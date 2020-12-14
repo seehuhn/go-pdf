@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -83,7 +84,7 @@ func TestExpectName(t *testing.T) {
 			if pos != newPos {
 				t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
 			}
-			if val != test.out {
+			if val != PDFName(test.out) {
 				t.Errorf("wrong value: expected %s, got %s", test.out, val)
 			}
 			if err != test.err {
@@ -97,7 +98,7 @@ func TestExpectName(t *testing.T) {
 	}
 }
 
-func TestSkipWhiteSpace(t *testing.T) {
+func TestExpectWhiteSpaceMaybe(t *testing.T) {
 	cases := []string{
 		"",
 		" ",
@@ -124,6 +125,51 @@ func TestSkipWhiteSpace(t *testing.T) {
 			}
 			if pos != int64(len(test)) {
 				t.Errorf("wrong position: expected %d, got %d", len(test), pos)
+			}
+		}
+	}
+}
+
+func TestExpectNumericOrReference(t *testing.T) {
+	cases := []struct {
+		in  string
+		pos int64
+		val PDFObject
+		err error
+	}{
+		{"", 0, nil, errMalformed},
+		{"12", 2, PDFInt(12), nil},
+		{"+12", 3, PDFInt(12), nil},
+		{"-12", 3, PDFInt(-12), nil},
+		{".5", 2, PDFReal(.5), nil},
+		{"+.5", 3, PDFReal(.5), nil},
+		{"-.5", 3, PDFReal(-.5), nil},
+		{".+5", 0, nil, errMalformed},
+		{"1 .+5 R", 1, PDFInt(1), nil},
+		{"1 2 R", 5, PDFReference{1, 2}, nil},
+	}
+
+	for _, test := range cases {
+		for _, suffix := range []string{"", " 0\n", " 0 S\n", " R"} {
+			buf := bytes.NewReader([]byte(test.in + suffix))
+			file, err := newFile(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pos, val, err := file.expectNumericOrReference(0)
+			if pos != test.pos {
+				t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
+			}
+			if !reflect.DeepEqual(val, test.val) {
+				t.Errorf("wrong value: expected %#v, got %#v", test.val, val)
+			}
+			if err != test.err {
+				if err != nil {
+					t.Errorf("unexpected error: %s", err.Error())
+				} else {
+					t.Errorf("missing error: %s", err)
+				}
 			}
 		}
 	}

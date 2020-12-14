@@ -15,6 +15,22 @@ func (b PDFBool) PDFWrite(w io.Writer) error {
 	panic("not implemented")
 }
 
+// PDFInt represents an integer constant in a PDF file.
+type PDFInt int64
+
+// PDFWrite implements the PDFObject interface
+func (b PDFInt) PDFWrite(w io.Writer) error {
+	panic("not implemented")
+}
+
+// PDFReal represents an real number in a PDF file.
+type PDFReal float64
+
+// PDFWrite implements the PDFObject interface
+func (b PDFReal) PDFWrite(w io.Writer) error {
+	panic("not implemented")
+}
+
 // PDFString represents a string constant in a PDF file.
 type PDFString string
 
@@ -44,5 +60,15 @@ type PDFDict map[PDFName]PDFObject
 
 // PDFWrite implements the PDFObject interface
 func (d PDFDict) PDFWrite(w io.Writer) error {
+	panic("not implemented")
+}
+
+// PDFReference represents an indirect object in a PDF file.
+type PDFReference struct {
+	no, gen int64
+}
+
+// PDFWrite implements the PDFObject interface
+func (d PDFReference) PDFWrite(w io.Writer) error {
 	panic("not implemented")
 }

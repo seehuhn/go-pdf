@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 )
 
 // File represents an open pdf file.
@@ -88,6 +89,7 @@ func (f *File) Get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
 }
 
 func (f *File) expect(pos int64, pattern string) (int64, error) {
+	// TODO(voss): change this to only match whole tokens?
 	end := pos + int64(len(pattern))
 	buf, err := f.Get(pos, end, true)
 	if err != nil {
@@ -97,6 +99,37 @@ func (f *File) expect(pos int64, pattern string) (int64, error) {
 		return end, nil
 	}
 	return pos, errMalformed
+}
+
+func (f *File) expectBytes(pos int64, cont func(byte) bool) (int64, error) {
+	blockSize := 32
+	var buf []byte
+	start := pos
+	used := 0
+gatherLoop:
+	for {
+		var err error
+		if used >= len(buf) {
+			start += int64(len(buf))
+			used = 0
+
+			buf, err = f.Get(start, start+int64(blockSize), true)
+			if err != nil {
+				return 0, err
+			} else if len(buf) == 0 {
+				// EOF reached
+				break gatherLoop
+			}
+		}
+		// now we have used < len(buf)
+
+		if !cont(buf[used]) {
+			break gatherLoop
+		}
+		used++
+	}
+
+	return start + int64(used), nil
 }
 
 func (f *File) expectEOL(pos int64) (int64, error) {
@@ -114,103 +147,120 @@ func (f *File) expectEOL(pos int64) (int64, error) {
 }
 
 func (f *File) expectWhiteSpaceMaybe(pos int64) (int64, error) {
-	blockSize := 16
-	var buf []byte
-	var err error
-	start := pos
-	used := 0
 	isComment := false
-	for {
-		if used >= len(buf) {
-			start += int64(len(buf))
-			buf, err = f.Get(start, start+int64(blockSize), true)
-			if err != nil {
-				return 0, err
-			} else if len(buf) == 0 {
-				// EOF reached
-				return start, nil
-			}
-			used = 0
-		}
-		// now we have used < len(buf)
-
+	return f.expectBytes(pos, func(c byte) bool {
 		if isComment {
-			if buf[used] == '\r' || buf[used] == '\n' {
+			if c == '\r' || c == '\n' {
 				isComment = false
 			}
 		} else {
-			if buf[used] == '%' {
+			if c == '%' {
 				isComment = true
-			} else if !isSpace[buf[used]] {
-				return start + int64(used), nil
+			} else if !isSpace[c] {
+				return false
 			}
 		}
-		used++
-	}
+		return true
+	})
 }
 
 func (f *File) expectInteger(pos int64) (int64, int64, error) {
-	buf, err := f.Get(pos, pos+24, true)
+	var res []byte
+	first := true
+	p2, err := f.expectBytes(pos, func(c byte) bool {
+		if first && (c == '+' || c == '-') {
+			res = append(res, c)
+		} else if c >= '0' && c <= '9' {
+			res = append(res, c)
+		} else {
+			return false
+		}
+		first = false
+		return true
+	})
 	if err != nil {
-		return pos, 0, err
+		return 0, 0, err
 	}
-	i := 0
-	n := len(buf)
 
-	negative := false
-	if i < n && (buf[i] == '-' || buf[i] == '+') {
-		negative = buf[i] == '-'
-		i++
-	}
-	start := i
-
-	var val int64
-	for i < n && buf[i] >= '0' && buf[i] <= '9' && i < start+18 {
-		val = 10*val + int64(buf[i]-'0')
-		i++
-	}
-	if i == start {
+	x, err := strconv.ParseInt(string(res), 10, 64)
+	if err != nil {
 		return pos, 0, errMalformed
 	}
-	if negative {
-		val = -val
-	}
-	return pos + int64(i), val, nil
+	return p2, x, nil
 }
 
 func (f *File) expectNumericOrReference(pos int64) (int64, PDFObject, error) {
-	panic("not implemented")
+	var res []byte
+	hasDot := false
+	first := true
+	p2, err := f.expectBytes(pos, func(c byte) bool {
+		if !hasDot && c == '.' {
+			hasDot = true
+			res = append(res, c)
+		} else if first && (c == '+' || c == '-') {
+			res = append(res, c)
+		} else if c >= '0' && c <= '9' {
+			res = append(res, c)
+		} else {
+			return false
+		}
+		first = false
+		return true
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if hasDot {
+		x, err := strconv.ParseFloat(string(res), 64)
+		if err != nil {
+			return pos, nil, errMalformed
+		}
+		return p2, PDFReal(x), nil
+	}
+
+	x1, err := strconv.ParseInt(string(res), 10, 64)
+	if err != nil {
+		return pos, nil, errMalformed
+	}
+
+	p3, err := f.expectWhiteSpaceMaybe(p2)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	p3, x2, err := f.expectInteger(p3)
+	if err == errMalformed {
+		return p2, PDFInt(x1), nil
+	} else if err != nil {
+		return 0, nil, err
+	}
+
+	p3, err = f.expectWhiteSpaceMaybe(p3)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	p3, err = f.expect(p3, "R")
+	if err == errMalformed {
+		return p2, PDFInt(x1), nil
+	} else if err != nil {
+		return 0, nil, err
+	}
+
+	return p3, PDFReference{x1, x2}, nil
 }
 
-func (f *File) expectName(pos int64) (int64, string, error) {
+func (f *File) expectName(pos int64) (int64, PDFName, error) {
 	pos, err := f.expect(pos, "/")
 	if err != nil {
 		return pos, "", err
 	}
 
-	blockSize := 32
-	var buf, res []byte
-	start := pos
-	used := 0
+	var res []byte
 	hex := 0
 	var hexByte byte
-gatherLoop:
-	for {
-		if used >= len(buf) {
-			start += int64(len(buf))
-			used = 0
-
-			buf, err = f.Get(start, start+int64(blockSize), true)
-			if err != nil {
-				return 0, "", err
-			} else if len(buf) == 0 {
-				// EOF reached
-				break gatherLoop
-			}
-		}
-		// now we have used < len(buf)
-
-		c := buf[used]
+	pos, err = f.expectBytes(pos, func(c byte) bool {
 		if hex > 0 {
 			var val byte
 			if c >= '0' && c <= '9' {
@@ -229,14 +279,17 @@ gatherLoop:
 			hexByte = 0
 			hex = 2
 		} else if isSpace[c] || isDelimiter[c] {
-			break gatherLoop
+			return false
 		} else {
 			res = append(res, c)
 		}
-		used++
+		return true
+	})
+	if err != nil {
+		return 0, "", err
 	}
 
-	return start + int64(used), string(res), nil
+	return pos, PDFName(res), nil
 }
 
 func (f *File) expectBool(pos int64) (int64, PDFBool, error) {
@@ -263,7 +316,7 @@ func (f *File) expectDict(pos int64) (int64, PDFDict, error) {
 			return 0, nil, err
 		}
 
-		var key string
+		var key PDFName
 		pos, key, err = f.expectName(pos)
 		if err == errMalformed {
 			break
@@ -282,7 +335,7 @@ func (f *File) expectDict(pos int64) (int64, PDFDict, error) {
 			return 0, nil, err
 		}
 
-		dict[PDFName(key)] = val
+		dict[key] = val
 	}
 	pos, err = f.expect(pos, ">>")
 	if err != nil {
@@ -323,6 +376,8 @@ func (f *File) expectObject(pos int64) (int64, PDFObject, error) {
 	switch {
 	case bytes.Equal(head, []byte("tr")), bytes.Equal(head, []byte("fa")):
 		return f.expectBool(pos)
+	case head[0] == '/':
+		return f.expectName(pos)
 	case bytes.Equal(head, []byte("<<")): // needs to come before string
 		return f.expectDictOrStream(pos)
 	case head[0] == '(', head[0] == '<':
