@@ -175,6 +175,75 @@ func TestExpectNumericOrReference(t *testing.T) {
 	}
 }
 
+func TestExpectQuotedString(t *testing.T) {
+	cases := []struct {
+		in  string
+		out string
+	}{
+		{`()`, ""},
+		{`(hello)`, "hello"},
+		{`(he(ll)o)`, "he(ll)o"},
+		{"(hello\n)", "hello\n"},
+		{"(hello\r)", "hello\n"},
+		{"(hello\r\n)", "hello\n"},
+		{"(hello\n\r)", "hello\n\n"},
+		{"(hell\\\no)", "hello"},
+		{`(h\145llo)`, "hello"},
+	}
+
+	for _, test := range cases {
+		buf := bytes.NewReader([]byte(test.in + " 1"))
+		file, err := newFile(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pos, val, err := file.expectQuotedString(0)
+		if pos != int64(len(test.in)) {
+			t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
+		}
+		if val != PDFString(test.out) {
+			t.Errorf("wrong value: expected %q, got %q", test.out, val)
+		}
+		if err != nil {
+			t.Errorf("unexpected error: %s", err.Error())
+		}
+	}
+}
+
+func TestExpectHexString(t *testing.T) {
+	cases := []struct {
+		in  string
+		out string
+	}{
+		{"<>", ""},
+		{"<68656c6c6f>", "hello"},
+		{"<68656C6C6F>", "hello"},
+		{"<68 65 6C 6C 6F>", "hello"},
+		{"<68656C70>", "help"},
+		{"<68656C7>", "help"},
+	}
+
+	for _, test := range cases {
+		buf := bytes.NewReader([]byte(test.in + " 1"))
+		file, err := newFile(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pos, val, err := file.expectHexString(0)
+		if pos != int64(len(test.in)) {
+			t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
+		}
+		if val != PDFString(test.out) {
+			t.Errorf("wrong value: expected %q, got %q", test.out, val)
+		}
+		if err != nil {
+			t.Errorf("unexpected error: %s", err.Error())
+		}
+	}
+}
+
 func TestFile(t *testing.T) {
 	fd, err := os.Open("PDF32000_2008.pdf")
 	if err != nil {

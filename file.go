@@ -137,10 +137,10 @@ func (f *File) expectEOL(pos int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if len(buf) == 0 || (buf[0] != 0x0D && buf[0] != 0x0A) {
+	if len(buf) == 0 || (buf[0] != '\r' && buf[0] != '\n') {
 		return 0, errMalformed
 	}
-	if len(buf) > 1 && buf[0] == 0x0D && buf[1] == 0x0A {
+	if len(buf) > 1 && buf[0] == '\r' && buf[1] == '\n' {
 		return pos + 2, nil
 	}
 	return pos + 1, nil
@@ -296,12 +296,159 @@ func (f *File) expectBool(pos int64) (int64, PDFBool, error) {
 	panic("not implemented")
 }
 
-func (f *File) expectString(pos int64) (int64, PDFString, error) {
-	panic("not implemented")
+func (f *File) expectQuotedString(pos int64) (int64, PDFString, error) {
+	pos, err := f.expect(pos, "(")
+	if err != nil {
+		return pos, "", err
+	}
+
+	var res []byte
+	parentCount := 0
+	escape := false
+	ignoreLF := false
+	isOctal := false
+	octalVal := byte(0)
+	pos, err = f.expectBytes(pos, func(c byte) bool {
+		if ignoreLF {
+			ignoreLF = false
+			if c == '\n' {
+				return true
+			}
+		}
+		if isOctal {
+			if c >= '0' && c <= '7' {
+				octalVal = octalVal*8 + (c - '0')
+				return true
+			}
+			res = append(res, octalVal)
+			isOctal = false
+		}
+		if escape {
+			escape = false
+			switch c {
+			case '\n':
+				return true
+			case '\r':
+				ignoreLF = true
+				return true
+			case 'n':
+				c = '\n'
+			case 'r':
+				c = '\r'
+			case 't':
+				c = '\t'
+			case 'b':
+				c = '\b'
+			case 'f':
+				c = '\f'
+			}
+			if c >= '0' && c <= '7' {
+				isOctal = true
+				octalVal = c - '0'
+				return true
+			}
+		} else if c == '\\' {
+			escape = true
+			return true
+		} else if c == '(' {
+			parentCount++
+		} else if c == ')' {
+			if parentCount > 0 {
+				parentCount--
+			} else {
+				return false
+			}
+		} else if c == '\r' {
+			c = '\n'
+			ignoreLF = true
+		}
+		res = append(res, c)
+		return true
+	})
+	if err != nil {
+		return pos, "", err
+	}
+
+	pos, err = f.expect(pos, ")")
+	if err != nil {
+		return pos, "", err
+	}
+	return pos, PDFString(res), nil
+}
+
+func (f *File) expectHexString(pos int64) (int64, PDFString, error) {
+	pos, err := f.expect(pos, "<")
+	if err != nil {
+		return pos, "", err
+	}
+
+	var res []byte
+	var hexVal byte
+	first := true
+	pos, err = f.expectBytes(pos, func(c byte) bool {
+		var d byte
+		if c >= '0' && c <= '9' {
+			d = c - '0'
+		} else if c >= 'A' && c <= 'F' {
+			d = c - 'A' + 10
+		} else if c >= 'a' && c <= 'f' {
+			d = c - 'a' + 10
+		} else if c == '>' {
+			return false
+		} else {
+			return true
+		}
+		if first {
+			hexVal = d
+		} else {
+			res = append(res, 16*hexVal+d)
+		}
+		first = !first
+		return true
+	})
+	if err != nil {
+		return pos, "", err
+	}
+	if !first {
+		res = append(res, 16*hexVal)
+	}
+
+	pos, err = f.expect(pos, ">")
+	if err != nil {
+		return pos, "", err
+	}
+	return pos, PDFString(res), nil
 }
 
 func (f *File) expectArray(pos int64) (int64, PDFArray, error) {
-	panic("not implemented")
+	pos, err := f.expect(pos, "[")
+	if err != nil {
+		return pos, nil, err
+	}
+
+	var array PDFArray
+	for {
+		pos, err = f.expectWhiteSpaceMaybe(pos)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		var obj PDFObject
+		pos, obj, err = f.expectObject(pos)
+		if err == errMalformed {
+			break
+		} else if err != nil {
+			return 0, nil, err
+		}
+
+		array = append(array, obj)
+	}
+
+	pos, err = f.expect(pos, "]")
+	if err != nil {
+		return pos, nil, err
+	}
+	return pos, array, nil
 }
 
 func (f *File) expectDict(pos int64) (int64, PDFDict, error) {
@@ -380,8 +527,10 @@ func (f *File) expectObject(pos int64) (int64, PDFObject, error) {
 		return f.expectName(pos)
 	case bytes.Equal(head, []byte("<<")): // needs to come before string
 		return f.expectDictOrStream(pos)
-	case head[0] == '(', head[0] == '<':
-		return f.expectString(pos)
+	case head[0] == '(':
+		return f.expectQuotedString(pos)
+	case head[0] == '<':
+		return f.expectHexString(pos)
 	case head[0] == '[':
 		return f.expectArray(pos)
 	case head[0] >= '0' && head[0] <= '9', head[0] == '+', head[0] == '-', head[0] == '.':
