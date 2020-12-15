@@ -8,6 +8,87 @@ import (
 	"testing"
 )
 
+func TestExpectWord(t *testing.T) {
+	cases := []struct {
+		in  string
+		err error
+	}{
+		{"", errMalformed},
+		{"tes", errMalformed},
+		{"test", nil},
+		{"teste", errMalformed},
+	}
+
+	for _, test := range cases {
+		for _, suffix := range []string{"", " tast\n"} {
+			buf := bytes.NewReader([]byte(test.in + suffix))
+			file, err := newFile(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pos, err := file.expectWord(0, "test")
+			target := int64(len(test.in))
+			if test.err == errMalformed {
+				target = 0
+			}
+			if pos != target {
+				t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
+			}
+			if err != test.err {
+				if test.err == nil {
+					t.Errorf("unexpected error: %s", err.Error())
+				} else {
+					t.Errorf("missing error: %s", test.err.Error())
+				}
+			}
+		}
+	}
+}
+
+func TestExpectBool(t *testing.T) {
+	cases := []struct {
+		in  string
+		val bool
+		err error
+	}{
+		{"true", true, nil},
+		{"false", false, nil},
+		{"truee", false, errMalformed},
+		{"fals", false, errMalformed},
+		{"", false, errMalformed},
+	}
+
+	for _, test := range cases {
+		for _, suffix := range []string{"", " 1\n"} {
+			buf := bytes.NewReader([]byte(test.in + suffix))
+			file, err := newFile(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pos, val, err := file.expectBool(0)
+			target := int64(len(test.in))
+			if test.err == errMalformed {
+				target = 0
+			}
+			if pos != target {
+				t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
+			}
+			if val != PDFBool(test.val) {
+				t.Errorf("wrong value: expected %t, got %t", test.val, val)
+			}
+			if err != test.err {
+				if test.err == nil {
+					t.Errorf("unexpected error: %s", err.Error())
+				} else {
+					t.Errorf("missing error: %s", test.err.Error())
+				}
+			}
+		}
+	}
+}
+
 func TestExpectInt(t *testing.T) {
 	cases := []struct {
 		in  string
@@ -42,7 +123,11 @@ func TestExpectInt(t *testing.T) {
 				t.Errorf("wrong value: expected %d, got %d", test.val, val)
 			}
 			if err != test.err {
-				t.Errorf("unexpected error: %s", err.Error())
+				if test.err == nil {
+					t.Errorf("unexpected error: %s", err.Error())
+				} else {
+					t.Errorf("missing error: %s", test.err.Error())
+				}
 			}
 		}
 	}

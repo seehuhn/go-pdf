@@ -89,16 +89,32 @@ func (f *File) Get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
 }
 
 func (f *File) expect(pos int64, pattern string) (int64, error) {
-	// TODO(voss): change this to only match whole tokens?
 	end := pos + int64(len(pattern))
 	buf, err := f.Get(pos, end, true)
 	if err != nil {
 		return 0, err
 	}
-	if bytes.Equal(buf, []byte(pattern)) {
-		return end, nil
+	if !bytes.Equal(buf, []byte(pattern)) {
+		return pos, errMalformed
 	}
-	return pos, errMalformed
+	return end, nil
+}
+
+func (f *File) expectWord(pos int64, word string) (int64, error) {
+	n := len(word)
+	end := pos + int64(n)
+	buf, err := f.Get(pos, end+1, true)
+	if err != nil {
+		return 0, err
+	}
+	if !bytes.HasPrefix(buf, []byte(word)) {
+		return pos, errMalformed
+	}
+	if len(buf) > n &&
+		(buf[n] >= 'A' && buf[n] <= 'Z' || buf[n] >= 'a' && buf[n] <= 'z') {
+		return pos, errMalformed
+	}
+	return end, nil
 }
 
 func (f *File) expectBytes(pos int64, cont func(byte) bool) (int64, error) {
@@ -162,6 +178,18 @@ func (f *File) expectWhiteSpaceMaybe(pos int64) (int64, error) {
 		}
 		return true
 	})
+}
+
+func (f *File) expectBool(pos int64) (int64, PDFBool, error) {
+	var res PDFBool
+	pos, err := f.expectWord(pos, "false")
+	if err == errMalformed {
+		pos, err = f.expectWord(pos, "true")
+		if err == nil {
+			res = PDFBool(true)
+		}
+	}
+	return pos, res, err
 }
 
 func (f *File) expectInteger(pos int64) (int64, int64, error) {
@@ -241,7 +269,7 @@ func (f *File) expectNumericOrReference(pos int64) (int64, PDFObject, error) {
 		return 0, nil, err
 	}
 
-	p3, err = f.expect(p3, "R")
+	p3, err = f.expectWord(p3, "R")
 	if err == errMalformed {
 		return p2, PDFInt(x1), nil
 	} else if err != nil {
@@ -290,10 +318,6 @@ func (f *File) expectName(pos int64) (int64, PDFName, error) {
 	}
 
 	return pos, PDFName(res), nil
-}
-
-func (f *File) expectBool(pos int64) (int64, PDFBool, error) {
-	panic("not implemented")
 }
 
 func (f *File) expectQuotedString(pos int64) (int64, PDFString, error) {
@@ -510,17 +534,41 @@ func (f *File) expectStream(pos int64) (int64, *PDFStream, error) {
 		return 0, nil, err
 	}
 
-	length, ok := dict[PDFName("Length")].(PDFInt)
-	if !ok {
+	p2, stream, err := f.expectStreamTail(p2, dict)
+	if err == errMalformed {
 		return pos, nil, errMalformed
+	} else if err != nil {
+		return 0, nil, err
 	}
+	stream.Ref = ref
 
 	p2, err = f.expectWhiteSpaceMaybe(p2)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	p2, err = f.expect(p2, "stream")
+	p2, err = f.expectWord(p2, "endobj")
+	if err == errMalformed {
+		return pos, nil, errMalformed
+	} else if err != nil {
+		return 0, nil, err
+	}
+
+	return p2, stream, nil
+}
+
+func (f *File) expectStreamTail(pos int64, dict PDFDict) (int64, *PDFStream, error) {
+	length, ok := dict[PDFName("Length")].(PDFInt)
+	if !ok {
+		return pos, nil, errMalformed
+	}
+
+	p2, err := f.expectWhiteSpaceMaybe(pos)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	p2, err = f.expectWord(p2, "stream")
 	if err == errMalformed {
 		return pos, nil, errMalformed
 	} else if err != nil {
@@ -532,7 +580,7 @@ func (f *File) expectStream(pos int64) (int64, *PDFStream, error) {
 		return 0, nil, err
 	}
 	if len(buf) >= 1 && buf[0] == '\n' {
-		p2 += 1
+		p2++
 	} else if len(buf) >= 2 && buf[0] == '\r' && buf[1] == '\n' {
 		p2 += 2
 	} else {
@@ -552,19 +600,7 @@ func (f *File) expectStream(pos int64) (int64, *PDFStream, error) {
 		return 0, nil, err
 	}
 
-	p2, err = f.expect(p2, "endstream")
-	if err == errMalformed {
-		return pos, nil, errMalformed
-	} else if err != nil {
-		return 0, nil, err
-	}
-
-	p2, err = f.expectWhiteSpaceMaybe(p2)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	p2, err = f.expect(p2, "endobj")
+	p2, err = f.expectWord(p2, "endstream")
 	if err == errMalformed {
 		return pos, nil, errMalformed
 	} else if err != nil {
@@ -575,7 +611,6 @@ func (f *File) expectStream(pos int64) (int64, *PDFStream, error) {
 		Dict:  dict,
 		Start: start,
 		End:   end,
-		Ref:   ref,
 	}
 	return p2, res, nil
 }
@@ -590,13 +625,15 @@ func (f *File) expectDictOrStream(pos int64) (int64, PDFObject, error) {
 	if err != nil {
 		return 0, nil, err
 	}
-	p2, err = f.expect(p2, "stream")
-	if err == errMalformed {
-		// just a dict, no stream
-		return pos, dict, nil
-	}
 
-	panic("not implemented")
+	p3, stream, err := f.expectStreamTail(p2, dict)
+	if err == errMalformed {
+		// just a dict, it seems ...
+		return pos, dict, nil
+	} else if err != nil {
+		return 0, nil, err
+	}
+	return p3, stream, err
 }
 
 func (f *File) expectObject(pos int64) (int64, PDFObject, error) {
@@ -613,7 +650,7 @@ func (f *File) expectObject(pos int64) (int64, PDFObject, error) {
 		return f.expectBool(pos)
 	case head[0] == '/':
 		return f.expectName(pos)
-	case bytes.Equal(head, []byte("<<")): // needs to come before string
+	case bytes.Equal(head, []byte("<<")): // this must come before hex strings
 		return f.expectDictOrStream(pos)
 	case head[0] == '(':
 		return f.expectQuotedString(pos)
@@ -651,7 +688,7 @@ func (f *File) expectObjectLabel(pos int64) (int64, *PDFReference, error) {
 		return 0, nil, err
 	}
 
-	p2, err = f.expect(p2, "obj")
+	p2, err = f.expectWord(p2, "obj")
 	if err == errMalformed {
 		return pos, nil, errMalformed
 	} else if err != nil {
@@ -662,7 +699,7 @@ func (f *File) expectObjectLabel(pos int64) (int64, *PDFReference, error) {
 }
 
 func (f *File) expectXRefAndTrailer(pos int64) (int64, error) {
-	pos, err := f.expect(pos, "xref")
+	pos, err := f.expectWord(pos, "xref")
 	if err == errMalformed {
 		pos, _, err := f.expectStream(pos)
 		return pos, err
@@ -713,7 +750,7 @@ func (f *File) expectXRefAndTrailer(pos int64) (int64, error) {
 }
 
 func (f *File) expectTrailer(pos int64) (int64, error) {
-	pos, err := f.expect(pos, "trailer")
+	pos, err := f.expectWord(pos, "trailer")
 	if err != nil {
 		return pos, err
 	}
@@ -734,7 +771,7 @@ func (f *File) findXRef() (int64, error) {
 		return 0, err
 	}
 
-	pos, err = f.expect(pos, "startxref")
+	pos, err = f.expectWord(pos, "startxref")
 	if err != nil {
 		return 0, err
 	}
