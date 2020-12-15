@@ -146,7 +146,7 @@ func TestExpectNumericOrReference(t *testing.T) {
 		{"-.5", 3, PDFReal(-.5), nil},
 		{".+5", 0, nil, errMalformed},
 		{"1 .+5 R", 1, PDFInt(1), nil},
-		{"1 2 R", 5, PDFReference{1, 2}, nil},
+		{"1 2 R", 5, &PDFReference{1, 2}, nil},
 	}
 
 	for _, test := range cases {
@@ -261,11 +261,7 @@ func TestFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pos, err = file.expectXRef(pos)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pos, err = file.expectTrailer(pos)
+	pos, err = file.expectXRefAndTrailer(pos)
 	if err != nil {
 		t.Fatal(err)
 	}

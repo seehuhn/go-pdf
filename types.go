@@ -63,12 +63,24 @@ func (d PDFDict) PDFWrite(w io.Writer) error {
 	panic("not implemented")
 }
 
+// PDFStream represent a stream object in a PDF file.
+type PDFStream struct {
+	Dict       PDFDict
+	Start, End int64
+	Ref        *PDFReference
+}
+
+// PDFWrite implements the PDFObject interface
+func (d *PDFStream) PDFWrite(w io.Writer) error {
+	panic("not implemented")
+}
+
 // PDFReference represents an indirect object in a PDF file.
 type PDFReference struct {
 	no, gen int64
 }
 
 // PDFWrite implements the PDFObject interface
-func (d PDFReference) PDFWrite(w io.Writer) error {
+func (d *PDFReference) PDFWrite(w io.Writer) error {
 	panic("not implemented")
 }
