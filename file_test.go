@@ -329,7 +329,7 @@ func TestExpectHexString(t *testing.T) {
 	}
 }
 
-func TestFile(t *testing.T) {
+func SestFile(t *testing.T) {
 	// fd, err := os.Open("PDF32000_2008.pdf")
 	fd, err := os.Open("example.pdf")
 	if err != nil {

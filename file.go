@@ -475,12 +475,12 @@ func (f *File) expectArray(pos int64) (int64, PDFArray, error) {
 	return pos, array, nil
 }
 
-func (f *File) expectDict(pos int64) (int64, PDFDict, error) {
+func (f *File) expectDict(pos int64) (int64, *PDFDict, error) {
 	pos, err := f.expect(pos, "<<")
 	if err != nil {
 		return pos, nil, err
 	}
-	dict := make(PDFDict)
+	dict := &PDFDict{Data: make(map[PDFName]PDFObject)}
 	for {
 		pos, err = f.expectWhiteSpaceMaybe(pos)
 		if err != nil {
@@ -506,7 +506,7 @@ func (f *File) expectDict(pos int64) (int64, PDFDict, error) {
 			return 0, nil, err
 		}
 
-		dict[key] = val
+		dict.Data[key] = val
 	}
 	pos, err = f.expect(pos, ">>")
 	if err != nil {
@@ -557,8 +557,8 @@ func (f *File) expectStream(pos int64) (int64, *PDFStream, error) {
 	return p2, stream, nil
 }
 
-func (f *File) expectStreamTail(pos int64, dict PDFDict) (int64, *PDFStream, error) {
-	length, ok := dict[PDFName("Length")].(PDFInt)
+func (f *File) expectStreamTail(pos int64, dict *PDFDict) (int64, *PDFStream, error) {
+	length, ok := dict.Data[PDFName("Length")].(PDFInt)
 	if !ok {
 		return pos, nil, errMalformed
 	}
@@ -829,4 +829,19 @@ var (
 		'/': true,
 		'%': true,
 	}
+)
+
+// PDFVersion represent the version of PDF standard used in a file.
+type PDFVersion int
+
+// Constants for the known PDF versions.
+const (
+	V1_0 PDFVersion = iota
+	V1_1
+	V1_2
+	V1_3
+	V1_4
+	V1_5
+	V1_6
+	V1_7
 )
