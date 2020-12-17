@@ -9,34 +9,36 @@ import (
 
 // Reader represents a pdf file opened for reading.
 type Reader struct {
-	Size int64
-	Pos  int64
+	size int64
+	pos  int64
+	r    io.ReaderAt
 
-	fd            io.ReaderAt
-	headerVersion int
+	HeaderVersion PDFVersion
+	Trailer       *PDFDict
 }
 
 // NewReader creates a new Reader object.
 func NewReader(data io.ReaderAt, size int64) (*Reader, error) {
-	file, err := newReader(data, size)
+	file := &Reader{
+		size: size,
+		r:    data,
+	}
+	err := file.checkHeader()
 	if err != nil {
 		return nil, err
 	}
-	err = file.checkHeader()
+
+	pos, err := file.findXRef()
 	if err != nil {
 		return nil, err
 	}
+	_, dict, err := file.expectXRefAndTrailer(pos)
+	if err != nil {
+		return nil, err
+	}
+	file.Trailer = dict
+
 	return file, nil
-}
-
-func newReader(data io.ReaderAt, size int64) (*Reader, error) {
-	return &Reader{
-		Size: size,
-		Pos:  0,
-
-		fd:            data,
-		headerVersion: -1,
-	}, nil
 }
 
 func (f *Reader) checkHeader() error {
@@ -51,37 +53,37 @@ func (f *Reader) checkHeader() error {
 	if val < 0 || val > 7 {
 		return errVersion
 	}
-	f.headerVersion = int(val)
+	f.HeaderVersion = PDFVersion(val)
 	return nil
 }
 
-// Get reads and returns a byte range from the file.
-func (f *Reader) Get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
-	if from < 0 || from > f.Size || to < from {
+// get reads and returns a byte range from the file.
+func (f *Reader) get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
+	if from < 0 || from > f.size || to < from {
 		return nil, errOutOfRange
 	}
-	if to > f.Size {
+	if to > f.size {
 		if shrinkIfNeeded {
-			to = f.Size
+			to = f.size
 		} else {
 			return nil, errOutOfRange
 		}
 	}
 	buf := make([]byte, to-from)
-	n, err := f.fd.ReadAt(buf, from)
+	n, err := f.r.ReadAt(buf, from)
 	if err == io.EOF && int64(n) == to-from {
 		err = nil
 	} else if err != nil {
-		f.Pos = -1
+		f.pos = -1
 		return nil, err
 	}
-	f.Pos = to
+	f.pos = to
 	return buf, nil
 }
 
 func (f *Reader) expect(pos int64, pattern string) (int64, error) {
 	end := pos + int64(len(pattern))
-	buf, err := f.Get(pos, end, true)
+	buf, err := f.get(pos, end, true)
 	if err != nil {
 		return 0, err
 	}
@@ -94,7 +96,7 @@ func (f *Reader) expect(pos int64, pattern string) (int64, error) {
 func (f *Reader) expectWord(pos int64, word string) (int64, error) {
 	n := len(word)
 	end := pos + int64(n)
-	buf, err := f.Get(pos, end+1, true)
+	buf, err := f.get(pos, end+1, true)
 	if err != nil {
 		return 0, err
 	}
@@ -120,7 +122,7 @@ gatherLoop:
 			start += int64(len(buf))
 			used = 0
 
-			buf, err = f.Get(start, start+int64(blockSize), true)
+			buf, err = f.get(start, start+int64(blockSize), true)
 			if err != nil {
 				return 0, err
 			} else if len(buf) == 0 {
@@ -140,7 +142,7 @@ gatherLoop:
 }
 
 func (f *Reader) expectEOL(pos int64) (int64, error) {
-	buf, err := f.Get(pos, pos+2, true)
+	buf, err := f.get(pos, pos+2, true)
 	if err != nil {
 		return 0, err
 	}
@@ -321,7 +323,7 @@ func (f *Reader) expectQuotedString(pos int64) (int64, PDFString, error) {
 	parentCount := 0
 	escape := false
 	ignoreLF := false
-	isOctal := false
+	isOctal := 0
 	octalVal := byte(0)
 	pos, err = f.expectBytes(pos, func(c byte) bool {
 		if ignoreLF {
@@ -330,13 +332,13 @@ func (f *Reader) expectQuotedString(pos int64) (int64, PDFString, error) {
 				return true
 			}
 		}
-		if isOctal {
-			if c >= '0' && c <= '7' {
-				octalVal = octalVal*8 + (c - '0')
-				return true
+		if isOctal > 0 {
+			octalVal = octalVal*8 + (c - '0')
+			isOctal--
+			if isOctal == 0 {
+				res = append(res, octalVal)
 			}
-			res = append(res, octalVal)
-			isOctal = false
+			return true
 		}
 		if escape {
 			escape = false
@@ -358,7 +360,7 @@ func (f *Reader) expectQuotedString(pos int64) (int64, PDFString, error) {
 				c = '\f'
 			}
 			if c >= '0' && c <= '7' {
-				isOctal = true
+				isOctal = 2
 				octalVal = c - '0'
 				return true
 			}
@@ -566,7 +568,7 @@ func (f *Reader) expectStreamTail(pos int64, dict *PDFDict) (int64, *PDFStream, 
 		return 0, nil, err
 	}
 
-	buf, err := f.Get(p2, p2+2, true)
+	buf, err := f.get(p2, p2+2, true)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -581,7 +583,7 @@ func (f *Reader) expectStreamTail(pos int64, dict *PDFDict) (int64, *PDFStream, 
 	start := p2
 
 	p2 += int64(length)
-	if p2 >= f.Size {
+	if p2 >= f.size {
 		return pos, nil, errMalformed
 	}
 	end := p2
@@ -600,7 +602,7 @@ func (f *Reader) expectStreamTail(pos int64, dict *PDFDict) (int64, *PDFStream, 
 
 	res := &PDFStream{
 		PDFDict: *dict,
-		R:       io.NewSectionReader(f.fd, start, end-start),
+		R:       io.NewSectionReader(f.r, start, end-start),
 	}
 	return p2, res, nil
 }
@@ -627,7 +629,7 @@ func (f *Reader) expectDictOrStream(pos int64) (int64, PDFObject, error) {
 }
 
 func (f *Reader) expectObject(pos int64) (int64, PDFObject, error) {
-	head, err := f.Get(pos, pos+2, true)
+	head, err := f.get(pos, pos+2, true)
 	if err != nil {
 		return 0, nil, err
 	} else if len(head) == 0 {
@@ -688,18 +690,18 @@ func (f *Reader) expectObjectLabel(pos int64) (int64, *PDFReference, error) {
 	return p2, &PDFReference{x, y}, nil
 }
 
-func (f *Reader) expectXRefAndTrailer(pos int64) (int64, error) {
+func (f *Reader) expectXRefAndTrailer(pos int64) (int64, *PDFDict, error) {
 	pos, err := f.expectWord(pos, "xref")
 	if err == errMalformed {
-		pos, _, err := f.expectStream(pos)
-		return pos, err
+		pos, stream, err := f.expectStream(pos)
+		return pos, &stream.PDFDict, err
 	} else if err != nil {
-		return pos, err
+		return pos, nil, err
 	}
 
 	pos, err = f.expectEOL(pos)
 	if err != nil {
-		return pos, err
+		return pos, nil, err
 	}
 
 	for {
@@ -709,12 +711,12 @@ func (f *Reader) expectXRefAndTrailer(pos int64) (int64, error) {
 		if err == errMalformed {
 			break
 		} else if err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 
 		pos, err = f.expect(pos, " ")
 		if err != nil {
-			return pos, err
+			return pos, nil, err
 		}
 
 		pos, length, err = f.expectInteger(pos)
@@ -724,44 +726,65 @@ func (f *Reader) expectXRefAndTrailer(pos int64) (int64, error) {
 
 		pos, err = f.expectEOL(pos)
 		if err != nil {
-			return pos, err
+			return pos, nil, err
 		}
 
 		fmt.Println("xref", start, length)
 		pos += 20 * length
+		// TODO(voss): read the xref information
 	}
 
-	pos, err = f.expectTrailer(pos)
+	pos, dict, err := f.expectTrailer(pos)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
-	return pos, nil
+	return pos, dict, nil
 }
 
-func (f *Reader) expectTrailer(pos int64) (int64, error) {
+func (f *Reader) expectTrailer(pos int64) (int64, *PDFDict, error) {
 	pos, err := f.expectWord(pos, "trailer")
 	if err != nil {
-		return pos, err
+		return pos, nil, err
 	}
 	pos, err = f.expectWhiteSpaceMaybe(pos)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	pos, _, err = f.expectDict(pos)
+	pos, dict, err := f.expectDict(pos)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	return pos, nil
+	return pos, dict, nil
 }
 
 func (f *Reader) findXRef() (int64, error) {
-	pos, err := f.findStartXRef()
-	if err != nil {
-		return 0, err
+	pos := int64(-1)
+	for sz := int64(32); sz <= 1024; sz *= 2 {
+		if sz > f.size {
+			sz = f.size
+		}
+
+		buf, err := f.get(f.size-sz, f.size, false)
+		if err != nil {
+			return 0, err
+		}
+
+		idx := bytes.LastIndex(buf, []byte("startxref"))
+		if idx >= 0 {
+			pos = f.size - sz + int64(idx)
+			break
+		}
+
+		if sz == f.size {
+			break
+		}
+	}
+	if pos < 0 {
+		return 0, errMalformed
 	}
 
-	pos, err = f.expectWord(pos, "startxref")
+	pos, err := f.expectWord(pos, "startxref")
 	if err != nil {
 		return 0, err
 	}
@@ -773,29 +796,6 @@ func (f *Reader) findXRef() (int64, error) {
 
 	_, val, err := f.expectInteger(pos)
 	return val, err
-}
-
-func (f *Reader) findStartXRef() (int64, error) {
-	for sz := int64(32); sz <= 1024; sz *= 2 {
-		if sz > f.Size {
-			sz = f.Size
-		}
-
-		buf, err := f.Get(f.Size-sz, f.Size, false)
-		if err != nil {
-			return 0, err
-		}
-
-		idx := bytes.LastIndex(buf, []byte("startxref"))
-		if idx >= 0 {
-			return f.Size - sz + int64(idx), nil
-		}
-
-		if sz == f.Size {
-			break
-		}
-	}
-	return 0, errMalformed
 }
 
 var (

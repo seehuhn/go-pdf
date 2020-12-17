@@ -8,6 +8,14 @@ import (
 	"testing"
 )
 
+func newReader(contents string) *Reader {
+	buf := bytes.NewReader([]byte(contents))
+	return &Reader{
+		size: buf.Size(),
+		r:    buf,
+	}
+}
+
 func TestExpectWord(t *testing.T) {
 	cases := []struct {
 		in  string
@@ -21,11 +29,7 @@ func TestExpectWord(t *testing.T) {
 
 	for _, test := range cases {
 		for _, suffix := range []string{"", " tast\n"} {
-			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newReader(buf, buf.Size())
-			if err != nil {
-				t.Fatal(err)
-			}
+			file := newReader(test.in + suffix)
 
 			pos, err := file.expectWord(0, "test")
 			target := int64(len(test.in))
@@ -61,11 +65,7 @@ func TestExpectBool(t *testing.T) {
 
 	for _, test := range cases {
 		for _, suffix := range []string{"", " 1\n"} {
-			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newReader(buf, buf.Size())
-			if err != nil {
-				t.Fatal(err)
-			}
+			file := newReader(test.in + suffix)
 
 			pos, val, err := file.expectBool(0)
 			target := int64(len(test.in))
@@ -109,11 +109,7 @@ func TestExpectInt(t *testing.T) {
 
 	for _, test := range cases {
 		for _, suffix := range []string{"", " 1\n"} {
-			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newReader(buf, buf.Size())
-			if err != nil {
-				t.Fatal(err)
-			}
+			file := newReader(test.in + suffix)
 
 			pos, val, err := file.expectInteger(0)
 			if pos != int64(len(test.in)) {
@@ -155,11 +151,7 @@ func TestExpectName(t *testing.T) {
 
 	for _, test := range cases {
 		for _, suffix := range []string{"", "(", " "} {
-			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newReader(buf, buf.Size())
-			if err != nil {
-				t.Fatal(err)
-			}
+			file := newReader(test.in + suffix)
 
 			pos, val, err := file.expectName(0)
 			newPos := int64(len(test.in))
@@ -198,11 +190,7 @@ func TestExpectWhiteSpaceMaybe(t *testing.T) {
 
 	for _, test := range cases {
 		for _, suffix := range []string{"", "x y\n"} {
-			buf := bytes.NewReader([]byte(test + suffix))
-			file, err := newReader(buf, buf.Size())
-			if err != nil {
-				t.Fatal(err)
-			}
+			file := newReader(test + suffix)
 
 			pos, err := file.expectWhiteSpaceMaybe(0)
 			if err != nil {
@@ -236,11 +224,7 @@ func TestExpectNumericOrReference(t *testing.T) {
 
 	for _, test := range cases {
 		for _, suffix := range []string{"", " 0\n", " 0 S\n", " R"} {
-			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newReader(buf, buf.Size())
-			if err != nil {
-				t.Fatal(err)
-			}
+			file := newReader(test.in + suffix)
 
 			pos, val, err := file.expectNumericOrReference(0)
 			if pos != test.pos {
@@ -274,14 +258,11 @@ func TestExpectQuotedString(t *testing.T) {
 		{"(hello\n\r)", "hello\n\n"},
 		{"(hell\\\no)", "hello"},
 		{`(h\145llo)`, "hello"},
+		{`(\0612)`, "12"},
 	}
 
 	for _, test := range cases {
-		buf := bytes.NewReader([]byte(test.in + " 1"))
-		file, err := newReader(buf, buf.Size())
-		if err != nil {
-			t.Fatal(err)
-		}
+		file := newReader(test.in + " 1")
 
 		pos, val, err := file.expectQuotedString(0)
 		if pos != int64(len(test.in)) {
@@ -310,11 +291,7 @@ func TestExpectHexString(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		buf := bytes.NewReader([]byte(test.in + " 1"))
-		file, err := newReader(buf, buf.Size())
-		if err != nil {
-			t.Fatal(err)
-		}
+		file := newReader(test.in + " 1")
 
 		pos, val, err := file.expectHexString(0)
 		if pos != int64(len(test.in)) {
@@ -329,7 +306,7 @@ func TestExpectHexString(t *testing.T) {
 	}
 }
 
-func SestFile(t *testing.T) {
+func TestFile(t *testing.T) {
 	// fd, err := os.Open("PDF32000_2008.pdf")
 	fd, err := os.Open("example.pdf")
 	if err != nil {
@@ -347,16 +324,7 @@ func SestFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pos, err := file.findXRef()
-	if err != nil {
-		t.Fatal(err)
-	}
-	pos, err = file.expectXRefAndTrailer(pos)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fmt.Println(file.Size - pos)
+	fmt.Println(file.Trailer)
 
 	t.Error("fish")
 }
