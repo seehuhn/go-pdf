@@ -1,16 +1,57 @@
 package pdflib
 
 import (
+	"bytes"
 	"os"
 	"testing"
 )
 
+func makeDict(args ...interface{}) *PDFDict {
+	res := &PDFDict{
+		Data: make(map[PDFName]PDFObject),
+	}
+	var name PDFName
+	for i, arg := range args {
+		if i%2 == 0 {
+			name = PDFName(arg.(string))
+		} else {
+			res.Data[name] = PDFObject(arg)
+		}
+	}
+	return res
+}
+
 func TestWrite(t *testing.T) {
+	contents := `BT
+/F1 24 Tf
+30 30 Td
+(Hello World) Tj
+ET
+`
+	buf := bytes.NewReader([]byte(contents))
+	contentNode := &PDFStream{
+		PDFDict: *makeDict(
+			"Length", PDFInt(buf.Size()),
+		),
+		R: buf,
+	}
+
+	font := makeDict(
+		"Type", PDFName("Font"),
+		"Subtype", PDFName("Type1"),
+		"BaseFont", PDFName("Helvetica"),
+		"Encoding", PDFName("MacRomanEncoding"))
+
+	resources := makeDict(
+		"Font", makeDict("F1", font))
+
 	page1 := &PDFDict{ // page 77
 		Data: map[PDFName]PDFObject{
-			"Type":     PDFName("Page"),
-			"CropBox":  PDFArray{PDFInt(0), PDFInt(0), PDFInt(595), PDFInt(842)},
-			"MediaBox": PDFArray{PDFInt(0), PDFInt(0), PDFReal(595.22), PDFInt(842)},
+			"Type":      PDFName("Page"),
+			"CropBox":   PDFArray{PDFInt(0), PDFInt(0), PDFInt(200), PDFInt(100)},
+			"MediaBox":  PDFArray{PDFInt(0), PDFInt(0), PDFInt(200), PDFInt(100)},
+			"Resources": resources,
+			"Contents":  contentNode,
 		},
 	}
 

@@ -22,7 +22,7 @@ func TestExpectWord(t *testing.T) {
 	for _, test := range cases {
 		for _, suffix := range []string{"", " tast\n"} {
 			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newFile(buf)
+			file, err := newReader(buf, buf.Size())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -62,7 +62,7 @@ func TestExpectBool(t *testing.T) {
 	for _, test := range cases {
 		for _, suffix := range []string{"", " 1\n"} {
 			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newFile(buf)
+			file, err := newReader(buf, buf.Size())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -110,7 +110,7 @@ func TestExpectInt(t *testing.T) {
 	for _, test := range cases {
 		for _, suffix := range []string{"", " 1\n"} {
 			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newFile(buf)
+			file, err := newReader(buf, buf.Size())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +156,7 @@ func TestExpectName(t *testing.T) {
 	for _, test := range cases {
 		for _, suffix := range []string{"", "(", " "} {
 			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newFile(buf)
+			file, err := newReader(buf, buf.Size())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -199,7 +199,7 @@ func TestExpectWhiteSpaceMaybe(t *testing.T) {
 	for _, test := range cases {
 		for _, suffix := range []string{"", "x y\n"} {
 			buf := bytes.NewReader([]byte(test + suffix))
-			file, err := newFile(buf)
+			file, err := newReader(buf, buf.Size())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -237,7 +237,7 @@ func TestExpectNumericOrReference(t *testing.T) {
 	for _, test := range cases {
 		for _, suffix := range []string{"", " 0\n", " 0 S\n", " R"} {
 			buf := bytes.NewReader([]byte(test.in + suffix))
-			file, err := newFile(buf)
+			file, err := newReader(buf, buf.Size())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -278,7 +278,7 @@ func TestExpectQuotedString(t *testing.T) {
 
 	for _, test := range cases {
 		buf := bytes.NewReader([]byte(test.in + " 1"))
-		file, err := newFile(buf)
+		file, err := newReader(buf, buf.Size())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -311,7 +311,7 @@ func TestExpectHexString(t *testing.T) {
 
 	for _, test := range cases {
 		buf := bytes.NewReader([]byte(test.in + " 1"))
-		file, err := newFile(buf)
+		file, err := newReader(buf, buf.Size())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -337,7 +337,12 @@ func SestFile(t *testing.T) {
 	}
 	defer fd.Close()
 
-	file, err := NewFile(fd)
+	fi, err := fd.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	file, err := NewReader(fd, fi.Size())
 	if err != nil {
 		t.Fatal(err)
 	}

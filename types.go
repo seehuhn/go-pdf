@@ -1,5 +1,7 @@
 package pdflib
 
+import "io"
+
 // PDFObject represents an object in a PDF file.
 type PDFObject interface{}
 
@@ -29,9 +31,8 @@ type PDFDict struct {
 
 // PDFStream represent a stream object in a PDF file.
 type PDFStream struct {
-	Dict       *PDFDict
-	Start, End int64
-	Ref        *PDFReference
+	PDFDict
+	R io.Reader
 }
 
 // PDFReference represents an indirect object in a PDF file.

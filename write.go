@@ -91,6 +91,25 @@ func (pdf *writer) WriteIndirect(obj PDFObject) error {
 		pdf.Writef("%d 0 obj\n", ref)
 		pdf.WriteDirect(obj, true)
 		pdf.WriteString("\nendobj\n")
+	case *PDFStream: // TODO(voss): any way to avoid duplications with PDFDict?
+		if obj.Ref != nil {
+			return nil
+		}
+		ref := pdf.nextRef
+		pdf.nextRef++
+		obj.Ref = &PDFReference{ref, 0}
+
+		for _, val := range obj.Data {
+			err := pdf.WriteIndirect(val)
+			if err != nil {
+				return err
+			}
+		}
+
+		pdf.xref[ref] = pdf.pos
+		pdf.Writef("%d 0 obj\n", ref)
+		pdf.WriteDirect(obj, true)
+		pdf.WriteString("\nendobj\n")
 	case PDFArray:
 		for _, val := range obj {
 			err := pdf.WriteIndirect(val)
@@ -141,6 +160,26 @@ func (pdf *writer) WriteDirect(obj PDFObject, forceInline bool) (PDFObject, erro
 				pdf.WriteDirect(val, false)
 			}
 			pdf.WriteString("\n>>")
+		}
+	case *PDFStream:
+		if ref := obj.Ref; ref != nil && !forceInline {
+			pdf.Writef("%d %d R", ref.no, ref.gen)
+		} else {
+			pdf.WriteString("<<")
+			for key, val := range obj.Data {
+				pdf.WriteString("\n")
+				pdf.WriteDirect(key, false)
+				pdf.WriteString(" ")
+				pdf.WriteDirect(val, false)
+			}
+			pdf.WriteString("\n>>\nstream\n")
+			// TODO(voss): check that the length is correct?
+			n, err := io.Copy(pdf.w, obj.R)
+			if err != nil {
+				return nil, err
+			}
+			pdf.pos += int64(n)
+			pdf.WriteString("\nendstream")
 		}
 	default:
 		panic("not implemented")

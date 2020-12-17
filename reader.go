@@ -7,18 +7,18 @@ import (
 	"strconv"
 )
 
-// File represents an open pdf file.
-type File struct {
+// Reader represents a pdf file opened for reading.
+type Reader struct {
 	Size int64
 	Pos  int64
 
-	fd            io.ReadSeeker
+	fd            io.ReaderAt
 	headerVersion int
 }
 
-// NewFile creates a new File object.
-func NewFile(data io.ReadSeeker) (*File, error) {
-	file, err := newFile(data)
+// NewReader creates a new Reader object.
+func NewReader(data io.ReaderAt, size int64) (*Reader, error) {
+	file, err := newReader(data, size)
 	if err != nil {
 		return nil, err
 	}
@@ -29,21 +29,17 @@ func NewFile(data io.ReadSeeker) (*File, error) {
 	return file, nil
 }
 
-func newFile(data io.ReadSeeker) (*File, error) {
-	pos, err := data.Seek(0, io.SeekEnd)
-	if err != nil {
-		return nil, err
-	}
-	return &File{
-		Size: pos,
-		Pos:  pos,
+func newReader(data io.ReaderAt, size int64) (*Reader, error) {
+	return &Reader{
+		Size: size,
+		Pos:  0,
 
 		fd:            data,
 		headerVersion: -1,
 	}, nil
 }
 
-func (f *File) checkHeader() error {
+func (f *Reader) checkHeader() error {
 	pos, err := f.expect(0, "%PDF-1.")
 	if err != nil {
 		return errMalformed
@@ -60,7 +56,7 @@ func (f *File) checkHeader() error {
 }
 
 // Get reads and returns a byte range from the file.
-func (f *File) Get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
+func (f *Reader) Get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
 	if from < 0 || from > f.Size || to < from {
 		return nil, errOutOfRange
 	}
@@ -71,16 +67,11 @@ func (f *File) Get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
 			return nil, errOutOfRange
 		}
 	}
-	if f.Pos != from {
-		_, err := f.fd.Seek(from, io.SeekStart)
-		if err != nil {
-			f.Pos = -1
-			return nil, err
-		}
-	}
 	buf := make([]byte, to-from)
-	_, err := io.ReadFull(f.fd, buf)
-	if err != nil {
+	n, err := f.fd.ReadAt(buf, from)
+	if err == io.EOF && int64(n) == to-from {
+		err = nil
+	} else if err != nil {
 		f.Pos = -1
 		return nil, err
 	}
@@ -88,7 +79,7 @@ func (f *File) Get(from, to int64, shrinkIfNeeded bool) ([]byte, error) {
 	return buf, nil
 }
 
-func (f *File) expect(pos int64, pattern string) (int64, error) {
+func (f *Reader) expect(pos int64, pattern string) (int64, error) {
 	end := pos + int64(len(pattern))
 	buf, err := f.Get(pos, end, true)
 	if err != nil {
@@ -100,7 +91,7 @@ func (f *File) expect(pos int64, pattern string) (int64, error) {
 	return end, nil
 }
 
-func (f *File) expectWord(pos int64, word string) (int64, error) {
+func (f *Reader) expectWord(pos int64, word string) (int64, error) {
 	n := len(word)
 	end := pos + int64(n)
 	buf, err := f.Get(pos, end+1, true)
@@ -117,7 +108,7 @@ func (f *File) expectWord(pos int64, word string) (int64, error) {
 	return end, nil
 }
 
-func (f *File) expectBytes(pos int64, cont func(byte) bool) (int64, error) {
+func (f *Reader) expectBytes(pos int64, cont func(byte) bool) (int64, error) {
 	blockSize := 32
 	var buf []byte
 	start := pos
@@ -148,7 +139,7 @@ gatherLoop:
 	return start + int64(used), nil
 }
 
-func (f *File) expectEOL(pos int64) (int64, error) {
+func (f *Reader) expectEOL(pos int64) (int64, error) {
 	buf, err := f.Get(pos, pos+2, true)
 	if err != nil {
 		return 0, err
@@ -162,7 +153,7 @@ func (f *File) expectEOL(pos int64) (int64, error) {
 	return pos + 1, nil
 }
 
-func (f *File) expectWhiteSpaceMaybe(pos int64) (int64, error) {
+func (f *Reader) expectWhiteSpaceMaybe(pos int64) (int64, error) {
 	isComment := false
 	return f.expectBytes(pos, func(c byte) bool {
 		if isComment {
@@ -180,7 +171,7 @@ func (f *File) expectWhiteSpaceMaybe(pos int64) (int64, error) {
 	})
 }
 
-func (f *File) expectBool(pos int64) (int64, PDFBool, error) {
+func (f *Reader) expectBool(pos int64) (int64, PDFBool, error) {
 	var res PDFBool
 	pos, err := f.expectWord(pos, "false")
 	if err == errMalformed {
@@ -192,7 +183,7 @@ func (f *File) expectBool(pos int64) (int64, PDFBool, error) {
 	return pos, res, err
 }
 
-func (f *File) expectInteger(pos int64) (int64, int64, error) {
+func (f *Reader) expectInteger(pos int64) (int64, int64, error) {
 	var res []byte
 	first := true
 	p2, err := f.expectBytes(pos, func(c byte) bool {
@@ -217,7 +208,7 @@ func (f *File) expectInteger(pos int64) (int64, int64, error) {
 	return p2, x, nil
 }
 
-func (f *File) expectNumericOrReference(pos int64) (int64, PDFObject, error) {
+func (f *Reader) expectNumericOrReference(pos int64) (int64, PDFObject, error) {
 	var res []byte
 	hasDot := false
 	first := true
@@ -279,7 +270,7 @@ func (f *File) expectNumericOrReference(pos int64) (int64, PDFObject, error) {
 	return p3, &PDFReference{x1, x2}, nil
 }
 
-func (f *File) expectName(pos int64) (int64, PDFName, error) {
+func (f *Reader) expectName(pos int64) (int64, PDFName, error) {
 	pos, err := f.expect(pos, "/")
 	if err != nil {
 		return pos, "", err
@@ -320,7 +311,7 @@ func (f *File) expectName(pos int64) (int64, PDFName, error) {
 	return pos, PDFName(res), nil
 }
 
-func (f *File) expectQuotedString(pos int64) (int64, PDFString, error) {
+func (f *Reader) expectQuotedString(pos int64) (int64, PDFString, error) {
 	pos, err := f.expect(pos, "(")
 	if err != nil {
 		return pos, "", err
@@ -400,7 +391,7 @@ func (f *File) expectQuotedString(pos int64) (int64, PDFString, error) {
 	return pos, PDFString(res), nil
 }
 
-func (f *File) expectHexString(pos int64) (int64, PDFString, error) {
+func (f *Reader) expectHexString(pos int64) (int64, PDFString, error) {
 	pos, err := f.expect(pos, "<")
 	if err != nil {
 		return pos, "", err
@@ -444,7 +435,7 @@ func (f *File) expectHexString(pos int64) (int64, PDFString, error) {
 	return pos, PDFString(res), nil
 }
 
-func (f *File) expectArray(pos int64) (int64, PDFArray, error) {
+func (f *Reader) expectArray(pos int64) (int64, PDFArray, error) {
 	pos, err := f.expect(pos, "[")
 	if err != nil {
 		return pos, nil, err
@@ -475,7 +466,7 @@ func (f *File) expectArray(pos int64) (int64, PDFArray, error) {
 	return pos, array, nil
 }
 
-func (f *File) expectDict(pos int64) (int64, *PDFDict, error) {
+func (f *Reader) expectDict(pos int64) (int64, *PDFDict, error) {
 	pos, err := f.expect(pos, "<<")
 	if err != nil {
 		return pos, nil, err
@@ -516,7 +507,7 @@ func (f *File) expectDict(pos int64) (int64, *PDFDict, error) {
 	return pos, dict, nil
 }
 
-func (f *File) expectStream(pos int64) (int64, *PDFStream, error) {
+func (f *Reader) expectStream(pos int64) (int64, *PDFStream, error) {
 	p2, ref, err := f.expectObjectLabel(pos)
 	if err != nil {
 		return p2, nil, err
@@ -557,7 +548,7 @@ func (f *File) expectStream(pos int64) (int64, *PDFStream, error) {
 	return p2, stream, nil
 }
 
-func (f *File) expectStreamTail(pos int64, dict *PDFDict) (int64, *PDFStream, error) {
+func (f *Reader) expectStreamTail(pos int64, dict *PDFDict) (int64, *PDFStream, error) {
 	length, ok := dict.Data[PDFName("Length")].(PDFInt)
 	if !ok {
 		return pos, nil, errMalformed
@@ -608,14 +599,13 @@ func (f *File) expectStreamTail(pos int64, dict *PDFDict) (int64, *PDFStream, er
 	}
 
 	res := &PDFStream{
-		Dict:  dict,
-		Start: start,
-		End:   end,
+		PDFDict: *dict,
+		R:       io.NewSectionReader(f.fd, start, end-start),
 	}
 	return p2, res, nil
 }
 
-func (f *File) expectDictOrStream(pos int64) (int64, PDFObject, error) {
+func (f *Reader) expectDictOrStream(pos int64) (int64, PDFObject, error) {
 	pos, dict, err := f.expectDict(pos)
 	if err != nil {
 		return pos, nil, err
@@ -636,7 +626,7 @@ func (f *File) expectDictOrStream(pos int64) (int64, PDFObject, error) {
 	return p3, stream, err
 }
 
-func (f *File) expectObject(pos int64) (int64, PDFObject, error) {
+func (f *Reader) expectObject(pos int64) (int64, PDFObject, error) {
 	head, err := f.Get(pos, pos+2, true)
 	if err != nil {
 		return 0, nil, err
@@ -665,7 +655,7 @@ func (f *File) expectObject(pos int64) (int64, PDFObject, error) {
 }
 
 // read expressions like "12 0 obj"
-func (f *File) expectObjectLabel(pos int64) (int64, *PDFReference, error) {
+func (f *Reader) expectObjectLabel(pos int64) (int64, *PDFReference, error) {
 	p2, x, err := f.expectInteger(pos)
 	if err != nil {
 		return p2, nil, err
@@ -698,7 +688,7 @@ func (f *File) expectObjectLabel(pos int64) (int64, *PDFReference, error) {
 	return p2, &PDFReference{x, y}, nil
 }
 
-func (f *File) expectXRefAndTrailer(pos int64) (int64, error) {
+func (f *Reader) expectXRefAndTrailer(pos int64) (int64, error) {
 	pos, err := f.expectWord(pos, "xref")
 	if err == errMalformed {
 		pos, _, err := f.expectStream(pos)
@@ -749,7 +739,7 @@ func (f *File) expectXRefAndTrailer(pos int64) (int64, error) {
 	return pos, nil
 }
 
-func (f *File) expectTrailer(pos int64) (int64, error) {
+func (f *Reader) expectTrailer(pos int64) (int64, error) {
 	pos, err := f.expectWord(pos, "trailer")
 	if err != nil {
 		return pos, err
@@ -765,7 +755,7 @@ func (f *File) expectTrailer(pos int64) (int64, error) {
 	return pos, nil
 }
 
-func (f *File) findXRef() (int64, error) {
+func (f *Reader) findXRef() (int64, error) {
 	pos, err := f.findStartXRef()
 	if err != nil {
 		return 0, err
@@ -785,7 +775,7 @@ func (f *File) findXRef() (int64, error) {
 	return val, err
 }
 
-func (f *File) findStartXRef() (int64, error) {
+func (f *Reader) findStartXRef() (int64, error) {
 	for sz := int64(32); sz <= 1024; sz *= 2 {
 		if sz > f.Size {
 			sz = f.Size
