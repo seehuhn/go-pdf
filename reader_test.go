@@ -75,7 +75,7 @@ func TestExpectBool(t *testing.T) {
 			if pos != target {
 				t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
 			}
-			if val != PDFBool(test.val) {
+			if val != Bool(test.val) {
 				t.Errorf("wrong value: expected %t, got %t", test.val, val)
 			}
 			if err != test.err {
@@ -161,7 +161,7 @@ func TestExpectName(t *testing.T) {
 			if pos != newPos {
 				t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
 			}
-			if val != PDFName(test.out) {
+			if val != Name(test.out) {
 				t.Errorf("wrong value: expected %s, got %s", test.out, val)
 			}
 			if err != test.err {
@@ -207,19 +207,19 @@ func TestExpectNumericOrReference(t *testing.T) {
 	cases := []struct {
 		in  string
 		pos int64
-		val PDFObject
+		val Object
 		err error
 	}{
 		{"", 0, nil, errMalformed},
-		{"12", 2, PDFInt(12), nil},
-		{"+12", 3, PDFInt(12), nil},
-		{"-12", 3, PDFInt(-12), nil},
-		{".5", 2, PDFReal(.5), nil},
-		{"+.5", 3, PDFReal(.5), nil},
-		{"-.5", 3, PDFReal(-.5), nil},
+		{"12", 2, Integer(12), nil},
+		{"+12", 3, Integer(12), nil},
+		{"-12", 3, Integer(-12), nil},
+		{".5", 2, Real(.5), nil},
+		{"+.5", 3, Real(.5), nil},
+		{"-.5", 3, Real(-.5), nil},
 		{".+5", 0, nil, errMalformed},
-		{"1 .+5 R", 1, PDFInt(1), nil},
-		{"1 2 R", 5, &PDFReference{1, 2}, nil},
+		{"1 .+5 R", 1, Integer(1), nil},
+		{"1 2 R", 5, &Reference{1, 2}, nil},
 	}
 
 	for _, test := range cases {
@@ -268,7 +268,7 @@ func TestExpectQuotedString(t *testing.T) {
 		if pos != int64(len(test.in)) {
 			t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
 		}
-		if val != PDFString(test.out) {
+		if val != String(test.out) {
 			t.Errorf("wrong value: expected %q, got %q", test.out, val)
 		}
 		if err != nil {
@@ -297,7 +297,7 @@ func TestExpectHexString(t *testing.T) {
 		if pos != int64(len(test.in)) {
 			t.Errorf("wrong position: expected %d, got %d", len(test.in), pos)
 		}
-		if val != PDFString(test.out) {
+		if val != String(test.out) {
 			t.Errorf("wrong value: expected %q, got %q", test.out, val)
 		}
 		if err != nil {
@@ -324,7 +324,7 @@ func TestFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(file.Trailer)
+	fmt.Println(string(file.Trailer.PDF()))
 
 	t.Error("fish")
 }

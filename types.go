@@ -1,42 +1,66 @@
 package pdflib
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sort"
-	"strings"
+	"strconv"
 )
 
-// PDFObject represents an object in a PDF file.
-type PDFObject interface{}
+// Object represents an object in a PDF file.
+type Object interface {
+	PDF() []byte
+}
 
-// PDFBool represents a boolean value in a PDF file.
-type PDFBool bool
+// Bool represents a boolean value in a PDF file.
+type Bool bool
 
-// PDFInt represents an integer constant in a PDF file.
-type PDFInt int64
+// PDF implements the Object interface
+func (x Bool) PDF() []byte {
+	if x {
+		return []byte("true")
+	}
+	return []byte("false")
+}
 
-// PDFReal represents an real number in a PDF file.
-type PDFReal float64
+// Integer represents an integer constant in a PDF file.
+type Integer int64
 
-// PDFString represents a string constant in a PDF file.
-type PDFString string
+// PDF implements the Object interface
+func (x Integer) PDF() []byte {
+	return []byte(strconv.FormatInt(int64(x), 10))
+}
 
-func (s PDFString) String() string {
-	l := []byte(s)
+// Real represents an real number in a PDF file.
+type Real float64
+
+// PDF implements the Object interface
+func (x Real) PDF() []byte {
+	return []byte(strconv.FormatFloat(float64(x), 'f', -1, 64))
+}
+
+// String represents a string constant in a PDF file.
+type String string
+
+// PDF implements the Object interface
+func (x String) PDF() []byte {
+	l := []byte(x)
 
 	var funny []int
 	for i, c := range l {
-		if c == '\r' || c == '\n' {
+		if c == '\r' || c == '\n' || c == '\t' {
 			continue
 		}
-		if c < 32 || c >= 80 || c == '(' || c == ')' || c == '\\' {
+		if c < 32 || c >= 79 || c == '(' || c == ')' || c == '\\' {
 			funny = append(funny, i)
 		}
 	}
-	n := len(s)
+	n := len(l)
 
-	buf := &strings.Builder{}
+	// TODO(voss): don't escape brackets if they are balanced
+
+	buf := &bytes.Buffer{}
 	if n+2*len(funny) < 2*n {
 		buf.WriteString("(")
 		pos := 0
@@ -46,8 +70,6 @@ func (s PDFString) String() string {
 			}
 			c := l[i]
 			switch c {
-			case '\t':
-				buf.WriteString(`\t`)
 			case '\b':
 				buf.WriteString(`\b`)
 			case '\f':
@@ -71,47 +93,141 @@ func (s PDFString) String() string {
 		fmt.Fprintf(buf, "<%02x>", l)
 	}
 
-	return buf.String()
+	return buf.Bytes()
 }
 
-// PDFName represents a name in a PDF file.
-type PDFName string
+// Name represents a name in a PDF file.
+type Name string
 
-// PDFArray represent an array in a PDF file.
-type PDFArray []PDFObject
+// PDF implements the Object interface
+func (x Name) PDF() []byte {
+	l := []byte(x)
 
-// PDFDict represent a Dictionary object in a PDF file.
-type PDFDict struct {
-	Data map[PDFName]PDFObject
-	Ref  *PDFReference
+	var funny []int
+	for i, c := range l {
+		if isSpace[c] || isDelimiter[c] || c < 0x21 || c > 0x7e {
+			funny = append(funny, i)
+		}
+	}
+	n := len(l)
+
+	buf := &bytes.Buffer{}
+	buf.WriteString("/")
+	pos := 0
+	for _, i := range funny {
+		if pos < i {
+			buf.Write(l[pos:i])
+		}
+		c := l[i]
+		fmt.Fprintf(buf, "#%02x", c)
+		pos = i + 1
+	}
+	if pos < n {
+		buf.Write(l[pos:n])
+	}
+
+	return buf.Bytes()
 }
 
-func (d *PDFDict) String() string {
+// Array represent an array in a PDF file.
+type Array []Object
+
+// PDF implements the Object interface
+func (x Array) PDF() []byte {
+	buf := &bytes.Buffer{}
+	buf.WriteByte('[')
+	for i, val := range x {
+		if i > 0 {
+			buf.WriteByte(' ') // TODO(voss): use '\n' here?
+		}
+		buf.Write(val.PDF())
+	}
+	buf.WriteByte(']')
+	return buf.Bytes()
+}
+
+// Dict represent a Dictionary object in a PDF file.
+type Dict struct {
+	Data map[Name]Object
+	Ref  *Reference
+}
+
+// PDF implements the Object interface
+func (x *Dict) PDF() []byte {
 	var keys []string
-	for key := range d.Data {
+	for key := range x.Data {
 		keys = append(keys, string(key))
 	}
 	sort.Strings(keys)
 
-	buf := &strings.Builder{}
+	buf := &bytes.Buffer{}
 	buf.WriteString("<<")
 	for _, key := range keys {
+		name := Name(key)
 		buf.WriteString("\n")
-		buf.WriteString(key)
+		buf.Write(name.PDF())
 		buf.WriteString(" ")
-		fmt.Fprint(buf, d.Data[PDFName(key)])
+		buf.Write(x.Data[name].PDF())
 	}
 	buf.WriteString("\n>>")
-	return buf.String()
+	return buf.Bytes()
 }
 
-// PDFStream represent a stream object in a PDF file.
-type PDFStream struct {
-	PDFDict
+// Stream represent a stream object in a PDF file.
+type Stream struct {
+	Dict
 	R io.Reader
 }
 
-// PDFReference represents an indirect object in a PDF file.
-type PDFReference struct {
-	no, gen int64
+// PDF implements the Object interface
+func (x *Stream) PDF() []byte {
+	buf := &bytes.Buffer{}
+	buf.Write(x.Dict.PDF())
+	buf.WriteString("\nstream\n")
+	io.Copy(buf, x.R)
+	buf.WriteString("\nendstream")
+	return buf.Bytes()
+}
+
+// Decode returns a reader for the decoded stream data.
+func (x *Stream) Decode() io.Reader {
+	r := x.R
+	filter := x.Dict.Data["Filter"]
+	param := x.Dict.Data["DecodeParms"]
+	switch f := filter.(type) {
+	case nil:
+		// pass
+	case Array:
+		pa, ok := param.(Array)
+		if len(pa) != len(f) {
+			ok = false
+		}
+		for i, name := range f {
+			var pi Object
+			if ok {
+				pi = pa[i]
+			}
+			r = applyFilter(r, name, pi)
+		}
+	default:
+		r = applyFilter(r, f, param)
+	}
+	return r
+}
+
+// Reference represents an indirect object in a PDF file.
+type Reference struct {
+	no, gen int64 // TODO(voss): use int and uint16
+}
+
+// PDF implements the Object interface
+func (x *Reference) PDF() []byte {
+	return []byte(fmt.Sprintf("%d %d R", x.no, x.gen))
+}
+
+func format(x Object) string {
+	if x == nil {
+		return "null"
+	}
+	return string(x.PDF())
 }

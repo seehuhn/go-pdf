@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-func makeDict(args ...interface{}) *PDFDict {
-	res := &PDFDict{
-		Data: make(map[PDFName]PDFObject),
+func makeDict(args ...interface{}) *Dict {
+	res := &Dict{
+		Data: make(map[Name]Object),
 	}
-	var name PDFName
+	var name Name
 	for i, arg := range args {
 		if i%2 == 0 {
-			name = PDFName(arg.(string))
+			name = Name(arg.(string))
 		} else {
-			res.Data[name] = PDFObject(arg)
+			res.Data[name] = Object(arg.(Object))
 		}
 	}
 	return res
@@ -29,53 +29,53 @@ func TestWrite(t *testing.T) {
 ET
 `
 	buf := bytes.NewReader([]byte(contents))
-	contentNode := &PDFStream{
-		PDFDict: *makeDict(
-			"Length", PDFInt(buf.Size()),
+	contentNode := &Stream{
+		Dict: *makeDict(
+			"Length", Integer(buf.Size()),
 		),
 		R: buf,
 	}
 
 	font := makeDict(
-		"Type", PDFName("Font"),
-		"Subtype", PDFName("Type1"),
-		"BaseFont", PDFName("Helvetica"),
-		"Encoding", PDFName("MacRomanEncoding"))
+		"Type", Name("Font"),
+		"Subtype", Name("Type1"),
+		"BaseFont", Name("Helvetica"),
+		"Encoding", Name("MacRomanEncoding"))
 
 	resources := makeDict(
 		"Font", makeDict("F1", font))
 
-	page1 := &PDFDict{ // page 77
-		Data: map[PDFName]PDFObject{
-			"Type":      PDFName("Page"),
-			"CropBox":   PDFArray{PDFInt(0), PDFInt(0), PDFInt(200), PDFInt(100)},
-			"MediaBox":  PDFArray{PDFInt(0), PDFInt(0), PDFInt(200), PDFInt(100)},
+	page1 := &Dict{ // page 77
+		Data: map[Name]Object{
+			"Type":      Name("Page"),
+			"CropBox":   Array{Integer(0), Integer(0), Integer(200), Integer(100)},
+			"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
 			"Resources": resources,
 			"Contents":  contentNode,
 		},
 	}
 
-	pages := &PDFDict{ // page 76
-		Data: map[PDFName]PDFObject{
-			"Type":  PDFName("Pages"),
-			"Kids":  PDFArray{page1},
-			"Count": PDFInt(1),
+	pages := &Dict{ // page 76
+		Data: map[Name]Object{
+			"Type":  Name("Pages"),
+			"Kids":  Array{page1},
+			"Count": Integer(1),
 		},
 	}
 	page1.Data["Parent"] = pages
 
-	catalog := &PDFDict{ // page 73
-		Data: map[PDFName]PDFObject{
-			"Type":  PDFName("Catalog"),
+	catalog := &Dict{ // page 73
+		Data: map[Name]Object{
+			"Type":  Name("Catalog"),
 			"Pages": pages,
 		},
 	}
-	info := &PDFDict{ // page 550
-		Data: map[PDFName]PDFObject{
-			"Title":    PDFString("PDF Test Document"),
-			"Author":   PDFString("Jochen Voss"),
-			"Subject":  PDFString("Testing"),
-			"Keywords": PDFString("PDF, testing, Go"),
+	info := &Dict{ // page 550
+		Data: map[Name]Object{
+			"Title":    String("PDF Test Document"),
+			"Author":   String("Jochen Voss"),
+			"Subject":  String("Testing"),
+			"Keywords": String("PDF, testing, Go"),
 		},
 	}
 

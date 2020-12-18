@@ -6,9 +6,9 @@ import (
 )
 
 // Write serialises a PDF tree and writes it to w.
-func Write(w io.Writer, catalog, info PDFObject, ver PDFVersion) error {
+func Write(w io.Writer, catalog, info Object, ver PDFVersion) error {
 	pdf := &writer{
-		w:       w,
+		w:       w, // TODO(voss): use a wrapper which updates pos
 		nextRef: 1,
 		xref:    make(map[int64]int64),
 	}
@@ -36,10 +36,10 @@ func Write(w io.Writer, catalog, info PDFObject, ver PDFVersion) error {
 	}
 
 	pdf.WriteString("trailer\n")
-	pdf.WriteDirect(&PDFDict{
-		Data: map[PDFName]PDFObject{
-			"Type": PDFName("XRef"),
-			"Size": PDFInt(pdf.nextRef),
+	pdf.WriteDirect(&Dict{
+		Data: map[Name]Object{
+			"Type": Name("XRef"),
+			"Size": Integer(pdf.nextRef),
 			"Info": info,
 			"Root": catalog,
 		},
@@ -70,15 +70,15 @@ func (pdf *writer) Writef(format string, args ...interface{}) error {
 	return pdf.WriteString(s)
 }
 
-func (pdf *writer) WriteIndirect(obj PDFObject) error {
+func (pdf *writer) WriteIndirect(obj Object) error {
 	switch obj := obj.(type) {
-	case *PDFDict:
+	case *Dict:
 		if obj.Ref != nil {
 			return nil
 		}
 		ref := pdf.nextRef
 		pdf.nextRef++
-		obj.Ref = &PDFReference{ref, 0}
+		obj.Ref = &Reference{ref, 0}
 
 		for _, val := range obj.Data {
 			err := pdf.WriteIndirect(val)
@@ -91,13 +91,13 @@ func (pdf *writer) WriteIndirect(obj PDFObject) error {
 		pdf.Writef("%d 0 obj\n", ref)
 		pdf.WriteDirect(obj, true)
 		pdf.WriteString("\nendobj\n")
-	case *PDFStream: // TODO(voss): any way to avoid duplications with PDFDict?
+	case *Stream: // TODO(voss): any way to avoid duplications with PDFDict?
 		if obj.Ref != nil {
 			return nil
 		}
 		ref := pdf.nextRef
 		pdf.nextRef++
-		obj.Ref = &PDFReference{ref, 0}
+		obj.Ref = &Reference{ref, 0}
 
 		for _, val := range obj.Data {
 			err := pdf.WriteIndirect(val)
@@ -110,7 +110,7 @@ func (pdf *writer) WriteIndirect(obj PDFObject) error {
 		pdf.Writef("%d 0 obj\n", ref)
 		pdf.WriteDirect(obj, true)
 		pdf.WriteString("\nendobj\n")
-	case PDFArray:
+	case Array:
 		for _, val := range obj {
 			err := pdf.WriteIndirect(val)
 			if err != nil {
@@ -121,25 +121,26 @@ func (pdf *writer) WriteIndirect(obj PDFObject) error {
 	return nil
 }
 
-func (pdf *writer) WriteDirect(obj PDFObject, forceInline bool) (PDFObject, error) {
+func (pdf *writer) WriteDirect(obj Object, forceInline bool) (Object, error) {
+	// TODO(voss): use the .PDF() methods
 	switch obj := obj.(type) {
 	case nil:
 		pdf.WriteString("null")
-	case PDFBool:
+	case Bool:
 		if obj {
 			pdf.WriteString("true")
 		} else {
 			pdf.WriteString("false")
 		}
-	case PDFInt:
+	case Integer:
 		pdf.Writef("%d", obj)
-	case PDFReal:
+	case Real:
 		pdf.Writef("%f", obj) // TODO(voss): follow the spec here
-	case PDFString:
+	case String:
 		pdf.Writef("(%s)", obj) // TODO(voss): implement this
-	case PDFName:
+	case Name:
 		pdf.Writef("/%s", obj) // TODO(voss): implement this
-	case PDFArray:
+	case Array:
 		pdf.WriteString("[")
 		for i, val := range obj {
 			if i > 0 {
@@ -148,7 +149,7 @@ func (pdf *writer) WriteDirect(obj PDFObject, forceInline bool) (PDFObject, erro
 			pdf.WriteDirect(val, false)
 		}
 		pdf.WriteString("]")
-	case *PDFDict:
+	case *Dict:
 		if ref := obj.Ref; ref != nil && !forceInline {
 			pdf.Writef("%d %d R", ref.no, ref.gen)
 		} else {
@@ -161,7 +162,7 @@ func (pdf *writer) WriteDirect(obj PDFObject, forceInline bool) (PDFObject, erro
 			}
 			pdf.WriteString("\n>>")
 		}
-	case *PDFStream:
+	case *Stream:
 		if ref := obj.Ref; ref != nil && !forceInline {
 			pdf.Writef("%d %d R", ref.no, ref.gen)
 		} else {
