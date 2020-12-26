@@ -151,7 +151,7 @@ func (pdf *writer) WriteDirect(obj Object, forceInline bool) (Object, error) {
 		pdf.WriteString("]")
 	case *Dict:
 		if ref := obj.Ref; ref != nil && !forceInline {
-			pdf.Writef("%d %d R", ref.no, ref.gen)
+			pdf.Writef("%d %d R", ref.Index, ref.Generation)
 		} else {
 			pdf.WriteString("<<")
 			for key, val := range obj.Data {
@@ -164,7 +164,7 @@ func (pdf *writer) WriteDirect(obj Object, forceInline bool) (Object, error) {
 		}
 	case *Stream:
 		if ref := obj.Ref; ref != nil && !forceInline {
-			pdf.Writef("%d %d R", ref.no, ref.gen)
+			pdf.Writef("%d %d R", ref.Index, ref.Generation)
 		} else {
 			pdf.WriteString("<<")
 			for key, val := range obj.Data {

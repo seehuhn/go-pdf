@@ -52,7 +52,7 @@ func (x String) PDF() []byte {
 		if c == '\r' || c == '\n' || c == '\t' {
 			continue
 		}
-		if c < 32 || c >= 79 || c == '(' || c == ')' || c == '\\' {
+		if c < 32 || c >= 127 || c == '(' || c == ')' || c == '\\' {
 			funny = append(funny, i)
 		}
 	}
@@ -61,7 +61,7 @@ func (x String) PDF() []byte {
 	// TODO(voss): don't escape brackets if they are balanced
 
 	buf := &bytes.Buffer{}
-	if n+2*len(funny) < 2*n {
+	if n+2*len(funny) <= 2*n {
 		buf.WriteString("(")
 		pos := 0
 		for _, i := range funny {
@@ -217,12 +217,13 @@ func (x *Stream) Decode() io.Reader {
 
 // Reference represents an indirect object in a PDF file.
 type Reference struct {
-	no, gen int64 // TODO(voss): use int and uint16
+	Index      int64 // TODO(voss): use int and uint16
+	Generation uint16
 }
 
 // PDF implements the Object interface
 func (x *Reference) PDF() []byte {
-	return []byte(fmt.Sprintf("%d %d R", x.no, x.gen))
+	return []byte(fmt.Sprintf("%d %d R", x.Index, x.Generation))
 }
 
 func format(x Object) string {

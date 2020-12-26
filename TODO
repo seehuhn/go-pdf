@@ -1,2 +1,4 @@
-- look at rsc.io/pdf
+- rename the package from pdflib to pdf, or make the
+  current code a sub-package called .../pdf
+- look at https://pkg.go.dev/rsc.io/pdf
 - add the error handling in write.go

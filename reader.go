@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strconv"
 )
 
@@ -48,7 +49,7 @@ func NewReader(data io.ReaderAt, size int64) (*Reader, error) {
 		}
 		Pos, ok := prev.(Integer)
 		if !ok || Pos <= 0 {
-			return nil, errMalformed
+			return nil, &MalformedFileError{}
 		}
 		dict, err = file.readXRefAndTrailer(int64(Pos))
 		if err != nil {
@@ -64,11 +65,11 @@ func NewReader(data io.ReaderAt, size int64) (*Reader, error) {
 func (f *Reader) checkHeader() error {
 	pos, err := f.expect(0, "%PDF-1.")
 	if err != nil {
-		return errMalformed
+		return &MalformedFileError{}
 	}
 	_, val, err := f.expectInteger(pos)
 	if err != nil {
-		return errMalformed
+		return &MalformedFileError{}
 	}
 	if val < 0 || val > 7 {
 		return errVersion
@@ -108,7 +109,7 @@ func (f *Reader) expect(pos int64, pattern string) (int64, error) {
 		return 0, err
 	}
 	if !bytes.Equal(buf, []byte(pattern)) {
-		return pos, errMalformed
+		return pos, &MalformedFileError{}
 	}
 	return end, nil
 }
@@ -121,11 +122,11 @@ func (f *Reader) expectWord(pos int64, word string) (int64, error) {
 		return 0, err
 	}
 	if !bytes.HasPrefix(buf, []byte(word)) {
-		return pos, errMalformed
+		return pos, &MalformedFileError{}
 	}
 	if len(buf) > n &&
 		(buf[n] >= 'A' && buf[n] <= 'Z' || buf[n] >= 'a' && buf[n] <= 'z') {
-		return pos, errMalformed
+		return pos, &MalformedFileError{}
 	}
 	return end, nil
 }
@@ -167,7 +168,7 @@ func (f *Reader) expectEOL(pos int64) (int64, error) {
 		return 0, err
 	}
 	if len(buf) == 0 || (buf[0] != '\r' && buf[0] != '\n') {
-		return 0, errMalformed
+		return 0, &MalformedFileError{}
 	}
 	if len(buf) > 1 && buf[0] == '\r' && buf[1] == '\n' {
 		return pos + 2, nil
@@ -175,7 +176,7 @@ func (f *Reader) expectEOL(pos int64) (int64, error) {
 	return pos + 1, nil
 }
 
-func (f *Reader) expectWhiteSpaceMaybe(pos int64) (int64, error) {
+func (f *Reader) skipWhiteSpace(pos int64) (int64, error) {
 	isComment := false
 	return f.expectBytes(pos, func(c byte) bool {
 		if isComment {
@@ -196,7 +197,7 @@ func (f *Reader) expectWhiteSpaceMaybe(pos int64) (int64, error) {
 func (f *Reader) expectBool(pos int64) (int64, Bool, error) {
 	var res Bool
 	pos, err := f.expectWord(pos, "false")
-	if err == errMalformed {
+	if _, ok := err.(*MalformedFileError); ok {
 		pos, err = f.expectWord(pos, "true")
 		if err == nil {
 			res = Bool(true)
@@ -225,7 +226,7 @@ func (f *Reader) expectInteger(pos int64) (int64, int64, error) {
 
 	x, err := strconv.ParseInt(string(res), 10, 64)
 	if err != nil {
-		return pos, 0, errMalformed
+		return pos, 0, &MalformedFileError{}
 	}
 	return p2, x, nil
 }
@@ -255,41 +256,44 @@ func (f *Reader) expectNumericOrReference(pos int64) (int64, Object, error) {
 	if hasDot {
 		x, err := strconv.ParseFloat(string(res), 64)
 		if err != nil {
-			return pos, nil, errMalformed
+			return pos, nil, &MalformedFileError{}
 		}
 		return p2, Real(x), nil
 	}
 
 	x1, err := strconv.ParseInt(string(res), 10, 64)
 	if err != nil {
-		return pos, nil, errMalformed
+		return pos, nil, &MalformedFileError{}
 	}
 
-	p3, err := f.expectWhiteSpaceMaybe(p2)
+	p3, err := f.skipWhiteSpace(p2)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p3, x2, err := f.expectInteger(p3)
-	if err == errMalformed {
+	if _, ok := err.(*MalformedFileError); ok {
 		return p2, Integer(x1), nil
 	} else if err != nil {
 		return 0, nil, err
 	}
 
-	p3, err = f.expectWhiteSpaceMaybe(p3)
+	p3, err = f.skipWhiteSpace(p3)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p3, err = f.expectWord(p3, "R")
-	if err == errMalformed {
+	if _, ok := err.(*MalformedFileError); ok {
 		return p2, Integer(x1), nil
 	} else if err != nil {
 		return 0, nil, err
 	}
 
-	return p3, &Reference{x1, x2}, nil
+	if x2 < 0 || x2 > 0xFFFF {
+		return 0, nil, &MalformedFileError{}
+	}
+	return p3, &Reference{x1, uint16(x2)}, nil
 }
 
 func (f *Reader) expectName(pos int64) (int64, Name, error) {
@@ -465,14 +469,14 @@ func (f *Reader) expectArray(pos int64) (int64, Array, error) {
 
 	var array Array
 	for {
-		pos, err = f.expectWhiteSpaceMaybe(pos)
+		pos, err = f.skipWhiteSpace(pos)
 		if err != nil {
 			return 0, nil, err
 		}
 
 		var obj Object
 		pos, obj, err = f.expectObject(pos)
-		if err == errMalformed {
+		if _, ok := err.(*MalformedFileError); ok {
 			break
 		} else if err != nil {
 			return 0, nil, err
@@ -495,20 +499,20 @@ func (f *Reader) expectDict(pos int64) (int64, *Dict, error) {
 	}
 	dict := &Dict{Data: make(map[Name]Object)}
 	for {
-		pos, err = f.expectWhiteSpaceMaybe(pos)
+		pos, err = f.skipWhiteSpace(pos)
 		if err != nil {
 			return 0, nil, err
 		}
 
 		var key Name
 		pos, key, err = f.expectName(pos)
-		if err == errMalformed {
+		if _, ok := err.(*MalformedFileError); ok {
 			break
 		} else if err != nil {
 			return 0, nil, err
 		}
 
-		pos, err = f.expectWhiteSpaceMaybe(pos)
+		pos, err = f.skipWhiteSpace(pos)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -535,34 +539,34 @@ func (f *Reader) expectStream(pos int64) (int64, *Stream, error) {
 		return p2, nil, err
 	}
 
-	p2, err = f.expectWhiteSpaceMaybe(p2)
+	p2, err = f.skipWhiteSpace(p2)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p2, dict, err := f.expectDict(p2)
-	if err == errMalformed {
-		return pos, nil, errMalformed
+	if _, ok := err.(*MalformedFileError); ok {
+		return pos, nil, &MalformedFileError{}
 	} else if err != nil {
 		return 0, nil, err
 	}
 
 	p2, stream, err := f.expectStreamTail(p2, dict)
-	if err == errMalformed {
-		return pos, nil, errMalformed
+	if _, ok := err.(*MalformedFileError); ok {
+		return pos, nil, &MalformedFileError{}
 	} else if err != nil {
 		return 0, nil, err
 	}
 	stream.Ref = ref
 
-	p2, err = f.expectWhiteSpaceMaybe(p2)
+	p2, err = f.skipWhiteSpace(p2)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p2, err = f.expectWord(p2, "endobj")
-	if err == errMalformed {
-		return pos, nil, errMalformed
+	if _, ok := err.(*MalformedFileError); ok {
+		return pos, nil, &MalformedFileError{}
 	} else if err != nil {
 		return 0, nil, err
 	}
@@ -573,17 +577,17 @@ func (f *Reader) expectStream(pos int64) (int64, *Stream, error) {
 func (f *Reader) expectStreamTail(pos int64, dict *Dict) (int64, *Stream, error) {
 	length, ok := dict.Data[Name("Length")].(Integer)
 	if !ok {
-		return pos, nil, errMalformed
+		return pos, nil, &MalformedFileError{}
 	}
 
-	p2, err := f.expectWhiteSpaceMaybe(pos)
+	p2, err := f.skipWhiteSpace(pos)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p2, err = f.expectWord(p2, "stream")
-	if err == errMalformed {
-		return pos, nil, errMalformed
+	if _, ok := err.(*MalformedFileError); ok {
+		return pos, nil, &MalformedFileError{}
 	} else if err != nil {
 		return 0, nil, err
 	}
@@ -597,25 +601,25 @@ func (f *Reader) expectStreamTail(pos int64, dict *Dict) (int64, *Stream, error)
 	} else if len(buf) >= 2 && buf[0] == '\r' && buf[1] == '\n' {
 		p2 += 2
 	} else {
-		return pos, nil, errMalformed
+		return pos, nil, &MalformedFileError{}
 	}
 
 	start := p2
 
 	p2 += int64(length)
 	if p2 >= f.size {
-		return pos, nil, errMalformed
+		return pos, nil, &MalformedFileError{}
 	}
 	end := p2
 
-	p2, err = f.expectWhiteSpaceMaybe(p2)
+	p2, err = f.skipWhiteSpace(p2)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p2, err = f.expectWord(p2, "endstream")
-	if err == errMalformed {
-		return pos, nil, errMalformed
+	if _, ok := err.(*MalformedFileError); ok {
+		return pos, nil, &MalformedFileError{}
 	} else if err != nil {
 		return 0, nil, err
 	}
@@ -633,13 +637,13 @@ func (f *Reader) expectDictOrStream(pos int64) (int64, Object, error) {
 		return pos, nil, err
 	}
 
-	p2, err := f.expectWhiteSpaceMaybe(pos)
+	p2, err := f.skipWhiteSpace(pos)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p3, stream, err := f.expectStreamTail(p2, dict)
-	if err == errMalformed {
+	if _, ok := err.(*MalformedFileError); ok {
 		// just a dict, it seems ...
 		return pos, dict, nil
 	} else if err != nil {
@@ -649,31 +653,62 @@ func (f *Reader) expectDictOrStream(pos int64) (int64, Object, error) {
 }
 
 func (f *Reader) expectObject(pos int64) (int64, Object, error) {
-	head, err := f.get(pos, pos+2, true)
+	buf, err := f.get(pos, pos+2, true)
 	if err != nil {
 		return 0, nil, err
-	} else if len(head) == 0 {
+	} else if len(buf) == 0 {
 		// we have reached EOF
-		return pos, nil, errMalformed
+		return pos, nil, &MalformedFileError{}
 	}
 
 	switch {
-	case bytes.Equal(head, []byte("tr")), bytes.Equal(head, []byte("fa")):
+	case bytes.Equal(buf, []byte("tr")), bytes.Equal(buf, []byte("fa")):
 		return f.expectBool(pos)
-	case head[0] == '/':
+	case buf[0] == '/':
 		return f.expectName(pos)
-	case bytes.Equal(head, []byte("<<")): // this must come before hex strings
+	case bytes.Equal(buf, []byte("<<")):
 		return f.expectDictOrStream(pos)
-	case head[0] == '(':
+	case buf[0] == '(':
 		return f.expectQuotedString(pos)
-	case head[0] == '<':
+	case buf[0] == '<':
 		return f.expectHexString(pos)
-	case head[0] == '[':
+	case buf[0] == '[':
 		return f.expectArray(pos)
-	case head[0] >= '0' && head[0] <= '9', head[0] == '+', head[0] == '-', head[0] == '.':
+	case buf[0] >= '0' && buf[0] <= '9', buf[0] == '+', buf[0] == '-', buf[0] == '.':
 		return f.expectNumericOrReference(pos)
 	}
-	return pos, nil, errMalformed
+	return pos, nil, &MalformedFileError{}
+}
+
+func (f *Reader) expectTopLevelObject(pos int64) (Object, *Reference, error) {
+	withRef := true
+	pos, ref, err := f.expectObjectLabel(pos)
+	if _, ok := err.(*MalformedFileError); ok {
+		withRef = false
+	} else if err != nil {
+		return nil, nil, err
+	}
+
+	pos, err = f.skipWhiteSpace(pos)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pos, obj, err := f.expectObject(pos)
+	if err != nil {
+		return nil, nil, err
+	}
+	if withRef {
+		pos, err = f.skipWhiteSpace(pos)
+		if err != nil {
+			return nil, nil, err
+		}
+		_, err = f.expectWord(pos, "endobj")
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return obj, ref, nil
 }
 
 // read expressions like "12 0 obj"
@@ -683,31 +718,34 @@ func (f *Reader) expectObjectLabel(pos int64) (int64, *Reference, error) {
 		return p2, nil, err
 	}
 
-	p2, err = f.expectWhiteSpaceMaybe(p2)
+	p2, err = f.skipWhiteSpace(p2)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p2, y, err := f.expectInteger(p2)
-	if err == errMalformed {
-		return pos, nil, errMalformed
+	if _, ok := err.(*MalformedFileError); ok {
+		return pos, nil, &MalformedFileError{}
 	} else if err != nil {
 		return 0, nil, err
 	}
 
-	p2, err = f.expectWhiteSpaceMaybe(p2)
+	p2, err = f.skipWhiteSpace(p2)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	p2, err = f.expectWord(p2, "obj")
-	if err == errMalformed {
-		return pos, nil, errMalformed
+	if _, ok := err.(*MalformedFileError); ok {
+		return pos, nil, &MalformedFileError{}
 	} else if err != nil {
 		return 0, nil, err
 	}
 
-	return p2, &Reference{x, y}, nil
+	if y < 0 || y > 0xFFFF {
+		return 0, nil, &MalformedFileError{}
+	}
+	return p2, &Reference{x, uint16(y)}, nil
 }
 
 func (f *Reader) readXRefAndTrailer(pos int64) (*Dict, error) {
@@ -716,7 +754,7 @@ func (f *Reader) readXRefAndTrailer(pos int64) (*Dict, error) {
 	fmt.Print("reading xref at ", pos, " ...")
 
 	pos, err := f.expectWord(pos, "xref")
-	if err == errMalformed {
+	if _, ok := err.(*MalformedFileError); ok {
 		var stream *Stream
 		pos, stream, err = f.expectStream(pos)
 		if err != nil {
@@ -763,7 +801,7 @@ func (f *Reader) expectTextXRef(pos int64, err error) (int64, error) {
 		var start, length int64
 
 		pos, start, err = f.expectInteger(pos)
-		if err == errMalformed {
+		if _, ok := err.(*MalformedFileError); ok {
 			break
 		} else if err != nil || start < 0 {
 			return 0, err
@@ -797,17 +835,17 @@ func (f *Reader) expectTextXRef(pos int64, err error) (int64, error) {
 func checkBinaryXrefDict(dict *Dict) ([]int, []*xrefSubSection, error) {
 	size, ok := dict.Data["Size"].(Integer)
 	if !ok {
-		return nil, nil, errMalformed
+		return nil, nil, &MalformedFileError{}
 	}
 	W, ok := dict.Data["W"].(Array)
 	if !ok || len(W) < 3 {
-		return nil, nil, errMalformed
+		return nil, nil, &MalformedFileError{}
 	}
 	var w []int
 	for i, Wi := range W {
 		wi, ok := Wi.(Integer)
 		if !ok || i < 3 && (wi < 0 || wi > 7) {
-			return nil, nil, errMalformed
+			return nil, nil, &MalformedFileError{}
 		}
 		w = append(w, int(wi))
 	}
@@ -819,13 +857,13 @@ func checkBinaryXrefDict(dict *Dict) ([]int, []*xrefSubSection, error) {
 	} else {
 		ind, ok := Index.(Array)
 		if !ok || len(ind)%2 != 0 {
-			return nil, nil, errMalformed
+			return nil, nil, &MalformedFileError{}
 		}
 		for i := 0; i < len(ind); i += 2 {
 			start, ok1 := ind[i].(Integer)
 			size, ok2 := ind[i+1].(Integer)
 			if !ok1 || !ok2 {
-				return nil, nil, errMalformed
+				return nil, nil, &MalformedFileError{}
 			}
 			ss = append(ss, &xrefSubSection{int64(start), int64(size)})
 		}
@@ -884,8 +922,8 @@ func (f *Reader) decodeBinaryXref(r io.Reader, w []int, ss []*xrefSubSection) er
 				f.xref[i] = &xrefEntry{
 					Pos: b,
 					InStream: &Reference{
-						no:  a,
-						gen: 0,
+						Index:      a,
+						Generation: 0,
 					},
 				}
 			}
@@ -906,7 +944,7 @@ func (f *Reader) decodeTextXref(pos, start, end int64) error {
 			return err
 		}
 		if buf[10] != ' ' || buf[16] != ' ' {
-			return errMalformed
+			return &MalformedFileError{}
 		}
 
 		a, err := strconv.ParseInt(string(buf[:10]), 10, 64)
@@ -933,7 +971,7 @@ func (f *Reader) decodeTextXref(pos, start, end int64) error {
 				Generation: uint16(b),
 			}
 		default:
-			return errMalformed
+			return &MalformedFileError{}
 		}
 
 		pos += 20
@@ -953,7 +991,7 @@ type xrefSubSection struct {
 }
 
 type xrefEntry struct {
-	Pos        int64 // -1 indicates free slots
+	Pos        int64 // -1 indicates unused/deleted objects
 	Generation uint16
 	InStream   *Reference
 }
@@ -963,7 +1001,7 @@ func (f *Reader) expectTrailer(pos int64) (int64, *Dict, error) {
 	if err != nil {
 		return pos, nil, err
 	}
-	pos, err = f.expectWhiteSpaceMaybe(pos)
+	pos, err = f.skipWhiteSpace(pos)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -997,7 +1035,7 @@ func (f *Reader) findStartXRef() (int64, error) {
 		}
 	}
 	if pos < 0 {
-		return 0, errMalformed
+		return 0, &MalformedFileError{}
 	}
 
 	pos, err := f.expectWord(pos, "startxref")
@@ -1014,28 +1052,42 @@ func (f *Reader) findStartXRef() (int64, error) {
 	return val, err
 }
 
-var (
-	isSpace = map[byte]bool{
-		0:  true,
-		9:  true,
-		10: true,
-		12: true,
-		13: true,
-		32: true,
+// Get reads the specified indirect object from the PDF file. If the object
+// does not exist, nil is returned for both the object and the error.
+func (f *Reader) Get(ref *Reference) (Object, error) {
+	return f.doGet(ref, true)
+}
+
+func (f *Reader) doGet(ref *Reference, allowInStream bool) (Object, error) {
+	entry := f.xref[ref.Index]
+	if entry == nil || entry.Generation != ref.Generation || entry.Pos < 0 {
+		return nil, nil
 	}
-	isDelimiter = map[byte]bool{
-		'(': true,
-		')': true,
-		'<': true,
-		'>': true,
-		'[': true,
-		']': true,
-		'{': true,
-		'}': true,
-		'/': true,
-		'%': true,
+
+	if entry.InStream != nil {
+		// TODO(voss): this seems very inefficient
+		if !allowInStream {
+			return nil, &MalformedFileError{}
+		}
+		objStream, err := f.doGet(entry.InStream, false)
+		if err != nil {
+			return nil, err
+		}
+		r := objStream.(*Stream).Decode() // TODO(voss): don't panic if no stream
+		io.CopyN(ioutil.Discard, r, entry.Pos)
+		// _, obj, err := f.expectObject(...from current position in r...)
+		panic("not implemented")
 	}
-)
+
+	obj, ref2, err := f.expectTopLevelObject(entry.Pos)
+	if err != nil {
+		return nil, err
+	}
+	if ref2 == nil || ref2.Index != ref.Index || ref2.Generation != ref.Generation {
+		return nil, &MalformedFileError{}
+	}
+	return obj, nil
+}
 
 // PDFVersion represent the version of PDF standard used in a file.
 type PDFVersion int

@@ -1,13 +1,32 @@
 package pdflib
 
-import "errors"
+import (
+	"errors"
+	"strconv"
+)
 
 var (
 	errOutOfRange = errors.New("file position out of range")
-
-	// TODO(voss): include a byte offset in the error, so that users
-	// get some meaningful feedback.
-	errMalformed = errors.New("file is not a valid PDF file")
-
-	errVersion = errors.New("unsupported PDF version")
+	errVersion    = errors.New("unsupported PDF version")
 )
+
+// MalformedFileError indicates that the PDF file could not be parsed.
+type MalformedFileError struct {
+	Pos int64
+	Err error
+}
+
+func (err *MalformedFileError) Error() string {
+	head := ""
+	if err.Pos > 0 {
+		head = strconv.FormatInt(err.Pos, 10) + ": "
+	}
+	tail := ""
+	if err.Err != nil {
+		tail = ": " + err.Err.Error()
+	}
+	return head + "not a valid PDF file" + tail
+}
+func (err *MalformedFileError) Unwrap() error {
+	return err.Err
+}
