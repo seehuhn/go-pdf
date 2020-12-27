@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"io/ioutil"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -85,6 +88,52 @@ func TestReadObject(t *testing.T) {
 		{"/ß", Name("ß"), true, nil},
 		{"/", Name(""), true, nil},
 
+		{`()`, String(""), true, nil},
+		{"(test string)", String("test string"), true, nil},
+		{`(hello)`, String("hello"), true, nil},
+		{`(he(ll)o)`, String("he(ll)o"), true, nil},
+		{`(he\)ll\(o)`, String("he)ll(o"), true, nil},
+		{"(hello\n)", String("hello\n"), true, nil},
+		{"(hello\r)", String("hello\n"), true, nil},
+		{"(hello\r\n)", String("hello\n"), true, nil},
+		{"(hello\n\r)", String("hello\n\n"), true, nil},
+		{"(hell\\\no)", String("hello"), true, nil},
+		{`(h\145llo)`, String("hello"), true, nil},
+		{`(\0612)`, String("12"), true, nil},
+
+		{"<>", String(""), true, nil},
+		{"<68656c6c6f>", String("hello"), true, nil},
+		{"<68656C6C6F>", String("hello"), true, nil},
+		{"<68 65 6C 6C 6F>", String("hello"), true, nil},
+		{"<68656C70>", String("help"), true, nil},
+		{"<68656C7>", String("help"), true, nil},
+
+		{"[1 2 3]", Array{Integer(1), Integer(2), Integer(3)}, true, nil},
+		{"[1 2 3 R 4]", Array{Integer(1), &Reference{2, 3}, Integer(4)}, true, nil},
+
+		{"<< /key 12 /val /23 >>", &Dict{
+			Data: map[Name]Object{
+				Name("key"): Integer(12),
+				Name("val"): Name("23"),
+			},
+		}, true, nil},
+		{"<< /key1 1 /key2 2 2 R /key3 3 >>", &Dict{
+			Data: map[Name]Object{
+				Name("key1"): Integer(1),
+				Name("key2"): &Reference{2, 2},
+				Name("key3"): Integer(3),
+			},
+		}, true, nil},
+
+		{"<< /Length 5 >>\nstream\nhello\nendstream", &Stream{
+			Dict: Dict{
+				Data: map[Name]Object{
+					Name("Length"): Integer(5),
+				},
+			},
+			R: strings.NewReader("hello"),
+		}, true, nil},
+
 		{"fals", nil, false, nil},
 		{"abc", nil, false, nil},
 	}
@@ -95,9 +144,37 @@ func TestReadObject(t *testing.T) {
 			file := testScanner(body)
 
 			val, err := file.ReadObject()
-			if val != test.val {
-				t.Errorf("%q: wrong value: expected %s, got %s",
-					body, format(test.val), format(val))
+			if s2, ok := test.val.(*Stream); ok {
+				s1, ok := val.(*Stream)
+				if !ok {
+					t.Errorf("%q: wront type: expected *Stream, got %T",
+						body, val)
+					continue
+				}
+				if !reflect.DeepEqual(s1.Dict, s2.Dict) {
+					t.Errorf("%q: wrong value: expected %#v, got %#v",
+						body, s2.Dict, s1.Dict)
+					continue
+				}
+				data1, err := ioutil.ReadAll(s1.R)
+				if err != nil {
+					t.Errorf("%q: %s", body, err)
+				}
+				if s2r, ok := s2.R.(io.Seeker); ok {
+					// rewind the seeker for the second suffix
+					s2r.Seek(0, io.SeekStart)
+				}
+				data2, err := ioutil.ReadAll(s2.R)
+				if err != nil {
+					t.Errorf("%q: %s", body, err)
+				}
+				if !bytes.Equal(data1, data2) {
+					t.Errorf("%q: wrong data in stream, expected %x, got %x",
+						body, data2, data1)
+				}
+			} else if !reflect.DeepEqual(val, test.val) {
+				t.Errorf("%q: wrong value: expected %#v, got %#v",
+					body, test.val, val)
 			}
 
 			if test.ok && err != nil {

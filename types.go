@@ -147,6 +147,7 @@ func (x Array) PDF() []byte {
 }
 
 // Dict represent a Dictionary object in a PDF file.
+// TODO(voss): any chance we can remove the struct?
 type Dict struct {
 	Data map[Name]Object
 	Ref  *Reference

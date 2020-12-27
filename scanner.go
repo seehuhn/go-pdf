@@ -67,7 +67,7 @@ func (s *scanner) ReadObject() (Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		buf, _ = s.Peek(7) // len("stream") == 6
+		buf, _ = s.Peek(6) // len("stream") == 6
 		if !bytes.HasPrefix(buf, []byte("stream")) {
 			return dict, nil
 		}
@@ -444,7 +444,7 @@ func (s *scanner) ReadStream(dict *Dict) (*Stream, error) {
 			return nil, err
 		}
 	} else {
-		// streams inside streams are forbidden by the spec
+		// the spec does not allow streams inside streams
 		return nil, &MalformedFileError{}
 	}
 
