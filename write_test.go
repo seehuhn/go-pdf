@@ -6,16 +6,14 @@ import (
 	"testing"
 )
 
-func makeDict(args ...interface{}) *Dict {
-	res := &Dict{
-		Data: make(map[Name]Object),
-	}
+func makeDict(args ...interface{}) Dict {
+	res := make(map[Name]Object)
 	var name Name
 	for i, arg := range args {
 		if i%2 == 0 {
 			name = Name(arg.(string))
 		} else {
-			res.Data[name] = Object(arg.(Object))
+			res[name] = Object(arg.(Object))
 		}
 	}
 	return res
@@ -30,7 +28,7 @@ ET
 `
 	buf := bytes.NewReader([]byte(contents))
 	contentNode := &Stream{
-		Dict: *makeDict(
+		Dict: makeDict(
 			"Length", Integer(buf.Size()),
 		),
 		R: buf,
@@ -45,38 +43,30 @@ ET
 	resources := makeDict(
 		"Font", makeDict("F1", font))
 
-	page1 := &Dict{ // page 77
-		Data: map[Name]Object{
-			"Type":      Name("Page"),
-			"CropBox":   Array{Integer(0), Integer(0), Integer(200), Integer(100)},
-			"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
-			"Resources": resources,
-			"Contents":  contentNode,
-		},
+	page1 := Dict{ // page 77
+		"Type":      Name("Page"),
+		"CropBox":   Array{Integer(0), Integer(0), Integer(200), Integer(100)},
+		"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
+		"Resources": resources,
+		"Contents":  contentNode,
 	}
 
-	pages := &Dict{ // page 76
-		Data: map[Name]Object{
-			"Type":  Name("Pages"),
-			"Kids":  Array{page1},
-			"Count": Integer(1),
-		},
+	pages := Dict{ // page 76
+		"Type":  Name("Pages"),
+		"Kids":  Array{page1},
+		"Count": Integer(1),
 	}
-	page1.Data["Parent"] = pages
+	page1["Parent"] = pages
 
-	catalog := &Dict{ // page 73
-		Data: map[Name]Object{
-			"Type":  Name("Catalog"),
-			"Pages": pages,
-		},
+	catalog := Dict{ // page 73
+		"Type":  Name("Catalog"),
+		"Pages": pages,
 	}
-	info := &Dict{ // page 550
-		Data: map[Name]Object{
-			"Title":    String("PDF Test Document"),
-			"Author":   String("Jochen Voss"),
-			"Subject":  String("Testing"),
-			"Keywords": String("PDF, testing, Go"),
-		},
+	info := Dict{ // page 550
+		"Title":    String("PDF Test Document"),
+		"Author":   String("Jochen Voss"),
+		"Subject":  String("Testing"),
+		"Keywords": String("PDF, testing, Go"),
 	}
 
 	fd, err := os.Create("test.pdf")

@@ -14,6 +14,9 @@ func applyFilter(r io.Reader, name Object, param Object) io.Reader {
 	}
 	switch string(n) {
 	case "FlateDecode":
+		if param != nil {
+			panic("not implemented")
+		}
 		zr, err := zlib.NewReader(r)
 		if err != nil {
 			return &errorReader{err}

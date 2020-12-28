@@ -2,6 +2,7 @@ package pdflib
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strconv"
@@ -22,6 +23,82 @@ func newScanner(r io.Reader) *scanner {
 		r:   r,
 		buf: make([]byte, scannerBufSize),
 	}
+}
+
+func (s *scanner) filePos() int64 {
+	return s.total + int64(s.used)
+}
+
+func (s *scanner) ReadIndirectObject() (*Indirect, error) {
+	id, err := s.ReadInteger()
+	if err != nil {
+		return nil, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return nil, err
+	}
+
+	gen, err := s.ReadInteger()
+	if err != nil {
+		return nil, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.SkipString("obj")
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := s.ReadObject()
+	if err != nil {
+		return nil, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return nil, err
+	}
+
+	if a, ok := obj.(Integer); ok {
+		// Check whether this is the start of a reference to an indirect
+		// object.
+		buf, err := s.Peek(6)
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(buf, []byte("endobj")) {
+			b, err := s.ReadInteger()
+			if err != nil {
+				return nil, err
+			}
+			err = s.SkipString("R")
+			if err != nil {
+				return nil, err
+			}
+			err = s.SkipWhiteSpace()
+			if err != nil {
+				return nil, err
+			}
+
+			obj = &Reference{
+				Index:      int64(a),
+				Generation: uint16(b),
+			}
+		}
+	}
+
+	err = s.SkipString("endobj")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Indirect{
+		Reference: Reference{int64(id), uint16(gen)},
+		Obj:       obj,
+	}, nil
 }
 
 func (s *scanner) ReadObject() (Object, error) {
@@ -85,7 +162,36 @@ func (s *scanner) ReadObject() (Object, error) {
 	return nil, err
 }
 
-// ReadName reads an integer or real number.
+// ReadInteger reads an integer.
+func (s *scanner) ReadInteger() (Integer, error) {
+	first := true
+	var res []byte
+	err := s.ScanBytes(func(c byte) bool {
+		if first && (c == '+' || c == '-') {
+			res = append(res, c)
+		} else if c >= '0' && c <= '9' {
+			res = append(res, c)
+		} else {
+			return false
+		}
+		first = false
+		return true
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	x, err := strconv.ParseInt(string(res), 10, 64)
+	if err != nil {
+		return 0, &MalformedFileError{
+			Pos: s.filePos(),
+			Err: err,
+		}
+	}
+	return Integer(x), nil
+}
+
+// ReadNumber reads an integer or real number.
 func (s *scanner) ReadNumber() (Object, error) {
 	hasDot := false
 	first := true
@@ -323,7 +429,7 @@ func (s *scanner) ReadArray() (Array, error) {
 }
 
 // ReadDict reads a PDF dictionary.
-func (s *scanner) ReadDict() (*Dict, error) {
+func (s *scanner) ReadDict() (Dict, error) {
 	err := s.SkipString("<<")
 	if err != nil {
 		return nil, err
@@ -333,7 +439,7 @@ func (s *scanner) ReadDict() (*Dict, error) {
 		return nil, err
 	}
 
-	dict := &Dict{Data: make(map[Name]Object)}
+	dict := make(map[Name]Object)
 	for {
 		var key Name
 		key, err = s.ReadName()
@@ -366,11 +472,7 @@ func (s *scanner) ReadDict() (*Dict, error) {
 				return nil, err
 			}
 			if buf[0] != '/' && buf[0] != '>' {
-				val2, err := s.ReadNumber()
-				b, isInt := val2.(Integer)
-				if err == nil && !isInt {
-					err = &MalformedFileError{}
-				}
+				b, err := s.ReadInteger()
 				if err != nil {
 					return nil, err
 				}
@@ -394,7 +496,7 @@ func (s *scanner) ReadDict() (*Dict, error) {
 			}
 		}
 
-		dict.Data[key] = val
+		dict[key] = val
 	}
 	err = s.SkipString(">>")
 	if err != nil {
@@ -405,8 +507,8 @@ func (s *scanner) ReadDict() (*Dict, error) {
 }
 
 // ReadDict reads a PDF dictionary.
-func (s *scanner) ReadStream(dict *Dict) (*Stream, error) {
-	length, ok := dict.Data[Name("Length")].(Integer)
+func (s *scanner) ReadStream(dict Dict) (*Stream, error) {
+	length, ok := dict[Name("Length")].(Integer)
 	if !ok {
 		return nil, &MalformedFileError{}
 	}
@@ -459,7 +561,7 @@ func (s *scanner) ReadStream(dict *Dict) (*Stream, error) {
 	}
 
 	return &Stream{
-		Dict: *dict,
+		Dict: dict,
 		R:    streamData,
 	}, nil
 }
@@ -483,8 +585,9 @@ func (s *scanner) refill() error {
 	return err
 }
 
-// Peek returns a view of the next n bytes of input.  The function panics,
-// if n is larger than scannerBufSize.  On EOF, short buffers may be returned.
+// Peek returns a view of the next n bytes of input.  The function panics, if n
+// is larger than scannerBufSize.  On EOF, short buffers without an error code
+// will be returned.
 func (s *scanner) Peek(n int) ([]byte, error) {
 	if n > scannerBufSize {
 		panic("peek window too large")
@@ -563,10 +666,23 @@ func (s *scanner) SkipString(pat string) error {
 		return err
 	}
 	if !bytes.Equal(buf, patBytes) {
-		return &MalformedFileError{}
+		return &MalformedFileError{
+			Pos: s.filePos(),
+			Err: fmt.Errorf("expected %q but found %q", pat, string(buf)),
+		}
 	}
 	s.pos += n
 	return nil
+}
+
+func (s *scanner) HasPrefix(pfx string) (bool, error) {
+	patBytes := []byte(pfx)
+	n := len(patBytes)
+	buf, err := s.Peek(n)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(buf, patBytes), nil
 }
 
 var (

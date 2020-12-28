@@ -111,25 +111,19 @@ func TestReadObject(t *testing.T) {
 		{"[1 2 3]", Array{Integer(1), Integer(2), Integer(3)}, true, nil},
 		{"[1 2 3 R 4]", Array{Integer(1), &Reference{2, 3}, Integer(4)}, true, nil},
 
-		{"<< /key 12 /val /23 >>", &Dict{
-			Data: map[Name]Object{
-				Name("key"): Integer(12),
-				Name("val"): Name("23"),
-			},
+		{"<< /key 12 /val /23 >>", Dict{
+			Name("key"): Integer(12),
+			Name("val"): Name("23"),
 		}, true, nil},
-		{"<< /key1 1 /key2 2 2 R /key3 3 >>", &Dict{
-			Data: map[Name]Object{
-				Name("key1"): Integer(1),
-				Name("key2"): &Reference{2, 2},
-				Name("key3"): Integer(3),
-			},
+		{"<< /key1 1 /key2 2 2 R /key3 3 >>", Dict{
+			Name("key1"): Integer(1),
+			Name("key2"): &Reference{2, 2},
+			Name("key3"): Integer(3),
 		}, true, nil},
 
 		{"<< /Length 5 >>\nstream\nhello\nendstream", &Stream{
 			Dict: Dict{
-				Data: map[Name]Object{
-					Name("Length"): Integer(5),
-				},
+				Name("Length"): Integer(5),
 			},
 			R: strings.NewReader("hello"),
 		}, true, nil},
@@ -160,10 +154,11 @@ func TestReadObject(t *testing.T) {
 				if err != nil {
 					t.Errorf("%q: %s", body, err)
 				}
-				if s2r, ok := s2.R.(io.Seeker); ok {
-					// rewind the seeker for the second suffix
-					s2r.Seek(0, io.SeekStart)
-				}
+
+				// rewind the reader for the second suffix
+				s2r := s2.R.(io.Seeker)
+				s2r.Seek(0, io.SeekStart)
+
 				data2, err := ioutil.ReadAll(s2.R)
 				if err != nil {
 					t.Errorf("%q: %s", body, err)

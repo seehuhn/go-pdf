@@ -147,16 +147,12 @@ func (x Array) PDF() []byte {
 }
 
 // Dict represent a Dictionary object in a PDF file.
-// TODO(voss): any chance we can remove the struct?
-type Dict struct {
-	Data map[Name]Object
-	Ref  *Reference
-}
+type Dict map[Name]Object
 
 // PDF implements the Object interface
-func (x *Dict) PDF() []byte {
+func (x Dict) PDF() []byte {
 	var keys []string
-	for key := range x.Data {
+	for key := range x {
 		keys = append(keys, string(key))
 	}
 	sort.Strings(keys)
@@ -168,7 +164,7 @@ func (x *Dict) PDF() []byte {
 		buf.WriteString("\n")
 		buf.Write(name.PDF())
 		buf.WriteString(" ")
-		buf.Write(x.Data[name].PDF())
+		buf.Write(x[name].PDF())
 	}
 	buf.WriteString("\n>>")
 	return buf.Bytes()
@@ -193,8 +189,8 @@ func (x *Stream) PDF() []byte {
 // Decode returns a reader for the decoded stream data.
 func (x *Stream) Decode() io.Reader {
 	r := x.R
-	filter := x.Dict.Data["Filter"]
-	param := x.Dict.Data["DecodeParms"]
+	filter := x.Dict["Filter"]
+	param := x.Dict["DecodeParms"]
 	switch f := filter.(type) {
 	case nil:
 		// pass
@@ -216,7 +212,7 @@ func (x *Stream) Decode() io.Reader {
 	return r
 }
 
-// Reference represents an indirect object in a PDF file.
+// Reference represents a reference to an indirect object in a PDF file.
 type Reference struct {
 	Index      int64 // TODO(voss): use int and uint16
 	Generation uint16
@@ -225,6 +221,21 @@ type Reference struct {
 // PDF implements the Object interface
 func (x *Reference) PDF() []byte {
 	return []byte(fmt.Sprintf("%d %d R", x.Index, x.Generation))
+}
+
+// Indirect represents an indirect object in a PDF file.
+type Indirect struct {
+	Reference
+	Obj Object
+}
+
+// PDF implements the Object interface
+func (x *Indirect) PDF() []byte {
+	buf := &bytes.Buffer{}
+	fmt.Fprintf(buf, "%d %d obj\n", x.Index, x.Generation)
+	buf.WriteString(format(x.Obj))
+	buf.WriteString("\nendobj")
+	return buf.Bytes()
 }
 
 func format(x Object) string {

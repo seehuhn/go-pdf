@@ -36,13 +36,11 @@ func Write(w io.Writer, catalog, info Object, ver PDFVersion) error {
 	}
 
 	pdf.WriteString("trailer\n")
-	pdf.WriteDirect(&Dict{
-		Data: map[Name]Object{
-			"Type": Name("XRef"),
-			"Size": Integer(pdf.nextRef),
-			"Info": info,
-			"Root": catalog,
-		},
+	pdf.WriteDirect(Dict{
+		"Type": Name("XRef"),
+		"Size": Integer(pdf.nextRef),
+		"Info": info,
+		"Root": catalog,
 	}, true)
 	pdf.Writef("\nstartxref\n%d\n%%%%EOF\n", xrefPos)
 
@@ -72,15 +70,11 @@ func (pdf *writer) Writef(format string, args ...interface{}) error {
 
 func (pdf *writer) WriteIndirect(obj Object) error {
 	switch obj := obj.(type) {
-	case *Dict:
-		if obj.Ref != nil {
-			return nil
-		}
+	case Dict:
 		ref := pdf.nextRef
 		pdf.nextRef++
-		obj.Ref = &Reference{ref, 0}
 
-		for _, val := range obj.Data {
+		for _, val := range obj {
 			err := pdf.WriteIndirect(val)
 			if err != nil {
 				return err
@@ -92,14 +86,10 @@ func (pdf *writer) WriteIndirect(obj Object) error {
 		pdf.WriteDirect(obj, true)
 		pdf.WriteString("\nendobj\n")
 	case *Stream: // TODO(voss): any way to avoid duplications with PDFDict?
-		if obj.Ref != nil {
-			return nil
-		}
 		ref := pdf.nextRef
 		pdf.nextRef++
-		obj.Ref = &Reference{ref, 0}
 
-		for _, val := range obj.Data {
+		for _, val := range obj.Dict {
 			err := pdf.WriteIndirect(val)
 			if err != nil {
 				return err
@@ -149,39 +139,31 @@ func (pdf *writer) WriteDirect(obj Object, forceInline bool) (Object, error) {
 			pdf.WriteDirect(val, false)
 		}
 		pdf.WriteString("]")
-	case *Dict:
-		if ref := obj.Ref; ref != nil && !forceInline {
-			pdf.Writef("%d %d R", ref.Index, ref.Generation)
-		} else {
-			pdf.WriteString("<<")
-			for key, val := range obj.Data {
-				pdf.WriteString("\n")
-				pdf.WriteDirect(key, false)
-				pdf.WriteString(" ")
-				pdf.WriteDirect(val, false)
-			}
-			pdf.WriteString("\n>>")
+	case Dict:
+		pdf.WriteString("<<")
+		for key, val := range obj {
+			pdf.WriteString("\n")
+			pdf.WriteDirect(key, false)
+			pdf.WriteString(" ")
+			pdf.WriteDirect(val, false)
 		}
+		pdf.WriteString("\n>>")
 	case *Stream:
-		if ref := obj.Ref; ref != nil && !forceInline {
-			pdf.Writef("%d %d R", ref.Index, ref.Generation)
-		} else {
-			pdf.WriteString("<<")
-			for key, val := range obj.Data {
-				pdf.WriteString("\n")
-				pdf.WriteDirect(key, false)
-				pdf.WriteString(" ")
-				pdf.WriteDirect(val, false)
-			}
-			pdf.WriteString("\n>>\nstream\n")
-			// TODO(voss): check that the length is correct?
-			n, err := io.Copy(pdf.w, obj.R)
-			if err != nil {
-				return nil, err
-			}
-			pdf.pos += int64(n)
-			pdf.WriteString("\nendstream")
+		pdf.WriteString("<<")
+		for key, val := range obj.Dict {
+			pdf.WriteString("\n")
+			pdf.WriteDirect(key, false)
+			pdf.WriteString(" ")
+			pdf.WriteDirect(val, false)
 		}
+		pdf.WriteString("\n>>\nstream\n")
+		// TODO(voss): check that the length is correct?
+		n, err := io.Copy(pdf.w, obj.R)
+		if err != nil {
+			return nil, err
+		}
+		pdf.pos += int64(n)
+		pdf.WriteString("\nendstream")
 	default:
 		panic("not implemented")
 	}
