@@ -157,7 +157,7 @@ func TestReadObject(t *testing.T) {
 
 				// rewind the reader for the second suffix
 				s2r := s2.R.(io.Seeker)
-				s2r.Seek(0, io.SeekStart)
+				_, _ = s2r.Seek(0, io.SeekStart)
 
 				data2, err := ioutil.ReadAll(s2.R)
 				if err != nil {

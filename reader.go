@@ -3,7 +3,6 @@ package pdflib
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 )
 
@@ -15,7 +14,7 @@ type Reader struct {
 	HeaderVersion PDFVersion
 	Trailer       *Dict
 
-	xref map[int64]*xrefEntry
+	xref map[int]*xRefEntry
 }
 
 // NewReader creates a new Reader object.
@@ -36,8 +35,6 @@ func NewReader(data io.ReaderAt, size int64) (*Reader, error) {
 		return nil, err
 	}
 	r.xref = xref
-
-	fmt.Println(len(r.xref), "xref entries found")
 
 	return r, nil
 }

@@ -2,7 +2,6 @@ package pdflib
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"testing"
 )
@@ -38,22 +37,4 @@ func TestReadHeaderVersion(t *testing.T) {
 			t.Errorf("%q: wrong error %q", in, err)
 		}
 	}
-}
-
-func TestRealFile(t *testing.T) {
-	name := "PDF32000_2008.pdf"
-	// name := "example.pdf"
-	fd, err := os.Open(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fi, err := fd.Stat()
-	if err != nil {
-		t.Fatal(err)
-	}
-	r, err := NewReader(fd, fi.Size())
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = r
 }

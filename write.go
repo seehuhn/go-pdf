@@ -9,8 +9,8 @@ import (
 type Writer struct {
 	w       *posWriter
 	ver     PDFVersion
-	nextRef int64
-	xref    map[int64]int64
+	nextRef int
+	xref    map[int]*xRefEntry
 
 	info    Dict
 	catalog Dict
@@ -23,9 +23,13 @@ func NewWriter(w io.Writer, ver PDFVersion) (*Writer, error) {
 		w:       &posWriter{w: w},
 		ver:     ver,
 		nextRef: 1,
-		xref:    make(map[int64]int64),
+		xref:    make(map[int]*xRefEntry),
 
 		catalog: make(Dict),
+	}
+	pdf.xref[0] = &xRefEntry{
+		Pos:        -1,
+		Generation: 65535,
 	}
 
 	_, err := fmt.Fprintf(pdf.w, "%%PDF-1.%d\n%%\x80\x80\x80\x80\n", ver)
@@ -67,12 +71,22 @@ func (pdf *Writer) Close() error {
 	}
 
 	xrefPos := pdf.w.pos
-	_, err = fmt.Fprintf(pdf.w, "xref\n0 %d\n0000000000 65535 f\r\n", pdf.nextRef)
+	_, err = fmt.Fprintf(pdf.w, "xref\n0 %d\n", pdf.nextRef)
 	if err != nil {
 		return err
 	}
-	for i := int64(1); i < pdf.nextRef; i++ {
-		_, err = fmt.Fprintf(pdf.w, "%010d 00000 n\r\n", pdf.xref[i])
+	for i := 0; i < pdf.nextRef; i++ {
+		entry := pdf.xref[i]
+		if entry != nil && entry.InStream != nil {
+			panic("object streams not supported") // TODO(voss)
+		}
+		if entry != nil && entry.Pos >= 0 {
+			_, err = fmt.Fprintf(pdf.w, "%010d %05d n\r\n",
+				entry.Pos, entry.Generation)
+		} else {
+			// free object
+			_, err = pdf.w.Write([]byte("0000000000 65535 f\r\n"))
+		}
 		if err != nil {
 			return err
 		}
@@ -104,7 +118,7 @@ func (pdf *Writer) WriteObject(obj Object) (*Reference, error) {
 	if !ok {
 		ind = &Indirect{
 			Reference: Reference{
-				Index:      pdf.nextRef,
+				Number:     pdf.nextRef,
 				Generation: 0,
 			},
 			Obj: obj,
@@ -117,7 +131,7 @@ func (pdf *Writer) WriteObject(obj Object) (*Reference, error) {
 		return nil, err
 	}
 
-	pdf.xref[ind.Reference.Index] = pos
+	pdf.xref[ind.Reference.Number] = &xRefEntry{Pos: pos, Generation: 0}
 
 	return &ind.Reference, nil
 }
@@ -126,7 +140,7 @@ func (pdf *Writer) WriteObject(obj Object) (*Reference, error) {
 func (pdf *Writer) ReserveNumber(obj Object) (*Indirect, *Reference) {
 	res := &Indirect{
 		Reference: Reference{
-			Index:      pdf.nextRef,
+			Number:     pdf.nextRef,
 			Generation: 0,
 		},
 		Obj: obj,

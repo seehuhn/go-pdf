@@ -8,66 +8,94 @@ import (
 	"strconv"
 )
 
-func (r *Reader) findXRef() (int64, int64, error) {
-	endChunk := int64(1024)
-	if endChunk > r.size {
-		endChunk = r.size
-	}
-	buf := make([]byte, endChunk)
-	n, err := r.r.ReadAt(buf, r.size-endChunk)
+func (r *Reader) findXRef() (int64, error) {
+	pos, err := r.lastOccurence("startxref")
 	if err != nil {
-		return 0, 0, err
+		return 0, err
+	}
+	pos += 9
+
+	s := newScanner(io.NewSectionReader(r.r, pos, r.size-pos))
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
 	}
 
-	idx := bytes.LastIndex(buf[:n], []byte("startxref"))
-	if idx < 0 {
-		return 0, 0, &MalformedFileError{
-			Pos: r.size,
-			Err: errors.New("startxref not found"),
-		}
-	}
-	markerPos := r.size - endChunk + int64(idx)
-
-	idx += 9
-	for isSpace[buf[idx]] && idx < n {
-		idx++
+	xRefPos, err := s.ReadInteger()
+	if err != nil {
+		return 0, err
 	}
 
-	var xrefPos int64
-	for idx < n && buf[idx] >= '0' && buf[idx] <= '9' {
-		xrefPos = xrefPos*10 + int64(buf[idx]-'0')
-		idx++
-	}
-	if xrefPos <= 0 || xrefPos >= markerPos {
-		return 0, 0, &MalformedFileError{
-			Pos: markerPos,
+	if xRefPos <= 0 || int64(xRefPos) >= r.size {
+		return 0, &MalformedFileError{
+			Pos: s.filePos(),
 			Err: errors.New("invalid xref position"),
 		}
 	}
 
-	return xrefPos, markerPos, nil
+	return int64(xRefPos), nil
 }
 
-func (r *Reader) readXRef() (map[int64]*xrefEntry, error) {
-	start, end, err := r.findXRef()
+func (r *Reader) lastOccurence(pat string) (int64, error) {
+	const chunkSize = 1024
+
+	buf := make([]byte, chunkSize)
+	k := int64(len(pat))
+	pos := r.size
+	for pos >= k {
+		start := pos - chunkSize
+		if start < 0 {
+			start = 0
+		}
+		n, err := r.r.ReadAt(buf[:pos-start], start)
+		if err != nil && err != io.EOF {
+			return 0, err
+		}
+
+		idx := bytes.LastIndex(buf[:n], []byte(pat))
+		if idx >= 0 {
+			return start + int64(idx), nil
+		}
+
+		pos = start + k - 1
+	}
+	return 0, &MalformedFileError{
+		Pos: 0,
+		Err: errors.New("startxref not found"),
+	}
+}
+
+func (r *Reader) readXRef() (map[int]*xRefEntry, error) {
+	start, err := r.findXRef()
 	if err != nil {
 		return nil, err
 	}
 
-	xref := make(map[int64]*xrefEntry)
+	xref := make(map[int]*xRefEntry)
 	for {
-		xRefData := io.NewSectionReader(r.r, start, end-start)
+		// I have found a PDF file where startxref pointed to the start of the
+		// line _after_ the "xref".  Make a cursory attempt to fix up this
+		// case.
+		if start > 5 {
+			start -= 5
+		}
+
+		xRefData := io.NewSectionReader(r.r, start, r.size-start)
 		s := newScanner(xRefData)
 
-		buf, err := s.Peek(4)
+		buf, err := s.Peek(9)
 		if err != nil {
 			return nil, err
 		}
 		var dict Dict
 		switch {
-		case bytes.Equal(buf, []byte("xref")):
+		case bytes.Equal(buf[5:], []byte("xref")):
+			s.pos += 5
+			dict, err = readOldStyleXRef(xref, s)
+		case bytes.Equal(buf[:4], []byte("xref")):
 			dict, err = readOldStyleXRef(xref, s)
 		default:
+			s.pos += 5
 			dict, err = readNewStyleXRef(xref, s)
 		}
 		if err != nil {
@@ -79,19 +107,19 @@ func (r *Reader) readXRef() (map[int64]*xrefEntry, error) {
 			break
 		}
 		prevStart, ok := prev.(Integer)
-		if !ok || prevStart <= 0 || int64(prevStart) >= start {
+		if !ok || prevStart <= 0 || int64(prevStart) >= r.size {
 			return nil, &MalformedFileError{
 				Pos: start,
 				Err: fmt.Errorf("invalid /Prev value %s", format(prev)),
 			}
 		}
-		start, end = int64(prevStart), start
+		start = int64(prevStart)
 	}
 
 	return xref, nil
 }
 
-func readOldStyleXRef(xref map[int64]*xrefEntry, s *scanner) (Dict, error) {
+func readOldStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	err := s.SkipString("xref")
 	if err != nil {
 		return nil, err
@@ -102,11 +130,11 @@ func readOldStyleXRef(xref map[int64]*xrefEntry, s *scanner) (Dict, error) {
 	}
 
 	for {
-		done, err := s.HasPrefix("trailer")
+		buf, err := s.Peek(1)
 		if err != nil {
 			return nil, err
 		}
-		if done {
+		if len(buf) == 0 || buf[0] < '0' || buf[0] > '9' {
 			break
 		}
 
@@ -128,12 +156,20 @@ func readOldStyleXRef(xref map[int64]*xrefEntry, s *scanner) (Dict, error) {
 			return nil, err
 		}
 
-		err = decodeOldStyleSection(xref, s, int64(start), int64(start+length))
+		err = decodeOldStyleSection(xref, s, int(start), int(start+length))
+		if err != nil {
+			return nil, err
+		}
+		err = s.SkipWhiteSpace()
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return nil, err
+	}
 	err = s.SkipString("trailer")
 	if err != nil {
 		return nil, err
@@ -145,7 +181,8 @@ func readOldStyleXRef(xref map[int64]*xrefEntry, s *scanner) (Dict, error) {
 	return s.ReadDict()
 }
 
-func decodeOldStyleSection(xref map[int64]*xrefEntry, s *scanner, start, end int64) error {
+func decodeOldStyleSection(xref map[int]*xRefEntry, s *scanner, start, end int) error {
+	// TODO(voss): use xrefSubSection?
 	for i := start; i < end; i++ {
 		if xref[i] != nil {
 			err := s.Discard(20)
@@ -172,17 +209,23 @@ func decodeOldStyleSection(xref map[int64]*xrefEntry, s *scanner, start, end int
 		}
 		b, err := strconv.ParseUint(string(buf[11:16]), 10, 16)
 		if err != nil {
-			return err
+			// fix a common error in some PDF files
+			if bytes.HasPrefix(buf, []byte("0000000000 65536 ")) {
+				b = 65535
+				buf[17] = 'f'
+			} else {
+				return err
+			}
 		}
 		c := buf[17]
 		switch c {
 		case 'f':
-			xref[i] = &xrefEntry{
+			xref[i] = &xRefEntry{
 				Pos:        -1,
 				Generation: uint16(b),
 			}
 		case 'n':
-			xref[i] = &xrefEntry{
+			xref[i] = &xRefEntry{
 				Pos:        a,
 				Generation: uint16(b),
 			}
@@ -198,7 +241,7 @@ func decodeOldStyleSection(xref map[int64]*xrefEntry, s *scanner, start, end int
 	return nil
 }
 
-func readNewStyleXRef(xref map[int64]*xrefEntry, s *scanner) (Dict, error) {
+func readNewStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	obj, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, err
@@ -224,7 +267,7 @@ func readNewStyleXRef(xref map[int64]*xrefEntry, s *scanner) (Dict, error) {
 	return dict, nil
 }
 
-func checkNewStyleDict(dict Dict) ([]int, []*xrefSubSection, error) {
+func checkNewStyleDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	size, ok := dict["Size"].(Integer)
 	if !ok {
 		return nil, nil, &MalformedFileError{}
@@ -236,16 +279,16 @@ func checkNewStyleDict(dict Dict) ([]int, []*xrefSubSection, error) {
 	var w []int
 	for i, Wi := range W {
 		wi, ok := Wi.(Integer)
-		if !ok || i < 3 && (wi < 0 || wi > 7) {
+		if !ok || i < 3 && (wi < 0 || wi > 8) {
 			return nil, nil, &MalformedFileError{}
 		}
 		w = append(w, int(wi))
 	}
 
 	Index := dict["Index"]
-	var ss []*xrefSubSection
+	var ss []*xRefSubSection
 	if Index == nil {
-		ss = append(ss, &xrefSubSection{0, int64(size)})
+		ss = append(ss, &xRefSubSection{0, int(size)})
 	} else {
 		ind, ok := Index.(Array)
 		if !ok || len(ind)%2 != 0 {
@@ -257,13 +300,13 @@ func checkNewStyleDict(dict Dict) ([]int, []*xrefSubSection, error) {
 			if !ok1 || !ok2 {
 				return nil, nil, &MalformedFileError{}
 			}
-			ss = append(ss, &xrefSubSection{int64(start), int64(size)})
+			ss = append(ss, &xRefSubSection{int(start), int(size)})
 		}
 	}
 	return w, ss, nil
 }
 
-func decodeNewStyleXref(xref map[int64]*xrefEntry, r io.Reader, w []int, ss []*xrefSubSection) error {
+func decodeNewStyleXref(xref map[int]*xRefEntry, r io.Reader, w []int, ss []*xRefSubSection) error {
 	wTotal := 0
 	for _, wi := range w {
 		wTotal += wi
@@ -295,7 +338,7 @@ func decodeNewStyleXref(xref map[int64]*xrefEntry, r io.Reader, w []int, ss []*x
 				// free/deleted object
 				// a = next free object
 				// b = generation number to be used if the object is resurrected
-				xref[i] = &xrefEntry{
+				xref[i] = &xRefEntry{
 					Pos:        -1,
 					Generation: uint16(b),
 				}
@@ -303,7 +346,7 @@ func decodeNewStyleXref(xref map[int64]*xrefEntry, r io.Reader, w []int, ss []*x
 				// used object, not compressed
 				// a = byte offset of the object
 				// b = generation number
-				xref[i] = &xrefEntry{
+				xref[i] = &xRefEntry{
 					Pos:        a,
 					Generation: uint16(b),
 				}
@@ -311,10 +354,10 @@ func decodeNewStyleXref(xref map[int64]*xrefEntry, r io.Reader, w []int, ss []*x
 				// used object, compressed
 				// a = object number of the compressed stream (generation number 0)
 				// b = index within the stream
-				xref[i] = &xrefEntry{
+				xref[i] = &xRefEntry{
 					Pos: b,
 					InStream: &Reference{
-						Index:      a,
+						Number:     int(a),
 						Generation: 0,
 					},
 				}
@@ -331,11 +374,11 @@ func decodeInt(buf []byte) (res int64) {
 	return res
 }
 
-type xrefSubSection struct {
-	Start, Size int64
+type xRefSubSection struct {
+	Start, Size int
 }
 
-type xrefEntry struct {
+type xRefEntry struct {
 	Pos        int64 // -1 indicates unused/deleted objects
 	Generation uint16
 	InStream   *Reference

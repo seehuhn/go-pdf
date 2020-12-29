@@ -264,13 +264,13 @@ func (x *Stream) Decode() io.Reader {
 
 // Reference represents a reference to an indirect object in a PDF file.
 type Reference struct {
-	Index      int64 // TODO(voss): use int and uint16
+	Number     int
 	Generation uint16
 }
 
 // PDF implements the Object interface
 func (x *Reference) PDF(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%d %d R", x.Index, x.Generation)
+	_, err := fmt.Fprintf(w, "%d %d R", x.Number, x.Generation)
 	return err
 }
 
@@ -286,7 +286,7 @@ func (x *Indirect) PDF(w io.Writer) error {
 		// missing objects are treated as null
 		return nil
 	}
-	_, err := fmt.Fprintf(w, "%d %d obj\n", x.Index, x.Generation)
+	_, err := fmt.Fprintf(w, "%d %d obj\n", x.Number, x.Generation)
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@ func (s *scanner) filePos() int64 {
 }
 
 func (s *scanner) ReadIndirectObject() (*Indirect, error) {
-	id, err := s.ReadInteger()
+	number, err := s.ReadInteger()
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (s *scanner) ReadIndirectObject() (*Indirect, error) {
 		return nil, err
 	}
 
-	gen, err := s.ReadInteger()
+	generation, err := s.ReadInteger()
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (s *scanner) ReadIndirectObject() (*Indirect, error) {
 			}
 
 			obj = &Reference{
-				Index:      int64(a),
+				Number:     int(a),
 				Generation: uint16(b),
 			}
 		}
@@ -100,7 +100,7 @@ func (s *scanner) ReadIndirectObject() (*Indirect, error) {
 	}
 
 	return &Indirect{
-		Reference: Reference{int64(id), uint16(gen)},
+		Reference: Reference{int(number), uint16(generation)},
 		Obj:       obj,
 	}, nil
 }
@@ -407,7 +407,7 @@ func (s *scanner) ReadArray() (Array, error) {
 		if integersSeen >= 2 && buf[0] == 'R' {
 			s.pos++
 			k := len(array)
-			a := int64(array[k-2].(Integer))
+			a := int(array[k-2].(Integer))
 			b := uint16(array[k-1].(Integer))
 			array = append(array[:k-2], &Reference{a, b})
 			integersSeen = 0
@@ -496,7 +496,7 @@ func (s *scanner) ReadDict() (Dict, error) {
 					return nil, err
 				}
 
-				val = &Reference{int64(a), uint16(b)}
+				val = &Reference{int(a), uint16(b)}
 			}
 		}
 
@@ -677,16 +677,6 @@ func (s *scanner) SkipString(pat string) error {
 	}
 	s.pos += n
 	return nil
-}
-
-func (s *scanner) HasPrefix(pfx string) (bool, error) {
-	patBytes := []byte(pfx)
-	n := len(patBytes)
-	buf, err := s.Peek(n)
-	if err != nil {
-		return false, err
-	}
-	return bytes.Equal(buf, patBytes), nil
 }
 
 var (

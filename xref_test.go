@@ -12,13 +12,29 @@ func TestFindXref(t *testing.T) {
 		size: int64(len(in)),
 		r:    strings.NewReader(in),
 	}
-	start, stop, err := r.findXRef()
+	start, err := r.findXRef()
 	if err != nil {
 		t.Error(err)
 	}
-	buf := []byte(in)[start:stop]
-	if !bytes.Equal(buf, []byte("hello\n")) {
-		t.Errorf("wrong xref data, expected %q but got %q",
-			"hello\n", string(buf))
+	if start != 9 {
+		t.Errorf("wrong xref start, expected 9 but got %d", start)
+	}
+}
+
+func TestLastOccurence(t *testing.T) {
+	buf := make([]byte, 2048)
+	pat := "ABC"
+	copy(buf[1023:], pat)
+
+	r := &Reader{
+		size: int64(len(buf)),
+		r:    bytes.NewReader(buf),
+	}
+	pos, err := r.lastOccurence(pat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pos != 1023 {
+		t.Errorf("found wrong position: expected 1023, got %d", pos)
 	}
 }
