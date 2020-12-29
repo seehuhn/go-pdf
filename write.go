@@ -82,7 +82,7 @@ func (pdf *Writer) Close() error {
 	if err != nil {
 		return err
 	}
-	_, err = pdf.w.Write([]byte(format(xrefDict)))
+	err = xrefDict.PDF(pdf.w)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (pdf *Writer) WriteObject(obj Object) (*Reference, error) {
 		pdf.nextRef++
 	}
 
-	_, err := pdf.w.Write([]byte(format(ind)))
+	err := ind.PDF(pdf.w)
 	if err != nil {
 		return nil, err
 	}

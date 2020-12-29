@@ -10,41 +10,49 @@ import (
 
 // Object represents an object in a PDF file.
 type Object interface {
-	PDF() []byte
+	PDF(w io.Writer) error
 }
 
 // Bool represents a boolean value in a PDF file.
 type Bool bool
 
 // PDF implements the Object interface
-func (x Bool) PDF() []byte {
+func (x Bool) PDF(w io.Writer) error {
+	var s string
 	if x {
-		return []byte("true")
+		s = "true"
+	} else {
+		s = "false"
 	}
-	return []byte("false")
+	_, err := w.Write([]byte(s))
+	return err
 }
 
 // Integer represents an integer constant in a PDF file.
 type Integer int64
 
 // PDF implements the Object interface
-func (x Integer) PDF() []byte {
-	return []byte(strconv.FormatInt(int64(x), 10))
+func (x Integer) PDF(w io.Writer) error {
+	s := strconv.FormatInt(int64(x), 10)
+	_, err := w.Write([]byte(s))
+	return err
 }
 
 // Real represents an real number in a PDF file.
 type Real float64
 
 // PDF implements the Object interface
-func (x Real) PDF() []byte {
-	return []byte(strconv.FormatFloat(float64(x), 'f', -1, 64))
+func (x Real) PDF(w io.Writer) error {
+	s := strconv.FormatFloat(float64(x), 'f', -1, 64)
+	_, err := w.Write([]byte(s))
+	return err
 }
 
 // String represents a string constant in a PDF file.
 type String string
 
 // PDF implements the Object interface
-func (x String) PDF() []byte {
+func (x String) PDF(w io.Writer) error {
 	l := []byte(x)
 
 	var funny []int
@@ -90,17 +98,18 @@ func (x String) PDF() []byte {
 		}
 		buf.WriteString(")")
 	} else {
-		fmt.Fprintf(buf, "<%02x>", l)
+		fmt.Fprintf(buf, "<%x>", l)
 	}
 
-	return buf.Bytes()
+	_, err := w.Write(buf.Bytes())
+	return err
 }
 
 // Name represents a name in a PDF file.
 type Name string
 
 // PDF implements the Object interface
-func (x Name) PDF() []byte {
+func (x Name) PDF(w io.Writer) error {
 	l := []byte(x)
 
 	var funny []int
@@ -126,53 +135,81 @@ func (x Name) PDF() []byte {
 		buf.Write(l[pos:n])
 	}
 
-	return buf.Bytes()
+	_, err := w.Write(buf.Bytes())
+	return err
 }
 
 // Array represent an array in a PDF file.
 type Array []Object
 
 // PDF implements the Object interface
-func (x Array) PDF() []byte {
-	buf := &bytes.Buffer{}
-	buf.WriteByte('[')
+func (x Array) PDF(w io.Writer) error {
+	_, err := w.Write([]byte("["))
+	if err != nil {
+		return err
+	}
 	for i, val := range x {
 		if i > 0 {
-			buf.WriteByte(' ') // TODO(voss): use '\n' here?
+			_, err := w.Write([]byte(" ")) // TODO(voss): use '\n' here?
+			if err != nil {
+				return err
+			}
 		}
-		buf.Write(val.PDF())
+		if val == nil {
+			_, err = w.Write([]byte("null"))
+		} else {
+			err = val.PDF(w)
+		}
+		if err != nil {
+			return err
+		}
 	}
-	buf.WriteByte(']')
-	return buf.Bytes()
+	_, err = w.Write([]byte("]"))
+	return err
 }
 
 // Dict represent a Dictionary object in a PDF file.
 type Dict map[Name]Object
 
 // PDF implements the Object interface
-func (x Dict) PDF() []byte {
+func (x Dict) PDF(w io.Writer) error {
 	var keys []string
 	for key := range x {
 		keys = append(keys, string(key))
 	}
 	sort.Strings(keys)
 
-	buf := &bytes.Buffer{}
-	buf.WriteString("<<")
+	_, err := w.Write([]byte("<<"))
+	if err != nil {
+		return err
+	}
+
 	for _, key := range keys {
 		name := Name(key)
 		val := x[name]
 		if val == nil {
 			continue
 		}
-		buf.WriteString("\n")
-		buf.Write(name.PDF())
-		buf.WriteString(" ")
-		q := val.PDF()
-		buf.Write(q)
+
+		_, err = w.Write([]byte("\n"))
+		if err != nil {
+			return err
+		}
+		err = name.PDF(w)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write([]byte(" "))
+		if err != nil {
+			return err
+		}
+		err = val.PDF(w)
+		if err != nil {
+			return err
+		}
 	}
-	buf.WriteString("\n>>")
-	return buf.Bytes()
+	_, err = w.Write([]byte("\n>>"))
+	return err
 }
 
 // Stream represent a stream object in a PDF file.
@@ -182,13 +219,21 @@ type Stream struct {
 }
 
 // PDF implements the Object interface
-func (x *Stream) PDF() []byte {
-	buf := &bytes.Buffer{}
-	buf.Write(x.Dict.PDF())
-	buf.WriteString("\nstream\n")
-	io.Copy(buf, x.R)
-	buf.WriteString("\nendstream")
-	return buf.Bytes()
+func (x *Stream) PDF(w io.Writer) error {
+	err := x.Dict.PDF(w)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte("\nstream\n"))
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, x.R)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte("\nendstream"))
+	return err
 }
 
 // Decode returns a reader for the decoded stream data.
@@ -224,8 +269,9 @@ type Reference struct {
 }
 
 // PDF implements the Object interface
-func (x *Reference) PDF() []byte {
-	return []byte(fmt.Sprintf("%d %d R", x.Index, x.Generation))
+func (x *Reference) PDF(w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%d %d R", x.Index, x.Generation)
+	return err
 }
 
 // Indirect represents an indirect object in a PDF file.
@@ -235,17 +281,29 @@ type Indirect struct {
 }
 
 // PDF implements the Object interface
-func (x *Indirect) PDF() []byte {
-	buf := &bytes.Buffer{}
-	fmt.Fprintf(buf, "%d %d obj\n", x.Index, x.Generation)
-	buf.WriteString(format(x.Obj))
-	buf.WriteString("\nendobj\n")
-	return buf.Bytes()
+func (x *Indirect) PDF(w io.Writer) error {
+	if x.Obj == nil {
+		// missing objects are treated as null
+		return nil
+	}
+	_, err := fmt.Fprintf(w, "%d %d obj\n", x.Index, x.Generation)
+	if err != nil {
+		return err
+	}
+	err = x.Obj.PDF(w)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte("\nendobj\n"))
+	return err
 }
 
 func format(x Object) string {
+	buf := &bytes.Buffer{}
 	if x == nil {
-		return "null"
+		buf.WriteString("null")
+	} else {
+		_ = x.PDF(buf)
 	}
-	return string(x.PDF())
+	return buf.String()
 }

@@ -2,16 +2,19 @@ package pdflib
 
 import "testing"
 
-func TestString(t *testing.T) {
+func TestFormat(t *testing.T) {
 	cases := []struct {
-		in, out string
+		in  Object
+		out string
 	}{
-		{"a", "(a)"},
-		{"", "()"},
-		{"\000", "<00>"},
+		{nil, "null"},
+		{String("a"), "(a)"},
+		{String(""), "()"},
+		{String("\000"), "<00>"},
+		{Array{Integer(1), nil, Integer(3)}, "[1 null 3]"},
 	}
 	for _, test := range cases {
-		out := format(String(test.in))
+		out := format(test.in)
 		if out != test.out {
 			t.Errorf("string wrongly formatted, expected %q but got %q",
 				test.out, out)
