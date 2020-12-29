@@ -52,6 +52,10 @@ func (s *scanner) ReadIndirectObject() (*Indirect, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return nil, err
+	}
 
 	obj, err := s.ReadObject()
 	if err != nil {

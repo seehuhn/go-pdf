@@ -58,7 +58,6 @@ func (r *Reader) readXRef() (map[int64]*xrefEntry, error) {
 	for {
 		xRefData := io.NewSectionReader(r.r, start, end-start)
 		s := newScanner(xRefData)
-		xRefData = nil
 
 		buf, err := s.Peek(4)
 		if err != nil {
@@ -68,13 +67,11 @@ func (r *Reader) readXRef() (map[int64]*xrefEntry, error) {
 		switch {
 		case bytes.Equal(buf, []byte("xref")):
 			dict, err = readOldStyleXRef(xref, s)
-		case bytes.HasPrefix(buf, []byte("<<")):
-			dict, err = readNewStyleXRef(xref, s)
 		default:
-			return nil, &MalformedFileError{
-				Pos: start,
-				Err: errors.New("xref data not found"),
-			}
+			dict, err = readNewStyleXRef(xref, s)
+		}
+		if err != nil {
+			return nil, err
 		}
 
 		prev := dict["Prev"]
@@ -151,7 +148,10 @@ func readOldStyleXRef(xref map[int64]*xrefEntry, s *scanner) (Dict, error) {
 func decodeOldStyleSection(xref map[int64]*xrefEntry, s *scanner, start, end int64) error {
 	for i := start; i < end; i++ {
 		if xref[i] != nil {
-			s.Discard(20)
+			err := s.Discard(20)
+			if err != nil {
+				return err
+			}
 			continue
 		}
 

@@ -6,8 +6,7 @@ import (
 )
 
 var (
-	errOutOfRange = errors.New("file position out of range")
-	errVersion    = errors.New("unsupported PDF version")
+	errVersion = errors.New("unsupported PDF version")
 )
 
 // MalformedFileError indicates that the PDF file could not be parsed.
@@ -17,15 +16,15 @@ type MalformedFileError struct {
 }
 
 func (err *MalformedFileError) Error() string {
-	head := ""
-	if err.Pos > 0 {
-		head = strconv.FormatInt(err.Pos, 10) + ": "
+	middle := ""
+	if err.Err != nil {
+		middle = ": " + err.Err.Error()
 	}
 	tail := ""
-	if err.Err != nil {
-		tail = ": " + err.Err.Error()
+	if err.Pos > 0 {
+		tail = " (at byte " + strconv.FormatInt(err.Pos, 10) + ")"
 	}
-	return head + "not a valid PDF file" + tail
+	return "not a valid PDF file" + middle + tail
 }
 func (err *MalformedFileError) Unwrap() error {
 	return err.Err

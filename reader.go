@@ -10,7 +10,6 @@ import (
 // Reader represents a pdf file opened for reading.
 type Reader struct {
 	size int64
-	pos  int64
 	r    io.ReaderAt
 
 	HeaderVersion PDFVersion

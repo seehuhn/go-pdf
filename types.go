@@ -161,10 +161,15 @@ func (x Dict) PDF() []byte {
 	buf.WriteString("<<")
 	for _, key := range keys {
 		name := Name(key)
+		val := x[name]
+		if val == nil {
+			continue
+		}
 		buf.WriteString("\n")
 		buf.Write(name.PDF())
 		buf.WriteString(" ")
-		buf.Write(x[name].PDF())
+		q := val.PDF()
+		buf.Write(q)
 	}
 	buf.WriteString("\n>>")
 	return buf.Bytes()
@@ -234,7 +239,7 @@ func (x *Indirect) PDF() []byte {
 	buf := &bytes.Buffer{}
 	fmt.Fprintf(buf, "%d %d obj\n", x.Index, x.Generation)
 	buf.WriteString(format(x.Obj))
-	buf.WriteString("\nendobj")
+	buf.WriteString("\nendobj\n")
 	return buf.Bytes()
 }
 
