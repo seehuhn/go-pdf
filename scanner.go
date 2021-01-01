@@ -15,21 +15,31 @@ type scanner struct {
 	buf       []byte
 	used, pos int
 
+	getInt func(Object) (Integer, error)
+
 	total int64
 }
 
-func newScanner(r io.Reader) *scanner {
+func newScanner(r io.Reader, getInt func(Object) (Integer, error)) *scanner {
 	return &scanner{
-		r:   r,
-		buf: make([]byte, scannerBufSize),
+		r:      r,
+		buf:    make([]byte, scannerBufSize),
+		getInt: getInt,
 	}
 }
 
 func (s *scanner) filePos() int64 {
-	return s.total + int64(s.used)
+	return s.total + int64(s.pos)
 }
 
 func (s *scanner) ReadIndirectObject() (*Indirect, error) {
+	// Some files point the xref entries at the end of the previous line.
+	// Try to fix this up by skipping any leading white space.
+	err := s.SkipWhiteSpace()
+	if err != nil {
+		return nil, err
+	}
+
 	number, err := s.ReadInteger()
 	if err != nil {
 		return nil, err
@@ -152,7 +162,7 @@ func (s *scanner) ReadObject() (Object, error) {
 		if !bytes.HasPrefix(buf, []byte("stream")) {
 			return dict, nil
 		}
-		return s.ReadStream(dict)
+		return s.ReadStreamData(dict)
 	case buf[0] == '(':
 		s.pos++
 		return s.ReadQuotedString()
@@ -510,14 +520,14 @@ func (s *scanner) ReadDict() (Dict, error) {
 	return dict, nil
 }
 
-// ReadDict reads a PDF dictionary.
-func (s *scanner) ReadStream(dict Dict) (*Stream, error) {
-	length, ok := dict[Name("Length")].(Integer)
-	if !ok {
-		return nil, &MalformedFileError{}
+// ReadStreamData reads the data of a PDF Stream, starting after the Dict.
+func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
+	length, err := s.getInt(dict["Length"])
+	if err != nil {
+		return nil, err
 	}
 
-	err := s.SkipWhiteSpace()
+	err = s.SkipWhiteSpace()
 	if err != nil {
 		return nil, err
 	}

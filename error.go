@@ -6,6 +6,10 @@ import (
 )
 
 var (
+	// ErrWrongPassword indicates that authentication failed because the
+	// correct password was not supplied.
+	ErrWrongPassword = errors.New("authentication failed")
+
 	errVersion = errors.New("unsupported PDF version")
 )
 

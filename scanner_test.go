@@ -12,13 +12,13 @@ import (
 
 func testScanner(contents string) *scanner {
 	buf := bytes.NewReader([]byte(contents))
-	return newScanner(buf)
+	return newScanner(buf, nil)
 }
 
 func TestRefill(t *testing.T) {
 	n := scannerBufSize + 2
 	buf := make([]byte, n)
-	s := newScanner(bytes.NewReader(buf))
+	s := newScanner(bytes.NewReader(buf), nil)
 
 	for _, inc := range []int{0, 1, scannerBufSize, 1} {
 		s.pos += inc

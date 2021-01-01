@@ -42,8 +42,29 @@ func doOneFile(fname string) error {
 	if err != nil {
 		return err
 	}
-	_, err = pdflib.NewReader(fd, fi.Size())
-	return err
+	r, err := pdflib.NewReader(fd, fi.Size(), nil)
+	if err != nil {
+		return err
+	}
+
+	catalog, err := r.GetDict(r.Trailer["Root"])
+	if err != nil {
+		return err
+	}
+
+	pages, err := r.GetDict(catalog["Pages"])
+	if err != nil {
+		return err
+	}
+
+	count, err := r.GetInt(pages["Count"])
+	if err != nil {
+		return err
+	}
+	// fmt.Println(count, fname)
+	_ = count
+
+	return nil
 }
 
 func main() {
@@ -54,7 +75,7 @@ func main() {
 		total++
 		err := doOneFile(fname)
 		if err != nil {
-			fmt.Println(fname+": ", err)
+			fmt.Println(fname+":", err)
 			errors++
 		}
 	}

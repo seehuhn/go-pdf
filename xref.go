@@ -13,9 +13,8 @@ func (r *Reader) findXRef() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	pos += 9
+	s := r.scannerAt(pos + 9)
 
-	s := newScanner(io.NewSectionReader(r.r, pos, r.size-pos))
 	err = s.SkipWhiteSpace()
 	if err != nil {
 		return 0, err
@@ -65,41 +64,55 @@ func (r *Reader) lastOccurence(pat string) (int64, error) {
 	}
 }
 
-func (r *Reader) readXRef() (map[int]*xRefEntry, error) {
+func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 	start, err := r.findXRef()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	xref := make(map[int]*xRefEntry)
+	trailer := Dict{}
+	first := true
 	for {
-		// I have found a PDF file where startxref pointed to the start of the
-		// line _after_ the "xref".  Make a cursory attempt to fix up this
-		// case.
-		if start > 5 {
-			start -= 5
-		}
+		s := r.scannerAt(start)
 
-		xRefData := io.NewSectionReader(r.r, start, r.size-start)
-		s := newScanner(xRefData)
-
-		buf, err := s.Peek(9)
+		buf, err := s.Peek(4)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		var dict Dict
 		switch {
-		case bytes.Equal(buf[5:], []byte("xref")):
-			s.pos += 5
+		case bytes.Equal(buf, []byte("xref")):
 			dict, err = readOldStyleXRef(xref, s)
-		case bytes.Equal(buf[:4], []byte("xref")):
-			dict, err = readOldStyleXRef(xref, s)
+
+			if xRefStm, ok := dict["XRefStm"]; ok {
+				zStart, ok := xRefStm.(Integer)
+				if !ok {
+					return nil, nil, &MalformedFileError{
+						Err: errors.New("wrong type for XRefStm (expected Integer)"),
+					}
+				}
+				s = r.scannerAt(int64(zStart))
+				_, err = readNewStyleXRef(xref, s)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
 		default:
-			s.pos += 5
 			dict, err = readNewStyleXRef(xref, s)
 		}
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+
+		if first {
+			for _, key := range []Name{"Root", "Encrypt", "Info", "ID"} {
+				val, ok := dict[key]
+				if ok {
+					trailer[key] = val
+				}
+			}
+			first = false
 		}
 
 		prev := dict["Prev"]
@@ -108,7 +121,7 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, error) {
 		}
 		prevStart, ok := prev.(Integer)
 		if !ok || prevStart <= 0 || int64(prevStart) >= r.size {
-			return nil, &MalformedFileError{
+			return nil, nil, &MalformedFileError{
 				Pos: start,
 				Err: fmt.Errorf("invalid /Prev value %s", format(prev)),
 			}
@@ -116,7 +129,7 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, error) {
 		start = int64(prevStart)
 	}
 
-	return xref, nil
+	return xref, trailer, nil
 }
 
 func readOldStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
@@ -382,4 +395,8 @@ type xRefEntry struct {
 	Pos        int64 // -1 indicates unused/deleted objects
 	Generation uint16
 	InStream   *Reference
+}
+
+func (entry *xRefEntry) IsFree() bool {
+	return entry == nil || entry.Pos < 0
 }

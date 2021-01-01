@@ -16,7 +16,7 @@ type Object interface {
 // Bool represents a boolean value in a PDF file.
 type Bool bool
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x Bool) PDF(w io.Writer) error {
 	var s string
 	if x {
@@ -29,9 +29,10 @@ func (x Bool) PDF(w io.Writer) error {
 }
 
 // Integer represents an integer constant in a PDF file.
+// TODO(voss): change this to `int`?
 type Integer int64
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x Integer) PDF(w io.Writer) error {
 	s := strconv.FormatInt(int64(x), 10)
 	_, err := w.Write([]byte(s))
@@ -41,7 +42,7 @@ func (x Integer) PDF(w io.Writer) error {
 // Real represents an real number in a PDF file.
 type Real float64
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x Real) PDF(w io.Writer) error {
 	s := strconv.FormatFloat(float64(x), 'f', -1, 64)
 	_, err := w.Write([]byte(s))
@@ -51,7 +52,7 @@ func (x Real) PDF(w io.Writer) error {
 // String represents a string constant in a PDF file.
 type String string
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x String) PDF(w io.Writer) error {
 	l := []byte(x)
 
@@ -108,7 +109,7 @@ func (x String) PDF(w io.Writer) error {
 // Name represents a name in a PDF file.
 type Name string
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x Name) PDF(w io.Writer) error {
 	l := []byte(x)
 
@@ -142,7 +143,7 @@ func (x Name) PDF(w io.Writer) error {
 // Array represent an array in a PDF file.
 type Array []Object
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x Array) PDF(w io.Writer) error {
 	_, err := w.Write([]byte("["))
 	if err != nil {
@@ -171,8 +172,13 @@ func (x Array) PDF(w io.Writer) error {
 // Dict represent a Dictionary object in a PDF file.
 type Dict map[Name]Object
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x Dict) PDF(w io.Writer) error {
+	if x == nil {
+		_, err := w.Write([]byte("null"))
+		return err
+	}
+
 	var keys []string
 	for key := range x {
 		keys = append(keys, string(key))
@@ -218,7 +224,7 @@ type Stream struct {
 	R io.Reader
 }
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x *Stream) PDF(w io.Writer) error {
 	err := x.Dict.PDF(w)
 	if err != nil {
@@ -268,7 +274,7 @@ type Reference struct {
 	Generation uint16
 }
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x *Reference) PDF(w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%d %d R", x.Number, x.Generation)
 	return err
@@ -280,7 +286,7 @@ type Indirect struct {
 	Obj Object
 }
 
-// PDF implements the Object interface
+// PDF implements the Object interface.
 func (x *Indirect) PDF(w io.Writer) error {
 	if x.Obj == nil {
 		// missing objects are treated as null

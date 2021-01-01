@@ -43,7 +43,7 @@ func NewWriter(w io.Writer, ver PDFVersion) (*Writer, error) {
 // Close closes the Writer, flushing any unwritten data to the underlying
 // io.Writer, but does not close the underlying io.Writer.
 func (pdf *Writer) Close() error {
-	pages, err := pdf.WriteObject(pdf.pages)
+	pages, err := pdf.WriteIndirect(pdf.pages)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (pdf *Writer) Close() error {
 	// page 73
 	pdf.catalog["Type"] = Name("Catalog")
 	pdf.catalog["Pages"] = pages
-	root, err := pdf.WriteObject(pdf.catalog)
+	root, err := pdf.WriteIndirect(pdf.catalog)
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func (pdf *Writer) Close() error {
 		// "ID" - optional (required for Encrypted), PDF1.1 (page 43)
 	}
 	if pdf.info != nil {
-		info, err := pdf.WriteObject(pdf.info)
+		info, err := pdf.WriteIndirect(pdf.info)
 		if err != nil {
 			return err
 		}
@@ -109,9 +109,10 @@ func (pdf *Writer) Close() error {
 	return nil
 }
 
-// WriteObject writes an object to the PDF file.  The returned reference
-// must be used to refer to this object from other parts of the file.
-func (pdf *Writer) WriteObject(obj Object) (*Reference, error) {
+// WriteIndirect writes an object to the PDF file, as an indirect object.  The
+// returned reference must be used to refer to this object from other parts of
+// the file.
+func (pdf *Writer) WriteIndirect(obj Object) (*Reference, error) {
 	pos := pdf.w.pos
 
 	ind, ok := obj.(*Indirect)

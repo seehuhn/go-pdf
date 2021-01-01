@@ -32,7 +32,7 @@ func TestWriter(t *testing.T) {
 (Hello World) Tj
 ET
 `))
-	contentNode, err := w.WriteObject(&Stream{
+	contentNode, err := w.WriteIndirect(&Stream{
 		Dict: Dict{
 			"Length": Integer(buf.Size()),
 		},
@@ -41,7 +41,7 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	font, err := w.WriteObject(Dict{
+	font, err := w.WriteIndirect(Dict{
 		"Type":     Name("Font"),
 		"Subtype":  Name("Type1"),
 		"BaseFont": Name("Helvetica"),
@@ -62,7 +62,7 @@ ET
 	})
 	w.pages = pagesObj
 
-	page1, err := w.WriteObject(Dict{ // page 77
+	page1, err := w.WriteIndirect(Dict{ // page 77
 		"Type":      Name("Page"),
 		"CropBox":   Array{Integer(0), Integer(0), Integer(200), Integer(100)},
 		"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
