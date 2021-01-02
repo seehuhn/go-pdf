@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // Object represents an object in a PDF file.
@@ -172,6 +173,16 @@ func (x Array) PDF(w io.Writer) error {
 // Dict represent a Dictionary object in a PDF file.
 type Dict map[Name]Object
 
+func (x Dict) String() string {
+	res := []string{"PDF Dict"}
+	tp, ok := x["Type"].(Name)
+	if ok {
+		res = append(res, string(tp))
+	}
+	res = append(res, strconv.FormatInt(int64(len(x)), 10)+" entries")
+	return "<" + strings.Join(res, ", ") + ">"
+}
+
 // PDF implements the Object interface.
 func (x Dict) PDF(w io.Writer) error {
 	if x == nil {
@@ -303,6 +314,28 @@ func (x *Indirect) PDF(w io.Writer) error {
 	_, err = w.Write([]byte("\nendobj\n"))
 	return err
 }
+
+// Version represent the version of PDF standard used in a file.
+type Version int
+
+// PDF implements the Object interface.
+func (ver Version) PDF(w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%%PDF-1.%d\n%%\x80\x80\x80\x80\n", ver)
+	return err
+}
+
+// Constants for the known PDF versions.
+const (
+	V1_0 Version = iota
+	V1_1
+	V1_2
+	V1_3
+	V1_4
+	V1_5
+	V1_6
+	V1_7
+	tooHighVersion
+)
 
 func format(x Object) string {
 	buf := &bytes.Buffer{}

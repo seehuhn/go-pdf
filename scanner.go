@@ -2,6 +2,7 @@ package pdflib
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -580,9 +581,35 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 	}, nil
 }
 
+func (s *scanner) readHeaderVersion() (Version, error) {
+	buf, err := s.Peek(16)
+	if err != nil {
+		return 0, err
+	}
+
+	if !bytes.HasPrefix(buf, []byte("%PDF-1.")) || len(buf) < 9 {
+		return 0, &MalformedFileError{
+			Err: errors.New("PDF header not found"),
+		}
+	}
+
+	version := Version(buf[7]) - '0'
+	if version < 0 || version >= tooHighVersion ||
+		buf[8] >= '0' && buf[8] <= '9' {
+		return 0, &MalformedFileError{Pos: 7, Err: errVersion}
+	}
+
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+
+	return version, nil
+}
+
 // Refill discards the read part of the buffer and reads as much new data as
-// possible.  An error is returned, if and only if the buffer could not be
-// filled completely.
+// possible.  Once the end of file is reached, s.used will be smaller than the
+// buffer size, but no error will be returned.
 func (s *scanner) refill() error {
 	s.total += int64(s.pos)
 	copy(s.buf, s.buf[s.pos:s.used])
@@ -687,6 +714,30 @@ func (s *scanner) SkipString(pat string) error {
 	}
 	s.pos += n
 	return nil
+}
+
+func (s *scanner) SkipAfter(pat string) error {
+	patBytes := []byte(pat)
+	n := len(patBytes)
+	if n > scannerBufSize {
+		panic("SkipAfter target too large")
+	}
+
+	for {
+		idx := bytes.Index(s.buf[s.pos:s.used], patBytes)
+		if idx >= 0 {
+			s.pos += idx + n
+			return nil
+		}
+		s.pos = s.used
+		err := s.refill()
+		if err != nil {
+			return err
+		}
+		if s.used == 0 {
+			return io.EOF
+		}
+	}
 }
 
 var (

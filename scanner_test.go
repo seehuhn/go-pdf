@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -219,4 +220,64 @@ func TestSkipWhiteSpace(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestReadHeaderVersion(t *testing.T) {
+	s := newScanner(strings.NewReader("%PDF-1.7\n"), nil)
+	version, err := s.readHeaderVersion()
+	if err != nil {
+		t.Errorf("unexpected error %q", err)
+	}
+	if version != V1_7 {
+		t.Errorf("wrong version: expected %d, got %d", V1_7, version)
+	}
+
+	for _, in := range []string{"", "%PEF-1.7\n", "%PDF-0.1\n"} {
+		s = newScanner(strings.NewReader(in), nil)
+		_, err = s.readHeaderVersion()
+		if err == nil {
+			t.Errorf("%q: missing error", in)
+		}
+	}
+
+	for _, in := range []string{"%PDF-1.9\n", "%PDF-1.50\n"} {
+		s = newScanner(strings.NewReader(in), nil)
+		_, err = s.readHeaderVersion()
+		if !errors.Is(err, errVersion) {
+			t.Errorf("%q: wrong error %q", in, err)
+		}
+	}
+}
+
+func TestSequential(t *testing.T) {
+	fd, err := os.Open("example.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewSequentialReader(fd)
+
+	out, err := os.Create("out.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+
+	var pdfOut *Writer
+	for obj := range c {
+		if e, ok := obj.(*pdfError); ok {
+			t.Fatal(e)
+		} else if ver, ok := obj.(Version); ok {
+			pdfOut, err = NewWriter(out, ver)
+			if err != nil {
+				t.Fatal(err)
+			}
+			continue
+		} else if trailer, ok := obj.(*pdfTrailer); ok {
+			pdfOut.Close(trailer.catalog.(*Reference), trailer.info.(*Reference))
+			break
+		}
+		pdfOut.WriteIndirect(obj)
+	}
+	t.Error("fish")
 }

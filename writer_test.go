@@ -17,13 +17,22 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	var catalog, info *Reference
+	defer func() {
+		err = w.Close(catalog, info)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
-	w.info = Dict{ // page 550
+	info, err = w.WriteIndirect(Dict{ // page 550
 		"Title":    String("PDF Test Document"),
 		"Author":   String("Jochen Voss"),
 		"Subject":  String("Testing"),
 		"Keywords": String("PDF, testing, Go"),
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	buf := bytes.NewReader([]byte(`BT
@@ -60,7 +69,6 @@ ET
 		"Kids":  Array{},
 		"Count": Integer(0),
 	})
-	w.pages = pagesObj
 
 	page1, err := w.WriteIndirect(Dict{ // page 77
 		"Type":      Name("Page"),
@@ -73,7 +81,21 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	pages := w.pages.Obj.(Dict)
+
+	pages := pagesObj.Obj.(Dict)
 	pages["Kids"] = append(pages["Kids"].(Array), page1)
 	pages["Count"] = pages["Count"].(Integer) + 1
+	_, err = w.WriteIndirect(pagesObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// page 73
+	catalog, err = w.WriteIndirect(Dict{
+		"Type":  Name("Catalog"),
+		"Pages": pagesRef,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
