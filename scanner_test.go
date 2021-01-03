@@ -13,7 +13,9 @@ import (
 
 func testScanner(contents string) *scanner {
 	buf := bytes.NewReader([]byte(contents))
-	return newScanner(buf, nil)
+	return newScanner(buf, func(o Object) (Integer, error) {
+		return o.(Integer), nil
+	})
 }
 
 func TestRefill(t *testing.T) {
@@ -136,9 +138,9 @@ func TestReadObject(t *testing.T) {
 	for _, test := range cases {
 		for _, suffix := range []string{"", " 1\n"} {
 			body := test.in + suffix
-			file := testScanner(body)
+			s := testScanner(body)
 
-			val, err := file.ReadObject()
+			val, err := s.ReadObject()
 			if s2, ok := test.val.(*Stream); ok {
 				s1, ok := val.(*Stream)
 				if !ok {
@@ -250,7 +252,7 @@ func TestReadHeaderVersion(t *testing.T) {
 }
 
 func TestSequential(t *testing.T) {
-	fd, err := os.Open("example.pdf")
+	fd, err := os.Open("test.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}

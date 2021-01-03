@@ -61,13 +61,55 @@ func NewReader(data io.ReaderAt, size int64, readPwd func() string) (*Reader, er
 			return nil, err
 		}
 
-		err = r.checkPwd()
-		if err != nil {
-			return nil, err
-		}
+		// err = r.checkPwd()
+		// if err != nil {
+		// 	return nil, err
+		// }
 	}
 
 	return r, nil
+}
+
+// Walk performs a depth-first walk through the object graph rooted at obj.
+func (r *Reader) Walk(obj Object, seen map[Reference]bool, fn func(Object) error) error {
+	switch x := obj.(type) {
+	case Dict:
+		for _, val := range x {
+			err := r.Walk(val, seen, fn)
+			if err != nil {
+				return err
+			}
+		}
+	case Array:
+		for _, val := range x {
+			err := r.Walk(val, seen, fn)
+			if err != nil {
+				return err
+			}
+		}
+	case *Stream:
+		for _, val := range x.Dict {
+			err := r.Walk(val, seen, fn)
+			if err != nil {
+				return err
+			}
+		}
+	case *Reference:
+		if seen[*x] {
+			return nil
+		}
+		seen[*x] = true
+
+		val, err := r.Get(x)
+		if err != nil {
+			return err
+		}
+		err = r.Walk(val, seen, fn)
+		if err != nil {
+			return err
+		}
+	}
+	return fn(obj)
 }
 
 // Get resolves references to indirect objects.

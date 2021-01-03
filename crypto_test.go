@@ -14,7 +14,7 @@ func TestComputeOU(t *testing.T) {
 		ID: []byte{0xac, 0xac, 0x29, 0xb4, 0x19, 0x2f, 0xd9, 0x23,
 			0xc2, 0x4f, 0xe6, 0x04, 0x24, 0x79, 0xb2, 0xa9},
 		R: 4,
-		N: 128,
+		N: 16,
 	}
 
 	O := sec.ComputeO(passwd, "")
@@ -56,6 +56,4 @@ func TestCrypto(t *testing.T) {
 	}
 
 	_ = catalog
-
-	t.Fatal("fish")
 }

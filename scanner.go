@@ -352,7 +352,9 @@ func (s *scanner) ReadHexString() (String, error) {
 		res = append(res, 16*hexVal)
 	}
 
-	s.pos++ // we have already seen the closing ">"
+	// If we reach the end of the file, the trailing ">" will be missing.
+	s.SkipString(">")
+
 	return String(res), nil
 }
 
@@ -486,6 +488,12 @@ func (s *scanner) ReadDict() (Dict, error) {
 			if err != nil {
 				return nil, err
 			}
+			if len(buf) == 0 {
+				return nil, &MalformedFileError{
+					Pos: s.filePos(),
+					Err: io.ErrUnexpectedEOF,
+				}
+			}
 			if buf[0] != '/' && buf[0] != '>' {
 				b, err := s.ReadInteger()
 				if err != nil {
@@ -526,6 +534,11 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 	length, err := s.getInt(dict["Length"])
 	if err != nil {
 		return nil, err
+	} else if length < 0 {
+		return nil, &MalformedFileError{
+			Pos: s.filePos(),
+			Err: errors.New("stream with negative length"),
+		}
 	}
 
 	err = s.SkipWhiteSpace()
@@ -550,7 +563,7 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		return nil, &MalformedFileError{}
 	}
 
-	start := s.total + int64(s.pos)
+	start := s.filePos()
 	l := int64(length)
 
 	var streamData io.Reader
@@ -647,6 +660,9 @@ func (s *scanner) Peek(n int) ([]byte, error) {
 }
 
 func (s *scanner) Discard(n int64) error {
+	if n < 0 {
+		panic("negative offset for Discard()")
+	}
 	unread := int64(s.used - s.pos)
 	if n <= unread {
 		s.pos += int(n)
@@ -678,7 +694,7 @@ func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 			return nil
 		}
 		if s.used == 0 {
-			return err
+			return err // io.ErrUnexpectedEOF
 		}
 	}
 }
