@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -249,37 +248,4 @@ func TestReadHeaderVersion(t *testing.T) {
 			t.Errorf("%q: wrong error %q", in, err)
 		}
 	}
-}
-
-func TestSequential(t *testing.T) {
-	fd, err := os.Open("test.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c := NewSequentialReader(fd)
-
-	out, err := os.Create("out.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-
-	var pdfOut *Writer
-	for obj := range c {
-		if e, ok := obj.(*pdfError); ok {
-			t.Fatal(e)
-		} else if ver, ok := obj.(Version); ok {
-			pdfOut, err = NewWriter(out, ver)
-			if err != nil {
-				t.Fatal(err)
-			}
-			continue
-		} else if trailer, ok := obj.(*pdfTrailer); ok {
-			pdfOut.Close(trailer.catalog.(*Reference), trailer.info.(*Reference))
-			break
-		}
-		pdfOut.WriteIndirect(obj)
-	}
-	t.Error("fish")
 }

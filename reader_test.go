@@ -1,11 +1,68 @@
 package pdflib
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestSequential(t *testing.T) {
+	fd, err := os.Open("test.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := NewSequentialReader(fd)
+
+	out, err := os.Create("out-sequential.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+
+	var pdfOut *Writer
+	for obj := range c {
+		if e, ok := obj.(*pdfError); ok {
+			t.Fatal(e)
+		} else if ver, ok := obj.(Version); ok {
+			pdfOut, err = NewWriter(out, ver)
+			if err != nil {
+				t.Fatal(err)
+			}
+			continue
+		} else if trailer, ok := obj.(*pdfTrailer); ok {
+			pdfOut.Close(trailer.catalog.(*Reference), trailer.info.(*Reference))
+			break
+		}
+		pdfOut.WriteIndirect(obj)
+	}
+}
+
+func TestWalk(t *testing.T) {
+	fd, err := os.Open("test.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fi, err := fd.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(fd, fi.Size(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seen := make(map[Reference]bool)
+	err = r.Walk(r.Trailer, seen, func(obj Object) error {
+		fmt.Println(format(obj))
+		return nil
+	})
+	t.Error("fish")
+}
 
 func TestReader6c3fdd9c(t *testing.T) {
 	// found by go-fuzz - check that the code doesn't panic
