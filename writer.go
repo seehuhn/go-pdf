@@ -94,24 +94,26 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 // WriteIndirect writes an object to the PDF file, as an indirect object.  The
 // returned reference must be used to refer to this object from other parts of
 // the file.
-func (pdf *Writer) WriteIndirect(obj Object) (*Reference, error) {
+func (pdf *Writer) WriteIndirect(obj Object, ref *Reference) (*Reference, error) {
 	pos := pdf.w.pos
 
 	ind, ok := obj.(*Indirect)
 	if ok {
+		if ref != nil && *ref != ind.Reference {
+			panic("inconsistent references")
+		}
 		if ind.Number >= pdf.nextRef {
 			pdf.nextRef = ind.Number + 1
 		}
+		ref = &ind.Reference
 	} else {
-		ind = &Indirect{
-			Reference: Reference{
-				Number:     pdf.nextRef,
-				Generation: 0,
-			},
-			Obj: obj,
-		}
-		pdf.nextRef++
+		ind = &Indirect{Obj: obj}
 	}
+
+	if ref == nil {
+		ref = pdf.Alloc()
+	}
+	ind.Reference = *ref
 
 	err := ind.PDF(pdf.w)
 	if err != nil {
@@ -123,18 +125,14 @@ func (pdf *Writer) WriteIndirect(obj Object) (*Reference, error) {
 	return &ind.Reference, nil
 }
 
-// ReserveNumber allocates an object number for an indirect object.
-func (pdf *Writer) ReserveNumber(obj Object) (*Indirect, *Reference) {
-	res := &Indirect{
-		Reference: Reference{
-			Number:     pdf.nextRef,
-			Generation: 0,
-		},
-		Obj: obj,
+// Alloc allocates an object number for an indirect object.
+func (pdf *Writer) Alloc() *Reference {
+	res := &Reference{
+		Number:     pdf.nextRef,
+		Generation: 0,
 	}
 	pdf.nextRef++
-
-	return res, &res.Reference
+	return res
 }
 
 type posWriter struct {

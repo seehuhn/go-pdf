@@ -37,7 +37,7 @@ func TestSequential(t *testing.T) {
 			pdfOut.Close(trailer.catalog.(*Reference), trailer.info.(*Reference))
 			break
 		}
-		pdfOut.WriteIndirect(obj)
+		pdfOut.WriteIndirect(obj, nil)
 	}
 }
 
