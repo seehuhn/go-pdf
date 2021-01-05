@@ -1,4 +1,4 @@
-package pdflib
+package pdf
 
 import (
 	"errors"

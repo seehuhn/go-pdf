@@ -1,3 +1,3 @@
-module seehuhn.de/go/pdflib
+module seehuhn.de/go/pdf
 
 go 1.15

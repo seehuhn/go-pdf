@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdflib"
+	"seehuhn.de/go/pdf"
 )
 
 func getNames() <-chan string {
@@ -42,7 +42,7 @@ func doOneFile(fname string) error {
 	if err != nil {
 		return err
 	}
-	r, err := pdflib.NewReader(fd, fi.Size(), nil)
+	r, err := pdf.NewReader(fd, fi.Size(), nil)
 	if err != nil {
 		return err
 	}
