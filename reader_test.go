@@ -9,38 +9,6 @@ import (
 	"testing"
 )
 
-func TestSequential(t *testing.T) {
-	fd, err := os.Open("test.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c := NewSequentialReader(fd)
-
-	out, err := os.Create("out-sequential.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-
-	var pdfOut *Writer
-	for obj := range c {
-		if e, ok := obj.(*pdfError); ok {
-			t.Fatal(e)
-		} else if ver, ok := obj.(Version); ok {
-			pdfOut, err = NewWriter(out, ver)
-			if err != nil {
-				t.Fatal(err)
-			}
-			continue
-		} else if trailer, ok := obj.(*pdfTrailer); ok {
-			pdfOut.Close(trailer.catalog.(*Reference), trailer.info.(*Reference))
-			break
-		}
-		pdfOut.WriteIndirect(obj, nil)
-	}
-}
-
 func TestWalk(t *testing.T) {
 	fd, err := os.Open("test.pdf")
 	if err != nil {
@@ -61,7 +29,7 @@ func TestWalk(t *testing.T) {
 		fmt.Println(format(obj))
 		return nil
 	})
-	t.Error("fish")
+	// t.Error("fish")
 }
 
 func TestReader6c3fdd9c(t *testing.T) {
@@ -78,7 +46,7 @@ func TestReader4d613ef2(t *testing.T) {
 	NewReader(buf, buf.Size(), nil)
 }
 
-func TastReader215874cf(t *testing.T) {
+func TestReader215874cf(t *testing.T) {
 	// found by go-fuzz - check that the code doesn't hang
 	buf := strings.NewReader("%PDF-1.4\n%\xb5\xed\xae\xfb\n3 0 o" +
 		"bj\n<< /Length 3 0 R\n" +
@@ -141,4 +109,16 @@ func TastReader215874cf(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+func TestReader65af881f(t *testing.T) {
+	// found by go-fuzz - check that the code doesn't panic
+	buf := strings.NewReader("%PDF-1.0\n0 0obj<</ 0 0%startxref8")
+	NewReader(buf, buf.Size(), nil)
+}
+
+func TestReaderb74cc49a0(t *testing.T) {
+	// found by go-fuzz - check that the code doesn't panic
+	buf := strings.NewReader("%PDF-1.0\n0 0obj(startxref8")
+	NewReader(buf, buf.Size(), nil)
 }

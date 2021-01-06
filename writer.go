@@ -97,32 +97,31 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 func (pdf *Writer) WriteIndirect(obj Object, ref *Reference) (*Reference, error) {
 	pos := pdf.w.pos
 
-	ind, ok := obj.(*Indirect)
-	if ok {
-		if ref != nil && *ref != ind.Reference {
-			panic("inconsistent references")
-		}
-		if ind.Number >= pdf.nextRef {
-			pdf.nextRef = ind.Number + 1
-		}
-		ref = &ind.Reference
-	} else {
-		ind = &Indirect{Obj: obj}
-	}
-
 	if ref == nil {
 		ref = pdf.Alloc()
 	}
-	ind.Reference = *ref
 
-	err := ind.PDF(pdf.w)
-	if err != nil {
-		return nil, err
+	if obj == nil {
+		// missing objects are treated as null
+		pos = -1
+	} else {
+		_, err := fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number, ref.Generation)
+		if err != nil {
+			return nil, err
+		}
+		err = obj.PDF(pdf.w)
+		if err != nil {
+			return nil, err
+		}
+		_, err = pdf.w.Write([]byte("\nendobj\n"))
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	pdf.xref[ind.Reference.Number] = &xRefEntry{Pos: pos, Generation: ind.Reference.Generation}
+	pdf.xref[ref.Number] = &xRefEntry{Pos: pos, Generation: ref.Generation}
 
-	return &ind.Reference, nil
+	return ref, nil
 }
 
 // Alloc allocates an object number for an indirect object.

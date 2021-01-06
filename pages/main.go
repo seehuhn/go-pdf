@@ -17,7 +17,7 @@ func Rect(llx, lly, urx, ury int) pdf.Array {
 		pdf.Integer(urx), pdf.Integer(ury)}
 }
 
-const pageTreeWidth = 3
+const pageTreeWidth = 12
 
 // PageTree represents a PDF page tree.
 type PageTree struct {
@@ -57,17 +57,7 @@ func (tree *PageTree) Flush() (pdf.Dict, *pdf.Reference, error) {
 }
 
 // Ship adds a new page or subtree to the PageTree.
-func (tree *PageTree) Ship(obj pdf.Object) error {
-	var ref *pdf.Reference
-	if ind, ok := obj.(*pdf.Indirect); ok {
-		ref = &ind.Reference
-		obj = ind.Obj
-	}
-
-	page, ok := obj.(pdf.Dict)
-	if !ok {
-		return errors.New("wrong type, expected pdf.Dict")
-	}
+func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
 	if page["Type"] != pdf.Name("Page") && page["Type"] != pdf.Name("Pages") {
 		return errors.New("wrong pdf.Dict type, expected /Page or /Pages")
 	}
@@ -79,10 +69,7 @@ func (tree *PageTree) Ship(obj pdf.Object) error {
 	tree.current = parent
 	page["Parent"] = parent.id
 
-	if ref == nil {
-		ref = tree.w.Alloc()
-	}
-	_, err = tree.w.WriteIndirect(page, ref)
+	ref, err = tree.w.WriteIndirect(page, ref)
 	if err != nil {
 		return err
 	}
@@ -200,7 +187,7 @@ func main() {
 
 	for i := 1; i <= 10; i++ {
 		buf := bytes.NewReader([]byte(fmt.Sprintf(`BT
-/F1 24 Tf
+/F1 12 Tf
 30 30 Td
 (page %d) Tj
 ET`, i)))
@@ -217,7 +204,7 @@ ET`, i)))
 			"Type":     pdf.Name("Page"),
 			"Contents": contentNode,
 		}
-		err = pageTree.Ship(page)
+		err = pageTree.Ship(page, nil)
 		if err != nil {
 			log.Fatal(err)
 		}

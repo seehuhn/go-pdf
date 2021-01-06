@@ -150,19 +150,19 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 	}
 
 	s := r.scannerAt(entry.Pos)
-	ind, err := s.ReadIndirectObject()
+	obj, fileRef, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, err
 	}
 
-	if *ref != ind.Reference {
+	if *ref != *fileRef {
 		return nil, &MalformedFileError{
 			Pos: 0,
 			Err: errors.New("xref corrupted"),
 		}
 	}
 
-	return ind.Obj, nil
+	return obj, nil
 }
 
 func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error) {
@@ -190,7 +190,7 @@ func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error
 		}
 	}
 
-	s := newScanner(stream.Decode(), r.GetInt)
+	s := newScanner(stream.Decode(), r.safeGetInt)
 	for {
 		err := s.SkipWhiteSpace()
 		if err != nil {
@@ -263,6 +263,37 @@ func (r *Reader) GetInt(obj Object) (Integer, error) {
 	return val, nil
 }
 
+func (r *Reader) safeGetInt(obj Object) (Integer, error) {
+	if x, ok := obj.(Integer); ok {
+		return x, nil
+	}
+
+	ref, ok := obj.(*Reference)
+	if !ok {
+		return 0, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: errors.New("wrong type (expected Integer)"),
+		}
+	}
+
+	if r.xref == nil {
+		return 0, &MalformedFileError{
+			Pos: 0,
+			Err: errors.New("cannot use references while reading xref table"),
+		}
+	}
+
+	entry := r.xref[ref.Number]
+	if entry.IsFree() || entry.Generation != ref.Generation {
+		return 0, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: errors.New("missing integer (not in xref table)"),
+		}
+	}
+	s := r.scannerAt(entry.Pos)
+	return s.readIndirectInteger()
+}
+
 // GetName resolves references to indirect objects and makes sure the resulting
 // object is a Name.
 func (r *Reader) GetName(obj Object) (Name, error) {
@@ -326,5 +357,6 @@ func (r *Reader) errPos(obj Object) int64 {
 }
 
 func (r *Reader) scannerAt(pos int64) *scanner {
-	return newScanner(io.NewSectionReader(r.r, pos, r.size-pos), r.GetInt)
+	return newScanner(io.NewSectionReader(r.r, pos, r.size-pos),
+		r.safeGetInt)
 }

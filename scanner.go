@@ -33,48 +33,48 @@ func (s *scanner) filePos() int64 {
 	return s.total + int64(s.pos)
 }
 
-func (s *scanner) ReadIndirectObject() (*Indirect, error) {
+func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 	// Some files point the xref entries at the end of the previous line.
 	// Try to fix this up by skipping any leading white space.
 	err := s.SkipWhiteSpace()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	number, err := s.ReadInteger()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = s.SkipWhiteSpace()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	generation, err := s.ReadInteger()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = s.SkipWhiteSpace()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = s.SkipString("obj")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = s.SkipWhiteSpace()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	obj, err := s.ReadObject()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = s.SkipWhiteSpace()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if a, ok := obj.(Integer); ok {
@@ -82,20 +82,20 @@ func (s *scanner) ReadIndirectObject() (*Indirect, error) {
 		// object.
 		buf, err := s.Peek(6)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !bytes.Equal(buf, []byte("endobj")) {
 			b, err := s.ReadInteger()
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			err = s.SkipString("R")
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			err = s.SkipWhiteSpace()
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			obj = &Reference{
@@ -107,13 +107,62 @@ func (s *scanner) ReadIndirectObject() (*Indirect, error) {
 
 	err = s.SkipString("endobj")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &Indirect{
-		Reference: Reference{int(number), uint16(generation)},
-		Obj:       obj,
-	}, nil
+	return obj, &Reference{int(number), uint16(generation)}, nil
+}
+
+func (s *scanner) readIndirectInteger() (Integer, error) {
+	// Some files point the xref entries at the end of the previous line.
+	// Try to fix this up by skipping any leading white space.
+	err := s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = s.ReadInteger() // object number
+	if err != nil {
+		return 0, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = s.ReadInteger() // generation
+	if err != nil {
+		return 0, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+
+	err = s.SkipString("obj")
+	if err != nil {
+		return 0, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+
+	obj, err := s.ReadInteger()
+	if err != nil {
+		return 0, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+
+	err = s.SkipString("endobj")
+	if err != nil {
+		return 0, err
+	}
+
+	return obj, nil
 }
 
 func (s *scanner) ReadObject() (Object, error) {
@@ -157,6 +206,9 @@ func (s *scanner) ReadObject() (Object, error) {
 		// check whether this is the start of a stream
 		err = s.SkipWhiteSpace()
 		if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				return dict, nil
+			}
 			return nil, err
 		}
 		buf, _ = s.Peek(6) // len("stream") == 6
@@ -506,6 +558,9 @@ func (s *scanner) ReadDict() (Dict, error) {
 				}
 
 				buf, err := s.Peek(1)
+				if len(buf) == 0 && err == nil {
+					err = io.EOF
+				}
 				if err != nil || buf[0] != 'R' {
 					return nil, err
 				}
@@ -694,7 +749,10 @@ func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 			return nil
 		}
 		if s.used == 0 {
-			return err // io.ErrUnexpectedEOF
+			if err == nil {
+				err = io.ErrUnexpectedEOF
+			}
+			return err
 		}
 	}
 }

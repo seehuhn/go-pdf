@@ -73,7 +73,14 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 	xref := make(map[int]*xRefEntry)
 	trailer := Dict{}
 	first := true
+	seen := make(map[int64]bool)
 	for {
+		// avoid xref loops
+		if seen[start] {
+			break
+		}
+		seen[start] = true
+
 		s := r.scannerAt(start)
 
 		buf, err := s.Peek(4)
@@ -255,11 +262,11 @@ func decodeOldStyleSection(xref map[int]*xRefEntry, s *scanner, start, end int) 
 }
 
 func readNewStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
-	obj, err := s.ReadIndirectObject()
+	obj, _, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, err
 	}
-	stream, ok := obj.Obj.(*Stream)
+	stream, ok := obj.(*Stream)
 	if !ok {
 		return nil, &MalformedFileError{
 			Pos: s.filePos(),

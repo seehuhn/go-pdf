@@ -135,7 +135,7 @@ func TestReadObject(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		for _, suffix := range []string{"", " 1\n"} {
+		for _, suffix := range []string{">>", " 1\n"} {
 			body := test.in + suffix
 			s := testScanner(body)
 
@@ -207,7 +207,7 @@ func TestSkipWhiteSpace(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		for _, suffix := range []string{"", "x y\n"} {
+		for _, suffix := range []string{">>", "x y\n"} {
 			body := test + suffix
 			s := testScanner(body)
 
@@ -224,7 +224,7 @@ func TestSkipWhiteSpace(t *testing.T) {
 }
 
 func TestReadHeaderVersion(t *testing.T) {
-	s := newScanner(strings.NewReader("%PDF-1.7\n"), nil)
+	s := newScanner(strings.NewReader("%PDF-1.7\n1 0 obj\n"), nil)
 	version, err := s.readHeaderVersion()
 	if err != nil {
 		t.Errorf("unexpected error %q", err)

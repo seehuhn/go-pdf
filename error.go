@@ -30,6 +30,7 @@ func (err *MalformedFileError) Error() string {
 	}
 	return "not a valid PDF file" + middle + tail
 }
+
 func (err *MalformedFileError) Unwrap() error {
 	return err.Err
 }

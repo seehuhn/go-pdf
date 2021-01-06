@@ -1,4 +1,4 @@
-- detect xref cycles
+- add a way to repair broken xref tables
 - look at https://pkg.go.dev/rsc.io/pdf
 - look at https://github.com/pdfcpu/pdfcpu
 - add a licence and copyright notices

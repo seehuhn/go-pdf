@@ -291,30 +291,6 @@ func (x *Reference) PDF(w io.Writer) error {
 	return err
 }
 
-// Indirect represents an indirect object in a PDF file.
-type Indirect struct {
-	Reference
-	Obj Object
-}
-
-// PDF implements the Object interface.
-func (x *Indirect) PDF(w io.Writer) error {
-	if x.Obj == nil {
-		// missing objects are treated as null
-		return nil
-	}
-	_, err := fmt.Fprintf(w, "%d %d obj\n", x.Number, x.Generation)
-	if err != nil {
-		return err
-	}
-	err = x.Obj.PDF(w)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write([]byte("\nendobj\n"))
-	return err
-}
-
 // Version represent the version of PDF standard used in a file.
 type Version int
 
