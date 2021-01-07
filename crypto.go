@@ -13,30 +13,7 @@ type encryptInfo struct {
 	StrF *cryptFilter
 	EFF  *cryptFilter
 
-	sh *standardSecurityHandler
-}
-
-func (r *Reader) checkPwd() error {
-	if r.encInfo == nil {
-		return nil
-	}
-	if r.encInfo.StmF == nil && r.encInfo.StrF == nil && r.encInfo.EFF == nil {
-		return nil
-	}
-
-	var passwd string
-	for {
-		if r.encInfo.sh.Authenticate(passwd) == nil {
-			return nil
-		}
-		if r.readPwd == nil {
-			return ErrWrongPassword
-		}
-		passwd = r.readPwd()
-		if passwd == "" {
-			return ErrWrongPassword
-		}
-	}
+	sh *StandardSecurityHandler
 }
 
 func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
@@ -172,14 +149,15 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 		emd = bool(obj)
 	}
 
-	res.sh = &standardSecurityHandler{
-		ID:  []byte(r.ID[0]),
-		N:   length / 8,
-		R:   int(R),
-		O:   []byte(O),
-		U:   []byte(U),
-		P:   uint32(P),
-		EMD: emd,
+	res.sh = &StandardSecurityHandler{
+		id: []byte(r.ID[0]),
+		n:  length / 8,
+		R:  int(R),
+		o:  []byte(O),
+		u:  []byte(U),
+		P:  uint32(P),
+
+		encryptMetaData: emd,
 	}
 
 	return res, nil
@@ -201,25 +179,20 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 		return nil, errors.New("missing StdCF entry in CF dict")
 	}
 
-	authEvent := Name("DocOpen")
-	if obj, ok := cfDict["AuthEvent"].(Name); ok {
-		authEvent = obj
-	}
-
 	res := &cryptFilter{}
 	res.Length = 0 // TODO(voss): is there a default?
 	if obj, ok := cfDict["Length"].(Integer); ok {
 		res.Length = int(obj) * 8
-		if res.Length < 40 || res.Length > 128 || res.Length%8 != 0 {
-			return nil, errors.New("invalid key length")
-		}
+	}
+	if res.Length < 40 || res.Length > 128 || res.Length%8 != 0 {
+		return nil, errors.New("invalid key length")
 	}
 
 	switch {
-	case cfDict["CFM"] == Name("V2") && authEvent == "DocOpen":
+	case cfDict["CFM"] == Name("V2"):
 		res.Cipher = CipherRC4
 		return res, nil
-	case cfDict["CFM"] == Name("AESV2") && authEvent == "DocOpen":
+	case cfDict["CFM"] == Name("AESV2"):
 		res.Cipher = CipherAES
 		return res, nil
 	default:
@@ -227,36 +200,221 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 	}
 }
 
-type standardSecurityHandler struct {
-	ID  []byte
-	N   int
-	R   int
-	O   []byte
-	U   []byte
-	P   uint32 // permission bits
-	EMD bool
+// The StandardSecurityHandler authenticates the user via a pair of passwords.
+// The "user password" is used to access the contents of the document, the
+// "owner password" can be used to control additional permissions, e.g.
+// permission to print the document.
+type StandardSecurityHandler struct {
+	id []byte
+	o  []byte
+	u  []byte
+	n  int
+
+	getPasswd func(needOwner bool) string
+	key       []byte
+
+	encryptMetaData bool
+
+	R int
+	P uint32
+
+	OwnerAuthenticated bool
 }
 
-func (sec *standardSecurityHandler) ComputeKey(passwd string) []byte {
-	pw := padPasswd(passwd)
+// NewSecurityHandler allocates a new, pre-authenticated StandardSecurityHandler.
+func NewSecurityHandler(id []byte, userPwd, ownerPwd string, P uint32) *StandardSecurityHandler {
+	sec := &StandardSecurityHandler{
+		id: id,
+		n:  16,
+		R:  4,
+		P:  P,
 
+		OwnerAuthenticated: true,
+	}
+	sec.o = sec.computeO(userPwd, ownerPwd)
+
+	key := sec.computeKey(nil, padPasswd(userPwd))
+	sec.u = sec.computeU(make([]byte, 32), key)
+	sec.key = key
+
+	return sec
+}
+
+// GetKey returns the key to decrypt string and stream data.  Passwords will
+// be requested via the getPasswd callback.  If the correct owner password was
+// supplied, the OwnerAuthenticated field will be set to true, in addition to
+// returning the key.
+func (sec *StandardSecurityHandler) GetKey(needOwner bool) ([]byte, error) {
+	// TODO(voss): key length for crypt filters???
+	if sec.key != nil {
+		return sec.key, nil
+	}
+
+	key := make([]byte, 16)
+	u := make([]byte, 32)
+
+	passwd := ""
+	for {
+
+		for try := 0; try < 2; try++ {
+			// try == 0: check whether passwd is the owner password
+			// try == 1: check whether passwd is the user password
+
+			pw := padPasswd(passwd)
+
+			if try == 0 {
+				// try to decrypt sec.O
+				h := md5.New()
+				h.Write(pw)
+				sum := h.Sum(nil)
+				if sec.R >= 3 {
+					for i := 0; i < 50; i++ {
+						h.Reset()
+						h.Write(sum) // sum[:sec.n]?
+						sum = h.Sum(sum[:0])
+					}
+				}
+				key := sum[:sec.n]
+
+				copy(pw, sec.o)
+				if sec.R >= 3 {
+					tmpKey := make([]byte, len(key))
+					for i := byte(19); i > 0; i-- {
+						for j := range tmpKey {
+							tmpKey[j] = key[j] ^ i
+						}
+						c, _ := rc4.NewCipher(tmpKey)
+						c.XORKeyStream(pw, pw)
+					}
+				}
+				c, _ := rc4.NewCipher(key)
+				c.XORKeyStream(pw, pw)
+			}
+
+			key = sec.computeKey(key, pw)
+			u = sec.computeU(u, key)
+			var ok bool
+			if sec.R >= 3 {
+				ok = bytes.Equal(sec.u[:16], u[:16])
+			} else {
+				ok = bytes.Equal(sec.u, u)
+			}
+
+			if ok {
+				sec.key = key
+				if try == 0 {
+					sec.OwnerAuthenticated = true
+				}
+				return key, nil
+			}
+
+			if needOwner {
+				break
+			}
+		}
+
+		// wrong password, try another one
+		if sec.getPasswd != nil {
+			passwd = sec.getPasswd(needOwner)
+		} else {
+			passwd = ""
+		}
+		if passwd == "" {
+			return nil, ErrWrongPassword
+		}
+	}
+}
+
+// algorithm 2: compute the encryption key
+// key must either be nil or have length of at least 16 bytes.
+// pw must be the padded password
+func (sec *StandardSecurityHandler) computeKey(key []byte, pw []byte) []byte {
 	h := md5.New()
 	h.Write(pw)
-	h.Write(sec.O)
+	h.Write(sec.o)
 	h.Write([]byte{byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
-	h.Write(sec.ID)
-	key := h.Sum(nil)
+	h.Write(sec.id)
+	key = h.Sum(key[:0])
 
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			h.Write(key[:sec.N])
+			h.Write(key[:sec.n])
 			key = h.Sum(key[:0])
 		}
 	}
-	return key[:sec.N]
+
+	return key[:sec.n]
 }
 
+// this uses only the .R field of sec.
+func (sec *StandardSecurityHandler) computeO(userPasswd, ownerPasswd string) []byte {
+	if ownerPasswd == "" {
+		ownerPasswd = userPasswd
+	}
+	pwo := padPasswd(ownerPasswd)
+
+	h := md5.New()
+	h.Write(pwo)
+	sum := h.Sum(nil)
+	if sec.R >= 3 {
+		for i := 0; i < 50; i++ {
+			h.Reset()
+			h.Write(sum) // sum[:sec.n]?
+			sum = h.Sum(sum[:0])
+		}
+	}
+	rc4key := sum[:sec.n]
+
+	c, _ := rc4.NewCipher(rc4key)
+	o := padPasswd(userPasswd)
+	c.XORKeyStream(o, o)
+	if sec.R >= 3 {
+		key := make([]byte, len(rc4key))
+		for i := byte(1); i <= 19; i++ {
+			for j := range key {
+				key[j] = rc4key[j] ^ i
+			}
+			c, _ = rc4.NewCipher(key)
+			c.XORKeyStream(o, o)
+		}
+	}
+	return o
+}
+
+// algorithm 4/5: compute U
+// U must be a slice of length 32.
+// key must be the encryption key computed from the user password.
+func (sec *StandardSecurityHandler) computeU(U []byte, key []byte) []byte {
+	c, _ := rc4.NewCipher(key)
+
+	if sec.R < 3 {
+		copy(U, passwdPad)
+		c.XORKeyStream(U, U)
+	} else {
+		h := md5.New()
+		h.Write(passwdPad)
+		h.Write(sec.id)
+		U = h.Sum(U[:0])
+		c.XORKeyStream(U, U)
+
+		tmpKey := make([]byte, len(key))
+		for i := byte(1); i <= 19; i++ {
+			for j := range tmpKey {
+				tmpKey[j] = key[j] ^ byte(i)
+			}
+			c, _ = rc4.NewCipher(tmpKey)
+			c.XORKeyStream(U, U)
+		}
+		// This gives the first 16 bytes of U, the remaining 16 bytes
+		// are "arbitrary padding".
+		U = append(U[:16], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+	}
+
+	return U
+}
+
+// returns a slice of length 32
 func padPasswd(passwd string) []byte {
 	pw := make([]byte, 32)
 	i := 0
@@ -276,97 +434,6 @@ func padPasswd(passwd string) []byte {
 	copy(pw[i:], passwdPad)
 
 	return pw
-}
-
-func (sec *standardSecurityHandler) ComputeO(userPasswd, ownerPasswd string) []byte {
-	if ownerPasswd == "" {
-		ownerPasswd = userPasswd
-	}
-	opw := padPasswd(ownerPasswd)
-
-	h := md5.New()
-	h.Write(opw)
-	sum := h.Sum(nil)
-	if sec.R >= 3 {
-		for i := 0; i < 50; i++ {
-			h.Reset()
-			h.Write(sum) // sum[:sec.Length/8]
-			sum = h.Sum(sum[:0])
-		}
-	}
-	rc4key := sum[:sec.N]
-
-	c, err := rc4.NewCipher(rc4key)
-	if err != nil {
-		// Only invalid Length values can cause errors, and we already checked
-		// the length, above.
-		panic(err)
-	}
-
-	o := padPasswd(userPasswd)
-	c.XORKeyStream(o, o)
-	if sec.R >= 3 {
-		key := make([]byte, len(rc4key))
-		for i := byte(1); i <= 19; i++ {
-			for j := range key {
-				key[j] = rc4key[j] ^ i
-			}
-			c, _ = rc4.NewCipher(key)
-			c.XORKeyStream(o, o)
-		}
-	}
-	return o
-}
-
-func (sec *standardSecurityHandler) ComputeU(userPasswd string) []byte {
-	rc4key := sec.ComputeKey(userPasswd)
-	c, err := rc4.NewCipher(rc4key)
-	if err != nil {
-		// Only invalid Length values can cause errors, and we already checked
-		// the length, above.
-		panic(err)
-	}
-
-	u := make([]byte, 32)
-	if sec.R < 3 {
-		copy(u, passwdPad)
-		c.XORKeyStream(u, u)
-	} else {
-		h := md5.New()
-		h.Write(passwdPad)
-		h.Write(sec.ID)
-		u = h.Sum(u[:0])
-		c.XORKeyStream(u, u)
-
-		key := make([]byte, len(rc4key))
-		for i := byte(1); i <= 19; i++ {
-			for j := range key {
-				key[j] = rc4key[j] ^ byte(i)
-			}
-			c, _ = rc4.NewCipher(key)
-			c.XORKeyStream(u, u)
-		}
-		// This gives the first 16 bytes of U, the remaining 16 bytes
-		// are "arbitrary padding".
-		u = u[:32]
-	}
-
-	return u
-}
-
-func (sec *standardSecurityHandler) Authenticate(passwd string) error {
-	U := sec.ComputeU(passwd)
-	var ok bool
-	if sec.R >= 3 {
-		ok = bytes.Equal(sec.U[:16], U[:16])
-	} else {
-		ok = bytes.Equal(sec.U, U)
-	}
-	if ok {
-		return nil
-	}
-
-	return ErrWrongPassword
 }
 
 var passwdPad = []byte{

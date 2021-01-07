@@ -162,7 +162,7 @@ func worker(O, userPwd []byte, keyBytes int, in <-chan []byte, found chan<- []by
 	h := md5.New()
 	sum := make([]byte, 16)
 	res := make([]byte, 32)
-	key := make([]byte, keyBytes)
+	tmpKey := make([]byte, keyBytes)
 	c := &ArcFour{}
 
 	for candidate := range in {
@@ -180,10 +180,10 @@ func worker(O, userPwd []byte, keyBytes int, in <-chan []byte, found chan<- []by
 		c.Reset(rc4key)
 		c.XORKeyStream(res, res)
 		for i := byte(1); i <= 19; i++ {
-			for j := range key {
-				key[j] = rc4key[j] ^ i
+			for j := range tmpKey {
+				tmpKey[j] = rc4key[j] ^ i
 			}
-			c.Reset(key)
+			c.Reset(tmpKey)
 			c.XORKeyStream(res, res)
 		}
 

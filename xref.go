@@ -399,9 +399,9 @@ type xRefSubSection struct {
 }
 
 type xRefEntry struct {
-	Pos        int64 // -1 indicates unused/deleted objects
-	Generation uint16
 	InStream   *Reference
+	Pos        int64
+	Generation uint16
 }
 
 func (entry *xRefEntry) IsFree() bool {

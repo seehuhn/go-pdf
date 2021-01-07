@@ -15,8 +15,8 @@ var (
 
 // MalformedFileError indicates that the PDF file could not be parsed.
 type MalformedFileError struct {
-	Pos int64
 	Err error
+	Pos int64
 }
 
 func (err *MalformedFileError) Error() string {

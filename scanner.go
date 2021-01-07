@@ -12,13 +12,12 @@ import (
 const scannerBufSize = 1024
 
 type scanner struct {
-	r         io.Reader
-	buf       []byte
-	used, pos int
-
+	r      io.Reader
 	getInt func(Object) (Integer, error)
-
-	total int64
+	buf    []byte
+	pos    int
+	used   int
+	total  int64
 }
 
 func newScanner(r io.Reader, getInt func(Object) (Integer, error)) *scanner {

@@ -9,9 +9,9 @@ import (
 // Writer represents a PDF file open for writing.
 type Writer struct {
 	w       *posWriter
+	xref    map[int]*xRefEntry
 	ver     Version
 	nextRef int
-	xref    map[int]*xRefEntry
 }
 
 // NewWriter prepares a PDF file for writing.
