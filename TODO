@@ -3,3 +3,4 @@
 - look at https://github.com/pdfcpu/pdfcpu
 - add a licence and copyright notices
 - Split old `MalformedFileError` into new `FileError` and `ObjectError`
+- attempt to add pdf-2.0 support

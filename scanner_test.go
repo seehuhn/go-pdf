@@ -14,13 +14,13 @@ func testScanner(contents string) *scanner {
 	buf := bytes.NewReader([]byte(contents))
 	return newScanner(buf, func(o Object) (Integer, error) {
 		return o.(Integer), nil
-	})
+	}, nil)
 }
 
 func TestRefill(t *testing.T) {
 	n := scannerBufSize + 2
 	buf := make([]byte, n)
-	s := newScanner(bytes.NewReader(buf), nil)
+	s := newScanner(bytes.NewReader(buf), nil, nil)
 
 	for _, inc := range []int{0, 1, scannerBufSize, 1} {
 		s.pos += inc
@@ -224,7 +224,7 @@ func TestSkipWhiteSpace(t *testing.T) {
 }
 
 func TestReadHeaderVersion(t *testing.T) {
-	s := newScanner(strings.NewReader("%PDF-1.7\n1 0 obj\n"), nil)
+	s := newScanner(strings.NewReader("%PDF-1.7\n1 0 obj\n"), nil, nil)
 	version, err := s.readHeaderVersion()
 	if err != nil {
 		t.Errorf("unexpected error %q", err)
@@ -234,7 +234,7 @@ func TestReadHeaderVersion(t *testing.T) {
 	}
 
 	for _, in := range []string{"", "%PEF-1.7\n", "%PDF-0.1\n"} {
-		s = newScanner(strings.NewReader(in), nil)
+		s = newScanner(strings.NewReader(in), nil, nil)
 		_, err = s.readHeaderVersion()
 		if err == nil {
 			t.Errorf("%q: missing error", in)
@@ -242,7 +242,7 @@ func TestReadHeaderVersion(t *testing.T) {
 	}
 
 	for _, in := range []string{"%PDF-1.9\n", "%PDF-1.50\n"} {
-		s = newScanner(strings.NewReader(in), nil)
+		s = newScanner(strings.NewReader(in), nil, nil)
 		_, err = s.readHeaderVersion()
 		if !errors.Is(err, errVersion) {
 			t.Errorf("%q: wrong error %q", in, err)

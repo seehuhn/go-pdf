@@ -18,13 +18,18 @@ type scanner struct {
 	pos    int
 	used   int
 	total  int64
+
+	dec    *encryptInfo
+	decRef *Reference
 }
 
-func newScanner(r io.Reader, getInt func(Object) (Integer, error)) *scanner {
+func newScanner(r io.Reader, getInt func(Object) (Integer, error),
+	dec *encryptInfo) *scanner {
 	return &scanner{
 		r:      r,
 		buf:    make([]byte, scannerBufSize),
 		getInt: getInt,
+		dec:    dec,
 	}
 }
 
@@ -66,6 +71,9 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
+	ref := &Reference{int(number), uint16(generation)}
+	s.decRef = ref
 
 	obj, err := s.ReadObject()
 	if err != nil {
@@ -109,7 +117,7 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 		return nil, nil, err
 	}
 
-	return obj, &Reference{int(number), uint16(generation)}, nil
+	return obj, ref, nil
 }
 
 func (s *scanner) readIndirectInteger() (Integer, error) {
@@ -365,7 +373,15 @@ func (s *scanner) ReadQuotedString() (String, error) {
 		return "", err
 	}
 
-	s.pos++ // we have already seen the closing ")".
+	err = s.SkipString(")")
+	if err != nil {
+		return "", err
+	}
+
+	if s.dec != nil && s.decRef != nil {
+		res, err = s.dec.DecryptBytes(s.decRef, res)
+	}
+
 	return String(res), nil
 }
 
@@ -403,8 +419,14 @@ func (s *scanner) ReadHexString() (String, error) {
 		res = append(res, 16*hexVal)
 	}
 
-	// If we reach the end of the file, the trailing ">" will be missing.
-	s.SkipString(">")
+	err = s.SkipString(">")
+	if err != nil {
+		return "", err
+	}
+
+	if s.dec != nil && s.decRef != nil {
+		res, err = s.dec.DecryptBytes(s.decRef, res)
+	}
 
 	return String(res), nil
 }

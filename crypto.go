@@ -2,21 +2,25 @@ package pdf
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/rc4"
 	"errors"
 	"fmt"
+	"io"
 )
 
 type encryptInfo struct {
-	StmF *cryptFilter
-	StrF *cryptFilter
-	EFF  *cryptFilter
+	stmF *cryptFilter
+	strF *cryptFilter
+	eff  *cryptFilter
 
-	sh *StandardSecurityHandler
+	sec *securityHandler
 }
 
-func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
+func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 	enc, err := r.GetDict(encObj)
 	if err != nil {
 		return nil, err
@@ -61,17 +65,17 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 			Cipher: CipherRC4,
 			Length: 40,
 		}
-		res.StmF = cf
-		res.StrF = cf
-		res.EFF = cf
+		res.stmF = cf
+		res.strF = cf
+		res.eff = cf
 	case 2:
 		cf := &cryptFilter{
 			Cipher: CipherRC4,
 			Length: length,
 		}
-		res.StmF = cf
-		res.StrF = cf
-		res.EFF = cf
+		res.stmF = cf
+		res.strF = cf
+		res.eff = cf
 	case 4:
 		var CF Dict
 		if obj, ok := enc["CF"].(Dict); ok {
@@ -85,7 +89,7 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 					Err: err,
 				}
 			}
-			res.StmF = ciph
+			res.stmF = ciph
 		}
 		if obj, ok := enc["StrF"].(Name); ok {
 			ciph, err := getCipher(obj, CF)
@@ -95,9 +99,9 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 					Err: err,
 				}
 			}
-			res.StrF = ciph
+			res.strF = ciph
 		}
-		res.EFF = res.StmF
+		res.eff = res.stmF
 		if obj, ok := enc["EFF"].(Name); ok {
 			ciph, err := getCipher(obj, CF)
 			if err != nil {
@@ -106,7 +110,7 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 					Err: err,
 				}
 			}
-			res.EFF = ciph
+			res.eff = ciph
 		}
 	default:
 		return nil, &MalformedFileError{
@@ -114,6 +118,9 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 			Err: errors.New("unsupported Encrypt.V value"),
 		}
 	}
+
+	// TODO(voss): move the following code into a new function
+	// newSecurityHandlerFromDict or so.
 
 	R, err := r.GetInt(enc["R"])
 	if err != nil || R < 2 || R > 4 {
@@ -149,7 +156,7 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 		emd = bool(obj)
 	}
 
-	res.sh = &StandardSecurityHandler{
+	res.sec = &securityHandler{
 		id: []byte(r.ID[0]),
 		n:  length / 8,
 		R:  int(R),
@@ -163,48 +170,201 @@ func (r *Reader) checkEncrypt(encObj Object) (*encryptInfo, error) {
 	return res, nil
 }
 
-func getCipher(name Name, CF Dict) (*cryptFilter, error) {
-	if name == "Identity" {
-		return nil, nil
+func (sec *securityHandler) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, error) {
+	h := md5.New()
+	key, err := sec.GetKey(false)
+	if err != nil {
+		return nil, err
 	}
-	if name != "StdCF" {
-		return nil, errors.New("unknown crypt filter " + string(name))
+	h.Write(key)
+	h.Write([]byte{byte(ref.Number), byte(ref.Number >> 8), byte(ref.Number >> 16),
+		byte(ref.Generation), byte(ref.Generation >> 8)})
+	if cf.Cipher == CipherAES {
+		h.Write([]byte("sAlT"))
 	}
-	if CF == nil {
-		return nil, errors.New("missing CF dictionary")
+	l := sec.n + 5
+	if l > 16 {
+		l = 16
+	}
+	return h.Sum(nil)[:l], nil
+}
+
+// EncryptBytes encrypts the bytes in buf using Algorithm 1 in the PDF spec.
+// This function modfies the contents of buf and may return buf.
+func (enc *encryptInfo) EncryptBytes(ref *Reference, buf []byte) ([]byte, error) {
+	cf := enc.strF
+	if cf == nil {
+		return buf, nil
 	}
 
-	cfDict, ok := CF[name].(Dict)
-	if !ok {
-		return nil, errors.New("missing StdCF entry in CF dict")
+	key, err := enc.sec.keyForRef(cf, ref)
+	if err != nil {
+		return nil, err
 	}
+	switch cf.Cipher {
+	case CipherAES:
+		n := len(buf)
+		nPad := 16 - n%16
+		out := make([]byte, 16+n+nPad) // iv | c(data|padding)
 
-	res := &cryptFilter{}
-	res.Length = 0 // TODO(voss): is there a default?
-	if obj, ok := cfDict["Length"].(Integer); ok {
-		res.Length = int(obj) * 8
-	}
-	if res.Length < 40 || res.Length > 128 || res.Length%8 != 0 {
-		return nil, errors.New("invalid key length")
-	}
+		iv := out[:16]
+		_, err = io.ReadFull(rand.Reader, iv)
+		if err != nil {
+			return nil, err
+		}
 
-	switch {
-	case cfDict["CFM"] == Name("V2"):
-		res.Cipher = CipherRC4
-		return res, nil
-	case cfDict["CFM"] == Name("AESV2"):
-		res.Cipher = CipherAES
-		return res, nil
+		c, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+		cbc := cipher.NewCBCEncrypter(c, iv)
+		cbc.CryptBlocks(out[16:], buf[:n+nPad-16])
+		// encrypt the last block separately, after appending the padding
+		copy(out[n+nPad:], buf[n+nPad-16:])
+		for i := 16 + n; i < len(out); i++ {
+			out[i] = byte(nPad)
+		}
+		cbc.CryptBlocks(out[n+nPad:], out[n+nPad:])
+		return out, nil
+	case CipherRC4:
+		c, err := rc4.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+		c.XORKeyStream(buf, buf)
+		return buf, nil
 	default:
-		return nil, errors.New("unknown cipher")
+		panic("unknown cipher")
 	}
 }
 
-// The StandardSecurityHandler authenticates the user via a pair of passwords.
+// DecryptBytes decrypts the bytes in buf using Algorithm 1 in the PDF spec.
+// This function modfies the contents of buf and may return buf.
+func (enc *encryptInfo) DecryptBytes(ref *Reference, buf []byte) ([]byte, error) {
+	cf := enc.strF
+	if cf == nil {
+		return buf, nil
+	}
+
+	key, err := enc.sec.keyForRef(cf, ref)
+	if err != nil {
+		return nil, err
+	}
+	switch cf.Cipher {
+	case CipherAES:
+		if len(buf) < 32 {
+			return nil, errCorrupted
+		}
+		iv := buf[:16]
+
+		c, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+
+		cbc := cipher.NewCBCDecrypter(c, iv)
+		cbc.CryptBlocks(buf[16:], buf[16:])
+
+		nPad := int(buf[len(buf)-1])
+		if nPad < 1 || nPad > 16 {
+			return nil, errCorrupted
+		}
+		return buf[16 : len(buf)-nPad], nil
+	case CipherRC4:
+		c, _ := rc4.NewCipher(key)
+		c.XORKeyStream(buf, buf)
+		return buf, nil
+	default:
+		panic("unknown cipher")
+	}
+}
+
+func (enc *encryptInfo) EncryptStream(ref *Reference, _ string, r io.Reader) (io.Reader, error) {
+	// TODO(voss): implement the name argument
+
+	cf := enc.stmF
+	if cf == nil {
+		return r, nil
+	}
+
+	key, err := enc.sec.keyForRef(cf, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cf.Cipher {
+	case CipherAES:
+		c, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+
+		buf := make([]byte, 32)
+		iv := buf[:16]
+		_, err = io.ReadFull(rand.Reader, iv)
+		if err != nil {
+			return nil, err
+		}
+
+		return &encryptReader{
+			cbc:   cipher.NewCBCEncrypter(c, iv),
+			r:     r,
+			buf:   buf,
+			ready: iv,
+		}, nil
+	case CipherRC4:
+		c, _ := rc4.NewCipher(key)
+		return &cipher.StreamReader{S: c, R: r}, nil
+	default:
+		panic("unknown cipher")
+	}
+}
+
+func (enc *encryptInfo) DecryptStream(ref *Reference, _ string, r io.Reader) (io.Reader, error) {
+	// TODO(voss): implement the name argument
+
+	cf := enc.stmF
+	if cf == nil {
+		return r, nil
+	}
+
+	key, err := enc.sec.keyForRef(cf, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cf.Cipher {
+	case CipherAES:
+		buf := make([]byte, 32)
+		iv := buf[:16]
+		_, err := io.ReadFull(r, iv)
+		if err != nil {
+			return nil, err
+		}
+
+		c, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+
+		return &decryptReader{
+			cbc: cipher.NewCBCDecrypter(c, iv),
+			r:   r,
+			buf: buf,
+		}, nil
+	case CipherRC4:
+		c, _ := rc4.NewCipher(key)
+		return &cipher.StreamReader{S: c, R: r}, nil
+	default:
+		panic("unknown cipher")
+	}
+}
+
+// The securityHandler authenticates the user via a pair of passwords.
 // The "user password" is used to access the contents of the document, the
 // "owner password" can be used to control additional permissions, e.g.
 // permission to print the document.
-type StandardSecurityHandler struct {
+type securityHandler struct {
 	id []byte
 	o  []byte
 	u  []byte
@@ -221,9 +381,9 @@ type StandardSecurityHandler struct {
 	OwnerAuthenticated bool
 }
 
-// NewSecurityHandler allocates a new, pre-authenticated StandardSecurityHandler.
-func NewSecurityHandler(id []byte, userPwd, ownerPwd string, P uint32) *StandardSecurityHandler {
-	sec := &StandardSecurityHandler{
+// newSecurityHandler allocates a new, pre-authenticated StandardSecurityHandler.
+func newSecurityHandler(id []byte, userPwd, ownerPwd string, P uint32) *securityHandler {
+	sec := &securityHandler{
 		id: id,
 		n:  16,
 		R:  4,
@@ -244,7 +404,7 @@ func NewSecurityHandler(id []byte, userPwd, ownerPwd string, P uint32) *Standard
 // be requested via the getPasswd callback.  If the correct owner password was
 // supplied, the OwnerAuthenticated field will be set to true, in addition to
 // returning the key.
-func (sec *StandardSecurityHandler) GetKey(needOwner bool) ([]byte, error) {
+func (sec *securityHandler) GetKey(needOwner bool) ([]byte, error) {
 	// TODO(voss): key length for crypt filters???
 	if sec.key != nil {
 		return sec.key, nil
@@ -328,12 +488,15 @@ func (sec *StandardSecurityHandler) GetKey(needOwner bool) ([]byte, error) {
 // algorithm 2: compute the encryption key
 // key must either be nil or have length of at least 16 bytes.
 // pw must be the padded password
-func (sec *StandardSecurityHandler) computeKey(key []byte, pw []byte) []byte {
+func (sec *securityHandler) computeKey(key []byte, pw []byte) []byte {
 	h := md5.New()
 	h.Write(pw)
 	h.Write(sec.o)
 	h.Write([]byte{byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
 	h.Write(sec.id)
+	if !sec.encryptMetaData {
+		h.Write([]byte{255, 255, 255, 255})
+	}
 	key = h.Sum(key[:0])
 
 	if sec.R >= 3 {
@@ -348,7 +511,7 @@ func (sec *StandardSecurityHandler) computeKey(key []byte, pw []byte) []byte {
 }
 
 // this uses only the .R field of sec.
-func (sec *StandardSecurityHandler) computeO(userPasswd, ownerPasswd string) []byte {
+func (sec *securityHandler) computeO(userPasswd, ownerPasswd string) []byte {
 	if ownerPasswd == "" {
 		ownerPasswd = userPasswd
 	}
@@ -360,7 +523,7 @@ func (sec *StandardSecurityHandler) computeO(userPasswd, ownerPasswd string) []b
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			h.Write(sum) // sum[:sec.n]?
+			h.Write(sum[:sec.n])
 			sum = h.Sum(sum[:0])
 		}
 	}
@@ -385,7 +548,7 @@ func (sec *StandardSecurityHandler) computeO(userPasswd, ownerPasswd string) []b
 // algorithm 4/5: compute U
 // U must be a slice of length 32.
 // key must be the encryption key computed from the user password.
-func (sec *StandardSecurityHandler) computeU(U []byte, key []byte) []byte {
+func (sec *securityHandler) computeU(U []byte, key []byte) []byte {
 	c, _ := rc4.NewCipher(key)
 
 	if sec.R < 3 {
@@ -479,4 +642,151 @@ func (c Cipher) String() string {
 	default:
 		return fmt.Sprintf("cipher#%d", c)
 	}
+}
+
+func getCipher(name Name, CF Dict) (*cryptFilter, error) {
+	if name == "Identity" {
+		return nil, nil
+	}
+	if name != "StdCF" {
+		return nil, errors.New("unknown crypt filter " + string(name))
+	}
+	if CF == nil {
+		return nil, errors.New("missing CF dictionary")
+	}
+
+	cfDict, ok := CF[name].(Dict)
+	if !ok {
+		return nil, errors.New("missing StdCF entry in CF dict")
+	}
+
+	res := &cryptFilter{}
+	res.Length = 0 // TODO(voss): is there a default?
+	if obj, ok := cfDict["Length"].(Integer); ok {
+		res.Length = int(obj) * 8
+	}
+	if res.Length < 40 || res.Length > 128 || res.Length%8 != 0 {
+		return nil, errors.New("invalid key length")
+	}
+
+	switch {
+	case cfDict["CFM"] == Name("V2"):
+		res.Cipher = CipherRC4
+		return res, nil
+	case cfDict["CFM"] == Name("AESV2"):
+		res.Cipher = CipherAES
+		return res, nil
+	default:
+		return nil, errors.New("unknown cipher")
+	}
+}
+
+type encryptReader struct {
+	cbc      cipher.BlockMode
+	r        io.Reader
+	buf      []byte
+	ready    []byte
+	reserved []byte
+}
+
+func (r *encryptReader) Read(p []byte) (int, error) {
+	if len(r.ready) == 0 {
+		k := copy(r.buf, r.reserved)
+		for k <= 16 && r.r != nil {
+			n, err := r.r.Read(r.buf[k:])
+			k += n
+			if err == io.EOF {
+				r.r = nil
+				// add the padding
+				kPad := 16 - k%16
+				full := k + kPad
+				for k < full {
+					r.buf[k] = byte(kPad)
+					k++
+				}
+			} else if err != nil {
+				return 0, err
+			}
+		}
+
+		if k < 16 {
+			if k > 0 {
+				panic("inconsistent buffer state")
+			}
+			return 0, io.EOF
+		}
+
+		l := k
+		if r.r != nil {
+			// reserve the last block, in case it turns out to be padding
+			l--
+		}
+		l -= l % 16
+		r.ready = r.buf[:l]
+		r.reserved = r.buf[l:k]
+		r.cbc.CryptBlocks(r.ready, r.ready)
+	}
+
+	n := copy(p, r.ready)
+	r.ready = r.ready[n:]
+	return n, nil
+}
+
+type decryptReader struct {
+	cbc      cipher.BlockMode
+	r        io.Reader
+	buf      []byte
+	ready    []byte
+	reserved []byte
+}
+
+func (r *decryptReader) Read(p []byte) (int, error) {
+	if len(r.ready) == 0 {
+		k := copy(r.buf, r.reserved)
+		for k <= 16 && r.r != nil {
+			n, err := r.r.Read(r.buf[k:])
+			k += n
+			if err == io.EOF {
+				r.r = nil
+				if k%16 != 0 {
+					return 0, errCorrupted
+				}
+			} else if err != nil {
+				return 0, err
+			}
+		}
+
+		if k < 16 {
+			if k > 0 {
+				panic("inconsistent buffer state")
+			}
+			return 0, io.EOF
+		}
+
+		l := k
+		if r.r != nil {
+			// reserve the last block, in case it turns out to be padding
+			l--
+		}
+		l -= l % 16
+		r.ready = r.buf[:l]
+		r.reserved = r.buf[l:k]
+		r.cbc.CryptBlocks(r.ready, r.ready)
+
+		if r.r == nil {
+			// remove the padding
+			if l != k {
+				panic("inconsistent buffer state")
+			}
+			nPad := int(r.buf[l-1])
+			if nPad < 1 || nPad > 16 || nPad > l {
+				return 0, errCorrupted
+			}
+			r.ready = r.ready[:l-nPad]
+		}
+	}
+
+	n := copy(p, r.ready)
+	r.ready = r.ready[n:]
+	return n, nil
 }

@@ -10,7 +10,8 @@ var (
 	// correct password was not supplied.
 	ErrWrongPassword = errors.New("authentication failed")
 
-	errVersion = errors.New("unsupported PDF version")
+	errVersion   = errors.New("unsupported PDF version")
+	errCorrupted = errors.New("corrupted ciphertext")
 )
 
 // MalformedFileError indicates that the PDF file could not be parsed.

@@ -233,6 +233,8 @@ func (x Dict) PDF(w io.Writer) error {
 type Stream struct {
 	Dict
 	R io.Reader
+
+	isEncrypted bool // TODO(voss): set this correctly
 }
 
 // PDF implements the Object interface.
