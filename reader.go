@@ -161,10 +161,6 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 }
 
 func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error) {
-	if r.enc != nil && r.enc.stmF != nil {
-		return nil, errors.New("StmF not implemented")
-	}
-
 	container, err := r.doGet(sRef, false)
 	if err != nil {
 		return nil, err
@@ -282,9 +278,6 @@ func (r *Reader) GetName(obj Object) (Name, error) {
 // GetString resolves references to indirect objects and makes sure the resulting
 // object is a String.
 func (r *Reader) GetString(obj Object) (String, error) {
-	if r.enc != nil && r.enc.strF != nil {
-		return "", errors.New("StrF not implemented")
-	}
 	candidate, err := r.Get(obj)
 	if err != nil {
 		return "", err

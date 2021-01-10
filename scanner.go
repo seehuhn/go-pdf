@@ -654,6 +654,15 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		return nil, &MalformedFileError{}
 	}
 
+	isEncrypted := false
+	if s.dec != nil {
+		streamData, err = s.dec.DecryptStream(s.decRef, "", streamData)
+		if err != nil {
+			return nil, err
+		}
+		isEncrypted = true
+	}
+
 	err = s.SkipWhiteSpace()
 	if err != nil {
 		return nil, err
@@ -665,8 +674,9 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 	}
 
 	return &Stream{
-		Dict: dict,
-		R:    streamData,
+		Dict:        dict,
+		R:           streamData,
+		isEncrypted: isEncrypted,
 	}, nil
 }
 
