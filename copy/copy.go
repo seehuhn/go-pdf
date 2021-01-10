@@ -1,6 +1,9 @@
 package main
 
 import (
+	"log"
+	"os"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -68,4 +71,43 @@ func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
 		return other, nil
 	}
 	return obj, nil
+}
+
+func main() {
+	fname := os.Args[1]
+	in, err := os.Open(fname)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer in.Close()
+	fi, err := in.Stat()
+	if err != nil {
+		log.Fatal(err)
+	}
+	r, err := pdf.NewReader(in, fi.Size(), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	out, err := os.Create("out.pdf")
+	if err != nil {
+		log.Fatal(err)
+	}
+	w, err := pdf.NewWriter(out, r.HeaderVersion)
+
+	trans := &walker{
+		trans: map[pdf.Reference]*pdf.Reference{},
+		r:     r,
+		w:     w,
+	}
+	obj, err := trans.Transfer(r.Trailer)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	trailer := obj.(pdf.Dict)
+	err = w.Close(trailer["Root"].(*pdf.Reference), trailer["Info"].(*pdf.Reference))
+	if err != nil {
+		log.Fatal(err)
+	}
 }

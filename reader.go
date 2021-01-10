@@ -202,10 +202,6 @@ func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error
 			return nil, err
 		}
 
-		err = s.SkipWhiteSpace()
-		if err != nil {
-			return nil, err
-		}
 		offs, err := s.ReadInteger()
 		if err != nil {
 			return nil, err

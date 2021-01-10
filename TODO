@@ -1,6 +1,10 @@
-- add a way to repair broken xref tables
-- look at https://pkg.go.dev/rsc.io/pdf
-- look at https://github.com/pdfcpu/pdfcpu
+- implement XRefStm (page 51)
+- write xref streams, if the pdf version allows so
 - add a licence and copyright notices
+- add a way to repair broken xref tables
 - Split old `MalformedFileError` into new `FileError` and `ObjectError`
 - attempt to add pdf-2.0 support
+- implement crypt filters
+
+- look at https://pkg.go.dev/rsc.io/pdf
+- look at https://github.com/pdfcpu/pdfcpu

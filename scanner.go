@@ -38,22 +38,10 @@ func (s *scanner) filePos() int64 {
 }
 
 func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
-	// Some files point the xref entries at the end of the previous line.
-	// Try to fix this up by skipping any leading white space.
-	err := s.SkipWhiteSpace()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	number, err := s.ReadInteger()
 	if err != nil {
 		return nil, nil, err
 	}
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	generation, err := s.ReadInteger()
 	if err != nil {
 		return nil, nil, err
@@ -121,22 +109,10 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 }
 
 func (s *scanner) readIndirectInteger() (Integer, error) {
-	// Some files point the xref entries at the end of the previous line.
-	// Try to fix this up by skipping any leading white space.
-	err := s.SkipWhiteSpace()
+	_, err := s.ReadInteger() // object number
 	if err != nil {
 		return 0, err
 	}
-
-	_, err = s.ReadInteger() // object number
-	if err != nil {
-		return 0, err
-	}
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return 0, err
-	}
-
 	_, err = s.ReadInteger() // generation
 	if err != nil {
 		return 0, err
@@ -147,10 +123,6 @@ func (s *scanner) readIndirectInteger() (Integer, error) {
 	}
 
 	err = s.SkipString("obj")
-	if err != nil {
-		return 0, err
-	}
-	err = s.SkipWhiteSpace()
 	if err != nil {
 		return 0, err
 	}
@@ -236,11 +208,16 @@ func (s *scanner) ReadObject() (Object, error) {
 	return nil, err
 }
 
-// ReadInteger reads an integer.
+// ReadInteger reads an integer, optionally preceeded by white space.
 func (s *scanner) ReadInteger() (Integer, error) {
+	err := s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+
 	first := true
 	var res []byte
-	err := s.ScanBytes(func(c byte) bool {
+	err = s.ScanBytes(func(c byte) bool {
 		if first && (c == '+' || c == '-') {
 			res = append(res, c)
 		} else if c >= '0' && c <= '9' {

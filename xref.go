@@ -15,11 +15,6 @@ func (r *Reader) findXRef() (int64, error) {
 	}
 	s := r.scannerAt(pos + 9)
 
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return 0, err
-	}
-
 	xRefPos, err := s.ReadInteger()
 	if err != nil {
 		return 0, err
@@ -162,11 +157,6 @@ func readOldStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = s.SkipWhiteSpace()
-		if err != nil {
-			return nil, err
-		}
-
 		length, err := s.ReadInteger()
 		if err != nil {
 			return nil, err
