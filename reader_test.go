@@ -1,36 +1,11 @@
 package pdf
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"strings"
 	"testing"
 )
-
-func TestWalk(t *testing.T) {
-	fd, err := os.Open("test.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	fi, err := fd.Stat()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r, err := NewReader(fd, fi.Size(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	seen := make(map[Reference]bool)
-	err = r.Walk(r.Trailer, seen, func(obj Object) error {
-		fmt.Println(format(obj))
-		return nil
-	})
-	// t.Error("fish")
-}
 
 func TestReader6c3fdd9c(t *testing.T) {
 	// found by go-fuzz - check that the code doesn't panic

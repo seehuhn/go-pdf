@@ -47,12 +47,7 @@ func doOneFile(fname string) error {
 		return err
 	}
 
-	catalog, err := r.GetDict(r.Trailer["Root"])
-	if err != nil {
-		return err
-	}
-
-	pages, err := r.GetDict(catalog["Pages"])
+	pages, err := r.GetDict(r.Catalog["Pages"])
 	if err != nil {
 		return err
 	}

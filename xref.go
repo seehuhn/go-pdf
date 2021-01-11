@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/bits"
 	"strconv"
 )
 
@@ -85,7 +86,7 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 		var dict Dict
 		switch {
 		case bytes.Equal(buf, []byte("xref")):
-			dict, err = readOldStyleXRef(xref, s)
+			dict, err = readXRefTable(xref, s)
 
 			if xRefStm, ok := dict["XRefStm"]; ok {
 				zStart, ok := xRefStm.(Integer)
@@ -95,13 +96,13 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 					}
 				}
 				s = r.scannerAt(int64(zStart))
-				_, err = readNewStyleXRef(xref, s)
+				_, err = readXRefStream(xref, s)
 				if err != nil {
 					return nil, nil, err
 				}
 			}
 		default:
-			dict, err = readNewStyleXRef(xref, s)
+			dict, err = readXRefStream(xref, s)
 		}
 		if err != nil {
 			return nil, nil, err
@@ -134,7 +135,7 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 	return xref, trailer, nil
 }
 
-func readOldStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
+func readXRefTable(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	err := s.SkipString("xref")
 	if err != nil {
 		return nil, err
@@ -166,7 +167,7 @@ func readOldStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 			return nil, err
 		}
 
-		err = decodeOldStyleSection(xref, s, int(start), int(start+length))
+		err = decodeXRefSection(xref, s, int(start), int(start+length))
 		if err != nil {
 			return nil, err
 		}
@@ -191,8 +192,8 @@ func readOldStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	return s.ReadDict()
 }
 
-func decodeOldStyleSection(xref map[int]*xRefEntry, s *scanner, start, end int) error {
-	// TODO(voss): use xrefSubSection?
+func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) error {
+	// TODO(voss): use xRefSubSection?
 	for i := start; i < end; i++ {
 		if xref[i] != nil {
 			err := s.Discard(20)
@@ -251,7 +252,7 @@ func decodeOldStyleSection(xref map[int]*xRefEntry, s *scanner, start, end int) 
 	return nil
 }
 
-func readNewStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
+func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	obj, _, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, err
@@ -265,11 +266,11 @@ func readNewStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	}
 	dict := stream.Dict
 
-	w, ss, err := checkNewStyleDict(dict)
+	w, ss, err := checkXRefStreamDict(dict)
 	if err != nil {
 		return nil, err
 	}
-	err = decodeNewStyleXref(xref, stream.Decode(), w, ss)
+	err = decodeXRefStream(xref, stream.Decode(), w, ss)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +278,7 @@ func readNewStyleXRef(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	return dict, nil
 }
 
-func checkNewStyleDict(dict Dict) ([]int, []*xRefSubSection, error) {
+func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	size, ok := dict["Size"].(Integer)
 	if !ok {
 		return nil, nil, &MalformedFileError{}
@@ -316,7 +317,7 @@ func checkNewStyleDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	return w, ss, nil
 }
 
-func decodeNewStyleXref(xref map[int]*xRefEntry, r io.Reader, w []int, ss []*xRefSubSection) error {
+func decodeXRefStream(xref map[int]*xRefEntry, r io.Reader, w []int, ss []*xRefSubSection) error {
 	wTotal := 0
 	for _, wi := range w {
 		wTotal += wi
@@ -382,6 +383,117 @@ func decodeInt(buf []byte) (res int64) {
 		res = res<<8 | int64(x)
 	}
 	return res
+}
+
+func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
+	_, err := fmt.Fprintf(pdf.w, "xref\n0 %d\n", pdf.nextRef)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < pdf.nextRef; i++ {
+		entry := pdf.xref[i]
+		if entry != nil && entry.InStream != nil {
+			panic("object streams not supported") // TODO(voss)
+		}
+		if entry != nil && entry.Pos >= 0 {
+			_, err = fmt.Fprintf(pdf.w, "%010d %05d n\r\n",
+				entry.Pos, entry.Generation)
+		} else {
+			// free object
+			_, err = pdf.w.Write([]byte("0000000000 65535 f\r\n"))
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = pdf.w.Write([]byte("trailer\n"))
+	if err != nil {
+		return err
+	}
+	err = xRefDict.PDF(pdf.w)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
+	// TODO(voss): fudge things up so that the XRefStream itself appears in the
+	// xref table.
+
+	xRefDict["Type"] = Name("XRef")
+
+	maxField2 := int64(0)
+	maxField3 := uint16(0)
+	for i := 0; i < pdf.nextRef; i++ {
+		entry := pdf.xref[i]
+		if entry == nil {
+			continue
+		}
+		var f2 int64
+		var f3 uint16
+		if entry.InStream != nil {
+			f2 = int64(entry.InStream.Number)
+			f3 = uint16(entry.Pos)
+		} else if entry.Pos >= 0 {
+			f2 = entry.Pos
+			f3 = entry.Generation
+		} else {
+			gen := entry.Generation
+			if gen == 65535 {
+				gen = 0
+			}
+			f2 = 0
+			f3 = gen
+		}
+		if f2 > maxField2 {
+			maxField2 = f2
+		}
+		if f3 > maxField3 {
+			maxField3 = f3
+		}
+	}
+	w2 := (bits.Len64(uint64(maxField2)) + 7) / 8
+	w3 := (bits.Len16(maxField3) + 7) / 8
+	W := Array{Integer(1), Integer(w2), Integer(w3)}
+	xRefDict["W"] = W
+	xRefDict["Length"] = Integer((1 + w2 + w3) * pdf.nextRef)
+
+	data := &bytes.Buffer{}
+	for i := 0; i < pdf.nextRef; i++ {
+		entry := pdf.xref[i]
+		if entry == nil || entry.Pos < 0 {
+			data.WriteByte(0)
+			encodeInt64(data, 0, w2)
+			encodeInt16(data, entry.Generation, w3)
+		} else if entry.InStream == nil {
+			data.WriteByte(1)
+			encodeInt64(data, uint64(entry.Pos), w2)
+			encodeInt16(data, entry.Generation, w3)
+		} else {
+			data.WriteByte(2)
+			encodeInt64(data, uint64(entry.InStream.Number), w2)
+			encodeInt16(data, uint16(entry.Pos), w3)
+		}
+	}
+
+	xref := &Stream{Dict: xRefDict, R: data}
+	// TODO(voss): compress the stream
+	_, err := pdf.WriteIndirect(xref, nil)
+	return err
+}
+
+func encodeInt64(data *bytes.Buffer, x uint64, w int) {
+	for i := w - 1; i >= 0; i-- {
+		data.WriteByte(byte(x >> (i * 8)))
+	}
+}
+
+func encodeInt16(data *bytes.Buffer, x uint16, w int) {
+	for i := w - 1; i >= 0; i-- {
+		data.WriteByte(byte(x >> (i * 8)))
+	}
 }
 
 type xRefSubSection struct {

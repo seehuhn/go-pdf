@@ -347,16 +347,19 @@ func (s *scanner) ReadQuotedString() (String, error) {
 		return true
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	err = s.SkipString(")")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if s.dec != nil && s.decRef != nil {
 		res, err = s.dec.DecryptBytes(s.decRef, res)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return String(res), nil
@@ -390,7 +393,7 @@ func (s *scanner) ReadHexString() (String, error) {
 		return true
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !first {
 		res = append(res, 16*hexVal)
@@ -398,11 +401,14 @@ func (s *scanner) ReadHexString() (String, error) {
 
 	err = s.SkipString(">")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if s.dec != nil && s.decRef != nil {
 		res, err = s.dec.DecryptBytes(s.decRef, res)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return String(res), nil
@@ -424,9 +430,9 @@ func (s *scanner) ReadName() (Name, error) {
 			if c >= '0' && c <= '9' {
 				val = c - '0'
 			} else if c >= 'A' && c <= 'F' {
-				val = c - 'A'
+				val = c - 'A' + 10
 			} else if c >= 'a' && c <= 'f' {
-				val = c - 'a'
+				val = c - 'a' + 10
 			}
 			hexByte = 16*hexByte + val
 			hex--

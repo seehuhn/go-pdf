@@ -163,8 +163,8 @@ func main() {
 	var catalog, info *pdf.Reference
 
 	info, err = w.WriteIndirect(pdf.Dict{ // page 550
-		"Title":  pdf.String("PDF Test Document"),
-		"Author": pdf.String("Jochen Voss"),
+		"Title":  pdf.TextString("PDF Test Document"),
+		"Author": pdf.TextString("Jochen Voß"),
 	}, nil)
 	if err != nil {
 		log.Fatal(err)

@@ -1,10 +1,10 @@
-- implement XRefStm (page 51)
-- write xref streams, if the pdf version allows so
+- allow to write compressed streams
 - add a licence and copyright notices
 - add a way to repair broken xref tables
 - Split old `MalformedFileError` into new `FileError` and `ObjectError`
-- attempt to add pdf-2.0 support
+- allow to write encrypted files
 - implement crypt filters
+- attempt to add pdf-2.0 support
 
 - look at https://pkg.go.dev/rsc.io/pdf
 - look at https://github.com/pdfcpu/pdfcpu

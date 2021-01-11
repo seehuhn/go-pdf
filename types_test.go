@@ -1,6 +1,10 @@
 package pdf
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+	"time"
+)
 
 func TestFormat(t *testing.T) {
 	cases := []struct {
@@ -18,6 +22,42 @@ func TestFormat(t *testing.T) {
 		if out != test.out {
 			t.Errorf("string wrongly formatted, expected %q but got %q",
 				test.out, out)
+		}
+	}
+}
+
+func TestTextString(t *testing.T) {
+	cases := []string{
+		"",
+		"hello",
+		"\000\011\n\f\r",
+		"ein Bär",
+		"o țesătură",
+		"中文",
+		"日本語",
+	}
+	for _, test := range cases {
+		enc := TextString(test)
+		out := enc.AsTextString()
+		if out != test {
+			t.Errorf("wrong text: %q != %q", out, test)
+		}
+	}
+}
+
+func TestDateString(t *testing.T) {
+	PST := time.FixedZone("PST", -8*60*60)
+	cases := []time.Time{
+		time.Date(1998, 12, 23, 19, 52, 0, 0, PST),
+	}
+	for _, test := range cases {
+		enc := DateString(test)
+		out, err := enc.AsDateString()
+		fmt.Println(test, string(enc), out)
+		if err != nil {
+			t.Error(err)
+		} else if !test.Equal(out) {
+			t.Errorf("wrong time: %s != %s", out, test)
 		}
 	}
 }

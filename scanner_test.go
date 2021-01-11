@@ -87,10 +87,11 @@ func TestReadObject(t *testing.T) {
 		{"/1.2", Name("1.2"), true, nil},
 		{"/A#42", Name("AB"), true, nil},
 		{"/F#23#20minor", Name("F# minor"), true, nil},
+		{"/1#2E5", Name("1.5"), true, nil},
 		{"/ß", Name("ß"), true, nil},
 		{"/", Name(""), true, nil},
 
-		{`()`, String(""), true, nil},
+		{`()`, String(nil), true, nil},
 		{"(test string)", String("test string"), true, nil},
 		{`(hello)`, String("hello"), true, nil},
 		{`(he(ll)o)`, String("he(ll)o"), true, nil},
@@ -103,7 +104,7 @@ func TestReadObject(t *testing.T) {
 		{`(h\145llo)`, String("hello"), true, nil},
 		{`(\0612)`, String("12"), true, nil},
 
-		{"<>", String(""), true, nil},
+		{"<>", String(nil), true, nil},
 		{"<68656c6c6f>", String("hello"), true, nil},
 		{"<68656C6C6F>", String("hello"), true, nil},
 		{"<68 65 6C 6C 6F>", String("hello"), true, nil},

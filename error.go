@@ -12,6 +12,7 @@ var (
 
 	errVersion   = errors.New("unsupported PDF version")
 	errCorrupted = errors.New("corrupted ciphertext")
+	errNoDate    = errors.New("not a valid date string")
 )
 
 // MalformedFileError indicates that the PDF file could not be parsed.

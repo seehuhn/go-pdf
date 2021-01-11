@@ -15,10 +15,10 @@ func TestWriter(t *testing.T) {
 	var catalog, info *Reference
 
 	info, err = w.WriteIndirect(Dict{ // page 550
-		"Title":    String("PDF Test Document"),
-		"Author":   String("Jochen Voss"),
-		"Subject":  String("Testing"),
-		"Keywords": String("PDF, testing, Go"),
+		"Title":    TextString("PDF Test Document"),
+		"Author":   TextString("Jochen Voß"),
+		"Subject":  TextString("Testing"),
+		"Keywords": TextString("PDF, testing, Go"),
 	}, nil)
 	if err != nil {
 		t.Fatal(err)

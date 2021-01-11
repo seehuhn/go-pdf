@@ -176,11 +176,12 @@ func (sec *securityHandler) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	h.Write(key)
-	h.Write([]byte{byte(ref.Number), byte(ref.Number >> 8), byte(ref.Number >> 16),
+	_, _ = h.Write(key)
+	_, _ = h.Write([]byte{
+		byte(ref.Number), byte(ref.Number >> 8), byte(ref.Number >> 16),
 		byte(ref.Generation), byte(ref.Generation >> 8)})
 	if cf.Cipher == CipherAES {
-		h.Write([]byte("sAlT"))
+		_, _ = h.Write([]byte("sAlT"))
 	}
 	l := sec.n + 5
 	if l > 16 {
@@ -425,12 +426,12 @@ func (sec *securityHandler) GetKey(needOwner bool) ([]byte, error) {
 			if try == 0 {
 				// try to decrypt sec.O
 				h := md5.New()
-				h.Write(pw)
+				_, _ = h.Write(pw)
 				sum := h.Sum(nil)
 				if sec.R >= 3 {
 					for i := 0; i < 50; i++ {
 						h.Reset()
-						h.Write(sum) // sum[:sec.n]?
+						_, _ = h.Write(sum) // sum[:sec.n]?
 						sum = h.Sum(sum[:0])
 					}
 				}
@@ -490,19 +491,20 @@ func (sec *securityHandler) GetKey(needOwner bool) ([]byte, error) {
 // pw must be the padded password
 func (sec *securityHandler) computeKey(key []byte, pw []byte) []byte {
 	h := md5.New()
-	h.Write(pw)
-	h.Write(sec.o)
-	h.Write([]byte{byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
-	h.Write(sec.id)
+	_, _ = h.Write(pw)
+	_, _ = h.Write(sec.o)
+	_, _ = h.Write([]byte{
+		byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
+	_, _ = h.Write(sec.id)
 	if !sec.encryptMetaData {
-		h.Write([]byte{255, 255, 255, 255})
+		_, _ = h.Write([]byte{255, 255, 255, 255})
 	}
 	key = h.Sum(key[:0])
 
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			h.Write(key[:sec.n])
+			_, _ = h.Write(key[:sec.n])
 			key = h.Sum(key[:0])
 		}
 	}
@@ -518,12 +520,12 @@ func (sec *securityHandler) computeO(userPasswd, ownerPasswd string) []byte {
 	pwo := padPasswd(ownerPasswd)
 
 	h := md5.New()
-	h.Write(pwo)
+	_, _ = h.Write(pwo)
 	sum := h.Sum(nil)
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			h.Write(sum[:sec.n])
+			_, _ = h.Write(sum[:sec.n])
 			sum = h.Sum(sum[:0])
 		}
 	}
@@ -556,8 +558,8 @@ func (sec *securityHandler) computeU(U []byte, key []byte) []byte {
 		c.XORKeyStream(U, U)
 	} else {
 		h := md5.New()
-		h.Write(passwdPad)
-		h.Write(sec.id)
+		_, _ = h.Write(passwdPad)
+		_, _ = h.Write(sec.id)
 		U = h.Sum(U[:0])
 		c.XORKeyStream(U, U)
 

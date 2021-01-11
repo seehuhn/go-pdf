@@ -8,6 +8,8 @@ import (
 
 // Writer represents a PDF file open for writing.
 type Writer struct {
+	PDFVersion Version
+
 	w       *posWriter
 	xref    map[int]*xRefEntry
 	ver     Version
@@ -17,6 +19,8 @@ type Writer struct {
 // NewWriter prepares a PDF file for writing.
 func NewWriter(w io.Writer, ver Version) (*Writer, error) {
 	pdf := &Writer{
+		PDFVersion: ver,
+
 		w:       &posWriter{w: w},
 		ver:     ver,
 		nextRef: 1,
@@ -42,47 +46,28 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 		return errors.New("missing /Catalog")
 	}
 
-	xrefDict := Dict{
-		"Type": Name("XRef"), // only needed for new-style xref
+	xRefDict := Dict{
 		"Size": Integer(pdf.nextRef),
 		"Root": catalog, // required, indirect (page 43)
+		// "Encrypt" - optional, PDF1.1 (page 43)
 		// "ID" - optional (required for Encrypted), PDF1.1 (page 43)
 	}
 	if info != nil {
-		xrefDict["Info"] = info
+		xRefDict["Info"] = info
 	}
 
-	xrefPos := pdf.w.pos
-	_, err := fmt.Fprintf(pdf.w, "xref\n0 %d\n", pdf.nextRef)
+	xRefPos := pdf.w.pos
+	var err error
+	if pdf.PDFVersion < V1_5 {
+		err = pdf.writeXRefTable(xRefDict)
+	} else {
+		err = pdf.writeXRefStream(xRefDict)
+	}
 	if err != nil {
 		return err
-	}
-	for i := 0; i < pdf.nextRef; i++ {
-		entry := pdf.xref[i]
-		if entry != nil && entry.InStream != nil {
-			panic("object streams not supported") // TODO(voss)
-		}
-		if entry != nil && entry.Pos >= 0 {
-			_, err = fmt.Fprintf(pdf.w, "%010d %05d n\r\n",
-				entry.Pos, entry.Generation)
-		} else {
-			// free object
-			_, err = pdf.w.Write([]byte("0000000000 65535 f\r\n"))
-		}
-		if err != nil {
-			return err
-		}
 	}
 
-	_, err = pdf.w.Write([]byte("trailer\n"))
-	if err != nil {
-		return err
-	}
-	err = xrefDict.PDF(pdf.w)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(pdf.w, "\nstartxref\n%d\n%%%%EOF\n", xrefPos)
+	_, err = fmt.Fprintf(pdf.w, "\nstartxref\n%d\n%%%%EOF\n", xRefPos)
 	if err != nil {
 		return err
 	}
@@ -92,13 +77,18 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 }
 
 // WriteIndirect writes an object to the PDF file, as an indirect object.  The
-// returned reference must be used to refer to this object from other parts of
+// returned reference can be used to refer to this object from other parts of
 // the file.
 func (pdf *Writer) WriteIndirect(obj Object, ref *Reference) (*Reference, error) {
 	pos := pdf.w.pos
 
 	if ref == nil {
 		ref = pdf.Alloc()
+	} else {
+		_, seen := pdf.xref[ref.Number]
+		if seen {
+			return nil, errors.New("object already written")
+		}
 	}
 
 	if obj == nil {

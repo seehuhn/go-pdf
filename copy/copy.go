@@ -93,7 +93,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	w, err := pdf.NewWriter(out, r.HeaderVersion)
+	w, err := pdf.NewWriter(out, r.PDFVersion)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	trans := &walker{
 		trans: map[pdf.Reference]*pdf.Reference{},

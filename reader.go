@@ -11,9 +11,11 @@ type Reader struct {
 	r    io.ReaderAt
 	xref map[int]*xRefEntry
 
-	HeaderVersion Version
-	ID            []string
-	Trailer       Dict
+	PDFVersion Version
+	ID         [][]byte
+	Trailer    Dict
+	Catalog    Dict
+	Info       *Info
 
 	enc *encryptInfo
 }
@@ -30,7 +32,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 	if err != nil {
 		return nil, err
 	}
-	r.HeaderVersion = version
+	r.PDFVersion = version
 
 	xref, trailer, err := r.readXRef()
 	if err != nil {
@@ -49,7 +51,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 			if !ok {
 				return nil, &MalformedFileError{Err: errors.New("malformed ID array")}
 			}
-			r.ID = append(r.ID, string(s))
+			r.ID = append(r.ID, []byte(s))
 		}
 	}
 
@@ -62,10 +64,49 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		r.enc.sec.getPasswd = readPwd
 	}
 
+	r.Catalog, err = r.GetDict(r.Trailer["Root"])
+	if err != nil {
+		return nil, err
+	}
+	if ver, ok := r.Catalog["Version"].(Name); ok {
+		var v2 Version
+		switch ver {
+		case "1.4":
+			v2 = V1_4
+		case "1.5":
+			v2 = V1_5
+		case "1.6":
+			v2 = V1_6
+		case "1.7":
+			v2 = V1_7
+		default:
+			return nil, &MalformedFileError{
+				Pos: r.errPos(r.Trailer["Root"]),
+				Err: errVersion,
+			}
+		}
+		if v2 > r.PDFVersion {
+			r.PDFVersion = v2
+		}
+	}
+
+	obj, err := r.Get(r.Trailer["Info"])
+	if err != nil {
+		return nil, err
+	}
+	if infoDict, ok := obj.(Dict); ok {
+		info := &Info{}
+		// We ignore errors here, so that we still recover the values we did
+		// read successfully.
+		_ = r.DictToStruct(info, infoDict, r.errPos(r.Trailer["Info"]))
+		r.Info = info
+	}
+
 	return r, nil
 }
 
 // Walk performs a depth-first walk through the object graph rooted at obj.
+// TODO(voss): remove
 func (r *Reader) Walk(obj Object, seen map[Reference]bool, fn func(Object) error) error {
 	switch x := obj.(type) {
 	case Dict:
@@ -276,11 +317,11 @@ func (r *Reader) GetName(obj Object) (Name, error) {
 func (r *Reader) GetString(obj Object) (String, error) {
 	candidate, err := r.Get(obj)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	val, ok := candidate.(String)
 	if !ok {
-		return "", &MalformedFileError{
+		return nil, &MalformedFileError{
 			Pos: r.errPos(obj),
 			Err: errors.New("wrong type (expected String)"),
 		}

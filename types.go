@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
+	"unicode/utf16"
 )
 
 // Object represents an object in a PDF file.
@@ -50,8 +52,9 @@ func (x Real) PDF(w io.Writer) error {
 	return err
 }
 
-// String represents a string constant in a PDF file.
-type String string
+// String represents a raw string in a PDF file.  The character set encoding,
+// if any, is determined by the context.
+type String []byte
 
 // PDF implements the Object interface.
 func (x String) PDF(w io.Writer) error {
@@ -105,6 +108,79 @@ func (x String) PDF(w io.Writer) error {
 
 	_, err := w.Write(buf.Bytes())
 	return err
+}
+
+// AsTextString interprets x as a PDF "text string" and returns
+// the corresponding utf-8 encoded string.
+func (x String) AsTextString() string {
+	if isUTF16(string(x)) {
+		return utf16Decode(x[2:])
+	}
+	return pdfDocDecode(x)
+}
+
+// TextString creates a String object using the "text string" encoding,
+// i.e. using either UTF-16BE encoding (with a BOM) or PdfDocEncoding.
+func TextString(s string) String {
+	rr := []rune(s)
+	buf := make([]byte, len(rr))
+	for i, r := range rr {
+		c, ok := toDocEncoding[r]
+		if ok {
+			buf[i] = c
+		} else if r <= 255 && fromDocEncoding[r] != noRune {
+			buf[i] = byte(r)
+		} else {
+			goto useUTF
+		}
+	}
+	return String(buf)
+
+useUTF:
+	enc := utf16.Encode(rr)
+	buf = make([]byte, 2*len(enc)+2)
+	buf[0] = 0xFE
+	buf[1] = 0xFF
+	for i, c := range enc {
+		buf[2*i+2] = byte(c >> 8)
+		buf[2*i+3] = byte(c)
+	}
+	return String(buf)
+}
+
+// AsDateString converts a PDF date string to a time.Time object.
+// If the string does not have the correct format, an error is returned.
+func (x String) AsDateString() (time.Time, error) {
+	formats := []string{
+		"D:20060102150405-07'00'", // invalid, but occurs in some files
+		"D:20060102150405-07'00",
+		"D:20060102150405-07'",
+		"D:20060102150405-07",
+		"D:20060102150405Z00'00'", // invalid, but occurs in some files
+		"D:20060102150405Z00'00",
+		"D:20060102150405Z00'",
+		"D:20060102150405Z00",
+		"D:20060102150405Z",
+		"D:20060102150405",
+		"D:200601021504",
+		"D:2006010215",
+		"D:20060102",
+		"D:200601",
+		"D:2006",
+	}
+	s := x.AsTextString()
+	for _, format := range formats {
+		t, err := time.Parse(format, s)
+		if err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, errNoDate
+}
+
+// DateString creates a String object encoding the given date and time.
+func DateString(t time.Time) String {
+	return String(t.Format("D:20060102150405-07'00"))
 }
 
 // Name represents a name in a PDF file.
