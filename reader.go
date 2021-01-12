@@ -68,6 +68,10 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 	if err != nil {
 		return nil, err
 	}
+	// cat := &Catalog{}
+	// _ = r.FillStruct(cat, r.Catalog, 0)
+	// fmt.Println(format(makeDict(cat)) + "\n")
+
 	if ver, ok := r.Catalog["Version"].(Name); ok {
 		var v2 Version
 		switch ver {
@@ -98,7 +102,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		info := &Info{}
 		// We ignore errors here, so that we still recover the values we did
 		// read successfully.
-		_ = r.DictToStruct(info, infoDict, r.errPos(r.Trailer["Info"]))
+		_ = r.FillStruct(info, infoDict, r.errPos(r.Trailer["Info"]))
 		r.Info = info
 	}
 
