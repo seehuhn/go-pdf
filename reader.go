@@ -3,6 +3,7 @@ package pdf
 import (
 	"errors"
 	"io"
+	"os"
 )
 
 // Reader represents a pdf file opened for reading.
@@ -12,11 +13,10 @@ type Reader struct {
 	xref map[int]*xRefEntry
 
 	PDFVersion Version
-	ID         [][]byte
-	Trailer    Dict
-	Catalog    Dict
+	Catalog    *Catalog
 	Info       *Info
 
+	ID  [][]byte
 	enc *encryptInfo
 }
 
@@ -39,19 +39,18 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		return nil, err
 	}
 	r.xref = xref
-	r.Trailer = trailer
 
 	ID, ok := trailer["ID"].(Array)
-	if ok {
-		if len(ID) != 2 {
-			return nil, &MalformedFileError{Err: errors.New("malformed ID array")}
-		}
+	if ok && len(ID) >= 2 {
 		for i := 0; i < 2; i++ {
 			s, ok := ID[i].(String)
 			if !ok {
-				return nil, &MalformedFileError{Err: errors.New("malformed ID array")}
+				break
 			}
 			r.ID = append(r.ID, []byte(s))
+		}
+		if len(r.ID) != 2 {
+			r.ID = nil
 		}
 	}
 
@@ -64,17 +63,16 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		r.enc.sec.getPasswd = readPwd
 	}
 
-	r.Catalog, err = r.GetDict(r.Trailer["Root"])
+	rootDict, err := r.GetDict(trailer["Root"])
 	if err != nil {
 		return nil, err
 	}
-	// cat := &Catalog{}
-	// _ = r.FillStruct(cat, r.Catalog, 0)
-	// fmt.Println(format(makeDict(cat)) + "\n")
+	r.Catalog = &Catalog{}
+	rootDict.AsStruct(r.Catalog, r, r.errPos(trailer["Root"]))
 
-	if ver, ok := r.Catalog["Version"].(Name); ok {
+	if r.Catalog.Version != "" {
 		var v2 Version
-		switch ver {
+		switch r.Catalog.Version {
 		case "1.4":
 			v2 = V1_4
 		case "1.5":
@@ -85,7 +83,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 			v2 = V1_7
 		default:
 			return nil, &MalformedFileError{
-				Pos: r.errPos(r.Trailer["Root"]),
+				Pos: r.errPos(trailer["Root"]),
 				Err: errVersion,
 			}
 		}
@@ -94,62 +92,125 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		}
 	}
 
-	obj, err := r.Get(r.Trailer["Info"])
+	obj, err := r.Get(trailer["Info"])
 	if err != nil {
 		return nil, err
 	}
 	if infoDict, ok := obj.(Dict); ok {
-		info := &Info{}
+		r.Info = &Info{}
 		// We ignore errors here, so that we still recover the values we did
 		// read successfully.
-		_ = r.FillStruct(info, infoDict, r.errPos(r.Trailer["Info"]))
-		r.Info = info
+		infoDict.AsStruct(r.Info, r, r.errPos(trailer["Info"]))
 	}
 
 	return r, nil
 }
 
+// Open opens the named PDF file for reading.  After use, Close() must be
+// called to close the file the Reader is reading from.
+func Open(fname string) (*Reader, error) {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	fi, err := fd.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return NewReader(fd, fi.Size(), nil)
+}
+
+// Close closes the underlying file of the reader.  This call only has an
+// effect if the io.ReaderAt passed to NewReader() has a Close() method, or if
+// the Reader was created using Open().  Otherwise, Close() has no effect and
+// returns nil.
+func (r *Reader) Close() error {
+	closer, ok := r.r.(io.Closer)
+	if ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 // Walk performs a depth-first walk through the object graph rooted at obj.
+//
 // TODO(voss): remove
-func (r *Reader) Walk(obj Object, seen map[Reference]bool, fn func(Object) error) error {
+func (r *Reader) Walk(obj Object, seen map[Reference]Object,
+	leaf func(Object) (Object, error),
+	root func(Object, *Reference) (*Reference, error)) (Object, error) {
+	obj, err := r.doWalk(obj, seen, leaf, root)
+	if err == nil && root != nil {
+		obj, err = root(obj, nil)
+	}
+	return obj, err
+}
+
+func (r *Reader) doWalk(obj Object, seen map[Reference]Object,
+	leaf func(Object) (Object, error),
+	root func(Object, *Reference) (*Reference, error)) (Object, error) {
 	switch x := obj.(type) {
 	case Dict:
-		for _, val := range x {
-			err := r.Walk(val, seen, fn)
+		res := Dict{}
+		for _, key := range x.sortedKeys() {
+			repl, err := r.doWalk(x[key], seen, leaf, root)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			res[key] = repl
 		}
+		return res, nil
 	case Array:
+		var res Array
 		for _, val := range x {
-			err := r.Walk(val, seen, fn)
+			repl, err := r.doWalk(val, seen, leaf, root)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			res = append(res, repl)
 		}
+		return res, nil
 	case *Stream:
-		for _, val := range x.Dict {
-			err := r.Walk(val, seen, fn)
+		res := &Stream{
+			Dict: make(Dict),
+			R:    x.R,
+		}
+		for _, key := range x.sortedKeys() {
+			repl, err := r.doWalk(x.Dict[key], seen, leaf, root)
 			if err != nil {
-				return err
+				return nil, err
+			}
+			res.Dict[key] = repl
+		}
+		return res, nil
+	case *Reference:
+		if other, ok := seen[*x]; ok {
+			return other, nil
+		}
+		res, err := leaf(x)
+		if err != nil {
+			return nil, err
+		}
+		seen[*x] = res
+
+		ind, err := r.Get(x)
+		if err != nil {
+			return nil, err
+		}
+		subTree, err := r.doWalk(ind, seen, leaf, root)
+		if err != nil {
+			return nil, err
+		}
+		if root != nil {
+			ref, _ := res.(*Reference)
+			_, err = root(subTree, ref)
+			if err != nil {
+				return nil, err
 			}
 		}
-	case *Reference:
-		if seen[*x] {
-			return nil
-		}
-		seen[*x] = true
 
-		val, err := r.Get(x)
-		if err != nil {
-			return err
-		}
-		err = r.Walk(val, seen, fn)
-		if err != nil {
-			return err
-		}
+		return res, nil
 	}
-	return fn(obj)
+	return leaf(obj)
 }
 
 // Get resolves references to indirect objects.

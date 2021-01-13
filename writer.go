@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 )
 
 // Writer represents a PDF file open for writing.
@@ -39,8 +40,21 @@ func NewWriter(w io.Writer, ver Version) (*Writer, error) {
 	return pdf, nil
 }
 
+// Create creates the named PDF file and opens it for output.  If a previous
+// file with the same name exists, it is overwritten.  After writing is
+// complete, Close() must be called to write the trailer and to close the
+// underlying file.
+func Create(name string) (*Writer, error) {
+	fd, err := os.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return NewWriter(fd, V1_7)
+}
+
 // Close closes the Writer, flushing any unwritten data to the underlying
-// io.Writer, but does not close the underlying io.Writer.
+// io.Writer.  If the underlying io.Writer as a Close() method, this writer is
+// also closed.
 func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 	if catalog == nil {
 		return errors.New("missing /Catalog")
@@ -72,7 +86,15 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 		return err
 	}
 
+	closer, ok := pdf.w.w.(io.Closer)
+	if ok {
+		return closer.Close()
+	}
+
+	// Since we couldn't close the writer, make sure we don't accidentally
+	// write beyond the end of file.
 	pdf.w = nil
+
 	return nil
 }
 

@@ -97,10 +97,11 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	seen := make(map[Reference]bool)
-	err = r.Walk(r.Trailer, seen, func(o Object) error {
-		return nil
-	})
+	seen := make(map[Reference]Object)
+	_, err = r.Walk(Array{Struct(r.Catalog), Struct(r.Info)}, seen,
+		func(o Object) (Object, error) {
+			return nil, nil
+		}, nil)
 	if err != nil {
 		t.Error(err)
 	}

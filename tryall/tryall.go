@@ -32,22 +32,13 @@ func getNames() <-chan string {
 }
 
 func doOneFile(fname string) error {
-	fd, err := os.Open(fname)
+	r, err := pdf.Open(fname)
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
+	defer r.Close()
 
-	fi, err := fd.Stat()
-	if err != nil {
-		return err
-	}
-	r, err := pdf.NewReader(fd, fi.Size(), nil)
-	if err != nil {
-		return err
-	}
-
-	pages, err := r.GetDict(r.Catalog["Pages"])
+	pages, err := r.GetDict(r.Catalog.Pages)
 	if err != nil {
 		return err
 	}

@@ -1,8 +1,6 @@
 package pdf
 
 import (
-	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 )
@@ -69,21 +67,7 @@ func TestReader215874cf(t *testing.T) {
 		"railer<</ 8/Root 7 0" +
 		"R/ 6 0R>>startxref69" +
 		"1\n")
-	r, err := NewReader(buf, buf.Size(), nil)
-	if err != nil {
-		return
-	}
-
-	seen := make(map[Reference]bool)
-	r.Walk(r.Trailer, seen, func(o Object) error {
-		if stream, ok := o.(*Stream); ok {
-			_, err := io.Copy(ioutil.Discard, stream.R)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	NewReader(buf, buf.Size(), nil)
 }
 
 func TestReader65af881f(t *testing.T) {

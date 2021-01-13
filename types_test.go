@@ -13,6 +13,8 @@ func TestFormat(t *testing.T) {
 	}{
 		{nil, "null"},
 		{String("a"), "(a)"},
+		{String("a (test version)"), "(a (test version))"},
+		{String("a (test version"), "(a \\(test version)"},
 		{String(""), "()"},
 		{String("\000"), "<00>"},
 		{Array{Integer(1), nil, Integer(3)}, "[1 null 3]"},
@@ -49,10 +51,12 @@ func TestDateString(t *testing.T) {
 	PST := time.FixedZone("PST", -8*60*60)
 	cases := []time.Time{
 		time.Date(1998, 12, 23, 19, 52, 0, 0, PST),
+		time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2020, 12, 24, 16, 30, 12, 0, time.FixedZone("", 90*60)),
 	}
 	for _, test := range cases {
-		enc := DateString(test)
-		out, err := enc.AsDateString()
+		enc := Date(test)
+		out, err := enc.AsDate()
 		fmt.Println(test, string(enc), out)
 		if err != nil {
 			t.Error(err)

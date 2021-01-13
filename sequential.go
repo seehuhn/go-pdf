@@ -1,3 +1,5 @@
+// TODO(voss): remove this file
+
 package pdf
 
 import (

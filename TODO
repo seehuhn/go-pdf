@@ -1,8 +1,9 @@
 - allow to write compressed streams
+- allow to write encrypted files
 - add a licence and copyright notices
+
 - add a way to repair broken xref tables
 - Split old `MalformedFileError` into new `FileError` and `ObjectError`
-- allow to write encrypted files
 - implement crypt filters
 - attempt to add pdf-2.0 support
 

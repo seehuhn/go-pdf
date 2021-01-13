@@ -25,7 +25,7 @@ type Info struct {
 // Catalog represents the information from a PDF /Root dictionary.
 type Catalog struct {
 	_                 struct{} `pdf:"Type=Catalog"`
-	Version           Name     `pdf:"optional"`
+	Version           Name     `pdf:"optional,allowstring"`
 	Extensions        Object   `pdf:"optional"`
 	Pages             *Reference
 	PageLabels        Object     `pdf:"optional"`
@@ -55,26 +55,34 @@ type Catalog struct {
 	NeedsRendering    bool       `pdf:"optional"`
 }
 
-// FillStruct initialises a tagged struct using the data from a PDF
-// dictionary.  s Must be a pointer to a struct.
-func (r *Reader) FillStruct(s interface{}, d Dict, errPos int64) error {
+// AsStruct initialises a tagged struct using the data from a PDF dictionary.
+// The argument s must be a pointer to a struct, or the function will panic.
+// The Reader r is used to resolve references to indirect objects, where
+// needed.  The value errPos is only used in error messages: it should be set
+// to the byte index of the Dict inside the PDF file (or 0, if the index is
+// unknown).
+func (d Dict) AsStruct(s interface{}, r *Reader, errPos int64) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
-	n := vt.NumField()
 
 	// To allow parsing malformed PDF files, we don't abort on error. Instead,
-	// we fill all struct fields we can and then return the last error
+	// we fill all struct fields we can and then return the first error
 	// encountered.
-	var err error
+	var firstErr error
 
 	seen := map[string]bool{}
 	extra := -1
 fieldLoop:
-	for i := 0; i < n; i++ {
+	for i := 0; i < vt.NumField(); i++ {
 		fVal := v.Field(i)
+		if !fVal.CanSet() {
+			continue
+		}
 		fInfo := vt.Field(i)
 		seen[fInfo.Name] = true
+		fVal.Set(reflect.Zero(fInfo.Type)) // zero all fields
 
+		// read the struct tags
 		optional := false
 		isTextString := false
 		allowstring := false
@@ -92,76 +100,73 @@ fieldLoop:
 			}
 		}
 
-		if fInfo.PkgPath != "" {
-			continue
+		// get and fix up the value from the Dict
+		dictVal := d[Name(fInfo.Name)]
+		if fInfo.Type != objectType && fInfo.Type != refType {
+			// follow references to indirect objects where needed
+			obj, err := r.Get(dictVal)
+			if err != nil {
+				firstErr = err
+				continue
+			}
+			dictVal = obj
 		}
-
-		dictVal, present := d[Name(fInfo.Name)]
-		if !present {
-			fVal.Set(reflect.Zero(fVal.Type()))
-			if !optional {
-				err = &MalformedFileError{
+		if dictVal == nil {
+			if !optional && firstErr == nil {
+				firstErr = &MalformedFileError{
 					Pos: errPos,
-					Err: fmt.Errorf("required Dict entry /%s not found", fInfo.Name),
+					Err: fmt.Errorf("required Dict entry /%s not found",
+						fInfo.Name),
 				}
 			}
 			continue
-		} else {
-			switch fVal.Interface().(type) {
-			case Object, *Reference:
-				// pass
-			default:
-				dictVal, err = r.Get(dictVal)
-				if err != nil {
-					continue
-				}
+		}
+		if allowstring && fInfo.Type == nameType {
+			if s, ok := dictVal.(String); ok {
+				dictVal = Name(s)
 			}
 		}
 
-		if s, ok := dictVal.(String); allowstring && isName(fVal) && ok {
-			dictVal = Name(s)
-		}
-
+		// finally, assign the value to the field
 		switch {
 		case isTextString:
 			s, ok := dictVal.(String)
-			if !ok {
-				err = &MalformedFileError{
+			if ok {
+				fVal.SetString(s.AsTextString())
+			} else if firstErr == nil {
+				firstErr = &MalformedFileError{
 					Pos: errPos,
 					Err: fmt.Errorf("/%s: expected pdf.String but got %T",
 						fInfo.Name, dictVal),
 				}
-				continue
 			}
-			fVal.SetString(s.AsTextString())
-		case isTime(fVal):
+		case fInfo.Type == timeType:
 			s, ok := dictVal.(String)
-			if !ok {
-				err = &MalformedFileError{
+			if ok {
+				t, err := s.AsDate()
+				if firstErr == nil && err != nil {
+					firstErr = &MalformedFileError{
+						Pos: errPos,
+						Err: fmt.Errorf("/%s: %s: %s",
+							fInfo.Name, s.AsTextString(), err),
+					}
+					continue
+				}
+				fVal.Set(reflect.ValueOf(t))
+			} else if firstErr == nil {
+				firstErr = &MalformedFileError{
 					Pos: errPos,
 					Err: fmt.Errorf("/%s: expected pdf.String but got %T",
 						fInfo.Name, dictVal),
 				}
-				continue
 			}
-			var t time.Time
-			t, err = s.AsDateString()
-			if err != nil {
-				err = &MalformedFileError{
-					Pos: errPos,
-					Err: fmt.Errorf("/%s: %s: %s",
-						fInfo.Name, s.AsTextString(), err),
-				}
-				continue
-			}
-			fVal.Set(reflect.ValueOf(t))
-		case fVal.Kind() == reflect.Bool:
+		case fInfo.Type.Kind() == reflect.Bool:
 			fVal.SetBool(dictVal == Bool(true))
+		case reflect.TypeOf(dictVal).AssignableTo(fInfo.Type):
+			fVal.Set(reflect.ValueOf(dictVal))
 		default:
-			if reflect.TypeOf(dictVal).AssignableTo(fVal.Type()) {
-				fVal.Set(reflect.ValueOf(dictVal))
-			} else {
-				err = &MalformedFileError{
+			if firstErr == nil {
+				firstErr = &MalformedFileError{
 					Pos: errPos,
 					Err: fmt.Errorf("/%s: expected %T but got %T",
 						fInfo.Name, fVal.Interface(), dictVal),
@@ -186,21 +191,20 @@ fieldLoop:
 		v.Field(extra).Set(reflect.ValueOf(extraDict))
 	}
 
-	return err
+	return firstErr
 }
 
-func makeDict(s interface{}) Dict {
+// Struct creates a PDF Dict object, encoding the fields of a Go struct.
+func Struct(s interface{}) Dict {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
 	vt := v.Type()
-	n := vt.NumField()
 
 	res := make(Dict)
-
 fieldLoop:
-	for i := 0; i < n; i++ {
+	for i := 0; i < vt.NumField(); i++ {
 		fVal := v.Field(i)
 		fInfo := vt.Field(i)
 
@@ -208,6 +212,8 @@ fieldLoop:
 		isTextString := false
 		for _, t := range strings.Split(fInfo.Tag.Get("pdf"), ",") {
 			switch t {
+			case "":
+				// pass
 			case "optional":
 				optional = true
 			case "text string":
@@ -217,10 +223,17 @@ fieldLoop:
 					res[Name(key)] = TextString(val)
 				}
 				continue fieldLoop
+			default:
+				assign := strings.SplitN(t, "=", 2)
+				if len(assign) != 2 {
+					continue
+				}
+				res[Name(assign[0])] = Name(assign[1])
 			}
 		}
 
-		if fInfo.PkgPath != "" {
+		if !fVal.CanSet() {
+			// Ignore fields which AsStruct() cannot set
 			continue
 		}
 
@@ -230,8 +243,8 @@ fieldLoop:
 			continue
 		case isTextString:
 			res[key] = TextString(fVal.Interface().(string))
-		case isTime(fVal):
-			res[key] = DateString(fVal.Interface().(time.Time))
+		case fInfo.Type == timeType:
+			res[key] = Date(fVal.Interface().(time.Time))
 		case fVal.Kind() == reflect.Bool:
 			res[key] = Bool(fVal.Bool())
 		default:
@@ -242,12 +255,9 @@ fieldLoop:
 	return res
 }
 
-func isTime(obj reflect.Value) bool {
-	_, ok := obj.Interface().(time.Time)
-	return ok
-}
-
-func isName(obj reflect.Value) bool {
-	_, ok := obj.Interface().(Name)
-	return ok
-}
+var (
+	objectType = reflect.TypeOf((*Object)(nil)).Elem()
+	refType    = reflect.TypeOf(&Reference{})
+	nameType   = reflect.TypeOf(Name(""))
+	timeType   = reflect.TypeOf(time.Time{})
+)

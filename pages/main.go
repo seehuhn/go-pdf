@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 
 	"seehuhn.de/go/pdf"
 )
@@ -150,16 +149,11 @@ func (pp *pages) toObject() pdf.Dict {
 }
 
 func main() {
-	fd, err := os.Create("test.pdf")
+	w, err := pdf.Create("test.pdf")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer fd.Close()
 
-	w, err := pdf.NewWriter(fd, pdf.V1_5)
-	if err != nil {
-		log.Fatal(err)
-	}
 	var catalog, info *pdf.Reference
 
 	info, err = w.WriteIndirect(pdf.Dict{ // page 550
@@ -169,8 +163,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	pageTree := NewPageTree(w)
 
 	font, err := w.WriteIndirect(pdf.Dict{
 		"Type":     pdf.Name("Font"),
@@ -185,6 +177,7 @@ func main() {
 		"Font": pdf.Dict{"F1": font},
 	}
 
+	pageTree := NewPageTree(w)
 	for i := 1; i <= 10; i++ {
 		buf := bytes.NewReader([]byte(fmt.Sprintf(`BT
 /F1 12 Tf

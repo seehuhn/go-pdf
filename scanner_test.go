@@ -101,6 +101,8 @@ func TestReadObject(t *testing.T) {
 		{"(hello\r\n)", String("hello\n"), true, nil},
 		{"(hello\n\r)", String("hello\n\n"), true, nil},
 		{"(hell\\\no)", String("hello"), true, nil},
+		{"(hell\\\ro)", String("hello"), true, nil},
+		{"(hell\\\r\no)", String("hello"), true, nil},
 		{`(h\145llo)`, String("hello"), true, nil},
 		{`(\0612)`, String("12"), true, nil},
 
@@ -171,8 +173,8 @@ func TestReadObject(t *testing.T) {
 						body, data2, data1)
 				}
 			} else if !reflect.DeepEqual(val, test.val) {
-				t.Errorf("%q: wrong value: expected %#v, got %#v",
-					body, test.val, val)
+				t.Errorf("%q: wrong value: expected %q, got %q",
+					body, format(test.val), format(val))
 			}
 
 			if test.ok && err != nil {

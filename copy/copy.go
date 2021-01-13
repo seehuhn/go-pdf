@@ -74,20 +74,11 @@ func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
 }
 
 func main() {
-	fname := os.Args[1]
-	in, err := os.Open(fname)
+	r, err := pdf.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer in.Close()
-	fi, err := in.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
-	r, err := pdf.NewReader(in, fi.Size(), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	defer r.Close()
 
 	out, err := os.Create("out.pdf")
 	if err != nil {
@@ -103,13 +94,18 @@ func main() {
 		r:     r,
 		w:     w,
 	}
-	obj, err := trans.Transfer(r.Trailer)
+
+	catalog, err := trans.Transfer(pdf.Struct(r.Catalog))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	trailer := obj.(pdf.Dict)
-	err = w.Close(trailer["Root"].(*pdf.Reference), trailer["Info"].(*pdf.Reference))
+	info, err := trans.Transfer(pdf.Struct(r.Info))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = w.Close(catalog.(*pdf.Reference), info.(*pdf.Reference))
 	if err != nil {
 		log.Fatal(err)
 	}

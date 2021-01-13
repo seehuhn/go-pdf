@@ -32,7 +32,6 @@ func (x Bool) PDF(w io.Writer) error {
 }
 
 // Integer represents an integer constant in a PDF file.
-// TODO(voss): change this to `int`?
 type Integer int64
 
 // PDF implements the Object interface.
@@ -60,18 +59,30 @@ type String []byte
 func (x String) PDF(w io.Writer) error {
 	l := []byte(x)
 
+	level := 0
+	for _, c := range l {
+		if c == '(' {
+			level++
+		} else if c == ')' {
+			level--
+			if level < 0 {
+				break
+			}
+		}
+	}
+	balanced := level == 0
+
 	var funny []int
 	for i, c := range l {
 		if c == '\r' || c == '\n' || c == '\t' {
 			continue
 		}
-		if c < 32 || c >= 127 || c == '(' || c == ')' || c == '\\' {
+		if c < 32 || c >= 127 || c == '\\' ||
+			!balanced && (c == '(' || c == ')') {
 			funny = append(funny, i)
 		}
 	}
 	n := len(l)
-
-	// TODO(voss): don't escape brackets if they are balanced
 
 	buf := &bytes.Buffer{}
 	if n+2*len(funny) <= 2*n {
@@ -148,17 +159,19 @@ useUTF:
 	return String(buf)
 }
 
-// AsDateString converts a PDF date string to a time.Time object.
+// AsDate converts a PDF date string to a time.Time object.
 // If the string does not have the correct format, an error is returned.
-func (x String) AsDateString() (time.Time, error) {
+func (x String) AsDate() (time.Time, error) {
+	s := x.AsTextString()
+	if s == "D:" {
+		return time.Time{}, nil
+	}
+	s = strings.ReplaceAll(s, "'", "")
+
 	formats := []string{
-		"D:20060102150405-07'00'", // invalid, but occurs in some files
-		"D:20060102150405-07'00",
-		"D:20060102150405-07'",
+		"D:20060102150405-0700",
 		"D:20060102150405-07",
-		"D:20060102150405Z00'00'", // invalid, but occurs in some files
-		"D:20060102150405Z00'00",
-		"D:20060102150405Z00'",
+		"D:20060102150405Z0000",
 		"D:20060102150405Z00",
 		"D:20060102150405Z",
 		"D:20060102150405",
@@ -167,8 +180,8 @@ func (x String) AsDateString() (time.Time, error) {
 		"D:20060102",
 		"D:200601",
 		"D:2006",
+		time.ANSIC,
 	}
-	s := x.AsTextString()
 	for _, format := range formats {
 		t, err := time.Parse(format, s)
 		if err == nil {
@@ -178,9 +191,12 @@ func (x String) AsDateString() (time.Time, error) {
 	return time.Time{}, errNoDate
 }
 
-// DateString creates a String object encoding the given date and time.
-func DateString(t time.Time) String {
-	return String(t.Format("D:20060102150405-07'00"))
+// Date creates a PDF String object encoding the given date and time.
+func Date(t time.Time) String {
+	s := t.Format("D:20060102150405-0700")
+	k := len(s) - 2
+	s = s[:k] + "'" + s[k:]
+	return String(s)
 }
 
 // Name represents a name in a PDF file.
@@ -259,6 +275,18 @@ func (x Dict) String() string {
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
+// sortedKeys returns the keys of x in alphabetical order.
+func (x Dict) sortedKeys() []Name {
+	var keys []Name
+	for key := range x {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i int, j int) bool {
+		return keys[i] < keys[j]
+	})
+	return keys
+}
+
 // PDF implements the Object interface.
 func (x Dict) PDF(w io.Writer) error {
 	if x == nil {
@@ -266,18 +294,12 @@ func (x Dict) PDF(w io.Writer) error {
 		return err
 	}
 
-	var keys []string
-	for key := range x {
-		keys = append(keys, string(key))
-	}
-	sort.Strings(keys)
-
 	_, err := w.Write([]byte("<<"))
 	if err != nil {
 		return err
 	}
 
-	for _, key := range keys {
+	for _, key := range x.sortedKeys() {
 		name := Name(key)
 		val := x[name]
 		if val == nil {
