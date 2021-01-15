@@ -239,7 +239,7 @@ func (s *scanner) ReadInteger() (Integer, error) {
 		first = false
 		return true
 	})
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return 0, err
 	}
 
@@ -814,7 +814,7 @@ func (s *scanner) SkipAfter(pat string) error {
 	patBytes := []byte(pat)
 	n := len(patBytes)
 	if n > scannerBufSize {
-		panic("SkipAfter target too large")
+		panic("SkipAfter target string too long")
 	}
 
 	for {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -250,5 +251,34 @@ func TestReadHeaderVersion(t *testing.T) {
 		if !errors.Is(err, errVersion) {
 			t.Errorf("%q: wrong error %q", in, err)
 		}
+	}
+}
+
+func TestFuzzingCorpus(t *testing.T) {
+	getInt := func(obj Object) (Integer, error) {
+		switch x := obj.(type) {
+		case Integer:
+			return x, nil
+		case *Reference:
+			return Integer(x.Number) - Integer(x.Generation), nil
+		default:
+			return 0, errors.New("not an integer")
+		}
+	}
+
+	// Test that there are no panics caused by the fuzzer's corpus.
+	names, err := filepath.Glob("corpus/*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fname := range names {
+		buf, err := ioutil.ReadFile(fname)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		r := bytes.NewReader(buf)
+		s := newScanner(r, 0, getInt, nil)
+		s.ReadObject() // we are just checking there is no panic
 	}
 }

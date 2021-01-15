@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -17,7 +18,9 @@ func main() {
 
 	for {
 		obj, ref, err := r.Read()
-		if err != nil {
+		if err == io.EOF {
+			break
+		} else if err != nil {
 			log.Fatal(err)
 		}
 		fmt.Println(ref, obj)

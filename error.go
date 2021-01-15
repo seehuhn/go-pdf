@@ -36,3 +36,11 @@ func (err *MalformedFileError) Error() string {
 func (err *MalformedFileError) Unwrap() error {
 	return err.Err
 }
+
+type errorReader struct {
+	err error
+}
+
+func (e *errorReader) Read([]byte) (int, error) {
+	return 0, e.err
+}

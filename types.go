@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -236,6 +237,13 @@ func (x Name) PDF(w io.Writer) error {
 // Array represent an array in a PDF file.
 type Array []Object
 
+func (x Array) String() string {
+	res := []string{}
+	res = append(res, "Array")
+	res = append(res, strconv.FormatInt(int64(len(x)), 10)+" elements")
+	return "<" + strings.Join(res, ", ") + ">"
+}
+
 // PDF implements the Object interface.
 func (x Array) PDF(w io.Writer) error {
 	_, err := w.Write([]byte("["))
@@ -271,7 +279,7 @@ func (x Dict) String() string {
 	if ok {
 		res = append(res, string(tp)+" Dict")
 	} else {
-		res = append(res, "PDF Dict")
+		res = append(res, "Dict")
 	}
 	res = append(res, strconv.FormatInt(int64(len(x)), 10)+" entries")
 	return "<" + strings.Join(res, ", ") + ">"
@@ -343,7 +351,7 @@ func (x *Stream) String() string {
 	if ok {
 		res = append(res, string(tp)+" Stream")
 	} else {
-		res = append(res, "PDF Stream")
+		res = append(res, "Stream")
 	}
 	length, ok := x.Dict["Length"].(Integer)
 	if ok {
@@ -380,6 +388,51 @@ func (x *Stream) PDF(w io.Writer) error {
 	return err
 }
 
+// ApplyFilter encodes the stream data using the given filter and parameters.
+// This changes the filter in place.  The .Decode() method can be used to get
+// back the original data, or the io.Reader in the .R field can be read to get
+// the encoded data.
+func (x *Stream) ApplyFilter(name Name, param Dict) error {
+	filter := x.Dict["Filter"]
+	decodeParms := x.Dict["DecodeParms"]
+	switch f := filter.(type) {
+	case nil:
+		if param != nil {
+			x.Dict["DecodeParms"] = param
+		}
+		x.Dict["Filter"] = name
+	case Name:
+		if decodeParms != nil || param != nil {
+			x.Dict["DecodeParms"] = Array{decodeParms, param}
+		}
+		x.Dict["Filter"] = Array{f, name}
+	case Array:
+		pp, ok := decodeParms.(Array)
+		if !ok && decodeParms != nil {
+			return errors.New("invalid /DecodeParms in stream")
+		}
+		if param != nil {
+			for len(pp) < len(f) {
+				pp = append(pp, nil)
+			}
+			pp = append(pp, param)
+		} else if len(pp) > 0 {
+			pp = append(pp, nil)
+		}
+		x.Dict["DecodeParms"] = pp
+		x.Dict["Filter"] = append(f, name)
+	default:
+		return errors.New("invalid /Filter in stream")
+	}
+	rEnc, length, err := filterEncode(x.R, name, param)
+	if err != nil {
+		return err
+	}
+	x.Dict["Length"] = length
+	x.R = rEnc
+	return nil
+}
+
 // Decode returns a reader for the decoded stream data.
 func (x *Stream) Decode() io.Reader {
 	r := x.R
@@ -413,8 +466,14 @@ type Reference struct {
 }
 
 func (x *Reference) String() string {
-	return "obj-" + strconv.FormatInt(int64(x.Number), 10) + "." +
-		strconv.FormatUint(uint64(x.Generation), 10)
+	res := []string{
+		"obj_",
+		strconv.FormatInt(int64(x.Number), 10),
+	}
+	if x.Generation > 0 {
+		res = append(res, "@", strconv.FormatUint(uint64(x.Generation), 10))
+	}
+	return strings.Join(res, "")
 }
 
 // PDF implements the Object interface.
@@ -425,12 +484,6 @@ func (x *Reference) PDF(w io.Writer) error {
 
 // Version represent the version of PDF standard used in a file.
 type Version int
-
-// PDF implements the Object interface.
-func (ver Version) PDF(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%%PDF-1.%d\n%%\x80\x80\x80\x80\n", ver)
-	return err
-}
 
 // Constants for the known PDF versions.
 const (

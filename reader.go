@@ -11,19 +11,23 @@ import (
 type Reader struct {
 	size int64
 	r    io.ReaderAt
-	pos  int64
 
-	xref map[int]*xRefEntry
+	pos    int64
+	objStm *objStm
+
+	xref    map[int]*xRefEntry
+	trailer Dict
 
 	PDFVersion Version
-	Catalog    *Catalog
-	Info       *Info
 
 	ID  [][]byte
 	enc *encryptInfo
 }
 
 // NewReader creates a new Reader object.
+//
+// TODO(voss): remove the needOwner argument, add an .AuthenticateOwner method
+// instead.
 func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string) (*Reader, error) {
 	r := &Reader{
 		size: size,
@@ -42,6 +46,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		return nil, err
 	}
 	r.xref = xref
+	r.trailer = trailer
 
 	ID, ok := trailer["ID"].(Array)
 	if ok && len(ID) >= 2 {
@@ -66,44 +71,31 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		r.enc.sec.getPasswd = readPwd
 	}
 
-	rootDict, err := r.GetDict(trailer["Root"])
-	if err != nil {
-		return nil, err
-	}
-	r.Catalog = &Catalog{}
-	rootDict.AsStruct(r.Catalog, r, r.errPos(trailer["Root"]))
-
-	if r.Catalog.Version != "" {
-		var v2 Version
-		switch r.Catalog.Version {
-		case "1.4":
-			v2 = V1_4
-		case "1.5":
-			v2 = V1_5
-		case "1.6":
-			v2 = V1_6
-		case "1.7":
-			v2 = V1_7
-		default:
-			return nil, &MalformedFileError{
-				Pos: r.errPos(trailer["Root"]),
-				Err: errVersion,
+	root := trailer["Root"]
+	catalog, err := r.GetDict(root)
+	if err == nil {
+		catVer, ok := catalog["Version"].(Name)
+		if ok {
+			var v2 Version
+			switch catVer {
+			case "1.4":
+				v2 = V1_4
+			case "1.5":
+				v2 = V1_5
+			case "1.6":
+				v2 = V1_6
+			case "1.7":
+				v2 = V1_7
+			default:
+				return nil, &MalformedFileError{
+					Pos: r.errPos(root),
+					Err: errVersion,
+				}
+			}
+			if v2 > r.PDFVersion {
+				r.PDFVersion = v2
 			}
 		}
-		if v2 > r.PDFVersion {
-			r.PDFVersion = v2
-		}
-	}
-
-	obj, err := r.Get(trailer["Info"])
-	if err != nil {
-		return nil, err
-	}
-	if infoDict, ok := obj.(Dict); ok {
-		r.Info = &Info{}
-		// We ignore errors here, so that we still recover the values we did
-		// read successfully.
-		infoDict.AsStruct(r.Info, r, r.errPos(trailer["Info"]))
 	}
 
 	return r, nil
@@ -135,10 +127,44 @@ func (r *Reader) Close() error {
 	return nil
 }
 
+// Catalog returns the PDF Catalog dictionary for the file.
+func (r *Reader) Catalog() (Dict, error) {
+	return r.GetDict(r.trailer["Root"])
+}
+
+// Info returns the PDF Catalog dictionary for the file.
+func (r *Reader) Info() (Dict, error) {
+	return r.GetDict(r.trailer["Info"])
+}
+
 func (r *Reader) Read() (Object, *Reference, error) {
 	s := r.scannerAt(r.pos)
 
 	for {
+		if r.objStm != nil && len(r.objStm.idx) > 0 {
+			s2 := r.objStm.s
+			err := s2.Discard(int64(r.objStm.idx[0].offs) - s2.bytesRead())
+			if err != nil {
+				return nil, nil, err
+			}
+			obj, err := s2.ReadObject()
+			if err != nil {
+				return nil, nil, err
+			}
+			ref := &Reference{
+				Number:     r.objStm.idx[0].number,
+				Generation: 0,
+			}
+
+			if len(r.objStm.idx) > 1 {
+				r.objStm.idx = r.objStm.idx[1:]
+			} else {
+				r.objStm = nil
+			}
+
+			return obj, ref, nil
+		}
+
 		err := s.SkipWhiteSpace()
 		if err != nil {
 			return nil, nil, err
@@ -178,7 +204,9 @@ func (r *Reader) Read() (Object, *Reference, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			panic("not implemented")
+			r.objStm = contents
+			r.pos = s.currentPos()
+			continue
 		}
 
 		// Try to fix up the xref information, so that after a sequential
@@ -297,7 +325,9 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 			Err: errors.New("no valid /First for ObjStm"),
 		}
 	}
-	s.Discard(int64(first) - pos)
+	for i := range idx {
+		idx[i].offs += int(first)
+	}
 
 	return &objStm{s: s, idx: idx}, nil
 }
@@ -324,7 +354,7 @@ func (r *Reader) getFromObjectStream(number int, cRef *Reference) (Object, error
 	found := false
 	for _, info := range contents.idx {
 		if info.number == number {
-			err = contents.s.Discard(int64(info.offs))
+			err = contents.s.Discard(int64(info.offs) - contents.s.bytesRead())
 			if err != nil {
 				return nil, err
 			}

@@ -1,8 +1,6 @@
 package pdf
 
 import (
-	"bytes"
-	"compress/zlib"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -90,23 +88,24 @@ func TestStream(t *testing.T) {
 }
 
 func TestCompressedStream(t *testing.T) {
-	dataIn := "\nbinary stream data\000123\n   "
+	dataIn := "\nbinary stream data\000123\n   xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+	stream := &Stream{
+		Dict: map[Name]Object{
+			"Length": Integer(len(dataIn)),
+		},
+		R: strings.NewReader(dataIn),
+	}
 
-	rIn := &bytes.Buffer{}
-	comp := zlib.NewWriter(rIn)
-	_, err := comp.Write([]byte(dataIn))
+	flateDecode := Name("FlateDecode")
+	err := stream.ApplyFilter(flateDecode, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	comp.Close()
 
-	stream := &Stream{
-		Dict: map[Name]Object{
-			"Length": Integer(rIn.Len()),
-			"Filter": Name("FlateDecode"),
-		},
-		R: rIn,
+	if stream.Dict["Filter"] != flateDecode {
+		t.Error("wrong /Filter value: " + format(stream.Dict["Filter"]))
 	}
+
 	rOut := stream.Decode()
 	dataOut, err := ioutil.ReadAll(rOut)
 	if err != nil {

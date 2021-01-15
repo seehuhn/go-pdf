@@ -95,7 +95,11 @@ func main() {
 		w:     w,
 	}
 
-	catalog, err := trans.Transfer(pdf.Struct(r.Catalog))
+	root, err := r.Catalog()
+	if err != nil {
+		log.Fatal(err)
+	}
+	catalog, err := trans.Transfer(root)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,7 +108,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	info, err := trans.Transfer(pdf.Struct(r.Info))
+	infoDict, err := r.Info()
+	if err != nil {
+		log.Fatal(err)
+	}
+	info, err := trans.Transfer(infoDict)
 	if err != nil {
 		log.Fatal(err)
 	}

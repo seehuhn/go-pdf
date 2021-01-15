@@ -77,8 +77,11 @@ func Fuzz(data []byte) int {
 		return 0
 	}
 
+	root, _ := r.Catalog()
+	info, _ := r.Info()
+
 	seen := make(map[pdf.Reference]pdf.Object)
-	_, err = Walk(r, pdf.Array{pdf.Struct(r.Catalog), pdf.Struct(r.Info)},
+	_, err = Walk(r, pdf.Array{root, info},
 		seen, func(o pdf.Object) (pdf.Object, error) {
 			if stream, ok := o.(*pdf.Stream); ok {
 				_, err := io.Copy(ioutil.Discard, stream.R)

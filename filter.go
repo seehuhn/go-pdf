@@ -35,6 +35,7 @@
 package pdf
 
 import (
+	"bytes"
 	"compress/zlib"
 	"fmt"
 	"io"
@@ -43,12 +44,13 @@ import (
 func filterDecode(r io.Reader, name Object, param Object) io.Reader {
 	n, ok := name.(Name)
 	if !ok {
+		// TODO(voss): use a conventional error return instead
 		return &errorReader{
 			fmt.Errorf("invalid filter description %s", format(name))}
 	}
-	switch string(n) {
+	switch n {
 	case "FlateDecode":
-		params := map[string]int{
+		flateParams := map[string]int{
 			"Predictor":        1,
 			"Colors":           1,
 			"BitsPerComponent": 8,
@@ -56,9 +58,9 @@ func filterDecode(r io.Reader, name Object, param Object) io.Reader {
 			"EarlyChange":      1,
 		}
 		if pDict, ok := param.(Dict); ok {
-			for key := range params {
+			for key := range flateParams {
 				if val, ok := pDict[Name(key)].(Integer); ok {
-					params[key] = int(val)
+					flateParams[key] = int(val)
 				}
 			}
 		}
@@ -68,11 +70,11 @@ func filterDecode(r io.Reader, name Object, param Object) io.Reader {
 		if err != nil {
 			return &errorReader{err}
 		}
-		switch params["Predictor"] {
+		switch flateParams["Predictor"] {
 		case 1:
 			// pass
 		case 12:
-			columns := params["Columns"]
+			columns := flateParams["Columns"]
 			zr = &pngUpReader{
 				r:    zr,
 				hist: make([]byte, 1+columns),
@@ -81,7 +83,7 @@ func filterDecode(r io.Reader, name Object, param Object) io.Reader {
 			}
 		default:
 			zr = &errorReader{fmt.Errorf("unsupported predictor %d",
-				params["Predictor"])}
+				flateParams["Predictor"])}
 		}
 		return zr
 	default:
@@ -121,10 +123,46 @@ func (r *pngUpReader) Read(b []byte) (int, error) {
 	return n, nil
 }
 
-type errorReader struct {
-	err error
-}
+// returns the encoded reader, the new size, and an error
+func filterEncode(r io.Reader, name Name, param Dict) (io.Reader, Object, error) {
+	switch name {
+	case "FlateDecode":
+		flateParams := map[string]int{
+			"Predictor":        1,
+			"Colors":           1,
+			"BitsPerComponent": 8,
+			"Columns":          1,
+			"EarlyChange":      1,
+		}
+		for key := range flateParams {
+			if val, ok := param[Name(key)].(Integer); ok {
+				flateParams[key] = int(val)
+			}
+		}
 
-func (e *errorReader) Read([]byte) (int, error) {
-	return 0, e.err
+		buf := &bytes.Buffer{}
+		comp := zlib.NewWriter(buf)
+		_, err := io.Copy(comp, r)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = comp.Close()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var zr io.Reader = buf
+		var length Object = Integer(buf.Len())
+
+		switch flateParams["Predictor"] {
+		case 1:
+			// pass
+		default:
+			return nil, nil, fmt.Errorf("unsupported predictor %d",
+				flateParams["Predictor"])
+		}
+		return zr, length, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported filter %q", name)
+	}
 }

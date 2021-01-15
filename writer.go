@@ -32,7 +32,7 @@ func NewWriter(w io.Writer, ver Version) (*Writer, error) {
 		Generation: 65535,
 	}
 
-	err := ver.PDF(pdf.w)
+	_, err := fmt.Fprintf(pdf.w, "%%PDF-1.%d\n%%\x80\x80\x80\x80\n", ver)
 	if err != nil {
 		return nil, err
 	}
