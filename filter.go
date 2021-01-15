@@ -40,7 +40,7 @@ import (
 	"io"
 )
 
-func applyFilter(r io.Reader, name Object, param Object) io.Reader {
+func filterDecode(r io.Reader, name Object, param Object) io.Reader {
 	n, ok := name.(Name)
 	if !ok {
 		return &errorReader{

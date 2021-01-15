@@ -99,13 +99,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	catRef, err := trans.w.WriteIndirect(catalog, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	info, err := trans.Transfer(pdf.Struct(r.Info))
 	if err != nil {
 		log.Fatal(err)
 	}
+	infoRef, err := trans.w.WriteIndirect(info, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	err = w.Close(catalog.(*pdf.Reference), info.(*pdf.Reference))
+	err = w.Close(catRef, infoRef)
 	if err != nil {
 		log.Fatal(err)
 	}

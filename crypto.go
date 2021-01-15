@@ -62,7 +62,7 @@ func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 	switch V {
 	case 1:
 		cf := &cryptFilter{
-			Cipher: CipherRC4,
+			Cipher: cipherRC4,
 			Length: 40,
 		}
 		res.stmF = cf
@@ -70,7 +70,7 @@ func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 		res.eff = cf
 	case 2:
 		cf := &cryptFilter{
-			Cipher: CipherRC4,
+			Cipher: cipherRC4,
 			Length: length,
 		}
 		res.stmF = cf
@@ -180,7 +180,7 @@ func (sec *securityHandler) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, 
 	_, _ = h.Write([]byte{
 		byte(ref.Number), byte(ref.Number >> 8), byte(ref.Number >> 16),
 		byte(ref.Generation), byte(ref.Generation >> 8)})
-	if cf.Cipher == CipherAES {
+	if cf.Cipher == cipherAES {
 		_, _ = h.Write([]byte("sAlT"))
 	}
 	l := sec.n + 5
@@ -203,7 +203,7 @@ func (enc *encryptInfo) EncryptBytes(ref *Reference, buf []byte) ([]byte, error)
 		return nil, err
 	}
 	switch cf.Cipher {
-	case CipherAES:
+	case cipherAES:
 		n := len(buf)
 		nPad := 16 - n%16
 		out := make([]byte, 16+n+nPad) // iv | c(data|padding)
@@ -227,7 +227,7 @@ func (enc *encryptInfo) EncryptBytes(ref *Reference, buf []byte) ([]byte, error)
 		}
 		cbc.CryptBlocks(out[n+nPad:], out[n+nPad:])
 		return out, nil
-	case CipherRC4:
+	case cipherRC4:
 		c, err := rc4.NewCipher(key)
 		if err != nil {
 			return nil, err
@@ -252,7 +252,7 @@ func (enc *encryptInfo) DecryptBytes(ref *Reference, buf []byte) ([]byte, error)
 		return nil, err
 	}
 	switch cf.Cipher {
-	case CipherAES:
+	case cipherAES:
 		if len(buf) < 32 {
 			return nil, errCorrupted
 		}
@@ -271,7 +271,7 @@ func (enc *encryptInfo) DecryptBytes(ref *Reference, buf []byte) ([]byte, error)
 			return nil, errCorrupted
 		}
 		return buf[16 : len(buf)-nPad], nil
-	case CipherRC4:
+	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
 		c.XORKeyStream(buf, buf)
 		return buf, nil
@@ -294,7 +294,7 @@ func (enc *encryptInfo) EncryptStream(ref *Reference, _ string, r io.Reader) (io
 	}
 
 	switch cf.Cipher {
-	case CipherAES:
+	case cipherAES:
 		c, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, err
@@ -313,7 +313,7 @@ func (enc *encryptInfo) EncryptStream(ref *Reference, _ string, r io.Reader) (io
 			buf:   buf,
 			ready: iv,
 		}, nil
-	case CipherRC4:
+	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
 		return &cipher.StreamReader{S: c, R: r}, nil
 	default:
@@ -335,7 +335,7 @@ func (enc *encryptInfo) DecryptStream(ref *Reference, _ string, r io.Reader) (io
 	}
 
 	switch cf.Cipher {
-	case CipherAES:
+	case cipherAES:
 		buf := make([]byte, 32)
 		iv := buf[:16]
 		_, err := io.ReadFull(r, iv)
@@ -353,7 +353,7 @@ func (enc *encryptInfo) DecryptStream(ref *Reference, _ string, r io.Reader) (io
 			r:   r,
 			buf: buf,
 		}, nil
-	case CipherRC4:
+	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
 		return &cipher.StreamReader{S: c, R: r}, nil
 	default:
@@ -607,7 +607,7 @@ var passwdPad = []byte{
 }
 
 type cryptFilter struct {
-	Cipher Cipher
+	Cipher cipherType
 	Length int
 }
 
@@ -615,31 +615,31 @@ func (cf *cryptFilter) String() string {
 	return fmt.Sprintf("%s-%d", cf.Cipher, cf.Length)
 }
 
-// Cipher denotes the type of encryption used in (parts of) a PDF file.
-type Cipher int
+// cipherType denotes the type of encryption used in (parts of) a PDF file.
+type cipherType int
 
 const (
-	// CipherUnknown indicates that the encryption scheme has not yet been
+	// cipherUnknown indicates that the encryption scheme has not yet been
 	// determined.
-	CipherUnknown Cipher = iota
+	cipherUnknown cipherType = iota
 
-	// CipherAES indicates that AES encryption in CBC mode is used.  This
+	// cipherAES indicates that AES encryption in CBC mode is used.  This
 	// corresponds to the StdCF crypt filter with a CFM value of AESV2 in the
 	// PDF specification.
-	CipherAES
+	cipherAES
 
-	// CipherRC4 indicates that RC4 encryption is used.  This corresponds to
+	// cipherRC4 indicates that RC4 encryption is used.  This corresponds to
 	// the StdCF crypt filter with a CFM value of V2 in the PDF specification.
-	CipherRC4
+	cipherRC4
 )
 
-func (c Cipher) String() string {
+func (c cipherType) String() string {
 	switch c {
-	case CipherUnknown:
+	case cipherUnknown:
 		return "unknown"
-	case CipherAES:
+	case cipherAES:
 		return "AES"
-	case CipherRC4:
+	case cipherRC4:
 		return "RC4"
 	default:
 		return fmt.Sprintf("cipher#%d", c)
@@ -673,10 +673,10 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 
 	switch {
 	case cfDict["CFM"] == Name("V2"):
-		res.Cipher = CipherRC4
+		res.Cipher = cipherRC4
 		return res, nil
 	case cfDict["CFM"] == Name("AESV2"):
-		res.Cipher = CipherAES
+		res.Cipher = cipherAES
 		return res, nil
 	default:
 		return nil, errors.New("unknown cipher")

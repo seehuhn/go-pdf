@@ -266,25 +266,15 @@ func (x Array) PDF(w io.Writer) error {
 type Dict map[Name]Object
 
 func (x Dict) String() string {
-	res := []string{"PDF Dict"}
+	res := []string{}
 	tp, ok := x["Type"].(Name)
 	if ok {
-		res = append(res, string(tp))
+		res = append(res, string(tp)+" Dict")
+	} else {
+		res = append(res, "PDF Dict")
 	}
 	res = append(res, strconv.FormatInt(int64(len(x)), 10)+" entries")
 	return "<" + strings.Join(res, ", ") + ">"
-}
-
-// sortedKeys returns the keys of x in alphabetical order.
-func (x Dict) sortedKeys() []Name {
-	var keys []Name
-	for key := range x {
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i int, j int) bool {
-		return keys[i] < keys[j]
-	})
-	return keys
 }
 
 // PDF implements the Object interface.
@@ -299,7 +289,7 @@ func (x Dict) PDF(w io.Writer) error {
 		return err
 	}
 
-	for _, key := range x.sortedKeys() {
+	for _, key := range x.SortedKeys() {
 		name := Name(key)
 		val := x[name]
 		if val == nil {
@@ -327,12 +317,49 @@ func (x Dict) PDF(w io.Writer) error {
 	return err
 }
 
+// SortedKeys returns the keys of x in alphabetical order.
+func (x Dict) SortedKeys() []Name {
+	var keys []Name
+	for key := range x {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i int, j int) bool {
+		return keys[i] < keys[j]
+	})
+	return keys
+}
+
 // Stream represent a stream object in a PDF file.
 type Stream struct {
 	Dict
 	R io.Reader
 
 	isEncrypted bool // TODO(voss): set this correctly
+}
+
+func (x *Stream) String() string {
+	res := []string{}
+	tp, ok := x.Dict["Type"].(Name)
+	if ok {
+		res = append(res, string(tp)+" Stream")
+	} else {
+		res = append(res, "PDF Stream")
+	}
+	length, ok := x.Dict["Length"].(Integer)
+	if ok {
+		res = append(res, strconv.FormatInt(int64(length), 10)+" bytes")
+	}
+	switch filter := x.Dict["Filter"].(type) {
+	case Name:
+		res = append(res, string(filter))
+	case Array:
+		for _, f := range filter {
+			if name, ok := f.(Name); ok {
+				res = append(res, string(name))
+			}
+		}
+	}
+	return "<" + strings.Join(res, ", ") + ">"
 }
 
 // PDF implements the Object interface.
@@ -371,10 +398,10 @@ func (x *Stream) Decode() io.Reader {
 			if ok {
 				pi = pa[i]
 			}
-			r = applyFilter(r, name, pi)
+			r = filterDecode(r, name, pi)
 		}
 	default:
-		r = applyFilter(r, f, param)
+		r = filterDecode(r, f, param)
 	}
 	return r
 }
@@ -383,6 +410,11 @@ func (x *Stream) Decode() io.Reader {
 type Reference struct {
 	Number     int
 	Generation uint16
+}
+
+func (x *Reference) String() string {
+	return "obj-" + strconv.FormatInt(int64(x.Number), 10) + "." +
+		strconv.FormatUint(uint64(x.Generation), 10)
 }
 
 // PDF implements the Object interface.

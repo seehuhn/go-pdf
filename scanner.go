@@ -12,32 +12,43 @@ import (
 const scannerBufSize = 1024
 
 type scanner struct {
-	r      io.Reader
-	getInt func(Object) (Integer, error)
-	buf    []byte
-	pos    int
-	used   int
-	total  int64
+	r       io.Reader
+	base    int64
+	getInt  func(Object) (Integer, error)
+	buf     []byte
+	pos     int
+	used    int
+	skipped int64
 
 	dec    *encryptInfo
 	decRef *Reference
 }
 
-func newScanner(r io.Reader, getInt func(Object) (Integer, error),
+func newScanner(r io.Reader, base int64, getInt func(Object) (Integer, error),
 	dec *encryptInfo) *scanner {
 	return &scanner{
 		r:      r,
+		base:   base,
 		buf:    make([]byte, scannerBufSize),
 		getInt: getInt,
 		dec:    dec,
 	}
 }
 
-func (s *scanner) filePos() int64 {
-	return s.total + int64(s.pos)
+func (s *scanner) currentPos() int64 {
+	return s.base + s.skipped + int64(s.pos)
+}
+
+func (s *scanner) bytesRead() int64 {
+	return s.skipped + int64(s.pos)
 }
 
 func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
+	err := s.SkipWhiteSpace()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	number, err := s.ReadInteger()
 	if err != nil {
 		return nil, nil, err
@@ -235,7 +246,7 @@ func (s *scanner) ReadInteger() (Integer, error) {
 	x, err := strconv.ParseInt(string(res), 10, 64)
 	if err != nil {
 		return 0, &MalformedFileError{
-			Pos: s.filePos(),
+			Pos: s.currentPos(),
 			Err: err,
 		}
 	}
@@ -546,7 +557,7 @@ func (s *scanner) ReadDict() (Dict, error) {
 			}
 			if len(buf) == 0 {
 				return nil, &MalformedFileError{
-					Pos: s.filePos(),
+					Pos: s.currentPos(),
 					Err: io.ErrUnexpectedEOF,
 				}
 			}
@@ -595,7 +606,7 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		return nil, err
 	} else if length < 0 {
 		return nil, &MalformedFileError{
-			Pos: s.filePos(),
+			Pos: s.currentPos(),
 			Err: errors.New("stream with negative length"),
 		}
 	}
@@ -622,7 +633,7 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		return nil, &MalformedFileError{}
 	}
 
-	start := s.filePos()
+	start := s.bytesRead()
 	l := int64(length)
 
 	var streamData io.Reader
@@ -681,11 +692,6 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 		return 0, &MalformedFileError{Pos: 7, Err: errVersion}
 	}
 
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return 0, err
-	}
-
 	return version, nil
 }
 
@@ -693,7 +699,7 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 // possible.  Once the end of file is reached, s.used will be smaller than the
 // buffer size, but no error will be returned.
 func (s *scanner) refill() error {
-	s.total += int64(s.pos)
+	s.skipped += int64(s.pos)
 	copy(s.buf, s.buf[s.pos:s.used])
 	s.used -= s.pos
 	s.pos = 0
@@ -739,12 +745,12 @@ func (s *scanner) Discard(n int64) error {
 	}
 
 	n -= unread
-	s.total += int64(s.used)
+	s.skipped += int64(s.used)
 	s.pos = 0
 	s.used = 0
 
 	n, err := io.CopyN(ioutil.Discard, s.r, n)
-	s.total += n
+	s.skipped += n
 	return err
 }
 
@@ -796,7 +802,7 @@ func (s *scanner) SkipString(pat string) error {
 	}
 	if !bytes.Equal(buf, patBytes) {
 		return &MalformedFileError{
-			Pos: s.filePos(),
+			Pos: s.currentPos(),
 			Err: fmt.Errorf("expected %q but found %q", pat, string(buf)),
 		}
 	}

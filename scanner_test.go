@@ -12,7 +12,7 @@ import (
 
 func testScanner(contents string) *scanner {
 	buf := bytes.NewReader([]byte(contents))
-	return newScanner(buf, func(o Object) (Integer, error) {
+	return newScanner(buf, 0, func(o Object) (Integer, error) {
 		return o.(Integer), nil
 	}, nil)
 }
@@ -20,12 +20,12 @@ func testScanner(contents string) *scanner {
 func TestRefill(t *testing.T) {
 	n := scannerBufSize + 2
 	buf := make([]byte, n)
-	s := newScanner(bytes.NewReader(buf), nil, nil)
+	s := newScanner(bytes.NewReader(buf), 0, nil, nil)
 
 	for _, inc := range []int{0, 1, scannerBufSize, 1} {
 		s.pos += inc
 		err := s.refill()
-		total := int(s.total) + s.pos
+		total := int(s.skipped) + s.pos
 		expectUsed := scannerBufSize
 		if expectUsed > n-total {
 			expectUsed = n - total
@@ -218,7 +218,7 @@ func TestSkipWhiteSpace(t *testing.T) {
 			if err != nil {
 				t.Errorf("%q: unexpected error: %s", body, err)
 			}
-			total := int(s.total) + s.pos
+			total := int(s.skipped) + s.pos
 			if total != len(test) {
 				t.Errorf("%q: wrong position %d", body, total)
 			}
@@ -227,7 +227,7 @@ func TestSkipWhiteSpace(t *testing.T) {
 }
 
 func TestReadHeaderVersion(t *testing.T) {
-	s := newScanner(strings.NewReader("%PDF-1.7\n1 0 obj\n"), nil, nil)
+	s := newScanner(strings.NewReader("%PDF-1.7\n1 0 obj\n"), 0, nil, nil)
 	version, err := s.readHeaderVersion()
 	if err != nil {
 		t.Errorf("unexpected error %q", err)
@@ -237,7 +237,7 @@ func TestReadHeaderVersion(t *testing.T) {
 	}
 
 	for _, in := range []string{"", "%PEF-1.7\n", "%PDF-0.1\n"} {
-		s = newScanner(strings.NewReader(in), nil, nil)
+		s = newScanner(strings.NewReader(in), 0, nil, nil)
 		_, err = s.readHeaderVersion()
 		if err == nil {
 			t.Errorf("%q: missing error", in)
@@ -245,7 +245,7 @@ func TestReadHeaderVersion(t *testing.T) {
 	}
 
 	for _, in := range []string{"%PDF-1.9\n", "%PDF-1.50\n"} {
-		s = newScanner(strings.NewReader(in), nil, nil)
+		s = newScanner(strings.NewReader(in), 0, nil, nil)
 		_, err = s.readHeaderVersion()
 		if !errors.Is(err, errVersion) {
 			t.Errorf("%q: wrong error %q", in, err)

@@ -93,16 +93,8 @@ ET
 	}
 
 	outR := bytes.NewReader(out.Bytes())
-	r, err := NewReader(outR, outR.Size(), nil)
+	_, err = NewReader(outR, outR.Size(), nil)
 	if err != nil {
 		t.Fatal(err)
-	}
-	seen := make(map[Reference]Object)
-	_, err = r.Walk(Array{Struct(r.Catalog), Struct(r.Info)}, seen,
-		func(o Object) (Object, error) {
-			return nil, nil
-		}, nil)
-	if err != nil {
-		t.Error(err)
 	}
 }

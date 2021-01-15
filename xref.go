@@ -23,7 +23,7 @@ func (r *Reader) findXRef() (int64, error) {
 
 	if xRefPos <= 0 || int64(xRefPos) >= r.size {
 		return 0, &MalformedFileError{
-			Pos: s.filePos(),
+			Pos: s.currentPos(),
 			Err: errors.New("invalid xref position"),
 		}
 	}
@@ -209,7 +209,7 @@ func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) erro
 		}
 		if len(buf) < 20 {
 			return &MalformedFileError{
-				Pos: s.filePos(),
+				Pos: s.currentPos(),
 				Err: io.ErrUnexpectedEOF,
 			}
 		}
@@ -242,7 +242,7 @@ func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) erro
 			}
 		default:
 			return &MalformedFileError{
-				Pos: s.filePos(),
+				Pos: s.currentPos(),
 				Err: errors.New("malformed xref table"),
 			}
 		}
@@ -260,7 +260,7 @@ func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	stream, ok := obj.(*Stream)
 	if !ok {
 		return nil, &MalformedFileError{
-			Pos: s.filePos(),
+			Pos: s.currentPos(),
 			Err: errors.New("invalid xref stream"),
 		}
 	}

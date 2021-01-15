@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -10,6 +11,8 @@ import (
 type Reader struct {
 	size int64
 	r    io.ReaderAt
+	pos  int64
+
 	xref map[int]*xRefEntry
 
 	PDFVersion Version
@@ -120,9 +123,9 @@ func Open(fname string) (*Reader, error) {
 	return NewReader(fd, fi.Size(), nil)
 }
 
-// Close closes the underlying file of the reader.  This call only has an
-// effect if the io.ReaderAt passed to NewReader() has a Close() method, or if
-// the Reader was created using Open().  Otherwise, Close() has no effect and
+// Close closes the file underlying the reader.  This call only has an effect
+// if the io.ReaderAt passed to NewReader() has a Close() method, or if the
+// Reader was created using Open().  Otherwise, Close() has no effect and
 // returns nil.
 func (r *Reader) Close() error {
 	closer, ok := r.r.(io.Closer)
@@ -132,85 +135,66 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// Walk performs a depth-first walk through the object graph rooted at obj.
-//
-// TODO(voss): remove
-func (r *Reader) Walk(obj Object, seen map[Reference]Object,
-	leaf func(Object) (Object, error),
-	root func(Object, *Reference) (*Reference, error)) (Object, error) {
-	obj, err := r.doWalk(obj, seen, leaf, root)
-	if err == nil && root != nil {
-		obj, err = root(obj, nil)
+func (r *Reader) Read() (Object, *Reference, error) {
+	s := r.scannerAt(r.pos)
+
+	for {
+		err := s.SkipWhiteSpace()
+		if err != nil {
+			return nil, nil, err
+		}
+		r.pos = s.currentPos()
+
+		buf, _ := s.Peek(9)
+		switch {
+		case bytes.HasPrefix(buf, []byte("xref")):
+			s.SkipAfter("trailer")
+			s.SkipWhiteSpace()
+			s.ReadDict()
+			s.SkipWhiteSpace()
+			fallthrough
+		case bytes.HasPrefix(buf, []byte("startxref")):
+			err = s.SkipString("startxref")
+			if err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
+
+		obj, ref, err := s.ReadIndirectObject()
+		if err != nil {
+			if err == io.ErrUnexpectedEOF {
+				r.pos = s.currentPos()
+				err = io.EOF
+			}
+			return nil, nil, err
+		}
+		if stm, ok := obj.(*Stream); ok && stm.Dict["Type"] == Name("XRef") {
+			// skip xref streams when reading objects sequentially
+			continue
+		}
+		if stm, ok := obj.(*Stream); ok && stm.Dict["Type"] == Name("ObjStm") {
+			contents, err := r.objStmScanner(stm, r.pos)
+			if err != nil {
+				return nil, nil, err
+			}
+			panic("not implemented")
+		}
+
+		// Try to fix up the xref information, so that after a sequential
+		// read of the file, random access works even if the xref tables
+		// had been corrupted.
+		entry := r.xref[ref.Number]
+		if entry != nil && (entry.Pos < 0 || entry.Generation <= ref.Generation) {
+			r.xref[ref.Number] = &xRefEntry{
+				Pos:        r.pos,
+				Generation: ref.Generation,
+			}
+		}
+
+		r.pos = s.currentPos()
+		return obj, ref, nil
 	}
-	return obj, err
-}
-
-func (r *Reader) doWalk(obj Object, seen map[Reference]Object,
-	leaf func(Object) (Object, error),
-	root func(Object, *Reference) (*Reference, error)) (Object, error) {
-	switch x := obj.(type) {
-	case Dict:
-		res := Dict{}
-		for _, key := range x.sortedKeys() {
-			repl, err := r.doWalk(x[key], seen, leaf, root)
-			if err != nil {
-				return nil, err
-			}
-			res[key] = repl
-		}
-		return res, nil
-	case Array:
-		var res Array
-		for _, val := range x {
-			repl, err := r.doWalk(val, seen, leaf, root)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, repl)
-		}
-		return res, nil
-	case *Stream:
-		res := &Stream{
-			Dict: make(Dict),
-			R:    x.R,
-		}
-		for _, key := range x.sortedKeys() {
-			repl, err := r.doWalk(x.Dict[key], seen, leaf, root)
-			if err != nil {
-				return nil, err
-			}
-			res.Dict[key] = repl
-		}
-		return res, nil
-	case *Reference:
-		if other, ok := seen[*x]; ok {
-			return other, nil
-		}
-		res, err := leaf(x)
-		if err != nil {
-			return nil, err
-		}
-		seen[*x] = res
-
-		ind, err := r.Get(x)
-		if err != nil {
-			return nil, err
-		}
-		subTree, err := r.doWalk(ind, seen, leaf, root)
-		if err != nil {
-			return nil, err
-		}
-		if root != nil {
-			ref, _ := res.(*Reference)
-			_, err = root(subTree, ref)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return res, nil
-	}
-	return leaf(obj)
 }
 
 // Get resolves references to indirect objects.
@@ -266,64 +250,96 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 	return obj, nil
 }
 
-func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error) {
-	container, err := r.doGet(sRef, false)
+type objStm struct {
+	s   *scanner
+	idx []stmObj
+}
+
+type stmObj struct {
+	number, offs int
+}
+
+func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
+	N, ok := stream.Dict["N"].(Integer)
+	if !ok || N < 0 || N > 10000 {
+		return nil, &MalformedFileError{
+			Pos: errPos,
+			Err: errors.New("no valid /N for ObjStm"),
+		}
+	}
+	n := int(N)
+
+	var dec *encryptInfo
+	if r.enc != nil && !stream.isEncrypted {
+		dec = r.enc
+	}
+	s := newScanner(stream.Decode(), 0, r.safeGetInt, dec)
+
+	idx := make([]stmObj, n)
+	for i := 0; i < n; i++ {
+		no, err := s.ReadInteger()
+		if err != nil {
+			return nil, err
+		}
+		offs, err := s.ReadInteger()
+		if err != nil {
+			return nil, err
+		}
+		idx[i].number = int(no)
+		idx[i].offs = int(offs)
+	}
+
+	pos := s.bytesRead()
+	first, ok := stream.Dict["First"].(Integer)
+	if !ok || first < Integer(pos) {
+		return nil, &MalformedFileError{
+			Pos: errPos,
+			Err: errors.New("no valid /First for ObjStm"),
+		}
+	}
+	s.Discard(int64(first) - pos)
+
+	return &objStm{s: s, idx: idx}, nil
+}
+
+func (r *Reader) getFromObjectStream(number int, cRef *Reference) (Object, error) {
+	// TODO(voss): fudge up the error position on return
+	container, err := r.doGet(cRef, false)
 	if err != nil {
 		return nil, err
 	}
 	stream, ok := container.(*Stream)
 	if !ok {
 		return nil, &MalformedFileError{
-			Pos: r.errPos(sRef),
+			Pos: r.errPos(cRef),
 			Err: errors.New("wrong type for object stream"),
 		}
 	}
 
-	first, ok := stream.Dict["First"].(Integer)
-	if !ok {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(sRef),
-			Err: errors.New("malformed object stream (no /First)"),
-		}
+	contents, err := r.objStmScanner(stream, r.errPos(cRef))
+	if err != nil {
+		return nil, err
 	}
 
-	var dec *encryptInfo
-	if r.enc != nil && !stream.isEncrypted {
-		dec = r.enc
-	}
-	s := newScanner(stream.Decode(), r.safeGetInt, dec)
-	for {
-		err := s.SkipWhiteSpace()
-		if err != nil {
-			return nil, err
-		}
-		if s.filePos() >= int64(first) {
-			return nil, &MalformedFileError{
-				Pos: r.errPos(sRef),
-				Err: errors.New("object missing from stream"),
-			}
-		}
-		no, err := s.ReadInteger()
-		if err != nil {
-			return nil, err
-		}
-
-		offs, err := s.ReadInteger()
-		if err != nil {
-			return nil, err
-		}
-
-		if int(no) == number {
-			objPos := int64(first + offs)
-			err = s.Discard(objPos - s.filePos())
+	found := false
+	for _, info := range contents.idx {
+		if info.number == number {
+			err = contents.s.Discard(int64(info.offs))
 			if err != nil {
 				return nil, err
 			}
+			found = true
 			break
 		}
 	}
+	if !found {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(cRef),
+			Err: errors.New("object missing from stream"),
+		}
+	}
 
-	return s.ReadObject()
+	return contents.s.ReadObject()
 }
 
 // GetDict resolves references to indirect objects and makes sure the resulting
@@ -430,7 +446,7 @@ func (r *Reader) scannerAt(pos int64) *scanner {
 	if r.enc != nil {
 		dec = r.enc
 	}
-	return newScanner(io.NewSectionReader(r.r, pos, r.size-pos),
+	return newScanner(io.NewSectionReader(r.r, pos, r.size-pos), pos,
 		r.safeGetInt, dec)
 }
 

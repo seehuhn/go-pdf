@@ -1,7 +1,11 @@
 package pdf
 
 import (
+	"bytes"
+	"compress/zlib"
 	"fmt"
+	"io/ioutil"
+	"strings"
 	"testing"
 	"time"
 )
@@ -63,5 +67,52 @@ func TestDateString(t *testing.T) {
 		} else if !test.Equal(out) {
 			t.Errorf("wrong time: %s != %s", out, test)
 		}
+	}
+}
+
+func TestStream(t *testing.T) {
+	dataIn := "\nbinary stream data\000123\n   "
+	rIn := strings.NewReader(dataIn)
+	stream := &Stream{
+		Dict: map[Name]Object{
+			"Length": Integer(len(dataIn)),
+		},
+		R: rIn,
+	}
+	rOut := stream.Decode()
+	dataOut, err := ioutil.ReadAll(rOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(dataOut) != dataIn {
+		t.Errorf("wrong result:\n  %q\n  %q", dataIn, dataOut)
+	}
+}
+
+func TestCompressedStream(t *testing.T) {
+	dataIn := "\nbinary stream data\000123\n   "
+
+	rIn := &bytes.Buffer{}
+	comp := zlib.NewWriter(rIn)
+	_, err := comp.Write([]byte(dataIn))
+	if err != nil {
+		t.Fatal(err)
+	}
+	comp.Close()
+
+	stream := &Stream{
+		Dict: map[Name]Object{
+			"Length": Integer(rIn.Len()),
+			"Filter": Name("FlateDecode"),
+		},
+		R: rIn,
+	}
+	rOut := stream.Decode()
+	dataOut, err := ioutil.ReadAll(rOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(dataOut) != dataIn {
+		t.Errorf("wrong result:\n  %q\n  %q", dataIn, dataOut)
 	}
 }
