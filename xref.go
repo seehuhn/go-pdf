@@ -480,7 +480,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 
 	xref := &Stream{Dict: xRefDict, R: data}
 	// TODO(voss): compress the stream
-	_, err := pdf.WriteIndirect(xref, nil)
+	_, err := pdf.Write(xref, nil)
 	return err
 }
 

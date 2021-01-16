@@ -14,7 +14,7 @@ func TestWriter(t *testing.T) {
 	}
 	var catalog, info *Reference
 
-	info, err = w.WriteIndirect(Dict{ // page 550
+	info, err = w.Write(Dict{ // page 550
 		"Title":    TextString("PDF Test Document"),
 		"Author":   TextString("Jochen Voß"),
 		"Subject":  TextString("Testing"),
@@ -30,7 +30,7 @@ func TestWriter(t *testing.T) {
 (Hello World) Tj
 ET
 `))
-	contentNode, err := w.WriteIndirect(&Stream{
+	contentNode, err := w.Write(&Stream{
 		Dict: Dict{
 			"Length": Integer(buf.Size()),
 		},
@@ -39,7 +39,7 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	font, err := w.WriteIndirect(Dict{
+	font, err := w.Write(Dict{
 		"Type":     Name("Font"),
 		"Subtype":  Name("Type1"),
 		"BaseFont": Name("Helvetica"),
@@ -60,7 +60,7 @@ ET
 		"Count": Integer(0),
 	}
 
-	page1, err := w.WriteIndirect(Dict{
+	page1, err := w.Write(Dict{
 		"Type":      Name("Page"),
 		"CropBox":   Array{Integer(0), Integer(0), Integer(200), Integer(100)},
 		"Resources": resources,
@@ -73,13 +73,13 @@ ET
 
 	pages["Kids"] = append(pages["Kids"].(Array), page1)
 	pages["Count"] = pages["Count"].(Integer) + 1
-	_, err = w.WriteIndirect(pages, pagesRef)
+	_, err = w.Write(pages, pagesRef)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// page 73
-	catalog, err = w.WriteIndirect(Dict{
+	catalog, err = w.Write(Dict{
 		"Type":  Name("Catalog"),
 		"Pages": pagesRef,
 	}, nil)

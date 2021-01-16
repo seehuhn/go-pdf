@@ -59,10 +59,10 @@ func TestDateString(t *testing.T) {
 	for _, test := range cases {
 		enc := Date(test)
 		out, err := enc.AsDate()
-		fmt.Println(test, string(enc), out)
 		if err != nil {
 			t.Error(err)
 		} else if !test.Equal(out) {
+			fmt.Println(test, string(enc), out)
 			t.Errorf("wrong time: %s != %s", out, test)
 		}
 	}

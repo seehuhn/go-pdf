@@ -64,7 +64,7 @@ func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = w.w.WriteIndirect(trans, other)
+		_, err = w.w.Write(trans, other)
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +103,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	catRef, err := trans.w.WriteIndirect(catalog, nil)
+	catRef, err := trans.w.Write(catalog, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	infoRef, err := trans.w.WriteIndirect(info, nil)
+	infoRef, err := trans.w.Write(info, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

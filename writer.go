@@ -98,10 +98,20 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 	return nil
 }
 
-// WriteIndirect writes an object to the PDF file, as an indirect object.  The
+// Alloc allocates an object number for an indirect object.
+func (pdf *Writer) Alloc() *Reference {
+	res := &Reference{
+		Number:     pdf.nextRef,
+		Generation: 0,
+	}
+	pdf.nextRef++
+	return res
+}
+
+// Write writes an object to the PDF file, as an indirect object.  The
 // returned reference can be used to refer to this object from other parts of
 // the file.
-func (pdf *Writer) WriteIndirect(obj Object, ref *Reference) (*Reference, error) {
+func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	pos := pdf.w.pos
 
 	if ref == nil {
@@ -136,14 +146,35 @@ func (pdf *Writer) WriteIndirect(obj Object, ref *Reference) (*Reference, error)
 	return ref, nil
 }
 
-// Alloc allocates an object number for an indirect object.
-func (pdf *Writer) Alloc() *Reference {
-	res := &Reference{
-		Number:     pdf.nextRef,
-		Generation: 0,
+// OpenStream adds a PDF Stream to the file and returns an io.Writer which can
+// be used to add the stream's data.  No other objects can be added to the file
+// until the stream is closed.
+func (pdf *Writer) OpenStream(dict Dict, ref *Reference) (io.WriteCloser, *Reference, error) {
+	if ref == nil {
+		ref = pdf.Alloc()
+	} else {
+		_, seen := pdf.xref[ref.Number]
+		if seen {
+			return nil, nil, errors.New("object already written")
+		}
 	}
-	pdf.nextRef++
-	return res
+	return &streamWriter{
+		dict: dict,
+		ref:  ref,
+	}, ref, nil
+}
+
+type streamWriter struct {
+	dict Dict
+	ref  *Reference
+}
+
+func (w *streamWriter) Write(p []byte) (int, error) {
+	panic("not implemented")
+}
+
+func (w *streamWriter) Close() error {
+	return nil
 }
 
 type posWriter struct {

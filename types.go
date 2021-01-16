@@ -48,6 +48,9 @@ type Real float64
 // PDF implements the Object interface.
 func (x Real) PDF(w io.Writer) error {
 	s := strconv.FormatFloat(float64(x), 'f', -1, 64)
+	if !strings.Contains(s, ".") {
+		s = s + "."
+	}
 	_, err := w.Write([]byte(s))
 	return err
 }
@@ -209,7 +212,7 @@ func (x Name) PDF(w io.Writer) error {
 
 	var funny []int
 	for i, c := range l {
-		if isSpace[c] || isDelimiter[c] || c < 0x21 || c > 0x7e {
+		if isSpace[c] || isDelimiter[c] || c < 0x21 || c > 0x7e || c == '#' {
 			funny = append(funny, i)
 		}
 	}

@@ -13,6 +13,8 @@ func fuzzGetInt(obj Object) (Integer, error) {
 	case Integer:
 		return x, nil
 	case *Reference:
+		// Allow the fuzzer to generate different indirect integer values,
+		// both positive and negative.
 		return Integer(x.Number) - Integer(x.Generation), nil
 	default:
 		return 0, errors.New("not an integer")
@@ -43,7 +45,7 @@ func Fuzz(data []byte) int {
 	s = newScanner(buf, 0, fuzzGetInt, nil)
 	obj, err = s.ReadObject()
 	if err != nil {
-		fmt.Println(out1)
+		fmt.Printf("%q\n", out1)
 		fmt.Println(err)
 		panic("buf1 read failed")
 	}

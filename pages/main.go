@@ -44,7 +44,7 @@ func (tree *PageTree) Flush() (pdf.Dict, *pdf.Reference, error) {
 	current := tree.current
 	for current.parent != nil {
 		obj := current.toObject()
-		_, err := tree.w.WriteIndirect(obj, current.id)
+		_, err := tree.w.Write(obj, current.id)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -68,7 +68,7 @@ func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
 	tree.current = parent
 	page["Parent"] = parent.id
 
-	ref, err = tree.w.WriteIndirect(page, ref)
+	ref, err = tree.w.Write(page, ref)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (tree *PageTree) splitIfNeeded(node *pages) (*pages, error) {
 
 	// Turn the node into a PDF object and write this to the file.
 	nodeObj := node.toObject()
-	_, err := tree.w.WriteIndirect(nodeObj, node.id)
+	_, err := tree.w.Write(nodeObj, node.id)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func main() {
 
 	var catalog, info *pdf.Reference
 
-	info, err = w.WriteIndirect(pdf.Dict{ // page 550
+	info, err = w.Write(pdf.Dict{ // page 550
 		"Title":  pdf.TextString("PDF Test Document"),
 		"Author": pdf.TextString("Jochen Voß"),
 	}, nil)
@@ -164,7 +164,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	font, err := w.WriteIndirect(pdf.Dict{
+	font, err := w.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
 		"BaseFont": pdf.Name("Helvetica"),
@@ -184,7 +184,7 @@ func main() {
 30 30 Td
 (page %d) Tj
 ET`, i)))
-		contentNode, err := w.WriteIndirect(&pdf.Stream{
+		contentNode, err := w.Write(&pdf.Stream{
 			Dict: pdf.Dict{
 				"Length": pdf.Integer(buf.Size()),
 			},
@@ -209,13 +209,13 @@ ET`, i)))
 	}
 	pages["CropBox"] = Rect(0, 0, 200, 100)
 	pages["Resources"] = resources
-	_, err = w.WriteIndirect(pages, pagesRef)
+	_, err = w.Write(pages, pagesRef)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// page 73
-	catalog, err = w.WriteIndirect(pdf.Dict{
+	catalog, err = w.Write(pdf.Dict{
 		"Type":  pdf.Name("Catalog"),
 		"Pages": pagesRef,
 	}, nil)

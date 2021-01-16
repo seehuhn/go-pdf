@@ -118,17 +118,17 @@ func TestEncryptBytes(t *testing.T) {
 				}
 
 				plainText := []byte(msg)
-				fmt.Printf("%x\n", plainText)
+				// fmt.Printf("%x\n", plainText)
 				cipherText, err := enc.EncryptBytes(ref, plainText)
 				if err != nil {
 					t.Fatal(err)
 				}
-				fmt.Printf("%x\n", cipherText)
+				// fmt.Printf("%x\n", cipherText)
 				restored, err := enc.DecryptBytes(ref, cipherText)
 				if err != nil {
 					t.Fatal(err)
 				}
-				fmt.Printf("%x\n", restored)
+				// fmt.Printf("%x\n", restored)
 				if string(restored) != msg {
 					t.Error("round-trip failed")
 				}
@@ -162,7 +162,7 @@ func TestEncryptStream(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				fmt.Printf("%x\n", res)
+				// fmt.Printf("%x\n", res)
 				if string(res) != msg {
 					t.Error("round-trip failed")
 				}

@@ -3,9 +3,9 @@ package pdf
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -98,9 +98,9 @@ func TestReadObject(t *testing.T) {
 		{`(he(ll)o)`, String("he(ll)o"), true, nil},
 		{`(he\)ll\(o)`, String("he)ll(o"), true, nil},
 		{"(hello\n)", String("hello\n"), true, nil},
-		{"(hello\r)", String("hello\n"), true, nil},
-		{"(hello\r\n)", String("hello\n"), true, nil},
-		{"(hello\n\r)", String("hello\n\n"), true, nil},
+		{"(hello\r)", String("hello\r"), true, nil},
+		{"(hello\r\n)", String("hello\r\n"), true, nil},
+		{"(hello\n\r)", String("hello\n\r"), true, nil},
 		{"(hell\\\no)", String("hello"), true, nil},
 		{"(hell\\\ro)", String("hello"), true, nil},
 		{"(hell\\\r\no)", String("hello"), true, nil},
@@ -254,31 +254,79 @@ func TestReadHeaderVersion(t *testing.T) {
 	}
 }
 
-func TestFuzzingCorpus(t *testing.T) {
+func TestFuzzerFinds(t *testing.T) {
 	getInt := func(obj Object) (Integer, error) {
 		switch x := obj.(type) {
 		case Integer:
 			return x, nil
 		case *Reference:
+			// Allow the fuzzer to generate different indirect integer values,
+			// both positive and negative.
 			return Integer(x.Number) - Integer(x.Generation), nil
 		default:
 			return 0, errors.New("not an integer")
 		}
 	}
 
-	// Test that there are no panics caused by the fuzzer's corpus.
-	names, err := filepath.Glob("corpus/*")
-	if err != nil {
-		t.Fatal(err)
+	cases := []string{
+		"0 ",
+		"<0d>",
+		"-0.",
+		"//",
+		"/#23",
+		"<<>>0",
+		"<</<</ 0 0>>",
 	}
-	for _, fname := range names {
-		buf, err := ioutil.ReadFile(fname)
+	for _, in := range cases {
+		// step 1: check that there is no panic when parsing the input
+
+		r := strings.NewReader(in)
+		s := newScanner(r, 0, getInt, nil)
+		obj1, err := s.ReadObject()
+		if err != nil {
+			return
+		}
+
+		// step 2: do a write->read->write cycle, and check that the
+		// two written values are the same.
+
+		buf := &bytes.Buffer{}
+		if obj1 == nil {
+			buf.WriteString("null")
+		} else {
+			err = obj1.PDF(buf)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
+		out1 := string(buf.Bytes())
 
-		r := bytes.NewReader(buf)
-		s := newScanner(r, 0, getInt, nil)
-		s.ReadObject() // we are just checking there is no panic
+		s = newScanner(buf, 0, getInt, nil)
+		obj2, err := s.ReadObject()
+		if err != nil {
+			fmt.Printf("%q -> %v -> %q\n", in, obj1, out1)
+			fmt.Println(err)
+			t.Error("buf1 read failed")
+			continue
+		}
+
+		buf.Reset()
+		if obj2 == nil {
+			buf.WriteString("null")
+		} else {
+			err = obj2.PDF(buf)
+		}
+		if err != nil {
+			fmt.Println(err)
+			t.Fatal("buf2 write failed")
+		}
+		out2 := string(buf.Bytes())
+
+		if out1 != out2 {
+			fmt.Printf("%q -> %v -> %q -> %v -> %q\n",
+				in, obj1, out1, obj2, out2)
+			t.Error("results differ")
+			continue
+		}
 	}
 }

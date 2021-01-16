@@ -196,7 +196,7 @@ func (s *scanner) ReadObject() (Object, error) {
 		// check whether this is the start of a stream
 		err = s.SkipWhiteSpace()
 		if err != nil {
-			if errors.Is(err, io.ErrUnexpectedEOF) {
+			if errors.Is(err, io.EOF) {
 				return dict, nil
 			}
 			return nil, err
@@ -272,7 +272,7 @@ func (s *scanner) ReadNumber() (Object, error) {
 		first = false
 		return true
 	})
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 
@@ -350,9 +350,6 @@ func (s *scanner) ReadQuotedString() (String, error) {
 			} else {
 				return false
 			}
-		} else if c == '\r' {
-			c = '\n'
-			ignoreLF = true
 		}
 		res = append(res, c)
 		return true
@@ -460,7 +457,7 @@ func (s *scanner) ReadName() (Name, error) {
 		}
 		return true
 	})
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return "", err
 	}
 
@@ -562,6 +559,8 @@ func (s *scanner) ReadDict() (Dict, error) {
 				}
 			}
 			if buf[0] != '/' && buf[0] != '>' {
+				errPos := s.currentPos()
+
 				b, err := s.ReadInteger()
 				if err != nil {
 					return nil, err
@@ -573,11 +572,14 @@ func (s *scanner) ReadDict() (Dict, error) {
 				}
 
 				buf, err := s.Peek(1)
-				if len(buf) == 0 && err == nil {
-					err = io.EOF
-				}
-				if err != nil || buf[0] != 'R' {
+				if err != nil {
 					return nil, err
+				}
+				if buf[0] != 'R' {
+					return nil, &MalformedFileError{
+						Pos: errPos,
+						Err: errors.New("expected /Name but found Integer"),
+					}
 				}
 				s.pos++
 				err = s.SkipWhiteSpace()
@@ -770,7 +772,7 @@ func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 		}
 		if s.used == 0 {
 			if err == nil {
-				err = io.ErrUnexpectedEOF
+				err = io.EOF
 			}
 			return err
 		}
