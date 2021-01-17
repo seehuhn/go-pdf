@@ -299,7 +299,7 @@ func TestFuzzerFinds(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		out1 := string(buf.Bytes())
+		out1 := buf.String()
 
 		s = newScanner(buf, 0, getInt, nil)
 		obj2, err := s.ReadObject()
@@ -320,7 +320,7 @@ func TestFuzzerFinds(t *testing.T) {
 			fmt.Println(err)
 			t.Fatal("buf2 write failed")
 		}
-		out2 := string(buf.Bytes())
+		out2 := buf.String()
 
 		if out1 != out2 {
 			fmt.Printf("%q -> %v -> %q -> %v -> %q\n",

@@ -174,10 +174,22 @@ func (r *Reader) Read() (Object, *Reference, error) {
 		buf, _ := s.Peek(9)
 		switch {
 		case bytes.HasPrefix(buf, []byte("xref")):
-			s.SkipAfter("trailer")
-			s.SkipWhiteSpace()
-			s.ReadDict()
-			s.SkipWhiteSpace()
+			err = s.SkipAfter("trailer")
+			if err != nil {
+				return nil, nil, err
+			}
+			err = s.SkipWhiteSpace()
+			if err != nil {
+				return nil, nil, err
+			}
+			_, err = s.ReadDict()
+			if err != nil {
+				return nil, nil, err
+			}
+			err = s.SkipWhiteSpace()
+			if err != nil {
+				return nil, nil, err
+			}
 			fallthrough
 		case bytes.HasPrefix(buf, []byte("startxref")):
 			err = s.SkipString("startxref")

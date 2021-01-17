@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -419,10 +420,11 @@ func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 }
 
 func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
-	// TODO(voss): fudge things up so that the XRefStream itself appears in the
-	// xref table.
+	ref := pdf.Alloc()
 
 	xRefDict["Type"] = Name("XRef")
+	// TODO(voss): avoid setting the wrong value in Writer.Close() first.
+	xRefDict["Size"] = Integer(pdf.nextRef)
 
 	maxField2 := int64(0)
 	maxField3 := uint16(0)
@@ -460,37 +462,44 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	xRefDict["W"] = W
 	xRefDict["Length"] = Integer((1 + w2 + w3) * pdf.nextRef)
 
-	data := &bytes.Buffer{}
+	// TODO(voss): compress the stream
+	swx, _, err := pdf.OpenStream(xRefDict, ref)
+	sw := bufio.NewWriter(swx)
 	for i := 0; i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
-		if entry == nil || entry.Pos < 0 {
-			data.WriteByte(0)
-			encodeInt64(data, 0, w2)
-			encodeInt16(data, entry.Generation, w3)
+		if entry == nil {
+			sw.WriteByte(0)
+			encodeInt64(sw, 0, w2)
+			encodeInt16(sw, 0, w3)
+		} else if entry.Pos < 0 {
+			sw.WriteByte(0)
+			encodeInt64(sw, 0, w2)
+			encodeInt16(sw, entry.Generation, w3)
 		} else if entry.InStream == nil {
-			data.WriteByte(1)
-			encodeInt64(data, uint64(entry.Pos), w2)
-			encodeInt16(data, entry.Generation, w3)
+			sw.WriteByte(1)
+			encodeInt64(sw, uint64(entry.Pos), w2)
+			encodeInt16(sw, entry.Generation, w3)
 		} else {
-			data.WriteByte(2)
-			encodeInt64(data, uint64(entry.InStream.Number), w2)
-			encodeInt16(data, uint16(entry.Pos), w3)
+			sw.WriteByte(2)
+			encodeInt64(sw, uint64(entry.InStream.Number), w2)
+			encodeInt16(sw, uint16(entry.Pos), w3)
 		}
 	}
-
-	xref := &Stream{Dict: xRefDict, R: data}
-	// TODO(voss): compress the stream
-	_, err := pdf.Write(xref, nil)
+	err = sw.Flush()
+	if err != nil {
+		return err
+	}
+	err = swx.Close()
 	return err
 }
 
-func encodeInt64(data *bytes.Buffer, x uint64, w int) {
+func encodeInt64(data io.ByteWriter, x uint64, w int) {
 	for i := w - 1; i >= 0; i-- {
 		data.WriteByte(byte(x >> (i * 8)))
 	}
 }
 
-func encodeInt16(data *bytes.Buffer, x uint16, w int) {
+func encodeInt16(data io.ByteWriter, x uint16, w int) {
 	for i := w - 1; i >= 0; i-- {
 		data.WriteByte(byte(x >> (i * 8)))
 	}

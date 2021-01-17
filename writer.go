@@ -123,22 +123,21 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 		}
 	}
 
+	_, err := fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number, ref.Generation)
+	if err != nil {
+		return nil, err
+	}
 	if obj == nil {
-		// missing objects are treated as null
-		pos = -1
+		_, err = fmt.Fprint(pdf.w, "null")
 	} else {
-		_, err := fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number, ref.Generation)
-		if err != nil {
-			return nil, err
-		}
 		err = obj.PDF(pdf.w)
-		if err != nil {
-			return nil, err
-		}
-		_, err = pdf.w.Write([]byte("\nendobj\n"))
-		if err != nil {
-			return nil, err
-		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	_, err = pdf.w.Write([]byte("\nendobj\n"))
+	if err != nil {
+		return nil, err
 	}
 
 	pdf.xref[ref.Number] = &xRefEntry{Pos: pos, Generation: ref.Generation}
@@ -158,23 +157,45 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference) (io.WriteCloser, *Refer
 			return nil, nil, errors.New("object already written")
 		}
 	}
+	pdf.xref[ref.Number] = &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation}
 	return &streamWriter{
-		dict: dict,
-		ref:  ref,
+		parent: pdf,
+		dict:   dict,
+		ref:    ref,
 	}, ref, nil
 }
 
 type streamWriter struct {
-	dict Dict
-	ref  *Reference
+	parent        *Writer
+	dict          Dict
+	ref           *Reference
+	headerWritten bool
 }
 
 func (w *streamWriter) Write(p []byte) (int, error) {
-	panic("not implemented")
+	if !w.headerWritten {
+		_, err := fmt.Fprintf(w.parent.w, "%d %d obj\n",
+			w.ref.Number, w.ref.Generation)
+		if err != nil {
+			return 0, err
+		}
+		// TODO(voss): deal with the /Length field
+		err = w.dict.PDF(w.parent.w)
+		if err != nil {
+			return 0, err
+		}
+		_, err = w.parent.w.Write([]byte("\nstream\n"))
+		if err != nil {
+			return 0, err
+		}
+		w.headerWritten = true
+	}
+	return w.parent.w.Write(p)
 }
 
 func (w *streamWriter) Close() error {
-	return nil
+	_, err := w.Write([]byte("\nendstream\nendobj\n"))
+	return err
 }
 
 type posWriter struct {
