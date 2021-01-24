@@ -271,7 +271,11 @@ func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = decodeXRefStream(xref, stream.Decode(), w, ss)
+	decoded, err := stream.Decode()
+	if err != nil {
+		return nil, err
+	}
+	err = decodeXRefStream(xref, decoded, w, ss)
 	if err != nil {
 		return nil, err
 	}
@@ -460,10 +464,14 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	w3 := (bits.Len16(maxField3) + 7) / 8
 	W := Array{Integer(1), Integer(w2), Integer(w3)}
 	xRefDict["W"] = W
-	xRefDict["Length"] = Integer((1 + w2 + w3) * pdf.nextRef)
 
-	// TODO(voss): compress the stream
-	swx, _, err := pdf.OpenStream(xRefDict, ref)
+	opt := &StreamOptions{
+		Filters: []*FilterInfo{
+			{"FlateDecode", nil},
+			// Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)}},
+		},
+	}
+	swx, _, err := pdf.OpenStream(xRefDict, ref, opt)
 	sw := bufio.NewWriter(swx)
 	for i := 0; i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]

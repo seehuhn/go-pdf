@@ -35,65 +35,176 @@
 package pdf
 
 import (
-	"bytes"
 	"compress/zlib"
+	"errors"
 	"fmt"
 	"io"
+	"strconv"
 )
 
-func filterDecode(r io.Reader, name Object, param Object) io.Reader {
-	n, ok := name.(Name)
-	if !ok {
-		// TODO(voss): use a conventional error return instead
-		return &errorReader{
-			fmt.Errorf("invalid filter description %s", format(name))}
-	}
-	switch n {
-	case "FlateDecode":
-		flateParams := map[string]int{
-			"Predictor":        1,
-			"Colors":           1,
-			"BitsPerComponent": 8,
-			"Columns":          1,
-			"EarlyChange":      1,
-		}
-		if pDict, ok := param.(Dict); ok {
-			for key := range flateParams {
-				if val, ok := pDict[Name(key)].(Integer); ok {
-					flateParams[key] = int(val)
+func extractFilterInfo(dict Dict) ([]*FilterInfo, error) {
+	parms := dict["DecodeParms"]
+	var filters []*FilterInfo
+	switch f := dict["Filter"].(type) {
+	case nil:
+		// pass
+	case Array:
+		pa, _ := parms.(Array)
+		for i, fi := range f {
+			name, err := asName(fi)
+			if err != nil {
+				return nil, err
+			}
+			var pDict Dict
+			if len(pa) > i {
+				x, err := asDict(pa[i])
+				if err != nil {
+					return nil, err
 				}
+				pDict = x
 			}
+			filter := &FilterInfo{
+				Name:  name,
+				Parms: pDict,
+			}
+			filters = append(filters, filter)
 		}
-		var zr io.Reader
-		var err error
-		zr, err = zlib.NewReader(r)
+	case Name:
+		pDict, err := asDict(parms)
 		if err != nil {
-			return &errorReader{err}
+			return nil, err
 		}
-		switch flateParams["Predictor"] {
-		case 1:
-			// pass
-		case 12:
-			columns := flateParams["Columns"]
-			zr = &pngUpReader{
-				r:    zr,
-				hist: make([]byte, 1+columns),
-				tmp:  make([]byte, 1+columns),
-				pend: []byte{},
-			}
-		default:
-			zr = &errorReader{fmt.Errorf("unsupported predictor %d",
-				flateParams["Predictor"])}
-		}
-		return zr
+		filters = append(filters, &FilterInfo{
+			Name:  f,
+			Parms: pDict,
+		})
 	default:
-		return &errorReader{fmt.Errorf("unsupported filter %q", n)}
+		return nil, errors.New("invalid /Filter field")
 	}
+	return filters, nil
+}
+
+type flateFilter struct {
+	Predictor        int
+	Colors           int
+	BitsPerComponent int
+	Columns          int
+	EarlyChange      bool
+}
+
+func ffFromDict(parms Dict) *flateFilter {
+	res := &flateFilter{
+		Predictor:        1,
+		Colors:           1,
+		BitsPerComponent: 8,
+		Columns:          1,
+		EarlyChange:      true,
+	}
+	if parms == nil {
+		return res
+	}
+	if val, ok := parms["Predictor"].(Integer); ok && val >= 1 && val <= 15 {
+		res.Predictor = int(val)
+	}
+	if val, ok := parms["Colors"].(Integer); ok && val >= 1 {
+		res.Colors = int(val)
+	}
+	if val, ok := parms["BitsPerComponent"].(Integer); ok &&
+		(val == 1 || val == 2 || val == 4 || val == 8 || val == 16) {
+		res.BitsPerComponent = int(val)
+	}
+	if val, ok := parms["Columns"].(Integer); ok && val >= 0 && res.Predictor > 1 {
+		res.Columns = int(val)
+	}
+	if val, ok := parms["EarlyChange"].(Integer); ok {
+		res.EarlyChange = (val != 0)
+	}
+	return res
+}
+
+func (ff *flateFilter) ToDict() Dict {
+	res := Dict{}
+	needed := false
+	if ff.Predictor != 1 {
+		res["Predictor"] = Integer(ff.Predictor)
+		needed = true
+	}
+	if ff.Predictor != 1 {
+		res["Colors"] = Integer(ff.Colors)
+		needed = true
+	}
+	if ff.Predictor != 8 {
+		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
+		needed = true
+	}
+	if ff.Predictor != 1 {
+		res["Columns"] = Integer(ff.Columns)
+		needed = true
+	}
+	if !ff.EarlyChange {
+		res["EarlyChange"] = Integer(0)
+		needed = true
+	}
+	if !needed {
+		return nil
+	}
+	return res
+}
+
+func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
+	zw := zlib.NewWriter(w)
+
+	close := func() error {
+		err := zw.Close()
+		if err != nil {
+			return err
+		}
+		return w.Close()
+	}
+
+	switch ff.Predictor {
+	case 1:
+		return &withClose{zw, close}, nil
+	case 12:
+		columns := ff.Columns
+		return &pngUpWriter{
+			w:     zw,
+			prev:  make([]byte, columns+1),
+			cur:   make([]byte, columns+1),
+			close: close,
+		}, nil
+	default:
+		return nil, errors.New("unsupported predictor " + strconv.Itoa(ff.Predictor))
+	}
+}
+
+func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
+	var res io.Reader
+	var err error
+	res, err = zlib.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	switch ff.Predictor {
+	case 1:
+		// pass
+	case 12:
+		columns := ff.Columns
+		res = &pngUpReader{
+			r:    res,
+			prev: make([]byte, 1+columns),
+			tmp:  make([]byte, 1+columns),
+			pend: []byte{},
+		}
+	default:
+		return nil, errors.New("unsupported predictor " + strconv.Itoa(ff.Predictor))
+	}
+	return res, nil
 }
 
 type pngUpReader struct {
 	r    io.Reader
-	hist []byte
+	prev []byte
 	tmp  []byte
 	pend []byte
 }
@@ -116,53 +227,99 @@ func (r *pngUpReader) Read(b []byte) (int, error) {
 			return n, fmt.Errorf("malformed PNG-Up encoding")
 		}
 		for i, b := range r.tmp {
-			r.hist[i] += b
+			r.prev[i] += b
 		}
-		r.pend = r.hist[1:]
+		r.pend = r.prev[1:]
 	}
 	return n, nil
 }
 
-// returns the encoded reader, the new size, and an error
-func filterEncode(r io.Reader, name Name, param Dict) (io.Reader, Object, error) {
-	switch name {
-	case "FlateDecode":
-		flateParams := map[string]int{
-			"Predictor":        1,
-			"Colors":           1,
-			"BitsPerComponent": 8,
-			"Columns":          1,
-			"EarlyChange":      1,
-		}
-		for key := range flateParams {
-			if val, ok := param[Name(key)].(Integer); ok {
-				flateParams[key] = int(val)
-			}
-		}
+type pngUpWriter struct {
+	w     io.Writer
+	prev  []byte
+	cur   []byte
+	pos   int
+	close func() error
+}
 
-		buf := &bytes.Buffer{}
-		comp := zlib.NewWriter(buf)
-		_, err := io.Copy(comp, r)
-		if err != nil {
-			return nil, nil, err
-		}
-		err = comp.Close()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		var zr io.Reader = buf
-		var length Object = Integer(buf.Len())
-
-		switch flateParams["Predictor"] {
-		case 1:
-			// pass
-		default:
-			return nil, nil, fmt.Errorf("unsupported predictor %d",
-				flateParams["Predictor"])
-		}
-		return zr, length, nil
-	default:
-		return nil, nil, fmt.Errorf("unsupported filter %q", name)
+func (w *pngUpWriter) Write(p []byte) (int, error) {
+	n := 0
+	if w.pos == 0 {
+		w.prev[0] = 2
+		w.cur[0] = 2
+		w.pos = 1
 	}
+	for len(p) > 0 {
+		l := copy(w.cur[w.pos:], p)
+		p = p[l:]
+
+		for i := w.pos; i < w.pos+l; i++ {
+			w.cur[i] -= w.prev[i]
+		}
+
+		start := w.pos
+		extra := 0
+		if start == 1 {
+			extra = 1
+		}
+		m, err := w.w.Write(w.cur[start-extra : w.pos+l])
+		if m > 0 {
+			m -= extra
+		}
+		w.pos += m
+		n += m
+		if w.pos == len(w.cur) {
+			w.cur, w.prev = w.prev, w.cur
+			w.pos = 1
+		}
+		if err != nil {
+			return n, err
+		}
+	}
+	return n, nil
+}
+
+func (w *pngUpWriter) Close() error {
+	if w.close != nil {
+		return w.close()
+	}
+	return nil
+}
+
+type withoutClose struct {
+	io.Writer
+}
+
+func (w withoutClose) Close() error {
+	return nil
+}
+
+type withClose struct {
+	io.Writer
+	close func() error
+}
+
+func (w *withClose) Close() error {
+	return w.close()
+}
+
+// FilterInfo describes one PDF stream filter.
+type FilterInfo struct {
+	Name  Name
+	Parms Dict
+}
+
+func (fi *FilterInfo) getFilter() (filter, error) {
+	switch fi.Name {
+	case "FlateDecode":
+		return ffFromDict(fi.Parms), nil
+	default:
+		return nil, errors.New("unsupported filter type " + string(fi.Name))
+	}
+}
+
+type filter interface {
+	ToDict() Dict
+	Encode(w io.WriteCloser) (io.WriteCloser, error)
+	Decode(r io.Reader) (io.Reader, error)
 }

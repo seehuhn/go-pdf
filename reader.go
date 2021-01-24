@@ -313,7 +313,15 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 	if r.enc != nil && !stream.isEncrypted {
 		dec = r.enc
 	}
-	s := newScanner(stream.Decode(), 0, r.safeGetInt, dec)
+
+	decoded, err := stream.Decode()
+	if err != nil {
+		return nil, &MalformedFileError{
+			Pos: errPos,
+			Err: err,
+		}
+	}
+	s := newScanner(decoded, 0, r.safeGetInt, dec)
 
 	idx := make([]stmObj, n)
 	for i := 0; i < n; i++ {

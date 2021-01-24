@@ -1,6 +1,7 @@
 package pdf
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,8 @@ type Writer struct {
 	xref    map[int]*xRefEntry
 	ver     Version
 	nextRef int
+
+	inStream bool
 }
 
 // NewWriter prepares a PDF file for writing.
@@ -53,7 +56,7 @@ func Create(name string) (*Writer, error) {
 }
 
 // Close closes the Writer, flushing any unwritten data to the underlying
-// io.Writer.  If the underlying io.Writer as a Close() method, this writer is
+// io.Writer.  If the underlying io.Writer has a Close() method, this writer is
 // also closed.
 func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 	if catalog == nil {
@@ -112,6 +115,10 @@ func (pdf *Writer) Alloc() *Reference {
 // returned reference can be used to refer to this object from other parts of
 // the file.
 func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
+	if pdf.inStream {
+		return nil, errors.New("Write() called while stream is open")
+	}
+
 	pos := pdf.w.pos
 
 	if ref == nil {
@@ -145,57 +152,175 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	return ref, nil
 }
 
+// StreamOptions describes how Writer.OpenStream() processes the stream
+// data while writing.
+type StreamOptions struct {
+	Filters []*FilterInfo
+}
+
 // OpenStream adds a PDF Stream to the file and returns an io.Writer which can
 // be used to add the stream's data.  No other objects can be added to the file
 // until the stream is closed.
-func (pdf *Writer) OpenStream(dict Dict, ref *Reference) (io.WriteCloser, *Reference, error) {
+func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io.WriteCloser, *Reference, error) {
 	if ref == nil {
 		ref = pdf.Alloc()
 	} else {
 		_, seen := pdf.xref[ref.Number]
 		if seen {
-			return nil, nil, errors.New("object already written")
+			return nil, nil, errors.New(ref.String() + " already written")
 		}
 	}
 	pdf.xref[ref.Number] = &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation}
-	return &streamWriter{
+
+	// Copy dict and dict["Filter"] as well as dict["DecodeParms"], so that
+	// we can register the new filters without changing the caller's dict.
+	d2 := make(Dict)
+	for key, val := range dict {
+		if key == "Filter" || key == "DecodeParms" {
+			if a, ok := val.(Array); ok {
+				if len(a) == 0 {
+					continue
+				}
+				val = append(Array{}, a...)
+			}
+		}
+		d2[key] = val
+	}
+	length := &placeholder{
+		size:  12,
+		alloc: pdf.Alloc,
+		store: pdf.Write,
+	}
+	d2["Length"] = length
+
+	var w io.WriteCloser = &streamWriter{
 		parent: pdf,
-		dict:   dict,
+		dict:   d2,
 		ref:    ref,
-	}, ref, nil
+		length: length,
+	}
+	if opt != nil {
+		for _, fi := range opt.Filters {
+			filter, err := fi.getFilter()
+			if err != nil {
+				return nil, nil, err
+			}
+			w, err = filter.Encode(w)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			switch x := d2["Filter"].(type) {
+			case nil:
+				d2["Filter"] = fi.Name
+				if len(fi.Parms) > 0 {
+					d2["DecodeParms"] = fi.Parms
+				}
+			case Name:
+				d2["Filter"] = Array{x, fi.Name}
+				if d2["DecodeParms"] != nil || len(fi.Parms) > 0 {
+					d2["DecodeParms"] = Array{d2["DecodeParms"], fi.Parms}
+				}
+			case Array:
+				d2["Filter"] = append(x, fi.Name)
+				b, ok := d2["DecodeParms"].(Array)
+				if d2["DecodeParms"] != nil && !ok {
+					return nil, nil, errors.New("wrong type for /DecodeParms")
+				}
+				if len(b) > 0 || len(fi.Parms) > 0 {
+					for len(b) < len(x) {
+						b = append(b, nil)
+					}
+					d2["DecodeParms"] = append(b, fi.Parms)
+				}
+			}
+		}
+	}
+	pdf.inStream = true
+	return w, ref, nil
 }
 
 type streamWriter struct {
-	parent        *Writer
-	dict          Dict
-	ref           *Reference
-	headerWritten bool
+	parent   *Writer
+	dict     Dict
+	ref      *Reference
+	started  bool
+	startPos int64
+	length   *placeholder
+	buf      []byte
 }
 
 func (w *streamWriter) Write(p []byte) (int, error) {
-	if !w.headerWritten {
-		_, err := fmt.Fprintf(w.parent.w, "%d %d obj\n",
-			w.ref.Number, w.ref.Generation)
+	if !w.started {
+		if len(w.buf)+len(p) < 1024 {
+			w.buf = append(w.buf, p...)
+			return len(p), nil
+		}
+
+		err := w.flush()
 		if err != nil {
 			return 0, err
 		}
-		// TODO(voss): deal with the /Length field
-		err = w.dict.PDF(w.parent.w)
-		if err != nil {
-			return 0, err
-		}
-		_, err = w.parent.w.Write([]byte("\nstream\n"))
-		if err != nil {
-			return 0, err
-		}
-		w.headerWritten = true
 	}
+
 	return w.parent.w.Write(p)
 }
 
+func (w *streamWriter) flush() error {
+	_, err := fmt.Fprintf(w.parent.w, "%d %d obj\n",
+		w.ref.Number, w.ref.Generation)
+	if err != nil {
+		return err
+	}
+	err = w.dict.PDF(w.parent.w)
+	if err != nil {
+		return err
+	}
+	_, err = w.parent.w.Write([]byte("\nstream\n"))
+	if err != nil {
+		return err
+	}
+	w.startPos = w.parent.w.pos
+	_, err = w.parent.w.Write(w.buf)
+	if err != nil {
+		return err
+	}
+	w.buf = nil
+	w.started = true
+	return nil
+}
+
 func (w *streamWriter) Close() error {
+	var endPos int64
+	if !w.started {
+		err := w.length.Set(Integer(len(w.buf)))
+		if err != nil {
+			return err
+		}
+		err = w.flush()
+		if err != nil {
+			return err
+		}
+		endPos = -1
+	} else {
+		endPos = w.parent.w.pos
+	}
+
 	_, err := w.Write([]byte("\nendstream\nendobj\n"))
-	return err
+	if err != nil {
+		return err
+	}
+
+	w.parent.inStream = false
+
+	if endPos >= 0 {
+		err = w.length.Set(Integer(endPos - w.startPos))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type posWriter struct {
@@ -207,4 +332,99 @@ func (w *posWriter) Write(p []byte) (int, error) {
 	n, err := w.w.Write(p)
 	w.pos += int64(n)
 	return n, err
+}
+
+type placeholder struct {
+	value string
+	size  int
+
+	alloc func() *Reference
+	store func(Object, *Reference) (*Reference, error)
+	ref   *Reference
+
+	fill io.WriteSeeker
+	pos  []int64
+}
+
+func (x *placeholder) PDF(w io.Writer) error {
+	if x.value != "" {
+		_, err := w.Write([]byte(x.value))
+		return err
+	}
+
+	u := w
+	if uu, ok := w.(*posWriter); ok {
+		u = uu.w
+	}
+	fill, ok := u.(io.WriteSeeker)
+	if ok {
+		// We can seek back: write a placeholder for now and fill in the actual
+		// value later.
+		pos, err := fill.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return err
+		}
+
+		x.fill = fill
+		x.pos = append(x.pos, pos)
+
+		buf := bytes.Repeat([]byte{' '}, x.size)
+		_, err = w.Write(buf)
+		return err
+	}
+
+	// We need to use an indirect reference.
+	if x.alloc == nil {
+		return errors.New("cannot seek to fill in placeholder")
+	}
+	x.ref = x.alloc()
+	buf := &bytes.Buffer{}
+	err := x.ref.PDF(buf)
+	if err != nil {
+		return err
+	}
+	x.value = buf.String()
+	_, err = w.Write([]byte(x.value))
+	return err
+}
+
+func (x *placeholder) Set(val Object) error {
+	if x.ref != nil {
+		ref, err := x.store(val, x.ref)
+		x.ref = ref
+		return err
+	}
+
+	buf := &bytes.Buffer{}
+	err := val.PDF(buf)
+	if err != nil {
+		return err
+	}
+	if buf.Len() > x.size {
+		return errors.New("too long replacement text")
+	}
+	x.value = buf.String()
+
+	if len(x.pos) == 0 {
+		return nil
+	}
+
+	currentPos, err := x.fill.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	for _, pos := range x.pos {
+		_, err = x.fill.Seek(pos, io.SeekStart)
+		if err != nil {
+			return err
+		}
+		_, err = x.fill.Write([]byte(x.value))
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = x.fill.Seek(currentPos, io.SeekStart)
+	return err
 }

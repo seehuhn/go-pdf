@@ -2,7 +2,6 @@ package pdf
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -391,75 +390,24 @@ func (x *Stream) PDF(w io.Writer) error {
 	return err
 }
 
-// ApplyFilter encodes the stream data using the given filter and parameters.
-// This changes the filter in place.  The .Decode() method can be used to get
-// back the original data, or the io.Reader in the .R field can be read to get
-// the encoded data.
-func (x *Stream) ApplyFilter(name Name, param Dict) error {
-	filter := x.Dict["Filter"]
-	decodeParms := x.Dict["DecodeParms"]
-	switch f := filter.(type) {
-	case nil:
-		if param != nil {
-			x.Dict["DecodeParms"] = param
-		}
-		x.Dict["Filter"] = name
-	case Name:
-		if decodeParms != nil || param != nil {
-			x.Dict["DecodeParms"] = Array{decodeParms, param}
-		}
-		x.Dict["Filter"] = Array{f, name}
-	case Array:
-		pp, ok := decodeParms.(Array)
-		if !ok && decodeParms != nil {
-			return errors.New("invalid /DecodeParms in stream")
-		}
-		if param != nil {
-			for len(pp) < len(f) {
-				pp = append(pp, nil)
-			}
-			pp = append(pp, param)
-		} else if len(pp) > 0 {
-			pp = append(pp, nil)
-		}
-		x.Dict["DecodeParms"] = pp
-		x.Dict["Filter"] = append(f, name)
-	default:
-		return errors.New("invalid /Filter in stream")
-	}
-	rEnc, length, err := filterEncode(x.R, name, param)
-	if err != nil {
-		return err
-	}
-	x.Dict["Length"] = length
-	x.R = rEnc
-	return nil
-}
-
 // Decode returns a reader for the decoded stream data.
-func (x *Stream) Decode() io.Reader {
-	r := x.R
-	filter := x.Dict["Filter"]
-	param := x.Dict["DecodeParms"]
-	switch f := filter.(type) {
-	case nil:
-		// pass
-	case Array:
-		pa, ok := param.(Array)
-		if len(pa) != len(f) {
-			ok = false
-		}
-		for i, name := range f {
-			var pi Object
-			if ok {
-				pi = pa[i]
-			}
-			r = filterDecode(r, name, pi)
-		}
-	default:
-		r = filterDecode(r, f, param)
+func (x *Stream) Decode() (io.Reader, error) {
+	filters, err := extractFilterInfo(x.Dict)
+	if err != nil {
+		return nil, err
 	}
-	return r
+	r := x.R
+	for _, fi := range filters {
+		filter, err := fi.getFilter()
+		if err != nil {
+			return nil, err
+		}
+		r, err = filter.Decode(r)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return r, nil
 }
 
 // Reference represents a reference to an indirect object in a PDF file.

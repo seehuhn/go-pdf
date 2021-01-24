@@ -77,36 +77,10 @@ func TestStream(t *testing.T) {
 		},
 		R: rIn,
 	}
-	rOut := stream.Decode()
-	dataOut, err := ioutil.ReadAll(rOut)
+	rOut, err := stream.Decode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(dataOut) != dataIn {
-		t.Errorf("wrong result:\n  %q\n  %q", dataIn, dataOut)
-	}
-}
-
-func TestCompressedStream(t *testing.T) {
-	dataIn := "\nbinary stream data\000123\n   xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-	stream := &Stream{
-		Dict: map[Name]Object{
-			"Length": Integer(len(dataIn)),
-		},
-		R: strings.NewReader(dataIn),
-	}
-
-	flateDecode := Name("FlateDecode")
-	err := stream.ApplyFilter(flateDecode, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if stream.Dict["Filter"] != flateDecode {
-		t.Error("wrong /Filter value: " + format(stream.Dict["Filter"]))
-	}
-
-	rOut := stream.Decode()
 	dataOut, err := ioutil.ReadAll(rOut)
 	if err != nil {
 		t.Fatal(err)
