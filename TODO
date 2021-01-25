@@ -1,12 +1,11 @@
-- allow to write compressed streams
+- rationalize the error handling
 - allow to write encrypted files
 - add a licence and copyright notices
-- rationalize the error handling
 
-- add a way to repair broken xref tables
-- Split old `MalformedFileError` into new `FileError` and `ObjectError`
+- Split old `MalformedFileError` into new `FileError` and `ObjectError`?
 - implement crypt filters
 - attempt to add pdf-2.0 support
+- add a way to repair broken xref tables?
 
 - look at https://pkg.go.dev/rsc.io/pdf
 - look at https://github.com/pdfcpu/pdfcpu

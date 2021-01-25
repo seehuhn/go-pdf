@@ -17,7 +17,7 @@ type encryptInfo struct {
 	strF *cryptFilter
 	eff  *cryptFilter
 
-	sec *securityHandler
+	sec *defSecHandler
 }
 
 func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
@@ -39,13 +39,8 @@ func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 	if obj, ok := enc["SubFilter"].(Name); ok {
 		subFilter = string(obj)
 	}
-	if filter != "Standard" || subFilter != "" {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(encObj),
-			Err: errors.New("unsupported security handler"),
-		}
-	}
 
+	// version of the encryption/decryption algorithm
 	V, _ := enc["V"].(Integer)
 
 	length := 40
@@ -77,6 +72,7 @@ func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 		res.strF = cf
 		res.eff = cf
 	case 4:
+		// TODO(voss): lengths in CF Dicts overrides global /Length?
 		var CF Dict
 		if obj, ok := enc["CF"].(Dict); ok {
 			CF = obj
@@ -119,60 +115,29 @@ func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 		}
 	}
 
-	// TODO(voss): move the following code into a new function
-	// newSecurityHandlerFromDict or so.
-
-	R, err := r.GetInt(enc["R"])
-	if err != nil || R < 2 || R > 4 {
+	switch {
+	case filter == "Standard" && subFilter == "":
+		sec, err := openDefSecHandler(enc, length, r.ID[0])
+		if err != nil {
+			return nil, &MalformedFileError{
+				Pos: r.errPos(encObj),
+				Err: err,
+			}
+		}
+		res.sec = sec
+	default:
 		return nil, &MalformedFileError{
 			Pos: r.errPos(encObj),
-			Err: errors.New("invalid Encrypt.R"),
+			Err: errors.New("unsupported security handler"),
 		}
-	}
-	O, err := r.GetString(enc["O"])
-	if err != nil || len(O) != 32 {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(encObj),
-			Err: errors.New("invalid Encrypt.O"),
-		}
-	}
-	U, err := r.GetString(enc["U"])
-	if err != nil || len(U) != 32 {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(encObj),
-			Err: errors.New("invalid Encrypt.U"),
-		}
-	}
-	P, err := r.GetInt(enc["P"])
-	if err != nil {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(encObj),
-			Err: errors.New("invalid Encrypt.P"),
-		}
-	}
-
-	emd := true
-	if obj, ok := enc["EncryptMetaData"].(Bool); ok && R == 4 {
-		emd = bool(obj)
-	}
-
-	res.sec = &securityHandler{
-		id: []byte(r.ID[0]),
-		n:  length / 8,
-		R:  int(R),
-		o:  []byte(O),
-		u:  []byte(U),
-		P:  uint32(P),
-
-		encryptMetaData: emd,
 	}
 
 	return res, nil
 }
 
-func (sec *securityHandler) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, error) {
+func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, error) {
 	h := md5.New()
-	key, err := sec.GetKey(false)
+	key, err := enc.sec.GetKey(false)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +148,7 @@ func (sec *securityHandler) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, 
 	if cf.Cipher == cipherAES {
 		_, _ = h.Write([]byte("sAlT"))
 	}
-	l := sec.n + 5
+	l := enc.sec.KeyBytes + 5
 	if l > 16 {
 		l = 16
 	}
@@ -198,7 +163,7 @@ func (enc *encryptInfo) EncryptBytes(ref *Reference, buf []byte) ([]byte, error)
 		return buf, nil
 	}
 
-	key, err := enc.sec.keyForRef(cf, ref)
+	key, err := enc.keyForRef(cf, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +212,7 @@ func (enc *encryptInfo) DecryptBytes(ref *Reference, buf []byte) ([]byte, error)
 		return buf, nil
 	}
 
-	key, err := enc.sec.keyForRef(cf, ref)
+	key, err := enc.keyForRef(cf, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +253,7 @@ func (enc *encryptInfo) EncryptStream(ref *Reference, _ string, r io.Reader) (io
 		return r, nil
 	}
 
-	key, err := enc.sec.keyForRef(cf, ref)
+	key, err := enc.keyForRef(cf, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +294,7 @@ func (enc *encryptInfo) DecryptStream(ref *Reference, _ string, r io.Reader) (io
 		return r, nil
 	}
 
-	key, err := enc.sec.keyForRef(cf, ref)
+	key, err := enc.keyForRef(cf, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -361,15 +326,15 @@ func (enc *encryptInfo) DecryptStream(ref *Reference, _ string, r io.Reader) (io
 	}
 }
 
-// The securityHandler authenticates the user via a pair of passwords.
+// The defSecHandler authenticates the user via a pair of passwords.
 // The "user password" is used to access the contents of the document, the
 // "owner password" can be used to control additional permissions, e.g.
 // permission to print the document.
-type securityHandler struct {
-	id []byte
-	o  []byte
-	u  []byte
-	n  int
+type defSecHandler struct {
+	id       []byte
+	o        []byte
+	u        []byte
+	KeyBytes int
 
 	getPasswd func(needOwner bool) string
 	key       []byte
@@ -382,13 +347,48 @@ type securityHandler struct {
 	OwnerAuthenticated bool
 }
 
-// newSecurityHandler allocates a new, pre-authenticated StandardSecurityHandler.
-func newSecurityHandler(id []byte, userPwd, ownerPwd string, P uint32) *securityHandler {
-	sec := &securityHandler{
-		id: id,
-		n:  16,
-		R:  4,
-		P:  P,
+func openDefSecHandler(enc Dict, length int, ID []byte) (*defSecHandler, error) {
+	R, ok := enc["R"].(Integer)
+	if !ok || R < 2 || R > 4 {
+		return nil, errors.New("invalid Encrypt.R")
+	}
+	O, ok := enc["O"].(String)
+	if !ok || len(O) != 32 {
+		return nil, errors.New("invalid Encrypt.O")
+	}
+	U, ok := enc["U"].(String)
+	if !ok || len(U) != 32 {
+		return nil, errors.New("invalid Encrypt.U")
+	}
+	P, ok := enc["P"].(Integer)
+	if !ok {
+		return nil, errors.New("invalid Encrypt.P")
+	}
+	emd := true
+	if obj, ok := enc["EncryptMetaData"].(Bool); ok && R == 4 {
+		emd = bool(obj)
+	}
+
+	sec := &defSecHandler{
+		id:       []byte(ID),
+		KeyBytes: length / 8,
+		R:        int(R),
+		o:        []byte(O),
+		u:        []byte(U),
+		P:        uint32(P),
+
+		encryptMetaData: emd,
+	}
+	return sec, nil
+}
+
+// createDefSecHandler allocates a new, pre-authenticated StandardSecurityHandler.
+func createDefSecHandler(id []byte, userPwd, ownerPwd string, P uint32) *defSecHandler {
+	sec := &defSecHandler{
+		id:       id,
+		KeyBytes: 16,
+		R:        4,
+		P:        P,
 
 		OwnerAuthenticated: true,
 	}
@@ -405,7 +405,7 @@ func newSecurityHandler(id []byte, userPwd, ownerPwd string, P uint32) *security
 // be requested via the getPasswd callback.  If the correct owner password was
 // supplied, the OwnerAuthenticated field will be set to true, in addition to
 // returning the key.
-func (sec *securityHandler) GetKey(needOwner bool) ([]byte, error) {
+func (sec *defSecHandler) GetKey(needOwner bool) ([]byte, error) {
 	// TODO(voss): key length for crypt filters???
 	if sec.key != nil {
 		return sec.key, nil
@@ -416,7 +416,6 @@ func (sec *securityHandler) GetKey(needOwner bool) ([]byte, error) {
 
 	passwd := ""
 	for {
-
 		for try := 0; try < 2; try++ {
 			// try == 0: check whether passwd is the owner password
 			// try == 1: check whether passwd is the user password
@@ -435,7 +434,7 @@ func (sec *securityHandler) GetKey(needOwner bool) ([]byte, error) {
 						sum = h.Sum(sum[:0])
 					}
 				}
-				key := sum[:sec.n]
+				key := sum[:sec.KeyBytes]
 
 				copy(pw, sec.o)
 				if sec.R >= 3 {
@@ -489,7 +488,7 @@ func (sec *securityHandler) GetKey(needOwner bool) ([]byte, error) {
 // algorithm 2: compute the encryption key
 // key must either be nil or have length of at least 16 bytes.
 // pw must be the padded password
-func (sec *securityHandler) computeKey(key []byte, pw []byte) []byte {
+func (sec *defSecHandler) computeKey(key []byte, pw []byte) []byte {
 	h := md5.New()
 	_, _ = h.Write(pw)
 	_, _ = h.Write(sec.o)
@@ -504,16 +503,16 @@ func (sec *securityHandler) computeKey(key []byte, pw []byte) []byte {
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			_, _ = h.Write(key[:sec.n])
+			_, _ = h.Write(key[:sec.KeyBytes])
 			key = h.Sum(key[:0])
 		}
 	}
 
-	return key[:sec.n]
+	return key[:sec.KeyBytes]
 }
 
 // this uses only the .R field of sec.
-func (sec *securityHandler) computeO(userPasswd, ownerPasswd string) []byte {
+func (sec *defSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
 	if ownerPasswd == "" {
 		ownerPasswd = userPasswd
 	}
@@ -525,11 +524,11 @@ func (sec *securityHandler) computeO(userPasswd, ownerPasswd string) []byte {
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			_, _ = h.Write(sum[:sec.n])
+			_, _ = h.Write(sum[:sec.KeyBytes])
 			sum = h.Sum(sum[:0])
 		}
 	}
-	rc4key := sum[:sec.n]
+	rc4key := sum[:sec.KeyBytes]
 
 	c, _ := rc4.NewCipher(rc4key)
 	o := padPasswd(userPasswd)
@@ -550,7 +549,7 @@ func (sec *securityHandler) computeO(userPasswd, ownerPasswd string) []byte {
 // algorithm 4/5: compute U
 // U must be a slice of length 32.
 // key must be the encryption key computed from the user password.
-func (sec *securityHandler) computeU(U []byte, key []byte) []byte {
+func (sec *defSecHandler) computeU(U []byte, key []byte) []byte {
 	c, _ := rc4.NewCipher(key)
 
 	if sec.R < 3 {

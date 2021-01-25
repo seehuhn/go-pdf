@@ -10,12 +10,12 @@ import (
 func TestComputeOU(t *testing.T) {
 	passwd := "test"
 	P := -4
-	sec := &securityHandler{
+	sec := &defSecHandler{
 		P: uint32(P),
 		id: []byte{0xac, 0xac, 0x29, 0xb4, 0x19, 0x2f, 0xd9, 0x23,
 			0xc2, 0x4f, 0xe6, 0x04, 0x24, 0x79, 0xb2, 0xa9},
-		R: 4,
-		n: 16,
+		R:        4,
+		KeyBytes: 16,
 
 		encryptMetaData: true,
 	}
@@ -56,7 +56,7 @@ func TestAuth(t *testing.T) {
 			pwdPos := -1
 			lastPwd := ""
 
-			sec := newSecurityHandler([]byte("0123456789ABCDEF"),
+			sec := createDefSecHandler([]byte("0123456789ABCDEF"),
 				test.user, test.owner, ^uint32(4))
 			key := sec.key
 
@@ -114,7 +114,7 @@ func TestEncryptBytes(t *testing.T) {
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
 					strF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  newSecurityHandler(id, "secret", "supersecret", ^uint32(0)),
+					sec:  createDefSecHandler(id, "secret", "supersecret", ^uint32(0)),
 				}
 
 				plainText := []byte(msg)
@@ -146,7 +146,7 @@ func TestEncryptStream(t *testing.T) {
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
 					stmF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  newSecurityHandler(id, "secret", "supersecret", ^uint32(0)),
+					sec:  createDefSecHandler(id, "secret", "supersecret", ^uint32(0)),
 				}
 
 				plainText := bytes.NewReader([]byte(msg))

@@ -2,7 +2,6 @@ package pdf
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -96,10 +95,6 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	fd, _ := os.Create("xxx.pdf")
-	fd.Write(out.Bytes())
-	fd.Close()
 
 	outR := bytes.NewReader(out.Bytes())
 	_, err = NewReader(outR, outR.Size(), nil)

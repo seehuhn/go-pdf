@@ -398,7 +398,7 @@ func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 	for i := 0; i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
 		if entry != nil && entry.InStream != nil {
-			panic("object streams not supported") // TODO(voss)
+			return errors.New("cannot use xref tables with object streams")
 		}
 		if entry != nil && entry.Pos >= 0 {
 			_, err = fmt.Fprintf(pdf.w, "%010d %05d n\r\n",
