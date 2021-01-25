@@ -467,8 +467,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 
 	opt := &StreamOptions{
 		Filters: []*FilterInfo{
-			{"FlateDecode", nil},
-			// Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)}},
+			{"FlateDecode", Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)}},
 		},
 	}
 	swx, _, err := pdf.OpenStream(xRefDict, ref, opt)

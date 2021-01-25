@@ -169,7 +169,7 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 		columns := ff.Columns
 		return &pngUpWriter{
 			w:     zw,
-			prev:  make([]byte, columns+1),
+			prev:  make([]byte, columns),
 			cur:   make([]byte, columns+1),
 			close: close,
 		}, nil
@@ -236,44 +236,30 @@ func (r *pngUpReader) Read(b []byte) (int, error) {
 
 type pngUpWriter struct {
 	w     io.Writer
-	prev  []byte
-	cur   []byte
+	prev  []byte // length col
+	cur   []byte // length col+1
 	pos   int
 	close func() error
 }
 
 func (w *pngUpWriter) Write(p []byte) (int, error) {
+	tmp := w.cur[1:]
 	n := 0
-	if w.pos == 0 {
-		w.prev[0] = 2
-		w.cur[0] = 2
-		w.pos = 1
-	}
 	for len(p) > 0 {
-		l := copy(w.cur[w.pos:], p)
+		l := copy(tmp[w.pos:], p)
 		p = p[l:]
-
-		for i := w.pos; i < w.pos+l; i++ {
-			w.cur[i] -= w.prev[i]
-		}
-
-		start := w.pos
-		extra := 0
-		if start == 1 {
-			extra = 1
-		}
-		m, err := w.w.Write(w.cur[start-extra : w.pos+l])
-		if m > 0 {
-			m -= extra
-		}
-		w.pos += m
-		n += m
-		if w.pos == len(w.cur) {
-			w.cur, w.prev = w.prev, w.cur
-			w.pos = 1
-		}
-		if err != nil {
-			return n, err
+		w.pos += l
+		n += l
+		if w.pos >= len(tmp) {
+			w.cur[0] = 2
+			for i := 0; i < w.pos; i++ {
+				tmp[i], w.prev[i] = tmp[i]-w.prev[i], tmp[i]
+			}
+			_, err := w.w.Write(w.cur)
+			if err != nil {
+				return n, err
+			}
+			w.pos = 0
 		}
 	}
 	return n, nil

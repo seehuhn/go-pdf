@@ -54,13 +54,13 @@ func TestFlate(t *testing.T) {
 }
 
 func TestPngUp(t *testing.T) {
-	columns := 5
+	columns := 2
 
-	for _, in := range []string{"", "12345", "1234567890"} {
+	for _, in := range []string{"", "11121314151617", "123456"} {
 		buf := &bytes.Buffer{}
 		w := &pngUpWriter{
 			w:    buf,
-			prev: make([]byte, columns+1),
+			prev: make([]byte, columns),
 			cur:  make([]byte, columns+1),
 		}
 		n, err := w.Write([]byte(in))
