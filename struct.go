@@ -7,13 +7,73 @@ import (
 	"time"
 )
 
+// Struct creates a PDF Dict object, encoding the fields of a Go struct.
+func Struct(s interface{}) Dict {
+	v := reflect.Indirect(reflect.ValueOf(s))
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+	vt := v.Type()
+
+	res := make(Dict)
+fieldLoop:
+	for i := 0; i < vt.NumField(); i++ {
+		fVal := v.Field(i)
+		fInfo := vt.Field(i)
+
+		optional := false
+		isTextString := false
+		for _, t := range strings.Split(fInfo.Tag.Get("pdf"), ",") {
+			switch t {
+			case "":
+				// pass
+			case "optional":
+				optional = true
+			case "text string":
+				isTextString = true
+			case "extra":
+				for key, val := range fVal.Interface().(map[string]string) {
+					res[Name(key)] = TextString(val)
+				}
+				continue fieldLoop
+			default:
+				assign := strings.SplitN(t, "=", 2)
+				if len(assign) != 2 {
+					continue
+				}
+				res[Name(assign[0])] = Name(assign[1])
+			}
+		}
+
+		if !fVal.CanSet() {
+			// Ignore fields which AsStruct() cannot set
+			continue
+		}
+
+		key := Name(fInfo.Name)
+		switch {
+		case optional && fVal.IsZero():
+			continue
+		case isTextString:
+			res[key] = TextString(fVal.Interface().(string))
+		case fInfo.Type == timeType:
+			res[key] = Date(fVal.Interface().(time.Time))
+		case fVal.Kind() == reflect.Bool:
+			res[key] = Bool(fVal.Bool())
+		default:
+			res[key] = fVal.Interface().(Object)
+		}
+	}
+
+	return res
+}
+
 // AsStruct initialises a tagged struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
-// The Reader r is used to resolve references to indirect objects, where
-// needed.
-//
-// TODO(voss): remove?
-func (d Dict) AsStruct(s interface{}, r *Reader) error {
+// The function get(), if non-nil, is used to resolve references to indirect
+// objects, where needed; the Reader.Get() method can be used for this
+// argument.
+func (d Dict) AsStruct(s interface{}, get func(Object) (Object, error)) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
 
@@ -54,9 +114,9 @@ fieldLoop:
 
 		// get and fix up the value from the Dict
 		dictVal := d[Name(fInfo.Name)]
-		if fInfo.Type != objectType && fInfo.Type != refType {
+		if fInfo.Type != objectType && fInfo.Type != refType && get != nil {
 			// follow references to indirect objects where needed
-			obj, err := r.Get(dictVal)
+			obj, err := get(dictVal)
 			if err != nil {
 				firstErr = err
 				continue
@@ -129,67 +189,6 @@ fieldLoop:
 	}
 
 	return firstErr
-}
-
-// Struct creates a PDF Dict object, encoding the fields of a Go struct.
-func Struct(s interface{}) Dict {
-	v := reflect.Indirect(reflect.ValueOf(s))
-	if v.Kind() != reflect.Struct {
-		return nil
-	}
-	vt := v.Type()
-
-	res := make(Dict)
-fieldLoop:
-	for i := 0; i < vt.NumField(); i++ {
-		fVal := v.Field(i)
-		fInfo := vt.Field(i)
-
-		optional := false
-		isTextString := false
-		for _, t := range strings.Split(fInfo.Tag.Get("pdf"), ",") {
-			switch t {
-			case "":
-				// pass
-			case "optional":
-				optional = true
-			case "text string":
-				isTextString = true
-			case "extra":
-				for key, val := range fVal.Interface().(map[string]string) {
-					res[Name(key)] = TextString(val)
-				}
-				continue fieldLoop
-			default:
-				assign := strings.SplitN(t, "=", 2)
-				if len(assign) != 2 {
-					continue
-				}
-				res[Name(assign[0])] = Name(assign[1])
-			}
-		}
-
-		if !fVal.CanSet() {
-			// Ignore fields which AsStruct() cannot set
-			continue
-		}
-
-		key := Name(fInfo.Name)
-		switch {
-		case optional && fVal.IsZero():
-			continue
-		case isTextString:
-			res[key] = TextString(fVal.Interface().(string))
-		case fInfo.Type == timeType:
-			res[key] = Date(fVal.Interface().(time.Time))
-		case fVal.Kind() == reflect.Bool:
-			res[key] = Bool(fVal.Bool())
-		default:
-			res[key] = fVal.Interface().(Object)
-		}
-	}
-
-	return res
 }
 
 var (

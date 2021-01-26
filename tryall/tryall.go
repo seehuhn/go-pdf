@@ -92,7 +92,7 @@ func doOneFile(fname string) error {
 		return err
 	}
 	catalog := &Catalog{}
-	root.AsStruct(catalog, r)
+	root.AsStruct(catalog, r.Get)
 	pages, err := r.GetDict(catalog.Pages)
 	if err != nil {
 		return err

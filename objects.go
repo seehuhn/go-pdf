@@ -262,7 +262,7 @@ func (x Array) PDF(w io.Writer) error {
 	}
 	for i, val := range x {
 		if i > 0 {
-			_, err := w.Write([]byte(" ")) // TODO(voss): use '\n' here?
+			_, err := w.Write([]byte(" "))
 			if err != nil {
 				return err
 			}
@@ -307,7 +307,15 @@ func (x Dict) PDF(w io.Writer) error {
 		return err
 	}
 
-	for _, key := range x.sortedKeys() {
+	var keys []Name
+	for key := range x {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i int, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	for _, key := range keys {
 		name := Name(key)
 		val := x[name]
 		if val == nil {
@@ -335,24 +343,12 @@ func (x Dict) PDF(w io.Writer) error {
 	return err
 }
 
-// sortedKeys returns the keys of x in alphabetical order.
-func (x Dict) sortedKeys() []Name {
-	var keys []Name
-	for key := range x {
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i int, j int) bool {
-		return keys[i] < keys[j]
-	})
-	return keys
-}
-
 // Stream represent a stream object in a PDF file.
 type Stream struct {
 	Dict
 	R io.Reader
 
-	isEncrypted bool // TODO(voss): set this correctly
+	isEncrypted bool
 }
 
 func (x *Stream) String() string {
@@ -449,7 +445,7 @@ func (x *Reference) PDF(w io.Writer) error {
 	return err
 }
 
-// TODO(voss): is this function needed?
+// TODO(voss): remove
 func format(x Object) string {
 	buf := &bytes.Buffer{}
 	if x == nil {
