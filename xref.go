@@ -471,25 +471,64 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 		},
 	}
 	swx, _, err := pdf.OpenStream(xRefDict, ref, opt)
+	if err != nil {
+		return err
+	}
 	sw := bufio.NewWriter(swx)
 	for i := 0; i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
 		if entry == nil {
-			sw.WriteByte(0)
-			encodeInt64(sw, 0, w2)
-			encodeInt16(sw, 0, w3)
+			err = sw.WriteByte(0)
+			if err != nil {
+				return err
+			}
+			err = encodeInt64(sw, 0, w2)
+			if err != nil {
+				return err
+			}
+			err = encodeInt16(sw, 0, w3)
+			if err != nil {
+				return err
+			}
 		} else if entry.Pos < 0 {
-			sw.WriteByte(0)
-			encodeInt64(sw, 0, w2)
-			encodeInt16(sw, entry.Generation, w3)
+			err = sw.WriteByte(0)
+			if err != nil {
+				return err
+			}
+			err = encodeInt64(sw, 0, w2)
+			if err != nil {
+				return err
+			}
+			err = encodeInt16(sw, entry.Generation, w3)
+			if err != nil {
+				return err
+			}
 		} else if entry.InStream == nil {
-			sw.WriteByte(1)
-			encodeInt64(sw, uint64(entry.Pos), w2)
-			encodeInt16(sw, entry.Generation, w3)
+			err = sw.WriteByte(1)
+			if err != nil {
+				return err
+			}
+			err = encodeInt64(sw, uint64(entry.Pos), w2)
+			if err != nil {
+				return err
+			}
+			err = encodeInt16(sw, entry.Generation, w3)
+			if err != nil {
+				return err
+			}
 		} else {
-			sw.WriteByte(2)
-			encodeInt64(sw, uint64(entry.InStream.Number), w2)
-			encodeInt16(sw, uint16(entry.Pos), w3)
+			err = sw.WriteByte(2)
+			if err != nil {
+				return err
+			}
+			err = encodeInt64(sw, uint64(entry.InStream.Number), w2)
+			if err != nil {
+				return err
+			}
+			err = encodeInt16(sw, uint16(entry.Pos), w3)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	err = sw.Flush()
@@ -500,16 +539,24 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	return err
 }
 
-func encodeInt64(data io.ByteWriter, x uint64, w int) {
+func encodeInt64(data io.ByteWriter, x uint64, w int) error {
 	for i := w - 1; i >= 0; i-- {
-		data.WriteByte(byte(x >> (i * 8)))
+		err := data.WriteByte(byte(x >> (i * 8)))
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func encodeInt16(data io.ByteWriter, x uint16, w int) {
+func encodeInt16(data io.ByteWriter, x uint16, w int) error {
 	for i := w - 1; i >= 0; i-- {
-		data.WriteByte(byte(x >> (i * 8)))
+		err := data.WriteByte(byte(x >> (i * 8)))
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 type xRefSubSection struct {

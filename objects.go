@@ -62,7 +62,13 @@ type String []byte
 func (x String) PDF(w io.Writer) error {
 	l := []byte(x)
 
-	// TODO(voss): encrypt l if needed
+	if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
+		enc, err := wenc.enc.EncryptBytes(wenc.ref, l)
+		if err != nil {
+			return err
+		}
+		l = enc
+	}
 
 	level := 0
 	for _, c := range l {
@@ -301,7 +307,7 @@ func (x Dict) PDF(w io.Writer) error {
 		return err
 	}
 
-	for _, key := range x.SortedKeys() {
+	for _, key := range x.sortedKeys() {
 		name := Name(key)
 		val := x[name]
 		if val == nil {
@@ -329,8 +335,8 @@ func (x Dict) PDF(w io.Writer) error {
 	return err
 }
 
-// SortedKeys returns the keys of x in alphabetical order.
-func (x Dict) SortedKeys() []Name {
+// sortedKeys returns the keys of x in alphabetical order.
+func (x Dict) sortedKeys() []Name {
 	var keys []Name
 	for key := range x {
 		keys = append(keys, key)
@@ -384,7 +390,14 @@ func (x *Stream) PDF(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// TODO(voss): encrypt x.R if needed
+
+	if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
+		enc, err := wenc.enc.cryptFilter(wenc.ref, withoutClose{w})
+		if err != nil {
+			return err
+		}
+		w = enc
+	}
 	_, err = io.Copy(w, x.R)
 	if err != nil {
 		return err
@@ -436,22 +449,7 @@ func (x *Reference) PDF(w io.Writer) error {
 	return err
 }
 
-// Version represent the version of PDF standard used in a file.
-type Version int
-
-// Constants for the known PDF versions.
-const (
-	V1_0 Version = iota
-	V1_1
-	V1_2
-	V1_3
-	V1_4
-	V1_5
-	V1_6
-	V1_7
-	tooHighVersion
-)
-
+// TODO(voss): is this function needed?
 func format(x Object) string {
 	buf := &bytes.Buffer{}
 	if x == nil {

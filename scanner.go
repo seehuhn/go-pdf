@@ -652,7 +652,7 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 
 	isEncrypted := false
 	if s.dec != nil {
-		streamData, err = s.dec.DecryptStream(s.decRef, "", streamData)
+		streamData, err = s.dec.DecryptStream(s.decRef, streamData)
 		if err != nil {
 			return nil, err
 		}
@@ -688,8 +688,8 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 		}
 	}
 
-	version := Version(buf[7]) - '0'
-	if version < 0 || version >= tooHighVersion ||
+	version := Version(buf[7]) - '0' + V1_0
+	if version < V1_0 || version >= tooHighVersion ||
 		buf[8] >= '0' && buf[8] <= '9' {
 		return 0, &MalformedFileError{Pos: 7, Err: errVersion}
 	}

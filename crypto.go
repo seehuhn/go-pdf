@@ -13,11 +13,11 @@ import (
 )
 
 type encryptInfo struct {
+	sec *defSecHandler
+
 	stmF *cryptFilter
 	strF *cryptFilter
 	eff  *cryptFilter
-
-	sec *defSecHandler
 }
 
 func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
@@ -135,6 +135,63 @@ func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 	return res, nil
 }
 
+func (enc *encryptInfo) ToDict() Dict {
+	dict := Dict{
+		"Filter": Name("Standard"),
+	}
+
+	canV1 := true
+	canV2 := true
+
+	length := 0
+	var cipher cipherType
+	for _, cf := range []*cryptFilter{enc.stmF, enc.strF, enc.eff} {
+		if length == 0 {
+			length = cf.Length
+			cipher = cf.Cipher
+		} else if length != cf.Length {
+			panic("not implemented: unequal key length")
+		} else if cipher != cf.Cipher {
+			panic("not implemented: mixed ciphers")
+		}
+		if cf.Cipher != cipherRC4 {
+			canV1 = false
+			canV2 = false
+		} else if cf.Cipher != cipherAES {
+			panic("not implemented: " + cf.Cipher.String())
+		}
+	}
+	if length != 40 {
+		canV1 = false
+	}
+
+	if canV1 {
+		dict["V"] = Integer(1)
+	} else if canV2 {
+		dict["V"] = Integer(2)
+		dict["Length"] = Integer(length)
+	} else {
+		dict["V"] = Integer(4)
+		dict["Length"] = Integer(length)
+		dict["StmF"] = Name("StdCF")
+		dict["StrF"] = Name("StdCF")
+		dict["CF"] = Dict{
+			"StdCF": Dict{"Length": Integer(length / 8), "CFM": Name("AESV2")},
+		}
+	}
+
+	sec := enc.sec
+	dict["R"] = Integer(sec.R)
+	dict["O"] = String(sec.o)
+	dict["U"] = String(sec.u)
+	dict["P"] = Integer(int32(sec.P))
+	if !sec.encryptMetaData {
+		dict["EncryptMetadata"] = Bool(false)
+	}
+
+	return dict
+}
+
 func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, error) {
 	h := md5.New()
 	key, err := enc.sec.GetKey(false)
@@ -245,50 +302,7 @@ func (enc *encryptInfo) DecryptBytes(ref *Reference, buf []byte) ([]byte, error)
 	}
 }
 
-func (enc *encryptInfo) EncryptStream(ref *Reference, _ string, r io.Reader) (io.Reader, error) {
-	// TODO(voss): implement the name argument
-
-	cf := enc.stmF
-	if cf == nil {
-		return r, nil
-	}
-
-	key, err := enc.keyForRef(cf, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	switch cf.Cipher {
-	case cipherAES:
-		c, err := aes.NewCipher(key)
-		if err != nil {
-			return nil, err
-		}
-
-		buf := make([]byte, 32)
-		iv := buf[:16]
-		_, err = io.ReadFull(rand.Reader, iv)
-		if err != nil {
-			return nil, err
-		}
-
-		return &encryptReader{
-			cbc:   cipher.NewCBCEncrypter(c, iv),
-			r:     r,
-			buf:   buf,
-			ready: iv,
-		}, nil
-	case cipherRC4:
-		c, _ := rc4.NewCipher(key)
-		return &cipher.StreamReader{S: c, R: r}, nil
-	default:
-		panic("unknown cipher")
-	}
-}
-
-func (enc *encryptInfo) DecryptStream(ref *Reference, _ string, r io.Reader) (io.Reader, error) {
-	// TODO(voss): implement the name argument
-
+func (enc *encryptInfo) DecryptStream(ref *Reference, r io.Reader) (io.Reader, error) {
 	cf := enc.stmF
 	if cf == nil {
 		return r, nil
@@ -383,7 +397,31 @@ func openDefSecHandler(enc Dict, length int, ID []byte) (*defSecHandler, error) 
 }
 
 // createDefSecHandler allocates a new, pre-authenticated StandardSecurityHandler.
-func createDefSecHandler(id []byte, userPwd, ownerPwd string, P uint32) *defSecHandler {
+func createDefSecHandler(id []byte, userPwd, ownerPwd string, perm Perm) *defSecHandler {
+	forbidden := uint32(0)
+	if perm&PermCopy == 0 {
+		forbidden |= 1 << (5 - 1)
+	}
+	if perm&PermPrint == 0 {
+		forbidden |= 1 << (12 - 1)
+		if perm&PermPrintDegraded == 0 {
+			forbidden |= 1 << (3 - 1)
+		}
+	}
+	if perm&PermAnnotate == 0 {
+		forbidden |= 1 << (6 - 1)
+		if perm&PermForms == 0 {
+			forbidden |= 1 << (9 - 1)
+		}
+	}
+	if perm&PermAssemble == 0 {
+		forbidden |= 1 << (11 - 1)
+	}
+	if perm&PermModify == 0 {
+		forbidden |= 1 << (4 - 1)
+	}
+	P := ^forbidden
+
 	sec := &defSecHandler{
 		id:       id,
 		KeyBytes: 16,
@@ -480,7 +518,7 @@ func (sec *defSecHandler) GetKey(needOwner bool) ([]byte, error) {
 			passwd = ""
 		}
 		if passwd == "" {
-			return nil, ErrWrongPassword
+			return nil, ErrNoAuth
 		}
 	}
 }
@@ -605,6 +643,151 @@ var passwdPad = []byte{
 	0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80, 0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
 }
 
+type encryptWriter struct {
+	w   io.WriteCloser
+	cbc cipher.BlockMode
+	buf []byte // must have length cbc.BlockSize()
+	pos int
+}
+
+func (enc *encryptInfo) cryptFilter(ref *Reference, w io.WriteCloser) (io.WriteCloser, error) {
+	cf := enc.stmF
+	if cf == nil {
+		return w, nil
+	}
+
+	key, err := enc.keyForRef(cf, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cf.Cipher {
+	case cipherAES:
+		c, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+
+		// generate and write the IV
+		buf := make([]byte, 16)
+		_, err = io.ReadFull(rand.Reader, buf)
+		if err != nil {
+			return nil, err
+		}
+		_, err = w.Write(buf)
+		if err != nil {
+			return nil, err
+		}
+
+		return &encryptWriter{
+			w:   w,
+			cbc: cipher.NewCBCEncrypter(c, buf),
+			buf: buf,
+		}, nil
+	case cipherRC4:
+		c, _ := rc4.NewCipher(key)
+		return &cipher.StreamWriter{S: c, W: w}, nil
+	default:
+		panic("unknown cipher")
+	}
+}
+
+func (w *encryptWriter) Write(p []byte) (int, error) {
+	n := 0
+	for len(p) > 0 {
+		k := copy(w.buf[w.pos:], p)
+		n += k
+		w.pos += k
+		p = p[k:]
+
+		if w.pos >= len(w.buf) {
+			w.cbc.CryptBlocks(w.buf, w.buf)
+			_, err := w.w.Write(w.buf)
+			if err != nil {
+				return n, err
+			}
+			w.pos = 0
+		}
+	}
+	return n, nil
+}
+
+func (w *encryptWriter) Close() error {
+	// add the padding
+	kPad := 16 - w.pos
+	for i := w.pos; i < len(w.buf); i++ {
+		w.buf[i] = byte(kPad)
+	}
+
+	// write the last block
+	w.cbc.CryptBlocks(w.buf, w.buf)
+	_, err := w.w.Write(w.buf)
+	if err != nil {
+		return err
+	}
+
+	return w.w.Close()
+}
+
+type decryptReader struct {
+	cbc      cipher.BlockMode
+	r        io.Reader
+	buf      []byte
+	ready    []byte
+	reserved []byte
+}
+
+func (r *decryptReader) Read(p []byte) (int, error) {
+	if len(r.ready) == 0 {
+		k := copy(r.buf, r.reserved)
+		for k <= 16 && r.r != nil {
+			n, err := r.r.Read(r.buf[k:])
+			k += n
+			if err == io.EOF {
+				r.r = nil
+				if k%16 != 0 {
+					return 0, errCorrupted
+				}
+			} else if err != nil {
+				return 0, err
+			}
+		}
+
+		if k < 16 {
+			if k > 0 {
+				panic("inconsistent buffer state")
+			}
+			return 0, io.EOF
+		}
+
+		l := k
+		if r.r != nil {
+			// reserve the last block, in case it turns out to be padding
+			l--
+		}
+		l -= l % 16
+		r.ready = r.buf[:l]
+		r.reserved = r.buf[l:k]
+		r.cbc.CryptBlocks(r.ready, r.ready)
+
+		if r.r == nil {
+			// remove the padding
+			if l != k {
+				panic("inconsistent buffer state")
+			}
+			nPad := int(r.buf[l-1])
+			if nPad < 1 || nPad > 16 || nPad > l {
+				return 0, errCorrupted
+			}
+			r.ready = r.ready[:l-nPad]
+		}
+	}
+
+	n := copy(p, r.ready)
+	r.ready = r.ready[n:]
+	return n, nil
+}
+
 type cryptFilter struct {
 	Cipher cipherType
 	Length int
@@ -682,112 +865,40 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 	}
 }
 
-type encryptReader struct {
-	cbc      cipher.BlockMode
-	r        io.Reader
-	buf      []byte
-	ready    []byte
-	reserved []byte
-}
+// Perm describes which operations are permitted when accessing the document
+// with User access (but not Owner access).
+type Perm int
 
-func (r *encryptReader) Read(p []byte) (int, error) {
-	if len(r.ready) == 0 {
-		k := copy(r.buf, r.reserved)
-		for k <= 16 && r.r != nil {
-			n, err := r.r.Read(r.buf[k:])
-			k += n
-			if err == io.EOF {
-				r.r = nil
-				// add the padding
-				kPad := 16 - k%16
-				full := k + kPad
-				for k < full {
-					r.buf[k] = byte(kPad)
-					k++
-				}
-			} else if err != nil {
-				return 0, err
-			}
-		}
+const (
+	// PermCopy allows to extract text and graphics.
+	PermCopy Perm = 1 << iota
 
-		if k < 16 {
-			if k > 0 {
-				panic("inconsistent buffer state")
-			}
-			return 0, io.EOF
-		}
+	// PermPrintDegraded allows printing of a low-level representation of the
+	// appearance, possibly of degraded quality.
+	PermPrintDegraded
 
-		l := k
-		if r.r != nil {
-			// reserve the last block, in case it turns out to be padding
-			l--
-		}
-		l -= l % 16
-		r.ready = r.buf[:l]
-		r.reserved = r.buf[l:k]
-		r.cbc.CryptBlocks(r.ready, r.ready)
-	}
+	// PermPrint allows printing a representation from which a faithful digital
+	// copy of the PDF content could be generated.  This implies
+	// PermPrintDegraded.
+	PermPrint
 
-	n := copy(p, r.ready)
-	r.ready = r.ready[n:]
-	return n, nil
-}
+	// PermForms allows to fill in form fields, including signature fields.
+	PermForms
 
-type decryptReader struct {
-	cbc      cipher.BlockMode
-	r        io.Reader
-	buf      []byte
-	ready    []byte
-	reserved []byte
-}
+	// PermAnnotate allows to add or modify text annotations. This implies
+	// PermForms.
+	PermAnnotate
 
-func (r *decryptReader) Read(p []byte) (int, error) {
-	if len(r.ready) == 0 {
-		k := copy(r.buf, r.reserved)
-		for k <= 16 && r.r != nil {
-			n, err := r.r.Read(r.buf[k:])
-			k += n
-			if err == io.EOF {
-				r.r = nil
-				if k%16 != 0 {
-					return 0, errCorrupted
-				}
-			} else if err != nil {
-				return 0, err
-			}
-		}
+	// PermAssemble allows to insert, rotate, or delete pages and create
+	// bookmarks or thumbnail images.
+	PermAssemble
 
-		if k < 16 {
-			if k > 0 {
-				panic("inconsistent buffer state")
-			}
-			return 0, io.EOF
-		}
+	// PermModify allows to modify the document.  This implies PermAssemble.
+	PermModify
 
-		l := k
-		if r.r != nil {
-			// reserve the last block, in case it turns out to be padding
-			l--
-		}
-		l -= l % 16
-		r.ready = r.buf[:l]
-		r.reserved = r.buf[l:k]
-		r.cbc.CryptBlocks(r.ready, r.ready)
+	permNext
 
-		if r.r == nil {
-			// remove the padding
-			if l != k {
-				panic("inconsistent buffer state")
-			}
-			nPad := int(r.buf[l-1])
-			if nPad < 1 || nPad > 16 || nPad > l {
-				return 0, errCorrupted
-			}
-			r.ready = r.ready[:l-nPad]
-		}
-	}
-
-	n := copy(p, r.ready)
-	r.ready = r.ready[n:]
-	return n, nil
-}
+	// PermAll gives the user all permissions, making User access equivalent to
+	// Owner access.
+	PermAll = permNext - 1
+)

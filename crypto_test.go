@@ -57,7 +57,7 @@ func TestAuth(t *testing.T) {
 			lastPwd := ""
 
 			sec := createDefSecHandler([]byte("0123456789ABCDEF"),
-				test.user, test.owner, ^uint32(4))
+				test.user, test.owner, PermModify)
 			key := sec.key
 
 			// deauthenticate the security handler
@@ -75,13 +75,13 @@ func TestAuth(t *testing.T) {
 			}
 
 			computedKey, err := sec.GetKey(false)
-			if err != nil && err != ErrWrongPassword {
+			if err != nil && err != ErrNoAuth {
 				t.Errorf("wrong error: %s", err)
 				continue
 			}
 			if test.user != "" && len(pwds) < 2 {
 				// need password, and only the wrong one supplied
-				if err != ErrWrongPassword {
+				if err != ErrNoAuth {
 					t.Error("wrong password not detected")
 				} else if pwdPos < len(pwds) {
 					t.Error("not all passwords tried")
@@ -114,7 +114,7 @@ func TestEncryptBytes(t *testing.T) {
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
 					strF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  createDefSecHandler(id, "secret", "supersecret", ^uint32(0)),
+					sec:  createDefSecHandler(id, "secret", "supersecret", PermPrint),
 				}
 
 				plainText := []byte(msg)
@@ -146,15 +146,24 @@ func TestEncryptStream(t *testing.T) {
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
 					stmF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  createDefSecHandler(id, "secret", "supersecret", ^uint32(0)),
+					sec:  createDefSecHandler(id, "secret", "supersecret", PermAll),
 				}
 
-				plainText := bytes.NewReader([]byte(msg))
-				cipherText, err := enc.EncryptStream(ref, "", plainText)
+				buf := &bytes.Buffer{}
+				w, err := enc.cryptFilter(ref, withoutClose{buf})
 				if err != nil {
 					t.Fatal(err)
 				}
-				restored, err := enc.DecryptStream(ref, "", cipherText)
+				_, err = w.Write([]byte(msg))
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = w.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				restored, err := enc.DecryptStream(ref, buf)
 				if err != nil {
 					t.Fatal(err)
 				}

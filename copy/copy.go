@@ -84,7 +84,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	w, err := pdf.NewWriter(out, r.PDFVersion)
+	w, err := pdf.NewWriter(out, &pdf.WriterOptions{
+		Version: r.Version,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}

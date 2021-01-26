@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	// ErrWrongPassword indicates that authentication failed because the
+	// ErrNoAuth indicates that authentication failed because the
 	// correct password was not supplied.
-	ErrWrongPassword = errors.New("authentication failed")
+	ErrNoAuth = errors.New("authentication failed")
 
 	errVersion   = errors.New("unsupported PDF version")
 	errCorrupted = errors.New("corrupted ciphertext")
@@ -37,10 +37,14 @@ func (err *MalformedFileError) Unwrap() error {
 	return err.Err
 }
 
-type errorReader struct {
-	err error
+// VersionError is returned when trying to use a feature in a PDF file which is
+// not supported by the PDF version used.
+type VersionError struct {
+	Earliest  Version
+	Operation string
 }
 
-func (e *errorReader) Read([]byte) (int, error) {
-	return 0, e.err
+func (err *VersionError) Error() string {
+	return (err.Operation + " requires PDF version " +
+		err.Earliest.String() + " or newer")
 }

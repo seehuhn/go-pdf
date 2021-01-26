@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strconv"
 )
 
 // Reader represents a pdf file opened for reading.
@@ -18,7 +19,7 @@ type Reader struct {
 	xref    map[int]*xRefEntry
 	trailer Dict
 
-	PDFVersion Version
+	Version Version
 
 	ID  [][]byte
 	enc *encryptInfo
@@ -39,7 +40,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 	if err != nil {
 		return nil, err
 	}
-	r.PDFVersion = version
+	r.Version = version
 
 	xref, trailer, err := r.readXRef()
 	if err != nil {
@@ -92,8 +93,8 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 					Err: errVersion,
 				}
 			}
-			if v2 > r.PDFVersion {
-				r.PDFVersion = v2
+			if v2 > r.Version {
+				r.Version = v2
 			}
 		}
 	}
@@ -523,4 +524,27 @@ func (r *Reader) errPos(obj Object) int64 {
 		number = entry.InStream.Number
 		gen = entry.InStream.Generation
 	}
+}
+
+// Version represent the version of PDF standard used in a file.
+type Version int
+
+// Constants for the known PDF versions.
+const (
+	V1_0 Version = iota + 1
+	V1_1
+	V1_2
+	V1_3
+	V1_4
+	V1_5
+	V1_6
+	V1_7
+	tooHighVersion
+)
+
+func (ver Version) String() string {
+	if ver >= V1_0 && ver <= V1_7 {
+		return "1." + string([]byte{byte(ver - V1_0 + '0')})
+	}
+	return "pdf.Version(" + strconv.Itoa(int(ver)) + ")"
 }

@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -11,23 +12,42 @@ import (
 
 // Writer represents a PDF file open for writing.
 type Writer struct {
-	PDFVersion Version
-
-	w       *posWriter
-	xref    map[int]*xRefEntry
-	ver     Version
-	nextRef int
-
+	ver      Version
+	id       [][]byte
+	w        *posWriter
+	xref     map[int]*xRefEntry
+	nextRef  int
 	inStream bool
 }
 
+// WriterOptions allows to influence the way a PDF file is generated.
+type WriterOptions struct {
+	Version Version
+	ID      [][]byte
+
+	UserPassword   string
+	OwnerPassword  string
+	UserPermission Perm
+}
+
+var defaultOptions = &WriterOptions{
+	Version: V1_7,
+}
+
 // NewWriter prepares a PDF file for writing.
-func NewWriter(w io.Writer, ver Version) (*Writer, error) {
+func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
+	if opt == nil {
+		opt = defaultOptions
+	} else {
+		if opt.Version == 0 {
+			opt.Version = defaultOptions.Version
+		}
+	}
+
 	pdf := &Writer{
-		PDFVersion: ver,
+		ver: opt.Version,
 
 		w:       &posWriter{w: w},
-		ver:     ver,
 		nextRef: 1,
 		xref:    make(map[int]*xRefEntry),
 	}
@@ -35,8 +55,77 @@ func NewWriter(w io.Writer, ver Version) (*Writer, error) {
 		Pos:        -1,
 		Generation: 65535,
 	}
+	if opt.ID != nil {
+		switch len(opt.ID) {
+		case 0:
+			id := make([]byte, 16)
+			_, err := io.ReadFull(rand.Reader, id)
+			if err != nil {
+				return nil, err
+			}
+			pdf.id = [][]byte{id, id}
+		case 1, 2:
+			for i := 0; i < 2; i++ {
+				id := make([]byte, 16)
+				if i < len(opt.ID) && opt.ID[i] != nil {
+					id = append(id[:0], opt.ID[i]...) // copy the value
+					if len(id) != 16 {
+						return nil, errors.New("wrong File Identifier length")
+					}
+				} else {
+					_, err := io.ReadFull(rand.Reader, id)
+					if err != nil {
+						return nil, err
+					}
+				}
+				pdf.id = append(pdf.id, id)
+			}
+		default:
+			return nil, errors.New("more than 2 File Identifiers given")
+		}
+	}
 
-	_, err := fmt.Fprintf(pdf.w, "%%PDF-1.%d\n%%\x80\x80\x80\x80\n", ver)
+	if opt.UserPassword != "" || opt.OwnerPassword != "" {
+		if err := pdf.checkVersion("encryption", V1_1); err != nil {
+			return nil, err
+		}
+		if pdf.id == nil {
+			id := make([]byte, 16)
+			_, err := io.ReadFull(rand.Reader, id)
+			if err != nil {
+				return nil, err
+			}
+			pdf.id = [][]byte{id, id}
+		}
+		sec := createDefSecHandler(pdf.id[0], opt.UserPassword,
+			opt.OwnerPassword, opt.UserPermission)
+		var cf *cryptFilter
+		if pdf.ver >= V1_6 {
+			cf = &cryptFilter{
+				Cipher: cipherAES,
+				Length: 128,
+			}
+		} else if pdf.ver >= V1_4 {
+			cf = &cryptFilter{
+				Cipher: cipherRC4,
+				Length: 128,
+			}
+		} else {
+			cf = &cryptFilter{
+				Cipher: cipherRC4,
+				Length: 40,
+			}
+		}
+		pdf.w.enc = &encryptInfo{
+			sec:  sec,
+			stmF: cf,
+			strF: cf,
+			eff:  cf,
+		}
+	}
+
+	_, err := fmt.Fprintf(pdf.w, "%%PDF-1.%d\n%%\x80\x80\x80\x80\n",
+		opt.Version-V1_0)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +142,7 @@ func Create(name string) (*Writer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewWriter(fd, V1_7)
+	return NewWriter(fd, nil)
 }
 
 // Close closes the Writer, flushing any unwritten data to the underlying
@@ -65,18 +154,25 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 	}
 
 	xRefDict := Dict{
+		"Root": catalog,
 		"Size": Integer(pdf.nextRef),
-		"Root": catalog, // required, indirect (page 43)
-		// "Encrypt" - optional, PDF1.1 (page 43)
-		// "ID" - optional (required for Encrypted), PDF1.1 (page 43)
 	}
 	if info != nil {
 		xRefDict["Info"] = info
 	}
+	if len(pdf.id) == 2 {
+		xRefDict["ID"] = Array{String(pdf.id[0]), String(pdf.id[1])}
+	}
+	if pdf.w.enc != nil {
+		xRefDict["Encrypt"] = pdf.w.enc.ToDict()
+	}
+
+	// don't encrypt the encryption dictionary and the xref dict
+	pdf.w.enc = nil
 
 	xRefPos := pdf.w.pos
 	var err error
-	if pdf.PDFVersion < V1_5 {
+	if pdf.ver < V1_5 {
 		err = pdf.writeXRefTable(xRefDict)
 	} else {
 		err = pdf.writeXRefStream(xRefDict)
@@ -128,6 +224,7 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 			return nil, errors.New("object already written")
 		}
 	}
+	pdf.w.ref = ref
 
 	pos := pdf.w.pos
 
@@ -158,9 +255,8 @@ func (pdf *Writer) ObjectStream(refs []*Reference, objects ...Object) ([]*Refere
 	if pdf.inStream {
 		return nil, errors.New("ObjectStream() while stream is open")
 	}
-
-	if pdf.PDFVersion < V1_5 {
-		return nil, errors.New("requires PDF version 1.5 or newer")
+	if err := pdf.checkVersion("using object streams", V1_5); err != nil {
+		return nil, err
 	}
 
 	sRef := pdf.Alloc()
@@ -273,6 +369,8 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io
 	}
 	pdf.xref[ref.Number] = &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation}
 
+	pdf.w.ref = ref
+
 	// Copy dict and dict["Filter"] as well as dict["DecodeParms"], so that
 	// we can register the new filters without changing the caller's dict.
 	d2 := make(Dict)
@@ -299,6 +397,13 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io
 		dict:   d2,
 		ref:    ref,
 		length: length,
+	}
+	if pdf.w.enc != nil {
+		enc, err := pdf.w.enc.cryptFilter(ref, w)
+		if err != nil {
+			return nil, nil, err
+		}
+		w = enc
 	}
 	if opt != nil {
 		for _, fi := range opt.Filters {
@@ -433,6 +538,10 @@ func (w *streamWriter) Close() error {
 type posWriter struct {
 	w   io.Writer
 	pos int64
+
+	// TODO(voss): is there a better place where to put this?
+	ref *Reference
+	enc *encryptInfo
 }
 
 func (w *posWriter) Write(p []byte) (int, error) {
@@ -534,4 +643,14 @@ func (x *placeholder) Set(val Object) error {
 
 	_, err = x.fill.Seek(currentPos, io.SeekStart)
 	return err
+}
+
+func (pdf *Writer) checkVersion(operation string, minVersion Version) error {
+	if pdf.ver >= minVersion {
+		return nil
+	}
+	return &VersionError{
+		Earliest:  minVersion,
+		Operation: operation,
+	}
 }

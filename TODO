@@ -1,8 +1,10 @@
 - rationalize the error handling
-- allow to write encrypted files
 - add a licence and copyright notices
+- check whether any dependencies use "fmt", and if not, try to not use "fmt"
+- make sure that supporting incremental updates will not require major changes
+  to the API
 
-- implement crypt filters
+- implement crypt filters?
 - attempt to add pdf-2.0 support?
 - add a way to repair broken xref tables?
 

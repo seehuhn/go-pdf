@@ -10,13 +10,10 @@ import (
 // AsStruct initialises a tagged struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
 // The Reader r is used to resolve references to indirect objects, where
-// needed.  The value errPos is only used in error messages: it should be set
-// to the byte index of the Dict inside the PDF file (or 0, if the index is
-// unknown).
+// needed.
 //
 // TODO(voss): remove?
-// TODO(voss): don't expose the errPos argument
-func (d Dict) AsStruct(s interface{}, r *Reader, errPos int64) error {
+func (d Dict) AsStruct(s interface{}, r *Reader) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
 
@@ -68,11 +65,8 @@ fieldLoop:
 		}
 		if dictVal == nil {
 			if !optional && firstErr == nil {
-				firstErr = &MalformedFileError{
-					Pos: errPos,
-					Err: fmt.Errorf("required Dict entry /%s not found",
-						fInfo.Name),
-				}
+				firstErr = fmt.Errorf("required Dict entry /%s not found",
+					fInfo.Name)
 			}
 			continue
 		}
@@ -89,31 +83,22 @@ fieldLoop:
 			if ok {
 				fVal.SetString(s.AsTextString())
 			} else if firstErr == nil {
-				firstErr = &MalformedFileError{
-					Pos: errPos,
-					Err: fmt.Errorf("/%s: expected pdf.String but got %T",
-						fInfo.Name, dictVal),
-				}
+				firstErr = fmt.Errorf("/%s: expected pdf.String but got %T",
+					fInfo.Name, dictVal)
 			}
 		case fInfo.Type == timeType:
 			s, ok := dictVal.(String)
 			if ok {
 				t, err := s.AsDate()
 				if firstErr == nil && err != nil {
-					firstErr = &MalformedFileError{
-						Pos: errPos,
-						Err: fmt.Errorf("/%s: %s: %s",
-							fInfo.Name, s.AsTextString(), err),
-					}
+					firstErr = fmt.Errorf("/%s: %s: %s",
+						fInfo.Name, s.AsTextString(), err)
 					continue
 				}
 				fVal.Set(reflect.ValueOf(t))
 			} else if firstErr == nil {
-				firstErr = &MalformedFileError{
-					Pos: errPos,
-					Err: fmt.Errorf("/%s: expected pdf.String but got %T",
-						fInfo.Name, dictVal),
-				}
+				firstErr = fmt.Errorf("/%s: expected pdf.String but got %T",
+					fInfo.Name, dictVal)
 			}
 		case fInfo.Type.Kind() == reflect.Bool:
 			fVal.SetBool(dictVal == Bool(true))
@@ -121,11 +106,8 @@ fieldLoop:
 			fVal.Set(reflect.ValueOf(dictVal))
 		default:
 			if firstErr == nil {
-				firstErr = &MalformedFileError{
-					Pos: errPos,
-					Err: fmt.Errorf("/%s: expected %T but got %T",
-						fInfo.Name, fVal.Interface(), dictVal),
-				}
+				firstErr = fmt.Errorf("/%s: expected %T but got %T",
+					fInfo.Name, fVal.Interface(), dictVal)
 			}
 		}
 	}

@@ -9,7 +9,12 @@ import (
 func TestWriter(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	w, err := NewWriter(out, V1_7)
+	opt := &WriterOptions{
+		ID:             [][]byte{},
+		OwnerPassword:  "test",
+		UserPermission: PermCopy,
+	}
+	w, err := NewWriter(out, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,6 +150,9 @@ func TestPlaceholder(t *testing.T) {
 	// try to read back the file
 
 	r, err := Open(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 	obj, err := r.GetDict(testRef)
 	if err != nil {
 		t.Fatal(err)
