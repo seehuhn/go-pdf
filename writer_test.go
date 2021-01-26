@@ -13,17 +13,25 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var catalog, info *Reference
 
-	info, err = w.Write(Dict{ // page 550
-		"Title":    TextString("PDF Test Document"),
-		"Author":   TextString("Jochen Voß"),
-		"Subject":  TextString("Testing"),
-		"Keywords": TextString("PDF, testing, Go"),
-	}, nil)
+	refs, err := w.ObjectStream(nil,
+		Dict{
+			"Title":    TextString("PDF Test Document"),
+			"Author":   TextString("Jochen Voß"),
+			"Subject":  TextString("Testing"),
+			"Keywords": TextString("PDF, testing, Go"),
+		},
+		Dict{
+			"Type":     Name("Font"),
+			"Subtype":  Name("Type1"),
+			"BaseFont": Name("Helvetica"),
+			"Encoding": Name("MacRomanEncoding"),
+		})
 	if err != nil {
 		t.Fatal(err)
 	}
+	info := refs[0]
+	font := refs[1]
 
 	stream, contentNode, err := w.OpenStream(Dict{}, nil, nil)
 	if err != nil {
@@ -39,16 +47,6 @@ ET
 		t.Fatal(err)
 	}
 	err = stream.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	font, err := w.Write(Dict{
-		"Type":     Name("Font"),
-		"Subtype":  Name("Type1"),
-		"BaseFont": Name("Helvetica"),
-		"Encoding": Name("MacRomanEncoding"),
-	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +81,7 @@ ET
 	}
 
 	// page 73
-	catalog, err = w.Write(Dict{
+	catalog, err := w.Write(Dict{
 		"Type":  Name("Catalog"),
 		"Pages": pagesRef,
 	}, nil)
@@ -95,6 +93,8 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// ioutil.WriteFile("debug.pdf", out.Bytes(), 0o644)
 
 	outR := bytes.NewReader(out.Bytes())
 	_, err = NewReader(outR, outR.Size(), nil)

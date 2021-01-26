@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 )
 
 // Writer represents a PDF file open for writing.
@@ -116,10 +117,8 @@ func (pdf *Writer) Alloc() *Reference {
 // the file.
 func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	if pdf.inStream {
-		return nil, errors.New("Write() called while stream is open")
+		return nil, errors.New("Write() while stream is open")
 	}
-
-	pos := pdf.w.pos
 
 	if ref == nil {
 		ref = pdf.Alloc()
@@ -129,6 +128,8 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 			return nil, errors.New("object already written")
 		}
 	}
+
+	pos := pdf.w.pos
 
 	_, err := fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number, ref.Generation)
 	if err != nil {
@@ -152,16 +153,116 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	return ref, nil
 }
 
-// StreamOptions describes how Writer.OpenStream() processes the stream
-// data while writing.
-type StreamOptions struct {
-	Filters []*FilterInfo
+// ObjectStream writes objects in a compressed object stream.
+func (pdf *Writer) ObjectStream(refs []*Reference, objects ...Object) ([]*Reference, error) {
+	if pdf.inStream {
+		return nil, errors.New("ObjectStream() while stream is open")
+	}
+
+	if pdf.PDFVersion < V1_5 {
+		return nil, errors.New("requires PDF version 1.5 or newer")
+	}
+
+	sRef := pdf.Alloc()
+	if refs == nil {
+		refs = make([]*Reference, len(objects))
+	} else if len(refs) != len(objects) {
+		return nil, errors.New("lengths of ref and objects differ")
+	}
+	for i, ref := range refs {
+		if _, isStream := objects[i].(*Stream); isStream {
+			return nil, errors.New("cannot store streams in object streams")
+		} else if _, isRef := objects[i].(*Reference); isRef {
+			return nil, errors.New("cannot store references in object streams")
+		}
+
+		if ref == nil {
+			refs[i] = pdf.Alloc()
+		} else if ref.Generation > 0 {
+			return nil, errors.New("cannot store generation >0 in stream")
+		} else {
+			_, seen := pdf.xref[ref.Number]
+			if seen {
+				return nil, errors.New("object already written")
+			}
+		}
+	}
+
+	// get the offsets
+	N := len(objects)
+	head := &bytes.Buffer{}
+	body := &bytes.Buffer{}
+	for i := 0; i < N; i++ {
+		ref := refs[i]
+		idx := strconv.Itoa(ref.Number) + " " + strconv.Itoa(body.Len()) + "\n"
+		_, err := head.WriteString(idx)
+		if err != nil {
+			return nil, err
+		}
+
+		pdf.xref[ref.Number] = &xRefEntry{InStream: sRef, Pos: int64(i)}
+
+		if i < N-1 {
+			// No need to buffer the last object, we will stream is separately
+			// at the end.
+			err = objects[i].PDF(body)
+			if err != nil {
+				return nil, err
+			}
+			err = body.WriteByte('\n')
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	dict := Dict{
+		"Type":  Name("ObjStm"),
+		"N":     Integer(N),
+		"First": Integer(head.Len()),
+	}
+	opt := &StreamOptions{
+		Filters: []*FilterInfo{
+			{Name: "FlateDecode"},
+		},
+	}
+	w, _, err := pdf.OpenStream(dict, sRef, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = w.Write(head.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = w.Write(body.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	// write the last object separately
+	err = objects[N-1].PDF(w)
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return refs, nil
 }
 
 // OpenStream adds a PDF Stream to the file and returns an io.Writer which can
 // be used to add the stream's data.  No other objects can be added to the file
 // until the stream is closed.
 func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io.WriteCloser, *Reference, error) {
+	if pdf.inStream {
+		return nil, nil, errors.New("OpenStream() while stream is open")
+	}
+
 	if ref == nil {
 		ref = pdf.Alloc()
 	} else {
@@ -238,6 +339,12 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io
 	}
 	pdf.inStream = true
 	return w, ref, nil
+}
+
+// StreamOptions describes how Writer.OpenStream() processes the stream
+// data while writing.
+type StreamOptions struct {
+	Filters []*FilterInfo
 }
 
 type streamWriter struct {

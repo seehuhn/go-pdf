@@ -2,9 +2,8 @@
 - allow to write encrypted files
 - add a licence and copyright notices
 
-- Split old `MalformedFileError` into new `FileError` and `ObjectError`?
 - implement crypt filters
-- attempt to add pdf-2.0 support
+- attempt to add pdf-2.0 support?
 - add a way to repair broken xref tables?
 
 - look at https://pkg.go.dev/rsc.io/pdf

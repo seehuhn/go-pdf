@@ -62,6 +62,8 @@ type String []byte
 func (x String) PDF(w io.Writer) error {
 	l := []byte(x)
 
+	// TODO(voss): encrypt l if needed
+
 	level := 0
 	for _, c := range l {
 		if c == '(' {
@@ -382,6 +384,7 @@ func (x *Stream) PDF(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	// TODO(voss): encrypt x.R if needed
 	_, err = io.Copy(w, x.R)
 	if err != nil {
 		return err
