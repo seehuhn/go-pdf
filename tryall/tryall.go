@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -87,23 +88,39 @@ func doOneFile(fname string) error {
 	}
 	defer r.Close()
 
-	root, err := r.Catalog()
-	if err != nil {
-		return err
-	}
-	catalog := &Catalog{}
-	root.AsStruct(catalog, r.Get)
-	pages, err := r.GetDict(catalog.Pages)
-	if err != nil {
-		return err
+	for {
+		obj, _, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		dict, ok := obj.(pdf.Dict)
+		if !ok {
+			continue
+		}
+		if dict["Type"] == pdf.Name("Font") {
+			fmt.Println(dict["Subtype"])
+		}
 	}
 
-	count, err := r.GetInt(pages["Count"])
-	if err != nil {
-		return err
-	}
+	// root, err := r.Catalog()
+	// if err != nil {
+	// 	return err
+	// }
+	// catalog := &Catalog{}
+	// root.AsStruct(catalog, r.Get)
+	// pages, err := r.GetDict(catalog.Pages)
+	// if err != nil {
+	// 	return err
+	// }
+	// count, err := r.GetInt(pages["Count"])
+	// if err != nil {
+	// 	return err
+	// }
 	// fmt.Println(count, fname)
-	_ = count
 
 	return nil
 }
@@ -116,7 +133,12 @@ func main() {
 		total++
 		err := doOneFile(fname)
 		if err != nil {
-			fmt.Println(fname+":", err)
+			sz := "?????????? "
+			fi, e2 := os.Stat(fname)
+			if e2 == nil {
+				sz = fmt.Sprintf("%10d ", fi.Size())
+			}
+			fmt.Println(sz, fname+":", err)
 			errors++
 		}
 	}

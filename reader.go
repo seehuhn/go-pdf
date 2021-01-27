@@ -13,8 +13,10 @@ type Reader struct {
 	size int64
 	r    io.ReaderAt
 
-	pos    int64
-	objStm *objStm
+	pos     int64
+	objStm  *objStm
+	level   int
+	special map[Reference]bool
 
 	xref    map[int]*xRefEntry
 	trailer Dict
@@ -31,8 +33,9 @@ type Reader struct {
 // instead.
 func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string) (*Reader, error) {
 	r := &Reader{
-		size: size,
-		r:    data,
+		size:    size,
+		r:       data,
+		special: make(map[Reference]bool),
 	}
 
 	s := r.scannerAt(0)
@@ -64,6 +67,9 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 	}
 
 	if encObj, ok := trailer["Encrypt"]; ok {
+		if ref, ok := encObj.(*Reference); ok {
+			r.special[*ref] = true
+		}
 		r.enc, err = r.parseEncryptDict(encObj)
 		if err != nil {
 			return nil, err
@@ -191,9 +197,14 @@ func (r *Reader) Read() (Object, *Reference, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			fallthrough
+			continue
+
 		case bytes.HasPrefix(buf, []byte("startxref")):
 			err = s.SkipString("startxref")
+			if err != nil {
+				return nil, nil, err
+			}
+			_, err = s.ReadInteger()
 			if err != nil {
 				return nil, nil, err
 			}
@@ -225,6 +236,7 @@ func (r *Reader) Read() (Object, *Reference, error) {
 		// Try to fix up the xref information, so that after a sequential
 		// read of the file, random access works even if the xref tables
 		// had been corrupted.
+		// TODO(voss): remove this?
 		entry := r.xref[ref.Number]
 		if entry != nil && (entry.Pos < 0 || entry.Generation <= ref.Generation) {
 			r.xref[ref.Number] = &xRefEntry{
@@ -466,39 +478,27 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 		return x, nil
 	}
 
-	ref, ok := obj.(*Reference)
-	if !ok {
+	if r.level > 2 {
 		return 0, &MalformedFileError{
 			Pos: r.errPos(obj),
-			Err: errors.New("wrong type (expected Integer)"),
+			Err: errors.New("length in ObjStm with Length in ... exceeded"),
 		}
 	}
-
-	if r.xref == nil {
-		return 0, &MalformedFileError{
-			Pos: 0,
-			Err: errors.New("cannot use references while reading xref table"),
-		}
-	}
-
-	entry := r.xref[ref.Number]
-	if entry.IsFree() || entry.Generation != ref.Generation {
-		return 0, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: errors.New("missing integer (not in xref table)"),
-		}
-	}
-	s := r.scannerAt(entry.Pos)
-	return s.readIndirectInteger()
+	r.level++
+	val, err := r.GetInt(obj)
+	r.level--
+	return val, err
 }
 
 func (r *Reader) scannerAt(pos int64) *scanner {
-	var dec *encryptInfo
+	var enc *encryptInfo
 	if r.enc != nil {
-		dec = r.enc
+		enc = r.enc
 	}
-	return newScanner(io.NewSectionReader(r.r, pos, r.size-pos), pos,
-		r.safeGetInt, dec)
+	s := newScanner(io.NewSectionReader(r.r, pos, r.size-pos), pos,
+		r.safeGetInt, enc)
+	s.special = r.special
+	return s
 }
 
 func (r *Reader) errPos(obj Object) int64 {

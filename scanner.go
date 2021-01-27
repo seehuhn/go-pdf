@@ -20,8 +20,9 @@ type scanner struct {
 	used    int
 	skipped int64
 
-	dec    *encryptInfo
-	decRef *Reference
+	enc     *encryptInfo
+	encRef  *Reference
+	special map[Reference]bool // objects with no encryption
 }
 
 func newScanner(r io.Reader, base int64, getInt func(Object) (Integer, error),
@@ -31,7 +32,7 @@ func newScanner(r io.Reader, base int64, getInt func(Object) (Integer, error),
 		base:   base,
 		buf:    make([]byte, scannerBufSize),
 		getInt: getInt,
-		dec:    dec,
+		enc:    dec,
 	}
 }
 
@@ -44,11 +45,6 @@ func (s *scanner) bytesRead() int64 {
 }
 
 func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
-	err := s.SkipWhiteSpace()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	number, err := s.ReadInteger()
 	if err != nil {
 		return nil, nil, err
@@ -72,7 +68,12 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 	}
 
 	ref := &Reference{int(number), uint16(generation)}
-	s.decRef = ref
+	if s.special[*ref] {
+		// some objects are not encrypted, e.g. xref dictionaries
+		s.enc = nil
+	} else {
+		s.encRef = ref
+	}
 
 	obj, err := s.ReadObject()
 	if err != nil {
@@ -363,8 +364,8 @@ func (s *scanner) ReadQuotedString() (String, error) {
 		return nil, err
 	}
 
-	if s.dec != nil && s.decRef != nil {
-		res, err = s.dec.DecryptBytes(s.decRef, res)
+	if s.enc != nil && s.encRef != nil {
+		res, err = s.enc.DecryptBytes(s.encRef, res)
 		if err != nil {
 			return nil, err
 		}
@@ -412,8 +413,8 @@ func (s *scanner) ReadHexString() (String, error) {
 		return nil, err
 	}
 
-	if s.dec != nil && s.decRef != nil {
-		res, err = s.dec.DecryptBytes(s.decRef, res)
+	if s.enc != nil && s.encRef != nil {
+		res, err = s.enc.DecryptBytes(s.encRef, res)
 		if err != nil {
 			return nil, err
 		}
@@ -651,8 +652,8 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 	}
 
 	isEncrypted := false
-	if s.dec != nil {
-		streamData, err = s.dec.DecryptStream(s.decRef, streamData)
+	if s.enc != nil {
+		streamData, err = s.enc.DecryptStream(s.encRef, streamData)
 		if err != nil {
 			return nil, err
 		}

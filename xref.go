@@ -85,9 +85,13 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 			return nil, nil, err
 		}
 		var dict Dict
+		var ref *Reference
 		switch {
 		case bytes.Equal(buf, []byte("xref")):
 			dict, err = readXRefTable(xref, s)
+			if err != nil {
+				return nil, nil, err
+			}
 
 			if xRefStm, ok := dict["XRefStm"]; ok {
 				zStart, ok := xRefStm.(Integer)
@@ -97,16 +101,19 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 					}
 				}
 				s = r.scannerAt(int64(zStart))
-				_, err = readXRefStream(xref, s)
+				_, ref, err = readXRefStream(xref, s)
 				if err != nil {
 					return nil, nil, err
 				}
 			}
 		default:
-			dict, err = readXRefStream(xref, s)
+			dict, ref, err = readXRefStream(xref, s)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
-		if err != nil {
-			return nil, nil, err
+		if ref != nil {
+			r.special[*ref] = true
 		}
 
 		if first {
@@ -253,14 +260,14 @@ func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) erro
 	return nil
 }
 
-func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
-	obj, _, err := s.ReadIndirectObject()
+func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, *Reference, error) {
+	obj, ref, err := s.ReadIndirectObject()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	stream, ok := obj.(*Stream)
 	if !ok {
-		return nil, &MalformedFileError{
+		return nil, nil, &MalformedFileError{
 			Pos: s.currentPos(),
 			Err: errors.New("invalid xref stream"),
 		}
@@ -269,18 +276,18 @@ func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 
 	w, ss, err := checkXRefStreamDict(dict)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	decoded, err := stream.Decode()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = decodeXRefStream(xref, decoded, w, ss)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return dict, nil
+	return dict, ref, nil
 }
 
 func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {

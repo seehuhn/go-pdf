@@ -1,0 +1,37 @@
+github.com/go-fonts
+golang.org/x/image/font
+
+
+TrueType Fonts (TTF)
+--------------------
+
+https://en.wikipedia.org/wiki/TrueType
+
+TrueType is a font standard developed in the late 1980s, by Apple and
+Microsoft. TrueType is the most common font format for both the Mac OS
+and Microsoft Windows operating systems.
+
+A competitor to Adobe's Type 1 fonts used in PostScript.
+
+github.com/golang/freetype/truetype
+
+
+
+OpenType Fonts (OTF)
+--------------------
+
+OpenType is a format for scalable computer fonts.  It was built on
+TrueType, and is a registered trademark of Microsoft.  OpenType fonts
+are used commonly today on the major computer platforms.
+
+golang.org/x/image/font/opentype
+
+
+
+PostScript Fonts (PFA/AFM)
+--------------------------
+
+https://en.wikipedia.org/wiki/PostScript_fonts
+
+Type 1 fonts are natively supported in Mac OS X, and in Windows 2000
+and later via the GDI API.

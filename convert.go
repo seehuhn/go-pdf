@@ -12,7 +12,7 @@ func asName(obj Object) (Name, error) {
 
 func asDict(obj Object) (Dict, error) {
 	if obj == nil {
-		return Dict{}, nil
+		return nil, nil
 	}
 	dict, ok := obj.(Dict)
 	if !ok {
