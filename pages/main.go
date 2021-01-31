@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -149,14 +148,14 @@ func (pp *pages) toObject() pdf.Dict {
 }
 
 func main() {
-	w, err := pdf.Create("test.pdf")
+	out, err := pdf.Create("test.pdf")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var catalog, info *pdf.Reference
 
-	info, err = w.Write(pdf.Dict{ // page 550
+	info, err = out.Write(pdf.Dict{ // page 550
 		"Title":  pdf.TextString("PDF Test Document"),
 		"Author": pdf.TextString("Jochen Voß"),
 	}, nil)
@@ -164,7 +163,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	font, err := w.Write(pdf.Dict{
+	font, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
 		"BaseFont": pdf.Name("Helvetica"),
@@ -177,19 +176,29 @@ func main() {
 		"Font": pdf.Dict{"F1": font},
 	}
 
-	pageTree := NewPageTree(w)
+	pageTree := NewPageTree(out)
 	for i := 1; i <= 10; i++ {
-		buf := bytes.NewReader([]byte(fmt.Sprintf(`BT
-/F1 12 Tf
-30 30 Td
-(page %d) Tj
-ET`, i)))
-		contentNode, err := w.Write(&pdf.Stream{
-			Dict: pdf.Dict{
-				"Length": pdf.Integer(buf.Size()),
-			},
-			R: buf,
-		}, nil)
+		stream, contentNode, err := out.OpenStream(nil, nil, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if i != 3 {
+			_, err = stream.Write([]byte(fmt.Sprintf(`BT
+			/F1 12 Tf
+			30 30 Td
+			(page %d) Tj
+			ET`, i)))
+		} else {
+			_, err = stream.Write([]byte(`BT
+			/F1 36 Tf
+			10 50 Td
+			(AVAVXXXAVAV) Tj
+			ET`))
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -207,15 +216,15 @@ ET`, i)))
 	if err != nil {
 		log.Fatal(err)
 	}
-	pages["CropBox"] = Rect(0, 0, 200, 100)
+	pages["CropBox"] = Rect(0, 0, 200, 200)
 	pages["Resources"] = resources
-	_, err = w.Write(pages, pagesRef)
+	_, err = out.Write(pages, pagesRef)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// page 73
-	catalog, err = w.Write(pdf.Dict{
+	catalog, err = out.Write(pdf.Dict{
 		"Type":  pdf.Name("Catalog"),
 		"Pages": pagesRef,
 	}, nil)
@@ -223,7 +232,7 @@ ET`, i)))
 		log.Fatal(err)
 	}
 
-	err = w.Close(catalog, info)
+	err = out.Close(catalog, info)
 	if err != nil {
 		log.Fatal(err)
 	}

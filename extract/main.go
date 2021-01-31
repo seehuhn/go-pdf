@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 
 func main() {
 	passwd := flag.String("p", "", "PDF password")
+	decode := flag.Bool("d", false, "decode streams")
 	flag.Parse()
 
 	var tryPasswd func(bool) string
@@ -77,6 +79,28 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	if stm, ok := obj.(*pdf.Stream); ok && *decode {
+		err = stm.Dict.PDF(os.Stdout)
+		fmt.Println()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("decoded stream")
+		r, err := stm.Decode()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		_, err = io.Copy(os.Stdout, r)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("\nendstream")
+		return
 	}
 
 	err = obj.PDF(os.Stdout)

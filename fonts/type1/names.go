@@ -1,0 +1,137 @@
+package type1
+
+import (
+	"bufio"
+	"embed"
+	"strconv"
+	"strings"
+	"sync"
+)
+
+// DecodeGlyphName maps a Type1 Glyph name to a sequence of unicode characters.
+// This implements the algorithm documented at
+// https://github.com/adobe-type-tools/agl-specification
+func DecodeGlyphName(name string, dingbats bool) []rune {
+	var res []rune
+
+	idx := strings.IndexByte(name, '.')
+	if idx >= 0 {
+		name = name[:idx]
+	}
+
+	parts := strings.Split(name, "_")
+	for _, part := range parts {
+		if dingbats {
+			c, ok := glyph.lookup("zapfdingbats", part)
+			if ok {
+				res = append(res, c)
+				continue
+			}
+		}
+
+		c, ok := glyph.lookup("glyphlist", part)
+		if ok {
+			res = append(res, c)
+			continue
+		}
+
+		if strings.HasPrefix(part, "uni") && len(part)%4 == 3 {
+			good := true
+			var candidates []rune
+			var val rune
+		hexLoop:
+			for i, c := range part[3:] {
+				switch {
+				case c >= '0' && c <= '9':
+					val = val*16 + rune(c-'0')
+				case c >= 'A' && c <= 'F':
+					val = val*16 + rune(c-'A'+10)
+				default:
+					good = false
+					break hexLoop
+				}
+				// fmt.Printf("%s.%d % x %04x\n", part, i, candidates, val)
+				if i%4 == 3 {
+					if val >= 0xD800 && val < 0xE000 {
+						good = false
+						break hexLoop
+					}
+					candidates = append(candidates, val)
+					val = 0
+				}
+			}
+			if good {
+				res = append(res, candidates...)
+				continue
+			}
+		}
+
+		if len(part) >= 5 && len(part) <= 7 && part[0] == 'u' {
+			good := true
+			var val rune
+		hexLoop2:
+			for _, c := range part[1:] {
+				switch {
+				case c >= '0' && c <= '9':
+					val = val*16 + rune(c-'0')
+				case c >= 'A' && c <= 'F':
+					val = val*16 + rune(c-'A'+10)
+				default:
+					good = false
+					break hexLoop2
+				}
+			}
+			if good && (val < 0xD800 || val >= 0xE000 && val < 0x110000) {
+				res = append(res, val)
+				continue
+			}
+		}
+	}
+
+	return res
+}
+
+//go:embed agl-aglfn/*.txt
+var glyphData embed.FS
+
+type glyphMap struct {
+	sync.Mutex
+	data map[string]map[string]rune
+}
+
+func (gm *glyphMap) lookup(file, name string) (rune, bool) {
+	gm.Lock()
+	defer gm.Unlock()
+
+	fMap := gm.data[file]
+	if fMap == nil {
+		fd, err := glyphData.Open("agl-aglfn/" + file + ".txt")
+		if err != nil {
+			panic("invalid glyph map " + file)
+		}
+
+		fMap = make(map[string]rune)
+
+		scanner := bufio.NewScanner(fd)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if len(line) == 0 || line[0] == '#' {
+				continue
+			}
+			ww := strings.SplitN(line, ";", 2)
+			name := ww[0]
+			code, _ := strconv.ParseInt(ww[1], 16, 32)
+			fMap[name] = rune(code)
+		}
+		if err := scanner.Err(); err != nil {
+			panic("corrupted glyph map " + file)
+		}
+		gm.data[file] = fMap
+	}
+	c, ok := fMap[name]
+	return c, ok
+}
+
+var glyph = &glyphMap{
+	data: make(map[string]map[string]rune),
+}
