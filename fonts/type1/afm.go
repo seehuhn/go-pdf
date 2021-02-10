@@ -6,44 +6,59 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"seehuhn.de/go/pdf/fonts"
 )
 
 //go:embed afm/*.afm
 var afmData embed.FS
 
-type box struct {
-	llx, lly, urx, ury float64
-}
-
-// All units are in 1/1000 of the scale of the font being formatted.
-// Multiplying with the scale factor gives values in 1000*bp.
-
-type font struct {
-	FontName  string
-	FullName  string
-	CapHeight float64
-	XHeight   float64
-	Ascender  float64
-	Descender float64
-	Chars     []*character
-}
-
-type character struct {
-	Code  int
-	Width float64
-	Name  string
-	BB    box
-	Lig   map[string]string
-	Kern  map[string]float64
-}
-
 type afmMap struct {
 	sync.Mutex
 
-	data map[string]*font
+	data map[string]*fonts.Font
 }
 
-func (m *afmMap) lookup(fontName string) *font {
+// Lookup returns information about one of the built-in PDF fonts.
+func Lookup(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Font {
+	raw := afm.Lookup(fontName, encoding)
+	if raw == nil {
+		return nil
+	}
+
+	// Units in an afm file are in 1/1000 of the scale of the font being
+	// formatted. Multiplying with the scale factor gives values in 1000*bp.
+	q := ptSize / 1000
+
+	f := &fonts.Font{
+		FontName:  raw.FontName,
+		FullName:  raw.FullName,
+		CapHeight: raw.CapHeight * q,
+		XHeight:   raw.XHeight * q,
+		Ascender:  raw.Ascender * q,
+		Descender: raw.Descender * q,
+		Encoding:  encoding,
+		Width:     make(map[byte]float64),
+		BBox:      make(map[byte]*fonts.Box),
+		Ligatures: raw.Ligatures,
+		Kerning:   raw.Kerning,
+	}
+	for c, w := range raw.Width {
+		f.Width[c] = w * q
+	}
+	for c, box := range raw.BBox {
+		f.BBox[c] = &fonts.Box{
+			LLx: box.LLx * q,
+			LLy: box.LLy * q,
+			URx: box.URx * q,
+			URy: box.URy * q,
+		}
+	}
+
+	return f
+}
+
+func (m *afmMap) Lookup(fontName string, encoding fonts.Encoding) *fonts.Font {
 	m.Lock()
 	defer m.Unlock()
 
@@ -56,11 +71,30 @@ func (m *afmMap) lookup(fontName string) *font {
 		return nil
 	}
 
-	f = &font{}
-	byName := make(map[string]*character)
+	dingbats := fontName == "ZapfDingbats"
+
+	f = &fonts.Font{
+		Encoding:  encoding,
+		Width:     make(map[byte]float64),
+		BBox:      make(map[byte]*fonts.Box),
+		Ligatures: make(map[fonts.GlyphPair]byte),
+		Kerning:   make(map[fonts.GlyphPair]float64),
+	}
+	byName := make(map[string]byte)
+	type ligInfo struct {
+		first, second, combined string
+	}
+	var ligatures []*ligInfo
+	type kernInfo struct {
+		first, second string
+		val           float64
+	}
+	var kerning []*kernInfo
+
 	charMetrics := false
 	kernPairs := false
 	scanner := bufio.NewScanner(fd)
+glyphLoop:
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) == 0 {
@@ -72,7 +106,12 @@ func (m *afmMap) lookup(fontName string) *font {
 			continue
 		}
 		if charMetrics {
-			c := &character{}
+			var name string
+			var charCode byte
+			var width float64
+			BBox := &fonts.Box{}
+			var ligTmp []*ligInfo
+
 			keyVals := strings.Split(line, ";")
 			for _, keyVal := range keyVals {
 				ff := strings.Fields(keyVal)
@@ -81,34 +120,50 @@ func (m *afmMap) lookup(fontName string) *font {
 				}
 				switch ff[0] {
 				case "C":
-					c.Code, _ = strconv.Atoi(ff[1])
+					// TODO(voss): is this needed?
+					// glyphIdx, _ = strconv.Atoi(ff[1])
 				case "WX":
-					c.Width, _ = strconv.ParseFloat(ff[1], 64)
+					width, _ = strconv.ParseFloat(ff[1], 64)
 				case "N":
-					c.Name = ff[1]
+					name = ff[1]
+					r := DecodeGlyphName(name, dingbats)
+					if len(r) != 1 {
+						panic("not implemented")
+					}
+					c, ok := encoding.Encode(r[0])
+					if !ok {
+						continue glyphLoop
+					}
+					charCode = c
 				case "B":
 					if len(ff) != 5 {
 						panic("corrupted afm data for " + fontName)
 					}
-					c.BB.llx, _ = strconv.ParseFloat(ff[1], 64)
-					c.BB.lly, _ = strconv.ParseFloat(ff[2], 64)
-					c.BB.urx, _ = strconv.ParseFloat(ff[3], 64)
-					c.BB.ury, _ = strconv.ParseFloat(ff[4], 64)
+					BBox.LLx, _ = strconv.ParseFloat(ff[1], 64)
+					BBox.LLy, _ = strconv.ParseFloat(ff[2], 64)
+					BBox.URx, _ = strconv.ParseFloat(ff[3], 64)
+					BBox.URy, _ = strconv.ParseFloat(ff[4], 64)
 				case "L":
 					if len(ff) != 3 {
 						panic("corrupted afm data for " + fontName)
 					}
-					if c.Lig == nil {
-						c.Lig = make(map[string]string)
-					}
-					c.Lig[ff[1]] = ff[2]
+					ligTmp = append(ligTmp, &ligInfo{
+						second:   ff[1],
+						combined: ff[2],
+					})
 				default:
 					panic(ff[0] + " not implemented")
 				}
 			}
-			f.Chars = append(f.Chars, c)
-			if c.Name != "" {
-				byName[c.Name] = c
+			byName[name] = charCode
+			if _, present := f.Width[charCode]; present {
+				panic("duplicate character (invalid encoding)")
+			}
+			f.Width[charCode] = width
+			f.BBox[charCode] = BBox
+			for _, lig := range ligTmp {
+				lig.first = name
+				ligatures = append(ligatures, lig)
 			}
 			continue
 		}
@@ -123,11 +178,12 @@ func (m *afmMap) lookup(fontName string) *font {
 			if len(fields) != 4 || fields[0] != "KPX" {
 				panic("unsupported KernPair " + line)
 			}
-			c := byName[fields[1]]
-			if c.Kern == nil {
-				c.Kern = make(map[string]float64)
+			kern := &kernInfo{
+				first:  fields[1],
+				second: fields[2],
 			}
-			c.Kern[fields[2]], _ = strconv.ParseFloat(fields[3], 64)
+			kern.val, _ = strconv.ParseFloat(fields[3], 64)
+			kerning = append(kerning, kern)
 			continue
 		}
 
@@ -173,14 +229,36 @@ func (m *afmMap) lookup(fontName string) *font {
 			charMetrics = true
 		case "StartKernPairs":
 			kernPairs = true
+		case "StartTrackKern":
+			panic("not implemented")
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		panic("corrupted afm data for " + fontName)
 	}
+
+	for _, lig := range ligatures {
+		a, aOk := byName[lig.first]
+		b, bOk := byName[lig.second]
+		c, cOk := byName[lig.combined]
+		if !aOk || !bOk || !cOk {
+			continue
+		}
+		f.Ligatures[fonts.GlyphPair{a, b}] = c
+	}
+
+	for _, kern := range kerning {
+		a, aOk := byName[kern.first]
+		b, bOk := byName[kern.second]
+		if !aOk || !bOk || kern.val == 0 {
+			continue
+		}
+		f.Kerning[fonts.GlyphPair{a, b}] = kern.val
+	}
+
 	return f
 }
 
 var afm = &afmMap{
-	data: make(map[string]*font),
+	data: make(map[string]*fonts.Font),
 }

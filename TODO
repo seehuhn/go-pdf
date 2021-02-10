@@ -1,3 +1,4 @@
+- remove the excess empty line before "startxref"
 - rationalize the error handling
 - add a licence and copyright notices
 - check whether any dependencies use "fmt", and if not, try to not use "fmt"

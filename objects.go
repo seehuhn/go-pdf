@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf16"
+
+	"seehuhn.de/go/pdf/fonts"
 )
 
 // Object represents an object in a PDF file.
@@ -147,11 +149,9 @@ func TextString(s string) String {
 	rr := []rune(s)
 	buf := make([]byte, len(rr))
 	for i, r := range rr {
-		c, ok := toDocEncoding[r]
+		c, ok := fonts.PDFDocEncoding.Encode(r)
 		if ok {
 			buf[i] = c
-		} else if r <= 255 && fromDocEncoding[r] != noRune {
-			buf[i] = byte(r)
 		} else {
 			goto useUTF
 		}

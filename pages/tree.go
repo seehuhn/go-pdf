@@ -1,19 +1,10 @@
-package main
+package pages
 
 import (
 	"errors"
-	"fmt"
-	"log"
 
 	"seehuhn.de/go/pdf"
 )
-
-// Rect takes the coordinates of two diagonally opposite points
-// and returns a PDF rectangle.
-func Rect(llx, lly, urx, ury int) pdf.Array {
-	return pdf.Array{pdf.Integer(llx), pdf.Integer(lly),
-		pdf.Integer(urx), pdf.Integer(ury)}
-}
 
 const pageTreeWidth = 12
 
@@ -145,95 +136,4 @@ func (pp *pages) toObject() pdf.Dict {
 		nodeDict["Parent"] = pp.parent.id
 	}
 	return nodeDict
-}
-
-func main() {
-	out, err := pdf.Create("test.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var catalog, info *pdf.Reference
-
-	info, err = out.Write(pdf.Dict{ // page 550
-		"Title":  pdf.TextString("PDF Test Document"),
-		"Author": pdf.TextString("Jochen Voß"),
-	}, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	font, err := out.Write(pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name("Helvetica"),
-		"Encoding": pdf.Name("MacRomanEncoding"),
-	}, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	resources := pdf.Dict{
-		"Font": pdf.Dict{"F1": font},
-	}
-
-	pageTree := NewPageTree(out)
-	for i := 1; i <= 10; i++ {
-		stream, contentNode, err := out.OpenStream(nil, nil, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if i != 3 {
-			_, err = stream.Write([]byte(fmt.Sprintf(`BT
-			/F1 12 Tf
-			30 30 Td
-			(page %d) Tj
-			ET`, i)))
-		} else {
-			_, err = stream.Write([]byte(`BT
-			/F1 36 Tf
-			10 50 Td
-			(AVAVXXXAVAV) Tj
-			ET`))
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = stream.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-		page := pdf.Dict{ // page 77
-			"Type":     pdf.Name("Page"),
-			"Contents": contentNode,
-		}
-		err = pageTree.Ship(page, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	pages, pagesRef, err := pageTree.Flush()
-	if err != nil {
-		log.Fatal(err)
-	}
-	pages["CropBox"] = Rect(0, 0, 200, 200)
-	pages["Resources"] = resources
-	_, err = out.Write(pages, pagesRef)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// page 73
-	catalog, err = out.Write(pdf.Dict{
-		"Type":  pdf.Name("Catalog"),
-		"Pages": pagesRef,
-	}, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = out.Close(catalog, info)
-	if err != nil {
-		log.Fatal(err)
-	}
 }
