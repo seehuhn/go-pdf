@@ -3,7 +3,7 @@ package pdf
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 )
 
@@ -167,7 +167,7 @@ func TestEncryptStream(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				res, err := ioutil.ReadAll(restored)
+				res, err := io.ReadAll(restored)
 				if err != nil {
 					t.Fatal(err)
 				}

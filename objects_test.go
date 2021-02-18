@@ -2,7 +2,7 @@ package pdf
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -81,7 +81,7 @@ func TestStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dataOut, err := ioutil.ReadAll(rOut)
+	dataOut, err := io.ReadAll(rOut)
 	if err != nil {
 		t.Fatal(err)
 	}

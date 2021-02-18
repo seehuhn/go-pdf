@@ -10,39 +10,57 @@ const pageTreeWidth = 12
 
 // PageTree represents a PDF page tree.
 type PageTree struct {
-	w       *pdf.Writer
-	root    *pages
-	current *pages
+	w        *pdf.Writer
+	root     *pages
+	current  *pages
+	defaults *Attributes
 }
 
 // NewPageTree allocates a new PageTree object.
-func NewPageTree(w *pdf.Writer) *PageTree {
+func NewPageTree(w *pdf.Writer, defaults *Attributes) *PageTree {
 	root := &pages{
 		id: w.Alloc(),
 	}
 	return &PageTree{
-		w:       w,
-		root:    root,
-		current: root,
+		w:        w,
+		root:     root,
+		current:  root,
+		defaults: defaults,
 	}
 }
 
 // Flush flushes all internal /Pages notes to the file and returns
 // the root of the page tree.  After .Flush() has been called, the
 // page tree cannot be used any more.
-func (tree *PageTree) Flush() (pdf.Dict, *pdf.Reference, error) {
+func (tree *PageTree) Flush() (*pdf.Reference, error) {
 	current := tree.current
 	for current.parent != nil {
 		obj := current.toObject()
 		_, err := tree.w.Write(obj, current.id)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		current = current.parent
 	}
 	tree.current = nil
 	tree.root = nil
-	return current.toObject(), current.id, nil
+
+	root := current.toObject()
+	if def := tree.defaults; def != nil {
+		if def.Resources != nil {
+			root["Resources"] = def.Resources
+		}
+		if def.MediaBox != nil {
+			root["MediaBox"] = def.MediaBox.ToObject()
+		}
+		if def.CropBox != nil {
+			root["CropBox"] = def.CropBox.ToObject()
+		}
+		if def.Rotate != 0 {
+			root["Rotate"] = pdf.Integer(def.Rotate)
+		}
+	}
+	return tree.w.Write(root, current.id)
 }
 
 // Ship adds a new page or subtree to the PageTree.

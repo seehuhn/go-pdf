@@ -18,6 +18,8 @@ type Writer struct {
 	xref     map[int]*xRefEntry
 	nextRef  int
 	inStream bool
+	catalog  *Reference
+	info     *Reference
 }
 
 // WriterOptions allows to influence the way a PDF file is generated.
@@ -148,17 +150,17 @@ func Create(name string) (*Writer, error) {
 // Close closes the Writer, flushing any unwritten data to the underlying
 // io.Writer.  If the underlying io.Writer has a Close() method, this writer is
 // also closed.
-func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
-	if catalog == nil {
+func (pdf *Writer) Close() error {
+	if pdf.catalog == nil {
 		return errors.New("missing /Catalog")
 	}
 
 	xRefDict := Dict{
-		"Root": catalog,
+		"Root": pdf.catalog,
 		"Size": Integer(pdf.nextRef),
 	}
-	if info != nil {
-		xRefDict["Info"] = info
+	if pdf.info != nil {
+		xRefDict["Info"] = pdf.info
 	}
 	if len(pdf.id) == 2 {
 		xRefDict["ID"] = Array{String(pdf.id[0]), String(pdf.id[1])}
@@ -195,6 +197,59 @@ func (pdf *Writer) Close(catalog *Reference, info *Reference) error {
 	// write beyond the end of file.
 	pdf.w = nil
 
+	return nil
+}
+
+// SetCatalog sets the Document Catalog for the file.  This must be called
+// exactly once before the file is closed.  The argument `cat` can either be a
+// Dict (which is then written to the file), or a *Reference pointing to a
+// Dict.  No changes can be made to the catalog after SetCatalog has been
+// called.
+//
+// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
+func (pdf *Writer) SetCatalog(cat Object) error {
+	if pdf.catalog != nil {
+		return errors.New("cannot set /Catalog twice")
+	}
+	switch x := cat.(type) {
+	case *Reference:
+		pdf.catalog = x
+	case Dict:
+		ref, err := pdf.Write(x, nil)
+		if err != nil {
+			return err
+		}
+		pdf.catalog = ref
+	default:
+		return errors.New("/Catalog must be Dict or *Reference")
+	}
+	return nil
+}
+
+// SetInfo sets the Document Information Dictionary for the file.  This can be
+// called at most once before the file is closed.  The argument `info` can
+// either be a Dict (which is then written to the file), or a *Reference
+// pointing to a Dict.  No changes can be made to the /Info dictionary after
+// SetInfo has been called.
+//
+// The Document Information Dictionary is documented in section
+// 14.3.3 of PDF 32000-1:2008.
+func (pdf *Writer) SetInfo(info Object) error {
+	if pdf.info != nil {
+		return errors.New("cannot set /Info twice")
+	}
+	switch x := info.(type) {
+	case *Reference:
+		pdf.info = x
+	case Dict:
+		ref, err := pdf.Write(x, nil)
+		if err != nil {
+			return err
+		}
+		pdf.info = ref
+	default:
+		return errors.New("/Info must be Dict or *Reference")
+	}
 	return nil
 }
 

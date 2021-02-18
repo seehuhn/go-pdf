@@ -12,7 +12,7 @@ import (
 
 // Font selection for all text on the page.
 const (
-	FontName     = "Times-Italic"
+	FontName     = "Times-Roman"
 	FontEncoding = "MacRomanEncoding"
 	FontSize     = 48
 )
@@ -21,13 +21,6 @@ var encTable = map[string]fonts.Encoding{
 	"StandardEncoding": fonts.StandardEncoding,
 	"MacRomanEncoding": fonts.MacRomanEncoding,
 	"WinAnsiEncoding":  fonts.WinAnsiEncoding,
-}
-
-// Rect takes the coordinates of two diagonally opposite points
-// and returns a PDF rectangle.
-func Rect(llx, lly, urx, ury int) pdf.Array {
-	return pdf.Array{pdf.Integer(llx), pdf.Integer(lly),
-		pdf.Integer(urx), pdf.Integer(ury)}
 }
 
 // WritePage emits a single page to the PDF file and returns the page dict.
@@ -166,7 +159,12 @@ func main() {
 	const width = 8 * 72
 	const height = 6 * 72
 
-	pageTree := pages.NewPageTree(out)
+	pageTree := pages.NewPageTree(out, &pages.Attributes{
+		Resources: pdf.Dict{
+			"Font": pdf.Dict{"F1": font},
+		},
+		MediaBox: &pages.Rectangle{LLx: 0, LLy: 0, URx: width, URy: height},
+	})
 	page, err := WritePage(out, width, height)
 	if err != nil {
 		log.Fatal(err)
@@ -176,36 +174,28 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pages, pagesRef, err := pageTree.Flush()
-	if err != nil {
-		log.Fatal(err)
-	}
-	pages["CropBox"] = Rect(0, 0, width, height)
-	pages["Resources"] = pdf.Dict{
-		"Font": pdf.Dict{"F1": font},
-	}
-	_, err = out.Write(pages, pagesRef)
+	pagesRef, err := pageTree.Flush()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	info, err := out.Write(pdf.Dict{
+	err = out.SetInfo(pdf.Dict{
 		"Title":  pdf.TextString("PDF Test Document"),
 		"Author": pdf.TextString("Jochen Voß"),
-	}, nil)
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	catalog, err := out.Write(pdf.Dict{
+	err = out.SetCatalog(pdf.Dict{
 		"Type":  pdf.Name("Catalog"),
 		"Pages": pagesRef,
-	}, nil)
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = out.Close(catalog, info)
+	err = out.Close()
 	if err != nil {
 		log.Fatal(err)
 	}

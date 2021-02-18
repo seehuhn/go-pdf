@@ -3,7 +3,7 @@ package pdf
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 )
 
@@ -40,7 +40,7 @@ func TestFlate(t *testing.T) {
 				t.Error(in, err)
 				continue
 			}
-			out, err := ioutil.ReadAll(r)
+			out, err := io.ReadAll(r)
 			if err != nil {
 				t.Error(in, err)
 				continue
@@ -77,7 +77,7 @@ func TestPngUp(t *testing.T) {
 			prev: make([]byte, columns+1),
 			tmp:  make([]byte, columns+1),
 		}
-		res, err := ioutil.ReadAll(r)
+		res, err := io.ReadAll(r)
 		if err != nil {
 			t.Error("unexpected error:", err)
 			continue

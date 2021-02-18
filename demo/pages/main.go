@@ -64,7 +64,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(out)
+	pageTree := pages.NewPageTree(out, &pages.Attributes{
+		Resources: pdf.Dict{
+			"Font": pdf.Dict{"F1": font},
+		},
+		MediaBox: &pages.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
+	})
 	for i := 1; i <= 100; i++ {
 		page, err := WritePage(out, i)
 		if err != nil {
@@ -76,36 +81,28 @@ func main() {
 		}
 	}
 
-	pages, pagesRef, err := pageTree.Flush()
-	if err != nil {
-		log.Fatal(err)
-	}
-	pages["CropBox"] = Rect(0, 0, 200, 200)
-	pages["Resources"] = pdf.Dict{
-		"Font": pdf.Dict{"F1": font},
-	}
-	_, err = out.Write(pages, pagesRef)
+	pagesRef, err := pageTree.Flush()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	info, err := out.Write(pdf.Dict{
-		"Title":  pdf.TextString("PDF Test Document"),
-		"Author": pdf.TextString("Jochen Voß"),
-	}, nil)
+	err = out.SetInfo(pdf.Struct(&pdf.Info{
+		Title:  "PDF Test Document",
+		Author: "Jochen Voß",
+	}))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	catalog, err := out.Write(pdf.Dict{
+	err = out.SetCatalog(pdf.Dict{
 		"Type":  pdf.Name("Catalog"),
 		"Pages": pagesRef,
-	}, nil)
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = out.Close(catalog, info)
+	err = out.Close()
 	if err != nil {
 		log.Fatal(err)
 	}

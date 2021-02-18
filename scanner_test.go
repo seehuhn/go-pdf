@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"reflect"
 	"strings"
 	"testing"
@@ -156,7 +155,7 @@ func TestReadObject(t *testing.T) {
 						body, s2.Dict, s1.Dict)
 					continue
 				}
-				data1, err := ioutil.ReadAll(s1.R)
+				data1, err := io.ReadAll(s1.R)
 				if err != nil {
 					t.Errorf("%q: %s", body, err)
 				}
@@ -165,7 +164,7 @@ func TestReadObject(t *testing.T) {
 				s2r := s2.R.(io.Seeker)
 				_, _ = s2r.Seek(0, io.SeekStart)
 
-				data2, err := ioutil.ReadAll(s2.R)
+				data2, err := io.ReadAll(s2.R)
 				if err != nil {
 					t.Errorf("%q: %s", body, err)
 				}

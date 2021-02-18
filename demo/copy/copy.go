@@ -105,7 +105,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	catRef, err := trans.w.Write(catalog, nil)
+	err = trans.w.SetCatalog(catalog)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -118,12 +118,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	infoRef, err := trans.w.Write(info, nil)
+	err = trans.w.SetInfo(info)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = w.Close(catRef, infoRef)
+	err = w.Close()
 	if err != nil {
 		log.Fatal(err)
 	}

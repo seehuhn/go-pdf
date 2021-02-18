@@ -35,7 +35,10 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info := refs[0]
+	err = w.SetInfo(refs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
 	font := refs[1]
 
 	stream, contentNode, err := w.OpenStream(Dict{}, nil, nil)
@@ -86,20 +89,20 @@ ET
 	}
 
 	// page 73
-	catalog, err := w.Write(Dict{
+	err = w.SetCatalog(Dict{
 		"Type":  Name("Catalog"),
 		"Pages": pagesRef,
-	}, nil)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = w.Close(catalog, info)
+	err = w.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// ioutil.WriteFile("debug.pdf", out.Bytes(), 0o644)
+	// os.WriteFile("debug.pdf", out.Bytes(), 0o644)
 
 	outR := bytes.NewReader(out.Bytes())
 	_, err = NewReader(outR, outR.Size(), nil)
@@ -132,7 +135,9 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cat, err := w.Write(Dict{}, nil)
+	err = w.SetCatalog(Dict{
+		"Type": Name("Catalog"),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +147,7 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = w.Close(cat, nil)
+	err = w.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

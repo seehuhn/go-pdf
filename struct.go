@@ -45,13 +45,12 @@ fieldLoop:
 			}
 		}
 
-		if !fVal.CanSet() {
-			// Ignore fields which AsStruct() cannot set
-			continue
-		}
-
 		key := Name(fInfo.Name)
 		switch {
+		case fInfo.PkgPath != "": // unexported field
+			// TODO(voss): is this the correct way to detect that
+			// fVal.Interface() will panic?
+			continue
 		case optional && fVal.IsZero():
 			continue
 		case isTextString:
@@ -189,6 +188,70 @@ fieldLoop:
 	}
 
 	return firstErr
+}
+
+// Catalog represents a PDF Document Catalog.
+//
+// This can be used together with the `Struct()`` function to construct
+// the argument for `Writer.SetDocument()`.
+//
+// The only required field in this structure is `Pages`, which specifies
+// the root of the page tree.
+//
+// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
+type Catalog struct {
+	_                 struct{} `pdf:"Type=Catalog"`
+	Version           Name     `pdf:"optional,allowstring"`
+	Extensions        Object   `pdf:"optional"`
+	Pages             *Reference
+	PageLabels        Object     `pdf:"optional"`
+	Names             Object     `pdf:"optional"`
+	Dests             Object     `pdf:"optional"`
+	ViewerPreferences Object     `pdf:"optional"`
+	PageLayout        Name       `pdf:"optional"`
+	PageMode          Name       `pdf:"optional"`
+	Outlines          *Reference `pdf:"optional"`
+	Threads           *Reference `pdf:"optional"`
+	OpenAction        Object     `pdf:"optional"`
+	AA                Object     `pdf:"optional"`
+	URI               Object     `pdf:"optional"`
+	AcroForm          Object     `pdf:"optional"`
+	MetaData          *Reference `pdf:"optional"`
+	StructTreeRoot    Object     `pdf:"optional"`
+	MarkInfo          Object     `pdf:"optional"`
+	Lang              string     `pdf:"text string,optional"`
+	SpiderInfo        Object     `pdf:"optional"`
+	OutputIntents     Object     `pdf:"optional"`
+	PieceInfo         Object     `pdf:"optional"`
+	OCProperties      Object     `pdf:"optional"`
+	Perms             Object     `pdf:"optional"`
+	Legal             Object     `pdf:"optional"`
+	Requirements      Object     `pdf:"optional"`
+	Collection        Object     `pdf:"optional"`
+	NeedsRendering    bool       `pdf:"optional"`
+}
+
+// Info represents a PDF Document Information Dictionary.
+//
+// This can be used together with the `Struct()`` function to construct
+// the argument for `Writer.SetInfo()`.
+//
+// All fields in this structure are optional.
+//
+// The Document Information Dictionary is documented in section
+// 14.3.3 of PDF 32000-1:2008.
+type Info struct {
+	Title        string    `pdf:"text string,optional"`
+	Author       string    `pdf:"text string,optional"`
+	Subject      string    `pdf:"text string,optional"`
+	Keywords     string    `pdf:"text string,optional"`
+	Creator      string    `pdf:"text string,optional"`
+	Producer     string    `pdf:"text string,optional"`
+	CreationDate time.Time `pdf:"optional"`
+	ModDate      time.Time `pdf:"optional"`
+	Trapped      Name      `pdf:"optional,allowstring"`
+
+	Custom map[string]string `pdf:"extra"`
 }
 
 var (

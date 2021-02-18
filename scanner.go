@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strconv"
 )
 
@@ -752,7 +751,7 @@ func (s *scanner) Discard(n int64) error {
 	s.pos = 0
 	s.used = 0
 
-	n, err := io.CopyN(ioutil.Discard, s.r, n)
+	n, err := io.CopyN(io.Discard, s.r, n)
 	s.skipped += n
 	return err
 }
