@@ -159,7 +159,7 @@ func main() {
 	const width = 8 * 72
 	const height = 6 * 72
 
-	pageTree := pages.NewPageTree(out, &pages.Attributes{
+	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: pdf.Dict{
 			"Font": pdf.Dict{"F1": font},
 		},

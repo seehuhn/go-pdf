@@ -47,10 +47,6 @@ fieldLoop:
 
 		key := Name(fInfo.Name)
 		switch {
-		case fInfo.PkgPath != "": // unexported field
-			// TODO(voss): is this the correct way to detect that
-			// fVal.Interface() will panic?
-			continue
 		case optional && fVal.IsZero():
 			continue
 		case isTextString:
@@ -60,7 +56,9 @@ fieldLoop:
 		case fVal.Kind() == reflect.Bool:
 			res[key] = Bool(fVal.Bool())
 		default:
-			res[key] = fVal.Interface().(Object)
+			if fVal.CanInterface() {
+				res[key] = fVal.Interface().(Object)
+			}
 		}
 	}
 
@@ -192,7 +190,7 @@ fieldLoop:
 
 // Catalog represents a PDF Document Catalog.
 //
-// This can be used together with the `Struct()`` function to construct
+// This can be used together with the `Struct()` function to construct
 // the argument for `Writer.SetDocument()`.
 //
 // The only required field in this structure is `Pages`, which specifies
@@ -233,7 +231,7 @@ type Catalog struct {
 
 // Info represents a PDF Document Information Dictionary.
 //
-// This can be used together with the `Struct()`` function to construct
+// This can be used together with the `Struct() function to construct
 // the argument for `Writer.SetInfo()`.
 //
 // All fields in this structure are optional.

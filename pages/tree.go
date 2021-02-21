@@ -13,11 +13,11 @@ type PageTree struct {
 	w        *pdf.Writer
 	root     *pages
 	current  *pages
-	defaults *Attributes
+	defaults *DefaultAttributes
 }
 
 // NewPageTree allocates a new PageTree object.
-func NewPageTree(w *pdf.Writer, defaults *Attributes) *PageTree {
+func NewPageTree(w *pdf.Writer, defaults *DefaultAttributes) *PageTree {
 	root := &pages{
 		id: w.Alloc(),
 	}
@@ -47,7 +47,7 @@ func (tree *PageTree) Flush() (*pdf.Reference, error) {
 
 	root := current.toObject()
 	if def := tree.defaults; def != nil {
-		if def.Resources != nil {
+		if len(def.Resources) > 0 {
 			root["Resources"] = def.Resources
 		}
 		if def.MediaBox != nil {
@@ -63,7 +63,9 @@ func (tree *PageTree) Flush() (*pdf.Reference, error) {
 	return tree.w.Write(root, current.id)
 }
 
-// Ship adds a new page or subtree to the PageTree.
+// Ship adds a new page or subtree to the PageTree. This function is for
+// special cases, where the caller constructs the page dictionary manually.
+// Normally callers will use the .AddPage() method, instead.
 func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
 	if page["Type"] != pdf.Name("Page") && page["Type"] != pdf.Name("Pages") {
 		return errors.New("wrong pdf.Dict type, expected /Page or /Pages")

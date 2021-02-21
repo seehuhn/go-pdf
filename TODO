@@ -1,6 +1,6 @@
+- add a licence and copyright notices
 - remove the excess empty line before "startxref"
 - rationalize the error handling
-- add a licence and copyright notices
 - check whether any dependencies use "fmt", and if not, try to not use "fmt"
 - make sure that supporting incremental updates will not require major changes
   to the API

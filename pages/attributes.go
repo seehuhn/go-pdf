@@ -1,6 +1,10 @@
 package pages
 
-import "seehuhn.de/go/pdf"
+import (
+	"math"
+
+	"seehuhn.de/go/pdf"
+)
 
 // Rectangle represents a PDF rectangle, given by the coordinates of
 // two diagonally opposite corners.
@@ -21,11 +25,30 @@ func (rect *Rectangle) ToObject() pdf.Array {
 	return res
 }
 
-// Attributes specifies inheritable Page Attributes.
+// NearlyEqual reports whether the corner coordinates of two rectangles
+// differ by less than `eps`.
+func (rect *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
+	return (math.Abs(rect.LLx-other.LLx) < eps &&
+		math.Abs(rect.LLy-other.LLy) < eps &&
+		math.Abs(rect.URx-other.URx) < eps &&
+		math.Abs(rect.URy-other.URy) < eps)
+}
+
+// Attributes specifies Page DefaultAttributes.
+//
+// These attributes are documented in section 7.7.3.3 of PDF 32000-1:2008.
+type Attributes struct {
+	Resources pdf.Dict
+	MediaBox  *Rectangle
+	CropBox   *Rectangle
+	Rotate    int
+}
+
+// DefaultAttributes specifies inheritable Page Attributes.
 //
 // These attributes are documented in sections 7.7.3.3 and 7.7.3.4 of
 // PDF 32000-1:2008.
-type Attributes struct {
+type DefaultAttributes struct {
 	Resources pdf.Dict
 	MediaBox  *Rectangle
 	CropBox   *Rectangle
@@ -34,8 +57,8 @@ type Attributes struct {
 
 // Default paper sizes as PDF rectangles.
 var (
-	A4     = &Rectangle{0, 0, 595.276, 841.890}
-	A5     = &Rectangle{0, 0, 419.528, 595.276}
+	A4     = &Rectangle{0, 0, 595.275, 841.889}
+	A5     = &Rectangle{0, 0, 419.527, 595.275}
 	Letter = &Rectangle{0, 0, 612, 792}
 	Legal  = &Rectangle{0, 0, 612, 1008}
 )
