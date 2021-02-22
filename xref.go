@@ -134,7 +134,7 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 		if !ok || prevStart <= 0 || int64(prevStart) >= r.size {
 			return nil, nil, &MalformedFileError{
 				Pos: start,
-				Err: fmt.Errorf("invalid /Prev value %s", format(prev)),
+				Err: errors.New("invalid /Prev value"),
 			}
 		}
 		start = int64(prevStart)
@@ -201,7 +201,7 @@ func readXRefTable(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 }
 
 func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) error {
-	// TODO(voss): use xRefSubSection?
+	offByOne := 0
 	for i := start; i < end; i++ {
 		if xref[i] != nil {
 			err := s.Discard(20)
@@ -228,7 +228,7 @@ func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) erro
 		}
 		b, err := strconv.ParseUint(string(buf[11:16]), 10, 16)
 		if err != nil {
-			// fix a common error in some PDF files
+			// fix an error seen in some PDF files
 			if bytes.HasPrefix(buf, []byte("0000000000 65536 ")) {
 				b = 65535
 				buf[17] = 'f'
@@ -236,15 +236,21 @@ func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) erro
 				return err
 			}
 		}
+
+		// fix an error seen in some PDF files
+		if i == start && start == 1 && a == 0 && b == 65535 {
+			offByOne = 1
+		}
+
 		c := buf[17]
 		switch c {
 		case 'f':
-			xref[i] = &xRefEntry{
+			xref[i-offByOne] = &xRefEntry{
 				Pos:        -1,
 				Generation: uint16(b),
 			}
 		case 'n':
-			xref[i] = &xRefEntry{
+			xref[i-offByOne] = &xRefEntry{
 				Pos:        a,
 				Generation: uint16(b),
 			}
@@ -434,7 +440,6 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	ref := pdf.Alloc()
 
 	xRefDict["Type"] = Name("XRef")
-	// TODO(voss): avoid setting the wrong value in Writer.Close() first.
 	xRefDict["Size"] = Integer(pdf.nextRef)
 
 	maxField2 := int64(0)

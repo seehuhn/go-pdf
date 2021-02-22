@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"testing"
 )
@@ -18,11 +19,13 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	encInfo1 := format(w.w.enc.ToDict())
 
+	author := TextString("Jochen Voß")
 	refs, err := w.ObjectStream(nil,
 		Dict{
 			"Title":    TextString("PDF Test Document"),
-			"Author":   TextString("Jochen Voß"),
+			"Author":   author,
 			"Subject":  TextString("Testing"),
 			"Keywords": TextString("PDF, testing, Go"),
 		},
@@ -88,7 +91,6 @@ ET
 		t.Fatal(err)
 	}
 
-	// page 73
 	err = w.SetCatalog(Dict{
 		"Type":  Name("Catalog"),
 		"Pages": pagesRef,
@@ -105,9 +107,37 @@ ET
 	// os.WriteFile("debug.pdf", out.Bytes(), 0o644)
 
 	outR := bytes.NewReader(out.Bytes())
-	_, err = NewReader(outR, outR.Size(), nil)
+	r, err := NewReader(outR, outR.Size(), nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	encInfo2 := format(r.enc.ToDict())
+
+	if encInfo1 != encInfo2 {
+		fmt.Println()
+		fmt.Println(encInfo1)
+		fmt.Println()
+		fmt.Println(encInfo2)
+		t.Error("encryption dictionaries differ")
+	}
+
+	_, err = r.enc.sec.GetKey(false)
+	if err != nil {
+		t.Fatal("xxx", err)
+	}
+
+	_, err = r.Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := r.Info()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if x := info["Author"].(String); !bytes.Equal(x, author) {
+		t.Error("wrong author " + x.AsTextString())
 	}
 }
 

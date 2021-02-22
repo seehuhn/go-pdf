@@ -15,9 +15,9 @@ func main() {
 	decode := flag.Bool("d", false, "decode streams")
 	flag.Parse()
 
-	var tryPasswd func(bool) string
+	var tryPasswd func() string
 	if *passwd != "" {
-		tryPasswd = func(bool) string {
+		tryPasswd = func() string {
 			var res string
 			if passwd != nil {
 				res = *passwd
@@ -103,7 +103,11 @@ func main() {
 		return
 	}
 
-	err = obj.PDF(os.Stdout)
+	if obj == nil {
+		_, err = fmt.Println("null")
+	} else {
+		err = obj.PDF(os.Stdout)
+	}
 	fmt.Println()
 	if err != nil {
 		fmt.Println(err)

@@ -98,7 +98,7 @@ func (x String) PDF(w io.Writer) error {
 	n := len(l)
 
 	buf := &bytes.Buffer{}
-	if n+2*len(funny) <= 2*n {
+	if 3*len(funny) <= n {
 		buf.WriteString("(")
 		pos := 0
 		for _, i := range funny {
@@ -443,15 +443,4 @@ func (x *Reference) String() string {
 func (x *Reference) PDF(w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%d %d R", x.Number, x.Generation)
 	return err
-}
-
-// TODO(voss): remove
-func format(x Object) string {
-	buf := &bytes.Buffer{}
-	if x == nil {
-		buf.WriteString("null")
-	} else {
-		_ = x.PDF(buf)
-	}
-	return buf.String()
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 )
 
@@ -613,11 +614,6 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		}
 	}
 
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return nil, err
-	}
-
 	err = s.SkipString("stream")
 	if err != nil {
 		return nil, err
@@ -631,6 +627,9 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		s.pos++
 	} else if len(buf) >= 2 && buf[0] == '\r' && buf[1] == '\n' {
 		s.pos += 2
+	} else if len(buf) >= 1 && buf[0] == '\r' {
+		// not allowed by the spec, but seen in the wild
+		s.pos++
 	} else {
 		return nil, &MalformedFileError{}
 	}
@@ -756,6 +755,9 @@ func (s *scanner) Discard(n int64) error {
 	return err
 }
 
+// ScanBytes iterates over the bytes of s until `accept()` returns false.  The
+// scanner position after the call returns is the byte for which `accept()`
+// returned false, the next read will start with this byte.
 func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 	empty := true
 	for {
@@ -832,6 +834,37 @@ func (s *scanner) SkipAfter(pat string) error {
 		}
 		if s.used == 0 {
 			return io.EOF
+		}
+	}
+}
+
+func (s *scanner) skipToNextObject() error {
+	pat := regexp.MustCompile(`^\d{1,12}\s+\d{1,12}\s+obj\s`)
+	for {
+		afterEOL := false
+		err := s.ScanBytes(func(c byte) bool {
+			if afterEOL {
+				if c >= '0' && c <= '9' {
+					return false
+				}
+				afterEOL = isSpace[c]
+			} else if c == '\r' || c == '\n' {
+				afterEOL = true
+			}
+			return true
+		})
+		if err != nil {
+			return err
+		}
+
+		buf, err := s.Peek(32)
+		if err != nil {
+			return err
+		} else if len(buf) == 0 {
+			return io.EOF
+		}
+		if pat.Find(buf) != nil {
+			return nil
 		}
 	}
 }

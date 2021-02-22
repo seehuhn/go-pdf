@@ -10,14 +10,12 @@ import (
 func TestComputeOU(t *testing.T) {
 	passwd := "test"
 	P := -4
-	sec := &defSecHandler{
+	sec := &stdSecHandler{
 		P: uint32(P),
 		id: []byte{0xac, 0xac, 0x29, 0xb4, 0x19, 0x2f, 0xd9, 0x23,
 			0xc2, 0x4f, 0xe6, 0x04, 0x24, 0x79, 0xb2, 0xa9},
 		R:        4,
 		KeyBytes: 16,
-
-		encryptMetaData: true,
 	}
 
 	O := sec.computeO(passwd, "")
@@ -53,18 +51,15 @@ func TestAuth(t *testing.T) {
 			{"wrong", test.owner},
 		}
 		for j, pwds := range trials {
-			pwdPos := -1
-			lastPwd := ""
-
-			sec := createDefSecHandler([]byte("0123456789ABCDEF"),
+			sec := createStdSecHandler([]byte("0123456789ABCDEF"),
 				test.user, test.owner, PermModify)
 			key := sec.key
 
-			// deauthenticate the security handler
-			sec.key = nil
-			sec.OwnerAuthenticated = false
+			sec.deauthenticate()
 
-			sec.getPasswd = func(_ bool) string {
+			pwdPos := -1
+			lastPwd := ""
+			sec.readPwd = func() string {
 				candidate := ""
 				pwdPos++
 				if pwdPos < len(pwds) {
@@ -105,6 +100,26 @@ func TestAuth(t *testing.T) {
 	}
 }
 
+func TestAuth2(t *testing.T) {
+	id := []byte{0xfb, 0xa6, 0x25, 0xd9, 0xcd, 0xfb, 0x88, 0x11,
+		0x9a, 0xd5, 0xa0, 0x94, 0x33, 0x68, 0x42, 0x95}
+	sec := createStdSecHandler(id, "", "test", PermCopy)
+
+	key, err := sec.GetKey(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec.deauthenticate()
+
+	key2, err := sec.GetKey(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(key, key2) {
+		t.Error("wrong key")
+	}
+}
+
 func TestEncryptBytes(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
 	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
@@ -114,7 +129,7 @@ func TestEncryptBytes(t *testing.T) {
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
 					strF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  createDefSecHandler(id, "secret", "supersecret", PermPrint),
+					sec:  createStdSecHandler(id, "secret", "supersecret", PermPrint),
 				}
 
 				plainText := []byte(msg)
@@ -146,7 +161,7 @@ func TestEncryptStream(t *testing.T) {
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
 					stmF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  createDefSecHandler(id, "secret", "supersecret", PermAll),
+					sec:  createStdSecHandler(id, "secret", "supersecret", PermAll),
 				}
 
 				buf := &bytes.Buffer{}

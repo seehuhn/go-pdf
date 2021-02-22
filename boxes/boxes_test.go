@@ -1,19 +1,11 @@
 package boxes
 
 import (
-	"fmt"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/pages"
 )
-
-func draw(page *pages.Page, box *vBox) {
-	originX := 0.0
-	originY := box.Depth
-	fmt.Fprintf(page, "%f %f %f %f re s",
-		originX, originY-box.Depth, box.Width, box.Depth+box.Height)
-}
 
 func TestFrame(t *testing.T) {
 	out, err := pdf.Create("test.pdf")
@@ -27,16 +19,76 @@ func TestFrame(t *testing.T) {
 	})
 
 	box := &vBox{
-		Width:    pages.A5.URx - pages.A5.LLx,
-		Height:   pages.A5.URy - pages.A5.LLy,
-		Depth:    0,
-		Contents: []stuff{},
+		stuffExtent: stuffExtent{
+			Width:  pages.A5.URx - pages.A5.LLx,
+			Height: pages.A5.URy - pages.A5.LLy,
+			Depth:  0,
+		},
+		Contents: []stuff{
+			kern(30),
+			&hBox{
+				stuffExtent: stuffExtent{
+					Width:  pages.A5.URx - pages.A5.LLx,
+					Height: 10,
+					Depth:  2,
+				},
+				Contents: []stuff{
+					kern(36),
+					&rule{
+						stuffExtent: stuffExtent{
+							Width:  20,
+							Height: 8,
+							Depth:  0,
+						},
+					},
+					kern(5),
+					&rule{
+						stuffExtent: stuffExtent{
+							Width:  30,
+							Height: 8,
+							Depth:  1.8,
+						},
+					},
+					&glue{
+						Length: 0,
+						Plus:   stretchAmount{1, 1},
+					},
+				},
+			},
+			&glue{
+				Length: 0,
+				Plus:   stretchAmount{1, 1},
+			},
+			&hBox{
+				stuffExtent: stuffExtent{
+					Width:  pages.A5.URx - pages.A5.LLx,
+					Height: 10,
+					Depth:  2,
+				},
+				Contents: []stuff{
+					&glue{
+						Length: 0,
+						Plus:   stretchAmount{1, 1},
+					},
+					&rule{
+						stuffExtent: stuffExtent{
+							Width:  20,
+							Height: 8,
+							Depth:  0,
+						},
+					},
+					&glue{
+						Length: 0,
+						Plus:   stretchAmount{1, 1},
+					},
+				},
+			},
+			kern(30),
+		},
 	}
 
 	page, err := pageTree.AddPage(&pages.Attributes{
 		MediaBox: &pages.Rectangle{
-			LLx: 0,
-			LLy: 0,
 			URx: pages.A5.URx - pages.A5.LLx,
 			URy: pages.A5.URy - pages.A5.LLy,
 		},
@@ -45,7 +97,7 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	draw(page, box)
+	box.Draw(page, 0, box.Depth)
 
 	err = page.Close()
 	if err != nil {
@@ -69,3 +121,9 @@ func TestFrame(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// compile time test: we implement the correct interfaces
+var _ stuff = &rule{}
+var _ stuff = &vBox{}
+var _ stuff = kern(0)
+var _ stuff = &glue{}

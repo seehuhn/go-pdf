@@ -28,10 +28,7 @@ type Reader struct {
 }
 
 // NewReader creates a new Reader object.
-//
-// TODO(voss): remove the needOwner argument, add an .AuthenticateOwner method
-// instead.
-func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string) (*Reader, error) {
+func NewReader(data io.ReaderAt, size int64, readPwd func() string) (*Reader, error) {
 	r := &Reader{
 		size:    size,
 		r:       data,
@@ -70,12 +67,10 @@ func NewReader(data io.ReaderAt, size int64, readPwd func(needOwner bool) string
 		if ref, ok := encObj.(*Reference); ok {
 			r.special[*ref] = true
 		}
-		r.enc, err = r.parseEncryptDict(encObj)
+		r.enc, err = r.parseEncryptDict(encObj, readPwd)
 		if err != nil {
 			return nil, err
 		}
-		// TODO(voss): set this in a different way?
-		r.enc.sec.getPasswd = readPwd
 	}
 
 	root := trailer["Root"]
@@ -120,6 +115,25 @@ func Open(fname string) (*Reader, error) {
 		return nil, err
 	}
 	return NewReader(fd, fi.Size(), nil)
+}
+
+// AuthenticateOwner tries to authenticate the owner of a document. If a
+// password is required, this calls the `readPwd()` function specified in the
+// call to `NewReader()`.  The return value is nil if the owner was
+// authenticated (or if no authentication is required), and ErrNoAuth if the
+// required password was not supplied.
+func (r *Reader) AuthenticateOwner() error {
+	if r.enc == nil || r.enc.sec.OwnerAuthenticated {
+		return nil
+	}
+	_, err := r.enc.sec.GetKey(true)
+	if err != nil {
+		return err
+	}
+	if !r.enc.sec.OwnerAuthenticated {
+		panic("inconsisten authentication state")
+	}
+	return nil
 }
 
 // Close closes the file underlying the reader.  This call only has an effect
@@ -209,6 +223,17 @@ func (r *Reader) Read() (Object, *Reference, error) {
 				return nil, nil, err
 			}
 			continue
+
+		case len(buf) == 0:
+			return nil, nil, io.EOF
+
+		case buf[0] < '0' || buf[0] > '9':
+			// Some PDF files embed random data.  Try to skip to the
+			// next object.
+			err = s.skipToNextObject()
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 
 		obj, ref, err := s.ReadIndirectObject()
@@ -231,18 +256,6 @@ func (r *Reader) Read() (Object, *Reference, error) {
 			r.objStm = contents
 			r.pos = s.currentPos()
 			continue
-		}
-
-		// Try to fix up the xref information, so that after a sequential
-		// read of the file, random access works even if the xref tables
-		// had been corrupted.
-		// TODO(voss): remove this?
-		entry := r.xref[ref.Number]
-		if entry != nil && (entry.Pos < 0 || entry.Generation <= ref.Generation) {
-			r.xref[ref.Number] = &xRefEntry{
-				Pos:        r.pos,
-				Generation: ref.Generation,
-			}
 		}
 
 		r.pos = s.currentPos()
@@ -365,21 +378,20 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 	return &objStm{s: s, idx: idx}, nil
 }
 
-func (r *Reader) getFromObjectStream(number int, cRef *Reference) (Object, error) {
-	// TODO(voss): fudge up the error position on return
-	container, err := r.doGet(cRef, false)
+func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error) {
+	container, err := r.doGet(sRef, false)
 	if err != nil {
 		return nil, err
 	}
 	stream, ok := container.(*Stream)
 	if !ok {
 		return nil, &MalformedFileError{
-			Pos: r.errPos(cRef),
+			Pos: r.errPos(sRef),
 			Err: errors.New("wrong type for object stream"),
 		}
 	}
 
-	contents, err := r.objStmScanner(stream, r.errPos(cRef))
+	contents, err := r.objStmScanner(stream, r.errPos(sRef))
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +409,7 @@ func (r *Reader) getFromObjectStream(number int, cRef *Reference) (Object, error
 	}
 	if !found {
 		return nil, &MalformedFileError{
-			Pos: r.errPos(cRef),
+			Pos: r.errPos(sRef),
 			Err: errors.New("object missing from stream"),
 		}
 	}

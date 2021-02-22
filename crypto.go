@@ -13,14 +13,14 @@ import (
 )
 
 type encryptInfo struct {
-	sec *defSecHandler
+	sec *stdSecHandler
 
 	stmF *cryptFilter
 	strF *cryptFilter
 	eff  *cryptFilter
 }
 
-func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
+func (r *Reader) parseEncryptDict(encObj Object, readPwd func() string) (*encryptInfo, error) {
 	enc, err := r.GetDict(encObj)
 	if err != nil {
 		return nil, err
@@ -117,7 +117,7 @@ func (r *Reader) parseEncryptDict(encObj Object) (*encryptInfo, error) {
 
 	switch {
 	case filter == "Standard" && subFilter == "":
-		sec, err := openDefSecHandler(enc, length, r.ID[0])
+		sec, err := openStdSecHandler(enc, length, r.ID[0], readPwd)
 		if err != nil {
 			return nil, &MalformedFileError{
 				Pos: r.errPos(encObj),
@@ -185,7 +185,7 @@ func (enc *encryptInfo) ToDict() Dict {
 	dict["O"] = String(sec.o)
 	dict["U"] = String(sec.u)
 	dict["P"] = Integer(int32(sec.P))
-	if !sec.encryptMetaData {
+	if sec.unencryptedMetaData {
 		dict["EncryptMetadata"] = Bool(false)
 	}
 
@@ -340,20 +340,23 @@ func (enc *encryptInfo) DecryptStream(ref *Reference, r io.Reader) (io.Reader, e
 	}
 }
 
-// The defSecHandler authenticates the user via a pair of passwords.
+// The stdSecHandler authenticates the user via a pair of passwords.
 // The "user password" is used to access the contents of the document, the
 // "owner password" can be used to control additional permissions, e.g.
 // permission to print the document.
-type defSecHandler struct {
+type stdSecHandler struct {
 	id       []byte
 	o        []byte
 	u        []byte
 	KeyBytes int
 
-	getPasswd func(needOwner bool) string
-	key       []byte
+	readPwd func() string
+	key     []byte
 
-	encryptMetaData bool
+	// We use the negation of /EncryptMetadata from the PDF spec, so that
+	// the Go default value (unencryptedMetaData==false) corresponds to the
+	// PDF default value (/EncryptMetadata true).
+	unencryptedMetaData bool
 
 	R int
 	P uint32
@@ -361,7 +364,7 @@ type defSecHandler struct {
 	OwnerAuthenticated bool
 }
 
-func openDefSecHandler(enc Dict, length int, ID []byte) (*defSecHandler, error) {
+func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func() string) (*stdSecHandler, error) {
 	R, ok := enc["R"].(Integer)
 	if !ok || R < 2 || R > 4 {
 		return nil, errors.New("invalid Encrypt.R")
@@ -383,50 +386,29 @@ func openDefSecHandler(enc Dict, length int, ID []byte) (*defSecHandler, error) 
 		emd = bool(obj)
 	}
 
-	sec := &defSecHandler{
+	sec := &stdSecHandler{
 		id:       []byte(ID),
 		KeyBytes: length / 8,
-		R:        int(R),
-		o:        []byte(O),
-		u:        []byte(U),
-		P:        uint32(P),
+		readPwd:  readPwd,
 
-		encryptMetaData: emd,
+		R: int(R),
+		o: []byte(O),
+		u: []byte(U),
+		P: uint32(P),
+
+		unencryptedMetaData: !emd,
 	}
 	return sec, nil
 }
 
-// createDefSecHandler allocates a new, pre-authenticated StandardSecurityHandler.
-func createDefSecHandler(id []byte, userPwd, ownerPwd string, perm Perm) *defSecHandler {
-	forbidden := uint32(0)
-	if perm&PermCopy == 0 {
-		forbidden |= 1 << (5 - 1)
-	}
-	if perm&PermPrint == 0 {
-		forbidden |= 1 << (12 - 1)
-		if perm&PermPrintDegraded == 0 {
-			forbidden |= 1 << (3 - 1)
-		}
-	}
-	if perm&PermAnnotate == 0 {
-		forbidden |= 1 << (6 - 1)
-		if perm&PermForms == 0 {
-			forbidden |= 1 << (9 - 1)
-		}
-	}
-	if perm&PermAssemble == 0 {
-		forbidden |= 1 << (11 - 1)
-	}
-	if perm&PermModify == 0 {
-		forbidden |= 1 << (4 - 1)
-	}
-	P := ^forbidden
-
-	sec := &defSecHandler{
+// createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
+// Handler.
+func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm) *stdSecHandler {
+	sec := &stdSecHandler{
 		id:       id,
 		KeyBytes: 16,
 		R:        4,
-		P:        P,
+		P:        stdSecPerm(perm),
 
 		OwnerAuthenticated: true,
 	}
@@ -439,11 +421,16 @@ func createDefSecHandler(id []byte, userPwd, ownerPwd string, perm Perm) *defSec
 	return sec
 }
 
+func (sec *stdSecHandler) deauthenticate() {
+	sec.key = nil
+	sec.OwnerAuthenticated = false
+}
+
 // GetKey returns the key to decrypt string and stream data.  Passwords will
 // be requested via the getPasswd callback.  If the correct owner password was
 // supplied, the OwnerAuthenticated field will be set to true, in addition to
 // returning the key.
-func (sec *defSecHandler) GetKey(needOwner bool) ([]byte, error) {
+func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 	// TODO(voss): key length for crypt filters???
 	if sec.key != nil {
 		return sec.key, nil
@@ -512,8 +499,8 @@ func (sec *defSecHandler) GetKey(needOwner bool) ([]byte, error) {
 		}
 
 		// wrong password, try another one
-		if sec.getPasswd != nil {
-			passwd = sec.getPasswd(needOwner)
+		if sec.readPwd != nil {
+			passwd = sec.readPwd()
 		} else {
 			passwd = ""
 		}
@@ -526,14 +513,14 @@ func (sec *defSecHandler) GetKey(needOwner bool) ([]byte, error) {
 // algorithm 2: compute the encryption key
 // key must either be nil or have length of at least 16 bytes.
 // pw must be the padded password
-func (sec *defSecHandler) computeKey(key []byte, pw []byte) []byte {
+func (sec *stdSecHandler) computeKey(key []byte, pw []byte) []byte {
 	h := md5.New()
 	_, _ = h.Write(pw)
 	_, _ = h.Write(sec.o)
 	_, _ = h.Write([]byte{
 		byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
 	_, _ = h.Write(sec.id)
-	if !sec.encryptMetaData {
+	if sec.unencryptedMetaData {
 		_, _ = h.Write([]byte{255, 255, 255, 255})
 	}
 	key = h.Sum(key[:0])
@@ -550,7 +537,7 @@ func (sec *defSecHandler) computeKey(key []byte, pw []byte) []byte {
 }
 
 // this uses only the .R field of sec.
-func (sec *defSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
+func (sec *stdSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
 	if ownerPasswd == "" {
 		ownerPasswd = userPasswd
 	}
@@ -587,7 +574,7 @@ func (sec *defSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
 // algorithm 4/5: compute U
 // U must be a slice of length 32.
 // key must be the encryption key computed from the user password.
-func (sec *defSecHandler) computeU(U []byte, key []byte) []byte {
+func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
 	c, _ := rc4.NewCipher(key)
 
 	if sec.R < 3 {
@@ -623,8 +610,6 @@ func padPasswd(passwd string) []byte {
 	for _, r := range passwd {
 		// Convert password to Latin-1.  We can do this by just taking the
 		// lower byte of every rune.
-		// TODO(voss): is this the right thing to do?
-		// TODO(voss): what happens for invalid password characters?
 		pw[i] = byte(r)
 		i++
 
@@ -902,3 +887,29 @@ const (
 	// Owner access.
 	PermAll = permNext - 1
 )
+
+func stdSecPerm(perm Perm) uint32 {
+	forbidden := uint32(0)
+	if perm&PermCopy == 0 {
+		forbidden |= 1 << (5 - 1)
+	}
+	if perm&PermPrint == 0 {
+		forbidden |= 1 << (12 - 1)
+		if perm&PermPrintDegraded == 0 {
+			forbidden |= 1 << (3 - 1)
+		}
+	}
+	if perm&PermAnnotate == 0 {
+		forbidden |= 1 << (6 - 1)
+		if perm&PermForms == 0 {
+			forbidden |= 1 << (9 - 1)
+		}
+	}
+	if perm&PermAssemble == 0 {
+		forbidden |= 1 << (11 - 1)
+	}
+	if perm&PermModify == 0 {
+		forbidden |= 1 << (4 - 1)
+	}
+	return ^forbidden
+}

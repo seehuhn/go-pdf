@@ -99,7 +99,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			}
 			pdf.id = [][]byte{id, id}
 		}
-		sec := createDefSecHandler(pdf.id[0], opt.UserPassword,
+		sec := createStdSecHandler(pdf.id[0], opt.UserPassword,
 			opt.OwnerPassword, opt.UserPermission)
 		var cf *cryptFilter
 		if pdf.ver >= V1_6 {
@@ -594,7 +594,6 @@ type posWriter struct {
 	w   io.Writer
 	pos int64
 
-	// TODO(voss): is there a better place where to put this?
 	ref *Reference
 	enc *encryptInfo
 }

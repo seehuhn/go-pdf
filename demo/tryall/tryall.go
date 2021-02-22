@@ -39,6 +39,24 @@ func doOneFile(fname string) error {
 	}
 	defer r.Close()
 
+	root, err := r.Catalog()
+	if err != nil {
+		return err
+	}
+	catalog := &pdf.Catalog{}
+	root.AsStruct(catalog, r.Get)
+	pages, err := r.GetDict(catalog.Pages)
+	if err != nil {
+		return err
+	}
+	count, err := r.GetInt(pages["Count"])
+	if err != nil {
+		return err
+	}
+
+	_ = count
+	// fmt.Println(count, fname)
+
 	for {
 		obj, _, err := r.Read()
 		if err == io.EOF {
@@ -48,30 +66,15 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		dict, ok := obj.(pdf.Dict)
-		if !ok {
-			continue
-		}
-		if dict["Type"] == pdf.Name("Font") {
-			fmt.Println(dict["Subtype"])
-		}
+		_ = obj
+		// dict, ok := obj.(pdf.Dict)
+		// if !ok {
+		// 	continue
+		// }
+		// if dict["Type"] == pdf.Name("Font") {
+		// 	fmt.Println(dict["Subtype"])
+		// }
 	}
-
-	// root, err := r.Catalog()
-	// if err != nil {
-	// 	return err
-	// }
-	// catalog := &Catalog{}
-	// root.AsStruct(catalog, r.Get)
-	// pages, err := r.GetDict(catalog.Pages)
-	// if err != nil {
-	// 	return err
-	// }
-	// count, err := r.GetInt(pages["Count"])
-	// if err != nil {
-	// 	return err
-	// }
-	// fmt.Println(count, fname)
 
 	return nil
 }
