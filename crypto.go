@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package pdf
 
 import (
@@ -21,7 +37,7 @@ type encryptInfo struct {
 }
 
 func (r *Reader) parseEncryptDict(encObj Object, readPwd func() string) (*encryptInfo, error) {
-	enc, err := r.GetDict(encObj)
+	enc, err := r.getDict(encObj)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +47,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func() string) (*encryp
 
 	res := &encryptInfo{}
 
-	filter, err := r.GetName(enc["Filter"])
+	filter, err := r.getName(enc["Filter"])
 	if err != nil {
 		return nil, err
 	}
@@ -154,10 +170,13 @@ func (enc *encryptInfo) ToDict() Dict {
 		} else if cipher != cf.Cipher {
 			panic("not implemented: mixed ciphers")
 		}
-		if cf.Cipher != cipherRC4 {
+		switch cf.Cipher {
+		case cipherAES:
 			canV1 = false
 			canV2 = false
-		} else if cf.Cipher != cipherAES {
+		case cipherRC4:
+			// pass
+		default:
 			panic("not implemented: " + cf.Cipher.String())
 		}
 	}
@@ -403,12 +422,22 @@ func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func() string) (
 
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
 // Handler.
-func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm) *stdSecHandler {
+func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) *stdSecHandler {
+	P := stdSecPerm(perm)
+	var R int
+	const rev3Perms = 1<<(9-1) | 1<<(10-1) | 1<<(11-1) | 1<<(12-1)
+	if V < 2 && P&rev3Perms == rev3Perms {
+		R = 2
+	} else if V <= 3 {
+		R = 3
+	} else {
+		R = 4
+	}
 	sec := &stdSecHandler{
 		id:       id,
 		KeyBytes: 16,
-		R:        4,
-		P:        stdSecPerm(perm),
+		R:        R,
+		P:        P,
 
 		OwnerAuthenticated: true,
 	}
@@ -432,7 +461,7 @@ func (sec *stdSecHandler) deauthenticate() {
 // returning the key.
 func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 	// TODO(voss): key length for crypt filters???
-	if sec.key != nil {
+	if sec.key != nil && (sec.OwnerAuthenticated || !needOwner) {
 		return sec.key, nil
 	}
 

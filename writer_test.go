@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package pdf
 
 import (
@@ -75,7 +91,7 @@ ET
 
 	page1, err := w.Write(Dict{
 		"Type":      Name("Page"),
-		"CropBox":   Array{Integer(0), Integer(0), Integer(200), Integer(100)},
+		"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
 		"Resources": resources,
 		"Contents":  contentNode,
 		"Parent":    pagesRef,
@@ -126,12 +142,12 @@ ET
 		t.Fatal("xxx", err)
 	}
 
-	_, err = r.Catalog()
+	_, err = r.GetCatalog()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info, err := r.Info()
+	info, err := r.GetInfo()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,12 +204,12 @@ func TestPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	obj, err := r.GetDict(testRef)
+	obj, err := r.getDict(testRef)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	lengthOut, err := r.GetInt(obj["Length"])
+	lengthOut, err := r.getInt(obj["Length"])
 	if err != nil {
 		t.Fatal(err)
 	}

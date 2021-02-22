@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package pdf
 
 import (
@@ -13,8 +29,11 @@ import (
 	"seehuhn.de/go/pdf/fonts"
 )
 
-// Object represents an object in a PDF file.
+// Object represents an object in a PDF file.  There are nine native types of
+// PDF objects, which implement this interface: Array, Bool, Dict, Integer,
+// Name, Real, Reference, Stream, and String.
 type Object interface {
+	// PDF writes the PDF file representation of the object to w.
 	PDF(w io.Writer) error
 }
 
@@ -244,7 +263,7 @@ func (x Name) PDF(w io.Writer) error {
 	return err
 }
 
-// Array represent an array in a PDF file.
+// Array represent an array of objects in a PDF file.
 type Array []Object
 
 func (x Array) String() string {

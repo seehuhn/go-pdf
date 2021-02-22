@@ -1,7 +1,24 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -39,26 +56,30 @@ func doOneFile(fname string) error {
 	}
 	defer r.Close()
 
-	root, err := r.Catalog()
+	root, err := r.GetCatalog()
 	if err != nil {
 		return err
 	}
 	catalog := &pdf.Catalog{}
-	root.AsStruct(catalog, r.Get)
-	pages, err := r.GetDict(catalog.Pages)
+	root.AsStruct(catalog, r.Resolve)
+	pagesObj, err := r.Resolve(catalog.Pages)
 	if err != nil {
 		return err
 	}
-	count, err := r.GetInt(pages["Count"])
+	pages, ok := pagesObj.(pdf.Dict)
+	if !ok {
+		return errors.New("/Pages object has wrong type")
+	}
+	countObj, err := r.Resolve(pages["Count"])
 	if err != nil {
 		return err
 	}
 
-	_ = count
+	_ = countObj
 	// fmt.Println(count, fname)
 
 	for {
-		obj, _, err := r.Read()
+		obj, _, err := r.ReadSequential()
 		if err == io.EOF {
 			break
 		}

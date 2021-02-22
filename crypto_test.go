@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package pdf
 
 import (
@@ -52,7 +68,7 @@ func TestAuth(t *testing.T) {
 		}
 		for j, pwds := range trials {
 			sec := createStdSecHandler([]byte("0123456789ABCDEF"),
-				test.user, test.owner, PermModify)
+				test.user, test.owner, PermModify, 4)
 			key := sec.key
 
 			sec.deauthenticate()
@@ -103,7 +119,7 @@ func TestAuth(t *testing.T) {
 func TestAuth2(t *testing.T) {
 	id := []byte{0xfb, 0xa6, 0x25, 0xd9, 0xcd, 0xfb, 0x88, 0x11,
 		0x9a, 0xd5, 0xa0, 0x94, 0x33, 0x68, 0x42, 0x95}
-	sec := createStdSecHandler(id, "", "test", PermCopy)
+	sec := createStdSecHandler(id, "", "test", PermCopy, 4)
 
 	key, err := sec.GetKey(false)
 	if err != nil {
@@ -128,8 +144,8 @@ func TestEncryptBytes(t *testing.T) {
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
-					strF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  createStdSecHandler(id, "secret", "supersecret", PermPrint),
+					strF: &cryptFilter{Cipher: cipher, Length: length},
+					sec:  createStdSecHandler(id, "secret", "supersecret", PermPrint, 4),
 				}
 
 				plainText := []byte(msg)
@@ -161,7 +177,7 @@ func TestEncryptStream(t *testing.T) {
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
 					stmF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  createStdSecHandler(id, "secret", "supersecret", PermAll),
+					sec:  createStdSecHandler(id, "secret", "supersecret", PermAll, 4),
 				}
 
 				buf := &bytes.Buffer{}

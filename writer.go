@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package pdf
 
 import (
@@ -99,25 +115,29 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			}
 			pdf.id = [][]byte{id, id}
 		}
-		sec := createStdSecHandler(pdf.id[0], opt.UserPassword,
-			opt.OwnerPassword, opt.UserPermission)
 		var cf *cryptFilter
+		var V int
 		if pdf.ver >= V1_6 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 128,
 			}
+			V = 4
 		} else if pdf.ver >= V1_4 {
 			cf = &cryptFilter{
 				Cipher: cipherRC4,
 				Length: 128,
 			}
+			V = 2
 		} else {
 			cf = &cryptFilter{
 				Cipher: cipherRC4,
 				Length: 40,
 			}
+			V = 1
 		}
+		sec := createStdSecHandler(pdf.id[0], opt.UserPassword,
+			opt.OwnerPassword, opt.UserPermission, V)
 		pdf.w.enc = &encryptInfo{
 			sec:  sec,
 			stmF: cf,

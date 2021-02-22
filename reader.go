@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package pdf
 
 import (
@@ -74,7 +90,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd func() string) (*Reader, er
 	}
 
 	root := trailer["Root"]
-	catalog, err := r.GetDict(root)
+	catalog, err := r.getDict(root)
 	if err == nil {
 		catVer, ok := catalog["Version"].(Name)
 		if ok {
@@ -127,13 +143,7 @@ func (r *Reader) AuthenticateOwner() error {
 		return nil
 	}
 	_, err := r.enc.sec.GetKey(true)
-	if err != nil {
-		return err
-	}
-	if !r.enc.sec.OwnerAuthenticated {
-		panic("inconsisten authentication state")
-	}
-	return nil
+	return err
 }
 
 // Close closes the file underlying the reader.  This call only has an effect
@@ -148,17 +158,28 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// Catalog returns the PDF Catalog dictionary for the file.
-func (r *Reader) Catalog() (Dict, error) {
-	return r.GetDict(r.trailer["Root"])
+// GetCatalog returns the PDF GetCatalog dictionary for the file.
+func (r *Reader) GetCatalog() (Dict, error) {
+	return r.getDict(r.trailer["Root"])
 }
 
-// Info returns the PDF Catalog dictionary for the file.
-func (r *Reader) Info() (Dict, error) {
-	return r.GetDict(r.trailer["Info"])
+// GetInfo returns the PDF Catalog dictionary for the file.
+func (r *Reader) GetInfo() (Dict, error) {
+	return r.getDict(r.trailer["Info"])
 }
 
-func (r *Reader) Read() (Object, *Reference, error) {
+// ReadSequential returns the objects in a PDF file in the order they are
+// stored in the file.  When the end of file has been reached, io.EOF is
+// returned. The read position is not affected by other methods of the Reader,
+// sequential access can safely be interspersed with calls to `Resolve()`.
+//
+// The function returns the next object in the file, together with a Reference
+// which can be used to read the object using `Resolve()`.
+//
+// ReadSequential makes some effort to repair problems in corrupted or
+// malformed PDF files.  In particular, it may still work when the `Resolve()`
+// method fails with errors.
+func (r *Reader) ReadSequential() (Object, *Reference, error) {
 	s := r.scannerAt(r.pos)
 
 	for {
@@ -263,11 +284,11 @@ func (r *Reader) Read() (Object, *Reference, error) {
 	}
 }
 
-// Get resolves references to indirect objects.
+// Resolve resolves references to indirect objects.
 //
 // If obj is of type *Reference, the function loads the corresponding object
 // from the file and returns the result.  Otherwise, obj is returned unchanged.
-func (r *Reader) Get(obj Object) (Object, error) {
+func (r *Reader) Resolve(obj Object) (Object, error) {
 	return r.doGet(obj, true)
 }
 
@@ -417,10 +438,10 @@ func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error
 	return contents.s.ReadObject()
 }
 
-// GetDict resolves references to indirect objects and makes sure the resulting
+// getDict resolves references to indirect objects and makes sure the resulting
 // object is a dictionary.
-func (r *Reader) GetDict(obj Object) (Dict, error) {
-	candidate, err := r.Get(obj)
+func (r *Reader) getDict(obj Object) (Dict, error) {
+	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -434,10 +455,10 @@ func (r *Reader) GetDict(obj Object) (Dict, error) {
 	return val, nil
 }
 
-// GetInt resolves references to indirect objects and makes sure the resulting
+// getInt resolves references to indirect objects and makes sure the resulting
 // object is an Integer.
-func (r *Reader) GetInt(obj Object) (Integer, error) {
-	candidate, err := r.Get(obj)
+func (r *Reader) getInt(obj Object) (Integer, error) {
+	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return 0, err
 	}
@@ -451,10 +472,10 @@ func (r *Reader) GetInt(obj Object) (Integer, error) {
 	return val, nil
 }
 
-// GetName resolves references to indirect objects and makes sure the resulting
+// getName resolves references to indirect objects and makes sure the resulting
 // object is a Name.
-func (r *Reader) GetName(obj Object) (Name, error) {
-	candidate, err := r.Get(obj)
+func (r *Reader) getName(obj Object) (Name, error) {
+	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return "", err
 	}
@@ -468,10 +489,10 @@ func (r *Reader) GetName(obj Object) (Name, error) {
 	return val, nil
 }
 
-// GetString resolves references to indirect objects and makes sure the resulting
+// getString resolves references to indirect objects and makes sure the resulting
 // object is a String.
-func (r *Reader) GetString(obj Object) (String, error) {
-	candidate, err := r.Get(obj)
+func (r *Reader) getString(obj Object) (String, error) {
+	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -497,7 +518,7 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 		}
 	}
 	r.level++
-	val, err := r.GetInt(obj)
+	val, err := r.getInt(obj)
 	r.level--
 	return val, err
 }
