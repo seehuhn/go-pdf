@@ -18,7 +18,6 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -26,73 +25,80 @@ import (
 func TestAuthentication(t *testing.T) {
 	msg := "super sécret"
 	for i, ver := range []Version{V1_6, V1_4, V1_3} {
-		out := &bytes.Buffer{}
+		for _, userFirst := range []bool{true, false} {
+			out := &bytes.Buffer{}
 
-		opt := &WriterOptions{
-			Version:        ver,
-			UserPassword:   "user",
-			OwnerPassword:  "owner",
-			UserPermission: PermAll,
-		}
-		w, err := NewWriter(out, opt)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		ref, err := w.Write(TextString(msg), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = w.SetCatalog(Dict{})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = w.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		pwdList := []string{"don't know", "user", "friend", "owner"}
-		pwdFunc := func() string {
-			if len(pwdList) == 0 {
-				return ""
+			opt := &WriterOptions{
+				Version:        ver,
+				UserPassword:   "user",
+				OwnerPassword:  "owner",
+				UserPermission: PermAll,
 			}
-			res := pwdList[0]
-			pwdList = pwdList[1:]
-			return res
-		}
+			w, err := NewWriter(out, opt)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		fmt.Println(out.String())
+			ref, err := w.Write(TextString(msg), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		outR := bytes.NewReader(out.Bytes())
-		r, err := NewReader(outR, outR.Size(), pwdFunc)
-		if err != nil {
-			t.Fatal(err, i)
-		}
-		dec, err := r.getString(ref)
-		if err != nil {
-			t.Fatal(err, i)
-		}
-		if dec.AsTextString() != msg {
-			t.Error("got wrong message", i)
-		}
-		if len(pwdList) != 2 {
-			t.Error("wrong user password used", i)
-		}
-		if r.enc.sec.OwnerAuthenticated {
-			t.Fatal("owner wrongly authenticated")
-		}
-		err = r.AuthenticateOwner()
-		if err != nil {
-			t.Fatal(err, i)
-		}
-		if !r.enc.sec.OwnerAuthenticated {
-			t.Fatal("owner not authenticated")
-		}
-		if len(pwdList) != 0 {
-			t.Error("wrong owner password used", i)
+			err = w.SetCatalog(Dict{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = w.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// ---------------------------------------------------------
+			// os.WriteFile(fmt.Sprintf("xxx%d.pdf", i), out.Bytes(), 0o666)
+			// ---------------------------------------------------------
+
+			var pwdList []string
+			if userFirst {
+				pwdList = append(pwdList, "don't know", "user")
+			}
+			pwdList = append(pwdList, "friend", "owner")
+			pwdFunc := func() string {
+				res := pwdList[0]
+				pwdList = pwdList[1:]
+				return res
+			}
+
+			in := bytes.NewReader(out.Bytes())
+			r, err := NewReader(in, in.Size(), pwdFunc)
+			if err != nil {
+				t.Fatal(err, i)
+			}
+			if userFirst {
+				dec, err := r.getString(ref)
+				if err != nil {
+					t.Fatal(err, i)
+				}
+				if dec.AsTextString() != msg {
+					t.Error("got wrong message", i)
+				}
+				if len(pwdList) != 2 {
+					t.Error("wrong user password used", i)
+				}
+			}
+			if r.enc.sec.OwnerAuthenticated {
+				t.Fatal("owner wrongly authenticated")
+			}
+			err = r.AuthenticateOwner()
+			if err != nil {
+				t.Fatal(err, i)
+			}
+			if !r.enc.sec.OwnerAuthenticated {
+				t.Fatal("owner not authenticated")
+			}
+			if len(pwdList) != 0 {
+				t.Error("wrong owner password used", i)
+			}
 		}
 	}
 }

@@ -449,7 +449,8 @@ func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 	if err != nil {
 		return err
 	}
-	return nil
+	_, err = pdf.w.Write([]byte{'\n'})
+	return err
 }
 
 func (pdf *Writer) writeXRefStream(xRefDict Dict) error {

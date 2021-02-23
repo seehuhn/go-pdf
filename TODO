@@ -1,10 +1,9 @@
 - make sure that unit tests don't leave stray files behind
-- remove the excess empty line before "startxref"
 - rationalize the error handling
-- check whether any dependencies use "fmt", and if not, try to not use "fmt"
 - make sure that supporting incremental updates to PDF files will not require
   major changes to the API
 
+- check whether any dependencies use "fmt", and if not, try to not use "fmt"
 - implement crypt filters?
 - attempt to add pdf-2.0 support?
 - add a way to repair broken xref tables?

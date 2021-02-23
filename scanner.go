@@ -136,42 +136,6 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 	return obj, ref, nil
 }
 
-func (s *scanner) readIndirectInteger() (Integer, error) {
-	_, err := s.ReadInteger() // object number
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.ReadInteger() // generation
-	if err != nil {
-		return 0, err
-	}
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return 0, err
-	}
-
-	err = s.SkipString("obj")
-	if err != nil {
-		return 0, err
-	}
-
-	obj, err := s.ReadInteger()
-	if err != nil {
-		return 0, err
-	}
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return 0, err
-	}
-
-	err = s.SkipString("endobj")
-	if err != nil {
-		return 0, err
-	}
-
-	return obj, nil
-}
-
 func (s *scanner) ReadObject() (Object, error) {
 	buf, err := s.Peek(5) // len("false") == 5
 	if err == nil {

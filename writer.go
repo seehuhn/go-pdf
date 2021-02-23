@@ -203,7 +203,7 @@ func (pdf *Writer) Close() error {
 		return err
 	}
 
-	_, err = fmt.Fprintf(pdf.w, "\nstartxref\n%d\n%%%%EOF\n", xRefPos)
+	_, err = fmt.Fprintf(pdf.w, "startxref\n%d\n%%%%EOF\n", xRefPos)
 	if err != nil {
 		return err
 	}

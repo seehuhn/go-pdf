@@ -433,9 +433,13 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 	} else {
 		R = 4
 	}
+	keyBytes := 16
+	if V == 1 {
+		keyBytes = 5
+	}
 	sec := &stdSecHandler{
 		id:       id,
-		KeyBytes: 16,
+		KeyBytes: keyBytes,
 		R:        R,
 		P:        P,
 

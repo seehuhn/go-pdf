@@ -24,13 +24,6 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-// Rect takes the coordinates of two diagonally opposite points
-// and returns a PDF rectangle.
-func Rect(llx, lly, urx, ury int) pdf.Array {
-	return pdf.Array{pdf.Integer(llx), pdf.Integer(lly),
-		pdf.Integer(urx), pdf.Integer(ury)}
-}
-
 // WritePage emits a single page to the PDF file and returns the page dict.
 func WritePage(out *pdf.Writer, i int) (pdf.Dict, error) {
 	stream, contentNode, err := out.OpenStream(nil, nil, nil)

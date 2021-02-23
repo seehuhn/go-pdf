@@ -84,13 +84,13 @@ fieldLoop:
 // AsStruct initialises a tagged struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
 // The function get(), if non-nil, is used to resolve references to indirect
-// objects, where needed; the Reader.Get() method can be used for this
+// objects, where needed; the `Reader.Resolve()` method can be used for this
 // argument.
 func (d Dict) AsStruct(s interface{}, get func(Object) (Object, error)) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
 
-	// To allow parsing malformed PDF files, we don't abort on error. Instead,
+	// To allow parsing malformed PDF files, we don't abort on error.  Instead,
 	// we fill all struct fields we can and then return the first error
 	// encountered.
 	var firstErr error
