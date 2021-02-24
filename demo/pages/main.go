@@ -40,7 +40,7 @@ func WritePage(out *pdf.Writer, i int) (pdf.Dict, error) {
 		_, err = stream.Write([]byte(`BT
 		/F1 36 Tf
 		10 50 Td
-		(AVAVXXXAVAV) Tj
+		(OXO) Tj
 		ET`))
 	}
 	if err != nil {

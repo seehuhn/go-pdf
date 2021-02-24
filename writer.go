@@ -28,7 +28,7 @@ import (
 
 // Writer represents a PDF file open for writing.
 type Writer struct {
-	ver      Version
+	Version  Version
 	id       [][]byte
 	w        *posWriter
 	xref     map[int]*xRefEntry
@@ -63,7 +63,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	}
 
 	pdf := &Writer{
-		ver: opt.Version,
+		Version: opt.Version,
 
 		w:       &posWriter{w: w},
 		nextRef: 1,
@@ -117,13 +117,13 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		}
 		var cf *cryptFilter
 		var V int
-		if pdf.ver >= V1_6 {
+		if pdf.Version >= V1_6 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 128,
 			}
 			V = 4
-		} else if pdf.ver >= V1_4 {
+		} else if pdf.Version >= V1_4 {
 			cf = &cryptFilter{
 				Cipher: cipherRC4,
 				Length: 128,
@@ -194,7 +194,7 @@ func (pdf *Writer) Close() error {
 
 	xRefPos := pdf.w.pos
 	var err error
-	if pdf.ver < V1_5 {
+	if pdf.Version < V1_5 {
 		err = pdf.writeXRefTable(xRefDict)
 	} else {
 		err = pdf.writeXRefStream(xRefDict)
@@ -720,7 +720,7 @@ func (x *placeholder) Set(val Object) error {
 }
 
 func (pdf *Writer) checkVersion(operation string, minVersion Version) error {
-	if pdf.ver >= minVersion {
+	if pdf.Version >= minVersion {
 		return nil
 	}
 	return &VersionError{

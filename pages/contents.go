@@ -73,8 +73,13 @@ func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
 		return nil, err
 	}
 
-	// TODO(voss): compress the stream
-	stream, _, err := tree.w.OpenStream(nil, contentRef, nil)
+	// TODO(voss): Use "LZWDecode" if tree.w.Version<pdf.V1_2
+	opt := &pdf.StreamOptions{
+		Filters: []*pdf.FilterInfo{
+			{Name: "FlateDecode"},
+		},
+	}
+	stream, _, err := tree.w.OpenStream(nil, contentRef, opt)
 	if err != nil {
 		return nil, err
 	}
