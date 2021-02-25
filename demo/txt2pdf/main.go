@@ -57,11 +57,14 @@ func convert(inName, outName string) error {
 	}
 	defer out.Close()
 
-	out.SetInfo(pdf.Struct(&pdf.Info{
+	err = out.SetInfo(pdf.Struct(&pdf.Info{
 		Title:        inName,
 		Producer:     "seehuhn.de/go/pdf/demo/txt2pdf",
 		CreationDate: time.Now(),
 	}))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	enc := fonts.WinAnsiEncoding
 	font, err := out.Write(pdf.Dict{

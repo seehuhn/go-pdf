@@ -105,8 +105,8 @@ func TestFrame(t *testing.T) {
 
 	page, err := pageTree.AddPage(&pages.Attributes{
 		MediaBox: &pages.Rectangle{
-			URx: pages.A5.URx - pages.A5.LLx,
-			URy: pages.A5.URy - pages.A5.LLy,
+			URx: box.Width,
+			URy: box.Height + box.Depth,
 		},
 	})
 	if err != nil {

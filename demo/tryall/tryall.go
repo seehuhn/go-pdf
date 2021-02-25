@@ -18,11 +18,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"sort"
 
 	"seehuhn.de/go/pdf"
 )
@@ -61,7 +63,10 @@ func doOneFile(fname string) error {
 		return err
 	}
 	catalog := &pdf.Catalog{}
-	root.AsStruct(catalog, r.Resolve)
+	err = root.AsStruct(catalog, r.Resolve)
+	if err != nil {
+		return err
+	}
 	pagesObj, err := r.Resolve(catalog.Pages)
 	if err != nil {
 		return err
@@ -87,7 +92,59 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		_ = obj
+		stream, ok := obj.(*pdf.Stream)
+		if !ok {
+			continue
+		}
+		filters, err := stream.Filters()
+		if err != nil {
+			return err
+		}
+		for _, fi := range filters {
+			if fi.Name != "FlateDecode" {
+				continue
+			}
+
+			useColors := false
+			if pred, ok := fi.Parms["Predictor"].(pdf.Integer); ok && pred > 1 {
+				useColors = true
+			}
+
+			var keys []pdf.Name
+			for key, val := range fi.Parms {
+				if key == "Columns" {
+					continue
+				}
+				if key == "BitsPerComponent" && val == pdf.Integer(8) {
+					continue
+				}
+				if key == "Colors" && (val == pdf.Integer(1) || !useColors) {
+					continue
+				}
+				keys = append(keys, key)
+			}
+			if len(keys) == 0 {
+				continue
+			}
+			sort.Slice(keys, func(i int, j int) bool {
+				return keys[i] < keys[j]
+			})
+
+			buf := &bytes.Buffer{}
+			for _, name := range keys {
+				val := fi.Parms[name]
+				if val == nil {
+					continue
+				}
+				if buf.Len() > 0 {
+					buf.WriteString(", ")
+				}
+				buf.WriteString(string(name) + ":")
+				val.PDF(buf)
+			}
+			fmt.Println(buf.String())
+		}
+
 		// dict, ok := obj.(pdf.Dict)
 		// if !ok {
 		// 	continue

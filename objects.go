@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -334,8 +335,7 @@ func (x Dict) PDF(w io.Writer) error {
 		return keys[i] < keys[j]
 	})
 
-	for _, key := range keys {
-		name := Name(key)
+	for _, name := range keys {
 		val := x[name]
 		if val == nil {
 			continue
@@ -421,9 +421,53 @@ func (x *Stream) PDF(w io.Writer) error {
 	return err
 }
 
+// Filters extracts the information contained in the /Filter and /DecodeParms
+// entries of the stream dictionary.
+func (x *Stream) Filters() ([]*FilterInfo, error) {
+	parms := x.Dict["DecodeParms"]
+	var filters []*FilterInfo
+	switch f := x.Dict["Filter"].(type) {
+	case nil:
+		// pass
+	case Array:
+		pa, _ := parms.(Array)
+		for i, fi := range f {
+			name, err := asName(fi)
+			if err != nil {
+				return nil, err
+			}
+			var pDict Dict
+			if len(pa) > i {
+				x, err := asDict(pa[i])
+				if err != nil {
+					return nil, err
+				}
+				pDict = x
+			}
+			filter := &FilterInfo{
+				Name:  name,
+				Parms: pDict,
+			}
+			filters = append(filters, filter)
+		}
+	case Name:
+		pDict, err := asDict(parms)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, &FilterInfo{
+			Name:  f,
+			Parms: pDict,
+		})
+	default:
+		return nil, errors.New("invalid /Filter field")
+	}
+	return filters, nil
+}
+
 // Decode returns a reader for the decoded stream data.
 func (x *Stream) Decode() (io.Reader, error) {
-	filters, err := extractFilterInfo(x.Dict)
+	filters, err := x.Filters()
 	if err != nil {
 		return nil, err
 	}

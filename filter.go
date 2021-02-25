@@ -46,6 +46,17 @@
 //     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 //     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// Frequencies of filter types used in the PDF files on my laptop:
+//     165622 FlateDecode
+//      11334 CCITTFaxDecode
+//       7595 DCTDecode
+//       3440 LZWDecode
+//       3431 ASCII85Decode
+//        455 JBIG2Decode
+//        166 ASCIIHexDecode
+//         78 JPXDecode
+//          5 RunLengthDecode
+
 package pdf
 
 import (
@@ -55,48 +66,6 @@ import (
 	"io"
 	"strconv"
 )
-
-func extractFilterInfo(dict Dict) ([]*FilterInfo, error) {
-	parms := dict["DecodeParms"]
-	var filters []*FilterInfo
-	switch f := dict["Filter"].(type) {
-	case nil:
-		// pass
-	case Array:
-		pa, _ := parms.(Array)
-		for i, fi := range f {
-			name, err := asName(fi)
-			if err != nil {
-				return nil, err
-			}
-			var pDict Dict
-			if len(pa) > i {
-				x, err := asDict(pa[i])
-				if err != nil {
-					return nil, err
-				}
-				pDict = x
-			}
-			filter := &FilterInfo{
-				Name:  name,
-				Parms: pDict,
-			}
-			filters = append(filters, filter)
-		}
-	case Name:
-		pDict, err := asDict(parms)
-		if err != nil {
-			return nil, err
-		}
-		filters = append(filters, &FilterInfo{
-			Name:  f,
-			Parms: pDict,
-		})
-	default:
-		return nil, errors.New("invalid /Filter field")
-	}
-	return filters, nil
-}
 
 type flateFilter struct {
 	Predictor        int
@@ -143,15 +112,15 @@ func (ff *flateFilter) ToDict() Dict {
 		res["Predictor"] = Integer(ff.Predictor)
 		needed = true
 	}
-	if ff.Predictor != 1 {
+	if ff.Colors != 1 {
 		res["Colors"] = Integer(ff.Colors)
 		needed = true
 	}
-	if ff.Predictor != 8 {
+	if ff.BitsPerComponent != 8 {
 		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
 		needed = true
 	}
-	if ff.Predictor != 1 {
+	if ff.Columns != 1 {
 		res["Columns"] = Integer(ff.Columns)
 		needed = true
 	}

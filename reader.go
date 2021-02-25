@@ -44,6 +44,9 @@ type Reader struct {
 }
 
 // NewReader creates a new Reader object.
+//
+// TODO(voss): should the readPwd method receive the document ID as an
+// argument?
 func NewReader(data io.ReaderAt, size int64, readPwd func() string) (*Reader, error) {
 	r := &Reader{
 		size:    size,

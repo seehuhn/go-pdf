@@ -18,6 +18,7 @@ package pages
 
 import (
 	"bufio"
+	"errors"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -45,6 +46,9 @@ func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
 	if attr != nil && attr.MediaBox != nil {
 		mediaBox = attr.MediaBox
 	}
+	if mediaBox == nil {
+		return nil, errors.New("missing MediaBox")
+	}
 
 	contentRef := tree.w.Alloc()
 
@@ -57,11 +61,15 @@ func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
 			pageDict["Resources"] = attr.Resources
 		}
 		if attr.MediaBox != nil &&
-			(def.MediaBox == nil || !def.MediaBox.NearlyEqual(attr.MediaBox, 1)) {
+			(def == nil ||
+				def.MediaBox == nil ||
+				!def.MediaBox.NearlyEqual(attr.MediaBox, 1)) {
 			pageDict["MediaBox"] = attr.MediaBox.ToObject()
 		}
 		if attr.CropBox != nil &&
-			(def.CropBox == nil || !def.CropBox.NearlyEqual(attr.CropBox, 1)) {
+			(def == nil ||
+				def.CropBox == nil ||
+				!def.CropBox.NearlyEqual(attr.CropBox, 1)) {
 			pageDict["CropBox"] = attr.CropBox.ToObject()
 		}
 		if attr.Rotate != 0 && def.Rotate != attr.Rotate {
