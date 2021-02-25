@@ -300,7 +300,7 @@ func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, *Reference, erro
 	if err != nil {
 		return nil, nil, err
 	}
-	decoded, err := stream.Decode()
+	decoded, err := stream.Decode(nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -496,7 +496,10 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 
 	opt := &StreamOptions{
 		Filters: []*FilterInfo{
-			{"FlateDecode", Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)}},
+			{
+				"FlateDecode",
+				Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)},
+			},
 		},
 	}
 	swx, _, err := pdf.OpenStream(xRefDict, ref, opt)

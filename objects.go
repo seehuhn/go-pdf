@@ -423,22 +423,42 @@ func (x *Stream) PDF(w io.Writer) error {
 
 // Filters extracts the information contained in the /Filter and /DecodeParms
 // entries of the stream dictionary.
-func (x *Stream) Filters() ([]*FilterInfo, error) {
-	parms := x.Dict["DecodeParms"]
+func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, error) {
+	if resolve == nil {
+		resolve = func(obj Object) (Object, error) {
+			return obj, nil
+		}
+	}
+	parms, err := resolve(x.Dict["DecodeParms"])
+	if err != nil {
+		return nil, err
+	}
 	var filters []*FilterInfo
-	switch f := x.Dict["Filter"].(type) {
+	filter, err := resolve(x.Dict["Filter"])
+	if err != nil {
+		return nil, err
+	}
+	switch f := filter.(type) {
 	case nil:
 		// pass
 	case Array:
 		pa, _ := parms.(Array)
 		for i, fi := range f {
+			fi, err := resolve(fi)
+			if err != nil {
+				return nil, err
+			}
 			name, err := asName(fi)
 			if err != nil {
 				return nil, err
 			}
 			var pDict Dict
 			if len(pa) > i {
-				x, err := asDict(pa[i])
+				pai, err := resolve(pa[i])
+				if err != nil {
+					return nil, err
+				}
+				x, err := asDict(pai)
 				if err != nil {
 					return nil, err
 				}
@@ -466,8 +486,10 @@ func (x *Stream) Filters() ([]*FilterInfo, error) {
 }
 
 // Decode returns a reader for the decoded stream data.
-func (x *Stream) Decode() (io.Reader, error) {
-	filters, err := x.Filters()
+//
+// TODO(voss): allow to decode only the first few filters?
+func (x *Stream) Decode(resolve func(Object) (Object, error)) (io.Reader, error) {
+	filters, err := x.Filters(resolve)
 	if err != nil {
 		return nil, err
 	}

@@ -93,7 +93,7 @@ func TestStream(t *testing.T) {
 		},
 		R: rIn,
 	}
-	rOut, err := stream.Decode()
+	rOut, err := stream.Decode(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

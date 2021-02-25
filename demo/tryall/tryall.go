@@ -63,10 +63,9 @@ func doOneFile(fname string) error {
 		return err
 	}
 	catalog := &pdf.Catalog{}
-	err = root.AsStruct(catalog, r.Resolve)
-	if err != nil {
-		return err
-	}
+	// Ignore errors, to get at least partial information in case of malformed
+	// PDF files.
+	_ = root.AsStruct(catalog, r.Resolve)
 	pagesObj, err := r.Resolve(catalog.Pages)
 	if err != nil {
 		return err
@@ -96,7 +95,7 @@ func doOneFile(fname string) error {
 		if !ok {
 			continue
 		}
-		filters, err := stream.Filters()
+		filters, err := stream.Filters(r.Resolve)
 		if err != nil {
 			return err
 		}

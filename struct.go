@@ -23,6 +23,8 @@ import (
 	"time"
 )
 
+// TODO(voss): document the struct tags
+
 // Struct creates a PDF Dict object, encoding the fields of a Go struct.
 func Struct(s interface{}) Dict {
 	v := reflect.Indirect(reflect.ValueOf(s))

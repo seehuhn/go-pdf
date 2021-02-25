@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Some code here, e.g. the pngUpReader, is taken from
-// https://pkg.go.dev/rsc.io/pdf .  Use of this source code is governed by a
-// BSD-style license, which is reproduced here:
+// Some code here is taken from "image/png" (and then modified).  Use of this
+// source code is governed by a BSD-style license, which is reproduced here:
 //
 //     Copyright (c) 2009 The Go Authors. All rights reserved.
 //
@@ -46,7 +45,7 @@
 //     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 //     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Frequencies of filter types used in the PDF files on my laptop:
+// Frequencies of filter types used in the PDF files on my system:
 //     165622 FlateDecode
 //      11334 CCITTFaxDecode
 //       7595 DCTDecode
@@ -62,10 +61,24 @@ package pdf
 import (
 	"compress/zlib"
 	"errors"
-	"fmt"
 	"io"
 	"strconv"
 )
+
+// FilterInfo describes one PDF stream filter.
+type FilterInfo struct {
+	Name  Name
+	Parms Dict
+}
+
+func (fi *FilterInfo) getFilter() (filter, error) {
+	switch fi.Name {
+	case "FlateDecode":
+		return ffFromDict(fi.Parms), nil
+	default:
+		return nil, errors.New("unsupported filter type " + string(fi.Name))
+	}
+}
 
 type flateFilter struct {
 	Predictor        int
@@ -76,7 +89,7 @@ type flateFilter struct {
 }
 
 func ffFromDict(parms Dict) *flateFilter {
-	res := &flateFilter{
+	res := &flateFilter{ // set defaults
 		Predictor:        1,
 		Colors:           1,
 		BitsPerComponent: 8,
@@ -86,17 +99,17 @@ func ffFromDict(parms Dict) *flateFilter {
 	if parms == nil {
 		return res
 	}
-	if val, ok := parms["Predictor"].(Integer); ok && val >= 1 && val <= 15 {
+
+	if val, ok := parms["Predictor"].(Integer); ok {
 		res.Predictor = int(val)
 	}
-	if val, ok := parms["Colors"].(Integer); ok && val >= 1 {
+	if val, ok := parms["Colors"].(Integer); ok {
 		res.Colors = int(val)
 	}
-	if val, ok := parms["BitsPerComponent"].(Integer); ok &&
-		(val == 1 || val == 2 || val == 4 || val == 8 || val == 16) {
+	if val, ok := parms["BitsPerComponent"].(Integer); ok {
 		res.BitsPerComponent = int(val)
 	}
-	if val, ok := parms["Columns"].(Integer); ok && val >= 0 && res.Predictor > 1 {
+	if val, ok := parms["Columns"].(Integer); ok {
 		res.Columns = int(val)
 	}
 	if val, ok := parms["EarlyChange"].(Integer); ok {
@@ -134,7 +147,97 @@ func (ff *flateFilter) ToDict() Dict {
 	return res
 }
 
+func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
+	if ff.EarlyChange == false {
+		return nil, errors.New("unsupported /EarlyChange setting")
+	}
+
+	var res io.Reader
+	var err error
+	res, err = zlib.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case ff.Predictor == 1:
+		// pass
+	case ff.Predictor >= 10 && ff.Predictor <= 15:
+		if ff.Colors < 1 || ff.Colors > 64 {
+			return nil, errors.New("invalid number of colour channels")
+		}
+		if ff.BitsPerComponent < 1 || ff.BitsPerComponent > 32 {
+			return nil, errors.New("invalid number of bits per component")
+		}
+		if ff.Columns < 1 || ff.Columns > 1<<20 {
+			return nil, errors.New("invalid number of columns")
+		}
+		res = ff.newPngReader(res)
+	default:
+		return nil, errors.New("unsupported predictor " + strconv.Itoa(ff.Predictor))
+	}
+	return res, nil
+}
+
+type pngReader struct {
+	r io.Reader
+
+	bytesPerPixel int
+
+	cr   []byte // current row
+	pr   []byte // previous row
+	pend []byte // data already converted, but not yet read by client
+}
+
+func (ff *flateFilter) newPngReader(r io.Reader) *pngReader {
+	res := &pngReader{
+		r: r,
+	}
+	bitsPerPixel := ff.BitsPerComponent * ff.Colors
+	res.bytesPerPixel = (bitsPerPixel + 7) / 8
+
+	// The +1 is for the per-row filter type, which is at cr[0].
+	rowSize := 1 + (bitsPerPixel*ff.Columns+7)/8
+	res.cr = make([]uint8, rowSize)
+	res.pr = make([]uint8, rowSize)
+
+	return res
+}
+
+func (r *pngReader) Read(b []byte) (int, error) {
+	n := 0
+	for len(b) > 0 {
+		if len(r.pend) > 0 {
+			m := copy(b, r.pend)
+			n += m
+			b = b[m:]
+			r.pend = r.pend[m:]
+			continue
+		}
+		_, err := io.ReadFull(r.r, r.cr)
+		if err != nil {
+			return n, err
+		}
+
+		// Apply the filter.
+		ft := r.cr[0]
+		if ft < 0 || ft >= nFilter {
+			return 0, errors.New("bad PNG filter type")
+		}
+		pngDec[ft](r.cr[1:], r.pr[1:], r.bytesPerPixel)
+		r.pend = r.cr[1:]
+
+		// The current row for y is the previous row for y+1.
+		r.pr, r.cr = r.cr, r.pr
+	}
+
+	return n, nil
+}
+
 func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
+	if ff.EarlyChange == false {
+		return nil, errors.New("unsupported /EarlyChange setting")
+	}
+
 	zw := zlib.NewWriter(w)
 
 	close := func() error {
@@ -145,114 +248,303 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 		return w.Close()
 	}
 
-	switch ff.Predictor {
-	case 1:
+	switch {
+	case ff.Predictor == 1:
 		return &withClose{zw, close}, nil
-	case 12:
-		columns := ff.Columns
-		return &pngUpWriter{
-			w:     zw,
-			prev:  make([]byte, columns),
-			cur:   make([]byte, columns+1),
-			close: close,
-		}, nil
+	case ff.Predictor >= 10 && ff.Predictor <= 15:
+		if ff.Colors < 1 || ff.Colors > 64 {
+			return nil, errors.New("invalid number of colour channels")
+		}
+		if ff.BitsPerComponent < 1 || ff.BitsPerComponent > 32 {
+			return nil, errors.New("invalid number of bits per component")
+		}
+		if ff.Columns < 1 || ff.Columns > 1<<20 {
+			return nil, errors.New("invalid number of columns")
+		}
+		return ff.newPngWriter(zw, close), nil
 	default:
 		return nil, errors.New("unsupported predictor " + strconv.Itoa(ff.Predictor))
 	}
 }
 
-func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
-	var res io.Reader
-	var err error
-	res, err = zlib.NewReader(r)
-	if err != nil {
-		return nil, err
-	}
-	switch ff.Predictor {
-	case 1:
-		// pass
-	case 12:
-		columns := ff.Columns
-		res = &pngUpReader{
-			r:    res,
-			prev: make([]byte, 1+columns),
-			tmp:  make([]byte, 1+columns),
-			pend: []byte{},
-		}
-	default:
-		return nil, errors.New("unsupported predictor " + strconv.Itoa(ff.Predictor))
-	}
-	return res, nil
-}
-
-type pngUpReader struct {
-	r    io.Reader
-	prev []byte
-	tmp  []byte
-	pend []byte
-}
-
-func (r *pngUpReader) Read(b []byte) (int, error) {
-	n := 0
-	for len(b) > 0 {
-		if len(r.pend) > 0 {
-			m := copy(b, r.pend)
-			n += m
-			b = b[m:]
-			r.pend = r.pend[m:]
-			continue
-		}
-		_, err := io.ReadFull(r.r, r.tmp)
-		if err != nil {
-			return n, err
-		}
-		if r.tmp[0] != 2 {
-			return n, fmt.Errorf("malformed PNG-Up encoding")
-		}
-		for i, b := range r.tmp {
-			r.prev[i] += b
-		}
-		r.pend = r.prev[1:]
-	}
-	return n, nil
-}
-
-type pngUpWriter struct {
+type pngWriter struct {
 	w     io.Writer
-	prev  []byte // length col
-	cur   []byte // length col+1
-	pos   int
 	close func() error
+
+	predictor    int
+	bitsPerPixel int
+
+	cr  [nFilter][]uint8
+	pr  []uint8
+	pos int
 }
 
-func (w *pngUpWriter) Write(p []byte) (int, error) {
-	tmp := w.cur[1:]
+func (ff *flateFilter) newPngWriter(w io.Writer, close func() error) *pngWriter {
+	res := &pngWriter{
+		w:     w,
+		close: close,
+	}
+	if ff.Predictor > 10 || ff.Predictor < 15 {
+		res.predictor = ff.Predictor - 10
+	}
+	res.bitsPerPixel = ff.BitsPerComponent * ff.Colors
+
+	// cr[*] and pr are the bytes for the current and previous row. cr[0] is
+	// unfiltered (or equivalently, filtered with the ftNone filter). cr[ft],
+	// for non-zero filter types ft, are buffers for transforming cr[0] under
+	// the other PNG filter types. These buffers are allocated once and re-used
+	// for each row. The +1 is for the per-row filter type, which is at
+	// cr[*][0].
+	sz := 1 + (res.bitsPerPixel*ff.Columns+7)/8
+	for i := range res.cr {
+		res.cr[i] = make([]uint8, sz)
+		res.cr[i][0] = uint8(i)
+	}
+	res.pr = make([]uint8, sz)
+
+	return res
+}
+
+// Chooses the filter to use for encoding the current row, and applies it. The
+// return value is the index of the filter and also of the row in cr that has
+// had it applied.
+//
+// We try all five filter types, and pick the one that minimizes the sum of
+// absolute differences. This is the same heuristic that libpng uses,
+// although the filters are attempted in order of estimated most likely to
+// be minimal, rather than in their enumeration order.
+func (w *pngWriter) choosePredictor() int {
+	cdat := w.cr[0][1:]
+	pdat := w.pr[1:]
+	bpp := (w.bitsPerPixel + 7) / 8
+
+	best := maxInt
+	filter := -1
+	for _, ft := range []int{ftUp, ftNone, ftPaeth, ftSub, ftAverage} {
+		out := w.cr[ft][1:]
+		pngEnc[ft](out, cdat, pdat, bpp)
+
+		sum := 0
+		for _, c := range out {
+			sum += abs8(c)
+			if sum >= best {
+				break
+			}
+		}
+		if sum < best {
+			best = sum
+			filter = ft
+		}
+	}
+
+	return filter
+}
+
+func (w *pngWriter) Write(p []byte) (int, error) {
 	n := 0
 	for len(p) > 0 {
+		tmp := w.cr[0][1:]
 		l := copy(tmp[w.pos:], p)
 		p = p[l:]
 		w.pos += l
 		n += l
 		if w.pos >= len(tmp) {
-			w.cur[0] = 2
-			for i := 0; i < w.pos; i++ {
-				tmp[i], w.prev[i] = tmp[i]-w.prev[i], tmp[i]
+			var ft int
+			if w.predictor > 0 {
+				ft = w.predictor
+				out := w.cr[ft][1:]
+				cdat := w.cr[0][1:]
+				pdat := w.pr[1:]
+				bpp := (w.bitsPerPixel + 7) / 8
+				pngEnc[ft](out, cdat, pdat, bpp)
+			} else {
+				ft = w.choosePredictor()
 			}
-			_, err := w.w.Write(w.cur)
+			_, err := w.w.Write(w.cr[ft])
 			if err != nil {
 				return n, err
 			}
+
+			// The current row for y is the previous row for y+1.
+			w.cr[0], w.pr = w.pr, w.cr[0]
 			w.pos = 0
 		}
 	}
 	return n, nil
 }
 
-func (w *pngUpWriter) Close() error {
+func (w *pngWriter) Close() error {
 	if w.close != nil {
 		return w.close()
 	}
 	return nil
+}
+
+// Filter type, as per the PNG spec.
+const (
+	ftNone    = 0
+	ftSub     = 1
+	ftUp      = 2
+	ftAverage = 3
+	ftPaeth   = 4
+	nFilter   = 5
+)
+
+var pngDec = [nFilter]func([]byte, []byte, int){
+	pngNoneDec,
+	pngSubDec,
+	pngUpDec,
+	pngAverageDec,
+	pngPaethDec,
+}
+
+var pngEnc = [nFilter]func([]byte, []byte, []byte, int){
+	pngNoneEnc,
+	pngSubEnc,
+	pngUpEnc,
+	pngAverageEnc,
+	pngPaethEnc,
+}
+
+func pngNoneDec(cdat, pdat []byte, bpp int) {
+	// No-op.
+}
+
+func pngNoneEnc(out, cdat, pdat []byte, bpp int) {
+	copy(out, cdat)
+}
+
+func pngSubDec(cdat, pdat []byte, bpp int) {
+	for i := bpp; i < len(cdat); i++ {
+		cdat[i] += cdat[i-bpp]
+	}
+}
+
+func pngSubEnc(out, cdat, pdat []byte, bpp int) {
+	for i := 0; i < bpp; i++ {
+		out[i] = cdat[i]
+	}
+	for i := bpp; i < len(out); i++ {
+		out[i] = cdat[i] - cdat[i-bpp]
+	}
+}
+
+func pngUpDec(cdat, pdat []byte, bpp int) {
+	for i, p := range pdat {
+		cdat[i] += p
+	}
+}
+
+func pngUpEnc(out, cdat, pdat []byte, bpp int) {
+	for i := 0; i < len(out); i++ {
+		out[i] = cdat[i] - pdat[i]
+	}
+}
+
+func pngAverageDec(cdat, pdat []byte, bpp int) {
+	// The first column has no column to the left of it, so it is a
+	// special case.  We know that the first column exists because ...,
+	// and so len(cdat) != 0.
+	// TODO(voss): check that this is still true
+	for i := 0; i < bpp; i++ {
+		cdat[i] += pdat[i] / 2
+	}
+	for i := bpp; i < len(cdat); i++ {
+		cdat[i] += byte((int(cdat[i-bpp]) + int(pdat[i])) / 2)
+	}
+}
+
+func pngAverageEnc(out, cdat, pdat []byte, bpp int) {
+	for i := 0; i < bpp; i++ {
+		out[i] = cdat[i] - pdat[i]/2
+	}
+	for i := bpp; i < len(out); i++ {
+		out[i] = cdat[i] - uint8((int(cdat[i-bpp])+int(pdat[i]))/2)
+	}
+}
+
+// pngPaethDec applies the Paeth filter to the cdat slice.
+// cdat is the current row's data, pdat is the previous row's data.
+func pngPaethDec(cdat, pdat []byte, bpp int) {
+	var a, b, c, pa, pb, pc int
+	for i := 0; i < bpp; i++ {
+		a, c = 0, 0
+		for j := i; j < len(cdat); j += bpp {
+			b = int(pdat[j])
+			pa = b - c
+			pb = a - c
+			pc = abs(pa + pb)
+			pa = abs(pa)
+			pb = abs(pb)
+			if pa <= pb && pa <= pc {
+				// No-op.
+			} else if pb <= pc {
+				a = b
+			} else {
+				a = c
+			}
+			a += int(cdat[j])
+			a &= 0xff
+			cdat[j] = uint8(a)
+			c = b
+		}
+	}
+}
+
+// pngPaethEnc implements the Paeth filter function, as per the PNG
+// specification.
+func pngPaethEnc(out, cdat, pdat []byte, bpp int) {
+	for i := 0; i < bpp; i++ {
+		out[i] = cdat[i] - pdat[i]
+	}
+	for i := bpp; i < len(out); i++ {
+		a := cdat[i-bpp]
+		b := pdat[i]
+		c := pdat[i-bpp]
+
+		// This is an optimized version of the sample code in the PNG spec.
+		pc := int(c)
+		pa := int(b) - pc
+		pb := int(a) - pc
+		pc = abs(pa + pb)
+		pa = abs(pa)
+		pb = abs(pb)
+		var x byte
+		if pa <= pb && pa <= pc {
+			x = a
+		} else if pb <= pc {
+			x = b
+		} else {
+			x = c
+		}
+
+		out[i] = cdat[i] - x
+	}
+}
+
+// intSize is either 32 or 64.
+const intSize = 32 << (^uint(0) >> 63)
+
+const maxInt = int(^uint(0) >> 1)
+
+func abs(x int) int {
+	// m := -1 if x < 0. m := 0 otherwise.
+	m := x >> (intSize - 1)
+
+	// In two's complement representation, the negative number
+	// of any number (except the smallest one) can be computed
+	// by flipping all the bits and add 1. This is faster than
+	// code with a branch.
+	// See Hacker's Delight, section 2-4.
+	return (x ^ m) - m
+}
+
+// The absolute value of a byte interpreted as a signed int8.
+func abs8(d uint8) int {
+	if d < 128 {
+		return int(d)
+	}
+	return 256 - int(d)
 }
 
 type withoutClose struct {
@@ -270,21 +562,6 @@ type withClose struct {
 
 func (w *withClose) Close() error {
 	return w.close()
-}
-
-// FilterInfo describes one PDF stream filter.
-type FilterInfo struct {
-	Name  Name
-	Parms Dict
-}
-
-func (fi *FilterInfo) getFilter() (filter, error) {
-	switch fi.Name {
-	case "FlateDecode":
-		return ffFromDict(fi.Parms), nil
-	default:
-		return nil, errors.New("unsupported filter type " + string(fi.Name))
-	}
 }
 
 type filter interface {

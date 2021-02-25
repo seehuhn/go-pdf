@@ -364,7 +364,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 		dec = r.enc
 	}
 
-	decoded, err := stream.Decode()
+	decoded, err := stream.Decode(r.Resolve)
 	if err != nil {
 		return nil, &MalformedFileError{
 			Pos: errPos,
