@@ -35,8 +35,8 @@ type afmMap struct {
 	data map[string]*fonts.Font
 }
 
-// Lookup returns information about one of the built-in PDF fonts.
-func Lookup(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Font {
+// BuiltIn returns information about one of the built-in PDF fonts.
+func BuiltIn(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Font {
 	raw := afm.Lookup(fontName, encoding)
 	if raw == nil {
 		return nil
@@ -49,13 +49,14 @@ func Lookup(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Fon
 	f := &fonts.Font{
 		FontName:  raw.FontName,
 		FullName:  raw.FullName,
+		FontSize:  ptSize,
 		CapHeight: raw.CapHeight * q,
 		XHeight:   raw.XHeight * q,
 		Ascender:  raw.Ascender * q,
 		Descender: raw.Descender * q,
 		Encoding:  encoding,
 		Width:     make(map[byte]float64),
-		BBox:      make(map[byte]*fonts.Box),
+		BBox:      make(map[byte]*fonts.Rect),
 		Ligatures: raw.Ligatures,
 		Kerning:   raw.Kerning,
 	}
@@ -63,7 +64,7 @@ func Lookup(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Fon
 		f.Width[c] = w * q
 	}
 	for c, box := range raw.BBox {
-		f.BBox[c] = &fonts.Box{
+		f.BBox[c] = &fonts.Rect{
 			LLx: box.LLx * q,
 			LLy: box.LLy * q,
 			URx: box.URx * q,
@@ -92,7 +93,7 @@ func (m *afmMap) Lookup(fontName string, encoding fonts.Encoding) *fonts.Font {
 	f = &fonts.Font{
 		Encoding:  encoding,
 		Width:     make(map[byte]float64),
-		BBox:      make(map[byte]*fonts.Box),
+		BBox:      make(map[byte]*fonts.Rect),
 		Ligatures: make(map[fonts.GlyphPair]byte),
 		Kerning:   make(map[fonts.GlyphPair]float64),
 	}
@@ -125,7 +126,7 @@ glyphLoop:
 			var name string
 			var charCode byte
 			var width float64
-			BBox := &fonts.Box{}
+			BBox := &fonts.Rect{}
 			var ligTmp []*ligInfo
 
 			keyVals := strings.Split(line, ";")
@@ -142,7 +143,7 @@ glyphLoop:
 					width, _ = strconv.ParseFloat(ff[1], 64)
 				case "N":
 					name = ff[1]
-					r := DecodeGlyphName(name, dingbats)
+					r := decodeGlyphName(name, dingbats)
 					if len(r) != 1 {
 						panic("not implemented")
 					}

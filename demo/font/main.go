@@ -30,7 +30,7 @@ import (
 const (
 	FontName     = "Times-Roman"
 	FontEncoding = "MacRomanEncoding"
-	FontSize     = 48
+	FontSize     = 48.0
 )
 
 var encTable = map[string]fonts.Encoding{
@@ -47,7 +47,7 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 	}
 
 	enc := encTable[FontEncoding]
-	F1 := type1.Lookup(FontName, enc, FontSize)
+	F1 := type1.BuiltIn(FontName, enc, FontSize)
 
 	margin := 50.0
 	baseLineSkip := 1.2 * FontSize
@@ -116,7 +116,7 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 		if !ok {
 			continue
 		}
-		xPos += kern * float64(FontSize) / 1000
+		xPos += kern * float64(F1.FontSize) / 1000
 		var kObj pdf.Object
 		if kern == float64(int64(kern)) {
 			kObj = pdf.Integer(-kern)
@@ -132,7 +132,7 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 		return nil, err
 	}
 
-	_, err = stream.Write([]byte(fmt.Sprintf("BT\n/F1 %d Tf\n%.1f %.1f Td\n",
+	_, err = stream.Write([]byte(fmt.Sprintf("BT\n/F1 %f Tf\n%.1f %.1f Td\n",
 		FontSize, margin, yPos)))
 	if err != nil {
 		return nil, err

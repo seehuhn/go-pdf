@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/fonts"
+	"seehuhn.de/go/pdf/fonts/type1"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -28,12 +30,49 @@ func TestFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	F1Dict, err := out.Write(pdf.Dict{
+		"Type":     pdf.Name("Font"),
+		"Subtype":  pdf.Name("Type1"),
+		"BaseFont": pdf.Name("Times-Roman"),
+		"Encoding": pdf.Name("MacRomanEncoding"),
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	F2Dict, err := out.Write(pdf.Dict{
+		"Type":     pdf.Name("Font"),
+		"Subtype":  pdf.Name("Type1"),
+		"BaseFont": pdf.Name("Times-Italic"),
+		"Encoding": pdf.Name("MacRomanEncoding"),
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	F1 := type1.BuiltIn("Times-Roman", fonts.MacRomanEncoding, 12)
+	F2 := type1.BuiltIn("Times-Italic", fonts.MacRomanEncoding, 12)
+
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
-		Resources: pdf.Dict{},
-		MediaBox:  pages.A5,
-		Rotate:    0,
+		Resources: pdf.Dict{
+			"Font": pdf.Dict{
+				"F1": F1Dict,
+				"F2": F2Dict,
+			},
+		},
+		MediaBox: pages.A5,
+		Rotate:   0,
 	})
 
+	text1, err := F1.TypeSet("Von Tiffany's fish ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text2, err := F2.TypeSet("et al. ")
+	if err != nil {
+		t.Fatal(err)
+	}
 	box := &vBox{
 		stuffExtent: stuffExtent{
 			Width:  pages.A5.URx - pages.A5.LLx,
@@ -50,14 +89,16 @@ func TestFrame(t *testing.T) {
 				},
 				Contents: []stuff{
 					kern(36),
-					&rule{
-						stuffExtent: stuffExtent{
-							Width:  20,
-							Height: 8,
-							Depth:  0,
-						},
+					&text{
+						font:     "F1",
+						fontSize: 12,
+						layout:   text1,
 					},
-					kern(5),
+					&text{
+						font:     "F2",
+						fontSize: 12,
+						layout:   text2,
+					},
 					&rule{
 						stuffExtent: stuffExtent{
 							Width:  30,
@@ -143,3 +184,4 @@ var _ stuff = &rule{}
 var _ stuff = &vBox{}
 var _ stuff = kern(0)
 var _ stuff = &glue{}
+var _ stuff = &text{}

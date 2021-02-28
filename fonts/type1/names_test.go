@@ -39,7 +39,7 @@ func TestDecodeGlyphName(t *testing.T) {
 		{"a7", true, []rune{0x271E}},
 	}
 	for i, test := range cases {
-		out := DecodeGlyphName(test.glyph, test.dingbats)
+		out := decodeGlyphName(test.glyph, test.dingbats)
 		equal := len(out) == len(test.res)
 		if equal {
 			for j, c := range out {

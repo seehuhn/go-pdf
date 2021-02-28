@@ -24,10 +24,10 @@ import (
 	"sync"
 )
 
-// DecodeGlyphName maps a Type1 Glyph name to a sequence of unicode characters.
+// decodeGlyphName maps a Type1 Glyph name to a sequence of unicode characters.
 // This implements the algorithm documented at
 // https://github.com/adobe-type-tools/agl-specification
-func DecodeGlyphName(name string, dingbats bool) []rune {
+func decodeGlyphName(name string, dingbats bool) []rune {
 	var res []rune
 
 	idx := strings.IndexByte(name, '.')

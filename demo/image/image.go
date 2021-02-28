@@ -107,7 +107,7 @@ func imagePage(img *image.NRGBA) error {
 }
 
 func main() {
-	img, err := readImage("Arlo.png")
+	img, err := readImage(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}

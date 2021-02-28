@@ -19,6 +19,8 @@ package boxes
 import (
 	"fmt"
 
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/fonts"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -210,4 +212,48 @@ func (obj *glue) Draw(page *pages.Page, xPos, yPos float64) {}
 
 func (obj *glue) Stretch() *stretchAmount {
 	return &obj.Plus
+}
+
+type text struct {
+	font     pdf.Name
+	fontSize float64
+	layout   *fonts.Layout
+}
+
+func (obj *text) Extent() *stuffExtent {
+	return &stuffExtent{
+		Width:  obj.layout.Width,
+		Height: obj.layout.Height,
+		Depth:  obj.layout.Depth,
+	}
+}
+
+func (obj *text) Draw(page *pages.Page, xPos, yPos float64) {
+	if len(obj.layout.Fragments) == 0 {
+		return
+	}
+
+	// TODO(voss): use "Tj" if len(Fragments)==1
+
+	fmt.Fprintln(page, "q")
+	fmt.Fprintln(page, "BT")
+	obj.font.PDF(page)
+	fmt.Fprintf(page, " %f Tf\n", obj.fontSize)
+	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
+	fmt.Fprint(page, "[")
+	for i, frag := range obj.layout.Fragments {
+		if i > 0 {
+			kern := obj.layout.Kerns[i-1]
+			iKern := int64(kern)
+			if float64(iKern) == kern {
+				fmt.Fprintf(page, " %d ", iKern)
+			} else {
+				fmt.Fprintf(page, " %f ", kern)
+			}
+		}
+		pdf.String(frag).PDF(page)
+	}
+	fmt.Fprint(page, "] TJ\n")
+	fmt.Fprintln(page, "ET")
+	fmt.Fprintln(page, "Q")
 }
