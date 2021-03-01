@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/fonts"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pages"
 )
 
 const tabWidth = 4
 
-func encodeString(enc fonts.Encoding, s string) pdf.String {
+func encodeString(enc font.Encoding, s string) pdf.String {
 	var res pdf.String
 	col := 0
 	for _, r := range s {
@@ -66,7 +66,7 @@ func convert(inName, outName string) error {
 		log.Fatal(err)
 	}
 
-	enc := fonts.WinAnsiEncoding
+	enc := font.WinAnsiEncoding
 	font, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),

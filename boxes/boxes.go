@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/fonts"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -217,7 +217,7 @@ func (obj *glue) Stretch() *stretchAmount {
 type text struct {
 	font     pdf.Name
 	fontSize float64
-	layout   *fonts.Layout
+	layout   *font.Layout
 }
 
 func (obj *text) Extent() *stuffExtent {

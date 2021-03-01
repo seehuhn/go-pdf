@@ -21,8 +21,8 @@ import (
 	"log"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/fonts"
-	"seehuhn.de/go/pdf/fonts/type1"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -33,10 +33,10 @@ const (
 	FontSize     = 48.0
 )
 
-var encTable = map[string]fonts.Encoding{
-	"StandardEncoding": fonts.StandardEncoding,
-	"MacRomanEncoding": fonts.MacRomanEncoding,
-	"WinAnsiEncoding":  fonts.WinAnsiEncoding,
+var encTable = map[string]font.Encoding{
+	"StandardEncoding": font.StandardEncoding,
+	"MacRomanEncoding": font.MacRomanEncoding,
+	"WinAnsiEncoding":  font.WinAnsiEncoding,
 }
 
 // WritePage emits a single page to the PDF file and returns the page dict.
@@ -78,7 +78,7 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 			panic("character " + string([]rune{r}) + " not in font")
 		}
 		if len(codes) > 0 {
-			pair := fonts.GlyphPair{last, c}
+			pair := font.GlyphPair{last, c}
 			lig, ok := F1.Ligatures[pair]
 			if ok {
 				codes = codes[:len(codes)-1]
@@ -112,7 +112,7 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 			break
 		}
 
-		kern, ok := F1.Kerning[fonts.GlyphPair{c, codes[i+1]}]
+		kern, ok := F1.Kerning[font.GlyphPair{c, codes[i+1]}]
 		if !ok {
 			continue
 		}

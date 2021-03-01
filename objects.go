@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 	"unicode/utf16"
-
-	"seehuhn.de/go/pdf/fonts"
 )
 
 // Object represents an object in a PDF file.  There are nine native types of
@@ -169,7 +167,7 @@ func TextString(s string) String {
 	rr := []rune(s)
 	buf := make([]byte, len(rr))
 	for i, r := range rr {
-		c, ok := fonts.PDFDocEncoding.Encode(r)
+		c, ok := pdfDocEncode(r)
 		if ok {
 			buf[i] = c
 		} else {

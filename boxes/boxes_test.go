@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/fonts"
-	"seehuhn.de/go/pdf/fonts/type1"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -31,6 +31,7 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	F1 := type1.BuiltIn("Times-Roman", font.MacRomanEncoding, 12)
 	F1Dict, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
@@ -41,6 +42,7 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	F2 := type1.BuiltIn("Times-Italic", font.MacRomanEncoding, 12)
 	F2Dict, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
@@ -50,9 +52,6 @@ func TestFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	F1 := type1.BuiltIn("Times-Roman", fonts.MacRomanEncoding, 12)
-	F2 := type1.BuiltIn("Times-Italic", fonts.MacRomanEncoding, 12)
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: pdf.Dict{

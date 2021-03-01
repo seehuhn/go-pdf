@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"seehuhn.de/go/pdf/fonts"
+	"seehuhn.de/go/pdf/font"
 )
 
 //go:embed afm/*.afm
@@ -32,11 +32,11 @@ var afmData embed.FS
 type afmMap struct {
 	sync.Mutex
 
-	data map[string]*fonts.Font
+	data map[string]*font.Font
 }
 
 // BuiltIn returns information about one of the built-in PDF fonts.
-func BuiltIn(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Font {
+func BuiltIn(fontName string, encoding font.Encoding, ptSize float64) *font.Font {
 	raw := afm.Lookup(fontName, encoding)
 	if raw == nil {
 		return nil
@@ -46,7 +46,7 @@ func BuiltIn(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Fo
 	// formatted. Multiplying with the scale factor gives values in 1000*bp.
 	q := ptSize / 1000
 
-	f := &fonts.Font{
+	f := &font.Font{
 		FontName:  raw.FontName,
 		FullName:  raw.FullName,
 		FontSize:  ptSize,
@@ -56,7 +56,7 @@ func BuiltIn(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Fo
 		Descender: raw.Descender * q,
 		Encoding:  encoding,
 		Width:     make(map[byte]float64),
-		BBox:      make(map[byte]*fonts.Rect),
+		BBox:      make(map[byte]*font.Rect),
 		Ligatures: raw.Ligatures,
 		Kerning:   raw.Kerning,
 	}
@@ -64,7 +64,7 @@ func BuiltIn(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Fo
 		f.Width[c] = w * q
 	}
 	for c, box := range raw.BBox {
-		f.BBox[c] = &fonts.Rect{
+		f.BBox[c] = &font.Rect{
 			LLx: box.LLx * q,
 			LLy: box.LLy * q,
 			URx: box.URx * q,
@@ -75,7 +75,7 @@ func BuiltIn(fontName string, encoding fonts.Encoding, ptSize float64) *fonts.Fo
 	return f
 }
 
-func (m *afmMap) Lookup(fontName string, encoding fonts.Encoding) *fonts.Font {
+func (m *afmMap) Lookup(fontName string, encoding font.Encoding) *font.Font {
 	m.Lock()
 	defer m.Unlock()
 
@@ -90,12 +90,12 @@ func (m *afmMap) Lookup(fontName string, encoding fonts.Encoding) *fonts.Font {
 
 	dingbats := fontName == "ZapfDingbats"
 
-	f = &fonts.Font{
+	f = &font.Font{
 		Encoding:  encoding,
 		Width:     make(map[byte]float64),
-		BBox:      make(map[byte]*fonts.Rect),
-		Ligatures: make(map[fonts.GlyphPair]byte),
-		Kerning:   make(map[fonts.GlyphPair]float64),
+		BBox:      make(map[byte]*font.Rect),
+		Ligatures: make(map[font.GlyphPair]byte),
+		Kerning:   make(map[font.GlyphPair]float64),
 	}
 	byName := make(map[string]byte)
 	type ligInfo struct {
@@ -126,7 +126,7 @@ glyphLoop:
 			var name string
 			var charCode byte
 			var width float64
-			BBox := &fonts.Rect{}
+			BBox := &font.Rect{}
 			var ligTmp []*ligInfo
 
 			keyVals := strings.Split(line, ";")
@@ -261,7 +261,7 @@ glyphLoop:
 		if !aOk || !bOk || !cOk {
 			continue
 		}
-		f.Ligatures[fonts.GlyphPair{a, b}] = c
+		f.Ligatures[font.GlyphPair{a, b}] = c
 	}
 
 	for _, kern := range kerning {
@@ -270,12 +270,12 @@ glyphLoop:
 		if !aOk || !bOk || kern.val == 0 {
 			continue
 		}
-		f.Kerning[fonts.GlyphPair{a, b}] = kern.val
+		f.Kerning[font.GlyphPair{a, b}] = kern.val
 	}
 
 	return f
 }
 
 var afm = &afmMap{
-	data: make(map[string]*fonts.Font),
+	data: make(map[string]*font.Font),
 }

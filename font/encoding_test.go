@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package fonts
+package font
 
 import (
 	"testing"
@@ -26,7 +26,6 @@ func TestBuiltinEncodings(t *testing.T) {
 		StandardEncoding,
 		MacRomanEncoding,
 		WinAnsiEncoding,
-		PDFDocEncoding,
 	}
 	for i, enc := range encodings {
 		for j := 0; j < 256; j++ {
