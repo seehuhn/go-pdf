@@ -22,34 +22,38 @@ import (
 	"unicode"
 )
 
-// Rect represents a rectangle in the PDF coordinate space.
-type Rect struct {
-	LLx, LLy, URx, URy float64
-}
-
-// IsPrint returns whether the glyph makes marks on the page.
-func (rect *Rect) IsPrint() bool {
-	return rect.LLx != 0 || rect.LLy != 0 || rect.URx != 0 || rect.URy != 0
-}
-
 // Font represents information about a PDF font at a given font size.
 type Font struct {
-	FontName  string
+	BaseFont  string
 	FullName  string
 	FontSize  float64
 	CapHeight float64
 	XHeight   float64
 	Ascender  float64
 	Descender float64
-	Encoding  Encoding
-	Width     map[byte]float64
-	BBox      map[byte]*Rect
-	Ligatures map[GlyphPair]byte
-	Kerning   map[GlyphPair]float64
+
+	Encoding Encoding
+
+	Width        map[byte]float64
+	MissingWidth float64
+	BBox         map[byte]*Rect
+	Ligatures    map[GlyphPair]byte
+	Kerning      map[GlyphPair]float64
+}
+
+// Rect represents a rectangle in the PDF coordinate space.
+type Rect struct {
+	LLx, LLy, URx, URy float64
+}
+
+// IsPrint returns whether the glyph leaves marks on the page.
+func (rect *Rect) IsPrint() bool {
+	return rect.LLx != 0 || rect.LLy != 0 || rect.URx != 0 || rect.URy != 0
 }
 
 // Layout contains the information needed to typeset a text.
 type Layout struct {
+	FontSize  float64
 	Fragments [][]byte
 	Kerns     []float64
 	Width     float64
@@ -60,17 +64,7 @@ type Layout struct {
 // TypeSet determines the layout of a string using a given font.  The function
 // takes ligatures and kerning information into account.  If the font cannot
 // represent all runes in the string, an error is returned.
-func (font *Font) TypeSet(s string) (*Layout, error) {
-	ligTab := []struct {
-		letters string
-		lig     rune
-	}{
-		{"ffi", '\uFB03'},
-		{"ffl", '\uFB04'},
-		{"fi", '\uFB01'},
-		{"fl", '\uFB02'},
-		{"ff", '\uFB00'},
-	}
+func (font *Font) TypeSet(s string, ptSize float64) (*Layout, error) {
 	for _, repl := range ligTab {
 		_, ok := font.Encoding.Encode(repl.lig)
 		if !ok {
@@ -78,6 +72,10 @@ func (font *Font) TypeSet(s string) (*Layout, error) {
 		}
 		s = strings.ReplaceAll(s, repl.letters, string([]rune{repl.lig}))
 	}
+
+	// Units in an afm file are in 1/1000 of the scale of the font being
+	// formatted. Multiplying with the scale factor gives values in 1000*bp.
+	q := ptSize / 1000
 
 	var codes []byte
 	var last byte
@@ -102,7 +100,9 @@ func (font *Font) TypeSet(s string) (*Layout, error) {
 		last = c
 	}
 
-	ll := &Layout{}
+	ll := &Layout{
+		FontSize: ptSize,
+	}
 	if len(codes) == 0 {
 		return ll, nil
 	}
@@ -114,14 +114,16 @@ func (font *Font) TypeSet(s string) (*Layout, error) {
 	for i, c := range codes {
 		bbox := font.BBox[c]
 		if bbox.IsPrint() {
-			if -bbox.LLy > depth {
-				depth = -bbox.LLy
+			thisDepth := -bbox.LLy * q
+			if thisDepth > depth {
+				depth = thisDepth
 			}
-			if bbox.URy > height {
-				height = bbox.URy
+			thisHeight := bbox.URy * q
+			if thisHeight > height {
+				height = thisHeight
 			}
 		}
-		width += font.Width[c]
+		width += font.Width[c] * q
 
 		if i == len(codes)-1 {
 			ll.Fragments = append(ll.Fragments, codes[pos:])
@@ -133,7 +135,7 @@ func (font *Font) TypeSet(s string) (*Layout, error) {
 			continue
 		}
 
-		width += kern * float64(font.FontSize) / 1000
+		width += kern * q
 		ll.Fragments = append(ll.Fragments, codes[pos:(i+1)])
 		ll.Kerns = append(ll.Kerns, -kern)
 		pos = i + 1
@@ -143,6 +145,17 @@ func (font *Font) TypeSet(s string) (*Layout, error) {
 	ll.Depth = depth
 
 	return ll, nil
+}
+
+var ligTab = []struct {
+	letters string
+	lig     rune
+}{
+	{"ffi", '\uFB03'},
+	{"ffl", '\uFB04'},
+	{"fi", '\uFB01'},
+	{"fl", '\uFB02'},
+	{"ff", '\uFB00'},
 }
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of

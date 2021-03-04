@@ -215,9 +215,8 @@ func (obj *glue) Stretch() *stretchAmount {
 }
 
 type text struct {
-	font     pdf.Name
-	fontSize float64
-	layout   *font.Layout
+	font   pdf.Name
+	layout *font.Layout
 }
 
 func (obj *text) Extent() *stuffExtent {
@@ -238,7 +237,7 @@ func (obj *text) Draw(page *pages.Page, xPos, yPos float64) {
 	fmt.Fprintln(page, "q")
 	fmt.Fprintln(page, "BT")
 	obj.font.PDF(page)
-	fmt.Fprintf(page, " %f Tf\n", obj.fontSize)
+	fmt.Fprintf(page, " %f Tf\n", obj.layout.FontSize)
 	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
 	fmt.Fprint(page, "[")
 	for i, frag := range obj.layout.Fragments {

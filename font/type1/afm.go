@@ -26,53 +26,19 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-//go:embed afm/*.afm
-var afmData embed.FS
+// BuiltIn returns information about one of the built-in PDF fonts.
+func BuiltIn(fontName string, encoding font.Encoding) *font.Font {
+	return afm.Lookup(fontName, encoding)
+}
+
+var afm = &afmMap{
+	data: make(map[string]*font.Font),
+}
 
 type afmMap struct {
 	sync.Mutex
 
 	data map[string]*font.Font
-}
-
-// BuiltIn returns information about one of the built-in PDF fonts.
-func BuiltIn(fontName string, encoding font.Encoding, ptSize float64) *font.Font {
-	raw := afm.Lookup(fontName, encoding)
-	if raw == nil {
-		return nil
-	}
-
-	// Units in an afm file are in 1/1000 of the scale of the font being
-	// formatted. Multiplying with the scale factor gives values in 1000*bp.
-	q := ptSize / 1000
-
-	f := &font.Font{
-		FontName:  raw.FontName,
-		FullName:  raw.FullName,
-		FontSize:  ptSize,
-		CapHeight: raw.CapHeight * q,
-		XHeight:   raw.XHeight * q,
-		Ascender:  raw.Ascender * q,
-		Descender: raw.Descender * q,
-		Encoding:  encoding,
-		Width:     make(map[byte]float64),
-		BBox:      make(map[byte]*font.Rect),
-		Ligatures: raw.Ligatures,
-		Kerning:   raw.Kerning,
-	}
-	for c, w := range raw.Width {
-		f.Width[c] = w * q
-	}
-	for c, box := range raw.BBox {
-		f.BBox[c] = &font.Rect{
-			LLx: box.LLx * q,
-			LLy: box.LLy * q,
-			URx: box.URx * q,
-			URy: box.URy * q,
-		}
-	}
-
-	return f
 }
 
 func (m *afmMap) Lookup(fontName string, encoding font.Encoding) *font.Font {
@@ -213,7 +179,7 @@ glyphLoop:
 				panic("unsupported writing direction")
 			}
 		case "FontName":
-			f.FontName = fields[1]
+			f.BaseFont = fields[1]
 		case "FullName":
 			f.FullName = fields[1]
 		case "CapHeight":
@@ -276,6 +242,5 @@ glyphLoop:
 	return f
 }
 
-var afm = &afmMap{
-	data: make(map[string]*font.Font),
-}
+//go:embed afm/*.afm
+var afmData embed.FS

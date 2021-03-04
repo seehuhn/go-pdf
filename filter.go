@@ -442,10 +442,9 @@ func pngUpEnc(out, cdat, pdat []byte, bpp int) {
 }
 
 func pngAverageDec(cdat, pdat []byte, bpp int) {
-	// The first column has no column to the left of it, so it is a
-	// special case.  We know that the first column exists because ...,
-	// and so len(cdat) != 0.
-	// TODO(voss): check that this is still true
+	// The first column has no column to the left of it, so it is a special
+	// case.  We know that the first column exists because we verify Columns>0
+	// in flateFilter.Decode().
 	for i := 0; i < bpp; i++ {
 		cdat[i] += pdat[i] / 2
 	}
@@ -463,8 +462,8 @@ func pngAverageEnc(out, cdat, pdat []byte, bpp int) {
 	}
 }
 
-// pngPaethDec applies the Paeth filter to the cdat slice.
-// cdat is the current row's data, pdat is the previous row's data.
+// pngPaethDec implements the Paeth filter function, as per the PNG
+// specification.
 func pngPaethDec(cdat, pdat []byte, bpp int) {
 	var a, b, c, pa, pb, pc int
 	for i := 0; i < bpp; i++ {
@@ -531,10 +530,9 @@ func abs(x int) int {
 	// m := -1 if x < 0. m := 0 otherwise.
 	m := x >> (intSize - 1)
 
-	// In two's complement representation, the negative number
-	// of any number (except the smallest one) can be computed
-	// by flipping all the bits and add 1. This is faster than
-	// code with a branch.
+	// In two's complement representation, the negative number of any number
+	// (except the smallest one) can be computed by flipping all the bits and
+	// add 1. This is faster than code with a branch.
 	// See Hacker's Delight, section 2-4.
 	return (x ^ m) - m
 }

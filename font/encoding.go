@@ -29,23 +29,25 @@ type Encoding interface {
 var (
 	// StandardEncoding is one of the PDF Latin-text encodings.
 	// See PDF 32000-1:2008, Table D.2
-	StandardEncoding = &builtinEncoding{toStandard, fromStandard}
+	StandardEncoding = &tables{toStandard, fromStandard}
 
 	// MacRomanEncoding is one of the PDF Latin-text encodings.
 	// See PDF 32000-1:2008, Table D.2
-	MacRomanEncoding = &builtinEncoding{toMacRoman, fromMacRoman}
+	MacRomanEncoding = &tables{toMacRoman, fromMacRoman}
 
 	// WinAnsiEncoding is one of the PDF Latin-text encodings.
 	// See PDF 32000-1:2008, Table D.2
-	WinAnsiEncoding = &builtinEncoding{toWinAnsi, fromWinAnsi}
+	WinAnsiEncoding = &tables{toWinAnsi, fromWinAnsi}
+
+	// TODO(voss): add the MacExpertEncoding
 )
 
-type builtinEncoding struct {
+type tables struct {
 	to   map[rune]byte
-	from [256]rune
+	from []rune
 }
 
-func (enc *builtinEncoding) Encode(r rune) (byte, bool) {
+func (enc *tables) Encode(r rune) (byte, bool) {
 	c, ok := enc.to[r]
 	if ok {
 		return c, true
@@ -56,11 +58,11 @@ func (enc *builtinEncoding) Encode(r rune) (byte, bool) {
 	return 0, false
 }
 
-func (enc *builtinEncoding) Decode(c byte) rune {
+func (enc *tables) Decode(c byte) rune {
 	return enc.from[c]
 }
 
-var fromStandard = [256]rune{
+var fromStandard = []rune{
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
@@ -145,7 +147,7 @@ var toStandard = map[rune]byte{
 	0x00df: 251,
 }
 
-var fromMacRoman = [256]rune{
+var fromMacRoman = []rune{
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
@@ -291,7 +293,7 @@ var toMacRoman = map[rune]byte{
 	0x02c7: 255,
 }
 
-var fromWinAnsi = [256]rune{
+var fromWinAnsi = []rune{
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
@@ -359,3 +361,10 @@ var toWinAnsi = map[rune]byte{
 }
 
 const noRune = unicode.ReplacementChar
+
+var stdEncs = map[string]Encoding{
+	"StandardEncoding": StandardEncoding, // TODO(voss): how to handle this?
+	"MacRomanEncoding": MacRomanEncoding,
+	"WinAnsiEncoding":  WinAnsiEncoding,
+	// TODO(voss): add MacExpertEncoding
+}

@@ -31,7 +31,7 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1 := type1.BuiltIn("Times-Roman", font.MacRomanEncoding, 12)
+	F1 := type1.BuiltIn("Times-Roman", font.MacRomanEncoding)
 	F1Dict, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
@@ -42,7 +42,7 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F2 := type1.BuiltIn("Times-Italic", font.MacRomanEncoding, 12)
+	F2 := type1.BuiltIn("Times-Italic", font.MacRomanEncoding)
 	F2Dict, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
@@ -64,11 +64,11 @@ func TestFrame(t *testing.T) {
 		Rotate:   0,
 	})
 
-	text1, err := F1.TypeSet("Von Tiffany's fish ")
+	text1, err := F1.TypeSet("Von Tiffany's fish ", 12)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text2, err := F2.TypeSet("et al. ")
+	text2, err := F2.TypeSet("et al. ", 12)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,14 +89,12 @@ func TestFrame(t *testing.T) {
 				Contents: []stuff{
 					kern(36),
 					&text{
-						font:     "F1",
-						fontSize: 12,
-						layout:   text1,
+						font:   "F1",
+						layout: text1,
 					},
 					&text{
-						font:     "F2",
-						fontSize: 12,
-						layout:   text2,
+						font:   "F2",
+						layout: text2,
 					},
 					&rule{
 						stuffExtent: stuffExtent{

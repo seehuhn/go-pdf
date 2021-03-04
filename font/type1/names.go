@@ -107,47 +107,54 @@ func decodeGlyphName(name string, dingbats bool) []rune {
 	return res
 }
 
-//go:embed agl-aglfn/*.txt
-var glyphData embed.FS
-
 type glyphMap struct {
 	sync.Mutex
-	data map[string]map[string]rune
+	nameToRune map[string]map[string]rune
+}
+
+func (gm *glyphMap) getFile(file string) map[string]rune {
+	fMap := gm.nameToRune[file]
+	if fMap != nil {
+		return fMap
+	}
+	fMap = make(map[string]rune)
+
+	fd, err := glyphData.Open("agl-aglfn/" + file + ".txt")
+	if err != nil {
+		panic("invalid glyph map " + file)
+	}
+
+	scanner := bufio.NewScanner(fd)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+		ww := strings.SplitN(line, ";", 2)
+		name := ww[0]
+		code, _ := strconv.ParseInt(ww[1], 16, 32)
+		fMap[name] = rune(code)
+	}
+	if err := scanner.Err(); err != nil {
+		panic("corrupted glyph map " + file)
+	}
+
+	gm.nameToRune[file] = fMap
+	return fMap
 }
 
 func (gm *glyphMap) lookup(file, name string) (rune, bool) {
 	gm.Lock()
 	defer gm.Unlock()
 
-	fMap := gm.data[file]
-	if fMap == nil {
-		fd, err := glyphData.Open("agl-aglfn/" + file + ".txt")
-		if err != nil {
-			panic("invalid glyph map " + file)
-		}
-
-		fMap = make(map[string]rune)
-
-		scanner := bufio.NewScanner(fd)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if len(line) == 0 || line[0] == '#' {
-				continue
-			}
-			ww := strings.SplitN(line, ";", 2)
-			name := ww[0]
-			code, _ := strconv.ParseInt(ww[1], 16, 32)
-			fMap[name] = rune(code)
-		}
-		if err := scanner.Err(); err != nil {
-			panic("corrupted glyph map " + file)
-		}
-		gm.data[file] = fMap
-	}
+	fMap := gm.getFile(file)
 	c, ok := fMap[name]
 	return c, ok
 }
 
 var glyph = &glyphMap{
-	data: make(map[string]map[string]rune),
+	nameToRune: make(map[string]map[string]rune),
 }
+
+//go:embed agl-aglfn/*.txt
+var glyphData embed.FS

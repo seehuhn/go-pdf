@@ -47,16 +47,18 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 	}
 
 	enc := encTable[FontEncoding]
-	F1 := type1.BuiltIn(FontName, enc, FontSize)
+	F1 := type1.BuiltIn(FontName, enc)
 
 	margin := 50.0
 	baseLineSkip := 1.2 * FontSize
+
+	q := FontSize / 1000
 
 	_, err = stream.Write([]byte("q\n1 .5 .5 RG\n"))
 	if err != nil {
 		return nil, err
 	}
-	yPos := height - margin - F1.Ascender
+	yPos := height - margin - F1.Ascender*q
 	for y := yPos; y > margin; y -= baseLineSkip {
 		_, err = stream.Write([]byte(fmt.Sprintf("%.1f %.1f m %.1f %.1f l\n",
 			margin, y, width-margin, y)))
@@ -100,12 +102,15 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 		bbox := F1.BBox[c]
 		if bbox.IsPrint() {
 			_, err = stream.Write([]byte(fmt.Sprintf("%.2f %.2f %.2f %.2f re\n",
-				xPos+bbox.LLx, yPos+bbox.LLy, bbox.URx-bbox.LLx, bbox.URy-bbox.LLy)))
+				xPos+bbox.LLx*q,
+				yPos+bbox.LLy*q,
+				bbox.URx*q-bbox.LLx*q,
+				bbox.URy*q-bbox.LLy*q)))
 			if err != nil {
 				return nil, err
 			}
 		}
-		xPos += F1.Width[c]
+		xPos += F1.Width[c] * q
 
 		if i == len(codes)-1 {
 			formatted = append(formatted, pdf.String(codes[pos:]))
@@ -116,7 +121,7 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 		if !ok {
 			continue
 		}
-		xPos += kern * float64(F1.FontSize) / 1000
+		xPos += kern * q
 		var kObj pdf.Object
 		if kern == float64(int64(kern)) {
 			kObj = pdf.Integer(-kern)
