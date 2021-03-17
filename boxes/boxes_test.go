@@ -21,7 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -31,10 +31,10 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1 := type1.BuiltIn("Times-Roman", font.MacRomanEncoding)
+	F1 := builtin.BuiltIn("Times-Roman", font.MacRomanEncoding)
 	F1Dict, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
+		"Subtype":  pdf.Name("builtin"),
 		"BaseFont": pdf.Name("Times-Roman"),
 		"Encoding": pdf.Name("MacRomanEncoding"),
 	}, nil)
@@ -42,10 +42,10 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F2 := type1.BuiltIn("Times-Italic", font.MacRomanEncoding)
+	F2 := builtin.BuiltIn("Times-Italic", font.MacRomanEncoding)
 	F2Dict, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
+		"Subtype":  pdf.Name("builtin"),
 		"BaseFont": pdf.Name("Times-Italic"),
 		"Encoding": pdf.Name("MacRomanEncoding"),
 	}, nil)

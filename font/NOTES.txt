@@ -2,6 +2,10 @@ github.com/go-fonts
 golang.org/x/image/font
 
 
+PdfTEX can work with Type 1 and TrueType fonts (and to some extent
+also with OpenType fonts).
+
+
 Type 1 (PostScript) Fonts (PFA/AFM)
 -----------------------------------
 
@@ -16,8 +20,9 @@ and later via the GDI API.
 TrueType Fonts (TTF)
 --------------------
 
+https://developer.apple.com/fonts/TrueType-Reference-Manual/
 https://en.wikipedia.org/wiki/TrueType
-github.com/golang/freetype/truetype
+https://github.com/golang/freetype/
 https://tex.stackexchange.com/questions/52819/how-do-i-use-truetype-fonts-with-pdftex-using-otftotfm
 
 TrueType is a font standard developed in the late 1980s, by Apple and
@@ -31,6 +36,7 @@ A competitor to Adobe's Type 1 fonts used in PostScript.
 OpenType Fonts (OTF)
 --------------------
 
+https://docs.microsoft.com/en-us/typography/opentype/spec/
 golang.org/x/image/font/opentype
 
 

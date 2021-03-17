@@ -7,7 +7,7 @@ import (
 )
 
 func CustomEncoding(runes []rune) Encoding {
-	// Find the standard encoding with the largest overlap in character set.
+	// Find the predefined encoding with the largest overlap in character set.
 	matches := map[string]int{}
 	for _, r := range runes {
 		for name, enc := range stdEncs {

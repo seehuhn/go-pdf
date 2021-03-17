@@ -28,7 +28,8 @@ import (
 
 // Writer represents a PDF file open for writing.
 type Writer struct {
-	Version  Version
+	Version Version
+
 	id       [][]byte
 	w        *posWriter
 	xref     map[int]*xRefEntry
@@ -325,8 +326,8 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	return ref, nil
 }
 
-// ObjectStream writes objects in a compressed object stream.
-func (pdf *Writer) ObjectStream(refs []*Reference, objects ...Object) ([]*Reference, error) {
+// WriteObjectStream writes objects in a compressed object stream.
+func (pdf *Writer) WriteObjectStream(refs []*Reference, objects ...Object) ([]*Reference, error) {
 	if pdf.inStream {
 		return nil, errors.New("ObjectStream() while stream is open")
 	}

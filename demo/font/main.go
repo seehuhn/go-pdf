@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -47,7 +47,7 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 	}
 
 	enc := encTable[FontEncoding]
-	F1 := type1.BuiltIn(FontName, enc)
+	F1 := builtin.BuiltIn(FontName, enc)
 
 	margin := 50.0
 	baseLineSkip := 1.2 * FontSize
@@ -169,7 +169,7 @@ func main() {
 
 	font, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
+		"Subtype":  pdf.Name("builtin"),
 		"BaseFont": pdf.Name(FontName),
 		"Encoding": pdf.Name(FontEncoding),
 	}, nil)

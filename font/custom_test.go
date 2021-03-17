@@ -16,7 +16,7 @@ func TestCustom(t *testing.T) {
 	buf := &bytes.Buffer{}
 	desc.PDF(buf)
 	fmt.Println(buf.String())
-	t.Error("fish")
+	// TODO(voss): finish this
 }
 
 func TestDescribe(t *testing.T) {

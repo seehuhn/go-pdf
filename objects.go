@@ -524,6 +524,11 @@ func (x *Reference) String() string {
 
 // PDF implements the Object interface.
 func (x *Reference) PDF(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%d %d R", x.Number, x.Generation)
+	var err error
+	if x == nil {
+		_, err = fmt.Fprint(w, "null")
+	} else {
+		_, err = fmt.Fprintf(w, "%d %d R", x.Number, x.Generation)
+	}
 	return err
 }
