@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/names"
 )
 
 // BuiltIn returns information about one of the built-in PDF fonts.
@@ -109,7 +110,7 @@ glyphLoop:
 					width, _ = strconv.ParseFloat(ff[1], 64)
 				case "N":
 					name = ff[1]
-					r := decodeGlyphName(name, dingbats)
+					r := names.ToUnicode(name, dingbats)
 					if len(r) != 1 {
 						panic("not implemented")
 					}

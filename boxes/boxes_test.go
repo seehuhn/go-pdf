@@ -142,7 +142,7 @@ func TestFrame(t *testing.T) {
 	}
 
 	page, err := pageTree.AddPage(&pages.Attributes{
-		MediaBox: &pages.Rectangle{
+		MediaBox: &pdf.Rectangle{
 			URx: box.Width,
 			URy: box.Height + box.Depth,
 		},

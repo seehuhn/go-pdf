@@ -14,20 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builtin
+package names
 
 import (
 	"bufio"
 	"embed"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 )
 
-// decodeGlyphName maps a Type1 Glyph name to a sequence of unicode characters.
+// ToUnicode maps a Type1 Glyph name to a sequence of unicode characters.
 // This implements the algorithm documented at
 // https://github.com/adobe-type-tools/agl-specification
-func decodeGlyphName(name string, dingbats bool) []rune {
+func ToUnicode(name string, dingbats bool) []rune {
 	var res []rune
 
 	idx := strings.IndexByte(name, '.')
@@ -107,9 +108,68 @@ func decodeGlyphName(name string, dingbats bool) []rune {
 	return res
 }
 
+func FromUnicode(r rune) string {
+	return glyph.encode(r)
+}
+
 type glyphMap struct {
 	sync.Mutex
 	nameToRune map[string]map[string]rune
+	runeToName map[rune]string
+}
+
+func (gm *glyphMap) encode(r rune) string {
+	rMap := gm.getEncode()
+
+	rr := expand(r)
+	var parts []string
+	for _, r := range rr {
+		name, ok := rMap[r]
+		if !ok {
+			name = fmt.Sprintf("u%04X", r)
+		}
+		parts = append(parts, name)
+	}
+	return strings.Join(parts, "_")
+}
+
+func (gm *glyphMap) getEncode() map[rune]string {
+	gm.Lock()
+	defer gm.Unlock()
+
+	if gm.runeToName != nil {
+		return gm.runeToName
+	}
+
+	r2n := make(map[rune]string)
+	fd, _ := glyphData.Open("agl-aglfn/aglfn.txt")
+
+	scanner := bufio.NewScanner(fd)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+		ww := strings.SplitN(line, ";", 3)
+		code, _ := strconv.ParseInt(ww[0], 16, 32)
+		name := ww[1]
+		r2n[rune(code)] = name
+	}
+	if err := scanner.Err(); err != nil {
+		panic("corrupted glyph map aglfn.txt")
+	}
+
+	gm.runeToName = r2n
+	return r2n
+}
+
+func (gm *glyphMap) lookup(file, name string) (rune, bool) {
+	gm.Lock()
+	defer gm.Unlock()
+
+	fMap := gm.getFile(file)
+	c, ok := fMap[name]
+	return c, ok
 }
 
 func (gm *glyphMap) getFile(file string) map[string]rune {
@@ -141,15 +201,6 @@ func (gm *glyphMap) getFile(file string) map[string]rune {
 
 	gm.nameToRune[file] = fMap
 	return fMap
-}
-
-func (gm *glyphMap) lookup(file, name string) (rune, bool) {
-	gm.Lock()
-	defer gm.Unlock()
-
-	fMap := gm.getFile(file)
-	c, ok := fMap[name]
-	return c, ok
 }
 
 var glyph = &glyphMap{

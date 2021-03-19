@@ -67,10 +67,10 @@ func (tree *PageTree) Flush() (*pdf.Reference, error) {
 			root["Resources"] = def.Resources
 		}
 		if def.MediaBox != nil {
-			root["MediaBox"] = def.MediaBox.ToObject()
+			root["MediaBox"] = def.MediaBox
 		}
 		if def.CropBox != nil {
-			root["CropBox"] = def.CropBox.ToObject()
+			root["CropBox"] = def.CropBox
 		}
 		if def.Rotate != 0 {
 			root["Rotate"] = pdf.Integer(def.Rotate)

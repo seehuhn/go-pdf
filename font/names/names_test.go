@@ -14,16 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builtin
+package names
 
-import "testing"
+import (
+	"testing"
+	"unicode"
+)
 
-func TestDecodeGlyphName(t *testing.T) {
+func TestToUnicode(t *testing.T) {
 	cases := []struct {
 		glyph    string
 		dingbats bool
 		res      []rune
 	}{
+		{"space", false, []rune{0x0020}},
+		{"A", false, []rune{0x0041}},
 		{"Lcommaaccent", false, []rune{0x013B}},
 		{"uni20AC0308", false, []rune{0x20AC, 0x0308}},
 		{"u1040C", false, []rune{0x1040C}},
@@ -39,7 +44,7 @@ func TestDecodeGlyphName(t *testing.T) {
 		{"a7", true, []rune{0x271E}},
 	}
 	for i, test := range cases {
-		out := decodeGlyphName(test.glyph, test.dingbats)
+		out := ToUnicode(test.glyph, test.dingbats)
 		equal := len(out) == len(test.res)
 		if equal {
 			for j, c := range out {
@@ -52,6 +57,45 @@ func TestDecodeGlyphName(t *testing.T) {
 		if !equal {
 			t.Errorf("%d: expected %q but got %q",
 				i, string(test.res), string(out))
+		}
+	}
+}
+
+func equal(a, b []rune) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestFromUnicode(t *testing.T) {
+	if FromUnicode('ﬄ') != "f_f_l" {
+		t.Error("wrong name for ffl-ligature")
+	}
+	for r := rune(0); r < 65537; r++ {
+		if !unicode.IsGraphic(r) {
+			continue
+		}
+		name := FromUnicode(r)
+		out := ToUnicode(name, false)
+		switch len(out) {
+		case 0:
+			t.Errorf("no output %c -> %s -> xxx", r, name)
+		case 1:
+			if r != out[0] {
+				t.Errorf("mismatch %c(%04x) -> %s -> %c(%04x)",
+					r, r, name, out, out)
+			}
+		default:
+			rr := expand(r)
+			if !equal(rr, out) {
+				t.Errorf("multi-rune %c -> %s -> %c", r, name, out)
+			}
 		}
 	}
 }

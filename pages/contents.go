@@ -38,7 +38,7 @@ type Page struct {
 // AddPage adds a new page to the page tree and returns an object which
 // can be used to write the content stream for the page.
 func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
-	var mediaBox *Rectangle
+	var mediaBox *pdf.Rectangle
 	def := tree.defaults
 	if def != nil {
 		mediaBox = def.MediaBox
@@ -64,13 +64,13 @@ func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
 			(def == nil ||
 				def.MediaBox == nil ||
 				!def.MediaBox.NearlyEqual(attr.MediaBox, 1)) {
-			pageDict["MediaBox"] = attr.MediaBox.ToObject()
+			pageDict["MediaBox"] = attr.MediaBox
 		}
 		if attr.CropBox != nil &&
 			(def == nil ||
 				def.CropBox == nil ||
 				!def.CropBox.NearlyEqual(attr.CropBox, 1)) {
-			pageDict["CropBox"] = attr.CropBox.ToObject()
+			pageDict["CropBox"] = attr.CropBox
 		}
 		if attr.Rotate != 0 && def.Rotate != attr.Rotate {
 			pageDict["Rotate"] = pdf.Integer(attr.Rotate)

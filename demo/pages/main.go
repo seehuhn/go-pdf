@@ -77,7 +77,7 @@ func main() {
 		Resources: pdf.Dict{
 			"Font": pdf.Dict{"F1": font},
 		},
-		MediaBox: &pages.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
+		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
 	for i := 1; i <= 100; i++ {
 		page, err := WritePage(out, i)

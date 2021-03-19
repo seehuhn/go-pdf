@@ -68,7 +68,7 @@ func imagePage(img *image.NRGBA) error {
 	pageTree := pages.NewPageTree(out, nil)
 
 	b := img.Bounds()
-	pageBox := &pages.Rectangle{
+	pageBox := &pdf.Rectangle{
 		URx: float64(b.Dx()) / dpi * 72,
 		URy: float64(b.Dy()) / dpi * 72,
 	}
