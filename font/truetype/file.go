@@ -5,48 +5,58 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
+	"unicode"
 )
 
-// offset subtable
-type offsets struct {
-	ScalerType    uint32
-	NumTables     uint16
-	SearchRange   uint16
-	EntrySelector uint16
-	RangeShift    uint16
-}
+type File struct {
+	fd      *os.File
+	offsets struct { // offset subtable
+		ScalerType uint32
+		NumTables  uint16
+		_          uint16 // SearchRange
+		_          uint16 // EntrySelector
+		_          uint16 // RangeShift
+	}
+	tables map[string]*tableInfo
 
-type Header struct {
-	ScalerType uint32
-	Tables     map[string]*TableInfo
+	FontName  string
+	NumGlyphs int
+	CMap      [][]rune
 }
 
 // table directory entry
-type TableInfo struct {
+type tableInfo struct {
 	CheckSum uint32
 	Offset   uint32
 	Length   uint32
 }
 
-func ReadHeader(r io.Reader) (*Header, error) {
-	offs := &offsets{}
-	err := binary.Read(r, binary.BigEndian, offs)
+func Open(fname string) (*File, error) {
+	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err
 	}
 
-	tag := offs.ScalerType
-	if tag != 0x00010000 && tag != 0x4F54544F {
+	tt := &File{
+		fd:     fd,
+		tables: map[string]*tableInfo{},
+	}
+
+	err = binary.Read(fd, binary.BigEndian, &tt.offsets)
+	if err != nil {
+		return nil, err
+	}
+
+	scalerType := tt.offsets.ScalerType
+	if scalerType != 0x00010000 && scalerType != 0x4F54544F {
 		return nil, errors.New("unsupported font type")
 	}
 
-	res := &Header{
-		ScalerType: tag,
-		Tables:     map[string]*TableInfo{},
-	}
-	for i := 0; i < int(offs.NumTables); i++ {
+	for i := 0; i < int(tt.offsets.NumTables); i++ {
 		var tag uint32
-		err := binary.Read(r, binary.BigEndian, &tag)
+		err := binary.Read(fd, binary.BigEndian, &tag)
 		if err != nil {
 			return nil, err
 		}
@@ -55,15 +65,304 @@ func ReadHeader(r io.Reader) (*Header, error) {
 			byte(tag >> 16),
 			byte(tag >> 8),
 			byte(tag)})
-		info := &TableInfo{}
-		err = binary.Read(r, binary.BigEndian, info)
+		info := &tableInfo{}
+		err = binary.Read(fd, binary.BigEndian, info)
 		if err != nil {
 			return nil, err
 		}
-		res.Tables[tagString] = info
+		tt.tables[tagString] = info
 	}
 
-	return res, nil
+	maxp, err := tt.getMaxpInfo()
+	if err != nil {
+		return nil, err
+	}
+	if maxp.NumGlyphs < 2 {
+		// glyph index 0 denotes a missing character
+		return nil, errors.New("no glyphs found")
+	}
+	tt.NumGlyphs = int(maxp.NumGlyphs)
+
+	cmap, cmapFd, err := tt.getCmapInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	unicode := func(idx int) rune {
+		return rune(idx)
+	}
+	macRoman := func(idx int) rune {
+		return macintosh[idx]
+	}
+	candidates := []struct {
+		PlatformID uint16
+		EncodingID uint16
+		IdxToRune  func(int) rune
+	}{
+		{3, 10, unicode}, // full unicode
+		{0, 4, unicode},
+		{3, 1, unicode}, // BMP
+		{0, 3, unicode},
+		{1, 0, macRoman},
+	}
+	done := false
+	for _, cand := range candidates {
+		table := cmap.find(cand.PlatformID, cand.EncodingID)
+		if table == nil {
+			continue
+		}
+
+		cmapTable, err := tt.load(cmapFd, table, cand.IdxToRune)
+		if err != nil {
+			continue
+		}
+
+		tt.CMap = cmapTable
+		done = true
+		break
+	}
+	if !done {
+		return nil, errors.New("unsupported character encoding")
+	}
+
+	tt.FontName, err = tt.GetFontName()
+	if err != nil && err != errNoName {
+		return nil, err
+	}
+
+	return tt, nil
+}
+
+func (tt *File) Close() error {
+	return tt.fd.Close()
+}
+
+type maxpTableHead struct {
+	Version   int32  //	0x00005000 or 0x00010000
+	NumGlyphs uint16 //	the number of glyphs in the font
+}
+
+func (tt *File) getMaxpInfo() (*maxpTableHead, error) {
+	maxp := &maxpTableHead{}
+	_, err := tt.readTableHead("maxp", maxp)
+	if err != nil {
+		return nil, err
+	}
+	if maxp.Version != 0x00005000 && maxp.Version != 0x00010000 {
+		return nil, errors.New("unknown maxp version 0x" +
+			strconv.FormatInt(int64(maxp.Version), 16))
+	}
+	return maxp, nil
+}
+
+type cmapTable struct {
+	Header struct {
+		Version   uint16
+		NumTables uint16
+	}
+	EncodingRecords []cmapRecord
+}
+
+type cmapRecord struct {
+	PlatformID     uint16
+	EncodingID     uint16
+	SubtableOffset uint32
+}
+
+func (tt *File) getCmapInfo() (*cmapTable, *io.SectionReader, error) {
+	cmap := &cmapTable{}
+	cmapFd, err := tt.readTableHead("cmap", &cmap.Header)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cmap.EncodingRecords = make([]cmapRecord, cmap.Header.NumTables)
+	err = binary.Read(cmapFd, binary.BigEndian, cmap.EncodingRecords)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cmap, cmapFd, nil
+}
+
+func (ct *cmapTable) find(plat, enc uint16) *cmapRecord {
+	for i := range ct.EncodingRecords {
+		table := &ct.EncodingRecords[i]
+		if table.PlatformID == plat && table.EncodingID == enc {
+			return table
+		}
+	}
+	return nil
+}
+
+func (tt *File) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune) ([][]rune, error) {
+	// The OpenType spec at
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
+	// documents the following cmap subtable formats:
+	//     Format 0: Byte encoding table
+	//     Format 2: High-byte mapping through table
+	//     Format 4: Segment mapping to delta values
+	//     Format 6: Trimmed table mapping
+	//     Format 8: mixed 16-bit and 32-bit coverage
+	//     Format 10: Trimmed array
+	//     Format 12: Segmented coverage
+	//     Format 13: Many-to-one range mappings
+	//     Format 14: Unicode Variation Sequences
+	// For the *.ttf and *.otf files on my system, I have found the
+	// following frequencies for these formats:
+	//
+	//     count | format
+	//     ------+-----------
+	//     21320 | Format 4
+	//      5747 | Format 6
+	//      3519 | Format 0
+	//      3225 | Format 12
+	//       143 | Format 2
+	//       107 | Format 14
+	//         4 | Format 13
+
+	_, err := fd.Seek(int64(table.SubtableOffset), io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
+	var format uint16
+	err = binary.Read(fd, binary.BigEndian, &format)
+	if err != nil {
+		return nil, err
+	}
+
+	info := fmt.Sprintf("PlatID = %d, EncID = %d, Fmt = %d: ",
+		table.PlatformID, table.EncodingID, format)
+
+	cmapTable := make([][]rune, tt.NumGlyphs)
+
+	switch format {
+	case 4:
+		type cmapFormat4 struct {
+			Length        uint16
+			Language      uint16
+			SegCountX2    uint16
+			SearchRange   uint16
+			EntrySelector uint16
+			RangeShift    uint16
+		}
+		data := &cmapFormat4{}
+		err = binary.Read(fd, binary.BigEndian, data)
+		if err != nil {
+			return nil, err
+		}
+		if data.SegCountX2%2 != 0 {
+			return nil, errors.New(info + "corrupted cmap subtable")
+		}
+		segCount := int(data.SegCountX2 / 2)
+		buf := make([]uint16, 4*segCount+1)
+		err = binary.Read(fd, binary.BigEndian, buf)
+		if err != nil {
+			return nil, err
+		}
+		startCode := buf[segCount+1 : 2*segCount+1]
+		endCode := buf[:segCount]
+		idDelta := buf[2*segCount+1 : 3*segCount+1]
+		idRangeOffset := buf[3*segCount+1 : 4*segCount+1]
+		glyphIdBase, err := fd.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
+
+		for k := 0; k < segCount; k++ {
+			if idRangeOffset[k] == 0 {
+				delta := idDelta[k]
+				for idx := int(startCode[k]); idx <= int(endCode[k]); idx++ {
+					c := int(uint16(idx) + delta)
+					if c == 0 {
+						continue
+					}
+					if c >= len(cmapTable) {
+						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
+					}
+					r := i2r(idx)
+					if !unicode.IsGraphic(r) {
+						continue
+					}
+					cmapTable[c] = append(cmapTable[c], r)
+				}
+			} else {
+				d := int(idRangeOffset[k])/2 - (segCount - k)
+				if d < 0 {
+					return nil, errors.New(info + "corrupt cmap table")
+				}
+				tmp := make([]uint16, int(endCode[k]-startCode[k])+1)
+				_, err = fd.Seek(glyphIdBase+2*int64(d), io.SeekStart)
+				if err != nil {
+					return nil, err
+				}
+				err = binary.Read(fd, binary.BigEndian, tmp)
+				if err != nil {
+					return nil, err
+				}
+				for idx := int(startCode[k]); idx <= int(endCode[k]); idx++ {
+					c := int(tmp[int(idx)-int(startCode[k])])
+					if c == 0 {
+						continue
+					}
+					if c >= len(cmapTable) {
+						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
+					}
+					r := i2r(idx)
+					if !unicode.IsGraphic(r) {
+						continue
+					}
+					cmapTable[c] = append(cmapTable[c], r)
+				}
+			}
+		}
+
+	case 12:
+		type cmapFormat12 struct {
+			_         uint16 // reserved
+			Length    uint32
+			Language  uint32
+			NumGroups uint32
+		}
+		data := &cmapFormat12{}
+		err = binary.Read(fd, binary.BigEndian, data)
+		if err != nil {
+			return nil, err
+		}
+
+		type segment struct {
+			StartCharCode uint32 //	First character code in this group
+			EndCharCode   uint32 //	Last character code in this group
+			StartGlyphID  uint32 //	Glyph index corresponding to the starting character code
+		}
+		for i := 0; i < int(data.NumGroups); i++ {
+			seg := &segment{}
+			err = binary.Read(fd, binary.BigEndian, seg)
+			if err != nil {
+				return nil, err
+			}
+			if seg.EndCharCode < seg.StartCharCode || seg.EndCharCode > 0x10FFFF {
+				return nil, errors.New("invalid character code in font")
+			}
+
+			c := seg.StartGlyphID
+			for idx := int(seg.StartCharCode); idx <= int(seg.EndCharCode); idx++ {
+				r := i2r(idx)
+				if !unicode.IsGraphic(r) {
+					continue
+				}
+				cmapTable[c] = append(cmapTable[c], r)
+				c++
+			}
+		}
+
+	default:
+		return nil, errors.New(info + "unsupported cmap format " +
+			strconv.Itoa(int(format)))
+	}
+
+	return cmapTable, nil
 }
 
 type nameTableHeader struct {
@@ -81,16 +380,9 @@ type nameTableRecord struct {
 	Offset             uint16 // name string offset in bytes
 }
 
-func (header *Header) GetFontName(fd io.ReaderAt) (string, error) {
-	info := header.Tables["name"]
-	if info == nil {
-		return "", errNoName
-	}
-
-	nameFd := io.NewSectionReader(fd, int64(info.Offset), int64(info.Length))
-
+func (tt *File) GetFontName() (string, error) {
 	nameHeader := &nameTableHeader{}
-	err := binary.Read(nameFd, binary.BigEndian, nameHeader)
+	nameFd, err := tt.readTableHead("name", nameHeader)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +398,8 @@ func (header *Header) GetFontName(fd io.ReaderAt) (string, error) {
 		}
 
 		switch {
-		case record.PlatformID == 1 && record.PlatformSpecificID == 0:
+		case record.PlatformID == 1 && record.PlatformSpecificID == 0 &&
+			record.LanguageID == 0:
 			nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
 				io.SeekStart)
 			buf := make([]byte, record.Length)
@@ -157,16 +450,9 @@ type postTableInfo struct {
 	IsFixedPitch       bool
 }
 
-func (header *Header) GetPostInfo(fd io.ReaderAt) (*postTableInfo, error) {
-	info := header.Tables["post"]
-	if info == nil {
-		return nil, errors.New("missing post table")
-	}
-
-	postFd := io.NewSectionReader(fd, int64(info.Offset), int64(info.Length))
-
+func (tt *File) GetPostInfo() (*postTableInfo, error) {
 	postHeader := &postTableHeader{}
-	err := binary.Read(postFd, binary.BigEndian, postHeader)
+	_, err := tt.readTableHead("post", postHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +460,7 @@ func (header *Header) GetPostInfo(fd io.ReaderAt) (*postTableInfo, error) {
 	// TODO(voss): check the format
 	// fmt.Printf("format = 0x%08X\n", postHeader.Format)
 
-	fmt.Println("xcv", postHeader.ItalicAngle)
+	// TODO(voss): make this more similar to the other functions in this file.
 	res := &postTableInfo{
 		ItalicAngle:        float64(postHeader.ItalicAngle) / 65536,
 		UnderlinePosition:  postHeader.UnderlinePosition,
@@ -229,15 +515,9 @@ type headTable struct {
 	GlyphDataFormat  int16 // 0 for current format
 }
 
-func (header *Header) GetHeadInfo(fd io.ReaderAt) (*headTable, error) {
-	info := header.Tables["head"]
-	if info == nil {
-		return nil, errors.New("missing head table")
-	}
-	headFd := io.NewSectionReader(fd, int64(info.Offset), int64(info.Length))
-
+func (tt *File) GetHeadInfo() (*headTable, error) {
 	head := &headTable{}
-	err := binary.Read(headFd, binary.BigEndian, head)
+	_, err := tt.readTableHead("head", head)
 	if err != nil {
 		return nil, err
 	}
@@ -298,19 +578,14 @@ type os2Table struct {
 	}
 }
 
-func (header *Header) GetOS2Info(fd io.ReaderAt) (*os2Table, error) {
-	info := header.Tables["OS/2"]
-	if info == nil {
-		return nil, errors.New("missing head table")
-	}
-	os2Fd := io.NewSectionReader(fd, int64(info.Offset), int64(info.Length))
-
+func (tt *File) GetOS2Info() (*os2Table, error) {
 	os2 := &os2Table{}
-	err := binary.Read(os2Fd, binary.BigEndian, &os2.V0)
+	os2Fd, err := tt.readTableHead("OS/2", &os2.V0)
 	if err != nil {
 		return nil, err
 	}
-	if os2.V0.Version > 0 || info.Length > 68 {
+
+	if os2.V0.Version > 0 || tt.tables["OS/2"].Length > 68 {
 		os2.V0MSValid = true
 		err := binary.Read(os2Fd, binary.BigEndian, &os2.V0MS)
 		if err != nil {
@@ -336,4 +611,19 @@ func (header *Header) GetOS2Info(fd io.ReaderAt) (*os2Table, error) {
 		}
 	}
 	return os2, nil
+}
+
+func (tt *File) readTableHead(name string, head interface{}) (*io.SectionReader, error) {
+	info := tt.tables[name]
+	if info == nil {
+		return nil, errors.New("missing " + name + " table")
+	}
+	tableFd := io.NewSectionReader(tt.fd, int64(info.Offset), int64(info.Length))
+
+	err := binary.Read(tableFd, binary.BigEndian, head)
+	if err != nil {
+		return nil, err
+	}
+
+	return tableFd, nil
 }
