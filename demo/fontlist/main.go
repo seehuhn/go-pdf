@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
@@ -17,19 +16,9 @@ func tryFont(fname string) error {
 	}
 	defer tt.Close()
 
-	latinOnly := true
-latinLoop:
-	for _, runes := range tt.CMap {
-		for _, r := range runes {
-			if !font.IsAdobeStandardLatin[r] {
-				fmt.Printf("xxx %04x %q\n", r, r)
-				latinOnly = false
-				break latinLoop
-			}
-		}
-	}
+	latinOnly := tt.IsAdobeStandardLatin()
 
-	fmt.Printf("%5d %5t %-30s %s\n",
+	fmt.Printf("%5d %-5t %-30s %s\n",
 		tt.NumGlyphs, latinOnly, tt.FontName, fname)
 
 	return nil

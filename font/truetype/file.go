@@ -10,67 +10,72 @@ import (
 	"unicode"
 )
 
-type File struct {
+// Font describes a TrueType font file.
+type Font struct {
 	fd      *os.File
-	offsets struct { // offset subtable
-		ScalerType uint32
-		NumTables  uint16
-		_          uint16 // SearchRange
-		_          uint16 // EntrySelector
-		_          uint16 // RangeShift
-	}
-	tables map[string]*tableInfo
+	offsets offsetsTable
+	tables  map[string]*tableRecord
+
+	Head *headTable
 
 	FontName  string
 	NumGlyphs int
 	CMap      [][]rune
 }
 
-// table directory entry
-type tableInfo struct {
+type offsetsTable struct {
+	ScalerType    uint32
+	NumTables     uint16
+	SearchRange   uint16
+	EntrySelector uint16
+	RangeShift    uint16
+}
+
+type tableRecord struct {
+	Tag      uint32
 	CheckSum uint32
 	Offset   uint32
 	Length   uint32
 }
 
-func Open(fname string) (*File, error) {
+func Open(fname string) (*Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err
 	}
 
-	tt := &File{
+	tt := &Font{
 		fd:     fd,
-		tables: map[string]*tableInfo{},
+		tables: map[string]*tableRecord{},
 	}
 
 	err = binary.Read(fd, binary.BigEndian, &tt.offsets)
 	if err != nil {
 		return nil, err
 	}
-
 	scalerType := tt.offsets.ScalerType
 	if scalerType != 0x00010000 && scalerType != 0x4F54544F {
 		return nil, errors.New("unsupported font type")
 	}
-
 	for i := 0; i < int(tt.offsets.NumTables); i++ {
-		var tag uint32
-		err := binary.Read(fd, binary.BigEndian, &tag)
+		info := &tableRecord{}
+		err = binary.Read(fd, binary.BigEndian, info)
 		if err != nil {
 			return nil, err
 		}
+
+		tag := info.Tag
 		tagString := string([]byte{
 			byte(tag >> 24),
 			byte(tag >> 16),
 			byte(tag >> 8),
 			byte(tag)})
-		info := &tableInfo{}
-		err = binary.Read(fd, binary.BigEndian, info)
-		if err != nil {
-			return nil, err
-		}
+
 		tt.tables[tagString] = info
+	}
+	tt.Head, err = tt.getHeadInfo()
+	if err != nil {
+		return nil, err
 	}
 
 	maxp, err := tt.getMaxpInfo()
@@ -133,7 +138,7 @@ func Open(fname string) (*File, error) {
 	return tt, nil
 }
 
-func (tt *File) Close() error {
+func (tt *Font) Close() error {
 	return tt.fd.Close()
 }
 
@@ -142,7 +147,7 @@ type maxpTableHead struct {
 	NumGlyphs uint16 //	the number of glyphs in the font
 }
 
-func (tt *File) getMaxpInfo() (*maxpTableHead, error) {
+func (tt *Font) getMaxpInfo() (*maxpTableHead, error) {
 	maxp := &maxpTableHead{}
 	_, err := tt.readTableHead("maxp", maxp)
 	if err != nil {
@@ -169,7 +174,7 @@ type cmapRecord struct {
 	SubtableOffset uint32
 }
 
-func (tt *File) getCmapInfo() (*cmapTable, *io.SectionReader, error) {
+func (tt *Font) getCmapInfo() (*cmapTable, *io.SectionReader, error) {
 	cmap := &cmapTable{}
 	cmapFd, err := tt.readTableHead("cmap", &cmap.Header)
 	if err != nil {
@@ -195,7 +200,7 @@ func (ct *cmapTable) find(plat, enc uint16) *cmapRecord {
 	return nil
 }
 
-func (tt *File) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune) ([][]rune, error) {
+func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune) ([][]rune, error) {
 	// The OpenType spec at
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 	// documents the following cmap subtable formats:
@@ -380,7 +385,7 @@ type nameTableRecord struct {
 	Offset             uint16 // name string offset in bytes
 }
 
-func (tt *File) GetFontName() (string, error) {
+func (tt *Font) GetFontName() (string, error) {
 	nameHeader := &nameTableHeader{}
 	nameFd, err := tt.readTableHead("name", nameHeader)
 	if err != nil {
@@ -450,7 +455,7 @@ type postTableInfo struct {
 	IsFixedPitch       bool
 }
 
-func (tt *File) GetPostInfo() (*postTableInfo, error) {
+func (tt *Font) GetPostInfo() (*postTableInfo, error) {
 	postHeader := &postTableHeader{}
 	_, err := tt.readTableHead("post", postHeader)
 	if err != nil {
@@ -515,7 +520,7 @@ type headTable struct {
 	GlyphDataFormat  int16 // 0 for current format
 }
 
-func (tt *File) GetHeadInfo() (*headTable, error) {
+func (tt *Font) getHeadInfo() (*headTable, error) {
 	head := &headTable{}
 	_, err := tt.readTableHead("head", head)
 	if err != nil {
@@ -578,7 +583,7 @@ type os2Table struct {
 	}
 }
 
-func (tt *File) GetOS2Info() (*os2Table, error) {
+func (tt *Font) GetOS2Info() (*os2Table, error) {
 	os2 := &os2Table{}
 	os2Fd, err := tt.readTableHead("OS/2", &os2.V0)
 	if err != nil {
@@ -613,12 +618,12 @@ func (tt *File) GetOS2Info() (*os2Table, error) {
 	return os2, nil
 }
 
-func (tt *File) readTableHead(name string, head interface{}) (*io.SectionReader, error) {
-	info := tt.tables[name]
-	if info == nil {
+func (tt *Font) readTableHead(name string, head interface{}) (*io.SectionReader, error) {
+	table := tt.tables[name]
+	if table == nil {
 		return nil, errors.New("missing " + name + " table")
 	}
-	tableFd := io.NewSectionReader(tt.fd, int64(info.Offset), int64(info.Length))
+	tableFd := io.NewSectionReader(tt.fd, int64(table.Offset), int64(table.Length))
 
 	err := binary.Read(tableFd, binary.BigEndian, head)
 	if err != nil {

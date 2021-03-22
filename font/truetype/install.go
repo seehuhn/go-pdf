@@ -1,7 +1,6 @@
 package truetype
 
 import (
-	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -23,19 +22,11 @@ func Install(w *pdf.Writer, fname string) (*pdf.Reference, error) {
 	}
 	size := stat.Size()
 
-	fmt.Printf("ScalerType = %08X\n", tt.offsets.ScalerType)
-	for tag, info := range tt.tables {
-		fmt.Println(tag, info)
-	}
 	FontName := tt.FontName
 	// TODO(voss): if FontName == "", invent a name: The name must be no longer
 	// than 63 characters and restricted to the printable ASCII subset, codes
 	// 33 to 126, except for the 10 characters '[', ']', '(', ')', '{', '}',
 	// '<', '>', '/', '%'.
-	headInfo, err := tt.GetHeadInfo()
-	if err != nil {
-		return nil, err
-	}
 	os2Info, err := tt.GetOS2Info()
 	if err != nil {
 		return nil, err
@@ -46,7 +37,7 @@ func Install(w *pdf.Writer, fname string) (*pdf.Reference, error) {
 	}
 
 	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(headInfo.UnitsPerEm)
+	q := 1000 / float64(tt.Head.UnitsPerEm)
 
 	// step 2: write a copy of the font file into the font stream.
 	dict := pdf.Dict{
@@ -85,7 +76,7 @@ func Install(w *pdf.Writer, fname string) (*pdf.Reference, error) {
 	case 10:
 		flags |= fontFlagScript
 	}
-	if headInfo.MacStyle&(1<<1) != 0 {
+	if tt.Head.MacStyle&(1<<1) != 0 {
 		flags |= fontFlagItalic
 	}
 	AdobeStandardLatinOnly := false // TODO(voss)
@@ -102,10 +93,10 @@ func Install(w *pdf.Writer, fname string) (*pdf.Reference, error) {
 		"FontName": pdf.Name(FontName),
 		"Flags":    pdf.Integer(flags),
 		"FontBBox": &pdf.Rectangle{
-			LLx: float64(headInfo.XMin) * q,
-			LLy: float64(headInfo.YMin) * q,
-			URx: float64(headInfo.XMax) * q,
-			URy: float64(headInfo.YMax) * q,
+			LLx: float64(tt.Head.XMin) * q,
+			LLy: float64(tt.Head.YMin) * q,
+			URx: float64(tt.Head.XMax) * q,
+			URy: float64(tt.Head.YMax) * q,
 		},
 		"ItalicAngle": pdf.Number(postInfo.ItalicAngle),
 		"FontFile2":   fontStream,
