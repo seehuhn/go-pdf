@@ -2,4 +2,6 @@ package truetype
 
 import "errors"
 
-var errNoName = errors.New("missing PostScript name")
+var (
+	errNoTable = errors.New("missing table")
+)

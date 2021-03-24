@@ -9,6 +9,18 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
+var minCharSet = map[rune]bool{
+	'a': true,
+	'z': true,
+	'A': true,
+	'Z': true,
+	'ﬀ': true,
+	'ﬁ': true,
+	'ﬂ': true,
+	'ț': true,
+	'â': true,
+}
+
 func tryFont(fname string) error {
 	tt, err := truetype.Open(fname)
 	if err != nil {
@@ -16,10 +28,8 @@ func tryFont(fname string) error {
 	}
 	defer tt.Close()
 
-	latinOnly := tt.IsAdobeStandardLatin()
-
-	fmt.Printf("%5d %-5t %-30s %s\n",
-		tt.NumGlyphs, latinOnly, tt.FontName, fname)
+	// fmt.Printf("%08x %5t %5t %5t\n", tt.Offsets.ScalerType,
+	// 	tt.Tables["glyf"] != nil, tt.Tables["CFF "] != nil, tt.Tables["CFF2"] != nil)
 
 	return nil
 }

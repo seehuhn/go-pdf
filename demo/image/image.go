@@ -5,7 +5,6 @@ import (
 	"image"
 	"image/draw"
 	"image/jpeg"
-	_ "image/jpeg"
 	_ "image/png"
 	"log"
 	"os"
@@ -65,14 +64,12 @@ func imagePage(img *image.NRGBA) error {
 		return err
 	}
 
-	pageTree := pages.NewPageTree(out, nil)
-
 	b := img.Bounds()
 	pageBox := &pdf.Rectangle{
 		URx: float64(b.Dx()) / dpi * 72,
 		URy: float64(b.Dy()) / dpi * 72,
 	}
-	page, err := pageTree.AddPage(&pages.Attributes{
+	page, err := pages.SinglePage(out, &pages.Attributes{
 		Resources: pdf.Dict{
 			"XObject": pdf.Dict{
 				"I1": image,
@@ -88,17 +85,6 @@ func imagePage(img *image.NRGBA) error {
 	fmt.Fprintln(page, "/I1 Do")
 
 	err = page.Close()
-	if err != nil {
-		return err
-	}
-
-	pagesRef, err := pageTree.Flush()
-	if err != nil {
-		return err
-	}
-	err = out.SetCatalog(pdf.Struct(&pdf.Catalog{
-		Pages: pagesRef,
-	}))
 	if err != nil {
 		return err
 	}

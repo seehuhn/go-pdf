@@ -19,6 +19,7 @@ package pages
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -35,9 +36,7 @@ type Page struct {
 	stm io.WriteCloser
 }
 
-// AddPage adds a new page to the page tree and returns an object which
-// can be used to write the content stream for the page.
-func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
+func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Rectangle, error) {
 	var mediaBox *pdf.Rectangle
 	def := tree.defaults
 	if def != nil {
@@ -47,7 +46,7 @@ func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
 		mediaBox = attr.MediaBox
 	}
 	if mediaBox == nil {
-		return nil, errors.New("missing MediaBox")
+		return nil, nil, errors.New("missing MediaBox")
 	}
 
 	contentRef := tree.w.Alloc()
@@ -78,9 +77,24 @@ func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
 	}
 	err := tree.Ship(pageDict, nil)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	return contentRef, mediaBox, nil
+}
+
+// AddPage adds a new page to the page tree and returns an object which
+// can be used to write the content stream for the page.
+func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
+	contentRef, mediaBox, err := tree.addPageInternal(attr)
+	if err != nil {
 		return nil, err
 	}
 
+	return tree.newPage(contentRef, mediaBox)
+}
+
+func (tree *PageTree) newPage(contentRef *pdf.Reference, mediaBox *pdf.Rectangle) (*Page, error) {
 	// TODO(voss): Use "LZWDecode" if tree.w.Version<pdf.V1_2
 	opt := &pdf.StreamOptions{
 		Filters: []*pdf.FilterInfo{
@@ -114,6 +128,26 @@ func (p *Page) Write(buf []byte) (int, error) {
 // error explaining why the write is short.
 func (p *Page) WriteString(s string) (int, error) {
 	return p.w.WriteString(s)
+}
+
+// Print formats the arguments using their default formats and writes the
+// resulting string to the content stream.  Spaces are added between operands
+// when neither is a string.
+func (p *Page) Print(a ...interface{}) {
+	p.w.WriteString(fmt.Sprint(a...))
+}
+
+// Printf formats the arguments according to a format specifier and writes the
+// resulting string to the content stream.
+func (p *Page) Printf(format string, a ...interface{}) {
+	p.w.WriteString(fmt.Sprintf(format, a...))
+}
+
+// Println formats its arguments using their default formats and writes the
+// resulting string to the content stream.  Spaces are always added between
+// operands and a newline is appended.
+func (p *Page) Println(a ...interface{}) {
+	p.w.WriteString(fmt.Sprintln(a...))
 }
 
 // Close writes any buffered data to the content stream and the closes the

@@ -81,7 +81,7 @@ func (tree *PageTree) Flush() (*pdf.Reference, error) {
 
 // Ship adds a new page or subtree to the PageTree. This function is for
 // special cases, where the caller constructs the page dictionary manually.
-// Normally callers will use the .AddPage() method, instead.
+// Normally callers would use the .AddPage() method, instead.
 func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
 	if page["Type"] != pdf.Name("Page") && page["Type"] != pdf.Name("Pages") {
 		return errors.New("wrong pdf.Dict type, expected /Page or /Pages")

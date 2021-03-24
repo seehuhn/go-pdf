@@ -20,6 +20,8 @@ import (
 	"errors"
 	"strings"
 	"unicode"
+
+	"seehuhn.de/go/pdf"
 )
 
 // Font represents information about a PDF font at a given font size.
@@ -39,6 +41,12 @@ type Font struct {
 	BBox         map[byte]*Rect
 	Ligatures    map[GlyphPair]byte
 	Kerning      map[GlyphPair]float64
+}
+
+type Descriptor interface {
+	Close() error
+	Embed(w *pdf.Writer) (*pdf.Reference, error)
+	GetInfo() (*Info, error)
 }
 
 // Rect represents a rectangle in the PDF coordinate space.

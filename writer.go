@@ -461,10 +461,10 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io
 		}
 		d2[key] = val
 	}
-	length := &placeholder{
+	length := &Placeholder{
 		size:  12,
 		alloc: pdf.Alloc,
-		store: pdf.Write,
+		write: pdf.Write,
 	}
 	d2["Length"] = length
 
@@ -534,7 +534,7 @@ type streamWriter struct {
 	ref      *Reference
 	started  bool
 	startPos int64
-	length   *placeholder
+	length   *Placeholder
 	buf      []byte
 }
 
@@ -625,19 +625,27 @@ func (w *posWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-type placeholder struct {
+type Placeholder struct {
 	value string
 	size  int
 
 	alloc func() *Reference
-	store func(Object, *Reference) (*Reference, error)
+	write func(Object, *Reference) (*Reference, error)
 	ref   *Reference
 
 	fill io.WriteSeeker
 	pos  []int64
 }
 
-func (x *placeholder) PDF(w io.Writer) error {
+func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
+	return &Placeholder{
+		size:  size,
+		alloc: pdf.Alloc,
+		write: pdf.Write,
+	}
+}
+
+func (x *Placeholder) PDF(w io.Writer) error {
 	if x.value != "" {
 		_, err := w.Write([]byte(x.value))
 		return err
@@ -679,9 +687,9 @@ func (x *placeholder) PDF(w io.Writer) error {
 	return err
 }
 
-func (x *placeholder) Set(val Object) error {
+func (x *Placeholder) Set(val Object) error {
 	if x.ref != nil {
-		ref, err := x.store(val, x.ref)
+		ref, err := x.write(val, x.ref)
 		x.ref = ref
 		return err
 	}

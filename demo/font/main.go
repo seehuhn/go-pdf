@@ -169,7 +169,7 @@ func main() {
 
 	font, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("builtin"),
+		"Subtype":  pdf.Name("Type1"),
 		"BaseFont": pdf.Name(FontName),
 		"Encoding": pdf.Name(FontEncoding),
 	}, nil)

@@ -1,8 +1,8 @@
 package font
 
-// IsAdobeStandardLatin lists the 229 characters of the Adobe Standard Latin
+// AdobeStandardLatin lists the 229 characters of the Adobe Standard Latin
 // character set.
-var IsAdobeStandardLatin = map[rune]bool{
+var AdobeStandardLatin = map[rune]bool{
 	' ':      true,
 	'\u00a0': true, // no-break space
 	'_':      true,

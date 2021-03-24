@@ -168,10 +168,10 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	length := &placeholder{
+	length := &Placeholder{
 		size:  5,
 		alloc: w.Alloc,
-		store: w.Write,
+		write: w.Write,
 	}
 	testRef, err := w.Write(Dict{
 		"Test":   Bool(true),

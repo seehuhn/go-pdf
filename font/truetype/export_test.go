@@ -6,7 +6,7 @@ import (
 )
 
 func TestExport(t *testing.T) {
-	tt, err := Open("RobotoSlab-Light.ttf")
+	tt, err := Open("FreeSerif.ttf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,7 +16,7 @@ func TestExport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = tt.Export(out)
+	n, err := tt.export(out, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,5 +29,13 @@ func TestExport(t *testing.T) {
 	err = tt.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	fi, err := os.Stat("out.ttf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Size() != n {
+		t.Errorf("wrong size: %d != %d", fi.Size(), n)
 	}
 }

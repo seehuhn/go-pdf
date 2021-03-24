@@ -5,142 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"unicode"
 )
-
-// Font describes a TrueType font file.
-type Font struct {
-	fd      *os.File
-	offsets offsetsTable
-	tables  map[string]*tableRecord
-
-	Head *headTable
-
-	FontName  string
-	NumGlyphs int
-	CMap      [][]rune
-}
-
-type offsetsTable struct {
-	ScalerType    uint32
-	NumTables     uint16
-	SearchRange   uint16
-	EntrySelector uint16
-	RangeShift    uint16
-}
-
-type tableRecord struct {
-	Tag      uint32
-	CheckSum uint32
-	Offset   uint32
-	Length   uint32
-}
-
-func Open(fname string) (*Font, error) {
-	fd, err := os.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-
-	tt := &Font{
-		fd:     fd,
-		tables: map[string]*tableRecord{},
-	}
-
-	err = binary.Read(fd, binary.BigEndian, &tt.offsets)
-	if err != nil {
-		return nil, err
-	}
-	scalerType := tt.offsets.ScalerType
-	if scalerType != 0x00010000 && scalerType != 0x4F54544F {
-		return nil, errors.New("unsupported font type")
-	}
-	for i := 0; i < int(tt.offsets.NumTables); i++ {
-		info := &tableRecord{}
-		err = binary.Read(fd, binary.BigEndian, info)
-		if err != nil {
-			return nil, err
-		}
-
-		tag := info.Tag
-		tagString := string([]byte{
-			byte(tag >> 24),
-			byte(tag >> 16),
-			byte(tag >> 8),
-			byte(tag)})
-
-		tt.tables[tagString] = info
-	}
-	tt.Head, err = tt.getHeadInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	maxp, err := tt.getMaxpInfo()
-	if err != nil {
-		return nil, err
-	}
-	if maxp.NumGlyphs < 2 {
-		// glyph index 0 denotes a missing character
-		return nil, errors.New("no glyphs found")
-	}
-	tt.NumGlyphs = int(maxp.NumGlyphs)
-
-	cmap, cmapFd, err := tt.getCmapInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	unicode := func(idx int) rune {
-		return rune(idx)
-	}
-	macRoman := func(idx int) rune {
-		return macintosh[idx]
-	}
-	candidates := []struct {
-		PlatformID uint16
-		EncodingID uint16
-		IdxToRune  func(int) rune
-	}{
-		{3, 10, unicode}, // full unicode
-		{0, 4, unicode},
-		{3, 1, unicode}, // BMP
-		{0, 3, unicode},
-		{1, 0, macRoman},
-	}
-	done := false
-	for _, cand := range candidates {
-		table := cmap.find(cand.PlatformID, cand.EncodingID)
-		if table == nil {
-			continue
-		}
-
-		cmapTable, err := tt.load(cmapFd, table, cand.IdxToRune)
-		if err != nil {
-			continue
-		}
-
-		tt.CMap = cmapTable
-		done = true
-		break
-	}
-	if !done {
-		return nil, errors.New("unsupported character encoding")
-	}
-
-	tt.FontName, err = tt.GetFontName()
-	if err != nil && err != errNoName {
-		return nil, err
-	}
-
-	return tt, nil
-}
-
-func (tt *Font) Close() error {
-	return tt.fd.Close()
-}
 
 type maxpTableHead struct {
 	Version   int32  //	0x00005000 or 0x00010000
@@ -433,7 +300,7 @@ func (tt *Font) GetFontName() (string, error) {
 		}
 	}
 
-	return "", errNoName
+	return "", errors.New("no usable font name found")
 }
 
 type postTableHeader struct {
@@ -449,7 +316,7 @@ type postTableHeader struct {
 }
 
 type postTableInfo struct {
-	ItalicAngle        float64
+	ItalicAngle        float64 // TODO(voss): use the in-table representation here
 	UnderlinePosition  int16
 	UnderlineThickness int16
 	IsFixedPitch       bool
@@ -531,6 +398,35 @@ func (tt *Font) getHeadInfo() (*headTable, error) {
 	}
 
 	return head, nil
+}
+
+type hheaTable struct {
+	Version             uint32 // 0x00010000 (1.0)
+	Ascent              int16  // Distance from baseline of highest ascender
+	Descent             int16  // Distance from baseline of lowest descender
+	LineGap             int16  // typographic line gap
+	AdvanceWidthMax     uint16 // must be consistent with horizontal metrics
+	MinLeftSideBearing  int16  // must be consistent with horizontal metrics
+	MinRightSideBearing int16  // must be consistent with horizontal metrics
+	XMaxExtent          int16  // max(lsb + (xMax-xMin))
+	CaretSlopeRise      int16  // used to calculate the slope of the caret (rise/run) set to 1 for vertical caret
+	CaretSlopeRun       int16  // 0 for vertical
+	CaretOffset         int16  // set value to 0 for non-slanted fonts
+	_                   int16  // set value to 0
+	_                   int16  // set value to 0
+	_                   int16  // set value to 0
+	_                   int16  // set value to 0
+	MetricDataFormat    int16  // 0 for current format
+	NumOfLongHorMetrics uint16 // number of advance widths in metrics table
+}
+
+func (tt *Font) getHHeaInfo() (*hheaTable, error) {
+	hhea := &hheaTable{}
+	_, err := tt.readTableHead("hhea", hhea)
+	if err != nil {
+		return nil, err
+	}
+	return hhea, nil
 }
 
 type os2Table struct {
@@ -621,7 +517,7 @@ func (tt *Font) GetOS2Info() (*os2Table, error) {
 func (tt *Font) readTableHead(name string, head interface{}) (*io.SectionReader, error) {
 	table := tt.tables[name]
 	if table == nil {
-		return nil, errors.New("missing " + name + " table")
+		return nil, errNoTable
 	}
 	tableFd := io.NewSectionReader(tt.fd, int64(table.Offset), int64(table.Length))
 

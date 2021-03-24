@@ -18,13 +18,10 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"sort"
 
 	"seehuhn.de/go/pdf"
 )
@@ -58,30 +55,7 @@ func doOneFile(fname string) error {
 	}
 	defer r.Close()
 
-	root, err := r.GetCatalog()
-	if err != nil {
-		return err
-	}
-	catalog := &pdf.Catalog{}
-	// Ignore errors, to get at least partial information in case of malformed
-	// PDF files.
-	_ = root.AsStruct(catalog, r.Resolve)
-	pagesObj, err := r.Resolve(catalog.Pages)
-	if err != nil {
-		return err
-	}
-	pages, ok := pagesObj.(pdf.Dict)
-	if !ok {
-		return errors.New("/Pages object has wrong type")
-	}
-	countObj, err := r.Resolve(pages["Count"])
-	if err != nil {
-		return err
-	}
-
-	_ = countObj
-	// fmt.Println(count, fname)
-
+seqLoop:
 	for {
 		obj, _, err := r.ReadSequential()
 		if err == io.EOF {
@@ -91,66 +65,53 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		stream, ok := obj.(*pdf.Stream)
+		dict, ok := obj.(pdf.Dict)
+		if !ok || dict["Type"] != pdf.Name("FontDescriptor") {
+			continue
+		}
+
+		var stemV float64
+		switch x := dict["StemV"].(type) {
+		case pdf.Integer:
+			stemV = float64(x)
+		case pdf.Real:
+			stemV = float64(x)
+		default:
+			continue seqLoop
+		}
+		if stemV > 1000 {
+			continue
+		}
+
+		weight, ok := dict["FontWeight"].(pdf.Integer)
 		if !ok {
 			continue
 		}
-		filters, err := stream.Filters(r.Resolve)
-		if err != nil {
-			return err
-		}
-		for _, fi := range filters {
-			if fi.Name != "FlateDecode" {
-				continue
-			}
 
-			useColors := false
-			if pred, ok := fi.Parms["Predictor"].(pdf.Integer); ok && pred > 1 {
-				useColors = true
+		stretch, ok := dict["FontStretch"].(pdf.Name)
+		if !ok {
+			stretch = "NA"
+		} else {
+			sMap := map[pdf.Name]pdf.Name{
+				"UltraCondensed": "1",
+				"ExtraCondensed": "2",
+				"Condensed":      "3",
+				"SemiCondensed":  "4",
+				"Normal":         "5",
+				"SemiExpanded":   "6",
+				"Expanded":       "7",
+				"ExtraExpanded":  "8",
+				"UltraExpanded":  "9",
 			}
-
-			var keys []pdf.Name
-			for key, val := range fi.Parms {
-				if key == "Columns" {
-					continue
-				}
-				if key == "BitsPerComponent" && val == pdf.Integer(8) {
-					continue
-				}
-				if key == "Colors" && (val == pdf.Integer(1) || !useColors) {
-					continue
-				}
-				keys = append(keys, key)
+			s2, ok := sMap[stretch]
+			if ok {
+				stretch = s2
+			} else {
+				fmt.Println("xxx", stretch)
 			}
-			if len(keys) == 0 {
-				continue
-			}
-			sort.Slice(keys, func(i int, j int) bool {
-				return keys[i] < keys[j]
-			})
-
-			buf := &bytes.Buffer{}
-			for _, name := range keys {
-				val := fi.Parms[name]
-				if val == nil {
-					continue
-				}
-				if buf.Len() > 0 {
-					buf.WriteString(", ")
-				}
-				buf.WriteString(string(name) + ":")
-				val.PDF(buf)
-			}
-			fmt.Println(buf.String())
 		}
 
-		// dict, ok := obj.(pdf.Dict)
-		// if !ok {
-		// 	continue
-		// }
-		// if dict["Type"] == pdf.Name("Font") {
-		// 	fmt.Println(dict["Subtype"])
-		// }
+		fmt.Printf("%g,%d,%s\n", stemV, weight, stretch)
 	}
 
 	return nil

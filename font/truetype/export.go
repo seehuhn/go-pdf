@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (tt *Font) Export(w io.Writer) error {
+func (tt *Font) export(w io.Writer, include func(string) bool) (int64, error) {
 	// Fix the order of tables in the body of the files.
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
 	var names []string
@@ -17,19 +17,23 @@ func (tt *Font) Export(w io.Writer) error {
 	for _, name := range []string{
 		"head", "hhea", "maxp", "OS/2", "hmtx", "LTSH", "VDMX", "hdmx", "cmap",
 		"fpgm", "prep", "cvt ", "loca", "glyf", "kern", "name", "post", "gasp",
-		"DSIG",
 	} {
 		if _, ok := tt.tables[name]; ok {
+			if include != nil && !include(name) {
+				continue
+			}
 			names = append(names, name)
 			seen[name] = true
 		}
 	}
 	var extra []string
-	drop := map[string]bool{
-		"PCLT": true,
-	}
 	for name := range tt.tables {
-		if drop[name] {
+		if name == "DSIG" {
+			// Pre-existing digital signatures will no longer be valid after we
+			// re-arranged the tables.
+			continue
+		}
+		if include != nil && !include(name) {
 			continue
 		}
 		if !seen[name] {
@@ -41,7 +45,7 @@ func (tt *Font) Export(w io.Writer) error {
 
 	// generate the new "head" table
 	headTable := &headTable{}
-	*headTable = *tt.Head
+	*headTable = *tt.head
 	headTable.CheckSumAdjustment = 0
 	ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
 	headTable.Modified = int64(time.Since(ttZeroTime).Seconds())
@@ -90,15 +94,16 @@ func (tt *Font) Export(w io.Writer) error {
 	buf.Reset()
 	err := binary.Write(buf, binary.BigEndian, offsets)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	err = binary.Write(buf, binary.BigEndian, records)
 	if err != nil {
-		return err
+		return 0, err
 	}
+	totalSize := int64(buf.Len())
 	n, err := w.Write(buf.Bytes())
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if n%4 != 0 {
 		panic("wrong header length")
@@ -122,16 +127,18 @@ func (tt *Font) Export(w io.Writer) error {
 			n = int(n64)
 			err = e2
 		}
+		totalSize += int64(n)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if k := n % 4; k != 0 {
 			_, err := w.Write(pad[:4-k])
 			if err != nil {
-				return err
+				return 0, err
 			}
+			totalSize += int64(4 - k)
 		}
 	}
 
-	return nil
+	return totalSize, nil
 }
