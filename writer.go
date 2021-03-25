@@ -326,12 +326,13 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	return ref, nil
 }
 
-// WriteObjectStream writes objects in a compressed object stream.
-func (pdf *Writer) WriteObjectStream(refs []*Reference, objects ...Object) ([]*Reference, error) {
+// WriteCompressed writes objects in a compressed object stream.
+func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Reference, error) {
 	if pdf.inStream {
 		return nil, errors.New("ObjectStream() while stream is open")
 	}
 	if err := pdf.checkVersion("using object streams", V1_5); err != nil {
+		// TODO(voss): write uncompressed objects instead.
 		return nil, err
 	}
 

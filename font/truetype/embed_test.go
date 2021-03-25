@@ -65,7 +65,6 @@ func TestEmbedFont(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	F2, err := w.Write(pdf.Dict{
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),

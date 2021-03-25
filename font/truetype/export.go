@@ -51,7 +51,7 @@ func (tt *Font) export(w io.Writer, include func(string) bool) (int64, error) {
 	headTable.Modified = int64(time.Since(ttZeroTime).Seconds())
 	headTable.FontDirectionHint = 2
 	buf := &bytes.Buffer{}
-	binary.Write(buf, binary.BigEndian, headTable)
+	_ = binary.Write(buf, binary.BigEndian, headTable)
 	headBytes := append([]byte{}, buf.Bytes()...) // keep a copy
 	headChecksum, _ := checksum(buf, true)
 

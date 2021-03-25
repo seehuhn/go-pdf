@@ -55,9 +55,8 @@ func doOneFile(fname string) error {
 	}
 	defer r.Close()
 
-seqLoop:
 	for {
-		obj, _, err := r.ReadSequential()
+		obj, ref, err := r.ReadSequential()
 		if err == io.EOF {
 			break
 		}
@@ -66,52 +65,29 @@ seqLoop:
 		}
 
 		dict, ok := obj.(pdf.Dict)
-		if !ok || dict["Type"] != pdf.Name("FontDescriptor") {
+		if !ok || dict["Type"] != pdf.Name("Font") || dict["Subtype"] != pdf.Name("Type0") {
 			continue
 		}
 
-		var stemV float64
-		switch x := dict["StemV"].(type) {
-		case pdf.Integer:
-			stemV = float64(x)
-		case pdf.Real:
-			stemV = float64(x)
-		default:
-			continue seqLoop
+		desc, err := r.Resolve(dict["DescendantFonts"])
+		if err != nil {
+			return err
 		}
-		if stemV > 1000 {
+
+		descA, ok := desc.(pdf.Array)
+		if !ok || len(descA) != 1 {
 			continue
 		}
 
-		weight, ok := dict["FontWeight"].(pdf.Integer)
-		if !ok {
+		xxx, err := r.Resolve(descA[0])
+		if err != nil {
+			return err
+		}
+		xxxDict, ok := xxx.(pdf.Dict)
+		if !ok || xxxDict["Subtype"] != pdf.Name("CIDFontType2") {
 			continue
 		}
-
-		stretch, ok := dict["FontStretch"].(pdf.Name)
-		if !ok {
-			stretch = "NA"
-		} else {
-			sMap := map[pdf.Name]pdf.Name{
-				"UltraCondensed": "1",
-				"ExtraCondensed": "2",
-				"Condensed":      "3",
-				"SemiCondensed":  "4",
-				"Normal":         "5",
-				"SemiExpanded":   "6",
-				"Expanded":       "7",
-				"ExtraExpanded":  "8",
-				"UltraExpanded":  "9",
-			}
-			s2, ok := sMap[stretch]
-			if ok {
-				stretch = s2
-			} else {
-				fmt.Println("xxx", stretch)
-			}
-		}
-
-		fmt.Printf("%g,%d,%s\n", stemV, weight, stretch)
+		fmt.Println(ref, fname)
 	}
 
 	return nil

@@ -38,7 +38,7 @@ func TestWriter(t *testing.T) {
 	encInfo1 := format(w.w.enc.ToDict())
 
 	author := TextString("Jochen Voß")
-	refs, err := w.WriteObjectStream(nil,
+	refs, err := w.WriteCompressed(nil,
 		Dict{
 			"Title":    TextString("PDF Test Document"),
 			"Author":   author,

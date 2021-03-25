@@ -4,10 +4,10 @@ import "seehuhn.de/go/pdf"
 
 type Info struct {
 	FontName string
-	Type     string
+	Type     string // TODO(voss): remove?
 
 	BBox  *pdf.Rectangle
-	Width map[byte]float64
+	Width []int
 	Kern  []Rect
 
 	IsAdobeLatin bool // is a subset of the Adobe standard Latin character set

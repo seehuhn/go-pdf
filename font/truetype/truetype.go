@@ -114,6 +114,10 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 	if err != nil {
 		return nil, err
 	}
+	hmtx, err := tt.getHMtxInfo(hheaInfo.NumOfLongHorMetrics)
+	if err != nil {
+		return nil, err
+	}
 
 	os2Info, err := tt.GetOS2Info()
 	// The "OS/2" table is optional for TrueType fonts, but required for
@@ -127,6 +131,8 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 
 	info := &font.Info{
 		Type: "TrueType",
+
+		Width: make([]int, tt.NumGlyphs),
 		BBox: &pdf.Rectangle{
 			LLx: float64(tt.head.XMin) * q,
 			LLy: float64(tt.head.YMin) * q,
@@ -143,6 +149,11 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 		Ascent:      float64(hheaInfo.Ascent) * q,
 		Descent:     float64(hheaInfo.Descent) * q,
 		LineGap:     float64(hheaInfo.LineGap) * q,
+	}
+
+	for i := 0; i < tt.NumGlyphs; i++ {
+		j := i % len(hmtx.HMetrics)
+		info.Width[i] = int(float64(hmtx.HMetrics[j].AdvanceWidth)*q + 0.5)
 	}
 
 	// provisional weight values, updated below
@@ -189,13 +200,14 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 			info.CapHeight = float64(os2Info.V4.CapHeight) * q
 			info.XHeight = float64(os2Info.V4.XHeight) * q
 		} else {
-			// TODO(voss): XHeight may be set equal to the top of the unscaled and
-			// unhinted glyph bounding box of the glyph encoded at U+0078 (LATIN
-			// SMALL LETTER X).
-
 			// TODO(voss): CapHeight may be set equal to the top of the unscaled
 			// and unhinted glyph bounding box of the glyph encoded at U+0048
 			// (LATIN CAPITAL LETTER H)
+			info.CapHeight = 800
+
+			// TODO(voss): XHeight may be set equal to the top of the unscaled and
+			// unhinted glyph bounding box of the glyph encoded at U+0078 (LATIN
+			// SMALL LETTER X).
 		}
 	}
 

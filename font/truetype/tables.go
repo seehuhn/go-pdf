@@ -272,8 +272,11 @@ func (tt *Font) GetFontName() (string, error) {
 		switch {
 		case record.PlatformID == 1 && record.PlatformSpecificID == 0 &&
 			record.LanguageID == 0:
-			nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
+			_, err = nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
 				io.SeekStart)
+			if err != nil {
+				return "", err
+			}
 			buf := make([]byte, record.Length)
 			_, err := io.ReadFull(nameFd, buf)
 			if err != nil {
@@ -285,8 +288,11 @@ func (tt *Font) GetFontName() (string, error) {
 			}
 			return string(rr), nil
 		case record.PlatformID == 3 && record.PlatformSpecificID == 1:
-			nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
+			_, err = nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
 				io.SeekStart)
+			if err != nil {
+				return "", err
+			}
 			buf := make([]uint16, record.Length/2)
 			err := binary.Read(nameFd, binary.BigEndian, buf)
 			if err != nil {
@@ -427,6 +433,32 @@ func (tt *Font) getHHeaInfo() (*hheaTable, error) {
 		return nil, err
 	}
 	return hhea, nil
+}
+
+type hmtxTable struct {
+	HMetrics        []LongHorMetric
+	LeftSideBearing []int16
+}
+
+type LongHorMetric struct {
+	AdvanceWidth    uint16
+	LeftSideBearing int16
+}
+
+func (tt *Font) getHMtxInfo(NumOfLongHorMetrics uint16) (*hmtxTable, error) {
+	hmtx := &hmtxTable{
+		HMetrics:        make([]LongHorMetric, NumOfLongHorMetrics),
+		LeftSideBearing: make([]int16, tt.NumGlyphs-int(NumOfLongHorMetrics)),
+	}
+	fd, err := tt.readTableHead("hmtx", hmtx.HMetrics)
+	if err != nil {
+		return nil, err
+	}
+	err = binary.Read(fd, binary.BigEndian, hmtx.LeftSideBearing)
+	if err != nil {
+		return nil, err
+	}
+	return hmtx, nil
 }
 
 type os2Table struct {

@@ -68,10 +68,10 @@ func (tt *Font) Embed(w *pdf.Writer) (*pdf.Reference, error) {
 // EmbedAsType0 embeds a TrueType font into a pdf file and returns a reference
 // to the CIDFont dictionary.
 func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
-	if w.Version < pdf.V1_2 {
+	if w.Version < pdf.V1_3 {
 		return nil, &pdf.VersionError{
 			Earliest:  pdf.V1_2,
-			Operation: "use of CIDFonts",
+			Operation: "use of TrueType-based CIDFonts",
 		}
 	}
 
@@ -79,7 +79,6 @@ func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
 	size := w.NewPlaceholder(10)
 	dict := pdf.Dict{
 		"Length1": size,
-		"Subtype": pdf.Name("OpenType"),
 	}
 	opt := &pdf.StreamOptions{
 		Filters: []*pdf.FilterInfo{
@@ -91,12 +90,7 @@ func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
 		return nil, err
 	}
 	n, err := tt.export(stm, func(name string) bool {
-		switch name {
-		case "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
-			return true
-		default:
-			return false
-		}
+		return true // name != "cmap"
 	})
 	if err != nil {
 		return nil, err
@@ -129,26 +123,42 @@ func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
 		// I guess this is still better than just saying 70.
 		"StemV": pdf.Integer(0.0838*float64(tt.Info.Weight) + 36.0198 + 0.5),
 
-		"FontFile3": FontFile,
+		"FontFile2": FontFile,
 	}
 	FontDescriptorRef, err := w.Write(FontDescriptor, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	CIDSystemInfo := pdf.Dict{
-		"Registry":   pdf.Name("Adobe"),
-		"Ordering":   pdf.Name("Identity"),
+	// TODO(voss): make sure there is only one copy of this per PDF file.
+	CIDSystemInfoRef, err := w.Write(pdf.Dict{
+		"Registry":   pdf.String("Adobe"),
+		"Ordering":   pdf.String("Identity"),
 		"Supplement": pdf.Integer(0),
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	DW := mostFrequent(tt.Info.Width)
+	W := encodeWidths(tt.Info.Width, DW)
+	WRefs, err := w.WriteCompressed(nil, W)
+	if err != nil {
+		return nil, err
 	}
 
 	CIDFont := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("CIDFontType2"),
 		"BaseFont":       FontName,
-		"CIDSystemInfo":  CIDSystemInfo,
+		"CIDSystemInfo":  CIDSystemInfoRef,
 		"FontDescriptor": FontDescriptorRef,
+		"W":              WRefs[0],
 	}
+	if DW != 0 {
+		CIDFont["DW"] = pdf.Integer(DW)
+	}
+
 	CIDFontRef, err := w.Write(CIDFont, nil)
 	if err != nil {
 		return nil, err
