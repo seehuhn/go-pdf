@@ -17,9 +17,6 @@ type Font struct {
 
 	head      *headTable
 	NumGlyphs int
-
-	CMap [][]rune // TODO(voss): map from runes to indices instead?
-	Info *font.Info
 }
 
 type offsetsTable struct {
@@ -88,16 +85,6 @@ func Open(fname string) (*Font, error) {
 		return nil, err
 	}
 
-	tt.CMap, err = tt.selectCmap()
-	if err != nil {
-		return nil, err
-	}
-
-	tt.Info, err = tt.GetInfo()
-	if err != nil {
-		return nil, err
-	}
-
 	return tt, nil
 }
 
@@ -106,7 +93,7 @@ func (tt *Font) Close() error {
 }
 
 func (tt *Font) GetInfo() (*font.Info, error) {
-	postInfo, err := tt.GetPostInfo()
+	postInfo, err := tt.getPostInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +106,7 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 		return nil, err
 	}
 
-	os2Info, err := tt.GetOS2Info()
+	os2Info, err := tt.getOS2Info()
 	// The "OS/2" table is optional for TrueType fonts, but required for
 	// OpenType fonts.
 	if err != nil && err != errNoTable {
@@ -130,17 +117,14 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 	q := 1000 / float64(tt.head.UnitsPerEm)
 
 	info := &font.Info{
-		Type: "TrueType",
-
 		Width: make([]int, tt.NumGlyphs),
-		BBox: &pdf.Rectangle{
+		FontBBox: &pdf.Rectangle{
 			LLx: float64(tt.head.XMin) * q,
 			LLy: float64(tt.head.YMin) * q,
 			URx: float64(tt.head.XMax) * q,
 			URy: float64(tt.head.YMax) * q,
 		},
 
-		IsAdobeLatin: tt.IsSubset(font.AdobeStandardLatin),
 		IsBold:       tt.head.MacStyle&(1<<0) != 0,
 		IsItalic:     tt.head.MacStyle&(1<<1) != 0,
 		IsFixedPitch: postInfo.IsFixedPitch,
@@ -156,6 +140,8 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 		info.Width[i] = int(float64(hmtx.HMetrics[j].AdvanceWidth)*q + 0.5)
 	}
 
+	// TODO(voss): get the individual bounding boxes for all glyphs
+
 	// provisional weight values, updated below
 	if info.IsBold {
 		info.Weight = 700
@@ -163,7 +149,7 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 		info.Weight = 400
 	}
 
-	info.FontName, err = tt.GetFontName()
+	info.FontName, err = tt.getFontName()
 	if err != nil {
 		// TODO(voss): if FontName == "", invent a name: The name must be no
 		// longer than 63 characters and restricted to the printable ASCII
@@ -220,17 +206,17 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 		}
 	}
 
-	_, ok := tt.tables["kern"]
-	if ok {
-		info.Kern = make([]font.Rect, tt.NumGlyphs)
-		// TODO(voss): ...
+	info.CMap, err = tt.selectCmap()
+	if err != nil {
+		return nil, err
 	}
+	info.IsAdobeLatin = info.IsSubset(font.AdobeStandardLatin)
 
 	return info, nil
 }
 
-func (tt *Font) selectCmap() ([][]rune, error) {
-	cmap, cmapFd, err := tt.getCmapInfo()
+func (tt *Font) selectCmap() (map[rune]font.GlyphIndex, error) {
+	cmapTable, cmapFd, err := tt.getCmapInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -254,17 +240,17 @@ func (tt *Font) selectCmap() ([][]rune, error) {
 	}
 
 	for _, cand := range candidates {
-		table := cmap.find(cand.PlatformID, cand.EncodingID)
-		if table == nil {
+		subTable := cmapTable.find(cand.PlatformID, cand.EncodingID)
+		if subTable == nil {
 			continue
 		}
 
-		cmapTable, err := tt.load(cmapFd, table, cand.IdxToRune)
+		cmap, err := tt.load(cmapFd, subTable, cand.IdxToRune)
 		if err != nil {
 			continue
 		}
 
-		return cmapTable, nil
+		return cmap, nil
 	}
 	return nil, errors.New("unsupported character encoding")
 }

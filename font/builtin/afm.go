@@ -28,21 +28,21 @@ import (
 )
 
 // BuiltIn returns information about one of the built-in PDF fonts.
-func BuiltIn(fontName string, encoding font.Encoding) *font.Font {
+func BuiltIn(fontName string, encoding font.Encoding) *font.OldFont {
 	return afm.Lookup(fontName, encoding)
 }
 
 var afm = &afmMap{
-	data: make(map[string]*font.Font),
+	data: make(map[string]*font.OldFont),
 }
 
 type afmMap struct {
 	sync.Mutex
 
-	data map[string]*font.Font
+	data map[string]*font.OldFont
 }
 
-func (m *afmMap) Lookup(fontName string, encoding font.Encoding) *font.Font {
+func (m *afmMap) Lookup(fontName string, encoding font.Encoding) *font.OldFont {
 	m.Lock()
 	defer m.Unlock()
 
@@ -50,6 +50,7 @@ func (m *afmMap) Lookup(fontName string, encoding font.Encoding) *font.Font {
 	if ok {
 		return f
 	}
+
 	fd, err := afmData.Open("afm/" + fontName + ".afm")
 	if err != nil {
 		return nil
@@ -57,7 +58,7 @@ func (m *afmMap) Lookup(fontName string, encoding font.Encoding) *font.Font {
 
 	dingbats := fontName == "ZapfDingbats"
 
-	f = &font.Font{
+	f = &font.OldFont{
 		Encoding:  encoding,
 		Width:     make(map[byte]float64),
 		BBox:      make(map[byte]*font.Rect),
@@ -240,6 +241,7 @@ glyphLoop:
 		f.Kerning[font.GlyphPair{a, b}] = kern.val
 	}
 
+	m.data[fontName] = f
 	return f
 }
 

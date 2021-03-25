@@ -1,73 +1,40 @@
 package truetype
 
 import (
+	"errors"
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
 
-// Embed embeds a TrueType font into a pdf file and returns a reference to
-// the font descriptor dictionary.
-func (tt *Font) Embed(w *pdf.Writer) (*pdf.Reference, error) {
-	// step 1: write a copy of the font file into the font stream.
-	size := w.NewPlaceholder(10)
-	dict := pdf.Dict{
-		"Length1": size,
-	}
-	opt := &pdf.StreamOptions{
-		Filters: []*pdf.FilterInfo{
-			{Name: "FlateDecode"},
-		},
-	}
-	stm, fontStream, err := w.OpenStream(dict, nil, opt)
+// Embed embeds a TrueType font into a pdf file.
+func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, error) {
+	tt, err := Open(fname)
 	if err != nil {
 		return nil, err
 	}
-	n, err := tt.export(stm, func(name string) bool {
-		return name != "vhea" && name != "vmtx" && name != "PCLT"
-	})
+	defer tt.Close()
+
+	info, err := tt.GetInfo()
 	if err != nil {
 		return nil, err
 	}
-	err = size.Set(pdf.Integer(n))
-	if err != nil {
-		return nil, err
+	FontName := pdf.Name(info.FontName)
+
+	// determine the character set
+	if subset != nil && !info.IsSuperset(subset) {
+		return nil, errors.New("font does not contain all requested glyphs")
 	}
-	err = stm.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	// step 3: write the font descriptor
-	fdesc := pdf.Dict{
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    pdf.Name(tt.Info.FontName),
-		"Flags":       pdf.Integer(getFlags(tt.Info)),
-		"FontBBox":    tt.Info.BBox,
-		"ItalicAngle": pdf.Number(tt.Info.ItalicAngle),
-		"Ascent":      pdf.Number(tt.Info.Ascent),
-		"Descent":     pdf.Number(tt.Info.Descent),
-		"CapHeight":   pdf.Number(tt.Info.CapHeight),
-
-		// TrueType files don't contain this information, so make up a value.
-		// The coefficients were found using linear regression over the fonts
-		// found in a large collection of PDF files.  The fit is not good, but
-		// I guess this is still better than just saying 70.
-		"StemV": pdf.Integer(0.0838*float64(tt.Info.Weight) + 36.0198 + 0.5),
-
-		"FontFile2": fontStream,
+	glyphs := []font.GlyphIndex{0} // always include the placeholder glyph
+	for r, idx := range info.CMap {
+		if subset == nil || subset[r] {
+			glyphs = append(glyphs, idx)
+		}
 	}
 
-	fdescRef, err := w.Write(fdesc, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return fdescRef, nil
-}
-
-// EmbedAsType0 embeds a TrueType font into a pdf file and returns a reference
-// to the CIDFont dictionary.
-func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
+	// TODO(voss): if len(glyphs) < 256, write a Type 2 font.
+	// This will require synthesizing a new cmap table.
 	if w.Version < pdf.V1_3 {
 		return nil, &pdf.VersionError{
 			Earliest:  pdf.V1_2,
@@ -89,8 +56,16 @@ func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO(voss): subset the font before embedding it.
 	n, err := tt.export(stm, func(name string) bool {
-		return true // name != "cmap"
+		// the list of tables to include is from PDF 32000-1:2008, table 126
+		switch name {
+		case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
+			return true
+		default:
+			fmt.Println("dropping", name)
+			return false
+		}
 	})
 	if err != nil {
 		return nil, err
@@ -104,24 +79,22 @@ func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
 		return nil, err
 	}
 
-	// step 2: get information about the font
-	FontName := pdf.Name(tt.Info.FontName)
-
+	// step 2: write the dictionaries to describe the font.
 	FontDescriptor := pdf.Dict{
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    FontName,
-		"Flags":       pdf.Integer(getFlags(tt.Info)),
-		"FontBBox":    tt.Info.BBox,
-		"ItalicAngle": pdf.Number(tt.Info.ItalicAngle),
-		"Ascent":      pdf.Number(tt.Info.Ascent),
-		"Descent":     pdf.Number(tt.Info.Descent),
-		"CapHeight":   pdf.Number(tt.Info.CapHeight),
+		"Flags":       pdf.Integer(getFlags(info)),
+		"FontBBox":    info.FontBBox,
+		"ItalicAngle": pdf.Number(info.ItalicAngle),
+		"Ascent":      pdf.Number(info.Ascent),
+		"Descent":     pdf.Number(info.Descent),
+		"CapHeight":   pdf.Number(info.CapHeight),
 
 		// TrueType files don't contain this information, so make up a value.
 		// The coefficients were found using linear regression over the fonts
 		// found in a large collection of PDF files.  The fit is not good, but
 		// I guess this is still better than just saying 70.
-		"StemV": pdf.Integer(0.0838*float64(tt.Info.Weight) + 36.0198 + 0.5),
+		"StemV": pdf.Integer(0.0838*float64(info.Weight) + 36.0198 + 0.5),
 
 		"FontFile2": FontFile,
 	}
@@ -140,8 +113,8 @@ func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
 		return nil, err
 	}
 
-	DW := mostFrequent(tt.Info.Width)
-	W := encodeWidths(tt.Info.Width, DW)
+	DW := mostFrequent(info.Width)
+	W := encodeWidths(info.Width, DW)
 	WRefs, err := w.WriteCompressed(nil, W)
 	if err != nil {
 		return nil, err
@@ -164,21 +137,47 @@ func (tt *Font) EmbedAsType0(w *pdf.Writer) (*pdf.Reference, error) {
 		return nil, err
 	}
 
-	return CIDFontRef, nil
+	FontRef, err := w.Write(pdf.Dict{
+		"Type":            pdf.Name("Font"),
+		"Subtype":         pdf.Name("Type0"),
+		"BaseFont":        pdf.Name(info.FontName), // TODO(voss): make sure this is consistent
+		"Encoding":        pdf.Name("Identity-H"),
+		"DescendantFonts": pdf.Array{CIDFontRef},
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	font := &font.NewFont{
+		Ref:  FontRef,
+		CMap: info.CMap,
+		Enc: func(idx font.GlyphIndex) []byte {
+			return []byte{byte(idx >> 8), byte(idx)}
+		},
+		Ligatures:   map[font.NewGlyphPair]font.GlyphIndex{},
+		Kerning:     map[font.NewGlyphPair]int{},
+		GlyphExtent: info.GlyphExtent,
+		Width:       info.Width,
+		Ascent:      info.Ascent,
+		Descent:     info.Descent,
+		LineGap:     info.LineGap,
+	}
+
+	return font, nil
 }
 
 type fontFlags int
 
 const (
-	fontFlagFixedPitch  fontFlags = 1 << (1 - 1)  // All glyphs have the same width (as opposed to proportional or variable-pitch fonts, which have different widths).
-	fontFlagSerif       fontFlags = 1 << (2 - 1)  // Glyphs have serifs, which are short strokes drawn at an angle on the top and bottom of glyph stems. (Sans serif fonts do not have serifs.)
-	fontFlagSymbolic    fontFlags = 1 << (3 - 1)  // Font contains glyphs outside the Adobe standard Latin character set. This flag and the Nonsymbolic flag shall not both be set or both be clear.
-	fontFlagScript      fontFlags = 1 << (4 - 1)  // Glyphs resemble cursive handwriting.
-	fontFlagNonsymbolic fontFlags = 1 << (6 - 1)  // Font uses the Adobe standard Latin character set or a subset of it.
-	fontFlagItalic      fontFlags = 1 << (7 - 1)  // Glyphs have dominant vertical strokes that are slanted.
-	fontFlagAllCap      fontFlags = 1 << (17 - 1) // Font contains no lowercase letters; typically used for display purposes, such as for titles or headlines.
-	fontFlagSmallCap    fontFlags = 1 << (18 - 1) // Font contains both uppercase and lowercase letters.  The uppercase letters are similar to those in the regular version of the same typeface family. The glyphs for the lowercase letters have the same shapes as the corresponding uppercase letters, but they are sized and their proportions adjusted so that they have the same size and stroke weight as lowercase glyphs in the same typeface family.
-	fontFlagForceBold   fontFlags = 1 << (19 - 1) // ...
+	fontFlagFixedPitch  fontFlags = 1 << 0  // All glyphs have the same width (as opposed to proportional or variable-pitch fonts, which have different widths).
+	fontFlagSerif       fontFlags = 1 << 1  // Glyphs have serifs, which are short strokes drawn at an angle on the top and bottom of glyph stems. (Sans serif fonts do not have serifs.)
+	fontFlagSymbolic    fontFlags = 1 << 2  // Font contains glyphs outside the Adobe standard Latin character set. This flag and the Nonsymbolic flag shall not both be set or both be clear.
+	fontFlagScript      fontFlags = 1 << 3  // Glyphs resemble cursive handwriting.
+	fontFlagNonsymbolic fontFlags = 1 << 5  // Font uses the Adobe standard Latin character set or a subset of it.
+	fontFlagItalic      fontFlags = 1 << 6  // Glyphs have dominant vertical strokes that are slanted.
+	fontFlagAllCap      fontFlags = 1 << 16 // Font contains no lowercase letters; typically used for display purposes, such as for titles or headlines.
+	fontFlagSmallCap    fontFlags = 1 << 17 // Font contains both uppercase and lowercase letters.  The uppercase letters are similar to those in the regular version of the same typeface family. The glyphs for the lowercase letters have the same shapes as the corresponding uppercase letters, but they are sized and their proportions adjusted so that they have the same size and stroke weight as lowercase glyphs in the same typeface family.
+	fontFlagForceBold   fontFlags = 1 << 18 // ...
 )
 
 func getFlags(info *font.Info) fontFlags {

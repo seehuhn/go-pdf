@@ -7,6 +7,8 @@ import (
 	"io"
 	"strconv"
 	"unicode"
+
+	"seehuhn.de/go/pdf/font"
 )
 
 type maxpTableHead struct {
@@ -67,7 +69,7 @@ func (ct *cmapTable) find(plat, enc uint16) *cmapRecord {
 	return nil
 }
 
-func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune) ([][]rune, error) {
+func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune) (map[rune]font.GlyphIndex, error) {
 	// The OpenType spec at
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 	// documents the following cmap subtable formats:
@@ -107,7 +109,7 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 	info := fmt.Sprintf("PlatID = %d, EncID = %d, Fmt = %d: ",
 		table.PlatformID, table.EncodingID, format)
 
-	cmapTable := make([][]rune, tt.NumGlyphs)
+	cmap := make(map[rune]font.GlyphIndex)
 
 	switch format {
 	case 4:
@@ -150,14 +152,14 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 					if c == 0 {
 						continue
 					}
-					if c >= len(cmapTable) {
+					if c >= tt.NumGlyphs {
 						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
 					}
 					r := i2r(idx)
 					if !unicode.IsGraphic(r) {
 						continue
 					}
-					cmapTable[c] = append(cmapTable[c], r)
+					cmap[r] = font.GlyphIndex(c)
 				}
 			} else {
 				d := int(idRangeOffset[k])/2 - (segCount - k)
@@ -178,14 +180,14 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 					if c == 0 {
 						continue
 					}
-					if c >= len(cmapTable) {
+					if c >= tt.NumGlyphs {
 						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
 					}
 					r := i2r(idx)
 					if !unicode.IsGraphic(r) {
 						continue
 					}
-					cmapTable[c] = append(cmapTable[c], r)
+					cmap[r] = font.GlyphIndex(c)
 				}
 			}
 		}
@@ -224,7 +226,7 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 				if !unicode.IsGraphic(r) {
 					continue
 				}
-				cmapTable[c] = append(cmapTable[c], r)
+				cmap[r] = font.GlyphIndex(c)
 				c++
 			}
 		}
@@ -234,7 +236,7 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 			strconv.Itoa(int(format)))
 	}
 
-	return cmapTable, nil
+	return cmap, nil
 }
 
 type nameTableHeader struct {
@@ -252,7 +254,7 @@ type nameTableRecord struct {
 	Offset             uint16 // name string offset in bytes
 }
 
-func (tt *Font) GetFontName() (string, error) {
+func (tt *Font) getFontName() (string, error) {
 	nameHeader := &nameTableHeader{}
 	nameFd, err := tt.readTableHead("name", nameHeader)
 	if err != nil {
@@ -328,7 +330,7 @@ type postTableInfo struct {
 	IsFixedPitch       bool
 }
 
-func (tt *Font) GetPostInfo() (*postTableInfo, error) {
+func (tt *Font) getPostInfo() (*postTableInfo, error) {
 	postHeader := &postTableHeader{}
 	_, err := tt.readTableHead("post", postHeader)
 	if err != nil {
@@ -436,18 +438,18 @@ func (tt *Font) getHHeaInfo() (*hheaTable, error) {
 }
 
 type hmtxTable struct {
-	HMetrics        []LongHorMetric
+	HMetrics        []longHorMetric
 	LeftSideBearing []int16
 }
 
-type LongHorMetric struct {
+type longHorMetric struct {
 	AdvanceWidth    uint16
 	LeftSideBearing int16
 }
 
 func (tt *Font) getHMtxInfo(NumOfLongHorMetrics uint16) (*hmtxTable, error) {
 	hmtx := &hmtxTable{
-		HMetrics:        make([]LongHorMetric, NumOfLongHorMetrics),
+		HMetrics:        make([]longHorMetric, NumOfLongHorMetrics),
 		LeftSideBearing: make([]int16, tt.NumGlyphs-int(NumOfLongHorMetrics)),
 	}
 	fd, err := tt.readTableHead("hmtx", hmtx.HMetrics)
@@ -511,7 +513,7 @@ type os2Table struct {
 	}
 }
 
-func (tt *Font) GetOS2Info() (*os2Table, error) {
+func (tt *Font) getOS2Info() (*os2Table, error) {
 	os2 := &os2Table{}
 	os2Fd, err := tt.readTableHead("OS/2", &os2.V0)
 	if err != nil {

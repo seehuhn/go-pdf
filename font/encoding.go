@@ -43,23 +43,23 @@ var (
 )
 
 type tables struct {
-	to   map[rune]byte
-	from []rune
+	To   map[rune]byte
+	From []rune
 }
 
 func (enc *tables) Encode(r rune) (byte, bool) {
-	c, ok := enc.to[r]
+	c, ok := enc.To[r]
 	if ok {
 		return c, true
 	}
-	if r <= 255 && enc.from[r] == r {
+	if r <= 255 && enc.From[r] == r {
 		return byte(r), true
 	}
 	return 0, false
 }
 
 func (enc *tables) Decode(c byte) rune {
-	return enc.from[c]
+	return enc.From[c]
 }
 
 var fromStandard = []rune{

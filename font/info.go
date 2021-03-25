@@ -4,11 +4,13 @@ import "seehuhn.de/go/pdf"
 
 type Info struct {
 	FontName string
-	Type     string // TODO(voss): remove?
 
-	BBox  *pdf.Rectangle
-	Width []int
-	Kern  []Rect
+	CMap map[rune]GlyphIndex
+
+	GlyphExtent []NewRect
+	Width       []int
+
+	FontBBox *pdf.Rectangle
 
 	IsAdobeLatin bool // is a subset of the Adobe standard Latin character set
 	IsBold       bool
@@ -25,4 +27,26 @@ type Info struct {
 	LineGap     float64
 	CapHeight   float64
 	XHeight     float64
+}
+
+// IsSubset returns true if the font includes only runes from the
+// given character set.
+func (info *Info) IsSubset(charset map[rune]bool) bool {
+	for r := range info.CMap {
+		if !charset[r] {
+			return false
+		}
+	}
+	return true
+}
+
+// IsSuperset returns true if the font includes all runes of the
+// given character set.
+func (info *Info) IsSuperset(charset map[rune]bool) bool {
+	for r, ok := range charset {
+		if ok && info.CMap[r] != 0 {
+			return false
+		}
+	}
+	return true
 }

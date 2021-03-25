@@ -6,10 +6,13 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-func CustomEncoding(runes []rune) Encoding {
+func CustomEncoding(subset map[rune]bool) Encoding {
 	// Find the predefined encoding with the largest overlap in character set.
 	matches := map[string]int{}
-	for _, r := range runes {
+	for r, ok := range subset {
+		if !ok {
+			continue
+		}
 		for name, enc := range stdEncs {
 			_, ok := enc.Encode(r)
 			if ok {
@@ -33,7 +36,10 @@ func CustomEncoding(runes []rune) Encoding {
 		from[c] = noRune
 	}
 	var missing []rune
-	for _, r := range runes {
+	for r, ok := range subset {
+		if !ok {
+			continue
+		}
 		c, ok := bestEnc.Encode(r)
 		if ok {
 			from[c] = r

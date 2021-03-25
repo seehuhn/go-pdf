@@ -24,11 +24,36 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Font represents information about a PDF font at a given font size.
-type Font struct {
+type GlyphIndex uint16
+
+type NewFont struct {
+	Ref *pdf.Reference
+
+	CMap      map[rune]GlyphIndex
+	Enc       func(GlyphIndex) []byte
+	Ligatures map[NewGlyphPair]GlyphIndex
+	Kerning   map[NewGlyphPair]int
+
+	GlyphExtent []NewRect
+	Width       []int
+
+	Ascent  float64
+	Descent float64
+	LineGap float64
+}
+
+type NewRect struct {
+	LLx, LLy, URx, URy int
+}
+
+type NewGlyphPair [2]GlyphIndex
+
+// ---------------------
+
+// OldFont represents information about a PDF font at a given font size.
+type OldFont struct {
 	BaseFont  string
 	FullName  string
-	FontSize  float64
 	CapHeight float64
 	XHeight   float64
 	Ascender  float64
@@ -36,20 +61,27 @@ type Font struct {
 
 	Encoding Encoding
 
-	Width        map[byte]float64
-	MissingWidth float64
-	BBox         map[byte]*Rect
-	Ligatures    map[GlyphPair]byte
-	Kerning      map[GlyphPair]float64
+	Width     map[byte]float64
+	BBox      map[byte]*Rect
+	Ligatures map[GlyphPair]byte
+	Kerning   map[GlyphPair]float64
 }
 
-type Descriptor interface {
+// TODO(voss): is the distinction between NewFont and FontFile really useful?
+
+type OtherFont interface {
+	GetGlyphs(string) []GlyphIndex
+	EncodeGlyph(GlyphIndex) []byte
+}
+
+type FontFile interface {
 	Close() error
-	Embed(w *pdf.Writer) (*pdf.Reference, error)
 	GetInfo() (*Info, error)
+	Embed(w *pdf.Writer, subset map[rune]bool) (*pdf.Reference, OtherFont, error)
 }
 
 // Rect represents a rectangle in the PDF coordinate space.
+// TODO(voss): replace with pdf.Rectangle
 type Rect struct {
 	LLx, LLy, URx, URy float64
 }
@@ -72,7 +104,7 @@ type Layout struct {
 // TypeSet determines the layout of a string using a given font.  The function
 // takes ligatures and kerning information into account.  If the font cannot
 // represent all runes in the string, an error is returned.
-func (font *Font) TypeSet(s string, ptSize float64) (*Layout, error) {
+func (font *OldFont) TypeSet(s string, ptSize float64) (*Layout, error) {
 	for _, repl := range ligTab {
 		_, ok := font.Encoding.Encode(repl.lig)
 		if !ok {
