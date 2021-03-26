@@ -61,9 +61,9 @@ func (m *afmMap) Lookup(fontName string, encoding font.Encoding) *font.OldFont {
 	f = &font.OldFont{
 		Encoding:  encoding,
 		Width:     make(map[byte]float64),
-		BBox:      make(map[byte]*font.Rect),
-		Ligatures: make(map[font.GlyphPair]byte),
-		Kerning:   make(map[font.GlyphPair]float64),
+		BBox:      make(map[byte]*font.OldRect),
+		Ligatures: make(map[font.OldGlyphPair]byte),
+		Kerning:   make(map[font.OldGlyphPair]float64),
 	}
 	byName := make(map[string]byte)
 	type ligInfo struct {
@@ -94,7 +94,7 @@ glyphLoop:
 			var name string
 			var charCode byte
 			var width float64
-			BBox := &font.Rect{}
+			BBox := &font.OldRect{}
 			var ligTmp []*ligInfo
 
 			keyVals := strings.Split(line, ";")
@@ -229,7 +229,7 @@ glyphLoop:
 		if !aOk || !bOk || !cOk {
 			continue
 		}
-		f.Ligatures[font.GlyphPair{a, b}] = c
+		f.Ligatures[font.OldGlyphPair{a, b}] = c
 	}
 
 	for _, kern := range kerning {
@@ -238,7 +238,7 @@ glyphLoop:
 		if !aOk || !bOk || kern.val == 0 {
 			continue
 		}
-		f.Kerning[font.GlyphPair{a, b}] = kern.val
+		f.Kerning[font.OldGlyphPair{a, b}] = kern.val
 	}
 
 	m.data[fontName] = f

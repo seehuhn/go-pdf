@@ -7,7 +7,7 @@ type Info struct {
 
 	CMap map[rune]GlyphIndex
 
-	GlyphExtent []NewRect
+	GlyphExtent []Rect
 	Width       []int
 
 	FontBBox *pdf.Rectangle
@@ -44,7 +44,7 @@ func (info *Info) IsSubset(charset map[rune]bool) bool {
 // given character set.
 func (info *Info) IsSuperset(charset map[rune]bool) bool {
 	for r, ok := range charset {
-		if ok && info.CMap[r] != 0 {
+		if ok && info.CMap[r] == 0 {
 			return false
 		}
 	}

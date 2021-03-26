@@ -9,7 +9,7 @@ import (
 )
 
 // Embed embeds a TrueType font into a pdf file.
-func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, error) {
+func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error) {
 	tt, err := Open(fname)
 	if err != nil {
 		return nil, err
@@ -24,7 +24,17 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 
 	// determine the character set
 	if subset != nil && !info.IsSuperset(subset) {
-		return nil, errors.New("font does not contain all requested glyphs")
+		var missing []rune
+		for r, ok := range subset {
+			if !ok {
+				continue
+			}
+			if info.CMap[r] == 0 {
+				missing = append(missing, r)
+			}
+		}
+		msg := fmt.Sprintf("missing glyphs: %q", string(missing))
+		return nil, errors.New(msg)
 	}
 	glyphs := []font.GlyphIndex{0} // always include the placeholder glyph
 	for r, idx := range info.CMap {
@@ -32,6 +42,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 			glyphs = append(glyphs, idx)
 		}
 	}
+	// TODO(voss): use this for subsetting the font
 
 	// TODO(voss): if len(glyphs) < 256, write a Type 2 font.
 	// This will require synthesizing a new cmap table.
@@ -56,7 +67,6 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 	if err != nil {
 		return nil, err
 	}
-	// TODO(voss): subset the font before embedding it.
 	n, err := tt.export(stm, func(name string) bool {
 		// the list of tables to include is from PDF 32000-1:2008, table 126
 		switch name {
@@ -148,14 +158,18 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 		return nil, err
 	}
 
-	font := &font.NewFont{
+	font := &font.Font{
 		Ref:  FontRef,
 		CMap: info.CMap,
-		Enc: func(idx font.GlyphIndex) []byte {
-			return []byte{byte(idx >> 8), byte(idx)}
+		Enc: func(ii ...font.GlyphIndex) []byte {
+			res := make([]byte, 0, 2*len(ii))
+			for _, idx := range ii {
+				res = append(res, byte(idx>>8), byte(idx))
+			}
+			return res
 		},
-		Ligatures:   map[font.NewGlyphPair]font.GlyphIndex{},
-		Kerning:     map[font.NewGlyphPair]int{},
+		Ligatures:   map[font.GlyphPair]font.GlyphIndex{},
+		Kerning:     map[font.GlyphPair]int{},
 		GlyphExtent: info.GlyphExtent,
 		Width:       info.Width,
 		Ascent:      info.Ascent,

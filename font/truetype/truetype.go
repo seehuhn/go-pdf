@@ -140,7 +140,17 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 		info.Width[i] = int(float64(hmtx.HMetrics[j].AdvanceWidth)*q + 0.5)
 	}
 
-	// TODO(voss): get the individual bounding boxes for all glyphs
+	info.GlyphExtent = make([]font.Rect, tt.NumGlyphs)
+	glyf, err := tt.getGlyfInfo()
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < tt.NumGlyphs; i++ {
+		info.GlyphExtent[i].LLx = int(float64(glyf.Data[i].XMin)*q + 0.5)
+		info.GlyphExtent[i].LLy = int(float64(glyf.Data[i].YMin)*q + 0.5)
+		info.GlyphExtent[i].URx = int(float64(glyf.Data[i].XMax)*q + 0.5)
+		info.GlyphExtent[i].URy = int(float64(glyf.Data[i].YMax)*q + 0.5)
+	}
 
 	// provisional weight values, updated below
 	if info.IsBold {
@@ -236,7 +246,7 @@ func (tt *Font) selectCmap() (map[rune]font.GlyphIndex, error) {
 		{0, 4, unicode},
 		{3, 1, unicode}, // BMP
 		{0, 3, unicode},
-		{1, 0, macRoman},
+		{1, 0, macRoman}, // vintage Apple format
 	}
 
 	for _, cand := range candidates {

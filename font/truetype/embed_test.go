@@ -40,8 +40,6 @@ func TestEmbedFont(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(F1.CMap)
-
 	for col := 0; col < 6; col++ {
 		contents.Println("BT")
 		contents.Printf("%d %f Td\n", 50+90*col, contents.URy-50-10)
@@ -51,12 +49,21 @@ func TestEmbedFont(t *testing.T) {
 			}
 			contents.Println("/F1 12 Tf")
 			s := pdf.String(fmt.Sprintf("%3d: ", c))
-			out := pdf.String(append([]byte(s), byte(F1.CMap[rune(c)]), ' '))
-			out.PDF(contents)
-			contents.Print(" Tj ")
+
+			idx := F1.CMap[rune(c)]
+			wd := F1.Width[idx]
+			textWithKern := pdf.Array{
+				pdf.String(s),
+				pdf.Number(-0.5 * (1000 - float64(wd))),
+				pdf.String(F1.Enc(idx)),
+				pdf.Number(-0.5 * (1000 - float64(wd))),
+				pdf.String(" "),
+			}
+			textWithKern.PDF(contents)
+			contents.Print(" TJ ")
+
 			contents.Println("/F2 12 Tf")
-			idx := F2.CMap[rune(c)]
-			out = pdf.String(F2.Enc(idx))
+			out := pdf.String(F2.Enc(F2.CMap[rune(c)]))
 			out.PDF(contents)
 			contents.Println(" Tj")
 			contents.Println("0 -15 TD")

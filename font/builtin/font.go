@@ -10,22 +10,40 @@ import (
 	"seehuhn.de/go/pdf/font/names"
 )
 
-func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, error) {
+func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error) {
 	fd, err := afmData.Open("afm/" + fname + ".afm")
 	if err != nil {
 		return nil, err
 	}
 	defer fd.Close()
 
-	info := &font.Info{
+	// enc maps between unicode runes and bytes in PDF strings.
+	enc := font.CustomEncoding(subset)
+	// glyphToByte maps from character indices to bytes in a PDF string.
+	glyphToByte := make(map[font.GlyphIndex]byte)
+
+	builtin := &font.Font{
 		CMap: map[rune]font.GlyphIndex{},
 	}
+
+	var FontName string
+	byName := make(map[string]font.GlyphIndex)
+	type kernInfo struct {
+		first, second string
+		val           int
+	}
+	var kerning []*kernInfo
 
 	dingbats := fname == "ZapfDingbats"
 	charMetrics := false
 	kernPairs := false
 	cIdx := font.GlyphIndex(0)
-	// TODO(voss): prepend an artificial entry for .notdef, so that CMap works
+
+	// prepend an artificial entry for .notdef, so that CMap works
+	builtin.GlyphExtent = append(builtin.GlyphExtent, font.Rect{})
+	builtin.Width = append(builtin.Width, 250)
+	cIdx++
+
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -40,7 +58,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 		if charMetrics {
 			var name string
 			var width int
-			var BBox font.NewRect
+			var BBox font.Rect
 
 			keyVals := strings.Split(line, ";")
 			for _, keyVal := range keyVals {
@@ -56,11 +74,6 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 					width, _ = strconv.Atoi(ff[1])
 				case "N":
 					name = ff[1]
-					rr := names.ToUnicode(name, dingbats)
-					if len(rr) != 1 {
-						panic("not implemented")
-					}
-					info.CMap[rr[0]] = cIdx
 				case "B":
 					if len(ff) != 5 {
 						panic("corrupted afm data for " + fname)
@@ -81,9 +94,23 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 					panic(ff[0] + " not implemented")
 				}
 			}
-			info.GlyphExtent = append(info.GlyphExtent, BBox)
-			info.Width = append(info.Width, width)
-			cIdx++
+
+			rr := names.ToUnicode(name, dingbats)
+			if len(rr) != 1 {
+				panic("not implemented")
+			}
+			r := rr[0]
+			if subset[r] {
+				builtin.CMap[r] = cIdx
+				c, ok := enc.Encode(r)
+				if ok {
+					glyphToByte[cIdx] = c
+				}
+				byName[name] = cIdx
+				builtin.GlyphExtent = append(builtin.GlyphExtent, BBox)
+				builtin.Width = append(builtin.Width, width)
+				cIdx++
+			}
 			continue
 		}
 
@@ -97,12 +124,12 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 			if len(fields) != 4 || fields[0] != "KPX" {
 				panic("unsupported KernPair " + line)
 			}
-			// kern := &kernInfo{
-			// 	first:  fields[1],
-			// 	second: fields[2],
-			// }
-			// kern.val, _ = strconv.ParseFloat(fields[3], 64)
-			// kerning = append(kerning, kern)
+			kern := &kernInfo{
+				first:  fields[1],
+				second: fields[2],
+			}
+			kern.val, _ = strconv.Atoi(fields[3])
+			kerning = append(kerning, kern)
 			continue
 		}
 
@@ -115,31 +142,31 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 				panic("unsupported writing direction")
 			}
 		case "FontName":
-			info.FontName = fields[1]
+			FontName = fields[1]
 		case "CapHeight":
-			x, err := strconv.ParseFloat(fields[1], 64)
-			if err != nil {
-				panic("corrupted afm data for " + fname)
-			}
-			info.CapHeight = x
+			// x, err := strconv.ParseFloat(fields[1], 64)
+			// if err != nil {
+			// 	panic("corrupted afm data for " + fname)
+			// }
+			// builtin.CapHeight = x
 		case "XHeight":
-			x, err := strconv.ParseFloat(fields[1], 64)
-			if err != nil {
-				panic("corrupted afm data for " + fname)
-			}
-			info.XHeight = x
+			// x, err := strconv.ParseFloat(fields[1], 64)
+			// if err != nil {
+			// 	panic("corrupted afm data for " + fname)
+			// }
+			// builtin.XHeight = x
 		case "Ascender":
 			x, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				panic("corrupted afm data for " + fname)
 			}
-			info.Ascent = x
+			builtin.Ascent = x
 		case "Descender":
 			x, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				panic("corrupted afm data for " + fname)
 			}
-			info.Descent = x
+			builtin.Descent = x
 		case "CharWidth":
 			panic("not implemented")
 		case "StartCharMetrics":
@@ -154,47 +181,37 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.NewFont, er
 		panic("corrupted afm data for " + fname)
 	}
 
-	enc := font.CustomEncoding(subset)
-	encoding := font.Describe(enc)
+	builtin.Enc = func(ii ...font.GlyphIndex) []byte {
+		res := make([]byte, len(ii))
+		for i, idx := range ii {
+			res[i] = glyphToByte[idx]
+		}
+		return res
+	}
 
-	cmap := map[rune]font.GlyphIndex{}
-	for r, ok := range subset {
-		if !ok {
+	// TODO(voss): builtin.Ligatures, LineGap, ...
+
+	builtin.Kerning = make(map[font.GlyphPair]int)
+	for _, kern := range kerning {
+		a, aOk := byName[kern.first]
+		b, bOk := byName[kern.second]
+		if !aOk || !bOk || kern.val == 0 {
 			continue
 		}
-		idx, ok := enc.Encode(r)
-		if ok {
-			cmap[r] = font.GlyphIndex(idx)
-		}
+		builtin.Kerning[font.GlyphPair{a, b}] = kern.val
 	}
 
 	Font := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name(info.FontName),
-		"Encoding": encoding,
+		"BaseFont": pdf.Name(FontName),
+		"Encoding": font.Describe(enc),
 	}
 	// TODO(voss): for w.Version == pdf.V1_0 we should set Font["Name"]
-
-	FontRef, err := w.Write(Font, nil)
+	builtin.Ref, err = w.Write(Font, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	font := &font.NewFont{
-		Ref:  FontRef,
-		CMap: cmap,
-		Enc: func(idx font.GlyphIndex) []byte {
-			return []byte{byte(idx)} // TODO(voss): ...
-		},
-		Ligatures:   map[font.NewGlyphPair]font.GlyphIndex{}, // TODO(voss): ...
-		Kerning:     map[font.NewGlyphPair]int{},             // TODO(voss): ...
-		GlyphExtent: info.GlyphExtent,
-		Width:       info.Width,
-		Ascent:      info.Ascent,
-		Descent:     info.Descent,
-		LineGap:     info.LineGap,
-	}
-
-	return font, nil
+	return builtin, nil
 }

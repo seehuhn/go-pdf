@@ -112,7 +112,7 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 	cmap := make(map[rune]font.GlyphIndex)
 
 	switch format {
-	case 4:
+	case 4: // Segment mapping to delta values
 		type cmapFormat4 struct {
 			Length        uint16
 			Language      uint16
@@ -156,10 +156,9 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
 					}
 					r := i2r(idx)
-					if !unicode.IsGraphic(r) {
-						continue
+					if unicode.IsGraphic(r) {
+						cmap[r] = font.GlyphIndex(c)
 					}
-					cmap[r] = font.GlyphIndex(c)
 				}
 			} else {
 				d := int(idRangeOffset[k])/2 - (segCount - k)
@@ -184,15 +183,14 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
 					}
 					r := i2r(idx)
-					if !unicode.IsGraphic(r) {
-						continue
+					if unicode.IsGraphic(r) {
+						cmap[r] = font.GlyphIndex(c)
 					}
-					cmap[r] = font.GlyphIndex(c)
 				}
 			}
 		}
 
-	case 12:
+	case 12: // Segmented coverage
 		type cmapFormat12 struct {
 			_         uint16 // reserved
 			Length    uint32
@@ -223,10 +221,9 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 			c := seg.StartGlyphID
 			for idx := int(seg.StartCharCode); idx <= int(seg.EndCharCode); idx++ {
 				r := i2r(idx)
-				if !unicode.IsGraphic(r) {
-					continue
+				if unicode.IsGraphic(r) {
+					cmap[r] = font.GlyphIndex(c)
 				}
-				cmap[r] = font.GlyphIndex(c)
 				c++
 			}
 		}
@@ -548,6 +545,56 @@ func (tt *Font) getOS2Info() (*os2Table, error) {
 	return os2, nil
 }
 
+type glyfTable struct {
+	Data []glyphHeader
+	// actual glyph descriptions omitted
+}
+
+type glyphHeader struct {
+	_    int16 // If the number of contours is greater than or equal to zero, this is a simple glyph. If negative, this is a composite glyph — the value -1 should be used for composite glyphs.
+	XMin int16 // Minimum x for coordinate data.
+	YMin int16 // Minimum y for coordinate data.
+	XMax int16 // Maximum x for coordinate data.
+	YMax int16 // Maximum y for coordinate data.
+}
+
+func (tt *Font) getGlyfInfo() (*glyfTable, error) {
+	var err error
+	offset := make([]uint32, tt.NumGlyphs+1)
+	if tt.head.IndexToLocFormat == 0 {
+		short := make([]uint16, tt.NumGlyphs+1)
+		_, err = tt.readTableHead("loca", short)
+		for i, x := range short {
+			offset[i] = uint32(x)
+		}
+	} else {
+		_, err = tt.readTableHead("loca", offset)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	res := &glyfTable{
+		Data: make([]glyphHeader, tt.NumGlyphs),
+	}
+	glyfFd, err := tt.readTableHead("glyf", nil)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < tt.NumGlyphs; i++ {
+		_, err := glyfFd.Seek(int64(offset[i]), io.SeekStart)
+		if err != nil {
+			return nil, err
+		}
+		err = binary.Read(glyfFd, binary.BigEndian, &res.Data[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return res, nil
+}
+
 func (tt *Font) readTableHead(name string, head interface{}) (*io.SectionReader, error) {
 	table := tt.tables[name]
 	if table == nil {
@@ -555,9 +602,11 @@ func (tt *Font) readTableHead(name string, head interface{}) (*io.SectionReader,
 	}
 	tableFd := io.NewSectionReader(tt.fd, int64(table.Offset), int64(table.Length))
 
-	err := binary.Read(tableFd, binary.BigEndian, head)
-	if err != nil {
-		return nil, err
+	if head != nil {
+		err := binary.Read(tableFd, binary.BigEndian, head)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return tableFd, nil

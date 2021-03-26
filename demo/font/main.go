@@ -26,60 +26,67 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-// Font selection for all text on the page.
 const (
-	FontName     = "Times-Roman"
-	FontEncoding = "MacRomanEncoding"
-	FontSize     = 48.0
+	FontName = "Times-Roman"
+	FontSize = 48.0
 )
 
-var encTable = map[string]font.Encoding{
-	"StandardEncoding": font.StandardEncoding,
-	"MacRomanEncoding": font.MacRomanEncoding,
-	"WinAnsiEncoding":  font.WinAnsiEncoding,
-}
-
-// WritePage emits a single page to the PDF file and returns the page dict.
-func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
-	stream, contentNode, err := out.OpenStream(nil, nil, nil)
-	if err != nil {
-		return nil, err
+func WritePage(out *pdf.Writer, text string, width, height float64) error {
+	subset := make(map[rune]bool)
+	for _, r := range text {
+		subset[r] = true
 	}
 
-	enc := encTable[FontEncoding]
-	F1 := builtin.BuiltIn(FontName, enc)
+	F1, err := builtin.Embed(out, FontName, subset)
+	// F1, err := truetype.Embed(out, "../../font/truetype/FreeSerif.ttf", subset)
+	if err != nil {
+		return err
+	}
+
+	page, err := pages.SinglePage(out, &pages.Attributes{
+		Resources: pdf.Dict{
+			"Font": pdf.Dict{"F1": F1.Ref},
+		},
+		MediaBox: &pdf.Rectangle{
+			URx: width,
+			URy: height,
+		},
+	})
+	if err != nil {
+		return err
+	}
 
 	margin := 50.0
 	baseLineSkip := 1.2 * FontSize
 
 	q := FontSize / 1000
 
-	_, err = stream.Write([]byte("q\n1 .5 .5 RG\n"))
+	_, err = page.Write([]byte("q\n1 .5 .5 RG\n"))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	yPos := height - margin - F1.Ascender*q
+	yPos := height - margin - F1.Ascent*q
 	for y := yPos; y > margin; y -= baseLineSkip {
-		_, err = stream.Write([]byte(fmt.Sprintf("%.1f %.1f m %.1f %.1f l\n",
+		_, err = page.Write([]byte(fmt.Sprintf("%.1f %.1f m %.1f %.1f l\n",
 			margin, y, width-margin, y)))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	_, err = stream.Write([]byte("s\nQ\n"))
+	_, err = page.Write([]byte("s\nQ\n"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	text := "Waterflask & fish bucket"
-	var codes []byte
-	var last byte
+	var codes []font.GlyphIndex
+	var last font.GlyphIndex
 	for _, r := range text {
-		c, ok := F1.Encoding.Encode(r)
+		c, ok := F1.CMap[r]
 		if !ok {
 			panic("character " + string([]rune{r}) + " not in font")
 		}
-		if len(codes) > 0 {
+
+		if len(codes) > 0 && F1.Ligatures != nil {
 			pair := font.GlyphPair{last, c}
 			lig, ok := F1.Ligatures[pair]
 			if ok {
@@ -87,33 +94,34 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 				c = lig
 			}
 		}
+
 		codes = append(codes, c)
 		last = c
 	}
 
-	_, err = stream.Write([]byte("q\n.2 1 .2 RG\n"))
+	_, err = page.Write([]byte("q\n.2 1 .2 RG\n"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var formatted pdf.Array
 	pos := 0
 	xPos := margin
 	for i, c := range codes {
-		bbox := F1.BBox[c]
-		if bbox.IsPrint() {
-			_, err = stream.Write([]byte(fmt.Sprintf("%.2f %.2f %.2f %.2f re\n",
-				xPos+bbox.LLx*q,
-				yPos+bbox.LLy*q,
-				bbox.URx*q-bbox.LLx*q,
-				bbox.URy*q-bbox.LLy*q)))
+		bbox := F1.GlyphExtent[c]
+		if !bbox.IsZero() {
+			_, err = page.Write([]byte(fmt.Sprintf("%.2f %.2f %.2f %.2f re\n",
+				xPos+float64(bbox.LLx)*q,
+				yPos+float64(bbox.LLy)*q,
+				float64(bbox.URx)*q-float64(bbox.LLx)*q,
+				float64(bbox.URy)*q-float64(bbox.LLy)*q)))
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
-		xPos += F1.Width[c] * q
+		xPos += float64(F1.Width[c]) * q
 
 		if i == len(codes)-1 {
-			formatted = append(formatted, pdf.String(codes[pos:]))
+			formatted = append(formatted, pdf.String(F1.Enc(codes[pos:]...)))
 			break
 		}
 
@@ -121,44 +129,36 @@ func WritePage(out *pdf.Writer, width, height float64) (pdf.Dict, error) {
 		if !ok {
 			continue
 		}
-		xPos += kern * q
-		var kObj pdf.Object
-		if kern == float64(int64(kern)) {
-			kObj = pdf.Integer(-kern)
-		} else {
-			kObj = pdf.Real(-kern)
-		}
+		xPos += float64(kern) * q
+		kObj := pdf.Number(-kern)
 		formatted = append(formatted,
-			pdf.String(codes[pos:(i+1)]), kObj)
+			pdf.String(F1.Enc(codes[pos:(i+1)]...)), kObj)
 		pos = i + 1
 	}
-	_, err = stream.Write([]byte("s\nQ\n"))
+	_, err = page.Write([]byte("s\nQ\n"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	_, err = stream.Write([]byte(fmt.Sprintf("BT\n/F1 %f Tf\n%.1f %.1f Td\n",
+	_, err = page.Write([]byte(fmt.Sprintf("BT\n/F1 %f Tf\n%.1f %.1f Td\n",
 		FontSize, margin, yPos)))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = formatted.PDF(stream)
+	err = formatted.PDF(page)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	_, err = stream.Write([]byte(" TJ\nET"))
+	_, err = page.Write([]byte(" TJ\nET"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = stream.Close()
+	err = page.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return pdf.Dict{
-		"Type":     pdf.Name("Page"),
-		"Contents": contentNode,
-	}, nil
+	return nil
 }
 
 func main() {
@@ -167,35 +167,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	font, err := out.Write(pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name(FontName),
-		"Encoding": pdf.Name(FontEncoding),
-	}, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	const width = 8 * 72
 	const height = 6 * 72
 
-	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
-		Resources: pdf.Dict{
-			"Font": pdf.Dict{"F1": font},
-		},
-		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: width, URy: height},
-	})
-	page, err := WritePage(out, width, height)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = pageTree.Ship(page, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pagesRef, err := pageTree.Flush()
+	text := "Waterﬂask & ﬁsh bucket"
+	err = WritePage(out, text, width, height)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -203,14 +179,6 @@ func main() {
 	err = out.SetInfo(pdf.Dict{
 		"Title":  pdf.TextString("PDF Test Document"),
 		"Author": pdf.TextString("Jochen Voß"),
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = out.SetCatalog(pdf.Dict{
-		"Type":  pdf.Name("Catalog"),
-		"Pages": pagesRef,
 	})
 	if err != nil {
 		log.Fatal(err)

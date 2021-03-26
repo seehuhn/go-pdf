@@ -26,15 +26,15 @@ import (
 
 type GlyphIndex uint16
 
-type NewFont struct {
+type Font struct {
 	Ref *pdf.Reference
 
 	CMap      map[rune]GlyphIndex
-	Enc       func(GlyphIndex) []byte
-	Ligatures map[NewGlyphPair]GlyphIndex
-	Kerning   map[NewGlyphPair]int
+	Enc       func(...GlyphIndex) []byte
+	Ligatures map[GlyphPair]GlyphIndex
+	Kerning   map[GlyphPair]int
 
-	GlyphExtent []NewRect
+	GlyphExtent []Rect
 	Width       []int
 
 	Ascent  float64
@@ -42,11 +42,18 @@ type NewFont struct {
 	LineGap float64
 }
 
-type NewRect struct {
+type Rect struct {
 	LLx, LLy, URx, URy int
 }
 
-type NewGlyphPair [2]GlyphIndex
+// IsZero returns whether the glyph leaves marks on the page.
+func (rect *Rect) IsZero() bool {
+	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
+}
+
+// GlyphPair represents two consecutive glyphs, specified by a pair of
+// character codes.  This is used for ligatures and kerning information.
+type GlyphPair [2]GlyphIndex
 
 // ---------------------
 
@@ -62,9 +69,9 @@ type OldFont struct {
 	Encoding Encoding
 
 	Width     map[byte]float64
-	BBox      map[byte]*Rect
-	Ligatures map[GlyphPair]byte
-	Kerning   map[GlyphPair]float64
+	BBox      map[byte]*OldRect
+	Ligatures map[OldGlyphPair]byte
+	Kerning   map[OldGlyphPair]float64
 }
 
 // TODO(voss): is the distinction between NewFont and FontFile really useful?
@@ -80,14 +87,14 @@ type FontFile interface {
 	Embed(w *pdf.Writer, subset map[rune]bool) (*pdf.Reference, OtherFont, error)
 }
 
-// Rect represents a rectangle in the PDF coordinate space.
+// OldRect represents a rectangle in the PDF coordinate space.
 // TODO(voss): replace with pdf.Rectangle
-type Rect struct {
+type OldRect struct {
 	LLx, LLy, URx, URy float64
 }
 
 // IsPrint returns whether the glyph leaves marks on the page.
-func (rect *Rect) IsPrint() bool {
+func (rect *OldRect) IsPrint() bool {
 	return rect.LLx != 0 || rect.LLy != 0 || rect.URx != 0 || rect.URy != 0
 }
 
@@ -129,7 +136,7 @@ func (font *OldFont) TypeSet(s string, ptSize float64) (*Layout, error) {
 			return nil, errors.New("missing glyph for rune " + string([]rune{r}))
 		}
 		if len(codes) > 0 {
-			pair := GlyphPair{last, c}
+			pair := OldGlyphPair{last, c}
 			lig, ok := font.Ligatures[pair]
 			if ok {
 				codes = codes[:len(codes)-1]
@@ -170,7 +177,7 @@ func (font *OldFont) TypeSet(s string, ptSize float64) (*Layout, error) {
 			break
 		}
 
-		kern, ok := font.Kerning[GlyphPair{c, codes[i+1]}]
+		kern, ok := font.Kerning[OldGlyphPair{c, codes[i+1]}]
 		if !ok {
 			continue
 		}
@@ -198,6 +205,6 @@ var ligTab = []struct {
 	{"ff", '\uFB00'},
 }
 
-// GlyphPair represents two consecutive glyphs, specified by a pair of
+// OldGlyphPair represents two consecutive glyphs, specified by a pair of
 // character codes.  This is used for ligatures and kerning information.
-type GlyphPair [2]byte
+type OldGlyphPair [2]byte
