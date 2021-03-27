@@ -42,13 +42,17 @@ func (ccc *subset) Add(s string) {
 }
 
 func TestFrame(t *testing.T) {
+	text1 := "Von Tiffany's fish "
+	text2 := "et al. "
+
 	out, err := pdf.Create("test.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	subset := NewSubset()
-	subset.Add("Von Tiffany's fish et al.")
+	subset.Add(text1)
+	subset.Add(text2)
 	subset.Add("ﬁ")
 
 	// F1, err := builtin.Embed(out, "Times-Roman", subset.chars)
@@ -76,8 +80,8 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	text1 := F1.Typeset("Von Tiffany's fish ", 12)
-	text2 := F2.Typeset("et al. ", 12)
+	layout1 := F1.Typeset(text1, 12)
+	layout2 := F2.Typeset(text2, 12)
 	box := &vBox{
 		stuffExtent: stuffExtent{
 			Width:  pages.A5.URx - pages.A5.LLx,
@@ -96,11 +100,11 @@ func TestFrame(t *testing.T) {
 					kern(36),
 					&text{
 						font:   "F1",
-						layout: text1,
+						layout: layout1,
 					},
 					&text{
 						font:   "F2",
-						layout: text2,
+						layout: layout2,
 					},
 					&rule{
 						stuffExtent: stuffExtent{

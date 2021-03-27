@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -20,18 +19,27 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 	}
 	defer fd.Close()
 
+	needSubset := false
 	if subset == nil {
-		subset = font.AdobeStandardLatin
+		needSubset = true
+		subset = make(map[rune]bool)
 	}
 
 	builtin := &font.Font{
-		CMap: map[rune]font.GlyphIndex{},
+		CMap:      map[rune]font.GlyphIndex{},
+		Ligatures: map[font.GlyphPair]font.GlyphIndex{},
 	}
 
 	var FontName string
-	nameToGlyph := make(map[string]font.GlyphIndex)
 	runeToName := make(map[rune]string)
+	nameToGlyph := make(map[string]font.GlyphIndex)
 	stdRuneToCode := make(map[rune]byte)
+
+	type ligInfo struct {
+		first, second, combined string
+	}
+	var ligatures []*ligInfo
+
 	type kernInfo struct {
 		first, second string
 		val           int
@@ -64,6 +72,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 			var width int
 			var code int
 			var BBox font.Rect
+			var ligTmp []*ligInfo
 
 			keyVals := strings.Split(line, ";")
 			for _, keyVal := range keyVals {
@@ -87,14 +96,13 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 					BBox.URx, _ = strconv.Atoi(ff[3])
 					BBox.URy, _ = strconv.Atoi(ff[4])
 				case "L":
-					// TODO(voss)
-					// if len(ff) != 3 {
-					// 	panic("corrupted afm data for " + fontName)
-					// }
-					// ligTmp = append(ligTmp, &ligInfo{
-					// 	second:   ff[1],
-					// 	combined: ff[2],
-					// })
+					if len(ff) != 3 {
+						panic("corrupted afm data for " + fname)
+					}
+					ligTmp = append(ligTmp, &ligInfo{
+						second:   ff[1],
+						combined: ff[2],
+					})
 				default:
 					panic(ff[0] + " not implemented")
 				}
@@ -105,6 +113,9 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 				panic("not implemented")
 			}
 			r := rr[0]
+			if needSubset && code > 0 {
+				subset[r] = true
+			}
 			if subset[r] {
 				builtin.CMap[r] = cIdx
 				nameToGlyph[name] = cIdx
@@ -112,8 +123,12 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 				if code > 0 {
 					stdRuneToCode[r] = byte(code)
 				}
-				builtin.GlyphExtent = append(builtin.GlyphExtent, BBox)
 				builtin.Width = append(builtin.Width, width)
+				builtin.GlyphExtent = append(builtin.GlyphExtent, BBox)
+				for _, lig := range ligTmp {
+					lig.first = name
+					ligatures = append(ligatures, lig)
+				}
 				cIdx++
 			}
 			continue
@@ -186,30 +201,31 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		panic("corrupted afm data for " + fname)
 	}
 
-	// TODO(voss): builtin.Ligatures, LineGap, ...
+	// TODO(voss): LineGap, ...
 
-	// pick a BaseEncoding
-	var bestName pdf.Object
-	bestCount := len(stdRuneToCode)
-	bestRuneToCode := stdRuneToCode
-	for name, enc := range stdEncs {
-		count := 0
-		runeToCode := make(map[rune]byte)
-		for r, ok := range subset {
-			if !ok {
-				continue
-			}
-			if c, ok := enc.Encode(r); ok {
-				count++
-				runeToCode[r] = c
-			}
-		}
-		if count > bestCount {
-			bestName = name
-			bestCount = count
-			bestRuneToCode = runeToCode
+	// store the ligature information
+	// TODO(voss): automatically extend the subset to include ligature targets?
+	for _, lig := range ligatures {
+		a, aOk := nameToGlyph[lig.first]
+		b, bOk := nameToGlyph[lig.second]
+		c, cOk := nameToGlyph[lig.combined]
+		if aOk && bOk && cOk {
+			builtin.Ligatures[font.GlyphPair{a, b}] = c
 		}
 	}
+
+	// store the kerning information
+	builtin.Kerning = make(map[font.GlyphPair]int)
+	for _, kern := range kerning {
+		a, aOk := nameToGlyph[kern.first]
+		b, bOk := nameToGlyph[kern.second]
+		if aOk && bOk && kern.val != 0 {
+			builtin.Kerning[font.GlyphPair{a, b}] = kern.val
+		}
+	}
+
+	// pick a BaseEncoding
+	bestName, bestRuneToCode := chooseBaseEncoding(stdRuneToCode, subset)
 
 	// fill in the gaps
 	var todo []rune
@@ -289,16 +305,6 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		return res
 	}
 
-	builtin.Kerning = make(map[font.GlyphPair]int)
-	for _, kern := range kerning {
-		a, aOk := nameToGlyph[kern.first]
-		b, bOk := nameToGlyph[kern.second]
-		if !aOk || !bOk || kern.val == 0 {
-			continue
-		}
-		builtin.Kerning[font.GlyphPair{a, b}] = kern.val
-	}
-
 	Font := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
@@ -314,10 +320,33 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 	return builtin, nil
 }
 
+func chooseBaseEncoding(stdRuneToCode map[rune]byte, subset map[rune]bool) (pdf.Object, map[rune]byte) {
+	var bestName pdf.Object
+	bestCount := len(stdRuneToCode)
+	bestRuneToCode := stdRuneToCode
+	for name, enc := range stdEncs {
+		count := 0
+		runeToCode := make(map[rune]byte)
+		for r, ok := range subset {
+			if !ok {
+				continue
+			}
+			if c, ok := enc.Encode(r); ok {
+				count++
+				runeToCode[r] = c
+			}
+		}
+		if count > bestCount {
+			bestName = name
+			bestCount = count
+			bestRuneToCode = runeToCode
+		}
+	}
+	return bestName, bestRuneToCode
+}
+
 var stdEncs = map[pdf.Name]font.Encoding{
 	"MacRomanEncoding": font.MacRomanEncoding,
 	"WinAnsiEncoding":  font.WinAnsiEncoding,
 	// TODO(voss): add MacExpertEncoding
 }
-
-const noRune = unicode.ReplacementChar

@@ -11,6 +11,21 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
+type offsetsTable struct {
+	ScalerType    uint32
+	NumTables     uint16
+	SearchRange   uint16
+	EntrySelector uint16
+	RangeShift    uint16
+}
+
+type tableRecord struct {
+	Tag      uint32
+	CheckSum uint32
+	Offset   uint32
+	Length   uint32
+}
+
 type maxpTableHead struct {
 	Version   int32  //	0x00005000 or 0x00010000
 	NumGlyphs uint16 //	the number of glyphs in the font
@@ -543,6 +558,61 @@ func (tt *Font) getOS2Info() (*os2Table, error) {
 		}
 	}
 	return os2, nil
+}
+
+func (tt *Font) getKernInfo(q float64) (map[font.GlyphPair]int, error) {
+	var Header struct {
+		Version   uint16
+		NumTables uint16
+	}
+	kernFd, err := tt.readTableHead("kern", &Header)
+	if err != nil {
+		return nil, err
+	} else if Header.Version != 0 {
+		return nil, errors.New("unsupported kern table version")
+	}
+
+	kerning := make(map[font.GlyphPair]int)
+	for i := 0; i < int(Header.NumTables); i++ {
+		var subHeader struct {
+			Version  uint16
+			Length   uint16
+			Coverage uint16
+		}
+		err = binary.Read(kernFd, binary.BigEndian, &subHeader)
+		if err != nil {
+			return nil, err
+		}
+		if subHeader.Version != 0 ||
+			subHeader.Coverage != 1 ||
+			subHeader.Length < 6+8 ||
+			subHeader.Length%2 != 0 {
+			// skip unsupported and mal-formed subtables
+			_, err = io.CopyN(io.Discard, kernFd, int64(subHeader.Length-6))
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		buf := make([]uint16, (subHeader.Length-6)/2)
+		err = binary.Read(kernFd, binary.BigEndian, buf)
+		if err != nil {
+			return nil, err
+		}
+
+		nPairs := int(buf[0])
+		buf = buf[4:] // skip the header
+		for nPairs > 0 && len(buf) >= 3 {
+			LR := font.GlyphPair{
+				font.GlyphIndex(buf[0]), font.GlyphIndex(buf[1])}
+			kern := int16(buf[2])
+			kerning[LR] = int(float64(kern)*q + 0.5)
+			buf = buf[3:]
+		}
+	}
+
+	return kerning, nil
 }
 
 type glyfTable struct {

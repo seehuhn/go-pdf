@@ -19,19 +19,55 @@ type Font struct {
 	NumGlyphs int
 }
 
-type offsetsTable struct {
-	ScalerType    uint32
-	NumTables     uint16
-	SearchRange   uint16
-	EntrySelector uint16
-	RangeShift    uint16
+// TODO(voss): merge this type with truetype.Font
+type fontInfo struct {
+	FontName string
+
+	CMap map[rune]font.GlyphIndex
+
+	GlyphExtent []font.Rect
+	Width       []int
+	Kerning     map[font.GlyphPair]int
+
+	FontBBox *pdf.Rectangle
+
+	IsAdobeLatin bool // is a subset of the Adobe standard Latin character set
+	IsBold       bool
+	IsFixedPitch bool
+	IsItalic     bool
+	IsScript     bool // glyphs resemble cursive handwriting
+	IsSerif      bool
+
+	Weight int // 300 = light, 400 = regular, 700 = bold
+
+	ItalicAngle float64
+	Ascent      float64
+	Descent     float64
+	LineGap     float64
+	CapHeight   float64
+	XHeight     float64
 }
 
-type tableRecord struct {
-	Tag      uint32
-	CheckSum uint32
-	Offset   uint32
-	Length   uint32
+// IsSubset returns true if the font includes only runes from the
+// given character set.
+func (info *fontInfo) IsSubset(charset map[rune]bool) bool {
+	for r := range info.CMap {
+		if !charset[r] {
+			return false
+		}
+	}
+	return true
+}
+
+// IsSuperset returns true if the font includes all runes of the
+// given character set.
+func (info *fontInfo) IsSuperset(charset map[rune]bool) bool {
+	for r, ok := range charset {
+		if ok && info.CMap[r] == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func Open(fname string) (*Font, error) {
@@ -92,7 +128,7 @@ func (tt *Font) Close() error {
 	return tt.fd.Close()
 }
 
-func (tt *Font) GetInfo() (*font.Info, error) {
+func (tt *Font) GetInfo() (*fontInfo, error) {
 	postInfo, err := tt.getPostInfo()
 	if err != nil {
 		return nil, err
@@ -116,7 +152,7 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 	// factor for converting from TrueType FUnit to PDF glyph units
 	q := 1000 / float64(tt.head.UnitsPerEm)
 
-	info := &font.Info{
+	info := &fontInfo{
 		Width: make([]int, tt.NumGlyphs),
 		FontBBox: &pdf.Rectangle{
 			LLx: float64(tt.head.XMin) * q,
@@ -221,6 +257,11 @@ func (tt *Font) GetInfo() (*font.Info, error) {
 		return nil, err
 	}
 	info.IsAdobeLatin = info.IsSubset(font.AdobeStandardLatin)
+
+	info.Kerning, err = tt.getKernInfo(q)
+	if err != nil {
+		return nil, err
+	}
 
 	return info, nil
 }

@@ -73,7 +73,6 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
 			return true
 		default:
-			fmt.Println("dropping", name)
 			return false
 		}
 	})
@@ -169,7 +168,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 			return res
 		},
 		Ligatures:   map[font.GlyphPair]font.GlyphIndex{},
-		Kerning:     map[font.GlyphPair]int{},
+		Kerning:     info.Kerning,
 		GlyphExtent: info.GlyphExtent,
 		Width:       info.Width,
 		Ascent:      info.Ascent,
@@ -194,7 +193,7 @@ const (
 	fontFlagForceBold   fontFlags = 1 << 18 // ...
 )
 
-func getFlags(info *font.Info) fontFlags {
+func getFlags(info *fontInfo) fontFlags {
 	var flags fontFlags
 	if info.IsFixedPitch {
 		flags |= fontFlagFixedPitch

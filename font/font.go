@@ -17,7 +17,6 @@
 package font
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 
@@ -54,38 +53,6 @@ func (rect *Rect) IsZero() bool {
 // GlyphPair represents two consecutive glyphs, specified by a pair of
 // character codes.  This is used for ligatures and kerning information.
 type GlyphPair [2]GlyphIndex
-
-// ---------------------
-
-// OldFont represents information about a PDF font at a given font size.
-type OldFont struct {
-	BaseFont  string
-	FullName  string
-	CapHeight float64
-	XHeight   float64
-	Ascender  float64
-	Descender float64
-
-	Encoding Encoding
-
-	Width     map[byte]float64
-	BBox      map[byte]*OldRect
-	Ligatures map[OldGlyphPair]byte
-	Kerning   map[OldGlyphPair]float64
-}
-
-// TODO(voss): is the distinction between NewFont and FontFile really useful?
-
-type OtherFont interface {
-	GetGlyphs(string) []GlyphIndex
-	EncodeGlyph(GlyphIndex) []byte
-}
-
-type FontFile interface {
-	Close() error
-	GetInfo() (*Info, error)
-	Embed(w *pdf.Writer, subset map[rune]bool) (*pdf.Reference, OtherFont, error)
-}
 
 // Layout contains the information needed to typeset a text.
 type Layout struct {
@@ -156,7 +123,6 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 		width += float64(font.Width[c]) * q
 
 		if i == len(codes)-1 {
-			fmt.Println(codes[pos:], "->", font.Enc(codes[pos:]...))
 			ll.Fragments = append(ll.Fragments, font.Enc(codes[pos:]...))
 			break
 		}
@@ -167,7 +133,6 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 		}
 
 		width += float64(kern) * q
-		fmt.Println(codes[pos : i+1])
 		ll.Fragments = append(ll.Fragments, font.Enc(codes[pos:i+1]...))
 		ll.Kerns = append(ll.Kerns, -kern)
 		pos = i + 1
@@ -188,19 +153,4 @@ var ligTab = []struct {
 	{"fi", '\uFB01'},
 	{"fl", '\uFB02'},
 	{"ff", '\uFB00'},
-}
-
-// OldGlyphPair represents two consecutive glyphs, specified by a pair of
-// character codes.  This is used for ligatures and kerning information.
-type OldGlyphPair [2]byte
-
-// OldRect represents a rectangle in the PDF coordinate space.
-// TODO(voss): replace with pdf.Rectangle
-type OldRect struct {
-	LLx, LLy, URx, URy float64
-}
-
-// IsPrint returns whether the glyph leaves marks on the page.
-func (rect *OldRect) IsPrint() bool {
-	return rect.LLx != 0 || rect.LLy != 0 || rect.URx != 0 || rect.URy != 0
 }
