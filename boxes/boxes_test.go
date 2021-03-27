@@ -20,10 +20,26 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/pages"
 )
+
+type subset struct {
+	chars map[rune]bool
+}
+
+func NewSubset() *subset {
+	return &subset{
+		chars: make(map[rune]bool),
+	}
+}
+
+func (ccc *subset) Add(s string) {
+	for _, r := range s {
+		ccc.chars[r] = true
+	}
+}
 
 func TestFrame(t *testing.T) {
 	out, err := pdf.Create("test.pdf")
@@ -31,47 +47,37 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1 := builtin.BuiltIn("Times-Roman", font.MacRomanEncoding)
-	F1Dict, err := out.Write(pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("builtin"),
-		"BaseFont": pdf.Name("Times-Roman"),
-		"Encoding": pdf.Name("MacRomanEncoding"),
-	}, nil)
+	subset := NewSubset()
+	subset.Add("Von Tiffany's fish et al.")
+	subset.Add("ﬁ")
+
+	// F1, err := builtin.Embed(out, "Times-Roman", subset.chars)
+	F1, err := truetype.Embed(out, "../font/truetype/FreeSerif.ttf", subset.chars)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	F2 := builtin.BuiltIn("Times-Italic", font.MacRomanEncoding)
-	F2Dict, err := out.Write(pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("builtin"),
-		"BaseFont": pdf.Name("Times-Italic"),
-		"Encoding": pdf.Name("MacRomanEncoding"),
-	}, nil)
+	F2, err := builtin.Embed(out, "Times-Italic", subset.chars)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
+	page, err := pages.SinglePage(out, &pages.Attributes{
 		Resources: pdf.Dict{
 			"Font": pdf.Dict{
-				"F1": F1Dict,
-				"F2": F2Dict,
+				"F1": F1.Ref,
+				"F2": F2.Ref,
 			},
 		},
 		MediaBox: pages.A5,
 		Rotate:   0,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	text1, err := F1.TypeSet("Von Tiffany's fish ", 12)
-	if err != nil {
-		t.Fatal(err)
-	}
-	text2, err := F2.TypeSet("et al. ", 12)
-	if err != nil {
-		t.Fatal(err)
-	}
+	text1 := F1.Typeset("Von Tiffany's fish ", 12)
+	text2 := F2.Typeset("et al. ", 12)
 	box := &vBox{
 		stuffExtent: stuffExtent{
 			Width:  pages.A5.URx - pages.A5.LLx,
@@ -141,31 +147,9 @@ func TestFrame(t *testing.T) {
 		},
 	}
 
-	page, err := pageTree.AddPage(&pages.Attributes{
-		MediaBox: &pdf.Rectangle{
-			URx: box.Width,
-			URy: box.Height + box.Depth,
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	box.Draw(page, 0, box.Depth)
 
 	err = page.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pages, err := pageTree.Flush()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = out.SetCatalog(pdf.Struct(&pdf.Catalog{
-		Pages: pages,
-	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +160,7 @@ func TestFrame(t *testing.T) {
 	}
 }
 
-// compile time test: we implement the correct interfaces
+// compile-time test: we implement the correct interfaces
 var _ stuff = &rule{}
 var _ stuff = &vBox{}
 var _ stuff = kern(0)

@@ -62,11 +62,11 @@ type vBox struct {
 }
 
 func (obj *vBox) Draw(page *pages.Page, xPos, yPos float64) {
-	fmt.Fprintln(page, "q")
-	fmt.Fprintln(page, "0 .8 0 RG")
+	page.Println("q")
+	page.Println("0 .8 0 RG")
 	fmt.Fprintf(page, "%f %f %f %f re s\n",
 		xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
-	fmt.Fprintln(page, "Q")
+	page.Println("Q")
 
 	boxTotal := obj.Depth + obj.Height
 	contentsTotal := 0.0
@@ -127,11 +127,11 @@ type hBox struct {
 }
 
 func (obj *hBox) Draw(page *pages.Page, xPos, yPos float64) {
-	fmt.Fprintln(page, "q")
-	fmt.Fprintln(page, ".7 .7 1 RG")
+	page.Println("q")
+	page.Println(".7 .7 1 RG")
 	fmt.Fprintf(page, "%f %f %f %f re s\n",
 		xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
-	fmt.Fprintln(page, "Q")
+	page.Println("Q")
 
 	boxTotal := obj.Width
 	contentsTotal := 0.0
@@ -234,25 +234,20 @@ func (obj *text) Draw(page *pages.Page, xPos, yPos float64) {
 
 	// TODO(voss): use "Tj" if len(Fragments)==1
 
-	fmt.Fprintln(page, "q")
-	fmt.Fprintln(page, "BT")
+	page.Println("q")
+	page.Println("BT")
 	obj.font.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", obj.layout.FontSize)
 	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
-	fmt.Fprint(page, "[")
+	fmt.Fprint(page, "[") // TODO(voss): use a PDF array?
 	for i, frag := range obj.layout.Fragments {
 		if i > 0 {
 			kern := obj.layout.Kerns[i-1]
-			iKern := int64(kern)
-			if float64(iKern) == kern {
-				fmt.Fprintf(page, " %d ", iKern)
-			} else {
-				fmt.Fprintf(page, " %f ", kern)
-			}
+			fmt.Fprintf(page, " %d ", kern)
 		}
 		pdf.String(frag).PDF(page)
 	}
 	fmt.Fprint(page, "] TJ\n")
-	fmt.Fprintln(page, "ET")
-	fmt.Fprintln(page, "Q")
+	page.Println("ET")
+	page.Println("Q")
 }

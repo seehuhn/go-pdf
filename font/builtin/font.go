@@ -2,8 +2,11 @@ package builtin
 
 import (
 	"bufio"
+	"errors"
+	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -17,17 +20,18 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 	}
 	defer fd.Close()
 
-	// enc maps between unicode runes and bytes in PDF strings.
-	enc := font.CustomEncoding(subset)
-	// glyphToByte maps from character indices to bytes in a PDF string.
-	glyphToByte := make(map[font.GlyphIndex]byte)
+	if subset == nil {
+		subset = font.AdobeStandardLatin
+	}
 
 	builtin := &font.Font{
 		CMap: map[rune]font.GlyphIndex{},
 	}
 
 	var FontName string
-	byName := make(map[string]font.GlyphIndex)
+	nameToGlyph := make(map[string]font.GlyphIndex)
+	runeToName := make(map[rune]string)
+	stdRuneToCode := make(map[rune]byte)
 	type kernInfo struct {
 		first, second string
 		val           int
@@ -58,6 +62,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		if charMetrics {
 			var name string
 			var width int
+			var code int
 			var BBox font.Rect
 
 			keyVals := strings.Split(line, ";")
@@ -68,8 +73,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 				}
 				switch ff[0] {
 				case "C":
-					// TODO(voss): is this needed?
-					// glyphIdx, _ = strconv.Atoi(ff[1])
+					code, _ = strconv.Atoi(ff[1])
 				case "WX":
 					width, _ = strconv.Atoi(ff[1])
 				case "N":
@@ -83,6 +87,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 					BBox.URx, _ = strconv.Atoi(ff[3])
 					BBox.URy, _ = strconv.Atoi(ff[4])
 				case "L":
+					// TODO(voss)
 					// if len(ff) != 3 {
 					// 	panic("corrupted afm data for " + fontName)
 					// }
@@ -102,11 +107,11 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 			r := rr[0]
 			if subset[r] {
 				builtin.CMap[r] = cIdx
-				c, ok := enc.Encode(r)
-				if ok {
-					glyphToByte[cIdx] = c
+				nameToGlyph[name] = cIdx
+				runeToName[r] = name
+				if code > 0 {
+					stdRuneToCode[r] = byte(code)
 				}
-				byName[name] = cIdx
 				builtin.GlyphExtent = append(builtin.GlyphExtent, BBox)
 				builtin.Width = append(builtin.Width, width)
 				cIdx++
@@ -181,20 +186,113 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		panic("corrupted afm data for " + fname)
 	}
 
+	// TODO(voss): builtin.Ligatures, LineGap, ...
+
+	// pick a BaseEncoding
+	var bestName pdf.Object
+	bestCount := len(stdRuneToCode)
+	bestRuneToCode := stdRuneToCode
+	for name, enc := range stdEncs {
+		count := 0
+		runeToCode := make(map[rune]byte)
+		for r, ok := range subset {
+			if !ok {
+				continue
+			}
+			if c, ok := enc.Encode(r); ok {
+				count++
+				runeToCode[r] = c
+			}
+		}
+		if count > bestCount {
+			bestName = name
+			bestCount = count
+			bestRuneToCode = runeToCode
+		}
+	}
+
+	// fill in the gaps
+	var todo []rune
+	used := make(map[byte]bool)
+	used[0] = true
+	for r, ok := range subset {
+		if !ok {
+			continue
+		}
+		c, ok := bestRuneToCode[r]
+		if ok {
+			used[c] = true
+		} else {
+			todo = append(todo, r)
+		}
+	}
+	sort.Slice(todo, func(i, j int) bool {
+		return todo[i] < todo[j]
+	})
+	var unused []byte
+	for i := 1; i < 256; i++ {
+		if c := byte(i); !used[c] {
+			unused = append(unused, c)
+		}
+	}
+	if len(todo) > len(unused) {
+		return nil, errors.New("subset too large")
+	}
+	type D struct {
+		name string
+		c    byte
+	}
+	var diff []D
+	for i, r := range todo {
+		c := unused[i]
+		name, ok := runeToName[r]
+		if !ok {
+			return nil, errors.New("glyph missing from font")
+		}
+		bestRuneToCode[r] = c
+		diff = append(diff, D{name: name, c: c})
+	}
+
+	// Construct the /Encoding dict
+	var Encoding pdf.Object
+	if len(diff) == 0 {
+		Encoding = bestName
+	} else {
+		Differences := pdf.Array{}
+		next := byte(0)
+		for _, d := range diff {
+			if d.c != next {
+				Differences = append(Differences, pdf.Integer(d.c))
+			}
+			Differences = append(Differences, pdf.Name(d.name))
+			next = d.c + 1
+		}
+		Encoding = pdf.Dict{
+			"Type":         pdf.Name("Encoding"),
+			"BaseEncoding": bestName,
+			"Differences":  Differences,
+		}
+	}
+
+	// glyphToCode maps from character indices to bytes in a PDF string.
+	// TODO(voss): use a slice instead of a map?
+	glyphToCode := make(map[font.GlyphIndex]byte)
+	for r, cIdx := range builtin.CMap {
+		glyphToCode[cIdx] = bestRuneToCode[r]
+	}
+
 	builtin.Enc = func(ii ...font.GlyphIndex) []byte {
 		res := make([]byte, len(ii))
 		for i, idx := range ii {
-			res[i] = glyphToByte[idx]
+			res[i] = glyphToCode[idx]
 		}
 		return res
 	}
 
-	// TODO(voss): builtin.Ligatures, LineGap, ...
-
 	builtin.Kerning = make(map[font.GlyphPair]int)
 	for _, kern := range kerning {
-		a, aOk := byName[kern.first]
-		b, bOk := byName[kern.second]
+		a, aOk := nameToGlyph[kern.first]
+		b, bOk := nameToGlyph[kern.second]
 		if !aOk || !bOk || kern.val == 0 {
 			continue
 		}
@@ -205,7 +303,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
 		"BaseFont": pdf.Name(FontName),
-		"Encoding": font.Describe(enc),
+		"Encoding": Encoding,
 	}
 	// TODO(voss): for w.Version == pdf.V1_0 we should set Font["Name"]
 	builtin.Ref, err = w.Write(Font, nil)
@@ -215,3 +313,11 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 
 	return builtin, nil
 }
+
+var stdEncs = map[pdf.Name]font.Encoding{
+	"MacRomanEncoding": font.MacRomanEncoding,
+	"WinAnsiEncoding":  font.WinAnsiEncoding,
+	// TODO(voss): add MacExpertEncoding
+}
+
+const noRune = unicode.ReplacementChar

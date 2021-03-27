@@ -193,6 +193,15 @@ func (gm *glyphMap) getFile(file string) map[string]rune {
 		ww := strings.SplitN(line, ";", 2)
 		name := ww[0]
 		code, _ := strconv.ParseInt(ww[1], 16, 32)
+
+		// fix up some swapped character codes
+		switch {
+		case name == "Tcommaaccent" && code == 0x0162:
+			code = 0x021A
+		case name == "tcommaaccent" && code == 0x0163:
+			code = 0x021B
+		}
+
 		fMap[name] = rune(code)
 	}
 	if err := scanner.Err(); err != nil {
