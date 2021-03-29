@@ -6,19 +6,40 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
 )
 
 const tabWidth = 4
 
-func encodeString(enc font.Encoding, s string) pdf.String {
+type subset struct {
+	chars map[rune]bool
+}
+
+func newSubset() *subset {
+	return &subset{
+		chars: make(map[rune]bool),
+	}
+}
+
+func (ccc *subset) Add(s string) {
+	for _, r := range s {
+		if unicode.IsGraphic(r) {
+			ccc.chars[r] = true
+		}
+	}
+}
+
+func encodeString(font *font.Font, s string) pdf.String {
 	var res pdf.String
 	col := 0
 	for _, r := range s {
@@ -32,11 +53,9 @@ func encodeString(enc font.Encoding, s string) pdf.String {
 			}
 			continue
 		}
-		c, ok := enc.Encode(r)
-		if !ok {
-			c = '?'
-		}
-		res = append(res, c)
+		idx := font.CMap[r]
+		c := font.Enc(idx)
+		res = append(res, c...)
 		col++
 	}
 	return res
@@ -50,6 +69,19 @@ func convert(inName, outName string) error {
 		return err
 	}
 	defer in.Close()
+
+	subset := newSubset()
+	scanner := bufio.NewScanner(in)
+	for scanner.Scan() {
+		subset.Add(scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	_, err = in.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
 
 	out, err := pdf.Create(outName)
 	if err != nil {
@@ -66,20 +98,14 @@ func convert(inName, outName string) error {
 		log.Fatal(err)
 	}
 
-	enc := font.WinAnsiEncoding
-	font, err := out.Write(pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name("Courier"),
-		"Encoding": pdf.Name("WinAnsiEncoding"),
-	}, nil)
+	F1, err := builtin.Embed(out, "Courier", subset.chars)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: pdf.Dict{
-			"Font": pdf.Dict{"F": font},
+			"Font": pdf.Dict{"F": F1.Ref},
 		},
 		MediaBox: pages.A4,
 	})
@@ -88,22 +114,22 @@ func convert(inName, outName string) error {
 	numLines := int((pages.A4.URy - 144) / 12)
 	pageLines := 0
 
-	scanner := bufio.NewScanner(in)
+	scanner = bufio.NewScanner(in)
 	for scanner.Scan() {
 		if page == nil {
 			page, err = pageTree.AddPage(nil)
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(page, "BT")
-			fmt.Fprintln(page, "/F 12 Tf")
-			fmt.Fprintln(page, "12 TL")
-			fmt.Fprintf(page, "72 %f Td\n", page.URy-72-10)
+			page.Println("BT")
+			page.Println("/F 12 Tf")
+			page.Println("12 TL")
+			page.Printf("72 %f Td\n", page.URy-72-10)
 		}
 
-		line := encodeString(enc, scanner.Text())
+		line := encodeString(F1, scanner.Text())
 		if len(line) > 0 {
-			line.PDF(page)
+			_ = line.PDF(page)
 			fmt.Fprintln(page, " Tj T*")
 		} else {
 			fmt.Fprintln(page, "T*")

@@ -18,6 +18,7 @@ package boxes
 
 import (
 	"testing"
+	"unicode"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
@@ -37,7 +38,9 @@ func NewSubset() *subset {
 
 func (ccc *subset) Add(s string) {
 	for _, r := range s {
-		ccc.chars[r] = true
+		if unicode.IsGraphic(r) {
+			ccc.chars[r] = true
+		}
 	}
 }
 

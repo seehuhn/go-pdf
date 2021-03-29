@@ -16,7 +16,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 	}
 	defer tt.Close()
 
-	info, err := tt.GetInfo()
+	info, err := tt.getInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +184,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		"DescendantFonts": pdf.Array{CIDFontRef},
 		"ToUnicode":       ToUnicodeRef,
 	}, nil)
+	// TODO(voss): we should set Name for PDF1.0
 	if err != nil {
 		return nil, err
 	}

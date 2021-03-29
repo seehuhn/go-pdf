@@ -70,6 +70,7 @@ func (info *fontInfo) IsSuperset(charset map[rune]bool) bool {
 	return true
 }
 
+// Open loads a TrueType font into memory.
 func Open(fname string) (*Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
@@ -124,11 +125,13 @@ func Open(fname string) (*Font, error) {
 	return tt, nil
 }
 
+// Close frees all resources associated with the font.  The Font object
+// cannot be used any more after Close() has been called.
 func (tt *Font) Close() error {
 	return tt.fd.Close()
 }
 
-func (tt *Font) GetInfo() (*fontInfo, error) {
+func (tt *Font) getInfo() (*fontInfo, error) {
 	postInfo, err := tt.getPostInfo()
 	if err != nil {
 		return nil, err

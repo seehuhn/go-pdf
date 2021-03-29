@@ -116,18 +116,23 @@ func (tree *PageTree) newPage(contentRef *pdf.Reference, mediaBox *pdf.Rectangle
 	}, nil
 }
 
+// Close writes any buffered data to the content stream and the closes the
+// stream.  The Page object cannot be used any more after .Close() has been
+// called.
+func (p *Page) Close() error {
+	err := p.w.Flush()
+	if err != nil {
+		return err
+	}
+	p.w = nil
+	return p.stm.Close()
+}
+
 // Write writes the contents of buf to the content stream.  It returns the
 // number of bytes written.  If nn < len(p), it also returns an error
 // explaining why the write is short.
 func (p *Page) Write(buf []byte) (int, error) {
 	return p.w.Write(buf)
-}
-
-// WriteString appends a string to the content stream.  It returns the number
-// of bytes written.  If the count is less than len(s), it also returns an
-// error explaining why the write is short.
-func (p *Page) WriteString(s string) (int, error) {
-	return p.w.WriteString(s)
 }
 
 // Print formats the arguments using their default formats and writes the
@@ -148,16 +153,4 @@ func (p *Page) Printf(format string, a ...interface{}) (int, error) {
 // operands and a newline is appended.
 func (p *Page) Println(a ...interface{}) (int, error) {
 	return p.w.WriteString(fmt.Sprintln(a...))
-}
-
-// Close writes any buffered data to the content stream and the closes the
-// stream.  The Page object cannot be used any more after .Close() has been
-// called.
-func (p *Page) Close() error {
-	err := p.w.Flush()
-	if err != nil {
-		return err
-	}
-	p.w = nil
-	return p.stm.Close()
 }

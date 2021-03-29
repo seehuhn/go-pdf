@@ -154,7 +154,7 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 		endCode := buf[:segCount]
 		idDelta := buf[2*segCount+1 : 3*segCount+1]
 		idRangeOffset := buf[3*segCount+1 : 4*segCount+1]
-		glyphIdBase, err := fd.Seek(0, io.SeekCurrent)
+		glyphIDBase, err := fd.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +181,7 @@ func (tt *Font) load(fd *io.SectionReader, table *cmapRecord, i2r func(int) rune
 					return nil, errors.New(info + "corrupt cmap table")
 				}
 				tmp := make([]uint16, int(endCode[k]-startCode[k])+1)
-				_, err = fd.Seek(glyphIdBase+2*int64(d), io.SeekStart)
+				_, err = fd.Seek(glyphIDBase+2*int64(d), io.SeekStart)
 				if err != nil {
 					return nil, err
 				}

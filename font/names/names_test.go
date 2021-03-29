@@ -77,11 +77,17 @@ func TestFromUnicode(t *testing.T) {
 	if FromUnicode('ﬄ') != "f_f_l" {
 		t.Error("wrong name for ffl-ligature")
 	}
+	seen := make(map[string]bool)
 	for r := rune(0); r < 65537; r++ {
 		if !unicode.IsGraphic(r) {
 			continue
 		}
 		name := FromUnicode(r)
+		if seen[name] {
+			t.Error("duplicate name " + name)
+		}
+		seen[name] = true
+
 		out := ToUnicode(name, false)
 		switch len(out) {
 		case 0:
