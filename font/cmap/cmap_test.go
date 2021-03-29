@@ -1,4 +1,4 @@
-package font
+package cmap
 
 import (
 	"testing"

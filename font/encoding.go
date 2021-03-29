@@ -361,10 +361,3 @@ var toWinAnsi = map[rune]byte{
 }
 
 const noRune = unicode.ReplacementChar
-
-var stdEncs = map[string]Encoding{
-	"StandardEncoding": StandardEncoding, // TODO(voss): how to handle this?
-	"MacRomanEncoding": MacRomanEncoding,
-	"WinAnsiEncoding":  WinAnsiEncoding,
-	// TODO(voss): add MacExpertEncoding
-}

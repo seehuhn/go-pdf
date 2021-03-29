@@ -148,7 +148,7 @@ func (ff *flateFilter) ToDict() Dict {
 }
 
 func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
-	if ff.EarlyChange == false {
+	if !ff.EarlyChange {
 		return nil, errors.New("unsupported /EarlyChange setting")
 	}
 
@@ -220,7 +220,7 @@ func (r *pngReader) Read(b []byte) (int, error) {
 
 		// Apply the filter.
 		ft := r.cr[0]
-		if ft < 0 || ft >= nFilter {
+		if ft >= nFilter {
 			return 0, errors.New("bad PNG filter type")
 		}
 		pngDec[ft](r.cr[1:], r.pr[1:], r.bytesPerPixel)
@@ -234,7 +234,7 @@ func (r *pngReader) Read(b []byte) (int, error) {
 }
 
 func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
-	if ff.EarlyChange == false {
+	if !ff.EarlyChange {
 		return nil, errors.New("unsupported /EarlyChange setting")
 	}
 

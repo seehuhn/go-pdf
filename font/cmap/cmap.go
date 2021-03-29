@@ -1,4 +1,4 @@
-package font
+package cmap
 
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
@@ -28,13 +28,14 @@ func WriteCMap(w io.Writer, name string, baseName string, cmap map[rune]int) err
 }
 
 type cmapInfo struct {
-	Name       string
-	Registry   string
-	Ordering   string
-	Supplement int
-	Type       int
-	Chars      []cidChar
-	Ranges     []cidRange
+	Name         string
+	Registry     string
+	Ordering     string
+	Supplement   int
+	Type         int
+	SkipComments bool
+	Chars        []cidChar
+	Ranges       []cidRange
 }
 
 type cidChar struct {

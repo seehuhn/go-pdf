@@ -133,21 +133,21 @@ func (p *Page) WriteString(s string) (int, error) {
 // Print formats the arguments using their default formats and writes the
 // resulting string to the content stream.  Spaces are added between operands
 // when neither is a string.
-func (p *Page) Print(a ...interface{}) {
-	p.w.WriteString(fmt.Sprint(a...))
+func (p *Page) Print(a ...interface{}) (int, error) {
+	return p.w.WriteString(fmt.Sprint(a...))
 }
 
 // Printf formats the arguments according to a format specifier and writes the
 // resulting string to the content stream.
-func (p *Page) Printf(format string, a ...interface{}) {
-	p.w.WriteString(fmt.Sprintf(format, a...))
+func (p *Page) Printf(format string, a ...interface{}) (int, error) {
+	return p.w.WriteString(fmt.Sprintf(format, a...))
 }
 
 // Println formats its arguments using their default formats and writes the
 // resulting string to the content stream.  Spaces are always added between
 // operands and a newline is appended.
-func (p *Page) Println(a ...interface{}) {
-	p.w.WriteString(fmt.Sprintln(a...))
+func (p *Page) Println(a ...interface{}) (int, error) {
+	return p.w.WriteString(fmt.Sprintln(a...))
 }
 
 // Close writes any buffered data to the content stream and the closes the

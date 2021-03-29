@@ -146,12 +146,43 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		return nil, err
 	}
 
+	cmapStream, ToUnicodeRef, err := w.OpenStream(pdf.Dict{}, nil, &pdf.StreamOptions{
+		Filters: []*pdf.FilterInfo{
+			{Name: "FlateDecode"},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	xxx := make(map[font.GlyphIndex]rune)
+	for r, c := range info.CMap {
+		xxx[c] = r
+	}
+	cmapInfo := &cmapInfo{
+		Name:       "Adobe-Identity-UCS",
+		Registry:   "Adobe",
+		Ordering:   "UCS",
+		Supplement: 0,
+		Chars:      []cidChar{},
+		Ranges:     []cidRange{},
+	}
+	cmapInfo.FillRanges(xxx)
+	err = cMapTmpl.Execute(cmapStream, cmapInfo)
+	if err != nil {
+		return nil, err
+	}
+	err = cmapStream.Close()
+	if err != nil {
+		return nil, err
+	}
+
 	FontRef, err := w.Write(pdf.Dict{
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
 		"BaseFont":        pdf.Name(info.FontName), // TODO(voss): make sure this is consistent
 		"Encoding":        pdf.Name("Identity-H"),
 		"DescendantFonts": pdf.Array{CIDFontRef},
+		"ToUnicode":       ToUnicodeRef,
 	}, nil)
 	if err != nil {
 		return nil, err

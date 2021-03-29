@@ -9,18 +9,6 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
-var minCharSet = map[rune]bool{
-	'a': true,
-	'z': true,
-	'A': true,
-	'Z': true,
-	'ﬀ': true,
-	'ﬁ': true,
-	'ﬂ': true,
-	'ț': true,
-	'â': true,
-}
-
 func tryFont(fname string) error {
 	tt, err := truetype.Open(fname)
 	if err != nil {
