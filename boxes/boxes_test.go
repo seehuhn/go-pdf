@@ -30,7 +30,7 @@ type subset struct {
 	chars map[rune]bool
 }
 
-func NewSubset() *subset {
+func newSubset() *subset {
 	return &subset{
 		chars: make(map[rune]bool),
 	}
@@ -53,13 +53,13 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	subset := NewSubset()
+	subset := newSubset()
 	subset.Add(text1)
 	subset.Add(text2)
 	subset.Add("ﬁ")
 
 	// F1, err := builtin.Embed(out, "Times-Roman", subset.chars)
-	F1, err := truetype.Embed(out, "../font/truetype/FreeSerif.ttf", subset.chars)
+	F1, err := truetype.Embed(out, "../font/truetype/ttf/FreeSerif.ttf", subset.chars)
 	if err != nil {
 		t.Fatal(err)
 	}

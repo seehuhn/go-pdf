@@ -1,16 +1,8 @@
-Font Types Supported in PDF
----------------------------
+Font Validators
+---------------
 
-Type1 - glyph shapes using Type 1 font technology
-
-Type0 + CIDFontType2 (PDF 1.2) - glyph shapes using TrueType/OpenType
-
-TrueType - Embedded TrueType font
-
-Type0 + CIDFontType0 (PDF 1.2) - glyph shapes using Type 1 font technology
-
-MMType1 - Type 1 Multiple Master Fonts
-Type3 - glyphs drawn using PDF commands
+https://github.com/googlefonts/fontbakery
+https://github.com/HinTak/Font-Validator
 
 
 Pre-existing Font Packages for Go
@@ -20,8 +12,8 @@ github.com/go-fonts
 golang.org/x/image/font
 
 
-Type 1 (PostScript) Fonts (PFA/AFM)
------------------------------------
+Type 1 (PostScript) Fonts (PFA/PFB+AFM/PFM)
+-------------------------------------------
 
 https://en.wikipedia.org/wiki/PostScript_fonts
 https://github.com/adobe-type-tools/agl-specification

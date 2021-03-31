@@ -6,7 +6,7 @@ import (
 )
 
 func TestExport(t *testing.T) {
-	tt, err := Open("FreeSerif.ttf")
+	tt, err := Open("ttf/FreeSerif.ttf")
 	if err != nil {
 		t.Fatal(err)
 	}

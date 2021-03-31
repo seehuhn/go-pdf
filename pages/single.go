@@ -1,6 +1,8 @@
 package pages
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+)
 
 func SinglePage(w *pdf.Writer, attr *Attributes) (*Page, error) {
 	tree := NewPageTree(w, nil)

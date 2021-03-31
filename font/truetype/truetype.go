@@ -3,20 +3,49 @@ package truetype
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/truetype/table"
 )
 
 // Font describes a TrueType font file.
 type Font struct {
-	fd      *os.File
-	offsets offsetsTable
-	tables  map[string]*tableRecord
+	Fd     *os.File
+	Header *table.Header
 
-	head      *headTable
+	head      *table.Head
 	NumGlyphs int
+}
+
+// HasTables returns true, if all the given tables are present in the font.
+func (tt *Font) HasTables(names ...string) bool {
+	for _, name := range names {
+		if tt.Header.Find(name) == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// IsTrueType checks whether all required tables for a TrueType font are
+// present.
+func (tt *Font) IsTrueType() bool {
+	return tt.HasTables("cmap", "glyf", "head", "hhea", "hmtx", "loca", "maxp", "name", "post")
+}
+
+// IsOpenType checks whether all required tables for an OpenType font are
+// present.
+func (tt *Font) IsOpenType() bool {
+	if !tt.HasTables("cmap", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post") {
+		return false
+	}
+	if tt.HasTables("glyf", "loca") || tt.HasTables("CFF ") {
+		return true
+	}
+	return false
 }
 
 // TODO(voss): merge this type with truetype.Font
@@ -78,33 +107,23 @@ func Open(fname string) (*Font, error) {
 	}
 
 	tt := &Font{
-		fd:     fd,
-		tables: map[string]*tableRecord{},
+		Header: &table.Header{},
+		Fd:     fd,
 	}
 
-	err = binary.Read(fd, binary.BigEndian, &tt.offsets)
+	err = binary.Read(fd, binary.BigEndian, &tt.Header.Offsets)
 	if err != nil {
 		return nil, err
 	}
-	scalerType := tt.offsets.ScalerType
+	tt.Header.Records = make([]table.Record, tt.Header.Offsets.NumTables)
+	err = binary.Read(fd, binary.BigEndian, &tt.Header.Records)
+	if err != nil {
+		return nil, err
+	}
+
+	scalerType := tt.Header.Offsets.ScalerType
 	if scalerType != 0x00010000 && scalerType != 0x4F54544F {
 		return nil, errors.New("unsupported font type")
-	}
-	for i := 0; i < int(tt.offsets.NumTables); i++ {
-		info := &tableRecord{}
-		err = binary.Read(fd, binary.BigEndian, info)
-		if err != nil {
-			return nil, err
-		}
-
-		tag := info.Tag
-		tagString := string([]byte{
-			byte(tag >> 24),
-			byte(tag >> 16),
-			byte(tag >> 8),
-			byte(tag)})
-
-		tt.tables[tagString] = info
 	}
 
 	maxp, err := tt.getMaxpInfo()
@@ -128,7 +147,7 @@ func Open(fname string) (*Font, error) {
 // Close frees all resources associated with the font.  The Font object
 // cannot be used any more after Close() has been called.
 func (tt *Font) Close() error {
-	return tt.fd.Close()
+	return tt.Fd.Close()
 }
 
 func (tt *Font) getInfo() (*fontInfo, error) {
@@ -148,7 +167,7 @@ func (tt *Font) getInfo() (*fontInfo, error) {
 	os2Info, err := tt.getOS2Info()
 	// The "OS/2" table is optional for TrueType fonts, but required for
 	// OpenType fonts.
-	if err != nil && err != errNoTable {
+	if _, missingTable := err.(*table.ErrNoTable); err != nil && !missingTable {
 		return nil, err
 	}
 
@@ -262,8 +281,24 @@ func (tt *Font) getInfo() (*fontInfo, error) {
 	info.IsAdobeLatin = info.IsSubset(font.AdobeStandardLatin)
 
 	info.Kerning, err = tt.getKernInfo(q)
-	if err != nil {
+	_, missingTable := err.(*table.ErrNoTable)
+	if missingTable {
+		// try to use GPOS instead
+	} else if err != nil {
 		return nil, err
+	}
+
+	GPOS, err := tt.ReadGposTable() // TODO(voss): ...
+	if GPOS == nil {
+		fmt.Println("GPOS:", err)
+	} else {
+		fmt.Println("GPOS", GPOS)
+		fd, _ := tt.Header.ReadTableHead(tt.Fd, "GPOS", nil)
+		xxx, err := GPOS.ReadFeatureInfo(fd, "DEU ", "latn")
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println(xxx)
 	}
 
 	return info, nil
@@ -294,7 +329,7 @@ func (tt *Font) selectCmap() (map[rune]font.GlyphIndex, error) {
 	}
 
 	for _, cand := range candidates {
-		subTable := cmapTable.find(cand.PlatformID, cand.EncodingID)
+		subTable := cmapTable.Find(cand.PlatformID, cand.EncodingID)
 		if subTable == nil {
 			continue
 		}

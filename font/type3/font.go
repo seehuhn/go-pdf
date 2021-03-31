@@ -12,8 +12,8 @@ import (
 )
 
 // A Builder is used to construct a type 3 font for inclusion in
-// PDF file.  Use .AddGlyph() to add all glyphs, and the call .Close()
-// to embed the font in the PDF file and to obtain a font.Font object.
+// PDF file.  Use .AddGlyph() to add the glyphs, and then call .Close()
+// to embed the font in the PDF file and to get a font.Font object.
 type Builder struct {
 	w          *pdf.Writer
 	width      float64
@@ -26,8 +26,8 @@ type Builder struct {
 }
 
 // New creates a new Builder for embedding a type 3 font into the PDF file w.
-// The canvas for drawing glyphs on is the rectangle between (0,0) and
-// (width,height).  Often width=height=1000 is used.
+// The canvas for drawing glyphs is the rectangle between (0,0) and
+// (width,height).  Often width == height == 1000 is used.
 func New(w *pdf.Writer, width, height float64) (*Builder, error) {
 	t3 := &Builder{
 		w:          w,

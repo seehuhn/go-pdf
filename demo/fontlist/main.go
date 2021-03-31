@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"seehuhn.de/go/pdf/font/truetype"
 )
@@ -16,8 +17,12 @@ func tryFont(fname string) error {
 	}
 	defer tt.Close()
 
-	// fmt.Printf("%08x %5t %5t %5t\n", tt.Offsets.ScalerType,
-	// 	tt.Tables["glyf"] != nil, tt.Tables["CFF "] != nil, tt.Tables["CFF2"] != nil)
+	ext := filepath.Ext(fname)
+	fmt.Printf("%08x %-5t %-5t %s\n",
+		tt.Header.Offsets.ScalerType,
+		tt.HasTables("glyf"),
+		tt.HasTables("CFF "),
+		ext)
 
 	return nil
 }

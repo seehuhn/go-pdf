@@ -22,7 +22,8 @@ func TestEmbedFont(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	F2, err := Embed(w, "FreeSerif.ttf", nil)
+	F2, err := Embed(w, "ttf/FreeSerif.ttf", nil)
+	// F2, err := Embed(w, "ttf/Roboto-Regular.ttf", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
