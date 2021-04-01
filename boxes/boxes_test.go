@@ -45,7 +45,7 @@ func (ccc *subset) Add(s string) {
 }
 
 func TestFrame(t *testing.T) {
-	text1 := "Von Tiffany's fish "
+	text1 := "Von Toffany's fish "
 	text2 := "et al. "
 
 	out, err := pdf.Create("test.pdf")

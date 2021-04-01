@@ -452,15 +452,6 @@ func (tt *Font) getGlyfInfo() (*table.Glyf, error) {
 	return res, nil
 }
 
-func (tt *Font) readLookupListTable(fd io.Reader, data *table.LookupList) error {
-	err := binary.Read(fd, binary.BigEndian, &data.LookupCount)
-	if err != nil {
-		return err
-	}
-	data.LookupOffsets = make([]uint16, data.LookupCount)
-	return binary.Read(fd, binary.BigEndian, data.LookupOffsets)
-}
-
 // ReadGposTable returns the GPOS table of a font.
 //
 // A list of OpenType language tags is here:
@@ -468,7 +459,7 @@ func (tt *Font) readLookupListTable(fd io.Reader, data *table.LookupList) error 
 //
 // A list of OpenType script tags is here:
 // https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
-func (tt *Font) ReadGposTable() (*table.GposHead, error) {
+func (tt *Font) ReadGposTable(langTag, scriptTag string) (*table.GposHead, error) {
 	GPOS := &table.GposHead{}
 	fd, err := tt.Header.ReadTableHead(tt.Fd, "GPOS", &GPOS.V10)
 	if err != nil {
@@ -485,13 +476,95 @@ func (tt *Font) ReadGposTable() (*table.GposHead, error) {
 		}
 	}
 
-	_, err = fd.Seek(int64(GPOS.V10.LookupListOffset), io.SeekStart)
+	xxx, err := GPOS.ReadFeatureInfo(fd, langTag, scriptTag)
 	if err != nil {
 		return nil, err
 	}
-	err = tt.readLookupListTable(fd, &GPOS.LookupList)
+
+	lookupBase := int64(GPOS.V10.LookupListOffset)
+	_, err = fd.Seek(lookupBase, io.SeekStart)
 	if err != nil {
 		return nil, err
+	}
+	lookupList, err := table.ReadLookupList(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, xx := range xxx { // TODO(voss): ...
+		for i, idx := range xx.LookupListIndices {
+			lookupTableBase := lookupBase + int64(lookupList.LookupOffsets[idx])
+			_, err = fd.Seek(lookupTableBase, io.SeekStart)
+			if err != nil {
+				return nil, err
+			}
+
+			lookupTable, err := table.ReadLookup(fd)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Printf("%s %3d: %v\n", xx.Tag, i, lookupTable)
+
+			switch lookupTable.Header.LookupType {
+			case 2:
+				for _, offs := range lookupTable.SubtableOffsets {
+					pairPosTableBase := lookupTableBase + int64(offs)
+					_, err = fd.Seek(pairPosTableBase, io.SeekStart)
+					if err != nil {
+						return nil, err
+					}
+					var format uint16
+					err = binary.Read(fd, binary.BigEndian, &format)
+					if err != nil {
+						return nil, err
+					}
+					switch format {
+					case 1:
+						fmt.Println("  - PairPosFormat1 Subtable")
+						pairPos, err := table.ReadPairPosFormat1(fd)
+						if err != nil {
+							return nil, err
+						}
+
+						_, err = fd.Seek(pairPosTableBase+int64(pairPos.Header.CoverageOffset),
+							io.SeekStart)
+						if err != nil {
+							return nil, err
+						}
+						coverage, err := table.ReadCoverage(fd)
+						if err != nil {
+							return nil, err
+						}
+						if len(coverage) != int(pairPos.Header.PairSetCount) {
+							return nil, errors.New("corrupted PairPos table")
+						}
+
+						for k, offs := range pairPos.PairSetOffsets {
+							_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
+							if err != nil {
+								return nil, err
+							}
+							x, err := table.ReadPairSet(fd,
+								pairPos.Header.ValueFormat1,
+								pairPos.Header.ValueFormat2)
+							if err != nil {
+								return nil, err
+							}
+							fmt.Println("      -", coverage[k], x)
+						}
+					case 2:
+						fmt.Println("  - PairPosFormat2 Subtable")
+						pairPos, err := table.ReadPairPosFormat2(fd)
+						if err != nil {
+							return nil, err
+						}
+						fmt.Println("      -", pairPos)
+					default:
+						fmt.Printf("  - unknown subtable type %d\n", format)
+					}
+				}
+			}
+		}
 	}
 
 	return GPOS, nil

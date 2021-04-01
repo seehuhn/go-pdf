@@ -3,7 +3,6 @@ package truetype
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"os"
 
 	"seehuhn.de/go/pdf"
@@ -288,17 +287,9 @@ func (tt *Font) getInfo() (*fontInfo, error) {
 		return nil, err
 	}
 
-	GPOS, err := tt.ReadGposTable() // TODO(voss): ...
-	if GPOS == nil {
-		fmt.Println("GPOS:", err)
-	} else {
-		fmt.Println("GPOS", GPOS)
-		fd, _ := tt.Header.ReadTableHead(tt.Fd, "GPOS", nil)
-		xxx, err := GPOS.ReadFeatureInfo(fd, "DEU ", "latn")
-		if err != nil {
-			return nil, err
-		}
-		fmt.Println(xxx)
+	_, err = tt.ReadGposTable("DEU ", "latn") // TODO(voss): ...
+	if err != nil {
+		return nil, err
 	}
 
 	return info, nil

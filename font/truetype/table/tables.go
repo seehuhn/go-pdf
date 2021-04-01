@@ -2,7 +2,10 @@ package table
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
+	"strings"
 )
 
 // Header describes the start of a TrueType/OpenType file.  The structure
@@ -298,6 +301,10 @@ func readScriptRecord(fd io.Reader, scriptTag string) (*scriptRecord, error) {
 	var dfltScript *scriptRecord
 	for i := range data.ScriptRecords {
 		rec := &data.ScriptRecords[i]
+		if i == 0 {
+			// in case there is no default, use the first script record
+			dfltScript = rec
+		}
 		switch rec.ScriptTag.String() {
 		case scriptTag:
 			return rec, nil
@@ -339,10 +346,10 @@ type langSys struct {
 	FeatureIndices []uint16 // Array of indices into the FeatureList, in arbitrary order
 }
 
-// A FeatureList enumerates features in an array of records and specifies
+// A featureList enumerates features in an array of records and specifies
 // the total number of features.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-list-table
-type FeatureList struct {
+type featureList struct {
 	FeatureCount   uint16          // Number of FeatureRecords in this table
 	FeatureRecords []FeatureRecord // Array of FeatureRecords — zero-based (first feature has FeatureIndex = 0), listed alphabetically by feature tag
 }
@@ -370,6 +377,324 @@ type LookupList struct {
 	LookupOffsets []uint16 // Array of offsets to Lookup tables, from beginning of LookupList — zero based (first lookup is Lookup index = 0)
 }
 
+// ReadLookupList reads the binary representation of a LookupList
+func ReadLookupList(r io.Reader) (*LookupList, error) {
+	res := &LookupList{}
+	err := binary.Read(r, binary.BigEndian, &res.LookupCount)
+	if err != nil {
+		return nil, err
+	}
+
+	res.LookupOffsets = make([]uint16, res.LookupCount)
+	err = binary.Read(r, binary.BigEndian, res.LookupOffsets)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+type Lookup struct {
+	Header struct {
+		LookupType    uint16 // Different enumerations for GSUB and GPOS
+		LookupFlag    uint16 // Lookup qualifiers
+		SubtableCount uint16 // Number of subtables for this lookup
+	}
+	SubtableOffsets  []uint16 // Array of offsets to lookup subtables, from beginning of Lookup table
+	MarkFilteringSet uint16   // Index (base 0) into GDEF mark glyph sets structure. This field is only present if the USE_MARK_FILTERING_SET lookup flag is set.
+}
+
+func ReadLookup(r io.Reader) (*Lookup, error) {
+	res := &Lookup{}
+	err := binary.Read(r, binary.BigEndian, &res.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	res.SubtableOffsets = make([]uint16, res.Header.SubtableCount)
+	err = binary.Read(r, binary.BigEndian, &res.SubtableOffsets)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Header.LookupFlag&0x0010 != 0 {
+		err = binary.Read(r, binary.BigEndian, &res.MarkFilteringSet)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return res, nil
+}
+
+type Coverage []uint16
+
+func ReadCoverage(r io.Reader) (Coverage, error) {
+	var version uint16
+	err := binary.Read(r, binary.BigEndian, &version)
+	if err != nil {
+		return nil, err
+	}
+
+	var count uint16
+	err = binary.Read(r, binary.BigEndian, &count)
+	if err != nil {
+		return nil, err
+	}
+
+	var res Coverage
+	switch version {
+	case 1:
+		res = make(Coverage, count)
+		err = binary.Read(r, binary.BigEndian, res)
+		if err != nil {
+			return nil, err
+		}
+	case 2:
+		for i := 0; i < int(count); i++ {
+			var buf struct {
+				StartGlyphID       uint16 // First glyph ID in the range
+				EndGlyphID         uint16 // Last glyph ID in the range
+				StartCoverageIndex uint16 // Coverage Index of first glyph ID in range
+			}
+			err = binary.Read(r, binary.BigEndian, &buf)
+			if err != nil {
+				return nil, err
+			}
+			for j := int(buf.StartGlyphID); j <= int(buf.EndGlyphID); j++ {
+				res = append(res, uint16(j))
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported coverage table vesrion %d", version)
+	}
+	return res, nil
+}
+
+// PairPosFormat1 is one of the two possible subtable formats for LookupType==2.
+type PairPosFormat1 struct {
+	// PosFormat uint16 omitted
+	Header struct {
+		CoverageOffset uint16 // Offset to Coverage table, from beginning of PairPos subtable.
+		ValueFormat1   uint16 // Defines the types of data in valueRecord1 — for the first glyph in the pair (may be zero).
+		ValueFormat2   uint16 // Defines the types of data in valueRecord2 — for the second glyph in the pair (may be zero).
+		PairSetCount   uint16 // Number of PairSet tables
+	}
+	PairSetOffsets []uint16 // Array of offsets to PairSet tables. Offsets are from beginning of PairPos subtable, ordered by Coverage Index.
+}
+
+// ReadPairPosFormat1 reads the binary representation of PairPosFormat1
+func ReadPairPosFormat1(r io.Reader) (*PairPosFormat1, error) {
+	res := &PairPosFormat1{}
+	err := binary.Read(r, binary.BigEndian, &res.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	res.PairSetOffsets = make([]uint16, res.Header.PairSetCount)
+	err = binary.Read(r, binary.BigEndian, res.PairSetOffsets)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+// A PairSet table enumerates all the glyph pairs that begin with a covered
+// glyph.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
+type PairSet struct {
+	PairValueCount   uint16            // Number of PairValueRecords
+	PairValueRecords []PairValueRecord // Array of PairValueRecords, ordered by glyph ID of the second glyph.
+}
+
+// A PairValueRecord specifies the second glyph in a pair and defines a
+// ValueRecord for each glyph.
+type PairValueRecord struct {
+	SecondGlyph  uint16       // Glyph ID of second glyph in the pair (first glyph is listed in the Coverage table).
+	ValueRecord1 *ValueRecord // Positioning data for the first glyph in the pair.
+	ValueRecord2 *ValueRecord // Positioning data for the second glyph in the pair.
+}
+
+// ReadPairSet reads the binary representation of a PairSet.
+func ReadPairSet(r io.Reader, ValueFormat1, ValueFormat2 uint16) (*PairSet, error) {
+	res := &PairSet{}
+	err := binary.Read(r, binary.BigEndian, &res.PairValueCount)
+	if err != nil {
+		return nil, err
+	}
+
+	res.PairValueRecords = make([]PairValueRecord, res.PairValueCount)
+	for i := 0; i < int(res.PairValueCount); i++ {
+		rec := &res.PairValueRecords[i]
+		err = binary.Read(r, binary.BigEndian, &rec.SecondGlyph)
+		if err != nil {
+			return nil, err
+		}
+		rec.ValueRecord1, err = ReadValueRecord(r, ValueFormat1)
+		if err != nil {
+			return nil, err
+		}
+		rec.ValueRecord2, err = ReadValueRecord(r, ValueFormat2)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return res, nil
+}
+
+// PairPosFormat2 is one of the two possible subtable formats for LookupType==2.
+type PairPosFormat2 struct {
+	// PosFormat uint16 omitted
+	Header struct {
+		CoverageOffset  uint16 // Offset to Coverage table, from beginning of PairPos subtable.
+		ValueFormat1    uint16 // ValueRecord definition — for the first glyph of the pair (may be zero).
+		ValueFormat2    uint16 // ValueRecord definition — for the second glyph of the pair (may be zero).
+		ClassDef1Offset uint16 // Offset to ClassDef table, from beginning of PairPos subtable — for the first glyph of the pair.
+		ClassDef2Offset uint16 // Offset to ClassDef table, from beginning of PairPos subtable — for the second glyph of the pair.
+		Class1Count     uint16 // Number of classes in classDef1 table — includes Class 0.
+		Class2Count     uint16 // Number of classes in classDef2 table — includes Class 0.
+	}
+	Records []Class2Record
+}
+
+type Class2Record struct {
+	valueRecord1 *ValueRecord // Positioning for first glyph — empty if valueFormat1 = 0.
+	valueRecord2 *ValueRecord // Positioning for second glyph — empty if valueFormat2 = 0.
+}
+
+func ReadPairPosFormat2(r io.Reader) (*PairPosFormat2, error) {
+	res := &PairPosFormat2{}
+	err := binary.Read(r, binary.BigEndian, &res.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	n := int(res.Header.Class1Count) * int(res.Header.Class2Count)
+	res.Records = make([]Class2Record, n)
+	for i := 0; i < n; i++ {
+		vr1, err := ReadValueRecord(r, res.Header.ValueFormat1)
+		if err != nil {
+			return nil, err
+		}
+		vr2, err := ReadValueRecord(r, res.Header.ValueFormat2)
+		if err != nil {
+			return nil, err
+		}
+		res.Records[i] = Class2Record{vr1, vr2}
+	}
+
+	return res, nil
+}
+
+// ValueRecord describes all the variables and values used to adjust the
+// position of a glyph or set of glyphs.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#value-record
+type ValueRecord struct {
+	XPlacement       int16  // Horizontal adjustment for placement, in design units.
+	YPlacement       int16  // Vertical adjustment for placement, in design units.
+	XAdvance         int16  // Horizontal adjustment for advance, in design units — only used for horizontal layout.
+	YAdvance         int16  // Vertical adjustment for advance, in design units — only used for vertical layout.
+	XPlaDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for horizontal placement, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
+	YPlaDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for vertical placement, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
+	XAdvDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for horizontal advance, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
+	YAdvDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for vertical advance, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
+}
+
+func (vr *ValueRecord) String() string {
+	var adjust []string
+	if vr != nil {
+		if vr.XPlacement != 0 {
+			adjust = append(adjust, fmt.Sprintf("xpos%+d", vr.XPlacement))
+		}
+		if vr.YPlacement != 0 {
+			adjust = append(adjust, fmt.Sprintf("ypos%+d", vr.YPlacement))
+		}
+		if vr.XAdvance != 0 {
+			adjust = append(adjust, fmt.Sprintf("xadv%+d", vr.XAdvance))
+		}
+		if vr.YAdvance != 0 {
+			adjust = append(adjust, fmt.Sprintf("yadv%+d", vr.YAdvance))
+		}
+		if vr.XPlaDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("xposdev%+d", vr.XPlaDeviceOffset))
+		}
+		if vr.YPlaDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("yposdev%+d", vr.YPlaDeviceOffset))
+		}
+		if vr.XAdvDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("xadvdev%+d", vr.XAdvDeviceOffset))
+		}
+		if vr.YAdvDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("yadvdev%+d", vr.YAdvDeviceOffset))
+		}
+	}
+	if len(adjust) == 0 {
+		return "_"
+	}
+	return strings.Join(adjust, ",")
+}
+
+// ReadValueRecord reads the binary representation of a ValueRecord.  The given
+// ValueFormat determines which fields are present in the binary
+// representation.
+func ReadValueRecord(r io.Reader, ValueFormat uint16) (*ValueRecord, error) {
+	if ValueFormat == 0 {
+		return nil, nil
+	}
+	res := &ValueRecord{}
+	if ValueFormat&0x0001 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.XPlacement)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ValueFormat&0x0002 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.YPlacement)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ValueFormat&0x0004 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.XAdvance)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ValueFormat&0x0008 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.YAdvance)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ValueFormat&0x0010 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.XPlaDeviceOffset)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ValueFormat&0x0020 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.YPlaDeviceOffset)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ValueFormat&0x0040 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.XAdvDeviceOffset)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if ValueFormat&0x0080 != 0 {
+		err := binary.Read(r, binary.BigEndian, &res.YAdvDeviceOffset)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 // GposHead contains a version number for the GposHead table and offsets to
 // locate the sub-tables.
 type GposHead struct {
@@ -383,11 +708,9 @@ type GposHead struct {
 	V11 struct { // version 1.1
 		FeatureVariationsOffset uint32 // Offset to FeatureVariations table, from beginning of GPOS table
 	}
-	LookupList LookupList
-	// FeatureVariations FeatureVariationsTable
 }
 
-func (GPOS *GposHead) ReadLangSys(fd io.ReadSeeker, langSysTag, scriptTag string) (*langSys, error) {
+func (GPOS *GposHead) readLangSys(fd io.ReadSeeker, langSysTag, scriptTag string) (*langSys, error) {
 	scriptListOffs := int64(GPOS.V10.ScriptListOffset)
 
 	_, err := fd.Seek(scriptListOffs, io.SeekStart)
@@ -397,6 +720,10 @@ func (GPOS *GposHead) ReadLangSys(fd io.ReadSeeker, langSysTag, scriptTag string
 	scriptRecord, err := readScriptRecord(fd, scriptTag)
 	if err != nil {
 		return nil, err
+	}
+	if scriptRecord == nil {
+		// TODO(voss): treat this error as if no GPOS/GSUB table is present
+		return nil, errors.New("no script record found")
 	}
 	scriptOffs := scriptListOffs + int64(scriptRecord.ScriptOffset)
 
@@ -425,10 +752,14 @@ func (GPOS *GposHead) ReadLangSys(fd io.ReadSeeker, langSysTag, scriptTag string
 		}
 	}
 	if langSysOffs < 0 {
-		if data.Header.DefaultLangSysOffset == 0 {
-			return nil, nil
+		if data.Header.DefaultLangSysOffset > 0 {
+			langSysOffs = int64(data.Header.DefaultLangSysOffset)
+		} else if len(data.LangSysRecords) > 0 {
+			// missing default, take the first language
+			langSysOffs = int64(data.LangSysRecords[0].LangSysOffset)
+		} else {
+			return nil, errors.New("no langSys record found")
 		}
-		langSysOffs = int64(data.Header.DefaultLangSysOffset)
 	}
 
 	_, err = fd.Seek(scriptOffs+langSysOffs, io.SeekStart)
@@ -449,14 +780,37 @@ func (GPOS *GposHead) ReadLangSys(fd io.ReadSeeker, langSysTag, scriptTag string
 	return ls, nil
 }
 
-type FeatureInfo struct {
+// The most common GPOS features seen on my system:
+//     6777 "kern"
+//     3219 "mark"
+//     2464 "mkmk"
+//     2301 "cpsp"
+//     1352 "size"
+//      117 "case"
+//       92 "dist"
+//       76 "vhal"
+//       76 "halt"
+//
+// The most common GSUB features seen on my system:
+//     5630 "liga"
+//     4185 "frac"
+//     3857 "aalt"
+//     3746 "onum"
+//     3434 "sups"
+//     3010 "lnum"
+//     2992 "pnum"
+//     2989 "ccmp"
+//     2976 "dnom"
+//     2962 "numr"
+
+type featureInfo struct {
 	Tag               string
 	LookupListIndices []uint16
 	Required          bool
 }
 
-func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langSysTag, scriptTag string) ([]FeatureInfo, error) {
-	langSys, err := GPOS.ReadLangSys(fd, langSysTag, scriptTag)
+func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langTag, scriptTag string) ([]featureInfo, error) {
+	langSys, err := GPOS.readLangSys(fd, langTag, scriptTag)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +828,7 @@ func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langSysTag, scriptTag st
 
 	featureListBase := int64(GPOS.V10.FeatureListOffset)
 
-	data := &FeatureList{}
+	data := &featureList{}
 	_, err = fd.Seek(featureListBase, io.SeekStart)
 	if err != nil {
 		return nil, err
@@ -489,13 +843,19 @@ func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langSysTag, scriptTag st
 		return nil, err
 	}
 
-	res := make([]FeatureInfo, len(todo))
-	for i, item := range todo {
+	var res []featureInfo
+	for _, item := range todo {
 		if item.idx >= data.FeatureCount {
 			continue
 		}
-		res[i].Tag = data.FeatureRecords[item.idx].FeatureTag.String()
-		res[i].Required = item.required
+		tag := data.FeatureRecords[item.idx].FeatureTag.String()
+		if tag == " RQD" {
+			continue
+		}
+
+		fi := featureInfo{}
+		fi.Tag = tag
+		fi.Required = item.required
 
 		offs := int64(data.FeatureRecords[item.idx].FeatureOffset)
 		_, err = fd.Seek(featureListBase+offs, io.SeekStart)
@@ -508,11 +868,12 @@ func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langSysTag, scriptTag st
 		if err != nil {
 			return nil, err
 		}
-		res[i].LookupListIndices = make([]uint16, feature.Header.LookupIndexCount)
-		err = binary.Read(fd, binary.BigEndian, res[i].LookupListIndices)
+		fi.LookupListIndices = make([]uint16, feature.Header.LookupIndexCount)
+		err = binary.Read(fd, binary.BigEndian, fi.LookupListIndices)
 		if err != nil {
 			return nil, err
 		}
+		res = append(res, fi)
 	}
 	return res, nil
 }

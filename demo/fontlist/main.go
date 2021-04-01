@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/truetype/table"
 )
 
 func tryFont(fname string) error {
@@ -17,12 +17,13 @@ func tryFont(fname string) error {
 	}
 	defer tt.Close()
 
-	ext := filepath.Ext(fname)
-	fmt.Printf("%08x %-5t %-5t %s\n",
-		tt.Header.Offsets.ScalerType,
-		tt.HasTables("glyf"),
-		tt.HasTables("CFF "),
-		ext)
+	_, err = tt.ReadGposTable("DEU ", "latn")
+	if _, ok := err.(*table.ErrNoTable); ok {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
