@@ -287,10 +287,10 @@ func (tt *Font) getInfo() (*fontInfo, error) {
 		return nil, err
 	}
 
-	_, err = tt.ReadGposTable("DEU ", "latn") // TODO(voss): ...
-	if err != nil {
-		return nil, err
-	}
+	// _, err = tt.ReadGposTable("DEU ", "latn") // TODO(voss): ...
+	// if err != nil {
+	// return nil, err
+	// }
 
 	return info, nil
 }

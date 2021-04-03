@@ -98,14 +98,14 @@ func convert(inName, outName string) error {
 		log.Fatal(err)
 	}
 
-	F1, err := builtin.Embed(out, "Courier", subset.chars)
+	F1, err := builtin.Embed(out, "F", "Courier", subset.chars)
 	if err != nil {
 		return err
 	}
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: pdf.Dict{
-			"Font": pdf.Dict{"F": F1.Ref},
+			"Font": pdf.Dict{F1.Name: F1.Ref},
 		},
 		MediaBox: pages.A4,
 	})

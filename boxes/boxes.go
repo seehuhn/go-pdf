@@ -24,210 +24,82 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-type stuff interface {
-	Extent() *stuffExtent
+// Parameters contains the parameter values used by the layout engine.
+type Parameters struct {
+	BaseLineSkip float64
+}
+
+// Box represents marks on a page within a rectangular area of known size.
+type Box interface {
+	Extent() *BoxExtent
 	Draw(page *pages.Page, xPos, yPos float64)
 }
 
-type stretcher interface {
-	Stretch() *stretchAmount
-}
-
-type stretchAmount struct {
-	Val   float64
-	Level int
-}
-
-type stuffExtent struct {
+// BoxExtent gives the dimensions of a Box.
+type BoxExtent struct {
 	Width, Height, Depth float64
+	WhiteSpaceOnly       bool
 }
 
-func (obj stuffExtent) Extent() *stuffExtent {
+// Extent implements the Box interface.
+func (obj BoxExtent) Extent() *BoxExtent {
 	return &obj
 }
 
-type rule struct {
-	stuffExtent
+// A Rule is a solidly filled rectangular region on the page.
+type Rule struct {
+	BoxExtent
 }
 
-func (obj *rule) Draw(page *pages.Page, xPos, yPos float64) {
-	fmt.Fprintf(page, "%f %f %f %f re f\n",
-		xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
-}
-
-type vBox struct {
-	stuffExtent
-
-	Contents []stuff
-}
-
-func (obj *vBox) Draw(page *pages.Page, xPos, yPos float64) {
-	page.Println("q")
-	page.Println("0 .8 0 RG")
-	fmt.Fprintf(page, "%f %f %f %f re s\n",
-		xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
-	page.Println("Q")
-
-	boxTotal := obj.Depth + obj.Height
-	contentsTotal := 0.0
-	for _, child := range obj.Contents {
-		ext := child.Extent()
-		contentsTotal += ext.Depth + ext.Height
-	}
-	if contentsTotal < boxTotal-1e-3 {
-		fmt.Println("underfull")
-		level := -1
-		var ii []int
-		stretchTotal := 0.0
-		for i, child := range obj.Contents {
-			stretch, ok := child.(stretcher)
-			if !ok {
-				continue
-			}
-			info := stretch.Stretch()
-
-			if info.Level > level {
-				level = info.Level
-				ii = nil
-				stretchTotal = 0
-			}
-			ii = append(ii, i)
-			stretchTotal += info.Val
-		}
-
-		if stretchTotal > 0 {
-			q := (boxTotal - contentsTotal) / stretchTotal
-			if level == 0 && q > 1 {
-				q = 1
-			}
-			for _, i := range ii {
-				child := obj.Contents[i]
-				ext := child.Extent()
-				amount := ext.Depth + ext.Height + child.(stretcher).Stretch().Val*q
-				obj.Contents[i] = kern(amount)
-			}
-		}
-	} else if contentsTotal > boxTotal+1e-3 {
-		fmt.Println("overfull")
-	}
-
-	y := yPos + obj.Height
-	for _, child := range obj.Contents {
-		ext := child.Extent()
-		y -= ext.Height
-		child.Draw(page, xPos, y)
-		y -= ext.Depth
+// Draw implements the Box interface.
+func (obj *Rule) Draw(page *pages.Page, xPos, yPos float64) {
+	if obj.Width > 0 && obj.Depth+obj.Height > 0 {
+		fmt.Fprintf(page, "%f %f %f %f re f\n",
+			xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
 	}
 }
 
-type hBox struct {
-	stuffExtent
+// Kern represents a fixed amount of space.
+type Kern float64
 
-	Contents []stuff
-}
-
-func (obj *hBox) Draw(page *pages.Page, xPos, yPos float64) {
-	page.Println("q")
-	page.Println(".7 .7 1 RG")
-	fmt.Fprintf(page, "%f %f %f %f re s\n",
-		xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
-	page.Println("Q")
-
-	boxTotal := obj.Width
-	contentsTotal := 0.0
-	for _, child := range obj.Contents {
-		ext := child.Extent()
-		contentsTotal += ext.Width
-	}
-	if contentsTotal < boxTotal-1e-3 {
-		fmt.Println("underfull")
-		level := -1
-		var ii []int
-		stretchTotal := 0.0
-		for i, child := range obj.Contents {
-			stretch, ok := child.(stretcher)
-			if !ok {
-				continue
-			}
-			info := stretch.Stretch()
-
-			if info.Level > level {
-				level = info.Level
-				ii = nil
-				stretchTotal = 0
-			}
-			ii = append(ii, i)
-			stretchTotal += info.Val
-		}
-
-		if stretchTotal > 0 {
-			q := (boxTotal - contentsTotal) / stretchTotal
-			if level == 0 && q > 1 {
-				q = 1
-			}
-			for _, i := range ii {
-				child := obj.Contents[i]
-				ext := child.Extent()
-				amount := ext.Width + child.(stretcher).Stretch().Val*q
-				obj.Contents[i] = kern(amount)
-			}
-		}
-	} else if contentsTotal > boxTotal+1e-3 {
-		fmt.Println("overfull")
-	}
-
-	x := xPos
-	for _, child := range obj.Contents {
-		ext := child.Extent()
-		child.Draw(page, x, yPos)
-		x += ext.Width
+// Extent implements the Box interface.
+func (obj Kern) Extent() *BoxExtent {
+	return &BoxExtent{
+		Width:          float64(obj),
+		Height:         float64(obj),
+		WhiteSpaceOnly: true,
 	}
 }
 
-type kern float64
+// Draw implements the Box interface.
+func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
 
-func (obj kern) Extent() *stuffExtent {
-	return &stuffExtent{
-		Width:  float64(obj),
-		Height: float64(obj),
-	}
-}
-
-func (obj kern) Draw(page *pages.Page, xPos, yPos float64) {}
-
-type glue struct {
-	Length float64
-	Plus   stretchAmount
-	Minus  stretchAmount
-}
-
-func (obj *glue) Extent() *stuffExtent {
-	return &stuffExtent{
-		Width:  obj.Length,
-		Height: obj.Length,
-	}
-}
-
-func (obj *glue) Draw(page *pages.Page, xPos, yPos float64) {}
-
-func (obj *glue) Stretch() *stretchAmount {
-	return &obj.Plus
-}
-
-type text struct {
+// Text represents a typeset string of characters as a Box object.
+type Text struct {
 	font   pdf.Name
 	layout *font.Layout
 }
 
-func (obj *text) Extent() *stuffExtent {
-	return &stuffExtent{
+// NewText returns a new Text object.
+func NewText(F *font.Font, ptSize float64, text string) *Text {
+	layout := F.Typeset(text, ptSize)
+	return &Text{
+		font:   F.Name,
+		layout: layout,
+	}
+}
+
+// Extent implements the Box interface
+func (obj *Text) Extent() *BoxExtent {
+	return &BoxExtent{
 		Width:  obj.layout.Width,
 		Height: obj.layout.Height,
 		Depth:  obj.layout.Depth,
 	}
 }
 
-func (obj *text) Draw(page *pages.Page, xPos, yPos float64) {
+// Draw implements the Box interface.
+func (obj *Text) Draw(page *pages.Page, xPos, yPos float64) {
 	if len(obj.layout.Fragments) == 0 {
 		return
 	}
@@ -250,4 +122,23 @@ func (obj *text) Draw(page *pages.Page, xPos, yPos float64) {
 	fmt.Fprint(page, "] TJ\n")
 	page.Println("ET")
 	page.Println("Q")
+}
+
+// Ship appends the box to the page tree as a new page.
+func Ship(tree *pages.PageTree, box Box) error {
+	ext := box.Extent()
+	attr := &pages.Attributes{
+		MediaBox: &pdf.Rectangle{
+			LLx: 0,
+			LLy: 0,
+			URx: ext.Width,
+			URy: ext.Depth + ext.Height,
+		},
+	}
+	page, err := tree.AddPage(attr)
+	if err != nil {
+		return err
+	}
+	box.Draw(page, 0, ext.Depth)
+	return page.Close()
 }

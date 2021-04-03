@@ -27,25 +27,25 @@ import (
 )
 
 const (
-	FontName = "Times-Roman"
-	FontSize = 48.0
+	fontName = "Times-Roman"
+	fontSize = 48.0
 )
 
-func WritePage(out *pdf.Writer, text string, width, height float64) error {
+func writePage(out *pdf.Writer, text string, width, height float64) error {
 	subset := make(map[rune]bool)
 	for _, r := range text {
 		subset[r] = true
 	}
 
-	F1, err := builtin.Embed(out, FontName, subset)
-	// F1, err := truetype.Embed(out, "../../font/truetype/FreeSerif.ttf", subset)
+	F1, err := builtin.Embed(out, "F1", fontName, subset)
+	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/FreeSerif.ttf", subset)
 	if err != nil {
 		return err
 	}
 
 	page, err := pages.SinglePage(out, &pages.Attributes{
 		Resources: pdf.Dict{
-			"Font": pdf.Dict{"F1": F1.Ref},
+			"Font": pdf.Dict{F1.Name: F1.Ref},
 		},
 		MediaBox: &pdf.Rectangle{
 			URx: width,
@@ -57,9 +57,9 @@ func WritePage(out *pdf.Writer, text string, width, height float64) error {
 	}
 
 	margin := 50.0
-	baseLineSkip := 1.2 * FontSize
+	baseLineSkip := 1.2 * fontSize
 
-	q := FontSize / 1000
+	q := fontSize / 1000
 
 	_, err = page.Write([]byte("q\n1 .5 .5 RG\n"))
 	if err != nil {
@@ -112,8 +112,8 @@ func WritePage(out *pdf.Writer, text string, width, height float64) error {
 			_, err = page.Write([]byte(fmt.Sprintf("%.2f %.2f %.2f %.2f re\n",
 				xPos+float64(bbox.LLx)*q,
 				yPos+float64(bbox.LLy)*q,
-				float64(bbox.URx)*q-float64(bbox.LLx)*q,
-				float64(bbox.URy)*q-float64(bbox.LLy)*q)))
+				float64(bbox.URx-bbox.LLx)*q,
+				float64(bbox.URy-bbox.LLy)*q)))
 			if err != nil {
 				return err
 			}
@@ -141,7 +141,7 @@ func WritePage(out *pdf.Writer, text string, width, height float64) error {
 	}
 
 	_, err = page.Write([]byte(fmt.Sprintf("BT\n/F1 %f Tf\n%.1f %.1f Td\n",
-		FontSize, margin, yPos)))
+		fontSize, margin, yPos)))
 	if err != nil {
 		return err
 	}
@@ -170,8 +170,8 @@ func main() {
 	const width = 8 * 72
 	const height = 6 * 72
 
-	text := "Waterﬂask & ﬁsh bucket"
-	err = WritePage(out, text, width, height)
+	text := "Waterﬂas' & ﬁsh bucket"
+	err = writePage(out, text, width, height)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -422,7 +422,7 @@ func (tt *Font) getGlyfInfo() (*table.Glyf, error) {
 		short := make([]uint16, tt.NumGlyphs+1)
 		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", short)
 		for i, x := range short {
-			offset[i] = uint32(x)
+			offset[i] = uint32(x) * 2
 		}
 	} else {
 		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", offset)
@@ -449,6 +449,62 @@ func (tt *Font) getGlyfInfo() (*table.Glyf, error) {
 		}
 	}
 
+	return res, nil
+}
+
+func readClassDefTable(r io.Reader) (map[font.GlyphIndex]uint16, error) {
+	var format uint16
+	err := binary.Read(r, binary.BigEndian, &format)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(map[font.GlyphIndex]uint16)
+	switch format {
+	case 1:
+		var firstGlyph uint16
+		err := binary.Read(r, binary.BigEndian, &firstGlyph)
+		if err != nil {
+			return nil, err
+		}
+		var count uint16
+		err = binary.Read(r, binary.BigEndian, &count)
+		if err != nil {
+			return nil, err
+		}
+		classValueArray := make([]uint16, count)
+		err = binary.Read(r, binary.BigEndian, classValueArray)
+		if err != nil {
+			return nil, err
+		}
+		base := font.GlyphIndex(firstGlyph)
+		for i := 0; i < int(count); i++ {
+			class := classValueArray[i]
+			if class != 0 {
+				res[base+font.GlyphIndex(i)] = class
+			}
+		}
+	case 2:
+		var count uint16
+		err := binary.Read(r, binary.BigEndian, &count)
+		if err != nil {
+			return nil, err
+		}
+		var rec table.ClassRangeRecord
+		for i := uint16(0); i < count; i++ {
+			err := binary.Read(r, binary.BigEndian, &rec)
+			if err != nil {
+				return nil, err
+			}
+			for idx := font.GlyphIndex(rec.StartGlyphID); idx <= font.GlyphIndex(rec.EndGlyphID); idx++ {
+				if rec.Class != 0 {
+					res[idx] = rec.Class
+				}
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported ClassDef table format %d", format)
+	}
 	return res, nil
 }
 
@@ -519,7 +575,7 @@ func (tt *Font) ReadGposTable(langTag, scriptTag string) (*table.GposHead, error
 						return nil, err
 					}
 					switch format {
-					case 1:
+					case 1: // lookup type 2, format 1
 						fmt.Println("  - PairPosFormat1 Subtable")
 						pairPos, err := table.ReadPairPosFormat1(fd)
 						if err != nil {
@@ -552,13 +608,58 @@ func (tt *Font) ReadGposTable(langTag, scriptTag string) (*table.GposHead, error
 							}
 							fmt.Println("      -", coverage[k], x)
 						}
-					case 2:
+					case 2: // lookup type 2, format 2
 						fmt.Println("  - PairPosFormat2 Subtable")
 						pairPos, err := table.ReadPairPosFormat2(fd)
 						if err != nil {
 							return nil, err
 						}
-						fmt.Println("      -", pairPos)
+
+						_, err = fd.Seek(pairPosTableBase+int64(pairPos.Header.CoverageOffset),
+							io.SeekStart)
+						if err != nil {
+							return nil, err
+						}
+						firstGlyphs, err := table.ReadCoverage(fd)
+						if err != nil {
+							return nil, err
+						}
+
+						offs := pairPos.Header.ClassDef1Offset
+						_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
+						if err != nil {
+							return nil, err
+						}
+						classDef1, err := readClassDefTable(fd)
+						if err != nil {
+							return nil, err
+						}
+
+						offs = pairPos.Header.ClassDef2Offset
+						_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
+						if err != nil {
+							return nil, err
+						}
+						classDef2, err := readClassDefTable(fd)
+						if err != nil {
+							return nil, err
+						}
+
+						for _, idx1 := range firstGlyphs {
+							for idx2 := 0; idx2 < tt.NumGlyphs; idx2++ {
+								c1 := classDef1[font.GlyphIndex(idx1)]
+								c2 := classDef2[font.GlyphIndex(idx2)]
+								k := c1*pairPos.Header.Class2Count + c2
+								if int(k) >= len(pairPos.Records) {
+									return nil, errors.New("corrupt font")
+								}
+								rec := pairPos.Records[k]
+								if rec.ValueRecord1 == nil || rec.ValueRecord1.XAdvance == 0 {
+									continue
+								}
+								fmt.Println(idx1, idx2, rec)
+							}
+						}
 					default:
 						fmt.Printf("  - unknown subtable type %d\n", format)
 					}

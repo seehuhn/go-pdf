@@ -3,6 +3,7 @@ package builtin
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"seehuhn.de/go/pdf/font/names"
 )
 
-func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error) {
+func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*font.Font, error) {
 	fd, err := afmData.Open("afm/" + fname + ".afm")
 	if err != nil {
 		return nil, err
@@ -26,6 +27,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 	}
 
 	builtin := &font.Font{
+		Name:      pdf.Name(name),
 		CMap:      map[rune]font.GlyphIndex{},
 		Ligatures: map[font.GlyphPair]font.GlyphIndex{},
 	}
@@ -259,14 +261,19 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 		c    byte
 	}
 	var diff []D
+	var missing []rune
 	for i, r := range todo {
 		c := unused[i]
 		name, ok := runeToName[r]
 		if !ok {
-			return nil, errors.New("glyph missing from font")
+			missing = append(missing, r)
+			continue
 		}
 		bestRuneToCode[r] = c
 		diff = append(diff, D{name: name, c: c})
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("glyphs missing from font: %q", string(missing))
 	}
 
 	// Construct the /Encoding dict

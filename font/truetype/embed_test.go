@@ -17,13 +17,13 @@ func TestEmbedFont(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1, err := builtin.Embed(w, "Times-Roman", font.AdobeStandardLatin)
+	F1, err := builtin.Embed(w, "F1", "Times-Roman", font.AdobeStandardLatin)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// F2, err := Embed(w, "ttf/FreeSerif.ttf", nil)
-	F2, err := Embed(w, "ttf/Roboto-Regular.ttf", nil)
+	F2, err := Embed(w, "F2", "ttf/Roboto-Regular.ttf", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,8 +31,8 @@ func TestEmbedFont(t *testing.T) {
 	contents, err := pages.SinglePage(w, &pages.Attributes{
 		Resources: map[pdf.Name]pdf.Object{
 			"Font": pdf.Dict{
-				"F1": F1.Ref,
-				"F2": F2.Ref,
+				F1.Name: F1.Ref,
+				F2.Name: F2.Ref,
 			},
 		},
 		MediaBox: pages.A4,

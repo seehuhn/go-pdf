@@ -9,7 +9,7 @@ import (
 )
 
 // Embed embeds a TrueType font into a pdf file.
-func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error) {
+func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*font.Font, error) {
 	tt, err := Open(fname)
 	if err != nil {
 		return nil, err
@@ -190,6 +190,7 @@ func Embed(w *pdf.Writer, fname string, subset map[rune]bool) (*font.Font, error
 	}
 
 	font := &font.Font{
+		Name: pdf.Name(name),
 		Ref:  FontRef,
 		CMap: info.CMap,
 		Enc: func(ii ...font.GlyphIndex) []byte {

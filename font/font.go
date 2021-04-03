@@ -17,16 +17,22 @@
 package font
 
 import (
+	"math"
 	"strings"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
 )
 
+// GlyphIndex is used to enumerate the blyphs in a font.  The first glyph
+// has index 0 and is used to indicate a missing character (usually rendered
+// as an empty box or similar).
 type GlyphIndex uint16
 
+// Font represents a font embedded in the PDF file.
 type Font struct {
-	Ref *pdf.Reference
+	Name pdf.Name
+	Ref  *pdf.Reference
 
 	CMap      map[rune]GlyphIndex
 	Enc       func(...GlyphIndex) []byte
@@ -36,11 +42,12 @@ type Font struct {
 	GlyphExtent []Rect
 	Width       []int
 
-	Ascent  float64
-	Descent float64
+	Ascent  float64 // Ascent in glyph coordinate units
+	Descent float64 // Descent in glyph coordinate units, as a negative number
 	LineGap float64
 }
 
+// Rect represents a rectangle with integer coordinates.
 type Rect struct {
 	LLx, LLy, URx, URy int
 }
@@ -60,8 +67,8 @@ type Layout struct {
 	Fragments [][]byte
 	Kerns     []int
 	Width     float64
-	Depth     float64
 	Height    float64
+	Depth     float64
 }
 
 // Typeset determines the layout of a string using the given font.  The
@@ -105,8 +112,8 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	}
 
 	width := 0.0
-	height := 0.0 // TODO(voss): -oo ?
-	depth := 0.0  // TODO(voss): -oo ?
+	height := math.Inf(-1)
+	depth := math.Inf(-1)
 	pos := 0
 	for i, c := range codes {
 		bbox := &font.GlyphExtent[c]

@@ -36,6 +36,17 @@ type Page struct {
 	stm io.WriteCloser
 }
 
+// AddPage adds a new page to the page tree and returns an object which
+// can be used to write the content stream for the page.
+func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
+	contentRef, mediaBox, err := tree.addPageInternal(attr)
+	if err != nil {
+		return nil, err
+	}
+
+	return tree.newPage(contentRef, mediaBox)
+}
+
 func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Rectangle, error) {
 	var mediaBox *pdf.Rectangle
 	def := tree.defaults
@@ -81,17 +92,6 @@ func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Re
 	}
 
 	return contentRef, mediaBox, nil
-}
-
-// AddPage adds a new page to the page tree and returns an object which
-// can be used to write the content stream for the page.
-func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
-	contentRef, mediaBox, err := tree.addPageInternal(attr)
-	if err != nil {
-		return nil, err
-	}
-
-	return tree.newPage(contentRef, mediaBox)
 }
 
 func (tree *PageTree) newPage(contentRef *pdf.Reference, mediaBox *pdf.Rectangle) (*Page, error) {

@@ -560,8 +560,8 @@ type PairPosFormat2 struct {
 }
 
 type Class2Record struct {
-	valueRecord1 *ValueRecord // Positioning for first glyph — empty if valueFormat1 = 0.
-	valueRecord2 *ValueRecord // Positioning for second glyph — empty if valueFormat2 = 0.
+	ValueRecord1 *ValueRecord // Positioning for first glyph — empty if valueFormat1 = 0.
+	ValueRecord2 *ValueRecord // Positioning for second glyph — empty if valueFormat2 = 0.
 }
 
 func ReadPairPosFormat2(r io.Reader) (*PairPosFormat2, error) {
@@ -586,6 +586,12 @@ func ReadPairPosFormat2(r io.Reader) (*PairPosFormat2, error) {
 	}
 
 	return res, nil
+}
+
+type ClassRangeRecord struct {
+	StartGlyphID uint16 // First glyph ID in the range
+	EndGlyphID   uint16 // Last glyph ID in the range
+	Class        uint16 // Applied to all glyphs in the range
 }
 
 // ValueRecord describes all the variables and values used to adjust the
