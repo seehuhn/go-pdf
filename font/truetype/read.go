@@ -438,8 +438,13 @@ func (tt *Font) getGlyfInfo() (*table.Glyf, error) {
 	if err != nil {
 		return nil, err
 	}
+	tableLen := tt.Header.Find("glyf").Length
 	for i := 0; i < tt.NumGlyphs; i++ {
-		_, err := glyfFd.Seek(int64(offset[i]), io.SeekStart)
+		offs := offset[i]
+		if offs >= tableLen {
+			continue
+		}
+		_, err := glyfFd.Seek(int64(offs), io.SeekStart)
 		if err != nil {
 			return nil, err
 		}
