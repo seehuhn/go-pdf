@@ -9,3 +9,9 @@ type ErrNoTable struct {
 func (err *ErrNoTable) Error() string {
 	return "missing " + err.Name + " table in font"
 }
+
+// IsMissing returns true, if err indicates a missing sfnt table.
+func IsMissing(err error) bool {
+	_, missing := err.(*ErrNoTable)
+	return missing
+}

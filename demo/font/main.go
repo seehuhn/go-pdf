@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -37,8 +37,10 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		subset[r] = true
 	}
 
-	F1, err := builtin.Embed(out, "F1", fontName, subset)
-	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/FreeSerif.ttf", subset)
+	// F1, err := builtin.Embed(out, "F1", fontName, subset)
+	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/FreeSerif.ttf", subset)
+	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/Roboto-Regular.ttf", subset)
+	F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", subset)
 	if err != nil {
 		return err
 	}
@@ -67,8 +69,8 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	}
 	yPos := height - margin - F1.Ascent*q
 	for y := yPos; y > margin; y -= baseLineSkip {
-		_, err = page.Write([]byte(fmt.Sprintf("%.1f %.1f m %.1f %.1f l\n",
-			margin, y, width-margin, y)))
+		_, err = page.Printf("%.1f %.1f m %.1f %.1f l\n",
+			margin, y, width-margin, y)
 		if err != nil {
 			return err
 		}
@@ -170,7 +172,7 @@ func main() {
 	const width = 8 * 72
 	const height = 6 * 72
 
-	text := "Waterﬂas' & ﬁsh bucket"
+	text := "Toterﬂas' & ﬁsh bucket"
 	err = writePage(out, text, width, height)
 	if err != nil {
 		log.Fatal(err)

@@ -360,7 +360,11 @@ func (tt *Font) getOS2Info() (*table.OS2, error) {
 	return os2, nil
 }
 
-func (tt *Font) getKernInfo(q float64) (map[font.GlyphPair]int, error) {
+// read kerning information from the "kern" table
+func (tt *Font) readKernInfo() (map[font.GlyphPair]int, error) {
+	// factor for converting from TrueType FUnit to PDF glyph units
+	q := 1000 / float64(tt.head.UnitsPerEm)
+
 	var Header struct {
 		Version   uint16
 		NumTables uint16
@@ -513,165 +517,243 @@ func readClassDefTable(r io.Reader) (map[font.GlyphIndex]uint16, error) {
 	return res, nil
 }
 
-// ReadGposTable returns the GPOS table of a font.
+type myLookupInfo struct {
+	Tag  string
+	Type uint16
+	Flag uint16
+	Pos  int64
+}
+
+func (tt *Font) readGposLookups(langTag, scriptTag string) (*io.SectionReader, []*myLookupInfo, error) {
+	GPOS := &table.GposHead{}
+	fd, err := tt.Header.ReadTableHead(tt.Fd, "GPOS", &GPOS.V10)
+	if err != nil {
+		return nil, nil, err
+	}
+	if GPOS.V10.MajorVersion != 1 || GPOS.V10.MinorVersion > 1 {
+		return nil, nil, fmt.Errorf("unsupported GPOS version %d.%d",
+			GPOS.V10.MajorVersion, GPOS.V10.MinorVersion)
+	}
+	if GPOS.V10.MinorVersion > 0 {
+		err = binary.Read(fd, binary.BigEndian, &GPOS.V11)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	featureList, err := GPOS.ReadFeatureInfo(fd, langTag, scriptTag)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	lookupBase := int64(GPOS.V10.LookupListOffset)
+	_, err = fd.Seek(lookupBase, io.SeekStart)
+	if err != nil {
+		return nil, nil, err
+	}
+	lookupList, err := table.ReadLookupList(fd)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var allLookups []*myLookupInfo
+	for _, feature := range featureList {
+		for _, idx := range feature.LookupListIndices {
+			lookupTableBase := lookupBase + int64(lookupList.LookupOffsets[idx])
+			_, err = fd.Seek(lookupTableBase, io.SeekStart)
+			if err != nil {
+				return nil, nil, err
+			}
+			lookupTable, err := table.ReadLookup(fd)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			lookupType := lookupTable.Header.LookupType
+			if lookupType != 9 {
+				for _, offs := range lookupTable.SubtableOffsets {
+					allLookups = append(allLookups, &myLookupInfo{
+						Tag:  feature.Tag,
+						Type: lookupType,
+						Flag: lookupTable.Header.LookupFlag,
+						Pos:  lookupTableBase + int64(offs),
+					})
+				}
+			} else {
+				for _, offs := range lookupTable.SubtableOffsets {
+					extensionPosTableBase := lookupTableBase + int64(offs)
+					_, err = fd.Seek(extensionPosTableBase, io.SeekStart)
+					if err != nil {
+						return nil, nil, err
+					}
+					extPos, err := table.ReadExtensionPos1(fd)
+					if err != nil {
+						return nil, nil, err
+					}
+					if extPos.PosFormat != 1 {
+						return nil, nil, fmt.Errorf(
+							"Extension Positioning Subtable format %d not supported",
+							extPos.PosFormat)
+					}
+					allLookups = append(allLookups, &myLookupInfo{
+						Tag:  feature.Tag,
+						Type: extPos.ExtensionLookupType,
+						Flag: lookupTable.Header.LookupFlag,
+						Pos:  extensionPosTableBase + int64(extPos.ExtensionOffset),
+					})
+				}
+			}
+		}
+	}
+	return fd, allLookups, nil
+}
+
+// readGposKernInfo reads kerning information from the "GPOS" table.
 //
 // A list of OpenType language tags is here:
 // https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
 //
 // A list of OpenType script tags is here:
 // https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
-func (tt *Font) ReadGposTable(langTag, scriptTag string) (*table.GposHead, error) {
-	GPOS := &table.GposHead{}
-	fd, err := tt.Header.ReadTableHead(tt.Fd, "GPOS", &GPOS.V10)
+func (tt *Font) readGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
+	// factor for converting from TrueType FUnit to PDF glyph units
+	q := 1000 / float64(tt.head.UnitsPerEm)
+
+	fd, allLookups, err := tt.readGposLookups(langTag, scriptTag)
 	if err != nil {
 		return nil, err
 	}
-	if GPOS.V10.MajorVersion != 1 || GPOS.V10.MinorVersion > 1 {
-		return nil, fmt.Errorf("unsupported GPOS version %d.%d",
-			GPOS.V10.MajorVersion, GPOS.V10.MinorVersion)
-	}
-	if GPOS.V10.MinorVersion > 0 {
-		err = binary.Read(fd, binary.BigEndian, &GPOS.V11)
-		if err != nil {
-			return nil, err
+
+	// TODO(voss): In lookupTable.Header.LookupFlag,
+	// IGNORE_BASE_GLYPHS, IGNORE_LIGATURES, or IGNORE_MARKS refer to
+	// base glyphs, ligatures and marks as defined in the Glyph Class
+	// Definition Table in the GDEF table.  If any of these flags are
+	// set, a Glyph Class Definition Table must be present. If any of
+	// these bits is set, then lookups must ignore glyphs of the
+	// respective type; that is, the other glyphs must be processed
+	// just as though these glyphs were not present.
+
+	res := make(map[font.GlyphPair]int)
+	for _, l := range allLookups {
+		if l.Tag != "kern" {
+			continue
 		}
-	}
-
-	xxx, err := GPOS.ReadFeatureInfo(fd, langTag, scriptTag)
-	if err != nil {
-		return nil, err
-	}
-
-	lookupBase := int64(GPOS.V10.LookupListOffset)
-	_, err = fd.Seek(lookupBase, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-	lookupList, err := table.ReadLookupList(fd)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, xx := range xxx { // TODO(voss): ...
-		for i, idx := range xx.LookupListIndices {
-			lookupTableBase := lookupBase + int64(lookupList.LookupOffsets[idx])
-			_, err = fd.Seek(lookupTableBase, io.SeekStart)
+		switch l.Type {
+		case 2:
+			pairPosTableBase := l.Pos
+			_, err = fd.Seek(pairPosTableBase, io.SeekStart)
 			if err != nil {
 				return nil, err
 			}
-
-			lookupTable, err := table.ReadLookup(fd)
+			var format uint16
+			err = binary.Read(fd, binary.BigEndian, &format)
 			if err != nil {
 				return nil, err
 			}
-			fmt.Printf("%s %3d: %v\n", xx.Tag, i, lookupTable)
+			switch format {
+			case 1: // lookup type 2, format 1
+				fmt.Println("  - PairPosFormat1 Subtable")
+				pairPos, err := table.ReadPairPosFormat1(fd)
+				if err != nil {
+					return nil, err
+				}
 
-			switch lookupTable.Header.LookupType {
-			case 2:
-				for _, offs := range lookupTable.SubtableOffsets {
-					pairPosTableBase := lookupTableBase + int64(offs)
-					_, err = fd.Seek(pairPosTableBase, io.SeekStart)
+				_, err = fd.Seek(pairPosTableBase+int64(pairPos.Header.CoverageOffset),
+					io.SeekStart)
+				if err != nil {
+					return nil, err
+				}
+				coverage, err := table.ReadCoverage(fd)
+				if err != nil {
+					return nil, err
+				}
+				if len(coverage) != int(pairPos.Header.PairSetCount) {
+					return nil, errors.New("GPOS/PairPos1: corrupted PairPos table")
+				}
+
+				for k, offs := range pairPos.PairSetOffsets {
+					_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
 					if err != nil {
 						return nil, err
 					}
-					var format uint16
-					err = binary.Read(fd, binary.BigEndian, &format)
+					x, err := table.ReadPairSet(fd,
+						pairPos.Header.ValueFormat1,
+						pairPos.Header.ValueFormat2)
 					if err != nil {
 						return nil, err
 					}
-					switch format {
-					case 1: // lookup type 2, format 1
-						fmt.Println("  - PairPosFormat1 Subtable")
-						pairPos, err := table.ReadPairPosFormat1(fd)
-						if err != nil {
-							return nil, err
-						}
-
-						_, err = fd.Seek(pairPosTableBase+int64(pairPos.Header.CoverageOffset),
-							io.SeekStart)
-						if err != nil {
-							return nil, err
-						}
-						coverage, err := table.ReadCoverage(fd)
-						if err != nil {
-							return nil, err
-						}
-						if len(coverage) != int(pairPos.Header.PairSetCount) {
-							return nil, errors.New("corrupted PairPos table")
-						}
-
-						for k, offs := range pairPos.PairSetOffsets {
-							_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
-							if err != nil {
-								return nil, err
-							}
-							x, err := table.ReadPairSet(fd,
-								pairPos.Header.ValueFormat1,
-								pairPos.Header.ValueFormat2)
-							if err != nil {
-								return nil, err
-							}
-							fmt.Println("      -", coverage[k], x)
-						}
-					case 2: // lookup type 2, format 2
-						fmt.Println("  - PairPosFormat2 Subtable")
-						pairPos, err := table.ReadPairPosFormat2(fd)
-						if err != nil {
-							return nil, err
-						}
-
-						_, err = fd.Seek(pairPosTableBase+int64(pairPos.Header.CoverageOffset),
-							io.SeekStart)
-						if err != nil {
-							return nil, err
-						}
-						firstGlyphs, err := table.ReadCoverage(fd)
-						if err != nil {
-							return nil, err
-						}
-
-						offs := pairPos.Header.ClassDef1Offset
-						_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
-						if err != nil {
-							return nil, err
-						}
-						classDef1, err := readClassDefTable(fd)
-						if err != nil {
-							return nil, err
-						}
-
-						offs = pairPos.Header.ClassDef2Offset
-						_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
-						if err != nil {
-							return nil, err
-						}
-						classDef2, err := readClassDefTable(fd)
-						if err != nil {
-							return nil, err
-						}
-
-						for _, idx1 := range firstGlyphs {
-							for idx2 := 0; idx2 < tt.NumGlyphs; idx2++ {
-								c1 := classDef1[font.GlyphIndex(idx1)]
-								c2 := classDef2[font.GlyphIndex(idx2)]
-								k := c1*pairPos.Header.Class2Count + c2
-								if int(k) >= len(pairPos.Records) {
-									return nil, errors.New("corrupt font")
-								}
-								rec := pairPos.Records[k]
-								if rec.ValueRecord1 == nil || rec.ValueRecord1.XAdvance == 0 {
-									continue
-								}
-								fmt.Println(idx1, idx2, rec)
-							}
-						}
-					default:
-						fmt.Printf("  - unknown subtable type %d\n", format)
+					// fmt.Println("      -", coverage[k], x)
+					a := font.GlyphIndex(coverage[k])
+					for _, xi := range x.PairValueRecords {
+						b := font.GlyphIndex(xi.SecondGlyph)
+						// TODO(voss): scale this correctly
+						d := int(float64(xi.ValueRecord1.XAdvance)*q + 0.5)
+						res[font.GlyphPair{a, b}] = d
 					}
 				}
+			case 2: // lookup type 2, format 2
+				fmt.Println("  - PairPosFormat2 Subtable")
+				pairPos, err := table.ReadPairPosFormat2(fd)
+				if err != nil {
+					return nil, err
+				}
+
+				_, err = fd.Seek(pairPosTableBase+int64(pairPos.Header.CoverageOffset),
+					io.SeekStart)
+				if err != nil {
+					return nil, err
+				}
+				firstGlyphs, err := table.ReadCoverage(fd)
+				if err != nil {
+					return nil, err
+				}
+
+				offs := pairPos.Header.ClassDef1Offset
+				_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
+				if err != nil {
+					return nil, err
+				}
+				classDef1, err := readClassDefTable(fd)
+				if err != nil {
+					return nil, err
+				}
+
+				offs = pairPos.Header.ClassDef2Offset
+				_, err = fd.Seek(pairPosTableBase+int64(offs), io.SeekStart)
+				if err != nil {
+					return nil, err
+				}
+				classDef2, err := readClassDefTable(fd)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, idx1 := range firstGlyphs {
+					for idx2 := 0; idx2 < tt.NumGlyphs; idx2++ {
+						c1 := classDef1[font.GlyphIndex(idx1)]
+						c2 := classDef2[font.GlyphIndex(idx2)]
+						k := c1*pairPos.Header.Class2Count + c2
+						if int(k) >= len(pairPos.Records) {
+							return nil, errors.New("GPOS/PairPos2: corrupt font")
+						}
+						rec := pairPos.Records[k]
+						if rec.ValueRecord1 == nil || rec.ValueRecord1.XAdvance == 0 {
+							continue
+						}
+						// fmt.Println(idx1, idx2, rec)
+						a := font.GlyphIndex(idx1)
+						b := font.GlyphIndex(idx2)
+						d := int(float64(rec.ValueRecord1.XAdvance)*q + 0.5)
+						res[font.GlyphPair{a, b}] = d
+					}
+				}
+			default:
+				fmt.Printf("  - unknown subtable format %d\n", format)
 			}
+		default:
+			fmt.Printf("  - unknown lookup type %d\n", l.Type)
 		}
 	}
 
-	return GPOS, nil
+	return res, nil
 }

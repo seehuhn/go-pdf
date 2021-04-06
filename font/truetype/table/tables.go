@@ -427,6 +427,21 @@ func ReadLookup(r io.Reader) (*Lookup, error) {
 	return res, nil
 }
 
+type ExtensionPosFormat1 struct {
+	PosFormat           uint16 // Format identifier: format = 1
+	ExtensionLookupType uint16 // Lookup type of subtable referenced by extensionOffset (i.e. the extension subtable).
+	ExtensionOffset     uint32 // Offset to the extension subtable, of lookup type extensionLookupType, relative to the start of the ExtensionPosFormat1 subtable.
+}
+
+func ReadExtensionPos1(r io.Reader) (*ExtensionPosFormat1, error) {
+	res := &ExtensionPosFormat1{}
+	err := binary.Read(r, binary.BigEndian, res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 type Coverage []uint16
 
 func ReadCoverage(r io.Reader) (Coverage, error) {
