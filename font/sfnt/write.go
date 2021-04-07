@@ -1,4 +1,20 @@
-package truetype
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package sfnt
 
 import (
 	"bytes"
@@ -8,10 +24,12 @@ import (
 	"sort"
 	"time"
 
-	"seehuhn.de/go/pdf/font/truetype/table"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
-func (tt *Font) export(w io.Writer, include func(string) bool) (int64, error) {
+// Export writes the font to the io.Writer w.  The include argument can be used
+// to select a subset of tables.
+func (tt *Font) Export(w io.Writer, include func(string) bool) (int64, error) {
 	// Fix the order of tables in the body of the files.
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
 	var names []string
@@ -48,7 +66,7 @@ func (tt *Font) export(w io.Writer, include func(string) bool) (int64, error) {
 
 	// generate the new "head" table
 	headTable := &table.Head{}
-	*headTable = *tt.head
+	*headTable = *tt.Head
 	headTable.CheckSumAdjustment = 0
 	ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
 	headTable.Modified = int64(time.Since(ttZeroTime).Seconds())

@@ -18,18 +18,28 @@ package pdf
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 )
 
 var (
-	// ErrNoAuth indicates that authentication failed because the
-	// correct password was not supplied.
-	ErrNoAuth = errors.New("authentication failed")
-
 	errVersion   = errors.New("unsupported PDF version")
 	errCorrupted = errors.New("corrupted ciphertext")
 	errNoDate    = errors.New("not a valid date string")
 )
+
+// AuthenticationError indicates that authentication failed because the correct
+// password has not been supplied.
+type AuthenticationError struct {
+	ID []byte
+}
+
+func (err *AuthenticationError) Error() string {
+	if err.ID == nil {
+		return "authentication failed"
+	}
+	return fmt.Sprintf("authentication failed for document ID %x", err.ID)
+}
 
 // MalformedFileError indicates that the PDF file could not be parsed.
 type MalformedFileError struct {
@@ -56,11 +66,11 @@ func (err *MalformedFileError) Unwrap() error {
 // VersionError is returned when trying to use a feature in a PDF file which is
 // not supported by the PDF version used.
 type VersionError struct {
-	Earliest  Version
 	Operation string
+	Earliest  Version
 }
 
 func (err *VersionError) Error() string {
 	return (err.Operation + " requires PDF version " +
-		err.Earliest.String() + " or newer")
+		err.Earliest.String() + " or later")
 }

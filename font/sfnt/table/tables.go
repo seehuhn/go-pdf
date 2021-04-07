@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package table
 
 import (
@@ -24,12 +40,50 @@ type Offsets struct {
 	RangeShift    uint16
 }
 
-// A Record is part of the Header.  It contains data about a single sfnt table.
+// A Record is part of the file Header.  It contains data about a single sfnt
+// table.
 type Record struct {
 	Tag      Tag
 	CheckSum uint32
 	Offset   uint32
 	Length   uint32
+}
+
+// ReadHeader reads the file header of an sfnt font file.
+func ReadHeader(r io.Reader) (*Header, error) {
+	res := &Header{}
+	err := binary.Read(r, binary.BigEndian, &res.Offsets)
+	if err != nil {
+		return nil, err
+	}
+
+	scalerType := res.Offsets.ScalerType
+	if scalerType != 0x00010000 && scalerType != 0x4F54544F {
+		return nil, fmt.Errorf("unsupported sfnt type 0x%8X", scalerType)
+	}
+	if res.Offsets.NumTables > 280 {
+		// the largest value observed on my laptop is 28
+		return nil, errors.New("too many sfnt tables in font")
+	}
+
+	res.Records = make([]Record, res.Offsets.NumTables)
+	err = binary.Read(r, binary.BigEndian, &res.Records)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+// Find returns the table record for the table with the given name.
+// If no such table exists, nil is returned.
+func (h *Header) Find(name string) *Record {
+	for i := 0; i < int(h.Offsets.NumTables); i++ {
+		if h.Records[i].Tag.String() == name {
+			return &h.Records[i]
+		}
+	}
+	return nil
 }
 
 // ReadTableHead can be used to read the initial, fixed-size portion of a sfnt
@@ -52,15 +106,49 @@ func (h *Header) ReadTableHead(r io.ReaderAt, name string, head interface{}) (*i
 	return tableFd, nil
 }
 
-// Find returns the table record for the table with the given name.
-// If no such table exists, nil is returned.
-func (h *Header) Find(name string) *Record {
-	for i := 0; i < int(h.Offsets.NumTables); i++ {
-		if string(h.Records[i].Tag[:]) == name {
-			return &h.Records[i]
-		}
-	}
-	return nil
+type Head struct {
+	Version            uint32 // 0x00010000 = version 1.0
+	FontRevision       uint32 // set by font manufacturer
+	CheckSumAdjustment uint32
+	MagicNumber        uint32 // set to 0x5F0F3CF5
+	Flags              uint16 //
+	// bit 0 - y value of 0 specifies baseline
+	// bit 1 - x position of left most black bit is LSB
+	// bit 2 - scaled point size and actual point size will differ (i.e. 24 point glyph differs from 12 point glyph scaled by factor of 2)
+	// bit 3 - use integer scaling instead of fractional
+	// bit 4 - (used by the Microsoft implementation of the TrueType scaler)
+	// bit 5 - This bit should be set in fonts that are intended to e laid out vertically, and in which the glyphs have been drawn such that an x-coordinate of 0 corresponds to the desired vertical baseline.
+	// bit 6 - This bit must be set to zero.
+	// bit 7 - This bit should be set if the font requires layout for correct linguistic rendering (e.g. Arabic fonts).
+	// bit 8 - This bit should be set for an AAT font which has one or more metamorphosis effects designated as happening by default.
+	// bit 9 - This bit should be set if the font contains any strong right-to-left glyphs.
+	// bit 10 - This bit should be set if the font contains Indic-style rearrangement effects.
+	// bits 11-13 - Defined by Adobe.
+	// bit 14 - This bit should be set if the glyphs in the font are simply generic symbols for code point ranges, such as for a last resort font.
+	UnitsPerEm uint16 // range from 64 to 16384
+	Created    int64  // international date
+	Modified   int64  // international date
+	XMin       int16  // for all glyph bounding boxes
+	YMin       int16  // for all glyph bounding boxes
+	XMax       int16  // for all glyph bounding boxes
+	YMax       int16  // for all glyph bounding boxes
+	MacStyle   uint16
+	// bit 0 bold
+	// bit 1 italic
+	// bit 2 underline
+	// bit 3 outline
+	// bit 4 shadow
+	// bit 5 condensed (narrow)
+	// bit 6 extended
+	LowestRecPPEM     uint16 //	smallest readable size in pixels
+	FontDirectionHint int16
+	// 0 Mixed directional glyphs
+	// 1 Only strongly left to right glyphs
+	// 2 Like 1 but also contains neutrals
+	// -1 Only strongly right to left glyphs
+	// -2 Like -1 but also contains neutrals
+	IndexToLocFormat int16 // 0 for short offsets, 1 for long
+	GlyphDataFormat  int16 // 0 for current format
 }
 
 type MaxpHead struct {
@@ -125,51 +213,6 @@ type PostInfo struct {
 	UnderlinePosition  int16
 	UnderlineThickness int16
 	IsFixedPitch       bool
-}
-
-type Head struct {
-	Version            uint32 // 0x00010000 = version 1.0
-	FontRevision       uint32 // set by font manufacturer
-	CheckSumAdjustment uint32
-	MagicNumber        uint32 // set to 0x5F0F3CF5
-	Flags              uint16 //
-	// bit 0 - y value of 0 specifies baseline
-	// bit 1 - x position of left most black bit is LSB
-	// bit 2 - scaled point size and actual point size will differ (i.e. 24 point glyph differs from 12 point glyph scaled by factor of 2)
-	// bit 3 - use integer scaling instead of fractional
-	// bit 4 - (used by the Microsoft implementation of the TrueType scaler)
-	// bit 5 - This bit should be set in fonts that are intended to e laid out vertically, and in which the glyphs have been drawn such that an x-coordinate of 0 corresponds to the desired vertical baseline.
-	// bit 6 - This bit must be set to zero.
-	// bit 7 - This bit should be set if the font requires layout for correct linguistic rendering (e.g. Arabic fonts).
-	// bit 8 - This bit should be set for an AAT font which has one or more metamorphosis effects designated as happening by default.
-	// bit 9 - This bit should be set if the font contains any strong right-to-left glyphs.
-	// bit 10 - This bit should be set if the font contains Indic-style rearrangement effects.
-	// bits 11-13 - Defined by Adobe.
-	// bit 14 - This bit should be set if the glyphs in the font are simply generic symbols for code point ranges, such as for a last resort font.
-	UnitsPerEm uint16 // range from 64 to 16384
-	Created    int64  // international date
-	Modified   int64  // international date
-	XMin       int16  // for all glyph bounding boxes
-	YMin       int16  // for all glyph bounding boxes
-	XMax       int16  // for all glyph bounding boxes
-	YMax       int16  // for all glyph bounding boxes
-	MacStyle   uint16
-	// bit 0 bold
-	// bit 1 italic
-	// bit 2 underline
-	// bit 3 outline
-	// bit 4 shadow
-	// bit 5 condensed (narrow)
-	// bit 6 extended
-	LowestRecPPEM     uint16 //	smallest readable size in pixels
-	FontDirectionHint int16
-	// 0 Mixed directional glyphs
-	// 1 Only strongly left to right glyphs
-	// 2 Like 1 but also contains neutrals
-	// -1 Only strongly right to left glyphs
-	// -2 Like -1 but also contains neutrals
-	IndexToLocFormat int16 // 0 for short offsets, 1 for long
-	GlyphDataFormat  int16 // 0 for current format
 }
 
 type Hhea struct {

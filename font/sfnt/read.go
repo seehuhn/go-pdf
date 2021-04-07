@@ -1,4 +1,20 @@
-package truetype
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package sfnt
 
 import (
 	"encoding/binary"
@@ -9,7 +25,7 @@ import (
 	"unicode"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/truetype/table"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 // TODO(voss): add better protections against malicious font files
@@ -210,7 +226,12 @@ func (tt *Font) load(fd *io.SectionReader, table *table.CmapRecord, i2r func(int
 	return cmap, nil
 }
 
-func (tt *Font) getFontName() (string, error) {
+func (tt *Font) GetFontName() (string, error) {
+	// TODO(voss): if FontName == "", invent a name: The name must be no
+	// longer than 63 characters and restricted to the printable ASCII
+	// subset, codes 33 to 126, except for the 10 characters '[', ']', '(',
+	// ')', '{', '}', '<', '>', '/', '%'.
+
 	nameHeader := &table.NameHeader{}
 	nameFd, err := tt.Header.ReadTableHead(tt.Fd, "name", nameHeader)
 	if err != nil {
@@ -267,7 +288,7 @@ func (tt *Font) getFontName() (string, error) {
 	return "", errors.New("no usable font name found")
 }
 
-func (tt *Font) getPostInfo() (*table.PostInfo, error) {
+func (tt *Font) GetPostInfo() (*table.PostInfo, error) {
 	postHeader := &table.PostHeader{}
 	_, err := tt.Header.ReadTableHead(tt.Fd, "post", postHeader)
 	if err != nil {
@@ -287,7 +308,7 @@ func (tt *Font) getPostInfo() (*table.PostInfo, error) {
 	return res, nil
 }
 
-func (tt *Font) getHeadInfo() (*table.Head, error) {
+func (tt *Font) readHeadTable() (*table.Head, error) {
 	head := &table.Head{}
 	_, err := tt.Header.ReadTableHead(tt.Fd, "head", head)
 	if err != nil {
@@ -300,7 +321,7 @@ func (tt *Font) getHeadInfo() (*table.Head, error) {
 	return head, nil
 }
 
-func (tt *Font) getHHeaInfo() (*table.Hhea, error) {
+func (tt *Font) GetHHeaInfo() (*table.Hhea, error) {
 	hhea := &table.Hhea{}
 	_, err := tt.Header.ReadTableHead(tt.Fd, "hhea", hhea)
 	if err != nil {
@@ -309,7 +330,7 @@ func (tt *Font) getHHeaInfo() (*table.Hhea, error) {
 	return hhea, nil
 }
 
-func (tt *Font) getHMtxInfo(NumOfLongHorMetrics uint16) (*table.Hmtx, error) {
+func (tt *Font) GetHMtxInfo(NumOfLongHorMetrics uint16) (*table.Hmtx, error) {
 	hmtx := &table.Hmtx{
 		HMetrics:        make([]table.LongHorMetric, NumOfLongHorMetrics),
 		LeftSideBearing: make([]int16, tt.NumGlyphs-int(NumOfLongHorMetrics)),
@@ -325,7 +346,7 @@ func (tt *Font) getHMtxInfo(NumOfLongHorMetrics uint16) (*table.Hmtx, error) {
 	return hmtx, nil
 }
 
-func (tt *Font) getOS2Info() (*table.OS2, error) {
+func (tt *Font) GetOS2Info() (*table.OS2, error) {
 	os2 := &table.OS2{}
 	os2Fd, err := tt.Header.ReadTableHead(tt.Fd, "OS/2", &os2.V0)
 	if err != nil {
@@ -361,9 +382,9 @@ func (tt *Font) getOS2Info() (*table.OS2, error) {
 }
 
 // read kerning information from the "kern" table
-func (tt *Font) readKernInfo() (map[font.GlyphPair]int, error) {
+func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.head.UnitsPerEm)
+	q := 1000 / float64(tt.Head.UnitsPerEm)
 
 	var Header struct {
 		Version   uint16
@@ -419,10 +440,10 @@ func (tt *Font) readKernInfo() (map[font.GlyphPair]int, error) {
 	return kerning, nil
 }
 
-func (tt *Font) getGlyfInfo() (*table.Glyf, error) {
+func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
 	var err error
 	offset := make([]uint32, tt.NumGlyphs+1)
-	if tt.head.IndexToLocFormat == 0 {
+	if tt.Head.IndexToLocFormat == 0 {
 		short := make([]uint16, tt.NumGlyphs+1)
 		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", short)
 		for i, x := range short {
@@ -608,16 +629,16 @@ func (tt *Font) readGposLookups(langTag, scriptTag string) (*io.SectionReader, [
 	return fd, allLookups, nil
 }
 
-// readGposKernInfo reads kerning information from the "GPOS" table.
+// ReadGposKernInfo reads kerning information from the "GPOS" table.
 //
 // A list of OpenType language tags is here:
 // https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
 //
 // A list of OpenType script tags is here:
 // https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
-func (tt *Font) readGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
+func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
 	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.head.UnitsPerEm)
+	q := 1000 / float64(tt.Head.UnitsPerEm)
 
 	fd, allLookups, err := tt.readGposLookups(langTag, scriptTag)
 	if err != nil {

@@ -27,7 +27,6 @@ import (
 )
 
 const (
-	fontName = "Times-Roman"
 	fontSize = 48.0
 )
 
@@ -37,7 +36,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		subset[r] = true
 	}
 
-	// F1, err := builtin.Embed(out, "F1", fontName, subset)
+	// F1, err := builtin.Embed(out, "F1", "Times-Roman", subset)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/FreeSerif.ttf", subset)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/Roboto-Regular.ttf", subset)
 	F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", subset)

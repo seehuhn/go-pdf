@@ -14,33 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cmap
+package table
 
-import (
-	"testing"
-)
-
-func TestFormatString(t *testing.T) {
-	s, err := formatPDFString("abc", []byte{'d', 'e'}, 'f', 2)
-	if err != nil {
-		t.Error(err)
-	} else if s != "(abcdef2)" {
-		t.Errorf("wrong result %q", s)
-	}
-
-	s, err = formatPDFString("x", 1.2)
-	if err == nil {
-		t.Error("missing error")
-	} else if s != "" {
-		t.Error("wrong string with error")
-	}
+// ErrNoTable indicates that a required table is missing from a TrueType or
+// OpenType font file.
+type ErrNoTable struct {
+	Name string
 }
 
-func TestFormatName(t *testing.T) {
-	name, err := formatPDFName("abc")
-	if err != nil {
-		t.Error(err)
-	} else if name != "/abc" {
-		t.Errorf("wrong result %q", name)
-	}
+func (err *ErrNoTable) Error() string {
+	return "missing " + err.Name + " table in font"
+}
+
+// IsMissing returns true, if err indicates a missing sfnt table.
+func IsMissing(err error) bool {
+	_, missing := err.(*ErrNoTable)
+	return missing
 }

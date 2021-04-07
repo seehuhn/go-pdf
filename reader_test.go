@@ -63,7 +63,7 @@ func TestAuthentication(t *testing.T) {
 				pwdList = append(pwdList, "don't know", "user")
 			}
 			pwdList = append(pwdList, "friend", "owner")
-			pwdFunc := func() string {
+			pwdFunc := func([]byte, int) string {
 				res := pwdList[0]
 				pwdList = pwdList[1:]
 				return res

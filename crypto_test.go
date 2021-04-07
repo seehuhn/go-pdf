@@ -67,15 +67,15 @@ func TestAuth(t *testing.T) {
 			{"wrong", test.owner},
 		}
 		for j, pwds := range trials {
-			sec := createStdSecHandler([]byte("0123456789ABCDEF"),
-				test.user, test.owner, PermModify, 4)
+			id := []byte("0123456789ABCDEF")
+			sec := createStdSecHandler(id, test.user, test.owner, PermModify, 4)
 			key := sec.key
 
 			sec.deauthenticate()
 
 			pwdPos := -1
 			lastPwd := ""
-			sec.readPwd = func() string {
+			sec.readPwd = func([]byte, int) string {
 				candidate := ""
 				pwdPos++
 				if pwdPos < len(pwds) {
@@ -86,13 +86,13 @@ func TestAuth(t *testing.T) {
 			}
 
 			computedKey, err := sec.GetKey(false)
-			if err != nil && err != ErrNoAuth {
+			if _, authErr := err.(*AuthenticationError); err != nil && !authErr {
 				t.Errorf("wrong error: %s", err)
 				continue
 			}
 			if test.user != "" && len(pwds) < 2 {
 				// need password, and only the wrong one supplied
-				if err != ErrNoAuth {
+				if _, authErr := err.(*AuthenticationError); !authErr {
 					t.Error("wrong password not detected")
 				} else if pwdPos < len(pwds) {
 					t.Error("not all passwords tried")

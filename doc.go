@@ -54,7 +54,7 @@
 //         log.Fatal(err)
 //     }
 //
-// The following classes implement native PDF objects.
+// The following classes implement the native PDF object types.
 // All of these implement the `pdf.Object` interface:
 //
 //     Array

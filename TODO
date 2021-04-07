@@ -3,10 +3,12 @@
 - make sure that supporting incremental updates to PDF files will not require
   major changes to the API
 
-- check whether any dependencies use "fmt", and if not, try to not use "fmt"
+- implement LZWDecode filters
+- implement CCITTFaxDecode filters
+- implement public key encryption?
 - implement crypt filters?
-- attempt to add pdf-2.0 support?
 - add a way to repair broken xref tables?
+- attempt to add pdf-2.0 support?
 
 - https://pkg.go.dev/rsc.io/pdf
 - https://github.com/pdfcpu/pdfcpu

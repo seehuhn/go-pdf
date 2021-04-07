@@ -36,7 +36,7 @@ type encryptInfo struct {
 	eff  *cryptFilter
 }
 
-func (r *Reader) parseEncryptDict(encObj Object, readPwd func() string) (*encryptInfo, error) {
+func (r *Reader) parseEncryptDict(encObj Object, readPwd ReadPwdFunc) (*encryptInfo, error) {
 	enc, err := r.getDict(encObj)
 	if err != nil {
 		return nil, err
@@ -369,7 +369,7 @@ type stdSecHandler struct {
 	u        []byte
 	KeyBytes int
 
-	readPwd func() string
+	readPwd ReadPwdFunc
 	key     []byte
 
 	// We use the negation of /EncryptMetadata from the PDF spec, so that
@@ -383,7 +383,7 @@ type stdSecHandler struct {
 	OwnerAuthenticated bool
 }
 
-func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func() string) (*stdSecHandler, error) {
+func openStdSecHandler(enc Dict, length int, ID []byte, readPwd ReadPwdFunc) (*stdSecHandler, error) {
 	R, ok := enc["R"].(Integer)
 	if !ok || R < 2 || R > 4 {
 		return nil, errors.New("invalid Encrypt.R")
@@ -473,6 +473,7 @@ func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 	u := make([]byte, 32)
 
 	passwd := ""
+	passWdTry := 0
 	for {
 		for try := 0; try < 2; try++ {
 			// try == 0: check whether passwd is the owner password
@@ -533,12 +534,13 @@ func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 
 		// wrong password, try another one
 		if sec.readPwd != nil {
-			passwd = sec.readPwd()
+			passwd = sec.readPwd(sec.id, passWdTry)
+			passWdTry++
 		} else {
 			passwd = ""
 		}
 		if passwd == "" {
-			return nil, ErrNoAuth
+			return nil, &AuthenticationError{sec.id}
 		}
 	}
 }

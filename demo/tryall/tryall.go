@@ -22,9 +22,25 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 )
+
+var passwords = map[string]string{
+	"acac29b4192fd923c24fe6042479b2a9": "test",
+	"c13cb3f802bb2d44b74cb449d64665a7": "Arlo",
+	"ce78fac52b4b1c9ae79788e36217ca99": "EDIT",
+	"fa71d689cb967d41b249a20f14d5269d": "201206616",
+}
+
+func readPwd(ID []byte, try int) string {
+	if try != 0 {
+		return ""
+	}
+	hex := fmt.Sprintf("%x", ID)
+	return passwords[hex]
+}
 
 func getNames() <-chan string {
 	fd, err := os.Open(os.Args[1])
@@ -49,7 +65,15 @@ func getNames() <-chan string {
 }
 
 func doOneFile(fname string) error {
-	r, err := pdf.Open(fname)
+	fd, err := os.Open(fname)
+	if err != nil {
+		return err
+	}
+	fi, err := fd.Stat()
+	if err != nil {
+		return err
+	}
+	r, err := pdf.NewReader(fd, fi.Size(), readPwd)
 	if err != nil {
 		return err
 	}
@@ -64,30 +88,22 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		dict, ok := obj.(pdf.Dict)
-		if !ok || dict["Type"] != pdf.Name("Font") || dict["Subtype"] != pdf.Name("Type0") {
-			continue
+		if stm, ok := obj.(*pdf.Stream); ok {
+			ff, err := stm.Filters(r.Resolve)
+			if err != nil {
+				return err
+			}
+			if len(ff) > 0 {
+				var names []string
+				for _, info := range ff {
+					names = append(names, string(info.Name))
+				}
+				fmt.Println(strings.Join(names, "|"))
+			}
 		}
 
-		desc, err := r.Resolve(dict["DescendantFonts"])
-		if err != nil {
-			return err
-		}
-
-		descA, ok := desc.(pdf.Array)
-		if !ok || len(descA) != 1 {
-			continue
-		}
-
-		xxx, err := r.Resolve(descA[0])
-		if err != nil {
-			return err
-		}
-		xxxDict, ok := xxx.(pdf.Dict)
-		if !ok || xxxDict["Subtype"] != pdf.Name("CIDFontType2") {
-			continue
-		}
-		fmt.Println(ref, fname)
+		_ = obj
+		_ = ref
 	}
 
 	return nil

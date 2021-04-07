@@ -327,13 +327,14 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 }
 
 // WriteCompressed writes objects in a compressed object stream.
+// This function is only available for PDF version 1.5 and newer.
 func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Reference, error) {
-	if pdf.inStream {
-		return nil, errors.New("ObjectStream() while stream is open")
-	}
 	if err := pdf.checkVersion("using object streams", V1_5); err != nil {
-		// TODO(voss): write uncompressed objects instead.
 		return nil, err
+	}
+
+	if pdf.inStream {
+		return nil, errors.New("WriteCompressed while stream is open")
 	}
 
 	sRef := pdf.Alloc()
@@ -626,6 +627,11 @@ func (w *posWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// A Placeholder can be used to reserve space in a PDF file where some value
+// can be filled in later.  This is for example used to store the content
+// length of a compressed stream in the stream dictionary. Placeholer objects
+// are created using Writer.NewPlaceholder(). As soon as the value is known, it
+// can be filled in using the Set() method.
 type Placeholder struct {
 	value string
 	size  int
@@ -638,6 +644,10 @@ type Placeholder struct {
 	pos  []int64
 }
 
+// NewPlaceholder creates a new placeholder for a value which is not yet known.
+// The argument size must be an upper bound to the length of the replacement
+// text.  Once the value becomes known, it can be filled in using the Set()
+// method.
 func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
 	return &Placeholder{
 		size:  size,
@@ -646,7 +656,10 @@ func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
 	}
 }
 
+// PDF implements the Object interface.
 func (x *Placeholder) PDF(w io.Writer) error {
+	// method 1: If the value is already known, we can just write it to the
+	// file.
 	if x.value != "" {
 		_, err := w.Write([]byte(x.value))
 		return err
@@ -658,8 +671,8 @@ func (x *Placeholder) PDF(w io.Writer) error {
 	}
 	fill, ok := u.(io.WriteSeeker)
 	if ok {
-		// We can seek back: write a placeholder for now and fill in the actual
-		// value later.
+		// method 2: If we can seek back, write whitespace for now and fill in
+		// the actual value later.
 		pos, err := fill.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
@@ -673,7 +686,7 @@ func (x *Placeholder) PDF(w io.Writer) error {
 		return err
 	}
 
-	// We need to use an indirect reference.
+	// method 3: If all else fails, use an indirect reference.
 	if x.alloc == nil {
 		return errors.New("cannot seek to fill in placeholder")
 	}
@@ -688,6 +701,8 @@ func (x *Placeholder) PDF(w io.Writer) error {
 	return err
 }
 
+// Set fills in the value of the placeholder object.  This should be called
+// as soon as possible after the value becomes known.
 func (x *Placeholder) Set(val Object) error {
 	if x.ref != nil {
 		ref, err := x.write(val, x.ref)
@@ -701,7 +716,7 @@ func (x *Placeholder) Set(val Object) error {
 		return err
 	}
 	if buf.Len() > x.size {
-		return errors.New("too long replacement text")
+		return errors.New("Placeholder: replacement text too long")
 	}
 	x.value = buf.String()
 
