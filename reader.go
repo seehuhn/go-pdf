@@ -43,11 +43,20 @@ type Reader struct {
 	enc *encryptInfo
 }
 
+// ReadPwdFunc describes a function which can be used to query the user for a
+// password for the document with the given ID. The first call for each
+// authentication attempt has try == 0.  If the returned password was wrong,
+// the function is called again, repeatedly, with sequentially increasing
+// values of try.  If the ReadPwdFunc return the empty string, the
+// authentication attempt is aborted and an AuthenticationError is reported to
+// the caller.
+type ReadPwdFunc func(ID []byte, try int) string
+
 // NewReader creates a new Reader object.
 //
 // TODO(voss): should the readPwd method receive the document ID as an
 // argument?
-func NewReader(data io.ReaderAt, size int64, readPwd func() string) (*Reader, error) {
+func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, error) {
 	r := &Reader{
 		size:    size,
 		r:       data,

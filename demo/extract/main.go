@@ -31,15 +31,13 @@ func main() {
 	decode := flag.Bool("d", false, "decode streams")
 	flag.Parse()
 
-	var tryPasswd func() string
+	var tryPasswd func([]byte, int) string
 	if *passwd != "" {
-		tryPasswd = func() string {
-			var res string
-			if passwd != nil {
-				res = *passwd
-				passwd = nil
+		tryPasswd = func(_ []byte, try int) string {
+			if passwd != nil && try == 0 {
+				return *passwd
 			}
-			return res
+			return ""
 		}
 	}
 
