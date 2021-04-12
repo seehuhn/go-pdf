@@ -18,6 +18,7 @@ package sfnt
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -49,14 +50,23 @@ func Open(fname string) (*Font, error) {
 		return nil, err
 	}
 
-	tt := &Font{
-		Header: header,
-		Fd:     fd,
-	}
-
-	tt.Head, err = tt.readHeadTable()
+	head := &table.Head{}
+	_, err = header.ReadTableHead(fd, "head", head)
 	if err != nil {
 		return nil, err
+	}
+	if head.Version != 0x00010000 {
+		return nil, fmt.Errorf(
+			"sfnt/head: unsupported version 0x%08X", head.Version)
+	}
+	if head.MagicNumber != 0x5F0F3CF5 {
+		return nil, errors.New("sfnt/head: wrong magic number")
+	}
+
+	tt := &Font{
+		Fd:     fd,
+		Header: header,
+		Head:   head,
 	}
 
 	maxp, err := tt.getMaxpInfo()
@@ -106,8 +116,19 @@ func (tt *Font) IsOpenType() bool {
 	return false
 }
 
+// SelectCmap chooses one of the sub-tables of the cmap table and reads the
+// fonts character encoding from there.  If a full unicode mapping is found,
+// this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
+// If this fails, a legacy 1,0 record is used as a last resort.
 func (tt *Font) SelectCmap() (map[rune]font.GlyphIndex, error) {
-	cmapTable, cmapFd, err := tt.getCmapInfo()
+	rec := tt.Header.Find("cmap")
+	if rec == nil {
+		return nil, &table.ErrNoTable{Name: "cmap"}
+	}
+	cmapFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
+	_ = cmapFd
+
+	cmapTable, err := table.ReadCmapTable(cmapFd)
 	if err != nil {
 		return nil, err
 	}
@@ -131,17 +152,17 @@ func (tt *Font) SelectCmap() (map[rune]font.GlyphIndex, error) {
 	}
 
 	for _, cand := range candidates {
-		subTable := cmapTable.Find(cand.PlatformID, cand.EncodingID)
-		if subTable == nil {
+		encRec := cmapTable.Find(cand.PlatformID, cand.EncodingID)
+		if encRec == nil {
 			continue
 		}
 
-		cmap, err := tt.load(cmapFd, subTable, cand.IdxToRune)
+		cmap, err := encRec.LoadCmap(cmapFd, cand.IdxToRune)
 		if err != nil {
 			continue
 		}
 
 		return cmap, nil
 	}
-	return nil, errors.New("unsupported character encoding")
+	return nil, errors.New("sfnt/cmap: no supported character encoding found")
 }

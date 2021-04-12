@@ -105,7 +105,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	}
 
 	if opt.UserPassword != "" || opt.OwnerPassword != "" {
-		if err := pdf.checkVersion("encryption", V1_1); err != nil {
+		if err := pdf.CheckVersion("encryption", V1_1); err != nil {
 			return nil, err
 		}
 		if pdf.id == nil {
@@ -329,7 +329,7 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 // WriteCompressed writes objects in a compressed object stream.
 // This function is only available for PDF version 1.5 and newer.
 func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Reference, error) {
-	if err := pdf.checkVersion("using object streams", V1_5); err != nil {
+	if err := pdf.CheckVersion("using object streams", V1_5); err != nil {
 		return nil, err
 	}
 
@@ -744,7 +744,10 @@ func (x *Placeholder) Set(val Object) error {
 	return err
 }
 
-func (pdf *Writer) checkVersion(operation string, minVersion Version) error {
+// CheckVersion checks whether the PDF file being written has version
+// minVersion or later.  If the version is new enough, nil is returned.
+// Otherwise a VersionError for the given operation is returned.
+func (pdf *Writer) CheckVersion(operation string, minVersion Version) error {
 	if pdf.Version >= minVersion {
 		return nil
 	}

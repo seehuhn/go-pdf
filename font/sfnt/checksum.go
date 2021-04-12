@@ -21,7 +21,42 @@ import (
 	"io"
 )
 
-func checksum(r io.Reader, isHead bool) (uint32, error) {
+type check struct {
+	sum  uint32
+	buf  [4]byte
+	used int
+}
+
+func (s *check) Write(p []byte) (int, error) {
+	n := 0
+	buf := s.buf
+	for len(p) > 0 {
+		k := copy(buf[s.used:], p)
+		p = p[k:]
+		n += k
+		s.used += k
+
+		if s.used == 4 {
+			s.sum += binary.BigEndian.Uint32(buf[:])
+			s.used = 0
+		}
+	}
+	return n, nil
+}
+
+func (s *check) Sum() uint32 {
+	if s.used != 0 {
+		s.Write([]byte{0, 0, 0}[:4-s.used])
+	}
+	return s.sum
+}
+
+func (s *check) Reset() {
+	s.sum = 0
+	s.used = 0
+}
+
+func checksumOld(r io.Reader, isHead bool) (uint32, error) {
 	var sum uint32
 
 	buf := make([]byte, 256)
