@@ -5,6 +5,12 @@ https://github.com/googlefonts/fontbakery
 https://github.com/HinTak/Font-Validator
 
 
+Article about subsetting of fonts
+---------------------------------
+
+http://www.4real.gr/technical-documents-ttf-subset.html
+
+
 Pre-existing Font Packages for Go
 ---------------------------------
 

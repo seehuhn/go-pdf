@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"unicode"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/table"
@@ -41,189 +40,6 @@ func (tt *Font) getMaxpInfo() (*table.MaxpHead, error) {
 			strconv.FormatInt(int64(maxp.Version), 16))
 	}
 	return maxp, nil
-}
-
-func (tt *Font) getCmapInfo() (*table.Cmap, *io.SectionReader, error) {
-	cmap := &table.Cmap{}
-	cmapFd, err := tt.Header.ReadTableHead(tt.Fd, "cmap", &cmap.Header)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	cmap.EncodingRecords = make([]table.CmapRecord, cmap.Header.NumTables)
-	err = binary.Read(cmapFd, binary.BigEndian, cmap.EncodingRecords)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return cmap, cmapFd, nil
-}
-
-func (tt *Font) load(fd *io.SectionReader, table *table.CmapRecord, i2r func(int) rune) (map[rune]font.GlyphIndex, error) {
-	// The OpenType spec at
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
-	// documents the following cmap subtable formats:
-	//     Format 0: Byte encoding table
-	//     Format 2: High-byte mapping through table
-	//     Format 4: Segment mapping to delta values
-	//     Format 6: Trimmed table mapping
-	//     Format 8: mixed 16-bit and 32-bit coverage
-	//     Format 10: Trimmed array
-	//     Format 12: Segmented coverage
-	//     Format 13: Many-to-one range mappings
-	//     Format 14: Unicode Variation Sequences
-	// For the *.ttf and *.otf files on my system, I have found the
-	// following frequencies for these formats:
-	//
-	//     count | format
-	//     ------+-----------
-	//     21320 | Format 4
-	//      5747 | Format 6
-	//      3519 | Format 0
-	//      3225 | Format 12
-	//       143 | Format 2
-	//       107 | Format 14
-	//         4 | Format 13
-
-	_, err := fd.Seek(int64(table.SubtableOffset), io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-
-	var format uint16
-	err = binary.Read(fd, binary.BigEndian, &format)
-	if err != nil {
-		return nil, err
-	}
-
-	info := fmt.Sprintf("PlatID = %d, EncID = %d, Fmt = %d: ",
-		table.PlatformID, table.EncodingID, format)
-
-	cmap := make(map[rune]font.GlyphIndex)
-
-	switch format {
-	case 4: // Segment mapping to delta values
-		type cmapFormat4 struct {
-			Length        uint16
-			Language      uint16
-			SegCountX2    uint16
-			SearchRange   uint16
-			EntrySelector uint16
-			RangeShift    uint16
-		}
-		data := &cmapFormat4{}
-		err = binary.Read(fd, binary.BigEndian, data)
-		if err != nil {
-			return nil, err
-		}
-		if data.SegCountX2%2 != 0 {
-			return nil, errors.New(info + "corrupted cmap subtable")
-		}
-		segCount := int(data.SegCountX2 / 2)
-		buf := make([]uint16, 4*segCount+1)
-		err = binary.Read(fd, binary.BigEndian, buf)
-		if err != nil {
-			return nil, err
-		}
-		startCode := buf[segCount+1 : 2*segCount+1]
-		endCode := buf[:segCount]
-		idDelta := buf[2*segCount+1 : 3*segCount+1]
-		idRangeOffset := buf[3*segCount+1 : 4*segCount+1]
-		glyphIDBase, err := fd.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return nil, err
-		}
-
-		for k := 0; k < segCount; k++ {
-			if idRangeOffset[k] == 0 {
-				delta := idDelta[k]
-				for idx := int(startCode[k]); idx <= int(endCode[k]); idx++ {
-					c := int(uint16(idx) + delta)
-					if c == 0 {
-						continue
-					}
-					if c >= tt.NumGlyphs {
-						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
-					}
-					r := i2r(idx)
-					if unicode.IsGraphic(r) {
-						cmap[r] = font.GlyphIndex(c)
-					}
-				}
-			} else {
-				d := int(idRangeOffset[k])/2 - (segCount - k)
-				if d < 0 {
-					return nil, errors.New(info + "corrupt cmap table")
-				}
-				tmp := make([]uint16, int(endCode[k]-startCode[k])+1)
-				_, err = fd.Seek(glyphIDBase+2*int64(d), io.SeekStart)
-				if err != nil {
-					return nil, err
-				}
-				err = binary.Read(fd, binary.BigEndian, tmp)
-				if err != nil {
-					return nil, err
-				}
-				for idx := int(startCode[k]); idx <= int(endCode[k]); idx++ {
-					c := int(tmp[int(idx)-int(startCode[k])])
-					if c == 0 {
-						continue
-					}
-					if c >= tt.NumGlyphs {
-						return nil, errors.New(info + "glyph index " + strconv.Itoa(c) + " out of range")
-					}
-					r := i2r(idx)
-					if unicode.IsGraphic(r) {
-						cmap[r] = font.GlyphIndex(c)
-					}
-				}
-			}
-		}
-
-	case 12: // Segmented coverage
-		type cmapFormat12 struct {
-			_         uint16 // reserved
-			Length    uint32
-			Language  uint32
-			NumGroups uint32
-		}
-		data := &cmapFormat12{}
-		err = binary.Read(fd, binary.BigEndian, data)
-		if err != nil {
-			return nil, err
-		}
-
-		type segment struct {
-			StartCharCode uint32 //	First character code in this group
-			EndCharCode   uint32 //	Last character code in this group
-			StartGlyphID  uint32 //	Glyph index corresponding to the starting character code
-		}
-		for i := 0; i < int(data.NumGroups); i++ {
-			seg := &segment{}
-			err = binary.Read(fd, binary.BigEndian, seg)
-			if err != nil {
-				return nil, err
-			}
-			if seg.EndCharCode < seg.StartCharCode || seg.EndCharCode > 0x10FFFF {
-				return nil, errors.New("invalid character code in font")
-			}
-
-			c := seg.StartGlyphID
-			for idx := int(seg.StartCharCode); idx <= int(seg.EndCharCode); idx++ {
-				r := i2r(idx)
-				if unicode.IsGraphic(r) {
-					cmap[r] = font.GlyphIndex(c)
-				}
-				c++
-			}
-		}
-
-	default:
-		return nil, errors.New(info + "unsupported cmap format " +
-			strconv.Itoa(int(format)))
-	}
-
-	return cmap, nil
 }
 
 func (tt *Font) GetFontName() (string, error) {
@@ -308,19 +124,6 @@ func (tt *Font) GetPostInfo() (*table.PostInfo, error) {
 	return res, nil
 }
 
-func (tt *Font) readHeadTable() (*table.Head, error) {
-	head := &table.Head{}
-	_, err := tt.Header.ReadTableHead(tt.Fd, "head", head)
-	if err != nil {
-		return nil, err
-	}
-	if head.MagicNumber != 0x5F0F3CF5 {
-		return nil, errors.New("wrong magic number")
-	}
-
-	return head, nil
-}
-
 func (tt *Font) GetHHeaInfo() (*table.Hhea, error) {
 	hhea := &table.Hhea{}
 	_, err := tt.Header.ReadTableHead(tt.Fd, "hhea", hhea)
@@ -381,7 +184,7 @@ func (tt *Font) GetOS2Info() (*table.OS2, error) {
 	return os2, nil
 }
 
-// read kerning information from the "kern" table
+// ReadKernInfo reads kerning information from the "kern" table.
 func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 	// factor for converting from TrueType FUnit to PDF glyph units
 	q := 1000 / float64(tt.Head.UnitsPerEm)
@@ -463,10 +266,9 @@ func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
 	if err != nil {
 		return nil, err
 	}
-	tableLen := tt.Header.Find("glyf").Length
 	for i := 0; i < tt.NumGlyphs; i++ {
 		offs := offset[i]
-		if offs >= tableLen {
+		if offs == offset[i+1] {
 			continue
 		}
 		_, err := glyfFd.Seek(int64(offs), io.SeekStart)

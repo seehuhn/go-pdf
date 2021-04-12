@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
+
+	"seehuhn.de/go/pdf/font"
 )
 
 // Header describes the start of a TrueType/OpenType file.  The structure
@@ -106,12 +109,15 @@ func (h *Header) ReadTableHead(r io.ReaderAt, name string, head interface{}) (*i
 	return tableFd, nil
 }
 
+// --------------------------------------------------------------------------
+
+// The Head table contains global information about a font.
 type Head struct {
 	Version            uint32 // 0x00010000 = version 1.0
 	FontRevision       uint32 // set by font manufacturer
 	CheckSumAdjustment uint32
 	MagicNumber        uint32 // set to 0x5F0F3CF5
-	Flags              uint16 //
+
 	// bit 0 - y value of 0 specifies baseline
 	// bit 1 - x position of left most black bit is LSB
 	// bit 2 - scaled point size and actual point size will differ (i.e. 24 point glyph differs from 12 point glyph scaled by factor of 2)
@@ -125,14 +131,20 @@ type Head struct {
 	// bit 10 - This bit should be set if the font contains Indic-style rearrangement effects.
 	// bits 11-13 - Defined by Adobe.
 	// bit 14 - This bit should be set if the glyphs in the font are simply generic symbols for code point ranges, such as for a last resort font.
+	Flags uint16
+
 	UnitsPerEm uint16 // range from 64 to 16384
-	Created    int64  // international date
-	Modified   int64  // international date
-	XMin       int16  // for all glyph bounding boxes
-	YMin       int16  // for all glyph bounding boxes
-	XMax       int16  // for all glyph bounding boxes
-	YMax       int16  // for all glyph bounding boxes
-	MacStyle   uint16
+
+	// Number of seconds since 12:00 midnight that started January 1st 1904 in
+	// GMT/UTC time zone.
+	Created  int64
+	Modified int64
+
+	XMin int16 // for all glyph bounding boxes
+	YMin int16 // for all glyph bounding boxes
+	XMax int16 // for all glyph bounding boxes
+	YMax int16 // for all glyph bounding boxes
+
 	// bit 0 bold
 	// bit 1 italic
 	// bit 2 underline
@@ -140,32 +152,57 @@ type Head struct {
 	// bit 4 shadow
 	// bit 5 condensed (narrow)
 	// bit 6 extended
-	LowestRecPPEM     uint16 //	smallest readable size in pixels
-	FontDirectionHint int16
+	MacStyle uint16
+
+	LowestRecPPEM uint16 //	smallest readable size in pixels
+
+	// Deprecated (Set to 2).
 	// 0 Mixed directional glyphs
 	// 1 Only strongly left to right glyphs
 	// 2 Like 1 but also contains neutrals
 	// -1 Only strongly right to left glyphs
 	// -2 Like -1 but also contains neutrals
+	FontDirectionHint int16
+
 	IndexToLocFormat int16 // 0 for short offsets, 1 for long
 	GlyphDataFormat  int16 // 0 for current format
 }
 
-type MaxpHead struct {
-	Version   int32  //	0x00005000 or 0x00010000
-	NumGlyphs uint16 //	the number of glyphs in the font
-}
+// --------------------------------------------------------------------------
 
+// Cmap is the Character To Glyph Index Mapping Table.
 type Cmap struct {
 	Header struct {
 		Version   uint16
 		NumTables uint16
 	}
-	EncodingRecords []CmapRecord
+	EncodingRecords []EncodingRecord
+}
+
+// ReadCmapTable reads the binary representation of a "cmap" table.
+func ReadCmapTable(r io.ReadSeeker) (*Cmap, error) {
+	cmap := &Cmap{}
+	err := binary.Read(r, binary.BigEndian, &cmap.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	if cmap.Header.NumTables > 100 {
+		// The largest number of cmap tables in the fonts on my laptop is 9.
+		return nil, errors.New("sfnt/cmap: too many encoding records")
+	}
+
+	cmap.EncodingRecords = make([]EncodingRecord, cmap.Header.NumTables)
+	err = binary.Read(r, binary.BigEndian, cmap.EncodingRecords)
+	if err != nil {
+		return nil, err
+	}
+
+	return cmap, nil
 }
 
 // Find locates an encoding record in the cmap table.
-func (ct *Cmap) Find(plat, enc uint16) *CmapRecord {
+func (ct *Cmap) Find(plat, enc uint16) *EncodingRecord {
 	for i := range ct.EncodingRecords {
 		table := &ct.EncodingRecords[i]
 		if table.PlatformID == plat && table.EncodingID == enc {
@@ -175,10 +212,224 @@ func (ct *Cmap) Find(plat, enc uint16) *CmapRecord {
 	return nil
 }
 
-type CmapRecord struct {
-	PlatformID     uint16
-	EncodingID     uint16
-	SubtableOffset uint32
+// An EncodingRecord specifies a particular encoding and the offset to the
+// subtable for the encoding.
+type EncodingRecord struct {
+	PlatformID     uint16 // Platform ID.
+	EncodingID     uint16 // Platform-specific encoding ID.
+	SubtableOffset uint32 // Byte offset from beginning of table to the subtable for this encoding.
+}
+
+type cmapFormat4 struct {
+	// Format uint16 omitted
+	Length        uint16
+	Language      uint16
+	SegCountX2    uint16
+	SearchRange   uint16
+	EntrySelector uint16
+	RangeShift    uint16
+}
+
+type cmapFormat12 struct {
+	// Format uint16 omitted
+	_         uint16 // reserved
+	Length    uint32
+	Language  uint32
+	NumGroups uint32
+}
+
+// used for cmap formats 8 and 12
+type sequentialMapGroup struct {
+	StartCharCode uint32 //	First character code in this group
+	EndCharCode   uint32 //	Last character code in this group
+	StartGlyphID  uint32 //	Glyph index corresponding to the starting character code
+}
+
+// LoadCmap reads a mapping from unicode runes to glyph indeces from a "cmap"
+// table encoding record.
+// The function does NOT check that glyph indices are valid.
+func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map[rune]font.GlyphIndex, error) {
+	// The OpenType spec at
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
+	// documents the following cmap subtable formats:
+	//
+	//     Format 0: Byte encoding table
+	//     Format 2: High-byte mapping through table
+	//     Format 4: Segment mapping to delta values
+	//     Format 6: Trimmed table mapping
+	//     Format 8: mixed 16-bit and 32-bit coverage
+	//     Format 10: Trimmed array
+	//     Format 12: Segmented coverage
+	//     Format 13: Many-to-one range mappings
+	//     Format 14: Unicode Variation Sequences
+	//
+	// For the *.ttf and *.otf files on my system, I have found the
+	// following frequencies for these formats:
+	//
+	//     count | format
+	//     ------+-----------
+	//     21320 | Format 4
+	//      5747 | Format 6
+	//      3519 | Format 0
+	//      3225 | Format 12
+	//       143 | Format 2
+	//       107 | Format 14
+	//         4 | Format 13
+
+	_, err := r.Seek(int64(encRec.SubtableOffset), io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
+	var format uint16
+	err = binary.Read(r, binary.BigEndian, &format)
+	if err != nil {
+		return nil, err
+	}
+
+	errPfx := fmt.Sprintf("sfnt/cmap/%d,%d,%d: ",
+		encRec.PlatformID, encRec.EncodingID, format)
+
+	cmap := make(map[rune]font.GlyphIndex)
+
+	switch format {
+	case 4: // Segment mapping to delta values
+		data := &cmapFormat4{}
+		err = binary.Read(r, binary.BigEndian, data)
+		if err != nil {
+			return nil, err
+		}
+
+		// Read endCode, reservedPad, startCode, idDelta, and idRangeOffsets.
+		// Since all of these are (arrays of) uint16 values, we just use a
+		// single read command.
+		if data.SegCountX2%2 != 0 {
+			return nil, errors.New(errPfx + "table corrupted")
+		}
+		segCount := int(data.SegCountX2 / 2)
+		if segCount > 100_000 {
+			// fonts on my system have up to around 10,000 segments
+			return nil, errors.New(errPfx + "too many segments")
+		}
+		buf := make([]uint16, 4*segCount+1)
+		err = binary.Read(r, binary.BigEndian, buf)
+		if err != nil {
+			return nil, err
+		}
+		endCode := buf[:segCount]
+		// reservedPad omitted
+		startCode := buf[segCount+1 : 2*segCount+1]
+		idDelta := buf[2*segCount+1 : 3*segCount+1]
+		idRangeOffset := buf[3*segCount+1 : 4*segCount+1]
+		glyphIDBase, err := r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
+
+		total := 0
+		for k := 0; k < segCount; k++ {
+			a := int(startCode[k])
+			b := int(endCode[k])
+			if b < a {
+				return nil, errors.New(errPfx + "table corrupted")
+			}
+			total += b - a + 1
+			if total > 500_000 {
+				// fonts on my system have up to around 50,000 mappings
+				return nil, errors.New(errPfx + "too many mappings")
+			}
+
+			if idRangeOffset[k] == 0 {
+				delta := idDelta[k]
+				for idx := a; idx <= b; idx++ {
+					c := int(uint16(idx) + delta)
+					if c == 0 {
+						continue
+					}
+					r := i2r(idx)
+					if unicode.IsGraphic(r) {
+						cmap[r] = font.GlyphIndex(c)
+					}
+				}
+			} else {
+				d := int(idRangeOffset[k])/2 - (segCount - k)
+				if d < 0 {
+					return nil, errors.New(errPfx + "table corrupted")
+				}
+				tmp := make([]uint16, b-a+1)
+				_, err = r.Seek(glyphIDBase+2*int64(d), io.SeekStart)
+				if err != nil {
+					return nil, err
+				}
+				err = binary.Read(r, binary.BigEndian, tmp)
+				if err != nil {
+					return nil, err
+				}
+				for idx := a; idx <= b; idx++ {
+					c := int(tmp[idx-a])
+					if c == 0 {
+						continue
+					}
+					r := i2r(idx)
+					if unicode.IsGraphic(r) {
+						cmap[r] = font.GlyphIndex(c)
+					}
+				}
+			}
+		}
+
+	case 12: // Segmented coverage
+		data := &cmapFormat12{}
+		err = binary.Read(r, binary.BigEndian, data)
+		if err != nil {
+			return nil, err
+		}
+		if data.NumGroups > 200_000 {
+			// fonts on my system have up to around 20,000 groups
+			return nil, errors.New(errPfx + "too many groups")
+		}
+
+		total := 0
+		for i := 0; i < int(data.NumGroups); i++ {
+			seg := &sequentialMapGroup{}
+			err = binary.Read(r, binary.BigEndian, seg)
+			if err != nil {
+				return nil, err
+			}
+
+			a := int(seg.StartCharCode)
+			b := int(seg.EndCharCode)
+			if b < a || b > 0x10FFFF {
+				return nil, errors.New(errPfx + "invalid character code")
+			}
+			total += b - a + 1
+			if total > 500_000 {
+				// fonts on my system have up to around 50,000 mappings
+				return nil, errors.New(errPfx + "too many mappings")
+			}
+
+			c := font.GlyphIndex(seg.StartGlyphID)
+			for idx := a; idx <= b; idx++ {
+				r := i2r(idx)
+				if unicode.IsGraphic(r) {
+					cmap[r] = c
+				}
+				c++
+			}
+		}
+
+	default:
+		return nil, fmt.Errorf("%sunsupported cmap format %d", errPfx, format)
+	}
+
+	return cmap, nil
+}
+
+// --------------------------------------------------------------------------
+
+type MaxpHead struct {
+	Version   int32  //	0x00005000 or 0x00010000
+	NumGlyphs uint16 //	the number of glyphs in the font
 }
 
 type NameHeader struct {

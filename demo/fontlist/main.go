@@ -21,26 +21,41 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"seehuhn.de/go/pdf/font/sfnt"
 )
 
 func tryFont(fname string) error {
 	tt, err := sfnt.Open(fname)
-	if err != nil && strings.Contains(err.Error(), "unsupported sfnt type") {
-		return nil
-	}
 	if err != nil {
 		return err
 	}
 	defer tt.Close()
 
-	ext := filepath.Ext(fname)
-	if ext == ".ttf" && tt.HasTables("CFF ") {
-		fmt.Println(fname)
-	}
+	// cmap, fd, err := tt.ReadCmapTable()
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, encRec := range cmap.EncodingRecords {
+	// 	_, err := fd.Seek(int64(encRec.SubtableOffset), io.SeekStart)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	var format uint16
+	// 	err = binary.Read(fd, binary.BigEndian, &format)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if format != 12 {
+	// 		continue
+	// 	}
+
+	// 	cmap, err := encRec.LoadCmap(fd, func(i int) rune { return rune(i) })
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	fmt.Println(len(cmap))
+	// }
 
 	return nil
 }

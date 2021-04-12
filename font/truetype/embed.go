@@ -26,6 +26,17 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
+// TrueType fonts with >255 glyphs (PDF 1.3)
+//   Type=Font, Subtype=Type0
+//   --DescendantFonts-> Type=Font, Subtype=CIDFontType2
+//   --FontDescriptor-> Type=FontDescriptor
+//   --FontFile2-> Length1=...
+
+// TrueType fonts with <255 glyphs (PDF 1.1)
+//   Type=Font, Subtype=TrueType
+//   --FontDescriptor-> Type=FontDescriptor
+//   --FontFile2-> Length1=...
+
 // Embed embeds a TrueType font into a pdf file.
 func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*font.Font, error) {
 	tt, err := sfnt.Open(fname)
@@ -38,10 +49,44 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 		return nil, errors.New("not a TrueType font")
 	}
 
-	// step 1: write a copy of the font file into the font stream.
+	// step 1: determine which glyphs to include
+	CMap, err := tt.SelectCmap()
+	if err != nil {
+		return nil, err
+	}
+	if subset != nil && !isSuperset(CMap, subset) {
+		var missing []rune
+		for r, ok := range subset {
+			if !ok {
+				continue
+			}
+			if CMap[r] == 0 {
+				missing = append(missing, r)
+			}
+		}
+		msg := fmt.Sprintf("missing glyphs: %q", string(missing))
+		return nil, errors.New(msg)
+	}
+	glyphs := []font.GlyphIndex{0} // always include the placeholder glyph
+	for r, idx := range CMap {
+		if subset == nil || subset[r] {
+			glyphs = append(glyphs, idx)
+		}
+	}
+	// TODO(voss): also include glyphs used for ligatures
+	// TODO(voss): subset the font as needed
+	// TODO(voss): if len(glyphs) < 256, write a Type 2 font.
+	// This will require synthesizing a new cmap table.
+
+	err = w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
+	if err != nil {
+		return nil, err
+	}
+
+	// step 2: write a copy of the font file into the font stream.
 	size := w.NewPlaceholder(10)
 	dict := pdf.Dict{
-		"Length1": size, // TODO(voss): do we need this? maybe only for type 2?
+		"Length1": size, // TODO(voss): maybe only needed for Subtype=TrueType?
 	}
 	opt := &pdf.StreamOptions{
 		Filters: []*pdf.FilterInfo{
@@ -52,15 +97,18 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	if err != nil {
 		return nil, err
 	}
-	n, err := tt.Export(stm, func(name string) bool {
-		// the list of tables to include is from PDF 32000-1:2008, table 126
-		switch name {
-		case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
-			return true
-		default:
-			return false
-		}
-	})
+	exOpt := &sfnt.ExportOptions{
+		Include: func(name string) bool {
+			// the list of tables to include is from PDF 32000-1:2008, table 126
+			switch name {
+			case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
+				return true
+			default:
+				return false
+			}
+		},
+	}
+	n, err := tt.Export(stm, exOpt)
 	if err != nil {
 		return nil, err
 	}
@@ -184,11 +232,6 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 		}
 	}
 
-	CMap, err := tt.SelectCmap()
-	if err != nil {
-		return nil, err
-	}
-
 	Kerning, err := tt.ReadKernInfo()
 	if table.IsMissing(err) {
 		// try to use GPOS instead
@@ -199,37 +242,6 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 		Kerning, err = tt.ReadGposKernInfo("DEU ", "latn") // TODO(voss): ...
 		if err != nil {
 			return nil, err
-		}
-	}
-
-	// determine the character set
-	if subset != nil && !isSuperset(CMap, subset) {
-		var missing []rune
-		for r, ok := range subset {
-			if !ok {
-				continue
-			}
-			if CMap[r] == 0 {
-				missing = append(missing, r)
-			}
-		}
-		msg := fmt.Sprintf("missing glyphs: %q", string(missing))
-		return nil, errors.New(msg)
-	}
-	glyphs := []font.GlyphIndex{0} // always include the placeholder glyph
-	for r, idx := range CMap {
-		if subset == nil || subset[r] {
-			glyphs = append(glyphs, idx)
-		}
-	}
-	// TODO(voss): use this for subsetting the font
-
-	// TODO(voss): if len(glyphs) < 256, write a Type 2 font.
-	// This will require synthesizing a new cmap table.
-	if w.Version < pdf.V1_3 {
-		return nil, &pdf.VersionError{
-			Earliest:  pdf.V1_2,
-			Operation: "use of TrueType-based CIDFonts",
 		}
 	}
 
@@ -247,7 +259,7 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	// TODO(voss): FontFlagAllCap
 	// TODO(voss): FontFlagSmallCap
 
-	// step 2: write the FontDescriptor dictionary
+	// step 3: write the FontDescriptor dictionary
 	FontDescriptor := pdf.Dict{
 		"Type":     pdf.Name("FontDescriptor"),
 		"FontName": pdf.Name(FontName),
@@ -323,12 +335,9 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 		xxx[c] = r
 	}
 	cmapInfo := &cmapInfo{
-		Name:       "Adobe-Identity-UCS",
-		Registry:   "Adobe",
-		Ordering:   "UCS",
-		Supplement: 0,
-		Chars:      []cidChar{},
-		Ranges:     []cidRange{},
+		Name:     "Adobe-Identity-UCS",
+		Registry: "Adobe",
+		Ordering: "UCS",
 	}
 	cmapInfo.FillRanges(xxx)
 	err = cMapTmpl.Execute(cmapStream, cmapInfo)

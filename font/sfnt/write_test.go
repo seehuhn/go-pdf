@@ -17,8 +17,13 @@
 package sfnt
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"testing"
+
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 func TestExport(t *testing.T) {
@@ -53,5 +58,78 @@ func TestExport(t *testing.T) {
 	}
 	if fi.Size() != n {
 		t.Errorf("wrong size: %d != %d", fi.Size(), n)
+	}
+}
+
+func TestWriteCmap(t *testing.T) {
+	cmap1 := make(map[rune]font.GlyphIndex)
+	for r := rune(32); r < 127; r++ {
+		cmap1[r] = font.GlyphIndex(r - 30)
+	}
+	cmap2 := make(map[rune]font.GlyphIndex)
+	for r := rune(32); r < 127; r++ {
+		cmap2[r] = font.GlyphIndex((r-32)*7/6 + 2)
+	}
+	cmap3 := make(map[rune]font.GlyphIndex)
+	for r := rune(32); r < 127; r++ {
+		cmap3[r] = font.GlyphIndex((r-32)*20/19 + 2)
+	}
+	cmap4 := make(map[rune]font.GlyphIndex)
+	for r := rune(32); r < 127; r++ {
+		if r < 40 {
+			cmap4[r] = font.GlyphIndex(2 + 2*r)
+		} else if r < 50 {
+			cmap4[r] = font.GlyphIndex(100 + r)
+		} else {
+			cmap4[r] = font.GlyphIndex(200 + 2*r)
+		}
+	}
+
+	for _, cmap := range []map[rune]font.GlyphIndex{
+		cmap1, cmap2, cmap3, cmap4,
+	} {
+		buf := &bytes.Buffer{}
+		enc, err := writeSimpleCmap(buf, cmap)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		fmt.Printf("% x\n", buf.Bytes())
+		fd := bytes.NewReader(buf.Bytes())
+		cmapTable, err := table.ReadCmapTable(fd)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		i2rMap := make(map[int]rune)
+		for r, idx := range cmap {
+			cc := enc(idx)
+			i2rMap[0xF000+int(cc[0])] = r
+		}
+		i2r := func(c int) rune { return i2rMap[c] }
+
+		encRec := cmapTable.Find(3, 0)
+		if encRec == nil {
+			t.Error("no 3,0 subtable found")
+			continue
+		}
+		out, err := encRec.LoadCmap(fd, i2r)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		if len(out) != len(cmap) {
+			t.Errorf("wrong cmap length: %d != %d", len(out), len(cmap))
+			continue
+		}
+		for r, idx := range out {
+			if cmap[r] != idx {
+				t.Errorf("wrong mapping: %04x -> %d != %d", r, idx, cmap[r])
+				continue
+			}
+		}
 	}
 }
