@@ -45,6 +45,10 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	}
 	defer tt.Close()
 
+	return EmbedFont(w, name, tt, subset)
+}
+
+func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) (*font.Font, error) {
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
 	}
@@ -64,26 +68,32 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 				missing = append(missing, r)
 			}
 		}
-		msg := fmt.Sprintf("missing glyphs: %q", string(missing))
-		return nil, errors.New(msg)
+		return nil, fmt.Errorf("missing glyphs: %q", string(missing))
 	}
-	glyphs := []font.GlyphIndex{0} // always include the placeholder glyph
+
+	var glyphs []font.GlyphIndex
+	glyphs = append(glyphs, 0) // always include the placeholder glyph
 	for r, idx := range CMap {
 		if subset == nil || subset[r] {
 			glyphs = append(glyphs, idx)
 		}
 	}
+
 	// TODO(voss): also include glyphs used for ligatures
+	_, err = tt.ReadGsubLigInfo("DEU ", "latn")
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO(voss): subset the font as needed
 	// TODO(voss): if len(glyphs) < 256, write a Type 2 font.
-	// This will require synthesizing a new cmap table.
 
 	err = w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
 
-	// step 2: write a copy of the font file into the font stream.
+	// step 2: store a copy of the font file in the font stream.
 	size := w.NewPlaceholder(10)
 	dict := pdf.Dict{
 		"Length1": size, // TODO(voss): maybe only needed for Subtype=TrueType?
@@ -232,17 +242,20 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 		}
 	}
 
-	Kerning, err := tt.ReadKernInfo()
-	if table.IsMissing(err) {
-		// try to use GPOS instead
-	} else if err != nil {
+	// TODO(voss): just use one of the tables
+	var Kerning map[font.GlyphPair]int
+	K1, err := tt.ReadGposKernInfo("DEU ", "latn") // TODO(voss): ...
+	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
-	if len(Kerning) == 0 {
-		Kerning, err = tt.ReadGposKernInfo("DEU ", "latn") // TODO(voss): ...
-		if err != nil {
-			return nil, err
-		}
+	K2, err := tt.ReadKernInfo()
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+	if len(K2) > len(K1) {
+		Kerning = K2
+	} else {
+		Kerning = K1
 	}
 
 	if postInfo.IsFixedPitch {

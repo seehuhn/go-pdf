@@ -98,16 +98,18 @@ func (tt *Font) HasTables(names ...string) bool {
 	return true
 }
 
-// IsTrueType checks whether all required tables for a TrueType font are
+// IsTrueType checks whether the tables required for a TrueType font are
 // present.
 func (tt *Font) IsTrueType() bool {
-	return tt.HasTables("cmap", "glyf", "head", "hhea", "hmtx", "loca", "maxp", "name", "post")
+	return tt.HasTables(
+		"cmap", "glyf", "head", "hhea", "hmtx", "loca", "maxp", "name", "post")
 }
 
-// IsOpenType checks whether all required tables for an OpenType font are
+// IsOpenType checks whether the tables required for an OpenType font are
 // present.
 func (tt *Font) IsOpenType() bool {
-	if !tt.HasTables("cmap", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post") {
+	if !tt.HasTables(
+		"cmap", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post") {
 		return false
 	}
 	if tt.HasTables("glyf", "loca") || tt.HasTables("CFF ") {
@@ -119,7 +121,7 @@ func (tt *Font) IsOpenType() bool {
 // SelectCmap chooses one of the sub-tables of the cmap table and reads the
 // fonts character encoding from there.  If a full unicode mapping is found,
 // this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
-// If this fails, a legacy 1,0 record is used as a last resort.
+// If this fails, a legacy 1,0 record is tried as a last resort.
 func (tt *Font) SelectCmap() (map[rune]font.GlyphIndex, error) {
 	rec := tt.Header.Find("cmap")
 	if rec == nil {
