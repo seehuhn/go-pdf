@@ -347,14 +347,19 @@ type myLookupInfo struct {
 	Pos  int64
 }
 
-func (tt *Font) readGposLookups(langTag, scriptTag string) (*io.SectionReader, []*myLookupInfo, error) {
+// A list of OpenType language tags is here:
+// https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
+//
+// A list of OpenType script tags is here:
+// https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
+func (tt *Font) readGtabLookups(tableName string, langTag, scriptTag string) (*io.SectionReader, []*myLookupInfo, error) {
 	GPOS := &table.GposHead{}
-	fd, err := tt.Header.ReadTableHead(tt.Fd, "GPOS", &GPOS.V10)
+	fd, err := tt.Header.ReadTableHead(tt.Fd, tableName, &GPOS.V10)
 	if err != nil {
 		return nil, nil, err
 	}
 	if GPOS.V10.MajorVersion != 1 || GPOS.V10.MinorVersion > 1 {
-		return nil, nil, fmt.Errorf("unsupported GPOS version %d.%d",
+		return nil, nil, fmt.Errorf("sfnt/"+tableName+": unsupported version %d.%d",
 			GPOS.V10.MajorVersion, GPOS.V10.MinorVersion)
 	}
 	if GPOS.V10.MinorVersion > 0 {
@@ -431,18 +436,46 @@ func (tt *Font) readGposLookups(langTag, scriptTag string) (*io.SectionReader, [
 	return fd, allLookups, nil
 }
 
-// ReadGposKernInfo reads kerning information from the "GPOS" table.
-//
-// A list of OpenType language tags is here:
-// https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
-//
-// A list of OpenType script tags is here:
-// https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
-func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
-	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.Head.UnitsPerEm)
+func (tt *Font) ReadGsubLigInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
+	fd, allLookups, err := tt.readGtabLookups("GSUB", langTag, scriptTag)
+	if err != nil {
+		return nil, err
+	}
 
-	fd, allLookups, err := tt.readGposLookups(langTag, scriptTag)
+	for _, l := range allLookups {
+		// https://docs.microsoft.com/en-us/typography/opentype/spec/features_ae#ccmp
+		if l.Tag != "ccmp" {
+			continue
+		}
+
+		switch l.Type {
+		case 6:
+			_, err := fd.Seek(l.Pos, io.SeekStart)
+			if err != nil {
+				return nil, err
+			}
+			var format uint16
+			err = binary.Read(fd, binary.BigEndian, &format)
+			if err != nil {
+				return nil, err
+			}
+			switch format {
+			default:
+				fmt.Printf("  - unsupported GSUB lookup type 6.%d\n", format)
+			}
+		default:
+			fmt.Printf("  - unsupported GSUB lookup type %d\n", l.Type)
+		}
+
+		// TODO(voss): also handle "liga"
+	}
+
+	return nil, nil
+}
+
+// ReadGposKernInfo reads kerning information from the "GPOS" table.
+func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
+	fd, allLookups, err := tt.readGtabLookups("GPOS", langTag, scriptTag)
 	if err != nil {
 		return nil, err
 	}
@@ -455,6 +488,9 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 	// these bits is set, then lookups must ignore glyphs of the
 	// respective type; that is, the other glyphs must be processed
 	// just as though these glyphs were not present.
+
+	// factor for converting from TrueType FUnit to PDF glyph units
+	q := 1000 / float64(tt.Head.UnitsPerEm)
 
 	res := make(map[font.GlyphPair]int)
 	for _, l := range allLookups {
@@ -475,7 +511,6 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 			}
 			switch format {
 			case 1: // lookup type 2, format 1
-				fmt.Println("  - PairPosFormat1 Subtable")
 				pairPos, err := table.ReadPairPosFormat1(fd)
 				if err != nil {
 					return nil, err
@@ -515,7 +550,6 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 					}
 				}
 			case 2: // lookup type 2, format 2
-				fmt.Println("  - PairPosFormat2 Subtable")
 				pairPos, err := table.ReadPairPosFormat2(fd)
 				if err != nil {
 					return nil, err
@@ -574,7 +608,7 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 				fmt.Printf("  - unknown subtable format %d\n", format)
 			}
 		default:
-			fmt.Printf("  - unknown lookup type %d\n", l.Type)
+			fmt.Printf("  - unsupported GPOS lookup type %d\n", l.Type)
 		}
 	}
 

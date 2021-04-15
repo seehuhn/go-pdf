@@ -1,3 +1,6 @@
+- Several glyphs in font/truetype/ttf/FreeMono.ttf seem to have width 0.
+  Is this my bug, or theirs?  E.g. GID 0, 29, 49, 129, 133, 149, ...
+
 - make sure that unit tests don't leave stray files behind
 - rationalize the error handling
 - make sure that supporting incremental updates to PDF files will not require

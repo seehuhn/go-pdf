@@ -35,8 +35,7 @@ type ExportOptions struct {
 	// GenerateSimpleCmap bool
 }
 
-// Export writes the font to the io.Writer w.  The include argument can be used
-// to select a subset of tables.
+// Export writes the font to the io.Writer w.
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	if opt == nil {
 		opt = &ExportOptions{}
@@ -139,41 +138,41 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 }
 
 func (tt *Font) exportSelectTables(opt *ExportOptions) []string {
+	var names []string
+	done := make(map[string]bool)
 	include := opt.Include
 
 	// Fix the order of tables in the body of the files.
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
-	var names []string
-	seen := make(map[string]bool)
 	for _, name := range []string{
 		"head", "hhea", "maxp", "OS/2", "hmtx", "LTSH", "VDMX", "hdmx", "cmap",
 		"fpgm", "prep", "cvt ", "loca", "glyf", "kern", "name", "post", "gasp",
 	} {
-		seen[name] = true
-		// if name == "cmap" && opt.GenerateSimpleCmap {
-		// 	names = append(names, name)
-		// }
+		done[name] = true
 		if tt.Header.Find(name) != nil {
 			if include == nil || include(name) {
 				names = append(names, name)
 			}
 		}
 	}
+
 	// Pre-existing digital signatures will no longer be valid after we
 	// re-arranged the tables:
-	seen["DSIG"] = true
-	var extra []string
+	done["DSIG"] = true
+
+	extraPos := len(names)
 	for i := 0; i < int(tt.Header.Offsets.NumTables); i++ {
 		name := tt.Header.Records[i].Tag.String()
-		if seen[name] {
+		if done[name] {
 			continue
 		}
 		if include == nil || include(name) {
-			extra = append(extra, name)
+			names = append(names, name)
 		}
 	}
-	sort.Strings(extra)
-	return append(names, extra...)
+	sort.Strings(names[extraPos:])
+
+	return names
 }
 
 type simpleCmapTableHead struct {

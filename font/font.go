@@ -18,7 +18,6 @@ package font
 
 import (
 	"math"
-	"strings"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
@@ -44,7 +43,7 @@ type Font struct {
 
 	Ascent  float64 // Ascent in glyph coordinate units
 	Descent float64 // Descent in glyph coordinate units, as a negative number
-	LineGap float64
+	LineGap float64 // TODO(voss): remove?
 }
 
 // Rect represents a rectangle with integer coordinates.
@@ -74,12 +73,12 @@ type Layout struct {
 // Typeset determines the layout of a string using the given font.  The
 // function takes ligatures and kerning information into account.
 func (font *Font) Typeset(s string, ptSize float64) *Layout {
-	for _, repl := range ligTab {
-		if font.CMap[repl.lig] == 0 {
-			continue
-		}
-		s = strings.ReplaceAll(s, repl.letters, string([]rune{repl.lig}))
-	}
+	// for _, repl := range ligTab {
+	// 	if font.CMap[repl.lig] == 0 {
+	// 		continue
+	// 	}
+	// 	s = strings.ReplaceAll(s, repl.letters, string([]rune{repl.lig}))
+	// }
 
 	// Units in an afm file are in 1/1000 of the scale of the font being
 	// formatted. Multiplying with the scale factor gives values in 1000*bp.

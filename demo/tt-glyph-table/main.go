@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -145,6 +146,15 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
+	tt, err := sfnt.Open(fontFileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer tt.Close()
+
+	// TODO(voss): remove this
+	fmt.Println(fontFileName + ":")
+
 	out, err := pdf.Create("test.pdf")
 	if err != nil {
 		log.Fatal(err)
@@ -158,7 +168,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	Font, err = truetype.Embed(out, "X", fontFileName, nil)
+	Font, err = truetype.EmbedFont(out, "X", tt, nil)
 	// Font, err = builtin.Embed(out, "X", "Times-Roman", font.AdobeStandardLatin)
 	if err != nil {
 		log.Fatal(err)
@@ -226,8 +236,8 @@ func main() {
 	for r, idx := range Font.CMap {
 		r2, seen := rev[idx]
 		if seen {
-			fmt.Printf("duplicate: %d -> 0x%04x 0x%04x\n",
-				idx, r2, r)
+			// fmt.Printf("duplicate: %d -> 0x%04x 0x%04x\n",
+			// 	idx, r2, r)
 		}
 		if r2 == 0 || r < r2 {
 			rev[idx] = r

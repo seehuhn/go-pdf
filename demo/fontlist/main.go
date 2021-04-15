@@ -23,6 +23,7 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 func tryFont(fname string) error {
@@ -31,6 +32,14 @@ func tryFont(fname string) error {
 		return err
 	}
 	defer tt.Close()
+
+	_, err = tt.ReadGsubLigInfo("DEU ", "latn")
+	if table.IsMissing(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 
 	// cmap, fd, err := tt.ReadCmapTable()
 	// if err != nil {

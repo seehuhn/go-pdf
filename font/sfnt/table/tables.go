@@ -213,7 +213,7 @@ func (ct *Cmap) Find(plat, enc uint16) *EncodingRecord {
 }
 
 // An EncodingRecord specifies a particular encoding and the offset to the
-// subtable for the encoding.
+// subtable for this encoding.
 type EncodingRecord struct {
 	PlatformID     uint16 // Platform ID.
 	EncodingID     uint16 // Platform-specific encoding ID.
@@ -1037,7 +1037,8 @@ func (GPOS *GposHead) readLangSys(fd io.ReadSeeker, langSysTag, scriptTag string
 		return nil, err
 	}
 	if scriptRecord == nil {
-		// TODO(voss): treat this error as if no GPOS/GSUB table is present
+		// TODO(voss): treat this error as if no GPOS/GSUB table is present?
+		//     Or maybe search all of the feature list directly, instead?
 		return nil, errors.New("no script record found")
 	}
 	scriptOffs := scriptListOffs + int64(scriptRecord.ScriptOffset)
@@ -1095,17 +1096,6 @@ func (GPOS *GposHead) readLangSys(fd io.ReadSeeker, langSysTag, scriptTag string
 	return ls, nil
 }
 
-// The most common GPOS features seen on my system:
-//     6777 "kern"
-//     3219 "mark"
-//     2464 "mkmk"
-//     2301 "cpsp"
-//     1352 "size"
-//      117 "case"
-//       92 "dist"
-//       76 "vhal"
-//       76 "halt"
-//
 // The most common GSUB features seen on my system:
 //     5630 "liga"
 //     4185 "frac"
@@ -1117,6 +1107,17 @@ func (GPOS *GposHead) readLangSys(fd io.ReadSeeker, langSysTag, scriptTag string
 //     2989 "ccmp"
 //     2976 "dnom"
 //     2962 "numr"
+//
+// The most common GPOS features seen on my system:
+//     6777 "kern"
+//     3219 "mark"
+//     2464 "mkmk"
+//     2301 "cpsp"
+//     1352 "size"
+//      117 "case"
+//       92 "dist"
+//       76 "vhal"
+//       76 "halt"
 
 type featureInfo struct {
 	Tag               string
@@ -1141,6 +1142,7 @@ func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langTag, scriptTag strin
 		todo = append(todo, todoEntry{langSys.FeatureIndices[i], false})
 	}
 
+	fmt.Println(GPOS.V10.FeatureListOffset)
 	featureListBase := int64(GPOS.V10.FeatureListOffset)
 
 	data := &featureList{}
@@ -1156,6 +1158,9 @@ func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langTag, scriptTag strin
 	err = binary.Read(fd, binary.BigEndian, data.FeatureRecords)
 	if err != nil {
 		return nil, err
+	}
+	for _, r := range data.FeatureRecords {
+		fmt.Println(r)
 	}
 
 	var res []featureInfo
