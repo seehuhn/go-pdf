@@ -23,19 +23,19 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// GlyphIndex is used to enumerate the blyphs in a font.  The first glyph
+// GlyphID is used to enumerate the glyphs in a font.  The first glyph
 // has index 0 and is used to indicate a missing character (usually rendered
-// as an empty box or similar).
-type GlyphIndex uint16
+// as an empty box).
+type GlyphID uint16
 
 // Font represents a font embedded in the PDF file.
 type Font struct {
 	Name pdf.Name
 	Ref  *pdf.Reference
 
-	CMap      map[rune]GlyphIndex
-	Enc       func(...GlyphIndex) []byte
-	Ligatures map[GlyphPair]GlyphIndex
+	CMap      map[rune]GlyphID
+	Enc       func(...GlyphID) []byte
+	Ligatures map[GlyphPair]GlyphID
 	Kerning   map[GlyphPair]int
 
 	GlyphExtent []Rect
@@ -58,10 +58,10 @@ func (rect *Rect) IsZero() bool {
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of
 // character codes.  This is used for ligatures and kerning information.
-type GlyphPair [2]GlyphIndex
+type GlyphPair [2]GlyphID
 
-// Layout contains the information needed to typeset a text.
-type Layout struct {
+// OldLayout contains the information needed to typeset a text.
+type OldLayout struct {
 	FontSize  float64
 	Fragments [][]byte
 	Kerns     []int
@@ -72,7 +72,7 @@ type Layout struct {
 
 // Typeset determines the layout of a string using the given font.  The
 // function takes ligatures and kerning information into account.
-func (font *Font) Typeset(s string, ptSize float64) *Layout {
+func (font *Font) Typeset(s string, ptSize float64) *OldLayout {
 	// for _, repl := range ligTab {
 	// 	if font.CMap[repl.lig] == 0 {
 	// 		continue
@@ -84,8 +84,8 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	// formatted. Multiplying with the scale factor gives values in 1000*bp.
 	q := ptSize / 1000
 
-	var codes []GlyphIndex
-	var last GlyphIndex
+	var codes []GlyphID
+	var last GlyphID
 	for _, r := range s {
 		if !unicode.IsGraphic(r) {
 			continue
@@ -103,7 +103,7 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 		last = c
 	}
 
-	ll := &Layout{
+	ll := &OldLayout{
 		FontSize: ptSize,
 	}
 	if len(codes) == 0 {
@@ -150,6 +150,19 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	return ll
 }
 
+type Layout struct {
+	Font     *Font
+	FontSize float64
+	Glyphs   []GlyphPos
+}
+
+type GlyphPos struct {
+	XOffset float64
+	YOffset float64
+	Advance float64
+}
+
+// TODO(voss): remove
 var ligTab = []struct {
 	letters string
 	lig     rune

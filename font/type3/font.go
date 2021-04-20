@@ -35,10 +35,10 @@ type Builder struct {
 	width      float64
 	height     float64
 	glyphWidth []int
-	cmap       map[rune]font.GlyphIndex
-	idxToName  map[font.GlyphIndex]pdf.Name
+	cmap       map[rune]font.GlyphID
+	idxToName  map[font.GlyphID]pdf.Name
 	nameToRef  map[pdf.Name]*pdf.Reference
-	used       map[font.GlyphIndex]bool
+	used       map[font.GlyphID]bool
 }
 
 // New creates a new Builder for embedding a type 3 font into the PDF file w.
@@ -50,10 +50,10 @@ func New(w *pdf.Writer, width, height float64) (*Builder, error) {
 		width:      width,
 		height:     height,
 		glyphWidth: make([]int, 256),
-		cmap:       make(map[rune]font.GlyphIndex),
-		idxToName:  make(map[font.GlyphIndex]pdf.Name),
+		cmap:       make(map[rune]font.GlyphID),
+		idxToName:  make(map[font.GlyphID]pdf.Name),
 		nameToRef:  make(map[pdf.Name]*pdf.Reference),
-		used:       make(map[font.GlyphIndex]bool),
+		used:       make(map[font.GlyphID]bool),
 	}
 	return t3, nil
 }
@@ -78,7 +78,7 @@ func (t3 *Builder) AddGlyph(r rune, width int) (*Glyph, error) {
 		return nil, err
 	}
 
-	idx := font.GlyphIndex(r % 256)
+	idx := font.GlyphID(r % 256)
 	for t3.used[idx] {
 		idx = (idx + 1) % 256
 	}
@@ -104,8 +104,8 @@ func (t3 *Builder) Close() (*font.Font, error) {
 		CharProcs[name] = ref
 	}
 
-	var min font.GlyphIndex = 256
-	var max font.GlyphIndex = 0
+	var min font.GlyphID = 256
+	var max font.GlyphID = 0
 	for idx := range t3.used {
 		if idx < min {
 			min = idx
@@ -121,7 +121,7 @@ func (t3 *Builder) Close() (*font.Font, error) {
 	}
 
 	var Differences pdf.Array
-	var prevIdx font.GlyphIndex = 256
+	var prevIdx font.GlyphID = 256
 	for idx := min; idx <= max; idx++ {
 		name, ok := t3.idxToName[idx]
 		if ok {
@@ -162,7 +162,7 @@ func (t3 *Builder) Close() (*font.Font, error) {
 	font := &font.Font{
 		Ref:  FontRef,
 		CMap: t3.cmap,
-		Enc: func(ii ...font.GlyphIndex) []byte {
+		Enc: func(ii ...font.GlyphID) []byte {
 			var res []byte
 			for _, idx := range ii {
 				if t3.used[idx] {

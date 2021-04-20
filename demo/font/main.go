@@ -79,8 +79,8 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	var codes []font.GlyphIndex
-	var last font.GlyphIndex
+	var codes []font.GlyphID
+	var last font.GlyphID
 	for _, r := range text {
 		c, ok := F1.CMap[r]
 		if !ok {

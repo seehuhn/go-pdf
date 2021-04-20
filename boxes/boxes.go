@@ -77,7 +77,7 @@ func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
 // Text represents a typeset string of characters as a Box object.
 type Text struct {
 	font   pdf.Name
-	layout *font.Layout
+	layout *font.OldLayout
 }
 
 // NewText returns a new Text object.

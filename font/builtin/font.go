@@ -44,13 +44,13 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 
 	builtin := &font.Font{
 		Name:      pdf.Name(name),
-		CMap:      map[rune]font.GlyphIndex{},
-		Ligatures: map[font.GlyphPair]font.GlyphIndex{},
+		CMap:      map[rune]font.GlyphID{},
+		Ligatures: map[font.GlyphPair]font.GlyphID{},
 	}
 
 	var FontName string
 	runeToName := make(map[rune]string)
-	nameToGlyph := make(map[string]font.GlyphIndex)
+	nameToGlyph := make(map[string]font.GlyphID)
 	stdRuneToCode := make(map[rune]byte)
 
 	type ligInfo struct {
@@ -67,7 +67,7 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	dingbats := fname == "ZapfDingbats"
 	charMetrics := false
 	kernPairs := false
-	cIdx := font.GlyphIndex(0)
+	cIdx := font.GlyphID(0)
 
 	// prepend an artificial entry for .notdef, so that CMap works
 	builtin.GlyphExtent = append(builtin.GlyphExtent, font.Rect{})
@@ -315,12 +315,12 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 
 	// glyphToCode maps from character indices to bytes in a PDF string.
 	// TODO(voss): use a slice instead of a map?
-	glyphToCode := make(map[font.GlyphIndex]byte)
+	glyphToCode := make(map[font.GlyphID]byte)
 	for r, cIdx := range builtin.CMap {
 		glyphToCode[cIdx] = bestRuneToCode[r]
 	}
 
-	builtin.Enc = func(ii ...font.GlyphIndex) []byte {
+	builtin.Enc = func(ii ...font.GlyphID) []byte {
 		res := make([]byte, len(ii))
 		for i, idx := range ii {
 			res[i] = glyphToCode[idx]

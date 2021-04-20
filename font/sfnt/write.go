@@ -202,7 +202,7 @@ type simpleCmapTableHead struct {
 }
 
 // write a cmap with just a 3,0,4 subtable for a simple font
-func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphIndex) (func(...font.GlyphIndex) []byte, error) {
+func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphID) (func(...font.GlyphID) []byte, error) {
 	var used []rune
 	for r, idx := range cmap {
 		if idx != 0 {
@@ -224,13 +224,13 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphIndex) (func(...font.G
 	type segment struct {
 		start  int // first index into used
 		end    int // last index into used
-		target font.GlyphIndex
+		target font.GlyphID
 	}
 	var ss []*segment
 	var strays []rune
 
 	first := true
-	var prev font.GlyphIndex
+	var prev font.GlyphID
 	runLength := 0
 	pos := 0
 	for i := 0; i < n; i++ {
@@ -277,7 +277,7 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphIndex) (func(...font.G
 	}
 	next := uint16(0xF000 + base)
 
-	g2c := make(map[font.GlyphIndex]byte)
+	g2c := make(map[font.GlyphID]byte)
 
 	// Construct the cmap table
 	data := &simpleCmapTableHead{
@@ -298,7 +298,7 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphIndex) (func(...font.G
 		IDDelta = append(IDDelta, uint16(seg.target)-next)
 		IDRangeOffsets = append(IDRangeOffsets, 0)
 		for i := 0; i < int(length); i++ {
-			g2c[seg.target+font.GlyphIndex(i)] = byte(next + uint16(i))
+			g2c[seg.target+font.GlyphID(i)] = byte(next + uint16(i))
 		}
 		next += length
 	}
@@ -320,7 +320,7 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphIndex) (func(...font.G
 			IDRangeOffsets = append(IDRangeOffsets, 4)
 		}
 		for i := 0; i < int(length); i++ {
-			g2c[font.GlyphIndex(GlyphIDArray[i])] = byte(next + uint16(i))
+			g2c[font.GlyphID(GlyphIDArray[i])] = byte(next + uint16(i))
 		}
 	}
 	// add the required final segment
@@ -350,7 +350,7 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphIndex) (func(...font.G
 		}
 	}
 
-	enc := func(ii ...font.GlyphIndex) []byte {
+	enc := func(ii ...font.GlyphID) []byte {
 		var res []byte
 		for _, i := range ii {
 			res = append(res, g2c[i])

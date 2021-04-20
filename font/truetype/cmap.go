@@ -44,17 +44,17 @@ type cmapInfo struct {
 }
 
 type cidChar struct {
-	Code font.GlyphIndex
+	Code font.GlyphID
 	CID  rune
 }
 
 type cidRange struct {
-	From, To font.GlyphIndex
+	From, To font.GlyphID
 	FromCID  rune
 }
 
-func (info *cmapInfo) FillRanges(cmap map[font.GlyphIndex]rune) {
-	var all []font.GlyphIndex
+func (info *cmapInfo) FillRanges(cmap map[font.GlyphID]rune) {
+	var all []font.GlyphID
 	for idx := range cmap {
 		all = append(all, idx)
 	}
@@ -66,7 +66,7 @@ func (info *cmapInfo) FillRanges(cmap map[font.GlyphIndex]rune) {
 	}
 
 	first := true
-	var start, lastIn font.GlyphIndex
+	var start, lastIn font.GlyphID
 	var lastOut rune
 	flush := func() {
 		if start < lastIn {
@@ -139,7 +139,7 @@ func formatPDFName(args ...interface{}) (string, error) {
 	return buf.String(), err
 }
 
-func hex(idx font.GlyphIndex) string {
+func hex(idx font.GlyphID) string {
 	return fmt.Sprintf("<%x>", []byte{byte(idx >> 8), byte(idx)})
 }
 
