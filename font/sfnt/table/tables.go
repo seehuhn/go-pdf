@@ -248,7 +248,7 @@ type sequentialMapGroup struct {
 // LoadCmap reads a mapping from unicode runes to glyph indeces from a "cmap"
 // table encoding record.
 // The function does NOT check that glyph indices are valid.
-func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map[rune]font.GlyphIndex, error) {
+func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map[rune]font.GlyphID, error) {
 	// The OpenType spec at
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 	// documents the following cmap subtable formats:
@@ -290,7 +290,7 @@ func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map
 	errPfx := fmt.Sprintf("sfnt/cmap/%d,%d,%d: ",
 		encRec.PlatformID, encRec.EncodingID, format)
 
-	cmap := make(map[rune]font.GlyphIndex)
+	cmap := make(map[rune]font.GlyphID)
 
 	switch format {
 	case 4: // Segment mapping to delta values
@@ -348,7 +348,7 @@ func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map
 					}
 					r := i2r(idx)
 					if unicode.IsGraphic(r) {
-						cmap[r] = font.GlyphIndex(c)
+						cmap[r] = font.GlyphID(c)
 					}
 				}
 			} else {
@@ -372,7 +372,7 @@ func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map
 					}
 					r := i2r(idx)
 					if unicode.IsGraphic(r) {
-						cmap[r] = font.GlyphIndex(c)
+						cmap[r] = font.GlyphID(c)
 					}
 				}
 			}
@@ -408,7 +408,7 @@ func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map
 				return nil, errors.New(errPfx + "too many mappings")
 			}
 
-			c := font.GlyphIndex(seg.StartGlyphID)
+			c := font.GlyphID(seg.StartGlyphID)
 			for idx := a; idx <= b; idx++ {
 				r := i2r(idx)
 				if unicode.IsGraphic(r) {

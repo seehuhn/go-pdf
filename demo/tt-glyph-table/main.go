@@ -37,7 +37,7 @@ const (
 )
 
 var Courier, Font *font.Font
-var rev map[font.GlyphIndex]rune
+var rev map[font.GlyphID]rune
 
 type rules struct{}
 
@@ -74,7 +74,7 @@ func (r rules) Draw(page *pages.Page, xPos, yPos float64) {
 	page.Println("Q")
 }
 
-type glyphBox font.GlyphIndex
+type glyphBox font.GlyphID
 
 func (g glyphBox) Extent() *boxes.BoxExtent {
 	bbox := Font.GlyphExtent[g]
@@ -90,7 +90,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	glyphWidth := float64(Font.Width[g]) * q
 	shift := (glyphBoxWidth - glyphWidth) / 2
 
-	ext := Font.GlyphExtent[font.GlyphIndex(g)]
+	ext := Font.GlyphExtent[font.GlyphID(g)]
 	page.Println("q")
 	page.Println(".3 1 .3 rg")
 	page.Printf("%.2f %.2f %.2f %.2f re\n",
@@ -113,7 +113,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	page.Println("s")
 	page.Println("Q")
 
-	r := rev[font.GlyphIndex(g)]
+	r := rev[font.GlyphID(g)]
 	var label string
 	if r != 0 {
 		label = fmt.Sprintf("%04X", r)
@@ -132,7 +132,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	fmt.Fprintf(page, "%f %f Td\n",
 		xPos+shift,
 		yPos)
-	buf := Font.Enc(font.GlyphIndex(g))
+	buf := Font.Enc(font.GlyphID(g))
 	pdf.String(buf).PDF(page)
 	page.Println(" Tj")
 	page.Println("ET")
@@ -232,7 +232,7 @@ func main() {
 	flush()
 
 	p.BaseLineSkip = 46
-	rev = make(map[font.GlyphIndex]rune)
+	rev = make(map[font.GlyphID]rune)
 	for r, idx := range Font.CMap {
 		r2, seen := rev[idx]
 		if seen {

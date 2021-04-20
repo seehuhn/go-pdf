@@ -62,30 +62,30 @@ func TestExport(t *testing.T) {
 }
 
 func TestWriteCmap(t *testing.T) {
-	cmap1 := make(map[rune]font.GlyphIndex)
+	cmap1 := make(map[rune]font.GlyphID)
 	for r := rune(32); r < 127; r++ {
-		cmap1[r] = font.GlyphIndex(r - 30)
+		cmap1[r] = font.GlyphID(r - 30)
 	}
-	cmap2 := make(map[rune]font.GlyphIndex)
+	cmap2 := make(map[rune]font.GlyphID)
 	for r := rune(32); r < 127; r++ {
-		cmap2[r] = font.GlyphIndex((r-32)*7/6 + 2)
+		cmap2[r] = font.GlyphID((r-32)*7/6 + 2)
 	}
-	cmap3 := make(map[rune]font.GlyphIndex)
+	cmap3 := make(map[rune]font.GlyphID)
 	for r := rune(32); r < 127; r++ {
-		cmap3[r] = font.GlyphIndex((r-32)*20/19 + 2)
+		cmap3[r] = font.GlyphID((r-32)*20/19 + 2)
 	}
-	cmap4 := make(map[rune]font.GlyphIndex)
+	cmap4 := make(map[rune]font.GlyphID)
 	for r := rune(32); r < 127; r++ {
 		if r < 40 {
-			cmap4[r] = font.GlyphIndex(2 + 2*r)
+			cmap4[r] = font.GlyphID(2 + 2*r)
 		} else if r < 50 {
-			cmap4[r] = font.GlyphIndex(100 + r)
+			cmap4[r] = font.GlyphID(100 + r)
 		} else {
-			cmap4[r] = font.GlyphIndex(200 + 2*r)
+			cmap4[r] = font.GlyphID(200 + 2*r)
 		}
 	}
 
-	for _, cmap := range []map[rune]font.GlyphIndex{
+	for _, cmap := range []map[rune]font.GlyphID{
 		cmap1, cmap2, cmap3, cmap4,
 	} {
 		buf := &bytes.Buffer{}

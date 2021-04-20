@@ -24,8 +24,19 @@ import (
 	"strconv"
 )
 
-// Reader represents a pdf file opened for reading.
+// Reader represents a pdf file opened for reading. Use the function Open() or
+// NewReader() to create a new Reader.
 type Reader struct {
+	// Version is the PDF version used in this file.  This is specified in
+	// the initial comment at the start of the file, and may be overridden by
+	// the /Version entry in the root dictionary.
+	Version Version
+
+	// The ID of the file.  This is either a slice of two byte slices (the
+	// original ID of the file, and the ID of the current version), or nil if
+	// the file does not specify an ID.
+	ID [][]byte
+
 	size int64
 	r    io.ReaderAt
 
@@ -37,14 +48,11 @@ type Reader struct {
 	xref    map[int]*xRefEntry
 	trailer Dict
 
-	Version Version
-
-	ID  [][]byte
 	enc *encryptInfo
 }
 
 // ReadPwdFunc describes a function which can be used to query the user for a
-// password for the document with the given ID. The first call for each
+// password for the document with the given ID.  The first call for each
 // authentication attempt has try == 0.  If the returned password was wrong,
 // the function is called again, repeatedly, with sequentially increasing
 // values of try.  If the ReadPwdFunc return the empty string, the
@@ -52,10 +60,21 @@ type Reader struct {
 // the caller.
 type ReadPwdFunc func(ID []byte, try int) string
 
+// Open opens the named PDF file for reading.  After use, Close() must be
+// called to close the file the Reader is reading from.
+func Open(fname string) (*Reader, error) {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	fi, err := fd.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return NewReader(fd, fi.Size(), nil)
+}
+
 // NewReader creates a new Reader object.
-//
-// TODO(voss): should the readPwd method receive the document ID as an
-// argument?
 func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, error) {
 	r := &Reader{
 		size:    size,
@@ -129,20 +148,6 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 	}
 
 	return r, nil
-}
-
-// Open opens the named PDF file for reading.  After use, Close() must be
-// called to close the file the Reader is reading from.
-func Open(fname string) (*Reader, error) {
-	fd, err := os.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-	fi, err := fd.Stat()
-	if err != nil {
-		return nil, err
-	}
-	return NewReader(fd, fi.Size(), nil)
 }
 
 // AuthenticateOwner tries to authenticate the owner of a document. If a

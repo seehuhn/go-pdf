@@ -71,7 +71,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		return nil, fmt.Errorf("missing glyphs: %q", string(missing))
 	}
 
-	var glyphs []font.GlyphIndex
+	var glyphs []font.GlyphID
 	glyphs = append(glyphs, 0) // always include the placeholder glyph
 	for r, idx := range CMap {
 		if subset == nil || subset[r] {
@@ -343,7 +343,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	if err != nil {
 		return nil, err
 	}
-	xxx := make(map[font.GlyphIndex]rune)
+	xxx := make(map[font.GlyphID]rune)
 	for r, c := range CMap {
 		xxx[c] = r
 	}
@@ -382,14 +382,14 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		Name: pdf.Name(name),
 		Ref:  FontRef,
 		CMap: CMap,
-		Enc: func(ii ...font.GlyphIndex) []byte {
+		Enc: func(ii ...font.GlyphID) []byte {
 			res := make([]byte, 0, 2*len(ii))
 			for _, idx := range ii {
 				res = append(res, byte(idx>>8), byte(idx))
 			}
 			return res
 		},
-		Ligatures:   map[font.GlyphPair]font.GlyphIndex{},
+		Ligatures:   map[font.GlyphPair]font.GlyphID{},
 		Kerning:     Kerning,
 		GlyphExtent: GlyphExtent,
 		Width:       Width,
@@ -417,7 +417,7 @@ const (
 
 // isSubset returns true if the font includes only runes from the
 // given character set.
-func isSubset(cmap map[rune]font.GlyphIndex, charset map[rune]bool) bool {
+func isSubset(cmap map[rune]font.GlyphID, charset map[rune]bool) bool {
 	for r := range cmap {
 		if !charset[r] {
 			return false
@@ -428,7 +428,7 @@ func isSubset(cmap map[rune]font.GlyphIndex, charset map[rune]bool) bool {
 
 // isSuperset returns true if the font includes all runes of the
 // given character set.
-func isSuperset(cmap map[rune]font.GlyphIndex, charset map[rune]bool) bool {
+func isSuperset(cmap map[rune]font.GlyphID, charset map[rune]bool) bool {
 	for r, ok := range charset {
 		if ok && cmap[r] == 0 {
 			return false

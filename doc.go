@@ -16,9 +16,11 @@
 
 // Package pdf provides support for reading and writing PDF files.
 //
-// This package treats PDF files as containers containing a sequence of objects
+// The package treats PDF files as containers containing a sequence of objects
 // (typically Dictionaries and Streams).  Object are written sequentially, but
-// can be read in any order.
+// can be read in any order.  These objects represent pages of text, fonts,
+// images and so on.  Subpackages implement support to produce PDF files
+// representing pages of text and images.
 //
 // A `Reader` can be used to read objects from an existing PDF file:
 //
@@ -54,8 +56,8 @@
 //         log.Fatal(err)
 //     }
 //
-// The following classes implement the native PDF object types.
-// All of these implement the `pdf.Object` interface:
+// The following classes implement the native PDF object types.  All of these
+// implement the `pdf.Object` interface:
 //
 //     Array
 //     Bool
@@ -66,7 +68,4 @@
 //     Reference
 //     Stream
 //     String
-//
-// Subpackages implement support to produce PDF files representing pages of
-// text and images.
 package pdf

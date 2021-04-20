@@ -233,7 +233,7 @@ func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 		buf = buf[4:] // skip the header
 		for nPairs > 0 && len(buf) >= 3 {
 			LR := font.GlyphPair{
-				font.GlyphIndex(buf[0]), font.GlyphIndex(buf[1])}
+				font.GlyphID(buf[0]), font.GlyphID(buf[1])}
 			kern := int16(buf[2])
 			kerning[LR] = int(float64(kern)*q + 0.5)
 			buf = buf[3:]
@@ -284,14 +284,14 @@ func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
 	return res, nil
 }
 
-func readClassDefTable(r io.Reader) (map[font.GlyphIndex]uint16, error) {
+func readClassDefTable(r io.Reader) (map[font.GlyphID]uint16, error) {
 	var format uint16
 	err := binary.Read(r, binary.BigEndian, &format)
 	if err != nil {
 		return nil, err
 	}
 
-	res := make(map[font.GlyphIndex]uint16)
+	res := make(map[font.GlyphID]uint16)
 	switch format {
 	case 1:
 		var firstGlyph uint16
@@ -309,11 +309,11 @@ func readClassDefTable(r io.Reader) (map[font.GlyphIndex]uint16, error) {
 		if err != nil {
 			return nil, err
 		}
-		base := font.GlyphIndex(firstGlyph)
+		base := font.GlyphID(firstGlyph)
 		for i := 0; i < int(count); i++ {
 			class := classValueArray[i]
 			if class != 0 {
-				res[base+font.GlyphIndex(i)] = class
+				res[base+font.GlyphID(i)] = class
 			}
 		}
 	case 2:
@@ -328,7 +328,7 @@ func readClassDefTable(r io.Reader) (map[font.GlyphIndex]uint16, error) {
 			if err != nil {
 				return nil, err
 			}
-			for idx := font.GlyphIndex(rec.StartGlyphID); idx <= font.GlyphIndex(rec.EndGlyphID); idx++ {
+			for idx := font.GlyphID(rec.StartGlyphID); idx <= font.GlyphID(rec.EndGlyphID); idx++ {
 				if rec.Class != 0 {
 					res[idx] = rec.Class
 				}
@@ -541,9 +541,9 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 						return nil, err
 					}
 					// fmt.Println("      -", coverage[k], x)
-					a := font.GlyphIndex(coverage[k])
+					a := font.GlyphID(coverage[k])
 					for _, xi := range x.PairValueRecords {
-						b := font.GlyphIndex(xi.SecondGlyph)
+						b := font.GlyphID(xi.SecondGlyph)
 						// TODO(voss): scale this correctly
 						d := int(float64(xi.ValueRecord1.XAdvance)*q + 0.5)
 						res[font.GlyphPair{a, b}] = d
@@ -587,8 +587,8 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 
 				for _, idx1 := range firstGlyphs {
 					for idx2 := 0; idx2 < tt.NumGlyphs; idx2++ {
-						c1 := classDef1[font.GlyphIndex(idx1)]
-						c2 := classDef2[font.GlyphIndex(idx2)]
+						c1 := classDef1[font.GlyphID(idx1)]
+						c2 := classDef2[font.GlyphID(idx2)]
 						k := c1*pairPos.Header.Class2Count + c2
 						if int(k) >= len(pairPos.Records) {
 							return nil, errors.New("GPOS/PairPos2: corrupt font")
@@ -598,8 +598,8 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 							continue
 						}
 						// fmt.Println(idx1, idx2, rec)
-						a := font.GlyphIndex(idx1)
-						b := font.GlyphIndex(idx2)
+						a := font.GlyphID(idx1)
+						b := font.GlyphID(idx2)
 						d := int(float64(rec.ValueRecord1.XAdvance)*q + 0.5)
 						res[font.GlyphPair{a, b}] = d
 					}

@@ -27,7 +27,11 @@ import (
 )
 
 // Writer represents a PDF file open for writing.
+// Use the functions Create() or NewWriter() to create a new Writer.
 type Writer struct {
+	// Version is the PDF version used in this file.  This field is
+	// read-only.  Use the opt argument of NewWriter to set the PDF version for
+	// a new file.
 	Version Version
 
 	id       [][]byte
@@ -51,6 +55,18 @@ type WriterOptions struct {
 
 var defaultOptions = &WriterOptions{
 	Version: V1_7,
+}
+
+// Create creates the named PDF file and opens it for output.  If a previous
+// file with the same name exists, it is overwritten.  After writing is
+// complete, Close() must be called to write the trailer and to close the
+// underlying file.
+func Create(name string) (*Writer, error) {
+	fd, err := os.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return NewWriter(fd, nil)
 }
 
 // NewWriter prepares a PDF file for writing.
@@ -154,18 +170,6 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	}
 
 	return pdf, nil
-}
-
-// Create creates the named PDF file and opens it for output.  If a previous
-// file with the same name exists, it is overwritten.  After writing is
-// complete, Close() must be called to write the trailer and to close the
-// underlying file.
-func Create(name string) (*Writer, error) {
-	fd, err := os.Create(name)
-	if err != nil {
-		return nil, err
-	}
-	return NewWriter(fd, nil)
 }
 
 // Close closes the Writer, flushing any unwritten data to the underlying
@@ -326,8 +330,9 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	return ref, nil
 }
 
-// WriteCompressed writes objects in a compressed object stream.
-// This function is only available for PDF version 1.5 and newer.
+// WriteCompressed writes a number of objects to the file as a compressed
+// object stream. This function is only available for PDF version 1.5 and
+// newer.
 func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Reference, error) {
 	if err := pdf.CheckVersion("using object streams", V1_5); err != nil {
 		return nil, err

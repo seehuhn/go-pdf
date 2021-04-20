@@ -122,7 +122,7 @@ func (tt *Font) IsOpenType() bool {
 // fonts character encoding from there.  If a full unicode mapping is found,
 // this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
 // If this fails, a legacy 1,0 record is tried as a last resort.
-func (tt *Font) SelectCmap() (map[rune]font.GlyphIndex, error) {
+func (tt *Font) SelectCmap() (map[rune]font.GlyphID, error) {
 	rec := tt.Header.Find("cmap")
 	if rec == nil {
 		return nil, &table.ErrNoTable{Name: "cmap"}

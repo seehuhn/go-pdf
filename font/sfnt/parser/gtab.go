@@ -1,9 +1,27 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package parser
 
 import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"unicode"
 
 	"seehuhn.de/go/pdf/font"
@@ -12,11 +30,13 @@ import (
 type gTab struct {
 	*Parser
 
-	glyphNames map[font.GlyphIndex]rune // TODO(voss): remove
+	glyphNames map[font.GlyphID]rune // TODO(voss): remove
 
 	lookupIndices    map[string][]uint16
 	lookupListOffset int64
 	lookups          []uint16
+
+	coverageCache map[int64]coverage
 }
 
 // modifies p.Funcs
@@ -49,10 +69,11 @@ func newGTab(p *Parser, script, lang string) (*gTab, error) {
 	}
 
 	res := &gTab{
-		Parser: p,
+		Parser:        p,
+		coverageCache: make(map[int64]coverage),
 	}
 
-	res.glyphNames = make(map[font.GlyphIndex]rune)
+	res.glyphNames = make(map[font.GlyphID]rune)
 	cmap, err := p.tt.SelectCmap()
 	if err != nil {
 		return nil, err
@@ -64,10 +85,10 @@ func newGTab(p *Parser, script, lang string) (*gTab, error) {
 	return res, nil
 }
 
-func (g *gTab) glyphName(gid font.GlyphIndex) string {
+func (g *gTab) glyphName(gid font.GlyphID) string {
 	r, ok := g.glyphNames[gid]
 	if !ok {
-		return fmt.Sprintf("#%d", gid)
+		return fmt.Sprintf("[%d]", gid)
 	}
 	if unicode.IsMark(r) {
 		return string([]rune{' ', r})
@@ -75,24 +96,12 @@ func (g *gTab) glyphName(gid font.GlyphIndex) string {
 	return string(r)
 }
 
-func (g *gTab) explainCoverage(cov map[font.GlyphIndex]int) string {
-	var rr []rune
-	funny := false
+func (g *gTab) explainCoverage(cov coverage) string {
+	var res []string
 	for gid := range cov {
-		r, ok := g.glyphNames[gid]
-		if !ok {
-			funny = true
-			continue
-		}
-		rr = append(rr, r)
-		if unicode.IsMark(r) {
-			rr = append(rr, ' ')
-		}
+		res = append(res, g.glyphName(gid))
 	}
-	if funny {
-		return "{" + string(rr) + "...}"
-	}
-	return "{" + string(rr) + "}"
+	return "{" + strings.Join(res, "") + "}"
 }
 
 func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
@@ -247,7 +256,12 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 	return nil
 }
 
-func (g *gTab) readCoverageTable(pos int64) (map[font.GlyphIndex]int, error) {
+func (g *gTab) readCoverageTable(pos int64) (coverage, error) {
+	res, ok := g.coverageCache[pos]
+	if ok {
+		return res, nil
+	}
+
 	s := &State{
 		A: pos,
 	}
@@ -260,10 +274,10 @@ func (g *gTab) readCoverageTable(pos int64) (map[font.GlyphIndex]int, error) {
 	}
 	format := int(s.A)
 
-	res := make(map[font.GlyphIndex]int)
+	res = make(coverage)
 
 	switch format {
-	case 1:
+	case 1: // coverage table format 1
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // glyphCount
 			CmdLoop,
@@ -275,9 +289,9 @@ func (g *gTab) readCoverageTable(pos int64) (map[font.GlyphIndex]int, error) {
 			return nil, err
 		}
 		for k, gid := range s.GetStash() {
-			res[font.GlyphIndex(gid)] = k
+			res[font.GlyphID(gid)] = k
 		}
-	case 2:
+	case 2: // coverage table format 2
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // rangeCount
 		)
@@ -287,9 +301,9 @@ func (g *gTab) readCoverageTable(pos int64) (map[font.GlyphIndex]int, error) {
 		rangeCount := int(s.A)
 		for i := 0; i < rangeCount; i++ {
 			err = g.Exec(s,
-				CmdRead16, TypeUInt, // startGlyphID
+				CmdRead16, TypeUInt, // startfont.GlyphIndex
 				CmdStash,
-				CmdRead16, TypeUInt, // endGlyphID
+				CmdRead16, TypeUInt, // endfont.GlyphIndex
 				CmdStash,
 				CmdRead16, TypeUInt, // startCoverageIndex
 				CmdStash,
@@ -299,13 +313,14 @@ func (g *gTab) readCoverageTable(pos int64) (map[font.GlyphIndex]int, error) {
 			}
 			xx := s.GetStash()
 			for k := int(xx[0]); k <= int(xx[1]); k++ {
-				res[font.GlyphIndex(k)] = k - int(xx[0]) + int(xx[2])
+				res[font.GlyphID(k)] = k - int(xx[0]) + int(xx[2])
 			}
 		}
 	default:
 		return nil, fmt.Errorf("unsupported coverage format %d", format)
 	}
 
+	g.coverageCache[pos] = res
 	return res, nil
 }
 
@@ -350,54 +365,157 @@ func (g *gTab) getGsubLookup(idx uint16, pfx string) (interface{}, error) {
 			return nil, err
 		}
 		subFormat := s.A
-		switch format {
-		case 1:
-			// LookupType 1: Single Substitution Subtable
-			fmt.Printf(pfx+"lookup type %d.%d, flags=0x%04x\n",
-				format, subFormat, flags)
 
+		var res GsubLookup
+
+		// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#table-organization
+		switch format {
+		case 1: // Single Substitution
+			// LookupType 1: Single Substitution Subtable
 			switch subFormat {
 			case 2:
 				err = g.Exec(s,
 					CmdRead16, TypeUInt, // coverageOffset
-					CmdStash,
+					CmdStore, 0,
 					CmdRead16, TypeUInt, // glyphCount
 					CmdLoop,
-					CmdRead16, TypeUInt, // substituteGlyphID[i]
+					CmdRead16, TypeUInt, // substitutefont.GlyphIndex[i]
 					CmdStash,
 					CmdEndLoop,
 				)
 				if err != nil {
 					return nil, err
 				}
-				xx := s.GetStash()
-				cov, err := g.readCoverageTable(subtablePos + int64(xx[0]))
+				repl := s.GetStash()
+				cov, err := g.readCoverageTable(subtablePos + s.R[0])
 				if err != nil {
 					return nil, err
 				}
-				repl := xx[1:]
-				for gid, i := range cov {
-					fmt.Printf("\t\t\t%q -> %q\n",
-						g.glyphName(gid), g.glyphName(font.GlyphIndex(repl[i])))
+				err = cov.check(len(repl))
+				if err != nil {
+					return nil, err
 				}
-			default:
-				fmt.Printf("%s\tunsupported subtable format %d.%d\n",
-					pfx, format, subFormat)
+				res = &gsubLookup1_2{
+					flags:              flags,
+					cov:                cov,
+					substituteGlyphIDs: stashToGlyphs(repl),
+				}
 			}
 		case 2: // Multiple Substitution Subtable
-			fmt.Printf(pfx+"lookup type %d.%d, flags=0x%04x\n",
-				format, subFormat, flags)
 			switch subFormat {
-			// case 1:
-			// 	err = g.Exec(s,
-			// 		CmdRead16, TypeUInt, // coverageOffset
-			// 		CmdRead16, TypeUInt, // sequenceCount
-			// 	)
-			default:
-				fmt.Printf("%s\tunsupported subtable format %d.%d\n",
-					pfx, format, subFormat)
+			case 1:
+				err = g.Exec(s,
+					CmdRead16, TypeUInt, // coverageOffset
+					CmdStore, 0,
+					CmdRead16, TypeUInt, // sequenceCount
+					CmdLoop,
+					CmdRead16, TypeUInt, // sequenceOffset[i]
+					CmdStash,
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				sequenceOffsets := s.GetStash()
+				cov, err := g.readCoverageTable(subtablePos + s.R[0])
+				if err != nil {
+					return nil, err
+				}
+				err = cov.check(len(sequenceOffsets))
+				if err != nil {
+					return nil, err
+				}
+				repl := make([][]font.GlyphID, len(sequenceOffsets))
+				for _, i := range cov {
+					s.A = subtablePos + int64(sequenceOffsets[i])
+					err = g.Exec(s,
+						CmdSeek,
+						CmdRead16, TypeUInt, // glyphCount
+						CmdLoop,
+						CmdRead16, TypeUInt, // substituteGlyphID[j]
+						CmdStash,
+						CmdEndLoop,
+					)
+					if err != nil {
+						return nil, err
+					}
+					repl[i] = stashToGlyphs(s.GetStash())
+				}
+				res = &gsubLookup2_1{
+					flags: flags,
+					cov:   cov,
+					repl:  repl,
+				}
+				res.explain(g, pfx)
 			}
-		case 6:
+		case 4: // Ligature Substitution Subtable
+			switch subFormat {
+			case 1:
+				err = g.Exec(s,
+					CmdRead16, TypeUInt, // coverageOffset
+					CmdStore, 0,
+					CmdRead16, TypeUInt, // ligatureSetCount
+					CmdLoop,
+					CmdRead16, TypeUInt, // ligatureSetOffset[i]
+					CmdStash,
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				ligatureSetOffsets := s.GetStash()
+				cov, err := g.readCoverageTable(subtablePos + s.R[0])
+				if err != nil {
+					return nil, err
+				}
+				fmt.Println(pfx+"\t"+g.explainCoverage(cov), len(ligatureSetOffsets))
+				for firstGlyph, i := range cov {
+					firstGlyphName := g.glyphName(font.GlyphID(firstGlyph))
+					if i >= len(ligatureSetOffsets) {
+						return nil, errors.New("ligatureSetOffset out of range")
+					}
+					ligSetTablePos := subtablePos + int64(ligatureSetOffsets[i])
+					s.A = ligSetTablePos
+					err = g.Exec(s,
+						CmdSeek,
+						CmdRead16, TypeUInt, // ligatureCount
+						CmdLoop,
+						CmdRead16, TypeUInt, // ligatureOffset[i]
+						CmdStash,
+						CmdEndLoop,
+					)
+					if err != nil {
+						return nil, err
+					}
+					ligatureOffsets := s.GetStash()
+					for _, o2 := range ligatureOffsets {
+						s.A = ligSetTablePos + int64(o2)
+						err = g.Exec(s,
+							CmdSeek,
+							CmdRead16, TypeUInt, // ligatureGlyph
+							CmdStash,
+							CmdRead16, TypeUInt, // componentCount
+							CmdDec,
+							CmdLoop,
+							CmdRead16, TypeUInt, // componentfont.GlyphIndex[i]
+							CmdStash,
+							CmdEndLoop,
+						)
+						if err != nil {
+							return nil, err
+						}
+						xx := s.GetStash()
+
+						in := []string{firstGlyphName}
+						for _, gid := range xx[1:] {
+							in = append(in, g.glyphName(font.GlyphID(gid)))
+						}
+						out := g.glyphName(font.GlyphID(xx[0]))
+						fmt.Println(pfx+"\t"+strings.Join(in, ""), "->", out)
+					}
+				}
+			}
+		case 6: // Chained Contexts Substitution Subtable
 			fmt.Printf(pfx+"lookup type %d.%d, flags=0x%04x\n",
 				format, subFormat, flags)
 
@@ -476,17 +594,40 @@ func (g *gTab) getGsubLookup(idx uint16, pfx string) (interface{}, error) {
 				}
 
 				for len(seqLookupRecord) >= 2 {
-					g.getGsubLookup(seqLookupRecord[1], pfx+"\taction: ")
+					g.getGsubLookup(seqLookupRecord[1], pfx+"\taction "+strconv.Itoa(int(seqLookupRecord[0]))+": ")
 					seqLookupRecord = seqLookupRecord[2:]
 				}
 			default:
 				fmt.Printf("%s- unsupported subtable format %d.%d",
 					pfx, format, subFormat)
 			}
-		default:
-			fmt.Printf(pfx+"unsupported lookup type %d\n", format)
+		}
+		if res == nil {
+			fmt.Printf("%sunsupported lookup type %d.%d\n",
+				pfx, format, subFormat)
+		} else {
+			res.explain(g, pfx)
 		}
 	}
 
 	return "something", nil
+}
+
+func stashToGlyphs(x []uint16) []font.GlyphID {
+	var res []font.GlyphID
+	for _, gid := range x {
+		res = append(res, font.GlyphID(gid))
+	}
+	return res
+}
+
+type coverage map[font.GlyphID]int
+
+func (cov coverage) check(size int) error {
+	for _, k := range cov {
+		if k < 0 || size >= 0 && k >= size {
+			return errors.New("invalid coverage table")
+		}
+	}
+	return nil
 }
