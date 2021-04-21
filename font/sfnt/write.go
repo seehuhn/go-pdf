@@ -40,6 +40,9 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	if opt == nil {
 		opt = &ExportOptions{}
 	}
+
+	var total int64
+
 	names := tt.exportSelectTables(opt)
 
 	replTab := make(map[string][]byte)
@@ -99,10 +102,12 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	total += 12
 	err = binary.Write(w, binary.BigEndian, header.Records)
 	if err != nil {
 		return 0, err
 	}
+	total += 16 * int64(len(header.Records))
 
 	// fix the checksum in the "head" table
 	cc.Reset()
@@ -113,28 +118,30 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	// write the tables
 	var pad [3]byte
 	for _, name := range names {
-		var n int
+		var n int64
 		if name == "head" {
-			n, err = w.Write(replTab["head"])
+			n32, e2 := w.Write(replTab["head"])
+			n = int64(n32)
+			err = e2
 		} else {
 			table := tt.Header.Find(name)
 			tableFd := io.NewSectionReader(tt.Fd, int64(table.Offset), int64(table.Length))
-			n64, e2 := io.Copy(w, tableFd)
-			n = int(n64)
-			err = e2
+			n, err = io.Copy(w, tableFd)
 		}
 		if err != nil {
 			return 0, err
 		}
+		total += n
 		if k := n % 4; k != 0 {
-			_, err := w.Write(pad[:4-k])
+			l, err := w.Write(pad[:4-k])
 			if err != nil {
 				return 0, err
 			}
+			total += int64(l)
 		}
 	}
 
-	return 0, nil
+	return total, nil
 }
 
 func (tt *Font) exportSelectTables(opt *ExportOptions) []string {

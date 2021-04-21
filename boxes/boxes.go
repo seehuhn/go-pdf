@@ -82,7 +82,7 @@ type Text struct {
 
 // NewText returns a new Text object.
 func NewText(F *font.Font, ptSize float64, text string) *Text {
-	layout := F.Typeset(text, ptSize)
+	layout := F.OldTypeset(text, ptSize)
 	return &Text{
 		font:   F.Name,
 		layout: layout,

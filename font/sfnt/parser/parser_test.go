@@ -69,5 +69,5 @@ func TestInterpreter(t *testing.T) {
 		}
 	}
 
-	t.Error("fish")
+	// t.Error("fish")
 }

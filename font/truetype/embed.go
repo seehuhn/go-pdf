@@ -132,7 +132,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	}
 
 	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.Head.UnitsPerEm)
+	q := 1000 / float64(tt.Head.UnitsPerEm) // TODO(voss): fix this
 
 	postInfo, err := tt.GetPostInfo()
 	if err != nil {
@@ -382,16 +382,13 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		Name: pdf.Name(name),
 		Ref:  FontRef,
 		CMap: CMap,
-		Enc: func(ii ...font.GlyphID) []byte {
-			res := make([]byte, 0, 2*len(ii))
-			for _, idx := range ii {
-				res = append(res, byte(idx>>8), byte(idx))
-			}
-			return res
+		Enc: func(gid font.GlyphID) []byte {
+			return []byte{byte(gid >> 8), byte(gid)}
 		},
 		Ligatures:   map[font.GlyphPair]font.GlyphID{},
 		Kerning:     Kerning,
 		GlyphExtent: GlyphExtent,
+		GlyphUnits:  1000, // TODO(voss): use font design units here
 		Width:       Width,
 		Ascent:      Ascent,
 		Descent:     Descent,

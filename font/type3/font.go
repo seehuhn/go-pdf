@@ -162,16 +162,14 @@ func (t3 *Builder) Close() (*font.Font, error) {
 	font := &font.Font{
 		Ref:  FontRef,
 		CMap: t3.cmap,
-		Enc: func(ii ...font.GlyphID) []byte {
-			var res []byte
-			for _, idx := range ii {
-				if t3.used[idx] {
-					res = append(res, byte(idx))
-				}
+		Enc: func(gid font.GlyphID) []byte {
+			if !t3.used[gid] {
+				return nil
 			}
-			return res
+			return []byte{byte(gid)}
 		},
-		Width: t3.glyphWidth,
+		Width:      t3.glyphWidth,
+		GlyphUnits: int(t3.width + 0.5), // TODO(voss): check this
 	}
 
 	return font, nil
