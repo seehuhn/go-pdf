@@ -187,7 +187,7 @@ func (tt *Font) GetOS2Info() (*table.OS2, error) {
 // ReadKernInfo reads kerning information from the "kern" table.
 func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.Head.UnitsPerEm)
+	q := 1000 / float64(tt.Head.UnitsPerEm) // TODO(voss): fix this
 
 	var Header struct {
 		Version   uint16
@@ -490,7 +490,7 @@ func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]
 	// just as though these glyphs were not present.
 
 	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.Head.UnitsPerEm)
+	q := 1000 / float64(tt.Head.UnitsPerEm) // TODO(voss): fix this
 
 	res := make(map[font.GlyphPair]int)
 	for _, l := range allLookups {

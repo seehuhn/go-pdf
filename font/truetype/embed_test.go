@@ -71,9 +71,9 @@ func TestEmbedFont(t *testing.T) {
 			wd := F1.Width[idx]
 			textWithKern := pdf.Array{
 				pdf.String(s),
-				pdf.Number(-0.5 * (1000 - float64(wd))),
+				pdf.Number(-0.5 * (float64(F1.GlyphUnits) - float64(wd))),
 				pdf.String(F1.Enc(idx)),
-				pdf.Number(-0.5 * (1000 - float64(wd))),
+				pdf.Number(-0.5 * (float64(F1.GlyphUnits) - float64(wd))),
 				pdf.String(" "),
 			}
 			textWithKern.PDF(contents)

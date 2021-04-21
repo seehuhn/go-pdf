@@ -44,14 +44,14 @@ type rules struct{}
 func (r rules) Extent() *boxes.BoxExtent {
 	return &boxes.BoxExtent{
 		Width:  0,
-		Height: Font.Ascent * glyphFontSize / 1000,
-		Depth:  -Font.Descent * glyphFontSize / 1000,
+		Height: Font.Ascent * glyphFontSize / float64(Font.GlyphUnits),
+		Depth:  -Font.Descent * glyphFontSize / float64(Font.GlyphUnits),
 	}
 }
 
 func (r rules) Draw(page *pages.Page, xPos, yPos float64) {
-	yLow := yPos + Font.Descent*glyphFontSize/1000
-	yHigh := yPos + Font.Ascent*glyphFontSize/1000
+	yLow := yPos + Font.Descent*glyphFontSize/float64(Font.GlyphUnits)
+	yHigh := yPos + Font.Ascent*glyphFontSize/float64(Font.GlyphUnits)
 
 	page.Println("q")
 	page.Println(".3 .3 1 RG")
@@ -80,13 +80,13 @@ func (g glyphBox) Extent() *boxes.BoxExtent {
 	bbox := Font.GlyphExtent[g]
 	return &boxes.BoxExtent{
 		Width:  glyphBoxWidth,
-		Height: 4 + float64(bbox.URy)*glyphFontSize/1000,
-		Depth:  8 - Font.Descent*glyphFontSize/1000,
+		Height: 4 + float64(bbox.URy)*glyphFontSize/float64(Font.GlyphUnits),
+		Depth:  8 - Font.Descent*glyphFontSize/float64(Font.GlyphUnits),
 	}
 }
 
 func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
-	q := float64(glyphFontSize) / 1000
+	q := float64(glyphFontSize) / float64(Font.GlyphUnits)
 	glyphWidth := float64(Font.Width[g]) * q
 	shift := (glyphBoxWidth - glyphWidth) / 2
 

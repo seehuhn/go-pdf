@@ -60,7 +60,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	margin := 50.0
 	baseLineSkip := 1.2 * fontSize
 
-	q := fontSize / 1000
+	q := fontSize / float64(F1.GlyphUnits)
 
 	_, err = page.Write([]byte("q\n1 .5 .5 RG\n"))
 	if err != nil {
@@ -122,7 +122,9 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		xPos += float64(F1.Width[c]) * q
 
 		if i == len(codes)-1 {
-			formatted = append(formatted, pdf.String(F1.Enc(codes[pos:]...)))
+			for _, gid := range codes[pos:] {
+				formatted = append(formatted, pdf.String(F1.Enc(gid)))
+			}
 			break
 		}
 
@@ -132,8 +134,11 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		}
 		xPos += float64(kern) * q
 		kObj := pdf.Number(-kern)
-		formatted = append(formatted,
-			pdf.String(F1.Enc(codes[pos:(i+1)]...)), kObj)
+		var enc []byte
+		for _, gid := range codes[pos:(i + 1)] {
+			enc = append(enc, F1.Enc(gid)...)
+		}
+		formatted = append(formatted, pdf.String(enc), kObj)
 		pos = i + 1
 	}
 	_, err = page.Write([]byte("s\nQ\n"))

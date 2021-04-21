@@ -23,20 +23,23 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// GlyphID is used to enumerate the glyphs in a font.  The first glyph
-// has index 0 and is used to indicate a missing character (usually rendered
-// as an empty box).
-type GlyphID uint16
-
 // Font represents a font embedded in the PDF file.
+// TODO(voss): make sure that there is a good way to determine the number
+// of glyphs in the font?
 type Font struct {
 	Name pdf.Name
 	Ref  *pdf.Reference
 
-	CMap      map[rune]GlyphID
-	Enc       func(...GlyphID) []byte
+	CMap map[rune]GlyphID
+	Enc  func(GlyphID) []byte
+
+	Substitute func(glyphs []GlyphID) []GlyphID
+	Layout     func(glyphs []GlyphID) []GlyphPos
+
 	Ligatures map[GlyphPair]GlyphID
 	Kerning   map[GlyphPair]int
+
+	GlyphUnits int
 
 	GlyphExtent []Rect
 	Width       []int
@@ -46,6 +49,11 @@ type Font struct {
 	LineGap float64 // TODO(voss): remove?
 }
 
+// GlyphID is used to enumerate the glyphs in a font.  The first glyph
+// has index 0 and is used to indicate a missing character (usually rendered
+// as an empty box).
+type GlyphID uint16
+
 // Rect represents a rectangle with integer coordinates.
 type Rect struct {
 	LLx, LLy, URx, URy int
@@ -54,6 +62,53 @@ type Rect struct {
 // IsZero returns whether the glyph leaves marks on the page.
 func (rect *Rect) IsZero() bool {
 	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
+}
+
+type Layout struct {
+	Font     *Font
+	FontSize float64
+	Glyphs   []GlyphPos
+}
+
+type GlyphPos struct {
+	Gid     GlyphID
+	XOffset int
+	YOffset int
+	Advance int
+}
+
+func (font *Font) TypeSet(s string, ptSize float64) *Layout {
+	var runs [][]rune
+	var run []rune
+	for _, r := range s {
+		if unicode.IsGraphic(r) {
+			run = append(run, r)
+		} else if len(run) > 0 {
+			runs = append(runs, run)
+			run = nil
+		}
+	}
+	if len(run) > 0 {
+		runs = append(runs, run)
+		run = nil
+	}
+
+	// introduce ligatures etc.
+	var glyphs []GlyphID
+	for _, run := range runs {
+		pos := len(glyphs)
+		for _, r := range run {
+			glyphs = append(glyphs, font.CMap[r])
+		}
+		glyphs = append(glyphs[:pos], font.Substitute(glyphs[pos:])...)
+	}
+
+	layout := font.Layout(glyphs)
+	return &Layout{
+		Font:     font,
+		FontSize: ptSize,
+		Glyphs:   layout,
+	}
 }
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of
@@ -70,9 +125,9 @@ type OldLayout struct {
 	Depth     float64
 }
 
-// Typeset determines the layout of a string using the given font.  The
+// OldTypeset determines the layout of a string using the given font.  The
 // function takes ligatures and kerning information into account.
-func (font *Font) Typeset(s string, ptSize float64) *OldLayout {
+func (font *Font) OldTypeset(s string, ptSize float64) *OldLayout {
 	// for _, repl := range ligTab {
 	// 	if font.CMap[repl.lig] == 0 {
 	// 		continue
@@ -80,33 +135,31 @@ func (font *Font) Typeset(s string, ptSize float64) *OldLayout {
 	// 	s = strings.ReplaceAll(s, repl.letters, string([]rune{repl.lig}))
 	// }
 
-	// Units in an afm file are in 1/1000 of the scale of the font being
-	// formatted. Multiplying with the scale factor gives values in 1000*bp.
-	q := ptSize / 1000
+	q := ptSize / float64(font.GlyphUnits)
 
-	var codes []GlyphID
+	var glyphs []GlyphID
 	var last GlyphID
 	for _, r := range s {
 		if !unicode.IsGraphic(r) {
 			continue
 		}
 		c := font.CMap[r]
-		if len(codes) > 0 {
+		if len(glyphs) > 0 {
 			pair := GlyphPair{last, c}
 			lig, ok := font.Ligatures[pair]
 			if ok {
-				codes = codes[:len(codes)-1]
+				glyphs = glyphs[:len(glyphs)-1]
 				c = lig
 			}
 		}
-		codes = append(codes, c)
+		glyphs = append(glyphs, c)
 		last = c
 	}
 
 	ll := &OldLayout{
 		FontSize: ptSize,
 	}
-	if len(codes) == 0 {
+	if len(glyphs) == 0 {
 		return ll
 	}
 
@@ -114,7 +167,7 @@ func (font *Font) Typeset(s string, ptSize float64) *OldLayout {
 	height := math.Inf(-1)
 	depth := math.Inf(-1)
 	pos := 0
-	for i, c := range codes {
+	for i, c := range glyphs {
 		bbox := &font.GlyphExtent[c]
 		if !bbox.IsZero() {
 			thisDepth := -float64(bbox.LLy) * q
@@ -128,18 +181,26 @@ func (font *Font) Typeset(s string, ptSize float64) *OldLayout {
 		}
 		width += float64(font.Width[c]) * q
 
-		if i == len(codes)-1 {
-			ll.Fragments = append(ll.Fragments, font.Enc(codes[pos:]...))
+		if i == len(glyphs)-1 {
+			var enc []byte
+			for _, gid := range glyphs[pos:] {
+				enc = append(enc, font.Enc(gid)...)
+			}
+			ll.Fragments = append(ll.Fragments, enc)
 			break
 		}
 
-		kern := font.Kerning[GlyphPair{c, codes[i+1]}]
+		kern := font.Kerning[GlyphPair{c, glyphs[i+1]}]
 		if kern == 0 {
 			continue
 		}
 
 		width += float64(kern) * q
-		ll.Fragments = append(ll.Fragments, font.Enc(codes[pos:i+1]...))
+		var enc []byte
+		for _, gid := range glyphs[pos : i+1] {
+			enc = append(enc, font.Enc(gid)...)
+		}
+		ll.Fragments = append(ll.Fragments, enc)
 		ll.Kerns = append(ll.Kerns, -kern)
 		pos = i + 1
 	}
@@ -148,28 +209,4 @@ func (font *Font) Typeset(s string, ptSize float64) *OldLayout {
 	ll.Depth = depth
 
 	return ll
-}
-
-type Layout struct {
-	Font     *Font
-	FontSize float64
-	Glyphs   []GlyphPos
-}
-
-type GlyphPos struct {
-	XOffset float64
-	YOffset float64
-	Advance float64
-}
-
-// TODO(voss): remove
-var ligTab = []struct {
-	letters string
-	lig     rune
-}{
-	{"ffi", '\uFB03'},
-	{"ffl", '\uFB04'},
-	{"fi", '\uFB01'},
-	{"fl", '\uFB02'},
-	{"ff", '\uFB00'},
 }

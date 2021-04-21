@@ -80,7 +80,7 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	}
 
 	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.Head.UnitsPerEm)
+	q := 1000 / float64(tt.Head.UnitsPerEm) // TODO(voss): fix this
 
 	_ = FontFile
 	_ = q

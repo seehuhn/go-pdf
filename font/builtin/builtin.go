@@ -29,7 +29,8 @@ import (
 	"seehuhn.de/go/pdf/font/names"
 )
 
-func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*font.Font, error) {
+// Embed returns a Font dictionary representing one of the builtin fonts.
+func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font.Font, error) {
 	fd, err := afmData.Open("afm/" + fname + ".afm")
 	if err != nil {
 		return nil, err
@@ -43,9 +44,10 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	}
 
 	builtin := &font.Font{
-		Name:      pdf.Name(name),
-		CMap:      map[rune]font.GlyphID{},
-		Ligatures: map[font.GlyphPair]font.GlyphID{},
+		Name:       pdf.Name(ref),
+		CMap:       map[rune]font.GlyphID{},
+		Ligatures:  map[font.GlyphPair]font.GlyphID{},
+		GlyphUnits: 1000,
 	}
 
 	var FontName string
@@ -71,7 +73,7 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 
 	// prepend an artificial entry for .notdef, so that CMap works
 	builtin.GlyphExtent = append(builtin.GlyphExtent, font.Rect{})
-	builtin.Width = append(builtin.Width, 250)
+	builtin.Width = append(builtin.Width, 250) // TODO(voss): what is the correct width?
 	cIdx++
 
 	scanner := bufio.NewScanner(fd)
@@ -246,6 +248,7 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	bestName, bestRuneToCode := chooseBaseEncoding(stdRuneToCode, subset)
 
 	// fill in the gaps
+	// TODO(voss): extract this into a separate function
 	var todo []rune
 	used := make(map[byte]bool)
 	used[0] = true
@@ -319,12 +322,43 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	for r, cIdx := range builtin.CMap {
 		glyphToCode[cIdx] = bestRuneToCode[r]
 	}
+	builtin.Enc = func(gid font.GlyphID) []byte {
+		return []byte{glyphToCode[gid]}
+	}
 
-	builtin.Enc = func(ii ...font.GlyphID) []byte {
-		res := make([]byte, len(ii))
-		for i, idx := range ii {
-			res[i] = glyphToCode[idx]
+	builtin.Substitute = func(glyphs []font.GlyphID) []font.GlyphID {
+		if len(glyphs) == 0 {
+			return nil
 		}
+
+		var res []font.GlyphID
+		last := glyphs[0]
+		for _, gid := range glyphs[1:] {
+			lig, ok := builtin.Ligatures[font.GlyphPair{last, gid}]
+			if ok {
+				last = lig
+			} else {
+				res = append(res, last)
+				last = gid
+			}
+		}
+		res = append(res, last)
+
+		return res
+	}
+
+	builtin.Layout = func(glyphs []font.GlyphID) []font.GlyphPos {
+		res := make([]font.GlyphPos, len(glyphs))
+		for i, gid := range glyphs {
+			kern := 0
+			if i < len(glyphs)-1 {
+				kern = builtin.Kerning[font.GlyphPair{gid, glyphs[i+1]}]
+			}
+
+			res[i].Gid = gid
+			res[i].Advance = builtin.Width[gid] + kern
+		}
+
 		return res
 	}
 
@@ -334,7 +368,9 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 		"BaseFont": pdf.Name(FontName),
 		"Encoding": Encoding,
 	}
-	// TODO(voss): for w.Version == pdf.V1_0 we should set Font["Name"]
+	if w.Version == pdf.V1_0 {
+		Font["Name"] = builtin.Name
+	}
 	builtin.Ref, err = w.Write(Font, nil)
 	if err != nil {
 		return nil, err

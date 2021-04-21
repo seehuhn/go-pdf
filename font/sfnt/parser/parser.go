@@ -61,7 +61,7 @@ type Parser struct {
 func New(tt *sfnt.Font) *Parser {
 	return &Parser{
 		tt:    tt,
-		scale: 1000 / float64(tt.Head.UnitsPerEm),
+		scale: 1000 / float64(tt.Head.UnitsPerEm), // TODO(voss): fix this
 	}
 }
 
