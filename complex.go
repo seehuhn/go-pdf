@@ -48,6 +48,7 @@ type Rectangle struct {
 func (rect *Rectangle) PDF(w io.Writer) error {
 	res := Array{}
 	for _, x := range []float64{rect.LLx, rect.LLy, rect.URx, rect.URy} {
+		x = math.Round(100*x) / 100
 		res = append(res, Number(x))
 	}
 	return res.PDF(w)

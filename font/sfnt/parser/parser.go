@@ -28,8 +28,9 @@ const bufferSize = 1024
 
 // State stores the current register values of the interpreter.
 type State struct {
-	A int64
-	R [8]int64
+	A   int64
+	R   [8]int64 // TODO(voss): let the caller allocate this instead?
+	Tag string
 
 	Stash16 []uint16
 }
@@ -53,6 +54,8 @@ type Parser struct {
 	lastRead  int
 
 	scale float64
+
+	// TODO(voss): can I get rid of this?
 	Funcs []func(*State)
 }
 
@@ -65,9 +68,9 @@ func New(tt *sfnt.Font) *Parser {
 	}
 }
 
-// SetTable sets up the parser to read from the given table.
+// OpenTable sets up the parser to read from the given table.
 // The current reading position is moved to the start of the table.
-func (p *Parser) SetTable(tableName string) error {
+func (p *Parser) OpenTable(tableName string) error {
 	info := p.tt.Header.Find(tableName)
 	if info == nil {
 		return fmt.Errorf("table %q not found", tableName)
@@ -133,6 +136,12 @@ func (p *Parser) Exec(s *State, cmds ...Command) error {
 			default:
 				panic("unknown type for CmdRead16")
 			}
+		case CmdReadTag:
+			buf, err := p.read(4)
+			if err != nil {
+				return err
+			}
+			s.Tag = string(buf)
 		case CmdSeek:
 			err := p.seek(s.A)
 			if err != nil {
@@ -141,6 +150,8 @@ func (p *Parser) Exec(s *State, cmds ...Command) error {
 
 		case CmdStore:
 			s.R[arg] = s.A
+		case CmdLoadI:
+			s.A = int64(int8(arg))
 		case CmdLoad:
 			s.A = s.R[arg]
 		case CmdStash:
@@ -168,26 +179,26 @@ func (p *Parser) Exec(s *State, cmds ...Command) error {
 		case CmdAssertEq:
 			target := int64(arg)
 			if s.A != target {
-				return fmt.Errorf("%s%+d: expected 0x%04x, but got 0x%04x (%d)",
-					p.tableName, p.lastRead, target, s.A, PC)
+				return p.error("expected 0x%04x, but got 0x%04x (%d)",
+					target, s.A, PC)
 			}
 		case CmdAssertGe:
 			target := int64(arg)
 			if s.A < target {
-				return fmt.Errorf("%s%+d: expected >=0x%04x, but got 0x%04x (%d)",
-					p.tableName, p.lastRead, target, s.A, PC)
+				return p.error("expected >=0x%04x, but got 0x%04x (%d)",
+					target, s.A, PC)
 			}
 		case CmdAssertGt:
 			target := int64(arg)
 			if s.A <= target {
-				return fmt.Errorf("%s%+d: expected >0x%04x, but got 0x%04x (%d)",
-					p.tableName, p.lastRead, target, s.A, PC)
+				return p.error("expected >0x%04x, but got 0x%04x (%d)",
+					target, s.A, PC)
 			}
 		case CmdAssertLe:
 			target := int64(arg)
 			if s.A > target {
-				return fmt.Errorf("%s%+d: expected <=0x%04x, but got 0x%04x (%d)",
-					p.tableName, p.lastRead, target, s.A, PC)
+				return p.error("expected <=0x%04x, but got 0x%04x (%d)",
+					target, s.A, PC)
 			}
 
 		case CmdJNZ:
@@ -225,8 +236,8 @@ func (p *Parser) Exec(s *State, cmds ...Command) error {
 func (p *Parser) seek(tablePos int64) error {
 	filePos := p.start + tablePos
 	if filePos < p.start || filePos > p.end {
-		return fmt.Errorf("%s: seek target %d is outside [%d,%d]",
-			p.tableName, filePos, p.start, p.end)
+		return p.error("seek target %d is outside [%d,%d]",
+			filePos, p.start, p.end)
 	}
 
 	if filePos >= p.from && filePos <= p.from+int64(p.used) {
@@ -265,7 +276,7 @@ func (p *Parser) read(n int) ([]byte, error) {
 			}
 		}
 		if err != nil {
-			return nil, err
+			return nil, p.error("read failed: %w", err)
 		}
 		p.used += l
 	}
@@ -278,6 +289,15 @@ func (p *Parser) read(n int) ([]byte, error) {
 	return res, nil
 }
 
+func (p *Parser) error(format string, a ...interface{}) error {
+	tableName := p.tableName
+	if tableName == "" {
+		tableName = "header"
+	}
+	a = append([]interface{}{tableName, p.lastRead}, a...)
+	return fmt.Errorf("%s%+d: "+format, a...)
+}
+
 // Command represents a command (or an argument for a command) for the
 // interpreter.
 type Command uint8
@@ -287,6 +307,7 @@ const (
 	CmdRead16   = iota // arg: type
 	CmdRead32          // arg: type
 	CmdStore           // arg: register
+	CmdLoadI           // arg: new int8 value for A
 	CmdLoad            // arg: register
 	CmdIAdd            // arg: int8 literal value
 	CmdAdd             // arg: register
@@ -299,12 +320,13 @@ const (
 	CmdAssertGt        // arg: comparison value
 	CmdAssertLe        // arg: comparison value
 	CmdJNZ             // arg: offset
-	CmdCall
+	CmdCall            // arg: Func index
 )
 
 // Commands which take no arguments
 const (
 	CmdSeek = iota + 128
+	CmdReadTag
 	CmdDec
 	CmdLoop
 	CmdEndLoop
