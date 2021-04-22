@@ -57,17 +57,14 @@ func TestInterpreter(t *testing.T) {
 	}
 
 	if tableName == "GSUB" {
-		for name, ii := range gtab.lookupIndices {
-			fmt.Println("\n\n" + name)
-			for _, i := range ii {
-				_, err := gtab.getGsubLookup(i, "")
-				if err != nil {
-					t.Fatal(err)
-				}
-				fmt.Println()
+		for _, i := range gtab.lookupIndices {
+			_, err := gtab.getGsubLookup(i, "")
+			if err != nil {
+				t.Fatal(err)
 			}
+			fmt.Println()
 		}
 	}
 
-	// t.Error("fish")
+	t.Error("fish")
 }
