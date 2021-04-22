@@ -251,7 +251,8 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 	}
 	g.lookupIndices = lookupIndices
 
-	// TODO(voss): only read the required entries
+	// Since more lookups might be required for recursive lookups, we
+	// keep the complete list of lookupOffsets.
 	err = g.Exec(s,
 		CmdLoad, 3, // lookupListOffset
 		CmdSeek,
