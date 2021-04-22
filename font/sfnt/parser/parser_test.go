@@ -62,7 +62,7 @@ func TestInterpreter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			fmt.Println()
+			fmt.Println("===========================================")
 		}
 	}
 
