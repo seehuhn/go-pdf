@@ -74,14 +74,6 @@ func (g *gTab) readCoverageTable(pos int64) (coverage, error) {
 	return res, nil
 }
 
-func stashToGlyphs(x []uint16) []font.GlyphID {
-	res := make([]font.GlyphID, len(x))
-	for i, gid := range x {
-		res[i] = font.GlyphID(gid)
-	}
-	return res
-}
-
 type coverage map[font.GlyphID]int
 
 func (cov coverage) check(size int) error {
