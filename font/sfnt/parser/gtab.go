@@ -36,6 +36,7 @@ type gTab struct {
 	lookups          []uint16
 
 	coverageCache map[int64]coverage
+	classDefCache map[int64]classDef
 }
 
 // modifies p.Funcs
