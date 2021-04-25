@@ -25,9 +25,9 @@ import (
 
 func TestInterpreter(t *testing.T) {
 	// tt, err := sfnt.Open("../../truetype/ttf/SourceSerif4-Regular.ttf")
-	tt, err := sfnt.Open("../../truetype/ttf/FreeSerif.ttf")
+	// tt, err := sfnt.Open("../../truetype/ttf/FreeSerif.ttf")
 	// tt, err := sfnt.Open("../../truetype/ttf/Roboto-Regular.ttf")
-	// tt, err := sfnt.Open("/Applications/LibreOffice.app/Contents/Resources/fonts/truetype/DejaVuSerif.ttf")
+	tt, err := sfnt.Open("/Applications/LibreOffice.app/Contents/Resources/fonts/truetype/DejaVuSerif.ttf")
 	if err != nil {
 		t.Fatal(err)
 	}

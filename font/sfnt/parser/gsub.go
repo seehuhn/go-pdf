@@ -46,11 +46,6 @@ glyphLoop:
 	return glyphs
 }
 
-type gsubLookupSubtable interface {
-	Replace(int, []font.GlyphID) (int, []font.GlyphID)
-	Explain(g *gTab, pfx string)
-}
-
 func (g *gTab) getGsubLookup(idx uint16, pfx string) (gsubLookup, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
@@ -105,6 +100,7 @@ func (g *gTab) getGsubLookup(idx uint16, pfx string) (gsubLookup, error) {
 }
 
 func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int64, pfx string) (gsubLookupSubtable, error) {
+	// TODO(voss): is this called more than once for the same subtablePos?6_3 -> use caching?
 	s.A = subtablePos
 	err := g.Exec(s,
 		CmdSeek,
@@ -119,7 +115,27 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#table-organization
 	switch 10*format + uint16(subFormat) {
-	case 1_2: // LookupType 1_2: Single Substitution Subtable
+	case 1_1: // Single Substitution Format 1
+		err = g.Exec(s,
+			CmdRead16, TypeUInt, // coverageOffset
+			CmdStore, 0,
+			CmdRead16, TypeUInt, // deltaGlyphID (mod 65536)
+		)
+		if err != nil {
+			return nil, err
+		}
+		delta := uint16(s.A)
+		cov, err := g.readCoverageTable(subtablePos + s.R[0])
+		if err != nil {
+			return nil, err
+		}
+		res = &gsub1_1{
+			flags: flags,
+			cov:   cov,
+			delta: delta,
+		}
+
+	case 1_2: // Single Substitution Format 2
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // coverageOffset
 			CmdStore, 0,
@@ -286,19 +302,25 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("\tCov", g.explainCoverage(cov))
 		backtrack, err := g.readClassDefTable(subtablePos + int64(backtrackClassDefOffset))
-		fmt.Println("\tBc", backtrack)
 		input, err := g.readClassDefTable(subtablePos + int64(inputClassDefOffset))
-		fmt.Println("\tIc", input)
 		lookahead, err := g.readClassDefTable(subtablePos + int64(lookaheadClassDefOffset))
-		fmt.Println("\tLc", lookahead)
-		for i, offs := range chainedClassSeqRuleSetOffsets {
+
+		xxx := &gsub6_2{
+			flags:     flags,
+			cov:       cov,
+			backtrack: backtrack,
+			input:     input,
+			lookahead: lookahead,
+		}
+
+		for _, offs := range chainedClassSeqRuleSetOffsets {
 			if offs == 0 {
+				xxx.rulesets = append(xxx.rulesets, nil)
 				continue
 			}
-			chainedClassSequenceRuleSetPos := subtablePos + int64(offs)
 
+			chainedClassSequenceRuleSetPos := subtablePos + int64(offs)
 			s.A = chainedClassSequenceRuleSetPos
 			err = g.Exec(s,
 				CmdSeek,
@@ -311,8 +333,12 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			if err != nil {
 				return nil, err
 			}
+
+			var ruleset seqRuleSet
 			chainedClassSeqRuleOffsets := s.GetStash()
-			for j, offs := range chainedClassSeqRuleOffsets {
+			for _, offs := range chainedClassSeqRuleOffsets {
+				rule := &seqRule{}
+
 				s.A = chainedClassSequenceRuleSetPos + int64(offs)
 				err = g.Exec(s,
 					CmdSeek,
@@ -326,7 +352,9 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 					return nil, err
 				}
 				backtrackSequence := s.GetStash()
-				fmt.Println(i, j, "b", backtrackSequence)
+				for _, class := range backtrackSequence {
+					rule.backtrack = append(rule.backtrack, int(class))
+				}
 
 				err = g.Exec(s,
 					CmdRead16, TypeUInt, // inputGlyphCount
@@ -341,7 +369,9 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 					return nil, err
 				}
 				inputSequence := s.GetStash()
-				fmt.Println(i, j, "i cov +", inputSequence)
+				for _, class := range inputSequence {
+					rule.input = append(rule.input, int(class))
+				}
 
 				err = g.Exec(s,
 					CmdRead16, TypeUInt, // lookaheadGlyphCount
@@ -354,9 +384,41 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 					return nil, err
 				}
 				lookaheadSequence := s.GetStash()
-				fmt.Println(i, j, "l", lookaheadSequence)
+				for _, class := range lookaheadSequence {
+					rule.lookahead = append(rule.lookahead, int(class))
+				}
+
+				err = g.Exec(s,
+					CmdRead16, TypeUInt, // seqLookupCount
+					CmdLoop,
+					CmdRead16, TypeUInt, // seqLookupRecord.sequenceIndex
+					CmdStash,
+					CmdRead16, TypeUInt, // seqLookupRecord.lookupListIndex
+					CmdStash,
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				seqLookupRecord := s.GetStash()
+
+				for len(seqLookupRecord) > 0 {
+					l, err := g.getGsubLookup(seqLookupRecord[1], "-")
+					if err != nil {
+						return nil, err
+					}
+					rule.actions = append(rule.actions, seqLookup{
+						pos:    int(seqLookupRecord[0]),
+						nested: l,
+					})
+					seqLookupRecord = seqLookupRecord[2:]
+				}
+
+				ruleset = append(ruleset, rule)
 			}
+			xxx.rulesets = append(xxx.rulesets, ruleset)
 		}
+		res = xxx
 
 	case 6_3: // Chained Contexts Substitution: Coverage-based Glyph Contexts
 		err = g.Exec(s,
@@ -434,7 +496,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			}
 			xxx.lookahead = append(xxx.lookahead, cover)
 		}
-		for len(seqLookupRecord) >= 2 {
+		for len(seqLookupRecord) > 0 {
 			l, err := g.getGsubLookup(seqLookupRecord[1], "-")
 			if err != nil {
 				return nil, err
@@ -464,6 +526,39 @@ func stashToGlyphs(x []uint16) []font.GlyphID {
 		res[i] = font.GlyphID(gid)
 	}
 	return res
+}
+
+type gsubLookupSubtable interface {
+	Replace(int, []font.GlyphID) (int, []font.GlyphID)
+	Explain(g *gTab, pfx string)
+}
+
+type gsub1_1 struct {
+	flags uint16
+	cov   coverage
+	delta uint16
+}
+
+func (l *gsub1_1) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
+	if l.flags != 0 {
+		panic("not implemented")
+	}
+	in := seq[i]
+	_, ok := l.cov[in]
+	if !ok {
+		return i, seq
+	}
+	seq[i] = font.GlyphID(uint16(seq[i]) + l.delta)
+	return i + 1, seq
+}
+
+func (l *gsub1_1) Explain(g *gTab, pfx string) {
+	fmt.Printf(pfx+"lookup type 1.1, flags=0x%04x\n", l.flags)
+	for gid, _ := range l.cov {
+		repl := font.GlyphID(uint16(gid) + l.delta)
+		fmt.Printf("%s\t%s -> %s\n",
+			pfx, g.glyphName(gid), g.glyphName(repl))
+	}
 }
 
 type gsub1_2 struct {
@@ -581,6 +676,64 @@ func (l *gsub4_1) Explain(g *gTab, pfx string) {
 			}
 			fmt.Printf("%s\t%s -> %s\n",
 				pfx, strings.Join(in, ""), g.glyphName(lig.out))
+		}
+	}
+}
+
+type gsub6_2 struct {
+	flags     uint16
+	cov       coverage
+	backtrack classDef
+	input     classDef
+	lookahead classDef
+	rulesets  []seqRuleSet // indexed by the input class, can be nil
+}
+
+type seqRuleSet []*seqRule
+
+type seqRule struct {
+	backtrack []int
+	input     []int
+	lookahead []int
+	actions   []seqLookup
+}
+
+func (l *gsub6_2) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
+	if l.flags != 0 {
+		panic("not implemented")
+	}
+
+	ruleNo := l.cov[seq[pos]]
+	if ruleNo >= len(l.rulesets) || l.rulesets[ruleNo] == nil {
+		return pos, seq
+	}
+
+	panic("not implemented")
+}
+
+func (l *gsub6_2) Explain(g *gTab, pfx string) {
+	fmt.Printf(pfx+"lookup type 6.2, flags=0x%04x\n", l.flags)
+	pfx = pfx + "\t"
+
+	fmt.Println(pfx+"Cov", g.explainCoverage(l.cov))
+	fmt.Println(pfx+"Bc", l.backtrack)
+	fmt.Println(pfx+"Ic", l.input)
+	fmt.Println(pfx+"Lc", l.lookahead)
+
+	for i, ruleset := range l.rulesets {
+		for j, rule := range ruleset {
+			fmt.Println(pfx+"b"+strconv.Itoa(i)+"."+strconv.Itoa(j),
+				rule.backtrack)
+			fmt.Println(pfx+"i"+strconv.Itoa(i)+"."+strconv.Itoa(j),
+				"cov +", rule.input)
+			fmt.Println(pfx+"l"+strconv.Itoa(i)+"."+strconv.Itoa(j),
+				rule.lookahead)
+			apfx := pfx + "@" + strconv.Itoa(i) + "." + strconv.Itoa(j)
+			for _, action := range rule.actions {
+				for _, subtable := range action.nested {
+					subtable.Explain(g, apfx)
+				}
+			}
 		}
 	}
 }
