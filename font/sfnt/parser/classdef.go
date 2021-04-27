@@ -26,12 +26,10 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 	switch format {
 	case 1:
 		err = g.Exec(s,
-			CmdRead16, TypeUInt, // startGlyphID
-			CmdStash,
+			CmdStash,            // startGlyphID
 			CmdRead16, TypeUInt, // glyphCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // classValueArray[i]
-			CmdStash,
+			CmdStash, // classValueArray[i]
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -39,22 +37,19 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 		}
 		stash := s.GetStash()
 		startGlyphID := font.GlyphID(stash[0])
-		for class, gid := range stash[1:] {
+		for gidOffs, class := range stash[1:] {
 			if class == 0 {
 				continue
 			}
-			res[startGlyphID+font.GlyphID(gid)] = class
+			res[startGlyphID+font.GlyphID(gidOffs)] = int(class)
 		}
 	case 2:
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // classRangeCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // classRangeRecords[i].startGlyphID
-			CmdStash,
-			CmdRead16, TypeUInt, // classRangeRecords[i].endGlyphID
-			CmdStash,
-			CmdRead16, TypeUInt, // classRangeRecords[i].class
-			CmdStash,
+			CmdStash, // classRangeRecords[i].startGlyphID
+			CmdStash, // classRangeRecords[i].endGlyphID
+			CmdStash, // classRangeRecords[i].class
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -65,14 +60,13 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 			start := int(stash[0])
 			end := int(stash[1])
 			class := int(stash[2])
-			if class == 0 {
-				continue
-			}
 			if end < start {
 				return nil, g.error("corrupt classDef record")
 			}
-			for gid := start; gid <= end; gid++ {
-				res[font.GlyphID(gid)] = class
+			if class != 0 {
+				for gid := start; gid <= end; gid++ {
+					res[font.GlyphID(gid)] = class
+				}
 			}
 			stash = stash[3:]
 		}
@@ -83,4 +77,5 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 	return res, nil
 }
 
+// TODO(voss): using uint16 instead of int?
 type classDef map[font.GlyphID]int

@@ -17,7 +17,6 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -31,7 +30,7 @@ type gTab struct {
 
 	glyphNames map[font.GlyphID]rune // TODO(voss): remove
 
-	lookupIndices    []uint16
+	LookupIndices    []uint16
 	lookupListOffset int64
 	lookups          []uint16
 
@@ -39,8 +38,9 @@ type gTab struct {
 	classDefCache map[int64]classDef
 }
 
-// modifies p.Funcs
-func newGTab(p *Parser, script, lang string) (*gTab, error) {
+// NewGTab wraps a parser with a helper to read GSUB and GPOS tables.
+// This modifies p.Funcs!
+func NewGTab(p *Parser, script, lang string) (*gTab, error) {
 	scriptSeen := false
 	chooseScript := func(s *State) {
 		if s.Tag == script {
@@ -98,7 +98,7 @@ func (g *gTab) explainCoverage(cov coverage) string {
 	return "{" + strings.Join(res, "") + "}"
 }
 
-func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
+func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {
 	err := g.OpenTable(tableName)
 	if err != nil {
 		return err
@@ -142,7 +142,8 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 
 	bestScriptOffs := s.R[4]
 	if bestScriptOffs == 0 {
-		return errors.New("no script found in font")
+		// no scripts defined
+		return nil
 	}
 
 	s.R[1] += bestScriptOffs
@@ -165,7 +166,8 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 
 	bestLangSysOffs := s.R[0]
 	if bestLangSysOffs == 0 {
-		return errors.New("no LangSys found in font")
+		// no language-specific script behavior is defined
+		return nil
 	}
 
 	s.A = s.R[1] + bestLangSysOffs
@@ -173,12 +175,10 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 		CmdSeek,
 		CmdRead16, TypeUInt, // lookupOrderOffset
 		CmdAssertEq, 0,
-		CmdRead16, TypeUInt, // requiredFeatureIndex
-		CmdStash,
+		CmdStash,            // requiredFeatureIndex
 		CmdRead16, TypeUInt, // featureIndexCount
 		CmdLoop,
-		CmdRead16, TypeUInt, // featureIndices[i]
-		CmdStash,
+		CmdStash, // featureIndices[i]
 		CmdEndLoop,
 
 		// Read the number of features in the feature list
@@ -229,8 +229,7 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 			CmdAssertEq, 0,
 			CmdRead16, TypeUInt, // lookupIndexCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // lookupIndex
-			CmdStash,
+			CmdStash, // lookupIndex
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -241,6 +240,7 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 	sort.Slice(lookupIndices, func(i, j int) bool {
 		return lookupIndices[i] < lookupIndices[j]
 	})
+
 	// remove duplicates
 	i := 1
 	for i < len(lookupIndices) {
@@ -250,17 +250,16 @@ func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 			i++
 		}
 	}
-	g.lookupIndices = lookupIndices
+	g.LookupIndices = lookupIndices
 
-	// Since more lookups might be required for recursive lookups, we
+	// Since more lookups might be required for nested lookups, we
 	// keep the complete list of lookupOffsets.
 	err = g.Exec(s,
 		CmdLoad, 3, // lookupListOffset
 		CmdSeek,
 		CmdRead16, TypeUInt, // lookupCount
 		CmdLoop,
-		CmdRead16, TypeUInt, // lookupOffset[i]
-		CmdStash,
+		CmdStash, // lookupOffset[i]
 		CmdEndLoop,
 	)
 	if err != nil {

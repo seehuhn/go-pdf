@@ -436,43 +436,6 @@ func (tt *Font) readGtabLookups(tableName string, langTag, scriptTag string) (*i
 	return fd, allLookups, nil
 }
 
-func (tt *Font) ReadGsubLigInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
-	fd, allLookups, err := tt.readGtabLookups("GSUB", langTag, scriptTag)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, l := range allLookups {
-		// https://docs.microsoft.com/en-us/typography/opentype/spec/features_ae#ccmp
-		if l.Tag != "ccmp" {
-			continue
-		}
-
-		switch l.Type {
-		case 6:
-			_, err := fd.Seek(l.Pos, io.SeekStart)
-			if err != nil {
-				return nil, err
-			}
-			var format uint16
-			err = binary.Read(fd, binary.BigEndian, &format)
-			if err != nil {
-				return nil, err
-			}
-			switch format {
-			default:
-				fmt.Printf("  - unsupported GSUB lookup type 6.%d\n", format)
-			}
-		default:
-			fmt.Printf("  - unsupported GSUB lookup type %d\n", l.Type)
-		}
-
-		// TODO(voss): also handle "liga"
-	}
-
-	return nil, nil
-}
-
 // ReadGposKernInfo reads kerning information from the "GPOS" table.
 func (tt *Font) ReadGposKernInfo(langTag, scriptTag string) (map[font.GlyphPair]int, error) {
 	fd, allLookups, err := tt.readGtabLookups("GPOS", langTag, scriptTag)
