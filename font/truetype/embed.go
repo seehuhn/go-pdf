@@ -80,10 +80,6 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	}
 
 	// TODO(voss): also include glyphs used for ligatures
-	_, err = tt.ReadGsubLigInfo("DEU ", "latn")
-	if err != nil {
-		return nil, err
-	}
 
 	// TODO(voss): subset the font as needed
 	// TODO(voss): if len(glyphs) < 256, write a Type 2 font.

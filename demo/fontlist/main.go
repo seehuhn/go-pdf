@@ -18,53 +18,54 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/font/sfnt/parser"
 )
 
 func tryFont(fname string) error {
+	// fmt.Println(fname)
 	tt, err := sfnt.Open(fname)
 	if err != nil {
 		return err
 	}
 	defer tt.Close()
 
-	_, err = tt.ReadGsubLigInfo("DEU ", "latn")
-	if table.IsMissing(err) {
+	if !tt.HasTables("GSUB") {
 		return nil
 	}
+
+	cmap, err := tt.SelectCmap()
 	if err != nil {
 		return err
 	}
 
-	// cmap, fd, err := tt.ReadCmapTable()
-	// if err != nil {
-	// 	return err
-	// }
-	// for _, encRec := range cmap.EncodingRecords {
-	// 	_, err := fd.Seek(int64(encRec.SubtableOffset), io.SeekStart)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	var format uint16
-	// 	err = binary.Read(fd, binary.BigEndian, &format)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if format != 12 {
-	// 		continue
-	// 	}
+	p := parser.New(tt)
+	info, err := p.ReadGsubInfo("latn", "ENG ")
+	if err != nil {
+		return err
+	}
 
-	// 	cmap, err := encRec.LoadCmap(fd, func(i int) rune { return rune(i) })
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	fmt.Println(len(cmap))
-	// }
+	s := "a nai\u0308ve, affluent Ba\u0308r"
+	var glyphs []font.GlyphID
+	for _, r := range s {
+		gid, ok := cmap[r]
+		if !ok {
+			return errors.New("missing glyph")
+		}
+		glyphs = append(glyphs, gid)
+	}
+	l1 := len(glyphs)
+
+	glyphs = info.Substitute(glyphs)
+	l2 := len(glyphs)
+
+	fmt.Println(l1, l2)
 
 	return nil
 }

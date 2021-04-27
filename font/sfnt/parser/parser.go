@@ -32,13 +32,13 @@ type State struct {
 	R   [8]int64 // TODO(voss): let the caller allocate this instead?
 	Tag string
 
-	Stash16 []uint16
+	Stash []uint16
 }
 
 // GetStash return the slice of stashed values and clears the stash.
 func (s *State) GetStash() []uint16 {
-	res := s.Stash16
-	s.Stash16 = nil
+	res := s.Stash
+	s.Stash = nil
 	return res
 }
 
@@ -155,7 +155,11 @@ func (p *Parser) Exec(s *State, cmds ...Command) error {
 		case CmdLoad:
 			s.A = s.R[arg]
 		case CmdStash:
-			s.Stash16 = append(s.Stash16, uint16(s.A))
+			buf, err := p.read(2)
+			if err != nil {
+				return err
+			}
+			s.Stash = append(s.Stash, uint16(buf[0])<<8+uint16(buf[1]))
 
 		case CmdDec:
 			s.A--

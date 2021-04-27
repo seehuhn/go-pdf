@@ -24,10 +24,10 @@ import (
 )
 
 func TestInterpreter(t *testing.T) {
-	// tt, err := sfnt.Open("../../truetype/ttf/SourceSerif4-Regular.ttf")
+	tt, err := sfnt.Open("../../truetype/ttf/SourceSerif4-Regular.ttf")
 	// tt, err := sfnt.Open("../../truetype/ttf/FreeSerif.ttf")
 	// tt, err := sfnt.Open("../../truetype/ttf/Roboto-Regular.ttf")
-	tt, err := sfnt.Open("/Applications/LibreOffice.app/Contents/Resources/fonts/truetype/DejaVuSerif.ttf")
+	// tt, err := sfnt.Open("/Applications/LibreOffice.app/Contents/Resources/fonts/truetype/DejaVuSerif.ttf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,21 +49,26 @@ func TestInterpreter(t *testing.T) {
 	}
 
 	p := New(tt)
-	gtab, err := newGTab(p, targetScript, targetLang)
+	gtab, err := NewGTab(p, targetScript, targetLang)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = gtab.init(tableName, includeFeature)
+	err = gtab.Init(tableName, includeFeature)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if tableName == "GSUB" {
-		for _, i := range gtab.lookupIndices {
-			_, err := gtab.getGsubLookup(i, "")
+		for _, idx := range gtab.LookupIndices {
+			l, err := gtab.GetGsubLookup(idx)
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			for _, subtable := range l {
+				subtable.explain(gtab, "")
+			}
+
 			fmt.Println("===========================================")
 		}
 	}

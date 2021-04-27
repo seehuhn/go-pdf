@@ -27,6 +27,45 @@ import (
 // http://adobe-type-tools.github.io/afdko/OpenTypeFeatureFileSpecification.html#7
 // TODO(voss): read this carefully
 
+// GsubInfo represents the information from the "GSUB" table of a font.
+type GsubInfo []gsubLookup
+
+// ReadGsubInfo reads the "GSUB" table of a font, for a given writing script
+// and language.
+func (p *Parser) ReadGsubInfo(script, lang string) (GsubInfo, error) {
+	gtab, err := NewGTab(p, script, lang)
+	if err != nil {
+		return nil, err
+	}
+
+	includeFeature := map[string]bool{
+		"ccmp": true,
+		"liga": true,
+		"clig": true,
+	}
+	err = gtab.Init("GSUB", includeFeature)
+	if err != nil {
+		return nil, err
+	}
+
+	var res GsubInfo
+	for _, idx := range gtab.LookupIndices {
+		l, err := gtab.GetGsubLookup(idx)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, l)
+	}
+	return res, nil
+}
+
+func (gsub GsubInfo) Substitute(glyphs []font.GlyphID) []font.GlyphID {
+	for _, l := range gsub {
+		glyphs = l.Substitute(glyphs)
+	}
+	return glyphs
+}
+
 type gsubLookup []gsubLookupSubtable
 
 func (l gsubLookup) Substitute(glyphs []font.GlyphID) []font.GlyphID {
@@ -46,7 +85,7 @@ glyphLoop:
 	return glyphs
 }
 
-func (g *gTab) getGsubLookup(idx uint16, pfx string) (gsubLookup, error) {
+func (g *gTab) GetGsubLookup(idx uint16) (gsubLookup, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
 	}
@@ -57,14 +96,11 @@ func (g *gTab) getGsubLookup(idx uint16, pfx string) (gsubLookup, error) {
 	s.A = base
 	err := g.Exec(s,
 		CmdSeek,
-		CmdRead16, TypeUInt, // lookupType
-		CmdStash,
-		CmdRead16, TypeUInt, // lookupFlag
-		CmdStash,
+		CmdStash,            // lookupType
+		CmdStash,            // lookupFlag
 		CmdRead16, TypeUInt, // subtableCount
 		CmdLoop,
-		CmdRead16, TypeUInt, // subtableOffset
-		CmdStash,
+		CmdStash, // subtableOffset
 		CmdEndLoop,
 	)
 	if err != nil {
@@ -85,10 +121,8 @@ func (g *gTab) getGsubLookup(idx uint16, pfx string) (gsubLookup, error) {
 	_ = markFilteringSet // TODO(voss): use this correctly
 
 	var lookup gsubLookup
-	for _, inc := range subtables {
-		subtablePos := base + int64(inc)
-
-		res, err := g.readGsubSubtable(s, flags, format, subtablePos, pfx)
+	for _, offs := range subtables {
+		res, err := g.readGsubSubtable(s, flags, format, base+int64(offs))
 		if err != nil {
 			return nil, err
 		}
@@ -99,8 +133,8 @@ func (g *gTab) getGsubLookup(idx uint16, pfx string) (gsubLookup, error) {
 	return lookup, nil
 }
 
-func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int64, pfx string) (gsubLookupSubtable, error) {
-	// TODO(voss): is this called more than once for the same subtablePos?6_3 -> use caching?
+func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int64) (gsubLookupSubtable, error) {
+	// TODO(voss): is this called more than once for the same subtablePos? -> use caching?
 	s.A = subtablePos
 	err := g.Exec(s,
 		CmdSeek,
@@ -141,8 +175,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			CmdStore, 0,
 			CmdRead16, TypeUInt, // glyphCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // substitutefont.GlyphIndex[i]
-			CmdStash,
+			CmdStash, // substitutefont.GlyphIndex[i]
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -169,8 +202,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			CmdStore, 0,
 			CmdRead16, TypeUInt, // sequenceCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // sequenceOffset[i]
-			CmdStash,
+			CmdStash, // sequenceOffset[i]
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -192,8 +224,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				CmdSeek,
 				CmdRead16, TypeUInt, // glyphCount
 				CmdLoop,
-				CmdRead16, TypeUInt, // substituteGlyphID[j]
-				CmdStash,
+				CmdStash, // substituteGlyphID[j]
 				CmdEndLoop,
 			)
 			if err != nil {
@@ -213,8 +244,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			CmdStore, 0,
 			CmdRead16, TypeUInt, // ligatureSetCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // ligatureSetOffset[i]
-			CmdStash,
+			CmdStash, // ligatureSetOffset[i]
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -240,8 +270,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				CmdSeek,
 				CmdRead16, TypeUInt, // ligatureCount
 				CmdLoop,
-				CmdRead16, TypeUInt, // ligatureOffset[i]
-				CmdStash,
+				CmdStash, // ligatureOffset[i]
 				CmdEndLoop,
 			)
 			if err != nil {
@@ -252,13 +281,12 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				s.A = ligSetTablePos + int64(o2)
 				err = g.Exec(s,
 					CmdSeek,
-					CmdRead16, TypeUInt, // ligatureGlyph
-					CmdStash,
+					CmdStash,            // ligatureGlyph
 					CmdRead16, TypeUInt, // componentCount
+					CmdAssertGt, 0,
 					CmdDec,
 					CmdLoop,
-					CmdRead16, TypeUInt, // componentfont.GlyphIndex[i]
-					CmdStash,
+					CmdStash, // componentfont.GlyphIndex[i]
 					CmdEndLoop,
 				)
 				if err != nil {
@@ -274,18 +302,237 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		}
 		res = xxx
 
+	case 5_2: // Context Substitution: Class-based Glyph Contexts
+		err = g.Exec(s,
+			CmdStash, // coverageOffset
+			CmdStash, // classDefOffset
+
+			CmdRead16, TypeUInt, // classSeqRuleSetCount
+			CmdLoop,
+			CmdStash, // classSeqRuleSetOffsets[i]
+			CmdEndLoop,
+		)
+		if err != nil {
+			return nil, err
+		}
+		stash := s.GetStash()
+		coverageOffset := stash[0]
+		classDefOffset := stash[1]
+		classSeqRuleSetOffsets := stash[2:]
+
+		cov, err := g.readCoverageTable(subtablePos + int64(coverageOffset))
+		if err != nil {
+			return nil, err
+		}
+		input, err := g.readClassDefTable(subtablePos + int64(classDefOffset))
+		if err != nil {
+			return nil, err
+		}
+
+		xxx := &gsub5_2{
+			flags:    flags,
+			cov:      cov,
+			input:    input,
+			rulesets: make([]classSeqRuleSet, len(classSeqRuleSetOffsets)),
+		}
+
+		for i, offs := range classSeqRuleSetOffsets {
+			if offs == 0 {
+				continue
+			}
+			classSeqRuleSetPos := subtablePos + int64(offs)
+			s.A = classSeqRuleSetPos
+			err = g.Exec(s,
+				CmdSeek,
+				CmdRead16, TypeUInt, // classSeqRuleCount
+				CmdLoop,
+				CmdStash, // classSeqRuleOffsets[i]
+				CmdEndLoop,
+			)
+			if err != nil {
+				return nil, err
+			}
+			classSeqRuleOffsets := s.GetStash()
+
+			var ruleSet classSeqRuleSet
+			for _, ruleOffs := range classSeqRuleOffsets {
+				rule := &classSequenceRule{}
+
+				s.A = classSeqRuleSetPos + int64(ruleOffs)
+				err = g.Exec(s,
+					CmdSeek,
+					CmdRead16, TypeUInt, // glyphCount
+					CmdStore, 0,
+					CmdRead16, TypeUInt, // seqLookupCount
+					CmdStore, 1,
+					CmdLoad, 0,
+					CmdAssertGt, 0,
+					CmdDec,
+					CmdLoop,
+					CmdStash, // inputSequence[i]
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				for _, class := range s.GetStash() {
+					rule.input = append(rule.input, int(class))
+				}
+
+				err = g.Exec(s,
+					CmdLoad, 1,
+					CmdLoop,
+					CmdStash, // seqLookupRecord.sequenceIndex
+					CmdStash, // seqLookupRecord.lookupListIndex
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				seqLookupRecord := s.GetStash()
+
+				for len(seqLookupRecord) > 0 {
+					l, err := g.GetGsubLookup(seqLookupRecord[1])
+					if err != nil {
+						return nil, err
+					}
+					rule.actions = append(rule.actions, seqLookup{
+						pos:    int(seqLookupRecord[0]),
+						nested: l,
+					})
+					seqLookupRecord = seqLookupRecord[2:]
+				}
+
+				ruleSet = append(ruleSet, rule)
+			}
+			xxx.rulesets[i] = ruleSet
+		}
+
+		res = xxx
+
+	case 6_1: // Chained Contexts Substitution: Simple Glyph Contexts
+		err = g.Exec(s,
+			CmdRead16, TypeUInt, // coverageOffset
+			CmdStore, 0,
+			CmdRead16, TypeUInt, // chainedSeqRuleSetCount
+			CmdLoop,
+			CmdStash, // chainedSeqRuleSetOffsets[i]
+			CmdEndLoop,
+		)
+		if err != nil {
+			return nil, err
+		}
+		chainedSeqRuleSetOffsets := s.GetStash()
+		cov, err := g.readCoverageTable(subtablePos + s.R[0])
+		if err != nil {
+			return nil, err
+		}
+
+		xxx := &gsub6_1{
+			flags: flags,
+			cov:   cov,
+		}
+		for _, offs := range chainedSeqRuleSetOffsets {
+			if offs == 0 {
+				xxx.rulesets = append(xxx.rulesets, nil)
+				continue
+			}
+
+			chainedSequenceRuleSetPos := subtablePos + int64(offs)
+			s.A = chainedSequenceRuleSetPos
+			err = g.Exec(s,
+				CmdSeek,
+				CmdRead16, TypeUInt, // chainedSeqRuleCount
+				CmdLoop,
+				CmdStash, // chainedSeqRuleOffsets[i]
+				CmdEndLoop,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			var ruleset chainedSeqRuleSet
+			chainedSeqRuleOffsets := s.GetStash()
+			for _, offs := range chainedSeqRuleOffsets {
+				rule := &chainedSequenceRule{}
+
+				s.A = chainedSequenceRuleSetPos + int64(offs)
+				err = g.Exec(s,
+					CmdSeek,
+					CmdRead16, TypeUInt, // backtrackGlyphCount
+					CmdLoop,
+					CmdStash, // backtrackSequence[i]
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				rule.backtrack = stashToGlyphs(s.GetStash())
+
+				err = g.Exec(s,
+					CmdRead16, TypeUInt, // inputGlyphCount
+					CmdAssertGt, 0,
+					CmdDec,
+					CmdLoop,
+					CmdStash, // inputSequence[i]
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				rule.input = stashToGlyphs(s.GetStash())
+
+				err = g.Exec(s,
+					CmdRead16, TypeUInt, // lookaheadGlyphCount
+					CmdLoop,
+					CmdStash, // lookaheadSequence[i]
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				rule.lookahead = stashToGlyphs(s.GetStash())
+
+				err = g.Exec(s,
+					CmdRead16, TypeUInt, // seqLookupCount
+					CmdLoop,
+					CmdStash, // seqLookupRecord.sequenceIndex
+					CmdStash, // seqLookupRecord.lookupListIndex
+					CmdEndLoop,
+				)
+				if err != nil {
+					return nil, err
+				}
+				seqLookupRecord := s.GetStash()
+
+				for len(seqLookupRecord) > 0 {
+					l, err := g.GetGsubLookup(seqLookupRecord[1])
+					if err != nil {
+						return nil, err
+					}
+					rule.actions = append(rule.actions, seqLookup{
+						pos:    int(seqLookupRecord[0]),
+						nested: l,
+					})
+					seqLookupRecord = seqLookupRecord[2:]
+				}
+
+				ruleset = append(ruleset, rule)
+			}
+			xxx.rulesets = append(xxx.rulesets, ruleset)
+		}
+		res = xxx
+
 	case 6_2: // Chained Contexts Substitution: Class-based Glyph Contexts
 		err = g.Exec(s,
-			CmdLoadI, 4,
-			CmdLoop,
-			CmdRead16, TypeUInt, // coverageOffset, backtrackClassDefOffset, inputClassDefOffset, lookaheadClassDefOffset
-			CmdStash,
-			CmdEndLoop,
+			CmdStash, // coverageOffset
+			CmdStash, // backtrackClassDefOffset
+			CmdStash, // inputClassDefOffset
+			CmdStash, // lookaheadClassDefOffset
 
 			CmdRead16, TypeUInt, // chainedClassSeqRuleSetCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // chainedClassSeqRuleSetOffset[i]
-			CmdStash,
+			CmdStash, // chainedClassSeqRuleSetOffset[i]
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -303,8 +550,17 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			return nil, err
 		}
 		backtrack, err := g.readClassDefTable(subtablePos + int64(backtrackClassDefOffset))
+		if err != nil {
+			return nil, err
+		}
 		input, err := g.readClassDefTable(subtablePos + int64(inputClassDefOffset))
+		if err != nil {
+			return nil, err
+		}
 		lookahead, err := g.readClassDefTable(subtablePos + int64(lookaheadClassDefOffset))
+		if err != nil {
+			return nil, err
+		}
 
 		xxx := &gsub6_2{
 			flags:     flags,
@@ -326,8 +582,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				CmdSeek,
 				CmdRead16, TypeUInt, // chainedClassSeqRuleCount
 				CmdLoop,
-				CmdRead16, TypeUInt, // chainedClassSeqRuleOffsets[i]
-				CmdStash,
+				CmdStash, // chainedClassSeqRuleOffsets[i]
 				CmdEndLoop,
 			)
 			if err != nil {
@@ -344,8 +599,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 					CmdSeek,
 					CmdRead16, TypeUInt, // backtrackGlyphCount
 					CmdLoop,
-					CmdRead16, TypeUInt, // backtrackSequence[i]
-					CmdStash,
+					CmdStash, // backtrackSequence[i]
 					CmdEndLoop,
 				)
 				if err != nil {
@@ -361,8 +615,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 					CmdAssertGt, 0,
 					CmdDec,
 					CmdLoop,
-					CmdRead16, TypeUInt, // inputSequence[i]
-					CmdStash,
+					CmdStash, // inputSequence[i]
 					CmdEndLoop,
 				)
 				if err != nil {
@@ -376,8 +629,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				err = g.Exec(s,
 					CmdRead16, TypeUInt, // lookaheadGlyphCount
 					CmdLoop,
-					CmdRead16, TypeUInt, // lookaheadSequence[i]
-					CmdStash,
+					CmdStash, // lookaheadSequence[i]
 					CmdEndLoop,
 				)
 				if err != nil {
@@ -391,10 +643,8 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				err = g.Exec(s,
 					CmdRead16, TypeUInt, // seqLookupCount
 					CmdLoop,
-					CmdRead16, TypeUInt, // seqLookupRecord.sequenceIndex
-					CmdStash,
-					CmdRead16, TypeUInt, // seqLookupRecord.lookupListIndex
-					CmdStash,
+					CmdStash, // seqLookupRecord.sequenceIndex
+					CmdStash, // seqLookupRecord.lookupListIndex
 					CmdEndLoop,
 				)
 				if err != nil {
@@ -403,7 +653,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				seqLookupRecord := s.GetStash()
 
 				for len(seqLookupRecord) > 0 {
-					l, err := g.getGsubLookup(seqLookupRecord[1], "-")
+					l, err := g.GetGsubLookup(seqLookupRecord[1])
 					if err != nil {
 						return nil, err
 					}
@@ -424,8 +674,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // backtrackGlyphCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // backtrackCoverageOffset
-			CmdStash,
+			CmdStash, // backtrackCoverageOffset
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -436,8 +685,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // inputGlyphCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // inputCoverageOffset
-			CmdStash,
+			CmdStash, // inputCoverageOffset
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -448,8 +696,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // lookaheadGlyphCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // lookaheadCoverageOffset
-			CmdStash,
+			CmdStash, // lookaheadCoverageOffset
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -460,10 +707,8 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // seqLookupCount
 			CmdLoop,
-			CmdRead16, TypeUInt, // seqLookupRecord.sequenceIndex
-			CmdStash,
-			CmdRead16, TypeUInt, // seqLookupRecord.lookupListIndex
-			CmdStash,
+			CmdStash, // seqLookupRecord.sequenceIndex
+			CmdStash, // seqLookupRecord.lookupListIndex
 			CmdEndLoop,
 		)
 		if err != nil {
@@ -497,7 +742,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			xxx.lookahead = append(xxx.lookahead, cover)
 		}
 		for len(seqLookupRecord) > 0 {
-			l, err := g.getGsubLookup(seqLookupRecord[1], "-")
+			l, err := g.GetGsubLookup(seqLookupRecord[1])
 			if err != nil {
 				return nil, err
 			}
@@ -508,14 +753,25 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			seqLookupRecord = seqLookupRecord[2:]
 		}
 		res = xxx
+
+	case 7_1: // Extension Substitution Subtable Format 1
+		err = g.Exec(s,
+			CmdRead16, TypeUInt, // extensionLookupType
+			CmdStore, 0,
+			CmdRead32, TypeUInt, // extensionOffset
+		)
+		if err != nil {
+			return nil, err
+		}
+		if s.R[0] == 7 {
+			return nil, g.error("invalid extension lookup")
+		}
+		return g.readGsubSubtable(s, flags, uint16(s.R[0]), subtablePos+s.A)
 	}
 
 	if res == nil {
-		fmt.Printf("%sunsupported lookup type %d.%d\n", pfx, format, subFormat)
-	} else if pfx != "-" {
-		res.Explain(g, pfx)
+		return nil, g.error("unsupported lookup type %d.%d\n", format, subFormat)
 	}
-	fmt.Println()
 
 	return res, nil
 }
@@ -530,7 +786,7 @@ func stashToGlyphs(x []uint16) []font.GlyphID {
 
 type gsubLookupSubtable interface {
 	Replace(int, []font.GlyphID) (int, []font.GlyphID)
-	Explain(g *gTab, pfx string)
+	explain(g *gTab, pfx string)
 }
 
 type gsub1_1 struct {
@@ -552,9 +808,9 @@ func (l *gsub1_1) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
 	return i + 1, seq
 }
 
-func (l *gsub1_1) Explain(g *gTab, pfx string) {
+func (l *gsub1_1) explain(g *gTab, pfx string) {
 	fmt.Printf(pfx+"lookup type 1.1, flags=0x%04x\n", l.flags)
-	for gid, _ := range l.cov {
+	for gid := range l.cov {
 		repl := font.GlyphID(uint16(gid) + l.delta)
 		fmt.Printf("%s\t%s -> %s\n",
 			pfx, g.glyphName(gid), g.glyphName(repl))
@@ -580,7 +836,7 @@ func (l *gsub1_2) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
 	return i + 1, seq
 }
 
-func (l *gsub1_2) Explain(g *gTab, pfx string) {
+func (l *gsub1_2) explain(g *gTab, pfx string) {
 	fmt.Printf(pfx+"lookup type 1.2, flags=0x%04x\n", l.flags)
 	for gid, k := range l.cov {
 		fmt.Printf("%s\t%s -> %s\n",
@@ -611,7 +867,7 @@ func (l *gsub2_1) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
 	return i + n, res
 }
 
-func (l *gsub2_1) Explain(g *gTab, pfx string) {
+func (l *gsub2_1) explain(g *gTab, pfx string) {
 	fmt.Printf(pfx+"lookup type 2.1, flags=0x%04x\n", l.flags)
 	for inGid, k := range l.cov {
 		var out []string
@@ -664,7 +920,7 @@ ligLoop:
 	return i, seq
 }
 
-func (l *gsub4_1) Explain(g *gTab, pfx string) {
+func (l *gsub4_1) explain(g *gTab, pfx string) {
 	fmt.Printf(pfx+"lookup type 4.1, flags=0x%04x\n", l.flags)
 	for inGid, k := range l.cov {
 		ligSet := l.repl[k]
@@ -676,6 +932,124 @@ func (l *gsub4_1) Explain(g *gTab, pfx string) {
 			}
 			fmt.Printf("%s\t%s -> %s\n",
 				pfx, strings.Join(in, ""), g.glyphName(lig.out))
+		}
+	}
+}
+
+type gsub5_2 struct {
+	flags    uint16
+	cov      coverage
+	input    classDef
+	rulesets []classSeqRuleSet // indexed by the input class, can be nil
+}
+
+type classSeqRuleSet []*classSequenceRule
+
+type classSequenceRule struct {
+	input   []int
+	actions []seqLookup
+}
+
+func (l *gsub5_2) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
+	if l.flags != 0 {
+		panic("not implemented")
+	}
+
+	gid := seq[pos]
+	_, ok := l.cov[gid]
+	if !ok {
+		return pos, seq
+	}
+
+	class := l.input[gid]
+	if class >= len(l.rulesets) {
+		return pos, seq
+	}
+
+rulesetLoop:
+	for _, rule := range l.rulesets[class] {
+		if pos+1+len(rule.input) >= len(seq) {
+			continue
+		}
+		for i, class := range rule.input {
+			if l.input[seq[pos+1+i]] != class {
+				continue rulesetLoop
+			}
+		}
+
+		return applyActions(rule.actions, pos, len(rule.input)+1, seq)
+	}
+	return pos, seq
+}
+
+func (l *gsub5_2) explain(g *gTab, pfx string) {
+	fmt.Printf(pfx+"lookup type 5.2, flags=0x%04x\n", l.flags)
+	pfx = pfx + "\t"
+
+	fmt.Println(pfx+"Cov", g.explainCoverage(l.cov))
+	fmt.Println(pfx+"Class", l.input)
+	for i, ruleset := range l.rulesets {
+		for j, rule := range ruleset {
+			apfx := pfx + "@" + strconv.Itoa(i) + "." + strconv.Itoa(j)
+			fmt.Println(apfx, i, rule.input)
+			for _, action := range rule.actions {
+				for _, subtable := range action.nested {
+					// TODO(voss): somehow show action.pos
+					subtable.explain(g, apfx)
+				}
+			}
+		}
+	}
+}
+
+type gsub6_1 struct {
+	flags    uint16
+	cov      coverage
+	rulesets []chainedSeqRuleSet
+}
+
+type chainedSeqRuleSet []*chainedSequenceRule
+
+type chainedSequenceRule struct {
+	backtrack []font.GlyphID
+	input     []font.GlyphID
+	lookahead []font.GlyphID
+	actions   []seqLookup
+}
+
+func (l *gsub6_1) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
+	if l.flags != 0 {
+		panic("not implemented")
+	}
+
+	ruleNo := l.cov[seq[pos]]
+	if ruleNo >= len(l.rulesets) || l.rulesets[ruleNo] == nil {
+		return pos, seq
+	}
+
+	panic("not implemented")
+}
+
+func (l *gsub6_1) explain(g *gTab, pfx string) {
+	fmt.Printf(pfx+"lookup type 6.1, flags=0x%04x\n", l.flags)
+	pfx = pfx + "\t"
+
+	fmt.Println(pfx+"Cov", g.explainCoverage(l.cov))
+	for gid, i := range l.cov {
+		ruleset := l.rulesets[i]
+		for j, rule := range ruleset {
+			fmt.Println(pfx+"b"+strconv.Itoa(i)+"."+strconv.Itoa(j),
+				rule.backtrack)
+			fmt.Println(pfx+"i"+strconv.Itoa(i)+"."+strconv.Itoa(j),
+				gid, rule.input)
+			fmt.Println(pfx+"l"+strconv.Itoa(i)+"."+strconv.Itoa(j),
+				rule.lookahead)
+			apfx := pfx + "@" + strconv.Itoa(i) + "." + strconv.Itoa(j)
+			for _, action := range rule.actions {
+				for _, subtable := range action.nested {
+					subtable.explain(g, apfx)
+				}
+			}
 		}
 	}
 }
@@ -711,7 +1085,7 @@ func (l *gsub6_2) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
 	panic("not implemented")
 }
 
-func (l *gsub6_2) Explain(g *gTab, pfx string) {
+func (l *gsub6_2) explain(g *gTab, pfx string) {
 	fmt.Printf(pfx+"lookup type 6.2, flags=0x%04x\n", l.flags)
 	pfx = pfx + "\t"
 
@@ -731,7 +1105,7 @@ func (l *gsub6_2) Explain(g *gTab, pfx string) {
 			apfx := pfx + "@" + strconv.Itoa(i) + "." + strconv.Itoa(j)
 			for _, action := range rule.actions {
 				for _, subtable := range action.nested {
-					subtable.Explain(g, apfx)
+					subtable.explain(g, apfx)
 				}
 			}
 		}
@@ -779,8 +1153,31 @@ func (l *gsub6_3) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
 		}
 	}
 
-	origLen := len(seq)
+	return applyActions(l.actions, pos, len(l.input), seq)
+}
+
+func (l *gsub6_3) explain(g *gTab, pfx string) {
+	fmt.Printf(pfx+"lookup type 6.3, flags=0x%04x\n", l.flags)
+	pfx = pfx + "\t"
+	for i := len(l.backtrack) - 1; i >= 0; i-- {
+		fmt.Println(pfx+"B", g.explainCoverage(l.backtrack[i]))
+	}
+	for _, cov := range l.input {
+		fmt.Println(pfx+"I", g.explainCoverage(cov))
+	}
+	for _, cov := range l.lookahead {
+		fmt.Println(pfx+"L", g.explainCoverage(cov))
+	}
 	for _, action := range l.actions {
+		for _, subtable := range action.nested {
+			subtable.explain(g, pfx+"@"+strconv.Itoa(action.pos))
+		}
+	}
+}
+
+func applyActions(actions []seqLookup, pos, length int, seq []font.GlyphID) (int, []font.GlyphID) {
+	origLen := len(seq)
+	for _, action := range actions {
 		// TODO(voss): how to interpret action.pos in case a prior action
 		// changes the length of seq?
 		aPos := pos + action.pos
@@ -798,24 +1195,5 @@ func (l *gsub6_3) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
 		}
 	}
 
-	return pos + len(l.input), seq
-}
-
-func (l *gsub6_3) Explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 6.3, flags=0x%04x\n", l.flags)
-	pfx = pfx + "\t"
-	for i := len(l.backtrack) - 1; i >= 0; i-- {
-		fmt.Println(pfx+"B", g.explainCoverage(l.backtrack[i]))
-	}
-	for _, cov := range l.input {
-		fmt.Println(pfx+"I", g.explainCoverage(cov))
-	}
-	for _, cov := range l.lookahead {
-		fmt.Println(pfx+"L", g.explainCoverage(cov))
-	}
-	for _, action := range l.actions {
-		for _, subtable := range action.nested {
-			subtable.Explain(g, pfx+"@"+strconv.Itoa(action.pos))
-		}
-	}
+	return pos + length, seq
 }
