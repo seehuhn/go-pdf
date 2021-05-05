@@ -22,6 +22,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 const bufferSize = 1024
@@ -57,6 +58,8 @@ type Parser struct {
 
 	// TODO(voss): can I get rid of this?
 	Funcs []func(*State)
+
+	classDefCache map[int64]ClassDef
 }
 
 // New allocates a new Parser.  SetTable() must be called before the
@@ -73,12 +76,14 @@ func New(tt *sfnt.Font) *Parser {
 func (p *Parser) OpenTable(tableName string) error {
 	info := p.tt.Header.Find(tableName)
 	if info == nil {
-		return fmt.Errorf("table %q not found", tableName)
+		return &table.ErrNoTable{Name: tableName}
 	}
 
 	p.tableName = tableName
 	p.start = int64(info.Offset)
 	p.end = int64(info.Offset) + int64(info.Length)
+
+	p.classDefCache = make(map[int64]ClassDef)
 
 	return p.seek(0)
 }
@@ -89,6 +94,7 @@ func (p *Parser) Exec(s *State, cmds ...Command) error {
 	var loopStartPC int
 	var loopCount int
 
+CommandLoop:
 	for PC < len(cmds) {
 		cmd := cmds[PC]
 		PC++
@@ -179,6 +185,12 @@ func (p *Parser) Exec(s *State, cmds ...Command) error {
 		case CmdCmpLt:
 			target := int64(int8(arg))
 			s.A = encodeBool[s.A < target]
+
+		case CmdExitIfLt:
+			target := int64(int8(arg))
+			if s.A < target {
+				break CommandLoop
+			}
 
 		case CmdAssertEq:
 			target := int64(arg)
@@ -319,6 +331,7 @@ const (
 	CmdCmpEq           // arg: comparison value
 	CmdCmpGe           // arg: comparison value
 	CmdCmpLt           // arg: comparison value
+	CmdExitIfLt        // arg: comparison value
 	CmdAssertEq        // arg: comparison value
 	CmdAssertGe        // arg: comparison value
 	CmdAssertGt        // arg: comparison value

@@ -1142,7 +1142,6 @@ func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langTag, scriptTag strin
 		todo = append(todo, todoEntry{langSys.FeatureIndices[i], false})
 	}
 
-	fmt.Println(GPOS.V10.FeatureListOffset)
 	featureListBase := int64(GPOS.V10.FeatureListOffset)
 
 	data := &featureList{}

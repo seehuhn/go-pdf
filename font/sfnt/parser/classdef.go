@@ -4,8 +4,8 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
-	res, ok := g.classDefCache[pos]
+func (p *Parser) readClassDefTable(pos int64) (ClassDef, error) {
+	res, ok := p.classDefCache[pos]
 	if ok {
 		return res, nil
 	}
@@ -13,7 +13,7 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 	s := &State{
 		A: pos,
 	}
-	err := g.Exec(s,
+	err := p.Exec(s,
 		CmdSeek,
 		CmdRead16, TypeUInt, // format
 	)
@@ -22,10 +22,10 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 	}
 	format := int(s.A)
 
-	res = make(classDef)
+	res = make(ClassDef)
 	switch format {
 	case 1:
-		err = g.Exec(s,
+		err = p.Exec(s,
 			CmdStash,            // startGlyphID
 			CmdRead16, TypeUInt, // glyphCount
 			CmdLoop,
@@ -44,7 +44,7 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 			res[startGlyphID+font.GlyphID(gidOffs)] = int(class)
 		}
 	case 2:
-		err = g.Exec(s,
+		err = p.Exec(s,
 			CmdRead16, TypeUInt, // classRangeCount
 			CmdLoop,
 			CmdStash, // classRangeRecords[i].startGlyphID
@@ -61,7 +61,7 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 			end := int(stash[1])
 			class := int(stash[2])
 			if end < start {
-				return nil, g.error("corrupt classDef record")
+				return nil, p.error("corrupt classDef record")
 			}
 			if class != 0 {
 				for gid := start; gid <= end; gid++ {
@@ -71,11 +71,15 @@ func (g *gTab) readClassDefTable(pos int64) (classDef, error) {
 			stash = stash[3:]
 		}
 	default:
-		return nil, g.error("unsupported classDef format %d", format)
+		return nil, p.error("unsupported classDef format %d", format)
 	}
+
+	p.classDefCache[pos] = res
 
 	return res, nil
 }
 
+// ClassDef represents the contents of a Class Definition Table
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
 // TODO(voss): using uint16 instead of int?
-type classDef map[font.GlyphID]int
+type ClassDef map[font.GlyphID]int

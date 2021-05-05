@@ -17,7 +17,6 @@
 package parser
 
 import (
-	"fmt"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/sfnt"
@@ -49,7 +48,7 @@ func TestInterpreter(t *testing.T) {
 	}
 
 	p := New(tt)
-	gtab, err := NewGTab(p, targetScript, targetLang)
+	gtab, err := newGTab(p, targetScript, targetLang)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,18 +59,10 @@ func TestInterpreter(t *testing.T) {
 
 	if tableName == "GSUB" {
 		for _, idx := range gtab.LookupIndices {
-			l, err := gtab.GetGsubLookup(idx)
+			_, err := gtab.GetGsubLookup(idx)
 			if err != nil {
 				t.Fatal(err)
 			}
-
-			for _, subtable := range l {
-				subtable.explain(gtab, "")
-			}
-
-			fmt.Println("===========================================")
 		}
 	}
-
-	t.Error("fish")
 }

@@ -18,8 +18,6 @@ package parser
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	"seehuhn.de/go/pdf/font"
 )
@@ -28,12 +26,12 @@ import (
 // TODO(voss): read this carefully
 
 // GsubInfo represents the information from the "GSUB" table of a font.
-type GsubInfo []gsubLookup
+type GsubInfo []*GsubLookup
 
 // ReadGsubInfo reads the "GSUB" table of a font, for a given writing script
 // and language.
 func (p *Parser) ReadGsubInfo(script, lang string) (GsubInfo, error) {
-	gtab, err := NewGTab(p, script, lang)
+	gtab, err := newGTab(p, script, lang)
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +57,8 @@ func (p *Parser) ReadGsubInfo(script, lang string) (GsubInfo, error) {
 	return res, nil
 }
 
+// Substitute applies transformations from the selected GSUB lookups to a
+// series of glyphs.
 func (gsub GsubInfo) Substitute(glyphs []font.GlyphID) []font.GlyphID {
 	for _, l := range gsub {
 		glyphs = l.Substitute(glyphs)
@@ -66,26 +66,38 @@ func (gsub GsubInfo) Substitute(glyphs []font.GlyphID) []font.GlyphID {
 	return glyphs
 }
 
-type gsubLookup []gsubLookupSubtable
+type GsubLookup struct {
+	subtables        []gsubLookupSubtable
+	Flags            uint16
+	markFilteringSet uint16
+}
 
-func (l gsubLookup) Substitute(glyphs []font.GlyphID) []font.GlyphID {
+func (l *GsubLookup) Replace(glyphs []font.GlyphID, pos int) ([]font.GlyphID, int) {
+	var next int
+	for _, subtable := range l.subtables {
+		glyphs, next = subtable.Replace(l.Flags, glyphs, pos)
+		if next > pos {
+			return glyphs, next
+		}
+	}
+	return glyphs, pos
+}
+
+func (l *GsubLookup) Substitute(glyphs []font.GlyphID) []font.GlyphID {
 	pos := 0
-glyphLoop:
 	for pos < len(glyphs) {
 		var next int
-		for _, subtable := range l {
-			next, glyphs = subtable.Replace(pos, glyphs)
-			if next > pos {
-				pos = next
-				continue glyphLoop
-			}
+		glyphs, next = l.Replace(glyphs, pos)
+		if next > pos {
+			pos = next
+		} else {
+			pos++
 		}
-		pos++
 	}
 	return glyphs
 }
 
-func (g *gTab) GetGsubLookup(idx uint16) (gsubLookup, error) {
+func (g *gTab) GetGsubLookup(idx uint16) (*GsubLookup, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
 	}
@@ -120,20 +132,22 @@ func (g *gTab) GetGsubLookup(idx uint16) (gsubLookup, error) {
 	}
 	_ = markFilteringSet // TODO(voss): use this correctly
 
-	var lookup gsubLookup
+	lookup := &GsubLookup{
+		Flags: flags,
+	}
 	for _, offs := range subtables {
-		res, err := g.readGsubSubtable(s, flags, format, base+int64(offs))
+		res, err := g.readGsubSubtable(s, format, base+int64(offs))
 		if err != nil {
 			return nil, err
 		}
 
-		lookup = append(lookup, res)
+		lookup.subtables = append(lookup.subtables, res)
 	}
 
 	return lookup, nil
 }
 
-func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int64) (gsubLookupSubtable, error) {
+func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsubLookupSubtable, error) {
 	// TODO(voss): is this called more than once for the same subtablePos? -> use caching?
 	s.A = subtablePos
 	err := g.Exec(s,
@@ -164,7 +178,6 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			return nil, err
 		}
 		res = &gsub1_1{
-			flags: flags,
 			cov:   cov,
 			delta: delta,
 		}
@@ -191,7 +204,6 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			return nil, err
 		}
 		res = &gsub1_2{
-			flags:              flags,
 			cov:                cov,
 			substituteGlyphIDs: stashToGlyphs(repl),
 		}
@@ -233,9 +245,8 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			repl[i] = stashToGlyphs(s.GetStash())
 		}
 		res = &gsub2_1{
-			flags: flags,
-			cov:   cov,
-			repl:  repl,
+			cov:  cov,
+			repl: repl,
 		}
 
 	case 4_1: // Ligature Substitution Subtable
@@ -256,9 +267,8 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 			return nil, err
 		}
 		xxx := &gsub4_1{
-			flags: flags,
-			cov:   cov,
-			repl:  make([][]ligature, len(ligatureSetOffsets)),
+			cov:  cov,
+			repl: make([][]ligature, len(ligatureSetOffsets)),
 		}
 		for _, i := range cov {
 			if i >= len(ligatureSetOffsets) {
@@ -330,7 +340,6 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		}
 
 		xxx := &gsub5_2{
-			flags:    flags,
 			cov:      cov,
 			input:    input,
 			rulesets: make([]classSeqRuleSet, len(classSeqRuleSetOffsets)),
@@ -429,8 +438,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		}
 
 		xxx := &gsub6_1{
-			flags: flags,
-			cov:   cov,
+			cov: cov,
 		}
 		for _, offs := range chainedSeqRuleSetOffsets {
 			if offs == 0 {
@@ -563,7 +571,6 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		}
 
 		xxx := &gsub6_2{
-			flags:     flags,
 			cov:       cov,
 			backtrack: backtrack,
 			input:     input,
@@ -589,10 +596,10 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 				return nil, err
 			}
 
-			var ruleset seqRuleSet
+			var ruleset chainedClassSeqRuleSet
 			chainedClassSeqRuleOffsets := s.GetStash()
 			for _, offs := range chainedClassSeqRuleOffsets {
-				rule := &seqRule{}
+				rule := &chainedClassSeqRule{}
 
 				s.A = chainedClassSequenceRuleSetPos + int64(offs)
 				err = g.Exec(s,
@@ -716,9 +723,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		}
 		seqLookupRecord := s.GetStash()
 
-		xxx := &gsub6_3{
-			flags: flags,
-		}
+		xxx := &gsub6_3{}
 
 		for _, offs := range backtrackCoverageOffsets {
 			cover, err := g.readCoverageTable(subtablePos + int64(offs))
@@ -766,7 +771,7 @@ func (g *gTab) readGsubSubtable(s *State, flags, format uint16, subtablePos int6
 		if s.R[0] == 7 {
 			return nil, g.error("invalid extension lookup")
 		}
-		return g.readGsubSubtable(s, flags, uint16(s.R[0]), subtablePos+s.A)
+		return g.readGsubSubtable(s, uint16(s.R[0]), subtablePos+s.A)
 	}
 
 	if res == nil {
@@ -785,78 +790,56 @@ func stashToGlyphs(x []uint16) []font.GlyphID {
 }
 
 type gsubLookupSubtable interface {
-	Replace(int, []font.GlyphID) (int, []font.GlyphID)
-	explain(g *gTab, pfx string)
+	Replace(uint16, []font.GlyphID, int) ([]font.GlyphID, int)
 }
 
 type gsub1_1 struct {
-	flags uint16
 	cov   coverage
 	delta uint16
 }
 
-func (l *gsub1_1) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
-		panic("not implemented")
+func (l *gsub1_1) Replace(flags uint16, seq []font.GlyphID, i int) ([]font.GlyphID, int) {
+	if flags != 0 {
+		panic(fmt.Sprintf("not implemented: flags=0x%04x", flags))
 	}
-	in := seq[i]
-	_, ok := l.cov[in]
-	if !ok {
-		return i, seq
+	gid := seq[i]
+	if _, ok := l.cov[gid]; !ok {
+		return seq, i
 	}
-	seq[i] = font.GlyphID(uint16(seq[i]) + l.delta)
-	return i + 1, seq
-}
-
-func (l *gsub1_1) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 1.1, flags=0x%04x\n", l.flags)
-	for gid := range l.cov {
-		repl := font.GlyphID(uint16(gid) + l.delta)
-		fmt.Printf("%s\t%s -> %s\n",
-			pfx, g.glyphName(gid), g.glyphName(repl))
-	}
+	seq[i] = font.GlyphID(uint16(gid) + l.delta)
+	return seq, i + 1
 }
 
 type gsub1_2 struct {
-	flags              uint16
 	cov                coverage
 	substituteGlyphIDs []font.GlyphID
 }
 
-func (l *gsub1_2) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
+func (l *gsub1_2) Replace(flags uint16, seq []font.GlyphID, i int) ([]font.GlyphID, int) {
+	if flags != 0 {
 		panic("not implemented")
 	}
 	in := seq[i]
 	j, ok := l.cov[in]
 	if !ok {
-		return i, seq
+		return seq, i
 	}
 	seq[i] = l.substituteGlyphIDs[j]
-	return i + 1, seq
-}
-
-func (l *gsub1_2) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 1.2, flags=0x%04x\n", l.flags)
-	for gid, k := range l.cov {
-		fmt.Printf("%s\t%s -> %s\n",
-			pfx, g.glyphName(gid), g.glyphName(l.substituteGlyphIDs[k]))
-	}
+	return seq, i + 1
 }
 
 type gsub2_1 struct {
-	flags uint16
-	cov   coverage
-	repl  [][]font.GlyphID
+	cov  coverage
+	repl [][]font.GlyphID
 }
 
-func (l *gsub2_1) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
+func (l *gsub2_1) Replace(flags uint16, seq []font.GlyphID, i int) ([]font.GlyphID, int) {
+	if flags != 0 {
 		panic("not implemented")
 	}
 	k, ok := l.cov[seq[i]]
 	if !ok {
-		return i, seq
+		return seq, i
 	}
 	repl := l.repl[k]
 	n := len(repl)
@@ -864,25 +847,12 @@ func (l *gsub2_1) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
 	res := append(seq, repl...) // just to allocate enough backing space
 	copy(seq[i+n:], seq[i:])
 	copy(seq[i:], repl)
-	return i + n, res
-}
-
-func (l *gsub2_1) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 2.1, flags=0x%04x\n", l.flags)
-	for inGid, k := range l.cov {
-		var out []string
-		for _, outGid := range l.repl[k] {
-			out = append(out, g.glyphName(outGid))
-		}
-		fmt.Printf("%s\t%s -> %s\n",
-			pfx, g.glyphName(inGid), strings.Join(out, ""))
-	}
+	return res, i + n
 }
 
 type gsub4_1 struct {
-	flags uint16
-	cov   coverage // maps first glyphs to repl indices
-	repl  [][]ligature
+	cov  coverage // maps first glyphs to repl indices
+	repl [][]ligature
 }
 
 type ligature struct {
@@ -890,13 +860,13 @@ type ligature struct {
 	out font.GlyphID
 }
 
-func (l *gsub4_1) Replace(i int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
+func (l *gsub4_1) Replace(flags uint16, seq []font.GlyphID, i int) ([]font.GlyphID, int) {
+	if flags != 0 {
 		panic("not implemented")
 	}
 	ligSetIdx, ok := l.cov[seq[i]]
 	if !ok {
-		return i, seq
+		return seq, i
 	}
 	ligSet := l.repl[ligSetIdx]
 
@@ -914,32 +884,15 @@ ligLoop:
 
 		seq[i] = lig.out
 		seq = append(seq[:i+1], seq[i+1+len(lig.in):]...)
-		return i + 1, seq
+		return seq, i + 1
 	}
 
-	return i, seq
-}
-
-func (l *gsub4_1) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 4.1, flags=0x%04x\n", l.flags)
-	for inGid, k := range l.cov {
-		ligSet := l.repl[k]
-		for j := range ligSet {
-			lig := &ligSet[j]
-			in := []string{g.glyphName(inGid)}
-			for _, gid := range lig.in {
-				in = append(in, g.glyphName(gid))
-			}
-			fmt.Printf("%s\t%s -> %s\n",
-				pfx, strings.Join(in, ""), g.glyphName(lig.out))
-		}
-	}
+	return seq, i
 }
 
 type gsub5_2 struct {
-	flags    uint16
 	cov      coverage
-	input    classDef
+	input    ClassDef
 	rulesets []classSeqRuleSet // indexed by the input class, can be nil
 }
 
@@ -950,25 +903,25 @@ type classSequenceRule struct {
 	actions []seqLookup
 }
 
-func (l *gsub5_2) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
+func (l *gsub5_2) Replace(flags uint16, seq []font.GlyphID, pos int) ([]font.GlyphID, int) {
+	if flags != 0 {
 		panic("not implemented")
 	}
 
 	gid := seq[pos]
-	_, ok := l.cov[gid]
-	if !ok {
-		return pos, seq
+	if _, ok := l.cov[gid]; !ok {
+		return seq, pos
 	}
 
 	class := l.input[gid]
 	if class >= len(l.rulesets) {
-		return pos, seq
+		return seq, pos
 	}
 
 rulesetLoop:
 	for _, rule := range l.rulesets[class] {
-		if pos+1+len(rule.input) >= len(seq) {
+		next := pos + 1 + len(rule.input)
+		if next > len(seq) {
 			continue
 		}
 		for i, class := range rule.input {
@@ -977,33 +930,13 @@ rulesetLoop:
 			}
 		}
 
-		return applyActions(rule.actions, pos, len(rule.input)+1, seq)
+		seq = applyActions(rule.actions, pos, seq)
+		return seq, next
 	}
-	return pos, seq
-}
-
-func (l *gsub5_2) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 5.2, flags=0x%04x\n", l.flags)
-	pfx = pfx + "\t"
-
-	fmt.Println(pfx+"Cov", g.explainCoverage(l.cov))
-	fmt.Println(pfx+"Class", l.input)
-	for i, ruleset := range l.rulesets {
-		for j, rule := range ruleset {
-			apfx := pfx + "@" + strconv.Itoa(i) + "." + strconv.Itoa(j)
-			fmt.Println(apfx, i, rule.input)
-			for _, action := range rule.actions {
-				for _, subtable := range action.nested {
-					// TODO(voss): somehow show action.pos
-					subtable.explain(g, apfx)
-				}
-			}
-		}
-	}
+	return seq, pos
 }
 
 type gsub6_1 struct {
-	flags    uint16
 	cov      coverage
 	rulesets []chainedSeqRuleSet
 }
@@ -1017,103 +950,81 @@ type chainedSequenceRule struct {
 	actions   []seqLookup
 }
 
-func (l *gsub6_1) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
+func (l *gsub6_1) Replace(flags uint16, seq []font.GlyphID, pos int) ([]font.GlyphID, int) {
+	if flags != 0 {
 		panic("not implemented")
 	}
 
 	ruleNo := l.cov[seq[pos]]
 	if ruleNo >= len(l.rulesets) || l.rulesets[ruleNo] == nil {
-		return pos, seq
+		return seq, pos
 	}
 
 	panic("not implemented")
 }
 
-func (l *gsub6_1) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 6.1, flags=0x%04x\n", l.flags)
-	pfx = pfx + "\t"
-
-	fmt.Println(pfx+"Cov", g.explainCoverage(l.cov))
-	for gid, i := range l.cov {
-		ruleset := l.rulesets[i]
-		for j, rule := range ruleset {
-			fmt.Println(pfx+"b"+strconv.Itoa(i)+"."+strconv.Itoa(j),
-				rule.backtrack)
-			fmt.Println(pfx+"i"+strconv.Itoa(i)+"."+strconv.Itoa(j),
-				gid, rule.input)
-			fmt.Println(pfx+"l"+strconv.Itoa(i)+"."+strconv.Itoa(j),
-				rule.lookahead)
-			apfx := pfx + "@" + strconv.Itoa(i) + "." + strconv.Itoa(j)
-			for _, action := range rule.actions {
-				for _, subtable := range action.nested {
-					subtable.explain(g, apfx)
-				}
-			}
-		}
-	}
-}
-
 type gsub6_2 struct {
-	flags     uint16
 	cov       coverage
-	backtrack classDef
-	input     classDef
-	lookahead classDef
-	rulesets  []seqRuleSet // indexed by the input class, can be nil
+	backtrack ClassDef
+	input     ClassDef
+	lookahead ClassDef
+	rulesets  []chainedClassSeqRuleSet // indexed by the input class, can be nil
 }
 
-type seqRuleSet []*seqRule
+type chainedClassSeqRuleSet []*chainedClassSeqRule
 
-type seqRule struct {
+type chainedClassSeqRule struct {
 	backtrack []int
 	input     []int
 	lookahead []int
 	actions   []seqLookup
 }
 
-func (l *gsub6_2) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
+func (l *gsub6_2) Replace(flags uint16, seq []font.GlyphID, pos int) ([]font.GlyphID, int) {
+	if flags != 0 {
 		panic("not implemented")
 	}
 
-	ruleNo := l.cov[seq[pos]]
-	if ruleNo >= len(l.rulesets) || l.rulesets[ruleNo] == nil {
-		return pos, seq
+	gid := seq[pos]
+	if _, ok := l.cov[gid]; !ok {
+		return seq, pos
 	}
 
-	panic("not implemented")
-}
+	class := l.input[gid]
+	if class >= len(l.rulesets) {
+		return seq, pos
+	}
 
-func (l *gsub6_2) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 6.2, flags=0x%04x\n", l.flags)
-	pfx = pfx + "\t"
+ruleLoop:
+	for _, rule := range l.rulesets[class] {
+		next := pos + 1 + len(rule.input)
+		if pos < len(rule.backtrack) || next+len(rule.lookahead) > len(seq) {
+			continue
+		}
 
-	fmt.Println(pfx+"Cov", g.explainCoverage(l.cov))
-	fmt.Println(pfx+"Bc", l.backtrack)
-	fmt.Println(pfx+"Ic", l.input)
-	fmt.Println(pfx+"Lc", l.lookahead)
-
-	for i, ruleset := range l.rulesets {
-		for j, rule := range ruleset {
-			fmt.Println(pfx+"b"+strconv.Itoa(i)+"."+strconv.Itoa(j),
-				rule.backtrack)
-			fmt.Println(pfx+"i"+strconv.Itoa(i)+"."+strconv.Itoa(j),
-				"cov +", rule.input)
-			fmt.Println(pfx+"l"+strconv.Itoa(i)+"."+strconv.Itoa(j),
-				rule.lookahead)
-			apfx := pfx + "@" + strconv.Itoa(i) + "." + strconv.Itoa(j)
-			for _, action := range rule.actions {
-				for _, subtable := range action.nested {
-					subtable.explain(g, apfx)
-				}
+		for i, class := range rule.backtrack {
+			if l.backtrack[seq[pos-1-i]] != class {
+				continue ruleLoop
 			}
 		}
+		for i, class := range rule.input {
+			if l.input[seq[pos+1+i]] != class {
+				continue ruleLoop
+			}
+		}
+		for i, class := range rule.lookahead {
+			if l.lookahead[seq[next+i]] != class {
+				continue ruleLoop
+			}
+		}
+
+		seq = applyActions(rule.actions, pos, seq)
+		return seq, next
 	}
+	return seq, pos
 }
 
 type gsub6_3 struct {
-	flags     uint16
 	backtrack []coverage
 	input     []coverage
 	lookahead []coverage
@@ -1122,78 +1033,51 @@ type gsub6_3 struct {
 
 type seqLookup struct {
 	pos    int
-	nested gsubLookup
+	nested *GsubLookup
 }
 
-func (l *gsub6_3) Replace(pos int, seq []font.GlyphID) (int, []font.GlyphID) {
-	if l.flags != 0 {
+func (l *gsub6_3) Replace(flags uint16, seq []font.GlyphID, pos int) ([]font.GlyphID, int) {
+	if flags != 0 {
 		panic("not implemented")
 	}
 
-	if pos < len(l.backtrack) || pos+len(l.input)+len(l.lookahead) >= len(seq) {
-		return pos, seq
+	next := pos + len(l.input)
+	if pos < len(l.backtrack) || next+len(l.lookahead) > len(seq) {
+		return seq, pos
 	}
 
 	for i, cov := range l.backtrack {
 		_, ok := cov[seq[pos-1-i]]
 		if !ok {
-			return pos, seq
+			return seq, pos
 		}
 	}
 	for i, cov := range l.input {
 		_, ok := cov[seq[pos+i]]
 		if !ok {
-			return pos, seq
+			return seq, pos
 		}
 	}
 	for i, cov := range l.lookahead {
-		_, ok := cov[seq[pos+len(l.input)+i]]
+		_, ok := cov[seq[next+i]]
 		if !ok {
-			return pos, seq
+			return seq, pos
 		}
 	}
 
-	return applyActions(l.actions, pos, len(l.input), seq)
+	seq = applyActions(l.actions, pos, seq)
+	return seq, next
 }
 
-func (l *gsub6_3) explain(g *gTab, pfx string) {
-	fmt.Printf(pfx+"lookup type 6.3, flags=0x%04x\n", l.flags)
-	pfx = pfx + "\t"
-	for i := len(l.backtrack) - 1; i >= 0; i-- {
-		fmt.Println(pfx+"B", g.explainCoverage(l.backtrack[i]))
-	}
-	for _, cov := range l.input {
-		fmt.Println(pfx+"I", g.explainCoverage(cov))
-	}
-	for _, cov := range l.lookahead {
-		fmt.Println(pfx+"L", g.explainCoverage(cov))
-	}
-	for _, action := range l.actions {
-		for _, subtable := range action.nested {
-			subtable.explain(g, pfx+"@"+strconv.Itoa(action.pos))
-		}
-	}
-}
-
-func applyActions(actions []seqLookup, pos, length int, seq []font.GlyphID) (int, []font.GlyphID) {
+func applyActions(actions []seqLookup, pos int, seq []font.GlyphID) []font.GlyphID {
 	origLen := len(seq)
 	for _, action := range actions {
-		// TODO(voss): how to interpret action.pos in case a prior action
-		// changes the length of seq?
-		aPos := pos + action.pos
-		origAPos := aPos
-		subtables := action.nested
-		for _, subtable := range subtables {
-			aPos, seq = subtable.Replace(aPos, seq)
-			if aPos != origAPos {
-				// as soon as one subtable matches, we are done
-				break
-			}
-		}
+		seq, _ = action.nested.Replace(seq, pos+action.pos)
 		if len(seq) != origLen {
+			// TODO(voss): how to interpret action.pos in case a prior action
+			// changes the length of seq?
 			panic("not implemented: nested lookup changed sequence length")
 		}
 	}
-
-	return pos + length, seq
+	return seq
 }
