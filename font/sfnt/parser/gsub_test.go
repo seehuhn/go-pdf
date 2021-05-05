@@ -14,7 +14,6 @@ func TestGsub4_1(t *testing.T) {
 		0, 0, 123, 124, 1, 2, 0, 0, 21, 0, 0,
 	}
 	gsub := &gsub4_1{
-		flags: 0,
 		cov: map[font.GlyphID]int{
 			1: 0,
 			2: 1,
@@ -44,7 +43,7 @@ func TestGsub4_1(t *testing.T) {
 	}
 	pos := 0
 	for pos < len(in) {
-		next, out := gsub.Replace(pos, in)
+		out, next := gsub.Replace(0, in, pos)
 		if next == pos {
 			if !isEqual(in, out) {
 				t.Errorf("change without progress: %d vs %d",

@@ -35,12 +35,11 @@ type gTab struct {
 	lookups          []uint16
 
 	coverageCache map[int64]coverage
-	classDefCache map[int64]classDef
 }
 
-// NewGTab wraps a parser with a helper to read GSUB and GPOS tables.
+// newGTab wraps a parser with a helper to read GSUB and GPOS tables.
 // This modifies p.Funcs!
-func NewGTab(p *Parser, script, lang string) (*gTab, error) {
+func newGTab(p *Parser, script, lang string) (*gTab, error) {
 	scriptSeen := false
 	chooseScript := func(s *State) {
 		if s.Tag == script {

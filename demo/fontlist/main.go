@@ -18,12 +18,10 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/parser"
 )
@@ -40,32 +38,37 @@ func tryFont(fname string) error {
 		return nil
 	}
 
-	cmap, err := tt.SelectCmap()
-	if err != nil {
-		return err
-	}
-
 	p := parser.New(tt)
 	info, err := p.ReadGsubInfo("latn", "ENG ")
 	if err != nil {
 		return err
 	}
-
-	s := "a nai\u0308ve, affluent Ba\u0308r"
-	var glyphs []font.GlyphID
-	for _, r := range s {
-		gid, ok := cmap[r]
-		if !ok {
-			return errors.New("missing glyph")
+	for _, lookup := range info {
+		if lookup.Flags != 0 {
+			fmt.Printf("%04x %s\n", lookup.Flags, fname)
 		}
-		glyphs = append(glyphs, gid)
 	}
-	l1 := len(glyphs)
 
-	glyphs = info.Substitute(glyphs)
-	l2 := len(glyphs)
+	// cmap, err := tt.SelectCmap()
+	// if err != nil {
+	// 	return err
+	// }
 
-	fmt.Println(l1, l2)
+	// s := "a nai\u0308ve, affluent Ba\u0308r"
+	// var glyphs []font.GlyphID
+	// for _, r := range s {
+	// 	gid, ok := cmap[r]
+	// 	if !ok {
+	// 		return errors.New("missing glyph")
+	// 	}
+	// 	glyphs = append(glyphs, gid)
+	// }
+	// l1 := len(glyphs)
+
+	// glyphs = info.Substitute(glyphs)
+	// l2 := len(glyphs)
+
+	// fmt.Println(l1, l2)
 
 	return nil
 }
