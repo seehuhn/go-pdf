@@ -86,7 +86,7 @@ func main() {
 
 		ref := &pdf.Reference{
 			Number:     number,
-			Generation: uint16(generation),
+			Generation: generation,
 		}
 		obj, err = r.Resolve(ref)
 	}

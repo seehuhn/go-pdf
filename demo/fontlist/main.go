@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/parser"
@@ -34,7 +35,7 @@ func tryFont(fname string) error {
 	}
 	defer tt.Close()
 
-	if !tt.HasTables("GSUB") {
+	if !tt.IsTrueType() || !tt.HasTables("GSUB") {
 		return nil
 	}
 
@@ -44,8 +45,8 @@ func tryFont(fname string) error {
 		return err
 	}
 	for _, lookup := range info {
-		if lookup.Flags != 0 {
-			fmt.Printf("%04x %s\n", lookup.Flags, fname)
+		if lookup.Flags&0x000E != 0 && lookup.Flags&1 == 0 {
+			fmt.Printf("%-40s %04x\n", filepath.Base(fname), lookup.Flags)
 		}
 	}
 

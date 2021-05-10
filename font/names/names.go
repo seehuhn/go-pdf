@@ -60,9 +60,9 @@ func ToUnicode(name string, dingbats bool) []rune {
 			for i, c := range part[3:] {
 				switch {
 				case c >= '0' && c <= '9':
-					val = val*16 + rune(c-'0')
+					val = val*16 + c - '0'
 				case c >= 'A' && c <= 'F':
-					val = val*16 + rune(c-'A'+10)
+					val = val*16 + c - 'A' + 10
 				default:
 					good = false
 					break hexLoop
@@ -90,9 +90,9 @@ func ToUnicode(name string, dingbats bool) []rune {
 			for _, c := range part[1:] {
 				switch {
 				case c >= '0' && c <= '9':
-					val = val*16 + rune(c-'0')
+					val = val*16 + c - '0'
 				case c >= 'A' && c <= 'F':
-					val = val*16 + rune(c-'A'+10)
+					val = val*16 + c - 'A' + 10
 				default:
 					good = false
 					break hexLoop2

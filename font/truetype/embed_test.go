@@ -65,14 +65,14 @@ func TestEmbedFont(t *testing.T) {
 				break
 			}
 			contents.Println("/F1 12 Tf")
-			s := pdf.String(fmt.Sprintf("%3d: ", c))
+			s := fmt.Sprintf("%3d: ", c)
 
 			idx := F1.CMap[rune(c)]
 			wd := F1.Width[idx]
 			textWithKern := pdf.Array{
 				pdf.String(s),
 				pdf.Number(-0.5 * (float64(F1.GlyphUnits) - float64(wd))),
-				pdf.String(F1.Enc(idx)),
+				F1.Enc(idx),
 				pdf.Number(-0.5 * (float64(F1.GlyphUnits) - float64(wd))),
 				pdf.String(" "),
 			}
@@ -80,7 +80,7 @@ func TestEmbedFont(t *testing.T) {
 			contents.Print(" TJ ")
 
 			contents.Println("/F2 12 Tf")
-			out := pdf.String(F2.Enc(F2.CMap[rune(c)]))
+			out := F2.Enc(F2.CMap[rune(c)])
 			out.PDF(contents)
 			contents.Println(" Tj")
 			contents.Println("0 -15 TD")

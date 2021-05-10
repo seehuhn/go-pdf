@@ -59,7 +59,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	_ = binary.Write(buf, binary.BigEndian, headTable)
 	replTab["head"] = append([]byte{}, buf.Bytes()...) // make a copy
 	cc := &check{}
-	buf.WriteTo(cc)
+	_, _ = buf.WriteTo(cc)
 	replSum["head"] = cc.Sum()
 
 	// generate and write the new file header
@@ -282,7 +282,7 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphID) (func(...font.Glyp
 	default:
 		base = uint16(256 - n)
 	}
-	next := uint16(0xF000 + base)
+	next := 0xF000 + base
 
 	g2c := make(map[font.GlyphID]byte)
 

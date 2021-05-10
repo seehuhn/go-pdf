@@ -160,7 +160,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 		xPos+shift,
 		yPos)
 	buf := theFont.Enc(font.GlyphID(g))
-	pdf.String(buf).PDF(page)
+	buf.PDF(page)
 	page.Println(" Tj")
 	page.Println("ET")
 	page.Println("Q")
@@ -235,7 +235,10 @@ func main() {
 				stretch),
 			boxes.Kern(36))
 		box := p.NewVBoxTo(pages.A4.URy, rowBoxes...)
-		boxes.Ship(pageTree, box)
+		err = boxes.Ship(pageTree, box)
+		if err != nil {
+			log.Fatal(err)
+		}
 		rowBoxes = nil
 		page++
 	}
@@ -258,18 +261,8 @@ func main() {
 		),
 		boxes.NewHBox(
 			boxes.Kern(72),
-			boxes.NewText(courier, 10, "number of ligatures: "),
-			boxes.NewText(courier, 10, strconv.Itoa(len(theFont.Ligatures))),
-		),
-		boxes.NewHBox(
-			boxes.Kern(72),
 			boxes.NewText(courier, 10, "number of GSUB lookups: "),
 			boxes.NewText(courier, 10, strconv.Itoa(len(gsub))),
-		),
-		boxes.NewHBox(
-			boxes.Kern(72),
-			boxes.NewText(courier, 10, "number of kerns: "),
-			boxes.NewText(courier, 10, strconv.Itoa(len(theFont.Kerning))),
 		),
 	)
 	flush()
@@ -277,11 +270,7 @@ func main() {
 	p.BaseLineSkip = 46
 	rev = make(map[font.GlyphID]rune)
 	for r, idx := range theFont.CMap {
-		r2, seen := rev[idx]
-		if seen {
-			// fmt.Printf("duplicate: %d -> 0x%04x 0x%04x\n",
-			// 	idx, r2, r)
-		}
+		r2 := rev[idx]
 		if r2 == 0 || r < r2 {
 			rev[idx] = r
 		}

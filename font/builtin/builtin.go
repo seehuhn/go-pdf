@@ -46,7 +46,6 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 	builtin := &font.Font{
 		Name:       pdf.Name(ref),
 		CMap:       map[rune]font.GlyphID{},
-		Ligatures:  map[font.GlyphPair]font.GlyphID{},
 		GlyphUnits: 1000,
 	}
 
@@ -58,13 +57,13 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 	type ligInfo struct {
 		first, second, combined string
 	}
-	var ligatures []*ligInfo
+	var nameLigs []*ligInfo
 
 	type kernInfo struct {
 		first, second string
 		val           int
 	}
-	var kerning []*kernInfo
+	var nameKern []*kernInfo
 
 	dingbats := fname == "ZapfDingbats"
 	charMetrics := false
@@ -147,7 +146,7 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 				builtin.GlyphExtent = append(builtin.GlyphExtent, BBox)
 				for _, lig := range ligTmp {
 					lig.first = name
-					ligatures = append(ligatures, lig)
+					nameLigs = append(nameLigs, lig)
 				}
 				cIdx++
 			}
@@ -169,7 +168,7 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 				second: fields[2],
 			}
 			kern.val, _ = strconv.Atoi(fields[3])
-			kerning = append(kerning, kern)
+			nameKern = append(nameKern, kern)
 			continue
 		}
 
@@ -225,22 +224,23 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 
 	// store the ligature information
 	// TODO(voss): automatically extend the subset to include ligature targets?
-	for _, lig := range ligatures {
+	ligatures := map[font.GlyphPair]font.GlyphID{}
+	for _, lig := range nameLigs {
 		a, aOk := nameToGlyph[lig.first]
 		b, bOk := nameToGlyph[lig.second]
 		c, cOk := nameToGlyph[lig.combined]
 		if aOk && bOk && cOk {
-			builtin.Ligatures[font.GlyphPair{a, b}] = c
+			ligatures[font.GlyphPair{a, b}] = c
 		}
 	}
 
 	// store the kerning information
-	builtin.Kerning = make(map[font.GlyphPair]int)
-	for _, kern := range kerning {
+	kerning := make(map[font.GlyphPair]int)
+	for _, kern := range nameKern {
 		a, aOk := nameToGlyph[kern.first]
 		b, bOk := nameToGlyph[kern.second]
 		if aOk && bOk && kern.val != 0 {
-			builtin.Kerning[font.GlyphPair{a, b}] = kern.val
+			kerning[font.GlyphPair{a, b}] = kern.val
 		}
 	}
 
@@ -322,9 +322,11 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 	for r, cIdx := range builtin.CMap {
 		glyphToCode[cIdx] = bestRuneToCode[r]
 	}
-	builtin.Enc = func(gid font.GlyphID) []byte {
-		return []byte{glyphToCode[gid]}
+	builtin.Enc = func(gid font.GlyphID) pdf.String {
+		return pdf.String{glyphToCode[gid]}
 	}
+
+	fmt.Println(ligatures)
 
 	builtin.Substitute = func(glyphs []font.GlyphID) []font.GlyphID {
 		if len(glyphs) == 0 {
@@ -334,7 +336,7 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 		var res []font.GlyphID
 		last := glyphs[0]
 		for _, gid := range glyphs[1:] {
-			lig, ok := builtin.Ligatures[font.GlyphPair{last, gid}]
+			lig, ok := ligatures[font.GlyphPair{last, gid}]
 			if ok {
 				last = lig
 			} else {
@@ -352,7 +354,7 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 		for i, gid := range glyphs {
 			kern := 0
 			if i < len(glyphs)-1 {
-				kern = builtin.Kerning[font.GlyphPair{gid, glyphs[i+1]}]
+				kern = kerning[font.GlyphPair{gid, glyphs[i+1]}]
 			}
 
 			res[i].Gid = gid

@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/parser"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -239,7 +240,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	}
 
 	// TODO(voss): just use one of the tables
-	var Kerning map[font.GlyphPair]int
+	var kerning map[font.GlyphPair]int
 	K1, err := tt.ReadGposKernInfo("DEU ", "latn") // TODO(voss): ...
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
@@ -249,9 +250,9 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		return nil, err
 	}
 	if len(K2) > len(K1) {
-		Kerning = K2
+		kerning = K2
 	} else {
-		Kerning = K1
+		kerning = K1
 	}
 
 	if postInfo.IsFixedPitch {
@@ -374,15 +375,39 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		return nil, err
 	}
 
+	pars := parser.New(tt)
+	gsub, err := pars.ReadGsubInfo("latn", "ENG ")
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+	var substitute func(glyphs []font.GlyphID) []font.GlyphID
+	if gsub != nil {
+		substitute = gsub.Substitute
+	}
+	layout := func(glyphs []font.GlyphID) []font.GlyphPos {
+		res := make([]font.GlyphPos, len(glyphs))
+		for i, gid := range glyphs {
+			res[i].Gid = gid
+			res[i].Advance = Width[gid]
+			if i > 0 {
+				pair := font.GlyphPair{res[i-1].Gid, gid}
+				if dx, ok := kerning[pair]; ok {
+					res[i-1].Advance += dx
+				}
+			}
+		}
+		return res
+	}
+
 	font := &font.Font{
 		Name: pdf.Name(name),
 		Ref:  FontRef,
 		CMap: CMap,
-		Enc: func(gid font.GlyphID) []byte {
-			return []byte{byte(gid >> 8), byte(gid)}
+		Enc: func(gid font.GlyphID) pdf.String {
+			return pdf.String{byte(gid >> 8), byte(gid)}
 		},
-		Ligatures:   map[font.GlyphPair]font.GlyphID{},
-		Kerning:     Kerning,
+		Substitute:  substitute,
+		Layout:      layout,
 		GlyphExtent: GlyphExtent,
 		GlyphUnits:  1000, // TODO(voss): use font design units here
 		Width:       Width,

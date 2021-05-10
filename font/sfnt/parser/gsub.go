@@ -66,9 +66,13 @@ func (gsub GsubInfo) Substitute(glyphs []font.GlyphID) []font.GlyphID {
 	return glyphs
 }
 
+// TODO(voss): look at ../../font/truetype/ttf/FreeSans.ttf when
+// implementing Flags.
 type GsubLookup struct {
+	Format uint16 // TODO(voss): remove?
+	Flags  uint16
+
 	subtables        []gsubLookupSubtable
-	Flags            uint16
 	markFilteringSet uint16
 }
 
@@ -133,7 +137,8 @@ func (g *gTab) GetGsubLookup(idx uint16) (*GsubLookup, error) {
 	_ = markFilteringSet // TODO(voss): use this correctly
 
 	lookup := &GsubLookup{
-		Flags: flags,
+		Format: format,
+		Flags:  flags,
 	}
 	for _, offs := range subtables {
 		res, err := g.readGsubSubtable(s, format, base+int64(offs))

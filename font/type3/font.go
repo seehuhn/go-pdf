@@ -162,7 +162,7 @@ func (t3 *Builder) Close() (*font.Font, error) {
 	font := &font.Font{
 		Ref:  FontRef,
 		CMap: t3.cmap,
-		Enc: func(gid font.GlyphID) []byte {
+		Enc: func(gid font.GlyphID) pdf.String {
 			if !t3.used[gid] {
 				return nil
 			}

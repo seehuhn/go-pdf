@@ -406,7 +406,7 @@ func openStdSecHandler(enc Dict, length int, ID []byte, readPwd ReadPwdFunc) (*s
 	}
 
 	sec := &stdSecHandler{
-		id:       []byte(ID),
+		id:       ID,
 		KeyBytes: length / 8,
 		readPwd:  readPwd,
 
@@ -625,7 +625,7 @@ func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
 		tmpKey := make([]byte, len(key))
 		for i := byte(1); i <= 19; i++ {
 			for j := range tmpKey {
-				tmpKey[j] = key[j] ^ byte(i)
+				tmpKey[j] = key[j] ^ i
 			}
 			c, _ = rc4.NewCipher(tmpKey)
 			c.XORKeyStream(U, U)
