@@ -79,6 +79,9 @@ func main() {
 		},
 		Rotate: 0,
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	page.Println("1 0 0 1 20 20 cm 1 j 1 J")
 	page.Printf("2 w %f %f m 0 0 l 400 0 l %f %f l S\n", xL, yL, xR, yR)

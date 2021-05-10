@@ -17,10 +17,7 @@
 package parser
 
 import (
-	"fmt"
 	"sort"
-	"strings"
-	"unicode"
 
 	"seehuhn.de/go/pdf/font"
 )
@@ -76,25 +73,6 @@ func newGTab(p *Parser, script, lang string) (*gTab, error) {
 	}
 
 	return res, nil
-}
-
-func (g *gTab) glyphName(gid font.GlyphID) string {
-	r, ok := g.glyphNames[gid]
-	if !ok {
-		return fmt.Sprintf("[%d]", gid)
-	}
-	if unicode.IsMark(r) {
-		return string([]rune{' ', r})
-	}
-	return string(r)
-}
-
-func (g *gTab) explainCoverage(cov coverage) string {
-	var res []string
-	for gid := range cov {
-		res = append(res, g.glyphName(gid))
-	}
-	return "{" + strings.Join(res, "") + "}"
 }
 
 func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {

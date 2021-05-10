@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -58,8 +57,8 @@ func TestFrame(t *testing.T) {
 	subset.Add(text2)
 	subset.Add("ﬁ")
 
-	// F1, err := builtin.Embed(out, "Times-Roman", subset.chars)
-	F1, err := truetype.Embed(out, "F1", "../font/truetype/ttf/FreeSerif.ttf", subset.chars)
+	F1, err := builtin.Embed(out, "F1", "Times-Roman", subset.chars)
+	// F1, err := truetype.Embed(out, "F1", "../font/truetype/ttf/FreeSerif.ttf", subset.chars)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,8 +82,8 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	layout1 := F1.OldTypeset(text1, 12)
-	layout2 := F2.OldTypeset(text2, 12)
+	layout1 := F1.Typeset(text1, 12)
+	layout2 := F2.Typeset(text2, 12)
 	box := &VBox{
 		BoxExtent: BoxExtent{
 			Width:  pages.A5.URx - pages.A5.LLx,
@@ -102,12 +101,12 @@ func TestFrame(t *testing.T) {
 				Contents: []Box{
 					Kern(36),
 					&Text{
-						font:   "F1",
-						layout: layout1,
+						fontRef: "F1",
+						layout:  layout1,
 					},
 					&Text{
-						font:   "F2",
-						layout: layout2,
+						fontRef: "F2",
+						layout:  layout2,
 					},
 					&Rule{
 						BoxExtent: BoxExtent{

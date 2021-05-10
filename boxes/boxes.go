@@ -18,6 +18,7 @@ package boxes
 
 import (
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -76,50 +77,110 @@ func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
 
 // Text represents a typeset string of characters as a Box object.
 type Text struct {
-	font   pdf.Name
-	layout *font.OldLayout
+	fontRef pdf.Name
+	layout  *font.Layout
 }
 
 // NewText returns a new Text object.
 func NewText(F *font.Font, ptSize float64, text string) *Text {
-	layout := F.OldTypeset(text, ptSize)
+	layout := F.Typeset(text, ptSize)
 	return &Text{
-		font:   F.Name,
-		layout: layout,
+		fontRef: F.Name,
+		layout:  layout,
 	}
 }
 
 // Extent implements the Box interface
 func (obj *Text) Extent() *BoxExtent {
+	font := obj.layout.Font
+	q := obj.layout.FontSize / float64(font.GlyphUnits)
+
+	width := 0.0
+	height := math.Inf(-1)
+	depth := math.Inf(-1)
+	for _, glyph := range obj.layout.Glyphs {
+		width += float64(glyph.Advance) * q
+
+		bbox := &font.GlyphExtent[glyph.Gid]
+		if !bbox.IsZero() {
+			thisDepth := -float64(bbox.LLy+glyph.YOffset) * q
+			if thisDepth > depth {
+				depth = thisDepth
+			}
+			thisHeight := float64(bbox.URy+glyph.YOffset) * q
+			if thisHeight > height {
+				height = thisHeight
+			}
+		}
+	}
+
 	return &BoxExtent{
-		Width:  obj.layout.Width,
-		Height: obj.layout.Height,
-		Depth:  obj.layout.Depth,
+		Width:  width,
+		Height: height,
+		Depth:  depth,
 	}
 }
 
 // Draw implements the Box interface.
 func (obj *Text) Draw(page *pages.Page, xPos, yPos float64) {
-	if len(obj.layout.Fragments) == 0 {
-		return
-	}
-
-	// TODO(voss): use "Tj" if len(Fragments)==1
+	font := obj.layout.Font
 
 	page.Println("q")
 	page.Println("BT")
-	obj.font.PDF(page)
+	obj.fontRef.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", obj.layout.FontSize)
 	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
-	fmt.Fprint(page, "[") // TODO(voss): use a PDF array?
-	for i, frag := range obj.layout.Fragments {
-		if i > 0 {
-			kern := obj.layout.Kerns[i-1]
-			fmt.Fprintf(page, " %d ", kern)
+
+	var run pdf.String
+	var data pdf.Array
+	flushRun := func() {
+		if len(run) > 0 {
+			data = append(data, run)
+			run = nil
 		}
-		pdf.String(frag).PDF(page)
 	}
-	fmt.Fprint(page, "] TJ\n")
+	flush := func() {
+		flushRun()
+		if len(data) == 0 {
+			return
+		}
+		if len(data) == 1 {
+			if s, ok := data[0].(pdf.String); ok {
+				s.PDF(page)
+				page.Println(" Tj")
+				data = nil
+				return
+			}
+		}
+		data.PDF(page)
+		page.Println(" TJ")
+		data = nil
+	}
+
+	xOffsAuto := 0
+	xOffs := 0
+	yOffs := 0
+	for _, glyph := range obj.layout.Glyphs {
+		if glyph.YOffset != yOffs {
+			flush()
+			yOffs = glyph.YOffset
+			page.Printf("%d Ts\n", yOffs)
+		}
+
+		xOffsWanted := xOffs + glyph.XOffset
+
+		if xOffsWanted != xOffsAuto {
+			// repositioning needed
+			flushRun()
+			data = append(data, -pdf.Integer(xOffsWanted-xOffsAuto))
+		}
+		run = append(run, font.Enc(glyph.Gid)...)
+
+		xOffs += glyph.Advance
+		xOffsAuto = xOffsWanted + font.Width[glyph.Gid]
+	}
+	flush()
+
 	page.Println("ET")
 	page.Println("Q")
 }

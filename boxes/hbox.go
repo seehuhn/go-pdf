@@ -114,7 +114,7 @@ func (obj *hBox) Draw(page *pages.Page, xPos, yPos float64) {
 			}
 		}
 	} else if contentsTotal > boxTotal+1e-3 {
-		// TODO(voss)
+		panic("not implemented")
 	}
 
 	x := xPos

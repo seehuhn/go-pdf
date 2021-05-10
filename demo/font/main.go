@@ -17,11 +17,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -36,7 +35,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		subset[r] = true
 	}
 
-	// F1, err := builtin.Embed(out, "F1", "Times-Roman", subset)
+	// F1, err := builtin.Embed(out, "F1", "Times-Roman", nil)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/FreeSerif.ttf", subset)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/Roboto-Regular.ttf", subset)
 	F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", subset)
@@ -59,105 +58,56 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 
 	margin := 50.0
 	baseLineSkip := 1.2 * fontSize
-
 	q := fontSize / float64(F1.GlyphUnits)
+	layout := F1.Typeset(text, fontSize)
+	glyphs := layout.Glyphs
 
-	_, err = page.Write([]byte("q\n1 .5 .5 RG\n"))
-	if err != nil {
-		return err
-	}
+	page.Println("q")
+	page.Println("1 .5 .5 RG")
 	yPos := height - margin - F1.Ascent*q
 	for y := yPos; y > margin; y -= baseLineSkip {
-		_, err = page.Printf("%.1f %.1f m %.1f %.1f l\n",
-			margin, y, width-margin, y)
-		if err != nil {
-			return err
-		}
+		page.Printf("%.1f %.1f m %.1f %.1f l\n", margin, y, width-margin, y)
 	}
-	_, err = page.Write([]byte("s\nQ\n"))
-	if err != nil {
-		return err
-	}
+	page.Println("s")
+	page.Println("Q")
 
-	var codes []font.GlyphID
-	var last font.GlyphID
-	for _, r := range text {
-		c, ok := F1.CMap[r]
-		if !ok {
-			panic("character " + string([]rune{r}) + " not in font")
-		}
-
-		if len(codes) > 0 && F1.Ligatures != nil {
-			pair := font.GlyphPair{last, c}
-			lig, ok := F1.Ligatures[pair]
-			if ok {
-				codes = codes[:len(codes)-1]
-				c = lig
-			}
-		}
-
-		codes = append(codes, c)
-		last = c
-	}
-
-	_, err = page.Write([]byte("q\n.2 1 .2 RG\n"))
-	if err != nil {
-		return err
-	}
-	var formatted pdf.Array
-	pos := 0
+	page.Println("q")
+	page.Println(".2 1 .2 RG")
 	xPos := margin
-	for i, c := range codes {
+	for _, gl := range glyphs {
+		c := gl.Gid
 		bbox := F1.GlyphExtent[c]
 		if !bbox.IsZero() {
-			_, err = page.Write([]byte(fmt.Sprintf("%.2f %.2f %.2f %.2f re\n",
-				xPos+float64(bbox.LLx)*q,
-				yPos+float64(bbox.LLy)*q,
-				float64(bbox.URx-bbox.LLx)*q,
-				float64(bbox.URy-bbox.LLy)*q)))
-			if err != nil {
-				return err
-			}
+			x := xPos + float64(gl.XOffset+bbox.LLx)*q
+			y := yPos + float64(gl.YOffset+bbox.LLy)*q
+			w := float64(bbox.URx-bbox.LLx) * q
+			h := float64(bbox.URy-bbox.LLy) * q
+			page.Printf("%.2f %.2f %.2f %.2f re\n", x, y, w, h)
+			page.Printf("%.2f %.2f %.2f %.2f re\n", x, y-baseLineSkip, w, h)
 		}
-		xPos += float64(F1.Width[c]) * q
+		xPos += float64(gl.Advance) * q
+	}
+	page.Println("s")
+	page.Println("Q")
 
-		if i == len(codes)-1 {
-			for _, gid := range codes[pos:] {
-				formatted = append(formatted, pdf.String(F1.Enc(gid)))
-			}
-			break
-		}
+	box := boxes.NewText(F1, fontSize, text)
+	box.Draw(page, margin, yPos-baseLineSkip)
 
-		kern, ok := F1.Kerning[font.GlyphPair{c, codes[i+1]}]
-		if !ok {
-			continue
+	xPos = margin
+	for _, gl := range glyphs {
+		c := gl.Gid
+		bbox := F1.GlyphExtent[c]
+		if !bbox.IsZero() {
+			x := xPos + float64(gl.XOffset)*q
+			y := yPos + float64(gl.YOffset)*q
+			page.Printf("BT /F1 %f Tf\n", fontSize)
+			page.Printf("%f %f Td\n", x, y)
+			enc := F1.Enc(c)
+			enc.PDF(page)
+			page.Println(" Tj")
+			page.Println("ET")
 		}
-		xPos += float64(kern) * q
-		kObj := pdf.Number(-kern)
-		var enc []byte
-		for _, gid := range codes[pos:(i + 1)] {
-			enc = append(enc, F1.Enc(gid)...)
-		}
-		formatted = append(formatted, pdf.String(enc), kObj)
-		pos = i + 1
-	}
-	_, err = page.Write([]byte("s\nQ\n"))
-	if err != nil {
-		return err
-	}
-
-	_, err = page.Write([]byte(fmt.Sprintf("BT\n/F1 %f Tf\n%.1f %.1f Td\n",
-		fontSize, margin, yPos)))
-	if err != nil {
-		return err
-	}
-	err = formatted.PDF(page)
-	if err != nil {
-		return err
-	}
-	_, err = page.Write([]byte(" TJ\nET"))
-	if err != nil {
-		return err
+		xPos += float64(gl.Advance) * q
 	}
 
 	err = page.Close()
@@ -176,7 +126,8 @@ func main() {
 	const width = 8 * 72
 	const height = 6 * 72
 
-	text := "Toterﬂas' & ﬁsh bucket"
+	// text := "Toterflas' & fish bucket"
+	text := "Ba\u0308rfisch"
 	err = writePage(out, text, width, height)
 	if err != nil {
 		log.Fatal(err)

@@ -17,7 +17,6 @@
 package font
 
 import (
-	"math"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
@@ -30,14 +29,10 @@ type Font struct {
 	Name pdf.Name
 	Ref  *pdf.Reference
 
-	CMap map[rune]GlyphID
-	Enc  func(GlyphID) []byte
-
+	CMap       map[rune]GlyphID
 	Substitute func(glyphs []GlyphID) []GlyphID
 	Layout     func(glyphs []GlyphID) []GlyphPos
-
-	Ligatures map[GlyphPair]GlyphID
-	Kerning   map[GlyphPair]int
+	Enc        func(GlyphID) pdf.String
 
 	GlyphUnits int
 
@@ -64,12 +59,14 @@ func (rect *Rect) IsZero() bool {
 	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
 }
 
+// Layout contains the information needed to typeset a run of text.
 type Layout struct {
 	Font     *Font
 	FontSize float64
 	Glyphs   []GlyphPos
 }
 
+// GlyphPos contains layout information for a single glyph in a run
 type GlyphPos struct {
 	Gid     GlyphID
 	XOffset int
@@ -77,7 +74,9 @@ type GlyphPos struct {
 	Advance int
 }
 
-func (font *Font) TypeSet(s string, ptSize float64) *Layout {
+// Typeset computes all information required to typeset the given string
+// in a PDF file.
+func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	var runs [][]rune
 	var run []rune
 	for _, r := range s {
@@ -90,10 +89,9 @@ func (font *Font) TypeSet(s string, ptSize float64) *Layout {
 	}
 	if len(run) > 0 {
 		runs = append(runs, run)
-		run = nil
 	}
 
-	// introduce ligatures etc.
+	// introduce ligatures, fix mark glyphs etc.
 	var glyphs []GlyphID
 	for _, run := range runs {
 		pos := len(glyphs)
@@ -103,7 +101,9 @@ func (font *Font) TypeSet(s string, ptSize float64) *Layout {
 		glyphs = append(glyphs[:pos], font.Substitute(glyphs[pos:])...)
 	}
 
+	// apply kerning etc.
 	layout := font.Layout(glyphs)
+
 	return &Layout{
 		Font:     font,
 		FontSize: ptSize,
@@ -114,99 +114,3 @@ func (font *Font) TypeSet(s string, ptSize float64) *Layout {
 // GlyphPair represents two consecutive glyphs, specified by a pair of
 // character codes.  This is used for ligatures and kerning information.
 type GlyphPair [2]GlyphID
-
-// OldLayout contains the information needed to typeset a text.
-type OldLayout struct {
-	FontSize  float64
-	Fragments [][]byte
-	Kerns     []int
-	Width     float64
-	Height    float64
-	Depth     float64
-}
-
-// OldTypeset determines the layout of a string using the given font.  The
-// function takes ligatures and kerning information into account.
-func (font *Font) OldTypeset(s string, ptSize float64) *OldLayout {
-	// for _, repl := range ligTab {
-	// 	if font.CMap[repl.lig] == 0 {
-	// 		continue
-	// 	}
-	// 	s = strings.ReplaceAll(s, repl.letters, string([]rune{repl.lig}))
-	// }
-
-	q := ptSize / float64(font.GlyphUnits)
-
-	var glyphs []GlyphID
-	var last GlyphID
-	for _, r := range s {
-		if !unicode.IsGraphic(r) {
-			continue
-		}
-		c := font.CMap[r]
-		if len(glyphs) > 0 {
-			pair := GlyphPair{last, c}
-			lig, ok := font.Ligatures[pair]
-			if ok {
-				glyphs = glyphs[:len(glyphs)-1]
-				c = lig
-			}
-		}
-		glyphs = append(glyphs, c)
-		last = c
-	}
-
-	ll := &OldLayout{
-		FontSize: ptSize,
-	}
-	if len(glyphs) == 0 {
-		return ll
-	}
-
-	width := 0.0
-	height := math.Inf(-1)
-	depth := math.Inf(-1)
-	pos := 0
-	for i, c := range glyphs {
-		bbox := &font.GlyphExtent[c]
-		if !bbox.IsZero() {
-			thisDepth := -float64(bbox.LLy) * q
-			if thisDepth > depth {
-				depth = thisDepth
-			}
-			thisHeight := float64(bbox.URy) * q
-			if thisHeight > height {
-				height = thisHeight
-			}
-		}
-		width += float64(font.Width[c]) * q
-
-		if i == len(glyphs)-1 {
-			var enc []byte
-			for _, gid := range glyphs[pos:] {
-				enc = append(enc, font.Enc(gid)...)
-			}
-			ll.Fragments = append(ll.Fragments, enc)
-			break
-		}
-
-		kern := font.Kerning[GlyphPair{c, glyphs[i+1]}]
-		if kern == 0 {
-			continue
-		}
-
-		width += float64(kern) * q
-		var enc []byte
-		for _, gid := range glyphs[pos : i+1] {
-			enc = append(enc, font.Enc(gid)...)
-		}
-		ll.Fragments = append(ll.Fragments, enc)
-		ll.Kerns = append(ll.Kerns, -kern)
-		pos = i + 1
-	}
-	ll.Width = width
-	ll.Height = height
-	ll.Depth = depth
-
-	return ll
-}
