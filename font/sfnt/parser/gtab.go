@@ -18,14 +18,10 @@ package parser
 
 import (
 	"sort"
-
-	"seehuhn.de/go/pdf/font"
 )
 
 type gTab struct {
 	*Parser
-
-	glyphNames map[font.GlyphID]rune // TODO(voss): remove
 
 	LookupIndices    []uint16
 	lookupListOffset int64
@@ -61,15 +57,6 @@ func newGTab(p *Parser, script, lang string) (*gTab, error) {
 	res := &gTab{
 		Parser:        p,
 		coverageCache: make(map[int64]coverage),
-	}
-
-	res.glyphNames = make(map[font.GlyphID]rune)
-	cmap, err := p.tt.SelectCmap()
-	if err != nil {
-		return nil, err
-	}
-	for r, gid := range cmap {
-		res.glyphNames[gid] = r
 	}
 
 	return res, nil
