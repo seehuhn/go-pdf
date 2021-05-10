@@ -17,11 +17,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
-	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -35,10 +36,10 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		subset[r] = true
 	}
 
-	// F1, err := builtin.Embed(out, "F1", "Times-Roman", nil)
+	F1, err := builtin.Embed(out, "F1", "Times-Roman", nil)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/FreeSerif.ttf", subset)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/Roboto-Regular.ttf", subset)
-	F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", subset)
+	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", subset)
 	if err != nil {
 		return err
 	}
@@ -61,6 +62,10 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	q := fontSize / float64(F1.GlyphUnits)
 	layout := F1.Typeset(text, fontSize)
 	glyphs := layout.Glyphs
+
+	for _, glyph := range layout.Glyphs {
+		fmt.Println(glyph)
+	}
 
 	page.Println("q")
 	page.Println("1 .5 .5 RG")
@@ -126,7 +131,6 @@ func main() {
 	const width = 8 * 72
 	const height = 6 * 72
 
-	// text := "Toterflas' & fish bucket"
 	text := "Ba\u0308rfisch"
 	err = writePage(out, text, width, height)
 	if err != nil {

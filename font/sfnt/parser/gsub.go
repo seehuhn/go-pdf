@@ -30,7 +30,7 @@ type GsubInfo []*GsubLookup
 
 // ReadGsubInfo reads the "GSUB" table of a font, for a given writing script
 // and language.
-func (p *Parser) ReadGsubInfo(script, lang string) (GsubInfo, error) {
+func (p *Parser) ReadGsubInfo(script, lang string, extraFeatures ...string) (GsubInfo, error) {
 	gtab, err := newGTab(p, script, lang)
 	if err != nil {
 		return nil, err
@@ -40,6 +40,9 @@ func (p *Parser) ReadGsubInfo(script, lang string) (GsubInfo, error) {
 		"ccmp": true,
 		"liga": true,
 		"clig": true,
+	}
+	for _, feature := range extraFeatures {
+		includeFeature[feature] = true
 	}
 	err = gtab.Init("GSUB", includeFeature)
 	if err != nil {
@@ -126,19 +129,19 @@ func (g *gTab) GetGsubLookup(idx uint16) (*GsubLookup, error) {
 	format := data[0]
 	flags := data[1]
 	subtables := data[2:]
-	markFilteringSet := -1
+	var markFilteringSet uint16
 	if flags&0x0010 != 0 {
 		err = g.Exec(s, CmdRead16, TypeUInt) // markFilteringSet
 		if err != nil {
 			return nil, err
 		}
-		markFilteringSet = int(s.A)
+		markFilteringSet = uint16(s.A)
 	}
-	_ = markFilteringSet // TODO(voss): use this correctly
 
 	lookup := &GsubLookup{
-		Format: format,
-		Flags:  flags,
+		Format:           format,
+		Flags:            flags,
+		markFilteringSet: markFilteringSet,
 	}
 	for _, offs := range subtables {
 		res, err := g.readGsubSubtable(s, format, base+int64(offs))

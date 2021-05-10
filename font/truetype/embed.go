@@ -323,7 +323,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		"FontDescriptor": FontDescriptorRef,
 		"W":              WRefs[0],
 	}
-	if DW != 0 {
+	if DW != 1000 {
 		CIDFont["DW"] = pdf.Integer(DW)
 	}
 
