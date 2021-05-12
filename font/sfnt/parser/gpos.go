@@ -147,6 +147,11 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 		markArrayOffset := data[3]
 		baseArrayOffset := data[4]
 
+		markArray, err := g.readMarkArrayTable(subtablePos + int64(markArrayOffset))
+		if err != nil {
+			return nil, err
+		}
+
 		markCoverage, err := g.readCoverageTable(subtablePos + int64(markCoverageOffset))
 		if err != nil {
 			return nil, err
@@ -159,12 +164,27 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 		fmt.Println(markCoverage)
 		fmt.Println(baseCoverage)
 		_ = markClassCount
-		_ = markArrayOffset
+		_ = markArray
 		_ = baseArrayOffset
+
+	case 9_1: // Extension Positioning Subtable Format 1
+		err = g.Exec(s,
+			CmdRead16, TypeUInt, // extensionLookupType
+			CmdStore, 0,
+			CmdRead32, TypeUInt, // extensionOffset
+		)
+		if err != nil {
+			return nil, err
+		}
+		if s.R[0] == 9 {
+			return nil, g.error("invalid extension lookup")
+		}
+		return g.readGposSubtable(s, uint16(s.R[0]), subtablePos+s.A)
 	}
 
 	if res == nil {
-		return nil, g.error("unsupported lookup type %d.%d\n", format, subFormat)
+		fmt.Println("upsupported format", format, subFormat)
+		// return nil, g.error("unsupported lookup type %d.%d\n", format, subFormat)
 	}
 
 	return res, nil
