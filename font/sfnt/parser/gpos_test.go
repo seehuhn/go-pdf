@@ -36,4 +36,6 @@ func TestGpos(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println(info)
+
+	t.Error("fish")
 }
