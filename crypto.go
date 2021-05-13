@@ -909,7 +909,7 @@ const (
 	// PermForms.
 	PermAnnotate
 
-	// PermAssemble allows to insert, rotate, or delete pages and create
+	// PermAssemble allows to insert, rotate, or delete pages and to create
 	// bookmarks or thumbnail images.
 	PermAssemble
 
