@@ -29,7 +29,7 @@
 //          log.Fatal(err)
 //      }
 //      defer r.Close()
-//      catalog, err := r.Catalog()
+//      catalog, err := r.GetCatalog()
 //      if err != nil {
 //          log.Fatal(err)
 //      }
@@ -56,7 +56,7 @@
 //         log.Fatal(err)
 //     }
 //
-// The following classes implement the native PDF object types.  All of these
+// The following classes represent the native PDF object types.  All of these
 // implement the `pdf.Object` interface:
 //
 //     Array
