@@ -134,22 +134,42 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 	switch 10*format + uint16(subFormat) {
 	case 4_1: // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment Point
 		err = g.Exec(s,
-			CmdStash, // markCoverageOffset
-			CmdStash, // baseCoverageOffset
-			CmdStash, // markClassCount
+			CmdStash,            // markCoverageOffset
+			CmdStash,            // baseCoverageOffset
+			CmdRead16, TypeUInt, // markClassCount
+			CmdStore, 0,
 			CmdStash, // markArrayOffset
 			CmdStash, // baseArrayOffset
 		)
 		data := s.GetStash()
 		markCoverageOffset := data[0]
 		baseCoverageOffset := data[1]
-		markClassCount := data[2]
-		markArrayOffset := data[3]
-		baseArrayOffset := data[4]
+		markClassCount := int(s.R[0])
+		markArrayOffset := data[2]
+		baseArrayOffset := data[3]
 
 		markArray, err := g.readMarkArrayTable(subtablePos + int64(markArrayOffset))
 		if err != nil {
 			return nil, err
+		}
+
+		baseArrayPos := subtablePos + int64(baseArrayOffset)
+		s.A = baseArrayPos
+		err = g.Exec(s,
+			CmdSeek,
+			CmdRead16, TypeUInt, // baseCount
+			CmdMult, 0,
+			CmdLoop,
+			CmdStash, // baseRecords[i].baseAnchorOffsets[j]
+			CmdEndLoop,
+		)
+		data = s.GetStash()
+		baseAnchors := make([]anchor, len(data))
+		for i, offs := range data {
+			err = g.readAnchor(baseArrayPos+int64(offs), &baseAnchors[i])
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		markCoverage, err := g.readCoverageTable(subtablePos + int64(markCoverageOffset))
@@ -160,12 +180,27 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(data)
-		fmt.Println(markCoverage)
-		fmt.Println(baseCoverage)
-		_ = markClassCount
-		_ = markArray
-		_ = baseArrayOffset
+
+		xxx := &gpos4_1{
+			Mark: map[font.GlyphID]*markRecord{},
+			Base: map[font.GlyphID][]anchor{},
+		}
+		for gid, idx := range baseCoverage {
+			a := idx * markClassCount
+			b := a + markClassCount
+			if b > len(baseAnchors) {
+				return nil, g.error("malformed GPOS 4.1 table")
+			}
+			xxx.Base[gid] = baseAnchors[a:b]
+		}
+		for gid, idx := range markCoverage {
+			if idx >= len(markArray) || markArray[idx].markClass >= uint16(markClassCount) {
+				return nil, g.error("malformed GPOS 4.1 table")
+			}
+			xxx.Mark[gid] = &markArray[idx]
+		}
+
+		res = xxx
 
 	case 9_1: // Extension Positioning Subtable Format 1
 		err = g.Exec(s,
@@ -191,5 +226,30 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 }
 
 type gposLookupSubtable interface {
-	Position(uint16, []font.GlyphPos, int)
+	Position(uint16, []font.GlyphPos, int) int
+}
+
+type gpos4_1 struct {
+	Mark map[font.GlyphID]*markRecord
+	Base map[font.GlyphID][]anchor
+}
+
+func (l *gpos4_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+	if pos == 0 {
+		return pos
+	}
+	mark, ok := l.Mark[seq[pos].Gid]
+	if !ok {
+		return pos
+	}
+	base, ok := l.Base[seq[pos-1].Gid]
+	if !ok {
+		return pos
+	}
+
+	baseAnchor := base[mark.markClass]
+
+	seq[pos].XOffset = -seq[pos-1].Advance + int(baseAnchor.X) - int(mark.X)
+	seq[pos].YOffset = int(baseAnchor.Y) - int(mark.Y)
+	return pos + 1
 }
