@@ -173,8 +173,10 @@ CommandLoop:
 			s.A += int64(int8(arg))
 		case CmdAdd:
 			s.A += s.R[arg]
-		case CmdIMul:
+		case CmdIMult:
 			s.A *= int64(int8(arg))
+		case CmdMult:
+			s.A *= s.R[arg]
 
 		case CmdCmpEq:
 			target := int64(int8(arg))
@@ -327,7 +329,8 @@ const (
 	CmdLoad            // arg: register
 	CmdIAdd            // arg: int8 literal value
 	CmdAdd             // arg: register
-	CmdIMul            // arg: int8 literal value
+	CmdIMult           // arg: int8 literal value
+	CmdMult            // arg: register
 	CmdCmpEq           // arg: comparison value
 	CmdCmpGe           // arg: comparison value
 	CmdCmpLt           // arg: comparison value
