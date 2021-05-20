@@ -199,6 +199,8 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 			}
 			xxx.Mark[gid] = &markArray[idx]
 		}
+		fmt.Println(xxx.Base)
+		fmt.Println(xxx.Mark)
 
 		res = xxx
 
