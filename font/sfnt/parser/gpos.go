@@ -141,6 +141,9 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 			CmdStash, // markArrayOffset
 			CmdStash, // baseArrayOffset
 		)
+		if err != nil {
+			return nil, err
+		}
 		data := s.GetStash()
 		markCoverageOffset := data[0]
 		baseCoverageOffset := data[1]
@@ -163,6 +166,9 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 			CmdStash, // baseRecords[i].baseAnchorOffsets[j]
 			CmdEndLoop,
 		)
+		if err != nil {
+			return nil, err
+		}
 		data = s.GetStash()
 		baseAnchors := make([]anchor, len(data))
 		for i, offs := range data {
