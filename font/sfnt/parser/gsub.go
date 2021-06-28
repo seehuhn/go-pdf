@@ -26,7 +26,7 @@ import (
 // TODO(voss): read this carefully
 
 // GsubInfo represents the information from the "GSUB" table of a font.
-type GsubInfo []*GsubLookup
+type GsubInfo []*gsubLookup
 
 // ReadGsubInfo reads the "GSUB" table of a font, for a given writing script
 // and language.
@@ -71,7 +71,7 @@ func (gsub GsubInfo) Substitute(glyphs []font.GlyphID) []font.GlyphID {
 
 // TODO(voss): look at ../../font/truetype/ttf/FreeSans.ttf when
 // implementing Flags.
-type GsubLookup struct {
+type gsubLookup struct {
 	Format uint16 // TODO(voss): remove?
 	Flags  uint16
 
@@ -79,7 +79,7 @@ type GsubLookup struct {
 	markFilteringSet uint16
 }
 
-func (l *GsubLookup) Replace(glyphs []font.GlyphID, pos int) ([]font.GlyphID, int) {
+func (l *gsubLookup) Replace(glyphs []font.GlyphID, pos int) ([]font.GlyphID, int) {
 	var next int
 	for _, subtable := range l.subtables {
 		glyphs, next = subtable.Replace(l.Flags, glyphs, pos)
@@ -90,7 +90,7 @@ func (l *GsubLookup) Replace(glyphs []font.GlyphID, pos int) ([]font.GlyphID, in
 	return glyphs, pos
 }
 
-func (l *GsubLookup) Substitute(glyphs []font.GlyphID) []font.GlyphID {
+func (l *gsubLookup) Substitute(glyphs []font.GlyphID) []font.GlyphID {
 	pos := 0
 	for pos < len(glyphs) {
 		var next int
@@ -104,7 +104,7 @@ func (l *GsubLookup) Substitute(glyphs []font.GlyphID) []font.GlyphID {
 	return glyphs
 }
 
-func (g *gTab) GetGsubLookup(idx uint16) (*GsubLookup, error) {
+func (g *gTab) GetGsubLookup(idx uint16) (*gsubLookup, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
 	}
@@ -138,7 +138,7 @@ func (g *gTab) GetGsubLookup(idx uint16) (*GsubLookup, error) {
 		markFilteringSet = uint16(s.A)
 	}
 
-	lookup := &GsubLookup{
+	lookup := &gsubLookup{
 		Format:           format,
 		Flags:            flags,
 		markFilteringSet: markFilteringSet,
@@ -1041,7 +1041,7 @@ type gsub6_3 struct {
 
 type seqLookup struct {
 	pos    int
-	nested *GsubLookup
+	nested *gsubLookup
 }
 
 func (l *gsub6_3) Replace(flags uint16, seq []font.GlyphID, pos int) ([]font.GlyphID, int) {
