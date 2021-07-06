@@ -120,7 +120,7 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 	s.A = subtablePos
 	err := g.Exec(s,
 		CmdSeek,
-		CmdRead16, TypeUInt, // format
+		CmdRead16, TypeUInt, // (sub-)format
 	)
 	if err != nil {
 		return nil, err
@@ -263,12 +263,13 @@ func (l *gpos4_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
 	return pos + 1
 }
 
+// Mark-to-Mark Attachment Positioning Format 1: Mark-to-base Attachment
+
 type gpos6_1 struct {
-	Mark map[font.GlyphID]*markRecord
-	Base map[font.GlyphID][]anchor
+	Mark1 map[font.GlyphID]*markRecord // the attaching mark
+	Mark2 map[font.GlyphID][]anchor    // the base mark being attached to
 }
 
-// Mark-to-Mark Attachment Positioning Format 1: Mark-to-base Attachment
 func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	err := g.Exec(s,
 		CmdStash, // mark1CoverageOffset
@@ -287,14 +288,36 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	mark1ArrayOffset := data[3]
 	mark2ArrayOffset := data[4]
 
-	_ = mark1CoverageOffset
-	_ = mark2CoverageOffset
+	mark1Array, err := g.readMarkArrayTable(subtablePos + int64(mark1ArrayOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("MA1", mark1Array)
+
+	mark1Coverage, err := g.readCoverageTable(subtablePos + int64(mark1CoverageOffset))
+	if err != nil {
+		return nil, err
+	}
+	mark2Coverage, err := g.readCoverageTable(subtablePos + int64(mark2CoverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	_ = mark1Coverage
+	_ = mark2Coverage
 	_ = markClassCount
-	_ = mark1ArrayOffset
+	_ = mark1Array
 	_ = mark2ArrayOffset
 	panic("not implemented")
 }
 
 func (l *gpos6_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+	// The mark2 glyph that combines with a mark1 glyph is the glyph preceding
+	// the mark1 glyph in glyph string order (skipping glyphs according to
+	// LookupFlags). The subtable applies precisely when that mark2 glyph is
+	// covered by mark2Coverage. To combine the mark glyphs, the placement of
+	// the mark1 glyph is adjusted such that the relevant attachment points
+	// coincide.
 	panic("not implemented")
 }
