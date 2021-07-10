@@ -149,7 +149,7 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 		return g.readGposSubtable(s, uint16(s.R[0]), subtablePos+s.A)
 	}
 
-	fmt.Println("upsupported format", format, subFormat)
+	fmt.Println("unsupported GPOS format", format, subFormat)
 	// return nil, g.error("unsupported lookup type %d.%d\n", format, subFormat)
 	return nil, nil
 }
@@ -159,8 +159,8 @@ type gposLookupSubtable interface {
 }
 
 type gpos4_1 struct {
-	Mark map[font.GlyphID]*markRecord
-	Base map[font.GlyphID][]anchor
+	Mark map[font.GlyphID]*markRecord // the attaching mark
+	Base map[font.GlyphID][]anchor    // the base glyph being attached to
 }
 
 // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment Point
@@ -219,7 +219,7 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 		return nil, err
 	}
 
-	xxx := &gpos4_1{
+	res := &gpos4_1{
 		Mark: map[font.GlyphID]*markRecord{},
 		Base: map[font.GlyphID][]anchor{},
 	}
@@ -229,18 +229,16 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 		if b > len(baseAnchors) {
 			return nil, g.error("malformed GPOS 4.1 table")
 		}
-		xxx.Base[gid] = baseAnchors[a:b]
+		res.Base[gid] = baseAnchors[a:b]
 	}
 	for gid, idx := range markCoverage {
 		if idx >= len(markArray) || markArray[idx].markClass >= uint16(markClassCount) {
 			return nil, g.error("malformed GPOS 4.1 table")
 		}
-		xxx.Mark[gid] = &markArray[idx]
+		res.Mark[gid] = &markArray[idx]
 	}
-	fmt.Println(xxx.Base)
-	fmt.Println(xxx.Mark)
 
-	return xxx, nil
+	return res, nil
 }
 
 func (l *gpos4_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
@@ -272,9 +270,10 @@ type gpos6_1 struct {
 
 func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	err := g.Exec(s,
-		CmdStash, // mark1CoverageOffset
-		CmdStash, // mark2CoverageOffset
-		CmdStash, // markClassCount
+		CmdStash,            // mark1CoverageOffset
+		CmdStash,            // mark2CoverageOffset
+		CmdRead16, TypeUInt, // markClassCount
+		CmdStore, 0,
 		CmdStash, // mark1ArrayOffset
 		CmdStash, // mark2ArrayOffset
 	)
@@ -284,16 +283,37 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	data := s.GetStash()
 	mark1CoverageOffset := data[0]
 	mark2CoverageOffset := data[1]
-	markClassCount := data[2]
-	mark1ArrayOffset := data[3]
-	mark2ArrayOffset := data[4]
+	markClassCount := int(s.R[0])
+	mark1ArrayOffset := data[2]
+	mark2ArrayOffset := data[3]
 
 	mark1Array, err := g.readMarkArrayTable(subtablePos + int64(mark1ArrayOffset))
 	if err != nil {
 		return nil, err
 	}
-
 	fmt.Println("MA1", mark1Array)
+
+	baseArrayPos := subtablePos + int64(mark2ArrayOffset)
+	s.A = baseArrayPos
+	err = g.Exec(s,
+		CmdSeek,
+		CmdRead16, TypeUInt, // mark2Count
+		CmdMult, 0,
+		CmdLoop,
+		CmdStash, // mark2Records[i].mark2AnchorOffsets[j]
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	data = s.GetStash()
+	mark2Anchors := make([]anchor, len(data))
+	for i, offs := range data {
+		err = g.readAnchor(baseArrayPos+int64(offs), &mark2Anchors[i])
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	mark1Coverage, err := g.readCoverageTable(subtablePos + int64(mark1CoverageOffset))
 	if err != nil {
@@ -304,12 +324,26 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 		return nil, err
 	}
 
-	_ = mark1Coverage
-	_ = mark2Coverage
-	_ = markClassCount
-	_ = mark1Array
-	_ = mark2ArrayOffset
-	panic("not implemented")
+	res := &gpos6_1{
+		Mark1: map[font.GlyphID]*markRecord{},
+		Mark2: map[font.GlyphID][]anchor{},
+	}
+	for gid, idx := range mark2Coverage {
+		a := idx * markClassCount
+		b := a + markClassCount
+		if b > len(mark2Anchors) {
+			return nil, g.error("malformed GPOS 4.1 table")
+		}
+		res.Mark2[gid] = mark2Anchors[a:b]
+	}
+	for gid, idx := range mark1Coverage {
+		if idx >= len(mark1Array) || mark1Array[idx].markClass >= uint16(markClassCount) {
+			return nil, g.error("malformed GPOS 6.1 table")
+		}
+		res.Mark1[gid] = &mark1Array[idx]
+	}
+
+	return res, nil
 }
 
 func (l *gpos6_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
