@@ -130,6 +130,8 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#table-organization
 	// switch 10*format + uint16(subFormat) {
 	switch 10*format + uint16(subFormat) {
+	case 2_1: // Pair Adjustment Positioning Format 1: Adjustments for Glyph Pairs
+		return g.readGpos2_1(s, subtablePos)
 	case 4_1: // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment
 		return g.readGpos4_1(s, subtablePos)
 	case 6_1: // Mark-to-Mark Attachment Positioning Format 1: Mark-to-Mark Attachment
@@ -156,6 +158,86 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 
 type gposLookupSubtable interface {
 	Position(uint16, []font.GlyphPos, int) int
+}
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
+type gpos2_1 struct {
+	cov    coverage
+	adjust []map[font.GlyphID]*pairAdjust
+}
+
+type pairAdjust struct {
+	first, second *valueRecord
+}
+
+func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
+	err := g.Exec(s,
+		CmdStash,            // coverageOffset
+		CmdStash,            // valueFormat1
+		CmdStash,            // valueFormat2
+		CmdRead16, TypeUInt, // pairSetCount
+		CmdLoop,
+		CmdStash, // pairSetOffsets[i]
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	data := s.GetStash()
+	coverageOffset := data[0]
+	valueFormat1 := data[1]
+	valueFormat2 := data[2]
+	pairSetOffsets := data[3:]
+
+	coverage, err := g.readCoverageTable(subtablePos + int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+	if len(coverage) != len(pairSetOffsets) {
+		return nil, g.error("malformed GPOS 2.1 table")
+	}
+
+	res := &gpos2_1{
+		cov:    coverage,
+		adjust: make([]map[font.GlyphID]*pairAdjust, len(pairSetOffsets)),
+	}
+	for i, offs := range pairSetOffsets {
+		pairMap := make(map[font.GlyphID]*pairAdjust)
+		s.A = subtablePos + int64(offs)
+		err := g.Exec(s,
+			CmdSeek,
+			CmdRead16, TypeUInt, // pairValueCount
+		)
+		if err != nil {
+			return nil, err
+		}
+		pairValueCount := int(s.A)
+		for i := 0; i < pairValueCount; i++ {
+			secondGlyph, err := g.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			vr1, err := g.readValueRecord(valueFormat1)
+			if err != nil {
+				return nil, err
+			}
+			vr2, err := g.readValueRecord(valueFormat2)
+			if err != nil {
+				return nil, err
+			}
+			pairMap[font.GlyphID(secondGlyph)] = &pairAdjust{
+				first:  vr1,
+				second: vr2,
+			}
+		}
+		res.adjust[i] = pairMap
+	}
+
+	return res, nil
+}
+
+func (l *gpos2_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+	panic("not implemented")
 }
 
 type gpos4_1 struct {
@@ -291,7 +373,6 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("MA1", mark1Array)
 
 	baseArrayPos := subtablePos + int64(mark2ArrayOffset)
 	s.A = baseArrayPos

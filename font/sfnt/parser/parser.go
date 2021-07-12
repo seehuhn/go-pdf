@@ -251,8 +251,23 @@ CommandLoop:
 	return nil
 }
 
-func (p *Parser) seek(tablePos int64) error {
-	filePos := p.start + tablePos
+// ReadUInt16 reads a single uint16 value from the current position.
+func (p *Parser) ReadUInt16() (uint16, error) {
+	buf, err := p.read(2)
+	if err != nil {
+		return 0, err
+	}
+	return uint16(buf[0])<<8 + uint16(buf[1]), nil
+}
+
+// ReadInt16 reads a single int16 value from the current position.
+func (p *Parser) ReadInt16() (int16, error) {
+	val, err := p.ReadUInt16()
+	return int16(val), err
+}
+
+func (p *Parser) seek(posInTable int64) error {
+	filePos := p.start + posInTable
 	if filePos < p.start || filePos > p.end {
 		return p.error("seek target %d is outside [%d,%d]",
 			filePos, p.start, p.end)
@@ -275,6 +290,14 @@ func (p *Parser) seek(tablePos int64) error {
 
 func (p *Parser) read(n int) ([]byte, error) {
 	p.lastRead = int(p.from + int64(p.pos) - p.start)
+	if n < 0 {
+		n = 0
+	} else if n > bufferSize {
+		n = bufferSize
+	}
+	if p.from+int64(p.pos+n) > p.end {
+		return nil, io.ErrUnexpectedEOF
+	}
 
 	for p.pos+n > p.used {
 		if len(p.buf) == 0 {
@@ -299,9 +322,6 @@ func (p *Parser) read(n int) ([]byte, error) {
 		p.used += l
 	}
 
-	if p.from+int64(p.pos+n) > p.end {
-		return nil, io.ErrUnexpectedEOF
-	}
 	res := p.buf[p.pos : p.pos+n]
 	p.pos += n
 	return res, nil
