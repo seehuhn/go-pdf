@@ -22,11 +22,11 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-type GposInfo []*GposLookup
+type gposInfo []*gposLookup
 
-// ReadGposInfo reads the "GSUB" table of a font, for a given writing script
+// readGposInfo reads the "GSUB" table of a font, for a given writing script
 // and language.
-func (p *Parser) ReadGposInfo(script, lang string, extraFeatures ...string) (GposInfo, error) {
+func (p *Parser) readGposInfo(script, lang string, extraFeatures ...string) (gposInfo, error) {
 	gtab, err := newGTab(p, script, lang)
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func (p *Parser) ReadGposInfo(script, lang string, extraFeatures ...string) (Gpo
 		return nil, err
 	}
 
-	var res GposInfo
+	var res gposInfo
 	for _, idx := range gtab.LookupIndices {
 		l, err := gtab.GetGposLookup(idx)
 		if err != nil {
@@ -56,7 +56,7 @@ func (p *Parser) ReadGposInfo(script, lang string, extraFeatures ...string) (Gpo
 	return res, nil
 }
 
-type GposLookup struct {
+type gposLookup struct {
 	Format uint16 // TODO(voss): remove?
 	Flags  uint16
 
@@ -64,7 +64,7 @@ type GposLookup struct {
 	markFilteringSet uint16
 }
 
-func (g *gTab) GetGposLookup(idx uint16) (*GposLookup, error) {
+func (g *gTab) GetGposLookup(idx uint16) (*gposLookup, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
 	}
@@ -98,7 +98,7 @@ func (g *gTab) GetGposLookup(idx uint16) (*GposLookup, error) {
 		markFilteringSet = uint16(s.A)
 	}
 
-	lookup := &GposLookup{
+	lookup := &gposLookup{
 		Format:           format,
 		Flags:            flags,
 		markFilteringSet: markFilteringSet,
@@ -120,99 +120,22 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 	s.A = subtablePos
 	err := g.Exec(s,
 		CmdSeek,
-		CmdRead16, TypeUInt, // format
+		CmdRead16, TypeUInt, // (sub-)format
 	)
 	if err != nil {
 		return nil, err
 	}
 	subFormat := s.A
 
-	var res gposLookupSubtable
-
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#table-organization
 	// switch 10*format + uint16(subFormat) {
 	switch 10*format + uint16(subFormat) {
-	case 4_1: // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment Point
-		err = g.Exec(s,
-			CmdStash,            // markCoverageOffset
-			CmdStash,            // baseCoverageOffset
-			CmdRead16, TypeUInt, // markClassCount
-			CmdStore, 0,
-			CmdStash, // markArrayOffset
-			CmdStash, // baseArrayOffset
-		)
-		if err != nil {
-			return nil, err
-		}
-		data := s.GetStash()
-		markCoverageOffset := data[0]
-		baseCoverageOffset := data[1]
-		markClassCount := int(s.R[0])
-		markArrayOffset := data[2]
-		baseArrayOffset := data[3]
-
-		markArray, err := g.readMarkArrayTable(subtablePos + int64(markArrayOffset))
-		if err != nil {
-			return nil, err
-		}
-
-		baseArrayPos := subtablePos + int64(baseArrayOffset)
-		s.A = baseArrayPos
-		err = g.Exec(s,
-			CmdSeek,
-			CmdRead16, TypeUInt, // baseCount
-			CmdMult, 0,
-			CmdLoop,
-			CmdStash, // baseRecords[i].baseAnchorOffsets[j]
-			CmdEndLoop,
-		)
-<<<<<<< HEAD
-=======
-		if err != nil {
-			return nil, err
-		}
->>>>>>> bff4f3d744e3d5c3645b1dbdbb5f1956192969c0
-		data = s.GetStash()
-		baseAnchors := make([]anchor, len(data))
-		for i, offs := range data {
-			err = g.readAnchor(baseArrayPos+int64(offs), &baseAnchors[i])
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		markCoverage, err := g.readCoverageTable(subtablePos + int64(markCoverageOffset))
-		if err != nil {
-			return nil, err
-		}
-		baseCoverage, err := g.readCoverageTable(subtablePos + int64(baseCoverageOffset))
-		if err != nil {
-			return nil, err
-		}
-
-		xxx := &gpos4_1{
-			Mark: map[font.GlyphID]*markRecord{},
-			Base: map[font.GlyphID][]anchor{},
-		}
-		for gid, idx := range baseCoverage {
-			a := idx * markClassCount
-			b := a + markClassCount
-			if b > len(baseAnchors) {
-				return nil, g.error("malformed GPOS 4.1 table")
-			}
-			xxx.Base[gid] = baseAnchors[a:b]
-		}
-		for gid, idx := range markCoverage {
-			if idx >= len(markArray) || markArray[idx].markClass >= uint16(markClassCount) {
-				return nil, g.error("malformed GPOS 4.1 table")
-			}
-			xxx.Mark[gid] = &markArray[idx]
-		}
-		fmt.Println(xxx.Base)
-		fmt.Println(xxx.Mark)
-
-		res = xxx
-
+	case 2_1: // Pair Adjustment Positioning Format 1: Adjustments for Glyph Pairs
+		return g.readGpos2_1(s, subtablePos)
+	case 4_1: // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment
+		return g.readGpos4_1(s, subtablePos)
+	case 6_1: // Mark-to-Mark Attachment Positioning Format 1: Mark-to-Mark Attachment
+		return g.readGpos6_1(s, subtablePos)
 	case 9_1: // Extension Positioning Subtable Format 1
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // extensionLookupType
@@ -228,21 +151,176 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 		return g.readGposSubtable(s, uint16(s.R[0]), subtablePos+s.A)
 	}
 
-	if res == nil {
-		fmt.Println("upsupported format", format, subFormat)
-		// return nil, g.error("unsupported lookup type %d.%d\n", format, subFormat)
-	}
-
-	return res, nil
+	fmt.Println("unsupported GPOS format", format, subFormat)
+	// return nil, g.error("unsupported lookup type %d.%d\n", format, subFormat)
+	return nil, nil
 }
 
 type gposLookupSubtable interface {
 	Position(uint16, []font.GlyphPos, int) int
 }
 
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
+type gpos2_1 struct {
+	cov    coverage
+	adjust []map[font.GlyphID]*pairAdjust
+}
+
+type pairAdjust struct {
+	first, second *valueRecord
+}
+
+func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
+	err := g.Exec(s,
+		CmdStash,            // coverageOffset
+		CmdStash,            // valueFormat1
+		CmdStash,            // valueFormat2
+		CmdRead16, TypeUInt, // pairSetCount
+		CmdLoop,
+		CmdStash, // pairSetOffsets[i]
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	data := s.GetStash()
+	coverageOffset := data[0]
+	valueFormat1 := data[1]
+	valueFormat2 := data[2]
+	pairSetOffsets := data[3:]
+
+	coverage, err := g.readCoverageTable(subtablePos + int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+	if len(coverage) != len(pairSetOffsets) {
+		return nil, g.error("malformed GPOS 2.1 table")
+	}
+
+	res := &gpos2_1{
+		cov:    coverage,
+		adjust: make([]map[font.GlyphID]*pairAdjust, len(pairSetOffsets)),
+	}
+	for i, offs := range pairSetOffsets {
+		pairMap := make(map[font.GlyphID]*pairAdjust)
+		s.A = subtablePos + int64(offs)
+		err := g.Exec(s,
+			CmdSeek,
+			CmdRead16, TypeUInt, // pairValueCount
+		)
+		if err != nil {
+			return nil, err
+		}
+		pairValueCount := int(s.A)
+		for i := 0; i < pairValueCount; i++ {
+			secondGlyph, err := g.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			vr1, err := g.readValueRecord(valueFormat1)
+			if err != nil {
+				return nil, err
+			}
+			vr2, err := g.readValueRecord(valueFormat2)
+			if err != nil {
+				return nil, err
+			}
+			pairMap[font.GlyphID(secondGlyph)] = &pairAdjust{
+				first:  vr1,
+				second: vr2,
+			}
+		}
+		res.adjust[i] = pairMap
+	}
+
+	return res, nil
+}
+
+func (l *gpos2_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+	panic("not implemented")
+}
+
 type gpos4_1 struct {
-	Mark map[font.GlyphID]*markRecord
-	Base map[font.GlyphID][]anchor
+	Mark map[font.GlyphID]*markRecord // the attaching mark
+	Base map[font.GlyphID][]anchor    // the base glyph being attached to
+}
+
+// Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment Point
+func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
+	err := g.Exec(s,
+		CmdStash,            // markCoverageOffset
+		CmdStash,            // baseCoverageOffset
+		CmdRead16, TypeUInt, // markClassCount
+		CmdStore, 0,
+		CmdStash, // markArrayOffset
+		CmdStash, // baseArrayOffset
+	)
+	if err != nil {
+		return nil, err
+	}
+	data := s.GetStash()
+	markCoverageOffset := data[0]
+	baseCoverageOffset := data[1]
+	markClassCount := int(s.R[0])
+	markArrayOffset := data[2]
+	baseArrayOffset := data[3]
+
+	markArray, err := g.readMarkArrayTable(subtablePos + int64(markArrayOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	baseArrayPos := subtablePos + int64(baseArrayOffset)
+	s.A = baseArrayPos
+	err = g.Exec(s,
+		CmdSeek,
+		CmdRead16, TypeUInt, // baseCount
+		CmdMult, 0,
+		CmdLoop,
+		CmdStash, // baseRecords[i].baseAnchorOffsets[j]
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	data = s.GetStash()
+	baseAnchors := make([]anchor, len(data))
+	for i, offs := range data {
+		err = g.readAnchor(baseArrayPos+int64(offs), &baseAnchors[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	markCoverage, err := g.readCoverageTable(subtablePos + int64(markCoverageOffset))
+	if err != nil {
+		return nil, err
+	}
+	baseCoverage, err := g.readCoverageTable(subtablePos + int64(baseCoverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	res := &gpos4_1{
+		Mark: map[font.GlyphID]*markRecord{},
+		Base: map[font.GlyphID][]anchor{},
+	}
+	for gid, idx := range baseCoverage {
+		a := idx * markClassCount
+		b := a + markClassCount
+		if b > len(baseAnchors) {
+			return nil, g.error("malformed GPOS 4.1 table")
+		}
+		res.Base[gid] = baseAnchors[a:b]
+	}
+	for gid, idx := range markCoverage {
+		if idx >= len(markArray) || markArray[idx].markClass >= uint16(markClassCount) {
+			return nil, g.error("malformed GPOS 4.1 table")
+		}
+		res.Mark[gid] = &markArray[idx]
+	}
+
+	return res, nil
 }
 
 func (l *gpos4_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
@@ -263,4 +341,98 @@ func (l *gpos4_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
 	seq[pos].XOffset = -seq[pos-1].Advance + int(baseAnchor.X) - int(mark.X)
 	seq[pos].YOffset = int(baseAnchor.Y) - int(mark.Y)
 	return pos + 1
+}
+
+// Mark-to-Mark Attachment Positioning Format 1: Mark-to-base Attachment
+
+type gpos6_1 struct {
+	Mark1 map[font.GlyphID]*markRecord // the attaching mark
+	Mark2 map[font.GlyphID][]anchor    // the base mark being attached to
+}
+
+func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
+	err := g.Exec(s,
+		CmdStash,            // mark1CoverageOffset
+		CmdStash,            // mark2CoverageOffset
+		CmdRead16, TypeUInt, // markClassCount
+		CmdStore, 0,
+		CmdStash, // mark1ArrayOffset
+		CmdStash, // mark2ArrayOffset
+	)
+	if err != nil {
+		return nil, err
+	}
+	data := s.GetStash()
+	mark1CoverageOffset := data[0]
+	mark2CoverageOffset := data[1]
+	markClassCount := int(s.R[0])
+	mark1ArrayOffset := data[2]
+	mark2ArrayOffset := data[3]
+
+	mark1Array, err := g.readMarkArrayTable(subtablePos + int64(mark1ArrayOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	baseArrayPos := subtablePos + int64(mark2ArrayOffset)
+	s.A = baseArrayPos
+	err = g.Exec(s,
+		CmdSeek,
+		CmdRead16, TypeUInt, // mark2Count
+		CmdMult, 0,
+		CmdLoop,
+		CmdStash, // mark2Records[i].mark2AnchorOffsets[j]
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	data = s.GetStash()
+	mark2Anchors := make([]anchor, len(data))
+	for i, offs := range data {
+		err = g.readAnchor(baseArrayPos+int64(offs), &mark2Anchors[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	mark1Coverage, err := g.readCoverageTable(subtablePos + int64(mark1CoverageOffset))
+	if err != nil {
+		return nil, err
+	}
+	mark2Coverage, err := g.readCoverageTable(subtablePos + int64(mark2CoverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	res := &gpos6_1{
+		Mark1: map[font.GlyphID]*markRecord{},
+		Mark2: map[font.GlyphID][]anchor{},
+	}
+	for gid, idx := range mark2Coverage {
+		a := idx * markClassCount
+		b := a + markClassCount
+		if b > len(mark2Anchors) {
+			return nil, g.error("malformed GPOS 4.1 table")
+		}
+		res.Mark2[gid] = mark2Anchors[a:b]
+	}
+	for gid, idx := range mark1Coverage {
+		if idx >= len(mark1Array) || mark1Array[idx].markClass >= uint16(markClassCount) {
+			return nil, g.error("malformed GPOS 6.1 table")
+		}
+		res.Mark1[gid] = &mark1Array[idx]
+	}
+
+	return res, nil
+}
+
+func (l *gpos6_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+	// The mark2 glyph that combines with a mark1 glyph is the glyph preceding
+	// the mark1 glyph in glyph string order (skipping glyphs according to
+	// LookupFlags). The subtable applies precisely when that mark2 glyph is
+	// covered by mark2Coverage. To combine the mark glyphs, the placement of
+	// the mark1 glyph is adjusted such that the relevant attachment points
+	// coincide.
+	panic("not implemented")
 }
