@@ -49,7 +49,8 @@ OpenType Fonts (OTF)
 --------------------
 
 https://docs.microsoft.com/en-us/typography/opentype/spec/
-golang.org/x/image/font/opentype
+https://golang.org/x/image/font/opentype
+https://simoncozens.github.io/fonts-and-layout/features.html#mapping-and-reordering
 
 
 OpenType is a format for scalable computer fonts.  It was built on

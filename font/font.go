@@ -23,21 +23,19 @@ import (
 )
 
 // Font represents a font embedded in the PDF file.
-// TODO(voss): make sure that there is a good way to determine the number
-// of glyphs in the font?
 type Font struct {
 	Name pdf.Name
 	Ref  *pdf.Reference
 
 	CMap       map[rune]GlyphID
-	Substitute func(glyphs []GlyphID) []GlyphID
-	Layout     func(glyphs []GlyphID) []GlyphPos
+	Substitute func(glyphs []Glyph) []Glyph
+	Layout     func(glyphs []Glyph)
 	Enc        func(GlyphID) pdf.String
 
 	GlyphUnits int
 
 	GlyphExtent []Rect
-	Width       []int
+	Width       []int // TODO(voss): needed?
 
 	Ascent  float64 // Ascent in glyph coordinate units
 	Descent float64 // Descent in glyph coordinate units, as a negative number
@@ -63,19 +61,20 @@ func (rect *Rect) IsZero() bool {
 type Layout struct {
 	Font     *Font
 	FontSize float64
-	Glyphs   []GlyphPos
+	Glyphs   []Glyph
 }
 
-// GlyphPos contains layout information for a single glyph in a run
-type GlyphPos struct {
+// Glyph contains layout information for a single glyph in a run
+type Glyph struct {
 	Gid     GlyphID
+	Chars   []rune
 	XOffset int
 	YOffset int
 	Advance int
 }
 
-// Typeset computes all information required to typeset the given string
-// in a PDF file.
+// Typeset computes all glyph and layout information required to typeset a
+// string in a PDF file.
 func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	var runs [][]rune
 	var run []rune
@@ -92,22 +91,26 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	}
 
 	// introduce ligatures, fix mark glyphs etc.
-	var glyphs []GlyphID
+	var glyphs []Glyph
 	for _, run := range runs {
 		pos := len(glyphs)
 		for _, r := range run {
-			glyphs = append(glyphs, font.CMap[r])
+			g := Glyph{
+				Gid:   font.CMap[r],
+				Chars: []rune{r},
+			}
+			glyphs = append(glyphs, g)
 		}
 		glyphs = append(glyphs[:pos], font.Substitute(glyphs[pos:])...)
 	}
 
-	// apply kerning etc.
-	layout := font.Layout(glyphs)
+	// determine glyph positions, apply kerning etc.
+	font.Layout(glyphs)
 
 	return &Layout{
 		Font:     font,
 		FontSize: ptSize,
-		Glyphs:   layout,
+		Glyphs:   glyphs,
 	}
 }
 

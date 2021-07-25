@@ -23,12 +23,22 @@ import (
 )
 
 func TestGsub4_1(t *testing.T) {
-	in := []font.GlyphID{
+	inGid := []font.GlyphID{
 		0, 0, 1, 2, 3, 1, 2, 4, 1, 2, 0, 0, 2, 1, 0, 0,
 	}
-	expected := []font.GlyphID{
+	expectedGid := []font.GlyphID{
 		0, 0, 123, 124, 1, 2, 0, 0, 21, 0, 0,
 	}
+
+	in := make([]font.Glyph, len(inGid))
+	for i, gid := range inGid {
+		in[i].Gid = gid
+	}
+	expected := make([]font.Glyph, len(expectedGid))
+	for i, gid := range expectedGid {
+		expected[i].Gid = gid
+	}
+
 	gsub := &gsub4_1{
 		cov: map[font.GlyphID]int{
 			1: 0,
@@ -81,11 +91,11 @@ func TestGsub4_1(t *testing.T) {
 	}
 }
 
-func isEqual(in []font.GlyphID, expected []font.GlyphID) bool {
+func isEqual(in []font.Glyph, expected []font.Glyph) bool {
 	equal := len(in) == len(expected)
 	if equal {
-		for i, gid := range in {
-			if expected[i] != gid {
+		for i, glyph := range in {
+			if expected[i].Gid != glyph.Gid {
 				equal = false
 				break
 			}

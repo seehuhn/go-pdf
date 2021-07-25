@@ -17,7 +17,6 @@
 package parser
 
 import (
-	"fmt"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/sfnt"
@@ -35,7 +34,5 @@ func TestGpos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(info)
-
-	t.Error("fish")
+	_ = info // TODO(voss): do some checks
 }

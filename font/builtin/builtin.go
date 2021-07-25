@@ -326,22 +326,23 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 		return pdf.String{glyphToCode[gid]}
 	}
 
-	fmt.Println(ligatures)
-
-	builtin.Substitute = func(glyphs []font.GlyphID) []font.GlyphID {
+	builtin.Substitute = func(glyphs []font.Glyph) []font.Glyph {
 		if len(glyphs) == 0 {
 			return nil
 		}
 
-		var res []font.GlyphID
+		var res []font.Glyph
 		last := glyphs[0]
-		for _, gid := range glyphs[1:] {
-			lig, ok := ligatures[font.GlyphPair{last, gid}]
+		for _, glyph := range glyphs[1:] {
+			lig, ok := ligatures[font.GlyphPair{last.Gid, glyph.Gid}]
 			if ok {
-				last = lig
+				last = font.Glyph{
+					Gid:   lig,
+					Chars: append(last.Chars, glyph.Chars...),
+				}
 			} else {
 				res = append(res, last)
-				last = gid
+				last = glyph
 			}
 		}
 		res = append(res, last)
@@ -349,19 +350,17 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 		return res
 	}
 
-	builtin.Layout = func(glyphs []font.GlyphID) []font.GlyphPos {
-		res := make([]font.GlyphPos, len(glyphs))
-		for i, gid := range glyphs {
+	builtin.Layout = func(glyphs []font.Glyph) {
+		for i, glyph := range glyphs {
+			gid := glyph.Gid
 			kern := 0
 			if i < len(glyphs)-1 {
-				kern = kerning[font.GlyphPair{gid, glyphs[i+1]}]
+				kern = kerning[font.GlyphPair{gid, glyphs[i+1].Gid}]
 			}
 
-			res[i].Gid = gid
-			res[i].Advance = builtin.Width[gid] + kern
+			glyphs[i].Gid = gid
+			glyphs[i].Advance = builtin.Width[gid] + kern
 		}
-
-		return res
 	}
 
 	Font := pdf.Dict{

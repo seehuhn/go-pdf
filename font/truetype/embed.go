@@ -33,7 +33,7 @@ import (
 //   --FontDescriptor-> Type=FontDescriptor
 //   --FontFile2-> Length1=...
 
-// TrueType fonts with <255 glyphs (PDF 1.1)
+// TrueType fonts with <=255 glyphs (PDF 1.1)
 //   Type=Font, Subtype=TrueType
 //   --FontDescriptor-> Type=FontDescriptor
 //   --FontFile2-> Length1=...
@@ -49,6 +49,7 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	return EmbedFont(w, name, tt, subset)
 }
 
+// EmbedFont embeds a TrueType font into a pdf file.
 func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) (*font.Font, error) {
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
@@ -83,7 +84,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	// TODO(voss): also include glyphs used for ligatures
 
 	// TODO(voss): subset the font as needed
-	// TODO(voss): if len(glyphs) < 256, write a Type 2 font.
+	// TODO(voss): if len(glyphs) <= 256, write a Type 2 font.
 
 	err = w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
 	if err != nil {
@@ -380,23 +381,20 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
-	var substitute func(glyphs []font.GlyphID) []font.GlyphID
+	var substitute func(glyphs []font.Glyph) []font.Glyph
 	if gsub != nil {
 		substitute = gsub.Substitute
 	}
-	layout := func(glyphs []font.GlyphID) []font.GlyphPos {
-		res := make([]font.GlyphPos, len(glyphs))
-		for i, gid := range glyphs {
-			res[i].Gid = gid
-			res[i].Advance = Width[gid]
+	layout := func(glyphs []font.Glyph) {
+		for i, glyph := range glyphs {
+			glyphs[i].Advance = Width[glyph.Gid]
 			if i > 0 {
-				pair := font.GlyphPair{res[i-1].Gid, gid}
+				pair := font.GlyphPair{glyphs[i-1].Gid, glyph.Gid}
 				if dx, ok := kerning[pair]; ok {
-					res[i-1].Advance += dx
+					glyphs[i-1].Advance += dx
 				}
 			}
 		}
-		return res
 	}
 
 	font := &font.Font{

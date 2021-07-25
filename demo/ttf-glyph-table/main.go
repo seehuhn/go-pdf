@@ -173,9 +173,6 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
-	// TODO(voss): remove this
-	fmt.Println(fontFileName + ":")
-
 	tt, err := sfnt.Open(fontFileName)
 	if err != nil {
 		log.Fatal(err)

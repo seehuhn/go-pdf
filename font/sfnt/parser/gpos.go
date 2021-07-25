@@ -17,8 +17,6 @@
 package parser
 
 import (
-	"fmt"
-
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -47,7 +45,7 @@ func (p *Parser) readGposInfo(script, lang string, extraFeatures ...string) (gpo
 
 	var res gposInfo
 	for _, idx := range gtab.LookupIndices {
-		l, err := gtab.GetGposLookup(idx)
+		l, err := gtab.getGposLookup(idx)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +62,7 @@ type gposLookup struct {
 	markFilteringSet uint16
 }
 
-func (g *gTab) GetGposLookup(idx uint16) (*gposLookup, error) {
+func (g *gTab) getGposLookup(idx uint16) (*gposLookup, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
 	}
@@ -109,7 +107,9 @@ func (g *gTab) GetGposLookup(idx uint16) (*gposLookup, error) {
 			return nil, err
 		}
 
-		lookup.subtables = append(lookup.subtables, res)
+		if res != nil {
+			lookup.subtables = append(lookup.subtables, res)
+		}
 	}
 
 	return lookup, nil
@@ -151,13 +151,12 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 		return g.readGposSubtable(s, uint16(s.R[0]), subtablePos+s.A)
 	}
 
-	fmt.Println("unsupported GPOS format", format, subFormat)
-	// return nil, g.error("unsupported lookup type %d.%d\n", format, subFormat)
+	// fmt.Println("unsupported GPOS format", format, subFormat)
 	return nil, nil
 }
 
 type gposLookupSubtable interface {
-	Position(uint16, []font.GlyphPos, int) int
+	Position(uint16, []font.Glyph, int) int
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
@@ -236,7 +235,7 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 	return res, nil
 }
 
-func (l *gpos2_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+func (l *gpos2_1) Position(flags uint16, seq []font.Glyph, pos int) int {
 	panic("not implemented")
 }
 
@@ -323,7 +322,7 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	return res, nil
 }
 
-func (l *gpos4_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+func (l *gpos4_1) Position(flags uint16, seq []font.Glyph, pos int) int {
 	if pos == 0 {
 		return pos
 	}
@@ -427,7 +426,7 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	return res, nil
 }
 
-func (l *gpos6_1) Position(flags uint16, seq []font.GlyphPos, pos int) int {
+func (l *gpos6_1) Position(flags uint16, seq []font.Glyph, pos int) int {
 	// The mark2 glyph that combines with a mark1 glyph is the glyph preceding
 	// the mark1 glyph in glyph string order (skipping glyphs according to
 	// LookupFlags). The subtable applies precisely when that mark2 glyph is
