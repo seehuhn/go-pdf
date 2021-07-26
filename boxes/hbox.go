@@ -114,7 +114,37 @@ func (obj *hBox) Draw(page *pages.Page, xPos, yPos float64) {
 			}
 		}
 	} else if contentsTotal > boxTotal+1e-3 {
-		panic("not implemented")
+		level := -1
+		var ii []int
+		shrinkTotal := 0.0
+		for i, child := range obj.Contents {
+			shrink, ok := child.(shrinker)
+			if !ok {
+				continue
+			}
+			info := shrink.Shrink()
+
+			if info.Level > level {
+				level = info.Level
+				ii = nil
+				shrinkTotal = 0
+			}
+			ii = append(ii, i)
+			shrinkTotal += info.Val
+		}
+
+		if shrinkTotal > 0 {
+			q := (contentsTotal - boxTotal) / shrinkTotal
+			if level == 0 && q > 1 {
+				q = 1
+			}
+			for _, i := range ii {
+				child := obj.Contents[i]
+				ext := child.Extent()
+				amount := ext.Width - child.(shrinker).Shrink().Val*q
+				obj.Contents[i] = Kern(amount)
+			}
+		}
 	}
 
 	x := xPos

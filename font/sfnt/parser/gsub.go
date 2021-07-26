@@ -22,6 +22,18 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
+// The most common GSUB features seen on my system:
+//     5630 "liga"
+//     4185 "frac"
+//     3857 "aalt"
+//     3746 "onum"
+//     3434 "sups"
+//     3010 "lnum"
+//     2992 "pnum"
+//     2989 "ccmp"
+//     2976 "dnom"
+//     2962 "numr"
+
 // http://adobe-type-tools.github.io/afdko/OpenTypeFeatureFileSpecification.html#7
 // TODO(voss): read this carefully
 

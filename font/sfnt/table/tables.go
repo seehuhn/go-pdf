@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"unicode"
 
 	"seehuhn.de/go/pdf/font"
@@ -564,6 +563,8 @@ type GlyphHeader struct {
 // the font defines script-specific features (a script without script-specific
 // features does not need a ScriptRecord).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-list-table-and-script-record
+//
+// Deprecated: convert to use sfnt/parser instead.
 type scriptList struct {
 	ScriptCount   uint16         // Number of ScriptRecords
 	ScriptRecords []scriptRecord // Array of ScriptRecords, listed alphabetically by script tag
@@ -572,6 +573,8 @@ type scriptList struct {
 // A scriptRecord consists of a ScriptTag that identifies a script, and an
 // offset into a Script table.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-list-table-and-script-record
+//
+// Deprecated: convert to use sfnt/parser instead.
 type scriptRecord struct {
 	ScriptTag    Tag    // Script tag identifier
 	ScriptOffset uint16 // Offset to Script table, from beginning of ScriptList
@@ -580,6 +583,8 @@ type scriptRecord struct {
 // readScriptRecord returns the ScriptRecord with the given script tag.  If no
 // record for tag is found, return the default record instead (or nil, of no
 // default record is found).
+//
+// Deprecated: convert to use sfnt/parser instead.
 func readScriptRecord(fd io.Reader, scriptTag string) (*scriptRecord, error) {
 	data := &scriptList{}
 	err := binary.Read(fd, binary.BigEndian, &data.ScriptCount)
@@ -614,6 +619,8 @@ func readScriptRecord(fd io.Reader, scriptTag string) (*scriptRecord, error) {
 // language system that defines how to use the script’s glyphs in the absence
 // of language-specific knowledge.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table-and-language-system-record
+//
+// Deprecated: convert to use sfnt/parser instead.
 type script struct {
 	Header struct {
 		DefaultLangSysOffset uint16 // Offset to default LangSys table, from beginning of Script table — may be NULL
@@ -626,11 +633,14 @@ type script struct {
 // identification tag (LangSysTag) and an offset to a Language System table
 // (LangSys).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table-and-language-system-record
+//
+// Deprecated: convert to use sfnt/parser instead.
 type langSysRecord struct {
 	LangSysTag    Tag    // LangSysTag identifier
 	LangSysOffset uint16 // Offset to LangSys table, from beginning of Script table
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 type langSys struct {
 	Header struct {
 		_                    uint16 // (reserved for an offset to a reordering table)
@@ -643,6 +653,8 @@ type langSys struct {
 // A featureList enumerates features in an array of records and specifies
 // the total number of features.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-list-table
+//
+// Deprecated: convert to use sfnt/parser instead.
 type featureList struct {
 	FeatureCount   uint16          // Number of FeatureRecords in this table
 	FeatureRecords []FeatureRecord // Array of FeatureRecords — zero-based (first feature has FeatureIndex = 0), listed alphabetically by feature tag
@@ -651,11 +663,14 @@ type featureList struct {
 // A FeatureRecord consists of a FeatureTag that identifies the feature and an
 // offset to a Feature table.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-list-table
+//
+// Deprecated: convert to use sfnt/parser instead.
 type FeatureRecord struct {
 	FeatureTag    Tag    // feature identification tag
 	FeatureOffset uint16 // Offset to Feature table, from beginning of FeatureList
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 type Feature struct {
 	Header struct {
 		FeatureParamsOffset uint16 // Offset from start of Feature table to FeatureParams table, if defined for the feature and present, else NULL
@@ -666,12 +681,16 @@ type Feature struct {
 
 // The LookupList table contains an array of offsets to Lookup tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
+//
+// Deprecated: convert to use sfnt/parser instead.
 type LookupList struct {
 	LookupCount   uint16   // Number of lookups in this table
 	LookupOffsets []uint16 // Array of offsets to Lookup tables, from beginning of LookupList — zero based (first lookup is Lookup index = 0)
 }
 
 // ReadLookupList reads the binary representation of a LookupList
+//
+// Deprecated: convert to use sfnt/parser instead.
 func ReadLookupList(r io.Reader) (*LookupList, error) {
 	res := &LookupList{}
 	err := binary.Read(r, binary.BigEndian, &res.LookupCount)
@@ -688,6 +707,7 @@ func ReadLookupList(r io.Reader) (*LookupList, error) {
 	return res, nil
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 type Lookup struct {
 	Header struct {
 		LookupType    uint16 // Different enumerations for GSUB and GPOS
@@ -698,6 +718,7 @@ type Lookup struct {
 	MarkFilteringSet uint16   // Index (base 0) into GDEF mark glyph sets structure. This field is only present if the USE_MARK_FILTERING_SET lookup flag is set.
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 func ReadLookup(r io.Reader) (*Lookup, error) {
 	res := &Lookup{}
 	err := binary.Read(r, binary.BigEndian, &res.Header)
@@ -721,12 +742,14 @@ func ReadLookup(r io.Reader) (*Lookup, error) {
 	return res, nil
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 type ExtensionPosFormat1 struct {
 	PosFormat           uint16 // Format identifier: format = 1
 	ExtensionLookupType uint16 // Lookup type of subtable referenced by extensionOffset (i.e. the extension subtable).
 	ExtensionOffset     uint32 // Offset to the extension subtable, of lookup type extensionLookupType, relative to the start of the ExtensionPosFormat1 subtable.
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 func ReadExtensionPos1(r io.Reader) (*ExtensionPosFormat1, error) {
 	res := &ExtensionPosFormat1{}
 	err := binary.Read(r, binary.BigEndian, res)
@@ -736,8 +759,10 @@ func ReadExtensionPos1(r io.Reader) (*ExtensionPosFormat1, error) {
 	return res, nil
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 type Coverage []uint16
 
+// Deprecated: convert to use sfnt/parser instead.
 func ReadCoverage(r io.Reader) (Coverage, error) {
 	var version uint16
 	err := binary.Read(r, binary.BigEndian, &version)
@@ -781,6 +806,8 @@ func ReadCoverage(r io.Reader) (Coverage, error) {
 }
 
 // PairPosFormat1 is one of the two possible subtable formats for LookupType==2.
+//
+// Deprecated: convert to use sfnt/parser instead.
 type PairPosFormat1 struct {
 	// PosFormat uint16 omitted
 	Header struct {
@@ -793,6 +820,8 @@ type PairPosFormat1 struct {
 }
 
 // ReadPairPosFormat1 reads the binary representation of PairPosFormat1
+//
+// Deprecated: convert to use sfnt/parser instead.
 func ReadPairPosFormat1(r io.Reader) (*PairPosFormat1, error) {
 	res := &PairPosFormat1{}
 	err := binary.Read(r, binary.BigEndian, &res.Header)
@@ -812,6 +841,8 @@ func ReadPairPosFormat1(r io.Reader) (*PairPosFormat1, error) {
 // A PairSet table enumerates all the glyph pairs that begin with a covered
 // glyph.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
+//
+// Deprecated: convert to use sfnt/parser instead.
 type PairSet struct {
 	PairValueCount   uint16            // Number of PairValueRecords
 	PairValueRecords []PairValueRecord // Array of PairValueRecords, ordered by glyph ID of the second glyph.
@@ -819,6 +850,8 @@ type PairSet struct {
 
 // A PairValueRecord specifies the second glyph in a pair and defines a
 // ValueRecord for each glyph.
+//
+// Deprecated: convert to use sfnt/parser instead.
 type PairValueRecord struct {
 	SecondGlyph  uint16       // Glyph ID of second glyph in the pair (first glyph is listed in the Coverage table).
 	ValueRecord1 *ValueRecord // Positioning data for the first glyph in the pair.
@@ -826,6 +859,8 @@ type PairValueRecord struct {
 }
 
 // ReadPairSet reads the binary representation of a PairSet.
+//
+// Deprecated: convert to use sfnt/parser instead.
 func ReadPairSet(r io.Reader, ValueFormat1, ValueFormat2 uint16) (*PairSet, error) {
 	res := &PairSet{}
 	err := binary.Read(r, binary.BigEndian, &res.PairValueCount)
@@ -854,6 +889,8 @@ func ReadPairSet(r io.Reader, ValueFormat1, ValueFormat2 uint16) (*PairSet, erro
 }
 
 // PairPosFormat2 is one of the two possible subtable formats for LookupType==2.
+//
+// Deprecated: convert to use sfnt/parser instead.
 type PairPosFormat2 struct {
 	// PosFormat uint16 omitted
 	Header struct {
@@ -868,11 +905,13 @@ type PairPosFormat2 struct {
 	Records []Class2Record
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 type Class2Record struct {
 	ValueRecord1 *ValueRecord // Positioning for first glyph — empty if valueFormat1 = 0.
 	ValueRecord2 *ValueRecord // Positioning for second glyph — empty if valueFormat2 = 0.
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 func ReadPairPosFormat2(r io.Reader) (*PairPosFormat2, error) {
 	res := &PairPosFormat2{}
 	err := binary.Read(r, binary.BigEndian, &res.Header)
@@ -897,6 +936,7 @@ func ReadPairPosFormat2(r io.Reader) (*PairPosFormat2, error) {
 	return res, nil
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 type ClassRangeRecord struct {
 	StartGlyphID uint16 // First glyph ID in the range
 	EndGlyphID   uint16 // Last glyph ID in the range
@@ -906,6 +946,8 @@ type ClassRangeRecord struct {
 // ValueRecord describes all the variables and values used to adjust the
 // position of a glyph or set of glyphs.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#value-record
+//
+// Deprecated: convert to use sfnt/parser instead.
 type ValueRecord struct {
 	XPlacement       int16  // Horizontal adjustment for placement, in design units.
 	YPlacement       int16  // Vertical adjustment for placement, in design units.
@@ -917,43 +959,11 @@ type ValueRecord struct {
 	YAdvDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for vertical advance, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
 }
 
-func (vr *ValueRecord) String() string {
-	var adjust []string
-	if vr != nil {
-		if vr.XPlacement != 0 {
-			adjust = append(adjust, fmt.Sprintf("xpos%+d", vr.XPlacement))
-		}
-		if vr.YPlacement != 0 {
-			adjust = append(adjust, fmt.Sprintf("ypos%+d", vr.YPlacement))
-		}
-		if vr.XAdvance != 0 {
-			adjust = append(adjust, fmt.Sprintf("xadv%+d", vr.XAdvance))
-		}
-		if vr.YAdvance != 0 {
-			adjust = append(adjust, fmt.Sprintf("yadv%+d", vr.YAdvance))
-		}
-		if vr.XPlaDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("xposdev%+d", vr.XPlaDeviceOffset))
-		}
-		if vr.YPlaDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("yposdev%+d", vr.YPlaDeviceOffset))
-		}
-		if vr.XAdvDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("xadvdev%+d", vr.XAdvDeviceOffset))
-		}
-		if vr.YAdvDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("yadvdev%+d", vr.YAdvDeviceOffset))
-		}
-	}
-	if len(adjust) == 0 {
-		return "_"
-	}
-	return strings.Join(adjust, ",")
-}
-
 // ReadValueRecord reads the binary representation of a ValueRecord.  The given
 // ValueFormat determines which fields are present in the binary
 // representation.
+//
+// Deprecated: convert to use sfnt/parser instead.
 func ReadValueRecord(r io.Reader, ValueFormat uint16) (*ValueRecord, error) {
 	if ValueFormat == 0 {
 		return nil, nil
@@ -1012,6 +1022,8 @@ func ReadValueRecord(r io.Reader, ValueFormat uint16) (*ValueRecord, error) {
 
 // GposHead contains a version number for the GposHead table and offsets to
 // locate the sub-tables.
+//
+// Deprecated: convert to use sfnt/parser instead.
 type GposHead struct {
 	V10 struct { // version 1.0
 		MajorVersion      uint16 // Major version of the GPOS table
@@ -1025,6 +1037,7 @@ type GposHead struct {
 	}
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 func (GPOS *GposHead) readLangSys(fd io.ReadSeeker, langSysTag, scriptTag string) (*langSys, error) {
 	scriptListOffs := int64(GPOS.V10.ScriptListOffset)
 
@@ -1096,35 +1109,14 @@ func (GPOS *GposHead) readLangSys(fd io.ReadSeeker, langSysTag, scriptTag string
 	return ls, nil
 }
 
-// The most common GSUB features seen on my system:
-//     5630 "liga"
-//     4185 "frac"
-//     3857 "aalt"
-//     3746 "onum"
-//     3434 "sups"
-//     3010 "lnum"
-//     2992 "pnum"
-//     2989 "ccmp"
-//     2976 "dnom"
-//     2962 "numr"
-//
-// The most common GPOS features seen on my system:
-//     6777 "kern"
-//     3219 "mark"
-//     2464 "mkmk"
-//     2301 "cpsp"
-//     1352 "size"
-//      117 "case"
-//       92 "dist"
-//       76 "vhal"
-//       76 "halt"
-
+// Deprecated: convert to use sfnt/parser instead.
 type featureInfo struct {
 	Tag               string
 	LookupListIndices []uint16
 	Required          bool
 }
 
+// Deprecated: convert to use sfnt/parser instead.
 func (GPOS *GposHead) ReadFeatureInfo(fd io.ReadSeeker, langTag, scriptTag string) ([]featureInfo, error) {
 	langSys, err := GPOS.readLangSys(fd, langTag, scriptTag)
 	if err != nil {

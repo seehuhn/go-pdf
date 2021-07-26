@@ -24,11 +24,4 @@ func main() {
 	if !tt.HasTables("GPOS") {
 		log.Fatal("font has no GPOS table")
 	}
-
-	K, err := tt.ReadGposKernInfo("DEU ", "latn")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(K)
 }

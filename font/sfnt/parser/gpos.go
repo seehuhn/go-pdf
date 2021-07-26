@@ -20,11 +20,23 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-type gposInfo []*gposLookup
+// The most common GPOS features seen on my system:
+//     6777 "kern"
+//     3219 "mark"
+//     2464 "mkmk"
+//     2301 "cpsp"
+//     1352 "size"
+//      117 "case"
+//       92 "dist"
+//       76 "vhal"
+//       76 "halt"
 
-// readGposInfo reads the "GSUB" table of a font, for a given writing script
+// GposInfo represents the information from the "GPOS" table of a font.
+type GposInfo []*gposLookup
+
+// ReadGposInfo reads the "GSUB" table of a font, for a given writing script
 // and language.
-func (p *Parser) readGposInfo(script, lang string, extraFeatures ...string) (gposInfo, error) {
+func (p *Parser) ReadGposInfo(script, lang string, extraFeatures ...string) (GposInfo, error) {
 	gtab, err := newGTab(p, script, lang)
 	if err != nil {
 		return nil, err
@@ -43,7 +55,7 @@ func (p *Parser) readGposInfo(script, lang string, extraFeatures ...string) (gpo
 		return nil, err
 	}
 
-	var res gposInfo
+	var res GposInfo
 	for _, idx := range gtab.LookupIndices {
 		l, err := gtab.getGposLookup(idx)
 		if err != nil {
@@ -54,12 +66,43 @@ func (p *Parser) readGposInfo(script, lang string, extraFeatures ...string) (gpo
 	return res, nil
 }
 
+// Layout applies the positioning from the selected GPOS lookups to a
+// series of glyphs.
+func (gpos GposInfo) Layout(glyphs []font.Glyph) {
+	for _, l := range gpos {
+		l.Layout(glyphs)
+	}
+}
+
 type gposLookup struct {
 	Format uint16 // TODO(voss): remove?
 	Flags  uint16
 
 	subtables        []gposLookupSubtable
 	markFilteringSet uint16
+}
+
+func (l *gposLookup) Layout(glyphs []font.Glyph) {
+	pos := 0
+	for pos < len(glyphs) {
+		next := l.Position(glyphs, pos)
+		if next > pos {
+			pos = next
+		} else {
+			pos++
+		}
+	}
+}
+
+func (l *gposLookup) Position(glyphs []font.Glyph, pos int) int {
+	var next int
+	for _, subtable := range l.subtables {
+		next = subtable.Position(l.Flags, glyphs, pos)
+		if next > pos {
+			return next
+		}
+	}
+	return pos
 }
 
 func (g *gTab) getGposLookup(idx uint16) (*gposLookup, error) {

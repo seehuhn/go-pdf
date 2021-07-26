@@ -240,22 +240,6 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		}
 	}
 
-	// TODO(voss): just use one of the tables
-	var kerning map[font.GlyphPair]int
-	K1, err := tt.ReadGposKernInfo("DEU ", "latn") // TODO(voss): ...
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-	K2, err := tt.ReadKernInfo()
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-	if len(K2) > len(K1) {
-		kerning = K2
-	} else {
-		kerning = K1
-	}
-
 	if postInfo.IsFixedPitch {
 		flags |= fontFlagFixedPitch
 	}
@@ -376,36 +360,13 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		return nil, err
 	}
 
-	pars := parser.New(tt)
-	gsub, err := pars.ReadGsubInfo("latn", "ENG ")
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-	var substitute func(glyphs []font.Glyph) []font.Glyph
-	if gsub != nil {
-		substitute = gsub.Substitute
-	}
-	layout := func(glyphs []font.Glyph) {
-		for i, glyph := range glyphs {
-			glyphs[i].Advance = Width[glyph.Gid]
-			if i > 0 {
-				pair := font.GlyphPair{glyphs[i-1].Gid, glyph.Gid}
-				if dx, ok := kerning[pair]; ok {
-					glyphs[i-1].Advance += dx
-				}
-			}
-		}
-	}
-
-	font := &font.Font{
+	fontObj := &font.Font{
 		Name: pdf.Name(name),
 		Ref:  FontRef,
 		CMap: CMap,
 		Enc: func(gid font.GlyphID) pdf.String {
 			return pdf.String{byte(gid >> 8), byte(gid)}
 		},
-		Substitute:  substitute,
-		Layout:      layout,
 		GlyphExtent: GlyphExtent,
 		GlyphUnits:  1000, // TODO(voss): use font design units here
 		Width:       Width,
@@ -414,7 +375,46 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		LineGap:     LineGap,
 	}
 
-	return font, nil
+	// TODO(voss): set these properly, somehow
+	lang := "ENG "
+	script := "latn"
+
+	pars := parser.New(tt)
+	gsub, err := pars.ReadGsubInfo(script, lang)
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+	if gsub != nil {
+		fontObj.Substitute = gsub.Substitute
+	}
+
+	gpos, err := pars.ReadGposInfo(script, lang)
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+	if gpos != nil {
+		fontObj.Layout = gpos.Layout
+	} else {
+		kerning, err := tt.ReadKernInfo()
+		if err != nil && !table.IsMissing(err) {
+			return nil, err
+		}
+		if kerning != nil {
+			fontObj.Layout = func(glyphs []font.Glyph) {
+				for i, glyph := range glyphs {
+					glyphs[i].Advance = Width[glyph.Gid]
+					if i > 0 {
+						pair := font.GlyphPair{glyphs[i-1].Gid, glyph.Gid}
+						if dx, ok := kerning[pair]; ok {
+							glyphs[i-1].Advance += dx
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return fontObj, nil
 }
 
 type fontFlags int

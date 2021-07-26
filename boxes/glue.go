@@ -22,6 +22,10 @@ type stretcher interface {
 	Stretch() *stretchAmount
 }
 
+type shrinker interface {
+	Shrink() *stretchAmount
+}
+
 type stretchAmount struct {
 	Val   float64
 	Level int
@@ -55,4 +59,8 @@ func (obj *glue) Draw(page *pages.Page, xPos, yPos float64) {}
 
 func (obj *glue) Stretch() *stretchAmount {
 	return &obj.Plus
+}
+
+func (obj *glue) Shrink() *stretchAmount {
+	return &obj.Minus
 }
