@@ -9,7 +9,7 @@ func (g *gTab) readMarkArrayTable(pos int64) ([]markRecord, error) {
 	err := g.Exec(s,
 		CmdSeek,
 		CmdRead16, TypeUInt, // markCount
-		CmdStore, 0,
+		CmdStoreInto, 0,
 		CmdLoop,
 		CmdStash, // markRecords[i].markClass
 		CmdStash, // markRecords[i].markAnchorOffset

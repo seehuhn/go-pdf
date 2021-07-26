@@ -16,9 +16,12 @@
 
 package parser
 
+import "seehuhn.de/go/pdf/font"
+
 // GdefInfo represents the information from the "GDEF" table of a font.
 type GdefInfo struct {
-	GlyphClassDef ClassDef
+	GlyphClassDef   map[font.GlyphID]glyphClass
+	MarkAttachClass ClassDef
 }
 
 // ReadGdefInfo reads the GDEF table of a font file.
@@ -29,7 +32,6 @@ func (p *Parser) ReadGdefInfo() (*GdefInfo, error) {
 	}
 
 	s := &State{}
-
 	err = p.Exec(s,
 		CmdRead16, TypeUInt, // majorVersion
 		CmdAssertEq, 1,
@@ -47,11 +49,33 @@ func (p *Parser) ReadGdefInfo() (*GdefInfo, error) {
 		return nil, err
 	}
 	offsets := s.GetStash()
-	glyphClassDefOffset := offsets[0]
+	glyphClassDefOffset := int64(offsets[0])
+	markAttachClassDefOffset := int64(offsets[3])
 
 	res := &GdefInfo{}
 	if glyphClassDefOffset != 0 {
-		res.GlyphClassDef, err = p.readClassDefTable(int64(glyphClassDefOffset))
+		classes, err := p.readClassDefTable(glyphClassDefOffset)
+		if err != nil {
+			return nil, err
+		}
+		res.GlyphClassDef = make(map[font.GlyphID]glyphClass)
+		for gid, class := range classes {
+			// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table
+			switch class {
+			case 1:
+				res.GlyphClassDef[gid] = glyphClassBase
+			case 2:
+				res.GlyphClassDef[gid] = glyphClassLigature
+			case 3:
+				res.GlyphClassDef[gid] = glyphClassMark
+			case 4:
+				res.GlyphClassDef[gid] = glyphClassComponent
+			}
+		}
+	}
+
+	if markAttachClassDefOffset != 0 {
+		res.MarkAttachClass, err = p.readClassDefTable(markAttachClassDefOffset)
 		if err != nil {
 			return nil, err
 		}
@@ -61,3 +85,12 @@ func (p *Parser) ReadGdefInfo() (*GdefInfo, error) {
 
 	return res, nil
 }
+
+type glyphClass uint8
+
+const (
+	glyphClassBase glyphClass = 1 << iota
+	glyphClassLigature
+	glyphClassMark
+	glyphClassComponent
+)

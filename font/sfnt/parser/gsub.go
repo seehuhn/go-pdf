@@ -186,7 +186,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 	case 1_1: // Single Substitution Format 1
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // coverageOffset
-			CmdStore, 0,
+			CmdStoreInto, 0,
 			CmdRead16, TypeUInt, // deltaGlyphID (mod 65536)
 		)
 		if err != nil {
@@ -205,7 +205,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 	case 1_2: // Single Substitution Format 2
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // coverageOffset
-			CmdStore, 0,
+			CmdStoreInto, 0,
 			CmdRead16, TypeUInt, // glyphCount
 			CmdLoop,
 			CmdStash, // substitutefont.GlyphIndex[i]
@@ -231,7 +231,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 	case 2_1: // Multiple Substitution Subtable
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // coverageOffset
-			CmdStore, 0,
+			CmdStoreInto, 0,
 			CmdRead16, TypeUInt, // sequenceCount
 			CmdLoop,
 			CmdStash, // sequenceOffset[i]
@@ -272,7 +272,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 	case 4_1: // Ligature Substitution Subtable
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // coverageOffset
-			CmdStore, 0,
+			CmdStoreInto, 0,
 			CmdRead16, TypeUInt, // ligatureSetCount
 			CmdLoop,
 			CmdStash, // ligatureSetOffset[i]
@@ -391,9 +391,9 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 				err = g.Exec(s,
 					CmdSeek,
 					CmdRead16, TypeUInt, // glyphCount
-					CmdStore, 0,
+					CmdStoreInto, 0,
 					CmdRead16, TypeUInt, // seqLookupCount
-					CmdStore, 1,
+					CmdStoreInto, 1,
 					CmdLoad, 0,
 					CmdAssertGt, 0,
 					CmdDec,
@@ -442,7 +442,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 	case 6_1: // Chained Contexts Substitution: Simple Glyph Contexts
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // coverageOffset
-			CmdStore, 0,
+			CmdStoreInto, 0,
 			CmdRead16, TypeUInt, // chainedSeqRuleSetCount
 			CmdLoop,
 			CmdStash, // chainedSeqRuleSetOffsets[i]
@@ -782,7 +782,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 	case 7_1: // Extension Substitution Subtable Format 1
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // extensionLookupType
-			CmdStore, 0,
+			CmdStoreInto, 0,
 			CmdRead32, TypeUInt, // extensionOffset
 		)
 		if err != nil {

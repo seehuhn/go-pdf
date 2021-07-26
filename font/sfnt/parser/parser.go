@@ -154,7 +154,7 @@ CommandLoop:
 				return err
 			}
 
-		case CmdStore:
+		case CmdStoreInto:
 			s.R[arg] = s.A
 		case CmdLoadI:
 			s.A = int64(int8(arg))
@@ -342,25 +342,25 @@ type Command uint8
 
 // Commands which take one argument
 const (
-	CmdRead16   = iota // arg: type
-	CmdRead32          // arg: type
-	CmdStore           // arg: register
-	CmdLoadI           // arg: new int8 value for A
-	CmdLoad            // arg: register
-	CmdIAdd            // arg: int8 literal value
-	CmdAdd             // arg: register
-	CmdIMult           // arg: int8 literal value
-	CmdMult            // arg: register
-	CmdCmpEq           // arg: comparison value
-	CmdCmpGe           // arg: comparison value
-	CmdCmpLt           // arg: comparison value
-	CmdExitIfLt        // arg: comparison value
-	CmdAssertEq        // arg: comparison value
-	CmdAssertGe        // arg: comparison value
-	CmdAssertGt        // arg: comparison value
-	CmdAssertLe        // arg: comparison value
-	CmdJNZ             // arg: offset
-	CmdCall            // arg: Func index
+	CmdRead16    = iota // arg: type
+	CmdRead32           // arg: type
+	CmdStoreInto        // arg: register
+	CmdLoadI            // arg: new int8 value for A
+	CmdLoad             // arg: register
+	CmdIAdd             // arg: int8 literal value
+	CmdAdd              // arg: register
+	CmdIMult            // arg: int8 literal value
+	CmdMult             // arg: register
+	CmdCmpEq            // arg: comparison value
+	CmdCmpGe            // arg: comparison value
+	CmdCmpLt            // arg: comparison value
+	CmdExitIfLt         // arg: comparison value
+	CmdAssertEq         // arg: comparison value
+	CmdAssertGe         // arg: comparison value
+	CmdAssertGt         // arg: comparison value
+	CmdAssertLe         // arg: comparison value
+	CmdJNZ              // arg: offset
+	CmdCall             // arg: Func index
 )
 
 // Commands which take no arguments

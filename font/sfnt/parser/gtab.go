@@ -18,11 +18,14 @@ package parser
 
 import (
 	"sort"
+
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 type gTab struct {
 	*Parser
 
+	gdef             *GdefInfo
 	LookupIndices    []uint16
 	lookupListOffset int64
 	lookups          []uint16
@@ -42,20 +45,24 @@ func newGTab(p *Parser, script, lang string) (*gTab, error) {
 			s.R[4] = s.A
 		}
 	}
-
 	chooseLang := func(s *State) {
 		if s.Tag == lang {
 			s.R[0] = s.A
 		}
 	}
-
 	p.Funcs = []func(*State){
 		chooseScript,
 		chooseLang,
 	}
 
+	gdef, err := p.ReadGdefInfo()
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+
 	res := &gTab{
 		Parser:        p,
+		gdef:          gdef,
 		coverageCache: make(map[int64]coverage),
 	}
 
@@ -76,13 +83,13 @@ func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {
 		CmdAssertEq, 1,
 		CmdRead16, TypeUInt, // minorVersion
 		CmdAssertLe, 1,
-		CmdStore, 0,
+		CmdStoreInto, 0,
 		CmdRead16, TypeUInt, // scriptListOffset
-		CmdStore, 1,
+		CmdStoreInto, 1,
 		CmdRead16, TypeUInt, // featureListOffset
-		CmdStore, 2,
+		CmdStoreInto, 2,
 		CmdRead16, TypeUInt, // lookupListOffset
-		CmdStore, 3,
+		CmdStoreInto, 3,
 		CmdLoad, 0,
 		CmdCmpLt, 1,
 		CmdJNZ, JumpOffset(2),
@@ -90,7 +97,7 @@ func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {
 
 		// Read the script list and pick a script.
 		CmdLoadI, 0,
-		CmdStore, 4,
+		CmdStoreInto, 4,
 		CmdLoad, 1, // scriptListOffset
 		CmdSeek,
 		CmdRead16, TypeUInt, // scriptCount
@@ -116,7 +123,7 @@ func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {
 		CmdLoad, 1,
 		CmdSeek,
 		CmdRead16, TypeUInt, // defaultLangSysOffset
-		CmdStore, 0,
+		CmdStoreInto, 0,
 		CmdRead16, TypeUInt, // langSysCount
 		CmdLoop,
 		CmdReadTag,          // langSysTag

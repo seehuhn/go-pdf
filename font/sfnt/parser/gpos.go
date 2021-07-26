@@ -17,6 +17,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -76,7 +78,9 @@ func (gpos GposInfo) Layout(glyphs []font.Glyph) {
 
 type gposLookup struct {
 	Format uint16 // TODO(voss): remove?
-	Flags  uint16
+
+	rtl    bool
+	filter filter
 
 	subtables        []gposLookupSubtable
 	markFilteringSet uint16
@@ -97,7 +101,7 @@ func (l *gposLookup) Layout(glyphs []font.Glyph) {
 func (l *gposLookup) Position(glyphs []font.Glyph, pos int) int {
 	var next int
 	for _, subtable := range l.subtables {
-		next = subtable.Position(l.Flags, glyphs, pos)
+		next = subtable.Position(l.filter, glyphs, pos)
 		if next > pos {
 			return next
 		}
@@ -141,7 +145,8 @@ func (g *gTab) getGposLookup(idx uint16) (*gposLookup, error) {
 
 	lookup := &gposLookup{
 		Format:           format,
-		Flags:            flags,
+		rtl:              flags&0x0001 != 0,
+		filter:           g.makeFilter(flags),
 		markFilteringSet: markFilteringSet,
 	}
 	for _, offs := range subtables {
@@ -182,7 +187,7 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 	case 9_1: // Extension Positioning Subtable Format 1
 		err = g.Exec(s,
 			CmdRead16, TypeUInt, // extensionLookupType
-			CmdStore, 0,
+			CmdStoreInto, 0,
 			CmdRead32, TypeUInt, // extensionOffset
 		)
 		if err != nil {
@@ -199,7 +204,7 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 }
 
 type gposLookupSubtable interface {
-	Position(uint16, []font.Glyph, int) int
+	Position(filter, []font.Glyph, int) int
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
@@ -278,7 +283,7 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 	return res, nil
 }
 
-func (l *gpos2_1) Position(flags uint16, seq []font.Glyph, pos int) int {
+func (l *gpos2_1) Position(filter filter, seq []font.Glyph, pos int) int {
 	panic("not implemented")
 }
 
@@ -293,7 +298,7 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 		CmdStash,            // markCoverageOffset
 		CmdStash,            // baseCoverageOffset
 		CmdRead16, TypeUInt, // markClassCount
-		CmdStore, 0,
+		CmdStoreInto, 0,
 		CmdStash, // markArrayOffset
 		CmdStash, // baseArrayOffset
 	)
@@ -365,7 +370,7 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	return res, nil
 }
 
-func (l *gpos4_1) Position(flags uint16, seq []font.Glyph, pos int) int {
+func (l *gpos4_1) Position(filter filter, seq []font.Glyph, pos int) int {
 	if pos == 0 {
 		return pos
 	}
@@ -392,11 +397,12 @@ type gpos6_1 struct {
 }
 
 func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-to-mark-attachment-positioning-format-1-mark-to-mark-attachment
 	err := g.Exec(s,
 		CmdStash,            // mark1CoverageOffset
 		CmdStash,            // mark2CoverageOffset
 		CmdRead16, TypeUInt, // markClassCount
-		CmdStore, 0,
+		CmdStoreInto, 0,
 		CmdStash, // mark1ArrayOffset
 		CmdStash, // mark2ArrayOffset
 	)
@@ -468,7 +474,7 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	return res, nil
 }
 
-func (l *gpos6_1) Position(flags uint16, seq []font.Glyph, pos int) int {
+func (l *gpos6_1) Position(filter filter, seq []font.Glyph, pos int) int {
 	// The mark2 glyph that combines with a mark1 glyph is the glyph preceding
 	// the mark1 glyph in glyph string order (skipping glyphs according to
 	// LookupFlags). The subtable applies precisely when that mark2 glyph is
@@ -481,14 +487,21 @@ func (l *gpos6_1) Position(flags uint16, seq []font.Glyph, pos int) int {
 		return pos
 	}
 
-	if flags != 0 {
-		panic("not implemented")
+	prevPos := pos - 1
+	for prevPos >= 0 && !filter(seq[prevPos].Gid) {
+		prevPos--
 	}
-
-	prev, ok := l.Mark2[seq[pos-1].Gid]
+	if prevPos < 0 {
+		return pos
+	}
+	prev, ok := l.Mark2[seq[prevPos].Gid]
+	if !ok {
+		return pos
+	}
 
 	_ = x
 	_ = prev
 	_ = ok
+	fmt.Println(seq[prevPos].Gid, seq[pos].Gid)
 	panic("not implemented")
 }

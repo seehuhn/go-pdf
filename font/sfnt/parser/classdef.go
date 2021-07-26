@@ -97,5 +97,5 @@ func (p *Parser) readClassDefTable(pos int64) (ClassDef, error) {
 
 // ClassDef represents the contents of a Class Definition Table
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
-// TODO(voss): using uint16 instead of int?
+// TODO(voss): use uint16 instead of int?
 type ClassDef map[font.GlyphID]int
