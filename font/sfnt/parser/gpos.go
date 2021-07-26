@@ -386,7 +386,6 @@ func (l *gpos4_1) Position(flags uint16, seq []font.Glyph, pos int) int {
 }
 
 // Mark-to-Mark Attachment Positioning Format 1: Mark-to-base Attachment
-
 type gpos6_1 struct {
 	Mark1 map[font.GlyphID]*markRecord // the attaching mark
 	Mark2 map[font.GlyphID][]anchor    // the base mark being attached to
@@ -476,5 +475,20 @@ func (l *gpos6_1) Position(flags uint16, seq []font.Glyph, pos int) int {
 	// covered by mark2Coverage. To combine the mark glyphs, the placement of
 	// the mark1 glyph is adjusted such that the relevant attachment points
 	// coincide.
+
+	x, ok := l.Mark1[seq[pos].Gid]
+	if !ok || pos == 0 {
+		return pos
+	}
+
+	if flags != 0 {
+		panic("not implemented")
+	}
+
+	prev, ok := l.Mark2[seq[pos-1].Gid]
+
+	_ = x
+	_ = prev
+	_ = ok
 	panic("not implemented")
 }
