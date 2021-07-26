@@ -393,7 +393,12 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		return nil, err
 	}
 	if gpos != nil {
-		fontObj.Layout = gpos.Layout
+		fontObj.Layout = func(glyphs []font.Glyph) {
+			for i, glyph := range glyphs {
+				glyphs[i].Advance = Width[glyph.Gid]
+			}
+			gpos.Layout(glyphs)
+		}
 	} else {
 		kerning, err := tt.ReadKernInfo()
 		if err != nil && !table.IsMissing(err) {

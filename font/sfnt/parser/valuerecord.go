@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	"strings"
+
+	"seehuhn.de/go/pdf/font"
 )
 
 // valueRecord describes all the variables and values used to adjust the
@@ -17,40 +19,6 @@ type valueRecord struct {
 	YPlaDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for vertical placement, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
 	XAdvDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for horizontal advance, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
 	YAdvDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for vertical advance, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
-}
-
-func (vr *valueRecord) String() string {
-	var adjust []string
-	if vr != nil {
-		if vr.XPlacement != 0 {
-			adjust = append(adjust, fmt.Sprintf("xpos%+d", vr.XPlacement))
-		}
-		if vr.YPlacement != 0 {
-			adjust = append(adjust, fmt.Sprintf("ypos%+d", vr.YPlacement))
-		}
-		if vr.XAdvance != 0 {
-			adjust = append(adjust, fmt.Sprintf("xadv%+d", vr.XAdvance))
-		}
-		if vr.YAdvance != 0 {
-			adjust = append(adjust, fmt.Sprintf("yadv%+d", vr.YAdvance))
-		}
-		if vr.XPlaDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("xposdev%+d", vr.XPlaDeviceOffset))
-		}
-		if vr.YPlaDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("yposdev%+d", vr.YPlaDeviceOffset))
-		}
-		if vr.XAdvDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("xadvdev%+d", vr.XAdvDeviceOffset))
-		}
-		if vr.YAdvDeviceOffset != 0 {
-			adjust = append(adjust, fmt.Sprintf("yadvdev%+d", vr.YAdvDeviceOffset))
-		}
-	}
-	if len(adjust) == 0 {
-		return "_"
-	}
-	return strings.Join(adjust, ",")
 }
 
 // readValueRecord reads the binary representation of a valueRecord.  The
@@ -111,4 +79,64 @@ func (p *Parser) readValueRecord(valueFormat uint16) (*valueRecord, error) {
 		}
 	}
 	return res, nil
+}
+
+func (vr *valueRecord) String() string {
+	var adjust []string
+	if vr != nil {
+		if vr.XPlacement != 0 {
+			adjust = append(adjust, fmt.Sprintf("xpos%+d", vr.XPlacement))
+		}
+		if vr.YPlacement != 0 {
+			adjust = append(adjust, fmt.Sprintf("ypos%+d", vr.YPlacement))
+		}
+		if vr.XAdvance != 0 {
+			adjust = append(adjust, fmt.Sprintf("xadv%+d", vr.XAdvance))
+		}
+		if vr.YAdvance != 0 {
+			adjust = append(adjust, fmt.Sprintf("yadv%+d", vr.YAdvance))
+		}
+		if vr.XPlaDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("xposdev%+d", vr.XPlaDeviceOffset))
+		}
+		if vr.YPlaDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("yposdev%+d", vr.YPlaDeviceOffset))
+		}
+		if vr.XAdvDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("xadvdev%+d", vr.XAdvDeviceOffset))
+		}
+		if vr.YAdvDeviceOffset != 0 {
+			adjust = append(adjust, fmt.Sprintf("yadvdev%+d", vr.YAdvDeviceOffset))
+		}
+	}
+	if len(adjust) == 0 {
+		return "_"
+	}
+	return strings.Join(adjust, ",")
+}
+
+func (vr *valueRecord) Apply(glyph *font.Glyph) {
+	if vr == nil {
+		return
+	}
+
+	glyph.XOffset += int(vr.XPlacement)
+	glyph.YOffset += int(vr.YPlacement)
+	glyph.Advance += int(vr.XAdvance)
+
+	if vr.YAdvance != 0 {
+		panic("not implemented")
+	}
+	if vr.XPlaDeviceOffset != 0 {
+		panic("not implemented")
+	}
+	if vr.YPlaDeviceOffset != 0 {
+		panic("not implemented")
+	}
+	if vr.XAdvDeviceOffset != 0 {
+		panic("not implemented")
+	}
+	if vr.YAdvDeviceOffset != 0 {
+		panic("not implemented")
+	}
 }

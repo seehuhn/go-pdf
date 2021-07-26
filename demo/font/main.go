@@ -131,7 +131,7 @@ func main() {
 	const width = 8 * 72
 	const height = 6 * 72
 
-	text := "Ba\u0308rfisch"
+	text := "Toba\u0308rfisch"
 	err = writePage(out, text, width, height)
 	if err != nil {
 		log.Fatal(err)

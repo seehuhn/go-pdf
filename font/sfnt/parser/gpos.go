@@ -284,7 +284,32 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 }
 
 func (l *gpos2_1) Position(filter filter, seq []font.Glyph, pos int) int {
-	panic("not implemented")
+	class, ok := l.cov[seq[pos].Gid]
+	if !ok || class >= len(l.adjust) {
+		return pos
+	}
+	tab := l.adjust[class]
+
+	next := pos + 1
+	for next < len(seq) && !filter(seq[next].Gid) {
+		next++
+	}
+	if next >= len(seq) {
+		return pos
+	}
+
+	pairAdjust, ok := tab[seq[next].Gid]
+	if !ok {
+		return pos
+	}
+
+	pairAdjust.first.Apply(&seq[pos])
+	pairAdjust.second.Apply(&seq[next])
+
+	if pairAdjust.second == nil {
+		return next
+	}
+	return next + 1
 }
 
 type gpos4_1 struct {
@@ -483,7 +508,7 @@ func (l *gpos6_1) Position(filter filter, seq []font.Glyph, pos int) int {
 	// coincide.
 
 	x, ok := l.Mark1[seq[pos].Gid]
-	if !ok || pos == 0 {
+	if !ok {
 		return pos
 	}
 
