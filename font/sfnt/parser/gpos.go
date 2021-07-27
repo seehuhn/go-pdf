@@ -464,6 +464,9 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	data = s.GetStash()
 	baseAnchors := make([]anchor, len(data))
 	for i, offs := range data {
+		if offs == 0 {
+			continue
+		}
 		err = g.readAnchor(baseArrayPos+int64(offs), &baseAnchors[i])
 		if err != nil {
 			return nil, err

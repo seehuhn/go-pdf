@@ -14,11 +14,13 @@ const (
 	markAttachmentTypeMask uint16 = 0xFF00
 )
 
+func useAllGlyphs(font.GlyphID) bool { return true }
+
 func (g *gTab) makeFilter(lookupFlag uint16) filter {
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
 
 	if g.gdef == nil {
-		return nil
+		return useAllGlyphs
 	}
 
 	if lookupFlag&ignoreMarks != 0 {
@@ -43,7 +45,7 @@ func (g *gTab) makeFilter(lookupFlag uint16) filter {
 		lookupFlag &= ^markAttachmentTypeMask
 	}
 
-	var filterFunc filter
+	filterFunc := useAllGlyphs
 	if lookupFlag&useMarkFilteringSet != 0 {
 		panic("not implemented")
 	} else if lookupFlag&markAttachmentTypeMask != 0 {
