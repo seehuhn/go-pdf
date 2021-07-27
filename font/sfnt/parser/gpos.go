@@ -180,6 +180,8 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 	switch 10*format + uint16(subFormat) {
 	case 2_1: // Pair Adjustment Positioning Format 1: Adjustments for Glyph Pairs
 		return g.readGpos2_1(s, subtablePos)
+	case 2_2: // Pair Adjustment Positioning Format 2: Class Pair Adjustment
+		return g.readGpos2_2(s, subtablePos)
 	case 4_1: // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment
 		return g.readGpos4_1(s, subtablePos)
 	case 6_1: // Mark-to-Mark Attachment Positioning Format 1: Mark-to-Mark Attachment
@@ -312,12 +314,116 @@ func (l *gpos2_1) Position(filter filter, seq []font.Glyph, pos int) int {
 	return next + 1
 }
 
+// Pair Adjustment Positioning Format 2: Class Pair Adjustment
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-2-class-pair-adjustment
+type gpos2_2 struct {
+	cov       coverage
+	classDef1 ClassDef
+	classDef2 ClassDef
+	adjust    [][]pairAdjust
+}
+
+func (g *gTab) readGpos2_2(s *State, subtablePos int64) (*gpos2_2, error) {
+	err := g.Exec(s,
+		CmdStash, // coverageOffset
+		CmdStash, // valueFormat1
+		CmdStash, // valueFormat2
+		CmdStash, // classDef1Offset
+		CmdStash, // classDef2Offset
+		CmdStash, // class1Count
+		CmdStash, // class2Count
+	)
+	if err != nil {
+		return nil, err
+	}
+	data := s.GetStash()
+	coverageOffset := data[0]
+	valueFormat1 := data[1]
+	valueFormat2 := data[2]
+	classDef1Offset := data[3]
+	classDef2Offset := data[4]
+	class1Count := int(data[5])
+	class2Count := int(data[6])
+
+	n := class1Count * class2Count
+	aa := make([]pairAdjust, n)
+	for i := 0; i < n; i++ {
+		vr1, err := g.readValueRecord(valueFormat1)
+		if err != nil {
+			return nil, err
+		}
+		vr2, err := g.readValueRecord(valueFormat2)
+		if err != nil {
+			return nil, err
+		}
+		aa[i].first = vr1
+		aa[i].second = vr2
+	}
+
+	cov, err := g.readCoverageTable(subtablePos + int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	classDef1, err := g.readClassDefTable(subtablePos + int64(classDef1Offset))
+	if err != nil {
+		return nil, err
+	}
+
+	classDef2, err := g.readClassDefTable(subtablePos + int64(classDef2Offset))
+	if err != nil {
+		return nil, err
+	}
+
+	res := &gpos2_2{
+		cov:       cov,
+		classDef1: classDef1,
+		classDef2: classDef2,
+		adjust:    make([][]pairAdjust, class1Count),
+	}
+	for i := 0; i < class1Count; i++ {
+		a := i * class2Count
+		b := (i + 1) * class2Count
+		res.adjust[i] = aa[a:b]
+	}
+
+	return res, nil
+}
+
+func (l *gpos2_2) Position(filter filter, seq []font.Glyph, pos int) int {
+	_, ok := l.cov[seq[pos].Gid]
+	if !ok {
+		return pos
+	}
+
+	next := pos + 1
+	for next < len(seq) && !filter(seq[next].Gid) {
+		next++
+	}
+	if next >= len(seq) {
+		return pos
+	}
+
+	class1 := l.classDef1[seq[pos].Gid]
+	class2 := l.classDef2[seq[next].Gid]
+	pairAdjust := l.adjust[class1][class2]
+
+	pairAdjust.first.Apply(&seq[pos])
+	pairAdjust.second.Apply(&seq[next])
+
+	if pairAdjust.second == nil {
+		return next
+	}
+	return next + 1
+}
+
+// Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment Point
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-to-base-attachment-positioning-format-1-mark-to-base-attachment-point
 type gpos4_1 struct {
 	Mark map[font.GlyphID]*markRecord // the attaching mark
 	Base map[font.GlyphID][]anchor    // the base glyph being attached to
 }
 
-// Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment Point
 func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	err := g.Exec(s,
 		CmdStash,            // markCoverageOffset
