@@ -59,7 +59,7 @@ func TestInterpreter(t *testing.T) {
 
 	if tableName == "GSUB" {
 		for _, idx := range gtab.LookupIndices {
-			_, err := gtab.GetGsubLookup(idx)
+			_, err := gtab.getGsubLookup(idx)
 			if err != nil {
 				t.Fatal(err)
 			}

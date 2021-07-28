@@ -17,8 +17,6 @@
 package parser
 
 import (
-	"fmt"
-
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -39,6 +37,25 @@ import (
 
 // GsubInfo represents the information from the "GSUB" table of a font.
 type GsubInfo []*gsubLookup
+
+type gsubLookup struct {
+	Format uint16 // TODO(voss): remove?
+
+	rtl    bool
+	filter filter
+
+	subtables        []gsubLookupSubtable
+	markFilteringSet uint16
+}
+
+type gsubLookupSubtable interface {
+	// Replace attempts to apply a single subtable at the given position.
+	// If returns the new glyphs and the new position.  The new position
+	// will be larger than pos, if and only if a substitution has been made.
+	//
+	// TODO(voss): how to signal that a deletion occured?
+	Replace(filter filter, glyphs []font.Glyph, pos int) ([]font.Glyph, int)
+}
 
 // ReadGsubInfo reads the "GSUB" table of a font, for a given writing script
 // and language.
@@ -63,7 +80,7 @@ func (p *Parser) ReadGsubInfo(script, lang string, extraFeatures ...string) (Gsu
 
 	var res GsubInfo
 	for _, idx := range gtab.LookupIndices {
-		l, err := gtab.GetGsubLookup(idx)
+		l, err := gtab.getGsubLookup(idx)
 		if err != nil {
 			return nil, err
 		}
@@ -76,37 +93,16 @@ func (p *Parser) ReadGsubInfo(script, lang string, extraFeatures ...string) (Gsu
 // series of glyphs.
 func (gsub GsubInfo) Substitute(glyphs []font.Glyph) []font.Glyph {
 	for _, l := range gsub {
-		glyphs = l.Substitute(glyphs)
+		glyphs = l.substitute(glyphs)
 	}
 	return glyphs
 }
 
-// TODO(voss): look at ../../font/truetype/ttf/FreeSans.ttf when
-// implementing Flags.
-type gsubLookup struct {
-	Format uint16 // TODO(voss): remove?
-	Flags  uint16
-
-	subtables        []gsubLookupSubtable
-	markFilteringSet uint16
-}
-
-func (l *gsubLookup) Replace(glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
-	var next int
-	for _, subtable := range l.subtables {
-		glyphs, next = subtable.Replace(l.Flags, glyphs, pos)
-		if next > pos {
-			return glyphs, next
-		}
-	}
-	return glyphs, pos
-}
-
-func (l *gsubLookup) Substitute(glyphs []font.Glyph) []font.Glyph {
+func (l *gsubLookup) substitute(glyphs []font.Glyph) []font.Glyph {
 	pos := 0
 	for pos < len(glyphs) {
 		var next int
-		glyphs, next = l.Replace(glyphs, pos)
+		glyphs, next = l.substituteOne(glyphs, pos)
 		if next > pos {
 			pos = next
 		} else {
@@ -116,7 +112,17 @@ func (l *gsubLookup) Substitute(glyphs []font.Glyph) []font.Glyph {
 	return glyphs
 }
 
-func (g *gTab) GetGsubLookup(idx uint16) (*gsubLookup, error) {
+func (l *gsubLookup) substituteOne(glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
+	for _, subtable := range l.subtables {
+		glyphs, next := subtable.Replace(l.filter, glyphs, pos)
+		if next > pos {
+			return glyphs, next
+		}
+	}
+	return glyphs, pos
+}
+
+func (g *gTab) getGsubLookup(idx uint16) (*gsubLookup, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
 	}
@@ -152,7 +158,8 @@ func (g *gTab) GetGsubLookup(idx uint16) (*gsubLookup, error) {
 
 	lookup := &gsubLookup{
 		Format:           format,
-		Flags:            flags,
+		rtl:              flags&0x0001 != 0,
+		filter:           g.makeFilter(flags),
 		markFilteringSet: markFilteringSet,
 	}
 	for _, offs := range subtables {
@@ -161,7 +168,9 @@ func (g *gTab) GetGsubLookup(idx uint16) (*gsubLookup, error) {
 			return nil, err
 		}
 
-		lookup.subtables = append(lookup.subtables, res)
+		if res != nil {
+			lookup.subtables = append(lookup.subtables, res)
+		}
 	}
 
 	return lookup, nil
@@ -184,7 +193,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#table-organization
 	switch 10*format + uint16(subFormat) {
 	case 1_1: // Single Substitution Format 1
-		err = g.Exec(s,
+		err := g.Exec(s,
 			CmdRead16, TypeUInt, // coverageOffset
 			CmdStoreInto, 0,
 			CmdRead16, TypeUInt, // deltaGlyphID (mod 65536)
@@ -421,7 +430,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 				seqLookupRecord := s.GetStash()
 
 				for len(seqLookupRecord) > 0 {
-					l, err := g.GetGsubLookup(seqLookupRecord[1])
+					l, err := g.getGsubLookup(seqLookupRecord[1])
 					if err != nil {
 						return nil, err
 					}
@@ -534,7 +543,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 				seqLookupRecord := s.GetStash()
 
 				for len(seqLookupRecord) > 0 {
-					l, err := g.GetGsubLookup(seqLookupRecord[1])
+					l, err := g.getGsubLookup(seqLookupRecord[1])
 					if err != nil {
 						return nil, err
 					}
@@ -680,7 +689,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 				seqLookupRecord := s.GetStash()
 
 				for len(seqLookupRecord) > 0 {
-					l, err := g.GetGsubLookup(seqLookupRecord[1])
+					l, err := g.getGsubLookup(seqLookupRecord[1])
 					if err != nil {
 						return nil, err
 					}
@@ -698,86 +707,7 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (gsu
 		res = xxx
 
 	case 6_3: // Chained Contexts Substitution: Coverage-based Glyph Contexts
-		err = g.Exec(s,
-			CmdRead16, TypeUInt, // backtrackGlyphCount
-			CmdLoop,
-			CmdStash, // backtrackCoverageOffset
-			CmdEndLoop,
-		)
-		if err != nil {
-			return nil, err
-		}
-		backtrackCoverageOffsets := s.GetStash()
-
-		err = g.Exec(s,
-			CmdRead16, TypeUInt, // inputGlyphCount
-			CmdLoop,
-			CmdStash, // inputCoverageOffset
-			CmdEndLoop,
-		)
-		if err != nil {
-			return nil, err
-		}
-		inputCoverageOffsets := s.GetStash()
-
-		err = g.Exec(s,
-			CmdRead16, TypeUInt, // lookaheadGlyphCount
-			CmdLoop,
-			CmdStash, // lookaheadCoverageOffset
-			CmdEndLoop,
-		)
-		if err != nil {
-			return nil, err
-		}
-		lookaheadCoverageOffsets := s.GetStash()
-
-		err = g.Exec(s,
-			CmdRead16, TypeUInt, // seqLookupCount
-			CmdLoop,
-			CmdStash, // seqLookupRecord.sequenceIndex
-			CmdStash, // seqLookupRecord.lookupListIndex
-			CmdEndLoop,
-		)
-		if err != nil {
-			return nil, err
-		}
-		seqLookupRecord := s.GetStash()
-
-		xxx := &gsub6_3{}
-
-		for _, offs := range backtrackCoverageOffsets {
-			cover, err := g.readCoverageTable(subtablePos + int64(offs))
-			if err != nil {
-				return nil, err
-			}
-			xxx.backtrack = append(xxx.backtrack, cover)
-		}
-		for _, offs := range inputCoverageOffsets {
-			cover, err := g.readCoverageTable(subtablePos + int64(offs))
-			if err != nil {
-				return nil, err
-			}
-			xxx.input = append(xxx.input, cover)
-		}
-		for _, offs := range lookaheadCoverageOffsets {
-			cover, err := g.readCoverageTable(subtablePos + int64(offs))
-			if err != nil {
-				return nil, err
-			}
-			xxx.lookahead = append(xxx.lookahead, cover)
-		}
-		for len(seqLookupRecord) > 0 {
-			l, err := g.GetGsubLookup(seqLookupRecord[1])
-			if err != nil {
-				return nil, err
-			}
-			xxx.actions = append(xxx.actions, seqLookup{
-				pos:    int(seqLookupRecord[0]),
-				nested: l,
-			})
-			seqLookupRecord = seqLookupRecord[2:]
-		}
-		res = xxx
+		return g.readGsub6_3(s, subtablePos)
 
 	case 7_1: // Extension Substitution Subtable Format 1
 		err = g.Exec(s,
@@ -809,19 +739,12 @@ func stashToGlyphs(x []uint16) []font.GlyphID {
 	return res
 }
 
-type gsubLookupSubtable interface {
-	Replace(uint16, []font.Glyph, int) ([]font.Glyph, int)
-}
-
 type gsub1_1 struct {
 	cov   coverage
 	delta uint16
 }
 
-func (l *gsub1_1) Replace(flags uint16, seq []font.Glyph, i int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic(fmt.Sprintf("not implemented: flags=0x%04x", flags))
-	}
+func (l *gsub1_1) Replace(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	gid := seq[i].Gid
 	if _, ok := l.cov[gid]; !ok {
 		return seq, i
@@ -835,10 +758,7 @@ type gsub1_2 struct {
 	substituteGlyphIDs []font.GlyphID
 }
 
-func (l *gsub1_2) Replace(flags uint16, seq []font.Glyph, i int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic("not implemented")
-	}
+func (l *gsub1_2) Replace(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	glyph := seq[i]
 	j, ok := l.cov[glyph.Gid]
 	if !ok {
@@ -854,10 +774,7 @@ type gsub2_1 struct {
 	repl [][]font.GlyphID
 }
 
-func (l *gsub2_1) Replace(flags uint16, seq []font.Glyph, i int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic("not implemented")
-	}
+func (l *gsub2_1) Replace(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	k, ok := l.cov[seq[i].Gid]
 	if !ok {
 		return seq, i
@@ -891,10 +808,7 @@ type ligature struct {
 	out font.GlyphID
 }
 
-func (l *gsub4_1) Replace(flags uint16, seq []font.Glyph, i int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic("not implemented")
-	}
+func (l *gsub4_1) Replace(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	ligSetIdx, ok := l.cov[seq[i].Gid]
 	if !ok {
 		return seq, i
@@ -908,6 +822,9 @@ ligLoop:
 			continue
 		}
 		for k, gid := range lig.in {
+			if !filter(seq[i+1+k].Gid) {
+				panic("not implemented")
+			}
 			if seq[i+1+k].Gid != gid {
 				continue ligLoop
 			}
@@ -941,11 +858,7 @@ type classSequenceRule struct {
 	actions []seqLookup
 }
 
-func (l *gsub5_2) Replace(flags uint16, seq []font.Glyph, pos int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic("not implemented")
-	}
-
+func (l *gsub5_2) Replace(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	glyph := seq[pos]
 	if _, ok := l.cov[glyph.Gid]; !ok {
 		return seq, pos
@@ -963,6 +876,12 @@ rulesetLoop:
 			continue
 		}
 		for i, class := range rule.input {
+			if !filter(seq[pos+1+i].Gid) {
+				panic("not implemented")
+			}
+			if !filter(seq[pos+1+i].Gid) {
+				panic("not implemented")
+			}
 			if l.input[seq[pos+1+i].Gid] != class {
 				continue rulesetLoop
 			}
@@ -988,11 +907,7 @@ type chainedSequenceRule struct {
 	actions   []seqLookup
 }
 
-func (l *gsub6_1) Replace(flags uint16, seq []font.Glyph, pos int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic("not implemented")
-	}
-
+func (l *gsub6_1) Replace(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	ruleNo := l.cov[seq[pos].Gid]
 	if ruleNo >= len(l.rulesets) || l.rulesets[ruleNo] == nil {
 		return seq, pos
@@ -1018,11 +933,7 @@ type chainedClassSeqRule struct {
 	actions   []seqLookup
 }
 
-func (l *gsub6_2) Replace(flags uint16, seq []font.Glyph, pos int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic("not implemented")
-	}
-
+func (l *gsub6_2) Replace(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	gid := seq[pos].Gid
 	if _, ok := l.cov[gid]; !ok {
 		return seq, pos
@@ -1041,16 +952,25 @@ ruleLoop:
 		}
 
 		for i, class := range rule.backtrack {
+			if !filter(seq[pos-1-i].Gid) {
+				panic("not implemented")
+			}
 			if l.backtrack[seq[pos-1-i].Gid] != class {
 				continue ruleLoop
 			}
 		}
 		for i, class := range rule.input {
+			if !filter(seq[pos+1+i].Gid) {
+				panic("not implemented")
+			}
 			if l.input[seq[pos+1+i].Gid] != class {
 				continue ruleLoop
 			}
 		}
 		for i, class := range rule.lookahead {
+			if !filter(seq[next+i].Gid) {
+				panic("not implemented")
+			}
 			if l.lookahead[seq[next+i].Gid] != class {
 				continue ruleLoop
 			}
@@ -1062,6 +982,8 @@ ruleLoop:
 	return seq, pos
 }
 
+// Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#63-chained-contexts-substitution-format-3-coverage-based-glyph-contexts
 type gsub6_3 struct {
 	backtrack []coverage
 	input     []coverage
@@ -1074,29 +996,117 @@ type seqLookup struct {
 	nested *gsubLookup
 }
 
-func (l *gsub6_3) Replace(flags uint16, seq []font.Glyph, pos int) ([]font.Glyph, int) {
-	if flags != 0 {
-		panic("not implemented")
+func (g *gTab) readGsub6_3(s *State, subtablePos int64) (*gsub6_3, error) {
+	err := g.Exec(s,
+		CmdRead16, TypeUInt, // backtrackGlyphCount
+		CmdLoop,
+		CmdStash, // backtrackCoverageOffset
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
 	}
+	backtrackCoverageOffsets := s.GetStash()
 
+	err = g.Exec(s,
+		CmdRead16, TypeUInt, // inputGlyphCount
+		CmdLoop,
+		CmdStash, // inputCoverageOffset
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	inputCoverageOffsets := s.GetStash()
+
+	err = g.Exec(s,
+		CmdRead16, TypeUInt, // lookaheadGlyphCount
+		CmdLoop,
+		CmdStash, // lookaheadCoverageOffset
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	lookaheadCoverageOffsets := s.GetStash()
+
+	err = g.Exec(s,
+		CmdRead16, TypeUInt, // seqLookupCount
+		CmdLoop,
+		CmdStash, // seqLookupRecord.sequenceIndex
+		CmdStash, // seqLookupRecord.lookupListIndex
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	seqLookupRecord := s.GetStash()
+
+	xxx := &gsub6_3{}
+
+	for _, offs := range backtrackCoverageOffsets {
+		cover, err := g.readCoverageTable(subtablePos + int64(offs))
+		if err != nil {
+			return nil, err
+		}
+		xxx.backtrack = append(xxx.backtrack, cover)
+	}
+	for _, offs := range inputCoverageOffsets {
+		cover, err := g.readCoverageTable(subtablePos + int64(offs))
+		if err != nil {
+			return nil, err
+		}
+		xxx.input = append(xxx.input, cover)
+	}
+	for _, offs := range lookaheadCoverageOffsets {
+		cover, err := g.readCoverageTable(subtablePos + int64(offs))
+		if err != nil {
+			return nil, err
+		}
+		xxx.lookahead = append(xxx.lookahead, cover)
+	}
+	for len(seqLookupRecord) > 0 {
+		l, err := g.getGsubLookup(seqLookupRecord[1])
+		if err != nil {
+			return nil, err
+		}
+		xxx.actions = append(xxx.actions, seqLookup{
+			pos:    int(seqLookupRecord[0]),
+			nested: l,
+		})
+		seqLookupRecord = seqLookupRecord[2:]
+	}
+	return xxx, nil
+}
+
+func (l *gsub6_3) Replace(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	next := pos + len(l.input)
 	if pos < len(l.backtrack) || next+len(l.lookahead) > len(seq) {
 		return seq, pos
 	}
 
 	for i, cov := range l.backtrack {
+		if !filter(seq[pos-1-i].Gid) {
+			panic("not implemented")
+		}
 		_, ok := cov[seq[pos-1-i].Gid]
 		if !ok {
 			return seq, pos
 		}
 	}
 	for i, cov := range l.input {
+		if !filter(seq[pos+i].Gid) {
+			panic("not implemented")
+		}
 		_, ok := cov[seq[pos+i].Gid]
 		if !ok {
 			return seq, pos
 		}
 	}
 	for i, cov := range l.lookahead {
+		if !filter(seq[next+i].Gid) {
+			panic("not implemented")
+		}
 		_, ok := cov[seq[next+i].Gid]
 		if !ok {
 			return seq, pos
@@ -1110,7 +1120,7 @@ func (l *gsub6_3) Replace(flags uint16, seq []font.Glyph, pos int) ([]font.Glyph
 func applyActions(actions []seqLookup, pos int, seq []font.Glyph) []font.Glyph {
 	origLen := len(seq)
 	for _, action := range actions {
-		seq, _ = action.nested.Replace(seq, pos+action.pos)
+		seq, _ = action.nested.substituteOne(seq, pos+action.pos)
 		if len(seq) != origLen {
 			// TODO(voss): how to interpret action.pos in case a prior action
 			// changes the length of seq?

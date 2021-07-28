@@ -36,6 +36,20 @@ import (
 // GposInfo represents the information from the "GPOS" table of a font.
 type GposInfo []*gposLookup
 
+type gposLookup struct {
+	Format uint16 // TODO(voss): remove?
+
+	rtl    bool
+	filter filter
+
+	subtables        []gposLookupSubtable
+	markFilteringSet uint16
+}
+
+type gposLookupSubtable interface {
+	Position(filter, []font.Glyph, int) int
+}
+
 // ReadGposInfo reads the "GSUB" table of a font, for a given writing script
 // and language.
 func (p *Parser) ReadGposInfo(script, lang string, extraFeatures ...string) (GposInfo, error) {
@@ -72,24 +86,14 @@ func (p *Parser) ReadGposInfo(script, lang string, extraFeatures ...string) (Gpo
 // series of glyphs.
 func (gpos GposInfo) Layout(glyphs []font.Glyph) {
 	for _, l := range gpos {
-		l.Layout(glyphs)
+		l.layout(glyphs)
 	}
 }
 
-type gposLookup struct {
-	Format uint16 // TODO(voss): remove?
-
-	rtl    bool
-	filter filter
-
-	subtables        []gposLookupSubtable
-	markFilteringSet uint16
-}
-
-func (l *gposLookup) Layout(glyphs []font.Glyph) {
+func (l *gposLookup) layout(glyphs []font.Glyph) {
 	pos := 0
 	for pos < len(glyphs) {
-		next := l.Position(glyphs, pos)
+		next := l.layoutOne(glyphs, pos)
 		if next > pos {
 			pos = next
 		} else {
@@ -98,10 +102,9 @@ func (l *gposLookup) Layout(glyphs []font.Glyph) {
 	}
 }
 
-func (l *gposLookup) Position(glyphs []font.Glyph, pos int) int {
-	var next int
+func (l *gposLookup) layoutOne(glyphs []font.Glyph, pos int) int {
 	for _, subtable := range l.subtables {
-		next = subtable.Position(l.filter, glyphs, pos)
+		next := subtable.Position(l.filter, glyphs, pos)
 		if next > pos {
 			return next
 		}
@@ -203,10 +206,6 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 
 	// fmt.Println("unsupported GPOS format", format, subFormat)
 	return nil, nil
-}
-
-type gposLookupSubtable interface {
-	Position(filter, []font.Glyph, int) int
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
@@ -637,5 +636,14 @@ func (l *gpos6_1) Position(filter filter, seq []font.Glyph, pos int) int {
 	_ = prev
 	_ = ok
 	fmt.Println(seq[prevPos].Gid, seq[pos].Gid)
+	panic("not implemented")
+}
+
+// Chained Contexts Positioning Format 3: Coverage-based Glyph Contexts
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#chained-contexts-positioning-format-3-coverage-based-glyph-contexts
+type gpos8_3 struct {
+}
+
+func (g *gTab) readGpos8_3(s *State, subtablePos int64) (*gpos8_3, error) {
 	panic("not implemented")
 }
