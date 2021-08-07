@@ -39,7 +39,7 @@ func tryFont(fname string) error {
 	}
 
 	p := parser.New(tt)
-	info, err := p.ReadGsubInfo("latn", "ENG ")
+	info, err := p.ReadGsubTable("latn", "ENG ")
 	if err != nil {
 		return err
 	}

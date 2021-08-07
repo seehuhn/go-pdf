@@ -380,15 +380,15 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	script := "latn"
 
 	pars := parser.New(tt)
-	gsub, err := pars.ReadGsubInfo(script, lang)
+	gsub, err := pars.ReadGsubTable(script, lang)
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
 	if gsub != nil {
-		fontObj.Substitute = gsub.Substitute
+		fontObj.Substitute = gsub.ApplyAll
 	}
 
-	gpos, err := pars.ReadGposInfo(script, lang)
+	gpos, err := pars.ReadGposTable(script, lang)
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}

@@ -69,8 +69,8 @@ func TestGsub4_1(t *testing.T) {
 	}
 	pos := 0
 	for pos < len(in) {
-		out, next := gsub.Replace(useAllGlyphs, in, pos)
-		if next == pos {
+		out, next := gsub.Apply(useAllGlyphs, in, pos)
+		if next < 0 {
 			if !isEqual(in, out) {
 				t.Errorf("change without progress: %d vs %d",
 					in, out)

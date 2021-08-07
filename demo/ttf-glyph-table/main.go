@@ -185,7 +185,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	gsub, err := pars.ReadGsubInfo("latn", "ENG ")
+	gsub, err := pars.ReadGsubTable("latn", "ENG ")
 	if err != nil && !table.IsMissing(err) {
 		log.Fatal(err)
 	}

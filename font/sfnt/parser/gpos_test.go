@@ -30,7 +30,7 @@ func TestGpos(t *testing.T) {
 	defer tt.Close()
 
 	pars := New(tt)
-	info, err := pars.ReadGposInfo("latn", "ENG ")
+	info, err := pars.ReadGposTable("latn", "ENG ")
 	if err != nil {
 		t.Fatal(err)
 	}
