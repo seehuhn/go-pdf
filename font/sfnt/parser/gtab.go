@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/locale"
 )
 
 type gTab struct {
@@ -35,7 +36,10 @@ type gTab struct {
 
 // newGTab wraps a parser with a helper to read GSUB and GPOS tables.
 // This modifies p.Funcs!
-func newGTab(p *Parser, script, lang string) (*gTab, error) {
+func newGTab(p *Parser, loc *locale.Locale) (*gTab, error) {
+	script := otfScript[loc.Script]
+	lang := otfLanguage[loc.Language]
+
 	scriptSeen := false
 	chooseScript := func(s *State) {
 		if s.Tag == script {

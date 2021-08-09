@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/parser"
+	"seehuhn.de/go/pdf/locale"
 )
 
 func tryFont(fname string) error {
@@ -39,7 +40,7 @@ func tryFont(fname string) error {
 	}
 
 	p := parser.New(tt)
-	info, err := p.ReadGsubTable("latn", "ENG ")
+	info, err := p.ReadGsubTable(locale.EnGB)
 	if err != nil {
 		return err
 	}

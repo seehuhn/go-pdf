@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/locale"
 )
 
 // The most common GPOS features seen on my system:
@@ -33,25 +34,10 @@ import (
 //       76 "vhal"
 //       76 "halt"
 
-// GposInfo represents the information from the "GPOS" table of a font.
-type GposInfo []*gposLookup
-
-type gposLookup struct {
-	rtl    bool
-	filter filter
-
-	subtables        []gposLookupSubtable
-	markFilteringSet uint16
-}
-
-type gposLookupSubtable interface {
-	Apply(filter, []font.Glyph, int) int
-}
-
-// ReadGposTable reads the "GSUB" table of a font, for a given writing script
+// ReadGposTable reads the "GPOS" table of a font, for a given writing script
 // and language.
-func (p *Parser) ReadGposTable(script, lang string, extraFeatures ...string) (GposInfo, error) {
-	gtab, err := newGTab(p, script, lang)
+func (p *Parser) ReadGposTable(loc *locale.Locale, extraFeatures ...string) (Lookups, error) {
+	gtab, err := newGTab(p, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +55,7 @@ func (p *Parser) ReadGposTable(script, lang string, extraFeatures ...string) (Gp
 		return nil, err
 	}
 
-	var res GposInfo
+	var res Lookups
 	for _, idx := range gtab.LookupIndices {
 		l, err := gtab.getGposLookup(idx)
 		if err != nil {
@@ -80,37 +66,8 @@ func (p *Parser) ReadGposTable(script, lang string, extraFeatures ...string) (Gp
 	return res, nil
 }
 
-// Layout applies the positioning from the selected GPOS lookups to a
-// series of glyphs.
-func (gpos GposInfo) Layout(glyphs []font.Glyph) {
-	for _, l := range gpos {
-		l.layout(glyphs)
-	}
-}
-
-func (l *gposLookup) layout(glyphs []font.Glyph) {
-	pos := 0
-	for pos < len(glyphs) {
-		next := l.layoutOne(glyphs, pos)
-		if next > pos {
-			pos = next
-		} else {
-			pos++
-		}
-	}
-}
-
-func (l *gposLookup) layoutOne(glyphs []font.Glyph, pos int) int {
-	for _, subtable := range l.subtables {
-		next := subtable.Apply(l.filter, glyphs, pos)
-		if next > pos {
-			return next
-		}
-	}
-	return pos
-}
-
-func (g *gTab) getGposLookup(idx uint16) (*gposLookup, error) {
+// TODO(voss): merge with getGsubLookup
+func (g *gTab) getGposLookup(idx uint16) (*lookupTable, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
 	}
@@ -144,7 +101,7 @@ func (g *gTab) getGposLookup(idx uint16) (*gposLookup, error) {
 		markFilteringSet = uint16(s.A)
 	}
 
-	lookup := &gposLookup{
+	lookup := &lookupTable{
 		rtl:              flags&0x0001 != 0,
 		filter:           g.makeFilter(flags),
 		markFilteringSet: markFilteringSet,
@@ -163,7 +120,7 @@ func (g *gTab) getGposLookup(idx uint16) (*gposLookup, error) {
 	return lookup, nil
 }
 
-func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gposLookupSubtable, error) {
+func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (lookupSubtable, error) {
 	// TODO(voss): is this called more than once for the same subtablePos? -> use caching?
 	s.A = subtablePos
 	err := g.Exec(s,
@@ -200,10 +157,14 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (gpo
 			return nil, g.error("invalid extension lookup")
 		}
 		return g.readGposSubtable(s, uint16(s.R[0]), subtablePos+s.A)
-	}
 
-	// fmt.Println("unsupported GPOS format", format, subFormat)
-	return nil, nil
+	default:
+		return &lookupNotImplemented{
+			table:      "GPOS",
+			lookupType: format,
+			format:     uint16(subFormat),
+		}, nil
+	}
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
@@ -282,10 +243,10 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 	return res, nil
 }
 
-func (l *gpos2_1) Apply(filter filter, seq []font.Glyph, pos int) int {
+func (l *gpos2_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	class, ok := l.cov[seq[pos].Gid]
 	if !ok || class >= len(l.adjust) {
-		return pos
+		return seq, -1
 	}
 	tab := l.adjust[class]
 
@@ -294,21 +255,21 @@ func (l *gpos2_1) Apply(filter filter, seq []font.Glyph, pos int) int {
 		next++
 	}
 	if next >= len(seq) {
-		return pos
+		return seq, -1
 	}
 
 	pairAdjust, ok := tab[seq[next].Gid]
 	if !ok {
-		return pos
+		return seq, -1
 	}
 
 	pairAdjust.first.Apply(&seq[pos])
 	pairAdjust.second.Apply(&seq[next])
 
 	if pairAdjust.second == nil {
-		return next
+		return seq, next
 	}
-	return next + 1
+	return seq, next + 1
 }
 
 // Pair Adjustment Positioning Format 2: Class Pair Adjustment
@@ -387,10 +348,10 @@ func (g *gTab) readGpos2_2(s *State, subtablePos int64) (*gpos2_2, error) {
 	return res, nil
 }
 
-func (l *gpos2_2) Apply(filter filter, seq []font.Glyph, pos int) int {
+func (l *gpos2_2) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	_, ok := l.cov[seq[pos].Gid]
 	if !ok {
-		return pos
+		return seq, -1
 	}
 
 	next := pos + 1
@@ -398,7 +359,7 @@ func (l *gpos2_2) Apply(filter filter, seq []font.Glyph, pos int) int {
 		next++
 	}
 	if next >= len(seq) {
-		return pos
+		return seq, -1
 	}
 
 	class1 := l.classDef1[seq[pos].Gid]
@@ -409,9 +370,9 @@ func (l *gpos2_2) Apply(filter filter, seq []font.Glyph, pos int) int {
 	pairAdjust.second.Apply(&seq[next])
 
 	if pairAdjust.second == nil {
-		return next
+		return seq, next
 	}
-	return next + 1
+	return seq, next + 1
 }
 
 // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment Point
@@ -501,24 +462,24 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	return res, nil
 }
 
-func (l *gpos4_1) Apply(filter filter, seq []font.Glyph, pos int) int {
+func (l *gpos4_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	if pos == 0 {
-		return pos
+		return seq, -1
 	}
 	mark, ok := l.Mark[seq[pos].Gid]
 	if !ok {
-		return pos
+		return seq, -1
 	}
 	base, ok := l.Base[seq[pos-1].Gid]
 	if !ok {
-		return pos
+		return seq, -1
 	}
 
 	baseAnchor := base[mark.markClass]
 
 	seq[pos].XOffset = -seq[pos-1].Advance + int(baseAnchor.X) - int(mark.X)
 	seq[pos].YOffset = int(baseAnchor.Y) - int(mark.Y)
-	return pos + 1
+	return seq, pos + 1
 }
 
 // Mark-to-Mark Attachment Positioning Format 1: Mark-to-base Attachment
@@ -605,7 +566,7 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	return res, nil
 }
 
-func (l *gpos6_1) Apply(filter filter, seq []font.Glyph, pos int) int {
+func (l *gpos6_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	// The mark2 glyph that combines with a mark1 glyph is the glyph preceding
 	// the mark1 glyph in glyph string order (skipping glyphs according to
 	// LookupFlags). The subtable applies precisely when that mark2 glyph is
@@ -615,7 +576,7 @@ func (l *gpos6_1) Apply(filter filter, seq []font.Glyph, pos int) int {
 
 	x, ok := l.Mark1[seq[pos].Gid]
 	if !ok {
-		return pos
+		return seq, -1
 	}
 
 	prevPos := pos - 1
@@ -623,11 +584,11 @@ func (l *gpos6_1) Apply(filter filter, seq []font.Glyph, pos int) int {
 		prevPos--
 	}
 	if prevPos < 0 {
-		return pos
+		return seq, -1
 	}
 	prev, ok := l.Mark2[seq[prevPos].Gid]
 	if !ok {
-		return pos
+		return seq, -1
 	}
 
 	_ = x

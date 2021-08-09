@@ -18,6 +18,7 @@ package parser
 
 import (
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/locale"
 )
 
 // The most common GSUB features seen on my system:
@@ -37,8 +38,8 @@ import (
 
 // ReadGsubTable reads the "GSUB" table of a font, for a given writing script
 // and language.
-func (p *Parser) ReadGsubTable(script, lang string, extraFeatures ...string) (Lookups, error) {
-	gtab, err := newGTab(p, script, lang)
+func (p *Parser) ReadGsubTable(loc *locale.Locale, extraFeatures ...string) (Lookups, error) {
+	gtab, err := newGTab(p, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +68,7 @@ func (p *Parser) ReadGsubTable(script, lang string, extraFeatures ...string) (Lo
 	return res, nil
 }
 
+// TODO(voss): merge with getGposLookup
 func (g *gTab) getGsubLookup(idx uint16) (*lookupTable, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.error("lookup index %d out of range", idx)
@@ -171,10 +173,14 @@ func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (loo
 			return nil, g.error("invalid extension lookup")
 		}
 		return g.readGsubSubtable(s, uint16(s.R[0]), subtablePos+s.A)
-	}
 
-	// fmt.Println("unsupported GSUB format", format, subFormat)
-	return nil, nil
+	default:
+		return &lookupNotImplemented{
+			table:      "GSUB",
+			lookupType: format,
+			format:     uint16(subFormat),
+		}, nil
+	}
 }
 
 type gsub1_1 struct {

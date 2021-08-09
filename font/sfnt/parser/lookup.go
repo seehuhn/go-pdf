@@ -41,3 +41,12 @@ func (l *lookupTable) applySubtables(glyphs []font.Glyph, pos int) ([]font.Glyph
 	}
 	return glyphs, pos + 1
 }
+
+type lookupNotImplemented struct {
+	table              string
+	lookupType, format uint16
+}
+
+func (l *lookupNotImplemented) Apply(filter filter, glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
+	return glyphs, -1
+}

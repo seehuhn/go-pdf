@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/parser"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -185,7 +186,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	gsub, err := pars.ReadGsubTable("latn", "ENG ")
+	gsub, err := pars.ReadGsubTable(locale.EnGB)
 	if err != nil && !table.IsMissing(err) {
 		log.Fatal(err)
 	}

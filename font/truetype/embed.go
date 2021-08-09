@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/parser"
 	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/locale"
 )
 
 // TrueType fonts with >255 glyphs (PDF 1.3)
@@ -375,12 +376,11 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		LineGap:     LineGap,
 	}
 
-	// TODO(voss): set these properly, somehow
-	lang := "ENG "
-	script := "latn"
+	// TODO(voss): set the locale properly, somehow
+	loc := locale.EnGB
 
 	pars := parser.New(tt)
-	gsub, err := pars.ReadGsubTable(script, lang)
+	gsub, err := pars.ReadGsubTable(loc)
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		fontObj.Substitute = gsub.ApplyAll
 	}
 
-	gpos, err := pars.ReadGposTable(script, lang)
+	gpos, err := pars.ReadGposTable(loc)
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 			for i, glyph := range glyphs {
 				glyphs[i].Advance = Width[glyph.Gid]
 			}
-			gpos.Layout(glyphs)
+			glyphs = gpos.ApplyAll(glyphs)
 		}
 	} else {
 		kerning, err := tt.ReadKernInfo()

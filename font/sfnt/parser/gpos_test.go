@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/locale"
 )
 
 func TestGpos(t *testing.T) {
@@ -30,7 +31,7 @@ func TestGpos(t *testing.T) {
 	defer tt.Close()
 
 	pars := New(tt)
-	info, err := pars.ReadGposTable("latn", "ENG ")
+	info, err := pars.ReadGposTable(locale.EnGB)
 	if err != nil {
 		t.Fatal(err)
 	}

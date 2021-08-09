@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/locale"
 )
 
 func TestInterpreter(t *testing.T) {
@@ -32,8 +33,6 @@ func TestInterpreter(t *testing.T) {
 	}
 	defer tt.Close()
 
-	targetScript := "latn"
-	targetLang := "ENG "
 	tableName := "GSUB"
 
 	includeFeature := make(map[string]bool)
@@ -48,7 +47,7 @@ func TestInterpreter(t *testing.T) {
 	}
 
 	p := New(tt)
-	gtab, err := newGTab(p, targetScript, targetLang)
+	gtab, err := newGTab(p, locale.EnGB)
 	if err != nil {
 		t.Fatal(err)
 	}
