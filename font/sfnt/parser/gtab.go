@@ -23,20 +23,23 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
+// gTab represents a GSUB or GPOS table.
 type gTab struct {
 	*Parser
 
-	gdef             *GdefInfo
-	LookupIndices    []uint16
+	gdef *GdefInfo
+
+	lookupIndices    []uint16
 	lookupListOffset int64
 	lookups          []uint16
+	lookupReader     stReaderFn
 
 	coverageCache map[int64]coverage
 }
 
 // newGTab wraps a parser with a helper to read GSUB and GPOS tables.
 // This modifies p.Funcs!
-func newGTab(p *Parser, loc *locale.Locale) (*gTab, error) {
+func newGTab(p *Parser, tableName string, loc *locale.Locale, includeFeature map[string]bool) (*gTab, error) {
 	script := otfScript[loc.Script]
 	lang := otfLanguage[loc.Language]
 
@@ -64,16 +67,29 @@ func newGTab(p *Parser, loc *locale.Locale) (*gTab, error) {
 		return nil, err
 	}
 
-	res := &gTab{
+	g := &gTab{
 		Parser:        p,
 		gdef:          gdef,
 		coverageCache: make(map[int64]coverage),
 	}
+	switch tableName {
+	case "GPOS":
+		g.lookupReader = g.readGposSubtable
+	case "GSUB":
+		g.lookupReader = g.readGsubSubtable
+	default:
+		panic("invalid table type " + tableName)
+	}
 
-	return res, nil
+	err = g.init(tableName, includeFeature)
+	if err != nil {
+		return nil, err
+	}
+
+	return g, nil
 }
 
-func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {
+func (g *gTab) init(tableName string, includeFeature map[string]bool) error {
 	err := g.OpenTable(tableName)
 	if err != nil {
 		return err
@@ -225,7 +241,7 @@ func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {
 			i++
 		}
 	}
-	g.LookupIndices = lookupIndices
+	g.lookupIndices = lookupIndices
 
 	// Since more lookups might be required for nested lookups, we
 	// keep the complete list of lookupOffsets.
@@ -244,4 +260,72 @@ func (g *gTab) Init(tableName string, includeFeature map[string]bool) error {
 	g.lookups = s.GetStash()
 
 	return nil
+}
+
+type stReaderFn func(s *State, format uint16, subtablePos int64) (lookupSubtable, error)
+
+// ReadLookups reads the selected lookup tables.
+func (g *gTab) ReadLookups() (Lookups, error) {
+	var res Lookups
+	for _, idx := range g.lookupIndices {
+		l, err := g.getGtabLookup(idx)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, l)
+	}
+	return res, nil
+}
+
+func (g *gTab) getGtabLookup(idx uint16) (*lookupTable, error) {
+	if int(idx) >= len(g.lookups) {
+		return nil, g.error("lookup index %d out of range", idx)
+	}
+	base := g.lookupListOffset + int64(g.lookups[idx])
+
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
+	s := &State{}
+	s.A = base
+	err := g.Exec(s,
+		CmdSeek,
+		CmdStash,            // lookupType
+		CmdStash,            // lookupFlag
+		CmdRead16, TypeUInt, // subtableCount
+		CmdLoop,
+		CmdStash, // subtableOffset
+		CmdEndLoop,
+	)
+	if err != nil {
+		return nil, err
+	}
+	data := s.GetStash()
+	format := data[0]
+	flags := data[1]
+	subtables := data[2:]
+	var markFilteringSet uint16
+	if flags&0x0010 != 0 {
+		err = g.Exec(s, CmdRead16, TypeUInt) // markFilteringSet
+		if err != nil {
+			return nil, err
+		}
+		markFilteringSet = uint16(s.A)
+	}
+
+	lookup := &lookupTable{
+		rtl:              flags&0x0001 != 0,
+		filter:           g.makeFilter(flags),
+		markFilteringSet: markFilteringSet,
+	}
+	for _, offs := range subtables {
+		res, err := g.lookupReader(s, format, base+int64(offs))
+		if err != nil {
+			return nil, err
+		}
+
+		if res != nil {
+			lookup.subtables = append(lookup.subtables, res)
+		}
+	}
+
+	return lookup, nil
 }

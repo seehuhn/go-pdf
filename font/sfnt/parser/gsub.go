@@ -39,11 +39,6 @@ import (
 // ReadGsubTable reads the "GSUB" table of a font, for a given writing script
 // and language.
 func (p *Parser) ReadGsubTable(loc *locale.Locale, extraFeatures ...string) (Lookups, error) {
-	gtab, err := newGTab(p, loc)
-	if err != nil {
-		return nil, err
-	}
-
 	includeFeature := map[string]bool{
 		"ccmp": true,
 		"liga": true,
@@ -52,74 +47,13 @@ func (p *Parser) ReadGsubTable(loc *locale.Locale, extraFeatures ...string) (Loo
 	for _, feature := range extraFeatures {
 		includeFeature[feature] = true
 	}
-	err = gtab.Init("GSUB", includeFeature)
+
+	g, err := newGTab(p, "GSUB", loc, includeFeature)
 	if err != nil {
 		return nil, err
 	}
 
-	var res Lookups
-	for _, idx := range gtab.LookupIndices {
-		l, err := gtab.getGsubLookup(idx)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, l)
-	}
-	return res, nil
-}
-
-// TODO(voss): merge with getGposLookup
-func (g *gTab) getGsubLookup(idx uint16) (*lookupTable, error) {
-	if int(idx) >= len(g.lookups) {
-		return nil, g.error("lookup index %d out of range", idx)
-	}
-	base := g.lookupListOffset + int64(g.lookups[idx])
-
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
-	s := &State{}
-	s.A = base
-	err := g.Exec(s,
-		CmdSeek,
-		CmdStash,            // lookupType
-		CmdStash,            // lookupFlag
-		CmdRead16, TypeUInt, // subtableCount
-		CmdLoop,
-		CmdStash, // subtableOffset
-		CmdEndLoop,
-	)
-	if err != nil {
-		return nil, err
-	}
-	data := s.GetStash()
-	format := data[0]
-	flags := data[1]
-	subtables := data[2:]
-	var markFilteringSet uint16
-	if flags&0x0010 != 0 {
-		err = g.Exec(s, CmdRead16, TypeUInt) // markFilteringSet
-		if err != nil {
-			return nil, err
-		}
-		markFilteringSet = uint16(s.A)
-	}
-
-	lookup := &lookupTable{
-		rtl:              flags&0x0001 != 0,
-		filter:           g.makeFilter(flags),
-		markFilteringSet: markFilteringSet,
-	}
-	for _, offs := range subtables {
-		res, err := g.readGsubSubtable(s, format, base+int64(offs))
-		if err != nil {
-			return nil, err
-		}
-
-		if res != nil {
-			lookup.subtables = append(lookup.subtables, res)
-		}
-	}
-
-	return lookup, nil
+	return g.ReadLookups()
 }
 
 func (g *gTab) readGsubSubtable(s *State, format uint16, subtablePos int64) (lookupSubtable, error) {
@@ -547,7 +481,7 @@ func (g *gTab) readGsub5_2(s *State, subtablePos int64) (*gsub5_2, error) {
 			seqLookupRecord := s.GetStash()
 
 			for len(seqLookupRecord) > 0 {
-				l, err := g.getGsubLookup(seqLookupRecord[1])
+				l, err := g.getGtabLookup(seqLookupRecord[1])
 				if err != nil {
 					return nil, err
 				}
@@ -709,7 +643,7 @@ func (g *gTab) readGsub6_1(s *State, subtablePos int64) (*gsub6_1, error) {
 			seqLookupRecord := s.GetStash()
 
 			for len(seqLookupRecord) > 0 {
-				l, err := g.getGsubLookup(seqLookupRecord[1])
+				l, err := g.getGtabLookup(seqLookupRecord[1])
 				if err != nil {
 					return nil, err
 				}
@@ -882,7 +816,7 @@ func (g *gTab) readGsub6_2(s *State, subtablePos int64) (*gsub6_2, error) {
 			seqLookupRecord := s.GetStash()
 
 			for len(seqLookupRecord) > 0 {
-				l, err := g.getGsubLookup(seqLookupRecord[1])
+				l, err := g.getGtabLookup(seqLookupRecord[1])
 				if err != nil {
 					return nil, err
 				}
@@ -1033,7 +967,7 @@ func (g *gTab) readGsub6_3(s *State, subtablePos int64) (*gsub6_3, error) {
 		xxx.lookahead = append(xxx.lookahead, cover)
 	}
 	for len(seqLookupRecord) > 0 {
-		l, err := g.getGsubLookup(seqLookupRecord[1])
+		l, err := g.getGtabLookup(seqLookupRecord[1])
 		if err != nil {
 			return nil, err
 		}

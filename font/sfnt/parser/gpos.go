@@ -17,8 +17,6 @@
 package parser
 
 import (
-	"fmt"
-
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -37,11 +35,6 @@ import (
 // ReadGposTable reads the "GPOS" table of a font, for a given writing script
 // and language.
 func (p *Parser) ReadGposTable(loc *locale.Locale, extraFeatures ...string) (Lookups, error) {
-	gtab, err := newGTab(p, loc)
-	if err != nil {
-		return nil, err
-	}
-
 	includeFeature := map[string]bool{
 		"kern": true,
 		"mark": true,
@@ -50,74 +43,13 @@ func (p *Parser) ReadGposTable(loc *locale.Locale, extraFeatures ...string) (Loo
 	for _, feature := range extraFeatures {
 		includeFeature[feature] = true
 	}
-	err = gtab.Init("GPOS", includeFeature)
+
+	g, err := newGTab(p, "GPOS", loc, includeFeature)
 	if err != nil {
 		return nil, err
 	}
 
-	var res Lookups
-	for _, idx := range gtab.LookupIndices {
-		l, err := gtab.getGposLookup(idx)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, l)
-	}
-	return res, nil
-}
-
-// TODO(voss): merge with getGsubLookup
-func (g *gTab) getGposLookup(idx uint16) (*lookupTable, error) {
-	if int(idx) >= len(g.lookups) {
-		return nil, g.error("lookup index %d out of range", idx)
-	}
-	base := g.lookupListOffset + int64(g.lookups[idx])
-
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
-	s := &State{}
-	s.A = base
-	err := g.Exec(s,
-		CmdSeek,
-		CmdStash,            // lookupType
-		CmdStash,            // lookupFlag
-		CmdRead16, TypeUInt, // subtableCount
-		CmdLoop,
-		CmdStash, // subtableOffset
-		CmdEndLoop,
-	)
-	if err != nil {
-		return nil, err
-	}
-	data := s.GetStash()
-	format := data[0]
-	flags := data[1]
-	subtables := data[2:]
-	var markFilteringSet uint16
-	if flags&0x0010 != 0 {
-		err = g.Exec(s, CmdRead16, TypeUInt) // markFilteringSet
-		if err != nil {
-			return nil, err
-		}
-		markFilteringSet = uint16(s.A)
-	}
-
-	lookup := &lookupTable{
-		rtl:              flags&0x0001 != 0,
-		filter:           g.makeFilter(flags),
-		markFilteringSet: markFilteringSet,
-	}
-	for _, offs := range subtables {
-		res, err := g.readGposSubtable(s, format, base+int64(offs))
-		if err != nil {
-			return nil, err
-		}
-
-		if res != nil {
-			lookup.subtables = append(lookup.subtables, res)
-		}
-	}
-
-	return lookup, nil
+	return g.ReadLookups()
 }
 
 func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (lookupSubtable, error) {
@@ -594,7 +526,6 @@ func (l *gpos6_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph,
 	_ = x
 	_ = prev
 	_ = ok
-	fmt.Println(seq[prevPos].Gid, seq[pos].Gid)
 	panic("not implemented")
 }
 

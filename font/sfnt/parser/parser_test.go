@@ -47,18 +47,14 @@ func TestInterpreter(t *testing.T) {
 	}
 
 	p := New(tt)
-	gtab, err := newGTab(p, locale.EnGB)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = gtab.Init(tableName, includeFeature)
+	g, err := newGTab(p, tableName, locale.EnGB, includeFeature)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if tableName == "GSUB" {
-		for _, idx := range gtab.LookupIndices {
-			_, err := gtab.getGsubLookup(idx)
+		for _, idx := range g.lookupIndices {
+			_, err := g.getGtabLookup(idx)
 			if err != nil {
 				t.Fatal(err)
 			}
