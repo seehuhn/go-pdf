@@ -24,8 +24,8 @@ type GdefInfo struct {
 	MarkAttachClass ClassDef
 }
 
-// ReadGdefInfo reads the GDEF table of a font file.
-func (p *Parser) ReadGdefInfo() (*GdefInfo, error) {
+// ReadGdefTable reads the GDEF table of a font file.
+func (p *Parser) ReadGdefTable() (*GdefInfo, error) {
 	err := p.OpenTable("GDEF")
 	if err != nil {
 		return nil, err

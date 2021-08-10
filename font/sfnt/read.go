@@ -282,14 +282,3 @@ func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
 
 	return res, nil
 }
-
-// Language describes the written language an OpenType font is used for.
-type Language string
-
-// Selected Language codes for OpenType fonts.
-// The full list can be found at
-// https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
-const (
-	LangEN Language = "ENG "
-	LangDE Language = "DEU "
-)

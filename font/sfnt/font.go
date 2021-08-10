@@ -36,6 +36,7 @@ type Font struct {
 }
 
 // Open loads a TrueType font into memory.
+// The .Close() method must be called once the Font is no longer used.
 func Open(fname string) (*Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
@@ -119,7 +120,7 @@ func (tt *Font) IsOpenType() bool {
 }
 
 // SelectCmap chooses one of the sub-tables of the cmap table and reads the
-// fonts character encoding from there.  If a full unicode mapping is found,
+// font's character encoding from there.  If a full unicode mapping is found,
 // this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
 // If this fails, a legacy 1,0 record is tried as a last resort.
 func (tt *Font) SelectCmap() (map[rune]font.GlyphID, error) {

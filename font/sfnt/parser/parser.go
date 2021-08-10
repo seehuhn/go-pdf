@@ -29,10 +29,9 @@ const bufferSize = 1024
 
 // State stores the current register values of the interpreter.
 type State struct {
-	A   int64
-	R   [8]int64 // TODO(voss): let the caller allocate this instead?
-	Tag string
-
+	A     int64
+	R     [2]int64 // TODO(voss): use names A, B, C instead?
+	Tag   string
 	Stash []uint16
 }
 
@@ -55,9 +54,6 @@ type Parser struct {
 	lastRead  int
 
 	scale float64
-
-	// TODO(voss): can I get rid of this?
-	Funcs []func(*State)
 
 	classDefCache map[int64]ClassDef
 }
@@ -139,15 +135,11 @@ CommandLoop:
 				s.A = int64(math.Round(float64(val) * p.scale))
 			case TypeFword:
 				s.A = int64(math.Round(float64(int32(val)) * p.scale))
+			case TypeTag:
+				s.Tag = string(buf)
 			default:
 				panic("unknown type for CmdRead16")
 			}
-		case CmdReadTag:
-			buf, err := p.read(4)
-			if err != nil {
-				return err
-			}
-			s.Tag = string(buf)
 		case CmdSeek:
 			err := p.seek(s.A)
 			if err != nil {
@@ -158,7 +150,7 @@ CommandLoop:
 			s.R[arg] = s.A
 		case CmdLoadI:
 			s.A = int64(int8(arg))
-		case CmdLoad:
+		case CmdLoadFrom:
 			s.A = s.R[arg]
 		case CmdStash:
 			buf, err := p.read(2)
@@ -177,16 +169,6 @@ CommandLoop:
 			s.A *= int64(int8(arg))
 		case CmdMult:
 			s.A *= s.R[arg]
-
-		case CmdCmpEq:
-			target := int64(int8(arg))
-			s.A = encodeBool[s.A == target]
-		case CmdCmpGe:
-			target := int64(int8(arg))
-			s.A = encodeBool[s.A >= target]
-		case CmdCmpLt:
-			target := int64(int8(arg))
-			s.A = encodeBool[s.A < target]
 
 		case CmdExitIfLt:
 			target := int64(int8(arg))
@@ -240,9 +222,6 @@ CommandLoop:
 			if loopCount > 0 {
 				PC = loopStartPC
 			}
-
-		case CmdCall:
-			p.Funcs[arg](s)
 
 		default:
 			panic(fmt.Sprintf("unknown command 0x%02x", cmd))
@@ -346,27 +325,22 @@ const (
 	CmdRead32           // arg: type
 	CmdStoreInto        // arg: register
 	CmdLoadI            // arg: new int8 value for A
-	CmdLoad             // arg: register
+	CmdLoadFrom         // arg: register
 	CmdIAdd             // arg: int8 literal value
 	CmdAdd              // arg: register
 	CmdIMult            // arg: int8 literal value
 	CmdMult             // arg: register
-	CmdCmpEq            // arg: comparison value
-	CmdCmpGe            // arg: comparison value
-	CmdCmpLt            // arg: comparison value
 	CmdExitIfLt         // arg: comparison value
 	CmdAssertEq         // arg: comparison value
 	CmdAssertGe         // arg: comparison value
 	CmdAssertGt         // arg: comparison value
 	CmdAssertLe         // arg: comparison value
 	CmdJNZ              // arg: offset
-	CmdCall             // arg: Func index
 )
 
 // Commands which take no arguments
 const (
 	CmdSeek = iota + 128
-	CmdReadTag
 	CmdDec
 	CmdLoop
 	CmdEndLoop
@@ -379,6 +353,7 @@ const (
 	TypeInt
 	TypeFword
 	TypeUFword
+	TypeTag
 )
 
 // JumpOffset encodes the jump distance for a relative jump

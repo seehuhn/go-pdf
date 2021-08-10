@@ -52,29 +52,44 @@ func (p *Parser) ReadGposTable(loc *locale.Locale, extraFeatures ...string) (Loo
 	return g.ReadLookups()
 }
 
-func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (lookupSubtable, error) {
+func (g *gTab) readGposSubtable(s *State, lookupType uint16, subtablePos int64) (lookupSubtable, error) {
 	// TODO(voss): is this called more than once for the same subtablePos? -> use caching?
 	s.A = subtablePos
 	err := g.Exec(s,
 		CmdSeek,
-		CmdRead16, TypeUInt, // (sub-)format
+		CmdRead16, TypeUInt, // format
 	)
 	if err != nil {
 		return nil, err
 	}
-	subFormat := s.A
+	format := s.A
 
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#table-organization
 	// switch 10*format + uint16(subFormat) {
-	switch 10*format + uint16(subFormat) {
+	switch 10*lookupType + uint16(format) {
 	case 2_1: // Pair Adjustment Positioning Format 1: Adjustments for Glyph Pairs
 		return g.readGpos2_1(s, subtablePos)
+
 	case 2_2: // Pair Adjustment Positioning Format 2: Class Pair Adjustment
 		return g.readGpos2_2(s, subtablePos)
+
 	case 4_1: // Mark-to-Base Attachment Positioning Format 1: Mark-to-base Attachment
 		return g.readGpos4_1(s, subtablePos)
+
 	case 6_1: // Mark-to-Mark Attachment Positioning Format 1: Mark-to-Mark Attachment
 		return g.readGpos6_1(s, subtablePos)
+
+	case 7_2: // Context Positioning Subtable Format 2: Class-based Glyph Contexts
+		return g.readSeqContext2(s, subtablePos)
+
+	case 8_1: // Chained Contexts Positioning Format 1: Simple Glyph Contexts
+		return g.readChained1(s, subtablePos)
+
+	case 8_2: // Chained Contexts Positioning Format 2: Class-based Glyph Contexts
+		return g.readChained2(s, subtablePos)
+
+	case 8_3: // Chained Contexts Positioning Format 3: Coverage-based Glyph Contexts
+		return g.readChained3(s, subtablePos)
 
 	case 9_1: // Extension Positioning Subtable Format 1
 		err = g.Exec(s,
@@ -93,8 +108,8 @@ func (g *gTab) readGposSubtable(s *State, format uint16, subtablePos int64) (loo
 	default:
 		return &lookupNotImplemented{
 			table:      "GPOS",
-			lookupType: format,
-			format:     uint16(subFormat),
+			lookupType: lookupType,
+			format:     uint16(format),
 		}, nil
 	}
 }

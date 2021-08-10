@@ -181,7 +181,7 @@ func main() {
 	defer tt.Close()
 
 	pars := parser.New(tt)
-	gdef, err = pars.ReadGdefInfo()
+	gdef, err = pars.ReadGdefTable()
 	if err != nil && !table.IsMissing(err) {
 		log.Fatal(err)
 	}
