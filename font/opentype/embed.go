@@ -63,6 +63,7 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 			} else {
 				switch name {
 				case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
+					// TODO(voss): include "gasp"?
 					return true
 				default:
 					return false

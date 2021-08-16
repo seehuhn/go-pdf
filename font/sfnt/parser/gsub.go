@@ -40,9 +40,11 @@ import (
 // and language.
 func (p *Parser) ReadGsubTable(loc *locale.Locale, extraFeatures ...string) (Lookups, error) {
 	includeFeature := map[string]bool{
+		"calt": true,
 		"ccmp": true,
-		"liga": true,
 		"clig": true,
+		"liga": true,
+		"locl": true,
 	}
 	for _, feature := range extraFeatures {
 		includeFeature[feature] = true

@@ -31,6 +31,7 @@ type Font struct {
 	Fd     *os.File
 	Header *table.Header
 	Head   *table.Head
+	Cmap   map[rune]font.GlyphID
 
 	NumGlyphs int // TODO(voss): should this be here?
 }
@@ -80,6 +81,11 @@ func Open(fname string) (*Font, error) {
 	}
 	tt.NumGlyphs = int(maxp.NumGlyphs)
 
+	tt.Cmap, err = tt.selectCmap()
+	if err != nil {
+		return nil, err
+	}
+
 	return tt, nil
 }
 
@@ -119,17 +125,16 @@ func (tt *Font) IsOpenType() bool {
 	return false
 }
 
-// SelectCmap chooses one of the sub-tables of the cmap table and reads the
+// selectCmap chooses one of the sub-tables of the cmap table and reads the
 // font's character encoding from there.  If a full unicode mapping is found,
 // this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
 // If this fails, a legacy 1,0 record is tried as a last resort.
-func (tt *Font) SelectCmap() (map[rune]font.GlyphID, error) {
+func (tt *Font) selectCmap() (map[rune]font.GlyphID, error) {
 	rec := tt.Header.Find("cmap")
 	if rec == nil {
 		return nil, &table.ErrNoTable{Name: "cmap"}
 	}
 	cmapFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
-	_ = cmapFd
 
 	cmapTable, err := table.ReadCmapTable(cmapFd)
 	if err != nil {

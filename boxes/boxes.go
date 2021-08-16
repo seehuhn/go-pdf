@@ -77,16 +77,14 @@ func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
 
 // Text represents a typeset string of characters as a Box object.
 type Text struct {
-	fontRef pdf.Name
-	layout  *font.Layout
+	layout *font.Layout
 }
 
 // NewText returns a new Text object.
 func NewText(F *font.Font, ptSize float64, text string) *Text {
 	layout := F.Typeset(text, ptSize)
 	return &Text{
-		fontRef: F.Name,
-		layout:  layout,
+		layout: layout,
 	}
 }
 
@@ -123,66 +121,7 @@ func (obj *Text) Extent() *BoxExtent {
 
 // Draw implements the Box interface.
 func (obj *Text) Draw(page *pages.Page, xPos, yPos float64) {
-	font := obj.layout.Font
-
-	page.Println("q")
-	page.Println("BT")
-	obj.fontRef.PDF(page)
-	fmt.Fprintf(page, " %f Tf\n", obj.layout.FontSize)
-	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
-
-	var run pdf.String
-	var data pdf.Array
-	flushRun := func() {
-		if len(run) > 0 {
-			data = append(data, run)
-			run = nil
-		}
-	}
-	flush := func() {
-		flushRun()
-		if len(data) == 0 {
-			return
-		}
-		if len(data) == 1 {
-			if s, ok := data[0].(pdf.String); ok {
-				s.PDF(page)
-				page.Println(" Tj")
-				data = nil
-				return
-			}
-		}
-		data.PDF(page)
-		page.Println(" TJ")
-		data = nil
-	}
-
-	xOffsAuto := 0
-	xOffs := 0
-	yOffs := 0
-	for _, glyph := range obj.layout.Glyphs {
-		if glyph.YOffset != yOffs {
-			flush()
-			yOffs = glyph.YOffset
-			page.Printf("%d Ts\n", yOffs)
-		}
-
-		xOffsWanted := xOffs + glyph.XOffset
-
-		if xOffsWanted != xOffsAuto {
-			// repositioning needed
-			flushRun()
-			data = append(data, -pdf.Integer(xOffsWanted-xOffsAuto))
-		}
-		run = append(run, font.Enc(glyph.Gid)...)
-
-		xOffs += glyph.Advance
-		xOffsAuto = xOffsWanted + font.Width[glyph.Gid]
-	}
-	flush()
-
-	page.Println("ET")
-	page.Println("Q")
+	obj.layout.Draw(page, xPos, yPos)
 }
 
 // Ship appends the box to the page tree as a new page.

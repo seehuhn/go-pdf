@@ -28,7 +28,6 @@ import (
 	"unicode"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -51,28 +50,6 @@ func (ccc *subset) Add(s string) {
 			ccc.chars[r] = true
 		}
 	}
-}
-
-func encodeString(font *font.Font, s string) pdf.String {
-	var res pdf.String
-	col := 0
-	for _, r := range s {
-		if r == '\t' {
-			for {
-				res = append(res, ' ')
-				col++
-				if col%tabWidth == 0 {
-					break
-				}
-			}
-			continue
-		}
-		idx := font.CMap[r]
-		c := font.Enc(idx)
-		res = append(res, c...)
-		col++
-	}
-	return res
 }
 
 func convert(inName, outName string) error {
@@ -141,13 +118,30 @@ func convert(inName, outName string) error {
 			page.Printf("72 %f Td\n", page.URy-72-10)
 		}
 
-		line := encodeString(F1, scanner.Text())
-		if len(line) > 0 {
-			_ = line.PDF(page)
-			fmt.Fprintln(page, " Tj T*")
+		line := scanner.Text()
+		var rr []rune
+		if strings.Contains(line, "\t") {
+			col := 0
+			for _, r := range line {
+				if r == '\t' {
+					for {
+						rr = append(rr, ' ')
+						col++
+						if col%tabWidth == 0 {
+							break
+						}
+					}
+				} else {
+					rr = append(rr, r)
+				}
+			}
 		} else {
-			fmt.Fprintln(page, "T*")
+			rr = []rune(line)
 		}
+		glyphs := F1.Layout(rr)
+		F1.DrawRaw(page, glyphs)
+
+		fmt.Fprintln(page, " T*")
 
 		pageLines++
 		if pageLines >= numLines {

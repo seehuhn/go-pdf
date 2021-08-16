@@ -17,9 +17,11 @@
 package font
 
 import (
+	"fmt"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/pages"
 )
 
 // Font represents a font embedded in the PDF file.
@@ -27,19 +29,71 @@ type Font struct {
 	Name pdf.Name
 	Ref  *pdf.Reference
 
-	CMap       map[rune]GlyphID
-	Substitute func(glyphs []Glyph) []Glyph
-	Layout     func(glyphs []Glyph)
-	Enc        func(GlyphID) pdf.String
+	Layout func([]rune) []Glyph
+	Enc    func(GlyphID) pdf.String
 
-	GlyphUnits int
-
+	GlyphUnits  int
 	GlyphExtent []Rect
-	Width       []int // TODO(voss): needed?
+	Width       []int
 
 	Ascent  float64 // Ascent in glyph coordinate units
 	Descent float64 // Descent in glyph coordinate units, as a negative number
 	LineGap float64 // TODO(voss): remove?
+}
+
+// DrawRaw emits PDF text mode commands to show the layout on the page.
+// This must be used between BT and ET, with the correct font already
+// set up.
+func (font *Font) DrawRaw(page *pages.Page, glyphs []Glyph) {
+	var run pdf.String
+	var data pdf.Array
+	flushRun := func() {
+		if len(run) > 0 {
+			data = append(data, run)
+			run = nil
+		}
+	}
+	flush := func() {
+		flushRun()
+		if len(data) == 0 {
+			return
+		}
+		if len(data) == 1 {
+			if s, ok := data[0].(pdf.String); ok {
+				s.PDF(page)
+				page.Println(" Tj")
+				data = nil
+				return
+			}
+		}
+		data.PDF(page)
+		page.Println(" TJ")
+		data = nil
+	}
+
+	xOffsAuto := 0
+	xOffs := 0
+	yOffs := 0
+	for _, glyph := range glyphs {
+		if glyph.YOffset != yOffs {
+			flush()
+			yOffs = glyph.YOffset
+			page.Printf("%d Ts\n", yOffs)
+		}
+
+		xOffsWanted := xOffs + glyph.XOffset
+
+		if xOffsWanted != xOffsAuto {
+
+			flushRun()
+			data = append(data, -pdf.Integer(xOffsWanted-xOffsAuto))
+		}
+		run = append(run, font.Enc(glyph.Gid)...)
+
+		xOffs += glyph.Advance
+		xOffsAuto = xOffsWanted + font.Width[glyph.Gid]
+	}
+	flush()
 }
 
 // GlyphID is used to enumerate the glyphs in a font.  The first glyph
@@ -57,13 +111,6 @@ func (rect *Rect) IsZero() bool {
 	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
 }
 
-// Layout contains the information needed to typeset a run of text.
-type Layout struct {
-	Font     *Font
-	FontSize float64
-	Glyphs   []Glyph
-}
-
 // Glyph contains layout information for a single glyph in a run
 type Glyph struct {
 	Gid     GlyphID
@@ -72,6 +119,10 @@ type Glyph struct {
 	YOffset int
 	Advance int
 }
+
+// GlyphPair represents two consecutive glyphs, specified by a pair of
+// character codes.  This is used for ligatures and kerning information.
+type GlyphPair [2]GlyphID
 
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
@@ -90,22 +141,10 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 		runs = append(runs, run)
 	}
 
-	// introduce ligatures, fix mark glyphs etc.
 	var glyphs []Glyph
 	for _, run := range runs {
-		pos := len(glyphs)
-		for _, r := range run {
-			g := Glyph{
-				Gid:   font.CMap[r],
-				Chars: []rune{r},
-			}
-			glyphs = append(glyphs, g)
-		}
-		glyphs = append(glyphs[:pos], font.Substitute(glyphs[pos:])...)
+		glyphs = append(glyphs, font.Layout(run)...)
 	}
-
-	// determine glyph positions, apply kerning etc.
-	font.Layout(glyphs)
 
 	return &Layout{
 		Font:     font,
@@ -114,6 +153,25 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	}
 }
 
-// GlyphPair represents two consecutive glyphs, specified by a pair of
-// character codes.  This is used for ligatures and kerning information.
-type GlyphPair [2]GlyphID
+// Layout contains the information needed to typeset a run of text.
+type Layout struct {
+	Font     *Font
+	FontSize float64
+	Glyphs   []Glyph
+}
+
+// Draw shows the text layout on a page.
+//
+// TODO(voss): This should probably not use pages.Page for the first argument.
+func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
+	page.Println("q")
+	page.Println("BT")
+	layout.Font.Name.PDF(page)
+	fmt.Fprintf(page, " %f Tf\n", layout.FontSize)
+	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
+
+	layout.Font.DrawRaw(page, layout.Glyphs)
+
+	page.Println("ET")
+	page.Println("Q")
+}

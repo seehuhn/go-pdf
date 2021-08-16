@@ -160,8 +160,17 @@ func (t3 *Builder) Close() (*font.Font, error) {
 	}
 
 	font := &font.Font{
-		Ref:  FontRef,
-		CMap: t3.cmap,
+		Ref: FontRef,
+		Layout: func(rr []rune) []font.Glyph {
+			glyphs := make([]font.Glyph, len(rr))
+			for i, r := range rr {
+				gid := t3.cmap[r]
+				glyphs[i].Chars = []rune{r}
+				glyphs[i].Gid = gid
+				glyphs[i].Advance = t3.glyphWidth[gid]
+			}
+			return glyphs
+		},
 		Enc: func(gid font.GlyphID) pdf.String {
 			if !t3.used[gid] {
 				return nil

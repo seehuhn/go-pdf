@@ -57,10 +57,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	}
 
 	// step 1: determine which glyphs to include
-	CMap, err := tt.SelectCmap()
-	if err != nil {
-		return nil, err
-	}
+	CMap := tt.Cmap
 	if subset != nil && !isSuperset(CMap, subset) {
 		var missing []rune
 		for r, ok := range subset {
@@ -87,7 +84,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	// TODO(voss): subset the font as needed
 	// TODO(voss): if len(glyphs) <= 256, write a Type 2 font.
 
-	err = w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
+	err := w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +108,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 			// the list of tables to include is from PDF 32000-1:2008, table 126
 			switch name {
 			case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
+				// TODO(voss): include "gasp"?
 				return true
 			default:
 				return false
@@ -364,7 +362,6 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	fontObj := &font.Font{
 		Name: pdf.Name(name),
 		Ref:  FontRef,
-		CMap: CMap,
 		Enc: func(gid font.GlyphID) pdf.String {
 			return pdf.String{byte(gid >> 8), byte(gid)}
 		},
@@ -384,28 +381,22 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
-	if gsub != nil {
-		fontObj.Substitute = gsub.ApplyAll
-	}
 
 	gpos, err := pars.ReadGposTable(loc)
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
-	if gpos != nil {
-		fontObj.Layout = func(glyphs []font.Glyph) {
-			for i, glyph := range glyphs {
-				glyphs[i].Advance = Width[glyph.Gid]
-			}
-			glyphs = gpos.ApplyAll(glyphs)
-		}
-	} else {
+
+	allLookups := append(gsub, gpos...)
+
+	var kernFn func(glyphs []font.Glyph)
+	if gpos == nil {
 		kerning, err := tt.ReadKernInfo()
 		if err != nil && !table.IsMissing(err) {
 			return nil, err
 		}
 		if kerning != nil {
-			fontObj.Layout = func(glyphs []font.Glyph) {
+			kernFn = func(glyphs []font.Glyph) {
 				for i, glyph := range glyphs {
 					glyphs[i].Advance = Width[glyph.Gid]
 					if i > 0 {
@@ -417,6 +408,19 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 				}
 			}
 		}
+	}
+
+	fontObj.Layout = func(rr []rune) []font.Glyph {
+		glyphs := make([]font.Glyph, len(rr))
+		for i, r := range rr {
+			glyphs[i].Chars = []rune{r}
+			glyphs[i].Gid = CMap[r]
+		}
+		allLookups.ApplyAll(glyphs)
+		if kernFn != nil {
+			kernFn(glyphs)
+		}
+		return glyphs
 	}
 
 	return fontObj, nil

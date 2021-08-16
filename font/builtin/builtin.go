@@ -45,7 +45,6 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 
 	builtin := &font.Font{
 		Name:       pdf.Name(ref),
-		CMap:       map[rune]font.GlyphID{},
 		GlyphUnits: 1000,
 	}
 
@@ -74,6 +73,8 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 	builtin.GlyphExtent = append(builtin.GlyphExtent, font.Rect{})
 	builtin.Width = append(builtin.Width, 250) // TODO(voss): what is the correct width?
 	cIdx++
+
+	cmap := make(map[rune]font.GlyphID)
 
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
@@ -136,7 +137,7 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 				subset[r] = true
 			}
 			if subset[r] {
-				builtin.CMap[r] = cIdx
+				cmap[r] = cIdx
 				nameToGlyph[name] = cIdx
 				runeToName[r] = name
 				if code > 0 {
@@ -319,48 +320,51 @@ func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font
 	// glyphToCode maps from character indices to bytes in a PDF string.
 	// TODO(voss): use a slice instead of a map?
 	glyphToCode := make(map[font.GlyphID]byte)
-	for r, cIdx := range builtin.CMap {
+	for r, cIdx := range cmap {
 		glyphToCode[cIdx] = bestRuneToCode[r]
 	}
 	builtin.Enc = func(gid font.GlyphID) pdf.String {
 		return pdf.String{glyphToCode[gid]}
 	}
 
-	builtin.Substitute = func(glyphs []font.Glyph) []font.Glyph {
-		if len(glyphs) == 0 {
+	builtin.Layout = func(rr []rune) []font.Glyph {
+		if len(rr) == 0 {
 			return nil
 		}
 
 		var res []font.Glyph
-		last := glyphs[0]
-		for _, glyph := range glyphs[1:] {
-			lig, ok := ligatures[font.GlyphPair{last.Gid, glyph.Gid}]
+		last := font.Glyph{
+			Chars: []rune{rr[0]},
+			Gid:   cmap[rr[0]],
+		}
+		for _, r := range rr[1:] {
+			gid := cmap[r]
+			lig, ok := ligatures[font.GlyphPair{last.Gid, gid}]
 			if ok {
-				last = font.Glyph{
-					Gid:   lig,
-					Chars: append(last.Chars, glyph.Chars...),
-				}
+				last.Gid = lig
+				last.Chars = append(last.Chars, r)
 			} else {
 				res = append(res, last)
-				last = glyph
+				last = font.Glyph{
+					Chars: []rune{r},
+					Gid:   gid,
+				}
 			}
 		}
 		res = append(res, last)
 
-		return res
-	}
-
-	builtin.Layout = func(glyphs []font.Glyph) {
-		for i, glyph := range glyphs {
+		for i, glyph := range res {
 			gid := glyph.Gid
 			kern := 0
-			if i < len(glyphs)-1 {
-				kern = kerning[font.GlyphPair{gid, glyphs[i+1].Gid}]
+			if i < len(res)-1 {
+				kern = kerning[font.GlyphPair{gid, res[i+1].Gid}]
 			}
 
-			glyphs[i].Gid = gid
-			glyphs[i].Advance = builtin.Width[gid] + kern
+			res[i].Gid = gid
+			res[i].Advance = builtin.Width[gid] + kern
 		}
+
+		return res
 	}
 
 	Font := pdf.Dict{

@@ -23,8 +23,6 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/parser"
-	"seehuhn.de/go/pdf/locale"
 )
 
 func tryFont(fname string) error {
@@ -35,38 +33,20 @@ func tryFont(fname string) error {
 	}
 	defer tt.Close()
 
-	if !tt.IsTrueType() || !tt.HasTables("GSUB") {
-		return nil
+	a := "..."
+	if tt.HasTables("glyf", "loca") {
+		a = "xxx"
+	}
+	b := "..."
+	if tt.HasTables("CFF ") {
+		b = "xxx"
+	}
+	c := "..."
+	if tt.HasTables("CFF2") {
+		c = "xxx"
 	}
 
-	p := parser.New(tt)
-	info, err := p.ReadGsubTable(locale.EnGB)
-	if err != nil {
-		return err
-	}
-
-	_ = info
-
-	// cmap, err := tt.SelectCmap()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// s := "a nai\u0308ve, affluent Ba\u0308r"
-	// var glyphs []font.GlyphID
-	// for _, r := range s {
-	// 	gid, ok := cmap[r]
-	// 	if !ok {
-	// 		return errors.New("missing glyph")
-	// 	}
-	// 	glyphs = append(glyphs, gid)
-	// }
-	// l1 := len(glyphs)
-
-	// glyphs = info.Substitute(glyphs)
-	// l2 := len(glyphs)
-
-	// fmt.Println(l1, l2)
+	fmt.Println(a, b, c)
 
 	return nil
 }

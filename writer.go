@@ -232,6 +232,8 @@ func (pdf *Writer) Close() error {
 // called.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
+//
+// TODO(voss): should this take an argument of type *Catalog instead?
 func (pdf *Writer) SetCatalog(cat Object) error {
 	if pdf.catalog != nil {
 		return errors.New("cannot set /Catalog twice")
@@ -254,11 +256,12 @@ func (pdf *Writer) SetCatalog(cat Object) error {
 // SetInfo sets the Document Information Dictionary for the file.  This can be
 // called at most once before the file is closed.  The argument `info` can
 // either be a Dict (which is then written to the file), or a *Reference
-// pointing to a Dict.  No changes can be made to the /Info dictionary after
-// SetInfo has been called.
+// pointing to a Dict.
 //
 // The Document Information Dictionary is documented in section
 // 14.3.3 of PDF 32000-1:2008.
+//
+// TODO(voss): should this take an argument of type *Info instead?
 func (pdf *Writer) SetInfo(info Object) error {
 	if pdf.info != nil {
 		return errors.New("cannot set /Info twice")
