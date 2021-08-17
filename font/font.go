@@ -32,13 +32,12 @@ type Font struct {
 	Layout func([]rune) []Glyph
 	Enc    func(GlyphID) pdf.String
 
-	GlyphUnits  int
-	GlyphExtent []Rect
-	Width       []int
+	GlyphUnits int
+	Ascent     float64 // Ascent in glyph coordinate units
+	Descent    float64 // Descent in glyph coordinate units, as a negative number
 
-	Ascent  float64 // Ascent in glyph coordinate units
-	Descent float64 // Descent in glyph coordinate units, as a negative number
-	LineGap float64 // TODO(voss): remove?
+	GlyphExtent []Rect // TODO(voss): needed?
+	Width       []int  // TODO(voss): needed?
 }
 
 // DrawRaw emits PDF text mode commands to show the layout on the page.

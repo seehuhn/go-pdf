@@ -89,7 +89,7 @@ func convert(inName, outName string) error {
 		log.Fatal(err)
 	}
 
-	F1, err := builtin.Embed(out, "F", "Courier", subset.chars)
+	F1, err := builtin.OldEmbed(out, "F", "Courier", subset.chars)
 	if err != nil {
 		return err
 	}

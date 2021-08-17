@@ -360,5 +360,3 @@ const (
 func JumpOffset(d int8) Command {
 	return Command(d)
 }
-
-var encodeBool = map[bool]int64{true: 1}

@@ -196,11 +196,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	courier, err = builtin.Embed(out, "C", "Courier", nil)
+	courier, err = builtin.OldEmbed(out, "C", "Courier", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	Italic, err := builtin.Embed(out, "I", "Times-Italic", nil)
+	Italic, err := builtin.OldEmbed(out, "I", "Times-Italic", nil)
 	if err != nil {
 		log.Fatal(err)
 	}

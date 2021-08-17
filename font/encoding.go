@@ -28,6 +28,8 @@ type Encoding interface {
 
 var (
 	// StandardEncoding is one of the PDF Latin-text encodings.
+	// It is normally only used for metadata, but not as a character
+	// encoding for glyphs in a font.
 	// See PDF 32000-1:2008, Table D.2
 	StandardEncoding = &tables{toStandard, fromStandard}
 

@@ -57,13 +57,13 @@ func TestFrame(t *testing.T) {
 	subset.Add(text2)
 	subset.Add("ﬁ")
 
-	F1, err := builtin.Embed(out, "F1", "Times-Roman", subset.chars)
+	F1, err := builtin.OldEmbed(out, "F1", "Times-Roman", subset.chars)
 	// F1, err := truetype.Embed(out, "F1", "../font/truetype/ttf/FreeSerif.ttf", subset.chars)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	F2, err := builtin.Embed(out, "F2", "Times-Italic", subset.chars)
+	F2, err := builtin.OldEmbed(out, "F2", "Times-Italic", subset.chars)
 	if err != nil {
 		t.Fatal(err)
 	}

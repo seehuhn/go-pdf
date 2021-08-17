@@ -159,7 +159,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 
 	Ascent := float64(hheaInfo.Ascent) * q
 	Descent := float64(hheaInfo.Descent) * q
-	LineGap := float64(hheaInfo.LineGap) * q
+	// LineGap := float64(hheaInfo.LineGap) * q
 
 	for i := 0; i < tt.NumGlyphs; i++ {
 		j := i % len(hmtx.HMetrics)
@@ -213,7 +213,7 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 			}
 			Ascent = ascent * q
 			Descent = descent * q
-			LineGap = float64(os2Info.V0MS.TypoLineGap) * q
+			// LineGap = float64(os2Info.V0MS.TypoLineGap) * q
 		}
 
 		if os2Info.V0.Version >= 4 {
@@ -370,7 +370,6 @@ func EmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) 
 		Width:       Width,
 		Ascent:      Ascent,
 		Descent:     Descent,
-		LineGap:     LineGap,
 	}
 
 	// TODO(voss): set the locale properly, somehow

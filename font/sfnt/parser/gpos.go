@@ -543,12 +543,3 @@ func (l *gpos6_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph,
 	_ = ok
 	panic("not implemented")
 }
-
-// Chained Contexts Positioning Format 3: Coverage-based Glyph Contexts
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#chained-contexts-positioning-format-3-coverage-based-glyph-contexts
-type gpos8_3 struct {
-}
-
-func (g *gTab) readGpos8_3(s *State, subtablePos int64) (*gpos8_3, error) {
-	panic("not implemented")
-}

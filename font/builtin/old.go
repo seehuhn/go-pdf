@@ -29,8 +29,8 @@ import (
 	"seehuhn.de/go/pdf/font/names"
 )
 
-// Embed returns a Font dictionary representing one of the builtin fonts.
-func Embed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font.Font, error) {
+// OldEmbed returns a Font dictionary representing one of the builtin fonts.
+func OldEmbed(w *pdf.Writer, ref string, fname string, subset map[rune]bool) (*font.Font, error) {
 	fd, err := afmData.Open("afm/" + fname + ".afm")
 	if err != nil {
 		return nil, err
