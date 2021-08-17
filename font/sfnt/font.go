@@ -125,6 +125,10 @@ func (tt *Font) IsOpenType() bool {
 	return false
 }
 
+func (tt *Font) IsVariable() bool {
+	return tt.HasTables("fvar")
+}
+
 // selectCmap chooses one of the sub-tables of the cmap table and reads the
 // font's character encoding from there.  If a full unicode mapping is found,
 // this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.

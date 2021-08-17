@@ -53,7 +53,7 @@ type Parser struct {
 	pos, used int
 	lastRead  int
 
-	scale float64
+	scale float64 // TODO(voss): store "design units" instead?
 
 	classDefCache map[int64]ClassDef
 }
