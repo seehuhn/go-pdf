@@ -44,10 +44,7 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = w.SetCatalog(Dict{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			w.SetCatalog(&Catalog{})
 
 			err = w.Close()
 			if err != nil {

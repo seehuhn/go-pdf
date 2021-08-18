@@ -137,13 +137,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = out.SetInfo(pdf.Dict{
-		"Title":  pdf.TextString("PDF Test Document"),
-		"Author": pdf.TextString("Jochen Voß"),
+	out.SetInfo(&pdf.Info{
+		Title:  "PDF Test Document",
+		Author: "Jochen Voß",
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	err = out.Close()
 	if err != nil {

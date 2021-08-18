@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestWriter(t *testing.T) {
@@ -37,14 +38,16 @@ func TestWriter(t *testing.T) {
 	}
 	encInfo1 := format(w.w.enc.ToDict())
 
-	author := TextString("Jochen Voß")
+	author := "Jochen Voß"
+	w.SetInfo(&Info{
+		Title:        "PDF Test Document",
+		Author:       author,
+		Subject:      "Testing",
+		Keywords:     "PDF, testing, Go",
+		CreationDate: time.Now(),
+	})
+
 	refs, err := w.WriteCompressed(nil,
-		Dict{
-			"Title":    TextString("PDF Test Document"),
-			"Author":   author,
-			"Subject":  TextString("Testing"),
-			"Keywords": TextString("PDF, testing, Go"),
-		},
 		Dict{
 			"Type":     Name("Font"),
 			"Subtype":  Name("Type1"),
@@ -54,11 +57,7 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.SetInfo(refs[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	font := refs[1]
+	font := refs[0]
 
 	stream, contentNode, err := w.OpenStream(Dict{}, nil, nil)
 	if err != nil {
@@ -107,13 +106,9 @@ ET
 		t.Fatal(err)
 	}
 
-	err = w.SetCatalog(Dict{
-		"Type":  Name("Catalog"),
-		"Pages": pagesRef,
+	w.SetCatalog(&Catalog{
+		Pages: pagesRef,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	err = w.Close()
 	if err != nil {
@@ -152,8 +147,8 @@ ET
 		t.Fatal(err)
 	}
 
-	if x := info["Author"].(String); !bytes.Equal(x, author) {
-		t.Error("wrong author " + x.AsTextString())
+	if x := info.Author; x != author {
+		t.Error("wrong author " + x)
 	}
 }
 
@@ -181,12 +176,7 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = w.SetCatalog(Dict{
-		"Type": Name("Catalog"),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	w.SetCatalog(&Catalog{})
 
 	err = length.Set(Integer(testVal))
 	if err != nil {

@@ -29,7 +29,8 @@ package locale
 //   codes defined by ISO 639. If this entry is absent,
 //   the language shall be considered to be unknown.
 
-// Language represents a RFC 3066 language subtag.
+// Language represents a RFC 3066 language subtag, as required by section
+// 14.9.2.2 of PDF 32000-1:2008 and described in
 // https://datatracker.ietf.org/doc/html/rfc3066
 type Language string
 

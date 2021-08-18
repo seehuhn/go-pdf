@@ -95,21 +95,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = out.SetInfo(pdf.Struct(&pdf.Info{
+	out.SetInfo(&pdf.Info{
 		Title:  "PDF Test Document",
 		Author: "Jochen Voß",
-	}))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = out.SetCatalog(pdf.Dict{
-		"Type":  pdf.Name("Catalog"),
-		"Pages": pagesRef,
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
+	out.SetCatalog(&pdf.Catalog{
+		Pages: pagesRef,
+	})
 
 	err = out.Close()
 	if err != nil {

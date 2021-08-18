@@ -80,14 +80,11 @@ func convert(inName, outName string) error {
 	}
 	defer out.Close()
 
-	err = out.SetInfo(pdf.Struct(&pdf.Info{
+	out.SetInfo(&pdf.Info{
 		Title:        inName,
 		Producer:     "seehuhn.de/go/pdf/demo/txt2pdf",
 		CreationDate: time.Now(),
-	}))
-	if err != nil {
-		log.Fatal(err)
-	}
+	})
 
 	F1, err := builtin.OldEmbed(out, "F", "Courier", subset.chars)
 	if err != nil {
@@ -139,7 +136,7 @@ func convert(inName, outName string) error {
 			rr = []rune(line)
 		}
 		glyphs := F1.Layout(rr)
-		F1.DrawRaw(page, glyphs)
+		F1.Draw(page, glyphs)
 
 		fmt.Fprintln(page, " T*")
 
@@ -170,12 +167,9 @@ func convert(inName, outName string) error {
 		return err
 	}
 
-	err = out.SetCatalog(pdf.Struct(&pdf.Catalog{
+	out.SetCatalog(&pdf.Catalog{
 		Pages: pagesRef,
-	}))
-	if err != nil {
-		return err
-	}
+	})
 
 	return nil
 }

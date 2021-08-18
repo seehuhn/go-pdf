@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -104,4 +105,14 @@ func TestStream(t *testing.T) {
 	if string(dataOut) != dataIn {
 		t.Errorf("wrong result:\n  %q\n  %q", dataIn, dataOut)
 	}
+}
+
+func format(x Object) string {
+	buf := &bytes.Buffer{}
+	if x == nil {
+		buf.WriteString("null")
+	} else {
+		_ = x.PDF(buf)
+	}
+	return buf.String()
 }

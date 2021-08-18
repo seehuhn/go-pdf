@@ -40,10 +40,10 @@ type Font struct {
 	Width       []int  // TODO(voss): needed?
 }
 
-// DrawRaw emits PDF text mode commands to show the layout on the page.
+// Draw emits PDF text mode commands to show the layout on the page.
 // This must be used between BT and ET, with the correct font already
 // set up.
-func (font *Font) DrawRaw(page *pages.Page, glyphs []Glyph) {
+func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 	var run pdf.String
 	var data pdf.Array
 	flushRun := func() {
@@ -169,7 +169,7 @@ func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 	fmt.Fprintf(page, " %f Tf\n", layout.FontSize)
 	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
 
-	layout.Font.DrawRaw(page, layout.Glyphs)
+	layout.Font.Draw(page, layout.Glyphs)
 
 	page.Println("ET")
 	page.Println("Q")

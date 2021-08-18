@@ -323,12 +323,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = out.SetCatalog(pdf.Struct(&pdf.Catalog{
+	out.SetCatalog(&pdf.Catalog{
 		Pages: pagesRef,
-	}))
-	if err != nil {
-		log.Fatal(err)
-	}
+	})
 
 	err = out.Close()
 	if err != nil {

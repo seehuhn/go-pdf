@@ -100,9 +100,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer out.Close()
+
 	w, err := pdf.NewWriter(out, &pdf.WriterOptions{
 		Version: r.Version,
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	catalog, err := r.GetCatalog()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,32 +119,24 @@ func main() {
 		r:     r,
 		w:     w,
 	}
+	catDict := pdf.Struct(catalog)
+	newCatDict := pdf.Dict{}
+	for key, val := range catDict {
+		obj, err := trans.Transfer(val)
+		if err != nil {
+			log.Fatal(err)
+		}
+		newCatDict[key] = obj
+	}
+	newCatDict.AsStruct(catalog, r.Resolve)
 
-	root, err := r.GetCatalog()
+	info, err := r.GetInfo()
 	if err != nil {
 		log.Fatal(err)
 	}
-	catalog, err := trans.Transfer(root)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = trans.w.SetCatalog(catalog)
-	if err != nil {
-		log.Fatal(err)
-	}
+	trans.w.SetInfo(info)
 
-	infoDict, err := r.GetInfo()
-	if err != nil {
-		log.Fatal(err)
-	}
-	info, err := trans.Transfer(infoDict)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = trans.w.SetInfo(info)
-	if err != nil {
-		log.Fatal(err)
-	}
+	trans.w.SetCatalog(catalog)
 
 	err = w.Close()
 	if err != nil {

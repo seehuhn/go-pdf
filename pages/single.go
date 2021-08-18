@@ -32,12 +32,9 @@ func SinglePage(w *pdf.Writer, attr *Attributes) (*Page, error) {
 		return nil, err
 	}
 
-	err = w.SetCatalog(pdf.Struct(&pdf.Catalog{
+	w.SetCatalog(&pdf.Catalog{
 		Pages: pages,
-	}))
-	if err != nil {
-		return nil, err
-	}
+	})
 
 	return tree.newPage(contentRef, mediaBox)
 }

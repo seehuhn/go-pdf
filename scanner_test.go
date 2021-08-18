@@ -345,13 +345,3 @@ func TestFuzzerFinds(t *testing.T) {
 		}
 	}
 }
-
-func format(x Object) string {
-	buf := &bytes.Buffer{}
-	if x == nil {
-		buf.WriteString("null")
-	} else {
-		_ = x.PDF(buf)
-	}
-	return buf.String()
-}

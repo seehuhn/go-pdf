@@ -34,13 +34,15 @@ type Writer struct {
 	// a new file.
 	Version Version
 
+	w               *posWriter
+	closeDownstream bool
+
 	id       [][]byte
-	w        *posWriter
 	xref     map[int]*xRefEntry
 	nextRef  int
 	inStream bool
-	catalog  *Reference
-	info     *Reference
+	catalog  *Catalog
+	info     *Info
 }
 
 // WriterOptions allows to influence the way a PDF file is generated.
@@ -66,7 +68,12 @@ func Create(name string) (*Writer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewWriter(fd, nil)
+	pdf, err := NewWriter(fd, nil)
+	if err != nil {
+		return nil, err
+	}
+	pdf.closeDownstream = true
+	return pdf, nil
 }
 
 // NewWriter prepares a PDF file for writing.
@@ -173,19 +180,27 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 }
 
 // Close closes the Writer, flushing any unwritten data to the underlying
-// io.Writer.  If the underlying io.Writer has a Close() method, this writer is
-// also closed.
+// io.Writer.  The SetCatalog method must be called before the file can be
+// closed.
 func (pdf *Writer) Close() error {
 	if pdf.catalog == nil {
 		return errors.New("missing /Catalog")
 	}
+	catRef, err := pdf.Write(Struct(pdf.catalog), nil)
+	if err != nil {
+		return err
+	}
 
 	xRefDict := Dict{
-		"Root": pdf.catalog,
+		"Root": catRef,
 		"Size": Integer(pdf.nextRef),
 	}
 	if pdf.info != nil {
-		xRefDict["Info"] = pdf.info
+		infoRef, err := pdf.Write(Struct(pdf.info), nil)
+		if err != nil {
+			return err
+		}
+		xRefDict["Info"] = infoRef
 	}
 	if len(pdf.id) == 2 {
 		xRefDict["ID"] = Array{String(pdf.id[0]), String(pdf.id[1])}
@@ -198,7 +213,6 @@ func (pdf *Writer) Close() error {
 	pdf.w.enc = nil
 
 	xRefPos := pdf.w.pos
-	var err error
 	if pdf.Version < V1_5 {
 		err = pdf.writeXRefTable(xRefDict)
 	} else {
@@ -218,67 +232,29 @@ func (pdf *Writer) Close() error {
 		return closer.Close()
 	}
 
-	// Since we couldn't close the writer, make sure we don't accidentally
-	// write beyond the end of file.
+	// Make sure we don't accidentally write beyond the end of file.
 	pdf.w = nil
 
 	return nil
 }
 
 // SetCatalog sets the Document Catalog for the file.  This must be called
-// exactly once before the file is closed.  The argument `cat` can either be a
-// Dict (which is then written to the file), or a *Reference pointing to a
-// Dict.  No changes can be made to the catalog after SetCatalog has been
-// called.
+// exactly once before the file is closed.  No changes can be made to the
+// catalog after SetCatalog has been called.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
-//
-// TODO(voss): should this take an argument of type *Catalog instead?
-func (pdf *Writer) SetCatalog(cat Object) error {
-	if pdf.catalog != nil {
-		return errors.New("cannot set /Catalog twice")
-	}
-	switch x := cat.(type) {
-	case *Reference:
-		pdf.catalog = x
-	case Dict:
-		ref, err := pdf.Write(x, nil)
-		if err != nil {
-			return err
-		}
-		pdf.catalog = ref
-	default:
-		return errors.New("/Catalog must be Dict or *Reference")
-	}
-	return nil
+func (pdf *Writer) SetCatalog(cat *Catalog) {
+	pdf.catalog = cat
 }
 
-// SetInfo sets the Document Information Dictionary for the file.  This can be
-// called at most once before the file is closed.  The argument `info` can
-// either be a Dict (which is then written to the file), or a *Reference
-// pointing to a Dict.
+// SetInfo sets the Document Information Dictionary for the file.  The writer
+// does not copy info, the struct should not be changed after SetInfo() has
+// been called.
 //
-// The Document Information Dictionary is documented in section
-// 14.3.3 of PDF 32000-1:2008.
-//
-// TODO(voss): should this take an argument of type *Info instead?
-func (pdf *Writer) SetInfo(info Object) error {
-	if pdf.info != nil {
-		return errors.New("cannot set /Info twice")
-	}
-	switch x := info.(type) {
-	case *Reference:
-		pdf.info = x
-	case Dict:
-		ref, err := pdf.Write(x, nil)
-		if err != nil {
-			return err
-		}
-		pdf.info = ref
-	default:
-		return errors.New("/Info must be Dict or *Reference")
-	}
-	return nil
+// The Document Information Dictionary is documented in section 14.3.3 of PDF
+// 32000-1:2008.
+func (pdf *Writer) SetInfo(info *Info) {
+	pdf.info = info
 }
 
 // Alloc allocates an object number for an indirect object.

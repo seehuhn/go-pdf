@@ -63,9 +63,13 @@ func main() {
 	var obj pdf.Object
 	switch {
 	case len(args) < 2 || args[1] == "catalog":
-		obj, err = r.GetCatalog()
+		var cat *pdf.Catalog
+		cat, err = r.GetCatalog()
+		obj = pdf.Struct(cat)
 	case args[1] == "info":
-		obj, err = r.GetInfo()
+		var info *pdf.Info
+		info, err = r.GetInfo()
+		obj = pdf.Struct(info)
 	default:
 		var number int
 		number, err = strconv.Atoi(args[1])

@@ -175,14 +175,32 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// GetCatalog returns the PDF GetCatalog dictionary for the file.
-func (r *Reader) GetCatalog() (Dict, error) {
-	return r.getDict(r.trailer["Root"])
+// GetCatalog returns the PDF Catalog for the file.
+func (r *Reader) GetCatalog() (*Catalog, error) {
+	infoDict, err := r.getDict(r.trailer["Root"])
+	if err != nil {
+		return nil, err
+	}
+	cat := &Catalog{}
+	err = infoDict.AsStruct(cat, r.Resolve)
+	if err != nil {
+		return nil, err
+	}
+	return cat, nil
 }
 
-// GetInfo returns the PDF Catalog dictionary for the file.
-func (r *Reader) GetInfo() (Dict, error) {
-	return r.getDict(r.trailer["Info"])
+// GetInfo returns the PDF Info dictionary for the file.
+func (r *Reader) GetInfo() (*Info, error) {
+	infoDict, err := r.getDict(r.trailer["Info"])
+	if err != nil {
+		return nil, err
+	}
+	info := &Info{}
+	err = infoDict.AsStruct(info, r.Resolve)
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 // ReadSequential returns the objects in a PDF file in the order they are
