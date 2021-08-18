@@ -143,14 +143,13 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 			}
 		}
 	}
+	// A simple font can only encode 255 different characters.
+	// If the user tries to use more characters, map some of them to the
+	// missing character glyph, using c=0.
+
 	b.enc[gid] = c
 	b.used[c] = true
-
-	if c == 0 {
-		// A simple font can only encode 255 different characters.
-		// If the user tries to use more characters, map some of them to the
-		// missing character glyph, using c=0.
-	} else {
+	if c != 0 {
 		for _, cand := range b.candidates {
 			if cand.enc.Decode(c) == r {
 				cand.hits++
