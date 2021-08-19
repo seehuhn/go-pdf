@@ -124,7 +124,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	} else {
 		label = "—"
 	}
-	lBox := boxes.NewText(courier, 8, label)
+	lBox := boxes.Text(courier, 8, label)
 	lBox.Draw(page,
 		xPos+(glyphBoxWidth-lBox.Extent().Width)/2,
 		yPos+theFont.Descent*q-6)
@@ -143,7 +143,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 			classLabel = "c" // Component glyph (part of single character, spacing glyph)
 		}
 		if classLabel != "" {
-			cBox := boxes.NewText(courier, 8, classLabel)
+			cBox := boxes.Text(courier, 8, classLabel)
 			page.Println("q")
 			page.Println("0.5 g")
 			cBox.Draw(page,
@@ -196,11 +196,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	courier, err = builtin.OldEmbed(out, "C", "Courier", nil)
+	courier, err = builtin.Embed(out, "C", "Courier")
 	if err != nil {
 		log.Fatal(err)
 	}
-	Italic, err := builtin.OldEmbed(out, "I", "Times-Italic", nil)
+	Italic, err := builtin.Embed(out, "I", "Times-Italic")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -220,19 +220,19 @@ func main() {
 	})
 
 	p := &boxes.Parameters{}
-	stretch := boxes.NewGlue(0, 1, 1, 1, 1)
+	stretch := boxes.Glue(0, 1, 1, 1, 1)
 
 	page := 1
 	var rowBoxes []boxes.Box
 	flush := func() {
 		rowBoxes = append(rowBoxes,
 			stretch,
-			boxes.NewHBoxTo(pages.A4.URx,
+			boxes.HBoxTo(pages.A4.URx,
 				stretch,
-				boxes.NewText(courier, 10, "- "+strconv.Itoa(page)+" -"),
+				boxes.Text(courier, 10, "- "+strconv.Itoa(page)+" -"),
 				stretch),
 			boxes.Kern(36))
-		box := p.NewVBoxTo(pages.A4.URy, rowBoxes...)
+		box := p.VBoxTo(pages.A4.URy, rowBoxes...)
 		err = boxes.Ship(pageTree, box)
 		if err != nil {
 			log.Fatal(err)
@@ -246,21 +246,21 @@ func main() {
 	p.BaseLineSkip = 13
 	rowBoxes = append(rowBoxes,
 		boxes.Kern(72),
-		boxes.NewHBox(
+		boxes.HBox(
 			boxes.Kern(72),
-			boxes.NewText(courier, 10, "input file: "),
-			boxes.NewText(courier, 10, fontFileName),
+			boxes.Text(courier, 10, "input file: "),
+			boxes.Text(courier, 10, fontFileName),
 		),
 		boxes.Kern(13),
-		boxes.NewHBox(
+		boxes.HBox(
 			boxes.Kern(72),
-			boxes.NewText(courier, 10, "number of glyphs: "),
-			boxes.NewText(courier, 10, strconv.Itoa(numGlyph)),
+			boxes.Text(courier, 10, "number of glyphs: "),
+			boxes.Text(courier, 10, strconv.Itoa(numGlyph)),
 		),
-		boxes.NewHBox(
+		boxes.HBox(
 			boxes.Kern(72),
-			boxes.NewText(courier, 10, "number of GSUB lookups: "),
-			boxes.NewText(courier, 10, strconv.Itoa(len(gsub))),
+			boxes.Text(courier, 10, "number of GSUB lookups: "),
+			boxes.Text(courier, 10, strconv.Itoa(len(gsub))),
 		),
 	)
 	flush()
@@ -278,15 +278,15 @@ func main() {
 			rowBoxes = append(rowBoxes, boxes.Kern(36))
 			headerBoxes := []boxes.Box{stretch, boxes.Kern(40)}
 			for i := 0; i < 10; i++ {
-				h := boxes.NewHBoxTo(glyphBoxWidth,
+				h := boxes.HBoxTo(glyphBoxWidth,
 					stretch,
-					boxes.NewText(courier, 10, strconv.Itoa(i)),
+					boxes.Text(courier, 10, strconv.Itoa(i)),
 					stretch)
 				headerBoxes = append(headerBoxes, h)
 			}
 			headerBoxes = append(headerBoxes, stretch)
 			rowBoxes = append(rowBoxes,
-				boxes.NewHBoxTo(pages.A4.URx, headerBoxes...))
+				boxes.HBoxTo(pages.A4.URx, headerBoxes...))
 			rowBoxes = append(rowBoxes, boxes.Kern(8))
 		}
 
@@ -295,10 +295,10 @@ func main() {
 		if label == "0" {
 			label = ""
 		}
-		h := boxes.NewHBoxTo(20,
+		h := boxes.HBoxTo(20,
 			stretch,
-			boxes.NewText(courier, 10, label),
-			boxes.NewText(Italic, 10, "x"),
+			boxes.Text(courier, 10, label),
+			boxes.Text(Italic, 10, "x"),
 		)
 		colBoxes = append(colBoxes, h, boxes.Kern(20), rules{})
 		for col := 0; col < 10; col++ {
@@ -311,7 +311,7 @@ func main() {
 		}
 		colBoxes = append(colBoxes, stretch)
 		rowBoxes = append(rowBoxes,
-			boxes.NewHBoxTo(pages.A4.URx, colBoxes...))
+			boxes.HBoxTo(pages.A4.URx, colBoxes...))
 
 		if row%16 == 15 || 10*(row+1) >= numGlyph {
 			flush()

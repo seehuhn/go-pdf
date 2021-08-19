@@ -43,6 +43,8 @@ type Writer struct {
 	inStream bool
 	catalog  *Catalog
 	info     *Info
+
+	onClose []func(*Writer) error
 }
 
 // WriterOptions allows to influence the way a PDF file is generated.
@@ -183,6 +185,13 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 // io.Writer.  The SetCatalog method must be called before the file can be
 // closed.
 func (pdf *Writer) Close() error {
+	for i := len(pdf.onClose) - 1; i >= 0; i-- {
+		err := pdf.onClose[i](pdf)
+		if err != nil {
+			return err
+		}
+	}
+
 	if pdf.catalog == nil {
 		return errors.New("missing /Catalog")
 	}
@@ -236,6 +245,13 @@ func (pdf *Writer) Close() error {
 	pdf.w = nil
 
 	return nil
+}
+
+// OnClose registers a callback function which is called before the writer is
+// closed.  Callbacks are executed in the reverse order, i.e. the last callback
+// registered is the first one to run.
+func (pdf *Writer) OnClose(callback func(*Writer) error) {
+	pdf.onClose = append(pdf.onClose, callback)
 }
 
 // SetCatalog sets the Document Catalog for the file.  This must be called

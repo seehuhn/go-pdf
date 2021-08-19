@@ -29,16 +29,32 @@ type VBox struct {
 	Contents []Box
 }
 
-// NewVBox creates a new VBox
-func (p *Parameters) NewVBox(children ...Box) *VBox {
+// VBox creates a new VBox, where the baseline coincides with the baseline of
+// the last child.
+func (p *Parameters) VBox(children ...Box) *VBox {
+	return p.vBoxInternal(false, children...)
+}
+
+// VTop creates a new VBox, where the baseline coincides with the baseline of
+// the first child.
+func (p *Parameters) VTop(children ...Box) *VBox {
+	return p.vBoxInternal(true, children...)
+}
+
+func (p *Parameters) vBoxInternal(top bool, children ...Box) *VBox {
 	vbox := &VBox{}
 	totalHeight := 0.0
+	firstHeight := 0.0
 	lastDepth := 0.0
 	first := true
 	for len(children) > 0 {
 		child := children[0]
 		children = children[1:]
 		ext := child.Extent()
+
+		if first {
+			firstHeight = ext.Height
+		}
 
 		if first || ext.WhiteSpaceOnly {
 			first = ext.WhiteSpaceOnly
@@ -59,13 +75,18 @@ func (p *Parameters) NewVBox(children ...Box) *VBox {
 
 		lastDepth = ext.Depth
 	}
-	vbox.Height = totalHeight - lastDepth
-	vbox.Depth = lastDepth
+	if top {
+		vbox.Height = firstHeight
+		vbox.Depth = totalHeight - firstHeight
+	} else {
+		vbox.Height = totalHeight - lastDepth
+		vbox.Depth = lastDepth
+	}
 	return vbox
 }
 
-// NewVBoxTo creates a new VBox with a given total height
-func (p *Parameters) NewVBoxTo(total float64, children ...Box) *VBox {
+// VBoxTo creates a new VBox with a given total height
+func (p *Parameters) VBoxTo(total float64, children ...Box) *VBox {
 	vbox := &VBox{}
 	lastDepth := 0.0
 	first := true

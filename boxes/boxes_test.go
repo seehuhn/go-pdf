@@ -18,30 +18,11 @@ package boxes
 
 import (
 	"testing"
-	"unicode"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
 )
-
-type subset struct {
-	chars map[rune]bool
-}
-
-func newSubset() *subset {
-	return &subset{
-		chars: make(map[rune]bool),
-	}
-}
-
-func (ccc *subset) Add(s string) {
-	for _, r := range s {
-		if unicode.IsGraphic(r) {
-			ccc.chars[r] = true
-		}
-	}
-}
 
 func TestFrame(t *testing.T) {
 	text1 := "Von Toffany's fish "
@@ -52,18 +33,13 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	subset := newSubset()
-	subset.Add(text1)
-	subset.Add(text2)
-	subset.Add("ﬁ")
-
-	F1, err := builtin.OldEmbed(out, "F1", "Times-Roman", subset.chars)
+	F1, err := builtin.Embed(out, "F1", "Times-Roman")
 	// F1, err := truetype.Embed(out, "F1", "../font/truetype/ttf/FreeSerif.ttf", subset.chars)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	F2, err := builtin.OldEmbed(out, "F2", "Times-Italic", subset.chars)
+	F2, err := builtin.Embed(out, "F2", "Times-Italic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,13 +76,13 @@ func TestFrame(t *testing.T) {
 				},
 				Contents: []Box{
 					Kern(36),
-					&Text{
+					&TextBox{
 						layout: layout1,
 					},
-					&Text{
+					&TextBox{
 						layout: layout2,
 					},
-					&Rule{
+					&RuleBox{
 						BoxExtent: BoxExtent{
 							Width:  30,
 							Height: 8,
@@ -134,7 +110,7 @@ func TestFrame(t *testing.T) {
 						Length: 0,
 						Plus:   stretchAmount{1, 1},
 					},
-					&Rule{
+					&RuleBox{
 						BoxExtent: BoxExtent{
 							Width:  20,
 							Height: 8,
@@ -165,8 +141,8 @@ func TestFrame(t *testing.T) {
 }
 
 // compile-time test: we implement the correct interfaces
-var _ Box = &Rule{}
+var _ Box = &RuleBox{}
 var _ Box = &VBox{}
 var _ Box = Kern(0)
 var _ Box = &glue{}
-var _ Box = &Text{}
+var _ Box = &TextBox{}

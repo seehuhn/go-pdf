@@ -47,13 +47,25 @@ func (obj BoxExtent) Extent() *BoxExtent {
 	return &obj
 }
 
-// A Rule is a solidly filled rectangular region on the page.
-type Rule struct {
+// A RuleBox is a solidly filled rectangular region on the page.
+type RuleBox struct {
 	BoxExtent
 }
 
+// Rule returns a new rule box (a box filled solid black).
+func Rule(width, height, depth float64) Box {
+	return &RuleBox{
+		BoxExtent: BoxExtent{
+			Width:          width,
+			Height:         height,
+			Depth:          depth,
+			WhiteSpaceOnly: false,
+		},
+	}
+}
+
 // Draw implements the Box interface.
-func (obj *Rule) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj *RuleBox) Draw(page *pages.Page, xPos, yPos float64) {
 	if obj.Width > 0 && obj.Depth+obj.Height > 0 {
 		fmt.Fprintf(page, "%f %f %f %f re f\n",
 			xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
@@ -75,21 +87,21 @@ func (obj Kern) Extent() *BoxExtent {
 // Draw implements the Box interface.
 func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
 
-// Text represents a typeset string of characters as a Box object.
-type Text struct {
+// TextBox represents a typeset string of characters as a Box object.
+type TextBox struct {
 	layout *font.Layout
 }
 
-// NewText returns a new Text object.
-func NewText(F *font.Font, ptSize float64, text string) *Text {
+// Text returns a new Text object.
+func Text(F *font.Font, ptSize float64, text string) *TextBox {
 	layout := F.Typeset(text, ptSize)
-	return &Text{
+	return &TextBox{
 		layout: layout,
 	}
 }
 
 // Extent implements the Box interface
-func (obj *Text) Extent() *BoxExtent {
+func (obj *TextBox) Extent() *BoxExtent {
 	font := obj.layout.Font
 	q := obj.layout.FontSize / float64(font.GlyphUnits)
 
@@ -120,7 +132,7 @@ func (obj *Text) Extent() *BoxExtent {
 }
 
 // Draw implements the Box interface.
-func (obj *Text) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj *TextBox) Draw(page *pages.Page, xPos, yPos float64) {
 	obj.layout.Draw(page, xPos, yPos)
 }
 

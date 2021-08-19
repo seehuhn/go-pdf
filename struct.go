@@ -214,7 +214,7 @@ fieldLoop:
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 type Catalog struct {
 	_                 struct{} `pdf:"Type=Catalog"`
-	Version           Name     `pdf:"optional,allowstring"`
+	Version           Name     `pdf:"optional,allowstring"` // TODO(voss): use pdf.Version
 	Extensions        Object   `pdf:"optional"`
 	Pages             *Reference
 	PageLabels        Object     `pdf:"optional"`

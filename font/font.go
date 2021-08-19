@@ -29,7 +29,7 @@ type Font struct {
 	Name pdf.Name
 	Ref  *pdf.Reference
 
-	Layout func([]rune) []Glyph
+	Layout func([]rune) []Glyph // TODO(voss): split this into cmap+layout
 	Enc    func(GlyphID) pdf.String
 
 	GlyphUnits int

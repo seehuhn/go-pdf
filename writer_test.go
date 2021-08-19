@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -149,6 +150,48 @@ ET
 
 	if x := info.Author; x != author {
 		t.Error("wrong author " + x)
+	}
+}
+
+func TestOnClose(t *testing.T) {
+	buf := &bytes.Buffer{}
+	pdf, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var first, second, third bool
+	myErr := errors.New("test error")
+	pdf.OnClose(func(w *Writer) error {
+		if !second || !third {
+			t.Error("wrong order")
+		}
+		first = true
+		return myErr
+	})
+	pdf.OnClose(func(w *Writer) error {
+		if first || !third {
+			t.Error("wrong order")
+		}
+		second = true
+		return nil
+	})
+	pdf.OnClose(func(w *Writer) error {
+		if first || second {
+			t.Error("wrong order")
+		}
+		third = true
+		return nil
+	})
+
+	pdf.SetCatalog(&Catalog{})
+	err = pdf.Close()
+	if err != myErr {
+		t.Error("callback error not detected")
+	}
+
+	if !(first && second && third) {
+		t.Error("callbacks not run")
 	}
 }
 

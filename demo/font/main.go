@@ -95,7 +95,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	page.Println("s")
 	page.Println("Q")
 
-	box := boxes.NewText(F1, fontSize, text)
+	box := boxes.Text(F1, fontSize, text)
 	box.Draw(page, margin, yPos-baseLineSkip)
 
 	xPos = margin

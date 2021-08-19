@@ -23,34 +23,58 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/names"
 )
 
 //go:embed afm/*.afm
 var afmData embed.FS
 
-type afmFont struct {
+// AfmInfo represent the font metrics and built-in character encoding
+// of an Adobe Type 1 font.
+type AfmInfo struct {
 	FontName string
-	Ascent   float64
-	Descent  float64
+
+	IsFixedPitch bool
+	IsDingbats   bool
+
+	Ascent    float64
+	Descent   float64
+	CapHeight float64
+	XHeight   float64
 
 	Code        []byte
 	GlyphExtent []font.Rect
 	Width       []int
-	Chars       []rune
+	Name        []string
 
 	Ligatures map[font.GlyphPair]font.GlyphID
 	Kern      map[font.GlyphPair]int
 }
 
-func readAfmFont(fname string) (*afmFont, error) {
-	fd, err := afmData.Open("afm/" + fname + ".afm")
+// ReadAfm reads the font metrics for one of the built-in pdf fonts.
+// FontName must be one of the following:
+//
+//     Courier
+//     Courier-Bold
+//     Courier-BoldOblique
+//     Courier-Oblique
+//     Helvetica
+//     Helvetica-Bold
+//     Helvetica-BoldOblique
+//     Helvetica-Oblique
+//     Times-Roman
+//     Times-Bold
+//     Times-BoldItalic
+//     Times-Italic
+//     Symbol
+//     ZapfDingbats
+func ReadAfm(fontName string) (*AfmInfo, error) {
+	fd, err := afmData.Open("afm/" + fontName + ".afm")
 	if err != nil {
 		return nil, err
 	}
 	defer fd.Close()
 
-	res := &afmFont{}
+	res := &AfmInfo{}
 
 	type ligInfo struct {
 		first, second, combined string
@@ -69,11 +93,11 @@ func readAfmFont(fname string) (*afmFont, error) {
 	res.Code = append(res.Code, 0)
 	res.Width = append(res.Width, 250) // TODO(voss): what is the correct width?
 	res.GlyphExtent = append(res.GlyphExtent, font.Rect{})
-	res.Chars = append(res.Chars, 0)
+	res.Name = append(res.Name, ".notdef")
 
 	charMetrics := false
 	kernPairs := false
-	dingbats := fname == "ZapfDingbats"
+	res.IsDingbats = fontName == "ZapfDingbats"
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -107,7 +131,7 @@ func readAfmFont(fname string) (*afmFont, error) {
 					name = ff[1]
 				case "B":
 					if len(ff) != 5 {
-						panic("corrupted afm data for " + fname)
+						panic("corrupted afm data for " + fontName)
 					}
 					BBox.LLx, _ = strconv.Atoi(ff[1])
 					BBox.LLy, _ = strconv.Atoi(ff[2])
@@ -115,7 +139,7 @@ func readAfmFont(fname string) (*afmFont, error) {
 					BBox.URy, _ = strconv.Atoi(ff[4])
 				case "L":
 					if len(ff) != 3 {
-						panic("corrupted afm data for " + fname)
+						panic("corrupted afm data for " + fontName)
 					}
 					ligTmp = append(ligTmp, &ligInfo{
 						second:   ff[1],
@@ -126,18 +150,12 @@ func readAfmFont(fname string) (*afmFont, error) {
 				}
 			}
 
-			rr := names.ToUnicode(name, dingbats)
-			if len(rr) != 1 {
-				panic("not implemented")
-			}
-			r := rr[0]
-
 			nameToGid[name] = font.GlyphID(len(res.Code))
 
 			res.Code = append(res.Code, byte(code))
 			res.Width = append(res.Width, width)
 			res.GlyphExtent = append(res.GlyphExtent, BBox)
-			res.Chars = append(res.Chars, r)
+			res.Name = append(res.Name, name)
 
 			for _, lig := range ligTmp {
 				lig.first = name
@@ -176,45 +194,45 @@ func readAfmFont(fname string) (*afmFont, error) {
 			}
 		case "FontName":
 			res.FontName = fields[1]
+		case "IsFixedPitch":
+			res.IsFixedPitch = fields[1] == "true"
 		case "CapHeight":
-			// x, err := strconv.ParseFloat(fields[1], 64)
-			// if err != nil {
-			// 	panic("corrupted afm data for " + fname)
-			// }
-			// builtin.CapHeight = x
+			x, err := strconv.ParseFloat(fields[1], 64)
+			if err != nil {
+				panic("corrupted afm data for " + fontName)
+			}
+			res.CapHeight = x
 		case "XHeight":
-			// x, err := strconv.ParseFloat(fields[1], 64)
-			// if err != nil {
-			// 	panic("corrupted afm data for " + fname)
-			// }
-			// builtin.XHeight = x
+			x, err := strconv.ParseFloat(fields[1], 64)
+			if err != nil {
+				panic("corrupted afm data for " + fontName)
+			}
+			res.XHeight = x
 		case "Ascender":
 			x, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
-				panic("corrupted afm data for " + fname)
+				panic("corrupted afm data for " + fontName)
 			}
 			res.Ascent = x
 		case "Descender":
 			x, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
-				panic("corrupted afm data for " + fname)
+				panic("corrupted afm data for " + fontName)
 			}
 			res.Descent = x
-		case "CharWidth":
-			panic("not implemented")
+		// case "CharWidth":
+		// 	panic("not implemented")
 		case "StartCharMetrics":
 			charMetrics = true
 		case "StartKernPairs":
 			kernPairs = true
-		case "StartTrackKern":
-			panic("not implemented")
+			// case "StartTrackKern":
+			// 	panic("not implemented")
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		panic("corrupted afm data for " + fname)
+		panic("corrupted afm data for " + fontName)
 	}
-
-	// TODO(voss): only use kerning/ligatures for proportional fonts
 
 	res.Ligatures = make(map[font.GlyphPair]font.GlyphID)
 	for _, lig := range nameLigs {

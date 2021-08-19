@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strings"
@@ -61,19 +60,6 @@ func convert(inName, outName string) error {
 	}
 	defer in.Close()
 
-	subset := newSubset()
-	scanner := bufio.NewScanner(in)
-	for scanner.Scan() {
-		subset.Add(scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	_, err = in.Seek(0, io.SeekStart)
-	if err != nil {
-		return err
-	}
-
 	out, err := pdf.Create(outName)
 	if err != nil {
 		return err
@@ -86,7 +72,7 @@ func convert(inName, outName string) error {
 		CreationDate: time.Now(),
 	})
 
-	F1, err := builtin.OldEmbed(out, "F", "Courier", subset.chars)
+	F1, err := builtin.Embed(out, "F", "Courier")
 	if err != nil {
 		return err
 	}
@@ -102,7 +88,7 @@ func convert(inName, outName string) error {
 	numLines := int((pages.A4.URy - 144) / 12)
 	pageLines := 0
 
-	scanner = bufio.NewScanner(in)
+	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
 		if page == nil {
 			page, err = pageTree.AddPage(nil)

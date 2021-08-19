@@ -5,12 +5,12 @@ import (
 )
 
 func TestEnc(t *testing.T) {
-	afm, err := readAfmFont("Times-Roman")
+	afm, err := ReadAfm("Times-Roman")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	b := newBuiltin(afm, nil)
+	b := newBuiltin(afm, nil, "F")
 
 	glyphs := b.Layout([]rune("½×A×ﬁ"))
 	if len(glyphs) != 5 {

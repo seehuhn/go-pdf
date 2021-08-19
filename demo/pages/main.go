@@ -63,6 +63,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// TODO(voss): convert this to a newer system
 	font, err := out.Write(pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
@@ -84,7 +85,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = pageTree.Ship(page, nil)
+		err = pageTree.Ship(page, nil) // Use AddPage() instead
 		if err != nil {
 			log.Fatal(err)
 		}

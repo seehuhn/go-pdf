@@ -29,8 +29,8 @@ type hBox struct {
 	Contents []Box
 }
 
-// NewHBox creates a new HBox
-func NewHBox(children ...Box) Box {
+// HBox creates a new HBox
+func HBox(children ...Box) Box {
 	hbox := &hBox{
 		BoxExtent: BoxExtent{
 			Height: math.Inf(-1),
@@ -51,8 +51,8 @@ func NewHBox(children ...Box) Box {
 	return hbox
 }
 
-// NewHBoxTo creates a new HBox with the given width
-func NewHBoxTo(total float64, boxes ...Box) Box {
+// HBoxTo creates a new HBox with the given width
+func HBoxTo(total float64, boxes ...Box) Box {
 	hbox := &hBox{
 		BoxExtent: BoxExtent{
 			Width:  total,

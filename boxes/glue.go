@@ -37,9 +37,9 @@ type glue struct {
 	Minus  stretchAmount
 }
 
-// NewGlue returns a new "glue" box with the given natural length and
+// Glue returns a new "glue" box with the given natural length and
 // stretchability.
-func NewGlue(length float64, plus float64, plusLevel int, minus float64, minusLevel int) Box {
+func Glue(length float64, plus float64, plusLevel int, minus float64, minusLevel int) Box {
 	return &glue{
 		Length: length,
 		Plus:   stretchAmount{plus, plusLevel},
