@@ -1,7 +1,9 @@
 package builtin
 
 import (
+	"fmt"
 	"sort"
+	"unicode"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -57,6 +59,7 @@ type builtin struct {
 	enc        map[font.GlyphID]byte
 	used       map[byte]bool
 	candidates []*candidate
+	overflow   bool
 }
 
 func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, name string) *builtin {
@@ -67,16 +70,15 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, name string) *builtin {
 		From: make([]rune, 256),
 	}
 	for gid, code := range afm.Code {
-		if code == 0 {
-			continue
-		}
-
 		rr := names.ToUnicode(afm.Name[gid], afm.IsDingbats)
-		if len(rr) != 1 {
-			// invalid character name
-			continue
+
+		var r rune
+		if len(rr) == 1 {
+			r = rr[0]
+		} else {
+			// ".notdef" and invalid names give len(rr) == 0.
+			r = unicode.ReplacementChar
 		}
-		r := rr[0]
 
 		cmap[r] = font.GlyphID(gid)
 		char[gid] = r
@@ -171,8 +173,8 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 	}
 
 	r := b.char[gid]
-	c = 0
 	hits := -1
+	found := false
 	for _, cand := range b.candidates {
 		if cand.hits < hits {
 			continue
@@ -181,19 +183,26 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 		if ok && !b.used[cCand] {
 			c = cCand
 			hits = cand.hits
+			found = true
 		}
 	}
-	if c == 0 && len(b.used) < 256 {
-		for c = 255; c > 0; c-- {
+	if !found && len(b.used) < 256 {
+		for i := 255; i >= 0; i-- {
+			c = byte(i)
 			if !b.used[c] {
+				found = true
 				break
 			}
 		}
 	}
+	fmt.Println(b.afm.Name[gid], b.name, c, found)
 
-	// A simple font can only encode 256 different characters. If we run out of
-	// character codes, just keep c==0 here and report an error when we try to
-	// write the font dictionary.
+	if !found {
+		// A simple font can only encode 256 different characters. If we run out of
+		// character codes, just keep c==0 here and report an error when we try to
+		// write the font dictionary.
+		b.overflow = true
+	}
 
 	b.enc[gid] = c
 	b.used[c] = true
@@ -227,9 +236,6 @@ func (b *builtin) DescribeEncoding() pdf.Object {
 	}
 	var diff []D
 	for gid, code := range b.enc {
-		if gid == 0 {
-			continue
-		}
 		r := b.char[gid]
 		if best.enc.Decode(code) != r {
 			diff = append(diff, D{
@@ -247,7 +253,7 @@ func (b *builtin) DescribeEncoding() pdf.Object {
 	sort.Slice(diff, func(i, j int) bool {
 		return diff[i].code < diff[j].code
 	})
-	next := byte(0)
+	next := byte(255)
 	for _, d := range diff {
 		if d.code != next {
 			Differences = append(Differences, pdf.Integer(d.code))
