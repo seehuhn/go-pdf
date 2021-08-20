@@ -25,9 +25,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-//go:embed afm/*.afm
-var afmData embed.FS
-
 // AfmInfo represent the font metrics and built-in character encoding
 // of an Adobe Type 1 font.
 type AfmInfo struct {
@@ -41,7 +38,7 @@ type AfmInfo struct {
 	CapHeight float64
 	XHeight   float64
 
-	Code        []byte
+	Code        []int16 // code byte, or -1 if unmapped
 	GlyphExtent []font.Rect
 	Width       []int
 	Name        []string
@@ -50,7 +47,7 @@ type AfmInfo struct {
 	Kern      map[font.GlyphPair]int
 }
 
-// ReadAfm reads the font metrics for one of the built-in pdf fonts.
+// Afm returns the font metrics for one of the built-in pdf fonts.
 // FontName must be one of the following:
 //
 //     Courier
@@ -67,7 +64,7 @@ type AfmInfo struct {
 //     Times-Italic
 //     Symbol
 //     ZapfDingbats
-func ReadAfm(fontName string) (*AfmInfo, error) {
+func Afm(fontName string) (*AfmInfo, error) {
 	fd, err := afmData.Open("afm/" + fontName + ".afm")
 	if err != nil {
 		return nil, err
@@ -89,22 +86,12 @@ func ReadAfm(fontName string) (*AfmInfo, error) {
 
 	nameToGid := make(map[string]font.GlyphID)
 
-	// prepend an artificial entry for .notdef, so that CMap works
-	res.Code = append(res.Code, 0)
-	res.Width = append(res.Width, 250) // TODO(voss): what is the correct width?
-	res.GlyphExtent = append(res.GlyphExtent, font.Rect{})
-	res.Name = append(res.Name, ".notdef")
-
 	charMetrics := false
 	kernPairs := false
 	res.IsDingbats = fontName == "ZapfDingbats"
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if len(line) == 0 {
-			continue
-		}
-
 		if strings.HasPrefix(line, "EndCharMetrics") {
 			charMetrics = false
 			continue
@@ -130,29 +117,21 @@ func ReadAfm(fontName string) (*AfmInfo, error) {
 				case "N":
 					name = ff[1]
 				case "B":
-					if len(ff) != 5 {
-						panic("corrupted afm data for " + fontName)
-					}
 					BBox.LLx, _ = strconv.Atoi(ff[1])
 					BBox.LLy, _ = strconv.Atoi(ff[2])
 					BBox.URx, _ = strconv.Atoi(ff[3])
 					BBox.URy, _ = strconv.Atoi(ff[4])
 				case "L":
-					if len(ff) != 3 {
-						panic("corrupted afm data for " + fontName)
-					}
 					ligTmp = append(ligTmp, &ligInfo{
 						second:   ff[1],
 						combined: ff[2],
 					})
-				default:
-					panic(ff[0] + " not implemented")
 				}
 			}
 
 			nameToGid[name] = font.GlyphID(len(res.Code))
 
-			res.Code = append(res.Code, byte(code))
+			res.Code = append(res.Code, int16(code))
 			res.Width = append(res.Width, width)
 			res.GlyphExtent = append(res.GlyphExtent, BBox)
 			res.Name = append(res.Name, name)
@@ -172,9 +151,6 @@ func ReadAfm(fontName string) (*AfmInfo, error) {
 			continue
 		}
 		if kernPairs {
-			if len(fields) != 4 || fields[0] != "KPX" {
-				panic("unsupported KernPair " + line)
-			}
 			kern := &kernInfo{
 				first:  fields[1],
 				second: fields[2],
@@ -188,46 +164,26 @@ func ReadAfm(fontName string) (*AfmInfo, error) {
 			continue
 		}
 		switch fields[0] {
-		case "MetricsSets":
-			if fields[1] != "0" {
-				panic("unsupported writing direction")
-			}
 		case "FontName":
 			res.FontName = fields[1]
 		case "IsFixedPitch":
 			res.IsFixedPitch = fields[1] == "true"
 		case "CapHeight":
-			x, err := strconv.ParseFloat(fields[1], 64)
-			if err != nil {
-				panic("corrupted afm data for " + fontName)
-			}
+			x, _ := strconv.ParseFloat(fields[1], 64)
 			res.CapHeight = x
 		case "XHeight":
-			x, err := strconv.ParseFloat(fields[1], 64)
-			if err != nil {
-				panic("corrupted afm data for " + fontName)
-			}
+			x, _ := strconv.ParseFloat(fields[1], 64)
 			res.XHeight = x
 		case "Ascender":
-			x, err := strconv.ParseFloat(fields[1], 64)
-			if err != nil {
-				panic("corrupted afm data for " + fontName)
-			}
+			x, _ := strconv.ParseFloat(fields[1], 64)
 			res.Ascent = x
 		case "Descender":
-			x, err := strconv.ParseFloat(fields[1], 64)
-			if err != nil {
-				panic("corrupted afm data for " + fontName)
-			}
+			x, _ := strconv.ParseFloat(fields[1], 64)
 			res.Descent = x
-		// case "CharWidth":
-		// 	panic("not implemented")
 		case "StartCharMetrics":
 			charMetrics = true
 		case "StartKernPairs":
 			kernPairs = true
-			// case "StartTrackKern":
-			// 	panic("not implemented")
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -255,3 +211,25 @@ func ReadAfm(fontName string) (*AfmInfo, error) {
 
 	return res, nil
 }
+
+// FontNames lists the names of the 14 built-in PDF fonts.
+// These are the valid arguments for the Afm() function.
+var FontNames = []string{
+	"Courier",
+	"Courier-Bold",
+	"Courier-BoldOblique",
+	"Courier-Oblique",
+	"Helvetica",
+	"Helvetica-Bold",
+	"Helvetica-BoldOblique",
+	"Helvetica-Oblique",
+	"Times-Roman",
+	"Times-Bold",
+	"Times-BoldItalic",
+	"Times-Italic",
+	"Symbol",
+	"ZapfDingbats",
+}
+
+//go:embed afm/*.afm
+var afmData embed.FS

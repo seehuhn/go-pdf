@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"unicode"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/table"
@@ -85,6 +86,7 @@ func Open(fname string) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
+	tt.Cmap[unicode.ReplacementChar] = 0
 
 	return tt, nil
 }
@@ -125,6 +127,7 @@ func (tt *Font) IsOpenType() bool {
 	return false
 }
 
+// IsVariable checks whether the font is a "variable font".
 func (tt *Font) IsVariable() bool {
 	return tt.HasTables("fvar")
 }

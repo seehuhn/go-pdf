@@ -27,7 +27,7 @@ import (
 
 // ToUnicode maps a Type1 Glyph name to a sequence of unicode characters.
 // This implements the algorithm documented at
-// https://github.com/adobe-type-tools/agl-specification
+// https://github.com/adobe-type-tools/agl-specification .
 func ToUnicode(name string, dingbats bool) []rune {
 	var res []rune
 
@@ -108,6 +108,7 @@ func ToUnicode(name string, dingbats bool) []rune {
 	return res
 }
 
+// FromUnicode find the PostScript glyph name for a unicode character.
 func FromUnicode(r rune) string {
 	return glyph.encode(r)
 }

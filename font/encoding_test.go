@@ -24,10 +24,20 @@ import (
 func TestBuiltinEncodings(t *testing.T) {
 	encodings := []Encoding{
 		StandardEncoding,
-		MacRomanEncoding,
 		WinAnsiEncoding,
+		MacRomanEncoding,
+		MacExpertEncoding,
 	}
 	for i, enc := range encodings {
+		r := enc.Decode(0)
+		if r != unicode.ReplacementChar {
+			t.Error("wrong mapping for character code 0")
+		}
+		_, ok := enc.Encode(unicode.ReplacementChar)
+		if ok {
+			t.Error("wrong mapping for unicode.ReplacementChar")
+		}
+
 		for j := 0; j < 256; j++ {
 			c := byte(j)
 

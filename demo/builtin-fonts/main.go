@@ -13,154 +13,274 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-const title = "The 14 Built-in PDF Fonts"
+const documentTitle = "The 14 Built-in PDF Fonts"
+const pageHeight = 62
 
-func main() {
-	targetName := "Times-Roman" // "ZapfDingbats"
-	targetAfm, err := builtin.ReadAfm(targetName)
+type fontTables struct {
+	w           *pdf.Writer
+	tree        *pages.PageTree
+	paperHeight float64
+	paperWidth  float64
+	textWidth   float64
+
+	bodyFont  *font.Font
+	titleFont *font.Font
+
+	pageNo int
+	fontNo int
+
+	content   []boxes.Box
+	fonts     []*font.Font
+	available int
+}
+
+func (f *fontTables) GetGlyphRows(fontName string) ([]boxes.Box, error) {
+	targetAfm, err := builtin.Afm(fontName)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	nGlyph := len(targetAfm.Code)
-	fmt.Println(nGlyph)
 
-	w, err := pdf.Create("builtin.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pageFonts := pdf.Dict{}
-	resources := pdf.Dict{
-		"Font": pageFonts,
-	}
-
-	titleFont, err := builtin.Embed(w, "B", "Times-Bold")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pageFonts[titleFont.Name] = titleFont.Ref
-	labelFont, err := builtin.Embed(w, "F", "Times-Roman")
-	if err != nil {
-		log.Fatal(err)
-	}
-	pageFonts[labelFont.Name] = labelFont.Ref
-
-	nFont := (nGlyph + 255) / 256
+	nFont := (nGlyph + 255) / 256 // at most 256 glyphs per font
 	tf := make([]*font.Font, nFont)
 	for i := 0; i < nFont; i++ {
-		name := fmt.Sprintf("T%d", i)
-		targetFont, err := builtin.EmbedAfm(w, name, targetAfm)
+		name := fmt.Sprintf("T%d", f.fontNo)
+		f.fontNo++
+		targetFont, err := builtin.EmbedAfm(f.w, name, targetAfm)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
-		pageFonts[targetFont.Name] = targetFont.Ref
 		tf[i] = targetFont
+		f.fonts = append(f.fonts, targetFont)
 	}
 
-	paper := pages.A4
-	tree := pages.NewPageTree(w, &pages.DefaultAttributes{
-		Resources: resources,
-		MediaBox:  paper,
-	})
-
-	p := boxes.Parameters{
-		BaseLineSkip: 12,
-	}
-	pageList := []boxes.Box{
-		boxes.HBoxTo(paper.URx,
-			boxes.Glue(0, 1, 1, 1, 1),
-			boxes.Text(titleFont, 24, title),
-			boxes.Glue(0, 1, 1, 1, 1),
-		),
-		boxes.Kern(72),
-	}
-	pageNo := 1
-	flushPage := func() {
-		if len(pageList) == 0 {
-			return
-		}
-
-		pageList = append(pageList,
-			boxes.Glue(0, 1, 1, 1, 1),
-			boxes.HBoxTo(paper.URx,
-				boxes.Glue(0, 1, 1, 1, 1),
-				boxes.Text(labelFont, 10, fmt.Sprintf("- %d -", pageNo)),
-				boxes.Glue(0, 1, 1, 1, 1),
-			),
-			boxes.Kern(36),
-		)
-
-		pageList = append([]boxes.Box{boxes.Kern(72)}, pageList...)
-		pageBox := p.VBoxTo(paper.URy, pageList...)
-		boxes.Ship(tree, pageBox)
-
-		pageNo++
-		pageList = nil
-	}
-
-	var columns []boxes.Box
-	var col []boxes.Box
-	done := false
-	colNo := 1
-	flushCol := func() {
-		if col != nil {
-			colBox := p.VTop(col...)
-			if len(columns) > 0 {
-				columns = append(columns, boxes.Kern(12))
-			}
-			columns = append(columns, colBox)
-			colNo++
-			col = nil
-
-			if len(columns) >= 2*4-1 || done {
-				columns = append([]boxes.Box{boxes.Kern(50)}, columns...)
-				tmp := boxes.HBox(columns...)
-				pageList = append(pageList, tmp)
-				columns = nil
-				flushPage()
-			}
-		}
-	}
+	var res []boxes.Box
 	for i := 0; i < nGlyph; i++ {
-		numRows := 50
-		if colNo > 4 {
-			numRows = (nGlyph - 200 + 3) / 4
-		}
-		if len(col) >= numRows {
-			flushCol()
-		}
 		iF := i / 256
 
 		name := targetAfm.Name[i]
 		rr := names.ToUnicode(name, targetAfm.IsDingbats)
-		if len(rr) != 1 {
-			name = name + " -"
-		} else if gg := tf[iF].Layout(rr); len(gg) != 1 || gg[0].Gid != font.GlyphID(i+1) {
-			name = name + " *"
-		}
-
 		line := boxes.HBoxTo(120,
 			boxes.HBoxTo(16,
 				boxes.Glue(0, 1, 1, 1, 1),
-				boxes.Text(labelFont, 10, fmt.Sprintf("%d", i))),
+				boxes.Text(f.bodyFont, 10, fmt.Sprintf("%d", i))),
 			boxes.HBoxTo(24,
 				boxes.Glue(0, 1, 1, 1, 1),
 				boxes.Text(tf[iF], 10, string(rr)),
 				boxes.Glue(0, 1, 1, 1, 1)),
-			boxes.Text(labelFont, 10, name),
+			boxes.Text(f.bodyFont, 10, name),
 		)
-		col = append(col, line)
+		res = append(res, line)
 	}
-	done = true
-	flushCol()
-	flushPage()
+	return res, nil
+}
+
+func (f *fontTables) MakeColumns(fontName string) error {
+	bb, err := f.GetGlyphRows(fontName)
+	if err != nil {
+		return err
+	}
+
+	p := boxes.Parameters{
+		BaseLineSkip: 12,
+	}
+
+	for len(bb) > 0 {
+		height := (len(bb) + 3) / 4
+		if height > pageHeight {
+			height = pageHeight
+		}
+		if height > f.available && f.available > 0 {
+			height = f.available
+		}
+		err := f.TryFlush(height)
+		if err != nil {
+			return err
+		}
+
+		var cc []boxes.Box
+		for i := 0; i < 4 && len(bb) > 0; i++ {
+			var col []boxes.Box
+			if height > len(bb) {
+				height = len(bb)
+			}
+			col, bb = bb[:height], bb[height:]
+
+			colBox := p.VTop(col...)
+			if len(cc) > 0 {
+				cc = append(cc, boxes.Kern(12))
+			}
+			cc = append(cc, colBox)
+		}
+		f.content = append(f.content, boxes.HBox(cc...))
+	}
+
+	return nil
+}
+
+func (f *fontTables) TryFlush(required int) error {
+	if f.available < required {
+		err := f.DoFlush()
+		if err != nil {
+			return err
+		}
+	}
+
+	f.available -= required
+	return nil
+}
+
+func (f *fontTables) DoFlush() error {
+	p := boxes.Parameters{
+		BaseLineSkip: 0,
+	}
+
+	f.pageNo++
+	pageList := []boxes.Box{
+		boxes.Kern(36),
+	}
+	pageList = append(pageList, f.content...)
+	pageList = append(pageList,
+		boxes.Glue(0, 1, 1, 1, 1),
+		boxes.HBoxTo(f.textWidth,
+			boxes.Glue(0, 1, 1, 1, 1),
+			boxes.Text(f.bodyFont, 10, fmt.Sprintf("- %d -", f.pageNo)),
+			boxes.Glue(0, 1, 1, 1, 1),
+		),
+		boxes.Kern(36),
+	)
+	pageBody := p.VBoxTo(f.paperHeight, pageList...)
+	withMargins := boxes.HBox(boxes.Kern(50), pageBody)
+
+	pageFonts := pdf.Dict{}
+	pageFonts[f.bodyFont.Name] = f.bodyFont.Ref
+	pageFonts[f.titleFont.Name] = f.titleFont.Ref
+	for _, font := range f.fonts {
+		pageFonts[font.Name] = font.Ref
+	}
+	attr := &pages.Attributes{
+		Resources: pdf.Dict{
+			"Font": pageFonts,
+		},
+	}
+	page, err := f.tree.AddPage(attr)
+	if err != nil {
+		return err
+	}
+	withMargins.Draw(page, 0, withMargins.Extent().Depth)
+	err = page.Close()
+	if err != nil {
+		return err
+	}
+
+	f.content = nil
+	f.available = pageHeight
+	return nil
+}
+
+func (f *fontTables) AddTitle(title string) error {
+	err := f.TryFlush(3 + 2 + 4)
+	if err != nil {
+		return err
+	}
+
+	f.content = append(f.content,
+		boxes.Kern(36),
+		boxes.HBoxTo(f.textWidth,
+			boxes.Glue(0, 1, 1, 1, 1),
+			boxes.Text(f.titleFont, 24, title),
+			boxes.Glue(0, 1, 1, 1, 1),
+		),
+		boxes.Kern(48),
+	)
+	return nil
+}
+
+func (f *fontTables) AddSubTitle(title string) error {
+	var cc []boxes.Box
+	extra := 0
+	if f.available < 10 {
+		err := f.DoFlush()
+		if err != nil {
+			return err
+		}
+	} else {
+		cc = append(cc, boxes.Kern(24))
+		extra += 2
+	}
+
+	err := f.TryFlush(extra + 1 + 1)
+	if err != nil {
+		return err
+	}
+
+	f.content = append(f.content, cc...)
+	f.content = append(f.content,
+		boxes.HBoxTo(f.textWidth,
+			boxes.Glue(0, 1, 1, 1, 1),
+			boxes.Text(f.titleFont, 10, title),
+			boxes.Glue(0, 1, 1, 1, 1),
+		),
+		boxes.Kern(12),
+	)
+	return nil
+}
+
+func main() {
+	w, err := pdf.Create("builtin.pdf")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	paper := pages.A4
+	tree := pages.NewPageTree(w, &pages.DefaultAttributes{
+		MediaBox: paper,
+	})
+
+	labelFont, err := builtin.Embed(w, "F", "Times-Roman")
+	if err != nil {
+		log.Fatal(err)
+	}
+	titleFont, err := builtin.Embed(w, "B", "Times-Bold")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	f := fontTables{
+		w:           w,
+		tree:        tree,
+		paperHeight: paper.URy,
+		paperWidth:  paper.URx,
+		textWidth:   paper.URx - 100,
+
+		bodyFont:  labelFont,
+		titleFont: titleFont,
+
+		available: pageHeight,
+	}
+	err = f.AddTitle(documentTitle)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, fontName := range builtin.FontNames {
+		err = f.AddSubTitle(fontName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		f.MakeColumns(fontName)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	f.DoFlush()
 
 	root, err := tree.Flush()
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	w.SetInfo(&pdf.Info{
-		Title:        "title",
+		Title:        documentTitle,
 		Producer:     "seehuhn.de/go/pdf/demo/builtin-fonts",
 		CreationDate: time.Now(),
 	})

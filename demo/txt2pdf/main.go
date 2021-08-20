@@ -24,7 +24,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"unicode"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
@@ -32,24 +31,6 @@ import (
 )
 
 const tabWidth = 4
-
-type subset struct {
-	chars map[rune]bool
-}
-
-func newSubset() *subset {
-	return &subset{
-		chars: make(map[rune]bool),
-	}
-}
-
-func (ccc *subset) Add(s string) {
-	for _, r := range s {
-		if unicode.IsGraphic(r) {
-			ccc.chars[r] = true
-		}
-	}
-}
 
 func convert(inName, outName string) error {
 	fmt.Println(inName, "->", outName)

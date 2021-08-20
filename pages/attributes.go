@@ -24,7 +24,7 @@ import (
 //
 // These attributes are documented in section 7.7.3.3 of PDF 32000-1:2008.
 type Attributes struct {
-	Resources pdf.Dict
+	Resources pdf.Dict // TODO(voss): use a struct here?
 	MediaBox  *pdf.Rectangle
 	CropBox   *pdf.Rectangle
 	Rotate    int
@@ -35,7 +35,7 @@ type Attributes struct {
 // These attributes are documented in sections 7.7.3.3 and 7.7.3.4 of
 // PDF 32000-1:2008.
 type DefaultAttributes struct {
-	Resources pdf.Dict
+	Resources pdf.Dict // TODO(voss): use a struct here?
 	MediaBox  *pdf.Rectangle
 	CropBox   *pdf.Rectangle
 	Rotate    int
