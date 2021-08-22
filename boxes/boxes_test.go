@@ -77,10 +77,10 @@ func TestFrame(t *testing.T) {
 				Contents: []Box{
 					Kern(36),
 					&TextBox{
-						layout: layout1,
+						Layout: layout1,
 					},
 					&TextBox{
-						layout: layout2,
+						Layout: layout2,
 					},
 					&RuleBox{
 						BoxExtent: BoxExtent{

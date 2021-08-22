@@ -16,6 +16,43 @@ import (
 const documentTitle = "The 14 Built-in PDF Fonts"
 const pageHeight = 62
 
+type glyphBox struct {
+	text *boxes.TextBox
+}
+
+func glyph(f *font.Font, ptSize float64, rr []rune) *glyphBox {
+	text := boxes.Text(f, ptSize, string(rr))
+	return &glyphBox{
+		text: text,
+	}
+}
+
+func (gl *glyphBox) Extent() *boxes.BoxExtent {
+	return gl.text.Extent()
+}
+
+func (gl *glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
+	page.Println("q")
+	font := gl.text.Layout.Font
+	q := float64(gl.text.Layout.FontSize) / float64(font.GlyphUnits)
+	x := xPos
+	y := yPos
+	page.Println(".4 1 .4 rg")
+	for _, glyph := range gl.text.Layout.Glyphs {
+		gid := glyph.Gid
+		ext := font.GlyphExtent[gid]
+		page.Printf("%.2f %.2f %.2f %.2f re\n",
+			x+float64(ext.LLx)*q+float64(glyph.XOffset),
+			y+float64(ext.LLy)*q+float64(glyph.YOffset),
+			float64(ext.URx-ext.LLx)*q,
+			float64(ext.URy-ext.LLy)*q)
+		x += float64(glyph.Advance)
+	}
+	page.Println("f")
+	page.Println("Q")
+	gl.text.Draw(page, xPos, yPos)
+}
+
 type fontTables struct {
 	w           *pdf.Writer
 	tree        *pages.PageTree
@@ -66,7 +103,7 @@ func (f *fontTables) GetGlyphRows(fontName string) ([]boxes.Box, error) {
 				boxes.Text(f.bodyFont, 10, fmt.Sprintf("%d", i))),
 			boxes.HBoxTo(24,
 				boxes.Glue(0, 1, 1, 1, 1),
-				boxes.Text(tf[iF], 10, string(rr)),
+				glyph(tf[iF], 10, rr),
 				boxes.Glue(0, 1, 1, 1, 1)),
 			boxes.Text(f.bodyFont, 10, name),
 		)

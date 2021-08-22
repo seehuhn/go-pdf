@@ -89,26 +89,26 @@ func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
 
 // TextBox represents a typeset string of characters as a Box object.
 type TextBox struct {
-	layout *font.Layout
+	Layout *font.Layout
 }
 
 // Text returns a new Text object.
 func Text(F *font.Font, ptSize float64, text string) *TextBox {
 	layout := F.Typeset(text, ptSize)
 	return &TextBox{
-		layout: layout,
+		Layout: layout,
 	}
 }
 
 // Extent implements the Box interface
 func (obj *TextBox) Extent() *BoxExtent {
-	font := obj.layout.Font
-	q := obj.layout.FontSize / float64(font.GlyphUnits)
+	font := obj.Layout.Font
+	q := obj.Layout.FontSize / float64(font.GlyphUnits)
 
 	width := 0.0
 	height := math.Inf(-1)
 	depth := math.Inf(-1)
-	for _, glyph := range obj.layout.Glyphs {
+	for _, glyph := range obj.Layout.Glyphs {
 		width += float64(glyph.Advance) * q
 
 		bbox := &font.GlyphExtent[glyph.Gid]
@@ -133,7 +133,7 @@ func (obj *TextBox) Extent() *BoxExtent {
 
 // Draw implements the Box interface.
 func (obj *TextBox) Draw(page *pages.Page, xPos, yPos float64) {
-	obj.layout.Draw(page, xPos, yPos)
+	obj.Layout.Draw(page, xPos, yPos)
 }
 
 // Ship appends the box to the page tree as a new page.
