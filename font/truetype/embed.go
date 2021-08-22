@@ -28,14 +28,14 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-// TrueType fonts with >255 glyphs (PDF 1.3)
-//   Type=Font, Subtype=Type0
-//   --DescendantFonts-> Type=Font, Subtype=CIDFontType2
+// TrueType fonts with <=255 glyphs (PDF 1.1)
+//   Type=Font, Subtype=TrueType
 //   --FontDescriptor-> Type=FontDescriptor
 //   --FontFile2-> Length1=...
 
-// TrueType fonts with <=255 glyphs (PDF 1.1)
-//   Type=Font, Subtype=TrueType
+// TrueType fonts with >255 glyphs (PDF 1.3)
+//   Type=Font, Subtype=Type0
+//   --DescendantFonts-> Type=Font, Subtype=CIDFontType2
 //   --FontDescriptor-> Type=FontDescriptor
 //   --FontFile2-> Length1=...
 

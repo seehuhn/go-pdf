@@ -123,13 +123,19 @@ type Glyph struct {
 // character codes.  This is used for ligatures and kerning information.
 type GlyphPair [2]GlyphID
 
+func isPrivateRange(r rune) bool {
+	return r >= '\uE000' && r <= '\uF8FF' ||
+		r >= '\U000F0000' && r <= '\U000FFFFD' ||
+		r >= '\U00100000' && r <= '\U0010FFFD'
+}
+
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
 func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	var runs [][]rune
 	var run []rune
 	for _, r := range s {
-		if unicode.IsGraphic(r) {
+		if unicode.IsGraphic(r) || isPrivateRange(r) {
 			run = append(run, r)
 		} else if len(run) > 0 {
 			runs = append(runs, run)
