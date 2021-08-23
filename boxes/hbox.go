@@ -154,3 +154,10 @@ func (obj *hBox) Draw(page *pages.Page, xPos, yPos float64) {
 		x += ext.Width
 	}
 }
+
+// Call fn for every child box.
+func (obj *hBox) Walk(fn func(Box)) {
+	for _, child := range obj.Contents {
+		fn(child)
+	}
+}

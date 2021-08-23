@@ -67,7 +67,6 @@ type fontTables struct {
 	fontNo int
 
 	content   []boxes.Box
-	fonts     []*font.Font
 	available int
 }
 
@@ -88,7 +87,6 @@ func (f *fontTables) GetGlyphRows(fontName string) ([]boxes.Box, error) {
 			return nil, err
 		}
 		tf[i] = targetFont
-		f.fonts = append(f.fonts, targetFont)
 	}
 
 	var res []boxes.Box
@@ -190,11 +188,16 @@ func (f *fontTables) DoFlush() error {
 	withMargins := boxes.HBox(boxes.Kern(50), pageBody)
 
 	pageFonts := pdf.Dict{}
-	pageFonts[f.bodyFont.Name] = f.bodyFont.Ref
-	pageFonts[f.titleFont.Name] = f.titleFont.Ref
-	for _, font := range f.fonts {
-		pageFonts[font.Name] = font.Ref
-	}
+	boxes.Walk(pageBody, func(box boxes.Box) {
+		switch b := box.(type) {
+		case *boxes.TextBox:
+			font := b.Layout.Font
+			pageFonts[font.Name] = font.Ref
+		case *glyphBox:
+			font := b.text.Layout.Font
+			pageFonts[font.Name] = font.Ref
+		}
+	})
 	attr := &pages.Attributes{
 		Resources: pdf.Dict{
 			"Font": pageFonts,

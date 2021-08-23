@@ -60,7 +60,7 @@ func TestFrame(t *testing.T) {
 
 	layout1 := F1.Typeset(text1, 12)
 	layout2 := F2.Typeset(text2, 12)
-	box := &VBox{
+	box := &vBox{
 		BoxExtent: BoxExtent{
 			Width:  pages.A5.URx - pages.A5.LLx,
 			Height: pages.A5.URy - pages.A5.LLy,
@@ -142,7 +142,7 @@ func TestFrame(t *testing.T) {
 
 // compile-time test: we implement the correct interfaces
 var _ Box = &RuleBox{}
-var _ Box = &VBox{}
+var _ Box = &vBox{}
 var _ Box = Kern(0)
 var _ Box = &glue{}
 var _ Box = &TextBox{}

@@ -22,8 +22,8 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-// VBox represents a Box which contains a column of sub-objects.
-type VBox struct {
+// vBox represents a Box which contains a column of sub-objects.
+type vBox struct {
 	BoxExtent
 
 	Contents []Box
@@ -31,18 +31,18 @@ type VBox struct {
 
 // VBox creates a new VBox, where the baseline coincides with the baseline of
 // the last child.
-func (p *Parameters) VBox(children ...Box) *VBox {
+func (p *Parameters) VBox(children ...Box) Box {
 	return p.vBoxInternal(false, children...)
 }
 
 // VTop creates a new VBox, where the baseline coincides with the baseline of
 // the first child.
-func (p *Parameters) VTop(children ...Box) *VBox {
+func (p *Parameters) VTop(children ...Box) Box {
 	return p.vBoxInternal(true, children...)
 }
 
-func (p *Parameters) vBoxInternal(top bool, children ...Box) *VBox {
-	vbox := &VBox{}
+func (p *Parameters) vBoxInternal(top bool, children ...Box) *vBox {
+	vbox := &vBox{}
 	totalHeight := 0.0
 	firstHeight := 0.0
 	lastDepth := 0.0
@@ -86,8 +86,8 @@ func (p *Parameters) vBoxInternal(top bool, children ...Box) *VBox {
 }
 
 // VBoxTo creates a new VBox with a given total height
-func (p *Parameters) VBoxTo(total float64, children ...Box) *VBox {
-	vbox := &VBox{}
+func (p *Parameters) VBoxTo(total float64, children ...Box) Box {
+	vbox := &vBox{}
 	lastDepth := 0.0
 	first := true
 	for len(children) > 0 {
@@ -118,7 +118,7 @@ func (p *Parameters) VBoxTo(total float64, children ...Box) *VBox {
 }
 
 // Draw implements the Box interface.
-func (obj *VBox) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj *vBox) Draw(page *pages.Page, xPos, yPos float64) {
 	boxTotal := obj.Depth + obj.Height
 	contentsTotal := 0.0
 	for _, child := range obj.Contents {
@@ -168,5 +168,12 @@ func (obj *VBox) Draw(page *pages.Page, xPos, yPos float64) {
 		y -= ext.Height
 		child.Draw(page, xPos, y)
 		y -= ext.Depth
+	}
+}
+
+// Call fn for every child box.
+func (obj *vBox) Walk(fn func(Box)) {
+	for _, child := range obj.Contents {
+		fn(child)
 	}
 }

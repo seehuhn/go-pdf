@@ -154,3 +154,17 @@ func Ship(tree *pages.PageTree, box Box) error {
 	box.Draw(page, 0, ext.Depth)
 	return page.Close()
 }
+
+type walker interface {
+	Walk(func(Box))
+}
+
+// Walk calls fn for every box in the tree rooted at box.
+func Walk(box Box, fn func(Box)) {
+	fn(box)
+	if w, ok := box.(walker); ok {
+		w.Walk(func(child Box) {
+			Walk(child, fn)
+		})
+	}
+}
