@@ -34,15 +34,15 @@ func tryFont(fname string) error {
 	defer tt.Close()
 
 	a := "..."
-	if tt.HasTables("glyf", "loca") {
+	if tt.HasTables("mort") {
 		a = "xxx"
 	}
 	b := "..."
-	if tt.HasTables("CFF ") {
+	if tt.HasTables("morx") {
 		b = "xxx"
 	}
 	c := "..."
-	if tt.HasTables("CFF2") {
+	if tt.HasTables("GSUB") {
 		c = "xxx"
 	}
 

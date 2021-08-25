@@ -41,12 +41,8 @@ func (tt *Font) getMaxpInfo() (*table.MaxpHead, error) {
 	return maxp, nil
 }
 
+// GetFontName reads the PostScript name of a font from the "name" table.
 func (tt *Font) GetFontName() (string, error) {
-	// TODO(voss): if FontName == "", invent a name: The name must be no
-	// longer than 63 characters and restricted to the printable ASCII
-	// subset, codes 33 to 126, except for the 10 characters '[', ']', '(',
-	// ')', '{', '}', '<', '>', '/', '%'.
-
 	nameHeader := &table.NameHeader{}
 	nameFd, err := tt.Header.ReadTableHead(tt.Fd, "name", nameHeader)
 	if err != nil {
@@ -185,9 +181,6 @@ func (tt *Font) GetOS2Info() (*table.OS2, error) {
 
 // ReadKernInfo reads kerning information from the "kern" table.
 func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
-	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.Head.UnitsPerEm) // TODO(voss): fix this
-
 	var Header struct {
 		Version   uint16
 		NumTables uint16
@@ -234,7 +227,7 @@ func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 			LR := font.GlyphPair{
 				font.GlyphID(buf[0]), font.GlyphID(buf[1])}
 			kern := int16(buf[2])
-			kerning[LR] = int(float64(kern)*q + 0.5)
+			kerning[LR] = int(kern)
 			buf = buf[3:]
 		}
 	}
@@ -242,6 +235,7 @@ func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 	return kerning, nil
 }
 
+// GetGlyfInfo reads the glyph bounding boxes from the "glyf" table.
 func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
 	var err error
 	offset := make([]uint32, tt.NumGlyphs+1)

@@ -32,7 +32,7 @@ type Font struct {
 	Fd     *os.File
 	Header *table.Header
 	Head   *table.Head
-	Cmap   map[rune]font.GlyphID
+	CMap   map[rune]font.GlyphID
 
 	NumGlyphs int // TODO(voss): should this be here?
 }
@@ -82,11 +82,11 @@ func Open(fname string) (*Font, error) {
 	}
 	tt.NumGlyphs = int(maxp.NumGlyphs)
 
-	tt.Cmap, err = tt.selectCmap()
+	tt.CMap, err = tt.selectCmap()
 	if err != nil {
 		return nil, err
 	}
-	tt.Cmap[unicode.ReplacementChar] = 0
+	tt.CMap[unicode.ReplacementChar] = 0
 
 	return tt, nil
 }

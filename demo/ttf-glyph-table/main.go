@@ -267,7 +267,7 @@ func main() {
 
 	p.BaseLineSkip = 46
 	rev = make(map[font.GlyphID]rune)
-	for r, idx := range tt.Cmap {
+	for r, idx := range tt.CMap {
 		r2 := rev[idx]
 		if r2 == 0 || r < r2 {
 			rev[idx] = r
