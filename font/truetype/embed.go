@@ -22,22 +22,12 @@ import (
 //   --FontDescriptor-> Type=FontDescriptor
 //   --FontFile2-> Length1=...
 
-// Embed embeds a TrueType font into a pdf file as a CIDFont.
-// This requires PDF version 1.3 or higher.
-func Embed(w *pdf.Writer, refName string, fname string, loc *locale.Locale) (*font.Font, error) {
-	tt, err := sfnt.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-	defer tt.Close() // TODO(voss): is this a good idea?
-
-	return EmbedFont(w, refName, tt, loc)
-}
-
-// EmbedFont embeds a TrueType font into a pdf file as a CIDFont.
-// This requires PDF version 1.3 or higher.
-func EmbedFont(w *pdf.Writer, refName string, tt *sfnt.Font, loc *locale.Locale) (*font.Font, error) {
-	err := w.CheckVersion("use of TrueType-based CIDfonts", pdf.V1_3)
+// EmbedFont embeds a TrueType font into a pdf file as a simple font. Up to 255
+// arbitrary glyphs from the font file can be accessed via the returned font
+// object.
+// This requires PDF version 1.1 or higher.
+func EmbedFontSimple(w *pdf.Writer, refName string, tt *sfnt.Font, loc *locale.Locale) (*font.Font, error) {
+	err := w.CheckVersion("use of TrueType fonts", pdf.V1_1)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +63,10 @@ type truetype struct {
 
 	Lookups  parser.Lookups
 	KernInfo map[font.GlyphPair]int
+
+	enc  map[font.GlyphID]byte
+	used map[byte]bool
+	tidy map[font.GlyphID]byte
 }
 
 func newTruetype(w *pdf.Writer, tt *sfnt.Font, loc *locale.Locale) (*truetype, error) {
@@ -142,6 +136,14 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, loc *locale.Locale) (*truetype, e
 		return nil, err
 	}
 
+	tidy := make(map[font.GlyphID]byte)
+	for r, gid := range tt.CMap {
+		if gid == 0 || r >= 256 {
+			continue
+		}
+		tidy[gid] = byte(r)
+	}
+
 	res := &truetype{
 		Ref:         w.Alloc(),
 		GlyphUnits:  int(tt.Head.UnitsPerEm),
@@ -152,7 +154,12 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, loc *locale.Locale) (*truetype, e
 
 		Lookups:  append(gsub, gpos...),
 		KernInfo: kernInfo,
+
+		enc:  make(map[font.GlyphID]byte),
+		used: map[byte]bool{},
+		tidy: tidy,
 	}
+
 	return res, nil
 }
 
@@ -176,8 +183,27 @@ func (t *truetype) Layout(gg []font.Glyph) []font.Glyph {
 }
 
 func (t *truetype) Enc(gid font.GlyphID) pdf.String {
-	// TODO(voss): be more clever here
-	return pdf.String{byte(gid >> 8), byte(gid)}
+	c, ok := t.enc[gid]
+	if ok {
+		return pdf.String{c}
+	}
+
+	c, ok = t.tidy[gid]
+	if !ok {
+		for i := 0; i < 256; i++ {
+			c := byte(i)
+			if !t.used[c] {
+				ok = true
+				break
+			}
+		}
+	}
+
+	if ok {
+		t.enc[gid] = c
+		t.used[c] = true
+	}
+	return pdf.String{c}
 }
 
 func (t *truetype) WriteFontDict(w *pdf.Writer) error {
