@@ -308,7 +308,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		f.MakeColumns(fontName)
+		err = f.MakeColumns(fontName)
 		if err != nil {
 			log.Fatal(err)
 		}

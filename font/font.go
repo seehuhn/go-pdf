@@ -29,7 +29,8 @@ type Font struct {
 	Name pdf.Name
 	Ref  *pdf.Reference
 
-	Layout func([]rune) []Glyph // TODO(voss): split this into cmap+layout
+	CMap   map[rune]GlyphID
+	Layout func([]Glyph) []Glyph
 	Enc    func(GlyphID) pdf.String
 
 	GlyphUnits int
@@ -40,7 +41,26 @@ type Font struct {
 	Width       []int  // TODO(voss): needed?
 }
 
-// Draw emits PDF text mode commands to show the layout on the page.
+// MakeGlyphs converts a string to a series of glyphs.  Use the function
+// font.Layout() to substitute ligatures and to apply kerning to the result.
+// If the font cannot represent all runes in s, an error is returned.
+func (font *Font) MakeGlyphs(s string) ([]Glyph, error) {
+	rr := []rune(s)
+	gg := make([]Glyph, len(rr))
+	for i, r := range rr {
+		gid, ok := font.CMap[r]
+		if !ok {
+			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
+				font.Name, r, string([]rune{r}))
+		}
+		gg[i].Gid = gid
+		gg[i].Chars = []rune{r}
+		gg[i].Advance = font.Width[gid]
+	}
+	return gg, nil
+}
+
+// Draw emits PDF text mode commands to show the glyphs on the page.
 // This must be used between BT and ET, with the correct font already
 // set up.
 func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
@@ -131,7 +151,7 @@ func isPrivateRange(r rune) bool {
 
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
-func (font *Font) Typeset(s string, ptSize float64) *Layout {
+func (font *Font) Typeset(s string, ptSize float64) (*Layout, error) {
 	var runs [][]rune
 	var run []rune
 	for _, r := range s {
@@ -148,14 +168,19 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 
 	var glyphs []Glyph
 	for _, run := range runs {
-		glyphs = append(glyphs, font.Layout(run)...)
+		gg, err := font.MakeGlyphs(string(run))
+		if err != nil {
+			return nil, err
+		}
+		gg = font.Layout(gg)
+		glyphs = append(glyphs, gg...)
 	}
 
 	return &Layout{
 		Font:     font,
 		FontSize: ptSize,
 		Glyphs:   glyphs,
-	}
+	}, nil
 }
 
 // Layout contains the information needed to typeset a run of text.
@@ -167,9 +192,8 @@ type Layout struct {
 
 // Draw shows the text layout on a page.
 //
-// TODO(voss): This should probably not use pages.Page for the first argument.
+// TODO(voss): This should maybe not use pages.Page for the first argument.
 func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
-	page.Println("q")
 	page.Println("BT")
 	layout.Font.Name.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", layout.FontSize)
@@ -178,5 +202,4 @@ func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 	layout.Font.Draw(page, layout.Glyphs)
 
 	page.Println("ET")
-	page.Println("Q")
 }

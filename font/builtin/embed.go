@@ -2,7 +2,6 @@ package builtin
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 
 	"seehuhn.de/go/pdf"
@@ -22,23 +21,26 @@ func Embed(w *pdf.Writer, ref string, fontName string) (*font.Font, error) {
 
 // EmbedAfm returns a Font structure representing a simple Type 1 font,
 // described by `afm`.
-func EmbedAfm(w *pdf.Writer, ref string, afm *AfmInfo) (*font.Font, error) {
+func EmbedAfm(w *pdf.Writer, refName string, afm *AfmInfo) (*font.Font, error) {
 	if len(afm.Code) == 0 {
 		return nil, errors.New("no glyphs in font")
 	}
 
 	fontRef := w.Alloc()
-	b := newBuiltin(afm, fontRef, ref)
+	b := newBuiltin(afm, fontRef, refName)
 	w.OnClose(b.WriteFontDict)
 
 	layout := b.FullLayout
 	if b.afm.IsFixedPitch {
-		layout = b.SimpleLayout
+		layout = func(gg []font.Glyph) []font.Glyph {
+			return gg
+		}
 	}
 
 	res := &font.Font{
-		Name:        pdf.Name(ref),
-		Ref:         fontRef,
+		Name:        pdf.Name(refName),
+		Ref:         b.fontRef,
+		CMap:        b.cmap,
 		Layout:      layout,
 		Enc:         b.Enc,
 		GlyphUnits:  1000,
@@ -62,11 +64,10 @@ type builtin struct {
 	used       map[byte]bool
 	candidates []*candidate
 
-	hasOverflow  bool
-	missingRunes map[rune]bool
+	hasOverflow bool
 }
 
-func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, name string) *builtin {
+func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, refName string) *builtin {
 	cmap := make(map[rune]font.GlyphID)
 	char := make([]rune, len(afm.Code))
 	thisFontEnc := make(fontEnc)
@@ -87,7 +88,7 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, name string) *builtin {
 	}
 
 	b := &builtin{
-		name:    name,
+		name:    refName,
 		afm:     afm,
 		fontRef: fontRef,
 		cmap:    cmap,
@@ -106,56 +107,21 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, name string) *builtin {
 	return b
 }
 
-func (b *builtin) RuneToGid(r rune) font.GlyphID {
-	gid, ok := b.cmap[r]
-	if !ok {
-		if b.missingRunes == nil {
-			b.missingRunes = make(map[rune]bool)
-		}
-		b.missingRunes[r] = true
-	}
-	return gid
-}
-
-// simple layout without ligatures and kerning
-func (b *builtin) SimpleLayout(rr []rune) []font.Glyph {
-	if len(rr) == 0 {
-		return nil
-	}
-
-	res := make([]font.Glyph, len(rr))
-	for i, r := range rr {
-		gid := b.RuneToGid(r)
-		res[i].Chars = []rune{r}
-		res[i].Gid = gid
-		res[i].Advance = b.afm.Width[gid]
-	}
-
-	return res
-}
-
-func (b *builtin) FullLayout(rr []rune) []font.Glyph {
-	if len(rr) == 0 {
+func (b *builtin) FullLayout(gg []font.Glyph) []font.Glyph {
+	if len(gg) == 0 {
 		return nil
 	}
 
 	var res []font.Glyph
-	last := font.Glyph{
-		Gid:   b.RuneToGid(rr[0]),
-		Chars: []rune{rr[0]},
-	}
-	for _, r := range rr[1:] {
-		gid := b.RuneToGid(r)
-		lig, ok := b.afm.Ligatures[font.GlyphPair{last.Gid, gid}]
+	last := gg[0]
+	for _, g := range gg[1:] {
+		lig, ok := b.afm.Ligatures[font.GlyphPair{last.Gid, g.Gid}]
 		if ok {
 			last.Gid = lig
-			last.Chars = append(last.Chars, r)
+			last.Chars = append(last.Chars, g.Chars...)
 		} else {
 			res = append(res, last)
-			last = font.Glyph{
-				Chars: []rune{r},
-				Gid:   gid,
-			}
+			last = g
 		}
 	}
 	res = append(res, last)
@@ -229,13 +195,6 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 func (b *builtin) WriteFontDict(w *pdf.Writer) error {
 	if b.hasOverflow {
 		return errors.New("too many different glyphs for simple font " + b.name)
-	}
-	if b.missingRunes != nil {
-		var rr []rune
-		for r := range b.missingRunes {
-			rr = append(rr, r)
-		}
-		return fmt.Errorf("font %q lacks runes %q", b.name, string(rr))
 	}
 
 	// See section 9.6.2.1 of PDF 32000-1:2008.

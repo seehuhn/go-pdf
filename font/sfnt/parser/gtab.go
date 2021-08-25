@@ -391,7 +391,7 @@ func (g *gTab) readSeqContext2(s *State, subtablePos int64) (*seqContext2, error
 		return nil, err
 	}
 
-	xxx := &seqContext2{
+	res := &seqContext2{
 		cov:      cov,
 		input:    input,
 		rulesets: make([]classSeqRuleSet, len(classSeqRuleSetOffsets)),
@@ -466,42 +466,41 @@ func (g *gTab) readSeqContext2(s *State, subtablePos int64) (*seqContext2, error
 
 			ruleSet = append(ruleSet, rule)
 		}
-		xxx.rulesets[i] = ruleSet
+		res.rulesets[i] = ruleSet
 	}
-	return xxx, nil
+	return res, nil
 }
 
-func (l *seqContext2) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *seqContext2) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	glyph := seq[pos]
 	if _, ok := l.cov[glyph.Gid]; !ok {
 		return seq, -1
 	}
 
-	class := l.input[glyph.Gid]
-	if class >= len(l.rulesets) {
+	class0 := l.input[glyph.Gid]
+	if class0 < 0 || class0 >= len(l.rulesets) {
 		return seq, -1
 	}
+	rules := l.rulesets[class0]
 
+	pp := []int{pos}
 rulesetLoop:
-	for _, rule := range l.rulesets[class] {
-		next := pos + 1 + len(rule.input)
-		if next > len(seq) {
-			continue
-		}
-		for i, class := range rule.input {
-			if !filter(seq[pos+1+i].Gid) {
-				panic("not implemented")
+	for _, rule := range rules {
+		p := pos
+		pp = pp[:1]
+		for _, classI := range rule.input {
+			p = filter.Next(seq, p)
+			if p < 0 {
+				return seq, -1
 			}
-			if !filter(seq[pos+1+i].Gid) {
-				panic("not implemented")
-			}
-			if l.input[seq[pos+1+i].Gid] != class {
+			pp = append(pp, p)
+			if l.input[seq[p].Gid] != classI {
 				continue rulesetLoop
 			}
 		}
 
-		seq = applyActions(rule.actions, pos, seq)
-		return seq, next
+		seq = applyActions(rule.actions, pp, seq)
+		return seq, p + 1
 	}
 	return seq, -1
 }
@@ -635,7 +634,7 @@ func (g *gTab) readChained1(s *State, subtablePos int64) (*chainedSeq1, error) {
 	return xxx, nil
 }
 
-func (l *chainedSeq1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *chainedSeq1) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	ruleNo := l.cov[seq[pos].Gid]
 	if ruleNo >= len(l.rulesets) || l.rulesets[ruleNo] == nil {
 		return seq, -1
@@ -810,57 +809,62 @@ func (g *gTab) readChained2(s *State, subtablePos int64) (*chainedSeq2, error) {
 	return res, nil
 }
 
-func (l *chainedSeq2) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *chainedSeq2) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	gid := seq[pos].Gid
 	if _, ok := l.cov[gid]; !ok {
 		return seq, -1
 	}
 
 	class := l.input[gid]
-	if class >= len(l.rulesets) {
+	if class < 0 || class >= len(l.rulesets) {
 		return seq, -1
 	}
+	rules := l.rulesets[class]
 
+	pp := []int{pos}
 ruleLoop:
-	for _, rule := range l.rulesets[class] {
-		next := pos + 1 + len(rule.input)
-		if pos < len(rule.backtrack) || next+len(rule.lookahead) > len(seq) {
-			continue
+	for _, rule := range rules {
+		p := pos
+		for _, class := range rule.backtrack {
+			p = filter.Prev(seq, p)
+			if p < 0 {
+				return seq, -1
+			}
+			if l.backtrack[seq[p].Gid] != class {
+				continue ruleLoop
+			}
+		}
+		p = pos
+		pp = pp[:1]
+		for _, class := range rule.input {
+			p = filter.Next(seq, p)
+			if p < 0 {
+				return seq, -1
+			}
+			pp = append(pp, p)
+			if l.input[seq[p].Gid] != class {
+				continue ruleLoop
+			}
+		}
+		next := p + 1
+		for _, class := range rule.lookahead {
+			p = filter.Next(seq, p)
+			if p < 0 {
+				return seq, -1
+			}
+			if l.lookahead[seq[p].Gid] != class {
+				continue ruleLoop
+			}
 		}
 
-		for i, class := range rule.backtrack {
-			if !filter(seq[pos-1-i].Gid) {
-				panic("not implemented")
-			}
-			if l.backtrack[seq[pos-1-i].Gid] != class {
-				continue ruleLoop
-			}
-		}
-		for i, class := range rule.input {
-			if !filter(seq[pos+1+i].Gid) {
-				panic("not implemented")
-			}
-			if l.input[seq[pos+1+i].Gid] != class {
-				continue ruleLoop
-			}
-		}
-		for i, class := range rule.lookahead {
-			if !filter(seq[next+i].Gid) {
-				panic("not implemented")
-			}
-			if l.lookahead[seq[next+i].Gid] != class {
-				continue ruleLoop
-			}
-		}
-
-		seq = applyActions(rule.actions, pos, seq)
+		seq = applyActions(rule.actions, pp, seq)
 		return seq, next
 	}
 	return seq, -1
 }
 
 // Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#63-chained-contexts-substitution-format-3-coverage-based-glyph-contexts
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chseqctxt3
 type chainedSeq3 struct {
 	backtrack []coverage
 	input     []coverage
@@ -919,70 +923,80 @@ func (g *gTab) readChained3(s *State, subtablePos int64) (*chainedSeq3, error) {
 	}
 	seqLookupRecord := s.GetStash()
 
-	xxx := &chainedSeq3{}
+	res := &chainedSeq3{}
 
 	for _, offs := range backtrackCoverageOffsets {
 		cover, err := g.readCoverageTable(subtablePos + int64(offs))
 		if err != nil {
 			return nil, err
 		}
-		xxx.backtrack = append(xxx.backtrack, cover)
+		res.backtrack = append(res.backtrack, cover)
 	}
 	for _, offs := range inputCoverageOffsets {
 		cover, err := g.readCoverageTable(subtablePos + int64(offs))
 		if err != nil {
 			return nil, err
 		}
-		xxx.input = append(xxx.input, cover)
+		res.input = append(res.input, cover)
 	}
 	for _, offs := range lookaheadCoverageOffsets {
 		cover, err := g.readCoverageTable(subtablePos + int64(offs))
 		if err != nil {
 			return nil, err
 		}
-		xxx.lookahead = append(xxx.lookahead, cover)
+		res.lookahead = append(res.lookahead, cover)
 	}
 	for len(seqLookupRecord) > 0 {
 		l, err := g.getGtabLookup(seqLookupRecord[1])
 		if err != nil {
 			return nil, err
 		}
-		xxx.actions = append(xxx.actions, seqLookup{
+		res.actions = append(res.actions, seqLookup{
 			pos:    int(seqLookupRecord[0]),
 			nested: l,
 		})
 		seqLookupRecord = seqLookupRecord[2:]
 	}
-	return xxx, nil
+	return res, nil
 }
 
-func (l *chainedSeq3) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
-	next := pos + len(l.input)
-	if pos < len(l.backtrack) || next+len(l.lookahead) > len(seq) {
+func (l *chainedSeq3) Apply(keep keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+	// TODO(voss): remove this fast path?
+	if pos < len(l.backtrack) || pos+len(l.input)+len(l.lookahead) > len(seq) {
 		return seq, -1
 	}
 
-	for i, cov := range l.backtrack {
-		if !filter(seq[pos-1-i].Gid) {
-			panic("not implemented")
+	p := pos
+	for _, cov := range l.backtrack {
+		p = keep.Prev(seq, p)
+		if p < 0 {
+			return seq, p
 		}
-		_, ok := cov[seq[pos-1-i].Gid]
+		_, ok := cov[seq[p].Gid]
 		if !ok {
 			return seq, -1
 		}
 	}
+	p = pos
+	pp := make([]int, len(l.input))
 	for i, cov := range l.input {
-		if !filter(seq[pos+i].Gid) {
-			panic("not implemented")
+		if i > 0 {
+			p = keep.Next(seq, p)
+			if p < 0 {
+				return seq, -1
+			}
 		}
-		_, ok := cov[seq[pos+i].Gid]
+		pp[i] = p
+		_, ok := cov[seq[p].Gid]
 		if !ok {
 			return seq, -1
 		}
 	}
+	next := p + 1 // TODO(voss): special consideration in the case that a nested lookup is a GPOS type 2, paired positioning, lookup
 	for i, cov := range l.lookahead {
-		if !filter(seq[next+i].Gid) {
-			panic("not implemented")
+		p = keep.Next(seq, p)
+		if p < 0 {
+			return seq, -1
 		}
 		_, ok := cov[seq[next+i].Gid]
 		if !ok {
@@ -990,14 +1004,17 @@ func (l *chainedSeq3) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Gl
 		}
 	}
 
-	seq = applyActions(l.actions, pos, seq)
+	seq = applyActions(l.actions, pp, seq)
 	return seq, next
 }
 
-func applyActions(actions []seqLookup, pos int, seq []font.Glyph) []font.Glyph {
+func applyActions(actions []seqLookup, pp []int, seq []font.Glyph) []font.Glyph {
 	origLen := len(seq)
 	for _, action := range actions {
-		seq, _ = action.nested.applySubtables(seq, pos+action.pos)
+		if action.pos < 0 || action.pos >= len(pp) {
+			continue
+		}
+		seq, _ = action.nested.applySubtables(seq, pp[action.pos])
 		if len(seq) != origLen {
 			// TODO(voss): how to interpret action.pos in case a prior action
 			// changes the length of seq?

@@ -145,7 +145,7 @@ func (g *gTab) readGsub1_1(s *State, subtablePos int64) (*gsub1_1, error) {
 	return res, nil
 }
 
-func (l *gsub1_1) Apply(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
+func (l *gsub1_1) Apply(filter keepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	gid := seq[i].Gid
 	if _, ok := l.cov[gid]; !ok {
 		return seq, -1
@@ -187,7 +187,7 @@ func (g *gTab) readGsub1_2(s *State, subtablePos int64) (*gsub1_2, error) {
 	return res, nil
 }
 
-func (l *gsub1_2) Apply(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
+func (l *gsub1_2) Apply(filter keepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	glyph := seq[i]
 	j, ok := l.cov[glyph.Gid]
 	if !ok {
@@ -246,7 +246,7 @@ func (g *gTab) readGsub2_1(s *State, subtablePos int64) (*gsub2_1, error) {
 	return res, nil
 }
 
-func (l *gsub2_1) Apply(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
+func (l *gsub2_1) Apply(filter keepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	k, ok := l.cov[seq[i].Gid]
 	if !ok {
 		return seq, -1
@@ -269,7 +269,8 @@ func (l *gsub2_1) Apply(filter filter, seq []font.Glyph, i int) ([]font.Glyph, i
 	return res, i + n
 }
 
-// Ligature Substitution Subtable
+// Ligature Substitution Format 1
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#41-ligature-substitution-format-1
 type gsub4_1 struct {
 	cov  coverage // maps first glyphs to repl indices
 	repl [][]ligature
@@ -344,8 +345,8 @@ func (g *gTab) readGsub4_1(s *State, subtablePos int64) (*gsub4_1, error) {
 	return xxx, nil
 }
 
-func (l *gsub4_1) Apply(filter filter, seq []font.Glyph, i int) ([]font.Glyph, int) {
-	ligSetIdx, ok := l.cov[seq[i].Gid]
+func (l *gsub4_1) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+	ligSetIdx, ok := l.cov[seq[pos].Gid]
 	if !ok {
 		return seq, -1
 	}
@@ -354,28 +355,33 @@ func (l *gsub4_1) Apply(filter filter, seq []font.Glyph, i int) ([]font.Glyph, i
 ligLoop:
 	for j := range ligSet {
 		lig := &ligSet[j]
-		if i+1+len(lig.in) > len(seq) {
-			continue
-		}
+		p := pos
 		for k, gid := range lig.in {
-			if !filter(seq[i+1+k].Gid) {
+			p++
+			if p >= len(seq) {
+				continue ligLoop
+			}
+			if !filter(seq[pos+1+k].Gid) {
 				panic("not implemented")
 			}
-			if seq[i+1+k].Gid != gid {
+			if seq[p].Gid != gid {
 				continue ligLoop
 			}
 		}
+		next := p + 1
 
-		var chars []rune
-		for j := i; j < i+len(lig.in); j++ {
-			chars = append(chars, seq[j].Chars...)
+		// gather the unicode representations
+		var rr []rune
+		for i := pos; i < next; i++ {
+			rr = append(rr, seq[i].Chars...)
 		}
-		seq[i] = font.Glyph{
+
+		seq[pos] = font.Glyph{
 			Gid:   lig.out,
-			Chars: chars,
+			Chars: rr,
 		}
-		seq = append(seq[:i+1], seq[i+1+len(lig.in):]...)
-		return seq, i + 1
+		seq = append(seq[:pos+1], seq[next:]...)
+		return seq, pos + 1
 	}
 
 	return seq, -1

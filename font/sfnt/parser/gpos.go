@@ -190,7 +190,7 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 	return res, nil
 }
 
-func (l *gpos2_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos2_1) Apply(keep keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	class, ok := l.cov[seq[pos].Gid]
 	if !ok || class >= len(l.adjust) {
 		return seq, -1
@@ -198,7 +198,7 @@ func (l *gpos2_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph,
 	tab := l.adjust[class]
 
 	next := pos + 1
-	for next < len(seq) && !filter(seq[next].Gid) {
+	for next < len(seq) && !keep(seq[next].Gid) {
 		next++
 	}
 	if next >= len(seq) {
@@ -295,14 +295,14 @@ func (g *gTab) readGpos2_2(s *State, subtablePos int64) (*gpos2_2, error) {
 	return res, nil
 }
 
-func (l *gpos2_2) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos2_2) Apply(keep keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	_, ok := l.cov[seq[pos].Gid]
 	if !ok {
 		return seq, -1
 	}
 
 	next := pos + 1
-	for next < len(seq) && !filter(seq[next].Gid) {
+	for next < len(seq) && !keep(seq[next].Gid) {
 		next++
 	}
 	if next >= len(seq) {
@@ -409,7 +409,7 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	return res, nil
 }
 
-func (l *gpos4_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos4_1) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	if pos == 0 {
 		return seq, -1
 	}
@@ -513,7 +513,7 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	return res, nil
 }
 
-func (l *gpos6_1) Apply(filter filter, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos6_1) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	// The mark2 glyph that combines with a mark1 glyph is the glyph preceding
 	// the mark1 glyph in glyph string order (skipping glyphs according to
 	// LookupFlags). The subtable applies precisely when that mark2 glyph is

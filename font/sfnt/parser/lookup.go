@@ -7,7 +7,7 @@ type Lookups []*lookupTable
 
 type lookupTable struct {
 	subtables        []lookupSubtable
-	filter           filter
+	filter           keepGlyphFn
 	markFilteringSet uint16
 	rtl              bool
 }
@@ -17,7 +17,7 @@ type lookupSubtable interface {
 	// If returns the new glyphs and the new position.  If the subtable
 	// cannot be applied, the unchanged glyphs and a negative position
 	// are returned
-	Apply(filter filter, glyphs []font.Glyph, pos int) ([]font.Glyph, int)
+	Apply(filter keepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int)
 }
 
 // ApplyAll applies transformations from the selected lookup tables to a
@@ -47,6 +47,6 @@ type lookupNotImplemented struct {
 	lookupType, format uint16
 }
 
-func (l *lookupNotImplemented) Apply(filter filter, glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *lookupNotImplemented) Apply(filter keepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
 	return glyphs, -1
 }

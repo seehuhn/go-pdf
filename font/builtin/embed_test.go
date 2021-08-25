@@ -5,6 +5,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -18,9 +19,14 @@ func TestEnc(t *testing.T) {
 
 		b := newBuiltin(afm, nil, "F")
 
-		glyphs := b.FullLayout([]rune("ý×A×˚"))
-		if len(glyphs) != 5 {
-			t.Fatal("wrong number of glyphs")
+		rr := []rune("ý×A×˚")
+		gids := make([]font.GlyphID, len(rr))
+		for i, r := range rr {
+			gid, ok := b.cmap[r]
+			if !ok {
+				t.Fatal("missing rune")
+			}
+			gids[i] = gid
 		}
 
 		codes := map[rune]byte{
@@ -36,15 +42,14 @@ func TestEnc(t *testing.T) {
 			"MacExpertEncoding": 0, // only contains funny characters
 		}
 
-		for _, glyph := range glyphs {
-			gid := glyph.Gid
+		for i, gid := range gids {
 			s := b.Enc(gid)
 			if len(s) != 1 {
 				t.Fatal("wrong number of codes")
 			}
 			c := s[0]
 
-			if c != codes[glyph.Chars[0]] {
+			if c != codes[rr[i]] {
 				t.Errorf("wrong char code %d", c)
 			}
 		}

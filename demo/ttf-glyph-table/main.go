@@ -204,7 +204,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err = truetype.EmbedFont(out, "X", tt, nil)
+	theFont, err = truetype.OldEmbedFont(out, "X", tt, nil)
 	// Font, err = builtin.Embed(out, "X", "Times-Roman", font.AdobeStandardLatin)
 	if err != nil {
 		log.Fatal(err)

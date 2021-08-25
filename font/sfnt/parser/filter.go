@@ -4,7 +4,28 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-type filter func(font.GlyphID) bool
+// keepGlyphFn is used to drop ignored characters in lookups with non-zero
+// lookup flags.  Functions of this type return true, if the glyph should be
+// used, and false if the glyph should be ignored.
+type keepGlyphFn func(font.GlyphID) bool
+
+func (keep keepGlyphFn) Next(seq []font.Glyph, pos int) int {
+	for i := pos + 1; i < len(seq); i++ {
+		if keep(seq[i].Gid) {
+			return i
+		}
+	}
+	return -1
+}
+
+func (keep keepGlyphFn) Prev(seq []font.Glyph, pos int) int {
+	for i := pos - 1; i >= 0; i-- {
+		if keep(seq[i].Gid) {
+			return i
+		}
+	}
+	return -1
+}
 
 const (
 	ignoreBaseGlyphs       uint16 = 0x0002
@@ -16,7 +37,7 @@ const (
 
 func useAllGlyphs(font.GlyphID) bool { return true }
 
-func (g *gTab) makeFilter(lookupFlag uint16) filter {
+func (g *gTab) makeFilter(lookupFlag uint16) keepGlyphFn {
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
 
 	if g.gdef == nil {

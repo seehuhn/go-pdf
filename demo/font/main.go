@@ -39,7 +39,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	// F1, err := builtin.Embed(out, "F1", "Times-Roman", nil)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/FreeSerif.ttf", subset)
 	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/Roboto-Regular.ttf", subset)
-	F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", subset)
+	F1, err := truetype.OldEmbed(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", subset)
 	if err != nil {
 		return err
 	}
@@ -60,11 +60,14 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	margin := 50.0
 	baseLineSkip := 1.2 * fontSize
 	q := fontSize / float64(F1.GlyphUnits)
-	layout := F1.Typeset(text, fontSize)
+	layout, err := F1.Typeset(text, fontSize)
+	if err != nil {
+		return err
+	}
 	glyphs := layout.Glyphs
 
 	for _, glyph := range layout.Glyphs {
-		fmt.Println(glyph)
+		fmt.Printf("%q %v\n", string(glyph.Chars), glyph)
 	}
 
 	page.Println("q")
