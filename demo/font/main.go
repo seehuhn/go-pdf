@@ -46,7 +46,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 
 	page, err := pages.SinglePage(out, &pages.Attributes{
 		Resources: pdf.Dict{
-			"Font": pdf.Dict{F1.Name: F1.Ref},
+			"Font": pdf.Dict{F1.InstName: F1.Ref},
 		},
 		MediaBox: &pdf.Rectangle{
 			URx: width,

@@ -26,8 +26,8 @@ import (
 
 // Font represents a font embedded in the PDF file.
 type Font struct {
-	Name pdf.Name
-	Ref  *pdf.Reference
+	InstName pdf.Name
+	Ref      *pdf.Reference
 
 	CMap   map[rune]GlyphID
 	Layout func([]Glyph) []Glyph
@@ -37,8 +37,8 @@ type Font struct {
 	Ascent     float64 // Ascent in glyph coordinate units
 	Descent    float64 // Descent in glyph coordinate units, as a negative number
 
-	GlyphExtent []Rect // TODO(voss): needed?
-	Width       []int  // TODO(voss): needed?
+	GlyphExtent []Rect // This is in Glyph design units.  TODO(voss): needed?
+	Width       []int  // This is in Glyph design units.  TODO(voss): needed?
 }
 
 // MakeGlyphs converts a string to a series of glyphs.  Use the function
@@ -51,7 +51,7 @@ func (font *Font) MakeGlyphs(s string) ([]Glyph, error) {
 		gid, ok := font.CMap[r]
 		if !ok {
 			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				font.Name, r, string([]rune{r}))
+				font.InstName, r, string([]rune{r}))
 		}
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
@@ -96,7 +96,7 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 	for _, glyph := range glyphs {
 		if glyph.YOffset != yOffs {
 			flush()
-			yOffs = glyph.YOffset
+			yOffs = font.ToGlyph(glyph.YOffset)
 			page.Printf("%d Ts\n", yOffs)
 		}
 
@@ -105,7 +105,7 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 		if xOffsWanted != xOffsAuto {
 
 			flushRun()
-			data = append(data, -pdf.Integer(xOffsWanted-xOffsAuto))
+			data = append(data, -pdf.Integer(font.ToGlyph(xOffsWanted-xOffsAuto)))
 		}
 		run = append(run, font.Enc(glyph.Gid)...)
 
@@ -113,6 +113,12 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 		xOffsAuto = xOffsWanted + font.Width[glyph.Gid]
 	}
 	flush()
+}
+
+// ToGlyph converts from font design units to PDF glyph coordinates.
+func (font *Font) ToGlyph(fontDesignSize int) int {
+	q := 1000 / float64(font.GlyphUnits)
+	return int(float64(fontDesignSize)*q + 0.5)
 }
 
 // GlyphID is used to enumerate the glyphs in a font.  The first glyph
@@ -134,9 +140,9 @@ func (rect *Rect) IsZero() bool {
 type Glyph struct {
 	Gid     GlyphID
 	Chars   []rune
-	XOffset int
-	YOffset int
-	Advance int
+	XOffset int // This is in Glyph design units.
+	YOffset int // This is in Glyph design units.
+	Advance int // This is in Glyph design units.
 }
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of
@@ -195,7 +201,7 @@ type Layout struct {
 // TODO(voss): This should maybe not use pages.Page for the first argument.
 func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 	page.Println("BT")
-	layout.Font.Name.PDF(page)
+	layout.Font.InstName.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", layout.FontSize)
 	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
 

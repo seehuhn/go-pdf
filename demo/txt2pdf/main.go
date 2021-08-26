@@ -26,7 +26,9 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -45,7 +47,6 @@ func convert(inName, outName string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
 	out.SetInfo(&pdf.Info{
 		Title:        inName,
@@ -53,14 +54,21 @@ func convert(inName, outName string) error {
 		CreationDate: time.Now(),
 	})
 
-	F1, err := builtin.Embed(out, "F", "Courier")
+	var Font *font.Font
+	if false {
+		Font, err = builtin.Embed(out, "F", "Courier")
+	} else {
+		Font, err = truetype.OldEmbed(out, "F",
+			"../../font/truetype/ttf/SourceSerif4-Regular.ttf",
+			nil)
+	}
 	if err != nil {
 		return err
 	}
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: pdf.Dict{
-			"Font": pdf.Dict{F1.Name: F1.Ref},
+			"Font": pdf.Dict{Font.InstName: Font.Ref},
 		},
 		MediaBox: pages.A4,
 	})
@@ -102,12 +110,12 @@ func convert(inName, outName string) error {
 		} else {
 			rr = []rune(line)
 		}
-		glyphs, err := F1.MakeGlyphs(string(rr))
+		glyphs, err := Font.MakeGlyphs(string(rr))
 		if err != nil {
 			return err
 		}
-		glyphs = F1.Layout(glyphs)
-		F1.Draw(page, glyphs)
+		glyphs = Font.Layout(glyphs)
+		Font.Draw(page, glyphs)
 
 		fmt.Fprintln(page, " T*")
 
@@ -141,8 +149,7 @@ func convert(inName, outName string) error {
 	out.SetCatalog(&pdf.Catalog{
 		Pages: pagesRef,
 	})
-
-	return nil
+	return out.Close()
 }
 
 func main() {

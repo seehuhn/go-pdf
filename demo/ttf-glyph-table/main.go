@@ -155,7 +155,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 
 	page.Println("q")
 	page.Println("BT")
-	theFont.Name.PDF(page)
+	theFont.InstName.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", float64(glyphFontSize))
 	fmt.Fprintf(page, "%f %f Td\n",
 		xPos+shift,
@@ -212,9 +212,9 @@ func main() {
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: pdf.Dict{
 			"Font": pdf.Dict{
-				courier.Name: courier.Ref,
-				Italic.Name:  Italic.Ref,
-				theFont.Name: theFont.Ref,
+				courier.InstName: courier.Ref,
+				Italic.InstName:  Italic.Ref,
+				theFont.InstName: theFont.Ref,
 			},
 		},
 	})

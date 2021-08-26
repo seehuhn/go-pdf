@@ -19,7 +19,6 @@ package parser
 import (
 	"fmt"
 	"io"
-	"math"
 
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/table"
@@ -53,8 +52,6 @@ type Parser struct {
 	pos, used int
 	lastRead  int
 
-	scale float64 // TODO(voss): store "design units" instead?
-
 	classDefCache map[int64]ClassDef
 }
 
@@ -62,8 +59,7 @@ type Parser struct {
 // parser can be used.
 func New(tt *sfnt.Font) *Parser {
 	return &Parser{
-		tt:    tt,
-		scale: 1000 / float64(tt.Head.UnitsPerEm), // TODO(voss): fix this
+		tt: tt,
 	}
 }
 
@@ -113,10 +109,6 @@ CommandLoop:
 				s.A = int64(val)
 			case TypeInt:
 				s.A = int64(int16(val))
-			case TypeUFword:
-				s.A = int64(math.Round(float64(val) * p.scale))
-			case TypeFword:
-				s.A = int64(math.Round(float64(int16(val)) * p.scale))
 			default:
 				panic("unknown type for CmdRead16")
 			}
@@ -131,10 +123,6 @@ CommandLoop:
 				s.A = int64(val)
 			case TypeInt:
 				s.A = int64(int32(val))
-			case TypeUFword:
-				s.A = int64(math.Round(float64(val) * p.scale))
-			case TypeFword:
-				s.A = int64(math.Round(float64(int32(val)) * p.scale))
 			case TypeTag:
 				s.Tag = string(buf)
 			default:
@@ -351,8 +339,6 @@ const (
 const (
 	TypeUInt Command = iota + 224
 	TypeInt
-	TypeFword
-	TypeUFword
 	TypeTag
 )
 

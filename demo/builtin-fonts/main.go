@@ -192,10 +192,10 @@ func (f *fontTables) DoFlush() error {
 		switch b := box.(type) {
 		case *boxes.TextBox:
 			font := b.Layout.Font
-			pageFonts[font.Name] = font.Ref
+			pageFonts[font.InstName] = font.Ref
 		case *glyphBox:
 			font := b.text.Layout.Font
-			pageFonts[font.Name] = font.Ref
+			pageFonts[font.InstName] = font.Ref
 		}
 	})
 	attr := &pages.Attributes{

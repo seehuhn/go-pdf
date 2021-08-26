@@ -106,7 +106,7 @@ func TestComplicatedGyphs(t *testing.T) {
 	page, err := pages.SinglePage(w, &pages.Attributes{
 		Resources: map[pdf.Name]pdf.Object{
 			"Font": pdf.Dict{
-				font.Name: font.Ref,
+				font.InstName: font.Ref,
 			},
 		},
 		MediaBox: &pdf.Rectangle{

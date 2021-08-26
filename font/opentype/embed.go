@@ -50,27 +50,32 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 		return nil, err
 	}
 	isCFF := tt.HasTables("CFF ")
-	exOpt := &sfnt.ExportOptions{
-		Include: func(name string) bool {
-			// the list of tables to include is from PDF 32000-1:2008, table 126
-			if isCFF {
-				switch name {
-				case "CFF ", "cmap": // TODO(voss): is this right?
-					return true
-				default:
-					return false
-				}
-			} else {
-				switch name {
-				case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
-					// TODO(voss): include "gasp"?
-					return true
-				default:
-					return false
-				}
-			}
-		},
+	exOpt := &sfnt.ExportOptions{}
+	// The list of tables to include is from PDF 32000-1:2008, table 126.
+	// TODO(voss): include "gasp"?
+	if isCFF {
+		exOpt.Include = map[string]bool{
+			"CFF ": true,
+			"cmap": true,
+		}
+	} else {
+		exOpt.Include = map[string]bool{
+			"glyf": true,
+			"head": true,
+			"hhea": true,
+			"hmtx": true,
+			"loca": true,
+			"maxp": true,
+			"cvt ": true,
+			"fpgm": true,
+			"prep": true,
+			"gasp": true,
+		}
 	}
+
+	// case "glyf", "head", "hhea", "hmtx", "loca", "maxp", "cvt ", "fpgm", "prep":
+	// 	// TODO(voss): include "gasp"?
+
 	_, err = tt.Export(stm, exOpt)
 	if err != nil {
 		return nil, err

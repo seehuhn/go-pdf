@@ -30,9 +30,18 @@ import (
 )
 
 type ExportOptions struct {
-	Include func(string) bool // select a subset of tables
-	// Subset             map[int]bool      // select a subset of glyphs
-	// GenerateSimpleCmap bool
+	Include            map[string]bool // select a subset of tables
+	Subset             []font.GlyphID  // select a subset of glyphs
+	GenerateSimpleCmap bool
+}
+
+func contains(ss []string, s string) bool {
+	for _, si := range ss {
+		if si == s {
+			return true
+		}
+	}
+	return false
 }
 
 // Export writes the font to the io.Writer w.
@@ -43,27 +52,31 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 
 	var total int64
 
-	names := tt.exportSelectTables(opt)
+	tableNames := tt.selectTables(opt)
 
 	replTab := make(map[string][]byte)
 	replSum := make(map[string]uint32)
 	buf := &bytes.Buffer{}
 
-	// generate the new "head" table
-	headTable := &table.Head{}
-	*headTable = *tt.Head
-	headTable.CheckSumAdjustment = 0
-	ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
-	headTable.Modified = int64(time.Since(ttZeroTime).Seconds())
-	headTable.FontDirectionHint = 2
-	_ = binary.Write(buf, binary.BigEndian, headTable)
-	replTab["head"] = append([]byte{}, buf.Bytes()...) // make a copy
 	cc := &check{}
-	_, _ = buf.WriteTo(cc)
-	replSum["head"] = cc.Sum()
+
+	hasHead := contains(tableNames, "head")
+	if hasHead {
+		// Copy and modify the "head" table.
+		// https://docs.microsoft.com/en-us/typography/opentype/spec/head
+		headTable := &table.Head{}
+		*headTable = *tt.Head
+		headTable.CheckSumAdjustment = 0
+		ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
+		headTable.Modified = int64(time.Since(ttZeroTime).Seconds())
+		_ = binary.Write(buf, binary.BigEndian, headTable)
+		replTab["head"] = append([]byte{}, buf.Bytes()...) // make a copy
+		_, _ = buf.WriteTo(cc)
+		replSum["head"] = cc.Sum()
+	}
 
 	// generate and write the new file header
-	numTables := len(names)
+	numTables := len(tableNames)
 	sel := bits.Len(uint(numTables)) - 1
 	header := &table.Header{
 		Offsets: table.Offsets{
@@ -73,19 +86,19 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			EntrySelector: uint16(sel),
 			RangeShift:    uint16(16 * (numTables - 1<<sel)),
 		},
-		Records: make([]table.Record, len(names)),
+		Records: make([]table.Record, len(tableNames)),
 	}
 	offset := uint32(12 + 16*numTables)
 	var totalSum uint32
-	for i, name := range names {
+	for i, name := range tableNames {
 		old := tt.Header.Find(name)
 		header.Records[i].Tag = old.Tag
 		header.Records[i].Offset = offset
 		var checksum uint32
 		var length uint32
-		if name == "head" {
-			checksum = replSum["head"]
-			length = uint32(len(replTab["head"]))
+		if body, ok := replTab[name]; ok {
+			checksum = replSum[name]
+			length = uint32(len(body))
 		} else {
 			checksum = old.CheckSum // TODO(voss): recalculate?
 			length = old.Length
@@ -110,17 +123,19 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	total += 16 * int64(len(header.Records))
 
 	// fix the checksum in the "head" table
-	cc.Reset()
-	headerChecksum, _ := checksumOld(buf, false)
-	totalSum += headerChecksum
-	binary.BigEndian.PutUint32(replTab["head"][8:12], 0xB1B0AFBA-totalSum)
+	if hasHead {
+		cc.Reset()
+		headerChecksum, _ := checksumOld(buf, false)
+		totalSum += headerChecksum
+		binary.BigEndian.PutUint32(replTab["head"][8:12], 0xB1B0AFBA-totalSum)
+	}
 
 	// write the tables
 	var pad [3]byte
-	for _, name := range names {
+	for _, name := range tableNames {
 		var n int64
-		if name == "head" {
-			n32, e2 := w.Write(replTab["head"])
+		if body, ok := replTab[name]; ok {
+			n32, e2 := w.Write(body)
 			n = int64(n32)
 			err = e2
 		} else {
@@ -144,7 +159,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	return total, nil
 }
 
-func (tt *Font) exportSelectTables(opt *ExportOptions) []string {
+func (tt *Font) selectTables(opt *ExportOptions) []string {
 	var names []string
 	done := make(map[string]bool)
 	include := opt.Include
@@ -157,7 +172,7 @@ func (tt *Font) exportSelectTables(opt *ExportOptions) []string {
 	} {
 		done[name] = true
 		if tt.Header.Find(name) != nil {
-			if include == nil || include(name) {
+			if include == nil || include[name] {
 				names = append(names, name)
 			}
 		}
@@ -173,7 +188,7 @@ func (tt *Font) exportSelectTables(opt *ExportOptions) []string {
 		if done[name] {
 			continue
 		}
-		if include == nil || include(name) {
+		if include == nil || include[name] {
 			names = append(names, name)
 		}
 	}

@@ -47,8 +47,8 @@ func TestFrame(t *testing.T) {
 	page, err := pages.SinglePage(out, &pages.Attributes{
 		Resources: pdf.Dict{
 			"Font": pdf.Dict{
-				F1.Name: F1.Ref,
-				F2.Name: F2.Ref,
+				F1.InstName: F1.Ref,
+				F2.InstName: F2.Ref,
 			},
 		},
 		MediaBox: pages.A5,

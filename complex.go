@@ -40,6 +40,7 @@ func (x Number) PDF(w io.Writer) error {
 
 // Rectangle represents a PDF rectangle, given by the coordinates of
 // two diagonally opposite corners in a PDF Array.
+// TODO(voss): should the values be integers?
 type Rectangle struct {
 	LLx, LLy, URx, URy float64
 }

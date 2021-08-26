@@ -38,7 +38,7 @@ func EmbedAfm(w *pdf.Writer, refName string, afm *AfmInfo) (*font.Font, error) {
 	}
 
 	res := &font.Font{
-		Name:        pdf.Name(refName),
+		InstName:    pdf.Name(refName),
 		Ref:         b.fontRef,
 		CMap:        b.cmap,
 		Layout:      layout,
@@ -64,7 +64,7 @@ type builtin struct {
 	used       map[byte]bool
 	candidates []*candidate
 
-	hasOverflow bool
+	overflowed bool
 }
 
 func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, refName string) *builtin {
@@ -175,7 +175,7 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 		// A simple font can only encode 256 different characters. If we run
 		// out of character codes, just return 0 here and report an error when
 		// we try to write the font dictionary at the end.
-		b.hasOverflow = true
+		b.overflowed = true
 		return pdf.String{0}
 	}
 
@@ -193,7 +193,7 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 }
 
 func (b *builtin) WriteFontDict(w *pdf.Writer) error {
-	if b.hasOverflow {
+	if b.overflowed {
 		return errors.New("too many different glyphs for simple font " + b.name)
 	}
 
