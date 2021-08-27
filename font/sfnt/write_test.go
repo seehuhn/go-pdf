@@ -18,7 +18,6 @@ package sfnt
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"testing"
 
@@ -62,74 +61,39 @@ func TestExport(t *testing.T) {
 }
 
 func TestWriteCmap(t *testing.T) {
-	cmap1 := make(map[rune]font.GlyphID)
-	for r := rune(32); r < 127; r++ {
-		cmap1[r] = font.GlyphID(r - 30)
-	}
-	cmap2 := make(map[rune]font.GlyphID)
-	for r := rune(32); r < 127; r++ {
-		cmap2[r] = font.GlyphID((r-32)*7/6 + 2)
-	}
-	cmap3 := make(map[rune]font.GlyphID)
-	for r := rune(32); r < 127; r++ {
-		cmap3[r] = font.GlyphID((r-32)*20/19 + 2)
-	}
-	cmap4 := make(map[rune]font.GlyphID)
-	for r := rune(32); r < 127; r++ {
-		if r < 40 {
-			cmap4[r] = font.GlyphID(2 + 2*r)
-		} else if r < 50 {
-			cmap4[r] = font.GlyphID(100 + r)
-		} else {
-			cmap4[r] = font.GlyphID(200 + 2*r)
-		}
+	subset := make([]font.GlyphID, 100)
+	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90} {
+		subset[c] = font.GlyphID(i + 1)
 	}
 
-	for _, cmap := range []map[rune]font.GlyphID{
-		cmap1, cmap2, cmap3, cmap4,
-	} {
-		buf := &bytes.Buffer{}
-		enc, err := writeSimpleCmap(buf, cmap)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
+	buf, err := makeSimpleCmap(subset)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		fmt.Printf("% x\n", buf.Bytes())
-		fd := bytes.NewReader(buf.Bytes())
-		cmapTable, err := table.ReadCmapTable(fd)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
+	r := bytes.NewReader(buf)
+	cmapTable, err := table.ReadCmapTable(r)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		i2rMap := make(map[int]rune)
-		for r, idx := range cmap {
-			cc := enc(idx)
-			i2rMap[0xF000+int(cc[0])] = r
-		}
-		i2r := func(c int) rune { return i2rMap[c] }
+	if cmapTable.Header.NumTables != 1 {
+		t.Errorf("wrong number of tables: %d != 1", cmapTable.Header.NumTables)
+	}
+	enc := cmapTable.Find(3, 0)
+	cmap, err := enc.LoadCmap(r, func(i int) rune { return rune(i) })
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		encRec := cmapTable.Find(3, 0)
-		if encRec == nil {
-			t.Error("no 3,0 subtable found")
-			continue
+	for r := rune(0); r < 256; r++ {
+		var expected font.GlyphID
+		if int(r) < len(subset) {
+			expected = subset[r]
 		}
-		out, err := encRec.LoadCmap(fd, i2r)
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-
-		if len(out) != len(cmap) {
-			t.Errorf("wrong cmap length: %d != %d", len(out), len(cmap))
-			continue
-		}
-		for r, idx := range out {
-			if cmap[r] != idx {
-				t.Errorf("wrong mapping: %04x -> %d != %d", r, idx, cmap[r])
-				continue
-			}
+		if cmap[r] != expected {
+			t.Errorf("wrong mapping: cmap[%d] == %d != %d",
+				r, cmap[r], expected)
 		}
 	}
 }

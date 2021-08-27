@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -58,9 +59,9 @@ func convert(inName, outName string) error {
 	if false {
 		Font, err = builtin.Embed(out, "F", "Courier")
 	} else {
-		Font, err = truetype.OldEmbed(out, "F",
+		Font, err = truetype.EmbedSimple(out, "F",
 			"../../font/truetype/ttf/SourceSerif4-Regular.ttf",
-			nil)
+			locale.DeDE)
 	}
 	if err != nil {
 		return err

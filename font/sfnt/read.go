@@ -99,6 +99,7 @@ func (tt *Font) GetFontName() (string, error) {
 	return "", errors.New("no usable font name found")
 }
 
+// GetPostInfo reads the "post" table of a sfnt file.
 func (tt *Font) GetPostInfo() (*table.PostInfo, error) {
 	postHeader := &table.PostHeader{}
 	_, err := tt.Header.ReadTableHead(tt.Fd, "post", postHeader)
@@ -119,6 +120,8 @@ func (tt *Font) GetPostInfo() (*table.PostInfo, error) {
 	return res, nil
 }
 
+// GetHHeaInfo reads the "hhea" table of a sfnt file.
+// TODO(voss): use caching?
 func (tt *Font) GetHHeaInfo() (*table.Hhea, error) {
 	hhea := &table.Hhea{}
 	_, err := tt.Header.ReadTableHead(tt.Fd, "hhea", hhea)
@@ -128,6 +131,7 @@ func (tt *Font) GetHHeaInfo() (*table.Hhea, error) {
 	return hhea, nil
 }
 
+// GetHMtxInfo reads the "hmtx" table of a sfnt file.
 func (tt *Font) GetHMtxInfo(NumOfLongHorMetrics uint16) (*table.Hmtx, error) {
 	hmtx := &table.Hmtx{
 		HMetrics:        make([]table.LongHorMetric, NumOfLongHorMetrics),
@@ -144,6 +148,7 @@ func (tt *Font) GetHMtxInfo(NumOfLongHorMetrics uint16) (*table.Hmtx, error) {
 	return hmtx, nil
 }
 
+// GetOS2Info reads the "OS/2" table of a sfnt file.
 func (tt *Font) GetOS2Info() (*table.OS2, error) {
 	os2 := &table.OS2{}
 	os2Fd, err := tt.Header.ReadTableHead(tt.Fd, "OS/2", &os2.V0)
@@ -235,8 +240,8 @@ func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 	return kerning, nil
 }
 
-// GetGlyfInfo reads the glyph bounding boxes from the "glyf" table.
-func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
+// GetGlyfOffsets returns the locations of the glyphs in the "glyf" table.
+func (tt *Font) GetGlyfOffsets() ([]uint32, error) {
 	var err error
 	offset := make([]uint32, tt.NumGlyphs+1)
 	if tt.Head.IndexToLocFormat == 0 {
@@ -248,6 +253,15 @@ func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
 	} else {
 		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", offset)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return offset, nil
+}
+
+// GetGlyfInfo reads the glyph bounding boxes from the "glyf" table.
+func (tt *Font) GetGlyfInfo() (*table.Glyf, error) {
+	offset, err := tt.GetGlyfOffsets()
 	if err != nil {
 		return nil, err
 	}

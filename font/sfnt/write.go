@@ -29,10 +29,10 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
+// ExportOptions provides options for the Font.Export() function.
 type ExportOptions struct {
-	Include            map[string]bool // select a subset of tables
-	Subset             []font.GlyphID  // select a subset of glyphs
-	GenerateSimpleCmap bool
+	Include map[string]bool // select a subset of tables
+	Subset  []font.GlyphID  // select a subset of glyphs
 }
 
 func contains(ss []string, s string) bool {
@@ -48,17 +48,51 @@ func contains(ss []string, s string) bool {
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	if opt == nil {
 		opt = &ExportOptions{}
+	} else if opt.Subset != nil {
+		opt.Include["cmap"] = true
 	}
-
-	var total int64
-
 	tableNames := tt.selectTables(opt)
 
 	replTab := make(map[string][]byte)
 	replSum := make(map[string]uint32)
-	buf := &bytes.Buffer{}
 
-	cc := &check{}
+	indexToLocFormat := -1
+	if opt.Subset != nil {
+		includeOnly := []font.GlyphID{0}
+		for _, origGid := range opt.Subset {
+			if origGid != 0 {
+				includeOnly = append(includeOnly, origGid)
+			}
+		}
+
+		cmapBytes, err := makeSimpleCmap(opt.Subset)
+		if err != nil {
+			return 0, err
+		}
+		replTab["cmap"] = cmapBytes
+		replSum["cmap"] = checksum(cmapBytes)
+
+		subsetInfo, err := tt.subsetGlyphs(includeOnly)
+		if err != nil {
+			return 0, err
+		}
+		replTab["glyf"] = subsetInfo.glyfBytes
+		replSum["glyf"] = checksum(subsetInfo.glyfBytes)
+		replTab["loca"] = subsetInfo.locaBytes
+		replSum["loca"] = checksum(subsetInfo.locaBytes)
+		indexToLocFormat = subsetInfo.indexToLocFormat
+		replTab["hmtx"] = subsetInfo.hmtxBytes
+		replSum["hmtx"] = checksum(subsetInfo.hmtxBytes)
+
+		maxpBytes, err := tt.Header.ReadTableBytes(tt.Fd, "maxp")
+		if err != nil {
+			return 0, err
+		}
+		// fix up numGlyphs
+		binary.BigEndian.PutUint16(maxpBytes[4:6], subsetInfo.numGlyphs)
+		replTab["maxp"] = maxpBytes
+		replSum["maxp"] = checksum(maxpBytes)
+	}
 
 	hasHead := contains(tableNames, "head")
 	if hasHead {
@@ -69,11 +103,19 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		headTable.CheckSumAdjustment = 0
 		ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
 		headTable.Modified = int64(time.Since(ttZeroTime).Seconds())
+		if indexToLocFormat >= 0 {
+			headTable.IndexToLocFormat = int16(indexToLocFormat)
+		}
+
+		buf := &bytes.Buffer{}
 		_ = binary.Write(buf, binary.BigEndian, headTable)
-		replTab["head"] = append([]byte{}, buf.Bytes()...) // make a copy
-		_, _ = buf.WriteTo(cc)
-		replSum["head"] = cc.Sum()
+		headBytes := buf.Bytes()
+		replTab["head"] = headBytes
+		replSum["head"] = checksum(headBytes)
 	}
+
+	var totalSize int64
+	var totalSum uint32
 
 	// generate and write the new file header
 	numTables := len(tableNames)
@@ -89,7 +131,6 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		Records: make([]table.Record, len(tableNames)),
 	}
 	offset := uint32(12 + 16*numTables)
-	var totalSum uint32
 	for i, name := range tableNames {
 		old := tt.Header.Find(name)
 		header.Records[i].Tag = old.Tag
@@ -111,22 +152,25 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	sort.Slice(header.Records, func(i, j int) bool {
 		return bytes.Compare(header.Records[i].Tag[:], header.Records[j].Tag[:]) < 0
 	})
-	err := binary.Write(w, binary.BigEndian, header.Offsets)
+	buf := &bytes.Buffer{}
+	err := binary.Write(buf, binary.BigEndian, header.Offsets)
 	if err != nil {
 		return 0, err
 	}
-	total += 12
-	err = binary.Write(w, binary.BigEndian, header.Records)
+	err = binary.Write(buf, binary.BigEndian, header.Records)
 	if err != nil {
 		return 0, err
 	}
-	total += 16 * int64(len(header.Records))
+	headerBytes := buf.Bytes()
+	_, err = w.Write(headerBytes)
+	if err != nil {
+		return 0, err
+	}
+	totalSize += int64(len(headerBytes))
+	totalSum += checksum(headerBytes)
 
-	// fix the checksum in the "head" table
 	if hasHead {
-		cc.Reset()
-		headerChecksum, _ := checksumOld(buf, false)
-		totalSum += headerChecksum
+		// fix the checksum in the "head" table
 		binary.BigEndian.PutUint32(replTab["head"][8:12], 0xB1B0AFBA-totalSum)
 	}
 
@@ -146,17 +190,125 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
-		total += n
+		totalSize += n
 		if k := n % 4; k != 0 {
 			l, err := w.Write(pad[:4-k])
 			if err != nil {
 				return 0, err
 			}
-			total += int64(l)
+			totalSize += int64(l)
 		}
 	}
 
-	return total, nil
+	return totalSize, nil
+}
+
+type subsetInfo struct {
+	numGlyphs           uint16
+	glyfBytes           []byte
+	locaBytes           []byte
+	indexToLocFormat    int // 0 for short offsets, 1 for long
+	hmtxBytes           []byte
+	numOfLongHorMetrics int
+}
+
+func (tt *Font) subsetGlyphs(includeOnly []font.GlyphID) (*subsetInfo, error) {
+	oldOffsets, err := tt.GetGlyfOffsets()
+	if err != nil {
+		return nil, err
+	}
+
+	glyfFd, err := tt.Header.ReadTableHead(tt.Fd, "glyf", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	hheaInfo, err := tt.GetHHeaInfo()
+	if err != nil {
+		return nil, err
+	}
+	hmtx, err := tt.GetHMtxInfo(hheaInfo.NumOfLongHorMetrics)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &subsetInfo{
+		numGlyphs: uint16(len(includeOnly)),
+	}
+
+	// write the new "glyf" table
+	var newOffsets []uint32
+	var newHMetrics []table.LongHorMetric
+	buf := &bytes.Buffer{}
+	for _, origGid := range includeOnly {
+		start := oldOffsets[origGid]
+		end := oldOffsets[origGid+1]
+		length := end - start
+
+		newOffsets = append(newOffsets, uint32(buf.Len()))
+		if length > 0 {
+			_, err = glyfFd.Seek(int64(start), io.SeekStart)
+			if err != nil {
+				return nil, err
+			}
+			_, err = io.CopyN(buf, glyfFd, int64(length))
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		newHMetrics = append(newHMetrics, table.LongHorMetric{
+			AdvanceWidth:    hmtx.GetAdvanceWidth(int(origGid)),
+			LeftSideBearing: hmtx.GetLSB(int(origGid)),
+		})
+	}
+	newOffsets = append(newOffsets, uint32(buf.Len()))
+	res.glyfBytes = buf.Bytes()
+
+	// write the new "loca" table
+	buf = &bytes.Buffer{}
+	if buf.Len() < 1<<16 {
+		res.indexToLocFormat = 0
+		shortOffsets := make([]uint16, len(newOffsets))
+		for i, offs := range newOffsets {
+			shortOffsets[i] = uint16(offs)
+		}
+		err = binary.Write(buf, binary.BigEndian, shortOffsets)
+	} else {
+		res.indexToLocFormat = 1
+		err = binary.Write(buf, binary.BigEndian, newOffsets)
+	}
+	if err != nil {
+		return nil, err
+	}
+	res.locaBytes = buf.Bytes()
+
+	// write the new "hmtx" table
+	n := len(newHMetrics)
+	numOfLongHorMetrics := n
+	for i := n - 1; i > 0; i-- {
+		if newHMetrics[i] != newHMetrics[i-1] {
+			break
+		}
+		numOfLongHorMetrics--
+	}
+	newLSB := make([]int16, n-numOfLongHorMetrics)
+	for i, hm := range newHMetrics[numOfLongHorMetrics:] {
+		newLSB[i] = hm.LeftSideBearing
+	}
+	buf = &bytes.Buffer{}
+	err = binary.Write(buf, binary.BigEndian, newHMetrics[:numOfLongHorMetrics])
+	if err != nil {
+		return nil, err
+	}
+	err = binary.Write(buf, binary.BigEndian, newLSB)
+	if err != nil {
+		return nil, err
+	}
+	res.hmtxBytes = buf.Bytes()
+	res.numOfLongHorMetrics = numOfLongHorMetrics
+
+	return res, nil
 }
 
 func (tt *Font) selectTables(opt *ExportOptions) []string {
@@ -223,127 +375,39 @@ type simpleCmapTableHead struct {
 	// GlyphIDArray   []uint16 // Glyph index array (arbitrary length)
 }
 
-// write a cmap with just a 3,0,4 subtable for a simple font
-func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphID) (func(...font.GlyphID) []byte, error) {
-	var used []rune
-	for r, idx := range cmap {
-		if idx != 0 {
-			used = append(used, r)
-		}
-	}
-	sort.Slice(used, func(i, j int) bool {
-		return cmap[used[i]] < cmap[used[j]]
-	})
-	n := len(used)
+// Write a cmap with just a 3,0,4 subtable to map character indices to glyph
+// indices in a subset, simple font.
+func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
+	n := len(subset)
 	if n > 256 {
 		return nil, errors.New("too many characters for a simple font")
 	}
 
-	// Covering k glyphs as a segment with non-consecutive character indices
-	// uses 4+k uint16 values.  Covering l glyphs as a segment with consecutive
-	// character indices uses 4 uint16 values.  Thus, we only use segments with
-	// consecutive character indices, if l >= 4.
-	type segment struct {
-		start  int // first index into used
-		end    int // last index into used
-		target font.GlyphID
-	}
-	var ss []*segment
-	var strays []rune
+	// Every non-zero entry in subset corresponds to a glyph included in the
+	// subset.  In the subsetted font these glyphs will be numbered
+	// consecutively, starting at glyph ID 1.  Thus, there are no contiguous
+	// character code segments mapping to non-consecutive glyph IDs and we will
+	// not need to use the glyphIdArray.
 
-	first := true
-	var prev font.GlyphID
-	runLength := 0
-	pos := 0
-	for i := 0; i < n; i++ {
-		idx := cmap[used[i]]
-		if first || idx == prev+1 {
-			runLength++
+	var StartCode, EndCode, IDDelta, IDRangeOffsets []uint16
+	prevC := 999 // impossible value
+	newGid := uint16(0)
+	for c, origGid := range subset {
+		if origGid == 0 {
+			continue
+		}
+		newGid++
+
+		if c == prevC+1 {
+			EndCode[len(EndCode)-1]++
 		} else {
-			if runLength >= 4 {
-				if pos < i-runLength {
-					strays = append(strays, used[pos:i-runLength]...)
-				}
-				ss = append(ss, &segment{
-					start:  i - runLength,
-					end:    i,
-					target: cmap[used[i-runLength]],
-				})
-				pos = i
-			}
-			runLength = 1
-		}
-
-		first = false
-		prev = idx
-	}
-	if runLength >= 4 {
-		if pos < n-runLength {
-			strays = append(strays, used[pos:n-runLength]...)
-		}
-		ss = append(ss, &segment{
-			start:  n - runLength,
-			end:    n,
-			target: cmap[used[n-runLength]],
-		})
-	} else {
-		strays = append(strays, used[pos:]...)
-	}
-
-	var base uint16
-	switch {
-	case 33+n <= 256:
-		base = 33
-	default:
-		base = uint16(256 - n)
-	}
-	next := 0xF000 + base
-
-	g2c := make(map[font.GlyphID]byte)
-
-	// Construct the cmap table
-	data := &simpleCmapTableHead{
-		NumTables:      1,
-		PlatformID:     3,
-		EncodingID:     0,
-		SubtableOffset: 12,
-		Format:         4,
-	}
-	var StartCode, EndCode, IDDelta, IDRangeOffsets, GlyphIDArray []uint16
-	for _, r := range strays {
-		GlyphIDArray = append(GlyphIDArray, uint16(cmap[r]))
-	}
-	for _, seg := range ss {
-		length := uint16(seg.end - seg.start)
-		StartCode = append(StartCode, next)
-		EndCode = append(EndCode, next+length-1)
-		IDDelta = append(IDDelta, uint16(seg.target)-next)
-		IDRangeOffsets = append(IDRangeOffsets, 0)
-		for i := 0; i < int(length); i++ {
-			g2c[seg.target+font.GlyphID(i)] = byte(next + uint16(i))
-		}
-		next += length
-	}
-	if len(GlyphIDArray) > 0 {
-		length := uint16(len(GlyphIDArray))
-		StartCode = append(StartCode, next)
-		EndCode = append(EndCode, next+length-1)
-		if length == 1 {
-			// a continuous segment of length one is shorter
-			IDDelta = append(IDDelta, GlyphIDArray[0]-next)
+			c16 := uint16(c)
+			StartCode = append(StartCode, c16)
+			EndCode = append(EndCode, c16)
+			IDDelta = append(IDDelta, newGid-c16)
 			IDRangeOffsets = append(IDRangeOffsets, 0)
-			GlyphIDArray = nil
-		} else {
-			IDDelta = append(IDDelta, 0)
-			// There will be one more segment, so we are using the second slot
-			// from the end, i.e. k = segCount-2.  We want to point at index 0
-			// in the GlyphIDArray, so we need
-			// 0 == idRangeOffset[k]/2 - (segCount - k).
-			IDRangeOffsets = append(IDRangeOffsets, 4)
 		}
-		for i := 0; i < int(length); i++ {
-			g2c[font.GlyphID(GlyphIDArray[i])] = byte(next + uint16(i))
-		}
+		prevC = c
 	}
 	// add the required final segment
 	StartCode = append(StartCode, 0xFFFF)
@@ -351,8 +415,17 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphID) (func(...font.Glyp
 	IDDelta = append(IDDelta, 0x0001)
 	IDRangeOffsets = append(IDRangeOffsets, 0)
 
+	// Encode the data in the binary format described at
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
+	data := &simpleCmapTableHead{
+		NumTables:      1,
+		PlatformID:     3,
+		EncodingID:     0,
+		SubtableOffset: 12,
+		Format:         4,
+	}
 	segCount := len(StartCode)
-	data.Length = uint16(2 * (8 + 4*(segCount+1) + len(GlyphIDArray)))
+	data.Length = uint16(2 * (8 + 4*(segCount+1)))
 	data.SegCountX2 = uint16(2 * segCount)
 	sel := bits.Len(uint(segCount))
 	data.SearchRange = 1 << sel
@@ -361,24 +434,17 @@ func writeSimpleCmap(w io.Writer, cmap map[rune]font.GlyphID) (func(...font.Glyp
 
 	EndCode = append(EndCode, 0) // add the ReservedPad field here
 
-	err := binary.Write(w, binary.BigEndian, data)
+	buf := &bytes.Buffer{}
+	err := binary.Write(buf, binary.BigEndian, data)
 	if err != nil {
 		return nil, err
 	}
-	for _, buf := range [][]uint16{EndCode, StartCode, IDDelta, IDRangeOffsets, GlyphIDArray} {
-		err := binary.Write(w, binary.BigEndian, buf)
+	for _, data := range [][]uint16{EndCode, StartCode, IDDelta, IDRangeOffsets} {
+		err := binary.Write(buf, binary.BigEndian, data)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	enc := func(ii ...font.GlyphID) []byte {
-		var res []byte
-		for _, i := range ii {
-			res = append(res, g2c[i])
-		}
-		return res
-	}
-
-	return enc, nil
+	return buf.Bytes(), nil
 }

@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - support for reading and writing PDF files
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package truetype
 
 import (
@@ -150,8 +166,7 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 
 	Width := make([]int, tt.NumGlyphs)
 	for i := 0; i < tt.NumGlyphs; i++ {
-		j := i % len(hmtx.HMetrics)
-		Width[i] = int(hmtx.HMetrics[j].AdvanceWidth)
+		Width[i] = int(hmtx.GetAdvanceWidth(i))
 	}
 
 	pars := parser.New(tt)
@@ -430,20 +445,19 @@ func (t *truetype) WriteFontFile(w *pdf.Writer, subset []font.GlyphID) (*pdf.Ref
 	exOpt := &sfnt.ExportOptions{
 		Include: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
-			// TODO(voss): include "gasp"?
-			"glyf": true,
-			"head": true,
-			"hhea": true,
-			"hmtx": true,
-			"loca": true,
-			"maxp": true,
-			"cvt ": true,
-			"fpgm": true,
-			"prep": true,
-			"gasp": true,
+			"glyf": true, // rewrite
+			"head": true, // update CheckSumAdjustment, Modified and indexToLocFormat
+			"hhea": true, // update various fields, including numberOfHMetrics (TODO)
+			"hmtx": true, // rewrite
+			"loca": true, // rewrite
+			"maxp": true, // update numGlyphs
+			"cvt ": true, // copy
+			"fpgm": true, // copy
+			"prep": true, // copy
+
+			"gasp": true, // copy, TODO(voss): is this addition wise/useful?
 		},
-		Subset:             subset,
-		GenerateSimpleCmap: true,
+		Subset: subset,
 	}
 	n, err := t.Ttf.Export(fontFileStream, exOpt)
 	if err != nil {

@@ -108,6 +108,21 @@ func (h *Header) ReadTableHead(r io.ReaderAt, name string, head interface{}) (*i
 	return tableFd, nil
 }
 
+// ReadTableBytes returns the body of a sfnt table.
+func (h *Header) ReadTableBytes(r io.ReaderAt, name string) ([]byte, error) {
+	table := h.Find(name)
+	if table == nil {
+		return nil, &ErrNoTable{name}
+	}
+
+	buf := make([]byte, table.Length)
+	_, err := r.ReadAt(buf, int64(table.Offset))
+	if err != nil {
+		return nil, err
+	}
+	return buf, nil
+}
+
 // --------------------------------------------------------------------------
 
 // The Head table contains global information about a font.
@@ -493,6 +508,26 @@ type Hmtx struct {
 type LongHorMetric struct {
 	AdvanceWidth    uint16
 	LeftSideBearing int16
+}
+
+// GetAdvanceWidth returns the advance width of a glyph, in font design units.
+func (h *Hmtx) GetAdvanceWidth(gid int) uint16 {
+	if gid >= len(h.HMetrics) {
+		return h.HMetrics[len(h.HMetrics)-1].AdvanceWidth
+	}
+	return h.HMetrics[gid].AdvanceWidth
+}
+
+// GetLSB returns the left side bearing width of a glyph, in font design units.
+func (h *Hmtx) GetLSB(gid int) int16 {
+	if gid < len(h.HMetrics) {
+		return h.HMetrics[gid].LeftSideBearing
+	}
+	gid -= len(h.HMetrics)
+	if gid < len(h.LeftSideBearing) {
+		return h.LeftSideBearing[gid]
+	}
+	return 0
 }
 
 type OS2 struct {
