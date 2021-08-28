@@ -18,7 +18,6 @@ package truetype
 
 import (
 	"errors"
-	"fmt"
 	"math"
 
 	"seehuhn.de/go/pdf"
@@ -351,7 +350,6 @@ func (t *truetype) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*p
 
 	var flags fontFlags
 	if t.os2Info != nil {
-		fmt.Printf("%#v\n", t.os2Info)
 		switch t.os2Info.V0.FamilyClass >> 8 {
 		case 1, 2, 3, 4, 5, 7:
 			flags |= fontFlagSerif

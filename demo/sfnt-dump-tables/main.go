@@ -38,12 +38,12 @@ func main() {
 		log.Fatal(err)
 	}
 	if len(args) == 1 {
-		fmt.Println(" name |     offset |     length")
-		fmt.Println("------+------------+------------")
+		fmt.Println(" name |     offset |     length |   checksum")
+		fmt.Println("------+------------+------------+-----------")
 		records := tt.Header.Records
 		for i := range records {
-			fmt.Printf(" %4s |%11d |%11d\n",
-				records[i].Tag, records[i].Offset, records[i].Length)
+			fmt.Printf(" %4s |%11d |%11d | 0x%08x\n",
+				records[i].Tag, records[i].Offset, records[i].Length, records[i].CheckSum)
 		}
 		return
 	}

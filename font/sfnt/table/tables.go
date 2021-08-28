@@ -585,12 +585,14 @@ type Glyf struct {
 	// actual glyph descriptions omitted
 }
 
+// GlyphHeader is the structure at the beginning of a glyph description.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#glyph-headers
 type GlyphHeader struct {
-	_    int16 // If the number of contours is greater than or equal to zero, this is a simple glyph. If negative, this is a composite glyph — the value -1 should be used for composite glyphs.
-	XMin int16 // Minimum x for coordinate data.
-	YMin int16 // Minimum y for coordinate data.
-	XMax int16 // Maximum x for coordinate data.
-	YMax int16 // Maximum y for coordinate data.
+	NumberOfContours int16 // If the number of contours is greater than or equal to zero, this is a simple glyph. If negative, this is a composite glyph — the value -1 should be used for composite glyphs.
+	XMin             int16 // Minimum x for coordinate data.
+	YMin             int16 // Minimum y for coordinate data.
+	XMax             int16 // Maximum x for coordinate data.
+	YMax             int16 // Maximum y for coordinate data.
 }
 
 // Tag represents a tag string composed of 4 ASCII bytes

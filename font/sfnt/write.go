@@ -61,9 +61,8 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	tableNames := tt.selectTables(opt)
 
 	replTab := make(map[string][]byte)
-	replSum := make(map[string]uint32)
 
-	indexToLocFormat := -1
+	var subsetInfo *subsetInfo
 	if opt.Subset != nil {
 		includeOnly := []font.GlyphID{0}
 		for _, origGid := range opt.Subset {
@@ -77,22 +76,15 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			return 0, err
 		}
 		replTab["cmap"] = cmapBytes
-		replSum["cmap"] = checksum(cmapBytes)
 
-		subsetInfo, err := tt.makeSubset(includeOnly)
+		subsetInfo, err = tt.makeSubset(includeOnly)
 		if err != nil {
 			return 0, err
 		}
-		replTab["glyf"] = subsetInfo.glyfBytes
-		replSum["glyf"] = checksum(subsetInfo.glyfBytes)
-		replTab["loca"] = subsetInfo.locaBytes
-		replSum["loca"] = checksum(subsetInfo.locaBytes)
-		indexToLocFormat = subsetInfo.indexToLocFormat
-		replTab["hmtx"] = subsetInfo.hmtxBytes
-		replSum["hmtx"] = checksum(subsetInfo.hmtxBytes)
-		replTab["hhea"] = subsetInfo.hheaBytes
-		replSum["hhea"] = checksum(subsetInfo.hheaBytes)
-
+		for _, name := range []string{"glyf", "loca", "hmtx", "hhea"} {
+			blob := subsetInfo.blobs[name]
+			replTab[name] = blob
+		}
 		// fix up numGlyphs
 		maxpBytes, err := tt.Header.ReadTableBytes(tt.Fd, "maxp")
 		if err != nil {
@@ -100,7 +92,6 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		}
 		binary.BigEndian.PutUint16(maxpBytes[4:6], subsetInfo.numGlyphs)
 		replTab["maxp"] = maxpBytes
-		replSum["maxp"] = checksum(maxpBytes)
 	}
 
 	hasHead := contains(tableNames, "head")
@@ -112,15 +103,18 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		headTable.CheckSumAdjustment = 0
 		ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
 		headTable.Modified = int64(time.Since(ttZeroTime).Seconds())
-		if indexToLocFormat >= 0 {
-			headTable.IndexToLocFormat = int16(indexToLocFormat)
+		if subsetInfo != nil {
+			headTable.XMin = subsetInfo.xMin
+			headTable.YMin = subsetInfo.yMin
+			headTable.XMax = subsetInfo.xMax
+			headTable.YMax = subsetInfo.yMax
+			headTable.IndexToLocFormat = int16(subsetInfo.indexToLocFormat)
 		}
 
 		buf := &bytes.Buffer{}
 		_ = binary.Write(buf, binary.BigEndian, headTable)
 		headBytes := buf.Bytes()
 		replTab["head"] = headBytes
-		replSum["head"] = checksum(headBytes)
 	}
 
 	var totalSize int64
@@ -144,18 +138,18 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		old := tt.Header.Find(name)
 		header.Records[i].Tag = old.Tag
 		header.Records[i].Offset = offset
-		var checksum uint32
+		var newChecksum uint32
 		var length uint32
 		if body, ok := replTab[name]; ok {
-			checksum = replSum[name]
+			newChecksum = checksum(body)
 			length = uint32(len(body))
 		} else {
-			checksum = old.CheckSum // TODO(voss): recalculate?
+			newChecksum = old.CheckSum // TODO(voss): recalculate?
 			length = old.Length
 		}
-		header.Records[i].CheckSum = checksum
+		header.Records[i].CheckSum = newChecksum
 		header.Records[i].Length = length
-		totalSum += checksum
+		totalSum += newChecksum
 		offset += 4 * ((length + 3) / 4)
 	}
 	sort.Slice(header.Records, func(i, j int) bool {
@@ -213,21 +207,19 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 }
 
 type subsetInfo struct {
-	numGlyphs        uint16
-	glyfBytes        []byte
-	locaBytes        []byte
-	indexToLocFormat int // 0 for short offsets, 1 for long
-	hmtxBytes        []byte
-	hheaBytes        []byte
+	numGlyphs uint16
+	blobs     map[string][]byte
+
+	// fields for the "head" table
+	xMin             int16
+	yMin             int16
+	xMax             int16
+	yMax             int16
+	indexToLocFormat int16 // 0 for short offsets, 1 for long
 }
 
 func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
-	oldOffsets, err := tt.GetGlyfOffsets()
-	if err != nil {
-		return nil, err
-	}
-
-	glyfFd, err := tt.Header.ReadTableHead(tt.Fd, "glyf", nil)
+	origOffsets, err := tt.GetGlyfOffsets()
 	if err != nil {
 		return nil, err
 	}
@@ -241,8 +233,17 @@ func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		return nil, err
 	}
 
+	glyfFd, err := tt.Header.ReadTableHead(tt.Fd, "glyf", nil)
+	if err != nil {
+		return nil, err
+	}
+
 	res := &subsetInfo{
-		numGlyphs: uint16(len(includeOnly)),
+		blobs: make(map[string][]byte),
+		xMin:  32767,
+		yMin:  32767,
+		xMax:  -32768,
+		yMax:  -32768,
 	}
 
 	// write the new "glyf" table
@@ -250,43 +251,122 @@ func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	var newHMetrics []table.LongHorMetric
 	var advanceWidthMax uint16
 	var minLeftSideBearing int16 = 32767
+	var minRightSideBearing int16 = 32767
+	var xMaxExtent int16
 	buf := &bytes.Buffer{}
-	for _, origGid := range includeOnly {
-		start := oldOffsets[origGid]
-		end := oldOffsets[origGid+1]
+	newGid := 0
+	for newGid < len(includeOnly) {
+		newOffsets = append(newOffsets, uint32(buf.Len()))
+
+		origGid := includeOnly[newGid]
+		start := origOffsets[origGid]
+		end := origOffsets[origGid+1]
 		length := end - start
 
-		newOffsets = append(newOffsets, uint32(buf.Len()))
+		advanceWidth := hmtx.GetAdvanceWidth(int(origGid))
+		if advanceWidth > advanceWidthMax {
+			advanceWidthMax = advanceWidth
+		}
+
+		leftSideBearing := hmtx.GetLSB(int(origGid))
+		if length > 0 && leftSideBearing < minLeftSideBearing {
+			minLeftSideBearing = leftSideBearing
+		}
+
 		if length > 0 {
 			_, err = glyfFd.Seek(int64(start), io.SeekStart)
 			if err != nil {
 				return nil, err
 			}
-			_, err = io.CopyN(buf, glyfFd, int64(length))
+			glyphHeader := &table.GlyphHeader{}
+			err = binary.Read(glyfFd, binary.BigEndian, glyphHeader)
+			if err != nil {
+				return nil, err
+			}
+			err = binary.Write(buf, binary.BigEndian, glyphHeader)
+			if err != nil {
+				return nil, err
+			}
+
+			if glyphHeader.XMin < res.xMin {
+				res.xMin = glyphHeader.XMin
+			}
+			if glyphHeader.YMin < res.yMin {
+				res.yMin = glyphHeader.YMin
+			}
+			if glyphHeader.XMax > res.xMax {
+				res.xMax = glyphHeader.XMax
+			}
+			if glyphHeader.YMax > res.yMax {
+				res.yMax = glyphHeader.YMax
+			}
+
+			xExtent := (int16(leftSideBearing) + glyphHeader.XMax - glyphHeader.XMin)
+			if xExtent > xMaxExtent {
+				xMaxExtent = xExtent
+			}
+			rightSideBearing := int16(advanceWidth) - xExtent
+			if rightSideBearing < minRightSideBearing {
+				minRightSideBearing = rightSideBearing
+			}
+
+			todo := int64(length) - 10
+			if glyphHeader.NumberOfContours < 0 { // composite glyph
+				// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
+				var compHead struct {
+					Flags      uint16
+					GlyphIndex uint16
+				}
+				err = binary.Read(glyfFd, binary.BigEndian, &compHead)
+				if err != nil {
+					return nil, err
+				}
+
+				// map the component gid to the new scheme
+				origComponetGid := font.GlyphID(compHead.GlyphIndex)
+				newComponentGid := -1
+				for i, gid := range includeOnly {
+					if gid == origComponetGid {
+						newComponentGid = i
+						break
+					}
+				}
+				if newComponentGid < 0 {
+					newComponentGid = len(includeOnly)
+					includeOnly = append(includeOnly, origComponetGid)
+				}
+				compHead.GlyphIndex = uint16(newComponentGid)
+
+				err = binary.Write(buf, binary.BigEndian, &compHead)
+				if err != nil {
+					return nil, err
+				}
+				todo -= 2
+
+				// TODO(voss): handle any additional components
+			}
+
+			_, err = io.CopyN(buf, glyfFd, todo)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		advanceWidth := hmtx.GetAdvanceWidth(int(origGid))
-		leftSideBearing := hmtx.GetLSB(int(origGid))
 		newHMetrics = append(newHMetrics, table.LongHorMetric{
 			AdvanceWidth:    advanceWidth,
 			LeftSideBearing: leftSideBearing,
 		})
-		if advanceWidth > advanceWidthMax {
-			advanceWidthMax = advanceWidth
-		}
-		if length > 0 && leftSideBearing < minLeftSideBearing {
-			minLeftSideBearing = leftSideBearing
-		}
+
+		newGid++
 	}
-	newOffsets = append(newOffsets, uint32(buf.Len()))
-	res.glyfBytes = buf.Bytes()
+	glyphEnd := buf.Len()
+	newOffsets = append(newOffsets, uint32(glyphEnd))
+	res.numGlyphs = uint16(len(includeOnly))
+	res.blobs["glyf"] = buf.Bytes()
 
 	// write the new "loca" table
 	buf = &bytes.Buffer{}
-	if buf.Len() < 1<<16 {
+	if glyphEnd < 1<<16 {
 		res.indexToLocFormat = 0
 		shortOffsets := make([]uint16, len(newOffsets))
 		for i, offs := range newOffsets {
@@ -300,7 +380,7 @@ func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.locaBytes = buf.Bytes()
+	res.blobs["loca"] = buf.Bytes()
 
 	// write the new "hmtx" table
 	n := len(newHMetrics)
@@ -324,20 +404,22 @@ func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	res.hmtxBytes = buf.Bytes()
+	res.blobs["hmtx"] = buf.Bytes()
 
 	// write the new "hhea" table
 	newHhea := &table.Hhea{}
 	*newHhea = *hheaInfo // copy the old data
 	newHhea.AdvanceWidthMax = advanceWidthMax
 	newHhea.MinLeftSideBearing = minLeftSideBearing
+	newHhea.MinRightSideBearing = minRightSideBearing
+	newHhea.XMaxExtent = xMaxExtent
 	newHhea.NumOfLongHorMetrics = uint16(numOfLongHorMetrics)
 	buf = &bytes.Buffer{}
 	err = binary.Write(buf, binary.BigEndian, newHhea)
 	if err != nil {
 		return nil, err
 	}
-	res.hheaBytes = buf.Bytes()
+	res.blobs["hhea"] = buf.Bytes()
 
 	return res, nil
 }

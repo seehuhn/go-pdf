@@ -243,20 +243,20 @@ func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 // GetGlyfOffsets returns the locations of the glyphs in the "glyf" table.
 func (tt *Font) GetGlyfOffsets() ([]uint32, error) {
 	var err error
-	offset := make([]uint32, tt.NumGlyphs+1)
+	offsets := make([]uint32, tt.NumGlyphs+1)
 	if tt.Head.IndexToLocFormat == 0 {
-		short := make([]uint16, tt.NumGlyphs+1)
-		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", short)
-		for i, x := range short {
-			offset[i] = uint32(x) * 2
+		shortOffsets := make([]uint16, tt.NumGlyphs+1)
+		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", shortOffsets)
+		for i, x := range shortOffsets {
+			offsets[i] = uint32(x) * 2
 		}
 	} else {
-		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", offset)
+		_, err = tt.Header.ReadTableHead(tt.Fd, "loca", offsets)
 	}
 	if err != nil {
 		return nil, err
 	}
-	return offset, nil
+	return offsets, nil
 }
 
 // GetGlyfInfo reads the glyph bounding boxes from the "glyf" table.
