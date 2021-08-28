@@ -46,7 +46,10 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	}
 
 	// step 1: determine which glyphs to include
-	CMap := tt.CMap
+	CMap, err := tt.SelectCMap()
+	if err != nil {
+		return nil, err
+	}
 	if subset != nil && !isSuperset(CMap, subset) {
 		var missing []rune
 		for r, ok := range subset {
@@ -73,7 +76,7 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	// TODO(voss): subset the font as needed
 	// TODO(voss): if len(glyphs) <= 256, write a Type 2 font.
 
-	err := w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
+	err = w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}

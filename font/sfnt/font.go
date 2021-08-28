@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"unicode"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/table"
@@ -32,7 +31,6 @@ type Font struct {
 	Fd     *os.File
 	Header *table.Header
 	Head   *table.Head
-	CMap   map[rune]font.GlyphID
 
 	NumGlyphs int // TODO(voss): should this be here?
 }
@@ -82,12 +80,6 @@ func Open(fname string) (*Font, error) {
 	}
 	tt.NumGlyphs = int(maxp.NumGlyphs)
 
-	tt.CMap, err = tt.selectCmap()
-	if err != nil {
-		return nil, err
-	}
-	tt.CMap[unicode.ReplacementChar] = 0
-
 	return tt, nil
 }
 
@@ -132,11 +124,11 @@ func (tt *Font) IsVariable() bool {
 	return tt.HasTables("fvar")
 }
 
-// selectCmap chooses one of the sub-tables of the cmap table and reads the
+// SelectCMap chooses one of the sub-tables of the cmap table and reads the
 // font's character encoding from there.  If a full unicode mapping is found,
 // this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
 // If this fails, a legacy 1,0 record is tried as a last resort.
-func (tt *Font) selectCmap() (map[rune]font.GlyphID, error) {
+func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
 	rec := tt.Header.Find("cmap")
 	if rec == nil {
 		return nil, &table.ErrNoTable{Name: "cmap"}

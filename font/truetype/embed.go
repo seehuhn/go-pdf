@@ -18,6 +18,7 @@ package truetype
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"seehuhn.de/go/pdf"
@@ -72,7 +73,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 	res := &font.Font{
 		InstName:    pdf.Name(instName),
 		Ref:         t.Ref,
-		CMap:        tt.CMap,
+		CMap:        t.CMap,
 		Layout:      t.Layout,
 		Enc:         t.Enc,
 		GlyphUnits:  t.GlyphUnits,
@@ -87,6 +88,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 type truetype struct {
 	InstName string
 	Ttf      *sfnt.Font
+	CMap     map[rune]font.GlyphID
 	os2Info  *table.OS2
 
 	// Information for the Font dictionary
@@ -144,6 +146,11 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 		return nil, err
 	}
 
+	cmap, err := tt.SelectCMap()
+	if err != nil {
+		return nil, err
+	}
+
 	Ascent := float64(hheaInfo.Ascent)
 	Descent := float64(hheaInfo.Descent)
 	if os2Info != nil && os2Info.V0MSValid {
@@ -184,7 +191,7 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 	}
 
 	tidy := make(map[font.GlyphID]byte)
-	for r, gid := range tt.CMap {
+	for r, gid := range cmap {
 		if rOld, used := tidy[gid]; r < 127 && (!used || byte(r) < rOld) {
 			tidy[gid] = byte(r)
 		}
@@ -195,6 +202,7 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 		InstName: instName,
 		Ttf:      tt,
 		os2Info:  os2Info,
+		CMap:     cmap,
 
 		FontName:    pdf.Name(subsetTag + fontName),
 		Ref:         w.Alloc(),
@@ -343,6 +351,7 @@ func (t *truetype) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*p
 
 	var flags fontFlags
 	if t.os2Info != nil {
+		fmt.Printf("%#v\n", t.os2Info)
 		switch t.os2Info.V0.FamilyClass >> 8 {
 		case 1, 2, 3, 4, 5, 7:
 			flags |= fontFlagSerif
@@ -363,11 +372,7 @@ func (t *truetype) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*p
 	if IsItalic {
 		flags |= fontFlagItalic
 	}
-	if isSubset(tt.CMap, font.AdobeStandardLatin) {
-		flags |= fontFlagNonsymbolic
-	} else {
-		flags |= fontFlagSymbolic
-	}
+	flags |= fontFlagSymbolic
 	// TODO(voss): FontFlagAllCap
 	// TODO(voss): FontFlagSmallCap
 
@@ -400,7 +405,7 @@ func (t *truetype) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*p
 	}
 
 	var capHeight int
-	if H, ok := tt.CMap['H']; ok {
+	if H, ok := t.CMap['H']; ok {
 		// CapHeight may be set equal to the top of the unscaled and unhinted
 		// glyph bounding box of the glyph encoded at U+0048 (LATIN CAPITAL
 		// LETTER H)
@@ -445,17 +450,15 @@ func (t *truetype) WriteFontFile(w *pdf.Writer, subset []font.GlyphID) (*pdf.Ref
 	exOpt := &sfnt.ExportOptions{
 		Include: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
-			"glyf": true, // rewrite
-			"head": true, // update CheckSumAdjustment, Modified and indexToLocFormat
-			"hhea": true, // update various fields, including numberOfHMetrics (TODO)
-			"hmtx": true, // rewrite
-			"loca": true, // rewrite
-			"maxp": true, // update numGlyphs
 			"cvt ": true, // copy
 			"fpgm": true, // copy
 			"prep": true, // copy
-
-			"gasp": true, // copy, TODO(voss): is this addition wise/useful?
+			"head": true, // update CheckSumAdjustment, Modified and indexToLocFormat
+			"hhea": true, // update various fields, including numberOfHMetrics
+			"maxp": true, // update numGlyphs
+			"hmtx": true, // rewrite
+			"loca": true, // rewrite
+			"glyf": true, // rewrite
 		},
 		Subset: subset,
 	}

@@ -26,7 +26,7 @@ import (
 )
 
 func TestExport(t *testing.T) {
-	tt, err := Open("../truetype/ttf/FreeSerif.ttf")
+	tt, err := Open("../truetype/ttf/SourceSerif4-Regular.ttf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,29 @@ func TestExport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := tt.Export(out, nil)
+	subset := make([]font.GlyphID, 100)
+	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90} {
+		subset[c] = font.GlyphID(i + 1)
+	}
+	opt := &ExportOptions{
+		Include: map[string]bool{
+			// The list of tables to include is from PDF 32000-1:2008, table 126.
+			"glyf": true, // rewrite
+			"head": true, // update CheckSumAdjustment, Modified and indexToLocFormat
+			"hhea": true, // update various fields, including numberOfHMetrics (TODO)
+			"hmtx": true, // rewrite
+			"loca": true, // rewrite
+			"maxp": true, // update numGlyphs
+			"cvt ": true, // copy
+			"fpgm": true, // copy
+			"prep": true, // copy
+
+			"gasp": true, // copy, TODO(voss): is this addition wise/useful?
+		},
+		Subset: subset,
+	}
+
+	n, err := tt.Export(out, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +102,7 @@ func TestWriteCmap(t *testing.T) {
 	if cmapTable.Header.NumTables != 1 {
 		t.Errorf("wrong number of tables: %d != 1", cmapTable.Header.NumTables)
 	}
-	enc := cmapTable.Find(3, 0)
+	enc := cmapTable.Find(1, 0)
 	cmap, err := enc.LoadCmap(r, func(i int) rune { return rune(i) })
 	if err != nil {
 		t.Fatal(err)

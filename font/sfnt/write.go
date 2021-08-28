@@ -46,6 +46,13 @@ func contains(ss []string, s string) bool {
 
 // Export writes the font to the io.Writer w.
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
+	// debug, err := os.Create("debug.ttf")
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// defer debug.Close()
+	// w = io.MultiWriter(w, debug)
+
 	if opt == nil {
 		opt = &ExportOptions{}
 	} else if opt.Subset != nil {
@@ -72,7 +79,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		replTab["cmap"] = cmapBytes
 		replSum["cmap"] = checksum(cmapBytes)
 
-		subsetInfo, err := tt.subsetGlyphs(includeOnly)
+		subsetInfo, err := tt.makeSubset(includeOnly)
 		if err != nil {
 			return 0, err
 		}
@@ -83,12 +90,14 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		indexToLocFormat = subsetInfo.indexToLocFormat
 		replTab["hmtx"] = subsetInfo.hmtxBytes
 		replSum["hmtx"] = checksum(subsetInfo.hmtxBytes)
+		replTab["hhea"] = subsetInfo.hheaBytes
+		replSum["hhea"] = checksum(subsetInfo.hheaBytes)
 
+		// fix up numGlyphs
 		maxpBytes, err := tt.Header.ReadTableBytes(tt.Fd, "maxp")
 		if err != nil {
 			return 0, err
 		}
-		// fix up numGlyphs
 		binary.BigEndian.PutUint16(maxpBytes[4:6], subsetInfo.numGlyphs)
 		replTab["maxp"] = maxpBytes
 		replSum["maxp"] = checksum(maxpBytes)
@@ -204,15 +213,15 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 }
 
 type subsetInfo struct {
-	numGlyphs           uint16
-	glyfBytes           []byte
-	locaBytes           []byte
-	indexToLocFormat    int // 0 for short offsets, 1 for long
-	hmtxBytes           []byte
-	numOfLongHorMetrics int
+	numGlyphs        uint16
+	glyfBytes        []byte
+	locaBytes        []byte
+	indexToLocFormat int // 0 for short offsets, 1 for long
+	hmtxBytes        []byte
+	hheaBytes        []byte
 }
 
-func (tt *Font) subsetGlyphs(includeOnly []font.GlyphID) (*subsetInfo, error) {
+func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	oldOffsets, err := tt.GetGlyfOffsets()
 	if err != nil {
 		return nil, err
@@ -239,6 +248,8 @@ func (tt *Font) subsetGlyphs(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	// write the new "glyf" table
 	var newOffsets []uint32
 	var newHMetrics []table.LongHorMetric
+	var advanceWidthMax uint16
+	var minLeftSideBearing int16 = 32767
 	buf := &bytes.Buffer{}
 	for _, origGid := range includeOnly {
 		start := oldOffsets[origGid]
@@ -257,10 +268,18 @@ func (tt *Font) subsetGlyphs(includeOnly []font.GlyphID) (*subsetInfo, error) {
 			}
 		}
 
+		advanceWidth := hmtx.GetAdvanceWidth(int(origGid))
+		leftSideBearing := hmtx.GetLSB(int(origGid))
 		newHMetrics = append(newHMetrics, table.LongHorMetric{
-			AdvanceWidth:    hmtx.GetAdvanceWidth(int(origGid)),
-			LeftSideBearing: hmtx.GetLSB(int(origGid)),
+			AdvanceWidth:    advanceWidth,
+			LeftSideBearing: leftSideBearing,
 		})
+		if advanceWidth > advanceWidthMax {
+			advanceWidthMax = advanceWidth
+		}
+		if length > 0 && leftSideBearing < minLeftSideBearing {
+			minLeftSideBearing = leftSideBearing
+		}
 	}
 	newOffsets = append(newOffsets, uint32(buf.Len()))
 	res.glyfBytes = buf.Bytes()
@@ -271,7 +290,7 @@ func (tt *Font) subsetGlyphs(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		res.indexToLocFormat = 0
 		shortOffsets := make([]uint16, len(newOffsets))
 		for i, offs := range newOffsets {
-			shortOffsets[i] = uint16(offs)
+			shortOffsets[i] = uint16(offs / 2)
 		}
 		err = binary.Write(buf, binary.BigEndian, shortOffsets)
 	} else {
@@ -306,7 +325,19 @@ func (tt *Font) subsetGlyphs(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		return nil, err
 	}
 	res.hmtxBytes = buf.Bytes()
-	res.numOfLongHorMetrics = numOfLongHorMetrics
+
+	// write the new "hhea" table
+	newHhea := &table.Hhea{}
+	*newHhea = *hheaInfo // copy the old data
+	newHhea.AdvanceWidthMax = advanceWidthMax
+	newHhea.MinLeftSideBearing = minLeftSideBearing
+	newHhea.NumOfLongHorMetrics = uint16(numOfLongHorMetrics)
+	buf = &bytes.Buffer{}
+	err = binary.Write(buf, binary.BigEndian, newHhea)
+	if err != nil {
+		return nil, err
+	}
+	res.hheaBytes = buf.Bytes()
 
 	return res, nil
 }
@@ -375,7 +406,7 @@ type simpleCmapTableHead struct {
 	// GlyphIDArray   []uint16 // Glyph index array (arbitrary length)
 }
 
-// Write a cmap with just a 3,0,4 subtable to map character indices to glyph
+// Write a cmap with just a 1,0,4 subtable to map character indices to glyph
 // indices in a subset, simple font.
 func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
 	n := len(subset)
@@ -419,13 +450,13 @@ func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
 	data := &simpleCmapTableHead{
 		NumTables:      1,
-		PlatformID:     3,
+		PlatformID:     1,
 		EncodingID:     0,
 		SubtableOffset: 12,
 		Format:         4,
 	}
 	segCount := len(StartCode)
-	data.Length = uint16(2 * (8 + 4*(segCount+1)))
+	data.Length = uint16(2 * (8 + 4*segCount))
 	data.SegCountX2 = uint16(2 * segCount)
 	sel := bits.Len(uint(segCount))
 	data.SearchRange = 1 << sel
@@ -439,8 +470,8 @@ func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, data := range [][]uint16{EndCode, StartCode, IDDelta, IDRangeOffsets} {
-		err := binary.Write(buf, binary.BigEndian, data)
+	for _, x := range [][]uint16{EndCode, StartCode, IDDelta, IDRangeOffsets} {
+		err := binary.Write(buf, binary.BigEndian, x)
 		if err != nil {
 			return nil, err
 		}
