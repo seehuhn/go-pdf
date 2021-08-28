@@ -42,8 +42,26 @@ func main() {
 		fmt.Println("------+------------+------------+-----------")
 		records := tt.Header.Records
 		for i := range records {
-			fmt.Printf(" %4s |%11d |%11d | 0x%08x\n",
-				records[i].Tag, records[i].Offset, records[i].Length, records[i].CheckSum)
+			name := records[i].Tag.String()
+			extra := ""
+			body, err := tt.Header.ReadTableBytes(tt.Fd, name)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if name == "head" {
+				body[8] = 0
+				body[9] = 0
+				body[10] = 0
+				body[11] = 0
+			}
+			computedSum := sfnt.Checksum(body)
+			if computedSum != records[i].CheckSum {
+				extra = fmt.Sprintf(" != 0x%08x", computedSum)
+			}
+
+			fmt.Printf(" %4s |%11d |%11d | 0x%08x%s\n",
+				name, records[i].Offset, records[i].Length,
+				records[i].CheckSum, extra)
 		}
 		return
 	}

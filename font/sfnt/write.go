@@ -46,13 +46,6 @@ func contains(ss []string, s string) bool {
 
 // Export writes the font to the io.Writer w.
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
-	// debug, err := os.Create("debug.ttf")
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// defer debug.Close()
-	// w = io.MultiWriter(w, debug)
-
 	if opt == nil {
 		opt = &ExportOptions{}
 	} else if opt.Subset != nil {
@@ -141,7 +134,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		var newChecksum uint32
 		var length uint32
 		if body, ok := replTab[name]; ok {
-			newChecksum = checksum(body)
+			newChecksum = Checksum(body)
 			length = uint32(len(body))
 		} else {
 			newChecksum = old.CheckSum // TODO(voss): recalculate?
@@ -170,7 +163,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		return 0, err
 	}
 	totalSize += int64(len(headerBytes))
-	totalSum += checksum(headerBytes)
+	totalSum += Checksum(headerBytes)
 
 	if hasHead {
 		// fix the checksum in the "head" table
@@ -313,42 +306,70 @@ func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
 			todo := int64(length) - 10
 			if glyphHeader.NumberOfContours < 0 { // composite glyph
 				// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
-				var compHead struct {
-					Flags      uint16
-					GlyphIndex uint16
-				}
-				err = binary.Read(glyfFd, binary.BigEndian, &compHead)
-				if err != nil {
-					return nil, err
-				}
+				for {
+					var compHead struct {
+						Flags      uint16
+						GlyphIndex uint16
+					}
+					err = binary.Read(glyfFd, binary.BigEndian, &compHead)
+					if err != nil {
+						return nil, err
+					}
 
-				// map the component gid to the new scheme
-				origComponetGid := font.GlyphID(compHead.GlyphIndex)
-				newComponentGid := -1
-				for i, gid := range includeOnly {
-					if gid == origComponetGid {
-						newComponentGid = i
+					// map the component gid to the new scheme
+					origComponetGid := font.GlyphID(compHead.GlyphIndex)
+					newComponentGid := -1
+					for i, gid := range includeOnly {
+						if gid == origComponetGid {
+							newComponentGid = i
+							break
+						}
+					}
+					if newComponentGid < 0 {
+						newComponentGid = len(includeOnly)
+						includeOnly = append(includeOnly, origComponetGid)
+					}
+					compHead.GlyphIndex = uint16(newComponentGid)
+
+					err = binary.Write(buf, binary.BigEndian, &compHead)
+					if err != nil {
+						return nil, err
+					}
+					todo -= 4
+
+					if compHead.Flags&0x0020 == 0 { // no more components
 						break
 					}
-				}
-				if newComponentGid < 0 {
-					newComponentGid = len(includeOnly)
-					includeOnly = append(includeOnly, origComponetGid)
-				}
-				compHead.GlyphIndex = uint16(newComponentGid)
 
-				err = binary.Write(buf, binary.BigEndian, &compHead)
-				if err != nil {
-					return nil, err
+					skip := int64(0)
+					if compHead.Flags&0x0001 != 0 { // ARG_1_AND_2_ARE_WORDS
+						skip += 4
+					} else {
+						skip += 2
+					}
+					if compHead.Flags&0x0008 != 0 { // WE_HAVE_A_SCALE
+						skip += 2
+					} else if compHead.Flags&0x0040 != 0 { // WE_HAVE_AN_X_AND_Y_SCALE
+						skip += 4
+					} else if compHead.Flags&0x0080 != 0 { // WE_HAVE_A_TWO_BY_TWO
+						skip += 8
+					}
+					_, err = io.CopyN(buf, glyfFd, skip)
+					if err != nil {
+						return nil, err
+					}
+					todo -= skip
 				}
-				todo -= 2
-
-				// TODO(voss): handle any additional components
 			}
 
 			_, err = io.CopyN(buf, glyfFd, todo)
 			if err != nil {
 				return nil, err
+			}
+
+			for length%4 != 0 {
+				buf.WriteByte(0)
+				length++
 			}
 		}
 

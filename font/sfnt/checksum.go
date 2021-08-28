@@ -28,15 +28,14 @@ type check struct {
 
 func (s *check) Write(p []byte) (int, error) {
 	n := 0
-	buf := s.buf
 	for len(p) > 0 {
-		k := copy(buf[s.used:], p)
+		k := copy(s.buf[s.used:], p)
 		p = p[k:]
 		n += k
 		s.used += k
 
 		if s.used == 4 {
-			s.sum += binary.BigEndian.Uint32(buf[:])
+			s.sum += binary.BigEndian.Uint32(s.buf[:])
 			s.used = 0
 		}
 	}
@@ -45,7 +44,7 @@ func (s *check) Write(p []byte) (int, error) {
 
 func (s *check) Sum() uint32 {
 	if s.used != 0 {
-		s.Write([]byte{0, 0, 0}[:4-s.used])
+		_, _ = s.Write([]byte{0, 0, 0}[:4-s.used])
 	}
 	return s.sum
 }
@@ -55,7 +54,9 @@ func (s *check) Reset() {
 	s.used = 0
 }
 
-func checksum(data []byte) uint32 {
+// Checksum implements the sfnt checksum algorithm.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums
+func Checksum(data []byte) uint32 {
 	cc := &check{}
 	_, _ = cc.Write(data)
 	return cc.Sum()
