@@ -86,19 +86,14 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	dict := pdf.Dict{
 		"Length1": size, // TODO(voss): maybe only needed for Subtype=TrueType?
 	}
-	opt := &pdf.StreamOptions{
-		Filters: []*pdf.FilterInfo{
-			{Name: "FlateDecode"},
-		},
-	}
-	stm, FontFile, err := w.OpenStream(dict, nil, opt)
+	stm, FontFile, err := w.OpenStream(dict, nil,
+		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return nil, err
 	}
 	exOpt := &sfnt.ExportOptions{
 		Include: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
-			// TODO(voss): include "gasp"?
 			"glyf": true,
 			"head": true,
 			"hhea": true,
@@ -314,11 +309,8 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 		return nil, err
 	}
 
-	cmapStream, ToUnicodeRef, err := w.OpenStream(pdf.Dict{}, nil, &pdf.StreamOptions{
-		Filters: []*pdf.FilterInfo{
-			{Name: "FlateDecode"},
-		},
-	})
+	cmapStream, ToUnicodeRef, err := w.OpenStream(pdf.Dict{}, nil,
+		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return nil, err
 	}

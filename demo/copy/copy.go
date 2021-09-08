@@ -119,7 +119,7 @@ func main() {
 		r:     r,
 		w:     w,
 	}
-	catDict := pdf.Struct(catalog)
+	catDict := pdf.AsDict(catalog)
 	newCatDict := pdf.Dict{}
 	for key, val := range catDict {
 		obj, err := trans.Transfer(val)
@@ -128,7 +128,10 @@ func main() {
 		}
 		newCatDict[key] = obj
 	}
-	newCatDict.AsStruct(catalog, r.Resolve)
+	err = newCatDict.Decode(catalog, r.Resolve)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	info, err := r.GetInfo()
 	if err != nil {

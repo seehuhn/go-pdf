@@ -65,11 +65,11 @@ func main() {
 	case len(args) < 2 || args[1] == "catalog":
 		var cat *pdf.Catalog
 		cat, err = r.GetCatalog()
-		obj = pdf.Struct(cat)
+		obj = pdf.AsDict(cat)
 	case args[1] == "info":
 		var info *pdf.Info
 		info, err = r.GetInfo()
-		obj = pdf.Struct(info)
+		obj = pdf.AsDict(info)
 	default:
 		var number int
 		number, err = strconv.Atoi(args[1])

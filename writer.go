@@ -82,14 +82,19 @@ func Create(name string) (*Writer, error) {
 func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
 		opt = defaultOptions
-	} else {
-		if opt.Version == 0 {
-			opt.Version = defaultOptions.Version
-		}
+	}
+
+	version := opt.Version
+	if version == 0 {
+		version = defaultOptions.Version
+	}
+	versionString, err := version.ToString()
+	if err != nil {
+		return nil, err
 	}
 
 	pdf := &Writer{
-		Version: opt.Version,
+		Version: version,
 
 		w:       &posWriter{w: w},
 		nextRef: 1,
@@ -172,8 +177,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		}
 	}
 
-	_, err := fmt.Fprintf(pdf.w, "%%PDF-1.%d\n%%\x80\x80\x80\x80\n",
-		opt.Version-V1_0)
+	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +199,7 @@ func (pdf *Writer) Close() error {
 	if pdf.catalog == nil {
 		return errors.New("missing /Catalog")
 	}
-	catRef, err := pdf.Write(Struct(pdf.catalog), nil)
+	catRef, err := pdf.Write(AsDict(pdf.catalog), nil)
 	if err != nil {
 		return err
 	}
@@ -205,7 +209,7 @@ func (pdf *Writer) Close() error {
 		"Size": Integer(pdf.nextRef),
 	}
 	if pdf.info != nil {
-		infoRef, err := pdf.Write(Struct(pdf.info), nil)
+		infoRef, err := pdf.Write(AsDict(pdf.info), nil)
 		if err != nil {
 			return err
 		}
@@ -395,12 +399,7 @@ func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Ref
 		"N":     Integer(N),
 		"First": Integer(head.Len()),
 	}
-	opt := &StreamOptions{
-		Filters: []*FilterInfo{
-			{Name: "FlateDecode"},
-		},
-	}
-	w, _, err := pdf.OpenStream(dict, sRef, opt)
+	w, _, err := pdf.OpenStream(dict, sRef, &FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +431,7 @@ func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Ref
 // OpenStream adds a PDF Stream to the file and returns an io.Writer which can
 // be used to add the stream's data.  No other objects can be added to the file
 // until the stream is closed.
-func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io.WriteCloser, *Reference, error) {
+func (pdf *Writer) OpenStream(dict Dict, ref *Reference, filters ...*FilterInfo) (io.WriteCloser, *Reference, error) {
 	if pdf.inStream {
 		return nil, nil, errors.New("OpenStream() while stream is open")
 	}
@@ -463,11 +462,7 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io
 		}
 		d2[key] = val
 	}
-	length := &Placeholder{
-		size:  12,
-		alloc: pdf.Alloc,
-		write: pdf.Write,
-	}
+	length := pdf.NewPlaceholder(12)
 	d2["Length"] = length
 
 	var w io.WriteCloser = &streamWriter{
@@ -483,51 +478,43 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, opt *StreamOptions) (io
 		}
 		w = enc
 	}
-	if opt != nil {
-		for _, fi := range opt.Filters {
-			filter, err := fi.getFilter()
-			if err != nil {
-				return nil, nil, err
-			}
-			w, err = filter.Encode(w)
-			if err != nil {
-				return nil, nil, err
-			}
+	for _, fi := range filters {
+		filter, err := fi.getFilter()
+		if err != nil {
+			return nil, nil, err
+		}
+		w, err = filter.Encode(w)
+		if err != nil {
+			return nil, nil, err
+		}
 
-			switch x := d2["Filter"].(type) {
-			case nil:
-				d2["Filter"] = fi.Name
-				if len(fi.Parms) > 0 {
-					d2["DecodeParms"] = fi.Parms
+		switch x := d2["Filter"].(type) {
+		case nil:
+			d2["Filter"] = fi.Name
+			if len(fi.Parms) > 0 {
+				d2["DecodeParms"] = fi.Parms
+			}
+		case Name:
+			d2["Filter"] = Array{x, fi.Name}
+			if d2["DecodeParms"] != nil || len(fi.Parms) > 0 {
+				d2["DecodeParms"] = Array{d2["DecodeParms"], fi.Parms}
+			}
+		case Array:
+			d2["Filter"] = append(x, fi.Name)
+			b, ok := d2["DecodeParms"].(Array)
+			if d2["DecodeParms"] != nil && !ok {
+				return nil, nil, errors.New("wrong type for /DecodeParms")
+			}
+			if len(b) > 0 || len(fi.Parms) > 0 {
+				for len(b) < len(x) {
+					b = append(b, nil)
 				}
-			case Name:
-				d2["Filter"] = Array{x, fi.Name}
-				if d2["DecodeParms"] != nil || len(fi.Parms) > 0 {
-					d2["DecodeParms"] = Array{d2["DecodeParms"], fi.Parms}
-				}
-			case Array:
-				d2["Filter"] = append(x, fi.Name)
-				b, ok := d2["DecodeParms"].(Array)
-				if d2["DecodeParms"] != nil && !ok {
-					return nil, nil, errors.New("wrong type for /DecodeParms")
-				}
-				if len(b) > 0 || len(fi.Parms) > 0 {
-					for len(b) < len(x) {
-						b = append(b, nil)
-					}
-					d2["DecodeParms"] = append(b, fi.Parms)
-				}
+				d2["DecodeParms"] = append(b, fi.Parms)
 			}
 		}
 	}
 	pdf.inStream = true
 	return w, ref, nil
-}
-
-// StreamOptions describes how Writer.OpenStream() processes the stream
-// data while writing.
-type StreamOptions struct {
-	Filters []*FilterInfo
 }
 
 type streamWriter struct {

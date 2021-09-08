@@ -29,7 +29,7 @@ import (
 type Reader struct {
 	// Version is the PDF version used in this file.  This is specified in
 	// the initial comment at the start of the file, and may be overridden by
-	// the /Version entry in the root dictionary.
+	// the /Version entry in the document catalog.
 	Version Version
 
 	// The ID of the file.  This is either a slice of two byte slices (the
@@ -47,6 +47,7 @@ type Reader struct {
 
 	xref    map[int]*xRefEntry
 	trailer Dict
+	catalog *Catalog
 
 	enc *encryptInfo
 }
@@ -121,30 +122,19 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 	}
 
 	root := trailer["Root"]
-	catalog, err := r.getDict(root)
-	if err == nil {
-		catVer, ok := catalog["Version"].(Name)
-		if ok {
-			var v2 Version
-			switch catVer {
-			case "1.4":
-				v2 = V1_4
-			case "1.5":
-				v2 = V1_5
-			case "1.6":
-				v2 = V1_6
-			case "1.7":
-				v2 = V1_7
-			default:
-				return nil, &MalformedFileError{
-					Pos: r.errPos(root),
-					Err: errVersion,
-				}
-			}
-			if v2 > r.Version {
-				r.Version = v2
-			}
-		}
+	catalogDict, err := r.getDict(root)
+	if err != nil {
+		return nil, err
+	}
+	r.catalog = &Catalog{}
+	err = catalogDict.Decode(r.catalog, r.Resolve)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.catalog.Version > r.Version {
+		// if unset, r.catalog.Version is zero and thus smaller than r.Version
+		r.Version = r.catalog.Version
 	}
 
 	return r, nil
@@ -177,16 +167,7 @@ func (r *Reader) Close() error {
 
 // GetCatalog returns the PDF Catalog for the file.
 func (r *Reader) GetCatalog() (*Catalog, error) {
-	infoDict, err := r.getDict(r.trailer["Root"])
-	if err != nil {
-		return nil, err
-	}
-	cat := &Catalog{}
-	err = infoDict.AsStruct(cat, r.Resolve)
-	if err != nil {
-		return nil, err
-	}
-	return cat, nil
+	return r.catalog, nil
 }
 
 // GetInfo returns the PDF Info dictionary for the file.
@@ -196,7 +177,7 @@ func (r *Reader) GetInfo() (*Info, error) {
 		return nil, err
 	}
 	info := &Info{}
-	err = infoDict.AsStruct(info, r.Resolve)
+	err = infoDict.Decode(info, r.Resolve)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +186,7 @@ func (r *Reader) GetInfo() (*Info, error) {
 
 // ReadSequential returns the objects in a PDF file in the order they are
 // stored in the file.  When the end of file has been reached, io.EOF is
-// returned. The read position is not affected by other methods of the Reader,
+// returned.  The read position is not affected by other methods of the Reader,
 // sequential access can safely be interspersed with calls to `Resolve()`.
 //
 // The function returns the next object in the file, together with a Reference
@@ -599,7 +580,8 @@ type Version int
 
 // Constants for the known PDF versions.
 const (
-	V1_0 Version = iota + 1
+	_ Version = iota
+	V1_0
 	V1_1
 	V1_2
 	V1_3
@@ -610,9 +592,43 @@ const (
 	tooHighVersion
 )
 
-func (ver Version) String() string {
-	if ver >= V1_0 && ver <= V1_7 {
-		return "1." + string([]byte{byte(ver - V1_0 + '0')})
+// ParseVersion parses a PDF version string.
+func ParseVersion(verString string) (Version, error) {
+	switch verString {
+	case "1.0":
+		return V1_0, nil
+	case "1.1":
+		return V1_1, nil
+	case "1.2":
+		return V1_2, nil
+	case "1.3":
+		return V1_3, nil
+	case "1.4":
+		return V1_4, nil
+	case "1.5":
+		return V1_5, nil
+	case "1.6":
+		return V1_6, nil
+	case "1.7":
+		return V1_7, nil
 	}
-	return "pdf.Version(" + strconv.Itoa(int(ver)) + ")"
+	return 0, errVersion
+}
+
+// ToString returns the string representation of ver, e.g. "1.7".
+// If ver does not correspond to a supported PDF version, and error is
+// returned.
+func (ver Version) ToString() (string, error) {
+	if ver >= V1_0 && ver <= V1_7 {
+		return "1." + string([]byte{byte(ver - V1_0 + '0')}), nil
+	}
+	return "", errVersion
+}
+
+func (ver Version) String() string {
+	versionString, err := ver.ToString()
+	if err != nil {
+		versionString = "pdf.Version(" + strconv.Itoa(int(ver)) + ")"
+	}
+	return versionString
 }

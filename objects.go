@@ -262,6 +262,14 @@ func (x Name) PDF(w io.Writer) error {
 	return err
 }
 
+func toName(obj Object) (Name, error) {
+	name, ok := obj.(Name)
+	if !ok {
+		return "", fmt.Errorf("wrong type, expected Name but got %T", obj)
+	}
+	return name, nil
+}
+
 // Array represent an array of objects in a PDF file.
 type Array []Object
 
@@ -360,6 +368,17 @@ func (x Dict) PDF(w io.Writer) error {
 	return err
 }
 
+func toDict(obj Object) (Dict, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	dict, ok := obj.(Dict)
+	if !ok {
+		return nil, fmt.Errorf("wrong type, expected Dict but got %T", obj)
+	}
+	return dict, nil
+}
+
 // Stream represent a stream object in a PDF file.
 type Stream struct {
 	Dict
@@ -446,7 +465,7 @@ func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, e
 			if err != nil {
 				return nil, err
 			}
-			name, err := asName(fi)
+			name, err := toName(fi)
 			if err != nil {
 				return nil, err
 			}
@@ -456,7 +475,7 @@ func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, e
 				if err != nil {
 					return nil, err
 				}
-				x, err := asDict(pai)
+				x, err := toDict(pai)
 				if err != nil {
 					return nil, err
 				}
@@ -469,7 +488,7 @@ func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, e
 			filters = append(filters, filter)
 		}
 	case Name:
-		pDict, err := asDict(parms)
+		pDict, err := toDict(parms)
 		if err != nil {
 			return nil, err
 		}

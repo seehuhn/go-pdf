@@ -40,12 +40,8 @@ func Embed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*fon
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("OpenType"),
 	}
-	opt := &pdf.StreamOptions{
-		Filters: []*pdf.FilterInfo{
-			{Name: "FlateDecode"},
-		},
-	}
-	stm, FontFile, err := w.OpenStream(dict, nil, opt)
+	stm, FontFile, err := w.OpenStream(dict, nil,
+		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return nil, err
 	}

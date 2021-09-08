@@ -26,7 +26,7 @@ import (
 
 // WritePage emits a single page to the PDF file and returns the page dict.
 func WritePage(out *pdf.Writer, i int) (pdf.Dict, error) {
-	stream, contentNode, err := out.OpenStream(nil, nil, nil)
+	stream, contentNode, err := out.OpenStream(nil, nil)
 	if err != nil {
 		return nil, err
 	}

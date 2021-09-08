@@ -25,8 +25,8 @@ import (
 
 // TODO(voss): document the struct tags
 
-// Struct creates a PDF Dict object, encoding the fields of a Go struct.
-func Struct(s interface{}) Dict {
+// AsDict creates a PDF Dict object, encoding the fields of a Go struct.
+func AsDict(s interface{}) Dict {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	if v.Kind() != reflect.Struct {
 		return nil
@@ -69,6 +69,12 @@ fieldLoop:
 			continue
 		case isTextString:
 			res[key] = TextString(fVal.Interface().(string))
+		case fInfo.Type == versionType:
+			version := fVal.Interface().(Version)
+			versionString, err := version.ToString()
+			if err == nil { // ignore invalid and unknown versions
+				res[key] = Name(versionString)
+			}
 		case fInfo.Type == timeType:
 			res[key] = Date(fVal.Interface().(time.Time))
 		case fVal.Kind() == reflect.Bool:
@@ -83,12 +89,12 @@ fieldLoop:
 	return res
 }
 
-// AsStruct initialises a tagged struct using the data from a PDF dictionary.
+// Decode initialises a tagged struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
 // The function get(), if non-nil, is used to resolve references to indirect
 // objects, where needed; the `Reader.Resolve()` method can be used for this
 // argument.
-func (d Dict) AsStruct(s interface{}, get func(Object) (Object, error)) error {
+func (d Dict) Decode(s interface{}, get func(Object) (Object, error)) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
 
@@ -161,16 +167,35 @@ fieldLoop:
 				firstErr = fmt.Errorf("/%s: expected pdf.String but got %T",
 					fInfo.Name, dictVal)
 			}
+		case fInfo.Type == versionType:
+			var vString string
+			switch x := dictVal.(type) {
+			case Name:
+				vString = string(x)
+			case String:
+				vString = x.AsTextString()
+			default:
+				if firstErr == nil {
+					firstErr = fmt.Errorf("/%s: expected pdf.Name but got %T",
+						fInfo.Name, dictVal)
+				}
+			}
+			version, err := ParseVersion(vString)
+			if err == nil {
+				fVal.Set(reflect.ValueOf(version))
+			} else if firstErr == nil {
+				firstErr = fmt.Errorf("/%s: %s: %s", fInfo.Name, vString, err)
+			}
 		case fInfo.Type == timeType:
 			s, ok := dictVal.(String)
 			if ok {
 				t, err := s.AsDate()
-				if firstErr == nil && err != nil {
+				if err == nil {
+					fVal.Set(reflect.ValueOf(t))
+				} else if firstErr == nil {
 					firstErr = fmt.Errorf("/%s: %s: %s",
 						fInfo.Name, s.AsTextString(), err)
-					continue
 				}
-				fVal.Set(reflect.ValueOf(t))
 			} else if firstErr == nil {
 				firstErr = fmt.Errorf("/%s: expected pdf.String but got %T",
 					fInfo.Name, dictVal)
@@ -214,7 +239,7 @@ fieldLoop:
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 type Catalog struct {
 	_                 struct{} `pdf:"Type=Catalog"`
-	Version           Name     `pdf:"optional,allowstring"` // TODO(voss): use pdf.Version
+	Version           Version  `pdf:"optional"`
 	Extensions        Object   `pdf:"optional"`
 	Pages             *Reference
 	PageLabels        Object     `pdf:"optional"`
@@ -268,8 +293,9 @@ type Info struct {
 }
 
 var (
-	objectType = reflect.TypeOf((*Object)(nil)).Elem()
-	refType    = reflect.TypeOf(&Reference{})
-	nameType   = reflect.TypeOf(Name(""))
-	timeType   = reflect.TypeOf(time.Time{})
+	objectType  = reflect.TypeOf((*Object)(nil)).Elem()
+	refType     = reflect.TypeOf(&Reference{})
+	nameType    = reflect.TypeOf(Name(""))
+	versionType = reflect.TypeOf(V1_7)
+	timeType    = reflect.TypeOf(time.Time{})
 )

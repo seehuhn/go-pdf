@@ -65,7 +65,7 @@ func imagePage(img *image.NRGBA) error {
 		"ColorSpace":       pdf.Name("DeviceRGB"),
 		"BitsPerComponent": pdf.Integer(8),
 		"Filter":           pdf.Name("DCTDecode"),
-	}, nil, nil)
+	}, nil)
 	if err != nil {
 		return err
 	}

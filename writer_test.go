@@ -60,7 +60,7 @@ func TestWriter(t *testing.T) {
 	}
 	font := refs[0]
 
-	stream, contentNode, err := w.OpenStream(Dict{}, nil, nil)
+	stream, contentNode, err := w.OpenStream(Dict{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestOnClose(t *testing.T) {
 		return nil
 	})
 
-	pdf.SetCatalog(&Catalog{})
+	pdf.SetCatalog(&Catalog{Pages: &Reference{}})
 	err = pdf.Close()
 	if err != myErr {
 		t.Error("callback error not detected")
@@ -206,11 +206,7 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	length := &Placeholder{
-		size:  5,
-		alloc: w.Alloc,
-		write: w.Write,
-	}
+	length := w.NewPlaceholder(5)
 	testRef, err := w.Write(Dict{
 		"Test":   Bool(true),
 		"Length": length,
@@ -219,7 +215,7 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w.SetCatalog(&Catalog{})
+	w.SetCatalog(&Catalog{Pages: &Reference{}})
 
 	err = length.Set(Integer(testVal))
 	if err != nil {

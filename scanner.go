@@ -656,24 +656,36 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 }
 
 func (s *scanner) readHeaderVersion() (Version, error) {
-	buf, err := s.Peek(16)
+	err := s.SkipString("%PDF-")
+	if err != nil {
+		if e, ok := err.(*MalformedFileError); ok {
+			// Give a clearer message if this is not a PDF file.
+			e.Err = errors.New("PDF header not found")
+		}
+		return 0, err
+	}
+
+	var buf []byte
+	err = s.ScanBytes(func(c byte) bool {
+		if c >= '0' && c <= '9' || c == '.' {
+			buf = append(buf, c)
+			return true
+		}
+		return false
+	})
 	if err != nil {
 		return 0, err
 	}
 
-	if !bytes.HasPrefix(buf, []byte("%PDF-1.")) || len(buf) < 9 {
+	ver, err := ParseVersion(string(buf))
+	if err != nil {
 		return 0, &MalformedFileError{
-			Err: errors.New("PDF header not found"),
+			Pos: 5,
+			Err: err,
 		}
 	}
 
-	version := Version(buf[7]) - '0' + V1_0
-	if version < V1_0 || version >= tooHighVersion ||
-		buf[8] >= '0' && buf[8] <= '9' {
-		return 0, &MalformedFileError{Pos: 7, Err: errVersion}
-	}
-
-	return version, nil
+	return ver, nil
 }
 
 // Refill discards the read part of the buffer and reads as much new data as

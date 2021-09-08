@@ -449,12 +449,8 @@ func (t *truetype) WriteFontFile(w *pdf.Writer, subset []font.GlyphID) (*pdf.Ref
 	fontFileDict := pdf.Dict{
 		"Length1": size,
 	}
-	opt := &pdf.StreamOptions{
-		Filters: []*pdf.FilterInfo{
-			{Name: "FlateDecode"},
-		},
-	}
-	fontFileStream, fontFile, err := w.OpenStream(fontFileDict, nil, opt)
+	fontFileStream, fontFile, err := w.OpenStream(fontFileDict, nil,
+		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return nil, err
 	}
