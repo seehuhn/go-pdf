@@ -137,7 +137,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			newChecksum = Checksum(body)
 			length = uint32(len(body))
 		} else {
-			newChecksum = old.CheckSum // TODO(voss): recalculate?
+			newChecksum = old.CheckSum
 			length = old.Length
 		}
 		header.Records[i].CheckSum = newChecksum

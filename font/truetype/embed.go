@@ -19,6 +19,7 @@ package truetype
 import (
 	"errors"
 	"math"
+	"time"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -48,7 +49,6 @@ func EmbedSimple(w *pdf.Writer, name string, fname string, loc *locale.Locale) (
 	if err != nil {
 		return nil, err
 	}
-	// TODO(voss): where/when to close this file
 
 	return EmbedFontSimple(w, tt, name, loc)
 }
@@ -56,7 +56,11 @@ func EmbedSimple(w *pdf.Writer, name string, fname string, loc *locale.Locale) (
 // EmbedFontSimple embeds a TrueType font into a pdf file as a simple font. Up
 // to 255 arbitrary glyphs from the font file can be accessed via the returned
 // font object.
-// This requires PDF version 1.1 or higher.
+//
+// This function takes ownership of tt and will close the font tt once it
+// is no longer needed.
+//
+// Use of TrueType fonts in PDF requires PDF version 1.1 or higher.
 func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*font.Font, error) {
 	err := w.CheckVersion("use of TrueType fonts", pdf.V1_1)
 	if err != nil {
@@ -196,7 +200,7 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 		}
 	}
 
-	subsetTag := "AAAAAA+" // TODO(voss)
+	subsetTag := makeSubsetTag() + "+"
 	res := &truetype{
 		InstName: instName,
 		Ttf:      tt,
@@ -333,6 +337,15 @@ func (t *truetype) WriteFontDict(w *pdf.Writer) error {
 	}
 
 	_, err = w.Write(Font, t.Ref)
+	if err != nil {
+		return err
+	}
+
+	err = t.Ttf.Close()
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 
@@ -472,7 +485,18 @@ func (t *truetype) WriteFontFile(w *pdf.Writer, subset []font.GlyphID) (*pdf.Ref
 	if err != nil {
 		return nil, err
 	}
+
 	return fontFile, nil
+}
+
+func makeSubsetTag() string {
+	var letters []rune
+	t := time.Now().UnixNano()
+	for len(letters) < 6 {
+		letters = append(letters, rune(t%26)+'A')
+		t /= 26
+	}
+	return string(letters)
 }
 
 type fontFlags int
