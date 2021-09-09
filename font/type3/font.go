@@ -156,8 +156,21 @@ func (t3 *Builder) Close() (*font.Font, error) {
 
 	font := &font.Font{
 		Ref: FontRef,
-		Layout: func(gg []font.Glyph) []font.Glyph {
-			return gg
+		Layout: func(rr []rune) ([]font.Glyph, error) {
+			gg := make([]font.Glyph, len(rr))
+			for i, r := range rr {
+				gid, ok := t3.cmap[r]
+				if !ok {
+					// TODO(voss): fix the font name in the error message
+					return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
+						"Type3 font", r, string([]rune{r}))
+				}
+				gg[i].Gid = gid
+				gg[i].Chars = []rune{r}
+				gg[i].Advance = t3.glyphWidth[gid]
+			}
+
+			return gg, nil
 		},
 		Enc: func(gid font.GlyphID) pdf.String {
 			if !t3.used[gid] {

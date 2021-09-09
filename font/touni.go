@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package font
 
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
@@ -24,81 +24,41 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"text/template"
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 )
 
 type cmapInfo struct {
-	Name         string
 	Registry     string
 	Ordering     string
 	Supplement   int
 	SkipComments bool
-	Chars        []cidChar
-	Ranges       []cidRange
+	CodeSpace    []string
+	Chars        []bfChar
+	Ranges       []bfRange
 }
 
-type cidChar struct {
-	Code font.GlyphID
-	CID  rune
+type bfChar struct {
+	Code pdf.String
+	Text []rune
 }
 
-type cidRange struct {
-	From, To font.GlyphID
-	FromCID  rune
+type bfRange struct {
+	From, To pdf.String
+	FromText []rune
 }
 
-func (info *cmapInfo) FillRanges(cmap map[font.GlyphID]rune) {
-	var all []font.GlyphID
-	for idx := range cmap {
-		all = append(all, idx)
+func toUnicodeSimple(ordering string) *cmapInfo {
+	res := &cmapInfo{
+		Registry:   "seehuhn.de",
+		Ordering:   ordering,
+		Supplement: 0,
+		CodeSpace:  []string{"<00><FF>"},
 	}
-	sort.Slice(all, func(i, j int) bool {
-		return all[i] < all[j]
-	})
-	if len(all) == 0 {
-		panic("empty cmap")
-	}
-
-	first := true
-	var start, lastIn font.GlyphID
-	var lastOut rune
-	flush := func() {
-		if start < lastIn {
-			info.Ranges = append(info.Ranges, cidRange{
-				From:    start,
-				To:      lastIn,
-				FromCID: lastOut - rune(lastIn-start),
-			})
-		} else {
-			info.Chars = append(info.Chars, cidChar{
-				Code: lastIn,
-				CID:  lastOut,
-			})
-		}
-	}
-	for _, r := range all {
-		c := cmap[r]
-		if first {
-			start = r
-			lastIn = r
-			lastOut = c
-			first = false
-		} else {
-			if r != lastIn+1 || c != lastOut+1 || lastIn%256 == 255 || lastOut%256 == 255 {
-				flush()
-				start = r
-			}
-			lastIn = r
-			lastOut = c
-		}
-	}
-	flush()
+	return res
 }
 
 func formatPDFString(args ...interface{}) (string, error) {
@@ -139,7 +99,7 @@ func formatPDFName(args ...interface{}) (string, error) {
 	return buf.String(), err
 }
 
-func hex(idx font.GlyphID) string {
+func hex(idx GlyphID) string {
 	return fmt.Sprintf("<%x>", []byte{byte(idx >> 8), byte(idx)})
 }
 
@@ -154,8 +114,8 @@ func runehex(r rune) string {
 
 const chunkSize = 100
 
-func charChunks(x []cidChar) [][]cidChar {
-	var res [][]cidChar
+func charChunks(x []bfChar) [][]bfChar {
+	var res [][]bfChar
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -166,8 +126,8 @@ func charChunks(x []cidChar) [][]cidChar {
 	return res
 }
 
-func rangeChunks(x []cidRange) [][]cidRange {
-	var res [][]cidRange
+func rangeChunks(x []bfRange) [][]bfRange {
+	var res [][]bfRange
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -178,7 +138,7 @@ func rangeChunks(x []cidRange) [][]cidRange {
 	return res
 }
 
-var cMapTmpl = template.Must(template.New("CMap").Funcs(template.FuncMap{
+var toUnicodeTmpl = template.Must(template.New("CMap").Funcs(template.FuncMap{
 	"PDFString":   formatPDFString,
 	"PDFName":     formatPDFName,
 	"hex":         hex,
@@ -194,11 +154,13 @@ begincmap
 /Ordering {{PDFString .Ordering}} def
 /Supplement {{.Supplement}} def
 end def
-/CMapName {{PDFName .Name}} def
+/CMapName {{printf "%s-%s-%03d" .Registry .Ordering .Supplement | PDFName}} def
 /CMapType 2 def
 /WMode 0 def
-1 begincodespacerange
-<0000><FFFF>
+{{len .CodeSpace}} begincodespacerange
+{{range .CodeSpace -}}
+{{.}}
+{{end -}}
 endcodespacerange
 {{range charChunks .Chars -}}
 {{len .}} beginbfchar

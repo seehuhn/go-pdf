@@ -18,6 +18,7 @@ package truetype
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
@@ -76,7 +77,6 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 	res := &font.Font{
 		InstName:    pdf.Name(instName),
 		Ref:         t.Ref,
-		CMap:        t.CMap,
 		Layout:      t.Layout,
 		Enc:         t.Enc,
 		GlyphUnits:  t.GlyphUnits,
@@ -106,9 +106,10 @@ type truetype struct {
 	Lookups  parser.Lookups
 	KernInfo map[font.GlyphPair]int
 
-	enc  map[font.GlyphID]byte
-	used map[byte]bool
-	tidy map[font.GlyphID]byte
+	enc  map[font.GlyphID]byte   // GID -> CID
+	used map[byte]bool           // CID in use?
+	tidy map[font.GlyphID]byte   // GID -> candidate CID
+	text map[font.GlyphID][]rune // GID -> text
 
 	overflowed bool
 }
@@ -221,17 +222,26 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 		enc:  make(map[font.GlyphID]byte),
 		used: map[byte]bool{},
 		tidy: tidy,
+		text: make(map[font.GlyphID][]rune),
 	}
 
 	return res, nil
 }
 
-func (t *truetype) Layout(gg []font.Glyph) []font.Glyph {
-	gg = t.Lookups.ApplyAll(gg)
-
-	for i, g := range gg {
-		gg[i].Advance = t.Width[g.Gid]
+func (t *truetype) Layout(rr []rune) ([]font.Glyph, error) {
+	gg := make([]font.Glyph, len(rr))
+	for i, r := range rr {
+		gid, ok := t.CMap[r]
+		if !ok {
+			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
+				t.FontName, r, string([]rune{r}))
+		}
+		gg[i].Gid = gid
+		gg[i].Chars = []rune{r}
+		gg[i].Advance = t.Width[gid]
 	}
+
+	gg = t.Lookups.ApplyAll(gg)
 
 	if t.KernInfo != nil {
 		for i := 0; i+1 < len(gg); i++ {
@@ -242,7 +252,13 @@ func (t *truetype) Layout(gg []font.Glyph) []font.Glyph {
 		}
 	}
 
-	return gg
+	for _, g := range gg {
+		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
+			t.text[g.Gid] = g.Chars // TODO(voss): should we copy this?
+		}
+	}
+
+	return gg, nil
 }
 
 func (t *truetype) Enc(gid font.GlyphID) pdf.String {
@@ -273,6 +289,8 @@ func (t *truetype) Enc(gid font.GlyphID) pdf.String {
 		// A simple font can only encode 256 different characters. If we run
 		// out of character codes, just return 0 here and report an error when
 		// we try to write the font dictionary at the end.
+		//
+		// TODO(voss): turn this into an error returned by .Layout()?
 		t.overflowed = true
 		t.enc[gid] = 0
 		return pdf.String{0}

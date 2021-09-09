@@ -18,6 +18,7 @@ package builtin
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 
 	"seehuhn.de/go/pdf"
@@ -48,15 +49,12 @@ func EmbedAfm(w *pdf.Writer, refName string, afm *AfmInfo) (*font.Font, error) {
 
 	layout := b.FullLayout
 	if b.afm.IsFixedPitch {
-		layout = func(gg []font.Glyph) []font.Glyph {
-			return gg
-		}
+		layout = b.SimpleLayout
 	}
 
 	res := &font.Font{
 		InstName:    pdf.Name(refName),
 		Ref:         b.fontRef,
-		CMap:        b.cmap,
 		Layout:      layout,
 		Enc:         b.Enc,
 		GlyphUnits:  1000,
@@ -73,7 +71,7 @@ type builtin struct {
 	name    string
 	afm     *AfmInfo
 
-	cmap map[rune]font.GlyphID
+	CMap map[rune]font.GlyphID
 	char []rune
 
 	enc        map[font.GlyphID]byte
@@ -107,7 +105,7 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, refName string) *builtin {
 		name:    refName,
 		afm:     afm,
 		fontRef: fontRef,
-		cmap:    cmap,
+		CMap:    cmap,
 		char:    char,
 		enc:     make(map[font.GlyphID]byte),
 		used:    make(map[byte]bool),
@@ -123,9 +121,25 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, refName string) *builtin {
 	return b
 }
 
-func (b *builtin) FullLayout(gg []font.Glyph) []font.Glyph {
-	if len(gg) == 0 {
-		return nil
+func (b *builtin) SimpleLayout(rr []rune) ([]font.Glyph, error) {
+	gg := make([]font.Glyph, len(rr))
+	for i, r := range rr {
+		gid, ok := b.CMap[r]
+		if !ok {
+			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
+				b.afm.FontName, r, string([]rune{r}))
+		}
+		gg[i].Gid = gid
+		gg[i].Chars = []rune{r}
+		gg[i].Advance = b.afm.Width[gid]
+	}
+	return gg, nil
+}
+
+func (b *builtin) FullLayout(rr []rune) ([]font.Glyph, error) {
+	gg, err := b.SimpleLayout(rr)
+	if err != nil {
+		return nil, err
 	}
 
 	var res []font.Glyph
@@ -140,21 +154,16 @@ func (b *builtin) FullLayout(gg []font.Glyph) []font.Glyph {
 			last = g
 		}
 	}
-	res = append(res, last)
-
-	for i, glyph := range res {
-		gid := glyph.Gid
-
-		kern := 0
-		if i < len(res)-1 {
-			kern = b.afm.Kern[font.GlyphPair{gid, res[i+1].Gid}]
-		}
-
-		res[i].Gid = gid
-		res[i].Advance = b.afm.Width[gid] + kern
+	gg = append(res, last)
+	if len(gg) < 2 {
+		return gg, nil
 	}
 
-	return res
+	for i := 0; i < len(gg)-1; i++ {
+		kern := b.afm.Kern[font.GlyphPair{gg[i].Gid, gg[i+1].Gid}]
+		gg[i].Advance += kern
+	}
+	return gg, nil
 }
 
 func (b *builtin) Enc(gid font.GlyphID) pdf.String {

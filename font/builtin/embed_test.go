@@ -38,7 +38,7 @@ func TestEnc(t *testing.T) {
 		rr := []rune("ý×A×˚")
 		gids := make([]font.GlyphID, len(rr))
 		for i, r := range rr {
-			gid, ok := b.cmap[r]
+			gid, ok := b.CMap[r]
 			if !ok {
 				t.Fatal("missing rune")
 			}
@@ -92,7 +92,7 @@ func TestCommaAccent(t *testing.T) {
 	}
 
 	b := newBuiltin(afm, nil, "F")
-	gid := b.cmap[r]
+	gid := b.CMap[r]
 
 	if afm.Code[gid] != -1 {
 		t.Errorf("character wrongly mapped at code %d", afm.Code[gid])

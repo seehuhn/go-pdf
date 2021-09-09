@@ -18,6 +18,7 @@ package font
 
 import (
 	"fmt"
+	"math"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
@@ -29,8 +30,7 @@ type Font struct {
 	InstName pdf.Name
 	Ref      *pdf.Reference
 
-	CMap   map[rune]GlyphID
-	Layout func([]Glyph) []Glyph
+	Layout func([]rune) ([]Glyph, error)
 	Enc    func(GlyphID) pdf.String
 
 	GlyphUnits int
@@ -39,25 +39,6 @@ type Font struct {
 
 	GlyphExtent []Rect // This is in Glyph design units.  TODO(voss): needed?
 	Width       []int  // This is in Glyph design units.  TODO(voss): needed?
-}
-
-// MakeGlyphs converts a string to a series of glyphs.  Use the function
-// font.Layout() to substitute ligatures and to apply kerning to the result.
-// If the font cannot represent all runes in s, an error is returned.
-func (font *Font) MakeGlyphs(s string) ([]Glyph, error) {
-	rr := []rune(s)
-	gg := make([]Glyph, len(rr))
-	for i, r := range rr {
-		gid, ok := font.CMap[r]
-		if !ok {
-			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				font.InstName, r, string([]rune{r}))
-		}
-		gg[i].Gid = gid
-		gg[i].Chars = []rune{r}
-		gg[i].Advance = font.Width[gid]
-	}
-	return gg, nil
 }
 
 // Draw emits PDF text mode commands to show the glyphs on the page.
@@ -102,10 +83,10 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 
 		xOffsWanted := xOffs + glyph.XOffset
 
-		if xOffsWanted != xOffsAuto {
-
+		delta := font.ToGlyph(xOffsWanted - xOffsAuto)
+		if delta != 0 {
 			flushRun()
-			data = append(data, -pdf.Integer(font.ToGlyph(xOffsWanted-xOffsAuto)))
+			data = append(data, -pdf.Integer(delta))
 		}
 		run = append(run, font.Enc(glyph.Gid)...)
 
@@ -118,7 +99,7 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 // ToGlyph converts from font design units to PDF glyph coordinates.
 func (font *Font) ToGlyph(fontDesignSize int) int {
 	q := 1000 / float64(font.GlyphUnits)
-	return int(float64(fontDesignSize)*q + 0.5)
+	return int(math.Round(float64(fontDesignSize) * q))
 }
 
 // GlyphID is used to enumerate the glyphs in a font.  The first glyph
@@ -174,11 +155,10 @@ func (font *Font) Typeset(s string, ptSize float64) (*Layout, error) {
 
 	var glyphs []Glyph
 	for _, run := range runs {
-		gg, err := font.MakeGlyphs(string(run))
+		gg, err := font.Layout(run)
 		if err != nil {
 			return nil, err
 		}
-		gg = font.Layout(gg)
 		glyphs = append(glyphs, gg...)
 	}
 

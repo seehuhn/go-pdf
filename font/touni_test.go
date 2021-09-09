@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package font
 
 import (
+	"os"
 	"testing"
 )
 
@@ -43,4 +44,13 @@ func TestFormatName(t *testing.T) {
 	} else if name != "/abc" {
 		t.Errorf("wrong result %q", name)
 	}
+}
+
+func TestToUnicodeSimple(t *testing.T) {
+	info := toUnicodeSimple("AAAAAA")
+	err := toUnicodeTmpl.Execute(os.Stdout, info)
+	if err != nil {
+		t.Error(err)
+	}
+	// t.Error("fish")
 }

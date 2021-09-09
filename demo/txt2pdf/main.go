@@ -111,11 +111,10 @@ func convert(inName, outName string) error {
 		} else {
 			rr = []rune(line)
 		}
-		glyphs, err := Font.MakeGlyphs(string(rr))
+		glyphs, err := Font.Layout(rr)
 		if err != nil {
 			return err
 		}
-		glyphs = Font.Layout(glyphs)
 		Font.Draw(page, glyphs)
 
 		fmt.Fprintln(page, " T*")

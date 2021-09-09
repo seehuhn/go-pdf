@@ -314,20 +314,20 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	if err != nil {
 		return nil, err
 	}
-	xxx := make(map[font.GlyphID]rune)
-	for r, c := range CMap {
-		xxx[c] = r
-	}
-	cmapInfo := &cmapInfo{
-		Name:     "Adobe-Identity-UCS",
-		Registry: "Adobe",
-		Ordering: "UCS",
-	}
-	cmapInfo.FillRanges(xxx)
-	err = cMapTmpl.Execute(cmapStream, cmapInfo)
-	if err != nil {
-		return nil, err
-	}
+	// xxx := make(map[font.GlyphID]rune)
+	// for r, c := range CMap {
+	// 	xxx[c] = r
+	// }
+	// cmapInfo := &cmapInfo{
+	// 	Name:     "Adobe-Identity-UCS",
+	// 	Registry: "Adobe",
+	// 	Ordering: "UCS",
+	// }
+	// cmapInfo.FillRangesUCS(xxx)
+	// err = cMapTmplUCS.Execute(cmapStream, cmapInfo)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	err = cmapStream.Close()
 	if err != nil {
 		return nil, err
@@ -352,7 +352,6 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	fontObj := &font.Font{
 		InstName: pdf.Name(name),
 		Ref:      FontRef,
-		CMap:     CMap,
 		Enc: func(gid font.GlyphID) pdf.String {
 			return pdf.String{byte(gid >> 8), byte(gid)}
 		},
@@ -399,15 +398,24 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 		}
 	}
 
-	fontObj.Layout = func(gg []font.Glyph) []font.Glyph {
-		gg = allLookups.ApplyAll(gg)
-		for i, g := range gg {
-			gg[i].Advance = fontObj.Width[g.Gid]
+	fontObj.Layout = func(rr []rune) ([]font.Glyph, error) {
+		gg := make([]font.Glyph, len(rr))
+		for i, r := range rr {
+			gid, ok := CMap[r]
+			if !ok {
+				return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
+					FontName, r, string([]rune{r}))
+			}
+			gg[i].Gid = gid
+			gg[i].Chars = []rune{r}
+			gg[i].Advance = Width[gid]
 		}
+
+		gg = allLookups.ApplyAll(gg)
 		if kernFn != nil {
 			kernFn(gg)
 		}
-		return gg
+		return gg, nil
 	}
 
 	return fontObj, nil
