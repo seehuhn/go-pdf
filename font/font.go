@@ -26,6 +26,8 @@ import (
 )
 
 // Font represents a font embedded in the PDF file.
+//
+// TODO(voss): turn this into an interface?
 type Font struct {
 	InstName pdf.Name
 	Ref      *pdf.Reference

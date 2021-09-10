@@ -28,19 +28,39 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-// OldEmbed embeds a TrueType font into a pdf file.
-func OldEmbed(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*font.Font, error) {
+// EmbedCID embeds a TrueType font into a pdf file as a CIDFont.
+//
+// In comparison, fonts embedded via EmbedSimple() lead to smaller PDF files,
+// but only up to 256 glyphs of the font can be via the returned font object.
+//
+// Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
+func EmbedCID(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*font.Font, error) {
 	tt, err := sfnt.Open(fname)
 	if err != nil {
 		return nil, err
 	}
-	defer tt.Close()
 
-	return OldEmbedFont(w, name, tt, subset)
+	return EmbedFontCID(w, name, tt, subset)
 }
 
-// OldEmbedFont embeds a TrueType font into a pdf file.
-func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) (*font.Font, error) {
+// EmbedFontCID embeds a TrueType font into a pdf file as a CIDFont.
+//
+// This function takes ownership of tt and will close the font tt once it is no
+// longer needed.
+//
+// In comparison, fonts embedded via EmbedFontSimple lead to smaller PDF files,
+// but only up to 256 glyphs of the font can be via the returned font object.
+//
+// Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
+func EmbedFontCID(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) (*font.Font, error) {
+	err := w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(voss): convert this to the new scheme, similar to
+	// EmbedFontSinple().
+
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
 	}
@@ -74,12 +94,6 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	// TODO(voss): also include glyphs used for ligatures
 
 	// TODO(voss): subset the font as needed
-	// TODO(voss): if len(glyphs) <= 256, write a Type 2 font.
-
-	err = w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
-	if err != nil {
-		return nil, err
-	}
 
 	// step 2: store a copy of the font file in the font stream.
 	size := w.NewPlaceholder(10)

@@ -30,11 +30,14 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-// EmbedSimple embeds the given TrueType font into a pdf file as a simple font.
+// EmbedSimple embeds a TrueType font into a pdf file as a simple font.
 // Up to 255 arbitrary glyphs from the font file can be accessed via the
 // returned font object.
 //
-// Use of TrueType fonts in PDF requires PDF version 1.1 or higher.
+// In comparison, fonts embedded via EmbedCID lead to larger PDF files, but
+// there is no limit on the number of glyphs which can be accessed.
+//
+// Use of simple TrueType fonts in PDF requires PDF version 1.1 or higher.
 func EmbedSimple(w *pdf.Writer, name string, fname string, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fname)
 	if err != nil {
@@ -44,14 +47,17 @@ func EmbedSimple(w *pdf.Writer, name string, fname string, loc *locale.Locale) (
 	return EmbedFontSimple(w, tt, name, loc)
 }
 
-// EmbedFontSimple embeds a TrueType font into a pdf file as a simple font. Up
-// to 255 arbitrary glyphs from the font file can be accessed via the returned
-// font object.
+// EmbedFontSimple embeds a TrueType font into a pdf file as a simple font.
+// Up to 255 arbitrary glyphs from the font file can be accessed via the
+// returned font object.
 //
-// This function takes ownership of tt and will close the font tt once it
-// is no longer needed.
+// This function takes ownership of tt and will close the font tt once it is no
+// longer needed.
 //
-// Use of TrueType fonts in PDF requires PDF version 1.1 or higher.
+// In comparison, fonts embedded via EmbedFontCID lead to larger PDF files, but
+// there is no limit on the number of glyphs which can be accessed.
+//
+// Use of simple TrueType fonts in PDF requires PDF version 1.1 or higher.
 func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*font.Font, error) {
 	err := w.CheckVersion("use of TrueType fonts", pdf.V1_1)
 	if err != nil {
@@ -78,7 +84,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 	return res, nil
 }
 
-type truetype struct {
+type ttfSimple struct {
 	InstName string
 	Ttf      *sfnt.Font
 	CMap     map[rune]font.GlyphID
@@ -104,7 +110,7 @@ type truetype struct {
 	overflowed bool
 }
 
-func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*truetype, error) {
+func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*ttfSimple, error) {
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
 	}
@@ -192,7 +198,7 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 	}
 
 	subsetTag := makeSubsetTag() + "+"
-	res := &truetype{
+	res := &ttfSimple{
 		InstName: instName,
 		Ttf:      tt,
 		os2Info:  os2Info,
@@ -219,7 +225,7 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 	return res, nil
 }
 
-func (t *truetype) Layout(rr []rune) ([]font.Glyph, error) {
+func (t *ttfSimple) Layout(rr []rune) ([]font.Glyph, error) {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
 		gid, ok := t.CMap[r]
@@ -256,7 +262,7 @@ func (t *truetype) Layout(rr []rune) ([]font.Glyph, error) {
 	return gg, nil
 }
 
-func (t *truetype) Enc(gid font.GlyphID) pdf.String {
+func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
 	c, ok := t.enc[gid]
 	if ok {
 		return pdf.String{c}
@@ -296,7 +302,7 @@ func (t *truetype) Enc(gid font.GlyphID) pdf.String {
 	return pdf.String{c}
 }
 
-func (t *truetype) WriteFontDict(w *pdf.Writer) error {
+func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 	if t.overflowed {
 		return errors.New("too many different glyphs for simple font " + t.InstName)
 	}
@@ -372,7 +378,7 @@ func (t *truetype) WriteFontDict(w *pdf.Writer) error {
 	return err
 }
 
-func (t *truetype) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*pdf.Reference, error) {
+func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*pdf.Reference, error) {
 	fontFileRef, err := t.WriteFontFile(w, subset)
 	if err != nil {
 		return nil, err
@@ -406,7 +412,10 @@ func (t *truetype) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*p
 	if IsItalic {
 		flags |= fontFlagItalic
 	}
+
+	// TODO(voss): can we set this correctly without breaking /Encoding?
 	flags |= fontFlagSymbolic
+
 	// TODO(voss): FontFlagAllCap
 	// TODO(voss): FontFlagSmallCap
 
@@ -466,7 +475,7 @@ func (t *truetype) WriteFontDescriptor(w *pdf.Writer, subset []font.GlyphID) (*p
 	return w.Write(FontDescriptor, nil)
 }
 
-func (t *truetype) WriteFontFile(w *pdf.Writer, subset []font.GlyphID) (*pdf.Reference, error) {
+func (t *ttfSimple) WriteFontFile(w *pdf.Writer, subset []font.GlyphID) (*pdf.Reference, error) {
 	// See section 9.9 of PDF 32000-1:2008.
 	size := w.NewPlaceholder(10)
 	fontFileDict := pdf.Dict{
@@ -510,7 +519,7 @@ func (t *truetype) WriteFontFile(w *pdf.Writer, subset []font.GlyphID) (*pdf.Ref
 
 func makeSubsetTag() string {
 	var letters []rune
-	t := time.Now().UnixNano()
+	t := time.Now().UnixNano() // TODO(voss): be more clever here?
 	for len(letters) < 6 {
 		letters = append(letters, rune(t%26)+'A')
 		t /= 26
