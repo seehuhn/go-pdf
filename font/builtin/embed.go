@@ -121,7 +121,7 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, refName string) *builtin {
 	return b
 }
 
-func (b *builtin) SimpleLayout(rr []rune) ([]font.Glyph, error) {
+func (b *builtin) makeGlyphs(rr []rune) ([]font.Glyph, error) {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
 		gid, ok := b.CMap[r]
@@ -131,15 +131,29 @@ func (b *builtin) SimpleLayout(rr []rune) ([]font.Glyph, error) {
 		}
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
-		gg[i].Advance = b.afm.Width[gid]
+	}
+	return gg, nil
+}
+
+func (b *builtin) SimpleLayout(rr []rune) ([]font.Glyph, error) {
+	gg, err := b.makeGlyphs(rr)
+	if err != nil {
+		return nil, err
+	}
+	for i := range gg {
+		gg[i].Advance = b.afm.Width[gg[i].Gid]
 	}
 	return gg, nil
 }
 
 func (b *builtin) FullLayout(rr []rune) ([]font.Glyph, error) {
-	gg, err := b.SimpleLayout(rr)
+	gg, err := b.makeGlyphs(rr)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(gg) < 2 {
+		return gg, nil
 	}
 
 	var res []font.Glyph
@@ -155,6 +169,10 @@ func (b *builtin) FullLayout(rr []rune) ([]font.Glyph, error) {
 		}
 	}
 	gg = append(res, last)
+
+	for i := range gg {
+		gg[i].Advance = b.afm.Width[gg[i].Gid]
+	}
 	if len(gg) < 2 {
 		return gg, nil
 	}
@@ -163,6 +181,7 @@ func (b *builtin) FullLayout(rr []rune) ([]font.Glyph, error) {
 		kern := b.afm.Kern[font.GlyphPair{gg[i].Gid, gg[i+1].Gid}]
 		gg[i].Advance += kern
 	}
+
 	return gg, nil
 }
 

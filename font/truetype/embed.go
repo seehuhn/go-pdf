@@ -30,21 +30,11 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-// TrueType fonts with <=255 glyphs (PDF 1.1)
-//   Type=Font, Subtype=TrueType
-//   --FontDescriptor-> Type=FontDescriptor
-//   --FontFile2-> Length1=...
-
-// TrueType fonts with >255 glyphs (PDF 1.3)
-//   Type=Font, Subtype=Type0
-//   --DescendantFonts-> Type=Font, Subtype=CIDFontType2
-//   --FontDescriptor-> Type=FontDescriptor
-//   --FontFile2-> Length1=...
-
 // EmbedSimple embeds the given TrueType font into a pdf file as a simple font.
 // Up to 255 arbitrary glyphs from the font file can be accessed via the
 // returned font object.
-// This requires PDF version 1.1 or higher.
+//
+// Use of TrueType fonts in PDF requires PDF version 1.1 or higher.
 func EmbedSimple(w *pdf.Writer, name string, fname string, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fname)
 	if err != nil {
@@ -103,13 +93,13 @@ type truetype struct {
 	GlyphExtent []font.Rect
 	Width       []int
 
-	Lookups  parser.Lookups
-	KernInfo map[font.GlyphPair]int
+	GSUB, GPOS parser.Lookups
+	KernInfo   map[font.GlyphPair]int
 
 	enc  map[font.GlyphID]byte   // GID -> CID
-	used map[byte]bool           // CID in use?
-	tidy map[font.GlyphID]byte   // GID -> candidate CID
+	used map[byte]bool           // is CID used or not?
 	text map[font.GlyphID][]rune // GID -> text
+	tidy map[font.GlyphID]byte   // GID -> candidate CID
 
 	overflowed bool
 }
@@ -216,7 +206,8 @@ func newTruetype(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loca
 		GlyphExtent: GlyphExtent,
 		Width:       Width,
 
-		Lookups:  append(gsub, gpos...),
+		GSUB:     gsub,
+		GPOS:     gpos,
 		KernInfo: kernInfo,
 
 		enc:  make(map[font.GlyphID]byte),
@@ -238,10 +229,13 @@ func (t *truetype) Layout(rr []rune) ([]font.Glyph, error) {
 		}
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
-		gg[i].Advance = t.Width[gid]
 	}
 
-	gg = t.Lookups.ApplyAll(gg)
+	gg = t.GSUB.ApplyAll(gg)
+	for i := range gg {
+		gg[i].Advance = t.Width[gg[i].Gid]
+	}
+	gg = t.GPOS.ApplyAll(gg)
 
 	if t.KernInfo != nil {
 		for i := 0; i+1 < len(gg); i++ {
@@ -254,7 +248,8 @@ func (t *truetype) Layout(rr []rune) ([]font.Glyph, error) {
 
 	for _, g := range gg {
 		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
-			t.text[g.Gid] = g.Chars // TODO(voss): should we copy this?
+			// copy the slice, in case the caller modifies it later
+			t.text[g.Gid] = append([]rune{}, g.Chars...)
 		}
 	}
 
@@ -342,7 +337,17 @@ func (t *truetype) WriteFontDict(w *pdf.Writer) error {
 		return err
 	}
 
-	// See sections 9.6.3 and 9.6.2.1 of PDF 32000-1:2008.
+	var mm []font.SimpleMapping
+	for gid, text := range t.text {
+		cid := t.enc[gid]
+		mm = append(mm, font.SimpleMapping{Cid: cid, Text: text})
+	}
+	toUnicodeRef, err := font.ToUnicodeSimple(w, "AAAAAA", mm)
+	if err != nil {
+		return err
+	}
+
+	// See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
 	Font := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("TrueType"),
@@ -351,7 +356,7 @@ func (t *truetype) WriteFontDict(w *pdf.Writer) error {
 		"LastChar":       pdf.Integer(last),
 		"Widths":         widths,
 		"FontDescriptor": fontDesc,
-		"ToUnicode":      nil, // TODO(voss)
+		"ToUnicode":      toUnicodeRef,
 	}
 
 	_, err = w.Write(Font, t.Ref)

@@ -35,6 +35,8 @@ import (
 
 const tabWidth = 4
 
+var fontFile = flag.String("f", "Courier", "the font to use")
+
 func convert(inName, outName string) error {
 	fmt.Println(inName, "->", outName)
 
@@ -56,12 +58,12 @@ func convert(inName, outName string) error {
 	})
 
 	var Font *font.Font
-	if false {
-		Font, err = builtin.Embed(out, "F", "Courier")
-	} else {
+	if strings.HasSuffix(*fontFile, ".ttf") {
 		Font, err = truetype.EmbedSimple(out, "F",
-			"../../font/truetype/ttf/SourceSerif4-Regular.ttf",
+			*fontFile,
 			locale.DeDE)
+	} else {
+		Font, err = builtin.Embed(out, "F", *fontFile)
 	}
 	if err != nil {
 		return err

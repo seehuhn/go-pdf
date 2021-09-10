@@ -24,14 +24,174 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 	"text/template"
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
 )
 
-type cmapInfo struct {
+// SimpleMapping describes the unicode text corresponding to a character
+// in a simple font.
+type SimpleMapping struct {
+	Cid  byte
+	Text []rune
+}
+
+// ToUnicodeSimple writes the ToUnicode stream for a simple font.
+func ToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping) (*pdf.Reference, error) {
+	data := &toUnicodeData{
+		Registry:   "seehuhn.de",
+		Ordering:   ordering,
+		Supplement: 0,
+		CodeSpace:  []string{"<00><FF>"},
+	}
+
+	canDeltaRange := make([]bool, len(mm))
+	step := make([]byte, len(mm))
+	var prevDelta int
+	var prevCid byte
+	sort.Slice(mm, func(i, j int) bool { return mm[i].Cid < mm[j].Cid })
+	for i, m := range mm {
+		delta := int(m.Text[0]) - int(m.Cid)
+		cid := m.Cid
+		if i > 0 {
+			canDeltaRange[i] = delta == prevDelta
+			step[i] = cid - prevCid
+		}
+		prevDelta = delta
+		prevCid = cid
+	}
+
+	pos := 0
+	for pos < len(mm) {
+		next := pos + 1
+		for next < len(mm) && canDeltaRange[next] {
+			next++
+		}
+		if next > pos+1 {
+			bf := bfRange{
+				From:     []byte{mm[pos].Cid},
+				To:       []byte{mm[next-1].Cid},
+				FromText: [][]rune{mm[pos].Text},
+			}
+			data.Ranges = append(data.Ranges, bf)
+			pos = next
+			continue
+		}
+
+		next = pos + 1
+		for next < len(mm) && step[next] < 2 {
+			next++
+		}
+		if next > pos+1 {
+			var repl [][]rune
+			for i := pos; i < next; i++ {
+				if i > pos && step[i] > 1 {
+					for j := 0; j < int(step[i]-1); j++ {
+						repl = append(repl, []rune{'\uFFFD'})
+					}
+				}
+				repl = append(repl, mm[i].Text)
+			}
+			bf := bfRange{
+				From:     []byte{mm[pos].Cid},
+				To:       []byte{mm[next-1].Cid},
+				FromText: repl,
+			}
+			data.Ranges = append(data.Ranges, bf)
+			pos = next
+			continue
+		}
+
+		data.Chars = append(data.Chars, bfChar{
+			Code: []byte{mm[pos].Cid},
+			Text: mm[pos].Text,
+		})
+		pos++
+	}
+
+	return writeToUnicodeStream(w, data)
+}
+
+// ToUnicodeCIDFont writes the ToUnicode stream for a CIDFont.
+func ToUnicodeCIDFont(w *pdf.Writer, cmap map[uint16]rune) (*pdf.Reference, error) {
+	data := &toUnicodeData{
+		Registry:   "Adobe",
+		Ordering:   "UCS",
+		Supplement: 0,
+		CodeSpace:  []string{"<00><FF>"},
+	}
+
+	var all []uint16
+	for idx := range cmap {
+		all = append(all, idx)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		return all[i] < all[j]
+	})
+	if len(all) == 0 {
+		panic("empty cmap")
+	}
+
+	first := true
+	var start, lastIn uint16
+	var lastOut rune
+	flush := func() {
+		if start < lastIn {
+			data.Ranges = append(data.Ranges, bfRange{
+				From:     []byte{byte(start >> 8), byte(start)},
+				To:       []byte{byte(lastIn >> 8), byte(lastIn)},
+				FromText: [][]rune{{lastOut - rune(lastIn-start)}},
+			})
+		} else {
+			data.Chars = append(data.Chars, bfChar{
+				Code: []byte{byte(lastIn >> 8), byte(lastIn)},
+				Text: []rune{lastOut - rune(lastIn-start)},
+			})
+		}
+	}
+	for _, r := range all {
+		c := cmap[r]
+		if first {
+			start = r
+			lastIn = r
+			lastOut = c
+			first = false
+		} else {
+			if r != lastIn+1 || c != lastOut+1 || lastIn%256 == 255 || lastOut%256 == 255 {
+				flush()
+				start = r
+			}
+			lastIn = r
+			lastOut = c
+		}
+	}
+	flush()
+
+	return writeToUnicodeStream(w, data)
+}
+
+func writeToUnicodeStream(w *pdf.Writer, data *toUnicodeData) (*pdf.Reference, error) {
+	cmapStream, toUnicodeRef, err := w.OpenStream(pdf.Dict{}, nil,
+		&pdf.FilterInfo{Name: "FlateDecode"})
+	if err != nil {
+		return nil, err
+	}
+	err = toUnicodeTmpl.Execute(cmapStream, data)
+	if err != nil {
+		return nil, err
+	}
+	err = cmapStream.Close()
+	if err != nil {
+		return nil, err
+	}
+	return toUnicodeRef, nil
+}
+
+type toUnicodeData struct {
 	Registry     string
 	Ordering     string
 	Supplement   int
@@ -46,19 +206,40 @@ type bfChar struct {
 	Text []rune
 }
 
-type bfRange struct {
-	From, To pdf.String
-	FromText []rune
+func (bfc bfChar) String() string {
+	var text []byte
+	for _, x := range utf16.Encode(bfc.Text) {
+		text = append(text, byte(x>>8), byte(x))
+	}
+	return fmt.Sprintf("<%02X> <%02X>", []byte(bfc.Code), text)
 }
 
-func toUnicodeSimple(ordering string) *cmapInfo {
-	res := &cmapInfo{
-		Registry:   "seehuhn.de",
-		Ordering:   ordering,
-		Supplement: 0,
-		CodeSpace:  []string{"<00><FF>"},
+type bfRange struct {
+	From, To pdf.String
+	FromText [][]rune
+}
+
+func (bfr bfRange) String() string {
+	if len(bfr.FromText) == 1 {
+		var text []byte
+		for _, x := range utf16.Encode(bfr.FromText[0]) {
+			text = append(text, byte(x>>8), byte(x))
+		}
+		return fmt.Sprintf("<%02X> <%02X> <%02X>",
+			[]byte(bfr.From), []byte(bfr.To), text)
 	}
-	return res
+
+	var texts []string
+	for _, in := range bfr.FromText {
+		var text []byte
+		for _, x := range utf16.Encode(in) {
+			text = append(text, byte(x>>8), byte(x))
+		}
+		texts = append(texts, fmt.Sprintf("<%02X>", text))
+	}
+	repl := strings.Join(texts, " ")
+	return fmt.Sprintf("<%02X> <%02X> [%s]",
+		[]byte(bfr.From), []byte(bfr.To), repl)
 }
 
 func formatPDFString(args ...interface{}) (string, error) {
@@ -165,7 +346,7 @@ endcodespacerange
 {{range charChunks .Chars -}}
 {{len .}} beginbfchar
 {{range . -}}
-{{hex .Code}} {{runehex .CID}}
+{{.}}
 {{end -}}
 endbfchar
 {{end -}}
@@ -173,7 +354,7 @@ endbfchar
 {{range rangeChunks .Ranges -}}
 {{len .}} beginbfrange
 {{range . -}}
-{{hex .From}}{{hex .To}}{{runehex .FromCID}}
+{{.}}
 {{end -}}
 endbfrange
 {{end -}}

@@ -309,26 +309,11 @@ func OldEmbedFont(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 		return nil, err
 	}
 
-	cmapStream, ToUnicodeRef, err := w.OpenStream(pdf.Dict{}, nil,
-		&pdf.FilterInfo{Name: "FlateDecode"})
-	if err != nil {
-		return nil, err
+	xxx := make(map[uint16]rune)
+	for r, gid := range CMap {
+		xxx[uint16(gid)] = r
 	}
-	// xxx := make(map[font.GlyphID]rune)
-	// for r, c := range CMap {
-	// 	xxx[c] = r
-	// }
-	// cmapInfo := &cmapInfo{
-	// 	Name:     "Adobe-Identity-UCS",
-	// 	Registry: "Adobe",
-	// 	Ordering: "UCS",
-	// }
-	// cmapInfo.FillRangesUCS(xxx)
-	// err = cMapTmplUCS.Execute(cmapStream, cmapInfo)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	err = cmapStream.Close()
+	ToUnicodeRef, err := font.ToUnicodeCIDFont(w, xxx)
 	if err != nil {
 		return nil, err
 	}

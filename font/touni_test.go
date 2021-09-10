@@ -17,7 +17,6 @@
 package font
 
 import (
-	"os"
 	"testing"
 )
 
@@ -44,13 +43,4 @@ func TestFormatName(t *testing.T) {
 	} else if name != "/abc" {
 		t.Errorf("wrong result %q", name)
 	}
-}
-
-func TestToUnicodeSimple(t *testing.T) {
-	info := toUnicodeSimple("AAAAAA")
-	err := toUnicodeTmpl.Execute(os.Stdout, info)
-	if err != nil {
-		t.Error(err)
-	}
-	// t.Error("fish")
 }
