@@ -36,8 +36,8 @@ type Font struct {
 	Enc    func(GlyphID) pdf.String
 
 	GlyphUnits int
-	Ascent     float64 // Ascent in glyph coordinate units
-	Descent    float64 // Descent in glyph coordinate units, as a negative number
+	Ascent     int // Ascent in glyph coordinate units
+	Descent    int // Descent in glyph coordinate units, as a negative number
 
 	GlyphExtent []Rect // This is in Glyph design units.  TODO(voss): needed?
 	Width       []int  // This is in Glyph design units.  TODO(voss): needed?

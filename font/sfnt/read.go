@@ -185,6 +185,8 @@ func (tt *Font) GetOS2Info() (*table.OS2, error) {
 }
 
 // ReadKernInfo reads kerning information from the "kern" table.
+//
+// TODO(voss): use a gpos2_1 structure instead.
 func (tt *Font) ReadKernInfo() (map[font.GlyphPair]int, error) {
 	var Header struct {
 		Version   uint16

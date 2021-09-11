@@ -33,10 +33,10 @@ type AfmInfo struct {
 	IsFixedPitch bool
 	IsDingbats   bool
 
-	Ascent    float64
-	Descent   float64
-	CapHeight float64
-	XHeight   float64
+	Ascent    int
+	Descent   int
+	CapHeight int
+	XHeight   int
 
 	Code        []int16 // code byte, or -1 if unmapped
 	GlyphExtent []font.Rect
@@ -169,16 +169,16 @@ func Afm(fontName string) (*AfmInfo, error) {
 		case "IsFixedPitch":
 			res.IsFixedPitch = fields[1] == "true"
 		case "CapHeight":
-			x, _ := strconv.ParseFloat(fields[1], 64)
+			x, _ := strconv.Atoi(fields[1])
 			res.CapHeight = x
 		case "XHeight":
-			x, _ := strconv.ParseFloat(fields[1], 64)
+			x, _ := strconv.Atoi(fields[1])
 			res.XHeight = x
 		case "Ascender":
-			x, _ := strconv.ParseFloat(fields[1], 64)
+			x, _ := strconv.Atoi(fields[1])
 			res.Ascent = x
 		case "Descender":
-			x, _ := strconv.ParseFloat(fields[1], 64)
+			x, _ := strconv.Atoi(fields[1])
 			res.Descent = x
 		case "StartCharMetrics":
 			charMetrics = true

@@ -48,14 +48,14 @@ type rules struct{}
 func (r rules) Extent() *boxes.BoxExtent {
 	return &boxes.BoxExtent{
 		Width:  0,
-		Height: theFont.Ascent * glyphFontSize / float64(theFont.GlyphUnits),
-		Depth:  -theFont.Descent * glyphFontSize / float64(theFont.GlyphUnits),
+		Height: float64(theFont.Ascent) * glyphFontSize / float64(theFont.GlyphUnits),
+		Depth:  -float64(theFont.Descent) * glyphFontSize / float64(theFont.GlyphUnits),
 	}
 }
 
 func (r rules) Draw(page *pages.Page, xPos, yPos float64) {
-	yLow := yPos + theFont.Descent*glyphFontSize/float64(theFont.GlyphUnits)
-	yHigh := yPos + theFont.Ascent*glyphFontSize/float64(theFont.GlyphUnits)
+	yLow := yPos + float64(theFont.Descent)*glyphFontSize/float64(theFont.GlyphUnits)
+	yHigh := yPos + float64(theFont.Ascent)*glyphFontSize/float64(theFont.GlyphUnits)
 
 	page.Println("q")
 	page.Println(".3 .3 1 RG")
@@ -85,7 +85,7 @@ func (g glyphBox) Extent() *boxes.BoxExtent {
 	return &boxes.BoxExtent{
 		Width:  glyphBoxWidth,
 		Height: 4 + float64(bbox.URy)*glyphFontSize/float64(theFont.GlyphUnits),
-		Depth:  8 - theFont.Descent*glyphFontSize/float64(theFont.GlyphUnits),
+		Depth:  8 - float64(theFont.Descent)*glyphFontSize/float64(theFont.GlyphUnits),
 	}
 }
 
@@ -103,8 +103,8 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	page.Println("f")
 	page.Println("Q")
 
-	yLow := yPos + theFont.Descent*q
-	yHigh := yPos + theFont.Ascent*q
+	yLow := yPos + float64(theFont.Descent)*q
+	yHigh := yPos + float64(theFont.Ascent)*q
 	page.Println("q")
 	page.Println("1 0 0 RG")
 	page.Println(".5 w")
@@ -127,7 +127,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	lBox := boxes.Text(courier, 8, label)
 	lBox.Draw(page,
 		xPos+(glyphBoxWidth-lBox.Extent().Width)/2,
-		yPos+theFont.Descent*q-6)
+		yPos+float64(theFont.Descent)*q-6)
 
 	if gdef != nil {
 		class := gdef.GlyphClassDef[font.GlyphID(g)]
@@ -148,7 +148,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 			page.Println("0.5 g")
 			cBox.Draw(page,
 				xPos+glyphBoxWidth-cBox.Extent().Width-1,
-				yPos+theFont.Descent*q-6)
+				yPos+float64(theFont.Descent)*q-6)
 			page.Println("Q")
 		}
 	}
@@ -204,7 +204,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err = truetype.EmbedFontCID(out, "X", tt, nil)
+	theFont, err = truetype.EmbedFontCID(out, tt, "X", locale.EnGB)
 	// Font, err = builtin.Embed(out, "X", "Times-Roman", font.AdobeStandardLatin)
 	if err != nil {
 		log.Fatal(err)

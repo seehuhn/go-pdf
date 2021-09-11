@@ -19,12 +19,12 @@ package truetype
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/parser"
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/font/sfnt/info"
 	"seehuhn.de/go/pdf/locale"
 )
 
@@ -34,13 +34,13 @@ import (
 // but only up to 256 glyphs of the font can be via the returned font object.
 //
 // Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
-func EmbedCID(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*font.Font, error) {
-	tt, err := sfnt.Open(fname)
+func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Locale) (*font.Font, error) {
+	tt, err := sfnt.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
 
-	return EmbedFontCID(w, name, tt, subset)
+	return EmbedFontCID(w, tt, instName, loc)
 }
 
 // EmbedFontCID embeds a TrueType font into a pdf file as a CIDFont.
@@ -52,48 +52,50 @@ func EmbedCID(w *pdf.Writer, name string, fname string, subset map[rune]bool) (*
 // but only up to 256 glyphs of the font can be via the returned font object.
 //
 // Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
-func EmbedFontCID(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]bool) (*font.Font, error) {
+func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*font.Font, error) {
 	err := w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO(voss): convert this to the new scheme, similar to
-	// EmbedFontSinple().
+	t, err := newTtfCID(w, tt, instName, loc)
+	if err != nil {
+		return nil, err
+	}
+	w.OnClose(t.WriteFontDict)
 
+	res := &font.Font{
+		InstName: pdf.Name(t.InstName),
+		Ref:      t.Ref,
+		Layout:   t.Layout,
+		Enc:      t.Enc,
+
+		GlyphUnits:  t.Info.GlyphUnits,
+		Ascent:      t.Info.Ascent,
+		Descent:     t.Info.Descent,
+		GlyphExtent: t.Info.GlyphExtent,
+		Width:       t.Info.Width,
+	}
+	return res, nil
+}
+
+type ttfCID struct {
+	// Information for the Font dictionary
+	InstName string
+	Ref      *pdf.Reference
+
+	Info *info.Info
+}
+
+func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*ttfCID, error) {
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
 	}
 
-	// step 1: determine which glyphs to include
-	CMap, err := tt.SelectCMap()
+	info, err := info.GetInfo(tt, loc)
 	if err != nil {
 		return nil, err
 	}
-	if subset != nil && !isSuperset(CMap, subset) {
-		var missing []rune
-		for r, ok := range subset {
-			if !ok {
-				continue
-			}
-			if CMap[r] == 0 {
-				missing = append(missing, r)
-			}
-		}
-		return nil, fmt.Errorf("missing glyphs: %q", string(missing))
-	}
-
-	var glyphs []font.GlyphID
-	glyphs = append(glyphs, 0) // always include the placeholder glyph
-	for r, idx := range CMap {
-		if subset == nil || subset[r] {
-			glyphs = append(glyphs, idx)
-		}
-	}
-
-	// TODO(voss): also include glyphs used for ligatures
-
-	// TODO(voss): subset the font as needed
 
 	// step 2: store a copy of the font file in the font stream.
 	size := w.NewPlaceholder(10)
@@ -133,156 +135,26 @@ func EmbedFontCID(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 		return nil, err
 	}
 
-	// factor for converting from TrueType FUnit to PDF glyph units
-	q := 1000 / float64(tt.Head.UnitsPerEm) // TODO(voss): fix this
-
-	postInfo, err := tt.GetPostInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	hheaInfo, err := tt.GetHHeaInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	hmtx, err := tt.GetHMtxInfo(hheaInfo.NumOfLongHorMetrics)
-	if err != nil {
-		return nil, err
-	}
-
-	os2Info, err := tt.GetOS2Info()
-	// The "OS/2" table is optional for TrueType fonts, but required for
-	// OpenType fonts.
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-
-	Width := make([]int, tt.NumGlyphs)
-
-	IsItalic := tt.Head.MacStyle&(1<<1) != 0
-
-	Ascent := float64(hheaInfo.Ascent) * q
-	Descent := float64(hheaInfo.Descent) * q
-	// LineGap := float64(hheaInfo.LineGap) * q
-
-	for i := 0; i < tt.NumGlyphs; i++ {
-		j := i % len(hmtx.HMetrics)
-		Width[i] = int(float64(hmtx.HMetrics[j].AdvanceWidth)*q + 0.5)
-	}
-
-	glyf, err := tt.GetGlyfInfo()
-	if err != nil {
-		return nil, err
-	}
-	GlyphExtent := make([]font.Rect, tt.NumGlyphs)
-	for i := 0; i < tt.NumGlyphs; i++ {
-		GlyphExtent[i].LLx = int(float64(glyf.Data[i].XMin)*q + 0.5)
-		GlyphExtent[i].LLy = int(float64(glyf.Data[i].YMin)*q + 0.5)
-		GlyphExtent[i].URx = int(float64(glyf.Data[i].XMax)*q + 0.5)
-		GlyphExtent[i].URy = int(float64(glyf.Data[i].YMax)*q + 0.5)
-	}
-
-	// provisional weight values, updated below
-	var Weight int // 300 = light, 400 = regular, 700 = bold
-	if tt.Head.MacStyle&(1<<0) != 0 {
-		// bold font
-		Weight = 700
-	} else {
-		Weight = 400
-	}
-
-	FontName, err := tt.GetFontName()
-	if err != nil {
-		// TODO(voss): if FontName == "", invent a name: The name must be no
-		// longer than 63 characters and restricted to the printable ASCII
-		// subset, codes 33 to 126, except for the 10 characters '[', ']', '(',
-		// ')', '{', '}', '<', '>', '/', '%'.
-		return nil, err
-	}
-
-	var CapHeight float64
-	if os2Info != nil {
-		// If the "OS/2" table is present, Windows seems to use this table to
-		// decide whether the font is bold/italic.  We follow Window's lead
-		// here (overriding the values from the head table).
-		IsItalic = os2Info.V0.Selection&(1<<0) != 0
-
-		Weight = int(os2Info.V0.WeightClass)
-
-		// we also override ascent, descent and linegap
-		if os2Info.V0MSValid {
-			var ascent, descent float64
-			if os2Info.V0.Selection&(1<<7) != 0 {
-				ascent = float64(os2Info.V0MS.TypoAscender)
-				descent = float64(os2Info.V0MS.TypoDescender)
-			} else {
-				ascent = float64(os2Info.V0MS.WinAscent)
-				descent = -float64(os2Info.V0MS.WinDescent)
-			}
-			Ascent = ascent * q
-			Descent = descent * q
-			// LineGap = float64(os2Info.V0MS.TypoLineGap) * q
-		}
-
-		if os2Info.V0.Version >= 4 {
-			CapHeight = float64(os2Info.V4.CapHeight) * q
-		}
-	}
-
-	if CapHeight == 0 {
-		// TODO(voss): CapHeight may be set equal to the top of the unscaled
-		// and unhinted glyph bounding box of the glyph encoded at U+0048
-		// (LATIN CAPITAL LETTER H)
-		CapHeight = 800
-	}
-
-	var flags fontFlags
-	if os2Info != nil {
-		switch os2Info.V0.FamilyClass >> 8 {
-		case 1, 2, 3, 4, 5, 7:
-			flags |= fontFlagSerif
-		case 10:
-			flags |= fontFlagScript
-		}
-	}
-	if postInfo.IsFixedPitch {
-		flags |= fontFlagFixedPitch
-	}
-	if IsItalic {
-		flags |= fontFlagItalic
-	}
-	if isSubset(CMap, font.AdobeStandardLatin) {
-		flags |= fontFlagNonsymbolic
-	} else {
-		flags |= fontFlagSymbolic
-	}
-	// TODO(voss): FontFlagAllCap
-	// TODO(voss): FontFlagSmallCap
+	q := 1000 / float64(info.GlyphUnits)
 
 	// step 3: write the FontDescriptor dictionary
+	subsetTag := makeSubsetTag()
 	FontDescriptor := pdf.Dict{
 		"Type":     pdf.Name("FontDescriptor"),
-		"FontName": pdf.Name(FontName),
-		"Flags":    pdf.Integer(flags),
+		"FontName": pdf.Name(subsetTag + "+" + info.FontName),
+		"Flags":    pdf.Integer(info.Flags),
 		"FontBBox": &pdf.Rectangle{
-			LLx: float64(tt.Head.XMin) * q,
-			LLy: float64(tt.Head.YMin) * q,
-			URx: float64(tt.Head.XMax) * q,
-			URy: float64(tt.Head.YMax) * q,
+			LLx: math.Round(float64(tt.Head.XMin) * q),
+			LLy: math.Round(float64(tt.Head.YMin) * q),
+			URx: math.Round(float64(tt.Head.XMax) * q),
+			URy: math.Round(float64(tt.Head.YMax) * q),
 		},
-		"ItalicAngle": pdf.Number(postInfo.ItalicAngle),
-		"Ascent":      pdf.Number(Ascent),
-		"Descent":     pdf.Number(Descent),
-		"CapHeight":   pdf.Number(CapHeight),
-
-		// TrueType files don't contain this information, so make up a value.
-		// The coefficients were found using linear regression over the fonts
-		// found in a large collection of PDF files.  The fit is not good, but
-		// I guess this is still better than just saying 70.
-		"StemV": pdf.Integer(0.0838*float64(Weight) + 36.0198 + 0.5),
-
-		"FontFile2": FontFile,
+		"ItalicAngle": pdf.Number(info.ItalicAngle),
+		"Ascent":      pdf.Integer(q*float64(info.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(info.Descent) + 0.5),
+		"CapHeight":   pdf.Integer(q*float64(info.CapHeight) + 0.5),
+		"StemV":       pdf.Integer(70),
+		"FontFile2":   FontFile,
 	}
 	FontDescriptorRef, err := w.Write(FontDescriptor, nil)
 	if err != nil {
@@ -299,8 +171,8 @@ func EmbedFontCID(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 		return nil, err
 	}
 
-	DW := mostFrequent(Width)
-	W := encodeWidths(Width, DW)
+	DW := mostFrequent(info.Width)
+	W := encodeWidths(info.Width, DW)
 	WRefs, err := w.WriteCompressed(nil, W)
 	if err != nil {
 		return nil, err
@@ -309,7 +181,7 @@ func EmbedFontCID(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	CIDFont := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("CIDFontType2"),
-		"BaseFont":       pdf.Name(FontName),
+		"BaseFont":       pdf.Name(subsetTag + "+" + info.FontName),
 		"CIDSystemInfo":  CIDSystemInfoRef,
 		"FontDescriptor": FontDescriptorRef,
 		"W":              WRefs[0],
@@ -324,7 +196,7 @@ func EmbedFontCID(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	}
 
 	xxx := make(map[uint16]rune)
-	for r, gid := range CMap {
+	for r, gid := range info.CMap {
 		xxx[uint16(gid)] = r
 	}
 	ToUnicodeRef, err := font.ToUnicodeCIDFont(w, xxx)
@@ -335,109 +207,62 @@ func EmbedFontCID(w *pdf.Writer, name string, tt *sfnt.Font, subset map[rune]boo
 	FontDict := pdf.Dict{
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        pdf.Name(FontName),
+		"BaseFont":        pdf.Name(info.FontName),
 		"Encoding":        pdf.Name("Identity-H"),
 		"DescendantFonts": pdf.Array{CIDFontRef},
 		"ToUnicode":       ToUnicodeRef,
 	}
 	if w.Version == pdf.V1_0 {
-		FontDict["Name"] = pdf.Name(name)
+		FontDict["Name"] = pdf.Name(instName)
 	}
 	FontRef, err := w.Write(FontDict, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	fontObj := &font.Font{
-		InstName: pdf.Name(name),
+	res := &ttfCID{
+		InstName: instName,
 		Ref:      FontRef,
-		Enc: func(gid font.GlyphID) pdf.String {
-			return pdf.String{byte(gid >> 8), byte(gid)}
-		},
-		GlyphExtent: GlyphExtent,
-		GlyphUnits:  1000, // TODO(voss): use font design units here
-		Width:       Width,
-		Ascent:      Ascent,
-		Descent:     Descent,
+		Info:     info,
 	}
 
-	// TODO(voss): set the locale properly, somehow
-	loc := locale.EnGB
+	return res, nil
+}
 
-	pars := parser.New(tt)
-	gsub, err := pars.ReadGsubTable(loc)
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-
-	gpos, err := pars.ReadGposTable(loc)
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-
-	allLookups := append(gsub, gpos...)
-
-	var kernFn func(glyphs []font.Glyph)
-	if gpos == nil {
-		kerning, err := tt.ReadKernInfo()
-		if err != nil && !table.IsMissing(err) {
-			return nil, err
+func (t *ttfCID) Layout(rr []rune) ([]font.Glyph, error) {
+	gg := make([]font.Glyph, len(rr))
+	for i, r := range rr {
+		gid, ok := t.Info.CMap[r]
+		if !ok {
+			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
+				t.Info.FontName, r, string([]rune{r}))
 		}
-		if kerning != nil {
-			kernFn = func(glyphs []font.Glyph) {
-				for i, glyph := range glyphs {
-					if i > 0 {
-						pair := font.GlyphPair{glyphs[i-1].Gid, glyph.Gid}
-						if dx, ok := kerning[pair]; ok {
-							glyphs[i-1].Advance += dx
-						}
-					}
-				}
+		gg[i].Gid = gid
+		gg[i].Chars = []rune{r}
+	}
+
+	gg = t.Info.GSUB.ApplyAll(gg)
+	for i := range gg {
+		gg[i].Advance = t.Info.Width[gg[i].Gid]
+	}
+	gg = t.Info.GPOS.ApplyAll(gg)
+
+	if t.Info.KernInfo != nil {
+		for i := 0; i+1 < len(gg); i++ {
+			pair := font.GlyphPair{gg[i].Gid, gg[i+1].Gid}
+			if dx, ok := t.Info.KernInfo[pair]; ok {
+				gg[i].Advance += dx
 			}
 		}
 	}
 
-	fontObj.Layout = func(rr []rune) ([]font.Glyph, error) {
-		gg := make([]font.Glyph, len(rr))
-		for i, r := range rr {
-			gid, ok := CMap[r]
-			if !ok {
-				return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-					FontName, r, string([]rune{r}))
-			}
-			gg[i].Gid = gid
-			gg[i].Chars = []rune{r}
-			gg[i].Advance = Width[gid]
-		}
-
-		gg = allLookups.ApplyAll(gg)
-		if kernFn != nil {
-			kernFn(gg)
-		}
-		return gg, nil
-	}
-
-	return fontObj, nil
+	return gg, nil
 }
 
-// isSubset returns true if the font includes only runes from the
-// given character set.
-func isSubset(cmap map[rune]font.GlyphID, charset map[rune]bool) bool {
-	for r := range cmap {
-		if !charset[r] {
-			return false
-		}
-	}
-	return true
+func (t *ttfCID) Enc(gid font.GlyphID) pdf.String {
+	return pdf.String{byte(gid >> 8), byte(gid)}
 }
 
-// isSuperset returns true if the font includes all runes of the
-// given character set.
-func isSuperset(cmap map[rune]font.GlyphID, charset map[rune]bool) bool {
-	for r, ok := range charset {
-		if ok && cmap[r] == 0 {
-			return false
-		}
-	}
-	return true
+func (t *ttfCID) WriteFontDict(w *pdf.Writer) error {
+	return nil
 }
