@@ -70,23 +70,24 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 	w.OnClose(t.WriteFontDict)
 
 	res := &font.Font{
-		InstName:    pdf.Name(t.InstName),
-		Ref:         t.Ref,
-		Layout:      t.Layout,
-		Enc:         t.Enc,
+		InstName: pdf.Name(instName),
+		Ref:      t.Ref,
+
 		GlyphUnits:  t.Info.GlyphUnits,
 		Ascent:      t.Info.Ascent,
 		Descent:     t.Info.Descent,
 		GlyphExtent: t.Info.GlyphExtent,
 		Width:       t.Info.Width,
+
+		Layout: t.Layout,
+		Enc:    t.Enc,
 	}
 	return res, nil
 }
 
 type ttfSimple struct {
-	Ttf      *sfnt.Font
-	InstName string
-	Ref      *pdf.Reference
+	Ttf *sfnt.Font
+	Ref *pdf.Reference
 
 	Info *info.Info
 
@@ -116,9 +117,8 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 	}
 
 	res := &ttfSimple{
-		Ttf:      tt,
-		Ref:      w.Alloc(),
-		InstName: instName,
+		Ttf: tt,
+		Ref: w.Alloc(),
 
 		Info: info,
 
@@ -210,7 +210,7 @@ func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
 
 func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 	if t.overflowed {
-		return errors.New("too many different glyphs for simple font " + t.InstName)
+		return errors.New("too many different glyphs for simple font " + t.Info.FontName)
 	}
 	if len(t.enc) == 0 {
 		return nil
@@ -228,8 +228,8 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		}
 		subset[c] = origGid
 	}
-
 	subsetTag := makeSubsetTag()
+
 	fontDesc, err := t.WriteFontDescriptor(w, subset, subsetTag)
 	if err != nil {
 		return err
