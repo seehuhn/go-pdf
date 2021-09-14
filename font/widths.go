@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package font
 
 import (
 	"seehuhn.de/go/pdf"
@@ -29,7 +29,7 @@ func mostFrequent(w []int) int {
 	bestCount := 0
 	bestVal := 0
 	for wi, count := range hist {
-		if count > bestCount {
+		if count > bestCount || count == 1000 && count == bestCount {
 			bestCount = count
 			bestVal = wi
 		}
@@ -43,8 +43,10 @@ type seq struct {
 }
 
 // see section 9.7.4.3 of PDF 32000-1:2008
-func encodeWidths(w []int, dw int) pdf.Array {
+func EncodeWidths(w []int) (int, pdf.Array) {
 	n := len(w)
+
+	dw := mostFrequent(w)
 
 	// remove any occurence of two or more consecutive dw values
 	var seqs []*seq
@@ -110,5 +112,5 @@ func encodeWidths(w []int, dw int) pdf.Array {
 		}
 	}
 
-	return res
+	return dw, res
 }

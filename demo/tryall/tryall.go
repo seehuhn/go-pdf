@@ -22,7 +22,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"strings"
 
 	"seehuhn.de/go/pdf"
 )
@@ -80,7 +79,7 @@ func doOneFile(fname string) error {
 	defer r.Close()
 
 	for {
-		obj, ref, err := r.ReadSequential()
+		obj, _, err := r.ReadSequential()
 		if err == io.EOF {
 			break
 		}
@@ -88,22 +87,31 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		if stm, ok := obj.(*pdf.Stream); ok {
-			ff, err := stm.Filters(r.Resolve)
+		if dict, ok := obj.(pdf.Dict); ok {
+			if dict["Type"] != pdf.Name("Font") {
+				continue
+			}
+			toUnicode, ok := dict["ToUnicode"]
+			if !ok {
+				continue
+			}
+			cmapObj, err := r.Resolve(toUnicode)
 			if err != nil {
 				return err
 			}
-			if len(ff) > 0 {
-				var names []string
-				for _, info := range ff {
-					names = append(names, string(info.Name))
-				}
-				fmt.Println(strings.Join(names, "|"))
-			}
-		}
+			cmap := cmapObj.(*pdf.Stream)
 
-		_ = obj
-		_ = ref
+			fmt.Println("*", fname)
+			r, err := cmap.Decode(r.Resolve)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(os.Stdout, r)
+			if err != nil {
+				return err
+			}
+			fmt.Println("---------------------------")
+		}
 	}
 
 	return nil

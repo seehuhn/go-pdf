@@ -159,8 +159,7 @@ func (t *ttfCID) WriteFontDict(w *pdf.Writer) error {
 		return err
 	}
 
-	DW := mostFrequent(t.Info.Width)
-	W := encodeWidths(t.Info.Width, DW)
+	DW, W := font.EncodeWidths(t.Info.Width)
 	WRefs, err := w.WriteCompressed(nil, W)
 	if err != nil {
 		return err

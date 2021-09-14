@@ -62,13 +62,13 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 		}
 		if len(data) == 1 {
 			if s, ok := data[0].(pdf.String); ok {
-				s.PDF(page)
+				_ = s.PDF(page)
 				page.Println(" Tj")
 				data = nil
 				return
 			}
 		}
-		data.PDF(page)
+		_ = data.PDF(page)
 		page.Println(" TJ")
 		data = nil
 	}
@@ -183,7 +183,7 @@ type Layout struct {
 // TODO(voss): This should maybe not use pages.Page for the first argument.
 func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 	page.Println("BT")
-	layout.Font.InstName.PDF(page)
+	_ = layout.Font.InstName.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", layout.FontSize)
 	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
 
