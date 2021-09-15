@@ -32,23 +32,14 @@ import (
 // ExportOptions provides options for the Font.Export() function.
 type ExportOptions struct {
 	Include map[string]bool // select a subset of tables
-	Subset  []font.GlyphID  // select a subset of glyphs
-}
-
-func contains(ss []string, s string) bool {
-	for _, si := range ss {
-		if si == s {
-			return true
-		}
-	}
-	return false
+	Cid2Gid []font.GlyphID  // select a subset of glyphs
 }
 
 // Export writes the font to the io.Writer w.
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	if opt == nil {
 		opt = &ExportOptions{}
-	} else if opt.Subset != nil {
+	} else if opt.Cid2Gid != nil {
 		opt.Include["cmap"] = true
 	}
 	tableNames := tt.selectTables(opt)
@@ -56,21 +47,22 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	replTab := make(map[string][]byte)
 
 	var subsetInfo *subsetInfo
-	if opt.Subset != nil {
-		includeOnly := []font.GlyphID{0}
-		for _, origGid := range opt.Subset {
+	if opt.Cid2Gid != nil {
+		var includeOnly []font.GlyphID
+		includeOnly = append(includeOnly, 0) // always include ".notdef"
+		for _, origGid := range opt.Cid2Gid {
 			if origGid != 0 {
 				includeOnly = append(includeOnly, origGid)
 			}
 		}
 
-		cmapBytes, err := makeSimpleCmap(opt.Subset)
+		cmapBytes, err := makeCmap(opt.Cid2Gid)
 		if err != nil {
 			return 0, err
 		}
 		replTab["cmap"] = cmapBytes
 
-		subsetInfo, err = tt.makeSubset(includeOnly)
+		subsetInfo, err = tt.getSubsetInfo(includeOnly)
 		if err != nil {
 			return 0, err
 		}
@@ -211,7 +203,7 @@ type subsetInfo struct {
 	indexToLocFormat int16 // 0 for short offsets, 1 for long
 }
 
-func (tt *Font) makeSubset(includeOnly []font.GlyphID) (*subsetInfo, error) {
+func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	origOffsets, err := tt.GetGlyfOffsets()
 	if err != nil {
 		return nil, err
@@ -483,15 +475,15 @@ func (tt *Font) selectTables(opt *ExportOptions) []string {
 	return names
 }
 
-type simpleCmapTableHead struct {
+type cmapTableHead struct {
 	// header
 	Version   uint16 // Table version number (0)
 	NumTables uint16 // Number of encoding tables that follow (1)
 
 	// encoding records (array of length 1)
-	PlatformID     uint16 // Platform ID (3)
+	PlatformID     uint16 // Platform ID (1)
 	EncodingID     uint16 // Platform-specific encoding ID (0)
-	SubtableOffset uint32 // Byte offset to the subtable (10)
+	SubtableOffset uint32 // Byte offset to the subtable (12)
 
 	// format 4 subtable
 	Format        uint16 // Format number (4)
@@ -510,11 +502,11 @@ type simpleCmapTableHead struct {
 }
 
 // Write a cmap with just a 1,0,4 subtable to map character indices to glyph
-// indices in a subset, simple font.
-func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
-	n := len(subset)
-	if n > 256 {
-		return nil, errors.New("too many characters for a simple font")
+// indices in a subsetted font.
+func makeCmap(cid2gid []font.GlyphID) ([]byte, error) {
+	n := len(cid2gid)
+	if n >= 1<<16 {
+		return nil, errors.New("too many characters")
 	}
 
 	// Every non-zero entry in subset corresponds to a glyph included in the
@@ -524,9 +516,9 @@ func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
 	// not need to use the glyphIdArray.
 
 	var StartCode, EndCode, IDDelta, IDRangeOffsets []uint16
-	prevC := 999 // impossible value
+	prevC := 1 << 16 // impossible value
 	newGid := uint16(0)
-	for c, origGid := range subset {
+	for c, origGid := range cid2gid {
 		if origGid == 0 {
 			continue
 		}
@@ -551,7 +543,7 @@ func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
 
 	// Encode the data in the binary format described at
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
-	data := &simpleCmapTableHead{
+	data := &cmapTableHead{
 		NumTables:      1,
 		PlatformID:     1,
 		EncodingID:     0,
@@ -581,4 +573,13 @@ func makeSimpleCmap(subset []font.GlyphID) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func contains(ss []string, s string) bool {
+	for _, si := range ss {
+		if si == s {
+			return true
+		}
+	}
+	return false
 }

@@ -62,10 +62,11 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 	if err != nil {
 		return nil, err
 	}
+
 	w.OnClose(t.WriteFontDict)
 
 	res := &font.Font{
-		InstName: pdf.Name(t.InstName),
+		InstName: pdf.Name(instName),
 		Ref:      t.Ref,
 		Layout:   t.Layout,
 		Enc:      t.Enc,
@@ -80,11 +81,13 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 }
 
 type ttfCID struct {
-	Ttf      *sfnt.Font
-	InstName string
-	Ref      *pdf.Reference
+	Ttf *sfnt.Font
+	Ref *pdf.Reference
 
 	Info *info.Info
+
+	used map[uint16]bool         // is CID used or not?
+	text map[font.GlyphID][]rune // GID -> text
 }
 
 func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*ttfCID, error) {
@@ -98,10 +101,12 @@ func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale
 	}
 
 	res := &ttfCID{
-		Ttf:      tt,
-		InstName: instName,
-		Ref:      w.Alloc(),
-		Info:     info,
+		Ttf:  tt,
+		Ref:  w.Alloc(),
+		Info: info,
+
+		used: map[uint16]bool{},
+		text: make(map[font.GlyphID][]rune),
 	}
 
 	return res, nil
@@ -134,10 +139,18 @@ func (t *ttfCID) Layout(rr []rune) ([]font.Glyph, error) {
 		}
 	}
 
+	for _, g := range gg {
+		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
+			// copy the slice, in case the caller modifies it later
+			t.text[g.Gid] = append([]rune{}, g.Chars...)
+		}
+	}
+
 	return gg, nil
 }
 
 func (t *ttfCID) Enc(gid font.GlyphID) pdf.String {
+	t.used[uint16(gid)] = true
 	return pdf.String{byte(gid >> 8), byte(gid)}
 }
 
@@ -191,7 +204,7 @@ func (t *ttfCID) WriteFontDict(w *pdf.Writer) error {
 		return err
 	}
 
-	FontDict := pdf.Dict{
+	Font := pdf.Dict{
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
 		"BaseFont":        pdf.Name(subsetTag + "+" + t.Info.FontName),
@@ -199,10 +212,16 @@ func (t *ttfCID) WriteFontDict(w *pdf.Writer) error {
 		"DescendantFonts": pdf.Array{CIDFontRef},
 		"ToUnicode":       ToUnicodeRef,
 	}
-	_, err = w.Write(FontDict, t.Ref)
+	_, err = w.Write(Font, t.Ref)
 	if err != nil {
 		return err
 	}
+
+	err = t.Ttf.Close()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

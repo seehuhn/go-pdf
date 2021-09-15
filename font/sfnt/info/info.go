@@ -158,13 +158,11 @@ func GetInfo(tt *sfnt.Font, loc *locale.Locale) (*Info, error) {
 		flags |= font.FlagItalic
 	}
 
-	// TODO(voss): can we set this correctly without breaking /Encoding?
-	// if isSubset(cmap, font.AdobeStandardLatin) {
-	// 	flags |= font.FlagNonsymbolic
-	// } else {
-	// 	flags |= font.FlagSymbolic
-	// }
-	flags |= font.FlagSymbolic
+	if isSubset(cmap, font.AdobeStandardLatin) {
+		flags |= font.FlagNonsymbolic
+	} else {
+		flags |= font.FlagSymbolic
+	}
 
 	// TODO(voss): font.FlagAllCap
 	// TODO(voss): font.FlagSmallCap

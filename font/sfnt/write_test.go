@@ -55,7 +55,7 @@ func TestExport(t *testing.T) {
 
 			"gasp": true, // copy, TODO(voss): is this addition wise/useful?
 		},
-		Subset: subset,
+		Cid2Gid: subset,
 	}
 
 	n, err := tt.Export(out, opt)
@@ -83,12 +83,12 @@ func TestExport(t *testing.T) {
 }
 
 func TestWriteCmap(t *testing.T) {
-	subset := make([]font.GlyphID, 100)
+	cid2gid := make([]font.GlyphID, 100)
 	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90} {
-		subset[c] = font.GlyphID(i + 1)
+		cid2gid[c] = font.GlyphID(i + 1)
 	}
 
-	buf, err := makeSimpleCmap(subset)
+	buf, err := makeCmap(cid2gid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,8 +110,8 @@ func TestWriteCmap(t *testing.T) {
 
 	for r := rune(0); r < 256; r++ {
 		var expected font.GlyphID
-		if int(r) < len(subset) {
-			expected = subset[r]
+		if int(r) < len(cid2gid) {
+			expected = cid2gid[r]
 		}
 		if cmap[r] != expected {
 			t.Errorf("wrong mapping: cmap[%d] == %d != %d",
