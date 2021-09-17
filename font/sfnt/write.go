@@ -66,8 +66,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
-		for _, name := range []string{"glyf", "loca", "hmtx", "hhea"} {
-			blob := subsetInfo.blobs[name]
+		for name, blob := range subsetInfo.blobs {
 			replTab[name] = blob
 		}
 		// fix up numGlyphs
@@ -204,16 +203,20 @@ type subsetInfo struct {
 }
 
 func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
-	origOffsets, err := tt.GetGlyfOffsets()
+	// TODO(voss): make better use of the data stored in tt.
+
+	NumGlyphs := len(tt.Width)
+
+	origOffsets, err := tt.getGlyfOffsets(NumGlyphs)
 	if err != nil {
 		return nil, err
 	}
 
-	hheaInfo, err := tt.GetHHeaInfo()
+	hheaInfo, err := tt.getHHeaInfo()
 	if err != nil {
 		return nil, err
 	}
-	hmtx, err := tt.GetHMtxInfo(hheaInfo.NumOfLongHorMetrics)
+	hmtx, err := tt.getHMtxInfo(NumGlyphs, int(hheaInfo.NumOfLongHorMetrics))
 	if err != nil {
 		return nil, err
 	}

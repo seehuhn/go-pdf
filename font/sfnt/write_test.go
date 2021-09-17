@@ -26,7 +26,7 @@ import (
 )
 
 func TestExport(t *testing.T) {
-	tt, err := Open("../truetype/ttf/SourceSerif4-Regular.ttf")
+	tt, err := Open("../truetype/ttf/SourceSerif4-Regular.ttf", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
+
+import "seehuhn.de/go/pdf/font/sfnt/parser"
 
 type markRecord struct {
 	markClass uint16
@@ -26,20 +28,20 @@ type anchor struct {
 	Y int16
 }
 
-func (g *gTab) readMarkArrayTable(pos int64) ([]markRecord, error) {
+func (g *GTab) readMarkArrayTable(pos int64) ([]markRecord, error) {
 	// TODO(voss): is caching needed here?
 
-	s := &State{
+	s := &parser.State{
 		A: pos,
 	}
 	err := g.Exec(s,
-		CmdSeek,
-		CmdRead16, TypeUInt, // markCount
-		CmdStoreInto, 0,
-		CmdLoop,
-		CmdStash, // markRecords[i].markClass
-		CmdStash, // markRecords[i].markAnchorOffset
-		CmdEndLoop,
+		parser.CmdSeek,
+		parser.CmdRead16, parser.TypeUInt, // markCount
+		parser.CmdStoreInto, 0,
+		parser.CmdLoop,
+		parser.CmdStash, // markRecords[i].markClass
+		parser.CmdStash, // markRecords[i].markAnchorOffset
+		parser.CmdEndLoop,
 	)
 	if err != nil {
 		return nil, err
@@ -65,15 +67,15 @@ func (g *gTab) readMarkArrayTable(pos int64) ([]markRecord, error) {
 	return res, nil
 }
 
-func (g *gTab) readAnchor(pos int64, res *anchor) error {
-	s := &State{
+func (g *GTab) readAnchor(pos int64, res *anchor) error {
+	s := &parser.State{
 		A: pos,
 	}
 	err := g.Exec(s,
-		CmdSeek,
-		CmdStash, // anchorFormat
-		CmdStash, // xCoordinate
-		CmdStash, // yCoordinate
+		parser.CmdSeek,
+		parser.CmdStash, // anchorFormat
+		parser.CmdStash, // xCoordinate
+		parser.CmdStash, // yCoordinate
 	)
 	if err != nil {
 		return err
@@ -106,25 +108,25 @@ func (g *gTab) readAnchor(pos int64, res *anchor) error {
 		res.X += dx
 		res.Y += dy
 	default:
-		return g.error("Anchor Table format %d not supported", format)
+		return g.Error("Anchor Table format %d not supported", format)
 	}
 
 	return nil
 }
 
-func (g *gTab) readDeviceTable(pos int64, offs uint16) (int16, error) {
+func (g *GTab) readDeviceTable(pos int64, offs uint16) (int16, error) {
 	if offs == 0 {
 		return 0, nil
 	}
 
-	s := &State{
+	s := &parser.State{
 		A: pos + int64(offs),
 	}
 	err := g.Exec(s,
-		CmdSeek,
-		CmdStash, // startSize
-		CmdStash, // endSize
-		CmdStash, // deltaFormat
+		parser.CmdSeek,
+		parser.CmdStash, // startSize
+		parser.CmdStash, // endSize
+		parser.CmdStash, // deltaFormat
 	)
 	if err != nil {
 		return 0, err

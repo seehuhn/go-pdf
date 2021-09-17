@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/info"
 	"seehuhn.de/go/pdf/locale"
 )
 
@@ -38,7 +37,7 @@ import (
 //
 // Use of simple TrueType fonts in PDF requires PDF version 1.1 or higher.
 func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Locale) (*font.Font, error) {
-	tt, err := sfnt.Open(fileName)
+	tt, err := sfnt.Open(fileName, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +73,11 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 		InstName: pdf.Name(instName),
 		Ref:      t.Ref,
 
-		GlyphUnits:  t.Info.GlyphUnits,
-		Ascent:      t.Info.Ascent,
-		Descent:     t.Info.Descent,
-		GlyphExtent: t.Info.GlyphExtent,
-		Width:       t.Info.Width,
+		GlyphUnits:  t.Ttf.GlyphUnits,
+		Ascent:      t.Ttf.Ascent,
+		Descent:     t.Ttf.Descent,
+		GlyphExtent: t.Ttf.GlyphExtent,
+		Width:       t.Ttf.Width,
 
 		Layout: t.Layout,
 		Enc:    t.Enc,
@@ -89,8 +88,6 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 type ttfSimple struct {
 	Ttf *sfnt.Font
 	Ref *pdf.Reference
-
-	Info *info.Info
 
 	enc  map[font.GlyphID]byte   // GID -> CID
 	used map[byte]bool           // is CID used or not?
@@ -105,13 +102,8 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 		return nil, errors.New("not a TrueType font")
 	}
 
-	info, err := info.GetInfo(tt, loc)
-	if err != nil {
-		return nil, err
-	}
-
 	tidy := make(map[font.GlyphID]byte)
-	for r, gid := range info.CMap {
+	for r, gid := range tt.CMap {
 		if rOld, used := tidy[gid]; r < 127 && (!used || byte(r) < rOld) {
 			tidy[gid] = byte(r)
 		}
@@ -120,8 +112,6 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 	res := &ttfSimple{
 		Ttf: tt,
 		Ref: w.Alloc(),
-
-		Info: info,
 
 		enc:  make(map[font.GlyphID]byte),
 		used: map[byte]bool{},
@@ -135,25 +125,25 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 func (t *ttfSimple) Layout(rr []rune) ([]font.Glyph, error) {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Info.CMap[r]
+		gid, ok := t.Ttf.CMap[r]
 		if !ok {
 			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Info.FontName, r, string([]rune{r}))
+				t.Ttf.FontName, r, string([]rune{r}))
 		}
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
 
-	gg = t.Info.GSUB.ApplyAll(gg)
+	gg = t.Ttf.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = t.Info.Width[gg[i].Gid]
+		gg[i].Advance = t.Ttf.Width[gg[i].Gid]
 	}
-	gg = t.Info.GPOS.ApplyAll(gg)
+	gg = t.Ttf.GPOS.ApplyAll(gg)
 
-	if t.Info.KernInfo != nil {
+	if t.Ttf.KernInfo != nil {
 		for i := 0; i+1 < len(gg); i++ {
 			pair := font.GlyphPair{gg[i].Gid, gg[i+1].Gid}
-			if dx, ok := t.Info.KernInfo[pair]; ok {
+			if dx, ok := t.Ttf.KernInfo[pair]; ok {
 				gg[i].Advance += dx
 			}
 		}
@@ -211,7 +201,7 @@ func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
 
 func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 	if t.overflowed {
-		return errors.New("too many different glyphs for simple font " + t.Info.FontName)
+		return errors.New("too many different glyphs for simple font " + t.Ttf.FontName)
 	}
 
 	// TODO(voss): cid2gid is passed down a long call chain.  Can this
@@ -236,12 +226,12 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 	}
 
 	var ww pdf.Array
-	q := 1000 / float64(t.Info.GlyphUnits)
+	q := 1000 / float64(t.Ttf.GlyphUnits)
 	for i := first; i <= last; i++ {
 		width := 0
 		if t.used[byte(i)] {
 			gid := cid2gid[i]
-			width = int(float64(t.Info.Width[gid])*q + 0.5)
+			width = int(float64(t.Ttf.Width[gid])*q + 0.5)
 		}
 		ww = append(ww, pdf.Integer(width))
 	}
@@ -264,7 +254,7 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 	Font := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("TrueType"),
-		"BaseFont":       pdf.Name(subsetTag + "+" + t.Info.FontName),
+		"BaseFont":       pdf.Name(subsetTag + "+" + t.Ttf.FontName),
 		"FirstChar":      pdf.Integer(first),
 		"LastChar":       pdf.Integer(last),
 		"Widths":         widths,
@@ -295,15 +285,15 @@ func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
 
 	// Compute the font bounding box for the subset.
 	// We always include glyph 0:
-	left := t.Info.GlyphExtent[0].LLx
-	right := t.Info.GlyphExtent[0].URx
-	top := t.Info.GlyphExtent[0].URy
-	bottom := t.Info.GlyphExtent[0].LLy
+	left := t.Ttf.GlyphExtent[0].LLx
+	right := t.Ttf.GlyphExtent[0].URx
+	top := t.Ttf.GlyphExtent[0].URy
+	bottom := t.Ttf.GlyphExtent[0].LLy
 	for _, origGid := range cid2gid {
 		if origGid == 0 {
 			continue
 		}
-		box := t.Info.GlyphExtent[origGid]
+		box := t.Ttf.GlyphExtent[origGid]
 		if box.LLx < left {
 			left = box.LLx
 		}
@@ -318,7 +308,7 @@ func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
 		}
 	}
 
-	q := 1000 / float64(t.Info.GlyphUnits)
+	q := 1000 / float64(t.Ttf.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
 		LLx: math.Round(float64(left) * q),
 		LLy: math.Round(float64(bottom) * q),
@@ -329,7 +319,7 @@ func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
 	// Following section 9.6.6.4 of PDF 32000-1:2008, for PDF versions before
 	// 1.3 we mark all fonts as symbolic, so that the CMap for glyph selection
 	// works.
-	flags := t.Info.Flags
+	flags := t.Ttf.Flags
 	if w.Version < pdf.V1_3 {
 		flags &= ^font.FlagNonsymbolic
 		flags |= font.FlagSymbolic
@@ -338,13 +328,13 @@ func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
 	// See sections 9.8.1 of PDF 32000-1:2008.
 	FontDescriptor := pdf.Dict{
 		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    pdf.Name(subsetTag + "+" + t.Info.FontName),
+		"FontName":    pdf.Name(subsetTag + "+" + t.Ttf.FontName),
 		"Flags":       pdf.Integer(flags),
 		"FontBBox":    FontBBox,
-		"ItalicAngle": pdf.Number(t.Info.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(t.Info.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(t.Info.Descent) + 0.5),
-		"CapHeight":   pdf.Integer(q*float64(t.Info.CapHeight) + 0.5),
+		"ItalicAngle": pdf.Number(t.Ttf.ItalicAngle),
+		"Ascent":      pdf.Integer(q*float64(t.Ttf.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(t.Ttf.Descent) + 0.5),
+		"CapHeight":   pdf.Integer(q*float64(t.Ttf.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70),
 		"FontFile2":   fontFileRef,
 	}

@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/parser"
+	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/locale"
@@ -41,7 +41,7 @@ const (
 
 var courier, theFont *font.Font
 var rev map[font.GlyphID]rune
-var gdef *parser.GdefInfo
+var gdef *gtab.GdefInfo
 
 type rules struct{}
 
@@ -174,19 +174,23 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
-	tt, err := sfnt.Open(fontFileName)
+	tt, err := sfnt.Open(fontFileName, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer tt.Close()
 
-	pars := parser.New(tt)
-	gdef, err = pars.ReadGdefTable()
+	gtab, err := gtab.New(tt.Header, tt.Fd, locale.EnGB)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	gdef, err = gtab.ReadGdefTable()
 	if err != nil && !table.IsMissing(err) {
 		log.Fatal(err)
 	}
 
-	gsub, err := pars.ReadGsubTable(locale.EnGB)
+	gsub, err := gtab.ReadGsubTable()
 	if err != nil && !table.IsMissing(err) {
 		log.Fatal(err)
 	}
@@ -267,11 +271,7 @@ func main() {
 
 	p.BaseLineSkip = 46
 	rev = make(map[font.GlyphID]rune)
-	cmap, err := tt.SelectCMap()
-	if err != nil {
-		log.Fatal(err)
-	}
-	for r, idx := range cmap {
+	for r, idx := range tt.CMap {
 		r2 := rev[idx]
 		if r2 == 0 || r < r2 {
 			rev[idx] = r

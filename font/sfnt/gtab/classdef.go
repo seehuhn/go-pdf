@@ -14,24 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/parser"
 )
 
-func (p *Parser) readClassDefTable(pos int64) (ClassDef, error) {
+func (p *GTab) readClassDefTable(pos int64) (ClassDef, error) {
 	res, ok := p.classDefCache[pos]
 	if ok {
 		return res, nil
 	}
 
-	s := &State{
+	s := &parser.State{
 		A: pos,
 	}
 	err := p.Exec(s,
-		CmdSeek,
-		CmdRead16, TypeUInt, // format
+		parser.CmdSeek,
+		parser.CmdRead16, parser.TypeUInt, // format
 	)
 	if err != nil {
 		return nil, err
@@ -42,11 +43,11 @@ func (p *Parser) readClassDefTable(pos int64) (ClassDef, error) {
 	switch format {
 	case 1:
 		err = p.Exec(s,
-			CmdStash,            // startGlyphID
-			CmdRead16, TypeUInt, // glyphCount
-			CmdLoop,
-			CmdStash, // classValueArray[i]
-			CmdEndLoop,
+			parser.CmdStash,                   // startGlyphID
+			parser.CmdRead16, parser.TypeUInt, // glyphCount
+			parser.CmdLoop,
+			parser.CmdStash, // classValueArray[i]
+			parser.CmdEndLoop,
 		)
 		if err != nil {
 			return nil, err
@@ -61,12 +62,12 @@ func (p *Parser) readClassDefTable(pos int64) (ClassDef, error) {
 		}
 	case 2:
 		err = p.Exec(s,
-			CmdRead16, TypeUInt, // classRangeCount
-			CmdLoop,
-			CmdStash, // classRangeRecords[i].startGlyphID
-			CmdStash, // classRangeRecords[i].endGlyphID
-			CmdStash, // classRangeRecords[i].class
-			CmdEndLoop,
+			parser.CmdRead16, parser.TypeUInt, // classRangeCount
+			parser.CmdLoop,
+			parser.CmdStash, // classRangeRecords[i].startGlyphID
+			parser.CmdStash, // classRangeRecords[i].endGlyphID
+			parser.CmdStash, // classRangeRecords[i].class
+			parser.CmdEndLoop,
 		)
 		if err != nil {
 			return nil, err
@@ -77,7 +78,7 @@ func (p *Parser) readClassDefTable(pos int64) (ClassDef, error) {
 			end := int(stash[1])
 			class := int(stash[2])
 			if end < start {
-				return nil, p.error("corrupt classDef record")
+				return nil, p.Error("corrupt classDef record")
 			}
 			if class != 0 {
 				for gid := start; gid <= end; gid++ {
@@ -87,10 +88,12 @@ func (p *Parser) readClassDefTable(pos int64) (ClassDef, error) {
 			stash = stash[3:]
 		}
 	default:
-		return nil, p.error("unsupported classDef format %d", format)
+		return nil, p.Error("unsupported classDef format %d", format)
 	}
 
-	p.classDefCache[pos] = res
+	if p.classDefCache != nil {
+		p.classDefCache[pos] = res
+	}
 
 	return res, nil
 }

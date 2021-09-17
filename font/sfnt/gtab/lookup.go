@@ -14,26 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import "seehuhn.de/go/pdf/font"
 
 // Lookups represents the information from a "GSUB" or "GPOS" table of a font.
-type Lookups []*lookupTable
+type Lookups []*LookupTable
 
-type lookupTable struct {
-	subtables        []lookupSubtable
-	filter           keepGlyphFn
-	markFilteringSet uint16
-	rtl              bool
+// LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
+// font.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
+type LookupTable struct {
+	Subtables []LookupSubtable
+	Filter    KeepGlyphFn
+
+	markFilteringSet uint16 // TODO(voss): use this or remove this?
+	rtl              bool   // TODO(voss): use this or remove this?
 }
 
-type lookupSubtable interface {
-	// Apply attempts to apply a single subtable at the given position.
+// LookupSubtable represents a subtable of a "GSUB" or "GPOS" lookup table.
+type LookupSubtable interface {
+	// Apply attempts to apply the subtable at the given position.
 	// If returns the new glyphs and the new position.  If the subtable
 	// cannot be applied, the unchanged glyphs and a negative position
 	// are returned
-	Apply(filter keepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int)
+	Apply(filter KeepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int)
 }
 
 // ApplyAll applies transformations from the selected lookup tables to a
@@ -48,9 +53,9 @@ func (gtab Lookups) ApplyAll(glyphs []font.Glyph) []font.Glyph {
 	return glyphs
 }
 
-func (l *lookupTable) applySubtables(glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
-	for _, subtable := range l.subtables {
-		glyphs, next := subtable.Apply(l.filter, glyphs, pos)
+func (l *LookupTable) applySubtables(glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
+	for _, subtable := range l.Subtables {
+		glyphs, next := subtable.Apply(l.Filter, glyphs, pos)
 		if next >= 0 {
 			return glyphs, next
 		}
@@ -63,6 +68,6 @@ type lookupNotImplemented struct {
 	lookupType, format uint16
 }
 
-func (l *lookupNotImplemented) Apply(filter keepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *lookupNotImplemented) Apply(filter KeepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
 	return glyphs, -1
 }

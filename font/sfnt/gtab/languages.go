@@ -14,26 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
-import (
-	"testing"
+import "seehuhn.de/go/pdf/locale"
 
-	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/locale"
-)
-
-func TestGpos(t *testing.T) {
-	tt, err := sfnt.Open("../../truetype/ttf/SourceSerif4-Regular.ttf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tt.Close()
-
-	pars := New(tt)
-	info, err := pars.ReadGposTable(locale.EnGB)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = info // TODO(voss): do some checks
+// https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
+var otfScript = map[locale.Script]string{
+	locale.ScriptCyrillic: "cyrl",
+	locale.ScriptGreek:    "grek",
+	locale.ScriptLatin:    "latn",
 }
+
+const otfDefaultScript = "DFLT"
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
+var otfLanguage = map[locale.Language]string{
+	locale.LangGerman:   "DEU ",
+	locale.LangEnglish:  "ENG ",
+	locale.LangRomanian: "ROM ",
+}
+
+const otfDefaultLanguage = "DFLT"

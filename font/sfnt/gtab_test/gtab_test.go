@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab_test
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/locale"
 )
 
@@ -37,35 +38,39 @@ func TestGtab(t *testing.T) {
 
 	fonts := append(allTTF, allOTF...)
 	for _, font := range fonts {
-		sfnt, err := sfnt.Open(font)
+		tt, err := sfnt.Open(font, locale.EnGB)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
-		p := New(sfnt)
-
-		gsub, err := p.ReadGsubTable(locale.EnGB)
-		if err != nil {
-			t.Error(err)
-		}
-		gpos, err := p.ReadGposTable(locale.EnGB)
+		p, err := gtab.New(tt.Header, tt.Fd, locale.EnGB)
 		if err != nil {
 			t.Error(err)
 		}
 
+		gsub, err := p.ReadGsubTable()
+		if err != nil {
+			t.Error(err)
+		}
+		gpos, err := p.ReadGposTable()
+		if err != nil {
+			t.Error(err)
+		}
 		fmt.Println(font, len(gsub), len(gpos))
+
 		for i, l := range gsub {
-			for j, s := range l.subtables {
+			for j, s := range l.Subtables {
 				fmt.Printf("\tGSUB %d.%d %T\n", i, j, s)
 			}
 		}
+
 		for i, l := range gpos {
-			for j, s := range l.subtables {
+			for j, s := range l.Subtables {
 				fmt.Printf("\tGPOS %d.%d %T\n", i, j, s)
 			}
 		}
 
-		err = sfnt.Close()
+		err = tt.Close()
 		if err != nil {
 			t.Error(err)
 		}

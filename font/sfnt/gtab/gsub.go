@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/locale"
+	"seehuhn.de/go/pdf/font/sfnt/parser"
 )
 
 // The most common GSUB features seen on my system:
@@ -36,9 +36,8 @@ import (
 // http://adobe-type-tools.github.io/afdko/OpenTypeFeatureFileSpecification.html#7
 // TODO(voss): read this carefully
 
-// ReadGsubTable reads the "GSUB" table of a font, for a given writing script
-// and language.
-func (p *Parser) ReadGsubTable(loc *locale.Locale, extraFeatures ...string) (Lookups, error) {
+// ReadGsubTable reads the "GSUB" table of a font.
+func (g *GTab) ReadGsubTable(extraFeatures ...string) (Lookups, error) {
 	includeFeature := map[string]bool{
 		"calt": true,
 		"ccmp": true,
@@ -50,20 +49,24 @@ func (p *Parser) ReadGsubTable(loc *locale.Locale, extraFeatures ...string) (Loo
 		includeFeature[feature] = true
 	}
 
-	g, err := newGTab(p, "GSUB", loc, includeFeature)
+	g.classDefCache = make(map[int64]ClassDef)
+	g.coverageCache = make(map[int64]coverage)
+	g.subtableReader = g.readGsubSubtable
+
+	ll, err := g.selectLookups("GSUB", includeFeature)
 	if err != nil {
 		return nil, err
 	}
 
-	return g.ReadLookups()
+	return g.readLookups(ll)
 }
 
-func (g *gTab) readGsubSubtable(s *State, lookupType uint16, subtablePos int64) (lookupSubtable, error) {
+func (g *GTab) readGsubSubtable(s *parser.State, lookupType uint16, subtablePos int64) (LookupSubtable, error) {
 	// TODO(voss): is this called more than once for the same subtablePos? -> use caching?
 	s.A = subtablePos
 	err := g.Exec(s,
-		CmdSeek,
-		CmdRead16, TypeUInt, // format
+		parser.CmdSeek,
+		parser.CmdRead16, parser.TypeUInt, // format
 	)
 	if err != nil {
 		return nil, err
@@ -98,15 +101,15 @@ func (g *gTab) readGsubSubtable(s *State, lookupType uint16, subtablePos int64) 
 
 	case 7_1: // Extension Substitution Subtable Format 1
 		err = g.Exec(s,
-			CmdRead16, TypeUInt, // extensionLookupType
-			CmdStoreInto, 0,
-			CmdRead32, TypeUInt, // extensionOffset
+			parser.CmdRead16, parser.TypeUInt, // extensionLookupType
+			parser.CmdStoreInto, 0,
+			parser.CmdRead32, parser.TypeUInt, // extensionOffset
 		)
 		if err != nil {
 			return nil, err
 		}
 		if s.R[0] == 7 {
-			return nil, g.error("invalid extension lookup")
+			return nil, g.Error("invalid extension lookup")
 		}
 		return g.readGsubSubtable(s, uint16(s.R[0]), subtablePos+s.A)
 
@@ -124,11 +127,11 @@ type gsub1_1 struct {
 	delta uint16
 }
 
-func (g *gTab) readGsub1_1(s *State, subtablePos int64) (*gsub1_1, error) {
+func (g *GTab) readGsub1_1(s *parser.State, subtablePos int64) (*gsub1_1, error) {
 	err := g.Exec(s,
-		CmdRead16, TypeUInt, // coverageOffset
-		CmdStoreInto, 0,
-		CmdRead16, TypeUInt, // deltaGlyphID (mod 65536)
+		parser.CmdRead16, parser.TypeUInt, // coverageOffset
+		parser.CmdStoreInto, 0,
+		parser.CmdRead16, parser.TypeUInt, // deltaGlyphID (mod 65536)
 	)
 	if err != nil {
 		return nil, err
@@ -145,7 +148,7 @@ func (g *gTab) readGsub1_1(s *State, subtablePos int64) (*gsub1_1, error) {
 	return res, nil
 }
 
-func (l *gsub1_1) Apply(filter keepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
+func (l *gsub1_1) Apply(filter KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	gid := seq[i].Gid
 	if _, ok := l.cov[gid]; !ok {
 		return seq, -1
@@ -159,14 +162,14 @@ type gsub1_2 struct {
 	substituteGlyphIDs []font.GlyphID
 }
 
-func (g *gTab) readGsub1_2(s *State, subtablePos int64) (*gsub1_2, error) {
+func (g *GTab) readGsub1_2(s *parser.State, subtablePos int64) (*gsub1_2, error) {
 	err := g.Exec(s,
-		CmdRead16, TypeUInt, // coverageOffset
-		CmdStoreInto, 0,
-		CmdRead16, TypeUInt, // glyphCount
-		CmdLoop,
-		CmdStash, // substitutefont.GlyphIndex[i]
-		CmdEndLoop,
+		parser.CmdRead16, parser.TypeUInt, // coverageOffset
+		parser.CmdStoreInto, 0,
+		parser.CmdRead16, parser.TypeUInt, // glyphCount
+		parser.CmdLoop,
+		parser.CmdStash, // substitutefont.GlyphIndex[i]
+		parser.CmdEndLoop,
 	)
 	if err != nil {
 		return nil, err
@@ -187,7 +190,7 @@ func (g *gTab) readGsub1_2(s *State, subtablePos int64) (*gsub1_2, error) {
 	return res, nil
 }
 
-func (l *gsub1_2) Apply(filter keepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
+func (l *gsub1_2) Apply(filter KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	glyph := seq[i]
 	j, ok := l.cov[glyph.Gid]
 	if !ok {
@@ -203,14 +206,14 @@ type gsub2_1 struct {
 	repl [][]font.GlyphID
 }
 
-func (g *gTab) readGsub2_1(s *State, subtablePos int64) (*gsub2_1, error) {
+func (g *GTab) readGsub2_1(s *parser.State, subtablePos int64) (*gsub2_1, error) {
 	err := g.Exec(s,
-		CmdRead16, TypeUInt, // coverageOffset
-		CmdStoreInto, 0,
-		CmdRead16, TypeUInt, // sequenceCount
-		CmdLoop,
-		CmdStash, // sequenceOffset[i]
-		CmdEndLoop,
+		parser.CmdRead16, parser.TypeUInt, // coverageOffset
+		parser.CmdStoreInto, 0,
+		parser.CmdRead16, parser.TypeUInt, // sequenceCount
+		parser.CmdLoop,
+		parser.CmdStash, // sequenceOffset[i]
+		parser.CmdEndLoop,
 	)
 	if err != nil {
 		return nil, err
@@ -228,11 +231,11 @@ func (g *gTab) readGsub2_1(s *State, subtablePos int64) (*gsub2_1, error) {
 	for _, i := range cov {
 		s.A = subtablePos + int64(sequenceOffsets[i])
 		err = g.Exec(s,
-			CmdSeek,
-			CmdRead16, TypeUInt, // glyphCount
-			CmdLoop,
-			CmdStash, // substituteGlyphID[j]
-			CmdEndLoop,
+			parser.CmdSeek,
+			parser.CmdRead16, parser.TypeUInt, // glyphCount
+			parser.CmdLoop,
+			parser.CmdStash, // substituteGlyphID[j]
+			parser.CmdEndLoop,
 		)
 		if err != nil {
 			return nil, err
@@ -246,7 +249,7 @@ func (g *gTab) readGsub2_1(s *State, subtablePos int64) (*gsub2_1, error) {
 	return res, nil
 }
 
-func (l *gsub2_1) Apply(filter keepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
+func (l *gsub2_1) Apply(filter KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	k, ok := l.cov[seq[i].Gid]
 	if !ok {
 		return seq, -1
@@ -281,14 +284,14 @@ type ligature struct {
 	out font.GlyphID
 }
 
-func (g *gTab) readGsub4_1(s *State, subtablePos int64) (*gsub4_1, error) {
+func (g *GTab) readGsub4_1(s *parser.State, subtablePos int64) (*gsub4_1, error) {
 	err := g.Exec(s,
-		CmdRead16, TypeUInt, // coverageOffset
-		CmdStoreInto, 0,
-		CmdRead16, TypeUInt, // ligatureSetCount
-		CmdLoop,
-		CmdStash, // ligatureSetOffset[i]
-		CmdEndLoop,
+		parser.CmdRead16, parser.TypeUInt, // coverageOffset
+		parser.CmdStoreInto, 0,
+		parser.CmdRead16, parser.TypeUInt, // ligatureSetCount
+		parser.CmdLoop,
+		parser.CmdStash, // ligatureSetOffset[i]
+		parser.CmdEndLoop,
 	)
 	if err != nil {
 		return nil, err
@@ -304,16 +307,16 @@ func (g *gTab) readGsub4_1(s *State, subtablePos int64) (*gsub4_1, error) {
 	}
 	for _, i := range cov {
 		if i >= len(ligatureSetOffsets) {
-			return nil, g.error("ligatureSetOffset %d out of range", i)
+			return nil, g.Error("ligatureSetOffset %d out of range", i)
 		}
 		ligSetTablePos := subtablePos + int64(ligatureSetOffsets[i])
 		s.A = ligSetTablePos
 		err = g.Exec(s,
-			CmdSeek,
-			CmdRead16, TypeUInt, // ligatureCount
-			CmdLoop,
-			CmdStash, // ligatureOffset[i]
-			CmdEndLoop,
+			parser.CmdSeek,
+			parser.CmdRead16, parser.TypeUInt, // ligatureCount
+			parser.CmdLoop,
+			parser.CmdStash, // ligatureOffset[i]
+			parser.CmdEndLoop,
 		)
 		if err != nil {
 			return nil, err
@@ -322,14 +325,14 @@ func (g *gTab) readGsub4_1(s *State, subtablePos int64) (*gsub4_1, error) {
 		for _, o2 := range ligatureOffsets {
 			s.A = ligSetTablePos + int64(o2)
 			err = g.Exec(s,
-				CmdSeek,
-				CmdStash,            // ligatureGlyph
-				CmdRead16, TypeUInt, // componentCount
-				CmdAssertGt, 0,
-				CmdDec,
-				CmdLoop,
-				CmdStash, // componentfont.GlyphIndex[i]
-				CmdEndLoop,
+				parser.CmdSeek,
+				parser.CmdStash,                   // ligatureGlyph
+				parser.CmdRead16, parser.TypeUInt, // componentCount
+				parser.CmdAssertGt, 0,
+				parser.CmdDec,
+				parser.CmdLoop,
+				parser.CmdStash, // componentfont.GlyphIndex[i]
+				parser.CmdEndLoop,
 			)
 			if err != nil {
 				return nil, err
@@ -345,7 +348,7 @@ func (g *gTab) readGsub4_1(s *State, subtablePos int64) (*gsub4_1, error) {
 	return xxx, nil
 }
 
-func (l *gsub4_1) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gsub4_1) Apply(filter KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	ligSetIdx, ok := l.cov[seq[pos].Gid]
 	if !ok {
 		return seq, -1

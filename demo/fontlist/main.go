@@ -27,7 +27,7 @@ import (
 
 func tryFont(fname string) error {
 	// fmt.Println(fname)
-	tt, err := sfnt.Open(fname)
+	tt, err := sfnt.Open(fname, nil)
 	if err != nil {
 		return err
 	}

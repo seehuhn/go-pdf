@@ -23,21 +23,37 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/locale"
 )
 
 // Font describes a TrueType font file.
 type Font struct {
 	Fd     *os.File
 	Header *table.Header
-	Head   *table.Head
+	Head   *table.Head // TODO(voss): needed?
 
-	NumGlyphs int // TODO(voss): should this be here?
+	CMap     map[rune]font.GlyphID
+	FontName string
+	Flags    font.Flags
+
+	GlyphUnits  int
+	Ascent      int // Ascent in glyph coordinate units
+	Descent     int // Descent in glyph coordinate units, as a negative number
+	CapHeight   int
+	ItalicAngle float64
+
+	GlyphExtent []font.Rect
+	Width       []int
+
+	GSUB, GPOS gtab.Lookups
+	KernInfo   map[font.GlyphPair]int
 }
 
 // Open loads a TrueType font into memory.
 // The .Close() method must be called once the Font is no longer used.
-func Open(fname string) (*Font, error) {
+func Open(fname string, loc *locale.Locale) (*Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -78,7 +94,151 @@ func Open(fname string) (*Font, error) {
 		// glyph index 0 denotes a missing character and is always included
 		return nil, errors.New("no glyphs found")
 	}
-	tt.NumGlyphs = int(maxp.NumGlyphs)
+	NumGlyphs := int(maxp.NumGlyphs)
+
+	hheaInfo, err := tt.getHHeaInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	os2Info, err := tt.getOS2Info()
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+
+	hmtx, err := tt.getHMtxInfo(NumGlyphs, int(hheaInfo.NumOfLongHorMetrics))
+	if err != nil {
+		return nil, err
+	}
+
+	glyf, err := tt.getGlyfInfo(NumGlyphs)
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+
+	postInfo, err := tt.getPostInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	fontName, err := tt.getFontName()
+	if err != nil {
+		// TODO(voss): if FontName == "", invent a name: The name must be no
+		// longer than 63 characters and restricted to the printable ASCII
+		// subset, codes 33 to 126, except for the 10 characters '[', ']', '(',
+		// ')', '{', '}', '<', '>', '/', '%'.
+		return nil, err
+	}
+
+	cmap, err := tt.SelectCMap()
+	if err != nil {
+		return nil, err
+	}
+
+	var GlyphExtent []font.Rect
+	if glyf != nil {
+		GlyphExtent = make([]font.Rect, NumGlyphs)
+		for i := 0; i < NumGlyphs; i++ {
+			GlyphExtent[i].LLx = int(glyf.Data[i].XMin)
+			GlyphExtent[i].LLy = int(glyf.Data[i].YMin)
+			GlyphExtent[i].URx = int(glyf.Data[i].XMax)
+			GlyphExtent[i].URy = int(glyf.Data[i].YMax)
+		}
+	}
+
+	Width := make([]int, NumGlyphs)
+	for i := 0; i < NumGlyphs; i++ {
+		Width[i] = int(hmtx.GetAdvanceWidth(i))
+	}
+
+	Ascent := int(hheaInfo.Ascent)
+	Descent := int(hheaInfo.Descent)
+	// LineGap := int(hheaInfo.LineGap)
+	if os2Info != nil && os2Info.V0MSValid {
+		if os2Info.V0.Selection&(1<<7) != 0 {
+			Ascent = int(os2Info.V0MS.TypoAscender)
+			Descent = int(os2Info.V0MS.TypoDescender)
+		} else {
+			Ascent = int(os2Info.V0MS.WinAscent)
+			Descent = -int(os2Info.V0MS.WinDescent)
+		}
+		// LineGap = int(os2Info.V0MS.TypoLineGap)
+	}
+
+	var capHeight int
+	if os2Info != nil && os2Info.V0.Version >= 4 {
+		capHeight = int(os2Info.V4.CapHeight)
+	} else if H, ok := cmap['H']; ok && GlyphExtent != nil {
+		// CapHeight may be set equal to the top of the unscaled and unhinted
+		// glyph bounding box of the glyph encoded at U+0048 (LATIN CAPITAL
+		// LETTER H)
+		capHeight = GlyphExtent[H].URy
+	} else {
+		capHeight = 800
+	}
+
+	pars, err := gtab.New(tt.Header, tt.Fd, loc)
+	if err != nil {
+		return nil, err
+	}
+	gsub, err := pars.ReadGsubTable()
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+	gpos, err := pars.ReadGposTable()
+	var kernInfo map[font.GlyphPair]int
+	if table.IsMissing(err) { // if no GPOS table is found ...
+		kernInfo, err = tt.readKernInfo()
+	}
+	if err != nil { // error from either ReadGposTable() or ReadKernInfo()
+		return nil, err
+	}
+
+	var flags font.Flags
+	if os2Info != nil {
+		switch os2Info.V0.FamilyClass >> 8 {
+		case 1, 2, 3, 4, 5, 7:
+			flags |= font.FlagSerif
+		case 10:
+			flags |= font.FlagScript
+		}
+	}
+	if postInfo.IsFixedPitch {
+		flags |= font.FlagFixedPitch
+	}
+	IsItalic := tt.Head.MacStyle&(1<<1) != 0
+	if os2Info != nil {
+		// If the "OS/2" table is present, Windows seems to use this table to
+		// decide whether the font is bold/italic.  We follow Window's lead
+		// here (overriding the values from the head table).
+		IsItalic = os2Info.V0.Selection&(1<<0) != 0
+	}
+	if IsItalic {
+		flags |= font.FlagItalic
+	}
+
+	if isSubset(cmap, font.AdobeStandardLatin) {
+		flags |= font.FlagNonsymbolic
+	} else {
+		flags |= font.FlagSymbolic
+	}
+
+	// TODO(voss): font.FlagAllCap
+	// TODO(voss): font.FlagSmallCap
+
+	tt.CMap = cmap
+	tt.FontName = fontName
+	tt.GlyphUnits = int(tt.Head.UnitsPerEm)
+	tt.Ascent = Ascent
+	tt.Descent = Descent
+	tt.CapHeight = capHeight
+	tt.ItalicAngle = postInfo.ItalicAngle
+	tt.GlyphExtent = GlyphExtent
+	tt.Width = Width
+	tt.Flags = flags
+	tt.GSUB = gsub
+	tt.GPOS = gpos
+	tt.KernInfo = kernInfo
 
 	return tt, nil
 }
@@ -172,4 +332,15 @@ func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
 		return cmap, nil
 	}
 	return nil, errors.New("sfnt/cmap: no supported character encoding found")
+}
+
+// isSubset returns true if the font includes only runes from the
+// given character set.
+func isSubset(cmap map[rune]font.GlyphID, charset map[rune]bool) bool {
+	for r := range cmap {
+		if !charset[r] {
+			return false
+		}
+	}
+	return true
 }

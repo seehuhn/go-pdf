@@ -17,47 +17,51 @@
 package parser
 
 import (
+	"errors"
+	"io"
+	"strings"
 	"testing"
-
-	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/locale"
 )
 
-func TestInterpreter(t *testing.T) {
-	tt, err := sfnt.Open("../../truetype/ttf/SourceSerif4-Regular.ttf")
-	// tt, err := sfnt.Open("../../truetype/ttf/FreeSerif.ttf")
-	// tt, err := sfnt.Open("../../truetype/ttf/Roboto-Regular.ttf")
-	// tt, err := sfnt.Open("/Applications/LibreOffice.app/Contents/Resources/fonts/truetype/DejaVuSerif.ttf")
+func TestParser(t *testing.T) {
+	buf := strings.NewReader("1234AB\xFF\xFF")
+	p := New(buf)
+
+	err := p.SetRegion("test", 0, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tt.Close()
-
-	tableName := "GSUB"
-
-	includeFeature := make(map[string]bool)
-	if tableName == "GSUB" {
-		includeFeature["ccmp"] = true
-		includeFeature["liga"] = true
-		includeFeature["clig"] = true
-	} else { // tableName == "GPOS"
-		includeFeature["kern"] = true
-		includeFeature["mark"] = true
-		includeFeature["mkmk"] = true
-	}
-
-	p := New(tt)
-	g, err := newGTab(p, tableName, locale.EnGB, includeFeature)
+	x, err := p.ReadUInt16()
 	if err != nil {
 		t.Fatal(err)
 	}
+	if x != '1'*256+'2' {
+		t.Errorf("wrong value, expected %d but got %d", '1'*256+'2', x)
+	}
+	_, err = p.ReadUInt16()
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("EOF not detected, got err=%s", err)
+	}
 
-	if tableName == "GSUB" {
-		for _, idx := range g.lookupIndices {
-			_, err := g.getGtabLookup(idx)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
+	err = p.SetRegion("xyz", 4, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = p.seek(6)
+	if err == nil {
+		t.Error("seek error not detected")
+	} else if !strings.Contains(err.Error(), "xyz") {
+		t.Error("table name not mentioned in error message", err)
+	}
+	err = p.seek(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	y, err := p.ReadInt16()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if y != -1 {
+		t.Errorf("wrong value, expected -1 but got %d", y)
 	}
 }

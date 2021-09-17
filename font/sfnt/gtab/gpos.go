@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/locale"
+	"seehuhn.de/go/pdf/font/sfnt/parser"
 )
 
 // The most common GPOS features seen on my system:
@@ -34,7 +34,7 @@ import (
 
 // ReadGposTable reads the "GPOS" table of a font, for a given writing script
 // and language.
-func (p *Parser) ReadGposTable(loc *locale.Locale, extraFeatures ...string) (Lookups, error) {
+func (g *GTab) ReadGposTable(extraFeatures ...string) (Lookups, error) {
 	includeFeature := map[string]bool{
 		"kern": true,
 		"mark": true,
@@ -44,20 +44,24 @@ func (p *Parser) ReadGposTable(loc *locale.Locale, extraFeatures ...string) (Loo
 		includeFeature[feature] = true
 	}
 
-	g, err := newGTab(p, "GPOS", loc, includeFeature)
+	g.classDefCache = make(map[int64]ClassDef)
+	g.coverageCache = make(map[int64]coverage)
+	g.subtableReader = g.readGposSubtable
+
+	ll, err := g.selectLookups("GPOS", includeFeature)
 	if err != nil {
 		return nil, err
 	}
 
-	return g.ReadLookups()
+	return g.readLookups(ll)
 }
 
-func (g *gTab) readGposSubtable(s *State, lookupType uint16, subtablePos int64) (lookupSubtable, error) {
+func (g *GTab) readGposSubtable(s *parser.State, lookupType uint16, subtablePos int64) (LookupSubtable, error) {
 	// TODO(voss): is this called more than once for the same subtablePos? -> use caching?
 	s.A = subtablePos
 	err := g.Exec(s,
-		CmdSeek,
-		CmdRead16, TypeUInt, // format
+		parser.CmdSeek,
+		parser.CmdRead16, parser.TypeUInt, // format
 	)
 	if err != nil {
 		return nil, err
@@ -93,15 +97,15 @@ func (g *gTab) readGposSubtable(s *State, lookupType uint16, subtablePos int64) 
 
 	case 9_1: // Extension Positioning Subtable Format 1
 		err = g.Exec(s,
-			CmdRead16, TypeUInt, // extensionLookupType
-			CmdStoreInto, 0,
-			CmdRead32, TypeUInt, // extensionOffset
+			parser.CmdRead16, parser.TypeUInt, // extensionLookupType
+			parser.CmdStoreInto, 0,
+			parser.CmdRead32, parser.TypeUInt, // extensionOffset
 		)
 		if err != nil {
 			return nil, err
 		}
 		if s.R[0] == 9 {
-			return nil, g.error("invalid extension lookup")
+			return nil, g.Error("invalid extension lookup")
 		}
 		return g.readGposSubtable(s, uint16(s.R[0]), subtablePos+s.A)
 
@@ -124,15 +128,15 @@ type pairAdjust struct {
 	first, second *valueRecord
 }
 
-func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
+func (g *GTab) readGpos2_1(s *parser.State, subtablePos int64) (*gpos2_1, error) {
 	err := g.Exec(s,
-		CmdStash,            // coverageOffset
-		CmdStash,            // valueFormat1
-		CmdStash,            // valueFormat2
-		CmdRead16, TypeUInt, // pairSetCount
-		CmdLoop,
-		CmdStash, // pairSetOffsets[i]
-		CmdEndLoop,
+		parser.CmdStash,                   // coverageOffset
+		parser.CmdStash,                   // valueFormat1
+		parser.CmdStash,                   // valueFormat2
+		parser.CmdRead16, parser.TypeUInt, // pairSetCount
+		parser.CmdLoop,
+		parser.CmdStash, // pairSetOffsets[i]
+		parser.CmdEndLoop,
 	)
 	if err != nil {
 		return nil, err
@@ -148,7 +152,7 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 		return nil, err
 	}
 	if len(coverage) != len(pairSetOffsets) {
-		return nil, g.error("malformed GPOS 2.1 table")
+		return nil, g.Error("malformed GPOS 2.1 table")
 	}
 
 	res := &gpos2_1{
@@ -159,8 +163,8 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 		pairMap := make(map[font.GlyphID]*pairAdjust)
 		s.A = subtablePos + int64(offs)
 		err := g.Exec(s,
-			CmdSeek,
-			CmdRead16, TypeUInt, // pairValueCount
+			parser.CmdSeek,
+			parser.CmdRead16, parser.TypeUInt, // pairValueCount
 		)
 		if err != nil {
 			return nil, err
@@ -190,7 +194,7 @@ func (g *gTab) readGpos2_1(s *State, subtablePos int64) (*gpos2_1, error) {
 	return res, nil
 }
 
-func (l *gpos2_1) Apply(keep keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	class, ok := l.cov[seq[pos].Gid]
 	if !ok || class >= len(l.adjust) {
 		return seq, -1
@@ -228,15 +232,15 @@ type gpos2_2 struct {
 	adjust    [][]pairAdjust
 }
 
-func (g *gTab) readGpos2_2(s *State, subtablePos int64) (*gpos2_2, error) {
+func (g *GTab) readGpos2_2(s *parser.State, subtablePos int64) (*gpos2_2, error) {
 	err := g.Exec(s,
-		CmdStash, // coverageOffset
-		CmdStash, // valueFormat1
-		CmdStash, // valueFormat2
-		CmdStash, // classDef1Offset
-		CmdStash, // classDef2Offset
-		CmdStash, // class1Count
-		CmdStash, // class2Count
+		parser.CmdStash, // coverageOffset
+		parser.CmdStash, // valueFormat1
+		parser.CmdStash, // valueFormat2
+		parser.CmdStash, // classDef1Offset
+		parser.CmdStash, // classDef2Offset
+		parser.CmdStash, // class1Count
+		parser.CmdStash, // class2Count
 	)
 	if err != nil {
 		return nil, err
@@ -295,7 +299,7 @@ func (g *gTab) readGpos2_2(s *State, subtablePos int64) (*gpos2_2, error) {
 	return res, nil
 }
 
-func (l *gpos2_2) Apply(keep keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos2_2) Apply(keep KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	_, ok := l.cov[seq[pos].Gid]
 	if !ok {
 		return seq, -1
@@ -329,14 +333,14 @@ type gpos4_1 struct {
 	Base map[font.GlyphID][]anchor    // the base glyph being attached to
 }
 
-func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
+func (g *GTab) readGpos4_1(s *parser.State, subtablePos int64) (*gpos4_1, error) {
 	err := g.Exec(s,
-		CmdStash,            // markCoverageOffset
-		CmdStash,            // baseCoverageOffset
-		CmdRead16, TypeUInt, // markClassCount
-		CmdStoreInto, 0,
-		CmdStash, // markArrayOffset
-		CmdStash, // baseArrayOffset
+		parser.CmdStash,                   // markCoverageOffset
+		parser.CmdStash,                   // baseCoverageOffset
+		parser.CmdRead16, parser.TypeUInt, // markClassCount
+		parser.CmdStoreInto, 0,
+		parser.CmdStash, // markArrayOffset
+		parser.CmdStash, // baseArrayOffset
 	)
 	if err != nil {
 		return nil, err
@@ -356,12 +360,12 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	baseArrayPos := subtablePos + int64(baseArrayOffset)
 	s.A = baseArrayPos
 	err = g.Exec(s,
-		CmdSeek,
-		CmdRead16, TypeUInt, // baseCount
-		CmdMult, 0,
-		CmdLoop,
-		CmdStash, // baseRecords[i].baseAnchorOffsets[j]
-		CmdEndLoop,
+		parser.CmdSeek,
+		parser.CmdRead16, parser.TypeUInt, // baseCount
+		parser.CmdMult, 0,
+		parser.CmdLoop,
+		parser.CmdStash, // baseRecords[i].baseAnchorOffsets[j]
+		parser.CmdEndLoop,
 	)
 	if err != nil {
 		return nil, err
@@ -395,13 +399,13 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 		a := idx * markClassCount
 		b := a + markClassCount
 		if b > len(baseAnchors) {
-			return nil, g.error("malformed GPOS 4.1 table")
+			return nil, g.Error("malformed GPOS 4.1 table")
 		}
 		res.Base[gid] = baseAnchors[a:b]
 	}
 	for gid, idx := range markCoverage {
 		if idx >= len(markArray) || markArray[idx].markClass >= uint16(markClassCount) {
-			return nil, g.error("malformed GPOS 4.1 table")
+			return nil, g.Error("malformed GPOS 4.1 table")
 		}
 		res.Mark[gid] = &markArray[idx]
 	}
@@ -409,7 +413,7 @@ func (g *gTab) readGpos4_1(s *State, subtablePos int64) (*gpos4_1, error) {
 	return res, nil
 }
 
-func (l *gpos4_1) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos4_1) Apply(filter KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	if pos == 0 {
 		return seq, -1
 	}
@@ -435,15 +439,15 @@ type gpos6_1 struct {
 	Mark2 map[font.GlyphID][]anchor    // the base mark being attached to
 }
 
-func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
+func (g *GTab) readGpos6_1(s *parser.State, subtablePos int64) (*gpos6_1, error) {
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-to-mark-attachment-positioning-format-1-mark-to-mark-attachment
 	err := g.Exec(s,
-		CmdStash,            // mark1CoverageOffset
-		CmdStash,            // mark2CoverageOffset
-		CmdRead16, TypeUInt, // markClassCount
-		CmdStoreInto, 0,
-		CmdStash, // mark1ArrayOffset
-		CmdStash, // mark2ArrayOffset
+		parser.CmdStash,                   // mark1CoverageOffset
+		parser.CmdStash,                   // mark2CoverageOffset
+		parser.CmdRead16, parser.TypeUInt, // markClassCount
+		parser.CmdStoreInto, 0,
+		parser.CmdStash, // mark1ArrayOffset
+		parser.CmdStash, // mark2ArrayOffset
 	)
 	if err != nil {
 		return nil, err
@@ -463,12 +467,12 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	baseArrayPos := subtablePos + int64(mark2ArrayOffset)
 	s.A = baseArrayPos
 	err = g.Exec(s,
-		CmdSeek,
-		CmdRead16, TypeUInt, // mark2Count
-		CmdMult, 0,
-		CmdLoop,
-		CmdStash, // mark2Records[i].mark2AnchorOffsets[j]
-		CmdEndLoop,
+		parser.CmdSeek,
+		parser.CmdRead16, parser.TypeUInt, // mark2Count
+		parser.CmdMult, 0,
+		parser.CmdLoop,
+		parser.CmdStash, // mark2Records[i].mark2AnchorOffsets[j]
+		parser.CmdEndLoop,
 	)
 	if err != nil {
 		return nil, err
@@ -499,13 +503,13 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 		a := idx * markClassCount
 		b := a + markClassCount
 		if b > len(mark2Anchors) {
-			return nil, g.error("malformed GPOS 4.1 table")
+			return nil, g.Error("malformed GPOS 4.1 table")
 		}
 		res.Mark2[gid] = mark2Anchors[a:b]
 	}
 	for gid, idx := range mark1Coverage {
 		if idx >= len(mark1Array) || mark1Array[idx].markClass >= uint16(markClassCount) {
-			return nil, g.error("malformed GPOS 6.1 table")
+			return nil, g.Error("malformed GPOS 6.1 table")
 		}
 		res.Mark1[gid] = &mark1Array[idx]
 	}
@@ -513,7 +517,7 @@ func (g *gTab) readGpos6_1(s *State, subtablePos int64) (*gpos6_1, error) {
 	return res, nil
 }
 
-func (l *gpos6_1) Apply(filter keepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *gpos6_1) Apply(filter KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int) {
 	// The mark2 glyph that combines with a mark1 glyph is the glyph preceding
 	// the mark1 glyph in glyph string order (skipping glyphs according to
 	// LookupFlags). The subtable applies precisely when that mark2 glyph is

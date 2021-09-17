@@ -31,7 +31,7 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
-	tt, err := sfnt.Open(fontFileName)
+	tt, err := sfnt.Open(fontFileName, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

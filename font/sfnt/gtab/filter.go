@@ -14,18 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
 )
 
-// keepGlyphFn is used to drop ignored characters in lookups with non-zero
-// lookup flags.  Functions of this type return true, if the glyph should be
+// KeepGlyphFn is used to drop ignored characters in lookups with non-zero
+// lookup flags.  Functions of this type return true if the glyph should be
 // used, and false if the glyph should be ignored.
-type keepGlyphFn func(font.GlyphID) bool
+type KeepGlyphFn func(font.GlyphID) bool
 
-func (keep keepGlyphFn) Next(seq []font.Glyph, pos int) int {
+// Next returns the index of the next glyph to use after pos.  If pos is
+// the last used glyph in the sequence, -1 is returned instead.
+func (keep KeepGlyphFn) Next(seq []font.Glyph, pos int) int {
 	for i := pos + 1; i < len(seq); i++ {
 		if keep(seq[i].Gid) {
 			return i
@@ -34,7 +36,9 @@ func (keep keepGlyphFn) Next(seq []font.Glyph, pos int) int {
 	return -1
 }
 
-func (keep keepGlyphFn) Prev(seq []font.Glyph, pos int) int {
+// Prev returns the index of the previous glyph to use before pos.  If pos is
+// the first used glyph in the sequence, -1 is returned instead.
+func (keep KeepGlyphFn) Prev(seq []font.Glyph, pos int) int {
 	for i := pos - 1; i >= 0; i-- {
 		if keep(seq[i].Gid) {
 			return i
@@ -53,7 +57,7 @@ const (
 
 func useAllGlyphs(font.GlyphID) bool { return true }
 
-func (g *gTab) makeFilter(lookupFlag uint16) keepGlyphFn {
+func (g *GTab) makeFilter(lookupFlag uint16) KeepGlyphFn {
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
 
 	if g.gdef == nil {

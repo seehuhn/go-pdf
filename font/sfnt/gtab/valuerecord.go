@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import (
 	"fmt"
@@ -40,56 +40,56 @@ type valueRecord struct {
 // readValueRecord reads the binary representation of a valueRecord.  The
 // valueFormat determines which fields are present in the binary
 // representation.
-func (p *Parser) readValueRecord(valueFormat uint16) (*valueRecord, error) {
+func (g *GTab) readValueRecord(valueFormat uint16) (*valueRecord, error) {
 	if valueFormat == 0 {
 		return nil, nil
 	}
 	res := &valueRecord{}
 	var err error
 	if valueFormat&0x0001 != 0 {
-		res.XPlacement, err = p.ReadInt16()
+		res.XPlacement, err = g.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0002 != 0 {
-		res.YPlacement, err = p.ReadInt16()
+		res.YPlacement, err = g.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0004 != 0 {
-		res.XAdvance, err = p.ReadInt16()
+		res.XAdvance, err = g.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0008 != 0 {
-		res.YAdvance, err = p.ReadInt16()
+		res.YAdvance, err = g.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0010 != 0 {
-		res.XPlaDeviceOffset, err = p.ReadUInt16()
+		res.XPlaDeviceOffset, err = g.ReadUInt16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0020 != 0 {
-		res.YPlaDeviceOffset, err = p.ReadUInt16()
+		res.YPlaDeviceOffset, err = g.ReadUInt16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0040 != 0 {
-		res.XAdvDeviceOffset, err = p.ReadUInt16()
+		res.XAdvDeviceOffset, err = g.ReadUInt16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0080 != 0 {
-		res.YAdvDeviceOffset, err = p.ReadUInt16()
+		res.YAdvDeviceOffset, err = g.ReadUInt16()
 		if err != nil {
 			return nil, err
 		}

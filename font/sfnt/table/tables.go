@@ -108,7 +108,7 @@ func (h *Header) ReadTableHead(r io.ReaderAt, name string, head interface{}) (*i
 	return tableFd, nil
 }
 
-// ReadTableBytes returns the body of a sfnt table.
+// ReadTableBytes returns the body of an sfnt table.
 func (h *Header) ReadTableBytes(r io.ReaderAt, name string) ([]byte, error) {
 	table := h.Find(name)
 	if table == nil {
@@ -385,7 +385,7 @@ func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map
 						continue
 					}
 					r := i2r(idx)
-					if unicode.IsGraphic(r) {
+					if unicode.IsGraphic(r) { // TODO(voss): is this test needed/useful? (also below)
 						cmap[r] = font.GlyphID(c)
 					}
 				}

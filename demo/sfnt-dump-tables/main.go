@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	tt, err := sfnt.Open(args[0])
+	tt, err := sfnt.Open(args[0], nil)
 	if err != nil {
 		log.Fatal(err)
 	}

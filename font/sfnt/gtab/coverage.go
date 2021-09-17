@@ -14,26 +14,27 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import (
 	"errors"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/parser"
 )
 
-func (g *gTab) readCoverageTable(pos int64) (coverage, error) {
+func (g *GTab) readCoverageTable(pos int64) (coverage, error) {
 	res, ok := g.coverageCache[pos]
 	if ok {
 		return res, nil
 	}
 
-	s := &State{
+	s := &parser.State{
 		A: pos,
 	}
 	err := g.Exec(s,
-		CmdSeek,
-		CmdRead16, TypeUInt, // format
+		parser.CmdSeek,
+		parser.CmdRead16, parser.TypeUInt, // format
 	)
 	if err != nil {
 		return nil, err
@@ -45,10 +46,10 @@ func (g *gTab) readCoverageTable(pos int64) (coverage, error) {
 	switch format {
 	case 1: // coverage table format 1
 		err = g.Exec(s,
-			CmdRead16, TypeUInt, // glyphCount
-			CmdLoop,
-			CmdStash, // glyphArray[i]
-			CmdEndLoop,
+			parser.CmdRead16, parser.TypeUInt, // glyphCount
+			parser.CmdLoop,
+			parser.CmdStash, // glyphArray[i]
+			parser.CmdEndLoop,
 		)
 		if err != nil {
 			return nil, err
@@ -58,7 +59,7 @@ func (g *gTab) readCoverageTable(pos int64) (coverage, error) {
 		}
 	case 2: // coverage table format 2
 		err = g.Exec(s,
-			CmdRead16, TypeUInt, // rangeCount
+			parser.CmdRead16, parser.TypeUInt, // rangeCount
 		)
 		if err != nil {
 			return nil, err
@@ -66,9 +67,9 @@ func (g *gTab) readCoverageTable(pos int64) (coverage, error) {
 		rangeCount := int(s.A)
 		for i := 0; i < rangeCount; i++ {
 			err = g.Exec(s,
-				CmdStash, // startfont.GlyphIndex
-				CmdStash, // endfont.GlyphIndex
-				CmdStash, // startCoverageIndex
+				parser.CmdStash, // startfont.GlyphIndex
+				parser.CmdStash, // endfont.GlyphIndex
+				parser.CmdStash, // startCoverageIndex
 			)
 			if err != nil {
 				return nil, err
@@ -79,7 +80,7 @@ func (g *gTab) readCoverageTable(pos int64) (coverage, error) {
 			}
 		}
 	default:
-		return nil, g.error("unsupported coverage format %d", format)
+		return nil, g.Error("unsupported coverage format %d", format)
 	}
 
 	g.coverageCache[pos] = res

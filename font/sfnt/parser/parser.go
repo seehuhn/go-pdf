@@ -19,9 +19,6 @@ package parser
 import (
 	"fmt"
 	"io"
-
-	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 const bufferSize = 1024
@@ -41,9 +38,10 @@ func (s *State) GetStash() []uint16 {
 	return res
 }
 
-// Parser allows to read data from a sfnt table.
+// Parser allows to read data from an sfnt file.
 type Parser struct {
-	tt         *sfnt.Font
+	r io.ReadSeeker
+
 	start, end int64
 	tableName  string
 
@@ -51,31 +49,21 @@ type Parser struct {
 	from      int64
 	pos, used int
 	lastRead  int
-
-	classDefCache map[int64]ClassDef
 }
 
-// New allocates a new Parser.  SetTable() must be called before the
+// New allocates a new Parser.  SetRegion() must be called before the
 // parser can be used.
-func New(tt *sfnt.Font) *Parser {
-	return &Parser{
-		tt: tt,
-	}
+func New(r io.ReadSeeker) *Parser {
+	return &Parser{r: r}
 }
 
-// OpenTable sets up the parser to read from the given table.
-// The current reading position is moved to the start of the table.
-func (p *Parser) OpenTable(tableName string) error {
-	info := p.tt.Header.Find(tableName)
-	if info == nil {
-		return &table.ErrNoTable{Name: tableName}
-	}
-
+// SetRegion sets up the parser to read from the given region in the file.
+// The current reading position is moved to the start of the region.
+// The tableName is only used in error messages.
+func (p *Parser) SetRegion(tableName string, start, length int64) error {
 	p.tableName = tableName
-	p.start = int64(info.Offset)
-	p.end = int64(info.Offset) + int64(info.Length)
-
-	p.classDefCache = make(map[int64]ClassDef)
+	p.start = start
+	p.end = start + length
 
 	return p.seek(0)
 }
@@ -126,7 +114,7 @@ CommandLoop:
 			case TypeTag:
 				s.Tag = string(buf)
 			default:
-				panic("unknown type for CmdRead16")
+				panic("unknown type for CmdRead32")
 			}
 		case CmdSeek:
 			err := p.seek(s.A)
@@ -167,32 +155,16 @@ CommandLoop:
 		case CmdAssertEq:
 			target := int64(arg)
 			if s.A != target {
-				return p.error("expected 0x%04x, but got 0x%04x (%d)",
-					target, s.A, PC)
-			}
-		case CmdAssertGe:
-			target := int64(arg)
-			if s.A < target {
-				return p.error("expected >=0x%04x, but got 0x%04x (%d)",
+				return p.Error("expected 0x%04x, but got 0x%04x (%d)",
 					target, s.A, PC)
 			}
 		case CmdAssertGt:
 			target := int64(arg)
 			if s.A <= target {
-				return p.error("expected >0x%04x, but got 0x%04x (%d)",
-					target, s.A, PC)
-			}
-		case CmdAssertLe:
-			target := int64(arg)
-			if s.A > target {
-				return p.error("expected <=0x%04x, but got 0x%04x (%d)",
+				return p.Error("expected >0x%04x, but got 0x%04x (%d)",
 					target, s.A, PC)
 			}
 
-		case CmdJNZ:
-			if s.A != 0 {
-				PC += int(int8(arg))
-			}
 		case CmdLoop:
 			loopStartPC = PC
 			loopCount = int(s.A)
@@ -233,17 +205,18 @@ func (p *Parser) ReadInt16() (int16, error) {
 	return int16(val), err
 }
 
+// seek changes the reading position within the current region.
 func (p *Parser) seek(posInTable int64) error {
 	filePos := p.start + posInTable
 	if filePos < p.start || filePos > p.end {
-		return p.error("seek target %d is outside [%d,%d]",
-			filePos, p.start, p.end)
+		return p.Error("seek target %d+%d is outside [%d,%d+%d]",
+			p.start, posInTable, p.start, p.start, p.end-p.start)
 	}
 
 	if filePos >= p.from && filePos <= p.from+int64(p.used) {
 		p.pos = int(filePos - p.from)
 	} else {
-		_, err := p.tt.Fd.Seek(filePos, io.SeekStart)
+		_, err := p.r.Seek(filePos, io.SeekStart)
 		if err != nil {
 			return err
 		}
@@ -275,7 +248,7 @@ func (p *Parser) read(n int) ([]byte, error) {
 		p.pos = 0
 		p.used = k
 
-		l, err := p.tt.Fd.Read(p.buf[p.used:])
+		l, err := p.r.Read(p.buf[p.used:])
 		if err == io.EOF {
 			if l > 0 {
 				err = nil
@@ -284,7 +257,7 @@ func (p *Parser) read(n int) ([]byte, error) {
 			}
 		}
 		if err != nil {
-			return nil, p.error("read failed: %w", err)
+			return nil, p.Error("read failed: %w", err)
 		}
 		p.used += l
 	}
@@ -294,7 +267,7 @@ func (p *Parser) read(n int) ([]byte, error) {
 	return res, nil
 }
 
-func (p *Parser) error(format string, a ...interface{}) error {
+func (p *Parser) Error(format string, a ...interface{}) error {
 	tableName := p.tableName
 	if tableName == "" {
 		tableName = "header"
@@ -320,10 +293,7 @@ const (
 	CmdMult             // arg: register
 	CmdExitIfLt         // arg: comparison value
 	CmdAssertEq         // arg: comparison value
-	CmdAssertGe         // arg: comparison value
 	CmdAssertGt         // arg: comparison value
-	CmdAssertLe         // arg: comparison value
-	CmdJNZ              // arg: offset
 )
 
 // Commands which take no arguments
@@ -341,8 +311,3 @@ const (
 	TypeInt
 	TypeTag
 )
-
-// JumpOffset encodes the jump distance for a relative jump
-func JumpOffset(d int8) Command {
-	return Command(d)
-}
