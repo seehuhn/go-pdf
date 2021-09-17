@@ -73,11 +73,11 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 		InstName: pdf.Name(instName),
 		Ref:      t.Ref,
 
-		GlyphUnits:  t.Ttf.GlyphUnits,
-		Ascent:      t.Ttf.Ascent,
-		Descent:     t.Ttf.Descent,
-		GlyphExtent: t.Ttf.GlyphExtent,
-		Width:       t.Ttf.Width,
+		GlyphUnits:  tt.GlyphUnits,
+		Ascent:      tt.Ascent,
+		Descent:     tt.Descent,
+		GlyphExtent: tt.GlyphExtent,
+		Width:       tt.Width,
 
 		Layout: t.Layout,
 		Enc:    t.Enc,
@@ -89,10 +89,10 @@ type ttfSimple struct {
 	Ttf *sfnt.Font
 	Ref *pdf.Reference
 
-	enc  map[font.GlyphID]byte   // GID -> CID
-	used map[byte]bool           // is CID used or not?
 	text map[font.GlyphID][]rune // GID -> text
+	enc  map[font.GlyphID]byte   // GID -> CID
 	tidy map[font.GlyphID]byte   // GID -> candidate CID
+	used map[byte]bool           // is CID used or not?
 
 	overflowed bool
 }
@@ -113,10 +113,10 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 		Ttf: tt,
 		Ref: w.Alloc(),
 
-		enc:  make(map[font.GlyphID]byte),
-		used: map[byte]bool{},
 		text: make(map[font.GlyphID][]rune),
+		enc:  make(map[font.GlyphID]byte),
 		tidy: tidy,
+		used: map[byte]bool{},
 	}
 
 	return res, nil
@@ -156,6 +156,7 @@ func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
 		return pdf.String{c}
 	}
 
+	// allocate a new cid
 	c, ok = t.tidy[gid]
 	if !ok {
 		for i := 127; i < 127+256; i++ {
@@ -195,19 +196,23 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		return errors.New("too many different glyphs for simple font " + t.Ttf.FontName)
 	}
 
+	// TODO(voss): write the dicts in the order in which they are read,
+	// i.e. /Font first.
+
 	// TODO(voss): cid2gid is passed down a long call chain.  Can this
 	// be simplified?
 	cid2gid := make([]font.GlyphID, 256)
-	first := 257
-	last := -1
-	for origGid, c := range t.enc {
-		if int(c) < first {
-			first = int(c)
+	firstCid := 257
+	lastCid := -1
+	for origGid, cid := range t.enc {
+		cid2gid[cid] = origGid
+
+		if int(cid) < firstCid {
+			firstCid = int(cid)
 		}
-		if int(c) > last {
-			last = int(c)
+		if int(cid) > lastCid {
+			lastCid = int(cid)
 		}
-		cid2gid[c] = origGid
 	}
 	subsetTag := makeSubsetTag()
 
@@ -218,7 +223,7 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 
 	var ww pdf.Array
 	q := 1000 / float64(t.Ttf.GlyphUnits)
-	for i := first; i <= last; i++ {
+	for i := firstCid; i <= lastCid; i++ {
 		width := 0
 		if t.used[byte(i)] {
 			gid := cid2gid[i]
@@ -246,8 +251,8 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("TrueType"),
 		"BaseFont":       pdf.Name(subsetTag + "+" + t.Ttf.FontName),
-		"FirstChar":      pdf.Integer(first),
-		"LastChar":       pdf.Integer(last),
+		"FirstChar":      pdf.Integer(firstCid),
+		"LastChar":       pdf.Integer(lastCid),
 		"Widths":         widths,
 		"FontDescriptor": fontDesc,
 		"ToUnicode":      toUnicodeRef,
