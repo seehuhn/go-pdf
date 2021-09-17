@@ -48,7 +48,6 @@ type Font struct {
 	Width       []int
 
 	GSUB, GPOS gtab.Lookups
-	KernInfo   map[font.GlyphPair]int
 }
 
 // Open loads a TrueType font into memory.
@@ -186,9 +185,8 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 	gpos, err := pars.ReadGposTable()
-	var kernInfo map[font.GlyphPair]int
 	if table.IsMissing(err) { // if no GPOS table is found ...
-		kernInfo, err = tt.readKernInfo()
+		gpos, err = tt.readKernInfo()
 	}
 	if err != nil { // error from either ReadGposTable() or ReadKernInfo()
 		return nil, err
@@ -238,7 +236,6 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	tt.Flags = flags
 	tt.GSUB = gsub
 	tt.GPOS = gpos
-	tt.KernInfo = kernInfo
 
 	return tt, nil
 }

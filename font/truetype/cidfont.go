@@ -121,15 +121,6 @@ func (t *ttfCID) Layout(rr []rune) ([]font.Glyph, error) {
 	}
 	gg = t.Ttf.GPOS.ApplyAll(gg)
 
-	if t.Ttf.KernInfo != nil {
-		for i := 0; i+1 < len(gg); i++ {
-			pair := font.GlyphPair{gg[i].Gid, gg[i+1].Gid}
-			if dx, ok := t.Ttf.KernInfo[pair]; ok {
-				gg[i].Advance += dx
-			}
-		}
-	}
-
 	for _, g := range gg {
 		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
 			// copy the slice, in case the caller modifies it later

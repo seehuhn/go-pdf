@@ -118,6 +118,7 @@ func (g *GTab) readGposSubtable(s *parser.State, lookupType uint16, subtablePos 
 	}
 }
 
+// Pair Adjustment Positioning Format 1: Adjustments for Glyph Pairs
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
 type gpos2_1 struct {
 	cov    coverage

@@ -112,7 +112,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 			page.Printf("BT /F1 %f Tf\n", fontSize)
 			page.Printf("%f %f Td\n", x, y)
 			enc := F1.Enc(c)
-			enc.PDF(page)
+			_ = enc.PDF(page)
 			page.Println(" Tj")
 			page.Println("ET")
 		}

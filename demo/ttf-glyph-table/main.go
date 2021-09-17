@@ -155,13 +155,13 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 
 	page.Println("q")
 	page.Println("BT")
-	theFont.InstName.PDF(page)
+	_ = theFont.InstName.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", float64(glyphFontSize))
 	fmt.Fprintf(page, "%f %f Td\n",
 		xPos+shift,
 		yPos)
 	buf := theFont.Enc(font.GlyphID(g))
-	buf.PDF(page)
+	_ = buf.PDF(page)
 	page.Println(" Tj")
 	page.Println("ET")
 	page.Println("Q")

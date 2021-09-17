@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -187,7 +188,7 @@ func (tt *Font) getOS2Info() (*table.OS2, error) {
 // readKernInfo reads kerning information from the "kern" table.
 //
 // TODO(voss): use a gpos2_1 structure instead.
-func (tt *Font) readKernInfo() (map[font.GlyphPair]int, error) {
+func (tt *Font) readKernInfo() (gtab.Lookups, error) {
 	var Header struct {
 		Version   uint16
 		NumTables uint16
@@ -199,7 +200,7 @@ func (tt *Font) readKernInfo() (map[font.GlyphPair]int, error) {
 		return nil, errors.New("unsupported kern table version")
 	}
 
-	kerning := make(map[font.GlyphPair]int)
+	var kerning []gtab.KernInfo
 	for i := 0; i < int(Header.NumTables); i++ {
 		var subHeader struct {
 			Version  uint16
@@ -231,15 +232,16 @@ func (tt *Font) readKernInfo() (map[font.GlyphPair]int, error) {
 		nPairs := int(buf[0])
 		buf = buf[4:] // skip the header
 		for nPairs > 0 && len(buf) >= 3 {
-			LR := font.GlyphPair{
-				font.GlyphID(buf[0]), font.GlyphID(buf[1])}
-			kern := int16(buf[2])
-			kerning[LR] = int(kern)
+			kerning = append(kerning, gtab.KernInfo{
+				Left:  font.GlyphID(buf[0]),
+				Right: font.GlyphID(buf[1]),
+				Kern:  int16(buf[2]),
+			})
 			buf = buf[3:]
 		}
 	}
 
-	return kerning, nil
+	return gtab.KerningAsLookup(kerning), nil
 }
 
 // getGlyfOffsets returns the locations of the glyphs in the "glyf" table.
