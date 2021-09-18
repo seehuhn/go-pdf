@@ -35,9 +35,12 @@ import (
 
 const tabWidth = 4
 
-var fontFile = flag.String("f", "Courier", "the font to use")
+var (
+	fontFile = flag.String("f", "Courier", "the font to use")
+	version  = flag.String("V", pdf.V1_7.String(), "PDF version to write")
+)
 
-func convert(inName, outName string) error {
+func convert(inName, outName string, V pdf.Version) error {
 	fmt.Println(inName, "->", outName)
 
 	in, err := os.Open(inName)
@@ -46,7 +49,15 @@ func convert(inName, outName string) error {
 	}
 	defer in.Close()
 
-	out, err := pdf.Create(outName)
+	fd, err := os.Create(outName)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+	opt := &pdf.WriterOptions{
+		Version: V,
+	}
+	out, err := pdf.NewWriter(fd, opt)
 	if err != nil {
 		return err
 	}
@@ -157,6 +168,11 @@ func convert(inName, outName string) error {
 func main() {
 	flag.Parse()
 
+	V, err := pdf.ParseVersion(*version)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for _, inName := range flag.Args() {
 		baseName := strings.TrimSuffix(inName, ".txt")
 		var outName string
@@ -173,7 +189,7 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		err := convert(inName, outName)
+		err := convert(inName, outName, V)
 		if err != nil {
 			log.Fatal(err)
 		}

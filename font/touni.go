@@ -40,8 +40,8 @@ type SimpleMapping struct {
 	Text []rune
 }
 
-// ToUnicodeSimple writes the ToUnicode stream for a simple font.
-func ToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping) (*pdf.Reference, error) {
+// WriteToUnicodeSimple writes the ToUnicode stream for a simple font.
+func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, toUnicodeRef *pdf.Reference) error {
 	data := &toUnicodeData{
 		Registry:   "seehuhn.de",
 		Ordering:   ordering,
@@ -113,11 +113,11 @@ func ToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping) (*pdf.R
 		pos++
 	}
 
-	return writeToUnicodeStream(w, data)
+	return writeToUnicodeStream(w, data, toUnicodeRef)
 }
 
 // ToUnicodeCIDFont writes the ToUnicode stream for a CIDFont.
-func ToUnicodeCIDFont(w *pdf.Writer, cmap map[uint16]rune) (*pdf.Reference, error) {
+func ToUnicodeCIDFont(w *pdf.Writer, cmap map[uint16]rune, toUnicodeRef *pdf.Reference) error {
 	data := &toUnicodeData{
 		Registry:   "Adobe",
 		Ordering:   "UCS",
@@ -171,24 +171,24 @@ func ToUnicodeCIDFont(w *pdf.Writer, cmap map[uint16]rune) (*pdf.Reference, erro
 	}
 	flush()
 
-	return writeToUnicodeStream(w, data)
+	return writeToUnicodeStream(w, data, toUnicodeRef)
 }
 
-func writeToUnicodeStream(w *pdf.Writer, data *toUnicodeData) (*pdf.Reference, error) {
-	cmapStream, toUnicodeRef, err := w.OpenStream(pdf.Dict{}, nil,
+func writeToUnicodeStream(w *pdf.Writer, data *toUnicodeData, toUnicodeRef *pdf.Reference) error {
+	cmapStream, _, err := w.OpenStream(pdf.Dict{}, toUnicodeRef,
 		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = toUnicodeTmpl.Execute(cmapStream, data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = cmapStream.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return toUnicodeRef, nil
+	return nil
 }
 
 type toUnicodeData struct {

@@ -65,6 +65,9 @@ var defaultOptions = &WriterOptions{
 // file with the same name exists, it is overwritten.  After writing is
 // complete, Close() must be called to write the trailer and to close the
 // underlying file.
+//
+// If non-default settings are required, NewWriter() can be used to set
+// options.
 func Create(name string) (*Writer, error) {
 	fd, err := os.Create(name)
 	if err != nil {
@@ -79,6 +82,10 @@ func Create(name string) (*Writer, error) {
 }
 
 // NewWriter prepares a PDF file for writing.
+//
+// The .Close() method must be called after the file contents have been
+// written.  It is the callers responsibility, to also close the writer w after
+// the pdf.Writer has been closed.
 func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
 		opt = defaultOptions
@@ -300,7 +307,7 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 	} else {
 		_, seen := pdf.xref[ref.Number]
 		if seen {
-			return nil, errors.New("object already written")
+			return nil, errDuplicateRef
 		}
 	}
 	pdf.w.ref = ref
@@ -330,18 +337,14 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 }
 
 // WriteCompressed writes a number of objects to the file as a compressed
-// object stream. This function is only available for PDF version 1.5 and
-// newer.
+// object stream.  Object streams are only available for PDF version 1.5 and
+// newer; in case the version is too low, the objects are written directly into
+// the PDF file, without compression.
 func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Reference, error) {
-	if err := pdf.CheckVersion("using object streams", V1_5); err != nil {
-		return nil, err
-	}
-
 	if pdf.inStream {
-		return nil, errors.New("WriteCompressed while stream is open")
+		return nil, errors.New("WriteCompressed() while stream is open")
 	}
 
-	sRef := pdf.Alloc()
 	if refs == nil {
 		refs = make([]*Reference, len(objects))
 	} else if len(refs) != len(objects) {
@@ -361,15 +364,27 @@ func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Ref
 		} else {
 			_, seen := pdf.xref[ref.Number]
 			if seen {
-				return nil, errors.New("object already written")
+				return nil, errDuplicateRef
 			}
 		}
+	}
+
+	if pdf.Version < V1_5 {
+		// Object streams are only availble in PDF version 1.5 and higher.
+		for i, obj := range objects {
+			_, err := pdf.Write(obj, refs[i])
+			if err != nil {
+				return nil, err
+			}
+		}
+		return refs, nil
 	}
 
 	// get the offsets
 	N := len(objects)
 	head := &bytes.Buffer{}
 	body := &bytes.Buffer{}
+	sRef := pdf.Alloc()
 	for i := 0; i < N; i++ {
 		ref := refs[i]
 		idx := strconv.Itoa(ref.Number) + " " + strconv.Itoa(body.Len()) + "\n"
@@ -381,8 +396,8 @@ func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Ref
 		pdf.xref[ref.Number] = &xRefEntry{InStream: sRef, Pos: int64(i)}
 
 		if i < N-1 {
-			// No need to buffer the last object, we will stream is separately
-			// at the end.
+			// No need to buffer the last object, since we can stream it
+			// separately at the end.
 			err = objects[i].PDF(body)
 			if err != nil {
 				return nil, err

@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	errVersion   = errors.New("unsupported PDF version")
-	errCorrupted = errors.New("corrupted ciphertext")
-	errNoDate    = errors.New("not a valid date string")
+	errVersion      = errors.New("unsupported PDF version")
+	errCorrupted    = errors.New("corrupted ciphertext")
+	errNoDate       = errors.New("not a valid date string")
+	errDuplicateRef = errors.New("object already written")
 )
 
 // AuthenticationError indicates that authentication failed because the correct

@@ -71,7 +71,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 
 	res := &font.Font{
 		InstName: pdf.Name(instName),
-		Ref:      t.Ref,
+		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,
 		Ascent:      tt.Ascent,
@@ -87,7 +87,12 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 
 type ttfSimple struct {
 	Ttf *sfnt.Font
-	Ref *pdf.Reference
+
+	FontRef           *pdf.Reference
+	FontDescriptorRef *pdf.Reference
+	WidthsRef         *pdf.Reference
+	ToUnicodeRef      *pdf.Reference
+	FontFileRef       *pdf.Reference
 
 	text map[font.GlyphID][]rune // GID -> text
 	enc  map[font.GlyphID]byte   // GID -> CID
@@ -111,7 +116,12 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 
 	res := &ttfSimple{
 		Ttf: tt,
-		Ref: w.Alloc(),
+
+		FontRef:           w.Alloc(),
+		FontDescriptorRef: w.Alloc(),
+		WidthsRef:         w.Alloc(),
+		ToUnicodeRef:      w.Alloc(),
+		FontFileRef:       w.Alloc(),
 
 		text: make(map[font.GlyphID][]rune),
 		enc:  make(map[font.GlyphID]byte),
@@ -179,8 +189,6 @@ func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
 		// A simple font can only encode 256 different characters. If we run
 		// out of character codes, just return 0 here and report an error when
 		// we try to write the font dictionary at the end.
-		//
-		// TODO(voss): turn this into an error returned by .Layout()?
 		t.overflowed = true
 		t.enc[gid] = 0
 		return pdf.String{0}
@@ -195,9 +203,6 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 	if t.overflowed {
 		return errors.New("too many different glyphs for simple font " + t.Ttf.FontName)
 	}
-
-	// TODO(voss): write the dicts in the order in which they are read,
-	// i.e. /Font first.
 
 	// TODO(voss): cid2gid is passed down a long call chain.  Can this
 	// be simplified?
@@ -215,69 +220,6 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		}
 	}
 	subsetTag := makeSubsetTag()
-
-	fontDesc, err := t.WriteFontDescriptor(w, cid2gid, subsetTag)
-	if err != nil {
-		return err
-	}
-
-	var ww pdf.Array
-	q := 1000 / float64(t.Ttf.GlyphUnits)
-	for i := firstCid; i <= lastCid; i++ {
-		width := 0
-		if t.used[byte(i)] {
-			gid := cid2gid[i]
-			width = int(float64(t.Ttf.Width[gid])*q + 0.5)
-		}
-		ww = append(ww, pdf.Integer(width))
-	}
-	widths, err := w.Write(ww, nil)
-	if err != nil {
-		return err
-	}
-
-	var mm []font.SimpleMapping
-	for gid, text := range t.text {
-		cid := t.enc[gid]
-		mm = append(mm, font.SimpleMapping{Cid: cid, Text: text})
-	}
-	toUnicodeRef, err := font.ToUnicodeSimple(w, subsetTag, mm)
-	if err != nil {
-		return err
-	}
-
-	// See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
-	Font := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("TrueType"),
-		"BaseFont":       pdf.Name(subsetTag + "+" + t.Ttf.FontName),
-		"FirstChar":      pdf.Integer(firstCid),
-		"LastChar":       pdf.Integer(lastCid),
-		"Widths":         widths,
-		"FontDescriptor": fontDesc,
-		"ToUnicode":      toUnicodeRef,
-	}
-
-	_, err = w.Write(Font, t.Ref)
-	if err != nil {
-		return err
-	}
-
-	err = t.Ttf.Close()
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
-	cid2gid []font.GlyphID, subsetTag string) (*pdf.Reference, error) {
-
-	fontFileRef, err := t.WriteFontFile(w, cid2gid)
-	if err != nil {
-		return nil, err
-	}
 
 	// Compute the font bounding box for the subset.
 	// We always include glyph 0:
@@ -304,12 +246,28 @@ func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
 		}
 	}
 
+	var cid2text []font.SimpleMapping
+	for gid, text := range t.text {
+		cid := t.enc[gid]
+		cid2text = append(cid2text, font.SimpleMapping{Cid: cid, Text: text})
+	}
+
 	q := 1000 / float64(t.Ttf.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
 		LLx: math.Round(float64(left) * q),
 		LLy: math.Round(float64(bottom) * q),
 		URx: math.Round(float64(right) * q),
 		URy: math.Round(float64(top) * q),
+	}
+
+	var Widths pdf.Array
+	for i := firstCid; i <= lastCid; i++ {
+		width := 0
+		if t.used[byte(i)] {
+			gid := cid2gid[i]
+			width = int(float64(t.Ttf.Width[gid])*q + 0.5)
+		}
+		Widths = append(Widths, pdf.Integer(width))
 	}
 
 	// Following section 9.6.6.4 of PDF 32000-1:2008, for PDF versions before
@@ -321,10 +279,24 @@ func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
 		flags |= font.FlagSymbolic
 	}
 
+	fontName := pdf.Name(subsetTag + "+" + t.Ttf.FontName)
+
+	// See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
+	Font := pdf.Dict{
+		"Type":           pdf.Name("Font"),
+		"Subtype":        pdf.Name("TrueType"),
+		"BaseFont":       fontName,
+		"FirstChar":      pdf.Integer(firstCid),
+		"LastChar":       pdf.Integer(lastCid),
+		"FontDescriptor": t.FontDescriptorRef,
+		"Widths":         t.WidthsRef,
+		"ToUnicode":      t.ToUnicodeRef,
+	}
+
 	// See sections 9.8.1 of PDF 32000-1:2008.
 	FontDescriptor := pdf.Dict{
 		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    pdf.Name(subsetTag + "+" + t.Ttf.FontName),
+		"FontName":    fontName,
 		"Flags":       pdf.Integer(flags),
 		"FontBBox":    FontBBox,
 		"ItalicAngle": pdf.Number(t.Ttf.ItalicAngle),
@@ -332,21 +304,44 @@ func (t *ttfSimple) WriteFontDescriptor(w *pdf.Writer,
 		"Descent":     pdf.Integer(q*float64(t.Ttf.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(t.Ttf.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70),
-		"FontFile2":   fontFileRef,
+		"FontFile2":   t.FontFileRef,
 	}
-	return w.Write(FontDescriptor, nil)
+
+	_, err := w.WriteCompressed(
+		[]*pdf.Reference{t.FontRef, t.FontDescriptorRef, t.WidthsRef},
+		Font, FontDescriptor, Widths)
+	if err != nil {
+		return err
+	}
+
+	err = font.WriteToUnicodeSimple(w, subsetTag, cid2text, t.ToUnicodeRef)
+	if err != nil {
+		return err
+	}
+
+	err = t.WriteFontFile(w, cid2gid)
+	if err != nil {
+		return err
+	}
+
+	err = t.Ttf.Close()
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
-func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) (*pdf.Reference, error) {
+func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
 	// See section 9.9 of PDF 32000-1:2008.
 	size := w.NewPlaceholder(10)
 	fontFileDict := pdf.Dict{
 		"Length1": size,
 	}
-	fontFileStream, fontFile, err := w.OpenStream(fontFileDict, nil,
+	fontFileStream, _, err := w.OpenStream(fontFileDict, t.FontFileRef,
 		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	exOpt := &sfnt.ExportOptions{
 		Include: map[string]bool{
@@ -365,18 +360,18 @@ func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) (*pdf.R
 	}
 	n, err := t.Ttf.Export(fontFileStream, exOpt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = size.Set(pdf.Integer(n))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = fontFileStream.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return fontFile, nil
+	return nil
 }
 
 func makeSubsetTag() string {

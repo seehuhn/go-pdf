@@ -181,7 +181,8 @@ func (t *ttfCID) WriteFontDict(w *pdf.Writer) error {
 	for r, gid := range t.Ttf.CMap {
 		mm[uint16(gid)] = r
 	}
-	ToUnicodeRef, err := font.ToUnicodeCIDFont(w, mm)
+	ToUnicodeRef := w.Alloc()
+	err = font.ToUnicodeCIDFont(w, mm, ToUnicodeRef)
 	if err != nil {
 		return err
 	}
