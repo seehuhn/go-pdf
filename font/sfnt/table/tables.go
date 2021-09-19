@@ -1,4 +1,4 @@
-// seehuhn.de/go/pdf - support for reading and writing PDF files
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
 // Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -184,8 +184,8 @@ type Head struct {
 
 // --------------------------------------------------------------------------
 
-// Cmap is the Character To Glyph Index Mapping Table.
-type Cmap struct {
+// CMap is the Character To Glyph Index Mapping Table.
+type CMap struct {
 	Header struct {
 		Version   uint16
 		NumTables uint16
@@ -193,9 +193,9 @@ type Cmap struct {
 	EncodingRecords []EncodingRecord
 }
 
-// ReadCmapTable reads the binary representation of a "cmap" table.
-func ReadCmapTable(r io.ReadSeeker) (*Cmap, error) {
-	cmap := &Cmap{}
+// ReadCMapTable reads the binary representation of a "cmap" table.
+func ReadCMapTable(r io.ReadSeeker) (*CMap, error) {
+	cmap := &CMap{}
 	err := binary.Read(r, binary.BigEndian, &cmap.Header)
 	if err != nil {
 		return nil, err
@@ -216,7 +216,7 @@ func ReadCmapTable(r io.ReadSeeker) (*Cmap, error) {
 }
 
 // Find locates an encoding record in the cmap table.
-func (ct *Cmap) Find(plat, enc uint16) *EncodingRecord {
+func (ct *CMap) Find(plat, enc uint16) *EncodingRecord {
 	for i := range ct.EncodingRecords {
 		table := &ct.EncodingRecords[i]
 		if table.PlatformID == plat && table.EncodingID == enc {
@@ -259,10 +259,10 @@ type sequentialMapGroup struct {
 	StartGlyphID  uint32 //	Glyph index corresponding to the starting character code
 }
 
-// LoadCmap reads a mapping from unicode runes to glyph indeces from a "cmap"
+// LoadCMap reads a mapping from unicode runes to glyph indeces from a "cmap"
 // table encoding record.
 // The function does NOT check that glyph indices are valid.
-func (encRec *EncodingRecord) LoadCmap(r io.ReadSeeker, i2r func(int) rune) (map[rune]font.GlyphID, error) {
+func (encRec *EncodingRecord) LoadCMap(r io.ReadSeeker, i2r func(int) rune) (map[rune]font.GlyphID, error) {
 	// The OpenType spec at
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
 	// documents the following cmap subtable formats:

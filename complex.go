@@ -1,4 +1,4 @@
-// seehuhn.de/go/pdf - support for reading and writing PDF files
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
 // Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify

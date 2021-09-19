@@ -1,4 +1,4 @@
-// seehuhn.de/go/pdf - support for reading and writing PDF files
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
 // Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -292,7 +292,7 @@ func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
 	}
 	cmapFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
 
-	cmapTable, err := table.ReadCmapTable(cmapFd)
+	cmapTable, err := table.ReadCMapTable(cmapFd)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
 			continue
 		}
 
-		cmap, err := encRec.LoadCmap(cmapFd, cand.IdxToRune)
+		cmap, err := encRec.LoadCMap(cmapFd, cand.IdxToRune)
 		if err != nil {
 			continue
 		}

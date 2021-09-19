@@ -1,4 +1,4 @@
-// seehuhn.de/go/pdf - support for reading and writing PDF files
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
 // Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -19,7 +19,6 @@ package sfnt
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"io"
 	"math/bits"
 	"sort"
@@ -56,7 +55,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			}
 		}
 
-		cmapBytes, err := makeCmap(opt.Cid2Gid)
+		cmapBytes, err := MakeCMap(opt.Cid2Gid)
 		if err != nil {
 			return 0, err
 		}
@@ -476,106 +475,6 @@ func (tt *Font) selectTables(opt *ExportOptions) []string {
 	sort.Strings(names[extraPos:])
 
 	return names
-}
-
-type cmapTableHead struct {
-	// header
-	Version   uint16 // Table version number (0)
-	NumTables uint16 // Number of encoding tables that follow (1)
-
-	// encoding records (array of length 1)
-	PlatformID     uint16 // Platform ID (1)
-	EncodingID     uint16 // Platform-specific encoding ID (0)
-	SubtableOffset uint32 // Byte offset to the subtable (12)
-
-	// format 4 subtable
-	Format        uint16 // Format number (4)
-	Length        uint16 // Length in bytes of the subtable.
-	Language      uint16 // (0)
-	SegCountX2    uint16 // 2 × segCount.
-	SearchRange   uint16 // ...
-	EntrySelector uint16 // ...
-	RangeShift    uint16 // ...
-	// EndCode        []uint16 // End characterCode for each segment, last=0xFFFF.
-	// ReservedPad    uint16   // (0)
-	// StartCode      []uint16 // Start character code for each segment.
-	// IDDelta        []uint16 // Delta for all character codes in segment.
-	// IDRangeOffsets []uint16 // Offsets into glyphIDArray or 0
-	// GlyphIDArray   []uint16 // Glyph index array (arbitrary length)
-}
-
-// Write a cmap with just a 1,0,4 subtable to map character indices to glyph
-// indices in a subsetted font.
-func makeCmap(cid2gid []font.GlyphID) ([]byte, error) {
-	n := len(cid2gid)
-	if n >= 1<<16 {
-		return nil, errors.New("too many characters")
-	}
-
-	// Every non-zero entry in subset corresponds to a glyph included in the
-	// subset.  In the subsetted font these glyphs will be numbered
-	// consecutively, starting at glyph ID 1.  Thus, there are no contiguous
-	// character code segments mapping to non-consecutive glyph IDs and we will
-	// not need to use the glyphIdArray.
-
-	var StartCode, EndCode, IDDelta, IDRangeOffsets []uint16
-	prevC := 1 << 16 // impossible value
-	newGid := uint16(0)
-	for c, origGid := range cid2gid {
-		if origGid == 0 {
-			continue
-		}
-		newGid++
-
-		if c == prevC+1 {
-			EndCode[len(EndCode)-1]++
-		} else {
-			c16 := uint16(c)
-			StartCode = append(StartCode, c16)
-			EndCode = append(EndCode, c16)
-			IDDelta = append(IDDelta, newGid-c16)
-			IDRangeOffsets = append(IDRangeOffsets, 0)
-		}
-		prevC = c
-	}
-	// add the required final segment
-	StartCode = append(StartCode, 0xFFFF)
-	EndCode = append(EndCode, 0xFFFF)
-	IDDelta = append(IDDelta, 0x0001)
-	IDRangeOffsets = append(IDRangeOffsets, 0)
-
-	// Encode the data in the binary format described at
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
-	data := &cmapTableHead{
-		NumTables:      1,
-		PlatformID:     1,
-		EncodingID:     0,
-		SubtableOffset: 12,
-		Format:         4,
-	}
-	segCount := len(StartCode)
-	data.Length = uint16(2 * (8 + 4*segCount))
-	data.SegCountX2 = uint16(2 * segCount)
-	sel := bits.Len(uint(segCount))
-	data.SearchRange = 1 << sel
-	data.EntrySelector = uint16(sel - 1)
-	data.RangeShift = data.SegCountX2 - data.SearchRange
-
-	EndCode = append(EndCode, 0) // add the ReservedPad field here
-
-	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.BigEndian, data)
-	if err != nil {
-		return nil, err
-	}
-	for _, x := range [][]uint16{EndCode, StartCode, IDDelta, IDRangeOffsets} {
-		err := binary.Write(buf, binary.BigEndian, x)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return buf.Bytes(), nil
 }
 
 func contains(ss []string, s string) bool {
