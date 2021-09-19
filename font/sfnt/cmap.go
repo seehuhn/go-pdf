@@ -19,7 +19,6 @@ package sfnt
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"math/bits"
 	"sort"
 
@@ -52,85 +51,15 @@ type cmapTableHead struct {
 	// GlyphIDArray   []uint16 // Glyph index array (arbitrary length)
 }
 
-// MakeCMap writes a cmap with just a 1,0,4 subtable to map character indices
-// to glyph indices in a subsetted font.
-func MakeCMap(cid2gid []font.GlyphID) ([]byte, error) {
-	n := len(cid2gid)
-	if n >= 1<<16 {
-		return nil, errors.New("too many characters")
-	}
-
-	// Every non-zero entry in subset corresponds to a glyph included in the
-	// subset.  In the subsetted font these glyphs will be numbered
-	// consecutively, starting at glyph ID 1.  Thus, there are no contiguous
-	// character code segments mapping to non-consecutive glyph IDs and we will
-	// not need to use the glyphIdArray.
-
-	var StartCode, EndCode, IDDelta, IDRangeOffsets []uint16
-	prevC := 1 << 16 // impossible value
-	newGid := uint16(0)
-	for c, origGid := range cid2gid {
-		if origGid == 0 {
-			continue
-		}
-		newGid++
-
-		if c == prevC+1 {
-			EndCode[len(EndCode)-1]++
-		} else {
-			c16 := uint16(c)
-			StartCode = append(StartCode, c16)
-			EndCode = append(EndCode, c16)
-			IDDelta = append(IDDelta, newGid-c16)
-			IDRangeOffsets = append(IDRangeOffsets, 0)
-		}
-		prevC = c
-	}
-	// add the required final segment
-	StartCode = append(StartCode, 0xFFFF)
-	EndCode = append(EndCode, 0xFFFF)
-	IDDelta = append(IDDelta, 0x0001)
-	IDRangeOffsets = append(IDRangeOffsets, 0)
-
-	// Encode the data in the binary format described at
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
-	data := &cmapTableHead{
-		NumTables:      1,
-		PlatformID:     1,
-		EncodingID:     0,
-		SubtableOffset: 12,
-		Format:         4,
-	}
-	segCount := len(StartCode)
-	data.Length = uint16(2 * (8 + 4*segCount))
-	data.SegCountX2 = uint16(2 * segCount)
-	sel := bits.Len(uint(segCount))
-	data.SearchRange = 1 << sel
-	data.EntrySelector = uint16(sel - 1)
-	data.RangeShift = data.SegCountX2 - data.SearchRange
-
-	EndCode = append(EndCode, 0) // add the ReservedPad field here
-
-	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.BigEndian, data)
-	if err != nil {
-		return nil, err
-	}
-	for _, x := range [][]uint16{EndCode, StartCode, IDDelta, IDRangeOffsets} {
-		err := binary.Write(buf, binary.BigEndian, x)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return buf.Bytes(), nil
-}
-
+// CMapEntry describes the association between a character index and
+// a glyph ID.
 type CMapEntry struct {
 	CID uint16
 	GID font.GlyphID
 }
 
+// MakeSubset converts a mapping from a full font to a subsetted font.
+// It also returns the list of original glyphs to include in the subset.
 func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []font.GlyphID) {
 	var newMapping []CMapEntry
 	for _, m := range origMapping {
@@ -146,16 +75,16 @@ func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []font.GlyphID) {
 	for i, m := range newMapping {
 		newGid := font.GlyphID(i + 1)
 		newToOrigGid = append(newToOrigGid, m.GID)
-		m.GID = newGid
+		newMapping[i].GID = newGid
 	}
 
 	return newMapping, newToOrigGid
 }
 
-// MakeCMap2 writes a cmap with just a 1,0,4 subtable to map character indices
+// MakeCMap writes a cmap with just a 1,0,4 subtable to map character indices
 // to glyph indices in a subsetted font. The slice `mapping` must be sorted in
 // order of increasing CID values.
-func MakeCMap2(mapping []CMapEntry) ([]byte, error) {
+func MakeCMap(mapping []CMapEntry) ([]byte, error) {
 	if len(mapping) == 0 {
 		return nil, nil
 	}

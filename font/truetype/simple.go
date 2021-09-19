@@ -343,6 +343,15 @@ func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
 	if err != nil {
 		return err
 	}
+	var mapping []sfnt.CMapEntry
+	for cid, gid := range cid2gid {
+		if gid != 0 {
+			mapping = append(mapping, sfnt.CMapEntry{
+				CID: uint16(cid),
+				GID: gid,
+			})
+		}
+	}
 	exOpt := &sfnt.ExportOptions{
 		Include: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
@@ -356,7 +365,7 @@ func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
 			"loca": true, // rewrite
 			"glyf": true, // rewrite
 		},
-		Cid2Gid: cid2gid,
+		Mapping: mapping,
 	}
 	n, err := t.Ttf.Export(fontFileStream, exOpt)
 	if err != nil {

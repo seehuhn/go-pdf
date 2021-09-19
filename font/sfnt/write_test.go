@@ -38,6 +38,15 @@ func TestExport(t *testing.T) {
 	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90} {
 		subset[c] = font.GlyphID(i + 1)
 	}
+	var mapping []CMapEntry
+	for cid, gid := range subset {
+		if gid != 0 {
+			mapping = append(mapping, CMapEntry{
+				CID: uint16(cid),
+				GID: gid,
+			})
+		}
+	}
 	opt := &ExportOptions{
 		Include: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
@@ -50,10 +59,8 @@ func TestExport(t *testing.T) {
 			"cvt ": true, // copy
 			"fpgm": true, // copy
 			"prep": true, // copy
-
-			"gasp": true, // copy, TODO(voss): is this addition wise/useful?
 		},
-		Cid2Gid: subset,
+		Mapping: mapping,
 	}
 
 	n, err := tt.Export(out, opt)

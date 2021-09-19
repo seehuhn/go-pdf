@@ -26,44 +26,6 @@ import (
 )
 
 func TestMakeCMap(t *testing.T) {
-	cid2gid := make([]font.GlyphID, 100)
-	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90} {
-		cid2gid[c] = font.GlyphID(i + 1)
-	}
-
-	buf, err := MakeCMap(cid2gid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := bytes.NewReader(buf)
-	cmapTable, err := table.ReadCMapTable(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if cmapTable.Header.NumTables != 1 {
-		t.Errorf("wrong number of tables: %d != 1", cmapTable.Header.NumTables)
-	}
-	enc := cmapTable.Find(1, 0)
-	cmap, err := enc.LoadCMap(r, func(i int) rune { return rune(i) })
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for r := rune(0); r < 256; r++ {
-		var expected font.GlyphID
-		if int(r) < len(cid2gid) {
-			expected = cid2gid[r]
-		}
-		if cmap[r] != expected {
-			t.Errorf("wrong mapping: cmap[%d] == %d != %d",
-				r, cmap[r], expected)
-		}
-	}
-}
-
-func TestMakeCMap2(t *testing.T) {
 	var mm []CMapEntry
 	check := make(map[rune]font.GlyphID)
 	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90, 92} {
@@ -75,7 +37,7 @@ func TestMakeCMap2(t *testing.T) {
 		check[rune(c)] = gid
 	}
 
-	buf, err := MakeCMap2(mm)
+	buf, err := MakeCMap(mm)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +47,6 @@ func TestMakeCMap2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if cmapTable.Header.NumTables != 1 {
 		t.Errorf("wrong number of tables: %d != 1", cmapTable.Header.NumTables)
 	}

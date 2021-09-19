@@ -31,34 +31,38 @@ import (
 // ExportOptions provides options for the Font.Export() function.
 type ExportOptions struct {
 	Include map[string]bool // select a subset of tables
-	Cid2Gid []font.GlyphID  // select a subset of glyphs
+	Mapping []CMapEntry     // select a subset of glyphs
+	ModTime time.Time
 }
 
 // Export writes the font to the io.Writer w.
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
-	if opt == nil {
-		opt = &ExportOptions{}
-	} else if opt.Cid2Gid != nil {
-		opt.Include["cmap"] = true
+	var include map[string]bool
+	modTime := time.Now()
+	var mapping []CMapEntry
+	if opt != nil {
+		include = opt.Include
+		mapping = opt.Mapping
+		if mapping != nil {
+			// TODO(voss): Is this wise?  Report an error instead?  Copy
+			// `include` to not modify the callers map?
+			include["cmap"] = true
+		}
+		if !opt.ModTime.IsZero() {
+			modTime = opt.ModTime
+		}
 	}
-	tableNames := tt.selectTables(opt)
 
 	replTab := make(map[string][]byte)
-
 	var subsetInfo *subsetInfo
-	if opt.Cid2Gid != nil {
-		var includeOnly []font.GlyphID
-		includeOnly = append(includeOnly, 0) // always include ".notdef"
-		for _, origGid := range opt.Cid2Gid {
-			if origGid != 0 {
-				includeOnly = append(includeOnly, origGid)
-			}
-		}
+	if mapping != nil {
+		newMapping, includeOnly := MakeSubset(mapping)
 
-		cmapBytes, err := MakeCMap(opt.Cid2Gid)
+		cmapBytes, err := MakeCMap(newMapping)
 		if err != nil {
 			return 0, err
 		}
+
 		replTab["cmap"] = cmapBytes
 
 		subsetInfo, err = tt.getSubsetInfo(includeOnly)
@@ -77,15 +81,16 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		replTab["maxp"] = maxpBytes
 	}
 
-	hasHead := contains(tableNames, "head")
-	if hasHead {
+	tableNames := tt.selectTables(include)
+
+	if contains(tableNames, "head") {
 		// Copy and modify the "head" table.
 		// https://docs.microsoft.com/en-us/typography/opentype/spec/head
 		headTable := &table.Head{}
 		*headTable = *tt.Head
 		headTable.CheckSumAdjustment = 0
 		ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
-		headTable.Modified = int64(time.Since(ttZeroTime).Seconds())
+		headTable.Modified = int64(modTime.Sub(ttZeroTime).Seconds())
 		if subsetInfo != nil {
 			headTable.XMin = subsetInfo.xMin
 			headTable.YMin = subsetInfo.yMin
@@ -155,9 +160,9 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	totalSize += int64(len(headerBytes))
 	totalSum += Checksum(headerBytes)
 
-	if hasHead {
+	if head, ok := replTab["head"]; ok {
 		// fix the checksum in the "head" table
-		binary.BigEndian.PutUint32(replTab["head"][8:12], 0xB1B0AFBA-totalSum)
+		binary.BigEndian.PutUint32(head[8:12], 0xB1B0AFBA-totalSum)
 	}
 
 	// write the tables
@@ -202,7 +207,7 @@ type subsetInfo struct {
 }
 
 func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
-	// TODO(voss): make better use of the data stored in tt.
+	// TODO(voss): make better use of the data stored in `tt`.
 
 	NumGlyphs := len(tt.Width)
 
@@ -257,6 +262,7 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 
 		leftSideBearing := hmtx.GetLSB(int(origGid))
 		if length > 0 && leftSideBearing < minLeftSideBearing {
+			// TODO(voss): is the "length > 0" check correct?
 			minLeftSideBearing = leftSideBearing
 		}
 
@@ -311,17 +317,17 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 					}
 
 					// map the component gid to the new scheme
-					origComponetGid := font.GlyphID(compHead.GlyphIndex)
+					origComponentGid := font.GlyphID(compHead.GlyphIndex)
 					newComponentGid := -1
 					for i, gid := range includeOnly {
-						if gid == origComponetGid {
+						if gid == origComponentGid {
 							newComponentGid = i
 							break
 						}
 					}
 					if newComponentGid < 0 {
 						newComponentGid = len(includeOnly)
-						includeOnly = append(includeOnly, origComponetGid)
+						includeOnly = append(includeOnly, origComponentGid)
 					}
 					compHead.GlyphIndex = uint16(newComponentGid)
 
@@ -439,10 +445,9 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	return res, nil
 }
 
-func (tt *Font) selectTables(opt *ExportOptions) []string {
+func (tt *Font) selectTables(include map[string]bool) []string {
 	var names []string
 	done := make(map[string]bool)
-	include := opt.Include
 
 	// Fix the order of tables in the body of the files.
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
