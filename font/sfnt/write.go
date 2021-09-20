@@ -30,42 +30,30 @@ import (
 
 // ExportOptions provides options for the Font.Export() function.
 type ExportOptions struct {
-	Include map[string]bool  // select a subset of tables
-	Mapping []font.CMapEntry // select a subset of glyphs
-	ModTime time.Time
+	IncludeTables map[string]bool  // include a subset of tables
+	IncludeGlyphs []font.GlyphID   // include a subset of glyphs
+	SubsetMapping []font.CMapEntry // include a generated cmap table
+	ModTime       time.Time
 }
 
 // Export writes the font to the io.Writer w.
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	var includeTables map[string]bool
-	modTime := time.Now()
-	var mapping []font.CMapEntry
+	var includeGlyphs []font.GlyphID
+	var subsetMapping []font.CMapEntry
+	var modTime time.Time
 	if opt != nil {
-		includeTables = opt.Include
-		mapping = opt.Mapping
-		if mapping != nil {
-			// TODO(voss): Is this wise?  Report an error instead?  Copy
-			// `include` to not modify the callers map?
-			includeTables["cmap"] = true
-		}
-		if !opt.ModTime.IsZero() {
-			modTime = opt.ModTime
-		}
+		includeTables = opt.IncludeTables
+		includeGlyphs = opt.IncludeGlyphs
+		subsetMapping = opt.SubsetMapping
+		modTime = opt.ModTime
 	}
 
-	replTab := make(map[string][]byte)
 	var subsetInfo *subsetInfo
-	if mapping != nil {
-		newMapping, includeOnly := font.MakeSubset(mapping)
-
-		cmapBytes, err := MakeCMap(newMapping)
-		if err != nil {
-			return 0, err
-		}
-
-		replTab["cmap"] = cmapBytes
-
-		subsetInfo, err = tt.getSubsetInfo(includeOnly)
+	replTab := make(map[string][]byte)
+	if includeGlyphs != nil {
+		var err error
+		subsetInfo, err = tt.getSubsetInfo(includeGlyphs)
 		if err != nil {
 			return 0, err
 		}
@@ -81,6 +69,14 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		replTab["maxp"] = maxpBytes
 	}
 
+	if subsetMapping != nil && (includeTables == nil || includeTables["cmap"]) {
+		cmapBytes, err := makeCMap(subsetMapping)
+		if err != nil {
+			return 0, err
+		}
+		replTab["cmap"] = cmapBytes
+	}
+
 	tableNames := tt.selectTables(includeTables)
 
 	if contains(tableNames, "head") {
@@ -89,8 +85,10 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		headTable := &table.Head{}
 		*headTable = *tt.Head
 		headTable.CheckSumAdjustment = 0
-		ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
-		headTable.Modified = int64(modTime.Sub(ttZeroTime).Seconds())
+		if !modTime.IsZero() {
+			ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
+			headTable.Modified = int64(modTime.Sub(ttZeroTime).Seconds())
+		}
 		if subsetInfo != nil {
 			headTable.XMin = subsetInfo.xMin
 			headTable.YMin = subsetInfo.yMin

@@ -108,7 +108,8 @@ func main() {
 				fmt.Println(err)
 				os.Exit(1)
 			}
-			fmt.Println("decoded stream")
+			fmt.Println("% decoded")
+			fmt.Println("stream")
 		}
 		r, err := stm.Decode(r.Resolve)
 		if err != nil {

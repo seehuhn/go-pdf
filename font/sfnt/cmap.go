@@ -50,10 +50,10 @@ type cmapTableHead struct {
 	// GlyphIDArray   []uint16 // Glyph index array (arbitrary length)
 }
 
-// MakeCMap writes a cmap with just a 1,0,4 subtable to map character indices
+// makeCMap writes a cmap containing a 1,0,4 subtable to map character indices
 // to glyph indices in a subsetted font. The slice `mapping` must be sorted in
 // order of increasing CID values.
-func MakeCMap(mapping []font.CMapEntry) ([]byte, error) {
+func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 	if len(mapping) == 0 {
 		return nil, nil
 	}

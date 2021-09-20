@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"time"
+	"sort"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -67,7 +67,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 		return nil, err
 	}
 
-	w.OnClose(t.WriteFontDict)
+	w.OnClose(t.WriteFont)
 
 	res := &font.Font{
 		InstName: pdf.Name(instName),
@@ -199,33 +199,41 @@ func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
 	return pdf.String{c}
 }
 
-func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
+func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 	if t.overflowed {
 		return errors.New("too many different glyphs for simple font " + t.Ttf.FontName)
 	}
 
-	cid2gid := make([]font.GlyphID, 256)
-	firstCid := 257
-	lastCid := -1
+	var mapping []font.CMapEntry
 	for origGid, cid := range t.enc {
-		cid2gid[cid] = origGid
-
-		if int(cid) < firstCid {
-			firstCid = int(cid)
+		if origGid == 0 {
+			continue
 		}
-		if int(cid) > lastCid {
-			lastCid = int(cid)
-		}
+		mapping = append(mapping, font.CMapEntry{
+			CID: uint16(cid),
+			GID: origGid,
+		})
 	}
-	subsetTag := makeSubsetTag()
+	if len(mapping) == 0 {
+		// It is not clear how a font with no glyphs should be included
+		// in a PDF file.  In order to avoid problems, add a dummy glyph.
+		mapping = append(mapping, font.CMapEntry{
+			CID: 0,
+			GID: 0,
+		})
+	}
+	sort.Slice(mapping, func(i, j int) bool { return mapping[i].CID < mapping[j].CID })
+	firstCid := mapping[0].CID
+	lastCid := mapping[len(mapping)-1].CID
+
+	subsetMapping, includeGlyphs := font.MakeSubset(mapping)
 
 	// Compute the font bounding box for the subset.
-	// We always include glyph 0:
-	left := t.Ttf.GlyphExtent[0].LLx
-	right := t.Ttf.GlyphExtent[0].URx
-	top := t.Ttf.GlyphExtent[0].URy
-	bottom := t.Ttf.GlyphExtent[0].LLy
-	for _, origGid := range cid2gid {
+	left := math.MaxInt
+	right := math.MinInt
+	top := math.MinInt
+	bottom := math.MaxInt
+	for _, origGid := range includeGlyphs {
 		if origGid == 0 {
 			continue
 		}
@@ -244,12 +252,6 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		}
 	}
 
-	var cid2text []font.SimpleMapping
-	for gid, text := range t.text {
-		cid := t.enc[gid]
-		cid2text = append(cid2text, font.SimpleMapping{Cid: cid, Text: text})
-	}
-
 	q := 1000 / float64(t.Ttf.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
 		LLx: math.Round(float64(left) * q),
@@ -258,14 +260,10 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		URy: math.Round(float64(top) * q),
 	}
 
-	var Widths pdf.Array
-	for i := firstCid; i <= lastCid; i++ {
-		width := 0
-		if t.used[byte(i)] {
-			gid := cid2gid[i]
-			width = int(float64(t.Ttf.Width[gid])*q + 0.5)
-		}
-		Widths = append(Widths, pdf.Integer(width))
+	var cid2text []font.SimpleMapping
+	for gid, text := range t.text {
+		cid := t.enc[gid]
+		cid2text = append(cid2text, font.SimpleMapping{Cid: cid, Text: text})
 	}
 
 	// Following section 9.6.6.4 of PDF 32000-1:2008, for PDF versions before
@@ -277,6 +275,7 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		flags |= font.FlagSymbolic
 	}
 
+	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Ttf.Width))
 	fontName := pdf.Name(subsetTag + "+" + t.Ttf.FontName)
 
 	// See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
@@ -301,8 +300,20 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		"Ascent":      pdf.Integer(q*float64(t.Ttf.Ascent) + 0.5),
 		"Descent":     pdf.Integer(q*float64(t.Ttf.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(t.Ttf.CapHeight) + 0.5),
-		"StemV":       pdf.Integer(70),
+		"StemV":       pdf.Integer(70), // information not available in ttf files
 		"FontFile2":   t.FontFileRef,
+	}
+
+	var Widths pdf.Array
+	pos := 0
+	for i := firstCid; i <= lastCid; i++ {
+		width := 0
+		if i == mapping[pos].CID {
+			gid := mapping[pos].GID
+			width = int(float64(t.Ttf.Width[gid])*q + 0.5)
+			pos++
+		}
+		Widths = append(Widths, pdf.Integer(width))
 	}
 
 	_, err := w.WriteCompressed(
@@ -317,21 +328,8 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		return err
 	}
 
-	err = t.WriteFontFile(w, cid2gid)
-	if err != nil {
-		return err
-	}
-
-	err = t.Ttf.Close()
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
-	// See section 9.9 of PDF 32000-1:2008.
+	// Finally, write the font file itself.
+	// See section 9.9 of PDF 32000-1:2008 for details.
 	size := w.NewPlaceholder(10)
 	fontFileDict := pdf.Dict{
 		"Length1": size,
@@ -341,17 +339,8 @@ func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
 	if err != nil {
 		return err
 	}
-	var mapping []font.CMapEntry
-	for cid, gid := range cid2gid {
-		if gid != 0 {
-			mapping = append(mapping, font.CMapEntry{
-				CID: uint16(cid),
-				GID: gid,
-			})
-		}
-	}
 	exOpt := &sfnt.ExportOptions{
-		Include: map[string]bool{
+		IncludeTables: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
 			"cvt ": true, // copy
 			"fpgm": true, // copy
@@ -362,8 +351,12 @@ func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
 			"hmtx": true, // rewrite
 			"loca": true, // rewrite
 			"glyf": true, // rewrite
+
+			// We use a CMap to map character codes to Glyph IDs
+			"cmap": true, // generate
 		},
-		Mapping: mapping,
+		SubsetMapping: subsetMapping,
+		IncludeGlyphs: includeGlyphs,
 	}
 	n, err := t.Ttf.Export(fontFileStream, exOpt)
 	if err != nil {
@@ -378,15 +371,10 @@ func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
 		return err
 	}
 
-	return nil
-}
-
-func makeSubsetTag() string {
-	var letters []rune
-	t := time.Now().UnixNano() // TODO(voss): be more clever here?
-	for len(letters) < 6 {
-		letters = append(letters, rune(t%26)+'A')
-		t /= 26
+	err = t.Ttf.Close()
+	if err != nil {
+		return err
 	}
-	return string(letters)
+
+	return err
 }

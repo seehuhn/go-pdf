@@ -247,7 +247,7 @@ func (t *ttfCID) WriteFontFile(w *pdf.Writer) (*pdf.Reference, error) {
 		return nil, err
 	}
 	exOpt := &sfnt.ExportOptions{
-		Include: map[string]bool{
+		IncludeTables: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
 			"glyf": true,
 			"head": true,

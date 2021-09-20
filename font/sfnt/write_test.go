@@ -47,8 +47,9 @@ func TestExport(t *testing.T) {
 			})
 		}
 	}
+	subsetMapping, includeGlyphs := font.MakeSubset(mapping)
 	opt := &ExportOptions{
-		Include: map[string]bool{
+		IncludeTables: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
 			"glyf": true, // rewrite
 			"head": true, // update CheckSumAdjustment, Modified and indexToLocFormat
@@ -59,8 +60,12 @@ func TestExport(t *testing.T) {
 			"cvt ": true, // copy
 			"fpgm": true, // copy
 			"prep": true, // copy
+
+			// We use a CMap to map character codes to Glyph IDs
+			"cmap": true, // generate
 		},
-		Mapping: mapping,
+		SubsetMapping: subsetMapping,
+		IncludeGlyphs: includeGlyphs,
 	}
 
 	n, err := tt.Export(out, opt)

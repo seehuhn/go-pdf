@@ -66,7 +66,7 @@ func TestType3(t *testing.T) {
 	}
 
 	page, err := pages.SinglePage(w, &pages.Attributes{
-		Resources: map[pdf.Name]pdf.Object{
+		Resources: pdf.Dict{
 			"Font": pdf.Dict{
 				"F1": F1.Ref,
 			},

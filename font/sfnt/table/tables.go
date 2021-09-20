@@ -348,8 +348,9 @@ func (encRec *EncodingRecord) LoadCMap(r io.ReadSeeker, i2r func(int) rune) (map
 				return nil, errors.New(errPfx + "table corrupted")
 			}
 			total += b - a + 1
-			if total > 500_000 {
-				// fonts on my system have up to around 50,000 mappings
+			if total > 70_000 {
+				// Fonts on my system have up to around 50,000 mappings,
+				// a reasonable maximum is 65536.
 				return nil, errors.New(errPfx + "too many mappings")
 			}
 
@@ -361,7 +362,7 @@ func (encRec *EncodingRecord) LoadCMap(r io.ReadSeeker, i2r func(int) rune) (map
 						continue
 					}
 					r := i2r(idx)
-					if unicode.IsGraphic(r) {
+					if r != unicode.ReplacementChar {
 						cmap[r] = font.GlyphID(c)
 					}
 				}
@@ -385,7 +386,7 @@ func (encRec *EncodingRecord) LoadCMap(r io.ReadSeeker, i2r func(int) rune) (map
 						continue
 					}
 					r := i2r(idx)
-					if unicode.IsGraphic(r) { // TODO(voss): is this test needed/useful? (also below)
+					if r != unicode.ReplacementChar {
 						cmap[r] = font.GlyphID(c)
 					}
 				}
@@ -425,7 +426,7 @@ func (encRec *EncodingRecord) LoadCMap(r io.ReadSeeker, i2r func(int) rune) (map
 			c := font.GlyphID(seg.StartGlyphID)
 			for idx := a; idx <= b; idx++ {
 				r := i2r(idx)
-				if unicode.IsGraphic(r) {
+				if r != unicode.ReplacementChar {
 					cmap[r] = c
 				}
 				c++
