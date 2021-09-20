@@ -137,11 +137,6 @@ func TestComplicatedGyphs(t *testing.T) {
 	box := boxes.Text(font, 24, string(text))
 	box.Draw(page, 10, 15)
 
-	err = page.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	err = w.Close()
 	if err != nil {
 		t.Fatal(err)

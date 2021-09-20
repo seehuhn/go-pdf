@@ -14,39 +14,59 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pages
+package truetype
 
 import (
+	"testing"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/pages"
 )
 
-// SinglePage sets up w to be a simple single-page document.
-// The returned page object can be used to draw the page contents.
-//
-// The page object is closed automatically when w.Close() is called.
-// This function calls w.SetCatalog(), so SetCatalog must not be
-// called manually when SinglePage is used.
-func SinglePage(w *pdf.Writer, attr *Attributes) (*Page, error) {
-	tree := NewPageTree(w, nil)
-	contentRef, mediaBox, err := tree.addPageInternal(attr)
+func TestSimple(t *testing.T) {
+	w, err := pdf.Create("test.pdf")
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 
-	pages, err := tree.Flush()
+	F, err := EmbedSimple(w, "F", "ttf/SourceSerif4-Regular.ttf", nil)
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 
-	page, err := tree.newPage(contentRef, mediaBox)
-	if err != nil {
-		return nil, err
-	}
-
-	w.SetCatalog(&pdf.Catalog{
-		Pages: pages,
+	page, err := pages.SinglePage(w, &pages.Attributes{
+		Resources: &pages.Resources{
+			Font: map[pdf.Name]pdf.Object{
+				F.InstName: F.Ref,
+			},
+		},
+		MediaBox: &pdf.Rectangle{
+			URx: 10 + 16*20,
+			URy: 5 + 16*20 + 5,
+		},
 	})
-	w.OnClose(func(_ *pdf.Writer) error { return page.Close() })
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	return page, nil
+	for i := 0; i < 256; i++ {
+		row := i / 16
+		col := i % 16
+		gid := font.GlyphID(i + 2)
+
+		layout := &font.Layout{
+			Font:     F,
+			FontSize: 16,
+			Glyphs: []font.Glyph{
+				{Gid: gid},
+			},
+		}
+		layout.Draw(page, float64(10+20*col), float64(16*20-10-20*row))
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

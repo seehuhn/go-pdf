@@ -17,6 +17,7 @@
 package gtab
 
 import (
+	"errors"
 	"io"
 	"sort"
 
@@ -321,11 +322,14 @@ func (g *GTab) getGtabLookup(idx uint16) (*LookupTable, error) {
 	flags := data[1]
 	subtables := data[2:]
 	var markFilteringSet uint16
-	if flags&0x0010 != 0 {
-		markFilteringSet, err = g.ReadUInt16()
-		if err != nil {
-			return nil, err
-		}
+	if flags&useMarkFilteringSet != 0 {
+		// TODO(voss): implement this
+		return nil, errors.New("USE_MARK_FILTERING_SET not supported")
+
+		// markFilteringSet, err = g.ReadUInt16()
+		// if err != nil {
+		// 	return nil, err
+		// }
 	}
 
 	lookup := &LookupTable{

@@ -137,9 +137,4 @@ func main() {
 		page.Printf("%f %f m %f %f l\n", p.x, p.y, p.x, p.y)
 	}
 	page.Println("S")
-
-	err = page.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
 }

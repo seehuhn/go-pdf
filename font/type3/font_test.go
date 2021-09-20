@@ -81,10 +81,6 @@ func TestType3(t *testing.T) {
 	page.Println("72 340 Td")
 	page.Println("(ABABAB) Tj")
 	page.Println("ET")
-	err = page.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	err = w.Close()
 	if err != nil {

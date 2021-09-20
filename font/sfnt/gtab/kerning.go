@@ -25,6 +25,8 @@ type KernInfo struct {
 	Kern        int16
 }
 
+// KerningAsLookup returns data from the "kern" table, converted to the form of
+// a GPOS lookup.
 func KerningAsLookup(kerning []KernInfo) Lookups {
 	cov := make(coverage)
 	nextClass := 0

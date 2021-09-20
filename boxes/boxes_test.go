@@ -129,11 +129,6 @@ func TestFrame(t *testing.T) {
 
 	box.Draw(page, 0, box.Depth)
 
-	err = page.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	err = out.Close()
 	if err != nil {
 		t.Error(err)

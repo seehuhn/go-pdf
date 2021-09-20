@@ -21,32 +21,31 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"seehuhn.de/go/pdf/font/sfnt"
 )
 
 func tryFont(fname string) error {
-	// fmt.Println(fname)
+	if !strings.HasSuffix(fname, ".otf") {
+		return nil
+	}
+
 	tt, err := sfnt.Open(fname, nil)
 	if err != nil {
 		return err
 	}
 	defer tt.Close()
 
-	a := "..."
-	if tt.HasTables("mort") {
-		a = "xxx"
-	}
-	b := "..."
-	if tt.HasTables("morx") {
-		b = "xxx"
-	}
-	c := "..."
-	if tt.HasTables("GSUB") {
-		c = "xxx"
+	if !tt.IsOpenType() {
+		return nil
 	}
 
-	fmt.Println(a, b, c)
+	if !tt.HasTables("glyf") {
+		return nil
+	}
+
+	fmt.Println(len(tt.Width), fname)
 
 	return nil
 }

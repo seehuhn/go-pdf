@@ -119,10 +119,6 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		xPos += float64(gl.Advance) * q
 	}
 
-	err = page.Close()
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

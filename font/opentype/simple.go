@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package opentype
 
 import (
 	"errors"
@@ -28,14 +28,14 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-// EmbedSimple embeds a TrueType font into a pdf file as a simple font.
+// EmbedSimple embeds an OpenType font into a pdf file as a simple font.
 // Up to 256 arbitrary glyphs from the font file can be accessed via the
 // returned font object.
 //
 // In comparison, fonts embedded via EmbedCID lead to larger PDF files, but
 // there is no limit on the number of glyphs which can be accessed.
 //
-// Use of simple TrueType fonts in PDF requires PDF version 1.1 or higher.
+// Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
 func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fileName, loc)
 	if err != nil {
@@ -45,7 +45,7 @@ func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Lo
 	return EmbedFontSimple(w, tt, instName, loc)
 }
 
-// EmbedFontSimple embeds a TrueType font into a pdf file as a simple font.
+// EmbedFontSimple embeds an OpenType font into a pdf file as a simple font.
 // Up to 256 arbitrary glyphs from the font file can be accessed via the
 // returned font object.
 //
@@ -55,14 +55,14 @@ func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Lo
 // In comparison, fonts embedded via EmbedFontCID lead to larger PDF files, but
 // there is no limit on the number of glyphs which can be accessed.
 //
-// Use of simple TrueType fonts in PDF requires PDF version 1.1 or higher.
+// Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
 func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*font.Font, error) {
-	err := w.CheckVersion("use of TrueType fonts", pdf.V1_1)
+	err := w.CheckVersion("use of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 
-	t, err := newTtfSimple(w, tt, instName, loc)
+	t, err := newOtfSimple(w, tt, instName, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +85,8 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 	return res, nil
 }
 
-type ttfSimple struct {
-	Ttf *sfnt.Font
+type otfSimple struct {
+	Otf *sfnt.Font
 
 	FontRef           *pdf.Reference
 	FontDescriptorRef *pdf.Reference
@@ -102,10 +102,18 @@ type ttfSimple struct {
 	overflowed bool
 }
 
-func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*ttfSimple, error) {
-	if !tt.IsTrueType() {
-		return nil, errors.New("not a TrueType font")
+func newOtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*otfSimple, error) {
+	if !tt.IsOpenType() {
+		return nil, errors.New("not an OpenType font")
 	}
+	if !tt.HasTables("glyf") {
+		return nil, errors.New("CFF-based OpenType fonts not supported")
+	}
+
+	// TODO(voss): "... conforming writers, instead of using a simple font,
+	// shall use a Type 0 font with an Identity-H encoding and use the glyph
+	// indices as character codes ..."
+	// (bottom of page 291 of PDF 32000-1:2008)
 
 	tidy := make(map[font.GlyphID]byte)
 	for r, gid := range tt.CMap {
@@ -114,8 +122,8 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 		}
 	}
 
-	res := &ttfSimple{
-		Ttf: tt,
+	res := &otfSimple{
+		Otf: tt,
 
 		FontRef:           w.Alloc(),
 		FontDescriptorRef: w.Alloc(),
@@ -132,23 +140,23 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 	return res, nil
 }
 
-func (t *ttfSimple) Layout(rr []rune) ([]font.Glyph, error) {
+func (t *otfSimple) Layout(rr []rune) ([]font.Glyph, error) {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Ttf.CMap[r]
+		gid, ok := t.Otf.CMap[r]
 		if !ok {
 			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Ttf.FontName, r, string([]rune{r}))
+				t.Otf.FontName, r, string([]rune{r}))
 		}
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
 
-	gg = t.Ttf.GSUB.ApplyAll(gg)
+	gg = t.Otf.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = t.Ttf.Width[gg[i].Gid]
+		gg[i].Advance = t.Otf.Width[gg[i].Gid]
 	}
-	gg = t.Ttf.GPOS.ApplyAll(gg)
+	gg = t.Otf.GPOS.ApplyAll(gg)
 
 	for _, g := range gg {
 		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
@@ -160,7 +168,7 @@ func (t *ttfSimple) Layout(rr []rune) ([]font.Glyph, error) {
 	return gg, nil
 }
 
-func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
+func (t *otfSimple) Enc(gid font.GlyphID) pdf.String {
 	c, ok := t.enc[gid]
 	if ok {
 		return pdf.String{c}
@@ -199,9 +207,9 @@ func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {
 	return pdf.String{c}
 }
 
-func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
+func (t *otfSimple) WriteFont(w *pdf.Writer) error {
 	if t.overflowed {
-		return errors.New("too many different glyphs for simple font " + t.Ttf.FontName)
+		return errors.New("too many different glyphs for simple font " + t.Otf.FontName)
 	}
 
 	var mapping []font.CMapEntry
@@ -237,7 +245,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		if origGid == 0 {
 			continue
 		}
-		box := t.Ttf.GlyphExtent[origGid]
+		box := t.Otf.GlyphExtent[origGid]
 		if box.LLx < left {
 			left = box.LLx
 		}
@@ -252,7 +260,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		}
 	}
 
-	q := 1000 / float64(t.Ttf.GlyphUnits)
+	q := 1000 / float64(t.Otf.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
 		LLx: math.Round(float64(left) * q),
 		LLy: math.Round(float64(bottom) * q),
@@ -266,17 +274,8 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		cid2text = append(cid2text, font.SimpleMapping{Cid: cid, Text: text})
 	}
 
-	// Following section 9.6.6.4 of PDF 32000-1:2008, for PDF versions before
-	// 1.3 we mark all fonts as symbolic, so that the CMap for glyph selection
-	// works.
-	flags := t.Ttf.Flags
-	if w.Version < pdf.V1_3 {
-		flags &= ^font.FlagNonsymbolic
-		flags |= font.FlagSymbolic
-	}
-
-	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Ttf.Width))
-	fontName := pdf.Name(subsetTag + "+" + t.Ttf.FontName)
+	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Otf.Width))
+	fontName := pdf.Name(subsetTag + "+" + t.Otf.FontName)
 
 	// See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
 	Font := pdf.Dict{
@@ -294,14 +293,14 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 	FontDescriptor := pdf.Dict{
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
-		"Flags":       pdf.Integer(flags),
+		"Flags":       pdf.Integer(t.Otf.Flags),
 		"FontBBox":    FontBBox,
-		"ItalicAngle": pdf.Number(t.Ttf.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(t.Ttf.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(t.Ttf.Descent) + 0.5),
-		"CapHeight":   pdf.Integer(q*float64(t.Ttf.CapHeight) + 0.5),
-		"StemV":       pdf.Integer(70), // information not available in ttf files
-		"FontFile2":   t.FontFileRef,
+		"ItalicAngle": pdf.Number(t.Otf.ItalicAngle),
+		"Ascent":      pdf.Integer(q*float64(t.Otf.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(t.Otf.Descent) + 0.5),
+		"CapHeight":   pdf.Integer(q*float64(t.Otf.CapHeight) + 0.5),
+		"StemV":       pdf.Integer(70), // information not available in otf files
+		"FontFile3":   t.FontFileRef,
 	}
 
 	var Widths pdf.Array
@@ -310,7 +309,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		width := 0
 		if i == mapping[pos].CID {
 			gid := mapping[pos].GID
-			width = int(float64(t.Ttf.Width[gid])*q + 0.5)
+			width = int(float64(t.Otf.Width[gid])*q + 0.5)
 			pos++
 		}
 		Widths = append(Widths, pdf.Integer(width))
@@ -330,9 +329,8 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 
 	// Finally, write the font file itself.
 	// See section 9.9 of PDF 32000-1:2008 for details.
-	size := w.NewPlaceholder(10)
 	fontFileDict := pdf.Dict{
-		"Length1": size,
+		"Subtype": pdf.Name("OpenType"),
 	}
 	fontFileStream, _, err := w.OpenStream(fontFileDict, t.FontFileRef,
 		&pdf.FilterInfo{Name: "FlateDecode"})
@@ -344,13 +342,13 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
 			"cvt ": true, // copy
 			"fpgm": true, // copy
-			"prep": true, // copy
+			"glyf": true, // rewrite
 			"head": true, // update CheckSumAdjustment, Modified and indexToLocFormat
 			"hhea": true, // update various fields, including numberOfHMetrics
-			"maxp": true, // update numGlyphs
 			"hmtx": true, // rewrite
 			"loca": true, // rewrite
-			"glyf": true, // rewrite
+			"maxp": true, // update numGlyphs
+			"prep": true, // copy
 
 			// We use a CMap to map character codes to Glyph IDs
 			"cmap": true, // generate
@@ -358,11 +356,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		SubsetMapping: subsetMapping,
 		IncludeGlyphs: includeGlyphs,
 	}
-	n, err := t.Ttf.Export(fontFileStream, exOpt)
-	if err != nil {
-		return err
-	}
-	err = size.Set(pdf.Integer(n))
+	_, err = t.Otf.Export(fontFileStream, exOpt)
 	if err != nil {
 		return err
 	}
@@ -371,7 +365,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	err = t.Ttf.Close()
+	err = t.Otf.Close()
 	if err != nil {
 		return err
 	}

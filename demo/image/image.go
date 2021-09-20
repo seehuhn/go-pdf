@@ -100,11 +100,6 @@ func imagePage(img *image.NRGBA) error {
 	fmt.Fprintf(page, "%f 0 0 %f 0 0 cm\n", pageBox.URx, pageBox.URy)
 	fmt.Fprintln(page, "/I1 Do")
 
-	err = page.Close()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
