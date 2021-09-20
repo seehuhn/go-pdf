@@ -116,18 +116,18 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	}
 
 	postInfo, err := tt.getPostInfo()
-	if err != nil {
+	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
 
 	fontName, err := tt.getFontName()
-	if err != nil {
-		// TODO(voss): if FontName == "", invent a name: The name must be no
-		// longer than 63 characters and restricted to the printable ASCII
-		// subset, codes 33 to 126, except for the 10 characters '[', ']', '(',
-		// ')', '{', '}', '<', '>', '/', '%'.
+	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
+	// TODO(voss): if FontName == "", invent a name: The name must be no
+	// longer than 63 characters and restricted to the printable ASCII
+	// subset, codes 33 to 126, except for the 10 characters '[', ']', '(',
+	// ')', '{', '}', '<', '>', '/', '%'.
 
 	cmap, err := tt.SelectCMap()
 	if err != nil {
@@ -188,7 +188,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if table.IsMissing(err) { // if no GPOS table is found ...
 		gpos, err = tt.readKernInfo()
 	}
-	if err != nil { // error from either ReadGposTable() or ReadKernInfo()
+	if err != nil && !table.IsMissing(err) { // error from either ReadGposTable() or ReadKernInfo()
 		return nil, err
 	}
 
@@ -201,7 +201,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 			flags |= font.FlagScript
 		}
 	}
-	if postInfo.IsFixedPitch {
+	if postInfo != nil && postInfo.IsFixedPitch {
 		flags |= font.FlagFixedPitch
 	}
 	IsItalic := tt.Head.MacStyle&(1<<1) != 0
@@ -230,7 +230,9 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	tt.Ascent = Ascent
 	tt.Descent = Descent
 	tt.CapHeight = capHeight
-	tt.ItalicAngle = postInfo.ItalicAngle
+	if postInfo != nil {
+		tt.ItalicAngle = postInfo.ItalicAngle
+	}
 	tt.GlyphExtent = GlyphExtent
 	tt.Width = Width
 	tt.Flags = flags

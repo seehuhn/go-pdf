@@ -30,23 +30,23 @@ import (
 
 // ExportOptions provides options for the Font.Export() function.
 type ExportOptions struct {
-	Include map[string]bool // select a subset of tables
-	Mapping []CMapEntry     // select a subset of glyphs
+	Include map[string]bool  // select a subset of tables
+	Mapping []font.CMapEntry // select a subset of glyphs
 	ModTime time.Time
 }
 
 // Export writes the font to the io.Writer w.
 func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
-	var include map[string]bool
+	var includeTables map[string]bool
 	modTime := time.Now()
-	var mapping []CMapEntry
+	var mapping []font.CMapEntry
 	if opt != nil {
-		include = opt.Include
+		includeTables = opt.Include
 		mapping = opt.Mapping
 		if mapping != nil {
 			// TODO(voss): Is this wise?  Report an error instead?  Copy
 			// `include` to not modify the callers map?
-			include["cmap"] = true
+			includeTables["cmap"] = true
 		}
 		if !opt.ModTime.IsZero() {
 			modTime = opt.ModTime
@@ -56,7 +56,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	replTab := make(map[string][]byte)
 	var subsetInfo *subsetInfo
 	if mapping != nil {
-		newMapping, includeOnly := MakeSubset(mapping)
+		newMapping, includeOnly := font.MakeSubset(mapping)
 
 		cmapBytes, err := MakeCMap(newMapping)
 		if err != nil {
@@ -81,7 +81,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		replTab["maxp"] = maxpBytes
 	}
 
-	tableNames := tt.selectTables(include)
+	tableNames := tt.selectTables(includeTables)
 
 	if contains(tableNames, "head") {
 		// Copy and modify the "head" table.
@@ -209,9 +209,9 @@ type subsetInfo struct {
 func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	// TODO(voss): make better use of the data stored in `tt`.
 
-	NumGlyphs := len(tt.Width)
+	origNumGlyphs := len(tt.Width)
 
-	origOffsets, err := tt.getGlyfOffsets(NumGlyphs)
+	origOffsets, err := tt.GetGlyfOffsets(origNumGlyphs)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	hmtx, err := tt.getHMtxInfo(NumGlyphs, int(hheaInfo.NumOfLongHorMetrics))
+	hmtx, err := tt.getHMtxInfo(origNumGlyphs, int(hheaInfo.NumOfLongHorMetrics))
 	if err != nil {
 		return nil, err
 	}
@@ -247,6 +247,8 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	var xMaxExtent int16
 	buf := &bytes.Buffer{}
 	newGid := 0
+	// Elements may be appended to includeOnly during the loop, so we don't
+	// use a range loop here.
 	for newGid < len(includeOnly) {
 		newOffsets = append(newOffsets, uint32(buf.Len()))
 

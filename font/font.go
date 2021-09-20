@@ -43,6 +43,11 @@ type Font struct {
 	Width       []int  // This is in Glyph design units.  TODO(voss): needed?
 }
 
+// NumGlyphs returns the number of glyphs in a font.
+func (font *Font) NumGlyphs() int {
+	return len(font.Width)
+}
+
 // Draw emits PDF text mode commands to show the glyphs on the page.
 // This must be used between BT and ET, with the correct font already
 // set up.

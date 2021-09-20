@@ -244,8 +244,8 @@ func (tt *Font) readKernInfo() (gtab.Lookups, error) {
 	return gtab.KerningAsLookup(kerning), nil
 }
 
-// getGlyfOffsets returns the locations of the glyphs in the "glyf" table.
-func (tt *Font) getGlyfOffsets(NumGlyphs int) ([]uint32, error) {
+// GetGlyfOffsets returns the locations of the glyphs in the "glyf" table.
+func (tt *Font) GetGlyfOffsets(NumGlyphs int) ([]uint32, error) {
 	var err error
 	offsets := make([]uint32, NumGlyphs+1)
 	if tt.Head.IndexToLocFormat == 0 {
@@ -265,7 +265,7 @@ func (tt *Font) getGlyfOffsets(NumGlyphs int) ([]uint32, error) {
 
 // getGlyfInfo reads the glyph bounding boxes from the "glyf" table.
 func (tt *Font) getGlyfInfo(NumGlyphs int) (*table.Glyf, error) {
-	offset, err := tt.getGlyfOffsets(NumGlyphs)
+	offset, err := tt.GetGlyfOffsets(NumGlyphs)
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/bits"
-	"sort"
 
 	"seehuhn.de/go/pdf/font"
 )
@@ -51,40 +50,10 @@ type cmapTableHead struct {
 	// GlyphIDArray   []uint16 // Glyph index array (arbitrary length)
 }
 
-// CMapEntry describes the association between a character index and
-// a glyph ID.
-type CMapEntry struct {
-	CID uint16
-	GID font.GlyphID
-}
-
-// MakeSubset converts a mapping from a full font to a subsetted font.
-// It also returns the list of original glyphs to include in the subset.
-func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []font.GlyphID) {
-	var newMapping []CMapEntry
-	for _, m := range origMapping {
-		if m.GID != 0 {
-			newMapping = append(newMapping, m)
-		}
-	}
-	sort.Slice(newMapping, func(i, j int) bool {
-		return newMapping[i].CID < newMapping[j].CID
-	})
-
-	newToOrigGid := []font.GlyphID{0}
-	for i, m := range newMapping {
-		newGid := font.GlyphID(i + 1)
-		newToOrigGid = append(newToOrigGid, m.GID)
-		newMapping[i].GID = newGid
-	}
-
-	return newMapping, newToOrigGid
-}
-
 // MakeCMap writes a cmap with just a 1,0,4 subtable to map character indices
 // to glyph indices in a subsetted font. The slice `mapping` must be sorted in
 // order of increasing CID values.
-func MakeCMap(mapping []CMapEntry) ([]byte, error) {
+func MakeCMap(mapping []font.CMapEntry) ([]byte, error) {
 	if len(mapping) == 0 {
 		return nil, nil
 	}
@@ -180,7 +149,7 @@ func MakeCMap(mapping []CMapEntry) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func findSegments(mapping []CMapEntry) []int {
+func findSegments(mapping []font.CMapEntry) []int {
 	// There are two different ways to encode GID values for a segment
 	// of CID values:
 	//

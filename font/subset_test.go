@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package font
 
 import (
 	"testing"
 )
 
 func TestGetSubsetTag(t *testing.T) {
-	tag := getSubsetTag(nil, 0)
+	tag := GetSubsetTag(nil, 0)
 	if tag != "AAAAAA" {
 		t.Error("wrong tag " + tag)
 	}

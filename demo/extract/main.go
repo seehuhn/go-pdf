@@ -29,6 +29,7 @@ import (
 func main() {
 	passwd := flag.String("p", "", "PDF password")
 	decode := flag.Bool("d", false, "decode streams")
+	decodeOnly := flag.Bool("D", false, "decode streams, don't show stream dicts")
 	flag.Parse()
 
 	var tryPasswd func([]byte, int) string
@@ -99,14 +100,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if stm, ok := obj.(*pdf.Stream); ok && *decode {
-		err = stm.Dict.PDF(os.Stdout)
-		fmt.Println()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+	if stm, ok := obj.(*pdf.Stream); ok && (*decode || *decodeOnly) {
+		if !*decodeOnly {
+			err = stm.Dict.PDF(os.Stdout)
+			fmt.Println()
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			fmt.Println("decoded stream")
 		}
-		fmt.Println("decoded stream")
 		r, err := stm.Decode(r.Resolve)
 		if err != nil {
 			fmt.Println(err)
@@ -117,7 +120,9 @@ func main() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		fmt.Println("\nendstream")
+		if !*decodeOnly {
+			fmt.Println("\nendstream")
+		}
 		return
 	}
 

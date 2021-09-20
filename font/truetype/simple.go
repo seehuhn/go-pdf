@@ -204,8 +204,6 @@ func (t *ttfSimple) WriteFontDict(w *pdf.Writer) error {
 		return errors.New("too many different glyphs for simple font " + t.Ttf.FontName)
 	}
 
-	// TODO(voss): cid2gid is passed down a long call chain.  Can this
-	// be simplified?
 	cid2gid := make([]font.GlyphID, 256)
 	firstCid := 257
 	lastCid := -1
@@ -343,10 +341,10 @@ func (t *ttfSimple) WriteFontFile(w *pdf.Writer, cid2gid []font.GlyphID) error {
 	if err != nil {
 		return err
 	}
-	var mapping []sfnt.CMapEntry
+	var mapping []font.CMapEntry
 	for cid, gid := range cid2gid {
 		if gid != 0 {
-			mapping = append(mapping, sfnt.CMapEntry{
+			mapping = append(mapping, font.CMapEntry{
 				CID: uint16(cid),
 				GID: gid,
 			})

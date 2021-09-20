@@ -26,11 +26,11 @@ import (
 )
 
 func TestMakeCMap(t *testing.T) {
-	var mm []CMapEntry
+	var mm []font.CMapEntry
 	check := make(map[rune]font.GlyphID)
 	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90, 92} {
 		gid := font.GlyphID(i + 1)
-		mm = append(mm, CMapEntry{
+		mm = append(mm, font.CMapEntry{
 			CID: uint16(c),
 			GID: gid,
 		})
@@ -66,31 +66,32 @@ func TestMakeCMap(t *testing.T) {
 
 func TestSplitSegments(t *testing.T) {
 	cases := []struct {
-		in  []CMapEntry
+		in  []font.CMapEntry
 		out []int
 	}{
 		{ // single delta segment
-			[]CMapEntry{{1, 1}, {2, 2}, {10, 10}},
+			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 2, GID: 2}, {CID: 10, GID: 10}},
 			[]int{0, 3},
 		},
 		{ // single GlyphIDArray segment
-			[]CMapEntry{{1, 1}, {2, 3}, {3, 5}},
+			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 2, GID: 3}, {CID: 3, GID: 5}},
 			[]int{0, 3},
 		},
 		{ // single glyph
-			[]CMapEntry{{1, 1}},
+			[]font.CMapEntry{{CID: 1, GID: 1}},
 			[]int{0, 1},
 		},
 		{ // a short GlyphIDArray segment is cheaper than two delta segments
-			[]CMapEntry{{1, 1}, {3, 1}},
+			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 3, GID: 1}},
 			[]int{0, 2},
 		},
 		{ // a long GlyphIDArray segment is more expensive than two delta segments
-			[]CMapEntry{{1, 1}, {5, 1}},
+			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 5, GID: 1}},
 			[]int{0, 1, 2},
 		},
 		{ // the example from the source code
-			[]CMapEntry{{1, 1}, {2, 2}, {5, 5}, {6, 10}, {7, 11}, {8, 6}},
+			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 2, GID: 2}, {CID: 5, GID: 5},
+				{CID: 6, GID: 10}, {CID: 7, GID: 11}, {CID: 8, GID: 6}},
 			[]int{0, 3, 6},
 		},
 	}

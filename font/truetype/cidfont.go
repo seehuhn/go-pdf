@@ -137,7 +137,7 @@ func (t *ttfCID) Enc(gid font.GlyphID) pdf.String {
 }
 
 func (t *ttfCID) WriteFontDict(w *pdf.Writer) error {
-	subsetTag := makeSubsetTag()
+	subsetTag := "AAAAAA" // TODO(voss)
 
 	FontDescriptorRef, err := t.WriteFontDescriptor(w, subsetTag)
 	if err != nil {

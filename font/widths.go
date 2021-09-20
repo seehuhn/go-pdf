@@ -42,7 +42,8 @@ type seq struct {
 	values []int
 }
 
-// see section 9.7.4.3 of PDF 32000-1:2008
+// EncodeWidths constructs the /Width array for PDF CID fonts.
+// See section 9.7.4.3 of PDF 32000-1:2008 for details.
 func EncodeWidths(w []int) (int, pdf.Array) {
 	n := len(w)
 

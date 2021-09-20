@@ -14,23 +14,54 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package font
 
 import (
 	"sort"
-
-	"seehuhn.de/go/pdf/font"
 )
+
+// CMapEntry describes the association between a character index and
+// a glyph ID.
+type CMapEntry struct {
+	CID uint16
+	GID GlyphID
+}
+
+// MakeSubset converts a mapping from a full font to a subsetted font.
+// It also returns the list of original glyphs to include in the subset.
+func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []GlyphID) {
+	var newMapping []CMapEntry
+	for _, m := range origMapping {
+		if m.GID != 0 {
+			newMapping = append(newMapping, m)
+		}
+	}
+	sort.Slice(newMapping, func(i, j int) bool {
+		return newMapping[i].CID < newMapping[j].CID
+	})
+
+	newToOrigGid := []GlyphID{0}
+	for i, m := range newMapping {
+		newGid := GlyphID(i + 1)
+		newToOrigGid = append(newToOrigGid, m.GID)
+		newMapping[i].GID = newGid
+	}
+
+	return newMapping, newToOrigGid
+}
 
 const subsetModulus = 26 * 26 * 26 * 26 * 26 * 26
 
-func getSubsetTag(gg []font.GlyphID, numGlyphs uint16) string {
+// GetSubsetTag constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe
+// a subset of glyphs of a font.  This is used for the /BaseFont entry in PDF
+// Font dictionaries and the /FontName entry in FontDescriptor dictionaries.
+func GetSubsetTag(gg []GlyphID, numGlyphs int) string {
 	sort.Slice(gg, func(i, j int) bool { return gg[i] < gg[j] })
 
 	// mix all the information into a single uint32
 	X := uint32(numGlyphs)
 	for _, g := range gg {
-		// 11 is the largest integer smaller than 1<<32 / subsetModulus which
+		// 11 is the largest integer smaller than `1<<32 / subsetModulus` which
 		// is relatively prime to 26.
 		X = (X*11 + uint32(g)) % subsetModulus
 	}

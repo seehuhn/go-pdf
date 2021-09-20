@@ -20,6 +20,7 @@ package font
 // See section 9.8.2 of PDF 32000-1:2008.
 type Flags uint32
 
+// Possible values for PDF Font Descriptor Flags.
 const (
 	FlagFixedPitch  Flags = 1 << 0  // All glyphs have the same width (as opposed to proportional or variable-pitch fonts, which have different widths).
 	FlagSerif       Flags = 1 << 1  // Glyphs have serifs, which are short strokes drawn at an angle on the top and bottom of glyph stems. (Sans serif fonts do not have serifs.)
