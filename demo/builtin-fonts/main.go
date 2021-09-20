@@ -215,8 +215,8 @@ func (f *fontTables) DoFlush() error {
 		}
 	})
 	attr := &pages.Attributes{
-		Resources: pdf.Dict{
-			"Font": pageFonts,
+		Resources: &pages.Resources{
+			Font: pageFonts,
 		},
 	}
 	page, err := f.tree.AddPage(attr)

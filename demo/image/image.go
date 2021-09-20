@@ -86,8 +86,8 @@ func imagePage(img *image.NRGBA) error {
 		URy: float64(b.Dy()) / dpi * 72,
 	}
 	page, err := pages.SinglePage(out, &pages.Attributes{
-		Resources: pdf.Dict{
-			"XObject": pdf.Dict{
+		Resources: &pages.Resources{
+			XObject: pdf.Dict{
 				"I1": image,
 			},
 		},

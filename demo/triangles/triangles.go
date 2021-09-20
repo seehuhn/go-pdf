@@ -88,7 +88,6 @@ func main() {
 	mu := yM + lambda*ny
 
 	page, err := pages.SinglePage(w, &pages.Attributes{
-		Resources: pdf.Dict{},
 		MediaBox: &pdf.Rectangle{
 			URx: 440,
 			URy: mu + 60,

@@ -67,8 +67,8 @@ func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Re
 		"Contents": contentRef,
 	}
 	if attr != nil {
-		if len(attr.Resources) > 0 {
-			pageDict["Resources"] = attr.Resources
+		if attr.Resources != nil {
+			pageDict["Resources"] = pdf.AsDict(attr.Resources)
 		}
 		if attr.MediaBox != nil &&
 			(def == nil ||
