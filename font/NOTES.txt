@@ -1,14 +1,9 @@
-Font Validators
----------------
+Font Validators and Tools
+-------------------------
 
-https://github.com/googlefonts/fontbakery
+https://github.com/adobe-type-tools/afdko
 https://github.com/HinTak/Font-Validator
-
-
-Article about subsetting of fonts
----------------------------------
-
-http://www.4real.gr/technical-documents-ttf-subset.html
+https://github.com/googlefonts/fontbakery
 
 
 Pre-existing Font Packages for Go
@@ -18,7 +13,7 @@ github.com/go-fonts
 golang.org/x/image/font
 
 
-Type 1 (PostScript) Fonts (PFA/PFB+AFM/PFM)
+Type 1 (PostScript) Fonts (PFA/PFB/AFM/PFM)
 -------------------------------------------
 
 https://en.wikipedia.org/wiki/PostScript_fonts

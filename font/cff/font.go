@@ -21,6 +21,7 @@ package cff
 // once this is working
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -28,41 +29,53 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-func readCFF(r io.ReadSeeker, length int64) error {
+type cffFont struct {
+	Name string
+}
+
+func readCFF(r io.ReadSeeker, length int64) (*cffFont, error) {
 	p := parser.New(r)
 	p.SetRegion("CFF", 0, length)
 	x, err := p.ReadUInt32()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	major := x >> 24
 	minor := (x >> 16) & 0xFF
 	nameIndexPos := int64((x >> 8) & 0xFF)
 	offSize := x & 0xFF
+	_ = offSize // TODO (what is this used for?)
 	if major != 1 {
-		return fmt.Errorf("unsupported CFF version %d.%d", major, minor)
+		return nil, fmt.Errorf("unsupported CFF version %d.%d", major, minor)
 	}
+
+	res := &cffFont{}
 
 	err = p.SeekPos(nameIndexPos)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	names, err := readIndex(p)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	if len(names) != 1 {
+		return nil, errors.New("CFF with multiple fonts not supported")
+	}
+	res.Name = string(names[0])
+
 	topDicts, err := readIndex(p)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(topDicts) != len(names) {
-		return errors.New("invalid CFF")
+		return nil, errors.New("invalid CFF")
 	}
 
 	for i, topDict := range topDicts {
 		dd, err := parseDict(topDict)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		fmt.Printf("Top DICT for %q:\n", string(names[i]))
 		for _, entry := range dd {
@@ -70,17 +83,15 @@ func readCFF(r io.ReadSeeker, length int64) error {
 		}
 	}
 
-	strings, err := readIndex(p)
-	if err != nil {
-		return err
-	}
-	for i, s := range strings {
-		fmt.Printf("string %d = %q\n", i+nStdString, string(s))
-	}
+	// strings, err := readIndex(p)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// for i, s := range strings {
+	// 	fmt.Printf("string %d = %q\n", i+nStdString, string(s))
+	// }
 
-	_ = offSize
-
-	return nil
+	return res, nil
 }
 
 var errCorruptDict = errors.New("invalid CFF DICT")
@@ -202,4 +213,58 @@ func readIndex(p *parser.Parser) ([][]byte, error) {
 	}
 
 	return res, nil
+}
+
+func writeIndex(w io.Writer, data [][]byte) (int, error) {
+	count := len(data)
+	if count >= 1<<16 {
+		return 0, errors.New("too many items for CFF INDEX")
+	}
+	if count == 0 {
+		return w.Write([]byte{0, 0})
+	}
+
+	bodyLength := 0
+	for _, blob := range data {
+		bodyLength += len(blob)
+	}
+
+	offSize := 1
+	for bodyLength+1 >= 1<<(8*offSize) {
+		offSize++
+	}
+	if offSize > 4 {
+		return 0, errors.New("too much data for CFF INDEX")
+	}
+
+	total := 0
+	out := bufio.NewWriter(w)
+
+	n, _ := out.Write([]byte{
+		byte(count >> 8), byte(count), // count
+		byte(offSize), // offSize
+	})
+	total += n
+
+	// offset
+	var buf [4]byte
+	pos := uint32(1)
+	for i := 0; i <= count; i++ {
+		for j := 0; j < offSize; j++ {
+			buf[j] = byte(pos >> (8 * (offSize - j - 1)))
+		}
+		n, _ = out.Write(buf[:offSize])
+		total += n
+		if i < count {
+			pos += uint32(len(data[i]))
+		}
+	}
+
+	// data
+	for i := 0; i < count; i++ {
+		n, _ = out.Write(data[i])
+		total += n
+	}
+
+	return total, out.Flush()
 }
