@@ -20,7 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfnt/parser"
+	"seehuhn.de/go/pdf/font/parser"
 )
 
 func (g *GTab) readCoverageTable(pos int64) (coverage, error) {

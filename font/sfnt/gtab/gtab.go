@@ -21,7 +21,7 @@ import (
 	"io"
 	"sort"
 
-	"seehuhn.de/go/pdf/font/sfnt/parser"
+	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/locale"
 )

@@ -18,7 +18,7 @@ package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfnt/parser"
+	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 

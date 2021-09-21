@@ -18,7 +18,7 @@ package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfnt/parser"
+	"seehuhn.de/go/pdf/font/parser"
 )
 
 func (p *GTab) readClassDefTable(pos int64) (ClassDef, error) {

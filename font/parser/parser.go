@@ -65,7 +65,12 @@ func (p *Parser) SetRegion(tableName string, start, length int64) error {
 	p.start = start
 	p.end = start + length
 
-	return p.seek(0)
+	return p.SeekPos(0)
+}
+
+// Size returns the total length of the current region.
+func (p *Parser) Size() int64 {
+	return p.end - p.start
 }
 
 // Exec runs the given commands, updating the state s.
@@ -86,8 +91,21 @@ CommandLoop:
 		}
 
 		switch cmd {
+		case CmdRead8:
+			buf, err := p.ReadBlob(1)
+			if err != nil {
+				return err
+			}
+			switch arg {
+			case TypeUInt:
+				s.A = int64(buf[0])
+			case TypeInt:
+				s.A = int64(int8(buf[0]))
+			default:
+				panic("unknown type for CmdRead16")
+			}
 		case CmdRead16:
-			buf, err := p.read(2)
+			buf, err := p.ReadBlob(2)
 			if err != nil {
 				return err
 			}
@@ -101,7 +119,7 @@ CommandLoop:
 				panic("unknown type for CmdRead16")
 			}
 		case CmdRead32:
-			buf, err := p.read(4)
+			buf, err := p.ReadBlob(4)
 			if err != nil {
 				return err
 			}
@@ -117,7 +135,7 @@ CommandLoop:
 				panic("unknown type for CmdRead32")
 			}
 		case CmdSeek:
-			err := p.seek(s.A)
+			err := p.SeekPos(s.A)
 			if err != nil {
 				return err
 			}
@@ -129,7 +147,7 @@ CommandLoop:
 		case CmdLoadFrom:
 			s.A = s.R[arg]
 		case CmdStash:
-			buf, err := p.read(2)
+			buf, err := p.ReadBlob(2)
 			if err != nil {
 				return err
 			}
@@ -190,9 +208,40 @@ CommandLoop:
 	return nil
 }
 
+func (p *Parser) Read(buf []byte) (int, error) {
+	total := 0
+	for {
+		k := len(buf)
+		if k == 0 {
+			break
+		}
+
+		if k > bufferSize {
+			k = bufferSize
+		}
+		tmp, err := p.ReadBlob(k)
+		k = copy(buf, tmp)
+		total += k
+		buf = buf[k:]
+		if err != nil {
+			return total, err
+		}
+	}
+	return total, nil
+}
+
+// ReadUInt8 reads a single uint8 value from the current position.
+func (p *Parser) ReadUInt8() (uint8, error) {
+	buf, err := p.ReadBlob(1)
+	if err != nil {
+		return 0, err
+	}
+	return uint8(buf[0]), nil
+}
+
 // ReadUInt16 reads a single uint16 value from the current position.
 func (p *Parser) ReadUInt16() (uint16, error) {
-	buf, err := p.read(2)
+	buf, err := p.ReadBlob(2)
 	if err != nil {
 		return 0, err
 	}
@@ -205,8 +254,17 @@ func (p *Parser) ReadInt16() (int16, error) {
 	return int16(val), err
 }
 
-// seek changes the reading position within the current region.
-func (p *Parser) seek(posInTable int64) error {
+// ReadUInt32 reads a single uint32 value from the current position.
+func (p *Parser) ReadUInt32() (uint32, error) {
+	buf, err := p.ReadBlob(4)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(buf[0])<<24 + uint32(buf[1])<<16 + uint32(buf[2])<<8 + uint32(buf[3]), nil
+}
+
+// SeekPos changes the reading position within the current region.
+func (p *Parser) SeekPos(posInTable int64) error {
 	filePos := p.start + posInTable
 	if filePos < p.start || filePos > p.end {
 		return p.Error("seek target %d+%d is outside [%d,%d+%d]",
@@ -228,7 +286,13 @@ func (p *Parser) seek(posInTable int64) error {
 	return nil
 }
 
-func (p *Parser) read(n int) ([]byte, error) {
+// ReadBlob reads n bytes from the file, starting at the current position.  The
+// returned slice points into the internal buffer, slice contents must not be
+// modified by the caller and are only valid until the next call to one of the
+// parser methods.
+//
+// The read size n must be <= 1024.
+func (p *Parser) ReadBlob(n int) ([]byte, error) {
 	p.lastRead = int(p.from + int64(p.pos) - p.start)
 	if n < 0 {
 		n = 0
@@ -282,7 +346,8 @@ type Command uint8
 
 // Commands which take one argument
 const (
-	CmdRead16    = iota // arg: type
+	CmdRead8     = iota // arg: type
+	CmdRead16           // arg: type
 	CmdRead32           // arg: type
 	CmdStoreInto        // arg: register
 	CmdLoadI            // arg: new int8 value for A

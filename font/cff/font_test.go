@@ -14,54 +14,37 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package cff
 
 import (
-	"errors"
 	"io"
-	"strings"
 	"testing"
+
+	"seehuhn.de/go/pdf/font/sfnt"
 )
 
-func TestParser(t *testing.T) {
-	buf := strings.NewReader("1234AB\xFF\xFF")
-	p := New(buf)
-
-	err := p.SetRegion("test", 0, 2)
+func TestReadCFF(t *testing.T) {
+	tt, err := sfnt.Open("../opentype/otf/SourceSerif4-Regular.otf", nil)
 	if err != nil {
 		t.Fatal(err)
-	}
-	x, err := p.ReadUInt16()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if x != '1'*256+'2' {
-		t.Errorf("wrong value, expected %d but got %d", '1'*256+'2', x)
-	}
-	_, err = p.ReadUInt16()
-	if !errors.Is(err, io.ErrUnexpectedEOF) {
-		t.Errorf("EOF not detected, got err=%s", err)
 	}
 
-	err = p.SetRegion("xyz", 4, 4)
+	table := tt.Header.Find("CFF ")
+	if table == nil {
+		t.Fatal("no CFF table found")
+	}
+	length := int64(table.Length)
+	tableFd := io.NewSectionReader(tt.Fd, int64(table.Offset), length)
+
+	err = readCFF(tableFd, length)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = tt.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = p.seek(6)
-	if err == nil {
-		t.Error("seek error not detected")
-	} else if !strings.Contains(err.Error(), "xyz") {
-		t.Error("table name not mentioned in error message", err)
-	}
-	err = p.seek(2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	y, err := p.ReadInt16()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if y != -1 {
-		t.Errorf("wrong value, expected -1 but got %d", y)
-	}
+
+	t.Error("fish")
 }

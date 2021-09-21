@@ -16,7 +16,7 @@
 
 package gtab
 
-import "seehuhn.de/go/pdf/font/sfnt/parser"
+import "seehuhn.de/go/pdf/font/parser"
 
 type markRecord struct {
 	markClass uint16

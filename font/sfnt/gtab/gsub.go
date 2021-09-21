@@ -18,7 +18,7 @@ package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfnt/parser"
+	"seehuhn.de/go/pdf/font/parser"
 )
 
 // The most common GSUB features seen on my system:
