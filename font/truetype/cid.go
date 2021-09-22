@@ -88,7 +88,7 @@ type ttfCID struct {
 	FontRef *pdf.Reference
 
 	text map[font.GlyphID][]rune // GID -> text
-	used map[uint16]bool         // is CID used or not?
+	used map[uint16]bool         // is CharCode used or not?
 }
 
 func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*ttfCID, error) {

@@ -52,14 +52,14 @@ type cmapTableHead struct {
 
 // makeCMap writes a cmap containing a 1,0,4 subtable to map character indices
 // to glyph indices in a subsetted font. The slice `mapping` must be sorted in
-// order of increasing CID values.
+// order of increasing CharCode values.
 func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 	if len(mapping) == 0 {
 		return nil, nil
 	}
 
 	var finalGID uint16
-	if n := len(mapping); mapping[n-1].CID == 0xFFFF {
+	if n := len(mapping); mapping[n-1].CharCode == 0xFFFF {
 		finalGID = uint16(mapping[n-1].GID)
 		mapping = mapping[:n-1]
 	}
@@ -70,22 +70,22 @@ func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 		start := segments[i-1]
 		end := segments[i]
 
-		cid := mapping[start].CID
+		charCode := mapping[start].CharCode
 		gid := uint16(mapping[start].GID)
-		delta := gid - cid
+		delta := gid - charCode
 		canUseDelta := true
 		for i := start + 1; i < end; i++ {
-			thisCid := mapping[i].CID
+			thisCharCode := mapping[i].CharCode
 			thisGid := uint16(mapping[i].GID)
-			thisDelta := thisGid - thisCid
+			thisDelta := thisGid - thisCharCode
 			if thisDelta != delta {
 				canUseDelta = false
 				break
 			}
 		}
 
-		StartCode = append(StartCode, cid)
-		EndCode = append(EndCode, mapping[end-1].CID)
+		StartCode = append(StartCode, charCode)
+		EndCode = append(EndCode, mapping[end-1].CharCode)
 		if canUseDelta {
 			IDDelta = append(IDDelta, delta)
 			IDRangeOffsets = append(IDRangeOffsets, 0)
@@ -99,9 +99,9 @@ func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 			}
 			IDRangeOffsets = append(IDRangeOffsets, uint16(offs))
 			pos := start
-			for c := cid; c <= mapping[end-1].CID; c++ {
+			for c := charCode; c <= mapping[end-1].CharCode; c++ {
 				var val uint16
-				if mapping[pos].CID == c {
+				if mapping[pos].CharCode == c {
 					val = uint16(mapping[pos].GID)
 					pos++
 				}
@@ -151,31 +151,31 @@ func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 
 func findSegments(mapping []font.CMapEntry) []int {
 	// There are two different ways to encode GID values for a segment
-	// of CID values:
+	// of CharCode values:
 	//
-	//   - If GID-CID is constant over the range, IDDelta can be used.
+	//   - If GID-CharCode is constant over the range, IDDelta can be used.
 	//     This requires 4 words of storage.
 	//     The range can contain unmapped character indices.
 	//   - Otherwise, GlyphIDArray can be used.  This requires
 	//     4 + (EndCode - StartCode + 1) words of storage.
 	//
 	// Example:
-	//     cid:  1  2  5 |  6  7  8  ->  4 + 7 = 11 words
-	//     gid:  1  2  5 | 10 11  6
+	//     charCode:  1  2  5 |  6  7  8  ->  4 + 7 = 11 words
+	//     gid:       1  2  5 | 10 11  6
 	//
-	//     cid:  1  2  5  6  7  8  ->  12 words
-	//     gid:  1  2  5 10 11  6
+	//     charCode:  1  2  5  6  7  8  ->  12 words
+	//     gid:       1  2  5 10 11  6
 	//
-	//     cid:  1  2  5 |  6  7 | 8  ->  4 + 4 + 5 = 13 words
-	//     gid:  1  2  5 | 10 11 | 6
+	//     charCode:  1  2  5 |  6  7 | 8  ->  4 + 4 + 5 = 13 words
+	//     gid:       1  2  5 | 10 11 | 6
 
 	cost := func(k, l int) int {
-		delta := uint16(mapping[k].GID) - mapping[k].CID
+		delta := uint16(mapping[k].GID) - mapping[k].CharCode
 		for i := k + 1; i < l; i++ {
-			deltaI := uint16(mapping[i].GID) - mapping[i].CID
+			deltaI := uint16(mapping[i].GID) - mapping[i].CharCode
 			if deltaI != delta {
 				// we have to use GlyphIDArray
-				return 4 + int(mapping[l-1].CID) - int(mapping[k].CID) + 1
+				return 4 + int(mapping[l-1].CharCode) - int(mapping[k].CharCode) + 1
 			}
 		}
 		return 4 // we can use IDDelta

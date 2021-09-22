@@ -36,8 +36,8 @@ import (
 // SimpleMapping describes the unicode text corresponding to a character
 // in a simple font.
 type SimpleMapping struct {
-	Cid  byte
-	Text []rune
+	CharCode byte
+	Text     []rune
 }
 
 // WriteToUnicodeSimple writes the ToUnicode stream for a simple font.
@@ -52,17 +52,17 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 	canDeltaRange := make([]bool, len(mm))
 	step := make([]byte, len(mm))
 	var prevDelta int
-	var prevCid byte
-	sort.Slice(mm, func(i, j int) bool { return mm[i].Cid < mm[j].Cid })
+	var prevCharCode byte
+	sort.Slice(mm, func(i, j int) bool { return mm[i].CharCode < mm[j].CharCode })
 	for i, m := range mm {
-		delta := int(m.Text[0]) - int(m.Cid)
-		cid := m.Cid
+		delta := int(m.Text[0]) - int(m.CharCode)
+		charCode := m.CharCode
 		if i > 0 {
 			canDeltaRange[i] = delta == prevDelta
-			step[i] = cid - prevCid
+			step[i] = charCode - prevCharCode
 		}
 		prevDelta = delta
-		prevCid = cid
+		prevCharCode = charCode
 	}
 
 	pos := 0
@@ -73,8 +73,8 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 		}
 		if next > pos+1 {
 			bf := bfRange{
-				From:     []byte{mm[pos].Cid},
-				To:       []byte{mm[next-1].Cid},
+				From:     []byte{mm[pos].CharCode},
+				To:       []byte{mm[next-1].CharCode},
 				FromText: [][]rune{mm[pos].Text},
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -97,8 +97,8 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 				repl = append(repl, mm[i].Text)
 			}
 			bf := bfRange{
-				From:     []byte{mm[pos].Cid},
-				To:       []byte{mm[next-1].Cid},
+				From:     []byte{mm[pos].CharCode},
+				To:       []byte{mm[next-1].CharCode},
 				FromText: repl,
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -107,7 +107,7 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 		}
 
 		data.Chars = append(data.Chars, bfChar{
-			Code: []byte{mm[pos].Cid},
+			Code: []byte{mm[pos].CharCode},
 			Text: mm[pos].Text,
 		})
 		pos++

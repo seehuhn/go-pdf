@@ -31,8 +31,8 @@ func TestMakeCMap(t *testing.T) {
 	for i, c := range []int{32, 65, 66, 67, 68, 70, 71, 90, 92} {
 		gid := font.GlyphID(i + 1)
 		mapping = append(mapping, font.CMapEntry{
-			CID: uint16(c),
-			GID: gid,
+			CharCode: uint16(c),
+			GID:      gid,
 		})
 		check[rune(c)] = gid
 	}
@@ -56,53 +56,53 @@ func TestMakeCMap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for cid, gid := range check {
-		if cmap[cid] != gid {
+	for charCode, gid := range check {
+		if cmap[charCode] != gid {
 			t.Errorf("wrong mapping: cmap[%d] == %d != %d",
-				cid, cmap[cid], gid)
+				charCode, cmap[charCode], gid)
 		}
 	}
-	for cid, gid := range cmap {
-		if check[cid] != gid {
+	for charCode, gid := range cmap {
+		if check[charCode] != gid {
 			t.Errorf("wrong mapping: cmap[%d] == %d != %d",
-				cid, gid, check[cid])
+				charCode, gid, check[charCode])
 		}
 	}
 }
 
 func TestFunnyEnd(t *testing.T) {
 	mapping := []font.CMapEntry{
-		{CID: 32, GID: 1},
-		{CID: 44, GID: 2},
-		{CID: 48, GID: 3},
-		{CID: 49, GID: 4},
-		{CID: 50, GID: 5},
-		{CID: 74, GID: 6},
-		{CID: 76, GID: 7},
-		{CID: 85, GID: 8},
-		{CID: 86, GID: 9},
-		{CID: 99, GID: 10},
-		{CID: 100, GID: 11},
-		{CID: 101, GID: 12},
-		{CID: 102, GID: 13},
-		{CID: 104, GID: 14},
-		{CID: 105, GID: 15},
-		{CID: 110, GID: 16},
-		{CID: 111, GID: 17},
-		{CID: 114, GID: 18},
-		{CID: 115, GID: 19},
-		{CID: 116, GID: 20},
-		{CID: 118, GID: 21},
-		{CID: 121, GID: 22},
-		{CID: 127, GID: 23},
-		{CID: 128, GID: 24},
-		{CID: 129, GID: 25},
-		{CID: 130, GID: 26},
+		{CharCode: 32, GID: 1},
+		{CharCode: 44, GID: 2},
+		{CharCode: 48, GID: 3},
+		{CharCode: 49, GID: 4},
+		{CharCode: 50, GID: 5},
+		{CharCode: 74, GID: 6},
+		{CharCode: 76, GID: 7},
+		{CharCode: 85, GID: 8},
+		{CharCode: 86, GID: 9},
+		{CharCode: 99, GID: 10},
+		{CharCode: 100, GID: 11},
+		{CharCode: 101, GID: 12},
+		{CharCode: 102, GID: 13},
+		{CharCode: 104, GID: 14},
+		{CharCode: 105, GID: 15},
+		{CharCode: 110, GID: 16},
+		{CharCode: 111, GID: 17},
+		{CharCode: 114, GID: 18},
+		{CharCode: 115, GID: 19},
+		{CharCode: 116, GID: 20},
+		{CharCode: 118, GID: 21},
+		{CharCode: 121, GID: 22},
+		{CharCode: 127, GID: 23},
+		{CharCode: 128, GID: 24},
+		{CharCode: 129, GID: 25},
+		{CharCode: 130, GID: 26},
 	}
 
 	check := make(map[rune]font.GlyphID)
 	for _, m := range mapping {
-		check[rune(m.CID)] = m.GID
+		check[rune(m.CharCode)] = m.GID
 	}
 
 	buf, err := makeCMap(mapping)
@@ -125,16 +125,16 @@ func TestFunnyEnd(t *testing.T) {
 	}
 	fmt.Println(cmap)
 
-	for cid, gid := range check {
-		if cmap[cid] != gid {
+	for charCode, gid := range check {
+		if cmap[charCode] != gid {
 			t.Errorf("wrong mapping: cmap[%d] == %d != %d",
-				cid, cmap[cid], gid)
+				charCode, cmap[charCode], gid)
 		}
 	}
-	for cid, gid := range cmap {
-		if check[cid] != gid {
+	for charCode, gid := range cmap {
+		if check[charCode] != gid {
 			t.Errorf("wrong mapping: cmap[%d] == %d != %d",
-				cid, gid, check[cid])
+				charCode, gid, check[charCode])
 		}
 	}
 }
@@ -145,28 +145,28 @@ func TestSplitSegments(t *testing.T) {
 		out []int
 	}{
 		{ // single delta segment
-			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 2, GID: 2}, {CID: 10, GID: 10}},
+			[]font.CMapEntry{{CharCode: 1, GID: 1}, {CharCode: 2, GID: 2}, {CharCode: 10, GID: 10}},
 			[]int{0, 3},
 		},
 		{ // single GlyphIDArray segment
-			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 2, GID: 3}, {CID: 3, GID: 5}},
+			[]font.CMapEntry{{CharCode: 1, GID: 1}, {CharCode: 2, GID: 3}, {CharCode: 3, GID: 5}},
 			[]int{0, 3},
 		},
 		{ // single glyph
-			[]font.CMapEntry{{CID: 1, GID: 1}},
+			[]font.CMapEntry{{CharCode: 1, GID: 1}},
 			[]int{0, 1},
 		},
 		{ // a short GlyphIDArray segment is cheaper than two delta segments
-			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 3, GID: 1}},
+			[]font.CMapEntry{{CharCode: 1, GID: 1}, {CharCode: 3, GID: 1}},
 			[]int{0, 2},
 		},
 		{ // a long GlyphIDArray segment is more expensive than two delta segments
-			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 5, GID: 1}},
+			[]font.CMapEntry{{CharCode: 1, GID: 1}, {CharCode: 5, GID: 1}},
 			[]int{0, 1, 2},
 		},
 		{ // the example from the source code
-			[]font.CMapEntry{{CID: 1, GID: 1}, {CID: 2, GID: 2}, {CID: 5, GID: 5},
-				{CID: 6, GID: 10}, {CID: 7, GID: 11}, {CID: 8, GID: 6}},
+			[]font.CMapEntry{{CharCode: 1, GID: 1}, {CharCode: 2, GID: 2}, {CharCode: 5, GID: 5},
+				{CharCode: 6, GID: 10}, {CharCode: 7, GID: 11}, {CharCode: 8, GID: 6}},
 			[]int{0, 3, 6},
 		},
 	}

@@ -95,9 +95,9 @@ type otfSimple struct {
 	FontFileRef       *pdf.Reference
 
 	text map[font.GlyphID][]rune // GID -> text
-	enc  map[font.GlyphID]byte   // GID -> CID
-	tidy map[font.GlyphID]byte   // GID -> candidate CID
-	used map[byte]bool           // is CID used or not?
+	enc  map[font.GlyphID]byte   // GID -> CharCode
+	tidy map[font.GlyphID]byte   // GID -> candidate CharCode
+	used map[byte]bool           // is CharCode used or not?
 
 	overflowed bool
 }
@@ -174,7 +174,7 @@ func (t *otfSimple) Enc(gid font.GlyphID) pdf.String {
 		return pdf.String{c}
 	}
 
-	// allocate a new cid
+	// allocate a new character code
 	c, ok = t.tidy[gid]
 	if !ok {
 		for i := 127; i < 127+256; i++ {
@@ -213,26 +213,26 @@ func (t *otfSimple) WriteFont(w *pdf.Writer) error {
 	}
 
 	var mapping []font.CMapEntry
-	for origGid, cid := range t.enc {
+	for origGid, charCode := range t.enc {
 		if origGid == 0 {
 			continue
 		}
 		mapping = append(mapping, font.CMapEntry{
-			CID: uint16(cid),
-			GID: origGid,
+			CharCode: uint16(charCode),
+			GID:      origGid,
 		})
 	}
 	if len(mapping) == 0 {
 		// It is not clear how a font with no glyphs should be included
 		// in a PDF file.  In order to avoid problems, add a dummy glyph.
 		mapping = append(mapping, font.CMapEntry{
-			CID: 0,
-			GID: 0,
+			CharCode: 0,
+			GID:      0,
 		})
 	}
-	sort.Slice(mapping, func(i, j int) bool { return mapping[i].CID < mapping[j].CID })
-	firstCid := mapping[0].CID
-	lastCid := mapping[len(mapping)-1].CID
+	sort.Slice(mapping, func(i, j int) bool { return mapping[i].CharCode < mapping[j].CharCode })
+	firstCharCode := mapping[0].CharCode
+	lastCharCode := mapping[len(mapping)-1].CharCode
 
 	subsetMapping, includeGlyphs := font.MakeSubset(mapping)
 
@@ -268,10 +268,10 @@ func (t *otfSimple) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(top) * q),
 	}
 
-	var cid2text []font.SimpleMapping
+	var cc2text []font.SimpleMapping
 	for gid, text := range t.text {
-		cid := t.enc[gid]
-		cid2text = append(cid2text, font.SimpleMapping{Cid: cid, Text: text})
+		charCode := t.enc[gid]
+		cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
 	}
 
 	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Otf.Width))
@@ -282,8 +282,8 @@ func (t *otfSimple) WriteFont(w *pdf.Writer) error {
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("TrueType"),
 		"BaseFont":       fontName,
-		"FirstChar":      pdf.Integer(firstCid),
-		"LastChar":       pdf.Integer(lastCid),
+		"FirstChar":      pdf.Integer(firstCharCode),
+		"LastChar":       pdf.Integer(lastCharCode),
 		"FontDescriptor": t.FontDescriptorRef,
 		"Widths":         t.WidthsRef,
 		"ToUnicode":      t.ToUnicodeRef,
@@ -305,9 +305,9 @@ func (t *otfSimple) WriteFont(w *pdf.Writer) error {
 
 	var Widths pdf.Array
 	pos := 0
-	for i := firstCid; i <= lastCid; i++ {
+	for i := firstCharCode; i <= lastCharCode; i++ {
 		width := 0
-		if i == mapping[pos].CID {
+		if i == mapping[pos].CharCode {
 			gid := mapping[pos].GID
 			width = int(float64(t.Otf.Width[gid])*q + 0.5)
 			pos++
@@ -322,7 +322,7 @@ func (t *otfSimple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	err = font.WriteToUnicodeSimple(w, subsetTag, cid2text, t.ToUnicodeRef)
+	err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, t.ToUnicodeRef)
 	if err != nil {
 		return err
 	}

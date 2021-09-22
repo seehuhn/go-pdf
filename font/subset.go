@@ -20,11 +20,11 @@ import (
 	"sort"
 )
 
-// CMapEntry describes the association between a character index and
+// CMapEntry describes the association between a character code and
 // a glyph ID.
 type CMapEntry struct {
-	CID uint16
-	GID GlyphID
+	CharCode uint16
+	GID      GlyphID
 }
 
 // MakeSubset converts a mapping from a full font to a subsetted font.
@@ -37,7 +37,7 @@ func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []GlyphID) {
 		}
 	}
 	sort.Slice(newMapping, func(i, j int) bool {
-		return newMapping[i].CID < newMapping[j].CID
+		return newMapping[i].CharCode < newMapping[j].CharCode
 	})
 
 	newToOrigGid := []GlyphID{0}

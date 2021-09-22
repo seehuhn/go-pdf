@@ -39,11 +39,11 @@ func TestExport(t *testing.T) {
 		subset[c] = font.GlyphID(i + 1)
 	}
 	var mapping []font.CMapEntry
-	for cid, gid := range subset {
+	for charCode, gid := range subset {
 		if gid != 0 {
 			mapping = append(mapping, font.CMapEntry{
-				CID: uint16(cid),
-				GID: gid,
+				CharCode: uint16(charCode),
+				GID:      gid,
 			})
 		}
 	}
