@@ -88,11 +88,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 type ttfSimple struct {
 	Ttf *sfnt.Font
 
-	FontRef           *pdf.Reference
-	FontDescriptorRef *pdf.Reference
-	WidthsRef         *pdf.Reference
-	ToUnicodeRef      *pdf.Reference
-	FontFileRef       *pdf.Reference
+	FontRef *pdf.Reference
 
 	text map[font.GlyphID][]rune // GID -> text
 	enc  map[font.GlyphID]byte   // GID -> CID
@@ -117,11 +113,7 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Loc
 	res := &ttfSimple{
 		Ttf: tt,
 
-		FontRef:           w.Alloc(),
-		FontDescriptorRef: w.Alloc(),
-		WidthsRef:         w.Alloc(),
-		ToUnicodeRef:      w.Alloc(),
-		FontFileRef:       w.Alloc(),
+		FontRef: w.Alloc(),
 
 		text: make(map[font.GlyphID][]rune),
 		enc:  make(map[font.GlyphID]byte),
@@ -204,6 +196,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		return errors.New("too many different glyphs for simple font " + t.Ttf.FontName)
 	}
 
+	// Determine the subset of glyphs to include.
 	var mapping []font.CMapEntry
 	for origGid, cid := range t.enc {
 		if origGid == 0 {
@@ -225,8 +218,9 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 	sort.Slice(mapping, func(i, j int) bool { return mapping[i].CID < mapping[j].CID })
 	firstCid := mapping[0].CID
 	lastCid := mapping[len(mapping)-1].CID
-
 	subsetMapping, includeGlyphs := font.MakeSubset(mapping)
+	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Ttf.Width))
+	fontName := pdf.Name(subsetTag + "+" + t.Ttf.FontName)
 
 	// Compute the font bounding box for the subset.
 	left := math.MaxInt
@@ -251,7 +245,6 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 			top = box.URy
 		}
 	}
-
 	q := 1000 / float64(t.Ttf.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
 		LLx: math.Round(float64(left) * q),
@@ -260,10 +253,20 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(top) * q),
 	}
 
-	var cid2text []font.SimpleMapping
-	for gid, text := range t.text {
-		cid := t.enc[gid]
-		cid2text = append(cid2text, font.SimpleMapping{Cid: cid, Text: text})
+	FontDescriptorRef := w.Alloc()
+	WidthsRef := w.Alloc()
+	ToUnicodeRef := w.Alloc()
+	FontFileRef := w.Alloc()
+
+	Font := pdf.Dict{ // See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
+		"Type":           pdf.Name("Font"),
+		"Subtype":        pdf.Name("TrueType"),
+		"BaseFont":       fontName,
+		"FirstChar":      pdf.Integer(firstCid),
+		"LastChar":       pdf.Integer(lastCid),
+		"FontDescriptor": FontDescriptorRef,
+		"Widths":         WidthsRef,
+		"ToUnicode":      ToUnicodeRef,
 	}
 
 	// Following section 9.6.6.4 of PDF 32000-1:2008, for PDF versions before
@@ -274,24 +277,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		flags &= ^font.FlagNonsymbolic
 		flags |= font.FlagSymbolic
 	}
-
-	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Ttf.Width))
-	fontName := pdf.Name(subsetTag + "+" + t.Ttf.FontName)
-
-	// See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
-	Font := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("TrueType"),
-		"BaseFont":       fontName,
-		"FirstChar":      pdf.Integer(firstCid),
-		"LastChar":       pdf.Integer(lastCid),
-		"FontDescriptor": t.FontDescriptorRef,
-		"Widths":         t.WidthsRef,
-		"ToUnicode":      t.ToUnicodeRef,
-	}
-
-	// See sections 9.8.1 of PDF 32000-1:2008.
-	FontDescriptor := pdf.Dict{
+	FontDescriptor := pdf.Dict{ // See sections 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
 		"Flags":       pdf.Integer(flags),
@@ -301,7 +287,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		"Descent":     pdf.Integer(q*float64(t.Ttf.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(t.Ttf.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70), // information not available in ttf files
-		"FontFile2":   t.FontFileRef,
+		"FontFile2":   FontFileRef,
 	}
 
 	var Widths pdf.Array
@@ -317,13 +303,18 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 	}
 
 	_, err := w.WriteCompressed(
-		[]*pdf.Reference{t.FontRef, t.FontDescriptorRef, t.WidthsRef},
+		[]*pdf.Reference{t.FontRef, FontDescriptorRef, WidthsRef},
 		Font, FontDescriptor, Widths)
 	if err != nil {
 		return err
 	}
 
-	err = font.WriteToUnicodeSimple(w, subsetTag, cid2text, t.ToUnicodeRef)
+	var cid2text []font.SimpleMapping
+	for gid, text := range t.text {
+		cid := t.enc[gid]
+		cid2text = append(cid2text, font.SimpleMapping{Cid: cid, Text: text})
+	}
+	err = font.WriteToUnicodeSimple(w, subsetTag, cid2text, ToUnicodeRef)
 	if err != nil {
 		return err
 	}
@@ -334,7 +325,7 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 	fontFileDict := pdf.Dict{
 		"Length1": size,
 	}
-	fontFileStream, _, err := w.OpenStream(fontFileDict, t.FontFileRef,
+	fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
 		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return err

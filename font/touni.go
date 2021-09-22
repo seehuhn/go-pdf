@@ -116,8 +116,8 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 	return writeToUnicodeStream(w, data, toUnicodeRef)
 }
 
-// ToUnicodeCIDFont writes the ToUnicode stream for a CIDFont.
-func ToUnicodeCIDFont(w *pdf.Writer, cmap map[uint16]rune, toUnicodeRef *pdf.Reference) error {
+// WriteToUnicodeCID writes the ToUnicode stream for a CIDFont.
+func WriteToUnicodeCID(w *pdf.Writer, cmap map[uint16]rune, toUnicodeRef *pdf.Reference) error {
 	data := &toUnicodeData{
 		Registry:   "Adobe",
 		Ordering:   "UCS",

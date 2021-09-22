@@ -112,5 +112,5 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Error("fish")
+	// t.Error("fish")
 }
