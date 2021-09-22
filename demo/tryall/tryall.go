@@ -18,50 +18,16 @@ package main
 
 import (
 	"bufio"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 )
-
-var passwords = map[string]string{
-	"acac29b4192fd923c24fe6042479b2a9": "test",
-	"c13cb3f802bb2d44b74cb449d64665a7": "Arlo",
-	"ce78fac52b4b1c9ae79788e36217ca99": "EDIT",
-	"fa71d689cb967d41b249a20f14d5269d": "201206616",
-}
-
-func readPwd(ID []byte, try int) string {
-	if try != 0 {
-		return ""
-	}
-	hex := fmt.Sprintf("%x", ID)
-	return passwords[hex]
-}
-
-func getNames() <-chan string {
-	fd, err := os.Open(os.Args[1])
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	c := make(chan string)
-	go func(c chan<- string) {
-		scanner := bufio.NewScanner(fd)
-		for scanner.Scan() {
-			c <- scanner.Text()
-		}
-		if err := scanner.Err(); err != nil {
-			log.Println("cannot read more file names:", err)
-		}
-
-		fd.Close()
-		close(c)
-	}(c)
-	return c
-}
 
 func doOneFile(fname string) error {
 	fd, err := os.Open(fname)
@@ -88,29 +54,23 @@ func doOneFile(fname string) error {
 		}
 
 		if dict, ok := obj.(pdf.Dict); ok {
-			if dict["Type"] != pdf.Name("Font") {
+			if dict["Type"] != pdf.Name("Font") || dict["Subtype"] != pdf.Name("CIDFontType2") {
 				continue
 			}
-			toUnicode, ok := dict["ToUnicode"]
-			if !ok {
-				continue
+			desc := "<missing>"
+			if CIDSystemInfo, ok := dict["CIDSystemInfo"]; ok {
+				CIDSystemInfo, err = r.Resolve(CIDSystemInfo)
+				if err != nil {
+					return err
+				}
+				d := CIDSystemInfo.(pdf.Dict)
+				registry := string(d["Registry"].(pdf.String))
+				ordering := string(d["Ordering"].(pdf.String))
+				supplement := int(d["Supplement"].(pdf.Integer))
+				desc = fmt.Sprintf("%s-%s-%d", registry, ordering, supplement)
 			}
-			cmapObj, err := r.Resolve(toUnicode)
-			if err != nil {
-				return err
-			}
-			cmap := cmapObj.(*pdf.Stream)
-
-			fmt.Println("*", fname)
-			r, err := cmap.Decode(r.Resolve)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(os.Stdout, r)
-			if err != nil {
-				return err
-			}
-			fmt.Println("---------------------------")
+			// fmt.Println(desc)
+			_ = desc
 		}
 	}
 
@@ -118,6 +78,16 @@ func doOneFile(fname string) error {
 }
 
 func main() {
+	passwords := flag.String("p", "", "list of passwords for authetication")
+	flag.Parse()
+
+	if *passwords != "" {
+		err := loadPasswordFile(*passwords)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	total := 0
 	errors := 0
 	c := getNames()
@@ -135,4 +105,54 @@ func main() {
 		}
 	}
 	fmt.Println(total, "files,", errors, "errors")
+}
+
+var passwords = map[string]string{}
+
+func loadPasswordFile(fname string) error {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+
+	scanner := bufio.NewScanner(fd)
+	for scanner.Scan() {
+		ff := strings.Fields(scanner.Text())
+		if len(ff) != 2 {
+			return errors.New("malformed password file")
+		}
+		passwords[ff[0]] = ff[1]
+	}
+	return scanner.Err()
+}
+
+func readPwd(ID []byte, try int) string {
+	if try != 0 {
+		return ""
+	}
+	hex := fmt.Sprintf("%x", ID)
+	return passwords[hex]
+}
+
+func getNames() <-chan string {
+	fd, err := os.Open(flag.Arg(0))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	c := make(chan string)
+	go func(c chan<- string) {
+		scanner := bufio.NewScanner(fd)
+		for scanner.Scan() {
+			c <- scanner.Text()
+		}
+		if err := scanner.Err(); err != nil {
+			log.Println("cannot read more file names:", err)
+		}
+
+		fd.Close()
+		close(c)
+	}(c)
+	return c
 }

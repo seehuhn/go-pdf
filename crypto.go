@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 )
 
 type encryptInfo struct {
@@ -41,6 +42,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd ReadPwdFunc) (*encryptI
 	if err != nil {
 		return nil, err
 	}
+	enc.PDF(os.Stdout)
 	if len(r.ID) != 2 {
 		return nil, &MalformedFileError{Err: errors.New("found Encrypt but no ID")}
 	}

@@ -144,7 +144,7 @@ func (s *scanner) ReadObject() (Object, error) {
 		if len(buf) < 5 {
 			err = &MalformedFileError{Err: io.EOF}
 		} else {
-			err = &MalformedFileError{}
+			err = &MalformedFileError{Pos: s.currentPos()}
 		}
 	}
 
