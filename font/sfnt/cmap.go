@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"math/bits"
 
+	"seehuhn.de/go/pdf/dijkstra"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -181,43 +182,9 @@ func findSegments(mapping []font.CMapEntry) []int {
 		return 4 // we can use IDDelta
 	}
 
-	// Use Dijkstra's algorithm to find the best splits between segments.
-	// https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
-	//     vertices: 0, 1, ..., n, start at 0, end at n
-	//     edges: (k, l) with 0 <= k < l <= n
 	n := len(mapping)
-	dist := make([]int, n)
-	to := make([]int, n)
-	for i := 0; i < n; i++ {
-		dist[i] = cost(i, n)
-		to[i] = n
-	}
 
-	pos := n
-	for pos > 0 {
-		bestNode, bestDist := 0, dist[0]
-		for i := 1; i < pos; i++ {
-			if dist[i] < bestDist {
-				bestNode = i
-				bestDist = dist[i]
-			}
-		}
-		pos = bestNode
-
-		for i := 0; i < pos; i++ {
-			alt := bestDist + cost(i, pos)
-			if alt < dist[i] {
-				dist[i] = alt
-				to[i] = pos
-			}
-		}
-	}
-
-	res := []int{0}
-	pos = 0
-	for pos < n {
-		pos = to[pos]
-		res = append(res, pos)
-	}
-	return res
+	// Use Dijkstra's algorithm to find the best splits between segments.
+	_, path := dijkstra.ShortestPath(cost, n)
+	return path
 }
