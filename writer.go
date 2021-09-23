@@ -536,7 +536,7 @@ type streamWriter struct {
 	parent   *Writer
 	dict     Dict
 	ref      *Reference
-	started  bool
+	started  bool // TODO(voss): can this be replaced by `buf == nil`?
 	startPos int64
 	length   *Placeholder
 	buf      []byte

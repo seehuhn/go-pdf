@@ -35,7 +35,10 @@ type cffFont struct {
 
 func readCFF(r io.ReadSeeker, length int64) (*cffFont, error) {
 	p := parser.New(r)
-	p.SetRegion("CFF", 0, length)
+	err := p.SetRegion("CFF", 0, length)
+	if err != nil {
+		return nil, err
+	}
 	x, err := p.ReadUInt32()
 	if err != nil {
 		return nil, err

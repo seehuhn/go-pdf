@@ -42,7 +42,7 @@ func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Lo
 		return nil, err
 	}
 
-	return EmbedFontSimple(w, tt, instName, loc)
+	return EmbedFontSimple(w, tt, instName)
 }
 
 // EmbedFontSimple embeds an OpenType font into a pdf file as a simple font.
@@ -56,13 +56,13 @@ func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Lo
 // there is no limit on the number of glyphs which can be accessed.
 //
 // Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
-func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*font.Font, error) {
+func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, error) {
 	err := w.CheckVersion("use of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 
-	t, err := newOtfSimple(w, tt, instName, loc)
+	t, err := newOtfSimple(w, tt, instName)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ type otfSimple struct {
 	overflowed bool
 }
 
-func newOtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*otfSimple, error) {
+func newOtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string) (*otfSimple, error) {
 	if !tt.IsOpenType() {
 		return nil, errors.New("not an OpenType font")
 	}

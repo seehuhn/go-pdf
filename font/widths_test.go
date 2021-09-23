@@ -97,7 +97,7 @@ func TestWidths(t *testing.T) {
 		},
 	}
 	for i, test := range cases {
-		DW, W := EncodeWidths(test.in)
+		DW, W := EncodeCIDWidths(test.in)
 		buf := &bytes.Buffer{}
 		_ = W.PDF(buf)
 		fmt.Println(i, buf.String())

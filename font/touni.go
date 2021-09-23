@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// SimpleMapping describes the unicode text corresponding to a character
+// SimpleMapping describes the unicode text corresponding to a character code
 // in a simple font.
 type SimpleMapping struct {
 	CharCode byte
@@ -116,24 +116,36 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 	return writeToUnicodeStream(w, data, toUnicodeRef)
 }
 
+// CIDMapping describes the unicode text corresponding to a character code
+// in a CIDFont.
+type CIDMapping struct {
+	CharCode uint16
+	Text     []rune
+}
+
 // WriteToUnicodeCID writes the ToUnicode stream for a CIDFont.
-func WriteToUnicodeCID(w *pdf.Writer, cmap map[uint16]rune, toUnicodeRef *pdf.Reference) error {
+func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Reference) error {
 	data := &toUnicodeData{
 		Registry:   "Adobe",
 		Ordering:   "UCS",
 		Supplement: 0,
-		CodeSpace:  []string{"<00><FF>"},
+		CodeSpace:  []string{"<0000><FFFF>"},
 	}
 
+	cmap := make(map[uint16]rune) // TODO(voss): don't use this
 	var all []uint16
-	for idx := range cmap {
-		all = append(all, idx)
+	for _, m := range mm {
+		if len(m.Text) != 1 { // TODO(voss): fix this
+			continue
+		}
+		all = append(all, m.CharCode)
+		cmap[m.CharCode] = m.Text[0]
 	}
-	sort.Slice(all, func(i, j int) bool {
-		return all[i] < all[j]
-	})
+	sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
 	if len(all) == 0 {
-		panic("empty cmap")
+		// TODO(voss)
+		all = append(all, 0)
+		cmap[0] = 0
 	}
 
 	first := true
@@ -175,7 +187,7 @@ func WriteToUnicodeCID(w *pdf.Writer, cmap map[uint16]rune, toUnicodeRef *pdf.Re
 }
 
 func writeToUnicodeStream(w *pdf.Writer, data *toUnicodeData, toUnicodeRef *pdf.Reference) error {
-	cmapStream, _, err := w.OpenStream(pdf.Dict{}, toUnicodeRef,
+	cmapStream, _, err := w.OpenStream(nil, toUnicodeRef,
 		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return err

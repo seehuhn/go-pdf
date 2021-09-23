@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -40,7 +41,7 @@ func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Local
 		return nil, err
 	}
 
-	return EmbedFontCID(w, tt, instName, loc)
+	return EmbedFontCID(w, tt, instName)
 }
 
 // EmbedFontCID embeds a TrueType font into a pdf file as a CIDFont.
@@ -53,13 +54,13 @@ func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Local
 // object.
 //
 // Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
-func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*font.Font, error) {
+func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, error) {
 	err := w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
 
-	t, err := newTtfCID(w, tt, instName, loc)
+	t, err := newTtfCID(w, tt, instName)
 	if err != nil {
 		return nil, err
 	}
@@ -88,10 +89,10 @@ type ttfCID struct {
 	FontRef *pdf.Reference
 
 	text map[font.GlyphID][]rune // GID -> text
-	used map[uint16]bool         // is CharCode used or not?
+	used map[font.GlyphID]bool   // is GID used?
 }
 
-func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*ttfCID, error) {
+func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*ttfCID, error) {
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
 	}
@@ -102,7 +103,9 @@ func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale
 		FontRef: w.Alloc(),
 
 		text: make(map[font.GlyphID][]rune),
-		used: map[uint16]bool{},
+		used: map[font.GlyphID]bool{
+			0: true, // always include the .notdef glyph
+		},
 	}
 
 	return res, nil
@@ -137,41 +140,73 @@ func (t *ttfCID) Layout(rr []rune) ([]font.Glyph, error) {
 }
 
 func (t *ttfCID) Enc(gid font.GlyphID) pdf.String {
-	t.used[uint16(gid)] = true
+	t.used[gid] = true
 	return pdf.String{byte(gid >> 8), byte(gid)}
 }
 
 func (t *ttfCID) WriteFont(w *pdf.Writer) error {
-	subsetTag := "AAAAAA" // TODO(voss)
-
-	q := 1000 / float64(t.Ttf.GlyphUnits)
-
-	// TODO(voss): make sure there is only one copy of this per PDF file.
-	CIDSystemInfoRef, err := w.Write(pdf.Dict{
-		"Registry":   pdf.String("Adobe"),
-		"Ordering":   pdf.String("Identity"),
-		"Supplement": pdf.Integer(0),
-	}, nil)
-	if err != nil {
-		return err
+	// Determine the subset of glyphs to include.
+	origNumGlyphs := len(t.Ttf.Width)
+	var includeGlyphs []font.GlyphID
+	for gid, ok := range t.used {
+		if !ok {
+			continue
+		}
+		includeGlyphs = append(includeGlyphs, gid)
 	}
-
-	mm := make(map[uint16]rune)
-	for r, gid := range t.Ttf.CMap {
-		mm[uint16(gid)] = r
+	sort.Slice(includeGlyphs, func(i, j int) bool {
+		return includeGlyphs[i] < includeGlyphs[j]
+	})
+	cid2gid := make([]byte, 2*origNumGlyphs)
+	for gid, cid := range includeGlyphs {
+		cid2gid[2*cid] = byte(gid >> 8)
+		cid2gid[2*cid+1] = byte(gid)
 	}
-
-	DW, W := font.EncodeWidths(t.Ttf.Width)
-
+	subsetTag := font.GetSubsetTag(includeGlyphs, origNumGlyphs)
 	fontName := pdf.Name(subsetTag + "+" + t.Ttf.FontName)
 
-	CIDFontRef := w.Alloc()
-	FontDescriptorRef := w.Alloc()
-	WidthsRef := w.Alloc()
-	ToUnicodeRef := w.Alloc()
-	FontFileRef := w.Alloc()
+	// Compute the font bounding box for the subset.
+	left := math.MaxInt
+	right := math.MinInt
+	top := math.MinInt
+	bottom := math.MaxInt
+	for _, origGid := range includeGlyphs {
+		if origGid == 0 {
+			continue
+		}
+		box := t.Ttf.GlyphExtent[origGid]
+		if box.LLx < left {
+			left = box.LLx
+		}
+		if box.URx > right {
+			right = box.URx
+		}
+		if box.LLy < bottom {
+			bottom = box.LLy
+		}
+		if box.URy > top {
+			top = box.URy
+		}
+	}
+	q := 1000 / float64(t.Ttf.GlyphUnits)
+	FontBBox := &pdf.Rectangle{
+		LLx: math.Round(float64(left) * q),
+		LLy: math.Round(float64(bottom) * q),
+		URx: math.Round(float64(right) * q),
+		URy: math.Round(float64(top) * q),
+	}
 
-	Font := pdf.Dict{
+	DW, W := font.EncodeCIDWidths(t.Ttf.Width) // TODO(voss): subset
+
+	CIDFontRef := w.Alloc()
+	CIDSystemInfoRef := w.Alloc()
+	FontDescriptorRef := w.Alloc()
+	WRef := w.Alloc()
+	CID2GIDMapRef := w.Alloc()
+	FontFileRef := w.Alloc()
+	ToUnicodeRef := w.Alloc()
+
+	Font := pdf.Dict{ // See section 9.7.6.1 of PDF 32000-1:2008.
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
 		"BaseFont":        fontName,
@@ -180,55 +215,79 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 		"ToUnicode":       ToUnicodeRef,
 	}
 
-	CIDFont := pdf.Dict{
+	CIDFont := pdf.Dict{ // See section 9.7.4.1 of PDF 32000-1:2008.
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("CIDFontType2"),
 		"BaseFont":       fontName,
 		"CIDSystemInfo":  CIDSystemInfoRef,
 		"FontDescriptor": FontDescriptorRef,
-		"W":              WidthsRef,
+		"CIDToGIDMap":    CID2GIDMapRef,
+	}
+	if W != nil {
+		CIDFont["W"] = WRef
 	}
 	if DW != 1000 {
 		CIDFont["DW"] = pdf.Integer(DW)
 	}
 
-	FontDescriptor := pdf.Dict{
-		"Type":     pdf.Name("FontDescriptor"),
-		"FontName": fontName,
-		"Flags":    pdf.Integer(t.Ttf.Flags),
-		"FontBBox": &pdf.Rectangle{
-			LLx: math.Round(float64(t.Ttf.Head.XMin) * q),
-			LLy: math.Round(float64(t.Ttf.Head.YMin) * q),
-			URx: math.Round(float64(t.Ttf.Head.XMax) * q),
-			URy: math.Round(float64(t.Ttf.Head.YMax) * q),
-		},
+	// TODO(voss): make sure there is only one copy of this per PDF file.
+	CIDSystemInfo := pdf.Dict{ // See sections 9.7.3 of PDF 32000-1:2008.
+		"Registry":   pdf.String("Adobe"),
+		"Ordering":   pdf.String("Identity"),
+		"Supplement": pdf.Integer(0),
+	}
+
+	FontDescriptor := pdf.Dict{ // See sections 9.8.1 of PDF 32000-1:2008.
+		"Type":        pdf.Name("FontDescriptor"),
+		"FontName":    fontName,
+		"Flags":       pdf.Integer(t.Ttf.Flags),
+		"FontBBox":    FontBBox,
 		"ItalicAngle": pdf.Number(t.Ttf.ItalicAngle),
 		"Ascent":      pdf.Integer(q*float64(t.Ttf.Ascent) + 0.5),
 		"Descent":     pdf.Integer(q*float64(t.Ttf.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(t.Ttf.CapHeight) + 0.5),
-		"StemV":       pdf.Integer(70),
+		"StemV":       pdf.Integer(70), // information not available in ttf files
 		"FontFile2":   FontFileRef,
 	}
 
-	_, err = w.WriteCompressed(
-		[]*pdf.Reference{t.FontRef, CIDFontRef, FontDescriptorRef, WidthsRef},
-		Font, CIDFont, FontDescriptor, W)
+	_, err := w.WriteCompressed(
+		[]*pdf.Reference{
+			t.FontRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef, WRef,
+		},
+		Font, CIDFont, CIDSystemInfo, FontDescriptor, W)
 	if err != nil {
 		return err
 	}
 
-	err = font.WriteToUnicodeCID(w, mm, ToUnicodeRef)
+	// write all the streams
+
+	cid2gidStream, _, err := w.OpenStream(nil, CID2GIDMapRef,
+		&pdf.FilterInfo{
+			Name: "FlateDecode",
+			Parms: pdf.Dict{
+				"Predictor": pdf.Integer(12),
+				"Columns":   pdf.Integer(2),
+			},
+		})
+	if err != nil {
+		return err
+	}
+	_, err = cid2gidStream.Write(cid2gid)
+	if err != nil {
+		return err
+	}
+	err = cid2gidStream.Close()
 	if err != nil {
 		return err
 	}
 
-	// Finally, write the font file itself.
+	// Write the font file itself.
 	// See section 9.9 of PDF 32000-1:2008 for details.
 	size := w.NewPlaceholder(10)
-	dict := pdf.Dict{
-		"Length1": size, // TODO(voss): maybe only needed for Subtype=TrueType?
+	fontFileDict := pdf.Dict{
+		"Length1": size,
 	}
-	stm, _, err := w.OpenStream(dict, FontFileRef,
+	fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
 		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return err
@@ -236,19 +295,19 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 	exOpt := &sfnt.ExportOptions{
 		IncludeTables: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
-			"glyf": true,
-			"head": true,
-			"hhea": true,
-			"hmtx": true,
-			"loca": true,
-			"maxp": true,
-			"cvt ": true,
-			"fpgm": true,
-			"prep": true,
-			"gasp": true,
+			"cvt ": true, // copy
+			"fpgm": true, // copy
+			"prep": true, // copy
+			"head": true, // update CheckSumAdjustment, Modified and indexToLocFormat
+			"hhea": true, // update various fields, including numberOfHMetrics
+			"maxp": true, // update numGlyphs
+			"hmtx": true, // rewrite
+			"loca": true, // rewrite
+			"glyf": true, // rewrite
 		},
+		IncludeGlyphs: includeGlyphs,
 	}
-	n, err := t.Ttf.Export(stm, exOpt)
+	n, err := t.Ttf.Export(fontFileStream, exOpt)
 	if err != nil {
 		return err
 	}
@@ -256,7 +315,17 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 	if err != nil {
 		return err
 	}
-	err = stm.Close()
+	err = fontFileStream.Close()
+	if err != nil {
+		return err
+	}
+
+	var cc2text []font.CIDMapping
+	for gid, text := range t.text {
+		fmt.Println(gid, "->", text)
+		cc2text = append(cc2text, font.CIDMapping{CharCode: uint16(gid), Text: text})
+	}
+	err = font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
 	if err != nil {
 		return err
 	}

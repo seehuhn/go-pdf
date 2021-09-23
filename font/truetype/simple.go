@@ -255,8 +255,8 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 
 	FontDescriptorRef := w.Alloc()
 	WidthsRef := w.Alloc()
-	ToUnicodeRef := w.Alloc()
 	FontFileRef := w.Alloc()
+	ToUnicodeRef := w.Alloc()
 
 	Font := pdf.Dict{ // See sections 9.6.2.1 and 9.6.3 of PDF 32000-1:2008.
 		"Type":           pdf.Name("Font"),
@@ -309,17 +309,9 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	var cc2text []font.SimpleMapping
-	for gid, text := range t.text {
-		charCode := t.enc[gid]
-		cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
-	}
-	err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
-	if err != nil {
-		return err
-	}
+	// write all the streams
 
-	// Finally, write the font file itself.
+	// Write the font file itself.
 	// See section 9.9 of PDF 32000-1:2008 for details.
 	size := w.NewPlaceholder(10)
 	fontFileDict := pdf.Dict{
@@ -358,6 +350,16 @@ func (t *ttfSimple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 	err = fontFileStream.Close()
+	if err != nil {
+		return err
+	}
+
+	var cc2text []font.SimpleMapping
+	for gid, text := range t.text {
+		charCode := t.enc[gid]
+		cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
+	}
+	err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
 	if err != nil {
 		return err
 	}

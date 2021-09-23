@@ -174,7 +174,7 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
-	tt, err := sfnt.Open(fontFileName, nil)
+	tt, err := sfnt.Open(fontFileName, locale.EnGB)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err = truetype.EmbedFontCID(out, tt, "X", locale.EnGB)
+	theFont, err = truetype.EmbedFontCID(out, tt, "X")
 	// Font, err = builtin.Embed(out, "X", "Times-Roman", font.AdobeStandardLatin)
 	if err != nil {
 		log.Fatal(err)

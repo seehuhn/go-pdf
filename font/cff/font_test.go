@@ -56,7 +56,10 @@ func TestIndex(t *testing.T) {
 
 		r := bytes.NewReader(buf.Bytes())
 		p := parser.New(r)
-		p.SetRegion("CFF", 0, int64(n))
+		err = p.SetRegion("CFF", 0, int64(n))
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		out, err := readIndex(p)
 		if err != nil {
