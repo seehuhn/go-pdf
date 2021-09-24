@@ -22,7 +22,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-func (font *cffFont) writeSubset(w io.Writer, subset []font.GlyphID) (int, error) {
+func (font *Font) writeSubset(w io.Writer, subset []font.GlyphID) (int, error) {
 	total := 0
 
 	// Header
@@ -39,7 +39,7 @@ func (font *cffFont) writeSubset(w io.Writer, subset []font.GlyphID) (int, error
 	}
 
 	// Name INDEX
-	n, err = writeIndex(w, [][]byte{[]byte(font.Name)})
+	n, err = writeIndex(w, [][]byte{[]byte(font.FontName)})
 	total += n
 	if err != nil {
 		return n, err

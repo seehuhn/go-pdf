@@ -92,7 +92,7 @@ func TestReadCFF(t *testing.T) {
 	length := int64(table.Length)
 	tableFd := io.NewSectionReader(tt.Fd, int64(table.Offset), length)
 
-	cff, err := readCFF(tableFd, length)
+	cff, err := ReadCFF(tableFd)
 	if err != nil {
 		t.Error(err)
 	}

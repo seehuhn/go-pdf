@@ -29,13 +29,24 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-type cffFont struct {
-	Name string
+type Font struct {
+	FontName  string
+	IsCIDFont bool
+	strings   []string
 }
 
-func readCFF(r io.ReadSeeker, length int64) (*cffFont, error) {
+func ReadCFF(r io.ReadSeeker) (*Font, error) {
+	length, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, err
+	}
+	_, err = r.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
 	p := parser.New(r)
-	err := p.SetRegion("CFF", 0, length)
+	err = p.SetRegion("CFF", 0, length)
 	if err != nil {
 		return nil, err
 	}
@@ -46,14 +57,14 @@ func readCFF(r io.ReadSeeker, length int64) (*cffFont, error) {
 	major := x >> 24
 	minor := (x >> 16) & 0xFF
 	nameIndexPos := int64((x >> 8) & 0xFF)
-	offSize := x & 0xFF
-	_ = offSize // TODO (what is this used for?)
+	// offSize := x & 0xFF // TODO(voss): what is this used for?
 	if major != 1 {
 		return nil, fmt.Errorf("unsupported CFF version %d.%d", major, minor)
 	}
 
-	res := &cffFont{}
+	cff := &Font{}
 
+	// read the Name INDEX
 	err = p.SeekPos(nameIndexPos)
 	if err != nil {
 		return nil, err
@@ -65,36 +76,58 @@ func readCFF(r io.ReadSeeker, length int64) (*cffFont, error) {
 	if len(names) != 1 {
 		return nil, errors.New("CFF with multiple fonts not supported")
 	}
-	res.Name = string(names[0])
+	cff.FontName = string(names[0])
 
+	// read the Top DICT
 	topDicts, err := readIndex(p)
 	if err != nil {
 		return nil, err
 	}
-	if len(topDicts) != len(names) {
+	if len(topDicts) != 1 {
 		return nil, errors.New("invalid CFF")
 	}
+	topDict, err := parseDict(topDicts[0])
+	if err != nil {
+		return nil, err
+	}
 
-	for i, topDict := range topDicts {
-		dd, err := parseDict(topDict)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Printf("Top DICT for %q:\n", string(names[i]))
-		for _, entry := range dd {
-			fmt.Printf("  - 0x%04x %v\n", entry.op, entry.args)
+	// read the String INDEX
+	strings, err := readIndex(p)
+	if err != nil {
+		return nil, err
+	}
+	cff.strings = make([]string, len(strings))
+	for i, s := range strings {
+		cff.strings[i] = string(s)
+	}
+
+	for _, entry := range topDict {
+		key := entry.op
+		// fmt.Printf("  - 0x%04x %v\n", key, entry.args)
+		switch key {
+		case keyROS:
+			cff.IsCIDFont = true
+		case keyCharstringType:
+			if len(entry.args) != 1 {
+				return nil, errors.New("invalid CFF")
+			}
+			val, ok := entry.args[0].(int32)
+			if !ok {
+				return nil, errors.New("invalid CFF")
+			}
+			if val != 2 {
+				return nil, errors.New("unsupported charstring type")
+			}
+			// case keyFamilyName:
+			// 	fmt.Println("family name =", cff.GetString(int(entry.args[0].(int32))))
+			// case keyNotice:
+			// 	fmt.Println("notice =", cff.GetString(int(entry.args[0].(int32))))
+			// case keyCopyright:
+			// 	fmt.Println("copyright =", cff.GetString(int(entry.args[0].(int32))))
 		}
 	}
 
-	// strings, err := readIndex(p)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// for i, s := range strings {
-	// 	fmt.Printf("string %d = %q\n", i+nStdString, string(s))
-	// }
-
-	return res, nil
+	return cff, nil
 }
 
 var errCorruptDict = errors.New("invalid CFF DICT")
@@ -271,3 +304,17 @@ func writeIndex(w io.Writer, data [][]byte) (int, error) {
 
 	return total, out.Flush()
 }
+
+const (
+	// keyNotice         = 0x0001 // SID
+	// keyFullName       = 0x0002 // SID
+	// keyFamilyName     = 0x0003 // SID
+	// keyFontBBox       = 0x0005
+	// keyCharset        = 0x000F
+	// keyCharStrings    = 0x0011
+	// keyPrivate        = 0x0012
+	// keyCopyright      = 0x0C00 // SID
+	// keyUnderlinePos   = 0x0C03
+	keyCharstringType = 0x0C06 // number (default=2)
+	keyROS            = 0x0C1E
+)

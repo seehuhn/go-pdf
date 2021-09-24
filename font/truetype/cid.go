@@ -55,14 +55,23 @@ func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Local
 //
 // Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
 func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, error) {
+	if !tt.IsTrueType() {
+		return nil, errors.New("not a TrueType font")
+	}
 	err := w.CheckVersion("use of TrueType-based CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
 
-	t, err := newTtfCID(w, tt, instName)
-	if err != nil {
-		return nil, err
+	t := &ttfCID{
+		Ttf: tt,
+
+		FontRef: w.Alloc(),
+
+		text: make(map[font.GlyphID][]rune),
+		used: map[font.GlyphID]bool{
+			0: true, // always include the .notdef glyph
+		},
 	}
 
 	w.OnClose(t.WriteFont)
@@ -90,25 +99,6 @@ type ttfCID struct {
 
 	text map[font.GlyphID][]rune // GID -> text
 	used map[font.GlyphID]bool   // is GID used?
-}
-
-func newTtfCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*ttfCID, error) {
-	if !tt.IsTrueType() {
-		return nil, errors.New("not a TrueType font")
-	}
-
-	res := &ttfCID{
-		Ttf: tt,
-
-		FontRef: w.Alloc(),
-
-		text: make(map[font.GlyphID][]rune),
-		used: map[font.GlyphID]bool{
-			0: true, // always include the .notdef glyph
-		},
-	}
-
-	return res, nil
 }
 
 func (t *ttfCID) Layout(rr []rune) ([]font.Glyph, error) {

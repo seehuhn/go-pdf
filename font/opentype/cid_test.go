@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-func TestCIDGlyf(t *testing.T) {
+func TestCID(t *testing.T) {
 	w, err := pdf.Create("test.pdf")
 	if err != nil {
 		t.Fatal(err)

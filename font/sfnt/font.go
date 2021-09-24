@@ -17,6 +17,7 @@
 package sfnt
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -69,8 +70,13 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 
+	tt := &Font{
+		Fd:     fd,
+		Header: header,
+	}
+
 	head := &table.Head{}
-	_, err = header.GetTableReader(fd, "head", head)
+	_, err = tt.GetTableReader("head", head)
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +87,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if head.MagicNumber != 0x5F0F3CF5 {
 		return nil, errors.New("sfnt/head: wrong magic number")
 	}
-
-	tt := &Font{
-		Fd:     fd,
-		Header: header,
-		head:   head,
-	}
+	tt.head = head
 
 	maxp, err := tt.getMaxpInfo()
 	if err != nil {
@@ -291,6 +292,26 @@ func (tt *Font) IsOpenType() bool {
 // IsVariable checks whether the font is a "variable font".
 func (tt *Font) IsVariable() bool {
 	return tt.HasTables("fvar")
+}
+
+// GetTableReader returns an io.SectionReader which can be used to read
+// the table data.  If head is non-nil, binary.Read() is used to
+// read the data at the start of the table into the value head points to.
+func (tt *Font) GetTableReader(name string, head interface{}) (*io.SectionReader, error) {
+	rec := tt.Header.Find(name)
+	if rec == nil {
+		return nil, &table.ErrNoTable{Name: name}
+	}
+	tableFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
+
+	if head != nil {
+		err := binary.Read(tableFd, binary.BigEndian, head)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return tableFd, nil
 }
 
 // SelectCMap chooses one of the sub-tables of the cmap table and reads the

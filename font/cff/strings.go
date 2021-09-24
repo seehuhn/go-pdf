@@ -16,6 +16,19 @@
 
 package cff
 
+func (cff *Font) GetString(SID int) string {
+	if SID < nStdString {
+		return stdStrings[SID]
+	}
+	SID -= nStdString
+
+	if SID < len(cff.strings) {
+		return cff.strings[SID]
+	}
+
+	return ""
+}
+
 var stdStrings = []string{
 	".notdef",             // 0
 	"space",               // 1

@@ -223,7 +223,7 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		return nil, err
 	}
 
-	glyfFd, err := tt.Header.GetTableReader(tt.Fd, "glyf", nil)
+	glyfFd, err := tt.GetTableReader("glyf", nil)
 	if err != nil {
 		return nil, err
 	}

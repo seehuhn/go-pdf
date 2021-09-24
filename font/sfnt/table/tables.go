@@ -88,26 +88,6 @@ func (h *Header) Find(name string) *Record {
 	return nil
 }
 
-// GetTableReader returns an io.SectionReader which can be used to read
-// the table data.  If head is non-nil, binary.Read() is used to
-// read the data at the start of the table into the value head points to.
-func (h *Header) GetTableReader(r io.ReaderAt, name string, head interface{}) (*io.SectionReader, error) {
-	table := h.Find(name)
-	if table == nil {
-		return nil, &ErrNoTable{name}
-	}
-	tableFd := io.NewSectionReader(r, int64(table.Offset), int64(table.Length))
-
-	if head != nil {
-		err := binary.Read(tableFd, binary.BigEndian, head)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return tableFd, nil
-}
-
 // ReadTableBytes returns the body of an sfnt table.
 func (h *Header) ReadTableBytes(r io.ReaderAt, name string) ([]byte, error) {
 	table := h.Find(name)

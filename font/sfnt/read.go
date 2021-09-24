@@ -31,7 +31,7 @@ import (
 
 func (tt *Font) getMaxpInfo() (*table.MaxpHead, error) {
 	maxp := &table.MaxpHead{}
-	_, err := tt.Header.GetTableReader(tt.Fd, "maxp", maxp)
+	_, err := tt.GetTableReader("maxp", maxp)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (tt *Font) getMaxpInfo() (*table.MaxpHead, error) {
 // getFontName reads the PostScript name of a font from the "name" table.
 func (tt *Font) getFontName() (string, error) {
 	nameHeader := &table.NameHeader{}
-	nameFd, err := tt.Header.GetTableReader(tt.Fd, "name", nameHeader)
+	nameFd, err := tt.GetTableReader("name", nameHeader)
 	if err != nil {
 		return "", err
 	}
@@ -103,7 +103,7 @@ func (tt *Font) getFontName() (string, error) {
 // getPostInfo reads the "post" table of a sfnt file.
 func (tt *Font) getPostInfo() (*table.PostInfo, error) {
 	postHeader := &table.PostHeader{}
-	_, err := tt.Header.GetTableReader(tt.Fd, "post", postHeader)
+	_, err := tt.GetTableReader("post", postHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (tt *Font) getPostInfo() (*table.PostInfo, error) {
 // TODO(voss): use caching?
 func (tt *Font) getHHeaInfo() (*table.Hhea, error) {
 	hhea := &table.Hhea{}
-	_, err := tt.Header.GetTableReader(tt.Fd, "hhea", hhea)
+	_, err := tt.GetTableReader("hhea", hhea)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (tt *Font) getHMtxInfo(NumGlyphs, NumOfLongHorMetrics int) (*table.Hmtx, er
 		HMetrics:        make([]table.LongHorMetric, NumOfLongHorMetrics),
 		LeftSideBearing: make([]int16, NumGlyphs-int(NumOfLongHorMetrics)),
 	}
-	fd, err := tt.Header.GetTableReader(tt.Fd, "hmtx", hmtx.HMetrics)
+	fd, err := tt.GetTableReader("hmtx", hmtx.HMetrics)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (tt *Font) getHMtxInfo(NumGlyphs, NumOfLongHorMetrics int) (*table.Hmtx, er
 // getOS2Info reads the "OS/2" table of a sfnt file.
 func (tt *Font) getOS2Info() (*table.OS2, error) {
 	os2 := &table.OS2{}
-	os2Fd, err := tt.Header.GetTableReader(tt.Fd, "OS/2", &os2.V0)
+	os2Fd, err := tt.GetTableReader("OS/2", &os2.V0)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (tt *Font) readKernInfo() (gtab.Lookups, error) {
 		Version   uint16
 		NumTables uint16
 	}
-	kernFd, err := tt.Header.GetTableReader(tt.Fd, "kern", &Header)
+	kernFd, err := tt.GetTableReader("kern", &Header)
 	if err != nil {
 		return nil, err
 	} else if Header.Version != 0 {
@@ -250,12 +250,12 @@ func (tt *Font) GetGlyfOffsets(NumGlyphs int) ([]uint32, error) {
 	offsets := make([]uint32, NumGlyphs+1)
 	if tt.head.IndexToLocFormat == 0 {
 		shortOffsets := make([]uint16, NumGlyphs+1)
-		_, err = tt.Header.GetTableReader(tt.Fd, "loca", shortOffsets)
+		_, err = tt.GetTableReader("loca", shortOffsets)
 		for i, x := range shortOffsets {
 			offsets[i] = uint32(x) * 2
 		}
 	} else {
-		_, err = tt.Header.GetTableReader(tt.Fd, "loca", offsets)
+		_, err = tt.GetTableReader("loca", offsets)
 	}
 	if err != nil {
 		return nil, err
@@ -273,7 +273,7 @@ func (tt *Font) getGlyfInfo(NumGlyphs int) (*table.Glyf, error) {
 	res := &table.Glyf{
 		Data: make([]table.GlyphHeader, NumGlyphs),
 	}
-	glyfFd, err := tt.Header.GetTableReader(tt.Fd, "glyf", nil)
+	glyfFd, err := tt.GetTableReader("glyf", nil)
 	if err != nil {
 		return nil, err
 	}
