@@ -24,6 +24,8 @@ func Flow(contents []Box, width float64) []Box {
 
 	cost := func(k, l int) int {
 		ll := tryLength(contents[k:l], width)
+		_ = ll
+		panic("not implemented")
 	}
 	_ = cost
 	panic("not implemented")

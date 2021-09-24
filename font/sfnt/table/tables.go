@@ -88,10 +88,10 @@ func (h *Header) Find(name string) *Record {
 	return nil
 }
 
-// ReadTableHead can be used to read the initial, fixed-size portion of a sfnt
-// table,  It returns an io.SectionReader which can be used to read the rest of
-// the table data.
-func (h *Header) ReadTableHead(r io.ReaderAt, name string, head interface{}) (*io.SectionReader, error) {
+// GetTableReader returns an io.SectionReader which can be used to read
+// the table data.  If head is non-nil, binary.Read() is used to
+// read the data at the start of the table into the value head points to.
+func (h *Header) GetTableReader(r io.ReaderAt, name string, head interface{}) (*io.SectionReader, error) {
 	table := h.Find(name)
 	if table == nil {
 		return nil, &ErrNoTable{name}

@@ -83,7 +83,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		// Copy and modify the "head" table.
 		// https://docs.microsoft.com/en-us/typography/opentype/spec/head
 		headTable := &table.Head{}
-		*headTable = *tt.Head
+		*headTable = *tt.head
 		headTable.CheckSumAdjustment = 0
 		if !modTime.IsZero() {
 			ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -223,7 +223,7 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		return nil, err
 	}
 
-	glyfFd, err := tt.Header.ReadTableHead(tt.Fd, "glyf", nil)
+	glyfFd, err := tt.Header.GetTableReader(tt.Fd, "glyf", nil)
 	if err != nil {
 		return nil, err
 	}

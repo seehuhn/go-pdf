@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package opentype
 
 import (
 	"testing"
@@ -25,13 +25,13 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-func TestSimple(t *testing.T) {
+func TestCIDGlyf(t *testing.T) {
 	w, err := pdf.Create("test.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tt, err := sfnt.Open("ttf/SourceSerif4-Regular.ttf", nil)
+	tt, err := sfnt.Open("otf/SourceSerif4-regular.otf", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestSimple(t *testing.T) {
 		},
 		MediaBox: &pdf.Rectangle{
 			URx: 10 + 16*20,
-			URy: 5 + 16*20 + 5,
+			URy: 5 + 32*20 + 5,
 		},
 	})
 	if err != nil {
@@ -63,7 +63,7 @@ func TestSimple(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < 256; i++ {
+	for i := 0; i < 512; i++ {
 		row := i / 16
 		col := i % 16
 		gid := font.GlyphID(i + 2)
@@ -80,7 +80,7 @@ func TestSimple(t *testing.T) {
 			FontSize: 16,
 			Glyphs:   gg,
 		}
-		layout.Draw(page, float64(10+20*col), float64(16*20-10-20*row))
+		layout.Draw(page, float64(10+20*col), float64(32*20-10-20*row))
 	}
 
 	err = w.Close()

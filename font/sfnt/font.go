@@ -32,7 +32,8 @@ import (
 type Font struct {
 	Fd     *os.File
 	Header *table.Header
-	Head   *table.Head // TODO(voss): needed?
+
+	head *table.Head // TODO(voss): needed?
 
 	CMap     map[rune]font.GlyphID
 	FontName string
@@ -43,6 +44,8 @@ type Font struct {
 	Descent     int // Descent in glyph coordinate units, as a negative number
 	CapHeight   int
 	ItalicAngle float64
+
+	FontBBox *font.Rect
 
 	GlyphExtent []font.Rect
 	Width       []int
@@ -67,7 +70,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	}
 
 	head := &table.Head{}
-	_, err = header.ReadTableHead(fd, "head", head)
+	_, err = header.GetTableReader(fd, "head", head)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +85,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	tt := &Font{
 		Fd:     fd,
 		Header: header,
-		Head:   head,
+		head:   head,
 	}
 
 	maxp, err := tt.getMaxpInfo()
@@ -204,7 +207,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if postInfo != nil && postInfo.IsFixedPitch {
 		flags |= font.FlagFixedPitch
 	}
-	IsItalic := tt.Head.MacStyle&(1<<1) != 0
+	IsItalic := head.MacStyle&(1<<1) != 0
 	if os2Info != nil {
 		// If the "OS/2" table is present, Windows seems to use this table to
 		// decide whether the font is bold/italic.  We follow Window's lead
@@ -226,12 +229,18 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 
 	tt.CMap = cmap
 	tt.FontName = fontName
-	tt.GlyphUnits = int(tt.Head.UnitsPerEm)
+	tt.GlyphUnits = int(tt.head.UnitsPerEm)
 	tt.Ascent = Ascent
 	tt.Descent = Descent
 	tt.CapHeight = capHeight
 	if postInfo != nil {
 		tt.ItalicAngle = postInfo.ItalicAngle
+	}
+	tt.FontBBox = &font.Rect{
+		LLx: int(head.XMin),
+		LLy: int(head.YMin),
+		URx: int(head.XMax),
+		URy: int(head.YMax),
 	}
 	tt.GlyphExtent = GlyphExtent
 	tt.Width = Width
@@ -262,14 +271,15 @@ func (tt *Font) HasTables(names ...string) bool {
 // present.
 func (tt *Font) IsTrueType() bool {
 	return tt.HasTables(
-		"cmap", "glyf", "head", "hhea", "hmtx", "loca", "maxp", "name", "post")
+		"cmap", "head", "hhea", "hmtx", "maxp", "name", "post",
+		"glyf", "loca")
 }
 
 // IsOpenType checks whether the tables required for an OpenType font are
 // present.
 func (tt *Font) IsOpenType() bool {
 	if !tt.HasTables(
-		"cmap", "head", "hhea", "hmtx", "maxp", "name", "OS/2", "post") {
+		"cmap", "head", "hhea", "hmtx", "maxp", "name", "post", "OS/2") {
 		return false
 	}
 	if tt.HasTables("glyf", "loca") || tt.HasTables("CFF ") {
