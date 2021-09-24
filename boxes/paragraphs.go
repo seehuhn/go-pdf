@@ -23,8 +23,81 @@ func Flow(contents []Box, width float64) []Box {
 	contents = append(contents, parEndFill)
 
 	cost := func(k, l int) int {
-		return 0
+		ll := tryLength(contents[k:l], width)
 	}
 	_ = cost
 	panic("not implemented")
+}
+
+type lineFillInfo struct {
+	length  float64
+	stretch float64
+}
+
+func tryLength(contents []Box, width float64) lineFillInfo {
+	contentsTotal := 0.0
+	for _, child := range contents {
+		ext := child.Extent()
+		contentsTotal += ext.Width
+	}
+	stretchTotal := 0.0
+	if contentsTotal < width-1e-3 {
+		level := -1
+		var ii []int
+		for i, child := range contents {
+			stretch, ok := child.(stretcher)
+			if !ok {
+				continue
+			}
+			info := stretch.Stretch()
+
+			if info.Level > level {
+				level = info.Level
+				ii = nil
+				stretchTotal = 0
+			}
+			ii = append(ii, i)
+			stretchTotal += info.Val
+		}
+
+		if stretchTotal > 0 {
+			q := (width - contentsTotal) / stretchTotal
+			if level == 0 && q > 1 {
+				q = 1
+			}
+			stretchTotal *= q
+		}
+	} else if contentsTotal > width+1e-3 {
+		level := -1
+		var ii []int
+		shrinkTotal := 0.0
+		for i, child := range contents {
+			shrink, ok := child.(shrinker)
+			if !ok {
+				continue
+			}
+			info := shrink.Shrink()
+
+			if info.Level > level {
+				level = info.Level
+				ii = nil
+				shrinkTotal = 0
+			}
+			ii = append(ii, i)
+			shrinkTotal += info.Val
+		}
+
+		if shrinkTotal > 0 {
+			q := (contentsTotal - width) / shrinkTotal
+			if level == 0 && q > 1 {
+				q = 1
+			}
+			stretchTotal = -shrinkTotal * q
+		}
+	}
+
+	return lineFillInfo{
+		length:  contentsTotal + stretchTotal,
+		stretch: stretchTotal,
+	}
 }
