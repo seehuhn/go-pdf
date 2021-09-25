@@ -200,16 +200,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	courier, err = builtin.Embed(out, "C", "Courier")
+	courier, err = builtin.Embed(out, "Courier", "C")
 	if err != nil {
 		log.Fatal(err)
 	}
-	Italic, err := builtin.Embed(out, "I", "Times-Italic")
+	Italic, err := builtin.Embed(out, "Times-Italic", "I")
 	if err != nil {
 		log.Fatal(err)
 	}
 	theFont, err = truetype.EmbedFontCID(out, tt, "X")
-	// Font, err = builtin.Embed(out, "X", "Times-Roman", font.AdobeStandardLatin)
+	// Font, err = builtin.Embed(out, "Times-Roman", "X")
 	if err != nil {
 		log.Fatal(err)
 	}

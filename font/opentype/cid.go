@@ -31,10 +31,12 @@ import (
 
 // EmbedCID embeds an OpenType font into a pdf file as a CIDFont.
 //
-// Use of CFF-based OpenType fonts in PDF requires PDF version 1.6 or higher.
-// Glyf-based OpenType fonts will be embeded as TrueType fonts, so require
-// only PDF version 1.3 or higher.
-func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Locale) (*font.Font, error) {
+// In comparison, fonts embedded via EmbedSimple() lead to smaller PDF files,
+// but only up to 256 glyphs of the font can be accessed via the returned font
+// object.
+//
+// Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
+func EmbedCID(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fileName, loc)
 	if err != nil {
 		return nil, err
@@ -48,17 +50,19 @@ func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Local
 // This function takes ownership of tt and will close the font tt once it is no
 // longer needed.
 //
-// Use of CFF-based OpenType fonts in PDF requires PDF version 1.6 or higher.
-// Glyf-based OpenType fonts will be embeded as TrueType fonts, so require
-// only PDF version 1.3 or higher.
-func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, error) {
+// In comparison, fonts embedded via EmbedSimple() lead to smaller PDF files,
+// but only up to 256 glyphs of the font can be accessed via the returned font
+// object.
+//
+// Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
+func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, error) {
 	if !tt.IsOpenType() {
 		return nil, errors.New("not an OpenType font")
 	}
 	if tt.IsTrueType() {
 		return truetype.EmbedFontCID(w, tt, instName)
 	}
-	err := w.CheckVersion("use of CFF-based OpenType fonts", pdf.V1_6)
+	err := w.CheckVersion("use of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +91,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, er
 	w.OnClose(t.WriteFont)
 
 	res := &font.Font{
-		InstName: pdf.Name(instName),
+		InstName: instName,
 		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,

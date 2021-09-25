@@ -70,11 +70,9 @@ func convert(inName, outName string, V pdf.Version) error {
 
 	var Font *font.Font
 	if strings.HasSuffix(*fontFile, ".ttf") {
-		Font, err = truetype.EmbedSimple(out, "F",
-			*fontFile,
-			locale.DeDE)
+		Font, err = truetype.EmbedSimple(out, *fontFile, "F", locale.EnGB)
 	} else {
-		Font, err = builtin.Embed(out, "F", *fontFile)
+		Font, err = builtin.Embed(out, *fontFile, "F")
 	}
 	if err != nil {
 		return err

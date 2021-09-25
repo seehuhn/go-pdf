@@ -98,7 +98,7 @@ func (f *fontTables) GetGlyphRows(fontName string) ([]boxes.Box, error) {
 	for i := 0; i < nFont; i++ {
 		name := fmt.Sprintf("T%d", f.fontNo)
 		f.fontNo++
-		targetFont, err := builtin.EmbedAfm(f.w, name, targetAfm)
+		targetFont, err := builtin.EmbedAfm(f.w, targetAfm, pdf.Name(name))
 		if err != nil {
 			return nil, err
 		}
@@ -293,11 +293,11 @@ func main() {
 		MediaBox: paper,
 	})
 
-	labelFont, err := builtin.Embed(w, "F", "Times-Roman")
+	labelFont, err := builtin.Embed(w, "Times-Roman", "F")
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := builtin.Embed(w, "B", "Times-Bold")
+	titleFont, err := builtin.Embed(w, "Times-Bold", "B")
 	if err != nil {
 		log.Fatal(err)
 	}

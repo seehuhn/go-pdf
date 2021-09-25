@@ -33,13 +33,13 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1, err := builtin.Embed(out, "F1", "Times-Roman")
-	// F1, err := truetype.Embed(out, "F1", "../font/truetype/ttf/FreeSerif.ttf", subset.chars)
+	F1, err := builtin.Embed(out, "Times-Roman", "F1")
+	// F1, err := truetype.Embed(out, "../font/truetype/ttf/FreeSerif.ttf", "F1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	F2, err := builtin.Embed(out, "F2", "Times-Italic")
+	F2, err := builtin.Embed(out, "Times-Italic", "F2")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -36,13 +36,13 @@ import (
 // there is no limit on the number of glyphs which can be accessed.
 //
 // Use of simple TrueType fonts in PDF requires PDF version 1.1 or higher.
-func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Locale) (*font.Font, error) {
+func EmbedSimple(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fileName, loc)
 	if err != nil {
 		return nil, err
 	}
 
-	return EmbedFontSimple(w, tt, instName, loc)
+	return EmbedFontSimple(w, tt, instName)
 }
 
 // EmbedFontSimple embeds a TrueType font into a pdf file as a simple font.
@@ -56,13 +56,13 @@ func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Lo
 // there is no limit on the number of glyphs which can be accessed.
 //
 // Use of simple TrueType fonts in PDF requires PDF version 1.1 or higher.
-func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*font.Font, error) {
+func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, error) {
 	err := w.CheckVersion("use of TrueType fonts", pdf.V1_1)
 	if err != nil {
 		return nil, err
 	}
 
-	t, err := newTtfSimple(w, tt, instName, loc)
+	t, err := newTtfSimple(w, tt, instName)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.
 	w.OnClose(t.WriteFont)
 
 	res := &font.Font{
-		InstName: pdf.Name(instName),
+		InstName: instName,
 		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,
@@ -98,7 +98,7 @@ type ttfSimple struct {
 	overflowed bool
 }
 
-func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string, loc *locale.Locale) (*ttfSimple, error) {
+func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*ttfSimple, error) {
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
 	}

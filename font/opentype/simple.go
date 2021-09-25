@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/locale"
 )
 
@@ -36,7 +37,7 @@ import (
 // there is no limit on the number of glyphs which can be accessed.
 //
 // Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
-func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Locale) (*font.Font, error) {
+func EmbedSimple(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fileName, loc)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,13 @@ func EmbedSimple(w *pdf.Writer, instName string, fileName string, loc *locale.Lo
 // there is no limit on the number of glyphs which can be accessed.
 //
 // Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
-func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, error) {
+func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, error) {
+	if !tt.IsOpenType() {
+		return nil, errors.New("not an OpenType font")
+	}
+	if tt.IsTrueType() {
+		return truetype.EmbedFontSimple(w, tt, instName)
+	}
 	err := w.CheckVersion("use of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
@@ -70,7 +77,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font,
 	w.OnClose(t.WriteFont)
 
 	res := &font.Font{
-		InstName: pdf.Name(instName),
+		InstName: instName,
 		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,
@@ -102,18 +109,7 @@ type otfSimple struct {
 	overflowed bool
 }
 
-func newOtfSimple(w *pdf.Writer, tt *sfnt.Font, instName string) (*otfSimple, error) {
-	if !tt.IsOpenType() {
-		return nil, errors.New("not an OpenType font")
-	}
-	if !tt.HasTables("glyf") {
-		return nil, errors.New("CFF-based OpenType fonts not supported")
-	}
-
-	// TODO(voss): "... conforming writers, instead of using a simple font,
-	// shall use a Type 0 font with an Identity-H encoding and use the glyph
-	// indices as character codes ..."
-	// (bottom of page 291 of PDF 32000-1:2008)
+func newOtfSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*otfSimple, error) {
 
 	tidy := make(map[font.GlyphID]byte)
 	for r, gid := range tt.CMap {
@@ -208,6 +204,8 @@ func (t *otfSimple) Enc(gid font.GlyphID) pdf.String {
 }
 
 func (t *otfSimple) WriteFont(w *pdf.Writer) error {
+	panic("not implemented")
+
 	if t.overflowed {
 		return errors.New("too many different glyphs for simple font " + t.Otf.FontName)
 	}

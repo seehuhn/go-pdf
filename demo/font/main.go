@@ -37,10 +37,10 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		subset[r] = true
 	}
 
-	// F1, err := builtin.Embed(out, "F1", "Times-Roman", nil)
-	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/FreeSerif.ttf", subset)
-	// F1, err := truetype.Embed(out, "F1", "../../font/truetype/ttf/Roboto-Regular.ttf", subset)
-	F1, err := truetype.EmbedCID(out, "F1", "../../font/truetype/ttf/SourceSerif4-Regular.ttf", locale.EnGB)
+	// F1, err := builtin.Embed(out, "Times-Roman", "F1", locale.EnGB)
+	// F1, err := truetype.Embed(out, "../../font/truetype/ttf/FreeSerif.ttf", "F1", locale.EnGB)
+	// F1, err := truetype.Embed(out, "../../font/truetype/ttf/Roboto-Regular.ttf", "F1", locale.EnGB)
+	F1, err := truetype.EmbedCID(out, "../../font/truetype/ttf/SourceSerif4-Regular.ttf", "F1", locale.EnGB)
 	if err != nil {
 		return err
 	}

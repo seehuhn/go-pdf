@@ -35,7 +35,7 @@ import (
 // object.
 //
 // Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
-func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Locale) (*font.Font, error) {
+func EmbedCID(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fileName, loc)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func EmbedCID(w *pdf.Writer, instName string, fileName string, loc *locale.Local
 // object.
 //
 // Use of TrueType-based CIDFonts in PDF requires PDF version 1.3 or higher.
-func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, error) {
+func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, error) {
 	if !tt.IsTrueType() {
 		return nil, errors.New("not a TrueType font")
 	}
@@ -77,7 +77,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName string) (*font.Font, er
 	w.OnClose(t.WriteFont)
 
 	res := &font.Font{
-		InstName: pdf.Name(instName),
+		InstName: instName,
 		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,

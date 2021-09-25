@@ -108,7 +108,7 @@ func TestComplicatedGyphs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	font, err := Embed(w, "F", "Courier")
+	font, err := Embed(w, "Courier", "F")
 	if err != nil {
 		t.Fatal(err)
 	}

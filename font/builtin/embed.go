@@ -28,23 +28,23 @@ import (
 
 // Embed returns a Font structure representing one of the 14 builtin fonts.
 // The valid font names are given in FontNames.
-func Embed(w *pdf.Writer, ref string, fontName string) (*font.Font, error) {
+func Embed(w *pdf.Writer, fontName string, instName pdf.Name) (*font.Font, error) {
 	afm, err := Afm(fontName)
 	if err != nil {
 		return nil, err
 	}
-	return EmbedAfm(w, ref, afm)
+	return EmbedAfm(w, afm, instName)
 }
 
 // EmbedAfm returns a Font structure representing a simple Type 1 font,
 // described by `afm`.
-func EmbedAfm(w *pdf.Writer, refName string, afm *AfmInfo) (*font.Font, error) {
+func EmbedAfm(w *pdf.Writer, afm *AfmInfo, instName pdf.Name) (*font.Font, error) {
 	if len(afm.Code) == 0 {
 		return nil, errors.New("no glyphs in font")
 	}
 
 	fontRef := w.Alloc()
-	b := newBuiltin(afm, fontRef, refName)
+	b := newBuiltin(afm, fontRef, instName)
 	w.OnClose(b.WriteFontDict)
 
 	layout := b.FullLayout
@@ -53,7 +53,7 @@ func EmbedAfm(w *pdf.Writer, refName string, afm *AfmInfo) (*font.Font, error) {
 	}
 
 	res := &font.Font{
-		InstName:    pdf.Name(refName),
+		InstName:    instName,
 		Ref:         b.fontRef,
 		Layout:      layout,
 		Enc:         b.Enc,
@@ -67,9 +67,9 @@ func EmbedAfm(w *pdf.Writer, refName string, afm *AfmInfo) (*font.Font, error) {
 }
 
 type builtin struct {
-	fontRef *pdf.Reference
-	name    string
-	afm     *AfmInfo
+	fontRef  *pdf.Reference
+	instName pdf.Name
+	afm      *AfmInfo
 
 	CMap map[rune]font.GlyphID
 	char []rune
@@ -81,7 +81,7 @@ type builtin struct {
 	overflowed bool
 }
 
-func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, refName string) *builtin {
+func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *builtin {
 	cmap := make(map[rune]font.GlyphID)
 	char := make([]rune, len(afm.Code))
 	thisFontEnc := make(fontEnc)
@@ -102,13 +102,13 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, refName string) *builtin {
 	}
 
 	b := &builtin{
-		name:    refName,
-		afm:     afm,
-		fontRef: fontRef,
-		CMap:    cmap,
-		char:    char,
-		enc:     make(map[font.GlyphID]byte),
-		used:    make(map[byte]bool),
+		instName: instName,
+		afm:      afm,
+		fontRef:  fontRef,
+		CMap:     cmap,
+		char:     char,
+		enc:      make(map[font.GlyphID]byte),
+		used:     make(map[byte]bool),
 
 		candidates: []*candidate{
 			{name: "", enc: thisFontEnc},
@@ -238,7 +238,7 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 
 func (b *builtin) WriteFontDict(w *pdf.Writer) error {
 	if b.overflowed {
-		return errors.New("too many different glyphs for simple font " + b.name)
+		return errors.New("too many different glyphs for simple font " + string(b.instName))
 	}
 
 	// See section 9.6.2.1 of PDF 32000-1:2008.
@@ -254,7 +254,7 @@ func (b *builtin) WriteFontDict(w *pdf.Writer) error {
 	}
 
 	if w.Version == pdf.V1_0 {
-		Font["Name"] = pdf.Name(b.name)
+		Font["Name"] = pdf.Name(b.instName)
 	}
 
 	_, err := w.Write(Font, b.fontRef)
