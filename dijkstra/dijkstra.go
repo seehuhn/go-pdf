@@ -16,16 +16,16 @@
 
 package dijkstra
 
-// ShortestPath implements ShortestPath's algorithm
+// ShortestPath implements Dijkstra's algorithm
 // https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
 //     vertices: 0, 1, ..., n, start at 0, end at n
-//     edges: (k, l) with 0 <= k < l <= n
+//     edges: (i, j) with 0 <= i < j <= n
 func ShortestPath(cost func(i, j int) int, n int) (int, []int) {
 	dist := make([]int, n)
-	to := make([]int, n)
+	from := make([]int, n)
 	for i := 0; i < n; i++ {
 		dist[i] = cost(i, n)
-		to[i] = n
+		from[i] = n
 	}
 
 	pos := n
@@ -43,7 +43,7 @@ func ShortestPath(cost func(i, j int) int, n int) (int, []int) {
 			alt := bestDist + cost(i, pos)
 			if alt < dist[i] {
 				dist[i] = alt
-				to[i] = pos
+				from[i] = pos
 			}
 		}
 	}
@@ -51,7 +51,7 @@ func ShortestPath(cost func(i, j int) int, n int) (int, []int) {
 	res := []int{0}
 	pos = 0
 	for pos < n {
-		pos = to[pos]
+		pos = from[pos]
 		res = append(res, pos)
 	}
 	return dist[0], res
