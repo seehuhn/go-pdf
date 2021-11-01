@@ -30,7 +30,7 @@ func (font *Font) writeSubset(w io.Writer, subset []font.GlyphID) (int, error) {
 		1, // major
 		0, // minor
 		4, // hdrSize
-		3, // offSize
+		4, // offSize
 	}
 	n, err := w.Write(header)
 	total += n

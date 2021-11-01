@@ -16,14 +16,17 @@
 
 package cff
 
-func (cff *Font) GetString(SID int) string {
-	if SID < nStdString {
-		return stdStrings[SID]
-	}
-	SID -= nStdString
+// 2-byte string identifier
+type sid uint16
 
-	if SID < len(cff.strings) {
-		return cff.strings[SID]
+func (cff *Font) getString(i sid) string {
+	if i < nStdString {
+		return stdStrings[i]
+	}
+	i -= nStdString
+
+	if int(i) < len(cff.strings) {
+		return cff.strings[i]
 	}
 
 	return ""
@@ -423,4 +426,4 @@ var stdStrings = []string{
 	"Semibold",            // 390
 }
 
-var nStdString = len(stdStrings)
+var nStdString = sid(len(stdStrings))
