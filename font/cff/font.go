@@ -21,6 +21,7 @@ package cff
 // once this is working
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -90,7 +91,7 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	if len(topDicts) != 1 {
 		return nil, errors.New("invalid CFF")
 	}
-	topDict, err := parseDict(topDicts[0])
+	topDict, err := decodeDict(topDicts[0])
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +142,37 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	return cff, nil
 }
 
-func (cff *Font) WriteCFF(w io.Writer) error {
+func (cff *Font) EncodeCFF(w io.Writer) ([]byte, error) {
+	res := &bytes.Buffer{}
 
+	// Header
+	header := []byte{
+		1, // major
+		0, // minor
+		4, // hdrSize
+		4, // offSize
+	}
+	res.Write(header)
+
+	// Name INDEX
+	_, err := writeIndex(w, [][]byte{[]byte(cff.FontName)})
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(voss): the following fields need fixing up
+	//   - FontBBox (in case of subsetting)
+	//   - charset: charset offset (0)
+	//   - Encoding: encoding offset (0)
+	//   - Charstrings: CharStrings offset (0)
+	//   - Private: Private DICT size and offset (0)
+	//   - FDArray: Font DICT (FD) INDEX offset (0)
+	//   - FDSelect: FDSelect offset (0)
+	topDictData := cff.topDict.encode()
+	_, err = writeIndex(w, [][]byte{topDictData})
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Bytes(), nil
 }

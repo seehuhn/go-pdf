@@ -1,7 +1,9 @@
 package cff
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -13,7 +15,7 @@ type cffDictEntry struct {
 }
 type cffDict []cffDictEntry
 
-func parseDict(buf []byte) (cffDict, error) {
+func decodeDict(buf []byte) (cffDict, error) {
 	var res cffDict
 	var stack []interface{}
 
@@ -53,7 +55,7 @@ func parseDict(buf []byte) (cffDict, error) {
 				int32(uint32(buf[1])<<24+uint32(buf[2])<<16+uint32(buf[3])<<8+uint32(buf[4])))
 			buf = buf[5:]
 		case b0 == 30:
-			tmp, x, err := decodeFloat(buf)
+			tmp, x, err := decodeFloat(buf[1:])
 			if err != nil {
 				return nil, err
 			}
@@ -122,6 +124,82 @@ func decodeFloat(buf []byte) ([]byte, float64, error) {
 			s = append(s, '0'+nibble)
 		}
 	}
+}
+
+func (d cffDict) encode() []byte {
+	res := &bytes.Buffer{}
+	for _, entry := range d {
+		for _, arg := range entry.args {
+			switch a := arg.(type) {
+			case int32:
+				fmt.Println(a)
+				switch {
+				case a >= -107 && a <= 107:
+					res.WriteByte(byte(a + 139))
+				case a >= 108 && a <= 1131:
+					// a = (b0–247)*256+b1+108
+					a -= 108
+					b1 := byte(a)
+					a >>= 8
+					b0 := byte(a + 247)
+					res.Write([]byte{b0, b1})
+				case a >= -1131 && a <= -108:
+					// a = -(b0–251)*256-b1-108
+					a = -108 - a
+					b1 := byte(a)
+					a >>= 8
+					b0 := byte(a + 251)
+					res.Write([]byte{b0, b1})
+				case a >= -32768 && a <= 32767:
+					a16 := uint16(a)
+					res.Write([]byte{28, byte(a16 >> 8), byte(a16)})
+				default:
+					a32 := uint32(a)
+					res.Write([]byte{29, byte(a32 >> 24), byte(a32 >> 16), byte(a32 >> 8), byte(a32)})
+				}
+			case float64:
+				res.WriteByte(0x1e)
+				s := fmt.Sprintf("%g::", a)
+				first := true
+				var tmp byte
+				for i := 0; i < len(s); i++ {
+					var nibble byte
+					c := s[i]
+					switch {
+					case c >= '0' && c <= '9':
+						nibble = c - '0'
+					case c == '.':
+						nibble = 0x0a
+					case c == 'e':
+						if s[i+1] != '-' {
+							nibble = 0x0b
+						} else {
+							i++
+							nibble = 0x0c
+						}
+					case i == 0 && c == '-':
+						nibble = 0x0e
+					case c == ':':
+						nibble = 0x0f
+					}
+					if first {
+						tmp = nibble << 4
+					} else {
+						res.WriteByte(tmp | nibble)
+					}
+					first = !first
+				}
+			}
+		}
+		if entry.op > 255 {
+			if entry.op>>8 != 12 {
+				panic("invalid DICT operator")
+			}
+			res.WriteByte(12)
+		}
+		res.WriteByte(byte(entry.op))
+	}
+	return res.Bytes()
 }
 
 const (
