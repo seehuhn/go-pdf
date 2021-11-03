@@ -29,15 +29,17 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
+// Font is a CFF font.
 type Font struct {
 	FontName string
 	topDict  cffDict
-	strings  []string
+	strings  cffStrings
 	gsubrs   [][]byte
 
 	IsCIDFont bool
 }
 
+// ReadCFF reads a CFF font from r.
 func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	length, err := r.Seek(0, io.SeekEnd)
 	if err != nil {
@@ -142,9 +144,8 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	return cff, nil
 }
 
-func (cff *Font) EncodeCFF(w io.Writer) ([]byte, error) {
-	res := &bytes.Buffer{}
-
+// EncodeCFF returns the binary encoding of CFF font.
+func (cff *Font) EncodeCFF() ([]byte, error) {
 	// Header
 	header := []byte{
 		1, // major
@@ -152,10 +153,9 @@ func (cff *Font) EncodeCFF(w io.Writer) ([]byte, error) {
 		4, // hdrSize
 		4, // offSize
 	}
-	res.Write(header)
 
 	// Name INDEX
-	_, err := writeIndex(w, [][]byte{[]byte(cff.FontName)})
+	nameIndexBlob, err := cffIndex{[]byte(cff.FontName)}.encode()
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +169,42 @@ func (cff *Font) EncodeCFF(w io.Writer) ([]byte, error) {
 	//   - FDArray: Font DICT (FD) INDEX offset (0)
 	//   - FDSelect: FDSelect offset (0)
 	topDictData := cff.topDict.encode()
-	_, err = writeIndex(w, [][]byte{topDictData})
+	topDictIndexBlob, err := cffIndex{topDictData}.encode()
 	if err != nil {
 		return nil, err
 	}
+
+	stringIndexBlob, err := cff.strings.encode()
+	if err != nil {
+		return nil, err
+	}
+
+	gsubrsIndexBlob, err := cffIndex(cff.gsubrs).encode()
+	if err != nil {
+		return nil, err
+	}
+
+	// We need to write the following sections:
+	//   - Header
+	//   - Name INDEX
+	//   - Top DICT INDEX
+	//   - String INDEX
+	//   - Global Subr INDEX
+	//
+	//   - Encodings [referenced by Top DICT]
+	//   - Charsets [referenced by Top DICT]
+	//   - FDSelect [referenced by Top DICT]
+	//   - CharStrings INDEX [referenced by Top DICT]
+	//   - Font DICT INDEX [referenced by Top DICT]
+	//   - Private DICT [referenced by Top DICT]
+	//   - Local Subr INDEX [referenced by Private DICT]
+	//   - Copyright and Trademark Notices [how to find these???]
+	res := &bytes.Buffer{}
+	res.Write(header)
+	res.Write(nameIndexBlob)
+	res.Write(topDictIndexBlob)
+	res.Write(stringIndexBlob)
+	res.Write(gsubrsIndexBlob)
 
 	return res.Bytes(), nil
 }

@@ -19,17 +19,27 @@ package cff
 // 2-byte string identifier
 type sid uint16
 
-func (cff *Font) getString(i sid) string {
+type cffStrings []string
+
+func (ss cffStrings) get(i sid) string {
 	if i < nStdString {
 		return stdStrings[i]
 	}
 	i -= nStdString
 
-	if int(i) < len(cff.strings) {
-		return cff.strings[i]
+	if int(i) < len(ss) {
+		return ss[i]
 	}
 
 	return ""
+}
+
+func (ss cffStrings) encode() ([]byte, error) {
+	stringIndex := make(cffIndex, 0, len(ss))
+	for _, s := range ss {
+		stringIndex = append(stringIndex, []byte(s))
+	}
+	return stringIndex.encode()
 }
 
 var stdStrings = []string{

@@ -2,13 +2,17 @@ package cff
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-func readIndex(p *parser.Parser) ([][]byte, error) {
+// cffIndex is a CFF INDEX, i.e. an ordered sequence of binary blobs.
+type cffIndex [][]byte
+
+func readIndex(p *parser.Parser) (cffIndex, error) {
 	count, err := p.ReadUInt16()
 	if err != nil {
 		return nil, err
@@ -56,7 +60,7 @@ func readIndex(p *parser.Parser) ([][]byte, error) {
 	return res, nil
 }
 
-func writeIndex(w io.Writer, data [][]byte) (int, error) {
+func (data cffIndex) writeTo(w io.Writer) (int, error) {
 	count := len(data)
 	if count >= 1<<16 {
 		return 0, errors.New("too many items for CFF INDEX")
@@ -108,4 +112,14 @@ func writeIndex(w io.Writer, data [][]byte) (int, error) {
 	}
 
 	return total, out.Flush()
+}
+
+// encode converts a CFF INDEX to its binary representation.
+func (data cffIndex) encode() ([]byte, error) {
+	buf := &bytes.Buffer{}
+	_, err := data.writeTo(buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

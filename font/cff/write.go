@@ -39,7 +39,8 @@ func (font *Font) writeSubset(w io.Writer, subset []font.GlyphID) (int, error) {
 	}
 
 	// Name INDEX
-	n, err = writeIndex(w, [][]byte{[]byte(font.FontName)})
+	nameIndex := cffIndex{[]byte(font.FontName)}
+	n, err = nameIndex.writeTo(w)
 	total += n
 	if err != nil {
 		return n, err

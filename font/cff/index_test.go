@@ -14,14 +14,14 @@ func TestIndex(t *testing.T) {
 	}
 
 	for _, count := range []int{0, 2, 3, 517} {
-		data := make([][]byte, count)
+		data := make(cffIndex, count)
 		for i := 0; i < count; i++ {
 			d := i % 2
 			data[i] = blob[d : d+127]
 		}
 
 		buf := &bytes.Buffer{}
-		n, err := writeIndex(buf, data)
+		n, err := data.writeTo(buf)
 		if err != nil {
 			t.Error(err)
 			continue
