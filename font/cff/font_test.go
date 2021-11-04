@@ -17,6 +17,7 @@
 package cff
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -39,7 +40,13 @@ func TestReadCFF(t *testing.T) {
 
 	cff, err := ReadCFF(tableFd)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
+	}
+
+	fmt.Println("topDict:")
+	for _, op := range cff.topDict.keys() {
+		args := cff.topDict[op]
+		fmt.Printf("%s: %v\n", op, args)
 	}
 
 	err = tt.Close()
@@ -59,6 +66,4 @@ func TestReadCFF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// t.Error("fish")
 }

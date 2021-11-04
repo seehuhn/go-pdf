@@ -58,17 +58,17 @@ func TestDecodeInt(t *testing.T) {
 			continue
 		}
 
-		e := d[0]
-		if e.op != 0 {
+		args, ok := d[0]
+		if !ok {
 			t.Error("wrong DICT op")
 			continue
 		}
-		if len(e.args) != 1 {
+		if len(args) != 1 {
 			t.Error("wrong DICT args length")
 			continue
 		}
 
-		x := e.args[0].(int32)
+		x := args[0].(int32)
 		if x != test.x {
 			t.Errorf("wrong value: %d != %d", x, test.x)
 		}
@@ -76,13 +76,10 @@ func TestDecodeInt(t *testing.T) {
 }
 
 func TestEncodeInt(t *testing.T) {
-	var op uint16 = 7
+	var op dictOp = 7
 	for i := int32(-32769); i <= 32769; i += 3 {
 		d := cffDict{
-			cffDictEntry{
-				op:   op,
-				args: []interface{}{i, i + 1, i + 2},
-			},
+			op: []interface{}{i, i + 1, i + 2},
 		}
 		blob := d.encode()
 		d2, err := decodeDict(blob)
@@ -93,17 +90,18 @@ func TestEncodeInt(t *testing.T) {
 		if len(d2) != 1 {
 			t.Fatal("wrong length")
 		}
-		if d2[0].op != d[0].op {
-			t.Errorf("wrong op: %d != %d", d2[0].op, d[0].op)
+		args, ok := d2[op]
+		if !ok {
+			t.Fatal("wrong op")
 		}
-		if len(d[0].args) != len(d2[0].args) {
+		if len(d[op]) != len(args) {
 			t.Errorf("wrong args count: %d != %d",
-				len(d2[0].args), len(d[0].args))
+				len(d[op]), len(args))
 		}
-		for i, x := range d[0].args {
-			if x.(int32) != d2[0].args[i].(int32) {
+		for i, x := range args {
+			if x.(int32) != d[op][i].(int32) {
 				t.Fatalf("wrong value: %d != %d",
-					x.(int32), d2[0].args[i].(int32))
+					x.(int32), d[op][i].(int32))
 			}
 		}
 	}
@@ -126,9 +124,7 @@ func TestEncodeFloat(t *testing.T) {
 	}
 	for _, x := range cases {
 		d := cffDict{
-			cffDictEntry{
-				args: []interface{}{x},
-			},
+			0: []interface{}{x},
 		}
 		blob := d.encode()
 		d2, err := decodeDict(blob)
@@ -139,15 +135,15 @@ func TestEncodeFloat(t *testing.T) {
 		if len(d2) != 1 {
 			t.Fatalf("wrong length %d", len(d2))
 		}
-		e := d2[0]
-		if e.op != 0 {
-			t.Errorf("wrong op: %d != %d", e.op, 0)
+		args, ok := d2[0]
+		if !ok {
+			t.Fatal("wrong op")
 		}
-		if len(e.args) != 1 {
+		if len(args) != 1 {
 			t.Errorf("wrong args count: %d != %d",
-				len(e.args), len(d[0].args))
+				len(args), len(d[0]))
 		}
-		out := e.args[0].(float64)
+		out := args[0].(float64)
 		if math.Abs(out-x) > 1e-6 || math.Abs(out-x) > 1e-6*(math.Abs(out)+math.Abs(x)) {
 			t.Errorf("%g != %g", out, x)
 		}

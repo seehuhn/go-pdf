@@ -36,6 +36,8 @@ type Font struct {
 	strings  cffStrings
 	gsubrs   [][]byte
 
+	charStrings cffIndex
+
 	IsCIDFont bool
 }
 
@@ -62,7 +64,7 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	major := x >> 24
 	minor := (x >> 16) & 0xFF
 	nameIndexPos := int64((x >> 8) & 0xFF)
-	offSize := x & 0xFF // TODO(voss): what is this used for?
+	offSize := x & 0xFF // unused
 	if major == 2 {
 		return nil, fmt.Errorf("unsupported CFF version %d.%d", major, minor)
 	} else if major != 1 || nameIndexPos < 4 || offSize > 4 {
@@ -97,6 +99,7 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
+	cff.topDict = topDict
 
 	// read the String INDEX
 	strings, err := readIndex(p)
@@ -115,33 +118,119 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	}
 	cff.gsubrs = gsubrs
 
-	for _, entry := range topDict {
-		key := entry.op
-		// fmt.Printf("  - 0x%04x %v\n", key, entry.args)
-		switch key {
-		case keyROS:
-			cff.IsCIDFont = true
-		case keyCharstringType:
-			if len(entry.args) != 1 {
-				return nil, errors.New("invalid CFF")
-			}
-			val, ok := entry.args[0].(int32)
-			if !ok {
-				return nil, errors.New("invalid CFF")
-			}
-			if val != 2 {
-				return nil, errors.New("unsupported charstring type")
-			}
-			// case keyFamilyName:
-			// 	fmt.Println("family name =", cff.GetString(int(entry.args[0].(int32))))
-			// case keyNotice:
-			// 	fmt.Println("notice =", cff.GetString(int(entry.args[0].(int32))))
-			// case keyCopyright:
-			// 	fmt.Println("copyright =", cff.GetString(int(entry.args[0].(int32))))
+	_, cff.IsCIDFont = topDict[opROS]
+	cct, ok := topDict[opCharstringType]
+	if ok {
+		var cct32 int32
+		if len(cct) == 1 {
+			cct32, ok = cct[0].(int32)
+		}
+		if !ok || cct32 != 2 {
+			return nil, fmt.Errorf("unsupported charstring type %v", cct)
 		}
 	}
 
+	// read the CharStrings INDEX
+	pos, ok := topDict.getInt(opCharStrings, 0)
+	if !ok {
+		return nil, errors.New("missing CharStrings INDEX")
+	}
+	err = p.SeekPos(int64(pos))
+	if err != nil {
+		return nil, err
+	}
+	charStrings, err := readIndex(p)
+	if err != nil {
+		return nil, err
+	}
+	cff.charStrings = charStrings
+
+	// read the list of character names
+	charsetIndex, _ := topDict.getInt(opCharset, 0)
+	var charset []sid
+	switch charsetIndex {
+	case 0: // ISOAdobe
+		panic("not implemented")
+	case 1: // Expert
+		panic("not implemented")
+	case 2: // ExpertSubset
+		panic("not implemented")
+	default:
+		err = p.SeekPos(int64(charsetIndex))
+		if err != nil {
+			return nil, err
+		}
+		charset, err = cff.readCharset(p, len(charStrings))
+		if err != nil {
+			return nil, err
+		}
+	}
+	for i, sid := range charset {
+		fmt.Println(i, "=", cff.strings.get(sid))
+	}
+
 	return cff, nil
+}
+
+func (cff *Font) readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
+	format, err := p.ReadUInt8()
+	if err != nil {
+		return nil, err
+	}
+
+	charset := make([]sid, 0, nGlyphs)
+	charset = append(charset, 0)
+	switch format {
+	case 0:
+		s := &parser.State{
+			A: int64(nGlyphs - 1),
+		}
+		err = p.Exec(s,
+			parser.CmdLoop,
+			parser.CmdStash,
+			parser.CmdEndLoop,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		data := s.GetStash()
+		for _, xi := range data {
+			charset = append(charset, sid(xi))
+		}
+	case 1:
+		for len(charset) < nGlyphs {
+			first, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			nLeft, err := p.ReadUInt8()
+			if err != nil {
+				return nil, err
+			}
+			for i := 0; i < int(nLeft)+1; i++ {
+				charset = append(charset, sid(int(first)+i))
+			}
+		}
+	case 2:
+		for len(charset) < nGlyphs {
+			first, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			nLeft, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			for i := 0; i < int(nLeft)+1; i++ {
+				charset = append(charset, sid(int(first)+i))
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported charset format %d", format)
+	}
+
+	return charset, nil
 }
 
 // EncodeCFF returns the binary encoding of CFF font.
@@ -199,12 +288,18 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 	//   - Private DICT [referenced by Top DICT]
 	//   - Local Subr INDEX [referenced by Private DICT]
 	//   - Copyright and Trademark Notices [how to find these???]
+	blobs := [][]byte{
+		header,
+		nameIndexBlob,
+		topDictIndexBlob,
+		stringIndexBlob,
+		gsubrsIndexBlob,
+	}
+
 	res := &bytes.Buffer{}
-	res.Write(header)
-	res.Write(nameIndexBlob)
-	res.Write(topDictIndexBlob)
-	res.Write(stringIndexBlob)
-	res.Write(gsubrsIndexBlob)
+	for _, blob := range blobs {
+		res.Write(blob)
+	}
 
 	return res.Bytes(), nil
 }

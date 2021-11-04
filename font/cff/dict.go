@@ -4,26 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 )
 
 var errCorruptDict = errors.New("invalid CFF DICT")
 
-type cffDictEntry struct {
-	op   uint16
-	args []interface{}
-}
-type cffDict []cffDictEntry
+type cffDict map[dictOp][]interface{}
 
 func decodeDict(buf []byte) (cffDict, error) {
-	var res cffDict
+	res := cffDict{}
 	var stack []interface{}
 
-	flush := func(op uint16) {
-		res = append(res, cffDictEntry{
-			op:   op,
-			args: stack,
-		})
+	flush := func(op dictOp) {
+		res[op] = stack
 		stack = nil
 	}
 
@@ -34,10 +28,10 @@ func decodeDict(buf []byte) (cffDict, error) {
 			if len(buf) < 2 {
 				return nil, errCorruptDict
 			}
-			flush(uint16(b0)<<8 + uint16(buf[1]))
+			flush(dictOp(b0)<<8 + dictOp(buf[1]))
 			buf = buf[2:]
 		case b0 <= 21:
-			flush(uint16(b0))
+			flush(dictOp(b0))
 			buf = buf[1:]
 		case b0 <= 27: // values 22–27, 31, and 255 are reserved
 			return nil, errCorruptDict
@@ -82,6 +76,11 @@ func decodeDict(buf []byte) (cffDict, error) {
 			return nil, errCorruptDict
 		}
 	}
+
+	if len(stack) > 0 {
+		return nil, errCorruptDict
+	}
+
 	return res, nil
 }
 
@@ -126,13 +125,45 @@ func decodeFloat(buf []byte) ([]byte, float64, error) {
 	}
 }
 
+func (d cffDict) getInt(op dictOp, defVal int32) (int32, bool) {
+	if len(d[op]) != 1 {
+		return defVal, false
+	}
+	x, ok := d[op][0].(int32)
+	if !ok {
+		return defVal, false
+	}
+	return x, true
+}
+
+func (d cffDict) keys() []dictOp {
+	keys := make([]dictOp, 0, len(d))
+	for k := range d {
+		keys = append(keys, k)
+	}
+	conv := func(op dictOp) int {
+		if op == opROS {
+			return -1
+		} else if op == opSyntheticBase {
+			return -2
+		}
+		return int(op)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return conv(keys[i]) < conv(keys[j])
+	})
+	return keys
+}
+
 func (d cffDict) encode() []byte {
+	keys := d.keys()
+
 	res := &bytes.Buffer{}
-	for _, entry := range d {
-		for _, arg := range entry.args {
+	for _, op := range keys {
+		args := d[op]
+		for _, arg := range args {
 			switch a := arg.(type) {
 			case int32:
-				fmt.Println(a)
 				switch {
 				case a >= -107 && a <= 107:
 					res.WriteByte(byte(a + 139))
@@ -191,27 +222,50 @@ func (d cffDict) encode() []byte {
 				}
 			}
 		}
-		if entry.op > 255 {
-			if entry.op>>8 != 12 {
+		if op > 255 {
+			if op>>8 != 12 {
 				panic("invalid DICT operator")
 			}
 			res.WriteByte(12)
 		}
-		res.WriteByte(byte(entry.op))
+		res.WriteByte(byte(op))
 	}
 	return res.Bytes()
 }
 
+type dictOp uint16
+
+func (d dictOp) String() string {
+	switch d {
+	case opCharset:
+		return "Charset"
+	case opCharStrings:
+		return "CharStrings"
+	case opCharstringType:
+		return "CharstringType"
+	case opSyntheticBase:
+		return "SyntheticBase"
+	case opROS:
+		return "ROS"
+	default:
+		if d < 256 {
+			return fmt.Sprintf("%d", d)
+		}
+		return fmt.Sprintf("%d %d", d>>8, d&0xff)
+	}
+}
+
 const (
-	// keyNotice         = 0x0001 // SID
-	// keyFullName       = 0x0002 // SID
-	// keyFamilyName     = 0x0003 // SID
-	// keyFontBBox       = 0x0005
-	// keyCharset        = 0x000F
-	// keyCharStrings    = 0x0011
-	// keyPrivate        = 0x0012
-	// keyCopyright      = 0x0C00 // SID
-	// keyUnderlinePos   = 0x0C03
-	keyCharstringType = 0x0C06 // number (default=2)
-	keyROS            = 0x0C1E
+	// opNotice         = 0x0001 // SID
+	// opFullName       = 0x0002 // SID
+	// opFamilyName     = 0x0003 // SID
+	// opFontBBox       = 0x0005
+	opCharset     = 0x000F
+	opCharStrings = 0x0011
+	// opPrivate        = 0x0012
+	// opCopyright      = 0x0C00 // SID
+	// opUnderlinePos   = 0x0C03
+	opCharstringType dictOp = 0x0C06 // number (default=2)
+	opSyntheticBase  dictOp = 0x0C14
+	opROS            dictOp = 0x0C1E
 )
