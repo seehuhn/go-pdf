@@ -17,11 +17,12 @@
 package cff
 
 import (
+	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"testing"
 
+	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt"
 )
 
@@ -54,16 +55,48 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := os.Create("out.cff")
+	_, err = cff.EncodeCFF()
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = cff.writeSubset(out, nil)
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestCharset(t *testing.T) {
+	cases := []struct {
+		blob   []byte
+		nGlyph int
+		first  sid
+		last   sid
+	}{
+		{[]byte{0, 0, 1, 0, 3, 0, 15}, 4, 1, 15},
+		{[]byte{1, 0, 2, 13}, 15, 2, 2 + 13},
+		{[]byte{2, 0, 3, 2, 1}, 1 + 2*256 + 2, 3, 3 + 2*256 + 1},
 	}
-	err = out.Close()
-	if err != nil {
-		t.Fatal(err)
+
+	for i, test := range cases {
+		fmt.Println("test", i)
+		r := bytes.NewReader(test.blob)
+		p := parser.New(r)
+		err := p.SetRegion("CFF", 0, int64(len(test.blob)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		names, err := readCharset(p, test.nGlyph)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(names) != test.nGlyph {
+			t.Errorf("expected %d glyphs, got %d", test.nGlyph, len(names))
+		}
+
+		out, err := encodeCharset(names)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !bytes.Equal(out, test.blob) {
+			t.Errorf("expected %v, got %v", test.blob, out)
+		}
 	}
 }

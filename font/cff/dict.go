@@ -136,6 +136,22 @@ func (d cffDict) getInt(op dictOp, defVal int32) (int32, bool) {
 	return x, true
 }
 
+func (d cffDict) getPair(op dictOp) (int32, int32, bool) {
+	xy := d[op]
+	if len(xy) != 2 {
+		return 0, 0, false
+	}
+	x, ok := xy[0].(int32)
+	if !ok {
+		return 0, 0, false
+	}
+	y, ok := xy[1].(int32)
+	if !ok {
+		return 0, 0, false
+	}
+	return x, y, true
+}
+
 func (d cffDict) keys() []dictOp {
 	keys := make([]dictOp, 0, len(d))
 	for k := range d {
@@ -256,16 +272,18 @@ func (d dictOp) String() string {
 }
 
 const (
+	opCharset        dictOp = 0x000F
+	opCharStrings    dictOp = 0x0011
+	opCharstringType dictOp = 0x0C06 // number (default=2)
+	opSyntheticBase  dictOp = 0x0C14
+	opROS            dictOp = 0x0C1E
+	opPrivate        dictOp = 0x0012
+
 	// opNotice         = 0x0001 // SID
 	// opFullName       = 0x0002 // SID
 	// opFamilyName     = 0x0003 // SID
 	// opFontBBox       = 0x0005
-	opCharset     = 0x000F
-	opCharStrings = 0x0011
 	// opPrivate        = 0x0012
 	// opCopyright      = 0x0C00 // SID
 	// opUnderlinePos   = 0x0C03
-	opCharstringType dictOp = 0x0C06 // number (default=2)
-	opSyntheticBase  dictOp = 0x0C14
-	opROS            dictOp = 0x0C1E
 )

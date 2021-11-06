@@ -73,6 +73,34 @@ func (p *Parser) Size() int64 {
 	return p.end - p.start
 }
 
+// Pos returns the current reading position within the current region.
+func (p *Parser) Pos() int64 {
+	return p.from + int64(p.pos) - p.start
+}
+
+// SeekPos changes the reading position within the current region.
+func (p *Parser) SeekPos(posInRegion int64) error {
+	filePos := p.start + posInRegion
+	if filePos < p.start || filePos > p.end {
+		return p.Error("seek target %d+%d is outside [%d,%d+%d]",
+			p.start, posInRegion, p.start, p.start, p.end-p.start)
+	}
+
+	if filePos >= p.from && filePos <= p.from+int64(p.used) {
+		p.pos = int(filePos - p.from)
+	} else {
+		_, err := p.r.Seek(filePos, io.SeekStart)
+		if err != nil {
+			return err
+		}
+		p.from = filePos
+		p.pos = 0
+		p.used = 0
+	}
+
+	return nil
+}
+
 // Exec runs the given commands, updating the state s.
 func (p *Parser) Exec(s *State, cmds ...Command) error {
 	var PC int
@@ -261,29 +289,6 @@ func (p *Parser) ReadUInt32() (uint32, error) {
 		return 0, err
 	}
 	return uint32(buf[0])<<24 + uint32(buf[1])<<16 + uint32(buf[2])<<8 + uint32(buf[3]), nil
-}
-
-// SeekPos changes the reading position within the current region.
-func (p *Parser) SeekPos(posInTable int64) error {
-	filePos := p.start + posInTable
-	if filePos < p.start || filePos > p.end {
-		return p.Error("seek target %d+%d is outside [%d,%d+%d]",
-			p.start, posInTable, p.start, p.start, p.end-p.start)
-	}
-
-	if filePos >= p.from && filePos <= p.from+int64(p.used) {
-		p.pos = int(filePos - p.from)
-	} else {
-		_, err := p.r.Seek(filePos, io.SeekStart)
-		if err != nil {
-			return err
-		}
-		p.from = filePos
-		p.pos = 0
-		p.used = 0
-	}
-
-	return nil
 }
 
 // ReadBlob reads n bytes from the file, starting at the current position.  The

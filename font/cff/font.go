@@ -32,11 +32,13 @@ import (
 // Font is a CFF font.
 type Font struct {
 	FontName string
-	topDict  cffDict
-	strings  cffStrings
-	gsubrs   [][]byte
 
+	topDict     cffDict
+	strings     cffStrings
+	gsubrs      [][]byte
 	charStrings cffIndex
+	glyphNames  []sid
+	privateDict cffDict
 
 	IsCIDFont bool
 }
@@ -78,14 +80,14 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	names, err := readIndex(p)
+	fontNames, err := readIndex(p)
 	if err != nil {
 		return nil, err
 	}
-	if len(names) != 1 {
+	if len(fontNames) != 1 {
 		return nil, errors.New("CFF with multiple fonts not supported")
 	}
-	cff.FontName = string(names[0])
+	cff.FontName = string(fontNames[0])
 
 	// read the Top DICT
 	topDicts, err := readIndex(p)
@@ -119,6 +121,8 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	cff.gsubrs = gsubrs
 
 	_, cff.IsCIDFont = topDict[opROS]
+
+	// read the CharStrings INDEX
 	cct, ok := topDict[opCharstringType]
 	if ok {
 		var cct32 int32
@@ -129,8 +133,6 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 			return nil, fmt.Errorf("unsupported charstring type %v", cct)
 		}
 	}
-
-	// read the CharStrings INDEX
 	pos, ok := topDict.getInt(opCharStrings, 0)
 	if !ok {
 		return nil, errors.New("missing CharStrings INDEX")
@@ -145,7 +147,7 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 	}
 	cff.charStrings = charStrings
 
-	// read the list of character names
+	// read the list of glyph names
 	charsetIndex, _ := topDict.getInt(opCharset, 0)
 	var charset []sid
 	switch charsetIndex {
@@ -160,19 +162,36 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		charset, err = cff.readCharset(p, len(charStrings))
+		charset, err = readCharset(p, len(charStrings))
 		if err != nil {
 			return nil, err
 		}
 	}
-	for i, sid := range charset {
-		fmt.Println(i, "=", cff.strings.get(sid))
+	cff.glyphNames = charset
+
+	// read the Private DICT
+	pdSize, pdPos, ok := topDict.getPair(opPrivate)
+	if !ok {
+		return nil, errors.New("missing Private DICT")
+	}
+	err = p.SeekPos(int64(pdPos))
+	if err != nil {
+		return nil, err
+	}
+	privateDictBlob := make([]byte, pdSize)
+	_, err = p.Read(privateDictBlob)
+	if err != nil {
+		return nil, err
+	}
+	cff.privateDict, err = decodeDict(privateDictBlob)
+	if err != nil {
+		return nil, err
 	}
 
 	return cff, nil
 }
 
-func (cff *Font) readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
+func readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
 	format, err := p.ReadUInt8()
 	if err != nil {
 		return nil, err
@@ -233,6 +252,85 @@ func (cff *Font) readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
 	return charset, nil
 }
 
+func encodeCharset(names []sid) ([]byte, error) {
+	if names[0] != 0 {
+		return nil, errors.New("invalid charset")
+	}
+	names = names[1:]
+
+	// find runs of consecutive glyph names
+	var runs []int
+	for i := 0; i < len(names); i++ {
+		if i == 0 || names[i] != names[i-1]+1 {
+			runs = append(runs, i)
+		}
+	}
+	runs = append(runs, len(names))
+
+	// find the longest run of consecutive glyph names
+	var longestRun int
+	for i := 1; i < len(runs); i++ {
+		if runs[i]-runs[i-1] > longestRun {
+			longestRun = runs[i] - runs[i-1]
+		}
+	}
+
+	length0 := 1 + 2*len(names) // length with format 0 encoding
+
+	length1 := 1 + 3*(len(runs)-1) // length with format 1 encoding
+	if longestRun-1 > 255 {
+		for i := 0; i < len(runs)-1; i++ {
+			d := runs[i+1] - runs[i] - 1
+			for d >= 256 {
+				d -= 256
+				length1 += 3
+			}
+		}
+	}
+
+	length2 := 1 + 4*(len(runs)-1) // length with format 2 encoding
+
+	var buf []byte
+	if length0 <= length1 && length0 <= length2 {
+		buf = make([]byte, length0)
+		buf[0] = 0
+		for i, name := range names {
+			buf[2*i+1] = byte(name >> 8)
+			buf[2*i+2] = byte(name)
+		}
+	} else if length1 < length2 {
+		buf = make([]byte, length1)
+		buf[0] = 1
+		for i := 0; i < len(runs)-1; i++ {
+			name := names[runs[i]]
+			dd := runs[i+1] - runs[i]
+			for dd > 0 {
+				d := dd - 1
+				if d > 255 {
+					d = 255
+				}
+				buf[3*i+1] = byte(name >> 8)
+				buf[3*i+2] = byte(name)
+				buf[3*i+3] = byte(d)
+				name += sid(d + 1)
+				dd -= d + 1
+			}
+		}
+	} else {
+		buf = make([]byte, length2)
+		buf[0] = 2
+		for i := 0; i < len(runs)-1; i++ {
+			name := names[runs[i]]
+			d := runs[i+1] - runs[i] - 1
+			buf[4*i+1] = byte(name >> 8)
+			buf[4*i+2] = byte(name)
+			buf[4*i+3] = byte(d >> 8)
+			buf[4*i+4] = byte(d)
+		}
+	}
+	return buf, nil
+}
+
 // EncodeCFF returns the binary encoding of CFF font.
 func (cff *Font) EncodeCFF() ([]byte, error) {
 	// Header
@@ -273,6 +371,11 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 		return nil, err
 	}
 
+	charStringsIndexBlob, err := cffIndex(cff.charStrings).encode()
+	if err != nil {
+		return nil, err
+	}
+
 	// We need to write the following sections:
 	//   - Header
 	//   - Name INDEX
@@ -280,11 +383,11 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 	//   - String INDEX
 	//   - Global Subr INDEX
 	//
-	//   - Encodings [referenced by Top DICT]
-	//   - Charsets [referenced by Top DICT]
-	//   - FDSelect [referenced by Top DICT]
+	//   - Encodings [referenced by Top DICT]  <-- needed?
+	//   - Charsets [referenced by Top DICT]  <-- needed?
+	//   - FDSelect [CIDFonts only, referenced by Top DICT]
 	//   - CharStrings INDEX [referenced by Top DICT]
-	//   - Font DICT INDEX [referenced by Top DICT]
+	//   - Font DICT INDEX [CIDFonts only, referenced by Top DICT]
 	//   - Private DICT [referenced by Top DICT]
 	//   - Local Subr INDEX [referenced by Private DICT]
 	//   - Copyright and Trademark Notices [how to find these???]
@@ -294,6 +397,7 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 		topDictIndexBlob,
 		stringIndexBlob,
 		gsubrsIndexBlob,
+		charStringsIndexBlob,
 	}
 
 	res := &bytes.Buffer{}

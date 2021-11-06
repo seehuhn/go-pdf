@@ -135,7 +135,7 @@ ET
 
 	_, err = r.enc.sec.GetKey(false)
 	if err != nil {
-		t.Fatal("xxx", err)
+		t.Fatal(err)
 	}
 
 	_, err = r.GetCatalog()
