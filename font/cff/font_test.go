@@ -37,6 +37,7 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal("no CFF table found")
 	}
 	length := int64(table.Length)
+	fmt.Println("before:", length)
 	tableFd := io.NewSectionReader(tt.Fd, int64(table.Offset), length)
 
 	cff, err := ReadCFF(tableFd)
@@ -55,10 +56,13 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = cff.EncodeCFF()
+	blob, err := cff.EncodeCFF()
 	if err != nil {
 		t.Fatal(err)
 	}
+	fmt.Println("after:", len(blob))
+
+	// t.Fatal("not implemented")
 }
 
 func TestCharset(t *testing.T) {

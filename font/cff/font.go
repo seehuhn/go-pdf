@@ -39,6 +39,7 @@ type Font struct {
 	charStrings cffIndex
 	glyphNames  []sid
 	privateDict cffDict
+	subrs       cffIndex
 
 	IsCIDFont bool
 }
@@ -188,6 +189,19 @@ func ReadCFF(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 
+	subrOffset, _ := cff.privateDict.getInt(opSubrs, 0)
+	if subrOffset > 0 {
+		err = p.SeekPos(int64(pdPos) + int64(subrOffset))
+		if err != nil {
+			return nil, err
+		}
+		subrs, err := readIndex(p)
+		if err != nil {
+			return nil, err
+		}
+		cff.subrs = subrs
+	}
+
 	return cff, nil
 }
 
@@ -282,8 +296,8 @@ func encodeCharset(names []sid) ([]byte, error) {
 		for i := 0; i < len(runs)-1; i++ {
 			d := runs[i+1] - runs[i] - 1
 			for d >= 256 {
-				d -= 256
 				length1 += 3
+				d -= 256
 			}
 		}
 	}
@@ -347,20 +361,7 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 		return nil, err
 	}
 
-	// TODO(voss): the following fields need fixing up
-	//   - FontBBox (in case of subsetting)
-	//   - charset: charset offset (0)
-	//   - Encoding: encoding offset (0)
-	//   - Charstrings: CharStrings offset (0)
-	//   - Private: Private DICT size and offset (0)
-	//   - FDArray: Font DICT (FD) INDEX offset (0)
-	//   - FDSelect: FDSelect offset (0)
-	topDictData := cff.topDict.encode()
-	topDictIndexBlob, err := cffIndex{topDictData}.encode()
-	if err != nil {
-		return nil, err
-	}
-
+	// this needs pruning in case of subsetting
 	stringIndexBlob, err := cff.strings.encode()
 	if err != nil {
 		return nil, err
@@ -376,21 +377,72 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 		return nil, err
 	}
 
-	// We need to write the following sections:
+	var privateDictBlob []byte
+	pdCopy := cff.privateDict.copy()
+	var offs int32
+	for { // TODO(voss): does this loop always terminate?
+		pdCopy[opSubrs] = []interface{}{offs}
+		privateDictBlob = pdCopy.encode()
+		newOffs := int32(len(privateDictBlob))
+		if newOffs == offs {
+			break
+		}
+		offs = newOffs
+	}
+
+	subrsIndexBlob, err := cff.subrs.encode()
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(voss): the following fields need fixing up
+	//   - FontBBox (in case of subsetting)
+	//   - charset: charset offset (0)
+	//   - Encoding: encoding offset (0)
+	//   - Charstrings: CharStrings offset (0)
+	//   - Private: Private DICT size and offset (0)
+	//   - FDArray: Font DICT (FD) INDEX offset (0) [only for CID Fonts]
+	//   - FDSelect: FDSelect offset (0) [only for CID Fonts]
+	var topDictIndexBlob []byte
+	tdCopy := cff.topDict.copy()
+	var ccIndex, pdIndex int32
+	pdSize := int32(len(privateDictBlob))
+	for { // TODO(voss): does this loop always terminate?
+		tdCopy[opCharStrings] = []interface{}{ccIndex}
+		tdCopy[opPrivate] = []interface{}{pdSize, pdIndex}
+		topDictData := tdCopy.encode()
+		topDictIndexBlob, err = cffIndex{topDictData}.encode()
+		if err != nil {
+			return nil, err
+		}
+		newCCIndex := int32(len(header) +
+			len(nameIndexBlob) +
+			len(topDictIndexBlob) +
+			len(stringIndexBlob) +
+			len(gsubrsIndexBlob))
+		newPdIndex := newCCIndex + int32(len(charStringsIndexBlob))
+		if newCCIndex == ccIndex && newPdIndex == pdIndex {
+			break
+		}
+		ccIndex = newCCIndex
+		pdIndex = newPdIndex
+	}
+
+	// A CFF file contains the following sections:
 	//   - Header
 	//   - Name INDEX
 	//   - Top DICT INDEX
 	//   - String INDEX
 	//   - Global Subr INDEX
 	//
-	//   - Encodings [referenced by Top DICT]  <-- needed?
-	//   - Charsets [referenced by Top DICT]  <-- needed?
-	//   - FDSelect [CIDFonts only, referenced by Top DICT]
+	//   . Encodings [referenced by Top DICT]  <-- needed?
+	//   . Charsets [referenced by Top DICT]  <-- needed?
+	//   . FDSelect [CIDFonts only, referenced by Top DICT]
 	//   - CharStrings INDEX [referenced by Top DICT]
-	//   - Font DICT INDEX [CIDFonts only, referenced by Top DICT]
+	//   . Font DICT INDEX [CIDFonts only, referenced by Top DICT]
 	//   - Private DICT [referenced by Top DICT]
 	//   - Local Subr INDEX [referenced by Private DICT]
-	//   - Copyright and Trademark Notices [how to find these???]
+	//   . Copyright and Trademark Notices [how to find these???]
 	blobs := [][]byte{
 		header,
 		nameIndexBlob,
@@ -398,6 +450,8 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 		stringIndexBlob,
 		gsubrsIndexBlob,
 		charStringsIndexBlob,
+		privateDictBlob,
+		subrsIndexBlob,
 	}
 
 	res := &bytes.Buffer{}
