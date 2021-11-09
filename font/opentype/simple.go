@@ -110,7 +110,6 @@ type otfSimple struct {
 }
 
 func newOtfSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*otfSimple, error) {
-
 	tidy := make(map[font.GlyphID]byte)
 	for r, gid := range tt.CMap {
 		if rOld, used := tidy[gid]; r < 127 && (!used || byte(r) < rOld) {

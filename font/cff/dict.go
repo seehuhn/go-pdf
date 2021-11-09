@@ -261,16 +261,36 @@ type dictOp uint16
 
 func (d dictOp) String() string {
 	switch d {
+	case opNotice:
+		return "Notice"
+	case opFullName:
+		return "FullName"
+	case opFamilyName:
+		return "FamilyName"
+	case opFontBBox:
+		return "FontBBox"
 	case opCharset:
 		return "Charset"
+	case opEncoding:
+		return "Encoding"
 	case opCharStrings:
 		return "CharStrings"
+	case opPrivate:
+		return "Private"
+	case opCopyright:
+		return "Copyright"
+	case opUnderlinePosition:
+		return "UnderlinePosition"
 	case opCharstringType:
 		return "CharstringType"
 	case opSyntheticBase:
 		return "SyntheticBase"
 	case opROS:
 		return "ROS"
+
+	case opSubrs:
+		return "Subrs"
+
 	default:
 		if d < 256 {
 			return fmt.Sprintf("%d", d)
@@ -281,20 +301,19 @@ func (d dictOp) String() string {
 
 const (
 	// top DICT operators
-	opCharset        dictOp = 0x000F
-	opCharStrings    dictOp = 0x0011
-	opPrivate        dictOp = 0x0012
-	opCharstringType dictOp = 0x0C06 // number (default=2)
-	opSyntheticBase  dictOp = 0x0C14
-	opROS            dictOp = 0x0C1E
-
-	// opNotice         = 0x0001 // SID
-	// opFullName       = 0x0002 // SID
-	// opFamilyName     = 0x0003 // SID
-	// opFontBBox       = 0x0005
-	// opPrivate        = 0x0012
-	// opCopyright      = 0x0C00 // SID
-	// opUnderlinePos   = 0x0C03
+	opNotice            dictOp = 0x0001
+	opFullName          dictOp = 0x0002
+	opFamilyName        dictOp = 0x0003
+	opFontBBox          dictOp = 0x0005
+	opCharset           dictOp = 0x000F
+	opEncoding          dictOp = 0x0010
+	opCharStrings       dictOp = 0x0011
+	opPrivate           dictOp = 0x0012
+	opCopyright         dictOp = 0x0C00
+	opUnderlinePosition dictOp = 0x0C03
+	opCharstringType    dictOp = 0x0C06
+	opSyntheticBase     dictOp = 0x0C14
+	opROS               dictOp = 0x0C1E
 
 	// private DICT operators
 	opSubrs dictOp = 0x0013 // Offset (self) to local subrs

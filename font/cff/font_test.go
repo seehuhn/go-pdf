@@ -19,28 +19,19 @@ package cff
 import (
 	"bytes"
 	"fmt"
-	"io"
+	"os"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/parser"
-	"seehuhn.de/go/pdf/font/sfnt"
 )
 
 func TestReadCFF(t *testing.T) {
-	tt, err := sfnt.Open("../opentype/otf/SourceSerif4-Regular.otf", nil)
+	in, err := os.Open("test.cff")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	table := tt.Header.Find("CFF ")
-	if table == nil {
-		t.Fatal("no CFF table found")
-	}
-	length := int64(table.Length)
-	fmt.Println("before:", length)
-	tableFd := io.NewSectionReader(tt.Fd, int64(table.Offset), length)
-
-	cff, err := ReadCFF(tableFd)
+	cff, err := Read(in)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,21 +39,40 @@ func TestReadCFF(t *testing.T) {
 	fmt.Println("topDict:")
 	for _, op := range cff.topDict.keys() {
 		args := cff.topDict[op]
-		fmt.Printf("%s: %v\n", op, args)
+		fmt.Printf("  - %s = %v\n", op, args)
 	}
 
-	err = tt.Close()
+	err = in.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	blob, err := cff.EncodeCFF()
+	blob, err := cff.Encode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("after:", len(blob))
+	os.WriteFile("out.cff", blob, 0644)
 
-	// t.Fatal("not implemented")
+	r := bytes.NewReader(blob)
+	cff2, err := Read(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cff.FontName != cff2.FontName {
+		t.Errorf("FontName: %q != %q", cff.FontName, cff2.FontName)
+	}
+	if len(cff.gsubrs) != len(cff2.gsubrs) {
+		t.Errorf("len(gsubrs): %d != %d", len(cff.gsubrs), len(cff2.gsubrs))
+	}
+	if len(cff.charStrings) != len(cff2.charStrings) {
+		t.Errorf("len(charStrings): %d != %d", len(cff.charStrings), len(cff2.charStrings))
+	}
+	if len(cff.subrs) != len(cff2.subrs) {
+		t.Errorf("len(subrs): %d != %d", len(cff.subrs), len(cff2.subrs))
+	}
+
+	t.Fatal("not implemented")
 }
 
 func TestCharset(t *testing.T) {

@@ -44,8 +44,8 @@ type Font struct {
 	IsCIDFont bool
 }
 
-// ReadCFF reads a CFF font from r.
-func ReadCFF(r io.ReadSeeker) (*Font, error) {
+// Read reads a CFF font from r.
+func Read(r io.ReadSeeker) (*Font, error) {
 	length, err := r.Seek(0, io.SeekEnd)
 	if err != nil {
 		return nil, err
@@ -281,24 +281,14 @@ func encodeCharset(names []sid) ([]byte, error) {
 	}
 	runs = append(runs, len(names))
 
-	// find the longest run of consecutive glyph names
-	var longestRun int
-	for i := 1; i < len(runs); i++ {
-		if runs[i]-runs[i-1] > longestRun {
-			longestRun = runs[i] - runs[i-1]
-		}
-	}
-
 	length0 := 1 + 2*len(names) // length with format 0 encoding
 
 	length1 := 1 + 3*(len(runs)-1) // length with format 1 encoding
-	if longestRun-1 > 255 {
-		for i := 0; i < len(runs)-1; i++ {
-			d := runs[i+1] - runs[i] - 1
-			for d >= 256 {
-				length1 += 3
-				d -= 256
-			}
+	for i := 0; i < len(runs)-1; i++ {
+		d := runs[i+1] - runs[i]
+		for d > 256 {
+			length1 += 3
+			d -= 256
 		}
 	}
 
@@ -345,14 +335,14 @@ func encodeCharset(names []sid) ([]byte, error) {
 	return buf, nil
 }
 
-// EncodeCFF returns the binary encoding of CFF font.
-func (cff *Font) EncodeCFF() ([]byte, error) {
+// Encode returns the binary encoding of a CFF font.
+func (cff *Font) Encode() ([]byte, error) {
 	// Header
 	header := []byte{
 		1, // major
 		0, // minor
 		4, // hdrSize
-		4, // offSize
+		3, // offSize, not sure what to do here
 	}
 
 	// Name INDEX
@@ -368,6 +358,11 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 	}
 
 	gsubrsIndexBlob, err := cffIndex(cff.gsubrs).encode()
+	if err != nil {
+		return nil, err
+	}
+
+	charsetsBlob, err := encodeCharset(cff.glyphNames)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +414,8 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 			len(nameIndexBlob) +
 			len(topDictIndexBlob) +
 			len(stringIndexBlob) +
-			len(gsubrsIndexBlob))
+			len(gsubrsIndexBlob) +
+			len(charsetsBlob))
 		newPdIndex := newCCIndex + int32(len(charStringsIndexBlob))
 		if newCCIndex == ccIndex && newPdIndex == pdIndex {
 			break
@@ -436,7 +432,7 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 	//   - Global Subr INDEX
 	//
 	//   . Encodings [referenced by Top DICT]  <-- needed?
-	//   . Charsets [referenced by Top DICT]  <-- needed?
+	//   - Charsets [referenced by Top DICT]  <-- needed?
 	//   . FDSelect [CIDFonts only, referenced by Top DICT]
 	//   - CharStrings INDEX [referenced by Top DICT]
 	//   . Font DICT INDEX [CIDFonts only, referenced by Top DICT]
@@ -449,6 +445,7 @@ func (cff *Font) EncodeCFF() ([]byte, error) {
 		topDictIndexBlob,
 		stringIndexBlob,
 		gsubrsIndexBlob,
+		charsetsBlob,
 		charStringsIndexBlob,
 		privateDictBlob,
 		subrsIndexBlob,

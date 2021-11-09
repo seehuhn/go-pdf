@@ -71,7 +71,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 	if err != nil {
 		return nil, err
 	}
-	cff, err := cff.ReadCFF(r)
+	cff, err := cff.Read(r)
 	if err != nil {
 		return nil, err
 	}

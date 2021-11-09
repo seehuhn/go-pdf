@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -78,6 +79,26 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	}
 
 	tableNames := tt.selectTables(includeTables)
+
+	if contains(tableNames, "CFF ") {
+		info := tt.Header.Find("CFF ")
+		if info == nil {
+			return 0, &table.ErrNoTable{Name: "CFF "}
+		}
+		length := int64(info.Length)
+		tableFd := io.NewSectionReader(tt.Fd, int64(info.Offset), length)
+
+		cff, err := cff.Read(tableFd)
+		if err != nil {
+			return 0, err
+		}
+		blob, err := cff.Encode()
+		// blob, err := tt.Header.ReadTableBytes(tt.Fd, "CFF ")
+		// if err != nil {
+		// 	return 0, err
+		// }
+		replTab["CFF "] = blob
+	}
 
 	if contains(tableNames, "head") {
 		// Copy and modify the "head" table.
