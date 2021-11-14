@@ -235,11 +235,23 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 	if err != nil {
 		return err
 	}
+
+	cffData, err := t.Cff.Encode()
+	if err != nil {
+		return err
+	}
+
 	exOpt := &sfnt.ExportOptions{
 		IncludeTables: map[string]bool{
 			// The list of tables to include is from PDF 32000-1:2008, table 126.
 			"CFF ": true,
 			"cmap": true,
+
+			"head": true, // Preview on MacOS seems to require this.
+			"maxp": true, // Preview on MacOS seems to require this.
+		},
+		Replace: map[string][]byte{
+			"CFF ": cffData,
 		},
 	}
 	_, err = t.Otf.Export(fontFileStream, exOpt)

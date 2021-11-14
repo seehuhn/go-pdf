@@ -17,6 +17,7 @@
 package parser
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"strings"
@@ -63,5 +64,34 @@ func TestParser(t *testing.T) {
 	}
 	if y != -1 {
 		t.Errorf("wrong value, expected -1 but got %d", y)
+	}
+}
+
+func TestPos(t *testing.T) {
+	buf := bytes.NewReader([]byte{'0', '1', '2', '3', '4', '5', '6', '7'})
+	p := New(buf)
+	p.SetRegion("test", 0, 8)
+
+	pos := p.Pos()
+	if pos != 0 {
+		t.Errorf("wrong position, expected 0 but got %d", pos)
+	}
+
+	_, err := p.ReadUInt16()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pos = p.Pos()
+	if pos != 2 {
+		t.Errorf("wrong position, expected 2 but got %d", pos)
+	}
+
+	err = p.SeekPos(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Pos() != 5 {
+		t.Errorf("wrong position, expected 5 but got %d", p.Pos())
 	}
 }

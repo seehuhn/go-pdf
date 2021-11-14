@@ -302,7 +302,7 @@ func (p *Parser) ReadBlob(n int) ([]byte, error) {
 	if n < 0 {
 		n = 0
 	} else if n > bufferSize {
-		n = bufferSize
+		panic("buffer size exceeded")
 	}
 	if p.from+int64(p.pos+n) > p.end {
 		return nil, io.ErrUnexpectedEOF

@@ -25,15 +25,15 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 // ExportOptions provides options for the Font.Export() function.
 type ExportOptions struct {
-	IncludeTables map[string]bool  // include a subset of tables
-	IncludeGlyphs []font.GlyphID   // include a subset of glyphs
-	SubsetMapping []font.CMapEntry // include a generated cmap table
+	IncludeTables map[string]bool   // include a subset of tables
+	Replace       map[string][]byte // replace a table with a custom one
+	IncludeGlyphs []font.GlyphID    // include a subset of glyphs
+	SubsetMapping []font.CMapEntry  // include a generated cmap table
 	ModTime       time.Time
 }
 
@@ -80,26 +80,6 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 
 	tableNames := tt.selectTables(includeTables)
 
-	if contains(tableNames, "CFF ") {
-		info := tt.Header.Find("CFF ")
-		if info == nil {
-			return 0, &table.ErrNoTable{Name: "CFF "}
-		}
-		length := int64(info.Length)
-		tableFd := io.NewSectionReader(tt.Fd, int64(info.Offset), length)
-
-		cff, err := cff.Read(tableFd)
-		if err != nil {
-			return 0, err
-		}
-		blob, err := cff.Encode()
-		// blob, err := tt.Header.ReadTableBytes(tt.Fd, "CFF ")
-		// if err != nil {
-		// 	return 0, err
-		// }
-		replTab["CFF "] = blob
-	}
-
 	if contains(tableNames, "head") {
 		// Copy and modify the "head" table.
 		// https://docs.microsoft.com/en-us/typography/opentype/spec/head
@@ -122,6 +102,12 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		_ = binary.Write(buf, binary.BigEndian, headTable)
 		headBytes := buf.Bytes()
 		replTab["head"] = headBytes
+	}
+
+	if opt.Replace != nil {
+		for name, repl := range opt.Replace {
+			replTab[name] = repl
+		}
 	}
 
 	var totalSize int64
@@ -472,10 +458,18 @@ func (tt *Font) selectTables(include map[string]bool) []string {
 
 	// Fix the order of tables in the body of the files.
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
-	for _, name := range []string{
-		"head", "hhea", "maxp", "OS/2", "hmtx", "LTSH", "VDMX", "hdmx", "cmap",
-		"fpgm", "prep", "cvt ", "loca", "glyf", "kern", "name", "post", "gasp",
-	} {
+	var candidates []string
+	if tt.Header.Find("CFF ") != nil && (include == nil || include["CFF "]) {
+		candidates = []string{
+			"head", "hhea", "maxp", "OS/2", "name", "cmap", "post", "CFF ",
+		}
+	} else {
+		candidates = []string{
+			"head", "hhea", "maxp", "OS/2", "hmtx", "LTSH", "VDMX", "hdmx", "cmap",
+			"fpgm", "prep", "cvt ", "loca", "glyf", "kern", "name", "post", "gasp",
+		}
+	}
+	for _, name := range candidates {
 		done[name] = true
 		if tt.Header.Find(name) != nil {
 			if include == nil || include[name] {

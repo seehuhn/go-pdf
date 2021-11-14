@@ -90,15 +90,20 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 
 		xOffsWanted := xOffs + glyph.XOffset
 
+		gid := glyph.Gid
+		if int(gid) >= len(font.Width) {
+			gid = 0
+		}
+
 		delta := font.ToGlyph(xOffsWanted - xOffsAuto)
 		if delta != 0 {
 			flushRun()
 			data = append(data, -pdf.Integer(delta))
 		}
-		run = append(run, font.Enc(glyph.Gid)...)
+		run = append(run, font.Enc(gid)...)
 
 		xOffs += glyph.Advance
-		xOffsAuto = xOffsWanted + font.Width[glyph.Gid]
+		xOffsAuto = xOffsWanted + font.Width[gid]
 	}
 	flush()
 }

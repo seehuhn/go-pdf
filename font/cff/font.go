@@ -46,6 +46,8 @@ type Font struct {
 
 // Read reads a CFF font from r.
 func Read(r io.ReadSeeker) (*Font, error) {
+	cff := &Font{}
+
 	length, err := r.Seek(0, io.SeekEnd)
 	if err != nil {
 		return nil, err
@@ -74,8 +76,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, errors.New("not a CFF font")
 	}
 
-	cff := &Font{}
-
 	// read the Name INDEX
 	err = p.SeekPos(nameIndexPos)
 	if err != nil {
@@ -91,14 +91,14 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.FontName = string(fontNames[0])
 
 	// read the Top DICT
-	topDicts, err := readIndex(p)
+	topDictIndex, err := readIndex(p)
 	if err != nil {
 		return nil, err
 	}
-	if len(topDicts) != 1 {
+	if len(topDictIndex) != 1 {
 		return nil, errors.New("invalid CFF")
 	}
-	topDict, err := decodeDict(topDicts[0])
+	topDict, err := decodeDict(topDictIndex[0])
 	if err != nil {
 		return nil, err
 	}
@@ -149,9 +149,9 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.charStrings = charStrings
 
 	// read the list of glyph names
-	charsetIndex, _ := topDict.getInt(opCharset, 0)
+	charsetsPos, _ := topDict.getInt(opCharset, 0)
 	var charset []sid
-	switch charsetIndex {
+	switch charsetsPos {
 	case 0: // ISOAdobe
 		panic("not implemented")
 	case 1: // Expert
@@ -159,7 +159,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	case 2: // ExpertSubset
 		panic("not implemented")
 	default:
-		err = p.SeekPos(int64(charsetIndex))
+		err = p.SeekPos(int64(charsetsPos))
 		if err != nil {
 			return nil, err
 		}
@@ -189,9 +189,9 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 
-	subrOffset, _ := cff.privateDict.getInt(opSubrs, 0)
-	if subrOffset > 0 {
-		err = p.SeekPos(int64(pdPos) + int64(subrOffset))
+	subrsIndexOffset, _ := cff.privateDict.getInt(opSubrs, 0)
+	if subrsIndexOffset > 0 {
+		err = p.SeekPos(int64(pdPos) + int64(subrsIndexOffset))
 		if err != nil {
 			return nil, err
 		}
@@ -342,7 +342,7 @@ func (cff *Font) Encode() ([]byte, error) {
 		1, // major
 		0, // minor
 		4, // hdrSize
-		3, // offSize, not sure what to do here
+		4, // offSize, not sure what to do here
 	}
 
 	// Name INDEX
@@ -400,9 +400,11 @@ func (cff *Font) Encode() ([]byte, error) {
 	//   - FDSelect: FDSelect offset (0) [only for CID Fonts]
 	var topDictIndexBlob []byte
 	tdCopy := cff.topDict.copy()
-	var ccIndex, pdIndex int32
+	delete(tdCopy, opEncoding)
+	var csIndex, ccIndex, pdIndex int32
 	pdSize := int32(len(privateDictBlob))
 	for { // TODO(voss): does this loop always terminate?
+		tdCopy[opCharset] = []interface{}{csIndex}
 		tdCopy[opCharStrings] = []interface{}{ccIndex}
 		tdCopy[opPrivate] = []interface{}{pdSize, pdIndex}
 		topDictData := tdCopy.encode()
@@ -410,16 +412,17 @@ func (cff *Font) Encode() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		newCCIndex := int32(len(header) +
+		newCSIndex := int32(len(header) +
 			len(nameIndexBlob) +
 			len(topDictIndexBlob) +
 			len(stringIndexBlob) +
-			len(gsubrsIndexBlob) +
-			len(charsetsBlob))
+			len(gsubrsIndexBlob))
+		newCCIndex := newCSIndex + int32(len(charsetsBlob))
 		newPdIndex := newCCIndex + int32(len(charStringsIndexBlob))
-		if newCCIndex == ccIndex && newPdIndex == pdIndex {
+		if newCSIndex == csIndex && newCCIndex == ccIndex && newPdIndex == pdIndex {
 			break
 		}
+		csIndex = newCSIndex
 		ccIndex = newCCIndex
 		pdIndex = newPdIndex
 	}

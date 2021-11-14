@@ -32,6 +32,7 @@ func TestCID(t *testing.T) {
 	}
 
 	tt, err := sfnt.Open("otf/SourceSerif4-regular.otf", nil)
+	// tt, err := sfnt.Open("otf/Atkinson-Hyperlegible-Regular-102.otf", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

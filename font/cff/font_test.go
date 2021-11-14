@@ -26,7 +26,7 @@ import (
 )
 
 func TestReadCFF(t *testing.T) {
-	in, err := os.Open("test.cff")
+	in, err := os.Open("Atkinson-Hyperlegible-BoldItalic-102.cff")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,6 @@ func TestReadCFF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile("out.cff", blob, 0644)
 
 	r := bytes.NewReader(blob)
 	cff2, err := Read(r)
@@ -72,7 +71,7 @@ func TestReadCFF(t *testing.T) {
 		t.Errorf("len(subrs): %d != %d", len(cff.subrs), len(cff2.subrs))
 	}
 
-	t.Fatal("not implemented")
+	// t.Fatal("not implemented")
 }
 
 func TestCharset(t *testing.T) {
