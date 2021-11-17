@@ -1,5 +1,7 @@
 package cff
 
+import "fmt"
+
 // Determine the indices of local and global subroutines used by a charstring.
 func charStringDependencies(cc []byte) (subr, gsubr []int32) {
 	local := make(map[int32]bool)
@@ -8,14 +10,45 @@ func charStringDependencies(cc []byte) (subr, gsubr []int32) {
 	storage := make(map[int32]int32)
 	var nStems int
 
-	i := 0
-	for i < len(cc) {
-		op := type2op(cc[i])
-		i++
-		if op == 0x0c && i < len(cc)-1 {
-			op = op<<8 | type2op(cc[i])
-			i++
+	for len(cc) > 0 {
+		op := t2op(cc[0])
+		cc = cc[1:]
+
+		if op >= 32 && op <= 246 {
+			stack = append(stack, int32(op)-139)
+			continue
+		} else if op >= 247 && op <= 250 {
+			if len(cc) < 1 {
+				break
+			}
+			stack = append(stack, int32(op)*256+int32(cc[0])+(108-247*256))
+			cc = cc[1:]
+			continue
+		} else if op >= 251 && op <= 254 {
+			if len(cc) < 2 {
+				break
+			}
+			stack = append(stack, -int32(op)*256-int32(cc[0])-(108-251*256))
+			cc = cc[2:]
+			continue
+		} else if op == 255 {
+			if len(cc) < 4 {
+				break
+			}
+			x := int32(uint32(cc[0])<<24 + uint32(cc[1])<<16 + uint32(cc[2])<<8 + uint32(cc[3]))
+			stack = append(stack, x) // TODO(voss): this is a float
+			cc = cc[4:]
+			continue
+		} else if op == 0x0c {
+			if len(cc) < 1 {
+				break
+			}
+			op = op<<8 | t2op(cc[0])
+			cc = cc[1:]
 		}
+
+		fmt.Println(stack, op, cc)
+
 		switch op {
 		case t2rmoveto, t2hmoveto, t2vmoveto, t2rlineto, t2hlineto, t2vlineto,
 			t2rrcurveto, t2hhcurveto, t2hvcurveto, t2rcurveline, t2rlinecurve,
@@ -30,7 +63,7 @@ func charStringDependencies(cc []byte) (subr, gsubr []int32) {
 			nStems += len(stack) / 2
 			stack = stack[:0]
 		case t2hintmask, t2cntrmask:
-			i += (nStems + 7) / 8
+			cc = cc[(nStems+7)/8:]
 			stack = stack[:0]
 
 		case t2abs:
@@ -210,57 +243,161 @@ func roll(data []int32, j int) {
 	copy(data[:j], tmp)
 }
 
-type type2op uint16
+type t2op uint16
+
+func (op t2op) String() string {
+	switch op {
+	case t2hstem:
+		return "t2hstem"
+	case t2vstem:
+		return "t2vstem"
+	case t2vmoveto:
+		return "t2vmoveto"
+	case t2rlineto:
+		return "t2rlineto"
+	case t2hlineto:
+		return "t2hlineto"
+	case t2vlineto:
+		return "t2vlineto"
+	case t2rrcurveto:
+		return "t2rrcurveto"
+	case t2callsubr:
+		return "t2callsubr"
+	case t2return:
+		return "t2return"
+	case t2endchar:
+		return "t2endchar"
+	case t2hstemhm:
+		return "t2hstemhm"
+	case t2hintmask:
+		return "t2hintmask"
+	case t2cntrmask:
+		return "t2cntrmask"
+	case t2rmoveto:
+		return "t2rmoveto"
+	case t2hmoveto:
+		return "t2hmoveto"
+	case t2vstemhm:
+		return "t2vstemhm"
+	case t2rcurveline:
+		return "t2rcurveline"
+	case t2rlinecurve:
+		return "t2rlinecurve"
+	case t2vvcurveto:
+		return "t2vvcurveto"
+	case t2hhcurveto:
+		return "t2hhcurveto"
+	case t2shortint:
+		return "t2shortint"
+	case t2callgsubr:
+		return "t2callgsubr"
+	case t2vhcurveto:
+		return "t2vhcurveto"
+	case t2hvcurveto:
+		return "t2hvcurveto"
+	case t2dotsection:
+		return "t2dotsection"
+	case t2and:
+		return "t2and"
+	case t2or:
+		return "t2or"
+	case t2not:
+		return "t2not"
+	case t2abs:
+		return "t2abs"
+	case t2add:
+		return "t2add"
+	case t2sub:
+		return "t2sub"
+	case t2div:
+		return "t2div"
+	case t2neg:
+		return "t2neg"
+	case t2eq:
+		return "t2eq"
+	case t2drop:
+		return "t2drop"
+	case t2put:
+		return "t2put"
+	case t2get:
+		return "t2get"
+	case t2ifelse:
+		return "t2ifelse"
+	case t2random:
+		return "t2random"
+	case t2mul:
+		return "t2mul"
+	case t2sqrt:
+		return "t2sqrt"
+	case t2dup:
+		return "t2dup"
+	case t2exch:
+		return "t2exch"
+	case t2index:
+		return "t2index"
+	case t2roll:
+		return "t2roll"
+	case t2hflex:
+		return "t2hflex"
+	case t2flex:
+		return "t2flex"
+	case t2hflex1:
+		return "t2hflex1"
+	case t2flex1:
+		return "t2flex1"
+	}
+	return fmt.Sprintf("t2op(%d)", op)
+}
 
 const (
-	t2hstem      type2op = 0x0001
-	t2vstem      type2op = 0x0003
-	t2vmoveto    type2op = 0x0004
-	t2rlineto    type2op = 0x0005
-	t2hlineto    type2op = 0x0006
-	t2vlineto    type2op = 0x0007
-	t2rrcurveto  type2op = 0x0008
-	t2callsubr   type2op = 0x000a
-	t2return     type2op = 0x000b
-	t2endchar    type2op = 0x000e
-	t2hstemhm    type2op = 0x0012
-	t2hintmask   type2op = 0x0013
-	t2cntrmask   type2op = 0x0014
-	t2rmoveto    type2op = 0x0015
-	t2hmoveto    type2op = 0x0016
-	t2vstemhm    type2op = 0x0017
-	t2rcurveline type2op = 0x0018
-	t2rlinecurve type2op = 0x0019
-	t2vvcurveto  type2op = 0x001a
-	t2hhcurveto  type2op = 0x001b
-	t2shortint   type2op = 0x001c
-	t2callgsubr  type2op = 0x001d
-	t2vhcurveto  type2op = 0x001e
-	t2hvcurveto  type2op = 0x001f
+	t2hstem      t2op = 0x0001
+	t2vstem      t2op = 0x0003
+	t2vmoveto    t2op = 0x0004
+	t2rlineto    t2op = 0x0005
+	t2hlineto    t2op = 0x0006
+	t2vlineto    t2op = 0x0007
+	t2rrcurveto  t2op = 0x0008
+	t2callsubr   t2op = 0x000a
+	t2return     t2op = 0x000b
+	t2endchar    t2op = 0x000e
+	t2hstemhm    t2op = 0x0012
+	t2hintmask   t2op = 0x0013
+	t2cntrmask   t2op = 0x0014
+	t2rmoveto    t2op = 0x0015
+	t2hmoveto    t2op = 0x0016
+	t2vstemhm    t2op = 0x0017
+	t2rcurveline t2op = 0x0018
+	t2rlinecurve t2op = 0x0019
+	t2vvcurveto  t2op = 0x001a
+	t2hhcurveto  t2op = 0x001b
+	t2shortint   t2op = 0x001c
+	t2callgsubr  t2op = 0x001d
+	t2vhcurveto  t2op = 0x001e
+	t2hvcurveto  t2op = 0x001f
 
-	t2dotsection type2op = 0x0c00
-	t2and        type2op = 0x0c03
-	t2or         type2op = 0x0c04
-	t2not        type2op = 0x0c05
-	t2abs        type2op = 0x0c09
-	t2add        type2op = 0x0c0a
-	t2sub        type2op = 0x0c0b
-	t2div        type2op = 0x0c0c
-	t2neg        type2op = 0x0c0e
-	t2eq         type2op = 0x0c0f
-	t2drop       type2op = 0x0c12
-	t2put        type2op = 0x0c14
-	t2get        type2op = 0x0c15
-	t2ifelse     type2op = 0x0c16
-	t2random     type2op = 0x0c17
-	t2mul        type2op = 0x0c18
-	t2sqrt       type2op = 0x0c1a
-	t2dup        type2op = 0x0c1b
-	t2exch       type2op = 0x0c1c
-	t2index      type2op = 0x0c1d
-	t2roll       type2op = 0x0c1e
-	t2hflex      type2op = 0x0c22
-	t2flex       type2op = 0x0c23
-	t2hflex1     type2op = 0x0c24
-	t2flex1      type2op = 0x0c25
+	t2dotsection t2op = 0x0c00
+	t2and        t2op = 0x0c03
+	t2or         t2op = 0x0c04
+	t2not        t2op = 0x0c05
+	t2abs        t2op = 0x0c09
+	t2add        t2op = 0x0c0a
+	t2sub        t2op = 0x0c0b
+	t2div        t2op = 0x0c0c
+	t2neg        t2op = 0x0c0e
+	t2eq         t2op = 0x0c0f
+	t2drop       t2op = 0x0c12
+	t2put        t2op = 0x0c14
+	t2get        t2op = 0x0c15
+	t2ifelse     t2op = 0x0c16
+	t2random     t2op = 0x0c17
+	t2mul        t2op = 0x0c18
+	t2sqrt       t2op = 0x0c1a
+	t2dup        t2op = 0x0c1b
+	t2exch       t2op = 0x0c1c
+	t2index      t2op = 0x0c1d
+	t2roll       t2op = 0x0c1e
+	t2hflex      t2op = 0x0c22
+	t2flex       t2op = 0x0c23
+	t2hflex1     t2op = 0x0c24
+	t2flex1      t2op = 0x0c25
 )
