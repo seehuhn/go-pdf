@@ -3,217 +3,256 @@ package cff
 import "fmt"
 
 // Determine the indices of local and global subroutines used by a charstring.
-func charStringDependencies(cc []byte) (subr, gsubr []int32) {
+func (cff *Font) charStringDependencies(cc []byte) (subr, gsubr []int32) {
 	local := make(map[int32]bool)
 	global := make(map[int32]bool)
 	var stack []int32
 	storage := make(map[int32]int32)
 	var nStems int
 
-	for len(cc) > 0 {
-		op := t2op(cc[0])
-		cc = cc[1:]
+	cmdStack := [][]byte{cc}
 
-		if op >= 32 && op <= 246 {
-			stack = append(stack, int32(op)-139)
-			continue
-		} else if op >= 247 && op <= 250 {
-			if len(cc) < 1 {
-				break
-			}
-			stack = append(stack, int32(op)*256+int32(cc[0])+(108-247*256))
+glyphLoop:
+	for len(cmdStack) > 0 {
+		cc = cmdStack[len(cmdStack)-1]
+		cmdStack = cmdStack[:len(cmdStack)-1]
+
+	subrLoop:
+		for len(cc) > 0 {
+			op := t2op(cc[0])
 			cc = cc[1:]
-			continue
-		} else if op >= 251 && op <= 254 {
-			if len(cc) < 2 {
-				break
-			}
-			stack = append(stack, -int32(op)*256-int32(cc[0])-(108-251*256))
-			cc = cc[2:]
-			continue
-		} else if op == 255 {
-			if len(cc) < 4 {
-				break
-			}
-			x := int32(uint32(cc[0])<<24 + uint32(cc[1])<<16 + uint32(cc[2])<<8 + uint32(cc[3]))
-			stack = append(stack, x) // TODO(voss): this is a float
-			cc = cc[4:]
-			continue
-		} else if op == 0x0c {
-			if len(cc) < 1 {
-				break
-			}
-			op = op<<8 | t2op(cc[0])
-			cc = cc[1:]
-		}
 
-		fmt.Println(stack, op, cc)
-
-		switch op {
-		case t2rmoveto, t2hmoveto, t2vmoveto, t2rlineto, t2hlineto, t2vlineto,
-			t2rrcurveto, t2hhcurveto, t2hvcurveto, t2rcurveline, t2rlinecurve,
-			t2vhcurveto, t2vvcurveto, t2flex, t2hflex, t2hflex1, t2flex1:
-			// all path construction operators clear the stack
-			stack = stack[:0]
-
-		case t2dotsection: // deprecated
-			stack = stack[:0]
-
-		case t2hstem, t2vstem, t2hstemhm, t2vstemhm:
-			nStems += len(stack) / 2
-			stack = stack[:0]
-		case t2hintmask, t2cntrmask:
-			cc = cc[(nStems+7)/8:]
-			stack = stack[:0]
-
-		case t2abs:
-			k := len(stack) - 1
-			if k >= 0 && stack[k] < 0 {
-				stack[k] = -stack[k]
-			}
-		case t2add:
-			k := len(stack) - 2
-			if k >= 0 {
-				stack[k] += stack[k+1]
-				stack = stack[:k+1]
-			}
-		case t2sub:
-			k := len(stack) - 2
-			if k >= 0 {
-				stack[k] -= stack[k+1]
-				stack = stack[:k+1]
-			}
-		case t2div:
-			k := len(stack) - 2
-			if k >= 0 {
-				if stack[k+1] != 0 {
-					stack[k] /= stack[k+1]
+			if op >= 32 && op <= 246 {
+				stack = append(stack, int32(op)-139)
+				continue
+			} else if op >= 247 && op <= 250 {
+				if len(cc) < 1 {
+					break
 				}
-				stack = stack[:k+1]
-			}
-		case t2neg:
-			k := len(stack) - 1
-			if k >= 0 {
-				stack[k] = -stack[k]
-			}
-		case t2random, t2sqrt:
-			// not implemented
-			stack = append(stack, 0)
-		case t2mul:
-			k := len(stack) - 2
-			if k >= 0 {
-				stack[k] *= stack[k+1]
-				stack = stack[:k+1]
-			}
-		case t2drop:
-			stack = stack[:len(stack)-1]
-		case t2exch:
-			k := len(stack) - 2
-			if k >= 0 {
-				stack[k], stack[k+1] = stack[k+1], stack[k]
-			}
-		case t2index:
-			k := len(stack) - 1
-			if k > 0 {
-				idx := int(stack[k])
-				if idx < 0 || k-idx-1 < 0 {
-					stack[k] = stack[k-1]
-				} else {
-					stack[k] = stack[k-idx-1]
+				stack = append(stack, int32(op)*256+int32(cc[0])+(108-247*256))
+				cc = cc[1:]
+				continue
+			} else if op >= 251 && op <= 254 {
+				if len(cc) < 1 {
+					break
 				}
+				stack = append(stack, -int32(op)*256-int32(cc[0])-(108-251*256))
+				cc = cc[1:]
+				continue
+			} else if op == 28 {
+				if len(cc) < 2 {
+					break
+				}
+				stack = append(stack, int32(int16(uint16(cc[0])<<8+uint16(cc[1]))))
+				cc = cc[2:]
+				continue
+			} else if op == 255 {
+				if len(cc) < 4 {
+					break
+				}
+				x := int32(uint32(cc[0])<<24 + uint32(cc[1])<<16 + uint32(cc[2])<<8 + uint32(cc[3]))
+				stack = append(stack, x) // TODO(voss): this is a float
+				cc = cc[4:]
+				continue
+			} else if op == 0x0c {
+				if len(cc) < 1 {
+					break
+				}
+				op = op<<8 | t2op(cc[0])
+				cc = cc[1:]
 			}
-		case t2roll:
-			k := len(stack) - 2
-			if k >= 0 {
-				n := int(stack[k])
-				j := int(stack[k+1])
-				if n > 0 && n <= k {
-					roll(stack[k-n:k], j)
+
+			ccStr := fmt.Sprint(cc)
+			if len(ccStr) > 40 {
+				ccStr = ccStr[:37] + "..."
+			}
+			fmt.Println(stack, op, ccStr)
+
+			switch op {
+			case t2rmoveto, t2hmoveto, t2vmoveto, t2rlineto, t2hlineto, t2vlineto,
+				t2rrcurveto, t2hhcurveto, t2hvcurveto, t2rcurveline, t2rlinecurve,
+				t2vhcurveto, t2vvcurveto, t2flex, t2hflex, t2hflex1, t2flex1:
+				// all path construction operators clear the stack
+				stack = stack[:0]
+
+			case t2dotsection: // deprecated
+				stack = stack[:0]
+
+			case t2hstem, t2vstem, t2hstemhm, t2vstemhm:
+				nStems += len(stack) / 2
+				stack = stack[:0]
+			case t2hintmask, t2cntrmask:
+				cc = cc[(nStems+7)/8:]
+				stack = stack[:0]
+
+			case t2abs:
+				k := len(stack) - 1
+				if k >= 0 && stack[k] < 0 {
+					stack[k] = -stack[k]
+				}
+			case t2add:
+				k := len(stack) - 2
+				if k >= 0 {
+					stack[k] += stack[k+1]
+					stack = stack[:k+1]
+				}
+			case t2sub:
+				k := len(stack) - 2
+				if k >= 0 {
+					stack[k] -= stack[k+1]
+					stack = stack[:k+1]
+				}
+			case t2div:
+				k := len(stack) - 2
+				if k >= 0 {
+					if stack[k+1] != 0 {
+						stack[k] /= stack[k+1]
+					}
+					stack = stack[:k+1]
+				}
+			case t2neg:
+				k := len(stack) - 1
+				if k >= 0 {
+					stack[k] = -stack[k]
+				}
+			case t2random, t2sqrt:
+				// not implemented
+				stack = append(stack, 0)
+			case t2mul:
+				k := len(stack) - 2
+				if k >= 0 {
+					stack[k] *= stack[k+1]
+					stack = stack[:k+1]
+				}
+			case t2drop:
+				stack = stack[:len(stack)-1]
+			case t2exch:
+				k := len(stack) - 2
+				if k >= 0 {
+					stack[k], stack[k+1] = stack[k+1], stack[k]
+				}
+			case t2index:
+				k := len(stack) - 1
+				if k > 0 {
+					idx := int(stack[k])
+					if idx < 0 || k-idx-1 < 0 {
+						stack[k] = stack[k-1]
+					} else {
+						stack[k] = stack[k-idx-1]
+					}
+				}
+			case t2roll:
+				k := len(stack) - 2
+				if k >= 0 {
+					n := int(stack[k])
+					j := int(stack[k+1])
+					if n > 0 && n <= k {
+						roll(stack[k-n:k], j)
+					}
+					stack = stack[:k]
+				}
+			case t2dup:
+				k := len(stack) - 1
+				if k >= 0 {
+					stack = append(stack, stack[k])
+				}
+
+			case t2put:
+				k := len(stack) - 2
+				if k >= 0 {
+					storage[stack[k+1]] = stack[k]
 				}
 				stack = stack[:k]
-			}
-		case t2dup:
-			k := len(stack) - 1
-			if k >= 0 {
-				stack = append(stack, stack[k])
-			}
-
-		case t2put:
-			k := len(stack) - 2
-			if k >= 0 {
-				storage[stack[k+1]] = stack[k]
-			}
-			stack = stack[:k]
-		case t2get:
-			k := len(stack) - 1
-			if k >= 0 {
-				stack[k] = storage[stack[k]]
-			}
-
-		case t2and:
-			k := len(stack) - 2
-			if k >= 0 {
-				var val int32
-				if stack[k] != 0 && stack[k+1] != 0 {
-					val = 1
+			case t2get:
+				k := len(stack) - 1
+				if k >= 0 {
+					stack[k] = storage[stack[k]]
 				}
-				stack = append(stack[:k], val)
-			}
-		case t2or:
-			k := len(stack) - 2
-			if k >= 0 {
-				var val int32
-				if stack[k] != 0 || stack[k+1] != 0 {
-					val = 1
-				}
-				stack = append(stack[:k], val)
-			}
-		case t2not:
-			k := len(stack) - 1
-			if k >= 0 {
-				var val int32
-				if stack[k] == 0 {
-					val = 1
-				}
-				stack[k] = val
-			}
-		case t2eq:
-			k := len(stack) - 2
-			if k >= 0 {
-				var val int32
-				if stack[k] == stack[k+1] {
-					val = 1
-				}
-				stack = append(stack[:k], val)
-			}
-		case t2ifelse:
-			k := len(stack) - 4
-			if k >= 0 {
-				val := stack[k]
-				if stack[k+2] > stack[k+3] {
-					val = stack[k+1]
-				}
-				stack = append(stack[:k], val)
-			}
 
-		case t2callsubr:
-			k := len(stack) - 1
-			if k >= 0 {
-				local[stack[k]] = true
-				stack = stack[:k]
+			case t2and:
+				k := len(stack) - 2
+				if k >= 0 {
+					var val int32
+					if stack[k] != 0 && stack[k+1] != 0 {
+						val = 1
+					}
+					stack = append(stack[:k], val)
+				}
+			case t2or:
+				k := len(stack) - 2
+				if k >= 0 {
+					var val int32
+					if stack[k] != 0 || stack[k+1] != 0 {
+						val = 1
+					}
+					stack = append(stack[:k], val)
+				}
+			case t2not:
+				k := len(stack) - 1
+				if k >= 0 {
+					var val int32
+					if stack[k] == 0 {
+						val = 1
+					}
+					stack[k] = val
+				}
+			case t2eq:
+				k := len(stack) - 2
+				if k >= 0 {
+					var val int32
+					if stack[k] == stack[k+1] {
+						val = 1
+					}
+					stack = append(stack[:k], val)
+				}
+			case t2ifelse:
+				k := len(stack) - 4
+				if k >= 0 {
+					val := stack[k]
+					if stack[k+2] > stack[k+3] {
+						val = stack[k+1]
+					}
+					stack = append(stack[:k], val)
+				}
+
+			case t2callsubr:
+				k := len(stack) - 1
+				biased := stack[k]
+				if k >= 0 {
+					local[biased] = true
+					stack = stack[:k]
+				}
+				if len(cc) > 0 {
+					cmdStack = append(cmdStack, cc)
+				}
+				if biased >= int32(len(cff.subrs)) {
+					break glyphLoop
+				}
+				cc = cff.getSubr(biased)
+
+			case t2callgsubr:
+				k := len(stack) - 1
+				biased := int32(stack[k])
+				if k >= 0 {
+					global[biased] = true
+					stack = stack[:k]
+				}
+				if len(cc) > 0 {
+					cmdStack = append(cmdStack, cc)
+				}
+				if biased >= int32(len(cff.gsubrs)) {
+					break glyphLoop
+				}
+				cc = cff.getGSubr(biased)
+
+			case t2endchar:
+				break glyphLoop
+
+			case t2return:
+				break subrLoop
+
+			default:
 			}
-
-		case t2callgsubr:
-			k := len(stack) - 1
-			if k >= 0 {
-				global[stack[k]] = true
-				stack = stack[:k]
-			}
-
-		case t2endchar, t2return:
-			break
-
-		default:
 		}
 	}
 

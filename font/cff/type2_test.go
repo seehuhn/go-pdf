@@ -18,8 +18,9 @@ func TestCCDep(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(cff.strings.get(cff.glyphNames[4]))
-	charStringDependencies(cff.charStrings[5])
+	glyphID := 2
+	fmt.Println(cff.strings.get(cff.glyphNames[glyphID]))
+	cff.charStringDependencies(cff.charStrings[glyphID])
 }
 
 func TestRoll(t *testing.T) {
