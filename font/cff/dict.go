@@ -125,7 +125,7 @@ func decodeFloat(buf []byte) ([]byte, float64, error) {
 	}
 }
 
-func (d cffDict) copy() cffDict {
+func (d cffDict) Copy() cffDict {
 	c := make(cffDict, len(d))
 	for k, v := range d {
 		c[k] = append([]interface{}{}, v...)
@@ -301,9 +301,11 @@ func (d dictOp) String() string {
 
 const (
 	// top DICT operators
+	opVersion           dictOp = 0x0000
 	opNotice            dictOp = 0x0001
 	opFullName          dictOp = 0x0002
 	opFamilyName        dictOp = 0x0003
+	opWeight            dictOp = 0x0004
 	opFontBBox          dictOp = 0x0005
 	opCharset           dictOp = 0x000F
 	opEncoding          dictOp = 0x0010
@@ -313,7 +315,10 @@ const (
 	opUnderlinePosition dictOp = 0x0C03
 	opCharstringType    dictOp = 0x0C06
 	opSyntheticBase     dictOp = 0x0C14
+	opPostScript        dictOp = 0x0C15
+	opBaseFontName      dictOp = 0x0C16
 	opROS               dictOp = 0x0C1E
+	opFontName          dictOp = 0x0C26
 
 	// private DICT operators
 	opSubrs dictOp = 0x0013 // Offset (self) to local subrs

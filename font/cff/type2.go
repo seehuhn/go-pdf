@@ -1,16 +1,25 @@
 package cff
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Determine the indices of local and global subroutines used by a charstring.
-func (cff *Font) charStringDependencies(cc []byte) (subr, gsubr []int32) {
-	local := make(map[int32]bool)
-	global := make(map[int32]bool)
-	var stack []int32
-	storage := make(map[int32]int32)
+func (cff *Font) charStringDependencies(cc []byte) (subr, gsubr []int) {
+	local := make(map[int]bool)
+	global := make(map[int]bool)
+	var stack []float64
+	storage := make(map[int]float64)
 	var nStems int
 
 	cmdStack := [][]byte{cc}
+	tainted := false
+
+	clear := func() {
+		stack = stack[:0]
+		tainted = false
+	}
 
 glyphLoop:
 	for len(cmdStack) > 0 {
@@ -23,36 +32,40 @@ glyphLoop:
 			cc = cc[1:]
 
 			if op >= 32 && op <= 246 {
-				stack = append(stack, int32(op)-139)
+				x := int32(op) - 139
+				stack = append(stack, float64(x))
 				continue
 			} else if op >= 247 && op <= 250 {
 				if len(cc) < 1 {
 					break
 				}
-				stack = append(stack, int32(op)*256+int32(cc[0])+(108-247*256))
+				x := int32(op)*256 + int32(cc[0]) + (108 - 247*256)
 				cc = cc[1:]
+				stack = append(stack, float64(x))
 				continue
 			} else if op >= 251 && op <= 254 {
 				if len(cc) < 1 {
 					break
 				}
-				stack = append(stack, -int32(op)*256-int32(cc[0])-(108-251*256))
+				x := -int32(op)*256 - int32(cc[0]) - (108 - 251*256)
 				cc = cc[1:]
+				stack = append(stack, float64(x))
 				continue
 			} else if op == 28 {
 				if len(cc) < 2 {
 					break
 				}
-				stack = append(stack, int32(int16(uint16(cc[0])<<8+uint16(cc[1]))))
+				x := int32(int16(uint16(cc[0])<<8 + uint16(cc[1])))
 				cc = cc[2:]
+				stack = append(stack, float64(x))
 				continue
 			} else if op == 255 {
 				if len(cc) < 4 {
 					break
 				}
 				x := int32(uint32(cc[0])<<24 + uint32(cc[1])<<16 + uint32(cc[2])<<8 + uint32(cc[3]))
-				stack = append(stack, x) // TODO(voss): this is a float
 				cc = cc[4:]
+				stack = append(stack, float64(x)/65536)
 				continue
 			} else if op == 0x0c {
 				if len(cc) < 1 {
@@ -73,17 +86,17 @@ glyphLoop:
 				t2rrcurveto, t2hhcurveto, t2hvcurveto, t2rcurveline, t2rlinecurve,
 				t2vhcurveto, t2vvcurveto, t2flex, t2hflex, t2hflex1, t2flex1:
 				// all path construction operators clear the stack
-				stack = stack[:0]
+				clear()
 
 			case t2dotsection: // deprecated
-				stack = stack[:0]
+				clear()
 
 			case t2hstem, t2vstem, t2hstemhm, t2vstemhm:
 				nStems += len(stack) / 2
-				stack = stack[:0]
+				clear()
 			case t2hintmask, t2cntrmask:
 				cc = cc[(nStems+7)/8:]
-				stack = stack[:0]
+				clear()
 
 			case t2abs:
 				k := len(stack) - 1
@@ -115,9 +128,14 @@ glyphLoop:
 				if k >= 0 {
 					stack[k] = -stack[k]
 				}
-			case t2random, t2sqrt:
-				// not implemented
+			case t2sqrt:
+				k := len(stack) - 1
+				if k >= 0 {
+					stack[k] = math.Sqrt(stack[k])
+				}
+			case t2random: // not implemented
 				stack = append(stack, 0)
+				tainted = true
 			case t2mul:
 				k := len(stack) - 2
 				if k >= 0 {
@@ -160,19 +178,19 @@ glyphLoop:
 			case t2put:
 				k := len(stack) - 2
 				if k >= 0 {
-					storage[stack[k+1]] = stack[k]
+					storage[int(stack[k+1])] = stack[k]
 				}
 				stack = stack[:k]
 			case t2get:
 				k := len(stack) - 1
 				if k >= 0 {
-					stack[k] = storage[stack[k]]
+					stack[k] = storage[int(stack[k])]
 				}
 
 			case t2and:
 				k := len(stack) - 2
 				if k >= 0 {
-					var val int32
+					var val float64
 					if stack[k] != 0 && stack[k+1] != 0 {
 						val = 1
 					}
@@ -181,7 +199,7 @@ glyphLoop:
 			case t2or:
 				k := len(stack) - 2
 				if k >= 0 {
-					var val int32
+					var val float64
 					if stack[k] != 0 || stack[k+1] != 0 {
 						val = 1
 					}
@@ -190,7 +208,7 @@ glyphLoop:
 			case t2not:
 				k := len(stack) - 1
 				if k >= 0 {
-					var val int32
+					var val float64
 					if stack[k] == 0 {
 						val = 1
 					}
@@ -199,7 +217,7 @@ glyphLoop:
 			case t2eq:
 				k := len(stack) - 2
 				if k >= 0 {
-					var val int32
+					var val float64
 					if stack[k] == stack[k+1] {
 						val = 1
 					}
@@ -216,34 +234,40 @@ glyphLoop:
 				}
 
 			case t2callsubr:
+				if tainted {
+					panic("tainted stack")
+				}
 				k := len(stack) - 1
-				biased := stack[k]
 				if k >= 0 {
+					biased := int(stack[k])
 					local[biased] = true
 					stack = stack[:k]
+					if len(cc) > 0 {
+						cmdStack = append(cmdStack, cc)
+					}
+					if biased >= len(cff.subrs) {
+						break glyphLoop
+					}
+					cc = cff.getSubr(biased)
 				}
-				if len(cc) > 0 {
-					cmdStack = append(cmdStack, cc)
-				}
-				if biased >= int32(len(cff.subrs)) {
-					break glyphLoop
-				}
-				cc = cff.getSubr(biased)
 
 			case t2callgsubr:
+				if tainted {
+					panic("tainted stack")
+				}
 				k := len(stack) - 1
-				biased := int32(stack[k])
 				if k >= 0 {
+					biased := int(stack[k])
 					global[biased] = true
 					stack = stack[:k]
+					if len(cc) > 0 {
+						cmdStack = append(cmdStack, cc)
+					}
+					if biased >= len(cff.gsubrs) {
+						break glyphLoop
+					}
+					cc = cff.getGSubr(biased)
 				}
-				if len(cc) > 0 {
-					cmdStack = append(cmdStack, cc)
-				}
-				if biased >= int32(len(cff.gsubrs)) {
-					break glyphLoop
-				}
-				cc = cff.getGSubr(biased)
 
 			case t2endchar:
 				break glyphLoop
@@ -269,14 +293,14 @@ glyphLoop:
 	return
 }
 
-func roll(data []int32, j int) {
+func roll(data []float64, j int) {
 	n := len(data)
 	j = j % n
 	if j < 0 {
 		j += n
 	}
 
-	tmp := make([]int32, j)
+	tmp := make([]float64, j)
 	copy(tmp, data[n-j:])
 	copy(data[j:], data[:n-j])
 	copy(data[:j], tmp)

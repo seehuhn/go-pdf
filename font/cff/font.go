@@ -35,7 +35,7 @@ type Font struct {
 
 	topDict     cffDict
 	strings     cffStrings
-	gsubrs      [][]byte
+	gsubrs      cffIndex
 	charStrings cffIndex
 	glyphNames  []sid
 	privateDict cffDict
@@ -373,7 +373,7 @@ func (cff *Font) Encode() ([]byte, error) {
 	}
 
 	var privateDictBlob []byte
-	pdCopy := cff.privateDict.copy()
+	pdCopy := cff.privateDict.Copy()
 	var offs int32
 	for { // TODO(voss): does this loop always terminate?
 		pdCopy[opSubrs] = []interface{}{offs}
@@ -399,7 +399,7 @@ func (cff *Font) Encode() ([]byte, error) {
 	//   - FDArray: Font DICT (FD) INDEX offset (0) [only for CID Fonts]
 	//   - FDSelect: FDSelect offset (0) [only for CID Fonts]
 	var topDictIndexBlob []byte
-	tdCopy := cff.topDict.copy()
+	tdCopy := cff.topDict.Copy()
 	delete(tdCopy, opEncoding)
 	var csIndex, ccIndex, pdIndex int32
 	pdSize := int32(len(privateDictBlob))
@@ -460,4 +460,15 @@ func (cff *Font) Encode() ([]byte, error) {
 	}
 
 	return res.Bytes(), nil
+}
+
+// Copy makes a semi-shallow copy of the font.
+func (cff *Font) Copy() *Font {
+	cff2 := *cff
+	cff2.strings = cff.strings.Copy()
+	cff2.gsubrs = cff.gsubrs.Copy()
+	cff2.charStrings = cff.charStrings.Copy()
+	cff2.glyphNames = append([]sid{}, cff.glyphNames...)
+	cff2.subrs = cff.subrs.Copy()
+	return &cff2
 }

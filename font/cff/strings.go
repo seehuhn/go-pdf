@@ -21,6 +21,14 @@ type sid uint16
 
 type cffStrings []string
 
+func (ss cffStrings) Copy() cffStrings {
+	return append(cffStrings{}, ss...)
+}
+
+func (ss cffStrings) Len() sid {
+	return sid(len(ss)) + nStdString
+}
+
 func (ss cffStrings) get(i sid) string {
 	if i < nStdString {
 		return stdStrings[i]

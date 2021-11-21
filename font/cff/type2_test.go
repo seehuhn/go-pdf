@@ -20,12 +20,13 @@ func TestCCDep(t *testing.T) {
 
 	glyphID := 2
 	fmt.Println(cff.strings.get(cff.glyphNames[glyphID]))
-	cff.charStringDependencies(cff.charStrings[glyphID])
+	subrUsed, gsubrUsed := cff.charStringDependencies(cff.charStrings[glyphID])
+	fmt.Println(subrUsed, gsubrUsed)
 }
 
 func TestRoll(t *testing.T) {
-	in := []int32{1, 2, 3, 4, 5, 6, 7, 8}
-	out := []int32{1, 2, 4, 5, 6, 3, 7, 8}
+	in := []float64{1, 2, 3, 4, 5, 6, 7, 8}
+	out := []float64{1, 2, 4, 5, 6, 3, 7, 8}
 	roll(in[2:6], 3)
 	for i, x := range in {
 		if out[i] != x {

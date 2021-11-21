@@ -123,3 +123,10 @@ func (data cffIndex) encode() ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
+// Copy makes a shallow copy of the INDEX.
+func (data cffIndex) Copy() cffIndex {
+	res := make(cffIndex, len(data))
+	copy(res, data)
+	return res
+}
