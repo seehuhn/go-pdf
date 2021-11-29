@@ -351,7 +351,6 @@ func (cff *Font) Encode() ([]byte, error) {
 		return nil, err
 	}
 
-	// this needs pruning in case of subsetting
 	stringIndexBlob, err := cff.strings.encode()
 	if err != nil {
 		return nil, err
@@ -401,30 +400,30 @@ func (cff *Font) Encode() ([]byte, error) {
 	var topDictIndexBlob []byte
 	tdCopy := cff.topDict.Copy()
 	delete(tdCopy, opEncoding)
-	var csIndex, ccIndex, pdIndex int32
+	var csOffset, ccOffset, pdOffset int32
 	pdSize := int32(len(privateDictBlob))
 	for { // TODO(voss): does this loop always terminate?
-		tdCopy[opCharset] = []interface{}{csIndex}
-		tdCopy[opCharStrings] = []interface{}{ccIndex}
-		tdCopy[opPrivate] = []interface{}{pdSize, pdIndex}
+		tdCopy[opCharset] = []interface{}{csOffset}
+		tdCopy[opCharStrings] = []interface{}{ccOffset}
+		tdCopy[opPrivate] = []interface{}{pdSize, pdOffset}
 		topDictData := tdCopy.encode()
 		topDictIndexBlob, err = cffIndex{topDictData}.encode()
 		if err != nil {
 			return nil, err
 		}
-		newCSIndex := int32(len(header) +
+		newCSOffset := int32(len(header) +
 			len(nameIndexBlob) +
 			len(topDictIndexBlob) +
 			len(stringIndexBlob) +
 			len(gsubrsIndexBlob))
-		newCCIndex := newCSIndex + int32(len(charsetsBlob))
-		newPdIndex := newCCIndex + int32(len(charStringsIndexBlob))
-		if newCSIndex == csIndex && newCCIndex == ccIndex && newPdIndex == pdIndex {
+		newCCOffset := newCSOffset + int32(len(charsetsBlob))
+		newPdOffset := newCCOffset + int32(len(charStringsIndexBlob))
+		if newCSOffset == csOffset && newCCOffset == ccOffset && newPdOffset == pdOffset {
 			break
 		}
-		csIndex = newCSIndex
-		ccIndex = newCCIndex
-		pdIndex = newPdIndex
+		csOffset = newCSOffset
+		ccOffset = newCCOffset
+		pdOffset = newPdOffset
 	}
 
 	// A CFF file contains the following sections:
@@ -461,6 +460,155 @@ func (cff *Font) Encode() ([]byte, error) {
 
 	return res.Bytes(), nil
 }
+
+// EncodeCID returns the binary encoding of a CFF font as a CIDFont.
+func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, error) {
+	numGlyphs := uint16(len(cff.charStrings))
+
+	blobs := make([][]byte, numSections)
+
+	// Header
+	blobs[secHeader] = []byte{
+		1, // major
+		0, // minor
+		4, // hdrSize
+		4, // offSize, not sure what to do here
+	}
+
+	// Name INDEX
+	var err error
+	blobs[secNameIndex], err = cffIndex{[]byte(cff.FontName)}.encode()
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(voss): add the registry and ordering strings
+	registrySID := sid(1)
+	orderingSID := sid(2)
+	blobs[secStringIndex], err = cff.strings.encode()
+	if err != nil {
+		return nil, err
+	}
+
+	blobs[secGsubrsIndex], err = cffIndex(cff.gsubrs).encode()
+	if err != nil {
+		return nil, err
+	}
+
+	blobs[secCharsets], err = encodeCharset(cff.glyphNames)
+	if err != nil {
+		return nil, err
+	}
+
+	fdSelect := &bytes.Buffer{}
+	fdSelect.Write([]byte{
+		3, // format
+		0, //
+
+		0, 0, // first FD
+		0, // default font dict
+
+		byte(numGlyphs >> 8), byte(numGlyphs), // sentinel
+	})
+	blobs[secFdSelect] = fdSelect.Bytes()
+
+	blobs[secCharStringsIndex], err = cffIndex(cff.charStrings).encode()
+	if err != nil {
+		return nil, err
+	}
+
+	pdCopy := cff.privateDict.Copy()
+	var off int32
+	for { // TODO(voss): does this loop always terminate?
+		pdCopy[opSubrs] = []interface{}{off}
+		blobs[secPrivateDict] = pdCopy.encode()
+		newOffs := int32(len(blobs[secPrivateDict]))
+		if newOffs == off {
+			break
+		}
+		off = newOffs
+	}
+
+	blobs[secSubrsIndex], err = cff.subrs.encode()
+	if err != nil {
+		return nil, err
+	}
+
+	cumsum := func() []int32 {
+		res := make([]int32, numSections+1)
+		for i := 0; i < numSections; i++ {
+			res[i+1] = res[i] + int32(len(blobs[i]))
+		}
+		return res
+	}
+
+	// A CFF-base CIDFont contains the following sections:
+	//   - Header
+	//   - Name INDEX
+	//   - Top DICT INDEX
+	//   - String INDEX
+	//   - Global Subr INDEX
+	//
+	//   - Charsets [referenced by Top DICT]
+	//   - FDSelect [referenced by Top DICT]
+	//   - CharStrings INDEX [referenced by Top DICT]
+	//   - Font DICT INDEX [referenced by Top DICT]
+	//   - Private DICT [referenced by Top DICT and Font DICT]
+	//   - Local Subr INDEX [referenced by Private DICT]
+	tdCopy := cff.topDict.Copy()
+	delete(tdCopy, opEncoding)
+	tdCopy[opROS] = []interface{}{
+		int32(registrySID), int32(orderingSID), int32(supplement),
+	}
+	pdSize := int32(len(blobs[secPrivateDict]))
+	offs := cumsum()
+	for { // TODO(voss): does this loop always terminate?
+		tdCopy[opCharset] = []interface{}{offs[secCharsets]}
+		tdCopy[opCharStrings] = []interface{}{offs[secCharStringsIndex]}
+		tdCopy[opPrivate] = []interface{}{pdSize, offs[secPrivateDict]}
+		tdCopy[opFDSelect] = []interface{}{offs[secFdSelect]}
+		topDictData := tdCopy.encode()
+		blobs[secTopDictIndex], err = cffIndex{topDictData}.encode()
+		if err != nil {
+			return nil, err
+		}
+
+		newOffs := cumsum()
+		done := true
+		for i := 0; i < numSections; i++ {
+			if newOffs[i] != offs[i] {
+				done = false
+				break
+			}
+		}
+		if done {
+			break
+		}
+
+		offs = newOffs
+	}
+
+	res := &bytes.Buffer{}
+	for i := 0; i < numSections; i++ {
+		res.Write(blobs[i])
+	}
+
+	return res.Bytes(), nil
+}
+
+const (
+	secHeader int = iota
+	secNameIndex
+	secTopDictIndex
+	secStringIndex
+	secGsubrsIndex
+	secCharsets
+	secFdSelect
+	secCharStringsIndex
+	secPrivateDict
+	secSubrsIndex
+	numSections
+)
 
 // Copy makes a semi-shallow copy of the font.
 func (cff *Font) Copy() *Font {

@@ -338,8 +338,8 @@ func (pdf *Writer) Write(obj Object, ref *Reference) (*Reference, error) {
 
 // WriteCompressed writes a number of objects to the file as a compressed
 // object stream.  Object streams are only available for PDF version 1.5 and
-// newer; in case the version is too low, the objects are written directly into
-// the PDF file, without compression.
+// newer; in case the file version is too low, the objects are written directly
+// into the PDF file, without compression.
 func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Reference, error) {
 	if pdf.inStream {
 		return nil, errors.New("WriteCompressed() while stream is open")

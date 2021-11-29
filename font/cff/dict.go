@@ -318,6 +318,8 @@ const (
 	opPostScript        dictOp = 0x0C15
 	opBaseFontName      dictOp = 0x0C16
 	opROS               dictOp = 0x0C1E
+	opCIDCount          dictOp = 0x0C22
+	opFDSelect          dictOp = 0x0C25
 	opFontName          dictOp = 0x0C26
 
 	// private DICT operators

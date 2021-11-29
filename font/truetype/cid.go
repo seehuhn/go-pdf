@@ -64,7 +64,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 	}
 
 	t := &ttfCID{
-		Ttf: tt,
+		Sfnt: tt,
 
 		FontRef: w.Alloc(),
 
@@ -93,7 +93,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 }
 
 type ttfCID struct {
-	Ttf *sfnt.Font
+	Sfnt *sfnt.Font
 
 	FontRef *pdf.Reference
 
@@ -104,20 +104,20 @@ type ttfCID struct {
 func (t *ttfCID) Layout(rr []rune) ([]font.Glyph, error) {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Ttf.CMap[r]
+		gid, ok := t.Sfnt.CMap[r]
 		if !ok {
 			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Ttf.FontName, r, string([]rune{r}))
+				t.Sfnt.FontName, r, string([]rune{r}))
 		}
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
 
-	gg = t.Ttf.GSUB.ApplyAll(gg)
+	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = t.Ttf.Width[gg[i].Gid]
+		gg[i].Advance = t.Sfnt.Width[gg[i].Gid]
 	}
-	gg = t.Ttf.GPOS.ApplyAll(gg)
+	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
 	for _, g := range gg {
 		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
@@ -136,7 +136,7 @@ func (t *ttfCID) Enc(gid font.GlyphID) pdf.String {
 
 func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
-	origNumGlyphs := len(t.Ttf.Width)
+	origNumGlyphs := len(t.Sfnt.Width)
 	var includeGlyphs []font.GlyphID
 	for gid, ok := range t.used {
 		if !ok {
@@ -153,9 +153,10 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 		cid2gid[2*cid+1] = byte(gid)
 	}
 	subsetTag := font.GetSubsetTag(includeGlyphs, origNumGlyphs)
-	fontName := pdf.Name(subsetTag + "+" + t.Ttf.FontName)
+	fontName := pdf.Name(subsetTag + "+" + t.Sfnt.FontName)
 
 	// Compute the font bounding box for the subset.
+	// TODO(voss): is this needed?
 	left := math.MaxInt
 	right := math.MinInt
 	top := math.MinInt
@@ -164,7 +165,7 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 		if origGid == 0 {
 			continue
 		}
-		box := t.Ttf.GlyphExtent[origGid]
+		box := t.Sfnt.GlyphExtent[origGid]
 		if box.LLx < left {
 			left = box.LLx
 		}
@@ -178,7 +179,7 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 			top = box.URy
 		}
 	}
-	q := 1000 / float64(t.Ttf.GlyphUnits)
+	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
 		LLx: math.Round(float64(left) * q),
 		LLy: math.Round(float64(bottom) * q),
@@ -186,7 +187,7 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(top) * q),
 	}
 
-	DW, W := font.EncodeCIDWidths(t.Ttf.Width) // TODO(voss): subset
+	DW, W := font.EncodeCIDWidths(t.Sfnt.Width) // TODO(voss): subset???
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
@@ -230,12 +231,12 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 	FontDescriptor := pdf.Dict{ // See sections 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
-		"Flags":       pdf.Integer(t.Ttf.Flags),
+		"Flags":       pdf.Integer(t.Sfnt.Flags),
 		"FontBBox":    FontBBox,
-		"ItalicAngle": pdf.Number(t.Ttf.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(t.Ttf.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(t.Ttf.Descent) + 0.5),
-		"CapHeight":   pdf.Integer(q*float64(t.Ttf.CapHeight) + 0.5),
+		"ItalicAngle": pdf.Number(t.Sfnt.ItalicAngle),
+		"Ascent":      pdf.Integer(q*float64(t.Sfnt.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(t.Sfnt.Descent) + 0.5),
+		"CapHeight":   pdf.Integer(q*float64(t.Sfnt.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70), // information not available in ttf files
 		"FontFile2":   FontFileRef,
 	}
@@ -297,7 +298,7 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 		},
 		IncludeGlyphs: includeGlyphs,
 	}
-	n, err := t.Ttf.Export(fontFileStream, exOpt)
+	n, err := t.Sfnt.Export(fontFileStream, exOpt)
 	if err != nil {
 		return err
 	}
@@ -319,7 +320,7 @@ func (t *ttfCID) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	err = t.Ttf.Close()
+	err = t.Sfnt.Close()
 	if err != nil {
 		return err
 	}

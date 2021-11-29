@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -77,8 +78,8 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 	}
 
 	t := &otfCID{
-		Otf: tt,
-		Cff: cff,
+		Sfnt: tt,
+		Cff:  cff,
 
 		FontRef: w.Alloc(),
 
@@ -107,8 +108,8 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 }
 
 type otfCID struct {
-	Otf *sfnt.Font
-	Cff *cff.Font
+	Sfnt *sfnt.Font
+	Cff  *cff.Font
 
 	FontRef *pdf.Reference
 
@@ -119,20 +120,20 @@ type otfCID struct {
 func (t *otfCID) Layout(rr []rune) ([]font.Glyph, error) {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Otf.CMap[r]
+		gid, ok := t.Sfnt.CMap[r]
 		if !ok {
 			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Otf.FontName, r, string([]rune{r}))
+				t.Sfnt.FontName, r, string([]rune{r}))
 		}
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
 
-	gg = t.Otf.GSUB.ApplyAll(gg)
+	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = t.Otf.Width[gg[i].Gid]
+		gg[i].Advance = t.Sfnt.Width[gg[i].Gid]
 	}
-	gg = t.Otf.GPOS.ApplyAll(gg)
+	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
 	for _, g := range gg {
 		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
@@ -150,11 +151,27 @@ func (t *otfCID) Enc(gid font.GlyphID) pdf.String {
 }
 
 func (t *otfCID) WriteFont(w *pdf.Writer) error {
-	// TODO(voss): implement subsetting
+	// Determine the subset of glyphs to include.
+	origNumGlyphs := len(t.Sfnt.Width)
+	var includeGlyphs []font.GlyphID
+	for gid, ok := range t.used {
+		if !ok {
+			continue
+		}
+		includeGlyphs = append(includeGlyphs, gid)
+	}
+	sort.Slice(includeGlyphs, func(i, j int) bool {
+		return includeGlyphs[i] < includeGlyphs[j]
+	})
+	cid2gid := make([]byte, 2*origNumGlyphs)
+	for gid, cid := range includeGlyphs {
+		cid2gid[2*cid] = byte(gid >> 8)
+		cid2gid[2*cid+1] = byte(gid)
+	}
+	subsetTag := font.GetSubsetTag(includeGlyphs, origNumGlyphs)
+	fontName := pdf.Name(subsetTag + "+" + t.Cff.FontName)
 
-	fontName := pdf.Name(t.Cff.FontName)
-
-	DW, W := font.EncodeCIDWidths(t.Otf.Width)
+	DW, W := font.EncodeCIDWidths(t.Sfnt.Width) // TODO(voss): subset???
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
@@ -195,22 +212,22 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 		"Supplement": pdf.Integer(0),
 	}
 
-	q := 1000 / float64(t.Otf.GlyphUnits)
+	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontDescriptor := pdf.Dict{ // See sections 9.8.1 of PDF 32000-1:2008.
 		"Type":     pdf.Name("FontDescriptor"),
 		"FontName": fontName,
-		"Flags":    pdf.Integer(t.Otf.Flags),
+		"Flags":    pdf.Integer(t.Sfnt.Flags),
 		"FontBBox": &pdf.Rectangle{
-			LLx: math.Round(float64(t.Otf.FontBBox.LLx) * q),
-			LLy: math.Round(float64(t.Otf.FontBBox.LLy) * q),
-			URx: math.Round(float64(t.Otf.FontBBox.URx) * q),
-			URy: math.Round(float64(t.Otf.FontBBox.URy) * q),
+			LLx: math.Round(float64(t.Sfnt.FontBBox.LLx) * q),
+			LLy: math.Round(float64(t.Sfnt.FontBBox.LLy) * q),
+			URx: math.Round(float64(t.Sfnt.FontBBox.URx) * q),
+			URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
 		},
-		"ItalicAngle": pdf.Number(t.Otf.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(t.Otf.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(t.Otf.Descent) + 0.5),
-		"CapHeight":   pdf.Integer(q*float64(t.Otf.CapHeight) + 0.5),
-		"StemV":       pdf.Integer(70), // information not available in ttf files
+		"ItalicAngle": pdf.Number(t.Sfnt.ItalicAngle),
+		"Ascent":      pdf.Integer(q*float64(t.Sfnt.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(t.Sfnt.Descent) + 0.5),
+		"CapHeight":   pdf.Integer(q*float64(t.Sfnt.CapHeight) + 0.5),
+		"StemV":       pdf.Integer(70), // information not available in otf files
 		"FontFile3":   FontFileRef,
 	}
 
@@ -250,11 +267,12 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 			"head": true, // Preview on MacOS seems to require this.
 			"maxp": true, // Preview on MacOS seems to require this.
 		},
+		// IncludeGlyphs: includeGlyphs,
 		Replace: map[string][]byte{
 			"CFF ": cffData,
 		},
 	}
-	_, err = t.Otf.Export(fontFileStream, exOpt)
+	_, err = t.Sfnt.Export(fontFileStream, exOpt)
 	if err != nil {
 		return err
 	}
@@ -272,7 +290,7 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	err = t.Otf.Close()
+	err = t.Sfnt.Close()
 	if err != nil {
 		return err
 	}
