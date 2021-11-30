@@ -19,32 +19,59 @@ package cff
 // 2-byte string identifier
 type sid uint16
 
-type cffStrings []string
-
-func (ss cffStrings) Copy() cffStrings {
-	return append(cffStrings{}, ss...)
+type cffStrings struct {
+	data []string
+	rev  map[string]sid
 }
 
-func (ss cffStrings) Len() sid {
-	return sid(len(ss)) + nStdString
+func (ss *cffStrings) Copy() *cffStrings {
+	res := &cffStrings{
+		data: make([]string, len(ss.data)),
+	}
+	copy(res.data, ss.data)
+	return res
 }
 
-func (ss cffStrings) get(i sid) string {
+func (ss *cffStrings) Len() sid {
+	return sid(len(ss.data)) + nStdString
+}
+
+func (ss *cffStrings) get(i sid) (string, bool) {
 	if i < nStdString {
-		return stdStrings[i]
+		return stdStrings[i], true
 	}
 	i -= nStdString
 
-	if int(i) < len(ss) {
-		return ss[i]
+	if int(i) < len(ss.data) {
+		return ss.data[i], true
 	}
 
-	return ""
+	return "", false
 }
 
-func (ss cffStrings) encode() ([]byte, error) {
-	stringIndex := make(cffIndex, 0, len(ss))
-	for _, s := range ss {
+func (ss *cffStrings) lookup(s string) sid {
+	if ss.rev == nil {
+		ss.rev = make(map[string]sid)
+		for i, s := range stdStrings {
+			ss.rev[s] = sid(i)
+		}
+		for i, s := range ss.data {
+			ss.rev[s] = sid(i) + nStdString
+		}
+	}
+
+	res, ok := ss.rev[s]
+	if !ok {
+		res = sid(len(ss.data))
+		ss.data = append(ss.data, s)
+		ss.rev[s] = res
+	}
+	return res
+}
+
+func (ss *cffStrings) encode() ([]byte, error) {
+	stringIndex := make(cffIndex, 0, len(ss.data))
+	for _, s := range ss.data {
 		stringIndex = append(stringIndex, []byte(s))
 	}
 	return stringIndex.encode()

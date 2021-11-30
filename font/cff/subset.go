@@ -11,14 +11,14 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 	for i, s := range stdStrings {
 		newStrings[s] = sid(i)
 	}
-	out.strings = nil
+	out.strings = &cffStrings{}
 	allocString := func(orig sid) sid {
-		s := cff.strings.get(orig)
+		s, _ := cff.strings.get(orig)
 		if new, ok := newStrings[s]; ok {
 			return new
 		}
-		new := sid(len(out.strings)) + nStdString
-		out.strings = append(out.strings, s)
+		new := sid(len(out.strings.data)) + nStdString
+		out.strings.data = append(out.strings.data, s)
 		newStrings[s] = new
 		return new
 	}

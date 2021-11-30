@@ -144,6 +144,14 @@ func (d cffDict) getInt(op dictOp, defVal int32) (int32, bool) {
 	return x, true
 }
 
+func (d cffDict) getSID(op dictOp) (sid, bool) {
+	i, ok := d.getInt(op, 0)
+	if !ok || i < 0 || i >= 65536 {
+		return 0, false
+	}
+	return sid(i), true
+}
+
 func (d cffDict) getPair(op dictOp) (int32, int32, bool) {
 	xy := d[op]
 	if len(xy) != 2 {
@@ -319,6 +327,7 @@ const (
 	opBaseFontName      dictOp = 0x0C16
 	opROS               dictOp = 0x0C1E
 	opCIDCount          dictOp = 0x0C22
+	opFDArray           dictOp = 0x0C24
 	opFDSelect          dictOp = 0x0C25
 	opFontName          dictOp = 0x0C26
 
