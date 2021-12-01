@@ -62,7 +62,7 @@ func (ss *cffStrings) lookup(s string) sid {
 
 	res, ok := ss.rev[s]
 	if !ok {
-		res = sid(len(ss.data))
+		res = sid(len(ss.data)) + nStdString
 		ss.data = append(ss.data, s)
 		ss.rev[s] = res
 	}

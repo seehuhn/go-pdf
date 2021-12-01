@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/parser"
+	"seehuhn.de/go/pdf/font/sfnt"
 )
 
 func TestReadCFF(t *testing.T) {
@@ -111,5 +112,53 @@ func TestCharset(t *testing.T) {
 		if !bytes.Equal(out, test.blob) {
 			t.Errorf("expected %v, got %v", test.blob, out)
 		}
+	}
+}
+
+func TestRewriteOtf(t *testing.T) {
+	otf, err := sfnt.Open("../opentype/otf/Atkinson-Hyperlegible-BoldItalic-102.otf", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cffRaw, err := otf.Header.ReadTableBytes(otf.Fd, "CFF ")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := bytes.NewReader(cffRaw)
+	cff, err := Read(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blob, err := cff.EncodeCID("Adobe", "Identity", 0)
+	// blob, err := cff.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile("debug.cff", blob, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exOpt := &sfnt.ExportOptions{
+		Replace: map[string][]byte{
+			"CFF ": blob,
+		},
+	}
+
+	out, err := os.Create("debug.otf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = otf.Export(out, exOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = out.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

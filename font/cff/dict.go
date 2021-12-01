@@ -252,6 +252,9 @@ func (d cffDict) encode() []byte {
 					}
 					first = !first
 				}
+			default:
+				fmt.Printf("unsupported type %T\n", a)
+				panic("fish")
 			}
 		}
 		if op > 255 {
