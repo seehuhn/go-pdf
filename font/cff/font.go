@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 
 	"seehuhn.de/go/pdf/font/parser"
 )
@@ -349,7 +350,7 @@ func (cff *Font) Encode() ([]byte, error) {
 		1, // major
 		0, // minor
 		4, // hdrSize
-		4, // offSize, not sure what to do here
+		4, // offSize
 	}
 
 	// section 1: Name INDEX
@@ -438,8 +439,9 @@ func (cff *Font) Encode() ([]byte, error) {
 	}
 
 	offs := cumsum()
-	fmt.Println(offs)
 	for { // TODO(voss): does this loop always terminate?
+		blobs[secHeader][3] = offsSize(offs[numSections])
+
 		pdCopy[opSubrs] = []interface{}{offs[secSubrsIndex] - offs[secPrivateDict]}
 		blobs[secPrivateDict] = pdCopy.encode()
 		pdSize := len(blobs[secPrivateDict])
@@ -478,9 +480,51 @@ func (cff *Font) Encode() ([]byte, error) {
 	return res.Bytes(), nil
 }
 
+var defaultFontMatrix = [6]float64{0.001, 0, 0, 0.001, 0, 0}
+
+func getFontMatrix(d cffDict) [6]float64 {
+	res := defaultFontMatrix
+
+	xx, ok := d[opFontMatrix]
+	if !ok || len(xx) != 6 {
+		return res
+	}
+	for i, x := range xx {
+		xi, ok := x.(float64)
+		if !ok {
+			return res
+		}
+		res[i] = xi
+	}
+
+	return res
+}
+
+func setFontMatrix(d cffDict, fm [6]float64) {
+	needed := false
+	for i, xi := range fm {
+		if math.Abs(xi-defaultFontMatrix[i]) > 1e-5 {
+			needed = true
+			break
+		}
+	}
+	if !needed {
+		return
+	}
+
+	val := make([]interface{}, 6)
+	for i, xi := range fm {
+		val[i] = xi
+	}
+	d[opFontMatrix] = val
+}
+
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
+// TODO(voss): this only works if the original font is not CID-keyed
 func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, error) {
 	numGlyphs := uint16(len(cff.charStrings))
+
+	fontMatrix := getFontMatrix(cff.topDict)
 
 	blobs := make([][]byte, cidNumSections)
 	newStrings := &cffStrings{}
@@ -501,6 +545,7 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	}
 
 	// section 2: top dict INDEX
+	// afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillTop
 	tdCopy := cff.topDict.Copy()
 	trans := func(op dictOp) {
 		if i, ok := cff.topDict.getSID(op); ok {
@@ -517,10 +562,12 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	trans(opFullName)
 	trans(opFamilyName)
 	trans(opWeight)
+	delete(tdCopy, opPaintType)  // per font
+	delete(tdCopy, opFontMatrix) // per font
 	// opCharset is updated below
 	delete(tdCopy, opEncoding)
 	// opCharStrings is updated below
-	// opPrivate is updated below
+	delete(tdCopy, opPrivate) // per font
 	trans(opPostScript)
 	trans(opBaseFontName)
 	registrySID := newStrings.lookup(registry)
@@ -528,9 +575,10 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	tdCopy[opROS] = []interface{}{
 		int32(registrySID), int32(orderingSID), int32(supplement),
 	}
+	tdCopy[opCIDCount] = []interface{}{int32(numGlyphs)}
 	// opFDArray is updated below
 	// opFDSelect is updated below
-	trans(opFontName)
+	delete(tdCopy, opFontName) // per font
 
 	// section 3: secStringIndex
 	// The new string index is stored in `newStrings`.
@@ -555,11 +603,11 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	// section 6: FDSelect
 	fdSelect := &bytes.Buffer{}
 	fdSelect.Write([]byte{
-		3, // format
-		0, //
+		3,    // format
+		0, 1, // nRanges
 
-		0, 0, // first FD
-		0, // default font dict
+		0, 0, // first = first glyph index in range
+		0, // fd = default font dict
 
 		byte(numGlyphs >> 8), byte(numGlyphs), // sentinel
 	})
@@ -573,6 +621,12 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 
 	// section 8: font DICT INDEX
 	fontDict := cffDict{}
+	setFontMatrix(fontDict, fontMatrix)
+	fontDict[opFontName] = []interface{}{int32(newStrings.lookup(cff.FontName))}
+	// maybe needs the following fields:
+	// (from afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont)
+	//   - PaintType
+	// opPrivate is set below
 	// secFDSelect is encoded below
 
 	// section 9: private DICT
@@ -600,6 +654,8 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 
 	offs := cumsum()
 	for { // TODO(voss): does this loop always terminate?
+		blobs[secHeader][3] = offsSize(offs[numSections])
+
 		pdCopy[opSubrs] = []interface{}{offs[cidSubrsIndex] - offs[cidPrivateDict]}
 		blobs[cidPrivateDict] = pdCopy.encode()
 		pdSize := len(blobs[cidPrivateDict])
@@ -614,7 +670,6 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 
 		tdCopy[opCharset] = []interface{}{offs[cidCharsets]}
 		tdCopy[opCharStrings] = []interface{}{offs[cidCharStringsIndex]}
-		tdCopy[opPrivate] = pdDesc
 		tdCopy[opFDArray] = []interface{}{offs[cidFDArray]}
 		tdCopy[opFDSelect] = []interface{}{offs[cidFdSelect]}
 		topDictData := tdCopy.encode()
@@ -689,4 +744,17 @@ func (cff *Font) Copy() *Font {
 	cff2.glyphNames = append([]sid{}, cff.glyphNames...)
 	cff2.subrs = cff.subrs.Copy()
 	return &cff2
+}
+
+func offsSize(i int32) byte {
+	switch {
+	case i < 1<<8:
+		return 1
+	case i < 1<<16:
+		return 2
+	case i < 1<<24:
+		return 3
+	default:
+		return 4
+	}
 }

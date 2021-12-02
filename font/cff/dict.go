@@ -324,7 +324,9 @@ const (
 	opPrivate           dictOp = 0x0012
 	opCopyright         dictOp = 0x0C00
 	opUnderlinePosition dictOp = 0x0C03
+	opPaintType         dictOp = 0x0C05
 	opCharstringType    dictOp = 0x0C06
+	opFontMatrix        dictOp = 0x0C07
 	opSyntheticBase     dictOp = 0x0C14
 	opPostScript        dictOp = 0x0C15
 	opBaseFontName      dictOp = 0x0C16
