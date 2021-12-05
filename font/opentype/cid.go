@@ -253,7 +253,7 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	cffData, err := t.Cff.Encode()
+	cffData, err := t.Cff.EncodeCID("Adobe", "Identity", 0)
 	if err != nil {
 		return err
 	}

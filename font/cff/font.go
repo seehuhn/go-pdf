@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 
 	"seehuhn.de/go/pdf/font/parser"
 )
@@ -480,45 +479,6 @@ func (cff *Font) Encode() ([]byte, error) {
 	return res.Bytes(), nil
 }
 
-var defaultFontMatrix = [6]float64{0.001, 0, 0, 0.001, 0, 0}
-
-func getFontMatrix(d cffDict) [6]float64 {
-	res := defaultFontMatrix
-
-	xx, ok := d[opFontMatrix]
-	if !ok || len(xx) != 6 {
-		return res
-	}
-	for i, x := range xx {
-		xi, ok := x.(float64)
-		if !ok {
-			return res
-		}
-		res[i] = xi
-	}
-
-	return res
-}
-
-func setFontMatrix(d cffDict, fm [6]float64) {
-	needed := false
-	for i, xi := range fm {
-		if math.Abs(xi-defaultFontMatrix[i]) > 1e-5 {
-			needed = true
-			break
-		}
-	}
-	if !needed {
-		return
-	}
-
-	val := make([]interface{}, 6)
-	for i, xi := range fm {
-		val[i] = xi
-	}
-	d[opFontMatrix] = val
-}
-
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 // TODO(voss): this only works if the original font is not CID-keyed
 func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, error) {
@@ -689,7 +649,6 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		if done {
 			break
 		}
-
 		offs = newOffs
 	}
 

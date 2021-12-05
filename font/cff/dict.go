@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 )
@@ -266,6 +267,45 @@ func (d cffDict) encode() []byte {
 		res.WriteByte(byte(op))
 	}
 	return res.Bytes()
+}
+
+var defaultFontMatrix = [6]float64{0.001, 0, 0, 0.001, 0, 0}
+
+func getFontMatrix(d cffDict) [6]float64 {
+	res := defaultFontMatrix
+
+	xx, ok := d[opFontMatrix]
+	if !ok || len(xx) != 6 {
+		return res
+	}
+	for i, x := range xx {
+		xi, ok := x.(float64)
+		if !ok {
+			return res
+		}
+		res[i] = xi
+	}
+
+	return res
+}
+
+func setFontMatrix(d cffDict, fm [6]float64) {
+	needed := false
+	for i, xi := range fm {
+		if math.Abs(xi-defaultFontMatrix[i]) > 1e-5 {
+			needed = true
+			break
+		}
+	}
+	if !needed {
+		return
+	}
+
+	val := make([]interface{}, 6)
+	for i, xi := range fm {
+		val[i] = xi
+	}
+	d[opFontMatrix] = val
 }
 
 type dictOp uint16
