@@ -204,7 +204,7 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 	}
 
 	// TODO(voss): make sure there is only one copy of this per PDF file.
-	// TODO(voss): if tt.Otf.CFF.IsCIDFont is true, use the values
+	// TODO(voss): if t.Sfnt.CFF.IsCIDFont is true, use the values
 	//     from the ROS operator?
 	CIDSystemInfo := pdf.Dict{ // See sections 9.7.3 of PDF 32000-1:2008.
 		"Registry":   pdf.String("Adobe"),

@@ -40,8 +40,9 @@ type Font struct {
 	glyphNames  []sid
 	privateDict cffDict
 	subrs       cffIndex
+	// TODO(voss): store CIDFont information
 
-	IsCIDFont bool
+	IsCIDFont bool // TODO(voss): remov this
 }
 
 // Read reads a CFF font from r.
@@ -494,7 +495,7 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		1, // major
 		0, // minor
 		4, // hdrSize
-		4, // offSize, not sure what to do here
+		4, // offSize
 	}
 
 	// section 1: Name INDEX
@@ -511,8 +512,8 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		if i, ok := cff.topDict.getSID(op); ok {
 			s, ok := cff.strings.get(i)
 			if ok {
-				iNew := newStrings.lookup(s)
-				tdCopy[op] = []interface{}{int32(iNew)}
+				newSID := newStrings.lookup(s)
+				tdCopy[op] = []interface{}{int32(newSID)}
 			}
 		}
 	}
@@ -567,7 +568,7 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		0, 1, // nRanges
 
 		0, 0, // first = first glyph index in range
-		0, // fd = default font dict
+		0, // font DICT 0
 
 		byte(numGlyphs >> 8), byte(numGlyphs), // sentinel
 	})
@@ -580,14 +581,13 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	}
 
 	// section 8: font DICT INDEX
+	// (see afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont)
 	fontDict := cffDict{}
 	setFontMatrix(fontDict, fontMatrix)
 	fontDict[opFontName] = []interface{}{int32(newStrings.lookup(cff.FontName))}
-	// maybe needs the following fields:
-	// (from afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont)
+	// maybe also needs the following field:
 	//   - PaintType
 	// opPrivate is set below
-	// secFDSelect is encoded below
 
 	// section 9: private DICT
 	pdCopy := cff.privateDict.Copy()
@@ -694,17 +694,7 @@ const (
 	cidNumSections
 )
 
-// Copy makes a semi-shallow copy of the font.
-func (cff *Font) Copy() *Font {
-	cff2 := *cff
-	cff2.strings = cff.strings.Copy()
-	cff2.gsubrs = cff.gsubrs.Copy()
-	cff2.charStrings = cff.charStrings.Copy()
-	cff2.glyphNames = append([]sid{}, cff.glyphNames...)
-	cff2.subrs = cff.subrs.Copy()
-	return &cff2
-}
-
+// TODO(voss): inline this?
 func offsSize(i int32) byte {
 	switch {
 	case i < 1<<8:

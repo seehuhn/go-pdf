@@ -49,6 +49,8 @@ func (ss *cffStrings) get(i sid) (string, bool) {
 	return "", false
 }
 
+// lookup returns the SID for the given string.  If the string is not part of
+// the strings collection, it is added and a newly allocated SID is returned.
 func (ss *cffStrings) lookup(s string) sid {
 	if ss.rev == nil {
 		ss.rev = make(map[string]sid)
