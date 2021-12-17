@@ -21,7 +21,7 @@ type sid uint16
 
 type cffStrings struct {
 	data []string
-	rev  map[string]sid
+	rev  map[string]int32
 }
 
 func (ss *cffStrings) Copy() *cffStrings {
@@ -32,43 +32,39 @@ func (ss *cffStrings) Copy() *cffStrings {
 	return res
 }
 
-func (ss *cffStrings) Len() sid {
-	return sid(len(ss.data)) + nStdString
-}
-
-func (ss *cffStrings) get(i sid) (string, bool) {
+func (ss *cffStrings) get(i int32) string {
 	if i < nStdString {
-		return stdStrings[i], true
+		return stdStrings[i]
 	}
 	i -= nStdString
 
 	if int(i) < len(ss.data) {
-		return ss.data[i], true
+		return ss.data[i]
 	}
 
-	return "", false
+	return ""
 }
 
 // lookup returns the SID for the given string.  If the string is not part of
 // the strings collection, it is added and a newly allocated SID is returned.
-func (ss *cffStrings) lookup(s string) sid {
+func (ss *cffStrings) lookup(s string) int32 {
 	if ss.rev == nil {
-		ss.rev = make(map[string]sid)
+		ss.rev = make(map[string]int32)
 		for i, s := range stdStrings {
-			ss.rev[s] = sid(i)
+			ss.rev[s] = int32(i)
 		}
 		for i, s := range ss.data {
-			ss.rev[s] = sid(i) + nStdString
+			ss.rev[s] = int32(i) + nStdString
 		}
 	}
 
 	res, ok := ss.rev[s]
 	if !ok {
-		res = sid(len(ss.data)) + nStdString
+		res = int32(len(ss.data)) + nStdString
 		ss.data = append(ss.data, s)
 		ss.rev[s] = res
 	}
-	return res
+	return int32(res)
 }
 
 func (ss *cffStrings) encode() ([]byte, error) {
@@ -473,4 +469,4 @@ var stdStrings = []string{
 	"Semibold",            // 390
 }
 
-var nStdString = sid(len(stdStrings))
+var nStdString = int32(len(stdStrings))

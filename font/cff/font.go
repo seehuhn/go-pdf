@@ -34,10 +34,9 @@ type Font struct {
 	FontName string
 
 	topDict     cffDict
-	strings     *cffStrings
 	gsubrs      cffIndex
 	charStrings cffIndex
-	glyphNames  []sid
+	glyphNames  []string
 	privateDict cffDict
 	subrs       cffIndex
 	// TODO(voss): store CIDFont information
@@ -99,23 +98,24 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if len(topDictIndex) != 1 {
 		return nil, errors.New("invalid CFF")
 	}
-	topDict, err := decodeDict(topDictIndex[0])
+
+	// read the String INDEX
+	stringIndex, err := readIndex(p)
+	if err != nil {
+		return nil, err
+	}
+	strings := &cffStrings{
+		data: make([]string, len(stringIndex)),
+	}
+	for i, s := range stringIndex {
+		strings.data[i] = string(s)
+	}
+
+	topDict, err := decodeDict(topDictIndex[0], strings)
 	if err != nil {
 		return nil, err
 	}
 	cff.topDict = topDict
-
-	// read the String INDEX
-	strings, err := readIndex(p)
-	if err != nil {
-		return nil, err
-	}
-	cff.strings = &cffStrings{
-		data: make([]string, len(strings)),
-	}
-	for i, s := range strings {
-		cff.strings.data[i] = string(s)
-	}
 
 	// read the Global Subr INDEX
 	gsubrs, err := readIndex(p)
@@ -153,7 +153,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 
 	// read the list of glyph names
 	charsetsPos, _ := topDict.getInt(opCharset, 0)
-	var charset []sid
+	var charset []int32
 	switch charsetsPos {
 	case 0: // ISOAdobe
 		panic("not implemented")
@@ -171,7 +171,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			return nil, err
 		}
 	}
-	cff.glyphNames = charset
+	cff.glyphNames = make([]string, len(charset))
+	for i, sid := range charset {
+		cff.glyphNames[i] = strings.get(sid)
+	}
 
 	// read the Private DICT
 	pdSize, pdPos, ok := topDict.getPair(opPrivate)
@@ -187,7 +190,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	cff.privateDict, err = decodeDict(privateDictBlob)
+	cff.privateDict, err = decodeDict(privateDictBlob, strings)
 	if err != nil {
 		return nil, err
 	}
@@ -208,13 +211,13 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	return cff, nil
 }
 
-func readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
+func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 	format, err := p.ReadUInt8()
 	if err != nil {
 		return nil, err
 	}
 
-	charset := make([]sid, 0, nGlyphs)
+	charset := make([]int32, 0, nGlyphs)
 	charset = append(charset, 0)
 	switch format {
 	case 0:
@@ -232,7 +235,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
 
 		data := s.GetStash()
 		for _, xi := range data {
-			charset = append(charset, sid(xi))
+			charset = append(charset, int32(xi))
 		}
 	case 1:
 		for len(charset) < nGlyphs {
@@ -245,7 +248,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
 				return nil, err
 			}
 			for i := 0; i < int(nLeft)+1; i++ {
-				charset = append(charset, sid(int(first)+i))
+				charset = append(charset, int32(int(first)+i))
 			}
 		}
 	case 2:
@@ -259,7 +262,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
 				return nil, err
 			}
 			for i := 0; i < int(nLeft)+1; i++ {
-				charset = append(charset, sid(int(first)+i))
+				charset = append(charset, int32(int(first)+i))
 			}
 		}
 	default:
@@ -269,7 +272,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]sid, error) {
 	return charset, nil
 }
 
-func encodeCharset(names []sid) ([]byte, error) {
+func encodeCharset(names []int32) ([]byte, error) {
 	if names[0] != 0 {
 		return nil, errors.New("invalid charset")
 	}
@@ -319,7 +322,7 @@ func encodeCharset(names []sid) ([]byte, error) {
 				buf[3*i+1] = byte(name >> 8)
 				buf[3*i+2] = byte(name)
 				buf[3*i+3] = byte(d)
-				name += sid(d + 1)
+				name += int32(d + 1)
 				dd -= d + 1
 			}
 		}
@@ -362,28 +365,10 @@ func (cff *Font) Encode() ([]byte, error) {
 
 	// section 2: top dict INDEX
 	tdCopy := cff.topDict.Copy()
-	trans := func(op dictOp) {
-		if i, ok := cff.topDict.getSID(op); ok {
-			s, ok := cff.strings.get(i)
-			if ok {
-				iNew := newStrings.lookup(s)
-				tdCopy[op] = []interface{}{int32(iNew)}
-			}
-		}
-	}
-	trans(opVersion)
-	trans(opNotice)
-	trans(opCopyright)
-	trans(opFullName)
-	trans(opFamilyName)
-	trans(opWeight)
 	// opCharset is updated below
 	delete(tdCopy, opEncoding)
 	// opCharStrings is updated below
 	// opPrivate is updated below
-	trans(opPostScript)
-	trans(opBaseFontName)
-	trans(opFontName)
 
 	// section 3: secStringIndex
 	// The new string index is stored in `newStrings`.
@@ -396,10 +381,10 @@ func (cff *Font) Encode() ([]byte, error) {
 	}
 
 	// section 5: charsets INDEX
-	subset := make([]sid, numGlyphs)
+	subset := make([]int32, numGlyphs)
 	for i := uint16(0); i < numGlyphs; i++ {
-		s, ok := cff.strings.get(cff.glyphNames[i])
-		if !ok {
+		s := cff.glyphNames[i]
+		if s == "" {
 			s = ".notdef"
 		}
 		subset[i] = newStrings.lookup(s)
@@ -425,11 +410,6 @@ func (cff *Font) Encode() ([]byte, error) {
 		return nil, err
 	}
 
-	blobs[secStringIndex], err = newStrings.encode()
-	if err != nil {
-		return nil, err
-	}
-
 	cumsum := func() []int32 {
 		res := make([]int32, numSections+1)
 		for i := 0; i < numSections; i++ {
@@ -443,15 +423,20 @@ func (cff *Font) Encode() ([]byte, error) {
 		blobs[secHeader][3] = offsSize(offs[numSections])
 
 		pdCopy[opSubrs] = []interface{}{offs[secSubrsIndex] - offs[secPrivateDict]}
-		blobs[secPrivateDict] = pdCopy.encode()
+		blobs[secPrivateDict] = pdCopy.encode(newStrings)
 		pdSize := len(blobs[secPrivateDict])
 		pdDesc := []interface{}{int32(pdSize), offs[secPrivateDict]}
 
 		tdCopy[opCharset] = []interface{}{offs[secCharsets]}
 		tdCopy[opCharStrings] = []interface{}{offs[secCharStringsIndex]}
 		tdCopy[opPrivate] = pdDesc
-		topDictData := tdCopy.encode()
+		topDictData := tdCopy.encode(newStrings)
 		blobs[secTopDictIndex], err = cffIndex{topDictData}.encode()
+		if err != nil {
+			return nil, err
+		}
+
+		blobs[secStringIndex], err = newStrings.encode()
 		if err != nil {
 			return nil, err
 		}
@@ -483,7 +468,7 @@ func (cff *Font) Encode() ([]byte, error) {
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 // TODO(voss): this only works if the original font is not CID-keyed
 func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, error) {
-	numGlyphs := uint16(len(cff.charStrings))
+	numGlyphs := int32(len(cff.charStrings))
 
 	fontMatrix := getFontMatrix(cff.topDict)
 
@@ -508,29 +493,12 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	// section 2: top dict INDEX
 	// afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillTop
 	tdCopy := cff.topDict.Copy()
-	trans := func(op dictOp) {
-		if i, ok := cff.topDict.getSID(op); ok {
-			s, ok := cff.strings.get(i)
-			if ok {
-				newSID := newStrings.lookup(s)
-				tdCopy[op] = []interface{}{int32(newSID)}
-			}
-		}
-	}
-	trans(opVersion)
-	trans(opNotice)
-	trans(opCopyright)
-	trans(opFullName)
-	trans(opFamilyName)
-	trans(opWeight)
 	delete(tdCopy, opPaintType)  // per font
 	delete(tdCopy, opFontMatrix) // per font
 	// opCharset is updated below
 	delete(tdCopy, opEncoding)
 	// opCharStrings is updated below
 	delete(tdCopy, opPrivate) // per font
-	trans(opPostScript)
-	trans(opBaseFontName)
 	registrySID := newStrings.lookup(registry)
 	orderingSID := newStrings.lookup(ordering)
 	tdCopy[opROS] = []interface{}{
@@ -552,9 +520,9 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	}
 
 	// section 5: charsets INDEX
-	subset := make([]sid, numGlyphs)
-	for i := uint16(0); i < numGlyphs; i++ {
-		subset[i] = sid(i)
+	subset := make([]int32, numGlyphs)
+	for i := int32(0); i < numGlyphs; i++ {
+		subset[i] = i
 	}
 	blobs[cidCharsets], err = encodeCharset(subset)
 	if err != nil {
@@ -599,11 +567,6 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		return nil, err
 	}
 
-	blobs[cidStringIndex], err = newStrings.encode()
-	if err != nil {
-		return nil, err
-	}
-
 	cumsum := func() []int32 {
 		res := make([]int32, cidNumSections+1)
 		for i := 0; i < cidNumSections; i++ {
@@ -617,12 +580,12 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		blobs[secHeader][3] = offsSize(offs[numSections])
 
 		pdCopy[opSubrs] = []interface{}{offs[cidSubrsIndex] - offs[cidPrivateDict]}
-		blobs[cidPrivateDict] = pdCopy.encode()
+		blobs[cidPrivateDict] = pdCopy.encode(newStrings)
 		pdSize := len(blobs[cidPrivateDict])
 		pdDesc := []interface{}{int32(pdSize), offs[cidPrivateDict]}
 
 		fontDict[opPrivate] = pdDesc
-		fontDictData := fontDict.encode()
+		fontDictData := fontDict.encode(newStrings)
 		blobs[cidFDArray], err = cffIndex{fontDictData}.encode()
 		if err != nil {
 			return nil, err
@@ -632,8 +595,13 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		tdCopy[opCharStrings] = []interface{}{offs[cidCharStringsIndex]}
 		tdCopy[opFDArray] = []interface{}{offs[cidFDArray]}
 		tdCopy[opFDSelect] = []interface{}{offs[cidFdSelect]}
-		topDictData := tdCopy.encode()
+		topDictData := tdCopy.encode(newStrings)
 		blobs[cidTopDictIndex], err = cffIndex{topDictData}.encode()
+		if err != nil {
+			return nil, err
+		}
+
+		blobs[cidStringIndex], err = newStrings.encode()
 		if err != nil {
 			return nil, err
 		}

@@ -46,9 +46,9 @@ func TestDecodeInt(t *testing.T) {
 	var buf []byte
 	for _, test := range cases {
 		buf = append(buf[:0], test.enc...)
-		buf = append(buf, 0)
+		buf = append(buf, byte(opDebug>>8), byte(opDebug&0xFF))
 
-		d, err := decodeDict(buf)
+		d, err := decodeDict(buf, nil)
 		if err != nil {
 			t.Error(err)
 			continue
@@ -58,7 +58,7 @@ func TestDecodeInt(t *testing.T) {
 			continue
 		}
 
-		args, ok := d[0]
+		args, ok := d[opDebug]
 		if !ok {
 			t.Error("wrong DICT op")
 			continue
@@ -81,8 +81,8 @@ func TestEncodeInt(t *testing.T) {
 		d := cffDict{
 			op: []interface{}{i, i + 1, i + 2},
 		}
-		blob := d.encode()
-		d2, err := decodeDict(blob)
+		blob := d.encode(nil)
+		d2, err := decodeDict(blob, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,10 +124,10 @@ func TestEncodeFloat(t *testing.T) {
 	}
 	for _, x := range cases {
 		d := cffDict{
-			0: []interface{}{x},
+			opDebug: []interface{}{x},
 		}
-		blob := d.encode()
-		d2, err := decodeDict(blob)
+		blob := d.encode(nil)
+		d2, err := decodeDict(blob, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -135,7 +135,7 @@ func TestEncodeFloat(t *testing.T) {
 		if len(d2) != 1 {
 			t.Fatalf("wrong length %d", len(d2))
 		}
-		args, ok := d2[0]
+		args, ok := d2[opDebug]
 		if !ok {
 			t.Fatal("wrong op")
 		}

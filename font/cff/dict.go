@@ -13,11 +13,25 @@ var errCorruptDict = errors.New("invalid CFF DICT")
 
 type cffDict map[dictOp][]interface{}
 
-func decodeDict(buf []byte) (cffDict, error) {
+func decodeDict(buf []byte, ss *cffStrings) (cffDict, error) {
 	res := cffDict{}
 	var stack []interface{}
 
 	flush := func(op dictOp) {
+		if op.isString() {
+			l := len(stack)
+			if l > 2 { // special case for opROS
+				l = 2
+			}
+			for i := 0; i < l; i++ {
+				s, ok := stack[i].(int32)
+				if ok {
+					stack[i] = ss.get(s)
+				} else {
+					stack[i] = ""
+				}
+			}
+		}
 		res[op] = stack
 		stack = nil
 	}
@@ -145,12 +159,15 @@ func (d cffDict) getInt(op dictOp, defVal int32) (int32, bool) {
 	return x, true
 }
 
-func (d cffDict) getSID(op dictOp) (sid, bool) {
-	i, ok := d.getInt(op, 0)
-	if !ok || i < 0 || i >= 65536 {
-		return 0, false
+func (d cffDict) getString(op dictOp) (string, bool) {
+	if len(d[op]) != 1 {
+		return "", false
 	}
-	return sid(i), true
+	s, ok := d[op][0].(string)
+	if !ok {
+		return "", false
+	}
+	return s, true
 }
 
 func (d cffDict) getPair(op dictOp) (int32, int32, bool) {
@@ -188,12 +205,18 @@ func (d cffDict) keys() []dictOp {
 	return keys
 }
 
-func (d cffDict) encode() []byte {
+func (d cffDict) encode(ss *cffStrings) []byte {
 	keys := d.keys()
 
 	res := &bytes.Buffer{}
 	for _, op := range keys {
 		args := d[op]
+		for i, arg := range args {
+			if s, ok := arg.(string); ok {
+				args[i] = int32(ss.lookup(s))
+			}
+		}
+
 		for _, arg := range args {
 			switch a := arg.(type) {
 			case int32:
@@ -254,8 +277,7 @@ func (d cffDict) encode() []byte {
 					first = !first
 				}
 			default:
-				fmt.Printf("unsupported type %T\n", a)
-				panic("fish")
+				panic(fmt.Sprintf("unsupported type %T in DICT at %s\n", a, op))
 			}
 		}
 		if op > 255 {
@@ -312,6 +334,8 @@ type dictOp uint16
 
 func (d dictOp) String() string {
 	switch d {
+	case opVersion:
+		return "Version"
 	case opNotice:
 		return "Notice"
 	case opFullName:
@@ -378,4 +402,17 @@ const (
 
 	// private DICT operators
 	opSubrs dictOp = 0x0013 // Offset (self) to local subrs
+
+	// used in local unit tests only
+	opDebug dictOp = 0x0CFF
 )
+
+func (d dictOp) isString() bool {
+	switch d {
+	case opVersion, opNotice, opCopyright, opFullName, opFamilyName, opWeight,
+		opPostScript, opBaseFontName, opROS, opFontName:
+		return true
+	default:
+		return false
+	}
+}
