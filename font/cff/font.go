@@ -16,16 +16,13 @@
 
 package cff
 
-// TODO(voss): post answer to
-// https://stackoverflow.com/questions/18351580/is-there-any-library-for-subsetting-opentype-ps-cff-fonts
-// once this is working
-
 import (
 	"bytes"
 	"errors"
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
@@ -39,9 +36,10 @@ type Font struct {
 	glyphNames  []string
 	privateDict cffDict
 	subrs       cffIndex
-	// TODO(voss): store CIDFont information
 
-	IsCIDFont bool // TODO(voss): remov this
+	gid2cid []font.GlyphID
+
+	// TODO(voss): store CIDFont information
 }
 
 // Read reads a CFF font from r.
@@ -68,16 +66,16 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	}
 	major := x >> 24
 	minor := (x >> 16) & 0xFF
-	nameIndexPos := int64((x >> 8) & 0xFF)
+	nameIndexOffs := int64((x >> 8) & 0xFF)
 	offSize := x & 0xFF // unused
 	if major == 2 {
 		return nil, fmt.Errorf("unsupported CFF version %d.%d", major, minor)
-	} else if major != 1 || nameIndexPos < 4 || offSize > 4 {
+	} else if major != 1 || nameIndexOffs < 4 || offSize > 4 {
 		return nil, errors.New("not a CFF font")
 	}
 
 	// read the Name INDEX
-	err = p.SeekPos(nameIndexPos)
+	err = p.SeekPos(nameIndexOffs)
 	if err != nil {
 		return nil, err
 	}
@@ -124,24 +122,22 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	}
 	cff.gsubrs = gsubrs
 
-	_, cff.IsCIDFont = topDict[opROS]
+	_, isCIDFont := topDict[opROS]
+	if isCIDFont {
+		return nil, errors.New("CIDfont support not implemented")
+	}
 
 	// read the CharStrings INDEX
-	cct, ok := topDict[opCharstringType]
-	if ok {
-		var cct32 int32
-		if len(cct) == 1 {
-			cct32, ok = cct[0].(int32)
-		}
-		if !ok || cct32 != 2 {
-			return nil, fmt.Errorf("unsupported charstring type %v", cct)
-		}
+	cct, _ := topDict.getInt(opCharstringType, 2)
+	if cct != 2 {
+		return nil, errors.New("unsupported charstring type")
 	}
-	pos, ok := topDict.getInt(opCharStrings, 0)
+	charStringsOffs, ok := topDict.getInt(opCharStrings, 0)
 	if !ok {
-		return nil, errors.New("missing CharStrings INDEX")
+		return nil, errors.New("missing CharStrings offset")
 	}
-	err = p.SeekPos(int64(pos))
+	delete(topDict, opCharStrings)
+	err = p.SeekPos(int64(charStringsOffs))
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +148,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.charStrings = charStrings
 
 	// read the list of glyph names
-	charsetsPos, _ := topDict.getInt(opCharset, 0)
+	charsetOffs, _ := topDict.getInt(opCharset, 0)
+	delete(topDict, opCharset)
 	var charset []int32
-	switch charsetsPos {
+	switch charsetOffs {
 	case 0: // ISOAdobe
 		panic("not implemented")
 	case 1: // Expert
@@ -162,7 +159,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	case 2: // ExpertSubset
 		panic("not implemented")
 	default:
-		err = p.SeekPos(int64(charsetsPos))
+		err = p.SeekPos(int64(charsetOffs))
 		if err != nil {
 			return nil, err
 		}
@@ -177,11 +174,12 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	}
 
 	// read the Private DICT
-	pdSize, pdPos, ok := topDict.getPair(opPrivate)
+	pdSize, pdOffs, ok := topDict.getPair(opPrivate)
 	if !ok {
 		return nil, errors.New("missing Private DICT")
 	}
-	err = p.SeekPos(int64(pdPos))
+	delete(topDict, opPrivate)
+	err = p.SeekPos(int64(pdOffs))
 	if err != nil {
 		return nil, err
 	}
@@ -195,9 +193,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 
-	subrsIndexOffset, _ := cff.privateDict.getInt(opSubrs, 0)
-	if subrsIndexOffset > 0 {
-		err = p.SeekPos(int64(pdPos) + int64(subrsIndexOffset))
+	subrsIndexOffs, _ := cff.privateDict.getInt(opSubrs, 0)
+	delete(cff.privateDict, opSubrs)
+	if subrsIndexOffs > 0 {
+		err = p.SeekPos(int64(pdOffs) + int64(subrsIndexOffs))
 		if err != nil {
 			return nil, err
 		}

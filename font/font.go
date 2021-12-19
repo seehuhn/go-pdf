@@ -117,6 +117,8 @@ func (font *Font) ToGlyph(fontDesignSize int) int {
 // GlyphID is used to enumerate the glyphs in a font.  The first glyph
 // has index 0 and is used to indicate a missing character (usually rendered
 // as an empty box).
+//
+// TODO(voss): is this the CID or GID in Adobe's language?
 type GlyphID uint16
 
 // Rect represents a rectangle with integer coordinates.

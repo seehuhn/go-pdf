@@ -53,24 +53,12 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		if dict, ok := obj.(pdf.Dict); ok {
-			if dict["Type"] != pdf.Name("Font") || dict["Subtype"] != pdf.Name("CIDFontType2") {
+		if stm, ok := obj.(*pdf.Stream); ok {
+			subType, ok := stm.Dict["Subtype"].(pdf.Name)
+			if !ok {
 				continue
 			}
-			desc := "<missing>"
-			if CIDSystemInfo, ok := dict["CIDSystemInfo"]; ok {
-				CIDSystemInfo, err = r.Resolve(CIDSystemInfo)
-				if err != nil {
-					return err
-				}
-				d := CIDSystemInfo.(pdf.Dict)
-				registry := string(d["Registry"].(pdf.String))
-				ordering := string(d["Ordering"].(pdf.String))
-				supplement := int(d["Supplement"].(pdf.Integer))
-				desc = fmt.Sprintf("%s-%s-%d", registry, ordering, supplement)
-			}
-			// fmt.Println(desc)
-			_ = desc
+			fmt.Println(subType)
 		}
 	}
 

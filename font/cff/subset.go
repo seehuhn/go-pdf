@@ -7,10 +7,12 @@ import "seehuhn.de/go/pdf/font"
 func (cff *Font) Subset(subset []font.GlyphID) *Font {
 	out := &Font{
 		FontName:    cff.FontName, // TODO(voss): subset tag needed?
-		topDict:     map[dictOp][]interface{}{},
-		gsubrs:      cff.gsubrs.Copy(),
-		privateDict: map[dictOp][]interface{}{},
-		subrs:       cff.subrs.Copy(),
+		topDict:     cff.topDict,  // TODO(voss): any updates needed?
+		gsubrs:      cff.gsubrs,
+		privateDict: cff.privateDict,
+		subrs:       cff.subrs,
+
+		gid2cid: append([]font.GlyphID{}, subset...),
 	}
 
 	out.charStrings = nil
@@ -20,5 +22,7 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 		out.glyphNames = append(out.glyphNames, cff.glyphNames[gid])
 	}
 
-	panic("not implemented")
+	// TODO(voss): prune unused subrs
+
+	return out
 }
