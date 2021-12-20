@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
@@ -71,6 +72,8 @@ func convert(inName, outName string, V pdf.Version) error {
 	var Font *font.Font
 	if strings.HasSuffix(*fontFile, ".ttf") {
 		Font, err = truetype.EmbedSimple(out, *fontFile, "F", locale.EnGB)
+	} else if strings.HasSuffix(*fontFile, ".otf") {
+		Font, err = opentype.EmbedCID(out, *fontFile, "F", locale.EnGB)
 	} else {
 		Font, err = builtin.Embed(out, *fontFile, "F")
 	}

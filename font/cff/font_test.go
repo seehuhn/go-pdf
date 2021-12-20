@@ -132,11 +132,12 @@ func TestRewriteOtf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blob, err := cff.EncodeCID("Adobe", "Identity", 0)
-	// blob, err := cff.Encode()
+	buf := &bytes.Buffer{}
+	err = cff.EncodeCID(buf, "Adobe", "Identity", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	blob := buf.Bytes()
 
 	err = os.WriteFile("debug.cff", blob, 0644)
 	if err != nil {

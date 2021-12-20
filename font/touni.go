@@ -41,6 +41,7 @@ type SimpleMapping struct {
 }
 
 // WriteToUnicodeSimple writes the ToUnicode stream for a simple font.
+// This modifies mm.
 func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, toUnicodeRef *pdf.Reference) error {
 	data := &toUnicodeData{
 		Registry:   "seehuhn.de",
@@ -49,16 +50,17 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 		CodeSpace:  []string{"<00><FF>"},
 	}
 
+	sort.Slice(mm, func(i, j int) bool { return mm[i].CharCode < mm[j].CharCode })
+
 	canDeltaRange := make([]bool, len(mm))
 	step := make([]byte, len(mm))
 	var prevDelta int
 	var prevCharCode byte
-	sort.Slice(mm, func(i, j int) bool { return mm[i].CharCode < mm[j].CharCode })
 	for i, m := range mm {
 		delta := int(m.Text[0]) - int(m.CharCode)
 		charCode := m.CharCode
 		if i > 0 {
-			canDeltaRange[i] = delta == prevDelta
+			canDeltaRange[i] = delta == prevDelta && len(m.Text) == 1
 			step[i] = charCode - prevCharCode
 		}
 		prevDelta = delta
@@ -124,6 +126,7 @@ type CIDMapping struct {
 }
 
 // WriteToUnicodeCID writes the ToUnicode stream for a CIDFont.
+// This modifies mm.
 func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Reference) error {
 	data := &toUnicodeData{
 		Registry:   "Adobe",
@@ -132,56 +135,75 @@ func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Referen
 		CodeSpace:  []string{"<0000><FFFF>"},
 	}
 
-	cmap := make(map[uint16]rune) // TODO(voss): don't use this
-	var all []uint16
-	for _, m := range mm {
-		if len(m.Text) != 1 { // TODO(voss): fix this
-			continue
+	sort.Slice(mm, func(i, j int) bool { return mm[i].CharCode < mm[j].CharCode })
+
+	canDeltaRange := make([]bool, len(mm))
+	step := make([]uint16, len(mm))
+	var prevDelta int
+	var prevCharCode uint16
+	for i, m := range mm {
+		delta := int(m.Text[0]) - int(m.CharCode)
+		charCode := m.CharCode
+		if i > 0 {
+			canDeltaRange[i] = delta == prevDelta && len(m.Text) == 1
+			step[i] = charCode - prevCharCode
 		}
-		all = append(all, m.CharCode)
-		cmap[m.CharCode] = m.Text[0]
-	}
-	sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
-	if len(all) == 0 {
-		// TODO(voss)
-		all = append(all, 0)
-		cmap[0] = 0
+		prevDelta = delta
+		prevCharCode = charCode
 	}
 
-	first := true
-	var start, lastIn uint16
-	var lastOut rune
-	flush := func() {
-		if start < lastIn {
-			data.Ranges = append(data.Ranges, bfRange{
+	pos := 0
+	for pos < len(mm) {
+		next := pos + 1
+		for next < len(mm) && canDeltaRange[next] {
+			next++
+		}
+		if next > pos+1 {
+			start := mm[pos].CharCode
+			end := mm[next-1].CharCode
+			bf := bfRange{
 				From:     []byte{byte(start >> 8), byte(start)},
-				To:       []byte{byte(lastIn >> 8), byte(lastIn)},
-				FromText: [][]rune{{lastOut - rune(lastIn-start)}},
-			})
-		} else {
-			data.Chars = append(data.Chars, bfChar{
-				Code: []byte{byte(lastIn >> 8), byte(lastIn)},
-				Text: []rune{lastOut - rune(lastIn-start)},
-			})
-		}
-	}
-	for _, r := range all {
-		c := cmap[r]
-		if first {
-			start = r
-			lastIn = r
-			lastOut = c
-			first = false
-		} else {
-			if r != lastIn+1 || c != lastOut+1 || lastIn%256 == 255 || lastOut%256 == 255 {
-				flush()
-				start = r
+				To:       []byte{byte(end >> 8), byte(end)},
+				FromText: [][]rune{mm[pos].Text},
 			}
-			lastIn = r
-			lastOut = c
+			data.Ranges = append(data.Ranges, bf)
+			pos = next
+			continue
 		}
+
+		next = pos + 1
+		for next < len(mm) && step[next] < 2 {
+			next++
+		}
+		if next > pos+1 {
+			var repl [][]rune
+			for i := pos; i < next; i++ {
+				if i > pos && step[i] > 1 {
+					for j := 0; j < int(step[i]-1); j++ {
+						repl = append(repl, []rune{'\uFFFD'})
+					}
+				}
+				repl = append(repl, mm[i].Text)
+			}
+			from := mm[pos].CharCode
+			to := mm[next-1].CharCode
+			bf := bfRange{
+				From:     []byte{byte(from >> 8), byte(from)},
+				To:       []byte{byte(to >> 8), byte(to)},
+				FromText: repl,
+			}
+			data.Ranges = append(data.Ranges, bf)
+			pos = next
+			continue
+		}
+
+		code := mm[pos].CharCode
+		data.Chars = append(data.Chars, bfChar{
+			Code: []byte{byte(code >> 8), byte(code)},
+			Text: mm[pos].Text,
+		})
+		pos++
 	}
-	flush()
 
 	return writeToUnicodeStream(w, data, toUnicodeRef)
 }

@@ -36,7 +36,7 @@ import (
 // but only up to 256 glyphs of the font can be accessed via the returned font
 // object.
 //
-// Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
+// Use of OpenType fonts in PDF requires PDF version 1.3 or higher.
 func EmbedCID(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
 	tt, err := sfnt.Open(fileName, loc)
 	if err != nil {
@@ -51,11 +51,11 @@ func EmbedCID(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.Loc
 // This function takes ownership of tt and will close the font tt once it is no
 // longer needed.
 //
-// In comparison, fonts embedded via EmbedSimple() lead to smaller PDF files,
+// In comparison, fonts embedded via EmbedFontSimple() lead to smaller PDF files,
 // but only up to 256 glyphs of the font can be accessed via the returned font
 // object.
 //
-// Use of OpenType fonts in PDF requires PDF version 1.6 or higher.
+// Use of OpenType fonts in PDF requires PDF version 1.3 or higher.
 func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, error) {
 	if !tt.IsOpenType() {
 		return nil, errors.New("not an OpenType font")
@@ -63,7 +63,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 	if tt.IsTrueType() {
 		return truetype.EmbedFontCID(w, tt, instName)
 	}
-	err := w.CheckVersion("use of OpenType fonts", pdf.V1_6)
+	err := w.CheckVersion("use of CFF-based CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 		return nil, err
 	}
 
-	t := &otfCID{
+	t := &cidFont{
 		Sfnt: tt,
 		Cff:  cff,
 
@@ -107,7 +107,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 	return res, nil
 }
 
-type otfCID struct {
+type cidFont struct {
 	Sfnt *sfnt.Font
 	Cff  *cff.Font
 
@@ -117,7 +117,7 @@ type otfCID struct {
 	used map[font.GlyphID]bool   // is GID used?
 }
 
-func (t *otfCID) Layout(rr []rune) ([]font.Glyph, error) {
+func (t *cidFont) Layout(rr []rune) ([]font.Glyph, error) {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
 		gid, ok := t.Sfnt.CMap[r]
@@ -145,31 +145,33 @@ func (t *otfCID) Layout(rr []rune) ([]font.Glyph, error) {
 	return gg, nil
 }
 
-func (t *otfCID) Enc(gid font.GlyphID) pdf.String {
+func (t *cidFont) Enc(gid font.GlyphID) pdf.String {
 	t.used[gid] = true
 	return pdf.String{byte(gid >> 8), byte(gid)}
 }
 
-func (t *otfCID) WriteFont(w *pdf.Writer) error {
+func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
 	origNumGlyphs := len(t.Sfnt.Width)
 	var includeGlyphs []font.GlyphID
 	for gid, ok := range t.used {
-		if !ok {
-			continue
+		if ok {
+			includeGlyphs = append(includeGlyphs, gid)
 		}
-		includeGlyphs = append(includeGlyphs, gid)
 	}
 	sort.Slice(includeGlyphs, func(i, j int) bool {
 		return includeGlyphs[i] < includeGlyphs[j]
 	})
-	cid2gid := make([]byte, 2*origNumGlyphs)
-	for gid, cid := range includeGlyphs {
-		cid2gid[2*cid] = byte(gid >> 8)
-		cid2gid[2*cid+1] = byte(gid)
-	}
 	subsetTag := font.GetSubsetTag(includeGlyphs, origNumGlyphs)
 	fontName := pdf.Name(subsetTag + "+" + t.Cff.FontName)
+
+	q := 1000 / float64(t.Sfnt.GlyphUnits)
+	FontBBox := &pdf.Rectangle{
+		LLx: math.Round(float64(t.Sfnt.FontBBox.LLx) * q),
+		LLy: math.Round(float64(t.Sfnt.FontBBox.LLy) * q),
+		URx: math.Round(float64(t.Sfnt.FontBBox.URx) * q),
+		URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
+	}
 
 	DW, W := font.EncodeCIDWidths(t.Sfnt.Width) // TODO(voss): subset???
 
@@ -204,30 +206,22 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 	}
 
 	// TODO(voss): make sure there is only one copy of this per PDF file.
-	// TODO(voss): if t.Sfnt.CFF.IsCIDFont is true, use the values
-	//     from the ROS operator?
 	CIDSystemInfo := pdf.Dict{ // See sections 9.7.3 of PDF 32000-1:2008.
 		"Registry":   pdf.String("Adobe"),
 		"Ordering":   pdf.String("Identity"),
 		"Supplement": pdf.Integer(0),
 	}
 
-	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontDescriptor := pdf.Dict{ // See sections 9.8.1 of PDF 32000-1:2008.
-		"Type":     pdf.Name("FontDescriptor"),
-		"FontName": fontName,
-		"Flags":    pdf.Integer(t.Sfnt.Flags),
-		"FontBBox": &pdf.Rectangle{
-			LLx: math.Round(float64(t.Sfnt.FontBBox.LLx) * q),
-			LLy: math.Round(float64(t.Sfnt.FontBBox.LLy) * q),
-			URx: math.Round(float64(t.Sfnt.FontBBox.URx) * q),
-			URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
-		},
+		"Type":        pdf.Name("FontDescriptor"),
+		"FontName":    fontName,
+		"Flags":       pdf.Integer(t.Sfnt.Flags),
+		"FontBBox":    FontBBox,
 		"ItalicAngle": pdf.Number(t.Sfnt.ItalicAngle),
 		"Ascent":      pdf.Integer(q*float64(t.Sfnt.Ascent) + 0.5),
 		"Descent":     pdf.Integer(q*float64(t.Sfnt.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(t.Sfnt.CapHeight) + 0.5),
-		"StemV":       pdf.Integer(70), // information not available in otf files
+		"StemV":       pdf.Integer(70), // information not available in sfnt files
 		"FontFile3":   FontFileRef,
 	}
 
@@ -245,34 +239,15 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 	// Write the font file itself.
 	// See section 9.9 of PDF 32000-1:2008 for details.
 	fontFileDict := pdf.Dict{
-		"Subtype": pdf.Name("OpenType"),
+		"Subtype": pdf.Name("CIDFontType0C"),
 	}
 	fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
 		&pdf.FilterInfo{Name: "FlateDecode"})
 	if err != nil {
 		return err
 	}
-
-	cffData, err := t.Cff.EncodeCID("Adobe", "Identity", 0)
-	if err != nil {
-		return err
-	}
-
-	exOpt := &sfnt.ExportOptions{
-		IncludeTables: map[string]bool{
-			// The list of tables to include is from PDF 32000-1:2008, table 126.
-			"CFF ": true,
-			"cmap": true,
-
-			"head": true, // Preview on MacOS seems to require this.
-			"maxp": true, // Preview on MacOS seems to require this.
-		},
-		// IncludeGlyphs: includeGlyphs,
-		Replace: map[string][]byte{
-			"CFF ": cffData,
-		},
-	}
-	_, err = t.Sfnt.Export(fontFileStream, exOpt)
+	cff := t.Cff.Subset(includeGlyphs)
+	err = cff.EncodeCID(fontFileStream, "Adobe", "Identity", 0)
 	if err != nil {
 		return err
 	}
@@ -281,11 +256,13 @@ func (t *otfCID) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	var cc2text []font.CIDMapping
-	for gid, text := range t.text {
-		cc2text = append(cc2text, font.CIDMapping{CharCode: uint16(gid), Text: text})
+	// Write the ToUnicode CMap.
+	var cid2text []font.CIDMapping
+	for cid, text := range t.text {
+		fmt.Printf("%04x -> %q\n", cid, string(text))
+		cid2text = append(cid2text, font.CIDMapping{CharCode: uint16(cid), Text: text})
 	}
-	err = font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
+	err = font.WriteToUnicodeCID(w, cid2text, ToUnicodeRef)
 	if err != nil {
 		return err
 	}

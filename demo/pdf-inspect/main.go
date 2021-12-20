@@ -22,24 +22,34 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"syscall"
 
+	"golang.org/x/term"
 	"seehuhn.de/go/pdf"
 )
 
+func check(err error) {
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
 func main() {
-	passwd := flag.String("p", "", "PDF password")
+	passwdArg := flag.String("p", "", "PDF password")
 	decode := flag.Bool("d", false, "decode streams")
 	decodeOnly := flag.Bool("D", false, "decode streams, don't show stream dicts")
 	flag.Parse()
 
-	var tryPasswd func([]byte, int) string
-	if *passwd != "" {
-		tryPasswd = func(_ []byte, try int) string {
-			if passwd != nil && try == 0 {
-				return *passwd
-			}
-			return ""
+	tryPasswd := func(_ []byte, try int) string {
+		if *passwdArg != "" && try == 0 {
+			return *passwdArg
 		}
+		fmt.Print("password: ")
+		passwd, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println("***")
+		check(err)
+		return string(passwd)
 	}
 
 	args := flag.Args()
@@ -82,10 +92,7 @@ func main() {
 		var generation uint16
 		if len(args) > 2 {
 			tmp, err := strconv.ParseUint(args[2], 10, 16)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			check(err)
 			generation = uint16(tmp)
 		}
 
@@ -104,10 +111,7 @@ func main() {
 		if !*decodeOnly {
 			err = stm.Dict.PDF(os.Stdout)
 			fmt.Println()
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			check(err)
 			fmt.Println("% decoded")
 			fmt.Println("stream")
 		}
@@ -133,8 +137,5 @@ func main() {
 		err = obj.PDF(os.Stdout)
 	}
 	fmt.Println()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	check(err)
 }

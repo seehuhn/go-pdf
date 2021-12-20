@@ -466,7 +466,7 @@ func (cff *Font) Encode() ([]byte, error) {
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 // TODO(voss): this only works if the original font is not CID-keyed
-func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, error) {
+func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
 	numGlyphs := int32(len(cff.charStrings))
 
 	fontMatrix := getFontMatrix(cff.topDict)
@@ -486,7 +486,7 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	var err error
 	blobs[cidNameIndex], err = cffIndex{[]byte(cff.FontName)}.encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// section 2: top dict INDEX
@@ -515,17 +515,23 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	// section 4: global subr INDEX
 	blobs[cidGsubrsIndex], err = cffIndex(cff.gsubrs).encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// section 5: charsets INDEX
+	// section 5: charsets INDEX (represents CIDs instead of glyph names)
 	subset := make([]int32, numGlyphs)
-	for i := int32(0); i < numGlyphs; i++ {
-		subset[i] = i
+	if cff.gid2cid != nil {
+		for gid, cid := range cff.gid2cid {
+			subset[gid] = int32(cid)
+		}
+	} else {
+		for i := int32(0); i < numGlyphs; i++ {
+			subset[i] = i
+		}
 	}
 	blobs[cidCharsets], err = encodeCharset(subset)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// section 6: FDSelect
@@ -544,7 +550,7 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	// section 7: charstrings INDEX
 	blobs[cidCharStringsIndex], err = cffIndex(cff.charStrings).encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// section 8: font DICT INDEX
@@ -563,7 +569,7 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 	// section 10: subrs INDEX
 	blobs[cidSubrsIndex], err = cff.subrs.encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	cumsum := func() []int32 {
@@ -587,7 +593,7 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		fontDictData := fontDict.encode(newStrings)
 		blobs[cidFDArray], err = cffIndex{fontDictData}.encode()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		tdCopy[opCharset] = []interface{}{offs[cidCharsets]}
@@ -597,12 +603,12 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		topDictData := tdCopy.encode(newStrings)
 		blobs[cidTopDictIndex], err = cffIndex{topDictData}.encode()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		blobs[cidStringIndex], err = newStrings.encode()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		newOffs := cumsum()
@@ -619,12 +625,13 @@ func (cff *Font) EncodeCID(registry, ordering string, supplement int) ([]byte, e
 		offs = newOffs
 	}
 
-	res := &bytes.Buffer{}
 	for i := 0; i < cidNumSections; i++ {
-		res.Write(blobs[i])
+		_, err = w.Write(blobs[i])
+		if err != nil {
+			return err
+		}
 	}
-
-	return res.Bytes(), nil
+	return nil
 }
 
 // these are the sections of a CIDKeyed CFF file, in the order they appear in

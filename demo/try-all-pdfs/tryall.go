@@ -53,20 +53,54 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		if stm, ok := obj.(*pdf.Stream); ok {
-			subType, ok := stm.Dict["Subtype"].(pdf.Name)
-			if !ok {
-				continue
-			}
-			fmt.Println(subType)
+		dict, ok := obj.(pdf.Dict)
+		if !ok || dict["Type"] != pdf.Name("Font") {
+			continue
 		}
+		fontType, ok := dict["Subtype"].(pdf.Name)
+		if !ok || (fontType != "Type1" && fontType != "CIDFontType0" && fontType != "CIDFontType2" && fontType != "TrueType") {
+			continue
+		}
+
+		fdObj, _ := r.Resolve(dict["FontDescriptor"])
+		if fdObj == nil {
+			// probably one of the built-in fonts
+			continue
+		}
+		fd, ok := fdObj.(pdf.Dict)
+		if !ok {
+			return errors.New("astonishing font")
+		}
+
+		key := pdf.Name("FontFile")
+		stmObj, _ := r.Resolve(fd[key])
+		if stmObj == nil {
+			key = "FontFile2"
+			stmObj, _ = r.Resolve(fd[key])
+		}
+		if stmObj == nil {
+			key = "FontFile3"
+			stmObj, _ = r.Resolve(fd[key])
+		}
+		if stmObj == nil {
+			// font not embedded
+			continue
+		}
+
+		stm, ok := stmObj.(*pdf.Stream)
+		if !ok {
+			return fmt.Errorf("strange font %T", stmObj)
+		}
+		subType, _ := stm.Dict["Subtype"].(pdf.Name)
+
+		fmt.Println(fontType, key, subType)
 	}
 
 	return nil
 }
 
 func main() {
-	passwords := flag.String("p", "", "list of passwords for authetication")
+	passwords := flag.String("p", "", "file with passwords for authentication")
 	flag.Parse()
 
 	if *passwords != "" {

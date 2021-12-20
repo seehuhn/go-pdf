@@ -21,11 +21,13 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/table"
@@ -81,10 +83,14 @@ func (r rules) Draw(page *pages.Page, xPos, yPos float64) {
 type glyphBox font.GlyphID
 
 func (g glyphBox) Extent() *boxes.BoxExtent {
-	bbox := theFont.GlyphExtent[g]
+	ht := theFont.Ascent
+	if theFont.GlyphExtent != nil {
+		bbox := theFont.GlyphExtent[g]
+		ht = bbox.URy
+	}
 	return &boxes.BoxExtent{
 		Width:  glyphBoxWidth,
-		Height: 4 + float64(bbox.URy)*glyphFontSize/float64(theFont.GlyphUnits),
+		Height: 4 + float64(ht)*glyphFontSize/float64(theFont.GlyphUnits),
 		Depth:  8 - float64(theFont.Descent)*glyphFontSize/float64(theFont.GlyphUnits),
 	}
 }
@@ -94,14 +100,16 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	glyphWidth := float64(theFont.Width[g]) * q
 	shift := (glyphBoxWidth - glyphWidth) / 2
 
-	ext := theFont.GlyphExtent[font.GlyphID(g)]
-	page.Println("q")
-	page.Println(".4 1 .4 rg")
-	page.Printf("%.2f %.2f %.2f %.2f re\n",
-		xPos+float64(ext.LLx)*q+shift, yPos+float64(ext.LLy)*q,
-		float64(ext.URx-ext.LLx)*q, float64(ext.URy-ext.LLy)*q)
-	page.Println("f")
-	page.Println("Q")
+	if theFont.GlyphExtent != nil {
+		ext := theFont.GlyphExtent[font.GlyphID(g)]
+		page.Println("q")
+		page.Println(".4 1 .4 rg")
+		page.Printf("%.2f %.2f %.2f %.2f re\n",
+			xPos+float64(ext.LLx)*q+shift, yPos+float64(ext.LLy)*q,
+			float64(ext.URx-ext.LLx)*q, float64(ext.URy-ext.LLy)*q)
+		page.Println("f")
+		page.Println("Q")
+	}
 
 	yLow := yPos + float64(theFont.Descent)*q
 	yHigh := yPos + float64(theFont.Ascent)*q
@@ -208,10 +216,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err = truetype.EmbedFontCID(out, tt, "X")
-	// Font, err = builtin.Embed(out, "Times-Roman", "X")
-	if err != nil {
-		log.Fatal(err)
+	if strings.HasSuffix(fontFileName, ".otf") {
+		theFont, err = opentype.EmbedFontCID(out, tt, "X")
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		theFont, err = truetype.EmbedFontCID(out, tt, "X")
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: pdf.Dict{
