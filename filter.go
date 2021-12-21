@@ -238,7 +238,7 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 		return nil, errors.New("unsupported /EarlyChange setting")
 	}
 
-	zw := zlib.NewWriter(w)
+	zw, _ := zlib.NewWriterLevel(w, zlib.BestCompression)
 
 	close := func() error {
 		err := zw.Close()
