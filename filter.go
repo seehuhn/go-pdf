@@ -281,13 +281,11 @@ type pngWriter struct {
 
 func (ff *flateFilter) newPngWriter(w io.Writer, close func() error) *pngWriter {
 	res := &pngWriter{
-		w:     w,
-		close: close,
+		w:            w,
+		close:        close,
+		predictor:    ff.Predictor - 10,
+		bitsPerPixel: ff.BitsPerComponent * ff.Colors,
 	}
-	if ff.Predictor > 10 || ff.Predictor < 15 {
-		res.predictor = ff.Predictor - 10
-	}
-	res.bitsPerPixel = ff.BitsPerComponent * ff.Colors
 
 	// cr[*] and pr are the bytes for the current and previous row. cr[0] is
 	// unfiltered (or equivalently, filtered with the ftNone filter). cr[ft],
@@ -350,7 +348,7 @@ func (w *pngWriter) Write(p []byte) (int, error) {
 		n += l
 		if w.pos >= len(tmp) {
 			var ft int
-			if w.predictor > 0 {
+			if w.predictor < nFilter {
 				ft = w.predictor
 				out := w.cr[ft][1:]
 				cdat := w.cr[0][1:]
