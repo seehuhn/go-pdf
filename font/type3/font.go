@@ -91,9 +91,9 @@ func (t3 *Builder) AddGlyph(r rune, width int) (*Glyph, error) {
 	return glyph, nil
 }
 
-// Close must be used after all glyphs have been added to the font. The
+// Embed must be used after all glyphs have been added to the font. The
 // resulting font.Font object can be used to place the glyphs on pages.
-func (t3 *Builder) Close() (*font.Font, error) {
+func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 	CharProcs := pdf.Dict{}
 	for name, ref := range t3.nameToRef {
 		CharProcs[name] = ref
@@ -131,7 +131,7 @@ func (t3 *Builder) Close() (*font.Font, error) {
 		"Differences": Differences,
 	}
 
-	FontRef, err := t3.w.Write(pdf.Dict{
+	Font := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type3"),
 		"FontBBox": &pdf.Rectangle{}, // [0,0,0,0] is always valid
@@ -143,9 +143,11 @@ func (t3 *Builder) Close() (*font.Font, error) {
 		"FirstChar": pdf.Integer(min),
 		"LastChar":  pdf.Integer(max),
 		"Widths":    Widths,
-	}, nil)
-	// TODO(voss): we should set /Name for PDF 1.0
-	//
+	}
+	if t3.w.Version == pdf.V1_0 {
+		Font["Name"] = pdf.Name(instName)
+	}
+	FontRef, err := t3.w.Write(Font, nil)
 	// TODO(voss): If the following condition is violated, we need to include a
 	// /ToUnicode entry: "the font includes only character names taken from the
 	// Adobe standard Latin character set and the set of named characters in
@@ -155,22 +157,18 @@ func (t3 *Builder) Close() (*font.Font, error) {
 	}
 
 	font := &font.Font{
-		Ref: FontRef,
-		Layout: func(rr []rune) ([]font.Glyph, error) {
+		InstName: pdf.Name(instName),
+		Ref:      FontRef,
+		Layout: func(rr []rune) []font.Glyph {
 			gg := make([]font.Glyph, len(rr))
 			for i, r := range rr {
-				gid, ok := t3.cmap[r]
-				if !ok {
-					// TODO(voss): fix the font name in the error message
-					return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-						"Type3 font", r, string([]rune{r}))
-				}
+				gid, _ := t3.cmap[r]
 				gg[i].Gid = gid
 				gg[i].Chars = []rune{r}
 				gg[i].Advance = t3.glyphWidth[gid]
 			}
 
-			return gg, nil
+			return gg
 		},
 		Enc: func(gid font.GlyphID) pdf.String {
 			if !t3.used[gid] {

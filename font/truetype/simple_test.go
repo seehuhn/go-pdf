@@ -68,7 +68,7 @@ func TestSimple(t *testing.T) {
 		col := i % 16
 		gid := font.GlyphID(i + 2)
 
-		gg, _ := F.Layout([]rune{text[gid]}) // try to establish glyph -> rune mapping
+		gg := F.Layout([]rune{text[gid]}) // try to establish glyph -> rune mapping
 		if len(gg) != 1 || gg[0].Gid != gid {
 			gg = []font.Glyph{
 				{Gid: gid},

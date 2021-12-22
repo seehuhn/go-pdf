@@ -125,10 +125,7 @@ func convert(inName, outName string, V pdf.Version) error {
 		} else {
 			rr = []rune(line)
 		}
-		glyphs, err := Font.Layout(rr)
-		if err != nil {
-			return err
-		}
+		glyphs := Font.Layout(rr)
 		Font.Draw(page, glyphs)
 
 		fmt.Fprintln(page, " T*")

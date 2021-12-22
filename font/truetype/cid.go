@@ -18,7 +18,6 @@ package truetype
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"sort"
 
@@ -101,14 +100,10 @@ type cidFont struct {
 	used map[font.GlyphID]bool   // is GID used?
 }
 
-func (t *cidFont) Layout(rr []rune) ([]font.Glyph, error) {
+func (t *cidFont) Layout(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Sfnt.CMap[r]
-		if !ok {
-			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Sfnt.FontName, r, string([]rune{r}))
-		}
+		gid := t.Sfnt.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
@@ -126,7 +121,7 @@ func (t *cidFont) Layout(rr []rune) ([]font.Glyph, error) {
 		}
 	}
 
-	return gg, nil
+	return gg
 }
 
 func (t *cidFont) Enc(gid font.GlyphID) pdf.String {

@@ -138,6 +138,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 
+	// TODO(voss): get the glyph extents for OpenType fonts
 	var GlyphExtent []font.Rect
 	if glyf != nil {
 		GlyphExtent = make([]font.Rect, NumGlyphs)

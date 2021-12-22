@@ -32,7 +32,7 @@ type Font struct {
 	InstName pdf.Name
 	Ref      *pdf.Reference
 
-	Layout func([]rune) ([]Glyph, error)
+	Layout func([]rune) []Glyph
 	Enc    func(GlyphID) pdf.String
 
 	GlyphUnits int
@@ -169,10 +169,7 @@ func (font *Font) Typeset(s string, ptSize float64) (*Layout, error) {
 
 	var glyphs []Glyph
 	for _, run := range runs {
-		gg, err := font.Layout(run)
-		if err != nil {
-			return nil, err
-		}
+		gg := font.Layout(run)
 		glyphs = append(glyphs, gg...)
 	}
 

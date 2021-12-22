@@ -18,7 +18,6 @@ package opentype
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"sort"
 
@@ -117,14 +116,10 @@ type cidFont struct {
 	used map[font.GlyphID]bool   // is GID used?
 }
 
-func (t *cidFont) Layout(rr []rune) ([]font.Glyph, error) {
+func (t *cidFont) Layout(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Sfnt.CMap[r]
-		if !ok {
-			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Sfnt.FontName, r, string([]rune{r}))
-		}
+		gid := t.Sfnt.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
@@ -142,7 +137,7 @@ func (t *cidFont) Layout(rr []rune) ([]font.Glyph, error) {
 		}
 	}
 
-	return gg, nil
+	return gg
 }
 
 func (t *cidFont) Enc(gid font.GlyphID) pdf.String {
@@ -259,7 +254,6 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	// Write the ToUnicode CMap.
 	var cid2text []font.CIDMapping
 	for cid, text := range t.text {
-		fmt.Printf("%04x -> %q\n", cid, string(text))
 		cid2text = append(cid2text, font.CIDMapping{CharCode: uint16(cid), Text: text})
 	}
 	err = font.WriteToUnicodeCID(w, cid2text, ToUnicodeRef)

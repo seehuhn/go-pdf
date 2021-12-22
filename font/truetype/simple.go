@@ -18,7 +18,6 @@ package truetype
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"sort"
 
@@ -124,14 +123,10 @@ func newTtfSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*ttfSimple, 
 	return res, nil
 }
 
-func (t *ttfSimple) Layout(rr []rune) ([]font.Glyph, error) {
+func (t *ttfSimple) Layout(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Ttf.CMap[r]
-		if !ok {
-			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Ttf.FontName, r, string([]rune{r}))
-		}
+		gid, _ := t.Ttf.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
@@ -149,7 +144,7 @@ func (t *ttfSimple) Layout(rr []rune) ([]font.Glyph, error) {
 		}
 	}
 
-	return gg, nil
+	return gg
 }
 
 func (t *ttfSimple) Enc(gid font.GlyphID) pdf.String {

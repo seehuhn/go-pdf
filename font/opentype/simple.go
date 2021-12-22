@@ -18,7 +18,6 @@ package opentype
 
 import (
 	"errors"
-	"fmt"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -133,14 +132,10 @@ func newOtfSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*otfSimple, 
 	return res, nil
 }
 
-func (t *otfSimple) Layout(rr []rune) ([]font.Glyph, error) {
+func (t *otfSimple) Layout(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := t.Otf.CMap[r]
-		if !ok {
-			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				t.Otf.FontName, r, string([]rune{r}))
-		}
+		gid := t.Otf.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
@@ -158,7 +153,7 @@ func (t *otfSimple) Layout(rr []rune) ([]font.Glyph, error) {
 		}
 	}
 
-	return gg, nil
+	return gg
 }
 
 func (t *otfSimple) Enc(gid font.GlyphID) pdf.String {

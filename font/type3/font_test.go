@@ -60,7 +60,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1, err := F1Builder.Close()
+	F1, err := F1Builder.Embed("F1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestType3(t *testing.T) {
 	page, err := pages.SinglePage(w, &pages.Attributes{
 		Resources: &pages.Resources{
 			Font: pdf.Dict{
-				"F1": F1.Ref,
+				F1.InstName: F1.Ref,
 			},
 		},
 		MediaBox: pages.A5,

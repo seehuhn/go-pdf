@@ -18,7 +18,6 @@ package builtin
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 
 	"seehuhn.de/go/pdf"
@@ -121,39 +120,29 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *builti
 	return b
 }
 
-func (b *builtin) makeGlyphs(rr []rune) ([]font.Glyph, error) {
+func (b *builtin) makeGlyphs(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, ok := b.CMap[r]
-		if !ok {
-			return nil, fmt.Errorf("font %q cannot encode rune %04x %q",
-				b.afm.FontName, r, string([]rune{r}))
-		}
+		gid, _ := b.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
-	return gg, nil
+	return gg
 }
 
-func (b *builtin) SimpleLayout(rr []rune) ([]font.Glyph, error) {
-	gg, err := b.makeGlyphs(rr)
-	if err != nil {
-		return nil, err
-	}
+func (b *builtin) SimpleLayout(rr []rune) []font.Glyph {
+	gg := b.makeGlyphs(rr)
 	for i := range gg {
 		gg[i].Advance = b.afm.Width[gg[i].Gid]
 	}
-	return gg, nil
+	return gg
 }
 
-func (b *builtin) FullLayout(rr []rune) ([]font.Glyph, error) {
-	gg, err := b.makeGlyphs(rr)
-	if err != nil {
-		return nil, err
-	}
+func (b *builtin) FullLayout(rr []rune) []font.Glyph {
+	gg := b.makeGlyphs(rr)
 
 	if len(gg) < 2 {
-		return gg, nil
+		return gg
 	}
 
 	var res []font.Glyph
@@ -174,7 +163,7 @@ func (b *builtin) FullLayout(rr []rune) ([]font.Glyph, error) {
 		gg[i].Advance = b.afm.Width[gg[i].Gid]
 	}
 	if len(gg) < 2 {
-		return gg, nil
+		return gg
 	}
 
 	for i := 0; i < len(gg)-1; i++ {
@@ -182,7 +171,7 @@ func (b *builtin) FullLayout(rr []rune) ([]font.Glyph, error) {
 		gg[i].Advance += kern
 	}
 
-	return gg, nil
+	return gg
 }
 
 func (b *builtin) Enc(gid font.GlyphID) pdf.String {

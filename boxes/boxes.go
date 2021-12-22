@@ -111,16 +111,21 @@ func (obj *TextBox) Extent() *BoxExtent {
 	for _, glyph := range obj.Layout.Glyphs {
 		width += float64(glyph.Advance) * q
 
-		bbox := &font.GlyphExtent[glyph.Gid]
-		if !bbox.IsZero() {
-			thisDepth := -float64(bbox.LLy+glyph.YOffset) * q
-			if thisDepth > depth {
-				depth = thisDepth
+		thisDepth := float64(font.Descent)
+		thisHeight := float64(font.Ascent)
+		if font.GlyphExtent != nil {
+			bbox := &font.GlyphExtent[glyph.Gid]
+			if bbox.IsZero() {
+				continue
 			}
-			thisHeight := float64(bbox.URy+glyph.YOffset) * q
-			if thisHeight > height {
-				height = thisHeight
-			}
+			thisDepth = -float64(bbox.LLy+glyph.YOffset) * q
+			thisHeight = float64(bbox.URy+glyph.YOffset) * q
+		}
+		if thisDepth > depth {
+			depth = thisDepth
+		}
+		if thisHeight > height {
+			height = thisHeight
 		}
 	}
 
@@ -134,6 +139,30 @@ func (obj *TextBox) Extent() *BoxExtent {
 // Draw implements the Box interface.
 func (obj *TextBox) Draw(page *pages.Page, xPos, yPos float64) {
 	obj.Layout.Draw(page, xPos, yPos)
+}
+
+type raiseBox struct {
+	Box
+	delta float64
+}
+
+func (obj raiseBox) Extent() *BoxExtent {
+	extent := obj.Box.Extent()
+	extent.Height += obj.delta
+	extent.Depth -= obj.delta
+	return extent
+}
+
+func (obj raiseBox) Draw(page *pages.Page, xPos, yPos float64) {
+	obj.Box.Draw(page, xPos, yPos+obj.delta)
+}
+
+// Raise raises the box by the given amount.
+func Raise(delta float64, box Box) Box {
+	return raiseBox{
+		Box:   box,
+		delta: delta,
+	}
 }
 
 // Ship appends the box to the page tree as a new page.
