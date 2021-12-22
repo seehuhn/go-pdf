@@ -148,9 +148,9 @@ func (t *cidFont) Enc(gid font.GlyphID) pdf.String {
 func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
 	origNumGlyphs := len(t.Sfnt.Width)
-	var includeGlyphs []font.GlyphID
+	includeGlyphs := []font.GlyphID{0} // always include .notdef
 	for gid, ok := range t.used {
-		if ok {
+		if ok && gid != 0 {
 			includeGlyphs = append(includeGlyphs, gid)
 		}
 	}

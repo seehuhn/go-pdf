@@ -41,7 +41,7 @@ type AfmInfo struct {
 	Code        []int16 // code byte, or -1 if unmapped
 	GlyphExtent []font.Rect
 	Width       []int
-	Name        []string
+	GlyphName   []string
 
 	Ligatures map[font.GlyphPair]font.GlyphID
 	Kern      map[font.GlyphPair]int
@@ -134,7 +134,7 @@ func Afm(fontName string) (*AfmInfo, error) {
 			res.Code = append(res.Code, int16(code))
 			res.Width = append(res.Width, width)
 			res.GlyphExtent = append(res.GlyphExtent, BBox)
-			res.Name = append(res.Name, name)
+			res.GlyphName = append(res.GlyphName, name)
 
 			for _, lig := range ligTmp {
 				lig.first = name

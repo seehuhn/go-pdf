@@ -109,7 +109,7 @@ func (f *fontTables) GetGlyphRows(fontName string) ([]boxes.Box, error) {
 	for i := 0; i < nGlyph; i++ {
 		iF := i / 256
 
-		name := targetAfm.Name[i]
+		name := targetAfm.GlyphName[i]
 		rr := names.ToUnicode(name, targetAfm.IsDingbats)
 		line := boxes.HBoxTo(120,
 			boxes.HBoxTo(16,

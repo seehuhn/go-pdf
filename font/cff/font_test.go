@@ -48,12 +48,13 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blob, err := cff.Encode()
+	buf := &bytes.Buffer{}
+	err = cff.Encode(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r := bytes.NewReader(blob)
+	r := bytes.NewReader(buf.Bytes())
 	cff2, err := Read(r)
 	if err != nil {
 		t.Fatal(err)

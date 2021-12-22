@@ -28,12 +28,12 @@ import (
 
 // Font is a CFF font.
 type Font struct {
-	FontName string
+	FontName  string
+	GlyphName []string
 
 	topDict     cffDict
 	gsubrs      cffIndex
 	charStrings cffIndex
-	glyphNames  []string
 	privateDict cffDict
 	subrs       cffIndex
 
@@ -168,9 +168,9 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			return nil, err
 		}
 	}
-	cff.glyphNames = make([]string, len(charset))
+	cff.GlyphName = make([]string, len(charset))
 	for i, sid := range charset {
-		cff.glyphNames[i] = strings.get(sid)
+		cff.GlyphName[i] = strings.get(sid)
 	}
 
 	// read the Private DICT
@@ -341,7 +341,7 @@ func encodeCharset(names []int32) ([]byte, error) {
 }
 
 // Encode returns the binary encoding of a CFF font.
-func (cff *Font) Encode() ([]byte, error) {
+func (cff *Font) Encode(w io.Writer) error {
 	numGlyphs := uint16(len(cff.charStrings))
 
 	blobs := make([][]byte, numSections)
@@ -359,7 +359,7 @@ func (cff *Font) Encode() ([]byte, error) {
 	var err error
 	blobs[secNameIndex], err = cffIndex{[]byte(cff.FontName)}.encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// section 2: top dict INDEX
@@ -376,13 +376,13 @@ func (cff *Font) Encode() ([]byte, error) {
 	// section 4: global subr INDEX
 	blobs[secGsubrsIndex], err = cffIndex(cff.gsubrs).encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// section 5: charsets INDEX
 	subset := make([]int32, numGlyphs)
 	for i := uint16(0); i < numGlyphs; i++ {
-		s := cff.glyphNames[i]
+		s := cff.GlyphName[i]
 		if s == "" {
 			s = ".notdef"
 		}
@@ -390,13 +390,13 @@ func (cff *Font) Encode() ([]byte, error) {
 	}
 	blobs[secCharsets], err = encodeCharset(subset)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// section 6: charstrings INDEX
 	blobs[secCharStringsIndex], err = cffIndex(cff.charStrings).encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// section 7: private DICT
@@ -406,7 +406,7 @@ func (cff *Font) Encode() ([]byte, error) {
 	// section 8: subrs INDEX
 	blobs[secSubrsIndex], err = cff.subrs.encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	cumsum := func() []int32 {
@@ -432,16 +432,15 @@ func (cff *Font) Encode() ([]byte, error) {
 		topDictData := tdCopy.encode(newStrings)
 		blobs[secTopDictIndex], err = cffIndex{topDictData}.encode()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		blobs[secStringIndex], err = newStrings.encode()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		newOffs := cumsum()
-		fmt.Println(newOffs)
 		done := true
 		for i := 0; i < numSections; i++ {
 			if newOffs[i] != offs[i] {
@@ -456,12 +455,14 @@ func (cff *Font) Encode() ([]byte, error) {
 		offs = newOffs
 	}
 
-	res := &bytes.Buffer{}
 	for i := 0; i < numSections; i++ {
-		res.Write(blobs[i])
+		_, err = w.Write(blobs[i])
+		if err != nil {
+			return err
+		}
 	}
 
-	return res.Bytes(), nil
+	return nil
 }
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.

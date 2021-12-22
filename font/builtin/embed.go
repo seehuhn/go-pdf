@@ -43,55 +43,52 @@ func EmbedAfm(w *pdf.Writer, afm *AfmInfo, instName pdf.Name) (*font.Font, error
 	}
 
 	fontRef := w.Alloc()
-	b := newBuiltin(afm, fontRef, instName)
-	w.OnClose(b.WriteFontDict)
-
-	layout := b.FullLayout
-	if b.afm.IsFixedPitch {
-		layout = b.SimpleLayout
-	}
+	fnt := newSimple(afm, fontRef, instName)
+	w.OnClose(fnt.WriteFont)
 
 	res := &font.Font{
-		InstName:    instName,
-		Ref:         b.fontRef,
-		Layout:      layout,
-		Enc:         b.Enc,
+		InstName: instName,
+		Ref:      fnt.FontRef,
+
 		GlyphUnits:  1000,
 		Ascent:      afm.Ascent,
 		Descent:     afm.Descent,
 		GlyphExtent: afm.GlyphExtent,
 		Width:       afm.Width,
+
+		Layout: fnt.Layout,
+		Enc:    fnt.Enc,
 	}
 	return res, nil
 }
 
-type builtin struct {
-	fontRef  *pdf.Reference
+type simple struct {
 	instName pdf.Name
 	afm      *AfmInfo
+
+	FontRef *pdf.Reference
 
 	CMap map[rune]font.GlyphID
 	char []rune
 
 	enc        map[font.GlyphID]byte
-	used       map[byte]bool
 	candidates []*candidate
+	used       map[byte]bool // is CharCode used or not?
 
 	overflowed bool
 }
 
-func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *builtin {
+func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple {
 	cmap := make(map[rune]font.GlyphID)
 	char := make([]rune, len(afm.Code))
 	thisFontEnc := make(fontEnc)
 	for gid, code := range afm.Code {
-		rr := names.ToUnicode(afm.Name[gid], afm.IsDingbats)
+		rr := names.ToUnicode(afm.GlyphName[gid], afm.IsDingbats)
 		if len(rr) != 1 {
 			// Some names produce no or more than one unicode runes.  Not sure
-			// how to handle these ...
+			// how to handle these cases ...
 			continue
 		}
-
 		r := rr[0]
 		cmap[r] = font.GlyphID(gid)
 		char[gid] = r
@@ -100,14 +97,16 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *builti
 		}
 	}
 
-	b := &builtin{
+	res := &simple{
 		instName: instName,
 		afm:      afm,
-		fontRef:  fontRef,
-		CMap:     cmap,
-		char:     char,
-		enc:      make(map[font.GlyphID]byte),
-		used:     make(map[byte]bool),
+
+		FontRef: fontRef,
+
+		CMap: cmap,
+		char: char,
+		enc:  make(map[font.GlyphID]byte),
+		used: map[byte]bool{},
 
 		candidates: []*candidate{
 			{name: "", enc: thisFontEnc},
@@ -117,38 +116,21 @@ func newBuiltin(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *builti
 		},
 	}
 
-	return b
+	return res
 }
 
-func (b *builtin) makeGlyphs(rr []rune) []font.Glyph {
+func (fnt *simple) Layout(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid, _ := b.CMap[r]
+		gid, _ := fnt.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
-	}
-	return gg
-}
-
-func (b *builtin) SimpleLayout(rr []rune) []font.Glyph {
-	gg := b.makeGlyphs(rr)
-	for i := range gg {
-		gg[i].Advance = b.afm.Width[gg[i].Gid]
-	}
-	return gg
-}
-
-func (b *builtin) FullLayout(rr []rune) []font.Glyph {
-	gg := b.makeGlyphs(rr)
-
-	if len(gg) < 2 {
-		return gg
 	}
 
 	var res []font.Glyph
 	last := gg[0]
 	for _, g := range gg[1:] {
-		lig, ok := b.afm.Ligatures[font.GlyphPair{last.Gid, g.Gid}]
+		lig, ok := fnt.afm.Ligatures[font.GlyphPair{last.Gid, g.Gid}]
 		if ok {
 			last.Gid = lig
 			last.Chars = append(last.Chars, g.Chars...)
@@ -160,44 +142,43 @@ func (b *builtin) FullLayout(rr []rune) []font.Glyph {
 	gg = append(res, last)
 
 	for i := range gg {
-		gg[i].Advance = b.afm.Width[gg[i].Gid]
+		gg[i].Advance = fnt.afm.Width[gg[i].Gid]
 	}
 	if len(gg) < 2 {
 		return gg
 	}
-
 	for i := 0; i < len(gg)-1; i++ {
-		kern := b.afm.Kern[font.GlyphPair{gg[i].Gid, gg[i+1].Gid}]
+		kern := fnt.afm.Kern[font.GlyphPair{gg[i].Gid, gg[i+1].Gid}]
 		gg[i].Advance += kern
 	}
 
 	return gg
 }
 
-func (b *builtin) Enc(gid font.GlyphID) pdf.String {
-	c, ok := b.enc[gid]
+func (fnt *simple) Enc(gid font.GlyphID) pdf.String {
+	c, ok := fnt.enc[gid]
 	if ok {
 		return pdf.String{c}
 	}
 
-	r := b.char[gid]
+	r := fnt.char[gid]
 	hits := -1
 	found := false
-	for _, cand := range b.candidates {
+	for _, cand := range fnt.candidates {
 		if cand.hits < hits {
 			continue
 		}
 		cCand, ok := cand.enc.Encode(r)
-		if ok && !b.used[cCand] {
+		if ok && !fnt.used[cCand] {
 			c = cCand
 			hits = cand.hits
 			found = true
 		}
 	}
-	if !found && len(b.used) < 256 {
+	if !found && len(fnt.used) < 256 {
 		for i := 255; i >= 0; i-- {
 			c = byte(i)
-			if !b.used[c] {
+			if !fnt.used[c] {
 				found = true
 				break
 			}
@@ -208,14 +189,15 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 		// A simple font can only encode 256 different characters. If we run
 		// out of character codes, just return 0 here and report an error when
 		// we try to write the font dictionary at the end.
-		b.overflowed = true
+		fnt.overflowed = true
+		fnt.enc[gid] = 0
 		return pdf.String{0}
 	}
 
-	b.enc[gid] = c
-	b.used[c] = true
+	fnt.used[c] = true
+	fnt.enc[gid] = c
 	if c != 0 {
-		for _, cand := range b.candidates {
+		for _, cand := range fnt.candidates {
 			if cTest, ok := cand.enc.Encode(r); ok && cTest == c {
 				cand.hits++
 			}
@@ -225,34 +207,34 @@ func (b *builtin) Enc(gid font.GlyphID) pdf.String {
 	return pdf.String{c}
 }
 
-func (b *builtin) WriteFontDict(w *pdf.Writer) error {
-	if b.overflowed {
-		return errors.New("too many different glyphs for simple font " + string(b.instName))
+func (fnt *simple) WriteFont(w *pdf.Writer) error {
+	if fnt.overflowed {
+		return errors.New("too many different glyphs for simple font " + string(fnt.afm.FontName))
 	}
 
 	// See section 9.6.2.1 of PDF 32000-1:2008.
 	Font := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name(b.afm.FontName),
+		"BaseFont": pdf.Name(fnt.afm.FontName),
 	}
 
-	enc := b.DescribeEncoding()
+	enc := fnt.DescribeEncoding()
 	if enc != nil {
 		Font["Encoding"] = enc
 	}
 
 	if w.Version == pdf.V1_0 {
-		Font["Name"] = pdf.Name(b.instName)
+		Font["Name"] = pdf.Name(fnt.instName)
 	}
 
-	_, err := w.Write(Font, b.fontRef)
+	_, err := w.Write(Font, fnt.FontRef)
 	return err
 }
 
-func (b *builtin) DescribeEncoding() pdf.Object {
-	best := b.candidates[0]
-	for _, cand := range b.candidates[1:] {
+func (fnt *simple) DescribeEncoding() pdf.Object {
+	best := fnt.candidates[0]
+	for _, cand := range fnt.candidates[1:] {
 		if cand.hits > best.hits {
 			best = cand
 		}
@@ -268,13 +250,13 @@ func (b *builtin) DescribeEncoding() pdf.Object {
 		name string
 	}
 	var diff []D
-	for gid, code := range b.enc {
-		r := b.char[gid]
+	for gid, code := range fnt.enc {
+		r := fnt.char[gid]
 		if cTest, ok := best.enc.Encode(r); !ok || cTest != code {
 			diff = append(diff, D{
 				code: code,
 				char: r,
-				name: b.afm.Name[gid],
+				name: fnt.afm.GlyphName[gid],
 			})
 		}
 	}

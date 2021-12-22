@@ -26,6 +26,76 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
+func TestSimple(t *testing.T) {
+	w, err := pdf.Create("test.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	afm, err := Afm("Times-Roman")
+	if err != nil {
+		t.Fatal(err)
+	}
+	F, err := EmbedAfm(w, afm, "F")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := pages.SinglePage(w, &pages.Attributes{
+		Resources: &pages.Resources{
+			Font: map[pdf.Name]pdf.Object{
+				F.InstName: F.Ref,
+			},
+		},
+		MediaBox: &pdf.Rectangle{
+			URx: 10 + 16*20,
+			URy: 5 + 16*20 + 5,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	text := map[font.GlyphID]rune{}
+	for i, name := range afm.GlyphName {
+		rr := names.ToUnicode(name, false)
+		if len(rr) != 1 {
+			continue
+		}
+		r := rr[0]
+		gid := font.GlyphID(i)
+		rOld, ok := text[gid]
+		if !ok || r < rOld {
+			text[gid] = r
+		}
+	}
+
+	for i := 0; i < 256; i++ {
+		row := i / 16
+		col := i % 16
+		gid := font.GlyphID(i + 2)
+
+		gg := F.Layout([]rune{text[gid]}) // try to establish glyph -> rune mapping
+		if len(gg) != 1 || gg[0].Gid != gid {
+			gg = []font.Glyph{
+				{Gid: gid},
+			}
+		}
+
+		layout := &font.Layout{
+			Font:     F,
+			FontSize: 16,
+			Glyphs:   gg,
+		}
+		layout.Draw(page, float64(10+20*col), float64(16*20-10-20*row))
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEnc(t *testing.T) {
 	for _, fontName := range []string{"Times-Roman", "Courier"} {
 		afm, err := Afm(fontName)
@@ -33,7 +103,7 @@ func TestEnc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		b := newBuiltin(afm, nil, "F")
+		b := newSimple(afm, nil, "F")
 
 		rr := []rune("ý×A×˚")
 		gids := make([]font.GlyphID, len(rr))
@@ -91,7 +161,7 @@ func TestCommaAccent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b := newBuiltin(afm, nil, "F")
+	b := newSimple(afm, nil, "F")
 	gid := b.CMap[r]
 
 	if afm.Code[gid] != -1 {

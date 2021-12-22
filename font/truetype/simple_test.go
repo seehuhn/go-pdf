@@ -35,7 +35,7 @@ func TestSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	F, err := EmbedFontCID(w, tt, "F")
+	F, err := EmbedFontSimple(w, tt, "F")
 	if err != nil {
 		t.Fatal(err)
 	}
