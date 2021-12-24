@@ -26,7 +26,7 @@ import (
 )
 
 func TestCID(t *testing.T) {
-	w, err := pdf.Create("test.pdf")
+	w, err := pdf.Create("test-otf-cid.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -97,12 +97,9 @@ type simple struct {
 	ToUnicodeRef      *pdf.Reference
 	FontFileRef       *pdf.Reference
 
-	text map[font.GlyphID][]rune // GID -> text
-	enc  map[font.GlyphID]byte   // GID -> CharCode
-	tidy map[font.GlyphID]byte   // GID -> candidate CharCode
-	used map[byte]bool           // is CharCode used or not?
-
-	overflowed bool
+	text  map[font.GlyphID][]rune // GID -> text
+	enc   map[font.GlyphID]byte   // GID -> CharCode
+	count int                     // next available CharCode
 }
 
 func newSimple(w *pdf.Writer, tt *sfnt.Font) *simple {
@@ -124,8 +121,6 @@ func newSimple(w *pdf.Writer, tt *sfnt.Font) *simple {
 
 		text: make(map[font.GlyphID][]rune),
 		enc:  make(map[font.GlyphID]byte),
-		tidy: tidy,
-		used: map[byte]bool{},
 	}
 
 	return res
@@ -161,50 +156,28 @@ func (fnt *simple) Enc(gid font.GlyphID) pdf.String {
 		return pdf.String{c}
 	}
 
-	// allocate a new character code
-	c, found = fnt.tidy[gid]
-	if !found {
-		for i := 127; i < 127+256; i++ {
-			if i < 256 {
-				c = byte(i)
-			} else {
-				// 256 -> 126
-				// 257 -> 125
-				// ...
-				c = byte(126 + 256 - i)
-			}
-			if !fnt.used[c] {
-				found = true
-				break
-			}
-		}
+	// increment fnt.count first, so that 0 is allocated last
+	fnt.count++
+	if _, ok := fnt.enc[0]; ok {
+		c = byte(fnt.count - 1)
+	} else if gid != 0 {
+		c = byte(fnt.count)
+	} else {
+		c = 0
 	}
 
-	if !found {
-		// A simple font can only encode 256 different characters. If we run
-		// out of character codes, just return 0 here and report an error when
-		// we try to write the font dictionary at the end.
-		fnt.overflowed = true
-		fnt.enc[gid] = 0
-		return pdf.String{0}
-	}
-
-	fnt.used[c] = true
 	fnt.enc[gid] = c
 	return pdf.String{c}
 }
 
 func (fnt *simple) WriteFont(w *pdf.Writer) error {
-	if fnt.overflowed {
+	if fnt.count > 256 {
 		return errors.New("too many different glyphs for simple font " + fnt.Sfnt.FontName)
 	}
 
 	// Determine the subset of glyphs to include.
 	var mapping []font.CMapEntry
 	for origGid, charCode := range fnt.enc {
-		if origGid == 0 {
-			continue
-		}
 		mapping = append(mapping, font.CMapEntry{
 			CharCode: uint16(charCode),
 			GID:      origGid,
@@ -224,6 +197,16 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 	_, includeGlyphs := font.MakeSubset(mapping)
 	subsetTag := font.GetSubsetTag(includeGlyphs, len(fnt.Sfnt.Width))
 	fontName := pdf.Name(subsetTag + "+" + fnt.Sfnt.FontName)
+
+	r, err := fnt.Sfnt.GetTableReader("CFF ", nil)
+	if err != nil {
+		return err
+	}
+	cff, err := cff.Read(r)
+	if err != nil {
+		return err
+	}
+	cff = cff.Subset(includeGlyphs)
 
 	q := 1000 / float64(fnt.Sfnt.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
@@ -274,7 +257,7 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		Widths = append(Widths, pdf.Integer(width))
 	}
 
-	_, err := w.WriteCompressed(
+	_, err = w.WriteCompressed(
 		[]*pdf.Reference{fnt.FontRef, FontDescriptorRef, WidthsRef},
 		Font, FontDescriptor, Widths)
 	if err != nil {
@@ -294,15 +277,6 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	r, err := fnt.Sfnt.GetTableReader("CFF ", nil)
-	if err != nil {
-		return err
-	}
-	cff, err := cff.Read(r)
-	if err != nil {
-		return err
-	}
-	cff = cff.Subset(includeGlyphs)
 	err = cff.Encode(fontFileStream)
 	if err != nil {
 		return err

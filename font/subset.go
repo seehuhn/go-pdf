@@ -32,17 +32,18 @@ type CMapEntry struct {
 func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []GlyphID) {
 	var newMapping []CMapEntry
 	for _, m := range origMapping {
-		if m.GID != 0 {
-			newMapping = append(newMapping, m)
-		}
+		newMapping = append(newMapping, m)
 	}
 	sort.Slice(newMapping, func(i, j int) bool {
 		return newMapping[i].CharCode < newMapping[j].CharCode
 	})
 
-	newToOrigGid := []GlyphID{0}
+	newToOrigGid := []GlyphID{0} // always include the .notdef glyph
 	for i, m := range newMapping {
-		newGid := GlyphID(i + 1)
+		if m.GID == 0 {
+			continue
+		}
+		newGid := GlyphID(len(newToOrigGid))
 		newToOrigGid = append(newToOrigGid, m.GID)
 		newMapping[i].GID = newGid
 	}

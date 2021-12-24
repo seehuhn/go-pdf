@@ -26,7 +26,7 @@ import (
 )
 
 func TestSimple(t *testing.T) {
-	w, err := pdf.Create("test.pdf")
+	w, err := pdf.Create("test-ttf-simple.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}

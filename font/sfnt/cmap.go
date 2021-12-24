@@ -52,7 +52,7 @@ type cmapTableHead struct {
 }
 
 // makeCMap writes a cmap containing a 1,0,4 subtable to map character indices
-// to glyph indices in a subsetted font. The slice `mapping` must be sorted in
+// to glyph indices in a subsetted font.  The slice `mapping` must be sorted in
 // order of increasing CharCode values.
 func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 	if len(mapping) == 0 {

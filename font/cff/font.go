@@ -17,7 +17,6 @@
 package cff
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -379,7 +378,10 @@ func (cff *Font) Encode(w io.Writer) error {
 		return err
 	}
 
-	// section 5: charsets INDEX
+	// section 5: encodings
+	blobs[secEncodings] = []byte{1, 1, 0, 255}
+
+	// section 6: charsets INDEX
 	subset := make([]int32, numGlyphs)
 	for i := uint16(0); i < numGlyphs; i++ {
 		s := cff.GlyphName[i]
@@ -393,17 +395,17 @@ func (cff *Font) Encode(w io.Writer) error {
 		return err
 	}
 
-	// section 6: charstrings INDEX
+	// section 7: charstrings INDEX
 	blobs[secCharStringsIndex], err = cffIndex(cff.charStrings).encode()
 	if err != nil {
 		return err
 	}
 
-	// section 7: private DICT
+	// section 8: private DICT
 	pdCopy := cff.privateDict.Copy()
 	// opSubrs is set below
 
-	// section 8: subrs INDEX
+	// section 9: subrs INDEX
 	blobs[secSubrsIndex], err = cff.subrs.encode()
 	if err != nil {
 		return err
@@ -427,6 +429,7 @@ func (cff *Font) Encode(w io.Writer) error {
 		pdDesc := []interface{}{int32(pdSize), offs[secPrivateDict]}
 
 		tdCopy[opCharset] = []interface{}{offs[secCharsets]}
+		tdCopy[opEncoding] = []interface{}{offs[secEncodings]}
 		tdCopy[opCharStrings] = []interface{}{offs[secCharStringsIndex]}
 		tdCopy[opPrivate] = pdDesc
 		topDictData := tdCopy.encode(newStrings)
@@ -466,7 +469,6 @@ func (cff *Font) Encode(w io.Writer) error {
 }
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
-// TODO(voss): this only works if the original font is not CID-keyed
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
 	numGlyphs := int32(len(cff.charStrings))
 
@@ -536,8 +538,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	// section 6: FDSelect
-	fdSelect := &bytes.Buffer{}
-	fdSelect.Write([]byte{
+	blobs[cidFdSelect] = []byte{
 		3,    // format
 		0, 1, // nRanges
 
@@ -545,8 +546,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 		0, // font DICT 0
 
 		byte(numGlyphs >> 8), byte(numGlyphs), // sentinel
-	})
-	blobs[cidFdSelect] = fdSelect.Bytes()
+	}
 
 	// section 7: charstrings INDEX
 	blobs[cidCharStringsIndex], err = cffIndex(cff.charStrings).encode()
@@ -635,7 +635,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	return nil
 }
 
-// these are the sections of a CIDKeyed CFF file, in the order they appear in
+// these are the sections of a simple CFF file, in the order they appear in
 // in the file.
 const (
 	secHeader int = iota
@@ -643,6 +643,7 @@ const (
 	secTopDictIndex
 	secStringIndex
 	secGsubrsIndex
+	secEncodings
 	secCharsets
 	secCharStringsIndex
 	secPrivateDict

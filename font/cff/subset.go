@@ -31,6 +31,8 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 		gid2cid: append([]font.GlyphID{}, subset...),
 	}
 
+	// TODO(voss): prune unused subrs
+
 	out.charStrings = cffIndex{cff.charStrings[0]}
 	out.GlyphName = []string{cff.GlyphName[0]}
 	for _, gid := range subset {
@@ -39,8 +41,6 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 			out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
 		}
 	}
-
-	// TODO(voss): prune unused subrs
 
 	return out
 }
