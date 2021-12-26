@@ -63,7 +63,7 @@ func (cff *Font) getGSubr(biased int) ([]byte, error) {
 //     or n*k - k*3 - n - 4 = (n-3)*(k-1)-7 bytes.
 
 // Find repeated command sequences which are candidates for subroutines.
-func (cff *Font) analyze(charStrings [][][]byte) {
+func analyze(charStrings [][][]byte) {
 	counts := map[string]int{}
 	for _, cc := range charStrings {
 		for _, cmd := range cc {

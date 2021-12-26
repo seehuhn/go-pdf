@@ -175,17 +175,6 @@ func (d cffDict) getInt(op dictOp, defVal int32) (int32, bool) {
 	return x, true
 }
 
-func (d cffDict) getString(op dictOp) (string, bool) {
-	if len(d[op]) != 1 {
-		return "", false
-	}
-	s, ok := d[op][0].(string)
-	if !ok {
-		return "", false
-	}
-	return s, true
-}
-
 func (d cffDict) getPair(op dictOp) (int32, int32, bool) {
 	xy := d[op]
 	if len(xy) != 2 {
@@ -293,7 +282,7 @@ func (d cffDict) encode(ss *cffStrings) []byte {
 					first = !first
 				}
 			default:
-				panic(fmt.Sprintf("unsupported type %T in DICT at %s\n", a, op))
+				panic(fmt.Sprintf("invalid type %T in DICT at %s\n", a, op))
 			}
 		}
 		if op > 255 {

@@ -18,7 +18,7 @@ package cff
 
 import "seehuhn.de/go/pdf/font"
 
-// Subset returns a copy of the font with only the glyphs in the given
+// Subset returns a copy of the font, including only the glyphs in the given
 // subset.  The ".notdef" glyph is always included as the first glyph.
 func (cff *Font) Subset(subset []font.GlyphID) *Font {
 	out := &Font{
@@ -38,7 +38,9 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 			// expand all subroutines
 			cmds, err := cff.decodeCharString(cff.charStrings[gid])
 			if err != nil {
-				panic(err)
+				// We failed to decode charstring, so we cannot reliably
+				// prune the subroutines.  Use naive subsetting instead.
+				return cff.naiveSubset(subset)
 			}
 			var cc []byte
 			for _, cmd := range cmds {
@@ -48,6 +50,30 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 			out.charStrings = append(out.charStrings, cc)
 			out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
 		}
+	}
+
+	return out
+}
+
+// naiveSubset returns a copy of the font with only the glyphs in the given
+// subset.  The ".notdef" glyph is always included as the first glyph.
+// This method does not prune/expand subroutines.
+func (cff *Font) naiveSubset(subset []font.GlyphID) *Font {
+	out := &Font{
+		FontName:    cff.FontName, // TODO(voss): subset tag needed?
+		topDict:     cff.topDict,
+		privateDict: cff.privateDict,
+		gsubrs:      cff.gsubrs,
+		subrs:       cff.subrs,
+
+		gid2cid: append([]font.GlyphID{}, subset...),
+	}
+
+	out.charStrings = cffIndex{cff.charStrings[0]}
+	out.GlyphName = []string{cff.GlyphName[0]}
+	for _, gid := range subset {
+		out.charStrings = append(out.charStrings, cff.charStrings[gid])
+		out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
 	}
 
 	return out

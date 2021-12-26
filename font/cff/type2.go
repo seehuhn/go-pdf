@@ -50,20 +50,20 @@ glyphLoop:
 		for len(cc) > 0 {
 			op := t2op(cc[0])
 
-			{
-				show := cc[1:]
-				tail := ""
-				info := ""
-				if k := len(stack); (op == t2callgsubr || op == t2callsubr) && k > 0 && stack[k-1].isInt {
-					idx := int(stack[k-1].val) + bias(len(cff.subrs))
-					info = fmt.Sprintf("@%d", idx)
-				}
-				if len(show) > 10 {
-					show = show[:10]
-					tail = "..."
-				}
-				fmt.Println(stack, " ", op.String()+info, " ", show, tail)
-			}
+			// {
+			// 	show := cc[1:]
+			// 	tail := ""
+			// 	info := ""
+			// 	if k := len(stack); (op == t2callgsubr || op == t2callsubr) && k > 0 && stack[k-1].isInt {
+			// 		idx := int(stack[k-1].val) + bias(len(cff.subrs))
+			// 		info = fmt.Sprintf("@%d", idx)
+			// 	}
+			// 	if len(show) > 10 {
+			// 		show = show[:10]
+			// 		tail = "..."
+			// 	}
+			// 	fmt.Println(stack, " ", op.String()+info, " ", show, tail)
+			// }
 
 			if op >= 32 && op <= 246 {
 				stack = append(stack, stackSlot{
@@ -396,20 +396,6 @@ func roll(data []stackSlot, j int) {
 	}
 
 	tmp := make([]stackSlot, j)
-	copy(tmp, data[n-j:])
-	copy(data[j:], data[:n-j])
-	copy(data[:j], tmp)
-}
-
-func rollF(data []float64, j int) {
-	n := len(data)
-
-	j = j % n
-	if j < 0 {
-		j += n
-	}
-
-	tmp := make([]float64, j)
 	copy(tmp, data[n-j:])
 	copy(data[j:], data[:n-j])
 	copy(data[:j], tmp)

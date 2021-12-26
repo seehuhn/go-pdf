@@ -17,44 +17,8 @@
 package cff
 
 import (
-	"fmt"
-	"os"
 	"testing"
 )
-
-func TestDecode(t *testing.T) {
-	// fd, err := os.Open("SourceSerif4-Regular.cff")
-	fd, err := os.Open("Atkinson-Hyperlegible-BoldItalic-102.cff")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fd.Close()
-
-	cff, err := Read(fd)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < 10; i++ {
-		cc := cff.charStrings[i]
-		fmt.Println("\nglyph", cff.GlyphName[i])
-
-		cmds, err := cff.decodeCharString(cc)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		var cc2 []byte
-		for _, cmd := range cmds {
-			cc2 = append(cc2, cmd...)
-		}
-		fmt.Println("\nagain")
-		_, err = cff.decodeCharString(cc2)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-}
 
 func TestRoll(t *testing.T) {
 	in := []int32{1, 2, 3, 4, 5, 6, 7, 8}

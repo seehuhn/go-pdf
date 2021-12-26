@@ -1,3 +1,5 @@
+- the CapHeight in SourceSerif4-Regular seems to differ between
+  TrueType (670) and OpenType (800).
 - Several glyphs in font/truetype/ttf/FreeMono.ttf seem to have width 0.
   Is this my bug, or theirs?  E.g. GID 0, 29, 49, 129, 133, 149, ...
 
