@@ -105,9 +105,6 @@ func (x String) PDF(w io.Writer) error {
 
 	var funny []int
 	for i, c := range l {
-		if c == '\r' || c == '\n' || c == '\t' {
-			continue
-		}
 		if c < 32 || c >= 127 || c == '\\' ||
 			!balanced && (c == '(' || c == ')') {
 			funny = append(funny, i)
@@ -125,6 +122,12 @@ func (x String) PDF(w io.Writer) error {
 			}
 			c := l[i]
 			switch c {
+			case '\r':
+				buf.WriteString(`\r`)
+			case '\n':
+				buf.WriteString(`\n`)
+			case '\t':
+				buf.WriteString(`\t`)
 			case '\b':
 				buf.WriteString(`\b`)
 			case '\f':

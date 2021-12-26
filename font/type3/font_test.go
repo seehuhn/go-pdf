@@ -24,7 +24,7 @@ import (
 )
 
 func TestType3(t *testing.T) {
-	w, err := pdf.Create("test.pdf")
+	w, err := pdf.Create("test-type3.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}

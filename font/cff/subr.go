@@ -16,6 +16,11 @@
 
 package cff
 
+import (
+	"errors"
+	"fmt"
+)
+
 func bias(nSubrs int) int {
 	if nSubrs < 1240 {
 		return 107
@@ -26,12 +31,56 @@ func bias(nSubrs int) int {
 	}
 }
 
-func (cff *Font) getSubr(biased int) []byte {
+func (cff *Font) getSubr(biased int) ([]byte, error) {
 	idx := biased + bias(len(cff.subrs))
-	return cff.subrs[idx]
+	if idx < 0 || idx >= len(cff.subrs) {
+		return nil, errors.New("invalid subr index")
+	}
+	return cff.subrs[idx], nil
 }
 
-func (cff *Font) getGSubr(biased int) []byte {
+func (cff *Font) getGSubr(biased int) ([]byte, error) {
 	idx := biased + bias(len(cff.gsubrs))
-	return cff.gsubrs[idx]
+	if idx < 0 || idx >= len(cff.gsubrs) {
+		return nil, errors.New("invalid gsubr index")
+	}
+	return cff.gsubrs[idx], nil
+}
+
+// size used for a subroutine:
+//   - an entry in the subrs and gsubrs INDEX takes
+//     up to 4 bytes, plus the size of the subroutine
+//   - the subrouting must finish with t2return
+//     or t2endchar (1 byte)
+//   - calling the subroutine uses k+1 bytes, where
+//     k=1 for the first 215 subroutines of each type, and
+//     k=2 for the next 2048 subroutines of each type.
+// An approximation could be the following:
+//   - if n bytes occur k times, this uses n*k bytes
+//   - if the n bytes are turned into a subroutine, this uses
+//     approximately k*2 + n + 3 or k*3 + n + 4 bytes.
+//   - the savings are n*k - k*2 - n - 3 = (n-2)*(k-1)-5
+//     or n*k - k*3 - n - 4 = (n-3)*(k-1)-7 bytes.
+
+// Find repeated command sequences which are candidates for subroutines.
+func (cff *Font) analyze(charStrings [][][]byte) {
+	counts := map[string]int{}
+	for _, cc := range charStrings {
+		for _, cmd := range cc {
+			counts[string(cmd)]++
+		}
+	}
+
+	hist := map[int]int{}
+	max := 0
+	for _, c := range counts {
+		hist[c]++
+		if c > max {
+			max = c
+		}
+	}
+
+	for i := 1; i <= max; i++ {
+		fmt.Printf("%d %d\n", i, hist[i])
+	}
 }

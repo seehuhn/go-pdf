@@ -24,20 +24,28 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 	out := &Font{
 		FontName:    cff.FontName, // TODO(voss): subset tag needed?
 		topDict:     cff.topDict,
-		gsubrs:      cff.gsubrs,
 		privateDict: cff.privateDict,
-		subrs:       cff.subrs,
 
 		gid2cid: append([]font.GlyphID{}, subset...),
 	}
 
-	// TODO(voss): prune unused subrs
+	// TODO(voss): re-introduce subroutines as needed
 
 	out.charStrings = cffIndex{cff.charStrings[0]}
 	out.GlyphName = []string{cff.GlyphName[0]}
 	for _, gid := range subset {
 		if gid != 0 {
-			out.charStrings = append(out.charStrings, cff.charStrings[gid])
+			// expand all subroutines
+			cmds, err := cff.decodeCharString(cff.charStrings[gid])
+			if err != nil {
+				panic(err)
+			}
+			var cc []byte
+			for _, cmd := range cmds {
+				cc = append(cc, cmd...)
+			}
+
+			out.charStrings = append(out.charStrings, cc)
 			out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
 		}
 	}

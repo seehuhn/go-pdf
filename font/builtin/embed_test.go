@@ -27,7 +27,7 @@ import (
 )
 
 func TestSimple(t *testing.T) {
-	w, err := pdf.Create("test.pdf")
+	w, err := pdf.Create("test-builtin-simple.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestCommaAccent(t *testing.T) {
 }
 
 func TestComplicatedGyphs(t *testing.T) {
-	w, err := pdf.Create("test.pdf")
+	w, err := pdf.Create("test-builtin-gylphs.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
