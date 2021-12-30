@@ -36,7 +36,7 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 	for _, gid := range subset {
 		if gid != 0 {
 			// expand all subroutines
-			cmds, err := cff.decodeCharString(cff.charStrings[gid])
+			cmds, err := cff.decodeCharString(cff.charStrings[gid], nil)
 			if err != nil {
 				// We failed to decode charstring, so we cannot reliably
 				// prune the subroutines.  Use naive subsetting instead.

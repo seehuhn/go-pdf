@@ -43,7 +43,13 @@ func (s stackSlot) String() string {
 	return res + suffix
 }
 
-func (cff *Font) decodeCharString(body []byte) ([][]byte, error) {
+type renderer interface {
+	rMoveTo(x, y float64)
+	rLineTo(x, y float64)
+	rCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64)
+}
+
+func (cff *Font) decodeCharString(body []byte, ctx renderer) ([][]byte, error) {
 	var cmds [][]byte
 	var stack []stackSlot
 	var nStems int
@@ -67,7 +73,8 @@ subrLoop:
 			// 	show := body[1:]
 			// 	tail := ""
 			// 	info := ""
-			// 	if k := len(stack); (op == t2callgsubr || op == t2callsubr) && k > 0 && isInt(stack[k-1].val) {
+			// 	if k := len(stack); (op == t2callgsubr || op == t2callsubr) &&
+			// 		k > 0 && isInt(stack[k-1].val) {
 			// 		idx := int(stack[k-1].val) + bias(len(cff.subrs))
 			// 		info = fmt.Sprintf("@%d", idx)
 			// 	}
@@ -116,7 +123,8 @@ subrLoop:
 					return nil, errIncomplete
 				}
 				// 16-bit signed integer with 16 bits of fraction
-				x := int32(uint32(body[1])<<24 + uint32(body[2])<<16 + uint32(body[3])<<8 + uint32(body[4]))
+				x := int32(uint32(body[1])<<24 + uint32(body[2])<<16 +
+					uint32(body[3])<<8 + uint32(body[4]))
 				stack = append(stack, stackSlot{
 					val: float64(x) / 65536,
 				})
@@ -135,11 +143,167 @@ subrLoop:
 				cmd, body = body[:1], body[1:]
 			}
 
+			// TODO(voss): the spec states that the path construction
+			// operators use the "bottom-most" stack entries.  There is
+			// a list of operators which may have an additional, first
+			// width argument.
 			switch op {
-			case t2rmoveto, t2hmoveto, t2vmoveto, t2rlineto, t2hlineto, t2vlineto,
-				t2rrcurveto, t2hhcurveto, t2hvcurveto, t2rcurveline, t2rlinecurve,
-				t2vhcurveto, t2vvcurveto, t2flex, t2hflex, t2hflex1, t2flex1:
-				// all path construction operators clear the stack
+			case t2rmoveto:
+				k := len(stack) - 2
+				if k < 0 {
+					return nil, errStackUnderflow
+				}
+				if ctx != nil {
+					ctx.rMoveTo(stack[k].val, stack[k+1].val)
+				}
+				stack = stack[:0]
+
+			case t2hmoveto:
+				k := len(stack) - 1
+				if k < 0 {
+					return nil, errStackUnderflow
+				}
+				if ctx != nil {
+					ctx.rMoveTo(stack[k].val, 0)
+				}
+				stack = stack[:0]
+
+			case t2vmoveto:
+				k := len(stack) - 1
+				if k < 0 {
+					return nil, errStackUnderflow
+				}
+				if ctx != nil {
+					ctx.rMoveTo(0, stack[k].val)
+				}
+				stack = stack[:0]
+
+			case t2rlineto:
+				if ctx != nil {
+					for len(stack) >= 2 {
+						ctx.rLineTo(stack[0].val, stack[1].val)
+						stack = stack[2:]
+					}
+				}
+				stack = stack[:0]
+
+			case t2hlineto, t2vlineto:
+				if ctx != nil {
+					horizontal := op == t2hlineto
+					for len(stack) > 0 {
+						if horizontal {
+							ctx.rLineTo(stack[0].val, 0)
+						} else {
+							ctx.rLineTo(0, stack[0].val)
+						}
+						stack = stack[1:]
+						horizontal = !horizontal
+					}
+				} else {
+					stack = stack[:0]
+				}
+
+			case t2rrcurveto, t2rcurveline, t2rlinecurve:
+				if ctx != nil {
+					for op == t2rlinecurve && len(stack) >= 8 {
+						ctx.rLineTo(stack[0].val, stack[1].val)
+						stack = stack[2:]
+					}
+					for len(stack) >= 6 {
+						ctx.rCurveTo(stack[0].val, stack[1].val,
+							stack[2].val, stack[3].val,
+							stack[4].val, stack[5].val)
+						stack = stack[6:]
+					}
+					if op == t2rcurveline && len(stack) >= 2 {
+						ctx.rLineTo(stack[0].val, stack[1].val)
+						stack = stack[2:]
+					}
+				}
+				stack = stack[:0]
+
+			case t2hhcurveto:
+				if ctx != nil {
+					var dy1 float64
+					if len(stack)%4 != 0 {
+						dy1, stack = stack[0].val, stack[1:]
+					}
+					for len(stack) >= 4 {
+						ctx.rCurveTo(stack[0].val, dy1,
+							stack[1].val, stack[2].val,
+							stack[3].val, 0)
+						stack = stack[4:]
+						dy1 = 0
+					}
+				}
+				stack = stack[:0]
+
+			case t2hvcurveto, t2vhcurveto:
+				if ctx != nil {
+					horizontal := op == t2hvcurveto
+					for len(stack) >= 4 {
+						var extra float64
+						if len(stack) == 5 {
+							extra = stack[4].val
+						}
+						if horizontal {
+							ctx.rCurveTo(stack[0].val, 0,
+								stack[1].val, stack[2].val,
+								extra, stack[3].val)
+						} else {
+							ctx.rCurveTo(0, stack[0].val,
+								stack[1].val, stack[2].val,
+								stack[3].val, extra)
+						}
+						stack = stack[4:]
+						horizontal = !horizontal
+					}
+				}
+				stack = stack[:0]
+
+			case t2vvcurveto:
+				if ctx != nil {
+					var dx1 float64
+					if len(stack)%4 != 0 {
+						dx1, stack = stack[0].val, stack[1:]
+					}
+					for len(stack) >= 4 {
+						ctx.rCurveTo(dx1, stack[0].val,
+							stack[1].val, stack[2].val,
+							0, stack[3].val)
+						stack = stack[4:]
+						dx1 = 0
+					}
+				}
+				stack = stack[:0]
+
+			case t2flex:
+				if ctx != nil {
+					if len(stack) >= 13 {
+						ctx.rCurveTo(stack[0].val, stack[1].val,
+							stack[2].val, stack[3].val,
+							stack[4].val, stack[5].val)
+						ctx.rCurveTo(stack[6].val, stack[7].val,
+							stack[8].val, stack[9].val,
+							stack[10].val, stack[11].val)
+						// TODO(voss): fd = stack[12].val / 100
+					}
+				}
+				stack = stack[:0]
+			case t2hflex:
+				if ctx != nil {
+					if len(stack) >= 6 {
+						ctx.rCurveTo(stack[0].val, 0,
+							stack[1].val, stack[2].val,
+							stack[3].val, 0)
+						ctx.rCurveTo(stack[4].val, 0,
+							stack[5].val, -stack[2].val,
+							stack[6].val, 0)
+						// TODO(voss): fd = 0.5
+					}
+				}
+				stack = stack[:0]
+			case t2hflex1, t2flex1:
 				stack = stack[:0]
 
 			case t2dotsection: // deprecated
