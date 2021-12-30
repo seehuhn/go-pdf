@@ -19,46 +19,55 @@ package cff
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 type stackSlot struct {
-	val   int32
-	isInt bool
+	val    float64
+	random bool
+}
+
+func isInt(x float64) bool {
+	return x == float64(int32(x))
 }
 
 func (s stackSlot) String() string {
-	if s.isInt {
-		return fmt.Sprintf("%d", s.val)
+	suffix := ""
+	if s.random {
+		suffix = "*"
 	}
-	return fmt.Sprintf("%d?", s.val)
+	res := fmt.Sprintf("%.3f", s.val)
+	if isInt(s.val) {
+		res = fmt.Sprintf("%d", int32(s.val))
+	}
+	return res + suffix
 }
 
-func (cff *Font) decodeCharString(cc []byte) ([][]byte, error) {
+func (cff *Font) decodeCharString(body []byte) ([][]byte, error) {
 	var cmds [][]byte
 	var stack []stackSlot
 	var nStems int
 
 	storage := make(map[int]stackSlot)
-	cmdStack := [][]byte{cc}
+	cmdStack := [][]byte{body}
 
-glyphLoop:
+subrLoop:
 	for len(cmdStack) > 0 {
-		cc = cmdStack[len(cmdStack)-1]
-		cmdStack = cmdStack[:len(cmdStack)-1]
+		cmdStack, body = cmdStack[:len(cmdStack)-1], cmdStack[len(cmdStack)-1]
 
-	subrLoop:
-		for len(cc) > 0 {
+	opLoop:
+		for len(body) > 0 {
 			if len(stack) > 48 {
-				return nil, errors.New("stack overflow")
+				return nil, errStackOverflow
 			}
 
-			op := t2op(cc[0])
+			op := t2op(body[0])
 
 			// {
-			// 	show := cc[1:]
+			// 	show := body[1:]
 			// 	tail := ""
 			// 	info := ""
-			// 	if k := len(stack); (op == t2callgsubr || op == t2callsubr) && k > 0 && stack[k-1].isInt {
+			// 	if k := len(stack); (op == t2callgsubr || op == t2callsubr) && k > 0 && isInt(stack[k-1].val) {
 			// 		idx := int(stack[k-1].val) + bias(len(cff.subrs))
 			// 		info = fmt.Sprintf("@%d", idx)
 			// 	}
@@ -71,69 +80,59 @@ glyphLoop:
 
 			if op >= 32 && op <= 246 {
 				stack = append(stack, stackSlot{
-					val:   int32(op) - 139,
-					isInt: true,
+					val: float64(int32(op) - 139),
 				})
-				cmds = append(cmds, cc[:1])
-				cc = cc[1:]
+				cmds, body = append(cmds, body[:1]), body[1:]
 				continue
 			} else if op >= 247 && op <= 250 {
-				if len(cc) < 2 {
-					return nil, errors.New("incomplete command")
+				if len(body) < 2 {
+					return nil, errIncomplete
 				}
 				stack = append(stack, stackSlot{
-					val:   int32(op)*256 + int32(cc[1]) + (108 - 247*256),
-					isInt: true,
+					val: float64(int32(op)*256 + int32(body[1]) + (108 - 247*256)),
 				})
-				cmds = append(cmds, cc[:2])
-				cc = cc[2:]
+				cmds, body = append(cmds, body[:2]), body[2:]
 				continue
 			} else if op >= 251 && op <= 254 {
-				if len(cc) < 2 {
-					return nil, errors.New("incomplete command")
+				if len(body) < 2 {
+					return nil, errIncomplete
 				}
 				stack = append(stack, stackSlot{
-					val:   -int32(op)*256 - int32(cc[0]) - (108 - 251*256),
-					isInt: true,
+					val: float64(-int32(op)*256 - int32(body[0]) - (108 - 251*256)),
 				})
-				cmds = append(cmds, cc[:2])
-				cc = cc[2:]
+				cmds, body = append(cmds, body[:2]), body[2:]
 				continue
 			} else if op == 28 {
-				if len(cc) < 3 {
-					return nil, errors.New("incomplete command")
+				if len(body) < 3 {
+					return nil, errIncomplete
 				}
 				stack = append(stack, stackSlot{
-					val:   int32(int16(uint16(cc[1])<<8 + uint16(cc[2]))),
-					isInt: true,
+					val: float64(int16(uint16(body[1])<<8 + uint16(body[2]))),
 				})
-				cmds = append(cmds, cc[:3])
-				cc = cc[3:]
+				cmds, body = append(cmds, body[:3]), body[3:]
 				continue
 			} else if op == 255 {
-				if len(cc) < 5 {
-					return nil, errors.New("incomplete command")
+				if len(body) < 5 {
+					return nil, errIncomplete
 				}
-				x := int32(uint32(cc[1])<<24 + uint32(cc[2])<<16 + uint32(cc[3])<<8 + uint32(cc[4]))
 				// 16-bit signed integer with 16 bits of fraction
+				x := int32(uint32(body[1])<<24 + uint32(body[2])<<16 + uint32(body[3])<<8 + uint32(body[4]))
 				stack = append(stack, stackSlot{
-					val:   x >> 16,
-					isInt: false,
+					val: float64(x) / 65536,
 				})
-				cmds = append(cmds, cc[:5])
-				cc = cc[5:]
+				cmds, body = append(cmds, body[:5]), body[5:]
 				continue
 			}
 
 			var cmd []byte
 			if op == 0x0c {
-				if len(cc) < 2 {
-					return nil, errors.New("incomplete command")
+				if len(body) < 2 {
+					return nil, errIncomplete
 				}
-				op = op<<8 | t2op(cc[1])
-				cmd, cc = cc[:2], cc[2:]
+				op = op<<8 | t2op(body[1])
+				cmd, body = body[:2], body[2:]
 			} else {
-				cmd, cc = cc[:1], cc[1:]
+				cmd, body = body[:1], body[1:]
 			}
 
 			switch op {
@@ -157,11 +156,11 @@ glyphLoop:
 				// need not be included."
 				nStems += len(stack) / 2
 				k := (nStems + 7) / 8
-				if k >= len(cc) {
-					return nil, errors.New("incomplete command")
+				if k >= len(body) {
+					return nil, errIncomplete
 				}
-				cmd = append(cmd, cc[:k]...)
-				cc = cc[k:]
+				cmd = append(cmd, body[:k]...)
+				body = body[k:]
 				stack = stack[:0]
 
 			case t2abs:
@@ -178,7 +177,7 @@ glyphLoop:
 					return nil, errStackUnderflow
 				}
 				stack[k].val += stack[k+1].val
-				stack[k].isInt = stack[k].isInt && stack[k+1].isInt
+				stack[k].random = stack[k].random || stack[k+1].random
 				stack = stack[:k+1]
 			case t2sub:
 				k := len(stack) - 2
@@ -186,20 +185,15 @@ glyphLoop:
 					return nil, errStackUnderflow
 				}
 				stack[k].val -= stack[k+1].val
-				stack[k].isInt = stack[k].isInt && stack[k+1].isInt
+				stack[k].random = stack[k].random || stack[k+1].random
 				stack = stack[:k+1]
 			case t2div:
 				k := len(stack) - 2
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				a := stack[k].val
-				b := stack[k+1].val
-				if b != 0 && a%b == 0 && stack[k].isInt && stack[k+1].isInt {
-					stack[k].val = a / b
-				} else {
-					stack[k].isInt = false
-				}
+				stack[k].val /= stack[k+1].val
+				stack[k].random = stack[k].random || stack[k+1].random
 				stack = stack[:k+1]
 			case t2neg:
 				k := len(stack) - 1
@@ -209,8 +203,8 @@ glyphLoop:
 				stack[k].val = -stack[k].val
 			case t2random:
 				stack = append(stack, stackSlot{
-					val:   0,
-					isInt: false,
+					val:    0.618,
+					random: true,
 				})
 			case t2mul:
 				k := len(stack) - 2
@@ -218,14 +212,14 @@ glyphLoop:
 					return nil, errStackUnderflow
 				}
 				stack[k].val *= stack[k+1].val
-				stack[k].isInt = stack[k].isInt && stack[k+1].isInt
+				stack[k].random = stack[k].random || stack[k+1].random
 				stack = stack[:k+1]
 			case t2sqrt:
 				k := len(stack) - 1
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k].isInt = false
+				stack[k].val = math.Sqrt(stack[k].val)
 			case t2drop:
 				k := len(stack) - 1
 				if k < 0 {
@@ -244,8 +238,11 @@ glyphLoop:
 					return nil, errStackUnderflow
 				}
 				idx := int(stack[k].val)
-				if idx < 0 || k-idx-1 < 0 || !stack[k].isInt {
+				if float64(idx) != stack[k].val || k-idx-1 < 0 {
 					return nil, errors.New("invalid index")
+				}
+				if idx < 0 {
+					idx = 0
 				}
 				stack[k] = stack[k-idx-1]
 			case t2roll:
@@ -273,7 +270,7 @@ glyphLoop:
 					return nil, errStackUnderflow
 				}
 				m := int(stack[k+1].val)
-				if m < 0 || m > 32 || !stack[k+1].isInt {
+				if float64(m) != stack[k+1].val || m < 0 || m > 32 {
 					return nil, errors.New("invalid store index")
 				}
 				storage[m] = stack[k]
@@ -284,7 +281,7 @@ glyphLoop:
 					return nil, errStackUnderflow
 				}
 				m := int(stack[k].val)
-				if m < 0 || m > 32 || !stack[k].isInt {
+				if float64(m) != stack[k+1].val || m < 0 || m > 32 {
 					return nil, errors.New("invalid store index")
 				}
 				stack[k] = storage[m]
@@ -298,7 +295,7 @@ glyphLoop:
 				if stack[k].val != 0 && stack[k+1].val != 0 {
 					m.val = 1
 				}
-				m.isInt = stack[k].isInt && stack[k+1].isInt
+				stack[k].random = stack[k].random || stack[k+1].random
 				stack = append(stack[:k], m)
 			case t2or:
 				k := len(stack) - 2
@@ -309,7 +306,7 @@ glyphLoop:
 				if stack[k].val != 0 || stack[k+1].val != 0 {
 					m.val = 1
 				}
-				m.isInt = stack[k].isInt && stack[k+1].isInt
+				stack[k].random = stack[k].random || stack[k+1].random
 				stack = append(stack[:k], m)
 			case t2not:
 				k := len(stack) - 1
@@ -331,7 +328,7 @@ glyphLoop:
 				} else {
 					stack[k].val = 0
 				}
-				stack[k].isInt = stack[k].isInt && stack[k+1].isInt
+				stack[k].random = stack[k].random || stack[k+1].random
 				stack = stack[:k+1]
 			case t2ifelse:
 				k := len(stack) - 4
@@ -344,7 +341,7 @@ glyphLoop:
 				} else {
 					m = stack[k+1]
 				}
-				m.isInt = m.isInt && stack[k+2].isInt && stack[k+3].isInt
+				m.random = m.random || stack[k+2].random || stack[k+3].random
 				stack = append(stack[:k], m)
 
 			case t2callsubr, t2callgsubr:
@@ -352,22 +349,22 @@ glyphLoop:
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				if !stack[k].isInt {
-					return nil, errors.New("invalid subroutine index")
+				if stack[k].random {
+					return nil, errInvalidSubroutine
 				}
 				biased := int(stack[k].val)
 				stack = stack[:k]
 
-				cmdStack = append(cmdStack, cc)
+				cmdStack = append(cmdStack, body)
 				if len(cmdStack) > 10 {
 					return nil, errors.New("maximum call stack size exceeded")
 				}
 
 				var err error
 				if op == t2callsubr {
-					cc, err = cff.getSubr(biased)
+					body, err = cff.getSubr(biased)
 				} else {
-					cc, err = cff.getGSubr(biased)
+					body, err = cff.getGSubr(biased)
 				}
 				if err != nil {
 					return nil, err
@@ -377,16 +374,16 @@ glyphLoop:
 				l := len(cmds) - 1
 				if isConstInt(cmds[l]) {
 					cmds = cmds[:l]
-					continue subrLoop
+					continue opLoop
 				} else {
 					cmd = []byte{12, 18} // t2drop
 				}
 
 			case t2return:
-				break subrLoop
+				break opLoop
 
 			case t2endchar:
-				break glyphLoop
+				break subrLoop
 
 			default:
 				// return nil, fmt.Errorf("unsupported opcode %d", op)
@@ -586,4 +583,11 @@ const (
 	t2flex       t2op = 0x0c23
 	t2hflex1     t2op = 0x0c24
 	t2flex1      t2op = 0x0c25
+)
+
+var (
+	errStackOverflow     = errors.New("operand stack overflow")
+	errStackUnderflow    = errors.New("operand stack underflow")
+	errIncomplete        = errors.New("incomplete type2 charstring")
+	errInvalidSubroutine = errors.New("invalid subroutine index")
 )

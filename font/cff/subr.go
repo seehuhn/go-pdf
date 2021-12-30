@@ -17,7 +17,6 @@
 package cff
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -34,7 +33,7 @@ func bias(nSubrs int) int {
 func (cff *Font) getSubr(biased int) ([]byte, error) {
 	idx := biased + bias(len(cff.subrs))
 	if idx < 0 || idx >= len(cff.subrs) {
-		return nil, errors.New("invalid subr index")
+		return nil, errInvalidSubroutine
 	}
 	return cff.subrs[idx], nil
 }
@@ -42,7 +41,7 @@ func (cff *Font) getSubr(biased int) ([]byte, error) {
 func (cff *Font) getGSubr(biased int) ([]byte, error) {
 	idx := biased + bias(len(cff.gsubrs))
 	if idx < 0 || idx >= len(cff.gsubrs) {
-		return nil, errors.New("invalid gsubr index")
+		return nil, errInvalidSubroutine
 	}
 	return cff.gsubrs[idx], nil
 }

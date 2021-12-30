@@ -554,5 +554,3 @@ func offsSize(i int32) byte {
 		return 4
 	}
 }
-
-var errStackUnderflow = errors.New("stack underflow")

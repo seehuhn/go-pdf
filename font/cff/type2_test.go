@@ -21,8 +21,8 @@ import (
 )
 
 func TestRoll(t *testing.T) {
-	in := []int32{1, 2, 3, 4, 5, 6, 7, 8}
-	out := []int32{1, 2, 4, 5, 6, 3, 7, 8}
+	in := []float64{1, 2, 3, 4, 5, 6, 7, 8}
+	out := []float64{1, 2, 4, 5, 6, 3, 7, 8}
 
 	min := make([]stackSlot, len(in))
 	for i, v := range in {

@@ -30,10 +30,7 @@ type CMapEntry struct {
 // MakeSubset converts a mapping from a full font to a subsetted font.
 // It also returns the list of original glyphs to include in the subset.
 func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []GlyphID) {
-	var newMapping []CMapEntry
-	for _, m := range origMapping {
-		newMapping = append(newMapping, m)
-	}
+	newMapping := append([]CMapEntry(nil), origMapping...)
 	sort.Slice(newMapping, func(i, j int) bool {
 		return newMapping[i].CharCode < newMapping[j].CharCode
 	})
