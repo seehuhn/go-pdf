@@ -48,6 +48,10 @@ glyphLoop:
 
 	subrLoop:
 		for len(cc) > 0 {
+			if len(stack) > 48 {
+				return nil, errors.New("stack overflow")
+			}
+
 			op := t2op(cc[0])
 
 			// {
@@ -147,8 +151,15 @@ glyphLoop:
 				stack = stack[:0]
 
 			case t2hintmask, t2cntrmask:
-				nStems += len(stack) / 2 // TODO(voss): check this!  (maybe via freetype implementation)
+				// "If hstem and vstem hints are both declared at the beginning
+				// of a charstring, and this sequence is followed directly by
+				// the hintmask or cntrmask operators, the vstem hint operator
+				// need not be included."
+				nStems += len(stack) / 2
 				k := (nStems + 7) / 8
+				if k >= len(cc) {
+					return nil, errors.New("incomplete command")
+				}
 				cmd = append(cmd, cc[:k]...)
 				cc = cc[k:]
 				stack = stack[:0]
@@ -347,8 +358,9 @@ glyphLoop:
 				biased := int(stack[k].val)
 				stack = stack[:k]
 
-				if len(cc) > 0 {
-					cmdStack = append(cmdStack, cc)
+				cmdStack = append(cmdStack, cc)
+				if len(cmdStack) > 10 {
+					return nil, errors.New("maximum call stack size exceeded")
 				}
 
 				var err error
