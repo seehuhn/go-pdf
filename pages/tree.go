@@ -33,6 +33,9 @@ type PageTree struct {
 }
 
 // NewPageTree allocates a new PageTree object.
+// Use .AddPage() to add pages to the tree.
+// Use .Finish() to write the tree to the file and return the root object
+// for inclusion in the document catalog.
 func NewPageTree(w *pdf.Writer, defaults *DefaultAttributes) *PageTree {
 	root := &pages{
 		id: w.Alloc(),
@@ -45,10 +48,10 @@ func NewPageTree(w *pdf.Writer, defaults *DefaultAttributes) *PageTree {
 	}
 }
 
-// Flush flushes all internal /Pages notes to the file and returns
-// the root of the page tree.  After .Flush() has been called, the
+// Finish flushes all internal /Pages notes to the file and returns
+// the root of the page tree.  After .Finish() has been called, the
 // page tree cannot be used any more.
-func (tree *PageTree) Flush() (*pdf.Reference, error) {
+func (tree *PageTree) Finish() (*pdf.Reference, error) {
 	current := tree.current
 	for current.parent != nil {
 		obj := current.toObject()

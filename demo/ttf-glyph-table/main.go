@@ -336,7 +336,7 @@ func main() {
 		}
 	}
 
-	pagesRef, err := pageTree.Flush()
+	pagesRef, err := pageTree.Finish()
 	if err != nil {
 		log.Fatal(err)
 	}

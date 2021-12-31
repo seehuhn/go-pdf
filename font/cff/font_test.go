@@ -66,8 +66,8 @@ func TestReadCFF(t *testing.T) {
 	if len(cff.gsubrs) != len(cff2.gsubrs) {
 		t.Errorf("len(gsubrs): %d != %d", len(cff.gsubrs), len(cff2.gsubrs))
 	}
-	if len(cff.charStrings) != len(cff2.charStrings) {
-		t.Errorf("len(charStrings): %d != %d", len(cff.charStrings), len(cff2.charStrings))
+	if len(cff.CharStrings) != len(cff2.CharStrings) {
+		t.Errorf("len(charStrings): %d != %d", len(cff.CharStrings), len(cff2.CharStrings))
 	}
 	if len(cff.subrs) != len(cff2.subrs) {
 		t.Errorf("len(subrs): %d != %d", len(cff.subrs), len(cff2.subrs))

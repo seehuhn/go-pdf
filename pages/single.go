@@ -33,7 +33,7 @@ func SinglePage(w *pdf.Writer, attr *Attributes) (*Page, error) {
 		return nil, err
 	}
 
-	pages, err := tree.Flush()
+	pages, err := tree.Finish()
 	if err != nil {
 		return nil, err
 	}

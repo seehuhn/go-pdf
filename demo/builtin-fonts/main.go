@@ -331,7 +331,7 @@ func main() {
 	}
 	f.DoFlush()
 
-	root, err := tree.Flush()
+	root, err := tree.Finish()
 	if err != nil {
 		log.Fatal(err)
 	}

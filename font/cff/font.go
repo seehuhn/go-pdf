@@ -28,12 +28,12 @@ import (
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a reader.
 type Font struct {
-	FontName  string
-	GlyphName []string
+	FontName    string
+	GlyphName   []string
+	CharStrings [][]byte
 
 	topDict     cffDict
 	gsubrs      cffIndex
-	charStrings cffIndex
 	privateDict cffDict
 	subrs       cffIndex
 
@@ -145,7 +145,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	cff.charStrings = charStrings
+	cff.CharStrings = charStrings
 
 	// read the list of glyph names
 	charsetOffs, _ := topDict.getInt(opCharset, 0)
@@ -212,7 +212,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 
 // Encode returns the binary encoding of a CFF font as a simple font.
 func (cff *Font) Encode(w io.Writer) error {
-	numGlyphs := uint16(len(cff.charStrings))
+	numGlyphs := uint16(len(cff.CharStrings))
 
 	blobs := make([][]byte, numSections)
 	newStrings := &cffStrings{}
@@ -267,7 +267,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 7: charstrings INDEX
-	blobs[secCharStringsIndex], err = cffIndex(cff.charStrings).encode()
+	blobs[secCharStringsIndex], err = cffIndex(cff.CharStrings).encode()
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func (cff *Font) Encode(w io.Writer) error {
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
-	numGlyphs := int32(len(cff.charStrings))
+	numGlyphs := int32(len(cff.CharStrings))
 
 	fontMatrix := getFontMatrix(cff.topDict)
 
@@ -420,7 +420,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	// section 7: charstrings INDEX
-	blobs[cidCharStringsIndex], err = cffIndex(cff.charStrings).encode()
+	blobs[cidCharStringsIndex], err = cffIndex(cff.CharStrings).encode()
 	if err != nil {
 		return err
 	}

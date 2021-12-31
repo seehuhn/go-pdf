@@ -152,7 +152,7 @@ func convert(inName, outName string, V pdf.Version) error {
 		}
 	}
 
-	pagesRef, err := pageTree.Flush()
+	pagesRef, err := pageTree.Finish()
 	if err != nil {
 		return err
 	}
