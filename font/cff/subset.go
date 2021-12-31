@@ -31,12 +31,12 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 
 	// TODO(voss): re-introduce subroutines as needed
 
-	out.CharStrings = cffIndex{cff.CharStrings[0]}
+	out.charStrings = cffIndex{cff.charStrings[0]}
 	out.GlyphName = []string{cff.GlyphName[0]}
 	for _, gid := range subset {
 		if gid != 0 {
 			// expand all subroutines
-			cmds, err := cff.DecodeCharString(cff.CharStrings[gid], nil)
+			cmds, err := cff.doDecode(nil, int(gid))
 			if err != nil {
 				// We failed to decode charstring, so we cannot reliably
 				// prune the subroutines.  Use naive subsetting instead.
@@ -47,7 +47,7 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 				cc = append(cc, cmd...)
 			}
 
-			out.CharStrings = append(out.CharStrings, cc)
+			out.charStrings = append(out.charStrings, cc)
 			out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
 		}
 	}
@@ -69,10 +69,10 @@ func (cff *Font) naiveSubset(subset []font.GlyphID) *Font {
 		gid2cid: append([]font.GlyphID{}, subset...),
 	}
 
-	out.CharStrings = cffIndex{cff.CharStrings[0]}
+	out.charStrings = cffIndex{cff.charStrings[0]}
 	out.GlyphName = []string{cff.GlyphName[0]}
 	for _, gid := range subset {
-		out.CharStrings = append(out.CharStrings, cff.CharStrings[gid])
+		out.charStrings = append(out.charStrings, cff.charStrings[gid])
 		out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
 	}
 

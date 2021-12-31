@@ -20,6 +20,8 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
+var q float64 = 0.4
+
 func main() {
 	flag.Parse()
 
@@ -39,10 +41,6 @@ func main() {
 				F.InstName: F.Ref,
 			},
 		},
-		MediaBox: &pdf.Rectangle{
-			URx: 440,
-			URy: 530,
-		},
 	})
 
 	names := flag.Args()
@@ -59,8 +57,36 @@ func main() {
 			continue
 		}
 
-		for i := range cff.CharStrings {
-			page, err := tree.AddPage(nil)
+		for i := range cff.GlyphName {
+			bbox := cff.GlyphExtent[i]
+			left := 0
+			if bbox.LLx < left {
+				left = bbox.LLx
+			}
+			right := cff.Width[i]
+			if right < 300 {
+				right = 300
+			}
+			if bbox.URx > right {
+				right = bbox.URx
+			}
+			top := 100
+			if bbox.URy > top {
+				top = bbox.URy
+			}
+			bottom := 0
+			if bbox.LLy < bottom {
+				bottom = bbox.LLy
+			}
+
+			page, err := tree.AddPage(&pages.Attributes{
+				MediaBox: &pdf.Rectangle{
+					LLx: q*float64(left) - 20,
+					LLy: q*float64(bottom) - 20,
+					URx: q*float64(right) + 20,
+					URy: q*float64(top) + 12 + 20,
+				},
+			})
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -107,7 +133,12 @@ type context struct {
 	xx   []float64
 	yy   []float64
 	x, y float64
+	w    int
 	ink  bool
+}
+
+func (ctx *context) SetWidth(w int) {
+	ctx.w = w
 }
 
 func (ctx *context) RMoveTo(x, y float64) {
@@ -147,26 +178,27 @@ func (ctx *context) RCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64) {
 }
 
 func illustrateGlyph(page *pages.Page, F *font.Font, cff *cff.Font, i int) error {
-	label := fmt.Sprintf("glyph %d: %s", i, cff.GlyphName[i])
 	hss := boxes.Glue(0, 1, 1, 1, 1)
+
+	label := fmt.Sprintf("glyph %d: %s", i, cff.GlyphName[i])
 	nameBox := boxes.Text(F, 12, label)
 	titleBox := boxes.HBoxTo(page.URx-page.LLx, hss, nameBox, hss)
-	titleBox.Draw(page, page.LLx, 12)
+	titleBox.Draw(page, page.LLx, page.URy-20)
 
-	baseX := 40.0
-	baseY := 120.0
-	page.Println("q 0.2 1 0.2 RG 2 w")
-	page.Printf("%.2f %.2f m %.2f %.2f l\n",
-		page.LLx, baseY, page.URx, baseY)
-	page.Printf("%.2f %.2f m %.2f %.2f l S Q\n",
-		baseX, page.LLy, baseX, page.URy)
+	page.Printf("%.3f 0 0 %.3f 0 0 cm\n", q, q)
 
-	page.Printf("0.4 0 0 0.4 %.2f %.2f cm\n", baseX, baseY)
+	page.Println("q")
+	page.Println("0.1 0.9 0.1 RG 3 w")
+	page.Println("0 -10 m 0 10 l")
+	page.Printf("0 0 m %d 0 l\n", cff.Width[i])
+	page.Printf("%d -10 m %d 0 l %d 10 l\n",
+		cff.Width[i]-10, cff.Width[i], cff.Width[i]-10)
+	page.Println("S Q")
 
 	ctx := &context{
 		page: page,
 	}
-	_, err := cff.DecodeCharString(cff.CharStrings[i], ctx)
+	err := cff.DecodeCharString(ctx, i)
 	if ctx.ink {
 		page.Println("h")
 	}

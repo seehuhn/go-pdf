@@ -281,14 +281,9 @@ func (d cffDict) encode(ss *cffStrings) []byte {
 					}
 					first = !first
 				}
-			default:
-				panic(fmt.Sprintf("invalid type %T in DICT at %s\n", a, op))
 			}
 		}
 		if op > 255 {
-			if op>>8 != 12 {
-				panic("invalid DICT operator")
-			}
 			res.WriteByte(12)
 		}
 		res.WriteByte(byte(op))
@@ -406,7 +401,9 @@ const (
 	opFontName          dictOp = 0x0C26
 
 	// private DICT operators
-	opSubrs dictOp = 0x0013 // Offset (self) to local subrs
+	opSubrs         dictOp = 0x0013 // Offset (self) to local subrs
+	opDefaultWidthX dictOp = 0x0014
+	opNominalWidthX dictOp = 0x0015
 
 	// used in local unit tests only
 	opDebug dictOp = 0x0CFF

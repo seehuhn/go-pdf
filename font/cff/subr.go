@@ -16,10 +16,6 @@
 
 package cff
 
-import (
-	"fmt"
-)
-
 func bias(nSubrs int) int {
 	if nSubrs < 1240 {
 		return 107
@@ -60,26 +56,3 @@ func (cff *Font) getGSubr(biased int) ([]byte, error) {
 //     approximately k*2 + n + 3 or k*3 + n + 4 bytes.
 //   - the savings are n*k - k*2 - n - 3 = (n-2)*(k-1)-5
 //     or n*k - k*3 - n - 4 = (n-3)*(k-1)-7 bytes.
-
-// Find repeated command sequences which are candidates for subroutines.
-func analyze(charStrings [][][]byte) {
-	counts := map[string]int{}
-	for _, cc := range charStrings {
-		for _, cmd := range cc {
-			counts[string(cmd)]++
-		}
-	}
-
-	hist := map[int]int{}
-	max := 0
-	for _, c := range counts {
-		hist[c]++
-		if c > max {
-			max = c
-		}
-	}
-
-	for i := 1; i <= max; i++ {
-		fmt.Printf("%d %d\n", i, hist[i])
-	}
-}

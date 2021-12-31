@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
@@ -30,7 +31,10 @@ import (
 type Font struct {
 	FontName    string
 	GlyphName   []string
-	CharStrings [][]byte
+	charStrings [][]byte
+
+	GlyphExtent []font.Rect // This is in font design units.
+	Width       []int       // This is in font design units.
 
 	topDict     cffDict
 	gsubrs      cffIndex
@@ -38,8 +42,6 @@ type Font struct {
 	subrs       cffIndex
 
 	gid2cid []font.GlyphID
-
-	// TODO(voss): store CIDFont information
 }
 
 // Read reads a CFF font from r.
@@ -145,7 +147,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	cff.CharStrings = charStrings
+	cff.charStrings = charStrings
 
 	// read the list of glyph names
 	charsetOffs, _ := topDict.getInt(opCharset, 0)
@@ -207,12 +209,87 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		cff.subrs = subrs
 	}
 
+	cff.GlyphExtent = make([]font.Rect, 0, len(cff.charStrings))
+	cff.Width = make([]int, 0, len(cff.charStrings))
+	ctx := &glyphDimensions{}
+	for i := range cff.charStrings {
+		_, err := cff.doDecode(ctx, i)
+		if err != nil {
+			return nil, err
+		}
+		cff.GlyphExtent = append(cff.GlyphExtent, ctx.bbox)
+		cff.Width = append(cff.Width, ctx.width)
+		ctx.reset()
+	}
+
 	return cff, nil
+}
+
+type glyphDimensions struct {
+	x, y   float64
+	width  int
+	bbox   font.Rect
+	hasInk bool
+}
+
+func (ctx *glyphDimensions) reset() {
+	*ctx = glyphDimensions{}
+}
+
+func (ctx *glyphDimensions) add() {
+	left := int(math.Floor(ctx.x))
+	if !ctx.hasInk || left < ctx.bbox.LLx {
+		ctx.bbox.LLx = left
+	}
+
+	right := int(math.Ceil(ctx.x))
+	if !ctx.hasInk || right > ctx.bbox.URx {
+		ctx.bbox.URx = right
+	}
+
+	bottom := int(math.Floor(ctx.y))
+	if !ctx.hasInk || bottom < ctx.bbox.LLy {
+		ctx.bbox.LLy = bottom
+	}
+
+	top := int(math.Ceil(ctx.y))
+	if !ctx.hasInk || top > ctx.bbox.URy {
+		ctx.bbox.URy = top
+	}
+
+	ctx.hasInk = true
+}
+
+func (ctx *glyphDimensions) SetWidth(w int) {
+	ctx.width = w
+}
+
+func (ctx *glyphDimensions) RMoveTo(x, y float64) {
+	ctx.x += x
+	ctx.y += y
+}
+
+func (ctx *glyphDimensions) RLineTo(x, y float64) {
+	if !ctx.hasInk {
+		ctx.add()
+	}
+	ctx.x += x
+	ctx.y += y
+	ctx.add()
+}
+
+func (ctx *glyphDimensions) RCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64) {
+	if !ctx.hasInk {
+		ctx.add()
+	}
+	ctx.x += dxa + dxb + dxc
+	ctx.y += dya + dyb + dyc
+	ctx.add()
 }
 
 // Encode returns the binary encoding of a CFF font as a simple font.
 func (cff *Font) Encode(w io.Writer) error {
-	numGlyphs := uint16(len(cff.CharStrings))
+	numGlyphs := uint16(len(cff.charStrings))
 
 	blobs := make([][]byte, numSections)
 	newStrings := &cffStrings{}
@@ -267,7 +344,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 7: charstrings INDEX
-	blobs[secCharStringsIndex], err = cffIndex(cff.CharStrings).encode()
+	blobs[secCharStringsIndex], err = cffIndex(cff.charStrings).encode()
 	if err != nil {
 		return err
 	}
@@ -341,7 +418,7 @@ func (cff *Font) Encode(w io.Writer) error {
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
-	numGlyphs := int32(len(cff.CharStrings))
+	numGlyphs := int32(len(cff.charStrings))
 
 	fontMatrix := getFontMatrix(cff.topDict)
 
@@ -420,7 +497,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	// section 7: charstrings INDEX
-	blobs[cidCharStringsIndex], err = cffIndex(cff.CharStrings).encode()
+	blobs[cidCharStringsIndex], err = cffIndex(cff.charStrings).encode()
 	if err != nil {
 		return err
 	}
@@ -541,7 +618,6 @@ const (
 	cidNumSections
 )
 
-// TODO(voss): inline this?
 func offsSize(i int32) byte {
 	switch {
 	case i < 1<<8:

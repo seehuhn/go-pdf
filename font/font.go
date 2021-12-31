@@ -35,12 +35,12 @@ type Font struct {
 	Layout func([]rune) []Glyph
 	Enc    func(GlyphID) pdf.String
 
-	GlyphUnits int
-	Ascent     int // Ascent in glyph coordinate units
-	Descent    int // Descent in glyph coordinate units, as a negative number
+	GlyphUnits int // font design units
+	Ascent     int // ascent in glyph coordinate units
+	Descent    int // descent in glyph coordinate units, as a negative number
 
-	GlyphExtent []Rect // This is in Glyph design units.  TODO(voss): needed?
-	Width       []int  // This is in Glyph design units.  TODO(voss): needed?
+	GlyphExtent []Rect // This is in font design units.  TODO(voss): needed?
+	Width       []int  // This is in font design units.  TODO(voss): needed?
 }
 
 // NumGlyphs returns the number of glyphs in a font.

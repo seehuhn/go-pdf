@@ -43,22 +43,61 @@ func (s stackSlot) String() string {
 	return res + suffix
 }
 
-type renderer interface {
+// A Renderer is used to draw a glyph encoded by a CFF charstring.
+type Renderer interface {
+	SetWidth(w int)
 	RMoveTo(x, y float64)
 	RLineTo(x, y float64)
 	RCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64)
 }
 
-// DecodeCharString returns the commands for the given charstring.
-func (cff *Font) DecodeCharString(body []byte, ctx renderer) ([][]byte, error) {
+// DecodeCharString uses ctx to render the charstring for glyph i.
+func (cff *Font) DecodeCharString(ctx Renderer, i int) error {
+	if i < 0 || i >= len(cff.charStrings) {
+		return errors.New("invalid glyph index")
+	}
+
+	_, err := cff.doDecode(ctx, i)
+	return err
+}
+
+// doDecode returns the commands for the given charstring.
+func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
+	body := cff.charStrings[i]
 	var cmds [][]byte
+	skipBytes := func(n int) {
+		cmds = append(cmds, body[:n])
+		body = body[n:]
+	}
+
 	var stack []stackSlot
-	var nStems int
+	clearStack := func() {
+		stack = stack[:0]
+	}
+
+	widthIsSet := false
+	setWidth := func(isPresent bool) {
+		if widthIsSet {
+			return
+		}
+		var glyphWidth int32
+		if isPresent {
+			dw, _ := cff.privateDict.getInt(opNominalWidthX, 0)
+			glyphWidth = int32(stack[0].val) + dw
+			stack = stack[1:]
+		} else {
+			glyphWidth, _ = cff.privateDict.getInt(opDefaultWidthX, 0)
+		}
+		if ctx != nil {
+			ctx.SetWidth(int(glyphWidth))
+		}
+		widthIsSet = true
+	}
 
 	storage := make(map[int]stackSlot)
 	cmdStack := [][]byte{body}
+	var nStems int
 
-subrLoop:
 	for len(cmdStack) > 0 {
 		cmdStack, body = cmdStack[:len(cmdStack)-1], cmdStack[len(cmdStack)-1]
 
@@ -90,7 +129,7 @@ subrLoop:
 				stack = append(stack, stackSlot{
 					val: float64(int32(op) - 139),
 				})
-				cmds, body = append(cmds, body[:1]), body[1:]
+				skipBytes(1)
 				continue
 			} else if op >= 247 && op <= 250 {
 				if len(body) < 2 {
@@ -99,7 +138,7 @@ subrLoop:
 				stack = append(stack, stackSlot{
 					val: float64(int32(op)*256 + int32(body[1]) + (108 - 247*256)),
 				})
-				cmds, body = append(cmds, body[:2]), body[2:]
+				skipBytes(2)
 				continue
 			} else if op >= 251 && op <= 254 {
 				if len(body) < 2 {
@@ -108,7 +147,7 @@ subrLoop:
 				stack = append(stack, stackSlot{
 					val: float64(-int32(op)*256 - int32(body[1]) - (108 - 251*256)),
 				})
-				cmds, body = append(cmds, body[:2]), body[2:]
+				skipBytes(2)
 				continue
 			} else if op == 28 {
 				if len(body) < 3 {
@@ -117,7 +156,7 @@ subrLoop:
 				stack = append(stack, stackSlot{
 					val: float64(int16(uint16(body[1])<<8 + uint16(body[2]))),
 				})
-				cmds, body = append(cmds, body[:3]), body[3:]
+				skipBytes(3)
 				continue
 			} else if op == 255 {
 				if len(body) < 5 {
@@ -129,7 +168,7 @@ subrLoop:
 				stack = append(stack, stackSlot{
 					val: float64(x) / 65536,
 				})
-				cmds, body = append(cmds, body[:5]), body[5:]
+				skipBytes(5)
 				continue
 			}
 
@@ -144,40 +183,27 @@ subrLoop:
 				cmd, body = body[:1], body[1:]
 			}
 
-			// TODO(voss): the spec states that the path construction
-			// operators use the "bottom-most" stack entries.  There is
-			// a list of operators which may have an additional, first
-			// width argument.
 			switch op {
 			case t2rmoveto:
-				k := len(stack) - 2
-				if k < 0 {
-					return nil, errStackUnderflow
+				setWidth(len(stack) > 2)
+				if ctx != nil && len(stack) >= 2 {
+					ctx.RMoveTo(stack[0].val, stack[1].val)
 				}
-				if ctx != nil {
-					ctx.RMoveTo(stack[k].val, stack[k+1].val)
-				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2hmoveto:
-				k := len(stack) - 1
-				if k < 0 {
-					return nil, errStackUnderflow
+				setWidth(len(stack) > 1)
+				if ctx != nil && len(stack) >= 1 {
+					ctx.RMoveTo(stack[0].val, 0)
 				}
-				if ctx != nil {
-					ctx.RMoveTo(stack[k].val, 0)
-				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2vmoveto:
-				k := len(stack) - 1
-				if k < 0 {
-					return nil, errStackUnderflow
+				setWidth(len(stack) > 1)
+				if ctx != nil && len(stack) >= 1 {
+					ctx.RMoveTo(0, stack[0].val)
 				}
-				if ctx != nil {
-					ctx.RMoveTo(0, stack[k].val)
-				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2rlineto:
 				if ctx != nil {
@@ -186,7 +212,7 @@ subrLoop:
 						stack = stack[2:]
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2hlineto, t2vlineto:
 				if ctx != nil {
@@ -201,7 +227,7 @@ subrLoop:
 						horizontal = !horizontal
 					}
 				} else {
-					stack = stack[:0]
+					clearStack()
 				}
 
 			case t2rrcurveto, t2rcurveline, t2rlinecurve:
@@ -221,7 +247,7 @@ subrLoop:
 						stack = stack[2:]
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2hhcurveto:
 				if ctx != nil {
@@ -237,7 +263,7 @@ subrLoop:
 						dy1 = 0
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2hvcurveto, t2vhcurveto:
 				if ctx != nil {
@@ -260,7 +286,7 @@ subrLoop:
 						horizontal = !horizontal
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2vvcurveto:
 				if ctx != nil {
@@ -276,7 +302,7 @@ subrLoop:
 						dx1 = 0
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2flex:
 				if ctx != nil {
@@ -287,10 +313,10 @@ subrLoop:
 						ctx.RCurveTo(stack[6].val, stack[7].val,
 							stack[8].val, stack[9].val,
 							stack[10].val, stack[11].val)
-						// TODO(voss): fd = stack[12].val / 100
+						// fd = stack[12].val / 100
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 			case t2flex1:
 				if ctx != nil {
 					if len(stack) >= 11 {
@@ -309,10 +335,10 @@ subrLoop:
 								stack[8].val, stack[9].val,
 								0, extra)
 						}
-						// TODO(voss): fd = 0.5
+						// fd = 0.5
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 			case t2hflex:
 				if ctx != nil {
 					if len(stack) >= 7 {
@@ -322,10 +348,10 @@ subrLoop:
 						ctx.RCurveTo(stack[4].val, 0,
 							stack[5].val, -stack[2].val,
 							stack[6].val, 0)
-						// TODO(voss): fd = 0.5
+						// fd = 0.5
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 			case t2hflex1:
 				if ctx != nil {
 					if len(stack) >= 9 {
@@ -336,19 +362,21 @@ subrLoop:
 						ctx.RCurveTo(stack[5].val, 0,
 							stack[6].val, stack[7].val,
 							stack[8].val, -dy)
-						// TODO(voss): fd = 0.5
+						// fd = 0.5
 					}
 				}
-				stack = stack[:0]
+				clearStack()
 
 			case t2dotsection: // deprecated
-				stack = stack[:0]
+				clearStack()
 
 			case t2hstem, t2vstem, t2hstemhm, t2vstemhm:
+				setWidth(len(stack)%2 == 1)
 				nStems += len(stack) / 2
-				stack = stack[:0]
+				clearStack()
 
 			case t2hintmask, t2cntrmask:
+				setWidth(len(stack)%2 == 1)
 				// "If hstem and vstem hints are both declared at the beginning
 				// of a charstring, and this sequence is followed directly by
 				// the hintmask or cntrmask operators, the vstem hint operator
@@ -360,7 +388,7 @@ subrLoop:
 				}
 				cmd = append(cmd, body[:k]...)
 				body = body[k:]
-				stack = stack[:0]
+				clearStack()
 
 			case t2abs:
 				k := len(stack) - 1
@@ -582,17 +610,27 @@ subrLoop:
 				break opLoop
 
 			case t2endchar:
-				break subrLoop
+				setWidth(len(stack) == 1 || len(stack) > 4)
+				cmds = append(cmds, []byte{14}) // t2endchar
+				return cmds, nil
 
 			default:
 				// return nil, fmt.Errorf("unsupported opcode %d", op)
 				fmt.Printf("unsupported opcode %d\n", op)
 			}
 			cmds = append(cmds, cmd)
-		} // end of subrLoop
-	} // end of glyphLoop
-	cmds = append(cmds, []byte{14}) // t2endchar
-	return cmds, nil
+		} // end of opLoop
+	}
+
+	return nil, errIncomplete
+}
+
+func isConstInt(cmd []byte) bool {
+	if len(cmd) == 0 {
+		return false
+	}
+	op := cmd[0]
+	return op == 28 || (32 <= op && op <= 254)
 }
 
 func roll(data []stackSlot, j int) {
@@ -607,14 +645,6 @@ func roll(data []stackSlot, j int) {
 	copy(tmp, data[n-j:])
 	copy(data[j:], data[:n-j])
 	copy(data[:j], tmp)
-}
-
-func isConstInt(cmd []byte) bool {
-	if len(cmd) == 0 {
-		return false
-	}
-	op := cmd[0]
-	return op == 28 || (32 <= op && op <= 254)
 }
 
 type t2op uint16
