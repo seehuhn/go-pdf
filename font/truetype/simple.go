@@ -86,11 +86,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 type simple struct {
 	Sfnt *sfnt.Font
 
-	FontRef           *pdf.Reference
-	FontDescriptorRef *pdf.Reference
-	WidthsRef         *pdf.Reference
-	ToUnicodeRef      *pdf.Reference
-	FontFileRef       *pdf.Reference
+	FontRef *pdf.Reference
 
 	text map[font.GlyphID][]rune // GID -> text
 	enc  map[font.GlyphID]byte   // GID -> CharCode
@@ -111,11 +107,7 @@ func newSimple(w *pdf.Writer, tt *sfnt.Font) *simple {
 	res := &simple{
 		Sfnt: tt,
 
-		FontRef:           w.Alloc(),
-		FontDescriptorRef: w.Alloc(),
-		WidthsRef:         w.Alloc(),
-		ToUnicodeRef:      w.Alloc(),
-		FontFileRef:       w.Alloc(),
+		FontRef: w.Alloc(),
 
 		text: make(map[font.GlyphID][]rune),
 		enc:  make(map[font.GlyphID]byte),
@@ -344,5 +336,5 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	return err
+	return nil
 }

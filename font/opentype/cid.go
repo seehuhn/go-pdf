@@ -54,7 +54,7 @@ func EmbedCID(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.Loc
 // but only up to 256 glyphs of the font can be accessed via the returned font
 // object.
 //
-// Use of OpenType fonts in PDF requires PDF version 1.3 or higher.
+// Use of OpenType CIDFonts requires PDF version 1.3 or higher.
 func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, error) {
 	if !tt.IsOpenType() {
 		return nil, errors.New("not an OpenType font")
@@ -62,7 +62,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 	if tt.IsTrueType() {
 		return truetype.EmbedFontCID(w, tt, instName)
 	}
-	err := w.CheckVersion("use of CFF-based CIDFonts", pdf.V1_3)
+	err := w.CheckVersion("use of OpenType CIDFonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}

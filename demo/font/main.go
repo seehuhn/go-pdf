@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
-	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -40,7 +40,8 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	// F1, err := builtin.Embed(out, "Times-Roman", "F1", locale.EnGB)
 	// F1, err := truetype.Embed(out, "../../font/truetype/ttf/FreeSerif.ttf", "F1", locale.EnGB)
 	// F1, err := truetype.Embed(out, "../../font/truetype/ttf/Roboto-Regular.ttf", "F1", locale.EnGB)
-	F1, err := truetype.EmbedCID(out, "../../font/truetype/ttf/SourceSerif4-Regular.ttf", "F1", locale.EnGB)
+	// F1, err := truetype.EmbedSimple(out, "../../font/truetype/ttf/SourceSerif4-Regular.ttf", "F1", locale.EnGB)
+	F1, err := opentype.EmbedSimple(out, "../../font/opentype/otf/SourceSerif4-Regular.otf", "F1", locale.EnGB)
 	if err != nil {
 		return err
 	}

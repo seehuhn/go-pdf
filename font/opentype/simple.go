@@ -56,7 +56,7 @@ func EmbedSimple(w *pdf.Writer, fileName string, instName pdf.Name, loc *locale.
 // In comparison, fonts embedded via EmbedFontCID lead to larger PDF files, but
 // there is no limit on the number of glyphs which can be accessed.
 //
-// Use of simple OpenType fonts in PDF requires PDF version 1.2 or higher.
+// Use of simple OpenType fonts requires PDF version 1.2 or higher.
 func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, error) {
 	if !tt.IsOpenType() {
 		return nil, errors.New("not an OpenType font")
@@ -69,115 +69,109 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 		return nil, err
 	}
 
-	fnt := newSimple(w, tt)
-	w.OnClose(fnt.WriteFont)
+	r, err := tt.GetTableReader("CFF ", nil)
+	if err != nil {
+		return nil, err
+	}
+	cff, err := cff.Read(r)
+	if err != nil {
+		return nil, err
+	}
+
+	t := &simple{
+		Sfnt: tt,
+		Cff:  cff,
+
+		FontRef: w.Alloc(),
+
+		text: make(map[font.GlyphID][]rune),
+		enc:  make(map[font.GlyphID]byte),
+	}
+
+	w.OnClose(t.WriteFont)
 
 	res := &font.Font{
 		InstName: instName,
-		Ref:      fnt.FontRef,
+		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,
 		Ascent:      tt.Ascent,
 		Descent:     tt.Descent,
-		GlyphExtent: tt.GlyphExtent,
+		GlyphExtent: t.Cff.GlyphExtent,
 		Width:       tt.Width,
 
-		Layout: fnt.Layout,
-		Enc:    fnt.Enc,
+		Layout: t.Layout,
+		Enc:    t.Enc,
 	}
 	return res, nil
 }
 
 type simple struct {
 	Sfnt *sfnt.Font
+	Cff  *cff.Font
 
-	FontRef           *pdf.Reference
-	FontDescriptorRef *pdf.Reference
-	WidthsRef         *pdf.Reference
-	ToUnicodeRef      *pdf.Reference
-	FontFileRef       *pdf.Reference
+	FontRef *pdf.Reference
 
-	text  map[font.GlyphID][]rune // GID -> text
-	enc   map[font.GlyphID]byte   // GID -> CharCode
-	count int                     // next available CharCode
+	text map[font.GlyphID][]rune // GID -> text
+	enc  map[font.GlyphID]byte   // GID -> CharCode
+
+	nextCharCode int // next available CharCode
+	allowNotdef  bool
 }
 
-func newSimple(w *pdf.Writer, tt *sfnt.Font) *simple {
-	tidy := make(map[font.GlyphID]byte)
-	for r, gid := range tt.CMap {
-		if rOld, used := tidy[gid]; r < 127 && (!used || byte(r) < rOld) {
-			tidy[gid] = byte(r)
-		}
-	}
-
-	res := &simple{
-		Sfnt: tt,
-
-		FontRef:           w.Alloc(),
-		FontDescriptorRef: w.Alloc(),
-		WidthsRef:         w.Alloc(),
-		ToUnicodeRef:      w.Alloc(),
-		FontFileRef:       w.Alloc(),
-
-		text: make(map[font.GlyphID][]rune),
-		enc:  make(map[font.GlyphID]byte),
-	}
-
-	return res
-}
-
-func (fnt *simple) Layout(rr []rune) []font.Glyph {
+func (t *simple) Layout(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
-		gid := fnt.Sfnt.CMap[r]
+		gid := t.Sfnt.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Chars = []rune{r}
 	}
 
-	gg = fnt.Sfnt.GSUB.ApplyAll(gg)
+	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = fnt.Sfnt.Width[gg[i].Gid]
+		gg[i].Advance = t.Sfnt.Width[gg[i].Gid]
 	}
-	gg = fnt.Sfnt.GPOS.ApplyAll(gg)
+	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
 	for _, g := range gg {
-		if _, seen := fnt.text[g.Gid]; !seen && len(g.Chars) > 0 {
+		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
 			// copy the slice, in case the caller modifies it later
-			fnt.text[g.Gid] = append([]rune{}, g.Chars...)
+			t.text[g.Gid] = append([]rune{}, g.Chars...)
 		}
 	}
 
 	return gg
 }
 
-func (fnt *simple) Enc(gid font.GlyphID) pdf.String {
-	c, found := fnt.enc[gid]
+func (t *simple) Enc(gid font.GlyphID) pdf.String {
+	c, found := t.enc[gid]
 	if found {
 		return pdf.String{c}
 	}
 
-	// increment fnt.count first, so that 0 is allocated last
-	fnt.count++
-	if _, ok := fnt.enc[0]; ok {
-		c = byte(fnt.count - 1)
-	} else if gid != 0 {
-		c = byte(fnt.count)
+	if gid == 0 {
+		c = 255
+		t.allowNotdef = true
 	} else {
-		c = 0
+		c = byte(t.nextCharCode)
+		t.nextCharCode++
 	}
 
-	fnt.enc[gid] = c
+	t.enc[gid] = c
 	return pdf.String{c}
 }
 
-func (fnt *simple) WriteFont(w *pdf.Writer) error {
-	if fnt.count > 256 {
-		return errors.New("too many different glyphs for simple font " + fnt.Sfnt.FontName)
+func (t *simple) WriteFont(w *pdf.Writer) error {
+	if t.allowNotdef {
+		t.nextCharCode++
+	}
+	if t.nextCharCode > 256 {
+		return errors.New("too many different glyphs for simple font " + t.Sfnt.FontName)
 	}
 
 	// Determine the subset of glyphs to include.
 	var mapping []font.CMapEntry
-	for origGid, charCode := range fnt.enc {
+	for origGid, charCode := range t.enc {
 		mapping = append(mapping, font.CMapEntry{
 			CharCode: uint16(charCode),
 			GID:      origGid,
@@ -195,25 +189,15 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 	firstCharCode := mapping[0].CharCode
 	lastCharCode := mapping[len(mapping)-1].CharCode
 	_, includeGlyphs := font.MakeSubset(mapping)
-	subsetTag := font.GetSubsetTag(includeGlyphs, len(fnt.Sfnt.Width))
-	fontName := pdf.Name(subsetTag + "+" + fnt.Sfnt.FontName)
+	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Sfnt.Width))
+	fontName := pdf.Name(subsetTag + "+" + t.Sfnt.FontName)
 
-	r, err := fnt.Sfnt.GetTableReader("CFF ", nil)
-	if err != nil {
-		return err
-	}
-	cff, err := cff.Read(r)
-	if err != nil {
-		return err
-	}
-	cff = cff.Subset(includeGlyphs)
-
-	q := 1000 / float64(fnt.Sfnt.GlyphUnits)
+	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
-		LLx: math.Round(float64(fnt.Sfnt.FontBBox.LLx) * q),
-		LLy: math.Round(float64(fnt.Sfnt.FontBBox.LLy) * q),
-		URx: math.Round(float64(fnt.Sfnt.FontBBox.URx) * q),
-		URy: math.Round(float64(fnt.Sfnt.FontBBox.URy) * q),
+		LLx: math.Round(float64(t.Sfnt.FontBBox.LLx) * q),
+		LLy: math.Round(float64(t.Sfnt.FontBBox.LLy) * q),
+		URx: math.Round(float64(t.Sfnt.FontBBox.URx) * q),
+		URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
 	}
 
 	FontDescriptorRef := w.Alloc()
@@ -235,12 +219,12 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
-		"Flags":       pdf.Integer(fnt.Sfnt.Flags),
+		"Flags":       pdf.Integer(t.Sfnt.Flags),
 		"FontBBox":    FontBBox,
-		"ItalicAngle": pdf.Number(fnt.Sfnt.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(fnt.Sfnt.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(fnt.Sfnt.Descent) + 0.5),
-		"CapHeight":   pdf.Integer(q*float64(fnt.Sfnt.CapHeight) + 0.5),
+		"ItalicAngle": pdf.Number(t.Sfnt.ItalicAngle),
+		"Ascent":      pdf.Integer(q*float64(t.Sfnt.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(t.Sfnt.Descent) + 0.5),
+		"CapHeight":   pdf.Integer(q*float64(t.Sfnt.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 		"FontFile3":   FontFileRef,
 	}
@@ -251,14 +235,14 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		width := 0
 		if i == mapping[pos].CharCode {
 			gid := mapping[pos].GID
-			width = int(float64(fnt.Sfnt.Width[gid])*q + 0.5)
+			width = int(float64(t.Sfnt.Width[gid])*q + 0.5)
 			pos++
 		}
 		Widths = append(Widths, pdf.Integer(width))
 	}
 
-	_, err = w.WriteCompressed(
-		[]*pdf.Reference{fnt.FontRef, FontDescriptorRef, WidthsRef},
+	_, err := w.WriteCompressed(
+		[]*pdf.Reference{t.FontRef, FontDescriptorRef, WidthsRef},
 		Font, FontDescriptor, Widths)
 	if err != nil {
 		return err
@@ -277,6 +261,7 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
+	cff := t.Cff.Subset(includeGlyphs)
 	err = cff.Encode(fontFileStream)
 	if err != nil {
 		return err
@@ -287,8 +272,8 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 	}
 
 	var cc2text []font.SimpleMapping
-	for gid, text := range fnt.text {
-		charCode := fnt.enc[gid]
+	for gid, text := range t.text {
+		charCode := t.enc[gid]
 		cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
 	}
 	err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
@@ -296,10 +281,10 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	err = fnt.Sfnt.Close()
+	err = t.Sfnt.Close()
 	if err != nil {
 		return err
 	}
 
-	return err
+	return nil
 }

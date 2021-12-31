@@ -76,7 +76,7 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 	}
 
 	widthIsSet := false
-	setWidth := func(isPresent bool) {
+	setGlyphWidth := func(isPresent bool) {
 		if widthIsSet {
 			return
 		}
@@ -185,21 +185,21 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 
 			switch op {
 			case t2rmoveto:
-				setWidth(len(stack) > 2)
+				setGlyphWidth(len(stack) > 2)
 				if ctx != nil && len(stack) >= 2 {
 					ctx.RMoveTo(stack[0].val, stack[1].val)
 				}
 				clearStack()
 
 			case t2hmoveto:
-				setWidth(len(stack) > 1)
+				setGlyphWidth(len(stack) > 1)
 				if ctx != nil && len(stack) >= 1 {
 					ctx.RMoveTo(stack[0].val, 0)
 				}
 				clearStack()
 
 			case t2vmoveto:
-				setWidth(len(stack) > 1)
+				setGlyphWidth(len(stack) > 1)
 				if ctx != nil && len(stack) >= 1 {
 					ctx.RMoveTo(0, stack[0].val)
 				}
@@ -371,12 +371,12 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 				clearStack()
 
 			case t2hstem, t2vstem, t2hstemhm, t2vstemhm:
-				setWidth(len(stack)%2 == 1)
+				setGlyphWidth(len(stack)%2 == 1)
 				nStems += len(stack) / 2
 				clearStack()
 
 			case t2hintmask, t2cntrmask:
-				setWidth(len(stack)%2 == 1)
+				setGlyphWidth(len(stack)%2 == 1)
 				// "If hstem and vstem hints are both declared at the beginning
 				// of a charstring, and this sequence is followed directly by
 				// the hintmask or cntrmask operators, the vstem hint operator
@@ -610,7 +610,7 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 				break opLoop
 
 			case t2endchar:
-				setWidth(len(stack) == 1 || len(stack) > 4)
+				setGlyphWidth(len(stack) == 1 || len(stack) > 4)
 				cmds = append(cmds, []byte{14}) // t2endchar
 				return cmds, nil
 
