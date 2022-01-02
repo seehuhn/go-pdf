@@ -190,7 +190,8 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 	lastCharCode := mapping[len(mapping)-1].CharCode
 	_, includeGlyphs := font.MakeSubset(mapping)
 	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Sfnt.Width))
-	fontName := pdf.Name(subsetTag + "+" + t.Sfnt.FontName)
+	cff := t.Cff.Subset(includeGlyphs)
+	fontName := pdf.Name(t.Cff.FontName) // includes the subset tag
 
 	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
@@ -261,7 +262,6 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 		return err
 	}
 
-	cff := t.Cff.Subset(includeGlyphs)
 	err = cff.Encode(fontFileStream)
 	if err != nil {
 		return err

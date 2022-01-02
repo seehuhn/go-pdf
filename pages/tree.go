@@ -24,6 +24,8 @@ import (
 
 const pageTreeWidth = 12
 
+// TODO(voss): allow to add subtrees which are still growing, e.g. for the toc
+
 // PageTree represents a PDF page tree.
 type PageTree struct {
 	w        *pdf.Writer

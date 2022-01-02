@@ -152,7 +152,7 @@ func isPrivateRange(r rune) bool {
 
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
-func (font *Font) Typeset(s string, ptSize float64) (*Layout, error) {
+func (font *Font) Typeset(s string, ptSize float64) *Layout {
 	var runs [][]rune
 	var run []rune
 	for _, r := range s {
@@ -177,7 +177,7 @@ func (font *Font) Typeset(s string, ptSize float64) (*Layout, error) {
 		Font:     font,
 		FontSize: ptSize,
 		Glyphs:   glyphs,
-	}, nil
+	}
 }
 
 // Layout contains the information needed to typeset a run of text.

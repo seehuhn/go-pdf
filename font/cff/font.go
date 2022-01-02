@@ -45,6 +45,8 @@ type Font struct {
 }
 
 // Read reads a CFF font from r.
+//
+// TODO(voss): implement reading of CIDFonts.
 func Read(r io.ReadSeeker) (*Font, error) {
 	cff := &Font{}
 
@@ -418,6 +420,9 @@ func (cff *Font) Encode(w io.Writer) error {
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
+	// TODO(voss): does topdict.CIDCount need adjusting for subset fonts?
+	// TODO(voss): does topdict.FontName need a subset tag?
+
 	numGlyphs := int32(len(cff.charStrings))
 
 	fontMatrix := getFontMatrix(cff.topDict)

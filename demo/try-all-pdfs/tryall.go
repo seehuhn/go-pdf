@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -27,7 +28,12 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/cff"
 )
+
+func isSubset(name string) bool {
+	return len(name) > 7 && name[6] == '+'
+}
 
 func doOneFile(fname string) error {
 	fd, err := os.Open(fname)
@@ -53,47 +59,47 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		dict, ok := obj.(pdf.Dict)
-		if !ok || dict["Type"] != pdf.Name("Font") {
+		Font, ok := obj.(pdf.Dict)
+		if !ok || Font["Type"] != pdf.Name("Font") {
 			continue
 		}
-		fontType, ok := dict["Subtype"].(pdf.Name)
-		if !ok || (fontType != "Type1" && fontType != "CIDFontType0" && fontType != "CIDFontType2" && fontType != "TrueType") {
-			continue
-		}
-
-		fdObj, _ := r.Resolve(dict["FontDescriptor"])
+		fdObj, _ := r.Resolve(Font["FontDescriptor"])
 		if fdObj == nil {
-			// probably one of the built-in fonts
+			// built-in font?
 			continue
 		}
-		fd, ok := fdObj.(pdf.Dict)
+		FontDescriptor, ok := fdObj.(pdf.Dict)
 		if !ok {
-			return errors.New("astonishing font")
+			return errors.New("silly font")
 		}
-
-		key := pdf.Name("FontFile")
-		stmObj, _ := r.Resolve(fd[key])
+		stmObj, _ := r.Resolve(FontDescriptor["FontFile3"])
 		if stmObj == nil {
-			key = "FontFile2"
-			stmObj, _ = r.Resolve(fd[key])
-		}
-		if stmObj == nil {
-			key = "FontFile3"
-			stmObj, _ = r.Resolve(fd[key])
-		}
-		if stmObj == nil {
-			// font not embedded
 			continue
 		}
-
-		stm, ok := stmObj.(*pdf.Stream)
+		FontFile3, ok := stmObj.(*pdf.Stream)
 		if !ok {
-			return fmt.Errorf("strange font %T", stmObj)
+			return errors.New("funny font")
 		}
-		subType, _ := stm.Dict["Subtype"].(pdf.Name)
 
-		fmt.Println(fontType, key, subType)
+		fontType, _ := Font["Subtype"].(pdf.Name)
+		subType, _ := FontFile3.Dict["Subtype"].(pdf.Name)
+		baseFont, _ := Font["BaseFont"].(pdf.Name)
+
+		r, err := FontFile3.Decode(r.Resolve)
+		if err != nil {
+			return err
+		}
+		buf, err := io.ReadAll(r)
+		if err != nil {
+			return err
+		}
+		cff, err := cff.Read(bytes.NewReader(buf))
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(
+			isSubset(string(baseFont)), isSubset(cff.FontName), fontType, subType)
 	}
 
 	return nil

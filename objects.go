@@ -427,7 +427,7 @@ func (x *Stream) PDF(w io.Writer) error {
 	}
 
 	if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
-		enc, err := wenc.enc.cryptFilter(wenc.ref, withoutClose{w})
+		enc, err := wenc.enc.cryptFilter(wenc.ref, withDummyClose{w})
 		if err != nil {
 			return err
 		}

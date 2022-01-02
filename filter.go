@@ -63,6 +63,8 @@ import (
 	"errors"
 	"io"
 	"strconv"
+
+	"seehuhn.de/go/pdf/lzw"
 )
 
 // FilterInfo describes one PDF stream filter.
@@ -73,8 +75,10 @@ type FilterInfo struct {
 
 func (fi *FilterInfo) getFilter() (filter, error) {
 	switch fi.Name {
+	case "LZWDecode":
+		return flateFromDict(fi.Parms, true), nil
 	case "FlateDecode":
-		return ffFromDict(fi.Parms), nil
+		return flateFromDict(fi.Parms, false), nil
 	default:
 		return nil, errors.New("unsupported filter type " + string(fi.Name))
 	}
@@ -86,15 +90,17 @@ type flateFilter struct {
 	BitsPerComponent int
 	Columns          int
 	EarlyChange      bool
+	IsLZW            bool
 }
 
-func ffFromDict(parms Dict) *flateFilter {
+func flateFromDict(parms Dict, isLZW bool) *flateFilter {
 	res := &flateFilter{ // set defaults
 		Predictor:        1,
 		Colors:           1,
 		BitsPerComponent: 8,
 		Columns:          1,
 		EarlyChange:      true,
+		IsLZW:            isLZW,
 	}
 	if parms == nil {
 		return res
@@ -120,41 +126,39 @@ func ffFromDict(parms Dict) *flateFilter {
 
 func (ff *flateFilter) ToDict() Dict {
 	res := Dict{}
-	needed := false
 	if ff.Predictor != 1 {
 		res["Predictor"] = Integer(ff.Predictor)
-		needed = true
 	}
-	if ff.Colors != 1 {
+	if ff.Predictor > 1 && ff.Colors != 1 {
 		res["Colors"] = Integer(ff.Colors)
-		needed = true
 	}
-	if ff.BitsPerComponent != 8 {
+	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
 		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
-		needed = true
 	}
-	if ff.Columns != 1 {
+	if ff.Predictor > 1 && ff.Columns != 1 {
 		res["Columns"] = Integer(ff.Columns)
-		needed = true
 	}
-	if !ff.EarlyChange {
+	if ff.IsLZW && !ff.EarlyChange {
 		res["EarlyChange"] = Integer(0)
-		needed = true
 	}
-	if !needed {
+	if len(res) == 0 {
 		return nil
 	}
 	return res
 }
 
 func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
-	if !ff.EarlyChange {
-		return nil, errors.New("unsupported /EarlyChange setting")
+	if ff.IsLZW && ff.EarlyChange {
+		return nil, errors.New("EarlyChange=1 not implemented")
 	}
 
 	var res io.Reader
 	var err error
-	res, err = zlib.NewReader(r)
+	if ff.IsLZW {
+		res = lzw.NewReader(r)
+	} else {
+		res, err = zlib.NewReader(r)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -234,11 +238,16 @@ func (r *pngReader) Read(b []byte) (int, error) {
 }
 
 func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
-	if !ff.EarlyChange {
-		return nil, errors.New("unsupported /EarlyChange setting")
+	if ff.IsLZW && ff.EarlyChange {
+		return nil, errors.New("EarlyChange=1 not implemented")
 	}
 
-	zw, _ := zlib.NewWriterLevel(w, zlib.BestCompression)
+	var zw io.WriteCloser
+	if ff.IsLZW {
+		zw = lzw.NewWriter(w)
+	} else {
+		zw, _ = zlib.NewWriterLevel(w, zlib.BestCompression)
+	}
 
 	close := func() error {
 		err := zw.Close()
@@ -543,11 +552,11 @@ func abs8(d uint8) int {
 	return 256 - int(d)
 }
 
-type withoutClose struct {
+type withDummyClose struct {
 	io.Writer
 }
 
-func (w withoutClose) Close() error {
+func (w withDummyClose) Close() error {
 	return nil
 }
 

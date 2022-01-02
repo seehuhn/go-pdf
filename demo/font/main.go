@@ -62,10 +62,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	margin := 50.0
 	baseLineSkip := 1.2 * fontSize
 	q := fontSize / float64(F1.GlyphUnits)
-	layout, err := F1.Typeset(text, fontSize)
-	if err != nil {
-		return err
-	}
+	layout := F1.Typeset(text, fontSize)
 	glyphs := layout.Glyphs
 
 	for _, glyph := range layout.Glyphs {

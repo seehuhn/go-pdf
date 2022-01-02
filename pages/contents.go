@@ -95,8 +95,14 @@ func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Re
 }
 
 func (tree *PageTree) newPage(contentRef *pdf.Reference, mediaBox *pdf.Rectangle) (*Page, error) {
-	// TODO(voss): Use "LZWDecode" if tree.w.Version<pdf.V1_2
-	stream, _, err := tree.w.OpenStream(nil, contentRef, &pdf.FilterInfo{Name: "FlateDecode"})
+	compress := &pdf.FilterInfo{
+		Name:  pdf.Name("LZWDecode"),
+		Parms: pdf.Dict{"EarlyChange": pdf.Integer(0)},
+	}
+	if tree.w.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+	}
+	stream, _, err := tree.w.OpenStream(nil, contentRef, compress)
 	if err != nil {
 		return nil, err
 	}

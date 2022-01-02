@@ -209,8 +209,14 @@ func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Referen
 }
 
 func writeToUnicodeStream(w *pdf.Writer, data *toUnicodeData, toUnicodeRef *pdf.Reference) error {
-	cmapStream, _, err := w.OpenStream(nil, toUnicodeRef,
-		&pdf.FilterInfo{Name: "FlateDecode"})
+	compress := &pdf.FilterInfo{
+		Name:  pdf.Name("LZWDecode"),
+		Parms: pdf.Dict{"EarlyChange": pdf.Integer(0)},
+	}
+	if w.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+	}
+	cmapStream, _, err := w.OpenStream(nil, toUnicodeRef, compress)
 	if err != nil {
 		return err
 	}

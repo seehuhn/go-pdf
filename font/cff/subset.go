@@ -16,13 +16,16 @@
 
 package cff
 
-import "seehuhn.de/go/pdf/font"
+import (
+	"seehuhn.de/go/pdf/font"
+)
 
 // Subset returns a copy of the font, including only the glyphs in the given
 // subset.  The ".notdef" glyph is always included as the first glyph.
 func (cff *Font) Subset(subset []font.GlyphID) *Font {
+	tag := font.GetSubsetTag(subset, len(cff.GlyphName))
 	out := &Font{
-		FontName:    cff.FontName, // TODO(voss): subset tag needed?
+		FontName:    tag + "+" + cff.FontName,
 		topDict:     cff.topDict,
 		privateDict: cff.privateDict,
 

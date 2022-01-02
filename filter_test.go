@@ -23,47 +23,83 @@ import (
 	"testing"
 )
 
+func TestLZWSimple(t *testing.T) {
+	// This is example 1 from section 7.4.4.2 of PDF 32000-1:2008
+	in := []byte{45, 45, 45, 45, 45, 65, 45, 45, 45, 66}
+
+	parms := Dict{
+		"EarlyChange": Integer(0),
+	}
+	ff := flateFromDict(parms, true)
+	buf := &bytes.Buffer{}
+	w, err := ff.Encode(withDummyClose{buf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.Bytes()
+
+	fmt.Printf("% 0X\n", out)
+	panic("fish")
+}
+
 func TestFlate(t *testing.T) {
 	parmsss := []Dict{
 		nil,
+		{},
 		{"Predictor": Integer(1)},
 		{"Predictor": Integer(12), "Columns": Integer(5)},
 	}
-	for _, parms := range parmsss {
-		ff := ffFromDict(parms)
-		for _, in := range []string{"", "12345", "1234567890"} {
-			buf := &bytes.Buffer{}
-			w, err := ff.Encode(withoutClose{buf})
-			if err != nil {
-				t.Error(in, err)
-				continue
+	for _, isLZW := range []bool{false, true} {
+		for _, parms := range parmsss {
+			if isLZW {
+				if parms == nil {
+					parms = Dict{}
+				}
+				parms["EarlyChange"] = Integer(0)
 			}
-			_, err = w.Write([]byte(in))
-			if err != nil {
-				t.Error(in, err)
-				continue
-			}
-			err = w.Close()
-			if err != nil {
-				t.Error(in, err)
-				continue
-			}
+			ff := flateFromDict(parms, isLZW)
+			for _, in := range []string{"", "12345", "1234567890"} {
+				buf := &bytes.Buffer{}
+				w, err := ff.Encode(withDummyClose{buf})
+				if err != nil {
+					t.Error(in, err)
+					continue
+				}
+				_, err = w.Write([]byte(in))
+				if err != nil {
+					t.Error(in, err)
+					continue
+				}
+				err = w.Close()
+				if err != nil {
+					t.Error(in, err)
+					continue
+				}
 
-			fmt.Printf("%d %q\n", buf.Len(), buf.String())
+				fmt.Printf("%d %q\n", buf.Len(), buf.String())
 
-			r, err := ff.Decode(buf)
-			if err != nil {
-				t.Error(in, err)
-				continue
-			}
-			out, err := io.ReadAll(r)
-			if err != nil {
-				t.Error(in, err)
-				continue
-			}
+				r, err := ff.Decode(buf)
+				if err != nil {
+					t.Error(in, err)
+					continue
+				}
+				out, err := io.ReadAll(r)
+				if err != nil {
+					t.Error(in, err)
+					continue
+				}
 
-			if in != string(out) {
-				t.Errorf("wrong results: %q vs %q", in, string(out))
+				if in != string(out) {
+					t.Errorf("wrong results: %q vs %q", in, string(out))
+				}
 			}
 		}
 	}
