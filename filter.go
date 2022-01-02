@@ -148,14 +148,10 @@ func (ff *flateFilter) ToDict() Dict {
 }
 
 func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
-	if ff.IsLZW && ff.EarlyChange {
-		return nil, errors.New("EarlyChange=1 not implemented")
-	}
-
 	var res io.Reader
 	var err error
 	if ff.IsLZW {
-		res = lzw.NewReader(r)
+		res = lzw.NewReader(r, ff.EarlyChange)
 	} else {
 		res, err = zlib.NewReader(r)
 	}
@@ -238,15 +234,15 @@ func (r *pngReader) Read(b []byte) (int, error) {
 }
 
 func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
-	if ff.IsLZW && ff.EarlyChange {
-		return nil, errors.New("EarlyChange=1 not implemented")
-	}
-
 	var zw io.WriteCloser
+	var err error
 	if ff.IsLZW {
-		zw = lzw.NewWriter(w)
+		zw, err = lzw.NewWriter(w, ff.EarlyChange)
 	} else {
-		zw, _ = zlib.NewWriterLevel(w, zlib.BestCompression)
+		zw, err = zlib.NewWriterLevel(w, zlib.BestCompression)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	close := func() error {

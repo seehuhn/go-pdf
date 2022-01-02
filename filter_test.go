@@ -23,33 +23,6 @@ import (
 	"testing"
 )
 
-func TestLZWSimple(t *testing.T) {
-	// This is example 1 from section 7.4.4.2 of PDF 32000-1:2008
-	in := []byte{45, 45, 45, 45, 45, 65, 45, 45, 45, 66}
-
-	parms := Dict{
-		"EarlyChange": Integer(0),
-	}
-	ff := flateFromDict(parms, true)
-	buf := &bytes.Buffer{}
-	w, err := ff.Encode(withDummyClose{buf})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = w.Write(in)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = w.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := buf.Bytes()
-
-	fmt.Printf("% 0X\n", out)
-	panic("fish")
-}
-
 func TestFlate(t *testing.T) {
 	parmsss := []Dict{
 		nil,

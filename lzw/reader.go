@@ -1,18 +1,59 @@
-// Copyright 2011 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+// Some code here is taken from "compress/lzw" (and then modified).  Use of
+// this source code is governed by a BSD-style license, which is reproduced
+// here:
+//
+//     Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+//     Redistribution and use in source and binary forms, with or without
+//     modification, are permitted provided that the following conditions are
+//     met:
+//
+//        * Redistributions of source code must retain the above copyright
+//     notice, this list of conditions and the following disclaimer.
+//        * Redistributions in binary form must reproduce the above
+//     copyright notice, this list of conditions and the following disclaimer
+//     in the documentation and/or other materials provided with the
+//     distribution.
+//        * Neither the name of Google Inc. nor the names of its
+//     contributors may be used to endorse or promote products derived from
+//     this software without specific prior written permission.
+//
+//     THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+//     "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+//     LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+//     A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+//     OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+//     SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+//     LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+//     DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+//     THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+//     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+//     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Package lzw implements the Lempel-Ziv-Welch compressed data format,
 // described in T. A. Welch, ``A Technique for High-Performance Data
 // Compression'', Computer, 17(6) (June 1984), pp 8-19.
 //
-// In particular, it implements LZW as used by the GIF and PDF file
-// formats, which means variable-width codes up to 12 bits and the first
+// In particular, it implements LZW as used by the PDF file
+// format, which means variable-width codes up to 12 bits and the first
 // two non-literal codes are a clear code and an EOF code.
-//
-// The TIFF file format uses a similar but incompatible version of the LZW
-// algorithm. See the golang.org/x/image/tiff/lzw package for an
-// implementation.
+// Both the correct and the "early change" variant are implemented.
 package lzw
 
 import (
@@ -25,19 +66,20 @@ const (
 	litWidth = 8
 	maxWidth = 12
 
-	decoderInvalidCode = 0xffff
+	clear              = 1 << litWidth
+	eof                = clear + 1
 	flushBuffer        = 1 << maxWidth
+	decoderInvalidCode = 0xffff
 )
 
 // Reader is an io.Reader which can be used to read compressed data in the
 // LZW format.
 type Reader struct {
-	r        io.ByteReader
-	bits     uint32
-	nBits    uint
-	width    uint
-	litWidth int // width in bits of literal codes
-	err      error
+	src          io.ByteReader
+	bits         uint32
+	nBits        uint
+	currentWidth uint
+	err          error
 
 	// The first 1<<litWidth codes are literal codes.
 	// The next two codes mean clear and EOF.
@@ -50,7 +92,7 @@ type Reader struct {
 	// last is the most recently seen code, or decoderInvalidCode.
 	//
 	// An invariant is that hi < overflow.
-	clear, eof, hi, overflow, last uint16
+	hi, overflow, last uint16
 
 	// Each code c in [lo, hi] expands to two or more bytes. For c != hi:
 	//   suffix[c] is the last of these bytes.
@@ -70,21 +112,23 @@ type Reader struct {
 	output [2 * 1 << maxWidth]byte
 	o      int    // write index into output
 	toRead []byte // bytes to return from Read
+
+	earlyChange uint16 // the off-by-one error allowed by the PDF spec
 }
 
 // readMSB returns the next code for "Most Significant Bits first" data.
 func (r *Reader) read() (uint16, error) {
-	for r.nBits < r.width {
-		x, err := r.r.ReadByte()
+	for r.nBits < r.currentWidth {
+		x, err := r.src.ReadByte()
 		if err != nil {
 			return 0, err
 		}
 		r.bits |= uint32(x) << (24 - r.nBits)
 		r.nBits += 8
 	}
-	code := uint16(r.bits >> (32 - r.width))
-	r.bits <<= r.width
-	r.nBits -= r.width
+	code := uint16(r.bits >> (32 - r.currentWidth))
+	r.bits <<= r.currentWidth
+	r.nBits -= r.currentWidth
 	return code, nil
 }
 
@@ -103,9 +147,7 @@ func (r *Reader) Read(b []byte) (int, error) {
 	}
 }
 
-// decode decompresses bytes from r and leaves them in d.toRead.
-// read specifies how to decode bytes into codes.
-// litWidth is the width in bits of literal codes.
+// decode decompresses bytes from src and leaves them in r.toRead.
 func (r *Reader) decode() {
 	// Loop over the code stream, converting codes into decompressed bytes.
 loop:
@@ -119,7 +161,7 @@ loop:
 			break
 		}
 		switch {
-		case code < r.clear:
+		case code < clear:
 			// We have a literal code.
 			r.output[r.o] = uint8(code)
 			r.o++
@@ -128,13 +170,13 @@ loop:
 				r.suffix[r.hi] = uint8(code)
 				r.prefix[r.hi] = r.last
 			}
-		case code == r.clear:
-			r.width = 1 + uint(r.litWidth)
-			r.hi = r.eof
-			r.overflow = 1 << r.width
+		case code == clear:
+			r.currentWidth = 1 + uint(litWidth)
+			r.hi = eof
+			r.overflow = 1 << r.currentWidth
 			r.last = decoderInvalidCode
 			continue
-		case code == r.eof:
+		case code == eof:
 			r.err = io.EOF
 			break loop
 		case code <= r.hi:
@@ -144,7 +186,7 @@ loop:
 				// followed by the head of the last expansion. To find the head, we walk
 				// the prefix chain until we find a literal code.
 				c = r.last
-				for c >= r.clear {
+				for c >= clear {
 					c = r.prefix[c]
 				}
 				r.output[i] = uint8(c)
@@ -152,7 +194,7 @@ loop:
 				c = r.last
 			}
 			// Copy the suffix chain into output and then write that to w.
-			for c >= r.clear {
+			for c >= clear {
 				r.output[i] = r.suffix[c]
 				i--
 				c = r.prefix[c]
@@ -169,19 +211,16 @@ loop:
 			break loop
 		}
 		r.last, r.hi = code, r.hi+1
-		if r.hi >= r.overflow {
-			if r.hi > r.overflow {
-				panic("unreachable")
-			}
-			if r.width == maxWidth {
+		if r.hi+r.earlyChange >= r.overflow {
+			if r.currentWidth >= maxWidth {
 				r.last = decoderInvalidCode
-				// Undo the d.hi++ a few lines above, so that (1) we maintain
-				// the invariant that d.hi < d.overflow, and (2) d.hi does not
+				// Undo the r.hi++ a few lines above, so that (1) we maintain
+				// the invariant that r.hi < r.overflow, and (2) r.hi does not
 				// eventually overflow a uint16.
 				r.hi--
 			} else {
-				r.width++
-				r.overflow = 1 << r.width
+				r.currentWidth++
+				r.overflow = 1 << r.currentWidth
 			}
 		}
 		if r.o >= flushBuffer {
@@ -198,35 +237,41 @@ var errClosed = errors.New("lzw: reader/writer is closed")
 // Close closes the Reader and returns an error for any future read operation.
 // It does not close the underlying io.Reader.
 func (r *Reader) Close() error {
+	if r.err == errClosed {
+		return nil
+	} else if r.err != nil && r.err != io.EOF {
+		return r.err
+	}
+
 	r.err = errClosed // in case any Reads come along
 	return nil
 }
 
 // NewReader creates a new io.ReadCloser.
-// Reads from the returned io.ReadCloser read and decompress data from r.
-// If r does not also implement io.ByteReader,
-// the decompressor may read more data than necessary from r.
-// It is the caller's responsibility to call Close on the ReadCloser when
+// Reads from the returned io.ReadCloser read and decompress data from src.
+// If src does not also implement io.ByteReader,
+// the decompressor may read more data than necessary from src.
+// It is the caller's responsibility to call Close() on the ReadCloser when
 // finished reading.
 //
 // It is guaranteed that the underlying type of the returned io.ReadCloser
 // is a *Reader.
-func NewReader(r io.Reader) io.ReadCloser {
-	res := new(Reader)
-	res.init(r)
-	return res
-}
-
-func (r *Reader) init(src io.Reader) {
+func NewReader(src io.Reader, earlyChange bool) io.ReadCloser {
 	br, ok := src.(io.ByteReader)
 	if !ok && src != nil {
 		br = bufio.NewReader(src)
 	}
-	r.r = br
-	r.litWidth = litWidth
-	r.width = 1 + uint(litWidth)
-	r.clear = uint16(1) << uint(litWidth)
-	r.eof, r.hi = r.clear+1, r.clear+1
-	r.overflow = uint16(1) << r.width
+
+	r := &Reader{}
+	r.src = br
+	r.currentWidth = 1 + uint(litWidth)
+	r.hi = eof
+	r.overflow = uint16(1) << r.currentWidth
 	r.last = decoderInvalidCode
+
+	if earlyChange {
+		r.earlyChange = 1
+	}
+
+	return r
 }

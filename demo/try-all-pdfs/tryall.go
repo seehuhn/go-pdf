@@ -18,7 +18,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,12 +27,7 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/cff"
 )
-
-func isSubset(name string) bool {
-	return len(name) > 7 && name[6] == '+'
-}
 
 func doOneFile(fname string) error {
 	fd, err := os.Open(fname)
@@ -51,7 +45,7 @@ func doOneFile(fname string) error {
 	defer r.Close()
 
 	for {
-		obj, _, err := r.ReadSequential()
+		obj, ref, err := r.ReadSequential()
 		if err == io.EOF {
 			break
 		}
@@ -59,47 +53,23 @@ func doOneFile(fname string) error {
 			return err
 		}
 
-		Font, ok := obj.(pdf.Dict)
-		if !ok || Font["Type"] != pdf.Name("Font") {
-			continue
-		}
-		fdObj, _ := r.Resolve(Font["FontDescriptor"])
-		if fdObj == nil {
-			// built-in font?
-			continue
-		}
-		FontDescriptor, ok := fdObj.(pdf.Dict)
+		stm, ok := obj.(*pdf.Stream)
 		if !ok {
-			return errors.New("silly font")
-		}
-		stmObj, _ := r.Resolve(FontDescriptor["FontFile3"])
-		if stmObj == nil {
 			continue
 		}
-		FontFile3, ok := stmObj.(*pdf.Stream)
-		if !ok {
-			return errors.New("funny font")
+		ff, err := stm.Filters(r.Resolve)
+		good := false
+		for _, f := range ff {
+			if f.Name == "LZWDecode" {
+				good = true
+				fmt.Println(f.Parms)
+				break
+			}
 		}
-
-		fontType, _ := Font["Subtype"].(pdf.Name)
-		subType, _ := FontFile3.Dict["Subtype"].(pdf.Name)
-		baseFont, _ := Font["BaseFont"].(pdf.Name)
-
-		r, err := FontFile3.Decode(r.Resolve)
-		if err != nil {
-			return err
+		if good {
+			fmt.Println(fname, ref)
+			stm.Dict.PDF(os.Stdout)
 		}
-		buf, err := io.ReadAll(r)
-		if err != nil {
-			return err
-		}
-		cff, err := cff.Read(bytes.NewReader(buf))
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(
-			isSubset(string(baseFont)), isSubset(cff.FontName), fontType, subType)
 	}
 
 	return nil

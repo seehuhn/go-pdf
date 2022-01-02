@@ -95,10 +95,7 @@ func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Re
 }
 
 func (tree *PageTree) newPage(contentRef *pdf.Reference, mediaBox *pdf.Rectangle) (*Page, error) {
-	compress := &pdf.FilterInfo{
-		Name:  pdf.Name("LZWDecode"),
-		Parms: pdf.Dict{"EarlyChange": pdf.Integer(0)},
-	}
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
 	if tree.w.Version >= pdf.V1_2 {
 		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
@@ -117,7 +114,7 @@ func (tree *PageTree) newPage(contentRef *pdf.Reference, mediaBox *pdf.Rectangle
 	}, nil
 }
 
-// Close writes any buffered data to the content stream and the closes the
+// Close writes any buffered data to the content stream and then closes the
 // stream.  The Page object cannot be used any more after .Close() has been
 // called.
 func (p *Page) Close() error {
