@@ -62,8 +62,9 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 // subset.  The ".notdef" glyph is always included as the first glyph.
 // This method does not prune/expand subroutines.
 func (cff *Font) naiveSubset(subset []font.GlyphID) *Font {
+	tag := font.GetSubsetTag(subset, len(cff.GlyphName))
 	out := &Font{
-		FontName:    cff.FontName, // TODO(voss): subset tag needed?
+		FontName:    tag + "+" + cff.FontName,
 		topDict:     cff.topDict,
 		privateDict: cff.privateDict,
 		gsubrs:      cff.gsubrs,

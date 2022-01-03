@@ -68,7 +68,11 @@ func (t3 *Builder) AddGlyph(r rune, width int) (*Glyph, error) {
 		return nil, errors.New("glyph already present")
 	}
 
-	stream, ref, err := t3.w.OpenStream(nil, nil, &pdf.FilterInfo{Name: "FlateDecode"})
+	compress := pdf.Name("LZWDecode")
+	if t3.w.Version >= pdf.V1_2 {
+		compress = "FlateDecode"
+	}
+	stream, ref, err := t3.w.OpenStream(nil, nil, &pdf.FilterInfo{Name: compress})
 	if err != nil {
 		return nil, err
 	}

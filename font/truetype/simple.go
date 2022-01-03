@@ -284,8 +284,14 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 	fontFileDict := pdf.Dict{
 		"Length1": size,
 	}
+	compress := &pdf.FilterInfo{
+		Name: pdf.Name("LZWDecode"),
+	}
+	if w.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+	}
 	fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
-		&pdf.FilterInfo{Name: "FlateDecode"})
+		compress)
 	if err != nil {
 		return err
 	}

@@ -58,6 +58,9 @@ func doOneFile(fname string) error {
 			continue
 		}
 		ff, err := stm.Filters(r.Resolve)
+		if err != nil {
+			return err
+		}
 		good := false
 		for _, f := range ff {
 			if f.Name == "LZWDecode" {

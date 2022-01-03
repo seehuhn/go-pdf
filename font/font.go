@@ -39,7 +39,7 @@ type Font struct {
 	Ascent     int // ascent in glyph coordinate units
 	Descent    int // descent in glyph coordinate units, as a negative number
 
-	GlyphExtent []Rect // This is in font design units.  TODO(voss): needed?
+	GlyphExtent []Rect // This is in font design units.
 	Width       []int  // This is in font design units.  TODO(voss): needed?
 }
 

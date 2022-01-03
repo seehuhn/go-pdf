@@ -494,6 +494,10 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, filters ...*FilterInfo)
 		w = enc
 	}
 	for _, fi := range filters {
+		if fi == nil {
+			continue
+		}
+
 		filter, err := fi.getFilter()
 		if err != nil {
 			return nil, nil, err

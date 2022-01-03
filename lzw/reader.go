@@ -54,6 +54,12 @@
 // format, which means variable-width codes up to 12 bits and the first
 // two non-literal codes are a clear code and an EOF code.
 // Both the correct and the "early change" variant are implemented.
+//
+// The main differences to the "compress/lzw" package are:
+//	- the pdf/lzw package sends a clear code as the first code
+//    (required for Preview on MacOS)
+//	- pdf/lzw implements the "early change" variant
+//  - pdf/lzw always uses MSB bit order and 8-bit literals
 package lzw
 
 import (
