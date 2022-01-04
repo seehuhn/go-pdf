@@ -83,7 +83,7 @@ const (
 type Writer struct {
 	// dst is the writer that compressed bytes are written to.
 	dst writer
-	// bits, nBits and width are the state for
+	// bits, nBits and currentWidth are the state for
 	// converting a code stream into a byte stream.
 	bits         uint32
 	nBits        uint
@@ -107,46 +107,74 @@ type Writer struct {
 	earlyChange uint32 // the off-by-one error allowed by the PDF spec
 }
 
-// writeMSB writes the code c for "Most Significant Bits first" data.
-func (w *Writer) write(c uint32) error {
-	w.bits |= c << (32 - w.currentWidth - w.nBits)
-	w.nBits += w.currentWidth
-	for w.nBits >= 8 {
-		if err := w.dst.WriteByte(byte(w.bits >> 24)); err != nil {
-			return err
-		}
-		w.bits <<= 8
-		w.nBits -= 8
+// NewWriter creates a new io.WriteCloser.
+// Writes to the returned io.WriteCloser are compressed and written to dst.
+// It is the caller's responsibility to call Close on the WriteCloser when
+// finished writing.
+//
+// It is guaranteed that the underlying type of the returned io.WriteCloser
+// is a *Writer.
+func NewWriter(dst io.Writer, earlyChange bool) (io.WriteCloser, error) {
+	bw, ok := dst.(writer)
+	if !ok && dst != nil {
+		bw = bufio.NewWriter(dst)
 	}
-	return nil
+
+	w := &Writer{}
+	w.dst = bw
+	w.currentWidth = 1 + litWidth
+	w.hi = eof
+	w.overflow = 1 << (litWidth + 1)
+	w.savedCode = invalidCode
+
+	if earlyChange {
+		w.earlyChange = 1
+	}
+
+	err := w.write(clear) // PDF expects a leading clear code.
+	if err != nil {
+		return nil, err
+	}
+
+	return w, nil
 }
 
-// errOutOfCodes is an internal error that means that the writer has run out
-// of unused codes and a clear code needs to be sent next.
-var errOutOfCodes = errors.New("lzw: out of codes")
-
-// incHi increments e.hi and checks for both overflow and running out of
-// unused codes. In the latter case, incHi sends a clear code, resets the
-// writer state and returns errOutOfCodes.
-func (w *Writer) incHi() error {
-	w.hi++
-	if w.hi+w.earlyChange == w.overflow {
-		w.currentWidth++
-		w.overflow <<= 1
+// Close closes the Writer, flushing any pending output.  It does not close
+// w's underlying writer.
+func (w *Writer) Close() error {
+	if w.err == errClosed {
+		return nil
+	} else if w.err != nil {
+		return w.err
 	}
-	if w.hi+w.earlyChange == maxCode {
-		if err := w.write(clear); err != nil {
+
+	// Make any future calls to Write return errClosed.
+	w.err = errClosed
+
+	// Write the savedCode if valid.
+	if w.savedCode != invalidCode {
+		if err := w.write(w.savedCode); err != nil {
+			w.err = err
 			return err
 		}
-		w.currentWidth = litWidth + 1
-		w.hi = eof
-		w.overflow = clear << 1
-		for i := range w.table {
-			w.table[i] = invalidEntry
+		if err := w.incHi(); err != nil && err != errOutOfCodes {
+			w.err = err
+			return err
 		}
-		return errOutOfCodes
 	}
-	return nil
+	// Write the eof code.
+	if err := w.write(eof); err != nil {
+		return err
+	}
+
+	// Write the final bits.
+	if w.nBits > 0 {
+		w.bits >>= 24
+		if err := w.dst.WriteByte(uint8(w.bits)); err != nil {
+			return err
+		}
+	}
+	return w.dst.Flush()
 }
 
 // Write writes a compressed representation of p to w's underlying writer.
@@ -155,10 +183,11 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 		return 0, w.err
 	}
 
-	if len(p) == 0 {
+	n = len(p)
+	if n == 0 {
 		return 0, nil
 	}
-	n = len(p)
+
 	code := w.savedCode
 	if code == invalidCode {
 		// The first code sent is always a literal code.
@@ -207,72 +236,44 @@ loop:
 	return n, nil
 }
 
-// Close closes the Writer, flushing any pending output.  It does not close
-// w's underlying writer.
-func (w *Writer) Close() error {
-	if w.err == errClosed {
-		return nil
-	} else if w.err != nil {
-		return w.err
+// incHi increments e.hi and checks for both overflow and running out of
+// unused codes. In the latter case, incHi sends a clear code, resets the
+// writer state and returns errOutOfCodes.
+func (w *Writer) incHi() error {
+	w.hi++
+	if w.hi+w.earlyChange == w.overflow {
+		w.currentWidth++
+		w.overflow <<= 1
 	}
-
-	// Make any future calls to Write return errClosed.
-	w.err = errClosed
-
-	// Write the savedCode if valid.
-	if w.savedCode != invalidCode {
-		if err := w.write(w.savedCode); err != nil {
-			w.err = err
+	if w.hi+w.earlyChange == maxCode {
+		if err := w.write(clear); err != nil {
 			return err
 		}
-		if err := w.incHi(); err != nil && err != errOutOfCodes {
-			w.err = err
-			return err
+		w.currentWidth = litWidth + 1
+		w.hi = eof
+		w.overflow = clear << 1
+		for i := range w.table {
+			w.table[i] = invalidEntry
 		}
+		return errOutOfCodes
 	}
-	// Write the eof code.
-	if err := w.write(eof); err != nil {
-		return err
-	}
-
-	// Write the final bits.
-	if w.nBits > 0 {
-		w.bits >>= 24
-		if err := w.dst.WriteByte(uint8(w.bits)); err != nil {
-			return err
-		}
-	}
-	return w.dst.Flush()
+	return nil
 }
 
-// NewWriter creates a new io.WriteCloser.
-// Writes to the returned io.WriteCloser are compressed and written to dst.
-// It is the caller's responsibility to call Close on the WriteCloser when
-// finished writing.
-//
-// It is guaranteed that the underlying type of the returned io.WriteCloser
-// is a *Writer.
-func NewWriter(dst io.Writer, earlyChange bool) (io.WriteCloser, error) {
-	bw, ok := dst.(writer)
-	if !ok && dst != nil {
-		bw = bufio.NewWriter(dst)
+// writeMSB writes the code c for "Most Significant Bits first" data.
+func (w *Writer) write(c uint32) error {
+	w.bits |= c << (32 - w.currentWidth - w.nBits)
+	w.nBits += w.currentWidth
+	for w.nBits >= 8 {
+		if err := w.dst.WriteByte(byte(w.bits >> 24)); err != nil {
+			return err
+		}
+		w.bits <<= 8
+		w.nBits -= 8
 	}
-
-	w := &Writer{}
-	w.dst = bw
-	w.currentWidth = 1 + litWidth
-	w.hi = eof
-	w.overflow = 1 << (litWidth + 1)
-	w.savedCode = invalidCode
-
-	if earlyChange {
-		w.earlyChange = 1
-	}
-
-	err := w.write(clear) // PDF expects a leading clear code.
-	if err != nil {
-		return nil, err
-	}
-
-	return w, nil
+	return nil
 }
+
+// errOutOfCodes is an internal error that means that the writer has run out
+// of unused codes and a clear code needs to be sent next.
+var errOutOfCodes = errors.New("lzw: out of codes")

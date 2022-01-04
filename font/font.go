@@ -40,7 +40,7 @@ type Font struct {
 	Descent    int // descent in glyph coordinate units, as a negative number
 
 	GlyphExtent []Rect // This is in font design units.
-	Width       []int  // This is in font design units.  TODO(voss): needed?
+	Width       []int  // This is in font design units.
 }
 
 // NumGlyphs returns the number of glyphs in a font.

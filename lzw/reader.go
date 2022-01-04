@@ -56,10 +56,10 @@
 // Both the correct and the "early change" variant are implemented.
 //
 // The main differences to the "compress/lzw" package are:
-//	- the pdf/lzw package sends a clear code as the first code
-//    (required for Preview on MacOS)
-//	- pdf/lzw implements the "early change" variant
-//  - pdf/lzw always uses MSB bit order and 8-bit literals
+//   * the pdf/lzw package sends a clear code as the first code
+//     (required for Preview on MacOS)
+//   * pdf/lzw implements the "early change" variant
+//   * pdf/lzw always uses MSB bit order and 8-bit literals
 package lzw
 
 import (
@@ -93,11 +93,11 @@ type Reader struct {
 	// with the upper bound incrementing on each code seen.
 	//
 	// overflow is the code at which hi overflows the code width. It always
-	// equals 1 << width.
-	//
-	// last is the most recently seen code, or decoderInvalidCode.
+	// equals 1 << currentWidth.
 	//
 	// An invariant is that hi < overflow.
+	//
+	// last is the most recently seen code, or decoderInvalidCode.
 	hi, overflow, last uint16
 
 	// Each code c in [lo, hi] expands to two or more bytes. For c != hi:
@@ -122,20 +122,46 @@ type Reader struct {
 	earlyChange uint16 // the off-by-one error allowed by the PDF spec
 }
 
-// readMSB returns the next code for "Most Significant Bits first" data.
-func (r *Reader) read() (uint16, error) {
-	for r.nBits < r.currentWidth {
-		x, err := r.src.ReadByte()
-		if err != nil {
-			return 0, err
-		}
-		r.bits |= uint32(x) << (24 - r.nBits)
-		r.nBits += 8
+// NewReader creates a new io.ReadCloser.
+// Reads from the returned io.ReadCloser read and decompress data from src.
+// If src does not also implement io.ByteReader,
+// the decompressor may read more data than necessary from src.
+// It is the caller's responsibility to call Close() on the ReadCloser when
+// finished reading.
+//
+// It is guaranteed that the underlying type of the returned io.ReadCloser
+// is a *Reader.
+func NewReader(src io.Reader, earlyChange bool) io.ReadCloser {
+	br, ok := src.(io.ByteReader)
+	if !ok && src != nil {
+		br = bufio.NewReader(src)
 	}
-	code := uint16(r.bits >> (32 - r.currentWidth))
-	r.bits <<= r.currentWidth
-	r.nBits -= r.currentWidth
-	return code, nil
+
+	r := &Reader{}
+	r.src = br
+	r.currentWidth = 1 + uint(litWidth)
+	r.hi = eof
+	r.overflow = uint16(1) << r.currentWidth
+	r.last = decoderInvalidCode
+
+	if earlyChange {
+		r.earlyChange = 1
+	}
+
+	return r
+}
+
+// Close closes the Reader and returns an error for any future read operation.
+// It does not close the underlying io.Reader.
+func (r *Reader) Close() error {
+	if r.err == errClosed {
+		return nil
+	} else if r.err != nil && r.err != io.EOF {
+		return r.err
+	}
+
+	r.err = errClosed // in case any Reads come along
+	return nil
 }
 
 // Read implements io.Reader, reading uncompressed bytes from its underlying Reader.
@@ -238,46 +264,20 @@ loop:
 	r.o = 0
 }
 
+// readMSB returns the next code for "Most Significant Bits first" data.
+func (r *Reader) read() (uint16, error) {
+	for r.nBits < r.currentWidth {
+		x, err := r.src.ReadByte()
+		if err != nil {
+			return 0, err
+		}
+		r.bits |= uint32(x) << (24 - r.nBits)
+		r.nBits += 8
+	}
+	code := uint16(r.bits >> (32 - r.currentWidth))
+	r.bits <<= r.currentWidth
+	r.nBits -= r.currentWidth
+	return code, nil
+}
+
 var errClosed = errors.New("lzw: reader/writer is closed")
-
-// Close closes the Reader and returns an error for any future read operation.
-// It does not close the underlying io.Reader.
-func (r *Reader) Close() error {
-	if r.err == errClosed {
-		return nil
-	} else if r.err != nil && r.err != io.EOF {
-		return r.err
-	}
-
-	r.err = errClosed // in case any Reads come along
-	return nil
-}
-
-// NewReader creates a new io.ReadCloser.
-// Reads from the returned io.ReadCloser read and decompress data from src.
-// If src does not also implement io.ByteReader,
-// the decompressor may read more data than necessary from src.
-// It is the caller's responsibility to call Close() on the ReadCloser when
-// finished reading.
-//
-// It is guaranteed that the underlying type of the returned io.ReadCloser
-// is a *Reader.
-func NewReader(src io.Reader, earlyChange bool) io.ReadCloser {
-	br, ok := src.(io.ByteReader)
-	if !ok && src != nil {
-		br = bufio.NewReader(src)
-	}
-
-	r := &Reader{}
-	r.src = br
-	r.currentWidth = 1 + uint(litWidth)
-	r.hi = eof
-	r.overflow = uint16(1) << r.currentWidth
-	r.last = decoderInvalidCode
-
-	if earlyChange {
-		r.earlyChange = 1
-	}
-
-	return r
-}
