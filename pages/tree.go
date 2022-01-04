@@ -29,8 +29,8 @@ const pageTreeWidth = 12
 // PageTree represents a PDF page tree.
 type PageTree struct {
 	w        *pdf.Writer
-	root     *pages
-	current  *pages
+	root     *internalNode
+	current  *internalNode
 	defaults *DefaultAttributes
 }
 
@@ -39,7 +39,7 @@ type PageTree struct {
 // Use .Finish() to write the tree to the file and return the root object
 // for inclusion in the document catalog.
 func NewPageTree(w *pdf.Writer, defaults *DefaultAttributes) *PageTree {
-	root := &pages{
+	root := &internalNode{
 		id: w.Alloc(),
 	}
 	return &PageTree{
@@ -87,9 +87,9 @@ func (tree *PageTree) Finish() (*pdf.Reference, error) {
 // Ship adds a new page or subtree to the PageTree. This function is for
 // special cases, where the caller constructs the page dictionary manually.
 // Normally callers would use the .AddPage() method, instead.
-func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
-	if page["Type"] != pdf.Name("Page") && page["Type"] != pdf.Name("Pages") {
-		return errors.New("wrong pdf.Dict type, expected /Page or /Pages")
+func (tree *PageTree) Ship(page pdf.Dict) error {
+	if page["Type"] != pdf.Name("Page") {
+		return errors.New("wrong pdf.Dict type, expected /Page")
 	}
 
 	parent, err := tree.splitIfNeeded(tree.current)
@@ -99,7 +99,7 @@ func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
 	tree.current = parent
 	page["Parent"] = parent.id
 
-	ref, err = tree.w.Write(page, ref)
+	ref, err := tree.w.Write(page, nil)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
 	return nil
 }
 
-func (tree *PageTree) splitIfNeeded(node *pages) (*pages, error) {
+func (tree *PageTree) splitIfNeeded(node *internalNode) (*internalNode, error) {
 	if len(node.kids) < pageTreeWidth {
 		return node, nil
 	}
@@ -128,7 +128,7 @@ func (tree *PageTree) splitIfNeeded(node *pages) (*pages, error) {
 	parent := node.parent
 	if parent == nil {
 		// tree is full: add another level at the root
-		parent = &pages{
+		parent = &internalNode{
 			id:    tree.w.Alloc(),
 			kids:  []*pdf.Reference{node.id},
 			count: node.count,
@@ -148,7 +148,7 @@ func (tree *PageTree) splitIfNeeded(node *pages) (*pages, error) {
 	if err != nil {
 		return nil, err
 	}
-	node = &pages{
+	node = &internalNode{
 		id:     tree.w.Alloc(),
 		parent: parent,
 	}
@@ -156,14 +156,14 @@ func (tree *PageTree) splitIfNeeded(node *pages) (*pages, error) {
 	return node, nil
 }
 
-type pages struct {
+type internalNode struct {
 	id     *pdf.Reference
-	parent *pages
+	parent *internalNode
 	kids   []*pdf.Reference
 	count  int
 }
 
-func (pp *pages) toObject() pdf.Dict {
+func (pp *internalNode) toObject() pdf.Dict {
 	var kids pdf.Array
 	for _, ref := range pp.kids {
 		kids = append(kids, ref)

@@ -85,7 +85,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = pageTree.Ship(page, nil) // Use AddPage() instead
+		err = pageTree.Ship(page) // TODO(voss): Use AddPage() instead
 		if err != nil {
 			log.Fatal(err)
 		}

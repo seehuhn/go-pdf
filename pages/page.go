@@ -26,9 +26,8 @@ import (
 )
 
 // Page represents the contents of a page in the PDF file.  The object provides
-// .Write() and .WriteString() methods to write the PDF content stream for the
-// page.  The .Close() method must be called after the content stream has been
-// written completely.
+// different methods to write the PDF content stream for the page.
+// After the content stream has been written, the .Close() method must be called .
 type Page struct {
 	LLx, LLy, URx, URy float64 // The media box for the page
 
@@ -86,7 +85,7 @@ func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Re
 			pageDict["Rotate"] = pdf.Integer(attr.Rotate)
 		}
 	}
-	err := tree.Ship(pageDict, nil)
+	err := tree.Ship(pageDict)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -127,9 +126,9 @@ func (p *Page) Close() error {
 }
 
 // Write writes the contents of buf to the content stream.  It returns the
-// number of bytes written.  If nn < len(p), it also returns an error
+// number of bytes written.  If n < len(buf), it also returns an error
 // explaining why the write is short.
-func (p *Page) Write(buf []byte) (int, error) {
+func (p *Page) Write(buf []byte) (n int, err error) {
 	return p.w.Write(buf)
 }
 
