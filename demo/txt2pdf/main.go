@@ -82,8 +82,8 @@ func convert(inName, outName string, V pdf.Version) error {
 	}
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
-		Resources: pdf.Dict{
-			"Font": pdf.Dict{Font.InstName: Font.Ref},
+		Resources: &pages.Resources{
+			Font: pdf.Dict{Font.InstName: Font.Ref},
 		},
 		MediaBox: pages.A4,
 	})

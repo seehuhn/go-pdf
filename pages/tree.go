@@ -68,8 +68,8 @@ func (tree *PageTree) Finish() (*pdf.Reference, error) {
 
 	root := current.toObject()
 	if def := tree.defaults; def != nil {
-		if len(def.Resources) > 0 {
-			root["Resources"] = def.Resources
+		if def.Resources != nil {
+			root["Resources"] = pdf.AsDict(def.Resources)
 		}
 		if def.MediaBox != nil {
 			root["MediaBox"] = def.MediaBox
@@ -105,8 +105,8 @@ func (tree *PageTree) Ship(page pdf.Dict, ref *pdf.Reference) error {
 	}
 
 	inc := 1
-	if cummulative, ok := page["Count"].(pdf.Integer); ok {
-		inc = int(cummulative)
+	if cumulative, ok := page["Count"].(pdf.Integer); ok {
+		inc = int(cumulative)
 	}
 	parent.kids = append(parent.kids, ref)
 	for parent != nil {

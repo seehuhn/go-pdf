@@ -75,8 +75,8 @@ func main() {
 	}
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
-		Resources: pdf.Dict{
-			"Font": pdf.Dict{"F1": font},
+		Resources: &pages.Resources{
+			Font: pdf.Dict{"F1": font},
 		},
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})

@@ -22,6 +22,7 @@ import (
 
 // Resources describes a PDF Resource Dictionary
 // See section 7.8.3 of PDF 32000-1:2008 for details.
+// TODO(voss): use []*font.Font for the .Font field?
 type Resources struct {
 	ExtGState  pdf.Dict  `pdf:"optional"` // maps resource names to graphics state parameter dictionaries
 	ColorSpace pdf.Dict  `pdf:"optional"` // maps each resource name to either the name of a device-dependent colour space or an array describing a colour space
@@ -60,14 +61,14 @@ type Attributes struct {
 // These attributes are documented in sections 7.7.3.3 and 7.7.3.4 of
 // PDF 32000-1:2008.
 type DefaultAttributes struct {
-	Resources pdf.Dict // TODO(voss): use a struct here?
+	Resources *Resources
 	MediaBox  *pdf.Rectangle
 	CropBox   *pdf.Rectangle
 	Rotate    int
 }
 
 // Default paper sizes as PDF rectangles.
-// TODO(voss): should these be rounded to integers
+// TODO(voss): should these be rounded to integers?
 var (
 	A4     = &pdf.Rectangle{URx: 595.275, URy: 841.889}
 	A5     = &pdf.Rectangle{URx: 419.527, URy: 595.275}
