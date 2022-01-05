@@ -34,6 +34,9 @@ type Writer struct {
 	// a new file.
 	Version Version
 
+	// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
+	Catalog *Catalog
+
 	w               *posWriter
 	closeDownstream bool
 
@@ -41,7 +44,6 @@ type Writer struct {
 	xref     map[int]*xRefEntry
 	nextRef  int
 	inStream bool
-	catalog  *Catalog
 	info     *Info
 
 	onClose []func(*Writer) error
@@ -102,6 +104,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 
 	pdf := &Writer{
 		Version: version,
+		Catalog: &Catalog{},
 
 		w:       &posWriter{w: w},
 		nextRef: 1,
@@ -203,10 +206,10 @@ func (pdf *Writer) Close() error {
 		}
 	}
 
-	if pdf.catalog == nil {
-		return errors.New("missing /Catalog")
+	if pdf.Catalog.Pages == nil {
+		return errors.New("no pages in PDF")
 	}
-	catRef, err := pdf.Write(AsDict(pdf.catalog), nil)
+	catRef, err := pdf.Write(AsDict(pdf.Catalog), nil)
 	if err != nil {
 		return err
 	}
@@ -263,15 +266,6 @@ func (pdf *Writer) Close() error {
 // registered is the first one to run.
 func (pdf *Writer) OnClose(callback func(*Writer) error) {
 	pdf.onClose = append(pdf.onClose, callback)
-}
-
-// SetCatalog sets the Document Catalog for the file.  This must be called
-// exactly once before the file is closed.  No changes can be made to the
-// catalog after SetCatalog has been called.
-//
-// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
-func (pdf *Writer) SetCatalog(cat *Catalog) {
-	pdf.catalog = cat
 }
 
 // SetInfo sets the Document Information Dictionary for the file.  The writer

@@ -80,28 +80,21 @@ func main() {
 		},
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
+	pp := pageTree.NewPageRange(nil)
 	for i := 1; i <= 100; i++ {
 		page, err := WritePage(out, i)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = pageTree.Ship(page) // TODO(voss): Use AddPage() instead
+		err = pp.Append(page) // TODO(voss): Use pageTree.AddPage() instead
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	pagesRef, err := pageTree.Finish()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	out.SetInfo(&pdf.Info{
 		Title:  "PDF Test Document",
 		Author: "Jochen Voß",
-	})
-	out.SetCatalog(&pdf.Catalog{
-		Pages: pagesRef,
 	})
 
 	err = out.Close()

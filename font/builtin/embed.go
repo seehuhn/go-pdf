@@ -120,6 +120,10 @@ func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple 
 }
 
 func (fnt *simple) Layout(rr []rune) []font.Glyph {
+	if len(rr) == 0 {
+		return nil
+	}
+
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
 		gid, _ := fnt.CMap[r]

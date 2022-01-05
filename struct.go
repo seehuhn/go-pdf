@@ -233,7 +233,7 @@ fieldLoop:
 
 // Catalog represents a PDF Document Catalog. This can be used together with
 // the `Struct()` function to construct the argument for
-// `Writer.SetDocument()`. The only required field in this structure is
+// `Writer.SetCatalog()`. The only required field in this structure is
 // `Pages`, which specifies the root of the page tree.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.

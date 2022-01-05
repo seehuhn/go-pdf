@@ -44,7 +44,7 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			w.SetCatalog(&Catalog{Pages: &Reference{}})
+			w.Catalog.Pages = &Reference{}
 
 			err = w.Close()
 			if err != nil {

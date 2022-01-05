@@ -27,89 +27,81 @@ import (
 
 // Page represents the contents of a page in the PDF file.  The object provides
 // different methods to write the PDF content stream for the page.
-// After the content stream has been written, the .Close() method must be called .
+// After the content stream has been written, the .Close() method must be called.
 type Page struct {
-	LLx, LLy, URx, URy float64 // The media box for the page
-
-	w   *bufio.Writer
-	stm io.WriteCloser
+	BBox *pdf.Rectangle
+	w    *bufio.Writer
+	stm  io.WriteCloser
+	dict pdf.Dict
+	pp   *PageRange
 }
 
-// AddPage adds a new page to the page tree and returns an object which
+// NewPage adds a new page to the page range and returns an object which
 // can be used to write the content stream for the page.
-func (tree *PageTree) AddPage(attr *Attributes) (*Page, error) {
-	contentRef, mediaBox, err := tree.addPageInternal(attr)
-	if err != nil {
-		return nil, err
+func (pp *PageRange) NewPage(attr *Attributes) (*Page, error) {
+	if pp.inPage {
+		return nil, errors.New("previous page not closed")
 	}
 
-	return tree.newPage(contentRef, mediaBox)
-}
+	tree := pp.tree
 
-func (tree *PageTree) addPageInternal(attr *Attributes) (*pdf.Reference, *pdf.Rectangle, error) {
 	var mediaBox *pdf.Rectangle
-	def := tree.defaults
-	if def != nil {
-		mediaBox = def.MediaBox
-	}
+	inherited := true
 	if attr != nil && attr.MediaBox != nil {
 		mediaBox = attr.MediaBox
-	}
-	if mediaBox == nil {
-		return nil, nil, errors.New("missing MediaBox")
+		inherited = false
+	} else if pp.attr != nil && pp.attr.MediaBox != nil {
+		mediaBox = pp.attr.MediaBox
+	} else if tree.attr != nil && tree.attr.MediaBox != nil {
+		mediaBox = tree.attr.MediaBox
+	} else {
+		return nil, errors.New("missing MediaBox")
 	}
 
-	contentRef := tree.w.Alloc()
+	defaultAttr := pp.attr
+	if defaultAttr == nil {
+		defaultAttr = tree.attr
+	}
 
 	pageDict := pdf.Dict{
-		"Type":     pdf.Name("Page"),
-		"Contents": contentRef,
+		"Type": pdf.Name("Page"),
+	}
+	if !inherited {
+		pageDict["MediaBox"] = mediaBox
 	}
 	if attr != nil {
 		if attr.Resources != nil {
 			pageDict["Resources"] = pdf.AsDict(attr.Resources)
 		}
-		if attr.MediaBox != nil &&
-			(def == nil ||
-				def.MediaBox == nil ||
-				!def.MediaBox.NearlyEqual(attr.MediaBox, 1)) {
-			pageDict["MediaBox"] = attr.MediaBox
-		}
 		if attr.CropBox != nil &&
-			(def == nil ||
-				def.CropBox == nil ||
-				!def.CropBox.NearlyEqual(attr.CropBox, 1)) {
+			(defaultAttr == nil ||
+				defaultAttr.CropBox == nil ||
+				!defaultAttr.CropBox.NearlyEqual(attr.CropBox, 1)) {
 			pageDict["CropBox"] = attr.CropBox
 		}
-		if attr.Rotate != 0 && def.Rotate != attr.Rotate {
+		if attr.Rotate != 0 && (defaultAttr == nil || defaultAttr.Rotate != attr.Rotate) {
 			pageDict["Rotate"] = pdf.Integer(attr.Rotate)
 		}
 	}
-	err := tree.Ship(pageDict)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	return contentRef, mediaBox, nil
-}
-
-func (tree *PageTree) newPage(contentRef *pdf.Reference, mediaBox *pdf.Rectangle) (*Page, error) {
 	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
 	if tree.w.Version >= pdf.V1_2 {
 		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
-	stream, _, err := tree.w.OpenStream(nil, contentRef, compress)
+	stream, contentRef, err := tree.w.OpenStream(nil, nil, compress)
 	if err != nil {
 		return nil, err
 	}
-	return &Page{
-		LLx: mediaBox.LLx,
-		LLy: mediaBox.LLy,
-		URx: mediaBox.URx,
-		URy: mediaBox.URy,
+	pageDict["Contents"] = contentRef
 
-		w:   bufio.NewWriter(stream),
-		stm: stream,
+	pp.inPage = true
+
+	return &Page{
+		BBox: mediaBox,
+		w:    bufio.NewWriter(stream),
+		stm:  stream,
+		dict: pageDict,
+		pp:   pp,
 	}, nil
 }
 
@@ -122,7 +114,12 @@ func (p *Page) Close() error {
 		return err
 	}
 	p.w = nil
-	return p.stm.Close()
+	err = p.stm.Close()
+	if err != nil {
+		return err
+	}
+	p.pp.inPage = false
+	return p.pp.Append(p.dict)
 }
 
 // Write writes the contents of buf to the content stream.  It returns the

@@ -65,7 +65,8 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	page, err := pages.SinglePage(w, &pages.Attributes{
+	pageTree := pages.NewPageTree(w, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pages.Resources{
 			Font: pdf.Dict{
 				F1.InstName: F1.Ref,
@@ -81,6 +82,7 @@ func TestType3(t *testing.T) {
 	page.Println("72 340 Td")
 	page.Println("(ABABAB) Tj")
 	page.Println("ET")
+	page.Close()
 
 	err = w.Close()
 	if err != nil {

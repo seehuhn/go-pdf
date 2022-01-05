@@ -41,7 +41,8 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	page, err := pages.SinglePage(w, &pages.Attributes{
+	pageTree := pages.NewPageTree(w, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pages.Resources{
 			Font: map[pdf.Name]pdf.Object{
 				F.InstName: F.Ref,
@@ -89,6 +90,7 @@ func TestSimple(t *testing.T) {
 		}
 		layout.Draw(page, float64(10+20*col), float64(16*20-10-20*row))
 	}
+	page.Close()
 
 	err = w.Close()
 	if err != nil {
@@ -189,7 +191,8 @@ func TestComplicatedGyphs(t *testing.T) {
 	text = append(text, names.ToUnicode("lcommaaccent", false)...)
 	text = append(text, 'C')
 
-	page, err := pages.SinglePage(w, &pages.Attributes{
+	pageTree := pages.NewPageTree(w, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pages.Resources{
 			Font: pdf.Dict{
 				font.InstName: font.Ref,
@@ -206,6 +209,7 @@ func TestComplicatedGyphs(t *testing.T) {
 
 	box := boxes.Text(font, 24, string(text))
 	box.Draw(page, 10, 15)
+	page.Close()
 
 	err = w.Close()
 	if err != nil {

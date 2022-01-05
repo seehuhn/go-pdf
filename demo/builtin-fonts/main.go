@@ -219,7 +219,7 @@ func (f *fontTables) DoFlush() error {
 			Font: pageFonts,
 		},
 	}
-	page, err := f.tree.AddPage(attr)
+	page, err := f.tree.NewPage(attr)
 	if err != nil {
 		return err
 	}
@@ -331,17 +331,10 @@ func main() {
 	}
 	f.DoFlush()
 
-	root, err := tree.Finish()
-	if err != nil {
-		log.Fatal(err)
-	}
 	w.SetInfo(&pdf.Info{
 		Title:        documentTitle,
 		Producer:     "seehuhn.de/go/pdf/demo/builtin-fonts",
 		CreationDate: time.Now(),
-	})
-	w.SetCatalog(&pdf.Catalog{
-		Pages: root,
 	})
 
 	err = w.Close()

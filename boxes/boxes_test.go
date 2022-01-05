@@ -44,7 +44,8 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	page, err := pages.SinglePage(out, &pages.Attributes{
+	pageTree := pages.NewPageTree(out, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pages.Resources{
 			Font: pdf.Dict{
 				F1.InstName: F1.Ref,
@@ -128,6 +129,7 @@ func TestFrame(t *testing.T) {
 	}
 
 	box.Draw(page, 0, box.Depth)
+	page.Close()
 
 	err = out.Close()
 	if err != nil {

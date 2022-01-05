@@ -139,7 +139,7 @@ func main() {
 	}
 	trans.w.SetInfo(info)
 
-	trans.w.SetCatalog(catalog)
+	trans.w.Catalog = catalog
 
 	err = w.Close()
 	if err != nil {

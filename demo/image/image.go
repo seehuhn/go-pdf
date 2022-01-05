@@ -57,6 +57,11 @@ func imagePage(img *image.NRGBA) error {
 	}
 	defer out.Close()
 
+	out.Catalog.ViewerPreferences = pdf.Dict{
+		"FitWindow":    pdf.Bool(true),
+		"HideWindowUI": pdf.Bool(true),
+	}
+
 	stream, image, err := out.OpenStream(pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
@@ -85,7 +90,8 @@ func imagePage(img *image.NRGBA) error {
 		URx: float64(b.Dx()) / dpi * 72,
 		URy: float64(b.Dy()) / dpi * 72,
 	}
-	page, err := pages.SinglePage(out, &pages.Attributes{
+	pageTree := pages.NewPageTree(out, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pages.Resources{
 			XObject: pdf.Dict{
 				"I1": image,
@@ -100,7 +106,7 @@ func imagePage(img *image.NRGBA) error {
 	fmt.Fprintf(page, "%f 0 0 %f 0 0 cm\n", pageBox.URx, pageBox.URy)
 	fmt.Fprintln(page, "/I1 Do")
 
-	return nil
+	return page.Close()
 }
 
 func main() {

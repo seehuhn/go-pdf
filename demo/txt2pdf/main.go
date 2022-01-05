@@ -95,14 +95,14 @@ func convert(inName, outName string, V pdf.Version) error {
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
 		if page == nil {
-			page, err = pageTree.AddPage(nil)
+			page, err = pageTree.NewPage(nil)
 			if err != nil {
 				return err
 			}
 			page.Println("BT")
 			page.Println("/F 12 Tf")
 			page.Println("12 TL")
-			page.Printf("72 %f Td\n", page.URy-72-10)
+			page.Printf("72 %f Td\n", page.BBox.URy-72-10)
 		}
 
 		line := scanner.Text()
@@ -152,14 +152,6 @@ func convert(inName, outName string, V pdf.Version) error {
 		}
 	}
 
-	pagesRef, err := pageTree.Finish()
-	if err != nil {
-		return err
-	}
-
-	out.SetCatalog(&pdf.Catalog{
-		Pages: pagesRef,
-	})
 	return out.Close()
 }
 

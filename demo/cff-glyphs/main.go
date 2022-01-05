@@ -94,7 +94,7 @@ func main() {
 				bottom = bbox.LLy
 			}
 
-			page, err := tree.AddPage(&pages.Attributes{
+			page, err := tree.NewPage(&pages.Attributes{
 				MediaBox: &pdf.Rectangle{
 					LLx: q*float64(left) - 20,
 					LLy: q*float64(bottom) - 20,
@@ -117,14 +117,6 @@ func main() {
 			}
 		}
 	}
-
-	pages, err := tree.Finish()
-	if err != nil {
-		log.Fatal(err)
-	}
-	out.SetCatalog(&pdf.Catalog{
-		Pages: pages,
-	})
 
 	err = out.Close()
 	if err != nil {
@@ -197,8 +189,8 @@ func illustrateGlyph(page *pages.Page, F *font.Font, cff *cff.Font, i int) error
 
 	label := fmt.Sprintf("glyph %d: %s", i, cff.GlyphName[i])
 	nameBox := boxes.Text(F, 12, label)
-	titleBox := boxes.HBoxTo(page.URx-page.LLx, hss, nameBox, hss)
-	titleBox.Draw(page, page.LLx, page.URy-20)
+	titleBox := boxes.HBoxTo(page.BBox.URx-page.BBox.LLx, hss, nameBox, hss)
+	titleBox.Draw(page, page.BBox.LLx, page.BBox.URy-20)
 
 	page.Printf("%.3f 0 0 %.3f 0 0 cm\n", q, q)
 

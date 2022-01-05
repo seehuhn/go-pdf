@@ -107,9 +107,7 @@ ET
 		t.Fatal(err)
 	}
 
-	w.SetCatalog(&Catalog{
-		Pages: pagesRef,
-	})
+	w.Catalog.Pages = pagesRef
 
 	err = w.Close()
 	if err != nil {
@@ -184,7 +182,7 @@ func TestOnClose(t *testing.T) {
 		return nil
 	})
 
-	pdf.SetCatalog(&Catalog{Pages: &Reference{}})
+	pdf.Catalog.Pages = &Reference{}
 	err = pdf.Close()
 	if err != myErr {
 		t.Error("callback error not detected")
@@ -215,7 +213,7 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w.SetCatalog(&Catalog{Pages: &Reference{}})
+	w.Catalog.Pages = &Reference{}
 
 	err = length.Set(Integer(testVal))
 	if err != nil {

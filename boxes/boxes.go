@@ -175,7 +175,7 @@ func Ship(tree *pages.PageTree, box Box) error {
 			URy: ext.Depth + ext.Height,
 		},
 	}
-	page, err := tree.AddPage(attr)
+	page, err := tree.NewPage(attr)
 	if err != nil {
 		return err
 	}

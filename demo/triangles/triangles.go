@@ -87,7 +87,8 @@ func main() {
 	lambda := (200 - xM) / nx
 	mu := yM + lambda*ny
 
-	page, err := pages.SinglePage(w, &pages.Attributes{
+	pageTree := pages.NewPageTree(w, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		MediaBox: &pdf.Rectangle{
 			URx: 440,
 			URy: mu + 60,
@@ -137,4 +138,9 @@ func main() {
 		page.Printf("%f %f m %f %f l\n", p.x, p.y, p.x, p.y)
 	}
 	page.Println("S")
+
+	err = page.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

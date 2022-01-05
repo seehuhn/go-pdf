@@ -46,7 +46,8 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	page, err := pages.SinglePage(out, &pages.Attributes{
+	pageTree := pages.NewPageTree(out, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pages.Resources{
 			Font: pdf.Dict{F1.InstName: F1.Ref},
 		},
@@ -117,7 +118,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		xPos += float64(gl.Advance) * q
 	}
 
-	return nil
+	return page.Close()
 }
 
 func main() {

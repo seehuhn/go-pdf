@@ -40,7 +40,8 @@ func TestCID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	page, err := pages.SinglePage(w, &pages.Attributes{
+	pageTree := pages.NewPageTree(w, nil)
+	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pages.Resources{
 			Font: map[pdf.Name]pdf.Object{
 				F.InstName: F.Ref,
@@ -82,6 +83,7 @@ func TestCID(t *testing.T) {
 		}
 		layout.Draw(page, float64(10+20*col), float64(32*20-10-20*row))
 	}
+	page.Close()
 
 	err = w.Close()
 	if err != nil {

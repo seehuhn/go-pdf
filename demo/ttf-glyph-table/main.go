@@ -336,15 +336,6 @@ func main() {
 		}
 	}
 
-	pagesRef, err := pageTree.Finish()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	out.SetCatalog(&pdf.Catalog{
-		Pages: pagesRef,
-	})
-
 	err = out.Close()
 	if err != nil {
 		log.Fatal(err)
