@@ -8,7 +8,6 @@
 - make sure that supporting incremental updates to PDF files will not require
   major changes to the API
 
-- implement LZWDecode filters
 - implement CCITTFaxDecode filters
 - implement public key encryption?
 - implement crypt filters?
