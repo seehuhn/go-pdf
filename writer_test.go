@@ -151,6 +151,43 @@ ET
 	}
 }
 
+type testCloseWriter struct {
+	isClosed bool
+}
+
+func (w *testCloseWriter) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func (w *testCloseWriter) Close() error {
+	w.isClosed = true
+	return nil
+}
+
+// TestClose tests that the writer does not close the underlying
+// io.Writer, unless .closeDownstream is set.
+func TestClose(t *testing.T) {
+	for _, doClose := range []bool{true, false} {
+		w := &testCloseWriter{}
+		out, err := NewWriter(w, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out.closeDownstream = doClose
+
+		out.Catalog.Pages = &Reference{} // pretend we have pages
+
+		err = out.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if doClose != w.isClosed {
+			t.Errorf("expected %v, got %v", doClose, w.isClosed)
+		}
+	}
+}
+
 func TestOnClose(t *testing.T) {
 	buf := &bytes.Buffer{}
 	pdf, err := NewWriter(buf, nil)
@@ -182,7 +219,8 @@ func TestOnClose(t *testing.T) {
 		return nil
 	})
 
-	pdf.Catalog.Pages = &Reference{}
+	pdf.Catalog.Pages = &Reference{} // pretend we have pages
+
 	err = pdf.Close()
 	if err != myErr {
 		t.Error("callback error not detected")

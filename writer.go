@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"errors"
@@ -38,6 +39,7 @@ type Writer struct {
 	Catalog *Catalog
 
 	w               *posWriter
+	origW           io.WriteCloser
 	closeDownstream bool
 
 	id       [][]byte
@@ -86,7 +88,7 @@ func Create(name string) (*Writer, error) {
 // NewWriter prepares a PDF file for writing.
 //
 // The .Close() method must be called after the file contents have been
-// written.  It is the callers responsibility, to also close the writer w after
+// written.  It is the callers responsibility, to close the writer w after
 // the pdf.Writer has been closed.
 func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
@@ -102,11 +104,23 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		return nil, err
 	}
 
+	var origW io.WriteCloser
+	if wc, ok := w.(io.WriteCloser); ok {
+		origW = wc
+	}
+
+	ww, ok := w.(writeFlusher)
+	if !ok {
+		ww = bufio.NewWriter(w)
+	}
+
 	pdf := &Writer{
 		Version: version,
 		Catalog: &Catalog{},
 
-		w:       &posWriter{w: w},
+		w:     &posWriter{w: ww},
+		origW: origW,
+
 		nextRef: 1,
 		xref:    make(map[int]*xRefEntry),
 	}
@@ -196,8 +210,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 }
 
 // Close closes the Writer, flushing any unwritten data to the underlying
-// io.Writer.  The SetCatalog method must be called before the file can be
-// closed.
+// io.Writer.
 func (pdf *Writer) Close() error {
 	for i := len(pdf.onClose) - 1; i >= 0; i-- {
 		err := pdf.onClose[i](pdf)
@@ -250,9 +263,13 @@ func (pdf *Writer) Close() error {
 		return err
 	}
 
-	closer, ok := pdf.w.w.(io.Closer)
-	if ok {
-		return closer.Close()
+	err = pdf.w.w.Flush()
+	if err != nil {
+		return err
+	}
+
+	if pdf.closeDownstream && pdf.origW != nil {
+		return pdf.origW.Close()
 	}
 
 	// Make sure we don't accidentally write beyond the end of file.
@@ -613,20 +630,6 @@ func (w *streamWriter) Close() error {
 	return nil
 }
 
-type posWriter struct {
-	w   io.Writer
-	pos int64
-
-	ref *Reference
-	enc *encryptInfo
-}
-
-func (w *posWriter) Write(p []byte) (int, error) {
-	n, err := w.w.Write(p)
-	w.pos += int64(n)
-	return n, err
-}
-
 // A Placeholder can be used to reserve space in a PDF file where some value
 // can be filled in later.  This is for example used to store the content
 // length of a compressed stream in the stream dictionary. Placeholer objects
@@ -755,4 +758,23 @@ func (pdf *Writer) CheckVersion(operation string, minVersion Version) error {
 		Earliest:  minVersion,
 		Operation: operation,
 	}
+}
+
+type writeFlusher interface {
+	io.Writer
+	Flush() error
+}
+
+type posWriter struct {
+	w   writeFlusher
+	pos int64
+
+	ref *Reference
+	enc *encryptInfo
+}
+
+func (w *posWriter) Write(p []byte) (int, error) {
+	n, err := w.w.Write(p)
+	w.pos += int64(n)
+	return n, err
 }

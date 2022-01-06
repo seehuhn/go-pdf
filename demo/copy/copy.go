@@ -17,11 +17,15 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
+	"runtime/pprof"
 
 	"seehuhn.de/go/pdf"
 )
+
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 type walker struct {
 	trans map[pdf.Reference]*pdf.Reference
@@ -90,7 +94,18 @@ func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
 }
 
 func main() {
-	r, err := pdf.Open(os.Args[1])
+	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
+	r, err := pdf.Open(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err)
 	}
