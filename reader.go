@@ -337,6 +337,7 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 		return r.getFromObjectStream(ref.Number, entry.InStream)
 	}
 
+	// TODO(voss): keep the scanner between calls?
 	s := r.scannerAt(entry.Pos)
 	obj, fileRef, err := s.ReadIndirectObject()
 	if err != nil {
