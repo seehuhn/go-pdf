@@ -38,7 +38,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 		}
 		err = p.Exec(s,
 			parser.CmdLoop,
-			parser.CmdStash,
+			parser.CmdStash16,
 			parser.CmdEndLoop,
 		)
 		if err != nil {

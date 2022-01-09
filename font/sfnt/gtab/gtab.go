@@ -87,11 +87,11 @@ func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) (
 	s := &parser.State{}
 
 	err = g.Exec(s,
-		parser.CmdStash, // majorVersion
-		parser.CmdStash, // minorVersion
-		parser.CmdStash, // scriptListOffset
-		parser.CmdStash, // featureListOffset
-		parser.CmdStash, // lookupListOffset
+		parser.CmdStash16, // majorVersion
+		parser.CmdStash16, // minorVersion
+		parser.CmdStash16, // scriptListOffset
+		parser.CmdStash16, // featureListOffset
+		parser.CmdStash16, // lookupListOffset
 	)
 	if err != nil {
 		return nil, err
@@ -148,8 +148,8 @@ func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) (
 	s.A = scriptTablePos
 	err = g.Exec(s,
 		parser.CmdSeek,
-		parser.CmdStash, // defaultLangSysOffset
-		parser.CmdStash, // langSysCount
+		parser.CmdStash16, // defaultLangSysOffset
+		parser.CmdStash16, // langSysCount
 	)
 	if err != nil {
 		return nil, err
@@ -183,10 +183,10 @@ func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) (
 		parser.CmdSeek,
 		parser.CmdRead16, parser.TypeUInt, // lookupOrderOffset
 		parser.CmdAssertEq, 0,
-		parser.CmdStash,                   // requiredFeatureIndex
+		parser.CmdStash16,                 // requiredFeatureIndex
 		parser.CmdRead16, parser.TypeUInt, // featureIndexCount
 		parser.CmdLoop,
-		parser.CmdStash, // featureIndices[i]
+		parser.CmdStash16, // featureIndices[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -237,10 +237,10 @@ func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) (
 		s.A = int64(offs) + featureListOffset
 		err = g.Exec(s,
 			parser.CmdSeek,                    // start of Feature table
-			parser.CmdStash,                   // featureParamsOffset
+			parser.CmdStash16,                 // featureParamsOffset
 			parser.CmdRead16, parser.TypeUInt, // lookupIndexCount
 			parser.CmdLoop,
-			parser.CmdStash, // lookupIndex
+			parser.CmdStash16, // lookupIndex
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -271,7 +271,7 @@ func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) (
 		parser.CmdSeek,
 		parser.CmdRead16, parser.TypeUInt, // lookupCount
 		parser.CmdLoop,
-		parser.CmdStash, // lookupOffset[i]
+		parser.CmdStash16, // lookupOffset[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -307,11 +307,11 @@ func (g *GTab) getGtabLookup(idx uint16) (*LookupTable, error) {
 	s.A = base
 	err := g.Exec(s,
 		parser.CmdSeek,
-		parser.CmdStash,                   // lookupType
-		parser.CmdStash,                   // lookupFlag
+		parser.CmdStash16,                 // lookupType
+		parser.CmdStash16,                 // lookupFlag
 		parser.CmdRead16, parser.TypeUInt, // subtableCount
 		parser.CmdLoop,
-		parser.CmdStash, // subtableOffset
+		parser.CmdStash16, // subtableOffset
 		parser.CmdEndLoop,
 	)
 	if err != nil {

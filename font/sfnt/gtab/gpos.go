@@ -131,12 +131,12 @@ type pairAdjust struct {
 
 func (g *GTab) readGpos2_1(s *parser.State, subtablePos int64) (*gpos2_1, error) {
 	err := g.Exec(s,
-		parser.CmdStash,                   // coverageOffset
-		parser.CmdStash,                   // valueFormat1
-		parser.CmdStash,                   // valueFormat2
+		parser.CmdStash16,                 // coverageOffset
+		parser.CmdStash16,                 // valueFormat1
+		parser.CmdStash16,                 // valueFormat2
 		parser.CmdRead16, parser.TypeUInt, // pairSetCount
 		parser.CmdLoop,
-		parser.CmdStash, // pairSetOffsets[i]
+		parser.CmdStash16, // pairSetOffsets[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -235,13 +235,13 @@ type gpos2_2 struct {
 
 func (g *GTab) readGpos2_2(s *parser.State, subtablePos int64) (*gpos2_2, error) {
 	err := g.Exec(s,
-		parser.CmdStash, // coverageOffset
-		parser.CmdStash, // valueFormat1
-		parser.CmdStash, // valueFormat2
-		parser.CmdStash, // classDef1Offset
-		parser.CmdStash, // classDef2Offset
-		parser.CmdStash, // class1Count
-		parser.CmdStash, // class2Count
+		parser.CmdStash16, // coverageOffset
+		parser.CmdStash16, // valueFormat1
+		parser.CmdStash16, // valueFormat2
+		parser.CmdStash16, // classDef1Offset
+		parser.CmdStash16, // classDef2Offset
+		parser.CmdStash16, // class1Count
+		parser.CmdStash16, // class2Count
 	)
 	if err != nil {
 		return nil, err
@@ -336,12 +336,12 @@ type gpos4_1 struct {
 
 func (g *GTab) readGpos4_1(s *parser.State, subtablePos int64) (*gpos4_1, error) {
 	err := g.Exec(s,
-		parser.CmdStash,                   // markCoverageOffset
-		parser.CmdStash,                   // baseCoverageOffset
+		parser.CmdStash16,                 // markCoverageOffset
+		parser.CmdStash16,                 // baseCoverageOffset
 		parser.CmdRead16, parser.TypeUInt, // markClassCount
 		parser.CmdStoreInto, 0,
-		parser.CmdStash, // markArrayOffset
-		parser.CmdStash, // baseArrayOffset
+		parser.CmdStash16, // markArrayOffset
+		parser.CmdStash16, // baseArrayOffset
 	)
 	if err != nil {
 		return nil, err
@@ -365,7 +365,7 @@ func (g *GTab) readGpos4_1(s *parser.State, subtablePos int64) (*gpos4_1, error)
 		parser.CmdRead16, parser.TypeUInt, // baseCount
 		parser.CmdMult, 0,
 		parser.CmdLoop,
-		parser.CmdStash, // baseRecords[i].baseAnchorOffsets[j]
+		parser.CmdStash16, // baseRecords[i].baseAnchorOffsets[j]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -443,12 +443,12 @@ type gpos6_1 struct {
 func (g *GTab) readGpos6_1(s *parser.State, subtablePos int64) (*gpos6_1, error) {
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-to-mark-attachment-positioning-format-1-mark-to-mark-attachment
 	err := g.Exec(s,
-		parser.CmdStash,                   // mark1CoverageOffset
-		parser.CmdStash,                   // mark2CoverageOffset
+		parser.CmdStash16,                 // mark1CoverageOffset
+		parser.CmdStash16,                 // mark2CoverageOffset
 		parser.CmdRead16, parser.TypeUInt, // markClassCount
 		parser.CmdStoreInto, 0,
-		parser.CmdStash, // mark1ArrayOffset
-		parser.CmdStash, // mark2ArrayOffset
+		parser.CmdStash16, // mark1ArrayOffset
+		parser.CmdStash16, // mark2ArrayOffset
 	)
 	if err != nil {
 		return nil, err
@@ -472,7 +472,7 @@ func (g *GTab) readGpos6_1(s *parser.State, subtablePos int64) (*gpos6_1, error)
 		parser.CmdRead16, parser.TypeUInt, // mark2Count
 		parser.CmdMult, 0,
 		parser.CmdLoop,
-		parser.CmdStash, // mark2Records[i].mark2AnchorOffsets[j]
+		parser.CmdStash16, // mark2Records[i].mark2AnchorOffsets[j]
 		parser.CmdEndLoop,
 	)
 	if err != nil {

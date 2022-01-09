@@ -38,12 +38,12 @@ type classSequenceRule struct {
 
 func (g *GTab) readSeqContext2(s *parser.State, subtablePos int64) (*seqContext2, error) {
 	err := g.Exec(s,
-		parser.CmdStash, // coverageOffset
-		parser.CmdStash, // classDefOffset
+		parser.CmdStash16, // coverageOffset
+		parser.CmdStash16, // classDefOffset
 
 		parser.CmdRead16, parser.TypeUInt, // classSeqRuleSetCount
 		parser.CmdLoop,
-		parser.CmdStash, // classSeqRuleSetOffsets[i]
+		parser.CmdStash16, // classSeqRuleSetOffsets[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -79,7 +79,7 @@ func (g *GTab) readSeqContext2(s *parser.State, subtablePos int64) (*seqContext2
 			parser.CmdSeek,
 			parser.CmdRead16, parser.TypeUInt, // classSeqRuleCount
 			parser.CmdLoop,
-			parser.CmdStash, // classSeqRuleOffsets[i]
+			parser.CmdStash16, // classSeqRuleOffsets[i]
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -102,7 +102,7 @@ func (g *GTab) readSeqContext2(s *parser.State, subtablePos int64) (*seqContext2
 				parser.CmdAssertGt, 0,
 				parser.CmdDec,
 				parser.CmdLoop,
-				parser.CmdStash, // inputSequence[i]
+				parser.CmdStash16, // inputSequence[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -115,8 +115,8 @@ func (g *GTab) readSeqContext2(s *parser.State, subtablePos int64) (*seqContext2
 			err = g.Exec(s,
 				parser.CmdLoadFrom, 1,
 				parser.CmdLoop,
-				parser.CmdStash, // seqLookupRecord.sequenceIndex
-				parser.CmdStash, // seqLookupRecord.lookupListIndex
+				parser.CmdStash16, // seqLookupRecord.sequenceIndex
+				parser.CmdStash16, // seqLookupRecord.lookupListIndex
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -199,7 +199,7 @@ func (g *GTab) readChained1(s *parser.State, subtablePos int64) (*chainedSeq1, e
 		parser.CmdStoreInto, 0,
 		parser.CmdRead16, parser.TypeUInt, // chainedSeqRuleSetCount
 		parser.CmdLoop,
-		parser.CmdStash, // chainedSeqRuleSetOffsets[i]
+		parser.CmdStash16, // chainedSeqRuleSetOffsets[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -226,7 +226,7 @@ func (g *GTab) readChained1(s *parser.State, subtablePos int64) (*chainedSeq1, e
 			parser.CmdSeek,
 			parser.CmdRead16, parser.TypeUInt, // chainedSeqRuleCount
 			parser.CmdLoop,
-			parser.CmdStash, // chainedSeqRuleOffsets[i]
+			parser.CmdStash16, // chainedSeqRuleOffsets[i]
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -243,7 +243,7 @@ func (g *GTab) readChained1(s *parser.State, subtablePos int64) (*chainedSeq1, e
 				parser.CmdSeek,
 				parser.CmdRead16, parser.TypeUInt, // backtrackGlyphCount
 				parser.CmdLoop,
-				parser.CmdStash, // backtrackSequence[i]
+				parser.CmdStash16, // backtrackSequence[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -256,7 +256,7 @@ func (g *GTab) readChained1(s *parser.State, subtablePos int64) (*chainedSeq1, e
 				parser.CmdAssertGt, 0,
 				parser.CmdDec,
 				parser.CmdLoop,
-				parser.CmdStash, // inputSequence[i]
+				parser.CmdStash16, // inputSequence[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -267,7 +267,7 @@ func (g *GTab) readChained1(s *parser.State, subtablePos int64) (*chainedSeq1, e
 			err = g.Exec(s,
 				parser.CmdRead16, parser.TypeUInt, // lookaheadGlyphCount
 				parser.CmdLoop,
-				parser.CmdStash, // lookaheadSequence[i]
+				parser.CmdStash16, // lookaheadSequence[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -278,8 +278,8 @@ func (g *GTab) readChained1(s *parser.State, subtablePos int64) (*chainedSeq1, e
 			err = g.Exec(s,
 				parser.CmdRead16, parser.TypeUInt, // seqLookupCount
 				parser.CmdLoop,
-				parser.CmdStash, // seqLookupRecord.sequenceIndex
-				parser.CmdStash, // seqLookupRecord.lookupListIndex
+				parser.CmdStash16, // seqLookupRecord.sequenceIndex
+				parser.CmdStash16, // seqLookupRecord.lookupListIndex
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -336,14 +336,14 @@ type chainedClassSeqRule struct {
 
 func (g *GTab) readChained2(s *parser.State, subtablePos int64) (*chainedSeq2, error) {
 	err := g.Exec(s,
-		parser.CmdStash, // coverageOffset
-		parser.CmdStash, // backtrackClassDefOffset
-		parser.CmdStash, // inputClassDefOffset
-		parser.CmdStash, // lookaheadClassDefOffset
+		parser.CmdStash16, // coverageOffset
+		parser.CmdStash16, // backtrackClassDefOffset
+		parser.CmdStash16, // inputClassDefOffset
+		parser.CmdStash16, // lookaheadClassDefOffset
 
 		parser.CmdRead16, parser.TypeUInt, // chainedClassSeqRuleSetCount
 		parser.CmdLoop,
-		parser.CmdStash, // chainedClassSeqRuleSetOffset[i]
+		parser.CmdStash16, // chainedClassSeqRuleSetOffset[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -392,7 +392,7 @@ func (g *GTab) readChained2(s *parser.State, subtablePos int64) (*chainedSeq2, e
 			parser.CmdSeek,
 			parser.CmdRead16, parser.TypeUInt, // chainedClassSeqRuleCount
 			parser.CmdLoop,
-			parser.CmdStash, // chainedClassSeqRuleOffsets[i]
+			parser.CmdStash16, // chainedClassSeqRuleOffsets[i]
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -409,7 +409,7 @@ func (g *GTab) readChained2(s *parser.State, subtablePos int64) (*chainedSeq2, e
 				parser.CmdSeek,
 				parser.CmdRead16, parser.TypeUInt, // backtrackGlyphCount
 				parser.CmdLoop,
-				parser.CmdStash, // backtrackSequence[i]
+				parser.CmdStash16, // backtrackSequence[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -425,7 +425,7 @@ func (g *GTab) readChained2(s *parser.State, subtablePos int64) (*chainedSeq2, e
 				parser.CmdAssertGt, 0,
 				parser.CmdDec,
 				parser.CmdLoop,
-				parser.CmdStash, // inputSequence[i]
+				parser.CmdStash16, // inputSequence[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -439,7 +439,7 @@ func (g *GTab) readChained2(s *parser.State, subtablePos int64) (*chainedSeq2, e
 			err = g.Exec(s,
 				parser.CmdRead16, parser.TypeUInt, // lookaheadGlyphCount
 				parser.CmdLoop,
-				parser.CmdStash, // lookaheadSequence[i]
+				parser.CmdStash16, // lookaheadSequence[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -453,8 +453,8 @@ func (g *GTab) readChained2(s *parser.State, subtablePos int64) (*chainedSeq2, e
 			err = g.Exec(s,
 				parser.CmdRead16, parser.TypeUInt, // seqLookupCount
 				parser.CmdLoop,
-				parser.CmdStash, // seqLookupRecord.sequenceIndex
-				parser.CmdStash, // seqLookupRecord.lookupListIndex
+				parser.CmdStash16, // seqLookupRecord.sequenceIndex
+				parser.CmdStash16, // seqLookupRecord.lookupListIndex
 				parser.CmdEndLoop,
 			)
 			if err != nil {
@@ -548,7 +548,7 @@ func (g *GTab) readChained3(s *parser.State, subtablePos int64) (*chainedSeq3, e
 	err := g.Exec(s,
 		parser.CmdRead16, parser.TypeUInt, // backtrackGlyphCount
 		parser.CmdLoop,
-		parser.CmdStash, // backtrackCoverageOffset
+		parser.CmdStash16, // backtrackCoverageOffset
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -559,7 +559,7 @@ func (g *GTab) readChained3(s *parser.State, subtablePos int64) (*chainedSeq3, e
 	err = g.Exec(s,
 		parser.CmdRead16, parser.TypeUInt, // inputGlyphCount
 		parser.CmdLoop,
-		parser.CmdStash, // inputCoverageOffset
+		parser.CmdStash16, // inputCoverageOffset
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -570,7 +570,7 @@ func (g *GTab) readChained3(s *parser.State, subtablePos int64) (*chainedSeq3, e
 	err = g.Exec(s,
 		parser.CmdRead16, parser.TypeUInt, // lookaheadGlyphCount
 		parser.CmdLoop,
-		parser.CmdStash, // lookaheadCoverageOffset
+		parser.CmdStash16, // lookaheadCoverageOffset
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -581,8 +581,8 @@ func (g *GTab) readChained3(s *parser.State, subtablePos int64) (*chainedSeq3, e
 	err = g.Exec(s,
 		parser.CmdRead16, parser.TypeUInt, // seqLookupCount
 		parser.CmdLoop,
-		parser.CmdStash, // seqLookupRecord.sequenceIndex
-		parser.CmdStash, // seqLookupRecord.lookupListIndex
+		parser.CmdStash16, // seqLookupRecord.sequenceIndex
+		parser.CmdStash16, // seqLookupRecord.lookupListIndex
 		parser.CmdEndLoop,
 	)
 	if err != nil {

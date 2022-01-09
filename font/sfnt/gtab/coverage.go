@@ -48,7 +48,7 @@ func (g *GTab) readCoverageTable(pos int64) (coverage, error) {
 		err = g.Exec(s,
 			parser.CmdRead16, parser.TypeUInt, // glyphCount
 			parser.CmdLoop,
-			parser.CmdStash, // glyphArray[i]
+			parser.CmdStash16, // glyphArray[i]
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -67,9 +67,9 @@ func (g *GTab) readCoverageTable(pos int64) (coverage, error) {
 		rangeCount := int(s.A)
 		for i := 0; i < rangeCount; i++ {
 			err = g.Exec(s,
-				parser.CmdStash, // startfont.GlyphIndex
-				parser.CmdStash, // endfont.GlyphIndex
-				parser.CmdStash, // startCoverageIndex
+				parser.CmdStash16, // startfont.GlyphIndex
+				parser.CmdStash16, // endfont.GlyphIndex
+				parser.CmdStash16, // startCoverageIndex
 			)
 			if err != nil {
 				return nil, err

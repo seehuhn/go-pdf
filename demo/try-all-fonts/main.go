@@ -18,11 +18,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt"
 )
 
@@ -37,15 +39,15 @@ func tryFont(fname string) error {
 	}
 	defer tt.Close()
 
-	if !tt.IsOpenType() {
+	cffData, _ := tt.Header.ReadTableBytes(tt.Fd, "CFF ")
+	if len(cffData) == 0 {
 		return nil
 	}
-
-	if !tt.HasTables("glyf") {
-		return nil
+	cff, err := cff.Read(bytes.NewReader(cffData))
+	if err != nil {
+		return err
 	}
-
-	fmt.Println(len(tt.Width), fname)
+	fmt.Println(cff.FontName)
 
 	return nil
 }

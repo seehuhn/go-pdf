@@ -39,8 +39,8 @@ func (g *GTab) readMarkArrayTable(pos int64) ([]markRecord, error) {
 		parser.CmdRead16, parser.TypeUInt, // markCount
 		parser.CmdStoreInto, 0,
 		parser.CmdLoop,
-		parser.CmdStash, // markRecords[i].markClass
-		parser.CmdStash, // markRecords[i].markAnchorOffset
+		parser.CmdStash16, // markRecords[i].markClass
+		parser.CmdStash16, // markRecords[i].markAnchorOffset
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -73,9 +73,9 @@ func (g *GTab) readAnchor(pos int64, res *anchor) error {
 	}
 	err := g.Exec(s,
 		parser.CmdSeek,
-		parser.CmdStash, // anchorFormat
-		parser.CmdStash, // xCoordinate
-		parser.CmdStash, // yCoordinate
+		parser.CmdStash16, // anchorFormat
+		parser.CmdStash16, // xCoordinate
+		parser.CmdStash16, // yCoordinate
 	)
 	if err != nil {
 		return err
@@ -124,9 +124,9 @@ func (g *GTab) readDeviceTable(pos int64, offs uint16) (int16, error) {
 	}
 	err := g.Exec(s,
 		parser.CmdSeek,
-		parser.CmdStash, // startSize
-		parser.CmdStash, // endSize
-		parser.CmdStash, // deltaFormat
+		parser.CmdStash16, // startSize
+		parser.CmdStash16, // endSize
+		parser.CmdStash16, // deltaFormat
 	)
 	if err != nil {
 		return 0, err

@@ -168,7 +168,7 @@ func (g *GTab) readGsub1_2(s *parser.State, subtablePos int64) (*gsub1_2, error)
 		parser.CmdStoreInto, 0,
 		parser.CmdRead16, parser.TypeUInt, // glyphCount
 		parser.CmdLoop,
-		parser.CmdStash, // substitutefont.GlyphIndex[i]
+		parser.CmdStash16, // substitutefont.GlyphIndex[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -212,7 +212,7 @@ func (g *GTab) readGsub2_1(s *parser.State, subtablePos int64) (*gsub2_1, error)
 		parser.CmdStoreInto, 0,
 		parser.CmdRead16, parser.TypeUInt, // sequenceCount
 		parser.CmdLoop,
-		parser.CmdStash, // sequenceOffset[i]
+		parser.CmdStash16, // sequenceOffset[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -234,7 +234,7 @@ func (g *GTab) readGsub2_1(s *parser.State, subtablePos int64) (*gsub2_1, error)
 			parser.CmdSeek,
 			parser.CmdRead16, parser.TypeUInt, // glyphCount
 			parser.CmdLoop,
-			parser.CmdStash, // substituteGlyphID[j]
+			parser.CmdStash16, // substituteGlyphID[j]
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -290,7 +290,7 @@ func (g *GTab) readGsub4_1(s *parser.State, subtablePos int64) (*gsub4_1, error)
 		parser.CmdStoreInto, 0,
 		parser.CmdRead16, parser.TypeUInt, // ligatureSetCount
 		parser.CmdLoop,
-		parser.CmdStash, // ligatureSetOffset[i]
+		parser.CmdStash16, // ligatureSetOffset[i]
 		parser.CmdEndLoop,
 	)
 	if err != nil {
@@ -315,7 +315,7 @@ func (g *GTab) readGsub4_1(s *parser.State, subtablePos int64) (*gsub4_1, error)
 			parser.CmdSeek,
 			parser.CmdRead16, parser.TypeUInt, // ligatureCount
 			parser.CmdLoop,
-			parser.CmdStash, // ligatureOffset[i]
+			parser.CmdStash16, // ligatureOffset[i]
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -326,12 +326,12 @@ func (g *GTab) readGsub4_1(s *parser.State, subtablePos int64) (*gsub4_1, error)
 			s.A = ligSetTablePos + int64(o2)
 			err = g.Exec(s,
 				parser.CmdSeek,
-				parser.CmdStash,                   // ligatureGlyph
+				parser.CmdStash16,                 // ligatureGlyph
 				parser.CmdRead16, parser.TypeUInt, // componentCount
 				parser.CmdAssertGt, 0,
 				parser.CmdDec,
 				parser.CmdLoop,
-				parser.CmdStash, // componentfont.GlyphIndex[i]
+				parser.CmdStash16, // componentfont.GlyphIndex[i]
 				parser.CmdEndLoop,
 			)
 			if err != nil {

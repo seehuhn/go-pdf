@@ -174,7 +174,7 @@ CommandLoop:
 			s.A = int64(int8(arg))
 		case CmdLoadFrom:
 			s.A = s.R[arg]
-		case CmdStash:
+		case CmdStash16:
 			buf, err := p.ReadBlob(2)
 			if err != nil {
 				return err
@@ -372,7 +372,7 @@ const (
 	CmdDec
 	CmdLoop
 	CmdEndLoop
-	CmdStash
+	CmdStash16
 )
 
 // Types for the CmdRead* commands

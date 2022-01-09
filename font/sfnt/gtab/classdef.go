@@ -43,10 +43,10 @@ func (p *GTab) readClassDefTable(pos int64) (ClassDef, error) {
 	switch format {
 	case 1:
 		err = p.Exec(s,
-			parser.CmdStash,                   // startGlyphID
+			parser.CmdStash16,                 // startGlyphID
 			parser.CmdRead16, parser.TypeUInt, // glyphCount
 			parser.CmdLoop,
-			parser.CmdStash, // classValueArray[i]
+			parser.CmdStash16, // classValueArray[i]
 			parser.CmdEndLoop,
 		)
 		if err != nil {
@@ -64,9 +64,9 @@ func (p *GTab) readClassDefTable(pos int64) (ClassDef, error) {
 		err = p.Exec(s,
 			parser.CmdRead16, parser.TypeUInt, // classRangeCount
 			parser.CmdLoop,
-			parser.CmdStash, // classRangeRecords[i].startGlyphID
-			parser.CmdStash, // classRangeRecords[i].endGlyphID
-			parser.CmdStash, // classRangeRecords[i].class
+			parser.CmdStash16, // classRangeRecords[i].startGlyphID
+			parser.CmdStash16, // classRangeRecords[i].endGlyphID
+			parser.CmdStash16, // classRangeRecords[i].class
 			parser.CmdEndLoop,
 		)
 		if err != nil {

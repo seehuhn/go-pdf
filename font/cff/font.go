@@ -117,6 +117,9 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
+	if _, isCIDFont := topDict[opROS]; isCIDFont {
+		return nil, errors.New("reading CIDfonts not implemented")
+	}
 	cff.topDict = topDict
 
 	// read the Global Subr INDEX
@@ -125,11 +128,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 	cff.gsubrs = gsubrs
-
-	_, isCIDFont := topDict[opROS]
-	if isCIDFont {
-		return nil, errors.New("reading CIDfonts not implemented")
-	}
 
 	// read the CharStrings INDEX
 	cct, _ := topDict.getInt(opCharstringType, 2)
@@ -176,6 +174,18 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	for i, sid := range charset {
 		cff.GlyphName[i] = strings.get(sid)
 	}
+
+	// encodingOffs, _ := topDict.getInt(opEncoding, 0)
+	// if encodingOffs != 0 {
+	// 	err = p.SeekPos(int64(encodingOffs))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	_, err = cff.readEncoding(p)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	// read the Private DICT
 	pdSize, pdOffs, ok := topDict.getPair(opPrivate)
@@ -289,7 +299,7 @@ func (ctx *glyphDimensions) RCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64) {
 	ctx.add()
 }
 
-// Encode returns the binary encoding of a CFF font as a simple font.
+// Encode writes the binary form of a CFF font as a simple font.
 func (cff *Font) Encode(w io.Writer) error {
 	numGlyphs := uint16(len(cff.charStrings))
 

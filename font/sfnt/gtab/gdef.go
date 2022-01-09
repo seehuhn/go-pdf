@@ -43,14 +43,14 @@ func (g *GTab) ReadGdefTable() (*GdefInfo, error) {
 		parser.CmdRead16, parser.TypeUInt, // majorVersion
 		parser.CmdAssertEq, 1,
 		parser.CmdRead16, parser.TypeUInt, // minorVersion
-		parser.CmdStash, // glyphClassDefOffset
-		parser.CmdStash, // attachListOffset
-		parser.CmdStash, // ligCaretListOffset
-		parser.CmdStash, // markAttachClassDefOffset
+		parser.CmdStash16, // glyphClassDefOffset
+		parser.CmdStash16, // attachListOffset
+		parser.CmdStash16, // ligCaretListOffset
+		parser.CmdStash16, // markAttachClassDefOffset
 		parser.CmdExitIfLt, 2,
-		parser.CmdStash, // markGlyphSetsDefOffset
+		parser.CmdStash16, // markGlyphSetsDefOffset
 		parser.CmdExitIfLt, 3,
-		parser.CmdStash, // itemVarStoreOffset
+		parser.CmdStash16, // itemVarStoreOffset
 	)
 	if err != nil {
 		return nil, err
