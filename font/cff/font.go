@@ -29,15 +29,15 @@ import (
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a reader.
 type Font struct {
-	FontName    string
-	GlyphName   []string
-	charStrings [][]byte
+	FontName  string
+	GlyphName []string
 
 	GlyphExtent []font.Rect // This is in font design units.
 	Width       []int       // This is in font design units.
 
 	topDict     cffDict
 	gsubrs      cffIndex
+	charStrings [][]byte
 	privateDict cffDict
 	subrs       cffIndex
 
@@ -155,10 +155,13 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	var charset []int32
 	switch charsetOffs {
 	case 0: // ISOAdobe
+		// TODO(voss): implement
 		return nil, errors.New("ISOAdobe charset not implemented")
 	case 1: // Expert
+		// TODO(voss): implement
 		return nil, errors.New("Expert charset not implemented")
 	case 2: // ExpertSubset
+		// TODO(voss): implement
 		return nil, errors.New("ExpertSubset charset not implemented")
 	default:
 		err = p.SeekPos(int64(charsetOffs))
@@ -339,7 +342,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 5: encodings
-	blobs[secEncodings] = []byte{1, 1, 0, byte(numGlyphs - 1)}
+	blobs[secEncodings] = []byte{1, 1, 0, byte(numGlyphs - 2)}
 
 	// section 6: charsets INDEX
 	subset := make([]int32, numGlyphs)

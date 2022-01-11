@@ -617,8 +617,7 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 				return cmds, nil
 
 			default:
-				// return nil, fmt.Errorf("unsupported opcode %d", op)
-				fmt.Printf("unsupported opcode %d\n", op)
+				return nil, fmt.Errorf("unsupported opcode %d", op)
 			}
 			cmds = append(cmds, cmd)
 		} // end of opLoop

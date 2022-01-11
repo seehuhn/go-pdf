@@ -261,7 +261,6 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 	if err != nil {
 		return err
 	}
-
 	err = cff.Encode(fontFileStream)
 	if err != nil {
 		return err
