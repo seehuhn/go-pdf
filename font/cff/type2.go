@@ -44,6 +44,8 @@ func (s stackSlot) String() string {
 }
 
 // A Renderer is used to draw a glyph encoded by a CFF charstring.
+// TODO(voss): use absolute instead of relative coordinates, so that
+//     GlyphMaker implements Renderer
 type Renderer interface {
 	SetWidth(w int)
 	RMoveTo(x, y float64)
