@@ -1,20 +1,24 @@
 package cff
 
-import "math"
+import (
+	"container/heap"
+	"fmt"
+	"math"
+)
 
 const eps = 6.0 / 65536
 
-type GlyphMaker struct {
+type glyphMaker struct {
 	width      int
 	posX, posY float64
 	cmds       []cmd
 }
 
-func (gm *GlyphMaker) SetWidth(w int) {
+func (gm *glyphMaker) SetWidth(w int) {
 	gm.width = w
 }
 
-func (gm *GlyphMaker) MoveTo(x, y float64) {
+func (gm *glyphMaker) MoveTo(x, y float64) {
 	dx := encode(x - gm.posX)
 	dy := encode(y - gm.posY)
 	gm.cmds = append(gm.cmds, cmd{
@@ -25,7 +29,7 @@ func (gm *GlyphMaker) MoveTo(x, y float64) {
 	gm.posY += dy.val
 }
 
-func (gm *GlyphMaker) LineTo(x, y float64) {
+func (gm *glyphMaker) LineTo(x, y float64) {
 	dx := encode(x - gm.posX)
 	dy := encode(y - gm.posY)
 	gm.cmds = append(gm.cmds, cmd{
@@ -36,7 +40,7 @@ func (gm *GlyphMaker) LineTo(x, y float64) {
 	gm.posY += dy.val
 }
 
-func (gm *GlyphMaker) CurveTo(xa, ya, xb, yb, xc, yc float64) {
+func (gm *glyphMaker) CurveTo(xa, ya, xb, yb, xc, yc float64) {
 	dxa := encode(xa - gm.posX)
 	dya := encode(xa - gm.posY)
 	dxb := encode(xb - xa)
@@ -51,7 +55,7 @@ func (gm *GlyphMaker) CurveTo(xa, ya, xb, yb, xc, yc float64) {
 	gm.posY += dya.val + dyb.val + dyc.val
 }
 
-func (gm *GlyphMaker) encode(defWidth, nomWidth int) []byte {
+func (gm *glyphMaker) encode(defWidth, nomWidth int) []byte {
 	var code []byte
 	if gm.width != defWidth {
 		w := encode(float64(gm.width - nomWidth))
@@ -72,25 +76,27 @@ func (gm *GlyphMaker) encode(defWidth, nomWidth int) []byte {
 		mov, cmds := cmds[0], cmds[1:]
 		if mov.args[0].isZero() {
 			code = append(code, mov.args[1].code...)
-			code = pushOp(code, t2vmoveto)
+			code = appendOp(code, t2vmoveto)
 		} else if mov.args[1].isZero() {
 			code = append(code, mov.args[0].code...)
-			code = pushOp(code, t2hmoveto)
+			code = appendOp(code, t2hmoveto)
 		} else {
-			code = mov.pushArgs(code)
-			code = pushOp(code, t2rmoveto)
+			code = mov.appendArgs(code)
+			code = appendOp(code, t2rmoveto)
 		}
 
 		k := 1
 		for k < len(cmds) && cmds[k].op != t2rmoveto {
 			k++
 		}
-		path, cmds := cmds[:k], cmds[k:]
+		path := cmds[:k]
+		cmds = cmds[k:]
 
-		_ = path // TODO(voss): implement
+		code := getCode(path)
+		fmt.Printf("xxx % x\n", code)
 	}
 
-	code = pushOp(code, t2endchar)
+	code = appendOp(code, t2endchar)
 	return code
 }
 
@@ -99,7 +105,7 @@ type cmd struct {
 	op   t2op
 }
 
-func (c cmd) pushArgs(code []byte) []byte {
+func (c cmd) appendArgs(code []byte) []byte {
 	for _, a := range c.args {
 		code = append(code, a.code...)
 	}
@@ -146,16 +152,16 @@ func edges(cmds []cmd) []edge {
 				continue
 			}
 			edges = append(edges, edge{
-				code: pushOp(code, t2rlineto),
+				code: copyOp(code, t2rlineto),
 				skip: i,
 			})
 		}
 
 		// {dx dy}+ xb yb xc yc xd yd  rlinecurve
 		if numLines < len(cmds) {
-			code = cmds[numLines].pushArgs(code)
+			code = cmds[numLines].appendArgs(code)
 			edges = append(edges, edge{
-				code: pushOp(code, t2rlinecurve),
+				code: copyOp(code, t2rlinecurve),
 				skip: numLines + 1,
 			})
 		}
@@ -179,7 +185,7 @@ func edges(cmds []cmd) []edge {
 				k++
 			}
 			edges = append(edges, edge{
-				code: pushOp(args, t2hlineto),
+				code: copyOp(args, t2hlineto),
 				skip: k,
 			})
 		}
@@ -203,12 +209,12 @@ func edges(cmds []cmd) []edge {
 				k++
 			}
 			edges = append(edges, edge{
-				code: pushOp(args, t2vlineto),
+				code: copyOp(args, t2vlineto),
 				skip: k,
 			})
 		}
 	} else {
-		numCurves := 0
+		numCurves := 1 // we know that cmds[0] is a curve
 		for numCurves < len(cmds) && cmds[numCurves].op == t2rrcurveto {
 			numCurves++
 		}
@@ -228,24 +234,158 @@ func edges(cmds []cmd) []edge {
 		// (dxa dya dxb dyb dxc dyc)+ rrcurveto
 		var code []byte
 		for i := 1; i <= numCurves; i++ {
-			code = cmds[i-1].pushArgs(code)
+			code = cmds[i-1].appendArgs(code)
 			edges = append(edges, edge{
-				code: pushOp(code, t2rrcurveto),
+				code: copyOp(code, t2rrcurveto),
 				skip: i,
 			})
 		}
 
 		// (dxa dya dxb dyb dxc dyc)+ dxd dyd rcurveline
 		if numCurves < len(cmds) {
-			code = cmds[numCurves].pushArgs(code)
+			code = cmds[numCurves].appendArgs(code)
 			edges = append(edges, edge{
-				code: pushOp(code, t2rcurveline),
+				code: copyOp(code, t2rcurveline),
 				skip: numCurves + 1,
+			})
+		}
+
+		// dy1? (dxa dxb dyb dxc)+ hhcurveto
+		code = nil
+		for i := 0; i < numCurves; i++ {
+			if !cmds[i].args[5].isZero() {
+				break
+			}
+			if !cmds[i].args[1].isZero() {
+				if i > 0 {
+					break
+				} else {
+					code = append(code, cmds[0].args[1].code...)
+				}
+			}
+			code = append(code, cmds[i].args[0].code...)
+			code = append(code, cmds[i].args[2].code...)
+			code = append(code, cmds[i].args[3].code...)
+			code = append(code, cmds[i].args[4].code...)
+			edges = append(edges, edge{
+				code: copyOp(code, t2hhcurveto),
+				skip: i + 1,
+			})
+		}
+
+		// dx1? (dya dxb dyb dyc)+ vvcurveto
+		code = nil
+		for i := 0; i < numCurves; i++ {
+			if !cmds[i].args[4].isZero() {
+				break
+			}
+			if !cmds[i].args[0].isZero() {
+				if i > 0 {
+					break
+				} else {
+					code = append(code, cmds[0].args[0].code...)
+				}
+			}
+			code = append(code, cmds[i].args[1].code...)
+			code = append(code, cmds[i].args[2].code...)
+			code = append(code, cmds[i].args[3].code...)
+			code = append(code, cmds[i].args[5].code...)
+			edges = append(edges, edge{
+				code: copyOp(code, t2vvcurveto),
+				skip: i + 1,
 			})
 		}
 	}
 
 	return edges
+}
+
+type entry struct {
+	state int
+	code  []byte
+}
+
+type priorityQueue struct {
+	entries []*entry
+	dir     map[int]int
+}
+
+func (pq *priorityQueue) Len() int {
+	return len(pq.entries)
+}
+
+func (pq *priorityQueue) Less(i, j int) bool {
+	return len(pq.entries[i].code) < len(pq.entries[j].code)
+}
+
+func (pq *priorityQueue) Swap(i, j int) {
+	entries := pq.entries
+	entries[i], entries[j] = entries[j], entries[i]
+	pq.dir[entries[i].state] = i
+	pq.dir[entries[j].state] = j
+}
+
+func (pq *priorityQueue) Push(x interface{}) {
+	entry := x.(*entry)
+	pq.dir[entry.state] = len(pq.entries)
+	pq.entries = append(pq.entries, entry)
+}
+
+func (pq *priorityQueue) Pop() interface{} {
+	n := pq.Len()
+	x := pq.entries[n-1]
+	pq.entries = pq.entries[0 : n-1]
+	delete(pq.dir, x.state)
+	return x
+}
+
+func (pq *priorityQueue) Update(state int, head, tail []byte) {
+	var e *entry
+
+	idx, ok := pq.dir[state]
+	if ok {
+		e = pq.entries[idx]
+	}
+	cost := len(head) + len(tail)
+	if ok && len(e.code) <= cost {
+		return
+	}
+
+	code := make([]byte, cost)
+	copy(code, head)
+	copy(code[len(head):], tail)
+	if ok {
+		e.code = code
+		heap.Fix(pq, idx)
+	} else {
+		e = &entry{state: state, code: code}
+		heap.Push(pq, e)
+	}
+}
+
+func getCode(cmds []cmd) []byte {
+	n := len(cmds)
+	done := make([]bool, n)
+	best := &priorityQueue{
+		dir: make(map[int]int),
+	}
+	for {
+		v := heap.Pop(best).(*entry)
+		from := v.state
+		for _, edge := range edges(cmds[from:]) {
+			to := from + edge.skip
+			if done[to] {
+				continue
+			}
+			best.Update(to, v.code, edge.code)
+		}
+
+		if idx, ok := best.dir[n]; ok {
+			return best.entries[idx].code
+		}
+
+		done[from] = true
+	}
 }
 
 type encodedNumber struct {
@@ -295,9 +435,23 @@ func (enc encodedNumber) isZero() bool {
 	return enc.val == 0
 }
 
-func pushOp(data []byte, op t2op) []byte {
+func appendOp(data []byte, op t2op) []byte {
 	if op > 255 {
 		return append(data, byte(op>>8), byte(op))
 	}
 	return append(data, byte(op))
+}
+
+func copyOp(data []byte, op t2op) []byte {
+	if op > 255 {
+		res := make([]byte, len(data)+2)
+		copy(res, data)
+		res[len(data)] = byte(op >> 8)
+		res[len(data)+1] = byte(op)
+		return res
+	}
+	res := make([]byte, len(data)+1)
+	copy(res, data)
+	res[len(data)] = byte(op)
+	return res
 }

@@ -342,7 +342,11 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 5: encodings
-	blobs[secEncodings] = []byte{1, 1, 0, byte(numGlyphs - 2)}
+	numEncoded := numGlyphs - 1 // leave out .notdef
+	if numEncoded >= 256 {
+		numEncoded = 256
+	}
+	blobs[secEncodings] = []byte{1, 1, 0, byte(numEncoded - 1)}
 
 	// section 6: charsets INDEX
 	subset := make([]int32, numGlyphs)
