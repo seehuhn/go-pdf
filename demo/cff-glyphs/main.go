@@ -136,52 +136,46 @@ func loadCFFData(fname string) ([]byte, error) {
 }
 
 type context struct {
-	page *pages.Page
-	xx   []float64
-	yy   []float64
-	x, y float64
-	w    int
-	ink  bool
+	page       *pages.Page
+	xx         []float64
+	yy         []float64
+	posX, posY float64
+	w          int32
+	ink        bool
 }
 
-func (ctx *context) SetWidth(w int) {
+func (ctx *context) SetWidth(w int32) {
 	ctx.w = w
 }
 
-func (ctx *context) RMoveTo(x, y float64) {
+func (ctx *context) MoveTo(x, y float64) {
 	if ctx.ink {
 		ctx.page.Println("h")
 	}
-	ctx.x += x
-	ctx.y += y
-	ctx.page.Printf("%.2f %.2f m\n", ctx.x, ctx.y)
-	ctx.xx = append(ctx.xx, ctx.x)
-	ctx.yy = append(ctx.yy, ctx.y)
+	ctx.posX = x
+	ctx.posY = y
+	ctx.page.Printf("%.2f %.2f m\n", ctx.posX, ctx.posY)
+	ctx.xx = append(ctx.xx, ctx.posX)
+	ctx.yy = append(ctx.yy, ctx.posY)
 }
 
-func (ctx *context) RLineTo(x, y float64) {
+func (ctx *context) LineTo(x, y float64) {
 	ctx.ink = true
-	ctx.x += x
-	ctx.y += y
-	ctx.page.Printf("%.2f %.2f l\n", ctx.x, ctx.y)
-	ctx.xx = append(ctx.xx, ctx.x)
-	ctx.yy = append(ctx.yy, ctx.y)
+	ctx.posX = x
+	ctx.posY = y
+	ctx.page.Printf("%.2f %.2f l\n", ctx.posX, ctx.posY)
+	ctx.xx = append(ctx.xx, ctx.posX)
+	ctx.yy = append(ctx.yy, ctx.posY)
 }
 
-func (ctx *context) RCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64) {
+func (ctx *context) CurveTo(xa, ya, xb, yb, xc, yc float64) {
 	ctx.ink = true
-	xa := ctx.x + dxa
-	ya := ctx.y + dya
-	xb := xa + dxb
-	yb := ya + dyb
-	xc := xb + dxc
-	yc := yb + dyc
 	ctx.page.Printf("%.2f %.2f %.2f %.2f %.2f %.2f c\n",
 		xa, ya, xb, yb, xc, yc)
-	ctx.x = xc
-	ctx.y = yc
-	ctx.xx = append(ctx.xx, ctx.x)
-	ctx.yy = append(ctx.yy, ctx.y)
+	ctx.posX = xc
+	ctx.posY = yc
+	ctx.xx = append(ctx.xx, ctx.posX)
+	ctx.yy = append(ctx.yy, ctx.posY)
 }
 
 func illustrateGlyph(page *pages.Page, F *font.Font, cff *cff.Font, i int) error {

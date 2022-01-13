@@ -9,12 +9,12 @@ import (
 const eps = 6.0 / 65536
 
 type glyphMaker struct {
-	width      int
+	width      int32
 	posX, posY float64
 	cmds       []cmd
 }
 
-func (gm *glyphMaker) SetWidth(w int) {
+func (gm *glyphMaker) SetWidth(w int32) {
 	gm.width = w
 }
 
@@ -42,20 +42,20 @@ func (gm *glyphMaker) LineTo(x, y float64) {
 
 func (gm *glyphMaker) CurveTo(xa, ya, xb, yb, xc, yc float64) {
 	dxa := encode(xa - gm.posX)
-	dya := encode(xa - gm.posY)
+	dya := encode(ya - gm.posY)
 	dxb := encode(xb - xa)
 	dyb := encode(yb - ya)
 	dxc := encode(xc - xb)
 	dyc := encode(yc - yb)
 	gm.cmds = append(gm.cmds, cmd{
-		args: []encodedNumber{dxa, dxb, dya, dyb, dxc, dyc},
+		args: []encodedNumber{dxa, dya, dxb, dyb, dxc, dyc},
 		op:   t2rrcurveto,
 	})
 	gm.posX += dxa.val + dxb.val + dxc.val
 	gm.posY += dya.val + dyb.val + dyc.val
 }
 
-func (gm *glyphMaker) encode(defWidth, nomWidth int) []byte {
+func (gm *glyphMaker) encode(defWidth, nomWidth int32) []byte {
 	var code []byte
 	if gm.width != defWidth {
 		w := encode(float64(gm.width - nomWidth))
@@ -72,8 +72,11 @@ func (gm *glyphMaker) encode(defWidth, nomWidth int) []byte {
 		copy(tmp[1:], cmds)
 		cmds = tmp
 	}
+
 	for len(cmds) > 1 {
-		mov, cmds := cmds[0], cmds[1:]
+		mov := cmds[0]
+		fmt.Println(mov)
+		cmds = cmds[1:]
 		if mov.args[0].isZero() {
 			code = append(code, mov.args[1].code...)
 			code = appendOp(code, t2vmoveto)
@@ -92,32 +95,108 @@ func (gm *glyphMaker) encode(defWidth, nomWidth int) []byte {
 		path := cmds[:k]
 		cmds = cmds[k:]
 
-		code := getCode(path)
-		fmt.Printf("xxx % x\n", code)
+		code = append(code, getCode(path)...)
+		fmt.Println()
 	}
 
 	code = appendOp(code, t2endchar)
 	return code
 }
 
-type cmd struct {
-	args []encodedNumber
-	op   t2op
+type pqEntry struct {
+	state int
+	code  []byte
 }
 
-func (c cmd) appendArgs(code []byte) []byte {
-	for _, a := range c.args {
-		code = append(code, a.code...)
+type priorityQueue struct {
+	entries []*pqEntry
+	dir     map[int]int
+}
+
+func (pq *priorityQueue) Len() int {
+	return len(pq.entries)
+}
+
+func (pq *priorityQueue) Less(i, j int) bool {
+	return len(pq.entries[i].code) < len(pq.entries[j].code)
+}
+
+func (pq *priorityQueue) Swap(i, j int) {
+	entries := pq.entries
+	entries[i], entries[j] = entries[j], entries[i]
+	pq.dir[entries[i].state] = i
+	pq.dir[entries[j].state] = j
+}
+
+func (pq *priorityQueue) Push(x interface{}) {
+	entry := x.(*pqEntry)
+	pq.dir[entry.state] = len(pq.entries)
+	pq.entries = append(pq.entries, entry)
+}
+
+func (pq *priorityQueue) Pop() interface{} {
+	n := pq.Len()
+	x := pq.entries[n-1]
+	pq.entries = pq.entries[0 : n-1]
+	delete(pq.dir, x.state)
+	return x
+}
+
+func (pq *priorityQueue) Update(state int, head, tail []byte) {
+	var e *pqEntry
+
+	idx, ok := pq.dir[state]
+	if ok {
+		e = pq.entries[idx]
 	}
-	return code
+	cost := len(head) + len(tail)
+	if ok && len(e.code) <= cost {
+		return
+	}
+
+	code := make([]byte, cost)
+	copy(code, head)
+	copy(code[len(head):], tail)
+	if ok {
+		e.code = code
+		heap.Fix(pq, idx)
+	} else {
+		e = &pqEntry{state: state, code: code}
+		heap.Push(pq, e)
+	}
 }
 
-type edge struct {
-	code []byte
-	skip int
+func getCode(cmds []cmd) []byte {
+	for _, c := range cmds {
+		fmt.Println(c)
+	}
+
+	n := len(cmds)
+	done := make([]bool, n+1)
+	best := &priorityQueue{
+		dir: make(map[int]int),
+	}
+	heap.Push(best, &pqEntry{state: 0, code: nil})
+	for {
+		v := heap.Pop(best).(*pqEntry)
+		from := v.state
+		if from == n {
+			return v.code
+		}
+		for _, edge := range findEdges(cmds[from:]) {
+			fmt.Println(".", from, edge)
+			to := from + edge.skip
+			if done[to] {
+				continue
+			}
+			best.Update(to, v.code, edge.code)
+		}
+
+		done[from] = true
+	}
 }
 
-func edges(cmds []cmd) []edge {
+func findEdges(cmds []cmd) []edge {
 	if len(cmds) == 0 {
 		return nil
 	}
@@ -138,7 +217,7 @@ func edges(cmds []cmd) []edge {
 
 		horizontal := make([]bool, numLines)
 		vertical := make([]bool, numLines)
-		for i := range cmds {
+		for i := 0; i < numLines; i++ {
 			horizontal[i] = cmds[i].args[1].isZero()
 			vertical[i] = cmds[i].args[0].isZero()
 		}
@@ -177,7 +256,7 @@ func edges(cmds []cmd) []edge {
 					}
 					args = append(args, cmds[k].args[1].code...)
 				} else {
-					if !vertical[k] {
+					if !horizontal[k] {
 						break
 					}
 					args = append(args, cmds[k].args[0].code...)
@@ -295,102 +374,51 @@ func edges(cmds []cmd) []edge {
 				skip: i + 1,
 			})
 		}
+
+		// TODO(voss): implement the missing operators
+		//   - ... hvcurveto
+		//   - ... vhcurveto
+		//   - ... flex
+		//   - ... flex1
+		//   - ... hflex
+		//   - ... hflex1
 	}
 
 	return edges
 }
 
-type entry struct {
-	state int
-	code  []byte
+type edge struct {
+	code []byte
+	skip int
 }
 
-type priorityQueue struct {
-	entries []*entry
-	dir     map[int]int
+func (e edge) String() string {
+	return fmt.Sprintf("edge (% x) %+d", e.code, e.skip)
 }
 
-func (pq *priorityQueue) Len() int {
-	return len(pq.entries)
+type cmd struct {
+	args []encodedNumber
+	op   t2op
 }
 
-func (pq *priorityQueue) Less(i, j int) bool {
-	return len(pq.entries[i].code) < len(pq.entries[j].code)
+func (c cmd) String() string {
+	return fmt.Sprint("cmd", c.args, c.op)
 }
 
-func (pq *priorityQueue) Swap(i, j int) {
-	entries := pq.entries
-	entries[i], entries[j] = entries[j], entries[i]
-	pq.dir[entries[i].state] = i
-	pq.dir[entries[j].state] = j
-}
-
-func (pq *priorityQueue) Push(x interface{}) {
-	entry := x.(*entry)
-	pq.dir[entry.state] = len(pq.entries)
-	pq.entries = append(pq.entries, entry)
-}
-
-func (pq *priorityQueue) Pop() interface{} {
-	n := pq.Len()
-	x := pq.entries[n-1]
-	pq.entries = pq.entries[0 : n-1]
-	delete(pq.dir, x.state)
-	return x
-}
-
-func (pq *priorityQueue) Update(state int, head, tail []byte) {
-	var e *entry
-
-	idx, ok := pq.dir[state]
-	if ok {
-		e = pq.entries[idx]
+func (c cmd) appendArgs(code []byte) []byte {
+	for _, a := range c.args {
+		code = append(code, a.code...)
 	}
-	cost := len(head) + len(tail)
-	if ok && len(e.code) <= cost {
-		return
-	}
-
-	code := make([]byte, cost)
-	copy(code, head)
-	copy(code[len(head):], tail)
-	if ok {
-		e.code = code
-		heap.Fix(pq, idx)
-	} else {
-		e = &entry{state: state, code: code}
-		heap.Push(pq, e)
-	}
-}
-
-func getCode(cmds []cmd) []byte {
-	n := len(cmds)
-	done := make([]bool, n)
-	best := &priorityQueue{
-		dir: make(map[int]int),
-	}
-	for {
-		v := heap.Pop(best).(*entry)
-		from := v.state
-		for _, edge := range edges(cmds[from:]) {
-			to := from + edge.skip
-			if done[to] {
-				continue
-			}
-			best.Update(to, v.code, edge.code)
-		}
-
-		if idx, ok := best.dir[n]; ok {
-			return best.entries[idx].code
-		}
-
-		done[from] = true
-	}
+	return code
 }
 
 type encodedNumber struct {
 	val  float64
 	code []byte
+}
+
+func (x encodedNumber) String() string {
+	return fmt.Sprintf("%g (% x)", x.val, x.code)
 }
 
 func encode(x float64) encodedNumber {
@@ -431,8 +459,8 @@ func encode(x float64) encodedNumber {
 	}
 }
 
-func (enc encodedNumber) isZero() bool {
-	return enc.val == 0
+func (x encodedNumber) isZero() bool {
+	return x.val == 0
 }
 
 func appendOp(data []byte, op t2op) []byte {

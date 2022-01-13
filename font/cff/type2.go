@@ -47,10 +47,10 @@ func (s stackSlot) String() string {
 // TODO(voss): use absolute instead of relative coordinates, so that
 //     GlyphMaker implements Renderer
 type Renderer interface {
-	SetWidth(w int)
-	RMoveTo(x, y float64)
-	RLineTo(x, y float64)
-	RCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64)
+	SetWidth(w int32)
+	MoveTo(x, y float64)
+	LineTo(x, y float64)
+	CurveTo(dxa, dya, dxb, dyb, dxc, dyc float64)
 }
 
 // DecodeCharString uses ctx to render the charstring for glyph i.
@@ -91,7 +91,7 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 			glyphWidth, _ = cff.privateDict.getInt(opDefaultWidthX, 0)
 		}
 		if ctx != nil {
-			ctx.SetWidth(int(glyphWidth))
+			ctx.SetWidth(glyphWidth)
 		}
 		widthIsSet = true
 	}
@@ -100,12 +100,33 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 	cmdStack := [][]byte{body}
 	var nStems int
 
+	var posX, posY float64
+	rMoveTo := func(dx, dy float64) {
+		posX += dx
+		posY += dy
+		ctx.MoveTo(posX, posY)
+	}
+	rLineTo := func(dx, dy float64) {
+		posX += dx
+		posY += dy
+		ctx.LineTo(posX, posY)
+	}
+	rCurveTo := func(dxa, dya, dxb, dyb, dxc, dyc float64) {
+		xa := posX + dxa
+		ya := posY + dya
+		xb := xa + dxb
+		yb := ya + dyb
+		posX = xb + dxc
+		posY = yb + dyc
+		ctx.CurveTo(xa, ya, xb, yb, posX, posY)
+	}
+
 	for len(cmdStack) > 0 {
 		cmdStack, body = cmdStack[:len(cmdStack)-1], cmdStack[len(cmdStack)-1]
 
 	opLoop:
 		for len(body) > 0 {
-			if len(stack) > 48 {
+			if len(stack) > 100 { // TODO(voss): the spec says 48, but some fonts use more???
 				return nil, errStackOverflow
 			}
 
@@ -189,28 +210,28 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 			case t2rmoveto:
 				setGlyphWidth(len(stack) > 2)
 				if ctx != nil && len(stack) >= 2 {
-					ctx.RMoveTo(stack[0].val, stack[1].val)
+					rMoveTo(stack[0].val, stack[1].val)
 				}
 				clearStack()
 
 			case t2hmoveto:
 				setGlyphWidth(len(stack) > 1)
 				if ctx != nil && len(stack) >= 1 {
-					ctx.RMoveTo(stack[0].val, 0)
+					rMoveTo(stack[0].val, 0)
 				}
 				clearStack()
 
 			case t2vmoveto:
 				setGlyphWidth(len(stack) > 1)
 				if ctx != nil && len(stack) >= 1 {
-					ctx.RMoveTo(0, stack[0].val)
+					rMoveTo(0, stack[0].val)
 				}
 				clearStack()
 
 			case t2rlineto:
 				if ctx != nil {
 					for len(stack) >= 2 {
-						ctx.RLineTo(stack[0].val, stack[1].val)
+						rLineTo(stack[0].val, stack[1].val)
 						stack = stack[2:]
 					}
 				}
@@ -221,9 +242,9 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 					horizontal := op == t2hlineto
 					for len(stack) > 0 {
 						if horizontal {
-							ctx.RLineTo(stack[0].val, 0)
+							rLineTo(stack[0].val, 0)
 						} else {
-							ctx.RLineTo(0, stack[0].val)
+							rLineTo(0, stack[0].val)
 						}
 						stack = stack[1:]
 						horizontal = !horizontal
@@ -235,17 +256,17 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 			case t2rrcurveto, t2rcurveline, t2rlinecurve:
 				if ctx != nil {
 					for op == t2rlinecurve && len(stack) >= 8 {
-						ctx.RLineTo(stack[0].val, stack[1].val)
+						rLineTo(stack[0].val, stack[1].val)
 						stack = stack[2:]
 					}
 					for len(stack) >= 6 {
-						ctx.RCurveTo(stack[0].val, stack[1].val,
+						rCurveTo(stack[0].val, stack[1].val,
 							stack[2].val, stack[3].val,
 							stack[4].val, stack[5].val)
 						stack = stack[6:]
 					}
 					if op == t2rcurveline && len(stack) >= 2 {
-						ctx.RLineTo(stack[0].val, stack[1].val)
+						rLineTo(stack[0].val, stack[1].val)
 						stack = stack[2:]
 					}
 				}
@@ -258,7 +279,7 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 						dy1, stack = stack[0].val, stack[1:]
 					}
 					for len(stack) >= 4 {
-						ctx.RCurveTo(stack[0].val, dy1,
+						rCurveTo(stack[0].val, dy1,
 							stack[1].val, stack[2].val,
 							stack[3].val, 0)
 						stack = stack[4:]
@@ -276,11 +297,11 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 							extra = stack[4].val
 						}
 						if horizontal {
-							ctx.RCurveTo(stack[0].val, 0,
+							rCurveTo(stack[0].val, 0,
 								stack[1].val, stack[2].val,
 								extra, stack[3].val)
 						} else {
-							ctx.RCurveTo(0, stack[0].val,
+							rCurveTo(0, stack[0].val,
 								stack[1].val, stack[2].val,
 								stack[3].val, extra)
 						}
@@ -297,7 +318,7 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 						dx1, stack = stack[0].val, stack[1:]
 					}
 					for len(stack) >= 4 {
-						ctx.RCurveTo(dx1, stack[0].val,
+						rCurveTo(dx1, stack[0].val,
 							stack[1].val, stack[2].val,
 							0, stack[3].val)
 						stack = stack[4:]
@@ -309,10 +330,10 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 			case t2flex:
 				if ctx != nil {
 					if len(stack) >= 13 {
-						ctx.RCurveTo(stack[0].val, stack[1].val,
+						rCurveTo(stack[0].val, stack[1].val,
 							stack[2].val, stack[3].val,
 							stack[4].val, stack[5].val)
-						ctx.RCurveTo(stack[6].val, stack[7].val,
+						rCurveTo(stack[6].val, stack[7].val,
 							stack[8].val, stack[9].val,
 							stack[10].val, stack[11].val)
 						// fd = stack[12].val / 100
@@ -322,18 +343,18 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 			case t2flex1:
 				if ctx != nil {
 					if len(stack) >= 11 {
-						ctx.RCurveTo(stack[0].val, stack[1].val,
+						rCurveTo(stack[0].val, stack[1].val,
 							stack[2].val, stack[3].val,
 							stack[4].val, stack[5].val)
 						extra := stack[10].val
 						dx := stack[0].val + stack[2].val + stack[4].val + stack[6].val + stack[8].val
 						dy := stack[1].val + stack[3].val + stack[5].val + stack[7].val + stack[9].val
 						if math.Abs(dx) > math.Abs(dy) {
-							ctx.RCurveTo(stack[6].val, stack[7].val,
+							rCurveTo(stack[6].val, stack[7].val,
 								stack[8].val, stack[9].val,
 								extra, 0)
 						} else {
-							ctx.RCurveTo(stack[6].val, stack[7].val,
+							rCurveTo(stack[6].val, stack[7].val,
 								stack[8].val, stack[9].val,
 								0, extra)
 						}
@@ -344,10 +365,10 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 			case t2hflex:
 				if ctx != nil {
 					if len(stack) >= 7 {
-						ctx.RCurveTo(stack[0].val, 0,
+						rCurveTo(stack[0].val, 0,
 							stack[1].val, stack[2].val,
 							stack[3].val, 0)
-						ctx.RCurveTo(stack[4].val, 0,
+						rCurveTo(stack[4].val, 0,
 							stack[5].val, -stack[2].val,
 							stack[6].val, 0)
 						// fd = 0.5
@@ -357,11 +378,11 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 			case t2hflex1:
 				if ctx != nil {
 					if len(stack) >= 9 {
-						ctx.RCurveTo(stack[0].val, stack[1].val,
+						rCurveTo(stack[0].val, stack[1].val,
 							stack[2].val, stack[3].val,
 							stack[4].val, 0)
 						dy := stack[1].val + stack[3].val + stack[5].val + stack[7].val
-						ctx.RCurveTo(stack[5].val, 0,
+						rCurveTo(stack[5].val, 0,
 							stack[6].val, stack[7].val,
 							stack[8].val, -dy)
 						// fd = 0.5

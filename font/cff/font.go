@@ -37,7 +37,7 @@ type Font struct {
 
 	topDict     cffDict
 	gsubrs      cffIndex
-	charStrings [][]byte
+	charStrings cffIndex
 	privateDict cffDict
 	subrs       cffIndex
 
@@ -233,7 +233,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			return nil, err
 		}
 		cff.GlyphExtent = append(cff.GlyphExtent, ctx.bbox)
-		cff.Width = append(cff.Width, ctx.width)
+		cff.Width = append(cff.Width, int(ctx.width))
 		ctx.reset()
 	}
 
@@ -242,7 +242,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 
 type glyphDimensions struct {
 	x, y   float64
-	width  int
+	width  int32
 	bbox   font.Rect
 	hasInk bool
 }
@@ -275,30 +275,30 @@ func (ctx *glyphDimensions) add() {
 	ctx.hasInk = true
 }
 
-func (ctx *glyphDimensions) SetWidth(w int) {
+func (ctx *glyphDimensions) SetWidth(w int32) {
 	ctx.width = w
 }
 
-func (ctx *glyphDimensions) RMoveTo(x, y float64) {
-	ctx.x += x
-	ctx.y += y
+func (ctx *glyphDimensions) MoveTo(x, y float64) {
+	ctx.x = x
+	ctx.y = y
 }
 
-func (ctx *glyphDimensions) RLineTo(x, y float64) {
+func (ctx *glyphDimensions) LineTo(x, y float64) {
 	if !ctx.hasInk {
 		ctx.add()
 	}
-	ctx.x += x
-	ctx.y += y
+	ctx.x = x
+	ctx.y = y
 	ctx.add()
 }
 
-func (ctx *glyphDimensions) RCurveTo(dxa, dya, dxb, dyb, dxc, dyc float64) {
+func (ctx *glyphDimensions) CurveTo(xa, ya, xb, yb, xc, yc float64) {
 	if !ctx.hasInk {
 		ctx.add()
 	}
-	ctx.x += dxa + dxb + dxc
-	ctx.y += dya + dyb + dyc
+	ctx.x = xc
+	ctx.y = yc
 	ctx.add()
 }
 

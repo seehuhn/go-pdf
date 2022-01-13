@@ -23,62 +23,55 @@ import (
 // Subset returns a copy of the font, including only the glyphs in the given
 // subset.  The ".notdef" glyph is always included as the first glyph.
 func (cff *Font) Subset(subset []font.GlyphID) *Font {
+	if subset[0] != 0 {
+		panic("invalid subset")
+	}
+
 	tag := font.GetSubsetTag(subset, len(cff.GlyphName))
 	out := &Font{
 		FontName:    tag + "+" + cff.FontName,
+		GlyphName:   make([]string, 0, len(subset)),
+		GlyphExtent: make([]font.Rect, 0, len(subset)),
+		Width:       make([]int, 0, len(subset)),
+
 		topDict:     cff.topDict,
 		privateDict: cff.privateDict,
 
 		gid2cid: append([]font.GlyphID{}, subset...),
 	}
 
-	// TODO(voss): re-introduce subroutines as needed
-
-	out.charStrings = cffIndex{cff.charStrings[0]}
-	out.GlyphName = []string{cff.GlyphName[0]}
 	for _, gid := range subset {
-		if gid != 0 {
-			// expand all subroutines
-			cmds, err := cff.doDecode(nil, int(gid))
-			if err != nil {
-				// We failed to decode charstring, so we cannot reliably
-				// prune the subroutines.  Use naive subsetting instead.
-				return cff.naiveSubset(subset)
-			}
-			var cc []byte
-			for _, cmd := range cmds {
-				cc = append(cc, cmd...)
-			}
-
-			out.charStrings = append(out.charStrings, cc)
-			out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
-		}
-	}
-
-	return out
-}
-
-// naiveSubset returns a copy of the font with only the glyphs in the given
-// subset.  The ".notdef" glyph is always included as the first glyph.
-// This method does not prune/expand subroutines.
-func (cff *Font) naiveSubset(subset []font.GlyphID) *Font {
-	tag := font.GetSubsetTag(subset, len(cff.GlyphName))
-	out := &Font{
-		FontName:    tag + "+" + cff.FontName,
-		topDict:     cff.topDict,
-		privateDict: cff.privateDict,
-		gsubrs:      cff.gsubrs,
-		subrs:       cff.subrs,
-
-		gid2cid: append([]font.GlyphID{}, subset...),
-	}
-
-	out.charStrings = cffIndex{cff.charStrings[0]}
-	out.GlyphName = []string{cff.GlyphName[0]}
-	for _, gid := range subset {
-		out.charStrings = append(out.charStrings, cff.charStrings[gid])
 		out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
+		out.GlyphExtent = append(out.GlyphExtent, cff.GlyphExtent[gid])
+		out.Width = append(out.Width, cff.Width[gid])
 	}
+
+	charStrings := make(cffIndex, 0, len(subset))
+	for _, gid := range subset {
+		// expand all subroutines
+		// TODO(voss): re-introduce subroutines as needed
+
+		cmds, err := cff.doDecode(nil, int(gid))
+		if err != nil {
+			// We failed to decode a charstring, so we cannot reliably
+			// prune the subroutines.  Use naive subsetting instead.
+			out.gsubrs = cff.gsubrs
+			out.subrs = cff.subrs
+
+			for _, gid := range subset {
+				out.charStrings = append(out.charStrings, cff.charStrings[gid])
+			}
+			return out
+		}
+
+		var cc []byte
+		for _, cmd := range cmds {
+			cc = append(cc, cmd...)
+		}
+
+		charStrings = append(charStrings, cc)
+	}
+	out.charStrings = charStrings
 
 	return out
 }
