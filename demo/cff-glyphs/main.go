@@ -72,7 +72,7 @@ func main() {
 			continue
 		}
 
-		for i := range cff.GlyphName {
+		for i := range cff.GlyphNames {
 			bbox := cff.GlyphExtent[i]
 			left := 0
 			if bbox.LLx < left {
@@ -140,11 +140,11 @@ type context struct {
 	xx         []float64
 	yy         []float64
 	posX, posY float64
-	w          int32
+	w          int16
 	ink        bool
 }
 
-func (ctx *context) SetWidth(w int32) {
+func (ctx *context) SetWidth(w int16) {
 	ctx.w = w
 }
 
@@ -181,7 +181,7 @@ func (ctx *context) CurveTo(xa, ya, xb, yb, xc, yc float64) {
 func illustrateGlyph(page *pages.Page, F *font.Font, cff *cff.Font, i int) error {
 	hss := boxes.Glue(0, 1, 1, 1, 1)
 
-	label := fmt.Sprintf("glyph %d: %s", i, cff.GlyphName[i])
+	label := fmt.Sprintf("glyph %d: %s", i, cff.GlyphNames[i])
 	nameBox := boxes.Text(F, 12, label)
 	titleBox := boxes.HBoxTo(page.BBox.URx-page.BBox.LLx, hss, nameBox, hss)
 	titleBox.Draw(page, page.BBox.LLx, page.BBox.URy-20)

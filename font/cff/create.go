@@ -2,23 +2,109 @@ package cff
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"math"
+
+	"seehuhn.de/go/pdf/font"
 )
 
-const eps = 6.0 / 65536
+// Builder can be used to construct a CFF font from scratch.
+type Builder struct {
+	cff      *Font
+	defWidth int16
+	nomWidth int16
 
-type glyphMaker struct {
-	width      int32
+	isInGlyph bool
+}
+
+// NewBuilder returns a new Builder.
+func NewBuilder(fontName string, defWidth, nomWidth int16) *Builder {
+	cff := &Font{
+		FontName: fontName,
+	}
+	return &Builder{
+		cff:      cff,
+		defWidth: defWidth,
+		nomWidth: nomWidth,
+	}
+}
+
+// AddGlyph adds a glyph to the font.
+// The first glyph added must be the ".notdef" glyph.
+func (b *Builder) AddGlyph(name string) (*Glyph, error) {
+	if len(b.cff.GlyphNames) == 0 && name != ".notdef" {
+		return nil, errNoNotdef
+	}
+
+	if b.isInGlyph {
+		return nil, errInGlyph
+	}
+	b.isInGlyph = true
+
+	b.cff.GlyphNames = append(b.cff.GlyphNames, name)
+	return &Glyph{
+		b: b,
+	}, nil
+}
+
+// Finish returns the completed CFF font.
+func (b *Builder) Finish() (*Font, error) {
+	if b.isInGlyph {
+		return nil, errInGlyph
+	}
+
+	pd := cffDict{}
+	pd[opDefaultWidthX] = []interface{}{int32(b.defWidth)}
+	pd[opNominalWidthX] = []interface{}{int32(b.nomWidth)}
+
+	// TODO(voss): extract subroutines
+
+	cff := b.cff
+	cff.privateDict = pd
+	return cff, nil
+}
+
+// Glyph is used to draw a glyph.
+type Glyph struct {
+	encoder
+
+	b *Builder
+}
+
+// Close adds the new glyph to the font.
+// After calling Close, the Glyph object can no longer be used.
+func (g *Glyph) Close() {
+	g.b.isInGlyph = false
+
+	cff := g.b.cff
+	cff.GlyphExtent = append(cff.GlyphExtent, g.extent)
+	cff.Width = append(cff.Width, int(g.width))
+
+	code := g.encode(g.b.defWidth, g.b.nomWidth)
+	cff.charStrings = append(cff.charStrings, code)
+
+	g.b = nil // prevent accidental use
+}
+
+type encoder struct {
+	width       int16
+	extent      font.Rect
+	initialized bool
+
 	posX, posY float64
 	cmds       []cmd
 }
 
-func (gm *glyphMaker) SetWidth(w int32) {
+// SetWidth implements the Renderer interface.
+func (gm *encoder) SetWidth(w int16) {
 	gm.width = w
 }
 
-func (gm *glyphMaker) MoveTo(x, y float64) {
+// MoveTo implements the Renderer interface.
+func (gm *encoder) MoveTo(x, y float64) {
+	gm.registerPoint(x, y)
+
 	dx := encode(x - gm.posX)
 	dy := encode(y - gm.posY)
 	gm.cmds = append(gm.cmds, cmd{
@@ -29,7 +115,10 @@ func (gm *glyphMaker) MoveTo(x, y float64) {
 	gm.posY += dy.val
 }
 
-func (gm *glyphMaker) LineTo(x, y float64) {
+// LineTo implements the Renderer interface.
+func (gm *encoder) LineTo(x, y float64) {
+	gm.registerPoint(x, y)
+
 	dx := encode(x - gm.posX)
 	dy := encode(y - gm.posY)
 	gm.cmds = append(gm.cmds, cmd{
@@ -40,7 +129,10 @@ func (gm *glyphMaker) LineTo(x, y float64) {
 	gm.posY += dy.val
 }
 
-func (gm *glyphMaker) CurveTo(xa, ya, xb, yb, xc, yc float64) {
+// CurveTo implements the Renderer interface.
+func (gm *encoder) CurveTo(xa, ya, xb, yb, xc, yc float64) {
+	gm.registerPoint(xc, yc)
+
 	dxa := encode(xa - gm.posX)
 	dya := encode(ya - gm.posY)
 	dxb := encode(xb - xa)
@@ -55,7 +147,35 @@ func (gm *glyphMaker) CurveTo(xa, ya, xb, yb, xc, yc float64) {
 	gm.posY += dya.val + dyb.val + dyc.val
 }
 
-func (gm *glyphMaker) encode(defWidth, nomWidth int32) []byte {
+func (gm *encoder) registerPoint(x, y float64) {
+	xL := int(math.Floor(x))
+	xR := int(math.Ceil(x))
+	yL := int(math.Floor(y))
+	yR := int(math.Ceil(y))
+
+	if gm.initialized {
+		if xL < gm.extent.LLx {
+			gm.extent.LLx = xL
+		}
+		if xR > gm.extent.URx {
+			gm.extent.URx = xR
+		}
+		if yL < gm.extent.LLy {
+			gm.extent.LLy = yL
+		}
+		if yR > gm.extent.URy {
+			gm.extent.URy = yR
+		}
+	} else {
+		gm.extent.LLx = xL
+		gm.extent.URx = xR
+		gm.extent.LLy = yL
+		gm.extent.URy = yR
+		gm.initialized = true
+	}
+}
+
+func (gm *encoder) encode(defWidth, nomWidth int16) []byte {
 	var code []byte
 	if gm.width != defWidth {
 		w := encode(float64(gm.width - nomWidth))
@@ -483,3 +603,10 @@ func copyOp(data []byte, op t2op) []byte {
 	res[len(data)] = byte(op)
 	return res
 }
+
+const eps = 6.0 / 65536
+
+var (
+	errNoNotdef = errors.New("cff: missing .notdef glyph")
+	errInGlyph  = errors.New("cff: glyph is already in progress")
+)

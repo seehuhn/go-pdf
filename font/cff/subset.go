@@ -21,16 +21,16 @@ import (
 )
 
 // Subset returns a copy of the font, including only the glyphs in the given
-// subset.  The ".notdef" glyph is always included as the first glyph.
+// subset.  The ".notdef" glyph must always be included as the first glyph.
 func (cff *Font) Subset(subset []font.GlyphID) *Font {
 	if subset[0] != 0 {
 		panic("invalid subset")
 	}
 
-	tag := font.GetSubsetTag(subset, len(cff.GlyphName))
+	tag := font.GetSubsetTag(subset, len(cff.GlyphNames))
 	out := &Font{
 		FontName:    tag + "+" + cff.FontName,
-		GlyphName:   make([]string, 0, len(subset)),
+		GlyphNames:  make([]string, 0, len(subset)),
 		GlyphExtent: make([]font.Rect, 0, len(subset)),
 		Width:       make([]int, 0, len(subset)),
 
@@ -41,7 +41,7 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 	}
 
 	for _, gid := range subset {
-		out.GlyphName = append(out.GlyphName, cff.GlyphName[gid])
+		out.GlyphNames = append(out.GlyphNames, cff.GlyphNames[gid])
 		out.GlyphExtent = append(out.GlyphExtent, cff.GlyphExtent[gid])
 		out.Width = append(out.Width, cff.Width[gid])
 	}
@@ -51,7 +51,7 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 		// expand all subroutines
 		// TODO(voss): re-introduce subroutines as needed
 
-		cmds, err := cff.doDecode(nil, int(gid))
+		cmds, err := cff.doDecode(nil, cff.charStrings[gid])
 		if err != nil {
 			// We failed to decode a charstring, so we cannot reliably
 			// prune the subroutines.  Use naive subsetting instead.

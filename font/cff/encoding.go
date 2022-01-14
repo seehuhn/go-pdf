@@ -28,7 +28,7 @@ func (cff *Font) readEncoding(p *parser.Parser) (*encoding, error) {
 			return nil, err
 		}
 		for i, c := range data {
-			fmt.Println(c, "->", cff.GlyphName[i+1])
+			fmt.Println(c, "->", cff.GlyphNames[i+1])
 		}
 	case 1:
 		fmt.Println("format 1")

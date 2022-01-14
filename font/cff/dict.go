@@ -25,8 +25,6 @@ import (
 	"strconv"
 )
 
-var errCorruptDict = errors.New("invalid CFF DICT")
-
 type cffDict map[dictOp][]interface{}
 
 func decodeDict(buf []byte, ss *cffStrings) (cffDict, error) {
@@ -418,3 +416,5 @@ func (d dictOp) isString() bool {
 		return false
 	}
 }
+
+var errCorruptDict = errors.New("cff: invalid DICT")

@@ -29,11 +29,11 @@ import (
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a reader.
 type Font struct {
-	FontName  string
-	GlyphName []string
+	FontName string
 
-	GlyphExtent []font.Rect // This is in font design units.
-	Width       []int       // This is in font design units.
+	GlyphNames  []string
+	GlyphExtent []font.Rect
+	Width       []int
 
 	topDict     cffDict
 	gsubrs      cffIndex
@@ -173,9 +173,9 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			return nil, err
 		}
 	}
-	cff.GlyphName = make([]string, len(charset))
+	cff.GlyphNames = make([]string, len(charset))
 	for i, sid := range charset {
-		cff.GlyphName[i] = strings.get(sid)
+		cff.GlyphNames[i] = strings.get(sid)
 	}
 
 	// encodingOffs, _ := topDict.getInt(opEncoding, 0)
@@ -228,7 +228,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.Width = make([]int, 0, len(cff.charStrings))
 	ctx := &glyphDimensions{}
 	for i := range cff.charStrings {
-		_, err := cff.doDecode(ctx, i)
+		_, err := cff.doDecode(ctx, cff.charStrings[i])
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +242,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 
 type glyphDimensions struct {
 	x, y   float64
-	width  int32
+	width  int16
 	bbox   font.Rect
 	hasInk bool
 }
@@ -275,7 +275,7 @@ func (ctx *glyphDimensions) add() {
 	ctx.hasInk = true
 }
 
-func (ctx *glyphDimensions) SetWidth(w int32) {
+func (ctx *glyphDimensions) SetWidth(w int16) {
 	ctx.width = w
 }
 
@@ -351,7 +351,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	// section 6: charsets INDEX
 	subset := make([]int32, numGlyphs)
 	for i := uint16(0); i < numGlyphs; i++ {
-		s := cff.GlyphName[i]
+		s := cff.GlyphNames[i]
 		if s == "" {
 			s = ".notdef"
 		}

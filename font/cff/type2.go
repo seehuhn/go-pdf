@@ -44,10 +44,9 @@ func (s stackSlot) String() string {
 }
 
 // A Renderer is used to draw a glyph encoded by a CFF charstring.
-// TODO(voss): use absolute instead of relative coordinates, so that
-//     GlyphMaker implements Renderer
+// TODO(voss): add hinting support.
 type Renderer interface {
-	SetWidth(w int32)
+	SetWidth(w int16) // TODO(voss): remove this?
 	MoveTo(x, y float64)
 	LineTo(x, y float64)
 	CurveTo(dxa, dya, dxb, dyb, dxc, dyc float64)
@@ -59,17 +58,16 @@ func (cff *Font) DecodeCharString(ctx Renderer, i int) error {
 		return errors.New("invalid glyph index")
 	}
 
-	_, err := cff.doDecode(ctx, i)
+	_, err := cff.doDecode(ctx, cff.charStrings[i])
 	return err
 }
 
 // doDecode returns the commands for the given charstring.
-func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
-	body := cff.charStrings[i]
+func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 	var cmds [][]byte
 	skipBytes := func(n int) {
-		cmds = append(cmds, body[:n])
-		body = body[n:]
+		cmds = append(cmds, code[:n])
+		code = code[n:]
 	}
 
 	var stack []stackSlot
@@ -82,13 +80,14 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 		if widthIsSet {
 			return
 		}
-		var glyphWidth int32
+		var glyphWidth int16
 		if isPresent {
 			dw, _ := cff.privateDict.getInt(opNominalWidthX, 0)
-			glyphWidth = int32(stack[0].val) + dw
+			glyphWidth = int16(stack[0].val) + int16(dw)
 			stack = stack[1:]
 		} else {
-			glyphWidth, _ = cff.privateDict.getInt(opDefaultWidthX, 0)
+			glyphWidth32, _ := cff.privateDict.getInt(opDefaultWidthX, 0)
+			glyphWidth = int16(glyphWidth32)
 		}
 		if ctx != nil {
 			ctx.SetWidth(glyphWidth)
@@ -97,7 +96,7 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 	}
 
 	storage := make(map[int]stackSlot)
-	cmdStack := [][]byte{body}
+	cmdStack := [][]byte{code}
 	var nStems int
 
 	var posX, posY float64
@@ -122,15 +121,15 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 	}
 
 	for len(cmdStack) > 0 {
-		cmdStack, body = cmdStack[:len(cmdStack)-1], cmdStack[len(cmdStack)-1]
+		cmdStack, code = cmdStack[:len(cmdStack)-1], cmdStack[len(cmdStack)-1]
 
 	opLoop:
-		for len(body) > 0 {
+		for len(code) > 0 {
 			if len(stack) > 100 { // TODO(voss): the spec says 48, but some fonts use more???
 				return nil, errStackOverflow
 			}
 
-			op := t2op(body[0])
+			op := t2op(code[0])
 
 			// {
 			// 	show := body[1:]
@@ -155,39 +154,39 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 				skipBytes(1)
 				continue
 			} else if op >= 247 && op <= 250 {
-				if len(body) < 2 {
+				if len(code) < 2 {
 					return nil, errIncomplete
 				}
 				stack = append(stack, stackSlot{
-					val: float64(int32(op)*256 + int32(body[1]) + (108 - 247*256)),
+					val: float64(int32(op)*256 + int32(code[1]) + (108 - 247*256)),
 				})
 				skipBytes(2)
 				continue
 			} else if op >= 251 && op <= 254 {
-				if len(body) < 2 {
+				if len(code) < 2 {
 					return nil, errIncomplete
 				}
 				stack = append(stack, stackSlot{
-					val: float64(-int32(op)*256 - int32(body[1]) - (108 - 251*256)),
+					val: float64(-int32(op)*256 - int32(code[1]) - (108 - 251*256)),
 				})
 				skipBytes(2)
 				continue
 			} else if op == 28 {
-				if len(body) < 3 {
+				if len(code) < 3 {
 					return nil, errIncomplete
 				}
 				stack = append(stack, stackSlot{
-					val: float64(int16(uint16(body[1])<<8 + uint16(body[2]))),
+					val: float64(int16(uint16(code[1])<<8 + uint16(code[2]))),
 				})
 				skipBytes(3)
 				continue
 			} else if op == 255 {
-				if len(body) < 5 {
+				if len(code) < 5 {
 					return nil, errIncomplete
 				}
 				// 16-bit signed integer with 16 bits of fraction
-				x := int32(uint32(body[1])<<24 + uint32(body[2])<<16 +
-					uint32(body[3])<<8 + uint32(body[4]))
+				x := int32(uint32(code[1])<<24 + uint32(code[2])<<16 +
+					uint32(code[3])<<8 + uint32(code[4]))
 				stack = append(stack, stackSlot{
 					val: float64(x) / 65536,
 				})
@@ -197,13 +196,13 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 
 			var cmd []byte
 			if op == 0x0c {
-				if len(body) < 2 {
+				if len(code) < 2 {
 					return nil, errIncomplete
 				}
-				op = op<<8 | t2op(body[1])
-				cmd, body = body[:2], body[2:]
+				op = op<<8 | t2op(code[1])
+				cmd, code = code[:2], code[2:]
 			} else {
-				cmd, body = body[:1], body[1:]
+				cmd, code = code[:1], code[1:]
 			}
 
 			switch op {
@@ -406,11 +405,11 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 				// need not be included."
 				nStems += len(stack) / 2
 				k := (nStems + 7) / 8
-				if k >= len(body) {
+				if k >= len(code) {
 					return nil, errIncomplete
 				}
-				cmd = append(cmd, body[:k]...)
-				body = body[k:]
+				cmd = append(cmd, code[:k]...)
+				code = code[k:]
 				clearStack()
 
 			case t2abs:
@@ -605,16 +604,16 @@ func (cff *Font) doDecode(ctx Renderer, i int) ([][]byte, error) {
 				biased := int(stack[k].val)
 				stack = stack[:k]
 
-				cmdStack = append(cmdStack, body)
+				cmdStack = append(cmdStack, code)
 				if len(cmdStack) > 10 {
 					return nil, errors.New("maximum call stack size exceeded")
 				}
 
 				var err error
 				if op == t2callsubr {
-					body, err = cff.getSubr(biased)
+					code, err = cff.getSubr(biased)
 				} else {
-					body, err = cff.getGSubr(biased)
+					code, err = cff.getGSubr(biased)
 				}
 				if err != nil {
 					return nil, err
