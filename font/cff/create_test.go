@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 func TestCreate(t *testing.T) {
-	b := NewBuilder("Test", 500, 500)
+	meta := &type1.FontDict{
+		FontName: "Test",
+	}
+	b := NewBuilder(meta, 500, 500)
 
 	g, err := b.AddGlyph(".notdef")
 	if err != nil {

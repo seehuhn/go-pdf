@@ -17,6 +17,7 @@
 package cff
 
 import (
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -29,7 +30,7 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 
 	tag := font.GetSubsetTag(subset, len(cff.GlyphNames))
 	out := &Font{
-		FontName:    tag + "+" + cff.FontName,
+		FontName:    pdf.Name(tag) + "+" + cff.FontName,
 		GlyphNames:  make([]string, 0, len(subset)),
 		GlyphExtent: make([]font.Rect, 0, len(subset)),
 		Width:       make([]int, 0, len(subset)),

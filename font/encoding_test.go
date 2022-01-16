@@ -17,8 +17,11 @@
 package font
 
 import (
+	"fmt"
 	"testing"
 	"unicode"
+
+	"seehuhn.de/go/pdf/font/names"
 )
 
 func TestBuiltinEncodings(t *testing.T) {
@@ -65,5 +68,17 @@ func TestBuiltinEncodings(t *testing.T) {
 				t.Errorf("Decoding failed: %d %04x->%d->%04x", i, r, c, r2)
 			}
 		}
+	}
+}
+
+func TestXXX(t *testing.T) {
+	for i := 0; i < 256; i++ {
+		c := byte(i)
+		r := MacExpertEncoding.Decode(c)
+		if r == unicode.ReplacementChar {
+			continue
+		}
+		name := names.FromUnicode(r)
+		fmt.Printf("  %d: %q\n", c, name)
 	}
 }

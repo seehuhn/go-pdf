@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Builder can be used to construct a CFF font from scratch.
@@ -19,9 +20,16 @@ type Builder struct {
 }
 
 // NewBuilder returns a new Builder.
-func NewBuilder(fontName string, defWidth, nomWidth int16) *Builder {
+func NewBuilder(meta *type1.FontDict, defWidth, nomWidth int16) *Builder {
+	if meta.Info == nil {
+		meta.Info = defaultFontDict.Info
+	}
+	if meta.Private == nil {
+		meta.Private = defaultFontDict.Private
+	}
+
 	cff := &Font{
-		FontName: fontName,
+		FontName: meta.FontName,
 	}
 	return &Builder{
 		cff:      cff,
@@ -605,6 +613,37 @@ func copyOp(data []byte, op t2op) []byte {
 }
 
 const eps = 6.0 / 65536
+
+var (
+	defaultFontDict = &type1.FontDict{
+		Info:       defaultFontInfo,
+		Private:    defaultPrivate,
+		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+		Encoding:   type1.StandardEncoding,
+	}
+	defaultFontInfo = &type1.FontInfo{
+		Version:            "",
+		Notice:             "",
+		FullName:           "",
+		FamilyName:         "",
+		Weight:             "",
+		ItalicAngle:        0,
+		IsFixedPitch:       false,
+		UnderlinePosition:  0,
+		UnderlineThickness: 0,
+	}
+	defaultPrivate = &type1.PrivateDict{
+		BlueValues:    []float64{},
+		OtherBlues:    []float64{},
+		BlueScale:     0,
+		BlueShift:     0,
+		BlueFuzz:      0,
+		StdHW:         0,
+		StdVW:         0,
+		ForceBold:     false,
+		LanguageGroup: 0,
+	}
+)
 
 var (
 	errNoNotdef = errors.New("cff: missing .notdef glyph")

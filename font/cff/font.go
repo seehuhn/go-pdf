@@ -22,6 +22,7 @@ import (
 	"io"
 	"math"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 )
@@ -29,7 +30,7 @@ import (
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a reader.
 type Font struct {
-	FontName string
+	FontName pdf.Name
 
 	GlyphNames  []string
 	GlyphExtent []font.Rect
@@ -90,7 +91,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if len(fontNames) != 1 {
 		return nil, errors.New("CFF with multiple fonts not supported")
 	}
-	cff.FontName = string(fontNames[0])
+	cff.FontName = pdf.Name(fontNames[0])
 
 	// read the Top DICT
 	topDictIndex, err := readIndex(p)
@@ -528,7 +529,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	// (see afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont)
 	fontDict := cffDict{}
 	setFontMatrix(fontDict, fontMatrix)
-	fontDict[opFontName] = []interface{}{int32(newStrings.lookup(cff.FontName))}
+	fontDict[opFontName] = []interface{}{int32(newStrings.lookup(string(cff.FontName)))}
 	// maybe also needs the following field:
 	//   - PaintType
 	// opPrivate is set below
