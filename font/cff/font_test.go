@@ -37,12 +37,6 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println("topDict:")
-	for _, op := range cff.topDict.keys() {
-		args := cff.topDict[op]
-		fmt.Printf("  - %s = %v\n", op, args)
-	}
-
 	err = in.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -60,8 +54,8 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cff.FontName != cff2.FontName {
-		t.Errorf("FontName: %q != %q", cff.FontName, cff2.FontName)
+	if cff.Meta.FontName != cff2.Meta.FontName {
+		t.Errorf("FontName: %q != %q", cff.Meta.FontName, cff2.Meta.FontName)
 	}
 	if len(cff.gsubrs) != len(cff2.gsubrs) {
 		t.Errorf("len(gsubrs): %d != %d", len(cff.gsubrs), len(cff2.gsubrs))

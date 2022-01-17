@@ -25,18 +25,18 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a reader.
 type Font struct {
-	FontName pdf.Name
+	Meta *type1.FontDict
 
 	GlyphNames  []string
 	GlyphExtent []font.Rect
 	Width       []int
 
-	topDict     cffDict
 	gsubrs      cffIndex
 	charStrings cffIndex
 	privateDict cffDict
@@ -72,7 +72,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	major := x >> 24
 	minor := (x >> 16) & 0xFF
 	nameIndexOffs := int64((x >> 8) & 0xFF)
-	offSize := x & 0xFF // unused
+	offSize := x & 0xFF // used only to exclude non-CFF files
 	if major == 2 {
 		return nil, fmt.Errorf("unsupported CFF version %d.%d", major, minor)
 	} else if major != 1 || nameIndexOffs < 4 || offSize > 4 {
@@ -91,7 +91,11 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if len(fontNames) != 1 {
 		return nil, errors.New("CFF with multiple fonts not supported")
 	}
-	cff.FontName = pdf.Name(fontNames[0])
+	cff.Meta = &type1.FontDict{
+		FontName: pdf.Name(fontNames[0]),
+		Info:     &type1.FontInfo{},
+		Private:  &type1.PrivateDict{},
+	}
 
 	// read the Top DICT
 	topDictIndex, err := readIndex(p)
@@ -121,7 +125,20 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if _, isCIDFont := topDict[opROS]; isCIDFont {
 		return nil, errors.New("reading CIDfonts not implemented")
 	}
-	cff.topDict = topDict
+	cff.Meta.Info.Version = topDict.getString(opVersion)
+	cff.Meta.Info.Notice = topDict.getString(opNotice)
+	cff.Meta.Info.Copyright = topDict.getString(opCopyright)
+	cff.Meta.Info.FullName = topDict.getString(opFullName)
+	cff.Meta.Info.FamilyName = topDict.getString(opFamilyName)
+	cff.Meta.Info.Weight = topDict.getString(opWeight)
+	isFixedPitch := topDict.getInt(opIsFixedPitch, 0)
+	cff.Meta.Info.IsFixedPitch = isFixedPitch != 0
+	cff.Meta.Info.ItalicAngle = topDict.getFloat(opItalicAngle, 0)
+	cff.Meta.Info.UnderlinePosition = topDict.getFloat(opUnderlinePosition,
+		defaultFontInfo.UnderlinePosition)
+	cff.Meta.Info.UnderlineThickness = topDict.getFloat(opUnderlineThickness,
+		defaultFontInfo.UnderlineThickness)
+	cff.Meta.PaintType = topDict.getInt(opPaintType, 0)
 
 	// read the Global Subr INDEX
 	gsubrs, err := readIndex(p)
@@ -131,12 +148,12 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.gsubrs = gsubrs
 
 	// read the CharStrings INDEX
-	cct, _ := topDict.getInt(opCharstringType, 2)
+	cct := topDict.getInt(opCharstringType, 2)
 	if cct != 2 {
 		return nil, errors.New("unsupported charstring type")
 	}
-	charStringsOffs, ok := topDict.getInt(opCharStrings, 0)
-	if !ok {
+	charStringsOffs := topDict.getInt(opCharStrings, 0)
+	if charStringsOffs == 0 {
 		return nil, errors.New("missing CharStrings offset")
 	}
 	delete(topDict, opCharStrings)
@@ -151,7 +168,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.charStrings = charStrings
 
 	// read the list of glyph names
-	charsetOffs, _ := topDict.getInt(opCharset, 0)
+	charsetOffs := topDict.getInt(opCharset, 0)
 	delete(topDict, opCharset)
 	var charset []int32
 	switch charsetOffs {
@@ -211,7 +228,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 
-	subrsIndexOffs, _ := cff.privateDict.getInt(opSubrs, 0)
+	subrsIndexOffs := cff.privateDict.getInt(opSubrs, 0)
 	delete(cff.privateDict, opSubrs)
 	if subrsIndexOffs > 0 {
 		err = p.SeekPos(int64(pdOffs) + int64(subrsIndexOffs))
@@ -320,15 +337,15 @@ func (cff *Font) Encode(w io.Writer) error {
 
 	// section 1: Name INDEX
 	var err error
-	blobs[secNameIndex], err = cffIndex{[]byte(cff.FontName)}.encode()
+	blobs[secNameIndex], err = cffIndex{[]byte(cff.Meta.FontName)}.encode()
 	if err != nil {
 		return err
 	}
 
 	// section 2: top dict INDEX
-	tdCopy := cff.topDict.Copy()
+	tdCopy := makeTopDict(cff.Meta)
 	// opCharset is updated below
-	delete(tdCopy, opEncoding)
+	// delete(tdCopy, opEncoding)
 	// opCharStrings is updated below
 	// opPrivate is updated below
 
@@ -439,11 +456,14 @@ func (cff *Font) Encode(w io.Writer) error {
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
 	// TODO(voss): does topdict.CIDCount need adjusting for subset fonts?
+	//     CIDCount = The number of valid CIDs in the CIDFont. Valid CIDs range
+	//     from 0 to (CIDCount − 1); CIDs outside this range are treated as
+	//     undefined glyphs.
 	// TODO(voss): does topdict.FontName need a subset tag?
 
 	numGlyphs := int32(len(cff.charStrings))
 
-	fontMatrix := getFontMatrix(cff.topDict)
+	fontMatrix := cff.Meta.FontMatrix
 
 	blobs := make([][]byte, cidNumSections)
 	newStrings := &cffStrings{}
@@ -458,14 +478,14 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 
 	// section 1: Name INDEX
 	var err error
-	blobs[cidNameIndex], err = cffIndex{[]byte(cff.FontName)}.encode()
+	blobs[cidNameIndex], err = cffIndex{[]byte(cff.Meta.FontName)}.encode()
 	if err != nil {
 		return err
 	}
 
 	// section 2: top dict INDEX
 	// afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillTop
-	tdCopy := cff.topDict.Copy()
+	tdCopy := makeTopDict(cff.Meta)
 	delete(tdCopy, opPaintType)  // per font
 	delete(tdCopy, opFontMatrix) // per font
 	// opCharset is updated below
@@ -528,8 +548,8 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	// section 8: font DICT INDEX
 	// (see afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont)
 	fontDict := cffDict{}
-	setFontMatrix(fontDict, fontMatrix)
-	fontDict[opFontName] = []interface{}{int32(newStrings.lookup(string(cff.FontName)))}
+	fontDict.setFontMatrix(opFontMatrix, fontMatrix)
+	fontDict[opFontName] = []interface{}{int32(newStrings.lookup(string(cff.Meta.FontName)))}
 	// maybe also needs the following field:
 	//   - PaintType
 	// opPrivate is set below

@@ -158,7 +158,8 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		return includeGlyphs[i] < includeGlyphs[j]
 	})
 	subsetTag := font.GetSubsetTag(includeGlyphs, origNumGlyphs)
-	fontName := pdf.Name(subsetTag) + "+" + t.Cff.FontName
+	fontName := pdf.Name(subsetTag) + "+" + t.Cff.Meta.FontName
+	// TODO(voss): check whether we now have two subset tags
 
 	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontBBox := &pdf.Rectangle{

@@ -23,6 +23,8 @@ import (
 	"math"
 	"sort"
 	"strconv"
+
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 type cffDict map[dictOp][]interface{}
@@ -162,15 +164,37 @@ func (d cffDict) Copy() cffDict {
 	return c
 }
 
-func (d cffDict) getInt(op dictOp, defVal int32) (int32, bool) {
+func (d cffDict) getInt(op dictOp, defVal int32) int32 {
 	if len(d[op]) != 1 {
-		return defVal, false
+		return defVal
 	}
 	x, ok := d[op][0].(int32)
 	if !ok {
-		return defVal, false
+		return defVal
 	}
-	return x, true
+	return x
+}
+
+func (d cffDict) getFloat(op dictOp, defVal float64) float64 {
+	if len(d[op]) != 1 {
+		return defVal
+	}
+	switch x := d[op][0].(type) {
+	case int32:
+		return float64(x)
+	case float64:
+		return x
+	default:
+		return defVal
+	}
+}
+
+func (d cffDict) getString(op dictOp) string {
+	if len(d[op]) != 1 {
+		return ""
+	}
+	x, _ := d[op][0].(string)
+	return x
 }
 
 func (d cffDict) getPair(op dictOp) (int32, int32, bool) {
@@ -187,6 +211,49 @@ func (d cffDict) getPair(op dictOp) (int32, int32, bool) {
 		return 0, 0, false
 	}
 	return x, y, true
+}
+
+func (d cffDict) getFontMatrix(op dictOp) ([]float64, bool) {
+	xx, ok := d[op]
+	if !ok || len(xx) != 6 {
+		return defaultFontMatrix, false
+	}
+
+	res := make([]float64, 6)
+	for i, x := range xx {
+		xi, ok := x.(float64)
+		if !ok {
+			return defaultFontMatrix, false
+		}
+		res[i] = xi
+	}
+
+	return res, true
+}
+
+func (d cffDict) setFontMatrix(op dictOp, fm []float64) {
+	// TODO(voss): do we need error handling here?
+
+	if len(fm) != 6 {
+		return
+	}
+
+	needed := false
+	for i, xi := range fm {
+		if math.Abs(xi-defaultFontMatrix[i]) > 1e-5 {
+			needed = true
+			break
+		}
+	}
+	if !needed {
+		return
+	}
+
+	val := make([]interface{}, 6)
+	for i, xi := range fm {
+		val[i] = xi
+	}
+	d[op] = val
 }
 
 func (d cffDict) keys() []dictOp {
@@ -289,44 +356,56 @@ func (d cffDict) encode(ss *cffStrings) []byte {
 	return res.Bytes()
 }
 
-var defaultFontMatrix = [6]float64{0.001, 0, 0, 0.001, 0, 0}
-
-func getFontMatrix(d cffDict) [6]float64 {
-	res := defaultFontMatrix
-
-	xx, ok := d[opFontMatrix]
-	if !ok || len(xx) != 6 {
-		return res
+func makeTopDict(meta *type1.FontDict) cffDict {
+	info := meta.Info
+	if info == nil {
+		info = defaultFontDict.Info
 	}
-	for i, x := range xx {
-		xi, ok := x.(float64)
-		if !ok {
-			return res
-		}
-		res[i] = xi
-	}
+	// private := meta.Private
+	// if private == nil {
+	// 	private = defaultFontDict.Private
+	// }
 
-	return res
+	topDict := cffDict{}
+	if info.Version != "" {
+		topDict[opVersion] = []interface{}{info.Version}
+	}
+	if info.Notice != "" {
+		topDict[opNotice] = []interface{}{info.Notice}
+	}
+	if info.Copyright != "" {
+		topDict[opCopyright] = []interface{}{info.Copyright}
+	}
+	if info.FullName != "" {
+		topDict[opFullName] = []interface{}{info.FullName}
+	}
+	if info.FamilyName != "" {
+		topDict[opFamilyName] = []interface{}{info.FamilyName}
+	}
+	if info.Weight != "" {
+		topDict[opWeight] = []interface{}{info.Weight}
+	}
+	if info.IsFixedPitch {
+		topDict[opIsFixedPitch] = []interface{}{int32(1)}
+	}
+	if info.ItalicAngle != 0 {
+		topDict[opItalicAngle] = []interface{}{info.ItalicAngle}
+	}
+	if info.UnderlinePosition != defaultFontInfo.UnderlinePosition {
+		topDict[opUnderlinePosition] = []interface{}{info.UnderlinePosition}
+	}
+	if info.UnderlineThickness != defaultFontInfo.UnderlineThickness {
+		topDict[opUnderlineThickness] = []interface{}{info.UnderlineThickness}
+	}
+	if meta.PaintType != 0 {
+		topDict[opPaintType] = []interface{}{meta.PaintType}
+	}
+	topDict.setFontMatrix(opFontMatrix, meta.FontMatrix)
+
+	return topDict
 }
 
-func setFontMatrix(d cffDict, fm [6]float64) {
-	needed := false
-	for i, xi := range fm {
-		if math.Abs(xi-defaultFontMatrix[i]) > 1e-5 {
-			needed = true
-			break
-		}
-	}
-	if !needed {
-		return
-	}
-
-	val := make([]interface{}, 6)
-	for i, xi := range fm {
-		val[i] = xi
-	}
-	d[opFontMatrix] = val
-}
+var defaultFontMatrix = []float64{0.001, 0, 0, 0.001, 0, 0}
 
 type dictOp uint16
 
@@ -374,29 +453,32 @@ func (d dictOp) String() string {
 
 const (
 	// top DICT operators
-	opVersion           dictOp = 0x0000
-	opNotice            dictOp = 0x0001
-	opFullName          dictOp = 0x0002
-	opFamilyName        dictOp = 0x0003
-	opWeight            dictOp = 0x0004
-	opFontBBox          dictOp = 0x0005
-	opCharset           dictOp = 0x000F
-	opEncoding          dictOp = 0x0010
-	opCharStrings       dictOp = 0x0011
-	opPrivate           dictOp = 0x0012
-	opCopyright         dictOp = 0x0C00
-	opUnderlinePosition dictOp = 0x0C03
-	opPaintType         dictOp = 0x0C05
-	opCharstringType    dictOp = 0x0C06
-	opFontMatrix        dictOp = 0x0C07
-	opSyntheticBase     dictOp = 0x0C14
-	opPostScript        dictOp = 0x0C15
-	opBaseFontName      dictOp = 0x0C16
-	opROS               dictOp = 0x0C1E
-	opCIDCount          dictOp = 0x0C22
-	opFDArray           dictOp = 0x0C24
-	opFDSelect          dictOp = 0x0C25
-	opFontName          dictOp = 0x0C26
+	opVersion            dictOp = 0x0000
+	opNotice             dictOp = 0x0001
+	opFullName           dictOp = 0x0002
+	opFamilyName         dictOp = 0x0003
+	opWeight             dictOp = 0x0004
+	opFontBBox           dictOp = 0x0005
+	opCharset            dictOp = 0x000F
+	opEncoding           dictOp = 0x0010
+	opCharStrings        dictOp = 0x0011
+	opPrivate            dictOp = 0x0012
+	opCopyright          dictOp = 0x0C00
+	opIsFixedPitch       dictOp = 0x0C01
+	opItalicAngle        dictOp = 0x0C02
+	opUnderlinePosition  dictOp = 0x0C03
+	opUnderlineThickness dictOp = 0x0C04
+	opPaintType          dictOp = 0x0C05
+	opCharstringType     dictOp = 0x0C06
+	opFontMatrix         dictOp = 0x0C07
+	opSyntheticBase      dictOp = 0x0C14
+	opPostScript         dictOp = 0x0C15
+	opBaseFontName       dictOp = 0x0C16
+	opROS                dictOp = 0x0C1E
+	opCIDCount           dictOp = 0x0C22
+	opFDArray            dictOp = 0x0C24
+	opFDSelect           dictOp = 0x0C25
+	opFontName           dictOp = 0x0C26
 
 	// private DICT operators
 	opSubrs         dictOp = 0x0013 // Offset (self) to local subrs

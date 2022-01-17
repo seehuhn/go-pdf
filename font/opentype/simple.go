@@ -191,7 +191,7 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 	_, includeGlyphs := font.MakeSubset(mapping)
 	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Sfnt.Width))
 	cff := t.Cff.Subset(includeGlyphs)
-	fontName := pdf.Name(t.Cff.FontName) // includes the subset tag
+	fontName := pdf.Name(t.Cff.Meta.FontName) // includes the subset tag
 
 	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontBBox := &pdf.Rectangle{

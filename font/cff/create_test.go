@@ -83,8 +83,8 @@ func TestEncode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defWidth, _ := cff.privateDict.getInt(opDefaultWidthX, 0)
-	nomWidth, _ := cff.privateDict.getInt(opNominalWidthX, 0)
+	defWidth := cff.privateDict.getInt(opDefaultWidthX, 0)
+	nomWidth := cff.privateDict.getInt(opNominalWidthX, 0)
 	code := ctx.encode(int16(defWidth), int16(nomWidth))
 	fmt.Printf("=> % x\n", code)
 	fmt.Printf(".. % x\n", orig)

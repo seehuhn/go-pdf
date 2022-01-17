@@ -19,6 +19,7 @@ package cff
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Subset returns a copy of the font, including only the glyphs in the given
@@ -30,12 +31,14 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 
 	tag := font.GetSubsetTag(subset, len(cff.GlyphNames))
 	out := &Font{
-		FontName:    pdf.Name(tag) + "+" + cff.FontName,
+		Meta: &type1.FontDict{
+			FontName: pdf.Name(tag) + "+" + cff.Meta.FontName,
+			// TODO(voss): copy the rest
+		},
 		GlyphNames:  make([]string, 0, len(subset)),
 		GlyphExtent: make([]font.Rect, 0, len(subset)),
 		Width:       make([]int, 0, len(subset)),
 
-		topDict:     cff.topDict,
 		privateDict: cff.privateDict,
 
 		gid2cid: append([]font.GlyphID{}, subset...),

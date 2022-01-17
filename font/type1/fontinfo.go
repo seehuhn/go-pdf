@@ -7,8 +7,8 @@ type FontDict struct {
 	Private *PrivateDict
 
 	FontName   pdf.Name
-	PaintType  int
-	FontMatrix [6]float64
+	PaintType  int32
+	FontMatrix []float64
 	Encoding   map[byte]string
 }
 
@@ -19,6 +19,8 @@ type FontInfo struct {
 
 	// Notice is a trademark or copyright notice, if applicable.
 	Notice string
+
+	Copyright string
 
 	// FullName is a unique, human-readable name for an individual font.
 	FullName string

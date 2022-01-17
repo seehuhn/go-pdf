@@ -47,7 +47,7 @@ func tryFont(fname string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(cff.FontName)
+	fmt.Println(cff.Meta.FontName)
 
 	return nil
 }

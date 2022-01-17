@@ -21,16 +21,10 @@ type Builder struct {
 
 // NewBuilder returns a new Builder.
 func NewBuilder(meta *type1.FontDict, defWidth, nomWidth int16) *Builder {
-	if meta.Info == nil {
-		meta.Info = defaultFontDict.Info
-	}
-	if meta.Private == nil {
-		meta.Private = defaultFontDict.Private
+	cff := &Font{
+		Meta: meta,
 	}
 
-	cff := &Font{
-		FontName: meta.FontName,
-	}
 	return &Builder{
 		cff:      cff,
 		defWidth: defWidth,
@@ -618,7 +612,7 @@ var (
 	defaultFontDict = &type1.FontDict{
 		Info:       defaultFontInfo,
 		Private:    defaultPrivate,
-		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+		FontMatrix: []float64{0.001, 0, 0, 0.001, 0, 0},
 		Encoding:   type1.StandardEncoding,
 	}
 	defaultFontInfo = &type1.FontInfo{
@@ -629,8 +623,8 @@ var (
 		Weight:             "",
 		ItalicAngle:        0,
 		IsFixedPitch:       false,
-		UnderlinePosition:  0,
-		UnderlineThickness: 0,
+		UnderlinePosition:  -100,
+		UnderlineThickness: 50,
 	}
 	defaultPrivate = &type1.PrivateDict{
 		BlueValues:    []float64{},

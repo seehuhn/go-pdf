@@ -82,11 +82,11 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 		}
 		var glyphWidth int16
 		if isPresent {
-			dw, _ := cff.privateDict.getInt(opNominalWidthX, 0)
+			dw := cff.privateDict.getInt(opNominalWidthX, 0)
 			glyphWidth = int16(stack[0].val) + int16(dw)
 			stack = stack[1:]
 		} else {
-			glyphWidth32, _ := cff.privateDict.getInt(opDefaultWidthX, 0)
+			glyphWidth32 := cff.privateDict.getInt(opDefaultWidthX, 0)
 			glyphWidth = int16(glyphWidth32)
 		}
 		if ctx != nil {
