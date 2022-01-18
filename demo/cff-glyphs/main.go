@@ -140,11 +140,11 @@ type context struct {
 	xx         []float64
 	yy         []float64
 	posX, posY float64
-	w          int16
+	w          int32
 	ink        bool
 }
 
-func (ctx *context) SetWidth(w int16) {
+func (ctx *context) SetWidth(w int32) {
 	ctx.w = w
 }
 

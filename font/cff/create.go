@@ -12,23 +12,23 @@ import (
 
 // Builder can be used to construct a CFF font from scratch.
 type Builder struct {
-	cff      *Font
-	defWidth int16
-	nomWidth int16
+	cff          *Font
+	defaultWidth int32
+	nominalWidth int32
 
 	isInGlyph bool
 }
 
 // NewBuilder returns a new Builder.
-func NewBuilder(meta *type1.FontDict, defWidth, nomWidth int16) *Builder {
+func NewBuilder(meta *type1.FontInfo, defWidth, nomWidth int32) *Builder {
 	cff := &Font{
-		Meta: meta,
+		Info: meta,
 	}
 
 	return &Builder{
-		cff:      cff,
-		defWidth: defWidth,
-		nomWidth: nomWidth,
+		cff:          cff,
+		defaultWidth: defWidth,
+		nominalWidth: nomWidth,
 	}
 }
 
@@ -46,24 +46,24 @@ func (b *Builder) AddGlyph(name string) (*Glyph, error) {
 
 	b.cff.GlyphNames = append(b.cff.GlyphNames, name)
 	return &Glyph{
+		encoder: encoder{
+			width: b.defaultWidth,
+		},
 		b: b,
 	}, nil
 }
 
-// Finish returns the completed CFF font.
-func (b *Builder) Finish() (*Font, error) {
+// Build returns the completed CFF font.
+func (b *Builder) Build() (*Font, error) {
 	if b.isInGlyph {
 		return nil, errInGlyph
 	}
 
-	pd := cffDict{}
-	pd[opDefaultWidthX] = []interface{}{int32(b.defWidth)}
-	pd[opNominalWidthX] = []interface{}{int32(b.nomWidth)}
-
 	// TODO(voss): extract subroutines
 
 	cff := b.cff
-	cff.privateDict = pd
+	cff.defaultWidth = b.defaultWidth
+	cff.nominalWidth = b.nominalWidth
 	return cff, nil
 }
 
@@ -83,14 +83,14 @@ func (g *Glyph) Close() {
 	cff.GlyphExtent = append(cff.GlyphExtent, g.extent)
 	cff.Width = append(cff.Width, int(g.width))
 
-	code := g.encode(g.b.defWidth, g.b.nomWidth)
+	code := g.encode(g.b.defaultWidth, g.b.nominalWidth)
 	cff.charStrings = append(cff.charStrings, code)
 
 	g.b = nil // prevent accidental use
 }
 
 type encoder struct {
-	width       int16
+	width       int32
 	extent      font.Rect
 	initialized bool
 
@@ -99,7 +99,7 @@ type encoder struct {
 }
 
 // SetWidth implements the Renderer interface.
-func (gm *encoder) SetWidth(w int16) {
+func (gm *encoder) SetWidth(w int32) {
 	gm.width = w
 }
 
@@ -177,7 +177,7 @@ func (gm *encoder) registerPoint(x, y float64) {
 	}
 }
 
-func (gm *encoder) encode(defWidth, nomWidth int16) []byte {
+func (gm *encoder) encode(defWidth, nomWidth int32) []byte {
 	var code []byte
 	if gm.width != defWidth {
 		w := encode(float64(gm.width - nomWidth))
@@ -319,6 +319,8 @@ func getCode(cmds []cmd) []byte {
 }
 
 func findEdges(cmds []cmd) []edge {
+	// TODO(voss): use at most 48 slots on the argument stack.
+
 	if len(cmds) == 0 {
 		return nil
 	}
@@ -608,35 +610,12 @@ func copyOp(data []byte, op t2op) []byte {
 
 const eps = 6.0 / 65536
 
-var (
-	defaultFontDict = &type1.FontDict{
-		Info:       defaultFontInfo,
-		Private:    defaultPrivate,
-		FontMatrix: []float64{0.001, 0, 0, 0.001, 0, 0},
-		Encoding:   type1.StandardEncoding,
-	}
-	defaultFontInfo = &type1.FontInfo{
-		Version:            "",
-		Notice:             "",
-		FullName:           "",
-		FamilyName:         "",
-		Weight:             "",
-		ItalicAngle:        0,
-		IsFixedPitch:       false,
-		UnderlinePosition:  -100,
-		UnderlineThickness: 50,
-	}
-	defaultPrivate = &type1.PrivateDict{
-		BlueValues:    []float64{},
-		OtherBlues:    []float64{},
-		BlueScale:     0,
-		BlueShift:     0,
-		BlueFuzz:      0,
-		StdHW:         0,
-		StdVW:         0,
-		ForceBold:     false,
-		LanguageGroup: 0,
-	}
+const (
+	defaultUnderlinePosition  = -100
+	defaultUnderlineThickness = 50
+	defaultBlueScale          = 0.039625
+	defaultBlueShift          = 7
+	defaultBlueFuzz           = 1
 )
 
 var (

@@ -31,15 +31,17 @@ import (
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a reader.
 type Font struct {
-	Meta *type1.FontDict
+	Info *type1.FontInfo
 
 	GlyphNames  []string
 	GlyphExtent []font.Rect
 	Width       []int
 
-	gsubrs      cffIndex
+	defaultWidth int32
+	nominalWidth int32
+
 	charStrings cffIndex
-	privateDict cffDict
+	gsubrs      cffIndex
 	subrs       cffIndex
 
 	gid2cid []font.GlyphID
@@ -91,10 +93,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if len(fontNames) != 1 {
 		return nil, errors.New("CFF with multiple fonts not supported")
 	}
-	cff.Meta = &type1.FontDict{
+	cff.Info = &type1.FontInfo{
 		FontName: pdf.Name(fontNames[0]),
-		Info:     &type1.FontInfo{},
-		Private:  &type1.PrivateDict{},
 	}
 
 	// read the Top DICT
@@ -125,20 +125,21 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if _, isCIDFont := topDict[opROS]; isCIDFont {
 		return nil, errors.New("reading CIDfonts not implemented")
 	}
-	cff.Meta.Info.Version = topDict.getString(opVersion)
-	cff.Meta.Info.Notice = topDict.getString(opNotice)
-	cff.Meta.Info.Copyright = topDict.getString(opCopyright)
-	cff.Meta.Info.FullName = topDict.getString(opFullName)
-	cff.Meta.Info.FamilyName = topDict.getString(opFamilyName)
-	cff.Meta.Info.Weight = topDict.getString(opWeight)
+	cff.Info.Version = topDict.getString(opVersion)
+	cff.Info.Notice = topDict.getString(opNotice)
+	cff.Info.Copyright = topDict.getString(opCopyright)
+	cff.Info.FullName = topDict.getString(opFullName)
+	cff.Info.FamilyName = topDict.getString(opFamilyName)
+	cff.Info.Weight = topDict.getString(opWeight)
 	isFixedPitch := topDict.getInt(opIsFixedPitch, 0)
-	cff.Meta.Info.IsFixedPitch = isFixedPitch != 0
-	cff.Meta.Info.ItalicAngle = topDict.getFloat(opItalicAngle, 0)
-	cff.Meta.Info.UnderlinePosition = topDict.getFloat(opUnderlinePosition,
-		defaultFontInfo.UnderlinePosition)
-	cff.Meta.Info.UnderlineThickness = topDict.getFloat(opUnderlineThickness,
-		defaultFontInfo.UnderlineThickness)
-	cff.Meta.PaintType = topDict.getInt(opPaintType, 0)
+	cff.Info.IsFixedPitch = isFixedPitch != 0
+	cff.Info.ItalicAngle = topDict.getFloat(opItalicAngle, 0)
+	cff.Info.UnderlinePosition = topDict.getFloat(opUnderlinePosition,
+		defaultUnderlinePosition)
+	cff.Info.UnderlineThickness = topDict.getFloat(opUnderlineThickness,
+		defaultUnderlineThickness)
+	cff.Info.PaintType = topDict.getInt(opPaintType, 0)
+	cff.Info.FontMatrix = topDict.getFontMatrix(opFontMatrix)
 
 	// read the Global Subr INDEX
 	gsubrs, err := readIndex(p)
@@ -223,13 +224,23 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	cff.privateDict, err = decodeDict(privateDictBlob, strings)
+	privateDict, err := decodeDict(privateDictBlob, strings)
 	if err != nil {
 		return nil, err
 	}
+	cff.Info.BlueValues = privateDict.getDelta32(opBlueValues)
+	cff.Info.OtherBlues = privateDict.getDelta32(opOtherBlues)
+	cff.Info.BlueScale = privateDict.getFloat(opBlueScale, defaultBlueScale)
+	cff.Info.BlueShift = privateDict.getInt(opBlueShift, 7)
+	cff.Info.BlueFuzz = privateDict.getInt(opBlueFuzz, 1)
+	cff.Info.StdHW = privateDict.getFloat(opStdHW, 0)
+	cff.Info.StdVW = privateDict.getFloat(opStdVW, 0)
+	cff.Info.ForceBold = privateDict.getInt(opForceBold, 0) != 0
+	cff.defaultWidth = privateDict.getInt(opDefaultWidthX, 0)
+	cff.nominalWidth = privateDict.getInt(opNominalWidthX, 0)
 
-	subrsIndexOffs := cff.privateDict.getInt(opSubrs, 0)
-	delete(cff.privateDict, opSubrs)
+	subrsIndexOffs := privateDict.getInt(opSubrs, 0)
+	delete(privateDict, opSubrs)
 	if subrsIndexOffs > 0 {
 		err = p.SeekPos(int64(pdOffs) + int64(subrsIndexOffs))
 		if err != nil {
@@ -260,7 +271,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 
 type glyphDimensions struct {
 	x, y   float64
-	width  int16
+	width  int32
 	bbox   font.Rect
 	hasInk bool
 }
@@ -293,7 +304,7 @@ func (ctx *glyphDimensions) add() {
 	ctx.hasInk = true
 }
 
-func (ctx *glyphDimensions) SetWidth(w int16) {
+func (ctx *glyphDimensions) SetWidth(w int32) {
 	ctx.width = w
 }
 
@@ -337,15 +348,15 @@ func (cff *Font) Encode(w io.Writer) error {
 
 	// section 1: Name INDEX
 	var err error
-	blobs[secNameIndex], err = cffIndex{[]byte(cff.Meta.FontName)}.encode()
+	blobs[secNameIndex], err = cffIndex{[]byte(cff.Info.FontName)}.encode()
 	if err != nil {
 		return err
 	}
 
 	// section 2: top dict INDEX
-	tdCopy := makeTopDict(cff.Meta)
+	topDict := makeTopDict(cff.Info)
 	// opCharset is updated below
-	// delete(tdCopy, opEncoding)
+	// opEncoding???
 	// opCharStrings is updated below
 	// opPrivate is updated below
 
@@ -387,7 +398,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 8: private DICT
-	pdCopy := cff.privateDict.Copy()
+	privateDict := cff.makePrivateDict()
 	// opSubrs is set below
 
 	// section 9: subrs INDEX
@@ -405,19 +416,22 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	offs := cumsum()
-	for { // TODO(voss): does this loop always terminate?
+	for {
+		// This loop terminates because the elements of offs are monotonically
+		// increasing.
+
 		blobs[secHeader][3] = offsSize(offs[numSections])
 
-		pdCopy[opSubrs] = []interface{}{offs[secSubrsIndex] - offs[secPrivateDict]}
-		blobs[secPrivateDict] = pdCopy.encode(newStrings)
+		privateDict[opSubrs] = []interface{}{offs[secSubrsIndex] - offs[secPrivateDict]}
+		blobs[secPrivateDict] = privateDict.encode(newStrings)
 		pdSize := len(blobs[secPrivateDict])
 		pdDesc := []interface{}{int32(pdSize), offs[secPrivateDict]}
 
-		tdCopy[opCharset] = []interface{}{offs[secCharsets]}
-		tdCopy[opEncoding] = []interface{}{offs[secEncodings]}
-		tdCopy[opCharStrings] = []interface{}{offs[secCharStringsIndex]}
-		tdCopy[opPrivate] = pdDesc
-		topDictData := tdCopy.encode(newStrings)
+		topDict[opCharset] = []interface{}{offs[secCharsets]}
+		topDict[opEncoding] = []interface{}{offs[secEncodings]}
+		topDict[opCharStrings] = []interface{}{offs[secCharStringsIndex]}
+		topDict[opPrivate] = pdDesc
+		topDictData := topDict.encode(newStrings)
 		blobs[secTopDictIndex], err = cffIndex{topDictData}.encode()
 		if err != nil {
 			return err
@@ -455,15 +469,9 @@ func (cff *Font) Encode(w io.Writer) error {
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
-	// TODO(voss): does topdict.CIDCount need adjusting for subset fonts?
-	//     CIDCount = The number of valid CIDs in the CIDFont. Valid CIDs range
-	//     from 0 to (CIDCount − 1); CIDs outside this range are treated as
-	//     undefined glyphs.
-	// TODO(voss): does topdict.FontName need a subset tag?
-
 	numGlyphs := int32(len(cff.charStrings))
 
-	fontMatrix := cff.Meta.FontMatrix
+	fontMatrix := cff.Info.FontMatrix
 
 	blobs := make([][]byte, cidNumSections)
 	newStrings := &cffStrings{}
@@ -478,29 +486,27 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 
 	// section 1: Name INDEX
 	var err error
-	blobs[cidNameIndex], err = cffIndex{[]byte(cff.Meta.FontName)}.encode()
+	blobs[cidNameIndex], err = cffIndex{[]byte(cff.Info.FontName)}.encode()
 	if err != nil {
 		return err
 	}
 
 	// section 2: top dict INDEX
 	// afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillTop
-	tdCopy := makeTopDict(cff.Meta)
-	delete(tdCopy, opPaintType)  // per font
-	delete(tdCopy, opFontMatrix) // per font
+	topDict := makeTopDict(cff.Info)
+	delete(topDict, opPaintType)  // per font
+	delete(topDict, opFontMatrix) // per font
 	// opCharset is updated below
-	delete(tdCopy, opEncoding)
+	delete(topDict, opEncoding)
 	// opCharStrings is updated below
-	delete(tdCopy, opPrivate) // per font
 	registrySID := newStrings.lookup(registry)
 	orderingSID := newStrings.lookup(ordering)
-	tdCopy[opROS] = []interface{}{
+	topDict[opROS] = []interface{}{
 		int32(registrySID), int32(orderingSID), int32(supplement),
 	}
-	tdCopy[opCIDCount] = []interface{}{int32(numGlyphs)}
+	topDict[opCIDCount] = []interface{}{int32(numGlyphs)}
 	// opFDArray is updated below
 	// opFDSelect is updated below
-	delete(tdCopy, opFontName) // per font
 
 	// section 3: secStringIndex
 	// The new string index is stored in `newStrings`.
@@ -549,13 +555,12 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	// (see afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont)
 	fontDict := cffDict{}
 	fontDict.setFontMatrix(opFontMatrix, fontMatrix)
-	fontDict[opFontName] = []interface{}{int32(newStrings.lookup(string(cff.Meta.FontName)))}
 	// maybe also needs the following field:
 	//   - PaintType
 	// opPrivate is set below
 
 	// section 9: private DICT
-	pdCopy := cff.privateDict.Copy()
+	privateDict := cff.makePrivateDict()
 	// opSubrs is set below
 
 	// section 10: subrs INDEX
@@ -573,11 +578,14 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	offs := cumsum()
-	for { // TODO(voss): does this loop always terminate?
+	for {
+		// This loop terminates because the elements of offs are monotonically
+		// increasing.
+
 		blobs[secHeader][3] = offsSize(offs[numSections])
 
-		pdCopy[opSubrs] = []interface{}{offs[cidSubrsIndex] - offs[cidPrivateDict]}
-		blobs[cidPrivateDict] = pdCopy.encode(newStrings)
+		privateDict[opSubrs] = []interface{}{offs[cidSubrsIndex] - offs[cidPrivateDict]}
+		blobs[cidPrivateDict] = privateDict.encode(newStrings)
 		pdSize := len(blobs[cidPrivateDict])
 		pdDesc := []interface{}{int32(pdSize), offs[cidPrivateDict]}
 
@@ -588,11 +596,11 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 			return err
 		}
 
-		tdCopy[opCharset] = []interface{}{offs[cidCharsets]}
-		tdCopy[opCharStrings] = []interface{}{offs[cidCharStringsIndex]}
-		tdCopy[opFDArray] = []interface{}{offs[cidFDArray]}
-		tdCopy[opFDSelect] = []interface{}{offs[cidFdSelect]}
-		topDictData := tdCopy.encode(newStrings)
+		topDict[opCharset] = []interface{}{offs[cidCharsets]}
+		topDict[opCharStrings] = []interface{}{offs[cidCharStringsIndex]}
+		topDict[opFDArray] = []interface{}{offs[cidFDArray]}
+		topDict[opFDSelect] = []interface{}{offs[cidFdSelect]}
+		topDictData := topDict.encode(newStrings)
 		blobs[cidTopDictIndex], err = cffIndex{topDictData}.encode()
 		if err != nil {
 			return err

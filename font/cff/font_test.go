@@ -54,8 +54,8 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cff.Meta.FontName != cff2.Meta.FontName {
-		t.Errorf("FontName: %q != %q", cff.Meta.FontName, cff2.Meta.FontName)
+	if cff.Info.FontName != cff2.Info.FontName {
+		t.Errorf("FontName: %q != %q", cff.Info.FontName, cff2.Info.FontName)
 	}
 	if len(cff.gsubrs) != len(cff2.gsubrs) {
 		t.Errorf("len(gsubrs): %d != %d", len(cff.gsubrs), len(cff2.gsubrs))

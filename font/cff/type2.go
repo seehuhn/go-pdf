@@ -46,7 +46,7 @@ func (s stackSlot) String() string {
 // A Renderer is used to draw a glyph encoded by a CFF charstring.
 // TODO(voss): add hinting support.
 type Renderer interface {
-	SetWidth(w int16) // TODO(voss): remove this?
+	SetWidth(w int32)
 	MoveTo(x, y float64)
 	LineTo(x, y float64)
 	CurveTo(dxa, dya, dxb, dyb, dxc, dyc float64)
@@ -80,14 +80,12 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 		if widthIsSet {
 			return
 		}
-		var glyphWidth int16
+		var glyphWidth int32
 		if isPresent {
-			dw := cff.privateDict.getInt(opNominalWidthX, 0)
-			glyphWidth = int16(stack[0].val) + int16(dw)
+			glyphWidth = int32(stack[0].val) + cff.defaultWidth
 			stack = stack[1:]
 		} else {
-			glyphWidth32 := cff.privateDict.getInt(opDefaultWidthX, 0)
-			glyphWidth = int16(glyphWidth32)
+			glyphWidth = cff.defaultWidth
 		}
 		if ctx != nil {
 			ctx.SetWidth(glyphWidth)
@@ -125,7 +123,7 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 
 	opLoop:
 		for len(code) > 0 {
-			if len(stack) > 100 { // TODO(voss): the spec says 48, but some fonts use more???
+			if len(stack) > 96 { // the spec says 48, but some fonts use more???
 				return nil, errStackOverflow
 			}
 

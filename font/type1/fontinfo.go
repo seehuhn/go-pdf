@@ -2,18 +2,9 @@ package type1
 
 import "seehuhn.de/go/pdf"
 
-type FontDict struct {
-	Info    *FontInfo
-	Private *PrivateDict
-
-	FontName   pdf.Name
-	PaintType  int32
-	FontMatrix []float64
-	Encoding   map[byte]string
-}
-
-// FontInfo holds information about a font.
 type FontInfo struct {
+	FontName pdf.Name
+
 	// Version is the version number of the font program.
 	Version string
 
@@ -49,16 +40,30 @@ type FontInfo struct {
 	// UnderlineThickness is the recommended stroke width for underlining, in
 	// units of the glyph coordinate system.
 	UnderlineThickness float64
-}
 
-type PrivateDict struct {
-	BlueValues    []float64
-	OtherBlues    []float64
-	BlueScale     float64
-	BlueShift     int
-	BlueFuzz      int
-	StdHW         float64
-	StdVW         float64
-	ForceBold     bool
-	LanguageGroup int
+	PaintType  int32
+	FontMatrix []float64
+
+	// BlueValues is an array containing an even number of integers.
+	// The first integer in each pair is less than or equal to the second integer.
+	// The first pair is the baseline overshoot position and the baseline.
+	// All subsequent pairs describe alignment zones for the tops of character features.
+	BlueValues []int32
+
+	OtherBlues []int32
+
+	BlueScale float64
+
+	BlueShift int32
+
+	BlueFuzz int32
+
+	// StdHW is the dominant width of horizontal stems for glyphs in the font.
+	StdHW float64
+
+	// StdVW the dominant width of vertical stems.
+	// Typically, this will be the width of straight stems in lower case letters.
+	StdVW float64
+
+	ForceBold bool
 }
