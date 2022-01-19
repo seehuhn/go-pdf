@@ -29,7 +29,7 @@ import (
 )
 
 // Font stores the data of a CFF font.
-// Use the Read() function to decode a CFF font from a reader.
+// Use the Read() function to decode a CFF font from a io.ReadSeeker.
 type Font struct {
 	Info *type1.FontInfo
 
@@ -74,7 +74,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	major := x >> 24
 	minor := (x >> 16) & 0xFF
 	nameIndexOffs := int64((x >> 8) & 0xFF)
-	offSize := x & 0xFF // used only to exclude non-CFF files
+	offSize := x & 0xFF // only used to exclude non-CFF files
 	if major == 2 {
 		return nil, fmt.Errorf("unsupported CFF version %d.%d", major, minor)
 	} else if major != 1 || nameIndexOffs < 4 || offSize > 4 {

@@ -47,7 +47,12 @@ func tryFont(fname string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(cff.Info.FontName)
+
+	w1 := tt.Width
+	w2 := cff.Width
+	if len(w1) != len(w2) {
+		return fmt.Errorf("widths differ: %d vs %d", len(w1), len(w2))
+	}
 
 	return nil
 }

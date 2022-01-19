@@ -22,27 +22,6 @@ import (
 	"math"
 )
 
-type stackSlot struct {
-	val    float64
-	random bool
-}
-
-func isInt(x float64) bool {
-	return x == float64(int32(x))
-}
-
-func (s stackSlot) String() string {
-	suffix := ""
-	if s.random {
-		suffix = "*"
-	}
-	res := fmt.Sprintf("%.3f", s.val)
-	if isInt(s.val) {
-		res = fmt.Sprintf("%d", int32(s.val))
-	}
-	return res + suffix
-}
-
 // A Renderer is used to draw a glyph encoded by a CFF charstring.
 // TODO(voss): add hinting support.
 type Renderer interface {
@@ -55,7 +34,7 @@ type Renderer interface {
 // DecodeCharString uses ctx to render the charstring for glyph i.
 func (cff *Font) DecodeCharString(ctx Renderer, i int) error {
 	if i < 0 || i >= len(cff.charStrings) {
-		return errors.New("invalid glyph index")
+		return errors.New("cff: invalid glyph index")
 	}
 
 	_, err := cff.doDecode(ctx, cff.charStrings[i])
@@ -70,7 +49,7 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 		code = code[n:]
 	}
 
-	var stack []stackSlot
+	var stack []float64
 	clearStack := func() {
 		stack = stack[:0]
 	}
@@ -82,7 +61,7 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 		}
 		var glyphWidth int32
 		if isPresent {
-			glyphWidth = int32(stack[0].val) + cff.defaultWidth
+			glyphWidth = int32(stack[0]) + cff.defaultWidth
 			stack = stack[1:]
 		} else {
 			glyphWidth = cff.defaultWidth
@@ -93,7 +72,7 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 		widthIsSet = true
 	}
 
-	storage := make(map[int]stackSlot)
+	storage := make(map[int]float64)
 	cmdStack := [][]byte{code}
 	var nStems int
 
@@ -134,8 +113,8 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 			// 	tail := ""
 			// 	info := ""
 			// 	if k := len(stack); (op == t2callgsubr || op == t2callsubr) &&
-			// 		k > 0 && isInt(stack[k-1].val) {
-			// 		idx := int(stack[k-1].val) + bias(len(cff.subrs))
+			// 		k > 0 && isInt(stack[k-1]) {
+			// 		idx := int(stack[k-1]) + bias(len(cff.subrs))
 			// 		info = fmt.Sprintf("@%d", idx)
 			// 	}
 			// 	if len(show) > 10 {
@@ -146,36 +125,31 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 			// }
 
 			if op >= 32 && op <= 246 {
-				stack = append(stack, stackSlot{
-					val: float64(int32(op) - 139),
-				})
+				stack = append(stack, float64(int32(op)-139))
 				skipBytes(1)
 				continue
 			} else if op >= 247 && op <= 250 {
 				if len(code) < 2 {
 					return nil, errIncomplete
 				}
-				stack = append(stack, stackSlot{
-					val: float64(int32(op)*256 + int32(code[1]) + (108 - 247*256)),
-				})
+				val := int32(op)*256 + int32(code[1]) + (108 - 247*256)
+				stack = append(stack, float64(val))
 				skipBytes(2)
 				continue
 			} else if op >= 251 && op <= 254 {
 				if len(code) < 2 {
 					return nil, errIncomplete
 				}
-				stack = append(stack, stackSlot{
-					val: float64(-int32(op)*256 - int32(code[1]) - (108 - 251*256)),
-				})
+				val := -int32(op)*256 - int32(code[1]) - (108 - 251*256)
+				stack = append(stack, float64(val))
 				skipBytes(2)
 				continue
 			} else if op == 28 {
 				if len(code) < 3 {
 					return nil, errIncomplete
 				}
-				stack = append(stack, stackSlot{
-					val: float64(int16(uint16(code[1])<<8 + uint16(code[2]))),
-				})
+				val := int16(uint16(code[1])<<8 + uint16(code[2]))
+				stack = append(stack, float64(val))
 				skipBytes(3)
 				continue
 			} else if op == 255 {
@@ -183,11 +157,9 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 					return nil, errIncomplete
 				}
 				// 16-bit signed integer with 16 bits of fraction
-				x := int32(uint32(code[1])<<24 + uint32(code[2])<<16 +
+				val := int32(uint32(code[1])<<24 + uint32(code[2])<<16 +
 					uint32(code[3])<<8 + uint32(code[4]))
-				stack = append(stack, stackSlot{
-					val: float64(x) / 65536,
-				})
+				stack = append(stack, float64(val))
 				skipBytes(5)
 				continue
 			}
@@ -207,28 +179,28 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 			case t2rmoveto:
 				setGlyphWidth(len(stack) > 2)
 				if ctx != nil && len(stack) >= 2 {
-					rMoveTo(stack[0].val, stack[1].val)
+					rMoveTo(stack[0], stack[1])
 				}
 				clearStack()
 
 			case t2hmoveto:
 				setGlyphWidth(len(stack) > 1)
 				if ctx != nil && len(stack) >= 1 {
-					rMoveTo(stack[0].val, 0)
+					rMoveTo(stack[0], 0)
 				}
 				clearStack()
 
 			case t2vmoveto:
 				setGlyphWidth(len(stack) > 1)
 				if ctx != nil && len(stack) >= 1 {
-					rMoveTo(0, stack[0].val)
+					rMoveTo(0, stack[0])
 				}
 				clearStack()
 
 			case t2rlineto:
 				if ctx != nil {
 					for len(stack) >= 2 {
-						rLineTo(stack[0].val, stack[1].val)
+						rLineTo(stack[0], stack[1])
 						stack = stack[2:]
 					}
 				}
@@ -239,9 +211,9 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 					horizontal := op == t2hlineto
 					for len(stack) > 0 {
 						if horizontal {
-							rLineTo(stack[0].val, 0)
+							rLineTo(stack[0], 0)
 						} else {
-							rLineTo(0, stack[0].val)
+							rLineTo(0, stack[0])
 						}
 						stack = stack[1:]
 						horizontal = !horizontal
@@ -253,17 +225,17 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 			case t2rrcurveto, t2rcurveline, t2rlinecurve:
 				if ctx != nil {
 					for op == t2rlinecurve && len(stack) >= 8 {
-						rLineTo(stack[0].val, stack[1].val)
+						rLineTo(stack[0], stack[1])
 						stack = stack[2:]
 					}
 					for len(stack) >= 6 {
-						rCurveTo(stack[0].val, stack[1].val,
-							stack[2].val, stack[3].val,
-							stack[4].val, stack[5].val)
+						rCurveTo(stack[0], stack[1],
+							stack[2], stack[3],
+							stack[4], stack[5])
 						stack = stack[6:]
 					}
 					if op == t2rcurveline && len(stack) >= 2 {
-						rLineTo(stack[0].val, stack[1].val)
+						rLineTo(stack[0], stack[1])
 						stack = stack[2:]
 					}
 				}
@@ -273,12 +245,12 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if ctx != nil {
 					var dy1 float64
 					if len(stack)%4 != 0 {
-						dy1, stack = stack[0].val, stack[1:]
+						dy1, stack = stack[0], stack[1:]
 					}
 					for len(stack) >= 4 {
-						rCurveTo(stack[0].val, dy1,
-							stack[1].val, stack[2].val,
-							stack[3].val, 0)
+						rCurveTo(stack[0], dy1,
+							stack[1], stack[2],
+							stack[3], 0)
 						stack = stack[4:]
 						dy1 = 0
 					}
@@ -291,16 +263,16 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 					for len(stack) >= 4 {
 						var extra float64
 						if len(stack) == 5 {
-							extra = stack[4].val
+							extra = stack[4]
 						}
 						if horizontal {
-							rCurveTo(stack[0].val, 0,
-								stack[1].val, stack[2].val,
-								extra, stack[3].val)
+							rCurveTo(stack[0], 0,
+								stack[1], stack[2],
+								extra, stack[3])
 						} else {
-							rCurveTo(0, stack[0].val,
-								stack[1].val, stack[2].val,
-								stack[3].val, extra)
+							rCurveTo(0, stack[0],
+								stack[1], stack[2],
+								stack[3], extra)
 						}
 						stack = stack[4:]
 						horizontal = !horizontal
@@ -312,12 +284,12 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if ctx != nil {
 					var dx1 float64
 					if len(stack)%4 != 0 {
-						dx1, stack = stack[0].val, stack[1:]
+						dx1, stack = stack[0], stack[1:]
 					}
 					for len(stack) >= 4 {
-						rCurveTo(dx1, stack[0].val,
-							stack[1].val, stack[2].val,
-							0, stack[3].val)
+						rCurveTo(dx1, stack[0],
+							stack[1], stack[2],
+							0, stack[3])
 						stack = stack[4:]
 						dx1 = 0
 					}
@@ -327,32 +299,32 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 			case t2flex:
 				if ctx != nil {
 					if len(stack) >= 13 {
-						rCurveTo(stack[0].val, stack[1].val,
-							stack[2].val, stack[3].val,
-							stack[4].val, stack[5].val)
-						rCurveTo(stack[6].val, stack[7].val,
-							stack[8].val, stack[9].val,
-							stack[10].val, stack[11].val)
-						// fd = stack[12].val / 100
+						rCurveTo(stack[0], stack[1],
+							stack[2], stack[3],
+							stack[4], stack[5])
+						rCurveTo(stack[6], stack[7],
+							stack[8], stack[9],
+							stack[10], stack[11])
+						// fd = stack[12] / 100
 					}
 				}
 				clearStack()
 			case t2flex1:
 				if ctx != nil {
 					if len(stack) >= 11 {
-						rCurveTo(stack[0].val, stack[1].val,
-							stack[2].val, stack[3].val,
-							stack[4].val, stack[5].val)
-						extra := stack[10].val
-						dx := stack[0].val + stack[2].val + stack[4].val + stack[6].val + stack[8].val
-						dy := stack[1].val + stack[3].val + stack[5].val + stack[7].val + stack[9].val
+						rCurveTo(stack[0], stack[1],
+							stack[2], stack[3],
+							stack[4], stack[5])
+						extra := stack[10]
+						dx := stack[0] + stack[2] + stack[4] + stack[6] + stack[8]
+						dy := stack[1] + stack[3] + stack[5] + stack[7] + stack[9]
 						if math.Abs(dx) > math.Abs(dy) {
-							rCurveTo(stack[6].val, stack[7].val,
-								stack[8].val, stack[9].val,
+							rCurveTo(stack[6], stack[7],
+								stack[8], stack[9],
 								extra, 0)
 						} else {
-							rCurveTo(stack[6].val, stack[7].val,
-								stack[8].val, stack[9].val,
+							rCurveTo(stack[6], stack[7],
+								stack[8], stack[9],
 								0, extra)
 						}
 						// fd = 0.5
@@ -362,12 +334,12 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 			case t2hflex:
 				if ctx != nil {
 					if len(stack) >= 7 {
-						rCurveTo(stack[0].val, 0,
-							stack[1].val, stack[2].val,
-							stack[3].val, 0)
-						rCurveTo(stack[4].val, 0,
-							stack[5].val, -stack[2].val,
-							stack[6].val, 0)
+						rCurveTo(stack[0], 0,
+							stack[1], stack[2],
+							stack[3], 0)
+						rCurveTo(stack[4], 0,
+							stack[5], -stack[2],
+							stack[6], 0)
 						// fd = 0.5
 					}
 				}
@@ -375,13 +347,13 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 			case t2hflex1:
 				if ctx != nil {
 					if len(stack) >= 9 {
-						rCurveTo(stack[0].val, stack[1].val,
-							stack[2].val, stack[3].val,
-							stack[4].val, 0)
-						dy := stack[1].val + stack[3].val + stack[5].val + stack[7].val
-						rCurveTo(stack[5].val, 0,
-							stack[6].val, stack[7].val,
-							stack[8].val, -dy)
+						rCurveTo(stack[0], stack[1],
+							stack[2], stack[3],
+							stack[4], 0)
+						dy := stack[1] + stack[3] + stack[5] + stack[7]
+						rCurveTo(stack[5], 0,
+							stack[6], stack[7],
+							stack[8], -dy)
 						// fd = 0.5
 					}
 				}
@@ -415,58 +387,51 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				if stack[k].val < 0 {
-					stack[k].val = -stack[k].val
+				if stack[k] < 0 {
+					stack[k] = -stack[k]
 				}
 			case t2add:
 				k := len(stack) - 2
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k].val += stack[k+1].val
-				stack[k].random = stack[k].random || stack[k+1].random
+				stack[k] += stack[k+1]
 				stack = stack[:k+1]
 			case t2sub:
 				k := len(stack) - 2
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k].val -= stack[k+1].val
-				stack[k].random = stack[k].random || stack[k+1].random
+				stack[k] -= stack[k+1]
 				stack = stack[:k+1]
 			case t2div:
 				k := len(stack) - 2
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k].val /= stack[k+1].val
-				stack[k].random = stack[k].random || stack[k+1].random
+				stack[k] /= stack[k+1]
 				stack = stack[:k+1]
 			case t2neg:
 				k := len(stack) - 1
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k].val = -stack[k].val
+				stack[k] = -stack[k]
 			case t2random:
-				stack = append(stack, stackSlot{
-					val:    0.618,
-					random: true,
-				})
+				stack = append(stack, 0.618) // a random number in (0, 1]
 			case t2mul:
 				k := len(stack) - 2
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k].val *= stack[k+1].val
-				stack[k].random = stack[k].random || stack[k+1].random
+				stack[k] *= stack[k+1]
 				stack = stack[:k+1]
 			case t2sqrt:
 				k := len(stack) - 1
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k].val = math.Sqrt(stack[k].val)
+				stack[k] = math.Sqrt(stack[k])
 			case t2drop:
 				k := len(stack) - 1
 				if k < 0 {
@@ -484,8 +449,8 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				idx := int(stack[k].val)
-				if float64(idx) != stack[k].val || k-idx-1 < 0 {
+				idx := int(stack[k])
+				if float64(idx) != stack[k] || k-idx-1 < 0 {
 					return nil, errors.New("invalid index")
 				}
 				if idx < 0 {
@@ -497,8 +462,8 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				n := int(stack[k].val)
-				j := int(stack[k+1].val)
+				n := int(stack[k])
+				j := int(stack[k+1])
 				if n <= 0 || n > k {
 					return nil, errors.New("invalid roll count")
 				}
@@ -516,8 +481,8 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				m := int(stack[k+1].val)
-				if float64(m) != stack[k+1].val || m < 0 || m > 32 {
+				m := int(stack[k+1])
+				if float64(m) != stack[k+1] || m < 0 || m > 32 {
 					return nil, errors.New("invalid store index")
 				}
 				storage[m] = stack[k]
@@ -527,8 +492,8 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				m := int(stack[k].val)
-				if float64(m) != stack[k+1].val || m < 0 || m > 32 {
+				m := int(stack[k])
+				if float64(m) != stack[k+1] || m < 0 || m > 32 {
 					return nil, errors.New("invalid store index")
 				}
 				stack[k] = storage[m]
@@ -538,68 +503,61 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				var m stackSlot
-				if stack[k].val != 0 && stack[k+1].val != 0 {
-					m.val = 1
+				var val float64
+				if stack[k] != 0 && stack[k+1] != 0 {
+					val = 1
 				}
-				stack[k].random = stack[k].random || stack[k+1].random
-				stack = append(stack[:k], m)
+				stack = append(stack[:k], val)
 			case t2or:
 				k := len(stack) - 2
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				var m stackSlot
-				if stack[k].val != 0 || stack[k+1].val != 0 {
-					m.val = 1
+				var val float64
+				if stack[k] != 0 || stack[k+1] != 0 {
+					val = 1
 				}
-				stack[k].random = stack[k].random || stack[k+1].random
-				stack = append(stack[:k], m)
+				stack = append(stack[:k], val)
 			case t2not:
 				k := len(stack) - 1
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				if stack[k].val == 0 {
-					stack[k].val = 1
+				if stack[k] == 0 {
+					stack[k] = 1
 				} else {
-					stack[k].val = 0
+					stack[k] = 0
 				}
 			case t2eq:
 				k := len(stack) - 2
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				if stack[k].val == stack[k+1].val {
-					stack[k].val = 1
+				if stack[k] == stack[k+1] {
+					stack[k] = 1
 				} else {
-					stack[k].val = 0
+					stack[k] = 0
 				}
-				stack[k].random = stack[k].random || stack[k+1].random
 				stack = stack[:k+1]
 			case t2ifelse:
 				k := len(stack) - 4
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				var m stackSlot
-				if stack[k+2].val <= stack[k+3].val {
-					m = stack[k]
+				var val float64
+				if stack[k+2] <= stack[k+3] {
+					val = stack[k]
 				} else {
-					m = stack[k+1]
+					val = stack[k+1]
 				}
-				m.random = m.random || stack[k+2].random || stack[k+3].random
-				stack = append(stack[:k], m)
+				stack = append(stack[:k], val)
 
 			case t2callsubr, t2callgsubr:
 				k := len(stack) - 1
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				if stack[k].random {
-					return nil, errInvalidSubroutine
-				}
-				biased := int(stack[k].val)
+				biased := int(stack[k])
 				stack = stack[:k]
 
 				cmdStack = append(cmdStack, code)
@@ -652,7 +610,7 @@ func isConstInt(cmd []byte) bool {
 	return op == 28 || (32 <= op && op <= 254)
 }
 
-func roll(data []stackSlot, j int) {
+func roll(data []float64, j int) {
 	n := len(data)
 
 	j = j % n
@@ -660,7 +618,7 @@ func roll(data []stackSlot, j int) {
 		j += n
 	}
 
-	tmp := make([]stackSlot, j)
+	tmp := make([]float64, j)
 	copy(tmp, data[n-j:])
 	copy(data[j:], data[:n-j])
 	copy(data[:j], tmp)
@@ -834,8 +792,8 @@ const (
 )
 
 var (
-	errStackOverflow     = errors.New("operand stack overflow")
-	errStackUnderflow    = errors.New("operand stack underflow")
-	errIncomplete        = errors.New("incomplete type2 charstring")
-	errInvalidSubroutine = errors.New("invalid subroutine index")
+	errStackOverflow     = errors.New("cff: operand stack overflow")
+	errStackUnderflow    = errors.New("cff: operand stack underflow")
+	errIncomplete        = errors.New("cff: incomplete charstring")
+	errInvalidSubroutine = errors.New("cff: invalid subroutine index")
 )

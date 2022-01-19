@@ -24,19 +24,10 @@ func TestRoll(t *testing.T) {
 	in := []float64{1, 2, 3, 4, 5, 6, 7, 8}
 	out := []float64{1, 2, 4, 5, 6, 3, 7, 8}
 
-	min := make([]stackSlot, len(in))
-	for i, v := range in {
-		min[i].val = v
-	}
-	mout := make([]stackSlot, len(in))
-	for i, v := range out {
-		mout[i].val = v
-	}
-
-	roll(min[2:6], 3)
-	for i, x := range min {
-		if mout[i] != x {
-			t.Error(min, mout)
+	roll(in[2:6], 3)
+	for i, x := range in {
+		if out[i] != x {
+			t.Error(in, out)
 			break
 		}
 	}
