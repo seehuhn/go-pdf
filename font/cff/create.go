@@ -20,9 +20,9 @@ type Builder struct {
 }
 
 // NewBuilder returns a new Builder.
-func NewBuilder(meta *type1.FontInfo, defWidth, nomWidth int32) *Builder {
+func NewBuilder(info *type1.FontInfo, defWidth, nomWidth int32) *Builder {
 	cff := &Font{
-		Info: meta,
+		Info: info,
 	}
 
 	return &Builder{

@@ -46,7 +46,7 @@ type Font struct {
 	CapHeight   int
 	ItalicAngle float64
 
-	FontBBox *font.Rect
+	FontBBox *font.Rect // always uses 1000 units to the em (not GlyphUnits)
 
 	GlyphExtent []font.Rect
 	Width       []int

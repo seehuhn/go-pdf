@@ -25,14 +25,18 @@ func TestRoundTrip(t *testing.T) {
 		UnderlineThickness: 40,
 		PaintType:          0,
 		FontMatrix:         []float64{1.0 / 1024, 0, 0, 1.0 / 1024, 0, 0},
-		BlueValues:         []int32{-22, 0, 500, 520, 700, 720},
-		OtherBlues:         []int32{-120, -100},
-		BlueScale:          1,
-		BlueShift:          2,
-		BlueFuzz:           3,
-		StdHW:              23.4,
-		StdVW:              34.5,
-		ForceBold:          true,
+		Private: []*type1.PrivateDict{
+			{
+				BlueValues: []int32{-22, 0, 500, 520, 700, 720},
+				OtherBlues: []int32{-120, -100},
+				BlueScale:  1,
+				BlueShift:  2,
+				BlueFuzz:   3,
+				StdHW:      23.4,
+				StdVW:      34.5,
+				ForceBold:  true,
+			},
+		},
 	}
 	b := NewBuilder(meta, 1000, 1000)
 
@@ -93,6 +97,7 @@ func TestRoundTrip(t *testing.T) {
 func TestCreate(t *testing.T) {
 	meta := &type1.FontInfo{
 		FontName: "Test",
+		Private:  []*type1.PrivateDict{{}},
 	}
 	b := NewBuilder(meta, 500, 500)
 

@@ -35,7 +35,7 @@ type Font struct {
 
 	GlyphNames  []string
 	GlyphExtent []font.Rect
-	Width       []int
+	Width       []int // TODO(voss): use int32?
 
 	defaultWidth int32
 	nominalWidth int32
@@ -122,8 +122,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, isCIDFont := topDict[opROS]; isCIDFont {
-		return nil, errors.New("reading CIDfonts not implemented")
+	if topDict.getInt(opCharstringType, 2) != 2 {
+		return nil, errors.New("cff: unsupported charstring type")
 	}
 	cff.Info.Version = topDict.getString(opVersion)
 	cff.Info.Notice = topDict.getString(opNotice)
@@ -139,6 +139,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.Info.UnderlineThickness = topDict.getFloat(opUnderlineThickness,
 		defaultUnderlineThickness)
 	cff.Info.PaintType = topDict.getInt(opPaintType, 0)
+
+	// TODO(voss): different default for CIDFonts?
 	cff.Info.FontMatrix = topDict.getFontMatrix(opFontMatrix)
 
 	// read the Global Subr INDEX
@@ -149,28 +151,37 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.gsubrs = gsubrs
 
 	// read the CharStrings INDEX
-	cct := topDict.getInt(opCharstringType, 2)
-	if cct != 2 {
-		return nil, errors.New("unsupported charstring type")
-	}
 	charStringsOffs := topDict.getInt(opCharStrings, 0)
-	if charStringsOffs == 0 {
-		return nil, errors.New("missing CharStrings offset")
-	}
-	delete(topDict, opCharStrings)
-	err = p.SeekPos(int64(charStringsOffs))
-	if err != nil {
-		return nil, err
-	}
-	charStrings, err := readIndex(p)
+	charStrings, err := readIndexAt(p, charStringsOffs, "CharStrings")
 	if err != nil {
 		return nil, err
 	}
 	cff.charStrings = charStrings
 
+	_, isCIDFont := topDict[opROS]
+	if isCIDFont {
+		fdArrayOffs := topDict.getInt(opFDArray, 0)
+		fdArrayIndex, err := readIndexAt(p, fdArrayOffs, "Font DICT")
+		if err != nil {
+			return nil, err
+		}
+		for _, fdBlob := range fdArrayIndex {
+			fontDict, err := decodeDict(fdBlob, strings)
+			if err != nil {
+				return nil, err
+			}
+			privateInfo, err := fontDict.readPrivate(p, strings)
+			if err != nil {
+				return nil, err
+			}
+			_ = privateInfo
+		}
+
+		return nil, errors.New("reading CIDfonts not implemented")
+	}
+
 	// read the list of glyph names
 	charsetOffs := topDict.getInt(opCharset, 0)
-	delete(topDict, opCharset)
 	var charset []int32
 	switch charsetOffs {
 	case 0: // ISOAdobe
@@ -210,48 +221,15 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	// }
 
 	// read the Private DICT
-	pdSize, pdOffs, ok := topDict.getPair(opPrivate)
-	if !ok {
-		return nil, errors.New("missing Private DICT")
-	}
-	delete(topDict, opPrivate)
-	err = p.SeekPos(int64(pdOffs))
+	info, err := topDict.readPrivate(p, strings)
 	if err != nil {
 		return nil, err
 	}
-	privateDictBlob := make([]byte, pdSize)
-	_, err = p.Read(privateDictBlob)
-	if err != nil {
-		return nil, err
-	}
-	privateDict, err := decodeDict(privateDictBlob, strings)
-	if err != nil {
-		return nil, err
-	}
-	cff.Info.BlueValues = privateDict.getDelta32(opBlueValues)
-	cff.Info.OtherBlues = privateDict.getDelta32(opOtherBlues)
-	cff.Info.BlueScale = privateDict.getFloat(opBlueScale, defaultBlueScale)
-	cff.Info.BlueShift = privateDict.getInt(opBlueShift, 7)
-	cff.Info.BlueFuzz = privateDict.getInt(opBlueFuzz, 1)
-	cff.Info.StdHW = privateDict.getFloat(opStdHW, 0)
-	cff.Info.StdVW = privateDict.getFloat(opStdVW, 0)
-	cff.Info.ForceBold = privateDict.getInt(opForceBold, 0) != 0
-	cff.defaultWidth = privateDict.getInt(opDefaultWidthX, 0)
-	cff.nominalWidth = privateDict.getInt(opNominalWidthX, 0)
 
-	subrsIndexOffs := privateDict.getInt(opSubrs, 0)
-	delete(privateDict, opSubrs)
-	if subrsIndexOffs > 0 {
-		err = p.SeekPos(int64(pdOffs) + int64(subrsIndexOffs))
-		if err != nil {
-			return nil, err
-		}
-		subrs, err := readIndex(p)
-		if err != nil {
-			return nil, err
-		}
-		cff.subrs = subrs
-	}
+	cff.Info.Private = []*type1.PrivateDict{info.private}
+	cff.defaultWidth = info.defaultWidth
+	cff.nominalWidth = info.nominalWidth
+	cff.subrs = info.subrs
 
 	cff.GlyphExtent = make([]font.Rect, 0, len(cff.charStrings))
 	cff.Width = make([]int, 0, len(cff.charStrings))

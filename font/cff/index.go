@@ -28,6 +28,18 @@ import (
 // cffIndex is a CFF INDEX, i.e. an ordered sequence of binary blobs.
 type cffIndex [][]byte
 
+func readIndexAt(p *parser.Parser, pos int32, name string) (cffIndex, error) {
+	if pos < 4 {
+		return nil, errors.New("cff: missing " + name + " INDEX")
+	}
+	err := p.SeekPos(int64(pos))
+	if err != nil {
+		return nil, err
+	}
+
+	return readIndex(p)
+}
+
 func readIndex(p *parser.Parser) (cffIndex, error) {
 	count, err := p.ReadUInt16()
 	if err != nil {

@@ -44,6 +44,10 @@ type FontInfo struct {
 	PaintType  int32
 	FontMatrix []float64
 
+	Private []*PrivateDict
+}
+
+type PrivateDict struct {
 	// BlueValues is an array containing an even number of integers.
 	// The first integer in each pair is less than or equal to the second integer.
 	// The first pair is the baseline overshoot position and the baseline.

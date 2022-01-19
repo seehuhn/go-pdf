@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 
+	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -249,6 +250,67 @@ func (d cffDict) getFontMatrix(op dictOp) []float64 {
 	return res
 }
 
+type privateInfo struct {
+	private      *type1.PrivateDict
+	fontMatrix   []float64 // TODO(voss): use or remove this
+	subrs        cffIndex
+	defaultWidth int32
+	nominalWidth int32
+}
+
+func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInfo, error) {
+	pdSize, pdOffs, ok := d.getPair(opPrivate)
+	if !ok || pdOffs < 4 || pdSize < 0 {
+		return nil, errors.New("cff: missing Private DICT")
+	}
+
+	err := p.SeekPos(int64(pdOffs))
+	if err != nil {
+		return nil, err
+	}
+
+	privateDictBlob := make([]byte, pdSize)
+	_, err = p.Read(privateDictBlob)
+	if err != nil {
+		return nil, err
+	}
+
+	privateDict, err := decodeDict(privateDictBlob, strings)
+	if err != nil {
+		return nil, err
+	}
+
+	private := &type1.PrivateDict{
+		BlueValues: privateDict.getDelta32(opBlueValues),
+		OtherBlues: privateDict.getDelta32(opOtherBlues),
+		BlueScale:  privateDict.getFloat(opBlueScale, defaultBlueScale),
+		BlueShift:  privateDict.getInt(opBlueShift, 7),
+		BlueFuzz:   privateDict.getInt(opBlueFuzz, 1),
+		StdHW:      privateDict.getFloat(opStdHW, 0),
+		StdVW:      privateDict.getFloat(opStdVW, 0),
+		ForceBold:  privateDict.getInt(opForceBold, 0) != 0,
+	}
+
+	var subrs cffIndex
+	subrsIndexOffs := privateDict.getInt(opSubrs, 0)
+	if subrsIndexOffs > 0 {
+		subrs, err = readIndexAt(p, pdOffs+subrsIndexOffs, "Subrs")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	info := &privateInfo{
+		private:      private,
+		defaultWidth: privateDict.getInt(opDefaultWidthX, 0),
+		nominalWidth: privateDict.getInt(opNominalWidthX, 0),
+		fontMatrix:   d.getFontMatrix(opFontMatrix), // TODO(voss): default for CIDFonts?
+		subrs:        subrs,
+	}
+
+	return info, nil
+}
+
 func (d cffDict) setDelta32(op dictOp, val []int32) {
 	if len(val) == 0 {
 		delete(d, op)
@@ -288,7 +350,7 @@ func (d cffDict) setFontMatrix(op dictOp, fm []float64) {
 	d[op] = val
 }
 
-func (d cffDict) keys() []dictOp {
+func (d cffDict) sortedKeys() []dictOp {
 	keys := make([]dictOp, 0, len(d))
 	for k := range d {
 		keys = append(keys, k)
@@ -308,7 +370,7 @@ func (d cffDict) keys() []dictOp {
 }
 
 func (d cffDict) encode(ss *cffStrings) []byte {
-	keys := d.keys()
+	keys := d.sortedKeys()
 
 	res := &bytes.Buffer{}
 	for _, op := range keys {
@@ -431,26 +493,29 @@ func makeTopDict(info *type1.FontInfo) cffDict {
 func (cff *Font) makePrivateDict() cffDict {
 	privateDict := cffDict{}
 
-	info := cff.Info
+	if len(cff.Info.Private) != 1 {
+		panic("not implemented")
+	}
+	private := cff.Info.Private[0]
 
-	privateDict.setDelta32(opBlueValues, info.BlueValues)
-	privateDict.setDelta32(opOtherBlues, info.OtherBlues)
-	if math.Abs(info.BlueScale-defaultBlueScale) > 1e-6 {
-		privateDict[opBlueScale] = []interface{}{info.BlueScale}
+	privateDict.setDelta32(opBlueValues, private.BlueValues)
+	privateDict.setDelta32(opOtherBlues, private.OtherBlues)
+	if math.Abs(private.BlueScale-defaultBlueScale) > 1e-6 {
+		privateDict[opBlueScale] = []interface{}{private.BlueScale}
 	}
-	if info.BlueShift != defaultBlueShift {
-		privateDict[opBlueShift] = []interface{}{info.BlueShift}
+	if private.BlueShift != defaultBlueShift {
+		privateDict[opBlueShift] = []interface{}{private.BlueShift}
 	}
-	if info.BlueFuzz != defaultBlueFuzz {
-		privateDict[opBlueFuzz] = []interface{}{info.BlueFuzz}
+	if private.BlueFuzz != defaultBlueFuzz {
+		privateDict[opBlueFuzz] = []interface{}{private.BlueFuzz}
 	}
-	if info.StdHW != 0 {
-		privateDict[opStdHW] = []interface{}{info.StdHW}
+	if private.StdHW != 0 {
+		privateDict[opStdHW] = []interface{}{private.StdHW}
 	}
-	if info.StdVW != 0 {
-		privateDict[opStdVW] = []interface{}{info.StdVW}
+	if private.StdVW != 0 {
+		privateDict[opStdVW] = []interface{}{private.StdVW}
 	}
-	if info.ForceBold {
+	if private.ForceBold {
 		privateDict[opForceBold] = []interface{}{int32(1)}
 	}
 
@@ -478,6 +543,8 @@ func (d dictOp) String() string {
 		return "FullName"
 	case opFamilyName:
 		return "FamilyName"
+	case opWeight:
+		return "Weight"
 	case opFontBBox:
 		return "FontBBox"
 	case opCharset:
@@ -498,9 +565,49 @@ func (d dictOp) String() string {
 		return "SyntheticBase"
 	case opROS:
 		return "ROS"
+	case opCIDFontVersion:
+		return "CIDFontVersion"
+	case opCIDFontRevision:
+		return "CIDFontRevision"
+	case opCIDFontType:
+		return "CIDFontType"
+	case opUIDBase:
+		return "UIDBase"
+	case opFontName:
+		return "FontName"
+	case opCIDCount:
+		return "CIDCount"
+	case opFDArray:
+		return "FDArray"
+	case opFDSelect:
+		return "FDSelect"
 
+	case opBlueValues:
+		return "BlueValues"
+	case opOtherBlues:
+		return "OtherBlues"
+	case opFamilyBlues:
+		return "FamilyBlues"
+	case opFamilyOtherBlues:
+		return "FamilyOtherBlues"
+	case opStdHW:
+		return "StdHW"
+	case opStdVW:
+		return "StdVW"
 	case opSubrs:
 		return "Subrs"
+	case opDefaultWidthX:
+		return "DefaultWidthX"
+	case opNominalWidthX:
+		return "NominalWidthX"
+	case opBlueScale:
+		return "BlueScale"
+	case opBlueShift:
+		return "BlueShift"
+	case opBlueFuzz:
+		return "BlueFuzz"
+	case opForceBold:
+		return "ForceBold"
 
 	default:
 		if d < 256 {
@@ -534,22 +641,29 @@ const (
 	opPostScript         dictOp = 0x0C15
 	opBaseFontName       dictOp = 0x0C16
 	opROS                dictOp = 0x0C1E
+	opCIDFontVersion     dictOp = 0x0C1F
+	opCIDFontRevision    dictOp = 0x0C20
+	opCIDFontType        dictOp = 0x0C21
 	opCIDCount           dictOp = 0x0C22
+	opUIDBase            dictOp = 0x0C23
 	opFDArray            dictOp = 0x0C24
 	opFDSelect           dictOp = 0x0C25
+	opFontName           dictOp = 0x0C26
 
 	// private DICT operators
-	opBlueValues    dictOp = 0x0006
-	opOtherBlues    dictOp = 0x0007
-	opStdHW         dictOp = 0x000A
-	opStdVW         dictOp = 0x000B
-	opSubrs         dictOp = 0x0013 // Offset (self) to local subrs
-	opDefaultWidthX dictOp = 0x0014
-	opNominalWidthX dictOp = 0x0015
-	opBlueScale     dictOp = 0x0C09
-	opBlueShift     dictOp = 0x0C0A
-	opBlueFuzz      dictOp = 0x0C0B
-	opForceBold     dictOp = 0x0C0E
+	opBlueValues       dictOp = 0x0006
+	opOtherBlues       dictOp = 0x0007
+	opFamilyBlues      dictOp = 0x0008
+	opFamilyOtherBlues dictOp = 0x0009
+	opStdHW            dictOp = 0x000A
+	opStdVW            dictOp = 0x000B
+	opSubrs            dictOp = 0x0013 // Offset (self) to local subrs
+	opDefaultWidthX    dictOp = 0x0014
+	opNominalWidthX    dictOp = 0x0015
+	opBlueScale        dictOp = 0x0C09
+	opBlueShift        dictOp = 0x0C0A
+	opBlueFuzz         dictOp = 0x0C0B
+	opForceBold        dictOp = 0x0C0E
 
 	// used in local unit tests only
 	opDebug dictOp = 0x0CFF
@@ -558,7 +672,7 @@ const (
 func (d dictOp) isString() bool {
 	switch d {
 	case opVersion, opNotice, opCopyright, opFullName, opFamilyName, opWeight,
-		opPostScript, opBaseFontName, opROS:
+		opPostScript, opBaseFontName, opROS, opFontName:
 		return true
 	default:
 		return false

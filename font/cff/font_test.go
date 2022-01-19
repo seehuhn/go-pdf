@@ -42,32 +42,7 @@ func TestReadCFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf := &bytes.Buffer{}
-	err = cff.Encode(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := bytes.NewReader(buf.Bytes())
-	cff2, err := Read(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if cff.Info.FontName != cff2.Info.FontName {
-		t.Errorf("FontName: %q != %q", cff.Info.FontName, cff2.Info.FontName)
-	}
-	if len(cff.gsubrs) != len(cff2.gsubrs) {
-		t.Errorf("len(gsubrs): %d != %d", len(cff.gsubrs), len(cff2.gsubrs))
-	}
-	if len(cff.charStrings) != len(cff2.charStrings) {
-		t.Errorf("len(charStrings): %d != %d", len(cff.charStrings), len(cff2.charStrings))
-	}
-	if len(cff.subrs) != len(cff2.subrs) {
-		t.Errorf("len(subrs): %d != %d", len(cff.subrs), len(cff2.subrs))
-	}
-
-	// t.Fatal("not implemented")
+	fmt.Println(cff.Info.FontName)
 }
 
 func TestCharset(t *testing.T) {
