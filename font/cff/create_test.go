@@ -2,7 +2,6 @@ package cff
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -38,13 +37,15 @@ func TestRoundTrip(t *testing.T) {
 			},
 		},
 	}
-	b := NewBuilder(meta, 1000, 1000)
 
-	g, err := b.AddGlyph(".notdef")
-	if err != nil {
-		t.Fatal(err)
+	in := &Font{
+		Info: meta,
 	}
-	g.SetWidth(1000)
+
+	g := &Glyph{
+		Name:  ".notdef",
+		Width: 1000,
+	}
 	g.MoveTo(50, 50)
 	g.LineTo(950, 50)
 	g.LineTo(950, 950)
@@ -53,26 +54,20 @@ func TestRoundTrip(t *testing.T) {
 	g.LineTo(900, 900)
 	g.LineTo(900, 100)
 	g.LineTo(100, 100)
-	g.Close()
+	in.Glyphs = append(in.Glyphs, g)
 
-	g, err = b.AddGlyph("A")
-	g.SetWidth(900)
+	g = &Glyph{
+		Name:  "A",
+		Width: 900,
+	}
 	g.MoveTo(50, 50)
 	g.LineTo(850, 50)
 	g.LineTo(850, 850)
 	g.LineTo(50, 850)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g.Close()
-
-	in, err := b.Build()
-	if err != nil {
-		t.Fatal(err)
-	}
+	in.Glyphs = append(in.Glyphs, g)
 
 	buf := &bytes.Buffer{}
-	err = in.Encode(buf)
+	err := in.Encode(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,9 +79,15 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	target := []int{1000, 900}
-	if !reflect.DeepEqual(out.Width, target) {
-		t.Errorf("Width: %v != %v", in.Width, target)
+	if len(out.Glyphs) != len(in.Glyphs) {
+		t.Fatalf("wrong number of glyphs: %d != %d", len(out.Glyphs), len(in.Glyphs))
+	}
+
+	target := []int32{1000, 900}
+	for i, g := range out.Glyphs {
+		if g.Width != target[i] {
+			t.Fatalf("wrong glyph %d width: %d != %d", i, g.Width, target[i])
+		}
 	}
 
 	if !reflect.DeepEqual(in.Info, out.Info) {
@@ -99,13 +100,14 @@ func TestCreate(t *testing.T) {
 		FontName: "Test",
 		Private:  []*type1.PrivateDict{{}},
 	}
-	b := NewBuilder(meta, 500, 500)
-
-	g, err := b.AddGlyph(".notdef")
-	if err != nil {
-		t.Fatal(err)
+	cff := &Font{
+		Info: meta,
 	}
-	g.SetWidth(500)
+
+	g := &Glyph{
+		Name:  ".notdef",
+		Width: 500,
+	}
 	g.MoveTo(50, 50)
 	g.LineTo(450, 50)
 	g.LineTo(450, 950)
@@ -114,14 +116,13 @@ func TestCreate(t *testing.T) {
 	g.LineTo(400, 900)
 	g.LineTo(400, 100)
 	g.LineTo(100, 100)
-	g.Close()
+	cff.Glyphs = append(cff.Glyphs, g)
 
 	// an arrow pointing right
-	g, err = b.AddGlyph("A")
-	if err != nil {
-		t.Fatal(err)
+	g = &Glyph{
+		Name:  "A",
+		Width: 1000,
 	}
-	g.SetWidth(1000)
 	g.MoveTo(0, 450)
 	g.LineTo(700, 450)
 	g.LineTo(700, 350)
@@ -129,12 +130,7 @@ func TestCreate(t *testing.T) {
 	g.LineTo(700, 650)
 	g.LineTo(700, 550)
 	g.LineTo(0, 550)
-	g.Close()
-
-	cff, err := b.Build()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cff.Glyphs = append(cff.Glyphs, g)
 
 	fd, err := os.Create("test.cff")
 	if err != nil {
@@ -151,26 +147,19 @@ func TestCreate(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-	in, err := os.Open("Atkinson-Hyperlegible-BoldItalic-102.cff")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	cff, err := Read(in)
+	body, err := os.ReadFile("SourceSerif4-Regular.cff")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	gid := 4
-
-	ctx := &encoder{}
-	orig, err := cff.doDecode(ctx, cff.charStrings[gid])
+	cff, err := Read(bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	code := ctx.encode(cff.defaultWidth, cff.nominalWidth)
-	fmt.Printf("=> % x\n", code)
-	fmt.Printf(".. % x\n", orig)
+	g := cff.Glyphs[161]
+	cmds := encodeArgs(g.Cmds)
+	out := encodeCommands(cmds)
+	_ = out
+	t.Error(g.Name)
 }

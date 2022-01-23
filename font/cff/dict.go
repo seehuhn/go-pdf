@@ -490,7 +490,7 @@ func makeTopDict(info *type1.FontInfo) cffDict {
 	return topDict
 }
 
-func (cff *Font) makePrivateDict() cffDict {
+func (cff *Font) makePrivateDict(defaultWidth, nominalWidth int32) cffDict {
 	privateDict := cffDict{}
 
 	if len(cff.Info.Private) != 1 {
@@ -519,11 +519,11 @@ func (cff *Font) makePrivateDict() cffDict {
 		privateDict[opForceBold] = []interface{}{int32(1)}
 	}
 
-	if cff.defaultWidth != 0 {
-		privateDict[opDefaultWidthX] = []interface{}{cff.defaultWidth}
+	if defaultWidth != 0 {
+		privateDict[opDefaultWidthX] = []interface{}{defaultWidth}
 	}
-	if cff.nominalWidth != 0 {
-		privateDict[opNominalWidthX] = []interface{}{cff.nominalWidth}
+	if nominalWidth != 0 {
+		privateDict[opNominalWidthX] = []interface{}{nominalWidth}
 	}
 
 	return privateDict

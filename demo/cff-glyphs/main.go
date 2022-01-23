@@ -72,13 +72,13 @@ func main() {
 			continue
 		}
 
-		for i := range cff.GlyphNames {
-			bbox := cff.GlyphExtent[i]
+		for i := range cff.Glyphs {
+			bbox := cff.Glyphs[i].Extent()
 			left := 0
 			if bbox.LLx < left {
 				left = bbox.LLx
 			}
-			right := cff.Width[i]
+			right := int(cff.Glyphs[i].Width)
 			if right < 300 {
 				right = 300
 			}
@@ -135,83 +135,60 @@ func loadCFFData(fname string) ([]byte, error) {
 	return os.ReadFile(fname)
 }
 
-type context struct {
-	page       *pages.Page
-	xx         []float64
-	yy         []float64
-	posX, posY float64
-	w          int32
-	ink        bool
-}
-
-func (ctx *context) SetWidth(w int32) {
-	ctx.w = w
-}
-
-func (ctx *context) MoveTo(x, y float64) {
-	if ctx.ink {
-		ctx.page.Println("h")
-	}
-	ctx.posX = x
-	ctx.posY = y
-	ctx.page.Printf("%.2f %.2f m\n", ctx.posX, ctx.posY)
-	ctx.xx = append(ctx.xx, ctx.posX)
-	ctx.yy = append(ctx.yy, ctx.posY)
-}
-
-func (ctx *context) LineTo(x, y float64) {
-	ctx.ink = true
-	ctx.posX = x
-	ctx.posY = y
-	ctx.page.Printf("%.2f %.2f l\n", ctx.posX, ctx.posY)
-	ctx.xx = append(ctx.xx, ctx.posX)
-	ctx.yy = append(ctx.yy, ctx.posY)
-}
-
-func (ctx *context) CurveTo(xa, ya, xb, yb, xc, yc float64) {
-	ctx.ink = true
-	ctx.page.Printf("%.2f %.2f %.2f %.2f %.2f %.2f c\n",
-		xa, ya, xb, yb, xc, yc)
-	ctx.posX = xc
-	ctx.posY = yc
-	ctx.xx = append(ctx.xx, ctx.posX)
-	ctx.yy = append(ctx.yy, ctx.posY)
-}
-
-func illustrateGlyph(page *pages.Page, F *font.Font, cff *cff.Font, i int) error {
+func illustrateGlyph(page *pages.Page, F *font.Font, fnt *cff.Font, i int) error {
 	hss := boxes.Glue(0, 1, 1, 1, 1)
 
-	label := fmt.Sprintf("glyph %d: %s", i, cff.GlyphNames[i])
+	label := fmt.Sprintf("glyph %d: %s", i, fnt.Glyphs[i].Name)
 	nameBox := boxes.Text(F, 12, label)
 	titleBox := boxes.HBoxTo(page.BBox.URx-page.BBox.LLx, hss, nameBox, hss)
 	titleBox.Draw(page, page.BBox.LLx, page.BBox.URy-20)
 
 	page.Printf("%.3f 0 0 %.3f 0 0 cm\n", q, q)
 
+	w := fnt.Glyphs[i].Width
 	page.Println("q")
 	page.Println("0.1 0.9 0.1 RG 3 w")
 	page.Println("0 -10 m 0 10 l")
-	page.Printf("0 0 m %d 0 l\n", cff.Width[i])
-	page.Printf("%d -10 m %d 0 l %d 10 l\n",
-		cff.Width[i]-10, cff.Width[i], cff.Width[i]-10)
+	page.Printf("0 0 m %d 0 l\n", w)
+	page.Printf("%d -10 m %d 0 l %d 10 l\n", w-10, w, w-10)
 	page.Println("S Q")
 
-	ctx := &context{
-		page: page,
+	glyph := fnt.Glyphs[i]
+
+	var xx []float64
+	var yy []float64
+	var ink bool
+	for _, cmd := range glyph.Cmds {
+		switch cmd.Op {
+		case cff.CmdMoveTo:
+			if ink {
+				page.Println("h")
+			}
+			page.Printf("%.3f %.3f m\n", cmd.Args[0], cmd.Args[1])
+			xx = append(xx, cmd.Args[0])
+			yy = append(yy, cmd.Args[1])
+		case cff.CmdLineTo:
+			page.Printf("%.3f %.3f l\n", cmd.Args[0], cmd.Args[1])
+			xx = append(xx, cmd.Args[0])
+			yy = append(yy, cmd.Args[1])
+			ink = true
+		case cff.CmdCurveTo:
+			page.Printf("%.3f %.3f %.3f %.3f %.3f %.3f c\n",
+				cmd.Args[0], cmd.Args[1], cmd.Args[2], cmd.Args[3], cmd.Args[4], cmd.Args[5])
+			xx = append(xx, cmd.Args[4])
+			yy = append(yy, cmd.Args[5])
+			ink = true
+		}
 	}
-	err := cff.DecodeCharString(ctx, i)
-	if ctx.ink {
+	if ink {
 		page.Println("h")
 	}
 	page.Println("S")
-	if err != nil {
-		return err
-	}
 
 	page.Println("q 0 0 0.8 rg")
-	for i := range ctx.xx {
-		x := ctx.xx[i]
-		y := ctx.yy[i]
+	for i := range xx {
+		x := xx[i]
+		y := yy[i]
 		label := boxes.Text(F, 16, fmt.Sprintf("%d", i))
 		label.Draw(page, x, y)
 	}

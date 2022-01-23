@@ -2,232 +2,200 @@ package cff
 
 import (
 	"container/heap"
-	"errors"
 	"fmt"
 	"math"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
 )
 
-// Builder can be used to construct a CFF font from scratch.
-type Builder struct {
-	cff          *Font
-	defaultWidth int32
-	nominalWidth int32
-
-	isInGlyph bool
-}
-
-// NewBuilder returns a new Builder.
-func NewBuilder(info *type1.FontInfo, defWidth, nomWidth int32) *Builder {
-	cff := &Font{
-		Info: info,
-	}
-
-	return &Builder{
-		cff:          cff,
-		defaultWidth: defWidth,
-		nominalWidth: nomWidth,
-	}
-}
-
-// AddGlyph adds a glyph to the font.
-// The first glyph added must be the ".notdef" glyph.
-func (b *Builder) AddGlyph(name string) (*Glyph, error) {
-	if len(b.cff.GlyphNames) == 0 && name != ".notdef" {
-		return nil, errNoNotdef
-	}
-
-	if b.isInGlyph {
-		return nil, errInGlyph
-	}
-	b.isInGlyph = true
-
-	b.cff.GlyphNames = append(b.cff.GlyphNames, name)
-	return &Glyph{
-		encoder: encoder{
-			width: b.defaultWidth,
-		},
-		b: b,
-	}, nil
-}
-
-// Build returns the completed CFF font.
-func (b *Builder) Build() (*Font, error) {
-	if b.isInGlyph {
-		return nil, errInGlyph
-	}
-
-	// TODO(voss): extract subroutines
-
-	cff := b.cff
-	cff.defaultWidth = b.defaultWidth
-	cff.nominalWidth = b.nominalWidth
-	return cff, nil
-}
-
-// Glyph is used to draw a glyph.
+// Glyph represents a glyph in a CFF font.
 type Glyph struct {
-	encoder
-
-	b *Builder
+	Name  string
+	Width int32
+	Cmds  []Command
 }
 
-// Close adds the new glyph to the font.
-// After calling Close, the Glyph object can no longer be used.
-func (g *Glyph) Close() {
-	g.b.isInGlyph = false
-
-	cff := g.b.cff
-	cff.GlyphExtent = append(cff.GlyphExtent, g.extent)
-	cff.Width = append(cff.Width, int(g.width))
-
-	code := g.encode(g.b.defaultWidth, g.b.nominalWidth)
-	cff.charStrings = append(cff.charStrings, code)
-
-	g.b = nil // prevent accidental use
+func (g *Glyph) MoveTo(x, y float64) {
+	g.Cmds = append(g.Cmds, Command{Op: CmdMoveTo, Args: []float64{x, y}})
 }
 
-type encoder struct {
-	width       int32
-	extent      font.Rect
-	initialized bool
-
-	posX, posY float64
-	cmds       []cmd
+func (g *Glyph) LineTo(x, y float64) {
+	g.Cmds = append(g.Cmds, Command{Op: CmdLineTo, Args: []float64{x, y}})
 }
 
-// SetWidth implements the Renderer interface.
-func (gm *encoder) SetWidth(w int32) {
-	gm.width = w
+func (g *Glyph) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
+	g.Cmds = append(g.Cmds, Command{Op: CmdCurveTo, Args: []float64{x1, y1, x2, y2, x3, y3}})
 }
 
-// MoveTo implements the Renderer interface.
-func (gm *encoder) MoveTo(x, y float64) {
-	gm.registerPoint(x, y)
-
-	dx := encode(x - gm.posX)
-	dy := encode(y - gm.posY)
-	gm.cmds = append(gm.cmds, cmd{
-		args: []encodedNumber{dx, dy},
-		op:   t2rmoveto,
-	})
-	gm.posX += dx.val
-	gm.posY += dy.val
-}
-
-// LineTo implements the Renderer interface.
-func (gm *encoder) LineTo(x, y float64) {
-	gm.registerPoint(x, y)
-
-	dx := encode(x - gm.posX)
-	dy := encode(y - gm.posY)
-	gm.cmds = append(gm.cmds, cmd{
-		args: []encodedNumber{dx, dy},
-		op:   t2rlineto,
-	})
-	gm.posX += dx.val
-	gm.posY += dy.val
-}
-
-// CurveTo implements the Renderer interface.
-func (gm *encoder) CurveTo(xa, ya, xb, yb, xc, yc float64) {
-	gm.registerPoint(xc, yc)
-
-	dxa := encode(xa - gm.posX)
-	dya := encode(ya - gm.posY)
-	dxb := encode(xb - xa)
-	dyb := encode(yb - ya)
-	dxc := encode(xc - xb)
-	dyc := encode(yc - yb)
-	gm.cmds = append(gm.cmds, cmd{
-		args: []encodedNumber{dxa, dya, dxb, dyb, dxc, dyc},
-		op:   t2rrcurveto,
-	})
-	gm.posX += dxa.val + dxb.val + dxc.val
-	gm.posY += dya.val + dyb.val + dyc.val
-}
-
-func (gm *encoder) registerPoint(x, y float64) {
-	xL := int(math.Floor(x))
-	xR := int(math.Ceil(x))
-	yL := int(math.Floor(y))
-	yR := int(math.Ceil(y))
-
-	if gm.initialized {
-		if xL < gm.extent.LLx {
-			gm.extent.LLx = xL
+// Extent computes the Glyph extent in font design units
+func (g *Glyph) Extent() font.Rect {
+	var left, right, top, bottom float64
+	first := true
+cmdLoop:
+	for _, cmd := range g.Cmds {
+		var x, y float64
+		switch cmd.Op {
+		case CmdMoveTo, CmdLineTo:
+			x = cmd.Args[0]
+			y = cmd.Args[1]
+		case CmdCurveTo:
+			x = cmd.Args[4]
+			y = cmd.Args[5]
+		default:
+			continue cmdLoop
 		}
-		if xR > gm.extent.URx {
-			gm.extent.URx = xR
+		if first || x < left {
+			left = x
 		}
-		if yL < gm.extent.LLy {
-			gm.extent.LLy = yL
+		if first || x > right {
+			right = x
 		}
-		if yR > gm.extent.URy {
-			gm.extent.URy = yR
+		if first || y < bottom {
+			bottom = y
 		}
-	} else {
-		gm.extent.LLx = xL
-		gm.extent.URx = xR
-		gm.extent.LLy = yL
-		gm.extent.URy = yR
-		gm.initialized = true
+		if first || y > top {
+			top = y
+		}
+		first = false
+	}
+	return font.Rect{
+		LLx: int(math.Floor(left)),
+		LLy: int(math.Floor(bottom)),
+		URx: int(math.Ceil(right)),
+		URy: int(math.Ceil(top)),
 	}
 }
 
-func (gm *encoder) encode(defWidth, nomWidth int32) []byte {
-	var code []byte
-	if gm.width != defWidth {
-		w := encode(float64(gm.width - nomWidth))
-		code = append(code, w.code...)
-	}
+// Command is a CFF glyph drawing command.
+type Command struct {
+	Op   CommandType
+	Args []float64
+}
 
-	cmds := gm.cmds
-	if len(cmds) > 0 && cmds[0].op != t2rmoveto {
-		tmp := make([]cmd, len(cmds)+1)
-		tmp[0] = cmd{
-			args: []encodedNumber{encode(0), encode(0)},
-			op:   t2rmoveto,
+// enCmd encodes a single command, using relative coordinates for the arguments
+// and storing the argument values as EncodedNumbers.
+type enCmd struct {
+	Op   CommandType
+	Args []encodedNumber
+}
+
+func (c enCmd) String() string {
+	return fmt.Sprint("cmd ", c.Args, c.Op)
+}
+
+func encodeArgs(cmds []Command) []enCmd {
+	res := make([]enCmd, len(cmds))
+
+	posX := 0.0
+	posY := 0.0
+	for i, cmd := range cmds {
+		switch cmd.Op {
+		case CmdMoveTo, CmdLineTo:
+			dx := encode(cmd.Args[0] - posX)
+			dy := encode(cmd.Args[1] - posY)
+			res[i] = enCmd{
+				Args: []encodedNumber{dx, dy},
+				Op:   cmd.Op,
+			}
+			posX += dx.Val
+			posY += dy.Val
+		case CmdCurveTo:
+			dxa := encode(cmd.Args[0] - posX)
+			dya := encode(cmd.Args[1] - posY)
+			dxb := encode(cmd.Args[2] - cmd.Args[0])
+			dyb := encode(cmd.Args[3] - cmd.Args[1])
+			dxc := encode(cmd.Args[4] - cmd.Args[2])
+			dyc := encode(cmd.Args[5] - cmd.Args[3])
+			res[i] = enCmd{
+				Args: []encodedNumber{dxa, dya, dxb, dyb, dxc, dyc},
+				Op:   CmdCurveTo,
+			}
+			posX += dxa.Val + dxb.Val + dxc.Val
+			posY += dya.Val + dyb.Val + dyc.Val
 		}
-		copy(tmp[1:], cmds)
-		cmds = tmp
 	}
+	return res
+}
+
+func (c enCmd) appendArgs(code []byte) []byte {
+	for _, a := range c.Args {
+		code = append(code, a.Code...)
+	}
+	return code
+}
+
+func encodeCommands(cmds []enCmd) [][]byte {
+	var res [][]byte
 
 	for len(cmds) > 1 {
-		mov := cmds[0]
-		fmt.Println(mov)
-		cmds = cmds[1:]
-		if mov.args[0].isZero() {
-			code = append(code, mov.args[1].code...)
-			code = appendOp(code, t2vmoveto)
-		} else if mov.args[1].isZero() {
-			code = append(code, mov.args[0].code...)
-			code = appendOp(code, t2hmoveto)
+		var mov enCmd
+		if cmds[0].Op == CmdMoveTo {
+			mov = cmds[0]
+			cmds = cmds[1:]
 		} else {
-			code = mov.appendArgs(code)
-			code = appendOp(code, t2rmoveto)
+			mov = enCmd{
+				Args: []encodedNumber{encode(0), encode(0)},
+				Op:   CmdMoveTo,
+			}
+		}
+
+		if mov.Args[0].IsZero() {
+			res = append(res, mov.Args[1].Code, t2vmoveto.Bytes())
+		} else if mov.Args[1].IsZero() {
+			res = append(res, mov.Args[0].Code, t2hmoveto.Bytes())
+		} else {
+			res = append(res, mov.Args[0].Code, mov.Args[1].Code, t2rmoveto.Bytes())
 		}
 
 		k := 1
-		for k < len(cmds) && cmds[k].op != t2rmoveto {
+		for k < len(cmds) && cmds[k].Op != CmdMoveTo {
 			k++
 		}
 		path := cmds[:k]
 		cmds = cmds[k:]
 
-		code = append(code, getCode(path)...)
-		fmt.Println()
+		res = append(res, encodePath(path)...)
 	}
 
-	code = appendOp(code, t2endchar)
-	return code
+	res = append(res, t2endchar.Bytes())
+	return res
+}
+
+func encodePath(cmds []enCmd) [][]byte {
+	for _, c := range cmds {
+		fmt.Println(c)
+	}
+
+	n := len(cmds)
+	done := make([]bool, n+1)
+	best := &priorityQueue{
+		dir: make(map[int]int),
+	}
+	heap.Push(best, &pqEntry{state: 0, code: nil})
+	for {
+		v := heap.Pop(best).(*pqEntry)
+		from := v.state
+		if from == n {
+			fmt.Println()
+			return v.code
+		}
+		for _, edge := range findEdges(cmds[from:]) {
+			fmt.Println(".", from, edge)
+			to := from + edge.step
+			if done[to] {
+				continue
+			}
+			best.Update(to, v, edge.code)
+		}
+
+		done[from] = true
+	}
 }
 
 type pqEntry struct {
 	state int
-	code  []byte
+	code  [][]byte
+	cost  int
 }
 
 type priorityQueue struct {
@@ -240,7 +208,7 @@ func (pq *priorityQueue) Len() int {
 }
 
 func (pq *priorityQueue) Less(i, j int) bool {
-	return len(pq.entries[i].code) < len(pq.entries[j].code)
+	return pq.entries[i].cost < pq.entries[j].cost
 }
 
 func (pq *priorityQueue) Swap(i, j int) {
@@ -264,61 +232,34 @@ func (pq *priorityQueue) Pop() interface{} {
 	return x
 }
 
-func (pq *priorityQueue) Update(state int, head, tail []byte) {
+func (pq *priorityQueue) Update(state int, head *pqEntry, tail []byte) {
 	var e *pqEntry
 
 	idx, ok := pq.dir[state]
 	if ok {
 		e = pq.entries[idx]
 	}
-	cost := len(head) + len(tail)
+	cost := head.cost + len(tail)
 	if ok && len(e.code) <= cost {
 		return
 	}
 
-	code := make([]byte, cost)
-	copy(code, head)
-	copy(code[len(head):], tail)
+	code := make([][]byte, len(head.code)+1)
+	copy(code, head.code)
+	code[len(head.code)] = tail
 	if ok {
 		e.code = code
+		e.cost = cost
 		heap.Fix(pq, idx)
 	} else {
-		e = &pqEntry{state: state, code: code}
+		e = &pqEntry{state: state, code: code, cost: cost}
 		heap.Push(pq, e)
 	}
 }
 
-func getCode(cmds []cmd) []byte {
-	for _, c := range cmds {
-		fmt.Println(c)
-	}
+const maxStack = 48
 
-	n := len(cmds)
-	done := make([]bool, n+1)
-	best := &priorityQueue{
-		dir: make(map[int]int),
-	}
-	heap.Push(best, &pqEntry{state: 0, code: nil})
-	for {
-		v := heap.Pop(best).(*pqEntry)
-		from := v.state
-		if from == n {
-			return v.code
-		}
-		for _, edge := range findEdges(cmds[from:]) {
-			fmt.Println(".", from, edge)
-			to := from + edge.skip
-			if done[to] {
-				continue
-			}
-			best.Update(to, v.code, edge.code)
-		}
-
-		done[from] = true
-	}
-}
-
-func findEdges(cmds []cmd) []edge {
+func findEdges(cmds []enCmd) []edge {
 	// TODO(voss): use at most 48 slots on the argument stack.
 
 	if len(cmds) == 0 {
@@ -328,10 +269,9 @@ func findEdges(cmds []cmd) []edge {
 	var edges []edge
 
 	numLines := 0
-	for numLines < len(cmds) && cmds[numLines].op == t2rlineto {
+	for numLines < len(cmds) && cmds[numLines].Op == CmdLineTo {
 		numLines++
 	}
-
 	if numLines > 0 {
 		// candidates:
 		//   - (dx dy)+  rlineto
@@ -342,21 +282,21 @@ func findEdges(cmds []cmd) []edge {
 		horizontal := make([]bool, numLines)
 		vertical := make([]bool, numLines)
 		for i := 0; i < numLines; i++ {
-			horizontal[i] = cmds[i].args[1].isZero()
-			vertical[i] = cmds[i].args[0].isZero()
+			horizontal[i] = cmds[i].Args[1].IsZero()
+			vertical[i] = cmds[i].Args[0].IsZero()
 		}
 
 		// {dx dy}+  rlineto
 		var code []byte
 		for i := 1; i <= numLines; i++ {
-			code = append(code, cmds[i-1].args[0].code...)
-			code = append(code, cmds[i-1].args[1].code...)
+			code = append(code, cmds[i-1].Args[0].Code...)
+			code = append(code, cmds[i-1].Args[1].Code...)
 			if i < numLines && !horizontal[i] && !vertical[i] {
 				continue
 			}
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlineto),
-				skip: i,
+				step: i,
 			})
 		}
 
@@ -365,60 +305,60 @@ func findEdges(cmds []cmd) []edge {
 			code = cmds[numLines].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlinecurve),
-				skip: numLines + 1,
+				step: numLines + 1,
 			})
 		}
 
 		// dx {dy dx}* dy?  hlineto
 		if horizontal[0] {
-			args := cmds[0].args[0].code
+			args := cmds[0].Args[0].Code
 			k := 1
 			for k < numLines {
 				if k%2 == 1 {
 					if !vertical[k] {
 						break
 					}
-					args = append(args, cmds[k].args[1].code...)
+					args = append(args, cmds[k].Args[1].Code...)
 				} else {
 					if !horizontal[k] {
 						break
 					}
-					args = append(args, cmds[k].args[0].code...)
+					args = append(args, cmds[k].Args[0].Code...)
 				}
 				k++
 			}
 			edges = append(edges, edge{
 				code: copyOp(args, t2hlineto),
-				skip: k,
+				step: k,
 			})
 		}
 
 		// dy {dx dy}* dx?  vlineto
 		if vertical[0] {
-			args := cmds[0].args[1].code
+			args := cmds[0].Args[1].Code
 			k := 1
 			for k < numLines {
 				if k%2 == 0 {
 					if !vertical[k] {
 						break
 					}
-					args = append(args, cmds[k].args[1].code...)
+					args = append(args, cmds[k].Args[1].Code...)
 				} else {
 					if !vertical[k] {
 						break
 					}
-					args = append(args, cmds[k].args[0].code...)
+					args = append(args, cmds[k].Args[0].Code...)
 				}
 				k++
 			}
 			edges = append(edges, edge{
 				code: copyOp(args, t2vlineto),
-				skip: k,
+				step: k,
 			})
 		}
 	} else {
 		numCurves := 1 // we know that cmds[0] is a curve
-		for numCurves < len(cmds) && cmds[numCurves].op == t2rrcurveto {
+		for numCurves < len(cmds) && cmds[numCurves].Op == CmdCurveTo {
 			numCurves++
 		}
 
@@ -440,7 +380,7 @@ func findEdges(cmds []cmd) []edge {
 			code = cmds[i-1].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rrcurveto),
-				skip: i,
+				step: i,
 			})
 		}
 
@@ -449,53 +389,53 @@ func findEdges(cmds []cmd) []edge {
 			code = cmds[numCurves].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rcurveline),
-				skip: numCurves + 1,
+				step: numCurves + 1,
 			})
 		}
 
 		// dy1? (dxa dxb dyb dxc)+ hhcurveto
 		code = nil
 		for i := 0; i < numCurves; i++ {
-			if !cmds[i].args[5].isZero() {
+			if !cmds[i].Args[5].IsZero() {
 				break
 			}
-			if !cmds[i].args[1].isZero() {
+			if !cmds[i].Args[1].IsZero() {
 				if i > 0 {
 					break
 				} else {
-					code = append(code, cmds[0].args[1].code...)
+					code = append(code, cmds[0].Args[1].Code...)
 				}
 			}
-			code = append(code, cmds[i].args[0].code...)
-			code = append(code, cmds[i].args[2].code...)
-			code = append(code, cmds[i].args[3].code...)
-			code = append(code, cmds[i].args[4].code...)
+			code = append(code, cmds[i].Args[0].Code...)
+			code = append(code, cmds[i].Args[2].Code...)
+			code = append(code, cmds[i].Args[3].Code...)
+			code = append(code, cmds[i].Args[4].Code...)
 			edges = append(edges, edge{
 				code: copyOp(code, t2hhcurveto),
-				skip: i + 1,
+				step: i + 1,
 			})
 		}
 
 		// dx1? (dya dxb dyb dyc)+ vvcurveto
 		code = nil
 		for i := 0; i < numCurves; i++ {
-			if !cmds[i].args[4].isZero() {
+			if !cmds[i].Args[4].IsZero() {
 				break
 			}
-			if !cmds[i].args[0].isZero() {
+			if !cmds[i].Args[0].IsZero() {
 				if i > 0 {
 					break
 				} else {
-					code = append(code, cmds[0].args[0].code...)
+					code = append(code, cmds[0].Args[0].Code...)
 				}
 			}
-			code = append(code, cmds[i].args[1].code...)
-			code = append(code, cmds[i].args[2].code...)
-			code = append(code, cmds[i].args[3].code...)
-			code = append(code, cmds[i].args[5].code...)
+			code = append(code, cmds[i].Args[1].Code...)
+			code = append(code, cmds[i].Args[2].Code...)
+			code = append(code, cmds[i].Args[3].Code...)
+			code = append(code, cmds[i].Args[5].Code...)
 			edges = append(edges, edge{
 				code: copyOp(code, t2vvcurveto),
-				skip: i + 1,
+				step: i + 1,
 			})
 		}
 
@@ -513,38 +453,55 @@ func findEdges(cmds []cmd) []edge {
 
 type edge struct {
 	code []byte
-	skip int
+	step int
 }
 
 func (e edge) String() string {
-	return fmt.Sprintf("edge (% x) %+d", e.code, e.skip)
+	return fmt.Sprintf("edge (% x) %+d", e.code, e.step)
 }
 
-type cmd struct {
-	args []encodedNumber
-	op   t2op
-}
+// CommandType is the type of a CFF glyph drawing command.
+type CommandType byte
 
-func (c cmd) String() string {
-	return fmt.Sprint("cmd", c.args, c.op)
-}
-
-func (c cmd) appendArgs(code []byte) []byte {
-	for _, a := range c.args {
-		code = append(code, a.code...)
+func (op CommandType) String() string {
+	switch op {
+	case CmdMoveTo:
+		return "moveto"
+	case CmdLineTo:
+		return "lineto"
+	case CmdCurveTo:
+		return "curveto"
+	default:
+		return fmt.Sprintf("CommandType(%d)", op)
 	}
-	return code
 }
 
+const (
+	// CmdMoveTo closes the previous subpath and starts a new one at the given point.
+	CmdMoveTo CommandType = iota + 1
+
+	// CmdLineTo appends a straight line segment from the previous point to the given point.
+	CmdLineTo
+
+	// CmdCurveTo appends a Bezier curve segment from the previous point to the given point.
+	CmdCurveTo
+)
+
+func (c Command) String() string {
+	return fmt.Sprint("cmd", c.Args, c.Op)
+}
+
+// encodedNumber is a number together with the Type2 charstring encoding of that number.
 type encodedNumber struct {
-	val  float64
-	code []byte
+	Val  float64
+	Code []byte
 }
 
 func (x encodedNumber) String() string {
-	return fmt.Sprintf("%g (% x)", x.val, x.code)
+	return fmt.Sprintf("%g (% x)", x.Val, x.Code)
 }
 
+// encode encodes the given number into a CFF encoding.
 func encode(x float64) encodedNumber {
 	var code []byte
 	var val float64
@@ -557,34 +514,39 @@ func encode(x float64) encodedNumber {
 	} else {
 		// encode as an integer
 		z := int16(xInt)
+		code = encodeInt(z)
 		val = float64(z)
-		switch {
-		case z >= -107 && z <= 107:
-			code = []byte{byte(z + 139)}
-		case z > 107 && z <= 1131:
-			z -= 108
-			b1 := byte(z)
-			z >>= 8
-			b0 := byte(z + 247)
-			code = []byte{b0, b1}
-		case z < -107 && z >= -1131:
-			z = -108 - z
-			b1 := byte(z)
-			z >>= 8
-			b0 := byte(z + 251)
-			code = []byte{b0, b1}
-		default:
-			code = []byte{28, byte(z >> 8), byte(z >> 8)}
-		}
 	}
 	return encodedNumber{
-		val:  val,
-		code: code,
+		Val:  val,
+		Code: code,
 	}
 }
 
-func (x encodedNumber) isZero() bool {
-	return x.val == 0
+func encodeInt(x int16) []byte {
+	switch {
+	case x >= -107 && x <= 107:
+		return []byte{byte(x + 139)}
+	case x > 107 && x <= 1131:
+		x -= 108
+		b1 := byte(x)
+		x >>= 8
+		b0 := byte(x + 247)
+		return []byte{b0, b1}
+	case x < -107 && x >= -1131:
+		x = -108 - x
+		b1 := byte(x)
+		x >>= 8
+		b0 := byte(x + 251)
+		return []byte{b0, b1}
+	default:
+		return []byte{28, byte(x >> 8), byte(x >> 8)}
+	}
+}
+
+// IsZero returns true if the encoded number is zero.
+func (x encodedNumber) IsZero() bool {
+	return x.Val == 0
 }
 
 func appendOp(data []byte, op t2op) []byte {
@@ -609,16 +571,3 @@ func copyOp(data []byte, op t2op) []byte {
 }
 
 const eps = 6.0 / 65536
-
-const (
-	defaultUnderlinePosition  = -100
-	defaultUnderlineThickness = 50
-	defaultBlueScale          = 0.039625
-	defaultBlueShift          = 7
-	defaultBlueFuzz           = 1
-)
-
-var (
-	errNoNotdef = errors.New("cff: missing .notdef glyph")
-	errInGlyph  = errors.New("cff: glyph is already in progress")
-)

@@ -31,18 +31,8 @@ import (
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a io.ReadSeeker.
 type Font struct {
-	Info *type1.FontInfo
-
-	GlyphNames  []string
-	GlyphExtent []font.Rect
-	Width       []int // TODO(voss): use int32?
-
-	defaultWidth int32
-	nominalWidth int32
-
-	charStrings cffIndex
-	gsubrs      cffIndex
-	subrs       cffIndex
+	Info   *type1.FontInfo
+	Glyphs []*Glyph
 
 	gid2cid []font.GlyphID
 }
@@ -148,7 +138,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	cff.gsubrs = gsubrs
 
 	// read the CharStrings INDEX
 	charStringsOffs := topDict.getInt(opCharStrings, 0)
@@ -156,7 +145,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	cff.charStrings = charStrings
 
 	_, isCIDFont := topDict[opROS]
 	if isCIDFont {
@@ -203,10 +191,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			return nil, err
 		}
 	}
-	cff.GlyphNames = make([]string, len(charset))
-	for i, sid := range charset {
-		cff.GlyphNames[i] = strings.get(sid)
-	}
 
 	// encodingOffs, _ := topDict.getInt(opEncoding, 0)
 	// if encodingOffs != 0 {
@@ -221,97 +205,124 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	// }
 
 	// read the Private DICT
-	info, err := topDict.readPrivate(p, strings)
+	private, err := topDict.readPrivate(p, strings)
 	if err != nil {
 		return nil, err
 	}
 
-	cff.Info.Private = []*type1.PrivateDict{info.private}
-	cff.defaultWidth = info.defaultWidth
-	cff.nominalWidth = info.nominalWidth
-	cff.subrs = info.subrs
+	cff.Info.Private = []*type1.PrivateDict{private.private}
 
-	cff.GlyphExtent = make([]font.Rect, 0, len(cff.charStrings))
-	cff.Width = make([]int, 0, len(cff.charStrings))
-	ctx := &glyphDimensions{}
-	for i := range cff.charStrings {
-		_, err := cff.doDecode(ctx, cff.charStrings[i])
+	cff.Glyphs = make([]*Glyph, len(charStrings))
+	info := &decodeInfo{
+		subr:         private.subrs,
+		gsubr:        gsubrs,
+		defaultWidth: private.defaultWidth,
+		nominalWidth: private.nominalWidth,
+	}
+	for i, code := range charStrings {
+		glyph, err := cff.doDecode(info, code)
 		if err != nil {
 			return nil, err
 		}
-		cff.GlyphExtent = append(cff.GlyphExtent, ctx.bbox)
-		cff.Width = append(cff.Width, int(ctx.width))
-		ctx.reset()
+		glyph.Name = strings.get(charset[i])
+		cff.Glyphs[i] = glyph
 	}
 
 	return cff, nil
 }
 
-type glyphDimensions struct {
-	x, y   float64
-	width  int32
-	bbox   font.Rect
-	hasInk bool
+func (cff *Font) GlyphExtent() []font.Rect {
+	numGlyphs := len(cff.Glyphs)
+	extents := make([]font.Rect, numGlyphs)
+	for i := 0; i < numGlyphs; i++ {
+		extents[i] = cff.Glyphs[i].Extent()
+	}
+	return extents
 }
 
-func (ctx *glyphDimensions) reset() {
-	*ctx = glyphDimensions{}
+func (cff *Font) selectWidths() (int32, int32) {
+	numGlyphs := int32(len(cff.Glyphs))
+	if numGlyphs == 0 {
+		return 0, 0
+	} else if numGlyphs == 1 {
+		return cff.Glyphs[0].Width, cff.Glyphs[0].Width
+	}
+
+	widthHist := make(map[int32]int32)
+	var mostFrequentCount int32
+	var defaultWidth int32
+	for _, glyph := range cff.Glyphs {
+		w := glyph.Width
+		widthHist[w]++
+		if widthHist[w] > mostFrequentCount {
+			defaultWidth = w
+			mostFrequentCount = widthHist[w]
+		}
+	}
+
+	// TODO(voss): the choice of nominalWidth can be improved
+	var sum int32
+	var minWidth int32 = math.MaxInt32
+	var maxWidth int32
+	for _, glyph := range cff.Glyphs {
+		w := glyph.Width
+		if w == defaultWidth {
+			continue
+		}
+		sum += w
+		if w < minWidth {
+			minWidth = w
+		}
+		if w > maxWidth {
+			maxWidth = w
+		}
+	}
+	nominalWidth := (sum + numGlyphs/2) / (numGlyphs - 1)
+	if nominalWidth < minWidth+107 {
+		nominalWidth = minWidth + 107
+	} else if nominalWidth > maxWidth-107 {
+		nominalWidth = maxWidth - 107
+	}
+	return defaultWidth, nominalWidth
 }
 
-func (ctx *glyphDimensions) add() {
-	left := int(math.Floor(ctx.x))
-	if !ctx.hasInk || left < ctx.bbox.LLx {
-		ctx.bbox.LLx = left
+func (cff *Font) encodeCharStrings() (cffIndex, int32, int32) {
+	numGlyphs := len(cff.Glyphs)
+
+	// TODO(voss): introduce subroutines
+
+	cc := make(cffIndex, numGlyphs)
+	defaultWidth, nominalWidth := cff.selectWidths()
+	for i, glyph := range cff.Glyphs {
+		w := glyph.Width
+		var wEnc []byte
+		if w != defaultWidth {
+			wEnc = encodeInt(int16(w - nominalWidth))
+		}
+
+		cmds := encodeArgs(glyph.Cmds)
+		data := encodeCommands(cmds)
+
+		k := len(wEnc)
+		for _, b := range data {
+			k += len(b)
+		}
+		code := make([]byte, 0, k)
+		code = append(code, wEnc...)
+		for _, b := range data {
+			code = append(code, b...)
+		}
+		cc[i] = code
 	}
 
-	right := int(math.Ceil(ctx.x))
-	if !ctx.hasInk || right > ctx.bbox.URx {
-		ctx.bbox.URx = right
-	}
-
-	bottom := int(math.Floor(ctx.y))
-	if !ctx.hasInk || bottom < ctx.bbox.LLy {
-		ctx.bbox.LLy = bottom
-	}
-
-	top := int(math.Ceil(ctx.y))
-	if !ctx.hasInk || top > ctx.bbox.URy {
-		ctx.bbox.URy = top
-	}
-
-	ctx.hasInk = true
-}
-
-func (ctx *glyphDimensions) SetWidth(w int32) {
-	ctx.width = w
-}
-
-func (ctx *glyphDimensions) MoveTo(x, y float64) {
-	ctx.x = x
-	ctx.y = y
-}
-
-func (ctx *glyphDimensions) LineTo(x, y float64) {
-	if !ctx.hasInk {
-		ctx.add()
-	}
-	ctx.x = x
-	ctx.y = y
-	ctx.add()
-}
-
-func (ctx *glyphDimensions) CurveTo(xa, ya, xb, yb, xc, yc float64) {
-	if !ctx.hasInk {
-		ctx.add()
-	}
-	ctx.x = xc
-	ctx.y = yc
-	ctx.add()
+	return cc, defaultWidth, nominalWidth
 }
 
 // Encode writes the binary form of a CFF font as a simple font.
 func (cff *Font) Encode(w io.Writer) error {
-	numGlyphs := uint16(len(cff.charStrings))
+	numGlyphs := uint16(len(cff.Glyphs))
+
+	charStrings, defWidth, nomWidth := cff.encodeCharStrings()
 
 	blobs := make([][]byte, numSections)
 	newStrings := &cffStrings{}
@@ -343,7 +354,8 @@ func (cff *Font) Encode(w io.Writer) error {
 	// We encode the blob below, once all strings are known.
 
 	// section 4: global subr INDEX
-	blobs[secGsubrsIndex], err = cffIndex(cff.gsubrs).encode()
+	gsubrs := cffIndex{}
+	blobs[secGsubrsIndex], err = gsubrs.encode()
 	if err != nil {
 		return err
 	}
@@ -358,7 +370,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	// section 6: charsets INDEX
 	subset := make([]int32, numGlyphs)
 	for i := uint16(0); i < numGlyphs; i++ {
-		s := cff.GlyphNames[i]
+		s := cff.Glyphs[i].Name
 		if s == "" {
 			s = ".notdef"
 		}
@@ -370,17 +382,18 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 7: charstrings INDEX
-	blobs[secCharStringsIndex], err = cffIndex(cff.charStrings).encode()
+	blobs[secCharStringsIndex], err = cffIndex(charStrings).encode()
 	if err != nil {
 		return err
 	}
 
 	// section 8: private DICT
-	privateDict := cff.makePrivateDict()
+	privateDict := cff.makePrivateDict(defWidth, nomWidth)
 	// opSubrs is set below
 
 	// section 9: subrs INDEX
-	blobs[secSubrsIndex], err = cff.subrs.encode()
+	subrs := cffIndex{}
+	blobs[secSubrsIndex], err = subrs.encode()
 	if err != nil {
 		return err
 	}
@@ -447,7 +460,9 @@ func (cff *Font) Encode(w io.Writer) error {
 
 // EncodeCID returns the binary encoding of a CFF font as a CIDFont.
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
-	numGlyphs := int32(len(cff.charStrings))
+	numGlyphs := int32(len(cff.Glyphs))
+
+	charStrings, defWidth, nomWidth := cff.encodeCharStrings()
 
 	fontMatrix := cff.Info.FontMatrix
 
@@ -491,7 +506,8 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	// We encode the blob below, once all strings are known.
 
 	// section 4: global subr INDEX
-	blobs[cidGsubrsIndex], err = cffIndex(cff.gsubrs).encode()
+	gsubrs := cffIndex{}
+	blobs[cidGsubrsIndex], err = gsubrs.encode()
 	if err != nil {
 		return err
 	}
@@ -524,7 +540,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	// section 7: charstrings INDEX
-	blobs[cidCharStringsIndex], err = cffIndex(cff.charStrings).encode()
+	blobs[cidCharStringsIndex], err = cffIndex(charStrings).encode()
 	if err != nil {
 		return err
 	}
@@ -538,11 +554,12 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	// opPrivate is set below
 
 	// section 9: private DICT
-	privateDict := cff.makePrivateDict()
+	privateDict := cff.makePrivateDict(defWidth, nomWidth)
 	// opSubrs is set below
 
 	// section 10: subrs INDEX
-	blobs[cidSubrsIndex], err = cff.subrs.encode()
+	subrs := cffIndex{}
+	blobs[cidSubrsIndex], err = subrs.encode()
 	if err != nil {
 		return err
 	}
@@ -659,3 +676,15 @@ func offsSize(i int32) byte {
 		return 4
 	}
 }
+
+const (
+	defaultUnderlinePosition  = -100
+	defaultUnderlineThickness = 50
+	defaultBlueScale          = 0.039625
+	defaultBlueShift          = 7
+	defaultBlueFuzz           = 1
+)
+
+var (
+	errNoNotdef = errors.New("cff: missing .notdef glyph")
+)

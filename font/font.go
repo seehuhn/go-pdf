@@ -123,7 +123,7 @@ type GlyphID uint16
 
 // Rect represents a rectangle with integer coordinates.
 type Rect struct {
-	LLx, LLy, URx, URy int
+	LLx, LLy, URx, URy int // TODO(voss): should we use int16 or int32 here?
 }
 
 // IsZero returns whether the glyph leaves marks on the page.

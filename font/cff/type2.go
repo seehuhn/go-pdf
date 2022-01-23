@@ -22,30 +22,20 @@ import (
 	"math"
 )
 
-// A Renderer is used to draw a glyph encoded by a CFF charstring.
-// TODO(voss): add hinting support.
-type Renderer interface {
-	SetWidth(w int32)
-	MoveTo(x, y float64)
-	LineTo(x, y float64)
-	CurveTo(dxa, dya, dxb, dyb, dxc, dyc float64)
-}
-
-// DecodeCharString uses ctx to render the charstring for glyph i.
-func (cff *Font) DecodeCharString(ctx Renderer, i int) error {
-	if i < 0 || i >= len(cff.charStrings) {
-		return errors.New("cff: invalid glyph index")
-	}
-
-	_, err := cff.doDecode(ctx, cff.charStrings[i])
-	return err
+type decodeInfo struct {
+	subr         cffIndex
+	gsubr        cffIndex
+	defaultWidth int32
+	nominalWidth int32
 }
 
 // doDecode returns the commands for the given charstring.
-func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
-	var cmds [][]byte
-	skipBytes := func(n int) {
-		cmds = append(cmds, code[:n])
+func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
+	res := &Glyph{
+		Width: info.defaultWidth,
+	}
+
+	skipBytes := func(n int) { // TODO(voss): remove?
 		code = code[n:]
 	}
 
@@ -59,15 +49,9 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 		if widthIsSet {
 			return
 		}
-		var glyphWidth int32
 		if isPresent {
-			glyphWidth = int32(stack[0]) + cff.defaultWidth
+			res.Width = int32(stack[0]) + info.nominalWidth
 			stack = stack[1:]
-		} else {
-			glyphWidth = cff.defaultWidth
-		}
-		if ctx != nil {
-			ctx.SetWidth(glyphWidth)
 		}
 		widthIsSet = true
 	}
@@ -80,12 +64,18 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 	rMoveTo := func(dx, dy float64) {
 		posX += dx
 		posY += dy
-		ctx.MoveTo(posX, posY)
+		res.Cmds = append(res.Cmds, Command{
+			Op:   CmdMoveTo,
+			Args: []float64{posX, posY},
+		})
 	}
 	rLineTo := func(dx, dy float64) {
 		posX += dx
 		posY += dy
-		ctx.LineTo(posX, posY)
+		res.Cmds = append(res.Cmds, Command{
+			Op:   CmdLineTo,
+			Args: []float64{posX, posY},
+		})
 	}
 	rCurveTo := func(dxa, dya, dxb, dyb, dxc, dyc float64) {
 		xa := posX + dxa
@@ -94,7 +84,10 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 		yb := ya + dyb
 		posX = xb + dxc
 		posY = yb + dyc
-		ctx.CurveTo(xa, ya, xb, yb, posX, posY)
+		res.Cmds = append(res.Cmds, Command{
+			Op:   CmdCurveTo,
+			Args: []float64{xa, ya, xb, yb, posX, posY},
+		})
 	}
 
 	for len(cmdStack) > 0 {
@@ -164,198 +157,176 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				continue
 			}
 
-			var cmd []byte
 			if op == 0x0c {
 				if len(code) < 2 {
 					return nil, errIncomplete
 				}
 				op = op<<8 | t2op(code[1])
-				cmd, code = code[:2], code[2:]
+				code = code[2:]
 			} else {
-				cmd, code = code[:1], code[1:]
+				code = code[1:]
 			}
 
 			switch op {
 			case t2rmoveto:
 				setGlyphWidth(len(stack) > 2)
-				if ctx != nil && len(stack) >= 2 {
+				if len(stack) >= 2 {
 					rMoveTo(stack[0], stack[1])
 				}
 				clearStack()
 
 			case t2hmoveto:
 				setGlyphWidth(len(stack) > 1)
-				if ctx != nil && len(stack) >= 1 {
+				if len(stack) >= 1 {
 					rMoveTo(stack[0], 0)
 				}
 				clearStack()
 
 			case t2vmoveto:
 				setGlyphWidth(len(stack) > 1)
-				if ctx != nil && len(stack) >= 1 {
+				if len(stack) >= 1 {
 					rMoveTo(0, stack[0])
 				}
 				clearStack()
 
 			case t2rlineto:
-				if ctx != nil {
-					for len(stack) >= 2 {
-						rLineTo(stack[0], stack[1])
-						stack = stack[2:]
-					}
+				for len(stack) >= 2 {
+					rLineTo(stack[0], stack[1])
+					stack = stack[2:]
 				}
 				clearStack()
 
 			case t2hlineto, t2vlineto:
-				if ctx != nil {
-					horizontal := op == t2hlineto
-					for len(stack) > 0 {
-						if horizontal {
-							rLineTo(stack[0], 0)
-						} else {
-							rLineTo(0, stack[0])
-						}
-						stack = stack[1:]
-						horizontal = !horizontal
+				horizontal := op == t2hlineto
+				for len(stack) > 0 {
+					if horizontal {
+						rLineTo(stack[0], 0)
+					} else {
+						rLineTo(0, stack[0])
 					}
-				} else {
-					clearStack()
+					stack = stack[1:]
+					horizontal = !horizontal
 				}
+				// clearStack()
 
 			case t2rrcurveto, t2rcurveline, t2rlinecurve:
-				if ctx != nil {
-					for op == t2rlinecurve && len(stack) >= 8 {
-						rLineTo(stack[0], stack[1])
-						stack = stack[2:]
-					}
-					for len(stack) >= 6 {
-						rCurveTo(stack[0], stack[1],
-							stack[2], stack[3],
-							stack[4], stack[5])
-						stack = stack[6:]
-					}
-					if op == t2rcurveline && len(stack) >= 2 {
-						rLineTo(stack[0], stack[1])
-						stack = stack[2:]
-					}
+				for op == t2rlinecurve && len(stack) >= 8 {
+					rLineTo(stack[0], stack[1])
+					stack = stack[2:]
+				}
+				for len(stack) >= 6 {
+					rCurveTo(stack[0], stack[1],
+						stack[2], stack[3],
+						stack[4], stack[5])
+					stack = stack[6:]
+				}
+				if op == t2rcurveline && len(stack) >= 2 {
+					rLineTo(stack[0], stack[1])
+					stack = stack[2:]
 				}
 				clearStack()
 
 			case t2hhcurveto:
-				if ctx != nil {
-					var dy1 float64
-					if len(stack)%4 != 0 {
-						dy1, stack = stack[0], stack[1:]
-					}
-					for len(stack) >= 4 {
-						rCurveTo(stack[0], dy1,
-							stack[1], stack[2],
-							stack[3], 0)
-						stack = stack[4:]
-						dy1 = 0
-					}
+				var dy1 float64
+				if len(stack)%4 != 0 {
+					dy1, stack = stack[0], stack[1:]
+				}
+				for len(stack) >= 4 {
+					rCurveTo(stack[0], dy1,
+						stack[1], stack[2],
+						stack[3], 0)
+					stack = stack[4:]
+					dy1 = 0
 				}
 				clearStack()
 
 			case t2hvcurveto, t2vhcurveto:
-				if ctx != nil {
-					horizontal := op == t2hvcurveto
-					for len(stack) >= 4 {
-						var extra float64
-						if len(stack) == 5 {
-							extra = stack[4]
-						}
-						if horizontal {
-							rCurveTo(stack[0], 0,
-								stack[1], stack[2],
-								extra, stack[3])
-						} else {
-							rCurveTo(0, stack[0],
-								stack[1], stack[2],
-								stack[3], extra)
-						}
-						stack = stack[4:]
-						horizontal = !horizontal
+				horizontal := op == t2hvcurveto
+				for len(stack) >= 4 {
+					var extra float64
+					if len(stack) == 5 {
+						extra = stack[4]
 					}
+					if horizontal {
+						rCurveTo(stack[0], 0,
+							stack[1], stack[2],
+							extra, stack[3])
+					} else {
+						rCurveTo(0, stack[0],
+							stack[1], stack[2],
+							stack[3], extra)
+					}
+					stack = stack[4:]
+					horizontal = !horizontal
 				}
 				clearStack()
 
 			case t2vvcurveto:
-				if ctx != nil {
-					var dx1 float64
-					if len(stack)%4 != 0 {
-						dx1, stack = stack[0], stack[1:]
-					}
-					for len(stack) >= 4 {
-						rCurveTo(dx1, stack[0],
-							stack[1], stack[2],
-							0, stack[3])
-						stack = stack[4:]
-						dx1 = 0
-					}
+				var dx1 float64
+				if len(stack)%4 != 0 {
+					dx1, stack = stack[0], stack[1:]
+				}
+				for len(stack) >= 4 {
+					rCurveTo(dx1, stack[0],
+						stack[1], stack[2],
+						0, stack[3])
+					stack = stack[4:]
+					dx1 = 0
 				}
 				clearStack()
 
 			case t2flex:
-				if ctx != nil {
-					if len(stack) >= 13 {
-						rCurveTo(stack[0], stack[1],
-							stack[2], stack[3],
-							stack[4], stack[5])
-						rCurveTo(stack[6], stack[7],
-							stack[8], stack[9],
-							stack[10], stack[11])
-						// fd = stack[12] / 100
-					}
+				if len(stack) >= 13 {
+					rCurveTo(stack[0], stack[1],
+						stack[2], stack[3],
+						stack[4], stack[5])
+					rCurveTo(stack[6], stack[7],
+						stack[8], stack[9],
+						stack[10], stack[11])
+					// fd = stack[12] / 100
 				}
 				clearStack()
 			case t2flex1:
-				if ctx != nil {
-					if len(stack) >= 11 {
-						rCurveTo(stack[0], stack[1],
-							stack[2], stack[3],
-							stack[4], stack[5])
-						extra := stack[10]
-						dx := stack[0] + stack[2] + stack[4] + stack[6] + stack[8]
-						dy := stack[1] + stack[3] + stack[5] + stack[7] + stack[9]
-						if math.Abs(dx) > math.Abs(dy) {
-							rCurveTo(stack[6], stack[7],
-								stack[8], stack[9],
-								extra, 0)
-						} else {
-							rCurveTo(stack[6], stack[7],
-								stack[8], stack[9],
-								0, extra)
-						}
-						// fd = 0.5
+				if len(stack) >= 11 {
+					rCurveTo(stack[0], stack[1],
+						stack[2], stack[3],
+						stack[4], stack[5])
+					extra := stack[10]
+					dx := stack[0] + stack[2] + stack[4] + stack[6] + stack[8]
+					dy := stack[1] + stack[3] + stack[5] + stack[7] + stack[9]
+					if math.Abs(dx) > math.Abs(dy) {
+						rCurveTo(stack[6], stack[7],
+							stack[8], stack[9],
+							extra, 0)
+					} else {
+						rCurveTo(stack[6], stack[7],
+							stack[8], stack[9],
+							0, extra)
 					}
+					// fd = 0.5
 				}
 				clearStack()
 			case t2hflex:
-				if ctx != nil {
-					if len(stack) >= 7 {
-						rCurveTo(stack[0], 0,
-							stack[1], stack[2],
-							stack[3], 0)
-						rCurveTo(stack[4], 0,
-							stack[5], -stack[2],
-							stack[6], 0)
-						// fd = 0.5
-					}
+				if len(stack) >= 7 {
+					rCurveTo(stack[0], 0,
+						stack[1], stack[2],
+						stack[3], 0)
+					rCurveTo(stack[4], 0,
+						stack[5], -stack[2],
+						stack[6], 0)
+					// fd = 0.5
 				}
 				clearStack()
 			case t2hflex1:
-				if ctx != nil {
-					if len(stack) >= 9 {
-						rCurveTo(stack[0], stack[1],
-							stack[2], stack[3],
-							stack[4], 0)
-						dy := stack[1] + stack[3] + stack[5] + stack[7]
-						rCurveTo(stack[5], 0,
-							stack[6], stack[7],
-							stack[8], -dy)
-						// fd = 0.5
-					}
+				if len(stack) >= 9 {
+					rCurveTo(stack[0], stack[1],
+						stack[2], stack[3],
+						stack[4], 0)
+					dy := stack[1] + stack[3] + stack[5] + stack[7]
+					rCurveTo(stack[5], 0,
+						stack[6], stack[7],
+						stack[8], -dy)
+					// fd = 0.5
 				}
 				clearStack()
 
@@ -378,7 +349,7 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 				if k >= len(code) {
 					return nil, errIncomplete
 				}
-				cmd = append(cmd, code[:k]...)
+				// TODO(voss): store code[:k] somewhere
 				code = code[k:]
 				clearStack()
 
@@ -567,21 +538,12 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 
 				var err error
 				if op == t2callsubr {
-					code, err = cff.getSubr(biased)
+					code, err = getSubr(info.subr, biased)
 				} else {
-					code, err = cff.getGSubr(biased)
+					code, err = getSubr(info.gsubr, biased)
 				}
 				if err != nil {
 					return nil, err
-				}
-
-				// remove the subroutine index from the stack
-				l := len(cmds) - 1
-				if isConstInt(cmds[l]) {
-					cmds = cmds[:l]
-					continue opLoop
-				} else {
-					cmd = []byte{12, 18} // t2drop
 				}
 
 			case t2return:
@@ -589,13 +551,11 @@ func (cff *Font) doDecode(ctx Renderer, code []byte) ([][]byte, error) {
 
 			case t2endchar:
 				setGlyphWidth(len(stack) == 1 || len(stack) > 4)
-				cmds = append(cmds, []byte{14}) // t2endchar
-				return cmds, nil
+				return res, nil
 
 			default:
 				return nil, fmt.Errorf("unsupported opcode %d", op)
 			}
-			cmds = append(cmds, cmd)
 		} // end of opLoop
 	}
 
@@ -625,6 +585,13 @@ func roll(data []float64, j int) {
 }
 
 type t2op uint16
+
+func (op t2op) Bytes() []byte {
+	if op > 255 {
+		return []byte{byte(op >> 8), byte(op)}
+	}
+	return []byte{byte(op)}
+}
 
 func (op t2op) String() string {
 	switch op {

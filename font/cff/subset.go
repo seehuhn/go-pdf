@@ -28,54 +28,16 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 		panic("invalid subset")
 	}
 
-	tag := font.GetSubsetTag(subset, len(cff.GlyphNames))
+	tag := font.GetSubsetTag(subset, len(cff.Glyphs))
 	info := *cff.Info
 	info.FontName = pdf.Name(tag) + "+" + cff.Info.FontName
 	out := &Font{
 		Info: &info,
-
-		GlyphNames:  make([]string, 0, len(subset)),
-		GlyphExtent: make([]font.Rect, 0, len(subset)),
-		Width:       make([]int, 0, len(subset)),
-
-		defaultWidth: cff.defaultWidth,
-		nominalWidth: cff.nominalWidth,
-
-		gid2cid: append([]font.GlyphID{}, subset...),
 	}
 
 	for _, gid := range subset {
-		out.GlyphNames = append(out.GlyphNames, cff.GlyphNames[gid])
-		out.GlyphExtent = append(out.GlyphExtent, cff.GlyphExtent[gid])
-		out.Width = append(out.Width, cff.Width[gid])
+		out.Glyphs = append(out.Glyphs, cff.Glyphs[gid])
 	}
-
-	charStrings := make(cffIndex, 0, len(subset))
-	for _, gid := range subset {
-		// expand all subroutines
-		// TODO(voss): re-introduce subroutines as needed
-
-		cmds, err := cff.doDecode(nil, cff.charStrings[gid])
-		if err != nil {
-			// We failed to decode a charstring, so we cannot reliably
-			// prune the subroutines.  Use naive subsetting instead.
-			out.gsubrs = cff.gsubrs
-			out.subrs = cff.subrs
-
-			for _, gid := range subset {
-				out.charStrings = append(out.charStrings, cff.charStrings[gid])
-			}
-			return out
-		}
-
-		var cc []byte
-		for _, cmd := range cmds {
-			cc = append(cc, cmd...)
-		}
-
-		charStrings = append(charStrings, cc)
-	}
-	out.charStrings = charStrings
 
 	return out
 }

@@ -97,7 +97,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 		GlyphUnits:  tt.GlyphUnits,
 		Ascent:      tt.Ascent,
 		Descent:     tt.Descent,
-		GlyphExtent: t.Cff.GlyphExtent,
+		GlyphExtent: t.Cff.GlyphExtent(),
 		Width:       tt.Width,
 
 		Layout: t.Layout,

@@ -26,20 +26,12 @@ func bias(nSubrs int) int {
 	}
 }
 
-func (cff *Font) getSubr(biased int) ([]byte, error) {
-	idx := biased + bias(len(cff.subrs))
-	if idx < 0 || idx >= len(cff.subrs) {
+func getSubr(subrs cffIndex, biased int) ([]byte, error) {
+	idx := biased + bias(len(subrs))
+	if idx < 0 || idx >= len(subrs) {
 		return nil, errInvalidSubroutine
 	}
-	return cff.subrs[idx], nil
-}
-
-func (cff *Font) getGSubr(biased int) ([]byte, error) {
-	idx := biased + bias(len(cff.gsubrs))
-	if idx < 0 || idx >= len(cff.gsubrs) {
-		return nil, errInvalidSubroutine
-	}
-	return cff.gsubrs[idx], nil
+	return subrs[idx], nil
 }
 
 // size used for a subroutine:
