@@ -145,21 +145,3 @@ func TestCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-func TestEncode(t *testing.T) {
-	body, err := os.ReadFile("SourceSerif4-Regular.cff")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cff, err := Read(bytes.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	g := cff.Glyphs[161]
-	cmds := encodeArgs(g.Cmds)
-	out := encodeCommands(cmds)
-	_ = out
-	t.Error(g.Name)
-}

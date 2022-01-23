@@ -117,9 +117,9 @@ func encodeArgs(cmds []Command) []enCmd {
 	return res
 }
 
-func (c enCmd) appendArgs(code []byte) []byte {
+func (c enCmd) appendArgs(code [][]byte) [][]byte {
 	for _, a := range c.Args {
-		code = append(code, a.Code...)
+		code = append(code, a.Code)
 	}
 	return code
 }
@@ -232,21 +232,24 @@ func (pq *priorityQueue) Pop() interface{} {
 	return x
 }
 
-func (pq *priorityQueue) Update(state int, head *pqEntry, tail []byte) {
+func (pq *priorityQueue) Update(state int, head *pqEntry, tail [][]byte) {
 	var e *pqEntry
 
 	idx, ok := pq.dir[state]
 	if ok {
 		e = pq.entries[idx]
 	}
-	cost := head.cost + len(tail)
+	cost := head.cost
+	for _, blob := range tail {
+		cost += len(blob)
+	}
 	if ok && len(e.code) <= cost {
 		return
 	}
 
-	code := make([][]byte, len(head.code)+1)
+	code := make([][]byte, len(head.code)+len(tail))
 	copy(code, head.code)
-	code[len(head.code)] = tail
+	copy(code[len(head.code):], tail)
 	if ok {
 		e.code = code
 		e.cost = cost
@@ -287,72 +290,64 @@ func findEdges(cmds []enCmd) []edge {
 		}
 
 		// {dx dy}+  rlineto
-		var code []byte
-		for i := 1; i <= numLines; i++ {
-			code = append(code, cmds[i-1].Args[0].Code...)
-			code = append(code, cmds[i-1].Args[1].Code...)
-			if i < numLines && !horizontal[i] && !vertical[i] {
-				continue
-			}
+		var code [][]byte
+		for i := 0; i < numLines && len(code)+2 <= maxStack; i++ {
+			code = append(code, cmds[i].Args[0].Code)
+			code = append(code, cmds[i].Args[1].Code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlineto),
-				step: i,
+				step: i + 1,
 			})
 		}
 
 		// {dx dy}+ xb yb xc yc xd yd  rlinecurve
-		if numLines < len(cmds) {
-			code = cmds[numLines].appendArgs(code)
+		if numLines < len(cmds) && len(code)+6 <= maxStack {
 			edges = append(edges, edge{
-				code: copyOp(code, t2rlinecurve),
+				code: copyOp(code, t2rlinecurve, cmds[numLines].Args...),
 				step: numLines + 1,
 			})
 		}
 
-		// dx {dy dx}* dy?  hlineto
-		if horizontal[0] {
-			args := cmds[0].Args[0].Code
+		if horizontal[0] { // dx {dy dx}* dy?  hlineto
+			code = [][]byte{cmds[0].Args[0].Code}
 			k := 1
-			for k < numLines {
+			for k < numLines && k < maxStack {
 				if k%2 == 1 {
 					if !vertical[k] {
 						break
 					}
-					args = append(args, cmds[k].Args[1].Code...)
+					code = append(code, cmds[k].Args[1].Code)
 				} else {
 					if !horizontal[k] {
 						break
 					}
-					args = append(args, cmds[k].Args[0].Code...)
+					code = append(code, cmds[k].Args[0].Code)
 				}
 				k++
 			}
 			edges = append(edges, edge{
-				code: copyOp(args, t2hlineto),
+				code: copyOp(code, t2hlineto),
 				step: k,
 			})
-		}
-
-		// dy {dx dy}* dx?  vlineto
-		if vertical[0] {
-			args := cmds[0].Args[1].Code
+		} else if vertical[0] { // dy {dx dy}* dx?  vlineto
+			code = [][]byte{cmds[0].Args[1].Code}
 			k := 1
-			for k < numLines {
+			for k < numLines && k < maxStack {
 				if k%2 == 0 {
 					if !vertical[k] {
 						break
 					}
-					args = append(args, cmds[k].Args[1].Code...)
+					code = append(code, cmds[k].Args[1].Code)
 				} else {
 					if !vertical[k] {
 						break
 					}
-					args = append(args, cmds[k].Args[0].Code...)
+					code = append(code, cmds[k].Args[0].Code)
 				}
 				k++
 			}
 			edges = append(edges, edge{
-				code: copyOp(args, t2vlineto),
+				code: copyOp(code, t2vlineto),
 				step: k,
 			})
 		}
@@ -375,17 +370,17 @@ func findEdges(cmds []enCmd) []edge {
 		//   - ... hflex1
 
 		// (dxa dya dxb dyb dxc dyc)+ rrcurveto
-		var code []byte
-		for i := 1; i <= numCurves; i++ {
-			code = cmds[i-1].appendArgs(code)
+		var code [][]byte
+		for i := 0; i < numCurves && len(code)+6 <= maxStack; i++ {
+			code = cmds[i].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rrcurveto),
-				step: i,
+				step: i + 1,
 			})
 		}
 
 		// (dxa dya dxb dyb dxc dyc)+ dxd dyd rcurveline
-		if numCurves < len(cmds) {
+		if numCurves < len(cmds) && len(code)+2 <= maxStack {
 			code = cmds[numCurves].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rcurveline),
@@ -395,7 +390,7 @@ func findEdges(cmds []enCmd) []edge {
 
 		// dy1? (dxa dxb dyb dxc)+ hhcurveto
 		code = nil
-		for i := 0; i < numCurves; i++ {
+		for i := 0; i < numCurves && len(code)+4 <= maxStack; i++ {
 			if !cmds[i].Args[5].IsZero() {
 				break
 			}
@@ -403,13 +398,13 @@ func findEdges(cmds []enCmd) []edge {
 				if i > 0 {
 					break
 				} else {
-					code = append(code, cmds[0].Args[1].Code...)
+					code = append(code, cmds[0].Args[1].Code)
 				}
 			}
-			code = append(code, cmds[i].Args[0].Code...)
-			code = append(code, cmds[i].Args[2].Code...)
-			code = append(code, cmds[i].Args[3].Code...)
-			code = append(code, cmds[i].Args[4].Code...)
+			code = append(code, cmds[i].Args[0].Code)
+			code = append(code, cmds[i].Args[2].Code)
+			code = append(code, cmds[i].Args[3].Code)
+			code = append(code, cmds[i].Args[4].Code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2hhcurveto),
 				step: i + 1,
@@ -418,7 +413,7 @@ func findEdges(cmds []enCmd) []edge {
 
 		// dx1? (dya dxb dyb dyc)+ vvcurveto
 		code = nil
-		for i := 0; i < numCurves; i++ {
+		for i := 0; i < numCurves && len(code)+4 <= maxStack; i++ {
 			if !cmds[i].Args[4].IsZero() {
 				break
 			}
@@ -426,13 +421,13 @@ func findEdges(cmds []enCmd) []edge {
 				if i > 0 {
 					break
 				} else {
-					code = append(code, cmds[0].Args[0].Code...)
+					code = append(code, cmds[0].Args[0].Code)
 				}
 			}
-			code = append(code, cmds[i].Args[1].Code...)
-			code = append(code, cmds[i].Args[2].Code...)
-			code = append(code, cmds[i].Args[3].Code...)
-			code = append(code, cmds[i].Args[5].Code...)
+			code = append(code, cmds[i].Args[1].Code)
+			code = append(code, cmds[i].Args[2].Code)
+			code = append(code, cmds[i].Args[3].Code)
+			code = append(code, cmds[i].Args[5].Code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2vvcurveto),
 				step: i + 1,
@@ -452,12 +447,12 @@ func findEdges(cmds []enCmd) []edge {
 }
 
 type edge struct {
-	code []byte
+	code [][]byte
 	step int
 }
 
 func (e edge) String() string {
-	return fmt.Sprintf("edge (% x) %+d", e.code, e.step)
+	return fmt.Sprintf("edge % x %+d", e.code, e.step)
 }
 
 // CommandType is the type of a CFF glyph drawing command.
@@ -549,24 +544,18 @@ func (x encodedNumber) IsZero() bool {
 	return x.Val == 0
 }
 
-func appendOp(data []byte, op t2op) []byte {
-	if op > 255 {
-		return append(data, byte(op>>8), byte(op))
+func copyOp(data [][]byte, op t2op, args ...encodedNumber) [][]byte {
+	res := make([][]byte, len(data)+len(args)+1)
+	pos := copy(res, data)
+	for _, arg := range args {
+		res[pos] = arg.Code
+		pos++
 	}
-	return append(data, byte(op))
-}
-
-func copyOp(data []byte, op t2op) []byte {
 	if op > 255 {
-		res := make([]byte, len(data)+2)
-		copy(res, data)
-		res[len(data)] = byte(op >> 8)
-		res[len(data)+1] = byte(op)
-		return res
+		res[pos] = []byte{byte(op >> 8), byte(op)}
+	} else {
+		res[pos] = []byte{byte(op)}
 	}
-	res := make([]byte, len(data)+1)
-	copy(res, data)
-	res[len(data)] = byte(op)
 	return res
 }
 
