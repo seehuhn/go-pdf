@@ -97,7 +97,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 		GlyphUnits:  tt.GlyphUnits,
 		Ascent:      tt.Ascent,
 		Descent:     tt.Descent,
-		GlyphExtent: cff.GlyphExtent(),
+		GlyphExtent: cff.GlyphExtents(),
 		Width:       tt.Width,
 
 		Layout: t.Layout,

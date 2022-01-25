@@ -91,7 +91,7 @@ func TestDecodeInt(t *testing.T) {
 	}
 }
 
-func TestEncodeInt(t *testing.T) {
+func TestEncodeIntDict(t *testing.T) {
 	var op dictOp = 7
 	for i := int32(-32769); i <= 32769; i += 3 {
 		d := cffDict{

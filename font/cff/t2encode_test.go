@@ -145,3 +145,26 @@ func TestCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEncodeIntType2(t *testing.T) {
+	// The decode for Type 2 integers is buried in the CFF parser.  For
+	// testing, we encode integers into arguments of a moveto command in a
+	// charstring, and then decode this charstring.
+	info := &decodeInfo{}
+	for i := -2000; i <= 2000; i += 2 {
+		var code []byte
+		code = append(code, encodeInt(int16(i))...)
+		code = append(code, encodeInt(int16(i+1))...)
+		code = append(code, t2rmoveto.Bytes()...)
+		code = append(code, t2endchar.Bytes()...)
+
+		glyph, err := decodeCharString(info, code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		args := glyph.Cmds[0].Args
+		if args[0] != float64(i) || args[1] != float64(i+1) {
+			t.Fatalf("%f,%f != %d,%d", args[0], args[1], i, i+1)
+		}
+	}
+}

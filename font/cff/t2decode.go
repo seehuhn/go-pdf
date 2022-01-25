@@ -29,8 +29,8 @@ type decodeInfo struct {
 	nominalWidth int32
 }
 
-// doDecode returns the commands for the given charstring.
-func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
+// decodeCharString returns the commands for the given charstring.
+func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 	res := &Glyph{
 		Width: info.defaultWidth,
 	}
@@ -39,7 +39,7 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 		code = code[n:]
 	}
 
-	var stack []float64
+	var stack []float64 // TODO(voss): use 16.16 fixed point numbers?
 	clearStack := func() {
 		stack = stack[:0]
 	}
@@ -58,7 +58,6 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 
 	var storage []float64
 	cmdStack := [][]byte{code}
-	var nStems int
 
 	var posX, posY float64
 	rMoveTo := func(dx, dy float64) {
@@ -101,22 +100,6 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 
 			op := t2op(code[0])
 
-			// {
-			// 	show := body[1:]
-			// 	tail := ""
-			// 	info := ""
-			// 	if k := len(stack); (op == t2callgsubr || op == t2callsubr) &&
-			// 		k > 0 && isInt(stack[k-1]) {
-			// 		idx := int(stack[k-1]) + bias(len(cff.subrs))
-			// 		info = fmt.Sprintf("@%d", idx)
-			// 	}
-			// 	if len(show) > 10 {
-			// 		show = show[:10]
-			// 		tail = "..."
-			// 	}
-			// 	fmt.Println(stack, " ", op.String()+info, " ", show, tail)
-			// }
-
 			if op >= 32 && op <= 246 {
 				stack = append(stack, float64(int32(op)-139))
 				skipBytes(1)
@@ -141,7 +124,7 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 				if len(code) < 3 {
 					return nil, errIncomplete
 				}
-				val := int16(uint16(code[1])<<8 + uint16(code[2]))
+				val := int16(code[1])<<8 + int16(code[2])
 				stack = append(stack, float64(val))
 				skipBytes(3)
 				continue
@@ -150,14 +133,14 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errIncomplete
 				}
 				// 16-bit signed integer with 16 bits of fraction
-				val := int32(uint32(code[1])<<24 + uint32(code[2])<<16 +
-					uint32(code[3])<<8 + uint32(code[4]))
+				val := int32(code[1])<<24 + int32(code[2])<<16 +
+					int32(code[3])<<8 + int32(code[4])
 				stack = append(stack, float64(val))
 				skipBytes(5)
 				continue
 			}
 
-			if op == 0x0c {
+			if op == 12 {
 				if len(code) < 2 {
 					return nil, errIncomplete
 				}
@@ -198,16 +181,15 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 
 			case t2hlineto, t2vlineto:
 				horizontal := op == t2hlineto
-				for len(stack) > 0 {
+				for _, z := range stack {
 					if horizontal {
-						rLineTo(stack[0], 0)
+						rLineTo(z, 0)
 					} else {
-						rLineTo(0, stack[0])
+						rLineTo(0, z)
 					}
-					stack = stack[1:]
 					horizontal = !horizontal
 				}
-				// clearStack()
+				clearStack()
 
 			case t2rrcurveto, t2rcurveline, t2rlinecurve:
 				for op == t2rlinecurve && len(stack) >= 8 {
@@ -333,23 +315,61 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 			case t2dotsection: // deprecated
 				clearStack()
 
-			case t2hstem, t2vstem, t2hstemhm, t2vstemhm:
+			case t2hstem, t2hstemhm:
 				setGlyphWidth(len(stack)%2 == 1)
-				nStems += len(stack) / 2
+				var prev int16
+				for k := 0; k < len(stack); k += 2 {
+					a := prev + int16(stack[k])
+					b := a + int16(stack[k+1])
+					res.HStem = append(res.HStem, a, b)
+					prev = b
+				}
+				clearStack()
+
+			case t2vstem, t2vstemhm:
+				setGlyphWidth(len(stack)%2 == 1)
+				var prev int16
+				for k := 0; k < len(stack); k += 2 {
+					a := prev + int16(stack[k])
+					b := a + int16(stack[k+1])
+					res.VStem = append(res.VStem, a, b)
+					prev = b
+				}
 				clearStack()
 
 			case t2hintmask, t2cntrmask:
 				setGlyphWidth(len(stack)%2 == 1)
+
 				// "If hstem and vstem hints are both declared at the beginning
 				// of a charstring, and this sequence is followed directly by
 				// the hintmask or cntrmask operators, the vstem hint operator
 				// need not be included."
-				nStems += len(stack) / 2
+				var prev int16
+				for k := 0; k < len(stack); k += 2 {
+					a := prev + int16(stack[k])
+					b := a + int16(stack[k+1])
+					res.VStem = append(res.VStem, a, b)
+					prev = b
+				}
+
+				nStems := (len(res.HStem) + len(res.VStem)) / 2
 				k := (nStems + 7) / 8
 				if k >= len(code) {
 					return nil, errIncomplete
 				}
-				// TODO(voss): store code[:k] somewhere
+
+				cmd := Command{
+					Op:   CmdHintMask,
+					Args: []float64{},
+				}
+				if op == t2cntrmask {
+					cmd.Op = CmdCntrMask
+				}
+				for _, b := range code[:k] {
+					cmd.Args = append(cmd.Args, float64(b))
+				}
+				res.Cmds = append(res.Cmds, cmd)
+
 				code = code[k:]
 				clearStack()
 
@@ -562,6 +582,7 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 		} // end of opLoop
 	}
 
+	// The normal exit from this function is via the t2endchar case above.
 	return nil, errIncomplete
 }
 

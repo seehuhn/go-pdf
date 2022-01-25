@@ -220,7 +220,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		nominalWidth: private.nominalWidth,
 	}
 	for i, code := range charStrings {
-		glyph, err := cff.doDecode(info, code)
+		glyph, err := decodeCharString(info, code)
 		if err != nil {
 			return nil, err
 		}
@@ -231,7 +231,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	return cff, nil
 }
 
-func (cff *Font) GlyphExtent() []font.Rect {
+// GlyphExtents returns the boundig boxes of all glyphs.
+func (cff *Font) GlyphExtents() []font.Rect {
 	numGlyphs := len(cff.Glyphs)
 	extents := make([]font.Rect, numGlyphs)
 	for i := 0; i < numGlyphs; i++ {
@@ -297,21 +298,26 @@ func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
 	cc := make(cffIndex, numGlyphs)
 	defaultWidth, nominalWidth := cff.selectWidths()
 	for i, glyph := range cff.Glyphs {
+		var header [][]byte
 		w := glyph.Width
-		var wEnc []byte
 		if w != defaultWidth {
-			wEnc = encodeInt(int16(w - nominalWidth))
+			header = append(header, encodeInt(int16(w-nominalWidth)))
 		}
+		// TODO(voss): encode the stem hints
 
-		cmds := encodeArgs(glyph.Cmds)
-		data := encodeCommands(cmds)
+		data := encodeCharString(glyph.Cmds)
 
-		k := len(wEnc)
+		k := 0
+		for _, b := range header {
+			k += len(b)
+		}
 		for _, b := range data {
 			k += len(b)
 		}
 		code := make([]byte, 0, k)
-		code = append(code, wEnc...)
+		for _, b := range header {
+			code = append(code, b...)
+		}
 		for _, b := range data {
 			code = append(code, b...)
 		}

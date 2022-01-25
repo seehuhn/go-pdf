@@ -13,16 +13,22 @@ type Glyph struct {
 	Name  string
 	Width int32
 	Cmds  []Command
+	HStem []int16
+	VStem []int16
 }
 
+// MoveTo move the current point to (x, y).
+// The previous sub-path, if any, is closed before the point is moved.
 func (g *Glyph) MoveTo(x, y float64) {
 	g.Cmds = append(g.Cmds, Command{Op: CmdMoveTo, Args: []float64{x, y}})
 }
 
+// LineTo adds a straight line to the current sub-path.
 func (g *Glyph) LineTo(x, y float64) {
 	g.Cmds = append(g.Cmds, Command{Op: CmdLineTo, Args: []float64{x, y}})
 }
 
+// CurveTo adds a cubic Bezier curve to the current sub-path.
 func (g *Glyph) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 	g.Cmds = append(g.Cmds, Command{Op: CmdCurveTo, Args: []float64{x1, y1, x2, y2, x3, y3}})
 }
@@ -69,7 +75,59 @@ cmdLoop:
 // Command is a CFF glyph drawing command.
 type Command struct {
 	Op   CommandType
-	Args []float64
+	Args []float64 // TODO(voss): use 16.16 fixed point?
+}
+
+func encodeCharString(commands []Command) [][]byte {
+	var res [][]byte
+
+	cmds := encodeArgs(commands)
+
+	hasMoved := false
+	for len(cmds) > 1 {
+		switch cmds[0].Op {
+		case CmdMoveTo:
+			mov := cmds[0]
+			if mov.Args[0].IsZero() {
+				res = append(res, mov.Args[1].Code, t2vmoveto.Bytes())
+			} else if mov.Args[1].IsZero() {
+				res = append(res, mov.Args[0].Code, t2hmoveto.Bytes())
+			} else {
+				res = append(res, mov.Args[0].Code, mov.Args[1].Code, t2rmoveto.Bytes())
+			}
+
+			hasMoved = true
+			cmds = cmds[1:]
+
+		case CmdLineTo, CmdCurveTo:
+			if !hasMoved {
+				panic("what to do here?")
+			}
+
+			k := 1
+			for k < len(cmds) && (cmds[k].Op == CmdLineTo || cmds[k].Op == CmdCurveTo) {
+				k++
+			}
+			path := cmds[:k]
+			cmds = cmds[k:]
+
+			res = append(res, encodePath(path)...)
+		case CmdHintMask, CmdCntrMask:
+			// TODO(voss): hande CmdHintMask and CmdCntrMask
+			// op := t2hintmask
+			// if cmds[0].Op == CmdCntrMask {
+			// 	op = t2cntrmask
+			// }
+			// res = append(res, append(op.Bytes(), cmds[0].Args[0].Code...))
+
+			cmds = cmds[1:]
+		default:
+			panic("unhandled command")
+		}
+	}
+	res = append(res, t2endchar.Bytes())
+
+	return res
 }
 
 // enCmd encodes a single command, using relative coordinates for the arguments
@@ -84,34 +142,44 @@ func (c enCmd) String() string {
 }
 
 func encodeArgs(cmds []Command) []enCmd {
+	// TODO(voss): should this function be merged into the caller?
 	res := make([]enCmd, len(cmds))
 
 	posX := 0.0
 	posY := 0.0
 	for i, cmd := range cmds {
+		res[i] = enCmd{
+			Op: cmd.Op,
+		}
 		switch cmd.Op {
 		case CmdMoveTo, CmdLineTo:
-			dx := encode(cmd.Args[0] - posX)
-			dy := encode(cmd.Args[1] - posY)
-			res[i] = enCmd{
-				Args: []encodedNumber{dx, dy},
-				Op:   cmd.Op,
-			}
+			dx := encodeNumber(cmd.Args[0] - posX)
+			dy := encodeNumber(cmd.Args[1] - posY)
+			res[i].Args = []encodedNumber{dx, dy}
 			posX += dx.Val
 			posY += dy.Val
+
 		case CmdCurveTo:
-			dxa := encode(cmd.Args[0] - posX)
-			dya := encode(cmd.Args[1] - posY)
-			dxb := encode(cmd.Args[2] - cmd.Args[0])
-			dyb := encode(cmd.Args[3] - cmd.Args[1])
-			dxc := encode(cmd.Args[4] - cmd.Args[2])
-			dyc := encode(cmd.Args[5] - cmd.Args[3])
-			res[i] = enCmd{
-				Args: []encodedNumber{dxa, dya, dxb, dyb, dxc, dyc},
-				Op:   CmdCurveTo,
-			}
+			dxa := encodeNumber(cmd.Args[0] - posX)
+			dya := encodeNumber(cmd.Args[1] - posY)
+			dxb := encodeNumber(cmd.Args[2] - cmd.Args[0])
+			dyb := encodeNumber(cmd.Args[3] - cmd.Args[1])
+			dxc := encodeNumber(cmd.Args[4] - cmd.Args[2])
+			dyc := encodeNumber(cmd.Args[5] - cmd.Args[3])
+			res[i].Args = []encodedNumber{dxa, dya, dxb, dyb, dxc, dyc}
 			posX += dxa.Val + dxb.Val + dxc.Val
 			posY += dya.Val + dyb.Val + dyc.Val
+
+		case CmdHintMask, CmdCntrMask:
+			k := len(cmd.Args)
+			code := make([]byte, k)
+			for i, arg := range cmd.Args {
+				code[i] = byte(arg)
+			}
+			res[i].Args = []encodedNumber{{Code: code}}
+
+		default:
+			panic("unhandled command")
 		}
 	}
 	return res
@@ -122,43 +190,6 @@ func (c enCmd) appendArgs(code [][]byte) [][]byte {
 		code = append(code, a.Code)
 	}
 	return code
-}
-
-func encodeCommands(cmds []enCmd) [][]byte {
-	var res [][]byte
-
-	for len(cmds) > 1 {
-		var mov enCmd
-		if cmds[0].Op == CmdMoveTo {
-			mov = cmds[0]
-			cmds = cmds[1:]
-		} else {
-			mov = enCmd{
-				Args: []encodedNumber{encode(0), encode(0)},
-				Op:   CmdMoveTo,
-			}
-		}
-
-		if mov.Args[0].IsZero() {
-			res = append(res, mov.Args[1].Code, t2vmoveto.Bytes())
-		} else if mov.Args[1].IsZero() {
-			res = append(res, mov.Args[0].Code, t2hmoveto.Bytes())
-		} else {
-			res = append(res, mov.Args[0].Code, mov.Args[1].Code, t2rmoveto.Bytes())
-		}
-
-		k := 1
-		for k < len(cmds) && cmds[k].Op != CmdMoveTo {
-			k++
-		}
-		path := cmds[:k]
-		cmds = cmds[k:]
-
-		res = append(res, encodePath(path)...)
-	}
-
-	res = append(res, t2endchar.Bytes())
-	return res
 }
 
 func encodePath(cmds []enCmd) [][]byte {
@@ -480,6 +511,12 @@ const (
 
 	// CmdCurveTo appends a Bezier curve segment from the previous point to the given point.
 	CmdCurveTo
+
+	// CmdHintMask adds a CFF hintmask command.
+	CmdHintMask
+
+	// CmdCntrMask adds a CFF cntrmask command.
+	CmdCntrMask
 )
 
 func (c Command) String() string {
@@ -496,8 +533,8 @@ func (x encodedNumber) String() string {
 	return fmt.Sprintf("%g (% x)", x.Val, x.Code)
 }
 
-// encode encodes the given number into a CFF encoding.
-func encode(x float64) encodedNumber {
+// encodeNumber encodes the given number into a CFF encoding.
+func encodeNumber(x float64) encodedNumber {
 	var code []byte
 	var val float64
 
@@ -535,7 +572,7 @@ func encodeInt(x int16) []byte {
 		b0 := byte(x + 251)
 		return []byte{b0, b1}
 	default:
-		return []byte{28, byte(x >> 8), byte(x >> 8)}
+		return []byte{28, byte(x >> 8), byte(x)}
 	}
 }
 
