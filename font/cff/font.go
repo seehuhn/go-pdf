@@ -286,8 +286,11 @@ func (cff *Font) selectWidths() (int32, int32) {
 	return defaultWidth, nominalWidth
 }
 
-func (cff *Font) encodeCharStrings() (cffIndex, int32, int32) {
+func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
 	numGlyphs := len(cff.Glyphs)
+	if numGlyphs < 1 || cff.Glyphs[0].Name != ".notdef" {
+		return nil, 0, 0, errMissingNotdef
+	}
 
 	// TODO(voss): introduce subroutines
 
@@ -315,14 +318,17 @@ func (cff *Font) encodeCharStrings() (cffIndex, int32, int32) {
 		cc[i] = code
 	}
 
-	return cc, defaultWidth, nominalWidth
+	return cc, defaultWidth, nominalWidth, nil
 }
 
 // Encode writes the binary form of a CFF font as a simple font.
 func (cff *Font) Encode(w io.Writer) error {
 	numGlyphs := uint16(len(cff.Glyphs))
 
-	charStrings, defWidth, nomWidth := cff.encodeCharStrings()
+	charStrings, defWidth, nomWidth, err := cff.encodeCharStrings()
+	if err != nil {
+		return err
+	}
 
 	blobs := make([][]byte, numSections)
 	newStrings := &cffStrings{}
@@ -336,7 +342,6 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 1: Name INDEX
-	var err error
 	blobs[secNameIndex], err = cffIndex{[]byte(cff.Info.FontName)}.encode()
 	if err != nil {
 		return err
@@ -462,7 +467,10 @@ func (cff *Font) Encode(w io.Writer) error {
 func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement int) error {
 	numGlyphs := int32(len(cff.Glyphs))
 
-	charStrings, defWidth, nomWidth := cff.encodeCharStrings()
+	charStrings, defWidth, nomWidth, err := cff.encodeCharStrings()
+	if err != nil {
+		return err
+	}
 
 	fontMatrix := cff.Info.FontMatrix
 
@@ -478,7 +486,6 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	// section 1: Name INDEX
-	var err error
 	blobs[cidNameIndex], err = cffIndex{[]byte(cff.Info.FontName)}.encode()
 	if err != nil {
 		return err
@@ -495,7 +502,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	registrySID := newStrings.lookup(registry)
 	orderingSID := newStrings.lookup(ordering)
 	topDict[opROS] = []interface{}{
-		int32(registrySID), int32(orderingSID), int32(supplement),
+		registrySID, orderingSID, int32(supplement),
 	}
 	topDict[opCIDCount] = []interface{}{int32(numGlyphs)}
 	// opFDArray is updated below
@@ -686,5 +693,5 @@ const (
 )
 
 var (
-	errNoNotdef = errors.New("cff: missing .notdef glyph")
+	errMissingNotdef = errors.New("cff: missing .notdef glyph")
 )

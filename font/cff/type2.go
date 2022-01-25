@@ -56,7 +56,7 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 		widthIsSet = true
 	}
 
-	storage := make(map[int]float64)
+	var storage []float64
 	cmdStack := [][]byte{code}
 	var nStems int
 
@@ -453,8 +453,11 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errStackUnderflow
 				}
 				m := int(stack[k+1])
-				if float64(m) != stack[k+1] || m < 0 || m > 32 {
-					return nil, errors.New("invalid store index")
+				if float64(m) != stack[k+1] || m < 0 || m >= 32 {
+					return nil, errors.New("cff: invalid store index")
+				}
+				if storage == nil {
+					storage = make([]float64, 32)
 				}
 				storage[m] = stack[k]
 				stack = stack[:k]
@@ -464,8 +467,8 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errStackUnderflow
 				}
 				m := int(stack[k])
-				if float64(m) != stack[k+1] || m < 0 || m > 32 {
-					return nil, errors.New("invalid store index")
+				if float64(m) != stack[k+1] || m < 0 || m >= len(storage) {
+					return nil, errors.New("cff: invalid store index")
 				}
 				stack[k] = storage[m]
 
@@ -560,14 +563,6 @@ func (cff *Font) doDecode(info *decodeInfo, code []byte) (*Glyph, error) {
 	}
 
 	return nil, errIncomplete
-}
-
-func isConstInt(cmd []byte) bool {
-	if len(cmd) == 0 {
-		return false
-	}
-	op := cmd[0]
-	return op == 28 || (32 <= op && op <= 254)
 }
 
 func roll(data []float64, j int) {
