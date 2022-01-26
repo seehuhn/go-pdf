@@ -2,11 +2,18 @@ package cff
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"math"
 
 	"seehuhn.de/go/pdf/font"
 )
+
+// Command is a CFF glyph drawing command.
+type Command struct {
+	Op   CommandType
+	Args []float64 // TODO(voss): use 16.16 fixed point?
+}
 
 // Glyph represents a glyph in a CFF font.
 type Glyph struct {
@@ -15,6 +22,14 @@ type Glyph struct {
 	Cmds  []Command
 	HStem []int16
 	VStem []int16
+}
+
+// NewGlyph allocates a new glyph.
+func NewGlyph(name string, width int32) *Glyph {
+	return &Glyph{
+		Name:  name,
+		Width: width,
+	}
 }
 
 // MoveTo move the current point to (x, y).
@@ -72,19 +87,90 @@ cmdLoop:
 	}
 }
 
-// Command is a CFF glyph drawing command.
-type Command struct {
-	Op   CommandType
-	Args []float64 // TODO(voss): use 16.16 fixed point?
+func (g *Glyph) getCharString(defaultWidth, nominalWidth int32) ([]byte, error) {
+	var header [][]byte
+	w := g.Width
+	if w != defaultWidth {
+		header = append(header, encodeInt(int16(w-nominalWidth)))
+	}
+
+	hintMaskUsed := false
+	for _, cmd := range g.Cmds {
+		if cmd.Op == CmdHintMask || cmd.Op == CmdCntrMask {
+			hintMaskUsed = true
+			break
+		}
+	}
+
+	type stemInfo struct {
+		stems []int16
+		op    t2op
+	}
+	allStems := []stemInfo{
+		{stems: g.HStem, op: t2hstem},
+		{stems: g.VStem, op: t2vstem},
+	}
+	if hintMaskUsed {
+		allStems[0].op = t2hstemhm
+		allStems[1].op = t2vstemhm
+	}
+	extra := len(header)
+	for i, pair := range allStems {
+		stems := pair.stems
+		op := pair.op
+		if len(stems)%2 != 0 {
+			return nil, errors.New("invalid number of stems")
+		}
+		for len(stems) > 0 {
+			k := (maxStack - extra) / 2
+			if k > len(stems)/2 {
+				k = len(stems) / 2
+			}
+			chunk := stems[:2*k]
+			stems = stems[2*k:]
+			prev := int16(0)
+			for _, x := range chunk {
+				header = append(header, encodeInt(x-prev))
+				prev = x
+			}
+
+			canOmitVStem := (i == 1 &&
+				len(stems) == 0 &&
+				len(g.Cmds) > 0 &&
+				(g.Cmds[0].Op == CmdHintMask || g.Cmds[0].Op == CmdCntrMask))
+			if !canOmitVStem {
+				header = append(header, op.Bytes())
+			}
+			extra = 0
+		}
+	}
+
+	data := encodePaths(g.Cmds)
+
+	k := 0
+	for _, b := range header {
+		k += len(b)
+	}
+	for _, b := range data {
+		k += len(b)
+	}
+	code := make([]byte, 0, k)
+	for _, b := range header {
+		code = append(code, b...)
+	}
+	for _, b := range data {
+		code = append(code, b...)
+	}
+
+	return code, nil
 }
 
-func encodeCharString(commands []Command) [][]byte {
+func encodePaths(commands []Command) [][]byte {
 	var res [][]byte
 
 	cmds := encodeArgs(commands)
 
-	hasMoved := false
-	for len(cmds) > 1 {
+	for len(cmds) > 0 {
 		switch cmds[0].Op {
 		case CmdMoveTo:
 			mov := cmds[0]
@@ -96,14 +182,9 @@ func encodeCharString(commands []Command) [][]byte {
 				res = append(res, mov.Args[0].Code, mov.Args[1].Code, t2rmoveto.Bytes())
 			}
 
-			hasMoved = true
 			cmds = cmds[1:]
 
 		case CmdLineTo, CmdCurveTo:
-			if !hasMoved {
-				panic("what to do here?")
-			}
-
 			k := 1
 			for k < len(cmds) && (cmds[k].Op == CmdLineTo || cmds[k].Op == CmdCurveTo) {
 				k++
@@ -112,13 +193,13 @@ func encodeCharString(commands []Command) [][]byte {
 			cmds = cmds[k:]
 
 			res = append(res, encodePath(path)...)
+
 		case CmdHintMask, CmdCntrMask:
-			// TODO(voss): hande CmdHintMask and CmdCntrMask
-			// op := t2hintmask
-			// if cmds[0].Op == CmdCntrMask {
-			// 	op = t2cntrmask
-			// }
-			// res = append(res, append(op.Bytes(), cmds[0].Args[0].Code...))
+			op := t2hintmask
+			if cmds[0].Op == CmdCntrMask {
+				op = t2cntrmask
+			}
+			res = append(res, append(op.Bytes(), cmds[0].Args[0].Code...))
 
 			cmds = cmds[1:]
 		default:
@@ -218,7 +299,6 @@ func encodePath(cmds []enCmd) [][]byte {
 			}
 			best.Update(to, v, edge.code)
 		}
-
 		done[from] = true
 	}
 }
@@ -274,7 +354,7 @@ func (pq *priorityQueue) Update(state int, head *pqEntry, tail [][]byte) {
 	for _, blob := range tail {
 		cost += len(blob)
 	}
-	if ok && len(e.code) <= cost {
+	if ok && e.cost <= cost {
 		return
 	}
 
@@ -294,184 +374,216 @@ func (pq *priorityQueue) Update(state int, head *pqEntry, tail [][]byte) {
 const maxStack = 48
 
 func findEdges(cmds []enCmd) []edge {
-	// TODO(voss): use at most 48 slots on the argument stack.
-
 	if len(cmds) == 0 {
 		return nil
 	}
 
 	var edges []edge
 
-	numLines := 0
-	for numLines < len(cmds) && cmds[numLines].Op == CmdLineTo {
-		numLines++
-	}
-	if numLines > 0 {
-		// candidates:
-		//   - (dx dy)+  rlineto
-		//   - dx (dy dx)* dy?  hlineto
-		//   - dy (dx dy)* dx?  vlineto
-		//   - (dx dy)+ xb yb xc yc xd yd  rlinecurve
-
-		horizontal := make([]bool, numLines)
-		vertical := make([]bool, numLines)
-		for i := 0; i < numLines; i++ {
-			horizontal[i] = cmds[i].Args[1].IsZero()
-			vertical[i] = cmds[i].Args[0].IsZero()
-		}
-
+	if cmds[0].Op == CmdLineTo {
 		// {dx dy}+  rlineto
 		var code [][]byte
-		for i := 0; i < numLines && len(code)+2 <= maxStack; i++ {
-			code = append(code, cmds[i].Args[0].Code)
-			code = append(code, cmds[i].Args[1].Code)
+		pos := 0
+		for pos < len(cmds) && cmds[pos].Op == CmdLineTo && len(code)+2 <= maxStack {
+			code = append(code, cmds[pos].Args[0].Code)
+			code = append(code, cmds[pos].Args[1].Code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlineto),
-				step: i + 1,
+				step: pos + 1,
 			})
+			pos++
 		}
 
 		// {dx dy}+ xb yb xc yc xd yd  rlinecurve
-		if numLines < len(cmds) && len(code)+6 <= maxStack {
+		if pos < len(cmds) && cmds[pos].Op == CmdCurveTo && len(code)+6 <= maxStack {
 			edges = append(edges, edge{
-				code: copyOp(code, t2rlinecurve, cmds[numLines].Args...),
-				step: numLines + 1,
+				code: copyOp(code, t2rlinecurve, cmds[pos].Args...),
+				step: pos + 1,
 			})
 		}
 
-		if horizontal[0] { // dx {dy dx}* dy?  hlineto
-			code = [][]byte{cmds[0].Args[0].Code}
-			k := 1
-			for k < numLines && k < maxStack {
-				if k%2 == 1 {
-					if !vertical[k] {
-						break
-					}
-					code = append(code, cmds[k].Args[1].Code)
-				} else {
-					if !horizontal[k] {
-						break
-					}
-					code = append(code, cmds[k].Args[0].Code)
-				}
-				k++
+		// dx {dy dx}* dy?  hlineto
+		// dy {dx dy}* dx?  vlineto
+		code = nil
+		var aligned []int // +1=horizontal, -1=vertical
+		for _, cmd := range cmds {
+			if cmd.Op != CmdLineTo {
+				break
 			}
-			edges = append(edges, edge{
-				code: copyOp(code, t2hlineto),
-				step: k,
-			})
-		} else if vertical[0] { // dy {dx dy}* dx?  vlineto
-			code = [][]byte{cmds[0].Args[1].Code}
-			k := 1
-			for k < numLines && k < maxStack {
-				if k%2 == 0 {
-					if !vertical[k] {
-						break
-					}
-					code = append(code, cmds[k].Args[1].Code)
-				} else {
-					if !vertical[k] {
-						break
-					}
-					code = append(code, cmds[k].Args[0].Code)
-				}
-				k++
+			dir := 0
+			if cmd.Args[1].IsZero() {
+				dir = 1
+			} else if cmd.Args[0].IsZero() {
+				dir = -1
 			}
+			aligned = append(aligned, dir)
+		}
+
+		sign := aligned[0]
+		if sign != 0 {
+			op := []t2op{t2hlineto, t2vlineto}[(1-sign)/2]
+			pos = 0
+			sign = 1
+			for pos < len(aligned) && sign*aligned[pos] > 0 {
+				code = append(code, cmds[pos].Args[(1-sign)/2].Code)
+				sign = -sign
+				pos++
+			}
+
 			edges = append(edges, edge{
-				code: copyOp(code, t2vlineto),
-				step: k,
+				code: copyOp(code, op),
+				step: pos,
 			})
 		}
-	} else {
-		numCurves := 1 // we know that cmds[0] is a curve
-		for numCurves < len(cmds) && cmds[numCurves].Op == CmdCurveTo {
-			numCurves++
-		}
-
-		// candidates:
-		//   - (dxa dya dxb dyb dxc dyc)+ rrcurveto
-		//   - (dxa dya dxb dyb dxc dyc)+ dxd dyd rcurveline
-		//   - dy1? (dxa dxb dyb dxc)+ hhcurveto
-		//   - dx1? (dya dxb dyb dyc)+ vvcurveto
-		//   - ... hvcurveto
-		//   - ... vhcurveto
-		//   - ... flex
-		//   - ... flex1
-		//   - ... hflex
-		//   - ... hflex1
-
+	} else { // Cmds[0].Op == CmdCurveTo
 		// (dxa dya dxb dyb dxc dyc)+ rrcurveto
+		pos := 0
 		var code [][]byte
-		for i := 0; i < numCurves && len(code)+6 <= maxStack; i++ {
-			code = cmds[i].appendArgs(code)
+		if pos < len(cmds) && cmds[pos].Op == CmdCurveTo && len(code)+6 <= maxStack {
+			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rrcurveto),
-				step: i + 1,
+				step: pos + 1,
 			})
+			pos++
 		}
 
 		// (dxa dya dxb dyb dxc dyc)+ dxd dyd rcurveline
-		if numCurves < len(cmds) && len(code)+2 <= maxStack {
-			code = cmds[numCurves].appendArgs(code)
+		if pos < len(cmds) && cmds[pos].Op == CmdLineTo && len(code)+2 <= maxStack {
+			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rcurveline),
-				step: numCurves + 1,
+				step: pos + 1,
 			})
 		}
 
-		// dy1? (dxa dxb dyb dxc)+ hhcurveto
-		code = nil
-		for i := 0; i < numCurves && len(code)+4 <= maxStack; i++ {
-			if !cmds[i].Args[5].IsZero() {
-				break
-			}
-			if !cmds[i].Args[1].IsZero() {
-				if i > 0 {
+		// dya? (dxa dxb dyb dxc)+ hhcurveto
+		// dxa? (dya dxb dyb dyc)+ vvcurveto
+		hhvv := []struct {
+			op   t2op
+			offs int
+		}{
+			{t2hhcurveto, 1},
+			{t2vvcurveto, 0},
+		}
+		for _, hv := range hhvv {
+			code = nil
+			pos = 0
+			// 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
+			for pos < len(cmds) && cmds[pos].Op == CmdCurveTo && len(code)+4 <= maxStack {
+				if !cmds[pos].Args[4+hv.offs].IsZero() {
 					break
-				} else {
-					code = append(code, cmds[0].Args[1].Code)
+				}
+				if !cmds[pos].Args[0+hv.offs].IsZero() {
+					if pos == 0 && len(code)+5 <= maxStack {
+						code = append(code, cmds[0].Args[0+hv.offs].Code)
+					} else {
+						break
+					}
+				}
+				code = append(code, cmds[pos].Args[1-hv.offs].Code)
+				code = append(code, cmds[pos].Args[2].Code)
+				code = append(code, cmds[pos].Args[3].Code)
+				code = append(code, cmds[pos].Args[5-hv.offs].Code)
+				edges = append(edges, edge{
+					code: copyOp(code, hv.op),
+					step: pos + 1,
+				})
+				pos++
+			}
+		}
+
+		// dx1 dx2 dy2 dy3 (dya dxb dyb dxc  dxd dxe dye dyf)* dxf?  hvcurveto
+		// ... vhcurveto
+		for offs, op := range []t2op{t2hvcurveto, t2vhcurveto} {
+			code = nil
+
+			origOffs := offs
+
+			// Args: 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
+			pos = 0
+			for pos < len(cmds) && cmds[pos].Op == CmdCurveTo {
+				if !cmds[pos].Args[1-offs].IsZero() {
+					break
+				}
+				lastIsAligned := cmds[pos].Args[4+offs].IsZero()
+				if offs != origOffs && !lastIsAligned {
+					break
+				}
+
+				if len(code)+4 > maxStack || !lastIsAligned && len(code)+5 > maxStack {
+					break
+				}
+				code = append(code, cmds[pos].Args[offs].Code)
+				code = append(code, cmds[pos].Args[2].Code)
+				code = append(code, cmds[pos].Args[3].Code)
+				code = append(code, cmds[pos].Args[5-offs].Code)
+				if !lastIsAligned {
+					code = append(code, cmds[pos].Args[4+offs].Code)
+				}
+				pos++
+
+				if offs != origOffs {
+					continue
+				}
+
+				offs = 1 - offs
+
+				edges = append(edges, edge{
+					code: copyOp(code, op),
+					step: pos,
+				})
+				if !lastIsAligned {
+					break
 				}
 			}
-			code = append(code, cmds[i].Args[0].Code)
-			code = append(code, cmds[i].Args[2].Code)
-			code = append(code, cmds[i].Args[3].Code)
-			code = append(code, cmds[i].Args[4].Code)
-			edges = append(edges, edge{
-				code: copyOp(code, t2hhcurveto),
-				step: i + 1,
-			})
 		}
 
-		// dx1? (dya dxb dyb dyc)+ vvcurveto
-		code = nil
-		for i := 0; i < numCurves && len(code)+4 <= maxStack; i++ {
-			if !cmds[i].Args[4].IsZero() {
-				break
-			}
-			if !cmds[i].Args[0].IsZero() {
-				if i > 0 {
-					break
-				} else {
-					code = append(code, cmds[0].Args[0].Code)
-				}
-			}
-			code = append(code, cmds[i].Args[1].Code)
-			code = append(code, cmds[i].Args[2].Code)
-			code = append(code, cmds[i].Args[3].Code)
-			code = append(code, cmds[i].Args[5].Code)
-			edges = append(edges, edge{
-				code: copyOp(code, t2vvcurveto),
-				step: i + 1,
-			})
-		}
+		if len(cmds) >= 2 &&
+			cmds[0].Op == CmdCurveTo && cmds[1].Op == CmdCurveTo &&
+			cmds[0].Args[5].IsZero() && cmds[1].Args[1].IsZero() {
+			// Args: 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
 
-		// TODO(voss): implement the missing operators
-		//   - ... hvcurveto
-		//   - ... vhcurveto
-		//   - ... flex
-		//   - ... flex1
-		//   - ... hflex
-		//   - ... hflex1
+			code = nil
+
+			dy := cmds[0].Args[3].Val + cmds[1].Args[3].Val
+			if cmds[0].Args[1].IsZero() && cmds[1].Args[5].IsZero() &&
+				math.Abs(dy) < 0.5/65536 {
+				// dx1  dx2 dy2  dx3  dx4  dx5  dx6  hflex
+				code = append(code, cmds[0].Args[0].Code)
+				code = append(code, cmds[0].Args[2].Code)
+				code = append(code, cmds[0].Args[3].Code)
+				code = append(code, cmds[0].Args[4].Code)
+				code = append(code, cmds[1].Args[0].Code)
+				code = append(code, cmds[1].Args[2].Code)
+				code = append(code, cmds[1].Args[4].Code)
+				code = append(code, t2hflex.Bytes())
+				edges = append(edges, edge{
+					code: code,
+					step: 2,
+				})
+			} else if math.Abs(dy+cmds[0].Args[1].Val+cmds[1].Args[5].Val) < 0.5/65536 {
+				// dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6  hflex1
+				code = append(code, cmds[0].Args[0].Code)
+				code = append(code, cmds[0].Args[1].Code)
+				code = append(code, cmds[0].Args[2].Code)
+				code = append(code, cmds[0].Args[3].Code)
+				code = append(code, cmds[0].Args[4].Code)
+				code = append(code, cmds[1].Args[0].Code)
+				code = append(code, cmds[1].Args[2].Code)
+				code = append(code, cmds[1].Args[3].Code)
+				code = append(code, cmds[1].Args[4].Code)
+				code = append(code, t2hflex1.Bytes())
+				edges = append(edges, edge{
+					code: code,
+					step: 2,
+				})
+			}
+
+			// We don't generate t2flex and t2flex1 commands.
+			// dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd  flex
+			// dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6  flex1
+		}
 	}
 
 	return edges
@@ -497,6 +609,10 @@ func (op CommandType) String() string {
 		return "lineto"
 	case CmdCurveTo:
 		return "curveto"
+	case CmdHintMask:
+		return "hintmask"
+	case CmdCntrMask:
+		return "cntrmask"
 	default:
 		return fmt.Sprintf("CommandType(%d)", op)
 	}
@@ -542,7 +658,7 @@ func encodeNumber(x float64) encodedNumber {
 	if math.Abs(x-xInt) > eps {
 		z := int32(math.Round(x * 65536))
 		val = float64(z) / 65536
-		code = []byte{byte(z >> 24), byte(z >> 16), byte(z >> 8), byte(z)}
+		code = []byte{255, byte(z >> 24), byte(z >> 16), byte(z >> 8), byte(z)}
 	} else {
 		// encode as an integer
 		z := int16(xInt)

@@ -2,10 +2,11 @@ package cff
 
 import (
 	"bytes"
-	"os"
+	"math"
 	"reflect"
 	"testing"
 
+	"github.com/go-test/deep"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -79,77 +80,195 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(out.Glyphs) != len(in.Glyphs) {
-		t.Fatalf("wrong number of glyphs: %d != %d", len(out.Glyphs), len(in.Glyphs))
-	}
-
-	target := []int32{1000, 900}
-	for i, g := range out.Glyphs {
-		if g.Width != target[i] {
-			t.Fatalf("wrong glyph %d width: %d != %d", i, g.Width, target[i])
-		}
-	}
-
-	if !reflect.DeepEqual(in.Info, out.Info) {
+	if !reflect.DeepEqual(in, out) {
 		t.Errorf("Info: %v != %v", in.Info, out.Info)
 	}
 }
 
-func TestCreate(t *testing.T) {
+func TestFindEdges(t *testing.T) {
 	meta := &type1.FontInfo{
-		FontName: "Test",
-		Private:  []*type1.PrivateDict{{}},
+		FontName:   "Test",
+		FontMatrix: defaultFontMatrix,
+		Private:    []*type1.PrivateDict{{}},
 	}
-	cff := &Font{
+	in := &Font{
 		Info: meta,
 	}
 
-	g := &Glyph{
-		Name:  ".notdef",
-		Width: 500,
-	}
-	g.MoveTo(50, 50)
-	g.LineTo(450, 50)
-	g.LineTo(450, 950)
-	g.LineTo(50, 950)
-	g.MoveTo(100, 900)
-	g.LineTo(400, 900)
-	g.LineTo(400, 100)
-	g.LineTo(100, 100)
-	cff.Glyphs = append(cff.Glyphs, g)
+	g := NewGlyph(".notdef", 0)
+	in.Glyphs = append(in.Glyphs, g)
 
-	// an arrow pointing right
-	g = &Glyph{
-		Name:  "A",
-		Width: 1000,
-	}
-	g.MoveTo(0, 450)
-	g.LineTo(700, 450)
-	g.LineTo(700, 350)
-	g.LineTo(1000, 500)
-	g.LineTo(700, 650)
-	g.LineTo(700, 550)
-	g.LineTo(0, 550)
-	cff.Glyphs = append(cff.Glyphs, g)
+	g = NewGlyph("test.1", 100) // empty, non-zero width
+	in.Glyphs = append(in.Glyphs, g)
 
-	fd, err := os.Create("test.cff")
+	g = NewGlyph("test.1b", 300) // t2hmoveto
+	g.MoveTo(10, 0)
+	g.LineTo(20, 10)
+	g.LineTo(20, 20)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.1c", 300) // t2vmoveto
+	g.MoveTo(0, 10)
+	g.LineTo(20, 10)
+	g.LineTo(20, 20)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.2", 200) // t2rlineto
+	g.MoveTo(10, 10)
+	g.LineTo(20, 20)
+	g.LineTo(30, 10)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.3a", 300) // t2hlineto
+	g.MoveTo(10, 10)
+	g.LineTo(20, 10)
+	g.LineTo(20, 20)
+	g.LineTo(40, 20)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.3b", 300) // t2vlineto
+	g.MoveTo(10, 10)
+	g.LineTo(10, 20)
+	g.LineTo(20, 20)
+	g.LineTo(20, 30)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.4a", 400) // t2rrcurveto
+	g.MoveTo(10, 10)
+	g.CurveTo(20, 100, 90, 90, 100, 100)
+	g.CurveTo(10, 20, 30, 40, 50, 60)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.4b", 400) // t2rlinecurve
+	g.MoveTo(0, 0)
+	g.LineTo(1, 2)
+	g.CurveTo(3, 4, 5, 6, 7, 8)
+	g.CurveTo(9, 10, 11, 12, 13, 14)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.4c", 400) // t2rcurveline
+	g.MoveTo(1, 2)
+	g.CurveTo(3, 4, 5, 6, 7, 8)
+	g.CurveTo(9, 10, 11, 12, 13, 14)
+	g.LineTo(15, 16)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.5a", 500) // t2hhcurveto
+	g.MoveTo(1, 2)
+	g.CurveTo(10, 2, 11, 12, 13, 12)
+	g.CurveTo(14, 12, 15, 16, 17, 16)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.5b", 500) // t2hhcurveto, first not horizontal
+	g.MoveTo(1, 1)
+	g.CurveTo(10, 2, 11, 12, 13, 12)
+	g.CurveTo(14, 12, 15, 16, 17, 16)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.5c", 500) // t2vvcurveto
+	g.MoveTo(1, 2)
+	g.CurveTo(1, 4, 7, 6, 7, 8)
+	g.CurveTo(7, 10, 13, 12, 13, 14)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.5d", 500) // t2vvcurveto, first not vertical
+	g.MoveTo(1, 2)
+	g.CurveTo(3, 4, 7, 6, 7, 8)
+	g.CurveTo(7, 10, 13, 12, 13, 14)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.6a", 600) // t2hvcurveto
+	g.MoveTo(1, 2)
+	g.CurveTo(3, 2, 7, 6, 7, 8)
+	g.CurveTo(7, 10, 11, 14, 13, 14)
+	g.CurveTo(15, 14, 19, 18, 19, 20)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.6b", 600) // t2hvcurveto, last segment not vertical
+	g.MoveTo(1, 2)
+	g.CurveTo(3, 2, 5, 6, 7, 8)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.6c", 600) // t2vhcurveto
+	g.MoveTo(1, 2)
+	g.CurveTo(1, 4, 5, 8, 7, 8)
+	g.CurveTo(9, 8, 13, 12, 13, 14)
+	g.CurveTo(13, 16, 17, 20, 19, 20)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.6d", 600) // t2vhcurveto, last segment not horizontal
+	g.MoveTo(1, 2)
+	g.CurveTo(1, 4, 5, 6, 7, 8)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.7a", 700) // t2hflex
+	g.MoveTo(0, 0)
+	g.CurveTo(1, 0, 2, 2.5, 3, 2.5)
+	g.CurveTo(4, 2.5, 5, 0, 6, 0)
+	in.Glyphs = append(in.Glyphs, g)
+
+	g = NewGlyph("test.7b", 700) // t2hflex1
+	g.MoveTo(0, 0)
+	g.CurveTo(1, 1, 2, 2.5, 3, 2.5)
+	g.CurveTo(4, 2.5, 5, 1, 6, 0)
+	in.Glyphs = append(in.Glyphs, g)
+
+	buf := &bytes.Buffer{}
+	err := in.Encode(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cff.Encode(fd)
+
+	// ----------------------------------------------------------------------
+
+	out, err := Read(bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = fd.Close()
-	if err != nil {
-		t.Fatal(err)
+	for _, d := range deep.Equal(in, out) {
+		t.Error(d)
 	}
 }
 
-func TestEncodeIntType2(t *testing.T) {
-	// The decode for Type 2 integers is buried in the CFF parser.  For
+func TestType2EncodeNumber(t *testing.T) {
+	cases := []float64{
+		0, 1, -1, 10, -10, 100, -100, 1000, -1000, 10000, -10000,
+		0.5, -0.5, 1.5, -1.5, 2.5, -2.5, 3.5, -3.5, 4.5, -4.5, 5.5, -5.5,
+		1 / 65536., -1 / 65536., 10 / 65536., -10 / 65536., 100 / 65536., -100 / 65536.,
+		12345.67,
+	}
+
+	// The decoder for Type 2 number is buried inside the CFF parser.  For
 	// testing, we encode integers into arguments of a moveto command in a
-	// charstring, and then decode this charstring.
+	// charstring, and then use the decoder to this charstring.
+	info := &decodeInfo{}
+	for _, test := range cases {
+		enc := encodeNumber(test)
+		if math.Abs(enc.Val-test) > eps {
+			t.Errorf("%f != %f", enc.Val, test)
+			continue
+		}
+
+		var code []byte
+		code = append(code, enc.Code...)
+		code = append(code, t2hmoveto.Bytes()...)
+		code = append(code, t2endchar.Bytes()...)
+
+		glyph, err := decodeCharString(info, code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		args := glyph.Cmds[0].Args
+		if math.Abs(args[0]-enc.Val) > 1e-10 {
+			t.Errorf("%f != %f", args[0], enc.Val)
+		}
+	}
+}
+
+func TestType2EncodeInt(t *testing.T) {
+	// The decoder for Type 2 integers is buried inside the CFF parser.  For
+	// testing, we encode integers into arguments of a moveto command in a
+	// charstring, and then use the decoder to this charstring.
 	info := &decodeInfo{}
 	for i := -2000; i <= 2000; i += 2 {
 		var code []byte

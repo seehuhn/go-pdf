@@ -252,13 +252,14 @@ func (d cffDict) getFontMatrix(op dictOp) []float64 {
 
 type privateInfo struct {
 	private      *type1.PrivateDict
-	fontMatrix   []float64 // TODO(voss): use or remove this
 	subrs        cffIndex
 	defaultWidth int32
 	nominalWidth int32
 }
 
 func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInfo, error) {
+	// TODO(voss): handle the font matrix
+
 	pdSize, pdOffs, ok := d.getPair(opPrivate)
 	if !ok || pdOffs < 4 || pdSize < 0 {
 		return nil, errors.New("cff: missing Private DICT")
@@ -304,7 +305,6 @@ func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInf
 		private:      private,
 		defaultWidth: privateDict.getInt(opDefaultWidthX, 0),
 		nominalWidth: privateDict.getInt(opNominalWidthX, 0),
-		fontMatrix:   d.getFontMatrix(opFontMatrix), // TODO(voss): default for CIDFonts?
 		subrs:        subrs,
 	}
 

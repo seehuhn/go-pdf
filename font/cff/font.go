@@ -293,33 +293,14 @@ func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
 		return nil, 0, 0, errMissingNotdef
 	}
 
-	// TODO(voss): introduce subroutines
+	// TODO(voss): re-introduce the subroutines
 
 	cc := make(cffIndex, numGlyphs)
 	defaultWidth, nominalWidth := cff.selectWidths()
 	for i, glyph := range cff.Glyphs {
-		var header [][]byte
-		w := glyph.Width
-		if w != defaultWidth {
-			header = append(header, encodeInt(int16(w-nominalWidth)))
-		}
-		// TODO(voss): encode the stem hints
-
-		data := encodeCharString(glyph.Cmds)
-
-		k := 0
-		for _, b := range header {
-			k += len(b)
-		}
-		for _, b := range data {
-			k += len(b)
-		}
-		code := make([]byte, 0, k)
-		for _, b := range header {
-			code = append(code, b...)
-		}
-		for _, b := range data {
-			code = append(code, b...)
+		code, err := glyph.getCharString(defaultWidth, nominalWidth)
+		if err != nil {
+			return nil, 0, 0, err
 		}
 		cc[i] = code
 	}
@@ -337,7 +318,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	blobs := make([][]byte, numSections)
-	newStrings := &cffStrings{}
+	strings := &cffStrings{}
 
 	// section 0: Header
 	blobs[secHeader] = []byte{
@@ -361,7 +342,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	// opPrivate is updated below
 
 	// section 3: secStringIndex
-	// The new string index is stored in `newStrings`.
+	// The new string index is stored in `strings`.
 	// We encode the blob below, once all strings are known.
 
 	// section 4: global subr INDEX
@@ -379,15 +360,15 @@ func (cff *Font) Encode(w io.Writer) error {
 	blobs[secEncodings] = []byte{1, 1, 0, byte(numEncoded - 1)}
 
 	// section 6: charsets INDEX
-	subset := make([]int32, numGlyphs)
+	glyphNames := make([]int32, numGlyphs)
 	for i := uint16(0); i < numGlyphs; i++ {
 		s := cff.Glyphs[i].Name
 		if s == "" {
 			s = ".notdef"
 		}
-		subset[i] = newStrings.lookup(s)
+		glyphNames[i] = strings.lookup(s)
 	}
-	blobs[secCharsets], err = encodeCharset(subset)
+	blobs[secCharsets], err = encodeCharset(glyphNames)
 	if err != nil {
 		return err
 	}
@@ -425,7 +406,7 @@ func (cff *Font) Encode(w io.Writer) error {
 		blobs[secHeader][3] = offsSize(offs[numSections])
 
 		privateDict[opSubrs] = []interface{}{offs[secSubrsIndex] - offs[secPrivateDict]}
-		blobs[secPrivateDict] = privateDict.encode(newStrings)
+		blobs[secPrivateDict] = privateDict.encode(strings)
 		pdSize := len(blobs[secPrivateDict])
 		pdDesc := []interface{}{int32(pdSize), offs[secPrivateDict]}
 
@@ -433,13 +414,13 @@ func (cff *Font) Encode(w io.Writer) error {
 		topDict[opEncoding] = []interface{}{offs[secEncodings]}
 		topDict[opCharStrings] = []interface{}{offs[secCharStringsIndex]}
 		topDict[opPrivate] = pdDesc
-		topDictData := topDict.encode(newStrings)
+		topDictData := topDict.encode(strings)
 		blobs[secTopDictIndex], err = cffIndex{topDictData}.encode()
 		if err != nil {
 			return err
 		}
 
-		blobs[secStringIndex], err = newStrings.encode()
+		blobs[secStringIndex], err = strings.encode()
 		if err != nil {
 			return err
 		}
@@ -481,7 +462,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	fontMatrix := cff.Info.FontMatrix
 
 	blobs := make([][]byte, cidNumSections)
-	newStrings := &cffStrings{}
+	strings := &cffStrings{}
 
 	// section 0: Header
 	blobs[cidHeader] = []byte{
@@ -505,8 +486,8 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	// opCharset is updated below
 	delete(topDict, opEncoding)
 	// opCharStrings is updated below
-	registrySID := newStrings.lookup(registry)
-	orderingSID := newStrings.lookup(ordering)
+	registrySID := strings.lookup(registry)
+	orderingSID := strings.lookup(ordering)
 	topDict[opROS] = []interface{}{
 		registrySID, orderingSID, int32(supplement),
 	}
@@ -515,7 +496,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	// opFDSelect is updated below
 
 	// section 3: secStringIndex
-	// The new string index is stored in `newStrings`.
+	// The new string index is stored in `strings`.
 	// We encode the blob below, once all strings are known.
 
 	// section 4: global subr INDEX
@@ -593,12 +574,12 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 		blobs[secHeader][3] = offsSize(offs[numSections])
 
 		privateDict[opSubrs] = []interface{}{offs[cidSubrsIndex] - offs[cidPrivateDict]}
-		blobs[cidPrivateDict] = privateDict.encode(newStrings)
+		blobs[cidPrivateDict] = privateDict.encode(strings)
 		pdSize := len(blobs[cidPrivateDict])
 		pdDesc := []interface{}{int32(pdSize), offs[cidPrivateDict]}
 
 		fontDict[opPrivate] = pdDesc
-		fontDictData := fontDict.encode(newStrings)
+		fontDictData := fontDict.encode(strings)
 		blobs[cidFDArray], err = cffIndex{fontDictData}.encode()
 		if err != nil {
 			return err
@@ -608,13 +589,13 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 		topDict[opCharStrings] = []interface{}{offs[cidCharStringsIndex]}
 		topDict[opFDArray] = []interface{}{offs[cidFDArray]}
 		topDict[opFDSelect] = []interface{}{offs[cidFdSelect]}
-		topDictData := topDict.encode(newStrings)
+		topDictData := topDict.encode(strings)
 		blobs[cidTopDictIndex], err = cffIndex{topDictData}.encode()
 		if err != nil {
 			return err
 		}
 
-		blobs[cidStringIndex], err = newStrings.encode()
+		blobs[cidStringIndex], err = strings.encode()
 		if err != nil {
 			return err
 		}

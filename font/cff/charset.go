@@ -91,9 +91,9 @@ func encodeCharset(names []int32) ([]byte, error) {
 	names = names[1:]
 
 	// find runs of consecutive glyph names
-	var runs []int
-	for i := 0; i < len(names); i++ {
-		if i == 0 || names[i] != names[i-1]+1 {
+	runs := []int{0}
+	for i := 1; i < len(names); i++ {
+		if names[i] != names[i-1]+1 {
 			runs = append(runs, i)
 		}
 	}
@@ -102,8 +102,8 @@ func encodeCharset(names []int32) ([]byte, error) {
 	length0 := 1 + 2*len(names) // length with format 0 encoding
 
 	length1 := 1 + 3*(len(runs)-1) // length with format 1 encoding
-	for i := 0; i < len(runs)-1; i++ {
-		d := runs[i+1] - runs[i]
+	for i := 1; i < len(runs); i++ {
+		d := runs[i] - runs[i-1]
 		for d > 256 {
 			length1 += 3
 			d -= 256
@@ -121,21 +121,19 @@ func encodeCharset(names []int32) ([]byte, error) {
 			buf[2*i+2] = byte(name)
 		}
 	} else if length1 < length2 {
-		buf = make([]byte, length1)
-		buf[0] = 1
+		buf = make([]byte, 0, length1)
+		buf = append(buf, 1)
 		for i := 0; i < len(runs)-1; i++ {
 			name := names[runs[i]]
-			dd := runs[i+1] - runs[i]
-			for dd > 0 {
-				d := dd - 1
-				if d > 255 {
-					d = 255
+			length := int32(runs[i+1] - runs[i])
+			for length > 0 {
+				chunk := length
+				if chunk > 256 {
+					chunk = 256
 				}
-				buf[3*i+1] = byte(name >> 8)
-				buf[3*i+2] = byte(name)
-				buf[3*i+3] = byte(d)
-				name += int32(d + 1)
-				dd -= d + 1
+				buf = append(buf, byte(name>>8), byte(name), byte(chunk-1))
+				name += chunk
+				length -= chunk
 			}
 		}
 	} else {

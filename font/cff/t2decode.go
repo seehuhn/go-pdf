@@ -135,7 +135,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				// 16-bit signed integer with 16 bits of fraction
 				val := int32(code[1])<<24 + int32(code[2])<<16 +
 					int32(code[3])<<8 + int32(code[4])
-				stack = append(stack, float64(val))
+				stack = append(stack, float64(val)/65536)
 				skipBytes(5)
 				continue
 			}
@@ -222,6 +222,20 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				}
 				clearStack()
 
+			case t2vvcurveto:
+				var dx1 float64
+				if len(stack)%4 != 0 {
+					dx1, stack = stack[0], stack[1:]
+				}
+				for len(stack) >= 4 {
+					rCurveTo(dx1, stack[0],
+						stack[1], stack[2],
+						0, stack[3])
+					stack = stack[4:]
+					dx1 = 0
+				}
+				clearStack()
+
 			case t2hvcurveto, t2vhcurveto:
 				horizontal := op == t2hvcurveto
 				for len(stack) >= 4 {
@@ -240,20 +254,6 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					}
 					stack = stack[4:]
 					horizontal = !horizontal
-				}
-				clearStack()
-
-			case t2vvcurveto:
-				var dx1 float64
-				if len(stack)%4 != 0 {
-					dx1, stack = stack[0], stack[1:]
-				}
-				for len(stack) >= 4 {
-					rCurveTo(dx1, stack[0],
-						stack[1], stack[2],
-						0, stack[3])
-					stack = stack[4:]
-					dx1 = 0
 				}
 				clearStack()
 
@@ -304,7 +304,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					rCurveTo(stack[0], stack[1],
 						stack[2], stack[3],
 						stack[4], 0)
-					dy := stack[1] + stack[3] + stack[5] + stack[7]
+					dy := stack[1] + stack[3] + stack[7]
 					rCurveTo(stack[5], 0,
 						stack[6], stack[7],
 						stack[8], -dy)
