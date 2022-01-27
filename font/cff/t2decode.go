@@ -586,6 +586,24 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 	return nil, errIncomplete
 }
 
+func getSubr(subrs cffIndex, biased int) ([]byte, error) {
+	var offset int
+	nSubrs := len(subrs)
+	if nSubrs < 1240 {
+		offset = 107
+	} else if nSubrs < 33900 {
+		offset = 1131
+	} else {
+		offset = 32768
+	}
+
+	idx := biased + offset
+	if idx < 0 || idx >= len(subrs) {
+		return nil, errInvalidSubroutine
+	}
+	return subrs[idx], nil
+}
+
 func roll(data []float64, j int) {
 	n := len(data)
 

@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package cff
 
 import (
@@ -9,19 +25,13 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-// Command is a CFF glyph drawing command.
-type Command struct {
-	Op   CommandType
-	Args []float64 // TODO(voss): use 16.16 fixed point?
-}
-
 // Glyph represents a glyph in a CFF font.
 type Glyph struct {
-	Name  string
-	Width int32
 	Cmds  []Command
 	HStem []int16
 	VStem []int16
+	Name  string
+	Width int32
 }
 
 // NewGlyph allocates a new glyph.
@@ -32,8 +42,8 @@ func NewGlyph(name string, width int32) *Glyph {
 	}
 }
 
-// MoveTo move the current point to (x, y).
-// The previous sub-path, if any, is closed before the point is moved.
+// MoveTo starts a new sub-path and moves the current point to (x, y).
+// The previous sub-path, if any, is closed.
 func (g *Glyph) MoveTo(x, y float64) {
 	g.Cmds = append(g.Cmds, Command{Op: CmdMoveTo, Args: []float64{x, y}})
 }
@@ -192,7 +202,7 @@ func encodePaths(commands []Command) [][]byte {
 			path := cmds[:k]
 			cmds = cmds[k:]
 
-			res = append(res, encodePath(path)...)
+			res = append(res, encodeSubPath(path)...)
 
 		case CmdHintMask, CmdCntrMask:
 			op := t2hintmask
@@ -211,19 +221,31 @@ func encodePaths(commands []Command) [][]byte {
 	return res
 }
 
-// enCmd encodes a single command, using relative coordinates for the arguments
-// and storing the argument values as EncodedNumbers.
-type enCmd struct {
-	Op   CommandType
-	Args []encodedNumber
-}
-
-func (c enCmd) String() string {
-	return fmt.Sprint("cmd ", c.Args, c.Op)
+func encodeSubPath(cmds []enCmd) [][]byte {
+	n := len(cmds)
+	done := make([]bool, n+1)
+	best := &priorityQueue{
+		idx: make(map[int]int),
+	}
+	heap.Push(best, &bestPath{pos: 0, code: nil})
+	for {
+		v := heap.Pop(best).(*bestPath)
+		from := v.pos
+		if from == n {
+			return v.code
+		}
+		for _, edge := range findEdges(cmds[from:]) {
+			to := from + edge.skip
+			if done[to] {
+				continue
+			}
+			best.Update(to, v, edge.code)
+		}
+		done[from] = true
+	}
 }
 
 func encodeArgs(cmds []Command) []enCmd {
-	// TODO(voss): should this function be merged into the caller?
 	res := make([]enCmd, len(cmds))
 
 	posX := 0.0
@@ -266,109 +288,81 @@ func encodeArgs(cmds []Command) []enCmd {
 	return res
 }
 
-func (c enCmd) appendArgs(code [][]byte) [][]byte {
-	for _, a := range c.Args {
-		code = append(code, a.Code)
-	}
-	return code
-}
-
-func encodePath(cmds []enCmd) [][]byte {
-	for _, c := range cmds {
-		fmt.Println(c)
-	}
-
-	n := len(cmds)
-	done := make([]bool, n+1)
-	best := &priorityQueue{
-		dir: make(map[int]int),
-	}
-	heap.Push(best, &pqEntry{state: 0, code: nil})
-	for {
-		v := heap.Pop(best).(*pqEntry)
-		from := v.state
-		if from == n {
-			fmt.Println()
-			return v.code
-		}
-		for _, edge := range findEdges(cmds[from:]) {
-			fmt.Println(".", from, edge)
-			to := from + edge.step
-			if done[to] {
-				continue
-			}
-			best.Update(to, v, edge.code)
-		}
-		done[from] = true
-	}
-}
-
-type pqEntry struct {
-	state int
-	code  [][]byte
-	cost  int
+type bestPath struct {
+	code [][]byte
+	pos  int
+	cost int
 }
 
 type priorityQueue struct {
-	entries []*pqEntry
-	dir     map[int]int
+	entries []*bestPath
+	idx     map[int]int
 }
 
-func (pq *priorityQueue) Len() int {
-	return len(pq.entries)
-}
-
-func (pq *priorityQueue) Less(i, j int) bool {
-	return pq.entries[i].cost < pq.entries[j].cost
-}
-
-func (pq *priorityQueue) Swap(i, j int) {
-	entries := pq.entries
-	entries[i], entries[j] = entries[j], entries[i]
-	pq.dir[entries[i].state] = i
-	pq.dir[entries[j].state] = j
-}
-
-func (pq *priorityQueue) Push(x interface{}) {
-	entry := x.(*pqEntry)
-	pq.dir[entry.state] = len(pq.entries)
-	pq.entries = append(pq.entries, entry)
-}
-
-func (pq *priorityQueue) Pop() interface{} {
-	n := pq.Len()
-	x := pq.entries[n-1]
-	pq.entries = pq.entries[0 : n-1]
-	delete(pq.dir, x.state)
-	return x
-}
-
-func (pq *priorityQueue) Update(state int, head *pqEntry, tail [][]byte) {
-	var e *pqEntry
-
-	idx, ok := pq.dir[state]
-	if ok {
-		e = pq.entries[idx]
-	}
+// Update updates the priority queue entry for the given position.
+// `newPos` is a position in the command list, in the range 0, ..., len(cmds).
+// The call registers a new edge, from `head` to `newPos`, obtained by
+// appending the code `tail` to the code for `head`.
+func (pq *priorityQueue) Update(newPos int, head *bestPath, tail [][]byte) {
+	code := make([][]byte, len(head.code)+len(tail))
+	copy(code, head.code)
+	copy(code[len(head.code):], tail)
 	cost := head.cost
 	for _, blob := range tail {
 		cost += len(blob)
 	}
-	if ok && e.cost <= cost {
-		return
-	}
 
-	code := make([][]byte, len(head.code)+len(tail))
-	copy(code, head.code)
-	copy(code[len(head.code):], tail)
-	if ok {
-		e.code = code
-		e.cost = cost
-		heap.Fix(pq, idx)
+	var entry *bestPath
+	idx, alreadyExists := pq.idx[newPos]
+	if alreadyExists {
+		entry = pq.entries[idx]
+		if entry.cost > cost {
+			entry.code = code
+			entry.cost = cost
+			heap.Fix(pq, idx)
+		}
 	} else {
-		e = &pqEntry{state: state, code: code, cost: cost}
-		heap.Push(pq, e)
+		entry = &bestPath{
+			pos:  newPos,
+			code: code,
+			cost: cost,
+		}
+		heap.Push(pq, entry)
 	}
+}
+
+// Len implements heap.Interface.
+func (pq *priorityQueue) Len() int {
+	return len(pq.entries)
+}
+
+// Less implements heap.Interface.
+func (pq *priorityQueue) Less(i, j int) bool {
+	return pq.entries[i].cost < pq.entries[j].cost
+}
+
+// Swap implements heap.Interface.
+func (pq *priorityQueue) Swap(i, j int) {
+	entries := pq.entries
+	entries[i], entries[j] = entries[j], entries[i]
+	pq.idx[entries[i].pos] = i
+	pq.idx[entries[j].pos] = j
+}
+
+// Push implements heap.Interface.
+func (pq *priorityQueue) Push(x interface{}) {
+	entry := x.(*bestPath)
+	pq.idx[entry.pos] = len(pq.entries)
+	pq.entries = append(pq.entries, entry)
+}
+
+// Pop implements heap.Interface.
+func (pq *priorityQueue) Pop() interface{} {
+	n := pq.Len()
+	x := pq.entries[n-1]
+	pq.entries = pq.entries[0 : n-1]
+	delete(pq.idx, x.pos)
+	return x
 }
 
 const maxStack = 48
@@ -389,7 +383,7 @@ func findEdges(cmds []enCmd) []edge {
 			code = append(code, cmds[pos].Args[1].Code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlineto),
-				step: pos + 1,
+				skip: pos + 1,
 			})
 			pos++
 		}
@@ -398,7 +392,7 @@ func findEdges(cmds []enCmd) []edge {
 		if pos < len(cmds) && cmds[pos].Op == CmdCurveTo && len(code)+6 <= maxStack {
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlinecurve, cmds[pos].Args...),
-				step: pos + 1,
+				skip: pos + 1,
 			})
 		}
 
@@ -432,7 +426,7 @@ func findEdges(cmds []enCmd) []edge {
 
 			edges = append(edges, edge{
 				code: copyOp(code, op),
-				step: pos,
+				skip: pos,
 			})
 		}
 	} else { // Cmds[0].Op == CmdCurveTo
@@ -443,7 +437,7 @@ func findEdges(cmds []enCmd) []edge {
 			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rrcurveto),
-				step: pos + 1,
+				skip: pos + 1,
 			})
 			pos++
 		}
@@ -453,7 +447,7 @@ func findEdges(cmds []enCmd) []edge {
 			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rcurveline),
-				step: pos + 1,
+				skip: pos + 1,
 			})
 		}
 
@@ -487,7 +481,7 @@ func findEdges(cmds []enCmd) []edge {
 				code = append(code, cmds[pos].Args[5-hv.offs].Code)
 				edges = append(edges, edge{
 					code: copyOp(code, hv.op),
-					step: pos + 1,
+					skip: pos + 1,
 				})
 				pos++
 			}
@@ -531,7 +525,7 @@ func findEdges(cmds []enCmd) []edge {
 
 				edges = append(edges, edge{
 					code: copyOp(code, op),
-					step: pos,
+					skip: pos,
 				})
 				if !lastIsAligned {
 					break
@@ -560,7 +554,7 @@ func findEdges(cmds []enCmd) []edge {
 				code = append(code, t2hflex.Bytes())
 				edges = append(edges, edge{
 					code: code,
-					step: 2,
+					skip: 2,
 				})
 			} else if math.Abs(dy+cmds[0].Args[1].Val+cmds[1].Args[5].Val) < 0.5/65536 {
 				// dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6  hflex1
@@ -576,7 +570,7 @@ func findEdges(cmds []enCmd) []edge {
 				code = append(code, t2hflex1.Bytes())
 				edges = append(edges, edge{
 					code: code,
-					step: 2,
+					skip: 2,
 				})
 			}
 
@@ -591,11 +585,17 @@ func findEdges(cmds []enCmd) []edge {
 
 type edge struct {
 	code [][]byte
-	step int
+	skip int
 }
 
 func (e edge) String() string {
-	return fmt.Sprintf("edge % x %+d", e.code, e.step)
+	return fmt.Sprintf("edge % x %+d", e.code, e.skip)
+}
+
+// Command is a CFF glyph drawing command.
+type Command struct {
+	Op   CommandType
+	Args []float64 // TODO(voss): use 16.16 fixed point?
 }
 
 // CommandType is the type of a CFF glyph drawing command.
@@ -637,6 +637,24 @@ const (
 
 func (c Command) String() string {
 	return fmt.Sprint("cmd", c.Args, c.Op)
+}
+
+// enCmd encodes a single command, using relative coordinates for the arguments
+// and storing the argument values as EncodedNumbers.
+type enCmd struct {
+	Op   CommandType
+	Args []encodedNumber
+}
+
+func (c enCmd) String() string {
+	return fmt.Sprint("cmd ", c.Args, c.Op)
+}
+
+func (c enCmd) appendArgs(code [][]byte) [][]byte {
+	for _, a := range c.Args {
+		code = append(code, a.Code)
+	}
+	return code
 }
 
 // encodedNumber is a number together with the Type2 charstring encoding of that number.

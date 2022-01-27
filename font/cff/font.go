@@ -293,7 +293,24 @@ func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
 		return nil, 0, 0, errMissingNotdef
 	}
 
-	// TODO(voss): re-introduce the subroutines
+	// TODO(voss): re-introduce the subroutines.
+	// Size used for a subroutine:
+	//   - an entry in the subrs and gsubrs INDEX takes
+	//     up to 4 bytes, plus the size of the subroutine
+	//   - the subrouting must finish with t2return
+	//     or t2endchar (1 byte)
+	//   - calling the subroutine uses k+1 bytes, where
+	//     k=1 for the first 215 subroutines of each type, and
+	//     k=2 for the next 2048 subroutines of each type.
+	// An approximation could be the following:
+	//   - if n bytes occur k times, this uses n*k bytes
+	//   - if the n bytes are turned into a subroutine, this uses
+	//     approximately k*2 + n + 3 or k*3 + n + 4 bytes.
+	//   - the savings are n*k - k*2 - n - 3 = (n-2)*(k-1)-5
+	//     or n*k - k*3 - n - 4 = (n-3)*(k-1)-7 bytes.
+	//
+	// http://www.allisons.org/ll/AlgDS/Tree/Suffix/
+	// https://stackoverflow.com/questions/9452701/ukkonens-suffix-tree-algorithm-in-plain-english
 
 	cc := make(cffIndex, numGlyphs)
 	defaultWidth, nominalWidth := cff.selectWidths()

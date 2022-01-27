@@ -116,6 +116,87 @@ func decodeDict(buf []byte, ss *cffStrings) (cffDict, error) {
 	return res, nil
 }
 
+func (d cffDict) encode(ss *cffStrings) []byte {
+	keys := d.sortedKeys()
+
+	res := &bytes.Buffer{}
+	for _, op := range keys {
+		args := d[op]
+		for i, arg := range args {
+			if s, ok := arg.(string); ok {
+				args[i] = int32(ss.lookup(s))
+			}
+		}
+
+		for _, arg := range args {
+			switch a := arg.(type) {
+			case int32:
+				switch {
+				case a >= -107 && a <= 107:
+					res.WriteByte(byte(a + 139))
+				case a >= 108 && a <= 1131:
+					// a = (b0–247)*256+b1+108
+					a -= 108
+					b1 := byte(a)
+					a >>= 8
+					b0 := byte(a + 247)
+					res.Write([]byte{b0, b1})
+				case a >= -1131 && a <= -108:
+					// a = -(b0–251)*256-b1-108
+					a = -108 - a
+					b1 := byte(a)
+					a >>= 8
+					b0 := byte(a + 251)
+					res.Write([]byte{b0, b1})
+				case a >= -32768 && a <= 32767:
+					a16 := uint16(a)
+					res.Write([]byte{28, byte(a16 >> 8), byte(a16)})
+				default:
+					a32 := uint32(a)
+					res.Write([]byte{29, byte(a32 >> 24), byte(a32 >> 16), byte(a32 >> 8), byte(a32)})
+				}
+			case float64:
+				res.WriteByte(0x1e)
+				s := fmt.Sprintf("%g::", a)
+				first := true
+				var tmp byte
+				for i := 0; i < len(s); i++ {
+					var nibble byte
+					c := s[i]
+					switch {
+					case c >= '0' && c <= '9':
+						nibble = c - '0'
+					case c == '.':
+						nibble = 0x0a
+					case c == 'e':
+						if s[i+1] != '-' {
+							nibble = 0x0b
+						} else {
+							i++
+							nibble = 0x0c
+						}
+					case i == 0 && c == '-':
+						nibble = 0x0e
+					case c == ':':
+						nibble = 0x0f
+					}
+					if first {
+						tmp = nibble << 4
+					} else {
+						res.WriteByte(tmp | nibble)
+					}
+					first = !first
+				}
+			}
+		}
+		if op > 255 {
+			res.WriteByte(12)
+		}
+		res.WriteByte(byte(op))
+	}
+	return res.Bytes()
+}
+
 // decodes a float (without the leading 0x1e)
 func decodeFloat(buf []byte) ([]byte, float64, error) {
 	var s []byte
@@ -155,14 +236,6 @@ func decodeFloat(buf []byte) ([]byte, float64, error) {
 			s = append(s, '0'+nibble)
 		}
 	}
-}
-
-func (d cffDict) Copy() cffDict {
-	c := make(cffDict, len(d))
-	for k, v := range d {
-		c[k] = append([]interface{}{}, v...)
-	}
-	return c
 }
 
 func (d cffDict) getInt(op dictOp, defVal int32) int32 {
@@ -250,6 +323,104 @@ func (d cffDict) getFontMatrix(op dictOp) []float64 {
 	return res
 }
 
+func (d cffDict) setDelta32(op dictOp, val []int32) {
+	if len(val) == 0 {
+		delete(d, op)
+		return
+	}
+	res := make([]interface{}, len(val))
+	var prev int32
+	for i, x := range val {
+		res[i] = x - prev
+		prev = x
+	}
+	d[op] = res
+}
+
+func (d cffDict) setFontMatrix(op dictOp, fm []float64) {
+	if len(fm) == 0 {
+		return
+	} else if len(fm) != 6 {
+		panic("bad font matrix")
+	}
+
+	needed := false
+	for i, xi := range fm {
+		if math.Abs(xi-defaultFontMatrix[i]) > 1e-5 {
+			needed = true
+			break
+		}
+	}
+	if !needed {
+		return
+	}
+
+	val := make([]interface{}, 6)
+	for i, xi := range fm {
+		val[i] = xi
+	}
+	d[op] = val
+}
+
+func (d cffDict) sortedKeys() []dictOp {
+	keys := make([]dictOp, 0, len(d))
+	for k := range d {
+		keys = append(keys, k)
+	}
+	conv := func(op dictOp) int {
+		if op == opROS {
+			return -1
+		} else if op == opSyntheticBase {
+			return -2
+		}
+		return int(op)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return conv(keys[i]) < conv(keys[j])
+	})
+	return keys
+}
+
+func makeTopDict(info *type1.FontInfo) cffDict {
+	topDict := cffDict{}
+	if info.Version != "" {
+		topDict[opVersion] = []interface{}{info.Version}
+	}
+	if info.Notice != "" {
+		topDict[opNotice] = []interface{}{info.Notice}
+	}
+	if info.Copyright != "" {
+		topDict[opCopyright] = []interface{}{info.Copyright}
+	}
+	if info.FullName != "" {
+		topDict[opFullName] = []interface{}{info.FullName}
+	}
+	if info.FamilyName != "" {
+		topDict[opFamilyName] = []interface{}{info.FamilyName}
+	}
+	if info.Weight != "" {
+		topDict[opWeight] = []interface{}{info.Weight}
+	}
+	if info.IsFixedPitch {
+		topDict[opIsFixedPitch] = []interface{}{int32(1)}
+	}
+	if info.ItalicAngle != 0 {
+		topDict[opItalicAngle] = []interface{}{info.ItalicAngle}
+	}
+	if info.UnderlinePosition != defaultUnderlinePosition {
+		topDict[opUnderlinePosition] = []interface{}{info.UnderlinePosition}
+	}
+	if info.UnderlineThickness != defaultUnderlineThickness {
+		topDict[opUnderlineThickness] = []interface{}{info.UnderlineThickness}
+	}
+	if info.PaintType != 0 {
+		topDict[opPaintType] = []interface{}{info.PaintType}
+	}
+	topDict.setFontMatrix(opFontMatrix, info.FontMatrix)
+
+	return topDict
+}
+
 type privateInfo struct {
 	private      *type1.PrivateDict
 	subrs        cffIndex
@@ -309,185 +480,6 @@ func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInf
 	}
 
 	return info, nil
-}
-
-func (d cffDict) setDelta32(op dictOp, val []int32) {
-	if len(val) == 0 {
-		delete(d, op)
-		return
-	}
-	res := make([]interface{}, len(val))
-	var prev int32
-	for i, x := range val {
-		res[i] = x - prev
-		prev = x
-	}
-	d[op] = res
-}
-
-func (d cffDict) setFontMatrix(op dictOp, fm []float64) {
-	if len(fm) == 0 {
-		return
-	} else if len(fm) != 6 {
-		panic("bad font matrix")
-	}
-
-	needed := false
-	for i, xi := range fm {
-		if math.Abs(xi-defaultFontMatrix[i]) > 1e-5 {
-			needed = true
-			break
-		}
-	}
-	if !needed {
-		return
-	}
-
-	val := make([]interface{}, 6)
-	for i, xi := range fm {
-		val[i] = xi
-	}
-	d[op] = val
-}
-
-func (d cffDict) sortedKeys() []dictOp {
-	keys := make([]dictOp, 0, len(d))
-	for k := range d {
-		keys = append(keys, k)
-	}
-	conv := func(op dictOp) int {
-		if op == opROS {
-			return -1
-		} else if op == opSyntheticBase {
-			return -2
-		}
-		return int(op)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		return conv(keys[i]) < conv(keys[j])
-	})
-	return keys
-}
-
-func (d cffDict) encode(ss *cffStrings) []byte {
-	keys := d.sortedKeys()
-
-	res := &bytes.Buffer{}
-	for _, op := range keys {
-		args := d[op]
-		for i, arg := range args {
-			if s, ok := arg.(string); ok {
-				args[i] = int32(ss.lookup(s))
-			}
-		}
-
-		for _, arg := range args {
-			switch a := arg.(type) {
-			case int32:
-				switch {
-				case a >= -107 && a <= 107:
-					res.WriteByte(byte(a + 139))
-				case a >= 108 && a <= 1131:
-					// a = (b0–247)*256+b1+108
-					a -= 108
-					b1 := byte(a)
-					a >>= 8
-					b0 := byte(a + 247)
-					res.Write([]byte{b0, b1})
-				case a >= -1131 && a <= -108:
-					// a = -(b0–251)*256-b1-108
-					a = -108 - a
-					b1 := byte(a)
-					a >>= 8
-					b0 := byte(a + 251)
-					res.Write([]byte{b0, b1})
-				case a >= -32768 && a <= 32767:
-					a16 := uint16(a)
-					res.Write([]byte{28, byte(a16 >> 8), byte(a16)})
-				default:
-					a32 := uint32(a)
-					res.Write([]byte{29, byte(a32 >> 24), byte(a32 >> 16), byte(a32 >> 8), byte(a32)})
-				}
-			case float64:
-				res.WriteByte(0x1e)
-				s := fmt.Sprintf("%g::", a)
-				first := true
-				var tmp byte
-				for i := 0; i < len(s); i++ {
-					var nibble byte
-					c := s[i]
-					switch {
-					case c >= '0' && c <= '9':
-						nibble = c - '0'
-					case c == '.':
-						nibble = 0x0a
-					case c == 'e':
-						if s[i+1] != '-' {
-							nibble = 0x0b
-						} else {
-							i++
-							nibble = 0x0c
-						}
-					case i == 0 && c == '-':
-						nibble = 0x0e
-					case c == ':':
-						nibble = 0x0f
-					}
-					if first {
-						tmp = nibble << 4
-					} else {
-						res.WriteByte(tmp | nibble)
-					}
-					first = !first
-				}
-			}
-		}
-		if op > 255 {
-			res.WriteByte(12)
-		}
-		res.WriteByte(byte(op))
-	}
-	return res.Bytes()
-}
-
-func makeTopDict(info *type1.FontInfo) cffDict {
-	topDict := cffDict{}
-	if info.Version != "" {
-		topDict[opVersion] = []interface{}{info.Version}
-	}
-	if info.Notice != "" {
-		topDict[opNotice] = []interface{}{info.Notice}
-	}
-	if info.Copyright != "" {
-		topDict[opCopyright] = []interface{}{info.Copyright}
-	}
-	if info.FullName != "" {
-		topDict[opFullName] = []interface{}{info.FullName}
-	}
-	if info.FamilyName != "" {
-		topDict[opFamilyName] = []interface{}{info.FamilyName}
-	}
-	if info.Weight != "" {
-		topDict[opWeight] = []interface{}{info.Weight}
-	}
-	if info.IsFixedPitch {
-		topDict[opIsFixedPitch] = []interface{}{int32(1)}
-	}
-	if info.ItalicAngle != 0 {
-		topDict[opItalicAngle] = []interface{}{info.ItalicAngle}
-	}
-	if info.UnderlinePosition != defaultUnderlinePosition {
-		topDict[opUnderlinePosition] = []interface{}{info.UnderlinePosition}
-	}
-	if info.UnderlineThickness != defaultUnderlineThickness {
-		topDict[opUnderlineThickness] = []interface{}{info.UnderlineThickness}
-	}
-	if info.PaintType != 0 {
-		topDict[opPaintType] = []interface{}{info.PaintType}
-	}
-	topDict.setFontMatrix(opFontMatrix, info.FontMatrix)
-
-	return topDict
 }
 
 func (cff *Font) makePrivateDict(defaultWidth, nominalWidth int32) cffDict {

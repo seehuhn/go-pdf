@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package cff
 
 import (
@@ -159,7 +175,7 @@ func TestFindEdges(t *testing.T) {
 	g.CurveTo(14, 12, 15, 16, 17, 16)
 	in.Glyphs = append(in.Glyphs, g)
 
-	g = NewGlyph("test.5b", 500) // t2hhcurveto, first not horizontal
+	g = NewGlyph("test.5b", 500) // t2hhcurveto, first segment not horizontal
 	g.MoveTo(1, 1)
 	g.CurveTo(10, 2, 11, 12, 13, 12)
 	g.CurveTo(14, 12, 15, 16, 17, 16)
@@ -171,7 +187,7 @@ func TestFindEdges(t *testing.T) {
 	g.CurveTo(7, 10, 13, 12, 13, 14)
 	in.Glyphs = append(in.Glyphs, g)
 
-	g = NewGlyph("test.5d", 500) // t2vvcurveto, first not vertical
+	g = NewGlyph("test.5d", 500) // t2vvcurveto, first segment not vertical
 	g.MoveTo(1, 2)
 	g.CurveTo(3, 4, 7, 6, 7, 8)
 	g.CurveTo(7, 10, 13, 12, 13, 14)
