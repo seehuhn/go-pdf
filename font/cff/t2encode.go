@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -30,12 +31,12 @@ type Glyph struct {
 	Cmds  []Command
 	HStem []int16
 	VStem []int16
-	Name  string
+	Name  pdf.Name
 	Width int32
 }
 
 // NewGlyph allocates a new glyph.
-func NewGlyph(name string, width int32) *Glyph {
+func NewGlyph(name pdf.Name, width int32) *Glyph {
 	return &Glyph{
 		Name:  name,
 		Width: width,

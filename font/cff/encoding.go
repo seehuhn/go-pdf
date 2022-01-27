@@ -17,14 +17,54 @@
 package cff
 
 import (
+	"errors"
 	"fmt"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-type encoding struct{}
+func (cff *Font) encodeEncoding(enc font.Encoding, ss cffStrings) error {
+	// TODO(voss): check whether StandardEncoding or ExpertEncoding can
+	// be used.
 
-func (cff *Font) readEncoding(p *parser.Parser) (*encoding, error) {
+	type supplement struct {
+		code     byte
+		glyphSID int32
+	}
+	var extra []*supplement
+	gid2code := make([]int16, 256)
+	for i := range gid2code {
+		gid2code[i] = -1
+	}
+	var maxGID font.GlyphID
+	for code, gid := range enc {
+		if int(gid) >= len(cff.Glyphs) || gid == 0 {
+			return errors.New("cff: invalid GID")
+		}
+
+		if gid <= 255 && gid2code[gid] < 0 {
+			if gid > maxGID {
+				maxGID = gid
+			}
+			gid2code[gid] = int16(code)
+		} else {
+			extra = append(extra, &supplement{
+				code:     code,
+				glyphSID: ss.lookup(string(cff.Glyphs[gid].Name)),
+			})
+		}
+	}
+
+	length0 := 2 + int(maxGID)
+
+	// length1 :=
+	_ = length0
+
+	return nil
+}
+
+func (cff *Font) readEncoding(p *parser.Parser) (font.Encoding, error) {
 	format, err := p.ReadUInt8()
 	if err != nil {
 		return nil, err

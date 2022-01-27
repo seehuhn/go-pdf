@@ -18,20 +18,6 @@ package font
 
 import "unicode"
 
-// Encoding describes the correspondence between character indices and unicode
-// characters for a PDF font.
-type Encoding interface {
-	// Encode gives the character code for a given rune.  The second
-	// return code indicates whether a mapping is available.
-	Encode(r rune) (byte, bool)
-
-	// Decode returns the rune corresponding to a given character code.  This
-	// is the inverse of Encode for all runes where Encode returns true in the
-	// second return value.  Decode() returns unicode.ReplacementChar for
-	// undefined code points.
-	Decode(c byte) rune
-}
-
 var (
 	// StandardEncoding is one of the PDF Latin-text encodings.
 	// It is normally only used for metadata, but not as a character

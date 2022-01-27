@@ -117,16 +117,16 @@ func (font *Font) ToGlyph(fontDesignSize int) int {
 // GlyphID is used to enumerate the glyphs in a font.  The first glyph
 // has index 0 and is used to indicate a missing character (usually rendered
 // as an empty box).
-//
-// TODO(voss): is this the CID or GID in Adobe's language?
 type GlyphID uint16
+
+type Encoding map[byte]GlyphID
 
 // Rect represents a rectangle with integer coordinates.
 type Rect struct {
 	LLx, LLy, URx, URy int // TODO(voss): should we use int16 or int32 here?
 }
 
-// IsZero returns whether the glyph leaves marks on the page.
+// IsZero is true if the glyph leaves no marks on the page.
 func (rect *Rect) IsZero() bool {
 	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
 }

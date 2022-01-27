@@ -24,8 +24,22 @@ import (
 	"seehuhn.de/go/pdf/font/names"
 )
 
+// OldEncoding describes the correspondence between character codes and unicode
+// characters for a simple PDF font.
+type OldEncoding interface {
+	// Encode gives the character code for a given rune.  The second
+	// return code indicates whether a mapping is available.
+	Encode(r rune) (byte, bool)
+
+	// Decode returns the rune corresponding to a given character code.  This
+	// is the inverse of Encode for all runes where Encode returns true in the
+	// second return value.  DecodeX() returns unicode.ReplacementChar for
+	// undefined code points.
+	Decode(c byte) rune
+}
+
 func TestBuiltinEncodings(t *testing.T) {
-	encodings := []Encoding{
+	encodings := []OldEncoding{
 		StandardEncoding,
 		WinAnsiEncoding,
 		MacRomanEncoding,

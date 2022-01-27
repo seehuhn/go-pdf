@@ -224,7 +224,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		glyph.Name = strings.get(charset[i])
+		glyph.Name = pdf.Name(strings.get(charset[i]))
 		cff.Glyphs[i] = glyph
 	}
 
@@ -383,7 +383,7 @@ func (cff *Font) Encode(w io.Writer) error {
 		if s == "" {
 			s = ".notdef"
 		}
-		glyphNames[i] = strings.lookup(s)
+		glyphNames[i] = strings.lookup(string(s))
 	}
 	blobs[secCharsets], err = encodeCharset(glyphNames)
 	if err != nil {
