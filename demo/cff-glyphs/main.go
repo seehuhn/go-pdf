@@ -66,19 +66,21 @@ func main() {
 			continue
 		}
 
-		cff, err := cff.Read(bytes.NewReader(cffData))
+		cffFont, err := cff.Read(bytes.NewReader(cffData))
 		if err != nil {
 			log.Printf("%s: %v", fname, err)
 			continue
 		}
 
-		for i := range cff.Glyphs {
-			bbox := cff.Glyphs[i].Extent()
+		X, err := cff.EmbedFontCID(out, cffFont, "X")
+
+		for i := range cffFont.Glyphs {
+			bbox := cffFont.Glyphs[i].Extent()
 			left := 0
 			if bbox.LLx < left {
 				left = bbox.LLx
 			}
-			right := int(cff.Glyphs[i].Width)
+			right := int(cffFont.Glyphs[i].Width)
 			if right < 300 {
 				right = 300
 			}
@@ -101,12 +103,17 @@ func main() {
 					URx: q*float64(right) + 20,
 					URy: q*float64(top) + 12 + 20,
 				},
+				Resources: &pages.Resources{
+					Font: pdf.Dict{
+						X.InstName: X.Ref,
+					},
+				},
 			})
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			err = illustrateGlyph(page, F, cff, i)
+			err = illustrateGlyph(page, F, X, cffFont, i)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -135,7 +142,7 @@ func loadCFFData(fname string) ([]byte, error) {
 	return os.ReadFile(fname)
 }
 
-func illustrateGlyph(page *pages.Page, F *font.Font, fnt *cff.Font, i int) error {
+func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) error {
 	hss := boxes.Glue(0, 1, 1, 1, 1)
 
 	label := fmt.Sprintf("glyph %d: %s", i, fnt.Glyphs[i].Name)
@@ -154,6 +161,21 @@ func illustrateGlyph(page *pages.Page, F *font.Font, fnt *cff.Font, i int) error
 	page.Println("S Q")
 
 	glyph := fnt.Glyphs[i]
+
+	page.Println("q")
+	page.Println("0.5 0.9 0.9 rg")
+	glyphImage := &font.Layout{
+		Font:     X,
+		FontSize: 1000,
+		Glyphs: []font.Glyph{
+			{
+				Gid:     font.GlyphID(i),
+				Advance: int(fnt.Glyphs[i].Width),
+			},
+		},
+	}
+	glyphImage.Draw(page, 0, 0)
+	page.Println("Q")
 
 	var xx []float64
 	var yy []float64

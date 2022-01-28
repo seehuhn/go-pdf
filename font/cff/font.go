@@ -241,6 +241,15 @@ func (cff *Font) GlyphExtents() []font.Rect {
 	return extents
 }
 
+// Widths returns the widths of all glyphs.
+func (cff *Font) Widths() []int {
+	res := make([]int, len(cff.Glyphs))
+	for i, glyph := range cff.Glyphs {
+		res[i] = int(glyph.Width)
+	}
+	return res
+}
+
 func (cff *Font) selectWidths() (int32, int32) {
 	numGlyphs := int32(len(cff.Glyphs))
 	if numGlyphs == 0 {

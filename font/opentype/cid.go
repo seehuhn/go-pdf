@@ -84,7 +84,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 
 		text: make(map[font.GlyphID][]rune),
 		used: map[font.GlyphID]bool{
-			0: true, // always include the .notdef glyph
+			0: true, // TODO(voss): is this needed?
 		},
 	}
 
@@ -169,7 +169,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
 	}
 
-	DW, W := font.EncodeCIDWidths(t.Sfnt.Width) // TODO(voss): subset???
+	DW, W := font.EncodeCIDWidths(t.Sfnt.Width)
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
