@@ -190,7 +190,10 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 	lastCharCode := mapping[len(mapping)-1].CharCode
 	_, includeGlyphs := font.MakeSubset(mapping)
 	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Sfnt.Width))
-	cff := t.Cff.Subset(includeGlyphs)
+	cff, err := t.Cff.Subset(includeGlyphs)
+	if err != nil {
+		return err
+	}
 	fontName := pdf.Name(t.Cff.Info.FontName) // includes the subset tag
 
 	q := 1000 / float64(t.Sfnt.GlyphUnits)
@@ -242,7 +245,7 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 		Widths = append(Widths, pdf.Integer(width))
 	}
 
-	_, err := w.WriteCompressed(
+	_, err = w.WriteCompressed(
 		[]*pdf.Reference{t.FontRef, FontDescriptorRef, WidthsRef},
 		Font, FontDescriptor, Widths)
 	if err != nil {

@@ -35,10 +35,6 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 		Width: info.defaultWidth,
 	}
 
-	skipBytes := func(n int) { // TODO(voss): remove?
-		code = code[n:]
-	}
-
 	var stack []float64 // TODO(voss): use 16.16 fixed point numbers?
 	clearStack := func() {
 		stack = stack[:0]
@@ -63,16 +59,16 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 	rMoveTo := func(dx, dy float64) {
 		posX += dx
 		posY += dy
-		res.Cmds = append(res.Cmds, Command{
-			Op:   CmdMoveTo,
+		res.Cmds = append(res.Cmds, GlyphOp{
+			Op:   OpMoveTo,
 			Args: []float64{posX, posY},
 		})
 	}
 	rLineTo := func(dx, dy float64) {
 		posX += dx
 		posY += dy
-		res.Cmds = append(res.Cmds, Command{
-			Op:   CmdLineTo,
+		res.Cmds = append(res.Cmds, GlyphOp{
+			Op:   OpLineTo,
 			Args: []float64{posX, posY},
 		})
 	}
@@ -83,8 +79,8 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 		yb := ya + dyb
 		posX = xb + dxc
 		posY = yb + dyc
-		res.Cmds = append(res.Cmds, Command{
-			Op:   CmdCurveTo,
+		res.Cmds = append(res.Cmds, GlyphOp{
+			Op:   OpCurveTo,
 			Args: []float64{xa, ya, xb, yb, posX, posY},
 		})
 	}
@@ -102,7 +98,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 
 			if op >= 32 && op <= 246 {
 				stack = append(stack, float64(int32(op)-139))
-				skipBytes(1)
+				code = code[1:]
 				continue
 			} else if op >= 247 && op <= 250 {
 				if len(code) < 2 {
@@ -110,7 +106,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				}
 				val := int32(op)*256 + int32(code[1]) + (108 - 247*256)
 				stack = append(stack, float64(val))
-				skipBytes(2)
+				code = code[2:]
 				continue
 			} else if op >= 251 && op <= 254 {
 				if len(code) < 2 {
@@ -118,7 +114,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				}
 				val := -int32(op)*256 - int32(code[1]) - (108 - 251*256)
 				stack = append(stack, float64(val))
-				skipBytes(2)
+				code = code[2:]
 				continue
 			} else if op == 28 {
 				if len(code) < 3 {
@@ -126,7 +122,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				}
 				val := int16(code[1])<<8 + int16(code[2])
 				stack = append(stack, float64(val))
-				skipBytes(3)
+				code = code[3:]
 				continue
 			} else if op == 255 {
 				if len(code) < 5 {
@@ -136,7 +132,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				val := int32(code[1])<<24 + int32(code[2])<<16 +
 					int32(code[3])<<8 + int32(code[4])
 				stack = append(stack, float64(val)/65536)
-				skipBytes(5)
+				code = code[5:]
 				continue
 			}
 
@@ -358,12 +354,12 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errIncomplete
 				}
 
-				cmd := Command{
-					Op:   CmdHintMask,
+				cmd := GlyphOp{
+					Op:   OpHintMask,
 					Args: []float64{},
 				}
 				if op == t2cntrmask {
-					cmd.Op = CmdCntrMask
+					cmd.Op = OpCntrMask
 				}
 				for _, b := range code[:k] {
 					cmd.Args = append(cmd.Args, float64(b))

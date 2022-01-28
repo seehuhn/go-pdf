@@ -119,8 +119,6 @@ func (font *Font) ToGlyph(fontDesignSize int) int {
 // as an empty box).
 type GlyphID uint16
 
-type Encoding map[byte]GlyphID
-
 // Rect represents a rectangle with integer coordinates.
 type Rect struct {
 	LLx, LLy, URx, URy int // TODO(voss): should we use int16 or int32 here?

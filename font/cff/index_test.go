@@ -36,24 +36,19 @@ func TestIndex(t *testing.T) {
 			data[i] = blob[d : d+127]
 		}
 
-		buf := &bytes.Buffer{}
-		n, err := data.writeTo(buf)
+		buf, err := data.encode()
 		if err != nil {
 			t.Error(err)
 			continue
 		}
-		if n != buf.Len() {
-			t.Errorf("wrong output size for count=%d: %d != %d",
-				count, n, buf.Len())
-		}
 
-		if count == 0 && n != 2 {
+		if count == 0 && len(buf) != 2 {
 			t.Error("wrong length for empty INDEX")
 		}
 
-		r := bytes.NewReader(buf.Bytes())
+		r := bytes.NewReader(buf)
 		p := parser.New(r)
-		err = p.SetRegion("CFF", 0, int64(n))
+		err = p.SetRegion("CFF", 0, int64(len(buf)))
 		if err != nil {
 			t.Fatal(err)
 		}

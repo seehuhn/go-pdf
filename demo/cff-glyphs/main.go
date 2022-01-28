@@ -160,19 +160,19 @@ func illustrateGlyph(page *pages.Page, F *font.Font, fnt *cff.Font, i int) error
 	var ink bool
 	for _, cmd := range glyph.Cmds {
 		switch cmd.Op {
-		case cff.CmdMoveTo:
+		case cff.OpMoveTo:
 			if ink {
 				page.Println("h")
 			}
 			page.Printf("%.3f %.3f m\n", cmd.Args[0], cmd.Args[1])
 			xx = append(xx, cmd.Args[0])
 			yy = append(yy, cmd.Args[1])
-		case cff.CmdLineTo:
+		case cff.OpLineTo:
 			page.Printf("%.3f %.3f l\n", cmd.Args[0], cmd.Args[1])
 			xx = append(xx, cmd.Args[0])
 			yy = append(yy, cmd.Args[1])
 			ink = true
-		case cff.CmdCurveTo:
+		case cff.OpCurveTo:
 			page.Printf("%.3f %.3f %.3f %.3f %.3f %.3f c\n",
 				cmd.Args[0], cmd.Args[1], cmd.Args[2], cmd.Args[3], cmd.Args[4], cmd.Args[5])
 			xx = append(xx, cmd.Args[4])

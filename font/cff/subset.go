@@ -17,15 +17,21 @@
 package cff
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
 
 // Subset returns a copy of the font, including only the glyphs in the given
 // subset.  The ".notdef" glyph must always be included as the first glyph.
-func (cff *Font) Subset(subset []font.GlyphID) *Font {
+func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 	if subset[0] != 0 {
-		panic("invalid subset")
+		return nil, errors.New("cff:invalid subset")
+	}
+
+	if len(cff.Info.FontName) >= 7 && cff.Info.FontName[6] == '+' {
+		return nil, errors.New("cff: cannot subset a subset")
 	}
 
 	tag := font.GetSubsetTag(subset, len(cff.Glyphs))
@@ -37,7 +43,8 @@ func (cff *Font) Subset(subset []font.GlyphID) *Font {
 
 	for _, gid := range subset {
 		out.Glyphs = append(out.Glyphs, cff.Glyphs[gid])
+		out.gid2cid = append(out.gid2cid, int32(gid))
 	}
 
-	return out
+	return out, nil
 }

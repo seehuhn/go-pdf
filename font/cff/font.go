@@ -34,7 +34,7 @@ type Font struct {
 	Info   *type1.FontInfo
 	Glyphs []*Glyph
 
-	gid2cid []font.GlyphID
+	gid2cid []int32
 }
 
 // Read reads a CFF font from r.
@@ -524,17 +524,14 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	// section 5: charsets INDEX (represents CIDs instead of glyph names)
-	subset := make([]int32, numGlyphs)
-	if cff.gid2cid != nil {
-		for gid, cid := range cff.gid2cid {
-			subset[gid] = int32(cid)
-		}
-	} else {
+	gid2cid := cff.gid2cid
+	if len(gid2cid) != int(numGlyphs) {
+		gid2cid := make([]int32, numGlyphs)
 		for i := int32(0); i < numGlyphs; i++ {
-			subset[i] = i
+			gid2cid[i] = i
 		}
 	}
-	blobs[cidCharsets], err = encodeCharset(subset)
+	blobs[cidCharsets], err = encodeCharset(gid2cid)
 	if err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ import (
 
 // Glyph represents a glyph in a CFF font.
 type Glyph struct {
-	Cmds  []Command
+	Cmds  []GlyphOp
 	HStem []int16
 	VStem []int16
 	Name  pdf.Name
@@ -46,17 +46,17 @@ func NewGlyph(name pdf.Name, width int32) *Glyph {
 // MoveTo starts a new sub-path and moves the current point to (x, y).
 // The previous sub-path, if any, is closed.
 func (g *Glyph) MoveTo(x, y float64) {
-	g.Cmds = append(g.Cmds, Command{Op: CmdMoveTo, Args: []float64{x, y}})
+	g.Cmds = append(g.Cmds, GlyphOp{Op: OpMoveTo, Args: []float64{x, y}})
 }
 
 // LineTo adds a straight line to the current sub-path.
 func (g *Glyph) LineTo(x, y float64) {
-	g.Cmds = append(g.Cmds, Command{Op: CmdLineTo, Args: []float64{x, y}})
+	g.Cmds = append(g.Cmds, GlyphOp{Op: OpLineTo, Args: []float64{x, y}})
 }
 
 // CurveTo adds a cubic Bezier curve to the current sub-path.
 func (g *Glyph) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
-	g.Cmds = append(g.Cmds, Command{Op: CmdCurveTo, Args: []float64{x1, y1, x2, y2, x3, y3}})
+	g.Cmds = append(g.Cmds, GlyphOp{Op: OpCurveTo, Args: []float64{x1, y1, x2, y2, x3, y3}})
 }
 
 // Extent computes the Glyph extent in font design units
@@ -67,10 +67,10 @@ cmdLoop:
 	for _, cmd := range g.Cmds {
 		var x, y float64
 		switch cmd.Op {
-		case CmdMoveTo, CmdLineTo:
+		case OpMoveTo, OpLineTo:
 			x = cmd.Args[0]
 			y = cmd.Args[1]
-		case CmdCurveTo:
+		case OpCurveTo:
 			x = cmd.Args[4]
 			y = cmd.Args[5]
 		default:
@@ -107,7 +107,7 @@ func (g *Glyph) getCharString(defaultWidth, nominalWidth int32) ([]byte, error) 
 
 	hintMaskUsed := false
 	for _, cmd := range g.Cmds {
-		if cmd.Op == CmdHintMask || cmd.Op == CmdCntrMask {
+		if cmd.Op == OpHintMask || cmd.Op == OpCntrMask {
 			hintMaskUsed = true
 			break
 		}
@@ -148,7 +148,7 @@ func (g *Glyph) getCharString(defaultWidth, nominalWidth int32) ([]byte, error) 
 			canOmitVStem := (i == 1 &&
 				len(stems) == 0 &&
 				len(g.Cmds) > 0 &&
-				(g.Cmds[0].Op == CmdHintMask || g.Cmds[0].Op == CmdCntrMask))
+				(g.Cmds[0].Op == OpHintMask || g.Cmds[0].Op == OpCntrMask))
 			if !canOmitVStem {
 				header = append(header, op.Bytes())
 			}
@@ -176,14 +176,14 @@ func (g *Glyph) getCharString(defaultWidth, nominalWidth int32) ([]byte, error) 
 	return code, nil
 }
 
-func encodePaths(commands []Command) [][]byte {
+func encodePaths(commands []GlyphOp) [][]byte {
 	var res [][]byte
 
 	cmds := encodeArgs(commands)
 
 	for len(cmds) > 0 {
 		switch cmds[0].Op {
-		case CmdMoveTo:
+		case OpMoveTo:
 			mov := cmds[0]
 			if mov.Args[0].IsZero() {
 				res = append(res, mov.Args[1].Code, t2vmoveto.Bytes())
@@ -195,9 +195,9 @@ func encodePaths(commands []Command) [][]byte {
 
 			cmds = cmds[1:]
 
-		case CmdLineTo, CmdCurveTo:
+		case OpLineTo, OpCurveTo:
 			k := 1
-			for k < len(cmds) && (cmds[k].Op == CmdLineTo || cmds[k].Op == CmdCurveTo) {
+			for k < len(cmds) && (cmds[k].Op == OpLineTo || cmds[k].Op == OpCurveTo) {
 				k++
 			}
 			path := cmds[:k]
@@ -205,9 +205,9 @@ func encodePaths(commands []Command) [][]byte {
 
 			res = append(res, encodeSubPath(path)...)
 
-		case CmdHintMask, CmdCntrMask:
+		case OpHintMask, OpCntrMask:
 			op := t2hintmask
-			if cmds[0].Op == CmdCntrMask {
+			if cmds[0].Op == OpCntrMask {
 				op = t2cntrmask
 			}
 			res = append(res, append(op.Bytes(), cmds[0].Args[0].Code...))
@@ -246,7 +246,7 @@ func encodeSubPath(cmds []enCmd) [][]byte {
 	}
 }
 
-func encodeArgs(cmds []Command) []enCmd {
+func encodeArgs(cmds []GlyphOp) []enCmd {
 	res := make([]enCmd, len(cmds))
 
 	posX := 0.0
@@ -256,14 +256,14 @@ func encodeArgs(cmds []Command) []enCmd {
 			Op: cmd.Op,
 		}
 		switch cmd.Op {
-		case CmdMoveTo, CmdLineTo:
+		case OpMoveTo, OpLineTo:
 			dx := encodeNumber(cmd.Args[0] - posX)
 			dy := encodeNumber(cmd.Args[1] - posY)
 			res[i].Args = []encodedNumber{dx, dy}
 			posX += dx.Val
 			posY += dy.Val
 
-		case CmdCurveTo:
+		case OpCurveTo:
 			dxa := encodeNumber(cmd.Args[0] - posX)
 			dya := encodeNumber(cmd.Args[1] - posY)
 			dxb := encodeNumber(cmd.Args[2] - cmd.Args[0])
@@ -274,7 +274,7 @@ func encodeArgs(cmds []Command) []enCmd {
 			posX += dxa.Val + dxb.Val + dxc.Val
 			posY += dya.Val + dyb.Val + dyc.Val
 
-		case CmdHintMask, CmdCntrMask:
+		case OpHintMask, OpCntrMask:
 			k := len(cmd.Args)
 			code := make([]byte, k)
 			for i, arg := range cmd.Args {
@@ -375,11 +375,11 @@ func findEdges(cmds []enCmd) []edge {
 
 	var edges []edge
 
-	if cmds[0].Op == CmdLineTo {
+	if cmds[0].Op == OpLineTo {
 		// {dx dy}+  rlineto
 		var code [][]byte
 		pos := 0
-		for pos < len(cmds) && cmds[pos].Op == CmdLineTo && len(code)+2 <= maxStack {
+		for pos < len(cmds) && cmds[pos].Op == OpLineTo && len(code)+2 <= maxStack {
 			code = append(code, cmds[pos].Args[0].Code)
 			code = append(code, cmds[pos].Args[1].Code)
 			edges = append(edges, edge{
@@ -390,7 +390,7 @@ func findEdges(cmds []enCmd) []edge {
 		}
 
 		// {dx dy}+ xb yb xc yc xd yd  rlinecurve
-		if pos < len(cmds) && cmds[pos].Op == CmdCurveTo && len(code)+6 <= maxStack {
+		if pos < len(cmds) && cmds[pos].Op == OpCurveTo && len(code)+6 <= maxStack {
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlinecurve, cmds[pos].Args...),
 				skip: pos + 1,
@@ -402,7 +402,7 @@ func findEdges(cmds []enCmd) []edge {
 		code = nil
 		var aligned []int // +1=horizontal, -1=vertical
 		for _, cmd := range cmds {
-			if cmd.Op != CmdLineTo {
+			if cmd.Op != OpLineTo {
 				break
 			}
 			dir := 0
@@ -434,7 +434,7 @@ func findEdges(cmds []enCmd) []edge {
 		// (dxa dya dxb dyb dxc dyc)+ rrcurveto
 		pos := 0
 		var code [][]byte
-		if pos < len(cmds) && cmds[pos].Op == CmdCurveTo && len(code)+6 <= maxStack {
+		if pos < len(cmds) && cmds[pos].Op == OpCurveTo && len(code)+6 <= maxStack {
 			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rrcurveto),
@@ -444,7 +444,7 @@ func findEdges(cmds []enCmd) []edge {
 		}
 
 		// (dxa dya dxb dyb dxc dyc)+ dxd dyd rcurveline
-		if pos < len(cmds) && cmds[pos].Op == CmdLineTo && len(code)+2 <= maxStack {
+		if pos < len(cmds) && cmds[pos].Op == OpLineTo && len(code)+2 <= maxStack {
 			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rcurveline),
@@ -465,7 +465,7 @@ func findEdges(cmds []enCmd) []edge {
 			code = nil
 			pos = 0
 			// 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
-			for pos < len(cmds) && cmds[pos].Op == CmdCurveTo && len(code)+4 <= maxStack {
+			for pos < len(cmds) && cmds[pos].Op == OpCurveTo && len(code)+4 <= maxStack {
 				if !cmds[pos].Args[4+hv.offs].IsZero() {
 					break
 				}
@@ -497,7 +497,7 @@ func findEdges(cmds []enCmd) []edge {
 
 			// Args: 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
 			pos = 0
-			for pos < len(cmds) && cmds[pos].Op == CmdCurveTo {
+			for pos < len(cmds) && cmds[pos].Op == OpCurveTo {
 				if !cmds[pos].Args[1-offs].IsZero() {
 					break
 				}
@@ -535,7 +535,7 @@ func findEdges(cmds []enCmd) []edge {
 		}
 
 		if len(cmds) >= 2 &&
-			cmds[0].Op == CmdCurveTo && cmds[1].Op == CmdCurveTo &&
+			cmds[0].Op == OpCurveTo && cmds[1].Op == OpCurveTo &&
 			cmds[0].Args[5].IsZero() && cmds[1].Args[1].IsZero() {
 			// Args: 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
 
@@ -593,26 +593,26 @@ func (e edge) String() string {
 	return fmt.Sprintf("edge % x %+d", e.code, e.skip)
 }
 
-// Command is a CFF glyph drawing command.
-type Command struct {
-	Op   CommandType
+// GlyphOp is a CFF glyph drawing command.
+type GlyphOp struct {
+	Op   GlyphOpType
 	Args []float64 // TODO(voss): use 16.16 fixed point?
 }
 
-// CommandType is the type of a CFF glyph drawing command.
-type CommandType byte
+// GlyphOpType is the type of a CFF glyph drawing command.
+type GlyphOpType byte
 
-func (op CommandType) String() string {
+func (op GlyphOpType) String() string {
 	switch op {
-	case CmdMoveTo:
+	case OpMoveTo:
 		return "moveto"
-	case CmdLineTo:
+	case OpLineTo:
 		return "lineto"
-	case CmdCurveTo:
+	case OpCurveTo:
 		return "curveto"
-	case CmdHintMask:
+	case OpHintMask:
 		return "hintmask"
-	case CmdCntrMask:
+	case OpCntrMask:
 		return "cntrmask"
 	default:
 		return fmt.Sprintf("CommandType(%d)", op)
@@ -620,30 +620,30 @@ func (op CommandType) String() string {
 }
 
 const (
-	// CmdMoveTo closes the previous subpath and starts a new one at the given point.
-	CmdMoveTo CommandType = iota + 1
+	// OpMoveTo closes the previous subpath and starts a new one at the given point.
+	OpMoveTo GlyphOpType = iota + 1
 
-	// CmdLineTo appends a straight line segment from the previous point to the given point.
-	CmdLineTo
+	// OpLineTo appends a straight line segment from the previous point to the given point.
+	OpLineTo
 
-	// CmdCurveTo appends a Bezier curve segment from the previous point to the given point.
-	CmdCurveTo
+	// OpCurveTo appends a Bezier curve segment from the previous point to the given point.
+	OpCurveTo
 
-	// CmdHintMask adds a CFF hintmask command.
-	CmdHintMask
+	// OpHintMask adds a CFF hintmask command.
+	OpHintMask
 
-	// CmdCntrMask adds a CFF cntrmask command.
-	CmdCntrMask
+	// OpCntrMask adds a CFF cntrmask command.
+	OpCntrMask
 )
 
-func (c Command) String() string {
+func (c GlyphOp) String() string {
 	return fmt.Sprint("cmd", c.Args, c.Op)
 }
 
 // enCmd encodes a single command, using relative coordinates for the arguments
 // and storing the argument values as EncodedNumbers.
 type enCmd struct {
-	Op   CommandType
+	Op   GlyphOpType
 	Args []encodedNumber
 }
 

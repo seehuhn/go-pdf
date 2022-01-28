@@ -17,10 +17,8 @@
 package cff
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
-	"io"
 
 	"seehuhn.de/go/pdf/font/parser"
 )
@@ -88,13 +86,14 @@ func readIndex(p *parser.Parser) (cffIndex, error) {
 	return res, nil
 }
 
-func (data cffIndex) writeTo(w io.Writer) (int, error) {
+// encode converts a CFF INDEX to its binary representation.
+func (data cffIndex) encode() ([]byte, error) {
 	count := len(data)
 	if count >= 1<<16 {
-		return 0, errors.New("too many items for CFF INDEX")
+		return nil, errors.New("cff: too many items for INDEX")
 	}
 	if count == 0 {
-		return w.Write([]byte{0, 0})
+		return []byte{0, 0}, nil
 	}
 
 	bodyLength := 0
@@ -107,27 +106,23 @@ func (data cffIndex) writeTo(w io.Writer) (int, error) {
 		offSize++
 	}
 	if offSize > 4 {
-		return 0, errors.New("too much data for CFF INDEX")
+		return nil, errors.New("cff: too much data for INDEX")
 	}
 
-	total := 0
-	out := bufio.NewWriter(w)
-
-	n, _ := out.Write([]byte{
+	out := &bytes.Buffer{}
+	out.Write([]byte{
 		byte(count >> 8), byte(count), // count
 		byte(offSize), // offSize
 	})
-	total += n
 
 	// offset
-	var buf [4]byte
+	var offsetBuf [4]byte
 	pos := uint32(1)
 	for i := 0; i <= count; i++ {
 		for j := 0; j < offSize; j++ {
-			buf[j] = byte(pos >> (8 * (offSize - j - 1)))
+			offsetBuf[j] = byte(pos >> (8 * (offSize - j - 1)))
 		}
-		n, _ = out.Write(buf[:offSize])
-		total += n
+		out.Write(offsetBuf[:offSize])
 		if i < count {
 			pos += uint32(len(data[i]))
 		}
@@ -135,26 +130,8 @@ func (data cffIndex) writeTo(w io.Writer) (int, error) {
 
 	// data
 	for i := 0; i < count; i++ {
-		n, _ = out.Write(data[i])
-		total += n
+		out.Write(data[i])
 	}
 
-	return total, out.Flush()
-}
-
-// encode converts a CFF INDEX to its binary representation.
-func (data cffIndex) encode() ([]byte, error) {
-	buf := &bytes.Buffer{}
-	_, err := data.writeTo(buf)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-// Copy makes a shallow copy of the INDEX.
-func (data cffIndex) Copy() cffIndex {
-	res := make(cffIndex, len(data))
-	copy(res, data)
-	return res
+	return out.Bytes(), nil
 }
