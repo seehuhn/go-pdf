@@ -18,6 +18,7 @@ package cff
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/parser"
@@ -69,4 +70,56 @@ func TestIndex(t *testing.T) {
 			}
 		}
 	}
+}
+
+func FuzzIndex(f *testing.F) {
+	iSeed := cffIndex{}
+	buf, err := iSeed.encode()
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(buf)
+	for _, d := range [][]byte{{}, {0}, {0, 1, 2, 3}} {
+		iSeed = append(iSeed, d)
+		buf, err := iSeed.encode()
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(buf)
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		r := bytes.NewReader(data)
+		p := parser.New(r)
+		err := p.SetRegion("CFF", 0, int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		i1, err := readIndex(p)
+		if err != nil {
+			return
+		}
+
+		buf, err := i1.encode()
+		if err != nil {
+			t.Fatal(err)
+		} else if len(buf) > len(data) {
+			t.Error("inefficient encoding")
+		}
+
+		r = bytes.NewReader(buf)
+		p = parser.New(r)
+		err = p.SetRegion("CFF", 0, int64(len(buf)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		i2, err := readIndex(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(i1, i2) {
+			t.Error("unequal")
+		}
+	})
 }

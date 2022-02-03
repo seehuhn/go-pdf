@@ -34,36 +34,49 @@ func decodeDict(buf []byte, ss *cffStrings) (cffDict, error) {
 	res := cffDict{}
 	var stack []interface{}
 
-	flush := func(op dictOp) {
+	flush := func(op dictOp) error {
 		if op.isString() {
 			l := len(stack)
 			if l > 2 { // special case for opROS
 				l = 2
 			}
 			for i := 0; i < l; i++ {
-				s, ok := stack[i].(int32)
-				if ok {
-					stack[i] = ss.get(s)
-				} else {
-					stack[i] = ""
+				var idx int32
+				switch x := stack[i].(type) {
+				case int32:
+					idx = x
+				case float64:
+					idx = int32(x)
+					if float64(idx) != x {
+						return errNoString
+					}
+				default:
+					return errNoString
+				}
+				var err error
+				stack[i], err = ss.get(idx)
+				if err != nil {
+					return err
 				}
 			}
 		}
 		res[op] = stack
 		stack = nil
+		return nil
 	}
 
 	for len(buf) > 0 {
 		b0 := buf[0]
+		var err error
 		switch {
 		case b0 == 12:
 			if len(buf) < 2 {
 				return nil, errCorruptDict
 			}
-			flush(dictOp(b0)<<8 + dictOp(buf[1]))
+			err = flush(dictOp(b0)<<8 + dictOp(buf[1]))
 			buf = buf[2:]
 		case b0 <= 21:
-			flush(dictOp(b0))
+			err = flush(dictOp(b0))
 			buf = buf[1:]
 		case b0 <= 27: // values 22–27, 31, and 255 are reserved
 			return nil, errCorruptDict
@@ -105,7 +118,10 @@ func decodeDict(buf []byte, ss *cffStrings) (cffDict, error) {
 			stack = append(stack, -int32(b0)*256-int32(buf[1])-(108-251*256))
 			buf = buf[2:]
 		default: // values 22–27, 31, and 255 are reserved
-			return nil, errCorruptDict
+			err = errCorruptDict
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -121,11 +137,12 @@ func (d cffDict) encode(ss *cffStrings) []byte {
 
 	res := &bytes.Buffer{}
 	for _, op := range keys {
-		args := d[op]
-		for i, arg := range args {
+		var args []interface{}
+		for _, arg := range d[op] {
 			if s, ok := arg.(string); ok {
-				args[i] = int32(ss.lookup(s))
+				arg = int32(ss.lookup(s))
 			}
+			args = append(args, arg)
 		}
 
 		for _, arg := range args {

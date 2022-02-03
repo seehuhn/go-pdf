@@ -18,6 +18,7 @@ package cff
 
 import (
 	"math"
+	"reflect"
 	"testing"
 )
 
@@ -164,4 +165,31 @@ func TestEncodeFloat(t *testing.T) {
 			t.Errorf("%g != %g", out, x)
 		}
 	}
+}
+
+func FuzzDict(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ss := &cffStrings{}
+
+		d1, err := decodeDict(data, ss)
+		if err != nil {
+			return
+		}
+
+		data2 := d1.encode(ss)
+		if len(ss.data) != 0 {
+			t.Errorf("%d strings appeared out of thin air", len(ss.data))
+		}
+		if len(data2) > len(data) {
+			t.Errorf("inefficient encoding")
+		}
+
+		d2, err := decodeDict(data2, ss)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(d1, d2) {
+			t.Errorf("%#v != %#v", d1, d2)
+		}
+	})
 }

@@ -24,6 +24,10 @@ import (
 )
 
 func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
+	if nGlyphs < 0 || nGlyphs >= 0x10000 {
+		return nil, fmt.Errorf("invalid number of glyphs: %d", nGlyphs)
+	}
+
 	format, err := p.ReadUInt8()
 	if err != nil {
 		return nil, err
@@ -59,8 +63,12 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 			if err != nil {
 				return nil, err
 			}
-			for i := 0; i < int(nLeft)+1; i++ {
-				charset = append(charset, int32(int(first)+i))
+			for i := int32(0); i < int32(nLeft)+1; i++ {
+				code := int32(first) + i
+				if code > 0xFFFF {
+					return nil, fmt.Errorf("invalid charset entry: %d", code)
+				}
+				charset = append(charset, code)
 			}
 		}
 	case 2:
@@ -73,12 +81,20 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 			if err != nil {
 				return nil, err
 			}
-			for i := 0; i < int(nLeft)+1; i++ {
-				charset = append(charset, int32(int(first)+i))
+			for i := int32(0); i < int32(nLeft)+1; i++ {
+				code := int32(first) + i
+				if code > 0xFFFF {
+					return nil, fmt.Errorf("invalid charset entry: %d", code)
+				}
+				charset = append(charset, code)
 			}
 		}
 	default:
 		return nil, fmt.Errorf("unsupported charset format %d", format)
+	}
+
+	if len(charset) != nGlyphs {
+		return nil, fmt.Errorf("unexpected charset length: %d", len(charset))
 	}
 
 	return charset, nil

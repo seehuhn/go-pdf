@@ -19,6 +19,7 @@ package cff
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/parser"
@@ -124,4 +125,43 @@ func TestCharsetRoundtrip(t *testing.T) {
 			}
 		}
 	}
+}
+
+func FuzzCharset(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte, nGlyphs int) {
+		r := bytes.NewReader(data)
+		p := parser.New(r)
+		err := p.SetRegion("CFF", 0, int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		names1, err := readCharset(p, nGlyphs)
+		if err != nil {
+			return
+		}
+
+		buf, err := encodeCharset(names1)
+		if err != nil {
+			t.Fatal(err)
+		} else if len(buf) > len(data) {
+			t.Error("inefficient encoding")
+		}
+
+		r = bytes.NewReader(buf)
+		p = parser.New(r)
+		err = p.SetRegion("CFF", 0, int64(len(buf)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		names2, err := readCharset(p, nGlyphs)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(names1, names2) {
+			fmt.Println(names1)
+			fmt.Println(names2)
+			t.Error("unequal")
+		}
+	})
 }

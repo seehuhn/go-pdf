@@ -16,6 +16,8 @@
 
 package cff
 
+import "errors"
+
 // 2-byte string identifier
 type sid uint16
 
@@ -32,17 +34,20 @@ func (ss *cffStrings) Copy() *cffStrings {
 	return res
 }
 
-func (ss *cffStrings) get(i int32) string {
+func (ss *cffStrings) get(i int32) (string, error) {
+	if i < 0 {
+		return "", errNoString
+	}
 	if i < nStdString {
-		return stdStrings[i]
+		return stdStrings[i], nil
 	}
 	i -= nStdString
 
 	if int(i) < len(ss.data) {
-		return ss.data[i]
+		return ss.data[i], nil
 	}
 
-	return ""
+	return "", errNoString
 }
 
 // lookup returns the SID for the given string.  If the string is not part of
@@ -470,3 +475,5 @@ var stdStrings = []string{
 }
 
 var nStdString = int32(len(stdStrings))
+
+var errNoString = errors.New("cff: invalid string index")

@@ -224,7 +224,11 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		glyph.Name = pdf.Name(strings.get(charset[i]))
+		name, err := strings.get(charset[i])
+		if err != nil {
+			return nil, err
+		}
+		glyph.Name = pdf.Name(name)
 		cff.Glyphs[i] = glyph
 	}
 
