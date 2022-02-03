@@ -56,7 +56,10 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 	cmdStack := [][]byte{code}
 
 	var posX, posY float64
+	hasMoved := false
+	var moveError error
 	rMoveTo := func(dx, dy float64) {
+		hasMoved = true
 		posX += dx
 		posY += dy
 		res.Cmds = append(res.Cmds, GlyphOp{
@@ -65,6 +68,9 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 		})
 	}
 	rLineTo := func(dx, dy float64) {
+		if !hasMoved {
+			moveError = errors.New("lineTo before moveTo")
+		}
 		posX += dx
 		posY += dy
 		res.Cmds = append(res.Cmds, GlyphOp{
@@ -73,6 +79,9 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 		})
 	}
 	rCurveTo := func(dxa, dya, dxb, dyb, dxc, dyc float64) {
+		if !hasMoved {
+			moveError = errors.New("curveTo before moveTo")
+		}
 		xa := posX + dxa
 		ya := posY + dya
 		xb := xa + dxb
@@ -312,9 +321,12 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				clearStack()
 
 			case t2hstem, t2hstemhm:
+				if len(stack) < 2 {
+					return nil, errStackUnderflow
+				}
 				setGlyphWidth(len(stack)%2 == 1)
 				var prev int16
-				for k := 0; k < len(stack); k += 2 {
+				for k := 0; k+1 < len(stack); k += 2 {
 					a := prev + int16(stack[k])
 					b := a + int16(stack[k+1])
 					res.HStem = append(res.HStem, a, b)
@@ -323,9 +335,12 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				clearStack()
 
 			case t2vstem, t2vstemhm:
+				if len(stack) < 2 {
+					return nil, errStackUnderflow
+				}
 				setGlyphWidth(len(stack)%2 == 1)
 				var prev int16
-				for k := 0; k < len(stack); k += 2 {
+				for k := 0; k+1 < len(stack); k += 2 {
 					a := prev + int16(stack[k])
 					b := a + int16(stack[k+1])
 					res.VStem = append(res.VStem, a, b)
@@ -341,7 +356,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				// the hintmask or cntrmask operators, the vstem hint operator
 				// need not be included."
 				var prev int16
-				for k := 0; k < len(stack); k += 2 {
+				for k := 0; k+1 < len(stack); k += 2 {
 					a := prev + int16(stack[k])
 					b := a + int16(stack[k+1])
 					res.VStem = append(res.VStem, a, b)
@@ -349,6 +364,9 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				}
 
 				nStems := (len(res.HStem) + len(res.VStem)) / 2
+				if nStems == 0 {
+					return nil, errIncomplete
+				}
 				k := (nStems + 7) / 8
 				if k >= len(code) {
 					return nil, errIncomplete
@@ -437,11 +455,11 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errStackUnderflow
 				}
 				idx := int(stack[k])
-				if float64(idx) != stack[k] || k-idx-1 < 0 {
-					return nil, errors.New("invalid index")
-				}
 				if idx < 0 {
 					idx = 0
+				}
+				if float64(idx) != stack[k] || k-idx-1 < 0 {
+					return nil, errors.New("invalid index")
 				}
 				stack[k] = stack[k-idx-1]
 			case t2roll:
@@ -469,7 +487,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errStackUnderflow
 				}
 				m := int(stack[k+1])
-				if float64(m) != stack[k+1] || m < 0 || m >= 32 {
+				if m < 0 || m >= 32 || float64(m) != stack[k+1] {
 					return nil, errors.New("cff: invalid store index")
 				}
 				if storage == nil {
@@ -483,7 +501,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errStackUnderflow
 				}
 				m := int(stack[k])
-				if float64(m) != stack[k+1] || m < 0 || m >= len(storage) {
+				if m < 0 || m >= len(storage) || float64(m) != stack[k] {
 					return nil, errors.New("cff: invalid store index")
 				}
 				stack[k] = storage[m]
@@ -574,6 +592,10 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 
 			default:
 				return nil, fmt.Errorf("unsupported opcode %d", op)
+			}
+
+			if moveError != nil {
+				return nil, moveError
 			}
 		} // end of opLoop
 	}

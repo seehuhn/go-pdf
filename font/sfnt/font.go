@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-// Font describes a TrueType font file.
+// Font describes a TrueType or OpenType font file.
 type Font struct {
 	Fd     *os.File
 	Header *table.Header

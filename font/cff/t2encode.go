@@ -518,11 +518,11 @@ func findEdges(cmds []enCmd) []edge {
 				}
 				pos++
 
-				if offs != origOffs {
+				offs = 1 - offs
+
+				if offs == origOffs {
 					continue
 				}
-
-				offs = 1 - offs
 
 				edges = append(edges, edge{
 					code: copyOp(code, op),

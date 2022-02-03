@@ -73,6 +73,10 @@ func main() {
 		}
 
 		X, err := cff.EmbedFontCID(out, cffFont, "X")
+		if err != nil {
+			log.Printf("%s: %v", fname, err)
+			continue
+		}
 
 		for i := range cffFont.Glyphs {
 			bbox := cffFont.Glyphs[i].Extent()

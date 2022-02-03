@@ -17,6 +17,8 @@
 package cff
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -31,4 +33,38 @@ func TestRoll(t *testing.T) {
 			break
 		}
 	}
+}
+
+func FuzzT2Decode(f *testing.F) {
+	f.Add(t2endchar.Bytes())
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fmt.Printf("A % x\n", data)
+		info := &decodeInfo{
+			subr:         cffIndex{},
+			gsubr:        cffIndex{},
+			defaultWidth: 500,
+			nominalWidth: 666,
+		}
+		g1, err := decodeCharString(info, data)
+		if err != nil {
+			return
+		}
+
+		tmp, err := g1.getCharString(info.defaultWidth, info.nominalWidth)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("B % x\n", tmp)
+
+		g2, err := decodeCharString(info, tmp)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(g1, g2) {
+			fmt.Printf("glyph 1: %#v\n", g1)
+			fmt.Printf("glyph 2: %#v\n", g2)
+			t.Error("different")
+		}
+	})
 }
