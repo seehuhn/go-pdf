@@ -676,6 +676,7 @@ func (x *Placeholder) PDF(w io.Writer) error {
 	if ok {
 		// method 2: If we can seek back, write whitespace for now and fill in
 		// the actual value later.
+		// TODO(voss): verify that this is triggered when embedding fonts
 		pos, err := fill.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
@@ -708,6 +709,7 @@ func (x *Placeholder) PDF(w io.Writer) error {
 // as soon as possible after the value becomes known.
 func (x *Placeholder) Set(val Object) error {
 	if x.ref != nil {
+		// TODO(voss): what happens if we are in a stream?
 		ref, err := x.write(val, x.ref)
 		x.ref = ref
 		return err

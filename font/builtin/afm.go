@@ -117,10 +117,14 @@ func Afm(fontName string) (*AfmInfo, error) {
 				case "N":
 					name = ff[1]
 				case "B":
-					BBox.LLx, _ = strconv.Atoi(ff[1])
-					BBox.LLy, _ = strconv.Atoi(ff[2])
-					BBox.URx, _ = strconv.Atoi(ff[3])
-					BBox.URy, _ = strconv.Atoi(ff[4])
+					conv := func(in string) int16 {
+						x, _ := strconv.Atoi(in)
+						return int16(x)
+					}
+					BBox.LLx = conv(ff[1])
+					BBox.LLy = conv(ff[2])
+					BBox.URx = conv(ff[3])
+					BBox.URy = conv(ff[4])
 				case "L":
 					ligTmp = append(ligTmp, &ligInfo{
 						second:   ff[1],

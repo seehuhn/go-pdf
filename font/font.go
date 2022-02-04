@@ -82,13 +82,14 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 	xOffs := 0
 	yOffs := 0
 	for _, glyph := range glyphs {
-		if glyph.YOffset != yOffs {
+		// TODO(voss): more conversions from Glyph units needed
+		if int(glyph.YOffset) != yOffs {
 			flush()
-			yOffs = font.ToGlyph(glyph.YOffset)
+			yOffs = font.ToGlyph(int(glyph.YOffset))
 			page.Printf("%d Ts\n", yOffs)
 		}
 
-		xOffsWanted := xOffs + glyph.XOffset
+		xOffsWanted := xOffs + int(glyph.XOffset)
 
 		gid := glyph.Gid
 		if int(gid) >= len(font.Width) {
@@ -102,7 +103,7 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 		}
 		run = append(run, font.Enc(gid)...)
 
-		xOffs += glyph.Advance
+		xOffs += int(glyph.Advance)
 		xOffsAuto = xOffsWanted + font.Width[gid]
 	}
 	flush()
@@ -110,6 +111,9 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 
 // ToGlyph converts from font design units to PDF glyph coordinates.
 func (font *Font) ToGlyph(fontDesignSize int) int {
+	if font.GlyphUnits == 1000 {
+		return fontDesignSize
+	}
 	q := 1000 / float64(font.GlyphUnits)
 	return int(math.Round(float64(fontDesignSize) * q))
 }
@@ -121,7 +125,7 @@ type GlyphID uint16
 
 // Rect represents a rectangle with integer coordinates.
 type Rect struct {
-	LLx, LLy, URx, URy int // TODO(voss): should we use int16 or int32 here?
+	LLx, LLy, URx, URy int16
 }
 
 // IsZero is true if the glyph leaves no marks on the page.
@@ -133,9 +137,9 @@ func (rect *Rect) IsZero() bool {
 type Glyph struct {
 	Gid     GlyphID
 	Chars   []rune
-	XOffset int // This is in Glyph design units.
-	YOffset int // This is in Glyph design units.
-	Advance int // This is in Glyph design units.
+	XOffset int16 // This is in Glyph design units.
+	YOffset int16 // This is in Glyph design units.
+	Advance int32 // This is in Glyph design units.
 }
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of

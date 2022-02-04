@@ -248,7 +248,7 @@ func (tt *Font) readKernInfo() (gtab.Lookups, error) {
 func (tt *Font) GetGlyfOffsets(NumGlyphs int) ([]uint32, error) {
 	var err error
 	offsets := make([]uint32, NumGlyphs+1)
-	if tt.head.IndexToLocFormat == 0 {
+	if !tt.head.HasLongOffsets {
 		shortOffsets := make([]uint16, NumGlyphs+1)
 		_, err = tt.GetTableReader("loca", shortOffsets)
 		for i, x := range shortOffsets {

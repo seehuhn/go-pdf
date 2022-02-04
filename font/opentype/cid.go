@@ -126,7 +126,7 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = t.Sfnt.Width[gg[i].Gid]
+		gg[i].Advance = int32(t.Sfnt.Width[gg[i].Gid])
 	}
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 

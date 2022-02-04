@@ -105,62 +105,6 @@ func (h *Header) ReadTableBytes(r io.ReaderAt, name string) ([]byte, error) {
 
 // --------------------------------------------------------------------------
 
-// The Head table contains global information about a font.
-type Head struct {
-	Version            uint32 // 0x00010000 = version 1.0
-	FontRevision       uint32 // set by font manufacturer
-	CheckSumAdjustment uint32
-	MagicNumber        uint32 // set to 0x5F0F3CF5
-
-	// bit 0: y value of 0 specifies baseline
-	// bit 1: x position of left most black bit is LSB
-	// bit 2: scaled point size and actual point size will differ (i.e. 24 point glyph differs from 12 point glyph scaled by factor of 2)
-	// bit 3: use integer scaling instead of fractional
-	// bit 4: (used by the Microsoft implementation of the TrueType scaler)
-	// bit 5: This bit should be set in fonts that are intended to be laid out vertically, and in which the glyphs have been drawn such that an x-coordinate of 0 corresponds to the desired vertical baseline.
-	// bit 6-10: These bits are not used in Opentype and should always be cleared.
-	// bits 11-13: Defined by Adobe.
-	// bit 14: This bit should be set if the glyphs in the font are simply generic symbols for code point ranges, such as for a last resort font.
-	// bit 15: Reserved, set to 0.
-	Flags uint16
-
-	UnitsPerEm uint16 // range from 64 to 16384
-
-	// Number of seconds since 12:00 midnight that started January 1st 1904 in
-	// GMT/UTC time zone.
-	Created  int64
-	Modified int64
-
-	XMin int16 // for all glyph bounding boxes
-	YMin int16 // for all glyph bounding boxes
-	XMax int16 // for all glyph bounding boxes
-	YMax int16 // for all glyph bounding boxes
-
-	// bit 0 bold
-	// bit 1 italic
-	// bit 2 underline
-	// bit 3 outline
-	// bit 4 shadow
-	// bit 5 condensed (narrow)
-	// bit 6 extended
-	MacStyle uint16
-
-	LowestRecPPEM uint16 //	smallest readable size in pixels
-
-	// Deprecated (Set to 2).
-	// 0 Mixed directional glyphs
-	// 1 Only strongly left to right glyphs
-	// 2 Like 1 but also contains neutrals
-	// -1 Only strongly right to left glyphs
-	// -2 Like -1 but also contains neutrals
-	FontDirectionHint int16
-
-	IndexToLocFormat int16 // 0 for short offsets, 1 for long
-	GlyphDataFormat  int16 // 0 for current format
-}
-
-// --------------------------------------------------------------------------
-
 // CMap is the Character To Glyph Index Mapping Table.
 type CMap struct {
 	Header struct {
@@ -452,7 +396,7 @@ type PostHeader struct {
 }
 
 type PostInfo struct {
-	ItalicAngle        float64 // TODO(voss): use the in-table representation here
+	ItalicAngle        float64
 	UnderlinePosition  int16
 	UnderlineThickness int16
 	IsFixedPitch       bool

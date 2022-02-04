@@ -146,14 +146,14 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 	gg = append(res, last)
 
 	for i := range gg {
-		gg[i].Advance = fnt.afm.Width[gg[i].Gid]
+		gg[i].Advance = int32(fnt.afm.Width[gg[i].Gid])
 	}
 	if len(gg) < 2 {
 		return gg
 	}
 	for i := 0; i < len(gg)-1; i++ {
 		kern := fnt.afm.Kern[font.GlyphPair{gg[i].Gid, gg[i+1].Gid}]
-		gg[i].Advance += kern
+		gg[i].Advance += int32(kern)
 	}
 
 	return gg

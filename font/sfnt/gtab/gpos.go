@@ -429,8 +429,8 @@ func (l *gpos4_1) Apply(filter KeepGlyphFn, seq []font.Glyph, pos int) ([]font.G
 
 	baseAnchor := base[mark.markClass]
 
-	seq[pos].XOffset = -seq[pos-1].Advance + int(baseAnchor.X) - int(mark.X)
-	seq[pos].YOffset = int(baseAnchor.Y) - int(mark.Y)
+	seq[pos].XOffset = -int16(seq[pos-1].Advance) + baseAnchor.X - mark.X
+	seq[pos].YOffset = baseAnchor.Y - mark.Y
 	return seq, pos + 1
 }
 

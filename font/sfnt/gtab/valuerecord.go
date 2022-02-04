@@ -136,9 +136,9 @@ func (vr *valueRecord) Apply(glyph *font.Glyph) {
 		return
 	}
 
-	glyph.XOffset += int(vr.XPlacement)
-	glyph.YOffset += int(vr.YPlacement)
-	glyph.Advance += int(vr.XAdvance)
+	glyph.XOffset += vr.XPlacement
+	glyph.YOffset += vr.YPlacement
+	glyph.Advance += int32(vr.XAdvance)
 
 	if vr.YAdvance != 0 {
 		panic("not implemented")

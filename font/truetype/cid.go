@@ -110,7 +110,7 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = t.Sfnt.Width[gg[i].Gid]
+		gg[i].Advance = int32(t.Sfnt.Width[gg[i].Gid])
 	}
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
@@ -273,11 +273,11 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	if err != nil {
 		return err
 	}
-	err = size.Set(pdf.Integer(n))
+	err = fontFileStream.Close()
 	if err != nil {
 		return err
 	}
-	err = fontFileStream.Close()
+	err = size.Set(pdf.Integer(n))
 	if err != nil {
 		return err
 	}

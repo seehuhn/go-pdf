@@ -91,10 +91,10 @@ cmdLoop:
 		first = false
 	}
 	return font.Rect{
-		LLx: int(math.Floor(left)),
-		LLy: int(math.Floor(bottom)),
-		URx: int(math.Ceil(right)),
-		URy: int(math.Ceil(top)),
+		LLx: int16(math.Floor(left)),
+		LLy: int16(math.Floor(bottom)),
+		URx: int16(math.Ceil(right)),
+		URy: int16(math.Ceil(top)),
 	}
 }
 

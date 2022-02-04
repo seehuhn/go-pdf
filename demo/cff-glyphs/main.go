@@ -80,22 +80,22 @@ func main() {
 
 		for i := range cffFont.Glyphs {
 			bbox := cffFont.Glyphs[i].Extent()
-			left := 0
+			left := int16(0)
 			if bbox.LLx < left {
 				left = bbox.LLx
 			}
-			right := int(cffFont.Glyphs[i].Width)
+			right := int16(cffFont.Glyphs[i].Width)
 			if right < 300 {
 				right = 300
 			}
 			if bbox.URx > right {
 				right = bbox.URx
 			}
-			top := 100
+			top := int16(100)
 			if bbox.URy > top {
 				top = bbox.URy
 			}
-			bottom := 0
+			bottom := int16(0)
 			if bbox.LLy < bottom {
 				bottom = bbox.LLy
 			}
@@ -174,7 +174,7 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 		Glyphs: []font.Glyph{
 			{
 				Gid:     font.GlyphID(i),
-				Advance: int(fnt.Glyphs[i].Width),
+				Advance: fnt.Glyphs[i].Width,
 			},
 		},
 	}

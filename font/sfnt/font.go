@@ -19,12 +19,12 @@ package sfnt
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
+	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -34,7 +34,7 @@ type Font struct {
 	Fd     *os.File
 	Header *table.Header
 
-	head *table.Head // TODO(voss): needed?
+	head *head.Info // TODO(voss): needed?
 
 	CMap     map[rune]font.GlyphID
 	FontName string
@@ -75,19 +75,14 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		Header: header,
 	}
 
-	head := &table.Head{}
-	_, err = tt.GetTableReader("head", head)
+	headFd, err := tt.GetTableReader("head", nil)
 	if err != nil {
 		return nil, err
 	}
-	if head.Version != 0x00010000 {
-		return nil, fmt.Errorf(
-			"sfnt/head: unsupported version 0x%08X", head.Version)
+	tt.head, err = head.Read(headFd)
+	if err != nil {
+		return nil, err
 	}
-	if head.MagicNumber != 0x5F0F3CF5 {
-		return nil, errors.New("sfnt/head: wrong magic number")
-	}
-	tt.head = head
 
 	maxp, err := tt.getMaxpInfo()
 	if err != nil {
@@ -143,10 +138,10 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if glyf != nil {
 		GlyphExtent = make([]font.Rect, NumGlyphs)
 		for i := 0; i < NumGlyphs; i++ {
-			GlyphExtent[i].LLx = int(glyf.Data[i].XMin)
-			GlyphExtent[i].LLy = int(glyf.Data[i].YMin)
-			GlyphExtent[i].URx = int(glyf.Data[i].XMax)
-			GlyphExtent[i].URy = int(glyf.Data[i].YMax)
+			GlyphExtent[i].LLx = glyf.Data[i].XMin
+			GlyphExtent[i].LLy = glyf.Data[i].YMin
+			GlyphExtent[i].URx = glyf.Data[i].XMax
+			GlyphExtent[i].URy = glyf.Data[i].YMax
 		}
 	}
 
@@ -176,7 +171,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		// CapHeight may be set equal to the top of the unscaled and unhinted
 		// glyph bounding box of the glyph encoded at U+0048 (LATIN CAPITAL
 		// LETTER H)
-		capHeight = GlyphExtent[H].URy
+		capHeight = int(GlyphExtent[H].URy)
 	} else {
 		capHeight = 800
 	}
@@ -209,7 +204,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if postInfo != nil && postInfo.IsFixedPitch {
 		flags |= font.FlagFixedPitch
 	}
-	IsItalic := head.MacStyle&(1<<1) != 0
+	IsItalic := tt.head.IsItalic
 	if os2Info != nil {
 		// If the "OS/2" table is present, Windows seems to use this table to
 		// decide whether the font is bold/italic.  We follow Window's lead
@@ -238,12 +233,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if postInfo != nil {
 		tt.ItalicAngle = postInfo.ItalicAngle
 	}
-	tt.FontBBox = &font.Rect{
-		LLx: int(head.XMin),
-		LLy: int(head.YMin),
-		URx: int(head.XMax),
-		URy: int(head.YMax),
-	}
+	tt.FontBBox = &tt.head.FontBBox // TODO(voss): avoid duplication
 	tt.GlyphExtent = GlyphExtent
 	tt.Width = Width
 	tt.Flags = flags

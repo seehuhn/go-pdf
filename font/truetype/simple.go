@@ -128,7 +128,7 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 
 	gg = fnt.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = fnt.Sfnt.Width[gg[i].Gid]
+		gg[i].Advance = int32(fnt.Sfnt.Width[gg[i].Gid])
 	}
 	gg = fnt.Sfnt.GPOS.ApplyAll(gg)
 

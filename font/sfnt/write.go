@@ -81,27 +81,24 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	tableNames := tt.selectTables(includeTables)
 
 	if contains(tableNames, "head") {
-		// Copy and modify the "head" table.
+		// update the head table
 		// https://docs.microsoft.com/en-us/typography/opentype/spec/head
-		headTable := &table.Head{}
-		*headTable = *tt.head
-		headTable.CheckSumAdjustment = 0
 		if !modTime.IsZero() {
-			ttZeroTime := time.Date(1904, time.January, 1, 0, 0, 0, 0, time.UTC)
-			headTable.Modified = int64(modTime.Sub(ttZeroTime).Seconds())
+			tt.head.Modified = modTime
 		}
 		if subsetInfo != nil {
-			headTable.XMin = subsetInfo.xMin
-			headTable.YMin = subsetInfo.yMin
-			headTable.XMax = subsetInfo.xMax
-			headTable.YMax = subsetInfo.yMax
-			headTable.IndexToLocFormat = int16(subsetInfo.indexToLocFormat)
+			tt.head.FontBBox.LLx = subsetInfo.xMin
+			tt.head.FontBBox.LLy = subsetInfo.yMin
+			tt.head.FontBBox.URx = subsetInfo.xMax
+			tt.head.FontBBox.URy = subsetInfo.yMax
+			tt.head.HasLongOffsets = subsetInfo.indexToLocFormat != 0
 		}
 
-		buf := &bytes.Buffer{}
-		_ = binary.Write(buf, binary.BigEndian, headTable)
-		headBytes := buf.Bytes()
-		replTab["head"] = headBytes
+		var err error
+		replTab["head"], err = tt.head.Encode()
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	if opt.Replace != nil {
