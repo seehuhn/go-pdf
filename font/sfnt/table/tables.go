@@ -363,11 +363,6 @@ func (encRec *EncodingRecord) LoadCMap(r io.ReadSeeker, i2r func(int) rune) (map
 
 // --------------------------------------------------------------------------
 
-type MaxpHead struct {
-	Version   int32  //	0x00005000 or 0x00010000
-	NumGlyphs uint16 //	the number of glyphs in the font
-}
-
 type NameHeader struct {
 	Format uint16 // table version number
 	Count  uint16 // number of name records

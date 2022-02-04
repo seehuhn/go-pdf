@@ -84,15 +84,18 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 
-	maxp, err := tt.getMaxpInfo()
+	maxpFd, err := tt.GetTableReader("maxp", nil)
 	if err != nil {
 		return nil, err
 	}
-	if maxp.NumGlyphs < 2 {
+	NumGlyphs, err := table.ReadMaxp(maxpFd)
+	if err != nil {
+		return nil, err
+	}
+	if NumGlyphs < 2 {
 		// glyph index 0 denotes a missing character and is always included
 		return nil, errors.New("no glyphs found")
 	}
-	NumGlyphs := int(maxp.NumGlyphs)
 
 	hheaInfo, err := tt.getHHeaInfo()
 	if err != nil {

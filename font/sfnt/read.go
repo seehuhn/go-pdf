@@ -20,7 +20,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"strconv"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
@@ -28,19 +27,6 @@ import (
 )
 
 // TODO(voss): add better protections against malicious font files
-
-func (tt *Font) getMaxpInfo() (*table.MaxpHead, error) {
-	maxp := &table.MaxpHead{}
-	_, err := tt.GetTableReader("maxp", maxp)
-	if err != nil {
-		return nil, err
-	}
-	if maxp.Version != 0x00005000 && maxp.Version != 0x00010000 {
-		return nil, errors.New("unknown maxp version 0x" +
-			strconv.FormatInt(int64(maxp.Version), 16))
-	}
-	return maxp, nil
-}
 
 // getFontName reads the PostScript name of a font from the "name" table.
 func (tt *Font) getFontName() (string, error) {
