@@ -435,7 +435,7 @@ func (h *Hmtx) GetAdvanceWidth(gid int) uint16 {
 	return h.HMetrics[gid].AdvanceWidth
 }
 
-// GetLSB returns the left side bearing width of a glyph, in font design units.
+// GetLSB returns the left side bearing of a glyph, in font design units.
 func (h *Hmtx) GetLSB(gid int) int16 {
 	if gid < len(h.HMetrics) {
 		return h.HMetrics[gid].LeftSideBearing

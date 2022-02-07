@@ -12,11 +12,12 @@ func TestMaxp(t *testing.T) {
 			t.Errorf("EncodeMaxp(%d): %v", numGlyphs, err)
 			continue
 		}
-		gotNumGlyphs, err := ReadMaxp(bytes.NewReader(maxp))
+		maxpInfo, err := ReadMaxp(bytes.NewReader(maxp))
 		if err != nil {
 			t.Errorf("ReadMaxp(%d): %v", numGlyphs, err)
 			continue
 		}
+		gotNumGlyphs := maxpInfo.NumGlyphs
 		if gotNumGlyphs != numGlyphs {
 			t.Errorf("ReadMaxp(%d): got %d glyphs, want %d", numGlyphs, gotNumGlyphs, numGlyphs)
 		}

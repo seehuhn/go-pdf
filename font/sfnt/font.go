@@ -88,12 +88,13 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	NumGlyphs, err := table.ReadMaxp(maxpFd)
+	maxp, err := table.ReadMaxp(maxpFd)
 	if err != nil {
 		return nil, err
 	}
-	if NumGlyphs < 2 {
-		// glyph index 0 denotes a missing character and is always included
+	NumGlyphs := maxp.NumGlyphs
+	if NumGlyphs < 1 {
+		// the ".notdef" glyph is always included
 		return nil, errors.New("no glyphs found")
 	}
 

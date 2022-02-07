@@ -8,6 +8,7 @@ import (
 	"seehuhn.de/go/pdf/font/names"
 )
 
+// EmbedFontCID embeds the font in the PDF file as a CID font.
 func EmbedFontCID(w *pdf.Writer, cff *Font, instName pdf.Name) (*font.Font, error) {
 	cmap := make(map[rune]font.GlyphID)
 	for gid, glyph := range cff.Glyphs {

@@ -32,7 +32,7 @@ type Glyph struct {
 	HStem []int16
 	VStem []int16
 	Name  pdf.Name
-	Width int32
+	Width int32 // TODO(voss): use int16 here?
 }
 
 // NewGlyph allocates a new glyph.
