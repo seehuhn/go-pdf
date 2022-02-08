@@ -24,11 +24,15 @@ func TestLengths(t *testing.T) {
 		CaretAngle:  0,
 		CaretOffset: 0,
 	}
-	hhea, hmtx := CFFEncodeHmtx(info)
+	hhea, hmtx := EncodeHmtx(info)
+
 	if len(hhea) != hheaLength {
 		t.Errorf("expected %d, got %d", hheaLength, len(hhea))
 	}
-	hmtxLength := 3*4 + 2*2
+
+	numGlyphs := len(info.Widths)
+	numWidths := 3
+	hmtxLength := 4*numWidths + 2*(numGlyphs-numWidths)
 	if len(hmtx) != hmtxLength {
 		t.Errorf("expected %d, got %d", hmtxLength, len(hhea))
 	}
@@ -57,7 +61,12 @@ func TestRiseAndRun(t *testing.T) {
 }
 
 func TestRationalApproximation(t *testing.T) {
-	for _, x := range []float64{1, 0, -1, math.Pi, -math.Sqrt2, math.E, -22.0 / 7.0} {
+	a, b := rationalApproximation(math.Pi, 10000)
+	if a != 355 || b != 113 {
+		t.Errorf("approximation for π not found: a=%d, b=%d", a, b)
+	}
+
+	for _, x := range []float64{1, 0, -1, 3.0 / 2.0, -math.Pi, math.Sqrt2, math.E, -22.0 / 7.0} {
 		for _, N := range []int{10, 100, 256, 512, 1000, 1024, 65535} {
 			a, b := rationalApproximation(x, N)
 			fmt.Printf("%g ≈ %d/%d (N=%d)\n", x, a, b, N)

@@ -124,7 +124,7 @@ type HmtxInfo struct {
 	CaretOffset int16
 }
 
-func CFFEncodeHmtx(info *HmtxInfo) ([]byte, []byte) {
+func EncodeHmtx(info *HmtxInfo) ([]byte, []byte) {
 	numGlyphs := len(info.Widths)
 	numWidths := numGlyphs
 	for numWidths > 1 && info.Widths[numWidths-1] == info.Widths[numWidths-2] {
