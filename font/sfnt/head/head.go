@@ -36,7 +36,7 @@ type Info struct {
 
 // Read reads and  decodes the binary representation of the head table.
 func Read(r io.Reader) (*Info, error) {
-	enc := &encodedHead{}
+	enc := &binaryHead{}
 	err := binary.Read(r, binary.BigEndian, enc)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (info *Info) Encode() (data []byte, err error) {
 		macStyle |= 1 << 6
 	}
 
-	enc := &encodedHead{
+	enc := &binaryHead{
 		Version:           0x00010000,
 		FontRevision:      uint32(info.FontRevision),
 		MagicNumber:       0x5F0F3CF5,
@@ -157,7 +157,7 @@ func PatchChecksum(head []byte, checksum uint32) {
 	binary.BigEndian.PutUint32(head[8:12], 0xB1B0AFBA-checksum)
 }
 
-type encodedHead struct {
+type binaryHead struct {
 	Version            uint32
 	FontRevision       uint32
 	CheckSumAdjustment uint32
