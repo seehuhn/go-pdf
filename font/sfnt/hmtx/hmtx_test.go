@@ -11,7 +11,7 @@ import (
 
 func TestRoundtrip(t *testing.T) {
 	i1 := &Info{
-		Widths: []uint16{100, 200, 300, 300},
+		Width: []uint16{100, 200, 300, 300},
 		GlyphExtent: []font.Rect{
 			{LLx: 10, LLy: 0, URx: 90, URy: 100},
 			{LLx: 20, LLy: 0, URx: 200, URy: 100},
@@ -24,13 +24,13 @@ func TestRoundtrip(t *testing.T) {
 		CaretAngle:  math.Pi / 180 * 10,
 		CaretOffset: 2,
 	}
-	hhea, hmtx := EncodeHmtx(i1)
-	i2, err := DecodeHmtx(hhea, hmtx)
+	hhea, hmtx := i1.Encode()
+	i2, err := Decode(hhea, hmtx)
 	if err != nil {
 		t.Errorf("error decoding hmtx: %v", err)
 	}
-	if !reflect.DeepEqual(i1.Widths, i2.Widths) {
-		t.Errorf("widths differ: %d vs %d", i1.Widths, i2.Widths)
+	if !reflect.DeepEqual(i1.Width, i2.Width) {
+		t.Errorf("widths differ: %d vs %d", i1.Width, i2.Width)
 	}
 	if i1.Ascent != i2.Ascent {
 		t.Errorf("ascent differs: %d vs %d", i1.Ascent, i2.Ascent)
@@ -51,13 +51,13 @@ func TestRoundtrip(t *testing.T) {
 
 func TestLengths(t *testing.T) {
 	info := &Info{
-		Widths: []uint16{100, 200, 300, 300, 300},
+		Width: []uint16{100, 200, 300, 300, 300},
 		GlyphExtent: []font.Rect{
-			{0, 0, 100, 100},
-			{10, 0, 100, 100},
-			{20, 0, 100, 100},
-			{30, 0, 100, 100},
-			{40, 0, 100, 100},
+			{LLx: 0, LLy: 0, URx: 100, URy: 100},
+			{LLx: 10, LLy: 0, URx: 100, URy: 100},
+			{LLx: 20, LLy: 0, URx: 100, URy: 100},
+			{LLx: 30, LLy: 0, URx: 100, URy: 100},
+			{LLx: 40, LLy: 0, URx: 100, URy: 100},
 		},
 		Ascent:      0,
 		Descent:     0,
@@ -65,13 +65,13 @@ func TestLengths(t *testing.T) {
 		CaretAngle:  0,
 		CaretOffset: 0,
 	}
-	hhea, hmtx := EncodeHmtx(info)
+	hhea, hmtx := info.Encode()
 
 	if len(hhea) != hheaLength {
 		t.Errorf("expected %d, got %d", hheaLength, len(hhea))
 	}
 
-	numGlyphs := len(info.Widths)
+	numGlyphs := len(info.Width)
 	numWidths := 3
 	hmtxLength := 4*numWidths + 2*(numGlyphs-numWidths)
 	if len(hmtx) != hmtxLength {
@@ -187,7 +187,7 @@ func FuzzAngle(f *testing.F) {
 
 func FuzzHmtx(f *testing.F) {
 	i1 := &Info{
-		Widths: []uint16{100, 200, 300, 300},
+		Width: []uint16{100, 200, 300, 300},
 		GlyphExtent: []font.Rect{
 			{LLx: 10, LLy: 0, URx: 90, URy: 100},
 			{LLx: 20, LLy: 0, URx: 200, URy: 100},
@@ -200,17 +200,17 @@ func FuzzHmtx(f *testing.F) {
 		CaretAngle:  math.Pi / 180 * 10,
 		CaretOffset: 2,
 	}
-	hhea, hmtx := EncodeHmtx(i1)
+	hhea, hmtx := i1.Encode()
 	f.Add(hhea, hmtx)
 
 	f.Fuzz(func(t *testing.T, hhea, hmtx []byte) {
-		i1, err := DecodeHmtx(hhea, hmtx)
+		i1, err := Decode(hhea, hmtx)
 		if err != nil {
 			return
 		}
 
-		hhea, hmtx = EncodeHmtx(i1)
-		i2, err := DecodeHmtx(hhea, hmtx)
+		hhea, hmtx = i1.Encode()
+		i2, err := Decode(hhea, hmtx)
 		if err != nil {
 			t.Fatal(err)
 		}

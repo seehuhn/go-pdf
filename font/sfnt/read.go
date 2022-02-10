@@ -107,34 +107,6 @@ func (tt *Font) getPostInfo() (*table.PostInfo, error) {
 	return res, nil
 }
 
-// getHHeaInfo reads the "hhea" table of a sfnt file.
-// TODO(voss): use caching?
-func (tt *Font) getHHeaInfo() (*table.Hhea, error) {
-	hhea := &table.Hhea{}
-	_, err := tt.GetTableReader("hhea", hhea)
-	if err != nil {
-		return nil, err
-	}
-	return hhea, nil
-}
-
-// getHMtxInfo reads the "hmtx" table of a sfnt file.
-func (tt *Font) getHMtxInfo(NumGlyphs, NumOfLongHorMetrics int) (*table.Hmtx, error) {
-	hmtx := &table.Hmtx{
-		HMetrics:        make([]table.LongHorMetric, NumOfLongHorMetrics),
-		LeftSideBearing: make([]int16, NumGlyphs-int(NumOfLongHorMetrics)),
-	}
-	fd, err := tt.GetTableReader("hmtx", hmtx.HMetrics)
-	if err != nil {
-		return nil, err
-	}
-	err = binary.Read(fd, binary.BigEndian, hmtx.LeftSideBearing)
-	if err != nil {
-		return nil, err
-	}
-	return hmtx, nil
-}
-
 // getOS2Info reads the "OS/2" table of a sfnt file.
 func (tt *Font) getOS2Info() (*table.OS2, error) {
 	os2 := &table.OS2{}
@@ -234,7 +206,7 @@ func (tt *Font) readKernInfo() (gtab.Lookups, error) {
 func (tt *Font) GetGlyfOffsets(NumGlyphs int) ([]uint32, error) {
 	var err error
 	offsets := make([]uint32, NumGlyphs+1)
-	if !tt.head.HasLongOffsets {
+	if !tt.HeadInfo.HasLongOffsets {
 		shortOffsets := make([]uint16, NumGlyphs+1)
 		_, err = tt.GetTableReader("loca", shortOffsets)
 		for i, x := range shortOffsets {

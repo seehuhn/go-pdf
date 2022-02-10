@@ -75,15 +75,20 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 
 	w.OnClose(t.WriteFont)
 
+	width := make([]int, len(tt.HmtxInfo.Width))
+	for i, w := range tt.HmtxInfo.Width {
+		width[i] = int(w)
+	}
+
 	res := &font.Font{
 		InstName: instName,
 		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,
-		Ascent:      tt.Ascent,
-		Descent:     tt.Descent,
-		GlyphExtent: tt.GlyphExtent,
-		Width:       tt.Width,
+		Ascent:      int(tt.HmtxInfo.Ascent),
+		Descent:     int(tt.HmtxInfo.Descent),
+		GlyphExtent: tt.HmtxInfo.GlyphExtent,
+		Width:       width,
 
 		Layout: t.Layout,
 		Enc:    t.Enc,
@@ -110,7 +115,7 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = int32(t.Sfnt.Width[gg[i].Gid])
+		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Width[gg[i].Gid])
 	}
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
@@ -131,7 +136,7 @@ func (t *cidFont) Enc(gid font.GlyphID) pdf.String {
 
 func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
-	origNumGlyphs := len(t.Sfnt.Width)
+	origNumGlyphs := t.Sfnt.NumGlyphs()
 	var includeGlyphs []font.GlyphID
 	for gid, ok := range t.used {
 		if ok {
@@ -158,7 +163,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
 	}
 
-	DW, W := font.EncodeCIDWidths(t.Sfnt.Width) // TODO(voss): subset???
+	DW, W := font.EncodeCIDWidths(t.Sfnt.HmtxInfo.Width) // TODO(voss): subset???
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
@@ -205,8 +210,8 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		"Flags":       pdf.Integer(t.Sfnt.Flags),
 		"FontBBox":    FontBBox,
 		"ItalicAngle": pdf.Number(t.Sfnt.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(t.Sfnt.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(t.Sfnt.Descent) + 0.5),
+		"Ascent":      pdf.Integer(q*float64(t.Sfnt.HmtxInfo.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(t.Sfnt.HmtxInfo.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(t.Sfnt.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 		"FontFile2":   FontFileRef,

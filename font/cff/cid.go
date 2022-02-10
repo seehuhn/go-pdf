@@ -47,6 +47,11 @@ func EmbedFontCID(w *pdf.Writer, cff *Font, instName pdf.Name) (*font.Font, erro
 
 	w.OnClose(t.WriteFont)
 
+	width := make([]int, len(cff.Glyphs))
+	for i, g := range cff.Glyphs {
+		width[i] = int(g.Width)
+	}
+
 	font := &font.Font{
 		InstName: instName,
 		Ref:      t.FontRef,
@@ -69,10 +74,10 @@ func EmbedFontCID(w *pdf.Writer, cff *Font, instName pdf.Name) (*font.Font, erro
 			return pdf.String{byte(gid >> 8), byte(gid)}
 		},
 		GlyphUnits:  1000, // TODO(voss): get from CFF
-		Ascent:      0,    // TODO(voss): ???
-		Descent:     0,    // TODO(voss): ???
+		Ascent:      0,    // TODO(voss): compute from bbox???
+		Descent:     0,    // TODO(voss): compute from bbox???
 		GlyphExtent: glyphExtents,
-		Width:       cff.Widths(),
+		Width:       width,
 	}
 	return font, nil
 }

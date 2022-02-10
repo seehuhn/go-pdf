@@ -90,15 +90,20 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 
 	w.OnClose(t.WriteFont)
 
+	width := make([]int, len(tt.HmtxInfo.Width))
+	for i, w := range tt.HmtxInfo.Width {
+		width[i] = int(w)
+	}
+
 	res := &font.Font{
 		InstName: instName,
 		Ref:      t.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,
-		Ascent:      tt.Ascent,
-		Descent:     tt.Descent,
+		Ascent:      int(tt.HmtxInfo.Ascent),
+		Descent:     int(tt.HmtxInfo.Descent),
 		GlyphExtent: t.Cff.GlyphExtents(),
-		Width:       tt.Width,
+		Width:       width,
 
 		Layout: t.Layout,
 		Enc:    t.Enc,
@@ -129,7 +134,7 @@ func (t *simple) Layout(rr []rune) []font.Glyph {
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = int32(t.Sfnt.Width[gg[i].Gid])
+		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Width[gg[i].Gid])
 	}
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
@@ -189,7 +194,7 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 	firstCharCode := mapping[0].CharCode
 	lastCharCode := mapping[len(mapping)-1].CharCode
 	_, includeGlyphs := font.MakeSubset(mapping)
-	subsetTag := font.GetSubsetTag(includeGlyphs, len(t.Sfnt.Width))
+	subsetTag := font.GetSubsetTag(includeGlyphs, t.Sfnt.NumGlyphs())
 	cff, err := t.Cff.Subset(includeGlyphs)
 	if err != nil {
 		return err
@@ -226,8 +231,8 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 		"Flags":       pdf.Integer(t.Sfnt.Flags),
 		"FontBBox":    FontBBox,
 		"ItalicAngle": pdf.Number(t.Sfnt.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(t.Sfnt.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(t.Sfnt.Descent) + 0.5),
+		"Ascent":      pdf.Integer(q*float64(t.Sfnt.HmtxInfo.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(t.Sfnt.HmtxInfo.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(t.Sfnt.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 		"FontFile3":   FontFileRef,
@@ -239,7 +244,7 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 		width := 0
 		if i == mapping[pos].CharCode {
 			gid := mapping[pos].GID
-			width = int(float64(t.Sfnt.Width[gid])*q + 0.5)
+			width = int(float64(t.Sfnt.HmtxInfo.Width[gid])*q + 0.5)
 			pos++
 		}
 		Widths = append(Widths, pdf.Integer(width))

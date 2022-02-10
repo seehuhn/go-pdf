@@ -30,13 +30,13 @@ func TestWidths(t *testing.T) {
 	type I = pdf.Integer
 
 	cases := []struct {
-		in  []int
-		dw  int
+		in  []uint16
+		dw  uint16
 		out A
 	}{
 		// test sequence detection
 		{
-			in: []int{1, 2, 3, 9, 9, 9, 9, 9, 9, 4, 5, 6},
+			in: []uint16{1, 2, 3, 9, 9, 9, 9, 9, 9, 4, 5, 6},
 			dw: 9,
 			out: A{
 				I(0), A{I(1), I(2), I(3)},
@@ -44,25 +44,25 @@ func TestWidths(t *testing.T) {
 			},
 		},
 		{
-			in:  []int{},
+			in:  []uint16{},
 			out: nil,
 		},
 		{
-			in: []int{1, 1, 1, 1, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0},
+			in: []uint16{1, 1, 1, 1, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0},
 			out: A{
 				I(0), I(4), I(1),
 				I(5), A{I(2), I(3), I(4)},
 			},
 		},
 		{
-			in: []int{2, 1, 4, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+			in: []uint16{2, 1, 4, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
 			out: A{
 				I(0), A{I(2), I(1), I(4)},
 				I(3), I(7), I(1),
 			},
 		},
 		{
-			in: []int{1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0},
+			in: []uint16{1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0},
 			out: A{
 				I(0), I(4), I(1),
 			},
@@ -70,26 +70,26 @@ func TestWidths(t *testing.T) {
 
 		// test default widths
 		{
-			in: []int{1, 0, 2, 0},
+			in: []uint16{1, 0, 2, 0},
 			out: A{
 				I(0), A{I(1), I(0), I(2)},
 			},
 		},
 		{
-			in: []int{0, 1, 0, 2, 0},
+			in: []uint16{0, 1, 0, 2, 0},
 			out: A{
 				I(1), A{I(1), I(0), I(2)},
 			},
 		},
 		{
-			in: []int{1, 0, 0, 2},
+			in: []uint16{1, 0, 0, 2},
 			out: A{
 				I(0), A{I(1)},
 				I(3), A{I(2)},
 			},
 		},
 		{
-			in: []int{0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0},
+			in: []uint16{0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0},
 			out: A{
 				I(4), A{I(1)},
 				I(7), A{I(2)},

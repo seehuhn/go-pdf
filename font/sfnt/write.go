@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -78,24 +79,41 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		replTab["cmap"] = cmapBytes
 	}
 
+	if includeTables["hhea"] || includeTables["hmtx"] {
+		info := tt.HmtxInfo
+		if subsetInfo != nil {
+			i2 := *info
+			info = &i2
+
+			info.Width = subsetInfo.Width
+			info.LSB = subsetInfo.LSB
+			info.GlyphExtent = subsetInfo.GlyphExtent
+		}
+		hhea, hmtx := info.Encode()
+		replTab["hhea"] = hhea
+		replTab["hmtx"] = hmtx
+	}
+
 	tableNames := tt.selectTables(includeTables)
 
 	if contains(tableNames, "head") {
-		// update the head table
+		// write the head table
 		// https://docs.microsoft.com/en-us/typography/opentype/spec/head
 		if !modTime.IsZero() {
-			tt.head.Modified = modTime
+			tt.HeadInfo.Modified = modTime
 		}
+
 		if subsetInfo != nil {
-			tt.head.FontBBox.LLx = subsetInfo.xMin
-			tt.head.FontBBox.LLy = subsetInfo.yMin
-			tt.head.FontBBox.URx = subsetInfo.xMax
-			tt.head.FontBBox.URy = subsetInfo.yMax
-			tt.head.HasLongOffsets = subsetInfo.indexToLocFormat != 0
+			// TODO(voss): don't modify the original struct
+			tt.HeadInfo.FontBBox.LLx = subsetInfo.xMin
+			tt.HeadInfo.FontBBox.LLy = subsetInfo.yMin
+			tt.HeadInfo.FontBBox.URx = subsetInfo.xMax
+			tt.HeadInfo.FontBBox.URy = subsetInfo.yMax
+			tt.HeadInfo.HasLongOffsets = subsetInfo.indexToLocFormat != 0
 		}
 
 		var err error
-		replTab["head"], err = tt.head.Encode()
+		replTab["head"], err = tt.HeadInfo.Encode()
 		if err != nil {
 			return 0, err
 		}
@@ -162,9 +180,9 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	totalSize += int64(len(headerBytes))
 	totalSum += Checksum(headerBytes)
 
-	if head, ok := replTab["head"]; ok {
+	if headData, ok := replTab["head"]; ok {
 		// fix the checksum in the "head" table
-		binary.BigEndian.PutUint32(head[8:12], 0xB1B0AFBA-totalSum)
+		head.PatchChecksum(headData, totalSum)
 	}
 
 	// write the tables
@@ -200,8 +218,13 @@ type subsetInfo struct {
 	numGlyphs uint16
 	blobs     map[string][]byte
 
+	// fields for the "hhea" and "hmtx" tables
+	Width       []uint16
+	GlyphExtent []font.Rect
+	LSB         []int16
+
 	// fields for the "head" table
-	xMin             int16
+	xMin             int16 // TODO(voss): are these needed?
 	yMin             int16
 	xMax             int16
 	yMax             int16
@@ -209,28 +232,11 @@ type subsetInfo struct {
 }
 
 func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
-	// TODO(voss): make better use of the data stored in `tt`.
-
-	origNumGlyphs := len(tt.Width)
-
-	origOffsets, err := tt.GetGlyfOffsets(origNumGlyphs)
-	if err != nil {
-		return nil, err
+	if includeOnly[0] != 0 {
+		panic("missing .notdef glyph")
 	}
 
-	hheaInfo, err := tt.getHHeaInfo()
-	if err != nil {
-		return nil, err
-	}
-	hmtx, err := tt.getHMtxInfo(origNumGlyphs, int(hheaInfo.NumOfLongHorMetrics))
-	if err != nil {
-		return nil, err
-	}
-
-	glyfFd, err := tt.GetTableReader("glyf", nil)
-	if err != nil {
-		return nil, err
-	}
+	origNumGlyphs := tt.NumGlyphs()
 
 	res := &subsetInfo{
 		blobs: make(map[string][]byte),
@@ -240,13 +246,35 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		yMax:  -32768,
 	}
 
+	res.Width = make([]uint16, len(includeOnly))
+	if tt.HmtxInfo.LSB != nil {
+		res.LSB = make([]int16, len(includeOnly))
+	}
+	if tt.HmtxInfo.GlyphExtent != nil {
+		res.GlyphExtent = make([]font.Rect, len(includeOnly))
+	}
+	for i, gid := range includeOnly {
+		res.Width[i] = tt.HmtxInfo.Width[gid]
+		if tt.HmtxInfo.LSB != nil {
+			res.LSB[i] = tt.HmtxInfo.LSB[gid]
+		}
+		if tt.HmtxInfo.GlyphExtent != nil {
+			res.GlyphExtent[i] = tt.HmtxInfo.GlyphExtent[gid]
+		}
+	}
+
+	origOffsets, err := tt.GetGlyfOffsets(origNumGlyphs)
+	if err != nil {
+		return nil, err
+	}
+
+	glyfFd, err := tt.GetTableReader("glyf", nil)
+	if err != nil {
+		return nil, err
+	}
+
 	// write the new "glyf" table
 	var newOffsets []uint32
-	var newHMetrics []table.LongHorMetric
-	var advanceWidthMax uint16
-	var minLeftSideBearing int16 = 32767
-	var minRightSideBearing int16 = 32767
-	var xMaxExtent int16
 	buf := &bytes.Buffer{}
 	newGid := 0
 	// Elements may be appended to includeOnly during the loop, so we don't
@@ -258,17 +286,6 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		start := origOffsets[origGid]
 		end := origOffsets[origGid+1]
 		length := end - start
-
-		advanceWidth := hmtx.GetAdvanceWidth(int(origGid))
-		if advanceWidth > advanceWidthMax {
-			advanceWidthMax = advanceWidth
-		}
-
-		leftSideBearing := hmtx.GetLSB(int(origGid))
-		if length > 0 && leftSideBearing < minLeftSideBearing {
-			// TODO(voss): is the "length > 0" check correct?
-			minLeftSideBearing = leftSideBearing
-		}
 
 		if length > 0 {
 			_, err = glyfFd.Seek(int64(start), io.SeekStart)
@@ -296,15 +313,6 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 			}
 			if glyphHeader.YMax > res.yMax {
 				res.yMax = glyphHeader.YMax
-			}
-
-			xExtent := (int16(leftSideBearing) + glyphHeader.XMax - glyphHeader.XMin)
-			if xExtent > xMaxExtent {
-				xMaxExtent = xExtent
-			}
-			rightSideBearing := int16(advanceWidth) - xExtent
-			if rightSideBearing < minRightSideBearing {
-				minRightSideBearing = rightSideBearing
 			}
 
 			todo := int64(length) - 10
@@ -377,11 +385,6 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 			}
 		}
 
-		newHMetrics = append(newHMetrics, table.LongHorMetric{
-			AdvanceWidth:    advanceWidth,
-			LeftSideBearing: leftSideBearing,
-		})
-
 		newGid++
 	}
 	glyphEnd := buf.Len()
@@ -391,7 +394,7 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 
 	// write the new "loca" table
 	buf = &bytes.Buffer{}
-	if glyphEnd < 1<<16 {
+	if glyphEnd < 1<<16 { // TODO(voss): should this be glyphEnd/2?
 		res.indexToLocFormat = 0
 		shortOffsets := make([]uint16, len(newOffsets))
 		for i, offs := range newOffsets {
@@ -406,45 +409,6 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		return nil, err
 	}
 	res.blobs["loca"] = buf.Bytes()
-
-	// write the new "hmtx" table
-	n := len(newHMetrics)
-	numOfLongHorMetrics := n
-	for i := n - 1; i > 0; i-- {
-		if newHMetrics[i] != newHMetrics[i-1] {
-			break
-		}
-		numOfLongHorMetrics--
-	}
-	newLSB := make([]int16, n-numOfLongHorMetrics)
-	for i, hm := range newHMetrics[numOfLongHorMetrics:] {
-		newLSB[i] = hm.LeftSideBearing
-	}
-	buf = &bytes.Buffer{}
-	err = binary.Write(buf, binary.BigEndian, newHMetrics[:numOfLongHorMetrics])
-	if err != nil {
-		return nil, err
-	}
-	err = binary.Write(buf, binary.BigEndian, newLSB)
-	if err != nil {
-		return nil, err
-	}
-	res.blobs["hmtx"] = buf.Bytes()
-
-	// write the new "hhea" table
-	newHhea := &table.Hhea{}
-	*newHhea = *hheaInfo // copy the old data
-	newHhea.AdvanceWidthMax = advanceWidthMax
-	newHhea.MinLeftSideBearing = minLeftSideBearing
-	newHhea.MinRightSideBearing = minRightSideBearing
-	newHhea.XMaxExtent = xMaxExtent
-	newHhea.NumOfLongHorMetrics = uint16(numOfLongHorMetrics)
-	buf = &bytes.Buffer{}
-	err = binary.Write(buf, binary.BigEndian, newHhea)
-	if err != nil {
-		return nil, err
-	}
-	res.blobs["hhea"] = buf.Bytes()
 
 	return res, nil
 }

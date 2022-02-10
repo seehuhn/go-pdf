@@ -25,31 +25,30 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/head"
+	"seehuhn.de/go/pdf/font/sfnt/hmtx"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/locale"
 )
 
 // Font describes a TrueType or OpenType font file.
 type Font struct {
+	FontName string
+	HeadInfo *head.Info
+	HmtxInfo *hmtx.Info
+
+	// TODO(voss): tidy the fields below
+
 	Fd     *os.File
 	Header *table.Header
 
-	head *head.Info // TODO(voss): needed?
-
-	CMap     map[rune]font.GlyphID
-	FontName string
-	Flags    font.Flags
+	CMap  map[rune]font.GlyphID
+	Flags font.Flags
 
 	GlyphUnits  int
-	Ascent      int // Ascent in glyph coordinate units
-	Descent     int // Descent in glyph coordinate units, as a negative number
 	CapHeight   int
 	ItalicAngle float64
 
 	FontBBox *font.Rect // always uses 1000 units to the em (not GlyphUnits)
-
-	GlyphExtent []font.Rect
-	Width       []int
 
 	GSUB, GPOS gtab.Lookups
 }
@@ -79,7 +78,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	tt.head, err = head.Read(headFd)
+	tt.HeadInfo, err = head.Read(headFd)
 	if err != nil {
 		return nil, err
 	}
@@ -98,18 +97,24 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, errors.New("no glyphs found")
 	}
 
-	hheaInfo, err := tt.getHHeaInfo()
+	hheaData, err := tt.Header.ReadTableBytes(tt.Fd, "hhea")
 	if err != nil {
 		return nil, err
+	}
+	hmtxData, err := tt.Header.ReadTableBytes(tt.Fd, "hmtx")
+	if err != nil {
+		return nil, err
+	}
+	hmtxInfo, err := hmtx.Decode(hheaData, hmtxData)
+	if err != nil {
+		return nil, err
+	}
+	if len(hmtxInfo.Width) != NumGlyphs {
+		return nil, errors.New("hmtx: wrong number of glyphs")
 	}
 
 	os2Info, err := tt.getOS2Info()
 	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-
-	hmtx, err := tt.getHMtxInfo(NumGlyphs, int(hheaInfo.NumOfLongHorMetrics))
-	if err != nil {
 		return nil, err
 	}
 
@@ -137,7 +142,6 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 
-	// TODO(voss): get the glyph extents for OpenType fonts
 	var GlyphExtent []font.Rect
 	if glyf != nil {
 		GlyphExtent = make([]font.Rect, NumGlyphs)
@@ -147,25 +151,20 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 			GlyphExtent[i].URx = glyf.Data[i].XMax
 			GlyphExtent[i].URy = glyf.Data[i].YMax
 		}
+	} else {
+		// TODO(voss): get the glyph extents for OpenType fonts
 	}
+	hmtxInfo.GlyphExtent = GlyphExtent
 
-	Width := make([]int, NumGlyphs)
-	for i := 0; i < NumGlyphs; i++ {
-		Width[i] = int(hmtx.GetAdvanceWidth(i))
-	}
-
-	Ascent := int(hheaInfo.Ascent)
-	Descent := int(hheaInfo.Descent)
-	// LineGap := int(hheaInfo.LineGap)
 	if os2Info != nil && os2Info.V0MSValid {
 		if os2Info.V0.Selection&(1<<7) != 0 {
-			Ascent = int(os2Info.V0MS.TypoAscender)
-			Descent = int(os2Info.V0MS.TypoDescender)
+			hmtxInfo.Ascent = os2Info.V0MS.TypoAscender
+			hmtxInfo.Descent = os2Info.V0MS.TypoDescender
 		} else {
-			Ascent = int(os2Info.V0MS.WinAscent)
-			Descent = -int(os2Info.V0MS.WinDescent)
+			hmtxInfo.Ascent = int16(os2Info.V0MS.WinAscent)
+			hmtxInfo.Descent = -int16(os2Info.V0MS.WinDescent)
 		}
-		// LineGap = int(os2Info.V0MS.TypoLineGap)
+		hmtxInfo.LineGap = os2Info.V0MS.TypoLineGap
 	}
 
 	var capHeight int
@@ -177,7 +176,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		// LETTER H)
 		capHeight = int(GlyphExtent[H].URy)
 	} else {
-		capHeight = 800
+		capHeight = 800 // TODO(voss): adjust for glyphUnits
 	}
 
 	pars, err := gtab.New(tt.Header, tt.Fd, loc)
@@ -208,7 +207,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if postInfo != nil && postInfo.IsFixedPitch {
 		flags |= font.FlagFixedPitch
 	}
-	IsItalic := tt.head.IsItalic
+	IsItalic := tt.HeadInfo.IsItalic
 	if os2Info != nil {
 		// If the "OS/2" table is present, Windows seems to use this table to
 		// decide whether the font is bold/italic.  We follow Window's lead
@@ -230,16 +229,13 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 
 	tt.CMap = cmap
 	tt.FontName = fontName
-	tt.GlyphUnits = int(tt.head.UnitsPerEm)
-	tt.Ascent = Ascent
-	tt.Descent = Descent
+	tt.HmtxInfo = hmtxInfo
+	tt.GlyphUnits = int(tt.HeadInfo.UnitsPerEm)
 	tt.CapHeight = capHeight
 	if postInfo != nil {
 		tt.ItalicAngle = postInfo.ItalicAngle
 	}
-	tt.FontBBox = &tt.head.FontBBox // TODO(voss): avoid duplication
-	tt.GlyphExtent = GlyphExtent
-	tt.Width = Width
+	tt.FontBBox = &tt.HeadInfo.FontBBox // TODO(voss): avoid duplication
 	tt.Flags = flags
 	tt.GSUB = gsub
 	tt.GPOS = gpos
@@ -251,6 +247,12 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 // cannot be used any more after Close() has been called.
 func (tt *Font) Close() error {
 	return tt.Fd.Close()
+}
+
+// NumGlyphs returns the number of glyphs in the font.
+// This value always include the ".notdef" glyph.
+func (tt *Font) NumGlyphs() int {
+	return len(tt.HmtxInfo.Width)
 }
 
 // HasTables returns true, if all the given tables are present in the font.

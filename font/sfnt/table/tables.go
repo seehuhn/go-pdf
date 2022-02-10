@@ -397,56 +397,6 @@ type PostInfo struct {
 	IsFixedPitch       bool
 }
 
-type Hhea struct {
-	Version             uint32 // 0x00010000 (1.0)
-	Ascent              int16  // Distance from baseline of highest ascender
-	Descent             int16  // Distance from baseline of lowest descender
-	LineGap             int16  // typographic line gap
-	AdvanceWidthMax     uint16 // must be consistent with horizontal metrics
-	MinLeftSideBearing  int16  // must be consistent with horizontal metrics
-	MinRightSideBearing int16  // must be consistent with horizontal metrics
-	XMaxExtent          int16  // max(lsb + (xMax-xMin))
-	CaretSlopeRise      int16  // used to calculate the slope of the caret (rise/run) set to 1 for vertical caret
-	CaretSlopeRun       int16  // 0 for vertical
-	CaretOffset         int16  // set value to 0 for non-slanted fonts
-	_                   int16  // set value to 0
-	_                   int16  // set value to 0
-	_                   int16  // set value to 0
-	_                   int16  // set value to 0
-	MetricDataFormat    int16  // 0 for current format
-	NumOfLongHorMetrics uint16 // number of advance widths in metrics table
-}
-
-type Hmtx struct {
-	HMetrics        []LongHorMetric
-	LeftSideBearing []int16
-}
-
-type LongHorMetric struct {
-	AdvanceWidth    uint16
-	LeftSideBearing int16
-}
-
-// GetAdvanceWidth returns the advance width of a glyph, in font design units.
-func (h *Hmtx) GetAdvanceWidth(gid int) uint16 {
-	if gid >= len(h.HMetrics) {
-		return h.HMetrics[len(h.HMetrics)-1].AdvanceWidth
-	}
-	return h.HMetrics[gid].AdvanceWidth
-}
-
-// GetLSB returns the left side bearing of a glyph, in font design units.
-func (h *Hmtx) GetLSB(gid int) int16 {
-	if gid < len(h.HMetrics) {
-		return h.HMetrics[gid].LeftSideBearing
-	}
-	gid -= len(h.HMetrics)
-	if gid < len(h.LeftSideBearing) {
-		return h.LeftSideBearing[gid]
-	}
-	return 0
-}
-
 type OS2 struct {
 	V0 struct {
 		Version            uint16    // table version number (set to 0)

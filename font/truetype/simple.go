@@ -67,15 +67,20 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 	fnt := newSimple(w, tt)
 	w.OnClose(fnt.WriteFont)
 
+	width := make([]int, len(tt.HmtxInfo.Width))
+	for i, w := range tt.HmtxInfo.Width {
+		width[i] = int(w)
+	}
+
 	res := &font.Font{
 		InstName: instName,
 		Ref:      fnt.FontRef,
 
 		GlyphUnits:  tt.GlyphUnits,
-		Ascent:      tt.Ascent,
-		Descent:     tt.Descent,
-		GlyphExtent: tt.GlyphExtent,
-		Width:       tt.Width,
+		Ascent:      int(tt.HmtxInfo.Ascent),
+		Descent:     int(tt.HmtxInfo.Descent),
+		GlyphExtent: tt.HmtxInfo.GlyphExtent,
+		Width:       width,
 
 		Layout: fnt.Layout,
 		Enc:    fnt.Enc,
@@ -128,7 +133,7 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 
 	gg = fnt.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = int32(fnt.Sfnt.Width[gg[i].Gid])
+		gg[i].Advance = int32(fnt.Sfnt.HmtxInfo.Width[gg[i].Gid])
 	}
 	gg = fnt.Sfnt.GPOS.ApplyAll(gg)
 
@@ -209,7 +214,7 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 	firstCharCode := mapping[0].CharCode
 	lastCharCode := mapping[len(mapping)-1].CharCode
 	subsetMapping, includeGlyphs := font.MakeSubset(mapping)
-	subsetTag := font.GetSubsetTag(includeGlyphs, len(fnt.Sfnt.Width))
+	subsetTag := font.GetSubsetTag(includeGlyphs, fnt.Sfnt.NumGlyphs())
 	fontName := pdf.Name(subsetTag + "+" + fnt.Sfnt.FontName)
 
 	q := 1000 / float64(fnt.Sfnt.GlyphUnits)
@@ -250,8 +255,8 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		"Flags":       pdf.Integer(flags),
 		"FontBBox":    FontBBox,
 		"ItalicAngle": pdf.Number(fnt.Sfnt.ItalicAngle),
-		"Ascent":      pdf.Integer(q*float64(fnt.Sfnt.Ascent) + 0.5),
-		"Descent":     pdf.Integer(q*float64(fnt.Sfnt.Descent) + 0.5),
+		"Ascent":      pdf.Integer(q*float64(fnt.Sfnt.HmtxInfo.Ascent) + 0.5),
+		"Descent":     pdf.Integer(q*float64(fnt.Sfnt.HmtxInfo.Descent) + 0.5),
 		"CapHeight":   pdf.Integer(q*float64(fnt.Sfnt.CapHeight) + 0.5),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 		"FontFile2":   FontFileRef,
@@ -263,7 +268,7 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		width := 0
 		if i == mapping[pos].CharCode {
 			gid := mapping[pos].GID
-			width = int(float64(fnt.Sfnt.Width[gid])*q + 0.5)
+			width = int(float64(fnt.Sfnt.HmtxInfo.Width[gid])*q + 0.5)
 			pos++
 		}
 		Widths = append(Widths, pdf.Integer(width))

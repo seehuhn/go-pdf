@@ -55,18 +55,20 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-// Info contains information relating to the "hhea" and "hmtx" tables.
+// Info contains information from the "hhea" and "hmtx" tables.
 type Info struct {
-	Widths      []uint16
+	Width       []uint16
 	GlyphExtent []font.Rect
+	LSB         []int16
 	Ascent      int16
-	Descent     int16
+	Descent     int16 // negative (I think)
 	LineGap     int16
 	CaretAngle  float64 // in radians, 0 for vertical
 	CaretOffset int16
 }
 
-func DecodeHmtx(hhea, hmtx []byte) (*Info, error) {
+// Decode extracts information from the "hhea" and "hmtx" tables.
+func Decode(hhea, hmtx []byte) (*Info, error) {
 	r := bytes.NewReader(hhea)
 	hheaData := &binaryHhea{}
 	err := binary.Read(r, binary.BigEndian, hheaData)
@@ -115,86 +117,100 @@ func DecodeHmtx(hhea, hmtx []byte) (*Info, error) {
 	if len(widths) < numHorMetrics {
 		return nil, fmt.Errorf("hmtx too short")
 	}
-	info.Widths = widths
-
-	info.GlyphExtent = make([]font.Rect, len(lsbs))
-	for i, lsb := range lsbs {
-		info.GlyphExtent[i].LLx = lsb
-	}
+	info.Width = widths
+	info.LSB = lsbs
 
 	return info, nil
 }
 
-func EncodeHmtx(info *Info) ([]byte, []byte) {
-	numGlyphs := len(info.Widths)
-	numWidths := numGlyphs
-	for numWidths > 1 && info.Widths[numWidths-1] == info.Widths[numWidths-2] {
-		numWidths--
+// Encode creates the "hhea" and "hmtx" tables.
+func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
+	numGlyphs := len(info.Width)
+	if info.LSB != nil && len(info.LSB) != numGlyphs {
+		panic("lsb length mismatch")
 	}
+	if info.GlyphExtent != nil && len(info.GlyphExtent) != numGlyphs {
+		panic("GlyphExtent length mismatch")
+	}
+
+	numLong := numGlyphs
+	for numLong > 1 && info.Width[numLong-1] == info.Width[numLong-2] {
+		numLong--
+	}
+
+	rise, run := fromAngle(info.CaretAngle)
 
 	hhea := &binaryHhea{
-		Version:             0x00010000, // 1.0
-		Ascent:              info.Ascent,
-		Descent:             info.Descent,
-		LineGap:             info.LineGap,
-		CaretOffset:         info.CaretOffset,
-		NumOfLongHorMetrics: uint16(numWidths),
+		Version: 0x00010000, // 1.0
+		Ascent:  info.Ascent,
+		Descent: info.Descent,
+		LineGap: info.LineGap,
+
+		CaretSlopeRise: rise,
+		CaretSlopeRun:  run,
+		CaretOffset:    info.CaretOffset,
+
+		NumOfLongHorMetrics: uint16(numLong),
 	}
 
-	lsbs := make([]int16, numGlyphs)
-	minLsb := int16(0x7fff)
-	minRsb := int16(0x7fff)
-	xMaxExtent := int16(0)
-	for i, w := range info.Widths {
+	for _, w := range info.Width {
 		if w > hhea.AdvanceWidthMax {
 			hhea.AdvanceWidthMax = w
 		}
+	}
 
-		bbox := info.GlyphExtent[i]
-		if bbox.IsZero() {
+	lsbs := info.LSB
+	if lsbs == nil {
+		lsbs = make([]int16, numGlyphs)
+		for i := 0; i < numGlyphs; i++ {
+			lsbs[i] = info.GlyphExtent[i].LLx
+		}
+	}
+	first := true
+	for i, lsb := range lsbs {
+		if info.GlyphExtent != nil && info.GlyphExtent[i].IsZero() {
 			continue
 		}
-
-		lsb := bbox.LLx
-		rsb := int16(w) - bbox.URx
-		lsbs[i] = lsb
-		if lsb < minLsb {
-			minLsb = lsb
-		}
-		if rsb < minRsb {
-			minRsb = rsb
-		}
-		if bbox.URx > xMaxExtent {
-			xMaxExtent = bbox.URx
+		if first || lsb < hhea.MinLeftSideBearing {
+			hhea.MinLeftSideBearing = lsb
+			first = false
 		}
 	}
-	if minLsb < int16(0x7fff) {
-		hhea.MinLeftSideBearing = minLsb
-		hhea.MinRightSideBearing = minRsb
-		hhea.XMaxExtent = xMaxExtent
-	}
 
-	caretAngle := info.CaretAngle
-	rise, run := fromAngle(caretAngle)
-	hhea.CaretSlopeRise = int16(rise)
-	hhea.CaretSlopeRun = int16(run)
+	if info.GlyphExtent != nil {
+		first = true
+		for i, bbox := range info.GlyphExtent {
+			if bbox.IsZero() {
+				continue
+			}
+
+			rsb := int16(info.Width[i]) - bbox.URx
+			if first || rsb < hhea.MinRightSideBearing {
+				hhea.MinRightSideBearing = rsb
+			}
+			if first || bbox.URx > hhea.XMaxExtent {
+				hhea.XMaxExtent = bbox.URx
+			}
+			first = false
+		}
+	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, hheaLength))
 	_ = binary.Write(buf, binary.BigEndian, hhea)
-	hheaData := buf.Bytes()
+	hheaData = buf.Bytes()
 
-	buf = bytes.NewBuffer(make([]byte, 0, 4*numWidths+2*(numGlyphs-numWidths)))
+	buf = bytes.NewBuffer(make([]byte, 0, 4*numLong+2*(numGlyphs-numLong)))
 	for i := 0; i < numGlyphs; i++ {
-		if i < numWidths {
+		if i < numLong {
 			buf.Write([]byte{
-				byte(info.Widths[i] >> 8), byte(info.Widths[i]),
+				byte(info.Width[i] >> 8), byte(info.Width[i]),
 			})
 		}
 		buf.Write([]byte{
 			byte(lsbs[i] >> 8), byte(lsbs[i]),
 		})
 	}
-	hmtxData := buf.Bytes()
+	hmtxData = buf.Bytes()
 
 	return hheaData, hmtxData
 }
@@ -217,7 +233,6 @@ func toAngle(rise, run int16) float64 {
 		float64(rise),
 		float64(run),
 	) - math.Pi/2
-	fmt.Printf("%d %d -> %f\n", rise, run, caretAngle)
 	return caretAngle
 }
 
@@ -227,18 +242,14 @@ func fromAngle(caretAngle float64) (rise, run int16) {
 	c := math.Cos(phi)
 	if math.Abs(c) <= 0.5/32767.0 {
 		if s >= 0 {
-			fmt.Printf("%f -> 1 0 *\n", caretAngle)
 			return 1, 0
-		} else {
-			fmt.Printf("%f -> -1 0 *\n", caretAngle)
-			return -1, 0
 		}
+		return -1, 0
 	}
 	rise0, run0 := bestRationalApproximation(s/c, 32767)
 	if s*float64(rise0) < 0 {
 		rise0, run0 = -rise0, -run0
 	}
-	fmt.Printf("%f -> %d %d\n", caretAngle, rise0, run0)
 	return int16(rise0), int16(run0)
 }
 

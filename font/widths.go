@@ -20,14 +20,14 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-func mostFrequent(w []int) int {
-	hist := make(map[int]int)
+func mostFrequent(w []uint16) uint16 {
+	hist := make(map[uint16]int)
 	for _, wi := range w {
 		hist[wi]++
 	}
 
 	bestCount := 0
-	bestVal := 0
+	bestVal := uint16(0)
 	for wi, count := range hist {
 		if count > bestCount || count == 1000 && count == bestCount {
 			bestCount = count
@@ -39,12 +39,12 @@ func mostFrequent(w []int) int {
 
 type seq struct {
 	start  int
-	values []int
+	values []uint16
 }
 
 // EncodeCIDWidths constructs the /W array for PDF CIDFonts.
 // See section 9.7.4.3 of PDF 32000-1:2008 for details.
-func EncodeCIDWidths(w []int) (int, pdf.Array) {
+func EncodeCIDWidths(w []uint16) (uint16, pdf.Array) {
 	n := len(w)
 
 	dw := mostFrequent(w)
