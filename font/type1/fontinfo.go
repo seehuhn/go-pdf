@@ -42,7 +42,7 @@ type FontInfo struct {
 
 	// ItalicAngle is the angle, in degrees counterclockwise from the vertical,
 	// of the dominant vertical strokes of the font.
-	ItalicAngle float64
+	ItalicAngle int32
 
 	// IsFixedPitch is a flag indicating whether the font is a fixed-pitch
 	// (monospaced) font.
@@ -51,13 +51,14 @@ type FontInfo struct {
 	// UnderlinePosition is the recommended distance from the baseline for
 	// positioning underlining strokes. This number is the y coordinate (in the
 	// glyph coordinate system) of the center of the stroke.
-	UnderlinePosition float64
+	UnderlinePosition int16
 
 	// UnderlineThickness is the recommended stroke width for underlining, in
 	// units of the glyph coordinate system.
-	UnderlineThickness float64
+	UnderlineThickness int16
 
-	PaintType  int32
+	IsOutlined bool
+
 	FontMatrix []float64
 
 	Private []*PrivateDict

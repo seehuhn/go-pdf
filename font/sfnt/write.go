@@ -139,7 +139,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			EntrySelector: uint16(sel),
 			RangeShift:    uint16(16 * (numTables - 1<<sel)),
 		},
-		Records: make([]table.Record, len(tableNames)),
+		Records: make([]table.Record, numTables),
 	}
 	offset := uint32(12 + 16*numTables)
 	for i, name := range tableNames {

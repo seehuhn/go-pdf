@@ -42,6 +42,11 @@ type Offsets struct {
 	RangeShift    uint16
 }
 
+const (
+	ScalerTypeTrueType = 0x00010000
+	ScalerTypeCFF      = 0x4F54544F
+)
+
 // A Record is part of the file Header.  It contains data about a single sfnt
 // table.
 type Record struct {
@@ -60,7 +65,7 @@ func ReadHeader(r io.Reader) (*Header, error) {
 	}
 
 	scalerType := res.Offsets.ScalerType
-	if scalerType != 0x00010000 && scalerType != 0x4F54544F {
+	if scalerType != ScalerTypeTrueType && scalerType != ScalerTypeCFF {
 		return nil, fmt.Errorf("unsupported sfnt type 0x%8X", scalerType)
 	}
 	if res.Offsets.NumTables > 280 {
@@ -464,6 +469,14 @@ type GlyphHeader struct {
 
 // Tag represents a tag string composed of 4 ASCII bytes
 type Tag [4]byte
+
+// MakeTag converts a string of length 4 bytes to a Tag.
+func MakeTag(s string) Tag {
+	if len(s) != 4 {
+		panic("tag must be 4 bytes")
+	}
+	return Tag{s[0], s[1], s[2], s[3]}
+}
 
 func (tag Tag) String() string {
 	return string(tag[:])

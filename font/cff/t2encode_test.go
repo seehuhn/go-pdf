@@ -35,11 +35,11 @@ func TestRoundTrip(t *testing.T) {
 		FullName:           "FullName",
 		FamilyName:         "FamilyName",
 		Weight:             "Weight",
-		ItalicAngle:        1.23,
+		ItalicAngle:        9,
 		IsFixedPitch:       true,
 		UnderlinePosition:  -80,
 		UnderlineThickness: 40,
-		PaintType:          0,
+		IsOutlined:         false,
 		FontMatrix:         []float64{1.0 / 1024, 0, 0, 1.0 / 1024, 0, 0},
 		Private: []*type1.PrivateDict{
 			{

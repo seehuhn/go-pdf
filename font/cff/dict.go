@@ -425,13 +425,13 @@ func makeTopDict(info *type1.FontInfo) cffDict {
 		topDict[opItalicAngle] = []interface{}{info.ItalicAngle}
 	}
 	if info.UnderlinePosition != defaultUnderlinePosition {
-		topDict[opUnderlinePosition] = []interface{}{info.UnderlinePosition}
+		topDict[opUnderlinePosition] = []interface{}{int32(info.UnderlinePosition)}
 	}
 	if info.UnderlineThickness != defaultUnderlineThickness {
-		topDict[opUnderlineThickness] = []interface{}{info.UnderlineThickness}
+		topDict[opUnderlineThickness] = []interface{}{int32(info.UnderlineThickness)}
 	}
-	if info.PaintType != 0 {
-		topDict[opPaintType] = []interface{}{info.PaintType}
+	if info.IsOutlined {
+		topDict[opPaintType] = []interface{}{int32(2)}
 	}
 	topDict.setFontMatrix(opFontMatrix, info.FontMatrix)
 

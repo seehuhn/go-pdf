@@ -1,4 +1,21 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 // Package head supports reading and writing the HEAD table.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/head
 package head
 
 import (
@@ -15,23 +32,25 @@ const headLength = 54
 
 // Info represents the information in the 'head' table of an sfnt.
 type Info struct {
-	FontRevision   Version // set by font manufacturer
-	HasYBaseAt0    bool    // baseline for font at y=0
-	HasXBaseAt0    bool    // left sidebearing point at x=0 (only for TrueType)
-	IsNonlinear    bool    // outline/advance width may change nonlinearly
-	UnitsPerEm     uint16  // font design units per em square
-	Created        time.Time
-	Modified       time.Time
-	FontBBox       font.Rect
-	IsBold         bool
-	IsItalic       bool
-	HasUnderline   bool
-	IsOutline      bool
-	HasShadow      bool
-	IsCondensed    bool
-	IsExtended     bool
+	FontRevision Version // set by font manufacturer
+	HasYBaseAt0  bool    // baseline for font at y=0
+	HasXBaseAt0  bool    // left sidebearing point at x=0 (only for TrueType)
+	IsNonlinear  bool    // outline/advance width may change nonlinearly
+	UnitsPerEm   uint16  // font design units per em square
+	Created      time.Time
+	Modified     time.Time
+	FontBBox     font.Rect
+
+	IsBold       bool
+	IsItalic     bool
+	HasUnderline bool
+	IsOutlined   bool
+	HasShadow    bool
+	IsCondensed  bool
+	IsExtended   bool
+
 	LowestRecPPEM  uint16 // smallest readable size in pixels
-	HasLongOffsets bool   // 'loca' table uses 32 bit offsets
+	HasLongOffsets bool   // 'loca' table uses 32 bit offsets (TrueType only)
 }
 
 // Read reads and  decodes the binary representation of the head table.
@@ -73,7 +92,7 @@ func Read(r io.Reader) (*Info, error) {
 	info.IsBold = enc.MacStyle&(1<<0) != 0
 	info.IsItalic = enc.MacStyle&(1<<1) != 0
 	info.HasUnderline = enc.MacStyle&(1<<2) != 0
-	info.IsOutline = enc.MacStyle&(1<<3) != 0
+	info.IsOutlined = enc.MacStyle&(1<<3) != 0
 	info.HasShadow = enc.MacStyle&(1<<4) != 0
 	info.IsCondensed = enc.MacStyle&(1<<5) != 0
 	info.IsExtended = enc.MacStyle&(1<<6) != 0
@@ -112,7 +131,7 @@ func (info *Info) Encode() (data []byte, err error) {
 	if info.HasUnderline {
 		macStyle |= 1 << 2
 	}
-	if info.IsOutline {
+	if info.IsOutlined {
 		macStyle |= 1 << 3
 	}
 	if info.HasShadow {

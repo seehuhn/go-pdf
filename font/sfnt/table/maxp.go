@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package table
 
 import (
@@ -27,8 +43,9 @@ func ReadMaxp(r io.Reader) (*MaxpInfo, error) {
 	return &MaxpInfo{numGlyphs}, nil
 }
 
-// EncodeMaxp encodes the number of Glyphs in a "maxp" table.
-func EncodeMaxp(numGlyphs int) ([]byte, error) {
+// Encode encodes the number of Glyphs in a "maxp" table.
+func (info *MaxpInfo) Encode() ([]byte, error) {
+	numGlyphs := info.NumGlyphs
 	if numGlyphs < 0 || numGlyphs >= 1<<16 {
 		return nil, errors.New("sfnt/maxp: numGlyphs out of range")
 	}

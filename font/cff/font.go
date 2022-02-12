@@ -123,12 +123,12 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.Info.Weight = topDict.getString(opWeight)
 	isFixedPitch := topDict.getInt(opIsFixedPitch, 0)
 	cff.Info.IsFixedPitch = isFixedPitch != 0
-	cff.Info.ItalicAngle = topDict.getFloat(opItalicAngle, 0)
-	cff.Info.UnderlinePosition = topDict.getFloat(opUnderlinePosition,
-		defaultUnderlinePosition)
-	cff.Info.UnderlineThickness = topDict.getFloat(opUnderlineThickness,
-		defaultUnderlineThickness)
-	cff.Info.PaintType = topDict.getInt(opPaintType, 0)
+	cff.Info.ItalicAngle = int32(topDict.getInt(opItalicAngle, 0))
+	cff.Info.UnderlinePosition = int16(topDict.getInt(opUnderlinePosition,
+		defaultUnderlinePosition))
+	cff.Info.UnderlineThickness = int16(topDict.getInt(opUnderlineThickness,
+		defaultUnderlineThickness))
+	cff.Info.IsOutlined = topDict.getInt(opPaintType, 0) != 0
 
 	// TODO(voss): different default for CIDFonts?
 	cff.Info.FontMatrix = topDict.getFontMatrix(opFontMatrix)
