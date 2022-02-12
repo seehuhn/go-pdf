@@ -42,7 +42,7 @@ type FontInfo struct {
 
 	// ItalicAngle is the angle, in degrees counterclockwise from the vertical,
 	// of the dominant vertical strokes of the font.
-	ItalicAngle int32
+	ItalicAngle float64
 
 	// IsFixedPitch is a flag indicating whether the font is a fixed-pitch
 	// (monospaced) font.

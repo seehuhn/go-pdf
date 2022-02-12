@@ -123,7 +123,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.Info.Weight = topDict.getString(opWeight)
 	isFixedPitch := topDict.getInt(opIsFixedPitch, 0)
 	cff.Info.IsFixedPitch = isFixedPitch != 0
-	cff.Info.ItalicAngle = int32(topDict.getInt(opItalicAngle, 0))
+	cff.Info.ItalicAngle = topDict.getFloat(opItalicAngle, 0)
 	cff.Info.UnderlinePosition = int16(topDict.getInt(opUnderlinePosition,
 		defaultUnderlinePosition))
 	cff.Info.UnderlineThickness = int16(topDict.getInt(opUnderlineThickness,

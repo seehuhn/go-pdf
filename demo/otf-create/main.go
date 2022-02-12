@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"io"
 	"log"
+	"math"
 	"math/bits"
 	"os"
 	"sort"
@@ -48,12 +49,11 @@ type Info struct {
 	Descent int16
 	LineGap int16
 
-	ItalicAngle        int32 // Italic angle (degrees counterclockwise from vertical)
-	UnderlinePosition  int16 // Underline position (negative)
-	UnderlineThickness int16 // Underline thickness
+	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
+	UnderlinePosition  int16   // Underline position (negative)
+	UnderlineThickness int16   // Underline thickness
 
 	IsBold       bool
-	IsItalic     bool
 	HasUnderline bool
 	IsOutlined   bool
 	IsRegular    bool
@@ -134,6 +134,10 @@ func makeHead(info *Info, glyphs []*cff.Glyph) ([]byte, error) {
 		Created:       now,
 		Modified:      now,
 		FontBBox:      bbox,
+		IsBold:        info.IsBold,
+		IsItalic:      info.ItalicAngle != 0,
+		HasUnderline:  info.HasUnderline,
+		IsOutlined:    info.IsOutlined,
 		LowestRecPPEM: 7,
 	}
 	return headInfo.Encode()
@@ -153,6 +157,7 @@ func makeHmtx(info *Info, glyphs []*cff.Glyph) ([]byte, []byte) {
 		Ascent:      info.Ascent,
 		Descent:     info.Descent,
 		LineGap:     info.LineGap,
+		CaretAngle:  float64(info.ItalicAngle) / 180 * math.Pi,
 	}
 
 	return hmtxInfo.Encode()
@@ -163,7 +168,7 @@ func makeOS2(info *Info) []byte {
 		WeightClass:  info.Weight,
 		WidthClass:   info.Width,
 		IsBold:       info.IsBold,
-		IsItalic:     info.IsItalic,
+		IsItalic:     info.ItalicAngle != 0,
 		HasUnderline: info.HasUnderline,
 		IsOutlined:   info.IsOutlined,
 		IsRegular:    info.IsRegular,
@@ -264,6 +269,8 @@ func main() {
 		Ascent:     700,
 		Descent:    -300,
 		LineGap:    200,
+
+		ItalicAngle: -10,
 	}
 
 	var glyphs []*cff.Glyph

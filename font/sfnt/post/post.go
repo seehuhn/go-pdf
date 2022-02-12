@@ -23,13 +23,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 )
 
 // Info contains information from the "post" table.
 type Info struct {
-	ItalicAngle        int32 // Italic angle in degrees
-	UnderlinePosition  int16 // Underline position (negative)
-	UnderlineThickness int16 // Underline thickness
+	ItalicAngle        float64 // Italic angle in degrees
+	UnderlinePosition  int16   // Underline position (negative)
+	UnderlineThickness int16   // Underline thickness
 	IsFixedPitch       bool
 }
 
@@ -45,7 +46,7 @@ func Read(r io.Reader) (*Info, error) {
 	}
 
 	info := &Info{
-		ItalicAngle:        post.ItalicAngle,
+		ItalicAngle:        float64(post.ItalicAngle) / 65536,
 		UnderlinePosition:  post.UnderlinePosition,
 		UnderlineThickness: post.UnderlineThickness,
 		IsFixedPitch:       post.IsFixedPitch != 0,
@@ -63,7 +64,7 @@ func (info *Info) Encode() []byte {
 
 	post := &postEnc{
 		Version:            0x00030000,
-		ItalicAngle:        info.ItalicAngle,
+		ItalicAngle:        int32(math.Round(info.ItalicAngle * 65536)),
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 		IsFixedPitch:       isFixedPitch,
