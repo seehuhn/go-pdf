@@ -21,6 +21,10 @@ package dijkstra
 //     vertices: 0, 1, ..., n, start at 0, end at n
 //     edges: (i, j) with 0 <= i < j <= n
 func ShortestPath(cost func(i, j int) int, n int) (int, []int) {
+	if n == 0 {
+		return 0, []int{0}
+	}
+
 	dist := make([]int, n)
 	from := make([]int, n)
 	for i := 0; i < n; i++ {

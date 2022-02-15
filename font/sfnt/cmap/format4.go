@@ -3,6 +3,7 @@ package cmap
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math/bits"
 	"sort"
 
@@ -37,6 +38,13 @@ func decodeFormat4(in []byte) (format4, error) {
 	idRangeOffset := words[3*segCount+1 : 4*segCount+1]
 	glyphIDArray := words[4*segCount+1:]
 
+	fmt.Println()
+	fmt.Printf("startCode: %x\n", startCode)
+	fmt.Printf("endCode:   %x\n", endCode)
+	fmt.Printf("idDelta:   %x\n", idDelta)
+	fmt.Printf("idRngOffs: %x\n", idRangeOffset)
+	fmt.Printf("glyphID:   %x\n", glyphIDArray)
+
 	cmap := format4{}
 	prevEnd := uint32(0)
 	for k := 0; k < segCount; k++ {
@@ -59,7 +67,7 @@ func decodeFormat4(in []byte) (format4, error) {
 			d := int(idRangeOffset[k])/2 - (segCount - k)
 			if d < 0 || d+int(end-start) > len(glyphIDArray) {
 				if start == 0xFFFF {
-					// some fonts have invalid data for the last segment
+					// some fonts seem to have invalid data for the last segment
 					continue
 				}
 				return nil, errMalformedCmap
@@ -80,7 +88,7 @@ func (cmap format4) Lookup(code uint32) font.GlyphID {
 }
 
 func (cmap format4) Encode() []byte {
-	var mapping []font.CMapEntry
+	mapping := make([]font.CMapEntry, 0, len(cmap))
 	for code, gid := range cmap {
 		c := uint16(code)
 		if uint32(c) != code {
@@ -95,14 +103,17 @@ func (cmap format4) Encode() []byte {
 		return mapping[i].CharCode < mapping[j].CharCode
 	})
 
+	// The final segment must be 0xFFFF-0xFFFF.  We map to 0, if there
+	// is no preexisting mapping.
 	var finalGID uint16
 	if n := len(mapping); n > 0 && mapping[n-1].CharCode == 0xFFFF {
 		finalGID = uint16(mapping[n-1].GID)
 		mapping = mapping[:n-1]
 	}
 
-	var StartCode, EndCode, IDDelta, IDRangeOffsets, GlyphIDArray []uint16
 	segments := findSegments(mapping)
+
+	var StartCode, EndCode, IDDelta, IDRangeOffsets, GlyphIDArray []uint16
 	for i := 1; i < len(segments); i++ {
 		start := segments[i-1]
 		end := segments[i]
@@ -152,8 +163,7 @@ func (cmap format4) Encode() []byte {
 	IDDelta = append(IDDelta, finalGID-0xFFFF)
 	IDRangeOffsets = append(IDRangeOffsets, 0)
 
-	// Encode the data in the binary format described at
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
+	// Encode the data in the binary format
 	data := &cmapFormat4{
 		Format: 4,
 	}
@@ -182,25 +192,15 @@ func findSegments(mapping []font.CMapEntry) []int {
 	//
 	//   - If GID-CharCode is constant over the range, IDDelta can be used.
 	//     This requires 4 words of storage.
-	//     The range can contain unmapped character indices.
+	//
 	//   - Otherwise, GlyphIDArray can be used.  This requires
 	//     4 + (EndCode - StartCode + 1) words of storage.
-	//
-	// Example:
-	//     charCode:  1  2  5 |  6  7  8  ->  4 + 7 = 11 words
-	//     gid:       1  2  5 | 10 11  6
-	//
-	//     charCode:  1  2  5  6  7  8  ->  12 words
-	//     gid:       1  2  5 10 11  6
-	//
-	//     charCode:  1  2  5 |  6  7 | 8  ->  4 + 4 + 5 = 13 words
-	//     gid:       1  2  5 | 10 11 | 6
 
 	cost := func(k, l int) int {
 		delta := uint16(mapping[k].GID) - mapping[k].CharCode
 		for i := k + 1; i < l; i++ {
 			deltaI := uint16(mapping[i].GID) - mapping[i].CharCode
-			if deltaI != delta {
+			if mapping[i].GID != mapping[i-1].GID+1 || deltaI != delta {
 				// we have to use GlyphIDArray
 				return 4 + int(mapping[l-1].CharCode) - int(mapping[k].CharCode) + 1
 			}
@@ -208,10 +208,8 @@ func findSegments(mapping []font.CMapEntry) []int {
 		return 4 // we can use IDDelta
 	}
 
-	n := len(mapping)
-
 	// Use Dijkstra's algorithm to find the best splits between segments.
-	_, path := dijkstra.ShortestPath(cost, n)
+	_, path := dijkstra.ShortestPath(cost, len(mapping))
 	return path
 }
 
