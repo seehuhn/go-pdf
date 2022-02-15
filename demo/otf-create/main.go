@@ -269,8 +269,6 @@ func main() {
 		Ascent:     700,
 		Descent:    -300,
 		LineGap:    200,
-
-		ItalicAngle: -10,
 	}
 
 	var glyphs []*cff.Glyph

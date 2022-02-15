@@ -18,44 +18,64 @@ package main
 
 import (
 	"bufio"
-	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
-	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
+var seen = make(map[string]bool)
+var count = make(map[uint16]int)
+
 func tryFont(fname string) error {
-	if !strings.HasSuffix(fname, ".otf") {
-		return nil
-	}
-
-	tt, err := sfnt.Open(fname, nil)
-	if err != nil {
-		return err
-	}
-	defer tt.Close()
-
-	cffData, _ := tt.Header.ReadTableBytes(tt.Fd, "CFF ")
-	if len(cffData) == 0 {
-		return nil
-	}
-	cff, err := cff.Read(bytes.NewReader(cffData))
-	if err != nil {
-		return err
-	}
-
-	// w1 := tt.Width
-	// w2 := cff.Width
-	// if len(w1) != len(w2) {
-	// 	return fmt.Errorf("widths differ: %d vs %d", len(w1), len(w2))
+	// tt, err := sfnt.Open(fname, nil)
+	// if err != nil {
+	// 	return err
 	// }
+	// defer tt.Close()
 
-	if tt.FontName != string(cff.Info.FontName) {
-		fmt.Println("xxx", tt.FontName, cff.Info.FontName, cff.Info.Notice)
+	fd, err := os.Open(fname)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+
+	header, err := table.ReadHeader(fd)
+	if err != nil {
+		return err
+	}
+
+	cmapData, err := header.ReadTableBytes(fd, "cmap")
+	if err != nil {
+		return err
+	}
+
+	subtables, err := cmap.LocateSubtables(cmapData)
+	if err != nil {
+		return err
+	}
+	for _, s := range subtables {
+		format := uint16(s.Data[0])<<8 | uint16(s.Data[1])
+
+		hash := sha256.New()
+		hash.Write(s.Data)
+		sum := string(hash.Sum(nil))
+		if seen[string(sum)] {
+			fmt.Println(format, len(s.Data), "seen")
+			continue
+		} else {
+			seen[sum] = true
+		}
+
+		count[format]++
+		outname := fmt.Sprintf("cmap/%02d-%05d.bin", format, count[format])
+		err = os.WriteFile(outname, s.Data, 0644)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -79,4 +99,5 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Fatal("main loop failed:", err)
 	}
+	fmt.Println(count)
 }

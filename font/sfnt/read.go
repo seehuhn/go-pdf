@@ -47,7 +47,7 @@ func (tt *Font) getFontName() (string, error) {
 		}
 
 		switch {
-		case record.PlatformID == 1 && record.PlatformSpecificID == 0 &&
+		case record.PlatformID == 1 && record.EncodingID == 0 &&
 			record.LanguageID == 0:
 			_, err = nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
 				io.SeekStart)
@@ -64,7 +64,7 @@ func (tt *Font) getFontName() (string, error) {
 				rr[i] = macintosh[c]
 			}
 			return string(rr), nil
-		case record.PlatformID == 3 && record.PlatformSpecificID == 1:
+		case record.PlatformID == 3 && record.EncodingID == 1:
 			_, err = nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
 				io.SeekStart)
 			if err != nil {

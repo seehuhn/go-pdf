@@ -375,12 +375,12 @@ type NameHeader struct {
 }
 
 type NameRecord struct {
-	PlatformID         uint16 // platform identifier code
-	PlatformSpecificID uint16 // platform-specific encoding identifier
-	LanguageID         uint16 // language identifier
-	NameID             uint16 // name identifier
-	Length             uint16 // name string length in bytes
-	Offset             uint16 // name string offset in bytes
+	PlatformID uint16 // platform identifier code
+	EncodingID uint16 // platform-specific encoding identifier
+	LanguageID uint16 // language identifier
+	NameID     uint16 // name identifier
+	Length     uint16 // name string length in bytes
+	Offset     uint16 // name string offset in bytes
 }
 
 type PostHeader struct {
