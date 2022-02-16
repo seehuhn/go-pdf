@@ -5,9 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/bits"
-	"sort"
 
-	"seehuhn.de/go/pdf/dijkstra"
+	"seehuhn.de/go/dijkstra"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -88,80 +87,31 @@ func (cmap format4) Lookup(code uint32) font.GlyphID {
 }
 
 func (cmap format4) Encode() []byte {
-	mapping := make([]font.CMapEntry, 0, len(cmap))
-	for code, gid := range cmap {
-		c := uint16(code)
-		if uint32(c) != code {
-			continue
-		}
-		mapping = append(mapping, font.CMapEntry{
-			CharCode: c,
-			GID:      gid,
-		})
+	g := makeSegments(cmap)
+	segments, err := dijkstra.ShortestPath[uint32, *segment, int](g, 0, 0x10000)
+	if err != nil {
+		panic(err)
 	}
-	sort.Slice(mapping, func(i, j int) bool {
-		return mapping[i].CharCode < mapping[j].CharCode
-	})
-
-	// The final segment must be 0xFFFF-0xFFFF.  We map to 0, if there
-	// is no preexisting mapping.
-	var finalGID uint16
-	if n := len(mapping); n > 0 && mapping[n-1].CharCode == 0xFFFF {
-		finalGID = uint16(mapping[n-1].GID)
-		mapping = mapping[:n-1]
-	}
-
-	segments := findSegments(mapping)
 
 	var StartCode, EndCode, IDDelta, IDRangeOffsets, GlyphIDArray []uint16
-	for i := 1; i < len(segments); i++ {
-		start := segments[i-1]
-		end := segments[i]
-
-		charCode := mapping[start].CharCode
-		gid := uint16(mapping[start].GID)
-		delta := gid - charCode
-		canUseDelta := true
-		for i := start + 1; i < end; i++ {
-			thisCharCode := mapping[i].CharCode
-			thisGid := uint16(mapping[i].GID)
-			thisDelta := thisGid - thisCharCode
-			if thisDelta != delta {
-				canUseDelta = false
-				break
-			}
-		}
-
-		StartCode = append(StartCode, charCode)
-		EndCode = append(EndCode, mapping[end-1].CharCode)
-		if canUseDelta {
-			IDDelta = append(IDDelta, delta)
+	for i, s := range segments {
+		StartCode = append(StartCode, s.first)
+		EndCode = append(EndCode, s.last)
+		IDDelta = append(IDDelta, s.delta)
+		if !s.useValues {
 			IDRangeOffsets = append(IDRangeOffsets, 0)
 		} else {
-			IDDelta = append(IDDelta, 0)
 			offs := 2 * (len(segments) - i + // remaining entries in IDRangeOffsets
-				1 + // the final segment
 				len(GlyphIDArray)) // any previous entries in GlyphIDArray
 			if offs > 65535 {
 				panic("too many mappings for a format 4 subtable")
 			}
 			IDRangeOffsets = append(IDRangeOffsets, uint16(offs))
-			pos := start
-			for c := charCode; c <= mapping[end-1].CharCode; c++ {
-				var val uint16
-				if mapping[pos].CharCode == c {
-					val = uint16(mapping[pos].GID)
-					pos++
-				}
-				GlyphIDArray = append(GlyphIDArray, val)
+			for c := uint32(s.first); c <= uint32(s.last); c++ {
+				GlyphIDArray = append(GlyphIDArray, uint16(cmap[c]))
 			}
 		}
 	}
-	// add the required final segment
-	StartCode = append(StartCode, 0xFFFF)
-	EndCode = append(EndCode, 0xFFFF)
-	IDDelta = append(IDDelta, finalGID-0xFFFF)
-	IDRangeOffsets = append(IDRangeOffsets, 0)
 
 	// Encode the data in the binary format
 	data := &cmapFormat4{
@@ -186,31 +136,103 @@ func (cmap format4) Encode() []byte {
 	return buf.Bytes()
 }
 
-func findSegments(mapping []font.CMapEntry) []int {
-	// There are two different ways to encode GID values for a segment
-	// of CharCode values:
-	//
-	//   - If GID-CharCode is constant over the range, IDDelta can be used.
-	//     This requires 4 words of storage.
-	//
-	//   - Otherwise, GlyphIDArray can be used.  This requires
-	//     4 + (EndCode - StartCode + 1) words of storage.
+type segment struct {
+	first     uint16
+	last      uint16
+	delta     uint16
+	useValues bool
+}
 
-	cost := func(k, l int) int {
-		delta := uint16(mapping[k].GID) - mapping[k].CharCode
-		for i := k + 1; i < l; i++ {
-			deltaI := uint16(mapping[i].GID) - mapping[i].CharCode
-			if mapping[i].GID != mapping[i-1].GID+1 || deltaI != delta {
-				// we have to use GlyphIDArray
-				return 4 + int(mapping[l-1].CharCode) - int(mapping[k].CharCode) + 1
-			}
-		}
-		return 4 // we can use IDDelta
+type makeSegments map[uint32]font.GlyphID
+
+func (ms makeSegments) Neighbours(v uint32) []*segment {
+	if v > 0xFFFF {
+		return nil
 	}
 
-	// Use Dijkstra's algorithm to find the best splits between segments.
-	_, path := dijkstra.ShortestPath(cost, len(mapping))
-	return path
+	// skip leading .notdef mappings
+	start := v
+	var skip uint16
+	for start < 0xFFFF && ms[start] == 0 {
+		start++
+		skip++
+	}
+
+	// check whether this is the last, special segment
+	delta := uint16(ms[start]) - uint16(start)
+	if start == 0xFFFF {
+		return []*segment{
+			{first: 0xFFFF, last: 0xFFFF, delta: delta},
+		}
+	}
+
+	// try to use a delta offset
+	end := start + 1
+	for end < 0xFFFF && uint16(ms[end])-uint16(end) == delta {
+		end++
+	}
+	segs := []*segment{
+		{
+			first: uint16(start),
+			last:  uint16(end - 1),
+			delta: delta,
+		},
+	}
+	if end-start >= 4 || start == 0xFFFE {
+		return segs
+	}
+
+	// as a last resort, store GID values explicitly
+	prevDelta := delta
+	numDelta := 1
+	numNotdef := 0
+	end = start + 1
+	for end < 0xFFFF {
+		thisGid := ms[end]
+
+		thisDelta := uint16(thisGid) - uint16(end)
+		if thisDelta == prevDelta {
+			numDelta++
+		} else {
+			prevDelta = thisDelta
+			numDelta = 1 + numNotdef
+		}
+
+		if thisGid == 0 {
+			numNotdef++
+		} else {
+			numNotdef = 0
+		}
+
+		if numDelta == 5 || numNotdef == 5 {
+			segs = append(segs, &segment{
+				first:     uint16(start),
+				last:      uint16(end - 5),
+				useValues: true,
+			})
+			return segs
+		}
+
+		end++
+	}
+
+	segs = append(segs, &segment{
+		first:     uint16(start),
+		last:      uint16(end - uint32(numNotdef) - 1),
+		useValues: true,
+	})
+	return segs
+}
+
+func (ms makeSegments) Length(e *segment) int {
+	if e.useValues {
+		return 4 + (int(e.last-e.first) + 1)
+	}
+	return 4
+}
+
+func (ms makeSegments) To(e *segment) uint32 {
+	return uint32(e.last) + 1
 }
 
 type cmapFormat4 struct {

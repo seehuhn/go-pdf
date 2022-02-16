@@ -25,6 +25,8 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
+// TODO(voss): move this over to the new code
+
 func TestMakeCMap(t *testing.T) {
 	var mapping []font.CMapEntry
 	check := make(map[rune]font.GlyphID)

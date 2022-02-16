@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"math/bits"
 
-	"seehuhn.de/go/pdf/dijkstra"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -170,21 +169,8 @@ func findSegments(mapping []font.CMapEntry) []int {
 	//     charCode:  1  2  5 |  6  7 | 8  ->  4 + 4 + 5 = 13 words
 	//     gid:       1  2  5 | 10 11 | 6
 
-	cost := func(k, l int) int {
-		delta := uint16(mapping[k].GID) - mapping[k].CharCode
-		for i := k + 1; i < l; i++ {
-			deltaI := uint16(mapping[i].GID) - mapping[i].CharCode
-			if deltaI != delta {
-				// we have to use GlyphIDArray
-				return 4 + int(mapping[l-1].CharCode) - int(mapping[k].CharCode) + 1
-			}
-		}
-		return 4 // we can use IDDelta
-	}
-
-	n := len(mapping)
-
 	// Use Dijkstra's algorithm to find the best splits between segments.
-	_, path := dijkstra.ShortestPath(cost, n)
-	return path
+	// _, path := dijkstra.ShortestPath(cost, n)
+
+	panic("not implemented")
 }
