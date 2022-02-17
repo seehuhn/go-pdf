@@ -18,11 +18,11 @@ package cff
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"reflect"
 	"testing"
 
-	"github.com/go-test/deep"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -241,8 +241,10 @@ func TestFindEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, d := range deep.Equal(in, out) {
-		t.Error(d)
+	if !reflect.DeepEqual(in, out) {
+		fmt.Println(in)
+		fmt.Println(out)
+		t.Error("different")
 	}
 }
 

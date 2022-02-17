@@ -10,11 +10,11 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
+// Format4 represents a format 4 cmap subtable.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
+type Format4 map[uint16]font.GlyphID
 
-type format4 map[uint32]font.GlyphID
-
-func decodeFormat4(in []byte) (format4, error) {
+func decodeFormat4(in []byte) (Format4, error) {
 	if len(in)%2 != 0 || len(in) < 16 {
 		return nil, errMalformedCmap
 	}
@@ -44,7 +44,7 @@ func decodeFormat4(in []byte) (format4, error) {
 	fmt.Printf("idRngOffs: %x\n", idRangeOffset)
 	fmt.Printf("glyphID:   %x\n", glyphIDArray)
 
-	cmap := format4{}
+	cmap := Format4{}
 	prevEnd := uint32(0)
 	for k := 0; k < segCount; k++ {
 		start := uint32(startCode[k])
@@ -59,7 +59,7 @@ func decodeFormat4(in []byte) (format4, error) {
 			for idx := start; idx < end; idx++ {
 				c := font.GlyphID(uint16(idx) + delta)
 				if c != 0 {
-					cmap[idx] = c
+					cmap[uint16(idx)] = c
 				}
 			}
 		} else {
@@ -74,7 +74,7 @@ func decodeFormat4(in []byte) (format4, error) {
 			for idx := start; idx < end; idx++ {
 				c := font.GlyphID(glyphIDArray[d+int(idx-start)])
 				if c != 0 {
-					cmap[idx] = c
+					cmap[uint16(idx)] = c
 				}
 			}
 		}
@@ -82,11 +82,13 @@ func decodeFormat4(in []byte) (format4, error) {
 	return cmap, nil
 }
 
-func (cmap format4) Lookup(code uint32) font.GlyphID {
-	return cmap[code]
+// Lookup implements the Subtable interface.
+func (cmap Format4) Lookup(code uint32) font.GlyphID {
+	return cmap[uint16(code)]
 }
 
-func (cmap format4) Encode() []byte {
+// Encode encodes the subtable into a byte slice.
+func (cmap Format4) Encode() []byte {
 	g := makeSegments(cmap)
 	segments, err := dijkstra.ShortestPath[uint32, *segment, int](g, 0, 0x10000)
 	if err != nil {
@@ -108,7 +110,7 @@ func (cmap format4) Encode() []byte {
 			}
 			IDRangeOffsets = append(IDRangeOffsets, uint16(offs))
 			for c := uint32(s.first); c <= uint32(s.last); c++ {
-				GlyphIDArray = append(GlyphIDArray, uint16(cmap[c]))
+				GlyphIDArray = append(GlyphIDArray, uint16(cmap[uint16(c)]))
 			}
 		}
 	}
@@ -143,9 +145,9 @@ type segment struct {
 	useValues bool
 }
 
-type makeSegments map[uint32]font.GlyphID
+type makeSegments map[uint16]font.GlyphID
 
-func (ms makeSegments) Neighbours(v uint32) []*segment {
+func (ms makeSegments) Edges(v uint32) []*segment {
 	if v > 0xFFFF {
 		return nil
 	}
@@ -153,13 +155,13 @@ func (ms makeSegments) Neighbours(v uint32) []*segment {
 	// skip leading .notdef mappings
 	start := v
 	var skip uint16
-	for start < 0xFFFF && ms[start] == 0 {
+	for start < 0xFFFF && ms[uint16(start)] == 0 {
 		start++
 		skip++
 	}
 
 	// check whether this is the last, special segment
-	delta := uint16(ms[start]) - uint16(start)
+	delta := uint16(ms[uint16(start)]) - uint16(start)
 	if start == 0xFFFF {
 		return []*segment{
 			{first: 0xFFFF, last: 0xFFFF, delta: delta},
@@ -168,7 +170,7 @@ func (ms makeSegments) Neighbours(v uint32) []*segment {
 
 	// try to use a delta offset
 	end := start + 1
-	for end < 0xFFFF && uint16(ms[end])-uint16(end) == delta {
+	for end < 0xFFFF && uint16(ms[uint16(end)])-uint16(end) == delta {
 		end++
 	}
 	segs := []*segment{
@@ -188,7 +190,7 @@ func (ms makeSegments) Neighbours(v uint32) []*segment {
 	numNotdef := 0
 	end = start + 1
 	for end < 0xFFFF {
-		thisGid := ms[end]
+		thisGid := ms[uint16(end)]
 
 		thisDelta := uint16(thisGid) - uint16(end)
 		if thisDelta == prevDelta {

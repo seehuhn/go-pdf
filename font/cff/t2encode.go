@@ -17,11 +17,11 @@
 package cff
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/dijkstra"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
@@ -222,30 +222,6 @@ func encodePaths(commands []GlyphOp) [][]byte {
 	return res
 }
 
-func encodeSubPath(cmds []enCmd) [][]byte {
-	n := len(cmds)
-	done := make([]bool, n+1)
-	best := &priorityQueue{
-		idx: make(map[int]int),
-	}
-	heap.Push(best, &bestPath{pos: 0, code: nil})
-	for {
-		v := heap.Pop(best).(*bestPath)
-		from := v.pos
-		if from == n {
-			return v.code
-		}
-		for _, edge := range findEdges(cmds[from:]) {
-			to := from + edge.skip
-			if done[to] {
-				continue
-			}
-			best.Update(to, v, edge.code)
-		}
-		done[from] = true
-	}
-}
-
 func encodeArgs(cmds []GlyphOp) []enCmd {
 	res := make([]enCmd, len(cmds))
 
@@ -289,89 +265,31 @@ func encodeArgs(cmds []GlyphOp) []enCmd {
 	return res
 }
 
-type bestPath struct {
+func encodeSubPath(cmds []enCmd) [][]byte {
+	g := encoder(cmds)
+	ee, err := dijkstra.ShortestPath[int, edge, int](g, 0, len(cmds))
+	if err != nil {
+		panic(err)
+	}
+	var res [][]byte
+	for _, e := range ee {
+		res = append(res, e.code...)
+	}
+	return res
+}
+
+type encoder []enCmd
+
+type edge struct {
 	code [][]byte
-	pos  int
-	cost int
+	to   int
 }
 
-type priorityQueue struct {
-	entries []*bestPath
-	idx     map[int]int
-}
-
-// Update updates the priority queue entry for the given position.
-// `newPos` is a position in the command list, in the range 0, ..., len(cmds).
-// The call registers a new edge, from `head` to `newPos`, obtained by
-// appending the code `tail` to the code for `head`.
-func (pq *priorityQueue) Update(newPos int, head *bestPath, tail [][]byte) {
-	code := make([][]byte, len(head.code)+len(tail))
-	copy(code, head.code)
-	copy(code[len(head.code):], tail)
-	cost := head.cost
-	for _, blob := range tail {
-		cost += len(blob)
-	}
-
-	var entry *bestPath
-	idx, alreadyExists := pq.idx[newPos]
-	if alreadyExists {
-		entry = pq.entries[idx]
-		if entry.cost > cost {
-			entry.code = code
-			entry.cost = cost
-			heap.Fix(pq, idx)
-		}
-	} else {
-		entry = &bestPath{
-			pos:  newPos,
-			code: code,
-			cost: cost,
-		}
-		heap.Push(pq, entry)
-	}
-}
-
-// Len implements heap.Interface.
-func (pq *priorityQueue) Len() int {
-	return len(pq.entries)
-}
-
-// Less implements heap.Interface.
-func (pq *priorityQueue) Less(i, j int) bool {
-	return pq.entries[i].cost < pq.entries[j].cost
-}
-
-// Swap implements heap.Interface.
-func (pq *priorityQueue) Swap(i, j int) {
-	entries := pq.entries
-	entries[i], entries[j] = entries[j], entries[i]
-	pq.idx[entries[i].pos] = i
-	pq.idx[entries[j].pos] = j
-}
-
-// Push implements heap.Interface.
-func (pq *priorityQueue) Push(x interface{}) {
-	entry := x.(*bestPath)
-	pq.idx[entry.pos] = len(pq.entries)
-	pq.entries = append(pq.entries, entry)
-}
-
-// Pop implements heap.Interface.
-func (pq *priorityQueue) Pop() interface{} {
-	n := pq.Len()
-	x := pq.entries[n-1]
-	pq.entries = pq.entries[0 : n-1]
-	delete(pq.idx, x.pos)
-	return x
-}
-
-const maxStack = 48
-
-func findEdges(cmds []enCmd) []edge {
-	if len(cmds) == 0 {
+func (enc encoder) Edges(from int) []edge {
+	if from >= len(enc) {
 		return nil
 	}
+	cmds := enc[from:]
 
 	var edges []edge
 
@@ -384,7 +302,7 @@ func findEdges(cmds []enCmd) []edge {
 			code = append(code, cmds[pos].Args[1].Code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlineto),
-				skip: pos + 1,
+				to:   from + pos + 1,
 			})
 			pos++
 		}
@@ -393,7 +311,7 @@ func findEdges(cmds []enCmd) []edge {
 		if pos < len(cmds) && cmds[pos].Op == OpCurveTo && len(code)+6 <= maxStack {
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlinecurve, cmds[pos].Args...),
-				skip: pos + 1,
+				to:   from + pos + 1,
 			})
 		}
 
@@ -427,7 +345,7 @@ func findEdges(cmds []enCmd) []edge {
 
 			edges = append(edges, edge{
 				code: copyOp(code, op),
-				skip: pos,
+				to:   from + pos,
 			})
 		}
 	} else { // Cmds[0].Op == CmdCurveTo
@@ -438,7 +356,7 @@ func findEdges(cmds []enCmd) []edge {
 			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rrcurveto),
-				skip: pos + 1,
+				to:   from + pos + 1,
 			})
 			pos++
 		}
@@ -448,7 +366,7 @@ func findEdges(cmds []enCmd) []edge {
 			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
 				code: copyOp(code, t2rcurveline),
-				skip: pos + 1,
+				to:   from + pos + 1,
 			})
 		}
 
@@ -482,7 +400,7 @@ func findEdges(cmds []enCmd) []edge {
 				code = append(code, cmds[pos].Args[5-hv.offs].Code)
 				edges = append(edges, edge{
 					code: copyOp(code, hv.op),
-					skip: pos + 1,
+					to:   from + pos + 1,
 				})
 				pos++
 			}
@@ -526,7 +444,7 @@ func findEdges(cmds []enCmd) []edge {
 
 				edges = append(edges, edge{
 					code: copyOp(code, op),
-					skip: pos,
+					to:   from + pos,
 				})
 				if !lastIsAligned {
 					break
@@ -555,7 +473,7 @@ func findEdges(cmds []enCmd) []edge {
 				code = append(code, t2hflex.Bytes())
 				edges = append(edges, edge{
 					code: code,
-					skip: 2,
+					to:   from + 2,
 				})
 			} else if math.Abs(dy+cmds[0].Args[1].Val+cmds[1].Args[5].Val) < 0.5/65536 {
 				// dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6  hflex1
@@ -571,7 +489,7 @@ func findEdges(cmds []enCmd) []edge {
 				code = append(code, t2hflex1.Bytes())
 				edges = append(edges, edge{
 					code: code,
-					skip: 2,
+					to:   from + 2,
 				})
 			}
 
@@ -584,14 +502,19 @@ func findEdges(cmds []enCmd) []edge {
 	return edges
 }
 
-type edge struct {
-	code [][]byte
-	skip int
+func (enc encoder) To(e edge) int {
+	return e.to
 }
 
-func (e edge) String() string {
-	return fmt.Sprintf("edge % x %+d", e.code, e.skip)
+func (enc encoder) Length(e edge) int {
+	l := 0
+	for _, b := range e.code {
+		l += len(b)
+	}
+	return l
 }
+
+const maxStack = 48
 
 // GlyphOp is a CFF glyph drawing command.
 type GlyphOp struct {
