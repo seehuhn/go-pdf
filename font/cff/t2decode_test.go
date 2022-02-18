@@ -50,7 +50,7 @@ func FuzzT2Decode(f *testing.F) {
 			return
 		}
 
-		tmp, err := g1.getCharString(info.defaultWidth, info.nominalWidth)
+		tmp, err := g1.encodeCharString(info.defaultWidth, info.nominalWidth)
 		if err != nil {
 			t.Fatal(err)
 		}

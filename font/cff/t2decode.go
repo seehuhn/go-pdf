@@ -29,13 +29,21 @@ type decodeInfo struct {
 	nominalWidth int32
 }
 
+type ccStage int
+
+const (
+	stageStart ccStage = iota
+	stageStems
+	stageHintMask
+)
+
 // decodeCharString returns the commands for the given charstring.
 func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 	res := &Glyph{
 		Width: info.defaultWidth,
 	}
 
-	var stack []float64 // TODO(voss): use 16.16 fixed point numbers?
+	var stack []float64 // TODO(voss): use 16.16 fixed point numbers
 	clearStack := func() {
 		stack = stack[:0]
 	}
@@ -93,6 +101,8 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 			Args: []float64{xa, ya, xb, yb, posX, posY},
 		})
 	}
+
+	stage := stageStart
 
 	for len(cmdStack) > 0 {
 		cmdStack, code = cmdStack[:len(cmdStack)-1], cmdStack[len(cmdStack)-1]
@@ -321,9 +331,12 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				clearStack()
 
 			case t2hstem, t2hstemhm:
-				if len(stack) < 2 {
+				if stage > stageStems {
+					return nil, errors.New("too late for stem commands")
+				} else if len(stack) < 2 {
 					return nil, errStackUnderflow
 				}
+				stage = stageStems
 				setGlyphWidth(len(stack)%2 == 1)
 				var prev int16
 				for k := 0; k+1 < len(stack); k += 2 {
@@ -335,9 +348,12 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				clearStack()
 
 			case t2vstem, t2vstemhm:
-				if len(stack) < 2 {
+				if stage > stageStems {
+					return nil, errors.New("too late for stem commands")
+				} else if len(stack) < 2 {
 					return nil, errStackUnderflow
 				}
+				stage = stageStems
 				setGlyphWidth(len(stack)%2 == 1)
 				var prev int16
 				for k := 0; k+1 < len(stack); k += 2 {
@@ -349,6 +365,12 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				clearStack()
 
 			case t2hintmask, t2cntrmask:
+				if len(stack) >= 2 {
+					if stage > stageStems {
+						return nil, errors.New("too late for stem commands")
+					}
+					stage = stageStems
+				}
 				setGlyphWidth(len(stack)%2 == 1)
 
 				// "If hstem and vstem hints are both declared at the beginning
@@ -362,6 +384,11 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					res.VStem = append(res.VStem, a, b)
 					prev = b
 				}
+
+				if stage < stageStems {
+					return nil, errors.New("too early for hintmask")
+				}
+				stage = stageHintMask
 
 				nStems := (len(res.HStem) + len(res.VStem)) / 2
 				if nStems == 0 {

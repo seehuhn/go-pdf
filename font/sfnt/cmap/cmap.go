@@ -3,10 +3,13 @@
 package cmap
 
 import (
-	"crypto/sha256"
+	"bytes"
 	"fmt"
 	"io"
+	"math"
+	"sort"
 
+	"golang.org/x/exp/slices"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -28,7 +31,7 @@ type Subtables []SubtableData
 func LocateSubtables(data []byte) (Subtables, error) {
 	const minLength = 10 // length of an empty format 6 subtable
 
-	if len(data) < 4 || len(data) >= 1<<29 {
+	if len(data) < 4 || len(data) > math.MaxUint32 {
 		return nil, errMalformedCmap
 	}
 	version := uint16(data[0])<<8 | uint16(data[1])
@@ -42,6 +45,11 @@ func LocateSubtables(data []byte) (Subtables, error) {
 
 	endOfHeader := uint32(4 + 8*numTables)
 	endOfData := uint32(len(data))
+
+	type seg struct {
+		start, end uint32
+	}
+	var segs []seg
 
 	res := make([]SubtableData, numTables)
 	for i := 0; i < numTables; i++ {
@@ -88,6 +96,19 @@ func LocateSubtables(data []byte) (Subtables, error) {
 		if length < checkLength || length > endOfData-o {
 			return nil, errMalformedCmap
 		}
+
+		// check that subtables are either disjoint or identical
+		idx := sort.Search(len(segs), func(i int) bool {
+			return o <= segs[i].start
+		})
+		if idx == len(segs) || o != segs[idx].start {
+			if idx > 0 && o < segs[idx-1].end ||
+				idx < len(segs) && o+length > segs[idx].start {
+				return nil, errMalformedCmap
+			}
+			segs = slices.Insert(segs, idx, seg{o, o + length})
+		}
+
 		res[i].PlatformID = platformID
 		res[i].EncodingID = encodingID
 		res[i].Language = language
@@ -98,45 +119,68 @@ func LocateSubtables(data []byte) (Subtables, error) {
 }
 
 func (ss Subtables) Write(w io.Writer) error {
-	numTables := len(ss)
+	type extended struct {
+		Data       []byte
+		Offs       uint32
+		PlatformID uint16
+		EncodingID uint16
+		Language   uint16
+	}
+	ext := make([]extended, len(ss))
+	for i, s := range ss {
+		ext[i].Data = s.Data
+		ext[i].PlatformID = s.PlatformID
+		ext[i].EncodingID = s.EncodingID
+		ext[i].Language = s.Language
+	}
+	sort.Slice(ext, func(i, j int) bool {
+		if ext[i].PlatformID != ext[j].PlatformID {
+			return ext[i].PlatformID < ext[j].PlatformID
+		}
+		if ext[i].EncodingID != ext[j].EncodingID {
+			return ext[i].EncodingID < ext[j].EncodingID
+		}
+		return ext[i].Language < ext[j].Language
+	})
+
+	numTables := len(ext)
 	endOfHeader := uint32(4 + 8*numTables)
+
+	pos := endOfHeader
+offsLoop:
+	for i, e := range ext {
+		for j := 0; j < i; j++ {
+			if bytes.Equal(e.Data, ext[j].Data) {
+				ext[i].Offs = ext[j].Offs
+				ext[i].Data = nil
+				continue offsLoop
+			}
+		}
+		ext[i].Offs = pos
+		pos += uint32(len(e.Data))
+	}
 
 	header := make([]byte, endOfHeader)
 	// header[0] = 0
 	// header[1] = 0
 	header[2] = byte(numTables >> 8)
 	header[3] = byte(numTables)
-	nextOffs := endOfHeader
-	seen := make(map[string]uint32)
-	var ii []int
-	for i := 0; i < numTables; i++ {
-		header[4+i*8] = byte(ss[i].PlatformID >> 8)
-		header[5+i*8] = byte(ss[i].PlatformID)
-		header[6+i*8] = byte(ss[i].EncodingID >> 8)
-		header[7+i*8] = byte(ss[i].EncodingID)
-
-		hash := sha256.New()
-		hash.Write(ss[i].Data)
-		key := string(hash.Sum(nil))
-		offs := seen[key]
-		if offs == 0 {
-			offs = nextOffs
-			seen[key] = offs
-			nextOffs += uint32(len(ss[i].Data))
-			ii = append(ii, i)
-		}
-
-		header[8+i*8] = byte(offs >> 24)
-		header[9+i*8] = byte(offs >> 16)
-		header[10+i*8] = byte(offs >> 8)
-		header[11+i*8] = byte(offs)
+	for i, e := range ext {
+		header[4+i*8] = byte(e.PlatformID >> 8)
+		header[5+i*8] = byte(e.PlatformID)
+		header[6+i*8] = byte(e.EncodingID >> 8)
+		header[7+i*8] = byte(e.EncodingID)
+		header[8+i*8] = byte(e.Offs >> 24)
+		header[9+i*8] = byte(e.Offs >> 16)
+		header[10+i*8] = byte(e.Offs >> 8)
+		header[11+i*8] = byte(e.Offs)
 	}
 	_, err := w.Write(header)
 	if err != nil {
 		return err
 	}
-	for _, i := range ii {
-		_, err = w.Write(ss[i].Data)
+	for _, e := range ext {
+		_, err = w.Write(e.Data)
 		if err != nil {
 			return err
 		}

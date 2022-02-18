@@ -328,7 +328,7 @@ func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
 	cc := make(cffIndex, numGlyphs)
 	defaultWidth, nominalWidth := cff.selectWidths()
 	for i, glyph := range cff.Glyphs {
-		code, err := glyph.getCharString(defaultWidth, nominalWidth)
+		code, err := glyph.encodeCharString(defaultWidth, nominalWidth)
 		if err != nil {
 			return nil, 0, 0, err
 		}

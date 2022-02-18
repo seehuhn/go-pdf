@@ -18,7 +18,6 @@ package cff
 
 import (
 	"math"
-	"reflect"
 	"testing"
 )
 
@@ -43,6 +42,32 @@ func TestDictDecodeFloat(t *testing.T) {
 			t.Errorf("wrong result: %g - %g = %g", x, test.out, x-test.out)
 		}
 	}
+}
+
+func FuzzFloatEncoding(f *testing.F) {
+	f.Add([]byte{0x0f})
+	f.Add([]byte{0xe2, 0xa2, 0x5f})
+	f.Add([]byte{0x0a, 0x14, 0x05, 0x41, 0xc3, 0xff})
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, x, err := decodeFloat(data)
+		if err != nil {
+			return
+		}
+		data2 := encodeFloat(x)
+		if len(data2) > len(data) {
+			t.Errorf("inefficient encoding: % x -> % x", data, data2)
+		}
+		tail, y, err := decodeFloat(data2)
+		if err != nil {
+			t.Fatalf("% x -> % x -> ... %s", data, data2, err)
+		}
+		if len(tail) != 0 {
+			t.Errorf("not all input used: % x -> % x", data, data2)
+		}
+		if math.Abs(x-y) > 1e-8*(math.Abs(x)+math.Abs(y)) {
+			t.Errorf("%g != %g", x, y)
+		}
+	})
 }
 
 func TestDictDecodeInt(t *testing.T) {
@@ -124,7 +149,7 @@ func TestDictEncodeInt(t *testing.T) {
 	}
 }
 
-func TestEncodeFloat(t *testing.T) {
+func TestDictFloat(t *testing.T) {
 	cases := []float64{
 		0,
 		1,
@@ -161,7 +186,7 @@ func TestEncodeFloat(t *testing.T) {
 				len(args), len(d[0]))
 		}
 		out := args[0].(float64)
-		if math.Abs(out-x) > 1e-6 || math.Abs(out-x) > 1e-6*(math.Abs(out)+math.Abs(x)) {
+		if math.Abs(out-x) > 1e-6 || math.Abs(out-x) > 1e-8*(math.Abs(out)+math.Abs(x)) {
 			t.Errorf("%g != %g", out, x)
 		}
 	}
@@ -188,8 +213,29 @@ func FuzzDict(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(d1, d2) {
-			t.Errorf("%#v != %#v", d1, d2)
+
+		if len(d2) != len(d1) {
+			t.Fatalf("wrong length: %d != %d", len(d2), len(d1))
+		}
+		for key, val1 := range d1 {
+			val2, ok := d2[key]
+			if !ok {
+				t.Fatalf("missing key %04x", key)
+			}
+			if len(val1) != len(val2) {
+				t.Fatalf("wrong length: %d != %d", len(val1), len(val2))
+			}
+			for i, x1 := range val1 {
+				x2 := val2[i]
+				if x1num, ok := x1.(float64); ok {
+					x2num, ok := x2.(float64)
+					if !ok || math.Abs(x1num-x2num) > 1e-8*(math.Abs(x1num)+math.Abs(x2num)) {
+						t.Fatalf("wrong value: %v != %v", x1, x2)
+					}
+				} else if x1 != x2 {
+					t.Fatalf("wrong value: %v != %v", x1, x2)
+				}
+			}
 		}
 	})
 }

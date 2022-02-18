@@ -23,7 +23,7 @@ import (
 	"testing"
 )
 
-func FuzzOS2(f *testing.F) {
+func FuzzPost(f *testing.F) {
 	f.Fuzz(func(t *testing.T, in []byte) {
 		i1, err := Read(bytes.NewReader(in))
 		if err != nil {

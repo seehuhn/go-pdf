@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -39,6 +40,8 @@ func FuzzCmapHeader(f *testing.F) {
 		buf := bytes.Buffer{}
 		ss.Write(&buf)
 		if len(buf.Bytes()) > len(data) {
+			fmt.Printf("A % x\n", data)
+			fmt.Printf("B % x\n", buf.Bytes())
 			t.Errorf("too long")
 		}
 		ss2, err := LocateSubtables(buf.Bytes())
@@ -49,7 +52,18 @@ func FuzzCmapHeader(f *testing.F) {
 			fmt.Printf("% x\n", buf.Bytes())
 			t.Fatal(err)
 		}
+		sort.Slice(ss, func(i, j int) bool {
+			if ss[i].PlatformID != ss[j].PlatformID {
+				return ss[i].PlatformID < ss[j].PlatformID
+			}
+			if ss[i].EncodingID != ss[j].EncodingID {
+				return ss[i].EncodingID < ss[j].EncodingID
+			}
+			return ss[i].Language < ss[j].Language
+		})
 		if !reflect.DeepEqual(ss, ss2) {
+			fmt.Printf("A % x\n", data)
+			fmt.Printf("B % x\n", buf.Bytes())
 			t.Errorf("ss != ss2")
 		}
 	})

@@ -98,7 +98,7 @@ cmdLoop:
 	}
 }
 
-func (g *Glyph) getCharString(defaultWidth, nominalWidth int32) ([]byte, error) {
+func (g *Glyph) encodeCharString(defaultWidth, nominalWidth int32) ([]byte, error) {
 	var header [][]byte
 	w := g.Width
 	if w != defaultWidth {
@@ -519,7 +519,7 @@ const maxStack = 48
 // GlyphOp is a CFF glyph drawing command.
 type GlyphOp struct {
 	Op   GlyphOpType
-	Args []float64 // TODO(voss): use 16.16 fixed point?
+	Args []float64 // TODO(voss): use 16.16 fixed point
 }
 
 // GlyphOpType is the type of a CFF glyph drawing command.
@@ -654,4 +654,4 @@ func copyOp(data [][]byte, op t2op, args ...encodedNumber) [][]byte {
 	return res
 }
 
-const eps = 6.0 / 65536
+const eps = 0.5 / 65536

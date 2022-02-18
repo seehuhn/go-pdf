@@ -173,37 +173,9 @@ func (d cffDict) encode(ss *cffStrings) []byte {
 					res.Write([]byte{29, byte(a32 >> 24), byte(a32 >> 16), byte(a32 >> 8), byte(a32)})
 				}
 			case float64:
+				buf := encodeFloat(a)
 				res.WriteByte(0x1e)
-				s := fmt.Sprintf("%g::", a)
-				first := true
-				var tmp byte
-				for i := 0; i < len(s); i++ {
-					var nibble byte
-					c := s[i]
-					switch {
-					case c >= '0' && c <= '9':
-						nibble = c - '0'
-					case c == '.':
-						nibble = 0x0a
-					case c == 'e':
-						if s[i+1] != '-' {
-							nibble = 0x0b
-						} else {
-							i++
-							nibble = 0x0c
-						}
-					case i == 0 && c == '-':
-						nibble = 0x0e
-					case c == ':':
-						nibble = 0x0f
-					}
-					if first {
-						tmp = nibble << 4
-					} else {
-						res.WriteByte(tmp | nibble)
-					}
-					first = !first
-				}
+				res.Write(buf)
 			}
 		}
 		if op > 255 {
@@ -248,11 +220,114 @@ func decodeFloat(buf []byte) ([]byte, float64, error) {
 			s = append(s, '-')
 		case 0xf:
 			x, err := strconv.ParseFloat(string(s), 64)
+			switch {
+			case x > 1e300:
+				x = 1e300
+			case x > -1e-300 && x < 1e-300:
+				x = 0
+			case x < -1e300:
+				x = -1e300
+			}
 			return buf, x, err
 		default:
 			s = append(s, '0'+nibble)
 		}
 	}
+}
+
+func encodeFloat(x float64) []byte {
+	if x == 0 {
+		return []byte{0x0f}
+	}
+
+	var head []byte
+	if x < 0 {
+		x = -x
+		head = append(head, 0xe)
+	}
+
+	const numDigits = 9
+
+	l := int(math.Floor(math.Log10(x))) + 1
+	i := int(math.Round(x / math.Pow10(l-numDigits)))
+	if i < 100_000_000 {
+		l--
+		i *= 10
+	} else if i > 999_999_999 {
+		l++
+		i /= 10
+	}
+	if i <= 0 {
+		panic("something fishy")
+	}
+	// now i contains all the digits
+
+	// remove trailing zeros
+	for i%10 == 0 {
+		i /= 10
+	}
+
+	// the decimal point is l positions to the right, from the start of i
+	digits := itoaBinary(i)
+	m := len(digits)
+	switch {
+	case l > m+2:
+		digits = append(digits, 0xb)
+		digits = append(digits, itoaBinary(l-m)...)
+	case l == m+2:
+		digits = append(digits, 0, 0)
+	case l == m+1:
+		digits = append(digits, 0)
+	case l == m:
+		// pass
+	case l > 0:
+		head = append(head, digits[:l]...)
+		head = append(head, 0xa)
+		digits = digits[l:]
+	case l == 0:
+		head = append(head, 0xa)
+	case l == -1:
+		head = append(head, 0xa, 0)
+	default:
+		digits = append(digits, 0xc)
+		digits = append(digits, itoaBinary(-l+m)...)
+	}
+
+	var out []byte
+	first := true
+	var half byte
+	for _, buf := range [][]byte{head, digits} {
+		for _, b := range buf {
+			if b > 15 {
+				panic("hamster")
+			}
+			if first {
+				half = b << 4
+			} else {
+				out = append(out, half+b)
+			}
+			first = !first
+		}
+	}
+	if first {
+		out = append(out, 0xff)
+	} else {
+		out = append(out, half+0xf)
+	}
+
+	return out
+}
+
+func itoaBinary(x int) []byte {
+	var digits []byte
+	for x > 0 {
+		digits = append(digits, byte(x%10))
+		x /= 10
+	}
+	for i, j := 0, len(digits)-1; i < j; i, j = i+1, j-1 {
+		digits[i], digits[j] = digits[j], digits[i]
+	}
+	return digits
 }
 
 func (d cffDict) getInt(op dictOp, defVal int32) int32 {
