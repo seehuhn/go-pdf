@@ -62,8 +62,8 @@ func FuzzT2Decode(f *testing.F) {
 		}
 
 		if !reflect.DeepEqual(g1, g2) {
-			fmt.Printf("glyph 1: %#v\n", g1)
-			fmt.Printf("glyph 2: %#v\n", g2)
+			fmt.Printf("glyph 1: %s\n", g1)
+			fmt.Printf("glyph 2: %s\n", g2)
 			t.Error("different")
 		}
 	})

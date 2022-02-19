@@ -441,7 +441,8 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k] /= stack[k+1]
+				x := stack[k] / stack[k+1]
+				stack[k] = math.Round(x*65536) / 65536 // TODO(voss): is this wise?
 				stack = stack[:k+1]
 			case t2neg:
 				k := len(stack) - 1
@@ -450,7 +451,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				}
 				stack[k] = -stack[k]
 			case t2random:
-				stack = append(stack, 0.618) // a random number in (0, 1]
+				stack = append(stack, 40501/65536.) // a random number in (0, 1]
 			case t2mul:
 				k := len(stack) - 2
 				if k < 0 {

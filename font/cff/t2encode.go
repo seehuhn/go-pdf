@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"seehuhn.de/go/dijkstra"
 	"seehuhn.de/go/pdf"
@@ -41,6 +42,17 @@ func NewGlyph(name pdf.Name, width int32) *Glyph {
 		Name:  name,
 		Width: width,
 	}
+}
+
+func (g *Glyph) String() string {
+	b := &strings.Builder{}
+	fmt.Fprintf(b, "Glyph %q (width %d):\n", g.Name, g.Width)
+	fmt.Fprintf(b, "  - HStem: %v\n", g.HStem)
+	fmt.Fprintf(b, "  - HStem: %v\n", g.VStem)
+	for i, cmd := range g.Cmds {
+		fmt.Fprintf(b, "  - Cmds[%d]: %s\n", i, cmd)
+	}
+	return b.String()
 }
 
 // MoveTo starts a new sub-path and moves the current point to (x, y).
@@ -596,7 +608,10 @@ func encodeNumber(x float64) encodedNumber {
 	var code []byte
 	var val float64
 
+	// TODO(voss): consider using t2dup here.
+
 	xInt := math.Round(x)
+	// TODO(voss): also consider fractions of two one-byte integers.
 	if math.Abs(x-xInt) > eps {
 		z := int32(math.Round(x * 65536))
 		val = float64(z) / 65536
