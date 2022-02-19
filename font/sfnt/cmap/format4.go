@@ -3,7 +3,6 @@ package cmap
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math/bits"
 
 	"seehuhn.de/go/dijkstra"
@@ -14,7 +13,7 @@ import (
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
 type Format4 map[uint16]font.GlyphID
 
-func decodeFormat4(in []byte) (Format4, error) {
+func decodeFormat4(in []byte) (Subtable, error) {
 	if len(in)%2 != 0 || len(in) < 16 {
 		return nil, errMalformedCmap
 	}
@@ -36,13 +35,6 @@ func decodeFormat4(in []byte) (Format4, error) {
 	idDelta := words[2*segCount+1 : 3*segCount+1]
 	idRangeOffset := words[3*segCount+1 : 4*segCount+1]
 	glyphIDArray := words[4*segCount+1:]
-
-	fmt.Println()
-	fmt.Printf("startCode: %x\n", startCode)
-	fmt.Printf("endCode:   %x\n", endCode)
-	fmt.Printf("idDelta:   %x\n", idDelta)
-	fmt.Printf("idRngOffs: %x\n", idRangeOffset)
-	fmt.Printf("glyphID:   %x\n", glyphIDArray)
 
 	cmap := Format4{}
 	prevEnd := uint32(0)
@@ -88,7 +80,7 @@ func (cmap Format4) Lookup(code uint32) font.GlyphID {
 }
 
 // Encode encodes the subtable into a byte slice.
-func (cmap Format4) Encode() []byte {
+func (cmap Format4) Encode(language uint16) []byte {
 	g := makeSegments(cmap)
 	segments, err := dijkstra.ShortestPath[uint32, *segment, int](g, 0, 0x10000)
 	if err != nil {
@@ -116,15 +108,16 @@ func (cmap Format4) Encode() []byte {
 	}
 
 	// Encode the data in the binary format
-	data := &cmapFormat4{
-		Format: 4,
-	}
 	segCount := len(StartCode)
-	data.Length = uint16(2 * (8 + 4*segCount + len(GlyphIDArray)))
-	data.SegCountX2 = uint16(2 * segCount)
 	sel := bits.Len(uint(segCount))
-	data.SearchRange = 1 << sel
-	data.EntrySelector = uint16(sel - 1)
+	data := &cmapFormat4{
+		Format:        4,
+		Length:        uint16(2 * (8 + 4*segCount + len(GlyphIDArray))),
+		Language:      language,
+		SegCountX2:    uint16(2 * segCount),
+		SearchRange:   1 << sel,
+		EntrySelector: uint16(sel - 1),
+	}
 	data.RangeShift = data.SegCountX2 - data.SearchRange
 
 	EndCode = append(EndCode, 0) // add the ReservedPad field here

@@ -13,12 +13,36 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
+// From the font files on my laptop, I extracted all cmap subtables
+// and removed duplicates.  The following table is the result.
+//
+//    count | format
+//   -------+--------
+//     1668 |    4 (Segment mapping to delta values)
+//      625 |    6 (Trimmed table mapping)
+//      554 |   12 (Segmented coverage)
+//      226 |    0 (Byte encoding table)
+//       54 |   14 (Unicode Variation Sequences)
+//       47 |    2 (High-byte mapping through table)
+//        2 |   10 (Trimmed array)
+//        1 |    8 (mixed 16-bit and 32-bit coverage)
+//        1 |   13 (Many-to-one range mappings)
+
 // SubtableData represents an encoded cmap subtable.
 type SubtableData struct {
 	PlatformID uint16 // Platform ID.
 	EncodingID uint16 // Platform-specific encoding ID.
 	Language   uint16
 	Data       []byte
+}
+
+func (sub SubtableData) Format() uint16 {
+	return uint16(sub.Data[0])<<8 | uint16(sub.Data[1])
+}
+
+func (sub SubtableData) Load() (Subtable, error) {
+	load := loaders[sub.Format()]
+	return load(sub.Data)
 }
 
 // Subtables represents the collection of all subtables in a cmap table.
@@ -192,112 +216,26 @@ offsLoop:
 // Subtable represents a decoded cmap subtable.
 type Subtable interface {
 	Lookup(code uint32) font.GlyphID
-	Encode() []byte
+	Encode(language uint16) []byte
 }
 
-type format2 struct {
+var loaders = map[uint16]func([]byte) (Subtable, error){
+	0:  decodeFormat0,
+	2:  notImplemented,
+	4:  decodeFormat4,
+	6:  decodeFormat6,
+	8:  notImplemented,
+	10: notImplemented,
+	12: decodeFormat12,
+	13: notImplemented,
+	14: notImplemented,
 }
 
-func decodeFormat2(data []byte) (*format2, error) {
-	panic("not implemented")
+func notImplemented(data []byte) (Subtable, error) {
+	return nil, errUnsupportedCmapFormat
 }
 
-func (cmap *format2) Lookup(code uint32) font.GlyphID {
-	panic("not implemented")
-}
-
-func (cmap *format2) Encode() []byte {
-	panic("not implemented")
-}
-
-type format6 struct {
-}
-
-func decodeFormat6(data []byte) (*format6, error) {
-	panic("not implemented")
-}
-
-func (cmap *format6) Lookup(code uint32) font.GlyphID {
-	panic("not implemented")
-}
-
-func (cmap *format6) Encode() []byte {
-	panic("not implemented")
-}
-
-type format8 struct {
-}
-
-func decodeFormat8(data []byte) (*format8, error) {
-	panic("not implemented")
-}
-
-func (cmap *format8) Lookup(code uint32) font.GlyphID {
-	panic("not implemented")
-}
-
-func (cmap *format8) Encode() []byte {
-	panic("not implemented")
-}
-
-type format10 struct {
-}
-
-func decodeFormat10(data []byte) (*format10, error) {
-	panic("not implemented")
-}
-
-func (cmap *format10) Lookup(code uint32) font.GlyphID {
-	panic("not implemented")
-}
-
-func (cmap *format10) Encode() []byte {
-	panic("not implemented")
-}
-
-type format12 struct {
-}
-
-func decodeFormat12(data []byte) (*format12, error) {
-	panic("not implemented")
-}
-
-func (cmap *format12) Lookup(code uint32) font.GlyphID {
-	panic("not implemented")
-}
-
-func (cmap *format12) Encode() []byte {
-	panic("not implemented")
-}
-
-type format13 struct {
-}
-
-func decodeFormat13(data []byte) (*format13, error) {
-	panic("not implemented")
-}
-
-func (cmap *format13) Lookup(code uint32) font.GlyphID {
-	panic("not implemented")
-}
-
-func (cmap *format13) Encode() []byte {
-	panic("not implemented")
-}
-
-type format14 struct {
-}
-
-func decodeFormat14(data []byte) (*format14, error) {
-	panic("not implemented")
-}
-
-func (cmap *format14) Lookup(code uint32) font.GlyphID {
-	panic("not implemented")
-}
-
-func (cmap *format14) Encode() []byte {
-	panic("not implemented")
-}
-
-var errMalformedCmap = fmt.Errorf("malformed cmap table")
+var (
+	errMalformedCmap         = fmt.Errorf("malformed cmap table")
+	errUnsupportedCmapFormat = fmt.Errorf("unsupported cmap format")
+)

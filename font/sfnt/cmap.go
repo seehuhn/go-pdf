@@ -38,7 +38,7 @@ func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 		cmap.SubtableData{
 			PlatformID: 1,
 			EncodingID: 0,
-			Data:       subtable.Encode(),
+			Data:       subtable.Encode(0),
 		},
 	}
 

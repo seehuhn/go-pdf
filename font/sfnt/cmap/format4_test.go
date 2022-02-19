@@ -2,12 +2,35 @@ package cmap
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"seehuhn.de/go/dijkstra"
 	"seehuhn.de/go/pdf/font"
 )
+
+func TestFormat4Samples(t *testing.T) {
+	// TODO(voss): remove
+	names, err := filepath.Glob("../../../demo/try-all-fonts/cmap/04-*.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) < 2 {
+		t.Fatal("not enough samples")
+	}
+	for _, name := range names {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = decodeFormat4(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
 
 func TestF4MakeSegment(t *testing.T) {
 	m := map[uint16]font.GlyphID{
@@ -77,7 +100,7 @@ func FuzzFormat4(f *testing.F) {
 			return
 		}
 
-		data2 := c1.Encode()
+		data2 := c1.Encode(0)
 		// if len(data2) > len(data) {
 		// 	t.Error("too long")
 		// }
@@ -97,3 +120,5 @@ func FuzzFormat4(f *testing.F) {
 		}
 	})
 }
+
+var _ Subtable = Format4(nil)

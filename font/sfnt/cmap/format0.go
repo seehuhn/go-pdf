@@ -12,7 +12,7 @@ type format0 struct {
 	glyphIDArray [256]uint8
 }
 
-func decodeFormat0(data []byte) (*format0, error) {
+func decodeFormat0(data []byte) (Subtable, error) {
 	data = data[6:]
 	if len(data) != 256 {
 		return nil, fmt.Errorf("cmap: format 0: expected 256 bytes, got %d", len(data))
