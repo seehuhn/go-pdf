@@ -60,11 +60,7 @@ func (tt *Font) getFontName() (string, error) {
 			if err != nil {
 				return "", err
 			}
-			rr := make([]rune, len(buf))
-			for i, c := range buf {
-				rr[i] = mac.Roman[c]
-			}
-			return string(rr), nil
+			return mac.Decode(buf), nil
 		case record.PlatformID == 3 && record.EncodingID == 1:
 			_, err = nameFd.Seek(int64(nameHeader.Offset)+int64(record.Offset),
 				io.SeekStart)

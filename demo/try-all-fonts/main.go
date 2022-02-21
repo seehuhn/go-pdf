@@ -49,10 +49,18 @@ func tryFont(fname string) error {
 		return err
 	}
 
-	_, err = name.Decode(nameData)
+	tt, err := name.Decode(nameData)
 	if err != nil {
 		return err
 	}
+
+	// for _, t := range tt.Tables {
+	// 	fmt.Println()
+	// 	fmt.Println(t)
+	// }
+	// fmt.Println("--------------------------")
+
+	_ = tt
 
 	return nil
 }

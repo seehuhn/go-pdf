@@ -332,7 +332,8 @@ func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
 		return rune(idx)
 	}
 	macRoman := func(idx int) rune {
-		return mac.Roman[idx]
+		// TODO(voss): declutter this
+		return []rune(mac.Decode([]byte{byte(idx)}))[0]
 	}
 	candidates := []struct {
 		PlatformID uint16
