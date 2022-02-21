@@ -81,3 +81,10 @@ func (cmap format12) Lookup(code uint32) font.GlyphID {
 	}
 	return font.GlyphID(cmap[idx].startGlyphID + code - cmap[idx].startCharCode)
 }
+
+func (cmap format12) CodeRange() (low, high uint32) {
+	if len(cmap) == 0 {
+		return 0, 0
+	}
+	return cmap[0].startCharCode, cmap[len(cmap)-1].endCharCode
+}

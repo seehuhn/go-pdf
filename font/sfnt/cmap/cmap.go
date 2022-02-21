@@ -36,10 +36,13 @@ type SubtableData struct {
 	Data       []byte
 }
 
+// Format returns the format of the cmap subtable.
+// Valid formats are 0, 2, 4, 6, 8, 10, 12, 13 and 14.
 func (sub SubtableData) Format() uint16 {
 	return uint16(sub.Data[0])<<8 | uint16(sub.Data[1])
 }
 
+// Load decodes a cmap subtable.
 func (sub SubtableData) Load() (Subtable, error) {
 	load := loaders[sub.Format()]
 	return load(sub.Data)
@@ -217,6 +220,9 @@ offsLoop:
 type Subtable interface {
 	Lookup(code uint32) font.GlyphID
 	Encode(language uint16) []byte
+
+	// CodeRange returns the smallest and largest code point in the subtable.
+	CodeRange() (low, high uint32)
 }
 
 var loaders = map[uint16]func([]byte) (Subtable, error){

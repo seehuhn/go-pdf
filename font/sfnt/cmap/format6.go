@@ -62,3 +62,21 @@ func (cmap *format6) Lookup(code uint32) font.GlyphID {
 	}
 	return cmap.GlyphIDArray[code-uint32(cmap.FirstCode)]
 }
+
+func (cmap *format6) CodeRange() (low, high uint32) {
+	i := 0
+	for i < len(cmap.GlyphIDArray) && cmap.GlyphIDArray[i] == 0 {
+		i++
+	}
+	if i == len(cmap.GlyphIDArray) {
+		return
+	}
+	low = uint32(cmap.FirstCode) + uint32(i)
+
+	i = len(cmap.GlyphIDArray) - 1
+	for cmap.GlyphIDArray[i] == 0 {
+		i--
+	}
+	high = uint32(cmap.FirstCode) + uint32(i)
+	return
+}

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -244,7 +245,7 @@ func Read(r io.Reader) (*Info, error) {
 }
 
 // Encode converts the info to a "OS/2" table.
-func (info *Info) Encode() []byte {
+func (info *Info) Encode(cc cmap.Subtable) []byte {
 	var avgCharWidth int16 // TODO(voss)
 
 	var permBits uint16
@@ -287,8 +288,18 @@ func (info *Info) Encode() []byte {
 	}
 	sel |= 0x0080 // always use Typo{A,De}scender
 
-	var firstCharIndex uint16 // TODO(voss)
-	var lastCharIndex uint16  // TODO(voss)
+	var firstCharIndex, lastCharIndex uint16
+	if cc != nil {
+		low, high := cc.CodeRange()
+		firstCharIndex = uint16(low)
+		if low > 0xFFFF {
+			firstCharIndex = 0xFFFF
+		}
+		lastCharIndex = uint16(high)
+		if high > 0xFFFF {
+			lastCharIndex = 0xFFFF
+		}
+	}
 
 	buf := &bytes.Buffer{}
 	v0 := &v0Data{
@@ -342,7 +353,7 @@ func (info *Info) Encode() []byte {
 		XHeight:     info.XHeight,
 		CapHeight:   info.CapHeight,
 		DefaultChar: 0,
-		BreakChar:   ' ',
+		BreakChar:   0, // TODO(voss)
 		MaxContext:  0, // TODO(voss)
 	}
 	binary.Write(buf, binary.BigEndian, v2)

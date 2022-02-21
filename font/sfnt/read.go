@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
+	"seehuhn.de/go/pdf/font/sfnt/mac"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -61,7 +62,7 @@ func (tt *Font) getFontName() (string, error) {
 			}
 			rr := make([]rune, len(buf))
 			for i, c := range buf {
-				rr[i] = macintosh[c]
+				rr[i] = mac.Roman[c]
 			}
 			return string(rr), nil
 		case record.PlatformID == 3 && record.EncodingID == 1:

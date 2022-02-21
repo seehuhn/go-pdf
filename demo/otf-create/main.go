@@ -29,7 +29,9 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
@@ -163,7 +165,7 @@ func makeHmtx(info *Info, glyphs []*cff.Glyph) ([]byte, []byte) {
 	return hmtxInfo.Encode()
 }
 
-func makeOS2(info *Info) []byte {
+func makeOS2(info *Info, cc cmap.Subtable) []byte {
 	os2Info := &os2.Info{
 		WeightClass:  info.Weight,
 		WidthClass:   info.Width,
@@ -178,7 +180,29 @@ func makeOS2(info *Info) []byte {
 		LineGap:      info.LineGap,
 		PermUse:      os2.PermInstall,
 	}
-	return os2Info.Encode()
+	return os2Info.Encode(cc)
+}
+
+func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, []byte) {
+	cc := cmap.Format4{}
+	for i, g := range glyphs {
+		rr := names.ToUnicode(string(g.Name), false)
+		if len(rr) == 1 {
+			r := uint16(rr[0])
+			if _, ok := cc[r]; !ok {
+				cc[r] = font.GlyphID(i)
+			}
+		}
+	}
+	cmapSubtable := cc.Encode(0)
+	ss := cmap.Subtables{
+		{PlatformID: 0, EncodingID: 3, Language: 0, Data: cmapSubtable},
+		{PlatformID: 3, EncodingID: 1, Language: 0, Data: cmapSubtable},
+	}
+	buf := &bytes.Buffer{}
+	ss.Write(buf)
+	cmapData := buf.Bytes()
+	return cc, cmapData
 }
 
 func makePost(info *Info) []byte {
@@ -317,7 +341,10 @@ func main() {
 	blobs["hhea"] = hheaData
 	blobs["hmtx"] = hmtxData
 
-	os2Data := makeOS2(info)
+	cc, cmapData := makeCmap(glyphs)
+	blobs["cmap"] = cmapData
+
+	os2Data := makeOS2(info, cc)
 	blobs["OS/2"] = os2Data
 
 	postData := makePost(info)
@@ -332,7 +359,7 @@ func main() {
 	// ----------------------------------------------------------------------
 
 	// "head", "hhea", "maxp", "OS/2", "name", "cmap", "post", "CFF "
-	tableNames := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "post", "CFF "}
+	tableNames := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "cmap", "post", "CFF "}
 
 	out, err := os.Create("test.otf")
 	if err != nil {

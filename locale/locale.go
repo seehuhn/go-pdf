@@ -45,34 +45,8 @@ package locale
 //   codes defined by ISO 639. If this entry is absent,
 //   the language shall be considered to be unknown.
 
-// Language represents a RFC 3066 language subtag, as required by section
-// 14.9.2.2 of PDF 32000-1:2008 and described in
-// https://datatracker.ietf.org/doc/html/rfc3066
-type Language string
-
-// Selected language tags, see
-// https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
-const (
-	LangEnglish  = "en"
-	LangGerman   = "de"
-	LangRomanian = "ro"
-)
-
-// Country represents a RFC 3066 country subtag,
-// denoting the area to which a language variant relates.
-type Country string
-
-// Selected country tags, see
-// https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
-const (
-	CountryGermany = "DE"
-	CountryRomania = "RO"
-	CountryUSA     = "US"
-	CountryUK      = "GB"
-)
-
 // Script indicates writing systems, for use with OpenType fonts
-type Script int
+type Script uint16
 
 // Selected writing systems.
 const (
@@ -89,27 +63,28 @@ type Locale struct {
 }
 
 func (loc *Locale) String() string {
-	if loc == nil || loc.Language == "" && loc.Country == "" {
+	if loc == nil || loc.Language == 0 && loc.Country == 0 {
 		return ""
 	}
-	if loc.Country == "" {
-		return string(loc.Language)
+	if loc.Country == 0 {
+		return loc.Language.String()
 	}
-	return string(loc.Language) + "-" + string(loc.Country)
+	return loc.Language.String() + "-" + loc.Country.String()
 }
 
+// TODO: are these needed/useful?
 var (
 	// DeDE denotes German as written in Germany.
 	DeDE = &Locale{
 		Language: LangGerman,
-		Country:  CountryGermany,
+		Country:  CountryDEU,
 		Script:   ScriptLatin,
 	}
 
 	// EnGB denotes English as written in the UK.
 	EnGB = &Locale{
 		Language: LangEnglish,
-		Country:  CountryUK,
+		Country:  CountryGBR,
 		Script:   ScriptLatin,
 	}
 

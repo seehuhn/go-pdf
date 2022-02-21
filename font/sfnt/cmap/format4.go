@@ -131,6 +131,23 @@ func (cmap Format4) Encode(language uint16) []byte {
 	return buf.Bytes()
 }
 
+// CodeRange returns the smallest and largest code point in the subtable.
+func (cmap Format4) CodeRange() (low, high uint32) {
+	if len(cmap) == 0 {
+		return
+	}
+	low = ^uint32(0)
+	for k := range cmap {
+		if uint32(k) < low {
+			low = uint32(k)
+		}
+		if uint32(k) > high {
+			high = uint32(k)
+		}
+	}
+	return
+}
+
 type segment struct {
 	first     uint16
 	last      uint16

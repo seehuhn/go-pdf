@@ -18,17 +18,13 @@ package main
 
 import (
 	"bufio"
-	"crypto/sha256"
 	"fmt"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/name"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
-
-var seen = make(map[string]bool)
-var count = make(map[uint16]int)
 
 func tryFont(fname string) error {
 	// tt, err := sfnt.Open(fname, nil)
@@ -48,34 +44,14 @@ func tryFont(fname string) error {
 		return err
 	}
 
-	cmapData, err := header.ReadTableBytes(fd, "cmap")
+	nameData, err := header.ReadTableBytes(fd, "name")
 	if err != nil {
 		return err
 	}
 
-	subtables, err := cmap.LocateSubtables(cmapData)
+	_, err = name.Decode(nameData)
 	if err != nil {
 		return err
-	}
-	for _, s := range subtables {
-		format := uint16(s.Data[0])<<8 | uint16(s.Data[1])
-
-		hash := sha256.New()
-		hash.Write(s.Data)
-		sum := string(hash.Sum(nil))
-		if seen[string(sum)] {
-			fmt.Println(format, len(s.Data), "seen")
-			continue
-		} else {
-			seen[sum] = true
-		}
-
-		count[format]++
-		outname := fmt.Sprintf("cmap/%02d-%05d.bin", format, count[format])
-		err = os.WriteFile(outname, s.Data, 0644)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -99,5 +75,4 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Fatal("main loop failed:", err)
 	}
-	fmt.Println(count)
 }

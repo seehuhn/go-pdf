@@ -33,3 +33,16 @@ func (cmap *format0) Encode(language uint16) []byte {
 	return append([]byte{0, 0, 1, 6, byte(language >> 8), byte(language)},
 		cmap.glyphIDArray[:]...)
 }
+
+func (cmap *format0) CodeRange() (low, high uint32) {
+	for i, c := range cmap.glyphIDArray {
+		if c == 0 {
+			continue
+		}
+		if low == 0 {
+			low = uint32(i)
+		}
+		high = uint32(i)
+	}
+	return
+}

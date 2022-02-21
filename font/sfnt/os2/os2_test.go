@@ -30,7 +30,7 @@ func FuzzOS2(f *testing.F) {
 			return
 		}
 
-		buf := i1.Encode()
+		buf := i1.Encode(nil)
 		i2, err := Read(bytes.NewReader(buf))
 		if err != nil {
 			t.Fatal(err)

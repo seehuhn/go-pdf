@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
+	"seehuhn.de/go/pdf/font/sfnt/mac"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -331,7 +332,7 @@ func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
 		return rune(idx)
 	}
 	macRoman := func(idx int) rune {
-		return macintosh[idx]
+		return mac.Roman[idx]
 	}
 	candidates := []struct {
 		PlatformID uint16
