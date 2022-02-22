@@ -54,13 +54,13 @@ func tryFont(fname string) error {
 		return err
 	}
 
-	// for _, t := range tt.Tables {
-	// 	fmt.Println()
-	// 	fmt.Println(t)
-	// }
-	// fmt.Println("--------------------------")
-
-	_ = tt
+	for _, t := range tt.Tables {
+		ver := t.Version
+		if ver == "" {
+			continue
+		}
+		fmt.Println("X", ver)
+	}
 
 	return nil
 }

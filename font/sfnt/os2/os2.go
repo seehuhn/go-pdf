@@ -353,8 +353,8 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		XHeight:     info.XHeight,
 		CapHeight:   info.CapHeight,
 		DefaultChar: 0,
-		BreakChar:   0, // TODO(voss)
-		MaxContext:  0, // TODO(voss)
+		BreakChar:   0x20, // TODO(voss)
+		MaxContext:  0,    // TODO(voss)
 	}
 	binary.Write(buf, binary.BigEndian, v2)
 

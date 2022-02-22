@@ -20,25 +20,50 @@ package name
 
 import (
 	"fmt"
+	"sort"
 	"strings"
-	"unicode/utf16"
 
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/mac"
 	"seehuhn.de/go/pdf/locale"
 )
 
+const MaxNameID = 10 // TODO(voss)
+
 // Info contains information from the "name" table.
 type Info struct {
-	Tables []*Table
+	Tables map[Loc]*Table
+}
+
+func (info *Info) SelectTable(lang locale.Language, country locale.Country) *Table {
+	for key, t := range info.Tables {
+		if key.Language == lang && key.Country == country {
+			return t
+		}
+	}
+	return nil
+}
+
+func (info *Info) selectLangTable(lang locale.Language) *Table {
+	var candidates []Loc
+	for key := range info.Tables {
+		if key.Language == lang {
+			candidates = append(candidates, key)
+		}
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		// TODO(voss): use a better criterion here
+		return candidates[i].Country < candidates[j].Country
+	})
+	return info.Tables[candidates[0]]
 }
 
 // Table contains the data for a single language
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
 type Table struct {
-	Language locale.Language
-	Country  locale.Country
-
 	Copyright      string
 	Family         string
 	Subfamily      string
@@ -58,8 +83,6 @@ type Table struct {
 
 func (t *Table) String() string {
 	b := &strings.Builder{}
-	fmt.Fprintf(b, "Language: %s\n", t.Language.Name())
-	fmt.Fprintf(b, "Country: %s\n", t.Country.Name())
 	fmt.Fprintf(b, "Copyright: %q\n", t.Copyright)
 	fmt.Fprintf(b, "Family: %q\n", t.Family)
 	fmt.Fprintf(b, "Subfamily: %q\n", t.Subfamily)
@@ -72,6 +95,35 @@ func (t *Table) String() string {
 	fmt.Fprintf(b, "Designer: %q\n", t.Designer)
 	fmt.Fprintf(b, "Description: %q\n", t.Description)
 	return b.String()
+}
+
+func (t *Table) get(i int) string {
+	switch i {
+	case 0:
+		return t.Copyright
+	case 1:
+		return t.Family
+	case 2:
+		return t.Subfamily
+	case 3:
+		return t.Identifier
+	case 4:
+		return t.FullName
+	case 5:
+		return t.Version
+	case 6:
+		return t.PostScriptName
+	case 7:
+		return t.Trademark
+	case 8:
+		return t.Manufacturer
+	case 9:
+		return t.Designer
+	case 10:
+		return t.Description
+	default:
+		return ""
+	}
 }
 
 // Decode extracts information from the "name" table.
@@ -106,9 +158,8 @@ func Decode(data []byte) (*Info, error) {
 		return nil, errMalformedNames
 	}
 
-	tables := make(map[loc]*Table)
+	tables := make(map[Loc]*Table)
 
-	var nameWords []uint16
 recLoop:
 	for i := 0; i < numRec; i++ {
 		pos := recBase + i*12
@@ -119,14 +170,14 @@ recLoop:
 		nameLen := int(data[pos+8])<<8 | int(data[pos+9])
 		nameOffset := int(data[pos+10])<<8 | int(data[pos+11])
 
-		var key loc
+		var key Loc
 		switch platformID {
 		case 1: // Macintosh
 			key = appleCodes[languageID]
 		case 3: // Windows
 			key = microsoftCodes[languageID]
 		}
-		if key.lang == 0 {
+		if key.Language == 0 {
 			continue
 		}
 
@@ -138,80 +189,83 @@ recLoop:
 		var val string
 		switch platformID {
 		case 0, 3: // Unicode and Windows
-			nameWords := nameWords[:0]
-			for i := 0; i+1 < nameLen; i += 2 {
-				nameWords = append(nameWords, uint16(nameBytes[i])<<8|uint16(nameBytes[i+1]))
-			}
-			val = string(utf16.Decode(nameWords))
-
+			val = utf16Decode(nameBytes)
 		case 1: // Macintosh
 			if encodingID != 0 {
 				// TODO(voss): implement some more encodings
 				continue recLoop
 			}
 			val = mac.Decode(nameBytes)
-
-		default:
+		}
+		if val == "" {
 			continue recLoop
 		}
 
-		if _, ok := tables[key]; !ok {
-			tables[key] = &Table{}
+		t := tables[key]
+		if t == nil {
+			t = &Table{}
 		}
 		switch nameID {
 		case 0:
-			tables[key].Copyright = val
+			t.Copyright = val
 		case 1:
-			tables[key].Family = val
+			t.Family = val
 		case 2:
-			tables[key].Subfamily = val
+			t.Subfamily = val
 		case 3:
-			tables[key].Identifier = val
+			t.Identifier = val
 		case 4:
-			tables[key].FullName = val
+			t.FullName = val
 		case 5:
-			tables[key].Version = val
+			t.Version = val
 		case 6:
-			tables[key].PostScriptName = val
+			t.PostScriptName = val
 		case 7:
-			tables[key].Trademark = val
+			t.Trademark = val
 		case 8:
-			tables[key].Manufacturer = val
+			t.Manufacturer = val
 		case 9:
-			tables[key].Designer = val
+			t.Designer = val
 		case 10:
-			tables[key].Description = val
+			t.Description = val
+		default:
+			continue recLoop
 		}
+		tables[key] = t
 	}
 
 	complete := make(map[locale.Language]bool)
 	for key := range tables {
-		if key.lang != 0 && key.country != 0 {
-			complete[key.lang] = true
+		if key.Language != 0 && key.Country != 0 {
+			complete[key.Language] = true
 		}
 	}
 
-	res := &Info{}
-	for key, table := range tables {
-		if key.country == 0 && complete[key.lang] {
-			continue
+	for key := range tables {
+		if key.Country == 0 && complete[key.Language] {
+			delete(tables, key)
 		}
-		table.Language = key.lang
-		table.Country = key.country
-		res.Tables = append(res.Tables, table)
+	}
+	res := &Info{
+		Tables: tables,
 	}
 
 	return res, nil
 }
 
+// Encode converts a "name" table into its binary form.
 func (info *Info) Encode(ss cmap.Subtables) []byte {
-	type record struct {
+	type recInfo struct {
 		PlatformID uint16
 		EncodingID uint16
 		LanguageID uint16
-		enc        func(string) []byte
+		NameID     uint16
+		offset     uint16
+		length     uint16
 	}
-	var records []*record
+	var records []*recInfo
+
+	b := newNameBuilder()
 
 	// platform ID 1 (Macintosh)
 	includeMac := false
@@ -222,17 +276,25 @@ func (info *Info) Encode(ss cmap.Subtables) []byte {
 		}
 	}
 	if includeMac {
-		haveLang := make(map[locale.Language]bool)
-		for _, t := range info.Tables {
-			haveLang[t.Language] = true
-		}
 		for languageID, loc := range appleCodes {
-			if haveLang[loc.lang] {
-				rec := &record{
-					PlatformID: 1,
-					EncodingID: 0,
+			t := info.selectLangTable(loc.Language)
+			if t == nil {
+				continue
+			}
+			for nameID := 0; nameID <= MaxNameID; nameID++ {
+				val := t.get(nameID)
+				if val == "" {
+					continue
+				}
+
+				offset, length := b.Add(mac.Encode(val))
+				rec := &recInfo{
+					PlatformID: 1, // Macintosh
+					EncodingID: 0, // Roman
 					LanguageID: languageID,
-					enc:        mac.Encode,
+					NameID:     uint16(nameID),
+					offset:     offset,
+					length:     length,
 				}
 				records = append(records, rec)
 			}
@@ -251,8 +313,96 @@ func (info *Info) Encode(ss cmap.Subtables) []byte {
 	if len(encodingIDs) == 0 {
 		encodingIDs[1] = true
 	}
+	for languageID, loc := range microsoftCodes {
+		t := info.SelectTable(loc.Language, loc.Country)
+		if t == nil {
+			continue
+		}
 
-	panic("not implemented")
+		for nameID := 0; nameID <= MaxNameID; nameID++ {
+			val := t.get(nameID)
+			if val == "" {
+				continue
+			}
+			offset, length := b.Add(utf16Encode(val))
+
+			for encodingID := range encodingIDs {
+				rec := &recInfo{
+					PlatformID: 3, // Windows
+					EncodingID: encodingID,
+					LanguageID: languageID,
+					NameID:     uint16(nameID),
+					offset:     offset,
+					length:     length,
+				}
+				records = append(records, rec)
+			}
+		}
+	}
+
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].PlatformID != records[j].PlatformID {
+			return records[i].PlatformID < records[j].PlatformID
+		}
+		if records[i].EncodingID != records[j].EncodingID {
+			return records[i].EncodingID < records[j].EncodingID
+		}
+		if records[i].LanguageID != records[j].LanguageID {
+			return records[i].LanguageID < records[j].LanguageID
+		}
+		return records[i].NameID < records[j].NameID
+	})
+
+	numRec := len(records)
+	startOfRecords := 6
+	startOfStrings := startOfRecords + numRec*12
+	res := make([]byte, startOfStrings+len(b.data))
+
+	res[2] = byte(numRec >> 8)
+	res[3] = byte(numRec)
+	res[4] = byte(startOfStrings >> 8)
+	res[5] = byte(startOfStrings)
+	for i := 0; i < numRec; i++ {
+		rec := records[i]
+		base := startOfRecords + i*12
+		res[base] = byte(rec.PlatformID >> 8)
+		res[base+1] = byte(rec.PlatformID)
+		res[base+2] = byte(rec.EncodingID >> 8)
+		res[base+3] = byte(rec.EncodingID)
+		res[base+4] = byte(rec.LanguageID >> 8)
+		res[base+5] = byte(rec.LanguageID)
+		res[base+6] = byte(rec.NameID >> 8)
+		res[base+7] = byte(rec.NameID)
+		res[base+8] = byte(rec.length >> 8)
+		res[base+9] = byte(rec.length)
+		res[base+10] = byte(rec.offset >> 8)
+		res[base+11] = byte(rec.offset)
+	}
+	copy(res[startOfStrings:], b.data)
+
+	return res
+}
+
+type nameBuilder struct {
+	data []byte
+	idx  map[string]uint16
+}
+
+func newNameBuilder() *nameBuilder {
+	return &nameBuilder{
+		idx: make(map[string]uint16),
+	}
+}
+
+func (nb *nameBuilder) Add(b []byte) (offs, length uint16) {
+	key := string(b)
+	if idx, ok := nb.idx[key]; ok {
+		return idx, uint16(len(b))
+	}
+	idx := uint16(len(nb.data))
+	nb.idx[key] = idx
+	nb.data = append(nb.data, b...)
+	return idx, uint16(len(b))
 }
 
 var errMalformedNames = fmt.Errorf("malformed name table")

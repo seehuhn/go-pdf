@@ -34,16 +34,127 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
+	"seehuhn.de/go/pdf/font/sfnt/name"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/locale"
 )
 
+func main() {
+	blobs := make(map[string][]byte)
+
+	info := &Info{
+		FullName:   "Test Font",
+		FamilyName: "Test",
+
+		Version: 0x00010000,
+		Weight:  os2.WeightNormal,
+		Width:   os2.WidthNormal,
+
+		UnitsPerEm: 1000,
+		Ascent:     700,
+		Descent:    -300,
+		LineGap:    200,
+
+		Copyright: "Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>",
+	}
+
+	var glyphs []*cff.Glyph
+
+	g := cff.NewGlyph(".notdef", 550)
+	g.MoveTo(0, 0)
+	g.LineTo(500, 0)
+	g.LineTo(500, 700)
+	g.LineTo(0, 700)
+	glyphs = append(glyphs, g)
+
+	g = cff.NewGlyph("space", 550)
+	glyphs = append(glyphs, g)
+
+	g = cff.NewGlyph("A", 550)
+	g.MoveTo(0, 0)
+	g.LineTo(500, 0)
+	g.LineTo(250, 710)
+	glyphs = append(glyphs, g)
+
+	g = cff.NewGlyph("B", 550)
+	g.MoveTo(0, 0)
+	g.LineTo(200, 0)
+	g.CurveTo(300, 0, 500, 75, 500, 175)
+	g.CurveTo(500, 275, 300, 350, 200, 350)
+	g.CurveTo(300, 350, 500, 425, 500, 525)
+	g.CurveTo(500, 625, 300, 700, 200, 700)
+	g.LineTo(0, 700)
+	glyphs = append(glyphs, g)
+
+	// ----------------------------------------------------------------------
+
+	headData, err := makeHead(info, glyphs)
+	if err != nil {
+		log.Fatal(err)
+	}
+	blobs["head"] = headData
+
+	maxpInfo := table.MaxpInfo{
+		NumGlyphs: len(glyphs),
+	}
+	maxpData, err := maxpInfo.Encode()
+	if err != nil {
+		log.Fatal(err)
+	}
+	blobs["maxp"] = maxpData
+
+	hheaData, hmtxData := makeHmtx(info, glyphs)
+	blobs["hhea"] = hheaData
+	blobs["hmtx"] = hmtxData
+
+	cc, ss := makeCmap(glyphs)
+	buf := &bytes.Buffer{}
+	ss.Write(buf)
+	blobs["cmap"] = buf.Bytes()
+
+	os2Data := makeOS2(info, cc)
+	blobs["OS/2"] = os2Data
+
+	nameData := makeName(info, ss)
+	blobs["name"] = nameData
+
+	postData := makePost(info)
+	blobs["post"] = postData
+
+	cffData, err := makeCFF(info, glyphs)
+	if err != nil {
+		log.Fatal(err)
+	}
+	blobs["CFF "] = cffData
+
+	// ----------------------------------------------------------------------
+
+	tableNames := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "name", "cmap", "post", "CFF "}
+
+	out, err := os.Create("test.otf")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = writeFile(out, tableNames, blobs)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = out.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// Info contains information about the font.
 type Info struct {
-	Version head.Version
-	Weight  os2.Weight
-	Width   os2.Width
+	FullName   string
+	FamilyName string
+	Weight     os2.Weight
+	Width      os2.Width
+	Version    head.Version
 
 	UnitsPerEm uint16
 
@@ -61,6 +172,8 @@ type Info struct {
 	IsRegular    bool
 	IsOblique    bool
 	IsFixedPitch bool
+
+	Copyright string
 }
 
 func makeCFF(info *Info, glyphs []*cff.Glyph) ([]byte, error) {
@@ -69,9 +182,9 @@ func makeCFF(info *Info, glyphs []*cff.Glyph) ([]byte, error) {
 		FontName:   "Test",
 		Version:    info.Version.String(),
 		Notice:     "https://scripts.sil.org/OFL",
-		Copyright:  "Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>",
-		FullName:   "Test",
-		FamilyName: "Test",
+		Copyright:  info.Copyright,
+		FullName:   info.FullName,
+		FamilyName: info.FamilyName,
 		Weight:     info.Weight.String(),
 		FontMatrix: []float64{q, 0, 0, q, 0, 0},
 
@@ -183,7 +296,24 @@ func makeOS2(info *Info, cc cmap.Subtable) []byte {
 	return os2Info.Encode(cc)
 }
 
-func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, []byte) {
+func makeName(info *Info, ss cmap.Subtables) []byte {
+	nameInfo := &name.Info{
+		Tables: map[name.Loc]*name.Table{
+			{
+				Language: locale.LangEnglish,
+				Country:  locale.CountryGBR,
+			}: {
+				Copyright: info.Copyright,
+				Family:    info.FamilyName,
+				FullName:  info.FullName,
+				Version:   "Version " + info.Version.String(),
+			},
+		},
+	}
+	return nameInfo.Encode(ss)
+}
+
+func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, cmap.Subtables) {
 	cc := cmap.Format4{}
 	for i, g := range glyphs {
 		rr := names.ToUnicode(string(g.Name), false)
@@ -199,10 +329,7 @@ func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, []byte) {
 		{PlatformID: 0, EncodingID: 3, Language: 0, Data: cmapSubtable},
 		{PlatformID: 3, EncodingID: 1, Language: 0, Data: cmapSubtable},
 	}
-	buf := &bytes.Buffer{}
-	ss.Write(buf)
-	cmapData := buf.Bytes()
-	return cc, cmapData
+	return cc, ss
 }
 
 func makePost(info *Info) []byte {
@@ -279,98 +406,4 @@ func writeFile(w io.Writer, tableNames []string, blobs map[string][]byte) error 
 		}
 	}
 	return nil
-}
-
-func main() {
-	blobs := make(map[string][]byte)
-
-	info := &Info{
-		Version: 0x00010000,
-		Weight:  os2.WeightNormal,
-		Width:   os2.WidthNormal,
-
-		UnitsPerEm: 1000,
-		Ascent:     700,
-		Descent:    -300,
-		LineGap:    200,
-	}
-
-	var glyphs []*cff.Glyph
-
-	g := cff.NewGlyph(".notdef", 550)
-	g.MoveTo(0, 0)
-	g.LineTo(500, 0)
-	g.LineTo(500, 700)
-	g.LineTo(0, 700)
-	glyphs = append(glyphs, g)
-
-	g = cff.NewGlyph("A", 550)
-	g.MoveTo(0, 0)
-	g.LineTo(500, 0)
-	g.MoveTo(250, 710)
-	glyphs = append(glyphs, g)
-
-	g = cff.NewGlyph("B", 550)
-	g.MoveTo(0, 0)
-	g.LineTo(200, 0)
-	g.CurveTo(300, 0, 500, 75, 500, 175)
-	g.CurveTo(500, 275, 300, 350, 200, 350)
-	g.CurveTo(300, 350, 500, 425, 500, 525)
-	g.CurveTo(500, 625, 300, 700, 200, 700)
-	g.LineTo(0, 700)
-	glyphs = append(glyphs, g)
-
-	// ----------------------------------------------------------------------
-
-	headData, err := makeHead(info, glyphs)
-	if err != nil {
-		log.Fatal(err)
-	}
-	blobs["head"] = headData
-
-	maxpInfo := table.MaxpInfo{
-		NumGlyphs: len(glyphs),
-	}
-	maxpData, err := maxpInfo.Encode()
-	if err != nil {
-		log.Fatal(err)
-	}
-	blobs["maxp"] = maxpData
-
-	hheaData, hmtxData := makeHmtx(info, glyphs)
-	blobs["hhea"] = hheaData
-	blobs["hmtx"] = hmtxData
-
-	cc, cmapData := makeCmap(glyphs)
-	blobs["cmap"] = cmapData
-
-	os2Data := makeOS2(info, cc)
-	blobs["OS/2"] = os2Data
-
-	postData := makePost(info)
-	blobs["post"] = postData
-
-	cffData, err := makeCFF(info, glyphs)
-	if err != nil {
-		log.Fatal(err)
-	}
-	blobs["CFF "] = cffData
-
-	// ----------------------------------------------------------------------
-
-	// "head", "hhea", "maxp", "OS/2", "name", "cmap", "post", "CFF "
-	tableNames := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "cmap", "post", "CFF "}
-
-	out, err := os.Create("test.otf")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = writeFile(out, tableNames, blobs)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = out.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
 }

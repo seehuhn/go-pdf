@@ -464,7 +464,8 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				if k < 0 {
 					return nil, errStackUnderflow
 				}
-				stack[k] = math.Sqrt(stack[k])
+				// TODO(voss): what to do for negative arguments?
+				stack[k] = math.Round(math.Sqrt(math.Abs(stack[k]))*65536) / 65536
 			case t2drop:
 				k := len(stack) - 1
 				if k < 0 {

@@ -14,33 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cmap
+package name
 
-import (
-	"os"
-	"path/filepath"
-	"testing"
-)
+import "testing"
 
-func TestFormat0Samples(t *testing.T) {
-	// TODO(voss): remove
-	names, err := filepath.Glob("../../../demo/try-all-fonts/cmap/00-*.bin")
-	if err != nil {
-		t.Fatal(err)
+func TestUTF16(t *testing.T) {
+	cases := []string{
+		"",
+		"hello",
+		"♠♡♢♣",
 	}
-	if len(names) < 2 {
-		t.Fatal("not enough samples")
-	}
-	for _, name := range names {
-		data, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = decodeFormat0(data)
-		if err != nil {
-			t.Fatal(err)
+	for _, c := range cases {
+		buf := utf16Encode(c)
+		d := utf16Decode(buf)
+		if d != c {
+			t.Errorf("%q -> % x -> %q", c, buf, d)
 		}
 	}
 }
-
-var _ Subtable = (*format0)(nil)
