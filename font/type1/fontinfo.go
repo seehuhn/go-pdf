@@ -57,8 +57,6 @@ type FontInfo struct {
 	// units of the glyph coordinate system.
 	UnderlineThickness int16
 
-	IsOutlined bool
-
 	FontMatrix []float64
 
 	Private []*PrivateDict

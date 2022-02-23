@@ -27,6 +27,7 @@ import (
 	"sort"
 	"time"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/names"
@@ -42,23 +43,55 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
+// CFFInfo contains information about the font.
+type CFFInfo struct {
+	FullName   string
+	FamilyName string
+	Weight     os2.Weight
+	Width      os2.Width
+
+	// FontName is a condensation of FullName.  It is customary to remove
+	// spaces and to limit its length to fewer than 40 characters. The
+	// resulting name should be unique.
+	FontName string
+
+	Version head.Version
+
+	Copyright string
+
+	Notice string
+
+	UnitsPerEm uint16
+
+	Ascent  int16
+	Descent int16
+	LineGap int16
+
+	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
+	UnderlinePosition  int16   // Underline position (negative)
+	UnderlineThickness int16   // Underline thickness
+
+	IsBold    bool
+	IsRegular bool
+	IsOblique bool
+}
+
 func main() {
 	blobs := make(map[string][]byte)
 
-	info := &Info{
+	info := &CFFInfo{
 		FullName:   "Test Font",
 		FamilyName: "Test",
+		Weight:     os2.WeightNormal,
+		Width:      os2.WidthNormal,
+		Version:    0x00010000,
 
-		Version: 0x00010000,
-		Weight:  os2.WeightNormal,
-		Width:   os2.WidthNormal,
+		Copyright: "Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>",
 
 		UnitsPerEm: 1000,
 		Ascent:     700,
 		Descent:    -300,
 		LineGap:    200,
-
-		Copyright: "Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>",
 	}
 
 	var glyphs []*cff.Glyph
@@ -121,7 +154,7 @@ func main() {
 	nameData := makeName(info, ss)
 	blobs["name"] = nameData
 
-	postData := makePost(info)
+	postData := makePost(info, glyphs)
 	blobs["post"] = postData
 
 	cffData, err := makeCFF(info, glyphs)
@@ -146,200 +179,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-// Info contains information about the font.
-type Info struct {
-	FullName   string
-	FamilyName string
-	Weight     os2.Weight
-	Width      os2.Width
-	Version    head.Version
-
-	UnitsPerEm uint16
-
-	Ascent  int16
-	Descent int16
-	LineGap int16
-
-	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
-	UnderlinePosition  int16   // Underline position (negative)
-	UnderlineThickness int16   // Underline thickness
-
-	IsBold       bool
-	HasUnderline bool
-	IsOutlined   bool
-	IsRegular    bool
-	IsOblique    bool
-	IsFixedPitch bool
-
-	Copyright string
-}
-
-func makeCFF(info *Info, glyphs []*cff.Glyph) ([]byte, error) {
-	q := 1 / float64(info.UnitsPerEm)
-	cffInfo := type1.FontInfo{
-		FontName:   "Test",
-		Version:    info.Version.String(),
-		Notice:     "https://scripts.sil.org/OFL",
-		Copyright:  info.Copyright,
-		FullName:   info.FullName,
-		FamilyName: info.FamilyName,
-		Weight:     info.Weight.String(),
-		FontMatrix: []float64{q, 0, 0, q, 0, 0},
-
-		ItalicAngle: info.ItalicAngle,
-
-		IsFixedPitch: info.IsFixedPitch,
-
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-
-		IsOutlined: info.IsOutlined,
-
-		Private: []*type1.PrivateDict{
-			{
-				BlueValues: []int32{-10, 0, 700, 710},
-			},
-		},
-	}
-	myCff := &cff.Font{
-		Info:   &cffInfo,
-		Glyphs: glyphs,
-	}
-
-	buf := &bytes.Buffer{}
-	err := myCff.Encode(buf)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func makeHead(info *Info, glyphs []*cff.Glyph) ([]byte, error) {
-	now := time.Now()
-
-	var bbox font.Rect
-	first := true
-	for _, g := range glyphs {
-		ext := g.Extent()
-		if ext.IsZero() {
-			continue
-		}
-		if first || ext.LLx < bbox.LLx {
-			bbox.LLx = ext.LLx
-		}
-		if first || ext.LLy < bbox.LLy {
-			bbox.LLy = ext.LLy
-		}
-		if first || ext.URx > bbox.URx {
-			bbox.URx = ext.URx
-		}
-		if first || ext.URy > bbox.URy {
-			bbox.URy = ext.URy
-		}
-		first = false
-	}
-
-	headInfo := head.Info{
-		FontRevision:  info.Version,
-		HasYBaseAt0:   true,
-		HasXBaseAt0:   true,
-		UnitsPerEm:    info.UnitsPerEm,
-		Created:       now,
-		Modified:      now,
-		FontBBox:      bbox,
-		IsBold:        info.IsBold,
-		IsItalic:      info.ItalicAngle != 0,
-		HasUnderline:  info.HasUnderline,
-		IsOutlined:    info.IsOutlined,
-		LowestRecPPEM: 7,
-	}
-	return headInfo.Encode()
-}
-
-func makeHmtx(info *Info, glyphs []*cff.Glyph) ([]byte, []byte) {
-	widths := make([]uint16, len(glyphs))
-	extents := make([]font.Rect, len(glyphs))
-	for i, g := range glyphs {
-		widths[i] = uint16(g.Width)
-		extents[i] = g.Extent()
-	}
-
-	hmtxInfo := &hmtx.Info{
-		Width:       widths,
-		GlyphExtent: extents,
-		Ascent:      info.Ascent,
-		Descent:     info.Descent,
-		LineGap:     info.LineGap,
-		CaretAngle:  float64(info.ItalicAngle) / 180 * math.Pi,
-	}
-
-	return hmtxInfo.Encode()
-}
-
-func makeOS2(info *Info, cc cmap.Subtable) []byte {
-	os2Info := &os2.Info{
-		WeightClass:  info.Weight,
-		WidthClass:   info.Width,
-		IsBold:       info.IsBold,
-		IsItalic:     info.ItalicAngle != 0,
-		HasUnderline: info.HasUnderline,
-		IsOutlined:   info.IsOutlined,
-		IsRegular:    info.IsRegular,
-		IsOblique:    info.IsOblique,
-		Ascent:       info.Ascent,
-		Descent:      info.Descent,
-		LineGap:      info.LineGap,
-		PermUse:      os2.PermInstall,
-	}
-	return os2Info.Encode(cc)
-}
-
-func makeName(info *Info, ss cmap.Subtables) []byte {
-	nameInfo := &name.Info{
-		Tables: map[name.Loc]*name.Table{
-			{
-				Language: locale.LangEnglish,
-				Country:  locale.CountryGBR,
-			}: {
-				Copyright: info.Copyright,
-				Family:    info.FamilyName,
-				FullName:  info.FullName,
-				Version:   "Version " + info.Version.String(),
-			},
-		},
-	}
-	return nameInfo.Encode(ss)
-}
-
-func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, cmap.Subtables) {
-	cc := cmap.Format4{}
-	for i, g := range glyphs {
-		rr := names.ToUnicode(string(g.Name), false)
-		if len(rr) == 1 {
-			r := uint16(rr[0])
-			if _, ok := cc[r]; !ok {
-				cc[r] = font.GlyphID(i)
-			}
-		}
-	}
-	cmapSubtable := cc.Encode(0)
-	ss := cmap.Subtables{
-		{PlatformID: 0, EncodingID: 3, Language: 0, Data: cmapSubtable},
-		{PlatformID: 3, EncodingID: 1, Language: 0, Data: cmapSubtable},
-	}
-	return cc, ss
-}
-
-func makePost(info *Info) []byte {
-	postInfo := &post.Info{
-		ItalicAngle:        info.ItalicAngle,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-		IsFixedPitch:       info.IsFixedPitch,
-	}
-	return postInfo.Encode()
 }
 
 // This changes the checksum in the "head" table in place.
@@ -406,4 +245,183 @@ func writeFile(w io.Writer, tableNames []string, blobs map[string][]byte) error 
 		}
 	}
 	return nil
+}
+
+func isFixedPitch(glyphs []*cff.Glyph) bool {
+	var width int32
+
+	for i := range glyphs {
+		w := glyphs[i].Width
+		if w == 0 {
+			continue
+		}
+		if width == 0 {
+			width = w
+		} else if width != w {
+			return false
+		}
+	}
+
+	return true
+}
+
+func makeCFF(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
+	q := 1 / float64(info.UnitsPerEm)
+	cffInfo := type1.FontInfo{
+		FullName:   info.FullName,
+		FamilyName: info.FamilyName,
+		Weight:     info.Weight.String(),
+		FontName:   pdf.Name(info.FontName),
+		Version:    info.Version.String(),
+
+		Copyright: info.Copyright,
+		Notice:    info.Notice, // TODO(voss)
+
+		FontMatrix: []float64{q, 0, 0, q, 0, 0},
+
+		ItalicAngle:  info.ItalicAngle,
+		IsFixedPitch: isFixedPitch(glyphs),
+
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+
+		Private: []*type1.PrivateDict{
+			{
+				BlueValues: []int32{-10, 0, 700, 710},
+			},
+		},
+	}
+	myCff := &cff.Font{
+		Info:   &cffInfo,
+		Glyphs: glyphs,
+	}
+
+	buf := &bytes.Buffer{}
+	err := myCff.Encode(buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func makeHead(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
+	now := time.Now()
+
+	var bbox font.Rect
+	first := true
+	for _, g := range glyphs {
+		ext := g.Extent()
+		if ext.IsZero() {
+			continue
+		}
+		if first || ext.LLx < bbox.LLx {
+			bbox.LLx = ext.LLx
+		}
+		if first || ext.LLy < bbox.LLy {
+			bbox.LLy = ext.LLy
+		}
+		if first || ext.URx > bbox.URx {
+			bbox.URx = ext.URx
+		}
+		if first || ext.URy > bbox.URy {
+			bbox.URy = ext.URy
+		}
+		first = false
+	}
+
+	headInfo := head.Info{
+		FontRevision:  info.Version,
+		HasYBaseAt0:   true,
+		HasXBaseAt0:   true,
+		UnitsPerEm:    info.UnitsPerEm,
+		Created:       now,
+		Modified:      now,
+		FontBBox:      bbox,
+		IsBold:        info.IsBold,
+		IsItalic:      info.ItalicAngle != 0,
+		LowestRecPPEM: 7,
+	}
+	return headInfo.Encode()
+}
+
+func makeHmtx(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, []byte) {
+	widths := make([]uint16, len(glyphs))
+	extents := make([]font.Rect, len(glyphs))
+	for i, g := range glyphs {
+		widths[i] = uint16(g.Width)
+		extents[i] = g.Extent()
+	}
+
+	hmtxInfo := &hmtx.Info{
+		Width:       widths,
+		GlyphExtent: extents,
+		Ascent:      info.Ascent,
+		Descent:     info.Descent,
+		LineGap:     info.LineGap,
+		CaretAngle:  float64(info.ItalicAngle) / 180 * math.Pi,
+	}
+
+	return hmtxInfo.Encode()
+}
+
+func makeOS2(info *CFFInfo, cc cmap.Subtable) []byte {
+	os2Info := &os2.Info{
+		WeightClass: info.Weight,
+		WidthClass:  info.Width,
+		IsBold:      info.IsBold,
+		IsItalic:    info.ItalicAngle != 0,
+		IsRegular:   info.IsRegular,
+		IsOblique:   info.IsOblique,
+		Ascent:      info.Ascent,
+		Descent:     info.Descent,
+		LineGap:     info.LineGap,
+		PermUse:     os2.PermInstall, // TODO(voss)
+	}
+	return os2Info.Encode(cc)
+}
+
+func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
+	nameInfo := &name.Info{
+		Tables: map[name.Loc]*name.Table{
+			{
+				Language: locale.LangEnglish,
+				Country:  locale.CountryGBR,
+			}: {
+				Copyright: info.Copyright,
+				Family:    info.FamilyName,
+				FullName:  info.FullName,
+				Version:   "Version " + info.Version.String(),
+			},
+		},
+	}
+	return nameInfo.Encode(ss)
+}
+
+func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, cmap.Subtables) {
+	cc := cmap.Format4{}
+	for i, g := range glyphs {
+		rr := names.ToUnicode(string(g.Name), false)
+		if len(rr) == 1 {
+			r := uint16(rr[0])
+			if _, ok := cc[r]; !ok {
+				cc[r] = font.GlyphID(i)
+			}
+		}
+	}
+	cmapSubtable := cc.Encode(0)
+	ss := cmap.Subtables{
+		{PlatformID: 1, EncodingID: 0, Language: 0, Data: cmapSubtable},
+		{PlatformID: 3, EncodingID: 1, Language: 0, Data: cmapSubtable},
+	}
+	return cc, ss
+}
+
+func makePost(info *CFFInfo, glyphs []*cff.Glyph) []byte {
+	postInfo := &post.Info{
+		ItalicAngle:        info.ItalicAngle,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		IsFixedPitch:       isFixedPitch(glyphs),
+	}
+	return postInfo.Encode()
 }

@@ -109,7 +109,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 
 	opLoop:
 		for len(code) > 0 {
-			if len(stack) > 96 { // the spec says 48, but some fonts use more???
+			if len(stack) > 96 { // TODO(voss): the spec says 48, but some fonts use more???
 				return nil, errStackOverflow
 			}
 
@@ -442,7 +442,10 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 					return nil, errStackUnderflow
 				}
 				x := stack[k] / stack[k+1]
-				stack[k] = math.Round(x*65536) / 65536 // TODO(voss): is this wise?
+				if !(math.Abs(x) < 32768) {
+					x = 0
+				}
+				stack[k] = math.Round(x*65536) / 65536
 				stack = stack[:k+1]
 			case t2neg:
 				k := len(stack) - 1

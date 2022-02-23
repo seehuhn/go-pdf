@@ -505,9 +505,9 @@ func makeTopDict(info *type1.FontInfo) cffDict {
 	if info.UnderlineThickness != defaultUnderlineThickness {
 		topDict[opUnderlineThickness] = []interface{}{int32(info.UnderlineThickness)}
 	}
-	if info.IsOutlined {
-		topDict[opPaintType] = []interface{}{int32(2)}
-	}
+	// if info.IsOutlined {
+	// 	topDict[opPaintType] = []interface{}{int32(2)}
+	// }
 	topDict.setFontMatrix(opFontMatrix, info.FontMatrix)
 
 	return topDict

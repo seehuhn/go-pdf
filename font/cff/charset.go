@@ -33,8 +33,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 		return nil, err
 	}
 
-	charset := make([]int32, 0, nGlyphs)
-	charset = append(charset, 0)
+	charset := make([]int32, 1, nGlyphs) // include leading 0
 	switch format {
 	case 0:
 		s := &parser.State{

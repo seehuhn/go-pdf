@@ -34,12 +34,10 @@ type Info struct {
 	WeightClass Weight
 	WidthClass  Width
 
-	IsBold       bool
-	IsItalic     bool
-	HasUnderline bool
-	IsOutlined   bool
-	IsRegular    bool
-	IsOblique    bool
+	IsBold    bool
+	IsItalic  bool
+	IsRegular bool
+	IsOblique bool
 
 	Ascent    int16
 	Descent   int16 // as a negative number
@@ -193,12 +191,12 @@ func Read(r io.Reader) (*Info, error) {
 
 		Vendor: v0.VendID,
 
-		IsItalic:     sel&0x0041 == 0x0001,
-		HasUnderline: sel&0x0042 == 0x0002,
-		IsOutlined:   sel&0x0048 == 0x0008,
-		IsBold:       sel&0x0060 == 0x0020,
-		IsRegular:    sel&0x0040 != 0,
-		IsOblique:    sel&0x0200 != 0,
+		IsItalic: sel&0x0041 == 0x0001,
+		// HasUnderline: sel&0x0042 == 0x0002,
+		// IsOutlined:   sel&0x0048 == 0x0008,
+		IsBold:    sel&0x0060 == 0x0020,
+		IsRegular: sel&0x0040 != 0,
+		IsOblique: sel&0x0200 != 0,
 	}
 
 	v0ms := &v0MsData{}
@@ -273,12 +271,12 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		if info.IsItalic {
 			sel |= 0x0001
 		}
-		if info.HasUnderline {
-			sel |= 0x0002
-		}
-		if info.IsOutlined {
-			sel |= 0x0008
-		}
+		// if info.HasUnderline {
+		// 	sel |= 0x0002
+		// }
+		// if info.IsOutlined {
+		// 	sel |= 0x0008
+		// }
 		if info.IsBold {
 			sel |= 0x0020
 		}

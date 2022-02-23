@@ -41,13 +41,11 @@ type Info struct {
 	Modified     time.Time
 	FontBBox     font.Rect
 
-	IsBold       bool
-	IsItalic     bool
-	HasUnderline bool
-	IsOutlined   bool
-	HasShadow    bool
-	IsCondensed  bool
-	IsExtended   bool
+	IsBold      bool
+	IsItalic    bool
+	HasShadow   bool
+	IsCondensed bool
+	IsExtended  bool
 
 	LowestRecPPEM  uint16 // smallest readable size in pixels
 	HasLongOffsets bool   // 'loca' table uses 32 bit offsets (TrueType only)
@@ -91,8 +89,8 @@ func Read(r io.Reader) (*Info, error) {
 
 	info.IsBold = enc.MacStyle&(1<<0) != 0
 	info.IsItalic = enc.MacStyle&(1<<1) != 0
-	info.HasUnderline = enc.MacStyle&(1<<2) != 0
-	info.IsOutlined = enc.MacStyle&(1<<3) != 0
+	// info.HasUnderline = enc.MacStyle&(1<<2) != 0
+	// info.IsOutlined = enc.MacStyle&(1<<3) != 0
 	info.HasShadow = enc.MacStyle&(1<<4) != 0
 	info.IsCondensed = enc.MacStyle&(1<<5) != 0
 	info.IsExtended = enc.MacStyle&(1<<6) != 0
@@ -128,12 +126,12 @@ func (info *Info) Encode() (data []byte, err error) {
 	if info.IsItalic {
 		macStyle |= 1 << 1
 	}
-	if info.HasUnderline {
-		macStyle |= 1 << 2
-	}
-	if info.IsOutlined {
-		macStyle |= 1 << 3
-	}
+	// if info.HasUnderline {
+	// 	macStyle |= 1 << 2
+	// }
+	// if info.IsOutlined {
+	// 	macStyle |= 1 << 3
+	// }
 	if info.HasShadow {
 		macStyle |= 1 << 4
 	}

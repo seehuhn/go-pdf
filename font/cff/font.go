@@ -128,7 +128,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		defaultUnderlinePosition))
 	cff.Info.UnderlineThickness = int16(topDict.getInt(opUnderlineThickness,
 		defaultUnderlineThickness))
-	cff.Info.IsOutlined = topDict.getInt(opPaintType, 0) != 0
 
 	// TODO(voss): different default for CIDFonts?
 	cff.Info.FontMatrix = topDict.getFontMatrix(opFontMatrix)
@@ -191,6 +190,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			return nil, err
 		}
 	}
+
+	// TODO(voss): add support for reading/writing the encoding
 
 	// encodingOffs, _ := topDict.getInt(opEncoding, 0)
 	// if encodingOffs != 0 {
