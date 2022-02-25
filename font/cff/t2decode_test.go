@@ -38,7 +38,6 @@ func TestRoll(t *testing.T) {
 func FuzzT2Decode(f *testing.F) {
 	f.Add(t2endchar.Bytes())
 	f.Fuzz(func(t *testing.T, data []byte) {
-		fmt.Printf("A % x\n", data)
 		info := &decodeInfo{
 			subr:         cffIndex{},
 			gsubr:        cffIndex{},
@@ -54,7 +53,6 @@ func FuzzT2Decode(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("B % x\n", tmp)
 
 		g2, err := decodeCharString(info, tmp)
 		if err != nil {

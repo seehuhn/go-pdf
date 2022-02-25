@@ -16,6 +16,8 @@
 
 package cff
 
+// TODO(voss): split this out into a separate "type2" module?
+
 import (
 	"errors"
 	"fmt"

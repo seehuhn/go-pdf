@@ -28,13 +28,18 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 )
 
+// TODO(voss): implement support for font matrices
+
 // Font stores the data of a CFF font.
 // Use the Read() function to decode a CFF font from a io.ReadSeeker.
 type Font struct {
 	Info   *type1.FontInfo
 	Glyphs []*Glyph
 
-	gid2cid []int32
+	IsCIDFont bool
+	Encoding  []font.GlyphID
+	FdSelect  FdSelectFn
+	Gid2cid   []int32 // TODO(voss): what is a good data type for this?
 }
 
 // Read reads a CFF font from r.
@@ -64,10 +69,9 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	nameIndexOffs := int64((x >> 8) & 0xFF)
 	offSize := x & 0xFF // only used to exclude non-CFF files
 	if major == 2 {
-		msg := fmt.Sprintf("version %d.%d", major, minor)
-		return nil, &NotSupportedError{msg}
+		return nil, notSupported(fmt.Sprintf("version %d.%d", major, minor))
 	} else if major != 1 || nameIndexOffs < 4 || offSize > 4 {
-		return nil, &InvalidFontError{"invalid header"}
+		return nil, invalidSince("invalid header")
 	}
 
 	// read the Name INDEX
@@ -80,7 +84,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 	if len(fontNames) == 0 {
-		return nil, invalidFont("no fonts present")
+		return nil, invalidSince("no font data")
 	} else if len(fontNames) > 1 {
 		return nil, notSupported("fontsets with more than one font")
 	}
@@ -94,7 +98,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 	if len(topDictIndex) != len(fontNames) {
-		return nil, invalidFont("must contain exactly one top dict")
+		return nil, invalidSince("wrong number of top dicts")
 	}
 
 	// read the String INDEX
@@ -146,98 +150,120 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 
-	_, isCIDFont := topDict[opROS]
-	if isCIDFont {
+	_, cff.IsCIDFont = topDict[opROS]
+	var decoders []*decodeInfo
+	if cff.IsCIDFont {
 		fdArrayOffs := topDict.getInt(opFDArray, 0)
 		fdArrayIndex, err := readIndexAt(p, fdArrayOffs, "Font DICT")
 		if err != nil {
 			return nil, err
+		} else if len(fdArrayIndex) > 256 {
+			return nil, invalidSince("too many Font DICTs")
 		}
 		for _, fdBlob := range fdArrayIndex {
 			fontDict, err := decodeDict(fdBlob, strings)
 			if err != nil {
 				return nil, err
 			}
-			fmt.Println()
-			for key, val := range fontDict {
-				fmt.Println(key, "->", val)
-			}
-			privateInfo, err := fontDict.readPrivate(p, strings)
+			pInfo, err := fontDict.readPrivate(p, strings)
 			if err != nil {
 				return nil, err
 			}
-			cff.Info.Private = append(cff.Info.Private, privateInfo.private)
-
-			_ = privateInfo
+			cff.Info.Private = append(cff.Info.Private, pInfo.private)
+			decoders = append(decoders, &decodeInfo{
+				subr:         pInfo.subrs,
+				gsubr:        gsubrs,
+				defaultWidth: pInfo.defaultWidth,
+				nominalWidth: pInfo.nominalWidth,
+			})
 		}
 
-		return nil, errors.New("reading CIDfonts not implemented")
+		fdSelectOffs := topDict.getInt(opFDSelect, 0)
+		if fdSelectOffs < 4 {
+			return nil, invalidSince("missing FDSelect")
+		}
+		err = p.SeekPos(int64(fdSelectOffs))
+		if err != nil {
+			return nil, err
+		}
+		cff.FdSelect, err = readFDSelect(p, len(charStrings))
 	}
 
 	// read the list of glyph names
 	charsetOffs := topDict.getInt(opCharset, 0)
 	var charset []int32
-	switch charsetOffs {
-	case 0: // ISOAdobe
-		// TODO(voss): implement
-		return nil, errors.New("ISOAdobe charset not implemented")
-	case 1: // Expert
-		// TODO(voss): implement
-		return nil, errors.New("Expert charset not implemented")
-	case 2: // ExpertSubset
-		// TODO(voss): implement
-		return nil, errors.New("ExpertSubset charset not implemented")
-	default:
-		err = p.SeekPos(int64(charsetOffs))
-		if err != nil {
-			return nil, err
+	if cff.IsCIDFont {
+		if charsetOffs != 0 {
+			err = p.SeekPos(int64(charsetOffs))
+			if err != nil {
+				return nil, err
+			}
+			charset, err = readCharset(p, len(charStrings))
+			if err != nil {
+				return nil, err
+			}
+			cff.Gid2cid = make([]int32, len(charStrings))
 		}
-		charset, err = readCharset(p, len(charStrings))
-		if err != nil {
-			return nil, err
+	} else {
+		switch charsetOffs {
+		case 0: // ISOAdobe
+			// TODO(voss): implement
+			return nil, errors.New("ISOAdobe charset not implemented")
+		case 1: // Expert
+			// TODO(voss): implement
+			return nil, errors.New("Expert charset not implemented")
+		case 2: // ExpertSubset
+			// TODO(voss): implement
+			return nil, errors.New("ExpertSubset charset not implemented")
+		default:
+			err = p.SeekPos(int64(charsetOffs))
+			if err != nil {
+				return nil, err
+			}
+			charset, err = readCharset(p, len(charStrings))
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-
-	// TODO(voss): add support for reading/writing the encoding
-
-	// encodingOffs, _ := topDict.getInt(opEncoding, 0)
-	// if encodingOffs != 0 {
-	// 	err = p.SeekPos(int64(encodingOffs))
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	_, err = cff.readEncoding(p)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// }
 
 	// read the Private DICT
-	private, err := topDict.readPrivate(p, strings)
-	if err != nil {
-		return nil, err
+	if !cff.IsCIDFont {
+		pInfo, err := topDict.readPrivate(p, strings)
+		if err != nil {
+			return nil, err
+		}
+		cff.Info.Private = []*type1.PrivateDict{pInfo.private}
+		cff.FdSelect = func(gid font.GlyphID) int { return 0 }
+		decoders = append(decoders, &decodeInfo{
+			subr:         pInfo.subrs,
+			gsubr:        gsubrs,
+			defaultWidth: pInfo.defaultWidth,
+			nominalWidth: pInfo.nominalWidth,
+		})
 	}
-
-	cff.Info.Private = []*type1.PrivateDict{private.private}
 
 	cff.Glyphs = make([]*Glyph, len(charStrings))
-	info := &decodeInfo{
-		subr:         private.subrs,
-		gsubr:        gsubrs,
-		defaultWidth: private.defaultWidth,
-		nominalWidth: private.nominalWidth,
-	}
-	for i, code := range charStrings {
+	for gid, code := range charStrings {
+		fdIdx := cff.FdSelect(font.GlyphID(gid))
+		info := decoders[fdIdx]
+
 		glyph, err := decodeCharString(info, code)
 		if err != nil {
 			return nil, err
 		}
-		name, err := strings.get(charset[i])
-		if err != nil {
-			return nil, err
+		if cff.IsCIDFont {
+			if charset != nil {
+				cff.Gid2cid[gid] = charset[gid]
+			}
+		} else {
+			name, err := strings.get(charset[gid])
+			if err != nil {
+				return nil, err
+			}
+			glyph.Name = pdf.Name(name)
 		}
-		glyph.Name = pdf.Name(name)
-		cff.Glyphs[i] = glyph
+		cff.Glyphs[gid] = glyph
 	}
 
 	return cff, nil
@@ -311,10 +337,11 @@ func (cff *Font) selectWidths() (int32, int32) {
 func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
 	numGlyphs := len(cff.Glyphs)
 	if numGlyphs < 1 || cff.Glyphs[0].Name != ".notdef" {
-		return nil, 0, 0, errMissingNotdef
+		return nil, 0, 0, invalidSince("missing .notedef glyph")
 	}
 
-	// TODO(voss): re-introduce the subroutines.
+	// TODO(voss): re-introduce subroutines.
+	//
 	// Size used for a subroutine:
 	//   - an entry in the subrs and gsubrs INDEX takes
 	//     up to 4 bytes, plus the size of the subroutine
@@ -545,7 +572,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 	}
 
 	// section 5: charsets INDEX (represents CIDs instead of glyph names)
-	gid2cid := cff.gid2cid
+	gid2cid := cff.Gid2cid
 	if len(gid2cid) != int(numGlyphs) {
 		gid2cid := make([]int32, numGlyphs)
 		for i := int32(0); i < numGlyphs; i++ {
@@ -603,7 +630,7 @@ func (cff *Font) EncodeCID(w io.Writer, registry, ordering string, supplement in
 
 	offs := cumsum()
 	for {
-		// This loop terminates because the elements of offs are monotonically
+		// This loop terminates since the elements of offs are monotonically
 		// increasing.
 
 		blobs[secHeader][3] = offsSize(offs[numSections])
@@ -712,8 +739,4 @@ const (
 	defaultBlueScale          = 0.039625
 	defaultBlueShift          = 7
 	defaultBlueFuzz           = 1
-)
-
-var (
-	errMissingNotdef = errors.New("cff: missing .notdef glyph")
 )

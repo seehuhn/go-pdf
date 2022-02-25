@@ -37,9 +37,7 @@ func TestCharsetDecode(t *testing.T) {
 		{[]byte{2, 0, 3, 2, 1}, 1 + 2*256 + 2, 3, 3 + 2*256 + 1},
 	}
 
-	for i, test := range cases {
-		fmt.Println("test", i)
-
+	for _, test := range cases {
 		p := parser.New(bytes.NewReader(test.blob))
 		err := p.SetRegion("CFF", 0, int64(len(test.blob)))
 		if err != nil {
@@ -108,8 +106,6 @@ func TestCharsetRoundtrip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		fmt.Printf("% x\n", data)
 
 		out, err := readCharset(p, len(names))
 		if err != nil {

@@ -43,7 +43,7 @@ func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 
 	for _, gid := range subset {
 		out.Glyphs = append(out.Glyphs, cff.Glyphs[gid])
-		out.gid2cid = append(out.gid2cid, int32(gid))
+		out.Gid2cid = append(out.Gid2cid, int32(gid))
 	}
 
 	return out, nil
