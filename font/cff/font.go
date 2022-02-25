@@ -38,8 +38,6 @@ type Font struct {
 }
 
 // Read reads a CFF font from r.
-//
-// TODO(voss): implement reading of CIDFonts.
 func Read(r io.ReadSeeker) (*Font, error) {
 	cff := &Font{}
 
@@ -66,9 +64,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	nameIndexOffs := int64((x >> 8) & 0xFF)
 	offSize := x & 0xFF // only used to exclude non-CFF files
 	if major == 2 {
-		return nil, fmt.Errorf("unsupported CFF version %d.%d", major, minor)
+		msg := fmt.Sprintf("version %d.%d", major, minor)
+		return nil, &NotSupportedError{msg}
 	} else if major != 1 || nameIndexOffs < 4 || offSize > 4 {
-		return nil, errors.New("not a CFF font")
+		return nil, &InvalidFontError{"invalid header"}
 	}
 
 	// read the Name INDEX
@@ -80,8 +79,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(fontNames) != 1 {
-		return nil, errors.New("CFF with multiple fonts not supported")
+	if len(fontNames) == 0 {
+		return nil, invalidFont("no fonts present")
+	} else if len(fontNames) > 1 {
+		return nil, notSupported("fontsets with more than one font")
 	}
 	cff.Info = &type1.FontInfo{
 		FontName: pdf.Name(fontNames[0]),
@@ -92,8 +93,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(topDictIndex) != 1 {
-		return nil, errors.New("invalid CFF")
+	if len(topDictIndex) != len(fontNames) {
+		return nil, invalidFont("must contain exactly one top dict")
 	}
 
 	// read the String INDEX
@@ -113,7 +114,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 	if topDict.getInt(opCharstringType, 2) != 2 {
-		return nil, errors.New("cff: unsupported charstring type")
+		return nil, notSupported("charstring type != 2")
 	}
 	cff.Info.Version = topDict.getString(opVersion)
 	cff.Info.Notice = topDict.getString(opNotice)
@@ -157,10 +158,16 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			if err != nil {
 				return nil, err
 			}
+			fmt.Println()
+			for key, val := range fontDict {
+				fmt.Println(key, "->", val)
+			}
 			privateInfo, err := fontDict.readPrivate(p, strings)
 			if err != nil {
 				return nil, err
 			}
+			cff.Info.Private = append(cff.Info.Private, privateInfo.private)
+
 			_ = privateInfo
 		}
 

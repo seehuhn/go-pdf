@@ -18,11 +18,11 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font/sfnt/name"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -44,22 +44,16 @@ func tryFont(fname string) error {
 		return err
 	}
 
-	nameData, err := header.ReadTableBytes(fd, "name")
+	cffData, err := header.ReadTableBytes(fd, "CFF ")
 	if err != nil {
 		return err
 	}
 
-	tt, err := name.Decode(nameData)
+	hash := sha256.Sum256(cffData)
+	outName := fmt.Sprintf("cff/%x.cff", hash)
+	err = os.WriteFile(outName, cffData, 0644)
 	if err != nil {
 		return err
-	}
-
-	for _, t := range tt.Tables {
-		ver := t.Version
-		if ver == "" {
-			continue
-		}
-		fmt.Println("X", ver)
 	}
 
 	return nil

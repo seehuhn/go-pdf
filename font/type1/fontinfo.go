@@ -19,6 +19,7 @@ package type1
 import "seehuhn.de/go/pdf"
 
 type FontInfo struct {
+	// PostScript language name (FontName or CIDFontName) of the font.
 	FontName pdf.Name
 
 	// Version is the version number of the font program.

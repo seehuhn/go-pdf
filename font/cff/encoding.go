@@ -88,7 +88,7 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 	return res, nil
 }
 
-func makeStdEncoding(glyphs []*Glyph) []font.GlyphID {
+func stdEncoding(glyphs []*Glyph) []font.GlyphID {
 	lookup := make(map[pdf.Name]font.GlyphID)
 	for i, g := range glyphs {
 		lookup[g.Name] = font.GlyphID(i)
@@ -103,7 +103,7 @@ func makeStdEncoding(glyphs []*Glyph) []font.GlyphID {
 	return res
 }
 
-func makeExpertEncoding(glyphs []*Glyph) []font.GlyphID {
+func expertEncoding(glyphs []*Glyph) []font.GlyphID {
 	lookup := make(map[pdf.Name]font.GlyphID)
 	for i, g := range glyphs {
 		lookup[g.Name] = font.GlyphID(i)
@@ -116,4 +116,20 @@ func makeExpertEncoding(glyphs []*Glyph) []font.GlyphID {
 		}
 	}
 	return res
+}
+
+func isStandardEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {
+	for code, gid := range encoding {
+		if gid == 0 {
+			continue
+		}
+		if type1.StandardEncoding[byte(code)] != glyphs[gid].Name {
+			return false
+		}
+	}
+	return true
+}
+
+func encodeEncoding(encoding []font.GlyphID, glyphs []*Glyph) ([]byte, error) {
+	panic("not implemented")
 }
