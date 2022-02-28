@@ -17,32 +17,9 @@
 package cmap
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 )
-
-func TestFormat12Samples(t *testing.T) {
-	// TODO(voss): remove
-	names, err := filepath.Glob("../../../demo/try-all-fonts/cmap/12-*.bin")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(names) < 2 {
-		t.Fatal("not enough samples")
-	}
-	for _, name := range names {
-		data, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = decodeFormat12(data)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-}
 
 func FuzzFormat12(f *testing.F) {
 	f.Add(format12{

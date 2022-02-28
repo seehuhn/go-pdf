@@ -599,8 +599,8 @@ func (cff *Font) selectWidths() (int32, int32) {
 
 func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
 	numGlyphs := len(cff.Glyphs)
-	if numGlyphs < 1 || cff.Glyphs[0].Name != ".notdef" {
-		return nil, 0, 0, invalidSince("missing .notedef glyph")
+	if numGlyphs < 1 || (!cff.IsCIDFont && cff.Glyphs[0].Name != ".notdef") {
+		return nil, 0, 0, invalidSince("missing .notdef glyph")
 	}
 
 	// TODO(voss): re-introduce subroutines.

@@ -202,14 +202,9 @@ func standardEncoding(glyphs []*Glyph) []font.GlyphID {
 }
 
 func isStandardEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {
-	lookup := make(map[font.GlyphID]byte)
-	for code, gid := range encoding {
-		lookup[gid] = byte(code)
-	}
-	for gid, g := range glyphs {
-		c1, ok1 := type1.StandardEncoding[g.Name]
-		c2, ok2 := lookup[font.GlyphID(gid)]
-		if c1 != c2 || ok1 != ok2 {
+	tmp := standardEncoding(glyphs)
+	for i, gid := range tmp {
+		if encoding[i] != gid {
 			return false
 		}
 	}
@@ -228,14 +223,9 @@ func expertEncoding(glyphs []*Glyph) []font.GlyphID {
 }
 
 func isExpertEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {
-	lookup := make(map[font.GlyphID]byte)
-	for code, gid := range encoding {
-		lookup[gid] = byte(code)
-	}
-	for gid, g := range glyphs {
-		c1, ok1 := type1.ExpertEncoding[g.Name]
-		c2, ok2 := lookup[font.GlyphID(gid)]
-		if c1 != c2 || ok1 != ok2 {
+	tmp := expertEncoding(glyphs)
+	for i, gid := range tmp {
+		if encoding[i] != gid {
 			return false
 		}
 	}

@@ -98,7 +98,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for difference := range deep.Equal(in, out) {
+	for _, difference := range deep.Equal(in, out) {
 		t.Error(difference)
 	}
 
@@ -249,7 +249,7 @@ func TestFindEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for err := range deep.Equal(in, out) {
+	for _, err := range deep.Equal(in, out) {
 		t.Error(err)
 	}
 	// if !reflect.DeepEqual(in, out) {

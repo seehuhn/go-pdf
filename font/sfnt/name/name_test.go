@@ -18,8 +18,6 @@ package name
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -28,19 +26,46 @@ import (
 )
 
 func FuzzNames(f *testing.F) {
-	names, err := filepath.Glob("../../../demo/try-all-fonts/name/*.bin")
-	if err != nil {
-		f.Fatal(err)
-	} else if len(names) < 2 {
-		f.Fatal("need at least two fonts")
+	info := &Info{
+		Tables: map[Loc]*Table{
+			{locale.LangEnglish, locale.CountryUSA}: {
+				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
+				Description: "This is a test.",
+			},
+			{locale.LangGerman, locale.CountryDEU}: {
+				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
+				Description: "Dies ist ein Test.",
+			},
+		},
 	}
-	for _, fname := range names {
-		body, err := os.ReadFile(fname)
-		if err != nil {
-			f.Fatal(err)
-		}
-		f.Add(body)
+	ss := cmap.Subtables{
+		{
+			PlatformID: 0,
+			EncodingID: 4,
+			Language:   0,
+		},
+		{
+			PlatformID: 1,
+			EncodingID: 0,
+			Language:   0,
+		},
+		{
+			PlatformID: 1,
+			EncodingID: 0,
+			Language:   2,
+		},
+		{
+			PlatformID: 3,
+			EncodingID: 1,
+			Language:   0,
+		},
+		{
+			PlatformID: 3,
+			EncodingID: 1,
+			Language:   0x0407,
+		},
 	}
+	f.Add(info.Encode(ss))
 
 	f.Fuzz(func(t *testing.T, in []byte) {
 		n1, err := Decode(in)

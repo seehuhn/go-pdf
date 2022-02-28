@@ -17,74 +17,9 @@
 package cmap
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
-
-	"seehuhn.de/go/dijkstra"
-	"seehuhn.de/go/pdf/font"
 )
-
-func TestFormat4Samples(t *testing.T) {
-	// TODO(voss): remove
-	names, err := filepath.Glob("../../../demo/try-all-fonts/cmap/04-*.bin")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(names) < 2 {
-		t.Fatal("not enough samples")
-	}
-	for _, name := range names {
-		data, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = decodeFormat4(data)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func TestF4MakeSegment(t *testing.T) {
-	m := map[uint16]font.GlyphID{
-		1:     1,
-		2:     2,
-		3:     3,
-		4:     4,
-		5:     5,
-		100:   100,
-		101:   102,
-		102:   104,
-		103:   106,
-		104:   108,
-		200:   200,
-		201:   202,
-		202:   204,
-		203:   206,
-		204:   208,
-		205:   210,
-		206:   211,
-		207:   212,
-		208:   213,
-		209:   214,
-		1000:  2000,
-		65532: 23,
-		65533: 22,
-	}
-
-	g := makeSegments(m)
-	ss, err := dijkstra.ShortestPath[uint32, *segment, int](g, 0, 0x10000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i, s := range ss {
-		fmt.Println(i, s)
-	}
-	// TODO(voss): do some checks on the output
-}
 
 func FuzzFormat4(f *testing.F) {
 	f.Add([]byte{
