@@ -22,6 +22,7 @@
 // https://en.wikipedia.org/wiki/Mac_OS_Roman
 package mac
 
+// Decode decodes a string of MacRoman encoded bytes.
 func Decode(cc []byte) string {
 	rr := make([]rune, len(cc))
 	for i, c := range cc {
@@ -34,6 +35,8 @@ func Decode(cc []byte) string {
 	return string(rr)
 }
 
+// Encode encodes a string of Unicode runes.  Runes which cannot be represented
+// in the MacRoman encoding are replaced by question marks.
 func Encode(s string) []byte {
 	rr := []rune(s)
 	res := make([]byte, len(rr))
@@ -43,7 +46,7 @@ func Encode(s string) []byte {
 		} else {
 			c, ok := enc[r]
 			if !ok {
-				c = 32
+				c = '?'
 			}
 			res[i] = c
 		}
