@@ -12,7 +12,7 @@ import (
 // FdSelectFn maps glyphID values to private dicts in Font.Info.Private.
 type FdSelectFn func(font.GlyphID) int
 
-func readFDSelect(p *parser.Parser, nGlyphs int) (FdSelectFn, error) {
+func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 	format, err := p.ReadUInt8()
 	if err != nil {
 		return nil, err
@@ -24,6 +24,11 @@ func readFDSelect(p *parser.Parser, nGlyphs int) (FdSelectFn, error) {
 		_, err := io.ReadFull(p, buf)
 		if err != nil {
 			return nil, err
+		}
+		for i := 0; i < nGlyphs; i++ {
+			if int(buf[i]) >= nPrivate {
+				return nil, invalidSince("FDSelect out of range")
+			}
 		}
 		return func(gid font.GlyphID) int {
 			return int(buf[gid])
@@ -51,6 +56,8 @@ func readFDSelect(p *parser.Parser, nGlyphs int) (FdSelectFn, error) {
 			fd, err := p.ReadUInt8()
 			if err != nil {
 				return nil, err
+			} else if int(fd) >= nPrivate {
+				return nil, invalidSince("FDSelect out of range")
 			}
 			if i > 0 {
 				end = append(end, font.GlyphID(first))

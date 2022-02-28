@@ -158,6 +158,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	charStrings, err := readIndexAt(p, charStringsOffs, "CharStrings")
 	if err != nil {
 		return nil, err
+	} else if len(charStrings) == 0 {
+		return nil, invalidSince("no charstrings")
 	}
 
 	ROS, isCIDFont := topDict[opROS]
@@ -189,6 +191,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			return nil, err
 		} else if len(fdArrayIndex) > 256 {
 			return nil, invalidSince("too many Font DICTs")
+		} else if len(fdArrayIndex) == 0 {
+			return nil, invalidSince("no Font DICTs")
 		}
 		for _, fdBlob := range fdArrayIndex {
 			fontDict, err := decodeDict(fdBlob, strings)
@@ -216,24 +220,25 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		cff.FdSelect, err = readFDSelect(p, len(charStrings))
+		cff.FdSelect, err = readFDSelect(p, len(charStrings), len(cff.Info.Private))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// read the list of glyph names
 	charsetOffs := topDict.getInt(opCharset, 0)
 	var charset []int32
 	if cff.IsCIDFont {
-		if charsetOffs != 0 {
-			err = p.SeekPos(int64(charsetOffs))
-			if err != nil {
-				return nil, err
-			}
-			charset, err = readCharset(p, len(charStrings))
-			if err != nil {
-				return nil, err
-			}
-			cff.Gid2cid = make([]int32, len(charStrings)) // filled in below
+		err = p.SeekPos(int64(charsetOffs))
+		if err != nil {
+			return nil, err
 		}
+		charset, err = readCharset(p, len(charStrings))
+		if err != nil {
+			return nil, err
+		}
+		cff.Gid2cid = make([]int32, len(charStrings)) // filled in below
 	} else {
 		switch charsetOffs {
 		case 0: // ISOAdobe charset
@@ -402,11 +407,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	if !cff.IsCIDFont {
 		glyphNames = make([]int32, numGlyphs)
 		for i := uint16(0); i < numGlyphs; i++ {
-			s := cff.Glyphs[i].Name
-			if s == "" {
-				s = ".notdef"
-			}
-			glyphNames[i] = strings.lookup(string(s))
+			glyphNames[i] = strings.lookup(string(cff.Glyphs[i].Name))
 		}
 
 		if isStandardEncoding(cff.Encoding, cff.Glyphs) {

@@ -26,7 +26,7 @@ func FuzzFdSelect(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fdSelect, err := readFDSelect(p, nGlyphs)
+		fdSelect, err := readFDSelect(p, nGlyphs, 10)
 		if err != nil {
 			return
 		}
@@ -41,7 +41,7 @@ func FuzzFdSelect(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fdSelect2, err := readFDSelect(p, nGlyphs)
+		fdSelect2, err := readFDSelect(p, nGlyphs, 25)
 		if err != nil {
 			t.Fatal(err)
 		}
