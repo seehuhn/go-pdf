@@ -18,11 +18,10 @@ package cff
 
 import (
 	"bytes"
-	"fmt"
 	"math"
-	"reflect"
 	"testing"
 
+	"github.com/go-test/deep"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -82,6 +81,10 @@ func TestRoundTrip(t *testing.T) {
 	g.LineTo(50, 850)
 	in.Glyphs = append(in.Glyphs, g)
 
+	in.Encoding = standardEncoding(in.Glyphs)
+
+	// ----------------------------------------------------------------------
+
 	buf := &bytes.Buffer{}
 	err := in.Encode(buf)
 	if err != nil {
@@ -95,9 +98,13 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(in, out) {
-		t.Errorf("Info: %v != %v", in.Info, out.Info)
+	for difference := range deep.Equal(in, out) {
+		t.Error(difference)
 	}
+
+	// if !reflect.DeepEqual(in, out) {
+	// 	t.Errorf("Info: %v != %v", in.Info, out.Info)
+	// }
 }
 
 func TestFindEdges(t *testing.T) {
@@ -228,6 +235,8 @@ func TestFindEdges(t *testing.T) {
 	g.CurveTo(4, 2.5, 5, 1, 6, 0)
 	in.Glyphs = append(in.Glyphs, g)
 
+	in.Encoding = standardEncoding(in.Glyphs)
+
 	buf := &bytes.Buffer{}
 	err := in.Encode(buf)
 	if err != nil {
@@ -240,11 +249,14 @@ func TestFindEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(in, out) {
-		fmt.Println(in)
-		fmt.Println(out)
-		t.Error("different")
+	for err := range deep.Equal(in, out) {
+		t.Error(err)
 	}
+	// if !reflect.DeepEqual(in, out) {
+	// 	fmt.Println(in)
+	// 	fmt.Println(out)
+	// 	t.Error("different")
+	// }
 }
 
 func TestType2EncodeNumber(t *testing.T) {

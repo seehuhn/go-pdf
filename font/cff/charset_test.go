@@ -123,6 +123,35 @@ func TestCharsetRoundtrip(t *testing.T) {
 	}
 }
 
+func TestISOAdobe(t *testing.T) {
+	// Appendix C of the ISO/IEC 14496-12:2015 specification has the names
+	// in order or consecutive SID values.  This differs from other
+	// "ISO-Adobe" character sets found on the web.
+	ss := &cffStrings{}
+	for i, name := range isoAdobeCharset {
+		sid := ss.lookup(name)
+		if int(sid) != i {
+			t.Errorf("%q: expected %d, got %d", name, i, sid)
+		}
+	}
+
+	// I can't think of an easy way to check that the other two character
+	// sets are correct.  We restrict ourselves to check the spelling
+	// by verifying that all names are in the list of default strings.
+	for _, name := range expertCharset {
+		sid := ss.lookup(name)
+		if sid >= nStdString {
+			t.Errorf("misspelled %q", name)
+		}
+	}
+	for _, name := range expertSubsetCharset {
+		sid := ss.lookup(name)
+		if sid >= nStdString {
+			t.Errorf("misspelled %q", name)
+		}
+	}
+}
+
 func FuzzCharset(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte, nGlyphs int) {
 		r := bytes.NewReader(data)

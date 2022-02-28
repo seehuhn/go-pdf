@@ -72,7 +72,7 @@ func (ss *cffStrings) lookup(s string) int32 {
 	return int32(res)
 }
 
-func (ss *cffStrings) encode() ([]byte, error) {
+func (ss *cffStrings) encode() []byte {
 	stringIndex := make(cffIndex, 0, len(ss.data))
 	for _, s := range ss.data {
 		stringIndex = append(stringIndex, []byte(s))

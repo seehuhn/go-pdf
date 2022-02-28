@@ -269,6 +269,17 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 	if err != nil {
 		return err
 	}
+	{ // TODO(voss): fix the encoding in a more systematic way
+		nCodes := len(cff.Glyphs) - 1
+		if nCodes > 256 {
+			nCodes = 256
+		}
+		cff.Encoding = make([]font.GlyphID, nCodes)
+		for i := 0; i < nCodes; i++ {
+			cff.Encoding[i] = font.GlyphID(i + 1)
+		}
+		cff.IsCIDFont = false
+	}
 	err = cff.Encode(fontFileStream)
 	if err != nil {
 		return err

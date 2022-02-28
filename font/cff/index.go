@@ -87,13 +87,13 @@ func readIndex(p *parser.Parser) (cffIndex, error) {
 }
 
 // encode converts a CFF INDEX to its binary representation.
-func (data cffIndex) encode() ([]byte, error) {
+func (data cffIndex) encode() []byte {
 	count := len(data)
 	if count >= 1<<16 {
-		return nil, errors.New("cff: too many items for INDEX")
+		panic("cff: too many items for INDEX")
 	}
 	if count == 0 {
-		return []byte{0, 0}, nil
+		return []byte{0, 0}
 	}
 
 	bodyLength := 0
@@ -106,7 +106,7 @@ func (data cffIndex) encode() ([]byte, error) {
 		offSize++
 	}
 	if offSize > 4 {
-		return nil, errors.New("cff: too much data for INDEX")
+		panic("cff: too much data for INDEX")
 	}
 
 	out := &bytes.Buffer{}
@@ -133,5 +133,5 @@ func (data cffIndex) encode() ([]byte, error) {
 		out.Write(data[i])
 	}
 
-	return out.Bytes(), nil
+	return out.Bytes()
 }

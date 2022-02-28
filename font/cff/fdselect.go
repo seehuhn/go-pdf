@@ -76,7 +76,7 @@ func readFDSelect(p *parser.Parser, nGlyphs int) (FdSelectFn, error) {
 	}
 }
 
-func (fdSelect FdSelectFn) Encode(nGlyphs int) []byte {
+func (fdSelect FdSelectFn) encode(nGlyphs int) []byte {
 	format0Length := nGlyphs + 1
 
 	buf := []byte{3, 0, 0}

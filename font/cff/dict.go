@@ -506,9 +506,8 @@ func makeTopDict(info *type1.FontInfo) cffDict {
 		topDict[opUnderlineThickness] = []interface{}{int32(info.UnderlineThickness)}
 	}
 	// if info.IsOutlined {
-	// 	topDict[opPaintType] = []interface{}{int32(2)}
+	// 	topDict[opPaintType] = []interface{}{int32(2)} // per font
 	// }
-	topDict.setFontMatrix(opFontMatrix, info.FontMatrix)
 
 	return topDict
 }
@@ -574,13 +573,10 @@ func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInf
 	return info, nil
 }
 
-func (cff *Font) makePrivateDict(defaultWidth, nominalWidth int32) cffDict {
-	privateDict := cffDict{}
+func (cff *Font) makePrivateDict(idx int, defaultWidth, nominalWidth int32) cffDict {
+	private := cff.Info.Private[idx]
 
-	if len(cff.Info.Private) != 1 {
-		panic("not implemented")
-	}
-	private := cff.Info.Private[0]
+	privateDict := cffDict{}
 
 	privateDict.setDelta32(opBlueValues, private.BlueValues)
 	privateDict.setDelta32(opOtherBlues, private.OtherBlues)
@@ -763,4 +759,12 @@ func (d dictOp) isString() bool {
 	}
 }
 
-var errCorruptDict = errors.New("cff: invalid DICT")
+const (
+	defaultUnderlinePosition  = -100
+	defaultUnderlineThickness = 50
+	defaultBlueScale          = 0.039625
+	defaultBlueShift          = 7
+	defaultBlueFuzz           = 1
+)
+
+var errCorruptDict = invalidSince("corrupt dict")

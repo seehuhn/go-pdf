@@ -56,7 +56,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 			return
 		}
 		if isPresent {
-			res.Width = int32(stack[0]) + info.nominalWidth
+			res.Width = int32(int16(stack[0])) + info.nominalWidth
 			stack = stack[1:]
 		}
 		widthIsSet = true

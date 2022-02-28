@@ -1,3 +1,5 @@
+github.com/go-test/deep v1.0.8 h1:TDsG77qcSprGbC6vTN8OuXp5g+J+b5Pcguhf7Zt61VM=
+github.com/go-test/deep v1.0.8/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
 golang.org/x/exp v0.0.0-20220218155646-ea2fe41b636b h1:MfB//GTRo4EQ2B9A3O4DkdfJ6C1f5vhfFW+riRV2K7Y=
 golang.org/x/exp v0.0.0-20220218155646-ea2fe41b636b/go.mod h1:lRnflEfy7nRvpQCcpkwaSP1nkrSyjkyFNcqXKfSXLMc=
 golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e h1:fLOSk5Q00efkSvAm+4xcoXD+RRmLmmulPn5I3Y9F2EM=

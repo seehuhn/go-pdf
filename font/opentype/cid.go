@@ -251,7 +251,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	if err != nil {
 		return err
 	}
-	err = cff.EncodeCID(fontFileStream, "Adobe", "Identity", 0)
+	err = cff.Encode(fontFileStream)
 	if err != nil {
 		return err
 	}

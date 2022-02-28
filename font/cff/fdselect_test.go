@@ -2,7 +2,6 @@ package cff
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"seehuhn.de/go/pdf/font"
@@ -19,10 +18,9 @@ func FuzzFdSelect(f *testing.F) {
 		func(gid font.GlyphID) int { return int(gid/5) % 5 },
 	}
 	for _, fd := range fds {
-		f.Add(fd.Encode(nGlyphs))
+		f.Add(fd.encode(nGlyphs))
 	}
 	f.Fuzz(func(t *testing.T, in []byte) {
-		fmt.Printf("A % x\n", in)
 		p := parser.New(bytes.NewReader(in))
 		err := p.SetRegion("FDSelect", 0, int64(len(in)))
 		if err != nil {
@@ -33,8 +31,7 @@ func FuzzFdSelect(f *testing.F) {
 			return
 		}
 
-		in2 := fdSelect.Encode(nGlyphs)
-		fmt.Printf("B % x\n", in2)
+		in2 := fdSelect.encode(nGlyphs)
 		if len(in2) > len(in) {
 			t.Error("inefficient encoding")
 		}

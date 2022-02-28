@@ -34,11 +34,27 @@ func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 		return nil, errors.New("cff: cannot subset a subset")
 	}
 
+	fdSelect := cff.FdSelect
+	if fdSelect == nil {
+		fdSelect = func(gi font.GlyphID) int { return 0 }
+	}
+
 	tag := font.GetSubsetTag(subset, len(cff.Glyphs))
 	info := *cff.Info
 	info.FontName = pdf.Name(tag) + "+" + cff.Info.FontName
 	out := &Font{
-		Info: &info,
+		Info:      &info,
+		IsCIDFont: true,
+		FdSelect:  fdSelect,
+	}
+	if cff.IsCIDFont {
+		out.Registry = cff.Registry
+		out.Ordering = cff.Ordering
+		out.Supplement = cff.Supplement
+	} else {
+		out.Registry = "Adobe"
+		out.Ordering = "Identity"
+		out.Supplement = 0
 	}
 
 	for _, gid := range subset {

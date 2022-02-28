@@ -37,11 +37,7 @@ func TestIndex(t *testing.T) {
 			data[i] = blob[d : d+127]
 		}
 
-		buf, err := data.encode()
-		if err != nil {
-			t.Error(err)
-			continue
-		}
+		buf := data.encode()
 
 		if count == 0 && len(buf) != 2 {
 			t.Error("wrong length for empty INDEX")
@@ -49,7 +45,7 @@ func TestIndex(t *testing.T) {
 
 		r := bytes.NewReader(buf)
 		p := parser.New(r)
-		err = p.SetRegion("CFF", 0, int64(len(buf)))
+		err := p.SetRegion("CFF", 0, int64(len(buf)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,17 +70,11 @@ func TestIndex(t *testing.T) {
 
 func FuzzIndex(f *testing.F) {
 	iSeed := cffIndex{}
-	buf, err := iSeed.encode()
-	if err != nil {
-		f.Fatal(err)
-	}
+	buf := iSeed.encode()
 	f.Add(buf)
 	for _, d := range [][]byte{{}, {0}, {0, 1, 2, 3}} {
 		iSeed = append(iSeed, d)
-		buf, err := iSeed.encode()
-		if err != nil {
-			f.Fatal(err)
-		}
+		buf := iSeed.encode()
 		f.Add(buf)
 	}
 
@@ -100,10 +90,8 @@ func FuzzIndex(f *testing.F) {
 			return
 		}
 
-		buf, err := i1.encode()
-		if err != nil {
-			t.Fatal(err)
-		} else if len(buf) > len(data) {
+		buf := i1.encode()
+		if len(buf) > len(data) {
 			t.Error("inefficient encoding")
 		}
 
