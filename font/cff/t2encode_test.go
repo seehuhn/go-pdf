@@ -81,7 +81,7 @@ func TestRoundTrip(t *testing.T) {
 	g.LineTo(50, 850)
 	in.Glyphs = append(in.Glyphs, g)
 
-	in.Encoding = standardEncoding(in.Glyphs)
+	in.Encoding = StandardEncoding(in.Glyphs)
 
 	// ----------------------------------------------------------------------
 
@@ -235,7 +235,7 @@ func TestFindEdges(t *testing.T) {
 	g.CurveTo(4, 2.5, 5, 1, 6, 0)
 	in.Glyphs = append(in.Glyphs, g)
 
-	in.Encoding = standardEncoding(in.Glyphs)
+	in.Encoding = StandardEncoding(in.Glyphs)
 
 	buf := &bytes.Buffer{}
 	err := in.Encode(buf)

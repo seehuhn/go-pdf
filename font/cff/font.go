@@ -316,7 +316,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		var enc []font.GlyphID
 		switch {
 		case encodingOffs == 0:
-			enc = standardEncoding(cff.Glyphs)
+			enc = StandardEncoding(cff.Glyphs)
 		case encodingOffs == 1:
 			enc = expertEncoding(cff.Glyphs)
 		case encodingOffs >= 4:

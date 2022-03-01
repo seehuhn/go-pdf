@@ -292,8 +292,9 @@ func makeCFF(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
 		},
 	}
 	myCff := &cff.Font{
-		Info:   &cffInfo,
-		Glyphs: glyphs,
+		Info:     &cffInfo,
+		Glyphs:   glyphs,
+		Encoding: cff.StandardEncoding(glyphs),
 	}
 
 	buf := &bytes.Buffer{}
@@ -381,16 +382,20 @@ func makeOS2(info *CFFInfo, cc cmap.Subtable) []byte {
 }
 
 func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
+	today := time.Now().Format("2006-01-02")
 	nameInfo := &name.Info{
 		Tables: map[name.Loc]*name.Table{
 			{
 				Language: locale.LangEnglish,
-				Country:  locale.CountryGBR,
+				Country:  locale.CountryUSA,
 			}: {
-				Copyright: info.Copyright,
-				Family:    info.FamilyName,
-				FullName:  info.FullName,
-				Version:   "Version " + info.Version.String(),
+				Copyright:      info.Copyright,
+				Family:         info.FamilyName,
+				Subfamily:      "Regular",
+				Identifier:     info.FullName + "; " + info.Version.String() + "; " + today,
+				FullName:       info.FullName,
+				Version:        "Version " + info.Version.String(),
+				PostScriptName: "Test",
 			},
 		},
 	}
