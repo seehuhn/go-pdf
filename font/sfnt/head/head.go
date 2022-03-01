@@ -51,7 +51,7 @@ type Info struct {
 	HasLongOffsets bool   // 'loca' table uses 32 bit offsets (TrueType only)
 }
 
-// Read reads and  decodes the binary representation of the head table.
+// Read reads and decodes the binary representation of the head table.
 func Read(r io.Reader) (*Info, error) {
 	enc := &binaryHead{}
 	err := binary.Read(r, binary.BigEndian, enc)
@@ -166,6 +166,11 @@ func (info *Info) Encode() (data []byte, err error) {
 	buf := bytes.NewBuffer(make([]byte, 0, headLength))
 	_ = binary.Write(buf, binary.BigEndian, enc)
 	return buf.Bytes(), nil
+}
+
+// ClearChecksum zeros the checksum field of the head table.
+func ClearChecksum(head []byte) {
+	binary.BigEndian.PutUint32(head[8:12], 0)
 }
 
 // PatchChecksum updates the checksum of the head table.

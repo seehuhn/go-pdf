@@ -18,13 +18,10 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"io"
 	"log"
 	"math"
-	"math/bits"
 	"os"
-	"sort"
 	"time"
 
 	"seehuhn.de/go/pdf"
@@ -45,6 +42,8 @@ import (
 
 // CFFInfo contains information about the font.
 type CFFInfo struct {
+	Glyphs []*cff.Glyph
+
 	FullName   string
 	FamilyName string
 	Weight     os2.Weight
@@ -55,11 +54,13 @@ type CFFInfo struct {
 	// resulting name should be unique.
 	FontName string
 
-	Version head.Version
+	Version          head.Version
+	CreationTime     time.Time
+	ModificationTime time.Time
 
 	Copyright string
-
-	Notice string
+	Notice    string
+	PermUse   os2.Permissions
 
 	UnitsPerEm uint16
 
@@ -76,17 +77,128 @@ type CFFInfo struct {
 	IsOblique bool
 }
 
+func Read(fname string) (*CFFInfo, error) {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+	header, err := table.ReadHeader(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	tableReader := func(name string) (*io.SectionReader, error) {
+		rec := header.Find(name)
+		if rec == nil {
+			return nil, &table.ErrNoTable{Name: name}
+		}
+		return io.NewSectionReader(fd, int64(rec.Offset), int64(rec.Length)), nil
+	}
+
+	info := &CFFInfo{}
+
+	// TODO(voss): handle missing tables
+
+	headFd, err := tableReader("head")
+	if err != nil {
+		return nil, err
+	}
+	headInfo, err := head.Read(headFd)
+	if err != nil {
+		return nil, err
+	}
+
+	hheaData, err := header.ReadTableBytes(fd, "hhea")
+	if err != nil {
+		return nil, err
+	}
+	hmtxData, err := header.ReadTableBytes(fd, "hmtx")
+	if err != nil {
+		return nil, err
+	}
+	hmtxInfo, err := hmtx.Decode(hheaData, hmtxData)
+	if err != nil {
+		return nil, err
+	}
+
+	maxpFd, err := tableReader("maxp")
+	if err != nil {
+		return nil, err
+	}
+	maxpInfo, err := table.ReadMaxp(maxpFd)
+	if err != nil {
+		return nil, err
+	}
+	numGlyphs := maxpInfo.NumGlyphs
+
+	os2Fd, err := tableReader("OS/2")
+	if err != nil {
+		return nil, err
+	}
+	os2Info, err := os2.Read(os2Fd)
+	if err != nil {
+		return nil, err
+	}
+
+	nameData, err := header.ReadTableBytes(fd, "name")
+	if err != nil {
+		return nil, err
+	}
+	nameInfo, err := name.Decode(nameData)
+	if err != nil {
+		return nil, err
+	}
+
+	// info.Glyphs =
+	// info.FullName =
+	// info.FamilyName =
+	info.Weight = os2Info.WeightClass
+	info.Width = os2Info.WidthClass
+	// info.FontName =
+	info.Version = headInfo.FontRevision
+	info.CreationTime = headInfo.Created
+	info.ModificationTime = headInfo.Modified
+	// info.Copyright =
+	// info.Notice =
+	info.PermUse = os2Info.PermUse
+	info.UnitsPerEm = headInfo.UnitsPerEm
+	info.Ascent = hmtxInfo.Ascent
+	// ALT: info.Ascent = os2Info.Ascent
+	info.Descent = hmtxInfo.Descent
+	// ALT: info.Descent = os2Info.Descent
+	info.LineGap = hmtxInfo.LineGap
+	// ALT: info.LineGap = os2Info.LineGap
+	info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
+	// info.UnderlinePosition =
+	// info.UnderlineThickness =
+	info.IsBold = headInfo.IsBold
+	// ALT: info.IsBold = os2Info.IsBold
+	info.IsRegular = os2Info.IsRegular
+	info.IsOblique = os2Info.IsOblique
+
+	_ = nameInfo
+	_ = numGlyphs
+
+	return info, nil
+}
+
 func main() {
 	blobs := make(map[string][]byte)
 
+	now := time.Now()
 	info := &CFFInfo{
 		FullName:   "Test Font",
 		FamilyName: "Test",
 		Weight:     os2.WeightNormal,
 		Width:      os2.WidthNormal,
-		Version:    0x00010000,
+
+		Version:          0x00010000,
+		CreationTime:     now,
+		ModificationTime: now,
 
 		Copyright: "Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>",
+		PermUse:   os2.PermInstall,
 
 		UnitsPerEm: 1000,
 		Ascent:     700,
@@ -94,23 +206,21 @@ func main() {
 		LineGap:    200,
 	}
 
-	var glyphs []*cff.Glyph
-
 	g := cff.NewGlyph(".notdef", 550)
 	g.MoveTo(0, 0)
 	g.LineTo(500, 0)
 	g.LineTo(500, 700)
 	g.LineTo(0, 700)
-	glyphs = append(glyphs, g)
+	info.Glyphs = append(info.Glyphs, g)
 
 	g = cff.NewGlyph("space", 550)
-	glyphs = append(glyphs, g)
+	info.Glyphs = append(info.Glyphs, g)
 
 	g = cff.NewGlyph("A", 550)
 	g.MoveTo(0, 0)
 	g.LineTo(500, 0)
 	g.LineTo(250, 710)
-	glyphs = append(glyphs, g)
+	info.Glyphs = append(info.Glyphs, g)
 
 	g = cff.NewGlyph("B", 550)
 	g.MoveTo(0, 0)
@@ -120,18 +230,22 @@ func main() {
 	g.CurveTo(300, 350, 500, 425, 500, 525)
 	g.CurveTo(500, 625, 300, 700, 200, 700)
 	g.LineTo(0, 700)
-	glyphs = append(glyphs, g)
+	info.Glyphs = append(info.Glyphs, g)
 
 	// ----------------------------------------------------------------------
 
-	headData, err := makeHead(info, glyphs)
+	headData, err := makeHead(info)
 	if err != nil {
 		log.Fatal(err)
 	}
 	blobs["head"] = headData
 
+	hheaData, hmtxData := makeHmtx(info)
+	blobs["hhea"] = hheaData
+	blobs["hmtx"] = hmtxData
+
 	maxpInfo := table.MaxpInfo{
-		NumGlyphs: len(glyphs),
+		NumGlyphs: len(info.Glyphs),
 	}
 	maxpData, err := maxpInfo.Encode()
 	if err != nil {
@@ -139,11 +253,7 @@ func main() {
 	}
 	blobs["maxp"] = maxpData
 
-	hheaData, hmtxData := makeHmtx(info, glyphs)
-	blobs["hhea"] = hheaData
-	blobs["hmtx"] = hmtxData
-
-	cc, ss := makeCmap(glyphs)
+	cc, ss := makeCmap(info)
 	buf := &bytes.Buffer{}
 	ss.Write(buf)
 	blobs["cmap"] = buf.Bytes()
@@ -154,10 +264,10 @@ func main() {
 	nameData := makeName(info, ss)
 	blobs["name"] = nameData
 
-	postData := makePost(info, glyphs)
+	postData := makePost(info)
 	blobs["post"] = postData
 
-	cffData, err := makeCFF(info, glyphs)
+	cffData, err := makeCFF(info)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -165,13 +275,13 @@ func main() {
 
 	// ----------------------------------------------------------------------
 
-	tableNames := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "name", "cmap", "post", "CFF "}
+	tables := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "name", "cmap", "post", "CFF "}
 
 	out, err := os.Create("test.otf")
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = writeFile(out, tableNames, blobs)
+	_, err = sfnt.WriteTables(out, table.ScalerTypeCFF, tables, blobs)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -179,72 +289,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-// This changes the checksum in the "head" table in place.
-func writeFile(w io.Writer, tableNames []string, blobs map[string][]byte) error {
-	numTables := len(tableNames)
-
-	// prepare the header
-	sel := bits.Len(uint(numTables)) - 1
-	offsets := &table.Offsets{
-		ScalerType:    table.ScalerTypeCFF,
-		NumTables:     uint16(numTables),
-		SearchRange:   1 << (sel + 4),
-		EntrySelector: uint16(sel),
-		RangeShift:    uint16(16 * (numTables - 1<<sel)),
-	}
-
-	var totalSum uint32
-	offset := uint32(12 + 16*numTables)
-	records := make([]table.Record, numTables)
-	for i, name := range tableNames {
-		length := uint32(len(blobs[name]))
-		sum := sfnt.Checksum(blobs[name])
-
-		records[i].Tag = table.MakeTag(name)
-		records[i].Length = length
-		records[i].CheckSum = sum
-		records[i].Offset = offset
-
-		totalSum += sum
-		offset += 4 * ((length + 3) / 4)
-	}
-	sort.Slice(records, func(i, j int) bool {
-		return bytes.Compare(records[i].Tag[:], records[j].Tag[:]) < 0
-	})
-
-	buf := &bytes.Buffer{}
-	binary.Write(buf, binary.BigEndian, offsets)
-	binary.Write(buf, binary.BigEndian, records)
-	headerBytes := buf.Bytes()
-	totalSum += sfnt.Checksum(headerBytes)
-
-	// fix the checksum in the "head" table
-	if headData, ok := blobs["head"]; ok {
-		head.PatchChecksum(headData, totalSum)
-	}
-
-	// write the tables
-	_, err := w.Write(headerBytes)
-	if err != nil {
-		return err
-	}
-	var pad [3]byte
-	for _, name := range tableNames {
-		body := blobs[name]
-		n, err := w.Write(body)
-		if err != nil {
-			return err
-		}
-		if k := n % 4; k != 0 {
-			_, err := w.Write(pad[:4-k])
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func isFixedPitch(glyphs []*cff.Glyph) bool {
@@ -265,7 +309,7 @@ func isFixedPitch(glyphs []*cff.Glyph) bool {
 	return true
 }
 
-func makeCFF(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
+func makeCFF(info *CFFInfo) ([]byte, error) {
 	q := 1 / float64(info.UnitsPerEm)
 	cffInfo := type1.FontInfo{
 		FullName:   info.FullName,
@@ -280,20 +324,20 @@ func makeCFF(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
 		FontMatrix: []float64{q, 0, 0, q, 0, 0},
 
 		ItalicAngle:  info.ItalicAngle,
-		IsFixedPitch: isFixedPitch(glyphs),
+		IsFixedPitch: isFixedPitch(info.Glyphs),
 
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 
 		Private: []*type1.PrivateDict{
 			{
-				BlueValues: []int32{-10, 0, 700, 710},
+				BlueValues: []int32{-10, 0, 700, 710}, // TODO(voss)
 			},
 		},
 	}
 	myCff := &cff.Font{
 		Info:   &cffInfo,
-		Glyphs: glyphs,
+		Glyphs: info.Glyphs,
 	}
 
 	buf := &bytes.Buffer{}
@@ -304,12 +348,10 @@ func makeCFF(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func makeHead(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
-	now := time.Now()
-
+func makeHead(info *CFFInfo) ([]byte, error) {
 	var bbox font.Rect
 	first := true
-	for _, g := range glyphs {
+	for _, g := range info.Glyphs {
 		ext := g.Extent()
 		if ext.IsZero() {
 			continue
@@ -334,8 +376,8 @@ func makeHead(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
 		HasYBaseAt0:   true,
 		HasXBaseAt0:   true,
 		UnitsPerEm:    info.UnitsPerEm,
-		Created:       now,
-		Modified:      now,
+		Created:       info.CreationTime,
+		Modified:      info.ModificationTime,
 		FontBBox:      bbox,
 		IsBold:        info.IsBold,
 		IsItalic:      info.ItalicAngle != 0,
@@ -344,10 +386,10 @@ func makeHead(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
 	return headInfo.Encode()
 }
 
-func makeHmtx(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, []byte) {
-	widths := make([]uint16, len(glyphs))
-	extents := make([]font.Rect, len(glyphs))
-	for i, g := range glyphs {
+func makeHmtx(info *CFFInfo) ([]byte, []byte) {
+	widths := make([]uint16, len(info.Glyphs))
+	extents := make([]font.Rect, len(info.Glyphs))
+	for i, g := range info.Glyphs {
 		widths[i] = uint16(g.Width)
 		extents[i] = g.Extent()
 	}
@@ -358,7 +400,7 @@ func makeHmtx(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, []byte) {
 		Ascent:      info.Ascent,
 		Descent:     info.Descent,
 		LineGap:     info.LineGap,
-		CaretAngle:  float64(info.ItalicAngle) / 180 * math.Pi,
+		CaretAngle:  info.ItalicAngle / 180 * math.Pi,
 	}
 
 	return hmtxInfo.Encode()
@@ -375,13 +417,21 @@ func makeOS2(info *CFFInfo, cc cmap.Subtable) []byte {
 		Ascent:      info.Ascent,
 		Descent:     info.Descent,
 		LineGap:     info.LineGap,
-		PermUse:     os2.PermInstall, // TODO(voss)
+		PermUse:     info.PermUse,
 	}
 	return os2Info.Encode(cc)
 }
 
 func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
-	today := time.Now().Format("2006-01-02")
+	day := info.ModificationTime
+	if day.IsZero() {
+		day = info.CreationTime
+	}
+	if day.IsZero() {
+		day = time.Now()
+	}
+	dayString := day.Format("2006-01-02")
+
 	nameInfo := &name.Info{
 		Tables: map[name.Loc]*name.Table{
 			{
@@ -391,7 +441,7 @@ func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
 				Copyright:      info.Copyright,
 				Family:         info.FamilyName,
 				Subfamily:      "Regular",
-				Identifier:     info.FullName + "; " + info.Version.String() + "; " + today,
+				Identifier:     info.FullName + "; " + info.Version.String() + "; " + dayString,
 				FullName:       info.FullName,
 				Version:        "Version " + info.Version.String(),
 				PostScriptName: "Test",
@@ -401,9 +451,9 @@ func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
 	return nameInfo.Encode(ss)
 }
 
-func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, cmap.Subtables) {
+func makeCmap(info *CFFInfo) (cmap.Format4, cmap.Subtables) {
 	cc := cmap.Format4{}
-	for i, g := range glyphs {
+	for i, g := range info.Glyphs {
 		rr := names.ToUnicode(string(g.Name), false)
 		if len(rr) == 1 {
 			r := uint16(rr[0])
@@ -420,12 +470,12 @@ func makeCmap(glyphs []*cff.Glyph) (cmap.Format4, cmap.Subtables) {
 	return cc, ss
 }
 
-func makePost(info *CFFInfo, glyphs []*cff.Glyph) []byte {
+func makePost(info *CFFInfo) []byte {
 	postInfo := &post.Info{
 		ItalicAngle:        info.ItalicAngle,
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
-		IsFixedPitch:       isFixedPitch(glyphs),
+		IsFixedPitch:       isFixedPitch(info.Glyphs),
 	}
 	return postInfo.Encode()
 }

@@ -86,50 +86,50 @@ type Info struct {
 }
 
 // Decode extracts information from the "hhea" and "hmtx" tables.
-func Decode(hhea, hmtx []byte) (*Info, error) {
-	r := bytes.NewReader(hhea)
-	hheaData := &binaryHhea{}
-	err := binary.Read(r, binary.BigEndian, hheaData)
+func Decode(hheaData, hmtxData []byte) (*Info, error) {
+	r := bytes.NewReader(hheaData)
+	hheaEnc := &binaryHhea{}
+	err := binary.Read(r, binary.BigEndian, hheaEnc)
 	if err != nil {
 		return nil, err
 	}
-	if hheaData.Version != 0x00010000 {
-		return nil, fmt.Errorf("unsupported hhea version %08x", hheaData.Version)
+	if hheaEnc.Version != 0x00010000 {
+		return nil, fmt.Errorf("unsupported hhea version %08x", hheaEnc.Version)
 	}
-	if hheaData.MetricDataFormat != 0 {
-		return nil, fmt.Errorf("unsupported metric data format %d", hheaData.MetricDataFormat)
+	if hheaEnc.MetricDataFormat != 0 {
+		return nil, fmt.Errorf("unsupported metric data format %d", hheaEnc.MetricDataFormat)
 	}
 
-	caretAngle := toAngle(hheaData.CaretSlopeRise, hheaData.CaretSlopeRun)
+	caretAngle := toAngle(hheaEnc.CaretSlopeRise, hheaEnc.CaretSlopeRun)
 	info := &Info{
-		Ascent:      hheaData.Ascent,
-		Descent:     hheaData.Descent,
-		LineGap:     hheaData.LineGap,
+		Ascent:      hheaEnc.Ascent,
+		Descent:     hheaEnc.Descent,
+		LineGap:     hheaEnc.LineGap,
 		CaretAngle:  caretAngle,
-		CaretOffset: hheaData.CaretOffset,
+		CaretOffset: hheaEnc.CaretOffset,
 	}
 
-	numHorMetrics := int(hheaData.NumOfLongHorMetrics)
+	numHorMetrics := int(hheaEnc.NumOfLongHorMetrics)
 	prevWidth := uint16(0)
 	var widths []uint16
 	var lsbs []int16
-	for i := 0; len(hmtx) > 0; i++ {
+	for i := 0; len(hmtxData) > 0; i++ {
 		width := prevWidth
 		if i < numHorMetrics {
-			if len(hmtx) < 2 {
+			if len(hmtxData) < 2 {
 				return nil, fmt.Errorf("hmtx too short")
 			}
-			width = uint16(hmtx[0])<<8 | uint16(hmtx[1])
-			hmtx = hmtx[2:]
+			width = uint16(hmtxData[0])<<8 | uint16(hmtxData[1])
+			hmtxData = hmtxData[2:]
 			prevWidth = width
 		}
 		widths = append(widths, width)
 
-		if len(hmtx) < 2 {
+		if len(hmtxData) < 2 {
 			return nil, fmt.Errorf("hmtx too short")
 		}
-		lsb := int16(hmtx[0])<<8 | int16(hmtx[1])
-		hmtx = hmtx[2:]
+		lsb := int16(hmtxData[0])<<8 | int16(hmtxData[1])
+		hmtxData = hmtxData[2:]
 		lsbs = append(lsbs, lsb)
 	}
 	if len(widths) < numHorMetrics {

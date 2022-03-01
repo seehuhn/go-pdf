@@ -52,7 +52,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	}
 
 	var subsetInfo *subsetInfo
-	replTab := make(map[string][]byte)
+	tableData := make(map[string][]byte)
 	if includeGlyphs != nil {
 		var err error
 		subsetInfo, err = tt.getSubsetInfo(includeGlyphs)
@@ -60,7 +60,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			return 0, err
 		}
 		for name, blob := range subsetInfo.blobs {
-			replTab[name] = blob
+			tableData[name] = blob
 		}
 		// fix up numGlyphs
 		maxpBytes, err := tt.Header.ReadTableBytes(tt.Fd, "maxp")
@@ -68,7 +68,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			return 0, err
 		}
 		binary.BigEndian.PutUint16(maxpBytes[4:6], subsetInfo.numGlyphs)
-		replTab["maxp"] = maxpBytes
+		tableData["maxp"] = maxpBytes
 	}
 
 	if subsetMapping != nil && (includeTables == nil || includeTables["cmap"]) {
@@ -76,7 +76,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
-		replTab["cmap"] = cmapBytes
+		tableData["cmap"] = cmapBytes
 	}
 
 	if includeTables["hhea"] || includeTables["hmtx"] {
@@ -90,8 +90,8 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			info.GlyphExtent = subsetInfo.GlyphExtent
 		}
 		hhea, hmtx := info.Encode()
-		replTab["hhea"] = hhea
-		replTab["hmtx"] = hmtx
+		tableData["hhea"] = hhea
+		tableData["hmtx"] = hmtx
 	}
 
 	tableNames := tt.selectTables(includeTables)
@@ -113,7 +113,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		}
 
 		var err error
-		replTab["head"], err = tt.HeadInfo.Encode()
+		tableData["head"], err = tt.HeadInfo.Encode()
 		if err != nil {
 			return 0, err
 		}
@@ -121,97 +121,21 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 
 	if opt.Replace != nil {
 		for name, repl := range opt.Replace {
-			replTab[name] = repl
+			tableData[name] = repl
 		}
 	}
 
-	var totalSize int64
-	var totalSum uint32
-
-	// generate and write the new file header
-	numTables := len(tableNames)
-	sel := bits.Len(uint(numTables)) - 1
-	header := &table.Header{
-		Offsets: table.Offsets{
-			ScalerType:    tt.Header.Offsets.ScalerType,
-			NumTables:     uint16(numTables),
-			SearchRange:   1 << (sel + 4),
-			EntrySelector: uint16(sel),
-			RangeShift:    uint16(16 * (numTables - 1<<sel)),
-		},
-		Records: make([]table.Record, numTables),
-	}
-	offset := uint32(12 + 16*numTables)
-	for i, name := range tableNames {
-		old := tt.Header.Find(name)
-		header.Records[i].Tag = old.Tag
-		header.Records[i].Offset = offset
-		var newChecksum uint32
-		var length uint32
-		if body, ok := replTab[name]; ok {
-			newChecksum = Checksum(body)
-			length = uint32(len(body))
-		} else {
-			newChecksum = old.CheckSum
-			length = old.Length
-		}
-		header.Records[i].CheckSum = newChecksum
-		header.Records[i].Length = length
-		totalSum += newChecksum
-		offset += 4 * ((length + 3) / 4)
-	}
-	sort.Slice(header.Records, func(i, j int) bool {
-		return bytes.Compare(header.Records[i].Tag[:], header.Records[j].Tag[:]) < 0
-	})
-	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.BigEndian, header.Offsets)
-	if err != nil {
-		return 0, err
-	}
-	err = binary.Write(buf, binary.BigEndian, header.Records)
-	if err != nil {
-		return 0, err
-	}
-	headerBytes := buf.Bytes()
-	_, err = w.Write(headerBytes)
-	if err != nil {
-		return 0, err
-	}
-	totalSize += int64(len(headerBytes))
-	totalSum += Checksum(headerBytes)
-
-	if headData, ok := replTab["head"]; ok {
-		// fix the checksum in the "head" table
-		head.PatchChecksum(headData, totalSum)
-	}
-
-	// write the tables
-	var pad [3]byte
 	for _, name := range tableNames {
-		var n int64
-		if body, ok := replTab[name]; ok {
-			n32, e2 := w.Write(body)
-			n = int64(n32)
-			err = e2
-		} else {
-			table := tt.Header.Find(name)
-			tableFd := io.NewSectionReader(tt.Fd, int64(table.Offset), int64(table.Length))
-			n, err = io.Copy(w, tableFd)
-		}
-		if err != nil {
-			return 0, err
-		}
-		totalSize += n
-		if k := n % 4; k != 0 {
-			l, err := w.Write(pad[:4-k])
+		if _, ok := tableData[name]; !ok {
+			blob, err := tt.Header.ReadTableBytes(tt.Fd, name)
 			if err != nil {
 				return 0, err
 			}
-			totalSize += int64(l)
+			tableData[name] = blob
 		}
 	}
 
-	return totalSize, nil
+	return WriteTables(w, tt.Header.Offsets.ScalerType, tableNames, tableData)
 }
 
 type subsetInfo struct {
@@ -465,4 +389,81 @@ func contains(ss []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// WriteTables writes an sfnt file containing the given tables.
+// This changes the checksum in the "head" table in place.
+func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData map[string][]byte) (int64, error) {
+	numTables := len(tableNames)
+
+	// prepare the header
+	sel := bits.Len(uint(numTables)) - 1
+	offsets := &table.Offsets{
+		ScalerType:    scalerType,
+		NumTables:     uint16(numTables),
+		SearchRange:   1 << (sel + 4),
+		EntrySelector: uint16(sel),
+		RangeShift:    uint16(16 * (numTables - 1<<sel)),
+	}
+
+	// temporarily clear the checksum in the "head" table
+	if headData, ok := tableData["head"]; ok {
+		head.ClearChecksum(headData)
+	}
+
+	var totalSum uint32
+	offset := uint32(12 + 16*numTables)
+	records := make([]table.Record, numTables)
+	for i, name := range tableNames {
+		body := tableData[name]
+		length := uint32(len(body))
+		checksum := Checksum(body)
+
+		records[i].Tag = table.MakeTag(name)
+		records[i].CheckSum = checksum
+		records[i].Offset = offset
+		records[i].Length = length
+
+		totalSum += checksum
+		offset += 4 * ((length + 3) / 4)
+	}
+	sort.Slice(records, func(i, j int) bool {
+		return bytes.Compare(records[i].Tag[:], records[j].Tag[:]) < 0
+	})
+
+	buf := &bytes.Buffer{}
+	binary.Write(buf, binary.BigEndian, offsets)
+	binary.Write(buf, binary.BigEndian, records)
+	headerBytes := buf.Bytes()
+	totalSum += Checksum(headerBytes)
+
+	// set the final checksum in the "head" table
+	if headData, ok := tableData["head"]; ok {
+		head.PatchChecksum(headData, totalSum)
+	}
+
+	// write the tables
+	var totalSize int64
+	n, err := w.Write(headerBytes)
+	totalSize += int64(n)
+	if err != nil {
+		return totalSize, err
+	}
+	var pad [3]byte
+	for _, name := range tableNames {
+		body := tableData[name]
+		n, err := w.Write(body)
+		totalSize += int64(n)
+		if err != nil {
+			return totalSize, err
+		}
+		if k := n % 4; k != 0 {
+			l, err := w.Write(pad[:4-k])
+			totalSize += int64(l)
+			if err != nil {
+				return totalSize, err
+			}
+		}
+	}
+	return totalSize, nil
 }
