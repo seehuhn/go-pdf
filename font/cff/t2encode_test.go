@@ -43,7 +43,7 @@ func TestRoundTrip(t *testing.T) {
 			{
 				BlueValues: []int32{-22, 0, 500, 520, 700, 720},
 				OtherBlues: []int32{-120, -100},
-				BlueScale:  1,
+				BlueScale:  0.04379,
 				BlueShift:  2,
 				BlueFuzz:   3,
 				StdHW:      23.4,
@@ -81,7 +81,7 @@ func TestRoundTrip(t *testing.T) {
 	g.LineTo(50, 850)
 	in.Glyphs = append(in.Glyphs, g)
 
-	in.Encoding = StandardEncoding(in.Glyphs)
+	in.Encoding = standardEncoding(in.Glyphs)
 
 	// ----------------------------------------------------------------------
 
@@ -235,7 +235,7 @@ func TestFindEdges(t *testing.T) {
 	g.CurveTo(4, 2.5, 5, 1, 6, 0)
 	in.Glyphs = append(in.Glyphs, g)
 
-	in.Encoding = StandardEncoding(in.Glyphs)
+	in.Encoding = standardEncoding(in.Glyphs)
 
 	buf := &bytes.Buffer{}
 	err := in.Encode(buf)
@@ -272,9 +272,10 @@ func TestType2EncodeNumber(t *testing.T) {
 	// charstring, and then use the decoder to this charstring.
 	info := &decodeInfo{}
 	for _, test := range cases {
-		enc := encodeNumber(test)
-		if math.Abs(enc.Val-test) > eps {
-			t.Errorf("%f != %f", enc.Val, test)
+		enc := encodeNumber(f16(test))
+
+		if math.Abs(enc.Val.Float64()-test) > 0.5/65536 {
+			t.Errorf("%f != %f", enc.Val.Float64(), test)
 			continue
 		}
 
@@ -288,8 +289,8 @@ func TestType2EncodeNumber(t *testing.T) {
 			t.Fatal(err)
 		}
 		args := glyph.Cmds[0].Args
-		if math.Abs(args[0]-enc.Val) > 1e-10 {
-			t.Errorf("%f != %f", args[0], enc.Val)
+		if math.Abs(args[0]-enc.Val.Float64()) > 1e-10 {
+			t.Errorf("%f != %f", args[0], enc.Val.Float64())
 		}
 	}
 }

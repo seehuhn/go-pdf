@@ -23,8 +23,8 @@ import (
 )
 
 func TestRoll(t *testing.T) {
-	in := []float64{1, 2, 3, 4, 5, 6, 7, 8}
-	out := []float64{1, 2, 4, 5, 6, 3, 7, 8}
+	in := []fixed16{1, 2, 3, 4, 5, 6, 7, 8}
+	out := []fixed16{1, 2, 4, 5, 6, 3, 7, 8}
 
 	roll(in[2:6], 3)
 	for i, x := range in {
@@ -37,31 +37,33 @@ func TestRoll(t *testing.T) {
 
 func FuzzT2Decode(f *testing.F) {
 	f.Add(t2endchar.Bytes())
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(t *testing.T, data1 []byte) {
 		info := &decodeInfo{
 			subr:         cffIndex{},
 			gsubr:        cffIndex{},
 			defaultWidth: 500,
 			nominalWidth: 666,
 		}
-		g1, err := decodeCharString(info, data)
+		g1, err := decodeCharString(info, data1)
 		if err != nil {
 			return
 		}
 
-		tmp, err := g1.encodeCharString(info.defaultWidth, info.nominalWidth)
+		data2, err := g1.encodeCharString(info.defaultWidth, info.nominalWidth)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		g2, err := decodeCharString(info, tmp)
+		g2, err := decodeCharString(info, data2)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if !reflect.DeepEqual(g1, g2) {
-			fmt.Printf("glyph 1: %s\n", g1)
-			fmt.Printf("glyph 2: %s\n", g2)
+			fmt.Printf("A % x\n", data1)
+			fmt.Printf("A %s\n", g1)
+			fmt.Printf("B % x\n", data2)
+			fmt.Printf("B %s\n", g2)
 			t.Error("different")
 		}
 	})

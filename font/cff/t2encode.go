@@ -33,11 +33,11 @@ type Glyph struct {
 	HStem []int16
 	VStem []int16
 	Name  pdf.Name
-	Width int32 // TODO(voss): use uint16 here
+	Width int16
 }
 
 // NewGlyph allocates a new glyph.
-func NewGlyph(name pdf.Name, width int32) *Glyph {
+func NewGlyph(name pdf.Name, width int16) *Glyph {
 	return &Glyph{
 		Name:  name,
 		Width: width,
@@ -110,11 +110,11 @@ cmdLoop:
 	}
 }
 
-func (g *Glyph) encodeCharString(defaultWidth, nominalWidth int32) ([]byte, error) {
+func (g *Glyph) encodeCharString(defaultWidth, nominalWidth int16) ([]byte, error) {
 	var header [][]byte
 	w := g.Width
 	if w != defaultWidth {
-		header = append(header, encodeInt(int16(w-nominalWidth)))
+		header = append(header, encodeInt(w-nominalWidth))
 	}
 
 	hintMaskUsed := false
@@ -237,27 +237,27 @@ func encodePaths(commands []GlyphOp) [][]byte {
 func encodeArgs(cmds []GlyphOp) []enCmd {
 	res := make([]enCmd, len(cmds))
 
-	posX := 0.0
-	posY := 0.0
+	var posX fixed16
+	var posY fixed16
 	for i, cmd := range cmds {
 		res[i] = enCmd{
 			Op: cmd.Op,
 		}
 		switch cmd.Op {
 		case OpMoveTo, OpLineTo:
-			dx := encodeNumber(cmd.Args[0] - posX)
-			dy := encodeNumber(cmd.Args[1] - posY)
+			dx := encodeNumber(f16(cmd.Args[0]) - posX)
+			dy := encodeNumber(f16(cmd.Args[1]) - posY)
 			res[i].Args = []encodedNumber{dx, dy}
 			posX += dx.Val
 			posY += dy.Val
 
 		case OpCurveTo:
-			dxa := encodeNumber(cmd.Args[0] - posX)
-			dya := encodeNumber(cmd.Args[1] - posY)
-			dxb := encodeNumber(cmd.Args[2] - cmd.Args[0])
-			dyb := encodeNumber(cmd.Args[3] - cmd.Args[1])
-			dxc := encodeNumber(cmd.Args[4] - cmd.Args[2])
-			dyc := encodeNumber(cmd.Args[5] - cmd.Args[3])
+			dxa := encodeNumber(f16(cmd.Args[0]) - posX)
+			dya := encodeNumber(f16(cmd.Args[1]) - posY)
+			dxb := encodeNumber(f16(cmd.Args[2]) - f16(cmd.Args[0]))
+			dyb := encodeNumber(f16(cmd.Args[3]) - f16(cmd.Args[1]))
+			dxc := encodeNumber(f16(cmd.Args[4]) - f16(cmd.Args[2]))
+			dyc := encodeNumber(f16(cmd.Args[5]) - f16(cmd.Args[3]))
 			res[i].Args = []encodedNumber{dxa, dya, dxb, dyb, dxc, dyc}
 			posX += dxa.Val + dxb.Val + dxc.Val
 			posY += dya.Val + dyb.Val + dyc.Val
@@ -473,7 +473,7 @@ func (enc encoder) Edges(from int) []edge {
 
 			dy := cmds[0].Args[3].Val + cmds[1].Args[3].Val
 			if cmds[0].Args[1].IsZero() && cmds[1].Args[5].IsZero() &&
-				math.Abs(dy) < 0.5/65536 {
+				dy == 0 {
 				// dx1  dx2 dy2  dx3  dx4  dx5  dx6  hflex
 				code = append(code, cmds[0].Args[0].Code)
 				code = append(code, cmds[0].Args[2].Code)
@@ -487,7 +487,7 @@ func (enc encoder) Edges(from int) []edge {
 					code: code,
 					to:   from + 2,
 				})
-			} else if math.Abs(dy+cmds[0].Args[1].Val+cmds[1].Args[5].Val) < 0.5/65536 {
+			} else if dy+cmds[0].Args[1].Val+cmds[1].Args[5].Val == 0 {
 				// dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6  hflex1
 				code = append(code, cmds[0].Args[0].Code)
 				code = append(code, cmds[0].Args[1].Code)
@@ -595,35 +595,28 @@ func (c enCmd) appendArgs(code [][]byte) [][]byte {
 
 // encodedNumber is a number together with the Type2 charstring encoding of that number.
 type encodedNumber struct {
-	Val  float64
+	Val  fixed16
 	Code []byte
 }
 
 func (x encodedNumber) String() string {
-	return fmt.Sprintf("%g (% x)", x.Val, x.Code)
+	return fmt.Sprintf("%g (% x)", x.Val.Float64(), x.Code)
 }
 
 // encodeNumber encodes the given number into a CFF encoding.
-func encodeNumber(x float64) encodedNumber {
+func encodeNumber(x fixed16) encodedNumber {
 	var code []byte
-	var val float64
 
 	// TODO(voss): consider using t2dup here.
-
-	xInt := math.Round(x)
 	// TODO(voss): also consider fractions of two one-byte integers.
-	if math.Abs(x-xInt) > eps {
-		z := int32(math.Round(x * 65536))
-		val = float64(z) / 65536
-		code = []byte{255, byte(z >> 24), byte(z >> 16), byte(z >> 8), byte(z)}
+
+	if x%65536 == 0 {
+		code = encodeInt(x.Int16())
 	} else {
-		// encode as an integer
-		z := int16(xInt)
-		code = encodeInt(z)
-		val = float64(z)
+		code = []byte{255, byte(x >> 24), byte(x >> 16), byte(x >> 8), byte(x)}
 	}
 	return encodedNumber{
-		Val:  val,
+		Val:  x,
 		Code: code,
 	}
 }
@@ -668,5 +661,3 @@ func copyOp(data [][]byte, op t2op, args ...encodedNumber) [][]byte {
 	}
 	return res
 }
-
-const eps = 0.5 / 65536

@@ -174,7 +174,7 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 		Glyphs: []font.Glyph{
 			{
 				Gid:     font.GlyphID(i),
-				Advance: fnt.Glyphs[i].Width,
+				Advance: int32(fnt.Glyphs[i].Width),
 			},
 		},
 	}

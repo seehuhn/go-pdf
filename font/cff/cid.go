@@ -77,7 +77,7 @@ func EmbedFontCID(w *pdf.Writer, cff *Font, instName pdf.Name) (*font.Font, erro
 				gid := cmap[r]
 				gg[i].Gid = gid
 				gg[i].Chars = []rune{r}
-				gg[i].Advance = cff.Glyphs[gid].Width
+				gg[i].Advance = int32(cff.Glyphs[gid].Width)
 
 				if _, seen := t.text[gid]; !seen {
 					t.text[gid] = []rune{r}

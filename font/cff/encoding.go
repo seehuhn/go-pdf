@@ -190,7 +190,7 @@ func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
 	return buf, nil
 }
 
-func StandardEncoding(glyphs []*Glyph) []font.GlyphID {
+func standardEncoding(glyphs []*Glyph) []font.GlyphID {
 	res := make([]font.GlyphID, 256)
 	for gid, g := range glyphs {
 		code, ok := type1.StandardEncoding[g.Name]
@@ -202,7 +202,7 @@ func StandardEncoding(glyphs []*Glyph) []font.GlyphID {
 }
 
 func isStandardEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {
-	tmp := StandardEncoding(glyphs)
+	tmp := standardEncoding(glyphs)
 	for i, gid := range tmp {
 		if encoding[i] != gid {
 			return false

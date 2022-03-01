@@ -248,7 +248,7 @@ func writeFile(w io.Writer, tableNames []string, blobs map[string][]byte) error 
 }
 
 func isFixedPitch(glyphs []*cff.Glyph) bool {
-	var width int32
+	var width int16
 
 	for i := range glyphs {
 		w := glyphs[i].Width
@@ -292,9 +292,8 @@ func makeCFF(info *CFFInfo, glyphs []*cff.Glyph) ([]byte, error) {
 		},
 	}
 	myCff := &cff.Font{
-		Info:     &cffInfo,
-		Glyphs:   glyphs,
-		Encoding: cff.StandardEncoding(glyphs),
+		Info:   &cffInfo,
+		Glyphs: glyphs,
 	}
 
 	buf := &bytes.Buffer{}

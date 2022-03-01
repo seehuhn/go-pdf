@@ -135,7 +135,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	cff.Info.Weight = topDict.getString(opWeight)
 	isFixedPitch := topDict.getInt(opIsFixedPitch, 0)
 	cff.Info.IsFixedPitch = isFixedPitch != 0
-	cff.Info.ItalicAngle = topDict.getFloat(opItalicAngle, 0)
+	italicAngle := topDict.getFloat(opItalicAngle, 0)
+	cff.Info.ItalicAngle = normaliseAngle(italicAngle)
 	cff.Info.UnderlinePosition = int16(topDict.getInt(opUnderlinePosition,
 		defaultUnderlinePosition))
 	cff.Info.UnderlineThickness = int16(topDict.getInt(opUnderlineThickness,
@@ -156,9 +157,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	// read the CharStrings INDEX
 	charStringsOffs := topDict.getInt(opCharStrings, 0)
 	charStrings, err := readIndexAt(p, charStringsOffs, "CharStrings")
+	nGlyphs := len(charStrings)
 	if err != nil {
 		return nil, err
-	} else if len(charStrings) == 0 {
+	} else if nGlyphs == 0 {
 		return nil, invalidSince("no charstrings")
 	}
 
@@ -220,7 +222,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		cff.FdSelect, err = readFDSelect(p, len(charStrings), len(cff.Info.Private))
+		cff.FdSelect, err = readFDSelect(p, nGlyphs, len(cff.Info.Private))
 		if err != nil {
 			return nil, err
 		}
@@ -234,25 +236,34 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		charset, err = readCharset(p, len(charStrings))
+		charset, err = readCharset(p, nGlyphs)
 		if err != nil {
 			return nil, err
 		}
-		cff.Gid2cid = make([]int32, len(charStrings)) // filled in below
+		cff.Gid2cid = make([]int32, nGlyphs) // filled in below
 	} else {
 		switch charsetOffs {
 		case 0: // ISOAdobe charset
-			charset = make([]int32, len(charStrings))
+			if nGlyphs > len(isoAdobeCharset) {
+				return nil, invalidSince("invalid charset")
+			}
+			charset = make([]int32, nGlyphs)
 			for i := range charset {
 				charset[i] = strings.lookup(isoAdobeCharset[i])
 			}
 		case 1: // Expert charset
-			charset = make([]int32, len(charStrings))
+			if nGlyphs > len(expertCharset) {
+				return nil, invalidSince("invalid charset")
+			}
+			charset = make([]int32, nGlyphs)
 			for i := range charset {
 				charset[i] = strings.lookup(expertCharset[i])
 			}
 		case 2: // ExpertSubset charset
-			charset = make([]int32, len(charStrings))
+			if nGlyphs > len(expertSubsetCharset) {
+				return nil, invalidSince("invalid charset")
+			}
+			charset = make([]int32, nGlyphs)
 			for i := range charset {
 				charset[i] = strings.lookup(expertSubsetCharset[i])
 			}
@@ -261,7 +272,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			if err != nil {
 				return nil, err
 			}
-			charset, err = readCharset(p, len(charStrings))
+			charset, err = readCharset(p, nGlyphs)
 			if err != nil {
 				return nil, err
 			}
@@ -283,7 +294,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		})
 	}
 
-	cff.Glyphs = make([]*Glyph, len(charStrings))
+	cff.Glyphs = make([]*Glyph, nGlyphs)
 	fdSelect := cff.FdSelect
 	if fdSelect == nil {
 		fdSelect = func(gid font.GlyphID) int { return 0 }
@@ -316,10 +327,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		var enc []font.GlyphID
 		switch {
 		case encodingOffs == 0:
-			enc = StandardEncoding(cff.Glyphs)
+			enc = standardEncoding(cff.Glyphs)
 		case encodingOffs == 1:
 			enc = expertEncoding(cff.Glyphs)
-		case encodingOffs >= 4:
+		default:
 			err = p.SeekPos(int64(encodingOffs))
 			if err != nil {
 				return nil, err
@@ -410,7 +421,7 @@ func (cff *Font) Encode(w io.Writer) error {
 			glyphNames[i] = strings.lookup(string(cff.Glyphs[i].Name))
 		}
 
-		if isStandardEncoding(cff.Encoding, cff.Glyphs) {
+		if len(cff.Encoding) == 0 || isStandardEncoding(cff.Encoding, cff.Glyphs) {
 			// topDict[opEncoding] = []interface{}{int32(0)}
 		} else if isExpertEncoding(cff.Encoding, cff.Glyphs) {
 			topDict[opEncoding] = []interface{}{int32(1)}
@@ -552,7 +563,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	return nil
 }
 
-func (cff *Font) selectWidths() (int32, int32) {
+func (cff *Font) selectWidths() (int16, int16) {
 	numGlyphs := int32(len(cff.Glyphs))
 	if numGlyphs == 0 {
 		return 0, 0
@@ -560,9 +571,9 @@ func (cff *Font) selectWidths() (int32, int32) {
 		return cff.Glyphs[0].Width, cff.Glyphs[0].Width
 	}
 
-	widthHist := make(map[int32]int32)
+	widthHist := make(map[int16]int32)
 	var mostFrequentCount int32
-	var defaultWidth int32
+	var defaultWidth int16
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		widthHist[w]++
@@ -574,14 +585,14 @@ func (cff *Font) selectWidths() (int32, int32) {
 
 	// TODO(voss): the choice of nominalWidth can be improved
 	var sum int32
-	var minWidth int32 = math.MaxInt32
-	var maxWidth int32
+	var minWidth int16 = math.MaxInt16
+	var maxWidth int16 = math.MinInt16
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		if w == defaultWidth {
 			continue
 		}
-		sum += w
+		sum += int32(w)
 		if w < minWidth {
 			minWidth = w
 		}
@@ -589,7 +600,7 @@ func (cff *Font) selectWidths() (int32, int32) {
 			maxWidth = w
 		}
 	}
-	nominalWidth := (sum + numGlyphs/2) / (numGlyphs - 1)
+	nominalWidth := int16((sum + numGlyphs/2) / (numGlyphs - 1))
 	if nominalWidth < minWidth+107 {
 		nominalWidth = minWidth + 107
 	} else if nominalWidth > maxWidth-107 {
@@ -598,7 +609,7 @@ func (cff *Font) selectWidths() (int32, int32) {
 	return defaultWidth, nominalWidth
 }
 
-func (cff *Font) encodeCharStrings() (cffIndex, int32, int32, error) {
+func (cff *Font) encodeCharStrings() (cffIndex, int16, int16, error) {
 	numGlyphs := len(cff.Glyphs)
 	if numGlyphs < 1 || (!cff.IsCIDFont && cff.Glyphs[0].Name != ".notdef") {
 		return nil, 0, 0, invalidSince("missing .notdef glyph")
@@ -644,6 +655,14 @@ func (cff *Font) Widths() []uint16 {
 		res[i] = uint16(glyph.Width)
 	}
 	return res
+}
+
+func normaliseAngle(x float64) float64 {
+	y := math.Mod(x+180, 360)
+	if y < 0 {
+		y += 360
+	}
+	return y - 180
 }
 
 func offsSize(i int32) byte {

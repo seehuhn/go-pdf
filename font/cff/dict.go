@@ -257,9 +257,6 @@ func encodeFloat(x float64) []byte {
 		l++
 		i /= 10
 	}
-	if i <= 0 {
-		panic("something fishy")
-	}
 	// now i contains all the digits
 
 	// remove trailing zeros
@@ -298,9 +295,6 @@ func encodeFloat(x float64) []byte {
 	var half byte
 	for _, buf := range [][]byte{head, digits} {
 		for _, b := range buf {
-			if b > 15 {
-				panic("hamster")
-			}
 			if first {
 				half = b << 4
 			} else {
@@ -515,8 +509,8 @@ func makeTopDict(info *type1.FontInfo) cffDict {
 type privateInfo struct {
 	private      *type1.PrivateDict
 	subrs        cffIndex
-	defaultWidth int32
-	nominalWidth int32
+	defaultWidth int16
+	nominalWidth int16
 }
 
 func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInfo, error) {
@@ -553,6 +547,9 @@ func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInf
 		StdVW:      privateDict.getFloat(opStdVW, 0),
 		ForceBold:  privateDict.getInt(opForceBold, 0) != 0,
 	}
+	private.BlueScale = clamp(private.BlueScale, 0, 1)
+	private.StdHW = clamp(private.StdHW, 0, 10000)
+	private.StdVW = clamp(private.StdVW, 0, 10000)
 
 	var subrs cffIndex
 	subrsIndexOffs := privateDict.getInt(opSubrs, 0)
@@ -565,15 +562,15 @@ func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInf
 
 	info := &privateInfo{
 		private:      private,
-		defaultWidth: privateDict.getInt(opDefaultWidthX, 0),
-		nominalWidth: privateDict.getInt(opNominalWidthX, 0),
+		defaultWidth: int16(privateDict.getInt(opDefaultWidthX, 0)),
+		nominalWidth: int16(privateDict.getInt(opNominalWidthX, 0)),
 		subrs:        subrs,
 	}
 
 	return info, nil
 }
 
-func (cff *Font) makePrivateDict(idx int, defaultWidth, nominalWidth int32) cffDict {
+func (cff *Font) makePrivateDict(idx int, defaultWidth, nominalWidth int16) cffDict {
 	private := cff.Info.Private[idx]
 
 	privateDict := cffDict{}
@@ -600,13 +597,22 @@ func (cff *Font) makePrivateDict(idx int, defaultWidth, nominalWidth int32) cffD
 	}
 
 	if defaultWidth != 0 {
-		privateDict[opDefaultWidthX] = []interface{}{defaultWidth}
+		privateDict[opDefaultWidthX] = []interface{}{int32(defaultWidth)}
 	}
 	if nominalWidth != 0 {
-		privateDict[opNominalWidthX] = []interface{}{nominalWidth}
+		privateDict[opNominalWidthX] = []interface{}{int32(nominalWidth)}
 	}
 
 	return privateDict
+}
+
+func clamp(x, min, max float64) float64 {
+	if x < min {
+		return min
+	} else if x > max {
+		return max
+	}
+	return x
 }
 
 var defaultFontMatrix = []float64{0.001, 0, 0, 0.001, 0, 0}
