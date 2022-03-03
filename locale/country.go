@@ -47,6 +47,8 @@ func (c Country) Name() string {
 // List of all ISO 3166-1 countries.
 // https://en.wikipedia.org/wiki/ISO_3166-1#Officially_assigned_code_elements
 const (
+	CountryUndefined Country = 0
+
 	CountryAFG Country = 4   // Afghanistan
 	CountryALB Country = 8   // Albania
 	CountryDZA Country = 12  // Algeria

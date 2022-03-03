@@ -51,16 +51,22 @@ const (
 	LangArabic
 	LangBengali
 	LangChinese
+	LangDanish
 	LangDutch
 	LangEnglish
+	LangFinnish
 	LangFrench
 	LangGerman
 	LangGreek
 	LangHindi
 	LangItalian
+	LangNorwegianBokmal
+	LangPolish
+	LangPortuguese
 	LangRomanian
 	LangRussian
 	LangSpanish
+	LangSwedish
 )
 
 type languageCodes struct {
@@ -71,18 +77,26 @@ type languageCodes struct {
 
 // selected languages from
 // https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
+// The columns are:
+//    code, 639-1, 639-2/T, Iso Language Name
 var languages = map[Language]languageCodes{
-	LangArabic:   {"ar", "ara", "Arabic"},
-	LangBengali:  {"bn", "ben", "Bengali"},
-	LangChinese:  {"zh", "zho", "Chinese"},
-	LangDutch:    {"nl", "nld", "Dutch"},
-	LangEnglish:  {"en", "eng", "English"},
-	LangFrench:   {"fr", "fra", "French"},
-	LangGerman:   {"de", "deu", "German"},
-	LangGreek:    {"el", "ell", "Greek"},
-	LangItalian:  {"it", "ita", "Italian"},
-	LangHindi:    {"hi", "hin", "Hindi"},
-	LangRomanian: {"ro", "ron", "Romanian"},
-	LangRussian:  {"ru", "rus", "Russian"},
-	LangSpanish:  {"es", "spa", "Spanish"},
+	LangArabic:          {"ar", "ara", "Arabic"},
+	LangBengali:         {"bn", "ben", "Bengali"},
+	LangChinese:         {"zh", "zho", "Chinese"},
+	LangDanish:          {"da", "dan", "Danish"},
+	LangDutch:           {"nl", "nld", "Dutch"},
+	LangEnglish:         {"en", "eng", "English"},
+	LangFinnish:         {"fi", "fin", "Finnish"},
+	LangFrench:          {"fr", "fra", "French"},
+	LangGerman:          {"de", "deu", "German"},
+	LangGreek:           {"el", "ell", "Greek"},
+	LangHindi:           {"hi", "hin", "Hindi"},
+	LangItalian:         {"it", "ita", "Italian"},
+	LangNorwegianBokmal: {"nb", "nob", "Norwegian Bokmål"},
+	LangPolish:          {"pl", "pol", "Polish"},
+	LangPortuguese:      {"pt", "por", "Portugese"},
+	LangRomanian:        {"ro", "ron", "Romanian"},
+	LangRussian:         {"ru", "rus", "Russian"},
+	LangSpanish:         {"es", "spa", "Spanish"},
+	LangSwedish:         {"sv", "swe", "Swedish"},
 }

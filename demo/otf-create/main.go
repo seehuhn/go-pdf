@@ -433,21 +433,21 @@ func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
 	dayString := day.Format("2006-01-02")
 
 	nameInfo := &name.Info{
-		Tables: map[name.Loc]*name.Table{
-			{
-				Language: locale.LangEnglish,
-				Country:  locale.CountryUSA,
-			}: {
-				Copyright:      info.Copyright,
-				Family:         info.FamilyName,
-				Subfamily:      "Regular",
-				Identifier:     info.FullName + "; " + info.Version.String() + "; " + dayString,
-				FullName:       info.FullName,
-				Version:        "Version " + info.Version.String(),
-				PostScriptName: "Test",
-			},
-		},
+		Tables: map[name.Loc]*name.Table{},
 	}
+	// TODO(voss): make this more convenient
+	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryGBR, locale.CountryUndefined} {
+		nameInfo.Tables[name.Loc{Language: locale.LangEnglish, Country: country}] = &name.Table{
+			Copyright:      info.Copyright,
+			Family:         info.FamilyName,
+			Subfamily:      "Regular",
+			Identifier:     info.FullName + "; " + info.Version.String() + "; " + dayString,
+			FullName:       info.FullName,
+			Version:        "Version " + info.Version.String(),
+			PostScriptName: "Test",
+		}
+	}
+
 	return nameInfo.Encode(ss)
 }
 

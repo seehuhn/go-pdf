@@ -22,20 +22,58 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf16"
 
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/mac"
 	"seehuhn.de/go/pdf/locale"
 )
 
-const MaxNameID = 10 // TODO(voss)
+const maxNameID = 10 // TODO(voss)
 
 // Info contains information from the "name" table.
 type Info struct {
 	Tables map[Loc]*Table
 }
 
-func (info *Info) SelectTable(lang locale.Language, country locale.Country) *Table {
+func (info *Info) BestTable(lang locale.Language, country locale.Country) *Table {
+	var best *Table
+	var bestLoc Loc
+
+	better := func(loc Loc) bool {
+		if best == nil {
+			return true
+		}
+
+		correctLocLang := loc.Language == lang
+		correctBestLang := bestLoc.Language == lang
+		if correctLocLang != correctBestLang {
+			return correctLocLang
+		}
+
+		locCode := msCode(loc)
+		bestCode := msCode(bestLoc)
+		if locCode != bestCode {
+			return locCode < bestCode
+		}
+
+		return loc.Country < bestLoc.Country
+	}
+
+	for loc, t := range info.Tables {
+		if loc.Language == lang && loc.Country == country {
+			return t
+		}
+		if better(loc) {
+			best = t
+			bestLoc = loc
+		}
+	}
+
+	return best
+}
+
+func (info *Info) selectExactLoc(lang locale.Language, country locale.Country) *Table {
 	for key, t := range info.Tables {
 		if key.Language == lang && key.Country == country {
 			return t
@@ -44,24 +82,11 @@ func (info *Info) SelectTable(lang locale.Language, country locale.Country) *Tab
 	return nil
 }
 
-func (info *Info) selectLangTable(lang locale.Language) *Table {
-	var candidates []Loc
-	for key := range info.Tables {
-		if key.Language == lang {
-			candidates = append(candidates, key)
-		}
-	}
-	if len(candidates) == 0 {
-		return nil
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		// TODO(voss): use a better criterion here
-		return candidates[i].Country < candidates[j].Country
-	})
-	return info.Tables[candidates[0]]
+func (info *Info) selectExactLang(lang locale.Language) *Table {
+	return info.selectExactLoc(lang, locale.CountryUndefined)
 }
 
-// Table contains the data for a single language
+// Table contains the name table data for a single language
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
 type Table struct {
 	Copyright      string
@@ -83,17 +108,39 @@ type Table struct {
 
 func (t *Table) String() string {
 	b := &strings.Builder{}
-	fmt.Fprintf(b, "Copyright: %q\n", t.Copyright)
-	fmt.Fprintf(b, "Family: %q\n", t.Family)
-	fmt.Fprintf(b, "Subfamily: %q\n", t.Subfamily)
-	fmt.Fprintf(b, "Identifier: %q\n", t.Identifier)
-	fmt.Fprintf(b, "FullName: %q\n", t.FullName)
-	fmt.Fprintf(b, "Version: %q\n", t.Version)
-	fmt.Fprintf(b, "PostScriptName: %q\n", t.PostScriptName)
-	fmt.Fprintf(b, "Trademark: %q\n", t.Trademark)
-	fmt.Fprintf(b, "Manufacturer: %q\n", t.Manufacturer)
-	fmt.Fprintf(b, "Designer: %q\n", t.Designer)
-	fmt.Fprintf(b, "Description: %q\n", t.Description)
+	if t.Copyright != "" {
+		fmt.Fprintf(b, "Copyright: %q\n", t.Copyright)
+	}
+	if t.Family != "" {
+		fmt.Fprintf(b, "Family: %q\n", t.Family)
+	}
+	if t.Subfamily != "" {
+		fmt.Fprintf(b, "Subfamily: %q\n", t.Subfamily)
+	}
+	if t.Identifier != "" {
+		fmt.Fprintf(b, "Identifier: %q\n", t.Identifier)
+	}
+	if t.FullName != "" {
+		fmt.Fprintf(b, "FullName: %q\n", t.FullName)
+	}
+	if t.Version != "" {
+		fmt.Fprintf(b, "Version: %q\n", t.Version)
+	}
+	if t.PostScriptName != "" {
+		fmt.Fprintf(b, "PostScriptName: %q\n", t.PostScriptName)
+	}
+	if t.Trademark != "" {
+		fmt.Fprintf(b, "Trademark: %q\n", t.Trademark)
+	}
+	if t.Manufacturer != "" {
+		fmt.Fprintf(b, "Manufacturer: %q\n", t.Manufacturer)
+	}
+	if t.Description != "" {
+		fmt.Fprintf(b, "Designer: %q\n", t.Designer)
+	}
+	if t.Description != "" {
+		fmt.Fprintf(b, "Description: %q\n", t.Description)
+	}
 	return b.String()
 }
 
@@ -170,14 +217,16 @@ recLoop:
 		nameLen := int(data[pos+8])<<8 | int(data[pos+9])
 		nameOffset := int(data[pos+10])<<8 | int(data[pos+11])
 
+		// We only use records where we understand the language ID.
 		var key Loc
 		switch platformID {
 		case 1: // Macintosh
-			key = appleCodes[languageID]
+			key = appleLang[languageID]
 		case 3: // Windows
-			key = microsoftCodes[languageID]
+			key = msLang[languageID]
 		}
 		if key.Language == 0 {
+			fmt.Printf("x %d %04x\n", platformID, languageID)
 			continue
 		}
 
@@ -234,18 +283,6 @@ recLoop:
 		tables[key] = t
 	}
 
-	complete := make(map[locale.Language]bool)
-	for key := range tables {
-		if key.Language != 0 && key.Country != 0 {
-			complete[key.Language] = true
-		}
-	}
-
-	for key := range tables {
-		if key.Country == 0 && complete[key.Language] {
-			delete(tables, key)
-		}
-	}
 	res := &Info{
 		Tables: tables,
 	}
@@ -276,12 +313,12 @@ func (info *Info) Encode(ss cmap.Subtables) []byte {
 		}
 	}
 	if includeMac {
-		for languageID, loc := range appleCodes {
-			t := info.selectLangTable(loc.Language)
+		for languageID, loc := range appleLang {
+			t := info.selectExactLang(loc.Language)
 			if t == nil {
 				continue
 			}
-			for nameID := 0; nameID <= MaxNameID; nameID++ {
+			for nameID := 0; nameID <= maxNameID; nameID++ {
 				val := t.get(nameID)
 				if val == "" {
 					continue
@@ -313,13 +350,13 @@ func (info *Info) Encode(ss cmap.Subtables) []byte {
 	if len(encodingIDs) == 0 {
 		encodingIDs[1] = true
 	}
-	for languageID, loc := range microsoftCodes {
-		t := info.SelectTable(loc.Language, loc.Country)
+	for languageID, loc := range msLang {
+		t := info.selectExactLoc(loc.Language, loc.Country)
 		if t == nil {
 			continue
 		}
 
-		for nameID := 0; nameID <= MaxNameID; nameID++ {
+		for nameID := 0; nameID <= maxNameID; nameID++ {
 			val := t.get(nameID)
 			if val == "" {
 				continue
@@ -403,6 +440,24 @@ func (nb *nameBuilder) Add(b []byte) (offs, length uint16) {
 	nb.idx[key] = idx
 	nb.data = append(nb.data, b...)
 	return idx, uint16(len(b))
+}
+
+func utf16Encode(s string) []byte {
+	rr := utf16.Encode([]rune(s))
+	res := make([]byte, len(rr)*2)
+	for i, r := range rr {
+		res[i*2] = byte(r >> 8)
+		res[i*2+1] = byte(r)
+	}
+	return res
+}
+
+func utf16Decode(buf []byte) string {
+	var nameWords []uint16
+	for i := 0; i+1 < len(buf); i += 2 {
+		nameWords = append(nameWords, uint16(buf[i])<<8|uint16(buf[i+1]))
+	}
+	return string(utf16.Decode(nameWords))
 }
 
 var errMalformedNames = fmt.Errorf("malformed name table")

@@ -204,6 +204,7 @@ type binaryHead struct {
 }
 
 // Version represents the font revision in 16.16 fixed point format.
+// TODO(voss): move this into a different package?
 type Version uint32
 
 func (v Version) String() string {

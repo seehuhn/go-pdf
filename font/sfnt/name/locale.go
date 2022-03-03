@@ -17,8 +17,6 @@
 package name
 
 import (
-	"unicode/utf16"
-
 	"seehuhn.de/go/pdf/locale"
 )
 
@@ -32,12 +30,12 @@ func (loc Loc) String() string {
 	if loc.Country == 0 {
 		return loc.Language.String()
 	}
-	return loc.Language.String() + "-" + loc.Country.String()
+	return loc.Language.String() + "_" + loc.Country.String()
 }
 
 // Selected Macintosh language codes
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-language-ids
-var appleCodes = map[uint16]Loc{
+var appleLang = map[uint16]Loc{
 	0:  {Language: locale.LangEnglish},
 	1:  {Language: locale.LangFrench},
 	2:  {Language: locale.LangGerman},
@@ -54,39 +52,47 @@ var appleCodes = map[uint16]Loc{
 
 // Selected Windows language codes
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-language-ids
-var microsoftCodes = map[uint16]Loc{
+var msLang = map[uint16]Loc{
 	0x0401: {Language: locale.LangArabic, Country: locale.CountrySAU},
+	0x0406: {Language: locale.LangDanish, Country: locale.CountryDNK},
 	0x0407: {Language: locale.LangGerman, Country: locale.CountryDEU},
 	0x0408: {Language: locale.LangGreek, Country: locale.CountryGRC},
 	0x0409: {Language: locale.LangEnglish, Country: locale.CountryUSA},
 	0x040A: {Language: locale.LangSpanish, Country: locale.CountryESP}, // traditional sort
+	0x040B: {Language: locale.LangFinnish, Country: locale.CountryFIN},
 	0x040C: {Language: locale.LangFrench, Country: locale.CountryFRA},
 	0x0410: {Language: locale.LangItalian, Country: locale.CountryITA},
 	0x0413: {Language: locale.LangDutch, Country: locale.CountryNLD},
+	0x0414: {Language: locale.LangNorwegianBokmal, Country: locale.CountryNOR},
+	0x0415: {Language: locale.LangPolish, Country: locale.CountryPOL},
+	0x0416: {Language: locale.LangPortuguese, Country: locale.CountryBRA},
 	0x0418: {Language: locale.LangRomanian, Country: locale.CountryROU},
 	0x0419: {Language: locale.LangRussian, Country: locale.CountryRUS},
+	0x041D: {Language: locale.LangSwedish, Country: locale.CountrySWE},
 	0x0439: {Language: locale.LangHindi, Country: locale.CountryIND},
 	0x0445: {Language: locale.LangBengali, Country: locale.CountryIND},
 	0x0804: {Language: locale.LangChinese, Country: locale.CountryCHN},
 	0x0809: {Language: locale.LangEnglish, Country: locale.CountryGBR},
+	0x0816: {Language: locale.LangPortuguese, Country: locale.CountryPRT},
 	0x0845: {Language: locale.LangBengali, Country: locale.CountryBGD},
 	0x0C0A: {Language: locale.LangSpanish, Country: locale.CountryESP}, // modern sort
+	0x0C0C: {Language: locale.LangFrench, Country: locale.CountryCAN},
 }
 
-func utf16Encode(s string) []byte {
-	rr := utf16.Encode([]rune(s))
-	res := make([]byte, len(rr)*2)
-	for i, r := range rr {
-		res[i*2] = byte(r >> 8)
-		res[i*2+1] = byte(r)
+func appleCode(lang locale.Language) (uint16, bool) {
+	for k, v := range appleLang {
+		if v.Language == lang {
+			return k, true
+		}
 	}
-	return res
+	return 0, false
 }
 
-func utf16Decode(buf []byte) string {
-	var nameWords []uint16
-	for i := 0; i+1 < len(buf); i += 2 {
-		nameWords = append(nameWords, uint16(buf[i])<<8|uint16(buf[i+1]))
+func msCode(loc Loc) uint16 {
+	for k, v := range msLang {
+		if v == loc {
+			return k
+		}
 	}
-	return string(utf16.Decode(nameWords))
+	return 0xFFFF
 }

@@ -17,10 +17,9 @@
 package name
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
+	"github.com/go-test/deep"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -74,16 +73,8 @@ func FuzzNames(f *testing.F) {
 		}
 
 		var ss cmap.Subtables
-		apple := map[locale.Language]uint16{}
-		for code, loc := range appleCodes {
-			apple[loc.Language] = code
-		}
-		ms := map[Loc]uint16{}
-		for code, loc := range microsoftCodes {
-			ms[loc] = code
-		}
 		for key := range n1.Tables {
-			languageID, ok := apple[key.Language]
+			languageID, ok := appleCode(key.Language)
 			if ok {
 				ss = append(ss, cmap.SubtableData{
 					PlatformID: 1, // Macintosh
@@ -91,8 +82,8 @@ func FuzzNames(f *testing.F) {
 					Language:   languageID,
 				})
 			}
-			languageID, ok = ms[key]
-			if ok {
+			languageID = msCode(key)
+			if languageID != 0xFFFF {
 				ss = append(ss, cmap.SubtableData{
 					PlatformID: 3, // Windows
 					EncodingID: 1, // Unicode BMP
@@ -107,39 +98,8 @@ func FuzzNames(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		equal := true
-		keys := map[Loc]bool{}
-		for key := range n1.Tables {
-			keys[key] = true
-		}
-		for key := range n2.Tables {
-			keys[key] = true
-		}
-		for key := range keys {
-			if !reflect.DeepEqual(n1.Tables[key], n2.Tables[key]) {
-				t1 := n1.Tables[key]
-				t2 := n2.Tables[key]
-				fmt.Println(key)
-				if t1 == nil {
-					fmt.Println("missing")
-				} else {
-					fmt.Println(t1)
-				}
-				if t2 == nil {
-					fmt.Println("missing")
-				} else {
-					fmt.Println(t2)
-				}
-
-				equal = false
-				break
-			}
-		}
-
-		if !equal {
-			// fmt.Printf("A % x\n", in)
-			// fmt.Printf("B % x\n", buf)
-			t.Fatal("not equal")
+		for _, diff := range deep.Equal(n1, n2) {
+			t.Error(diff)
 		}
 	})
 }
