@@ -104,42 +104,6 @@ func (tt *Font) getPostInfo() (*table.PostInfo, error) {
 	return res, nil
 }
 
-// getOS2Info reads the "OS/2" table of a sfnt file.
-func (tt *Font) getOS2Info() (*table.OS2, error) {
-	os2 := &table.OS2{}
-	os2Fd, err := tt.GetTableReader("OS/2", &os2.V0)
-	if err != nil {
-		return nil, err
-	}
-
-	if os2.V0.Version > 0 || tt.Header.Find("OS/2").Length > 68 {
-		os2.V0MSValid = true
-		err := binary.Read(os2Fd, binary.BigEndian, &os2.V0MS)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if os2.V0.Version >= 1 {
-		err := binary.Read(os2Fd, binary.BigEndian, &os2.V1)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if os2.V0.Version >= 4 {
-		err := binary.Read(os2Fd, binary.BigEndian, &os2.V4)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if os2.V0.Version >= 5 {
-		err := binary.Read(os2Fd, binary.BigEndian, &os2.V5)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return os2, nil
-}
-
 // readKernInfo reads kerning information from the "kern" table.
 //
 // TODO(voss): use a gpos2_1 structure instead.

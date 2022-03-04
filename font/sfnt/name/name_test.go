@@ -31,7 +31,15 @@ func FuzzNames(f *testing.F) {
 				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
 				Description: "This is a test.",
 			},
+			{locale.LangEnglish, locale.CountryUndefined}: {
+				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
+				Description: "This is a test.",
+			},
 			{locale.LangGerman, locale.CountryDEU}: {
+				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
+				Description: "Dies ist ein Test.",
+			},
+			{locale.LangGerman, locale.CountryUndefined}: {
 				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
 				Description: "Dies ist ein Test.",
 			},

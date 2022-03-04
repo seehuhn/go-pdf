@@ -40,3 +40,24 @@ func TestMaxp(t *testing.T) {
 		}
 	}
 }
+
+func FuzzMaxp(f *testing.F) {
+	f.Add([]byte{0x00, 0x00, 0x50, 0x00, 0x12, 0x34})
+	f.Fuzz(func(t *testing.T, data []byte) {
+		maxpInfo, err := ReadMaxp(bytes.NewReader(data))
+		if err != nil {
+			return
+		}
+		data2, err := maxpInfo.Encode()
+		if err != nil {
+			t.Fatal(err)
+		}
+		maxpInfo2, err := ReadMaxp(bytes.NewReader(data2))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if maxpInfo2.NumGlyphs != maxpInfo.NumGlyphs {
+			t.Errorf("numGlyphs: %d != %d", maxpInfo2.NumGlyphs, maxpInfo.NumGlyphs)
+		}
+	})
+}

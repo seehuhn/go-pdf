@@ -20,6 +20,7 @@ package name
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"unicode/utf16"
@@ -29,48 +30,11 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-const maxNameID = 10 // TODO(voss)
+const maxNameID = 25
 
 // Info contains information from the "name" table.
 type Info struct {
 	Tables map[Loc]*Table
-}
-
-func (info *Info) BestTable(lang locale.Language, country locale.Country) *Table {
-	var best *Table
-	var bestLoc Loc
-
-	better := func(loc Loc) bool {
-		if best == nil {
-			return true
-		}
-
-		correctLocLang := loc.Language == lang
-		correctBestLang := bestLoc.Language == lang
-		if correctLocLang != correctBestLang {
-			return correctLocLang
-		}
-
-		locCode := msCode(loc)
-		bestCode := msCode(bestLoc)
-		if locCode != bestCode {
-			return locCode < bestCode
-		}
-
-		return loc.Country < bestLoc.Country
-	}
-
-	for loc, t := range info.Tables {
-		if loc.Language == lang && loc.Country == country {
-			return t
-		}
-		if better(loc) {
-			best = t
-			bestLoc = loc
-		}
-	}
-
-	return best
 }
 
 func (info *Info) selectExactLoc(lang locale.Language, country locale.Country) *Table {
@@ -89,21 +53,31 @@ func (info *Info) selectExactLang(lang locale.Language) *Table {
 // Table contains the name table data for a single language
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#name-ids
 type Table struct {
-	Copyright      string
-	Family         string
-	Subfamily      string
-	Identifier     string
-	FullName       string
-	Version        string
-	PostScriptName string
-	Trademark      string
-	Manufacturer   string
-	Designer       string
-	Description    string
-	// VendorURL      *url.URL
-	// DesignerURL    *url.URL
-	// License        string
-	// LicenseURL     *url.URL
+	Copyright                string
+	Family                   string
+	Subfamily                string
+	Identifier               string
+	FullName                 string
+	Version                  string
+	PostScriptName           string
+	Trademark                string
+	Manufacturer             string
+	Designer                 string
+	Description              string
+	VendorURL                string
+	DesignerURL              string
+	License                  string
+	LicenseURL               string
+	TypographicFamily        string
+	TypographicSubfamily     string
+	MacFullName              string
+	SampleText               string
+	CIDFontName              string
+	WWSFamily                string
+	WWSSubfamily             string
+	LightBackgroundPalette   string
+	DarkBackgroundPalette    string
+	VariationsPostScriptName string
 }
 
 func (t *Table) String() string {
@@ -141,6 +115,48 @@ func (t *Table) String() string {
 	if t.Description != "" {
 		fmt.Fprintf(b, "Description: %q\n", t.Description)
 	}
+	if t.VendorURL != "" {
+		fmt.Fprintf(b, "VendorURL: %s\n", t.VendorURL)
+	}
+	if t.DesignerURL != "" {
+		fmt.Fprintf(b, "DesignerURL: %s\n", t.DesignerURL)
+	}
+	if t.License != "" {
+		fmt.Fprintf(b, "License: %q\n", t.License)
+	}
+	if t.LicenseURL != "" {
+		fmt.Fprintf(b, "LicenseURL: %s\n", t.LicenseURL)
+	}
+	if t.TypographicFamily != "" {
+		fmt.Fprintf(b, "TypographicFamily: %q\n", t.TypographicFamily)
+	}
+	if t.TypographicSubfamily != "" {
+		fmt.Fprintf(b, "TypographicSubfamily: %q\n", t.TypographicSubfamily)
+	}
+	if t.MacFullName != "" {
+		fmt.Fprintf(b, "MacFullName: %q\n", t.MacFullName)
+	}
+	if t.SampleText != "" {
+		fmt.Fprintf(b, "SampleText: %q\n", t.SampleText)
+	}
+	if t.CIDFontName != "" {
+		fmt.Fprintf(b, "CIDFontName: %q\n", t.CIDFontName)
+	}
+	if t.WWSFamily != "" {
+		fmt.Fprintf(b, "WWSFamily: %q\n", t.WWSFamily)
+	}
+	if t.WWSSubfamily != "" {
+		fmt.Fprintf(b, "WWSSubfamily: %q\n", t.WWSSubfamily)
+	}
+	if t.LightBackgroundPalette != "" {
+		fmt.Fprintf(b, "LightBackgroundPalette: %q\n", t.LightBackgroundPalette)
+	}
+	if t.DarkBackgroundPalette != "" {
+		fmt.Fprintf(b, "DarkBackgroundPalette: %q\n", t.DarkBackgroundPalette)
+	}
+	if t.VariationsPostScriptName != "" {
+		fmt.Fprintf(b, "VariationsPostScriptName: %q\n", t.VariationsPostScriptName)
+	}
 	return b.String()
 }
 
@@ -168,6 +184,34 @@ func (t *Table) get(i int) string {
 		return t.Designer
 	case 10:
 		return t.Description
+	case 11:
+		return t.VendorURL
+	case 12:
+		return t.DesignerURL
+	case 13:
+		return t.License
+	case 14:
+		return t.LicenseURL
+	case 16:
+		return t.TypographicFamily
+	case 17:
+		return t.TypographicSubfamily
+	case 18:
+		return t.MacFullName
+	case 19:
+		return t.SampleText
+	case 20:
+		return t.CIDFontName
+	case 21:
+		return t.WWSFamily
+	case 22:
+		return t.WWSSubfamily
+	case 23:
+		return t.LightBackgroundPalette
+	case 24:
+		return t.DarkBackgroundPalette
+	case 25:
+		return t.VariationsPostScriptName
 	default:
 		return ""
 	}
@@ -226,22 +270,21 @@ recLoop:
 			key = msLang[languageID]
 		}
 		if key.Language == 0 {
-			fmt.Printf("x %d %04x\n", platformID, languageID)
 			continue
 		}
 
+		var val string
 		if storageOffset+nameOffset+nameLen > len(data) {
 			return nil, errMalformedNames
 		}
 		nameBytes := data[storageOffset+nameOffset : storageOffset+nameOffset+nameLen]
-
-		var val string
 		switch platformID {
 		case 0, 3: // Unicode and Windows
 			val = utf16Decode(nameBytes)
 		case 1: // Macintosh
 			if encodingID != 0 {
 				// TODO(voss): implement some more encodings
+				// https://unicode.org/Public/MAPPINGS/VENDORS/APPLE/ReadMe.txt
 				continue recLoop
 			}
 			val = mac.Decode(nameBytes)
@@ -277,6 +320,34 @@ recLoop:
 			t.Designer = val
 		case 10:
 			t.Description = val
+		case 11:
+			t.VendorURL = val
+		case 12:
+			t.DesignerURL = val
+		case 13:
+			t.License = val
+		case 14:
+			t.LicenseURL = val
+		case 16:
+			t.TypographicFamily = val
+		case 17:
+			t.TypographicSubfamily = val
+		case 18:
+			t.MacFullName = val
+		case 19:
+			t.SampleText = val
+		case 20:
+			t.CIDFontName = val
+		case 21:
+			t.WWSFamily = val
+		case 22:
+			t.WWSSubfamily = val
+		case 23:
+			t.LightBackgroundPalette = val
+		case 24:
+			t.DarkBackgroundPalette = val
+		case 25:
+			t.VariationsPostScriptName = val
 		default:
 			continue recLoop
 		}
@@ -288,6 +359,19 @@ recLoop:
 	}
 
 	return res, nil
+}
+
+func parseAndNormalize(s string) *url.URL {
+	u1, err := url.Parse(s)
+	if err != nil {
+		return nil
+	}
+	s2 := u1.String()
+	u2, err := url.Parse(s2)
+	if err != nil {
+		panic(err)
+	}
+	return u2
 }
 
 // Encode converts a "name" table into its binary form.

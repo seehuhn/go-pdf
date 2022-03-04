@@ -49,8 +49,11 @@ func (l Language) Name() string {
 const (
 	LangUndefined Language = iota
 	LangArabic
+	LangBasque
 	LangBengali
+	LangCatalan
 	LangChinese
+	LangCzech
 	LangDanish
 	LangDutch
 	LangEnglish
@@ -59,14 +62,20 @@ const (
 	LangGerman
 	LangGreek
 	LangHindi
+	LangHungarian
 	LangItalian
+	LangJapanese
+	LangKorean
 	LangNorwegianBokmal
 	LangPolish
 	LangPortuguese
 	LangRomanian
 	LangRussian
+	LangSlovak
+	LangSlovenian
 	LangSpanish
 	LangSwedish
+	LangTurkish
 )
 
 type languageCodes struct {
@@ -81,8 +90,11 @@ type languageCodes struct {
 //    code, 639-1, 639-2/T, Iso Language Name
 var languages = map[Language]languageCodes{
 	LangArabic:          {"ar", "ara", "Arabic"},
+	LangBasque:          {"eu", "eus", "Basque"},
 	LangBengali:         {"bn", "ben", "Bengali"},
+	LangCatalan:         {"ca", "cat", "Catalan"},
 	LangChinese:         {"zh", "zho", "Chinese"},
+	LangCzech:           {"cs", "ces", "Czech"},
 	LangDanish:          {"da", "dan", "Danish"},
 	LangDutch:           {"nl", "nld", "Dutch"},
 	LangEnglish:         {"en", "eng", "English"},
@@ -91,12 +103,18 @@ var languages = map[Language]languageCodes{
 	LangGerman:          {"de", "deu", "German"},
 	LangGreek:           {"el", "ell", "Greek"},
 	LangHindi:           {"hi", "hin", "Hindi"},
+	LangHungarian:       {"hu", "hun", "Hungarian"},
 	LangItalian:         {"it", "ita", "Italian"},
+	LangJapanese:        {"ja", "jpn", "Japanese"},
+	LangKorean:          {"ko", "kor", "Korean"},
 	LangNorwegianBokmal: {"nb", "nob", "Norwegian Bokmål"},
 	LangPolish:          {"pl", "pol", "Polish"},
 	LangPortuguese:      {"pt", "por", "Portugese"},
 	LangRomanian:        {"ro", "ron", "Romanian"},
 	LangRussian:         {"ru", "rus", "Russian"},
+	LangSlovak:          {"sk", "slk", "Slovak"},
+	LangSlovenian:       {"sl", "slv", "Slovenian"},
 	LangSpanish:         {"es", "spa", "Spanish"},
 	LangSwedish:         {"sv", "swe", "Swedish"},
+	LangTurkish:         {"tr", "tur", "Turkish"},
 }

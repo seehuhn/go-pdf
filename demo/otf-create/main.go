@@ -436,7 +436,7 @@ func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
 		Tables: map[name.Loc]*name.Table{},
 	}
 	// TODO(voss): make this more convenient
-	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryGBR, locale.CountryUndefined} {
+	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryUndefined} {
 		nameInfo.Tables[name.Loc{Language: locale.LangEnglish, Country: country}] = &name.Table{
 			Copyright:      info.Copyright,
 			Family:         info.FamilyName,

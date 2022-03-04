@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
 	"seehuhn.de/go/pdf/font/sfnt/mac"
+	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -84,20 +85,6 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 
-	maxpFd, err := tt.GetTableReader("maxp", nil)
-	if err != nil {
-		return nil, err
-	}
-	maxp, err := table.ReadMaxp(maxpFd)
-	if err != nil {
-		return nil, err
-	}
-	NumGlyphs := maxp.NumGlyphs
-	if NumGlyphs < 1 {
-		// the ".notdef" glyph is always included
-		return nil, errors.New("no glyphs found")
-	}
-
 	hheaData, err := tt.Header.ReadTableBytes(tt.Fd, "hhea")
 	if err != nil {
 		return nil, err
@@ -110,13 +97,31 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(hmtxInfo.Width) != NumGlyphs {
-		return nil, errors.New("hmtx: wrong number of glyphs")
+
+	maxpFd, err := tt.GetTableReader("maxp", nil)
+	if err != nil {
+		return nil, err
+	}
+	maxp, err := table.ReadMaxp(maxpFd)
+	if err != nil {
+		return nil, err
+	}
+	NumGlyphs := maxp.NumGlyphs
+	if NumGlyphs != len(hmtxInfo.Width) {
+		return nil, errors.New("inconsistent number of glyphs")
 	}
 
-	os2Info, err := tt.getOS2Info()
-	if err != nil && !table.IsMissing(err) {
+	var os2Info *os2.Info
+	os2Fd, err := tt.GetTableReader("OS/2", nil)
+	if table.IsMissing(err) {
+		// pass
+	} else if err != nil {
 		return nil, err
+	} else {
+		os2Info, err = os2.Read(os2Fd)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	glyf, err := tt.getGlyfInfo(NumGlyphs)
@@ -157,20 +162,15 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	}
 	hmtxInfo.GlyphExtent = GlyphExtent
 
-	if os2Info != nil && os2Info.V0MSValid {
-		if os2Info.V0.Selection&(1<<7) != 0 {
-			hmtxInfo.Ascent = os2Info.V0MS.TypoAscender
-			hmtxInfo.Descent = os2Info.V0MS.TypoDescender
-		} else {
-			hmtxInfo.Ascent = int16(os2Info.V0MS.WinAscent)
-			hmtxInfo.Descent = -int16(os2Info.V0MS.WinDescent)
-		}
-		hmtxInfo.LineGap = os2Info.V0MS.TypoLineGap
+	if os2Info != nil {
+		hmtxInfo.Ascent = os2Info.Ascent
+		hmtxInfo.Descent = os2Info.Descent
+		hmtxInfo.LineGap = os2Info.LineGap
 	}
 
 	var capHeight int
-	if os2Info != nil && os2Info.V0.Version >= 4 {
-		capHeight = int(os2Info.V4.CapHeight)
+	if os2Info != nil && os2Info.CapHeight != 0 {
+		capHeight = int(os2Info.CapHeight)
 	} else if H, ok := cmap['H']; ok && GlyphExtent != nil {
 		// CapHeight may be set equal to the top of the unscaled and unhinted
 		// glyph bounding box of the glyph encoded at U+0048 (LATIN CAPITAL
@@ -198,7 +198,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 
 	var flags font.Flags
 	if os2Info != nil {
-		switch os2Info.V0.FamilyClass >> 8 {
+		switch os2Info.FamilyClass >> 8 {
 		case 1, 2, 3, 4, 5, 7:
 			flags |= font.FlagSerif
 		case 10:
@@ -213,7 +213,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		// If the "OS/2" table is present, Windows seems to use this table to
 		// decide whether the font is bold/italic.  We follow Window's lead
 		// here (overriding the values from the head table).
-		IsItalic = os2Info.V0.Selection&(1<<0) != 0
+		IsItalic = os2Info.IsItalic
 	}
 	if IsItalic {
 		flags |= font.FlagItalic

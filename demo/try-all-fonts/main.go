@@ -49,9 +49,15 @@ func tryFont(fname string) error {
 		return err
 	}
 
-	_, err = name.Decode(nameData)
+	nameInfo, err := name.Decode(nameData)
 	if err != nil {
 		return err
+	}
+
+	for _, t := range nameInfo.Tables {
+		if t.LicenseURL != "" {
+			fmt.Println(t.LicenseURL)
+		}
 	}
 
 	return nil

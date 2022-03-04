@@ -21,6 +21,9 @@ import (
 )
 
 // Loc contains locale information for name table entries.
+// Tables from entries with PlatformID == 3 (Apple) have only language set,
+// while tables from entries with PlatformID == 1 (Microsoft) have language
+// and country set.
 type Loc struct {
 	Language locale.Language
 	Country  locale.Country
@@ -42,10 +45,14 @@ var appleLang = map[uint16]Loc{
 	3:  {Language: locale.LangItalian},
 	4:  {Language: locale.LangDutch},
 	6:  {Language: locale.LangSpanish},
+	11: {Language: locale.LangJapanese},
 	12: {Language: locale.LangArabic},
 	14: {Language: locale.LangGreek},
+	19: {Language: locale.LangChinese}, // traditional
 	21: {Language: locale.LangHindi},
+	23: {Language: locale.LangTurkish},
 	32: {Language: locale.LangRussian},
+	33: {Language: locale.LangChinese}, // simplified
 	37: {Language: locale.LangRomanian},
 	67: {Language: locale.LangBengali},
 }
@@ -54,6 +61,8 @@ var appleLang = map[uint16]Loc{
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-language-ids
 var msLang = map[uint16]Loc{
 	0x0401: {Language: locale.LangArabic, Country: locale.CountrySAU},
+	0x0403: {Language: locale.LangCatalan, Country: locale.CountryESP},
+	0x0405: {Language: locale.LangCzech, Country: locale.CountryCZE},
 	0x0406: {Language: locale.LangDanish, Country: locale.CountryDNK},
 	0x0407: {Language: locale.LangGerman, Country: locale.CountryDEU},
 	0x0408: {Language: locale.LangGreek, Country: locale.CountryGRC},
@@ -61,18 +70,26 @@ var msLang = map[uint16]Loc{
 	0x040A: {Language: locale.LangSpanish, Country: locale.CountryESP}, // traditional sort
 	0x040B: {Language: locale.LangFinnish, Country: locale.CountryFIN},
 	0x040C: {Language: locale.LangFrench, Country: locale.CountryFRA},
+	0x040E: {Language: locale.LangHungarian, Country: locale.CountryHUN},
 	0x0410: {Language: locale.LangItalian, Country: locale.CountryITA},
+	0x0411: {Language: locale.LangJapanese, Country: locale.CountryJPN},
+	0x0412: {Language: locale.LangKorean, Country: locale.CountryKOR},
 	0x0413: {Language: locale.LangDutch, Country: locale.CountryNLD},
 	0x0414: {Language: locale.LangNorwegianBokmal, Country: locale.CountryNOR},
 	0x0415: {Language: locale.LangPolish, Country: locale.CountryPOL},
 	0x0416: {Language: locale.LangPortuguese, Country: locale.CountryBRA},
 	0x0418: {Language: locale.LangRomanian, Country: locale.CountryROU},
 	0x0419: {Language: locale.LangRussian, Country: locale.CountryRUS},
+	0x041B: {Language: locale.LangSlovak, Country: locale.CountrySVK},
 	0x041D: {Language: locale.LangSwedish, Country: locale.CountrySWE},
+	0x041F: {Language: locale.LangTurkish, Country: locale.CountryTUR},
+	0x0424: {Language: locale.LangSlovenian, Country: locale.CountrySVN},
+	0x042D: {Language: locale.LangBasque, Country: locale.CountryESP},
 	0x0439: {Language: locale.LangHindi, Country: locale.CountryIND},
 	0x0445: {Language: locale.LangBengali, Country: locale.CountryIND},
 	0x0804: {Language: locale.LangChinese, Country: locale.CountryCHN},
 	0x0809: {Language: locale.LangEnglish, Country: locale.CountryGBR},
+	0x080A: {Language: locale.LangSpanish, Country: locale.CountryMEX},
 	0x0816: {Language: locale.LangPortuguese, Country: locale.CountryPRT},
 	0x0845: {Language: locale.LangBengali, Country: locale.CountryBGD},
 	0x0C0A: {Language: locale.LangSpanish, Country: locale.CountryESP}, // modern sort

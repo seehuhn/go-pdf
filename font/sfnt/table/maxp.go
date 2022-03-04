@@ -40,13 +40,17 @@ func ReadMaxp(r io.Reader) (*MaxpInfo, error) {
 	}
 
 	numGlyphs := int(buf[4])<<8 | int(buf[5])
+	if numGlyphs == 0 {
+		return nil, errors.New("sfnt/maxp: numGlyphs is zero")
+	}
+
 	return &MaxpInfo{numGlyphs}, nil
 }
 
 // Encode encodes the number of Glyphs in a "maxp" table.
 func (info *MaxpInfo) Encode() ([]byte, error) {
 	numGlyphs := info.NumGlyphs
-	if numGlyphs < 0 || numGlyphs >= 1<<16 {
+	if numGlyphs < 1 || numGlyphs >= 1<<16 {
 		return nil, errors.New("sfnt/maxp: numGlyphs out of range")
 	}
 	return []byte{0x00, 0x00, 0x50, 0x00, byte(numGlyphs >> 8), byte(numGlyphs)}, nil

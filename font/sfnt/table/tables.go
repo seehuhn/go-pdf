@@ -402,56 +402,6 @@ type PostInfo struct {
 	IsFixedPitch       bool
 }
 
-type OS2 struct {
-	V0 struct {
-		Version            uint16    // table version number (set to 0)
-		AvgCharWidth       int16     // average weighted advance width of lower case letters and space
-		WeightClass        uint16    // visual weight (degree of blackness or thickness) of stroke in glyphs
-		WidthClass         uint16    // relative change from the normal aspect ratio (width to height ratio) as specified by a font designer for the glyphs in the font
-		Type               int16     // characteristics and properties of this font (set undefined bits to zero)
-		SubscriptXSize     int16     // recommended horizontal size in pixels for subscripts
-		SubscriptYSize     int16     // recommended vertical size in pixels for subscripts
-		SubscriptXOffset   int16     // recommended horizontal offset for subscripts
-		SubscriptYOffset   int16     // recommended vertical offset form the baseline for subscripts
-		SuperscriptXSize   int16     // recommended horizontal size in pixels for superscripts
-		SuperscriptYSize   int16     // recommended vertical size in pixels for superscripts
-		SuperscriptXOffset int16     // recommended horizontal offset for superscripts
-		SuperscriptYOffset int16     // recommended vertical offset from the baseline for superscripts
-		StrikeoutSize      int16     // width of the strikeout stroke
-		StrikeoutPosition  int16     // position of the strikeout stroke relative to the baseline
-		FamilyClass        int16     // classification of font-family design.
-		Panose             [10]byte  // series of number used to describe the visual characteristics of a given typeface
-		UnicodeRange       [4]uint32 // Field is split into two bit fields of 96 and 36 bits each. The low 96 bits are used to specify the Unicode blocks encompassed by the font file. The high 32 bits are used to specify the character or script sets covered by the font file. Bit assignments are pending. Set to 0
-		VendID             [4]byte   // four character identifier for the font vendor
-		Selection          uint16    // 2-byte bit field containing information concerning the nature of the font patterns
-		FirstCharIndex     uint16    // The minimum Unicode index in this font.
-		LastCharIndex      uint16    // The maximum Unicode index in this font.
-	}
-	V0MSValid bool
-	V0MS      struct {
-		TypoAscender  int16  // The typographic ascender for this font. This is not necessarily the same as the ascender value in the 'hhea' table.
-		TypoDescender int16  // The typographic descender for this font. This is not necessarily the same as the descender value in the 'hhea' table.
-		TypoLineGap   int16  // The typographic line gap for this font. This is not necessarily the same as the line gap value in the 'hhea' table.
-		WinAscent     uint16 // The ascender metric for Windows. WinAscent is computed as the yMax for all characters in the Windows ANSI character set.
-		WinDescent    uint16 // The descender metric for Windows. WinDescent is computed as the -yMin for all characters in the Windows ANSI character set.
-	}
-	V1 struct {
-		CodePageRange1 uint32 // Bits 0-31
-		CodePageRange2 uint32 // Bits 32-63
-	}
-	V4 struct {
-		XHeight     int16  // The distance between the baseline and the approximate height of non-ascending lowercase letters measured in FUnits.
-		CapHeight   int16  // The distance between the baseline and the approximate height of uppercase letters measured in FUnits.
-		DefaultChar uint16 // The default character displayed by Windows to represent an unsupported character. (Typically this should be 0.)
-		BreakChar   uint16 // The break character used by Windows.
-		MaxContext  uint16 // The maximum length of a target glyph OpenType context for any feature in this font.
-	}
-	V5 struct {
-		LowerPointSize uint16 // The lowest size (in twentieths of a typographic point), at which the font starts to be used. This is an inclusive value.
-		UpperPointSize uint16 // The highest size (in twentieths of a typographic point), at which the font starts to be used. This is an exclusive value. Use 0xFFFFU to indicate no upper limit.
-	}
-}
-
 type Glyf struct {
 	Data []GlyphHeader
 	// actual glyph descriptions omitted
