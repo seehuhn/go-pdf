@@ -18,10 +18,13 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"log"
 	"math"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"seehuhn.de/go/pdf"
@@ -44,15 +47,9 @@ import (
 type CFFInfo struct {
 	Glyphs []*cff.Glyph
 
-	FullName   string
 	FamilyName string
-	Weight     os2.Weight
 	Width      os2.Width
-
-	// FontName is a condensation of FullName.  It is customary to remove
-	// spaces and to limit its length to fewer than 40 characters. The
-	// resulting name should be unique.
-	FontName string
+	Weight     os2.Weight
 
 	Version          head.Version
 	CreationTime     time.Time
@@ -77,6 +74,41 @@ type CFFInfo struct {
 	IsOblique bool
 }
 
+// Subfamily returns the subfamily name of the font.
+func (info *CFFInfo) Subfamily() string {
+	var words []string
+	if info.Width != 0 && info.Width != os2.WidthNormal {
+		words = append(words, info.Width.String())
+	}
+	if info.Weight != 0 && info.Weight != os2.WeightNormal {
+		words = append(words, info.Weight.String())
+	} else if info.IsBold {
+		words = append(words, "Bold")
+	}
+	if info.IsOblique {
+		words = append(words, "Oblique")
+	} else if info.ItalicAngle != 0 {
+		words = append(words, "Italic")
+	}
+	if len(words) == 0 {
+		return "Regular"
+	}
+	return strings.Join(words, " ")
+}
+
+// FullName returns the full name of the font.
+func (info *CFFInfo) FullName() string {
+	return info.FamilyName + " " + info.Subfamily()
+}
+
+// PostscriptName returns the Postscript name of the font.
+func (info *CFFInfo) PostscriptName() string {
+	name := info.FamilyName + "-" + info.Subfamily()
+	re := regexp.MustCompile(`[^!-$&-'*-.0-;=?-Z\\^-z|~]+`)
+	return re.ReplaceAllString(name, "")
+}
+
+// Read reads an OpenType font from a file.
 func Read(fname string) (*CFFInfo, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
@@ -149,17 +181,37 @@ func Read(fname string) (*CFFInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	nameTable := nameInfo.Tables.Get()
+	if nameTable == nil {
+		return nil, errors.New("no name table")
+	}
+	// TODO(voss): use SubFamily, Fullname etc. to double-check the flags from
+	// the OS/2 table.
+
+	cmapData, err := header.ReadTableBytes(fd, "cmap")
+	if err != nil {
+		return nil, err
+	}
+	subtables, err := cmap.Decode(cmapData)
+	if err != nil {
+		return nil, err
+	}
+	cmapInfo, err := subtables.GetBest()
+	if err != nil {
+		return nil, err
+	}
+	_ = cmapInfo
 
 	// info.Glyphs =
-	// info.FullName =
-	// info.FamilyName =
+	info.FamilyName = nameTable.Family
 	info.Weight = os2Info.WeightClass
 	info.Width = os2Info.WidthClass
 	// info.FontName =
 	info.Version = headInfo.FontRevision
+	// ALT: nameTable.Version
 	info.CreationTime = headInfo.Created
 	info.ModificationTime = headInfo.Modified
-	// info.Copyright =
+	info.Copyright = nameTable.Copyright
 	// info.Notice =
 	info.PermUse = os2Info.PermUse
 	info.UnitsPerEm = headInfo.UnitsPerEm
@@ -188,7 +240,6 @@ func main() {
 
 	now := time.Now()
 	info := &CFFInfo{
-		FullName:   "Test Font",
 		FamilyName: "Test",
 		Weight:     os2.WeightNormal,
 		Width:      os2.WidthNormal,
@@ -312,10 +363,10 @@ func isFixedPitch(glyphs []*cff.Glyph) bool {
 func makeCFF(info *CFFInfo) ([]byte, error) {
 	q := 1 / float64(info.UnitsPerEm)
 	cffInfo := type1.FontInfo{
-		FullName:   info.FullName,
+		FullName:   info.FullName(),
 		FamilyName: info.FamilyName,
 		Weight:     info.Weight.String(),
-		FontName:   pdf.Name(info.FontName),
+		FontName:   pdf.Name(info.PostscriptName()),
 		Version:    info.Version.String(),
 
 		Copyright: info.Copyright,
@@ -435,16 +486,16 @@ func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
 	nameInfo := &name.Info{
 		Tables: map[name.Loc]*name.Table{},
 	}
-	// TODO(voss): make this more convenient
+	fullName := info.FullName()
 	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryUndefined} {
 		nameInfo.Tables[name.Loc{Language: locale.LangEnglish, Country: country}] = &name.Table{
 			Copyright:      info.Copyright,
 			Family:         info.FamilyName,
-			Subfamily:      "Regular",
-			Identifier:     info.FullName + "; " + info.Version.String() + "; " + dayString,
-			FullName:       info.FullName,
+			Subfamily:      info.Subfamily(),
+			Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
+			FullName:       fullName,
 			Version:        "Version " + info.Version.String(),
-			PostScriptName: "Test",
+			PostScriptName: info.PostscriptName(),
 		}
 	}
 
@@ -464,8 +515,8 @@ func makeCmap(info *CFFInfo) (cmap.Format4, cmap.Subtables) {
 	}
 	cmapSubtable := cc.Encode(0)
 	ss := cmap.Subtables{
-		{PlatformID: 1, EncodingID: 0, Language: 0, Data: cmapSubtable},
-		{PlatformID: 3, EncodingID: 1, Language: 0, Data: cmapSubtable},
+		{PlatformID: 1, EncodingID: 0, Language: 0}: cmapSubtable,
+		{PlatformID: 3, EncodingID: 1, Language: 0}: cmapSubtable,
 	}
 	return cc, ss
 }

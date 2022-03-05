@@ -18,13 +18,20 @@ package main
 
 import (
 	"bufio"
+	"encoding/csv"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 
 	"seehuhn.de/go/pdf/font/sfnt/name"
+	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
+
+var out *csv.Writer
 
 func tryFont(fname string) error {
 	// tt, err := sfnt.Open(fname, nil)
@@ -49,15 +56,37 @@ func tryFont(fname string) error {
 		return err
 	}
 
+	tableReader := func(name string) (*io.SectionReader, error) {
+		rec := header.Find(name)
+		if rec == nil {
+			return nil, &table.ErrNoTable{Name: name}
+		}
+		return io.NewSectionReader(fd, int64(rec.Offset), int64(rec.Length)), nil
+	}
+
+	os2Fd, err := tableReader("OS/2")
+	if table.IsMissing(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	os2Info, err := os2.Read(os2Fd)
+	if err != nil {
+		return err
+	}
+
 	nameInfo, err := name.Decode(nameData)
 	if err != nil {
 		return err
 	}
 
-	for _, t := range nameInfo.Tables {
-		if t.LicenseURL != "" {
-			fmt.Println(t.LicenseURL)
-		}
+	t := nameInfo.Tables.Get()
+	if t == nil {
+		return errors.New("no name table")
+	}
+
+	if !os2Info.IsBold && strings.Contains(t.Subfamily, "Bold") {
+		fmt.Println(t)
 	}
 
 	return nil
@@ -70,6 +99,12 @@ func main() {
 	}
 	defer fd.Close()
 
+	outFd, err := os.Create("x.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	out = csv.NewWriter(outFd)
+
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
 		fname := scanner.Text()
@@ -80,5 +115,10 @@ func main() {
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal("main loop failed:", err)
+	}
+	out.Flush()
+	err = outFd.Close()
+	if err != nil {
+		log.Fatal(err)
 	}
 }

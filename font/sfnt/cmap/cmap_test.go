@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
-	"sort"
 	"testing"
 )
 
@@ -34,22 +33,14 @@ func FuzzCmapHeader(f *testing.F) {
 	})
 	buf := bytes.Buffer{}
 	ss := Subtables{
-		{
-			PlatformID: 3,
-			EncodingID: 10,
-			Data:       []byte{0, 1, 0, 8, 1, 2, 3, 4, 101, 102, 103, 104},
-		},
-		{
-			PlatformID: 0,
-			EncodingID: 4,
-			Data:       []byte{0, 1, 0, 8, 5, 6, 7, 8, 101, 102, 103, 104},
-		},
+		{PlatformID: 3, EncodingID: 10}: []byte{0, 1, 0, 8, 1, 2, 3, 4, 101, 102, 103, 104},
+		{PlatformID: 0, EncodingID: 4}:  []byte{0, 1, 0, 8, 5, 6, 7, 8, 101, 102, 103, 104},
 	}
 	ss.Write(&buf)
 	f.Add(buf.Bytes())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		ss, err := LocateSubtables(data)
+		ss, err := Decode(data)
 		if err != nil {
 			return
 		}
@@ -60,23 +51,14 @@ func FuzzCmapHeader(f *testing.F) {
 			fmt.Printf("B % x\n", buf.Bytes())
 			t.Errorf("too long")
 		}
-		ss2, err := LocateSubtables(buf.Bytes())
+		ss2, err := Decode(buf.Bytes())
 		if err != nil {
-			for i := 0; i < len(ss); i++ {
-				fmt.Printf("%d %d % x\n", ss[i].PlatformID, ss[i].EncodingID, ss[i].Data)
+			for key, data := range ss {
+				fmt.Printf("%d %d % x\n", key.PlatformID, key.EncodingID, data)
 			}
 			fmt.Printf("% x\n", buf.Bytes())
 			t.Fatal(err)
 		}
-		sort.Slice(ss, func(i, j int) bool {
-			if ss[i].PlatformID != ss[j].PlatformID {
-				return ss[i].PlatformID < ss[j].PlatformID
-			}
-			if ss[i].EncodingID != ss[j].EncodingID {
-				return ss[i].EncodingID < ss[j].EncodingID
-			}
-			return ss[i].Language < ss[j].Language
-		})
 		if !reflect.DeepEqual(ss, ss2) {
 			fmt.Printf("A % x\n", data)
 			fmt.Printf("B % x\n", buf.Bytes())

@@ -46,31 +46,11 @@ func FuzzNames(f *testing.F) {
 		},
 	}
 	ss := cmap.Subtables{
-		{
-			PlatformID: 0,
-			EncodingID: 4,
-			Language:   0,
-		},
-		{
-			PlatformID: 1,
-			EncodingID: 0,
-			Language:   0,
-		},
-		{
-			PlatformID: 1,
-			EncodingID: 0,
-			Language:   2,
-		},
-		{
-			PlatformID: 3,
-			EncodingID: 1,
-			Language:   0,
-		},
-		{
-			PlatformID: 3,
-			EncodingID: 1,
-			Language:   0x0407,
-		},
+		{PlatformID: 0, EncodingID: 4}:              nil,
+		{PlatformID: 1, EncodingID: 0}:              nil,
+		{PlatformID: 1, EncodingID: 0, Language: 2}: nil,
+		{PlatformID: 3, EncodingID: 1}:              nil,
+		{PlatformID: 3, EncodingID: 1}:              nil,
 	}
 	f.Add(info.Encode(ss))
 
@@ -80,23 +60,15 @@ func FuzzNames(f *testing.F) {
 			return
 		}
 
-		var ss cmap.Subtables
+		ss := make(cmap.Subtables)
 		for key := range n1.Tables {
 			languageID, ok := appleCode(key.Language)
 			if ok {
-				ss = append(ss, cmap.SubtableData{
-					PlatformID: 1, // Macintosh
-					EncodingID: 0, // Roman
-					Language:   languageID,
-				})
+				ss[cmap.Key{PlatformID: 1, EncodingID: 0, Language: languageID}] = nil
 			}
 			languageID = msCode(key)
 			if languageID != 0xFFFF {
-				ss = append(ss, cmap.SubtableData{
-					PlatformID: 3, // Windows
-					EncodingID: 1, // Unicode BMP
-					Language:   languageID,
-				})
+				ss[cmap.Key{PlatformID: 3, EncodingID: 1}] = nil
 			}
 		}
 

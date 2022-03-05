@@ -34,7 +34,7 @@ const maxNameID = 25
 
 // Info contains information from the "name" table.
 type Info struct {
-	Tables map[Loc]*Table
+	Tables Tables
 }
 
 func (info *Info) selectExactLoc(lang locale.Language, country locale.Country) *Table {
@@ -82,14 +82,23 @@ type Table struct {
 
 func (t *Table) String() string {
 	b := &strings.Builder{}
-	if t.Copyright != "" {
-		fmt.Fprintf(b, "Copyright: %q\n", t.Copyright)
-	}
 	if t.Family != "" {
 		fmt.Fprintf(b, "Family: %q\n", t.Family)
 	}
 	if t.Subfamily != "" {
 		fmt.Fprintf(b, "Subfamily: %q\n", t.Subfamily)
+	}
+	if t.TypographicFamily != "" {
+		fmt.Fprintf(b, "TypographicFamily: %q\n", t.TypographicFamily)
+	}
+	if t.TypographicSubfamily != "" {
+		fmt.Fprintf(b, "TypographicSubfamily: %q\n", t.TypographicSubfamily)
+	}
+	if t.WWSFamily != "" {
+		fmt.Fprintf(b, "WWSFamily: %q\n", t.WWSFamily)
+	}
+	if t.WWSSubfamily != "" {
+		fmt.Fprintf(b, "WWSSubfamily: %q\n", t.WWSSubfamily)
 	}
 	if t.Identifier != "" {
 		fmt.Fprintf(b, "Identifier: %q\n", t.Identifier)
@@ -121,17 +130,14 @@ func (t *Table) String() string {
 	if t.DesignerURL != "" {
 		fmt.Fprintf(b, "DesignerURL: %s\n", t.DesignerURL)
 	}
+	if t.Copyright != "" {
+		fmt.Fprintf(b, "Copyright: %q\n", t.Copyright)
+	}
 	if t.License != "" {
 		fmt.Fprintf(b, "License: %q\n", t.License)
 	}
 	if t.LicenseURL != "" {
 		fmt.Fprintf(b, "LicenseURL: %s\n", t.LicenseURL)
-	}
-	if t.TypographicFamily != "" {
-		fmt.Fprintf(b, "TypographicFamily: %q\n", t.TypographicFamily)
-	}
-	if t.TypographicSubfamily != "" {
-		fmt.Fprintf(b, "TypographicSubfamily: %q\n", t.TypographicSubfamily)
 	}
 	if t.MacFullName != "" {
 		fmt.Fprintf(b, "MacFullName: %q\n", t.MacFullName)
@@ -141,12 +147,6 @@ func (t *Table) String() string {
 	}
 	if t.CIDFontName != "" {
 		fmt.Fprintf(b, "CIDFontName: %q\n", t.CIDFontName)
-	}
-	if t.WWSFamily != "" {
-		fmt.Fprintf(b, "WWSFamily: %q\n", t.WWSFamily)
-	}
-	if t.WWSSubfamily != "" {
-		fmt.Fprintf(b, "WWSSubfamily: %q\n", t.WWSSubfamily)
 	}
 	if t.LightBackgroundPalette != "" {
 		fmt.Fprintf(b, "LightBackgroundPalette: %q\n", t.LightBackgroundPalette)
@@ -158,6 +158,26 @@ func (t *Table) String() string {
 		fmt.Fprintf(b, "VariationsPostScriptName: %q\n", t.VariationsPostScriptName)
 	}
 	return b.String()
+}
+
+// Tables contains the information from the "name" table.
+type Tables map[Loc]*Table
+
+// Get returns the default name table.  This is the en_US version, if available.
+func (tt Tables) Get() *Table {
+	t := tt[Loc{Language: locale.LangEnglish, Country: locale.CountryUSA}]
+	if t != nil {
+		return t
+	}
+
+	t = tt[Loc{Language: locale.LangEnglish, Country: locale.CountryUndefined}]
+	if t != nil {
+		return t
+	}
+
+	// TODO(voss): try some fallback
+
+	return nil
 }
 
 func (t *Table) get(i int) string {
@@ -390,8 +410,8 @@ func (info *Info) Encode(ss cmap.Subtables) []byte {
 
 	// platform ID 1 (Macintosh)
 	includeMac := false
-	for i := range ss {
-		if ss[i].PlatformID == 1 {
+	for key := range ss {
+		if key.PlatformID == 1 {
 			includeMac = true
 			break
 		}
@@ -426,9 +446,9 @@ func (info *Info) Encode(ss cmap.Subtables) []byte {
 	// Encoding IDs for platform 3 'name' entries should match the encoding IDs
 	// used for platform 3 subtables in the 'cmap' table.
 	encodingIDs := make(map[uint16]bool)
-	for i := range ss {
-		if ss[i].PlatformID == 3 {
-			encodingIDs[ss[i].EncodingID] = true
+	for key := range ss {
+		if key.PlatformID == 3 {
+			encodingIDs[key.EncodingID] = true
 		}
 	}
 	if len(encodingIDs) == 0 {

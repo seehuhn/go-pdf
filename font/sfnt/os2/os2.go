@@ -112,6 +112,31 @@ const (
 // font designer for the glyphs in a font.
 type Width uint16
 
+func (w Width) String() string {
+	switch w {
+	case WidthUltraCondensed:
+		return "Ultra Condensed"
+	case WidthExtraCondensed:
+		return "Extra Condensed"
+	case WidthCondensed:
+		return "Condensed"
+	case WidthSemiCondensed:
+		return "Semi Condensed"
+	case WidthNormal:
+		return "Normal"
+	case WidthSemiExpanded:
+		return "Semi Expanded"
+	case WidthExpanded:
+		return "Expanded"
+	case WidthExtraExpanded:
+		return "Extra Expanded"
+	case WidthUltraExpanded:
+		return "Ultra Expanded"
+	default:
+		return fmt.Sprintf("Width(%d)", w)
+	}
+}
+
 // Valid width values.
 const (
 	WidthUltraCondensed Width = 1 // 50% of WidthNormal
@@ -163,8 +188,8 @@ func Read(r io.Reader) (*Info, error) {
 
 	sel := v0.Selection
 	if v0.Version <= 3 {
-		// Applications should ignore bits 7 to 15 in a font that has a version
-		// 0 to version 3 OS/2 table.
+		// Applications should ignore bits 7 to 15 in a font that has a
+		// version 0 to version 3 OS/2 table.
 		sel &= 0x007F
 	}
 
@@ -271,16 +296,16 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		if info.IsItalic {
 			sel |= 0x0001
 		}
-		// if info.HasUnderline {
-		// 	sel |= 0x0002
-		// }
-		// if info.IsOutlined {
-		// 	sel |= 0x0008
-		// }
 		if info.IsBold {
 			sel |= 0x0020
 		}
 	}
+	// if info.HasUnderline {
+	// 	sel |= 0x0002
+	// }
+	// if info.IsOutlined {
+	// 	sel |= 0x0008
+	// }
 	if info.IsOblique {
 		sel |= 0x0200
 	}

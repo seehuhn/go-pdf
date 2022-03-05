@@ -4,6 +4,7 @@ package cmap
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -11,6 +12,7 @@ import (
 
 	"golang.org/x/exp/slices"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/mac"
 )
 
 // From the font files on my laptop, I extracted all cmap subtables
@@ -28,34 +30,62 @@ import (
 //        1 |    8 (mixed 16-bit and 32-bit coverage)
 //        1 |   13 (Many-to-one range mappings)
 
-// SubtableData represents an encoded cmap subtable.
-type SubtableData struct {
+// Key selects a subtable of a cmap table.
+type Key struct {
 	PlatformID uint16 // Platform ID.
 	EncodingID uint16 // Platform-specific encoding ID.
 	Language   uint16
-	Data       []byte
 }
 
-// Format returns the format of the cmap subtable.
-// Valid formats are 0, 2, 4, 6, 8, 10, 12, 13 and 14.
-func (sub SubtableData) Format() uint16 {
-	return uint16(sub.Data[0])<<8 | uint16(sub.Data[1])
+// Subtables contains all subtables from a cmap table.
+type Subtables map[Key][]byte
+
+// Get decodes the given cmap subtable.
+func (ss Subtables) Get(key Key) (Subtable, error) {
+	data, ok := ss[key]
+	if !ok {
+		return nil, errors.New("cmap: no such subtable")
+	}
+	format := uint16(data[0])<<8 | uint16(data[1])
+	load := loaders[format]
+	return load(data)
 }
 
-// Load decodes a cmap subtable.
-func (sub SubtableData) Load() (Subtable, error) {
-	load := loaders[sub.Format()]
-	return load(sub.Data)
+// GetBest selects the "best" subtable from a cmap table.
+func (ss Subtables) GetBest() (Subtable, error) {
+	unicode := func(code int) rune {
+		return rune(code)
+	}
+	macRoman := func(code int) rune {
+		// TODO(voss): declutter this
+		return []rune(mac.Decode([]byte{byte(code)}))[0]
+	}
+	candidates := []struct {
+		PlatformID uint16
+		EncodingID uint16
+		IdxToRune  func(int) rune
+	}{
+		{3, 10, unicode}, // full unicode
+		{0, 4, unicode},
+		{3, 1, unicode}, // BMP
+		{0, 3, unicode},
+		{1, 0, macRoman}, // vintage Apple format
+	}
+	// TODO(voss): use IdxToRune
+
+	for _, c := range candidates {
+		if sub, err := ss.Get(Key{c.PlatformID, c.EncodingID, 0}); err == nil {
+			return sub, nil
+		}
+	}
+	return nil, errors.New("cmap: no suitable subtable found")
 }
 
-// Subtables represents the collection of all subtables in a cmap table.
-type Subtables []SubtableData
-
-// LocateSubtables returns all subtables of the given "cmap" table.
+// Decode returns all subtables of the given "cmap" table.
 // The returned subtables are guaranteed to be at least 10 bytes long
 // and to have a valid format value (0, 2, 4, 6, 8, 10, 12, 13 or 14)
 // in the first two bytes.
-func LocateSubtables(data []byte) (Subtables, error) {
+func Decode(data []byte) (Subtables, error) {
 	const minLength = 10 // length of an empty format 6 subtable
 
 	if len(data) < 4 || len(data) > math.MaxUint32 {
@@ -78,7 +108,7 @@ func LocateSubtables(data []byte) (Subtables, error) {
 	}
 	var segs []seg
 
-	res := make([]SubtableData, numTables)
+	res := make(Subtables)
 	for i := 0; i < numTables; i++ {
 		platformID := uint16(data[4+i*8])<<8 | uint16(data[5+i*8])
 		if platformID > 4 {
@@ -136,10 +166,12 @@ func LocateSubtables(data []byte) (Subtables, error) {
 			segs = slices.Insert(segs, idx, seg{o, o + length})
 		}
 
-		res[i].PlatformID = platformID
-		res[i].EncodingID = encodingID
-		res[i].Language = language
-		res[i].Data = data[o : o+length]
+		key := Key{
+			PlatformID: platformID,
+			EncodingID: encodingID,
+			Language:   language,
+		}
+		res[key] = data[o : o+length]
 	}
 
 	return res, nil
@@ -147,18 +179,16 @@ func LocateSubtables(data []byte) (Subtables, error) {
 
 func (ss Subtables) Write(w io.Writer) error {
 	type extended struct {
-		Data       []byte
-		Offs       uint32
-		PlatformID uint16
-		EncodingID uint16
-		Language   uint16
+		Data []byte
+		Offs uint32
+		Key
 	}
-	ext := make([]extended, len(ss))
-	for i, s := range ss {
-		ext[i].Data = s.Data
-		ext[i].PlatformID = s.PlatformID
-		ext[i].EncodingID = s.EncodingID
-		ext[i].Language = s.Language
+	ext := make([]extended, 0, len(ss))
+	for key, data := range ss {
+		ext = append(ext, extended{
+			Data: data,
+			Key:  key,
+		})
 	}
 	sort.Slice(ext, func(i, j int) bool {
 		if ext[i].PlatformID != ext[j].PlatformID {
@@ -219,6 +249,8 @@ offsLoop:
 // Subtable represents a decoded cmap subtable.
 type Subtable interface {
 	Lookup(code uint32) font.GlyphID
+
+	// Encode returns the binary form of the subtable.
 	Encode(language uint16) []byte
 
 	// CodeRange returns the smallest and largest code point in the subtable.

@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,34 +14,32 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package sfnt
+package main
 
 import (
-	"bytes"
+	"testing"
 
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/os2"
 )
 
-// makeCMap writes a cmap containing a 1,0,4 subtable to map character indices
-// to glyph indices in a subsetted font.
-func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
-	subtable := make(cmap.Format4)
-	for _, entry := range mapping {
-		if entry.GID == 0 {
-			continue
-		}
-		subtable[entry.CharCode] = entry.GID
+func TestPostscriptName(t *testing.T) {
+	info := &CFFInfo{
+		FamilyName:  `A(n)d[r]o{m}e/d<a> N%ebula`,
+		Weight:      os2.WeightBold,
+		ItalicAngle: -12,
+	}
+	psName := info.PostscriptName()
+	if psName != "AndromedaNebula-BoldItalic" {
+		t.Errorf("wrong postscript name: %q", psName)
 	}
 
-	cmap := cmap.Subtables{
-		cmap.Key{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
+	var rr []rune
+	for i := 0; i < 255; i++ {
+		rr = append(rr, rune(i))
 	}
-
-	buf := &bytes.Buffer{}
-	if err := cmap.Write(buf); err != nil {
-		return nil, err
+	info.FamilyName = string(rr)
+	psName = info.PostscriptName()
+	if len(psName) != 127-33-10+len("-BoldItalic") {
+		t.Errorf("wrong postscript name: %q", psName)
 	}
-
-	return buf.Bytes(), nil
 }
