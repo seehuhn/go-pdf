@@ -208,7 +208,7 @@ func Read(fname string) (*CFFInfo, error) {
 	info.Width = os2Info.WidthClass
 	// info.FontName =
 	info.Version = headInfo.FontRevision
-	// ALT: nameTable.Version
+	//   ALT: nameTable.Version
 	info.CreationTime = headInfo.Created
 	info.ModificationTime = headInfo.Modified
 	info.Copyright = nameTable.Copyright
@@ -216,16 +216,16 @@ func Read(fname string) (*CFFInfo, error) {
 	info.PermUse = os2Info.PermUse
 	info.UnitsPerEm = headInfo.UnitsPerEm
 	info.Ascent = hmtxInfo.Ascent
-	// ALT: info.Ascent = os2Info.Ascent
+	//   ALT: info.Ascent = os2Info.Ascent
 	info.Descent = hmtxInfo.Descent
-	// ALT: info.Descent = os2Info.Descent
+	//   ALT: info.Descent = os2Info.Descent
 	info.LineGap = hmtxInfo.LineGap
-	// ALT: info.LineGap = os2Info.LineGap
+	//   ALT: info.LineGap = os2Info.LineGap
 	info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
 	// info.UnderlinePosition =
 	// info.UnderlineThickness =
 	info.IsBold = headInfo.IsBold
-	// ALT: info.IsBold = os2Info.IsBold
+	//   ALT: info.IsBold = os2Info.IsBold
 	info.IsRegular = os2Info.IsRegular
 	info.IsOblique = os2Info.IsOblique
 
@@ -473,7 +473,7 @@ func makeOS2(info *CFFInfo, cc cmap.Subtable) []byte {
 	return os2Info.Encode(cc)
 }
 
-func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
+func makeName(info *CFFInfo, ss cmap.Table) []byte {
 	day := info.ModificationTime
 	if day.IsZero() {
 		day = info.CreationTime
@@ -502,7 +502,7 @@ func makeName(info *CFFInfo, ss cmap.Subtables) []byte {
 	return nameInfo.Encode(ss)
 }
 
-func makeCmap(info *CFFInfo) (cmap.Format4, cmap.Subtables) {
+func makeCmap(info *CFFInfo) (cmap.Format4, cmap.Table) {
 	cc := cmap.Format4{}
 	for i, g := range info.Glyphs {
 		rr := names.ToUnicode(string(g.Name), false)
@@ -514,7 +514,7 @@ func makeCmap(info *CFFInfo) (cmap.Format4, cmap.Subtables) {
 		}
 	}
 	cmapSubtable := cc.Encode(0)
-	ss := cmap.Subtables{
+	ss := cmap.Table{
 		{PlatformID: 1, EncodingID: 0, Language: 0}: cmapSubtable,
 		{PlatformID: 3, EncodingID: 1, Language: 0}: cmapSubtable,
 	}

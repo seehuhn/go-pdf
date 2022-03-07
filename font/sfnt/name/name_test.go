@@ -45,7 +45,7 @@ func FuzzNames(f *testing.F) {
 			},
 		},
 	}
-	ss := cmap.Subtables{
+	ss := cmap.Table{
 		{PlatformID: 0, EncodingID: 4}:              nil,
 		{PlatformID: 1, EncodingID: 0}:              nil,
 		{PlatformID: 1, EncodingID: 0, Language: 2}: nil,
@@ -60,7 +60,7 @@ func FuzzNames(f *testing.F) {
 			return
 		}
 
-		ss := make(cmap.Subtables)
+		ss := make(cmap.Table)
 		for key := range n1.Tables {
 			languageID, ok := appleCode(key.Language)
 			if ok {

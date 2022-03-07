@@ -46,7 +46,7 @@ func FuzzFormat4(f *testing.F) {
 	})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		c1, err := decodeFormat4(data)
+		c1, err := decodeFormat4(data, nil)
 		if err != nil {
 			return
 		}
@@ -56,7 +56,7 @@ func FuzzFormat4(f *testing.F) {
 		// 	t.Error("too long")
 		// }
 
-		c2, err := decodeFormat4(data2)
+		c2, err := decodeFormat4(data2, nil)
 		if err != nil {
 			t.Error(err)
 		}

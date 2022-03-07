@@ -32,7 +32,7 @@ func FuzzCmapHeader(f *testing.F) {
 		0, 6, 0, 10, 0, 0, 0, 0,
 	})
 	buf := bytes.Buffer{}
-	ss := Subtables{
+	ss := Table{
 		{PlatformID: 3, EncodingID: 10}: []byte{0, 1, 0, 8, 1, 2, 3, 4, 101, 102, 103, 104},
 		{PlatformID: 0, EncodingID: 4}:  []byte{0, 1, 0, 8, 5, 6, 7, 8, 101, 102, 103, 104},
 	}

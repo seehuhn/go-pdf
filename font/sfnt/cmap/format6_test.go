@@ -31,14 +31,14 @@ func FuzzFormat6(f *testing.F) {
 	}).Encode(0))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		c1, err := decodeFormat6(data)
+		c1, err := decodeFormat6(data, nil)
 		if err != nil {
 			return
 		}
 
 		data2 := c1.Encode(0)
 
-		c2, err := decodeFormat6(data2)
+		c2, err := decodeFormat6(data2, nil)
 		if err != nil {
 			t.Error(err)
 		}

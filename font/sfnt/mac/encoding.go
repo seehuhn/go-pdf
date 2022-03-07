@@ -35,6 +35,14 @@ func Decode(cc []byte) string {
 	return string(rr)
 }
 
+// DecodeOne decodes a single MacRoman encoded byte.
+func DecodeOne(c byte) rune {
+	if c < 128 {
+		return rune(c)
+	}
+	return dec[c-128]
+}
+
 // Encode encodes a string of Unicode runes.  Runes which cannot be represented
 // in the MacRoman encoding are replaced by question marks.
 func Encode(s string) []byte {

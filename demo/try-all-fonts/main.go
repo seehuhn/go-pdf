@@ -19,15 +19,11 @@ package main
 import (
 	"bufio"
 	"encoding/csv"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"strings"
 
-	"seehuhn.de/go/pdf/font/sfnt/name"
-	"seehuhn.de/go/pdf/font/sfnt/os2"
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -51,43 +47,63 @@ func tryFont(fname string) error {
 		return err
 	}
 
-	nameData, err := header.ReadTableBytes(fd, "name")
+	cmapData, err := header.ReadTableBytes(fd, "cmap")
 	if err != nil {
 		return err
 	}
-
-	tableReader := func(name string) (*io.SectionReader, error) {
-		rec := header.Find(name)
-		if rec == nil {
-			return nil, &table.ErrNoTable{Name: name}
+	cmapTable, err := cmap.Decode(cmapData)
+	if err != nil {
+		return err
+	}
+	good := false
+	for key := range cmapTable {
+		if key.Language != 0 {
+			fmt.Println("xxx", key, fname)
+		} else {
+			good = true
 		}
-		return io.NewSectionReader(fd, int64(rec.Offset), int64(rec.Length)), nil
+	}
+	if !good {
+		fmt.Println("yyy", fname)
 	}
 
-	os2Fd, err := tableReader("OS/2")
-	if table.IsMissing(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	os2Info, err := os2.Read(os2Fd)
-	if err != nil {
-		return err
-	}
+	// nameData, err := header.ReadTableBytes(fd, "name")
+	// if err != nil {
+	// 	return err
+	// }
 
-	nameInfo, err := name.Decode(nameData)
-	if err != nil {
-		return err
-	}
+	// tableReader := func(name string) (*io.SectionReader, error) {
+	// 	rec := header.Find(name)
+	// 	if rec == nil {
+	// 		return nil, &table.ErrNoTable{Name: name}
+	// 	}
+	// 	return io.NewSectionReader(fd, int64(rec.Offset), int64(rec.Length)), nil
+	// }
 
-	t := nameInfo.Tables.Get()
-	if t == nil {
-		return errors.New("no name table")
-	}
+	// os2Fd, err := tableReader("OS/2")
+	// if table.IsMissing(err) {
+	// 	return nil
+	// } else if err != nil {
+	// 	return err
+	// }
+	// os2Info, err := os2.Read(os2Fd)
+	// if err != nil {
+	// 	return err
+	// }
 
-	if !os2Info.IsBold && strings.Contains(t.Subfamily, "Bold") {
-		fmt.Println(t)
-	}
+	// nameInfo, err := name.Decode(nameData)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// t := nameInfo.Tables.Get()
+	// if t == nil {
+	// 	return errors.New("no name table")
+	// }
+
+	// if !os2Info.IsBold && strings.Contains(t.Subfamily, "Bold") {
+	// 	fmt.Println(t)
+	// }
 
 	return nil
 }

@@ -34,7 +34,7 @@ func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 		subtable[entry.CharCode] = entry.GID
 	}
 
-	cmap := cmap.Subtables{
+	cmap := cmap.Table{
 		cmap.Key{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 

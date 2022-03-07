@@ -29,7 +29,7 @@ func FuzzFormat12(f *testing.F) {
 	}.Encode(0))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		c1, err := decodeFormat12(data)
+		c1, err := decodeFormat12(data, nil)
 		if err != nil {
 			return
 		}
@@ -39,7 +39,7 @@ func FuzzFormat12(f *testing.F) {
 			t.Error("too long")
 		}
 
-		c2, err := decodeFormat12(data2)
+		c2, err := decodeFormat12(data2, nil)
 		if err != nil {
 			t.Error(err)
 		}

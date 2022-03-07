@@ -21,11 +21,11 @@ import (
 )
 
 type format6 struct {
-	FirstCode    uint16
+	FirstCode    rune
 	GlyphIDArray []font.GlyphID
 }
 
-func decodeFormat6(data []byte) (Subtable, error) {
+func decodeFormat6(data []byte, code2rune func(c int) rune) (Subtable, error) {
 	if len(data) < 10 {
 		return nil, errMalformedCmap
 	}
@@ -42,7 +42,7 @@ func decodeFormat6(data []byte) (Subtable, error) {
 	}
 
 	res := &format6{
-		FirstCode:    firstCode,
+		FirstCode:    rune(firstCode),
 		GlyphIDArray: make([]font.GlyphID, count),
 	}
 	for i := 0; i < count; i++ {
@@ -69,17 +69,17 @@ func (cmap *format6) Encode(language uint16) []byte {
 	return res
 }
 
-func (cmap *format6) Lookup(code uint32) font.GlyphID {
-	if code < uint32(cmap.FirstCode) {
+func (cmap *format6) Lookup(r rune) font.GlyphID {
+	if r < cmap.FirstCode {
 		return 0
 	}
-	if code >= uint32(cmap.FirstCode)+uint32(len(cmap.GlyphIDArray)) {
+	if r >= cmap.FirstCode+rune(len(cmap.GlyphIDArray)) {
 		return 0
 	}
-	return cmap.GlyphIDArray[code-uint32(cmap.FirstCode)]
+	return cmap.GlyphIDArray[r-cmap.FirstCode]
 }
 
-func (cmap *format6) CodeRange() (low, high uint32) {
+func (cmap *format6) CodeRange() (low, high rune) {
 	i := 0
 	for i < len(cmap.GlyphIDArray) && cmap.GlyphIDArray[i] == 0 {
 		i++
@@ -87,12 +87,12 @@ func (cmap *format6) CodeRange() (low, high uint32) {
 	if i == len(cmap.GlyphIDArray) {
 		return
 	}
-	low = uint32(cmap.FirstCode) + uint32(i)
+	low = cmap.FirstCode + rune(i)
 
 	i = len(cmap.GlyphIDArray) - 1
 	for cmap.GlyphIDArray[i] == 0 {
 		i--
 	}
-	high = uint32(cmap.FirstCode) + uint32(i)
+	high = cmap.FirstCode + rune(i)
 	return
 }

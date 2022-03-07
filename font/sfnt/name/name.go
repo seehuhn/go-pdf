@@ -395,7 +395,7 @@ func parseAndNormalize(s string) *url.URL {
 }
 
 // Encode converts a "name" table into its binary form.
-func (info *Info) Encode(ss cmap.Subtables) []byte {
+func (info *Info) Encode(ss cmap.Table) []byte {
 	type recInfo struct {
 		PlatformID uint16
 		EncodingID uint16

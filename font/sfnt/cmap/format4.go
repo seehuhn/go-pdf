@@ -29,7 +29,7 @@ import (
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
 type Format4 map[uint16]font.GlyphID
 
-func decodeFormat4(in []byte) (Subtable, error) {
+func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 	if len(in)%2 != 0 || len(in) < 16 {
 		return nil, errMalformedCmap
 	}
@@ -91,8 +91,8 @@ func decodeFormat4(in []byte) (Subtable, error) {
 }
 
 // Lookup implements the Subtable interface.
-func (cmap Format4) Lookup(code uint32) font.GlyphID {
-	return cmap[uint16(code)]
+func (cmap Format4) Lookup(r rune) font.GlyphID {
+	return cmap[uint16(r)]
 }
 
 // Encode encodes the subtable into a byte slice.
@@ -148,17 +148,17 @@ func (cmap Format4) Encode(language uint16) []byte {
 }
 
 // CodeRange returns the smallest and largest code point in the subtable.
-func (cmap Format4) CodeRange() (low, high uint32) {
+func (cmap Format4) CodeRange() (low, high rune) {
 	if len(cmap) == 0 {
 		return
 	}
-	low = ^uint32(0)
+	low = 1<<31 - 1
 	for k := range cmap {
-		if uint32(k) < low {
-			low = uint32(k)
+		if rune(k) < low {
+			low = rune(k)
 		}
-		if uint32(k) > high {
-			high = uint32(k)
+		if rune(k) > high {
+			high = rune(k)
 		}
 	}
 	return
