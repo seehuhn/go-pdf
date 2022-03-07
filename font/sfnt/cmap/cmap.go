@@ -32,15 +32,15 @@ func Decode(data []byte) (Table, error) {
 	const minLength = 10 // length of an empty format 6 subtable
 
 	if len(data) < 4 || len(data) > math.MaxUint32 {
-		return nil, errMalformedCmap
+		return nil, errMalformedTable
 	}
 	version := uint16(data[0])<<8 | uint16(data[1])
 	if version != 0 {
-		return nil, fmt.Errorf("cmap: unknown version %d", version)
+		return nil, fmt.Errorf("cmap: unknown table version %d", version)
 	}
 	numTables := int(data[2])<<8 | int(data[3])
 	if len(data) < 4+8*numTables {
-		return nil, errMalformedCmap
+		return nil, errMalformedTable
 	}
 
 	endOfHeader := uint32(4 + 8*numTables)
@@ -55,7 +55,7 @@ func Decode(data []byte) (Table, error) {
 	for i := 0; i < numTables; i++ {
 		platformID := uint16(data[4+i*8])<<8 | uint16(data[5+i*8])
 		if platformID > 4 {
-			return nil, errMalformedCmap
+			return nil, errMalformedTable
 		}
 		encodingID := uint16(data[6+i*8])<<8 | uint16(data[7+i*8])
 
@@ -64,7 +64,7 @@ func Decode(data []byte) (Table, error) {
 			uint32(data[10+i*8])<<8 |
 			uint32(data[11+i*8])
 		if o < endOfHeader || o > endOfData-minLength {
-			return nil, errMalformedCmap
+			return nil, errMalformedTable
 		}
 
 		var language uint16
@@ -78,7 +78,7 @@ func Decode(data []byte) (Table, error) {
 		case 8, 10, 12, 13:
 			checkLength = 12
 			if o > endOfData-checkLength {
-				return nil, errMalformedCmap
+				return nil, errMalformedTable
 			}
 			length = uint32(data[o+4])<<24 |
 				uint32(data[o+5])<<16 |
@@ -91,10 +91,10 @@ func Decode(data []byte) (Table, error) {
 				uint32(data[o+4])<<8 |
 				uint32(data[o+5])
 		default:
-			return nil, errMalformedCmap
+			return nil, errMalformedTable
 		}
 		if length < checkLength || length > endOfData-o {
-			return nil, errMalformedCmap
+			return nil, errMalformedTable
 		}
 
 		if platformID != 1 {
@@ -108,7 +108,7 @@ func Decode(data []byte) (Table, error) {
 		if idx == len(segs) || o != segs[idx].start {
 			if idx > 0 && o < segs[idx-1].end ||
 				idx < len(segs) && o+length > segs[idx].start {
-				return nil, errMalformedCmap
+				return nil, errMalformedTable
 			}
 			segs = slices.Insert(segs, idx, seg{o, o + length})
 		}
@@ -200,22 +200,17 @@ func (ss Table) Get(key Key) (Subtable, error) {
 		return nil, errors.New("cmap: no such subtable")
 	}
 
-	unicode := func(code int) rune {
-		return rune(code)
-	}
 	macRoman := func(code int) rune {
 		return mac.DecodeOne(byte(code))
 	}
 
-	code2rune := unicode
+	var code2rune func(int) rune
 	if key.PlatformID == 1 {
 		if key.EncodingID != 0 {
 			return nil, errors.New("cmap: unsupported Mac encoding")
 		}
 		code2rune = macRoman
 	}
-	// TODO(voss): use code2rune
-	_ = code2rune
 
 	format := uint16(data[0])<<8 | uint16(data[1])
 	decode := decoders[format]
@@ -244,6 +239,7 @@ func (ss Table) GetBest() (Subtable, error) {
 }
 
 var (
-	errMalformedCmap         = fmt.Errorf("malformed cmap table")
-	errUnsupportedCmapFormat = fmt.Errorf("unsupported cmap format")
+	errMalformedTable        = errors.New("cmap: malformed table")
+	errMalformedSubtable     = errors.New("cmap: malformed subtable")
+	errUnsupportedCmapFormat = errors.New("unsupported cmap format")
 )

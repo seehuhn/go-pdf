@@ -30,13 +30,17 @@ import (
 type Format4 map[uint16]font.GlyphID
 
 func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
+	if code2rune == nil {
+		code2rune = unicode
+	}
+
 	if len(in)%2 != 0 || len(in) < 16 {
-		return nil, errMalformedCmap
+		return nil, errMalformedSubtable
 	}
 
 	segCountX2 := int(in[6])<<8 | int(in[7])
 	if segCountX2%2 != 0 || 4*segCountX2+16 > len(in) {
-		return nil, errMalformedCmap
+		return nil, errMalformedSubtable
 	}
 	segCount := segCountX2 / 2
 
@@ -58,7 +62,7 @@ func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 		start := uint32(startCode[k])
 		end := uint32(endCode[k]) + 1
 		if start < prevEnd || end <= start {
-			return nil, errMalformedCmap
+			return nil, errMalformedSubtable
 		}
 		prevEnd = end
 
@@ -67,7 +71,7 @@ func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 			for idx := start; idx < end; idx++ {
 				c := font.GlyphID(uint16(idx) + delta)
 				if c != 0 {
-					cmap[uint16(idx)] = c
+					cmap[uint16(code2rune(int(idx)))] = c
 				}
 			}
 		} else {
@@ -77,12 +81,12 @@ func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 					// some fonts seem to have invalid data for the last segment
 					continue
 				}
-				return nil, errMalformedCmap
+				return nil, errMalformedSubtable
 			}
 			for idx := start; idx < end; idx++ {
 				c := font.GlyphID(glyphIDArray[d+int(idx-start)])
 				if c != 0 {
-					cmap[uint16(idx)] = c
+					cmap[uint16(code2rune(int(idx)))] = c
 				}
 			}
 		}

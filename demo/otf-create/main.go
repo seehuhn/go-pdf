@@ -17,229 +17,21 @@
 package main
 
 import (
-	"bytes"
-	"errors"
-	"io"
 	"log"
-	"math"
 	"os"
-	"regexp"
-	"strings"
 	"time"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/names"
-	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
-	"seehuhn.de/go/pdf/font/sfnt/head"
-	"seehuhn.de/go/pdf/font/sfnt/hmtx"
-	"seehuhn.de/go/pdf/font/sfnt/name"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
-	"seehuhn.de/go/pdf/font/sfnt/post"
-	"seehuhn.de/go/pdf/font/sfnt/table"
-	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/locale"
+	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
-// CFFInfo contains information about the font.
-type CFFInfo struct {
-	Glyphs []*cff.Glyph
-
-	FamilyName string
-	Width      os2.Width
-	Weight     os2.Weight
-
-	Version          head.Version
-	CreationTime     time.Time
-	ModificationTime time.Time
-
-	Copyright string
-	Notice    string
-	PermUse   os2.Permissions
-
-	UnitsPerEm uint16
-
-	Ascent  int16
-	Descent int16
-	LineGap int16
-
-	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
-	UnderlinePosition  int16   // Underline position (negative)
-	UnderlineThickness int16   // Underline thickness
-
-	IsBold    bool
-	IsRegular bool
-	IsOblique bool
-}
-
-// Subfamily returns the subfamily name of the font.
-func (info *CFFInfo) Subfamily() string {
-	var words []string
-	if info.Width != 0 && info.Width != os2.WidthNormal {
-		words = append(words, info.Width.String())
-	}
-	if info.Weight != 0 && info.Weight != os2.WeightNormal {
-		words = append(words, info.Weight.String())
-	} else if info.IsBold {
-		words = append(words, "Bold")
-	}
-	if info.IsOblique {
-		words = append(words, "Oblique")
-	} else if info.ItalicAngle != 0 {
-		words = append(words, "Italic")
-	}
-	if len(words) == 0 {
-		return "Regular"
-	}
-	return strings.Join(words, " ")
-}
-
-// FullName returns the full name of the font.
-func (info *CFFInfo) FullName() string {
-	return info.FamilyName + " " + info.Subfamily()
-}
-
-// PostscriptName returns the Postscript name of the font.
-func (info *CFFInfo) PostscriptName() string {
-	name := info.FamilyName + "-" + info.Subfamily()
-	re := regexp.MustCompile(`[^!-$&-'*-.0-;=?-Z\\^-z|~]+`)
-	return re.ReplaceAllString(name, "")
-}
-
-// Read reads an OpenType font from a file.
-func Read(fname string) (*CFFInfo, error) {
-	fd, err := os.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-	header, err := table.ReadHeader(fd)
-	if err != nil {
-		return nil, err
-	}
-
-	tableReader := func(name string) (*io.SectionReader, error) {
-		rec := header.Find(name)
-		if rec == nil {
-			return nil, &table.ErrNoTable{Name: name}
-		}
-		return io.NewSectionReader(fd, int64(rec.Offset), int64(rec.Length)), nil
-	}
-
-	info := &CFFInfo{}
-
-	// TODO(voss): handle missing tables
-
-	headFd, err := tableReader("head")
-	if err != nil {
-		return nil, err
-	}
-	headInfo, err := head.Read(headFd)
-	if err != nil {
-		return nil, err
-	}
-
-	hheaData, err := header.ReadTableBytes(fd, "hhea")
-	if err != nil {
-		return nil, err
-	}
-	hmtxData, err := header.ReadTableBytes(fd, "hmtx")
-	if err != nil {
-		return nil, err
-	}
-	hmtxInfo, err := hmtx.Decode(hheaData, hmtxData)
-	if err != nil {
-		return nil, err
-	}
-
-	maxpFd, err := tableReader("maxp")
-	if err != nil {
-		return nil, err
-	}
-	maxpInfo, err := table.ReadMaxp(maxpFd)
-	if err != nil {
-		return nil, err
-	}
-	numGlyphs := maxpInfo.NumGlyphs
-
-	os2Fd, err := tableReader("OS/2")
-	if err != nil {
-		return nil, err
-	}
-	os2Info, err := os2.Read(os2Fd)
-	if err != nil {
-		return nil, err
-	}
-
-	nameData, err := header.ReadTableBytes(fd, "name")
-	if err != nil {
-		return nil, err
-	}
-	nameInfo, err := name.Decode(nameData)
-	if err != nil {
-		return nil, err
-	}
-	nameTable := nameInfo.Tables.Get()
-	if nameTable == nil {
-		return nil, errors.New("no name table")
-	}
-	// TODO(voss): use SubFamily, Fullname etc. to double-check the flags from
-	// the OS/2 table.
-
-	cmapData, err := header.ReadTableBytes(fd, "cmap")
-	if err != nil {
-		return nil, err
-	}
-	subtables, err := cmap.Decode(cmapData)
-	if err != nil {
-		return nil, err
-	}
-	cmapInfo, err := subtables.GetBest()
-	if err != nil {
-		return nil, err
-	}
-	_ = cmapInfo
-
-	// info.Glyphs =
-	info.FamilyName = nameTable.Family
-	info.Weight = os2Info.WeightClass
-	info.Width = os2Info.WidthClass
-	// info.FontName =
-	info.Version = headInfo.FontRevision
-	//   ALT: nameTable.Version
-	info.CreationTime = headInfo.Created
-	info.ModificationTime = headInfo.Modified
-	info.Copyright = nameTable.Copyright
-	// info.Notice =
-	info.PermUse = os2Info.PermUse
-	info.UnitsPerEm = headInfo.UnitsPerEm
-	info.Ascent = hmtxInfo.Ascent
-	//   ALT: info.Ascent = os2Info.Ascent
-	info.Descent = hmtxInfo.Descent
-	//   ALT: info.Descent = os2Info.Descent
-	info.LineGap = hmtxInfo.LineGap
-	//   ALT: info.LineGap = os2Info.LineGap
-	info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
-	// info.UnderlinePosition =
-	// info.UnderlineThickness =
-	info.IsBold = headInfo.IsBold
-	//   ALT: info.IsBold = os2Info.IsBold
-	info.IsRegular = os2Info.IsRegular
-	info.IsOblique = os2Info.IsOblique
-
-	_ = nameInfo
-	_ = numGlyphs
-
-	return info, nil
-}
-
 func main() {
-	blobs := make(map[string][]byte)
-
 	now := time.Now()
-	info := &CFFInfo{
+	info := &sfntcff.Info{
 		FamilyName: "Test",
 		Weight:     os2.WeightNormal,
 		Width:      os2.WidthNormal,
@@ -283,56 +75,15 @@ func main() {
 	g.LineTo(0, 700)
 	info.Glyphs = append(info.Glyphs, g)
 
-	// ----------------------------------------------------------------------
-
-	headData, err := makeHead(info)
-	if err != nil {
-		log.Fatal(err)
-	}
-	blobs["head"] = headData
-
-	hheaData, hmtxData := makeHmtx(info)
-	blobs["hhea"] = hheaData
-	blobs["hmtx"] = hmtxData
-
-	maxpInfo := table.MaxpInfo{
-		NumGlyphs: len(info.Glyphs),
-	}
-	maxpData, err := maxpInfo.Encode()
-	if err != nil {
-		log.Fatal(err)
-	}
-	blobs["maxp"] = maxpData
-
-	cc, ss := makeCmap(info)
-	buf := &bytes.Buffer{}
-	ss.Write(buf)
-	blobs["cmap"] = buf.Bytes()
-
-	os2Data := makeOS2(info, cc)
-	blobs["OS/2"] = os2Data
-
-	nameData := makeName(info, ss)
-	blobs["name"] = nameData
-
-	postData := makePost(info)
-	blobs["post"] = postData
-
-	cffData, err := makeCFF(info)
-	if err != nil {
-		log.Fatal(err)
-	}
-	blobs["CFF "] = cffData
+	info.CMap = makeCMap(info.Glyphs)
 
 	// ----------------------------------------------------------------------
-
-	tables := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "name", "cmap", "post", "CFF "}
 
 	out, err := os.Create("test.otf")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = sfnt.WriteTables(out, table.ScalerTypeCFF, tables, blobs)
+	_, err = info.Write(out)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -342,191 +93,16 @@ func main() {
 	}
 }
 
-func isFixedPitch(glyphs []*cff.Glyph) bool {
-	var width int16
-
-	for i := range glyphs {
-		w := glyphs[i].Width
-		if w == 0 {
-			continue
-		}
-		if width == 0 {
-			width = w
-		} else if width != w {
-			return false
-		}
-	}
-
-	return true
-}
-
-func makeCFF(info *CFFInfo) ([]byte, error) {
-	q := 1 / float64(info.UnitsPerEm)
-	cffInfo := type1.FontInfo{
-		FullName:   info.FullName(),
-		FamilyName: info.FamilyName,
-		Weight:     info.Weight.String(),
-		FontName:   pdf.Name(info.PostscriptName()),
-		Version:    info.Version.String(),
-
-		Copyright: info.Copyright,
-		Notice:    info.Notice, // TODO(voss)
-
-		FontMatrix: []float64{q, 0, 0, q, 0, 0},
-
-		ItalicAngle:  info.ItalicAngle,
-		IsFixedPitch: isFixedPitch(info.Glyphs),
-
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-
-		Private: []*type1.PrivateDict{
-			{
-				BlueValues: []int32{-10, 0, 700, 710}, // TODO(voss)
-			},
-		},
-	}
-	myCff := &cff.Font{
-		Info:   &cffInfo,
-		Glyphs: info.Glyphs,
-	}
-
-	buf := &bytes.Buffer{}
-	err := myCff.Encode(buf)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func makeHead(info *CFFInfo) ([]byte, error) {
-	var bbox font.Rect
-	first := true
-	for _, g := range info.Glyphs {
-		ext := g.Extent()
-		if ext.IsZero() {
-			continue
-		}
-		if first || ext.LLx < bbox.LLx {
-			bbox.LLx = ext.LLx
-		}
-		if first || ext.LLy < bbox.LLy {
-			bbox.LLy = ext.LLy
-		}
-		if first || ext.URx > bbox.URx {
-			bbox.URx = ext.URx
-		}
-		if first || ext.URy > bbox.URy {
-			bbox.URy = ext.URy
-		}
-		first = false
-	}
-
-	headInfo := head.Info{
-		FontRevision:  info.Version,
-		HasYBaseAt0:   true,
-		HasXBaseAt0:   true,
-		UnitsPerEm:    info.UnitsPerEm,
-		Created:       info.CreationTime,
-		Modified:      info.ModificationTime,
-		FontBBox:      bbox,
-		IsBold:        info.IsBold,
-		IsItalic:      info.ItalicAngle != 0,
-		LowestRecPPEM: 7,
-	}
-	return headInfo.Encode()
-}
-
-func makeHmtx(info *CFFInfo) ([]byte, []byte) {
-	widths := make([]uint16, len(info.Glyphs))
-	extents := make([]font.Rect, len(info.Glyphs))
-	for i, g := range info.Glyphs {
-		widths[i] = uint16(g.Width)
-		extents[i] = g.Extent()
-	}
-
-	hmtxInfo := &hmtx.Info{
-		Width:       widths,
-		GlyphExtent: extents,
-		Ascent:      info.Ascent,
-		Descent:     info.Descent,
-		LineGap:     info.LineGap,
-		CaretAngle:  info.ItalicAngle / 180 * math.Pi,
-	}
-
-	return hmtxInfo.Encode()
-}
-
-func makeOS2(info *CFFInfo, cc cmap.Subtable) []byte {
-	os2Info := &os2.Info{
-		WeightClass: info.Weight,
-		WidthClass:  info.Width,
-		IsBold:      info.IsBold,
-		IsItalic:    info.ItalicAngle != 0,
-		IsRegular:   info.IsRegular,
-		IsOblique:   info.IsOblique,
-		Ascent:      info.Ascent,
-		Descent:     info.Descent,
-		LineGap:     info.LineGap,
-		PermUse:     info.PermUse,
-	}
-	return os2Info.Encode(cc)
-}
-
-func makeName(info *CFFInfo, ss cmap.Table) []byte {
-	day := info.ModificationTime
-	if day.IsZero() {
-		day = info.CreationTime
-	}
-	if day.IsZero() {
-		day = time.Now()
-	}
-	dayString := day.Format("2006-01-02")
-
-	nameInfo := &name.Info{
-		Tables: map[name.Loc]*name.Table{},
-	}
-	fullName := info.FullName()
-	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryUndefined} {
-		nameInfo.Tables[name.Loc{Language: locale.LangEnglish, Country: country}] = &name.Table{
-			Copyright:      info.Copyright,
-			Family:         info.FamilyName,
-			Subfamily:      info.Subfamily(),
-			Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
-			FullName:       fullName,
-			Version:        "Version " + info.Version.String(),
-			PostScriptName: info.PostscriptName(),
-		}
-	}
-
-	return nameInfo.Encode(ss)
-}
-
-func makeCmap(info *CFFInfo) (cmap.Format4, cmap.Table) {
-	cc := cmap.Format4{}
-	for i, g := range info.Glyphs {
+func makeCMap(gg []*cff.Glyph) cmap.Subtable {
+	cmap := cmap.Format4{}
+	for i, g := range gg {
 		rr := names.ToUnicode(string(g.Name), false)
 		if len(rr) == 1 {
 			r := uint16(rr[0])
-			if _, ok := cc[r]; !ok {
-				cc[r] = font.GlyphID(i)
+			if _, ok := cmap[r]; !ok {
+				cmap[r] = font.GlyphID(i)
 			}
 		}
 	}
-	cmapSubtable := cc.Encode(0)
-	ss := cmap.Table{
-		{PlatformID: 1, EncodingID: 0, Language: 0}: cmapSubtable,
-		{PlatformID: 3, EncodingID: 1, Language: 0}: cmapSubtable,
-	}
-	return cc, ss
-}
-
-func makePost(info *CFFInfo) []byte {
-	postInfo := &post.Info{
-		ItalicAngle:        info.ItalicAngle,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-		IsFixedPitch:       isFixedPitch(info.Glyphs),
-	}
-	return postInfo.Encode()
+	return cmap
 }

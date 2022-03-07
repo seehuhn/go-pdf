@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+
+	"seehuhn.de/go/pdf/font"
 )
 
 // Info contains information from the "post" table.
@@ -42,7 +44,10 @@ func Read(r io.Reader) (*Info, error) {
 	}
 	if post.Version != 0x00010000 && post.Version != 0x00020000 &&
 		post.Version != 0x00025000 && post.Version != 0x00030000 {
-		return nil, fmt.Errorf("post: unsupported version %08x", post.Version)
+		return nil, &font.NotSupportedError{
+			SubSystem: "sfnt/post",
+			Feature:   fmt.Sprintf("version %08x", post.Version),
+		}
 	}
 
 	info := &Info{

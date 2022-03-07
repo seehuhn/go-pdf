@@ -16,18 +16,13 @@
 
 package cff
 
-// NotSupportedError indicates that the font file seems valid but uses a
-// CFF feature which is not supported by this library.
-type NotSupportedError struct {
-	Feature string
-}
-
-func (err *NotSupportedError) Error() string {
-	return "cff: " + err.Feature + " not supported"
-}
+import "seehuhn.de/go/pdf/font"
 
 func notSupported(feature string) error {
-	return &NotSupportedError{feature}
+	return &font.NotSupportedError{
+		SubSystem: "cmap",
+		Feature:   feature,
+	}
 }
 
 // InvalidFontError indicates a problem with the font file.

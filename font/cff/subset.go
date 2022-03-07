@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Subset returns a copy of the font, including only the glyphs in the given
@@ -48,13 +49,13 @@ func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 		FdSelect:  fdSelect,
 	}
 	if cff.IsCIDFont {
-		out.Registry = cff.Registry
-		out.Ordering = cff.Ordering
-		out.Supplement = cff.Supplement
+		out.ROS = cff.ROS
 	} else {
-		out.Registry = "Adobe"
-		out.Ordering = "Identity"
-		out.Supplement = 0
+		out.ROS = &type1.ROS{
+			Registry:   "Adobe",
+			Ordering:   "Identity",
+			Supplement: 0,
+		}
 	}
 
 	for _, gid := range subset {

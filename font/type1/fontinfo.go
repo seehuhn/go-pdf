@@ -25,9 +25,10 @@ type FontInfo struct {
 	// Version is the version number of the font program.
 	Version string
 
-	// Notice is a trademark or copyright notice, if applicable.
+	// Notice is used to save any trademark notice/information for the font.
 	Notice string
 
+	// The copyright notice of the font.
 	Copyright string
 
 	// FullName is a unique, human-readable name for an individual font.
@@ -59,10 +60,9 @@ type FontInfo struct {
 	UnderlineThickness int16
 
 	FontMatrix []float64
-
-	Private []*PrivateDict
 }
 
+// PrivateDict contains information about a font's private dictionary.
 type PrivateDict struct {
 	// BlueValues is an array containing an even number of integers.
 	// The first integer in each pair is less than or equal to the second integer.
@@ -86,4 +86,11 @@ type PrivateDict struct {
 	StdVW float64
 
 	ForceBold bool
+}
+
+// ROS constains information for CID Fonts
+type ROS struct {
+	Registry   string
+	Ordering   string
+	Supplement int32
 }

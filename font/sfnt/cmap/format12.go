@@ -17,6 +17,8 @@
 package cmap
 
 import (
+	"errors"
+	"fmt"
 	"sort"
 
 	"seehuhn.de/go/pdf/font"
@@ -33,13 +35,19 @@ type format12segment struct {
 }
 
 func decodeFormat12(data []byte, code2rune func(c int) rune) (Subtable, error) {
+	if code2rune != nil {
+		return nil, errors.New("cmap/format12: code2rune not supported")
+	}
+
 	if len(data) < 16 {
-		return nil, errMalformedCmap
+		fmt.Println("A")
+		return nil, errMalformedSubtable
 	}
 
 	nSegments := uint32(data[12])<<24 | uint32(data[13])<<16 | uint32(data[14])<<8 | uint32(data[15])
 	if len(data) != 16+int(nSegments)*12 || nSegments > 1e6 {
-		return nil, errMalformedCmap
+		fmt.Println("B")
+		return nil, errMalformedSubtable
 	}
 
 	segments := make(format12, nSegments)
@@ -52,9 +60,10 @@ func decodeFormat12(data []byte, code2rune func(c int) rune) (Subtable, error) {
 
 		if segments[i].startCharCode <= prevEnd ||
 			segments[i].endCharCode < segments[i].startCharCode ||
-			startGlyphID > 65535 ||
-			startGlyphID+uint32(segments[i].startCharCode-segments[i].endCharCode) > 65535 {
-			return nil, errMalformedCmap
+			startGlyphID > 0x10_FFFF ||
+			startGlyphID+uint32(segments[i].endCharCode-segments[i].startCharCode) > 0x10_FFFF {
+			fmt.Println("C", i, prevEnd, segments[i].startCharCode, segments[i].endCharCode, startGlyphID)
+			return nil, errMalformedSubtable
 		}
 		segments[i].startGlyphID = font.GlyphID(startGlyphID)
 

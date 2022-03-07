@@ -349,7 +349,7 @@ func (enc encoder) Edges(from int) []edge {
 			op := []t2op{t2hlineto, t2vlineto}[(1-sign)/2]
 			pos = 0
 			sign = 1
-			for pos < len(aligned) && sign*aligned[pos] > 0 {
+			for pos < len(aligned) && sign*aligned[pos] > 0 && len(code)+1 <= maxStack {
 				code = append(code, cmds[pos].Args[(1-sign)/2].Code)
 				sign = -sign
 				pos++

@@ -30,20 +30,18 @@ import (
 // TODO(voss): implement support for font matrices
 
 // Font stores the data of a CFF font.
-// Use the Read() function to decode a CFF font from a io.ReadSeeker.
 type Font struct {
-	Info     *type1.FontInfo
 	Glyphs   []*Glyph
+	Info     *type1.FontInfo
+	Private  []*type1.PrivateDict
 	FdSelect FdSelectFn
 
 	IsCIDFont bool
 
 	Encoding []font.GlyphID
 
-	Gid2cid    []int32 // TODO(voss): what is a good data type for this?
-	Registry   string
-	Ordering   string
-	Supplement int32
+	Gid2cid []int32 // TODO(voss): what is a good data type for this?
+	ROS     *type1.ROS
 }
 
 // Read reads a CFF font from r.
@@ -171,21 +169,23 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if len(ROS) != 3 {
 			return nil, invalidSince("wrong number of ROS values")
 		}
+		ros := &type1.ROS{}
 		if reg, ok := ROS[0].(string); ok {
-			cff.Registry = reg
+			ros.Registry = reg
 		} else {
 			return nil, invalidSince("wrong type for Registry")
 		}
 		if ord, ok := ROS[1].(string); ok {
-			cff.Ordering = ord
+			ros.Ordering = ord
 		} else {
 			return nil, invalidSince("wrong type for Ordering")
 		}
 		if sup, ok := ROS[2].(int32); ok {
-			cff.Supplement = sup
+			ros.Supplement = sup
 		} else {
 			return nil, invalidSince("wrong type for Supplement")
 		}
+		cff.ROS = ros
 
 		fdArrayOffs := topDict.getInt(opFDArray, 0)
 		fdArrayIndex, err := readIndexAt(p, fdArrayOffs, "Font DICT")
@@ -205,7 +205,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 			if err != nil {
 				return nil, err
 			}
-			cff.Info.Private = append(cff.Info.Private, pInfo.private)
+			cff.Private = append(cff.Private, pInfo.private)
 			decoders = append(decoders, &decodeInfo{
 				subr:         pInfo.subrs,
 				gsubr:        gsubrs,
@@ -222,7 +222,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		cff.FdSelect, err = readFDSelect(p, nGlyphs, len(cff.Info.Private))
+		cff.FdSelect, err = readFDSelect(p, nGlyphs, len(cff.Private))
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +285,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		cff.Info.Private = []*type1.PrivateDict{pInfo.private}
+		cff.Private = []*type1.PrivateDict{pInfo.private}
 		decoders = append(decoders, &decodeInfo{
 			subr:         pInfo.subrs,
 			gsubr:        gsubrs,
@@ -387,10 +387,10 @@ func (cff *Font) Encode(w io.Writer) error {
 	// opCharStrings is updated below
 	if cff.IsCIDFont {
 		// afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillTop
-		registrySID := strings.lookup(cff.Registry)
-		orderingSID := strings.lookup(cff.Ordering)
+		registrySID := strings.lookup(cff.ROS.Registry)
+		orderingSID := strings.lookup(cff.ROS.Ordering)
 		topDict[opROS] = []interface{}{
-			registrySID, orderingSID, cff.Supplement,
+			registrySID, orderingSID, cff.ROS.Supplement,
 		}
 		topDict[opCIDCount] = []interface{}{int32(numGlyphs)}
 		// opFDArray is updated below
@@ -460,7 +460,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	blobs = append(blobs, cffIndex(charStrings).encode())
 
 	// section 9: font DICT INDEX
-	numFonts := len(cff.Info.Private)
+	numFonts := len(cff.Private)
 	fontDicts := make([]cffDict, numFonts)
 	if cff.IsCIDFont {
 		for i := range fontDicts {
@@ -612,6 +612,7 @@ func (cff *Font) selectWidths() (int16, int16) {
 func (cff *Font) encodeCharStrings() (cffIndex, int16, int16, error) {
 	numGlyphs := len(cff.Glyphs)
 	if numGlyphs < 1 || (!cff.IsCIDFont && cff.Glyphs[0].Name != ".notdef") {
+		fmt.Println("XXX", numGlyphs, cff.IsCIDFont, cff.Glyphs[0].Name)
 		return nil, 0, 0, invalidSince("missing .notdef glyph")
 	}
 

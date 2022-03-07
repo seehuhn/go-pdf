@@ -39,22 +39,23 @@ func TestRoundTrip(t *testing.T) {
 		UnderlinePosition:  -80,
 		UnderlineThickness: 40,
 		FontMatrix:         []float64{1.0 / 1024, 0, 0, 1.0 / 1024, 0, 0},
-		Private: []*type1.PrivateDict{
-			{
-				BlueValues: []int32{-22, 0, 500, 520, 700, 720},
-				OtherBlues: []int32{-120, -100},
-				BlueScale:  0.04379,
-				BlueShift:  2,
-				BlueFuzz:   3,
-				StdHW:      23.4,
-				StdVW:      34.5,
-				ForceBold:  true,
-			},
+	}
+	private := []*type1.PrivateDict{
+		{
+			BlueValues: []int32{-22, 0, 500, 520, 700, 720},
+			OtherBlues: []int32{-120, -100},
+			BlueScale:  0.04379,
+			BlueShift:  2,
+			BlueFuzz:   3,
+			StdHW:      23.4,
+			StdVW:      34.5,
+			ForceBold:  true,
 		},
 	}
 
 	in := &Font{
-		Info: meta,
+		Info:    meta,
+		Private: private,
 	}
 
 	g := &Glyph{
@@ -111,10 +112,10 @@ func TestFindEdges(t *testing.T) {
 	meta := &type1.FontInfo{
 		FontName:   "Test",
 		FontMatrix: defaultFontMatrix,
-		Private:    []*type1.PrivateDict{{}},
 	}
 	in := &Font{
-		Info: meta,
+		Info:    meta,
+		Private: []*type1.PrivateDict{{}},
 	}
 
 	g := NewGlyph(".notdef", 0)

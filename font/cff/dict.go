@@ -571,7 +571,7 @@ func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInf
 }
 
 func (cff *Font) makePrivateDict(idx int, defaultWidth, nominalWidth int16) cffDict {
-	private := cff.Info.Private[idx]
+	private := cff.Private[idx]
 
 	privateDict := cffDict{}
 

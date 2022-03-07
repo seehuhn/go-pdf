@@ -109,6 +109,10 @@ func Decode(hheaData, hmtxData []byte) (*Info, error) {
 		CaretOffset: hheaEnc.CaretOffset,
 	}
 
+	if hmtxData == nil {
+		return info, nil
+	}
+
 	numHorMetrics := int(hheaEnc.NumOfLongHorMetrics)
 	prevWidth := uint16(0)
 	var widths []uint16

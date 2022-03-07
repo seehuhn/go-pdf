@@ -208,5 +208,5 @@ type binaryHead struct {
 type Version uint32
 
 func (v Version) String() string {
-	return fmt.Sprintf("%.03f", float32(v)/65536)
+	return fmt.Sprintf("%.03f", float64(v)/65536)
 }

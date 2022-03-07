@@ -29,6 +29,10 @@ type format0 struct {
 }
 
 func decodeFormat0(data []byte, code2rune func(c int) rune) (Subtable, error) {
+	if code2rune == nil {
+		code2rune = unicode
+	}
+
 	data = data[6:]
 	if len(data) != 256 {
 		return nil, fmt.Errorf("cmap: format 0: expected 256 bytes, got %d", len(data))
@@ -36,6 +40,9 @@ func decodeFormat0(data []byte, code2rune func(c int) rune) (Subtable, error) {
 
 	res := make(Format4)
 	for code, gid := range data {
+		if gid == 0 {
+			continue
+		}
 		r := code2rune(code)
 		res[uint16(r)] = font.GlyphID(gid)
 	}

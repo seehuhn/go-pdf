@@ -133,7 +133,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	if cff.Info.ItalicAngle != 0 {
 		flags |= font.FlagItalic // TODO(voss): is the logic correct?
 	}
-	if cff.Info.Private[0].ForceBold {
+	if cff.Private[0].ForceBold {
 		flags |= font.FlagForceBold
 	}
 	// TODO(voss): add more flags

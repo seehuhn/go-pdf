@@ -74,7 +74,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 		Width: info.defaultWidth,
 	}
 
-	var stack []fixed16
+	stack := make([]fixed16, 0, maxStack)
 	clearStack := func() {
 		stack = stack[:0]
 	}

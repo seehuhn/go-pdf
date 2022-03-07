@@ -18,92 +18,29 @@ package main
 
 import (
 	"bufio"
-	"encoding/csv"
 	"fmt"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font/sfnt/cmap"
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
-var out *csv.Writer
-
 func tryFont(fname string) error {
-	// tt, err := sfnt.Open(fname, nil)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer tt.Close()
-
 	fd, err := os.Open(fname)
 	if err != nil {
 		return err
 	}
 	defer fd.Close()
 
-	header, err := table.ReadHeader(fd)
-	if err != nil {
+	info, err := sfntcff.Read(fd)
+	if font.IsUnsupported(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
-	cmapData, err := header.ReadTableBytes(fd, "cmap")
-	if err != nil {
-		return err
-	}
-	cmapTable, err := cmap.Decode(cmapData)
-	if err != nil {
-		return err
-	}
-	good := false
-	for key := range cmapTable {
-		if key.Language != 0 {
-			fmt.Println("xxx", key, fname)
-		} else {
-			good = true
-		}
-	}
-	if !good {
-		fmt.Println("yyy", fname)
-	}
-
-	// nameData, err := header.ReadTableBytes(fd, "name")
-	// if err != nil {
-	// 	return err
-	// }
-
-	// tableReader := func(name string) (*io.SectionReader, error) {
-	// 	rec := header.Find(name)
-	// 	if rec == nil {
-	// 		return nil, &table.ErrNoTable{Name: name}
-	// 	}
-	// 	return io.NewSectionReader(fd, int64(rec.Offset), int64(rec.Length)), nil
-	// }
-
-	// os2Fd, err := tableReader("OS/2")
-	// if table.IsMissing(err) {
-	// 	return nil
-	// } else if err != nil {
-	// 	return err
-	// }
-	// os2Info, err := os2.Read(os2Fd)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// nameInfo, err := name.Decode(nameData)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// t := nameInfo.Tables.Get()
-	// if t == nil {
-	// 	return errors.New("no name table")
-	// }
-
-	// if !os2Info.IsBold && strings.Contains(t.Subfamily, "Bold") {
-	// 	fmt.Println(t)
-	// }
+	_ = info
 
 	return nil
 }
@@ -115,12 +52,6 @@ func main() {
 	}
 	defer fd.Close()
 
-	outFd, err := os.Create("x.csv")
-	if err != nil {
-		log.Fatal(err)
-	}
-	out = csv.NewWriter(outFd)
-
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
 		fname := scanner.Text()
@@ -131,10 +62,5 @@ func main() {
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal("main loop failed:", err)
-	}
-	out.Flush()
-	err = outFd.Close()
-	if err != nil {
-		log.Fatal(err)
 	}
 }

@@ -1,0 +1,145 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package sfntcff
+
+import (
+	"bufio"
+	"bytes"
+	"os"
+	"reflect"
+	"testing"
+
+	"seehuhn.de/go/pdf/font/sfnt/os2"
+)
+
+func TestPostscriptName(t *testing.T) {
+	info := &Info{
+		FamilyName:  `A(n)d[r]o{m}e/d<a> N%ebula`,
+		Weight:      os2.WeightBold,
+		ItalicAngle: -12,
+	}
+	psName := info.PostscriptName()
+	if psName != "AndromedaNebula-BoldItalic" {
+		t.Errorf("wrong postscript name: %q", psName)
+	}
+
+	var rr []rune
+	for i := 0; i < 255; i++ {
+		rr = append(rr, rune(i))
+	}
+	info.FamilyName = string(rr)
+	psName = info.PostscriptName()
+	if len(psName) != 127-33-10+len("-BoldItalic") {
+		t.Errorf("wrong postscript name: %q", psName)
+	}
+}
+
+func TestMany(t *testing.T) {
+	listFd, err := os.Open("/Users/voss/project/pdflib/demo/try-all-fonts/all-fonts")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scanner := bufio.NewScanner(listFd)
+fontLoop:
+	for scanner.Scan() {
+		fname := scanner.Text()
+
+		fd, err := os.Open(fname)
+		if err != nil {
+			t.Error(err)
+			continue fontLoop
+		}
+
+		var r ReaderReaderAt = fd
+		buf := &bytes.Buffer{}
+		for i := 0; i < 2; i++ {
+			font, err := Read(r)
+			if err != nil {
+				if i == 0 {
+					t.Error(err)
+				}
+				continue fontLoop
+			}
+
+			buf.Reset()
+			_, err = font.Write(buf)
+			if err != nil {
+				t.Error(err)
+				continue fontLoop
+			}
+
+			r = bytes.NewReader(buf.Bytes())
+		}
+
+		fd.Close()
+	}
+	listFd.Close()
+}
+
+func FuzzFont(f *testing.F) {
+	fd, err := os.Open("/Users/voss/project/pdflib/demo/try-all-fonts/all-fonts")
+	if err != nil {
+		f.Fatal(err)
+	}
+
+	scanner := bufio.NewScanner(fd)
+	for scanner.Scan() {
+		fname := scanner.Text()
+		stat, err := os.Stat(fname)
+		if err != nil {
+			f.Error(err)
+			continue
+		}
+		if stat.Size() > 10000 {
+			continue
+		}
+		body, err := os.ReadFile(fname)
+		if err != nil {
+			f.Error(err)
+			continue
+		}
+		f.Add(body)
+	}
+	fd.Close()
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		font, err := Read(bytes.NewReader(data))
+		if err != nil || len(font.Glyphs) == 0 {
+			return
+		}
+
+		buf := &bytes.Buffer{}
+		_, err = font.Write(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		font2, err := Read(bytes.NewReader(buf.Bytes()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(font, font2) {
+			t.Errorf("different")
+		}
+
+		// for _, diff := range deep.Equal(font, font2) {
+		// 	t.Error(diff)
+		// }
+	})
+}

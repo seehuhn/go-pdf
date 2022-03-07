@@ -14,41 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cmap
+package font
 
-import (
-	"fmt"
-	"reflect"
-	"testing"
-
-	"seehuhn.de/go/pdf/font"
-)
-
-func FuzzFormat6(f *testing.F) {
-	f.Add((&format6{
-		FirstCode:    123,
-		GlyphIDArray: []font.GlyphID{6, 4, 2},
-	}).Encode(0))
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		c1, err := decodeFormat6(data, nil)
-		if err != nil {
-			return
-		}
-
-		data2 := c1.Encode(0)
-
-		c2, err := decodeFormat6(data2, nil)
-		if err != nil {
-			t.Error(err)
-		}
-
-		if !reflect.DeepEqual(c1, c2) {
-			fmt.Printf("A: % x\n", data)
-			fmt.Printf("B: % x\n", data2)
-			t.Error("not equal")
-		}
-	})
+// NotSupportedError indicates that a font file seems valid but uses a
+// CFF feature which is not supported by this library.
+type NotSupportedError struct {
+	SubSystem string
+	Feature   string
 }
 
-var _ Subtable = (*format6)(nil)
+func (err *NotSupportedError) Error() string {
+	return err.SubSystem + ": " + err.Feature + " not supported"
+}
+
+// IsUnsupported returns true if the error is a NotSupportedError.
+func IsUnsupported(err error) bool {
+	_, ok := err.(*NotSupportedError)
+	return ok
+}

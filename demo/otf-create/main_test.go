@@ -15,31 +15,3 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 package main
-
-import (
-	"testing"
-
-	"seehuhn.de/go/pdf/font/sfnt/os2"
-)
-
-func TestPostscriptName(t *testing.T) {
-	info := &CFFInfo{
-		FamilyName:  `A(n)d[r]o{m}e/d<a> N%ebula`,
-		Weight:      os2.WeightBold,
-		ItalicAngle: -12,
-	}
-	psName := info.PostscriptName()
-	if psName != "AndromedaNebula-BoldItalic" {
-		t.Errorf("wrong postscript name: %q", psName)
-	}
-
-	var rr []rune
-	for i := 0; i < 255; i++ {
-		rr = append(rr, rune(i))
-	}
-	info.FamilyName = string(rr)
-	psName = info.PostscriptName()
-	if len(psName) != 127-33-10+len("-BoldItalic") {
-		t.Errorf("wrong postscript name: %q", psName)
-	}
-}

@@ -66,7 +66,10 @@ func ReadHeader(r io.Reader) (*Header, error) {
 
 	scalerType := res.Offsets.ScalerType
 	if scalerType != ScalerTypeTrueType && scalerType != ScalerTypeCFF {
-		return nil, fmt.Errorf("unsupported sfnt type 0x%8X", scalerType)
+		return nil, &font.NotSupportedError{
+			SubSystem: "sfnt/header",
+			Feature:   fmt.Sprintf("scaler type %x", scalerType),
+		}
 	}
 	if res.Offsets.NumTables > 280 {
 		// the largest value observed on my laptop is 28
