@@ -278,6 +278,7 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 		for i := 0; i < nCodes; i++ {
 			cff.Encoding[i] = font.GlyphID(i + 1)
 		}
+		cff.ROS = nil
 	}
 	err = cff.Encode(fontFileStream)
 	if err != nil {

@@ -149,7 +149,12 @@ func loadCFFData(fname string) ([]byte, error) {
 func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) error {
 	hss := boxes.Glue(0, 1, 1, 1, 1)
 
-	label := fmt.Sprintf("glyph %d: %s", i, fnt.Glyphs[i].Name)
+	var label string
+	if fnt.Glyphs[i].Name != "" {
+		label = fmt.Sprintf("glyph %d %q", i, fnt.Glyphs[i].Name)
+	} else {
+		label = fmt.Sprintf("glyph %d", i)
+	}
 	nameBox := boxes.Text(F, 12, label)
 	titleBox := boxes.HBoxTo(page.BBox.URx-page.BBox.LLx, hss, nameBox, hss)
 	titleBox.Draw(page, page.BBox.LLx, page.BBox.URy-20)
