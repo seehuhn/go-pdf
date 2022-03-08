@@ -95,7 +95,7 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 			return int(fdIdx[idx])
 		}, nil
 	default:
-		return nil, notSupported(fmt.Sprintf("FDSelect format %d", format))
+		return nil, unsupported(fmt.Sprintf("FDSelect format %d", format))
 	}
 }
 

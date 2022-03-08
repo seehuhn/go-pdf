@@ -24,6 +24,12 @@ import (
 )
 
 func FuzzPost(f *testing.F) {
+	f.Add((&Info{
+		ItalicAngle:        -9,
+		UnderlinePosition:  -50,
+		UnderlineThickness: 10,
+	}).Encode())
+
 	f.Fuzz(func(t *testing.T, in []byte) {
 		i1, err := Read(bytes.NewReader(in))
 		if err != nil {

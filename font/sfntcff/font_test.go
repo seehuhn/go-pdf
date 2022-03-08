@@ -21,9 +21,9 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"reflect"
 	"testing"
 
+	"github.com/go-test/deep"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 )
 
@@ -56,52 +56,47 @@ func DisabledTestMany(t *testing.T) { // TODO(voss)
 	}
 
 	scanner := bufio.NewScanner(listFd)
-fontLoop:
 	for scanner.Scan() {
 		fname := scanner.Text()
 
-		fd, err := os.Open(fname)
-		if err != nil {
-			t.Error(err)
-			continue fontLoop
-		}
-
-		var r io.ReaderAt = fd
-		buf := &bytes.Buffer{}
-		for i := 0; i < 2; i++ {
-			font, err := Read(r)
-			if i == 0 {
-				fd.Close()
-			}
+		t.Run(fname, func(t *testing.T) {
+			fd, err := os.Open(fname)
 			if err != nil {
-				if i == 0 {
-					t.Error(err)
+				t.Fatal(err)
+			}
+			defer fd.Close()
+
+			var r io.ReaderAt = fd
+			buf := &bytes.Buffer{}
+			for i := 0; i < 2; i++ {
+				font, err := Read(r)
+				if err != nil {
+					if i == 0 {
+						return
+					} else {
+						t.Fatal(err)
+					}
 				}
-				continue fontLoop
-			}
 
-			// simplify glyphs to speed up fuzzing
-			if len(font.Glyphs) > 100 {
-				font.Glyphs = font.Glyphs[:100]
-			}
-			for _, g := range font.Glyphs {
-				b := g.Extent()
-				g.Cmds = nil
-				g.MoveTo(float64(b.LLx), float64(b.LLy))
-				g.LineTo(float64(b.URx), float64(b.LLy))
-				g.LineTo(float64(b.URx), float64(b.URy))
-				g.LineTo(float64(b.LLx), float64(b.URy))
-			}
+				// simplify glyphs to speed up fuzzing
+				for _, g := range font.Glyphs {
+					b := g.Extent()
+					g.Cmds = nil
+					g.MoveTo(float64(b.LLx), float64(b.LLy))
+					g.LineTo(float64(b.URx), float64(b.LLy))
+					g.LineTo(float64(b.URx), float64(b.URy))
+					g.LineTo(float64(b.LLx), float64(b.URy))
+				}
 
-			buf.Reset()
-			_, err = font.Write(buf)
-			if err != nil {
-				t.Error(err)
-				continue fontLoop
-			}
+				buf.Reset()
+				_, err = font.Write(buf)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-			r = bytes.NewReader(buf.Bytes())
-		}
+				r = bytes.NewReader(buf.Bytes())
+			}
+		})
 	}
 	listFd.Close()
 }
@@ -139,9 +134,6 @@ func FuzzFont(f *testing.F) {
 		}
 
 		// simplify glyphs to speed up fuzzing
-		if len(font.Glyphs) > 100 {
-			font.Glyphs = font.Glyphs[:100]
-		}
 		for _, g := range font.Glyphs {
 			b := g.Extent()
 			g.Cmds = nil
@@ -162,12 +154,12 @@ func FuzzFont(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		if !reflect.DeepEqual(font, font2) {
-			t.Errorf("different")
-		}
-
-		// for _, diff := range deep.Equal(font, font2) {
-		// 	t.Error(diff)
+		// if !reflect.DeepEqual(font, font2) {
+		// 	t.Errorf("different")
 		// }
+
+		for _, diff := range deep.Equal(font, font2) {
+			t.Error(diff)
+		}
 	})
 }

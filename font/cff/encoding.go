@@ -17,7 +17,7 @@
 package cff
 
 import (
-	"errors"
+	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf/font"
@@ -32,7 +32,7 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 	}
 
 	res := make([]font.GlyphID, 256)
-	current := font.GlyphID(1)
+	currentGid := font.GlyphID(1)
 	switch format & 127 {
 	case 0:
 		nCodes, err := p.ReadUInt8()
@@ -40,7 +40,7 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 			return nil, err
 		}
 		if int(nCodes) >= len(charset) {
-			return nil, invalidSince("encoding too long")
+			return nil, invalidSince("format 0 encoding too long")
 		}
 		codes := make([]byte, nCodes)
 		_, err = io.ReadFull(p, codes)
@@ -51,8 +51,8 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 			if res[c] != 0 {
 				return nil, invalidSince("invalid format 0 encoding")
 			}
-			res[c] = current
-			current++
+			res[c] = currentGid
+			currentGid++
 		}
 	case 1:
 		nRanges, err := p.ReadUInt8()
@@ -69,20 +69,20 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 				return nil, err
 			}
 			if int(first)+int(nLeft) > 255 {
-				return nil, errors.New("invalid encoding")
+				return nil, invalidSince("invalid format 1 encoding")
 			}
 			for j := int(first); j <= int(first+nLeft); j++ {
-				if int(current) >= len(charset) {
-					return nil, errors.New("encoding too long")
+				if int(currentGid) >= len(charset) {
+					return nil, invalidSince("format 1 encoding too long")
 				} else if res[j] != 0 {
-					return nil, errors.New("invalid format 1 encoding")
+					return nil, invalidSince("invalid format 1 encoding")
 				}
-				res[j] = current
-				current++
+				res[j] = currentGid
+				currentGid++
 			}
 		}
 	default:
-		return nil, errors.New("cff: unsupported encoding format")
+		return nil, unsupported(fmt.Sprintf("encoding format %d", format&127))
 	}
 
 	if (format & 128) != 0 {
@@ -106,7 +106,7 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 				return nil, err
 			}
 			gid := lookup[sid]
-			if gid >= current {
+			if gid >= currentGid {
 				return nil, invalidSince("invalid encoding supplement")
 			}
 			if gid != 0 {
@@ -207,14 +207,14 @@ func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
 }
 
 func standardEncoding(glyphs []*Glyph) []font.GlyphID {
-	res := make([]font.GlyphID, 256)
+	encoding := make([]font.GlyphID, 256)
 	for gid, g := range glyphs {
 		code, ok := type1.StandardEncoding[g.Name]
 		if ok {
-			res[code] = font.GlyphID(gid)
+			encoding[code] = font.GlyphID(gid)
 		}
 	}
-	return res
+	return encoding
 }
 
 func isStandardEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {

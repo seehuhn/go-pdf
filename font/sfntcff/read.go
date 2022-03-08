@@ -252,14 +252,6 @@ func Read(r io.ReaderAt) (*Info, error) {
 		return nil, err
 	}
 
-	// TODO(voss)
-	if cffInfo.IsCIDFont {
-		return nil, &font.NotSupportedError{
-			SubSystem: "sfntcff",
-			Feature:   "CID fonts",
-		}
-	}
-
 	if hmtxInfo != nil && len(hmtxInfo.Width) > 0 {
 		if len(hmtxInfo.Width) != len(cffInfo.Glyphs) {
 			return nil, errors.New("sfnt/header: hmtx and cff glyph count mismatch")
@@ -273,7 +265,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 
 	if nameTable != nil {
 		info.FamilyName = nameTable.Family
-	} else if cffInfo != nil {
+	} else {
 		info.FamilyName = cffInfo.Info.FamilyName
 	}
 	if os2Info != nil {
@@ -297,7 +289,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 	if nameTable != nil {
 		info.Copyright = nameTable.Copyright
 		info.Trademark = nameTable.Trademark
-	} else if cffInfo != nil {
+	} else {
 		info.Copyright = cffInfo.Info.Copyright
 		info.Trademark = cffInfo.Info.Notice
 	}
@@ -323,13 +315,13 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
 	} else if postInfo != nil {
 		info.ItalicAngle = postInfo.ItalicAngle
-	} else if cffInfo != nil {
+	} else {
 		info.ItalicAngle = cffInfo.Info.ItalicAngle
 	}
 	if postInfo != nil {
 		info.UnderlinePosition = postInfo.UnderlinePosition
 		info.UnderlineThickness = postInfo.UnderlineThickness
-	} else if cffInfo != nil {
+	} else {
 		info.UnderlinePosition = cffInfo.Info.UnderlinePosition
 		info.UnderlineThickness = cffInfo.Info.UnderlineThickness
 	}
@@ -342,9 +334,14 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.IsRegular = os2Info.IsRegular
 		info.IsOblique = os2Info.IsOblique
 	}
-	if cffInfo != nil {
-		info.Glyphs = cffInfo.Glyphs
-	}
+
+	info.Glyphs = cffInfo.Glyphs
+	info.Private = cffInfo.Private
+	info.FdSelect = cffInfo.FdSelect
+	info.Encoding = cffInfo.Encoding
+	info.Gid2cid = cffInfo.Gid2cid
+	info.ROS = cffInfo.ROS
+
 	info.CMap = cmapSubtable
 
 	return info, nil

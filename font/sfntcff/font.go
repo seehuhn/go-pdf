@@ -21,10 +21,12 @@ import (
 	"strings"
 	"time"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Info contains information about the font.
@@ -55,8 +57,13 @@ type Info struct {
 	IsRegular bool
 	IsOblique bool
 
-	Glyphs []*cff.Glyph
-	CMap   cmap.Subtable
+	Glyphs   []*cff.Glyph
+	Private  []*type1.PrivateDict
+	FdSelect cff.FdSelectFn
+	Encoding []font.GlyphID
+	Gid2cid  []int32
+	ROS      *type1.ROS
+	CMap     cmap.Subtable
 }
 
 // FullName returns the full name of the font.

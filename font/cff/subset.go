@@ -28,7 +28,7 @@ import (
 // subset.  The ".notdef" glyph must always be included as the first glyph.
 func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 	if subset[0] != 0 {
-		return nil, errors.New("cff:invalid subset")
+		return nil, errors.New("cff: invalid subset")
 	}
 
 	if len(cff.Info.FontName) >= 7 && cff.Info.FontName[6] == '+' {
@@ -44,12 +44,11 @@ func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 	info := *cff.Info
 	info.FontName = pdf.Name(tag) + "+" + cff.Info.FontName
 	out := &Font{
-		Info:      &info,
-		IsCIDFont: true,
-		FdSelect:  fdSelect,
-		Private:   cff.Private,
+		Info:     &info,
+		FdSelect: fdSelect,
+		Private:  cff.Private,
 	}
-	if cff.IsCIDFont {
+	if cff.ROS != nil {
 		out.ROS = cff.ROS
 	} else {
 		out.ROS = &type1.ROS{

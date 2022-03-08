@@ -226,7 +226,7 @@ func makePost(info *Info) []byte {
 
 func makeCFF(info *Info) ([]byte, error) {
 	q := 1 / float64(info.UnitsPerEm)
-	cffInfo := type1.FontInfo{
+	cffInfo := &type1.FontInfo{
 		FullName:   info.FullName(),
 		FamilyName: info.FamilyName,
 		Weight:     info.Weight.String(),
@@ -244,15 +244,14 @@ func makeCFF(info *Info) ([]byte, error) {
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 	}
-	private := []*type1.PrivateDict{
-		{
-			BlueValues: []int32{-10, 0, 700, 710}, // TODO(voss)
-		},
-	}
 	myCff := &cff.Font{
-		Glyphs:  info.Glyphs,
-		Info:    &cffInfo,
-		Private: private,
+		Glyphs:   info.Glyphs,
+		Info:     cffInfo,
+		Private:  info.Private,
+		FdSelect: info.FdSelect,
+		Encoding: info.Encoding,
+		Gid2cid:  info.Gid2cid,
+		ROS:      info.ROS,
 	}
 
 	buf := &bytes.Buffer{}

@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 func main() {
@@ -74,6 +75,12 @@ func main() {
 	g.CurveTo(500, 625, 300, 700, 200, 700)
 	g.LineTo(0, 700)
 	info.Glyphs = append(info.Glyphs, g)
+	info.Private = []*type1.PrivateDict{
+		{
+			BlueValues: []int32{-10, 0, 700, 710}, // TODO(voss)
+		},
+	}
+	info.FdSelect = func(gi font.GlyphID) int { return 0 }
 
 	info.CMap = makeCMap(info.Glyphs)
 

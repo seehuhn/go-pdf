@@ -18,7 +18,7 @@ package cff
 
 import "seehuhn.de/go/pdf/font"
 
-func notSupported(feature string) error {
+func unsupported(feature string) error {
 	return &font.NotSupportedError{
 		SubSystem: "cmap",
 		Feature:   feature,

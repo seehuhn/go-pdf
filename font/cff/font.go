@@ -36,8 +36,6 @@ type Font struct {
 	Private  []*type1.PrivateDict
 	FdSelect FdSelectFn
 
-	IsCIDFont bool // TODO(voss): can this be replaced with ROS!=nil?
-
 	Encoding []font.GlyphID
 
 	Gid2cid []int32 // TODO(voss): what is a good data type for this?
@@ -73,7 +71,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	nameIndexOffs := int64((x >> 8) & 0xFF)
 	offSize := x & 0xFF // only used to exclude non-CFF files
 	if major == 2 {
-		return nil, notSupported(fmt.Sprintf("version %d.%d", major, minor))
+		return nil, unsupported(fmt.Sprintf("version %d.%d", major, minor))
 	} else if major != 1 || nameIndexOffs < 4 || offSize > 4 {
 		return nil, invalidSince("invalid header")
 	}
@@ -90,7 +88,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if len(fontNames) == 0 {
 		return nil, invalidSince("no font data")
 	} else if len(fontNames) > 1 {
-		return nil, notSupported("fontsets with more than one font")
+		return nil, unsupported("fontsets with more than one font")
 	}
 	cff.Info = &type1.FontInfo{
 		FontName: pdf.Name(fontNames[0]),
@@ -123,7 +121,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		return nil, err
 	}
 	if topDict.getInt(opCharstringType, 2) != 2 {
-		return nil, notSupported("charstring type != 2")
+		return nil, unsupported("charstring type != 2")
 	}
 	cff.Info.Version = topDict.getString(opVersion)
 	cff.Info.Notice = topDict.getString(opNotice)
@@ -163,7 +161,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	}
 
 	ROS, isCIDFont := topDict[opROS]
-	cff.IsCIDFont = isCIDFont
 	var decoders []*decodeInfo
 	if isCIDFont {
 		if len(ROS) != 3 {
@@ -231,7 +228,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	// read the list of glyph names
 	charsetOffs := topDict.getInt(opCharset, 0)
 	var charset []int32
-	if cff.IsCIDFont {
+	if isCIDFont {
 		err = p.SeekPos(int64(charsetOffs))
 		if err != nil {
 			return nil, err
@@ -280,7 +277,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	}
 
 	// read the Private DICT
-	if !cff.IsCIDFont {
+	if !isCIDFont {
 		pInfo, err := topDict.readPrivate(p, strings)
 		if err != nil {
 			return nil, err
@@ -307,7 +304,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		if cff.IsCIDFont {
+		if isCIDFont {
 			if charset != nil {
 				cff.Gid2cid[gid] = charset[gid]
 			}
@@ -322,7 +319,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	}
 
 	// read the encoding
-	if !cff.IsCIDFont {
+	if !isCIDFont {
 		encodingOffs := topDict.getInt(opEncoding, 0)
 		var enc []font.GlyphID
 		switch {
@@ -385,7 +382,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	topDict := makeTopDict(cff.Info)
 	// opCharset is updated below
 	// opCharStrings is updated below
-	if cff.IsCIDFont {
+	if cff.ROS != nil {
 		// afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillTop
 		registrySID := strings.lookup(cff.ROS.Registry)
 		orderingSID := strings.lookup(cff.ROS.Ordering)
@@ -415,7 +412,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	// section 5: encodings
 	secEncodings := -1
 	var glyphNames []int32
-	if !cff.IsCIDFont {
+	if cff.ROS == nil {
 		glyphNames = make([]int32, numGlyphs)
 		for i := uint16(0); i < numGlyphs; i++ {
 			glyphNames[i] = strings.lookup(string(cff.Glyphs[i].Name))
@@ -437,7 +434,7 @@ func (cff *Font) Encode(w io.Writer) error {
 
 	// section 6: charsets
 	var charsets []byte
-	if !cff.IsCIDFont {
+	if cff.ROS == nil {
 		charsets, err = encodeCharset(glyphNames)
 	} else {
 		charsets, err = encodeCharset(cff.Gid2cid)
@@ -450,7 +447,7 @@ func (cff *Font) Encode(w io.Writer) error {
 
 	// section 7: FDSelect
 	secFdSelect := -1
-	if cff.IsCIDFont {
+	if cff.ROS != nil {
 		secFdSelect = len(blobs)
 		blobs = append(blobs, cff.FdSelect.encode(int(numGlyphs)))
 	}
@@ -462,7 +459,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	// section 9: font DICT INDEX
 	numFonts := len(cff.Private)
 	fontDicts := make([]cffDict, numFonts)
-	if cff.IsCIDFont {
+	if cff.ROS != nil {
 		for i := range fontDicts {
 			// see afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont
 			fontDict := cffDict{}
@@ -512,7 +509,7 @@ func (cff *Font) Encode(w io.Writer) error {
 			blobs[secPrivateDict] = privateDicts[i].encode(strings)
 			pdSize := len(blobs[secPrivateDict])
 			pdDesc := []interface{}{int32(pdSize), offs[secPrivateDict]}
-			if cff.IsCIDFont {
+			if cff.ROS != nil {
 				fontDicts[i][opPrivate] = pdDesc
 				fontDictData := fontDicts[i].encode(strings)
 				fontDictIndex = append(fontDictIndex, fontDictData)
@@ -520,7 +517,7 @@ func (cff *Font) Encode(w io.Writer) error {
 				topDict[opPrivate] = pdDesc
 			}
 		}
-		if cff.IsCIDFont {
+		if cff.ROS != nil {
 			blobs[secFontDictIndex] = fontDictIndex.encode()
 		}
 
@@ -611,7 +608,7 @@ func (cff *Font) selectWidths() (int16, int16) {
 
 func (cff *Font) encodeCharStrings() (cffIndex, int16, int16, error) {
 	numGlyphs := len(cff.Glyphs)
-	if numGlyphs < 1 || (!cff.IsCIDFont && cff.Glyphs[0].Name != ".notdef") {
+	if numGlyphs < 1 || (cff.ROS == nil && cff.Glyphs[0].Name != ".notdef") {
 		return nil, 0, 0, invalidSince("missing .notdef glyph")
 	}
 
