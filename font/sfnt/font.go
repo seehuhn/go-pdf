@@ -259,7 +259,7 @@ func (tt *Font) NumGlyphs() int {
 // HasTables returns true, if all the given tables are present in the font.
 func (tt *Font) HasTables(names ...string) bool {
 	for _, name := range names {
-		if tt.Header.Find(name) == nil {
+		if _, ok := tt.Header.Toc[name]; !ok {
 			return false
 		}
 	}
@@ -296,9 +296,9 @@ func (tt *Font) IsVariable() bool {
 // the table data.  If head is non-nil, binary.Read() is used to
 // read the data at the start of the table into the value head points to.
 func (tt *Font) GetTableReader(name string, head interface{}) (*io.SectionReader, error) {
-	rec := tt.Header.Find(name)
-	if rec == nil {
-		return nil, &table.ErrNoTable{Name: name}
+	rec, err := tt.Header.Find(name)
+	if err != nil {
+		return nil, err
 	}
 	tableFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
 
@@ -317,9 +317,9 @@ func (tt *Font) GetTableReader(name string, head interface{}) (*io.SectionReader
 // this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
 // If this fails, a legacy 1,0 record is tried as a last resort.
 func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
-	rec := tt.Header.Find("cmap")
-	if rec == nil {
-		return nil, &table.ErrNoTable{Name: "cmap"}
+	rec, err := tt.Header.Find("cmap")
+	if err != nil {
+		return nil, err
 	}
 	cmapFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
 

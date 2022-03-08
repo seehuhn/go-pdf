@@ -102,21 +102,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	box.Draw(page, margin, yPos-baseLineSkip)
 
 	xPos = margin
-	for _, gl := range glyphs {
-		c := gl.Gid
-		bbox := F1.GlyphExtent[c]
-		if !bbox.IsZero() {
-			x := xPos + float64(gl.XOffset)*q
-			y := yPos + float64(gl.YOffset)*q
-			page.Printf("BT /F1 %f Tf\n", fontSize)
-			page.Printf("%f %f Td\n", x, y)
-			enc := F1.Enc(c)
-			_ = enc.PDF(page)
-			page.Println(" Tj")
-			page.Println("ET")
-		}
-		xPos += float64(gl.Advance) * q
-	}
+	layout.Draw(page, xPos, yPos)
 
 	return page.Close()
 }

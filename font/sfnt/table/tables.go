@@ -21,26 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"unicode"
 
 	"seehuhn.de/go/pdf/font"
 )
-
-// Header describes the start of a TrueType/OpenType file.  The structure
-// contains information required to access the tables in the file.
-type Header struct {
-	Offsets Offsets
-	Records []Record
-}
-
-// The Offsets sub-table forms the first part of Header.
-type Offsets struct {
-	ScalerType    uint32
-	NumTables     uint16
-	SearchRange   uint16
-	EntrySelector uint16
-	RangeShift    uint16
-}
 
 const (
 	ScalerTypeTrueType = 0x00010000
@@ -48,68 +33,156 @@ const (
 	ScalerTypeApple    = 0x74727565
 )
 
-// A Record is part of the file Header.  It contains data about a single sfnt
-// table.
+type Header struct {
+	ScalerType uint32
+	Toc        map[string]Record
+}
+
 type Record struct {
-	Tag      Tag
-	CheckSum uint32
-	Offset   uint32
-	Length   uint32
+	Offset uint32
+	Length uint32
 }
 
 // ReadHeader reads the file header of an sfnt font file.
-func ReadHeader(r io.Reader) (*Header, error) {
-	res := &Header{}
-	err := binary.Read(r, binary.BigEndian, &res.Offsets)
+func ReadHeader(r io.ReaderAt) (*Header, error) {
+	var buf [16]byte
+	_, err := r.ReadAt(buf[:6], 0)
 	if err != nil {
 		return nil, err
 	}
+	scalerType := uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3])
+	numTables := int(buf[4])<<8 | int(buf[5])
 
-	scalerType := res.Offsets.ScalerType
-	if scalerType != ScalerTypeTrueType && scalerType != ScalerTypeCFF {
+	if scalerType != ScalerTypeTrueType &&
+		scalerType != ScalerTypeCFF &&
+		scalerType != ScalerTypeApple {
 		return nil, &font.NotSupportedError{
 			SubSystem: "sfnt/header",
-			Feature:   fmt.Sprintf("scaler type %x", scalerType),
+			Feature:   fmt.Sprintf("scaler type 0x%x", scalerType),
 		}
 	}
-	if res.Offsets.NumTables > 280 {
+	if numTables > 280 {
 		// the largest value observed on my laptop is 28
-		return nil, errors.New("too many sfnt tables in font")
+		return nil, errors.New("sfnt/header: too many tables")
 	}
 
-	res.Records = make([]Record, res.Offsets.NumTables)
-	err = binary.Read(r, binary.BigEndian, &res.Records)
-	if err != nil {
+	h := &Header{
+		ScalerType: scalerType,
+		Toc:        make(map[string]Record),
+	}
+	type alloc struct {
+		Start uint32
+		End   uint32
+	}
+	var coverage []alloc
+	for i := 0; i < numTables; i++ {
+		_, err := r.ReadAt(buf[:], int64(12+i*16))
+		if err != nil {
+			return nil, err
+		}
+		name := string(buf[:4])
+		offset := uint32(buf[8])<<24 + uint32(buf[9])<<16 + uint32(buf[10])<<8 + uint32(buf[11])
+		length := uint32(buf[12])<<24 + uint32(buf[13])<<16 + uint32(buf[14])<<8 + uint32(buf[15])
+		if offset >= 1<<28 || length >= 1<<28 { // 256MB size limit
+			return nil, errors.New("sfnt/header: invalid offset or length")
+		}
+		if length == 0 || !isKnownTable[name] {
+			continue
+		}
+		h.Toc[name] = Record{
+			Offset: offset,
+			Length: length,
+		}
+		coverage = append(coverage, alloc{
+			Start: offset,
+			End:   offset + length,
+		})
+	}
+	if len(h.Toc) == 0 {
+		return nil, errors.New("sfnt/header: no tables found")
+	}
+
+	// perform some sanity checks
+	sort.Slice(coverage, func(i, j int) bool {
+		return coverage[i].Start < coverage[j].Start
+	})
+	if coverage[0].Start < 12 {
+		return nil, errors.New("sfnt/header: invalid table offset")
+	}
+	for i := 1; i < len(coverage); i++ {
+		if coverage[i-1].End > coverage[i].Start {
+			return nil, errors.New("sfnt/header: overlapping tables")
+		}
+	}
+	_, err = r.ReadAt(buf[:1], int64(coverage[len(coverage)-1].End)-1)
+	if err == io.EOF {
+		return nil, errors.New("sfnt/header: table extends beyond EOF")
+	} else if err != nil {
 		return nil, err
 	}
 
+	return h, nil
+}
+
+func (h *Header) Find(tableName string) (Record, error) {
+	rec, ok := h.Toc[tableName]
+	if !ok {
+		return rec, &ErrNoTable{Name: tableName}
+	}
+	return rec, nil
+}
+
+func (h *Header) ReadTableBytes(r io.ReaderAt, tableName string) ([]byte, error) {
+	rec, err := h.Find(tableName)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]byte, rec.Length)
+	_, err = r.ReadAt(res, int64(rec.Offset))
+	if err != nil {
+		return nil, err
+	}
 	return res, nil
 }
 
-// Find returns the table record for the table with the given name.
-// If no such table exists, nil is returned.
-func (h *Header) Find(name string) *Record {
-	for i := 0; i < int(h.Offsets.NumTables); i++ {
-		if h.Records[i].Tag.String() == name {
-			return &h.Records[i]
-		}
-	}
-	return nil
-}
-
-// ReadTableBytes returns the body of an sfnt table.
-func (h *Header) ReadTableBytes(r io.ReaderAt, name string) ([]byte, error) {
-	table := h.Find(name)
-	if table == nil {
-		return nil, &ErrNoTable{name}
-	}
-
-	buf := make([]byte, table.Length)
-	_, err := r.ReadAt(buf, int64(table.Offset))
-	if err != nil {
-		return nil, err
-	}
-	return buf, nil
+var isKnownTable = map[string]bool{
+	"BASE": true,
+	"CBDT": true,
+	"CBLC": true,
+	"CFF ": true,
+	"cmap": true,
+	"cvt ": true,
+	"DSIG": true,
+	"feat": true,
+	"FFTM": true,
+	"fpgm": true,
+	"fvar": true,
+	"gasp": true,
+	"GDEF": true,
+	"glyf": true,
+	"GPOS": true,
+	"GSUB": true,
+	"gvar": true,
+	"hdmx": true,
+	"head": true,
+	"hhea": true,
+	"hmtx": true,
+	"HVAR": true,
+	"kern": true,
+	"loca": true,
+	"LTSH": true,
+	"maxp": true,
+	"meta": true,
+	"morx": true,
+	"name": true,
+	"OS/2": true,
+	"post": true,
+	"prep": true,
+	"STAT": true,
+	"VDMX": true,
+	"vhea": true,
+	"vmtx": true,
+	"VORG": true,
 }
 
 // --------------------------------------------------------------------------

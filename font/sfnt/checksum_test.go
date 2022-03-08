@@ -32,7 +32,7 @@ func TestChecksum(t *testing.T) {
 	}
 
 	for i, test := range cases {
-		computed := Checksum(test.Body)
+		computed := checksum(test.Body)
 		if computed != test.Expected {
 			t.Errorf("test %d failed: %08x != %08x",
 				i+1, computed, test.Expected)

@@ -18,11 +18,9 @@ package sfntcff
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"regexp"
-	"sort"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
@@ -35,123 +33,19 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
-type record struct {
-	Offset uint32
-	Length uint32
-}
-
-type alloc struct {
-	Start uint32
-	End   uint32
-}
-
-type header struct {
-	scalerType uint32
-	toc        map[string]record
-}
-
-func readHeader(r io.ReaderAt) (*header, error) {
-	var buf [16]byte
-	_, err := r.ReadAt(buf[:6], 0)
-	if err != nil {
-		return nil, err
-	}
-	scalerType := uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3])
-	numTables := int(buf[4])<<8 | int(buf[5])
-
-	if scalerType != table.ScalerTypeTrueType &&
-		scalerType != table.ScalerTypeCFF &&
-		scalerType != table.ScalerTypeApple {
-		return nil, &font.NotSupportedError{
-			SubSystem: "sfnt/header",
-			Feature:   fmt.Sprintf("scaler type 0x%x", scalerType),
-		}
-	}
-	if numTables > 280 {
-		// the largest value observed on my laptop is 28
-		return nil, errors.New("sfnt/header: too many tables")
-	}
-
-	res := &header{
-		scalerType: scalerType,
-		toc:        make(map[string]record),
-	}
-	var coverage []alloc
-	for i := 0; i < numTables; i++ {
-		_, err := r.ReadAt(buf[:], int64(12+i*16))
-		if err != nil {
-			return nil, err
-		}
-		name := string(buf[:4])
-		offset := uint32(buf[8])<<24 + uint32(buf[9])<<16 + uint32(buf[10])<<8 + uint32(buf[11])
-		length := uint32(buf[12])<<24 + uint32(buf[13])<<16 + uint32(buf[14])<<8 + uint32(buf[15])
-		if offset >= 1<<28 || length >= 1<<28 { // 256MB size limit
-			return nil, errors.New("sfnt/header: invalid offset or length")
-		}
-		if length == 0 || !isKnownTable[name] {
-			continue
-		}
-		res.toc[name] = record{
-			Offset: offset,
-			Length: length,
-		}
-		coverage = append(coverage, alloc{
-			Start: offset,
-			End:   offset + length,
-		})
-	}
-	if len(res.toc) == 0 {
-		return nil, errors.New("sfnt/header: no tables found")
-	}
-
-	// perform some sanity checks
-	sort.Slice(coverage, func(i, j int) bool {
-		return coverage[i].Start < coverage[j].Start
-	})
-	if coverage[0].Start < 12 {
-		return nil, errors.New("sfnt/header: invalid table offset")
-	}
-	for i := 1; i < len(coverage); i++ {
-		if coverage[i-1].End > coverage[i].Start {
-			return nil, errors.New("sfnt/header: overlapping tables")
-		}
-	}
-	_, err = r.ReadAt(buf[:1], int64(coverage[len(coverage)-1].End)-1)
-	if err == io.EOF {
-		return nil, errors.New("sfnt/header: table extends beyond EOF")
-	} else if err != nil {
-		return nil, err
-	}
-
-	return res, nil
-}
-
 // Read reads an OpenType font from a file.
 func Read(r io.ReaderAt) (*Info, error) {
-	header, err := readHeader(r)
+	header, err := table.ReadHeader(r)
 	if err != nil {
 		return nil, err
 	}
 
 	tableReader := func(name string) (*io.SectionReader, error) {
-		rec, ok := header.toc[name]
+		rec, ok := header.Toc[name]
 		if !ok {
 			return nil, &table.ErrNoTable{Name: name}
 		}
 		return io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length)), nil
-	}
-
-	tableBytes := func(name string) ([]byte, error) {
-		rec, ok := header.toc[name]
-		if !ok {
-			return nil, &table.ErrNoTable{Name: name}
-		}
-		res := make([]byte, rec.Length)
-		_, err := r.ReadAt(res, int64(rec.Offset))
-		if err != nil {
-			return nil, err
-		}
-		return res, nil
 	}
 
 	var headInfo *head.Info
@@ -167,11 +61,11 @@ func Read(r io.ReaderAt) (*Info, error) {
 	}
 
 	var hmtxInfo *hmtx.Info
-	hheaData, err := tableBytes("hhea")
+	hheaData, err := header.ReadTableBytes(r, "hhea")
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
-	hmtxData, err := tableBytes("hmtx")
+	hmtxData, err := header.ReadTableBytes(r, "hmtx")
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
@@ -205,7 +99,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 	}
 
 	var nameTable *name.Table
-	nameData, err := tableBytes("name")
+	nameData, err := header.ReadTableBytes(r, "name")
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
@@ -217,7 +111,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		nameTable = nameInfo.Tables.Get()
 	}
 
-	cmapData, err := tableBytes("cmap")
+	cmapData, err := header.ReadTableBytes(r, "cmap")
 	if err != nil {
 		return nil, err
 	}
@@ -371,44 +265,4 @@ func getCFFVersion(info *cff.Font) (head.Version, bool) {
 		return 0, false
 	}
 	return v, true
-}
-
-var isKnownTable = map[string]bool{
-	"BASE": true,
-	"CBDT": true,
-	"CBLC": true,
-	"CFF ": true,
-	"cmap": true,
-	"cvt ": true,
-	"DSIG": true,
-	"feat": true,
-	"FFTM": true,
-	"fpgm": true,
-	"fvar": true,
-	"gasp": true,
-	"GDEF": true,
-	"glyf": true,
-	"GPOS": true,
-	"GSUB": true,
-	"gvar": true,
-	"hdmx": true,
-	"head": true,
-	"hhea": true,
-	"hmtx": true,
-	"HVAR": true,
-	"kern": true,
-	"loca": true,
-	"LTSH": true,
-	"maxp": true,
-	"meta": true,
-	"morx": true,
-	"name": true,
-	"OS/2": true,
-	"post": true,
-	"prep": true,
-	"STAT": true,
-	"VDMX": true,
-	"vhea": true,
-	"vmtx": true,
-	"VORG": true,
 }

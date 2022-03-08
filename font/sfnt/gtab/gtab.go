@@ -75,11 +75,11 @@ func New(toc *table.Header, r io.ReadSeeker, loc *locale.Locale) (*GTab, error) 
 
 // selectLookups returns the selected lookups as indices into the lookupList.
 func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) ([]uint16, error) {
-	info := g.toc.Find(tableName)
-	if info == nil {
-		return nil, &table.ErrNoTable{Name: tableName}
+	info, err := g.toc.Find(tableName)
+	if err != nil {
+		return nil, err
 	}
-	err := g.SetRegion(tableName, int64(info.Offset), int64(info.Length))
+	err = g.SetRegion(tableName, int64(info.Offset), int64(info.Length))
 	if err != nil {
 		return nil, err
 	}

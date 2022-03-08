@@ -285,14 +285,12 @@ func (pdf *Writer) OnClose(callback func(*Writer) error) {
 	pdf.onClose = append(pdf.onClose, callback)
 }
 
-// SetInfo sets the Document Information Dictionary for the file.  The writer
-// does not copy info, the struct should not be changed after SetInfo() has
-// been called.
-//
+// SetInfo sets the Document Information Dictionary for the file.
 // The Document Information Dictionary is documented in section 14.3.3 of PDF
 // 32000-1:2008.
 func (pdf *Writer) SetInfo(info *Info) {
-	pdf.info = info
+	info2 := *info
+	pdf.info = &info2
 }
 
 // Alloc allocates an object number for an indirect object.

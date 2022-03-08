@@ -54,9 +54,9 @@ func (s *check) Reset() {
 	s.used = 0
 }
 
-// Checksum implements the sfnt checksum algorithm.
+// checksum implements the sfnt checksum algorithm.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums
-func Checksum(data []byte) uint32 {
+func checksum(data []byte) uint32 {
 	cc := &check{}
 	_, _ = cc.Write(data)
 	return cc.Sum()

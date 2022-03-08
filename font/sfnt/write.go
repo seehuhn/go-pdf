@@ -135,7 +135,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		}
 	}
 
-	return WriteTables(w, tt.Header.Offsets.ScalerType, tableNames, tableData)
+	return WriteTables(w, tt.Header.ScalerType, tableNames, tableData)
 }
 
 type subsetInfo struct {
@@ -344,7 +344,7 @@ func (tt *Font) selectTables(include map[string]bool) []string {
 	// Fix the order of tables in the body of the files.
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
 	var candidates []string
-	if tt.Header.Find("CFF ") != nil && (include == nil || include["CFF "]) {
+	if _, ok := tt.Header.Toc["CFF "]; ok && (include == nil || include["CFF "]) {
 		candidates = []string{
 			"head", "hhea", "maxp", "OS/2", "name", "cmap", "post", "CFF ",
 		}
@@ -356,7 +356,7 @@ func (tt *Font) selectTables(include map[string]bool) []string {
 	}
 	for _, name := range candidates {
 		done[name] = true
-		if tt.Header.Find(name) != nil {
+		if _, ok := tt.Header.Toc[name]; ok {
 			if include == nil || include[name] {
 				names = append(names, name)
 			}
@@ -368,8 +368,7 @@ func (tt *Font) selectTables(include map[string]bool) []string {
 	done["DSIG"] = true
 
 	extraPos := len(names)
-	for i := 0; i < int(tt.Header.Offsets.NumTables); i++ {
-		name := tt.Header.Records[i].Tag.String()
+	for name := range tt.Header.Toc {
 		if done[name] {
 			continue
 		}
@@ -391,6 +390,24 @@ func contains(ss []string, s string) bool {
 	return false
 }
 
+// The offsets sub-table forms the first part of Header.
+type offsets struct {
+	ScalerType    uint32
+	NumTables     uint16
+	SearchRange   uint16
+	EntrySelector uint16
+	RangeShift    uint16
+}
+
+// A record is part of the file Header.  It contains data about a single sfnt
+// table.
+type record struct {
+	Tag      table.Tag
+	CheckSum uint32
+	Offset   uint32
+	Length   uint32
+}
+
 // WriteTables writes an sfnt file containing the given tables.
 // This changes the checksum in the "head" table in place.
 func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData map[string][]byte) (int64, error) {
@@ -398,7 +415,7 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 
 	// prepare the header
 	sel := bits.Len(uint(numTables)) - 1
-	offsets := &table.Offsets{
+	offsets := &offsets{
 		ScalerType:    scalerType,
 		NumTables:     uint16(numTables),
 		SearchRange:   1 << (sel + 4),
@@ -413,11 +430,11 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 
 	var totalSum uint32
 	offset := uint32(12 + 16*numTables)
-	records := make([]table.Record, numTables)
+	records := make([]record, numTables)
 	for i, name := range tableNames {
 		body := tableData[name]
 		length := uint32(len(body))
-		checksum := Checksum(body)
+		checksum := checksum(body)
 
 		records[i].Tag = table.MakeTag(name)
 		records[i].CheckSum = checksum
@@ -435,7 +452,7 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 	binary.Write(buf, binary.BigEndian, offsets)
 	binary.Write(buf, binary.BigEndian, records)
 	headerBytes := buf.Bytes()
-	totalSum += Checksum(headerBytes)
+	totalSum += checksum(headerBytes)
 
 	// set the final checksum in the "head" table
 	if headData, ok := tableData["head"]; ok {

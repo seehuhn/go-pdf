@@ -19,7 +19,6 @@ package gtab
 import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
-	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 // ReadGdefTable reads the GDEF table of a font file.
@@ -29,11 +28,11 @@ func (g *GTab) ReadGdefTable() (*GdefInfo, error) {
 	}
 
 	tableName := "GDEF"
-	info := g.toc.Find(tableName)
-	if info == nil {
-		return nil, &table.ErrNoTable{Name: tableName}
+	info, err := g.toc.Find(tableName)
+	if err != nil {
+		return nil, err
 	}
-	err := g.SetRegion(tableName, int64(info.Offset), int64(info.Length))
+	err = g.SetRegion(tableName, int64(info.Offset), int64(info.Length))
 	if err != nil {
 		return nil, err
 	}
