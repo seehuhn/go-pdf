@@ -19,7 +19,6 @@ package cff
 import (
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 
 	"seehuhn.de/go/dijkstra"
@@ -33,7 +32,7 @@ type Glyph struct {
 	HStem []int16
 	VStem []int16
 	Name  pdf.Name
-	Width int16
+	Width int16 // TODO(voss): should this be uint16?
 }
 
 // NewGlyph allocates a new glyph.
@@ -58,26 +57,35 @@ func (g *Glyph) String() string {
 // MoveTo starts a new sub-path and moves the current point to (x, y).
 // The previous sub-path, if any, is closed.
 func (g *Glyph) MoveTo(x, y float64) {
-	g.Cmds = append(g.Cmds, GlyphOp{Op: OpMoveTo, Args: []float64{x, y}})
+	g.Cmds = append(g.Cmds, GlyphOp{
+		Op:   OpMoveTo,
+		Args: []Fixed16{f16(x), f16(y)},
+	})
 }
 
 // LineTo adds a straight line to the current sub-path.
 func (g *Glyph) LineTo(x, y float64) {
-	g.Cmds = append(g.Cmds, GlyphOp{Op: OpLineTo, Args: []float64{x, y}})
+	g.Cmds = append(g.Cmds, GlyphOp{
+		Op:   OpLineTo,
+		Args: []Fixed16{f16(x), f16(y)},
+	})
 }
 
 // CurveTo adds a cubic Bezier curve to the current sub-path.
 func (g *Glyph) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
-	g.Cmds = append(g.Cmds, GlyphOp{Op: OpCurveTo, Args: []float64{x1, y1, x2, y2, x3, y3}})
+	g.Cmds = append(g.Cmds, GlyphOp{
+		Op:   OpCurveTo,
+		Args: []Fixed16{f16(x1), f16(y1), f16(x2), f16(y2), f16(x3), f16(y3)},
+	})
 }
 
 // Extent computes the Glyph extent in font design units
 func (g *Glyph) Extent() font.Rect {
-	var left, right, top, bottom float64
+	var left, right, top, bottom Fixed16
 	first := true
 cmdLoop:
 	for _, cmd := range g.Cmds {
-		var x, y float64
+		var x, y Fixed16
 		switch cmd.Op {
 		case OpMoveTo, OpLineTo:
 			x = cmd.Args[0]
@@ -103,10 +111,10 @@ cmdLoop:
 		first = false
 	}
 	return font.Rect{
-		LLx: int16(math.Floor(left)),
-		LLy: int16(math.Floor(bottom)),
-		URx: int16(math.Ceil(right)),
-		URy: int16(math.Ceil(top)),
+		LLx: left.Floor(),
+		LLy: bottom.Floor(),
+		URx: right.Ceil(),
+		URy: top.Ceil(),
 	}
 }
 
@@ -237,27 +245,27 @@ func encodePaths(commands []GlyphOp) [][]byte {
 func encodeArgs(cmds []GlyphOp) []enCmd {
 	res := make([]enCmd, len(cmds))
 
-	var posX fixed16
-	var posY fixed16
+	var posX Fixed16
+	var posY Fixed16
 	for i, cmd := range cmds {
 		res[i] = enCmd{
 			Op: cmd.Op,
 		}
 		switch cmd.Op {
 		case OpMoveTo, OpLineTo:
-			dx := encodeNumber(f16(cmd.Args[0]) - posX)
-			dy := encodeNumber(f16(cmd.Args[1]) - posY)
+			dx := encodeNumber(cmd.Args[0] - posX)
+			dy := encodeNumber(cmd.Args[1] - posY)
 			res[i].Args = []encodedNumber{dx, dy}
 			posX += dx.Val
 			posY += dy.Val
 
 		case OpCurveTo:
-			dxa := encodeNumber(f16(cmd.Args[0]) - posX)
-			dya := encodeNumber(f16(cmd.Args[1]) - posY)
-			dxb := encodeNumber(f16(cmd.Args[2]) - f16(cmd.Args[0]))
-			dyb := encodeNumber(f16(cmd.Args[3]) - f16(cmd.Args[1]))
-			dxc := encodeNumber(f16(cmd.Args[4]) - f16(cmd.Args[2]))
-			dyc := encodeNumber(f16(cmd.Args[5]) - f16(cmd.Args[3]))
+			dxa := encodeNumber(cmd.Args[0] - posX)
+			dya := encodeNumber(cmd.Args[1] - posY)
+			dxb := encodeNumber(cmd.Args[2] - cmd.Args[0])
+			dyb := encodeNumber(cmd.Args[3] - cmd.Args[1])
+			dxc := encodeNumber(cmd.Args[4] - cmd.Args[2])
+			dyc := encodeNumber(cmd.Args[5] - cmd.Args[3])
 			res[i].Args = []encodedNumber{dxa, dya, dxb, dyb, dxc, dyc}
 			posX += dxa.Val + dxb.Val + dxc.Val
 			posY += dya.Val + dyb.Val + dyc.Val
@@ -266,7 +274,7 @@ func encodeArgs(cmds []GlyphOp) []enCmd {
 			k := len(cmd.Args)
 			code := make([]byte, k)
 			for i, arg := range cmd.Args {
-				code[i] = byte(arg)
+				code[i] = arg.Byte()
 			}
 			res[i].Args = []encodedNumber{{Code: code}}
 
@@ -283,7 +291,13 @@ func encodeSubPath(cmds []enCmd) [][]byte {
 	if err != nil {
 		panic(err)
 	}
-	var res [][]byte
+
+	total := 0
+	for _, e := range ee {
+		total += len(e.code)
+	}
+
+	res := make([][]byte, 0, total)
 	for _, e := range ee {
 		res = append(res, e.code...)
 	}
@@ -310,13 +324,14 @@ func (enc encoder) Edges(from int) []edge {
 		var code [][]byte
 		pos := 0
 		for pos < len(cmds) && cmds[pos].Op == OpLineTo && len(code)+2 <= maxStack {
-			code = append(code, cmds[pos].Args[0].Code)
-			code = append(code, cmds[pos].Args[1].Code)
+			code = append(code,
+				cmds[pos].Args[0].Code,
+				cmds[pos].Args[1].Code)
+			pos++
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlineto),
-				to:   from + pos + 1,
+				to:   from + pos,
 			})
-			pos++
 		}
 
 		// {dx dy}+ xb yb xc yc xd yd  rlinecurve
@@ -341,14 +356,14 @@ func (enc encoder) Edges(from int) []edge {
 			} else if cmd.Args[0].IsZero() {
 				dir = -1
 			}
-			aligned = append(aligned, dir)
+			aligned = append(aligned, dir) // TODO(voss): can we avoid this allocation?
 		}
 
 		sign := aligned[0]
 		if sign != 0 {
 			op := []t2op{t2hlineto, t2vlineto}[(1-sign)/2]
 			pos = 0
-			sign = 1
+			sign = 1 // TODO(voss): double-check this
 			for pos < len(aligned) && sign*aligned[pos] > 0 && len(code)+1 <= maxStack {
 				code = append(code, cmds[pos].Args[(1-sign)/2].Code)
 				sign = -sign
@@ -406,15 +421,16 @@ func (enc encoder) Edges(from int) []edge {
 						break
 					}
 				}
-				code = append(code, cmds[pos].Args[1-hv.offs].Code)
-				code = append(code, cmds[pos].Args[2].Code)
-				code = append(code, cmds[pos].Args[3].Code)
-				code = append(code, cmds[pos].Args[5-hv.offs].Code)
+				code = append(code,
+					cmds[pos].Args[1-hv.offs].Code,
+					cmds[pos].Args[2].Code,
+					cmds[pos].Args[3].Code,
+					cmds[pos].Args[5-hv.offs].Code)
+				pos++
 				edges = append(edges, edge{
 					code: copyOp(code, hv.op),
-					to:   from + pos + 1,
+					to:   from + pos,
 				})
-				pos++
 			}
 		}
 
@@ -439,10 +455,11 @@ func (enc encoder) Edges(from int) []edge {
 				if len(code)+4 > maxStack || !lastIsAligned && len(code)+5 > maxStack {
 					break
 				}
-				code = append(code, cmds[pos].Args[offs].Code)
-				code = append(code, cmds[pos].Args[2].Code)
-				code = append(code, cmds[pos].Args[3].Code)
-				code = append(code, cmds[pos].Args[5-offs].Code)
+				code = append(code,
+					cmds[pos].Args[offs].Code,
+					cmds[pos].Args[2].Code,
+					cmds[pos].Args[3].Code,
+					cmds[pos].Args[5-offs].Code)
 				if !lastIsAligned {
 					code = append(code, cmds[pos].Args[4+offs].Code)
 				}
@@ -475,30 +492,32 @@ func (enc encoder) Edges(from int) []edge {
 			if cmds[0].Args[1].IsZero() && cmds[1].Args[5].IsZero() &&
 				dy == 0 {
 				// dx1  dx2 dy2  dx3  dx4  dx5  dx6  hflex
-				code = append(code, cmds[0].Args[0].Code)
-				code = append(code, cmds[0].Args[2].Code)
-				code = append(code, cmds[0].Args[3].Code)
-				code = append(code, cmds[0].Args[4].Code)
-				code = append(code, cmds[1].Args[0].Code)
-				code = append(code, cmds[1].Args[2].Code)
-				code = append(code, cmds[1].Args[4].Code)
-				code = append(code, t2hflex.Bytes())
+				code = append(code,
+					cmds[0].Args[0].Code,
+					cmds[0].Args[2].Code,
+					cmds[0].Args[3].Code,
+					cmds[0].Args[4].Code,
+					cmds[1].Args[0].Code,
+					cmds[1].Args[2].Code,
+					cmds[1].Args[4].Code,
+					t2hflex.Bytes())
 				edges = append(edges, edge{
 					code: code,
 					to:   from + 2,
 				})
 			} else if dy+cmds[0].Args[1].Val+cmds[1].Args[5].Val == 0 {
 				// dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6  hflex1
-				code = append(code, cmds[0].Args[0].Code)
-				code = append(code, cmds[0].Args[1].Code)
-				code = append(code, cmds[0].Args[2].Code)
-				code = append(code, cmds[0].Args[3].Code)
-				code = append(code, cmds[0].Args[4].Code)
-				code = append(code, cmds[1].Args[0].Code)
-				code = append(code, cmds[1].Args[2].Code)
-				code = append(code, cmds[1].Args[3].Code)
-				code = append(code, cmds[1].Args[4].Code)
-				code = append(code, t2hflex1.Bytes())
+				code = append(code,
+					cmds[0].Args[0].Code,
+					cmds[0].Args[1].Code,
+					cmds[0].Args[2].Code,
+					cmds[0].Args[3].Code,
+					cmds[0].Args[4].Code,
+					cmds[1].Args[0].Code,
+					cmds[1].Args[2].Code,
+					cmds[1].Args[3].Code,
+					cmds[1].Args[4].Code,
+					t2hflex1.Bytes())
 				edges = append(edges, edge{
 					code: code,
 					to:   from + 2,
@@ -531,7 +550,7 @@ const maxStack = 48
 // GlyphOp is a CFF glyph drawing command.
 type GlyphOp struct {
 	Op   GlyphOpType
-	Args []float64 // TODO(voss): use 16.16 fixed point
+	Args []Fixed16
 }
 
 // GlyphOpType is the type of a CFF glyph drawing command.
@@ -595,7 +614,7 @@ func (c enCmd) appendArgs(code [][]byte) [][]byte {
 
 // encodedNumber is a number together with the Type2 charstring encoding of that number.
 type encodedNumber struct {
-	Val  fixed16
+	Val  Fixed16
 	Code []byte
 }
 
@@ -604,7 +623,7 @@ func (x encodedNumber) String() string {
 }
 
 // encodeNumber encodes the given number into a CFF encoding.
-func encodeNumber(x fixed16) encodedNumber {
+func encodeNumber(x Fixed16) encodedNumber {
 	var code []byte
 
 	// TODO(voss): consider using t2dup here.

@@ -21,5 +21,5 @@ find . -name "*_test.go" -print0 \
 | while IFS=":" read -r file_name test_name; do
     echo ""
     echo "# $file_name $test_name"
-    go1.18rc1 test -fuzz="$test_name" "$file_name" -fuzztime=1m
+    go1.18rc1 test -fuzz="$test_name" "$file_name" -fuzztime=30s
 done

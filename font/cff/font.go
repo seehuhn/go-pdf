@@ -36,7 +36,7 @@ type Font struct {
 	Private  []*type1.PrivateDict
 	FdSelect FdSelectFn
 
-	IsCIDFont bool
+	IsCIDFont bool // TODO(voss): can this be replaced with ROS!=nil?
 
 	Encoding []font.GlyphID
 
@@ -612,7 +612,6 @@ func (cff *Font) selectWidths() (int16, int16) {
 func (cff *Font) encodeCharStrings() (cffIndex, int16, int16, error) {
 	numGlyphs := len(cff.Glyphs)
 	if numGlyphs < 1 || (!cff.IsCIDFont && cff.Glyphs[0].Name != ".notdef") {
-		fmt.Println("XXX", numGlyphs, cff.IsCIDFont, cff.Glyphs[0].Name)
 		return nil, 0, 0, invalidSince("missing .notdef glyph")
 	}
 

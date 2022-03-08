@@ -21,9 +21,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
 func tryFont(fname string) error {
@@ -33,14 +30,10 @@ func tryFont(fname string) error {
 	}
 	defer fd.Close()
 
-	info, err := sfntcff.Read(fd)
-	if font.IsUnsupported(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	_ = info
+	// _, err = sfntcff.ReadHeader(fd)
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

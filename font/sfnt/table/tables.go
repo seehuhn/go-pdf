@@ -45,6 +45,7 @@ type Offsets struct {
 const (
 	ScalerTypeTrueType = 0x00010000
 	ScalerTypeCFF      = 0x4F54544F
+	ScalerTypeApple    = 0x74727565
 )
 
 // A Record is part of the file Header.  It contains data about a single sfnt

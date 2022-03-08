@@ -50,14 +50,16 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	blobs["hhea"] = hheaData
 	blobs["hmtx"] = hmtxData
 
-	maxpInfo := table.MaxpInfo{
-		NumGlyphs: len(info.Glyphs),
+	if info.Glyphs != nil {
+		maxpInfo := table.MaxpInfo{
+			NumGlyphs: len(info.Glyphs),
+		}
+		maxpData, err := maxpInfo.Encode()
+		if err != nil {
+			return 0, err
+		}
+		blobs["maxp"] = maxpData
 	}
-	maxpData, err := maxpInfo.Encode()
-	if err != nil {
-		return 0, err
-	}
-	blobs["maxp"] = maxpData
 
 	cmapSubtable := info.CMap.Encode(0)
 	ss := cmap.Table{

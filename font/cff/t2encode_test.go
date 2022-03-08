@@ -290,8 +290,8 @@ func TestType2EncodeNumber(t *testing.T) {
 			t.Fatal(err)
 		}
 		args := glyph.Cmds[0].Args
-		if math.Abs(args[0]-enc.Val.Float64()) > 1e-10 {
-			t.Errorf("%f != %f", args[0], enc.Val.Float64())
+		if args[0] != enc.Val {
+			t.Errorf("%f != %f", args[0].Float64(), enc.Val.Float64())
 		}
 	}
 }
@@ -313,8 +313,8 @@ func TestType2EncodeInt(t *testing.T) {
 			t.Fatal(err)
 		}
 		args := glyph.Cmds[0].Args
-		if args[0] != float64(i) || args[1] != float64(i+1) {
-			t.Fatalf("%f,%f != %d,%d", args[0], args[1], i, i+1)
+		if args[0] != f16FromInt(i) || args[1] != f16FromInt(i+1) {
+			t.Fatalf("%f,%f != %d,%d", args[0].Float64(), args[1].Float64(), i, i+1)
 		}
 	}
 }

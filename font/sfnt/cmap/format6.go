@@ -43,7 +43,10 @@ func decodeFormat6(data []byte, code2rune func(c int) rune) (Subtable, error) {
 
 	res := make(Format4)
 	for i := 0; i < count; i++ {
-		res[uint16(code2rune(i+firstCode))] = font.GlyphID(data[2*i])<<8 | font.GlyphID(data[2*i+1])
+		gid := font.GlyphID(data[2*i])<<8 | font.GlyphID(data[2*i+1])
+		if gid != 0 {
+			res[uint16(code2rune(i+firstCode))] = gid
+		}
 	}
 	return res, nil
 }

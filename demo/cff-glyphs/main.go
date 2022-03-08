@@ -181,8 +181,8 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 	glyphImage.Draw(page, 0, 0)
 	page.Println("Q")
 
-	var xx []float64
-	var yy []float64
+	var xx []cff.Fixed16
+	var yy []cff.Fixed16
 	var ink bool
 	for _, cmd := range glyph.Cmds {
 		switch cmd.Op {
@@ -190,17 +190,19 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 			if ink {
 				page.Println("h")
 			}
-			page.Printf("%.3f %.3f m\n", cmd.Args[0], cmd.Args[1])
+			page.Printf("%.3f %.3f m\n", cmd.Args[0].Float64(), cmd.Args[1].Float64())
 			xx = append(xx, cmd.Args[0])
 			yy = append(yy, cmd.Args[1])
 		case cff.OpLineTo:
-			page.Printf("%.3f %.3f l\n", cmd.Args[0], cmd.Args[1])
+			page.Printf("%.3f %.3f l\n", cmd.Args[0].Float64(), cmd.Args[1].Float64())
 			xx = append(xx, cmd.Args[0])
 			yy = append(yy, cmd.Args[1])
 			ink = true
 		case cff.OpCurveTo:
 			page.Printf("%.3f %.3f %.3f %.3f %.3f %.3f c\n",
-				cmd.Args[0], cmd.Args[1], cmd.Args[2], cmd.Args[3], cmd.Args[4], cmd.Args[5])
+				cmd.Args[0].Float64(), cmd.Args[1].Float64(),
+				cmd.Args[2].Float64(), cmd.Args[3].Float64(),
+				cmd.Args[4].Float64(), cmd.Args[5].Float64())
 			xx = append(xx, cmd.Args[4])
 			yy = append(yy, cmd.Args[5])
 			ink = true
@@ -216,7 +218,7 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 		x := xx[i]
 		y := yy[i]
 		label := boxes.Text(F, 16, fmt.Sprintf("%d", i))
-		label.Draw(page, x, y)
+		label.Draw(page, x.Float64(), y.Float64())
 	}
 	page.Println("Q")
 

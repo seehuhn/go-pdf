@@ -59,3 +59,18 @@ func FuzzHead(f *testing.F) {
 		}
 	})
 }
+
+func FuzzVersion(f *testing.F) {
+	f.Add(uint32(0x00010000))
+	f.Fuzz(func(t *testing.T, x uint32) {
+		v1 := Version(x)
+		s := v1.String()
+		v2, err := VersionFromString(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v1.Round() != v2 {
+			t.Errorf("%s != %s", v1, v2)
+		}
+	})
+}

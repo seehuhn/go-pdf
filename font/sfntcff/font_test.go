@@ -19,6 +19,7 @@ package sfntcff
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -48,7 +49,7 @@ func TestPostscriptName(t *testing.T) {
 	}
 }
 
-func TestMany(t *testing.T) {
+func DisabledTestMany(t *testing.T) { // TODO(voss)
 	listFd, err := os.Open("/Users/voss/project/pdflib/demo/try-all-fonts/all-fonts")
 	if err != nil {
 		t.Fatal(err)
@@ -65,15 +66,31 @@ fontLoop:
 			continue fontLoop
 		}
 
-		var r ReaderReaderAt = fd
+		var r io.ReaderAt = fd
 		buf := &bytes.Buffer{}
 		for i := 0; i < 2; i++ {
 			font, err := Read(r)
+			if i == 0 {
+				fd.Close()
+			}
 			if err != nil {
 				if i == 0 {
 					t.Error(err)
 				}
 				continue fontLoop
+			}
+
+			// simplify glyphs to speed up fuzzing
+			if len(font.Glyphs) > 100 {
+				font.Glyphs = font.Glyphs[:100]
+			}
+			for _, g := range font.Glyphs {
+				b := g.Extent()
+				g.Cmds = nil
+				g.MoveTo(float64(b.LLx), float64(b.LLy))
+				g.LineTo(float64(b.URx), float64(b.LLy))
+				g.LineTo(float64(b.URx), float64(b.URy))
+				g.LineTo(float64(b.LLx), float64(b.URy))
 			}
 
 			buf.Reset()
@@ -85,8 +102,6 @@ fontLoop:
 
 			r = bytes.NewReader(buf.Bytes())
 		}
-
-		fd.Close()
 	}
 	listFd.Close()
 }
@@ -121,6 +136,19 @@ func FuzzFont(f *testing.F) {
 		font, err := Read(bytes.NewReader(data))
 		if err != nil || len(font.Glyphs) == 0 {
 			return
+		}
+
+		// simplify glyphs to speed up fuzzing
+		if len(font.Glyphs) > 100 {
+			font.Glyphs = font.Glyphs[:100]
+		}
+		for _, g := range font.Glyphs {
+			b := g.Extent()
+			g.Cmds = nil
+			g.MoveTo(float64(b.LLx), float64(b.LLy))
+			g.LineTo(float64(b.URx), float64(b.LLy))
+			g.LineTo(float64(b.URx), float64(b.URy))
+			g.LineTo(float64(b.LLx), float64(b.URy))
 		}
 
 		buf := &bytes.Buffer{}

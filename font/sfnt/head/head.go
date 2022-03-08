@@ -21,8 +21,12 @@ package head
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"math"
+	"regexp"
+	"strconv"
 	"time"
 
 	"seehuhn.de/go/pdf/font"
@@ -207,6 +211,32 @@ type binaryHead struct {
 // TODO(voss): move this into a different package?
 type Version uint32
 
+// VersionFromString parses a version string in the form "1.234" or "Version 1.234".
+// String data after the last digit is ignored.
+func VersionFromString(s string) (Version, error) {
+	m := versionPat.FindStringSubmatch(s)
+	if len(m) != 2 {
+		return 0, errInvalidVersion
+	}
+
+	ver, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return 0, errInvalidVersion
+	}
+	return Version(ver*65536 + 0.5), nil
+}
+
 func (v Version) String() string {
 	return fmt.Sprintf("%.03f", float64(v)/65536)
 }
+
+// Round removes all information from v which is not visible in the string
+// representation.
+func (v Version) Round() Version {
+	x := math.Round(float64(v)/65536*1000) / 1000
+	return Version(math.Round(x * 65536))
+}
+
+var versionPat = regexp.MustCompile(`^(?:Version )?(\d+\.?\d+)`)
+
+var errInvalidVersion = errors.New("invalid version")

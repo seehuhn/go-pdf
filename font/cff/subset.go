@@ -47,6 +47,7 @@ func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 		Info:      &info,
 		IsCIDFont: true,
 		FdSelect:  fdSelect,
+		Private:   cff.Private,
 	}
 	if cff.IsCIDFont {
 		out.ROS = cff.ROS

@@ -23,8 +23,8 @@ import (
 )
 
 func TestRoll(t *testing.T) {
-	in := []fixed16{1, 2, 3, 4, 5, 6, 7, 8}
-	out := []fixed16{1, 2, 4, 5, 6, 3, 7, 8}
+	in := []Fixed16{1, 2, 3, 4, 5, 6, 7, 8}
+	out := []Fixed16{1, 2, 4, 5, 6, 3, 7, 8}
 
 	roll(in[2:6], 3)
 	for i, x := range in {

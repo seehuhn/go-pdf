@@ -67,7 +67,6 @@ func ToUnicode(name string, dingbats bool) []rune {
 					good = false
 					break hexLoop
 				}
-				// fmt.Printf("%s.%d % x %04x\n", part, i, candidates, val)
 				if i%4 == 3 {
 					if val >= 0xD800 && val < 0xE000 {
 						good = false
