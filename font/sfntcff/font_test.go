@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -71,11 +72,10 @@ func DisabledTestMany(t *testing.T) { // TODO(voss)
 			for i := 0; i < 2; i++ {
 				font, err := Read(r)
 				if err != nil {
-					if i == 0 {
+					if i == 0 && strings.Contains(err.Error(), "sfnt: missing CFF  table") {
 						return
-					} else {
-						t.Fatal(err)
 					}
+					t.Fatal(err)
 				}
 
 				// simplify glyphs to speed up fuzzing

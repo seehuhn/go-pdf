@@ -319,6 +319,8 @@ func (enc encoder) Edges(from int) []edge {
 
 	var edges []edge
 
+	// TODO(voss): avoid generating unnecessary edges.
+
 	if cmds[0].Op == OpLineTo {
 		// {dx dy}+  rlineto
 		var code [][]byte
@@ -548,6 +550,7 @@ func (enc encoder) Length(e edge) int {
 const maxStack = 48
 
 // GlyphOp is a CFF glyph drawing command.
+// TODO(voss): try to find a more memory efficient representation?
 type GlyphOp struct {
 	Op   GlyphOpType
 	Args []Fixed16
