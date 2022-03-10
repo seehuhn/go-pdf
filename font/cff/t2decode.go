@@ -694,7 +694,8 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				return res, nil
 
 			default:
-				return nil, fmt.Errorf("unsupported opcode %d", op)
+				return nil, invalidSince(
+					fmt.Sprintf("unsupported type 2 opcode %d", op))
 			}
 
 			if moveError != nil {

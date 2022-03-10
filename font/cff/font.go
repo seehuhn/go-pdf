@@ -31,15 +31,27 @@ import (
 
 // Font stores the data of a CFF font.
 type Font struct {
-	Glyphs   []*Glyph
-	Info     *type1.FontInfo
-	Private  []*type1.PrivateDict
+	Glyphs []*Glyph
+	Info   *type1.FontInfo
+
+	Private []*type1.PrivateDict
+
+	// FdSelect determines which private dictionary is used for each glyph.
 	FdSelect FdSelectFn
 
+	// Encoding lists the glyphs corresponding to the 256 one-byte
+	// character codes in simple fonts.  For CIDFonts (where ROS != nil),
+	// this must be nil.
 	Encoding []font.GlyphID
 
+	// ROS specifies the character collection of the font, using Adobe's
+	// Registry, Ordering, Supplement system.  This must be non-nil
+	// if and only if the font is a CIDFont.
+	ROS *type1.ROS
+
+	// Gid2cid lists the character identifiers corresponding to the glyphs.
+	// This is only present for CIDFonts.
 	Gid2cid []int32 // TODO(voss): what is a good data type for this?
-	ROS     *type1.ROS
 }
 
 // Read reads a CFF font from r.
