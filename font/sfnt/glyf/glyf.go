@@ -1,18 +1,34 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+// Package glyf implements reading and writing the "glyf" and "loca" tables.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf
+// https://docs.microsoft.com/en-us/typography/opentype/spec/loca
 package glyf
 
-import (
-	"fmt"
+import "io"
 
-	"seehuhn.de/go/pdf/font"
-)
-
-type Glyph struct {
-	data []byte
+// Info contains information from the "glyf" table.
+type Info struct {
+	Glyphs []*Glyph
 }
 
 // Decode converts the data from the "glyf" and "loca" tables into
 // a slice of Glyphs.
-func Decode(glyfData, locaData []byte, locaFormat int16) ([]*Glyph, error) {
+func Decode(glyfData, locaData []byte, locaFormat int16) (*Info, error) {
 	offs, err := decodeLoca(glyfData, locaData, locaFormat)
 	if err != nil {
 		return nil, err
@@ -23,64 +39,42 @@ func Decode(glyfData, locaData []byte, locaFormat int16) ([]*Glyph, error) {
 	gg := make([]*Glyph, numGlyphs)
 	for i := range gg {
 		data := glyfData[offs[i]:offs[i+1]]
-		gg[i] = &Glyph{data: data}
+		g, err := decodeGlyph(data)
+		if err != nil {
+			return nil, err
+		}
+		gg[i] = g
 	}
 
-	return gg, nil
+	info := &Info{
+		Glyphs: gg,
+	}
+	return info, nil
 }
 
-func decodeLoca(glyfData, locaData []byte, locaFormat int16) ([]int, error) {
-	var offs []int
-	switch locaFormat {
-	case 0:
-		n := len(locaData)
-		if n < 4 || n%2 != 0 {
-			return nil, &font.InvalidFontError{
-				SubSystem: "sfnt/loca",
-				Reason:    "invalid table length",
+// Encode encodes the Glyphs into a "glyf" and "loca" table.
+func (info *Info) Encode(w io.Writer) ([]byte, int16, error) {
+	offs := make([]int, len(info.Glyphs)+1)
+	offs[0] = 0
+	for i, g := range info.Glyphs {
+		data := g.encode()
+
+		n, err := w.Write(data)
+		if err != nil {
+			return nil, 0, err
+		}
+		if n%2 != 0 {
+			_, err := w.Write([]byte{0})
+			if err != nil {
+				return nil, 0, err
 			}
+			n++
 		}
-		offs = make([]int, n/2-1)
-		prev := 0
-		for i := range offs {
-			x := int(locaData[2*i])<<8 + int(locaData[2*i+1])
-			pos := 2 * x
-			if pos < prev || pos > len(glyfData) {
-				return nil, &font.InvalidFontError{
-					SubSystem: "sfnt/loca",
-					Reason:    fmt.Sprintf("invalid offset %d", pos),
-				}
-			}
-			offs[i] = pos
-			prev = pos
-		}
-	case 1:
-		n := len(locaData)
-		if n < 8 || n%4 != 0 {
-			return nil, &font.InvalidFontError{
-				SubSystem: "sfnt/loca",
-				Reason:    "invalid table length",
-			}
-		}
-		offs = make([]int, len(locaData)/4-1)
-		prev := 0
-		for i := range offs {
-			pos := int(locaData[4*i])<<24 + int(locaData[4*i+1])<<16 +
-				int(locaData[4*i+2])<<8 + int(locaData[4*i+3])
-			if pos < prev || pos > len(glyfData) {
-				return nil, &font.InvalidFontError{
-					SubSystem: "sfnt/loca",
-					Reason:    "invalid offset",
-				}
-			}
-			offs[i] = pos
-			prev = pos
-		}
-	default:
-		return nil, &font.NotSupportedError{
-			SubSystem: "sfnt/loca",
-			Feature:   fmt.Sprintf("loca table format %d", locaFormat),
-		}
+
+		offs[i+1] = offs[i] + n
 	}
-	return offs, nil
+
+	locaData, locaFormat := encodeLoca(offs)
+
+	return locaData, locaFormat, nil
 }
