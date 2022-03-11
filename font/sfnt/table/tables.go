@@ -149,37 +149,37 @@ var isKnownTable = map[string]bool{
 	"BASE": true,
 	"CBDT": true,
 	"CBLC": true,
-	"CFF ": true,
-	"cmap": true,
-	"cvt ": true,
+	"CFF ": true, //    O
+	"cmap": true, // T, O
+	"cvt ": true, // T
 	"DSIG": true,
 	"feat": true,
 	"FFTM": true,
-	"fpgm": true,
+	"fpgm": true, // T
 	"fvar": true,
-	"gasp": true,
+	"gasp": true, // T
 	"GDEF": true,
-	"glyf": true,
+	"glyf": true, // T
 	"GPOS": true,
 	"GSUB": true,
 	"gvar": true,
-	"hdmx": true,
-	"head": true,
-	"hhea": true,
-	"hmtx": true,
+	"hdmx": true, // T
+	"head": true, // T, O
+	"hhea": true, // T, O
+	"hmtx": true, // T
 	"HVAR": true,
-	"kern": true,
-	"loca": true,
-	"LTSH": true,
-	"maxp": true,
+	"kern": true, // T
+	"loca": true, // T
+	"LTSH": true, // T
+	"maxp": true, // T, O
 	"meta": true,
 	"morx": true,
-	"name": true,
-	"OS/2": true,
-	"post": true,
-	"prep": true,
+	"name": true, // T, O
+	"OS/2": true, // T, O
+	"post": true, // T, O
+	"prep": true, // T
 	"STAT": true,
-	"VDMX": true,
+	"VDMX": true, // T
 	"vhea": true,
 	"vmtx": true,
 	"VORG": true,

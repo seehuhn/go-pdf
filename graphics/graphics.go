@@ -6,11 +6,12 @@ type State struct {
 	// Color Space
 	// Color
 	// Text State
-	LineWidth  float64
-	LineCap    LineCapStyle
-	LineJoin   LineJoinStyle
-	MiterLimit float64
-	// DashPattern
+	LineWidth   float64
+	LineCap     LineCapStyle
+	LineJoin    LineJoinStyle
+	MiterLimit  float64
+	DashPattern []float64
+	DashPhase   float64
 	// Rendering Intent
 	StrokeAdjustment bool
 	// Blend Mode
@@ -38,3 +39,7 @@ const (
 	LineJoinRound LineJoinStyle = 1
 	LineJoinBevel LineJoinStyle = 2
 )
+
+type Context struct {
+	state *State
+}

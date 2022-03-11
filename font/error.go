@@ -16,6 +16,16 @@
 
 package font
 
+// InvalidFontError indicates a problem with font data.
+type InvalidFontError struct {
+	SubSystem string
+	Reason    string
+}
+
+func (err *InvalidFontError) Error() string {
+	return err.SubSystem + ": " + err.Reason
+}
+
 // NotSupportedError indicates that a font file seems valid but uses a
 // CFF feature which is not supported by this library.
 type NotSupportedError struct {

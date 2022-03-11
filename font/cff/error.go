@@ -20,20 +20,14 @@ import "seehuhn.de/go/pdf/font"
 
 func unsupported(feature string) error {
 	return &font.NotSupportedError{
-		SubSystem: "cmap",
+		SubSystem: "cff",
 		Feature:   feature,
 	}
 }
 
-// InvalidFontError indicates a problem with the font file.
-type InvalidFontError struct {
-	Reason string
-}
-
-func (err *InvalidFontError) Error() string {
-	return "cff: " + err.Reason
-}
-
 func invalidSince(reason string) error {
-	return &InvalidFontError{reason}
+	return &font.InvalidFontError{
+		SubSystem: "cff",
+		Reason:    reason,
+	}
 }
