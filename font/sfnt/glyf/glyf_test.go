@@ -19,37 +19,37 @@ package glyf
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-test/deep"
 )
 
 func FuzzGlyf(f *testing.F) {
-	info := &Info{
-		Glyphs: []*Glyph{
-			{tail: nil},
-			{tail: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
-			{tail: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}},
-		},
-	}
-	buf := &bytes.Buffer{}
-	locaData, locaFormat, err := info.Encode(buf)
+	names, err := filepath.Glob("../../../demo/try-all-fonts/glyf/*.glyf")
 	if err != nil {
 		f.Fatal(err)
 	}
-	f.Add(buf.Bytes(), locaData, locaFormat)
-
-	info = &Info{
-		Glyphs: []*Glyph{
-			{tail: bytes.Repeat([]byte{1, 2}, 32769)},
-		},
+	for _, name := range names {
+		glyfData, err := os.ReadFile(name)
+		if err != nil {
+			f.Error(err)
+			continue
+		}
+		locaName := strings.TrimSuffix(name, ".glyf") + ".loca"
+		locaData, err := os.ReadFile(locaName)
+		if err != nil {
+			f.Error(err)
+			continue
+		}
+		locaFormat := int16(0)
+		if len(glyfData) > 0xFFFF {
+			locaFormat = 1
+		}
+		f.Add(glyfData, locaData, locaFormat)
 	}
-	buf.Reset()
-	locaData, locaFormat, err = info.Encode(buf)
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Add(buf.Bytes(), locaData, locaFormat)
 
 	f.Fuzz(func(t *testing.T, glyfData, locaData []byte, locaFormat int16) {
 		info, err := Decode(glyfData, locaData, locaFormat)
@@ -75,10 +75,10 @@ func FuzzGlyf(f *testing.F) {
 			different = true
 		}
 		if different {
-			fmt.Println("Ag", glyfData)
-			fmt.Println("Al", locaData)
-			fmt.Println("Bg", glyfData2)
-			fmt.Println("Bl", locaData2)
+			fmt.Println("A.g", glyfData)
+			fmt.Println("A.l", locaData)
+			fmt.Println("B.g", glyfData2)
+			fmt.Println("B.l", locaData2)
 			fmt.Println(info)
 			fmt.Println(info2)
 			t.Error("not equal")

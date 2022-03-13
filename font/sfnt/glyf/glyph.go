@@ -16,17 +16,25 @@
 
 package glyf
 
-import "seehuhn.de/go/pdf/font"
+import (
+	"bytes"
+
+	"seehuhn.de/go/pdf/font"
+)
 
 // Glyph represents a single glyph in a TrueType font.
 type Glyph struct {
-	numCont int16
-	xMin    int16
-	yMin    int16
-	xMax    int16
-	yMax    int16
+	xMin int16
+	yMin int16
+	xMax int16
+	yMax int16
 
-	tail []byte
+	data interface{} // either GlyphSimple or GlyphComposite
+}
+
+type GlyphSimple struct {
+	numContours int16
+	tail        []byte
 }
 
 func decodeGlyph(data []byte) (*Glyph, error) {
@@ -39,21 +47,86 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 		}
 	}
 
-	numCont := int16(data[0])<<8 | int16(data[1])
-	if numCont < 0 {
-		numCont = -1
-	}
 	g := &Glyph{
-		numCont: numCont,
-		xMin:    int16(data[2])<<8 | int16(data[3]),
-		yMin:    int16(data[4])<<8 | int16(data[5]),
-		xMax:    int16(data[6])<<8 | int16(data[7]),
-		yMax:    int16(data[8])<<8 | int16(data[9]),
+		xMin: int16(data[2])<<8 | int16(data[3]),
+		yMin: int16(data[4])<<8 | int16(data[5]),
+		xMax: int16(data[6])<<8 | int16(data[7]),
+		yMax: int16(data[8])<<8 | int16(data[9]),
+	}
 
-		tail: data[10:],
+	numCont := int16(data[0])<<8 | int16(data[1])
+	if numCont >= 0 {
+		g.data = GlyphSimple{
+			numContours: numCont,
+			tail:        data[10:],
+		}
+	} else {
+		comp, err := decodeGlyphComposite(data[10:])
+		if err != nil {
+			return nil, err
+		}
+		g.data = *comp
 	}
 
 	return g, nil
+}
+
+type GlyphComposite struct {
+	Components []GlyphComponent
+	Commands   []byte
+}
+
+type GlyphComponent struct {
+	Flags      uint16
+	GlyphIndex font.GlyphID
+	Args       []byte
+}
+
+func decodeGlyphComposite(data []byte) (*GlyphComposite, error) {
+	var components []GlyphComponent
+	done := false
+	for !done {
+		if len(data) < 4 {
+			return nil, errIncompleteGlyph
+		}
+
+		flags := uint16(data[0])<<8 | uint16(data[1])
+		glyphIndex := uint16(data[2])<<8 | uint16(data[3])
+		data = data[4:]
+
+		skip := 0
+		if flags&0x0001 != 0 { // ARG_1_AND_2_ARE_WORDS
+			skip += 4
+		} else {
+			skip += 2
+		}
+		if flags&0x0008 != 0 { // WE_HAVE_A_SCALE
+			skip += 2
+		} else if flags&0x0040 != 0 { // WE_HAVE_AN_X_AND_Y_SCALE
+			skip += 4
+		} else if flags&0x0080 != 0 { // WE_HAVE_A_TWO_BY_TWO
+			skip += 8
+		}
+		if len(data) < skip {
+			return nil, errIncompleteGlyph
+		}
+		args := data[:skip]
+		data = data[skip:]
+
+		components = append(components, GlyphComponent{
+			Flags:      flags,
+			GlyphIndex: font.GlyphID(glyphIndex),
+			Args:       args,
+		})
+
+		done = flags&0x0020 == 0 // MORE_COMPONENTS
+	}
+
+	res := &GlyphComposite{
+		Components: components,
+		Commands:   data,
+	}
+	return res, nil
 }
 
 func (g *Glyph) encode() []byte {
@@ -61,9 +134,34 @@ func (g *Glyph) encode() []byte {
 		return nil
 	}
 
-	data := make([]byte, 10+len(g.tail))
-	data[0] = byte(g.numCont >> 8)
-	data[1] = byte(g.numCont)
+	var numContours int16
+	var tail []byte
+	switch g0 := g.data.(type) {
+	case GlyphSimple:
+		numContours = g0.numContours
+		tail = g0.tail
+
+	case GlyphComposite:
+		numContours = -1
+
+		buf := bytes.Buffer{} // TODO(voss): avoid allocation/copying
+		for _, comp := range g0.Components {
+			buf.Write([]byte{
+				byte(comp.Flags >> 8), byte(comp.Flags),
+				byte(comp.GlyphIndex >> 8), byte(comp.GlyphIndex),
+			})
+			buf.Write(comp.Args)
+		}
+		buf.Write(g0.Commands)
+		tail = buf.Bytes()
+
+	default:
+		panic("unexpected glyph type")
+	}
+
+	data := make([]byte, 10+len(tail))
+	data[0] = byte(numContours >> 8)
+	data[1] = byte(numContours)
 	data[2] = byte(g.xMin >> 8)
 	data[3] = byte(g.xMin)
 	data[4] = byte(g.yMin >> 8)
@@ -72,6 +170,11 @@ func (g *Glyph) encode() []byte {
 	data[7] = byte(g.xMax)
 	data[8] = byte(g.yMax >> 8)
 	data[9] = byte(g.yMax)
-	copy(data[10:], g.tail)
+	copy(data[10:], tail)
 	return data
+}
+
+var errIncompleteGlyph = &font.InvalidFontError{
+	SubSystem: "sfnt/glyf",
+	Reason:    "incomplete glyph",
 }

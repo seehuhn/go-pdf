@@ -18,9 +18,12 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"os"
+
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 func tryFont(fname string) error {
@@ -30,10 +33,38 @@ func tryFont(fname string) error {
 	}
 	defer fd.Close()
 
-	// _, err = sfntcff.ReadHeader(fd)
-	// if err != nil {
-	// 	return err
-	// }
+	header, err := table.ReadHeader(fd)
+	if err != nil {
+		return err
+	}
+
+	glyfData, err := header.ReadTableBytes(fd, "glyf")
+	if table.IsMissing(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	if len(glyfData) > 70000 {
+		return nil
+	}
+
+	locaData, err := header.ReadTableBytes(fd, "loca")
+	if err != nil {
+		return err
+	}
+
+	hash := sha256.Sum256(glyfData)
+	outName := fmt.Sprintf("glyf/%x.glyf", hash)
+	err = os.WriteFile(outName, glyfData, 0644)
+	if err != nil {
+		return err
+	}
+	outName = fmt.Sprintf("glyf/%x.loca", hash)
+	err = os.WriteFile(outName, locaData, 0644)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
