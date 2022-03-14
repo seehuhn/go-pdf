@@ -22,11 +22,11 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-func decodeLoca(glyfData, locaData []byte, locaFormat int16) ([]int, error) {
+func decodeLoca(enc *Encoded) ([]int, error) {
 	var offs []int
-	switch locaFormat {
+	switch enc.LocaFormat {
 	case 0:
-		n := len(locaData)
+		n := len(enc.LocaData)
 		if n < 4 || n%2 != 0 {
 			return nil, &font.InvalidFontError{
 				SubSystem: "sfnt/loca",
@@ -36,9 +36,9 @@ func decodeLoca(glyfData, locaData []byte, locaFormat int16) ([]int, error) {
 		offs = make([]int, n/2)
 		prev := 0
 		for i := range offs {
-			x := int(locaData[2*i])<<8 + int(locaData[2*i+1])
+			x := int(enc.LocaData[2*i])<<8 + int(enc.LocaData[2*i+1])
 			pos := 2 * x
-			if pos < prev || pos > len(glyfData) {
+			if pos < prev || pos > len(enc.GlyfData) {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/loca",
 					Reason:    fmt.Sprintf("invalid offset %d", pos),
@@ -48,19 +48,19 @@ func decodeLoca(glyfData, locaData []byte, locaFormat int16) ([]int, error) {
 			prev = pos
 		}
 	case 1:
-		n := len(locaData)
+		n := len(enc.LocaData)
 		if n < 8 || n%4 != 0 {
 			return nil, &font.InvalidFontError{
 				SubSystem: "sfnt/loca",
 				Reason:    "invalid table length",
 			}
 		}
-		offs = make([]int, len(locaData)/4)
+		offs = make([]int, len(enc.LocaData)/4)
 		prev := 0
 		for i := range offs {
-			pos := int(locaData[4*i])<<24 + int(locaData[4*i+1])<<16 +
-				int(locaData[4*i+2])<<8 + int(locaData[4*i+3])
-			if pos < prev || pos > len(glyfData) {
+			pos := int(enc.LocaData[4*i])<<24 + int(enc.LocaData[4*i+1])<<16 +
+				int(enc.LocaData[4*i+2])<<8 + int(enc.LocaData[4*i+3])
+			if pos < prev || pos > len(enc.GlyfData) {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/loca",
 					Reason:    "invalid offset",
@@ -72,7 +72,7 @@ func decodeLoca(glyfData, locaData []byte, locaFormat int16) ([]int, error) {
 	default:
 		return nil, &font.NotSupportedError{
 			SubSystem: "sfnt/loca",
-			Feature:   fmt.Sprintf("loca table format %d", locaFormat),
+			Feature:   fmt.Sprintf("loca table format %d", enc.LocaFormat),
 		}
 	}
 	return offs, nil

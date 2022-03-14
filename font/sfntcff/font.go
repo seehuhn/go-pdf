@@ -65,8 +65,19 @@ type Info struct {
 // TTInfo contains information specific to TrueType fonts.
 type TTInfo struct {
 	Widths []uint16
-	Glyphs []*glyf.Glyph
-	blobs  map[string][]byte
+	Glyphs glyf.Glyphs
+	Tables map[string][]byte
+}
+
+func (info *Info) NumGlyphs() int {
+	switch outlines := info.Font.(type) {
+	case *cff.Outlines:
+		return len(outlines.Glyphs)
+	case *TTInfo:
+		return len(outlines.Glyphs)
+	default:
+		panic("unexpected font type")
+	}
 }
 
 // Widths return the advance widths of the glyphs of the font.
@@ -97,6 +108,9 @@ func (info *Info) Extents() []font.Rect {
 	case *TTInfo:
 		extents := make([]font.Rect, len(f.Glyphs))
 		for i, g := range f.Glyphs {
+			if g == nil {
+				continue
+			}
 			extents[i] = g.Rect
 		}
 		return extents

@@ -52,7 +52,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 	}
 
 	var subsetInfo *subsetInfo
-	tableData := make(map[string][]byte)
+	tables := make(map[string][]byte)
 	if includeGlyphs != nil {
 		var err error
 		subsetInfo, err = tt.getSubsetInfo(includeGlyphs)
@@ -60,7 +60,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			return 0, err
 		}
 		for name, blob := range subsetInfo.blobs {
-			tableData[name] = blob
+			tables[name] = blob
 		}
 		// fix up numGlyphs
 		maxpBytes, err := tt.Header.ReadTableBytes(tt.Fd, "maxp")
@@ -68,7 +68,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			return 0, err
 		}
 		binary.BigEndian.PutUint16(maxpBytes[4:6], subsetInfo.numGlyphs)
-		tableData["maxp"] = maxpBytes
+		tables["maxp"] = maxpBytes
 	}
 
 	if subsetMapping != nil && (includeTables == nil || includeTables["cmap"]) {
@@ -76,7 +76,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
-		tableData["cmap"] = cmapBytes
+		tables["cmap"] = cmapBytes
 	}
 
 	if includeTables["hhea"] || includeTables["hmtx"] {
@@ -90,8 +90,8 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			info.GlyphExtents = subsetInfo.GlyphExtent
 		}
 		hhea, hmtx := info.Encode()
-		tableData["hhea"] = hhea
-		tableData["hmtx"] = hmtx
+		tables["hhea"] = hhea
+		tables["hmtx"] = hmtx
 	}
 
 	tableNames := tt.selectTables(includeTables)
@@ -109,11 +109,11 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			tt.HeadInfo.FontBBox.LLy = subsetInfo.yMin
 			tt.HeadInfo.FontBBox.URx = subsetInfo.xMax
 			tt.HeadInfo.FontBBox.URy = subsetInfo.yMax
-			tt.HeadInfo.HasLongOffsets = subsetInfo.indexToLocFormat != 0
+			tt.HeadInfo.LocaFormat = subsetInfo.indexToLocFormat
 		}
 
 		var err error
-		tableData["head"], err = tt.HeadInfo.Encode()
+		tables["head"], err = tt.HeadInfo.Encode()
 		if err != nil {
 			return 0, err
 		}
@@ -121,21 +121,21 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 
 	if opt.Replace != nil {
 		for name, repl := range opt.Replace {
-			tableData[name] = repl
+			tables[name] = repl
 		}
 	}
 
 	for _, name := range tableNames {
-		if _, ok := tableData[name]; !ok {
+		if _, ok := tables[name]; !ok {
 			blob, err := tt.Header.ReadTableBytes(tt.Fd, name)
 			if err != nil {
 				return 0, err
 			}
-			tableData[name] = blob
+			tables[name] = blob
 		}
 	}
 
-	return WriteTables(w, tt.Header.ScalerType, tableNames, tableData)
+	return WriteTables(w, tt.Header.ScalerType, tables)
 }
 
 type subsetInfo struct {
@@ -410,8 +410,23 @@ type record struct {
 
 // WriteTables writes an sfnt file containing the given tables.
 // This changes the checksum in the "head" table in place.
-func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData map[string][]byte) (int64, error) {
-	numTables := len(tableNames)
+func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, error) {
+	numTables := len(tables)
+
+	tableNames := make([]string, 0, numTables)
+	for name := range tables {
+		tableNames = append(tableNames, name)
+	}
+
+	// TODO(voss): sort the table names in the recommended order
+	sort.Slice(tableNames, func(i, j int) bool {
+		iPrio := tableOrder[tableNames[i]]
+		jPrio := tableOrder[tableNames[j]]
+		if iPrio != jPrio {
+			return iPrio > jPrio
+		}
+		return tableNames[i] < tableNames[j]
+	})
 
 	// prepare the header
 	sel := bits.Len(uint(numTables)) - 1
@@ -424,7 +439,7 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 	}
 
 	// temporarily clear the checksum in the "head" table
-	if headData, ok := tableData["head"]; ok {
+	if headData, ok := tables["head"]; ok {
 		head.ClearChecksum(headData)
 	}
 
@@ -432,7 +447,7 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 	offset := uint32(12 + 16*numTables)
 	records := make([]record, numTables)
 	for i, name := range tableNames {
-		body := tableData[name]
+		body := tables[name]
 		length := uint32(len(body))
 		checksum := checksum(body)
 
@@ -455,7 +470,7 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 	totalSum += checksum(headerBytes)
 
 	// set the final checksum in the "head" table
-	if headData, ok := tableData["head"]; ok {
+	if headData, ok := tables["head"]; ok {
 		head.PatchChecksum(headData, totalSum)
 	}
 
@@ -468,7 +483,7 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 	}
 	var pad [3]byte
 	for _, name := range tableNames {
-		body := tableData[name]
+		body := tables[name]
 		n, err := w.Write(body)
 		totalSize += int64(n)
 		if err != nil {
@@ -483,4 +498,25 @@ func WriteTables(w io.Writer, scalerType uint32, tableNames []string, tableData 
 		}
 	}
 	return totalSize, nil
+}
+
+var tableOrder = map[string]int{
+	"head": 95,
+	"hhea": 90,
+	"maxp": 85,
+	"OS/2": 80,
+	"hmtx": 75,
+	"LTSH": 70,
+	"VDMX": 65,
+	"hdmx": 60,
+	"name": 55,
+	"cmap": 50,
+	"post": 45,
+	"fpgm": 40,
+	"prep": 35,
+	"cvt ": 30,
+	"loca": 25,
+	"glyf": 20,
+	"kern": 15,
+	"gasp": 10,
 }

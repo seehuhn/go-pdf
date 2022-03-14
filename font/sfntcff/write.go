@@ -38,33 +38,20 @@ import (
 )
 
 func (info *Info) Write(w io.Writer) (int64, error) {
-	blobs := make(map[string][]byte)
+	tables := make(map[string][]byte)
 
-	headData, err := makeHead(info)
+	hheaData, hmtxData := makeHmtx(info)
+	tables["hhea"] = hheaData
+	tables["hmtx"] = hmtxData
+
+	maxpInfo := table.MaxpInfo{
+		NumGlyphs: info.NumGlyphs(),
+	}
+	maxpData, err := maxpInfo.Encode()
 	if err != nil {
 		return 0, err
 	}
-	blobs["head"] = headData
-
-	hheaData, hmtxData := makeHmtx(info)
-	blobs["hhea"] = hheaData
-	blobs["hmtx"] = hmtxData
-
-	switch font := info.Font.(type) {
-	case *cff.Outlines:
-		if font.Glyphs != nil {
-			maxpInfo := table.MaxpInfo{
-				NumGlyphs: len(font.Glyphs),
-			}
-			maxpData, err := maxpInfo.Encode()
-			if err != nil {
-				return 0, err
-			}
-			blobs["maxp"] = maxpData
-		}
-	default:
-		panic("unexpected font type")
-	}
+	tables["maxp"] = maxpData
 
 	cmapSubtable := info.CMap.Encode(0)
 	ss := cmap.Table{
@@ -73,28 +60,50 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	}
 	buf := &bytes.Buffer{}
 	ss.Write(buf)
-	blobs["cmap"] = buf.Bytes()
+	tables["cmap"] = buf.Bytes()
 
 	os2Data := makeOS2(info)
-	blobs["OS/2"] = os2Data
+	tables["OS/2"] = os2Data
 
 	nameData := makeName(info, ss)
-	blobs["name"] = nameData
+	tables["name"] = nameData
 
 	postData := makePost(info)
-	blobs["post"] = postData
+	tables["post"] = postData
 
-	cffData, err := makeCFF(info)
+	var locaFormat int16
+	var scalerType uint32
+	switch outlines := info.Font.(type) {
+	case *cff.Outlines:
+		cffData, err := makeCFF(info, outlines)
+		if err != nil {
+			return 0, err
+		}
+		tables["CFF "] = cffData
+		scalerType = table.ScalerTypeCFF
+	case *TTInfo:
+		enc, err := outlines.Glyphs.Encode()
+		if err != nil {
+			return 0, err
+		}
+		tables["glyf"] = enc.GlyfData
+		tables["loca"] = enc.LocaData
+		locaFormat = enc.LocaFormat
+		for name, data := range outlines.Tables {
+			tables[name] = data
+		}
+		scalerType = table.ScalerTypeTrueType
+	default:
+		panic("unexpected font type")
+	}
+
+	headData, err := makeHead(info, locaFormat)
 	if err != nil {
 		return 0, err
 	}
-	blobs["CFF "] = cffData
+	tables["head"] = headData
 
-	// ----------------------------------------------------------------------
-
-	tables := []string{"head", "hhea", "hmtx", "maxp", "OS/2", "name", "cmap", "post", "CFF "}
-
-	return sfnt.WriteTables(w, table.ScalerTypeCFF, tables, blobs)
+	return sfnt.WriteTables(w, scalerType, tables)
 }
 
 func isFixedPitch(ww []uint16) bool {
@@ -114,7 +123,7 @@ func isFixedPitch(ww []uint16) bool {
 	return true
 }
 
-func makeHead(info *Info) ([]byte, error) {
+func makeHead(info *Info, locaFormat int16) ([]byte, error) {
 	var bbox font.Rect
 	switch font := info.Font.(type) {
 	case *cff.Outlines:
@@ -123,6 +132,9 @@ func makeHead(info *Info) ([]byte, error) {
 		}
 	case *TTInfo:
 		for _, g := range font.Glyphs {
+			if g == nil {
+				continue
+			}
 			bbox.Extend(g.Rect)
 		}
 	}
@@ -138,6 +150,7 @@ func makeHead(info *Info) ([]byte, error) {
 		IsBold:        info.IsBold,
 		IsItalic:      info.ItalicAngle != 0,
 		LowestRecPPEM: 7,
+		LocaFormat:    locaFormat,
 	}
 	return headInfo.Encode()
 }
@@ -211,7 +224,7 @@ func makePost(info *Info) []byte {
 	return postInfo.Encode()
 }
 
-func makeCFF(info *Info) ([]byte, error) {
+func makeCFF(info *Info, outlines *cff.Outlines) ([]byte, error) {
 	q := 1 / float64(info.UnitsPerEm)
 	fontInfo := &type1.FontInfo{
 		FullName:   info.FullName(),
@@ -223,7 +236,7 @@ func makeCFF(info *Info) ([]byte, error) {
 		Copyright: info.Copyright,
 		Notice:    info.Trademark,
 
-		FontMatrix: []float64{q, 0, 0, q, 0, 0},
+		FontMatrix: []float64{q, 0, 0, q, 0, 0}, // TODO(voss): is this right?
 
 		ItalicAngle:  info.ItalicAngle,
 		IsFixedPitch: isFixedPitch(info.Widths()),
@@ -231,7 +244,6 @@ func makeCFF(info *Info) ([]byte, error) {
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 	}
-	outlines := info.Font.(*cff.Outlines)
 	myCff := &cff.Font{
 		FontInfo: fontInfo,
 		Outlines: outlines,

@@ -167,14 +167,17 @@ func (tt *Font) readKernInfo() (gtab.Lookups, error) {
 func (tt *Font) GetGlyfOffsets(NumGlyphs int) ([]uint32, error) {
 	var err error
 	offsets := make([]uint32, NumGlyphs+1)
-	if !tt.HeadInfo.HasLongOffsets {
+	switch tt.HeadInfo.LocaFormat {
+	case 0:
 		shortOffsets := make([]uint16, NumGlyphs+1)
 		_, err = tt.GetTableReader("loca", shortOffsets)
 		for i, x := range shortOffsets {
 			offsets[i] = uint32(x) * 2
 		}
-	} else {
+	case 1:
 		_, err = tt.GetTableReader("loca", offsets)
+	default:
+		return nil, errors.New("invalid \"loca\" table format")
 	}
 	if err != nil {
 		return nil, err

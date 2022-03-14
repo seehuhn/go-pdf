@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
 	"seehuhn.de/go/pdf/font/sfnt/name"
@@ -162,8 +163,45 @@ func Read(r io.ReaderAt) (*Info, error) {
 			}
 		}
 	case table.ScalerTypeTrueType, table.ScalerTypeApple:
-		return nil, errors.New("not implemented")
-		// panic("not implemented")
+		glyfData, err := header.ReadTableBytes(r, "glyf")
+		if err != nil {
+			return nil, err
+		}
+		locaData, err := header.ReadTableBytes(r, "loca")
+		if err != nil {
+			return nil, err
+		}
+		enc := &glyf.Encoded{
+			GlyfData:   glyfData,
+			LocaData:   locaData,
+			LocaFormat: headInfo.LocaFormat,
+		}
+		ttGlyphs, err := glyf.Decode(enc)
+		if err != nil {
+			return nil, err
+		}
+
+		tables := make(map[string][]byte)
+		for _, name := range []string{"cvt ", "fpgm", "prep", "gasp"} {
+			if !header.Has(name) {
+				continue
+			}
+			data, err := header.ReadTableBytes(r, name)
+			if err != nil {
+				return nil, err
+			}
+			tables[name] = data
+		}
+
+		if len(ttGlyphs) != len(hmtxInfo.Widths) {
+			return nil, errors.New("sfnt: inconsistent number of glyphs/widths")
+		}
+
+		Outlines = &TTInfo{
+			Widths: hmtxInfo.Widths,
+			Glyphs: ttGlyphs,
+			Tables: tables,
+		}
 	default:
 		panic("unexpected scaler type")
 	}
@@ -232,7 +270,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.UnderlinePosition = fontInfo.UnderlinePosition
 		info.UnderlineThickness = fontInfo.UnderlineThickness
 	}
-	if headInfo != nil {
+	if headInfo != nil { // TODO(voss): which order is best?
 		info.IsBold = headInfo.IsBold
 	} else if os2Info != nil {
 		info.IsBold = os2Info.IsBold

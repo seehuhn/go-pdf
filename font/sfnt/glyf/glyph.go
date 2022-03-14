@@ -17,8 +17,6 @@
 package glyf
 
 import (
-	"bytes"
-
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -130,49 +128,76 @@ func decodeGlyphComposite(data []byte) (*GlyphComposite, error) {
 	return res, nil
 }
 
-func (g *Glyph) encode() []byte {
+func (g *Glyph) encodeLen() int {
 	if g == nil {
-		return nil
+		return 0
+	}
+
+	total := 10
+	switch g0 := g.data.(type) {
+	case GlyphSimple:
+		total += len(g0.tail)
+	case GlyphComposite:
+		for _, comp := range g0.Components {
+			total += 4 + len(comp.Args)
+		}
+		total += len(g0.Commands)
+	default:
+		panic("unexpected glyph type")
+	}
+	if total%2 != 0 {
+		total++
+	}
+	return total
+}
+
+func (g *Glyph) append(buf []byte) []byte {
+	if g == nil {
+		return buf
 	}
 
 	var numContours int16
-	var tail []byte
 	switch g0 := g.data.(type) {
 	case GlyphSimple:
 		numContours = g0.numContours
-		tail = g0.tail
-
 	case GlyphComposite:
 		numContours = -1
-
-		buf := bytes.Buffer{} // TODO(voss): avoid allocation/copying
-		for _, comp := range g0.Components {
-			buf.Write([]byte{
-				byte(comp.Flags >> 8), byte(comp.Flags),
-				byte(comp.GlyphIndex >> 8), byte(comp.GlyphIndex),
-			})
-			buf.Write(comp.Args)
-		}
-		buf.Write(g0.Commands)
-		tail = buf.Bytes()
-
 	default:
 		panic("unexpected glyph type")
 	}
 
-	data := make([]byte, 10+len(tail))
-	data[0] = byte(numContours >> 8)
-	data[1] = byte(numContours)
-	data[2] = byte(g.LLx >> 8)
-	data[3] = byte(g.LLx)
-	data[4] = byte(g.LLy >> 8)
-	data[5] = byte(g.LLy)
-	data[6] = byte(g.URx >> 8)
-	data[7] = byte(g.URx)
-	data[8] = byte(g.URy >> 8)
-	data[9] = byte(g.URy)
-	copy(data[10:], tail)
-	return data
+	buf = append(buf,
+		byte(numContours>>8),
+		byte(numContours),
+		byte(g.LLx>>8),
+		byte(g.LLx),
+		byte(g.LLy>>8),
+		byte(g.LLy),
+		byte(g.URx>>8),
+		byte(g.URx),
+		byte(g.URy>>8),
+		byte(g.URy))
+
+	switch g0 := g.data.(type) {
+	case GlyphSimple:
+		buf = append(buf, g0.tail...)
+	case GlyphComposite:
+		for _, comp := range g0.Components {
+			buf = append(buf,
+				byte(comp.Flags>>8), byte(comp.Flags),
+				byte(comp.GlyphIndex>>8), byte(comp.GlyphIndex))
+			buf = append(buf, comp.Args...)
+		}
+		buf = append(buf, g0.Commands...)
+	default:
+		panic("unexpected glyph type")
+	}
+
+	if len(buf)%2 != 0 {
+		buf = append(buf, 0)
+	}
+
+	return buf
 }
 
 var errIncompleteGlyph = &font.InvalidFontError{

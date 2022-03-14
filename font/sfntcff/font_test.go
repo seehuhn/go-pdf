@@ -21,11 +21,9 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/go-test/deep"
-	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 )
 
@@ -51,7 +49,7 @@ func TestPostscriptName(t *testing.T) {
 	}
 }
 
-func DisabledTestMany(t *testing.T) { // TODO(voss)
+func TestMany(t *testing.T) { // TODO(voss)
 	listFd, err := os.Open("/Users/voss/project/pdflib/demo/try-all-fonts/all-fonts")
 	if err != nil {
 		t.Fatal(err)
@@ -73,20 +71,7 @@ func DisabledTestMany(t *testing.T) { // TODO(voss)
 			for i := 0; i < 2; i++ {
 				font, err := Read(r)
 				if err != nil {
-					if i == 0 && strings.Contains(err.Error(), "sfnt: missing CFF  table") {
-						return
-					}
 					t.Fatal(err)
-				}
-
-				// simplify glyphs to speed up fuzzing
-				for _, g := range font.Font.(*cff.Outlines).Glyphs {
-					b := g.Extent()
-					g.Cmds = nil
-					g.MoveTo(float64(b.LLx), float64(b.LLy))
-					g.LineTo(float64(b.URx), float64(b.LLy))
-					g.LineTo(float64(b.URx), float64(b.URy))
-					g.LineTo(float64(b.LLx), float64(b.URy))
 				}
 
 				buf.Reset()
@@ -130,18 +115,8 @@ func FuzzFont(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		font, err := Read(bytes.NewReader(data))
-		if err != nil || len(font.Font.(*cff.Outlines).Glyphs) == 0 {
+		if err != nil {
 			return
-		}
-
-		// simplify glyphs to speed up fuzzing
-		for _, g := range font.Font.(*cff.Outlines).Glyphs {
-			b := g.Extent()
-			g.Cmds = nil
-			g.MoveTo(float64(b.LLx), float64(b.LLy))
-			g.LineTo(float64(b.URx), float64(b.LLy))
-			g.LineTo(float64(b.URx), float64(b.URy))
-			g.LineTo(float64(b.LLx), float64(b.URy))
 		}
 
 		buf := &bytes.Buffer{}

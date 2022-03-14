@@ -17,7 +17,6 @@
 package glyf
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,19 +51,22 @@ func FuzzGlyf(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, glyfData, locaData []byte, locaFormat int16) {
-		info, err := Decode(glyfData, locaData, locaFormat)
+		enc := &Encoded{
+			GlyfData:   glyfData,
+			LocaData:   locaData,
+			LocaFormat: locaFormat,
+		}
+		info, err := Decode(enc)
 		if err != nil {
 			return
 		}
 
-		buf := &bytes.Buffer{}
-		locaData2, locaFormat2, err := info.Encode(buf)
+		enc2, err := info.Encode()
 		if err != nil {
 			t.Fatal(err)
 		}
-		glyfData2 := buf.Bytes()
 
-		info2, err := Decode(glyfData2, locaData2, locaFormat2)
+		info2, err := Decode(enc2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,10 +77,10 @@ func FuzzGlyf(f *testing.F) {
 			different = true
 		}
 		if different {
-			fmt.Println("A.g", glyfData)
-			fmt.Println("A.l", locaData)
-			fmt.Println("B.g", glyfData2)
-			fmt.Println("B.l", locaData2)
+			fmt.Println("A.g", enc.GlyfData)
+			fmt.Println("A.l", enc.LocaData)
+			fmt.Println("B.g", enc2.GlyfData)
+			fmt.Println("B.l", enc2.LocaData)
 			fmt.Println(info)
 			fmt.Println(info2)
 			t.Error("not equal")

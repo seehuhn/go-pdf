@@ -124,6 +124,15 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 	return h, nil
 }
 
+func (h *Header) Has(names ...string) bool {
+	for _, name := range names {
+		if _, ok := h.Toc[name]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (h *Header) Find(tableName string) (Record, error) {
 	rec, ok := h.Toc[tableName]
 	if !ok {

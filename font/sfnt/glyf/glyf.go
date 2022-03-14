@@ -19,17 +19,20 @@
 // https://docs.microsoft.com/en-us/typography/opentype/spec/loca
 package glyf
 
-import "io"
+// Glyphs contains the information from a "glyf" table.
+type Glyphs []*Glyph
 
-// Info contains information from the "glyf" table.
-type Info struct {
-	Glyphs []*Glyph
+type Encoded struct {
+	GlyfData   []byte
+	LocaData   []byte
+	LocaFormat int16
 }
 
-// Decode converts the data from the "glyf" and "loca" tables into
-// a slice of Glyphs.
-func Decode(glyfData, locaData []byte, locaFormat int16) (*Info, error) {
-	offs, err := decodeLoca(glyfData, locaData, locaFormat)
+// Decode converts the data from the "glyf" and "loca" tables into a slice of
+// Glyphs.  The value for locaFormat is specified in the indexToLocFormat entry
+// in the 'head' table.
+func Decode(enc *Encoded) (Glyphs, error) {
+	offs, err := decodeLoca(enc)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +41,7 @@ func Decode(glyfData, locaData []byte, locaFormat int16) (*Info, error) {
 
 	gg := make([]*Glyph, numGlyphs)
 	for i := range gg {
-		data := glyfData[offs[i]:offs[i+1]]
+		data := enc.GlyfData[offs[i]:offs[i+1]]
 		g, err := decodeGlyph(data)
 		if err != nil {
 			return nil, err
@@ -46,35 +49,31 @@ func Decode(glyfData, locaData []byte, locaFormat int16) (*Info, error) {
 		gg[i] = g
 	}
 
-	info := &Info{
-		Glyphs: gg,
-	}
-	return info, nil
+	return gg, nil
 }
 
 // Encode encodes the Glyphs into a "glyf" and "loca" table.
-func (info *Info) Encode(w io.Writer) ([]byte, int16, error) {
-	offs := make([]int, len(info.Glyphs)+1)
+func (gg Glyphs) Encode() (*Encoded, error) {
+	n := len(gg)
+
+	offs := make([]int, n+1)
 	offs[0] = 0
-	for i, g := range info.Glyphs {
-		data := g.encode()
-
-		n, err := w.Write(data)
-		if err != nil {
-			return nil, 0, err
-		}
-		if n%2 != 0 {
-			_, err := w.Write([]byte{0})
-			if err != nil {
-				return nil, 0, err
-			}
-			n++
-		}
-
-		offs[i+1] = offs[i] + n
+	for i, g := range gg {
+		l := g.encodeLen()
+		offs[i+1] = offs[i] + l
 	}
-
 	locaData, locaFormat := encodeLoca(offs)
 
-	return locaData, locaFormat, nil
+	glyfData := make([]byte, 0, offs[n])
+	for _, g := range gg {
+		glyfData = g.append(glyfData)
+	}
+
+	enc := &Encoded{
+		GlyfData:   glyfData,
+		LocaData:   locaData,
+		LocaFormat: locaFormat,
+	}
+
+	return enc, nil
 }

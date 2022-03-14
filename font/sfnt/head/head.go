@@ -51,8 +51,8 @@ type Info struct {
 	IsCondensed bool
 	IsExtended  bool
 
-	LowestRecPPEM  uint16 // smallest readable size in pixels
-	HasLongOffsets bool   // 'loca' table uses 32 bit offsets (TrueType only)
+	LowestRecPPEM uint16 // smallest readable size in pixels
+	LocaFormat    int16  // 0 for short offsets, 1 for long (TrueType only)
 }
 
 // Read reads and decodes the binary representation of the head table.
@@ -100,7 +100,7 @@ func Read(r io.Reader) (*Info, error) {
 	info.IsExtended = enc.MacStyle&(1<<6) != 0
 
 	info.LowestRecPPEM = enc.LowestRecPPEM
-	info.HasLongOffsets = enc.IndexToLocFormat != 0
+	info.LocaFormat = enc.IndexToLocFormat
 
 	return info, nil
 }
@@ -161,10 +161,7 @@ func (info *Info) Encode() (data []byte, err error) {
 		MacStyle:          macStyle,
 		LowestRecPPEM:     info.LowestRecPPEM,
 		FontDirectionHint: 2,
-	}
-
-	if info.HasLongOffsets {
-		enc.IndexToLocFormat = 1
+		IndexToLocFormat:  info.LocaFormat,
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, headLength))
