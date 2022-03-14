@@ -90,8 +90,8 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 
 	w.OnClose(t.WriteFont)
 
-	width := make([]int, len(tt.HmtxInfo.Width))
-	for i, w := range tt.HmtxInfo.Width {
+	width := make([]int, len(tt.HmtxInfo.Widths))
+	for i, w := range tt.HmtxInfo.Widths {
 		width[i] = int(w)
 	}
 
@@ -131,7 +131,7 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Width[gg[i].Gid])
+		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Widths[gg[i].Gid])
 	}
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
@@ -163,7 +163,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		return includeGlyphs[i] < includeGlyphs[j]
 	})
 	subsetTag := font.GetSubsetTag(includeGlyphs, origNumGlyphs)
-	fontName := pdf.Name(subsetTag) + "+" + t.Cff.Info.FontName
+	fontName := pdf.Name(subsetTag) + "+" + t.Cff.FontInfo.FontName
 	// TODO(voss): check whether we now have two subset tags
 
 	q := 1000 / float64(t.Sfnt.GlyphUnits)
@@ -174,7 +174,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
 	}
 
-	DW, W := font.EncodeCIDWidths(t.Sfnt.HmtxInfo.Width)
+	DW, W := font.EncodeCIDWidths(t.Sfnt.HmtxInfo.Widths)
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()

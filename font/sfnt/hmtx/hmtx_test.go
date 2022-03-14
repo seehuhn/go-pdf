@@ -27,8 +27,8 @@ import (
 
 func TestRoundtrip(t *testing.T) {
 	i1 := &Info{
-		Width: []uint16{100, 200, 300, 300},
-		GlyphExtent: []font.Rect{
+		Widths: []uint16{100, 200, 300, 300},
+		GlyphExtents: []font.Rect{
 			{LLx: 10, LLy: 0, URx: 90, URy: 100},
 			{LLx: 20, LLy: 0, URx: 200, URy: 100},
 			{LLx: 30, LLy: 0, URx: 300, URy: 100},
@@ -45,8 +45,8 @@ func TestRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Errorf("error decoding hmtx: %v", err)
 	}
-	if !reflect.DeepEqual(i1.Width, i2.Width) {
-		t.Errorf("widths differ: %d vs %d", i1.Width, i2.Width)
+	if !reflect.DeepEqual(i1.Widths, i2.Widths) {
+		t.Errorf("widths differ: %d vs %d", i1.Widths, i2.Widths)
 	}
 	if i1.Ascent != i2.Ascent {
 		t.Errorf("ascent differs: %d vs %d", i1.Ascent, i2.Ascent)
@@ -67,8 +67,8 @@ func TestRoundtrip(t *testing.T) {
 
 func TestLengths(t *testing.T) {
 	info := &Info{
-		Width: []uint16{100, 200, 300, 300, 300},
-		GlyphExtent: []font.Rect{
+		Widths: []uint16{100, 200, 300, 300, 300},
+		GlyphExtents: []font.Rect{
 			{LLx: 0, LLy: 0, URx: 100, URy: 100},
 			{LLx: 10, LLy: 0, URx: 100, URy: 100},
 			{LLx: 20, LLy: 0, URx: 100, URy: 100},
@@ -87,7 +87,7 @@ func TestLengths(t *testing.T) {
 		t.Errorf("expected %d, got %d", hheaLength, len(hhea))
 	}
 
-	numGlyphs := len(info.Width)
+	numGlyphs := len(info.Widths)
 	numWidths := 3
 	hmtxLength := 4*numWidths + 2*(numGlyphs-numWidths)
 	if len(hmtx) != hmtxLength {
@@ -203,8 +203,8 @@ func FuzzAngle(f *testing.F) {
 
 func FuzzHmtx(f *testing.F) {
 	i1 := &Info{
-		Width: []uint16{100, 200, 300, 300},
-		GlyphExtent: []font.Rect{
+		Widths: []uint16{100, 200, 300, 300},
+		GlyphExtents: []font.Rect{
 			{LLx: 10, LLy: 0, URx: 90, URy: 100},
 			{LLx: 20, LLy: 0, URx: 200, URy: 100},
 			{LLx: 30, LLy: 0, URx: 300, URy: 100},

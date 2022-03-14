@@ -29,25 +29,30 @@ import (
 
 // TODO(voss): implement support for font matrices
 
-// Font stores the data of a CFF font.
+// Font stores a CFF font.
 type Font struct {
+	*type1.FontInfo
+	*Outlines
+}
+
+// Outlines stores the glyph data of a CFF font.
+type Outlines struct {
 	Glyphs []*Glyph
-	Info   *type1.FontInfo
 
 	Private []*type1.PrivateDict
 
 	// FdSelect determines which private dictionary is used for each glyph.
 	FdSelect FdSelectFn
 
-	// Encoding lists the glyphs corresponding to the 256 one-byte
-	// character codes in simple fonts.  For CIDFonts (where ROS != nil),
-	// this must be nil.
-	Encoding []font.GlyphID
-
 	// ROS specifies the character collection of the font, using Adobe's
 	// Registry, Ordering, Supplement system.  This must be non-nil
 	// if and only if the font is a CIDFont.
 	ROS *type1.ROS
+
+	// Encoding lists the glyphs corresponding to the 256 one-byte
+	// character codes in simple fonts.  For CIDFonts (where ROS != nil),
+	// this must be nil.
+	Encoding []font.GlyphID
 
 	// Gid2cid lists the character identifiers corresponding to the glyphs.
 	// This is only present for CIDFonts.
@@ -56,7 +61,9 @@ type Font struct {
 
 // Read reads a CFF font from r.
 func Read(r io.ReadSeeker) (*Font, error) {
-	cff := &Font{}
+	cff := &Font{
+		Outlines: &Outlines{},
+	}
 
 	length, err := r.Seek(0, io.SeekEnd)
 	if err != nil {
@@ -102,7 +109,7 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	} else if len(fontNames) > 1 {
 		return nil, unsupported("fontsets with more than one font")
 	}
-	cff.Info = &type1.FontInfo{
+	cff.FontInfo = &type1.FontInfo{
 		FontName: pdf.Name(fontNames[0]),
 	}
 
@@ -135,23 +142,23 @@ func Read(r io.ReadSeeker) (*Font, error) {
 	if topDict.getInt(opCharstringType, 2) != 2 {
 		return nil, unsupported("charstring type != 2")
 	}
-	cff.Info.Version = topDict.getString(opVersion)
-	cff.Info.Notice = topDict.getString(opNotice)
-	cff.Info.Copyright = topDict.getString(opCopyright)
-	cff.Info.FullName = topDict.getString(opFullName)
-	cff.Info.FamilyName = topDict.getString(opFamilyName)
-	cff.Info.Weight = topDict.getString(opWeight)
+	cff.FontInfo.Version = topDict.getString(opVersion)
+	cff.FontInfo.Notice = topDict.getString(opNotice)
+	cff.FontInfo.Copyright = topDict.getString(opCopyright)
+	cff.FontInfo.FullName = topDict.getString(opFullName)
+	cff.FontInfo.FamilyName = topDict.getString(opFamilyName)
+	cff.FontInfo.Weight = topDict.getString(opWeight)
 	isFixedPitch := topDict.getInt(opIsFixedPitch, 0)
-	cff.Info.IsFixedPitch = isFixedPitch != 0
+	cff.FontInfo.IsFixedPitch = isFixedPitch != 0
 	italicAngle := topDict.getFloat(opItalicAngle, 0)
-	cff.Info.ItalicAngle = normaliseAngle(italicAngle)
-	cff.Info.UnderlinePosition = int16(topDict.getInt(opUnderlinePosition,
+	cff.FontInfo.ItalicAngle = normaliseAngle(italicAngle)
+	cff.FontInfo.UnderlinePosition = int16(topDict.getInt(opUnderlinePosition,
 		defaultUnderlinePosition))
-	cff.Info.UnderlineThickness = int16(topDict.getInt(opUnderlineThickness,
+	cff.FontInfo.UnderlineThickness = int16(topDict.getInt(opUnderlineThickness,
 		defaultUnderlineThickness))
 
 	// TODO(voss): different default for CIDFonts?
-	cff.Info.FontMatrix = topDict.getFontMatrix(opFontMatrix)
+	cff.FontInfo.FontMatrix = topDict.getFontMatrix(opFontMatrix)
 
 	// section 4: global subr INDEX
 	gsubrs, err := readIndex(p)
@@ -388,10 +395,10 @@ func (cff *Font) Encode(w io.Writer) error {
 	})
 
 	// section 1: Name INDEX
-	blobs = append(blobs, cffIndex{[]byte(cff.Info.FontName)}.encode())
+	blobs = append(blobs, cffIndex{[]byte(cff.FontInfo.FontName)}.encode())
 
 	// section 2: top dict INDEX
-	topDict := makeTopDict(cff.Info)
+	topDict := makeTopDict(cff.FontInfo)
 	// opCharset is updated below
 	// opCharStrings is updated below
 	if cff.ROS != nil {
@@ -405,7 +412,7 @@ func (cff *Font) Encode(w io.Writer) error {
 		// opFDArray is updated below
 		// opFDSelect is updated below
 	} else {
-		topDict.setFontMatrix(opFontMatrix, cff.Info.FontMatrix)
+		topDict.setFontMatrix(opFontMatrix, cff.FontInfo.FontMatrix)
 		// opEncoding is updated below
 		// opPrivate is updated below
 	}
@@ -475,7 +482,7 @@ func (cff *Font) Encode(w io.Writer) error {
 		for i := range fontDicts {
 			// see afdko/c/shared/source/cffwrite/cffwrite_dict.c:cfwDictFillFont
 			fontDict := cffDict{}
-			fontDict.setFontMatrix(opFontMatrix, cff.Info.FontMatrix)
+			fontDict.setFontMatrix(opFontMatrix, cff.FontInfo.FontMatrix)
 			// opPrivate is set below
 			fontDicts[i] = fontDict
 		}
@@ -572,7 +579,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	return nil
 }
 
-func (cff *Font) selectWidths() (int16, int16) {
+func (cff *Font) selectWidths() (uint16, uint16) {
 	numGlyphs := int32(len(cff.Glyphs))
 	if numGlyphs == 0 {
 		return 0, 0
@@ -580,9 +587,9 @@ func (cff *Font) selectWidths() (int16, int16) {
 		return cff.Glyphs[0].Width, cff.Glyphs[0].Width
 	}
 
-	widthHist := make(map[int16]int32)
+	widthHist := make(map[uint16]int32)
 	var mostFrequentCount int32
-	var defaultWidth int16
+	var defaultWidth uint16
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		widthHist[w]++
@@ -594,8 +601,8 @@ func (cff *Font) selectWidths() (int16, int16) {
 
 	// TODO(voss): the choice of nominalWidth can be improved
 	var sum int32
-	var minWidth int16 = math.MaxInt16
-	var maxWidth int16 = math.MinInt16
+	var minWidth uint16 = math.MaxUint16
+	var maxWidth uint16 = 0
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		if w == defaultWidth {
@@ -609,7 +616,7 @@ func (cff *Font) selectWidths() (int16, int16) {
 			maxWidth = w
 		}
 	}
-	nominalWidth := int16((sum + numGlyphs/2) / (numGlyphs - 1))
+	nominalWidth := uint16((sum + numGlyphs/2) / (numGlyphs - 1))
 	if nominalWidth < minWidth+107 {
 		nominalWidth = minWidth + 107
 	} else if nominalWidth > maxWidth-107 {
@@ -618,7 +625,7 @@ func (cff *Font) selectWidths() (int16, int16) {
 	return defaultWidth, nominalWidth
 }
 
-func (cff *Font) encodeCharStrings() (cffIndex, int16, int16, error) {
+func (cff *Font) encodeCharStrings() (cffIndex, uint16, uint16, error) {
 	numGlyphs := len(cff.Glyphs)
 	if numGlyphs < 1 || (cff.ROS == nil && cff.Glyphs[0].Name != ".notdef") {
 		return nil, 0, 0, invalidSince("missing .notdef glyph")

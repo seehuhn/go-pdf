@@ -90,8 +90,8 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 
 	w.OnClose(t.WriteFont)
 
-	width := make([]int, len(tt.HmtxInfo.Width))
-	for i, w := range tt.HmtxInfo.Width {
+	width := make([]int, len(tt.HmtxInfo.Widths))
+	for i, w := range tt.HmtxInfo.Widths {
 		width[i] = int(w)
 	}
 
@@ -134,7 +134,7 @@ func (t *simple) Layout(rr []rune) []font.Glyph {
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Width[gg[i].Gid])
+		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Widths[gg[i].Gid])
 	}
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
@@ -199,7 +199,7 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 	if err != nil {
 		return err
 	}
-	fontName := pdf.Name(t.Cff.Info.FontName) // includes the subset tag
+	fontName := pdf.Name(t.Cff.FontInfo.FontName) // includes the subset tag
 
 	q := 1000 / float64(t.Sfnt.GlyphUnits)
 	FontBBox := &pdf.Rectangle{
@@ -244,7 +244,7 @@ func (t *simple) WriteFont(w *pdf.Writer) error {
 		width := 0
 		if i == mapping[pos].CharCode {
 			gid := mapping[pos].GID
-			width = int(float64(t.Sfnt.HmtxInfo.Width[gid])*q + 0.5)
+			width = int(float64(t.Sfnt.HmtxInfo.Widths[gid])*q + 0.5)
 			pos++
 		}
 		Widths = append(Widths, pdf.Integer(width))

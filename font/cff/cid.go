@@ -127,10 +127,10 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	}
 
 	flags := font.FlagSymbolic
-	if cff.Info.IsFixedPitch {
+	if cff.FontInfo.IsFixedPitch {
 		flags |= font.FlagFixedPitch
 	}
-	if cff.Info.ItalicAngle != 0 {
+	if cff.FontInfo.ItalicAngle != 0 {
 		flags |= font.FlagItalic // TODO(voss): is the logic correct?
 	}
 	if cff.Private[0].ForceBold {
@@ -148,7 +148,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	Font := pdf.Dict{ // See section 9.7.6.1 of PDF 32000-1:2008.
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        cff.Info.FontName + "-" + "Identity-H",
+		"BaseFont":        cff.FontInfo.FontName + "-" + "Identity-H",
 		"Encoding":        pdf.Name("Identity-H"),
 		"DescendantFonts": pdf.Array{CIDFontRef},
 		"ToUnicode":       ToUnicodeRef,
@@ -157,7 +157,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 	CIDFont := pdf.Dict{ // See section 9.7.4.1 of PDF 32000-1:2008.
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("CIDFontType0"),
-		"BaseFont":       cff.Info.FontName,
+		"BaseFont":       cff.FontInfo.FontName,
 		"CIDSystemInfo":  CIDSystemInfoRef,
 		"FontDescriptor": FontDescriptorRef,
 	}
@@ -177,10 +177,10 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 
 	FontDescriptor := pdf.Dict{ // See sections 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    cff.Info.FontName,
+		"FontName":    cff.FontInfo.FontName,
 		"Flags":       pdf.Integer(flags),
 		"FontBBox":    t.FontBBox,
-		"ItalicAngle": pdf.Number(cff.Info.ItalicAngle),
+		"ItalicAngle": pdf.Number(cff.FontInfo.ItalicAngle),
 		"Ascent":      pdf.Integer(0),  // TODO(voss): ???
 		"Descent":     pdf.Integer(0),  // TODO(voss): ???
 		"CapHeight":   pdf.Integer(0),  // TODO(voss): ???

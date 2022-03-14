@@ -75,8 +75,8 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 
 	w.OnClose(t.WriteFont)
 
-	width := make([]int, len(tt.HmtxInfo.Width))
-	for i, w := range tt.HmtxInfo.Width {
+	width := make([]int, len(tt.HmtxInfo.Widths))
+	for i, w := range tt.HmtxInfo.Widths {
 		width[i] = int(w)
 	}
 
@@ -87,7 +87,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 		GlyphUnits:  tt.GlyphUnits,
 		Ascent:      int(tt.HmtxInfo.Ascent),
 		Descent:     int(tt.HmtxInfo.Descent),
-		GlyphExtent: tt.HmtxInfo.GlyphExtent,
+		GlyphExtent: tt.HmtxInfo.GlyphExtents,
 		Width:       width,
 
 		Layout: t.Layout,
@@ -115,7 +115,7 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
 	for i := range gg {
-		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Width[gg[i].Gid])
+		gg[i].Advance = int32(t.Sfnt.HmtxInfo.Widths[gg[i].Gid])
 	}
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
@@ -163,7 +163,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
 	}
 
-	DW, W := font.EncodeCIDWidths(t.Sfnt.HmtxInfo.Width) // TODO(voss): subset???
+	DW, W := font.EncodeCIDWidths(t.Sfnt.HmtxInfo.Widths) // TODO(voss): subset???
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()

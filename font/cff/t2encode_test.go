@@ -54,8 +54,10 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	in := &Font{
-		Info:    meta,
-		Private: private,
+		FontInfo: meta,
+		Outlines: &Outlines{
+			Private: private,
+		},
 	}
 
 	g := &Glyph{
@@ -114,8 +116,10 @@ func TestFindEdges(t *testing.T) {
 		FontMatrix: defaultFontMatrix,
 	}
 	in := &Font{
-		Info:    meta,
-		Private: []*type1.PrivateDict{{}},
+		FontInfo: meta,
+		Outlines: &Outlines{
+			Private: []*type1.PrivateDict{{}},
+		},
 	}
 
 	g := NewGlyph(".notdef", 0)

@@ -32,11 +32,11 @@ type Glyph struct {
 	HStem []int16
 	VStem []int16
 	Name  pdf.Name
-	Width int16 // TODO(voss): should this be uint16?
+	Width uint16
 }
 
 // NewGlyph allocates a new glyph.
-func NewGlyph(name pdf.Name, width int16) *Glyph {
+func NewGlyph(name pdf.Name, width uint16) *Glyph {
 	return &Glyph{
 		Name:  name,
 		Width: width,
@@ -118,11 +118,11 @@ cmdLoop:
 	}
 }
 
-func (g *Glyph) encodeCharString(defaultWidth, nominalWidth int16) ([]byte, error) {
+func (g *Glyph) encodeCharString(defaultWidth, nominalWidth uint16) ([]byte, error) {
 	var header [][]byte
 	w := g.Width
 	if w != defaultWidth {
-		header = append(header, encodeInt(w-nominalWidth))
+		header = append(header, encodeInt(int16(w-nominalWidth)))
 	}
 
 	hintMaskUsed := false

@@ -50,15 +50,20 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	blobs["hhea"] = hheaData
 	blobs["hmtx"] = hmtxData
 
-	if info.Glyphs != nil {
-		maxpInfo := table.MaxpInfo{
-			NumGlyphs: len(info.Glyphs),
+	switch font := info.Font.(type) {
+	case *cff.Outlines:
+		if font.Glyphs != nil {
+			maxpInfo := table.MaxpInfo{
+				NumGlyphs: len(font.Glyphs),
+			}
+			maxpData, err := maxpInfo.Encode()
+			if err != nil {
+				return 0, err
+			}
+			blobs["maxp"] = maxpData
 		}
-		maxpData, err := maxpInfo.Encode()
-		if err != nil {
-			return 0, err
-		}
-		blobs["maxp"] = maxpData
+	default:
+		panic("unexpected font type")
 	}
 
 	cmapSubtable := info.CMap.Encode(0)
@@ -92,11 +97,10 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	return sfnt.WriteTables(w, table.ScalerTypeCFF, tables, blobs)
 }
 
-func isFixedPitch(glyphs []*cff.Glyph) bool {
-	var width int16
+func isFixedPitch(ww []uint16) bool {
+	var width uint16
 
-	for i := range glyphs {
-		w := glyphs[i].Width
+	for _, w := range ww {
 		if w == 0 {
 			continue
 		}
@@ -112,25 +116,15 @@ func isFixedPitch(glyphs []*cff.Glyph) bool {
 
 func makeHead(info *Info) ([]byte, error) {
 	var bbox font.Rect
-	first := true
-	for _, g := range info.Glyphs {
-		ext := g.Extent()
-		if ext.IsZero() {
-			continue
+	switch font := info.Font.(type) {
+	case *cff.Outlines:
+		for _, g := range font.Glyphs {
+			bbox.Extend(g.Extent())
 		}
-		if first || ext.LLx < bbox.LLx {
-			bbox.LLx = ext.LLx
+	case *TTInfo:
+		for _, g := range font.Glyphs {
+			bbox.Extend(g.Rect)
 		}
-		if first || ext.LLy < bbox.LLy {
-			bbox.LLy = ext.LLy
-		}
-		if first || ext.URx > bbox.URx {
-			bbox.URx = ext.URx
-		}
-		if first || ext.URy > bbox.URy {
-			bbox.URy = ext.URy
-		}
-		first = false
 	}
 
 	headInfo := head.Info{
@@ -149,20 +143,13 @@ func makeHead(info *Info) ([]byte, error) {
 }
 
 func makeHmtx(info *Info) ([]byte, []byte) {
-	widths := make([]uint16, len(info.Glyphs))
-	extents := make([]font.Rect, len(info.Glyphs))
-	for i, g := range info.Glyphs {
-		widths[i] = uint16(g.Width)
-		extents[i] = g.Extent()
-	}
-
 	hmtxInfo := &hmtx.Info{
-		Width:       widths,
-		GlyphExtent: extents,
-		Ascent:      info.Ascent,
-		Descent:     info.Descent,
-		LineGap:     info.LineGap,
-		CaretAngle:  info.ItalicAngle / 180 * math.Pi,
+		Widths:       info.Widths(),
+		GlyphExtents: info.Extents(),
+		Ascent:       info.Ascent,
+		Descent:      info.Descent,
+		LineGap:      info.LineGap,
+		CaretAngle:   info.ItalicAngle / 180 * math.Pi,
 	}
 
 	return hmtxInfo.Encode()
@@ -219,14 +206,14 @@ func makePost(info *Info) []byte {
 		ItalicAngle:        info.ItalicAngle,
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
-		IsFixedPitch:       isFixedPitch(info.Glyphs),
+		IsFixedPitch:       isFixedPitch(info.Widths()),
 	}
 	return postInfo.Encode()
 }
 
 func makeCFF(info *Info) ([]byte, error) {
 	q := 1 / float64(info.UnitsPerEm)
-	cffInfo := &type1.FontInfo{
+	fontInfo := &type1.FontInfo{
 		FullName:   info.FullName(),
 		FamilyName: info.FamilyName,
 		Weight:     info.Weight.String(),
@@ -239,19 +226,15 @@ func makeCFF(info *Info) ([]byte, error) {
 		FontMatrix: []float64{q, 0, 0, q, 0, 0},
 
 		ItalicAngle:  info.ItalicAngle,
-		IsFixedPitch: isFixedPitch(info.Glyphs),
+		IsFixedPitch: isFixedPitch(info.Widths()),
 
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 	}
+	outlines := info.Font.(*cff.Outlines)
 	myCff := &cff.Font{
-		Glyphs:   info.Glyphs,
-		Info:     cffInfo,
-		Private:  info.Private,
-		FdSelect: info.FdSelect,
-		Encoding: info.Encoding,
-		Gid2cid:  info.Gid2cid,
-		ROS:      info.ROS,
+		FontInfo: fontInfo,
+		Outlines: outlines,
 	}
 
 	buf := &bytes.Buffer{}

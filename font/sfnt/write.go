@@ -85,9 +85,9 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			i2 := *info
 			info = &i2
 
-			info.Width = subsetInfo.Width
+			info.Widths = subsetInfo.Width
 			info.LSB = subsetInfo.LSB
-			info.GlyphExtent = subsetInfo.GlyphExtent
+			info.GlyphExtents = subsetInfo.GlyphExtent
 		}
 		hhea, hmtx := info.Encode()
 		tableData["hhea"] = hhea
@@ -174,16 +174,16 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 	if tt.HmtxInfo.LSB != nil {
 		res.LSB = make([]int16, len(includeOnly))
 	}
-	if tt.HmtxInfo.GlyphExtent != nil {
+	if tt.HmtxInfo.GlyphExtents != nil {
 		res.GlyphExtent = make([]font.Rect, len(includeOnly))
 	}
 	for i, gid := range includeOnly {
-		res.Width[i] = tt.HmtxInfo.Width[gid]
+		res.Width[i] = tt.HmtxInfo.Widths[gid]
 		if tt.HmtxInfo.LSB != nil {
 			res.LSB[i] = tt.HmtxInfo.LSB[gid]
 		}
-		if tt.HmtxInfo.GlyphExtent != nil {
-			res.GlyphExtent[i] = tt.HmtxInfo.GlyphExtent[gid]
+		if tt.HmtxInfo.GlyphExtents != nil {
+			res.GlyphExtent[i] = tt.HmtxInfo.GlyphExtents[gid]
 		}
 	}
 

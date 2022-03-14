@@ -50,21 +50,23 @@ func main() {
 		LineGap:    200,
 	}
 
+	cffInfo := &cff.Outlines{}
+
 	g := cff.NewGlyph(".notdef", 550)
 	g.MoveTo(0, 0)
 	g.LineTo(500, 0)
 	g.LineTo(500, 700)
 	g.LineTo(0, 700)
-	info.Glyphs = append(info.Glyphs, g)
+	cffInfo.Glyphs = append(cffInfo.Glyphs, g)
 
 	g = cff.NewGlyph("space", 550)
-	info.Glyphs = append(info.Glyphs, g)
+	cffInfo.Glyphs = append(cffInfo.Glyphs, g)
 
 	g = cff.NewGlyph("A", 550)
 	g.MoveTo(0, 0)
 	g.LineTo(500, 0)
 	g.LineTo(250, 710)
-	info.Glyphs = append(info.Glyphs, g)
+	cffInfo.Glyphs = append(cffInfo.Glyphs, g)
 
 	g = cff.NewGlyph("B", 550)
 	g.MoveTo(0, 0)
@@ -74,15 +76,16 @@ func main() {
 	g.CurveTo(300, 350, 500, 425, 500, 525)
 	g.CurveTo(500, 625, 300, 700, 200, 700)
 	g.LineTo(0, 700)
-	info.Glyphs = append(info.Glyphs, g)
-	info.Private = []*type1.PrivateDict{
+	cffInfo.Glyphs = append(cffInfo.Glyphs, g)
+	cffInfo.Private = []*type1.PrivateDict{
 		{
 			BlueValues: []int32{-10, 0, 700, 710}, // TODO(voss)
 		},
 	}
-	info.FdSelect = func(gi font.GlyphID) int { return 0 }
+	cffInfo.FdSelect = func(gi font.GlyphID) int { return 0 }
 
-	info.CMap = makeCMap(info.Glyphs)
+	info.Font = cffInfo
+	info.CMap = makeCMap(cffInfo.Glyphs)
 
 	// ----------------------------------------------------------------------
 

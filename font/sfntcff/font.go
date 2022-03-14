@@ -24,9 +24,9 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
-	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Info contains information about the font.
@@ -57,13 +57,52 @@ type Info struct {
 	IsRegular bool
 	IsOblique bool
 
-	Glyphs   []*cff.Glyph
-	Private  []*type1.PrivateDict
-	FdSelect cff.FdSelectFn
-	Encoding []font.GlyphID
-	Gid2cid  []int32
-	ROS      *type1.ROS
-	CMap     cmap.Subtable
+	// TODO(voss): should this have a separate field for advance widths?
+	CMap cmap.Subtable
+	Font interface{} // either *cff.Outlines or *TTInfo
+}
+
+// TTInfo contains information specific to TrueType fonts.
+type TTInfo struct {
+	Widths []uint16
+	Glyphs []*glyf.Glyph
+	blobs  map[string][]byte
+}
+
+// Widths return the advance widths of the glyphs of the font.
+func (info *Info) Widths() []uint16 {
+	switch f := info.Font.(type) {
+	case *cff.Outlines:
+		widths := make([]uint16, len(f.Glyphs))
+		for i, g := range f.Glyphs {
+			widths[i] = g.Width
+		}
+		return widths
+	case *TTInfo:
+		return f.Widths
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// Extents returns the glyph bounding boxes for the font.
+func (info *Info) Extents() []font.Rect {
+	switch f := info.Font.(type) {
+	case *cff.Outlines:
+		extents := make([]font.Rect, len(f.Glyphs))
+		for i, g := range f.Glyphs {
+			extents[i] = g.Extent()
+		}
+		return extents
+	case *TTInfo:
+		extents := make([]font.Rect, len(f.Glyphs))
+		for i, g := range f.Glyphs {
+			extents[i] = g.Rect
+		}
+		return extents
+	default:
+		panic("unexpected font type")
+	}
 }
 
 // FullName returns the full name of the font.

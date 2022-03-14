@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Read reads an OpenType font from a file.
@@ -136,31 +137,43 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	var cffInfo *cff.Font
-	cffFd, err := tableReader("CFF ")
-	if err != nil {
-		return nil, err
-	}
-	cffInfo, err = cff.Read(cffFd)
-	if err != nil {
-		return nil, err
-	}
+	var Outlines interface{}
+	var fontInfo *type1.FontInfo
+	switch header.ScalerType {
+	case table.ScalerTypeCFF:
+		var cffInfo *cff.Font
+		cffFd, err := tableReader("CFF ")
+		if err != nil {
+			return nil, err
+		}
+		cffInfo, err = cff.Read(cffFd)
+		if err != nil {
+			return nil, err
+		}
+		fontInfo = cffInfo.FontInfo
+		Outlines = cffInfo.Outlines
 
-	if hmtxInfo != nil && len(hmtxInfo.Width) > 0 {
-		if len(hmtxInfo.Width) != len(cffInfo.Glyphs) {
-			return nil, errors.New("sfnt/header: hmtx and cff glyph count mismatch")
+		if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
+			if len(hmtxInfo.Widths) != len(cffInfo.Glyphs) {
+				return nil, errors.New("sfnt: hmtx and cff glyph count mismatch")
+			}
+			for i, w := range hmtxInfo.Widths {
+				cffInfo.Glyphs[i].Width = w
+			}
 		}
-		for i, w := range hmtxInfo.Width {
-			cffInfo.Glyphs[i].Width = int16(w)
-		}
+	case table.ScalerTypeTrueType, table.ScalerTypeApple:
+		return nil, errors.New("not implemented")
+		// panic("not implemented")
+	default:
+		panic("unexpected scaler type")
 	}
 
 	info := &Info{}
 
 	if nameTable != nil {
 		info.FamilyName = nameTable.Family
-	} else {
-		info.FamilyName = cffInfo.Info.FamilyName
+	} else if fontInfo != nil {
+		info.FamilyName = fontInfo.FamilyName
 	}
 	if os2Info != nil {
 		info.Width = os2Info.WidthClass
@@ -172,7 +185,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.Version = ver
 	} else if headInfo != nil {
 		info.Version = headInfo.FontRevision.Round()
-	} else if ver, ok := getCFFVersion(cffInfo); ok {
+	} else if ver, ok := getCFFVersion(fontInfo); ok {
 		info.Version = ver
 	}
 	if headInfo != nil {
@@ -183,9 +196,9 @@ func Read(r io.ReaderAt) (*Info, error) {
 	if nameTable != nil {
 		info.Copyright = nameTable.Copyright
 		info.Trademark = nameTable.Trademark
-	} else {
-		info.Copyright = cffInfo.Info.Copyright
-		info.Trademark = cffInfo.Info.Notice
+	} else if fontInfo != nil {
+		info.Copyright = fontInfo.Copyright
+		info.Trademark = fontInfo.Notice
 	}
 	if os2Info != nil {
 		info.PermUse = os2Info.PermUse
@@ -209,15 +222,15 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
 	} else if postInfo != nil {
 		info.ItalicAngle = postInfo.ItalicAngle
-	} else {
-		info.ItalicAngle = cffInfo.Info.ItalicAngle
+	} else if fontInfo != nil {
+		info.ItalicAngle = fontInfo.ItalicAngle
 	}
 	if postInfo != nil {
 		info.UnderlinePosition = postInfo.UnderlinePosition
 		info.UnderlineThickness = postInfo.UnderlineThickness
-	} else {
-		info.UnderlinePosition = cffInfo.Info.UnderlinePosition
-		info.UnderlineThickness = cffInfo.Info.UnderlineThickness
+	} else if fontInfo != nil {
+		info.UnderlinePosition = fontInfo.UnderlinePosition
+		info.UnderlineThickness = fontInfo.UnderlineThickness
 	}
 	if headInfo != nil {
 		info.IsBold = headInfo.IsBold
@@ -229,12 +242,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.IsOblique = os2Info.IsOblique
 	}
 
-	info.Glyphs = cffInfo.Glyphs
-	info.Private = cffInfo.Private
-	info.FdSelect = cffInfo.FdSelect
-	info.Encoding = cffInfo.Encoding
-	info.Gid2cid = cffInfo.Gid2cid
-	info.ROS = cffInfo.ROS
+	info.Font = Outlines
 
 	info.CMap = cmapSubtable
 
@@ -256,11 +264,11 @@ func getNameTableVersion(t *name.Table) (head.Version, bool) {
 
 var cffVersionPat = regexp.MustCompile(`^(?:Version )?(\d+\.?\d+)`)
 
-func getCFFVersion(info *cff.Font) (head.Version, bool) {
-	if info == nil || info.Info.Version == "" {
+func getCFFVersion(fontInfo *type1.FontInfo) (head.Version, bool) {
+	if fontInfo == nil || fontInfo.Version == "" {
 		return 0, false
 	}
-	v, err := head.VersionFromString(info.Info.Version)
+	v, err := head.VersionFromString(fontInfo.Version)
 	if err != nil {
 		return 0, false
 	}

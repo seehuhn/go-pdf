@@ -107,7 +107,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 	NumGlyphs := maxp.NumGlyphs
-	if NumGlyphs != len(hmtxInfo.Width) {
+	if NumGlyphs != len(hmtxInfo.Widths) {
 		return nil, errors.New("inconsistent number of glyphs")
 	}
 
@@ -160,7 +160,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	} else {
 		// TODO(voss): get the glyph extents for OpenType fonts
 	}
-	hmtxInfo.GlyphExtent = GlyphExtent
+	hmtxInfo.GlyphExtents = GlyphExtent
 
 	if os2Info != nil {
 		hmtxInfo.Ascent = os2Info.Ascent
@@ -253,7 +253,7 @@ func (tt *Font) Close() error {
 // NumGlyphs returns the number of glyphs in the font.
 // This value always include the ".notdef" glyph.
 func (tt *Font) NumGlyphs() int {
-	return len(tt.HmtxInfo.Width)
+	return len(tt.HmtxInfo.Widths)
 }
 
 // HasTables returns true, if all the given tables are present in the font.

@@ -73,9 +73,9 @@ import (
 
 // Info contains information from the "hhea" and "hmtx" tables.
 type Info struct {
-	Width       []uint16
-	GlyphExtent []font.Rect
-	LSB         []int16
+	Widths       []uint16
+	GlyphExtents []font.Rect
+	LSB          []int16
 
 	Ascent  int16
 	Descent int16 // negative
@@ -139,7 +139,7 @@ func Decode(hheaData, hmtxData []byte) (*Info, error) {
 	if len(widths) < numHorMetrics {
 		return nil, fmt.Errorf("hmtx too short")
 	}
-	info.Width = widths
+	info.Widths = widths
 	info.LSB = lsbs
 
 	return info, nil
@@ -147,16 +147,16 @@ func Decode(hheaData, hmtxData []byte) (*Info, error) {
 
 // Encode creates the "hhea" and "hmtx" tables.
 func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
-	numGlyphs := len(info.Width)
+	numGlyphs := len(info.Widths)
 	if info.LSB != nil && len(info.LSB) != numGlyphs {
 		panic("lsb length mismatch")
 	}
-	if info.GlyphExtent != nil && len(info.GlyphExtent) != numGlyphs {
+	if info.GlyphExtents != nil && len(info.GlyphExtents) != numGlyphs {
 		panic("GlyphExtent length mismatch")
 	}
 
 	numLong := numGlyphs
-	for numLong > 1 && info.Width[numLong-1] == info.Width[numLong-2] {
+	for numLong > 1 && info.Widths[numLong-1] == info.Widths[numLong-2] {
 		numLong--
 	}
 
@@ -175,7 +175,7 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 		NumOfLongHorMetrics: uint16(numLong),
 	}
 
-	for _, w := range info.Width {
+	for _, w := range info.Widths {
 		if w > hhea.AdvanceWidthMax {
 			hhea.AdvanceWidthMax = w
 		}
@@ -185,12 +185,12 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 	if lsbs == nil {
 		lsbs = make([]int16, numGlyphs)
 		for i := 0; i < numGlyphs; i++ {
-			lsbs[i] = info.GlyphExtent[i].LLx
+			lsbs[i] = info.GlyphExtents[i].LLx
 		}
 	}
 	first := true
 	for i, lsb := range lsbs {
-		if info.GlyphExtent != nil && info.GlyphExtent[i].IsZero() {
+		if info.GlyphExtents != nil && info.GlyphExtents[i].IsZero() {
 			continue
 		}
 		if first || lsb < hhea.MinLeftSideBearing {
@@ -199,14 +199,14 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 		}
 	}
 
-	if info.GlyphExtent != nil {
+	if info.GlyphExtents != nil {
 		first = true
-		for i, bbox := range info.GlyphExtent {
+		for i, bbox := range info.GlyphExtents {
 			if bbox.IsZero() {
 				continue
 			}
 
-			rsb := int16(info.Width[i]) - bbox.URx
+			rsb := int16(info.Widths[i]) - bbox.URx
 			if first || rsb < hhea.MinRightSideBearing {
 				hhea.MinRightSideBearing = rsb
 			}
@@ -225,7 +225,7 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 	for i := 0; i < numGlyphs; i++ {
 		if i < numLong {
 			buf.Write([]byte{
-				byte(info.Width[i] >> 8), byte(info.Width[i]),
+				byte(info.Widths[i] >> 8), byte(info.Widths[i]),
 			})
 		}
 		buf.Write([]byte{

@@ -31,7 +31,7 @@ func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 		return nil, errors.New("cff: invalid subset")
 	}
 
-	fontName := cff.Info.FontName
+	fontName := cff.FontInfo.FontName
 	if len(fontName) >= 7 && fontName[6] == '+' {
 		// TODO(voss): what to do here?  The subset code will be wrong.
 		// Does this matter?
@@ -44,12 +44,15 @@ func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
 	}
 
 	tag := font.GetSubsetTag(subset, len(cff.Glyphs))
-	info := *cff.Info
-	info.FontName = pdf.Name(tag) + "+" + fontName
-	out := &Font{
-		Info:     &info,
+	fontInfo := *cff.FontInfo
+	fontInfo.FontName = pdf.Name(tag) + "+" + fontName
+	outlines := &Outlines{
 		FdSelect: fdSelect,
 		Private:  cff.Private,
+	}
+	out := &Font{
+		FontInfo: &fontInfo,
+		Outlines: outlines,
 	}
 	if cff.ROS != nil {
 		out.ROS = cff.ROS

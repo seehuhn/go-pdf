@@ -24,17 +24,8 @@ import (
 
 // Glyph represents a single glyph in a TrueType font.
 type Glyph struct {
-	xMin int16
-	yMin int16
-	xMax int16
-	yMax int16
-
+	font.Rect
 	data interface{} // either GlyphSimple or GlyphComposite
-}
-
-type GlyphSimple struct {
-	numContours int16
-	tail        []byte
 }
 
 func decodeGlyph(data []byte) (*Glyph, error) {
@@ -48,10 +39,12 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 	}
 
 	g := &Glyph{
-		xMin: int16(data[2])<<8 | int16(data[3]),
-		yMin: int16(data[4])<<8 | int16(data[5]),
-		xMax: int16(data[6])<<8 | int16(data[7]),
-		yMax: int16(data[8])<<8 | int16(data[9]),
+		Rect: font.Rect{
+			LLx: int16(data[2])<<8 | int16(data[3]),
+			LLy: int16(data[4])<<8 | int16(data[5]),
+			URx: int16(data[6])<<8 | int16(data[7]),
+			URy: int16(data[8])<<8 | int16(data[9]),
+		},
 	}
 
 	numCont := int16(data[0])<<8 | int16(data[1])
@@ -71,11 +64,19 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 	return g, nil
 }
 
+// GlyphSimple is a simple glyph.
+type GlyphSimple struct {
+	numContours int16
+	tail        []byte
+}
+
+// GlyphComposite is a composite glyph.
 type GlyphComposite struct {
 	Components []GlyphComponent
 	Commands   []byte
 }
 
+// GlyphComponent is a single component of a composite glyph.
 type GlyphComponent struct {
 	Flags      uint16
 	GlyphIndex font.GlyphID
@@ -162,14 +163,14 @@ func (g *Glyph) encode() []byte {
 	data := make([]byte, 10+len(tail))
 	data[0] = byte(numContours >> 8)
 	data[1] = byte(numContours)
-	data[2] = byte(g.xMin >> 8)
-	data[3] = byte(g.xMin)
-	data[4] = byte(g.yMin >> 8)
-	data[5] = byte(g.yMin)
-	data[6] = byte(g.xMax >> 8)
-	data[7] = byte(g.xMax)
-	data[8] = byte(g.yMax >> 8)
-	data[9] = byte(g.yMax)
+	data[2] = byte(g.LLx >> 8)
+	data[3] = byte(g.LLx)
+	data[4] = byte(g.LLy >> 8)
+	data[5] = byte(g.LLy)
+	data[6] = byte(g.URx >> 8)
+	data[7] = byte(g.URx)
+	data[8] = byte(g.URy >> 8)
+	data[9] = byte(g.URy)
 	copy(data[10:], tail)
 	return data
 }

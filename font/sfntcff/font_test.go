@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/go-test/deep"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 )
 
@@ -79,7 +80,7 @@ func DisabledTestMany(t *testing.T) { // TODO(voss)
 				}
 
 				// simplify glyphs to speed up fuzzing
-				for _, g := range font.Glyphs {
+				for _, g := range font.Font.(*cff.Outlines).Glyphs {
 					b := g.Extent()
 					g.Cmds = nil
 					g.MoveTo(float64(b.LLx), float64(b.LLy))
@@ -129,12 +130,12 @@ func FuzzFont(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		font, err := Read(bytes.NewReader(data))
-		if err != nil || len(font.Glyphs) == 0 {
+		if err != nil || len(font.Font.(*cff.Outlines).Glyphs) == 0 {
 			return
 		}
 
 		// simplify glyphs to speed up fuzzing
-		for _, g := range font.Glyphs {
+		for _, g := range font.Font.(*cff.Outlines).Glyphs {
 			b := g.Extent()
 			g.Cmds = nil
 			g.MoveTo(float64(b.LLx), float64(b.LLy))
