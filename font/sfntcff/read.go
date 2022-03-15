@@ -18,6 +18,7 @@ package sfntcff
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"regexp"
@@ -42,6 +43,16 @@ func Read(r io.ReaderAt) (*Info, error) {
 		return nil, err
 	}
 
+	if !(header.Has("glyf", "loca") || header.Has("CFF ")) {
+		if header.Has("CFF2") {
+			return nil, &font.NotSupportedError{
+				SubSystem: "sfnt",
+				Feature:   "CFF2-based fonts",
+			}
+		}
+		return nil, errors.New("sfntcff: no TrueType/OpenType glyph data found")
+	}
+
 	tableReader := func(name string) (*io.SectionReader, error) {
 		rec, ok := header.Toc[name]
 		if !ok {
@@ -49,6 +60,9 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 		return io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length)), nil
 	}
+
+	// we try to read the tables in the order guven by
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
 
 	var headInfo *head.Info
 	headFd, err := tableReader("head")
@@ -62,31 +76,20 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	var hmtxInfo *hmtx.Info
 	hheaData, err := header.ReadTableBytes(r, "hhea")
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
-	hmtxData, err := header.ReadTableBytes(r, "hmtx")
+	// decoded below when reading "hmtx"
+
+	maxpFd, err := tableReader("maxp")
+	if err != nil {
+		return nil, err
+	}
+	maxpInfo, err := table.ReadMaxp(maxpFd)
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
-	if hheaData != nil {
-		hmtxInfo, err = hmtx.Decode(hheaData, hmtxData)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// maxpFd, err := tableReader("maxp")
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// maxpInfo, err := table.ReadMaxp(maxpFd)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// numGlyphs := maxpInfo.NumGlyphs
 
 	var os2Info *os2.Info
 	os2Fd, err := tableReader("OS/2")
@@ -98,6 +101,31 @@ func Read(r io.ReaderAt) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	var hmtxInfo *hmtx.Info
+	hmtxData, err := header.ReadTableBytes(r, "hmtx")
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+	if hheaData != nil {
+		hmtxInfo, err = hmtx.Decode(hheaData, hmtxData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var cmapSubtable cmap.Subtable
+	cmapData, err := header.ReadTableBytes(r, "cmap")
+	if err != nil && !table.IsMissing(err) {
+		return nil, err
+	}
+	if cmapData != nil {
+		cmapTable, err := cmap.Decode(cmapData)
+		if err != nil {
+			return nil, err
+		}
+		cmapSubtable, _ = cmapTable.GetBest()
 	}
 
 	var nameTable *name.Table
@@ -113,19 +141,6 @@ func Read(r io.ReaderAt) (*Info, error) {
 		nameTable = nameInfo.Tables.Get()
 	}
 
-	cmapData, err := header.ReadTableBytes(r, "cmap")
-	if err != nil {
-		return nil, err
-	}
-	cmapTable, err := cmap.Decode(cmapData)
-	if err != nil {
-		return nil, err
-	}
-	cmapSubtable, err := cmapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-
 	var postInfo *post.Info
 	postFd, err := tableReader("post")
 	if err != nil && !table.IsMissing(err) {
@@ -138,6 +153,13 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
+	// Fix up some commonly found problems.
+	if maxpInfo != nil && hmtxInfo != nil &&
+		maxpInfo.NumGlyphs > 1 && len(hmtxInfo.Widths) > maxpInfo.NumGlyphs {
+		hmtxInfo.Widths = hmtxInfo.Widths[:maxpInfo.NumGlyphs]
+	}
+
+	// Read the glyph data.
 	var Outlines interface{}
 	var fontInfo *type1.FontInfo
 	switch header.ScalerType {
@@ -163,11 +185,11 @@ func Read(r io.ReaderAt) (*Info, error) {
 			}
 		}
 	case table.ScalerTypeTrueType, table.ScalerTypeApple:
-		glyfData, err := header.ReadTableBytes(r, "glyf")
+		locaData, err := header.ReadTableBytes(r, "loca")
 		if err != nil {
 			return nil, err
 		}
-		locaData, err := header.ReadTableBytes(r, "loca")
+		glyfData, err := header.ReadTableBytes(r, "glyf")
 		if err != nil {
 			return nil, err
 		}
@@ -194,29 +216,40 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 
 		if len(ttGlyphs) != len(hmtxInfo.Widths) {
-			return nil, errors.New("sfnt: inconsistent number of glyphs/widths")
+			return nil, errors.New("sfnt: hmtx and ttf glyph count mismatch")
 		}
 
-		Outlines = &TTInfo{
+		if maxpInfo == nil {
+			return nil, &table.ErrNoTable{Name: "maxp"}
+		}
+		Outlines = &TTFOutlines{
 			Widths: hmtxInfo.Widths,
 			Glyphs: ttGlyphs,
 			Tables: tables,
+			Maxp:   maxpInfo.TTF,
 		}
 	default:
 		panic("unexpected scaler type")
 	}
 
-	info := &Info{}
+	// Merge the information from the various tables.
+	info := &Info{
+		Font: Outlines,
+		CMap: cmapSubtable,
+	}
 
 	if nameTable != nil {
 		info.FamilyName = nameTable.Family
-	} else if fontInfo != nil {
+	}
+	if info.FamilyName == "" && fontInfo != nil {
 		info.FamilyName = fontInfo.FamilyName
 	}
 	if os2Info != nil {
 		info.Width = os2Info.WidthClass
 		info.Weight = os2Info.WeightClass
-		//   ALT: info.Weight = os2.WeightFromString(cffInfo.Info.Weight)
+	}
+	if info.Weight == 0 && fontInfo != nil {
+		info.Weight = font.WeightFromString(fontInfo.Weight)
 	}
 
 	if ver, ok := getNameTableVersion(nameTable); ok {
@@ -241,28 +274,95 @@ func Read(r io.ReaderAt) (*Info, error) {
 	if os2Info != nil {
 		info.PermUse = os2Info.PermUse
 	}
+
 	if headInfo != nil {
 		info.UnitsPerEm = headInfo.UnitsPerEm
-		//   ALT: cffInfo.Info.FontMatrix
+		// TODO(voss): check Info.FontMatrix (and private dicts?)
 	} else {
 		info.UnitsPerEm = 1000
 	}
-	if hmtxInfo != nil {
-		info.Ascent = hmtxInfo.Ascent
-		info.Descent = hmtxInfo.Descent
-		info.LineGap = hmtxInfo.LineGap
-	} else if os2Info != nil {
+
+	if os2Info != nil {
 		info.Ascent = os2Info.Ascent
 		info.Descent = os2Info.Descent
 		info.LineGap = os2Info.LineGap
+	} else if hmtxInfo != nil {
+		info.Ascent = hmtxInfo.Ascent
+		info.Descent = hmtxInfo.Descent
+		info.LineGap = hmtxInfo.LineGap
 	}
-	if hmtxInfo != nil {
-		info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
-	} else if postInfo != nil {
+
+	if os2Info != nil {
+		info.CapHeight = os2Info.CapHeight
+		info.XHeight = os2Info.XHeight
+	}
+	if info.CapHeight == 0 && cmapSubtable != nil {
+		gid := cmapSubtable.Lookup('H')
+		if gid != 0 {
+			info.CapHeight = info.Extent(gid).URy
+		}
+	}
+	if info.CapHeight == 0 && info.Ascent > 0 && info.Descent < 0 {
+		// Heuristic found using linear regression on the fonts on my laptop.
+		x := math.Round(0.942*float64(info.Ascent) + 0.673*float64(info.Descent) + 12.544)
+		if x > 0 {
+			info.CapHeight = int16(x)
+		}
+	}
+	if info.CapHeight == 0 {
+		// Heuristic found using linear regression on the fonts on my laptop.
+		info.CapHeight = int16(math.Round(float64(info.UnitsPerEm) * 0.839))
+	}
+	if info.XHeight == 0 && cmapSubtable != nil {
+		gid := cmapSubtable.Lookup('x')
+		if gid != 0 {
+			info.XHeight = info.Extent(gid).URy
+		}
+	}
+	if info.XHeight == 0 && info.Ascent > 0 && info.Descent < 0 {
+		// Heuristic found using linear regression on the fonts on my laptop.
+		x := math.Round(0.941*float64(info.Ascent) + 0.946*float64(info.Descent) - 126.961)
+		if x > 0 {
+			info.XHeight = int16(x)
+		}
+	}
+	if info.XHeight == 0 {
+		// Heuristic found using linear regression on the fonts on my laptop.
+		info.XHeight = int16(math.Round(float64(info.UnitsPerEm) * 0.671))
+	}
+
+	if postInfo != nil {
 		info.ItalicAngle = postInfo.ItalicAngle
 	} else if fontInfo != nil {
 		info.ItalicAngle = fontInfo.ItalicAngle
+	} else if hmtxInfo != nil {
+		info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
 	}
+
+	{
+		var i1, i2, i3 bool
+		if headInfo != nil {
+			i1 = headInfo.IsItalic
+		}
+		if os2Info != nil {
+			i2 = os2Info.IsItalic
+			i2 = os2Info.IsOblique
+		}
+		var a1, a2, a3 float64
+		if postInfo != nil {
+			a1 = postInfo.ItalicAngle
+		}
+		if fontInfo != nil {
+			a2 = fontInfo.ItalicAngle
+		}
+		if hmtxInfo != nil {
+			a3 = hmtxInfo.CaretAngle * 180 / math.Pi
+		}
+		if (i1 || i2) != (a1 != 0 || a2 != 0 || a3 != 0) {
+			return nil, fmt.Errorf("funny %t %t %t %g %g %g", i1, i2, i3, a1, a2, a3)
+		}
+	}
+
 	if postInfo != nil {
 		info.UnderlinePosition = postInfo.UnderlinePosition
 		info.UnderlineThickness = postInfo.UnderlineThickness
@@ -270,19 +370,16 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.UnderlinePosition = fontInfo.UnderlinePosition
 		info.UnderlineThickness = fontInfo.UnderlineThickness
 	}
-	if headInfo != nil { // TODO(voss): which order is best?
-		info.IsBold = headInfo.IsBold
-	} else if os2Info != nil {
+
+	if os2Info != nil {
 		info.IsBold = os2Info.IsBold
+	} else if headInfo != nil {
+		info.IsBold = headInfo.IsBold
 	}
 	if os2Info != nil {
 		info.IsRegular = os2Info.IsRegular
 		info.IsOblique = os2Info.IsOblique
 	}
-
-	info.Font = Outlines
-
-	info.CMap = cmapSubtable
 
 	return info, nil
 }

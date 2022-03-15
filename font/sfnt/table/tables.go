@@ -86,7 +86,7 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 		if offset >= 1<<28 || length >= 1<<28 { // 256MB size limit
 			return nil, errors.New("sfnt/header: invalid offset or length")
 		}
-		if length == 0 || !isKnownTable[name] {
+		if !isKnownTable[name] {
 			continue
 		}
 		h.Toc[name] = Record{
@@ -104,7 +104,10 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 
 	// perform some sanity checks
 	sort.Slice(coverage, func(i, j int) bool {
-		return coverage[i].Start < coverage[j].Start
+		if coverage[i].Start != coverage[j].Start {
+			return coverage[i].Start < coverage[j].Start
+		}
+		return coverage[i].End < coverage[j].End
 	})
 	if coverage[0].Start < 12 {
 		return nil, errors.New("sfnt/header: invalid table offset")
@@ -147,8 +150,8 @@ func (h *Header) ReadTableBytes(r io.ReaderAt, tableName string) ([]byte, error)
 		return nil, err
 	}
 	res := make([]byte, rec.Length)
-	_, err = r.ReadAt(res, int64(rec.Offset))
-	if err != nil {
+	n, err := r.ReadAt(res, int64(rec.Offset))
+	if n < len(res) && err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -158,37 +161,37 @@ var isKnownTable = map[string]bool{
 	"BASE": true,
 	"CBDT": true,
 	"CBLC": true,
-	"CFF ": true, //    O
-	"cmap": true, // T, O
-	"cvt ": true, // T
+	"CFF ": true,
+	"cmap": true,
+	"cvt ": true,
 	"DSIG": true,
 	"feat": true,
 	"FFTM": true,
-	"fpgm": true, // T
+	"fpgm": true,
 	"fvar": true,
-	"gasp": true, // T
+	"gasp": true,
 	"GDEF": true,
-	"glyf": true, // T
+	"glyf": true,
 	"GPOS": true,
 	"GSUB": true,
 	"gvar": true,
-	"hdmx": true, // T
-	"head": true, // T, O
-	"hhea": true, // T, O
-	"hmtx": true, // T
+	"hdmx": true,
+	"head": true,
+	"hhea": true,
+	"hmtx": true,
 	"HVAR": true,
-	"kern": true, // T
-	"loca": true, // T
-	"LTSH": true, // T
-	"maxp": true, // T, O
+	"kern": true,
+	"loca": true,
+	"LTSH": true,
+	"maxp": true,
 	"meta": true,
 	"morx": true,
-	"name": true, // T, O
-	"OS/2": true, // T, O
-	"post": true, // T, O
-	"prep": true, // T
+	"name": true,
+	"OS/2": true,
+	"post": true,
+	"prep": true,
 	"STAT": true,
-	"VDMX": true, // T
+	"VDMX": true,
 	"vhea": true,
 	"vmtx": true,
 	"VORG": true,

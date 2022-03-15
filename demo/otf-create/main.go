@@ -34,8 +34,8 @@ func main() {
 	now := time.Now()
 	info := &sfntcff.Info{
 		FamilyName: "Test",
-		Weight:     os2.WeightNormal,
-		Width:      os2.WidthNormal,
+		Weight:     font.WeightNormal,
+		Width:      font.WidthNormal,
 
 		Version:          0x00010000,
 		CreationTime:     now,

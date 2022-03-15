@@ -420,8 +420,8 @@ func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int6
 
 	// TODO(voss): sort the table names in the recommended order
 	sort.Slice(tableNames, func(i, j int) bool {
-		iPrio := tableOrder[tableNames[i]]
-		jPrio := tableOrder[tableNames[j]]
+		iPrio := ttTableOrder[tableNames[i]]
+		jPrio := ttTableOrder[tableNames[j]]
 		if iPrio != jPrio {
 			return iPrio > jPrio
 		}
@@ -500,7 +500,8 @@ func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int6
 	return totalSize, nil
 }
 
-var tableOrder = map[string]int{
+// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
+var ttTableOrder = map[string]int{
 	"head": 95,
 	"hhea": 90,
 	"maxp": 85,
@@ -509,14 +510,15 @@ var tableOrder = map[string]int{
 	"LTSH": 70,
 	"VDMX": 65,
 	"hdmx": 60,
-	"name": 55,
-	"cmap": 50,
-	"post": 45,
-	"fpgm": 40,
-	"prep": 35,
-	"cvt ": 30,
-	"loca": 25,
-	"glyf": 20,
-	"kern": 15,
+	"cmap": 55,
+	"fpgm": 50,
+	"prep": 45,
+	"cvt ": 40,
+	"loca": 35,
+	"glyf": 30,
+	"kern": 25,
+	"name": 20,
+	"post": 15,
 	"gasp": 10,
+	"DSIG": 5,
 }

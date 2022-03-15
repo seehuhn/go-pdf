@@ -409,41 +409,32 @@ func (info *Info) Encode(ss cmap.Table) []byte {
 	b := newNameBuilder()
 
 	// platform ID 1 (Macintosh)
-	includeMac := false
-	for key := range ss {
-		if key.PlatformID == 1 {
-			includeMac = true
-			break
+	for languageID, loc := range appleLang {
+		t := info.selectExactLang(loc.Language)
+		if t == nil {
+			continue
 		}
-	}
-	if includeMac {
-		for languageID, loc := range appleLang {
-			t := info.selectExactLang(loc.Language)
-			if t == nil {
+		for nameID := 0; nameID <= maxNameID; nameID++ {
+			val := t.get(nameID)
+			if val == "" {
 				continue
 			}
-			for nameID := 0; nameID <= maxNameID; nameID++ {
-				val := t.get(nameID)
-				if val == "" {
-					continue
-				}
 
-				offset, length := b.Add(mac.Encode(val))
-				rec := &recInfo{
-					PlatformID: 1, // Macintosh
-					EncodingID: 0, // Roman
-					LanguageID: languageID,
-					NameID:     uint16(nameID),
-					offset:     offset,
-					length:     length,
-				}
-				records = append(records, rec)
+			offset, length := b.Add(mac.Encode(val))
+			rec := &recInfo{
+				PlatformID: 1, // Macintosh
+				EncodingID: 0, // Roman
+				LanguageID: languageID,
+				NameID:     uint16(nameID),
+				offset:     offset,
+				length:     length,
 			}
+			records = append(records, rec)
 		}
 	}
 
 	// Platform ID 3 (Windows).
-	// Encoding IDs for platform 3 'name' entries should match the encoding IDs
+	// Encoding IDs for platform 3 'name' entries must match the encoding IDs
 	// used for platform 3 subtables in the 'cmap' table.
 	encodingIDs := make(map[uint16]bool)
 	for key := range ss {
@@ -451,9 +442,7 @@ func (info *Info) Encode(ss cmap.Table) []byte {
 			encodingIDs[key.EncodingID] = true
 		}
 	}
-	if len(encodingIDs) == 0 {
-		encodingIDs[1] = true
-	}
+	encodingIDs[1] = true
 	for languageID, loc := range msLang {
 		t := info.selectExactLoc(loc.Language, loc.Country)
 		if t == nil {

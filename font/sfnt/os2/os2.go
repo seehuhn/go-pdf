@@ -22,17 +22,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 // Info contains information from the "OS/2" table.
 type Info struct {
-	WeightClass Weight
-	WidthClass  Width
+	WeightClass font.Weight
+	WidthClass  font.Width
 
 	IsBold    bool
 	IsItalic  bool
@@ -42,8 +42,10 @@ type Info struct {
 	Ascent    int16
 	Descent   int16 // as a negative number
 	LineGap   int16
-	XHeight   int16
 	CapHeight int16
+	XHeight   int16
+
+	AvgGlyphWidth int16 // arithmetic average of the width of all non-zero width glyphs
 
 	SubscriptXSize     int16
 	SubscriptYSize     int16
@@ -64,91 +66,6 @@ type Info struct {
 	PermNoSubsetting bool // the font may not be subsetted prior to embedding
 	PermOnlyBitmap   bool // only bitmaps contained in the font may be embedded
 }
-
-// Weight indicates the visual weight (degree of blackness or thickness of
-// strokes) of the characters in the font.  Values from 1 to 1000 are valid.
-type Weight uint16
-
-func (w Weight) String() string {
-	switch w {
-	case WeightThin:
-		return "Thin"
-	case WeightExtraLight:
-		return "Extra Light"
-	case WeightLight:
-		return "Light"
-	case WeightNormal:
-		return "Normal"
-	case WeightMedium:
-		return "Medium"
-	case WeightSemiBold:
-		return "Semi Bold"
-	case WeightBold:
-		return "Bold"
-	case WeightExtraBold:
-		return "Extra Bold"
-	case WeightBlack:
-		return "Black"
-	default:
-		return fmt.Sprintf("%d", w)
-	}
-}
-
-// Pre-defined weight classes.
-// TODO(voss): move to a different package?
-const (
-	WeightThin       Weight = 100
-	WeightExtraLight Weight = 200
-	WeightLight      Weight = 300
-	WeightNormal     Weight = 400
-	WeightMedium     Weight = 500
-	WeightSemiBold   Weight = 600
-	WeightBold       Weight = 700
-	WeightExtraBold  Weight = 800
-	WeightBlack      Weight = 900
-)
-
-// Width indicates the aspect ratio (width to height ratio) as specified by a
-// font designer for the glyphs in a font.
-type Width uint16
-
-func (w Width) String() string {
-	switch w {
-	case WidthUltraCondensed:
-		return "Ultra Condensed"
-	case WidthExtraCondensed:
-		return "Extra Condensed"
-	case WidthCondensed:
-		return "Condensed"
-	case WidthSemiCondensed:
-		return "Semi Condensed"
-	case WidthNormal:
-		return "Normal"
-	case WidthSemiExpanded:
-		return "Semi Expanded"
-	case WidthExpanded:
-		return "Expanded"
-	case WidthExtraExpanded:
-		return "Extra Expanded"
-	case WidthUltraExpanded:
-		return "Ultra Expanded"
-	default:
-		return fmt.Sprintf("Width(%d)", w)
-	}
-}
-
-// Valid width values.
-const (
-	WidthUltraCondensed Width = 1 // 50% of WidthNormal
-	WidthExtraCondensed Width = 2 // 62.5% of WidthNormal
-	WidthCondensed      Width = 3 // 75% of WidthNormal
-	WidthSemiCondensed  Width = 4 // 87.5% of WidthNormal
-	WidthNormal         Width = 5
-	WidthSemiExpanded   Width = 6 // 112.5% of WidthNormal
-	WidthExpanded       Width = 7 // 125% of WidthNormal
-	WidthExtraExpanded  Width = 8 // 150% of WidthNormal
-	WidthUltraExpanded  Width = 9 // 200% of WidthNormal
-)
 
 // Permissions describes rights to embed and use a font.
 type Permissions int
@@ -194,11 +111,17 @@ func Read(r io.Reader) (*Info, error) {
 	}
 
 	info := &Info{
-		WeightClass:      Weight(v0.WeightClass),
-		WidthClass:       Width(v0.WidthClass),
-		PermUse:          permUse,
-		PermNoSubsetting: permBits&0x0100 != 0,
-		PermOnlyBitmap:   permBits&0x0200 != 0,
+		WeightClass: font.Weight(v0.WeightClass),
+		WidthClass:  font.Width(v0.WidthClass),
+
+		IsBold:   sel&0x0060 == 0x0020,
+		IsItalic: sel&0x0041 == 0x0001,
+		// HasUnderline: sel&0x0042 == 0x0002,
+		// IsOutlined:   sel&0x0048 == 0x0008,
+		IsRegular: sel&0x0040 != 0,
+		IsOblique: sel&0x0200 != 0,
+
+		AvgGlyphWidth: v0.AvgCharWidth,
 
 		SubscriptXSize:     v0.SubscriptXSize,
 		SubscriptYSize:     v0.SubscriptYSize,
@@ -213,15 +136,11 @@ func Read(r io.Reader) (*Info, error) {
 
 		FamilyClass: v0.FamilyClass,
 		Panose:      v0.Panose,
+		Vendor:      v0.VendID,
 
-		Vendor: v0.VendID,
-
-		IsItalic: sel&0x0041 == 0x0001,
-		// HasUnderline: sel&0x0042 == 0x0002,
-		// IsOutlined:   sel&0x0048 == 0x0008,
-		IsBold:    sel&0x0060 == 0x0020,
-		IsRegular: sel&0x0040 != 0,
-		IsOblique: sel&0x0200 != 0,
+		PermUse:          permUse,
+		PermNoSubsetting: permBits&0x0100 != 0,
+		PermOnlyBitmap:   permBits&0x0200 != 0,
 	}
 
 	v0ms := &v0MsData{}
@@ -261,16 +180,18 @@ func Read(r io.Reader) (*Info, error) {
 		}
 		return nil, err
 	}
-	info.XHeight = v2.XHeight
-	info.CapHeight = v2.CapHeight
+	if v2.XHeight > 0 {
+		info.XHeight = v2.XHeight
+	}
+	if v2.CapHeight > 0 {
+		info.CapHeight = v2.CapHeight
+	}
 
 	return info, nil
 }
 
 // Encode converts the info to a "OS/2" table.
 func (info *Info) Encode(cc cmap.Subtable) []byte {
-	var avgCharWidth int16 // TODO(voss)
-
 	var permBits uint16
 	switch info.PermUse {
 	case PermRestricted:
@@ -288,6 +209,11 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 	}
 
 	var unicodeRange [4]uint32 // TODO(voss)
+	setUniBit := func(b int) {
+		w := b / 32
+		b = b % 32
+		unicodeRange[w] |= 1 << b
+	}
 
 	var sel uint16
 	if info.IsRegular {
@@ -321,13 +247,14 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		lastCharIndex = uint16(high)
 		if high > 0xFFFF {
 			lastCharIndex = 0xFFFF
+			setUniBit(57)
 		}
 	}
 
 	buf := &bytes.Buffer{}
 	v0 := &v0Data{
 		Version:            4,
-		AvgCharWidth:       avgCharWidth,
+		AvgCharWidth:       info.AvgGlyphWidth,
 		WeightClass:        uint16(info.WeightClass),
 		WidthClass:         uint16(info.WidthClass),
 		Type:               permBits,
@@ -355,8 +282,8 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		TypoAscender:  info.Ascent,
 		TypoDescender: info.Descent,
 		TypoLineGap:   info.LineGap,
-		WinAscent:     0, // TODO(voss)
-		WinDescent:    0, // TODO(voss)
+		WinAscent:     uint16(info.Ascent),   // TODO(voss)
+		WinDescent:    uint16(-info.Descent), // TODO(voss)
 	}
 	binary.Write(buf, binary.BigEndian, v0ms)
 
@@ -373,11 +300,11 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 	})
 
 	v2 := &v2Data{
-		XHeight:     info.XHeight,
-		CapHeight:   info.CapHeight,
-		DefaultChar: 0,
-		BreakChar:   0x20, // TODO(voss)
-		MaxContext:  0,    // TODO(voss)
+		XHeight:   info.XHeight,
+		CapHeight: info.CapHeight,
+		// DefaultChar: 0, // TODO(voss)
+		// BreakChar:   0, // TODO(voss)
+		// MaxContext:  0, // TODO(voss)
 	}
 	binary.Write(buf, binary.BigEndian, v2)
 

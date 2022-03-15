@@ -22,6 +22,7 @@ package glyf
 // Glyphs contains the information from a "glyf" table.
 type Glyphs []*Glyph
 
+// Encoded represents the data of a "glyf" and "loca" table.
 type Encoded struct {
 	GlyfData   []byte
 	LocaData   []byte

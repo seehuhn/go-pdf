@@ -24,13 +24,13 @@ import (
 	"testing"
 
 	"github.com/go-test/deep"
-	"seehuhn.de/go/pdf/font/sfnt/os2"
+	"seehuhn.de/go/pdf/font"
 )
 
 func TestPostscriptName(t *testing.T) {
 	info := &Info{
 		FamilyName:  `A(n)d[r]o{m}e/d<a> N%ebula`,
-		Weight:      os2.WeightBold,
+		Weight:      font.WeightBold,
 		ItalicAngle: -12,
 	}
 	psName := info.PostscriptName()
@@ -49,7 +49,7 @@ func TestPostscriptName(t *testing.T) {
 	}
 }
 
-func TestMany(t *testing.T) { // TODO(voss)
+func DisabledTestMany(t *testing.T) { // TODO(voss)
 	listFd, err := os.Open("/Users/voss/project/pdflib/demo/try-all-fonts/all-fonts")
 	if err != nil {
 		t.Fatal(err)

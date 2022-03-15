@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"io"
 	"math"
+	"strings"
 	"time"
 
 	"seehuhn.de/go/pdf"
@@ -44,23 +45,24 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	tables["hhea"] = hheaData
 	tables["hmtx"] = hmtxData
 
-	maxpInfo := table.MaxpInfo{
-		NumGlyphs: info.NumGlyphs(),
+	var ss cmap.Table
+	if info.CMap != nil {
+		uniEncoding := uint16(3)
+		winEncoding := uint16(1)
+		if _, high := info.CMap.CodeRange(); high > 0xFFFF {
+			// TODO(voss): should this check the cmap table format instead?
+			uniEncoding = 4
+			winEncoding = 10
+		}
+		cmapSubtable := info.CMap.Encode(0)
+		ss = cmap.Table{
+			{PlatformID: 0, EncodingID: uniEncoding, Language: 0}: cmapSubtable,
+			{PlatformID: 3, EncodingID: winEncoding, Language: 0}: cmapSubtable,
+		}
+		buf := &bytes.Buffer{}
+		ss.Write(buf)
+		tables["cmap"] = buf.Bytes()
 	}
-	maxpData, err := maxpInfo.Encode()
-	if err != nil {
-		return 0, err
-	}
-	tables["maxp"] = maxpData
-
-	cmapSubtable := info.CMap.Encode(0)
-	ss := cmap.Table{
-		{PlatformID: 1, EncodingID: 0, Language: 0}: cmapSubtable,
-		{PlatformID: 3, EncodingID: 1, Language: 0}: cmapSubtable,
-	}
-	buf := &bytes.Buffer{}
-	ss.Write(buf)
-	tables["cmap"] = buf.Bytes()
 
 	os2Data := makeOS2(info)
 	tables["OS/2"] = os2Data
@@ -73,6 +75,7 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 
 	var locaFormat int16
 	var scalerType uint32
+	var maxpTtf *table.MaxpTTF
 	switch outlines := info.Font.(type) {
 	case *cff.Outlines:
 		cffData, err := makeCFF(info, outlines)
@@ -81,7 +84,7 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		}
 		tables["CFF "] = cffData
 		scalerType = table.ScalerTypeCFF
-	case *TTInfo:
+	case *TTFOutlines:
 		enc, err := outlines.Glyphs.Encode()
 		if err != nil {
 			return 0, err
@@ -93,9 +96,20 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 			tables[name] = data
 		}
 		scalerType = table.ScalerTypeTrueType
+		maxpTtf = outlines.Maxp
 	default:
 		panic("unexpected font type")
 	}
+
+	maxpInfo := table.MaxpInfo{
+		NumGlyphs: info.NumGlyphs(),
+		TTF:       maxpTtf,
+	}
+	maxpData, err := maxpInfo.Encode()
+	if err != nil {
+		return 0, err
+	}
+	tables["maxp"] = maxpData
 
 	headData, err := makeHead(info, locaFormat)
 	if err != nil {
@@ -130,7 +144,7 @@ func makeHead(info *Info, locaFormat int16) ([]byte, error) {
 		for _, g := range font.Glyphs {
 			bbox.Extend(g.Extent())
 		}
-	case *TTInfo:
+	case *TTFOutlines:
 		for _, g := range font.Glyphs {
 			if g == nil {
 				continue
@@ -169,17 +183,37 @@ func makeHmtx(info *Info) ([]byte, []byte) {
 }
 
 func makeOS2(info *Info) []byte {
+	avgGlyphWidth := 0
+	count := 0
+	ww := info.Widths()
+	for _, w := range ww {
+		if w > 0 {
+			avgGlyphWidth += int(w)
+			count++
+		}
+	}
+	if count > 0 {
+		avgGlyphWidth = (avgGlyphWidth + count/2) / count
+	}
+
 	os2Info := &os2.Info{
 		WeightClass: info.Weight,
 		WidthClass:  info.Width,
-		IsBold:      info.IsBold,
-		IsItalic:    info.ItalicAngle != 0,
-		IsRegular:   info.IsRegular,
-		IsOblique:   info.IsOblique,
-		Ascent:      info.Ascent,
-		Descent:     info.Descent,
-		LineGap:     info.LineGap,
-		PermUse:     info.PermUse,
+
+		IsBold:    info.IsBold,
+		IsItalic:  info.ItalicAngle != 0,
+		IsRegular: info.IsRegular,
+		IsOblique: info.IsOblique,
+
+		AvgGlyphWidth: int16(avgGlyphWidth),
+
+		Ascent:    info.Ascent,
+		Descent:   info.Descent,
+		LineGap:   info.LineGap,
+		CapHeight: info.CapHeight,
+		XHeight:   info.XHeight,
+
+		PermUse: info.PermUse,
 	}
 	return os2Info.Encode(info.CMap)
 }
@@ -233,7 +267,7 @@ func makeCFF(info *Info, outlines *cff.Outlines) ([]byte, error) {
 		FontName:   pdf.Name(info.PostscriptName()),
 		Version:    info.Version.String(),
 
-		Copyright: info.Copyright,
+		Copyright: strings.ReplaceAll(info.Copyright, "©", "(c)"),
 		Notice:    info.Trademark,
 
 		FontMatrix: []float64{q, 0, 0, q, 0, 0}, // TODO(voss): is this right?

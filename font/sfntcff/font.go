@@ -27,13 +27,14 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 // Info contains information about the font.
 type Info struct {
 	FamilyName string
-	Width      os2.Width
-	Weight     os2.Weight
+	Width      font.Width
+	Weight     font.Weight
 
 	Version          head.Version
 	CreationTime     time.Time
@@ -45,9 +46,11 @@ type Info struct {
 
 	UnitsPerEm uint16
 
-	Ascent  int16
-	Descent int16
-	LineGap int16
+	Ascent    int16
+	Descent   int16 // negative
+	LineGap   int16
+	CapHeight int16
+	XHeight   int16
 
 	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
 	UnderlinePosition  int16   // Underline position (negative)
@@ -57,23 +60,24 @@ type Info struct {
 	IsRegular bool
 	IsOblique bool
 
-	// TODO(voss): should this have a separate field for advance widths?
 	CMap cmap.Subtable
 	Font interface{} // either *cff.Outlines or *TTInfo
 }
 
-// TTInfo contains information specific to TrueType fonts.
-type TTInfo struct {
+// TTFOutlines contains information specific to TrueType fonts.
+type TTFOutlines struct {
 	Widths []uint16
 	Glyphs glyf.Glyphs
 	Tables map[string][]byte
+	Maxp   *table.MaxpTTF
 }
 
+// NumGlyphs returns the number of glyphs in the font.
 func (info *Info) NumGlyphs() int {
 	switch outlines := info.Font.(type) {
 	case *cff.Outlines:
 		return len(outlines.Glyphs)
-	case *TTInfo:
+	case *TTFOutlines:
 		return len(outlines.Glyphs)
 	default:
 		panic("unexpected font type")
@@ -89,8 +93,20 @@ func (info *Info) Widths() []uint16 {
 			widths[i] = g.Width
 		}
 		return widths
-	case *TTInfo:
+	case *TTFOutlines:
 		return f.Widths
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// Extent returns the glyph bounding box for one glyph.
+func (info *Info) Extent(gid font.GlyphID) font.Rect {
+	switch f := info.Font.(type) {
+	case *cff.Outlines:
+		return f.Glyphs[gid].Extent()
+	case *TTFOutlines:
+		return f.Glyphs[gid].Rect
 	default:
 		panic("unexpected font type")
 	}
@@ -105,7 +121,7 @@ func (info *Info) Extents() []font.Rect {
 			extents[i] = g.Extent()
 		}
 		return extents
-	case *TTInfo:
+	case *TTFOutlines:
 		extents := make([]font.Rect, len(f.Glyphs))
 		for i, g := range f.Glyphs {
 			if g == nil {
@@ -134,10 +150,10 @@ func (info *Info) PostscriptName() string {
 // Subfamily returns the subfamily name of the font.
 func (info *Info) Subfamily() string {
 	var words []string
-	if info.Width != 0 && info.Width != os2.WidthNormal {
+	if info.Width != 0 && info.Width != font.WidthNormal {
 		words = append(words, info.Width.String())
 	}
-	if info.Weight != 0 && info.Weight != os2.WeightNormal {
+	if info.Weight != 0 && info.Weight != font.WeightNormal {
 		words = append(words, info.Weight.String())
 	} else if info.IsBold {
 		words = append(words, "Bold")
