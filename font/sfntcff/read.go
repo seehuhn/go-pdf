@@ -302,33 +302,11 @@ func Read(r io.ReaderAt) (*Info, error) {
 			info.CapHeight = info.Extent(gid).URy
 		}
 	}
-	if info.CapHeight == 0 && info.Ascent > 0 && info.Descent < 0 {
-		// Heuristic found using linear regression on the fonts on my laptop.
-		x := math.Round(0.942*float64(info.Ascent) + 0.673*float64(info.Descent) + 12.544)
-		if x > 0 {
-			info.CapHeight = int16(x)
-		}
-	}
-	if info.CapHeight == 0 {
-		// Heuristic found using linear regression on the fonts on my laptop.
-		info.CapHeight = int16(math.Round(float64(info.UnitsPerEm) * 0.839))
-	}
 	if info.XHeight == 0 && cmapSubtable != nil {
 		gid := cmapSubtable.Lookup('x')
 		if gid != 0 {
 			info.XHeight = info.Extent(gid).URy
 		}
-	}
-	if info.XHeight == 0 && info.Ascent > 0 && info.Descent < 0 {
-		// Heuristic found using linear regression on the fonts on my laptop.
-		x := math.Round(0.941*float64(info.Ascent) + 0.946*float64(info.Descent) - 126.961)
-		if x > 0 {
-			info.XHeight = int16(x)
-		}
-	}
-	if info.XHeight == 0 {
-		// Heuristic found using linear regression on the fonts on my laptop.
-		info.XHeight = int16(math.Round(float64(info.UnitsPerEm) * 0.671))
 	}
 
 	if postInfo != nil {
@@ -346,7 +324,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 		if os2Info != nil {
 			i2 = os2Info.IsItalic
-			i2 = os2Info.IsOblique
+			i3 = os2Info.IsOblique
 		}
 		var a1, a2, a3 float64
 		if postInfo != nil {
@@ -359,7 +337,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 			a3 = hmtxInfo.CaretAngle * 180 / math.Pi
 		}
 		if (i1 || i2) != (a1 != 0 || a2 != 0 || a3 != 0) {
-			return nil, fmt.Errorf("funny %t %t %t %g %g %g", i1, i2, i3, a1, a2, a3)
+			return nil, fmt.Errorf("funny %t %t %t %g %g %g %q", i1, i2, i3, a1, a2, a3, nameTable.Subfamily)
 		}
 	}
 

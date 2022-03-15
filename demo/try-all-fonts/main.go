@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"seehuhn.de/go/pdf/font/sfntcff"
 )
@@ -53,7 +54,10 @@ func main() {
 		fname := scanner.Text()
 		err = tryFont(fname)
 		if err != nil {
-			fmt.Println(fname+":", err)
+			if msg := err.Error(); strings.Contains(msg, "funny") {
+				fmt.Printf("%s %s\n", msg[6:], fname)
+			}
+			// fmt.Println(fname+":", err)
 		}
 	}
 	if err := scanner.Err(); err != nil {
