@@ -19,6 +19,7 @@
 package post
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -34,20 +35,18 @@ type Info struct {
 	UnderlinePosition  int16   // Underline position (negative)
 	UnderlineThickness int16   // Underline thickness
 	IsFixedPitch       bool
+
+	Names []string // can be nil
 }
 
 // Read reads the "post" table from r.
+// The slice in the .Names field in the returned structure, if non-nil,
+// may point to shared internal storage and must not be shared.
+// The function may read r beyond the end of the table.
 func Read(r io.Reader) (*Info, error) {
 	post := &postEnc{}
 	if err := binary.Read(r, binary.BigEndian, post); err != nil {
 		return nil, err
-	}
-	if post.Version != 0x00010000 && post.Version != 0x00020000 &&
-		post.Version != 0x00025000 && post.Version != 0x00030000 {
-		return nil, &font.NotSupportedError{
-			SubSystem: "sfnt/post",
-			Feature:   fmt.Sprintf("version %08x", post.Version),
-		}
 	}
 
 	info := &Info{
@@ -57,26 +56,109 @@ func Read(r io.Reader) (*Info, error) {
 		IsFixedPitch:       post.IsFixedPitch != 0,
 	}
 
+	switch post.Version {
+	case 0x00010000:
+		info.Names = macRoman
+
+	case 0x00020000:
+		r := bufio.NewReader(r)
+		var buf [2]byte
+		_, err := io.ReadFull(r, buf[:])
+		if err != nil {
+			return nil, err
+		}
+		numGlyphs := int(buf[0])<<8 + int(buf[1])
+		indexBuf := make([]byte, 2*numGlyphs)
+		_, err = io.ReadFull(r, indexBuf)
+		if err != nil {
+			return nil, err
+		}
+
+		var names []string
+
+		info.Names = make([]string, numGlyphs)
+		nameBuf := make([]byte, 255)
+		nMac := len(macRoman)
+		for i := 0; i < numGlyphs; i++ {
+			idx := int(indexBuf[2*i])<<8 + int(indexBuf[2*i+1])
+			if idx < nMac {
+				info.Names[i] = macRoman[idx]
+			} else {
+				idx -= nMac
+				for len(names) <= idx {
+					l, err := r.ReadByte()
+					if err != nil {
+						return nil, err
+					}
+					_, err = io.ReadFull(r, nameBuf[:l])
+					if err != nil {
+						return nil, err
+					}
+					names = append(names, string(nameBuf[:l]))
+				}
+				info.Names[i] = names[idx]
+			}
+		}
+
+	case 0x00030000:
+		// pass
+
+	default:
+		return nil, &font.NotSupportedError{
+			SubSystem: "sfnt/post",
+			Feature:   fmt.Sprintf("table version %08x", post.Version),
+		}
+	}
+
 	return info, nil
 }
 
 // Encode encodes the "post" table.
 func (info *Info) Encode() []byte {
-	var isFixedPitch uint32
-	if info.IsFixedPitch {
-		isFixedPitch = 1
+	var version uint32
+	if len(info.Names) == 0 {
+		version = 0x00030000
+	} else if isMacRoman(info.Names) {
+		version = 0x00010000
+	} else {
+		version = 0x00020000
 	}
 
-	post := &postEnc{
-		Version:            0x00030000,
+	header := &postEnc{
+		Version:            version,
 		ItalicAngle:        int32(math.Round(info.ItalicAngle * 65536)),
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
-		IsFixedPitch:       isFixedPitch,
+	}
+	if info.IsFixedPitch {
+		header.IsFixedPitch = 1
+	}
+	buf := new(bytes.Buffer)
+	_ = binary.Write(buf, binary.BigEndian, header)
+
+	if version == 0x00020000 {
+		numGlyphs := len(info.Names)
+		buf.Write([]byte{byte(numGlyphs >> 8), byte(numGlyphs)})
+
+		mac := make(map[string]int, len(macRoman))
+		for i, name := range macRoman {
+			mac[name] = i
+		}
+		var stringData []byte
+		numStrings := 0
+
+		for _, name := range info.Names {
+			idx, ok := mac[name]
+			if !ok {
+				idx = len(macRoman) + numStrings
+				stringData = append(stringData, byte(len(name)))
+				stringData = append(stringData, name...)
+			}
+			buf.Write([]byte{byte(idx >> 8), byte(idx)})
+		}
+		buf.Write(stringData)
 	}
 
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, post)
 	return buf.Bytes()
 }
 

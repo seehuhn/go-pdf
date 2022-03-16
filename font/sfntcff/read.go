@@ -18,10 +18,10 @@ package sfntcff
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"regexp"
+	"strings"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
@@ -317,30 +317,6 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.ItalicAngle = hmtxInfo.CaretAngle * 180 / math.Pi
 	}
 
-	{
-		var i1, i2, i3 bool
-		if headInfo != nil {
-			i1 = headInfo.IsItalic
-		}
-		if os2Info != nil {
-			i2 = os2Info.IsItalic
-			i3 = os2Info.IsOblique
-		}
-		var a1, a2, a3 float64
-		if postInfo != nil {
-			a1 = postInfo.ItalicAngle
-		}
-		if fontInfo != nil {
-			a2 = fontInfo.ItalicAngle
-		}
-		if hmtxInfo != nil {
-			a3 = hmtxInfo.CaretAngle * 180 / math.Pi
-		}
-		if (i1 || i2) != (a1 != 0 || a2 != 0 || a3 != 0) {
-			return nil, fmt.Errorf("funny %t %t %t %g %g %g %q", i1, i2, i3, a1, a2, a3, nameTable.Subfamily)
-		}
-	}
-
 	if postInfo != nil {
 		info.UnderlinePosition = postInfo.UnderlinePosition
 		info.UnderlineThickness = postInfo.UnderlineThickness
@@ -349,14 +325,47 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.UnderlineThickness = fontInfo.UnderlineThickness
 	}
 
+	// Currently we set IsItalic if there is any evidence of the font being
+	// slanted.  Are we too eager setting this?
+	// TODO(voss): check that this gives good results
+	info.IsItalic = info.ItalicAngle != 0
+	if headInfo != nil && headInfo.IsItalic {
+		info.IsItalic = true
+	}
+	if os2Info != nil && (os2Info.IsItalic || os2Info.IsOblique) {
+		info.IsItalic = true
+	}
+	if nameTable != nil && strings.Contains(nameTable.Subfamily, "Italic") {
+		info.IsItalic = true
+	}
+
 	if os2Info != nil {
 		info.IsBold = os2Info.IsBold
 	} else if headInfo != nil {
 		info.IsBold = headInfo.IsBold
 	}
+	if nameTable != nil && strings.Contains(nameTable.Subfamily, "Bold") {
+		info.IsBold = true
+	}
+
 	if os2Info != nil {
 		info.IsRegular = os2Info.IsRegular
+	}
+	if !(info.IsItalic || info.IsBold) && nameTable != nil && nameTable.Subfamily == "Regular" {
+		info.IsRegular = true
+	}
+
+	if os2Info != nil {
 		info.IsOblique = os2Info.IsOblique
+	}
+
+	if os2Info != nil {
+		switch os2Info.FamilyClass >> 8 {
+		case 1, 2, 3, 4, 5, 7:
+			info.IsSerif = true
+		case 10:
+			info.IsScript = true
+		}
 	}
 
 	return info, nil

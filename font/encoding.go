@@ -144,6 +144,12 @@ var toStandard = map[rune]byte{
 	0x00df: 251,
 }
 
+// TODO(voss): this seems to be duplicated at least three times:
+//    font/sfnt/mac/encoding.go
+//    font/encoding.go
+//    font/sfnt/post/names.go
+// There is also similar code in font/cff/charset.go.
+
 var fromMacRoman = []rune{
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,

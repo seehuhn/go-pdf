@@ -56,9 +56,12 @@ type Info struct {
 	UnderlinePosition  int16   // Underline position (negative)
 	UnderlineThickness int16   // Underline thickness
 
+	IsItalic  bool // Glyphs have dominant vertical strokes that are slanted.
 	IsBold    bool
 	IsRegular bool
 	IsOblique bool
+	IsSerif   bool
+	IsScript  bool // Glyphs resemble cursive handwriting.
 
 	CMap cmap.Subtable
 	Font interface{} // either *cff.Outlines or *TTInfo
@@ -106,7 +109,11 @@ func (info *Info) Extent(gid font.GlyphID) font.Rect {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Extent()
 	case *TTFOutlines:
-		return f.Glyphs[gid].Rect
+		g := f.Glyphs[gid]
+		if g == nil {
+			return font.Rect{}
+		}
+		return g.Rect
 	default:
 		panic("unexpected font type")
 	}
