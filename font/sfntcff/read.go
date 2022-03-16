@@ -185,6 +185,13 @@ func Read(r io.ReaderAt) (*Info, error) {
 			}
 		}
 	case table.ScalerTypeTrueType, table.ScalerTypeApple:
+		if headInfo == nil {
+			return nil, &table.ErrNoTable{Name: "head"}
+		}
+		if maxpInfo == nil {
+			return nil, &table.ErrNoTable{Name: "maxp"}
+		}
+
 		locaData, err := header.ReadTableBytes(r, "loca")
 		if err != nil {
 			return nil, err
@@ -215,15 +222,16 @@ func Read(r io.ReaderAt) (*Info, error) {
 			tables[name] = data
 		}
 
-		if len(ttGlyphs) != len(hmtxInfo.Widths) {
-			return nil, errors.New("sfnt: hmtx and ttf glyph count mismatch")
+		var widths []uint16
+		if hmtxInfo != nil {
+			if len(ttGlyphs) != len(hmtxInfo.Widths) {
+				return nil, errors.New("sfnt: hmtx and ttf glyph count mismatch")
+			}
+			widths = hmtxInfo.Widths
 		}
 
-		if maxpInfo == nil {
-			return nil, &table.ErrNoTable{Name: "maxp"}
-		}
 		Outlines = &TTFOutlines{
-			Widths: hmtxInfo.Widths,
+			Widths: widths,
 			Glyphs: ttGlyphs,
 			Tables: tables,
 			Maxp:   maxpInfo.TTF,
@@ -344,16 +352,20 @@ func Read(r io.ReaderAt) (*Info, error) {
 	} else if headInfo != nil {
 		info.IsBold = headInfo.IsBold
 	}
-	if nameTable != nil && strings.Contains(nameTable.Subfamily, "Bold") {
+	// TODO(voss): we could also check info.Weight == font.WeightBold
+	if nameTable != nil &&
+		strings.Contains(nameTable.Subfamily, "Bold") &&
+		!strings.Contains(nameTable.Subfamily, "Semi Bold") &&
+		!strings.Contains(nameTable.Subfamily, "Extra Bold") {
 		info.IsBold = true
 	}
 
 	if os2Info != nil {
 		info.IsRegular = os2Info.IsRegular
 	}
-	if !(info.IsItalic || info.IsBold) && nameTable != nil && nameTable.Subfamily == "Regular" {
-		info.IsRegular = true
-	}
+	// if !(info.IsItalic || info.IsBold) && nameTable != nil && nameTable.Subfamily == "Regular" {
+	// 	info.IsRegular = true
+	// }
 
 	if os2Info != nil {
 		info.IsOblique = os2Info.IsOblique

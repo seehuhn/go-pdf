@@ -29,9 +29,9 @@ import (
 
 func TestPostscriptName(t *testing.T) {
 	info := &Info{
-		FamilyName:  `A(n)d[r]o{m}e/d<a> N%ebula`,
-		Weight:      font.WeightBold,
-		ItalicAngle: -12,
+		FamilyName: `A(n)d[r]o{m}e/d<a> N%ebula`,
+		Weight:     font.WeightBold,
+		IsItalic:   true,
 	}
 	psName := info.PostscriptName()
 	if psName != "AndromedaNebula-BoldItalic" {

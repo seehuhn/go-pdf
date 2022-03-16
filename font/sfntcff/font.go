@@ -167,7 +167,7 @@ func (info *Info) Subfamily() string {
 	}
 	if info.IsOblique {
 		words = append(words, "Oblique")
-	} else if info.ItalicAngle != 0 {
+	} else if info.IsItalic {
 		words = append(words, "Italic")
 	}
 	if len(words) == 0 {

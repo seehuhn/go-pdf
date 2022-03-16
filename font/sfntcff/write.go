@@ -196,6 +196,13 @@ func makeOS2(info *Info) []byte {
 		avgGlyphWidth = (avgGlyphWidth + count/2) / count
 	}
 
+	var familyClass int16
+	if info.IsSerif {
+		familyClass = 3 << 8
+	} else if info.IsScript {
+		familyClass = 10 << 8
+	}
+
 	os2Info := &os2.Info{
 		WeightClass: info.Weight,
 		WidthClass:  info.Width,
@@ -205,13 +212,15 @@ func makeOS2(info *Info) []byte {
 		IsRegular: info.IsRegular,
 		IsOblique: info.IsOblique,
 
-		AvgGlyphWidth: int16(avgGlyphWidth),
-
 		Ascent:    info.Ascent,
 		Descent:   info.Descent,
 		LineGap:   info.LineGap,
 		CapHeight: info.CapHeight,
 		XHeight:   info.XHeight,
+
+		AvgGlyphWidth: int16(avgGlyphWidth),
+
+		FamilyClass: familyClass,
 
 		PermUse: info.PermUse,
 	}
