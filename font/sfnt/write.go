@@ -409,13 +409,17 @@ type record struct {
 }
 
 // WriteTables writes an sfnt file containing the given tables.
+// Tables where the data is nil are not written, use a zero-length slice
+// to write a table with no data.
 // This changes the checksum in the "head" table in place.
 func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, error) {
 	numTables := len(tables)
 
 	tableNames := make([]string, 0, numTables)
-	for name := range tables {
-		tableNames = append(tableNames, name)
+	for name, data := range tables {
+		if data != nil {
+			tableNames = append(tableNames, name)
+		}
 	}
 
 	// TODO(voss): sort the table names in the recommended order

@@ -36,7 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 )
 
-// Read reads an OpenType font from a file.
+// Read reads and decodes a TrueType or OpenType font file.
 func Read(r io.ReaderAt) (*Info, error) {
 	header, err := table.ReadHeader(r)
 	if err != nil {
@@ -61,7 +61,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		return io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length)), nil
 	}
 
-	// we try to read the tables in the order guven by
+	// we try to read the tables in the order given by
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
 
 	var headInfo *head.Info
@@ -153,10 +153,19 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	// Fix up some commonly found problems.
-	if maxpInfo != nil && hmtxInfo != nil &&
-		maxpInfo.NumGlyphs > 1 && len(hmtxInfo.Widths) > maxpInfo.NumGlyphs {
-		hmtxInfo.Widths = hmtxInfo.Widths[:maxpInfo.NumGlyphs]
+	var numGlyphs int
+	if maxpInfo != nil {
+		numGlyphs = maxpInfo.NumGlyphs
+	}
+	if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
+		if numGlyphs == 0 {
+			numGlyphs = len(hmtxInfo.Widths)
+		} else if len(hmtxInfo.Widths) > numGlyphs {
+			// Fix up a problem founs in some fonts
+			hmtxInfo.Widths = hmtxInfo.Widths[:numGlyphs]
+		} else if len(hmtxInfo.Widths) != numGlyphs {
+			return nil, errors.New("sfnt: hmtx and maxp glyph count mismatch")
+		}
 	}
 
 	// Read the glyph data.
@@ -176,10 +185,11 @@ func Read(r io.ReaderAt) (*Info, error) {
 		fontInfo = cffInfo.FontInfo
 		Outlines = cffInfo.Outlines
 
-		if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
-			if len(hmtxInfo.Widths) != len(cffInfo.Glyphs) {
-				return nil, errors.New("sfnt: hmtx and cff glyph count mismatch")
-			}
+		if numGlyphs == 0 {
+			numGlyphs = len(cffInfo.Glyphs)
+		} else if len(cffInfo.Glyphs) != numGlyphs {
+			return nil, errors.New("sfnt: cff glyph count mismatch")
+		} else if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
 			for i, w := range hmtxInfo.Widths {
 				cffInfo.Glyphs[i].Width = w
 			}
@@ -222,11 +232,14 @@ func Read(r io.ReaderAt) (*Info, error) {
 			tables[name] = data
 		}
 
+		if numGlyphs == 0 {
+			numGlyphs = len(ttGlyphs)
+		} else if len(ttGlyphs) != numGlyphs {
+			return nil, errors.New("sfnt: ttf glyph count mismatch")
+		}
+
 		var widths []uint16
-		if hmtxInfo != nil {
-			if len(ttGlyphs) != len(hmtxInfo.Widths) {
-				return nil, errors.New("sfnt: hmtx and ttf glyph count mismatch")
-			}
+		if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
 			widths = hmtxInfo.Widths
 		}
 

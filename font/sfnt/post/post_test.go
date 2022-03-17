@@ -29,6 +29,12 @@ func FuzzPost(f *testing.F) {
 		UnderlinePosition:  -50,
 		UnderlineThickness: 10,
 	}).Encode())
+	f.Add((&Info{
+		ItalicAngle:        -9,
+		UnderlinePosition:  -50,
+		UnderlineThickness: 10,
+		Names:              []string{".notdef", "sonderbar", "merkwuerdig", "dcroat"},
+	}).Encode())
 
 	f.Fuzz(func(t *testing.T, in []byte) {
 		i1, err := Read(bytes.NewReader(in))
@@ -37,6 +43,7 @@ func FuzzPost(f *testing.F) {
 		}
 
 		buf := i1.Encode()
+
 		i2, err := Read(bytes.NewReader(buf))
 		if err != nil {
 			t.Fatal(err)

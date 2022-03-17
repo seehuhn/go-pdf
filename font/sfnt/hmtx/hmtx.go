@@ -147,19 +147,6 @@ func Decode(hheaData, hmtxData []byte) (*Info, error) {
 
 // Encode creates the "hhea" and "hmtx" tables.
 func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
-	numGlyphs := len(info.Widths)
-	if info.LSB != nil && len(info.LSB) != numGlyphs {
-		panic("lsb length mismatch")
-	}
-	if info.GlyphExtents != nil && len(info.GlyphExtents) != numGlyphs {
-		panic("GlyphExtent length mismatch")
-	}
-
-	numLong := numGlyphs
-	for numLong > 1 && info.Widths[numLong-1] == info.Widths[numLong-2] {
-		numLong--
-	}
-
 	rise, run := fromAngle(info.CaretAngle)
 
 	hhea := &binaryHhea{
@@ -171,21 +158,21 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 		CaretSlopeRise: rise,
 		CaretSlopeRun:  run,
 		CaretOffset:    info.CaretOffset,
-
-		NumOfLongHorMetrics: uint16(numLong),
 	}
 
-	for _, w := range info.Widths {
-		if w > hhea.AdvanceWidthMax {
-			hhea.AdvanceWidthMax = w
+	if info.Widths != nil {
+		for _, w := range info.Widths {
+			if w > hhea.AdvanceWidthMax {
+				hhea.AdvanceWidthMax = w
+			}
 		}
 	}
 
 	lsbs := info.LSB
-	if lsbs == nil {
-		lsbs = make([]int16, numGlyphs)
-		for i := 0; i < numGlyphs; i++ {
-			lsbs[i] = info.GlyphExtents[i].LLx
+	if lsbs == nil && info.GlyphExtents != nil {
+		lsbs = make([]int16, len(info.GlyphExtents))
+		for i, ext := range info.GlyphExtents {
+			lsbs[i] = ext.LLx
 		}
 	}
 	first := true
@@ -199,25 +186,54 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 		}
 	}
 
-	if info.GlyphExtents != nil {
+	if info.GlyphExtents != nil && info.Widths != nil {
+		if len(info.GlyphExtents) != len(info.Widths) {
+			panic("len(info.GlyphExtents) != len(info.Widths)")
+		}
 		first = true
-		for i, bbox := range info.GlyphExtents {
-			if bbox.IsZero() {
+		for i, ext := range info.GlyphExtents {
+			if ext.IsZero() {
 				continue
 			}
-
-			rsb := int16(info.Widths[i]) - bbox.URx
+			rsb := int16(info.Widths[i]) - ext.URx
 			if first || rsb < hhea.MinRightSideBearing {
 				hhea.MinRightSideBearing = rsb
 			}
-			if first || bbox.URx > hhea.XMaxExtent {
-				hhea.XMaxExtent = bbox.URx
+			first = false
+		}
+	}
+
+	if info.GlyphExtents != nil {
+		first = true
+		for _, ext := range info.GlyphExtents {
+			if ext.IsZero() {
+				continue
+			}
+			if first || ext.URx > hhea.XMaxExtent {
+				hhea.XMaxExtent = ext.URx
 			}
 			first = false
 		}
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, hheaLength))
+	if info.Widths == nil || lsbs == nil {
+		_ = binary.Write(buf, binary.BigEndian, hhea)
+		hheaData = buf.Bytes()
+		return hheaData, nil
+	}
+
+	numGlyphs := len(info.Widths)
+	if len(lsbs) != numGlyphs {
+		panic("len(lsbs) != len(info.Widths)")
+	}
+
+	numLong := numGlyphs
+	for numLong > 1 && info.Widths[numLong-1] == info.Widths[numLong-2] {
+		numLong--
+	}
+	hhea.NumOfLongHorMetrics = uint16(numLong)
+
 	_ = binary.Write(buf, binary.BigEndian, hhea)
 	hheaData = buf.Bytes()
 
@@ -330,10 +346,10 @@ type binaryHhea struct {
 	CaretSlopeRise      int16
 	CaretSlopeRun       int16
 	CaretOffset         int16
-	_                   int16
-	_                   int16
-	_                   int16
-	_                   int16
+	_                   int16 // reserved
+	_                   int16 // reserved
+	_                   int16 // reserved
+	_                   int16 // reserved
 	MetricDataFormat    int16
 	NumOfLongHorMetrics uint16
 }

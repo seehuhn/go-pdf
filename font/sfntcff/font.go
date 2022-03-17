@@ -64,10 +64,10 @@ type Info struct {
 	IsScript  bool // Glyphs resemble cursive handwriting.
 
 	CMap cmap.Subtable
-	Font interface{} // either *cff.Outlines or *TTInfo
+	Font interface{} // either *cff.Outlines or *TTFOutlines
 }
 
-// TTFOutlines contains information specific to TrueType fonts.
+// TTFOutlines stores the glyph data of a TrueType font.
 type TTFOutlines struct {
 	Widths []uint16
 	Glyphs glyf.Glyphs

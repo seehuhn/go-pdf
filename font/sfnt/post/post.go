@@ -116,7 +116,7 @@ func Read(r io.Reader) (*Info, error) {
 // Encode encodes the "post" table.
 func (info *Info) Encode() []byte {
 	var version uint32
-	if len(info.Names) == 0 {
+	if info.Names == nil {
 		version = 0x00030000
 	} else if isMacRoman(info.Names) {
 		version = 0x00010000
@@ -153,6 +153,7 @@ func (info *Info) Encode() []byte {
 				idx = len(macRoman) + numStrings
 				stringData = append(stringData, byte(len(name)))
 				stringData = append(stringData, name...)
+				numStrings++
 			}
 			buf.Write([]byte{byte(idx >> 8), byte(idx)})
 		}

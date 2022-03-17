@@ -21,8 +21,9 @@ import (
 	"io"
 )
 
+// MaxpInfo contains information from the "maxp" table.
 type MaxpInfo struct {
-	NumGlyphs int
+	NumGlyphs int // number of glyphs in the font (range 1, ..., 65535)
 	TTF       *MaxpTTF
 }
 
