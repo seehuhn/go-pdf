@@ -84,7 +84,7 @@ func main() {
 	}
 	cffInfo.FdSelect = func(gi font.GlyphID) int { return 0 }
 
-	info.Font = cffInfo
+	info.Outlines = cffInfo
 	info.CMap = makeCMap(cffInfo.Glyphs)
 
 	// ----------------------------------------------------------------------

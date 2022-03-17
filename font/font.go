@@ -18,6 +18,7 @@ package font
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"unicode"
 
@@ -39,13 +40,13 @@ type Font struct {
 	Ascent     int // ascent in glyph coordinate units
 	Descent    int // descent in glyph coordinate units, as a negative number
 
-	GlyphExtent []Rect // This is in font design units.
-	Width       []int  // This is in font design units.
+	GlyphExtent []Rect   // This is in font design units.
+	Widths      []uint16 // This is in font design units.
 }
 
 // NumGlyphs returns the number of glyphs in a font.
 func (font *Font) NumGlyphs() int {
-	return len(font.Width)
+	return len(font.Widths)
 }
 
 // Draw emits PDF text mode commands to show the glyphs on the page.
@@ -92,7 +93,7 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 		xOffsWanted := xOffs + int(glyph.XOffset)
 
 		gid := glyph.Gid
-		if int(gid) >= len(font.Width) {
+		if int(gid) >= len(font.Widths) {
 			gid = 0
 		}
 
@@ -104,7 +105,7 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 		run = append(run, font.Enc(gid)...)
 
 		xOffs += int(glyph.Advance)
-		xOffsAuto = xOffsWanted + font.Width[gid]
+		xOffsAuto = xOffsWanted + int(font.Widths[gid])
 	}
 	flush()
 }
@@ -133,6 +134,7 @@ func (rect Rect) IsZero() bool {
 	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
 }
 
+// Extend enlarges the rectangle to also cover `other`.
 func (rect *Rect) Extend(other Rect) {
 	if other.IsZero() {
 		return
@@ -153,6 +155,17 @@ func (rect *Rect) Extend(other Rect) {
 	if other.URy > rect.URy {
 		rect.URy = other.URy
 	}
+}
+
+// PDF implements the pdf.Object interface.
+func (rect Rect) PDF(w io.Writer) error {
+	res := pdf.Array{
+		pdf.Integer(rect.LLx),
+		pdf.Integer(rect.LLy),
+		pdf.Integer(rect.URx),
+		pdf.Integer(rect.URy),
+	}
+	return res.PDF(w)
 }
 
 // Glyph contains layout information for a single glyph in a run

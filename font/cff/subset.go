@@ -27,6 +27,7 @@ import (
 // Subset returns a copy of the font, including only the glyphs in the given
 // subset.  The ".notdef" glyph must always be included as the first glyph.
 func (cff *Font) Subset(subset []font.GlyphID) (*Font, error) {
+	// TODO(voss): move this somewhere else
 	if subset[0] != 0 {
 		return nil, errors.New("cff: invalid subset")
 	}

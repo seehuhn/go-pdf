@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
+	"seehuhn.de/go/pdf/font/sfnt/maxp"
 	"seehuhn.de/go/pdf/font/sfnt/name"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/post"
@@ -86,7 +87,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	maxpInfo, err := table.ReadMaxp(maxpFd)
+	maxpInfo, err := maxp.Read(maxpFd)
 	if err != nil && !table.IsMissing(err) {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 	}
 	if postFd != nil {
 		postInfo, err = post.Read(postFd)
-		if err != nil && !font.IsUnsupported(err) {
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -243,11 +244,16 @@ func Read(r io.ReaderAt) (*Info, error) {
 			widths = hmtxInfo.Widths
 		}
 
+		var names []string
+		if postInfo != nil {
+			names = postInfo.Names
+		}
 		Outlines = &TTFOutlines{
 			Widths: widths,
 			Glyphs: ttGlyphs,
 			Tables: tables,
 			Maxp:   maxpInfo.TTF,
+			Names:  names,
 		}
 	default:
 		panic("unexpected scaler type")
@@ -255,8 +261,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 
 	// Merge the information from the various tables.
 	info := &Info{
-		Font: Outlines,
-		CMap: cmapSubtable,
+		Outlines: Outlines,
+		CMap:     cmapSubtable,
 	}
 
 	if nameTable != nil {
@@ -320,13 +326,13 @@ func Read(r io.ReaderAt) (*Info, error) {
 	if info.CapHeight == 0 && cmapSubtable != nil {
 		gid := cmapSubtable.Lookup('H')
 		if gid != 0 {
-			info.CapHeight = info.Extent(gid).URy
+			info.CapHeight = info.GlyphExtent(gid).URy
 		}
 	}
 	if info.XHeight == 0 && cmapSubtable != nil {
 		gid := cmapSubtable.Lookup('x')
 		if gid != 0 {
-			info.XHeight = info.Extent(gid).URy
+			info.XHeight = info.GlyphExtent(gid).URy
 		}
 	}
 

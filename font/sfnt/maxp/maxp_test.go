@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package table
+package maxp
 
 import (
 	"bytes"
@@ -23,13 +23,13 @@ import (
 
 func TestMaxp(t *testing.T) {
 	for _, numGlyphs := range []int{1, 2, 3, 255, 256, 1000, 65535} {
-		info := &MaxpInfo{NumGlyphs: numGlyphs}
+		info := &Info{NumGlyphs: numGlyphs}
 		maxp, err := info.Encode()
 		if err != nil {
 			t.Errorf("EncodeMaxp(%d): %v", numGlyphs, err)
 			continue
 		}
-		maxpInfo, err := ReadMaxp(bytes.NewReader(maxp))
+		maxpInfo, err := Read(bytes.NewReader(maxp))
 		if err != nil {
 			t.Errorf("ReadMaxp(%d): %v", numGlyphs, err)
 			continue
@@ -44,7 +44,7 @@ func TestMaxp(t *testing.T) {
 func FuzzMaxp(f *testing.F) {
 	f.Add([]byte{0x00, 0x00, 0x50, 0x00, 0x12, 0x34})
 	f.Fuzz(func(t *testing.T, data []byte) {
-		maxpInfo, err := ReadMaxp(bytes.NewReader(data))
+		maxpInfo, err := Read(bytes.NewReader(data))
 		if err != nil {
 			return
 		}
@@ -52,7 +52,7 @@ func FuzzMaxp(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		maxpInfo2, err := ReadMaxp(bytes.NewReader(data2))
+		maxpInfo2, err := Read(bytes.NewReader(data2))
 		if err != nil {
 			t.Fatal(err)
 		}

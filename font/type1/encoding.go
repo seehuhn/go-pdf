@@ -18,6 +18,10 @@ package type1
 
 import "seehuhn.de/go/pdf"
 
+// TODO(voss): There is some redundancy between the following files:
+//     font/type1/encoding.go
+//     font/encoding.go
+
 // StandardEncoding is the standard encoding for Type 1 fonts.
 var StandardEncoding = map[pdf.Name]byte{
 	"space":        32,

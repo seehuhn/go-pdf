@@ -67,11 +67,6 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 	fnt := newSimple(w, tt)
 	w.OnClose(fnt.WriteFont)
 
-	width := make([]int, len(tt.HmtxInfo.Widths))
-	for i, w := range tt.HmtxInfo.Widths {
-		width[i] = int(w)
-	}
-
 	res := &font.Font{
 		InstName: instName,
 		Ref:      fnt.FontRef,
@@ -80,7 +75,7 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 		Ascent:      int(tt.HmtxInfo.Ascent),
 		Descent:     int(tt.HmtxInfo.Descent),
 		GlyphExtent: tt.HmtxInfo.GlyphExtents,
-		Width:       width,
+		Widths:      tt.HmtxInfo.Widths,
 
 		Layout: fnt.Layout,
 		Enc:    fnt.Enc,

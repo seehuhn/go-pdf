@@ -97,7 +97,7 @@ func (g glyphBox) Extent() *boxes.BoxExtent {
 
 func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	q := float64(glyphFontSize) / float64(theFont.GlyphUnits)
-	glyphWidth := float64(theFont.Width[g]) * q
+	glyphWidth := float64(theFont.Widths[g]) * q
 	shift := (glyphBoxWidth - glyphWidth) / 2
 
 	if theFont.GlyphExtent != nil {
@@ -259,7 +259,7 @@ func main() {
 		page++
 	}
 
-	numGlyph := len(theFont.Width)
+	numGlyph := len(theFont.Widths)
 
 	p.BaseLineSkip = 13
 	rowBoxes = append(rowBoxes,

@@ -54,7 +54,7 @@ func EmbedAfm(w *pdf.Writer, afm *AfmInfo, instName pdf.Name) (*font.Font, error
 		Ascent:      afm.Ascent,
 		Descent:     afm.Descent,
 		GlyphExtent: afm.GlyphExtent,
-		Width:       afm.Width,
+		Widths:      afm.Width,
 
 		Layout: fnt.Layout,
 		Enc:    fnt.Enc,

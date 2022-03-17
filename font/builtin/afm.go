@@ -40,7 +40,7 @@ type AfmInfo struct {
 
 	Code        []int16 // code byte, or -1 if unmapped
 	GlyphExtent []font.Rect
-	Width       []int
+	Width       []uint16
 	GlyphName   []string
 
 	Ligatures map[font.GlyphPair]font.GlyphID
@@ -98,7 +98,7 @@ func Afm(fontName string) (*AfmInfo, error) {
 		}
 		if charMetrics {
 			var name string
-			var width int
+			var width uint16
 			var code int
 			var BBox font.Rect
 			var ligTmp []*ligInfo
@@ -113,7 +113,8 @@ func Afm(fontName string) (*AfmInfo, error) {
 				case "C":
 					code, _ = strconv.Atoi(ff[1])
 				case "WX":
-					width, _ = strconv.Atoi(ff[1])
+					tmp, _ := strconv.Atoi(ff[1])
+					width = uint16(tmp)
 				case "N":
 					name = ff[1]
 				case "B":

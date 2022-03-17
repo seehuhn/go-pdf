@@ -20,21 +20,19 @@ import (
 	"bytes"
 	"io"
 	"math"
-	"strings"
 	"time"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
+	"seehuhn.de/go/pdf/font/sfnt/maxp"
 	"seehuhn.de/go/pdf/font/sfnt/name"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
-	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/locale"
 )
 
@@ -75,8 +73,8 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 
 	var locaFormat int16
 	var scalerType uint32
-	var maxpTtf *table.MaxpTTF
-	switch outlines := info.Font.(type) {
+	var maxpTtf *maxp.TTFInfo
+	switch outlines := info.Outlines.(type) {
 	case *cff.Outlines:
 		cffData, err := makeCFF(info, outlines)
 		if err != nil {
@@ -101,7 +99,7 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		panic("unexpected font type")
 	}
 
-	maxpInfo := table.MaxpInfo{
+	maxpInfo := &maxp.Info{
 		NumGlyphs: info.NumGlyphs(),
 		TTF:       maxpTtf,
 	}
@@ -120,9 +118,14 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	return sfnt.WriteTables(w, scalerType, tables)
 }
 
-func isFixedPitch(ww []uint16) bool {
-	var width uint16
+// IsFixedPitch returns true if all glyphs in the font have the same width.
+func (info *Info) IsFixedPitch() bool {
+	ww := info.Widths()
+	if len(ww) == 0 {
+		return false
+	}
 
+	var width uint16
 	for _, w := range ww {
 		if w == 0 {
 			continue
@@ -139,7 +142,7 @@ func isFixedPitch(ww []uint16) bool {
 
 func makeHead(info *Info, locaFormat int16) ([]byte, error) {
 	var bbox font.Rect
-	switch font := info.Font.(type) {
+	switch font := info.Outlines.(type) {
 	case *cff.Outlines:
 		for _, g := range font.Glyphs {
 			bbox.Extend(g.Extent())
@@ -250,7 +253,7 @@ func makeName(info *Info, ss cmap.Table) []byte {
 			Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
 			FullName:       fullName,
 			Version:        "Version " + info.Version.String(),
-			PostScriptName: info.PostscriptName(),
+			PostScriptName: string(info.PostscriptName()),
 		}
 	}
 
@@ -262,31 +265,16 @@ func makePost(info *Info) []byte {
 		ItalicAngle:        info.ItalicAngle,
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
-		IsFixedPitch:       isFixedPitch(info.Widths()),
+		IsFixedPitch:       info.IsFixedPitch(),
+	}
+	if outlines, ok := info.Outlines.(*TTFOutlines); ok {
+		postInfo.Names = outlines.Names
 	}
 	return postInfo.Encode()
 }
 
 func makeCFF(info *Info, outlines *cff.Outlines) ([]byte, error) {
-	q := 1 / float64(info.UnitsPerEm)
-	fontInfo := &type1.FontInfo{
-		FullName:   info.FullName(),
-		FamilyName: info.FamilyName,
-		Weight:     info.Weight.String(),
-		FontName:   pdf.Name(info.PostscriptName()),
-		Version:    info.Version.String(),
-
-		Copyright: strings.ReplaceAll(info.Copyright, "©", "(c)"),
-		Notice:    info.Trademark,
-
-		FontMatrix: []float64{q, 0, 0, q, 0, 0}, // TODO(voss): is this right?
-
-		ItalicAngle:  info.ItalicAngle,
-		IsFixedPitch: isFixedPitch(info.Widths()),
-
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-	}
+	fontInfo := info.GetFontInfo()
 	myCff := &cff.Font{
 		FontInfo: fontInfo,
 		Outlines: outlines,

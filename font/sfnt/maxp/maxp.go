@@ -14,20 +14,27 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package table
+// Package maxp has code for reading and wrinting the "OS/2" table.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/maxp
+package maxp
 
 import (
 	"errors"
 	"io"
 )
 
-// MaxpInfo contains information from the "maxp" table.
-type MaxpInfo struct {
-	NumGlyphs int // number of glyphs in the font (range 1, ..., 65535)
-	TTF       *MaxpTTF
+// Info contains information from the "maxp" table.
+type Info struct {
+	// NumGlyphs is number of glyphs in the font, in the range 1, ..., 65535.
+	NumGlyphs int
+
+	// TTF contains additional information for TrueType fonts.
+	// This must be nil for CFF-based fonts.
+	TTF *TTFInfo
 }
 
-type MaxpTTF struct {
+// TTFInfo contains TrueType-specific information from the "maxp" table.
+type TTFInfo struct {
 	MaxPoints             uint16
 	MaxContours           uint16
 	MaxCompositePoints    uint16
@@ -43,9 +50,8 @@ type MaxpTTF struct {
 	MaxComponentDepth     uint16
 }
 
-// ReadMaxp reads the number of Glyphs from the "maxp" table.
-// All other information is ignored.
-func ReadMaxp(r io.Reader) (*MaxpInfo, error) {
+// Read reads the "maxp" table.
+func Read(r io.Reader) (*Info, error) {
 	var buf [26]byte
 	_, err := io.ReadFull(r, buf[:6])
 	if err != nil {
@@ -61,7 +67,7 @@ func ReadMaxp(r io.Reader) (*MaxpInfo, error) {
 	if numGlyphs == 0 {
 		return nil, errors.New("sfnt/maxp: numGlyphs is zero")
 	}
-	info := &MaxpInfo{
+	info := &Info{
 		NumGlyphs: numGlyphs,
 	}
 	if version == 0x00005000 {
@@ -72,7 +78,7 @@ func ReadMaxp(r io.Reader) (*MaxpInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	info.TTF = &MaxpTTF{
+	info.TTF = &TTFInfo{
 		MaxPoints:             uint16(buf[0])<<8 | uint16(buf[1]),
 		MaxContours:           uint16(buf[2])<<8 | uint16(buf[3]),
 		MaxCompositePoints:    uint16(buf[4])<<8 | uint16(buf[5]),
@@ -90,8 +96,8 @@ func ReadMaxp(r io.Reader) (*MaxpInfo, error) {
 	return info, nil
 }
 
-// Encode encodes the number of Glyphs in a "maxp" table.
-func (info *MaxpInfo) Encode() ([]byte, error) {
+// Encode encodes the "maxp" table.
+func (info *Info) Encode() ([]byte, error) {
 	numGlyphs := info.NumGlyphs
 	if numGlyphs < 1 || numGlyphs >= 1<<16 {
 		return nil, errors.New("sfnt/maxp: numGlyphs out of range")

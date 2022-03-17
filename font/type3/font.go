@@ -34,7 +34,7 @@ type Builder struct {
 	w          *pdf.Writer
 	width      float64
 	height     float64
-	glyphWidth []int
+	glyphWidth []uint16
 	cmap       map[rune]font.GlyphID
 	idxToName  map[font.GlyphID]pdf.Name
 	nameToRef  map[pdf.Name]*pdf.Reference
@@ -49,7 +49,7 @@ func New(w *pdf.Writer, width, height float64) (*Builder, error) {
 		w:          w,
 		width:      width,
 		height:     height,
-		glyphWidth: make([]int, 256),
+		glyphWidth: make([]uint16, 256), // TODO(voss): use the correct length
 		cmap:       make(map[rune]font.GlyphID),
 		idxToName:  make(map[font.GlyphID]pdf.Name),
 		nameToRef:  make(map[pdf.Name]*pdf.Reference),
@@ -60,7 +60,7 @@ func New(w *pdf.Writer, width, height float64) (*Builder, error) {
 
 // AddGlyph adds a new glyph to the type 3 font.  R is the rune associated with
 // the glyph, and width is the horizontal increment in character position.
-func (t3 *Builder) AddGlyph(r rune, width int) (*Glyph, error) {
+func (t3 *Builder) AddGlyph(r rune, width uint16) (*Glyph, error) {
 	if len(t3.cmap) >= 256 {
 		return nil, errors.New("too many glyphs")
 	}
@@ -180,7 +180,7 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 			}
 			return []byte{byte(gid)}
 		},
-		Width:      t3.glyphWidth,
+		Widths:     t3.glyphWidth,
 		GlyphUnits: int(t3.width + 0.5), // TODO(voss): check this
 	}
 

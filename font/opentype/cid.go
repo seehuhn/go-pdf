@@ -90,11 +90,6 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 
 	w.OnClose(t.WriteFont)
 
-	width := make([]int, len(tt.HmtxInfo.Widths))
-	for i, w := range tt.HmtxInfo.Widths {
-		width[i] = int(w)
-	}
-
 	res := &font.Font{
 		InstName: instName,
 		Ref:      t.FontRef,
@@ -103,7 +98,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 		Ascent:      int(tt.HmtxInfo.Ascent),
 		Descent:     int(tt.HmtxInfo.Descent),
 		GlyphExtent: cff.GlyphExtents(),
-		Width:       width,
+		Widths:      tt.HmtxInfo.Widths,
 
 		Layout: t.Layout,
 		Enc:    t.Enc,

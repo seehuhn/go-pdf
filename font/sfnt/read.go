@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/mac"
+	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
@@ -84,24 +85,18 @@ func (tt *Font) getFontName() (string, error) {
 }
 
 // getPostInfo reads the "post" table of a sfnt file.
-func (tt *Font) getPostInfo() (*table.PostInfo, error) {
-	postHeader := &table.PostHeader{}
-	_, err := tt.GetTableReader("post", postHeader)
+func (tt *Font) getPostInfo() (*post.Info, error) {
+	fd, err := tt.GetTableReader("post", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO(voss): check the format
-	// fmt.Printf("format = 0x%08X\n", postHeader.Format)
-
-	// TODO(voss): make this more similar to the other functions in this file.
-	res := &table.PostInfo{
-		ItalicAngle:        float64(postHeader.ItalicAngle) / 65536,
-		UnderlinePosition:  postHeader.UnderlinePosition,
-		UnderlineThickness: postHeader.UnderlineThickness,
-		IsFixedPitch:       postHeader.IsFixedPitch != 0,
+	postInfo, err := post.Read(fd)
+	if err != nil {
+		return nil, err
 	}
-	return res, nil
+
+	return postInfo, nil
 }
 
 // readKernInfo reads kerning information from the "kern" table.

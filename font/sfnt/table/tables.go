@@ -83,9 +83,6 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 		name := string(buf[:4])
 		offset := uint32(buf[8])<<24 + uint32(buf[9])<<16 + uint32(buf[10])<<8 + uint32(buf[11])
 		length := uint32(buf[12])<<24 + uint32(buf[13])<<16 + uint32(buf[14])<<8 + uint32(buf[15])
-		if offset >= 1<<28 || length >= 1<<28 { // 256MB size limit
-			return nil, errors.New("sfnt/header: invalid offset or length")
-		}
 		if !isKnownTable[name] {
 			continue
 		}
@@ -470,25 +467,6 @@ type NameRecord struct {
 	NameID     uint16 // name identifier
 	Length     uint16 // name string length in bytes
 	Offset     uint16 // name string offset in bytes
-}
-
-type PostHeader struct {
-	Format             uint32 // Format of this table
-	ItalicAngle        int32  // Italic angle in degrees
-	UnderlinePosition  int16  // Underline position
-	UnderlineThickness int16  // Underline thickness
-	IsFixedPitch       uint32 // Font is monospaced; set to 1 if the font is monospaced and 0 otherwise (N.B., to maintain compatibility with older versions of the TrueType spec, accept any non-zero value as meaning that the font is monospaced)
-	MinMemType42       uint32 // Minimum memory usage when a TrueType font is downloaded as a Type 42 font
-	MaxMemType42       uint32 // Maximum memory usage when a TrueType font is downloaded as a Type 42 font
-	MinMemType1        uint32 // Minimum memory usage when a TrueType font is downloaded as a Type 1 font
-	MaxMemType1        uint32 // Maximum memory usage when a TrueType font is downloaded as a Type 1 font
-}
-
-type PostInfo struct {
-	ItalicAngle        float64
-	UnderlinePosition  int16
-	UnderlineThickness int16
-	IsFixedPitch       bool
 }
 
 type Glyf struct {

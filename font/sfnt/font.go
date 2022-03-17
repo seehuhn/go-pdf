@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
 	"seehuhn.de/go/pdf/font/sfnt/mac"
+	"seehuhn.de/go/pdf/font/sfnt/maxp"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/locale"
@@ -102,11 +103,11 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	maxp, err := table.ReadMaxp(maxpFd)
+	maxpInfo, err := maxp.Read(maxpFd)
 	if err != nil {
 		return nil, err
 	}
-	NumGlyphs := maxp.NumGlyphs
+	NumGlyphs := maxpInfo.NumGlyphs
 	if NumGlyphs != len(hmtxInfo.Widths) {
 		return nil, errors.New("inconsistent number of glyphs")
 	}
