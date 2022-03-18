@@ -106,7 +106,7 @@ func Read(r io.Reader) (*Info, error) {
 }
 
 // Encode returns the binary representation of the head table.
-func (info *Info) Encode() (data []byte, err error) {
+func (info *Info) Encode() []byte {
 	var flags uint16
 	if info.HasYBaseAt0 {
 		flags |= 1 << 0
@@ -166,7 +166,7 @@ func (info *Info) Encode() (data []byte, err error) {
 
 	buf := bytes.NewBuffer(make([]byte, 0, headLength))
 	_ = binary.Write(buf, binary.BigEndian, enc)
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
 // ClearChecksum zeros the checksum field of the head table.

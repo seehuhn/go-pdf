@@ -54,7 +54,7 @@ func Decode(enc *Encoded) (Glyphs, error) {
 }
 
 // Encode encodes the Glyphs into a "glyf" and "loca" table.
-func (gg Glyphs) Encode() (*Encoded, error) {
+func (gg Glyphs) Encode() *Encoded {
 	n := len(gg)
 
 	offs := make([]int, n+1)
@@ -76,5 +76,5 @@ func (gg Glyphs) Encode() (*Encoded, error) {
 		LocaFormat: locaFormat,
 	}
 
-	return enc, nil
+	return enc
 }

@@ -17,8 +17,6 @@
 package sfnt
 
 import (
-	"bytes"
-
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 )
@@ -38,10 +36,5 @@ func makeCMap(mapping []font.CMapEntry) ([]byte, error) {
 		cmap.Key{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 
-	buf := &bytes.Buffer{}
-	if err := cmap.Write(buf); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
+	return cmap.Encode(), nil
 }

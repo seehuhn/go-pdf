@@ -25,7 +25,7 @@ import (
 
 func TestHeadLength(t *testing.T) {
 	info := &Info{}
-	data, _ := info.Encode()
+	data := info.Encode()
 	if len(data) != headLength {
 		t.Errorf("expected %d, got %d", headLength, len(data))
 	}
@@ -33,7 +33,7 @@ func TestHeadLength(t *testing.T) {
 
 func FuzzHead(f *testing.F) {
 	info := &Info{}
-	data, _ := info.Encode()
+	data := info.Encode()
 	f.Add(data)
 
 	f.Fuzz(func(t *testing.T, d1 []byte) {
@@ -42,10 +42,7 @@ func FuzzHead(f *testing.F) {
 			return
 		}
 
-		d2, err := i1.Encode()
-		if err != nil {
-			t.Fatal(err)
-		}
+		d2 := i1.Encode()
 
 		i2, err := Read(bytes.NewReader(d2))
 		if err != nil {

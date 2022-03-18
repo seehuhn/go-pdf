@@ -71,11 +71,11 @@ type Info struct {
 
 // TTFOutlines stores the glyph data of a TrueType font.
 type TTFOutlines struct {
-	Widths []uint16
 	Glyphs glyf.Glyphs
+	Widths []uint16
+	Names  []string
 	Tables map[string][]byte
 	Maxp   *maxp.TTFInfo
-	Names  []string
 }
 
 // GetFontInfo returns an Adobe FontInfo structure for the given font.
@@ -213,6 +213,21 @@ func (info *Info) Extents() []font.Rect {
 			extents[i] = g.Rect
 		}
 		return extents
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// GlyphWidth returns the advance width of the glyph with the given glyph ID.
+func (info *Info) GlyphWidth(gid font.GlyphID) uint16 {
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		return f.Glyphs[gid].Width
+	case *TTFOutlines:
+		if f.Widths == nil {
+			return 0
+		}
+		return f.Widths[gid]
 	default:
 		panic("unexpected font type")
 	}

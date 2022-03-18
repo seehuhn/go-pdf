@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"sort"
 
@@ -140,7 +139,8 @@ func Decode(data []byte) (Table, error) {
 	return res, nil
 }
 
-func (ss Table) Write(w io.Writer) error {
+// Encode converts the cmap table into binary form.
+func (ss Table) Encode() []byte {
 	type extended struct {
 		Data []byte
 		Offs uint32
@@ -180,33 +180,26 @@ offsLoop:
 		pos += uint32(len(e.Data))
 	}
 
-	header := make([]byte, endOfHeader)
+	res := make([]byte, endOfHeader, pos)
 	// header[0] = 0
 	// header[1] = 0
-	header[2] = byte(numTables >> 8)
-	header[3] = byte(numTables)
+	res[2] = byte(numTables >> 8)
+	res[3] = byte(numTables)
 	for i, e := range ext {
-		header[4+i*8] = byte(e.PlatformID >> 8)
-		header[5+i*8] = byte(e.PlatformID)
-		header[6+i*8] = byte(e.EncodingID >> 8)
-		header[7+i*8] = byte(e.EncodingID)
-		header[8+i*8] = byte(e.Offs >> 24)
-		header[9+i*8] = byte(e.Offs >> 16)
-		header[10+i*8] = byte(e.Offs >> 8)
-		header[11+i*8] = byte(e.Offs)
-	}
-	_, err := w.Write(header)
-	if err != nil {
-		return err
+		res[4+i*8] = byte(e.PlatformID >> 8)
+		res[5+i*8] = byte(e.PlatformID)
+		res[6+i*8] = byte(e.EncodingID >> 8)
+		res[7+i*8] = byte(e.EncodingID)
+		res[8+i*8] = byte(e.Offs >> 24)
+		res[9+i*8] = byte(e.Offs >> 16)
+		res[10+i*8] = byte(e.Offs >> 8)
+		res[11+i*8] = byte(e.Offs)
 	}
 	for _, e := range ext {
-		_, err = w.Write(e.Data)
-		if err != nil {
-			return err
-		}
+		res = append(res, e.Data...)
 	}
 
-	return nil
+	return res
 }
 
 // Get decodes the given cmap subtable.

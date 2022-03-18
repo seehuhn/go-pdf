@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package simple
 
 import (
@@ -8,11 +24,15 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Embed embeds a TrueType or OpenType font into a PDF document.
+//
+// This requires PDF version 1.1 or higher, and
+// use of CFF-based OpenType fonts requires PDF version 1.2 or higher.
 func Embed(w *pdf.Writer, info *sfntcff.Info, instName pdf.Name) (*font.Font, error) {
 	isTrueType := info.IsTrueType()
 	isOpenType := info.IsOpenType()
@@ -120,8 +140,20 @@ func (s *simple) WriteFont(w *pdf.Writer) error {
 	}
 	subsetTag := font.GetSubsetTag(includeGlyphs, s.info.NumGlyphs())
 
+	fontName := pdf.Name(subsetTag) + "+" + s.info.PostscriptName()
+
+	FontDescriptorRef := w.Alloc()
+	WidthsRef := w.Alloc()
+	FontFileRef := w.Alloc()
+	ToUnicodeRef := w.Alloc()
+
 	switch outlines := s.info.Outlines.(type) {
 	case *cff.Outlines:
+		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_2)
+		if err != nil {
+			return err
+		}
+
 		o2 := &cff.Outlines{}
 		pIdxMap := make(map[int]int)
 		for _, gid := range includeGlyphs {
@@ -162,13 +194,6 @@ func (s *simple) WriteFont(w *pdf.Writer) error {
 			Outlines: o2,
 		}
 
-		FontDescriptorRef := w.Alloc()
-		WidthsRef := w.Alloc()
-		FontFileRef := w.Alloc()
-		ToUnicodeRef := w.Alloc()
-
-		fontName := pdf.Name(subsetTag) + "+" + fontInfo.FontName
-
 		Font := pdf.Dict{ // See section 9.6.2.1 of PDF 32000-1:2008.
 			"Type":           pdf.Name("Font"),
 			"Subtype":        pdf.Name("Type1"),
@@ -199,7 +224,7 @@ func (s *simple) WriteFont(w *pdf.Writer) error {
 			Widths = append(Widths, pdf.Integer(ww[m.GID]))
 		}
 
-		_, err := w.WriteCompressed(
+		_, err = w.WriteCompressed(
 			[]*pdf.Reference{s.FontRef, FontDescriptorRef, WidthsRef},
 			Font, FontDescriptor, Widths)
 		if err != nil {
@@ -225,17 +250,148 @@ func (s *simple) WriteFont(w *pdf.Writer) error {
 			return err
 		}
 
-		var cc2text []font.SimpleMapping
-		for gid, text := range s.text {
-			charCode := s.enc[gid]
-			cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
-		}
-		err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
+	case *sfntcff.TTFOutlines:
+		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
 		if err != nil {
 			return err
 		}
+
+		newGid := make(map[font.GlyphID]font.GlyphID)
+		todo := make(map[font.GlyphID]bool)
+		nextGid := font.GlyphID(0)
+		for _, gid := range includeGlyphs {
+			newGid[gid] = nextGid
+			nextGid++
+
+			for _, gid2 := range outlines.Glyphs[gid].Components() {
+				if _, ok := newGid[gid2]; !ok {
+					todo[gid2] = true
+				}
+			}
+		}
+		for len(todo) > 0 {
+			gid := pop(todo)
+			includeGlyphs = append(includeGlyphs, gid)
+			newGid[gid] = nextGid
+			nextGid++
+
+			for _, gid2 := range outlines.Glyphs[gid].Components() {
+				if _, ok := newGid[gid2]; !ok {
+					todo[gid2] = true
+				}
+			}
+		}
+
+		encoding := cmap.Format4{}
+		for gid, c := range s.enc {
+			gid = newGid[gid]
+			if gid != 0 {
+				encoding[uint16(c)] = gid
+			}
+		}
+
+		o2 := &sfntcff.TTFOutlines{
+			Tables: outlines.Tables,
+			Maxp:   outlines.Maxp,
+		}
+		for _, gid := range includeGlyphs {
+			g := outlines.Glyphs[gid]
+			o2.Glyphs = append(o2.Glyphs, g.FixComponents(newGid))
+			o2.Widths = append(o2.Widths, outlines.Widths[gid])
+			// o2.Names = append(o2.Names, outlines.Names[gid])
+		}
+		i2 := &sfntcff.Info{}
+		*i2 = *s.info
+		i2.Outlines = o2
+
+		// ---
+
+		Font := pdf.Dict{ // See section 9.6.2.1 of PDF 32000-1:2008.
+			"Type":           pdf.Name("Font"),
+			"Subtype":        pdf.Name("TrueType"),
+			"BaseFont":       fontName,
+			"FirstChar":      pdf.Integer(firstCharCode),
+			"LastChar":       pdf.Integer(lastCharCode),
+			"FontDescriptor": FontDescriptorRef,
+			"Widths":         WidthsRef,
+			"ToUnicode":      ToUnicodeRef,
+		}
+
+		FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
+			"Type":        pdf.Name("FontDescriptor"),
+			"FontName":    fontName,
+			"Flags":       pdf.Integer(flags(s.info, true)), // TODO(voss)
+			"FontBBox":    i2.BBox(),
+			"ItalicAngle": pdf.Number(i2.ItalicAngle),
+			"Ascent":      pdf.Integer(i2.Ascent),
+			"Descent":     pdf.Integer(i2.Descent),
+			"CapHeight":   pdf.Integer(i2.CapHeight),
+			"StemV":       pdf.Integer(70), // information not available in sfnt files
+			"FontFile2":   FontFileRef,
+		}
+
+		var Widths pdf.Array
+		for _, w := range o2.Widths {
+			Widths = append(Widths, pdf.Integer(w))
+		}
+
+		_, err = w.WriteCompressed(
+			[]*pdf.Reference{s.FontRef, FontDescriptorRef, WidthsRef},
+			Font, FontDescriptor, Widths)
+		if err != nil {
+			return err
+		}
+
+		// Write the font file itself.
+		// See section 9.9 of PDF 32000-1:2008 for details.
+		size := w.NewPlaceholder(10)
+		fontFileDict := pdf.Dict{
+			"Length1": size,
+		}
+		compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+		if w.Version >= pdf.V1_2 {
+			compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+		}
+		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef, compress)
+		if err != nil {
+			return err
+		}
+		n, err := i2.EmbedSimple(fontFileStream, encoding)
+		if err != nil {
+			return err
+		}
+		err = size.Set(pdf.Integer(n))
+		if err != nil {
+			return err
+		}
+		err = fontFileStream.Close()
+		if err != nil {
+			return err
+		}
+
+	default:
+		panic("unsupported outlines type")
 	}
+
+	var cc2text []font.SimpleMapping
+	for gid, text := range s.text {
+		charCode := s.enc[gid]
+		cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
+	}
+	err := font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func pop(todo map[font.GlyphID]bool) font.GlyphID {
+	for key := range todo {
+		delete(todo, key)
+		return key
+	}
+	panic("empty map")
 }
 
 func flags(info *sfntcff.Info, symbolic bool) uint32 {

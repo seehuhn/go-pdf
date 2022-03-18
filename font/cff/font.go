@@ -242,6 +242,8 @@ func Read(r io.ReadSeeker) (*Font, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		cff.FdSelect = func(gid font.GlyphID) int { return 0 }
 	}
 
 	// read the list of glyph names
@@ -312,9 +314,6 @@ func Read(r io.ReadSeeker) (*Font, error) {
 
 	cff.Glyphs = make([]*Glyph, nGlyphs)
 	fdSelect := cff.FdSelect
-	if fdSelect == nil {
-		fdSelect = func(gid font.GlyphID) int { return 0 }
-	}
 	for gid, code := range charStrings {
 		fdIdx := fdSelect(font.GlyphID(gid))
 		info := decoders[fdIdx]

@@ -61,10 +61,7 @@ func FuzzGlyf(f *testing.F) {
 			return
 		}
 
-		enc2, err := info.Encode()
-		if err != nil {
-			t.Fatal(err)
-		}
+		enc2 := info.Encode()
 
 		info2, err := Decode(enc2)
 		if err != nil {

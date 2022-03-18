@@ -24,11 +24,7 @@ import (
 func TestMaxp(t *testing.T) {
 	for _, numGlyphs := range []int{1, 2, 3, 255, 256, 1000, 65535} {
 		info := &Info{NumGlyphs: numGlyphs}
-		maxp, err := info.Encode()
-		if err != nil {
-			t.Errorf("EncodeMaxp(%d): %v", numGlyphs, err)
-			continue
-		}
+		maxp := info.Encode()
 		maxpInfo, err := Read(bytes.NewReader(maxp))
 		if err != nil {
 			t.Errorf("ReadMaxp(%d): %v", numGlyphs, err)
@@ -48,10 +44,7 @@ func FuzzMaxp(f *testing.F) {
 		if err != nil {
 			return
 		}
-		data2, err := maxpInfo.Encode()
-		if err != nil {
-			t.Fatal(err)
-		}
+		data2 := maxpInfo.Encode()
 		maxpInfo2, err := Read(bytes.NewReader(data2))
 		if err != nil {
 			t.Fatal(err)

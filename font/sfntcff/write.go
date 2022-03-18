@@ -39,7 +39,7 @@ import (
 func (info *Info) Write(w io.Writer) (int64, error) {
 	tables := make(map[string][]byte)
 
-	hheaData, hmtxData := makeHmtx(info)
+	hheaData, hmtxData := info.makeHmtx()
 	tables["hhea"] = hheaData
 	tables["hmtx"] = hmtxData
 
@@ -54,39 +54,29 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		}
 		cmapSubtable := info.CMap.Encode(0)
 		ss = cmap.Table{
-			{PlatformID: 0, EncodingID: uniEncoding, Language: 0}: cmapSubtable,
-			{PlatformID: 3, EncodingID: winEncoding, Language: 0}: cmapSubtable,
+			{PlatformID: 0, EncodingID: uniEncoding}: cmapSubtable,
+			{PlatformID: 3, EncodingID: winEncoding}: cmapSubtable,
 		}
-		buf := &bytes.Buffer{}
-		ss.Write(buf)
-		tables["cmap"] = buf.Bytes()
+		tables["cmap"] = ss.Encode()
 	}
 
-	os2Data := makeOS2(info)
-	tables["OS/2"] = os2Data
-
-	nameData := makeName(info, ss)
-	tables["name"] = nameData
-
-	postData := makePost(info)
-	tables["post"] = postData
+	tables["OS/2"] = info.makeOS2()
+	tables["name"] = info.makeName(ss)
+	tables["post"] = info.makePost()
 
 	var locaFormat int16
 	var scalerType uint32
 	var maxpTtf *maxp.TTFInfo
 	switch outlines := info.Outlines.(type) {
 	case *cff.Outlines:
-		cffData, err := makeCFF(info, outlines)
+		cffData, err := info.makeCFF(outlines)
 		if err != nil {
 			return 0, err
 		}
 		tables["CFF "] = cffData
 		scalerType = table.ScalerTypeCFF
 	case *TTFOutlines:
-		enc, err := outlines.Glyphs.Encode()
-		if err != nil {
-			return 0, err
-		}
+		enc := outlines.Glyphs.Encode()
 		tables["glyf"] = enc.GlyfData
 		tables["loca"] = enc.LocaData
 		locaFormat = enc.LocaFormat
@@ -103,19 +93,39 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		NumGlyphs: info.NumGlyphs(),
 		TTF:       maxpTtf,
 	}
-	maxpData, err := maxpInfo.Encode()
-	if err != nil {
-		return 0, err
-	}
-	tables["maxp"] = maxpData
+	tables["maxp"] = maxpInfo.Encode()
 
-	headData, err := makeHead(info, locaFormat)
-	if err != nil {
-		return 0, err
-	}
-	tables["head"] = headData
+	tables["head"] = info.makeHead(locaFormat)
 
 	return sfnt.WriteTables(w, scalerType, tables)
+}
+
+func (info *Info) EmbedSimple(w io.Writer, encoding cmap.Subtable) (int64, error) {
+	tables := make(map[string][]byte)
+	ss := cmap.Table{
+		{PlatformID: 1, EncodingID: 0}: encoding.Encode(0),
+	}
+	tables["cmap"] = ss.Encode()
+
+	tables["hhea"], tables["hmtx"] = info.makeHmtx()
+
+	outlines := info.Outlines.(*TTFOutlines)
+	enc := outlines.Glyphs.Encode()
+	tables["glyf"] = enc.GlyfData
+	tables["loca"] = enc.LocaData
+	for name, data := range outlines.Tables {
+		tables[name] = data
+	}
+
+	maxpInfo := &maxp.Info{
+		NumGlyphs: info.NumGlyphs(),
+		TTF:       outlines.Maxp,
+	}
+	tables["maxp"] = maxpInfo.Encode()
+
+	tables["head"] = info.makeHead(enc.LocaFormat)
+
+	return sfnt.WriteTables(w, table.ScalerTypeTrueType, tables)
 }
 
 // IsFixedPitch returns true if all glyphs in the font have the same width.
@@ -140,7 +150,7 @@ func (info *Info) IsFixedPitch() bool {
 	return true
 }
 
-func makeHead(info *Info, locaFormat int16) ([]byte, error) {
+func (info *Info) makeHead(locaFormat int16) []byte {
 	var bbox font.Rect
 	switch font := info.Outlines.(type) {
 	case *cff.Outlines:
@@ -172,7 +182,7 @@ func makeHead(info *Info, locaFormat int16) ([]byte, error) {
 	return headInfo.Encode()
 }
 
-func makeHmtx(info *Info) ([]byte, []byte) {
+func (info *Info) makeHmtx() ([]byte, []byte) {
 	hmtxInfo := &hmtx.Info{
 		Widths:       info.Widths(),
 		GlyphExtents: info.Extents(),
@@ -185,7 +195,7 @@ func makeHmtx(info *Info) ([]byte, []byte) {
 	return hmtxInfo.Encode()
 }
 
-func makeOS2(info *Info) []byte {
+func (info *Info) makeOS2() []byte {
 	avgGlyphWidth := 0
 	count := 0
 	ww := info.Widths()
@@ -230,7 +240,7 @@ func makeOS2(info *Info) []byte {
 	return os2Info.Encode(info.CMap)
 }
 
-func makeName(info *Info, ss cmap.Table) []byte {
+func (info *Info) makeName(ss cmap.Table) []byte {
 	day := info.ModificationTime
 	if day.IsZero() {
 		day = info.CreationTime
@@ -260,7 +270,7 @@ func makeName(info *Info, ss cmap.Table) []byte {
 	return nameInfo.Encode(ss)
 }
 
-func makePost(info *Info) []byte {
+func (info *Info) makePost() []byte {
 	postInfo := &post.Info{
 		ItalicAngle:        info.ItalicAngle,
 		UnderlinePosition:  info.UnderlinePosition,
@@ -273,7 +283,7 @@ func makePost(info *Info) []byte {
 	return postInfo.Encode()
 }
 
-func makeCFF(info *Info, outlines *cff.Outlines) ([]byte, error) {
+func (info *Info) makeCFF(outlines *cff.Outlines) ([]byte, error) {
 	fontInfo := info.GetFontInfo()
 	myCff := &cff.Font{
 		FontInfo: fontInfo,

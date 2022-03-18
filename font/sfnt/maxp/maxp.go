@@ -97,16 +97,16 @@ func Read(r io.Reader) (*Info, error) {
 }
 
 // Encode encodes the "maxp" table.
-func (info *Info) Encode() ([]byte, error) {
+func (info *Info) Encode() []byte {
 	numGlyphs := info.NumGlyphs
 	if numGlyphs < 1 || numGlyphs >= 1<<16 {
-		return nil, errors.New("sfnt/maxp: numGlyphs out of range")
+		panic("sfnt/maxp: numGlyphs out of range")
 	}
 	if info.TTF == nil {
 		buf := []byte{
 			0x00, 0x00, 0x50, 0x00, byte(numGlyphs >> 8), byte(numGlyphs),
 		}
-		return buf, nil
+		return buf
 	}
 
 	ttf := info.TTF
@@ -127,5 +127,5 @@ func (info *Info) Encode() ([]byte, error) {
 		byte(ttf.MaxComponentElements >> 8), byte(ttf.MaxComponentElements),
 		byte(ttf.MaxComponentDepth >> 8), byte(ttf.MaxComponentDepth),
 	}
-	return buf, nil
+	return buf
 }

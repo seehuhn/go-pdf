@@ -112,11 +112,7 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			tt.HeadInfo.LocaFormat = subsetInfo.indexToLocFormat
 		}
 
-		var err error
-		tables["head"], err = tt.HeadInfo.Encode()
-		if err != nil {
-			return 0, err
-		}
+		tables["head"] = tt.HeadInfo.Encode()
 	}
 
 	if opt.Replace != nil {
