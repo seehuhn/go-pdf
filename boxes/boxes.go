@@ -128,6 +128,14 @@ func (obj *TextBox) Extent() *BoxExtent {
 		}
 	}
 
+	// TODO(voss): is the following wise?
+	if height < float64(font.Ascent)*q {
+		height = float64(font.Ascent) * q
+	}
+	if depth < float64(-font.Descent)*q {
+		depth = float64(-font.Descent) * q
+	}
+
 	return &BoxExtent{
 		Width:  width,
 		Height: height,

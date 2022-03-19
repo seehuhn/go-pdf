@@ -203,6 +203,9 @@ func (g *Glyph) append(buf []byte) []byte {
 // Components returns the components of a composite glyph, or nil if the glyph
 // is simple.
 func (g *Glyph) Components() []font.GlyphID {
+	if g == nil {
+		return nil
+	}
 	switch d := g.data.(type) {
 	case GlyphSimple:
 		return nil
@@ -218,6 +221,9 @@ func (g *Glyph) Components() []font.GlyphID {
 }
 
 func (g *Glyph) FixComponents(newGid map[font.GlyphID]font.GlyphID) *Glyph {
+	if g == nil {
+		return nil
+	}
 	switch d := g.data.(type) {
 	case GlyphSimple:
 		return g

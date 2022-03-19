@@ -39,9 +39,9 @@ func Embed(w *pdf.Writer, info *sfntcff.Info, instName pdf.Name) (*font.Font, er
 	if !(isTrueType || isOpenType) {
 		return nil, errors.New("no glyph outlines found")
 	}
-	if info.CMap == nil {
-		return nil, errors.New("no useable CMap found")
-	}
+	// if info.CMap == nil {
+	// 	return nil, errors.New("no useable CMap found")
+	// }
 
 	widths := info.Widths()
 	if widths == nil {
@@ -169,7 +169,7 @@ func (s *simple) WriteFont(w *pdf.Writer) error {
 		o2.FdSelect = func(gid font.GlyphID) int {
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
-		if len(o2.Private) > 1 {
+		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
 			// Embed as a CID-keyed CFF font.
 			o2.ROS = &type1.ROS{
 				Registry:   "Adobe",
@@ -360,11 +360,11 @@ func (s *simple) WriteFont(w *pdf.Writer) error {
 		if err != nil {
 			return err
 		}
-		err = size.Set(pdf.Integer(n))
+		err = fontFileStream.Close()
 		if err != nil {
 			return err
 		}
-		err = fontFileStream.Close()
+		err = size.Set(pdf.Integer(n)) // TODO(voss): move this earlier once Placeholder is fixed
 		if err != nil {
 			return err
 		}

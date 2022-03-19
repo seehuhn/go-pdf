@@ -103,6 +103,10 @@ func Read(r io.Reader) (*Info, error) {
 	case 0x00030000:
 		// pass
 
+	case 0x00040000:
+		// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6post.html
+		// pass
+
 	default:
 		return nil, &font.NotSupportedError{
 			SubSystem: "sfnt/post",
