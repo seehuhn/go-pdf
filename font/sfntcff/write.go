@@ -22,8 +22,8 @@ import (
 	"math"
 	"time"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/head"
@@ -75,7 +75,7 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		}
 		tables["CFF "] = cffData
 		scalerType = table.ScalerTypeCFF
-	case *TTFOutlines:
+	case *GlyfOutlines:
 		enc := outlines.Glyphs.Encode()
 		tables["glyf"] = enc.GlyfData
 		tables["loca"] = enc.LocaData
@@ -100,16 +100,18 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	return sfnt.WriteTables(w, scalerType, tables)
 }
 
-func (info *Info) EmbedSimple(w io.Writer, encoding cmap.Subtable) (int64, error) {
+// EmbedSimple writes the binary form of the font for embedding in a PDF
+// file as a simple font.
+func (info *Info) EmbedSimple(w io.Writer) (int64, error) {
 	tables := make(map[string][]byte)
 	ss := cmap.Table{
-		{PlatformID: 1, EncodingID: 0}: encoding.Encode(0),
+		{PlatformID: 1, EncodingID: 0}: info.CMap.Encode(0),
 	}
 	tables["cmap"] = ss.Encode()
 
 	tables["hhea"], tables["hmtx"] = info.makeHmtx()
 
-	outlines := info.Outlines.(*TTFOutlines)
+	outlines := info.Outlines.(*GlyfOutlines)
 	enc := outlines.Glyphs.Encode()
 	tables["glyf"] = enc.GlyfData
 	tables["loca"] = enc.LocaData
@@ -151,14 +153,14 @@ func (info *Info) IsFixedPitch() bool {
 }
 
 func (info *Info) makeHead(locaFormat int16) []byte {
-	var bbox font.Rect
-	switch font := info.Outlines.(type) {
+	var bbox funit.Rect
+	switch outlines := info.Outlines.(type) {
 	case *cff.Outlines:
-		for _, g := range font.Glyphs {
+		for _, g := range outlines.Glyphs {
 			bbox.Extend(g.Extent())
 		}
-	case *TTFOutlines:
-		for _, g := range font.Glyphs {
+	case *GlyfOutlines:
+		for _, g := range outlines.Glyphs {
 			if g == nil {
 				continue
 			}
@@ -184,8 +186,8 @@ func (info *Info) makeHead(locaFormat int16) []byte {
 
 func (info *Info) makeHmtx() ([]byte, []byte) {
 	hmtxInfo := &hmtx.Info{
-		Widths:       info.Widths(),
-		GlyphExtents: info.Extents(),
+		Widths:       info.fWidths(),
+		GlyphExtents: info.fExtents(),
 		Ascent:       info.Ascent,
 		Descent:      info.Descent,
 		LineGap:      info.LineGap,
@@ -277,7 +279,7 @@ func (info *Info) makePost() []byte {
 		UnderlineThickness: info.UnderlineThickness,
 		IsFixedPitch:       info.IsFixedPitch(),
 	}
-	if outlines, ok := info.Outlines.(*TTFOutlines); ok {
+	if outlines, ok := info.Outlines.(*GlyfOutlines); ok {
 		postInfo.Names = outlines.Names
 	}
 	return postInfo.Encode()

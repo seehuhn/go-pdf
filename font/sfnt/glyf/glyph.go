@@ -18,11 +18,12 @@ package glyf
 
 import (
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 // Glyph represents a single glyph in a TrueType font.
 type Glyph struct {
-	font.Rect
+	funit.Rect
 	data interface{} // either GlyphSimple or GlyphComposite
 }
 
@@ -56,11 +57,11 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 	}
 
 	g := &Glyph{
-		Rect: font.Rect{
-			LLx: int16(data[2])<<8 | int16(data[3]),
-			LLy: int16(data[4])<<8 | int16(data[5]),
-			URx: int16(data[6])<<8 | int16(data[7]),
-			URy: int16(data[8])<<8 | int16(data[9]),
+		Rect: funit.Rect{
+			LLx: funit.Int16(data[2])<<8 | funit.Int16(data[3]),
+			LLy: funit.Int16(data[4])<<8 | funit.Int16(data[5]),
+			URx: funit.Int16(data[6])<<8 | funit.Int16(data[7]),
+			URy: funit.Int16(data[8])<<8 | funit.Int16(data[9]),
 		},
 	}
 
@@ -220,6 +221,7 @@ func (g *Glyph) Components() []font.GlyphID {
 	}
 }
 
+// FixComponents changes the glyph component IDs of a composite glyph.
 func (g *Glyph) FixComponents(newGid map[font.GlyphID]font.GlyphID) *Glyph {
 	if g == nil {
 		return nil

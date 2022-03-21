@@ -20,9 +20,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math"
 	"os"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
@@ -149,9 +151,9 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		return nil, err
 	}
 
-	var GlyphExtent []font.Rect
+	var GlyphExtent []funit.Rect
 	if glyf != nil {
-		GlyphExtent = make([]font.Rect, NumGlyphs)
+		GlyphExtent = make([]funit.Rect, NumGlyphs)
 		for i := 0; i < NumGlyphs; i++ {
 			GlyphExtent[i].LLx = glyf.Data[i].XMin
 			GlyphExtent[i].LLy = glyf.Data[i].YMin
@@ -229,6 +231,15 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	// TODO(voss): font.FlagAllCap
 	// TODO(voss): font.FlagSmallCap
 
+	q := 1000 / float64(tt.HeadInfo.UnitsPerEm)
+	fbox := tt.HeadInfo.FontBBox
+	bbox := &font.Rect{
+		LLx: int16(math.Round(float64(fbox.LLx) * q)),
+		LLy: int16(math.Round(float64(fbox.LLy) * q)),
+		URx: int16(math.Round(float64(fbox.URx) * q)),
+		URy: int16(math.Round(float64(fbox.URy) * q)),
+	}
+
 	tt.CMap = cmap
 	tt.FontName = fontName
 	tt.HmtxInfo = hmtxInfo
@@ -237,7 +248,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 	if postInfo != nil {
 		tt.ItalicAngle = postInfo.ItalicAngle
 	}
-	tt.FontBBox = &tt.HeadInfo.FontBBox // TODO(voss): avoid duplication
+	tt.FontBBox = bbox
 	tt.Flags = flags
 	tt.GSUB = gsub
 	tt.GPOS = gpos

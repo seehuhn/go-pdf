@@ -42,6 +42,14 @@ type BoxExtent struct {
 	WhiteSpaceOnly       bool
 }
 
+func (obj BoxExtent) String() string {
+	extra := ""
+	if obj.WhiteSpaceOnly {
+		extra = "*"
+	}
+	return fmt.Sprintf("%gx%g%+g%s", obj.Width, obj.Height, obj.Depth, extra)
+}
+
 // Extent implements the Box interface.
 func (obj BoxExtent) Extent() *BoxExtent {
 	return &obj
@@ -102,7 +110,7 @@ func Text(F *font.Font, ptSize float64, text string) *TextBox {
 // Extent implements the Box interface
 func (obj *TextBox) Extent() *BoxExtent {
 	font := obj.Layout.Font
-	q := obj.Layout.FontSize / float64(font.GlyphUnits)
+	q := obj.Layout.FontSize / 1000
 
 	width := 0.0
 	height := math.Inf(-1)
@@ -112,8 +120,8 @@ func (obj *TextBox) Extent() *BoxExtent {
 
 		thisDepth := float64(font.Descent)
 		thisHeight := float64(font.Ascent)
-		if font.GlyphExtent != nil {
-			bbox := &font.GlyphExtent[glyph.Gid]
+		if font.GlyphExtents != nil {
+			bbox := &font.GlyphExtents[glyph.Gid]
 			if bbox.IsZero() {
 				continue
 			}
@@ -132,8 +140,8 @@ func (obj *TextBox) Extent() *BoxExtent {
 	if height < float64(font.Ascent)*q {
 		height = float64(font.Ascent) * q
 	}
-	if depth < float64(-font.Descent)*q {
-		depth = float64(-font.Descent) * q
+	if depth < float64(-font.Descent) {
+		depth = -float64(font.Descent) * q
 	}
 
 	return &BoxExtent{

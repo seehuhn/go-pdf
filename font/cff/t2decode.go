@@ -22,13 +22,15 @@ import (
 	"errors"
 	"fmt"
 	"math"
+
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 type decodeInfo struct {
 	subr         cffIndex
 	gsubr        cffIndex
-	defaultWidth uint16
-	nominalWidth uint16
+	defaultWidth funit.Uint16
+	nominalWidth funit.Uint16
 }
 
 type ccStage int
@@ -115,7 +117,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 			return
 		}
 		if isPresent {
-			res.Width = uint16(stack[0].Int16()) + info.nominalWidth
+			res.Width = funit.Uint16(stack[0].Int16()) + info.nominalWidth
 			copy(stack, stack[1:])
 			stack = stack[:len(stack)-1]
 		}

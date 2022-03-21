@@ -64,6 +64,24 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 		return nil, err
 	}
 
+	q := 1000 / float64(tt.GlyphUnits)
+
+	ee := tt.HmtxInfo.GlyphExtents
+	glyphExtents := make([]font.Rect, len(ee))
+	for i, ext := range ee {
+		glyphExtents[i] = font.Rect{
+			LLx: int16(math.Round(float64(ext.LLx) * q)),
+			LLy: int16(math.Round(float64(ext.LLy) * q)),
+			URx: int16(math.Round(float64(ext.URx) * q)),
+			URy: int16(math.Round(float64(ext.URy) * q)),
+		}
+	}
+
+	widths := make([]uint16, len(tt.HmtxInfo.Widths))
+	for i, w := range tt.HmtxInfo.Widths {
+		widths[i] = uint16(math.Round(float64(w) * q))
+	}
+
 	fnt := newSimple(w, tt)
 	w.OnClose(fnt.WriteFont)
 
@@ -71,11 +89,10 @@ func EmbedFontSimple(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Fon
 		InstName: instName,
 		Ref:      fnt.FontRef,
 
-		GlyphUnits:  tt.GlyphUnits,
-		Ascent:      int(tt.HmtxInfo.Ascent),
-		Descent:     int(tt.HmtxInfo.Descent),
-		GlyphExtent: tt.HmtxInfo.GlyphExtents,
-		Widths:      tt.HmtxInfo.Widths,
+		Ascent:       int(math.Round(float64(tt.HmtxInfo.Ascent) * q)),
+		Descent:      int(math.Round(float64(tt.HmtxInfo.Descent) * q)),
+		GlyphExtents: glyphExtents,
+		Widths:       widths,
 
 		Layout: fnt.Layout,
 		Enc:    fnt.Enc,

@@ -68,21 +68,21 @@ import (
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 // Info contains information from the "hhea" and "hmtx" tables.
 type Info struct {
-	Widths       []uint16
-	GlyphExtents []font.Rect
-	LSB          []int16
+	Widths       []funit.Uint16
+	GlyphExtents []funit.Rect
+	LSB          []funit.Int16
 
-	Ascent  int16
-	Descent int16 // negative
-	LineGap int16
+	Ascent  funit.Int16
+	Descent funit.Int16 // negative
+	LineGap funit.Int16
 
 	CaretAngle  float64 // in radians, 0 for vertical
-	CaretOffset int16
+	CaretOffset funit.Int16
 }
 
 // Decode extracts information from the "hhea" and "hmtx" tables.
@@ -114,16 +114,16 @@ func Decode(hheaData, hmtxData []byte) (*Info, error) {
 	}
 
 	numHorMetrics := int(hheaEnc.NumOfLongHorMetrics)
-	prevWidth := uint16(0)
-	var widths []uint16
-	var lsbs []int16
+	prevWidth := funit.Uint16(0)
+	var widths []funit.Uint16
+	var lsbs []funit.Int16
 	for i := 0; len(hmtxData) > 0; i++ {
 		width := prevWidth
 		if i < numHorMetrics {
 			if len(hmtxData) < 2 {
 				return nil, fmt.Errorf("hmtx too short")
 			}
-			width = uint16(hmtxData[0])<<8 | uint16(hmtxData[1])
+			width = funit.Uint16(hmtxData[0])<<8 | funit.Uint16(hmtxData[1])
 			hmtxData = hmtxData[2:]
 			prevWidth = width
 		}
@@ -132,7 +132,7 @@ func Decode(hheaData, hmtxData []byte) (*Info, error) {
 		if len(hmtxData) < 2 {
 			return nil, fmt.Errorf("hmtx too short")
 		}
-		lsb := int16(hmtxData[0])<<8 | int16(hmtxData[1])
+		lsb := funit.Int16(hmtxData[0])<<8 | funit.Int16(hmtxData[1])
 		hmtxData = hmtxData[2:]
 		lsbs = append(lsbs, lsb)
 	}
@@ -170,7 +170,7 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 
 	lsbs := info.LSB
 	if lsbs == nil && info.GlyphExtents != nil {
-		lsbs = make([]int16, len(info.GlyphExtents))
+		lsbs = make([]funit.Int16, len(info.GlyphExtents))
 		for i, ext := range info.GlyphExtents {
 			lsbs[i] = ext.LLx
 		}
@@ -195,7 +195,7 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 			if ext.IsZero() {
 				continue
 			}
-			rsb := int16(info.Widths[i]) - ext.URx
+			rsb := funit.Int16(info.Widths[i]) - ext.URx
 			if first || rsb < hhea.MinRightSideBearing {
 				hhea.MinRightSideBearing = rsb
 			}
@@ -336,16 +336,16 @@ func bestRationalApproximation(x float64, N int) (p int, q int) {
 
 type binaryHhea struct {
 	Version             uint32
-	Ascent              int16
-	Descent             int16
-	LineGap             int16
-	AdvanceWidthMax     uint16
-	MinLeftSideBearing  int16
-	MinRightSideBearing int16
-	XMaxExtent          int16
+	Ascent              funit.Int16
+	Descent             funit.Int16
+	LineGap             funit.Int16
+	AdvanceWidthMax     funit.Uint16
+	MinLeftSideBearing  funit.Int16
+	MinRightSideBearing funit.Int16
+	XMaxExtent          funit.Int16
 	CaretSlopeRise      int16
 	CaretSlopeRun       int16
-	CaretOffset         int16
+	CaretOffset         funit.Int16
 	_                   int16 // reserved
 	_                   int16 // reserved
 	_                   int16 // reserved

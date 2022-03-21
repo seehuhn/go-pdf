@@ -25,6 +25,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
@@ -39,11 +40,11 @@ type Info struct {
 	IsRegular bool
 	IsOblique bool
 
-	Ascent    int16
-	Descent   int16 // as a negative number
-	LineGap   int16
-	CapHeight int16
-	XHeight   int16
+	Ascent    funit.Int16
+	Descent   funit.Int16 // as a negative number
+	LineGap   funit.Int16
+	CapHeight funit.Int16
+	XHeight   funit.Int16
 
 	AvgGlyphWidth int16 // arithmetic average of the width of all non-zero width glyphs
 
@@ -154,8 +155,8 @@ func Read(r io.Reader) (*Info, error) {
 		info.Ascent = v0ms.TypoAscender
 		info.Descent = v0ms.TypoDescender
 	} else {
-		info.Ascent = int16(v0ms.WinAscent)
-		info.Descent = -int16(v0ms.WinDescent)
+		info.Ascent = funit.Int16(v0ms.WinAscent)
+		info.Descent = -funit.Int16(v0ms.WinDescent)
 	}
 	info.LineGap = v0ms.TypoLineGap
 
@@ -282,8 +283,8 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		TypoAscender:  info.Ascent,
 		TypoDescender: info.Descent,
 		TypoLineGap:   info.LineGap,
-		WinAscent:     uint16(info.Ascent),   // TODO(voss)
-		WinDescent:    uint16(-info.Descent), // TODO(voss)
+		WinAscent:     funit.Uint16(info.Ascent),   // TODO(voss)
+		WinDescent:    funit.Uint16(-info.Descent), // TODO(voss)
 	}
 	binary.Write(buf, binary.BigEndian, v0ms)
 
@@ -337,16 +338,16 @@ type v0Data struct {
 }
 
 type v0MsData struct {
-	TypoAscender  int16
-	TypoDescender int16
-	TypoLineGap   int16
-	WinAscent     uint16
-	WinDescent    uint16
+	TypoAscender  funit.Int16
+	TypoDescender funit.Int16
+	TypoLineGap   funit.Int16
+	WinAscent     funit.Uint16
+	WinDescent    funit.Uint16
 }
 
 type v2Data struct {
-	XHeight     int16
-	CapHeight   int16
+	XHeight     funit.Int16
+	CapHeight   funit.Int16
 	DefaultChar uint16
 	BreakChar   uint16
 	MaxContext  uint16

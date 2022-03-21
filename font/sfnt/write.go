@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
@@ -85,9 +86,9 @@ func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
 			i2 := *info
 			info = &i2
 
-			info.Widths = subsetInfo.Width
+			info.Widths = subsetInfo.Widths
 			info.LSB = subsetInfo.LSB
-			info.GlyphExtents = subsetInfo.GlyphExtent
+			info.GlyphExtents = subsetInfo.GlyphExtents
 		}
 		hhea, hmtx := info.Encode()
 		tables["hhea"] = hhea
@@ -139,15 +140,15 @@ type subsetInfo struct {
 	blobs     map[string][]byte
 
 	// fields for the "hhea" and "hmtx" tables
-	Width       []uint16
-	GlyphExtent []font.Rect
-	LSB         []int16
+	Widths       []funit.Uint16
+	GlyphExtents []funit.Rect
+	LSB          []funit.Int16
 
 	// fields for the "head" table
-	xMin             int16 // TODO(voss): are these needed?
-	yMin             int16
-	xMax             int16
-	yMax             int16
+	xMin             funit.Int16 // TODO(voss): are these needed?
+	yMin             funit.Int16
+	xMax             funit.Int16
+	yMax             funit.Int16
 	indexToLocFormat int16 // 0 for short offsets, 1 for long
 }
 
@@ -166,20 +167,20 @@ func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
 		yMax:  -32768,
 	}
 
-	res.Width = make([]uint16, len(includeOnly))
+	res.Widths = make([]funit.Uint16, len(includeOnly))
 	if tt.HmtxInfo.LSB != nil {
-		res.LSB = make([]int16, len(includeOnly))
+		res.LSB = make([]funit.Int16, len(includeOnly))
 	}
 	if tt.HmtxInfo.GlyphExtents != nil {
-		res.GlyphExtent = make([]font.Rect, len(includeOnly))
+		res.GlyphExtents = make([]funit.Rect, len(includeOnly))
 	}
 	for i, gid := range includeOnly {
-		res.Width[i] = tt.HmtxInfo.Widths[gid]
+		res.Widths[i] = tt.HmtxInfo.Widths[gid]
 		if tt.HmtxInfo.LSB != nil {
 			res.LSB[i] = tt.HmtxInfo.LSB[gid]
 		}
 		if tt.HmtxInfo.GlyphExtents != nil {
-			res.GlyphExtent[i] = tt.HmtxInfo.GlyphExtents[gid]
+			res.GlyphExtents[i] = tt.HmtxInfo.GlyphExtents[gid]
 		}
 	}
 

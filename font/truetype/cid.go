@@ -62,8 +62,27 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 		return nil, err
 	}
 
+	q := 1000 / float64(tt.GlyphUnits)
+
+	ee := tt.HmtxInfo.GlyphExtents
+	glyphExtents := make([]font.Rect, len(ee))
+	for i, ext := range ee {
+		glyphExtents[i] = font.Rect{
+			LLx: int16(math.Round(float64(ext.LLx) * q)),
+			LLy: int16(math.Round(float64(ext.LLy) * q)),
+			URx: int16(math.Round(float64(ext.URx) * q)),
+			URy: int16(math.Round(float64(ext.URy) * q)),
+		}
+	}
+
+	widths := make([]uint16, len(tt.HmtxInfo.Widths))
+	for i, w := range tt.HmtxInfo.Widths {
+		widths[i] = uint16(math.Round(float64(w) * q))
+	}
+
 	t := &cidFont{
-		Sfnt: tt,
+		Sfnt:   tt,
+		Widths: widths,
 
 		FontRef: w.Alloc(),
 
@@ -79,11 +98,10 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 		InstName: instName,
 		Ref:      t.FontRef,
 
-		GlyphUnits:  tt.GlyphUnits,
-		Ascent:      int(tt.HmtxInfo.Ascent),
-		Descent:     int(tt.HmtxInfo.Descent),
-		GlyphExtent: tt.HmtxInfo.GlyphExtents,
-		Widths:      tt.HmtxInfo.Widths,
+		Ascent:       int(math.Round(float64(tt.HmtxInfo.Ascent) * q)),
+		Descent:      int(math.Round(float64(tt.HmtxInfo.Descent) * q)),
+		GlyphExtents: glyphExtents,
+		Widths:       widths,
 
 		Layout: t.Layout,
 		Enc:    t.Enc,
@@ -92,7 +110,8 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 }
 
 type cidFont struct {
-	Sfnt *sfnt.Font
+	Sfnt   *sfnt.Font
+	Widths []uint16
 
 	FontRef *pdf.Reference
 
@@ -158,7 +177,7 @@ func (t *cidFont) WriteFont(w *pdf.Writer) error {
 		URy: math.Round(float64(t.Sfnt.FontBBox.URy) * q),
 	}
 
-	DW, W := font.EncodeCIDWidths(t.Sfnt.HmtxInfo.Widths) // TODO(voss): subset???
+	DW, W := font.EncodeCIDWidths(t.Widths)
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()

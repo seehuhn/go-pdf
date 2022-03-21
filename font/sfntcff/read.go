@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
@@ -239,7 +240,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 			return nil, errors.New("sfnt: ttf glyph count mismatch")
 		}
 
-		var widths []uint16
+		var widths []funit.Uint16
 		if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
 			widths = hmtxInfo.Widths
 		}
@@ -248,7 +249,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		if postInfo != nil {
 			names = postInfo.Names
 		}
-		Outlines = &TTFOutlines{
+		Outlines = &GlyfOutlines{
 			Widths: widths,
 			Glyphs: ttGlyphs,
 			Tables: tables,
@@ -326,13 +327,13 @@ func Read(r io.ReaderAt) (*Info, error) {
 	if info.CapHeight == 0 && cmapSubtable != nil {
 		gid := cmapSubtable.Lookup('H')
 		if gid != 0 {
-			info.CapHeight = info.GlyphExtent(gid).URy
+			info.CapHeight = info.fGlyphHeight(gid)
 		}
 	}
 	if info.XHeight == 0 && cmapSubtable != nil {
 		gid := cmapSubtable.Lookup('x')
 		if gid != 0 {
-			info.XHeight = info.GlyphExtent(gid).URy
+			info.XHeight = info.fGlyphHeight(gid)
 		}
 	}
 

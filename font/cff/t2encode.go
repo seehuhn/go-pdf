@@ -23,7 +23,7 @@ import (
 
 	"seehuhn.de/go/dijkstra"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 // Glyph represents a glyph in a CFF font.
@@ -32,11 +32,11 @@ type Glyph struct {
 	HStem []int16
 	VStem []int16
 	Name  pdf.Name
-	Width uint16
+	Width funit.Uint16
 }
 
 // NewGlyph allocates a new glyph.
-func NewGlyph(name pdf.Name, width uint16) *Glyph {
+func NewGlyph(name pdf.Name, width funit.Uint16) *Glyph {
 	return &Glyph{
 		Name:  name,
 		Width: width,
@@ -80,7 +80,7 @@ func (g *Glyph) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 }
 
 // Extent computes the Glyph extent in font design units
-func (g *Glyph) Extent() font.Rect {
+func (g *Glyph) Extent() funit.Rect {
 	var left, right, top, bottom Fixed16
 	first := true
 cmdLoop:
@@ -110,15 +110,15 @@ cmdLoop:
 		}
 		first = false
 	}
-	return font.Rect{
-		LLx: left.Floor(),
-		LLy: bottom.Floor(),
-		URx: right.Ceil(),
-		URy: top.Ceil(),
+	return funit.Rect{
+		LLx: funit.Int16(left.Floor()),
+		LLy: funit.Int16(bottom.Floor()),
+		URx: funit.Int16(right.Ceil()),
+		URy: funit.Int16(top.Ceil()),
 	}
 }
 
-func (g *Glyph) encodeCharString(defaultWidth, nominalWidth uint16) ([]byte, error) {
+func (g *Glyph) encodeCharString(defaultWidth, nominalWidth funit.Uint16) ([]byte, error) {
 	var header [][]byte
 	w := g.Width
 	if w != defaultWidth {

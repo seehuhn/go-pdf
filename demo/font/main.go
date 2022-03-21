@@ -62,7 +62,6 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 
 	margin := 50.0
 	baseLineSkip := 1.2 * fontSize
-	q := fontSize / float64(F1.GlyphUnits)
 	layout := F1.Typeset(text, fontSize)
 	glyphs := layout.Glyphs
 
@@ -72,7 +71,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 
 	page.Println("q")
 	page.Println("1 .5 .5 RG")
-	yPos := height - margin - float64(F1.Ascent)*q
+	yPos := height - margin - float64(F1.Ascent)
 	for y := yPos; y > margin; y -= baseLineSkip {
 		page.Printf("%.1f %.1f m %.1f %.1f l\n", margin, y, width-margin, y)
 	}
@@ -84,16 +83,16 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	xPos := margin
 	for _, gl := range glyphs {
 		c := gl.Gid
-		bbox := F1.GlyphExtent[c]
+		bbox := F1.GlyphExtents[c]
 		if !bbox.IsZero() {
-			x := xPos + float64(gl.XOffset+bbox.LLx)*q
-			y := yPos + float64(gl.YOffset+bbox.LLy)*q
-			w := float64(bbox.URx-bbox.LLx) * q
-			h := float64(bbox.URy-bbox.LLy) * q
+			x := xPos + float64(gl.XOffset+bbox.LLx)
+			y := yPos + float64(gl.YOffset+bbox.LLy)
+			w := float64(bbox.URx - bbox.LLx)
+			h := float64(bbox.URy - bbox.LLy)
 			page.Printf("%.2f %.2f %.2f %.2f re\n", x, y, w, h)
 			page.Printf("%.2f %.2f %.2f %.2f re\n", x, y-baseLineSkip, w, h)
 		}
-		xPos += float64(gl.Advance) * q
+		xPos += float64(gl.Advance)
 	}
 	page.Println("s")
 	page.Println("Q")

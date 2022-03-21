@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"time"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 const headLength = 54
@@ -43,7 +43,7 @@ type Info struct {
 	UnitsPerEm   uint16  // font design units per em square
 	Created      time.Time
 	Modified     time.Time
-	FontBBox     font.Rect
+	FontBBox     funit.Rect
 
 	IsBold      bool
 	IsItalic    bool
@@ -84,7 +84,7 @@ func Read(r io.Reader) (*Info, error) {
 	info.Created = decodeTime(enc.Created)
 	info.Modified = decodeTime(enc.Modified)
 
-	info.FontBBox = font.Rect{
+	info.FontBBox = funit.Rect{
 		LLx: enc.XMin,
 		LLy: enc.YMin,
 		URx: enc.XMax,
@@ -154,10 +154,10 @@ func (info *Info) Encode() []byte {
 		UnitsPerEm:        info.UnitsPerEm,
 		Created:           encodeTime(info.Created),
 		Modified:          encodeTime(info.Modified),
-		XMin:              int16(info.FontBBox.LLx),
-		YMin:              int16(info.FontBBox.LLy),
-		XMax:              int16(info.FontBBox.URx),
-		YMax:              int16(info.FontBBox.URy),
+		XMin:              info.FontBBox.LLx,
+		YMin:              info.FontBBox.LLy,
+		XMax:              info.FontBBox.URx,
+		YMax:              info.FontBBox.URy,
 		MacStyle:          macStyle,
 		LowestRecPPEM:     info.LowestRecPPEM,
 		FontDirectionHint: 2,
@@ -190,10 +190,10 @@ type binaryHead struct {
 	Created            int64
 	Modified           int64
 
-	XMin int16
-	YMin int16
-	XMax int16
-	YMax int16
+	XMin funit.Int16
+	YMin funit.Int16
+	XMax funit.Int16
+	YMax funit.Int16
 
 	MacStyle uint16
 

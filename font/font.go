@@ -19,7 +19,6 @@ package font
 import (
 	"fmt"
 	"io"
-	"math"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
@@ -36,12 +35,11 @@ type Font struct {
 	Layout func([]rune) []Glyph
 	Enc    func(GlyphID) pdf.String
 
-	GlyphUnits int // font design units
-	Ascent     int // ascent in glyph coordinate units
-	Descent    int // descent in glyph coordinate units, as a negative number
+	Ascent  int // PDF glyph space units
+	Descent int // PDF glyph space units, negative
 
-	GlyphExtent []Rect   // This is in font design units.
-	Widths      []uint16 // This is in font design units.
+	GlyphExtents []Rect   // PDF glyph space units
+	Widths       []uint16 // PDF glyph space units
 }
 
 // NumGlyphs returns the number of glyphs in a font.
@@ -83,11 +81,9 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 	xOffs := 0
 	yOffs := 0
 	for _, glyph := range glyphs {
-		// TODO(voss): more conversions from Glyph units needed
 		if int(glyph.YOffset) != yOffs {
 			flush()
-			yOffs = font.ToGlyph(int(glyph.YOffset))
-			page.Printf("%d Ts\n", yOffs)
+			page.Printf("%d Ts\n", glyph.YOffset)
 		}
 
 		xOffsWanted := xOffs + int(glyph.XOffset)
@@ -97,7 +93,7 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 			gid = 0
 		}
 
-		delta := font.ToGlyph(xOffsWanted - xOffsAuto)
+		delta := xOffsWanted - xOffsAuto
 		if delta != 0 {
 			flushRun()
 			data = append(data, -pdf.Integer(delta))
@@ -108,15 +104,6 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 		xOffsAuto = xOffsWanted + int(font.Widths[gid])
 	}
 	flush()
-}
-
-// ToGlyph converts from font design units to PDF glyph coordinates.
-func (font *Font) ToGlyph(fontDesignSize int) int {
-	if font.GlyphUnits == 1000 {
-		return fontDesignSize
-	}
-	q := 1000 / float64(font.GlyphUnits)
-	return int(math.Round(float64(fontDesignSize) * q))
 }
 
 // GlyphID is used to enumerate the glyphs in a font.  The first glyph

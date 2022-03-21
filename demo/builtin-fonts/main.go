@@ -50,18 +50,17 @@ func (gl *glyphBox) Extent() *boxes.BoxExtent {
 func (gl *glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	page.Println("q")
 	font := gl.text.Layout.Font
-	q := float64(gl.text.Layout.FontSize) / float64(font.GlyphUnits)
 	x := xPos
 	y := yPos
 	page.Println(".4 1 .4 rg")
 	for _, glyph := range gl.text.Layout.Glyphs {
 		gid := glyph.Gid
-		ext := font.GlyphExtent[gid]
+		ext := font.GlyphExtents[gid]
 		page.Printf("%.2f %.2f %.2f %.2f re\n",
-			x+float64(ext.LLx)*q+float64(glyph.XOffset),
-			y+float64(ext.LLy)*q+float64(glyph.YOffset),
-			float64(ext.URx-ext.LLx)*q,
-			float64(ext.URy-ext.LLy)*q)
+			x+float64(ext.LLx)+float64(glyph.XOffset),
+			y+float64(ext.LLy)+float64(glyph.YOffset),
+			float64(ext.URx-ext.LLx),
+			float64(ext.URy-ext.LLy))
 		x += float64(glyph.Advance)
 	}
 	page.Println("f")

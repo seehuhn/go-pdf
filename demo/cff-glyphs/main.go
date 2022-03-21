@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -72,30 +73,30 @@ func main() {
 			continue
 		}
 
-		X, err := cff.EmbedFontCID(out, cffFont, "X")
-		if err != nil {
-			log.Printf("%s: %v", fname, err)
-			continue
-		}
+		// X, err := cff.EmbedFontCID(out, cffFont, "X")
+		// if err != nil {
+		// 	log.Printf("%s: %v", fname, err)
+		// 	continue
+		// }
 
 		for i := range cffFont.Glyphs {
 			bbox := cffFont.Glyphs[i].Extent()
-			left := int16(0)
+			left := funit.Int16(0)
 			if bbox.LLx < left {
 				left = bbox.LLx
 			}
-			right := int16(cffFont.Glyphs[i].Width)
+			right := funit.Int16(cffFont.Glyphs[i].Width)
 			if right < 300 {
 				right = 300
 			}
 			if bbox.URx > right {
 				right = bbox.URx
 			}
-			top := int16(100)
+			top := funit.Int16(100)
 			if bbox.URy > top {
 				top = bbox.URy
 			}
-			bottom := int16(0)
+			bottom := funit.Int16(0)
 			if bbox.LLy < bottom {
 				bottom = bbox.LLy
 			}
@@ -109,7 +110,7 @@ func main() {
 				},
 				Resources: &pages.Resources{
 					Font: pdf.Dict{
-						X.InstName: X.Ref,
+						// X.InstName: X.Ref,
 					},
 				},
 			})
@@ -117,6 +118,7 @@ func main() {
 				log.Fatal(err)
 			}
 
+			var X *font.Font // TODO(voss)
 			err = illustrateGlyph(page, F, X, cffFont, i)
 			if err != nil {
 				log.Fatal(err)
@@ -171,20 +173,20 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 
 	glyph := fnt.Glyphs[i]
 
-	page.Println("q")
-	page.Println("0.5 0.9 0.9 rg")
-	glyphImage := &font.Layout{
-		Font:     X,
-		FontSize: 1000,
-		Glyphs: []font.Glyph{
-			{
-				Gid:     font.GlyphID(i),
-				Advance: int32(fnt.Glyphs[i].Width),
-			},
-		},
-	}
-	glyphImage.Draw(page, 0, 0)
-	page.Println("Q")
+	// page.Println("q")
+	// page.Println("0.5 0.9 0.9 rg")
+	// glyphImage := &font.Layout{
+	// 	Font:     X,
+	// 	FontSize: 1000,
+	// 	Glyphs: []font.Glyph{
+	// 		{
+	// 			Gid:     font.GlyphID(i),
+	// 			Advance: int32(fnt.Glyphs[i].Width),
+	// 		},
+	// 	},
+	// }
+	// glyphImage.Draw(page, 0, 0)
+	// page.Println("Q")
 
 	var xx []cff.Fixed16
 	var yy []cff.Fixed16

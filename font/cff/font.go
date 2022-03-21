@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -362,9 +363,10 @@ func Read(r io.ReadSeeker) (*Font, error) {
 }
 
 // GlyphExtents returns the boundig boxes of all glyphs.
-func (cff *Font) GlyphExtents() []font.Rect {
+// TODO(voss): is this method needed?
+func (cff *Font) GlyphExtents() []funit.Rect {
 	numGlyphs := len(cff.Glyphs)
-	extents := make([]font.Rect, numGlyphs)
+	extents := make([]funit.Rect, numGlyphs)
 	for i := 0; i < numGlyphs; i++ {
 		extents[i] = cff.Glyphs[i].Extent()
 	}
@@ -578,7 +580,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	return nil
 }
 
-func (cff *Font) selectWidths() (uint16, uint16) {
+func (cff *Font) selectWidths() (funit.Uint16, funit.Uint16) {
 	numGlyphs := int32(len(cff.Glyphs))
 	if numGlyphs == 0 {
 		return 0, 0
@@ -586,9 +588,9 @@ func (cff *Font) selectWidths() (uint16, uint16) {
 		return cff.Glyphs[0].Width, cff.Glyphs[0].Width
 	}
 
-	widthHist := make(map[uint16]int32)
+	widthHist := make(map[funit.Uint16]int32)
 	var mostFrequentCount int32
-	var defaultWidth uint16
+	var defaultWidth funit.Uint16
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		widthHist[w]++
@@ -600,8 +602,8 @@ func (cff *Font) selectWidths() (uint16, uint16) {
 
 	// TODO(voss): the choice of nominalWidth can be improved
 	var sum int32
-	var minWidth uint16 = math.MaxUint16
-	var maxWidth uint16 = 0
+	var minWidth funit.Uint16 = math.MaxUint16
+	var maxWidth funit.Uint16 = 0
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		if w == defaultWidth {
@@ -615,7 +617,7 @@ func (cff *Font) selectWidths() (uint16, uint16) {
 			maxWidth = w
 		}
 	}
-	nominalWidth := uint16((sum + numGlyphs/2) / (numGlyphs - 1))
+	nominalWidth := funit.Uint16((sum + numGlyphs/2) / (numGlyphs - 1))
 	if nominalWidth < minWidth+107 {
 		nominalWidth = minWidth + 107
 	} else if nominalWidth > maxWidth-107 {
@@ -624,7 +626,7 @@ func (cff *Font) selectWidths() (uint16, uint16) {
 	return defaultWidth, nominalWidth
 }
 
-func (cff *Font) encodeCharStrings() (cffIndex, uint16, uint16, error) {
+func (cff *Font) encodeCharStrings() (cffIndex, funit.Uint16, funit.Uint16, error) {
 	numGlyphs := len(cff.Glyphs)
 	if numGlyphs < 1 || (cff.ROS == nil && cff.Glyphs[0].Name != ".notdef") {
 		return nil, 0, 0, invalidSince("missing .notdef glyph")

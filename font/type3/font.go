@@ -180,8 +180,7 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 			}
 			return []byte{byte(gid)}
 		},
-		Widths:     t3.glyphWidth,
-		GlyphUnits: int(t3.width + 0.5), // TODO(voss): check this
+		Widths: t3.glyphWidth,
 	}
 
 	return font, nil
