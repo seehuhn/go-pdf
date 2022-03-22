@@ -66,6 +66,7 @@ func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
 	return nil, nil
 }
 
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-list-table-and-script-record
 func readScriptList(p *parser.Parser, offset int64) error {
 	err := p.SeekPos(offset)
 	if err != nil {
@@ -116,4 +117,24 @@ func readScriptList(p *parser.Parser, offset int64) error {
 	}
 
 	return nil
+}
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table-and-language-system-record
+func readScriptTable(p *parser.Parser, offset int64) error {
+	err := p.SeekPos(offset)
+	if err != nil {
+		return err
+	}
+
+	data, err := p.ReadBlob(4)
+	if err != nil {
+		return err
+	}
+
+	defaultLangSysOffset := uint16(data[0])<<8 + uint16(data[1])
+	langSysCount := uint16(data[2])<<8 + uint16(data[3])
+
+	_ = defaultLangSysOffset
+	_ = langSysCount
+	panic("not implemented")
 }
