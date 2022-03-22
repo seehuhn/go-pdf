@@ -1,24 +1,7 @@
-// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-package simple
+package cid
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"sort"
 
@@ -30,10 +13,6 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 )
 
-// Embed embeds a TrueType or OpenType font into a PDF document.
-//
-// This requires PDF version 1.1 or higher, and
-// use of CFF-based OpenType fonts requires PDF version 1.2 or higher.
 func Embed(w *pdf.Writer, info *sfntcff.Info, instName pdf.Name) (*font.Font, error) {
 	isTrueType := info.IsGlyf()
 	isOpenType := info.IsCFF()
@@ -70,12 +49,11 @@ func Embed(w *pdf.Writer, info *sfntcff.Info, instName pdf.Name) (*font.Font, er
 }
 
 type fontHandler struct {
-	FontRef      *pdf.Reference
-	info         *sfntcff.Info
-	widths       []uint16
-	text         map[font.GlyphID][]rune
-	enc          map[font.GlyphID]byte
-	nextCharCode int
+	FontRef *pdf.Reference
+	info    *sfntcff.Info
+	widths  []uint16
+	text    map[font.GlyphID][]rune
+	used    map[uint16]bool
 }
 
 func (s *fontHandler) Layout(rr []rune) []font.Glyph {
@@ -94,44 +72,22 @@ func (s *fontHandler) Layout(rr []rune) []font.Glyph {
 }
 
 func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
-	c, ok := s.enc[gid]
-	if ok {
-		return pdf.String{c}
+	var c uint16
+	if gid <= 0xFFFF {
+		c = uint16(gid)
 	}
-
-	c = byte(s.nextCharCode)
-	s.nextCharCode++
-	s.enc[gid] = c
-	return pdf.String{c}
+	s.used[c] = true
+	return pdf.String{byte(c >> 8), byte(c)}
 }
 
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {
-	if s.nextCharCode > 256 {
-		return fmt.Errorf("too many different glyphs for simple font %q",
-			s.info.FullName())
-	}
-
 	// Determine the subset of glyphs to include.
-	mapping := make([]font.CMapEntry, 0, len(s.enc))
-	for gid, c := range s.enc {
-		mapping = append(mapping, font.CMapEntry{
-			CharCode: uint16(c),
-			GID:      gid,
-		})
+	includeGlyphs := make([]font.GlyphID, 0, len(s.used)+1)
+	includeGlyphs = append(includeGlyphs, 0) // always include .notdef
+	for c := range s.used {
+		includeGlyphs = append(includeGlyphs, font.GlyphID(c))
 	}
-	sort.Slice(mapping, func(i, j int) bool { return mapping[i].CharCode < mapping[j].CharCode })
-
-	firstCharCode := mapping[0].CharCode
-	lastCharCode := mapping[len(mapping)-1].CharCode
-
-	includeGlyphs := make([]font.GlyphID, 0, len(mapping)+1)
-	includeGlyphs = append(includeGlyphs, 0) // always include the .notdef glyph
-	for _, m := range mapping {
-		if m.GID == 0 {
-			continue
-		}
-		includeGlyphs = append(includeGlyphs, m.GID)
-	}
+	sort.Slice(includeGlyphs, func(i, j int) bool { return includeGlyphs[i] < includeGlyphs[j] })
 	subsetTag := font.GetSubsetTag(includeGlyphs, s.info.NumGlyphs())
 
 	// subset the font
@@ -159,23 +115,14 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		o2.FdSelect = func(gid font.GlyphID) int {
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
-		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
-			// Embed as a CID-keyed CFF font.
-			o2.ROS = &type1.ROS{
-				Registry:   "Adobe",
-				Ordering:   "Identity",
-				Supplement: 0,
-			}
-			o2.Gid2cid = make([]int32, len(includeGlyphs))
-			for i, gid := range includeGlyphs {
-				o2.Gid2cid[i] = int32(s.enc[gid])
-			}
-		} else {
-			// Embed as a simple CFF font.
-			o2.Encoding = make([]font.GlyphID, 256)
-			for i, gid := range includeGlyphs {
-				o2.Encoding[s.enc[gid]] = font.GlyphID(i)
-			}
+		o2.ROS = &type1.ROS{
+			Registry:   "Adobe",
+			Ordering:   "Identity",
+			Supplement: 0,
+		}
+		o2.Gid2cid = make([]int32, len(includeGlyphs))
+		for i, gid := range includeGlyphs {
+			o2.Gid2cid[i] = int32(gid)
 		}
 		subsetInfo.Outlines = o2
 
@@ -235,21 +182,42 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 
 	fontName := pdf.Name(subsetTag) + "+" + subsetInfo.PostscriptName()
 
+	CIDFontRef := w.Alloc()
+	CIDSystemInfoRef := w.Alloc()
 	FontDescriptorRef := w.Alloc()
-	WidthsRef := w.Alloc()
+	WidthsRef := w.Alloc() // TODO(voss): don't allocte if W == nil.
 	FontFileRef := w.Alloc()
 	ToUnicodeRef := w.Alloc()
 
 	q := 1000 / float64(subsetInfo.UnitsPerEm)
 
-	Font := pdf.Dict{ // See section 9.6.2.1 of PDF 32000-1:2008.
+	Font := pdf.Dict{ // See section 9.7.6.1 of PDF 32000-1:2008.
+		"Type":            pdf.Name("Font"),
+		"Subtype":         pdf.Name("Type0"),
+		"Encoding":        pdf.Name("Identity-H"),
+		"DescendantFonts": pdf.Array{CIDFontRef},
+		"ToUnicode":       ToUnicodeRef,
+	}
+
+	DW, W := font.EncodeCIDWidths(s.widths)
+	CIDFont := pdf.Dict{ // See section 9.7.4.1 of PDF 32000-1:2008.
 		"Type":           pdf.Name("Font"),
 		"BaseFont":       fontName,
-		"FirstChar":      pdf.Integer(firstCharCode),
-		"LastChar":       pdf.Integer(lastCharCode),
+		"CIDSystemInfo":  CIDSystemInfoRef,
 		"FontDescriptor": FontDescriptorRef,
-		"Widths":         WidthsRef,
-		"ToUnicode":      ToUnicodeRef,
+	}
+	if W != nil {
+		CIDFont["W"] = WidthsRef
+	}
+	if DW != 1000 {
+		CIDFont["DW"] = pdf.Integer(DW)
+	}
+
+	// TODO(voss): make sure there is only one copy of this per PDF file.
+	CIDSystemInfo := pdf.Dict{ // See sections 9.7.3 of PDF 32000-1:2008.
+		"Registry":   pdf.String("Adobe"),
+		"Ordering":   pdf.String("Identity"),
+		"Supplement": pdf.Integer(0),
 	}
 
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
@@ -264,20 +232,15 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
 
-	var Widths pdf.Array
-	ww := s.widths
-	for _, m := range mapping {
-		Widths = append(Widths, pdf.Integer(ww[m.GID]))
-	}
-
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
-		Font["Subtype"] = pdf.Name("Type1")
+		Font["BaseFont"] = fontName + "-" + "Identity-H"
+		CIDFont["Subtype"] = pdf.Name("CIDFontType0")
 		FontDescriptor["FontFile3"] = FontFileRef
 
 		_, err := w.WriteCompressed(
-			[]*pdf.Reference{s.FontRef, FontDescriptorRef, WidthsRef},
-			Font, FontDescriptor, Widths)
+			[]*pdf.Reference{s.FontRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef, WidthsRef},
+			Font, CIDFont, CIDSystemInfo, FontDescriptor, W)
 		if err != nil {
 			return err
 		}
@@ -285,7 +248,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		// Write the font file itself.
 		// See section 9.9 of PDF 32000-1:2008 for details.
 		fontFileDict := pdf.Dict{
-			"Subtype": pdf.Name("Type1C"),
+			"Subtype": pdf.Name("CIDFontType0C"),
 		}
 		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
 			&pdf.FilterInfo{Name: "FlateDecode"})
@@ -306,12 +269,36 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		}
 
 	case *sfntcff.GlyfOutlines:
-		Font["Subtype"] = pdf.Name("TrueType")
+		CID2GIDMapRef := w.Alloc()
+
+		Font["BaseFont"] = fontName
+		CIDFont["Subtype"] = pdf.Name("CIDFontType2")
+		CIDFont["CIDToGIDMap"] = CID2GIDMapRef
 		FontDescriptor["FontFile2"] = FontFileRef
 
 		_, err := w.WriteCompressed(
-			[]*pdf.Reference{s.FontRef, FontDescriptorRef, WidthsRef},
-			Font, FontDescriptor, Widths)
+			[]*pdf.Reference{s.FontRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef, WidthsRef},
+			Font, CIDFont, CIDSystemInfo, FontDescriptor, W)
+		if err != nil {
+			return err
+		}
+
+		cid2gidStream, _, err := w.OpenStream(nil, CID2GIDMapRef,
+			&pdf.FilterInfo{
+				Name: "FlateDecode",
+				Parms: pdf.Dict{
+					"Predictor": pdf.Integer(12),
+					"Columns":   pdf.Integer(2),
+				},
+			})
+		if err != nil {
+			return err
+		}
+		_, err = cid2gidStream.Write(cid2gid)
+		if err != nil {
+			return err
+		}
+		err = cid2gidStream.Close()
 		if err != nil {
 			return err
 		}

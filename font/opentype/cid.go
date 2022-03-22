@@ -94,7 +94,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 		widths[i] = uint16(math.Round(float64(w) * q))
 	}
 
-	t := &cidFont{
+	t := &fontHandler{
 		Sfnt:   tt,
 		Cff:    cff,
 		widths: widths,
@@ -124,7 +124,7 @@ func EmbedFontCID(w *pdf.Writer, tt *sfnt.Font, instName pdf.Name) (*font.Font, 
 	return res, nil
 }
 
-type cidFont struct {
+type fontHandler struct {
 	Sfnt   *sfnt.Font
 	Cff    *cff.Font
 	widths []uint16
@@ -135,7 +135,7 @@ type cidFont struct {
 	used map[font.GlyphID]bool   // is GID used?
 }
 
-func (t *cidFont) Layout(rr []rune) []font.Glyph {
+func (t *fontHandler) Layout(rr []rune) []font.Glyph {
 	gg := make([]font.Glyph, len(rr))
 	for i, r := range rr {
 		gid := t.Sfnt.CMap[r]
@@ -159,12 +159,12 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 	return gg
 }
 
-func (t *cidFont) Enc(gid font.GlyphID) pdf.String {
+func (t *fontHandler) Enc(gid font.GlyphID) pdf.String {
 	t.used[gid] = true
 	return pdf.String{byte(gid >> 8), byte(gid)}
 }
 
-func (t *cidFont) WriteFont(w *pdf.Writer) error {
+func (t *fontHandler) WriteFont(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
 	origNumGlyphs := t.Sfnt.NumGlyphs()
 	includeGlyphs := []font.GlyphID{0} // always include .notdef
