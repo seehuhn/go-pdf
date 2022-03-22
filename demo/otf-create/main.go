@@ -45,9 +45,10 @@ func main() {
 		PermUse:   os2.PermInstall,
 
 		UnitsPerEm: 1000,
-		Ascent:     700,
-		Descent:    -300,
-		LineGap:    200,
+
+		Ascent:  700,
+		Descent: -300,
+		LineGap: 200,
 	}
 
 	cffInfo := &cff.Outlines{}
@@ -79,7 +80,7 @@ func main() {
 	cffInfo.Glyphs = append(cffInfo.Glyphs, g)
 	cffInfo.Private = []*type1.PrivateDict{
 		{
-			BlueValues: []int32{-10, 0, 700, 710}, // TODO(voss)
+			BlueValues: []int32{-10, 0, 700, 710},
 		},
 	}
 	cffInfo.FdSelect = func(gi font.GlyphID) int { return 0 }

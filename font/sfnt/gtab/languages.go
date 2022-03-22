@@ -20,9 +20,14 @@ import "seehuhn.de/go/pdf/locale"
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
 var otfScript = map[locale.Script]string{
-	locale.ScriptCyrillic: "cyrl",
-	locale.ScriptGreek:    "grek",
-	locale.ScriptLatin:    "latn",
+	locale.ScriptCyrillic:       "cyrl",
+	locale.ScriptGreek:          "grek",
+	locale.ScriptLatin:          "latn",
+	locale.ScriptHiragana:       "kana",
+	locale.ScriptCJKIdeographic: "hani",
+	locale.ScriptThai:           "thai",
+	locale.ScriptArabic:         "arab",
+	locale.ScriptHebrew:         "hebr",
 }
 
 const otfDefaultScript = "DFLT"

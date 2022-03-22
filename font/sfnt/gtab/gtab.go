@@ -28,6 +28,7 @@ import (
 
 // GTab represents a GSUB or GPOS table.
 type GTab struct {
+	r   io.ReaderAt
 	toc *table.Header
 	*parser.Parser
 
@@ -48,10 +49,10 @@ type stReaderFn func(s *parser.State, format uint16, subtablePos int64) (LookupS
 // New wraps a parser with a helper to read GSUB and GPOS tables. The loc
 // argument determines the writing script and language.
 // If loc is nil, the default script and language of the font are used.
-func New(toc *table.Header, r io.ReadSeeker, loc *locale.Locale) (*GTab, error) {
+func New(toc *table.Header, r io.ReaderAt, loc *locale.Locale) (*GTab, error) {
 	g := &GTab{
+		r:        r,
 		toc:      toc,
-		Parser:   parser.New(r),
 		script:   otfDefaultScript,
 		language: otfDefaultLanguage,
 	}
@@ -79,10 +80,8 @@ func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) (
 	if err != nil {
 		return nil, err
 	}
-	err = g.SetRegion(tableName, int64(info.Offset), int64(info.Length))
-	if err != nil {
-		return nil, err
-	}
+	g.Parser = parser.New(tableName,
+		io.NewSectionReader(g.r, int64(info.Offset), int64(info.Length)))
 
 	s := &parser.State{}
 

@@ -21,18 +21,14 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/cid"
 	"seehuhn.de/go/pdf/font/sfnt/gtab"
-	"seehuhn.de/go/pdf/font/sfnt/table"
-	"seehuhn.de/go/pdf/font/truetype"
-	"seehuhn.de/go/pdf/locale"
+	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -182,26 +178,33 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
-	tt, err := sfnt.Open(fontFileName, locale.EnGB)
+	fd, err := os.Open(fontFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer tt.Close()
-
-	gtab, err := gtab.New(tt.Header, tt.Fd, locale.EnGB)
+	tt, err := sfntcff.Read(fd)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = fd.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	gdef, err = gtab.ReadGdefTable()
-	if err != nil && !table.IsMissing(err) {
-		log.Fatal(err)
-	}
+	// gtab, err := gtab.New(tt.Header, tt.Fd, locale.EnGB)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	gsub, err := gtab.ReadGsubTable()
-	if err != nil && !table.IsMissing(err) {
-		log.Fatal(err)
-	}
+	// gdef, err = gtab.ReadGdefTable()
+	// if err != nil && !table.IsMissing(err) {
+	// 	log.Fatal(err)
+	// }
+
+	// gsub, err := gtab.ReadGsubTable()
+	// if err != nil && !table.IsMissing(err) {
+	// 	log.Fatal(err)
+	// }
 
 	out, err := pdf.Create("test.pdf")
 	if err != nil {
@@ -216,16 +219,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if strings.HasSuffix(fontFileName, ".otf") {
-		theFont, err = opentype.EmbedFontCID(out, tt, "X")
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		theFont, err = truetype.EmbedFontCID(out, tt, "X")
-		if err != nil {
-			log.Fatal(err)
-		}
+	theFont, err = cid.Embed(out, tt, "X")
+	if err != nil {
+		log.Fatal(err)
 	}
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: &pages.Resources{
@@ -275,22 +271,22 @@ func main() {
 			boxes.Text(courier, 10, "number of glyphs: "),
 			boxes.Text(courier, 10, strconv.Itoa(numGlyph)),
 		),
-		boxes.HBox(
-			boxes.Kern(72),
-			boxes.Text(courier, 10, "number of GSUB lookups: "),
-			boxes.Text(courier, 10, strconv.Itoa(len(gsub))),
-		),
+		// boxes.HBox(
+		// 	boxes.Kern(72),
+		// 	boxes.Text(courier, 10, "number of GSUB lookups: "),
+		// 	boxes.Text(courier, 10, strconv.Itoa(len(gsub))),
+		// ),
 	)
 	flush()
 
 	p.BaseLineSkip = 46
 	rev = make(map[font.GlyphID]rune)
-	for r, idx := range tt.CMap {
-		r2 := rev[idx]
-		if r2 == 0 || r < r2 {
-			rev[idx] = r
-		}
-	}
+	// for r, idx := range tt.CMap {
+	// 	r2 := rev[idx]
+	// 	if r2 == 0 || r < r2 {
+	// 		rev[idx] = r
+	// 	}
+	// }
 	for row := 0; 10*row < numGlyph; row++ {
 		if len(rowBoxes) == 0 {
 			rowBoxes = append(rowBoxes, boxes.Kern(36))

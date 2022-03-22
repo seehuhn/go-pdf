@@ -50,9 +50,14 @@ type Script uint16
 
 // Selected writing systems.
 const (
-	ScriptCyrillic Script = iota
+	ScriptArabic Script = iota
+	ScriptCJKIdeographic
+	ScriptCyrillic
 	ScriptGreek
+	ScriptHebrew
+	ScriptHiragana
 	ScriptLatin
+	ScriptThai
 )
 
 // Locale defines language properties of a text.

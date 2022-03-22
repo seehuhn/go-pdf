@@ -23,27 +23,10 @@ import (
 
 const bufferSize = 1024
 
-// State stores the current register values of the interpreter.
-type State struct {
-	A     int64
-	R     [2]int64 // TODO(voss): use names A, B, C instead?
-	Tag   string
-	Stash []uint16
-}
-
-// GetStash return the slice of stashed values and clears the stash.
-func (s *State) GetStash() []uint16 {
-	res := s.Stash
-	s.Stash = nil
-	return res
-}
-
 // Parser allows to read data from an sfnt file.
 type Parser struct {
-	r io.ReadSeeker
-
-	start, end int64
-	tableName  string
+	r         ReadSeekSizer
+	tableName string
 
 	buf       []byte
 	from      int64
@@ -51,41 +34,36 @@ type Parser struct {
 	lastRead  int
 }
 
+type ReadSeekSizer interface {
+	io.ReadSeeker
+	Size() int64
+}
+
 // New allocates a new Parser.  SetRegion() must be called before the
 // parser can be used.
-func New(r io.ReadSeeker) *Parser {
-	return &Parser{r: r}
+func New(tableName string, r ReadSeekSizer) *Parser {
+	p := &Parser{
+		r:         r,
+		tableName: tableName,
+	}
+	err := p.SeekPos(0)
+	if err != nil {
+		panic(err)
+	}
+	return p
 }
 
-// SetRegion sets up the parser to read from the given region in the file.
-// The current reading position is moved to the start of the region.
-// The tableName is only used in error messages.
-func (p *Parser) SetRegion(tableName string, start, length int64) error {
-	p.tableName = tableName
-	p.start = start
-	p.end = start + length
-
-	return p.SeekPos(0)
-}
-
-// Size returns the total length of the current region.
 func (p *Parser) Size() int64 {
-	return p.end - p.start
+	return p.r.Size()
 }
 
 // Pos returns the current reading position within the current region.
 func (p *Parser) Pos() int64 {
-	return p.from + int64(p.pos) - p.start
+	return p.from + int64(p.pos)
 }
 
 // SeekPos changes the reading position within the current region.
-func (p *Parser) SeekPos(posInRegion int64) error {
-	filePos := p.start + posInRegion
-	if filePos < p.start || filePos > p.end {
-		return p.Error("seek target %d+%d is outside [%d,%d+%d]",
-			p.start, posInRegion, p.start, p.start, p.end-p.start)
-	}
-
+func (p *Parser) SeekPos(filePos int64) error {
 	if filePos >= p.from && filePos <= p.from+int64(p.used) {
 		p.pos = int(filePos - p.from)
 	} else {
@@ -99,6 +77,126 @@ func (p *Parser) SeekPos(posInRegion int64) error {
 	}
 
 	return nil
+}
+
+// Read reads len(buf) bytes of data into buf.  It returns the number of bytes
+// read and an error, if any.  The error is non-nil if and only if less than
+// len(buf) bytes were read.
+func (p *Parser) Read(buf []byte) (int, error) {
+	total := 0
+	for len(buf) > 0 {
+		k := len(buf)
+		if k > bufferSize {
+			k = bufferSize
+		}
+		tmp, err := p.ReadBlob(k)
+		k = copy(buf, tmp)
+		total += k
+		buf = buf[k:]
+		if len(buf) > 0 && err != nil {
+			return total, err
+		}
+	}
+	return total, nil
+}
+
+// ReadUInt8 reads a single uint8 value from the current position.
+func (p *Parser) ReadUInt8() (uint8, error) {
+	buf, err := p.ReadBlob(1)
+	if err != nil {
+		return 0, err
+	}
+	return uint8(buf[0]), nil
+}
+
+// ReadUInt16 reads a single uint16 value from the current position.
+func (p *Parser) ReadUInt16() (uint16, error) {
+	buf, err := p.ReadBlob(2)
+	if err != nil {
+		return 0, err
+	}
+	return uint16(buf[0])<<8 + uint16(buf[1]), nil
+}
+
+// ReadInt16 reads a single int16 value from the current position.
+func (p *Parser) ReadInt16() (int16, error) {
+	val, err := p.ReadUInt16()
+	return int16(val), err
+}
+
+// ReadUInt32 reads a single uint32 value from the current position.
+func (p *Parser) ReadUInt32() (uint32, error) {
+	buf, err := p.ReadBlob(4)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(buf[0])<<24 + uint32(buf[1])<<16 + uint32(buf[2])<<8 + uint32(buf[3]), nil
+}
+
+// ReadBlob reads n bytes from the file, starting at the current position.  The
+// returned slice points into the internal buffer, slice contents must not be
+// modified by the caller and are only valid until the next call to one of the
+// parser methods.
+//
+// The read size n must be <= 1024.
+func (p *Parser) ReadBlob(n int) ([]byte, error) {
+	p.lastRead = int(p.from + int64(p.pos))
+	if n < 0 {
+		n = 0
+	} else if n > bufferSize {
+		panic("buffer size exceeded")
+	}
+
+	for p.pos+n > p.used {
+		if len(p.buf) == 0 {
+			p.buf = make([]byte, bufferSize)
+		}
+		k := copy(p.buf, p.buf[p.pos:p.used])
+		p.from += int64(p.pos)
+		p.pos = 0
+		p.used = k
+
+		l, err := p.r.Read(p.buf[p.used:])
+		if err == io.EOF {
+			if l > 0 {
+				err = nil
+			} else {
+				err = io.ErrUnexpectedEOF
+			}
+		}
+		if err != nil {
+			return nil, p.Error("read failed: %w", err)
+		}
+		p.used += l
+	}
+
+	res := p.buf[p.pos : p.pos+n]
+	p.pos += n
+	return res, nil
+}
+
+func (p *Parser) Error(format string, a ...interface{}) error {
+	tableName := p.tableName
+	if tableName == "" {
+		tableName = "header"
+	}
+	a = append([]interface{}{tableName, p.lastRead}, a...)
+	return fmt.Errorf("%s%+d: "+format, a...)
+}
+
+// State stores the current register values of the interpreter.
+type State struct {
+	A     int64
+	R     [2]int64 // TODO(voss): use names A, B, C instead?
+	Tag   string
+	Stash []uint16
+}
+
+// GetStash return the slice of stashed values and clears the stash.
+func (s *State) GetStash() []uint16 {
+	res := s.Stash
+	s.Stash = nil
+	return res
 }
 
 // Exec runs the given commands, updating the state s.
@@ -234,115 +332,6 @@ CommandLoop:
 		}
 	}
 	return nil
-}
-
-func (p *Parser) Read(buf []byte) (int, error) {
-	total := 0
-	for {
-		k := len(buf)
-		if k == 0 {
-			break
-		}
-
-		if k > bufferSize {
-			k = bufferSize
-		}
-		tmp, err := p.ReadBlob(k)
-		k = copy(buf, tmp)
-		total += k
-		buf = buf[k:]
-		if err != nil {
-			return total, err
-		}
-	}
-	return total, nil
-}
-
-// ReadUInt8 reads a single uint8 value from the current position.
-func (p *Parser) ReadUInt8() (uint8, error) {
-	buf, err := p.ReadBlob(1)
-	if err != nil {
-		return 0, err
-	}
-	return uint8(buf[0]), nil
-}
-
-// ReadUInt16 reads a single uint16 value from the current position.
-func (p *Parser) ReadUInt16() (uint16, error) {
-	buf, err := p.ReadBlob(2)
-	if err != nil {
-		return 0, err
-	}
-	return uint16(buf[0])<<8 + uint16(buf[1]), nil
-}
-
-// ReadInt16 reads a single int16 value from the current position.
-func (p *Parser) ReadInt16() (int16, error) {
-	val, err := p.ReadUInt16()
-	return int16(val), err
-}
-
-// ReadUInt32 reads a single uint32 value from the current position.
-func (p *Parser) ReadUInt32() (uint32, error) {
-	buf, err := p.ReadBlob(4)
-	if err != nil {
-		return 0, err
-	}
-	return uint32(buf[0])<<24 + uint32(buf[1])<<16 + uint32(buf[2])<<8 + uint32(buf[3]), nil
-}
-
-// ReadBlob reads n bytes from the file, starting at the current position.  The
-// returned slice points into the internal buffer, slice contents must not be
-// modified by the caller and are only valid until the next call to one of the
-// parser methods.
-//
-// The read size n must be <= 1024.
-func (p *Parser) ReadBlob(n int) ([]byte, error) {
-	p.lastRead = int(p.from + int64(p.pos) - p.start)
-	if n < 0 {
-		n = 0
-	} else if n > bufferSize {
-		panic("buffer size exceeded")
-	}
-	if p.from+int64(p.pos+n) > p.end {
-		return nil, io.ErrUnexpectedEOF
-	}
-
-	for p.pos+n > p.used {
-		if len(p.buf) == 0 {
-			p.buf = make([]byte, bufferSize)
-		}
-		k := copy(p.buf, p.buf[p.pos:p.used])
-		p.from += int64(p.pos)
-		p.pos = 0
-		p.used = k
-
-		l, err := p.r.Read(p.buf[p.used:])
-		if err == io.EOF {
-			if l > 0 {
-				err = nil
-			} else {
-				err = io.ErrUnexpectedEOF
-			}
-		}
-		if err != nil {
-			return nil, p.Error("read failed: %w", err)
-		}
-		p.used += l
-	}
-
-	res := p.buf[p.pos : p.pos+n]
-	p.pos += n
-	return res, nil
-}
-
-func (p *Parser) Error(format string, a ...interface{}) error {
-	tableName := p.tableName
-	if tableName == "" {
-		tableName = "header"
-	}
-	a = append([]interface{}{tableName, p.lastRead}, a...)
-	return fmt.Errorf("%s%+d: "+format, a...)
 }
 
 // Command represents a command (or an argument for a command) for the

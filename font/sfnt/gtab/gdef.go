@@ -17,6 +17,8 @@
 package gtab
 
 import (
+	"io"
+
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 )
@@ -32,10 +34,8 @@ func (g *GTab) ReadGdefTable() (*GdefInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = g.SetRegion(tableName, int64(info.Offset), int64(info.Length))
-	if err != nil {
-		return nil, err
-	}
+	r := io.NewSectionReader(g.r, int64(info.Offset), int64(info.Length))
+	g.Parser = parser.New("GDEF", r)
 
 	s := &parser.State{}
 	err = g.Exec(s,

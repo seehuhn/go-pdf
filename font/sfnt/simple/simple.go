@@ -330,7 +330,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		if err != nil {
 			return err
 		}
-		n, err := subsetInfo.EmbedSimple(fontFileStream)
+		n, err := subsetInfo.Embed(fontFileStream)
 		if err != nil {
 			return err
 		}

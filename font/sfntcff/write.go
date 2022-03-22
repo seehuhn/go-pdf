@@ -100,14 +100,16 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 	return sfnt.WriteTables(w, scalerType, tables)
 }
 
-// EmbedSimple writes the binary form of the font for embedding in a PDF
-// file as a simple font.
-func (info *Info) EmbedSimple(w io.Writer) (int64, error) {
+// Embed writes the binary form of the font for embedding in a PDF file.
+func (info *Info) Embed(w io.Writer) (int64, error) {
 	tables := make(map[string][]byte)
-	ss := cmap.Table{
-		{PlatformID: 1, EncodingID: 0}: info.CMap.Encode(0),
+
+	if info.CMap != nil {
+		ss := cmap.Table{
+			{PlatformID: 1, EncodingID: 0}: info.CMap.Encode(0),
+		}
+		tables["cmap"] = ss.Encode()
 	}
-	tables["cmap"] = ss.Encode()
 
 	tables["hhea"], tables["hmtx"] = info.makeHmtx()
 

@@ -61,25 +61,12 @@ type Outlines struct {
 }
 
 // Read reads a CFF font from r.
-func Read(r io.ReadSeeker) (*Font, error) {
+func Read(r parser.ReadSeekSizer) (*Font, error) {
 	cff := &Font{
 		Outlines: &Outlines{},
 	}
 
-	length, err := r.Seek(0, io.SeekEnd)
-	if err != nil {
-		return nil, err
-	}
-	_, err = r.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-
-	p := parser.New(r)
-	err = p.SetRegion("CFF", 0, length)
-	if err != nil {
-		return nil, err
-	}
+	p := parser.New("CFF", r)
 
 	// section 0: header
 	x, err := p.ReadUInt32()

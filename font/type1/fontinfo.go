@@ -16,7 +16,11 @@
 
 package type1
 
-import "seehuhn.de/go/pdf"
+import (
+	"io"
+
+	"seehuhn.de/go/pdf"
+)
 
 type FontInfo struct {
 	// PostScript language name (FontName or CIDFontName) of the font.
@@ -90,8 +94,19 @@ type PrivateDict struct {
 
 // ROS describes a character collection covered by a PostScript font.
 // A character collection implies an encoding which maps Character IDs to glyphs.
+// See sections 9.7.3 of PDF 32000-1:2008.
 type ROS struct {
 	Registry   string
 	Ordering   string
 	Supplement int32
+}
+
+// PDF implements the pdf.Object interface.
+func (ros *ROS) PDF(w io.Writer) error {
+	d := pdf.Dict{
+		"Registry":   pdf.String(ros.Registry),
+		"Ordering":   pdf.String(ros.Ordering),
+		"Supplement": pdf.Integer(ros.Supplement),
+	}
+	return d.PDF(w)
 }
