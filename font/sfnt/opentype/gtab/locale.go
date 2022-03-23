@@ -5,6 +5,7 @@ import "seehuhn.de/go/pdf/locale"
 // https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
 var otfScript = map[string]locale.Script{
 	"DFLT": locale.ScriptUndefined,
+
 	"cyrl": locale.ScriptCyrillic,
 	"grek": locale.ScriptGreek,
 	"latn": locale.ScriptLatin,
@@ -47,5 +48,4 @@ var otfLanguage = map[string]locale.Language{
 	"SVE ": locale.LangSwedish,
 	"TRK ": locale.LangTurkish,
 	"ZHS ": locale.LangChinese, // Chinese, Simplified
-	"ZHT ": locale.LangChinese, // Chinese, Traditional
 }
