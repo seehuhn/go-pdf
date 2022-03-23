@@ -7,6 +7,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
+	"seehuhn.de/go/pdf/locale"
 )
 
 type Info struct{}
@@ -67,8 +68,8 @@ func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-list-table-and-script-record
-func readScriptList(p *parser.Parser, offset int64) error {
-	err := p.SeekPos(offset)
+func readScriptList(p *parser.Parser, pos int64) error {
+	err := p.SeekPos(pos)
 	if err != nil {
 		return err
 	}
@@ -84,26 +85,28 @@ func readScriptList(p *parser.Parser, offset int64) error {
 		}
 	}
 
-	buf := make([]byte, 6*int(scriptCount))
-	_, err = p.Read(buf)
-	if err != nil {
-		return err
-	}
-
 	type scriptTableEntry struct {
 		offset uint16
-		tag    uint32
+		script locale.Script
 	}
 
 	var entries []scriptTableEntry
+	var buf [6]byte
 	for i := 0; i < int(scriptCount); i++ {
+		_, err = p.Read(buf[:])
+		if err != nil {
+			return err
+		}
+
+		scriptTag := string(buf[:4])
+		script, ok := otfScript[scriptTag]
+		if !ok {
+			continue
+		}
+
 		entry := scriptTableEntry{
-			// TODO(voss): filter out unrecognized scripts
-			tag: uint32(buf[i*6+0])<<24 |
-				uint32(buf[i*6+1])<<16 |
-				uint32(buf[i*6+2])<<8 |
-				uint32(buf[i*6+3]),
-			offset: uint16(buf[i*6+4])<<8 + uint16(buf[i*6+5]),
+			offset: uint16(buf[4])<<8 + uint16(buf[5]),
+			script: script,
 		}
 		entries = append(entries, entry)
 	}
@@ -112,16 +115,15 @@ func readScriptList(p *parser.Parser, offset int64) error {
 	})
 
 	for _, entry := range entries {
-		pos := offset + int64(entry.offset)
-		_ = pos
+		readScriptTable(p, pos+int64(entry.offset), entry.script)
 	}
 
 	return nil
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table-and-language-system-record
-func readScriptTable(p *parser.Parser, offset int64) error {
-	err := p.SeekPos(offset)
+func readScriptTable(p *parser.Parser, pos int64, script locale.Script) error {
+	err := p.SeekPos(pos)
 	if err != nil {
 		return err
 	}
@@ -134,7 +136,42 @@ func readScriptTable(p *parser.Parser, offset int64) error {
 	defaultLangSysOffset := uint16(data[0])<<8 + uint16(data[1])
 	langSysCount := uint16(data[2])<<8 + uint16(data[3])
 
-	_ = defaultLangSysOffset
-	_ = langSysCount
-	panic("not implemented")
+	type langSysRecord struct {
+		offset uint16
+		lang   locale.Language
+	}
+
+	var records []langSysRecord
+	var buf [6]byte
+	for i := 0; i < int(langSysCount); i++ {
+		_, err = p.Read(buf[:])
+		if err != nil {
+			return err
+		}
+
+		langTag := string(buf[:4])
+		lang, ok := otfLanguage[langTag]
+		if !ok {
+			continue
+		}
+
+		entry := langSysRecord{
+			offset: uint16(buf[4])<<8 + uint16(buf[5]),
+			lang:   lang,
+		}
+		records = append(records, entry)
+	}
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].offset < records[j].offset
+	})
+
+	if defaultLangSysOffset != 0 {
+		fmt.Println("*", script)
+	}
+	for _, record := range records {
+		fmt.Println(record.lang, script)
+	}
+
+	// panic("not implemented")
+	return nil
 }

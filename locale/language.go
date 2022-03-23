@@ -49,8 +49,10 @@ func (l Language) Name() string {
 const (
 	LangUndefined Language = iota
 	LangArabic
+	LangAzerbaijani
 	LangBasque
 	LangBengali
+	LangBulgarian
 	LangCatalan
 	LangChinese
 	LangCzech
@@ -90,8 +92,10 @@ type languageCodes struct {
 //    code, 639-1, 639-2/T, Iso Language Name
 var languages = map[Language]languageCodes{
 	LangArabic:          {"ar", "ara", "Arabic"},
+	LangAzerbaijani:     {"az", "aze", "Azerbaijani"},
 	LangBasque:          {"eu", "eus", "Basque"},
 	LangBengali:         {"bn", "ben", "Bengali"},
+	LangBulgarian:       {"bg", "bul", "Bulgarian"},
 	LangCatalan:         {"ca", "cat", "Catalan"},
 	LangChinese:         {"zh", "zho", "Chinese"},
 	LangCzech:           {"cs", "ces", "Czech"},

@@ -16,6 +16,8 @@
 
 package locale
 
+import "fmt"
+
 // Locale information is used in the following places:
 //
 // * The /Lang entry in the catalog dictionary:
@@ -48,9 +50,33 @@ package locale
 // Script indicates writing systems, for use with OpenType fonts
 type Script uint16
 
+func (s Script) String() string {
+	switch s {
+	case ScriptArabic:
+		return "Arabic"
+	case ScriptCJKIdeographic:
+		return "CJKIdeographic"
+	case ScriptCyrillic:
+		return "Cyrillic"
+	case ScriptGreek:
+		return "Greek"
+	case ScriptHebrew:
+		return "Hebrew"
+	case ScriptHiragana:
+		return "Hiragana"
+	case ScriptLatin:
+		return "Latin"
+	case ScriptThai:
+		return "Thai"
+	default:
+		return fmt.Sprintf("Script(%d)", s)
+	}
+}
+
 // Selected writing systems.
 const (
-	ScriptArabic Script = iota
+	ScriptUndefined Script = iota
+	ScriptArabic
 	ScriptCJKIdeographic
 	ScriptCyrillic
 	ScriptGreek
