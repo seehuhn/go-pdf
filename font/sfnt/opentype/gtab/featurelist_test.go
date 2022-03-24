@@ -14,29 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package classdef
+package gtab
 
 import (
 	"bytes"
 	"fmt"
 	"reflect"
 	"testing"
+
+	"seehuhn.de/go/pdf/font/parser"
 )
 
-func FuzzClassDef(f *testing.F) {
-	f.Add([]byte{0, 1, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1})
-	f.Add([]byte{0, 1, 0, 0, 0, 0})
-	f.Add([]byte{0, 2, 0, 0})
+func FuzzFeatureList(f *testing.F) {
+	info := featureListInfo{}
+	info = append(info, &feature{tag: "test"})
+	f.Add(info.encode())
+	info = append(info, &feature{tag: "kern", lookups: []lookupIndex{0, 1, 2, 3}})
+	f.Add(info.encode())
+
 	f.Fuzz(func(t *testing.T, data []byte) {
-		buf := make([]byte, 256)
-		info, err := Read(bytes.NewReader(data), buf)
+		p := parser.New("featureList test", bytes.NewReader(data))
+		info, err := readFeatureList(p, 0)
 		if err != nil {
 			return
 		}
 
-		data2 := info.Encode()
+		data2 := info.encode()
 
-		info2, err := Read(bytes.NewReader(data2), buf)
+		// if len(data2) > len(data) {
+		// 	fmt.Printf("A % x\n", data)
+		// 	fmt.Printf("B % x\n", data2)
+		// 	t.Errorf("encode: %d > %d", len(data2), len(data))
+		// }
+
+		p = parser.New("featureList test", bytes.NewReader(data2))
+		info2, err := readFeatureList(p, 0)
 		if err != nil {
 			fmt.Printf("A % x\n", data)
 			fmt.Printf("B % x\n", data2)
@@ -44,19 +56,21 @@ func FuzzClassDef(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		if len(data2) > len(data) {
-			fmt.Printf("A % x\n", data)
-			fmt.Printf("B % x\n", data2)
-			fmt.Println(info)
-			fmt.Println(info2)
-			t.Error("encode is longer than original")
-		}
-
 		if !reflect.DeepEqual(info, info2) {
-			fmt.Printf("A % x\n", data)
-			fmt.Printf("B % x\n", data2)
-			fmt.Println(info)
-			fmt.Println(info2)
+			// fmt.Printf("A % x\n", data)
+			// fmt.Printf("B % x\n", data2)
+
+			if len(info) != len(info2) {
+				t.Fatal("different lengths")
+			}
+			fmt.Println("length:", len(info))
+			for i, f1 := range info {
+				f2 := info2[i]
+
+				if f1.tag != f2.tag {
+					t.Fatalf("info[%d].tag: %q != %q", i, f1.tag, f2.tag)
+				}
+			}
 			t.Error("different")
 		}
 	})

@@ -1,3 +1,140 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package gtab
 
+import (
+	"fmt"
+
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/parser"
+)
+
 type featureIndex uint16
+
+type feature struct {
+	tag     string
+	lookups []lookupIndex
+	// params  interface{}
+}
+
+func (f feature) String() string {
+	return fmt.Sprintf("%s:%v", f.tag, f.lookups)
+}
+
+type featureListInfo []*feature
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-list-table
+func readFeatureList(p *parser.Parser, pos int64) (featureListInfo, error) {
+	err := p.SeekPos(pos)
+	if err != nil {
+		return nil, err
+	}
+
+	featureCount, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	type featureRecord struct {
+		tag  string
+		offs uint16
+	}
+	var featureList []*featureRecord
+	for i := 0; i < int(featureCount); i++ {
+		buf, err := p.ReadBlob(6)
+		if err != nil {
+			return nil, err
+		}
+
+		featureList = append(featureList, &featureRecord{
+			tag:  string(buf[:4]),
+			offs: uint16(buf[4])<<8 + uint16(buf[5]),
+		})
+	}
+
+	var res featureListInfo
+	totalSize := 2 + 6*len(featureList)
+	for _, rec := range featureList {
+		err = p.SeekPos(pos + int64(rec.offs))
+		if err != nil {
+			return nil, err
+		}
+		buf, err := p.ReadBlob(4)
+		if err != nil {
+			return nil, err
+		}
+		// featureParamsOffset := uint16(buf[0])<<8 + uint16(buf[1])
+		featureLookupCount := uint16(buf[2])<<8 + uint16(buf[3])
+
+		if totalSize > 0xFFFF {
+			return nil, &font.InvalidFontError{
+				SubSystem: "sfnt/gtab",
+				Reason:    "feature list overflow",
+			}
+		}
+		totalSize += 4 + 2*int(featureLookupCount)
+
+		var lookupListIndices []lookupIndex
+		for i := 0; i < int(featureLookupCount); i++ {
+			idx, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			lookupListIndices = append(lookupListIndices, lookupIndex(idx))
+		}
+		res = append(res, &feature{
+			tag:     rec.tag,
+			lookups: lookupListIndices,
+		})
+	}
+	return res, nil
+}
+
+func (info featureListInfo) encode() []byte {
+	offs := make([]uint16, len(info))
+	totalSize := 2 + 6*len(info)
+	for i, f := range info {
+		offs[i] = uint16(totalSize)
+		totalSize += 4 + 2*len(f.lookups)
+	}
+	if totalSize > 0xFFFF {
+		panic("featureListInfo too large")
+	}
+
+	buf := make([]byte, totalSize)
+	buf[0] = byte(len(info) >> 8)
+	buf[1] = byte(len(info))
+	for i, f := range info {
+		tag := []byte(f.tag)
+		buf[2+6*i] = byte(tag[0])
+		buf[3+6*i] = byte(tag[1])
+		buf[4+6*i] = byte(tag[2])
+		buf[5+6*i] = byte(tag[3])
+		buf[6+6*i] = byte(offs[i] >> 8)
+		buf[7+6*i] = byte(offs[i])
+	}
+	for i, f := range info {
+		p := int(offs[i])
+		// featureParamsOffset
+		buf[p+2] = byte(len(f.lookups) >> 8)
+		buf[p+3] = byte(len(f.lookups))
+		for i, l := range f.lookups {
+			buf[p+4+2*i] = byte(l >> 8)
+			buf[p+5+2*i] = byte(l)
+		}
+	}
+	return buf
+}
