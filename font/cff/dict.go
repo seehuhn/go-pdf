@@ -355,6 +355,7 @@ func (d cffDict) getString(op dictOp) string {
 		return ""
 	}
 	x, _ := d[op][0].(string)
+	x = string([]rune(x)) // make sure we have valid utf-8 data
 	return x
 }
 
