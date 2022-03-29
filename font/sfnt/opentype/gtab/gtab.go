@@ -26,11 +26,14 @@ import (
 
 // Info contains the information from a "GSUB" or "GPOS" table.
 type Info struct {
-	ScriptList ScriptListInfo
+	ScriptList  ScriptListInfo
+	FeatureList FeatureListInfo
 }
 
 // Read reads and decodes a "GSUB" or "GPOS" table from r.
 // The argument tableName is only used in error messages.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#gpos-header
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#gsub-header
 func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
 	p := parser.New(tableName, r)
 
@@ -68,19 +71,30 @@ func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
 		uint32(header.ScriptListOffset),
 		uint32(header.FeatureListOffset),
 		uint32(header.LookupListOffset),
-		FeatureVariationsOffset,
 	} {
-		if 0 < offset && offset < endOfHeader || int64(offset) > fileSize {
-			return nil, &font.NotSupportedError{
+		if offset < endOfHeader || int64(offset) > fileSize {
+			return nil, &font.InvalidFontError{
 				SubSystem: "sfnt/gtab",
-				Feature:   fmt.Sprintf("%s header has invalid offset", tableName),
+				Reason:    fmt.Sprintf("%s header has invalid offset", tableName),
 			}
+		}
+	}
+	if FeatureVariationsOffset != 0 && FeatureVariationsOffset < endOfHeader ||
+		int64(FeatureVariationsOffset) > fileSize {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/gtab",
+			Reason:    fmt.Sprintf("%s header has invalid FeatureVariationsOffset", tableName),
 		}
 	}
 
 	info := &Info{}
-	if header.ScriptListOffset != 0 {
-		info.ScriptList, err = readScriptList(p, int64(header.ScriptListOffset))
+	info.ScriptList, err = readScriptList(p, int64(header.ScriptListOffset))
+	if err != nil {
+		return nil, err
+	}
+	info.FeatureList, err = readFeatureList(p, int64(header.FeatureListOffset))
+	if err != nil {
+		return nil, err
 	}
 
 	_ = FeatureVariationsOffset

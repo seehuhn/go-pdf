@@ -23,22 +23,29 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-type featureIndex uint16
+// FeatureIndex enumerates features.
+// It is used as an index into the FeatureListInfo.
+// Valid values are in the range from 0 to 0xFFFE.
+// The special value 0xFFFF is used to indicate the absence of required
+// features in the `Features` struct.
+type FeatureIndex uint16
 
-type feature struct {
-	tag     string
-	lookups []lookupIndex
-	// params  interface{}
+// Feature describes an OpenType feature, used either in a "GPOS" or "GSUB"
+// table.
+type Feature struct {
+	Tag     string
+	Lookups []LookupIndex
 }
 
-func (f feature) String() string {
-	return fmt.Sprintf("%s:%v", f.tag, f.lookups)
+func (f Feature) String() string {
+	return fmt.Sprintf("%s:%v", f.Tag, f.Lookups)
 }
 
-type featureListInfo []*feature
+// FeatureListInfo contains the contents of an OpenType "Feature List" table.
+type FeatureListInfo []*Feature
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-list-table
-func readFeatureList(p *parser.Parser, pos int64) (featureListInfo, error) {
+func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err
@@ -65,7 +72,7 @@ func readFeatureList(p *parser.Parser, pos int64) (featureListInfo, error) {
 		})
 	}
 
-	var res featureListInfo
+	var res FeatureListInfo
 	totalSize := 2 + 6*len(featureList)
 	for _, rec := range featureList {
 		err = p.SeekPos(pos + int64(rec.offs))
@@ -80,6 +87,7 @@ func readFeatureList(p *parser.Parser, pos int64) (featureListInfo, error) {
 		featureLookupCount := uint16(buf[2])<<8 + uint16(buf[3])
 
 		if totalSize > 0xFFFF {
+			// this condition also ensures featureCount < 0xFFFF
 			return nil, &font.InvalidFontError{
 				SubSystem: "sfnt/gtab",
 				Reason:    "feature list overflow",
@@ -87,28 +95,28 @@ func readFeatureList(p *parser.Parser, pos int64) (featureListInfo, error) {
 		}
 		totalSize += 4 + 2*int(featureLookupCount)
 
-		var lookupListIndices []lookupIndex
+		var lookupListIndices []LookupIndex
 		for i := 0; i < int(featureLookupCount); i++ {
 			idx, err := p.ReadUInt16()
 			if err != nil {
 				return nil, err
 			}
-			lookupListIndices = append(lookupListIndices, lookupIndex(idx))
+			lookupListIndices = append(lookupListIndices, LookupIndex(idx))
 		}
-		res = append(res, &feature{
-			tag:     rec.tag,
-			lookups: lookupListIndices,
+		res = append(res, &Feature{
+			Tag:     rec.tag,
+			Lookups: lookupListIndices,
 		})
 	}
 	return res, nil
 }
 
-func (info featureListInfo) encode() []byte {
+func (info FeatureListInfo) encode() []byte {
 	offs := make([]uint16, len(info))
 	totalSize := 2 + 6*len(info)
 	for i, f := range info {
 		offs[i] = uint16(totalSize)
-		totalSize += 4 + 2*len(f.lookups)
+		totalSize += 4 + 2*len(f.Lookups)
 	}
 	if totalSize > 0xFFFF {
 		panic("featureListInfo too large")
@@ -118,7 +126,7 @@ func (info featureListInfo) encode() []byte {
 	buf[0] = byte(len(info) >> 8)
 	buf[1] = byte(len(info))
 	for i, f := range info {
-		tag := []byte(f.tag)
+		tag := []byte(f.Tag)
 		buf[2+6*i] = byte(tag[0])
 		buf[3+6*i] = byte(tag[1])
 		buf[4+6*i] = byte(tag[2])
@@ -129,9 +137,9 @@ func (info featureListInfo) encode() []byte {
 	for i, f := range info {
 		p := int(offs[i])
 		// featureParamsOffset
-		buf[p+2] = byte(len(f.lookups) >> 8)
-		buf[p+3] = byte(len(f.lookups))
-		for i, l := range f.lookups {
+		buf[p+2] = byte(len(f.Lookups) >> 8)
+		buf[p+3] = byte(len(f.Lookups))
+		for i, l := range f.Lookups {
 			buf[p+4+2*i] = byte(l >> 8)
 			buf[p+5+2*i] = byte(l)
 		}

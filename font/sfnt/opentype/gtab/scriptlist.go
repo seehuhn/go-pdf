@@ -32,8 +32,8 @@ type ScriptLang struct {
 
 // Features describes the mandatory and optional features for a script/language.
 type Features struct {
-	required featureIndex // 0xFFFF, if no required feature
-	optional []featureIndex
+	Required FeatureIndex // 0xFFFF, if no required feature
+	Optional []FeatureIndex
 }
 
 // ScriptListInfo contains the information of a ScriptList table.
@@ -191,7 +191,7 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 		return nil, err
 	}
 	lookupOrderOffset := uint16(data[0])<<8 + uint16(data[1])
-	requiredFeatureIndex := featureIndex(data[2])<<8 + featureIndex(data[3])
+	requiredFeatureIndex := FeatureIndex(data[2])<<8 + FeatureIndex(data[3])
 	featureIndexCount := uint16(data[4])<<8 + uint16(data[5])
 	if lookupOrderOffset != 0 {
 		return nil, &font.NotSupportedError{
@@ -200,7 +200,7 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 		}
 	}
 
-	featureIndices := make([]featureIndex, featureIndexCount)
+	featureIndices := make([]FeatureIndex, featureIndexCount)
 	for i := 0; i < int(featureIndexCount); i++ {
 		idx, err := p.ReadUInt16()
 		if err != nil {
@@ -208,12 +208,12 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 		} else if idx == 0xFFFF {
 			continue
 		}
-		featureIndices[i] = featureIndex(idx)
+		featureIndices[i] = FeatureIndex(idx)
 	}
 
 	return &Features{
-		required: requiredFeatureIndex,
-		optional: featureIndices,
+		Required: requiredFeatureIndex,
+		Optional: featureIndices,
 	}, nil
 }
 
@@ -263,7 +263,7 @@ func (info ScriptListInfo) encode() []byte {
 			}
 			langSys := info[ScriptLang{script: sRec.script, lang: lang}]
 			// lookupOrderOffset, requiredFeatureIndex, featureIndexCount, featureIndices:
-			totalSize += 6 + len(langSys.optional)*2
+			totalSize += 6 + len(langSys.Optional)*2
 		}
 		totalSize += 4 + 6*langCount // defaultLangSysOffset, langSysCount, langSysRecords
 	}
@@ -314,11 +314,11 @@ func (info ScriptListInfo) encode() []byte {
 		pos := 4 + 6*len(langSysRecords)
 		if defaultRecord != nil {
 			defaultRecord.offs = uint16(pos)
-			pos += 6 + len(defaultRecord.langSys.optional)*2
+			pos += 6 + len(defaultRecord.langSys.Optional)*2
 		}
 		for _, lRec := range langSysRecords {
 			lRec.offs = uint16(pos)
-			pos += 6 + len(lRec.langSys.optional)*2
+			pos += 6 + len(lRec.langSys.Optional)*2
 		}
 
 		// write the Script table for sRec.tag
@@ -338,11 +338,11 @@ func (info ScriptListInfo) encode() []byte {
 		if defaultRecord != nil {
 			p := scriptTablePos + int(defaultRecord.offs)
 			ff := defaultRecord.langSys
-			buf[p+2] = byte(ff.required >> 8)
-			buf[p+3] = byte(ff.required)
-			buf[p+4] = byte(len(ff.optional) >> 8)
-			buf[p+5] = byte(len(ff.optional))
-			for i, idx := range ff.optional {
+			buf[p+2] = byte(ff.Required >> 8)
+			buf[p+3] = byte(ff.Required)
+			buf[p+4] = byte(len(ff.Optional) >> 8)
+			buf[p+5] = byte(len(ff.Optional))
+			for i, idx := range ff.Optional {
 				buf[p+6+2*i] = byte(idx >> 8)
 				buf[p+6+2*i+1] = byte(idx)
 			}
@@ -350,11 +350,11 @@ func (info ScriptListInfo) encode() []byte {
 		for _, lRec := range langSysRecords {
 			p := scriptTablePos + int(lRec.offs)
 			ff := lRec.langSys
-			buf[p+2] = byte(ff.required >> 8)
-			buf[p+3] = byte(ff.required)
-			buf[p+4] = byte(len(ff.optional) >> 8)
-			buf[p+5] = byte(len(ff.optional))
-			for i, idx := range ff.optional {
+			buf[p+2] = byte(ff.Required >> 8)
+			buf[p+3] = byte(ff.Required)
+			buf[p+4] = byte(len(ff.Optional) >> 8)
+			buf[p+5] = byte(len(ff.Optional))
+			for i, idx := range ff.Optional {
 				buf[p+6+2*i] = byte(idx >> 8)
 				buf[p+6+2*i+1] = byte(idx)
 			}

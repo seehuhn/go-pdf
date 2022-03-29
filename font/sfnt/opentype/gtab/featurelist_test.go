@@ -26,10 +26,10 @@ import (
 )
 
 func FuzzFeatureList(f *testing.F) {
-	info := featureListInfo{}
-	info = append(info, &feature{tag: "test"})
+	info := FeatureListInfo{}
+	info = append(info, &Feature{Tag: "test"})
 	f.Add(info.encode())
-	info = append(info, &feature{tag: "kern", lookups: []lookupIndex{0, 1, 2, 3}})
+	info = append(info, &Feature{Tag: "kern", Lookups: []LookupIndex{0, 1, 2, 3}})
 	f.Add(info.encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -67,8 +67,8 @@ func FuzzFeatureList(f *testing.F) {
 			for i, f1 := range info {
 				f2 := info2[i]
 
-				if f1.tag != f2.tag {
-					t.Fatalf("info[%d].tag: %q != %q", i, f1.tag, f2.tag)
+				if f1.Tag != f2.Tag {
+					t.Fatalf("info[%d].tag: %q != %q", i, f1.Tag, f2.Tag)
 				}
 			}
 			t.Error("different")
