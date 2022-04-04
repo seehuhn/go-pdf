@@ -41,7 +41,7 @@ type GTab struct {
 	subtableReader   stReaderFn
 
 	classDefCache map[int64]ClassDef
-	coverageCache map[int64]coverage
+	coverageCache map[int64]Coverage
 }
 
 type stReaderFn func(s *parser.State, format uint16, subtablePos int64) (LookupSubtable, error)

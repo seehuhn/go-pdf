@@ -28,7 +28,7 @@ type KernInfo struct {
 // KerningAsLookup returns data from the "kern" table, converted to the form of
 // a GPOS lookup.
 func KerningAsLookup(kerning []KernInfo) Lookups {
-	cov := make(coverage)
+	cov := make(Coverage)
 	nextClass := 0
 	var adjust []map[font.GlyphID]*pairAdjust
 	for _, k := range kerning {

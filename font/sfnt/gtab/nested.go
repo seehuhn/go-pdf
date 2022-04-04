@@ -24,7 +24,7 @@ import (
 // Sequence Context Format 2: class-based glyph contexts
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-2-class-based-glyph-contexts
 type seqContext2 struct {
-	cov      coverage
+	cov      Coverage
 	input    ClassDef
 	rulesets []classSeqRuleSet // indexed by the input class, can be nil
 }
@@ -180,7 +180,7 @@ rulesetLoop:
 // Chained Sequence Context Format 1: simple glyph contexts
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
 type chainedSeq1 struct {
-	cov      coverage
+	cov      Coverage
 	rulesets []chainedSeqRuleSet
 }
 
@@ -318,7 +318,7 @@ func (l *chainedSeq1) Apply(filter KeepGlyphFn, seq []font.Glyph, pos int) ([]fo
 // Chained Sequence Context Format 2: class-based glyph contexts
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-2-class-based-glyph-contexts
 type chainedSeq2 struct {
-	cov       coverage
+	cov       Coverage
 	backtrack ClassDef
 	input     ClassDef
 	lookahead ClassDef
@@ -538,9 +538,9 @@ ruleLoop:
 // Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chseqctxt3
 type chainedSeq3 struct {
-	backtrack []coverage
-	input     []coverage
-	lookahead []coverage
+	backtrack []Coverage
+	input     []Coverage
+	lookahead []Coverage
 	actions   []seqLookup
 }
 

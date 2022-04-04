@@ -50,7 +50,7 @@ func (g *GTab) ReadGsubTable(extraFeatures ...string) (Lookups, error) {
 	}
 
 	g.classDefCache = make(map[int64]ClassDef)
-	g.coverageCache = make(map[int64]coverage)
+	g.coverageCache = make(map[int64]Coverage)
 	g.subtableReader = g.readGsubSubtable
 
 	ll, err := g.selectLookups("GSUB", includeFeature)
@@ -123,7 +123,7 @@ func (g *GTab) readGsubSubtable(s *parser.State, lookupType uint16, subtablePos 
 }
 
 type gsub1_1 struct {
-	cov   coverage
+	cov   Coverage
 	delta uint16
 }
 
@@ -158,7 +158,7 @@ func (l *gsub1_1) Apply(filter KeepGlyphFn, seq []font.Glyph, i int) ([]font.Gly
 }
 
 type gsub1_2 struct {
-	cov                coverage
+	cov                Coverage
 	substituteGlyphIDs []font.GlyphID
 }
 
@@ -202,7 +202,7 @@ func (l *gsub1_2) Apply(filter KeepGlyphFn, seq []font.Glyph, i int) ([]font.Gly
 
 // Multiple Substitution Subtable
 type gsub2_1 struct {
-	cov  coverage
+	cov  Coverage
 	repl [][]font.GlyphID
 }
 
@@ -275,7 +275,7 @@ func (l *gsub2_1) Apply(filter KeepGlyphFn, seq []font.Glyph, i int) ([]font.Gly
 // Ligature Substitution Format 1
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#41-ligature-substitution-format-1
 type gsub4_1 struct {
-	cov  coverage // maps first glyphs to repl indices
+	cov  Coverage // maps first glyphs to repl indices
 	repl [][]ligature
 }
 

@@ -45,7 +45,7 @@ func (g *GTab) ReadGposTable(extraFeatures ...string) (Lookups, error) {
 	}
 
 	g.classDefCache = make(map[int64]ClassDef)
-	g.coverageCache = make(map[int64]coverage)
+	g.coverageCache = make(map[int64]Coverage)
 	g.subtableReader = g.readGposSubtable
 
 	ll, err := g.selectLookups("GPOS", includeFeature)
@@ -121,7 +121,7 @@ func (g *GTab) readGposSubtable(s *parser.State, lookupType uint16, subtablePos 
 // Pair Adjustment Positioning Format 1: Adjustments for Glyph Pairs
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
 type gpos2_1 struct {
-	cov    coverage
+	cov    Coverage
 	adjust []map[font.GlyphID]*pairAdjust
 }
 
@@ -227,7 +227,7 @@ func (l *gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Gly
 // Pair Adjustment Positioning Format 2: Class Pair Adjustment
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-2-class-pair-adjustment
 type gpos2_2 struct {
-	cov       coverage
+	cov       Coverage
 	classDef1 ClassDef
 	classDef2 ClassDef
 	adjust    [][]pairAdjust
