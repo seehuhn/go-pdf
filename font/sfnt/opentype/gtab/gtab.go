@@ -28,13 +28,14 @@ import (
 type Info struct {
 	ScriptList  ScriptListInfo
 	FeatureList FeatureListInfo
+	LookupList  LookupListInfo
 }
 
 // Read reads and decodes a "GSUB" or "GPOS" table from r.
 // The argument tableName is only used in error messages.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#gpos-header
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#gsub-header
-func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
+func Read(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, error) {
 	p := parser.New(tableName, r)
 
 	var header struct {
@@ -96,7 +97,12 @@ func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
 	if err != nil {
 		return nil, err
 	}
+	info.LookupList, err = readLookupList(p, int64(header.LookupListOffset), sr)
+	if err != nil {
+		return nil, err
+	}
 
-	_ = FeatureVariationsOffset
+	_ = FeatureVariationsOffset // TODO(voss): implement this
+
 	return info, nil
 }

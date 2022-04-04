@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-func (g *GTab) readCoverageTable(pos int64) (coverage, error) {
+func (g *GTab) readCoverageTable(pos int64) (Coverage, error) {
 	res, ok := g.coverageCache[pos]
 	if ok {
 		return res, nil
@@ -41,7 +41,7 @@ func (g *GTab) readCoverageTable(pos int64) (coverage, error) {
 	}
 	format := int(s.A)
 
-	res = make(coverage)
+	res = make(Coverage)
 
 	switch format {
 	case 1: // coverage table format 1
@@ -87,9 +87,9 @@ func (g *GTab) readCoverageTable(pos int64) (coverage, error) {
 	return res, nil
 }
 
-type coverage map[font.GlyphID]int
+type Coverage map[font.GlyphID]int
 
-func (cov coverage) check(size int) error {
+func (cov Coverage) check(size int) error {
 	for _, k := range cov {
 		if k < 0 || size >= 0 && k >= size {
 			return errors.New("invalid coverage table")

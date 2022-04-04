@@ -24,6 +24,8 @@ import (
 	"os"
 	"strings"
 
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gpos"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gsub"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
@@ -47,7 +49,16 @@ func tryFont(fname string) error {
 		}
 		r := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
 
-		_, err = gtab.Read(tableName, r)
+		var sr gtab.SubtableReader
+		switch tableName {
+		case "GPOS":
+			sr = gpos.ReadGposSubtable
+		case "GSUB":
+			sr = gsub.ReadGsubSubtable
+		default:
+			panic("invalid table name")
+		}
+		_, err = gtab.Read(tableName, r, sr)
 		if err != nil {
 			return err
 		}

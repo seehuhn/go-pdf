@@ -69,8 +69,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 			return nil, err
 		}
 
-		scriptTag := string(buf[:4])
-		script, ok := otfScript[scriptTag]
+		script, ok := otfScript[string(buf[:4])]
 		if !ok {
 			continue
 		}
@@ -145,8 +144,7 @@ func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info Scr
 			return err
 		}
 
-		langTag := string(buf[:4])
-		lang, ok := otfLanguage[langTag]
+		lang, ok := otfLanguage[string(buf[:4])]
 		if !ok {
 			continue
 		}
