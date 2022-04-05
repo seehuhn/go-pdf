@@ -56,7 +56,7 @@ func readIndex(p *parser.Parser) (cffIndex, error) {
 	prevOffset := uint32(1)
 	size := p.Size()
 	for i := 0; i <= int(count); i++ {
-		blob, err := p.ReadBlob(int(offSize))
+		blob, err := p.ReadBytes(int(offSize))
 		if err != nil {
 			return nil, err
 		}

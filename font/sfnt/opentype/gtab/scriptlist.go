@@ -64,7 +64,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 
 	var entries []scriptTableEntry
 	for i := 0; i < int(scriptCount); i++ {
-		buf, err := p.ReadBlob(6)
+		buf, err := p.ReadBytes(6)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +111,7 @@ func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info Scr
 		return err
 	}
 
-	data, err := p.ReadBlob(4)
+	data, err := p.ReadBytes(4)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info Scr
 
 	var records []langSysRecord
 	for i := 0; i < int(langSysCount); i++ {
-		buf, err := p.ReadBlob(6)
+		buf, err := p.ReadBytes(6)
 		if err != nil {
 			return err
 		}
@@ -184,7 +184,7 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 		return nil, err
 	}
 
-	data, err := p.ReadBlob(6)
+	data, err := p.ReadBytes(6)
 	if err != nil {
 		return nil, err
 	}

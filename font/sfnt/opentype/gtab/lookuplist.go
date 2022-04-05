@@ -17,28 +17,29 @@
 package gtab
 
 import (
-	"fmt"
-
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
 type LookupIndex uint16
 
-type LookupListInfo []*LookupInfo
+type LookupList []*LookupTable
 
-type LookupInfo struct {
+// LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
+// font.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
+type LookupTable struct {
 	Meta      *LookupMetaInfo
-	SubTables []Subtable
+	Subtables []Subtable
 }
 
-func (li *LookupInfo) EncodeLen() int {
+func (li *LookupTable) EncodeLen() int {
 	total := 6
-	total += 2 * len(li.SubTables)
+	total += 2 * len(li.Subtables)
 	if li.Meta.LookupFlag&0x0010 != 0 {
 		total += 2
 	}
-	for _, subtable := range li.SubTables {
+	for _, subtable := range li.Subtables {
 		total += subtable.EncodeLen(li.Meta)
 	}
 	return total
@@ -66,7 +67,7 @@ type Subtable interface {
 type SubtableReader func(*parser.Parser, int64, *LookupMetaInfo) (Subtable, error)
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
-func readLookupList(p *parser.Parser, pos int64, sr SubtableReader) (LookupListInfo, error) {
+func readLookupList(p *parser.Parser, pos int64, sr SubtableReader) (LookupList, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func readLookupList(p *parser.Parser, pos int64, sr SubtableReader) (LookupListI
 		}
 	}
 
-	res := make(LookupListInfo, lookupCount)
+	res := make(LookupList, lookupCount)
 
 	var subtableOffsets []uint16
 	for i, offs := range lookupOffsets {
@@ -94,7 +95,7 @@ func readLookupList(p *parser.Parser, pos int64, sr SubtableReader) (LookupListI
 		if err != nil {
 			return nil, err
 		}
-		buf, err := p.ReadBlob(6)
+		buf, err := p.ReadBytes(6)
 		if err != nil {
 			return nil, err
 		}
@@ -132,15 +133,15 @@ func readLookupList(p *parser.Parser, pos int64, sr SubtableReader) (LookupListI
 			subTables[j] = subtable
 		}
 
-		res[i] = &LookupInfo{
+		res[i] = &LookupTable{
 			Meta:      meta,
-			SubTables: subTables,
+			Subtables: subTables,
 		}
 	}
 	return res, nil
 }
 
-func (info LookupListInfo) encode() []byte {
+func (info LookupList) encode() []byte {
 	lookupCount := len(info)
 
 	lookupOffsets := make([]int, lookupCount)
@@ -156,13 +157,8 @@ func (info LookupListInfo) encode() []byte {
 		res = append(res, byte(lookupOffsets[i]>>8), byte(lookupOffsets[i]))
 	}
 
-	for i, li := range info {
-		if len(res) != lookupOffsets[i] { // TODO(voss): remove
-			fmt.Println(lookupOffsets)
-			fmt.Println(i, len(res), lookupOffsets[i])
-			panic("internal error")
-		}
-		subTableCount := len(li.SubTables)
+	for _, li := range info {
+		subTableCount := len(li.Subtables)
 		res = append(res,
 			byte(li.Meta.LookupType>>8), byte(li.Meta.LookupType),
 			byte(li.Meta.LookupFlag>>8), byte(li.Meta.LookupFlag),
@@ -173,7 +169,7 @@ func (info LookupListInfo) encode() []byte {
 		if li.Meta.LookupFlag&0x0010 != 0 {
 			stPos += 2
 		}
-		for _, st := range li.SubTables {
+		for _, st := range li.Subtables {
 			res = append(res, byte(stPos>>8), byte(stPos))
 			stPos += st.EncodeLen(li.Meta)
 		}
@@ -181,7 +177,7 @@ func (info LookupListInfo) encode() []byte {
 			res = append(res,
 				byte(li.Meta.MarkFilteringSet>>8), byte(li.Meta.MarkFilteringSet))
 		}
-		for _, st := range li.SubTables {
+		for _, st := range li.Subtables {
 			res = append(res, st.Encode(li.Meta)...)
 		}
 	}

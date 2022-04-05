@@ -61,7 +61,7 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 	}
 	var featureList []*featureRecord
 	for i := 0; i < int(featureCount); i++ {
-		buf, err := p.ReadBlob(6)
+		buf, err := p.ReadBytes(6)
 		if err != nil {
 			return nil, err
 		}
@@ -72,14 +72,14 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 		})
 	}
 
-	var res FeatureListInfo
+	var info FeatureListInfo
 	totalSize := 2 + 6*len(featureList)
 	for _, rec := range featureList {
 		err = p.SeekPos(pos + int64(rec.offs))
 		if err != nil {
 			return nil, err
 		}
-		buf, err := p.ReadBlob(4)
+		buf, err := p.ReadBytes(4)
 		if err != nil {
 			return nil, err
 		}
@@ -103,22 +103,25 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 			}
 			lookupListIndices = append(lookupListIndices, LookupIndex(idx))
 		}
-		res = append(res, &Feature{
+		info = append(info, &Feature{
 			Tag:     rec.tag,
 			Lookups: lookupListIndices,
 		})
 	}
-	return res, nil
+
+	return info, nil
 }
 
 func (info FeatureListInfo) encode() []byte {
 	offs := make([]uint16, len(info))
 	totalSize := 2 + 6*len(info)
+	var largestOffset int
 	for i, f := range info {
+		largestOffset = totalSize
 		offs[i] = uint16(totalSize)
 		totalSize += 4 + 2*len(f.Lookups)
 	}
-	if totalSize > 0xFFFF {
+	if largestOffset > 0xFFFF {
 		panic("featureListInfo too large")
 	}
 

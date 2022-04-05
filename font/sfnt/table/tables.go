@@ -152,7 +152,7 @@ func (h *Header) ReadTableBytes(r io.ReaderAt, tableName string) ([]byte, error)
 	if n < len(res) && err != nil {
 		return nil, err
 	}
-	return res, nil
+	return res[:n], nil
 }
 
 var isKnownTable = map[string]bool{

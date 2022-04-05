@@ -28,7 +28,7 @@ import (
 type Info struct {
 	ScriptList  ScriptListInfo
 	FeatureList FeatureListInfo
-	LookupList  LookupListInfo
+	LookupList  LookupList
 }
 
 // Read reads and decodes a "GSUB" or "GPOS" table from r.
@@ -67,6 +67,12 @@ func Read(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, e
 		endOfHeader += 4
 	}
 
+	if header.ScriptListOffset == 0 || header.LookupListOffset == 0 {
+		return &Info{
+			ScriptList: make(ScriptListInfo),
+		}, nil
+	}
+
 	fileSize := p.Size()
 	for _, offset := range []uint32{
 		uint32(header.ScriptListOffset),
@@ -76,7 +82,8 @@ func Read(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, e
 		if offset < endOfHeader || int64(offset) > fileSize {
 			return nil, &font.InvalidFontError{
 				SubSystem: "sfnt/gtab",
-				Reason:    fmt.Sprintf("%s header has invalid offset", tableName),
+				Reason: fmt.Sprintf("%s header has invalid offset %d",
+					tableName, offset),
 			}
 		}
 	}

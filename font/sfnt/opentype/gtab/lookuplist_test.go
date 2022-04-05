@@ -61,56 +61,56 @@ func dummyReader(p *parser.Parser, pos int64, info *LookupMetaInfo) (Subtable, e
 }
 
 func FuzzLookupList(f *testing.F) {
-	l := LookupListInfo{
-		&LookupInfo{
+	l := LookupList{
+		&LookupTable{
 			Meta: &LookupMetaInfo{},
-			SubTables: []Subtable{
+			Subtables: []Subtable{
 				dummySubTable{},
 			},
 		},
 	}
 	f.Add(l.encode())
 
-	l = LookupListInfo{
-		&LookupInfo{
+	l = LookupList{
+		&LookupTable{
 			Meta: &LookupMetaInfo{
 				LookupType: 4,
 				LookupFlag: 0x0010,
 			},
-			SubTables: []Subtable{
+			Subtables: []Subtable{
 				dummySubTable{1, 2, 3, 4},
 			},
 		},
 	}
 	f.Add(l.encode())
 
-	l = LookupListInfo{
-		&LookupInfo{
+	l = LookupList{
+		&LookupTable{
 			Meta: &LookupMetaInfo{
 				LookupType: 1,
 			},
-			SubTables: []Subtable{
+			Subtables: []Subtable{
 				dummySubTable{0},
 				dummySubTable{1},
 				dummySubTable{2},
 			},
 		},
-		&LookupInfo{
+		&LookupTable{
 			Meta: &LookupMetaInfo{
 				LookupType:       2,
 				LookupFlag:       0x0010,
 				MarkFilteringSet: 7,
 			},
-			SubTables: []Subtable{
+			Subtables: []Subtable{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},
 			},
 		},
-		&LookupInfo{
+		&LookupTable{
 			Meta: &LookupMetaInfo{
 				LookupType: 3,
 			},
-			SubTables: []Subtable{
+			Subtables: []Subtable{
 				dummySubTable{7, 8, 9},
 			},
 		},

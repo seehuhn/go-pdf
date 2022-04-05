@@ -22,10 +22,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"strings"
 
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gpos"
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gsub"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
@@ -52,9 +49,9 @@ func tryFont(fname string) error {
 		var sr gtab.SubtableReader
 		switch tableName {
 		case "GPOS":
-			sr = gpos.ReadGposSubtable
+			sr = gtab.ReadGposSubtable
 		case "GSUB":
-			sr = gsub.ReadGsubSubtable
+			sr = gtab.ReadGsubSubtable
 		default:
 			panic("invalid table name")
 		}
@@ -84,10 +81,7 @@ func main() {
 		fname := scanner.Text()
 		err = tryFont(fname)
 		if err != nil {
-			if msg := err.Error(); strings.Contains(msg, "funny") {
-				fmt.Printf("%s %s\n", msg[6:], fname)
-			}
-			// fmt.Println(fname+":", err)
+			fmt.Fprintln(os.Stderr, fname+":", err)
 		}
 	}
 	if err := scanner.Err(); err != nil {

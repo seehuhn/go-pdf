@@ -24,7 +24,7 @@ import (
 )
 
 // readCharset reads charset data.  The function includes a leading 0
-// in the output, to represent the ".notdef" glyph.
+// in the output to represent the ".notdef" glyph.
 func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 	if nGlyphs < 1 || nGlyphs >= 0x10000 {
 		return nil, fmt.Errorf("invalid number of glyphs: %d", nGlyphs)
@@ -38,20 +38,11 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 	charset := make([]int32, 1, nGlyphs) // include leading 0
 	switch format {
 	case 0:
-		s := &parser.State{
-			A: int64(nGlyphs - 1),
-		}
-		err = p.Exec(s,
-			parser.CmdLoop,
-			parser.CmdStash16,
-			parser.CmdEndLoop,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		data := s.GetStash()
-		for _, xi := range data {
+		for i := 0; i < nGlyphs-1; i++ {
+			xi, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
 			charset = append(charset, int32(xi))
 		}
 	case 1:

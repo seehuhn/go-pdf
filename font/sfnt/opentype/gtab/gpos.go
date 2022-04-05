@@ -14,17 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package gsub
+package gtab
 
 import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 )
 
-func ReadGsubSubtable(p *parser.Parser, pos int64, meta *gtab.LookupMetaInfo) (gtab.Subtable, error) {
+// ReadGposSubtable reads a GPOS subtable.
+// This function can be used as the SubtableReader argument to Read().
+func ReadGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
+	err := p.SeekPos(pos)
+	if err != nil {
+		return nil, err
+	}
+
 	format, err := p.ReadUInt16()
 	if err != nil {
 		return nil, err
@@ -32,28 +38,28 @@ func ReadGsubSubtable(p *parser.Parser, pos int64, meta *gtab.LookupMetaInfo) (g
 
 	switch 10*meta.LookupType + format {
 	default:
-		msg := fmt.Sprintf("GSUB %d.%d\n", meta.LookupType, format)
+		msg := fmt.Sprintf("GPOS %d.%d\n", meta.LookupType, format)
 		fmt.Print(msg)
-		return notImplementedSubtable(format), nil
+		return notImplementedGposSubtable(format), nil
 	}
 }
 
-type notImplementedSubtable uint16
+type notImplementedGposSubtable uint16
 
-func (st notImplementedSubtable) Apply(meta *gtab.LookupMetaInfo, _ []font.Glyph, _ int) ([]font.Glyph, int) {
-	msg := fmt.Sprintf("GSUB lookup type %d, format %d not implemented",
+func (st notImplementedGposSubtable) Apply(meta *LookupMetaInfo, _ []font.Glyph, _ int) ([]font.Glyph, int) {
+	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
 		meta.LookupType, st)
 	panic(msg)
 }
 
-func (st notImplementedSubtable) EncodeLen(meta *gtab.LookupMetaInfo) int {
-	msg := fmt.Sprintf("GSUB lookup type %d, format %d not implemented",
+func (st notImplementedGposSubtable) EncodeLen(meta *LookupMetaInfo) int {
+	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
 		meta.LookupType, st)
 	panic(msg)
 }
 
-func (st notImplementedSubtable) Encode(meta *gtab.LookupMetaInfo) []byte {
-	msg := fmt.Sprintf("GSUB lookup type %d, format %d not implemented",
+func (st notImplementedGposSubtable) Encode(meta *LookupMetaInfo) []byte {
+	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
 		meta.LookupType, st)
 	panic(msg)
 }

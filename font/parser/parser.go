@@ -34,6 +34,8 @@ type Parser struct {
 	lastRead  int
 }
 
+// ReadSeekSizer describes the requirements for a reader that can be used
+// as the input to a Parser.
 type ReadSeekSizer interface {
 	io.ReadSeeker
 	Size() int64
@@ -53,6 +55,7 @@ func New(tableName string, r ReadSeekSizer) *Parser {
 	return p
 }
 
+// Size returns the total size of the underlying input file.
 func (p *Parser) Size() int64 {
 	return p.r.Size()
 }
@@ -89,7 +92,7 @@ func (p *Parser) Read(buf []byte) (int, error) {
 		if k > bufferSize {
 			k = bufferSize
 		}
-		tmp, err := p.ReadBlob(k)
+		tmp, err := p.ReadBytes(k)
 		k = copy(buf, tmp)
 		total += k
 		buf = buf[k:]
@@ -102,7 +105,7 @@ func (p *Parser) Read(buf []byte) (int, error) {
 
 // ReadUInt8 reads a single uint8 value from the current position.
 func (p *Parser) ReadUInt8() (uint8, error) {
-	buf, err := p.ReadBlob(1)
+	buf, err := p.ReadBytes(1)
 	if err != nil {
 		return 0, err
 	}
@@ -111,7 +114,7 @@ func (p *Parser) ReadUInt8() (uint8, error) {
 
 // ReadUInt16 reads a single uint16 value from the current position.
 func (p *Parser) ReadUInt16() (uint16, error) {
-	buf, err := p.ReadBlob(2)
+	buf, err := p.ReadBytes(2)
 	if err != nil {
 		return 0, err
 	}
@@ -126,20 +129,20 @@ func (p *Parser) ReadInt16() (int16, error) {
 
 // ReadUInt32 reads a single uint32 value from the current position.
 func (p *Parser) ReadUInt32() (uint32, error) {
-	buf, err := p.ReadBlob(4)
+	buf, err := p.ReadBytes(4)
 	if err != nil {
 		return 0, err
 	}
 	return uint32(buf[0])<<24 + uint32(buf[1])<<16 + uint32(buf[2])<<8 + uint32(buf[3]), nil
 }
 
-// ReadBlob reads n bytes from the file, starting at the current position.  The
+// ReadBytes reads n bytes from the file, starting at the current position.  The
 // returned slice points into the internal buffer, slice contents must not be
 // modified by the caller and are only valid until the next call to one of the
 // parser methods.
 //
 // The read size n must be <= 1024.
-func (p *Parser) ReadBlob(n int) ([]byte, error) {
+func (p *Parser) ReadBytes(n int) ([]byte, error) {
 	p.lastRead = int(p.from + int64(p.pos))
 	if n < 0 {
 		n = 0
@@ -200,6 +203,9 @@ func (s *State) GetStash() []uint16 {
 }
 
 // Exec runs the given commands, updating the state s.
+//
+// Deprecated: This function is deprecated and will be removed before the 1.0
+// release.
 func (p *Parser) Exec(s *State, cmds ...Command) error {
 	var PC int
 	var loopStartPC int
@@ -218,7 +224,7 @@ CommandLoop:
 
 		switch cmd {
 		case CmdRead8:
-			buf, err := p.ReadBlob(1)
+			buf, err := p.ReadBytes(1)
 			if err != nil {
 				return err
 			}
@@ -231,7 +237,7 @@ CommandLoop:
 				panic("unknown type for CmdRead16")
 			}
 		case CmdRead16:
-			buf, err := p.ReadBlob(2)
+			buf, err := p.ReadBytes(2)
 			if err != nil {
 				return err
 			}
@@ -245,7 +251,7 @@ CommandLoop:
 				panic("unknown type for CmdRead16")
 			}
 		case CmdRead32:
-			buf, err := p.ReadBlob(4)
+			buf, err := p.ReadBytes(4)
 			if err != nil {
 				return err
 			}
@@ -273,7 +279,7 @@ CommandLoop:
 		case CmdLoadFrom:
 			s.A = s.R[arg]
 		case CmdStash16:
-			buf, err := p.ReadBlob(2)
+			buf, err := p.ReadBytes(2)
 			if err != nil {
 				return err
 			}
