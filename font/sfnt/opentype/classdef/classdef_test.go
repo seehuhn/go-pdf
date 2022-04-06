@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"seehuhn.de/go/pdf/font/parser"
 )
 
 func FuzzClassDef(f *testing.F) {
@@ -28,15 +30,14 @@ func FuzzClassDef(f *testing.F) {
 	f.Add([]byte{0, 1, 0, 0, 0, 0})
 	f.Add([]byte{0, 2, 0, 0})
 	f.Fuzz(func(t *testing.T, data []byte) {
-		buf := make([]byte, 256)
-		info, err := Read(bytes.NewReader(data), buf)
+		info, err := ReadTable(parser.New("test", bytes.NewReader(data)), 0)
 		if err != nil {
 			return
 		}
 
 		data2 := info.Encode()
 
-		info2, err := Read(bytes.NewReader(data2), buf)
+		info2, err := ReadTable(parser.New("test", bytes.NewReader(data2)), 0)
 		if err != nil {
 			fmt.Printf("A % x\n", data)
 			fmt.Printf("B % x\n", data2)

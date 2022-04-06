@@ -53,7 +53,7 @@ func Read(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, e
 	}
 	if header.MajorVersion != 1 || header.MinorVersion > 1 {
 		return nil, &font.NotSupportedError{
-			SubSystem: "sfnt/gtab",
+			SubSystem: "sfnt/opentype/gtab",
 			Feature: fmt.Sprintf("%s table version %d.%d",
 				tableName, header.MajorVersion, header.MinorVersion),
 		}
@@ -79,18 +79,18 @@ func Read(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, e
 		uint32(header.FeatureListOffset),
 		uint32(header.LookupListOffset),
 	} {
-		if offset < endOfHeader || int64(offset) > fileSize {
+		if offset < endOfHeader || int64(offset) >= fileSize {
 			return nil, &font.InvalidFontError{
-				SubSystem: "sfnt/gtab",
+				SubSystem: "sfnt/opentype/gtab",
 				Reason: fmt.Sprintf("%s header has invalid offset %d",
 					tableName, offset),
 			}
 		}
 	}
 	if FeatureVariationsOffset != 0 && FeatureVariationsOffset < endOfHeader ||
-		int64(FeatureVariationsOffset) > fileSize {
+		int64(FeatureVariationsOffset) >= fileSize {
 		return nil, &font.InvalidFontError{
-			SubSystem: "sfnt/gtab",
+			SubSystem: "sfnt/opentype/gtab",
 			Reason:    fmt.Sprintf("%s header has invalid FeatureVariationsOffset", tableName),
 		}
 	}

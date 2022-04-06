@@ -134,7 +134,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 		yPos+float64(theFont.Descent)*q-6)
 
 	if gdef != nil {
-		class := gdef.GlyphClassDef[font.GlyphID(g)]
+		class := gdef.GlyphClass[font.GlyphID(g)]
 		var classLabel string
 		switch class {
 		case 1:

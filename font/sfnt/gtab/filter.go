@@ -78,7 +78,7 @@ func (g *GTab) makeFilter(lookupFlag uint16) KeepGlyphFn {
 	if lookupFlag&ignoreMarks != 0 {
 		skip |= glyphClassMark
 	}
-	if g.gdef.GlyphClassDef == nil {
+	if g.gdef.GlyphClass == nil {
 		skip = 0
 	}
 
@@ -92,10 +92,10 @@ func (g *GTab) makeFilter(lookupFlag uint16) KeepGlyphFn {
 	} else if lookupFlag&markAttachmentTypeMask != 0 {
 		attachmentType := int(lookupFlag & markAttachmentTypeMask >> 8)
 		filterFunc = func(gid font.GlyphID) bool {
-			if g.gdef.GlyphClassDef[gid]&skip != 0 {
+			if g.gdef.GlyphClass[gid]&skip != 0 {
 				return false
 			}
-			if g.gdef.GlyphClassDef[gid] == glyphClassMark &&
+			if g.gdef.GlyphClass[gid] == glyphClassMark &&
 				g.gdef.MarkAttachClass[gid] != attachmentType {
 				return false
 			}
@@ -103,7 +103,7 @@ func (g *GTab) makeFilter(lookupFlag uint16) KeepGlyphFn {
 		}
 	} else if skip != 0 {
 		filterFunc = func(gid font.GlyphID) bool {
-			return g.gdef.GlyphClassDef[gid]&skip == 0
+			return g.gdef.GlyphClass[gid]&skip == 0
 		}
 	}
 

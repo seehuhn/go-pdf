@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package coverage reads and writes OpenType "Coverage Tables"
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-table
 package coverage
 
 import (
@@ -23,8 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-// Table represents an OpenType coverage table.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-table
+// Table represents an OpenType "Coverage Table".
 type Table map[font.GlyphID]int
 
 // ReadTable reads a coverage table from the given parser.
@@ -54,7 +55,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 			}
 			if _, alreadySeen := table[font.GlyphID(gid)]; alreadySeen {
 				return nil, &font.InvalidFontError{
-					SubSystem: "opentype/coverage",
+					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 1)",
 				}
 			}
@@ -77,14 +78,14 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 			startCoverageIndex := int(buf[4])<<8 | int(buf[5])
 			if startCoverageIndex != pos {
 				return nil, &font.InvalidFontError{
-					SubSystem: "opentype/coverage",
+					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 2)",
 				}
 			}
 			for gid := startGlyphID; gid <= endGlyphID; gid++ {
 				if _, alreadySeen := table[font.GlyphID(gid)]; alreadySeen {
 					return nil, &font.InvalidFontError{
-						SubSystem: "opentype/coverage",
+						SubSystem: "sfnt/opentype/coverage",
 						Reason:    "invalid coverage table (format 2)",
 					}
 				}
@@ -95,7 +96,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 
 	default:
 		return nil, &font.NotSupportedError{
-			SubSystem: "opentype/coverage",
+			SubSystem: "sfnt/opentype/coverage",
 			Feature:   fmt.Sprintf("coverage format %d", format),
 		}
 	}

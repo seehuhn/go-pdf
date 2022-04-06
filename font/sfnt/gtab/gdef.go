@@ -64,18 +64,18 @@ func (g *GTab) ReadGdefTable() (*GdefInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		res.GlyphClassDef = make(map[font.GlyphID]glyphClass)
+		res.GlyphClass = make(map[font.GlyphID]glyphClass)
 		for gid, class := range classes {
 			// https://docs.microsoft.com/en-us/typography/opentype/spec/gdef#glyph-class-definition-table
 			switch class {
 			case 1:
-				res.GlyphClassDef[gid] = glyphClassBase
+				res.GlyphClass[gid] = glyphClassBase
 			case 2:
-				res.GlyphClassDef[gid] = glyphClassLigature
+				res.GlyphClass[gid] = glyphClassLigature
 			case 3:
-				res.GlyphClassDef[gid] = glyphClassMark
+				res.GlyphClass[gid] = glyphClassMark
 			case 4:
-				res.GlyphClassDef[gid] = glyphClassComponent
+				res.GlyphClass[gid] = glyphClassComponent
 			}
 		}
 	}
@@ -94,14 +94,14 @@ func (g *GTab) ReadGdefTable() (*GdefInfo, error) {
 
 // GdefInfo represents the information from the "GDEF" table of a font.
 type GdefInfo struct {
-	GlyphClassDef   map[font.GlyphID]glyphClass
+	GlyphClass      map[font.GlyphID]glyphClass
 	MarkAttachClass ClassDef
 }
 
 type glyphClass uint8
 
 const (
-	glyphClassBase glyphClass = 1 << iota
+	glyphClassBase glyphClass = 1 + iota
 	glyphClassLigature
 	glyphClassMark
 	glyphClassComponent

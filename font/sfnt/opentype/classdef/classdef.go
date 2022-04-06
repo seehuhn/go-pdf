@@ -20,76 +20,28 @@ package classdef
 
 import (
 	"fmt"
-	"io"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/parser"
 )
 
-// Info containst the information from an OpenType "Class Definition Table".
-type Info map[font.GlyphID]uint16
+// Table contains the information from an OpenType "Class Definition Table".
+type Table map[font.GlyphID]uint16
 
-type reader struct {
-	r          io.Reader
-	buf        []byte
-	a, b       int
-	readAtMost int
-}
-
-func (r *reader) ReadBytes(nBytes int) ([]byte, error) {
-	if nBytes > len(r.buf) {
-		panic("buffer too small")
-	}
-	for r.a+nBytes > r.b {
-		if r.a > 0 && r.b > r.a {
-			copy(r.buf, r.buf[r.a:r.b])
-			r.b -= r.a
-			r.a = 0
-		}
-
-		d := len(r.buf) - r.b
-		if d > r.readAtMost {
-			d = r.readAtMost
-		}
-		n, err := r.r.Read(r.buf[r.b : r.b+d])
-		if n == 0 {
-			if err == nil || err == io.EOF {
-				err = io.ErrUnexpectedEOF
-			}
-			return nil, err
-		}
-		r.b += n
-		r.readAtMost -= n
-	}
-	res := r.buf[r.a : r.a+nBytes]
-	r.a += nBytes
-	return res, nil
-}
-
-func (r *reader) ReadUint16() (uint16, error) {
-	data, err := r.ReadBytes(2)
+// ReadTable reads and decodes an OpenType "Class Definition Table".
+func ReadTable(p *parser.Parser, pos int64) (Table, error) {
+	err := p.SeekPos(pos)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return uint16(data[0])<<8 | uint16(data[1]), nil
-}
 
-// Read reads and decodes an OpenType "Class Definition Table".
-// The buffer `buf`, if non-nil, is used as scratch space.
-func Read(r io.Reader, buf []byte) (Info, error) {
-	if len(buf) < 16 {
-		buf = make([]byte, 256)
-	}
-	tab := &reader{r: r, buf: buf}
-
-	tab.readAtMost = 4
-	version, err := tab.ReadUint16()
+	version, err := p.ReadUInt16()
 	if err != nil {
 		return nil, err
 	}
 	switch version {
 	case 1:
-		tab.readAtMost += 2
-		data, err := tab.ReadBytes(4)
+		data, err := p.ReadBytes(4)
 		if err != nil {
 			return nil, err
 		}
@@ -102,11 +54,9 @@ func Read(r io.Reader, buf []byte) (Info, error) {
 			}
 		}
 
-		res := make(Info, glyphCount)
-		tab.readAtMost += 2 * glyphCount
-
+		res := make(Table, glyphCount)
 		for i := 0; i < glyphCount; i++ {
-			classValue, err := tab.ReadUint16()
+			classValue, err := p.ReadUInt16()
 			if err != nil {
 				return nil, err
 			}
@@ -117,16 +67,15 @@ func Read(r io.Reader, buf []byte) (Info, error) {
 		return res, nil
 
 	case 2:
-		classRangeCount, err := tab.ReadUint16()
+		classRangeCount, err := p.ReadUInt16()
 		if err != nil {
 			return nil, err
 		}
 
-		res := Info{}
-		tab.readAtMost += 6 * int(classRangeCount)
+		res := Table{}
 		var prevEnd font.GlyphID
 		for i := 0; i < int(classRangeCount); i++ {
-			data, err := tab.ReadBytes(6)
+			data, err := p.ReadBytes(6)
 			if err != nil {
 				return nil, err
 			}
@@ -159,7 +108,7 @@ func Read(r io.Reader, buf []byte) (Info, error) {
 }
 
 // Encode converts the class definition table to binary format.
-func (info Info) Encode() []byte {
+func (info Table) Encode() []byte {
 	if len(info) == 0 {
 		return []byte{0, 2, 0, 0}
 	}
