@@ -216,6 +216,10 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 }
 
 func (info ScriptListInfo) encode() []byte {
+	if info == nil {
+		return nil
+	}
+
 	rScript := map[locale.Script]string{}
 	for tag, code := range otfScript {
 		rScript[code] = tag

@@ -23,9 +23,9 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-// ReadGposSubtable reads a GPOS subtable.
+// readGposSubtable reads a GPOS subtable.
 // This function can be used as the SubtableReader argument to Read().
-func ReadGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
+func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err

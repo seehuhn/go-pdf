@@ -21,6 +21,8 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
+// LookupIndex enumerates lookups.
+// It is used as an index into a LookupList.
 type LookupIndex uint16
 
 type LookupList []*LookupTable
@@ -142,6 +144,10 @@ func readLookupList(p *parser.Parser, pos int64, sr SubtableReader) (LookupList,
 }
 
 func (info LookupList) encode() []byte {
+	if info == nil {
+		return nil
+	}
+
 	lookupCount := len(info)
 
 	lookupOffsets := make([]int, lookupCount)

@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package gdef
 
 import (
@@ -72,6 +88,38 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 	_ = itemVarStoreOffset     // TODO(voss): implement
 
 	return table, nil
+}
+
+// Encode converts the GDEF table to its binary form.
+func (table *Table) Encode() []byte {
+	total := 12
+	var glyphClassDefOffset int
+	if table.GlyphClass != nil {
+		glyphClassDefOffset = total
+		total += table.GlyphClass.AppendLen()
+	}
+	var markAttachClassDefOffset int
+	if table.MarkAttachClass != nil {
+		markAttachClassDefOffset = total
+		total += table.MarkAttachClass.AppendLen()
+	}
+	buf := make([]byte, 12, total)
+	// We always write table version 1.0:
+	// buf[0] = 0
+	buf[1] = 1
+	// buf[2] = 0
+	// buf[3] = 0
+	buf[4] = byte(glyphClassDefOffset >> 8)
+	buf[5] = byte(glyphClassDefOffset)
+	buf[10] = byte(markAttachClassDefOffset >> 8)
+	buf[11] = byte(markAttachClassDefOffset)
+	if glyphClassDefOffset > 0 {
+		buf = table.GlyphClass.Append(buf)
+	}
+	if markAttachClassDefOffset > 0 {
+		buf = table.MarkAttachClass.Append(buf)
+	}
+	return buf
 }
 
 // Possible values for the GlyphClass field.

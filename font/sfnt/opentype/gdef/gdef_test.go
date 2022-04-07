@@ -14,54 +14,47 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package classdef
+package gdef
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
 	"testing"
 
-	"seehuhn.de/go/pdf/font/parser"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 )
 
-func FuzzClassDef(f *testing.F) {
-	f.Add([]byte{0, 1, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1})
-	f.Add([]byte{0, 1, 0, 0, 0, 0})
-	f.Add([]byte{0, 2, 0, 0})
+func FuzzGdef(f *testing.F) {
+	table := &Table{}
+	f.Add(table.Encode())
+	table.GlyphClass = classdef.Table{
+		2:  GlyphClassBase,
+		3:  GlyphClassBase,
+		4:  GlyphClassBase,
+		10: GlyphClassLigature,
+	}
+	f.Add(table.Encode())
+	table.MarkAttachClass = classdef.Table{
+		5: 1,
+		6: 2,
+		7: 1,
+	}
+	f.Add(table.Encode())
+
 	f.Fuzz(func(t *testing.T, data []byte) {
-		info, err := ReadTable(parser.New("test", bytes.NewReader(data)), 0)
+		table1, err := Read(bytes.NewReader(data))
 		if err != nil {
 			return
 		}
 
-		data2 := info.Append(nil)
+		data2 := table1.Encode()
 
-		info2, err := ReadTable(parser.New("test", bytes.NewReader(data2)), 0)
+		table2, err := Read(bytes.NewReader(data2))
 		if err != nil {
-			fmt.Printf("A % x\n", data)
-			fmt.Printf("B % x\n", data2)
-			fmt.Println(info)
 			t.Fatal(err)
 		}
 
-		if len(data2) > len(data) {
-			fmt.Printf("A % x\n", data)
-			fmt.Printf("B % x\n", data2)
-			fmt.Println(info)
-			fmt.Println(info2)
-			t.Error("encode is longer than original")
-		}
-
-		if len(data2) != info.AppendLen() {
-			t.Errorf("wrong length, expected %d, got %d", info.AppendLen(), len(data2))
-		}
-
-		if !reflect.DeepEqual(info, info2) {
-			fmt.Printf("A % x\n", data)
-			fmt.Printf("B % x\n", data2)
-			fmt.Println(info)
-			fmt.Println(info2)
+		if !reflect.DeepEqual(table1, table2) {
 			t.Error("different")
 		}
 	})

@@ -107,12 +107,13 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 	}
 }
 
-// Encode converts the class definition table to binary format.
-func (info Table) Encode() []byte {
-	if len(info) == 0 {
-		return []byte{0, 2, 0, 0}
-	}
+type encInfo struct {
+	minGid, maxGid font.GlyphID
+	format1Size    int
+	format2Size    int
+}
 
+func (info Table) getEncInfo() *encInfo {
 	minGid := font.GlyphID(0xFFFF)
 	maxGid := font.GlyphID(0)
 	for key := range info {
@@ -126,15 +127,13 @@ func (info Table) Encode() []byte {
 
 	format1Size := 6 + 2*(int(maxGid)-int(minGid)+1)
 
-	format2Size := 4
 	segCount := 0
 	segStart := -1
 	var segClass uint16
-	for i := int(minGid); i <= int(maxGid) && format2Size < format1Size; i++ {
+	for i := int(minGid); i <= int(maxGid) && 4+6*segCount < format1Size; i++ {
 		class := info[font.GlyphID(i)]
 
 		if segStart >= 0 && class != segClass {
-			format2Size += 6
 			segCount++
 			segStart = -1
 		}
@@ -147,45 +146,63 @@ func (info Table) Encode() []byte {
 	}
 	if segStart >= 0 {
 		segCount++
-		format2Size += 6
 	}
 
-	for format1Size <= format2Size {
-		buf := make([]byte, format1Size)
-		// buf[0] = 0
-		buf[1] = 1
-		buf[2] = byte(minGid >> 8)
-		buf[3] = byte(minGid)
-		count := maxGid - minGid + 1
-		buf[4] = byte(count >> 8)
-		buf[5] = byte(count)
+	format2Size := 4 + 6*segCount
+
+	return &encInfo{
+		minGid:      minGid,
+		maxGid:      maxGid,
+		format1Size: format1Size,
+		format2Size: format2Size,
+	}
+}
+
+// AppendLen returns the size of the binary table representation.
+func (info Table) AppendLen() int {
+	if len(info) == 0 {
+		return 4
+	}
+	encInfo := info.getEncInfo()
+	if encInfo.format1Size < encInfo.format2Size {
+		return encInfo.format1Size
+	}
+	return encInfo.format2Size
+}
+
+// Append appends the binary table representation to the given buffer.
+func (info Table) Append(buf []byte) []byte {
+	if len(info) == 0 {
+		return append(buf, 0, 2, 0, 0)
+	}
+
+	encInfo := info.getEncInfo()
+
+	for encInfo.format1Size <= encInfo.format2Size {
+		count := encInfo.maxGid - encInfo.minGid + 1
+		buf = append(buf,
+			0, 1,
+			byte(encInfo.minGid>>8), byte(encInfo.minGid),
+			byte(count>>8), byte(count))
 		for i := 0; i < int(count); i++ {
-			class := info[minGid+font.GlyphID(i)]
-			buf[6+2*i] = byte(class >> 8)
-			buf[6+2*i+1] = byte(class)
+			class := info[encInfo.minGid+font.GlyphID(i)]
+			buf = append(buf, byte(class>>8), byte(class))
 		}
 		return buf
 	}
 
-	buf := make([]byte, format2Size)
-	// buf[0] = 0
-	buf[1] = 2
-	buf[2] = byte(segCount >> 8)
-	buf[3] = byte(segCount)
-	pos := 4
-	segStart = -1
-	for i := int(minGid); i <= int(maxGid); i++ {
+	segCount := (encInfo.format2Size - 4) / 6
+	buf = append(buf, 0, 2, byte(segCount>>8), byte(segCount))
+	segStart := -1
+	var segClass uint16
+	for i := int(encInfo.minGid); i <= int(encInfo.maxGid); i++ {
 		class := info[font.GlyphID(i)]
 
 		if segStart >= 0 && class != segClass {
-			buf[pos] = byte(segStart >> 8)
-			buf[pos+1] = byte(segStart)
-			buf[pos+2] = byte((i - 1) >> 8)
-			buf[pos+3] = byte(i - 1)
-			buf[pos+4] = byte(segClass >> 8)
-			buf[pos+5] = byte(segClass)
-
-			pos += 6
+			buf = append(buf,
+				byte(segStart>>8), byte(segStart),
+				byte((i-1)>>8), byte(i-1),
+				byte(segClass>>8), byte(segClass))
 			segStart = -1
 		}
 		if segStart == -1 {
@@ -196,12 +213,11 @@ func (info Table) Encode() []byte {
 		}
 	}
 	if segStart >= 0 {
-		buf[pos] = byte(segStart >> 8)
-		buf[pos+1] = byte(segStart)
-		buf[pos+2] = byte(maxGid >> 8)
-		buf[pos+3] = byte(maxGid)
-		buf[pos+4] = byte(segClass >> 8)
-		buf[pos+5] = byte(segClass)
+		buf = append(buf,
+			byte(segStart>>8), byte(segStart),
+			byte(encInfo.maxGid>>8), byte(encInfo.maxGid),
+			byte(segClass>>8), byte(segClass))
 	}
+
 	return buf
 }

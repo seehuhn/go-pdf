@@ -72,7 +72,7 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 		})
 	}
 
-	var info FeatureListInfo
+	info := FeatureListInfo{}
 	totalSize := 2 + 6*len(featureList)
 	for _, rec := range featureList {
 		err = p.SeekPos(pos + int64(rec.offs))
@@ -113,6 +113,10 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 }
 
 func (info FeatureListInfo) encode() []byte {
+	if info == nil {
+		return nil
+	}
+
 	offs := make([]uint16, len(info))
 	totalSize := 2 + 6*len(info)
 	var largestOffset int

@@ -30,6 +30,8 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/maxp"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -69,6 +71,10 @@ type Info struct {
 
 	CMap     cmap.Subtable
 	Outlines interface{} // either *cff.Outlines or *TTFOutlines
+
+	Gdef *gdef.Table
+	Gsub *gtab.Info
+	Gpos *gtab.Info
 }
 
 // GlyfOutlines stores the glyph data of a TrueType font.

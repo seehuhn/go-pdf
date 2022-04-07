@@ -19,12 +19,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
 func tryFont(fname string) error {
@@ -34,37 +32,29 @@ func tryFont(fname string) error {
 	}
 	defer r.Close()
 
-	header, err := table.ReadHeader(r)
-	if err != nil {
-		return err
-	}
-
-	for _, tableName := range []string{"GPOS", "GSUB"} {
-		rec, ok := header.Toc[tableName]
-		if !ok {
-			continue
-		}
-		r := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
-
-		var sr gtab.SubtableReader
-		switch tableName {
-		case "GPOS":
-			sr = gtab.ReadGposSubtable
-		case "GSUB":
-			sr = gtab.ReadGsubSubtable
-		default:
-			panic("invalid table name")
-		}
-		_, err = gtab.Read(tableName, r, sr)
-		if err != nil {
-			return err
-		}
-	}
-
-	// info, err := sfntcff.Read(r)
+	// header, err := table.ReadHeader(r)
 	// if err != nil {
 	// 	return err
 	// }
+
+	// for _, tableName := range []string{"GPOS", "GSUB"} {
+	// 	rec, ok := header.Toc[tableName]
+	// 	if !ok {
+	// 		continue
+	// 	}
+	// 	r := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
+
+	// 	_, err = gtab.Read(tableName, r)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	info, err := sfntcff.Read(r)
+	if err != nil {
+		return err
+	}
+	_ = info
 
 	return nil
 }

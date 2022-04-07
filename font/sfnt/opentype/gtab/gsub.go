@@ -24,9 +24,9 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
-// ReadGsubSubtable reads a GSUB subtable.
+// readGsubSubtable reads a GSUB subtable.
 // This function can be used as the SubtableReader argument to Read().
-func ReadGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
+func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err

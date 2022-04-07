@@ -97,6 +97,16 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 
 	tables["head"] = info.makeHead(locaFormat)
 
+	if info.Gdef != nil {
+		tables["GDEF"] = info.Gdef.Encode()
+	}
+	if info.Gsub != nil {
+		tables["GSUB"] = info.Gsub.Encode()
+	}
+	if info.Gpos != nil {
+		tables["GPOS"] = info.Gpos.Encode()
+	}
+
 	return sfnt.WriteTables(w, scalerType, tables)
 }
 

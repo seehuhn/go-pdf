@@ -32,10 +32,20 @@ type Info struct {
 }
 
 // Read reads and decodes a "GSUB" or "GPOS" table from r.
-// The argument tableName is only used in error messages.
+// TableName must be either "GSUB" or "GPOS".
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#gpos-header
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#gsub-header
-func Read(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, error) {
+func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
+	var sr SubtableReader
+	switch tableName {
+	case "GPOS":
+		sr = readGposSubtable
+	case "GSUB":
+		sr = readGsubSubtable
+	default:
+		panic("invalid table name")
+	}
+
 	p := parser.New(tableName, r)
 
 	var header struct {
@@ -112,4 +122,42 @@ func Read(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, e
 	_ = FeatureVariationsOffset // TODO(voss): implement this
 
 	return info, nil
+}
+
+// Encode returns the binary representation of a "GSUB" or "GPOS" table.
+func (info *Info) Encode() []byte {
+	scriptList := info.ScriptList.encode()
+	featureList := info.FeatureList.encode()
+	lookupList := info.LookupList.encode()
+
+	total := 10
+	var scriptListOffset int
+	if scriptList != nil {
+		scriptListOffset = total
+		total += len(scriptList)
+	}
+	var featureListOffset int
+	if featureList != nil {
+		featureListOffset = total
+		total += len(featureList)
+	}
+	var lookupListOffset int
+	if lookupList != nil {
+		lookupListOffset = total
+		total += len(lookupList)
+	}
+
+	buf := make([]byte, total)
+	copy(buf, []byte{
+		0, 1, // major version
+		0, 0, // minor version
+		byte(scriptListOffset >> 8), byte(scriptListOffset),
+		byte(featureListOffset >> 8), byte(featureListOffset),
+		byte(lookupListOffset >> 8), byte(lookupListOffset),
+	})
+	copy(buf[scriptListOffset:], scriptList)
+	copy(buf[featureListOffset:], featureList)
+	copy(buf[lookupListOffset:], lookupList)
+
+	return buf
 }
