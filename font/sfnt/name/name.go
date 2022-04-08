@@ -248,8 +248,8 @@ func Decode(data []byte) (*Info, error) {
 	}
 	// all fonts on my laptop use version 0 of the table
 
-	numRec := int(data[2])<<8 + int(data[3])
-	storageOffset := int(data[4])<<8 + int(data[5])
+	numRec := int(data[2])<<8 | int(data[3])
+	storageOffset := int(data[4])<<8 | int(data[5])
 
 	recBase := 6
 	endOfHeader := recBase + 12*numRec
@@ -262,7 +262,7 @@ func Decode(data []byte) (*Info, error) {
 		if endOfHeader+2 > len(data) {
 			return nil, errMalformedNames
 		}
-		numLang = int(data[endOfHeader])<<8 + int(data[endOfHeader+1])
+		numLang = int(data[endOfHeader])<<8 | int(data[endOfHeader+1])
 		endOfHeader += 2 + numLang*4
 	}
 	if storageOffset < endOfHeader || storageOffset > len(data) {

@@ -75,7 +75,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 		}
 
 		entry := scriptTableEntry{
-			offset: uint16(buf[4])<<8 + uint16(buf[5]),
+			offset: uint16(buf[4])<<8 | uint16(buf[5]),
 			script: script,
 		}
 		entries = append(entries, entry)
@@ -116,8 +116,8 @@ func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info Scr
 		return err
 	}
 
-	defaultLangSysOffset := uint16(data[0])<<8 + uint16(data[1])
-	langSysCount := uint16(data[2])<<8 + uint16(data[3])
+	defaultLangSysOffset := uint16(data[0])<<8 | uint16(data[1])
+	langSysCount := uint16(data[2])<<8 | uint16(data[3])
 
 	if defaultLangSysOffset > 0 && defaultLangSysOffset < 4+6*langSysCount {
 		return &font.InvalidFontError{
@@ -150,7 +150,7 @@ func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info Scr
 		}
 
 		entry := langSysRecord{
-			offset: uint16(buf[4])<<8 + uint16(buf[5]),
+			offset: uint16(buf[4])<<8 | uint16(buf[5]),
 			lang:   lang,
 		}
 		records = append(records, entry)
@@ -188,9 +188,9 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 	if err != nil {
 		return nil, err
 	}
-	lookupOrderOffset := uint16(data[0])<<8 + uint16(data[1])
-	requiredFeatureIndex := FeatureIndex(data[2])<<8 + FeatureIndex(data[3])
-	featureIndexCount := uint16(data[4])<<8 + uint16(data[5])
+	lookupOrderOffset := uint16(data[0])<<8 | uint16(data[1])
+	requiredFeatureIndex := FeatureIndex(data[2])<<8 | FeatureIndex(data[3])
+	featureIndexCount := uint16(data[4])<<8 | uint16(data[5])
 	if lookupOrderOffset != 0 {
 		return nil, &font.NotSupportedError{
 			SubSystem: "sfnt/gtab",

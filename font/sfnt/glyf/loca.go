@@ -36,7 +36,7 @@ func decodeLoca(enc *Encoded) ([]int, error) {
 		offs = make([]int, n/2)
 		prev := 0
 		for i := range offs {
-			x := int(enc.LocaData[2*i])<<8 + int(enc.LocaData[2*i+1])
+			x := int(enc.LocaData[2*i])<<8 | int(enc.LocaData[2*i+1])
 			pos := 2 * x
 			if pos < prev || pos > len(enc.GlyfData) {
 				return nil, &font.InvalidFontError{
@@ -58,8 +58,8 @@ func decodeLoca(enc *Encoded) ([]int, error) {
 		offs = make([]int, len(enc.LocaData)/4)
 		prev := 0
 		for i := range offs {
-			pos := int(enc.LocaData[4*i])<<24 + int(enc.LocaData[4*i+1])<<16 +
-				int(enc.LocaData[4*i+2])<<8 + int(enc.LocaData[4*i+3])
+			pos := int(enc.LocaData[4*i])<<24 | int(enc.LocaData[4*i+1])<<16 |
+				int(enc.LocaData[4*i+2])<<8 | int(enc.LocaData[4*i+3])
 			if pos < prev || pos > len(enc.GlyfData) {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/loca",

@@ -47,7 +47,7 @@ func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 	// TODO(voss): decode words on-demand to avoid this allocation.
 	words := make([]uint16, 0, (len(in)-14)/2)
 	for i := 14; i < len(in); i += 2 {
-		words = append(words, uint16(in[i])<<8+uint16(in[i+1]))
+		words = append(words, uint16(in[i])<<8|uint16(in[i+1]))
 	}
 	endCode := words[:segCount]
 	// reservedPad omitted

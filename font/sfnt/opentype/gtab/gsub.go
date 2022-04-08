@@ -78,8 +78,8 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (*gsub1_1, error) {
 	if err != nil {
 		return nil, err
 	}
-	coverageOffset := int64(buf[0])<<8 + int64(buf[1])
-	deltaGlyphID := font.GlyphID(buf[2])<<8 + font.GlyphID(buf[3])
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	deltaGlyphID := font.GlyphID(buf[2])<<8 | font.GlyphID(buf[3])
 	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
 	if err != nil {
 		return nil, err

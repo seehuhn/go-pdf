@@ -67,7 +67,7 @@ func Read(r io.Reader) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		numGlyphs := int(buf[0])<<8 + int(buf[1])
+		numGlyphs := int(buf[0])<<8 | int(buf[1])
 		indexBuf := make([]byte, 2*numGlyphs)
 		_, err = io.ReadFull(r, indexBuf)
 		if err != nil {
@@ -80,7 +80,7 @@ func Read(r io.Reader) (*Info, error) {
 		nameBuf := make([]byte, 255)
 		nMac := len(macRoman)
 		for i := 0; i < numGlyphs; i++ {
-			idx := int(indexBuf[2*i])<<8 + int(indexBuf[2*i+1])
+			idx := int(indexBuf[2*i])<<8 | int(indexBuf[2*i+1])
 			if idx < nMac {
 				info.Names[i] = macRoman[idx]
 			} else {

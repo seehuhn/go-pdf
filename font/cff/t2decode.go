@@ -207,7 +207,7 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				if len(code) < 3 {
 					return nil, errIncomplete
 				}
-				val := int16(code[1])<<8 + int16(code[2])
+				val := int16(code[1])<<8 | int16(code[2])
 				stack = append(stack, f16FromInt16(val))
 				code = code[3:]
 				continue
@@ -215,8 +215,8 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				if len(code) < 5 {
 					return nil, errIncomplete
 				}
-				val := Fixed16(code[1])<<24 + Fixed16(code[2])<<16 +
-					Fixed16(code[3])<<8 + Fixed16(code[4])
+				val := Fixed16(code[1])<<24 | Fixed16(code[2])<<16 |
+					Fixed16(code[3])<<8 | Fixed16(code[4])
 				stack = append(stack, val)
 				code = code[5:]
 				continue

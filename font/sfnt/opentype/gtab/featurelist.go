@@ -68,7 +68,7 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 
 		featureList = append(featureList, &featureRecord{
 			tag:  string(buf[:4]),
-			offs: uint16(buf[4])<<8 + uint16(buf[5]),
+			offs: uint16(buf[4])<<8 | uint16(buf[5]),
 		})
 	}
 
@@ -83,8 +83,8 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		// featureParamsOffset := uint16(buf[0])<<8 + uint16(buf[1])
-		featureLookupCount := uint16(buf[2])<<8 + uint16(buf[3])
+		// featureParamsOffset := uint16(buf[0])<<8 | uint16(buf[1])
+		featureLookupCount := uint16(buf[2])<<8 | uint16(buf[3])
 
 		if totalSize > 0xFFFF {
 			// this condition also ensures featureCount < 0xFFFF

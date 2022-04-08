@@ -74,7 +74,7 @@ func decodeDict(buf []byte, ss *cffStrings) (cffDict, error) {
 			if len(buf) < 2 {
 				return nil, errCorruptDict
 			}
-			err = flush(dictOp(b0)<<8 + dictOp(buf[1]))
+			err = flush(dictOp(b0)<<8 | dictOp(buf[1]))
 			buf = buf[2:]
 		case b0 <= 21:
 			err = flush(dictOp(b0))
@@ -85,14 +85,14 @@ func decodeDict(buf []byte, ss *cffStrings) (cffDict, error) {
 			if len(buf) < 3 {
 				return nil, errCorruptDict
 			}
-			stack = append(stack, int32(int16(uint16(buf[1])<<8+uint16(buf[2]))))
+			stack = append(stack, int32(int16(uint16(buf[1])<<8|uint16(buf[2]))))
 			buf = buf[3:]
 		case b0 == 29:
 			if len(buf) < 5 {
 				return nil, errCorruptDict
 			}
 			stack = append(stack,
-				int32(uint32(buf[1])<<24+uint32(buf[2])<<16+uint32(buf[3])<<8+uint32(buf[4])))
+				int32(uint32(buf[1])<<24|uint32(buf[2])<<16|uint32(buf[3])<<8|uint32(buf[4])))
 			buf = buf[5:]
 		case b0 == 30:
 			tmp, x, err := decodeFloat(buf[1:])

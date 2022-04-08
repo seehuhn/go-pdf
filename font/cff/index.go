@@ -63,7 +63,7 @@ func readIndex(p *parser.Parser) (cffIndex, error) {
 
 		var offs uint32
 		for _, x := range blob {
-			offs = offs<<8 + uint32(x)
+			offs = offs<<8 | uint32(x)
 		}
 		if offs < prevOffset || int64(offs) >= size {
 			return nil, p.Error("invalid CFF INDEX")

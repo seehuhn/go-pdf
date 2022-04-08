@@ -134,16 +134,18 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	}
 	subsetTag := font.GetSubsetTag(includeGlyphs, s.info.NumGlyphs())
 
+	if _, ok := s.info.Outlines.(*cff.Outlines); ok {
+		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_2)
+		if err != nil {
+			return err
+		}
+	}
+
 	// subset the font
 	subsetInfo := &sfntcff.Info{}
 	*subsetInfo = *s.info
 	switch outlines := s.info.Outlines.(type) {
 	case *cff.Outlines:
-		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_2)
-		if err != nil {
-			return err
-		}
-
 		o2 := &cff.Outlines{}
 		pIdxMap := make(map[int]int)
 		for _, gid := range includeGlyphs {

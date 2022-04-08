@@ -82,8 +82,8 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 			return nil, err
 		}
 		name := string(buf[:4])
-		offset := uint32(buf[8])<<24 + uint32(buf[9])<<16 + uint32(buf[10])<<8 + uint32(buf[11])
-		length := uint32(buf[12])<<24 + uint32(buf[13])<<16 + uint32(buf[14])<<8 + uint32(buf[15])
+		offset := uint32(buf[8])<<24 | uint32(buf[9])<<16 | uint32(buf[10])<<8 | uint32(buf[11])
+		length := uint32(buf[12])<<24 | uint32(buf[13])<<16 | uint32(buf[14])<<8 | uint32(buf[15])
 		if !isKnownTable[name] {
 			continue
 		}

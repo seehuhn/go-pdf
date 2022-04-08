@@ -118,7 +118,7 @@ func (p *Parser) ReadUInt16() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	return uint16(buf[0])<<8 + uint16(buf[1]), nil
+	return uint16(buf[0])<<8 | uint16(buf[1]), nil
 }
 
 // ReadInt16 reads a single int16 value from the current position.
@@ -133,7 +133,7 @@ func (p *Parser) ReadUInt32() (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return uint32(buf[0])<<24 + uint32(buf[1])<<16 + uint32(buf[2])<<8 + uint32(buf[3]), nil
+	return uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3]), nil
 }
 
 // ReadBytes reads n bytes from the file, starting at the current position.  The
@@ -241,7 +241,7 @@ CommandLoop:
 			if err != nil {
 				return err
 			}
-			val := uint16(buf[0])<<8 + uint16(buf[1])
+			val := uint16(buf[0])<<8 | uint16(buf[1])
 			switch arg {
 			case TypeUInt:
 				s.A = int64(val)
@@ -255,7 +255,7 @@ CommandLoop:
 			if err != nil {
 				return err
 			}
-			val := uint32(buf[0])<<24 + uint32(buf[1])<<16 + uint32(buf[2])<<8 + uint32(buf[3])
+			val := uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3])
 			switch arg {
 			case TypeUInt:
 				s.A = int64(val)
@@ -283,7 +283,7 @@ CommandLoop:
 			if err != nil {
 				return err
 			}
-			s.Stash = append(s.Stash, uint16(buf[0])<<8+uint16(buf[1]))
+			s.Stash = append(s.Stash, uint16(buf[0])<<8|uint16(buf[1]))
 
 		case CmdDec:
 			s.A--

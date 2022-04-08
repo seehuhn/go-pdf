@@ -70,7 +70,7 @@ type Info struct {
 	IsScript  bool // Glyphs resemble cursive handwriting.
 
 	CMap     cmap.Subtable
-	Outlines interface{} // either *cff.Outlines or *TTFOutlines
+	Outlines interface{} // either *cff.Outlines or *GlyfOutlines
 
 	Gdef *gdef.Table
 	Gsub *gtab.Info

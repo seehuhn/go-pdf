@@ -24,17 +24,11 @@ import (
 // Glyph represents a single glyph in a TrueType font.
 type Glyph struct {
 	funit.Rect
-	data interface{} // either GlyphSimple or GlyphComposite
+	Data interface{} // either SimpleGlyph or CompositeGlyph
 }
 
-// GlyphSimple is a simple glyph.
-type GlyphSimple struct {
-	numContours int16
-	tail        []byte
-}
-
-// GlyphComposite is a composite glyph.
-type GlyphComposite struct {
+// CompositeGlyph is a composite glyph.
+type CompositeGlyph struct {
 	Components []GlyphComponent
 	Commands   []byte
 }
@@ -67,8 +61,8 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 
 	numCont := int16(data[0])<<8 | int16(data[1])
 	if numCont >= 0 {
-		g.data = GlyphSimple{
-			numContours: numCont,
+		g.Data = SimpleGlyph{
+			NumContours: numCont,
 			tail:        data[10:],
 		}
 	} else {
@@ -76,13 +70,13 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 		if err != nil {
 			return nil, err
 		}
-		g.data = *comp
+		g.Data = *comp
 	}
 
 	return g, nil
 }
 
-func decodeGlyphComposite(data []byte) (*GlyphComposite, error) {
+func decodeGlyphComposite(data []byte) (*CompositeGlyph, error) {
 	var components []GlyphComponent
 	done := false
 	for !done {
@@ -122,7 +116,7 @@ func decodeGlyphComposite(data []byte) (*GlyphComposite, error) {
 		done = flags&0x0020 == 0 // MORE_COMPONENTS
 	}
 
-	res := &GlyphComposite{
+	res := &CompositeGlyph{
 		Components: components,
 		Commands:   data,
 	}
@@ -135,10 +129,10 @@ func (g *Glyph) encodeLen() int {
 	}
 
 	total := 10
-	switch d := g.data.(type) {
-	case GlyphSimple:
+	switch d := g.Data.(type) {
+	case SimpleGlyph:
 		total += len(d.tail)
-	case GlyphComposite:
+	case CompositeGlyph:
 		for _, comp := range d.Components {
 			total += 4 + len(comp.Args)
 		}
@@ -158,10 +152,10 @@ func (g *Glyph) append(buf []byte) []byte {
 	}
 
 	var numContours int16
-	switch g0 := g.data.(type) {
-	case GlyphSimple:
-		numContours = g0.numContours
-	case GlyphComposite:
+	switch g0 := g.Data.(type) {
+	case SimpleGlyph:
+		numContours = g0.NumContours
+	case CompositeGlyph:
 		numContours = -1
 	default:
 		panic("unexpected glyph type")
@@ -179,10 +173,10 @@ func (g *Glyph) append(buf []byte) []byte {
 		byte(g.URy>>8),
 		byte(g.URy))
 
-	switch d := g.data.(type) {
-	case GlyphSimple:
+	switch d := g.Data.(type) {
+	case SimpleGlyph:
 		buf = append(buf, d.tail...)
-	case GlyphComposite:
+	case CompositeGlyph:
 		for _, comp := range d.Components {
 			buf = append(buf,
 				byte(comp.Flags>>8), byte(comp.Flags),
@@ -207,10 +201,10 @@ func (g *Glyph) Components() []font.GlyphID {
 	if g == nil {
 		return nil
 	}
-	switch d := g.data.(type) {
-	case GlyphSimple:
+	switch d := g.Data.(type) {
+	case SimpleGlyph:
 		return nil
-	case GlyphComposite:
+	case CompositeGlyph:
 		res := make([]font.GlyphID, len(d.Components))
 		for i, comp := range d.Components {
 			res[i] = comp.GlyphIndex
@@ -226,11 +220,11 @@ func (g *Glyph) FixComponents(newGid map[font.GlyphID]font.GlyphID) *Glyph {
 	if g == nil {
 		return nil
 	}
-	switch d := g.data.(type) {
-	case GlyphSimple:
+	switch d := g.Data.(type) {
+	case SimpleGlyph:
 		return g
-	case GlyphComposite:
-		d2 := GlyphComposite{
+	case CompositeGlyph:
+		d2 := CompositeGlyph{
 			Components: make([]GlyphComponent, len(d.Components)),
 			Commands:   d.Commands,
 		}
@@ -243,7 +237,7 @@ func (g *Glyph) FixComponents(newGid map[font.GlyphID]font.GlyphID) *Glyph {
 		}
 		g2 := &Glyph{
 			Rect: g.Rect,
-			data: d2,
+			Data: d2,
 		}
 		return g2
 	default:

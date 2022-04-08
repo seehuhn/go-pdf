@@ -38,18 +38,18 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	majorVersion := uint16(buf[0])<<8 + uint16(buf[1])
-	minorVersion := uint16(buf[2])<<8 + uint16(buf[3])
+	majorVersion := uint16(buf[0])<<8 | uint16(buf[1])
+	minorVersion := uint16(buf[2])<<8 | uint16(buf[3])
 	if majorVersion != 1 || (minorVersion != 0 && minorVersion != 2 && minorVersion != 3) {
 		return nil, &font.NotSupportedError{
 			SubSystem: "sfnt/opentype/gdef",
 			Feature:   fmt.Sprintf("GDEF table version %d.%d", majorVersion, minorVersion),
 		}
 	}
-	glyphClassDefOffset := uint16(buf[4])<<8 + uint16(buf[5])
-	attachListOffset := uint16(buf[6])<<8 + uint16(buf[7])
-	ligCaretListOffset := uint16(buf[8])<<8 + uint16(buf[9])
-	markAttachClassDefOffset := uint16(buf[10])<<8 + uint16(buf[11])
+	glyphClassDefOffset := uint16(buf[4])<<8 | uint16(buf[5])
+	attachListOffset := uint16(buf[6])<<8 | uint16(buf[7])
+	ligCaretListOffset := uint16(buf[8])<<8 | uint16(buf[9])
+	markAttachClassDefOffset := uint16(buf[10])<<8 | uint16(buf[11])
 	var markGlyphSetsDefOffset uint16
 	if minorVersion >= 2 {
 		markGlyphSetsDefOffset, err = p.ReadUInt16()

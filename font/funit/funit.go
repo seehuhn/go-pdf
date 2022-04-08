@@ -22,6 +22,9 @@ type Int16 int16
 // Uint16 is an unsigned 16-bit integer in font design units.
 type Uint16 uint16
 
+// Int32 is a 32-bit integer in font design units.
+type Int32 int32
+
 // Rect represents a rectangle in font design units.
 type Rect struct {
 	LLx, LLy, URx, URy Int16

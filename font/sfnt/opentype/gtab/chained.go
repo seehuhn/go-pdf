@@ -82,8 +82,8 @@ func readChained3(p *parser.Parser, subtablePos int64) (*chainedSeq3, error) {
 		if err != nil {
 			return nil, err
 		}
-		actions[i].sequenceIndex = uint16(buf[0])<<8 + uint16(buf[1])
-		actions[i].lookupListIndex = uint16(buf[2])<<8 + uint16(buf[3])
+		actions[i].sequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
+		actions[i].lookupListIndex = uint16(buf[2])<<8 | uint16(buf[3])
 	}
 
 	res := &chainedSeq3{
