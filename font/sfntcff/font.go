@@ -277,21 +277,27 @@ func (info *Info) Extents() []font.Rect {
 	return extents
 }
 
-// GlyphWidth returns the advance width of the glyph with the given glyph ID,
-// in PDF glyph space units.
-func (info *Info) GlyphWidth(gid font.GlyphID) uint16 {
-	q := 1000 / float64(info.UnitsPerEm)
+// FGlyphWidth returns the advance width of the glyph with the given glyph ID,
+// in font design units.
+func (info *Info) FGlyphWidth(gid font.GlyphID) funit.Uint16 {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
-		return uint16(math.Round(float64(f.Glyphs[gid].Width) * q))
+		return f.Glyphs[gid].Width
 	case *GlyfOutlines:
 		if f.Widths == nil {
 			return 0
 		}
-		return uint16(math.Round(float64(f.Widths[gid]) * q))
+		return f.Widths[gid]
 	default:
 		panic("unexpected font type")
 	}
+}
+
+// GlyphWidth returns the advance width of the glyph with the given glyph ID,
+// in PDF glyph space units.
+func (info *Info) GlyphWidth(gid font.GlyphID) uint16 {
+	q := 1000 / float64(info.UnitsPerEm)
+	return uint16(math.Round(float64(info.FGlyphWidth(gid)) * q))
 }
 
 // GlyphExtent returns the glyph bounding box for one glyph.

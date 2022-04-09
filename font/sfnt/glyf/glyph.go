@@ -140,7 +140,7 @@ func (g *Glyph) encodeLen() int {
 	default:
 		panic("unexpected glyph type")
 	}
-	for total%4 != 0 {
+	for total%2 != 0 {
 		total++
 	}
 	return total
@@ -188,7 +188,7 @@ func (g *Glyph) append(buf []byte) []byte {
 		panic("unexpected glyph type")
 	}
 
-	for len(buf)%4 != 0 {
+	for len(buf)%2 != 0 {
 		buf = append(buf, 0)
 	}
 
