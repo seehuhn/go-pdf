@@ -54,6 +54,7 @@ func tryFont(fname string) error {
 	if err != nil {
 		return err
 	}
+
 	_ = info
 
 	return nil

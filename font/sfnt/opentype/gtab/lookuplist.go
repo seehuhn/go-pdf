@@ -25,6 +25,8 @@ import (
 // It is used as an index into a LookupList.
 type LookupIndex uint16
 
+// LookupList contains the information from a Lookup List Table.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
 type LookupList []*LookupTable
 
 // LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
@@ -35,6 +37,7 @@ type LookupTable struct {
 	Subtables []Subtable
 }
 
+// EncodeLen returns the number of bytes required to encode the LookupTable.
 func (li *LookupTable) EncodeLen() int {
 	total := 6
 	total += 2 * len(li.Subtables)
@@ -47,6 +50,7 @@ func (li *LookupTable) EncodeLen() int {
 	return total
 }
 
+// LookupMetaInfo contains information associated with a lookup table.
 type LookupMetaInfo struct {
 	LookupType       uint16
 	LookupFlag       uint16
@@ -66,10 +70,11 @@ type Subtable interface {
 	Encode(*LookupMetaInfo) []byte
 }
 
-type SubtableReader func(*parser.Parser, int64, *LookupMetaInfo) (Subtable, error)
+// subtableReader is a function that can decode a subtable.
+// Different functions are required for "GSUB" and "GPOS" tables.
+type subtableReader func(*parser.Parser, int64, *LookupMetaInfo) (Subtable, error)
 
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
-func readLookupList(p *parser.Parser, pos int64, sr SubtableReader) (LookupList, error) {
+func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err

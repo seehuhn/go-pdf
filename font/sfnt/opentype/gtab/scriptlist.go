@@ -26,8 +26,8 @@ import (
 
 // ScriptLang is a pair of script and language.
 type ScriptLang struct {
-	script locale.Script
-	lang   locale.Language
+	Script locale.Script
+	Lang   locale.Language
 }
 
 // Features describes the mandatory and optional features for a script/language.
@@ -164,14 +164,14 @@ func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info Scr
 		if err != nil {
 			return err
 		}
-		info[ScriptLang{script: script, lang: locale.LangUndefined}] = ff
+		info[ScriptLang{Script: script, Lang: locale.LangUndefined}] = ff
 	}
 	for _, record := range records {
 		ff, err := readLangSysTable(p, pos+int64(record.offset))
 		if err != nil {
 			return err
 		}
-		info[ScriptLang{script: script, lang: record.lang}] = ff
+		info[ScriptLang{Script: script, Lang: record.lang}] = ff
 	}
 
 	return nil
@@ -231,7 +231,7 @@ func (info ScriptListInfo) encode() []byte {
 
 	scripts := map[locale.Script][]locale.Language{}
 	for key := range info {
-		scripts[key.script] = append(scripts[key.script], key.lang)
+		scripts[key.Script] = append(scripts[key.Script], key.Lang)
 	}
 
 	type scriptRecord struct {
@@ -263,7 +263,7 @@ func (info ScriptListInfo) encode() []byte {
 			if lang != locale.LangUndefined {
 				langCount++
 			}
-			langSys := info[ScriptLang{script: sRec.script, lang: lang}]
+			langSys := info[ScriptLang{Script: sRec.script, Lang: lang}]
 			// lookupOrderOffset, requiredFeatureIndex, featureIndexCount, featureIndices:
 			totalSize += 6 + len(langSys.Optional)*2
 		}
@@ -293,7 +293,7 @@ func (info ScriptListInfo) encode() []byte {
 		var defaultRecord *langSysRecord
 		var langSysRecords []*langSysRecord
 		for _, lang := range langs {
-			langSys := info[ScriptLang{script: sRec.script, lang: lang}]
+			langSys := info[ScriptLang{Script: sRec.script, Lang: lang}]
 			if lang == locale.LangUndefined {
 				defaultRecord = &langSysRecord{
 					langSys: langSys,

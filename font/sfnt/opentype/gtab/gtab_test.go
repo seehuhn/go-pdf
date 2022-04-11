@@ -8,20 +8,62 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
+func TestGetLookups(t *testing.T) {
+	gtabInfo := Info{
+		ScriptList: map[ScriptLang]*Features{
+			{Script: locale.ScriptLatin}: {
+				Required: 0,
+				Optional: []FeatureIndex{
+					1, 2, 3,
+				},
+			},
+		},
+		FeatureList: []*Feature{
+			{Tag: "dflt", Lookups: []LookupIndex{0, 3}},
+			{Tag: "kern", Lookups: []LookupIndex{1, 3}},
+			{Tag: "mkmk", Lookups: []LookupIndex{4, 3, 2}},
+			{Tag: "test", Lookups: []LookupIndex{4, 5}},
+		},
+		LookupList: []*LookupTable{
+			nil, nil, nil, nil, nil, nil,
+		},
+	}
+
+	cases := []struct {
+		tags     []string
+		expected []LookupIndex
+	}{
+		{nil, []LookupIndex{0, 3}},
+		{[]string{"kern"}, []LookupIndex{0, 1, 3}},
+		{[]string{"kern", "test"}, []LookupIndex{0, 1, 3, 4, 5}},
+	}
+
+	for _, test := range cases {
+		includeFeature := map[string]bool{}
+		for _, tag := range test.tags {
+			includeFeature[tag] = true
+		}
+		ll := gtabInfo.getLookups(locale.EnGB, includeFeature)
+		if len(ll) != len(test.expected) {
+			t.Errorf("GetLookups(%v) = %v, expected %v", test.tags, ll, test.expected)
+		}
+	}
+}
+
 func FuzzGtab(f *testing.F) {
 	info := &Info{}
 	f.Add(info.Encode())
 
 	info.ScriptList = ScriptListInfo{
-		{script: locale.ScriptUndefined, lang: locale.LangUndefined}: {
+		{Script: locale.ScriptUndefined, Lang: locale.LangUndefined}: {
 			Required: 0xFFFF,
 			Optional: []FeatureIndex{1, 2, 3, 4},
 		},
-		{script: locale.ScriptLatin, lang: locale.LangUndefined}: {
+		{Script: locale.ScriptLatin, Lang: locale.LangUndefined}: {
 			Required: 0,
 			Optional: []FeatureIndex{2, 4, 5},
 		},
-		{script: locale.ScriptLatin, lang: locale.LangGerman}: {
+		{Script: locale.ScriptLatin, Lang: locale.LangGerman}: {
 			Required: 6,
 		},
 	}

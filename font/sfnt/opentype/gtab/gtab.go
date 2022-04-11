@@ -36,7 +36,7 @@ type Info struct {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#gpos-header
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#gsub-header
 func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
-	var sr SubtableReader
+	var sr subtableReader
 	switch tableName {
 	case "GPOS":
 		sr = readGposSubtable
@@ -48,7 +48,7 @@ func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
 	return doRead(tableName, r, sr)
 }
 
-func doRead(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, error) {
+func doRead(tableName string, r parser.ReadSeekSizer, sr subtableReader) (*Info, error) {
 	p := parser.New(tableName, r)
 
 	var header struct {

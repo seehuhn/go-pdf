@@ -27,32 +27,32 @@ import (
 
 func FuzzScriptList(f *testing.F) {
 	info := ScriptListInfo{}
-	info[ScriptLang{script: locale.ScriptUndefined, lang: locale.LangUndefined}] = &Features{
+	info[ScriptLang{Script: locale.ScriptUndefined, Lang: locale.LangUndefined}] = &Features{
 		Optional: []FeatureIndex{0},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info[ScriptLang{script: locale.ScriptLatin, lang: locale.LangEnglish}] = &Features{
+	info[ScriptLang{Script: locale.ScriptLatin, Lang: locale.LangEnglish}] = &Features{
 		Required: FeatureIndex(0xFFFF),
 		Optional: []FeatureIndex{1, 2, 3, 4},
 	}
-	info[ScriptLang{script: locale.ScriptLatin, lang: locale.LangUndefined}] = &Features{
+	info[ScriptLang{Script: locale.ScriptLatin, Lang: locale.LangUndefined}] = &Features{
 		Required: 7,
 		Optional: []FeatureIndex{5, 6},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info[ScriptLang{script: locale.ScriptArabic, lang: locale.LangUndefined}] = &Features{
+	info[ScriptLang{Script: locale.ScriptArabic, Lang: locale.LangUndefined}] = &Features{
 		Required: FeatureIndex(0),
 		Optional: []FeatureIndex{1, 2},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info[ScriptLang{script: locale.ScriptUndefined, lang: locale.LangArabic}] = &Features{
+	info[ScriptLang{Script: locale.ScriptUndefined, Lang: locale.LangArabic}] = &Features{
 		Required: FeatureIndex(0xFFFF),
 		Optional: []FeatureIndex{1, 3, 5},
 	}
-	info[ScriptLang{script: locale.ScriptUndefined, lang: locale.LangAzerbaijani}] = &Features{
+	info[ScriptLang{Script: locale.ScriptUndefined, Lang: locale.LangAzerbaijani}] = &Features{
 		Required: FeatureIndex(0xFFFF),
 		Optional: []FeatureIndex{2, 4, 6},
 	}

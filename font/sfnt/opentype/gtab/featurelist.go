@@ -30,6 +30,9 @@ import (
 // features in the `Features` struct.
 type FeatureIndex uint16
 
+// FeatureListInfo contains the contents of an OpenType "Feature List" table.
+type FeatureListInfo []*Feature
+
 // Feature describes an OpenType feature, used either in a "GPOS" or "GSUB"
 // table.
 type Feature struct {
@@ -44,9 +47,6 @@ type Feature struct {
 func (f Feature) String() string {
 	return fmt.Sprintf("%s:%v", f.Tag, f.Lookups)
 }
-
-// FeatureListInfo contains the contents of an OpenType "Feature List" table.
-type FeatureListInfo []*Feature
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-list-table
 func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {

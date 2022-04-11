@@ -67,13 +67,14 @@ func (st notImplementedGsubSubtable) Encode(meta *LookupMetaInfo) []byte {
 	panic(msg)
 }
 
+// Gsub1_1 is a GSUB subtable for format 1.1.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#11-single-substitution-format-1
-type gsub1_1 struct {
-	cov   coverage.Table
-	delta font.GlyphID
+type Gsub1_1 struct {
+	Cov   coverage.Table
+	Delta font.GlyphID
 }
 
-func readGsub1_1(p *parser.Parser, subtablePos int64) (*gsub1_1, error) {
+func readGsub1_1(p *parser.Parser, subtablePos int64) (*Gsub1_1, error) {
 	buf, err := p.ReadBytes(4)
 	if err != nil {
 		return nil, err
@@ -84,34 +85,34 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (*gsub1_1, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := &gsub1_1{
-		cov:   cov,
-		delta: deltaGlyphID,
+	res := &Gsub1_1{
+		Cov:   cov,
+		Delta: deltaGlyphID,
 	}
 	return res, nil
 }
 
-func (l *gsub1_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.Glyph, int) {
+func (l *Gsub1_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	gid := seq[i].Gid
-	if _, ok := l.cov[gid]; !ok {
+	if _, ok := l.Cov[gid]; !ok {
 		return seq, -1
 	}
-	seq[i].Gid = gid + l.delta
+	seq[i].Gid = gid + l.Delta
 	return seq, i + 1
 }
 
-func (l *gsub1_1) EncodeLen(*LookupMetaInfo) int {
-	return 6 + l.cov.EncodeLen()
+func (l *Gsub1_1) EncodeLen(*LookupMetaInfo) int {
+	return 6 + l.Cov.EncodeLen()
 }
 
-func (l *gsub1_1) Encode(*LookupMetaInfo) []byte {
-	buf := make([]byte, 6+l.cov.EncodeLen())
+func (l *Gsub1_1) Encode(*LookupMetaInfo) []byte {
+	buf := make([]byte, 6+l.Cov.EncodeLen())
 	// buf[0] = 0
 	buf[1] = 1
 	// buf[2] = 0
 	buf[3] = 6
-	buf[4] = byte(l.delta >> 8)
-	buf[5] = byte(l.delta)
-	copy(buf[6:], l.cov.Encode())
+	buf[4] = byte(l.Delta >> 8)
+	buf[5] = byte(l.Delta)
+	copy(buf[6:], l.Cov.Encode())
 	return buf
 }

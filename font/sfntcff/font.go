@@ -300,7 +300,7 @@ func (info *Info) GlyphWidth(gid font.GlyphID) uint16 {
 	return uint16(math.Round(float64(info.FGlyphWidth(gid)) * q))
 }
 
-// GlyphExtent returns the glyph bounding box for one glyph in font design
+// FGlyphExtent returns the glyph bounding box for one glyph in font design
 // units.
 func (info *Info) FGlyphExtent(gid font.GlyphID) funit.Rect {
 	switch f := info.Outlines.(type) {
