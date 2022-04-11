@@ -1,14 +1,35 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package debug
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"math"
+	"time"
 
 	"golang.org/x/image/font/gofont/goregular"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Build a font for use in unit tests.
@@ -18,11 +39,59 @@ func Build() (*sfntcff.Info, error) {
 		return nil, err
 	}
 
-	outlines := info.Outlines.(*sfntcff.GlyfOutlines)
-	cffOutlines := &cff.Outlines{}
+	var includeGid []font.GlyphID
+	cmap := cmap.Format4{}
+	encoding := make([]font.GlyphID, 256)
+	includeGid = append(includeGid, 0)
+	var topMin, topMax funit.Int16
+	var bottomMin, bottomMax funit.Int16
 	for c := 'A'; c <= 'Z'; c++ {
 		gid := info.CMap.Lookup(c)
-		gl := outlines.Glyphs[gid]
+		cmap[uint16(c)] = font.GlyphID(len(includeGid))
+		encoding[c] = font.GlyphID(len(includeGid))
+		includeGid = append(includeGid, gid)
+
+		ext := info.FGlyphExtent(gid)
+		top := ext.URy
+		if c == 'A' || top < topMin {
+			topMin = top
+		}
+		if c == 'A' || top > topMax {
+			topMax = top
+		}
+
+		if c == 'Q' {
+			continue
+		}
+		bottom := ext.LLy
+		if c == 'A' || bottom < bottomMin {
+			bottomMin = bottom
+		}
+		if c == 'A' || bottom > bottomMax {
+			bottomMax = bottom
+		}
+	}
+	encoding['<'] = 27
+	encoding['>'] = 28
+	encoding['='] = 29
+
+	oldOutlines := info.Outlines.(*sfntcff.GlyfOutlines)
+	newOutlines := &cff.Outlines{
+		Private: []*type1.PrivateDict{
+			{
+				BlueValues: []funit.Int16{
+					bottomMin, bottomMax, topMin, topMax,
+				},
+			},
+		},
+		FdSelect: func(font.GlyphID) int {
+			return 0
+		},
+		Encoding: encoding,
+	}
+
+	for _, gid := range includeGid {
+		gl := oldOutlines.Glyphs[gid]
 		g := gl.Data.(glyf.SimpleGlyph)
 		glyphInfo, err := g.Decode()
 		if err != nil {
@@ -30,7 +99,6 @@ func Build() (*sfntcff.Info, error) {
 			continue
 		}
 
-		fmt.Println("glyph", c)
 		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.FGlyphWidth(gid))
 		for _, cc := range glyphInfo.Contours {
 			var extended glyf.Contour
@@ -89,11 +157,58 @@ func Build() (*sfntcff.Info, error) {
 				}
 			}
 		}
-		cffOutlines.Glyphs = append(cffOutlines.Glyphs, cffGlyph)
+		newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 	}
 
-	info.Outlines = cffOutlines
-	// info.CMap = ...
+	ext := info.FGlyphExtent(info.CMap.Lookup('M'))
+	xMid := math.Round(float64(ext.URx+ext.LLx) / 2)
+	yMid := math.Round(float64(ext.URy+ext.LLy) / 2)
+	a := math.Round(math.Min(xMid, yMid) * 0.8)
 
-	return info, errors.New("not implemented")
+	cffGlyph := cff.NewGlyph("marker.left", funit.Uint16(ext.URx))
+	cffGlyph.MoveTo(xMid, yMid)
+	cffGlyph.LineTo(xMid-a, yMid-a)
+	cffGlyph.LineTo(xMid-a, yMid+a)
+	cmap[uint16('>')] = font.GlyphID(len(includeGid))
+	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
+
+	cffGlyph = cff.NewGlyph("marker.right", funit.Uint16(ext.URx))
+	cffGlyph.MoveTo(xMid, yMid)
+	cffGlyph.LineTo(xMid+a, yMid+a)
+	cffGlyph.LineTo(xMid+a, yMid-a)
+	cmap[uint16('<')] = font.GlyphID(len(includeGid))
+	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
+
+	cffGlyph = cff.NewGlyph("marker", funit.Uint16(ext.URx))
+	cffGlyph.MoveTo(xMid, yMid)
+	cffGlyph.LineTo(xMid-a, yMid-a)
+	cffGlyph.LineTo(xMid-a, yMid+a)
+	cffGlyph.LineTo(xMid, yMid)
+	cffGlyph.LineTo(xMid+a, yMid+a)
+	cffGlyph.LineTo(xMid+a, yMid-a)
+	cmap[uint16('=')] = font.GlyphID(len(includeGid))
+	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
+
+	res := &sfntcff.Info{
+		FamilyName:   "Debug",
+		Width:        info.Width,
+		Weight:       info.Weight,
+		Version:      0,
+		CreationTime: time.Now(),
+
+		UnitsPerEm:         info.UnitsPerEm,
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		LineGap:            info.LineGap,
+		CapHeight:          info.CapHeight,
+		XHeight:            info.XHeight,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		IsRegular:          true,
+
+		CMap:     cmap,
+		Outlines: newOutlines,
+	}
+
+	return res, nil
 }

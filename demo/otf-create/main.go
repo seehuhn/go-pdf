@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
@@ -80,7 +81,7 @@ func main() {
 	cffInfo.Glyphs = append(cffInfo.Glyphs, g)
 	cffInfo.Private = []*type1.PrivateDict{
 		{
-			BlueValues: []int32{-10, 0, 700, 710},
+			BlueValues: []funit.Int16{-10, 0, 700, 710},
 		},
 	}
 	cffInfo.FdSelect = func(gi font.GlyphID) int { return 0 }

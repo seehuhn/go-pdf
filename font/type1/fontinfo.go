@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 type FontInfo struct {
@@ -72,9 +73,9 @@ type PrivateDict struct {
 	// The first integer in each pair is less than or equal to the second integer.
 	// The first pair is the baseline overshoot position and the baseline.
 	// All subsequent pairs describe alignment zones for the tops of character features.
-	BlueValues []int32
+	BlueValues []funit.Int16
 
-	OtherBlues []int32
+	OtherBlues []funit.Int16
 
 	BlueScale float64
 

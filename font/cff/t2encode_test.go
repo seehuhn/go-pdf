@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/go-test/deep"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -42,8 +43,8 @@ func TestRoundTrip(t *testing.T) {
 	}
 	private := []*type1.PrivateDict{
 		{
-			BlueValues: []int32{-22, 0, 500, 520, 700, 720},
-			OtherBlues: []int32{-120, -100},
+			BlueValues: []funit.Int16{-22, 0, 500, 520, 700, 720},
+			OtherBlues: []funit.Int16{-120, -100},
 			BlueScale:  0.04379,
 			BlueShift:  2,
 			BlueFuzz:   3,

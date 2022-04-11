@@ -359,19 +359,19 @@ func (d cffDict) getString(op dictOp) string {
 	return x
 }
 
-func (d cffDict) getDelta32(op dictOp) []int32 {
+func (d cffDict) getDeltaF16(op dictOp) []funit.Int16 {
 	values := d[op]
 	if len(values) == 0 {
 		return nil
 	}
-	res := make([]int32, len(values))
-	var prev int32
+	res := make([]funit.Int16, len(values))
+	var prev funit.Int16
 	for i, v := range values {
 		x, ok := v.(int32)
 		if !ok {
 			return nil
 		}
-		res[i] = x + prev
+		res[i] = funit.Int16(x) + prev
 		prev = res[i]
 	}
 	return res
@@ -411,15 +411,15 @@ func (d cffDict) getFontMatrix(op dictOp) []float64 {
 	return res
 }
 
-func (d cffDict) setDelta32(op dictOp, val []int32) {
+func (d cffDict) setDeltaF16(op dictOp, val []funit.Int16) {
 	if len(val) == 0 {
 		delete(d, op)
 		return
 	}
 	res := make([]interface{}, len(val))
-	var prev int32
+	var prev funit.Int16
 	for i, x := range val {
-		res[i] = x - prev
+		res[i] = int32(x - prev)
 		prev = x
 	}
 	d[op] = res
@@ -540,8 +540,8 @@ func (d cffDict) readPrivate(p *parser.Parser, strings *cffStrings) (*privateInf
 	}
 
 	private := &type1.PrivateDict{
-		BlueValues: privateDict.getDelta32(opBlueValues),
-		OtherBlues: privateDict.getDelta32(opOtherBlues),
+		BlueValues: privateDict.getDeltaF16(opBlueValues),
+		OtherBlues: privateDict.getDeltaF16(opOtherBlues),
 		BlueScale:  privateDict.getFloat(opBlueScale, defaultBlueScale),
 		BlueShift:  privateDict.getInt(opBlueShift, 7),
 		BlueFuzz:   privateDict.getInt(opBlueFuzz, 1),
@@ -577,8 +577,8 @@ func (cff *Font) makePrivateDict(idx int, defaultWidth, nominalWidth funit.Uint1
 
 	privateDict := cffDict{}
 
-	privateDict.setDelta32(opBlueValues, private.BlueValues)
-	privateDict.setDelta32(opOtherBlues, private.OtherBlues)
+	privateDict.setDeltaF16(opBlueValues, private.BlueValues)
+	privateDict.setDeltaF16(opOtherBlues, private.OtherBlues)
 	if math.Abs(private.BlueScale-defaultBlueScale) > 1e-6 {
 		privateDict[opBlueScale] = []interface{}{private.BlueScale}
 	}

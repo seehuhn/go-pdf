@@ -300,31 +300,29 @@ func (info *Info) GlyphWidth(gid font.GlyphID) uint16 {
 	return uint16(math.Round(float64(info.FGlyphWidth(gid)) * q))
 }
 
-// GlyphExtent returns the glyph bounding box for one glyph.
-func (info *Info) GlyphExtent(gid font.GlyphID) font.Rect {
-	q := 1000 / float64(info.UnitsPerEm)
+// GlyphExtent returns the glyph bounding box for one glyph in font design
+// units.
+func (info *Info) FGlyphExtent(gid font.GlyphID) funit.Rect {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
-		ext := f.Glyphs[gid].Extent()
-		return font.Rect{
-			LLx: int16(math.Round(float64(ext.LLx) * q)),
-			LLy: int16(math.Round(float64(ext.LLy) * q)),
-			URx: int16(math.Round(float64(ext.URx) * q)),
-			URy: int16(math.Round(float64(ext.URy) * q)),
-		}
+		return f.Glyphs[gid].Extent()
 	case *GlyfOutlines:
 		g := f.Glyphs[gid]
-		if g == nil {
-			return font.Rect{}
-		}
-		return font.Rect{
-			LLx: int16(math.Round(float64(g.Rect.LLx) * q)),
-			LLy: int16(math.Round(float64(g.Rect.LLy) * q)),
-			URx: int16(math.Round(float64(g.Rect.URx) * q)),
-			URy: int16(math.Round(float64(g.Rect.URy) * q)),
-		}
+		return g.Rect
 	default:
 		panic("unexpected font type")
+	}
+}
+
+// GlyphExtent returns the glyph bounding box for one glyph in glyph units.
+func (info *Info) GlyphExtent(gid font.GlyphID) font.Rect {
+	ext := info.FGlyphExtent(gid)
+	q := 1000 / float64(info.UnitsPerEm)
+	return font.Rect{
+		LLx: int16(math.Round(float64(ext.LLx) * q)),
+		LLy: int16(math.Round(float64(ext.LLy) * q)),
+		URx: int16(math.Round(float64(ext.URx) * q)),
+		URy: int16(math.Round(float64(ext.URy) * q)),
 	}
 }
 
