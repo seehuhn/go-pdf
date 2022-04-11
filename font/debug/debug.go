@@ -189,12 +189,14 @@ func MakeFont() (*sfntcff.Info, error) {
 	cmap[uint16('=')] = font.GlyphID(len(includeGid))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
+	now := time.Now()
 	res := &sfntcff.Info{
-		FamilyName:   "Debug",
-		Width:        info.Width,
-		Weight:       info.Weight,
-		Version:      0,
-		CreationTime: time.Now(),
+		FamilyName:       "Debug",
+		Width:            info.Width,
+		Weight:           info.Weight,
+		Version:          0,
+		CreationTime:     now,
+		ModificationTime: now,
 
 		UnitsPerEm:         info.UnitsPerEm,
 		Ascent:             info.Ascent,

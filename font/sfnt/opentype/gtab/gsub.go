@@ -40,6 +40,8 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 	switch 10*meta.LookupType + format {
 	case 1_1:
 		return readGsub1_1(p, pos)
+	case 1_2:
+		return readGsub1_2(p, pos)
 	default:
 		msg := fmt.Sprintf("GSUB %d.%d\n", meta.LookupType, format)
 		fmt.Print(msg)
@@ -67,7 +69,7 @@ func (st notImplementedGsubSubtable) Encode(meta *LookupMetaInfo) []byte {
 	panic(msg)
 }
 
-// Gsub1_1 is a GSUB subtable for format 1.1.
+// Gsub1_1 is a format 1.1 GSUB subtable.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#11-single-substitution-format-1
 type Gsub1_1 struct {
 	Cov   coverage.Table
@@ -92,6 +94,7 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (*Gsub1_1, error) {
 	return res, nil
 }
 
+// Apply implements the Subtable interface.
 func (l *Gsub1_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.Glyph, int) {
 	gid := seq[i].Gid
 	if _, ok := l.Cov[gid]; !ok {
@@ -101,10 +104,12 @@ func (l *Gsub1_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.G
 	return seq, i + 1
 }
 
+// EncodeLen implements the Subtable interface.
 func (l *Gsub1_1) EncodeLen(*LookupMetaInfo) int {
 	return 6 + l.Cov.EncodeLen()
 }
 
+// Encode implements the Subtable interface.
 func (l *Gsub1_1) Encode(*LookupMetaInfo) []byte {
 	buf := make([]byte, 6+l.Cov.EncodeLen())
 	// buf[0] = 0
@@ -114,5 +119,82 @@ func (l *Gsub1_1) Encode(*LookupMetaInfo) []byte {
 	buf[4] = byte(l.Delta >> 8)
 	buf[5] = byte(l.Delta)
 	copy(buf[6:], l.Cov.Encode())
+	return buf
+}
+
+// Gsub1_2 is a format 1.2 GSUB subtable.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#12-single-substitution-format-2
+type Gsub1_2 struct {
+	Cov                coverage.Table
+	SubstituteGlyphIDs []font.GlyphID
+}
+
+func readGsub1_2(p *parser.Parser, subtablePos int64) (*Gsub1_2, error) {
+	buf, err := p.ReadBytes(4)
+	if err != nil {
+		return nil, err
+	}
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	glyphCount := int(buf[2])<<8 | int(buf[3])
+	substituteGlyphIDs := make([]font.GlyphID, glyphCount)
+	for i := 0; i < glyphCount; i++ {
+		gid, err := p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+		substituteGlyphIDs[i] = font.GlyphID(gid)
+	}
+
+	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cov) != glyphCount {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/gtab",
+			Reason:    "malformed format 1.2 GSUB subtable",
+		}
+	}
+
+	res := &Gsub1_2{
+		Cov:                cov,
+		SubstituteGlyphIDs: substituteGlyphIDs,
+	}
+	return res, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gsub1_2) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.Glyph, int) {
+	gid := seq[i].Gid
+	if idx, ok := l.Cov[gid]; ok {
+		seq[i].Gid = l.SubstituteGlyphIDs[idx]
+		return seq, i + 1
+	}
+	return seq, -1
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gsub1_2) EncodeLen(*LookupMetaInfo) int {
+	return 6 + 2*len(l.SubstituteGlyphIDs) + l.Cov.EncodeLen()
+}
+
+// Encode implements the Subtable interface.
+func (l *Gsub1_2) Encode(*LookupMetaInfo) []byte {
+	n := len(l.SubstituteGlyphIDs)
+	covOffs := 6 + 2*n
+
+	buf := make([]byte, covOffs+l.Cov.EncodeLen())
+	// buf[0] = 0
+	buf[1] = 2
+	buf[2] = byte(covOffs >> 8)
+	buf[3] = byte(covOffs)
+	buf[4] = byte(n >> 8)
+	buf[5] = byte(n)
+	for i := 0; i < n; i++ {
+		buf[6+2*i] = byte(l.SubstituteGlyphIDs[i] >> 8)
+		buf[6+2*i+1] = byte(l.SubstituteGlyphIDs[i])
+	}
+	copy(buf[covOffs:], l.Cov.Encode())
 	return buf
 }
