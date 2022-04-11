@@ -33,7 +33,11 @@ type FeatureIndex uint16
 // Feature describes an OpenType feature, used either in a "GPOS" or "GSUB"
 // table.
 type Feature struct {
-	Tag     string
+	// Tag describes the function of this feature.
+	// https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags
+	Tag string
+
+	// Lookups is a list of lookup indices that are used by this feature.
 	Lookups []LookupIndex
 }
 

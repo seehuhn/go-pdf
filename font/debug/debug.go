@@ -32,8 +32,8 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 )
 
-// Build a font for use in unit tests.
-func Build() (*sfntcff.Info, error) {
+// MakeFont creates a simple font for use in unit tests.
+func MakeFont() (*sfntcff.Info, error) {
 	info, err := sfntcff.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
 		return nil, err

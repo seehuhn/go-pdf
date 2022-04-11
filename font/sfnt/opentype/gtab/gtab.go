@@ -45,7 +45,10 @@ func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
 	default:
 		panic("invalid table name")
 	}
+	return doRead(tableName, r, sr)
+}
 
+func doRead(tableName string, r parser.ReadSeekSizer, sr SubtableReader) (*Info, error) {
 	p := parser.New(tableName, r)
 
 	var header struct {

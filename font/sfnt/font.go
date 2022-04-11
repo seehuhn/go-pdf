@@ -183,7 +183,7 @@ func Open(fname string, loc *locale.Locale) (*Font, error) {
 		capHeight = 800 // TODO(voss): adjust for glyphUnits
 	}
 
-	pars, err := gtab.New(tt.Header, tt.Fd, loc)
+	pars, err := gtab.Read(tt.Header, tt.Fd, loc)
 	if err != nil {
 		return nil, err
 	}
