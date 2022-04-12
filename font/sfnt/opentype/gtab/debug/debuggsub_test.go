@@ -44,8 +44,21 @@ func TestGsub(t *testing.T) {
 			Delta: 26,
 		}},
 		{1, &gtab.Gsub1_2{
-			Cov:                map[font.GlyphID]int{3: 1, 6: 0},
-			SubstituteGlyphIDs: []font.GlyphID{26, 29},
+			Cov:                map[font.GlyphID]int{3: 0, 6: 1},
+			SubstituteGlyphIDs: []font.GlyphID{29, 26},
+		}},
+		{2, &gtab.Gsub2_1{
+			Cov: map[font.GlyphID]int{3: 0, 4: 1},
+			Repl: [][]font.GlyphID{
+				{29, 4},
+				{26},
+			},
+		}},
+		{3, &gtab.Gsub3_1{
+			Cov: map[font.GlyphID]int{3: 0},
+			Alt: [][]font.GlyphID{
+				{29, 21, 22},
+			},
 		}},
 	}
 	for testIdx, test := range cases {
@@ -80,9 +93,9 @@ func TestGsub(t *testing.T) {
 			{Gid: 4},
 			{Gid: 5},
 		}
-		expected := []font.GlyphID{1, 2, 29, 4, 5}
+		expected := []font.GlyphID{1, 2, 29}
 		gg := trfm.Apply(in)
-		if out := unpack(gg); !reflect.DeepEqual(out, expected) {
+		if out := unpack(gg); !reflect.DeepEqual(out[:3], expected) {
 			t.Errorf("expected %v, got %v", expected, out)
 		}
 

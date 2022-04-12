@@ -25,6 +25,46 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
+func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
+	readFn func(p *parser.Parser, subtablePos int64) (Subtable, error),
+	data1 []byte) {
+
+	t.Helper()
+
+	p := parser.New("test", bytes.NewReader(data1))
+	format, err := p.ReadUInt16()
+	if err != nil || format != lookupFormat {
+		return
+	}
+
+	l1, err := readFn(p, 0)
+	if err != nil {
+		return
+	}
+
+	meta := &LookupMetaInfo{LookupType: lookupType}
+	data2 := l1.Encode(meta)
+	if len(data2) != l1.EncodeLen(meta) {
+		t.Errorf("encodeLen mismatch: %d != %d", len(data2), l1.EncodeLen(meta))
+	}
+
+	p = parser.New("test", bytes.NewReader(data2))
+	format, err = p.ReadUInt16()
+	if err != nil {
+		t.Fatal(err)
+	} else if format != lookupFormat {
+		t.Fatalf("unexpected format: %d.%d", lookupType, format)
+	}
+	l2, err := readFn(p, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(l1, l2) {
+		t.Error("different")
+	}
+}
+
 func FuzzGsub1_1(f *testing.F) {
 	l := &Gsub1_1{
 		Cov:   map[font.GlyphID]int{3: 0},
@@ -34,79 +74,51 @@ func FuzzGsub1_1(f *testing.F) {
 	f.Add(l.Encode(meta))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		p := parser.New("test", bytes.NewReader(data))
-		format, err := p.ReadUInt16()
-		if err != nil || format != 1 {
-			return
-		}
-
-		l1, err := readGsub1_1(p, 0)
-		if err != nil {
-			return
-		}
-
-		data2 := l1.Encode(meta)
-		if len(data2) != l1.EncodeLen(meta) {
-			t.Errorf("encodeLen mismatch: %d != %d", len(data2), l1.EncodeLen(meta))
-		}
-
-		p = parser.New("test", bytes.NewReader(data2))
-		format, err = p.ReadUInt16()
-		if err != nil {
-			t.Fatal(err)
-		} else if format != 1 {
-			t.Fatalf("unexpected format: %d", format)
-		}
-		l2, err := readGsub1_1(p, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(l1, l2) {
-			t.Error("different")
-		}
+		doFuzz(t, 1, 1, readGsub1_1, data)
 	})
 }
 
 func FuzzGsub1_2(f *testing.F) {
 	l := &Gsub1_2{
-		Cov:                map[font.GlyphID]int{3: 0, 2: 1},
+		Cov:                map[font.GlyphID]int{2: 0, 3: 1},
 		SubstituteGlyphIDs: []font.GlyphID{6, 7},
 	}
 	meta := &LookupMetaInfo{LookupType: 1}
 	f.Add(l.Encode(meta))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		p := parser.New("test", bytes.NewReader(data))
-		format, err := p.ReadUInt16()
-		if err != nil || format != 2 {
-			return
-		}
+		doFuzz(t, 1, 2, readGsub1_2, data)
+	})
+}
 
-		l1, err := readGsub1_2(p, 0)
-		if err != nil {
-			return
-		}
+func FuzzGsub2_1(f *testing.F) {
+	l := &Gsub2_1{
+		Cov: map[font.GlyphID]int{2: 0, 3: 1},
+		Repl: [][]font.GlyphID{
+			{4, 5},
+			{1, 2, 3},
+		},
+	}
+	meta := &LookupMetaInfo{LookupType: 2}
+	f.Add(l.Encode(meta))
 
-		data2 := l1.Encode(meta)
-		if len(data2) != l1.EncodeLen(meta) {
-			t.Errorf("encodeLen mismatch: %d != %d", len(data2), l1.EncodeLen(meta))
-		}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 2, 1, readGsub2_1, data)
+	})
+}
 
-		p = parser.New("test", bytes.NewReader(data2))
-		format, err = p.ReadUInt16()
-		if err != nil {
-			t.Fatal(err)
-		} else if format != 2 {
-			t.Fatalf("unexpected format: %d", format)
-		}
-		l2, err := readGsub1_2(p, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
+func FuzzGsub3_1(f *testing.F) {
+	l := &Gsub3_1{
+		Cov: map[font.GlyphID]int{1: 0, 2: 1},
+		Alt: [][]font.GlyphID{
+			{3, 4},
+			{5, 6, 7},
+		},
+	}
+	meta := &LookupMetaInfo{LookupType: 3}
+	f.Add(l.Encode(meta))
 
-		if !reflect.DeepEqual(l1, l2) {
-			t.Error("different")
-		}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 3, 1, readGsub3_1, data)
 	})
 }

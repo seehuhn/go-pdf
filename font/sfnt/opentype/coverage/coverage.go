@@ -26,6 +26,9 @@ import (
 )
 
 // Table represents an OpenType "Coverage Table".
+// A Coverage table defines a unique index value, the Coverage Index, for each covered glyph.
+// The Coverage Indexes are sequential, from 0 to the number of covered glyphs minus 1.
+// The map from glyph ID to Coverage Index must be strictly monotonic.
 type Table map[font.GlyphID]int
 
 // ReadTable reads a coverage table from the given parser.
@@ -48,18 +51,20 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 		if err != nil {
 			return nil, err
 		}
+		prev := -1
 		for i := 0; i < int(glyphCount); i++ {
 			gid, err := p.ReadUInt16()
 			if err != nil {
 				return nil, err
 			}
-			if _, alreadySeen := table[font.GlyphID(gid)]; alreadySeen {
+			if int(gid) <= prev {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 1)",
 				}
 			}
 			table[font.GlyphID(gid)] = i
+			prev = int(gid)
 		}
 
 	case 2: // Coverage Format 2
@@ -68,6 +73,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 			return nil, err
 		}
 		pos := 0
+		prev := -1
 		for i := 0; i < int(rangeCount); i++ {
 			buf, err := p.ReadBytes(6)
 			if err != nil {
@@ -76,22 +82,17 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 			startGlyphID := int(buf[0])<<8 | int(buf[1])
 			endGlyphID := int(buf[2])<<8 | int(buf[3])
 			startCoverageIndex := int(buf[4])<<8 | int(buf[5])
-			if startCoverageIndex != pos {
+			if startCoverageIndex != pos || startGlyphID <= prev {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 2)",
 				}
 			}
 			for gid := startGlyphID; gid <= endGlyphID; gid++ {
-				if _, alreadySeen := table[font.GlyphID(gid)]; alreadySeen {
-					return nil, &font.InvalidFontError{
-						SubSystem: "sfnt/opentype/coverage",
-						Reason:    "invalid coverage table (format 2)",
-					}
-				}
 				table[font.GlyphID(gid)] = pos
 				pos++
 			}
+			prev = endGlyphID
 		}
 
 	default:
@@ -108,6 +109,11 @@ func (table Table) encInfo() ([]font.GlyphID, int, int) {
 	rev := make([]font.GlyphID, len(table))
 	for gid, i := range table {
 		rev[i] = gid
+	}
+	for i := 1; i < len(rev); i++ {
+		if rev[i-1] >= rev[i] {
+			panic("invalid coverage table")
+		}
 	}
 
 	format1Length := 4 + 2*len(table)

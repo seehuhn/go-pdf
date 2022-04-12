@@ -42,6 +42,10 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readGsub1_1(p, pos)
 	case 1_2:
 		return readGsub1_2(p, pos)
+	case 2_1:
+		return readGsub2_1(p, pos)
+	case 3_1:
+		return readGsub3_1(p, pos)
 	default:
 		msg := fmt.Sprintf("GSUB %d.%d\n", meta.LookupType, format)
 		fmt.Print(msg)
@@ -69,14 +73,14 @@ func (st notImplementedGsubSubtable) Encode(meta *LookupMetaInfo) []byte {
 	panic(msg)
 }
 
-// Gsub1_1 is a format 1.1 GSUB subtable.
+// Gsub1_1 is a Single Substitution GSUB subtable (type 1, format 1).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#11-single-substitution-format-1
 type Gsub1_1 struct {
 	Cov   coverage.Table
 	Delta font.GlyphID
 }
 
-func readGsub1_1(p *parser.Parser, subtablePos int64) (*Gsub1_1, error) {
+func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	buf, err := p.ReadBytes(4)
 	if err != nil {
 		return nil, err
@@ -122,14 +126,14 @@ func (l *Gsub1_1) Encode(*LookupMetaInfo) []byte {
 	return buf
 }
 
-// Gsub1_2 is a format 1.2 GSUB subtable.
+// Gsub1_2 is a Single Substitution GSUB subtable (type 1, format 2).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#12-single-substitution-format-2
 type Gsub1_2 struct {
 	Cov                coverage.Table
 	SubstituteGlyphIDs []font.GlyphID
 }
 
-func readGsub1_2(p *parser.Parser, subtablePos int64) (*Gsub1_2, error) {
+func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	buf, err := p.ReadBytes(4)
 	if err != nil {
 		return nil, err
@@ -194,6 +198,262 @@ func (l *Gsub1_2) Encode(*LookupMetaInfo) []byte {
 	for i := 0; i < n; i++ {
 		buf[6+2*i] = byte(l.SubstituteGlyphIDs[i] >> 8)
 		buf[6+2*i+1] = byte(l.SubstituteGlyphIDs[i])
+	}
+	copy(buf[covOffs:], l.Cov.Encode())
+	return buf
+}
+
+// Gsub2_1 is a Multiple Substitution GSUB subtable (type 2, format 1).
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#21-multiple-substitution-format-1
+type Gsub2_1 struct {
+	Cov  coverage.Table
+	Repl [][]font.GlyphID // individual sequences must have non-zero length
+}
+
+func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(4)
+	if err != nil {
+		return nil, err
+	}
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	sequenceCount := int(buf[2])<<8 | int(buf[3])
+	sequenceOffsets := make([]uint16, sequenceCount)
+	for i := 0; i < sequenceCount; i++ {
+		sequenceOffsets[i], err = p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	repl := make([][]font.GlyphID, sequenceCount)
+	for i := 0; i < sequenceCount; i++ {
+		err := p.SeekPos(subtablePos + int64(sequenceOffsets[i]))
+		if err != nil {
+			return nil, err
+		}
+		glyphCount, err := p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+		repl[i] = make([]font.GlyphID, glyphCount)
+		for j := 0; j < int(glyphCount); j++ {
+			gid, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			repl[i][j] = font.GlyphID(gid)
+		}
+	}
+
+	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cov) != sequenceCount {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/gtab",
+			Reason:    "malformed format 2.1 GSUB subtable",
+		}
+	}
+
+	res := &Gsub2_1{
+		Cov:  cov,
+		Repl: repl,
+	}
+	return res, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gsub2_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.Glyph, int) {
+	gid := seq[i].Gid
+	idx, ok := l.Cov[gid]
+	if !ok {
+		return seq, -1
+	}
+
+	repl := l.Repl[idx]
+	k := len(repl)
+
+	res := make([]font.Glyph, len(seq)-1+k)
+	copy(res, seq[:i])
+	for j := 0; j < k; j++ {
+		res[i+j].Gid = repl[j]
+	}
+	copy(res[i+k:], seq[i+1:])
+
+	if k > 0 {
+		res[i].Chars = seq[i].Chars
+	}
+
+	return res, i + k
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gsub2_1) EncodeLen(*LookupMetaInfo) int {
+	total := 6 + 2*len(l.Repl)
+	for _, repl := range l.Repl {
+		total += 2 + 2*len(repl)
+	}
+	total += l.Cov.EncodeLen()
+	return total
+}
+
+// Encode implements the Subtable interface.
+func (l *Gsub2_1) Encode(*LookupMetaInfo) []byte {
+	sequenceCount := len(l.Repl)
+	covOffs := 6 + 2*sequenceCount
+
+	sequenceOffsets := make([]uint16, sequenceCount)
+	for i, repl := range l.Repl {
+		sequenceOffsets[i] = uint16(covOffs)
+		covOffs += 2 + 2*len(repl)
+	}
+
+	buf := make([]byte, covOffs+l.Cov.EncodeLen())
+	// buf[0] = 0
+	buf[1] = 1
+	buf[2] = byte(covOffs >> 8)
+	buf[3] = byte(covOffs)
+	buf[4] = byte(len(l.Repl) >> 8)
+	buf[5] = byte(len(l.Repl))
+	pos := 6
+	for i := range l.Repl {
+		buf[pos] = byte(sequenceOffsets[i] >> 8)
+		buf[pos+1] = byte(sequenceOffsets[i])
+		pos += 2
+	}
+	for _, repl := range l.Repl {
+		buf[pos] = byte(len(repl) >> 8)
+		buf[pos+1] = byte(len(repl))
+		pos += 2
+		for _, gid := range repl {
+			buf[pos] = byte(gid >> 8)
+			buf[pos+1] = byte(gid)
+			pos += 2
+		}
+	}
+	copy(buf[covOffs:], l.Cov.Encode())
+	return buf
+}
+
+// Gsub3_1 is a Alternate Substitution GSUB subtable (type 3, format 1).
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#31-alternate-substitution-format-1
+type Gsub3_1 struct {
+	Cov coverage.Table
+	Alt [][]font.GlyphID
+}
+
+func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(4)
+	if err != nil {
+		return nil, err
+	}
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	alternateSetCount := int(buf[2])<<8 | int(buf[3])
+	alternateSetOffsets := make([]uint16, alternateSetCount)
+	for i := 0; i < alternateSetCount; i++ {
+		alternateSetOffsets[i], err = p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	alt := make([][]font.GlyphID, alternateSetCount)
+	for i := 0; i < alternateSetCount; i++ {
+		err := p.SeekPos(subtablePos + int64(alternateSetOffsets[i]))
+		if err != nil {
+			return nil, err
+		}
+		glyphCount, err := p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+		alt[i] = make([]font.GlyphID, glyphCount)
+		for j := 0; j < int(glyphCount); j++ {
+			gid, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			alt[i][j] = font.GlyphID(gid)
+		}
+	}
+
+	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cov) != alternateSetCount {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/gtab",
+			Reason:    "malformed format 3.1 GSUB subtable",
+		}
+	}
+
+	res := &Gsub3_1{
+		Cov: cov,
+		Alt: alt,
+	}
+	return res, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gsub3_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.Glyph, int) {
+	idx, ok := l.Cov[seq[i].Gid]
+	if !ok {
+		return seq, -1
+	}
+	if len(l.Alt[idx]) > 0 {
+		// TODO(voss): implement a mechanism to select alternate glyphs.
+		seq[i].Gid = l.Alt[idx][0]
+	}
+	return seq, i + 1
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gsub3_1) EncodeLen(*LookupMetaInfo) int {
+	total := 6 + 2*len(l.Alt)
+	for _, repl := range l.Alt {
+		total += 2 + 2*len(repl)
+	}
+	total += l.Cov.EncodeLen()
+	return total
+}
+
+// Encode implements the Subtable interface.
+func (l *Gsub3_1) Encode(*LookupMetaInfo) []byte {
+	alternateSetCount := len(l.Alt)
+	covOffs := 6 + 2*alternateSetCount
+
+	alternateSetOffsets := make([]uint16, alternateSetCount)
+	for i, repl := range l.Alt {
+		alternateSetOffsets[i] = uint16(covOffs)
+		covOffs += 2 + 2*len(repl)
+	}
+
+	buf := make([]byte, covOffs+l.Cov.EncodeLen())
+	// buf[0] = 0
+	buf[1] = 1
+	buf[2] = byte(covOffs >> 8)
+	buf[3] = byte(covOffs)
+	buf[4] = byte(len(l.Alt) >> 8)
+	buf[5] = byte(len(l.Alt))
+	pos := 6
+	for i := range l.Alt {
+		buf[pos] = byte(alternateSetOffsets[i] >> 8)
+		buf[pos+1] = byte(alternateSetOffsets[i])
+		pos += 2
+	}
+	for _, alt := range l.Alt {
+		buf[pos] = byte(len(alt) >> 8)
+		buf[pos+1] = byte(len(alt))
+		pos += 2
+		for _, gid := range alt {
+			buf[pos] = byte(gid >> 8)
+			buf[pos+1] = byte(gid)
+			pos += 2
+		}
 	}
 	copy(buf[covOffs:], l.Cov.Encode())
 	return buf

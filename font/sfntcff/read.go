@@ -33,7 +33,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/maxp"
 	"seehuhn.de/go/pdf/font/sfnt/name"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
@@ -413,27 +412,27 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	if header.Has("GSUB") {
-		gsubFd, err := tableReader("GSUB")
-		if err != nil {
-			return nil, err
-		}
-		info.Gsub, err = gtab.Read("GSUB", gsubFd)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// if header.Has("GSUB") {
+	// 	gsubFd, err := tableReader("GSUB")
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	info.Gsub, err = gtab.Read("GSUB", gsubFd)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
-	if header.Has("GPOS") {
-		gposFd, err := tableReader("GPOS")
-		if err != nil {
-			return nil, err
-		}
-		info.Gpos, err = gtab.Read("GPOS", gposFd)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// if header.Has("GPOS") {
+	// 	gposFd, err := tableReader("GPOS")
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	info.Gpos, err = gtab.Read("GPOS", gposFd)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	return info, nil
 }
