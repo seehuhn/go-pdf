@@ -19,6 +19,8 @@ package parser
 import (
 	"fmt"
 	"io"
+
+	"seehuhn.de/go/pdf/font"
 )
 
 const bufferSize = 1024
@@ -134,6 +136,40 @@ func (p *Parser) ReadUInt32() (uint32, error) {
 		return 0, err
 	}
 	return uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3]), nil
+}
+
+// ReadUInt16Slice reads a length followed by a sequence of uint16 values.
+func (p *Parser) ReadUInt16Slice() ([]uint16, error) {
+	n, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	res := make([]uint16, n)
+	for i := range res {
+		val, err := p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+		res[i] = val
+	}
+	return res, nil
+}
+
+// ReadGIDSlice reads a length followed by a sequence of GlyphID values.
+func (p *Parser) ReadGIDSlice() ([]font.GlyphID, error) {
+	n, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	res := make([]font.GlyphID, n)
+	for i := range res {
+		val, err := p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+		res[i] = font.GlyphID(val)
+	}
+	return res, nil
 }
 
 // ReadBytes reads n bytes from the file, starting at the current position.  The

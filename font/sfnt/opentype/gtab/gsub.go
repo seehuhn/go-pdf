@@ -134,27 +134,21 @@ type Gsub1_2 struct {
 }
 
 func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	buf, err := p.ReadBytes(4)
+	coverageOffset, err := p.ReadUInt16()
 	if err != nil {
 		return nil, err
 	}
-	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
-	glyphCount := int(buf[2])<<8 | int(buf[3])
-	substituteGlyphIDs := make([]font.GlyphID, glyphCount)
-	for i := 0; i < glyphCount; i++ {
-		gid, err := p.ReadUInt16()
-		if err != nil {
-			return nil, err
-		}
-		substituteGlyphIDs[i] = font.GlyphID(gid)
-	}
-
-	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	substituteGlyphIDs, err := p.ReadGIDSlice()
 	if err != nil {
 		return nil, err
 	}
 
-	if len(cov) != glyphCount {
+	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cov) != len(substituteGlyphIDs) {
 		return nil, &font.InvalidFontError{
 			SubSystem: "sfnt/gtab",
 			Reason:    "malformed format 1.2 GSUB subtable",
@@ -211,19 +205,15 @@ type Gsub2_1 struct {
 }
 
 func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	buf, err := p.ReadBytes(4)
+	coverageOffset, err := p.ReadUInt16()
 	if err != nil {
 		return nil, err
 	}
-	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
-	sequenceCount := int(buf[2])<<8 | int(buf[3])
-	sequenceOffsets := make([]uint16, sequenceCount)
-	for i := 0; i < sequenceCount; i++ {
-		sequenceOffsets[i], err = p.ReadUInt16()
-		if err != nil {
-			return nil, err
-		}
+	sequenceOffsets, err := p.ReadUInt16Slice()
+	if err != nil {
+		return nil, err
 	}
+	sequenceCount := len(sequenceOffsets)
 
 	repl := make([][]font.GlyphID, sequenceCount)
 	for i := 0; i < sequenceCount; i++ {
@@ -231,21 +221,13 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		glyphCount, err := p.ReadUInt16()
+		repl[i], err = p.ReadGIDSlice()
 		if err != nil {
 			return nil, err
 		}
-		repl[i] = make([]font.GlyphID, glyphCount)
-		for j := 0; j < int(glyphCount); j++ {
-			gid, err := p.ReadUInt16()
-			if err != nil {
-				return nil, err
-			}
-			repl[i][j] = font.GlyphID(gid)
-		}
 	}
 
-	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +319,7 @@ func (l *Gsub2_1) Encode(*LookupMetaInfo) []byte {
 	return buf
 }
 
-// Gsub3_1 is a Alternate Substitution GSUB subtable (type 3, format 1).
+// Gsub3_1 is an Alternate Substitution GSUB subtable (type 3, format 1).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#31-alternate-substitution-format-1
 type Gsub3_1 struct {
 	Cov coverage.Table
@@ -345,19 +327,15 @@ type Gsub3_1 struct {
 }
 
 func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	buf, err := p.ReadBytes(4)
+	coverageOffset, err := p.ReadUInt16()
 	if err != nil {
 		return nil, err
 	}
-	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
-	alternateSetCount := int(buf[2])<<8 | int(buf[3])
-	alternateSetOffsets := make([]uint16, alternateSetCount)
-	for i := 0; i < alternateSetCount; i++ {
-		alternateSetOffsets[i], err = p.ReadUInt16()
-		if err != nil {
-			return nil, err
-		}
+	alternateSetOffsets, err := p.ReadUInt16Slice()
+	if err != nil {
+		return nil, err
 	}
+	alternateSetCount := len(alternateSetOffsets)
 
 	alt := make([][]font.GlyphID, alternateSetCount)
 	for i := 0; i < alternateSetCount; i++ {
@@ -379,7 +357,7 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		}
 	}
 
-	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
 	if err != nil {
 		return nil, err
 	}
@@ -457,4 +435,91 @@ func (l *Gsub3_1) Encode(*LookupMetaInfo) []byte {
 	}
 	copy(buf[covOffs:], l.Cov.Encode())
 	return buf
+}
+
+// Gsub4_1 is a Ligature Substitution GSUB subtable (type 4, format 1).
+type Gsub4_1 struct {
+	Cov  coverage.Table
+	Repl [][]Ligature
+}
+
+// Ligature represents a substitution of a sequence of glyphs into a single glyph.
+type Ligature struct {
+	In  []font.GlyphID // excludes the first input glyph, since this is in Cov
+	Out font.GlyphID
+}
+
+func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	coverageOffset, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	ligatureSetOffsets, err := p.ReadUInt16Slice()
+	if err != nil {
+		return nil, err
+	}
+
+	repl := make([][]Ligature, len(ligatureSetOffsets))
+	for i, ligatureSetOffset := range ligatureSetOffsets {
+		ligatureSetPos := subtablePos + int64(ligatureSetOffset)
+		err := p.SeekPos(ligatureSetPos)
+		if err != nil {
+			return nil, err
+		}
+		ligatureOffsets, err := p.ReadUInt16Slice()
+		if err != nil {
+			return nil, err
+		}
+
+		repl[i] = make([]Ligature, len(ligatureOffsets))
+		for j, ligatureOffset := range ligatureOffsets {
+			err = p.SeekPos(ligatureSetPos + int64(ligatureOffset))
+			if err != nil {
+				return nil, err
+			}
+			ligatureGlyph, err := p.ReadUInt16()
+			if err != nil {
+				return nil, err
+			}
+			componentGlyphIDs, err := p.ReadGIDSlice()
+			if err != nil {
+				return nil, err
+			}
+
+			repl[i][j].In = componentGlyphIDs
+			repl[i][j].Out = font.GlyphID(ligatureGlyph)
+		}
+	}
+
+	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	return &Gsub4_1{
+		Cov:  cov,
+		Repl: repl,
+	}, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gsub4_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.Glyph, int) {
+	ligSetIdx, ok := l.Cov[seq[i].Gid]
+	if !ok {
+		return seq, -1
+	}
+	ligSet := l.Repl[ligSetIdx]
+
+	_ = ligSet
+	panic("not implemented")
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gsub4_1) EncodeLen(meta *LookupMetaInfo) int {
+	panic("not implemented")
+}
+
+// Encode implements the Subtable interface.
+func (l *Gsub4_1) Encode(meta *LookupMetaInfo) []byte {
+	panic("not implemented")
 }
