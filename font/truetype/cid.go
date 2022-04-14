@@ -124,7 +124,7 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 	for i, r := range rr {
 		gid := t.Sfnt.CMap[r]
 		gg[i].Gid = gid
-		gg[i].Chars = []rune{r}
+		gg[i].Text = []rune{r}
 	}
 
 	gg = t.Sfnt.GSUB.ApplyAll(gg)
@@ -134,9 +134,9 @@ func (t *cidFont) Layout(rr []rune) []font.Glyph {
 	gg = t.Sfnt.GPOS.ApplyAll(gg)
 
 	for _, g := range gg {
-		if _, seen := t.text[g.Gid]; !seen && len(g.Chars) > 0 {
+		if _, seen := t.text[g.Gid]; !seen && len(g.Text) > 0 {
 			// copy the slice, in case the caller modifies it later
-			t.text[g.Gid] = append([]rune{}, g.Chars...)
+			t.text[g.Gid] = append([]rune{}, g.Text...)
 		}
 	}
 

@@ -101,7 +101,7 @@ type GdefInfo struct {
 type glyphClass uint8
 
 const (
-	glyphClassBase glyphClass = 1 + iota
+	glyphClassBase glyphClass = 1 << iota
 	glyphClassLigature
 	glyphClassMark
 	glyphClassComponent

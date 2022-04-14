@@ -158,7 +158,7 @@ func (rect Rect) PDF(w io.Writer) error {
 // Glyph contains layout information for a single glyph in a run
 type Glyph struct {
 	Gid     GlyphID
-	Chars   []rune
+	Text    []rune
 	XOffset int16 // This is in Glyph design units.
 	YOffset int16 // This is in Glyph design units.
 	Advance int32 // This is in Glyph design units.

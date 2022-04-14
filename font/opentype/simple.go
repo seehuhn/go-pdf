@@ -143,7 +143,7 @@ func (s *simple) Layout(rr []rune) []font.Glyph {
 	for i, r := range rr {
 		gid := s.Sfnt.CMap[r]
 		gg[i].Gid = gid
-		gg[i].Chars = []rune{r}
+		gg[i].Text = []rune{r}
 	}
 
 	gg = s.Sfnt.GSUB.ApplyAll(gg)
@@ -153,9 +153,9 @@ func (s *simple) Layout(rr []rune) []font.Glyph {
 	gg = s.Sfnt.GPOS.ApplyAll(gg)
 
 	for _, g := range gg {
-		if _, seen := s.text[g.Gid]; !seen && len(g.Chars) > 0 {
+		if _, seen := s.text[g.Gid]; !seen && len(g.Text) > 0 {
 			// copy the slice, in case the caller modifies it later
-			s.text[g.Gid] = append([]rune{}, g.Chars...)
+			s.text[g.Gid] = append([]rune{}, g.Text...)
 		}
 	}
 

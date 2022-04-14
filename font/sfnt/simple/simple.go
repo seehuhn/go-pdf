@@ -83,7 +83,7 @@ func (s *fontHandler) Layout(rr []rune) []font.Glyph {
 	for i, r := range rr {
 		gid := s.info.CMap.Lookup(r)
 		gg[i].Gid = gid
-		gg[i].Chars = []rune{r}
+		gg[i].Text = []rune{r}
 		gg[i].Advance = int32(s.widths[gid])
 
 		if _, seen := s.text[gid]; !seen {

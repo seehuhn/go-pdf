@@ -265,7 +265,7 @@ func (l *Gsub2_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.G
 	copy(res[i+k:], seq[i+1:])
 
 	if k > 0 {
-		res[i].Chars = seq[i].Chars
+		res[i].Text = seq[i].Text
 	}
 
 	return res, i + k
@@ -438,6 +438,7 @@ func (l *Gsub3_1) Encode(*LookupMetaInfo) []byte {
 }
 
 // Gsub4_1 is a Ligature Substitution GSUB subtable (type 4, format 1).
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#41-ligature-substitution-format-1
 type Gsub4_1 struct {
 	Cov  coverage.Table
 	Repl [][]Ligature
@@ -481,9 +482,17 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			if err != nil {
 				return nil, err
 			}
-			componentGlyphIDs, err := p.ReadGIDSlice()
+			componentCount, err := p.ReadUInt16()
 			if err != nil {
 				return nil, err
+			}
+			componentGlyphIDs := make([]font.GlyphID, componentCount-1)
+			for k := range componentGlyphIDs {
+				gid, err := p.ReadUInt16()
+				if err != nil {
+					return nil, err
+				}
+				componentGlyphIDs[k] = font.GlyphID(gid)
 			}
 
 			repl[i][j].In = componentGlyphIDs
@@ -494,6 +503,13 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
 	if err != nil {
 		return nil, err
+	}
+
+	if len(cov) != len(repl) {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/gsub",
+			Reason:    "malformed format 4.1 GSUB subtable",
+		}
 	}
 
 	return &Gsub4_1{
@@ -510,16 +526,96 @@ func (l *Gsub4_1) Apply(meta *LookupMetaInfo, seq []font.Glyph, i int) ([]font.G
 	}
 	ligSet := l.Repl[ligSetIdx]
 
-	_ = ligSet
-	panic("not implemented")
+ligLoop:
+	for j := range ligSet {
+		lig := &ligSet[j]
+		p := i
+		for _, gid := range lig.In {
+			p++
+			if p >= len(seq) {
+				continue ligLoop
+			}
+			if seq[p].Gid != gid {
+				continue ligLoop
+			}
+		}
+		next := p + 1
+
+		// gather the unicode representations
+		var rr []rune
+		for i := i; i < next; i++ {
+			rr = append(rr, seq[i].Text...)
+		}
+
+		seq[i] = font.Glyph{
+			Gid:  lig.Out,
+			Text: rr,
+		}
+		seq = append(seq[:i+1], seq[next:]...)
+		return seq, i + 1
+	}
+
+	return seq, -1
 }
 
 // EncodeLen implements the Subtable interface.
 func (l *Gsub4_1) EncodeLen(meta *LookupMetaInfo) int {
-	panic("not implemented")
+	total := 6 + 2*len(l.Repl)
+	for _, repl := range l.Repl {
+		total += 2 + 2*len(repl)
+		for _, lig := range repl {
+			total += 4 + 2*len(lig.In)
+		}
+	}
+	total += l.Cov.EncodeLen()
+	return total
 }
 
 // Encode implements the Subtable interface.
 func (l *Gsub4_1) Encode(meta *LookupMetaInfo) []byte {
-	panic("not implemented")
+	ligatureSetCount := len(l.Repl)
+	total := 6 + 2*ligatureSetCount
+	ligatureSetOffsets := make([]uint16, ligatureSetCount)
+	for i, repl := range l.Repl {
+		ligatureSetOffsets[i] = uint16(total)
+		total += 2 + 2*len(repl)
+		for _, lig := range repl {
+			total += 4 + 2*len(lig.In)
+		}
+	}
+	coverageOffset := total
+	total += l.Cov.EncodeLen()
+
+	buf := make([]byte, 0, total)
+
+	buf = append(buf,
+		0, 1, // version
+		byte(coverageOffset>>8), byte(coverageOffset),
+		byte(ligatureSetCount>>8), byte(ligatureSetCount),
+	)
+	for _, offs := range ligatureSetOffsets {
+		buf = append(buf, byte(offs>>8), byte(offs))
+	}
+	for _, repl := range l.Repl {
+		ligatureCount := len(repl)
+		buf = append(buf, byte(ligatureCount>>8), byte(ligatureCount))
+		pos := 2 + 2*ligatureCount
+		for _, lig := range repl {
+			buf = append(buf, byte(pos>>8), byte(pos))
+			pos += 4 + 2*len(lig.In)
+		}
+		for _, lig := range repl {
+			componentCount := len(lig.In) + 1
+			buf = append(buf,
+				byte(lig.Out>>8), byte(lig.Out),
+				byte(componentCount>>8), byte(componentCount),
+			)
+			for _, gid := range lig.In {
+				buf = append(buf, byte(gid>>8), byte(gid))
+			}
+		}
+	}
+	buf = append(buf, l.Cov.Encode()...)
+
+	return buf
 }

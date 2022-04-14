@@ -29,8 +29,8 @@ type Glyph struct {
 
 // CompositeGlyph is a composite glyph.
 type CompositeGlyph struct {
-	Components []GlyphComponent
-	Commands   []byte
+	Components   []GlyphComponent
+	Instructions []byte
 }
 
 // GlyphComponent is a single component of a composite glyph.
@@ -40,6 +40,7 @@ type GlyphComponent struct {
 	Args       []byte
 }
 
+// Note that decodeGlyph retains sub-slices of data.
 func decodeGlyph(data []byte) (*Glyph, error) {
 	if len(data) == 0 {
 		return nil, nil
@@ -50,6 +51,26 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 		}
 	}
 
+	var glyphData interface{}
+	numCont := int16(data[0])<<8 | int16(data[1])
+	if numCont >= 0 {
+		simple := SimpleGlyph{
+			NumContours: numCont,
+			tail:        data[10:],
+		}
+		err := simple.removePadding()
+		if err != nil {
+			return nil, err
+		}
+		glyphData = simple
+	} else {
+		comp, err := decodeGlyphComposite(data[10:])
+		if err != nil {
+			return nil, err
+		}
+		glyphData = *comp
+	}
+
 	g := &Glyph{
 		Rect: funit.Rect{
 			LLx: funit.Int16(data[2])<<8 | funit.Int16(data[3]),
@@ -57,28 +78,15 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 			URx: funit.Int16(data[6])<<8 | funit.Int16(data[7]),
 			URy: funit.Int16(data[8])<<8 | funit.Int16(data[9]),
 		},
+		Data: glyphData,
 	}
-
-	numCont := int16(data[0])<<8 | int16(data[1])
-	if numCont >= 0 {
-		g.Data = SimpleGlyph{
-			NumContours: numCont,
-			tail:        data[10:],
-		}
-	} else {
-		comp, err := decodeGlyphComposite(data[10:])
-		if err != nil {
-			return nil, err
-		}
-		g.Data = *comp
-	}
-
 	return g, nil
 }
 
 func decodeGlyphComposite(data []byte) (*CompositeGlyph, error) {
 	var components []GlyphComponent
 	done := false
+	weHaveInstructions := false
 	for !done {
 		if len(data) < 4 {
 			return nil, errIncompleteGlyph
@@ -87,6 +95,10 @@ func decodeGlyphComposite(data []byte) (*CompositeGlyph, error) {
 		flags := uint16(data[0])<<8 | uint16(data[1])
 		glyphIndex := uint16(data[2])<<8 | uint16(data[3])
 		data = data[4:]
+
+		if flags&0x0100 != 0 { // WE_HAVE_INSTRUCTIONS
+			weHaveInstructions = true
+		}
 
 		skip := 0
 		if flags&0x0001 != 0 { // ARG_1_AND_2_ARE_WORDS
@@ -116,9 +128,19 @@ func decodeGlyphComposite(data []byte) (*CompositeGlyph, error) {
 		done = flags&0x0020 == 0 // MORE_COMPONENTS
 	}
 
+	if weHaveInstructions && len(data) >= 2 {
+		L := int(data[0])<<8 | int(data[1])
+		data = data[2:]
+		if len(data) > L {
+			data = data[:L]
+		}
+	} else {
+		data = nil
+	}
+
 	res := &CompositeGlyph{
-		Components: components,
-		Commands:   data,
+		Components:   components,
+		Instructions: data,
 	}
 	return res, nil
 }
@@ -136,11 +158,13 @@ func (g *Glyph) encodeLen() int {
 		for _, comp := range d.Components {
 			total += 4 + len(comp.Args)
 		}
-		total += len(d.Commands)
+		if d.Instructions != nil {
+			total += 2 + len(d.Instructions)
+		}
 	default:
 		panic("unexpected glyph type")
 	}
-	for total%2 != 0 {
+	for total%glyfAlign != 0 {
 		total++
 	}
 	return total
@@ -183,12 +207,16 @@ func (g *Glyph) append(buf []byte) []byte {
 				byte(comp.GlyphIndex>>8), byte(comp.GlyphIndex))
 			buf = append(buf, comp.Args...)
 		}
-		buf = append(buf, d.Commands...)
+		if d.Instructions != nil {
+			L := len(d.Instructions)
+			buf = append(buf, byte(L>>8), byte(L))
+			buf = append(buf, d.Instructions...)
+		}
 	default:
 		panic("unexpected glyph type")
 	}
 
-	for len(buf)%2 != 0 {
+	for len(buf)%glyfAlign != 0 {
 		buf = append(buf, 0)
 	}
 
@@ -225,8 +253,8 @@ func (g *Glyph) FixComponents(newGid map[font.GlyphID]font.GlyphID) *Glyph {
 		return g
 	case CompositeGlyph:
 		d2 := CompositeGlyph{
-			Components: make([]GlyphComponent, len(d.Components)),
-			Commands:   d.Commands,
+			Components:   make([]GlyphComponent, len(d.Components)),
+			Instructions: d.Instructions,
 		}
 		for i, c := range d.Components {
 			d2.Components[i] = GlyphComponent{
@@ -244,6 +272,8 @@ func (g *Glyph) FixComponents(newGid map[font.GlyphID]font.GlyphID) *Glyph {
 		panic("unexpected glyph type")
 	}
 }
+
+const glyfAlign = 2
 
 var errIncompleteGlyph = &font.InvalidFontError{
 	SubSystem: "sfnt/glyf",

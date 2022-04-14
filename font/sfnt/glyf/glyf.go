@@ -40,7 +40,7 @@ func Decode(enc *Encoded) (Glyphs, error) {
 
 	numGlyphs := len(offs) - 1
 
-	gg := make([]*Glyph, numGlyphs)
+	gg := make(Glyphs, numGlyphs)
 	for i := range gg {
 		data := enc.GlyfData[offs[i]:offs[i+1]]
 		g, err := decodeGlyph(data)

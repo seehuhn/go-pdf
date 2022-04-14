@@ -53,7 +53,7 @@ func (li *LookupTable) EncodeLen() int {
 // LookupMetaInfo contains information associated with a lookup table.
 type LookupMetaInfo struct {
 	LookupType       uint16
-	LookupFlag       uint16
+	LookupFlag       LookupFlags
 	MarkFilteringSet uint16
 }
 
@@ -65,9 +65,9 @@ type Subtable interface {
 	// are returned
 	Apply(*LookupMetaInfo, []font.Glyph, int) ([]font.Glyph, int)
 
-	EncodeLen(*LookupMetaInfo) int
+	EncodeLen(*LookupMetaInfo) int // TODO(voss): is the meta argument used?
 
-	Encode(*LookupMetaInfo) []byte
+	Encode(*LookupMetaInfo) []byte // TODO(voss): is the meta argument used?
 }
 
 // subtableReader is a function that can decode a subtable.
@@ -107,7 +107,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 			return nil, err
 		}
 		lookupType := uint16(buf[0])<<8 | uint16(buf[1])
-		lookupFlag := uint16(buf[2])<<8 | uint16(buf[3])
+		lookupFlag := LookupFlags(buf[2])<<8 | LookupFlags(buf[3])
 		subTableCount := uint16(buf[4])<<8 | uint16(buf[5])
 		subtableOffsets = subtableOffsets[:0]
 		for j := 0; j < int(subTableCount); j++ {
@@ -118,7 +118,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 			subtableOffsets = append(subtableOffsets, subtableOffset)
 		}
 		var markFilteringSet uint16
-		if lookupFlag&0x0010 != 0 {
+		if lookupFlag&LookupUseMarkFilteringSet != 0 {
 			markFilteringSet, err = p.ReadUInt16()
 			if err != nil {
 				return nil, err
@@ -177,14 +177,14 @@ func (info LookupList) encode() []byte {
 
 		stPos := 6
 		stPos += 2 * subTableCount
-		if li.Meta.LookupFlag&0x0010 != 0 {
+		if li.Meta.LookupFlag&LookupUseMarkFilteringSet != 0 {
 			stPos += 2
 		}
 		for _, st := range li.Subtables {
 			res = append(res, byte(stPos>>8), byte(stPos))
 			stPos += st.EncodeLen(li.Meta)
 		}
-		if li.Meta.LookupFlag&0x0010 != 0 {
+		if li.Meta.LookupFlag&LookupUseMarkFilteringSet != 0 {
 			res = append(res,
 				byte(li.Meta.MarkFilteringSet>>8), byte(li.Meta.MarkFilteringSet))
 		}

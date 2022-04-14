@@ -22,13 +22,18 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
 // Table contains the parsed GDEF table.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/GDEF
 type Table struct {
-	GlyphClass      classdef.Table
-	MarkAttachClass classdef.Table
+	GlyphClass classdef.Table // class definition table for glyph type
+	// TODO(voss): attachment point list table
+	// TODO(voss): ligature caret list table
+	MarkAttachClass classdef.Table   // class definition table for mark attachment type
+	MarkGlyphSets   []coverage.Table // table of mark glyph set definitions
+	// TODO(voss): Item Variation Store table
 }
 
 // Read reads the GDEF table.
@@ -84,15 +89,56 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 		}
 	}
 
-	_ = markGlyphSetsDefOffset // TODO(voss): implement
-	_ = itemVarStoreOffset     // TODO(voss): implement
+	if markGlyphSetsDefOffset != 0 {
+		pos := int64(markGlyphSetsDefOffset)
+		err = p.SeekPos(pos)
+		if err != nil {
+			return nil, err
+		}
+		buf, err := p.ReadBytes(4)
+		if err != nil {
+			return nil, err
+		}
+		format := uint16(buf[0])<<8 | uint16(buf[1])
+		if format != 1 {
+			return nil, &font.NotSupportedError{
+				SubSystem: "sfnt/opentype/gdef",
+				Feature:   fmt.Sprintf("mark glyph sets format %d", format),
+			}
+		}
+		markGlyphSetCount := uint16(buf[2])<<8 | uint16(buf[3])
+		coverageOffsets := make([]uint32, markGlyphSetCount)
+		for i := range coverageOffsets {
+			coverageOffsets[i], err = p.ReadUInt32()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		table.MarkGlyphSets = make([]coverage.Table, markGlyphSetCount)
+		for i := range table.MarkGlyphSets {
+			table.MarkGlyphSets[i], err = coverage.ReadTable(p, pos+int64(coverageOffsets[i]))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	_ = itemVarStoreOffset // TODO(voss): implement
 
 	return table, nil
 }
 
 // Encode converts the GDEF table to its binary form.
 func (table *Table) Encode() []byte {
+	version := uint32(0x00010000)
 	total := 12
+
+	if table.MarkGlyphSets != nil {
+		version = 0x00010002
+		total = 14
+	}
+
 	var glyphClassDefOffset int
 	if table.GlyphClass != nil {
 		glyphClassDefOffset = total
@@ -103,26 +149,54 @@ func (table *Table) Encode() []byte {
 		markAttachClassDefOffset = total
 		total += table.MarkAttachClass.AppendLen()
 	}
+	var markGlyphSetsDefOffset int
+	if table.MarkGlyphSets != nil {
+		markGlyphSetsDefOffset = total
+		total += 4 + 4*len(table.MarkGlyphSets)
+		for _, set := range table.MarkGlyphSets {
+			total += set.EncodeLen()
+		}
+	}
+
 	buf := make([]byte, 12, total)
 	// We always write table version 1.0:
-	// buf[0] = 0
-	buf[1] = 1
-	// buf[2] = 0
-	// buf[3] = 0
+	buf[0] = byte(version >> 24)
+	buf[1] = byte(version >> 16)
+	buf[2] = byte(version >> 8)
+	buf[3] = byte(version)
 	buf[4] = byte(glyphClassDefOffset >> 8)
 	buf[5] = byte(glyphClassDefOffset)
 	buf[10] = byte(markAttachClassDefOffset >> 8)
 	buf[11] = byte(markAttachClassDefOffset)
+	if version >= 0x00010002 {
+		buf = append(buf, byte(markGlyphSetsDefOffset>>8), byte(markGlyphSetsDefOffset))
+	}
 	if glyphClassDefOffset > 0 {
 		buf = table.GlyphClass.Append(buf)
 	}
 	if markAttachClassDefOffset > 0 {
 		buf = table.MarkAttachClass.Append(buf)
 	}
+	if markGlyphSetsDefOffset > 0 {
+		markGlyphSetCount := len(table.MarkGlyphSets)
+		buf = append(buf,
+			0, 1, // format
+			byte(markGlyphSetCount>>8), byte(markGlyphSetCount))
+		offs := 4 + 4*markGlyphSetCount
+		for _, set := range table.MarkGlyphSets {
+			buf = append(buf,
+				byte(offs>>24), byte(offs>>16), byte(offs>>8), byte(offs))
+			offs += set.EncodeLen()
+		}
+		for _, set := range table.MarkGlyphSets {
+			buf = append(buf, set.Encode()...)
+		}
+	}
 	return buf
 }
 
 // Possible values for the GlyphClass field.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/GDEF#glyph-class-definition-table
 const (
 	GlyphClassBase      = 1
 	GlyphClassLigature  = 2

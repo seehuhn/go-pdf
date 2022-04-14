@@ -34,6 +34,8 @@ var otfScript = map[string]locale.Script{
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
 var otfLanguage = map[string]locale.Language{
+	"dftl": locale.LangUndefined,
+
 	"ARA ": locale.LangArabic,
 	"AZE ": locale.LangAzerbaijani,
 	"BEN ": locale.LangBengali,

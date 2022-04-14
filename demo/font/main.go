@@ -66,7 +66,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	glyphs := layout.Glyphs
 
 	for _, glyph := range layout.Glyphs {
-		fmt.Printf("%q %v\n", string(glyph.Chars), glyph)
+		fmt.Printf("%q %v\n", string(glyph.Text), glyph)
 	}
 
 	page.Println("q")

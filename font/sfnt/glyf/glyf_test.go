@@ -17,6 +17,7 @@
 package glyf
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,7 +25,40 @@ import (
 	"testing"
 
 	"github.com/go-test/deep"
+	"golang.org/x/image/font/gofont/goregular"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
+
+func BenchmarkGlyph(b *testing.B) {
+	r := bytes.NewReader(goregular.TTF)
+	header, err := table.ReadHeader(r)
+	if err != nil {
+		b.Fatal(err)
+	}
+	glyfData, err := header.ReadTableBytes(r, "glyf")
+	if err != nil {
+		b.Fatal(err)
+	}
+	locaData, err := header.ReadTableBytes(r, "loca")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	enc := &Encoded{
+		GlyfData:   glyfData,
+		LocaData:   locaData,
+		LocaFormat: 0,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err = Decode(enc)
+	}
+
+	if err != nil {
+		b.Fatal(err)
+	}
+}
 
 func FuzzGlyf(f *testing.F) {
 	names, err := filepath.Glob("../../../demo/try-all-fonts/glyf/*.glyf")

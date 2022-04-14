@@ -263,7 +263,7 @@ func (l *gsub2_1) Apply(filter KeepGlyphFn, seq []font.Glyph, i int) ([]font.Gly
 	}
 	if n > 0 {
 		// TODO(voss): What should we do for n=0?
-		repl[i].Chars = seq[i].Chars
+		repl[i].Text = seq[i].Text
 	}
 
 	res := append(seq, repl...) // just to allocate enough backing space
@@ -376,12 +376,12 @@ ligLoop:
 		// gather the unicode representations
 		var rr []rune
 		for i := pos; i < next; i++ {
-			rr = append(rr, seq[i].Chars...)
+			rr = append(rr, seq[i].Text...)
 		}
 
 		seq[pos] = font.Glyph{
-			Gid:   lig.out,
-			Chars: rr,
+			Gid:  lig.out,
+			Text: rr,
 		}
 		seq = append(seq[:pos+1], seq[next:]...)
 		return seq, pos + 1

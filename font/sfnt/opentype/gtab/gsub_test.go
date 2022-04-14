@@ -29,7 +29,7 @@ func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
 	readFn func(p *parser.Parser, subtablePos int64) (Subtable, error),
 	data1 []byte) {
 
-	t.Helper()
+	// t.Helper()
 
 	p := parser.New("test", bytes.NewReader(data1))
 	format, err := p.ReadUInt16()
@@ -120,5 +120,28 @@ func FuzzGsub3_1(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 3, 1, readGsub3_1, data)
+	})
+}
+
+func FuzzGsub4_1(f *testing.F) {
+	l := &Gsub4_1{
+		Cov: map[font.GlyphID]int{1: 0, 2: 1},
+		Repl: [][]Ligature{
+			{
+				{In: []font.GlyphID{1, 2, 3}, Out: 10},
+				{In: []font.GlyphID{1, 2}, Out: 11},
+				{In: []font.GlyphID{1}, Out: 12},
+			},
+			{
+				{In: []font.GlyphID{1, 2}, Out: 13},
+				{In: []font.GlyphID{1}, Out: 14},
+			},
+		},
+	}
+	meta := &LookupMetaInfo{LookupType: 4}
+	f.Add(l.Encode(meta))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 4, 1, readGsub4_1, data)
 	})
 }

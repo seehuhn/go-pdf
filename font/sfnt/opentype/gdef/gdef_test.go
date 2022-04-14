@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
 func FuzzGdef(f *testing.F) {
@@ -38,6 +39,11 @@ func FuzzGdef(f *testing.F) {
 		5: 1,
 		6: 2,
 		7: 1,
+	}
+	f.Add(table.Encode())
+	table.MarkGlyphSets = []coverage.Table{
+		{12: 0, 13: 1, 14: 2},
+		{10: 0, 15: 1, 16: 2},
 	}
 	f.Add(table.Encode())
 

@@ -102,7 +102,7 @@ func FuzzGtab(f *testing.F) {
 			},
 		},
 		&LookupTable{
-			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: 0x0010, MarkFilteringSet: 7},
+			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: LookupUseMarkFilteringSet, MarkFilteringSet: 7},
 			Subtables: []Subtable{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},
@@ -123,7 +123,7 @@ func FuzzGtab(f *testing.F) {
 			},
 		},
 		&LookupTable{
-			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: 0x0010, MarkFilteringSet: 7},
+			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: LookupUseMarkFilteringSet, MarkFilteringSet: 7},
 			Subtables: []Subtable{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},
@@ -144,7 +144,7 @@ func FuzzGtab(f *testing.F) {
 			},
 		},
 		&LookupTable{
-			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: 0x0010, MarkFilteringSet: 7},
+			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: LookupUseMarkFilteringSet, MarkFilteringSet: 7},
 			Subtables: []Subtable{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},

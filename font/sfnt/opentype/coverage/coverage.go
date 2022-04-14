@@ -31,6 +31,12 @@ import (
 // The map from glyph ID to Coverage Index must be strictly monotonic.
 type Table map[font.GlyphID]int
 
+// Contains returns true if the given glyph ID is covered by the table.
+func (table Table) Contains(gid font.GlyphID) bool {
+	_, ok := table[gid]
+	return ok
+}
+
 // ReadTable reads a coverage table from the given parser.
 func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 	err := p.SeekPos(pos)

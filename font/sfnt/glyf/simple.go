@@ -43,7 +43,7 @@ type GlyphInfo struct {
 }
 
 // Decode returns the contours of a glyph.
-func (glyph SimpleGlyph) Decode() (*GlyphInfo, error) {
+func (glyph *SimpleGlyph) Decode() (*GlyphInfo, error) {
 	buf := glyph.tail
 
 	numContours := int(glyph.NumContours)
@@ -75,7 +75,7 @@ func (glyph SimpleGlyph) Decode() (*GlyphInfo, error) {
 		buf = buf[1:]
 		ff[i] = flags
 		i++
-		if flags&0x08 != 0 {
+		if flags&flagRepeat != 0 {
 			if len(buf) < 1 {
 				return nil, errInvalidGlyphData
 			}
@@ -88,23 +88,26 @@ func (glyph SimpleGlyph) Decode() (*GlyphInfo, error) {
 			}
 		}
 	}
+	if i != numPoints {
+		return nil, errInvalidGlyphData
+	}
 
 	// decode the x-coordinates
 	xx := make([]funit.Int16, numPoints)
 	var x funit.Int16
 	for i, flags := range ff {
-		if flags&0x02 != 0 { // X_SHORT_VECTOR
+		if flags&flagXShortVec != 0 {
 			if len(buf) < 1 {
 				return nil, errInvalidGlyphData
 			}
 			dx := funit.Int16(buf[0])
 			buf = buf[1:]
-			if flags&0x10 != 0 { // X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR
+			if flags&flagXSameOrPos != 0 {
 				x += dx
 			} else {
 				x -= dx
 			}
-		} else if flags&0x10 == 0 { // !X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR
+		} else if flags&flagXSameOrPos == 0 {
 			if len(buf) < 2 {
 				return nil, errInvalidGlyphData
 			}
@@ -119,18 +122,18 @@ func (glyph SimpleGlyph) Decode() (*GlyphInfo, error) {
 	yy := make([]funit.Int16, numPoints)
 	var y funit.Int16
 	for i, flags := range ff {
-		if flags&0x04 != 0 { // Y_SHORT_VECTOR
+		if flags&flagYShortVec != 0 {
 			if len(buf) < 1 {
 				return nil, errInvalidGlyphData
 			}
 			dy := funit.Int16(buf[0])
 			buf = buf[1:]
-			if flags&0x20 != 0 { // Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR
+			if flags&flagYSameOrPos != 0 {
 				y += dy
 			} else {
 				y -= dy
 			}
-		} else if flags&0x20 == 0 { // !Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR
+		} else if flags&flagYSameOrPos == 0 {
 			if len(buf) < 2 {
 				return nil, errInvalidGlyphData
 			}
@@ -147,7 +150,7 @@ func (glyph SimpleGlyph) Decode() (*GlyphInfo, error) {
 		end := int(endPtsOfContours[i]) + 1
 		pp := make([]Point, end-start)
 		for j := start; j < end; j++ {
-			pp[j-start] = Point{xx[j], yy[j], ff[j]&0x01 != 0}
+			pp[j-start] = Point{xx[j], yy[j], ff[j]&flagOnCurve != 0}
 		}
 		start = end
 
@@ -161,6 +164,79 @@ func (glyph SimpleGlyph) Decode() (*GlyphInfo, error) {
 
 	return res, nil
 }
+
+func (glyph *SimpleGlyph) removePadding() error {
+	buf := glyph.tail
+
+	numContours := int(glyph.NumContours)
+	if len(buf) < 2*numContours+2 {
+		return errInvalidGlyphData
+	}
+	pos := 2 * numContours // endPtsOfContours
+
+	numPoints := 0
+	if numContours > 0 {
+		numPoints = (int(buf[pos-2])<<8 | int(buf[pos-1])) + 1
+	}
+	instructionLength := int(buf[pos])<<8 | int(buf[pos+1])
+	pos += 2 + instructionLength
+
+	// decode the flags
+	coordBytes := 0
+	i := 0
+	for i < numPoints {
+		if len(buf) <= pos {
+			return errInvalidGlyphData
+		}
+		flags := buf[pos]
+		pos++
+
+		repeat := 1
+		if flags&flagRepeat != 0 {
+			if len(buf) <= pos {
+				return errInvalidGlyphData
+			}
+			repeat = int(buf[pos]) + 1
+			pos++
+		}
+
+		xBytes := 0
+		if flags&flagXShortVec != 0 {
+			xBytes = 1
+		} else if flags&flagXSameOrPos == 0 {
+			xBytes = 2
+		}
+		yBytes := 0
+		if flags&flagYShortVec != 0 {
+			yBytes = 1
+		} else if flags&flagYSameOrPos == 0 {
+			yBytes = 2
+		}
+
+		coordBytes += (xBytes + yBytes) * repeat
+		i += repeat
+	}
+
+	pos += coordBytes
+
+	if i != numPoints || pos > len(buf) {
+		return errInvalidGlyphData
+	}
+
+	glyph.tail = buf[:pos]
+
+	return nil
+}
+
+// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#simpleGlyphFlags
+const (
+	flagOnCurve    = 0x01 // ON_CURVE_POINT
+	flagXShortVec  = 0x02 // X_SHORT_VECTOR
+	flagYShortVec  = 0x04 // Y_SHORT_VECTOR
+	flagRepeat     = 0x08 // REPEAT_FLAG
+	flagXSameOrPos = 0x10 // X_IS_SAME_OR_POSITIVE_X_SHORT_VECTOR
+	flagYSameOrPos = 0x20 // Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR
+)
 
 var errInvalidGlyphData = &font.InvalidFontError{
 	SubSystem: "sfnt/glyf",

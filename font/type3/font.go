@@ -168,7 +168,7 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 			for i, r := range rr {
 				gid := t3.cmap[r]
 				gg[i].Gid = gid
-				gg[i].Chars = []rune{r}
+				gg[i].Text = []rune{r}
 				gg[i].Advance = int32(t3.glyphWidth[gid])
 			}
 

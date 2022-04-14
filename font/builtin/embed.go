@@ -127,7 +127,7 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 	for i, r := range rr {
 		gid, _ := fnt.CMap[r]
 		gg[i].Gid = gid
-		gg[i].Chars = []rune{r}
+		gg[i].Text = []rune{r}
 	}
 
 	var res []font.Glyph
@@ -136,7 +136,7 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 		lig, ok := fnt.afm.Ligatures[font.GlyphPair{last.Gid, g.Gid}]
 		if ok {
 			last.Gid = lig
-			last.Chars = append(last.Chars, g.Chars...)
+			last.Text = append(last.Text, g.Text...)
 		} else {
 			res = append(res, last)
 			last = g

@@ -24,6 +24,8 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -60,6 +62,19 @@ func TestGsub(t *testing.T) {
 				{29, 21, 22},
 			},
 		}},
+		{4, &gtab.Gsub4_1{
+			Cov: map[font.GlyphID]int{3: 0, 4: 1},
+			Repl: [][]gtab.Ligature{
+				{
+					{In: []font.GlyphID{4, 5}, Out: 29},
+					{In: []font.GlyphID{5}, Out: 29},
+				},
+				{
+					{In: []font.GlyphID{3, 2}, Out: 27},
+					{In: []font.GlyphID{1}, Out: 27},
+				},
+			},
+		}},
 	}
 	for testIdx, test := range cases {
 		gsub := &gtab.Info{
@@ -71,7 +86,10 @@ func TestGsub(t *testing.T) {
 			},
 			LookupList: []*gtab.LookupTable{
 				{
-					Meta:      &gtab.LookupMetaInfo{LookupType: test.lookupType},
+					Meta: &gtab.LookupMetaInfo{
+						LookupType: test.lookupType,
+						LookupFlag: gtab.LookupIgnoreLigatures,
+					},
 					Subtables: []gtab.Subtable{test.subtable},
 				},
 			},
@@ -100,6 +118,11 @@ func TestGsub(t *testing.T) {
 		}
 
 		fontInfo.Gsub = gsub
+		fontInfo.Gdef = &gdef.Table{
+			GlyphClass: classdef.Table{
+				4: gdef.GlyphClassLigature,
+			},
+		}
 		fname := fmt.Sprintf("%03d.otf", testIdx)
 		fd, err := os.Create(fname)
 		if err != nil {
