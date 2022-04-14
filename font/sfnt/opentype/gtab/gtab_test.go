@@ -59,7 +59,7 @@ func TestGetLookups(t *testing.T) {
 		for _, tag := range test.tags {
 			includeFeature[tag] = true
 		}
-		ll := gtabInfo.getLookups(locale.EnGB, includeFeature)
+		ll := gtabInfo.GetFeatureLookups(locale.EnGB, includeFeature)
 		if len(ll) != len(test.expected) {
 			t.Errorf("GetLookups(%v) = %v, expected %v", test.tags, ll, test.expected)
 		}

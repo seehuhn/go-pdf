@@ -20,57 +20,40 @@ import (
 	"sort"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/locale"
 )
 
-// Transformation represents a list of lookups to apply.
-type Transformation struct {
-	info          *Info
-	lookupIndices []LookupIndex
+// ApplyLookup applies a single lookup to the given glyphs.
+func (info *Info) ApplyLookup(glyphs []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table) []font.Glyph {
+	pos := 0
+	for pos < len(glyphs) {
+		// TODO(voss): do we need to protect against infinite loops
+		glyphs, pos = info.ApplyLookupAt(glyphs, lookupIndex, gdef, pos)
+	}
+
+	return glyphs
 }
 
-// GetTransformation returns the transformation for the given features in the
-// specified locale.
-func (info *Info) GetTransformation(loc *locale.Locale, includeFeature map[string]bool) *Transformation {
-	if info == nil {
-		return nil
-	}
-	ll := info.getLookups(loc, includeFeature)
-	if len(ll) == 0 {
-		return nil
-	}
-	return &Transformation{info, ll}
-}
+// ApplyLookupAt applies a single lookup to the given glyphs at position pos.
+func (info *Info) ApplyLookupAt(glyphs []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos int) ([]font.Glyph, int) {
+	lookup := info.LookupList[lookupIndex]
+	keep := MakeFilter(lookup.Meta, gdef)
 
-// Apply applies the transformation to the given glyphs.
-func (trfm *Transformation) Apply(gg []font.Glyph) []font.Glyph {
-	if trfm == nil {
-		return gg
-	}
-
-	for _, l := range trfm.lookupIndices {
-		lookup := trfm.info.LookupList[l]
-		pos := 0
-		for pos < len(gg) {
-			gg, pos = trfm.applySubtables(lookup, gg, pos)
+	for _, subtable := range lookup.Subtables {
+		newGlyphs, next, nested := subtable.Apply(keep, glyphs, pos)
+		if next < 0 {
+			continue
 		}
+		_ = nested // TODO(voss): implement
+		return newGlyphs, next
 	}
-	return gg
+	return glyphs, pos + 1
 }
 
-func (trfm *Transformation) applySubtables(l *LookupTable, gg []font.Glyph, pos int) ([]font.Glyph, int) {
-	for _, subtable := range l.Subtables {
-		gg, next := subtable.Apply(l.Meta, gg, pos)
-		if next >= 0 {
-			return gg, next
-		}
-	}
-	return gg, pos + 1
-}
-
-// getLookups returns the lookups required to implement the given features in
-// the specified locale.
-func (info *Info) getLookups(loc *locale.Locale, includeFeature map[string]bool) []LookupIndex {
+// GetFeatureLookups returns the lookups required to implement the given
+// features in the specified locale.
+func (info *Info) GetFeatureLookups(loc *locale.Locale, includeFeature map[string]bool) []LookupIndex {
 	if info == nil || len(info.ScriptList) == 0 {
 		return nil
 	}

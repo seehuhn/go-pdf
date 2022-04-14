@@ -40,26 +40,28 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 	default:
 		msg := fmt.Sprintf("GPOS %d.%d\n", meta.LookupType, format)
 		fmt.Print(msg)
-		return notImplementedGposSubtable(format), nil
+		return notImplementedGposSubtable{meta.LookupType, format}, nil
 	}
 }
 
-type notImplementedGposSubtable uint16
+type notImplementedGposSubtable struct {
+	lookupType, lookupFormat uint16
+}
 
-func (st notImplementedGposSubtable) Apply(meta *LookupMetaInfo, _ []font.Glyph, _ int) ([]font.Glyph, int) {
+func (st notImplementedGposSubtable) Apply(_ KeepGlyphFn, _ []font.Glyph, _ int) ([]font.Glyph, int, Nested) {
 	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
-		meta.LookupType, st)
+		st.lookupType, st.lookupFormat)
 	panic(msg)
 }
 
-func (st notImplementedGposSubtable) EncodeLen(meta *LookupMetaInfo) int {
+func (st notImplementedGposSubtable) EncodeLen() int {
 	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
-		meta.LookupType, st)
+		st.lookupType, st.lookupFormat)
 	panic(msg)
 }
 
-func (st notImplementedGposSubtable) Encode(meta *LookupMetaInfo) []byte {
+func (st notImplementedGposSubtable) Encode() []byte {
 	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
-		meta.LookupType, st)
+		st.lookupType, st.lookupFormat)
 	panic(msg)
 }

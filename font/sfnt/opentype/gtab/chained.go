@@ -21,6 +21,11 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
+// A Chained Contexts Substitution subtable describes glyph substitutions in
+// context with an ability to look back and/or look ahead in the sequence of
+// glyphs.  It can replace one or more glyphs within a certain pattern of
+// glyphs, using nested lookups.
+
 // Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chseqctxt3
 type chainedSeq3 struct {

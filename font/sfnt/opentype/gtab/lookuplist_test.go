@@ -29,18 +29,15 @@ import (
 
 type dummySubTable []byte
 
-func (st dummySubTable) Apply(meta *LookupMetaInfo, glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
-	return glyphs, -1
+func (st dummySubTable) Apply(_ KeepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int, Nested) {
+	return glyphs, -1, nil
 }
 
-func (st dummySubTable) EncodeLen(meta *LookupMetaInfo) int {
+func (st dummySubTable) EncodeLen() int {
 	return len(st)
 }
 
-func (st dummySubTable) Encode(meta *LookupMetaInfo) []byte {
-	if len(st) != int(meta.LookupType) {
-		panic("wrong size for dummy lookup")
-	}
+func (st dummySubTable) Encode() []byte {
 	return []byte(st)
 }
 

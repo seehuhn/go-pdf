@@ -94,7 +94,8 @@ func TestGsub(t *testing.T) {
 				},
 			},
 		}
-		trfm := gsub.GetTransformation(locale.EnUS, nil)
+
+		lookups := gsub.GetFeatureLookups(locale.EnUS, nil)
 
 		unpack := func(gg []font.Glyph) []font.GlyphID {
 			res := make([]font.GlyphID, len(gg))
@@ -112,7 +113,12 @@ func TestGsub(t *testing.T) {
 			{Gid: 5},
 		}
 		expected := []font.GlyphID{1, 2, 29}
-		gg := trfm.Apply(in)
+
+		gg := in
+		for _, lookupIndex := range lookups {
+			gg = gsub.ApplyLookup(gg, lookupIndex, nil)
+		}
+
 		if out := unpack(gg); !reflect.DeepEqual(out[:3], expected) {
 			t.Errorf("expected %v, got %v", expected, out)
 		}

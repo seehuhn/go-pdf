@@ -29,6 +29,14 @@ type LookupIndex uint16
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
 type LookupList []*LookupTable
 
+// LookupMetaInfo contains information associated with a lookup but not
+// specific to a subtable.
+type LookupMetaInfo struct {
+	LookupType       uint16
+	LookupFlag       LookupFlags
+	MarkFilteringSet uint16
+}
+
 // LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
 // font.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
@@ -45,16 +53,9 @@ func (li *LookupTable) EncodeLen() int {
 		total += 2
 	}
 	for _, subtable := range li.Subtables {
-		total += subtable.EncodeLen(li.Meta)
+		total += subtable.EncodeLen()
 	}
 	return total
-}
-
-// LookupMetaInfo contains information associated with a lookup table.
-type LookupMetaInfo struct {
-	LookupType       uint16
-	LookupFlag       LookupFlags
-	MarkFilteringSet uint16
 }
 
 // Subtable represents a subtable of a "GSUB" or "GPOS" lookup table.
@@ -63,11 +64,11 @@ type Subtable interface {
 	// If returns the new glyphs and the new position.  If the subtable
 	// cannot be applied, the unchanged glyphs and a negative position
 	// are returned
-	Apply(*LookupMetaInfo, []font.Glyph, int) ([]font.Glyph, int)
+	Apply(KeepGlyphFn, []font.Glyph, int) ([]font.Glyph, int, Nested)
 
-	EncodeLen(*LookupMetaInfo) int // TODO(voss): is the meta argument used?
+	EncodeLen() int
 
-	Encode(*LookupMetaInfo) []byte // TODO(voss): is the meta argument used?
+	Encode() []byte
 }
 
 // subtableReader is a function that can decode a subtable.
@@ -182,14 +183,14 @@ func (info LookupList) encode() []byte {
 		}
 		for _, st := range li.Subtables {
 			res = append(res, byte(stPos>>8), byte(stPos))
-			stPos += st.EncodeLen(li.Meta)
+			stPos += st.EncodeLen()
 		}
 		if li.Meta.LookupFlag&LookupUseMarkFilteringSet != 0 {
 			res = append(res,
 				byte(li.Meta.MarkFilteringSet>>8), byte(li.Meta.MarkFilteringSet))
 		}
 		for _, st := range li.Subtables {
-			res = append(res, st.Encode(li.Meta)...)
+			res = append(res, st.Encode()...)
 		}
 	}
 	return res

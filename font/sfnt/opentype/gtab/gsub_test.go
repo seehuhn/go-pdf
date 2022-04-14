@@ -42,10 +42,9 @@ func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
 		return
 	}
 
-	meta := &LookupMetaInfo{LookupType: lookupType}
-	data2 := l1.Encode(meta)
-	if len(data2) != l1.EncodeLen(meta) {
-		t.Errorf("encodeLen mismatch: %d != %d", len(data2), l1.EncodeLen(meta))
+	data2 := l1.Encode()
+	if len(data2) != l1.EncodeLen() {
+		t.Errorf("encodeLen mismatch: %d != %d", len(data2), l1.EncodeLen())
 	}
 
 	p = parser.New("test", bytes.NewReader(data2))
@@ -70,8 +69,7 @@ func FuzzGsub1_1(f *testing.F) {
 		Cov:   map[font.GlyphID]int{3: 0},
 		Delta: 26,
 	}
-	meta := &LookupMetaInfo{LookupType: 1}
-	f.Add(l.Encode(meta))
+	f.Add(l.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 1, 1, readGsub1_1, data)
@@ -83,8 +81,7 @@ func FuzzGsub1_2(f *testing.F) {
 		Cov:                map[font.GlyphID]int{2: 0, 3: 1},
 		SubstituteGlyphIDs: []font.GlyphID{6, 7},
 	}
-	meta := &LookupMetaInfo{LookupType: 1}
-	f.Add(l.Encode(meta))
+	f.Add(l.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 1, 2, readGsub1_2, data)
@@ -99,8 +96,7 @@ func FuzzGsub2_1(f *testing.F) {
 			{1, 2, 3},
 		},
 	}
-	meta := &LookupMetaInfo{LookupType: 2}
-	f.Add(l.Encode(meta))
+	f.Add(l.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 2, 1, readGsub2_1, data)
@@ -115,8 +111,7 @@ func FuzzGsub3_1(f *testing.F) {
 			{5, 6, 7},
 		},
 	}
-	meta := &LookupMetaInfo{LookupType: 3}
-	f.Add(l.Encode(meta))
+	f.Add(l.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 3, 1, readGsub3_1, data)
@@ -138,8 +133,7 @@ func FuzzGsub4_1(f *testing.F) {
 			},
 		},
 	}
-	meta := &LookupMetaInfo{LookupType: 4}
-	f.Add(l.Encode(meta))
+	f.Add(l.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 4, 1, readGsub4_1, data)
