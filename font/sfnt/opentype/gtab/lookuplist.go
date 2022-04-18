@@ -21,14 +21,6 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-// LookupIndex enumerates lookups.
-// It is used as an index into a LookupList.
-type LookupIndex uint16
-
-// LookupList contains the information from a Lookup List Table.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
-type LookupList []*LookupTable
-
 // LookupMetaInfo contains information associated with a lookup but not
 // specific to a subtable.
 type LookupMetaInfo struct {
@@ -36,6 +28,28 @@ type LookupMetaInfo struct {
 	LookupFlag       LookupFlags
 	MarkFilteringSet uint16
 }
+
+// LookupFlags contains bits which modify application of a lookup to a glyph string.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags
+type LookupFlags uint16
+
+// Bit values for LookupFlag.
+const (
+	LookupRightToLeft            LookupFlags = 0x0001
+	LookupIgnoreBaseGlyphs       LookupFlags = 0x0002
+	LookupIgnoreLigatures        LookupFlags = 0x0004
+	LookupIgnoreMarks            LookupFlags = 0x0008
+	LookupUseMarkFilteringSet    LookupFlags = 0x0010
+	LookupMarkAttachmentTypeMask LookupFlags = 0xFF00
+)
+
+// LookupIndex enumerates lookups.
+// It is used as an index into a LookupList.
+type LookupIndex uint16
+
+// LookupList contains the information from a Lookup List Table.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
+type LookupList []*LookupTable
 
 // LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
 // font.

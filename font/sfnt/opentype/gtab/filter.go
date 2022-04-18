@@ -22,6 +22,25 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 )
 
+// The following table shows the frequency of different lookupflag bits
+// in the lookup tables in the fonts on my laptop.
+//
+// count   |  base ligature marks filtset attchtype
+// --------+----------------------------------------
+// 104671  |    .      .      .      .      .
+//   7317  |    .      .      X      .      .
+//   4602  |    .      .      .      .      X
+//    876  |    .      .      .      X      .
+//    194  |    X      X      .      .      .
+//     80  |    X      X      .      .      X
+//     58  |    .      X      .      .      .
+//     36  |    X      .      .      .      .
+//     32  |    .      X      X      .      .
+//     20  |    X      .      .      .      X
+//      6  |    X      .      .      X      .
+//      6  |    .      .      X      .      X
+//      4  |    X      X      .      X      .
+
 // KeepGlyphFn is used to drop ignored characters in lookups with non-zero
 // lookup flags.  Functions of this type return true if the glyph should be
 // used, and false if the glyph should be ignored.
@@ -100,17 +119,3 @@ func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 }
 
 func useAllGlyphs(font.GlyphID) bool { return true }
-
-// LookupFlags contains bits which modify application of a lookup to a glyph string.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags
-type LookupFlags uint16
-
-// Bit values for LookupFlag.
-const (
-	LookupRightToLeft            LookupFlags = 0x0001
-	LookupIgnoreBaseGlyphs       LookupFlags = 0x0002
-	LookupIgnoreLigatures        LookupFlags = 0x0004
-	LookupIgnoreMarks            LookupFlags = 0x0008
-	LookupUseMarkFilteringSet    LookupFlags = 0x0010
-	LookupMarkAttachmentTypeMask LookupFlags = 0xFF00
-)

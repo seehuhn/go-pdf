@@ -22,6 +22,7 @@ import (
 	"log"
 	"os"
 
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
@@ -55,7 +56,21 @@ func tryFont(fname string) error {
 		return err
 	}
 
-	_ = info
+	for _, table := range []*gtab.Info{info.Gpos, info.Gsub} {
+		if table == nil {
+			continue
+		}
+		lookups := table.LookupList
+		for _, lookup := range lookups {
+			flags := lookup.Meta.LookupFlag
+			fmt.Println("X",
+				flags&gtab.LookupIgnoreBaseGlyphs != 0,
+				flags&gtab.LookupIgnoreLigatures != 0,
+				flags&gtab.LookupIgnoreMarks != 0,
+				flags&gtab.LookupUseMarkFilteringSet != 0,
+				flags&gtab.LookupMarkAttachmentTypeMask != 0)
+		}
+	}
 
 	return nil
 }

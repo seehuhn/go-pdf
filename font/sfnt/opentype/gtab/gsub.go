@@ -47,8 +47,6 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 	case 3_1:
 		return readGsub3_1(p, pos)
 	default:
-		msg := fmt.Sprintf("GSUB %d.%d\n", meta.LookupType, format)
-		fmt.Print(msg)
 		return notImplementedGsubSubtable{meta.LookupType, format}, nil
 	}
 }
@@ -151,6 +149,7 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	if len(cov) != len(substituteGlyphIDs) {
+		// TODO(voss): is this right?
 		return nil, &font.InvalidFontError{
 			SubSystem: "sfnt/gtab",
 			Reason:    "malformed format 1.2 GSUB subtable",
@@ -235,6 +234,7 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	if len(cov) != sequenceCount {
+		// TODO(voss): is this right?
 		return nil, &font.InvalidFontError{
 			SubSystem: "sfnt/gtab",
 			Reason:    "malformed format 2.1 GSUB subtable",
@@ -365,6 +365,7 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	if len(cov) != alternateSetCount {
+		// TODO(voss): is this right?
 		return nil, &font.InvalidFontError{
 			SubSystem: "sfnt/gtab",
 			Reason:    "malformed format 3.1 GSUB subtable",
@@ -508,6 +509,7 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	if len(cov) != len(repl) {
+		// TODO(voss): is this right?
 		return nil, &font.InvalidFontError{
 			SubSystem: "sfnt/gsub",
 			Reason:    "malformed format 4.1 GSUB subtable",
@@ -528,32 +530,36 @@ func (l *Gsub4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph
 	}
 	ligSet := l.Repl[ligSetIdx]
 
+	var strays []font.Glyph
+	var rr []rune
 ligLoop:
 	for j := range ligSet {
 		lig := &ligSet[j]
+		strays = strays[:0]
+		rr = rr[:0]
 		p := i
 		for _, gid := range lig.In {
-			p++ // TODO(voss): skip ignored glyphs
+			p++
+			for p < len(seq) && !keep(seq[p].Gid) {
+				strays = append(strays, seq[p])
+				p++
+			}
 			if p >= len(seq) {
 				continue ligLoop
 			}
 			if seq[p].Gid != gid {
 				continue ligLoop
 			}
+			rr = append(rr, seq[p].Text...)
 		}
-		next := p + 1
-
-		// gather the unicode representations
-		var rr []rune
-		for i := i; i < next; i++ {
-			rr = append(rr, seq[i].Text...)
-		}
+		tail := seq[p+1:]
 
 		seq[i] = font.Glyph{
 			Gid:  lig.Out,
 			Text: rr,
 		}
-		seq = append(seq[:i+1], seq[next:]...)
+		seq = append(seq[:i+1], strays...)
+		seq = append(seq, tail...)
 		return seq, i + 1, nil
 	}
 

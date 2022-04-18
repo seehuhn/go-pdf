@@ -38,8 +38,6 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 
 	switch 10*meta.LookupType + format {
 	default:
-		msg := fmt.Sprintf("GPOS %d.%d\n", meta.LookupType, format)
-		fmt.Print(msg)
 		return notImplementedGposSubtable{meta.LookupType, format}, nil
 	}
 }

@@ -27,9 +27,14 @@ import (
 // ApplyLookup applies a single lookup to the given glyphs.
 func (info *Info) ApplyLookup(glyphs []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table) []font.Glyph {
 	pos := 0
+	numLeft := len(glyphs)
 	for pos < len(glyphs) {
-		// TODO(voss): do we need to protect against infinite loops
 		glyphs, pos = info.ApplyLookupAt(glyphs, lookupIndex, gdef, pos)
+		newNumLeft := len(glyphs) - pos
+		if newNumLeft >= numLeft {
+			panic("infinite loop")
+		}
+		numLeft = newNumLeft
 	}
 
 	return glyphs
@@ -51,9 +56,9 @@ func (info *Info) ApplyLookupAt(glyphs []font.Glyph, lookupIndex LookupIndex, gd
 	return glyphs, pos + 1
 }
 
-// GetFeatureLookups returns the lookups required to implement the given
+// FindLookups returns the lookups required to implement the given
 // features in the specified locale.
-func (info *Info) GetFeatureLookups(loc *locale.Locale, includeFeature map[string]bool) []LookupIndex {
+func (info *Info) FindLookups(loc *locale.Locale, includeFeature map[string]bool) []LookupIndex {
 	if info == nil || len(info.ScriptList) == 0 {
 		return nil
 	}

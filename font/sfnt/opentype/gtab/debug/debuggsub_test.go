@@ -36,6 +36,12 @@ func TestGsub(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	gdef := &gdef.Table{
+		GlyphClass: classdef.Table{
+			4: gdef.GlyphClassLigature,
+		},
+	}
+
 	type testCase struct {
 		lookupType uint16
 		subtable   gtab.Subtable
@@ -66,12 +72,13 @@ func TestGsub(t *testing.T) {
 			Cov: map[font.GlyphID]int{3: 0, 4: 1},
 			Repl: [][]gtab.Ligature{
 				{
-					{In: []font.GlyphID{4, 5}, Out: 29},
-					{In: []font.GlyphID{5}, Out: 29},
+					{In: []font.GlyphID{4, 5}, Out: 29}, // excluded by gdef
+					{In: []font.GlyphID{5}, Out: 29},    // used in the test
 				},
 				{
 					{In: []font.GlyphID{3, 2}, Out: 27},
 					{In: []font.GlyphID{1}, Out: 27},
+					{In: []font.GlyphID{}, Out: 26},
 				},
 			},
 		}},
@@ -95,11 +102,11 @@ func TestGsub(t *testing.T) {
 			},
 		}
 
-		lookups := gsub.GetFeatureLookups(locale.EnUS, nil)
+		lookups := gsub.FindLookups(locale.EnUS, nil)
 
-		unpack := func(gg []font.Glyph) []font.GlyphID {
-			res := make([]font.GlyphID, len(gg))
-			for i, g := range gg {
+		unpack := func(seq []font.Glyph) []font.GlyphID {
+			res := make([]font.GlyphID, len(seq))
+			for i, g := range seq {
 				res[i] = g.Gid
 			}
 			return res
@@ -116,19 +123,16 @@ func TestGsub(t *testing.T) {
 
 		gg := in
 		for _, lookupIndex := range lookups {
-			gg = gsub.ApplyLookup(gg, lookupIndex, nil)
+			gg = gsub.ApplyLookup(gg, lookupIndex, gdef)
 		}
 
+		fmt.Println(testIdx, unpack(gg))
 		if out := unpack(gg); !reflect.DeepEqual(out[:3], expected) {
 			t.Errorf("expected %v, got %v", expected, out)
 		}
 
 		fontInfo.Gsub = gsub
-		fontInfo.Gdef = &gdef.Table{
-			GlyphClass: classdef.Table{
-				4: gdef.GlyphClassLigature,
-			},
-		}
+		fontInfo.Gdef = gdef
 		fname := fmt.Sprintf("%03d.otf", testIdx)
 		fd, err := os.Create(fname)
 		if err != nil {

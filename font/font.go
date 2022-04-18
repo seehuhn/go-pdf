@@ -193,8 +193,8 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 
 	var glyphs []Glyph
 	for _, run := range runs {
-		gg := font.Layout(run)
-		glyphs = append(glyphs, gg...)
+		seq := font.Layout(run)
+		glyphs = append(glyphs, seq...)
 	}
 
 	return &Layout{

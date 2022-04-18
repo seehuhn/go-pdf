@@ -120,7 +120,7 @@ func main() {
 		c <- boxes.Text(labelFont, 10, strings.Join(title, ", "))
 		c <- boxes.Text(labelFont, 7, fname)
 
-		var gg []font.Glyph
+		var seq []font.Glyph
 		total := 0.
 		for gid := 0; gid < info.NumGlyphs(); gid++ {
 			if info.GlyphExtent(font.GlyphID(gid)).IsZero() {
@@ -130,17 +130,17 @@ func main() {
 			if total+float64(w) > float64(info.UnitsPerEm)*24*72*5 {
 				break
 			}
-			gg = append(gg, font.Glyph{
+			seq = append(seq, font.Glyph{
 				Gid:     font.GlyphID(gid),
 				Advance: int32(w),
 			})
 			total += float64(w)
-			if len(gg) >= 27 {
+			if len(seq) >= 27 {
 				break
 			}
 		}
 
-		if len(gg) > 0 {
+		if len(seq) > 0 {
 			F, err := cid.Embed(w, info, pdf.Name(fmt.Sprintf("F%d", i)))
 			if err != nil {
 				log.Fatal(err)
@@ -148,7 +148,7 @@ func main() {
 			l := &font.Layout{
 				Font:     F,
 				FontSize: 24,
-				Glyphs:   gg,
+				Glyphs:   seq,
 			}
 			c <- &boxes.TextBox{
 				Layout: l,
