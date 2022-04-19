@@ -331,7 +331,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			if glyphCount == 0 {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/opentype/gtab",
-					Reason:    "invalid glyph count in SeqContext1",
+					Reason:    "invalid glyph count in SeqContext2",
 				}
 			}
 			seqLookupCount := int(buf[2])<<8 | int(buf[3])
@@ -400,7 +400,7 @@ ruleLoop:
 
 // EncodeLen implements the Subtable interface.
 func (l *SeqContext2) EncodeLen() int {
-	total := 6 + 2*len(l.Rules)
+	total := 8 + 2*len(l.Rules)
 	total += l.Cov.EncodeLen()
 	total += l.Classes.AppendLen()
 	for _, rule := range l.Rules {
@@ -416,7 +416,7 @@ func (l *SeqContext2) EncodeLen() int {
 func (l *SeqContext2) Encode() []byte {
 	seqRuleSetCount := len(l.Rules)
 
-	total := 6 + 2*seqRuleSetCount
+	total := 8 + 2*seqRuleSetCount
 	seqRuleSetOffsets := make([]uint16, seqRuleSetCount)
 	for i, rule := range l.Rules {
 		seqRuleSetOffsets[i] = uint16(total)
@@ -427,11 +427,14 @@ func (l *SeqContext2) Encode() []byte {
 	}
 	coverageOffset := total
 	total += l.Cov.EncodeLen()
+	classDefOffset := total
+	total += l.Classes.AppendLen()
 
 	buf := make([]byte, 0, total)
 	buf = append(buf,
 		0, 1, // format
 		byte(coverageOffset>>8), byte(coverageOffset),
+		byte(classDefOffset>>8), byte(classDefOffset),
 		byte(seqRuleSetCount>>8), byte(seqRuleSetCount),
 	)
 	for _, offset := range seqRuleSetOffsets {
@@ -471,5 +474,6 @@ func (l *SeqContext2) Encode() []byte {
 		}
 	}
 	buf = append(buf, l.Cov.Encode()...)
+	buf = l.Classes.Append(buf)
 	return buf
 }

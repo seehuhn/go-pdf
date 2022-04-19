@@ -66,3 +66,47 @@ func FuzzSeqContext1(f *testing.F) {
 		doFuzz(t, 1, 1, readSeqContext1, data)
 	})
 }
+
+func FuzzSeqContext2(f *testing.F) {
+	sub := &SeqContext2{}
+	f.Add(sub.Encode())
+	sub.Cov = coverage.Table{3: 0, 5: 1}
+	sub.Rules = [][]ClassSequenceRule{
+		{},
+		{},
+	}
+	f.Add(sub.Encode())
+	sub.Rules = [][]ClassSequenceRule{
+		{
+			{
+				In: []uint16{4},
+				Actions: []SeqLookup{
+					{SequenceIndex: 0, LookupListIndex: 1},
+					{SequenceIndex: 1, LookupListIndex: 5},
+					{SequenceIndex: 0, LookupListIndex: 4},
+				},
+			},
+		},
+		{
+			{
+				In: []uint16{6, 7},
+				Actions: []SeqLookup{
+					{SequenceIndex: 0, LookupListIndex: 2},
+				},
+			},
+			{
+				In: []uint16{6},
+				Actions: []SeqLookup{
+					{SequenceIndex: 2, LookupListIndex: 1},
+					{SequenceIndex: 1, LookupListIndex: 2},
+					{SequenceIndex: 0, LookupListIndex: 3},
+				},
+			},
+		},
+	}
+	f.Add(sub.Encode())
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 1, 1, readSeqContext1, data)
+	})
+}
