@@ -23,18 +23,17 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-// valueRecord describes all the variables and values used to adjust the
-// position of a glyph or set of glyphs.
+// valueRecord describes an adjustment to the position of a glyph or set of glyphs.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#value-record
 type valueRecord struct {
-	XPlacement       int16  // Horizontal adjustment for placement, in design units.
-	YPlacement       int16  // Vertical adjustment for placement, in design units.
-	XAdvance         int16  // Horizontal adjustment for advance, in design units — only used for horizontal layout.
-	YAdvance         int16  // Vertical adjustment for advance, in design units — only used for vertical layout.
-	XPlaDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for horizontal placement, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
-	YPlaDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for vertical placement, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
-	XAdvDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for horizontal advance, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
-	YAdvDeviceOffset uint16 // Offset to Device table (non-variable font) / VariationIndex table (variable font) for vertical advance, from beginning of the immediate parent table (SinglePos or PairPosFormat2 lookup subtable, PairSet table within a PairPosFormat1 lookup subtable) — may be NULL.
+	XPlacement       int16  // Horizontal adjustment for placement
+	YPlacement       int16  // Vertical adjustment for placement
+	XAdvance         int16  // Horizontal adjustment for advance
+	YAdvance         int16  // Vertical adjustment for advance
+	XPlaDeviceOffset uint16 // Offset to Device table/VariationIndex table for horizontal placement
+	YPlaDeviceOffset uint16 // Offset to Device table/VariationIndex table for vertical placement
+	XAdvDeviceOffset uint16 // Offset to Device table/VariationIndex table for horizontal advance
+	YAdvDeviceOffset uint16 // Offset to Device table/VariationIndex table for vertical advance
 }
 
 // readValueRecord reads the binary representation of a valueRecord.  The

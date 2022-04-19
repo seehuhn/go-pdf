@@ -308,6 +308,9 @@ func (info *Info) FGlyphExtent(gid font.GlyphID) funit.Rect {
 		return f.Glyphs[gid].Extent()
 	case *GlyfOutlines:
 		g := f.Glyphs[gid]
+		if g == nil {
+			return funit.Rect{}
+		}
 		return g.Rect
 	default:
 		panic("unexpected font type")

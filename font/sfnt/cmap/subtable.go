@@ -20,6 +20,8 @@ import "seehuhn.de/go/pdf/font"
 
 // Subtable represents a decoded cmap subtable.
 type Subtable interface {
+	// Lookup returns the glyph index for the given rune.
+	// If the rune is not found, Lookup returns 0 (corresponding to the ".notdef" glyph).
 	Lookup(r rune) font.GlyphID
 
 	// Encode returns the binary form of the subtable.

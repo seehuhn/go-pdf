@@ -17,52 +17,10 @@
 package gtab
 
 import (
-	"bytes"
-	"reflect"
 	"testing"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/parser"
 )
-
-func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
-	readFn func(p *parser.Parser, subtablePos int64) (Subtable, error),
-	data1 []byte) {
-
-	// t.Helper()
-
-	p := parser.New("test", bytes.NewReader(data1))
-	format, err := p.ReadUInt16()
-	if err != nil || format != lookupFormat {
-		return
-	}
-
-	l1, err := readFn(p, 0)
-	if err != nil {
-		return
-	}
-
-	data2 := l1.Encode()
-	if len(data2) != l1.EncodeLen() {
-		t.Errorf("encodeLen mismatch: %d != %d", len(data2), l1.EncodeLen())
-	}
-
-	p = parser.New("test", bytes.NewReader(data2))
-	format, err = p.ReadUInt16()
-	if err != nil {
-		t.Fatal(err)
-	} else if format != lookupFormat {
-		t.Fatalf("unexpected format: %d.%d", lookupType, format)
-	}
-	l2, err := readFn(p, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(l1, l2) {
-		t.Error("different")
-	}
-}
 
 func FuzzGsub1_1(f *testing.F) {
 	l := &Gsub1_1{

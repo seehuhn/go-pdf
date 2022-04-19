@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/sfnt/cid"
-	"seehuhn.de/go/pdf/font/sfnt/gtab"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -39,7 +39,7 @@ const (
 
 var courier, theFont *font.Font
 var rev map[font.GlyphID]rune
-var gdef *gtab.GdefInfo
+var gdefInfo *gdef.Table
 
 type rules struct{}
 
@@ -133,8 +133,8 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 		xPos+(glyphBoxWidth-lBox.Extent().Width)/2,
 		yPos+float64(theFont.Descent)*q-6)
 
-	if gdef != nil {
-		class := gdef.GlyphClass[font.GlyphID(g)]
+	if gdefInfo != nil {
+		class := gdefInfo.GlyphClass[font.GlyphID(g)]
 		var classLabel string
 		switch class {
 		case 1:
@@ -191,15 +191,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// gtab, err := gtab.New(tt.Header, tt.Fd, locale.EnGB)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// gdef, err = gtab.ReadGdefTable()
-	// if err != nil && !table.IsMissing(err) {
-	// 	log.Fatal(err)
-	// }
+	gdefInfo = tt.Gdef
 
 	// gsub, err := gtab.ReadGsubTable()
 	// if err != nil && !table.IsMissing(err) {
@@ -281,12 +273,17 @@ func main() {
 
 	p.BaseLineSkip = 46
 	rev = make(map[font.GlyphID]rune)
-	// for r, idx := range tt.CMap {
-	// 	r2 := rev[idx]
-	// 	if r2 == 0 || r < r2 {
-	// 		rev[idx] = r
-	// 	}
-	// }
+	min, max := tt.CMap.CodeRange()
+	for r := min; r <= max; r++ {
+		gid := tt.CMap.Lookup(r)
+		if gid == 0 {
+			continue
+		}
+		r2 := rev[gid]
+		if r2 == 0 || r < r2 {
+			rev[gid] = r
+		}
+	}
 	for row := 0; 10*row < numGlyph; row++ {
 		if len(rowBoxes) == 0 {
 			rowBoxes = append(rowBoxes, boxes.Kern(36))

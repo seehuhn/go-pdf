@@ -46,7 +46,12 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readGsub2_1(p, pos)
 	case 3_1:
 		return readGsub3_1(p, pos)
+	case 4_1:
+		return readGsub4_1(p, pos)
+	case 5_1:
+		return readSeqContext1(p, pos)
 	default:
+		fmt.Println("GSUB", meta.LookupType, format)
 		return notImplementedGsubSubtable{meta.LookupType, format}, nil
 	}
 }
@@ -73,7 +78,7 @@ func (st notImplementedGsubSubtable) Encode() []byte {
 	panic(msg)
 }
 
-// Gsub1_1 is a Single Substitution GSUB subtable (type 1, format 1).
+// Gsub1_1 is a Single Substitution subtable (GSUB type 1, format 1).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#11-single-substitution-format-1
 type Gsub1_1 struct {
 	Cov   coverage.Table

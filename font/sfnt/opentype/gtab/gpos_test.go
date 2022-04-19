@@ -20,49 +20,18 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
-func FuzzSeqContext1(f *testing.F) {
-	sub := &SeqContext1{}
-	f.Add(sub.Encode())
-	sub.Cov = coverage.Table{3: 0, 5: 1}
-	sub.Rules = [][]SequenceRule{
-		{},
-		{},
-	}
-	f.Add(sub.Encode())
-	sub.Rules = [][]SequenceRule{
-		{
-			{
-				In: []font.GlyphID{4},
-				Actions: []SeqLookup{
-					{SequenceIndex: 0, LookupListIndex: 1},
-					{SequenceIndex: 1, LookupListIndex: 5},
-					{SequenceIndex: 0, LookupListIndex: 4},
-				},
-			},
-		},
-		{
-			{
-				In: []font.GlyphID{6, 7},
-				Actions: []SeqLookup{
-					{SequenceIndex: 0, LookupListIndex: 2},
-				},
-			},
-			{
-				In: []font.GlyphID{6},
-				Actions: []SeqLookup{
-					{SequenceIndex: 2, LookupListIndex: 1},
-					{SequenceIndex: 1, LookupListIndex: 2},
-					{SequenceIndex: 0, LookupListIndex: 3},
-				},
-			},
+func FuzzGpos1_1(f *testing.F) {
+	l := &Gpos1_1{
+		Cov: map[font.GlyphID]int{8: 0, 9: 1},
+		Adjust: &ValueRecord{
+			XAdvance: 100,
 		},
 	}
-	f.Add(sub.Encode())
+	f.Add(l.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		doFuzz(t, 1, 1, readSeqContext1, data)
+		doFuzz(t, 1, 1, readGpos1_1, data)
 	})
 }
