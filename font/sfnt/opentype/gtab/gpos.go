@@ -73,6 +73,7 @@ func (st notImplementedGposSubtable) Encode() []byte {
 }
 
 // Gpos1_1 is a Single Adjustment Positioning Subtable (GPOS type 1, format 1)
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#single-adjustment-positioning-format-1-single-positioning-value
 type Gpos1_1 struct {
 	Cov    coverage.Table
 	Adjust *ValueRecord

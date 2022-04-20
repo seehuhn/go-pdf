@@ -33,10 +33,10 @@ import (
 )
 
 // MakeFont creates a simple font for use in unit tests.
-func MakeFont() (*sfntcff.Info, error) {
+func MakeFont() *sfntcff.Info {
 	info, err := sfntcff.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	var includeGid []font.GlyphID
@@ -169,14 +169,14 @@ func MakeFont() (*sfntcff.Info, error) {
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid-a, yMid-a)
 	cffGlyph.LineTo(xMid-a, yMid+a)
-	cmap[uint16('>')] = font.GlyphID(len(includeGid))
+	cmap[uint16('>')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	cffGlyph = cff.NewGlyph("marker.right", funit.Uint16(ext.URx))
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
-	cmap[uint16('<')] = font.GlyphID(len(includeGid))
+	cmap[uint16('<')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	cffGlyph = cff.NewGlyph("marker", funit.Uint16(ext.URx))
@@ -186,7 +186,7 @@ func MakeFont() (*sfntcff.Info, error) {
 	cffGlyph.LineTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
-	cmap[uint16('=')] = font.GlyphID(len(includeGid))
+	cmap[uint16('=')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	now := time.Now()
@@ -212,5 +212,5 @@ func MakeFont() (*sfntcff.Info, error) {
 		Outlines: newOutlines,
 	}
 
-	return res, nil
+	return res
 }

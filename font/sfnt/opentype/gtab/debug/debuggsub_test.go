@@ -31,10 +31,7 @@ import (
 )
 
 func TestGsub(t *testing.T) {
-	fontInfo, err := debug.MakeFont()
-	if err != nil {
-		t.Fatal(err)
-	}
+	fontInfo := debug.MakeFont()
 
 	gdef := &gdef.Table{
 		GlyphClass: classdef.Table{
