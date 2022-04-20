@@ -35,7 +35,7 @@ import (
 )
 
 func main() {
-	panic("The font 'YRMIPR+Loopiejuice-Regular' contains bad /Widths.")
+	panic("The font 'YRMIPR+Loopiejuice-Regular' contains bad /Widths.") // TODO(voss): fix this
 
 	fontNamesFile := flag.String("f", "", "file containing font names")
 	flag.Parse()

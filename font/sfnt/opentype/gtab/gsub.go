@@ -50,6 +50,8 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readGsub4_1(p, pos)
 	case 5_1:
 		return readSeqContext1(p, pos)
+	case 5_2:
+		return readSeqContext2(p, pos)
 	default:
 		fmt.Println("GSUB", meta.LookupType, format)
 		return notImplementedGsubSubtable{meta.LookupType, format}, nil

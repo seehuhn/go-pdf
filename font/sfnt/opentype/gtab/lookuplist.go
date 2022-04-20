@@ -35,12 +35,12 @@ type LookupFlags uint16
 
 // Bit values for LookupFlag.
 const (
-	LookupRightToLeft            LookupFlags = 0x0001
-	LookupIgnoreBaseGlyphs       LookupFlags = 0x0002
-	LookupIgnoreLigatures        LookupFlags = 0x0004
-	LookupIgnoreMarks            LookupFlags = 0x0008
-	LookupUseMarkFilteringSet    LookupFlags = 0x0010
-	LookupMarkAttachmentTypeMask LookupFlags = 0xFF00
+	LookupRightToLeft         LookupFlags = 0x0001
+	LookupIgnoreBaseGlyphs    LookupFlags = 0x0002
+	LookupIgnoreLigatures     LookupFlags = 0x0004
+	LookupIgnoreMarks         LookupFlags = 0x0008
+	LookupUseMarkFilteringSet LookupFlags = 0x0010
+	LookupMarkAttachTypeMask  LookupFlags = 0xFF00
 )
 
 // LookupIndex enumerates lookups.

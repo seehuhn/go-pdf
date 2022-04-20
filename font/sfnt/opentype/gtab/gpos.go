@@ -42,6 +42,8 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readGpos1_1(p, pos)
 	case 7_1:
 		return readSeqContext1(p, pos)
+	case 7_2:
+		return readSeqContext2(p, pos)
 	default:
 		fmt.Println("GPOS", meta.LookupType, format)
 		return notImplementedGposSubtable{meta.LookupType, format}, nil

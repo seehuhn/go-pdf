@@ -55,7 +55,7 @@ func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 	}
 
 	flags := meta.LookupFlag
-	attachClass := uint16((flags & LookupMarkAttachmentTypeMask) >> 8)
+	markAttachType := uint16((flags & LookupMarkAttachTypeMask) >> 8)
 	var markGlyphSet coverage.Table
 
 	type filterSel int
@@ -86,10 +86,8 @@ func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 			sel |= filterMarksFromSet
 			markGlyphSet = gdefTable.MarkGlyphSets[meta.MarkFilteringSet]
 		}
-	} else if attachClass != 0 && gdefTable.MarkAttachClass != nil {
-		if gdefTable.MarkAttachClass != nil {
-			sel |= filterAttachClass
-		}
+	} else if markAttachType != 0 && gdefTable.MarkAttachClass != nil {
+		sel |= filterAttachClass
 	}
 
 	if sel == 0 {
@@ -107,9 +105,11 @@ func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 			return false
 		}
 		if sel&filterMarksFromSet != 0 && !markGlyphSet.Contains(gid) {
+			// TODO(voss): does this only apply to mark glyphs?
 			return false
 		}
-		if sel&filterAttachClass != 0 && gdefTable.MarkAttachClass[gid] != attachClass {
+		if sel&filterAttachClass != 0 && gdefTable.MarkAttachClass[gid] != markAttachType {
+			// TODO(voss): does this only apply to mark glyphs?
 			return false
 		}
 		return true

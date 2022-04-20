@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 
 	"seehuhn.de/go/pdf"
@@ -28,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/sfnt/cid"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -41,136 +43,6 @@ var courier, theFont *font.Font
 var rev map[font.GlyphID]rune
 var gdefInfo *gdef.Table
 
-type rules struct{}
-
-func (r rules) Extent() *boxes.BoxExtent {
-	return &boxes.BoxExtent{
-		Width:  0,
-		Height: float64(theFont.Ascent) * glyphFontSize / 1000,
-		Depth:  -float64(theFont.Descent) * glyphFontSize / 1000,
-	}
-}
-
-func (r rules) Draw(page *pages.Page, xPos, yPos float64) {
-	yLow := yPos + float64(theFont.Descent)*glyphFontSize/1000
-	yHigh := yPos + float64(theFont.Ascent)*glyphFontSize/1000
-
-	page.Println("q")
-	page.Println(".3 .3 1 RG")
-	page.Println(".5 w")
-	for _, y := range []float64{
-		yLow,
-		yPos,
-		yHigh,
-	} {
-		page.Printf("%.2f %.2f m\n", xPos, y)
-		page.Printf("%.2f %.2f l\n", xPos+10*glyphBoxWidth, y)
-	}
-	for i := 0; i <= 10; i++ {
-		x := xPos + float64(i)*glyphBoxWidth
-		page.Printf("%.2f %.2f m\n", x, yLow)
-		page.Printf("%.2f %.2f l\n", x, yHigh)
-	}
-
-	page.Println("s")
-	page.Println("Q")
-}
-
-type glyphBox font.GlyphID
-
-func (g glyphBox) Extent() *boxes.BoxExtent {
-	ht := theFont.Ascent
-	if theFont.GlyphExtents != nil {
-		bbox := theFont.GlyphExtents[g]
-		ht = int(bbox.URy)
-	}
-	return &boxes.BoxExtent{
-		Width:  glyphBoxWidth,
-		Height: 4 + float64(ht)*glyphFontSize/1000,
-		Depth:  8 - float64(theFont.Descent)*glyphFontSize/1000,
-	}
-}
-
-func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
-	q := float64(glyphFontSize) / 1000
-	glyphWidth := float64(theFont.Widths[g]) * q
-	shift := (glyphBoxWidth - glyphWidth) / 2
-
-	if theFont.GlyphExtents != nil {
-		ext := theFont.GlyphExtents[font.GlyphID(g)]
-		page.Println("q")
-		page.Println(".4 1 .4 rg")
-		page.Printf("%.2f %.2f %.2f %.2f re\n",
-			xPos+float64(ext.LLx)*q+shift, yPos+float64(ext.LLy)*q,
-			float64(ext.URx-ext.LLx)*q, float64(ext.URy-ext.LLy)*q)
-		page.Println("f")
-		page.Println("Q")
-	}
-
-	yLow := yPos + float64(theFont.Descent)*q
-	yHigh := yPos + float64(theFont.Ascent)*q
-	page.Println("q")
-	page.Println("1 0 0 RG")
-	page.Println(".5 w")
-	x := xPos + shift
-	page.Printf("%.2f %.2f m\n", x, yLow)
-	page.Printf("%.2f %.2f l\n", x, yHigh)
-	x += glyphWidth
-	page.Printf("%.2f %.2f m\n", x, yLow)
-	page.Printf("%.2f %.2f l\n", x, yHigh)
-	page.Println("s")
-	page.Println("Q")
-
-	r := rev[font.GlyphID(g)]
-	var label string
-	if r != 0 {
-		label = fmt.Sprintf("%04X", r)
-	} else {
-		label = "—"
-	}
-	lBox := boxes.Text(courier, 8, label)
-	lBox.Draw(page,
-		xPos+(glyphBoxWidth-lBox.Extent().Width)/2,
-		yPos+float64(theFont.Descent)*q-6)
-
-	if gdefInfo != nil {
-		class := gdefInfo.GlyphClass[font.GlyphID(g)]
-		var classLabel string
-		switch class {
-		case 1:
-			classLabel = "b" // Base glyph (single character, spacing glyph)
-		case 2:
-			classLabel = "l" // Ligature glyph (multiple character, spacing glyph)
-		case 3:
-			classLabel = "m" // Mark glyph (non-spacing combining glyph)
-		case 4:
-			classLabel = "c" // Component glyph (part of single character, spacing glyph)
-		}
-		if classLabel != "" {
-			cBox := boxes.Text(courier, 8, classLabel)
-			page.Println("q")
-			page.Println("0.5 g")
-			cBox.Draw(page,
-				xPos+glyphBoxWidth-cBox.Extent().Width-1,
-				yPos+float64(theFont.Descent)*q-6)
-			page.Println("Q")
-		}
-	}
-
-	page.Println("q")
-	page.Println("BT")
-	_ = theFont.InstName.PDF(page)
-	fmt.Fprintf(page, " %f Tf\n", float64(glyphFontSize))
-	fmt.Fprintf(page, "%f %f Td\n",
-		xPos+shift,
-		yPos)
-	buf := theFont.Enc(font.GlyphID(g))
-	_ = buf.PDF(page)
-	page.Println(" Tj")
-	page.Println("ET")
-	page.Println("Q")
-}
-
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: tt-glyph-table font.ttf")
@@ -183,6 +55,10 @@ func main() {
 		log.Fatal(err)
 	}
 	tt, err := sfntcff.Read(fd)
+	if err != nil {
+		log.Fatal(err)
+	}
+	header, err := table.ReadHeader(fd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -203,11 +79,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	labelFont, err := builtin.Embed(out, "Helvetica", "L")
+	if err != nil {
+		log.Fatal(err)
+	}
 	courier, err = builtin.Embed(out, "Courier", "C")
 	if err != nil {
 		log.Fatal(err)
 	}
-	Italic, err := builtin.Embed(out, "Times-Italic", "I")
+	italic, err := builtin.Embed(out, "Times-Italic", "I")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -215,63 +95,52 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: &pages.Resources{
 			Font: pdf.Dict{
-				courier.InstName: courier.Ref,
-				Italic.InstName:  Italic.Ref,
 				theFont.InstName: theFont.Ref,
 			},
 		},
+		MediaBox: pages.A4,
 	})
 
-	p := &boxes.Parameters{}
-	stretch := boxes.Glue(0, 1, 1, 1, 1)
+	c := make(chan boxes.Box)
+	res := make(chan error)
+	go func() {
+		res <- makePages(out, pageTree, c, labelFont)
+	}()
 
-	page := 1
-	var rowBoxes []boxes.Box
-	flush := func() {
-		rowBoxes = append(rowBoxes,
-			stretch,
-			boxes.HBoxTo(pages.A4.URx,
-				stretch,
-				boxes.Text(courier, 10, "- "+strconv.Itoa(page)+" -"),
-				stretch),
-			boxes.Kern(36))
-		box := p.VBoxTo(pages.A4.URy, rowBoxes...)
-		err = boxes.Ship(pageTree, box)
-		if err != nil {
-			log.Fatal(err)
-		}
-		rowBoxes = nil
-		page++
-	}
+	stretch := boxes.Glue(0, 1, 1, 1, 1)
 
 	numGlyph := len(theFont.Widths)
 
-	p.BaseLineSkip = 13
-	rowBoxes = append(rowBoxes,
-		boxes.Kern(72),
-		boxes.HBox(
-			boxes.Kern(72),
-			boxes.Text(courier, 10, "input file: "),
-			boxes.Text(courier, 10, fontFileName),
-		),
-		boxes.Kern(13),
-		boxes.HBox(
-			boxes.Kern(72),
-			boxes.Text(courier, 10, "number of glyphs: "),
-			boxes.Text(courier, 10, strconv.Itoa(numGlyph)),
-		),
-		// boxes.HBox(
-		// 	boxes.Kern(72),
-		// 	boxes.Text(courier, 10, "number of GSUB lookups: "),
-		// 	boxes.Text(courier, 10, strconv.Itoa(len(gsub))),
-		// ),
+	c <- boxes.Kern(36)
+	c <- boxes.Text(labelFont, 10, "full name: "+tt.FullName())
+	c <- boxes.Text(labelFont, 10, "version: "+tt.Version.String())
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("number of glyphs: %d", numGlyph))
+	c <- boxes.HBox(
+		boxes.Text(labelFont, 10, "input file: "),
+		boxes.Text(courier, 10, fontFileName),
 	)
-	flush()
+	c <- boxes.Kern(12)
+	c <- boxes.Text(labelFont, 10, "SFNT tables:")
+	var names []string
+	for name := range header.Toc {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		c <- boxes.HBox(
+			boxes.Text(courier, 10, "  •"+name+" "),
+			boxes.HBoxTo(72,
+				stretch,
+				boxes.Text(labelFont, 10, fmt.Sprintf("%d bytes", header.Toc[name].Length)),
+			),
+		)
+	}
+	c <- nil // new page
 
-	p.BaseLineSkip = 46
 	rev = make(map[font.GlyphID]rune)
 	min, max := tt.CMap.CodeRange()
 	for r := min; r <= max; r++ {
@@ -285,22 +154,6 @@ func main() {
 		}
 	}
 	for row := 0; 10*row < numGlyph; row++ {
-		if len(rowBoxes) == 0 {
-			rowBoxes = append(rowBoxes, boxes.Kern(36))
-			headerBoxes := []boxes.Box{stretch, boxes.Kern(40)}
-			for i := 0; i < 10; i++ {
-				h := boxes.HBoxTo(glyphBoxWidth,
-					stretch,
-					boxes.Text(courier, 10, strconv.Itoa(i)),
-					stretch)
-				headerBoxes = append(headerBoxes, h)
-			}
-			headerBoxes = append(headerBoxes, stretch)
-			rowBoxes = append(rowBoxes,
-				boxes.HBoxTo(pages.A4.URx, headerBoxes...))
-			rowBoxes = append(rowBoxes, boxes.Kern(8))
-		}
-
 		colBoxes := []boxes.Box{stretch}
 		label := strconv.Itoa(row)
 		if label == "0" {
@@ -309,7 +162,7 @@ func main() {
 		h := boxes.HBoxTo(20,
 			stretch,
 			boxes.Text(courier, 10, label),
-			boxes.Text(Italic, 10, "x"),
+			boxes.Text(italic, 10, "x"),
 		)
 		colBoxes = append(colBoxes, h, boxes.Kern(20), rules{})
 		for col := 0; col < 10; col++ {
@@ -321,12 +174,13 @@ func main() {
 			}
 		}
 		colBoxes = append(colBoxes, stretch)
-		rowBoxes = append(rowBoxes,
-			boxes.HBoxTo(pages.A4.URx, colBoxes...))
+		c <- boxes.HBoxTo(textWidth, colBoxes...)
+	}
 
-		if row%16 == 15 || 10*(row+1) >= numGlyph {
-			flush()
-		}
+	close(c)
+	err = <-res
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	err = out.Close()
