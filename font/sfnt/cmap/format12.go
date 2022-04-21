@@ -28,9 +28,9 @@ import (
 type format12 []format12segment
 
 type format12segment struct {
-	startCharCode rune
-	endCharCode   rune
-	startGlyphID  font.GlyphID
+	StartCharCode rune
+	EndCharCode   rune
+	StartGlyphID  font.GlyphID
 }
 
 func decodeFormat12(data []byte, code2rune func(c int) rune) (Subtable, error) {
@@ -51,19 +51,19 @@ func decodeFormat12(data []byte, code2rune func(c int) rune) (Subtable, error) {
 	prevEnd := rune(-1)
 	for i := uint32(0); i < nSegments; i++ {
 		base := 16 + i*12
-		segments[i].startCharCode = rune(data[base])<<24 | rune(data[base+1])<<16 | rune(data[base+2])<<8 | rune(data[base+3])
-		segments[i].endCharCode = rune(data[base+4])<<24 | rune(data[base+5])<<16 | rune(data[base+6])<<8 | rune(data[base+7])
+		segments[i].StartCharCode = rune(data[base])<<24 | rune(data[base+1])<<16 | rune(data[base+2])<<8 | rune(data[base+3])
+		segments[i].EndCharCode = rune(data[base+4])<<24 | rune(data[base+5])<<16 | rune(data[base+6])<<8 | rune(data[base+7])
 		startGlyphID := uint32(data[base+8])<<24 | uint32(data[base+9])<<16 | uint32(data[base+10])<<8 | uint32(data[base+11])
 
-		if segments[i].startCharCode <= prevEnd ||
-			segments[i].endCharCode < segments[i].startCharCode ||
+		if segments[i].StartCharCode <= prevEnd ||
+			segments[i].EndCharCode < segments[i].StartCharCode ||
 			startGlyphID > 0x10_FFFF ||
-			startGlyphID+uint32(segments[i].endCharCode-segments[i].startCharCode) > 0x10_FFFF {
+			startGlyphID+uint32(segments[i].EndCharCode-segments[i].StartCharCode) > 0x10_FFFF {
 			return nil, errMalformedSubtable
 		}
-		segments[i].startGlyphID = font.GlyphID(startGlyphID)
+		segments[i].StartGlyphID = font.GlyphID(startGlyphID)
 
-		prevEnd = segments[i].endCharCode
+		prevEnd = segments[i].EndCharCode
 	}
 
 	return segments, nil
@@ -81,35 +81,35 @@ func (cmap format12) Encode(language uint16) []byte {
 	})
 	for i := 0; i < nSegments; i++ {
 		base := 16 + i*12
-		out[base] = byte(cmap[i].startCharCode >> 24)
-		out[base+1] = byte(cmap[i].startCharCode >> 16)
-		out[base+2] = byte(cmap[i].startCharCode >> 8)
-		out[base+3] = byte(cmap[i].startCharCode)
-		out[base+4] = byte(cmap[i].endCharCode >> 24)
-		out[base+5] = byte(cmap[i].endCharCode >> 16)
-		out[base+6] = byte(cmap[i].endCharCode >> 8)
-		out[base+7] = byte(cmap[i].endCharCode)
+		out[base] = byte(cmap[i].StartCharCode >> 24)
+		out[base+1] = byte(cmap[i].StartCharCode >> 16)
+		out[base+2] = byte(cmap[i].StartCharCode >> 8)
+		out[base+3] = byte(cmap[i].StartCharCode)
+		out[base+4] = byte(cmap[i].EndCharCode >> 24)
+		out[base+5] = byte(cmap[i].EndCharCode >> 16)
+		out[base+6] = byte(cmap[i].EndCharCode >> 8)
+		out[base+7] = byte(cmap[i].EndCharCode)
 		// out[base+8] = 0
 		// out[base+9] = 0
-		out[base+10] = byte(cmap[i].startGlyphID >> 8)
-		out[base+11] = byte(cmap[i].startGlyphID)
+		out[base+10] = byte(cmap[i].StartGlyphID >> 8)
+		out[base+11] = byte(cmap[i].StartGlyphID)
 	}
 	return out
 }
 
 func (cmap format12) Lookup(code rune) font.GlyphID {
 	idx := sort.Search(len(cmap), func(i int) bool {
-		return code <= cmap[i].endCharCode
+		return code <= cmap[i].EndCharCode
 	})
-	if idx == len(cmap) || cmap[idx].startCharCode > code {
+	if idx == len(cmap) || cmap[idx].StartCharCode > code {
 		return 0
 	}
-	return cmap[idx].startGlyphID + font.GlyphID(code-cmap[idx].startCharCode)
+	return cmap[idx].StartGlyphID + font.GlyphID(code-cmap[idx].StartCharCode)
 }
 
 func (cmap format12) CodeRange() (low, high rune) {
 	if len(cmap) == 0 {
 		return 0, 0
 	}
-	return cmap[0].startCharCode, cmap[len(cmap)-1].endCharCode
+	return cmap[0].StartCharCode, cmap[len(cmap)-1].EndCharCode
 }

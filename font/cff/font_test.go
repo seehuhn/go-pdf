@@ -21,12 +21,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf/font"
 )
 
 func FuzzFont(f *testing.F) {
-	deep.FloatPrecision = 8
-
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cff1, err := Read(bytes.NewReader(data))
 		if err != nil {
@@ -45,13 +44,17 @@ func FuzzFont(f *testing.F) {
 			return
 		}
 
-		for _, diff := range deep.Equal(cff1, cff2) {
-			t.Error(diff)
+		opt := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
+			for gid := 0; gid < len(cff1.Glyphs); gid++ {
+				if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+					return false
+				}
+			}
+			return true
+		})
+
+		if diff := cmp.Diff(cff1, cff2, opt); diff != "" {
+			t.Errorf("different (-old +new):\n%s", diff)
 		}
-		// if !reflect.DeepEqual(cff1, cff2) {
-		// 	fmt.Println(cff1)
-		// 	fmt.Println(cff2)
-		// 	t.Error("different")
-		// }
 	})
 }

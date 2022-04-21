@@ -29,7 +29,7 @@ func (info *Info) ApplyLookup(glyphs []font.Glyph, lookupIndex LookupIndex, gdef
 	pos := 0
 	numLeft := len(glyphs)
 	for pos < len(glyphs) {
-		glyphs, pos = info.ApplyLookupAt(glyphs, lookupIndex, gdef, pos)
+		glyphs, pos = info.applyLookupAt(glyphs, lookupIndex, gdef, pos)
 		newNumLeft := len(glyphs) - pos
 		if newNumLeft >= numLeft {
 			panic("infinite loop")
@@ -40,20 +40,54 @@ func (info *Info) ApplyLookup(glyphs []font.Glyph, lookupIndex LookupIndex, gdef
 	return glyphs
 }
 
-// ApplyLookupAt applies a single lookup to the given glyphs at position pos.
-func (info *Info) ApplyLookupAt(glyphs []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos int) ([]font.Glyph, int) {
+// applyLookupAt applies a single lookup to the given glyphs at position pos.
+func (info *Info) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos int) ([]font.Glyph, int) {
+	numLookups := len(info.LookupList)
+
 	lookup := info.LookupList[lookupIndex]
 	keep := MakeFilter(lookup.Meta, gdef)
+	newSeq, newPos, nested := lookup.Subtables.Apply(keep, seq, pos)
+	if newPos < 0 {
+		return seq, pos + 1
+	}
+	if len(nested) == 0 {
+		return newSeq, newPos
+	}
 
-	for _, subtable := range lookup.Subtables {
-		newGlyphs, next, nested := subtable.Apply(keep, glyphs, pos)
-		if next < 0 {
+	seq = newSeq
+	next := newPos
+	numActions := 1 // we count the original lookup as an action
+	for len(nested) > 0 && numActions < 64 {
+		a := nested[0]
+		nested = nested[1:]
+		if int(a.SequenceIndex) < pos || int(a.SequenceIndex) >= next || int(a.LookupListIndex) >= numLookups {
 			continue
 		}
-		_ = nested // TODO(voss): implement
-		return newGlyphs, next
+
+		numActions++
+		lookup = info.LookupList[a.LookupListIndex]
+		keep = MakeFilter(lookup.Meta, gdef)
+		newSeq, newPos, n2 := lookup.Subtables.Apply(keep, seq, int(a.SequenceIndex))
+		if newPos < 0 {
+			continue
+		}
+
+		seq = newSeq
+		if newPos > next {
+			next = newPos
+		}
+		delta := len(newSeq) - len(seq)
+		for _, a2 := range nested {
+			if a2.SequenceIndex > a.SequenceIndex && int(a2.SequenceIndex) < newPos {
+				continue
+			} else if int(a2.SequenceIndex) >= newPos {
+				a2.SequenceIndex += uint16(delta)
+			}
+			n2 = append(n2, a2)
+		}
+		nested = n2
 	}
-	return glyphs, pos + 1
+	return seq, next
 }
 
 // FindLookups returns the lookups required to implement the given

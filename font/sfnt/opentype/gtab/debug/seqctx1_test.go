@@ -1,6 +1,23 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package debug
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -10,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
+	"seehuhn.de/go/pdf/locale"
 )
 
 func TestSequenceContext1(t *testing.T) {
@@ -291,8 +309,11 @@ func Test9736(t *testing.T) {
 }
 
 func Test9737(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
+	fontInfo := debug.MakeCompleteFont()
 	fontInfo.FamilyName = "Test9737"
+
+	gidA := fontInfo.CMap.Lookup('A')
+	gidB := fontInfo.CMap.Lookup('B')
 
 	fontInfo.Gsub = &gtab.Info{
 		ScriptList: map[gtab.ScriptLang]*gtab.Features{
@@ -301,51 +322,69 @@ func Test9737(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-	}
-	numFunny := 10
-	for i := 0; i < numFunny; i++ {
-		var actions []gtab.SeqLookup
-		for j := 0; j < numFunny+1; j++ {
-			if j <= i {
-				continue
-			}
-			actions = append(actions, gtab.SeqLookup{
-				SequenceIndex:   0,
-				LookupListIndex: gtab.LookupIndex(j),
-			})
-		}
-
-		l := &gtab.LookupTable{
-			Meta: &gtab.LookupMetaInfo{
-				LookupType: 5,
-			},
-			Subtables: []gtab.Subtable{
-				&gtab.SeqContext1{
-					Cov: coverage.Table{1: 0},
-					Rules: [][]gtab.SequenceRule{
-						{
-							{In: []font.GlyphID{}, Actions: actions},
+		LookupList: []*gtab.LookupTable{
+			{ // lookup 0
+				Meta: &gtab.LookupMetaInfo{
+					LookupType: 5,
+				},
+				Subtables: []gtab.Subtable{
+					&gtab.SeqContext1{
+						Cov: coverage.Table{gidA: 0},
+						Rules: [][]gtab.SequenceRule{
+							{
+								{
+									In: []font.GlyphID{gidB},
+									Actions: []gtab.SeqLookup{
+										{SequenceIndex: 0, LookupListIndex: 1},
+										{SequenceIndex: 0, LookupListIndex: 0},
+									},
+								},
+								{
+									In: []font.GlyphID{gidA, gidB},
+									Actions: []gtab.SeqLookup{
+										{SequenceIndex: 0, LookupListIndex: 1},
+										{SequenceIndex: 0, LookupListIndex: 0},
+									},
+								},
+								{
+									In: []font.GlyphID{gidA, gidA, gidB},
+									Actions: []gtab.SeqLookup{
+										{SequenceIndex: 0, LookupListIndex: 1},
+										{SequenceIndex: 0, LookupListIndex: 0},
+									},
+								},
+							},
 						},
 					},
 				},
 			},
-		}
-		fontInfo.Gsub.LookupList = append(fontInfo.Gsub.LookupList, l)
-	}
-	l := &gtab.LookupTable{
-		Meta: &gtab.LookupMetaInfo{
-			LookupType: 2,
-		},
-		Subtables: []gtab.Subtable{
-			&gtab.Gsub2_1{
-				Cov: coverage.Table{1: 0},
-				Repl: [][]font.GlyphID{
-					{1, 2, 1},
+			{ // lookup 1
+				Meta: &gtab.LookupMetaInfo{
+					LookupType: 2,
+				},
+				Subtables: []gtab.Subtable{
+					&gtab.Gsub2_1{
+						Cov: coverage.Table{gidA: 0},
+						Repl: [][]font.GlyphID{
+							{gidA, gidA},
+						},
+					},
 				},
 			},
 		},
 	}
-	fontInfo.Gsub.LookupList = append(fontInfo.Gsub.LookupList, l)
+
+	gg := []font.Glyph{
+		{Gid: gidA},
+		{Gid: gidB},
+	}
+	gsub := fontInfo.Gsub
+	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
+		gg = gsub.ApplyLookup(gg, lookupIndex, nil)
+	}
+	fmt.Println(gg)
+	// harfbuzz gives AAB
+	// MS Word gives AAAAB
 
 	fd, err := os.Create("test9737.otf")
 	if err != nil {

@@ -145,17 +145,14 @@ func (l *SeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.G
 	}
 	rule := l.Rules[ruleIdx]
 
-	var strays []font.Glyph
-	var rr []rune
+	var matchPos []int
 ruleLoop:
 	for _, r := range rule {
-		strays = strays[:0]
-		rr = rr[:0]
 		p := i
+		matchPos = append(matchPos[:0], p)
 		for _, gid := range r.In {
 			p++
 			for p < len(seq) && !keep(seq[p].Gid) {
-				strays = append(strays, seq[p])
 				p++
 			}
 			if p >= len(seq) {
@@ -164,10 +161,19 @@ ruleLoop:
 			if seq[p].Gid != gid {
 				continue ruleLoop
 			}
-			rr = append(rr, seq[p].Text...)
+			matchPos = append(matchPos, p)
 		}
 
-		panic("not implemented")
+		actions := make(Nested, len(r.Actions))
+		for j, a := range r.Actions {
+			idx := int(a.SequenceIndex)
+			if idx < len(matchPos) {
+				actions[j].SequenceIndex = uint16(matchPos[idx])
+				actions[j].LookupListIndex = a.LookupListIndex
+			}
+		}
+
+		return seq, p + 1, actions
 	}
 
 	return seq, -1, nil
@@ -370,17 +376,14 @@ func (l *SeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.G
 	}
 	rule := l.Rules[ruleIdx]
 
-	var strays []font.Glyph
-	var rr []rune
+	var matchPos []int
 ruleLoop:
 	for _, r := range rule {
-		strays = strays[:0]
-		rr = rr[:0]
 		p := i
+		matchPos = append(matchPos[:0], p)
 		for _, cls := range r.In {
 			p++
 			for p < len(seq) && !keep(seq[p].Gid) {
-				strays = append(strays, seq[p])
 				p++
 			}
 			if p >= len(seq) {
@@ -389,10 +392,19 @@ ruleLoop:
 			if l.Classes[seq[p].Gid] != cls {
 				continue ruleLoop
 			}
-			rr = append(rr, seq[p].Text...)
+			matchPos = append(matchPos, p)
 		}
 
-		panic("not implemented")
+		actions := make(Nested, len(r.Actions))
+		for j, a := range r.Actions {
+			idx := int(a.SequenceIndex)
+			if idx < len(matchPos) {
+				actions[j].SequenceIndex = uint16(matchPos[idx])
+				actions[j].LookupListIndex = a.LookupListIndex
+			}
+		}
+
+		return seq, p + 1, actions
 	}
 
 	return seq, -1, nil
@@ -432,7 +444,7 @@ func (l *SeqContext2) Encode() []byte {
 
 	buf := make([]byte, 0, total)
 	buf = append(buf,
-		0, 1, // format
+		0, 2, // format
 		byte(coverageOffset>>8), byte(coverageOffset),
 		byte(classDefOffset>>8), byte(classDefOffset),
 		byte(seqRuleSetCount>>8), byte(seqRuleSetCount),
@@ -476,4 +488,212 @@ func (l *SeqContext2) Encode() []byte {
 	buf = append(buf, l.Cov.Encode()...)
 	buf = l.Classes.Append(buf)
 	return buf
+}
+
+// SeqContext3 is used for GSUB type 5 format 3 subtables and GPOS type 7 format 3 subtables.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-3-coverage-based-glyph-contexts
+type SeqContext3 struct {
+	Cov     []coverage.Table
+	Actions Nested
+}
+
+func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(4)
+	if err != nil {
+		return nil, err
+	}
+	glyphCount := int(buf[0])<<8 | int(buf[1])
+	seqLookupCount := int(buf[2])<<8 | int(buf[3])
+	coverageOffsets := make([]uint16, glyphCount)
+	for i := range coverageOffsets {
+		coverageOffsets[i], err = p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	actions := make(Nested, seqLookupCount)
+	for k := range actions {
+		buf, err := p.ReadBytes(4)
+		if err != nil {
+			return nil, err
+		}
+		actions[k].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
+		actions[k].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+	}
+
+	cov := make([]coverage.Table, glyphCount)
+	for i, offset := range coverageOffsets {
+		cov[i], err = coverage.ReadTable(p, subtablePos+int64(offset))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	res := &SeqContext3{
+		Cov:     cov,
+		Actions: actions,
+	}
+	return res, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	extra := len(l.Cov) - 1
+	for _, cov := range l.Cov {
+		if i+extra >= len(seq) || !cov.Contains(seq[i].Gid) {
+			return seq, -1, nil
+		}
+		for i < len(seq) && !keep(seq[i].Gid) {
+			i++
+		}
+		extra--
+	}
+
+	return seq, -1, nil
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *SeqContext3) EncodeLen() int {
+	total := 6 + 2*len(l.Cov) + 4*len(l.Actions)
+	for _, cov := range l.Cov {
+		total += cov.EncodeLen()
+	}
+	return total
+}
+
+// Encode implements the Subtable interface.
+func (l *SeqContext3) Encode() []byte {
+	glyphCount := len(l.Cov)
+	seqLookupCount := len(l.Actions)
+
+	total := 6 + 2*len(l.Cov) + 4*len(l.Actions)
+	coverageOffsets := make([]uint16, glyphCount)
+	for i, cov := range l.Cov {
+		coverageOffsets[i] = uint16(total)
+		total += cov.EncodeLen()
+	}
+
+	buf := make([]byte, 0, total)
+	buf = append(buf,
+		0, 3, // format
+		byte(glyphCount>>8), byte(glyphCount),
+		byte(seqLookupCount>>8), byte(seqLookupCount),
+	)
+	for _, offset := range coverageOffsets {
+		buf = append(buf, byte(offset>>8), byte(offset))
+	}
+	for _, action := range l.Actions {
+		buf = append(buf,
+			byte(action.SequenceIndex>>8), byte(action.SequenceIndex),
+			byte(action.LookupListIndex>>8), byte(action.LookupListIndex),
+		)
+	}
+	for i, cov := range l.Cov {
+		if len(buf) != int(coverageOffsets[i]) {
+			panic("internal error") // TODO(voss): remove
+		}
+		buf = append(buf, cov.Encode()...)
+	}
+	return buf
+}
+
+// old code follows ...
+
+// A Chained Contexts Substitution subtable describes glyph substitutions in
+// context with an ability to look back and/or look ahead in the sequence of
+// glyphs.  It can replace one or more glyphs within a certain pattern of
+// glyphs, using nested lookups.
+
+// Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chseqctxt3
+type chainedSeq3 struct {
+	backtrack []coverage.Table
+	input     []coverage.Table
+	lookahead []coverage.Table
+	actions   []seqLookupRecord
+}
+
+type seqLookupRecord struct {
+	sequenceIndex   uint16
+	lookupListIndex uint16
+}
+
+func readChained3(p *parser.Parser, subtablePos int64) (*chainedSeq3, error) {
+	backtrackGlyphCount, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	backtrackCoverageOffsets := make([]uint16, backtrackGlyphCount)
+	for i := 0; i < int(backtrackGlyphCount); i++ {
+		backtrackCoverageOffsets[i], err = p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	inputGlyphCount, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	inputCoverageOffsets := make([]uint16, inputGlyphCount)
+	for i := 0; i < int(inputGlyphCount); i++ {
+		inputCoverageOffsets[i], err = p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	lookaheadGlyphCount, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	lookaheadCoverageOffsets := make([]uint16, lookaheadGlyphCount)
+	for i := 0; i < int(lookaheadGlyphCount); i++ {
+		lookaheadCoverageOffsets[i], err = p.ReadUInt16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	seqLookupCount, err := p.ReadUInt16()
+	if err != nil {
+		return nil, err
+	}
+	actions := make([]seqLookupRecord, seqLookupCount)
+	for i := 0; i < int(seqLookupCount); i++ {
+		buf, err := p.ReadBytes(4)
+		if err != nil {
+			return nil, err
+		}
+		actions[i].sequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
+		actions[i].lookupListIndex = uint16(buf[2])<<8 | uint16(buf[3])
+	}
+
+	res := &chainedSeq3{
+		actions: actions,
+	}
+
+	for _, offs := range backtrackCoverageOffsets {
+		cover, err := coverage.ReadTable(p, subtablePos+int64(offs))
+		if err != nil {
+			return nil, err
+		}
+		res.backtrack = append(res.backtrack, cover)
+	}
+	for _, offs := range inputCoverageOffsets {
+		cover, err := coverage.ReadTable(p, subtablePos+int64(offs))
+		if err != nil {
+			return nil, err
+		}
+		res.input = append(res.input, cover)
+	}
+	for _, offs := range lookaheadCoverageOffsets {
+		cover, err := coverage.ReadTable(p, subtablePos+int64(offs))
+		if err != nil {
+			return nil, err
+		}
+		res.lookahead = append(res.lookahead, cover)
+	}
+	return res, nil
 }

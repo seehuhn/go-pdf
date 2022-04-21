@@ -21,7 +21,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -57,7 +58,8 @@ func TestRoundTrip(t *testing.T) {
 	in := &Font{
 		FontInfo: meta,
 		Outlines: &Outlines{
-			Private: private,
+			Private:  private,
+			FdSelect: func(gi font.GlyphID) int { return 0 },
 		},
 	}
 
@@ -102,13 +104,18 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, difference := range deep.Equal(in, out) {
-		t.Error(difference)
-	}
+	opt := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
+		for gid := 0; gid < len(in.Glyphs); gid++ {
+			if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+				return false
+			}
+		}
+		return true
+	})
 
-	// if !reflect.DeepEqual(in, out) {
-	// 	t.Errorf("Info: %v != %v", in.Info, out.Info)
-	// }
+	if diff := cmp.Diff(in, out, opt); diff != "" {
+		t.Errorf("different (-old +new):\n%s", diff)
+	}
 }
 
 func TestFindEdges(t *testing.T) {
@@ -119,7 +126,8 @@ func TestFindEdges(t *testing.T) {
 	in := &Font{
 		FontInfo: meta,
 		Outlines: &Outlines{
-			Private: []*type1.PrivateDict{{}},
+			Private:  []*type1.PrivateDict{{}},
+			FdSelect: func(gi font.GlyphID) int { return 0 },
 		},
 	}
 
@@ -255,14 +263,18 @@ func TestFindEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, err := range deep.Equal(in, out) {
-		t.Error(err)
+
+	opt := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
+		for gid := 0; gid < len(in.Glyphs); gid++ {
+			if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+				return false
+			}
+		}
+		return true
+	})
+	if diff := cmp.Diff(in, out, opt); diff != "" {
+		t.Errorf("different (-old +new):\n%s", diff)
 	}
-	// if !reflect.DeepEqual(in, out) {
-	// 	fmt.Println(in)
-	// 	fmt.Println(out)
-	// 	t.Error("different")
-	// }
 }
 
 func TestType2EncodeNumber(t *testing.T) {

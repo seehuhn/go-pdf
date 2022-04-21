@@ -23,9 +23,9 @@ import (
 
 func FuzzFormat12(f *testing.F) {
 	f.Add(format12{
-		{startCharCode: 10, endCharCode: 20, startGlyphID: 30},
-		{startCharCode: 1000, endCharCode: 2000, startGlyphID: 41},
-		{startCharCode: 2000, endCharCode: 3000, startGlyphID: 1},
+		{StartCharCode: 10, EndCharCode: 20, StartGlyphID: 30},
+		{StartCharCode: 1000, EndCharCode: 2000, StartGlyphID: 41},
+		{StartCharCode: 2000, EndCharCode: 3000, StartGlyphID: 1},
 	}.Encode(0))
 
 	f.Fuzz(func(t *testing.T, data []byte) {

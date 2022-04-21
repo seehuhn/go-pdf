@@ -19,7 +19,7 @@ package name
 import (
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -78,8 +78,8 @@ func FuzzNames(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		for _, diff := range deep.Equal(n1, n2) {
-			t.Error(diff)
+		if diff := cmp.Diff(n1, n2); diff != "" {
+			t.Errorf("different (-old +new):\n%s", diff)
 		}
 	})
 }

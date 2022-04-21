@@ -18,13 +18,12 @@ package glyf
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/image/font/gofont/goregular"
 	"seehuhn.de/go/pdf/font/sfnt/table"
 )
@@ -102,19 +101,8 @@ func FuzzGlyf(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		different := false
-		for _, diff := range deep.Equal(info, info2) {
-			fmt.Println(diff)
-			different = true
-		}
-		if different {
-			fmt.Println("A.g", enc.GlyfData)
-			fmt.Println("A.l", enc.LocaData)
-			fmt.Println("B.g", enc2.GlyfData)
-			fmt.Println("B.l", enc2.LocaData)
-			fmt.Println(info)
-			fmt.Println(info2)
-			t.Error("not equal")
+		if diff := cmp.Diff(info, info2); diff != "" {
+			t.Errorf("different (-old +new):\n%s", diff)
 		}
 	})
 }

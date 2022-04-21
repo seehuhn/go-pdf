@@ -18,10 +18,10 @@ package gtab
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/locale"
 )
@@ -97,7 +97,7 @@ func FuzzGtab(f *testing.F) {
 	info.LookupList = LookupList{
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 1},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{0},
 				dummySubTable{1},
 				dummySubTable{2},
@@ -105,20 +105,20 @@ func FuzzGtab(f *testing.F) {
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: LookupUseMarkFilteringSet, MarkFilteringSet: 7},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},
 			},
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 3},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{7, 8, 9},
 			},
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 1},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{0},
 				dummySubTable{1},
 				dummySubTable{2},
@@ -126,20 +126,20 @@ func FuzzGtab(f *testing.F) {
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: LookupUseMarkFilteringSet, MarkFilteringSet: 7},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},
 			},
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 3},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{7, 8, 9},
 			},
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 1},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{0},
 				dummySubTable{1},
 				dummySubTable{2},
@@ -147,20 +147,20 @@ func FuzzGtab(f *testing.F) {
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 2, LookupFlag: LookupUseMarkFilteringSet, MarkFilteringSet: 7},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},
 			},
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 3},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{7, 8, 9},
 			},
 		},
 		&LookupTable{
 			Meta: &LookupMetaInfo{LookupType: 5},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{10, 11, 12, 13, 14},
 			},
 		},
@@ -220,9 +220,7 @@ func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(l1, l2) {
-		fmt.Println(l1)
-		fmt.Println(l2)
-		t.Error("different")
+	if diff := cmp.Diff(l1, l2); diff != "" {
+		t.Errorf("different (-old +new):\n%s", diff)
 	}
 }

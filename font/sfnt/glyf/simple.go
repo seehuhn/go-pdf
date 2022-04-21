@@ -24,7 +24,7 @@ import (
 // SimpleGlyph is a simple glyph.
 type SimpleGlyph struct {
 	NumContours int16
-	tail        []byte
+	Tail        []byte
 }
 
 // A Point is a point in a glyph outline
@@ -44,7 +44,7 @@ type GlyphInfo struct {
 
 // Decode returns the contours of a glyph.
 func (glyph *SimpleGlyph) Decode() (*GlyphInfo, error) {
-	buf := glyph.tail
+	buf := glyph.Tail
 
 	numContours := int(glyph.NumContours)
 	if len(buf) < 2*numContours+2 {
@@ -166,7 +166,7 @@ func (glyph *SimpleGlyph) Decode() (*GlyphInfo, error) {
 }
 
 func (glyph *SimpleGlyph) removePadding() error {
-	buf := glyph.tail
+	buf := glyph.Tail
 
 	numContours := int(glyph.NumContours)
 	if len(buf) < 2*numContours+2 {
@@ -223,7 +223,7 @@ func (glyph *SimpleGlyph) removePadding() error {
 		return errInvalidGlyphData
 	}
 
-	glyph.tail = buf[:pos]
+	glyph.Tail = buf[:pos]
 
 	return nil
 }

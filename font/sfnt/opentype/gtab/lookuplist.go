@@ -56,7 +56,7 @@ type LookupList []*LookupTable
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
 type LookupTable struct {
 	Meta      *LookupMetaInfo
-	Subtables []Subtable
+	Subtables Subtables
 }
 
 // EncodeLen returns the number of bytes required to encode the LookupTable.
@@ -83,6 +83,18 @@ type Subtable interface {
 	EncodeLen() int
 
 	Encode() []byte
+}
+
+type Subtables []Subtable
+
+func (ss Subtables) Apply(keep KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int, Nested) {
+	for _, subtable := range ss {
+		newSeq, newPos, nested := subtable.Apply(keep, seq, pos)
+		if newPos >= 0 {
+			return newSeq, newPos, nested
+		}
+	}
+	return seq, -1, nil
 }
 
 // subtableReader is a function that can decode a subtable.
@@ -146,7 +158,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 			MarkFilteringSet: markFilteringSet,
 		}
 
-		subTables := make([]Subtable, subTableCount)
+		subTables := make(Subtables, subTableCount)
 		for j, subtableOffset := range subtableOffsets {
 			subtable, err := sr(p, lookupTablePos+int64(subtableOffset), meta)
 			if err != nil {

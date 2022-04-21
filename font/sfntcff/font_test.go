@@ -23,8 +23,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
 )
 
 func TestPostscriptName(t *testing.T) {
@@ -114,13 +115,13 @@ func FuzzFont(f *testing.F) {
 	fd.Close()
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		font, err := Read(bytes.NewReader(data))
+		font1, err := Read(bytes.NewReader(data))
 		if err != nil {
 			return
 		}
 
 		buf := &bytes.Buffer{}
-		_, err = font.Write(buf)
+		_, err = font1.Write(buf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,12 +131,16 @@ func FuzzFont(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		// if !reflect.DeepEqual(font, font2) {
-		// 	t.Errorf("different")
-		// }
-
-		for _, diff := range deep.Equal(font, font2) {
-			t.Error(diff)
+		opt := cmp.Comparer(func(fn1, fn2 cff.FdSelectFn) bool {
+			for gid := 0; gid < font1.NumGlyphs(); gid++ {
+				if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+					return false
+				}
+			}
+			return true
+		})
+		if diff := cmp.Diff(font1, font2, opt); diff != "" {
+			t.Errorf("different (-old +new):\n%s", diff)
 		}
 	})
 }

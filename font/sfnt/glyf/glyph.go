@@ -56,7 +56,7 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 	if numCont >= 0 {
 		simple := SimpleGlyph{
 			NumContours: numCont,
-			tail:        data[10:],
+			Tail:        data[10:],
 		}
 		err := simple.removePadding()
 		if err != nil {
@@ -153,7 +153,7 @@ func (g *Glyph) encodeLen() int {
 	total := 10
 	switch d := g.Data.(type) {
 	case SimpleGlyph:
-		total += len(d.tail)
+		total += len(d.Tail)
 	case CompositeGlyph:
 		for _, comp := range d.Components {
 			total += 4 + len(comp.Args)
@@ -199,7 +199,7 @@ func (g *Glyph) append(buf []byte) []byte {
 
 	switch d := g.Data.(type) {
 	case SimpleGlyph:
-		buf = append(buf, d.tail...)
+		buf = append(buf, d.Tail...)
 	case CompositeGlyph:
 		for _, comp := range d.Components {
 			buf = append(buf,

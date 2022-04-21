@@ -24,6 +24,29 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
+// A Contextual Substitution subtable describes glyph substitutions in context
+// that replace one or more glyphs within a certain pattern of glyphs,
+// using nested lookups.
+//
+// GSUB 5.1 - Context Substitution Format 1: Simple Glyph Contexts
+//     Sequence Context Format 1: simple glyph contexts
+// GSUB 5.2 - Context Substitution Format 2: Class-based Glyph Contexts
+//     Sequence Context Format 2: class-based glyph contexts
+// GSUB 5.3 - Context Substitution Format 3: Coverage-based Glyph Contexts
+//     Sequence Context Format 3: coverage-based glyph contexts
+
+// A Chained Contexts Substitution subtable describes glyph substitutions in
+// context with an ability to look back and/or look ahead in the sequence of
+// glyphs.  It can replace one or more glyphs within a certain pattern of
+// glyphs, using nested lookups.
+//
+// GSUB 6.1 - Chained Contexts Substitution Format 1: Simple Glyph Contexts
+//     Chained Sequence Context Format 1: simple glyph contexts
+// GSUB 6.2 - Chained Contexts Substitution Format 2: Class-based Glyph Contexts
+//     Chained Sequence Context Format 2: class-based glyph contexts
+// GSUB 6.3 - Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
+//     Chained Sequence Context Format 3: coverage-based glyph contexts
+
 // readGsubSubtable reads a GSUB subtable.
 // This function can be used as the SubtableReader argument to Read().
 func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
@@ -52,6 +75,8 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readSeqContext1(p, pos)
 	case 5_2:
 		return readSeqContext2(p, pos)
+	case 5_3:
+		return readSeqContext3(p, pos)
 	default:
 		fmt.Println("GSUB", meta.LookupType, format)
 		return notImplementedGsubSubtable{meta.LookupType, format}, nil
@@ -634,26 +659,3 @@ func (l *Gsub4_1) Encode() []byte {
 
 	return buf
 }
-
-// A Contextual Substitution subtable describes glyph substitutions in context
-// that replace one or more glyphs within a certain pattern of glyphs,
-// using nested lookups.
-//
-// GSUB 5.1 - Context Substitution Format 1: Simple Glyph Contexts
-//     Sequence Context Format 1: simple glyph contexts
-// GSUB 5.2 - Context Substitution Format 2: Class-based Glyph Contexts
-//     Sequence Context Format 2: class-based glyph contexts
-// GSUB 5.3 - Context Substitution Format 3: Coverage-based Glyph Contexts
-//     Sequence Context Format 3: coverage-based glyph contexts
-
-// A Chained Contexts Substitution subtable describes glyph substitutions in
-// context with an ability to look back and/or look ahead in the sequence of
-// glyphs.  It can replace one or more glyphs within a certain pattern of
-// glyphs, using nested lookups.
-//
-// GSUB 6.1 - Chained Contexts Substitution Format 1: Simple Glyph Contexts
-//     Chained Sequence Context Format 1: simple glyph contexts
-// GSUB 6.2 - Chained Contexts Substitution Format 2: Class-based Glyph Contexts
-//     Chained Sequence Context Format 2: class-based glyph contexts
-// GSUB 6.3 - Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
-//     Chained Sequence Context Format 3: coverage-based glyph contexts

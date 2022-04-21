@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
@@ -71,8 +71,8 @@ func FuzzEncoding(f *testing.F) {
 			}
 		}
 
-		for _, err := range deep.Equal(enc1, enc2) {
-			t.Error(err)
+		if diff := cmp.Diff(enc1, enc2); diff != "" {
+			t.Errorf("different (-old +new):\n%s", diff)
 		}
 	})
 }

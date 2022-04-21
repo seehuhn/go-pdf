@@ -61,7 +61,7 @@ func FuzzLookupList(f *testing.F) {
 	l := LookupList{
 		&LookupTable{
 			Meta: &LookupMetaInfo{},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{},
 			},
 		},
@@ -74,7 +74,7 @@ func FuzzLookupList(f *testing.F) {
 				LookupType: 4,
 				LookupFlag: LookupUseMarkFilteringSet,
 			},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{1, 2, 3, 4},
 			},
 		},
@@ -86,7 +86,7 @@ func FuzzLookupList(f *testing.F) {
 			Meta: &LookupMetaInfo{
 				LookupType: 1,
 			},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{0},
 				dummySubTable{1},
 				dummySubTable{2},
@@ -98,7 +98,7 @@ func FuzzLookupList(f *testing.F) {
 				LookupFlag:       LookupUseMarkFilteringSet,
 				MarkFilteringSet: 7,
 			},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{3, 4},
 				dummySubTable{5, 6},
 			},
@@ -107,7 +107,7 @@ func FuzzLookupList(f *testing.F) {
 			Meta: &LookupMetaInfo{
 				LookupType: 3,
 			},
-			Subtables: []Subtable{
+			Subtables: Subtables{
 				dummySubTable{7, 8, 9},
 			},
 		},
