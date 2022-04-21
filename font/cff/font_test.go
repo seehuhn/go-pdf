@@ -19,6 +19,7 @@ package cff
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -44,7 +45,7 @@ func FuzzFont(f *testing.F) {
 			return
 		}
 
-		opt := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
+		cmpFdSelectFn := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
 			for gid := 0; gid < len(cff1.Glyphs); gid++ {
 				if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
 					return false
@@ -52,8 +53,10 @@ func FuzzFont(f *testing.F) {
 			}
 			return true
 		})
-
-		if diff := cmp.Diff(cff1, cff2, opt); diff != "" {
+		cmpFloat := cmp.Comparer(func(x, y float64) bool {
+			return math.Abs(x-y) < 5e-7
+		})
+		if diff := cmp.Diff(cff1, cff2, cmpFdSelectFn, cmpFloat); diff != "" {
 			t.Errorf("different (-old +new):\n%s", diff)
 		}
 	})

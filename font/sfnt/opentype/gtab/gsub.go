@@ -180,12 +180,10 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		return nil, err
 	}
 
-	if len(cov) != len(substituteGlyphIDs) {
-		// TODO(voss): is this right?
-		return nil, &font.InvalidFontError{
-			SubSystem: "sfnt/gtab",
-			Reason:    "malformed format 1.2 GSUB subtable",
-		}
+	if len(cov) > len(substituteGlyphIDs) {
+		cov.Prune(len(substituteGlyphIDs))
+	} else {
+		substituteGlyphIDs = substituteGlyphIDs[:len(cov)]
 	}
 
 	res := &Gsub1_2{
@@ -246,8 +244,19 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if err != nil {
 		return nil, err
 	}
-	sequenceCount := len(sequenceOffsets)
 
+	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cov) > len(sequenceOffsets) {
+		cov.Prune(len(sequenceOffsets))
+	} else {
+		sequenceOffsets = sequenceOffsets[:len(cov)]
+	}
+
+	sequenceCount := len(sequenceOffsets)
 	repl := make([][]font.GlyphID, sequenceCount)
 	for i := 0; i < sequenceCount; i++ {
 		err := p.SeekPos(subtablePos + int64(sequenceOffsets[i]))
@@ -257,19 +266,6 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		repl[i], err = p.ReadGIDSlice()
 		if err != nil {
 			return nil, err
-		}
-	}
-
-	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(cov) != sequenceCount {
-		// TODO(voss): is this right?
-		return nil, &font.InvalidFontError{
-			SubSystem: "sfnt/gtab",
-			Reason:    "malformed format 2.1 GSUB subtable",
 		}
 	}
 
@@ -369,8 +365,19 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if err != nil {
 		return nil, err
 	}
-	alternateSetCount := len(alternateSetOffsets)
 
+	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cov) > len(alternateSetOffsets) {
+		cov.Prune(len(alternateSetOffsets))
+	} else {
+		alternateSetOffsets = alternateSetOffsets[:len(cov)]
+	}
+
+	alternateSetCount := len(alternateSetOffsets)
 	alt := make([][]font.GlyphID, alternateSetCount)
 	for i := 0; i < alternateSetCount; i++ {
 		err := p.SeekPos(subtablePos + int64(alternateSetOffsets[i]))
@@ -388,19 +395,6 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				return nil, err
 			}
 			alt[i][j] = font.GlyphID(gid)
-		}
-	}
-
-	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(cov) != alternateSetCount {
-		// TODO(voss): is this right?
-		return nil, &font.InvalidFontError{
-			SubSystem: "sfnt/gtab",
-			Reason:    "malformed format 3.1 GSUB subtable",
 		}
 	}
 
@@ -495,6 +489,17 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		return nil, err
 	}
 
+	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cov) > len(ligatureSetOffsets) {
+		cov.Prune(len(ligatureSetOffsets))
+	} else {
+		ligatureSetOffsets = ligatureSetOffsets[:len(cov)]
+	}
+
 	repl := make([][]Ligature, len(ligatureSetOffsets))
 	for i, ligatureSetOffset := range ligatureSetOffsets {
 		ligatureSetPos := subtablePos + int64(ligatureSetOffset)
@@ -532,19 +537,6 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 			repl[i][j].In = componentGlyphIDs
 			repl[i][j].Out = font.GlyphID(ligatureGlyph)
-		}
-	}
-
-	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(cov) != len(repl) {
-		// TODO(voss): is this right?
-		return nil, &font.InvalidFontError{
-			SubSystem: "sfnt/gsub",
-			Reason:    "malformed format 4.1 GSUB subtable",
 		}
 	}
 

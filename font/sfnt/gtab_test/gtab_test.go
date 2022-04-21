@@ -43,7 +43,7 @@ func TestGtab(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		p, err := gtab.Read(tt.Header, tt.Fd, locale.EnGB)
+		p, err := gtab.OldRead(tt.Header, tt.Fd, locale.EnGB)
 		if err != nil {
 			t.Error(err)
 		}

@@ -46,10 +46,10 @@ type GTab struct {
 
 type stReaderFn func(s *parser.State, format uint16, subtablePos int64) (LookupSubtable, error)
 
-// Read wraps a parser with a helper to read GSUB and GPOS tables. The loc
+// OldRead wraps a parser with a helper to read GSUB and GPOS tables. The loc
 // argument determines the writing script and language.
 // If loc is nil, the default script and language of the font are used.
-func Read(toc *table.Header, r io.ReaderAt, loc *locale.Locale) (*GTab, error) {
+func OldRead(toc *table.Header, r io.ReaderAt, loc *locale.Locale) (*GTab, error) {
 	g := &GTab{
 		r:        r,
 		toc:      toc,

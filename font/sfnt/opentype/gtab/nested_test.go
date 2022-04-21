@@ -114,14 +114,14 @@ func FuzzSeqContext2(f *testing.F) {
 func FuzzSeqContext3(f *testing.F) {
 	sub := &SeqContext3{}
 	f.Add(sub.Encode())
-	sub.Cov = append(sub.Cov, coverage.Table{3: 0, 4: 1})
+	sub.Covv = append(sub.Covv, coverage.Table{3: 0, 4: 1})
 	sub.Actions = []SeqLookup{
 		{SequenceIndex: 0, LookupListIndex: 1},
 		{SequenceIndex: 1, LookupListIndex: 5},
 		{SequenceIndex: 0, LookupListIndex: 4},
 	}
 	f.Add(sub.Encode())
-	sub.Cov = append(sub.Cov, coverage.Table{1: 0, 3: 1, 5: 2})
+	sub.Covv = append(sub.Covv, coverage.Table{1: 0, 3: 1, 5: 2})
 	f.Add(sub.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {

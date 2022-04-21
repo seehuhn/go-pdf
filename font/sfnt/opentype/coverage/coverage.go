@@ -111,6 +111,19 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 	return table, nil
 }
 
+// Prune removes all glyphs from the table that have coverage index >= size.
+func (table Table) Prune(size int) {
+	var gg []font.GlyphID
+	for gid, class := range table {
+		if class >= size {
+			gg = append(gg, gid)
+		}
+	}
+	for _, gid := range gg {
+		delete(table, font.GlyphID(gid))
+	}
+}
+
 func (table Table) encInfo() ([]font.GlyphID, int, int) {
 	rev := make([]font.GlyphID, len(table))
 	for gid, i := range table {

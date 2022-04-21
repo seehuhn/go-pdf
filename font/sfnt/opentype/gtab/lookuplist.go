@@ -85,8 +85,12 @@ type Subtable interface {
 	Encode() []byte
 }
 
+// Subtables is a slice of Subtable.
 type Subtables []Subtable
 
+// Apply tries the subtables one by one and applies the first one that
+// matches.  If no subtable matches, the unchanged glyphs and a negative
+// position are returned.
 func (ss Subtables) Apply(keep KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int, Nested) {
 	for _, subtable := range ss {
 		newSeq, newPos, nested := subtable.Apply(keep, seq, pos)

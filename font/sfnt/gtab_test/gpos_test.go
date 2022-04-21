@@ -31,7 +31,7 @@ func TestGpos(t *testing.T) {
 	}
 	defer tt.Close()
 
-	pars, err := gtab.Read(tt.Header, tt.Fd, locale.EnGB)
+	pars, err := gtab.OldRead(tt.Header, tt.Fd, locale.EnGB)
 	if err != nil {
 		t.Fatal(err)
 	}
