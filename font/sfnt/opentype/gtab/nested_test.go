@@ -113,7 +113,7 @@ func TestSeqContext2(t *testing.T) {
 func TestSeqContext3(t *testing.T) {
 	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext3{
-		Covv: []coverage.Table{
+		InputCov: []coverage.Table{
 			{1: 0, 3: 1, 4: 2},
 			{2: 0, 4: 1, 5: 2},
 			{3: 0, 5: 1},
@@ -280,14 +280,14 @@ func FuzzSeqContext2(f *testing.F) {
 func FuzzSeqContext3(f *testing.F) {
 	sub := &SeqContext3{}
 	f.Add(sub.Encode())
-	sub.Covv = append(sub.Covv, coverage.Table{3: 0, 4: 1})
+	sub.InputCov = append(sub.InputCov, coverage.Table{3: 0, 4: 1})
 	sub.Actions = []SeqLookup{
 		{SequenceIndex: 0, LookupListIndex: 1},
 		{SequenceIndex: 1, LookupListIndex: 5},
 		{SequenceIndex: 0, LookupListIndex: 4},
 	}
 	f.Add(sub.Encode())
-	sub.Covv = append(sub.Covv, coverage.Table{1: 0, 3: 1, 5: 2})
+	sub.InputCov = append(sub.InputCov, coverage.Table{1: 0, 3: 1, 5: 2})
 	f.Add(sub.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -344,5 +344,84 @@ func FuzzChainedSeqContext1(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 2, 1, readChainedSeqContext1, data)
+	})
+}
+
+func FuzzChainedSeqContext2(f *testing.F) {
+	sub := &ChainedSeqContext2{}
+	f.Add(sub.Encode())
+	sub.Cov = coverage.Table{1: 0, 3: 1}
+	sub.Backtrack = classdef.Table{2: 1, 3: 1, 4: 2}
+	sub.Input = classdef.Table{3: 1, 4: 2}
+	sub.Lookahead = classdef.Table{3: 1, 4: 2, 5: 2}
+	sub.Rules = [][]*ChainedClassSeqRule{
+		{
+			{
+				Backtrack: []uint16{},
+				Input:     []uint16{1},
+				Lookahead: []uint16{2, 3},
+				Actions: []SeqLookup{
+					{SequenceIndex: 0, LookupListIndex: 1},
+					{SequenceIndex: 0, LookupListIndex: 2},
+				},
+			},
+			{
+				Backtrack: []uint16{4, 5, 6},
+				Input:     []uint16{7, 8},
+				Lookahead: []uint16{9},
+				Actions: []SeqLookup{
+					{SequenceIndex: 1, LookupListIndex: 0},
+				},
+			},
+			{
+				Backtrack: []uint16{10, 11},
+				Input:     []uint16{12},
+				Lookahead: []uint16{},
+				Actions: []SeqLookup{
+					{SequenceIndex: 0, LookupListIndex: 1000},
+				},
+			},
+		},
+		{
+			{
+				Backtrack: []uint16{},
+				Input:     []uint16{13},
+				Lookahead: []uint16{},
+				Actions: []SeqLookup{
+					{SequenceIndex: 0, LookupListIndex: 1},
+					{SequenceIndex: 0, LookupListIndex: 2},
+					{SequenceIndex: 0, LookupListIndex: 3},
+				},
+			},
+		},
+	}
+	f.Add(sub.Encode())
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 2, 2, readChainedSeqContext2, data)
+	})
+}
+
+func FuzzChainedSeqContext3(f *testing.F) {
+	sub := &ChainedSeqContext3{}
+	f.Add(sub.Encode())
+	sub.BacktrackCov = []coverage.Table{
+		{1: 0, 3: 1},
+	}
+	sub.InputCov = []coverage.Table{
+		{2: 0, 3: 1},
+		{3: 0, 4: 1},
+	}
+	sub.LookaheadCov = []coverage.Table{
+		{4: 0, 5: 1, 6: 2},
+	}
+	sub.Actions = []SeqLookup{
+		{SequenceIndex: 0, LookupListIndex: 1},
+		{SequenceIndex: 0, LookupListIndex: 2},
+	}
+	f.Add(sub.Encode())
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 2, 3, readChainedSeqContext3, data)
 	})
 }

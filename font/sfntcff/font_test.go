@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/image/font/gofont/gobolditalic"
+	"golang.org/x/image/font/gofont/goregular"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 )
@@ -89,30 +91,8 @@ func DisabledTestMany(t *testing.T) { // TODO(voss)
 }
 
 func FuzzFont(f *testing.F) {
-	fd, err := os.Open("/Users/voss/project/pdflib/demo/try-all-fonts/all-fonts")
-	if err != nil {
-		f.Fatal(err)
-	}
-
-	scanner := bufio.NewScanner(fd)
-	for scanner.Scan() {
-		fname := scanner.Text()
-		stat, err := os.Stat(fname)
-		if err != nil {
-			f.Error(err)
-			continue
-		}
-		if stat.Size() > 10000 {
-			continue
-		}
-		body, err := os.ReadFile(fname)
-		if err != nil {
-			f.Error(err)
-			continue
-		}
-		f.Add(body)
-	}
-	fd.Close()
+	f.Add(goregular.TTF)
+	f.Add(gobolditalic.TTF)
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		font1, err := Read(bytes.NewReader(data))

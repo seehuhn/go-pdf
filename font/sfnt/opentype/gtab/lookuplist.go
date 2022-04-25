@@ -116,6 +116,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 
 	res := make(LookupList, lookupCount)
 
+	numLookups := 0
 	numSubTables := 0
 
 	var subtableOffsets []uint16
@@ -132,11 +133,15 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 		lookupType := uint16(buf[0])<<8 | uint16(buf[1])
 		lookupFlag := LookupFlags(buf[2])<<8 | LookupFlags(buf[3])
 		subTableCount := uint16(buf[4])<<8 | uint16(buf[5])
+		numLookups++
 		numSubTables += int(subTableCount)
-		if numSubTables > 5000 {
+		if numLookups+numSubTables > 6000 {
+			// The condition ensures that we can always store the lookup
+			// data (using extension subtables if necessary), without
+			// exceeding the maximum offset size in the lookup list table.
 			return nil, &font.InvalidFontError{
 				SubSystem: "sfnt/opentype/gtab",
-				Reason:    "too many lookup subtables",
+				Reason:    "too many lookup (sub-)tables",
 			}
 		}
 		subtableOffsets = subtableOffsets[:0]
@@ -373,7 +378,7 @@ func (info LookupList) tryReorder(chunks []layoutChunk) []layoutChunk {
 		fmt.Println(i, lookupSize[li], replace[li], li == largestLookup)
 	}
 
-	panic("not implemented")
+	panic("not implemented") // TODO(voss): finish this
 }
 
 // Extension Substitution Subtable Format 1

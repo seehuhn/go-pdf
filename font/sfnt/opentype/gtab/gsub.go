@@ -79,10 +79,13 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readSeqContext3(p, pos)
 	case 6_1:
 		return readChainedSeqContext1(p, pos)
-	// case 6_2:
-	// case 6_3:
+	case 6_2:
+		return readChainedSeqContext2(p, pos)
+	case 6_3:
+		return readChainedSeqContext3(p, pos)
 	case 7_1:
 		return readExtensionSubtable(p, pos)
+
 	default:
 		fmt.Println("GSUB", meta.LookupType, format)
 		return notImplementedGsubSubtable{meta.LookupType, format}, nil
@@ -125,7 +128,7 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
 	deltaGlyphID := font.GlyphID(buf[2])<<8 | font.GlyphID(buf[3])
-	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	cov, err := coverage.Read(p, subtablePos+coverageOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +184,7 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		return nil, err
 	}
 
-	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	cov, err := coverage.Read(p, subtablePos+int64(coverageOffset))
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +254,7 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		return nil, err
 	}
 
-	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	cov, err := coverage.Read(p, subtablePos+int64(coverageOffset))
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +375,7 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		return nil, err
 	}
 
-	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	cov, err := coverage.Read(p, subtablePos+int64(coverageOffset))
 	if err != nil {
 		return nil, err
 	}
@@ -495,7 +498,7 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		return nil, err
 	}
 
-	cov, err := coverage.ReadTable(p, subtablePos+int64(coverageOffset))
+	cov, err := coverage.Read(p, subtablePos+int64(coverageOffset))
 	if err != nil {
 		return nil, err
 	}

@@ -73,7 +73,7 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 	table := &Table{}
 
 	if glyphClassDefOffset != 0 {
-		table.GlyphClass, err = classdef.ReadTable(p, int64(glyphClassDefOffset))
+		table.GlyphClass, err = classdef.Read(p, int64(glyphClassDefOffset))
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 	_ = ligCaretListOffset // TODO(voss): implement
 
 	if markAttachClassDefOffset != 0 {
-		table.MarkAttachClass, err = classdef.ReadTable(p, int64(markAttachClassDefOffset))
+		table.MarkAttachClass, err = classdef.Read(p, int64(markAttachClassDefOffset))
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,7 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 
 		table.MarkGlyphSets = make([]coverage.Table, markGlyphSetCount)
 		for i := range table.MarkGlyphSets {
-			table.MarkGlyphSets[i], err = coverage.ReadTable(p, pos+int64(coverageOffsets[i]))
+			table.MarkGlyphSets[i], err = coverage.Read(p, pos+int64(coverageOffsets[i]))
 			if err != nil {
 				return nil, err
 			}

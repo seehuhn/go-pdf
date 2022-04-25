@@ -40,12 +40,22 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 	switch 10*meta.LookupType + format {
 	case 1_1:
 		return readGpos1_1(p, pos)
+
 	case 7_1:
 		return readSeqContext1(p, pos)
 	case 7_2:
 		return readSeqContext2(p, pos)
 	case 7_3:
 		return readSeqContext3(p, pos)
+	case 8_1:
+		return readChainedSeqContext1(p, pos)
+	case 8_2:
+		return readChainedSeqContext2(p, pos)
+	case 8_3:
+		return readChainedSeqContext3(p, pos)
+	case 9_1:
+		return readExtensionSubtable(p, pos)
+
 	default:
 		fmt.Println("GPOS", meta.LookupType, format)
 		return notImplementedGposSubtable{meta.LookupType, format}, nil
@@ -92,7 +102,7 @@ func readGpos1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if err != nil {
 		return nil, err
 	}
-	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	cov, err := coverage.Read(p, subtablePos+coverageOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +168,7 @@ func readGpos1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			return nil, err
 		}
 	}
-	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	cov, err := coverage.Read(p, subtablePos+coverageOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +268,7 @@ func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		}
 	}
 
-	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	cov, err := coverage.Read(p, subtablePos+coverageOffset)
 	if err != nil {
 		return nil, err
 	}

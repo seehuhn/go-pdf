@@ -37,8 +37,8 @@ func (table Table) Contains(gid font.GlyphID) bool {
 	return ok
 }
 
-// ReadTable reads a coverage table from the given parser.
-func ReadTable(p *parser.Parser, pos int64) (Table, error) {
+// Read reads a coverage table from the given parser.
+func Read(p *parser.Parser, pos int64) (Table, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err

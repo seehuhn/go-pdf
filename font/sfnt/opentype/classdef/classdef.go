@@ -28,8 +28,8 @@ import (
 // Table contains the information from an OpenType "Class Definition Table".
 type Table map[font.GlyphID]uint16
 
-// ReadTable reads and decodes an OpenType "Class Definition Table".
-func ReadTable(p *parser.Parser, pos int64) (Table, error) {
+// Read reads and decodes an OpenType "Class Definition Table".
+func Read(p *parser.Parser, pos int64) (Table, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err

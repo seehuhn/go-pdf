@@ -32,14 +32,14 @@ func FuzzCoverageTable(f *testing.F) {
 	f.Add([]byte{0, 2, 0, 1, 1, 0, 1, 2, 0, 0})
 	f.Add([]byte{0, 2, 0, 2, 1, 0, 1, 2, 0, 0, 2, 0, 2, 5, 0, 3})
 	f.Fuzz(func(t *testing.T, data1 []byte) {
-		c1, err := ReadTable(parser.New("coverage table test", bytes.NewReader(data1)), 0)
+		c1, err := Read(parser.New("coverage table test", bytes.NewReader(data1)), 0)
 		if err != nil {
 			return
 		}
 
 		data2 := c1.Encode()
 
-		c2, err := ReadTable(parser.New("coverage table test", bytes.NewReader(data2)), 0)
+		c2, err := Read(parser.New("coverage table test", bytes.NewReader(data2)), 0)
 		if err != nil {
 			t.Fatal(err)
 		}
