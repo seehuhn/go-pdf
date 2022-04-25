@@ -23,11 +23,6 @@ import (
 )
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table
-
-type format0 struct {
-	glyphIDArray [256]uint8
-}
-
 func decodeFormat0(data []byte, code2rune func(c int) rune) (Subtable, error) {
 	if code2rune == nil {
 		code2rune = unicode

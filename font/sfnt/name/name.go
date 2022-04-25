@@ -20,7 +20,6 @@ package name
 
 import (
 	"fmt"
-	"net/url"
 	"sort"
 	"strings"
 	"unicode/utf16"
@@ -379,19 +378,6 @@ recLoop:
 	}
 
 	return res, nil
-}
-
-func parseAndNormalize(s string) *url.URL {
-	u1, err := url.Parse(s)
-	if err != nil {
-		return nil
-	}
-	s2 := u1.String()
-	u2, err := url.Parse(s2)
-	if err != nil {
-		panic(err)
-	}
-	return u2
 }
 
 // Encode converts a "name" table into its binary form.

@@ -151,9 +151,9 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		for _, gid := range includeGlyphs {
 			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
 			oldPIdx := outlines.FdSelect(gid)
-			newPIdx, ok := pIdxMap[oldPIdx]
+			_, ok := pIdxMap[oldPIdx]
 			if !ok {
-				newPIdx = len(o2.Private)
+				newPIdx := len(o2.Private)
 				pIdxMap[oldPIdx] = newPIdx
 				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
 			}

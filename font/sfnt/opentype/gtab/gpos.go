@@ -127,11 +127,103 @@ func (l *Gpos1_1) Encode() []byte {
 	total := coverageOffs + l.Cov.EncodeLen()
 	buf := make([]byte, 0, total)
 	buf = append(buf,
-		0, 1,
+		0, 1, // format
 		byte(coverageOffs>>8), byte(coverageOffs),
 		byte(format>>8), byte(format),
 	)
 	buf = append(buf, l.Adjust.encode(format)...)
+	buf = append(buf, l.Cov.Encode()...)
+	return buf
+}
+
+// Gpos1_2 is a Single Adjustment Positioning Subtable (GPOS type 1, format 2)
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#single-adjustment-positioning-format-2-array-of-positioning-values
+type Gpos1_2 struct {
+	Cov    coverage.Table
+	Adjust []*ValueRecord
+}
+
+func readGpos1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(6)
+	if err != nil {
+		return nil, err
+	}
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	valueFormat := uint16(buf[2])<<8 | uint16(buf[3])
+	valueCount := int(buf[4])<<8 | int(buf[5])
+	valueRecords := make([]*ValueRecord, valueCount)
+	for i := range valueRecords {
+		valueRecords[i], err = readValueRecord(p, valueFormat)
+		if err != nil {
+			return nil, err
+		}
+	}
+	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(valueRecords) > len(cov) {
+		valueRecords = valueRecords[:len(cov)]
+	} else if len(valueRecords) < len(cov) {
+		cov.Prune(len(valueRecords))
+	}
+
+	res := &Gpos1_2{
+		Cov:    cov,
+		Adjust: valueRecords,
+	}
+	return res, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gpos1_2) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	idx, ok := l.Cov[seq[i].Gid]
+	if !ok {
+		return seq, -1, nil
+	}
+	l.Adjust[idx].Apply(&seq[i])
+	return seq, i + 1, nil
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gpos1_2) EncodeLen() int {
+	var valueFormat uint16
+	for _, adj := range l.Adjust {
+		valueFormat |= adj.getFormat()
+	}
+	total := 8
+	if len(l.Adjust) > 0 {
+		total += l.Adjust[0].encodeLen(valueFormat) * len(l.Adjust)
+	}
+	total += l.Cov.EncodeLen()
+	return total
+}
+
+// Encode implements the Subtable interface.
+func (l *Gpos1_2) Encode() []byte {
+	var valueFormat uint16
+	for _, adj := range l.Adjust {
+		valueFormat |= adj.getFormat()
+	}
+	valueCount := len(l.Adjust)
+	total := 8
+	if len(l.Adjust) > 0 {
+		total += l.Adjust[0].encodeLen(valueFormat) * valueCount
+	}
+	coverageOffset := total
+	total += l.Cov.EncodeLen()
+
+	buf := make([]byte, 0, total)
+	buf = append(buf,
+		0, 2, // format
+		byte(coverageOffset>>8), byte(coverageOffset),
+		byte(valueFormat>>8), byte(valueFormat),
+		byte(valueCount>>8), byte(valueCount),
+	)
+	for _, adj := range l.Adjust {
+		buf = append(buf, adj.encode(valueFormat)...)
+	}
 	buf = append(buf, l.Cov.Encode()...)
 	return buf
 }

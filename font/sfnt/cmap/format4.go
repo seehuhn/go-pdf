@@ -143,9 +143,9 @@ func (cmap Format4) Encode(language uint16) []byte {
 	EndCode = append(EndCode, 0) // add the ReservedPad field here
 
 	buf := &bytes.Buffer{}
-	binary.Write(buf, binary.BigEndian, data)
+	_ = binary.Write(buf, binary.BigEndian, data)
 	for _, x := range [][]uint16{EndCode, StartCode, IDDelta, IDRangeOffsets, GlyphIDArray} {
-		binary.Write(buf, binary.BigEndian, x)
+		_ = binary.Write(buf, binary.BigEndian, x)
 	}
 
 	return buf.Bytes()

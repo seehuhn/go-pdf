@@ -35,3 +35,20 @@ func FuzzGpos1_1(f *testing.F) {
 		doFuzz(t, 1, 1, readGpos1_1, data)
 	})
 }
+
+func FuzzGpos1_2(f *testing.F) {
+	l := &Gpos1_2{}
+	f.Add(l.Encode())
+	l = &Gpos1_2{
+		Cov: map[font.GlyphID]int{8: 0, 9: 1},
+		Adjust: []*ValueRecord{
+			{XAdvance: 100},
+			{XAdvance: 50, XPlacement: -50},
+		},
+	}
+	f.Add(l.Encode())
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 1, 2, readGpos1_2, data)
+	})
+}

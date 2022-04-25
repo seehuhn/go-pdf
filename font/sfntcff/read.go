@@ -20,7 +20,6 @@ import (
 	"errors"
 	"io"
 	"math"
-	"regexp"
 	"strings"
 
 	"seehuhn.de/go/pdf/font"
@@ -188,9 +187,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		fontInfo = cffInfo.FontInfo
 		Outlines = cffInfo.Outlines
 
-		if numGlyphs == 0 {
-			numGlyphs = len(cffInfo.Glyphs)
-		} else if len(cffInfo.Glyphs) != numGlyphs {
+		if numGlyphs != 0 && len(cffInfo.Glyphs) != numGlyphs {
 			return nil, errors.New("sfnt: cff glyph count mismatch")
 		} else if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
 			for i, w := range hmtxInfo.Widths {
@@ -235,9 +232,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 			tables[name] = data
 		}
 
-		if numGlyphs == 0 {
-			numGlyphs = len(ttGlyphs)
-		} else if len(ttGlyphs) != numGlyphs {
+		if numGlyphs != 0 && len(ttGlyphs) != numGlyphs {
 			return nil, errors.New("sfnt: ttf glyph count mismatch")
 		}
 
@@ -437,8 +432,6 @@ func Read(r io.ReaderAt) (*Info, error) {
 	return info, nil
 }
 
-var nameTableVersionPat = regexp.MustCompile(`^Version (\d+\.?\d+)`)
-
 func getNameTableVersion(t *name.Table) (head.Version, bool) {
 	if t == nil {
 		return 0, false
@@ -449,8 +442,6 @@ func getNameTableVersion(t *name.Table) (head.Version, bool) {
 	}
 	return v, true
 }
-
-var cffVersionPat = regexp.MustCompile(`^(?:Version )?(\d+\.?\d+)`)
 
 func getCFFVersion(fontInfo *type1.FontInfo) (head.Version, bool) {
 	if fontInfo == nil || fontInfo.Version == "" {
