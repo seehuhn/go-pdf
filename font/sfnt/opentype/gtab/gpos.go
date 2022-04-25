@@ -25,7 +25,7 @@ import (
 )
 
 // readGposSubtable reads a GPOS subtable.
-// This function can be used as the SubtableReader argument to Read().
+// This function can be used as the SubtableReader argument to readLookupList().
 func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
@@ -235,6 +235,7 @@ type Gpos2_1 struct {
 	Adjust []map[font.GlyphID]*PairAdjust
 }
 
+// PairAdjust represents information from a PairValueRecord table.
 type PairAdjust struct {
 	First, Second *ValueRecord
 }

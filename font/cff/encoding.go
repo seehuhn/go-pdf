@@ -152,7 +152,8 @@ func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
 	for gid := font.GlyphID(1); gid <= maxGid; gid++ {
 		code, ok := codes[gid]
 		if !ok {
-			return nil, invalidSince("encoded glyphs not consecutive")
+			msg := fmt.Sprintf("glyph %d not in encoding", gid)
+			return nil, invalidSince(msg)
 		}
 		if int(gid-startGid) != int(code)-int(startCode) {
 			ss = append(ss, seg{startCode, uint8(gid - startGid - 1)})

@@ -43,7 +43,14 @@ func MakeSimpleFont() *sfntcff.Info {
 	var includeGid []font.GlyphID
 	cmap := cmap.Format4{}
 	encoding := make([]font.GlyphID, 256)
-	includeGid = append(includeGid, 0)
+
+	includeGid = append(includeGid, 0, 1, 2, 3)
+	cmap[0x000D] = font.GlyphID(2)
+	cmap[0x0020] = font.GlyphID(3)
+	encoding[0] = font.GlyphID(1)
+	encoding[0x000D] = font.GlyphID(2)
+	encoding[0x0020] = font.GlyphID(3)
+
 	var topMin, topMax funit.Int16
 	var bottomMin, bottomMax funit.Int16
 	for c := 'A'; c <= 'Z'; c++ {
@@ -72,11 +79,8 @@ func MakeSimpleFont() *sfntcff.Info {
 			bottomMax = bottom
 		}
 	}
-	encoding['<'] = 27
-	encoding['>'] = 28
-	encoding['='] = 29
 
-	oldOutlines := info.Outlines.(*sfntcff.GlyfOutlines)
+	origOutlines := info.Outlines.(*sfntcff.GlyfOutlines)
 	newOutlines := &cff.Outlines{
 		Private: []*type1.PrivateDict{
 			{
@@ -92,15 +96,24 @@ func MakeSimpleFont() *sfntcff.Info {
 	}
 
 	for _, gid := range includeGid {
-		gl := oldOutlines.Glyphs[gid]
-		g := gl.Data.(glyf.SimpleGlyph)
+		origGlyph := origOutlines.Glyphs[gid]
+		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.FGlyphWidth(gid))
+
+		var g glyf.SimpleGlyph
+		var ok bool
+		if origGlyph != nil {
+			g, ok = origGlyph.Data.(glyf.SimpleGlyph)
+		}
+		if !ok {
+			newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
+			continue
+		}
 		glyphInfo, err := g.Decode()
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
-		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.FGlyphWidth(gid))
 		for _, cc := range glyphInfo.Contours {
 			var extended glyf.Contour
 			var prev glyf.Point
@@ -170,6 +183,7 @@ func MakeSimpleFont() *sfntcff.Info {
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid-a, yMid-a)
 	cffGlyph.LineTo(xMid-a, yMid+a)
+	encoding['>'] = font.GlyphID(len(newOutlines.Glyphs))
 	cmap[uint16('>')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
@@ -177,6 +191,7 @@ func MakeSimpleFont() *sfntcff.Info {
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
+	encoding['<'] = font.GlyphID(len(newOutlines.Glyphs))
 	cmap[uint16('<')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
@@ -187,6 +202,7 @@ func MakeSimpleFont() *sfntcff.Info {
 	cffGlyph.LineTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
+	encoding['='] = font.GlyphID(len(newOutlines.Glyphs))
 	cmap[uint16('=')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
@@ -249,7 +265,7 @@ func MakeCompleteFont() *sfntcff.Info {
 		}
 	}
 
-	oldOutlines := info.Outlines.(*sfntcff.GlyfOutlines)
+	origOutlines := info.Outlines.(*sfntcff.GlyfOutlines)
 	newOutlines := &cff.Outlines{
 		Private: []*type1.PrivateDict{
 			{
@@ -263,14 +279,14 @@ func MakeCompleteFont() *sfntcff.Info {
 		},
 	}
 
-	for i, gl := range oldOutlines.Glyphs {
+	for i, origGlyph := range origOutlines.Glyphs {
 		gid := font.GlyphID(i)
 		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.FGlyphWidth(gid))
 
 		var g glyf.SimpleGlyph
 		var ok bool
-		if gl != nil {
-			g, ok = gl.Data.(glyf.SimpleGlyph)
+		if origGlyph != nil {
+			g, ok = origGlyph.Data.(glyf.SimpleGlyph)
 		}
 		if !ok {
 			newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)

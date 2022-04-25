@@ -48,7 +48,7 @@ import (
 //     Chained Sequence Context Format 3: coverage-based glyph contexts
 
 // readGsubSubtable reads a GSUB subtable.
-// This function can be used as the SubtableReader argument to Read().
+// This function can be used as the SubtableReader argument to readLookupList().
 func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
@@ -77,6 +77,12 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readSeqContext2(p, pos)
 	case 5_3:
 		return readSeqContext3(p, pos)
+	case 6_1:
+		return readChainedSeqContext1(p, pos)
+	// case 6_2:
+	// case 6_3:
+	case 7_1:
+		return readExtensionSubtable(p, pos)
 	default:
 		fmt.Println("GSUB", meta.LookupType, format)
 		return notImplementedGsubSubtable{meta.LookupType, format}, nil

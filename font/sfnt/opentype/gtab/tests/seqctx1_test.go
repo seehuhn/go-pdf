@@ -17,10 +17,10 @@
 package tests
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
@@ -55,10 +55,10 @@ func TestSequenceContext1(t *testing.T) {
 				Subtables: []gtab.Subtable{
 					&gtab.SeqContext1{
 						Cov: coverage.Table{1: 0},
-						Rules: [][]gtab.SequenceRule{
+						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									In: []font.GlyphID{3, 5},
+									Input: []font.GlyphID{3, 5},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 1},
 										{SequenceIndex: 1, LookupListIndex: 3},
@@ -154,10 +154,10 @@ func Test9735(t *testing.T) {
 				Subtables: []gtab.Subtable{
 					&gtab.SeqContext1{
 						Cov: coverage.Table{1: 0},
-						Rules: [][]gtab.SequenceRule{
+						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									In: []font.GlyphID{3, 5},
+									Input: []font.GlyphID{3, 5},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 1},
 										{SequenceIndex: 2, LookupListIndex: 2},
@@ -248,10 +248,10 @@ func Test9736(t *testing.T) {
 				Subtables: []gtab.Subtable{
 					&gtab.SeqContext1{
 						Cov: coverage.Table{gidF: 0},
-						Rules: [][]gtab.SequenceRule{
+						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									In: []font.GlyphID{gidI, gidF},
+									Input: []font.GlyphID{gidI, gidF},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 0, LookupListIndex: 1},
 										{SequenceIndex: 1, LookupListIndex: 2},
@@ -308,8 +308,11 @@ func Test9736(t *testing.T) {
 	}
 }
 
+// Test9737 tests a situation where HarfBuzz and MS Word disagree.
+// We side with Word here.
+// https://github.com/harfbuzz/harfbuzz/issues/3545
 func Test9737(t *testing.T) {
-	fontInfo := debug.MakeCompleteFont()
+	fontInfo := debug.MakeSimpleFont()
 	fontInfo.FamilyName = "Test9737"
 
 	gidA := fontInfo.CMap.Lookup('A')
@@ -330,27 +333,27 @@ func Test9737(t *testing.T) {
 				Subtables: []gtab.Subtable{
 					&gtab.SeqContext1{
 						Cov: coverage.Table{gidA: 0},
-						Rules: [][]gtab.SequenceRule{
+						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									In: []font.GlyphID{gidB},
+									Input: []font.GlyphID{gidB},
 									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 1},
-										{SequenceIndex: 0, LookupListIndex: 0},
+										{SequenceIndex: 0, LookupListIndex: 1}, // AB -> AAB
+										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
 									},
 								},
 								{
-									In: []font.GlyphID{gidA, gidB},
+									Input: []font.GlyphID{gidA, gidB},
 									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 1},
-										{SequenceIndex: 0, LookupListIndex: 0},
+										{SequenceIndex: 0, LookupListIndex: 1}, // AAB -> AAAB
+										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
 									},
 								},
 								{
-									In: []font.GlyphID{gidA, gidA, gidB},
+									Input: []font.GlyphID{gidA, gidA, gidB},
 									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 1},
-										{SequenceIndex: 0, LookupListIndex: 0},
+										{SequenceIndex: 0, LookupListIndex: 1}, // AAAB -> AAAAB
+										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
 									},
 								},
 							},
@@ -366,7 +369,7 @@ func Test9737(t *testing.T) {
 					&gtab.Gsub2_1{
 						Cov: coverage.Table{gidA: 0},
 						Repl: [][]font.GlyphID{
-							{gidA, gidA},
+							{gidA, gidA}, // A -> AA
 						},
 					},
 				},
@@ -382,20 +385,29 @@ func Test9737(t *testing.T) {
 	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
 		gg = gsub.ApplyLookup(gg, lookupIndex, nil)
 	}
-	fmt.Println(gg)
-	// harfbuzz gives AAB
 	// MS Word gives AAAAB
+	// harfbuzz gives AAB
 
-	fd, err := os.Create("test9737.otf")
-	if err != nil {
-		t.Fatal(err)
+	got := unpack(gg)
+	expected := []font.GlyphID{gidA, gidA, gidA, gidA, gidB}
+
+	if diff := cmp.Diff(expected, got); diff != "" {
+		t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
 	}
-	_, err = fontInfo.Write(fd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = fd.Close()
-	if err != nil {
-		t.Error(err)
+
+	if *exportFonts {
+		// Write out the font for MS Word.
+		fd, err := os.Create("test9737.otf")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = fontInfo.Write(fd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = fd.Close()
+		if err != nil {
+			t.Error(err)
+		}
 	}
 }

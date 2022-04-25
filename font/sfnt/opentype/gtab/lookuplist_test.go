@@ -27,6 +27,22 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
+func readDummySubtable(p *parser.Parser, pos int64, info *LookupMetaInfo) (Subtable, error) {
+	if info.LookupType > 32 {
+		return nil, errors.New("invalid type for dummy lookup")
+	}
+	err := p.SeekPos(pos)
+	if err != nil {
+		return nil, err
+	}
+	res := make(dummySubTable, info.LookupType)
+	_, err = p.Read(res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 type dummySubTable []byte
 
 func (st dummySubTable) Apply(_ KeepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int, Nested) {
@@ -39,22 +55,6 @@ func (st dummySubTable) EncodeLen() int {
 
 func (st dummySubTable) Encode() []byte {
 	return []byte(st)
-}
-
-func dummyReader(p *parser.Parser, pos int64, info *LookupMetaInfo) (Subtable, error) {
-	err := p.SeekPos(pos)
-	if err != nil {
-		return nil, err
-	}
-	if info.LookupType > 32 {
-		return nil, errors.New("invalid size for dummy lookup")
-	}
-	res := make(dummySubTable, int(info.LookupType))
-	_, err = p.Read(res)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
 }
 
 func FuzzLookupList(f *testing.F) {
@@ -116,14 +116,15 @@ func FuzzLookupList(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
 		p := parser.New("lookupList test", bytes.NewReader(data1))
-		l1, err := readLookupList(p, 0, dummyReader)
+		l1, err := readLookupList(p, 0, readDummySubtable)
 		if err != nil {
 			return
 		}
 
 		data2 := l1.encode()
+
 		p = parser.New("lookupList test", bytes.NewReader(data2))
-		l2, err := readLookupList(p, 0, dummyReader)
+		l2, err := readLookupList(p, 0, readDummySubtable)
 		if err != nil {
 			t.Fatal(err)
 		}

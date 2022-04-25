@@ -17,6 +17,7 @@
 package tests
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"reflect"
@@ -101,14 +102,6 @@ func TestGsub(t *testing.T) {
 
 		lookups := gsub.FindLookups(locale.EnUS, nil)
 
-		unpack := func(seq []font.Glyph) []font.GlyphID {
-			res := make([]font.GlyphID, len(seq))
-			for i, g := range seq {
-				res[i] = g.Gid
-			}
-			return res
-		}
-
 		in := []font.Glyph{
 			{Gid: 1},
 			{Gid: 2},
@@ -145,3 +138,13 @@ func TestGsub(t *testing.T) {
 		}
 	}
 }
+
+func unpack(seq []font.Glyph) []font.GlyphID {
+	res := make([]font.GlyphID, len(seq))
+	for i, g := range seq {
+		res[i] = g.Gid
+	}
+	return res
+}
+
+var exportFonts = flag.Bool("export-fonts", false, "export fonts used in tests")
