@@ -17,7 +17,6 @@
 package tests
 
 import (
-	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -114,23 +113,11 @@ func TestSequenceContext1(t *testing.T) {
 		},
 	}
 
-	fd, err := os.Create("test.otf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = fontInfo.Write(fd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = fd.Close()
-	if err != nil {
-		t.Error(err)
-	}
+	exportFont(fontInfo, 9730)
 }
 
 func Test9735(t *testing.T) {
 	fontInfo := debug.MakeSimpleFont()
-	fontInfo.FamilyName = "Test9735"
 
 	fontInfo.Gdef = &gdef.Table{
 		GlyphClass: classdef.Table{
@@ -200,15 +187,7 @@ func Test9735(t *testing.T) {
 		},
 	}
 
-	fd, err := os.Create("test9735.otf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = fontInfo.Write(fd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = fd.Close()
+	err := exportFont(fontInfo, 9735)
 	if err != nil {
 		t.Error(err)
 	}
@@ -216,7 +195,6 @@ func Test9735(t *testing.T) {
 
 func Test9736(t *testing.T) {
 	fontInfo := debug.MakeCompleteFont()
-	fontInfo.FamilyName = "Test9736"
 
 	gidF := fontInfo.CMap.Lookup('F')
 	gidI := fontInfo.CMap.Lookup('I')
@@ -294,15 +272,7 @@ func Test9736(t *testing.T) {
 		},
 	}
 
-	fd, err := os.Create("test9736.otf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = fontInfo.Write(fd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = fd.Close()
+	err := exportFont(fontInfo, 9736)
 	if err != nil {
 		t.Error(err)
 	}
@@ -313,7 +283,6 @@ func Test9736(t *testing.T) {
 // https://github.com/harfbuzz/harfbuzz/issues/3545
 func Test9737(t *testing.T) {
 	fontInfo := debug.MakeSimpleFont()
-	fontInfo.FamilyName = "Test9737"
 
 	gidA := fontInfo.CMap.Lookup('A')
 	gidB := fontInfo.CMap.Lookup('B')
@@ -395,19 +364,5 @@ func Test9737(t *testing.T) {
 		t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
 	}
 
-	if *exportFonts {
-		// Write out the font for MS Word.
-		fd, err := os.Create("test9737.otf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = fontInfo.Write(fd)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = fd.Close()
-		if err != nil {
-			t.Error(err)
-		}
-	}
+	exportFont(fontInfo, 9737)
 }

@@ -28,12 +28,11 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
+	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/locale"
 )
 
 func TestGsub(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
-
 	gdef := &gdef.Table{
 		GlyphClass: classdef.Table{
 			4: gdef.GlyphClassLigature,
@@ -121,20 +120,14 @@ func TestGsub(t *testing.T) {
 			t.Errorf("expected %v, got %v", expected, out)
 		}
 
-		fontInfo.Gsub = gsub
-		fontInfo.Gdef = gdef
-		fname := fmt.Sprintf("%03d.otf", testIdx)
-		fd, err := os.Create(fname)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = fontInfo.Write(fd)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = fd.Close()
-		if err != nil {
-			t.Error(err)
+		if *exportFonts {
+			fontInfo := debug.MakeSimpleFont()
+			fontInfo.Gsub = gsub
+			fontInfo.Gdef = gdef
+			err := exportFont(fontInfo, 700+testIdx)
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}
 }
@@ -148,3 +141,27 @@ func unpack(seq []font.Glyph) []font.GlyphID {
 }
 
 var exportFonts = flag.Bool("export-fonts", false, "export fonts used in tests")
+
+func exportFont(fontInfo *sfntcff.Info, idx int) error {
+	if !*exportFonts {
+		return nil
+	}
+
+	fontInfo.FamilyName = fmt.Sprintf("Test%04d", idx)
+
+	fname := fmt.Sprintf("test%04d.otf", idx)
+	fd, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	_, err = fontInfo.Write(fd)
+	if err != nil {
+		return err
+	}
+	err = fd.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

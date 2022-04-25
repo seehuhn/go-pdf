@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/debug"
@@ -41,17 +39,7 @@ func TestGpos(t *testing.T) {
 	}
 	fontInfo.Gpos = gpos
 
-	testIdx := 1234
-	fname := fmt.Sprintf("test%03d.otf", testIdx)
-	fd, err := os.Create(fname)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = fontInfo.Write(fd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = fd.Close()
+	err := exportFont(fontInfo, 1234)
 	if err != nil {
 		t.Error(err)
 	}
