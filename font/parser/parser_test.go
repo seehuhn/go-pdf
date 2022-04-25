@@ -30,7 +30,7 @@ func TestPos(t *testing.T) {
 		t.Errorf("wrong position, expected 0 but got %d", pos)
 	}
 
-	_, err := p.ReadUInt16()
+	_, err := p.ReadUint16()
 	if err != nil {
 		t.Fatal(err)
 	}

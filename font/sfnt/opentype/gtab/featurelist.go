@@ -55,7 +55,7 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 		return nil, err
 	}
 
-	featureCount, err := p.ReadUInt16()
+	featureCount, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 
 		var lookupListIndices []LookupIndex
 		for i := 0; i < int(featureLookupCount); i++ {
-			idx, err := p.ReadUInt16()
+			idx, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}

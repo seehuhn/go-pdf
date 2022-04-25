@@ -29,7 +29,7 @@ import (
 type FdSelectFn func(font.GlyphID) int
 
 func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
-	format, err := p.ReadUInt8()
+	format, err := p.ReadUint8()
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 			return int(buf[gid])
 		}, nil
 	case 3:
-		nRanges, err := p.ReadUInt16()
+		nRanges, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
@@ -63,13 +63,13 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 
 		prev := uint16(0)
 		for i := 0; i < int(nRanges); i++ {
-			first, err := p.ReadUInt16()
+			first, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			} else if i > 0 && first <= prev || i == 0 && first != 0 {
 				return nil, invalidSince("FDSelect is invalid")
 			}
-			fd, err := p.ReadUInt8()
+			fd, err := p.ReadUint8()
 			if err != nil {
 				return nil, err
 			} else if int(fd) >= nPrivate {
@@ -81,7 +81,7 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 			fdIdx = append(fdIdx, fd)
 			prev = first
 		}
-		sentinel, err := p.ReadUInt16()
+		sentinel, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		} else if int(sentinel) != nGlyphs {

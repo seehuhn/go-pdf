@@ -47,11 +47,11 @@ type SequenceRule struct {
 }
 
 func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	coverageOffset, err := p.ReadUInt16()
+	coverageOffset, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
-	seqRuleSetOffsets, err := p.ReadUInt16Slice()
+	seqRuleSetOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			return nil, err
 		}
 
-		seqRuleOffsets, err := p.ReadUInt16Slice()
+		seqRuleOffsets, err := p.ReadUint16Slice()
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +103,7 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			seqLookupCount := int(buf[2])<<8 | int(buf[3])
 			inputSequence := make([]font.GlyphID, glyphCount-1)
 			for k := range inputSequence {
-				xk, err := p.ReadUInt16()
+				xk, err := p.ReadUint16()
 				if err != nil {
 					return nil, err
 				}
@@ -267,7 +267,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 	coverageOffset := uint16(buf[0])<<8 | uint16(buf[1])
 	classDefOffset := uint16(buf[2])<<8 | uint16(buf[3])
-	seqRuleSetOffsets, err := p.ReadUInt16Slice()
+	seqRuleSetOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +299,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		seqRuleOffsets, err := p.ReadUInt16Slice()
+		seqRuleOffsets, err := p.ReadUint16Slice()
 		if err != nil {
 			return nil, err
 		}
@@ -323,7 +323,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			seqLookupCount := int(buf[2])<<8 | int(buf[3])
 			inputSequence := make([]uint16, glyphCount-1)
 			for k := range inputSequence {
-				xk, err := p.ReadUInt16()
+				xk, err := p.ReadUint16()
 				if err != nil {
 					return nil, err
 				}
@@ -486,7 +486,7 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	seqLookupCount := int(buf[2])<<8 | int(buf[3])
 	coverageOffsets := make([]uint16, glyphCount)
 	for i := range coverageOffsets {
-		coverageOffsets[i], err = p.ReadUInt16()
+		coverageOffsets[i], err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
@@ -594,11 +594,11 @@ type ChainedSequenceRule struct {
 }
 
 func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	coverageOffset, err := p.ReadUInt16()
+	coverageOffset, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
-	chainedSeqRuleSetOffsets, err := p.ReadUInt16Slice()
+	chainedSeqRuleSetOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -622,7 +622,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 			return nil, err
 		}
 
-		chainedSeqRuleOffsets, err := p.ReadUInt16Slice()
+		chainedSeqRuleOffsets, err := p.ReadUint16Slice()
 		if err != nil {
 			return nil, err
 		}
@@ -638,13 +638,13 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 			if err != nil {
 				return nil, err
 			}
-			inputGlyphCount, err := p.ReadUInt16()
+			inputGlyphCount, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
 			inputSequence := make([]font.GlyphID, inputGlyphCount-1)
 			for k := range inputSequence {
-				val, err := p.ReadUInt16()
+				val, err := p.ReadUint16()
 				if err != nil {
 					return nil, err
 				}
@@ -654,7 +654,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 			if err != nil {
 				return nil, err
 			}
-			seqLookupCount, err := p.ReadUInt16()
+			seqLookupCount, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}

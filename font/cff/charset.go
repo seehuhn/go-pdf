@@ -30,7 +30,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 		return nil, fmt.Errorf("invalid number of glyphs: %d", nGlyphs)
 	}
 
-	format, err := p.ReadUInt8()
+	format, err := p.ReadUint8()
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 	switch format {
 	case 0:
 		for i := 0; i < nGlyphs-1; i++ {
-			xi, err := p.ReadUInt16()
+			xi, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
@@ -47,11 +47,11 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 		}
 	case 1:
 		for len(charset) < nGlyphs {
-			first, err := p.ReadUInt16()
+			first, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
-			nLeft, err := p.ReadUInt8()
+			nLeft, err := p.ReadUint8()
 			if err != nil {
 				return nil, err
 			}
@@ -65,11 +65,11 @@ func readCharset(p *parser.Parser, nGlyphs int) ([]int32, error) {
 		}
 	case 2:
 		for len(charset) < nGlyphs {
-			first, err := p.ReadUInt16()
+			first, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
-			nLeft, err := p.ReadUInt16()
+			nLeft, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}

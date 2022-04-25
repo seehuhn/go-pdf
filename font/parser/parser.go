@@ -105,8 +105,8 @@ func (p *Parser) Read(buf []byte) (int, error) {
 	return total, nil
 }
 
-// ReadUInt8 reads a single uint8 value from the current position.
-func (p *Parser) ReadUInt8() (uint8, error) {
+// ReadUint8 reads a single uint8 value from the current position.
+func (p *Parser) ReadUint8() (uint8, error) {
 	buf, err := p.ReadBytes(1)
 	if err != nil {
 		return 0, err
@@ -114,8 +114,8 @@ func (p *Parser) ReadUInt8() (uint8, error) {
 	return uint8(buf[0]), nil
 }
 
-// ReadUInt16 reads a single uint16 value from the current position.
-func (p *Parser) ReadUInt16() (uint16, error) {
+// ReadUint16 reads a single uint16 value from the current position.
+func (p *Parser) ReadUint16() (uint16, error) {
 	buf, err := p.ReadBytes(2)
 	if err != nil {
 		return 0, err
@@ -125,12 +125,12 @@ func (p *Parser) ReadUInt16() (uint16, error) {
 
 // ReadInt16 reads a single int16 value from the current position.
 func (p *Parser) ReadInt16() (int16, error) {
-	val, err := p.ReadUInt16()
+	val, err := p.ReadUint16()
 	return int16(val), err
 }
 
-// ReadUInt32 reads a single uint32 value from the current position.
-func (p *Parser) ReadUInt32() (uint32, error) {
+// ReadUint32 reads a single uint32 value from the current position.
+func (p *Parser) ReadUint32() (uint32, error) {
 	buf, err := p.ReadBytes(4)
 	if err != nil {
 		return 0, err
@@ -138,15 +138,15 @@ func (p *Parser) ReadUInt32() (uint32, error) {
 	return uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3]), nil
 }
 
-// ReadUInt16Slice reads a length followed by a sequence of uint16 values.
-func (p *Parser) ReadUInt16Slice() ([]uint16, error) {
-	n, err := p.ReadUInt16()
+// ReadUint16Slice reads a length followed by a sequence of uint16 values.
+func (p *Parser) ReadUint16Slice() ([]uint16, error) {
+	n, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
 	res := make([]uint16, n)
 	for i := range res {
-		val, err := p.ReadUInt16()
+		val, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
@@ -157,13 +157,13 @@ func (p *Parser) ReadUInt16Slice() ([]uint16, error) {
 
 // ReadGIDSlice reads a length followed by a sequence of GlyphID values.
 func (p *Parser) ReadGIDSlice() ([]font.GlyphID, error) {
-	n, err := p.ReadUInt16()
+	n, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
 	res := make([]font.GlyphID, n)
 	for i := range res {
-		val, err := p.ReadUInt16()
+		val, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}

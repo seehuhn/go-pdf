@@ -55,7 +55,7 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return nil, err
 	}
 
-	format, err := p.ReadUInt16()
+	format, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ type Gsub1_2 struct {
 }
 
 func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	coverageOffset, err := p.ReadUInt16()
+	coverageOffset, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -236,11 +236,11 @@ type Gsub2_1 struct {
 }
 
 func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	coverageOffset, err := p.ReadUInt16()
+	coverageOffset, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
-	sequenceOffsets, err := p.ReadUInt16Slice()
+	sequenceOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -357,11 +357,11 @@ type Gsub3_1 struct {
 }
 
 func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	coverageOffset, err := p.ReadUInt16()
+	coverageOffset, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
-	alternateSetOffsets, err := p.ReadUInt16Slice()
+	alternateSetOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -384,13 +384,13 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		glyphCount, err := p.ReadUInt16()
+		glyphCount, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 		alt[i] = make([]font.GlyphID, glyphCount)
 		for j := 0; j < int(glyphCount); j++ {
-			gid, err := p.ReadUInt16()
+			gid, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
@@ -480,11 +480,11 @@ type Ligature struct {
 }
 
 func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
-	coverageOffset, err := p.ReadUInt16()
+	coverageOffset, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
-	ligatureSetOffsets, err := p.ReadUInt16Slice()
+	ligatureSetOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +507,7 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		ligatureOffsets, err := p.ReadUInt16Slice()
+		ligatureOffsets, err := p.ReadUint16Slice()
 		if err != nil {
 			return nil, err
 		}
@@ -518,17 +518,17 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			if err != nil {
 				return nil, err
 			}
-			ligatureGlyph, err := p.ReadUInt16()
+			ligatureGlyph, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
-			componentCount, err := p.ReadUInt16()
+			componentCount, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
 			componentGlyphIDs := make([]font.GlyphID, componentCount-1)
 			for k := range componentGlyphIDs {
-				gid, err := p.ReadUInt16()
+				gid, err := p.ReadUint16()
 				if err != nil {
 					return nil, err
 				}

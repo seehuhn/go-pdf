@@ -193,7 +193,7 @@ func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
 	// t.Helper()
 
 	p := parser.New("test", bytes.NewReader(data1))
-	format, err := p.ReadUInt16()
+	format, err := p.ReadUint16()
 	if err != nil || format != lookupFormat {
 		return
 	}
@@ -209,7 +209,7 @@ func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
 	}
 
 	p = parser.New("test", bytes.NewReader(data2))
-	format, err = p.ReadUInt16()
+	format, err = p.ReadUint16()
 	if err != nil {
 		t.Fatal(err)
 	} else if format != lookupFormat {

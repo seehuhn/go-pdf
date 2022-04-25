@@ -57,14 +57,14 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 	markAttachClassDefOffset := uint16(buf[10])<<8 | uint16(buf[11])
 	var markGlyphSetsDefOffset uint16
 	if minorVersion >= 2 {
-		markGlyphSetsDefOffset, err = p.ReadUInt16()
+		markGlyphSetsDefOffset, err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	var itemVarStoreOffset uint32
 	if minorVersion >= 3 {
-		itemVarStoreOffset, err = p.ReadUInt32()
+		itemVarStoreOffset, err = p.ReadUint32()
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +109,7 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 		markGlyphSetCount := uint16(buf[2])<<8 | uint16(buf[3])
 		coverageOffsets := make([]uint32, markGlyphSetCount)
 		for i := range coverageOffsets {
-			coverageOffsets[i], err = p.ReadUInt32()
+			coverageOffsets[i], err = p.ReadUint32()
 			if err != nil {
 				return nil, err
 			}

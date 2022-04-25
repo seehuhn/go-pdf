@@ -35,7 +35,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 		return nil, err
 	}
 
-	version, err := p.ReadUInt16()
+	version, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 
 		res := make(Table, glyphCount)
 		for i := 0; i < glyphCount; i++ {
-			classValue, err := p.ReadUInt16()
+			classValue, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
@@ -67,7 +67,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 		return res, nil
 
 	case 2:
-		classRangeCount, err := p.ReadUInt16()
+		classRangeCount, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}

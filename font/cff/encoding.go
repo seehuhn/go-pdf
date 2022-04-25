@@ -26,7 +26,7 @@ import (
 )
 
 func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
-	format, err := p.ReadUInt8()
+	format, err := p.ReadUint8()
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 	currentGid := font.GlyphID(1)
 	switch format & 127 {
 	case 0:
-		nCodes, err := p.ReadUInt8()
+		nCodes, err := p.ReadUint8()
 		if err != nil {
 			return nil, err
 		}
@@ -55,16 +55,16 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 			currentGid++
 		}
 	case 1:
-		nRanges, err := p.ReadUInt8()
+		nRanges, err := p.ReadUint8()
 		if err != nil {
 			return nil, err
 		}
 		for i := 0; i < int(nRanges); i++ {
-			first, err := p.ReadUInt8()
+			first, err := p.ReadUint8()
 			if err != nil {
 				return nil, err
 			}
-			nLeft, err := p.ReadUInt8()
+			nLeft, err := p.ReadUint8()
 			if err != nil {
 				return nil, err
 			}
@@ -90,18 +90,18 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 		for gid, sid := range charset {
 			lookup[uint16(sid)] = font.GlyphID(gid)
 		}
-		nSups, err := p.ReadUInt8()
+		nSups, err := p.ReadUint8()
 		if err != nil {
 			return nil, err
 		}
 		for i := 0; i < int(nSups); i++ {
-			code, err := p.ReadUInt8()
+			code, err := p.ReadUint8()
 			if err != nil {
 				return nil, err
 			} else if res[code] != 0 {
 				return nil, invalidSince("invalid encoding supplement")
 			}
-			sid, err := p.ReadUInt16()
+			sid, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}

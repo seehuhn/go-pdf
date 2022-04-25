@@ -111,14 +111,14 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 		return nil, err
 	}
 
-	lookupCount, err := p.ReadUInt16()
+	lookupCount, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
 
 	lookupOffsets := make([]uint16, lookupCount)
 	for i := range lookupOffsets {
-		lookupOffsets[i], err = p.ReadUInt16()
+		lookupOffsets[i], err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +142,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 		subTableCount := uint16(buf[4])<<8 | uint16(buf[5])
 		subtableOffsets = subtableOffsets[:0]
 		for j := 0; j < int(subTableCount); j++ {
-			subtableOffset, err := p.ReadUInt16()
+			subtableOffset, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
@@ -150,7 +150,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 		}
 		var markFilteringSet uint16
 		if lookupFlag&LookupUseMarkFilteringSet != 0 {
-			markFilteringSet, err = p.ReadUInt16()
+			markFilteringSet, err = p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}

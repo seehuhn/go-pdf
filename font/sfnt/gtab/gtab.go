@@ -104,7 +104,7 @@ func (g *GTab) selectLookups(tableName string, includeFeature map[string]bool) (
 	lookupListOffset := int64(data[4])
 	var featureVariationsOffset uint16
 	if data[1] > 0 {
-		featureVariationsOffset, err = g.ReadUInt16()
+		featureVariationsOffset, err = g.ReadUint16()
 		if err != nil {
 			return nil, err
 		}

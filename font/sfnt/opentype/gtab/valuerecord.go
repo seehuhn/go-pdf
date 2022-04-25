@@ -69,25 +69,25 @@ func readValueRecord(p *parser.Parser, valueFormat uint16) (*ValueRecord, error)
 		}
 	}
 	if valueFormat&0x0010 != 0 {
-		res.XPlacementDevOffs, err = p.ReadUInt16()
+		res.XPlacementDevOffs, err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0020 != 0 {
-		res.YPlacementDevOffs, err = p.ReadUInt16()
+		res.YPlacementDevOffs, err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0040 != 0 {
-		res.XAdvanceDevOffs, err = p.ReadUInt16()
+		res.XAdvanceDevOffs, err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0080 != 0 {
-		res.YAdvanceDevOffs, err = p.ReadUInt16()
+		res.YAdvanceDevOffs, err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}

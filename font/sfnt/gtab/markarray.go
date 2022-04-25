@@ -89,11 +89,11 @@ func (g *GTab) readAnchor(pos int64, res *anchor) error {
 	case 1:
 		// nothing to do
 	case 3:
-		xDeviceOffset, err := g.ReadUInt16()
+		xDeviceOffset, err := g.ReadUint16()
 		if err != nil {
 			return err
 		}
-		yDeviceOffset, err := g.ReadUInt16()
+		yDeviceOffset, err := g.ReadUint16()
 		if err != nil {
 			return err
 		}

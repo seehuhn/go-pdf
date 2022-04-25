@@ -44,7 +44,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 		return nil, err
 	}
 
-	format, err := p.ReadUInt16()
+	format, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -53,13 +53,13 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 
 	switch format {
 	case 1: // Coverage Format 1
-		glyphCount, err := p.ReadUInt16()
+		glyphCount, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 		prev := -1
 		for i := 0; i < int(glyphCount); i++ {
-			gid, err := p.ReadUInt16()
+			gid, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
@@ -74,7 +74,7 @@ func ReadTable(p *parser.Parser, pos int64) (Table, error) {
 		}
 
 	case 2: // Coverage Format 2
-		rangeCount, err := p.ReadUInt16()
+		rangeCount, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}

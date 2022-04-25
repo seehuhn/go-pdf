@@ -73,7 +73,7 @@ func doRead(tableName string, r parser.ReadSeekSizer, sr subtableReader) (*Info,
 	}
 	endOfHeader := uint32(10)
 	if header.MinorVersion == 1 {
-		FeatureVariationsOffset, err = p.ReadUInt32()
+		FeatureVariationsOffset, err = p.ReadUint32()
 		if err != nil {
 			return nil, err
 		}

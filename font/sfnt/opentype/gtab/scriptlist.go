@@ -46,7 +46,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 		return nil, err
 	}
 
-	scriptCount, err := p.ReadUInt16()
+	scriptCount, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 
 	featureIndices := make([]FeatureIndex, featureIndexCount)
 	for i := 0; i < int(featureIndexCount); i++ {
-		idx, err := p.ReadUInt16()
+		idx, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		} else if idx == 0xFFFF {

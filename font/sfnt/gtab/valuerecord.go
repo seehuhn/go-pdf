@@ -70,25 +70,25 @@ func (g *GTab) readValueRecord(valueFormat uint16) (*valueRecord, error) {
 		}
 	}
 	if valueFormat&0x0010 != 0 {
-		res.XPlaDeviceOffset, err = g.ReadUInt16()
+		res.XPlaDeviceOffset, err = g.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0020 != 0 {
-		res.YPlaDeviceOffset, err = g.ReadUInt16()
+		res.YPlaDeviceOffset, err = g.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0040 != 0 {
-		res.XAdvDeviceOffset, err = g.ReadUInt16()
+		res.XAdvDeviceOffset, err = g.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 	}
 	if valueFormat&0x0080 != 0 {
-		res.YAdvDeviceOffset, err = g.ReadUInt16()
+		res.YAdvDeviceOffset, err = g.ReadUint16()
 		if err != nil {
 			return nil, err
 		}

@@ -39,7 +39,7 @@ func readIndexAt(p *parser.Parser, pos int32, name string) (cffIndex, error) {
 }
 
 func readIndex(p *parser.Parser) (cffIndex, error) {
-	count, err := p.ReadUInt16()
+	count, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func readIndex(p *parser.Parser) (cffIndex, error) {
 		return nil, nil
 	}
 
-	offSize, err := p.ReadUInt8()
+	offSize, err := p.ReadUint8()
 	if err != nil {
 		return nil, err
 	}

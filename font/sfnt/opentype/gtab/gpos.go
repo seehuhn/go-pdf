@@ -32,7 +32,7 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return nil, err
 	}
 
-	format, err := p.ReadUInt16()
+	format, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
@@ -226,4 +226,98 @@ func (l *Gpos1_2) Encode() []byte {
 	}
 	buf = append(buf, l.Cov.Encode()...)
 	return buf
+}
+
+// Gpos2_1 is a Pair Adjustment Positioning Subtable (format 1)
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
+type Gpos2_1 struct {
+	Cov    coverage.Table
+	Adjust []map[font.GlyphID]*PairAdjust
+}
+
+type PairAdjust struct {
+	First, Second *ValueRecord
+}
+
+func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(8)
+	if err != nil {
+		return nil, err
+	}
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	valueFormat1 := uint16(buf[2])<<8 | uint16(buf[3])
+	valueFormat2 := uint16(buf[4])<<8 | uint16(buf[5])
+	pairSetCount := int(buf[6])<<8 | int(buf[7])
+
+	pairSetOffsets := make([]uint16, pairSetCount)
+	for i := range pairSetOffsets {
+		pairSetOffsets[i], err = p.ReadUint16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	cov, err := coverage.ReadTable(p, subtablePos+coverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pairSetOffsets) > len(cov) {
+		pairSetOffsets = pairSetOffsets[:len(cov)]
+	} else if len(pairSetOffsets) < len(cov) {
+		cov.Prune(len(pairSetOffsets))
+	}
+
+	adjust := make([]map[font.GlyphID]*PairAdjust, len(pairSetOffsets))
+	for i, offset := range pairSetOffsets {
+		err = p.SeekPos(subtablePos + int64(offset))
+		if err != nil {
+			return nil, err
+		}
+		pairValueCount, err := p.ReadUint16()
+		if err != nil {
+			return nil, err
+		}
+		adj := make(map[font.GlyphID]*PairAdjust, pairValueCount)
+		for j := 0; j < int(pairValueCount); j++ {
+			secondGlyph, err := p.ReadUint16()
+			if err != nil {
+				return nil, err
+			}
+			first, err := readValueRecord(p, valueFormat1)
+			if err != nil {
+				return nil, err
+			}
+			second, err := readValueRecord(p, valueFormat2)
+			if err != nil {
+				return nil, err
+			}
+			adj[font.GlyphID(secondGlyph)] = &PairAdjust{
+				First:  first,
+				Second: second,
+			}
+		}
+		adjust[i] = adj
+	}
+
+	res := &Gpos2_1{
+		Cov:    cov,
+		Adjust: adjust,
+	}
+	return res, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gpos2_1) Apply(KeepGlyphFn, []font.Glyph, int) ([]font.Glyph, int, Nested) {
+	panic("not implemented")
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gpos2_1) EncodeLen() int {
+	panic("not implemented")
+}
+
+// Encode implements the Subtable interface.
+func (l *Gpos2_1) Encode() []byte {
+	panic("not implemented")
 }

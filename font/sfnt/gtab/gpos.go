@@ -172,7 +172,7 @@ func (g *GTab) readGpos2_1(s *parser.State, subtablePos int64) (*gpos2_1, error)
 		}
 		pairValueCount := int(s.A)
 		for i := 0; i < pairValueCount; i++ {
-			secondGlyph, err := g.ReadUInt16()
+			secondGlyph, err := g.ReadUint16()
 			if err != nil {
 				return nil, err
 			}

@@ -69,7 +69,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 	p := parser.New("CFF", r)
 
 	// section 0: header
-	x, err := p.ReadUInt32()
+	x, err := p.ReadUint32()
 	if err != nil {
 		return nil, err
 	}
