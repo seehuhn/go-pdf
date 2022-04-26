@@ -72,6 +72,10 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	for i, seqRuleSetOffset := range seqRuleSetOffsets {
+		if seqRuleSetOffset == 0 {
+			continue
+		}
+
 		base := subtablePos + int64(seqRuleSetOffset)
 		err = p.SeekPos(base)
 		if err != nil {
@@ -266,7 +270,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 	coverageOffset := uint16(buf[0])<<8 | uint16(buf[1])
 	classDefOffset := uint16(buf[2])<<8 | uint16(buf[3])
-	seqRuleSetOffsets, err := p.ReadUint16Slice()
+	classSeqRuleSetOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
@@ -275,10 +279,10 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(cov) > len(seqRuleSetOffsets) {
-		cov.Prune(len(seqRuleSetOffsets))
+	if len(cov) > len(classSeqRuleSetOffsets) {
+		cov.Prune(len(classSeqRuleSetOffsets))
 	} else {
-		seqRuleSetOffsets = seqRuleSetOffsets[:len(cov)]
+		classSeqRuleSetOffsets = classSeqRuleSetOffsets[:len(cov)]
 	}
 
 	classDef, err := classdef.Read(p, subtablePos+int64(classDefOffset))
@@ -289,11 +293,14 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	res := &SeqContext2{
 		Cov:     cov,
 		Classes: classDef,
-		Rules:   make([][]*ClassSequenceRule, len(seqRuleSetOffsets)),
+		Rules:   make([][]*ClassSequenceRule, len(classSeqRuleSetOffsets)),
 	}
 
-	for i, seqRuleSetOffset := range seqRuleSetOffsets {
-		base := subtablePos + int64(seqRuleSetOffset)
+	for i, classSeqRuleSetOffset := range classSeqRuleSetOffsets {
+		if classSeqRuleSetOffset == 0 {
+			continue
+		}
+		base := subtablePos + int64(classSeqRuleSetOffset)
 		err = p.SeekPos(base)
 		if err != nil {
 			return nil, err
@@ -637,6 +644,10 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 
 	rules := make([][]*ChainedSeqRule, len(chainedSeqRuleSetOffsets))
 	for i, chainedSeqRuleSetOffset := range chainedSeqRuleSetOffsets {
+		if chainedSeqRuleSetOffset == 0 {
+			continue
+		}
+
 		base := subtablePos + int64(chainedSeqRuleSetOffset)
 		err = p.SeekPos(base)
 		if err != nil {
@@ -899,6 +910,7 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 	backtrackClassDefOffset := uint16(buf[2])<<8 | uint16(buf[3])
 	inputClassDefOffset := uint16(buf[4])<<8 | uint16(buf[5])
 	lookaheadClassDefOffset := uint16(buf[6])<<8 | uint16(buf[7])
+
 	chainedClassSeqRuleSetOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
@@ -929,6 +941,10 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 
 	rules := make([][]*ChainedClassSeqRule, len(chainedClassSeqRuleSetOffsets))
 	for i, chainedClassSeqRuleSetOffset := range chainedClassSeqRuleSetOffsets {
+		if chainedClassSeqRuleSetOffset == 0 {
+			continue
+		}
+
 		base := subtablePos + int64(chainedClassSeqRuleSetOffset)
 		err = p.SeekPos(base)
 		if err != nil {

@@ -101,20 +101,12 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 		return nil, err
 	}
 
-	lookupCount, err := p.ReadUint16()
+	lookupOffsets, err := p.ReadUint16Slice()
 	if err != nil {
 		return nil, err
 	}
 
-	lookupOffsets := make([]uint16, lookupCount)
-	for i := range lookupOffsets {
-		lookupOffsets[i], err = p.ReadUint16()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	res := make(LookupList, lookupCount)
+	res := make(LookupList, len(lookupOffsets))
 
 	numLookups := 0
 	numSubTables := 0
