@@ -52,3 +52,57 @@ func FuzzGpos1_2(f *testing.F) {
 		doFuzz(t, 1, 2, readGpos1_2, data)
 	})
 }
+
+func FuzzGpos2_1(f *testing.F) {
+	l := &Gpos2_1{}
+	f.Add(l.Encode())
+	l = &Gpos2_1{
+		Cov: map[font.GlyphID]int{1: 0, 3: 1},
+		Adjust: []map[font.GlyphID]*PairAdjust{
+			{
+				2: &PairAdjust{
+					First: &ValueRecord{
+						XAdvance: -10,
+					},
+				},
+			},
+		},
+	}
+	f.Add(l.Encode())
+	l.Adjust = []map[font.GlyphID]*PairAdjust{
+		{
+			2: &PairAdjust{
+				First: &ValueRecord{
+					XAdvance: -10,
+				},
+			},
+			4: &PairAdjust{
+				First: &ValueRecord{
+					XAdvance: -10,
+				},
+				Second: &ValueRecord{
+					XPlacement: 5,
+				},
+			},
+			6: &PairAdjust{
+				First: &ValueRecord{
+					XAdvance: -10,
+				},
+				Second: &ValueRecord{
+					XPlacement:        1,
+					YPlacement:        2,
+					XAdvance:          3,
+					YAdvance:          4,
+					XPlacementDevOffs: 5,
+					YPlacementDevOffs: 6,
+					XAdvanceDevOffs:   7,
+					YAdvanceDevOffs:   8,
+				},
+			},
+		},
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 2, 1, readGpos2_1, data)
+	})
+}

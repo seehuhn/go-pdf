@@ -18,7 +18,9 @@ package gtab
 
 import (
 	"fmt"
+	"sort"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
@@ -40,6 +42,10 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 	switch 10*meta.LookupType + format {
 	case 1_1:
 		return readGpos1_1(p, pos)
+	case 1_2:
+		return readGpos1_2(p, pos)
+	case 2_1:
+		return readGpos2_1(p, pos)
 
 	case 7_1:
 		return readSeqContext1(p, pos)
@@ -319,16 +325,108 @@ func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos2_1) Apply(KeepGlyphFn, []font.Glyph, int) ([]font.Glyph, int, Nested) {
-	panic("not implemented")
+func (l *Gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if i+1 >= len(seq) {
+		return seq, -1, nil
+	}
+
+	idx, ok := l.Cov[seq[i].Gid]
+	if !ok {
+		return seq, -1, nil
+	}
+	adj := l.Adjust[idx]
+	if adj == nil {
+		return seq, -1, nil
+	}
+
+	rule, ok := adj[seq[i+1].Gid]
+	if !ok {
+		return seq, -1, nil
+	}
+
+	rule.First.Apply(&seq[i])
+	rule.Second.Apply(&seq[i+1])
+	next := i + 1
+	if rule.Second != nil {
+		next = i + 2
+	}
+	return seq, next, nil
 }
 
 // EncodeLen implements the Subtable interface.
 func (l *Gpos2_1) EncodeLen() int {
-	panic("not implemented")
+	total := 10 + 2*len(l.Adjust)
+	total += l.Cov.EncodeLen()
+	var valueFormat1, valueFormat2 uint16
+	for _, adj := range l.Adjust {
+		for _, v := range adj {
+			valueFormat1 |= v.First.getFormat()
+			valueFormat2 |= v.Second.getFormat()
+		}
+	}
+	for _, adj := range l.Adjust {
+		total += 2 + 2*len(adj)
+		for _, v := range adj {
+			total += v.First.encodeLen(valueFormat1)
+			total += v.Second.encodeLen(valueFormat2)
+		}
+	}
+	return total
 }
 
 // Encode implements the Subtable interface.
 func (l *Gpos2_1) Encode() []byte {
-	panic("not implemented")
+	pairSetCount := len(l.Adjust)
+	total := 10 + 2*pairSetCount
+	coverageOffset := total
+	total += l.Cov.EncodeLen()
+	var valueFormat1, valueFormat2 uint16
+	for _, adj := range l.Adjust {
+		for _, v := range adj {
+			valueFormat1 |= v.First.getFormat()
+			valueFormat2 |= v.Second.getFormat()
+		}
+	}
+	pairSetOffsets := make([]uint16, pairSetCount)
+	for i, adj := range l.Adjust {
+		pairSetOffsets[i] = uint16(total)
+		total += 2 + 2*len(adj)
+		for _, v := range adj {
+			total += v.First.encodeLen(valueFormat1)
+			total += v.Second.encodeLen(valueFormat2)
+		}
+	}
+
+	buf := make([]byte, 0, total)
+	buf = append(buf,
+		0, 1, // format
+		byte(coverageOffset>>8), byte(coverageOffset),
+		byte(valueFormat1>>8), byte(valueFormat1),
+		byte(valueFormat2>>8), byte(valueFormat2),
+		byte(pairSetCount>>8), byte(pairSetCount),
+	)
+	for _, offset := range pairSetOffsets {
+		buf = append(buf, byte(offset>>8), byte(offset))
+	}
+
+	buf = append(buf, l.Cov.Encode()...)
+
+	for i, adj := range l.Adjust {
+		if len(buf) != int(pairSetOffsets[i]) {
+			panic("internal error") // TODO(voss): remove
+		}
+
+		pairValueCount := len(adj)
+		buf = append(buf, byte(pairValueCount>>8), byte(pairValueCount))
+
+		keys := maps.Keys(adj)
+		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		for _, secondGlyph := range keys {
+			buf = append(buf, byte(secondGlyph>>8), byte(secondGlyph))
+			buf = append(buf, adj[secondGlyph].First.encode(valueFormat1)...)
+			buf = append(buf, adj[secondGlyph].Second.encode(valueFormat2)...)
+		}
+	}
+
+	return buf
 }

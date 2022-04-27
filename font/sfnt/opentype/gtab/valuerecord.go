@@ -42,6 +42,10 @@ type ValueRecord struct {
 // valueFormat determines which fields are present in the binary
 // representation.
 func readValueRecord(p *parser.Parser, valueFormat uint16) (*ValueRecord, error) {
+	if valueFormat == 0 {
+		return nil, nil
+	}
+
 	res := &ValueRecord{}
 	var err error
 	if valueFormat&0x0001 != 0 {
@@ -96,6 +100,10 @@ func readValueRecord(p *parser.Parser, valueFormat uint16) (*ValueRecord, error)
 }
 
 func (vr *ValueRecord) getFormat() uint16 {
+	if vr == nil {
+		return 0
+	}
+
 	var format uint16
 	if vr.XPlacement != 0 {
 		format |= 0x0001
@@ -121,6 +129,13 @@ func (vr *ValueRecord) getFormat() uint16 {
 	if vr.YAdvanceDevOffs != 0 {
 		format |= 0x0080
 	}
+
+	if format == 0 {
+		// set one of the fields to mark the difference between
+		// a nil *ValueRecord and a zero value.
+		format = 0x0004
+	}
+
 	return format
 }
 
@@ -162,6 +177,10 @@ func (vr *ValueRecord) encode(format uint16) []byte {
 }
 
 func (vr *ValueRecord) String() string {
+	if vr == nil {
+		return "<nil>"
+	}
+
 	var adjust []string
 	if vr.XPlacement != 0 {
 		adjust = append(adjust, fmt.Sprintf("xpos%+d", vr.XPlacement))

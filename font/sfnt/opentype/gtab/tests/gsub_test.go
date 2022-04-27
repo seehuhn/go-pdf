@@ -23,14 +23,63 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/locale"
 )
+
+func TestGsub1_1(t *testing.T) {
+	fontInfo := debug.MakeSimpleFont()
+	gidA := fontInfo.CMap.Lookup('A')
+	gidB := fontInfo.CMap.Lookup('B')
+	gidM := fontInfo.CMap.Lookup('M')
+	fontInfo.Gdef = &gdef.Table{
+		GlyphClass: classdef.Table{
+			gidM: gdef.GlyphClassMark,
+		},
+	}
+	fontInfo.Gsub = &gtab.Info{
+		ScriptList: map[gtab.ScriptLang]*gtab.Features{
+			{}: {}, // Required: 0
+		},
+		FeatureList: []*gtab.Feature{
+			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
+		},
+		LookupList: []*gtab.LookupTable{
+			{
+				Meta: &gtab.LookupMetaInfo{
+					LookupType: 1,
+					LookupFlag: gtab.LookupIgnoreMarks,
+				},
+				Subtables: []gtab.Subtable{
+					&gtab.Gsub1_1{
+						Cov:   coverage.Table{gidA: 0, gidM: 1},
+						Delta: 1,
+					},
+				},
+			},
+		},
+	}
+
+	gsub := fontInfo.Gsub
+	lookups := gsub.FindLookups(locale.EnUS, nil)
+
+	seq := []font.Glyph{{Gid: gidA}, {Gid: gidA}, {Gid: gidM}, {Gid: gidB}, {Gid: gidA}}
+	want := []font.Glyph{{Gid: gidB}, {Gid: gidB}, {Gid: gidM}, {Gid: gidB}, {Gid: gidB}}
+	for _, lookupIndex := range lookups {
+		seq = gsub.ApplyLookup(seq, lookupIndex, fontInfo.Gdef)
+	}
+	if diff := cmp.Diff(want, seq); diff != "" {
+		t.Errorf("unexpected result (-want +got):\n%s", diff)
+	}
+	exportFont(fontInfo, 1)
+}
 
 func TestGsub(t *testing.T) {
 	gdef := &gdef.Table{

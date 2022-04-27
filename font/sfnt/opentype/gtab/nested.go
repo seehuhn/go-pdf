@@ -176,10 +176,13 @@ ruleLoop:
 // EncodeLen implements the Subtable interface.
 func (l *SeqContext1) EncodeLen() int {
 	total := 6 + 2*len(l.Rules)
-	for _, rule := range l.Rules {
-		total += 2 + 2*len(rule)
-		for _, r := range rule {
-			total += 4 + 2*len(r.Input) + 4*len(r.Actions)
+	for _, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
+		total += 2 + 2*len(rules)
+		for _, rule := range rules {
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	total += l.Cov.EncodeLen()
@@ -192,11 +195,14 @@ func (l *SeqContext1) Encode() []byte {
 
 	total := 6 + 2*seqRuleSetCount
 	seqRuleSetOffsets := make([]uint16, seqRuleSetCount)
-	for i, rule := range l.Rules {
+	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		seqRuleSetOffsets[i] = uint16(total)
-		total += 2 + 2*len(rule)
-		for _, r := range rule {
-			total += 4 + 2*len(r.Input) + 4*len(r.Actions)
+		total += 2 + 2*len(rules)
+		for _, rule := range rules {
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	coverageOffset := total
@@ -211,32 +217,35 @@ func (l *SeqContext1) Encode() []byte {
 	for _, offset := range seqRuleSetOffsets {
 		buf = append(buf, byte(offset>>8), byte(offset))
 	}
-	for i, rule := range l.Rules {
+	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		if len(buf) != int(seqRuleSetOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}
-		seqRuleCount := len(rule)
+		seqRuleCount := len(rules)
 		buf = append(buf,
 			byte(seqRuleCount>>8), byte(seqRuleCount),
 		)
 		pos := 2 + 2*seqRuleCount
-		for _, r := range rule {
+		for _, rule := range rules {
 			buf = append(buf,
 				byte(pos>>8), byte(pos),
 			)
-			pos += 4 + 2*len(r.Input) + 4*len(r.Actions)
+			pos += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
-		for _, r := range rule {
-			glyphCount := len(r.Input) + 1
-			seqLookupCount := len(r.Actions)
+		for _, rule := range rules {
+			glyphCount := len(rule.Input) + 1
+			seqLookupCount := len(rule.Actions)
 			buf = append(buf,
 				byte(glyphCount>>8), byte(glyphCount),
 				byte(seqLookupCount>>8), byte(seqLookupCount),
 			)
-			for _, gid := range r.Input {
+			for _, gid := range rule.Input {
 				buf = append(buf, byte(gid>>8), byte(gid))
 			}
-			for _, action := range r.Actions {
+			for _, action := range rule.Actions {
 				buf = append(buf,
 					byte(action.SequenceIndex>>8), byte(action.SequenceIndex),
 					byte(action.LookupListIndex>>8), byte(action.LookupListIndex),
@@ -400,10 +409,13 @@ func (l *SeqContext2) EncodeLen() int {
 	total := 8 + 2*len(l.Rules)
 	total += l.Cov.EncodeLen()
 	total += l.Classes.AppendLen()
-	for _, rule := range l.Rules {
-		total += 2 + 2*len(rule)
-		for _, r := range rule {
-			total += 4 + 2*len(r.Input) + 4*len(r.Actions)
+	for _, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
+		total += 2 + 2*len(rules)
+		for _, rule := range rules {
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	return total
@@ -415,11 +427,14 @@ func (l *SeqContext2) Encode() []byte {
 
 	total := 8 + 2*seqRuleSetCount
 	seqRuleSetOffsets := make([]uint16, seqRuleSetCount)
-	for i, rule := range l.Rules {
+	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		seqRuleSetOffsets[i] = uint16(total)
-		total += 2 + 2*len(rule)
-		for _, r := range rule {
-			total += 4 + 2*len(r.Input) + 4*len(r.Actions)
+		total += 2 + 2*len(rules)
+		for _, rule := range rules {
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	coverageOffset := total
@@ -437,32 +452,35 @@ func (l *SeqContext2) Encode() []byte {
 	for _, offset := range seqRuleSetOffsets {
 		buf = append(buf, byte(offset>>8), byte(offset))
 	}
-	for i, rule := range l.Rules {
+	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		if len(buf) != int(seqRuleSetOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}
-		seqRuleCount := len(rule)
+		seqRuleCount := len(rules)
 		buf = append(buf,
 			byte(seqRuleCount>>8), byte(seqRuleCount),
 		)
 		pos := 2 + 2*seqRuleCount
-		for _, r := range rule {
+		for _, rule := range rules {
 			buf = append(buf,
 				byte(pos>>8), byte(pos),
 			)
-			pos += 4 + 2*len(r.Input) + 4*len(r.Actions)
+			pos += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
-		for _, r := range rule {
-			glyphCount := len(r.Input) + 1
-			seqLookupCount := len(r.Actions)
+		for _, rule := range rules {
+			glyphCount := len(rule.Input) + 1
+			seqLookupCount := len(rule.Actions)
 			buf = append(buf,
 				byte(glyphCount>>8), byte(glyphCount),
 				byte(seqLookupCount>>8), byte(seqLookupCount),
 			)
-			for _, gid := range r.Input {
+			for _, gid := range rule.Input {
 				buf = append(buf, byte(gid>>8), byte(gid))
 			}
-			for _, action := range r.Actions {
+			for _, action := range rule.Actions {
 				buf = append(buf,
 					byte(action.SequenceIndex>>8), byte(action.SequenceIndex),
 					byte(action.LookupListIndex>>8), byte(action.LookupListIndex),
@@ -786,6 +804,9 @@ func (l *ChainedSeqContext1) EncodeLen() int {
 	total := 6 + 2*len(l.Rules)
 	total += l.Cov.EncodeLen()
 	for _, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
 			total += 2 + 2*len(rule.Backtrack)
@@ -805,6 +826,9 @@ func (l *ChainedSeqContext1) Encode() []byte {
 	total += l.Cov.EncodeLen()
 	chainedSeqRuleSetOffsets := make([]uint16, chainedSeqRuleSetCount)
 	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		chainedSeqRuleSetOffsets[i] = uint16(total)
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
@@ -828,6 +852,9 @@ func (l *ChainedSeqContext1) Encode() []byte {
 	buf = append(buf, l.Cov.Encode()...)
 
 	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		if len(buf) != int(chainedSeqRuleSetOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}
@@ -1090,6 +1117,9 @@ func (l *ChainedSeqContext2) EncodeLen() int {
 	total += l.Input.AppendLen()
 	total += l.Lookahead.AppendLen()
 	for _, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
 			total += 2 + 2*len(rule.Backtrack)
@@ -1115,6 +1145,9 @@ func (l *ChainedSeqContext2) Encode() []byte {
 	total += l.Lookahead.AppendLen()
 	chainedSeqRuleSetOffsets := make([]uint16, chainedSeqRuleSetCount)
 	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		chainedSeqRuleSetOffsets[i] = uint16(total)
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
@@ -1144,6 +1177,9 @@ func (l *ChainedSeqContext2) Encode() []byte {
 	buf = l.Lookahead.Append(buf)
 
 	for i, rules := range l.Rules {
+		if rules == nil {
+			continue
+		}
 		if len(buf) != int(chainedSeqRuleSetOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}

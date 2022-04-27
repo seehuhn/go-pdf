@@ -77,7 +77,7 @@ func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 		// If the IGNORE_MARKS bit is set, this supersedes any mark filtering set
 		// or mark attachment type indications.
 		if gdefTable.GlyphClass != nil {
-			sel |= filterLigatures
+			sel |= filterAllMarks
 		}
 	} else if flags&LookupUseMarkFilteringSet != 0 {
 		// If a mark filtering set is specified, this supersedes any mark

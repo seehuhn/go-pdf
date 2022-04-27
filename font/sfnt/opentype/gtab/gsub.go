@@ -140,8 +140,11 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_1) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+func (l *Gsub1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
 	gid := seq[i].Gid
+	if !keep(gid) {
+		return seq, -1, nil
+	}
 	if _, ok := l.Cov[gid]; !ok {
 		return seq, -1, nil
 	}
