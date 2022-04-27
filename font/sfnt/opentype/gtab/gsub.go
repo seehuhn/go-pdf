@@ -206,7 +206,10 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_2) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+func (l *Gsub1_2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if !keep(seq[i].Gid) {
+		return seq, -1, nil
+	}
 	gid := seq[i].Gid
 	if idx, ok := l.Cov[gid]; ok {
 		seq[i].Gid = l.SubstituteGlyphIDs[idx]
@@ -289,7 +292,10 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub2_1) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+func (l *Gsub2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if !keep(seq[i].Gid) {
+		return seq, -1, nil
+	}
 	gid := seq[i].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
@@ -418,7 +424,10 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub3_1) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+func (l *Gsub3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if !keep(seq[i].Gid) {
+		return seq, -1, nil
+	}
 	idx, ok := l.Cov[seq[i].Gid]
 	if !ok {
 		return seq, -1, nil
@@ -560,6 +569,9 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 // Apply implements the Subtable interface.
 func (l *Gsub4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if !keep(seq[i].Gid) {
+		return seq, -1, nil
+	}
 	ligSetIdx, ok := l.Cov[seq[i].Gid]
 	if !ok {
 		return seq, -1, nil
@@ -592,7 +604,7 @@ ligLoop:
 
 		seq[i] = font.Glyph{
 			Gid:  lig.Out,
-			Text: rr,
+			Text: append(seq[i].Text, rr...),
 		}
 		seq = append(seq[:i+1], strays...)
 		seq = append(seq, tail...)

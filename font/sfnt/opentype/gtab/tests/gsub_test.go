@@ -20,10 +20,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
@@ -34,101 +32,99 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
-func TestGsub1_1(t *testing.T) {
+func TestGsub(t *testing.T) {
 	fontInfo := debug.MakeSimpleFont()
 	gidA := fontInfo.CMap.Lookup('A')
 	gidB := fontInfo.CMap.Lookup('B')
+	gidC := fontInfo.CMap.Lookup('C')
 	gidM := fontInfo.CMap.Lookup('M')
-	fontInfo.Gdef = &gdef.Table{
-		GlyphClass: classdef.Table{
-			gidM: gdef.GlyphClassMark,
-		},
-	}
-	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
-		},
-		FeatureList: []*gtab.Feature{
-			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
-		},
-		LookupList: []*gtab.LookupTable{
-			{
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 1,
-					LookupFlag: gtab.LookupIgnoreMarks,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_1{
-						Cov:   coverage.Table{gidA: 0, gidM: 1},
-						Delta: 1,
-					},
-				},
-			},
-		},
-	}
-
-	gsub := fontInfo.Gsub
-	lookups := gsub.FindLookups(locale.EnUS, nil)
-
-	seq := []font.Glyph{{Gid: gidA}, {Gid: gidA}, {Gid: gidM}, {Gid: gidB}, {Gid: gidA}}
-	want := []font.Glyph{{Gid: gidB}, {Gid: gidB}, {Gid: gidM}, {Gid: gidB}, {Gid: gidB}}
-	for _, lookupIndex := range lookups {
-		seq = gsub.ApplyLookup(seq, lookupIndex, fontInfo.Gdef)
-	}
-	if diff := cmp.Diff(want, seq); diff != "" {
-		t.Errorf("unexpected result (-want +got):\n%s", diff)
-	}
-	exportFont(fontInfo, 1)
-}
-
-func TestGsub(t *testing.T) {
-	gdef := &gdef.Table{
-		GlyphClass: classdef.Table{
-			4: gdef.GlyphClassLigature,
-		},
-	}
+	gidN := fontInfo.CMap.Lookup('N')
 
 	type testCase struct {
 		lookupType uint16
 		subtable   gtab.Subtable
+		in, out    string
 	}
 	cases := []testCase{
-		{1, &gtab.Gsub1_1{
-			Cov:   map[font.GlyphID]int{3: 0},
-			Delta: 26,
-		}},
-		{1, &gtab.Gsub1_2{
-			Cov:                map[font.GlyphID]int{3: 0, 6: 1},
-			SubstituteGlyphIDs: []font.GlyphID{29, 26},
-		}},
-		{2, &gtab.Gsub2_1{
-			Cov: map[font.GlyphID]int{3: 0, 4: 1},
-			Repl: [][]font.GlyphID{
-				{29, 4},
-				{26},
+		{
+			lookupType: 1,
+			subtable: &gtab.Gsub1_1{
+				Cov:   coverage.Table{gidA: 0, gidM: 1},
+				Delta: 1,
 			},
-		}},
-		{3, &gtab.Gsub3_1{
-			Cov: map[font.GlyphID]int{3: 0},
-			Alt: [][]font.GlyphID{
-				{29, 21, 22},
+			in:  "AAMBA",
+			out: "BBMBB",
+		},
+		{
+			lookupType: 1,
+			subtable: &gtab.Gsub1_2{
+				Cov:                coverage.Table{gidA: 0, gidB: 1, gidM: 2},
+				SubstituteGlyphIDs: []font.GlyphID{gidB, gidA, gidB},
 			},
-		}},
-		{4, &gtab.Gsub4_1{
-			Cov: map[font.GlyphID]int{3: 0, 4: 1},
-			Repl: [][]gtab.Ligature{
-				{
-					{In: []font.GlyphID{4, 5}, Out: 29}, // excluded by gdef
-					{In: []font.GlyphID{5}, Out: 29},    // used in the test
-				},
-				{
-					{In: []font.GlyphID{3, 2}, Out: 27},
-					{In: []font.GlyphID{1}, Out: 27},
-					{In: []font.GlyphID{}, Out: 26},
+			in:  "ABCMA",
+			out: "BACMB",
+		},
+		{
+			lookupType: 2,
+			subtable: &gtab.Gsub2_1{
+				Cov: map[font.GlyphID]int{gidA: 0, gidM: 1},
+				Repl: [][]font.GlyphID{
+					{gidA, gidB, gidA},
+					{gidA},
 				},
 			},
-		}},
+			in:  "ABMA",
+			out: "ABABMABA",
+		},
+		{
+			lookupType: 3,
+			subtable: &gtab.Gsub3_1{
+				Cov: map[font.GlyphID]int{gidA: 0, gidM: 1},
+				Alt: [][]font.GlyphID{
+					{gidB, gidC},
+					{gidN},
+				},
+			},
+			in:  "ABMA",
+			out: "BBMB",
+		},
+		{
+			lookupType: 4,
+			subtable: &gtab.Gsub4_1{
+				Cov: map[font.GlyphID]int{gidA: 0, gidM: 1},
+				Repl: [][]gtab.Ligature{
+					{
+						{In: []font.GlyphID{gidA, gidA}, Out: gidC},
+						{In: []font.GlyphID{gidA}, Out: gidB},
+					},
+					{
+						{
+							In:  []font.GlyphID{gidA},
+							Out: gidN,
+						},
+					},
+				},
+			},
+			in:  "AAAMAMAMAAA",
+			out: "CMCMMB",
+		},
 	}
+
+	gdef := &gdef.Table{
+		GlyphClass: classdef.Table{
+			gidM: gdef.GlyphClassMark,
+		},
+	}
+
+	a, b := fontInfo.CMap.CodeRange()
+	rev := make(map[font.GlyphID]rune)
+	for r := a; r <= b; r++ {
+		gid := fontInfo.CMap.Lookup(r)
+		if gid != 0 {
+			rev[gid] = r
+		}
+	}
+
 	for testIdx, test := range cases {
 		gsub := &gtab.Info{
 			ScriptList: map[gtab.ScriptLang]*gtab.Features{
@@ -141,39 +137,43 @@ func TestGsub(t *testing.T) {
 				{
 					Meta: &gtab.LookupMetaInfo{
 						LookupType: test.lookupType,
-						LookupFlag: gtab.LookupIgnoreLigatures,
+						LookupFlag: gtab.LookupIgnoreMarks,
 					},
 					Subtables: []gtab.Subtable{test.subtable},
 				},
 			},
 		}
 
+		seq := make([]font.Glyph, len(test.in))
+		for i, r := range test.in {
+			seq[i].Gid = fontInfo.CMap.Lookup(r)
+			seq[i].Text = []rune{r}
+		}
 		lookups := gsub.FindLookups(locale.EnUS, nil)
-
-		in := []font.Glyph{
-			{Gid: 1},
-			{Gid: 2},
-			{Gid: 3},
-			{Gid: 4},
-			{Gid: 5},
-		}
-		expected := []font.GlyphID{1, 2, 29}
-
-		gg := in
 		for _, lookupIndex := range lookups {
-			gg = gsub.ApplyLookup(gg, lookupIndex, gdef)
+			seq = gsub.ApplyLookup(seq, lookupIndex, gdef)
 		}
 
-		fmt.Println(testIdx, unpack(gg))
-		if out := unpack(gg); !reflect.DeepEqual(out[:3], expected) {
-			t.Errorf("expected %v, got %v", expected, out)
+		var textRunes []rune
+		var outRunes []rune
+		for _, g := range seq {
+			textRunes = append(textRunes, g.Text...)
+			outRunes = append(outRunes, rev[g.Gid])
+		}
+		text := string(textRunes)
+		out := string(outRunes)
+
+		fmt.Println(testIdx+1, test.in, "->", test.out)
+		if out != test.out {
+			t.Errorf("expected output %q, got %q", test.out, out)
+		} else if text != test.in {
+			t.Errorf("expected text %q, got %q", test.in, text)
 		}
 
 		if *exportFonts {
-			fontInfo := debug.MakeSimpleFont()
-			fontInfo.Gsub = gsub
 			fontInfo.Gdef = gdef
-			err := exportFont(fontInfo, 700+testIdx)
+			fontInfo.Gsub = gsub
+			err := exportFont(fontInfo, testIdx+1)
 			if err != nil {
 				t.Error(err)
 			}
