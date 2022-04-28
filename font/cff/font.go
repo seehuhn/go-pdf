@@ -489,6 +489,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	}
 
 	// section 11: subrs INDEX
+	// TODO(voss): only write this section, if subroutines are present?
 	secSubrsIndex := len(blobs)
 	blobs = append(blobs, cffIndex{}.encode())
 
@@ -512,6 +513,7 @@ func (cff *Font) Encode(w io.Writer) error {
 		var fontDictIndex cffIndex
 		for i := 0; i < numFonts; i++ {
 			secPrivateDict := secPrivateDicts[i]
+			// TODO(voss): only write this key, if subroutines are present?
 			privateDicts[i][opSubrs] = []interface{}{offs[secSubrsIndex] - offs[secPrivateDict]}
 			blobs[secPrivateDict] = privateDicts[i].encode(strings)
 			pdSize := len(blobs[secPrivateDict])

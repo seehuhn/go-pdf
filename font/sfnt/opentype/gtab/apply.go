@@ -32,7 +32,8 @@ func (info *Info) ApplyLookup(glyphs []font.Glyph, lookupIndex LookupIndex, gdef
 		glyphs, pos = info.applyLookupAt(glyphs, lookupIndex, gdef, pos)
 		newNumLeft := len(glyphs) - pos
 		if newNumLeft >= numLeft {
-			panic("infinite loop")
+			// panic("infinite loop")
+			pos = len(glyphs) - numLeft + 1
 		}
 		numLeft = newNumLeft
 	}
@@ -54,17 +55,24 @@ func (info *Info) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gdef 
 		return newSeq, newPos
 	}
 
+	orig := seq
 	seq = newSeq
 	next := newPos
 	numActions := 1 // we count the original lookup as an action
-	for len(nested) > 0 && numActions < 64 {
+	for len(nested) > 0 {
+		if numActions >= 64 {
+			return orig, pos + 1
+		}
+		numActions++
+
+		// fmt.Println(next, seq)
+
 		a := nested[0]
 		nested = nested[1:]
 		if int(a.SequenceIndex) < pos || int(a.SequenceIndex) >= next || int(a.LookupListIndex) >= numLookups {
 			continue
 		}
 
-		numActions++
 		lookup = info.LookupList[a.LookupListIndex]
 		keep = MakeFilter(lookup.Meta, gdef)
 		newSeq, newPos, n2 := lookup.Subtables.Apply(keep, seq, int(a.SequenceIndex))

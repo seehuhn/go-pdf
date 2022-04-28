@@ -37,7 +37,7 @@ type Nested []SeqLookup
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-1-simple-glyph-contexts
 type SeqContext1 struct {
 	Cov   coverage.Table
-	Rules [][]*SeqRule
+	Rules [][]*SeqRule // indexed by coverage index
 }
 
 // SeqRule describes a sequence of glyphs and the actions to be performed
@@ -134,6 +134,9 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 // Apply implements the Subtable interface.
 func (l *SeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if !keep(seq[i].Gid) {
+		return seq, -1, nil
+	}
 	rulesIdx, ok := l.Cov[seq[i].Gid]
 	if !ok {
 		return seq, -1, nil
@@ -262,13 +265,13 @@ func (l *SeqContext1) Encode() []byte {
 type SeqContext2 struct {
 	Cov     coverage.Table
 	Classes classdef.Table
-	Rules   [][]*ClassSequenceRule
+	Rules   [][]*ClassSequenceRule // indexed by class index of the first glyph
 }
 
 // ClassSequenceRule describes a sequence of glyph classes and the actions to
 // be performed
 type ClassSequenceRule struct {
-	Input   []uint16 // excludes the first input glyph, since this is in Cov
+	Input   []uint16 // excludes the first input glyph
 	Actions Nested
 }
 
@@ -288,15 +291,15 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(cov) > len(classSeqRuleSetOffsets) {
-		cov.Prune(len(classSeqRuleSetOffsets))
-	} else {
-		classSeqRuleSetOffsets = classSeqRuleSetOffsets[:len(cov)]
-	}
 
 	classDef, err := classdef.Read(p, subtablePos+int64(classDefOffset))
 	if err != nil {
 		return nil, err
+	}
+
+	numClasses := classDef.NumClasses()
+	if len(classSeqRuleSetOffsets) > numClasses {
+		classSeqRuleSetOffsets = classSeqRuleSetOffsets[:numClasses]
 	}
 
 	res := &SeqContext2{
@@ -365,10 +368,14 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 // Apply implements the Subtable interface.
 func (l *SeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	ruleIdx, ok := l.Cov[seq[i].Gid]
+	if !keep(seq[i].Gid) {
+		return seq, -1, nil
+	}
+	_, ok := l.Cov[seq[i].Gid]
 	if !ok {
 		return seq, -1, nil
 	}
+	ruleIdx := l.Classes[seq[i].Gid]
 	rule := l.Rules[ruleIdx]
 
 	var matchPos []int

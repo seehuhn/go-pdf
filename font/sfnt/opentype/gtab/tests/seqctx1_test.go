@@ -19,14 +19,12 @@ package tests
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
-	"seehuhn.de/go/pdf/locale"
 )
 
 func TestSequenceContext1(t *testing.T) {
@@ -113,7 +111,7 @@ func TestSequenceContext1(t *testing.T) {
 		},
 	}
 
-	exportFont(fontInfo, 9730)
+	exportFont(fontInfo, 9730, "")
 }
 
 func Test9735(t *testing.T) {
@@ -187,7 +185,7 @@ func Test9735(t *testing.T) {
 		},
 	}
 
-	err := exportFont(fontInfo, 9735)
+	err := exportFont(fontInfo, 9735, "")
 	if err != nil {
 		t.Error(err)
 	}
@@ -272,97 +270,8 @@ func Test9736(t *testing.T) {
 		},
 	}
 
-	err := exportFont(fontInfo, 9736)
+	err := exportFont(fontInfo, 9736, "")
 	if err != nil {
 		t.Error(err)
 	}
-}
-
-// Test9737 tests a situation where HarfBuzz and MS Word disagree.
-// We side with Word here.
-// https://github.com/harfbuzz/harfbuzz/issues/3545
-func Test9737(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
-
-	gidA := fontInfo.CMap.Lookup('A')
-	gidB := fontInfo.CMap.Lookup('B')
-
-	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
-		},
-		FeatureList: []*gtab.Feature{
-			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
-		},
-		LookupList: []*gtab.LookupTable{
-			{ // lookup 0
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: coverage.Table{gidA: 0},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{
-									Input: []font.GlyphID{gidB},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 1}, // AB -> AAB
-										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-									},
-								},
-								{
-									Input: []font.GlyphID{gidA, gidB},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 1}, // AAB -> AAAB
-										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-									},
-								},
-								{
-									Input: []font.GlyphID{gidA, gidA, gidB},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 1}, // AAAB -> AAAAB
-										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 1
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 2,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub2_1{
-						Cov: coverage.Table{gidA: 0},
-						Repl: [][]font.GlyphID{
-							{gidA, gidA}, // A -> AA
-						},
-					},
-				},
-			},
-		},
-	}
-
-	gg := []font.Glyph{
-		{Gid: gidA},
-		{Gid: gidB},
-	}
-	gsub := fontInfo.Gsub
-	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
-		gg = gsub.ApplyLookup(gg, lookupIndex, nil)
-	}
-	// MS Word gives AAAAB
-	// harfbuzz gives AAB
-
-	got := unpack(gg)
-	expected := []font.GlyphID{gidA, gidA, gidA, gidA, gidB}
-
-	if diff := cmp.Diff(expected, got); diff != "" {
-		t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
-	}
-
-	exportFont(fontInfo, 9737)
 }

@@ -270,10 +270,11 @@ func (info *Info) makeName(ss cmap.Table) []byte {
 	fullName := info.FullName()
 	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryUndefined} {
 		nameInfo.Tables[name.Loc{Language: locale.LangEnglish, Country: country}] = &name.Table{
-			Copyright:      info.Copyright,
-			Trademark:      info.Trademark,
 			Family:         info.FamilyName,
 			Subfamily:      info.Subfamily(),
+			Description:    info.Description,
+			Copyright:      info.Copyright,
+			Trademark:      info.Trademark,
 			Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
 			FullName:       fullName,
 			Version:        "Version " + info.Version.String(),

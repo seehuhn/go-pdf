@@ -276,6 +276,10 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.Weight = font.WeightFromString(fontInfo.Weight)
 	}
 
+	if nameTable != nil {
+		info.Description = nameTable.Description
+	}
+
 	if ver, ok := getNameTableVersion(nameTable); ok {
 		info.Version = ver
 	} else if headInfo != nil {

@@ -28,6 +28,17 @@ import (
 // Table contains the information from an OpenType "Class Definition Table".
 type Table map[font.GlyphID]uint16
 
+// NumClasses returns the number of classes in the table.
+func (info Table) NumClasses() int {
+	maxClass := uint16(0)
+	for _, class := range info {
+		if class > maxClass {
+			maxClass = class
+		}
+	}
+	return int(maxClass) + 1
+}
+
 // Read reads and decodes an OpenType "Class Definition Table".
 func Read(p *parser.Parser, pos int64) (Table, error) {
 	err := p.SeekPos(pos)

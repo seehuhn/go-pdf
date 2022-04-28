@@ -38,9 +38,10 @@ import (
 
 // Info contains information about the font.
 type Info struct {
-	FamilyName string
-	Width      font.Width
-	Weight     font.Weight
+	FamilyName  string
+	Width       font.Width
+	Weight      font.Weight
+	Description string
 
 	Version          head.Version
 	CreationTime     time.Time
