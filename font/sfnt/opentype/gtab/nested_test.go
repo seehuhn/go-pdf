@@ -19,10 +19,95 @@ package gtab
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
+
+type debugNestedLookup struct {
+	matchPos []int
+	actions  Nested
+}
+
+func (l *debugNestedLookup) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if i != 0 {
+		seq[i].Gid = 3
+		return seq, i + 1, nil
+	}
+	next := l.matchPos[len(l.matchPos)-1] + 1
+	nested := l.actions.substituteLocations(l.matchPos)
+	return seq, next, nested
+}
+
+func (l *debugNestedLookup) EncodeLen() int {
+	panic("unreachable")
+}
+
+func (l *debugNestedLookup) Encode() []byte {
+	panic("unreachable")
+}
+
+// TestNestedSimple tests that the nested lookup works as expected
+// when the nested lookups are single glyph substitutions.
+func TestNestedSimple(t *testing.T) {
+	type testCase struct {
+		sequenceIndex []int
+		out           []font.GlyphID
+	}
+	cases := []testCase{
+		{[]int{0}, []font.GlyphID{2, 1, 1, 1, 1, 3, 3}},
+		{[]int{1}, []font.GlyphID{1, 1, 2, 1, 1, 3, 3}},
+		{[]int{2}, []font.GlyphID{1, 1, 1, 1, 2, 3, 3}},
+		{[]int{3}, []font.GlyphID{1, 1, 1, 1, 1, 3, 3}},
+		{[]int{1, 2}, []font.GlyphID{1, 1, 2, 1, 2, 3, 3}},
+		{[]int{1, 3}, []font.GlyphID{1, 1, 2, 1, 1, 3, 3}},
+	}
+	for _, test := range cases {
+		var nested Nested
+		for _, seqenceIndex := range test.sequenceIndex {
+			nested = append(nested, SeqLookup{
+				SequenceIndex:   uint16(seqenceIndex),
+				LookupListIndex: 1,
+			})
+		}
+		info := &Info{
+			LookupList: LookupList{
+				{
+					Meta: &LookupMetaInfo{},
+					Subtables: []Subtable{
+						&debugNestedLookup{
+							matchPos: []int{0, 2, 4},
+							actions:  nested,
+						},
+					},
+				},
+				{
+					Meta: &LookupMetaInfo{
+						LookupType: 1,
+					},
+					Subtables: []Subtable{
+						&Gsub1_1{
+							Cov:   coverage.Table{1: 0},
+							Delta: 1,
+						},
+					},
+				},
+			},
+		}
+		seq := []font.Glyph{
+			{Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1},
+		}
+		seq = info.ApplyLookup(seq, 0, nil)
+		var out []font.GlyphID
+		for _, g := range seq {
+			out = append(out, g.Gid)
+		}
+		if diff := cmp.Diff(test.out, out); diff != "" {
+			t.Error(diff)
+		}
+	}
+}
 
 func TestSeqContext1(t *testing.T) {
 	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
@@ -70,23 +155,16 @@ func TestSeqContext1(t *testing.T) {
 func TestSeqContext2(t *testing.T) {
 	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext2{
-		Cov:     map[font.GlyphID]int{2: 0, 3: 1, 4: 2},
-		Classes: classdef.Table{1: 1, 2: 0, 3: 1, 4: 0, 5: 1, 99: 0},
+		Cov:     map[font.GlyphID]int{2: 0, 3: 1, 4: 2, 99: 3},
+		Classes: classdef.Table{1: 1, 3: 1, 5: 1},
 		Rules: [][]*ClassSequenceRule{
-			{ // seq = 2, ...
-				{Input: []uint16{0}},
-				{Input: []uint16{1, 0, 0}},
+			{ // seq = class0, ...
 				{Input: []uint16{1, 0}},
-				{Input: []uint16{1, 0, 1}},
+				{Input: []uint16{1}},
 			},
-			{ // seq = 3, ...
+			{ // seq = class1, ...
 				{Input: []uint16{1}},
 				{Input: []uint16{0, 1, 0}},
-			},
-			{ // seq = 4, ...
-				{Input: []uint16{1, 0}},
-				{Input: []uint16{0}},
-				{Input: []uint16{1}},
 			},
 		},
 	}
@@ -95,12 +173,12 @@ func TestSeqContext2(t *testing.T) {
 	cases := []struct {
 		before, after int
 	}{
-		{0, -1},
-		{1, 4}, // matches 2, 3, 4
-		{2, -1},
-		{3, 6}, // matches 4, [99,] 5
-		{4, -1},
-		{5, -1},
+		{0, -1}, // not in coverage table
+		{1, 4},  // matches class0, class1, class0
+		{2, -1}, // no match for class1, class0, class1
+		{3, 6},  // matches 4, [99,] 5
+		{4, -1}, // keep returns false
+		{5, -1}, // not in coverage table
 	}
 	for _, test := range cases {
 		_, next, _ := l.Apply(keep, in, test.before)

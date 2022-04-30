@@ -223,6 +223,31 @@ func TestGsub(t *testing.T) {
 			in:  "AB",
 			out: "AAAAB",
 		},
+		// TODO(voss): re-enable this test once the code is fixed.
+		// { // test postitions when nested lookups change the sequence length
+		// 	lookupType: 5,
+		// 	subtable: &gtab.SeqContext1{
+		// 		Cov: coverage.Table{gidA: 0},
+		// 		Rules: [][]*gtab.SeqRule{
+		// 			{
+		// 				{
+		// 					Input: []font.GlyphID{gidA, gidA},
+		// 					Actions: []gtab.SeqLookup{
+		// 						{SequenceIndex: 1, LookupListIndex: 3}, // A A A -> A AA A
+		// 						{SequenceIndex: 2, LookupListIndex: 2}, // A AA A -> A AX A
+		// 					},
+		// 				},
+		// 				{
+		// 					Actions: []gtab.SeqLookup{
+		// 						{SequenceIndex: 0, LookupListIndex: 1}, // A -> B
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	in:  "AAAAA",
+		// 	out: "AAXABB",
+		// },
 		{ // test next position when lookup flags are used for nested lookups, using GSUB 5.1
 			lookupType: 5,
 			subtable: &gtab.SeqContext1{

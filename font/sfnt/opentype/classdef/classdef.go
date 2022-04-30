@@ -26,6 +26,7 @@ import (
 )
 
 // Table contains the information from an OpenType "Class Definition Table".
+// All glyphs not assigned to a class fall into Class 0.
 type Table map[font.GlyphID]uint16
 
 // NumClasses returns the number of classes in the table.

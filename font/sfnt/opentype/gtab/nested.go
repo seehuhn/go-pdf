@@ -33,6 +33,34 @@ type SeqLookup struct {
 // Nested describes the actions of nested lookups.
 type Nested []SeqLookup
 
+func readNested(p *parser.Parser, seqLookupCount int) (Nested, error) {
+	res := make(Nested, seqLookupCount)
+	for i := range res {
+		buf, err := p.ReadBytes(4)
+		if err != nil {
+			return nil, err
+		}
+		res[i].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
+		res[i].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+	}
+	return res, nil
+}
+
+func (actions Nested) substituteLocations(matchPos []int) Nested {
+	res := make(Nested, 0, len(actions))
+	for _, action := range actions {
+		idx := int(action.SequenceIndex)
+		if idx >= len(matchPos) {
+			continue
+		}
+		res = append(res, SeqLookup{
+			SequenceIndex:   uint16(matchPos[idx]),
+			LookupListIndex: action.LookupListIndex,
+		})
+	}
+	return res
+}
+
 // SeqContext1 is used for GSUB type 5 format 1 subtables and GPOS type 7 format 1 subtables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-1-simple-glyph-contexts
 type SeqContext1 struct {
@@ -113,14 +141,9 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				}
 				inputSequence[k] = font.GlyphID(xk)
 			}
-			actions := make(Nested, seqLookupCount)
-			for k := range actions {
-				buf, err := p.ReadBytes(4)
-				if err != nil {
-					return nil, err
-				}
-				actions[k].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
-				actions[k].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+			actions, err := readNested(p, seqLookupCount)
+			if err != nil {
+				return nil, err
 			}
 			res.Rules[i][j] = &SeqRule{
 				Input:   inputSequence,
@@ -161,15 +184,7 @@ ruleLoop:
 			matchPos = append(matchPos, p)
 		}
 
-		actions := make(Nested, len(rule.Actions))
-		for j, a := range rule.Actions {
-			idx := int(a.SequenceIndex)
-			if idx < len(matchPos) {
-				actions[j].SequenceIndex = uint16(matchPos[idx])
-				actions[j].LookupListIndex = a.LookupListIndex
-			}
-		}
-
+		actions := rule.Actions.substituteLocations(matchPos)
 		return seq, p + 1, actions
 	}
 
@@ -347,14 +362,9 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				}
 				inputSequence[k] = xk
 			}
-			actions := make(Nested, seqLookupCount)
-			for k := range actions {
-				buf, err := p.ReadBytes(4)
-				if err != nil {
-					return nil, err
-				}
-				actions[k].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
-				actions[k].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+			actions, err := readNested(p, seqLookupCount)
+			if err != nil {
+				return nil, err
 			}
 			res.Rules[i][j] = &ClassSequenceRule{
 				Input:   inputSequence,
@@ -376,15 +386,15 @@ func (l *SeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.G
 		return seq, -1, nil
 	}
 	ruleIdx := l.Classes[seq[i].Gid]
-	rule := l.Rules[ruleIdx]
+	rules := l.Rules[ruleIdx]
 
 	var matchPos []int
 ruleLoop:
-	for _, r := range rule {
+	for _, rule := range rules {
 		p := i
 		matchPos = append(matchPos[:0], p)
-		glyphsNeeded := len(r.Input)
-		for _, cls := range r.Input {
+		glyphsNeeded := len(rule.Input)
+		for _, cls := range rule.Input {
 			glyphsNeeded--
 			p++
 			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -396,15 +406,7 @@ ruleLoop:
 			matchPos = append(matchPos, p)
 		}
 
-		actions := make(Nested, len(r.Actions))
-		for j, a := range r.Actions {
-			idx := int(a.SequenceIndex)
-			if idx < len(matchPos) {
-				actions[j].SequenceIndex = uint16(matchPos[idx])
-				actions[j].LookupListIndex = a.LookupListIndex
-			}
-		}
-
+		actions := rule.Actions.substituteLocations(matchPos)
 		return seq, p + 1, actions
 	}
 
@@ -528,14 +530,9 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		}
 	}
 
-	actions := make(Nested, seqLookupCount)
-	for k := range actions {
-		buf, err := p.ReadBytes(4)
-		if err != nil {
-			return nil, err
-		}
-		actions[k].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
-		actions[k].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+	actions, err := readNested(p, seqLookupCount)
+	if err != nil {
+		return nil, err
 	}
 
 	cov := make([]coverage.Table, glyphCount)
@@ -574,15 +571,7 @@ func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.G
 		matchPos = append(matchPos, p)
 	}
 
-	actions := make(Nested, len(l.Actions))
-	for j, a := range l.Actions {
-		idx := int(a.SequenceIndex)
-		if idx < len(matchPos) {
-			actions[j].SequenceIndex = uint16(matchPos[idx])
-			actions[j].LookupListIndex = a.LookupListIndex
-		}
-	}
-
+	actions := l.Actions.substituteLocations(matchPos)
 	return seq, p + 1, actions
 }
 
@@ -715,14 +704,9 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 			if err != nil {
 				return nil, err
 			}
-			actions := make(Nested, seqLookupCount)
-			for k := range actions {
-				buf, err := p.ReadBytes(4)
-				if err != nil {
-					return nil, err
-				}
-				actions[k].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
-				actions[k].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+			actions, err := readNested(p, int(seqLookupCount))
+			if err != nil {
+				return nil, err
 			}
 			rules[i][j] = &ChainedSeqRule{
 				Backtrack: backtrackSequence,
@@ -791,15 +775,7 @@ ruleLoop:
 			}
 		}
 
-		actions := make(Nested, len(rule.Actions))
-		for j, a := range rule.Actions {
-			idx := int(a.SequenceIndex)
-			if idx < len(matchPos) {
-				actions[j].SequenceIndex = uint16(matchPos[idx])
-				actions[j].LookupListIndex = a.LookupListIndex
-			}
-		}
-
+		actions := rule.Actions.substituteLocations(matchPos)
 		return seq, next, actions
 	}
 
@@ -967,6 +943,7 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 		return nil, err
 	}
 
+	// TODO(voss): this is indexed by class, not coverage index!
 	if len(cov) > len(chainedClassSeqRuleSetOffsets) {
 		cov.Prune(len(chainedClassSeqRuleSetOffsets))
 	} else {
@@ -1020,14 +997,9 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 			if err != nil {
 				return nil, err
 			}
-			actions := make(Nested, seqLookupCount)
-			for k := range actions {
-				buf, err := p.ReadBytes(4)
-				if err != nil {
-					return nil, err
-				}
-				actions[k].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
-				actions[k].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+			actions, err := readNested(p, int(seqLookupCount))
+			if err != nil {
+				return nil, err
 			}
 
 			rules[i][j] = &ChainedClassSeqRule{
@@ -1101,15 +1073,7 @@ ruleLoop:
 			}
 		}
 
-		actions := make(Nested, len(rule.Actions))
-		for j, a := range rule.Actions {
-			idx := int(a.SequenceIndex)
-			if idx < len(matchPos) {
-				actions[j].SequenceIndex = uint16(matchPos[idx])
-				actions[j].LookupListIndex = a.LookupListIndex
-			}
-		}
-
+		actions := rule.Actions.substituteLocations(matchPos)
 		return seq, next, actions
 	}
 
@@ -1275,14 +1239,9 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 	if err != nil {
 		return nil, err
 	}
-	actions := make(Nested, seqLookupCount)
-	for k := range actions {
-		buf, err := p.ReadBytes(4)
-		if err != nil {
-			return nil, err
-		}
-		actions[k].SequenceIndex = uint16(buf[0])<<8 | uint16(buf[1])
-		actions[k].LookupListIndex = LookupIndex(buf[2])<<8 | LookupIndex(buf[3])
+	actions, err := readNested(p, int(seqLookupCount))
+	if err != nil {
+		return nil, err
 	}
 
 	backtrackCov := make([]coverage.Table, len(backtrackCoverageOffsets))
@@ -1363,14 +1322,7 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([
 		}
 	}
 
-	actions := make(Nested, len(l.Actions))
-	for j, a := range l.Actions {
-		idx := int(a.SequenceIndex)
-		if idx < len(matchPos) {
-			actions[j].SequenceIndex = uint16(matchPos[idx])
-			actions[j].LookupListIndex = a.LookupListIndex
-		}
-	}
+	actions := l.Actions.substituteLocations(matchPos)
 
 	return seq, next, actions
 }
