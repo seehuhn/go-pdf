@@ -115,6 +115,9 @@ func (st notImplementedGsubSubtable) Encode() []byte {
 }
 
 // Gsub1_1 is a Single Substitution subtable (GSUB type 1, format 1).
+// Lookups of this type allow to replace a single glyph with another glyph.
+// The original glyph must be contained in the coverage table.
+// The new glyph is determined by adding `delta` to the original glyph's GID.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#11-single-substitution-format-1
 type Gsub1_1 struct {
 	Cov   coverage.Table
@@ -171,10 +174,14 @@ func (l *Gsub1_1) Encode() []byte {
 }
 
 // Gsub1_2 is a Single Substitution GSUB subtable (type 1, format 2).
+// Lookups of this type allow to replace a single glyph with another glyph.
+// The original glyph must be contained in the coverage table.
+// The new glyph is found by looking up the replacement GID in the
+// SubstituteGlyphIDs table (indexed by the coverage index of the original GID).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#12-single-substitution-format-2
 type Gsub1_2 struct {
 	Cov                coverage.Table
-	SubstituteGlyphIDs []font.GlyphID
+	SubstituteGlyphIDs []font.GlyphID // indexed by coverage index
 }
 
 func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -244,10 +251,15 @@ func (l *Gsub1_2) Encode() []byte {
 }
 
 // Gsub2_1 is a Multiple Substitution GSUB subtable (type 2, format 1).
+// Lookups of this type allow to replace a singly glyph with multiple glyphs.
+// The original glyph must be contained in the coverage table.
+// The new glyphs are found by looking up the replacement GIDs in the
+// `Repl` table (indexed by the coverage index of the original GID).
+// Replacement sequences must have at least one glyph.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#21-multiple-substitution-format-1
 type Gsub2_1 struct {
 	Cov  coverage.Table
-	Repl [][]font.GlyphID // individual sequences must have non-zero length
+	Repl [][]font.GlyphID // indexed by coverage table
 }
 
 func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -488,10 +500,11 @@ func (l *Gsub3_1) Encode() []byte {
 }
 
 // Gsub4_1 is a Ligature Substitution GSUB subtable (type 4, format 1).
+// Lookups of this type replace a sequence of glyphs with a single glyph.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#41-ligature-substitution-format-1
 type Gsub4_1 struct {
 	Cov  coverage.Table
-	Repl [][]Ligature
+	Repl [][]Ligature // indexed by coverage index
 }
 
 // Ligature represents a substitution of a sequence of glyphs into a single glyph.

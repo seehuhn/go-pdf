@@ -1,0 +1,173 @@
+package builder
+
+import (
+	"fmt"
+	"unicode"
+	"unicode/utf8"
+)
+
+// itemType identifies the type of lexer items.
+type itemType int
+
+const (
+	itemError itemType = iota
+	itemEOF
+	itemEOL
+	itemIdentifier
+	itemString
+)
+
+type item struct {
+	typ itemType
+	val string
+}
+
+func (i item) String() string {
+	switch i.typ {
+	case itemError:
+		return i.val
+	case itemEOF:
+		return "EOF"
+	}
+	if len(i.val) > 10 {
+		return fmt.Sprintf("%.10q...", i.val)
+	}
+	return fmt.Sprintf("%q", i.val)
+}
+
+func lex(name string, input string) (*lexer, <-chan item) {
+	c := make(chan item)
+	l := &lexer{
+		name:  name,
+		input: input,
+		items: c,
+		line:  1,
+	}
+	go l.run()
+	return l, c
+}
+
+type lexer struct {
+	name  string // only for error reporting
+	input string
+	line  int
+	start int // start position of current item
+	pos   int // current position in input
+	width int // width of last rune read from input
+	items chan<- item
+}
+
+func (l *lexer) run() {
+	for state := lexStart; state != nil; {
+		state = state(l)
+	}
+	close(l.items)
+}
+
+func (l *lexer) emit(t itemType) {
+	l.items <- item{typ: t, val: l.input[l.start:l.pos]}
+	l.start = l.pos
+}
+
+func (l *lexer) next() (r rune) {
+	if l.pos >= len(l.input) {
+		return eof
+	}
+	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
+	l.pos += l.width
+	return r
+}
+
+func (l *lexer) ignore() {
+	l.start = l.pos
+}
+
+func (l *lexer) backup() {
+	l.pos -= l.width
+}
+
+func (l *lexer) peek() rune {
+	r := l.next()
+	l.backup()
+	return r
+}
+
+func (l *lexer) errorf(format string, args ...interface{}) stateFn {
+	l.items <- item{
+		typ: itemError,
+		val: fmt.Sprintf(format, args...),
+	}
+	return nil
+}
+
+const eof = rune(0)
+
+// stateFn represents the state of the scanner
+// as a function that returns the next state.
+type stateFn func(*lexer) stateFn
+
+func lexStart(l *lexer) stateFn {
+	// Skip whitespace.
+	for {
+		r := l.next()
+		if r == eof {
+			l.emit(itemEOF)
+			return nil
+		}
+		if r == '\n' || !unicode.IsSpace(r) {
+			l.backup()
+			break
+		}
+	}
+	l.ignore()
+
+	// At least one more rune is available, and it is not a white space character.
+	r := l.next()
+	switch {
+	case r == '\n':
+		l.emit(itemEOL)
+		return lexStart
+	case unicode.IsLetter(r):
+		return lexIdentifier
+	case r == '"':
+		return lexString
+	default:
+		return l.errorf("unexpected character %#U", r)
+	}
+}
+
+func lexIdentifier(l *lexer) stateFn {
+	for {
+		r := l.next()
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
+			if r != eof {
+				l.backup()
+			}
+			l.emit(itemIdentifier)
+			return lexStart
+		}
+	}
+}
+
+func lexString(l *lexer) stateFn {
+	escape := false
+	for {
+		r := l.next()
+		if r == eof || r == '\n' {
+			return l.errorf("unterminated string")
+		}
+		if escape {
+			escape = false
+			continue
+		}
+		if r == '\\' {
+			escape = true
+			continue
+		}
+		if r == '"' {
+			break
+		}
+	}
+	l.emit(itemString)
+	return lexStart
+}
