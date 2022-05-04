@@ -6,6 +6,17 @@ import (
 	"unicode/utf8"
 )
 
+func lex(input string) (*lexer, <-chan item) {
+	c := make(chan item)
+	l := &lexer{
+		input: input,
+		items: c,
+		line:  1,
+	}
+	go l.run()
+	return l, c
+}
+
 // itemType identifies the type of lexer items.
 type itemType int
 
@@ -15,6 +26,8 @@ const (
 	itemEOL
 	itemIdentifier
 	itemString
+	itemInteger
+	itemEqual
 )
 
 type item struct {
@@ -35,20 +48,7 @@ func (i item) String() string {
 	return fmt.Sprintf("%q", i.val)
 }
 
-func lex(name string, input string) (*lexer, <-chan item) {
-	c := make(chan item)
-	l := &lexer{
-		name:  name,
-		input: input,
-		items: c,
-		line:  1,
-	}
-	go l.run()
-	return l, c
-}
-
 type lexer struct {
-	name  string // only for error reporting
 	input string
 	line  int
 	start int // start position of current item
@@ -71,6 +71,7 @@ func (l *lexer) emit(t itemType) {
 
 func (l *lexer) next() (r rune) {
 	if l.pos >= len(l.input) {
+		l.width = 0
 		return eof
 	}
 	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
@@ -131,6 +132,11 @@ func lexStart(l *lexer) stateFn {
 		return lexIdentifier
 	case r == '"':
 		return lexString
+	case r >= '0' && r <= '9':
+		return lexInteger
+	case r == '=':
+		l.emit(itemEqual)
+		return lexStart
 	default:
 		return l.errorf("unexpected character %#U", r)
 	}
@@ -169,5 +175,17 @@ func lexString(l *lexer) stateFn {
 		}
 	}
 	l.emit(itemString)
+	return lexStart
+}
+
+func lexInteger(l *lexer) stateFn {
+	for {
+		r := l.next()
+		if r < '0' || r > '9' {
+			l.backup()
+			break
+		}
+	}
+	l.emit(itemInteger)
 	return lexStart
 }
