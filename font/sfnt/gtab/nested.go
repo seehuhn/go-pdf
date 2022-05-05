@@ -677,7 +677,7 @@ func (l *chainedSeq3) Apply(keep KeepGlyphFn, seq []font.Glyph, pos int) ([]font
 
 type seqLookup struct {
 	pos    int
-	nested *LookupTable
+	nested *OldLookupTable
 }
 
 func applyActions(actions []seqLookup, pp []int, seq []font.Glyph) []font.Glyph {

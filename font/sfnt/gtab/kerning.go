@@ -54,7 +54,7 @@ func KerningAsLookup(kerning []KernInfo) Lookups {
 		cov:    cov,
 		adjust: adjust,
 	}
-	lookup := &LookupTable{
+	lookup := &OldLookupTable{
 		Subtables: []LookupSubtable{subtable},
 		Filter:    useAllGlyphs,
 	}

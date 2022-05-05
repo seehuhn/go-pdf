@@ -44,7 +44,7 @@ func TestGpos(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-		LookupList: []*gtab.LookupTable{
+		LookupList: gtab.LookupList{
 			{
 				Meta: &gtab.LookupMetaInfo{
 					LookupType: lookupType,

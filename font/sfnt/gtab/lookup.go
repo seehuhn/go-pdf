@@ -19,12 +19,12 @@ package gtab
 import "seehuhn.de/go/pdf/font"
 
 // Lookups represents the information from a "GSUB" or "GPOS" table of a font.
-type Lookups []*LookupTable
+type Lookups []*OldLookupTable
 
-// LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
+// OldLookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
 // font.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
-type LookupTable struct {
+type OldLookupTable struct {
 	Subtables []LookupSubtable
 	Filter    KeepGlyphFn
 
@@ -53,7 +53,7 @@ func (gtab Lookups) ApplyAll(glyphs []font.Glyph) []font.Glyph {
 	return glyphs
 }
 
-func (l *LookupTable) applySubtables(glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
+func (l *OldLookupTable) applySubtables(glyphs []font.Glyph, pos int) ([]font.Glyph, int) {
 	for _, subtable := range l.Subtables {
 		glyphs, next := subtable.Apply(l.Filter, glyphs, pos)
 		if next >= 0 {

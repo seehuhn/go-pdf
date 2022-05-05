@@ -42,7 +42,7 @@ func TestGetLookups(t *testing.T) {
 			{Tag: "mkmk", Lookups: []LookupIndex{4, 3, 2}},
 			{Tag: "test", Lookups: []LookupIndex{4, 5}},
 		},
-		LookupList: []*LookupTable{
+		LookupList: LookupList{
 			nil, nil, nil, nil, nil, nil,
 		},
 	}

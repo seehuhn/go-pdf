@@ -295,7 +295,7 @@ func (g *GTab) readLookups(lookupIndices []uint16) (Lookups, error) {
 	return res, nil
 }
 
-func (g *GTab) getGtabLookup(idx uint16) (*LookupTable, error) {
+func (g *GTab) getGtabLookup(idx uint16) (*OldLookupTable, error) {
 	if int(idx) >= len(g.lookups) {
 		return nil, g.Error("lookup index %d out of range", idx)
 	}
@@ -331,7 +331,7 @@ func (g *GTab) getGtabLookup(idx uint16) (*LookupTable, error) {
 		// }
 	}
 
-	lookup := &LookupTable{
+	lookup := &OldLookupTable{
 		Filter:           g.makeFilter(flags),
 		rtl:              flags&0x0001 != 0,
 		markFilteringSet: markFilteringSet,

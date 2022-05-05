@@ -24,6 +24,22 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
+// LookupIndex enumerates lookups.
+// It is used as an index into a LookupList.
+type LookupIndex uint16
+
+// LookupList contains the information from a Lookup List Table.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
+type LookupList []*LookupTable
+
+// LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
+// font.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
+type LookupTable struct {
+	Meta      *LookupMetaInfo
+	Subtables Subtables
+}
+
 // LookupMetaInfo contains information associated with a lookup but not
 // specific to a subtable.
 type LookupMetaInfo struct {
@@ -45,22 +61,6 @@ const (
 	LookupUseMarkFilteringSet LookupFlags = 0x0010
 	LookupMarkAttachTypeMask  LookupFlags = 0xFF00
 )
-
-// LookupIndex enumerates lookups.
-// It is used as an index into a LookupList.
-type LookupIndex uint16
-
-// LookupList contains the information from a Lookup List Table.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-list-table
-type LookupList []*LookupTable
-
-// LookupTable represents a lookup table inside a "GSUB" or "GPOS" table of a
-// font.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table
-type LookupTable struct {
-	Meta      *LookupMetaInfo
-	Subtables Subtables
-}
 
 // Subtable represents a subtable of a "GSUB" or "GPOS" lookup table.
 type Subtable interface {

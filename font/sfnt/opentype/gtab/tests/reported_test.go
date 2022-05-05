@@ -45,7 +45,7 @@ func Test9737(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-		LookupList: []*gtab.LookupTable{
+		LookupList: gtab.LookupList{
 			{ // lookup 0
 				Meta: &gtab.LookupMetaInfo{
 					LookupType: 5,
@@ -139,7 +139,7 @@ func Test9738(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-		LookupList: []*gtab.LookupTable{
+		LookupList: gtab.LookupList{
 			{ // lookup 0
 				Meta: &gtab.LookupMetaInfo{
 					LookupType: 5,

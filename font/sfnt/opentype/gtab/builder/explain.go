@@ -1,0 +1,243 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package builder
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
+	"seehuhn.de/go/pdf/font/sfntcff"
+)
+
+// ExplainGsub returns a human-readable, textual description of the lookups
+// in a GSUB table.  This function panics if `ll` is not a GSUB table.
+func ExplainGsub(fontInfo *sfntcff.Info, ll gtab.LookupList) string {
+	ee := newExplainer(fontInfo)
+
+	for _, lookup := range ll {
+		var mappings []mapping
+
+		var lookupType int
+		setType := func(newType int) {
+			if lookupType != 0 && lookupType != newType {
+				panic("inconsistent subtables")
+			}
+			lookupType = newType
+		}
+
+		for _, subtable := range lookup.Subtables {
+			switch l := subtable.(type) {
+			case *gtab.Gsub1_1:
+				setType(1)
+				for key := range l.Cov {
+					mappings = append(mappings, mapping{
+						from: []font.GlyphID{key},
+						to:   []font.GlyphID{key + l.Delta},
+					})
+				}
+			case *gtab.Gsub1_2:
+				setType(1)
+				for key, idx := range l.Cov {
+					mappings = append(mappings, mapping{
+						from: []font.GlyphID{key},
+						to:   []font.GlyphID{l.SubstituteGlyphIDs[idx]},
+					})
+				}
+			case *gtab.Gsub2_1:
+				setType(2)
+			case *gtab.Gsub3_1:
+				setType(3)
+			case *gtab.Gsub4_1:
+				setType(4)
+			case *gtab.SeqContext1:
+				setType(5)
+			case *gtab.SeqContext2:
+				setType(5)
+			case *gtab.SeqContext3:
+				setType(5)
+			case *gtab.ChainedSeqContext1:
+				setType(6)
+			case *gtab.ChainedSeqContext2:
+				setType(6)
+			case *gtab.ChainedSeqContext3:
+				setType(6)
+			default:
+				panic(fmt.Sprintf("unsupported subtable type %T", l))
+			}
+		}
+
+		fmt.Fprintf(ee.w, "GSUB_%d:", lookupType)
+		ee.explainFlags(lookup.Meta.LookupFlag)
+		switch lookupType {
+		case 0:
+			panic("no subtables")
+		case 1:
+			ee.explainMappings(mappings)
+			ee.w.WriteRune('\n')
+		default:
+			ee.w.WriteString(" # not yet implemented\n")
+		}
+	}
+
+	return ee.w.String()
+}
+
+type explainer struct {
+	w      *strings.Builder
+	mapped []string
+	names  []string
+}
+
+func newExplainer(fontInfo *sfntcff.Info) *explainer {
+	mappings := make([]string, fontInfo.NumGlyphs())
+	a, b := fontInfo.CMap.CodeRange()
+	for r := a; r <= b; r++ {
+		gid := fontInfo.CMap.Lookup(r)
+		if gid != 0 {
+			mappings[gid] = fmt.Sprintf("%q", string([]rune{r}))
+		}
+	}
+
+	names := make([]string, fontInfo.NumGlyphs())
+	for i := range names {
+		name := fontInfo.GlyphName(font.GlyphID(i))
+		if name != "" {
+			names[i] = string(name)
+		} else {
+			names[i] = fmt.Sprintf("%d", i)
+		}
+	}
+
+	return &explainer{
+		w:      &strings.Builder{},
+		mapped: mappings,
+		names:  names,
+	}
+}
+
+func (ee *explainer) explainFlags(flags gtab.LookupFlags) {
+	if flags&gtab.LookupIgnoreMarks != 0 {
+		ee.w.WriteString(" -marks")
+	}
+	if flags&gtab.LookupRightToLeft != 0 {
+		ee.w.WriteString(" -rtl")
+	}
+	if flags&gtab.LookupIgnoreBaseGlyphs != 0 {
+		ee.w.WriteString(" -base")
+	}
+	if flags&gtab.LookupIgnoreLigatures != 0 {
+		ee.w.WriteString(" -lig")
+	}
+	// if flags&LookupUseMarkFilteringSet != 0 {
+	// 	ee.w.WriteString(" -UseMarkFilteringSet")
+	// }
+	// if flags&LookupMarkAttachTypeMask != 0 {
+	// 	ee.w.WriteString(" -MarkAttachTypeMask")
+	// }
+}
+
+type mapping struct {
+	from []font.GlyphID
+	to   []font.GlyphID
+}
+
+func (ee *explainer) explainMappings(mm []mapping) {
+	sort.Slice(mm, func(i, j int) bool {
+		for k := 0; k < len(mm[i].from) && k < len(mm[j].from); k++ {
+			if mm[i].from[k] != mm[j].from[k] {
+				return mm[i].from[k] < mm[j].from[k]
+			}
+		}
+		return len(mm[i].from) < len(mm[j].from)
+	})
+
+	sep := " "
+	for len(mm) > 0 {
+		ee.w.WriteString(sep)
+		sep = ", "
+
+		canRange := len(mm) > 2
+		for i := 1; canRange && i < len(mm); i++ {
+			if len(mm[i].from) != 1 || len(mm[i].to) != 1 {
+				canRange = false
+			}
+		}
+
+		rangeLen := 1
+		if canRange {
+			delta := mm[0].to[0] - mm[0].from[0]
+			for i := 1; i < len(mm); i++ {
+				from := mm[i].from[0]
+				to := mm[i].to[0]
+				if from != mm[i-1].from[0]+1 || to != from+delta {
+					break
+				}
+				rangeLen++
+			}
+		}
+
+		if rangeLen > 2 {
+			fmt.Fprintf(ee.w, "%s-%s -> %s-%s",
+				ee.names[mm[0].from[0]],
+				ee.names[mm[rangeLen-1].from[0]],
+				ee.names[mm[0].to[0]],
+				ee.names[mm[rangeLen-1].to[0]],
+			)
+			mm = mm[rangeLen:]
+		} else {
+			from := ee.explainSequence(mm[0].from)
+			to := ee.explainSequence(mm[0].to)
+			fmt.Fprintf(ee.w, "%s -> %s", from, to)
+			mm = mm[1:]
+		}
+	}
+}
+
+func (ee *explainer) explainSequence(seq []font.GlyphID) string {
+	if len(seq) == 0 {
+		return ""
+	}
+
+	if len(seq) == 1 && "\""+ee.names[seq[0]]+"\"" == ee.mapped[seq[0]] {
+		return ee.names[seq[0]]
+	}
+
+	canUseMapped := true
+	for _, gid := range seq {
+		if ee.mapped[gid] == "" {
+			canUseMapped = false
+			break
+		}
+	}
+
+	parts := make([]string, len(seq))
+	if canUseMapped {
+		for i, gid := range seq {
+			name := ee.mapped[gid]
+			parts[i] = name[1 : len(name)-1]
+		}
+		return "\"" + strings.Join(parts, "") + "\""
+	}
+
+	for i, gid := range seq {
+		parts[i] = ee.names[gid]
+	}
+	return strings.Join(parts, " ")
+}
