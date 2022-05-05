@@ -64,7 +64,7 @@ func FuzzGsub2_1(f *testing.F) {
 func FuzzGsub3_1(f *testing.F) {
 	l := &Gsub3_1{
 		Cov: map[font.GlyphID]int{1: 0, 2: 1},
-		Alt: [][]font.GlyphID{
+		Alternates: [][]font.GlyphID{
 			{3, 4},
 			{5, 6, 7},
 		},

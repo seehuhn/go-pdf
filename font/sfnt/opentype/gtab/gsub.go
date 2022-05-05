@@ -382,8 +382,8 @@ func (l *Gsub2_1) Encode() []byte {
 // Gsub3_1 is an Alternate Substitution GSUB subtable (type 3, format 1).
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#31-alternate-substitution-format-1
 type Gsub3_1 struct {
-	Cov coverage.Table
-	Alt [][]font.GlyphID
+	Cov        coverage.Table
+	Alternates [][]font.GlyphID
 }
 
 func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -429,8 +429,8 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	res := &Gsub3_1{
-		Cov: cov,
-		Alt: alt,
+		Cov:        cov,
+		Alternates: alt,
 	}
 	return res, nil
 }
@@ -444,17 +444,17 @@ func (l *Gsub3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph
 	if !ok {
 		return seq, -1, nil
 	}
-	if len(l.Alt[idx]) > 0 {
+	if len(l.Alternates[idx]) > 0 {
 		// TODO(voss): implement a mechanism to select alternate glyphs.
-		seq[i].Gid = l.Alt[idx][0]
+		seq[i].Gid = l.Alternates[idx][0]
 	}
 	return seq, i + 1, nil
 }
 
 // EncodeLen implements the Subtable interface.
 func (l *Gsub3_1) EncodeLen() int {
-	total := 6 + 2*len(l.Alt)
-	for _, repl := range l.Alt {
+	total := 6 + 2*len(l.Alternates)
+	for _, repl := range l.Alternates {
 		total += 2 + 2*len(repl)
 	}
 	total += l.Cov.EncodeLen()
@@ -463,11 +463,11 @@ func (l *Gsub3_1) EncodeLen() int {
 
 // Encode implements the Subtable interface.
 func (l *Gsub3_1) Encode() []byte {
-	alternateSetCount := len(l.Alt)
+	alternateSetCount := len(l.Alternates)
 	covOffs := 6 + 2*alternateSetCount
 
 	alternateSetOffsets := make([]uint16, alternateSetCount)
-	for i, repl := range l.Alt {
+	for i, repl := range l.Alternates {
 		alternateSetOffsets[i] = uint16(covOffs)
 		covOffs += 2 + 2*len(repl)
 	}
@@ -477,15 +477,15 @@ func (l *Gsub3_1) Encode() []byte {
 	buf[1] = 1
 	buf[2] = byte(covOffs >> 8)
 	buf[3] = byte(covOffs)
-	buf[4] = byte(len(l.Alt) >> 8)
-	buf[5] = byte(len(l.Alt))
+	buf[4] = byte(len(l.Alternates) >> 8)
+	buf[5] = byte(len(l.Alternates))
 	pos := 6
-	for i := range l.Alt {
+	for i := range l.Alternates {
 		buf[pos] = byte(alternateSetOffsets[i] >> 8)
 		buf[pos+1] = byte(alternateSetOffsets[i])
 		pos += 2
 	}
-	for _, alt := range l.Alt {
+	for _, alt := range l.Alternates {
 		buf[pos] = byte(len(alt) >> 8)
 		buf[pos+1] = byte(len(alt))
 		pos += 2

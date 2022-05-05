@@ -24,10 +24,15 @@ const (
 	itemError itemType = iota
 	itemEOF
 	itemEOL
-	itemIdentifier
-	itemString
-	itemInteger
+	itemArrow
+	itemColon
+	itemComma
 	itemEqual
+	itemHyphen
+	itemIdentifier
+	itemInteger
+	itemSemicolon
+	itemString
 )
 
 type item struct {
@@ -62,6 +67,7 @@ func (l *lexer) run() {
 		state = state(l)
 	}
 	close(l.items)
+	fmt.Println("lexer done")
 }
 
 func (l *lexer) emit(t itemType) {
@@ -123,19 +129,38 @@ func lexStart(l *lexer) stateFn {
 	l.ignore()
 
 	// At least one more rune is available, and it is not a white space character.
+
 	r := l.next()
 	switch {
 	case r == '\n':
 		l.emit(itemEOL)
 		return lexStart
-	case unicode.IsLetter(r):
+	case unicode.IsLetter(r) || r == '.' || r == '_':
 		return lexIdentifier
 	case r == '"':
 		return lexString
 	case r >= '0' && r <= '9':
 		return lexInteger
+	case r == '-':
+		r := l.next()
+		if r == '>' {
+			l.emit(itemArrow)
+		} else {
+			l.backup()
+			l.emit(itemHyphen)
+		}
+		return lexStart
 	case r == '=':
 		l.emit(itemEqual)
+		return lexStart
+	case r == ':':
+		l.emit(itemColon)
+		return lexStart
+	case r == ';':
+		l.emit(itemSemicolon)
+		return lexStart
+	case r == ',':
+		l.emit(itemComma)
 		return lexStart
 	default:
 		return l.errorf("unexpected character %#U", r)
@@ -145,7 +170,7 @@ func lexStart(l *lexer) stateFn {
 func lexIdentifier(l *lexer) stateFn {
 	for {
 		r := l.next()
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
+		if !(unicode.IsLetter(r) || r == '.' || r == '_' || unicode.IsDigit(r)) {
 			if r != eof {
 				l.backup()
 			}

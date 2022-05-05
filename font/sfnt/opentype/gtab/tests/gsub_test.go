@@ -81,7 +81,7 @@ func TestGsub(t *testing.T) {
 		lookupType uint16
 		subtable   gtab.Subtable
 		in, out    string
-		text       string // text content, if different from in
+		text       string // text content, if different from `in`
 	}
 	cases := []testCase{
 		{ // test GSUB 1.1
@@ -118,7 +118,7 @@ func TestGsub(t *testing.T) {
 			lookupType: 3,
 			subtable: &gtab.Gsub3_1{
 				Cov: coverage.Table{gidA: 0, gidM: 1},
-				Alt: [][]font.GlyphID{
+				Alternates: [][]font.GlyphID{
 					{gidB, gidC},
 					{gidN},
 				},
@@ -439,7 +439,7 @@ func TestGsub(t *testing.T) {
 			gidM: gdef.GlyphClassMark,
 		},
 	}
-	lookups := []*gtab.LookupTable{
+	lookups := gtab.LookupList{
 		{ // lookup index 0
 			Meta: &gtab.LookupMetaInfo{
 				LookupType: 0, // placeholder for test.lookupType
@@ -620,7 +620,7 @@ func Test1000(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-		LookupList: []*gtab.LookupTable{
+		LookupList: gtab.LookupList{
 			{ // lookup 0
 				Meta: &gtab.LookupMetaInfo{
 					LookupType: 5,
@@ -735,7 +735,7 @@ func Test1001(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-		LookupList: []*gtab.LookupTable{
+		LookupList: gtab.LookupList{
 			{ // lookup 0
 				Meta: &gtab.LookupMetaInfo{
 					LookupType: 5,
@@ -845,7 +845,7 @@ func Test1002(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-		LookupList: []*gtab.LookupTable{
+		LookupList: gtab.LookupList{
 			{ // lookup 0
 				Meta: &gtab.LookupMetaInfo{
 					LookupType: 5,
@@ -954,7 +954,7 @@ func Test1003(t *testing.T) {
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
 		},
-		LookupList: []*gtab.LookupTable{
+		LookupList: gtab.LookupList{
 			{ // lookup 0
 				// match "A"; apply 2@0
 				// match "BAAAA"; apply 1@4
