@@ -99,6 +99,9 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 		case item.typ == itemIdentifier && item.val == "GSUB_4":
 			l := p.parseGsub4()
 			lookups = append(lookups, l)
+		case item.typ == itemIdentifier && item.val == "GSUB_5":
+			l := p.parseSeqCtx()
+			lookups = append(lookups, l)
 		default:
 			p.fatal(fmt.Sprintf("unexpected %s", item))
 		}
@@ -244,7 +247,7 @@ func (p *parser) parseGsub3() *gtab.LookupTable {
 			p.fatal(fmt.Sprintf("expected single glyph, got %v", from))
 		}
 		p.expect(itemArrow, "\"->\"")
-		to := p.parseGlyphList()
+		to := p.parseGlyphSet()
 		if len(to) == 0 {
 			p.fatal(fmt.Sprintf("expected at least one glyph at %s", p.next()))
 		}
@@ -354,6 +357,10 @@ func (p *parser) parseGsub4() *gtab.LookupTable {
 	}
 }
 
+func (p *parser) parseSeqCtx() *gtab.LookupTable {
+	panic("not implemented")
+}
+
 func (p *parser) parseLookupFlags() gtab.LookupFlags {
 	var flags gtab.LookupFlags
 	var item item
@@ -456,6 +463,13 @@ done:
 		p.fatal("hyphenated range not terminated")
 	}
 
+	return res
+}
+
+func (p *parser) parseGlyphSet() []font.GlyphID {
+	p.expect(itemSquareBracketOpen, "[")
+	res := p.parseGlyphList()
+	p.expect(itemSquareBracketClose, "]")
 	return res
 }
 

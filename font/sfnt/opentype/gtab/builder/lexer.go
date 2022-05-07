@@ -48,6 +48,8 @@ const (
 	itemIdentifier
 	itemInteger
 	itemSemicolon
+	itemSquareBracketClose
+	itemSquareBracketOpen
 	itemString
 )
 
@@ -175,9 +177,17 @@ func lexStart(l *lexer) stateFn {
 	case r == ';':
 		l.emit(itemSemicolon)
 		return lexStart
+	case r == '[':
+		l.emit(itemSquareBracketOpen)
+		return lexStart
+	case r == ']':
+		l.emit(itemSquareBracketClose)
+		return lexStart
 	case r == ',':
 		l.emit(itemComma)
 		return lexStart
+	case r == '#':
+		return lexComment
 	default:
 		return l.errorf("unexpected character %#U", r)
 	}
@@ -228,5 +238,17 @@ func lexInteger(l *lexer) stateFn {
 		}
 	}
 	l.emit(itemInteger)
+	return lexStart
+}
+
+func lexComment(l *lexer) stateFn {
+	for {
+		r := l.next()
+		if r == eof || r == '\n' {
+			break
+		}
+	}
+	l.backup()
+	l.ignore()
 	return lexStart
 }

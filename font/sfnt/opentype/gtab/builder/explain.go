@@ -62,10 +62,30 @@ func ExplainGsub(fontInfo *sfntcff.Info, ll gtab.LookupList) string {
 				}
 			case *gtab.Gsub2_1:
 				setType(2)
+				for key, idx := range l.Cov {
+					mappings = append(mappings, mapping{
+						from: []font.GlyphID{key},
+						to:   l.Repl[idx],
+					})
+				}
 			case *gtab.Gsub3_1:
 				setType(3)
+				for gid, idx := range l.Cov {
+					mappings = append(mappings, mapping{
+						from: []font.GlyphID{gid},
+						to:   l.Alternates[idx],
+					})
+				}
 			case *gtab.Gsub4_1:
 				setType(4)
+				for gid, idx := range l.Cov {
+					for _, lig := range l.Repl[idx] {
+						mappings = append(mappings, mapping{
+							from: append([]font.GlyphID{gid}, lig.In...),
+							to:   []font.GlyphID{lig.Out},
+						})
+					}
+				}
 			case *gtab.SeqContext1:
 				setType(5)
 			case *gtab.SeqContext2:
@@ -88,8 +108,11 @@ func ExplainGsub(fontInfo *sfntcff.Info, ll gtab.LookupList) string {
 		switch lookupType {
 		case 0:
 			panic("no subtables")
-		case 1:
+		case 1, 2, 4:
 			ee.explainMappings(mappings)
+			ee.w.WriteRune('\n')
+		case 3:
+			ee.explainSetMappings(mappings)
 			ee.w.WriteRune('\n')
 		default:
 			ee.w.WriteString(" # not yet implemented\n")
@@ -207,6 +230,22 @@ func (ee *explainer) explainMappings(mm []mapping) {
 			fmt.Fprintf(ee.w, "%s -> %s", from, to)
 			mm = mm[1:]
 		}
+	}
+}
+
+func (ee *explainer) explainSetMappings(mm []mapping) {
+	sort.Slice(mm, func(i, j int) bool {
+		return mm[i].from[0] < mm[j].from[0]
+	})
+
+	sep := " "
+	for len(mm) > 0 {
+		ee.w.WriteString(sep)
+		sep = ", "
+		from := ee.explainSequence(mm[0].from)
+		to := ee.explainSequence(mm[0].to)
+		fmt.Fprintf(ee.w, "%s -> [ %s ]", from, to)
+		mm = mm[1:]
 	}
 }
 
