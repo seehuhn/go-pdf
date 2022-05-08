@@ -70,7 +70,7 @@ type SeqContext1 struct {
 
 // SeqRule describes a sequence of glyphs and the actions to be performed
 type SeqRule struct {
-	Input   []font.GlyphID // excludes the first input glyph, since this is in Cov
+	In      []font.GlyphID // excludes the first input glyph, since this is in Cov
 	Actions Nested
 }
 
@@ -146,7 +146,7 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				return nil, err
 			}
 			res.Rules[i][j] = &SeqRule{
-				Input:   inputSequence,
+				In:      inputSequence,
 				Actions: actions,
 			}
 		}
@@ -171,8 +171,8 @@ ruleLoop:
 	for _, rule := range rules {
 		p := i
 		matchPos = append(matchPos[:0], p)
-		glyphsNeeded := len(rule.Input)
-		for _, gid := range rule.Input {
+		glyphsNeeded := len(rule.In)
+		for _, gid := range rule.In {
 			glyphsNeeded--
 			p++
 			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -200,7 +200,7 @@ func (l *SeqContext1) EncodeLen() int {
 		}
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
 		}
 	}
 	total += l.Cov.EncodeLen()
@@ -220,7 +220,7 @@ func (l *SeqContext1) Encode() []byte {
 		seqRuleSetOffsets[i] = uint16(total)
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
 		}
 	}
 	coverageOffset := total
@@ -251,16 +251,16 @@ func (l *SeqContext1) Encode() []byte {
 			buf = append(buf,
 				byte(pos>>8), byte(pos),
 			)
-			pos += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
+			pos += 4 + 2*len(rule.In) + 4*len(rule.Actions)
 		}
 		for _, rule := range rules {
-			glyphCount := len(rule.Input) + 1
+			glyphCount := len(rule.In) + 1
 			seqLookupCount := len(rule.Actions)
 			buf = append(buf,
 				byte(glyphCount>>8), byte(glyphCount),
 				byte(seqLookupCount>>8), byte(seqLookupCount),
 			)
-			for _, gid := range rule.Input {
+			for _, gid := range rule.In {
 				buf = append(buf, byte(gid>>8), byte(gid))
 			}
 			for _, action := range rule.Actions {

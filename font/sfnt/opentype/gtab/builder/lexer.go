@@ -41,6 +41,7 @@ const (
 	itemEOF
 	itemEOL
 	itemArrow
+	itemAt
 	itemColon
 	itemComma
 	itemEqual
@@ -185,6 +186,9 @@ func lexStart(l *lexer) stateFn {
 		return lexStart
 	case r == ',':
 		l.emit(itemComma)
+		return lexStart
+	case r == '@':
+		l.emit(itemAt)
 		return lexStart
 	case r == '#':
 		return lexComment

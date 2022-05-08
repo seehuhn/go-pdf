@@ -55,7 +55,7 @@ func TestSequenceContext1(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									Input: []font.GlyphID{3, 5},
+									In: []font.GlyphID{3, 5},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 1},
 										{SequenceIndex: 1, LookupListIndex: 3},
@@ -142,7 +142,7 @@ func Test9735(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									Input: []font.GlyphID{3, 5},
+									In: []font.GlyphID{3, 5},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 1},
 										{SequenceIndex: 2, LookupListIndex: 2},
@@ -227,7 +227,7 @@ func Test9736(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									Input: []font.GlyphID{gidI, gidF},
+									In: []font.GlyphID{gidI, gidF},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 0, LookupListIndex: 1},
 										{SequenceIndex: 1, LookupListIndex: 2},

@@ -28,11 +28,13 @@ import (
 
 // ExplainGsub returns a human-readable, textual description of the lookups
 // in a GSUB table.  This function panics if `ll` is not a GSUB table.
-func ExplainGsub(fontInfo *sfntcff.Info, ll gtab.LookupList) string {
+func ExplainGsub(fontInfo *sfntcff.Info) string {
 	ee := newExplainer(fontInfo)
 
+	ll := fontInfo.Gsub.LookupList
 	for _, lookup := range ll {
 		var mappings []mapping
+		var actions []action
 
 		var lookupType int
 		setType := func(newType int) {
@@ -88,6 +90,14 @@ func ExplainGsub(fontInfo *sfntcff.Info, ll gtab.LookupList) string {
 				}
 			case *gtab.SeqContext1:
 				setType(5)
+				for gid, idx := range l.Cov {
+					for _, rule := range l.Rules[idx] {
+						actions = append(actions, action{
+							from:    append([]font.GlyphID{gid}, rule.In...),
+							actions: rule.Actions,
+						})
+					}
+				}
 			case *gtab.SeqContext2:
 				setType(5)
 			case *gtab.SeqContext3:
@@ -113,6 +123,9 @@ func ExplainGsub(fontInfo *sfntcff.Info, ll gtab.LookupList) string {
 			ee.w.WriteRune('\n')
 		case 3:
 			ee.explainSetMappings(mappings)
+			ee.w.WriteRune('\n')
+		case 5:
+			ee.explainActions(actions)
 			ee.w.WriteRune('\n')
 		default:
 			ee.w.WriteString(" # not yet implemented\n")
@@ -182,13 +195,8 @@ type mapping struct {
 }
 
 func (ee *explainer) explainMappings(mm []mapping) {
-	sort.Slice(mm, func(i, j int) bool {
-		for k := 0; k < len(mm[i].from) && k < len(mm[j].from); k++ {
-			if mm[i].from[k] != mm[j].from[k] {
-				return mm[i].from[k] < mm[j].from[k]
-			}
-		}
-		return len(mm[i].from) < len(mm[j].from)
+	sort.SliceStable(mm, func(i, j int) bool {
+		return mm[i].from[0] < mm[j].from[0]
 	})
 
 	sep := " "
@@ -225,16 +233,16 @@ func (ee *explainer) explainMappings(mm []mapping) {
 			)
 			mm = mm[rangeLen:]
 		} else {
-			from := ee.explainSequence(mm[0].from)
-			to := ee.explainSequence(mm[0].to)
-			fmt.Fprintf(ee.w, "%s -> %s", from, to)
+			ee.explainSequence(mm[0].from)
+			ee.w.WriteString(" -> ")
+			ee.explainSequence(mm[0].to)
 			mm = mm[1:]
 		}
 	}
 }
 
 func (ee *explainer) explainSetMappings(mm []mapping) {
-	sort.Slice(mm, func(i, j int) bool {
+	sort.SliceStable(mm, func(i, j int) bool {
 		return mm[i].from[0] < mm[j].from[0]
 	})
 
@@ -242,20 +250,41 @@ func (ee *explainer) explainSetMappings(mm []mapping) {
 	for len(mm) > 0 {
 		ee.w.WriteString(sep)
 		sep = ", "
-		from := ee.explainSequence(mm[0].from)
-		to := ee.explainSequence(mm[0].to)
-		fmt.Fprintf(ee.w, "%s -> [ %s ]", from, to)
+
+		ee.explainSequence(mm[0].from)
+		ee.w.WriteString(" -> [")
+		ee.explainSequence(mm[0].to)
+		ee.w.WriteRune(']')
 		mm = mm[1:]
 	}
 }
 
-func (ee *explainer) explainSequence(seq []font.GlyphID) string {
+type action struct {
+	from    []font.GlyphID
+	actions gtab.Nested
+}
+
+func (ee *explainer) explainActions(aa []action) {
+	sep := " "
+	for len(aa) > 0 {
+		ee.w.WriteString(sep)
+		sep = ", "
+
+		ee.explainSequence(aa[0].from)
+		ee.w.WriteString(" -> ")
+		ee.explainNested(aa[0].actions)
+		aa = aa[1:]
+	}
+}
+
+func (ee *explainer) explainSequence(seq []font.GlyphID) {
 	if len(seq) == 0 {
-		return ""
+		return
 	}
 
 	if len(seq) == 1 && "\""+ee.names[seq[0]]+"\"" == ee.mapped[seq[0]] {
-		return ee.names[seq[0]]
+		ee.w.WriteString(ee.names[seq[0]])
+		return
 	}
 
 	canUseMapped := true
@@ -266,17 +295,28 @@ func (ee *explainer) explainSequence(seq []font.GlyphID) string {
 		}
 	}
 
-	parts := make([]string, len(seq))
 	if canUseMapped {
-		for i, gid := range seq {
+		ee.w.WriteRune('"')
+		for _, gid := range seq {
 			name := ee.mapped[gid]
-			parts[i] = name[1 : len(name)-1]
+			ee.w.WriteString(name[1 : len(name)-1])
 		}
-		return "\"" + strings.Join(parts, "") + "\""
+		ee.w.WriteRune('"')
+	} else {
+		for i, gid := range seq {
+			if i > 0 {
+				ee.w.WriteRune(' ')
+			}
+			ee.w.WriteString(ee.names[gid])
+		}
 	}
+}
 
-	for i, gid := range seq {
-		parts[i] = ee.names[gid]
+func (ee *explainer) explainNested(actions gtab.Nested) {
+	for i, a := range actions {
+		if i > 0 {
+			ee.w.WriteRune(' ')
+		}
+		fmt.Fprintf(ee.w, "%d@%d", a.LookupListIndex, a.SequenceIndex)
 	}
-	return strings.Join(parts, " ")
 }

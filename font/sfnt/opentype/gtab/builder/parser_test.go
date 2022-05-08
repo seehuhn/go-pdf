@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/debug"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 )
 
 func TestParser(t *testing.T) {
@@ -31,18 +32,19 @@ func TestParser(t *testing.T) {
 	GSUB_1: A->X, B->X, C->X, M->X, N->X
 	GSUB_2: A -> "AA", B -> "AA", C -> "ABAAC"
 	GSUB_3: A -> [ "BCD" ]
-	GSUB_4: -marks A A -> A
-	# GSUB_5: "AAA" -> 1@0 2@1 1@0
-	# class alpha = [A-Z]
-	# class digits = [0-9]
-	# GSUB_5: [A B C] / :alpha: :digits: -> 2@0
-	# GSUB_5: [A B C] [A C] [A D] -> 3@0
+	GSUB_4: -marks A A A -> B, A -> D, A A -> C
+	GSUB_5: "AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0
+	class :alpha: = [A-Z]
+	class :digits: = [0-9]
+	GSUB_5: [A B C] / :alpha: :digits: -> 2@0
+	GSUB_5: [A B C] [A C] [A D] -> 3@0
 	`)
 	if err != nil {
 		t.Fatal(err)
 	}
+	fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 
-	explain := ExplainGsub(fontInfo, lookups)
+	explain := ExplainGsub(fontInfo)
 	fmt.Println(explain)
 
 	t.Error("fish")

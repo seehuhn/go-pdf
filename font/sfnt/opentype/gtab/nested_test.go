@@ -115,20 +115,20 @@ func TestSeqContext1(t *testing.T) {
 		Cov: map[font.GlyphID]int{2: 0, 3: 1, 4: 2},
 		Rules: [][]*SeqRule{
 			{ // seq = 2, ...
-				{Input: []font.GlyphID{2}},
-				{Input: []font.GlyphID{3, 4, 6}},
-				{Input: []font.GlyphID{3, 4}},
-				{Input: []font.GlyphID{3, 4, 5}}, // does not match since it comes last
+				{In: []font.GlyphID{2}},
+				{In: []font.GlyphID{3, 4, 6}},
+				{In: []font.GlyphID{3, 4}},
+				{In: []font.GlyphID{3, 4, 5}}, // does not match since it comes last
 			},
 			{ // seq = 3, ...
-				{Input: []font.GlyphID{3}},
-				{Input: []font.GlyphID{5}},
-				{Input: []font.GlyphID{4, 5, 6}},
+				{In: []font.GlyphID{3}},
+				{In: []font.GlyphID{5}},
+				{In: []font.GlyphID{4, 5, 6}},
 			},
 			{ // seq = 4, ...
-				{Input: []font.GlyphID{5, 6}},
-				{Input: []font.GlyphID{4}},
-				{Input: []font.GlyphID{5}},
+				{In: []font.GlyphID{5, 6}},
+				{In: []font.GlyphID{4}},
+				{In: []font.GlyphID{5}},
 			},
 		},
 	}
@@ -279,7 +279,7 @@ func FuzzSeqContext1(f *testing.F) {
 	sub.Rules = [][]*SeqRule{
 		{
 			{
-				Input: []font.GlyphID{4},
+				In: []font.GlyphID{4},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 5},
@@ -289,13 +289,13 @@ func FuzzSeqContext1(f *testing.F) {
 		},
 		{
 			{
-				Input: []font.GlyphID{6, 7},
+				In: []font.GlyphID{6, 7},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 2},
 				},
 			},
 			{
-				Input: []font.GlyphID{6},
+				In: []font.GlyphID{6},
 				Actions: []SeqLookup{
 					{SequenceIndex: 2, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 2},
