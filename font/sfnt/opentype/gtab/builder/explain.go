@@ -21,7 +21,9 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfntcff"
 )
@@ -33,21 +35,21 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 
 	ll := fontInfo.Gsub.LookupList
 	for _, lookup := range ll {
-		var mappings []mapping
-		var actions []action
-
-		var lookupType int
-		setType := func(newType int) {
-			if lookupType != 0 && lookupType != newType {
+		checkType := func(newType int) {
+			if newType != int(lookup.Meta.LookupType) {
 				panic("inconsistent subtables")
 			}
-			lookupType = newType
 		}
 
-		for _, subtable := range lookup.Subtables {
+		for i, subtable := range lookup.Subtables {
+			var mappings []mapping
+			var actions []action
+			var classActions []classAction
+			var cov coverage.Table
+
 			switch l := subtable.(type) {
 			case *gtab.Gsub1_1:
-				setType(1)
+				checkType(1)
 				for key := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{key},
@@ -55,7 +57,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					})
 				}
 			case *gtab.Gsub1_2:
-				setType(1)
+				checkType(1)
 				for key, idx := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{key},
@@ -63,7 +65,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					})
 				}
 			case *gtab.Gsub2_1:
-				setType(2)
+				checkType(2)
 				for key, idx := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{key},
@@ -71,7 +73,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					})
 				}
 			case *gtab.Gsub3_1:
-				setType(3)
+				checkType(3)
 				for gid, idx := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{gid},
@@ -79,7 +81,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					})
 				}
 			case *gtab.Gsub4_1:
-				setType(4)
+				checkType(4)
 				for gid, idx := range l.Cov {
 					for _, lig := range l.Repl[idx] {
 						mappings = append(mappings, mapping{
@@ -89,7 +91,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					}
 				}
 			case *gtab.SeqContext1:
-				setType(5)
+				checkType(5)
 				for gid, idx := range l.Cov {
 					for _, rule := range l.Rules[idx] {
 						actions = append(actions, action{
@@ -99,37 +101,52 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					}
 				}
 			case *gtab.SeqContext2:
-				setType(5)
+				checkType(5)
+				cov = l.Cov
+				for classIdx, rules := range l.Rules {
+					for _, rule := range rules {
+						classActions = append(classActions, classAction{
+							from:    append([]uint16{uint16(classIdx)}, rule.In...),
+							actions: rule.Actions,
+						})
+					}
+				}
 			case *gtab.SeqContext3:
-				setType(5)
+				checkType(5)
 			case *gtab.ChainedSeqContext1:
-				setType(6)
+				checkType(6)
 			case *gtab.ChainedSeqContext2:
-				setType(6)
+				checkType(6)
 			case *gtab.ChainedSeqContext3:
-				setType(6)
+				checkType(6)
 			default:
 				panic(fmt.Sprintf("unsupported subtable type %T", l))
 			}
-		}
 
-		fmt.Fprintf(ee.w, "GSUB_%d:", lookupType)
-		ee.explainFlags(lookup.Meta.LookupFlag)
-		switch lookupType {
-		case 0:
-			panic("no subtables")
-		case 1, 2, 4:
-			ee.explainMappings(mappings)
-			ee.w.WriteRune('\n')
-		case 3:
-			ee.explainSetMappings(mappings)
-			ee.w.WriteRune('\n')
-		case 5:
-			ee.explainActions(actions)
-			ee.w.WriteRune('\n')
-		default:
-			ee.w.WriteString(" # not yet implemented\n")
+			if i == 0 {
+				fmt.Fprintf(ee.w, "GSUB_%d:", lookup.Meta.LookupType)
+				ee.explainFlags(lookup.Meta.LookupFlag)
+			} else {
+				ee.w.WriteString(" ||\n    ")
+			}
+			switch lookup.Meta.LookupType {
+			case 1, 2, 4:
+				ee.explainMappings(mappings)
+			case 3:
+				ee.explainSetMappings(mappings)
+			case 5:
+				if len(actions) > 0 { // format 1
+					ee.explainActions(actions)
+				} else if len(classActions) > 0 { // format 2
+					ee.explainCoverage(cov)
+				} else {
+					ee.w.WriteString("...")
+				}
+			default:
+				ee.w.WriteString(" # not yet implemented")
+			}
 		}
+		ee.w.WriteRune('\n')
 	}
 
 	return ee.w.String()
@@ -277,6 +294,11 @@ func (ee *explainer) explainActions(aa []action) {
 	}
 }
 
+type classAction struct {
+	from    []uint16
+	actions gtab.Nested
+}
+
 func (ee *explainer) explainSequence(seq []font.GlyphID) {
 	if len(seq) == 0 {
 		return
@@ -310,6 +332,16 @@ func (ee *explainer) explainSequence(seq []font.GlyphID) {
 			ee.w.WriteString(ee.names[gid])
 		}
 	}
+}
+
+func (ee *explainer) explainCoverage(cov coverage.Table) {
+	keys := maps.Keys(cov)
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	ee.w.WriteRune('/')
+	ee.explainSequence(keys)
+	ee.w.WriteRune('/')
 }
 
 func (ee *explainer) explainNested(actions gtab.Nested) {

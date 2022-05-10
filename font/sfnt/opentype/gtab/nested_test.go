@@ -157,14 +157,14 @@ func TestSeqContext2(t *testing.T) {
 	l := &SeqContext2{
 		Cov:     map[font.GlyphID]int{2: 0, 3: 1, 4: 2, 99: 3},
 		Classes: classdef.Table{1: 1, 3: 1, 5: 1},
-		Rules: [][]*ClassSequenceRule{
+		Rules: [][]*ClassSeqRule{
 			{ // seq = class0, ...
-				{Input: []uint16{1, 0}},
-				{Input: []uint16{1}},
+				{In: []uint16{1, 0}},
+				{In: []uint16{1}},
 			},
 			{ // seq = class1, ...
-				{Input: []uint16{1}},
-				{Input: []uint16{0, 1, 0}},
+				{In: []uint16{1}},
+				{In: []uint16{0, 1, 0}},
 			},
 		},
 	}
@@ -315,15 +315,15 @@ func FuzzSeqContext2(f *testing.F) {
 	sub := &SeqContext2{}
 	f.Add(sub.Encode())
 	sub.Cov = coverage.Table{3: 0, 5: 1}
-	sub.Rules = [][]*ClassSequenceRule{
+	sub.Rules = [][]*ClassSeqRule{
 		{},
 		{},
 	}
 	f.Add(sub.Encode())
-	sub.Rules = [][]*ClassSequenceRule{
+	sub.Rules = [][]*ClassSeqRule{
 		{
 			{
-				Input: []uint16{4},
+				In: []uint16{4},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 5},
@@ -333,13 +333,13 @@ func FuzzSeqContext2(f *testing.F) {
 		},
 		{
 			{
-				Input: []uint16{6, 7},
+				In: []uint16{6, 7},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 2},
 				},
 			},
 			{
-				Input: []uint16{6},
+				In: []uint16{6},
 				Actions: []SeqLookup{
 					{SequenceIndex: 2, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 2},

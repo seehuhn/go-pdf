@@ -280,13 +280,13 @@ func (l *SeqContext1) Encode() []byte {
 type SeqContext2 struct {
 	Cov     coverage.Table
 	Classes classdef.Table
-	Rules   [][]*ClassSequenceRule // indexed by class index of the first glyph
+	Rules   [][]*ClassSeqRule // indexed by class index of the first glyph
 }
 
-// ClassSequenceRule describes a sequence of glyph classes and the actions to
+// ClassSeqRule describes a sequence of glyph classes and the actions to
 // be performed
-type ClassSequenceRule struct {
-	Input   []uint16 // excludes the first input glyph
+type ClassSeqRule struct {
+	In      []uint16 // excludes the first input glyph
 	Actions Nested
 }
 
@@ -320,7 +320,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	res := &SeqContext2{
 		Cov:     cov,
 		Classes: classDef,
-		Rules:   make([][]*ClassSequenceRule, len(classSeqRuleSetOffsets)),
+		Rules:   make([][]*ClassSeqRule, len(classSeqRuleSetOffsets)),
 	}
 
 	for i, classSeqRuleSetOffset := range classSeqRuleSetOffsets {
@@ -336,7 +336,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		res.Rules[i] = make([]*ClassSequenceRule, len(seqRuleOffsets))
+		res.Rules[i] = make([]*ClassSeqRule, len(seqRuleOffsets))
 		for j, seqRuleOffset := range seqRuleOffsets {
 			err = p.SeekPos(base + int64(seqRuleOffset))
 			if err != nil {
@@ -366,8 +366,8 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			if err != nil {
 				return nil, err
 			}
-			res.Rules[i][j] = &ClassSequenceRule{
-				Input:   inputSequence,
+			res.Rules[i][j] = &ClassSeqRule{
+				In:      inputSequence,
 				Actions: actions,
 			}
 		}
@@ -393,8 +393,8 @@ ruleLoop:
 	for _, rule := range rules {
 		p := i
 		matchPos = append(matchPos[:0], p)
-		glyphsNeeded := len(rule.Input)
-		for _, cls := range rule.Input {
+		glyphsNeeded := len(rule.In)
+		for _, cls := range rule.In {
 			glyphsNeeded--
 			p++
 			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -424,7 +424,7 @@ func (l *SeqContext2) EncodeLen() int {
 		}
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
 		}
 	}
 	return total
@@ -443,7 +443,7 @@ func (l *SeqContext2) Encode() []byte {
 		seqRuleSetOffsets[i] = uint16(total)
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
 		}
 	}
 	coverageOffset := total
@@ -477,16 +477,16 @@ func (l *SeqContext2) Encode() []byte {
 			buf = append(buf,
 				byte(pos>>8), byte(pos),
 			)
-			pos += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
+			pos += 4 + 2*len(rule.In) + 4*len(rule.Actions)
 		}
 		for _, rule := range rules {
-			glyphCount := len(rule.Input) + 1
+			glyphCount := len(rule.In) + 1
 			seqLookupCount := len(rule.Actions)
 			buf = append(buf,
 				byte(glyphCount>>8), byte(glyphCount),
 				byte(seqLookupCount>>8), byte(seqLookupCount),
 			)
-			for _, gid := range rule.Input {
+			for _, gid := range rule.In {
 				buf = append(buf, byte(gid>>8), byte(gid))
 			}
 			for _, action := range rule.Actions {

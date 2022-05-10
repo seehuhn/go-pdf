@@ -77,59 +77,58 @@ type parser struct {
 
 func (p *parser) parse() (lookups gtab.LookupList) {
 	for {
-		item := p.next()
+		item := p.readItem()
 		switch {
 		case item.typ == itemEOF:
 			return
 		case item.typ == itemError:
-			p.fatal(item.val)
+			p.fatal("%s", item.val)
 		case item.typ == itemSemicolon || item.typ == itemEOL:
 			// pass
 		case item.typ == itemIdentifier && item.val == "class":
 			p.parseClassDef()
 		case item.typ == itemIdentifier && item.val == "GSUB_1":
-			l := p.parseGsub1()
+			l := p.readGsub1()
 			lookups = append(lookups, l)
 		case item.typ == itemIdentifier && item.val == "GSUB_2":
-			l := p.parseGsub2()
+			l := p.readGsub2()
 			lookups = append(lookups, l)
 		case item.typ == itemIdentifier && item.val == "GSUB_3":
-			l := p.parseGsub3()
+			l := p.readGsub3()
 			lookups = append(lookups, l)
 		case item.typ == itemIdentifier && item.val == "GSUB_4":
-			l := p.parseGsub4()
+			l := p.readGsub4()
 			lookups = append(lookups, l)
 		case item.typ == itemIdentifier && item.val == "GSUB_5":
-			l := p.parseSeqCtx(5)
+			l := p.readSeqCtx(5)
 			lookups = append(lookups, l)
 		default:
-			p.fatal(fmt.Sprintf("unexpected %s", item))
+			p.fatal("unexpected %s", item)
 		}
 	}
 }
 
-func (p *parser) parseGsub1() *gtab.LookupTable {
+func (p *parser) readGsub1() *gtab.LookupTable {
 	res := make(map[font.GlyphID]font.GlyphID)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
+	flags := p.readLookupFlags()
 	for {
-		from := p.parseGlyphList()
-		p.expect(itemArrow, "\"->\"")
-		to := p.parseGlyphList()
+		from := p.readGlyphList()
+		p.required(itemArrow, "\"->\"")
+		to := p.readGlyphList()
 		if len(from) != len(to) {
-			p.fatal(fmt.Sprintf("length mismatch: %v vs. %v", from, to))
+			p.fatal("length mismatch: %v vs. %v", from, to)
 		}
 		for i, fromGid := range from {
 			if _, ok := res[fromGid]; ok {
-				p.fatal(fmt.Sprintf("duplicate mapping for GID %d", fromGid))
+				p.fatal("duplicate mapping for GID %d", fromGid)
 			}
 			res[fromGid] = to[i]
 		}
 
-		sep := p.next()
-		if sep.typ != itemComma {
-			p.backlog = append(p.backlog, sep)
+		if !p.optional(itemComma) {
 			break
 		}
 		p.optional(itemEOL)
@@ -176,36 +175,38 @@ func (p *parser) parseGsub1() *gtab.LookupTable {
 		}
 	}
 	return &gtab.LookupTable{
-		Meta:      &gtab.LookupMetaInfo{LookupType: 1},
+		Meta: &gtab.LookupMetaInfo{
+			LookupType: 1,
+			LookupFlag: flags,
+		},
 		Subtables: []gtab.Subtable{subtable},
 	}
 }
 
-func (p *parser) parseGsub2() *gtab.LookupTable {
+func (p *parser) readGsub2() *gtab.LookupTable {
 	res := make(map[font.GlyphID][]font.GlyphID)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
+	flags := p.readLookupFlags()
 	for {
-		from := p.parseGlyphList()
+		from := p.readGlyphList()
 		if len(from) != 1 {
-			p.fatal(fmt.Sprintf("expected single glyph, got %v", from))
+			p.fatal("expected single glyph, got %v", from)
 		}
-		p.expect(itemArrow, "\"->\"")
-		to := p.parseGlyphList()
+		p.required(itemArrow, "\"->\"")
+		to := p.readGlyphList()
 		if len(to) == 0 {
-			p.fatal(fmt.Sprintf("expected at least one glyph at %s", p.next()))
+			p.fatal("expected at least one glyph at %s", p.readItem())
 		}
 
 		fromGid := from[0]
 		if _, ok := res[fromGid]; ok {
-			p.fatal(fmt.Sprintf("duplicate mapping for GID %d", fromGid))
+			p.fatal("duplicate mapping for GID %d", fromGid)
 		}
 		res[fromGid] = to
 
-		sep := p.next()
-		if sep.typ != itemComma {
-			p.backlog = append(p.backlog, sep)
+		if !p.optional(itemComma) {
 			break
 		}
 		p.optional(itemEOL)
@@ -231,36 +232,38 @@ func (p *parser) parseGsub2() *gtab.LookupTable {
 	}
 
 	return &gtab.LookupTable{
-		Meta:      &gtab.LookupMetaInfo{LookupType: 2},
+		Meta: &gtab.LookupMetaInfo{
+			LookupType: 2,
+			LookupFlag: flags,
+		},
 		Subtables: []gtab.Subtable{subtable},
 	}
 }
 
-func (p *parser) parseGsub3() *gtab.LookupTable {
+func (p *parser) readGsub3() *gtab.LookupTable {
 	res := make(map[font.GlyphID][]font.GlyphID)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
+	flags := p.readLookupFlags()
 	for {
-		from := p.parseGlyphList()
+		from := p.readGlyphList()
 		if len(from) != 1 {
-			p.fatal(fmt.Sprintf("expected single glyph, got %v", from))
+			p.fatal("expected single glyph, got %v", from)
 		}
-		p.expect(itemArrow, "\"->\"")
+		p.required(itemArrow, "\"->\"")
 		to := p.readGlyphSet()
 		if len(to) == 0 {
-			p.fatal(fmt.Sprintf("expected at least one glyph at %s", p.next()))
+			p.fatal("expected at least one glyph at %s", p.readItem())
 		}
 
 		fromGid := from[0]
 		if _, ok := res[fromGid]; ok {
-			p.fatal(fmt.Sprintf("duplicate mapping for GID %d", fromGid))
+			p.fatal("duplicate mapping for GID %d", fromGid)
 		}
 		res[fromGid] = to
 
-		sep := p.next()
-		if sep.typ != itemComma {
-			p.backlog = append(p.backlog, sep)
+		if !p.optional(itemComma) {
 			break
 		}
 		p.optional(itemEOL)
@@ -286,40 +289,41 @@ func (p *parser) parseGsub3() *gtab.LookupTable {
 	}
 
 	return &gtab.LookupTable{
-		Meta:      &gtab.LookupMetaInfo{LookupType: 3},
+		Meta: &gtab.LookupMetaInfo{
+			LookupType: 3,
+			LookupFlag: flags,
+		},
 		Subtables: []gtab.Subtable{subtable},
 	}
 }
 
-func (p *parser) parseGsub4() *gtab.LookupTable {
-	res := make(map[font.GlyphID][]gtab.Ligature)
+func (p *parser) readGsub4() *gtab.LookupTable {
+	data := make(map[font.GlyphID][]gtab.Ligature)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
-	flags := p.parseLookupFlags()
+	flags := p.readLookupFlags()
 	for {
-		from := p.parseGlyphList()
+		from := p.readGlyphList()
 		if len(from) == 0 {
-			p.fatal(fmt.Sprintf("expected at least one glyph at %s", p.next()))
+			p.fatal("expected at least one glyph at %s", p.readItem())
 		}
-		p.expect(itemArrow, "\"->\"")
-		to := p.parseGlyphList()
+		p.required(itemArrow, "\"->\"")
+		to := p.readGlyphList()
 		if len(to) != 1 {
-			p.fatal(fmt.Sprintf("expected single glyph, got %v", to))
+			p.fatal("expected single glyph, got %v", to)
 		}
 
 		key := from[0]
-		res[key] = append(res[key], gtab.Ligature{In: from[1:], Out: to[0]})
+		data[key] = append(data[key], gtab.Ligature{In: from[1:], Out: to[0]})
 
-		sep := p.next()
-		if sep.typ != itemComma {
-			p.backlog = append(p.backlog, sep)
+		if !p.optional(itemComma) {
 			break
 		}
 		p.optional(itemEOL)
 	}
 
-	in := maps.Keys(res)
+	in := maps.Keys(data)
 	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
 	cov := make(coverage.Table, len(in))
 	for i, gid := range in {
@@ -328,7 +332,7 @@ func (p *parser) parseGsub4() *gtab.LookupTable {
 
 	repl := make([][]gtab.Ligature, len(in))
 	for i, gid := range in {
-		ligs := res[gid]
+		ligs := data[gid]
 		sort.Slice(ligs, func(i, j int) bool {
 			if len(ligs[i].In) != len(ligs[j].In) {
 				return len(ligs[i].In) > len(ligs[j].In)
@@ -354,93 +358,192 @@ func (p *parser) parseGsub4() *gtab.LookupTable {
 	}
 }
 
-func (p *parser) parseSeqCtx(lookupType uint16) *gtab.LookupTable {
-	res := make(map[font.GlyphID][]*gtab.SeqRule)
-
+func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 	p.optional(itemColon)
 	p.optional(itemEOL)
-	flags := p.parseLookupFlags()
+	flags := p.readLookupFlags()
+
+	lookup := &gtab.LookupTable{
+		Meta:      &gtab.LookupMetaInfo{LookupType: lookupType, LookupFlag: flags},
+		Subtables: []gtab.Subtable{},
+	}
+
 	for {
-		from := p.parseGlyphList()
-		if len(from) == 0 {
-			p.fatal(fmt.Sprintf("expected at least one glyph at %s", p.next()))
+		next := p.peek()
+		switch next.typ {
+		default: // format 1
+			res := make(map[font.GlyphID][]*gtab.SeqRule)
+			for {
+				from := p.readGlyphList()
+				if len(from) == 0 {
+					p.fatal("expected at least one glyph at %s", p.readItem())
+				}
+				p.required(itemArrow, "\"->\"")
+				nested := p.parseNestedLookups()
+
+				key := from[0]
+				res[key] = append(res[key], &gtab.SeqRule{In: from[1:], Actions: nested})
+
+				if !p.optional(itemComma) {
+					break
+				}
+				p.optional(itemEOL)
+			}
+			in := maps.Keys(res)
+			sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
+			cov := make(coverage.Table, len(in))
+			for i, gid := range in {
+				cov[gid] = i
+			}
+
+			rules := make([][]*gtab.SeqRule, len(in))
+			for i, gid := range in {
+				seqRule := res[gid]
+				sort.Slice(seqRule, func(i, j int) bool {
+					if len(seqRule[i].In) != len(seqRule[j].In) {
+						return len(seqRule[i].In) > len(seqRule[j].In)
+					}
+					for i, gidA := range seqRule[i].In {
+						gidB := seqRule[j].In[i]
+						if gidA != gidB {
+							return gidA < gidB
+						}
+					}
+					return false // should not happen
+				})
+				rules[i] = seqRule
+			}
+
+			subtable := &gtab.SeqContext1{
+				Cov:   cov,
+				Rules: rules,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+
+		case itemSlash: // format 2
+			p.required(itemSlash, "/")
+			firstGlyphs := p.readGlyphList()
+			p.required(itemSlash, "/")
+
+			classIndex := make(map[string]uint16)
+
+			data := make(map[uint16][]*gtab.ClassSeqRule)
+
+			for {
+				classNames := p.readClassNames()
+				p.required(itemArrow, "\"->\"")
+				actions := p.parseNestedLookups()
+
+				classIndices := make([]uint16, len(classNames))
+				for i, className := range classNames {
+					if _, ok := classIndex[className]; !ok && className != "" {
+						_, ok := p.classes[className]
+						if !ok {
+							p.fatal("unknown class :%s:", className)
+						}
+						classIndex[className] = uint16(len(classIndex) + 1)
+					}
+					classIndices[i] = classIndex[className]
+				}
+
+				firstClass := classIndices[0]
+				data[firstClass] = append(data[firstClass], &gtab.ClassSeqRule{
+					In:      classIndices[1:],
+					Actions: actions,
+				})
+
+				if !p.optional(itemComma) {
+					break
+				}
+				p.optional(itemEOL)
+			}
+
+			cov := make(coverage.Table, len(firstGlyphs))
+			for i, gid := range firstGlyphs {
+				cov[gid] = i
+			}
+
+			classes := make(map[font.GlyphID]uint16)
+			for className, classIdx := range classIndex {
+				if classIdx == 0 {
+					continue
+				}
+				cls := p.classes[className]
+				fmt.Println(className, cls)
+				for _, gid := range cls {
+					_, ok := classes[gid]
+					if ok {
+						p.fatal("overlapping classes for glyph %d", gid)
+					}
+					classes[gid] = classIdx
+				}
+			}
+
+			numClasses := len(classIndex) + 1
+			rules := make([][]*gtab.ClassSeqRule, numClasses)
+			for classIndex := range rules {
+				classSeqRules := data[uint16(classIndex)]
+				sort.Slice(classSeqRules, func(i, j int) bool {
+					if len(classSeqRules[i].In) != len(classSeqRules[j].In) {
+						return len(classSeqRules[i].In) > len(classSeqRules[j].In)
+					}
+					for k := 0; k < len(classSeqRules[k].In) && k < len(classSeqRules[j].In); k++ {
+						if classSeqRules[i].In[k] != classSeqRules[j].In[k] {
+							return classSeqRules[i].In[k] < classSeqRules[j].In[k]
+						}
+					}
+					return false // should not happen
+				})
+				rules[classIndex] = classSeqRules
+			}
+
+			subtable := &gtab.SeqContext2{
+				Cov:     cov,
+				Classes: classes,
+				Rules:   rules,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+
+		case itemSquareBracketOpen: // format 3
+			panic("not implemented")
 		}
-		p.expect(itemArrow, "\"->\"")
-		nested := p.parseNestedLookups()
-
-		key := from[0]
-		res[key] = append(res[key], &gtab.SeqRule{In: from[1:], Actions: nested})
-
-		sep := p.next()
-		if sep.typ != itemComma {
-			p.backlog = append(p.backlog, sep)
+		if !p.optional(itemOr) {
 			break
 		}
 		p.optional(itemEOL)
 	}
 
-	in := maps.Keys(res)
-	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
-	cov := make(coverage.Table, len(in))
-	for i, gid := range in {
-		cov[gid] = i
-	}
-
-	rules := make([][]*gtab.SeqRule, len(in))
-	for i, gid := range in {
-		seqRule := res[gid]
-		sort.Slice(seqRule, func(i, j int) bool {
-			if len(seqRule[i].In) != len(seqRule[j].In) {
-				return len(seqRule[i].In) > len(seqRule[j].In)
-			}
-			for i, gidA := range seqRule[i].In {
-				gidB := seqRule[j].In[i]
-				if gidA != gidB {
-					return gidA < gidB
-				}
-			}
-			return false // should not happen
-		})
-		rules[i] = seqRule
-	}
-
-	subtable := &gtab.SeqContext1{
-		Cov:   cov,
-		Rules: rules,
-	}
-	return &gtab.LookupTable{
-		Meta:      &gtab.LookupMetaInfo{LookupType: lookupType, LookupFlag: flags},
-		Subtables: []gtab.Subtable{subtable},
-	}
+	return lookup
 }
 
-func (p *parser) parseLookupFlags() gtab.LookupFlags {
+func (p *parser) readLookupFlags() gtab.LookupFlags {
 	var flags gtab.LookupFlags
-	var item item
 	for {
-		item = p.next()
-		if item.typ != itemHyphen {
+		if !p.optional(itemHyphen) {
 			break
 		}
 		which := p.readIdentifier()
 		switch which {
 		case "marks":
 			flags |= gtab.LookupIgnoreMarks
+		case "ligs":
+			flags |= gtab.LookupIgnoreLigatures
+		case "base":
+			flags |= gtab.LookupIgnoreBaseGlyphs
 		default:
-			p.fatal(fmt.Sprintf("unknown lookup flag: %s", which))
+			p.fatal("unknown lookup flag: %s", which)
 		}
 	}
-	p.backlog = append(p.backlog, item)
 	p.optional(itemEOL)
 	return flags
 }
 
 func (p *parser) parseClassDef() {
-	p.expect(itemColon, ":")
+	p.required(itemColon, ":")
 	className := p.readIdentifier()
-	p.expect(itemColon, ":")
+	p.required(itemColon, ":")
 	if _, ok := p.classes[className]; ok {
-		p.fatal(fmt.Sprintf("multiple definition for class %q", className))
+		p.fatal("multiple definition for class %q", className)
 	}
 	p.optional(itemEqual)
 	gidList := p.readGlyphSet()
@@ -448,13 +551,13 @@ func (p *parser) parseClassDef() {
 	p.classes[className] = gidList
 }
 
-func (p *parser) parseGlyphList() []font.GlyphID {
+func (p *parser) readGlyphList() []font.GlyphID {
 	var res []font.GlyphID
 
 	var item item
-	hasHyphen := false
+	hyphenSeen := false
 	for {
-		item = p.next()
+		item = p.readItem()
 
 		var next []font.GlyphID
 		switch item.typ {
@@ -469,7 +572,7 @@ func (p *parser) parseGlyphList() []font.GlyphID {
 			for r := range decodeString(item.val) {
 				gid := p.fontInfo.CMap.Lookup(r)
 				if gid == 0 {
-					p.fatal(fmt.Sprintf("rune %q not in mapped in font", r))
+					p.fatal("rune %q not in mapped in font", r)
 				}
 				next = append(next, gid)
 			}
@@ -477,21 +580,22 @@ func (p *parser) parseGlyphList() []font.GlyphID {
 		case itemInteger:
 			x, err := strconv.Atoi(item.val)
 			if err != nil || x < 0 || x >= p.fontInfo.NumGlyphs() {
-				p.fatal(fmt.Sprintf("invalid glyph id %q", item.val))
+				p.fatal("invalid glyph id %q", item.val)
 			}
 			next = append(next, font.GlyphID(x))
 
 		case itemHyphen:
-			if hasHyphen {
+			if hyphenSeen {
 				p.fatal("consecutive hyphens in glyph list")
 			}
-			hasHyphen = true
+			hyphenSeen = true
 
 		default:
 			goto done
 		}
+
 		for _, gid := range next {
-			if hasHyphen {
+			if hyphenSeen {
 				if len(res) == 0 {
 					p.fatal("invalid range")
 				}
@@ -505,7 +609,7 @@ func (p *parser) parseGlyphList() []font.GlyphID {
 						res = append(res, i)
 					}
 				}
-				hasHyphen = false
+				hyphenSeen = false
 			} else {
 				res = append(res, gid)
 			}
@@ -514,7 +618,7 @@ func (p *parser) parseGlyphList() []font.GlyphID {
 done:
 	p.backlog = append(p.backlog, item)
 
-	if hasHyphen {
+	if hyphenSeen {
 		p.fatal("hyphenated range not terminated")
 	}
 
@@ -522,32 +626,32 @@ done:
 }
 
 func (p *parser) readGlyphSet() []font.GlyphID {
-	p.expect(itemSquareBracketOpen, "[")
-	res := p.parseGlyphList()
-	p.expect(itemSquareBracketClose, "]")
+	p.required(itemSquareBracketOpen, "[")
+	res := p.readGlyphList()
+	p.required(itemSquareBracketClose, "]")
 	return res
 }
 
 func (p *parser) parseNestedLookups() gtab.Nested {
 	var res gtab.Nested
 	for {
-		item := p.next()
+		item := p.readItem()
 		if item.typ != itemInteger {
 			p.backlog = append(p.backlog, item)
 			return res
 		}
 		lookupIndex, err := strconv.Atoi(item.val)
 		if err != nil {
-			p.fatal(fmt.Sprintf("invalid lookup index: %q", item.val))
+			p.fatal("invalid lookup index: %q", item.val)
 		}
-		p.expect(itemAt, "@")
-		item = p.next()
+		p.required(itemAt, "@")
+		item = p.readItem()
 		if item.typ != itemInteger {
-			p.fatal(fmt.Sprintf("invalid lookup position: %q", item.val))
+			p.fatal("invalid lookup position: %q", item.val)
 		}
 		lookupPos, err := strconv.Atoi(item.val)
 		if err != nil {
-			p.fatal(fmt.Sprintf("invalid lookup position: %q", item.val))
+			p.fatal("invalid lookup position: %q", item.val)
 		}
 		res = append(res, gtab.SeqLookup{
 			SequenceIndex:   uint16(lookupPos),
@@ -556,7 +660,51 @@ func (p *parser) parseNestedLookups() gtab.Nested {
 	}
 }
 
-func (p *parser) next() item {
+func (p *parser) readIdentifier() string {
+	item := p.readItem()
+	if item.typ != itemIdentifier {
+		p.fatal("expected identifier, got %s", item)
+	}
+	return item.val
+}
+
+func (p *parser) readClassName() string {
+	p.required(itemColon, ":")
+	item := p.readItem()
+	var name string
+	switch item.typ {
+	case itemIdentifier:
+		name = item.val
+		p.required(itemColon, ":")
+	case itemColon:
+		// pass
+	default:
+		p.fatal("expected class name, got %s", item)
+	}
+	if name == "" {
+		return ""
+	}
+	if _, ok := p.classes[name]; !ok {
+		p.fatal("unknown class :%s:", name)
+	}
+	return name
+}
+
+// read a list of one or more class names
+func (p *parser) readClassNames() []string {
+	var classNames []string
+	for {
+		classNames = append(classNames, p.readClassName())
+
+		next := p.readItem()
+		p.backlog = append(p.backlog, next)
+		if next.typ != itemColon {
+			return classNames
+		}
+	}
+}
+
+func (p *parser) readItem() item {
 	if len(p.backlog) > 0 {
 		n := len(p.backlog) - 1
 		item := p.backlog[n]
@@ -566,27 +714,27 @@ func (p *parser) next() item {
 	return <-p.tokens
 }
 
-func (p *parser) readIdentifier() string {
-	item := p.next()
-	if item.typ != itemIdentifier {
-		p.fatal(fmt.Sprintf("expected identifier, got %s", item))
-	}
-	return item.val
+func (p *parser) peek() item {
+	next := p.readItem()
+	p.backlog = append(p.backlog, next)
+	return next
 }
 
-func (p *parser) expect(typ itemType, desc string) item {
-	item := p.next()
+func (p *parser) required(typ itemType, desc string) item {
+	item := p.readItem()
 	if item.typ != typ {
-		p.fatal(fmt.Sprintf("expected %s, got %s", desc, item))
+		p.fatal("expected %s, got %s", desc, item)
 	}
 	return item
 }
 
-func (p *parser) optional(typ itemType) {
-	item := p.next()
+func (p *parser) optional(typ itemType) bool {
+	item := p.readItem()
 	if item.typ != typ {
 		p.backlog = append(p.backlog, item)
+		return false
 	}
+	return true
 }
 
 func decodeString(s string) <-chan rune {
@@ -628,6 +776,7 @@ func (err *parseError) Error() string {
 	return err.msg
 }
 
-func (p *parser) fatal(msg string) {
+func (p *parser) fatal(format string, a ...interface{}) {
+	msg := fmt.Sprintf(format, a...)
 	panic(&parseError{msg})
 }

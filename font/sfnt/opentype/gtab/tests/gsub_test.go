@@ -312,10 +312,10 @@ func TestGsub(t *testing.T) {
 			subtable: &gtab.SeqContext2{
 				Cov:     coverage.Table{gidA: 0, gidB: 1, gidM: 2},
 				Classes: classdef.Table{gidA: 1, gidB: 1},
-				Rules: [][]*gtab.ClassSequenceRule{
+				Rules: [][]*gtab.ClassSeqRule{
 					{ // class 0 (not used)
 						{
-							Input: []uint16{},
+							In: []uint16{},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 1, LookupListIndex: 1},
 							},
@@ -323,7 +323,7 @@ func TestGsub(t *testing.T) {
 					},
 					{ // class 1
 						{
-							Input: []uint16{1, 1},
+							In: []uint16{1, 1},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 1, LookupListIndex: 2},
 							},
@@ -339,11 +339,11 @@ func TestGsub(t *testing.T) {
 			subtable: &gtab.SeqContext2{
 				Cov:     coverage.Table{gidA: 0},
 				Classes: classdef.Table{gidA: 1},
-				Rules: [][]*gtab.ClassSequenceRule{
+				Rules: [][]*gtab.ClassSeqRule{
 					{},
 					{
 						{
-							Input: []uint16{1, 1},
+							In: []uint16{1, 1},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 4},
 								{SequenceIndex: 0, LookupListIndex: 4},

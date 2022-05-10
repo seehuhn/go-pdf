@@ -48,7 +48,9 @@ const (
 	itemHyphen
 	itemIdentifier
 	itemInteger
+	itemOr
 	itemSemicolon
+	itemSlash
 	itemSquareBracketClose
 	itemSquareBracketOpen
 	itemString
@@ -132,6 +134,22 @@ const eof = rune(0)
 // as a function that returns the next state.
 type stateFn func(*lexer) stateFn
 
+var singleCharTokens = map[rune]itemType{
+	',': itemComma,
+	';': itemSemicolon,
+	':': itemColon,
+	'[': itemSquareBracketOpen,
+	']': itemSquareBracketClose,
+	'@': itemAt,
+	'/': itemSlash,
+	'=': itemEqual,
+}
+
+func isSingleCharToken(r rune) bool {
+	_, ok := singleCharTokens[r]
+	return ok
+}
+
 func lexStart(l *lexer) stateFn {
 	// Skip whitespace.
 	for {
@@ -160,6 +178,9 @@ func lexStart(l *lexer) stateFn {
 		return lexString
 	case r >= '0' && r <= '9':
 		return lexInteger
+	case isSingleCharToken(r):
+		l.emit(singleCharTokens[r])
+		return lexStart
 	case r == '-':
 		r := l.next()
 		if r == '>' {
@@ -169,27 +190,14 @@ func lexStart(l *lexer) stateFn {
 			l.emit(itemHyphen)
 		}
 		return lexStart
-	case r == '=':
-		l.emit(itemEqual)
-		return lexStart
-	case r == ':':
-		l.emit(itemColon)
-		return lexStart
-	case r == ';':
-		l.emit(itemSemicolon)
-		return lexStart
-	case r == '[':
-		l.emit(itemSquareBracketOpen)
-		return lexStart
-	case r == ']':
-		l.emit(itemSquareBracketClose)
-		return lexStart
-	case r == ',':
-		l.emit(itemComma)
-		return lexStart
-	case r == '@':
-		l.emit(itemAt)
-		return lexStart
+	case r == '|':
+		r := l.next()
+		if r == '|' {
+			l.emit(itemOr)
+			return lexStart
+		}
+		l.backup()
+		return l.errorf("expected '|'")
 	case r == '#':
 		return lexComment
 	default:
