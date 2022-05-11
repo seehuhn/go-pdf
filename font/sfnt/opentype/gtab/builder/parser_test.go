@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 )
@@ -33,9 +34,9 @@ func TestParser(t *testing.T) {
 	GSUB_2: A -> "AA", B -> "AA", C -> "ABAAC"
 	GSUB_3: A -> [ "BCD" ]
 	GSUB_4: -marks A A A -> B, A -> D, A A -> C
-	class :alpha: = [A-K]
-	class :digits: = [L-Z]
 	GSUB_5:
+	  class :alpha: = [A-K]
+	  class :digits: = [L-Z]
 	  "AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 ||
 	  /A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
 	  [A B C] [A C] [A D] -> 3@0
@@ -51,4 +52,75 @@ func TestParser(t *testing.T) {
 	fmt.Println(explain)
 
 	t.Error("fish")
+}
+
+func FuzzGsub1(f *testing.F) {
+	f.Add("A->B, M->N")
+	f.Add("A-C -> B-D, M->N, N->O")
+	f.Add("A->X, B->X, C->X, M->X, N->X")
+	f.Fuzz(func(t *testing.T, desc string) {
+		fontInfo := debug.MakeSimpleFont()
+		lookups, err := parse(fontInfo, "GSUB_1: "+desc)
+		if err != nil || len(lookups) != 1 {
+			return
+		}
+		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
+		desc2 := ExplainGsub(fontInfo)
+		lookups2, err := parse(fontInfo, desc2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := cmp.Diff(lookups, lookups2); d != "" {
+			t.Error(d)
+		}
+	})
+}
+
+func FuzzGsub2(f *testing.F) {
+	f.Add("A->B, M->N")
+	f.Add(`A -> "AA", B -> "AA", C -> "ABAAC"`)
+	f.Fuzz(func(t *testing.T, desc string) {
+		fontInfo := debug.MakeSimpleFont()
+		lookups, err := parse(fontInfo, "GSUB_2: "+desc)
+		if err != nil || len(lookups) != 1 {
+			return
+		}
+		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
+		desc2 := ExplainGsub(fontInfo)
+		lookups2, err := parse(fontInfo, desc2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := cmp.Diff(lookups, lookups2); d != "" {
+			t.Error(d)
+		}
+	})
+}
+
+func FuzzGsub5(f *testing.F) {
+	f.Add(`"AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 `)
+	f.Add(`/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2`)
+	f.Add(`[A B C] [A C] [A D] -> 3@0`)
+	f.Add(`"AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 ||
+	/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
+	[A B C] [A C] [A D] -> 3@0`)
+	f.Fuzz(func(t *testing.T, desc string) {
+		fontInfo := debug.MakeSimpleFont()
+		lookups, err := parse(fontInfo, `
+			class :alpha: = [A-K]
+			class :digits: = [L-Z]
+			GSUB_5: `+desc)
+		if err != nil || len(lookups) != 1 {
+			return
+		}
+		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
+		desc2 := ExplainGsub(fontInfo)
+		lookups2, err := parse(fontInfo, desc2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := cmp.Diff(lookups, lookups2); d != "" {
+			t.Error(d)
+		}
+	})
 }

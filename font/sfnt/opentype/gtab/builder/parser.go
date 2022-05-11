@@ -397,6 +397,7 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 		case itemSlash: // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
+			sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
 			p.required(itemSlash, "/")
 
 			classIndex := make(map[string]uint16)
@@ -773,11 +774,31 @@ done:
 	return res
 }
 
+// readGlyphSet returns a set of glyph IDs.
+// This sorts the glyphs in order of increasing GID and removes duplicates
 func (p *parser) readGlyphSet() []font.GlyphID {
 	p.required(itemSquareBracketOpen, "[")
 	res := p.readGlyphList()
+	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
 	p.required(itemSquareBracketClose, "]")
-	return res
+	return dedup(res)
+}
+
+func dedup(seq []font.GlyphID) []font.GlyphID {
+	if len(seq) < 2 {
+		return seq
+	}
+
+	pos := 1
+	for i := 1; i < len(seq); i++ {
+		if seq[i] == seq[i-1] {
+			continue
+		}
+		seq[pos] = seq[i]
+		pos++
+	}
+
+	return seq[:pos]
 }
 
 func (p *parser) readNestedLookups() gtab.Nested {

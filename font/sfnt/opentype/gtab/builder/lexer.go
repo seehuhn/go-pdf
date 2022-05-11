@@ -89,7 +89,6 @@ func (l *lexer) run() {
 		state = state(l)
 	}
 	close(l.items)
-	fmt.Println("lexer done")
 }
 
 func (l *lexer) emit(t itemType) {
