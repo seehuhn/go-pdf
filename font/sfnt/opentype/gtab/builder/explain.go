@@ -33,19 +33,64 @@ import (
 func ExplainGsub(fontInfo *sfntcff.Info) string {
 	ee := newExplainer(fontInfo)
 
-	ll := fontInfo.Gsub.LookupList
-	for _, lookup := range ll {
+	numClasses := 0
+
+	for _, lookup := range fontInfo.Gsub.LookupList {
 		checkType := func(newType int) {
 			if newType != int(lookup.Meta.LookupType) {
-				panic("inconsistent subtables")
+				panic("inconsistent subtable types")
+			}
+		}
+
+		// find and name all glyph classes used in this lookup
+		type classKey struct {
+			subtableIdx int
+			classIdx    uint16
+		}
+		classMap := make(map[classKey]string)
+		classNames := make(map[string]string)
+		for i, subtable := range lookup.Subtables {
+			ctx, ok := subtable.(*gtab.SeqContext2)
+			if !ok {
+				continue
+			}
+			subtableClasses := ctx.Classes.NumClasses()
+			gg := make([][]font.GlyphID, subtableClasses)
+			for gid, classIdx := range ctx.Classes {
+				if classIdx > 0 {
+					gg[classIdx] = append(gg[classIdx], gid)
+				}
+			}
+			for j, glyphs := range gg {
+				if j == 0 {
+					classMap[classKey{i, 0}] = "::"
+					continue
+				}
+
+				sort.Slice(glyphs, func(k, l int) bool {
+					return glyphs[k] < glyphs[l]
+				})
+				b := &strings.Builder{}
+				ee.explainSequenceW(b, glyphs)
+				desc := b.String()
+
+				className, ok := classNames[desc]
+				if !ok {
+					numClasses++
+					className = fmt.Sprintf(":c%d:", numClasses)
+					classNames[desc] = className
+					fmt.Fprintf(ee.w, "class %s = [%s]\n", className, desc)
+				}
+				classMap[classKey{i, uint16(j)}] = className
 			}
 		}
 
 		for i, subtable := range lookup.Subtables {
 			var mappings []mapping
 			var actions []action
-			var classActions []classAction
 			var cov coverage.Table
+			var classActions []classAction
+			var cc *gtab.SeqContext3
 
 			switch l := subtable.(type) {
 			case *gtab.Gsub1_1:
@@ -113,6 +158,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 				}
 			case *gtab.SeqContext3:
 				checkType(5)
+				cc = l
 			case *gtab.ChainedSeqContext1:
 				checkType(6)
 			case *gtab.ChainedSeqContext2:
@@ -131,16 +177,38 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 			}
 			switch lookup.Meta.LookupType {
 			case 1, 2, 4:
-				ee.explainMappings(mappings)
+				ee.explainSeqMappings(mappings)
 			case 3:
 				ee.explainSetMappings(mappings)
 			case 5:
 				if len(actions) > 0 { // format 1
 					ee.explainActions(actions)
-				} else if len(classActions) > 0 { // format 2
+				} else if cov != nil { // format 2
+					ee.w.WriteRune('/')
 					ee.explainCoverage(cov)
-				} else {
-					ee.w.WriteString("...")
+					ee.w.WriteRune('/')
+					for j, classAction := range classActions {
+						if j > 0 {
+							ee.w.WriteString(",")
+						}
+						for _, classIdx := range classAction.from {
+							ee.w.WriteRune(' ')
+							ee.w.WriteString(classMap[classKey{i, classIdx}])
+						}
+						ee.w.WriteString(" -> ")
+						ee.explainNested(classAction.actions)
+					}
+				} else { // format 3
+					for j, cov := range cc.In {
+						if j > 0 {
+							ee.w.WriteRune(' ')
+						}
+						ee.w.WriteRune('[')
+						ee.explainCoverage(cov)
+						ee.w.WriteRune(']')
+					}
+					ee.w.WriteString(" -> ")
+					ee.explainNested(cc.Actions)
 				}
 			default:
 				ee.w.WriteString(" # not yet implemented")
@@ -211,7 +279,7 @@ type mapping struct {
 	to   []font.GlyphID
 }
 
-func (ee *explainer) explainMappings(mm []mapping) {
+func (ee *explainer) explainSeqMappings(mm []mapping) {
 	sort.SliceStable(mm, func(i, j int) bool {
 		return mm[i].from[0] < mm[j].from[0]
 	})
@@ -250,9 +318,9 @@ func (ee *explainer) explainMappings(mm []mapping) {
 			)
 			mm = mm[rangeLen:]
 		} else {
-			ee.explainSequence(mm[0].from)
+			ee.writeGlyphList(mm[0].from)
 			ee.w.WriteString(" -> ")
-			ee.explainSequence(mm[0].to)
+			ee.writeGlyphList(mm[0].to)
 			mm = mm[1:]
 		}
 	}
@@ -268,9 +336,9 @@ func (ee *explainer) explainSetMappings(mm []mapping) {
 		ee.w.WriteString(sep)
 		sep = ", "
 
-		ee.explainSequence(mm[0].from)
+		ee.writeGlyphList(mm[0].from)
 		ee.w.WriteString(" -> [")
-		ee.explainSequence(mm[0].to)
+		ee.writeGlyphList(mm[0].to)
 		ee.w.WriteRune(']')
 		mm = mm[1:]
 	}
@@ -287,7 +355,7 @@ func (ee *explainer) explainActions(aa []action) {
 		ee.w.WriteString(sep)
 		sep = ", "
 
-		ee.explainSequence(aa[0].from)
+		ee.writeGlyphList(aa[0].from)
 		ee.w.WriteString(" -> ")
 		ee.explainNested(aa[0].actions)
 		aa = aa[1:]
@@ -299,13 +367,17 @@ type classAction struct {
 	actions gtab.Nested
 }
 
-func (ee *explainer) explainSequence(seq []font.GlyphID) {
+func (ee *explainer) writeGlyphList(seq []font.GlyphID) {
+	ee.explainSequenceW(ee.w, seq)
+}
+
+func (ee *explainer) explainSequenceW(w *strings.Builder, seq []font.GlyphID) {
 	if len(seq) == 0 {
 		return
 	}
 
 	if len(seq) == 1 && "\""+ee.names[seq[0]]+"\"" == ee.mapped[seq[0]] {
-		ee.w.WriteString(ee.names[seq[0]])
+		w.WriteString(ee.names[seq[0]])
 		return
 	}
 
@@ -318,18 +390,18 @@ func (ee *explainer) explainSequence(seq []font.GlyphID) {
 	}
 
 	if canUseMapped {
-		ee.w.WriteRune('"')
+		w.WriteRune('"')
 		for _, gid := range seq {
 			name := ee.mapped[gid]
-			ee.w.WriteString(name[1 : len(name)-1])
+			w.WriteString(name[1 : len(name)-1])
 		}
-		ee.w.WriteRune('"')
+		w.WriteRune('"')
 	} else {
 		for i, gid := range seq {
 			if i > 0 {
-				ee.w.WriteRune(' ')
+				w.WriteRune(' ')
 			}
-			ee.w.WriteString(ee.names[gid])
+			w.WriteString(ee.names[gid])
 		}
 	}
 }
@@ -339,9 +411,7 @@ func (ee *explainer) explainCoverage(cov coverage.Table) {
 	sort.Slice(keys, func(i, j int) bool {
 		return keys[i] < keys[j]
 	})
-	ee.w.WriteRune('/')
-	ee.explainSequence(keys)
-	ee.w.WriteRune('/')
+	ee.writeGlyphList(keys)
 }
 
 func (ee *explainer) explainNested(actions gtab.Nested) {

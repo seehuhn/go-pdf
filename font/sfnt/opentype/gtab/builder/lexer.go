@@ -42,6 +42,7 @@ const (
 	itemEOL
 	itemArrow
 	itemAt
+	itemBar
 	itemColon
 	itemComma
 	itemEqual
@@ -194,10 +195,11 @@ func lexStart(l *lexer) stateFn {
 		r := l.next()
 		if r == '|' {
 			l.emit(itemOr)
-			return lexStart
+		} else {
+			l.backup()
+			l.emit(itemBar)
 		}
-		l.backup()
-		return l.errorf("expected '|'")
+		return lexStart
 	case r == '#':
 		return lexComment
 	default:

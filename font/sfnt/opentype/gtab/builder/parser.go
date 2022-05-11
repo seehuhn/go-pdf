@@ -102,6 +102,9 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 		case item.typ == itemIdentifier && item.val == "GSUB_5":
 			l := p.readSeqCtx(5)
 			lookups = append(lookups, l)
+		case item.typ == itemIdentifier && item.val == "GSUB_6":
+			l := p.readChainedSeqCtx(6)
+			lookups = append(lookups, l)
 		default:
 			p.fatal("unexpected %s", item)
 		}
@@ -138,11 +141,7 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 		p.fatal("no substitutions found")
 	}
 
-	// length of a coverage table:
-	//   - format 1: 4 + 2*n
-	//   - format 2: 4 + 6*n.ranges
-	// length of a GSUB 1.1 subtable: 6 + len(cov)
-	// length of a GSUB 1.2 subtable: 6 + 2*n + len(cov)
+	// TODO(voss): be more clever in choosing format 1/2 subtables
 	in := maps.Keys(res)
 	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
 	cov := make(coverage.Table, len(in))
@@ -184,7 +183,7 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 }
 
 func (p *parser) readGsub2() *gtab.LookupTable {
-	res := make(map[font.GlyphID][]font.GlyphID)
+	data := make(map[font.GlyphID][]font.GlyphID)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
@@ -201,10 +200,10 @@ func (p *parser) readGsub2() *gtab.LookupTable {
 		}
 
 		fromGid := from[0]
-		if _, ok := res[fromGid]; ok {
+		if _, ok := data[fromGid]; ok {
 			p.fatal("duplicate mapping for GID %d", fromGid)
 		}
-		res[fromGid] = to
+		data[fromGid] = to
 
 		if !p.optional(itemComma) {
 			break
@@ -212,11 +211,11 @@ func (p *parser) readGsub2() *gtab.LookupTable {
 		p.optional(itemEOL)
 	}
 
-	if len(res) == 0 {
+	if len(data) == 0 {
 		p.fatal("no substitutions found")
 	}
 
-	in := maps.Keys(res)
+	in := maps.Keys(data)
 	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
 	cov := make(coverage.Table, len(in))
 	for i, gid := range in {
@@ -224,7 +223,7 @@ func (p *parser) readGsub2() *gtab.LookupTable {
 	}
 	repl := make([][]font.GlyphID, len(in))
 	for i, gid := range in {
-		repl[i] = res[gid]
+		repl[i] = data[gid]
 	}
 	subtable := &gtab.Gsub2_1{
 		Cov:  cov,
@@ -332,20 +331,7 @@ func (p *parser) readGsub4() *gtab.LookupTable {
 
 	repl := make([][]gtab.Ligature, len(in))
 	for i, gid := range in {
-		ligs := data[gid]
-		sort.Slice(ligs, func(i, j int) bool {
-			if len(ligs[i].In) != len(ligs[j].In) {
-				return len(ligs[i].In) > len(ligs[j].In)
-			}
-			for i, gidA := range ligs[i].In {
-				gidB := ligs[j].In[i]
-				if gidA != gidB {
-					return gidA < gidB
-				}
-			}
-			return ligs[i].Out < ligs[j].Out
-		})
-		repl[i] = ligs
+		repl[i] = data[gid]
 	}
 
 	subtable := &gtab.Gsub4_1{
@@ -374,15 +360,16 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 		default: // format 1
 			res := make(map[font.GlyphID][]*gtab.SeqRule)
 			for {
-				from := p.readGlyphList()
-				if len(from) == 0 {
+				input := p.readGlyphList()
+				p.required(itemArrow, "\"->\"")
+				actions := p.readNestedLookups()
+
+				if len(input) == 0 {
 					p.fatal("expected at least one glyph at %s", p.readItem())
 				}
-				p.required(itemArrow, "\"->\"")
-				nested := p.parseNestedLookups()
 
-				key := from[0]
-				res[key] = append(res[key], &gtab.SeqRule{In: from[1:], Actions: nested})
+				key := input[0]
+				res[key] = append(res[key], &gtab.SeqRule{In: input[1:], Actions: actions})
 
 				if !p.optional(itemComma) {
 					break
@@ -398,20 +385,7 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 
 			rules := make([][]*gtab.SeqRule, len(in))
 			for i, gid := range in {
-				seqRule := res[gid]
-				sort.Slice(seqRule, func(i, j int) bool {
-					if len(seqRule[i].In) != len(seqRule[j].In) {
-						return len(seqRule[i].In) > len(seqRule[j].In)
-					}
-					for i, gidA := range seqRule[i].In {
-						gidB := seqRule[j].In[i]
-						if gidA != gidB {
-							return gidA < gidB
-						}
-					}
-					return false // should not happen
-				})
-				rules[i] = seqRule
+				rules[i] = res[gid]
 			}
 
 			subtable := &gtab.SeqContext1{
@@ -430,12 +404,12 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 			data := make(map[uint16][]*gtab.ClassSeqRule)
 
 			for {
-				classNames := p.readClassNames()
+				inputClasses := p.readClassNames()
 				p.required(itemArrow, "\"->\"")
-				actions := p.parseNestedLookups()
+				actions := p.readNestedLookups()
 
-				classIndices := make([]uint16, len(classNames))
-				for i, className := range classNames {
+				classIndices := make([]uint16, len(inputClasses))
+				for i, className := range inputClasses {
 					if _, ok := classIndex[className]; !ok && className != "" {
 						_, ok := p.classes[className]
 						if !ok {
@@ -469,7 +443,6 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 					continue
 				}
 				cls := p.classes[className]
-				fmt.Println(className, cls)
 				for _, gid := range cls {
 					_, ok := classes[gid]
 					if ok {
@@ -482,19 +455,7 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 			numClasses := len(classIndex) + 1
 			rules := make([][]*gtab.ClassSeqRule, numClasses)
 			for classIndex := range rules {
-				classSeqRules := data[uint16(classIndex)]
-				sort.Slice(classSeqRules, func(i, j int) bool {
-					if len(classSeqRules[i].In) != len(classSeqRules[j].In) {
-						return len(classSeqRules[i].In) > len(classSeqRules[j].In)
-					}
-					for k := 0; k < len(classSeqRules[k].In) && k < len(classSeqRules[j].In); k++ {
-						if classSeqRules[i].In[k] != classSeqRules[j].In[k] {
-							return classSeqRules[i].In[k] < classSeqRules[j].In[k]
-						}
-					}
-					return false // should not happen
-				})
-				rules[classIndex] = classSeqRules
+				rules[classIndex] = data[uint16(classIndex)]
 			}
 
 			subtable := &gtab.SeqContext2{
@@ -505,7 +466,194 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
 		case itemSquareBracketOpen: // format 3
-			panic("not implemented")
+			var in []coverage.Table
+			for {
+				glyphs := p.readGlyphSet()
+				cov := make(coverage.Table, len(glyphs))
+				for i, gid := range glyphs {
+					cov[gid] = i
+				}
+				in = append(in, cov)
+				if p.optional(itemArrow) {
+					break
+				}
+			}
+			actions := p.readNestedLookups()
+
+			subtable := &gtab.SeqContext3{
+				In:      in,
+				Actions: actions,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+		}
+		if !p.optional(itemOr) {
+			break
+		}
+		p.optional(itemEOL)
+	}
+
+	return lookup
+}
+
+func (p *parser) readChainedSeqCtx(lookupType uint16) *gtab.LookupTable {
+	p.optional(itemColon)
+	p.optional(itemEOL)
+	flags := p.readLookupFlags()
+
+	lookup := &gtab.LookupTable{
+		Meta:      &gtab.LookupMetaInfo{LookupType: lookupType, LookupFlag: flags},
+		Subtables: []gtab.Subtable{},
+	}
+
+	for {
+		next := p.peek()
+		switch next.typ {
+		default: // format 1
+			res := make(map[font.GlyphID][]*gtab.ChainedSeqRule)
+			for {
+				backtrack := p.readGlyphList()
+				p.required(itemBar, "|")
+				input := p.readGlyphList()
+				p.required(itemBar, "|")
+				lookahead := p.readGlyphList()
+				p.required(itemArrow, "\"->\"")
+				nested := p.readNestedLookups()
+
+				if len(input) == 0 {
+					p.fatal("expected at least one glyph at %s", p.readItem())
+				}
+
+				key := input[0]
+				res[key] = append(res[key], &gtab.ChainedSeqRule{
+					Backtrack: rev(backtrack),
+					Input:     input,
+					Lookahead: lookahead,
+					Actions:   nested,
+				})
+
+				if !p.optional(itemComma) {
+					break
+				}
+				p.optional(itemEOL)
+			}
+
+			in := maps.Keys(res)
+			sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
+			cov := make(coverage.Table, len(in))
+			for i, gid := range in {
+				cov[gid] = i
+			}
+
+			rules := make([][]*gtab.ChainedSeqRule, len(in))
+			for i, gid := range in {
+				rules[i] = res[gid]
+			}
+
+			subtable := &gtab.ChainedSeqContext1{
+				Cov:   cov,
+				Rules: rules,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+
+		case itemSlash: // format 2
+			p.required(itemSlash, "/")
+			firstGlyphs := p.readGlyphList()
+			p.required(itemSlash, "/")
+
+			classIndex := make(map[string]uint16)
+
+			data := make(map[uint16][]*gtab.ClassSeqRule)
+
+			for {
+				backtrackClasses := p.readClassNames()
+				p.required(itemBar, "|")
+				inputClasses := p.readClassNames()
+				p.required(itemBar, "|")
+				lookaheadClasses := p.readClassNames()
+				p.required(itemArrow, "\"->\"")
+				actions := p.readNestedLookups()
+
+				_ = backtrackClasses
+				_ = lookaheadClasses
+				// TODO(voss)
+
+				classIndices := make([]uint16, len(inputClasses))
+				for i, className := range inputClasses {
+					if _, ok := classIndex[className]; !ok && className != "" {
+						_, ok := p.classes[className]
+						if !ok {
+							p.fatal("unknown class :%s:", className)
+						}
+						classIndex[className] = uint16(len(classIndex) + 1)
+					}
+					classIndices[i] = classIndex[className]
+				}
+
+				firstClass := classIndices[0]
+				data[firstClass] = append(data[firstClass], &gtab.ClassSeqRule{
+					In:      classIndices[1:],
+					Actions: actions,
+				})
+
+				if !p.optional(itemComma) {
+					break
+				}
+				p.optional(itemEOL)
+			}
+
+			cov := make(coverage.Table, len(firstGlyphs))
+			for i, gid := range firstGlyphs {
+				cov[gid] = i
+			}
+
+			classes := make(map[font.GlyphID]uint16)
+			for className, classIdx := range classIndex {
+				if classIdx == 0 {
+					continue
+				}
+				cls := p.classes[className]
+				for _, gid := range cls {
+					_, ok := classes[gid]
+					if ok {
+						p.fatal("overlapping classes for glyph %d", gid)
+					}
+					classes[gid] = classIdx
+				}
+			}
+
+			numClasses := len(classIndex) + 1
+			rules := make([][]*gtab.ClassSeqRule, numClasses)
+			for classIndex := range rules {
+				rules[classIndex] = data[uint16(classIndex)]
+			}
+
+			subtable := &gtab.SeqContext2{
+				Cov:     cov,
+				Classes: classes,
+				Rules:   rules,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+
+		case itemSquareBracketOpen: // format 3
+			var in []coverage.Table
+			for {
+				glyphs := p.readGlyphSet()
+				cov := make(coverage.Table, len(glyphs))
+				for i, gid := range glyphs {
+					cov[gid] = i
+				}
+				in = append(in, cov)
+				if p.optional(itemArrow) {
+					break
+				}
+			}
+			actions := p.readNestedLookups()
+
+			subtable := &gtab.SeqContext3{
+				In:      in,
+				Actions: actions,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
 		}
 		if !p.optional(itemOr) {
 			break
@@ -632,7 +780,7 @@ func (p *parser) readGlyphSet() []font.GlyphID {
 	return res
 }
 
-func (p *parser) parseNestedLookups() gtab.Nested {
+func (p *parser) readNestedLookups() gtab.Nested {
 	var res gtab.Nested
 	for {
 		item := p.readItem()
@@ -766,6 +914,15 @@ func decodeString(s string) <-chan rune {
 		close(c)
 	}()
 	return c
+}
+
+// rev reverses the order of glyphs in seq.
+// The slice is modified in-place, and also returned.
+func rev(seq []font.GlyphID) []font.GlyphID {
+	for i, j := 0, len(seq)-1; i < j; i, j = i+1, j-1 {
+		seq[i], seq[j] = seq[j], seq[i]
+	}
+	return seq
 }
 
 type parseError struct {

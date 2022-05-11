@@ -191,7 +191,7 @@ func TestSeqContext2(t *testing.T) {
 func TestSeqContext3(t *testing.T) {
 	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext3{
-		InputCov: []coverage.Table{
+		In: []coverage.Table{
 			{1: 0, 3: 1, 4: 2},
 			{2: 0, 4: 1, 5: 2},
 			{3: 0, 5: 1},
@@ -358,14 +358,14 @@ func FuzzSeqContext2(f *testing.F) {
 func FuzzSeqContext3(f *testing.F) {
 	sub := &SeqContext3{}
 	f.Add(sub.Encode())
-	sub.InputCov = append(sub.InputCov, coverage.Table{3: 0, 4: 1})
+	sub.In = append(sub.In, coverage.Table{3: 0, 4: 1})
 	sub.Actions = []SeqLookup{
 		{SequenceIndex: 0, LookupListIndex: 1},
 		{SequenceIndex: 1, LookupListIndex: 5},
 		{SequenceIndex: 0, LookupListIndex: 4},
 	}
 	f.Add(sub.Encode())
-	sub.InputCov = append(sub.InputCov, coverage.Table{1: 0, 3: 1, 5: 2})
+	sub.In = append(sub.In, coverage.Table{1: 0, 3: 1, 5: 2})
 	f.Add(sub.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {

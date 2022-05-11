@@ -359,7 +359,7 @@ func TestGsub(t *testing.T) {
 		{ // test GSUB 5.3
 			lookupType: 5,
 			subtable: &gtab.SeqContext3{
-				InputCov: []coverage.Table{
+				In: []coverage.Table{
 					{gidA: 0, gidB: 1},
 					{gidB: 0, gidC: 1},
 					{gidA: 0, gidC: 1},

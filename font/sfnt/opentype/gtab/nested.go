@@ -505,8 +505,8 @@ func (l *SeqContext2) Encode() []byte {
 // SeqContext3 is used for GSUB type 5 format 3 and GPOS type 7 format 3 subtables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-3-coverage-based-glyph-contexts
 type SeqContext3 struct {
-	InputCov []coverage.Table
-	Actions  Nested
+	In      []coverage.Table
+	Actions Nested
 }
 
 func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -544,22 +544,22 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	res := &SeqContext3{
-		InputCov: cov,
-		Actions:  actions,
+		In:      cov,
+		Actions: actions,
 	}
 	return res, nil
 }
 
 // Apply implements the Subtable interface.
 func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !l.InputCov[0].Contains(seq[i].Gid) {
+	if !l.In[0].Contains(seq[i].Gid) {
 		return seq, -1, nil
 	}
 
 	p := i
 	matchPos := []int{p}
-	glyphsNeeded := len(l.InputCov) - 1
-	for _, cov := range l.InputCov[1:] {
+	glyphsNeeded := len(l.In) - 1
+	for _, cov := range l.In[1:] {
 		glyphsNeeded--
 		p++
 		for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -577,8 +577,8 @@ func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.G
 
 // EncodeLen implements the Subtable interface.
 func (l *SeqContext3) EncodeLen() int {
-	total := 6 + 2*len(l.InputCov) + 4*len(l.Actions)
-	for _, cov := range l.InputCov {
+	total := 6 + 2*len(l.In) + 4*len(l.Actions)
+	for _, cov := range l.In {
 		total += cov.EncodeLen()
 	}
 	return total
@@ -586,12 +586,12 @@ func (l *SeqContext3) EncodeLen() int {
 
 // Encode implements the Subtable interface.
 func (l *SeqContext3) Encode() []byte {
-	glyphCount := len(l.InputCov)
+	glyphCount := len(l.In)
 	seqLookupCount := len(l.Actions)
 
-	total := 6 + 2*len(l.InputCov) + 4*len(l.Actions)
+	total := 6 + 2*len(l.In) + 4*len(l.Actions)
 	coverageOffsets := make([]uint16, glyphCount)
-	for i, cov := range l.InputCov {
+	for i, cov := range l.In {
 		coverageOffsets[i] = uint16(total)
 		total += cov.EncodeLen()
 	}
@@ -611,7 +611,7 @@ func (l *SeqContext3) Encode() []byte {
 			byte(action.LookupListIndex>>8), byte(action.LookupListIndex),
 		)
 	}
-	for i, cov := range l.InputCov {
+	for i, cov := range l.In {
 		if len(buf) != int(coverageOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}
@@ -900,7 +900,7 @@ type ChainedSeqContext2 struct {
 	Backtrack classdef.Table
 	Input     classdef.Table
 	Lookahead classdef.Table
-	Rules     [][]*ChainedClassSeqRule
+	Rules     [][]*ChainedClassSeqRule // indexed by input glyph class
 }
 
 // ChainedClassSeqRule is used for GSUB type 6 format 2 and GPOS type 8 format 2 subtables.

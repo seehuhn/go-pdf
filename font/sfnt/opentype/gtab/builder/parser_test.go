@@ -37,9 +37,11 @@ func TestParser(t *testing.T) {
 	class :digits: = [L-Z]
 	GSUB_5:
 	  "AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 ||
-	  /A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2
+	  /A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
+	  [A B C] [A C] [A D] -> 3@0
+	GSUB_6:
+	  A B | C D | E F -> 1@0 2@1, B | C D E | F -> 1@2
 	`)
-	// [A B C] [A C] [A D] -> 3@0
 	if err != nil {
 		t.Fatal(err)
 	}
