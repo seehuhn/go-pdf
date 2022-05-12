@@ -119,6 +119,9 @@ func FuzzGsub5(f *testing.F) {
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
+		fmt.Println("@1@")
+		fmt.Println("GSUB_5: " + desc)
+		fmt.Println("@2@")
 		fmt.Println(desc2)
 		lookups2, err := parse(fontInfo, desc2)
 		if err != nil {

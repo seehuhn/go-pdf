@@ -137,17 +137,16 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 	}
 
 	// TODO(voss): be more clever in choosing format 1/2 subtables
-	in := maps.Keys(res)
-	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
-	cov := make(coverage.Table, len(in))
-	for i, gid := range in {
-		cov[gid] = i
-	}
+	cov := makeCoverageTable(maps.Keys(res))
 
 	isConstDelta := true
-	delta := res[in[0]] - in[0]
-	for _, gid := range in[1:] {
-		if res[gid] != delta+gid {
+	first := true
+	var delta font.GlyphID
+	for gid, idx := range cov {
+		if first {
+			first = false
+			delta = font.GlyphID(idx) - gid
+		} else if font.GlyphID(idx) != gid+delta {
 			isConstDelta = false
 			break
 		}
@@ -159,8 +158,8 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 			Delta: delta,
 		}
 	} else {
-		subst := make([]font.GlyphID, len(in))
-		for i, gid := range in {
+		subst := make([]font.GlyphID, len(cov))
+		for gid, i := range cov {
 			subst[i] = res[gid]
 		}
 		subtable = &gtab.Gsub1_2{
@@ -210,14 +209,9 @@ func (p *parser) readGsub2() *gtab.LookupTable {
 		p.fatal("no substitutions found")
 	}
 
-	in := maps.Keys(data)
-	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
-	cov := make(coverage.Table, len(in))
-	for i, gid := range in {
-		cov[gid] = i
-	}
-	repl := make([][]font.GlyphID, len(in))
-	for i, gid := range in {
+	cov := makeCoverageTable(maps.Keys(data))
+	repl := make([][]font.GlyphID, len(cov))
+	for gid, i := range cov {
 		repl[i] = data[gid]
 	}
 	subtable := &gtab.Gsub2_1{
@@ -267,14 +261,9 @@ func (p *parser) readGsub3() *gtab.LookupTable {
 		p.fatal("no substitutions found")
 	}
 
-	in := maps.Keys(res)
-	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
-	cov := make(coverage.Table, len(in))
-	for i, gid := range in {
-		cov[gid] = i
-	}
-	repl := make([][]font.GlyphID, len(in))
-	for i, gid := range in {
+	cov := makeCoverageTable(maps.Keys(res))
+	repl := make([][]font.GlyphID, len(cov))
+	for gid, i := range cov {
 		repl[i] = res[gid]
 	}
 	subtable := &gtab.Gsub3_1{
@@ -317,15 +306,9 @@ func (p *parser) readGsub4() *gtab.LookupTable {
 		p.optional(itemEOL)
 	}
 
-	in := maps.Keys(data)
-	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
-	cov := make(coverage.Table, len(in))
-	for i, gid := range in {
-		cov[gid] = i
-	}
-
-	repl := make([][]gtab.Ligature, len(in))
-	for i, gid := range in {
+	cov := makeCoverageTable(maps.Keys(data))
+	repl := make([][]gtab.Ligature, len(cov))
+	for gid, i := range cov {
 		repl[i] = data[gid]
 	}
 
@@ -375,15 +358,10 @@ gsubLoop:
 				}
 				p.optional(itemEOL)
 			}
-			in := maps.Keys(res)
-			sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
-			cov := make(coverage.Table, len(in))
-			for i, gid := range in {
-				cov[gid] = i
-			}
+			cov := makeCoverageTable(maps.Keys(res))
 
-			rules := make([][]*gtab.SeqRule, len(in))
-			for i, gid := range in {
+			rules := make([][]*gtab.SeqRule, len(cov))
+			for gid, i := range cov {
 				rules[i] = res[gid]
 			}
 
@@ -444,10 +422,7 @@ gsubLoop:
 				p.optional(itemEOL)
 			}
 
-			cov := make(coverage.Table, len(firstGlyphs))
-			for i, gid := range firstGlyphs {
-				cov[gid] = i
-			}
+			cov := makeCoverageTable(firstGlyphs)
 
 			subtable := &gtab.SeqContext2{
 				Cov:   cov,
@@ -744,6 +719,9 @@ func (p *parser) parseClassDef() (string, []font.GlyphID) {
 	p.required(itemColon, ":")
 	p.optional(itemEqual)
 	gidList := p.readGlyphSet()
+	if len(gidList) == 0 {
+		p.fatal("empty class :%s:", className)
+	}
 	return className, gidList
 }
 
@@ -828,10 +806,11 @@ func (p *parser) readGlyphSet() []font.GlyphID {
 	res := p.readGlyphList()
 	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
 	p.required(itemSquareBracketClose, "]")
-	return dedup(res)
+	return unique(res)
 }
 
-func dedup(seq []font.GlyphID) []font.GlyphID {
+// unique removes duplicates from a sorted slice.
+func unique(seq []font.GlyphID) []font.GlyphID {
 	if len(seq) < 2 {
 		return seq
 	}
@@ -984,6 +963,16 @@ func isIdentifier(i item, val string) bool {
 		return false
 	}
 	return i.val == val
+}
+
+func makeCoverageTable(in []font.GlyphID) coverage.Table {
+	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
+	in = unique(in)
+	cov := make(coverage.Table, len(in))
+	for i, gid := range in {
+		cov[gid] = i
+	}
+	return cov
 }
 
 // rev reverses the order of items in a slice.
