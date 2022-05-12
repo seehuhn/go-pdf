@@ -54,9 +54,9 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 			if !ok {
 				continue
 			}
-			subtableClasses := ctx.Classes.NumClasses()
+			subtableClasses := ctx.Input.NumClasses()
 			gg := make([][]font.GlyphID, subtableClasses)
-			for gid, classIdx := range ctx.Classes {
+			for gid, classIdx := range ctx.Input {
 				if classIdx > 0 {
 					gg[classIdx] = append(gg[classIdx], gid)
 				}
@@ -140,7 +140,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 				for gid, idx := range l.Cov {
 					for _, rule := range l.Rules[idx] {
 						actions = append(actions, action{
-							from:    append([]font.GlyphID{gid}, rule.In...),
+							from:    append([]font.GlyphID{gid}, rule.Input...),
 							actions: rule.Actions,
 						})
 					}
@@ -151,7 +151,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 				for classIdx, rules := range l.Rules {
 					for _, rule := range rules {
 						classActions = append(classActions, classAction{
-							from:    append([]uint16{uint16(classIdx)}, rule.In...),
+							from:    append([]uint16{uint16(classIdx)}, rule.Input...),
 							actions: rule.Actions,
 						})
 					}
@@ -199,7 +199,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 						ee.explainNested(classAction.actions)
 					}
 				} else { // format 3
-					for j, cov := range cc.In {
+					for j, cov := range cc.Input {
 						if j > 0 {
 							ee.w.WriteRune(' ')
 						}

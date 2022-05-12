@@ -50,8 +50,6 @@ func TestParser(t *testing.T) {
 
 	explain := ExplainGsub(fontInfo)
 	fmt.Println(explain)
-
-	t.Error("fish")
 }
 
 func FuzzGsub1(f *testing.F) {

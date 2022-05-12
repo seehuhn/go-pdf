@@ -70,7 +70,7 @@ type SeqContext1 struct {
 
 // SeqRule describes a sequence of glyphs and the actions to be performed
 type SeqRule struct {
-	In      []font.GlyphID // excludes the first input glyph, since this is in Cov
+	Input   []font.GlyphID // excludes the first input glyph, since this is in Cov
 	Actions Nested
 }
 
@@ -146,7 +146,7 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				return nil, err
 			}
 			res.Rules[i][j] = &SeqRule{
-				In:      inputSequence,
+				Input:   inputSequence,
 				Actions: actions,
 			}
 		}
@@ -171,8 +171,8 @@ ruleLoop:
 	for _, rule := range rules {
 		p := i
 		matchPos = append(matchPos[:0], p)
-		glyphsNeeded := len(rule.In)
-		for _, gid := range rule.In {
+		glyphsNeeded := len(rule.Input)
+		for _, gid := range rule.Input {
 			glyphsNeeded--
 			p++
 			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -200,7 +200,7 @@ func (l *SeqContext1) EncodeLen() int {
 		}
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	total += l.Cov.EncodeLen()
@@ -220,7 +220,7 @@ func (l *SeqContext1) Encode() []byte {
 		seqRuleSetOffsets[i] = uint16(total)
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	coverageOffset := total
@@ -251,16 +251,16 @@ func (l *SeqContext1) Encode() []byte {
 			buf = append(buf,
 				byte(pos>>8), byte(pos),
 			)
-			pos += 4 + 2*len(rule.In) + 4*len(rule.Actions)
+			pos += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 		for _, rule := range rules {
-			glyphCount := len(rule.In) + 1
+			glyphCount := len(rule.Input) + 1
 			seqLookupCount := len(rule.Actions)
 			buf = append(buf,
 				byte(glyphCount>>8), byte(glyphCount),
 				byte(seqLookupCount>>8), byte(seqLookupCount),
 			)
-			for _, gid := range rule.In {
+			for _, gid := range rule.Input {
 				buf = append(buf, byte(gid>>8), byte(gid))
 			}
 			for _, action := range rule.Actions {
@@ -278,15 +278,15 @@ func (l *SeqContext1) Encode() []byte {
 // SeqContext2 is used for GSUB type 5 format 2 subtables and GPOS type 7 format 2 subtables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-2-class-based-glyph-contexts
 type SeqContext2 struct {
-	Cov     coverage.Table
-	Classes classdef.Table
-	Rules   [][]*ClassSeqRule // indexed by class index of the first glyph
+	Cov   coverage.Table
+	Input classdef.Table
+	Rules [][]*ClassSeqRule // indexed by class index of the first glyph
 }
 
 // ClassSeqRule describes a sequence of glyph classes and the actions to
 // be performed
 type ClassSeqRule struct {
-	In      []uint16 // excludes the first input glyph
+	Input   []uint16 // excludes the first input glyph
 	Actions Nested
 }
 
@@ -318,9 +318,9 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	res := &SeqContext2{
-		Cov:     cov,
-		Classes: classDef,
-		Rules:   make([][]*ClassSeqRule, len(classSeqRuleSetOffsets)),
+		Cov:   cov,
+		Input: classDef,
+		Rules: make([][]*ClassSeqRule, len(classSeqRuleSetOffsets)),
 	}
 
 	for i, classSeqRuleSetOffset := range classSeqRuleSetOffsets {
@@ -367,7 +367,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				return nil, err
 			}
 			res.Rules[i][j] = &ClassSeqRule{
-				In:      inputSequence,
+				Input:   inputSequence,
 				Actions: actions,
 			}
 		}
@@ -385,7 +385,7 @@ func (l *SeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.G
 	if !ok {
 		return seq, -1, nil
 	}
-	ruleIdx := l.Classes[seq[i].Gid]
+	ruleIdx := l.Input[seq[i].Gid]
 	rules := l.Rules[ruleIdx]
 
 	var matchPos []int
@@ -393,14 +393,14 @@ ruleLoop:
 	for _, rule := range rules {
 		p := i
 		matchPos = append(matchPos[:0], p)
-		glyphsNeeded := len(rule.In)
-		for _, cls := range rule.In {
+		glyphsNeeded := len(rule.Input)
+		for _, cls := range rule.Input {
 			glyphsNeeded--
 			p++
 			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
 				p++
 			}
-			if p+glyphsNeeded >= len(seq) || l.Classes[seq[p].Gid] != cls {
+			if p+glyphsNeeded >= len(seq) || l.Input[seq[p].Gid] != cls {
 				continue ruleLoop
 			}
 			matchPos = append(matchPos, p)
@@ -417,14 +417,14 @@ ruleLoop:
 func (l *SeqContext2) EncodeLen() int {
 	total := 8 + 2*len(l.Rules)
 	total += l.Cov.EncodeLen()
-	total += l.Classes.AppendLen()
+	total += l.Input.AppendLen()
 	for _, rules := range l.Rules {
 		if rules == nil {
 			continue
 		}
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	return total
@@ -443,13 +443,13 @@ func (l *SeqContext2) Encode() []byte {
 		seqRuleSetOffsets[i] = uint16(total)
 		total += 2 + 2*len(rules)
 		for _, rule := range rules {
-			total += 4 + 2*len(rule.In) + 4*len(rule.Actions)
+			total += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 	}
 	coverageOffset := total
 	total += l.Cov.EncodeLen()
 	classDefOffset := total
-	total += l.Classes.AppendLen()
+	total += l.Input.AppendLen()
 
 	buf := make([]byte, 0, total)
 	buf = append(buf,
@@ -477,16 +477,16 @@ func (l *SeqContext2) Encode() []byte {
 			buf = append(buf,
 				byte(pos>>8), byte(pos),
 			)
-			pos += 4 + 2*len(rule.In) + 4*len(rule.Actions)
+			pos += 4 + 2*len(rule.Input) + 4*len(rule.Actions)
 		}
 		for _, rule := range rules {
-			glyphCount := len(rule.In) + 1
+			glyphCount := len(rule.Input) + 1
 			seqLookupCount := len(rule.Actions)
 			buf = append(buf,
 				byte(glyphCount>>8), byte(glyphCount),
 				byte(seqLookupCount>>8), byte(seqLookupCount),
 			)
-			for _, gid := range rule.In {
+			for _, gid := range rule.Input {
 				buf = append(buf, byte(gid>>8), byte(gid))
 			}
 			for _, action := range rule.Actions {
@@ -498,14 +498,14 @@ func (l *SeqContext2) Encode() []byte {
 		}
 	}
 	buf = append(buf, l.Cov.Encode()...)
-	buf = l.Classes.Append(buf)
+	buf = l.Input.Append(buf)
 	return buf
 }
 
 // SeqContext3 is used for GSUB type 5 format 3 and GPOS type 7 format 3 subtables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-3-coverage-based-glyph-contexts
 type SeqContext3 struct {
-	In      []coverage.Table
+	Input   []coverage.Table
 	Actions Nested
 }
 
@@ -544,7 +544,7 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	res := &SeqContext3{
-		In:      cov,
+		Input:   cov,
 		Actions: actions,
 	}
 	return res, nil
@@ -552,14 +552,14 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 // Apply implements the Subtable interface.
 func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !l.In[0].Contains(seq[i].Gid) {
+	if !l.Input[0].Contains(seq[i].Gid) {
 		return seq, -1, nil
 	}
 
 	p := i
 	matchPos := []int{p}
-	glyphsNeeded := len(l.In) - 1
-	for _, cov := range l.In[1:] {
+	glyphsNeeded := len(l.Input) - 1
+	for _, cov := range l.Input[1:] {
 		glyphsNeeded--
 		p++
 		for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -577,8 +577,8 @@ func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.G
 
 // EncodeLen implements the Subtable interface.
 func (l *SeqContext3) EncodeLen() int {
-	total := 6 + 2*len(l.In) + 4*len(l.Actions)
-	for _, cov := range l.In {
+	total := 6 + 2*len(l.Input) + 4*len(l.Actions)
+	for _, cov := range l.Input {
 		total += cov.EncodeLen()
 	}
 	return total
@@ -586,12 +586,12 @@ func (l *SeqContext3) EncodeLen() int {
 
 // Encode implements the Subtable interface.
 func (l *SeqContext3) Encode() []byte {
-	glyphCount := len(l.In)
+	glyphCount := len(l.Input)
 	seqLookupCount := len(l.Actions)
 
-	total := 6 + 2*len(l.In) + 4*len(l.Actions)
+	total := 6 + 2*len(l.Input) + 4*len(l.Actions)
 	coverageOffsets := make([]uint16, glyphCount)
-	for i, cov := range l.In {
+	for i, cov := range l.Input {
 		coverageOffsets[i] = uint16(total)
 		total += cov.EncodeLen()
 	}
@@ -611,7 +611,7 @@ func (l *SeqContext3) Encode() []byte {
 			byte(action.LookupListIndex>>8), byte(action.LookupListIndex),
 		)
 	}
-	for i, cov := range l.In {
+	for i, cov := range l.Input {
 		if len(buf) != int(coverageOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}

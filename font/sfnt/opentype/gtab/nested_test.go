@@ -115,20 +115,20 @@ func TestSeqContext1(t *testing.T) {
 		Cov: map[font.GlyphID]int{2: 0, 3: 1, 4: 2},
 		Rules: [][]*SeqRule{
 			{ // seq = 2, ...
-				{In: []font.GlyphID{2}},
-				{In: []font.GlyphID{3, 4, 6}},
-				{In: []font.GlyphID{3, 4}},
-				{In: []font.GlyphID{3, 4, 5}}, // does not match since it comes last
+				{Input: []font.GlyphID{2}},
+				{Input: []font.GlyphID{3, 4, 6}},
+				{Input: []font.GlyphID{3, 4}},
+				{Input: []font.GlyphID{3, 4, 5}}, // does not match since it comes last
 			},
 			{ // seq = 3, ...
-				{In: []font.GlyphID{3}},
-				{In: []font.GlyphID{5}},
-				{In: []font.GlyphID{4, 5, 6}},
+				{Input: []font.GlyphID{3}},
+				{Input: []font.GlyphID{5}},
+				{Input: []font.GlyphID{4, 5, 6}},
 			},
 			{ // seq = 4, ...
-				{In: []font.GlyphID{5, 6}},
-				{In: []font.GlyphID{4}},
-				{In: []font.GlyphID{5}},
+				{Input: []font.GlyphID{5, 6}},
+				{Input: []font.GlyphID{4}},
+				{Input: []font.GlyphID{5}},
 			},
 		},
 	}
@@ -155,16 +155,16 @@ func TestSeqContext1(t *testing.T) {
 func TestSeqContext2(t *testing.T) {
 	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext2{
-		Cov:     map[font.GlyphID]int{2: 0, 3: 1, 4: 2, 99: 3},
-		Classes: classdef.Table{1: 1, 3: 1, 5: 1},
+		Cov:   map[font.GlyphID]int{2: 0, 3: 1, 4: 2, 99: 3},
+		Input: classdef.Table{1: 1, 3: 1, 5: 1},
 		Rules: [][]*ClassSeqRule{
 			{ // seq = class0, ...
-				{In: []uint16{1, 0}},
-				{In: []uint16{1}},
+				{Input: []uint16{1, 0}},
+				{Input: []uint16{1}},
 			},
 			{ // seq = class1, ...
-				{In: []uint16{1}},
-				{In: []uint16{0, 1, 0}},
+				{Input: []uint16{1}},
+				{Input: []uint16{0, 1, 0}},
 			},
 		},
 	}
@@ -191,7 +191,7 @@ func TestSeqContext2(t *testing.T) {
 func TestSeqContext3(t *testing.T) {
 	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext3{
-		In: []coverage.Table{
+		Input: []coverage.Table{
 			{1: 0, 3: 1, 4: 2},
 			{2: 0, 4: 1, 5: 2},
 			{3: 0, 5: 1},
@@ -279,7 +279,7 @@ func FuzzSeqContext1(f *testing.F) {
 	sub.Rules = [][]*SeqRule{
 		{
 			{
-				In: []font.GlyphID{4},
+				Input: []font.GlyphID{4},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 5},
@@ -289,13 +289,13 @@ func FuzzSeqContext1(f *testing.F) {
 		},
 		{
 			{
-				In: []font.GlyphID{6, 7},
+				Input: []font.GlyphID{6, 7},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 2},
 				},
 			},
 			{
-				In: []font.GlyphID{6},
+				Input: []font.GlyphID{6},
 				Actions: []SeqLookup{
 					{SequenceIndex: 2, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 2},
@@ -323,7 +323,7 @@ func FuzzSeqContext2(f *testing.F) {
 	sub.Rules = [][]*ClassSeqRule{
 		{
 			{
-				In: []uint16{4},
+				Input: []uint16{4},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 5},
@@ -333,13 +333,13 @@ func FuzzSeqContext2(f *testing.F) {
 		},
 		{
 			{
-				In: []uint16{6, 7},
+				Input: []uint16{6, 7},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 2},
 				},
 			},
 			{
-				In: []uint16{6},
+				Input: []uint16{6},
 				Actions: []SeqLookup{
 					{SequenceIndex: 2, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 2},
@@ -358,14 +358,14 @@ func FuzzSeqContext2(f *testing.F) {
 func FuzzSeqContext3(f *testing.F) {
 	sub := &SeqContext3{}
 	f.Add(sub.Encode())
-	sub.In = append(sub.In, coverage.Table{3: 0, 4: 1})
+	sub.Input = append(sub.Input, coverage.Table{3: 0, 4: 1})
 	sub.Actions = []SeqLookup{
 		{SequenceIndex: 0, LookupListIndex: 1},
 		{SequenceIndex: 1, LookupListIndex: 5},
 		{SequenceIndex: 0, LookupListIndex: 4},
 	}
 	f.Add(sub.Encode())
-	sub.In = append(sub.In, coverage.Table{1: 0, 3: 1, 5: 2})
+	sub.Input = append(sub.Input, coverage.Table{1: 0, 3: 1, 5: 2})
 	f.Add(sub.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {

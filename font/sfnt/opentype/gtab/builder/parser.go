@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfntcff"
@@ -44,8 +45,6 @@ func parse(fontInfo *sfntcff.Info, input string) (lookups gtab.LookupList, err e
 
 		fontInfo: fontInfo,
 		byName:   byName,
-
-		classes: make(map[string][]font.GlyphID),
 	}
 
 	defer func() {
@@ -71,8 +70,6 @@ type parser struct {
 
 	fontInfo *sfntcff.Info
 	byName   map[string]font.GlyphID
-
-	classes map[string][]font.GlyphID
 }
 
 func (p *parser) parse() (lookups gtab.LookupList) {
@@ -85,8 +82,6 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 			p.fatal("%s", item.val)
 		case item.typ == itemSemicolon || item.typ == itemEOL:
 			// pass
-		case item.typ == itemIdentifier && item.val == "class":
-			p.parseClassDef()
 		case item.typ == itemIdentifier && item.val == "GSUB_1":
 			l := p.readGsub1()
 			lookups = append(lookups, l)
@@ -354,9 +349,14 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 		Subtables: []gtab.Subtable{},
 	}
 
+	input := make(classdef.Table)
+	inputClassIdx := make(map[string]uint16)
+
+gsubLoop:
 	for {
 		next := p.peek()
-		switch next.typ {
+		fmt.Println(next)
+		switch next.val {
 		default: // format 1
 			res := make(map[font.GlyphID][]*gtab.SeqRule)
 			for {
@@ -369,7 +369,7 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 				}
 
 				key := input[0]
-				res[key] = append(res[key], &gtab.SeqRule{In: input[1:], Actions: actions})
+				res[key] = append(res[key], &gtab.SeqRule{Input: input[1:], Actions: actions})
 
 				if !p.optional(itemComma) {
 					break
@@ -394,38 +394,50 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-		case itemSlash: // format 2
+		case "class":
+			className, glyphList := p.parseClassDef()
+			if _, exists := inputClassIdx[className]; exists {
+				p.fatal("duplicate class :%s:", className)
+			}
+			cls := uint16(len(inputClassIdx)) + 1
+			inputClassIdx[className] = cls
+			for _, gid := range glyphList {
+				if _, alreadyUsed := input[gid]; alreadyUsed {
+					p.fatal("overlapping classes for glyph %d", gid)
+				}
+				input[gid] = cls
+			}
+			p.optional(itemEOL)
+			continue gsubLoop
+
+		case "/": // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
 			sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
 			p.required(itemSlash, "/")
 
-			classIndex := make(map[string]uint16)
-
-			data := make(map[uint16][]*gtab.ClassSeqRule)
+			numClasses := len(inputClassIdx) + 1
+			rules := make([][]*gtab.ClassSeqRule, numClasses)
 
 			for {
-				inputClasses := p.readClassNames()
+				inputClassNames := p.readClassNames()
 				p.required(itemArrow, "\"->\"")
 				actions := p.readNestedLookups()
 
-				classIndices := make([]uint16, len(inputClasses))
-				for i, className := range inputClasses {
-					if _, ok := classIndex[className]; !ok && className != "" {
-						_, ok := p.classes[className]
-						if !ok {
-							p.fatal("unknown class :%s:", className)
-						}
-						classIndex[className] = uint16(len(classIndex) + 1)
+				input := make([]uint16, len(inputClassNames))
+				for i, className := range inputClassNames {
+					cls, exists := inputClassIdx[className]
+					if className != "" && !exists {
+						p.fatal("undefined class :%s:", className)
 					}
-					classIndices[i] = classIndex[className]
+					input[i] = cls
 				}
 
-				firstClass := classIndices[0]
-				data[firstClass] = append(data[firstClass], &gtab.ClassSeqRule{
-					In:      classIndices[1:],
+				rule := &gtab.ClassSeqRule{
+					Input:   input[1:],
 					Actions: actions,
-				})
+				}
+				rules[input[0]] = append(rules[input[0]], rule)
 
 				if !p.optional(itemComma) {
 					break
@@ -438,35 +450,17 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 				cov[gid] = i
 			}
 
-			classes := make(map[font.GlyphID]uint16)
-			for className, classIdx := range classIndex {
-				if classIdx == 0 {
-					continue
-				}
-				cls := p.classes[className]
-				for _, gid := range cls {
-					_, ok := classes[gid]
-					if ok {
-						p.fatal("overlapping classes for glyph %d", gid)
-					}
-					classes[gid] = classIdx
-				}
-			}
-
-			numClasses := len(classIndex) + 1
-			rules := make([][]*gtab.ClassSeqRule, numClasses)
-			for classIndex := range rules {
-				rules[classIndex] = data[uint16(classIndex)]
-			}
-
 			subtable := &gtab.SeqContext2{
-				Cov:     cov,
-				Classes: classes,
-				Rules:   rules,
+				Cov:   cov,
+				Input: input,
+				Rules: rules,
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-		case itemSquareBracketOpen: // format 3
+			input = make(classdef.Table) // make sure to not change subtable.Classes
+			maps.Clear(inputClassIdx)
+
+		case "[": // format 3
 			var in []coverage.Table
 			for {
 				glyphs := p.readGlyphSet()
@@ -482,7 +476,7 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 			actions := p.readNestedLookups()
 
 			subtable := &gtab.SeqContext3{
-				In:      in,
+				Input:   in,
 				Actions: actions,
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
@@ -506,9 +500,17 @@ func (p *parser) readChainedSeqCtx(lookupType uint16) *gtab.LookupTable {
 		Subtables: []gtab.Subtable{},
 	}
 
+	inputClasses := make(classdef.Table)
+	inputClassIdx := make(map[string]uint16)
+	backtrackClasses := make(classdef.Table)
+	backtrackClassIdx := make(map[string]uint16)
+	lookaheadClasses := make(classdef.Table)
+	lookaheadClassIdx := make(map[string]uint16)
+
+gsubLoop:
 	for {
 		next := p.peek()
-		switch next.typ {
+		switch next.val {
 		default: // format 1
 			res := make(map[font.GlyphID][]*gtab.ChainedSeqRule)
 			for {
@@ -556,45 +558,106 @@ func (p *parser) readChainedSeqCtx(lookupType uint16) *gtab.LookupTable {
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-		case itemSlash: // format 2
+		case "inputclass":
+			className, glyphList := p.parseClassDef()
+			if _, exists := inputClassIdx[className]; exists {
+				p.fatal("duplicate input class :%s:", className)
+			}
+			cls := uint16(len(inputClassIdx)) + 1
+			inputClassIdx[className] = cls
+			for _, gid := range glyphList {
+				if _, alreadyUsed := inputClasses[gid]; alreadyUsed {
+					p.fatal("overlapping input classes for glyph %d", gid)
+				}
+				inputClasses[gid] = cls
+			}
+			p.optional(itemEOL)
+			continue gsubLoop
+
+		case "backtrackclass":
+			className, glyphList := p.parseClassDef()
+			if _, exists := backtrackClassIdx[className]; exists {
+				p.fatal("duplicate backtrack class :%s:", className)
+			}
+			cls := uint16(len(backtrackClassIdx)) + 1
+			backtrackClassIdx[className] = cls
+			for _, gid := range glyphList {
+				if _, alreadyUsed := backtrackClasses[gid]; alreadyUsed {
+					p.fatal("overlapping backtrack classes for glyph %d", gid)
+				}
+				backtrackClasses[gid] = cls
+			}
+			p.optional(itemEOL)
+			continue gsubLoop
+
+		case "lookaheadclass":
+			className, glyphList := p.parseClassDef()
+			if _, exists := lookaheadClassIdx[className]; exists {
+				p.fatal("duplicate lookahead class :%s:", className)
+			}
+			cls := uint16(len(lookaheadClassIdx)) + 1
+			lookaheadClassIdx[className] = cls
+			for _, gid := range glyphList {
+				if _, alreadyUsed := lookaheadClasses[gid]; alreadyUsed {
+					p.fatal("overlapping lookahead classes for glyph %d", gid)
+				}
+				lookaheadClasses[gid] = cls
+			}
+			p.optional(itemEOL)
+			continue gsubLoop
+
+		case "/": // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
+			sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
 			p.required(itemSlash, "/")
 
-			classIndex := make(map[string]uint16)
-
-			data := make(map[uint16][]*gtab.ClassSeqRule)
+			numClasses := len(inputClassIdx) + 1
+			rules := make([][]*gtab.ChainedClassSeqRule, numClasses)
 
 			for {
-				backtrackClasses := p.readClassNames()
+				backtrackClassNames := p.readClassNames()
 				p.required(itemBar, "|")
-				inputClasses := p.readClassNames()
+				inputClassNames := p.readClassNames()
 				p.required(itemBar, "|")
-				lookaheadClasses := p.readClassNames()
+				lookaheadClassNames := p.readClassNames()
 				p.required(itemArrow, "\"->\"")
 				actions := p.readNestedLookups()
 
-				_ = backtrackClasses
-				_ = lookaheadClasses
-				// TODO(voss)
-
-				classIndices := make([]uint16, len(inputClasses))
-				for i, className := range inputClasses {
-					if _, ok := classIndex[className]; !ok && className != "" {
-						_, ok := p.classes[className]
-						if !ok {
-							p.fatal("unknown class :%s:", className)
-						}
-						classIndex[className] = uint16(len(classIndex) + 1)
+				input := make([]uint16, len(inputClassNames))
+				for i, className := range inputClassNames {
+					cls, exists := inputClassIdx[className]
+					if className != "" && !exists {
+						p.fatal("undefined class :%s:", className)
 					}
-					classIndices[i] = classIndex[className]
+					input[i] = cls
 				}
 
-				firstClass := classIndices[0]
-				data[firstClass] = append(data[firstClass], &gtab.ClassSeqRule{
-					In:      classIndices[1:],
-					Actions: actions,
-				})
+				backtrack := make([]uint16, len(backtrackClassNames))
+				for i, className := range backtrackClassNames {
+					cls, exists := backtrackClassIdx[className]
+					if className != "" && !exists {
+						p.fatal("undefined class :%s:", className)
+					}
+					backtrack[i] = cls
+				}
+
+				lookahead := make([]uint16, len(lookaheadClassNames))
+				for i, className := range lookaheadClassNames {
+					cls, exists := lookaheadClassIdx[className]
+					if className != "" && !exists {
+						p.fatal("undefined class :%s:", className)
+					}
+					lookahead[i] = cls
+				}
+
+				rule := &gtab.ChainedClassSeqRule{
+					Backtrack: rev(backtrack),
+					Input:     input[1:],
+					Lookahead: lookahead,
+					Actions:   actions,
+				}
+				rules[input[0]] = append(rules[input[0]], rule)
 
 				if !p.optional(itemComma) {
 					break
@@ -607,43 +670,31 @@ func (p *parser) readChainedSeqCtx(lookupType uint16) *gtab.LookupTable {
 				cov[gid] = i
 			}
 
-			classes := make(map[font.GlyphID]uint16)
-			for className, classIdx := range classIndex {
-				if classIdx == 0 {
-					continue
-				}
-				cls := p.classes[className]
-				for _, gid := range cls {
-					_, ok := classes[gid]
-					if ok {
-						p.fatal("overlapping classes for glyph %d", gid)
-					}
-					classes[gid] = classIdx
-				}
-			}
-
-			numClasses := len(classIndex) + 1
-			rules := make([][]*gtab.ClassSeqRule, numClasses)
-			for classIndex := range rules {
-				rules[classIndex] = data[uint16(classIndex)]
-			}
-
-			subtable := &gtab.SeqContext2{
-				Cov:     cov,
-				Classes: classes,
-				Rules:   rules,
+			subtable := &gtab.ChainedSeqContext2{
+				Cov:       cov,
+				Backtrack: inputClasses,
+				Input:     backtrackClasses,
+				Lookahead: lookaheadClasses,
+				Rules:     rules,
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-		case itemSquareBracketOpen: // format 3
-			var in []coverage.Table
+			inputClasses = make(classdef.Table) // make sure to not change subtable.inputClasses
+			maps.Clear(inputClassIdx)
+			backtrackClasses = make(classdef.Table) // make sure to not change subtable.backtrackClasses
+			maps.Clear(backtrackClassIdx)
+			lookaheadClasses = make(classdef.Table) // make sure to not change subtable.lookaheadClasses
+			maps.Clear(lookaheadClassIdx)
+
+		case "[": // format 3
+			var input []coverage.Table
 			for {
 				glyphs := p.readGlyphSet()
 				cov := make(coverage.Table, len(glyphs))
 				for i, gid := range glyphs {
 					cov[gid] = i
 				}
-				in = append(in, cov)
+				input = append(input, cov)
 				if p.optional(itemArrow) {
 					break
 				}
@@ -651,7 +702,7 @@ func (p *parser) readChainedSeqCtx(lookupType uint16) *gtab.LookupTable {
 			actions := p.readNestedLookups()
 
 			subtable := &gtab.SeqContext3{
-				In:      in,
+				Input:   input,
 				Actions: actions,
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
@@ -687,17 +738,14 @@ func (p *parser) readLookupFlags() gtab.LookupFlags {
 	return flags
 }
 
-func (p *parser) parseClassDef() {
+func (p *parser) parseClassDef() (string, []font.GlyphID) {
+	p.readIdentifier() // "class"
 	p.required(itemColon, ":")
 	className := p.readIdentifier()
 	p.required(itemColon, ":")
-	if _, ok := p.classes[className]; ok {
-		p.fatal("multiple definition for class %q", className)
-	}
 	p.optional(itemEqual)
 	gidList := p.readGlyphSet()
-
-	p.classes[className] = gidList
+	return className, gidList
 }
 
 func (p *parser) readGlyphList() []font.GlyphID {
@@ -850,16 +898,11 @@ func (p *parser) readClassName() string {
 	default:
 		p.fatal("expected class name, got %s", item)
 	}
-	if name == "" {
-		return ""
-	}
-	if _, ok := p.classes[name]; !ok {
-		p.fatal("unknown class :%s:", name)
-	}
 	return name
 }
 
-// read a list of one or more class names
+// readClassNames reads a list of one or more class names.
+// At least one class name must be present or an error is raised.
 func (p *parser) readClassNames() []string {
 	var classNames []string
 	for {
@@ -937,9 +980,9 @@ func decodeString(s string) <-chan rune {
 	return c
 }
 
-// rev reverses the order of glyphs in seq.
+// rev reverses the order of items in a slice.
 // The slice is modified in-place, and also returned.
-func rev(seq []font.GlyphID) []font.GlyphID {
+func rev[T any](seq []T) []T {
 	for i, j := 0, len(seq)-1; i < j; i, j = i+1, j-1 {
 		seq[i], seq[j] = seq[j], seq[i]
 	}

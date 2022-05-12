@@ -170,7 +170,7 @@ func TestGsub(t *testing.T) {
 				Rules: [][]*gtab.SeqRule{
 					{
 						{
-							In: []font.GlyphID{gidA},
+							Input: []font.GlyphID{gidA},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 1},
 							},
@@ -178,7 +178,7 @@ func TestGsub(t *testing.T) {
 					},
 					{
 						{
-							In: []font.GlyphID{gidA},
+							Input: []font.GlyphID{gidA},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 1},
 							},
@@ -196,7 +196,7 @@ func TestGsub(t *testing.T) {
 				Rules: [][]*gtab.SeqRule{
 					{
 						{
-							In: []font.GlyphID{gidA, gidB},
+							Input: []font.GlyphID{gidA, gidB},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 5},
 							},
@@ -214,7 +214,7 @@ func TestGsub(t *testing.T) {
 				Rules: [][]*gtab.SeqRule{
 					{
 						{
-							In: []font.GlyphID{},
+							Input: []font.GlyphID{},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 3}, // A->AA
 								{SequenceIndex: 0, LookupListIndex: 0}, // repeat
@@ -233,21 +233,21 @@ func TestGsub(t *testing.T) {
 				Rules: [][]*gtab.SeqRule{
 					{
 						{
-							In: []font.GlyphID{gidB},
+							Input: []font.GlyphID{gidB},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 3}, // AB -> AAB
 								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
 							},
 						},
 						{
-							In: []font.GlyphID{gidA, gidB},
+							Input: []font.GlyphID{gidA, gidB},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 3}, // AAB -> AAAB
 								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
 							},
 						},
 						{
-							In: []font.GlyphID{gidA, gidA, gidB},
+							Input: []font.GlyphID{gidA, gidA, gidB},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 3}, // AAAB -> AAAAB
 								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
@@ -291,7 +291,7 @@ func TestGsub(t *testing.T) {
 				Rules: [][]*gtab.SeqRule{
 					{
 						{
-							In: []font.GlyphID{gidB, gidA},
+							Input: []font.GlyphID{gidB, gidA},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 1, LookupListIndex: 6}, // B(A*)B -> B\1X
 							},
@@ -310,12 +310,12 @@ func TestGsub(t *testing.T) {
 		{ // test GSUB 5.2
 			lookupType: 5,
 			subtable: &gtab.SeqContext2{
-				Cov:     coverage.Table{gidA: 0, gidB: 1, gidM: 2},
-				Classes: classdef.Table{gidA: 1, gidB: 1},
+				Cov:   coverage.Table{gidA: 0, gidB: 1, gidM: 2},
+				Input: classdef.Table{gidA: 1, gidB: 1},
 				Rules: [][]*gtab.ClassSeqRule{
 					{ // class 0 (not used)
 						{
-							In: []uint16{},
+							Input: []uint16{},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 1, LookupListIndex: 1},
 							},
@@ -323,7 +323,7 @@ func TestGsub(t *testing.T) {
 					},
 					{ // class 1
 						{
-							In: []uint16{1, 1},
+							Input: []uint16{1, 1},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 1, LookupListIndex: 2},
 							},
@@ -337,13 +337,13 @@ func TestGsub(t *testing.T) {
 		{ // test GSUB 5.2
 			lookupType: 5,
 			subtable: &gtab.SeqContext2{
-				Cov:     coverage.Table{gidA: 0},
-				Classes: classdef.Table{gidA: 1},
+				Cov:   coverage.Table{gidA: 0},
+				Input: classdef.Table{gidA: 1},
 				Rules: [][]*gtab.ClassSeqRule{
 					{},
 					{
 						{
-							In: []uint16{1, 1},
+							Input: []uint16{1, 1},
 							Actions: []gtab.SeqLookup{
 								{SequenceIndex: 0, LookupListIndex: 4},
 								{SequenceIndex: 0, LookupListIndex: 4},
@@ -359,7 +359,7 @@ func TestGsub(t *testing.T) {
 		{ // test GSUB 5.3
 			lookupType: 5,
 			subtable: &gtab.SeqContext3{
-				In: []coverage.Table{
+				Input: []coverage.Table{
 					{gidA: 0, gidB: 1},
 					{gidB: 0, gidC: 1},
 					{gidA: 0, gidC: 1},
@@ -522,7 +522,7 @@ func TestGsub(t *testing.T) {
 					Rules: [][]*gtab.SeqRule{
 						{
 							{
-								In: []font.GlyphID{gidB},
+								Input: []font.GlyphID{gidB},
 								Actions: []gtab.SeqLookup{
 									{SequenceIndex: 1, LookupListIndex: 3},
 								},
@@ -631,7 +631,7 @@ func Test1000(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{ // ABABA
-									In: []font.GlyphID{gidB, gidA, gidB, gidA},
+									Input: []font.GlyphID{gidB, gidA, gidB, gidA},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 1}, // B(A*)B -> B\1Y
 									},
@@ -657,7 +657,7 @@ func Test1000(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									In: []font.GlyphID{gidB},
+									Input: []font.GlyphID{gidB},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 3},
 									},
@@ -746,7 +746,7 @@ func Test1001(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{ // ABABA
-									In: []font.GlyphID{gidB, gidA, gidB, gidA},
+									Input: []font.GlyphID{gidB, gidA, gidB, gidA},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 3, LookupListIndex: 1}, // B(A*)B -> B\1Y
 									},
@@ -772,7 +772,7 @@ func Test1001(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									In: []font.GlyphID{gidB},
+									Input: []font.GlyphID{gidB},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 3},
 									},
@@ -863,7 +863,7 @@ func Test1002(t *testing.T) {
 							},
 							{
 								{ // BAAAA
-									In: []font.GlyphID{gidA, gidA, gidA, gidA},
+									Input: []font.GlyphID{gidA, gidA, gidA, gidA},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 3, LookupListIndex: 1},
 									},
@@ -883,7 +883,7 @@ func Test1002(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									In: []font.GlyphID{gidA, gidA},
+									Input: []font.GlyphID{gidA, gidA},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 3},
 									},
@@ -974,7 +974,7 @@ func Test1003(t *testing.T) {
 							},
 							{
 								{ // BAAAA
-									In: []font.GlyphID{gidA, gidA, gidA, gidA},
+									Input: []font.GlyphID{gidA, gidA, gidA, gidA},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 4, LookupListIndex: 1},
 									},
