@@ -33,8 +33,6 @@ import (
 func ExplainGsub(fontInfo *sfntcff.Info) string {
 	ee := newExplainer(fontInfo)
 
-	numClasses := 0
-
 	for _, lookup := range fontInfo.Gsub.LookupList {
 		checkType := func(newType int) {
 			if newType != int(lookup.Meta.LookupType) {
@@ -42,91 +40,62 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 			}
 		}
 
-		// find and name all glyph classes used in this lookup
-		type classKey struct {
-			subtableIdx int
-			classIdx    uint16
-		}
-		classMap := make(map[classKey]string)
-		classNames := make(map[string]string)
 		for i, subtable := range lookup.Subtables {
-			ctx, ok := subtable.(*gtab.SeqContext2)
-			if !ok {
-				continue
+			if i == 0 {
+				fmt.Fprintf(ee.w, "GSUB_%d:", lookup.Meta.LookupType)
+				ee.explainFlags(lookup.Meta.LookupFlag)
+			} else {
+				ee.w.WriteString(" ||\n    ")
 			}
-			subtableClasses := ctx.Input.NumClasses()
-			gg := make([][]font.GlyphID, subtableClasses)
-			for gid, classIdx := range ctx.Input {
-				if classIdx > 0 {
-					gg[classIdx] = append(gg[classIdx], gid)
-				}
-			}
-			for j, glyphs := range gg {
-				if j == 0 {
-					classMap[classKey{i, 0}] = "::"
-					continue
-				}
-
-				sort.Slice(glyphs, func(k, l int) bool {
-					return glyphs[k] < glyphs[l]
-				})
-				b := &strings.Builder{}
-				ee.explainSequenceW(b, glyphs)
-				desc := b.String()
-
-				className, ok := classNames[desc]
-				if !ok {
-					numClasses++
-					className = fmt.Sprintf(":c%d:", numClasses)
-					classNames[desc] = className
-					fmt.Fprintf(ee.w, "class %s = [%s]\n", className, desc)
-				}
-				classMap[classKey{i, uint16(j)}] = className
-			}
-		}
-
-		for i, subtable := range lookup.Subtables {
-			var mappings []mapping
-			var actions []action
-			var cov coverage.Table
-			var classActions []classAction
-			var cc *gtab.SeqContext3
 
 			switch l := subtable.(type) {
 			case *gtab.Gsub1_1:
 				checkType(1)
+				var mappings []mapping
 				for key := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{key},
 						to:   []font.GlyphID{key + l.Delta},
 					})
 				}
+				ee.explainSeqMappings(mappings)
+
 			case *gtab.Gsub1_2:
 				checkType(1)
+				var mappings []mapping
 				for key, idx := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{key},
 						to:   []font.GlyphID{l.SubstituteGlyphIDs[idx]},
 					})
 				}
+				ee.explainSeqMappings(mappings)
+
 			case *gtab.Gsub2_1:
 				checkType(2)
+				var mappings []mapping
 				for key, idx := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{key},
 						to:   l.Repl[idx],
 					})
 				}
+				ee.explainSeqMappings(mappings)
+
 			case *gtab.Gsub3_1:
 				checkType(3)
+				var mappings []mapping
 				for gid, idx := range l.Cov {
 					mappings = append(mappings, mapping{
 						from: []font.GlyphID{gid},
 						to:   l.Alternates[idx],
 					})
 				}
+				ee.explainSetMappings(mappings)
+
 			case *gtab.Gsub4_1:
 				checkType(4)
+				var mappings []mapping
 				for gid, idx := range l.Cov {
 					for _, lig := range l.Repl[idx] {
 						mappings = append(mappings, mapping{
@@ -135,83 +104,100 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 						})
 					}
 				}
+				ee.explainSeqMappings(mappings)
+
 			case *gtab.SeqContext1:
 				checkType(5)
+				var seqActions []seqAction
 				for gid, idx := range l.Cov {
 					for _, rule := range l.Rules[idx] {
-						actions = append(actions, action{
+						seqActions = append(seqActions, seqAction{
 							from:    append([]font.GlyphID{gid}, rule.Input...),
 							actions: rule.Actions,
 						})
 					}
 				}
+				sort.SliceStable(seqActions, func(i, j int) bool {
+					return seqActions[i].from[0] < seqActions[j].from[0]
+				})
+				for j, a := range seqActions {
+					if j == 0 {
+						ee.w.WriteRune(' ')
+					} else {
+						ee.w.WriteString(", ")
+					}
+					ee.writeGlyphList(a.from)
+					ee.w.WriteString(" -> ")
+					ee.explainNested(a.actions)
+				}
+
 			case *gtab.SeqContext2:
 				checkType(5)
-				cov = l.Cov
-				for classIdx, rules := range l.Rules {
+				numClasses := l.Input.NumClasses()
+				glyphs := make([][]font.GlyphID, numClasses)
+				for gid, cls := range l.Input {
+					glyphs[cls] = append(glyphs[cls], gid)
+				}
+				for j := 0; j < numClasses; j++ {
+					if j == 0 {
+						continue
+					}
+					sort.Slice(glyphs[j], func(k, l int) bool { return glyphs[j][k] < glyphs[j][l] })
+					fmt.Fprintf(ee.w, "\tclass :c%d: = [", j)
+					ee.writeGlyphList(glyphs[j])
+					ee.w.WriteString("]\n")
+				}
+				ee.w.WriteString("\t/")
+				ee.explainCoverage(l.Cov)
+				ee.w.WriteRune('/')
+				var classActions []classAction
+				for cls, rules := range l.Rules {
 					for _, rule := range rules {
 						classActions = append(classActions, classAction{
-							from:    append([]uint16{uint16(classIdx)}, rule.Input...),
+							from:    append([]uint16{uint16(cls)}, rule.Input...),
 							actions: rule.Actions,
 						})
 					}
 				}
-			case *gtab.SeqContext3:
-				checkType(5)
-				cc = l
-			case *gtab.ChainedSeqContext1:
-				checkType(6)
-			case *gtab.ChainedSeqContext2:
-				checkType(6)
-			case *gtab.ChainedSeqContext3:
-				checkType(6)
-			default:
-				panic(fmt.Sprintf("unsupported subtable type %T", l))
-			}
-
-			if i == 0 {
-				fmt.Fprintf(ee.w, "GSUB_%d:", lookup.Meta.LookupType)
-				ee.explainFlags(lookup.Meta.LookupFlag)
-			} else {
-				ee.w.WriteString(" ||\n    ")
-			}
-			switch lookup.Meta.LookupType {
-			case 1, 2, 4:
-				ee.explainSeqMappings(mappings)
-			case 3:
-				ee.explainSetMappings(mappings)
-			case 5:
-				if len(actions) > 0 { // format 1
-					ee.explainActions(actions)
-				} else if cov != nil { // format 2
-					ee.w.WriteRune('/')
-					ee.explainCoverage(cov)
-					ee.w.WriteRune('/')
-					for j, classAction := range classActions {
-						if j > 0 {
-							ee.w.WriteString(",")
-						}
-						for _, classIdx := range classAction.from {
-							ee.w.WriteRune(' ')
-							ee.w.WriteString(classMap[classKey{i, classIdx}])
-						}
-						ee.w.WriteString(" -> ")
-						ee.explainNested(classAction.actions)
+				sort.SliceStable(classActions, func(i, j int) bool {
+					return classActions[i].from[0] < classActions[j].from[0]
+				})
+				for i, a := range classActions {
+					if i > 0 {
+						ee.w.WriteRune(',')
 					}
-				} else { // format 3
-					for j, cov := range cc.Input {
-						if j > 0 {
-							ee.w.WriteRune(' ')
+					for _, cls := range a.from {
+						if cls == 0 {
+							ee.w.WriteString(" ::")
+						} else {
+							fmt.Fprintf(ee.w, " :c%d:", cls)
 						}
-						ee.w.WriteRune('[')
-						ee.explainCoverage(cov)
-						ee.w.WriteRune(']')
 					}
 					ee.w.WriteString(" -> ")
-					ee.explainNested(cc.Actions)
+					ee.explainNested(a.actions)
 				}
+
+			case *gtab.SeqContext3:
+				checkType(5)
+				for _, cov := range l.Input {
+					ee.w.WriteString(" [")
+					ee.explainCoverage(cov)
+					ee.w.WriteRune(']')
+				}
+				ee.w.WriteString(" -> ")
+				ee.explainNested(l.Actions)
+
+			case *gtab.ChainedSeqContext1:
+				checkType(6)
+
+			case *gtab.ChainedSeqContext2:
+				checkType(6)
+
+			case *gtab.ChainedSeqContext3:
+				checkType(6)
+
 			default:
-				ee.w.WriteString(" # not yet implemented")
+				panic(fmt.Sprintf("unsupported subtable type %T", l))
 			}
 		}
 		ee.w.WriteRune('\n')
@@ -344,12 +330,12 @@ func (ee *explainer) explainSetMappings(mm []mapping) {
 	}
 }
 
-type action struct {
+type seqAction struct {
 	from    []font.GlyphID
 	actions gtab.Nested
 }
 
-func (ee *explainer) explainActions(aa []action) {
+func (ee *explainer) explainActions(aa []seqAction) {
 	sep := " "
 	for len(aa) > 0 {
 		ee.w.WriteString(sep)

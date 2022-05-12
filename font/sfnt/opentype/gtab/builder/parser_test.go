@@ -35,13 +35,17 @@ func TestParser(t *testing.T) {
 	GSUB_3: A -> [ "BCD" ]
 	GSUB_4: -marks A A A -> B, A -> D, A A -> C
 	GSUB_5:
-	  class :alpha: = [A-K]
-	  class :digits: = [L-Z]
-	  "AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 ||
-	  /A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
-	  [A B C] [A C] [A D] -> 3@0
+		"AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 ||
+		class :alpha: = [A-K]
+		class :digits: = [L-Z]
+		/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
+		[A B C] [A C] [A D] -> 3@0
 	GSUB_6:
-	  A B | C D | E F -> 1@0 2@1, B | C D E | F -> 1@2
+		A B | C D | E F -> 1@0 2@1, B | C D E | F -> 1@2 ||
+		inputclass :ABC: = ["ABC"]
+		backtrackclass :DEF: = ["DEF"]
+		lookaheadclass :DEF: = ["DEF"]
+		/A B C/ :DEF: :: | :ABC: | :: :DEF: -> 1@0
 	`)
 	if err != nil {
 		t.Fatal(err)
@@ -97,22 +101,25 @@ func FuzzGsub2(f *testing.F) {
 
 func FuzzGsub5(f *testing.F) {
 	f.Add(`"AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 `)
-	f.Add(`/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2`)
+	f.Add(`
+		class :alpha: = [A-K]
+		class :digits: = [L-Z]
+    	/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2`)
 	f.Add(`[A B C] [A C] [A D] -> 3@0`)
 	f.Add(`"AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 ||
-	/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
-	[A B C] [A C] [A D] -> 3@0`)
+		class :alpha: = [A-K]
+		class :digits: = [L-Z]
+		/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
+		[A B C] [A C] [A D] -> 3@0`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := parse(fontInfo, `
-			class :alpha: = [A-K]
-			class :digits: = [L-Z]
-			GSUB_5: `+desc)
+		lookups, err := parse(fontInfo, "GSUB_5: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
+		fmt.Println(desc2)
 		lookups2, err := parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)

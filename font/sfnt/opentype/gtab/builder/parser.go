@@ -82,22 +82,22 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 			p.fatal("%s", item.val)
 		case item.typ == itemSemicolon || item.typ == itemEOL:
 			// pass
-		case item.typ == itemIdentifier && item.val == "GSUB_1":
+		case isIdentifier(item, "GSUB_1"):
 			l := p.readGsub1()
 			lookups = append(lookups, l)
-		case item.typ == itemIdentifier && item.val == "GSUB_2":
+		case isIdentifier(item, "GSUB_2"):
 			l := p.readGsub2()
 			lookups = append(lookups, l)
-		case item.typ == itemIdentifier && item.val == "GSUB_3":
+		case isIdentifier(item, "GSUB_3"):
 			l := p.readGsub3()
 			lookups = append(lookups, l)
-		case item.typ == itemIdentifier && item.val == "GSUB_4":
+		case isIdentifier(item, "GSUB_4"):
 			l := p.readGsub4()
 			lookups = append(lookups, l)
-		case item.typ == itemIdentifier && item.val == "GSUB_5":
+		case isIdentifier(item, "GSUB_5"):
 			l := p.readSeqCtx(5)
 			lookups = append(lookups, l)
-		case item.typ == itemIdentifier && item.val == "GSUB_6":
+		case isIdentifier(item, "GSUB_6"):
 			l := p.readChainedSeqCtx(6)
 			lookups = append(lookups, l)
 		default:
@@ -355,8 +355,7 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 gsubLoop:
 	for {
 		next := p.peek()
-		fmt.Println(next)
-		switch next.val {
+		switch {
 		default: // format 1
 			res := make(map[font.GlyphID][]*gtab.SeqRule)
 			for {
@@ -394,7 +393,7 @@ gsubLoop:
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-		case "class":
+		case isIdentifier(next, "class"):
 			className, glyphList := p.parseClassDef()
 			if _, exists := inputClassIdx[className]; exists {
 				p.fatal("duplicate class :%s:", className)
@@ -410,7 +409,7 @@ gsubLoop:
 			p.optional(itemEOL)
 			continue gsubLoop
 
-		case "/": // format 2
+		case next.typ == itemSlash: // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
 			sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
@@ -460,7 +459,7 @@ gsubLoop:
 			input = make(classdef.Table) // make sure to not change subtable.Classes
 			maps.Clear(inputClassIdx)
 
-		case "[": // format 3
+		case next.typ == itemSquareBracketOpen: // format 3
 			var in []coverage.Table
 			for {
 				glyphs := p.readGlyphSet()
@@ -510,7 +509,7 @@ func (p *parser) readChainedSeqCtx(lookupType uint16) *gtab.LookupTable {
 gsubLoop:
 	for {
 		next := p.peek()
-		switch next.val {
+		switch {
 		default: // format 1
 			res := make(map[font.GlyphID][]*gtab.ChainedSeqRule)
 			for {
@@ -558,7 +557,7 @@ gsubLoop:
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-		case "inputclass":
+		case isIdentifier(next, "inputclass"):
 			className, glyphList := p.parseClassDef()
 			if _, exists := inputClassIdx[className]; exists {
 				p.fatal("duplicate input class :%s:", className)
@@ -574,7 +573,7 @@ gsubLoop:
 			p.optional(itemEOL)
 			continue gsubLoop
 
-		case "backtrackclass":
+		case isIdentifier(next, "backtrackclass"):
 			className, glyphList := p.parseClassDef()
 			if _, exists := backtrackClassIdx[className]; exists {
 				p.fatal("duplicate backtrack class :%s:", className)
@@ -590,7 +589,7 @@ gsubLoop:
 			p.optional(itemEOL)
 			continue gsubLoop
 
-		case "lookaheadclass":
+		case isIdentifier(next, "lookaheadclass"):
 			className, glyphList := p.parseClassDef()
 			if _, exists := lookaheadClassIdx[className]; exists {
 				p.fatal("duplicate lookahead class :%s:", className)
@@ -606,7 +605,7 @@ gsubLoop:
 			p.optional(itemEOL)
 			continue gsubLoop
 
-		case "/": // format 2
+		case next.typ == itemSlash: // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
 			sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
@@ -686,7 +685,7 @@ gsubLoop:
 			lookaheadClasses = make(classdef.Table) // make sure to not change subtable.lookaheadClasses
 			maps.Clear(lookaheadClassIdx)
 
-		case "[": // format 3
+		case next.typ == itemSquareBracketOpen: // format 3
 			var input []coverage.Table
 			for {
 				glyphs := p.readGlyphSet()
@@ -978,6 +977,13 @@ func decodeString(s string) <-chan rune {
 		close(c)
 	}()
 	return c
+}
+
+func isIdentifier(i item, val string) bool {
+	if i.typ != itemIdentifier {
+		return false
+	}
+	return i.val == val
 }
 
 // rev reverses the order of items in a slice.
