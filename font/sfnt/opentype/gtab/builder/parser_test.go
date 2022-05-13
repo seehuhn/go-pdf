@@ -45,7 +45,8 @@ func TestParser(t *testing.T) {
 		inputclass :ABC: = ["ABC"]
 		backtrackclass :DEF: = ["DEF"]
 		lookaheadclass :DEF: = ["DEF"]
-		/A B C/ :DEF: :: | :ABC: | :: :DEF: -> 1@0
+		/A B C/ :DEF: :: | :ABC: | :: :DEF: -> 1@0 ||
+		[A] [A B C] | [A B] [A C] [B C] | [A B C] [A B C] -> 1@0 1@1 1@2
 	`)
 	if err != nil {
 		t.Fatal(err)

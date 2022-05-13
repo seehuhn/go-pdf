@@ -483,14 +483,14 @@ func FuzzChainedSeqContext2(f *testing.F) {
 func FuzzChainedSeqContext3(f *testing.F) {
 	sub := &ChainedSeqContext3{}
 	f.Add(sub.Encode())
-	sub.BacktrackCov = []coverage.Table{
+	sub.Backtrack = []coverage.Table{
 		{1: 0, 3: 1},
 	}
-	sub.InputCov = []coverage.Table{
+	sub.Input = []coverage.Table{
 		{2: 0, 3: 1},
 		{3: 0, 4: 1},
 	}
-	sub.LookaheadCov = []coverage.Table{
+	sub.Lookahead = []coverage.Table{
 		{4: 0, 5: 1, 6: 2},
 	}
 	sub.Actions = []SeqLookup{

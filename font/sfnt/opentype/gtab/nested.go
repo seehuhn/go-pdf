@@ -1209,10 +1209,10 @@ func (l *ChainedSeqContext2) Encode() []byte {
 // ChainedSeqContext3 is used for GSUB type 6 and GPOS type 8 format 3 subtables
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-3-coverage-based-glyph-contexts
 type ChainedSeqContext3 struct {
-	BacktrackCov []coverage.Table
-	InputCov     []coverage.Table
-	LookaheadCov []coverage.Table
-	Actions      Nested
+	Backtrack []coverage.Table
+	Input     []coverage.Table
+	Lookahead []coverage.Table
+	Actions   Nested
 }
 
 func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -1269,19 +1269,19 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 	}
 
 	res := &ChainedSeqContext3{
-		BacktrackCov: backtrackCov,
-		InputCov:     inputCov,
-		LookaheadCov: lookaheadCov,
-		Actions:      actions,
+		Backtrack: backtrackCov,
+		Input:     inputCov,
+		Lookahead: lookaheadCov,
+		Actions:   actions,
 	}
 	return res, nil
 }
 
 // Apply implements the Subtable interface.
 func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	glyphsNeeded := len(l.BacktrackCov)
+	glyphsNeeded := len(l.Backtrack)
 	p := i
-	for _, cov := range l.BacktrackCov {
+	for _, cov := range l.Backtrack {
 		glyphsNeeded--
 		p--
 		for p-glyphsNeeded >= 0 && !keep(seq[p].Gid) {
@@ -1292,12 +1292,12 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([
 		}
 	}
 
-	matchPos := make([]int, 0, len(l.InputCov))
+	matchPos := make([]int, 0, len(l.Input))
 
 	p = i
 	matchPos = append(matchPos, p)
-	glyphsNeeded = len(l.InputCov) + len(l.LookaheadCov)
-	for _, cov := range l.InputCov {
+	glyphsNeeded = len(l.Input) + len(l.Lookahead)
+	for _, cov := range l.Input {
 		// TODO(voss): is this right?  What if keep(seq[i].Gid) == false?
 		glyphsNeeded--
 		p++
@@ -1311,7 +1311,7 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([
 	}
 	next := p + 1
 
-	for _, cov := range l.LookaheadCov {
+	for _, cov := range l.Lookahead {
 		glyphsNeeded--
 		p++
 		for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -1330,17 +1330,17 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([
 // EncodeLen implements the Subtable interface.
 func (l *ChainedSeqContext3) EncodeLen() int {
 	total := 10
-	total += 2 * len(l.BacktrackCov)
-	total += 2 * len(l.InputCov)
-	total += 2 * len(l.LookaheadCov)
+	total += 2 * len(l.Backtrack)
+	total += 2 * len(l.Input)
+	total += 2 * len(l.Lookahead)
 	total += 4 * len(l.Actions)
-	for _, cov := range l.BacktrackCov {
+	for _, cov := range l.Backtrack {
 		total += cov.EncodeLen()
 	}
-	for _, cov := range l.InputCov {
+	for _, cov := range l.Input {
 		total += cov.EncodeLen()
 	}
-	for _, cov := range l.LookaheadCov {
+	for _, cov := range l.Lookahead {
 		total += cov.EncodeLen()
 	}
 	return total
@@ -1348,28 +1348,28 @@ func (l *ChainedSeqContext3) EncodeLen() int {
 
 // Encode implements the Subtable interface.
 func (l *ChainedSeqContext3) Encode() []byte {
-	backtrackGlyphCount := len(l.BacktrackCov)
-	inputGlyphCount := len(l.InputCov)
-	lookaheadGlyphCount := len(l.LookaheadCov)
+	backtrackGlyphCount := len(l.Backtrack)
+	inputGlyphCount := len(l.Input)
+	lookaheadGlyphCount := len(l.Lookahead)
 	seqLookupCount := len(l.Actions)
 
 	total := 10
-	total += 2 * len(l.BacktrackCov)
-	total += 2 * len(l.InputCov)
-	total += 2 * len(l.LookaheadCov)
+	total += 2 * len(l.Backtrack)
+	total += 2 * len(l.Input)
+	total += 2 * len(l.Lookahead)
 	total += 4 * len(l.Actions)
 	backtrackCoverageOffsets := make([]uint16, backtrackGlyphCount)
-	for i, cov := range l.BacktrackCov {
+	for i, cov := range l.Backtrack {
 		backtrackCoverageOffsets[i] = uint16(total)
 		total += cov.EncodeLen()
 	}
 	inputCoverageOffsets := make([]uint16, inputGlyphCount)
-	for i, cov := range l.InputCov {
+	for i, cov := range l.Input {
 		inputCoverageOffsets[i] = uint16(total)
 		total += cov.EncodeLen()
 	}
 	lookaheadCoverageOffsets := make([]uint16, lookaheadGlyphCount)
-	for i, cov := range l.LookaheadCov {
+	for i, cov := range l.Lookahead {
 		lookaheadCoverageOffsets[i] = uint16(total)
 		total += cov.EncodeLen()
 	}
@@ -1405,19 +1405,19 @@ func (l *ChainedSeqContext3) Encode() []byte {
 		)
 	}
 
-	for i, cov := range l.BacktrackCov {
+	for i, cov := range l.Backtrack {
 		if len(buf) != int(backtrackCoverageOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}
 		buf = append(buf, cov.Encode()...)
 	}
-	for i, cov := range l.InputCov {
+	for i, cov := range l.Input {
 		if len(buf) != int(inputCoverageOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}
 		buf = append(buf, cov.Encode()...)
 	}
-	for i, cov := range l.LookaheadCov {
+	for i, cov := range l.Lookahead {
 		if len(buf) != int(lookaheadCoverageOffsets[i]) {
 			panic("internal error") // TODO(voss): remove
 		}

@@ -332,7 +332,7 @@ func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {
 		Subtables: []gtab.Subtable{},
 	}
 
-	input := make(classdef.Table)
+	inputClasses := make(classdef.Table)
 	inputClassIdx := make(map[string]uint16)
 
 gsubLoop:
@@ -351,13 +351,17 @@ gsubLoop:
 				}
 
 				key := input[0]
-				res[key] = append(res[key], &gtab.SeqRule{Input: input[1:], Actions: actions})
+				res[key] = append(res[key], &gtab.SeqRule{
+					Input:   input[1:],
+					Actions: actions,
+				})
 
 				if !p.optional(itemComma) {
 					break
 				}
 				p.optional(itemEOL)
 			}
+
 			cov := makeCoverageTable(maps.Keys(res))
 
 			rules := make([][]*gtab.SeqRule, len(cov))
@@ -379,10 +383,10 @@ gsubLoop:
 			cls := uint16(len(inputClassIdx)) + 1
 			inputClassIdx[className] = cls
 			for _, gid := range glyphList {
-				if _, alreadyUsed := input[gid]; alreadyUsed {
+				if _, alreadyUsed := inputClasses[gid]; alreadyUsed {
 					p.fatal("overlapping classes for glyph %d", gid)
 				}
-				input[gid] = cls
+				inputClasses[gid] = cls
 			}
 			p.optional(itemEOL)
 			continue gsubLoop
@@ -390,7 +394,6 @@ gsubLoop:
 		case next.typ == itemSlash: // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
-			sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
 			p.required(itemSlash, "/")
 
 			numClasses := len(inputClassIdx) + 1
@@ -426,23 +429,18 @@ gsubLoop:
 
 			subtable := &gtab.SeqContext2{
 				Cov:   cov,
-				Input: input,
+				Input: inputClasses,
 				Rules: rules,
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-			input = make(classdef.Table) // make sure to not change subtable.Classes
+			inputClasses = make(classdef.Table) // make sure to not change subtable.Input
 			maps.Clear(inputClassIdx)
 
 		case next.typ == itemSquareBracketOpen: // format 3
-			var in []coverage.Table
+			var input []coverage.Table
 			for {
-				glyphs := p.readGlyphSet()
-				cov := make(coverage.Table, len(glyphs))
-				for i, gid := range glyphs {
-					cov[gid] = i
-				}
-				in = append(in, cov)
+				input = append(input, makeCoverageTable(p.readGlyphSet()))
 				if p.optional(itemArrow) {
 					break
 				}
@@ -450,7 +448,7 @@ gsubLoop:
 			actions := p.readNestedLookups()
 
 			subtable := &gtab.SeqContext3{
-				Input:   in,
+				Input:   input,
 				Actions: actions,
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
@@ -514,15 +512,10 @@ gsubLoop:
 				p.optional(itemEOL)
 			}
 
-			in := maps.Keys(res)
-			sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
-			cov := make(coverage.Table, len(in))
-			for i, gid := range in {
-				cov[gid] = i
-			}
+			cov := makeCoverageTable(maps.Keys(res))
 
-			rules := make([][]*gtab.ChainedSeqRule, len(in))
-			for i, gid := range in {
+			rules := make([][]*gtab.ChainedSeqRule, len(cov))
+			for gid, i := range cov {
 				rules[i] = res[gid]
 			}
 
@@ -583,7 +576,6 @@ gsubLoop:
 		case next.typ == itemSlash: // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
-			sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
 			p.required(itemSlash, "/")
 
 			numClasses := len(inputClassIdx) + 1
@@ -639,10 +631,7 @@ gsubLoop:
 				p.optional(itemEOL)
 			}
 
-			cov := make(coverage.Table, len(firstGlyphs))
-			for i, gid := range firstGlyphs {
-				cov[gid] = i
-			}
+			cov := makeCoverageTable(firstGlyphs)
 
 			subtable := &gtab.ChainedSeqContext2{
 				Cov:       cov,
@@ -653,31 +642,40 @@ gsubLoop:
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 
-			inputClasses = make(classdef.Table) // make sure to not change subtable.inputClasses
+			inputClasses = make(classdef.Table) // make sure to not change subtable.Input
 			maps.Clear(inputClassIdx)
-			backtrackClasses = make(classdef.Table) // make sure to not change subtable.backtrackClasses
+			backtrackClasses = make(classdef.Table) // make sure to not change subtable.Backtrack
 			maps.Clear(backtrackClassIdx)
-			lookaheadClasses = make(classdef.Table) // make sure to not change subtable.lookaheadClasses
+			lookaheadClasses = make(classdef.Table) // make sure to not change subtable.Lookahead
 			maps.Clear(lookaheadClassIdx)
 
 		case next.typ == itemSquareBracketOpen: // format 3
-			var input []coverage.Table
+			var input, backtrack, lookahead []coverage.Table
 			for {
-				glyphs := p.readGlyphSet()
-				cov := make(coverage.Table, len(glyphs))
-				for i, gid := range glyphs {
-					cov[gid] = i
+				backtrack = append(backtrack, makeCoverageTable(p.readGlyphSet()))
+				if p.optional(itemBar) {
+					break
 				}
-				input = append(input, cov)
+			}
+			for {
+				input = append(input, makeCoverageTable(p.readGlyphSet()))
+				if p.optional(itemBar) {
+					break
+				}
+			}
+			for {
+				lookahead = append(lookahead, makeCoverageTable(p.readGlyphSet()))
 				if p.optional(itemArrow) {
 					break
 				}
 			}
 			actions := p.readNestedLookups()
 
-			subtable := &gtab.SeqContext3{
-				Input:   input,
-				Actions: actions,
+			subtable := &gtab.ChainedSeqContext3{
+				Backtrack: rev(backtrack),
+				Input:     input,
+				Lookahead: lookahead,
+				Actions:   actions,
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 		}
@@ -807,24 +805,6 @@ func (p *parser) readGlyphSet() []font.GlyphID {
 	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
 	p.required(itemSquareBracketClose, "]")
 	return unique(res)
-}
-
-// unique removes duplicates from a sorted slice.
-func unique(seq []font.GlyphID) []font.GlyphID {
-	if len(seq) < 2 {
-		return seq
-	}
-
-	pos := 1
-	for i := 1; i < len(seq); i++ {
-		if seq[i] == seq[i-1] {
-			continue
-		}
-		seq[pos] = seq[i]
-		pos++
-	}
-
-	return seq[:pos]
 }
 
 func (p *parser) readNestedLookups() gtab.Nested {
@@ -973,6 +953,24 @@ func makeCoverageTable(in []font.GlyphID) coverage.Table {
 		cov[gid] = i
 	}
 	return cov
+}
+
+// unique removes duplicates from a sorted slice.
+func unique[T comparable](seq []T) []T {
+	if len(seq) < 2 {
+		return seq
+	}
+
+	pos := 1
+	for i := 1; i < len(seq); i++ {
+		if seq[i] == seq[i-1] {
+			continue
+		}
+		seq[pos] = seq[i]
+		pos++
+	}
+
+	return seq[:pos]
 }
 
 // rev reverses the order of items in a slice.
