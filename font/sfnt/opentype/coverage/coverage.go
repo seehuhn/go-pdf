@@ -88,7 +88,9 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 			startGlyphID := int(buf[0])<<8 | int(buf[1])
 			endGlyphID := int(buf[2])<<8 | int(buf[3])
 			startCoverageIndex := int(buf[4])<<8 | int(buf[5])
-			if startCoverageIndex != pos || startGlyphID <= prev {
+			if startCoverageIndex != pos ||
+				startGlyphID <= prev ||
+				endGlyphID < startGlyphID {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 2)",

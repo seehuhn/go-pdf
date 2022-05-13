@@ -501,7 +501,7 @@ gsubLoop:
 				key := input[0]
 				res[key] = append(res[key], &gtab.ChainedSeqRule{
 					Backtrack: rev(backtrack),
-					Input:     input,
+					Input:     input[1:],
 					Lookahead: lookahead,
 					Actions:   nested,
 				})
@@ -635,8 +635,8 @@ gsubLoop:
 
 			subtable := &gtab.ChainedSeqContext2{
 				Cov:       cov,
-				Backtrack: inputClasses,
-				Input:     backtrackClasses,
+				Backtrack: backtrackClasses,
+				Input:     inputClasses,
 				Lookahead: lookaheadClasses,
 				Rules:     rules,
 			}
@@ -980,6 +980,15 @@ func rev[T any](seq []T) []T {
 		seq[i], seq[j] = seq[j], seq[i]
 	}
 	return seq
+}
+
+func copyRev[T any](seq []T) []T {
+	n := len(seq)
+	res := make([]T, n)
+	for i := 0; i < n; i++ {
+		res[i] = seq[n-i-1]
+	}
+	return res
 }
 
 type parseError struct {

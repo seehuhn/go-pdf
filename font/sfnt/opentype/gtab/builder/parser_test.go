@@ -90,6 +90,35 @@ func FuzzGsub2(f *testing.F) {
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
+		fmt.Println("@1@")
+		fmt.Println("GSUB_2: " + desc)
+		fmt.Println("@2@")
+		fmt.Println(desc2)
+		lookups2, err := parse(fontInfo, desc2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := cmp.Diff(lookups, lookups2); d != "" {
+			t.Error(d)
+		}
+	})
+}
+
+func FuzzGsub3(f *testing.F) {
+	f.Add("A->[B], M->[N]")
+	f.Add(`A -> ["AA"], B -> ["AA"], C -> ["ABAAC"]`)
+	f.Fuzz(func(t *testing.T, desc string) {
+		fontInfo := debug.MakeSimpleFont()
+		lookups, err := parse(fontInfo, "GSUB_3: "+desc)
+		if err != nil || len(lookups) != 1 {
+			return
+		}
+		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
+		desc2 := ExplainGsub(fontInfo)
+		fmt.Println("@1@")
+		fmt.Println("GSUB_3: " + desc)
+		fmt.Println("@2@")
+		fmt.Println(desc2)
 		lookups2, err := parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)
@@ -122,6 +151,43 @@ func FuzzGsub5(f *testing.F) {
 		desc2 := ExplainGsub(fontInfo)
 		fmt.Println("@1@")
 		fmt.Println("GSUB_5: " + desc)
+		fmt.Println("@2@")
+		fmt.Println(desc2)
+		lookups2, err := parse(fontInfo, desc2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := cmp.Diff(lookups, lookups2); d != "" {
+			t.Error(d)
+		}
+	})
+}
+
+func FuzzGsub6(f *testing.F) {
+	f.Add(`A B | C D | E F -> 1@0 2@1, B | C D E | F -> 1@2`)
+	f.Add(`
+		backtrackclass :DEF: = ["DEF"]
+		inputclass :ABC: = ["ABC"]
+		lookaheadclass :GHI: = ["GHI"]
+		/A B C/ :DEF: :: | :ABC: | :: :GHI: -> 1@0`)
+	f.Add(`[A] [A B C] | [A B] [A C] [B C] | [A B C] [A B C] -> 1@0 1@1 1@2`)
+	f.Add(`
+		A B | C D | E F -> 1@0 2@1, B | C D E | F -> 1@2 ||
+		inputclass :ABC: = ["ABC"]
+		backtrackclass :DEF: = ["DEF"]
+		lookaheadclass :DEF: = ["DEF"]
+		/A B C/ :DEF: :: | :ABC: | :: :DEF: -> 1@0 ||
+		[A] [A B C] | [A B] [A C] [B C] | [A B C] [A B C] -> 1@0 1@1 1@2`)
+	f.Fuzz(func(t *testing.T, desc string) {
+		fontInfo := debug.MakeSimpleFont()
+		lookups, err := parse(fontInfo, "GSUB_6: "+desc)
+		if err != nil || len(lookups) != 1 {
+			return
+		}
+		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
+		desc2 := ExplainGsub(fontInfo)
+		fmt.Println("@1@")
+		fmt.Println("GSUB_6: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
 		lookups2, err := parse(fontInfo, desc2)

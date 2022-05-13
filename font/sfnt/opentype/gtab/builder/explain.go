@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfntcff"
@@ -45,7 +46,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 				fmt.Fprintf(ee.w, "GSUB_%d:", lookup.Meta.LookupType)
 				ee.explainFlags(lookup.Meta.LookupFlag)
 			} else {
-				ee.w.WriteString(" ||\n    ")
+				ee.w.WriteString(" ||\n\t")
 			}
 
 			switch l := subtable.(type) {
@@ -73,25 +74,34 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 
 			case *gtab.Gsub2_1:
 				checkType(2)
-				var mappings []mapping
-				for key, idx := range l.Cov {
-					mappings = append(mappings, mapping{
-						from: []font.GlyphID{key},
-						to:   l.Repl[idx],
-					})
+				inputGlyphs := maps.Keys(l.Cov)
+				sort.Slice(inputGlyphs, func(i, j int) bool { return inputGlyphs[i] < inputGlyphs[j] })
+				for i, gid := range inputGlyphs {
+					if i == 0 {
+						ee.w.WriteRune(' ')
+					} else {
+						ee.w.WriteString(", ")
+					}
+					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.w.WriteString(" -> ")
+					ee.writeGlyphList(l.Repl[i])
 				}
-				ee.explainSeqMappings(mappings)
 
 			case *gtab.Gsub3_1:
 				checkType(3)
-				var mappings []mapping
-				for gid, idx := range l.Cov {
-					mappings = append(mappings, mapping{
-						from: []font.GlyphID{gid},
-						to:   l.Alternates[idx],
-					})
+				inputGlyphs := maps.Keys(l.Cov)
+				sort.Slice(inputGlyphs, func(i, j int) bool { return inputGlyphs[i] < inputGlyphs[j] })
+				for i, gid := range inputGlyphs {
+					if i == 0 {
+						ee.w.WriteRune(' ')
+					} else {
+						ee.w.WriteString(", ")
+					}
+					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.w.WriteString(" -> [")
+					ee.writeGlyphList(l.Alternates[i])
+					ee.w.WriteRune(']')
 				}
-				ee.explainSetMappings(mappings)
 
 			case *gtab.Gsub4_1:
 				checkType(4)
@@ -108,79 +118,54 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 
 			case *gtab.SeqContext1:
 				checkType(5)
-				var seqActions []seqAction
-				for gid, idx := range l.Cov {
-					for _, rule := range l.Rules[idx] {
-						seqActions = append(seqActions, seqAction{
-							from:    append([]font.GlyphID{gid}, rule.Input...),
-							actions: rule.Actions,
-						})
+				firstGlyphs := maps.Keys(l.Cov)
+				sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
+				first := true
+				for i, gid := range firstGlyphs {
+					input := []font.GlyphID{gid}
+					for _, rule := range l.Rules[i] {
+						input = append(input[:1], rule.Input...)
+						if first {
+							ee.w.WriteRune(' ')
+							first = false
+						} else {
+							ee.w.WriteString(", ")
+						}
+						ee.writeGlyphList(input)
+						ee.w.WriteString(" -> ")
+						ee.explainNested(rule.Actions)
 					}
-				}
-				sort.SliceStable(seqActions, func(i, j int) bool {
-					return seqActions[i].from[0] < seqActions[j].from[0]
-				})
-				for j, a := range seqActions {
-					if j == 0 {
-						ee.w.WriteRune(' ')
-					} else {
-						ee.w.WriteString(", ")
-					}
-					ee.writeGlyphList(a.from)
-					ee.w.WriteString(" -> ")
-					ee.explainNested(a.actions)
 				}
 
 			case *gtab.SeqContext2:
 				checkType(5)
-				numClasses := l.Input.NumClasses()
-				glyphs := make([][]font.GlyphID, numClasses)
-				for gid, cls := range l.Input {
-					glyphs[cls] = append(glyphs[cls], gid)
-				}
-				for j := 0; j < numClasses; j++ {
-					if j == 0 {
-						continue
-					}
-					sort.Slice(glyphs[j], func(k, l int) bool { return glyphs[j][k] < glyphs[j][l] })
-					fmt.Fprintf(ee.w, "\tclass :c%d: = [", j)
-					ee.writeGlyphList(glyphs[j])
-					ee.w.WriteString("]\n")
-				}
-				ee.w.WriteString("\t/")
+				ee.defineClasses("class", l.Input)
+				ee.w.WriteString("/")
 				ee.explainCoverage(l.Cov)
 				ee.w.WriteRune('/')
-				var classActions []classAction
+				first := true
 				for cls, rules := range l.Rules {
+					input := []uint16{uint16(cls)}
 					for _, rule := range rules {
-						classActions = append(classActions, classAction{
-							from:    append([]uint16{uint16(cls)}, rule.Input...),
-							actions: rule.Actions,
-						})
-					}
-				}
-				sort.SliceStable(classActions, func(i, j int) bool {
-					return classActions[i].from[0] < classActions[j].from[0]
-				})
-				for i, a := range classActions {
-					if i > 0 {
-						ee.w.WriteRune(',')
-					}
-					for _, cls := range a.from {
-						if cls == 0 {
-							ee.w.WriteString(" ::")
+						if first {
+							first = false
 						} else {
-							fmt.Fprintf(ee.w, " :c%d:", cls)
+							ee.w.WriteRune(',')
 						}
+						input = append(input[:1], rule.Input...)
+						ee.writeClassList(input)
+						ee.w.WriteString(" -> ")
+						ee.explainNested(rule.Actions)
 					}
-					ee.w.WriteString(" -> ")
-					ee.explainNested(a.actions)
 				}
 
 			case *gtab.SeqContext3:
 				checkType(5)
-				for _, cov := range l.Input {
-					ee.w.WriteString(" [")
+				for i, cov := range l.Input {
+					if i > 0 {
+						ee.w.WriteRune(' ')
+					}
+					ee.w.WriteRune('[')
 					ee.explainCoverage(cov)
 					ee.w.WriteRune(']')
 				}
@@ -189,12 +174,85 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 
 			case *gtab.ChainedSeqContext1:
 				checkType(6)
+				firstGlyphs := maps.Keys(l.Cov)
+				sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
+				first := true
+				for i, gid := range firstGlyphs {
+					input := []font.GlyphID{gid}
+					for _, rule := range l.Rules[i] {
+						backtrack := copyRev(rule.Backtrack)
+						input = append(input[:1], rule.Input...)
+						lookahead := rule.Lookahead
+						if first {
+							ee.w.WriteRune(' ')
+							first = false
+						} else {
+							ee.w.WriteString(", ")
+						}
+						ee.writeGlyphList(backtrack)
+						ee.w.WriteString(" | ")
+						ee.writeGlyphList(input)
+						ee.w.WriteString(" | ")
+						ee.writeGlyphList(lookahead)
+						ee.w.WriteString(" -> ")
+						ee.explainNested(rule.Actions)
+					}
+				}
 
 			case *gtab.ChainedSeqContext2:
 				checkType(6)
+				ee.defineClasses("backtrackclass", l.Backtrack)
+				ee.defineClasses("inputclass", l.Input)
+				ee.defineClasses("lookaheadclass", l.Lookahead)
+				ee.w.WriteString("/")
+				ee.explainCoverage(l.Cov)
+				ee.w.WriteRune('/')
+				first := true
+				for cls, rules := range l.Rules {
+					input := []uint16{uint16(cls)}
+					for _, rule := range rules {
+						if first {
+							first = false
+						} else {
+							ee.w.WriteRune(',')
+						}
+						backtrack := copyRev(rule.Backtrack)
+						input = append(input[:1], rule.Input...)
+						lookahead := rule.Lookahead
+						ee.writeClassList(backtrack)
+						ee.w.WriteString(" | ")
+						ee.writeClassList(input)
+						ee.w.WriteString(" | ")
+						ee.writeClassList(lookahead)
+						ee.w.WriteString(" -> ")
+						ee.explainNested(rule.Actions)
+					}
+				}
 
 			case *gtab.ChainedSeqContext3:
 				checkType(6)
+				for i, cov := range copyRev(l.Backtrack) {
+					if i > 0 {
+						ee.w.WriteRune(' ')
+					}
+					ee.w.WriteRune('[')
+					ee.explainCoverage(cov)
+					ee.w.WriteRune(']')
+				}
+				ee.w.WriteString(" |")
+				for _, cov := range l.Input {
+					ee.w.WriteString(" [")
+					ee.explainCoverage(cov)
+					ee.w.WriteRune(']')
+				}
+				ee.w.WriteString(" |")
+				for _, cov := range l.Lookahead {
+					ee.w.WriteString(" [")
+					ee.explainCoverage(cov)
+					ee.w.WriteRune(']')
+				}
+				ee.w.WriteString(" -> ")
+				ee.explainNested(l.Actions)
 
 			default:
 				panic(fmt.Sprintf("unsupported subtable type %T", l))
@@ -312,55 +370,12 @@ func (ee *explainer) explainSeqMappings(mm []mapping) {
 	}
 }
 
-func (ee *explainer) explainSetMappings(mm []mapping) {
-	sort.SliceStable(mm, func(i, j int) bool {
-		return mm[i].from[0] < mm[j].from[0]
-	})
-
-	sep := " "
-	for len(mm) > 0 {
-		ee.w.WriteString(sep)
-		sep = ", "
-
-		ee.writeGlyphList(mm[0].from)
-		ee.w.WriteString(" -> [")
-		ee.writeGlyphList(mm[0].to)
-		ee.w.WriteRune(']')
-		mm = mm[1:]
-	}
-}
-
-type seqAction struct {
-	from    []font.GlyphID
-	actions gtab.Nested
-}
-
-func (ee *explainer) explainActions(aa []seqAction) {
-	sep := " "
-	for len(aa) > 0 {
-		ee.w.WriteString(sep)
-		sep = ", "
-
-		ee.writeGlyphList(aa[0].from)
-		ee.w.WriteString(" -> ")
-		ee.explainNested(aa[0].actions)
-		aa = aa[1:]
-	}
-}
-
-type classAction struct {
-	from    []uint16
-	actions gtab.Nested
-}
-
 func (ee *explainer) writeGlyphList(seq []font.GlyphID) {
-	ee.explainSequenceW(ee.w, seq)
-}
-
-func (ee *explainer) explainSequenceW(w *strings.Builder, seq []font.GlyphID) {
 	if len(seq) == 0 {
 		return
 	}
+
+	w := ee.w
 
 	if len(seq) == 1 && "\""+ee.names[seq[0]]+"\"" == ee.mapped[seq[0]] {
 		w.WriteString(ee.names[seq[0]])
@@ -392,6 +407,16 @@ func (ee *explainer) explainSequenceW(w *strings.Builder, seq []font.GlyphID) {
 	}
 }
 
+func (ee *explainer) writeClassList(input []uint16) {
+	for _, cls := range input {
+		if cls == 0 {
+			ee.w.WriteString(" ::")
+		} else {
+			fmt.Fprintf(ee.w, " :c%d:", cls)
+		}
+	}
+}
+
 func (ee *explainer) explainCoverage(cov coverage.Table) {
 	keys := maps.Keys(cov)
 	sort.Slice(keys, func(i, j int) bool {
@@ -406,5 +431,22 @@ func (ee *explainer) explainNested(actions gtab.Nested) {
 			ee.w.WriteRune(' ')
 		}
 		fmt.Fprintf(ee.w, "%d@%d", a.LookupListIndex, a.SequenceIndex)
+	}
+}
+
+func (ee *explainer) defineClasses(classType string, class classdef.Table) {
+	numClasses := class.NumClasses()
+	glyphs := make([][]font.GlyphID, numClasses)
+	for gid, cls := range class {
+		glyphs[cls] = append(glyphs[cls], gid)
+	}
+	for j := 0; j < numClasses; j++ {
+		if j == 0 {
+			continue
+		}
+		sort.Slice(glyphs[j], func(k, l int) bool { return glyphs[j][k] < glyphs[j][l] })
+		fmt.Fprintf(ee.w, "%s :c%d: = [", classType, j)
+		ee.writeGlyphList(glyphs[j])
+		ee.w.WriteString("]\n\t")
 	}
 }

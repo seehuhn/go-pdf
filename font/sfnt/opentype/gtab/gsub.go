@@ -574,6 +574,22 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		}
 	}
 
+	total := 6 + 2*len(repl)
+	for _, replI := range repl {
+		total += 2 + 2*len(replI)
+		for _, lig := range replI {
+			total += 4 + 2*len(lig.In)
+		}
+	}
+	// Now total is the coverage offset when encoding the subtable without
+	// overlapping data.
+	if total > 0xFFFF {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/opentype/gtab",
+			Reason:    "GSUB 4.1 too large",
+		}
+	}
+
 	return &Gsub4_1{
 		Cov:  cov,
 		Repl: repl,
@@ -654,6 +670,9 @@ func (l *Gsub4_1) Encode() []byte {
 	}
 	coverageOffset := total
 	total += l.Cov.EncodeLen()
+	if coverageOffset > 0xFFFF {
+		panic("coverage offset overflow")
+	}
 
 	buf := make([]byte, 0, total)
 

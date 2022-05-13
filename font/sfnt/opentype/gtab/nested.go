@@ -316,13 +316,15 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if len(classSeqRuleSetOffsets) > numClasses {
 		classSeqRuleSetOffsets = classSeqRuleSetOffsets[:numClasses]
 	}
+	seqRuleSetCount := len(classSeqRuleSetOffsets)
 
 	res := &SeqContext2{
 		Cov:   cov,
 		Input: classDef,
-		Rules: make([][]*ClassSeqRule, len(classSeqRuleSetOffsets)),
+		Rules: make([][]*ClassSeqRule, seqRuleSetCount),
 	}
 
+	total := 8 + 2*seqRuleSetCount
 	for i, classSeqRuleSetOffset := range classSeqRuleSetOffsets {
 		if classSeqRuleSetOffset == 0 {
 			continue
@@ -337,6 +339,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			return nil, err
 		}
 		res.Rules[i] = make([]*ClassSeqRule, len(seqRuleOffsets))
+		total += 2 + 2*len(res.Rules[i])
 		for j, seqRuleOffset := range seqRuleOffsets {
 			err = p.SeekPos(base + int64(seqRuleOffset))
 			if err != nil {
@@ -370,6 +373,15 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				Input:   inputSequence,
 				Actions: actions,
 			}
+			total += 4 + 2*len(inputSequence) + 4*len(actions)
+		}
+	}
+	total += cov.EncodeLen()
+
+	if total > 0xFFFF {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/opentype/gtab",
+			Reason:    "too large SeqContext2",
 		}
 	}
 
@@ -433,7 +445,6 @@ func (l *SeqContext2) EncodeLen() int {
 // Encode implements the Subtable interface.
 func (l *SeqContext2) Encode() []byte {
 	seqRuleSetCount := len(l.Rules)
-
 	total := 8 + 2*seqRuleSetCount
 	seqRuleSetOffsets := make([]uint16, seqRuleSetCount)
 	for i, rules := range l.Rules {
@@ -450,6 +461,10 @@ func (l *SeqContext2) Encode() []byte {
 	total += l.Cov.EncodeLen()
 	classDefOffset := total
 	total += l.Input.AppendLen()
+
+	if classDefOffset > 0xFFFF {
+		panic("classDefOffset too large")
+	}
 
 	buf := make([]byte, 0, total)
 	buf = append(buf,
