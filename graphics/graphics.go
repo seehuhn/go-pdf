@@ -55,7 +55,3 @@ const (
 	LineJoinRound LineJoinStyle = 1
 	LineJoinBevel LineJoinStyle = 2
 )
-
-type Context struct {
-	state *State
-}

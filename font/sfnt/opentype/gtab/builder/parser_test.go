@@ -27,7 +27,7 @@ import (
 
 func TestParser(t *testing.T) {
 	fontInfo := debug.MakeSimpleFont()
-	lookups, err := parse(fontInfo, `
+	lookups, err := Parse(fontInfo, `
 	GSUB_1: A->B, M->N
 	GSUB_1: A-C -> B-D, M->N, N->O
 	GSUB_1: A->X, B->X, C->X, M->X, N->X
@@ -63,13 +63,13 @@ func FuzzGsub1(f *testing.F) {
 	f.Add("A->X, B->X, C->X, M->X, N->X")
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := parse(fontInfo, "GSUB_1: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB_1: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
-		lookups2, err := parse(fontInfo, desc2)
+		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,7 +84,7 @@ func FuzzGsub2(f *testing.F) {
 	f.Add(`A -> "AA", B -> "AA", C -> "ABAAC"`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := parse(fontInfo, "GSUB_2: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB_2: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
@@ -94,7 +94,7 @@ func FuzzGsub2(f *testing.F) {
 		fmt.Println("GSUB_2: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
-		lookups2, err := parse(fontInfo, desc2)
+		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +109,7 @@ func FuzzGsub3(f *testing.F) {
 	f.Add(`A -> ["AA"], B -> ["AA"], C -> ["ABAAC"]`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := parse(fontInfo, "GSUB_3: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB_3: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
@@ -119,7 +119,7 @@ func FuzzGsub3(f *testing.F) {
 		fmt.Println("GSUB_3: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
-		lookups2, err := parse(fontInfo, desc2)
+		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -143,7 +143,7 @@ func FuzzGsub5(f *testing.F) {
 		[A B C] [A C] [A D] -> 3@0`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := parse(fontInfo, "GSUB_5: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB_5: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
@@ -153,7 +153,7 @@ func FuzzGsub5(f *testing.F) {
 		fmt.Println("GSUB_5: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
-		lookups2, err := parse(fontInfo, desc2)
+		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,7 +180,7 @@ func FuzzGsub6(f *testing.F) {
 		[A] [A B C] | [A B] [A C] [B C] | [A B C] [A B C] -> 1@0 1@1 1@2`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := parse(fontInfo, "GSUB_6: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB_6: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
@@ -190,7 +190,7 @@ func FuzzGsub6(f *testing.F) {
 		fmt.Println("GSUB_6: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
-		lookups2, err := parse(fontInfo, desc2)
+		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)
 		}

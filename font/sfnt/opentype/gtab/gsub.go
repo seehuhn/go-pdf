@@ -24,29 +24,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
-// A Contextual Substitution subtable describes glyph substitutions in context
-// that replace one or more glyphs within a certain pattern of glyphs,
-// using nested lookups.
-//
-// GSUB 5.1 - Context Substitution Format 1: Simple Glyph Contexts
-//     Sequence Context Format 1: simple glyph contexts
-// GSUB 5.2 - Context Substitution Format 2: Class-based Glyph Contexts
-//     Sequence Context Format 2: class-based glyph contexts
-// GSUB 5.3 - Context Substitution Format 3: Coverage-based Glyph Contexts
-//     Sequence Context Format 3: coverage-based glyph contexts
-
-// A Chained Contexts Substitution subtable describes glyph substitutions in
-// context with an ability to look back and/or look ahead in the sequence of
-// glyphs.  It can replace one or more glyphs within a certain pattern of
-// glyphs, using nested lookups.
-//
-// GSUB 6.1 - Chained Contexts Substitution Format 1: Simple Glyph Contexts
-//     Chained Sequence Context Format 1: simple glyph contexts
-// GSUB 6.2 - Chained Contexts Substitution Format 2: Class-based Glyph Contexts
-//     Chained Sequence Context Format 2: class-based glyph contexts
-// GSUB 6.3 - Chained Contexts Substitution Format 3: Coverage-based Glyph Contexts
-//     Chained Sequence Context Format 3: coverage-based glyph contexts
-
 // readGsubSubtable reads a GSUB subtable.
 // This function can be used as the SubtableReader argument to readLookupList().
 func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtable, error) {
@@ -85,6 +62,8 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return readChainedSeqContext3(p, pos)
 	case 7_1:
 		return readExtensionSubtable(p, pos)
+	case 8_1:
+		return readGsub8_1(p, pos)
 
 	default:
 		fmt.Println("GSUB", meta.LookupType, format)
@@ -704,6 +683,186 @@ func (l *Gsub4_1) Encode() []byte {
 		}
 	}
 	buf = append(buf, l.Cov.Encode()...)
+
+	return buf
+}
+
+// Gsub8_1 is a Reverse Chaining Contextual Single Substitution GSUB subtable
+// (type 8, format 1).
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#81-reverse-chaining-contextual-single-substitution-format-1-coverage-based-glyph-contexts
+type Gsub8_1 struct {
+	Input              coverage.Table
+	Backtrack          []coverage.Table
+	Lookahead          []coverage.Table
+	SubstituteGlyphIDs []font.GlyphID // indexed by input coverage index
+}
+
+func readGsub8_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	coverageOffset, err := p.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	backtrackCoverageOffsets, err := p.ReadUint16Slice()
+	if err != nil {
+		return nil, err
+	}
+	lookaheadCoverageOffsets, err := p.ReadUint16Slice()
+	if err != nil {
+		return nil, err
+	}
+	substituteGlyphIDs, err := p.ReadGIDSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	input, err := coverage.Read(p, subtablePos+int64(coverageOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	backtrack := make([]coverage.Table, len(backtrackCoverageOffsets))
+	for i, offs := range backtrackCoverageOffsets {
+		backtrack[i], err = coverage.Read(p, subtablePos+int64(offs))
+		if err != nil {
+			return nil, err
+		}
+	}
+	lookahead := make([]coverage.Table, len(lookaheadCoverageOffsets))
+	for i, offs := range lookaheadCoverageOffsets {
+		lookahead[i], err = coverage.Read(p, subtablePos+int64(offs))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(input) > len(substituteGlyphIDs) {
+		input.Prune(len(substituteGlyphIDs))
+	} else {
+		substituteGlyphIDs = substituteGlyphIDs[:len(input)]
+	}
+
+	res := &Gsub8_1{
+		Input:              input,
+		Backtrack:          backtrack,
+		Lookahead:          lookahead,
+		SubstituteGlyphIDs: substituteGlyphIDs,
+	}
+	return res, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+	if !keep(seq[i].Gid) {
+		return seq, -1, nil
+	}
+	idx, ok := l.Input[seq[i].Gid]
+	if !ok {
+		return seq, -1, nil
+	}
+
+	p := i
+	glyphsNeeded := len(l.Backtrack)
+	for _, cov := range l.Backtrack {
+		p--
+		glyphsNeeded--
+		for p-glyphsNeeded >= 0 && !keep(seq[p].Gid) {
+			p--
+		}
+		if p-glyphsNeeded < 0 || !cov.Contains(seq[p].Gid) {
+			return seq, -1, nil
+		}
+	}
+
+	p = i
+	glyphsNeeded = len(l.Lookahead)
+	for _, cov := range l.Lookahead {
+		p++
+		glyphsNeeded--
+		for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
+			p++
+		}
+		if p+glyphsNeeded >= len(seq) || !cov.Contains(seq[p].Gid) {
+			return seq, -1, nil
+		}
+	}
+
+	seq[i].Gid = l.SubstituteGlyphIDs[idx]
+	return seq, i + 1, nil
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gsub8_1) EncodeLen() int {
+	total := 10
+	total += 2 * len(l.Backtrack)
+	total += 2 * len(l.Lookahead)
+	total += 2 * len(l.SubstituteGlyphIDs)
+	total += l.Input.EncodeLen()
+	for _, cov := range l.Backtrack {
+		total += cov.EncodeLen()
+	}
+	for _, cov := range l.Lookahead {
+		total += cov.EncodeLen()
+	}
+	return total
+}
+
+// Encode implements the Subtable interface.
+func (l *Gsub8_1) Encode() []byte {
+	backtrackGlyphCount := len(l.Backtrack)
+	lookaheadGlyphCount := len(l.Lookahead)
+	glyphCount := len(l.SubstituteGlyphIDs)
+
+	total := 10
+	total += 2 * backtrackGlyphCount
+	total += 2 * lookaheadGlyphCount
+	total += 2 * glyphCount
+	coverageOffset := total
+	total += l.Input.EncodeLen()
+	backtrackCoverageOffsets := make([]uint16, backtrackGlyphCount)
+	for i, cov := range l.Backtrack {
+		backtrackCoverageOffsets[i] = uint16(total)
+		total += cov.EncodeLen()
+	}
+	lookaheadCoverageOffsets := make([]uint16, lookaheadGlyphCount)
+	for i, cov := range l.Lookahead {
+		lookaheadCoverageOffsets[i] = uint16(total)
+		total += cov.EncodeLen()
+	}
+
+	buf := make([]byte, 0, total)
+	buf = append(buf,
+		0, 1, // format
+		byte(coverageOffset>>8), byte(coverageOffset),
+		byte(backtrackGlyphCount>>8), byte(backtrackGlyphCount),
+	)
+	for _, offset := range backtrackCoverageOffsets {
+		buf = append(buf, byte(offset>>8), byte(offset))
+	}
+	buf = append(buf, byte(lookaheadGlyphCount>>8), byte(lookaheadGlyphCount))
+	for _, offset := range lookaheadCoverageOffsets {
+		buf = append(buf, byte(offset>>8), byte(offset))
+	}
+	buf = append(buf, byte(glyphCount>>8), byte(glyphCount))
+	for _, gid := range l.SubstituteGlyphIDs {
+		buf = append(buf, byte(gid>>8), byte(gid))
+	}
+
+	if len(buf) != coverageOffset {
+		panic("internal error") // TODO(voss): remove
+	}
+	buf = append(buf, l.Input.Encode()...)
+	for i, cov := range l.Backtrack {
+		if len(buf) != int(backtrackCoverageOffsets[i]) {
+			panic("internal error") // TODO(voss): remove
+		}
+		buf = append(buf, cov.Encode()...)
+	}
+	for i, cov := range l.Lookahead {
+		if len(buf) != int(lookaheadCoverageOffsets[i]) {
+			panic("internal error") // TODO(voss): remove
+		}
+		buf = append(buf, cov.Encode()...)
+	}
 
 	return buf
 }

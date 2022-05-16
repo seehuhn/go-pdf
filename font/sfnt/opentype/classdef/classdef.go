@@ -190,7 +190,7 @@ func (info Table) Append(buf []byte) []byte {
 
 	encInfo := info.getEncInfo()
 
-	for encInfo.format1Size <= encInfo.format2Size {
+	if encInfo.format1Size <= encInfo.format2Size {
 		count := encInfo.maxGid - encInfo.minGid + 1
 		buf = append(buf,
 			0, 1,

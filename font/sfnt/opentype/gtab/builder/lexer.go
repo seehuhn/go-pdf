@@ -114,12 +114,6 @@ func (l *lexer) backup() {
 	l.pos -= l.width
 }
 
-func (l *lexer) peek() rune {
-	r := l.next()
-	l.backup()
-	return r
-}
-
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	l.items <- item{
 		typ: itemError,

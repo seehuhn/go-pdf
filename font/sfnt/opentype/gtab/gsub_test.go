@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
 func FuzzGsub1_1(f *testing.F) {
@@ -95,5 +96,31 @@ func FuzzGsub4_1(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 4, 1, readGsub4_1, data)
+	})
+}
+
+func FuzzGsub8_1(f *testing.F) {
+	l := &Gsub8_1{
+		Input:              coverage.Table{1: 0},
+		SubstituteGlyphIDs: []font.GlyphID{2},
+	}
+	f.Add(l.Encode())
+	l = &Gsub8_1{
+		Input: coverage.Table{1: 0},
+		Backtrack: []coverage.Table{
+			{1: 0, 2: 1, 4: 2},
+			{1: 0, 3: 1, 4: 2},
+		},
+		Lookahead: []coverage.Table{
+			{2: 0, 3: 1, 10: 2},
+			{3: 0},
+			{3: 0, 4: 1},
+		},
+		SubstituteGlyphIDs: []font.GlyphID{2},
+	}
+	f.Add(l.Encode())
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 8, 1, readGsub8_1, data)
 	})
 }

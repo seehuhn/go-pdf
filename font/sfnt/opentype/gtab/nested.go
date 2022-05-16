@@ -671,6 +671,9 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 		chainedSeqRuleSetOffsets = chainedSeqRuleSetOffsets[:len(cov)]
 	}
 
+	total := 6 + 2*len(chainedSeqRuleSetOffsets)
+	total += cov.EncodeLen()
+
 	rules := make([][]*ChainedSeqRule, len(chainedSeqRuleSetOffsets))
 	for i, chainedSeqRuleSetOffset := range chainedSeqRuleSetOffsets {
 		if chainedSeqRuleSetOffset == 0 {
@@ -687,6 +690,14 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 		if err != nil {
 			return nil, err
 		}
+
+		if total > 0xFFFF {
+			return nil, &font.InvalidFontError{
+				SubSystem: "sfnt/opentype/gtab",
+				Reason:    "ChainedSeqContext1 too large",
+			}
+		}
+		ruleSetSize := 2 + 2*len(chainedSeqRuleOffsets)
 
 		rules[i] = make([]*ChainedSeqRule, len(chainedSeqRuleOffsets))
 		for j, chainedSeqRuleOffset := range chainedSeqRuleOffsets {
@@ -723,6 +734,18 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 			if err != nil {
 				return nil, err
 			}
+
+			if ruleSetSize > 0xFFFF {
+				return nil, &font.InvalidFontError{
+					SubSystem: "sfnt/opentype/gtab",
+					Reason:    "ChainedSeqContext1 ruleset too large",
+				}
+			}
+			ruleSetSize += 2 + 2*len(backtrackSequence)
+			ruleSetSize += 2 + 2*len(inputSequence)
+			ruleSetSize += 2 + 2*len(lookaheadSequence)
+			ruleSetSize += 2 + 4*len(actions)
+
 			rules[i][j] = &ChainedSeqRule{
 				Backtrack: backtrackSequence,
 				Input:     inputSequence,
@@ -730,6 +753,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 				Actions:   actions,
 			}
 		}
+		total += ruleSetSize
 	}
 
 	res := &ChainedSeqContext1{

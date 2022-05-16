@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
-func parse(fontInfo *sfntcff.Info, input string) (lookups gtab.LookupList, err error) {
+func Parse(fontInfo *sfntcff.Info, input string) (lookups gtab.LookupList, err error) {
 	numGlyphs := fontInfo.NumGlyphs()
 	byName := make(map[string]font.GlyphID)
 	for i := font.GlyphID(0); i < font.GlyphID(numGlyphs); i++ {
@@ -140,17 +140,18 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 	cov := makeCoverageTable(maps.Keys(res))
 
 	isConstDelta := true
-	first := true
 	var delta font.GlyphID
-	for gid, idx := range cov {
+	first := true
+	for gid, idx := range res {
 		if first {
 			first = false
 			delta = font.GlyphID(idx) - gid
-		} else if font.GlyphID(idx) != gid+delta {
+		} else if font.GlyphID(idx)-gid != delta {
 			isConstDelta = false
 			break
 		}
 	}
+
 	var subtable gtab.Subtable
 	if isConstDelta {
 		subtable = &gtab.Gsub1_1{

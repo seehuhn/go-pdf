@@ -29,6 +29,7 @@ func (info *Info) ApplyLookup(glyphs []font.Glyph, lookupIndex LookupIndex, gdef
 	pos := 0
 	numLeft := len(glyphs)
 	for pos < len(glyphs) {
+		// TODO(voss): GSUB 8.1 subtables are applied in reverse order.
 		glyphs, pos = info.applyLookupAt(glyphs, lookupIndex, gdef, pos)
 		newNumLeft := len(glyphs) - pos
 		if newNumLeft >= numLeft {

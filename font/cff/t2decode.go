@@ -288,7 +288,6 @@ func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
 				}
 				if op == t2rcurveline && len(tmp) >= 2 {
 					rLineTo(tmp[0], tmp[1])
-					tmp = tmp[2:]
 				}
 				clearStack()
 
