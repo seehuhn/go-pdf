@@ -527,11 +527,17 @@ func TestGsub(t *testing.T) {
 	fontInfo := debug.MakeSimpleFont()
 
 	gidA := fontInfo.CMap.Lookup('A')
+	gidK := fontInfo.CMap.Lookup('K')
+	gidL := fontInfo.CMap.Lookup('L')
 	gidM := fontInfo.CMap.Lookup('M')
+	gidN := fontInfo.CMap.Lookup('N')
 	gdef := &gdef.Table{
 		GlyphClass: classdef.Table{
 			gidA: gdef.GlyphClassBase,
+			gidK: gdef.GlyphClassLigature,
+			gidL: gdef.GlyphClassLigature,
 			gidM: gdef.GlyphClassMark,
+			gidN: gdef.GlyphClassMark,
 		},
 	}
 
@@ -611,12 +617,86 @@ func TestGsub(t *testing.T) {
 			in:  "ABC",
 			out: "AXC",
 		},
-		{
-			desc: `GSUB_5: "ABC" -> 1@0 1@2 1@3 2@2
-					GSUB_2: "A" -> "DE", "B" -> "FG", "G" -> "H"
-					GSUB_4: "FHC" -> "I"`,
-			in:  "ABC",
-			out: "DEI", // ABC -> DEBC -> DEFGC -> DEFHC -> DEI
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: "AAAA" -> 1@0 4@2 3@1 2@0
+					GSUB_4: "AA" -> "A"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "AAAA",
+			out: "XYZ",
+		},
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: "AAA" -> 1@0 4@2 3@1 2@0
+					GSUB_2: "A" -> "AA"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "AAA",
+			out: "XYZA",
+		},
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: "AAA" -> 1@0 5@2 4@1 3@0
+			        GSUB_5: "AA" -> 2@1
+					GSUB_2: "A" -> "AA"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "AAA",
+			out: "XYZA",
+		},
+		// {
+		// 	desc: `GSUB_5: "ABC" -> 1@0 1@2 1@3 2@2
+		// 			GSUB_2: "A" -> "DE", "B" -> "FG", "G" -> "H"
+		// 			GSUB_4: "FHC" -> "I"`,
+		// 	in:  "ABC",
+		// 	out: "DEI", // ABC -> DEBC -> DEFGC -> DEFHC -> DEI
+		// },
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
+					GSUB_5: "AK" -> 2@1
+					GSUB_1: "K" -> "L"
+					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+			in:  "AKAKA",
+			out: "ALXKA",
+		},
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
+					GSUB_5: "AL" -> 2@1
+					GSUB_1: "L" -> "A"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "ALAA",
+			out: "XAYZ",
+		},
+		{ // harfbuzz: XYAZA, Mac: XAYZA, Windows: XAAYZ
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
+					GSUB_5: "AL" -> 2@1
+					GSUB_2: "L" -> "AA"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "ALAA",
+			out: "XAAYZ", // TODO(voss): what shall we do?
+		},
+		{ // harfbuzz, Mac: XLYZ, Windows: XLYZA
+			desc: `GSUB_5: -ligs "AAAA" -> 1@0 5@2 4@1 3@0
+					GSUB_5: "AL" -> 2@1
+					GSUB_4: "LA" -> "L"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "ALAAA",
+			out: "XLYZ", // TODO(voss): what shall we do?
+		},
+		{ // harfbuzz, Mac: AKA, Windows: ABAA
+			desc: `GSUB_5: -ligs "AAA" -> 1@0
+					GSUB_5: "AL" -> 2@1 3@1
+					GSUB_4: "LA" -> "K"
+					GSUB_1: "L" -> "B"`,
+			in:  "ALAA",
+			out: "???",
 		},
 		// {
 		// 	desc: `GSUB_5: -marks "AAA" -> 3@2 1@0 2@1
@@ -660,6 +740,15 @@ func TestGsub(t *testing.T) {
 				LookupList: lookupList,
 			}
 
+			if *exportFonts {
+				fontInfo.Gdef = gdef
+				fontInfo.Gsub = gsub
+				err := exportFont(fontInfo, testIdx+1, test.in+" -> "+test.out)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+
 			seq := make([]font.Glyph, len(test.in))
 			for i, r := range test.in {
 				seq[i].Gid = fontInfo.CMap.Lookup(r)
@@ -688,15 +777,6 @@ func TestGsub(t *testing.T) {
 				t.Errorf("expected output %q, got %q", test.out, out)
 			} else if text != expectedText {
 				t.Errorf("expected text %q, got %q", expectedText, text)
-			}
-
-			if *exportFonts {
-				fontInfo.Gdef = gdef
-				fontInfo.Gsub = gsub
-				err := exportFont(fontInfo, testIdx+1, test.in+" -> "+test.out)
-				if err != nil {
-					t.Error(err)
-				}
 			}
 		})
 	}
