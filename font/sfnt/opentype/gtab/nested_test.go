@@ -30,14 +30,21 @@ type debugNestedLookup struct {
 	actions  Nested
 }
 
-func (l *debugNestedLookup) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if i != 0 {
-		seq[i].Gid = 3
-		return seq, i + 1, nil
+func (l *debugNestedLookup) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	if a != 0 {
+		return &Match{
+			MatchPos: []int{a},
+			Replace: []font.Glyph{
+				{Gid: 3},
+			},
+			Next: a + 1,
+		}
 	}
-	next := l.matchPos[len(l.matchPos)-1] + 1
-	nested := l.actions.substituteLocations(l.matchPos)
-	return seq, next, nested
+	return &Match{
+		MatchPos: l.matchPos,
+		Actions:  l.actions,
+		Next:     l.matchPos[len(l.matchPos)-1] + 1,
+	}
 }
 
 func (l *debugNestedLookup) EncodeLen() int {
@@ -82,7 +89,7 @@ func TestNestedSimple(t *testing.T) {
 						},
 					},
 				},
-				{
+				{ // 1 -> 2
 					Meta: &LookupMetaInfo{
 						LookupType: 1,
 					},
@@ -98,7 +105,7 @@ func TestNestedSimple(t *testing.T) {
 		seq := []font.Glyph{
 			{Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1},
 		}
-		seq = info.ApplyLookup(seq, 0, nil)
+		seq = info.LookupList.ApplyLookup(seq, 0, nil)
 		var out []font.GlyphID
 		for _, g := range seq {
 			out = append(out, g.Gid)
@@ -145,9 +152,13 @@ func TestSeqContext1(t *testing.T) {
 		{5, -1},
 	}
 	for _, test := range cases {
-		_, next, _ := l.Apply(keep, in, test.before)
+		m := l.Apply(keep, in, test.before, len(in))
+		next := -1
+		if m != nil {
+			next = m.Next
+		}
 		if next != test.after {
-			t.Errorf("Apply(%d) = %d, want %d", test.before, next, test.after)
+			t.Errorf("Apply(%d) = %d, want %d", test.before, m.Next, test.after)
 		}
 	}
 }
@@ -181,9 +192,13 @@ func TestSeqContext2(t *testing.T) {
 		{5, -1}, // not in coverage table
 	}
 	for _, test := range cases {
-		_, next, _ := l.Apply(keep, in, test.before)
+		m := l.Apply(keep, in, test.before, len(in))
+		next := -1
+		if m != nil {
+			next = m.Next
+		}
 		if next != test.after {
-			t.Errorf("Apply(%d) = %d, want %d", test.before, next, test.after)
+			t.Errorf("Apply(%d) = %d, want %d", test.before, m.Next, test.after)
 		}
 	}
 }
@@ -210,9 +225,13 @@ func TestSeqContext3(t *testing.T) {
 		{5, -1},
 	}
 	for _, test := range cases {
-		_, next, _ := l.Apply(keep, in, test.before)
+		m := l.Apply(keep, in, test.before, len(in))
+		next := -1
+		if m != nil {
+			next = m.Next
+		}
 		if next != test.after {
-			t.Errorf("Apply(%d) = %d, want %d", test.before, next, test.after)
+			t.Errorf("Apply(%d) = %d, want %d", test.before, m.Next, test.after)
 		}
 	}
 }
@@ -260,9 +279,13 @@ func TestChainedSeqContext1(t *testing.T) {
 		{4, 6}, // matches [1, 2,] 3, 4, [5]
 	}
 	for _, test := range cases {
-		_, next, _ := l.Apply(keep, in, test.before)
+		m := l.Apply(keep, in, test.before, len(in))
+		next := -1
+		if m != nil {
+			next = m.Next
+		}
 		if next != test.after {
-			t.Errorf("Apply(%d) = %d, want %d", test.before, next, test.after)
+			t.Errorf("Apply(%d) = %d, want %d", test.before, m.Next, test.after)
 		}
 	}
 }

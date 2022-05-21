@@ -17,6 +17,7 @@
 package gtab
 
 import (
+	"fmt"
 	"sort"
 
 	"seehuhn.de/go/pdf/font"
@@ -25,78 +26,153 @@ import (
 )
 
 // ApplyLookup applies a single lookup to the given glyphs.
-func (info *Info) ApplyLookup(glyphs []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table) []font.Glyph {
+func (ll LookupList) ApplyLookup(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table) []font.Glyph {
 	pos := 0
-	numLeft := len(glyphs)
-	for pos < len(glyphs) {
+	numLeft := len(seq)
+	for pos < len(seq) {
 		// TODO(voss): GSUB 8.1 subtables are applied in reverse order.
-		glyphs, pos = info.applyLookupAt(glyphs, lookupIndex, gdef, pos)
-		newNumLeft := len(glyphs) - pos
+		seq, pos = ll.applyLookupAt(seq, lookupIndex, gdef, pos, len(seq))
+		newNumLeft := len(seq) - pos
 		if newNumLeft >= numLeft {
 			// panic("infinite loop")
-			pos = len(glyphs) - numLeft + 1
+			pos = len(seq) - numLeft + 1
 		}
 		numLeft = newNumLeft
 	}
 
-	return glyphs
+	return seq
 }
 
 // applyLookupAt applies a single lookup to the given glyphs at position pos.
-func (info *Info) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos int) ([]font.Glyph, int) {
-	numLookups := len(info.LookupList)
-
-	lookup := info.LookupList[lookupIndex]
-	keep := MakeFilter(lookup.Meta, gdef)
-	newSeq, newPos, nested := lookup.Subtables.Apply(keep, seq, pos)
-	if newPos < 0 {
+func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos, b int) ([]font.Glyph, int) {
+	numLookups := len(ll)
+	if int(lookupIndex) >= numLookups {
 		return seq, pos + 1
 	}
-	if len(nested) == 0 {
-		return newSeq, newPos
+	lookup := ll[lookupIndex]
+
+	keep := MakeFilter(lookup.Meta, gdef)
+	match := lookup.Subtables.Apply(keep, seq, pos, b)
+	if match == nil {
+		return seq, pos + 1
+	}
+	if match.Actions == nil {
+		fmt.Println(pos, match.MatchPos, match.Next)
+		seq = applyMatch(seq, match, pos)
+		{ // TODO(voss): remove
+			out := make([]rune, len(seq))
+			for i, g := range seq {
+				out[i] = rune(g.Gid) + 'A' - 4
+			}
+			fmt.Println(string(out))
+		}
+		return seq, match.Next
 	}
 
-	orig := seq
-	seq = newSeq
-	next := newPos
+	if match.Replace != nil {
+		panic("invalid match object")
+	}
+
+	actions := extractActions(match)
+	next := match.Next
+
 	numActions := 1 // we count the original lookup as an action
-	for len(nested) > 0 {
-		if numActions >= 64 {
-			return orig, pos + 1
-		}
+	for len(actions) > 0 && numActions < 64 {
 		numActions++
 
-		// fmt.Println(next, seq)
-
-		a := nested[0]
-		nested = nested[1:]
-		if int(a.SequenceIndex) < pos || int(a.SequenceIndex) >= next || int(a.LookupListIndex) >= numLookups {
+		action := actions[0]
+		actions = actions[1:]
+		if int(action.lookupListIndex) >= numLookups {
 			continue
 		}
+		lookup = ll[action.lookupListIndex]
 
-		lookup = info.LookupList[a.LookupListIndex]
 		keep = MakeFilter(lookup.Meta, gdef)
-		newSeq, newPos, n2 := lookup.Subtables.Apply(keep, seq, int(a.SequenceIndex))
-		if newPos < 0 {
+		match = lookup.Subtables.Apply(keep, seq, action.a, action.b)
+		if match == nil {
 			continue
 		}
-
-		seq = newSeq
-		if newPos > next {
-			next = newPos
+		if match.Actions == nil {
+			seq = applyMatch(seq, match, action.a)
+			// TODO(voss): update matchPos for the subsequent actions
+		} else {
+			actions = append(extractActions(match), actions...)
 		}
-		delta := len(newSeq) - len(seq)
-		for _, a2 := range nested {
-			if a2.SequenceIndex > a.SequenceIndex && int(a2.SequenceIndex) < newPos {
-				continue
-			} else if int(a2.SequenceIndex) >= newPos {
-				a2.SequenceIndex += uint16(delta)
-			}
-			n2 = append(n2, a2)
-		}
-		nested = n2
 	}
+
 	return seq, next
+}
+
+func applyMatch(seq []font.Glyph, m *Match, pos int) []font.Glyph {
+	matchPos := m.MatchPos
+
+	oldLen := len(seq)
+	oldTailPos := matchPos[len(matchPos)-1] + 1
+	tailLen := oldLen - oldTailPos
+	newLen := oldLen - len(matchPos) + len(m.Replace)
+	newTailPos := newLen - tailLen
+
+	var newText []rune
+	for _, offs := range matchPos {
+		newText = append(newText, seq[offs].Text...)
+	}
+
+	out := seq
+
+	if newLen > oldLen {
+		// In case the sequence got longer, move the tail out of the way first.
+		out = append(out, make([]font.Glyph, newLen-oldLen)...)
+		copy(out[newTailPos:], out[oldTailPos:])
+	}
+
+	// copy the ignored glyphs into position, just before the new tail
+	removeListIdx := len(matchPos) - 1
+	insertPos := newTailPos - 1
+	for i := oldTailPos - 1; i >= pos; i-- {
+		if removeListIdx >= 0 && matchPos[removeListIdx] == i {
+			removeListIdx--
+		} else {
+			out[insertPos] = seq[i]
+			insertPos--
+		}
+	}
+
+	// copy the new glyphs into position
+	if len(m.Replace) > 0 {
+		copy(out[pos:], m.Replace)
+		out[pos].Text = newText
+	}
+
+	if newLen < oldLen {
+		// In case the sequence got shorter, move the tail to the new position now.
+		copy(out[newTailPos:], out[oldTailPos:])
+		out = out[:newLen]
+	}
+	return out
+}
+
+type recursiveLookup struct {
+	a, b            int
+	lookupListIndex LookupIndex
+}
+
+func extractActions(match *Match) []recursiveLookup {
+	actions := make([]recursiveLookup, 0, len(match.Actions))
+	for _, nested := range match.Actions {
+		if int(nested.SequenceIndex) >= len(match.MatchPos) {
+			continue
+		}
+		actionPos := match.MatchPos[nested.SequenceIndex]
+		if actionPos >= match.Next {
+			continue
+		}
+		actions = append(actions, recursiveLookup{
+			a:               actionPos,
+			b:               match.Next,
+			lookupListIndex: nested.LookupListIndex,
+		})
+	}
+	return actions
 }
 
 // FindLookups returns the lookups required to implement the given

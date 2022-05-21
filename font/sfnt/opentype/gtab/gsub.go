@@ -37,60 +37,31 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return nil, err
 	}
 
-	switch 10*meta.LookupType + format {
-	case 1_1:
-		return readGsub1_1(p, pos)
-	case 1_2:
-		return readGsub1_2(p, pos)
-	case 2_1:
-		return readGsub2_1(p, pos)
-	case 3_1:
-		return readGsub3_1(p, pos)
-	case 4_1:
-		return readGsub4_1(p, pos)
-	case 5_1:
-		return readSeqContext1(p, pos)
-	case 5_2:
-		return readSeqContext2(p, pos)
-	case 5_3:
-		return readSeqContext3(p, pos)
-	case 6_1:
-		return readChainedSeqContext1(p, pos)
-	case 6_2:
-		return readChainedSeqContext2(p, pos)
-	case 6_3:
-		return readChainedSeqContext3(p, pos)
-	case 7_1:
-		return readExtensionSubtable(p, pos)
-	case 8_1:
-		return readGsub8_1(p, pos)
-
-	default:
-		fmt.Println("GSUB", meta.LookupType, format)
-		return notImplementedGsubSubtable{meta.LookupType, format}, nil
+	reader, ok := gsubReaders[10*meta.LookupType+format]
+	if !ok {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/opentype/gtab",
+			Reason: fmt.Sprintf("unknown GSUB subtable format %d.%d",
+				meta.LookupType, format),
+		}
 	}
+	return reader(p, pos)
 }
 
-type notImplementedGsubSubtable struct {
-	lookupType, lookupFormat uint16
-}
-
-func (st notImplementedGsubSubtable) Apply(_ KeepGlyphFn, _ []font.Glyph, _ int) ([]font.Glyph, int, Nested) {
-	msg := fmt.Sprintf("GSUB lookup type %d, format %d not implemented",
-		st.lookupType, st.lookupFormat)
-	panic(msg)
-}
-
-func (st notImplementedGsubSubtable) EncodeLen() int {
-	msg := fmt.Sprintf("GSUB lookup type %d, format %d not implemented",
-		st.lookupType, st.lookupFormat)
-	panic(msg)
-}
-
-func (st notImplementedGsubSubtable) Encode() []byte {
-	msg := fmt.Sprintf("GSUB lookup type %d, format %d not implemented",
-		st.lookupType, st.lookupFormat)
-	panic(msg)
+var gsubReaders = map[uint16]func(p *parser.Parser, pos int64) (Subtable, error){
+	1_1: readGsub1_1,
+	1_2: readGsub1_2,
+	2_1: readGsub2_1,
+	3_1: readGsub3_1,
+	4_1: readGsub4_1,
+	5_1: readSeqContext1,
+	5_2: readSeqContext2,
+	5_3: readSeqContext3,
+	6_1: readChainedSeqContext1,
+	6_2: readChainedSeqContext2,
+	6_3: readChainedSeqContext3,
+	7_1: readExtensionSubtable,
+	8_1: readGsub8_1,
 }
 
 // Gsub1_1 is a Single Substitution subtable (GSUB type 1, format 1).
@@ -122,16 +93,22 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	gid := seq[i].Gid
+func (l *Gsub1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
 	if !keep(gid) {
-		return seq, -1, nil
+		return nil
 	}
 	if _, ok := l.Cov[gid]; !ok {
-		return seq, -1, nil
+		return nil
 	}
-	seq[i].Gid = gid + l.Delta
-	return seq, i + 1, nil
+	m := &Match{
+		MatchPos: []int{a},
+		Replace: []font.Glyph{
+			{Gid: gid + l.Delta, Text: seq[a].Text},
+		},
+		Next: a + 1,
+	}
+	return m
 }
 
 // EncodeLen implements the Subtable interface.
@@ -192,16 +169,23 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !keep(seq[i].Gid) {
-		return seq, -1, nil
+func (l *Gsub1_2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
 	}
-	gid := seq[i].Gid
-	if idx, ok := l.Cov[gid]; ok {
-		seq[i].Gid = l.SubstituteGlyphIDs[idx]
-		return seq, i + 1, nil
+	idx, ok := l.Cov[gid]
+	if !ok {
+		return nil
 	}
-	return seq, -1, nil
+	m := &Match{
+		MatchPos: []int{a},
+		Replace: []font.Glyph{
+			{Gid: l.SubstituteGlyphIDs[idx], Text: seq[a].Text},
+		},
+		Next: a + 1,
+	}
+	return m
 }
 
 // EncodeLen implements the Subtable interface.
@@ -283,31 +267,32 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !keep(seq[i].Gid) {
-		return seq, -1, nil
+func (l *Gsub2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
 	}
-	gid := seq[i].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
 
 	repl := l.Repl[idx]
 	k := len(repl)
 
-	res := make([]font.Glyph, len(seq)-1+k)
-	copy(res, seq[:i])
-	for j := 0; j < k; j++ {
-		res[i+j].Gid = repl[j]
+	insert := make([]font.Glyph, k)
+	for i, replGid := range repl {
+		insert[i] = font.Glyph{Gid: replGid}
 	}
-	copy(res[i+k:], seq[i+1:])
-
 	if k > 0 {
-		res[i].Text = seq[i].Text
+		insert[0].Text = seq[a].Text
 	}
 
-	return res, i + k, nil
+	return &Match{
+		MatchPos: []int{a},
+		Replace:  insert,
+		Next:     a + k,
+	}
 }
 
 // EncodeLen implements the Subtable interface.
@@ -415,19 +400,28 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !keep(seq[i].Gid) {
-		return seq, -1, nil
+func (l *Gsub3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
 	}
-	idx, ok := l.Cov[seq[i].Gid]
+	idx, ok := l.Cov[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
-	if len(l.Alternates[idx]) > 0 {
-		// TODO(voss): implement a mechanism to select alternate glyphs.
-		seq[i].Gid = l.Alternates[idx][0]
+
+	alt := l.Alternates[idx]
+	if len(alt) == 0 {
+		return nil // TODO(voss): should we return an empty match instead?
 	}
-	return seq, i + 1, nil
+
+	return &Match{
+		MatchPos: []int{a},
+		Replace: []font.Glyph{
+			{Gid: alt[0], Text: seq[a].Text},
+		},
+		Next: a + 1,
+	}
 }
 
 // EncodeLen implements the Subtable interface.
@@ -576,50 +570,55 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !keep(seq[i].Gid) {
-		return seq, -1, nil
+func (l *Gsub4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
 	}
-	ligSetIdx, ok := l.Cov[seq[i].Gid]
+	ligSetIdx, ok := l.Cov[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
 	ligSet := l.Repl[ligSetIdx]
 
-	var strays []font.Glyph
-	var rr []rune
+	var text []rune
+	var matchPos []int
 ligLoop:
 	for j := range ligSet {
 		lig := &ligSet[j]
-		strays = strays[:0]
-		rr = rr[:0]
-		p := i
-		for _, gid := range lig.In {
+
+		matchPos = matchPos[:0]
+		text = text[:0]
+
+		p := a
+		matchPos = append(matchPos, p)
+		text = append(text, seq[p].Text...)
+		for _, ligGid := range lig.In {
 			p++
-			for p < len(seq) && !keep(seq[p].Gid) {
-				strays = append(strays, seq[p])
+			for p < b && !keep(seq[p].Gid) {
 				p++
 			}
-			if p >= len(seq) {
+			if p >= b {
 				continue ligLoop
 			}
-			if seq[p].Gid != gid {
+			if seq[p].Gid != ligGid {
 				continue ligLoop
 			}
-			rr = append(rr, seq[p].Text...)
-		}
-		tail := seq[p+1:]
 
-		seq[i] = font.Glyph{
-			Gid:  lig.Out,
-			Text: append(seq[i].Text, rr...),
+			matchPos = append(matchPos, p)
+			text = append(text, seq[p].Text...)
 		}
-		seq = append(seq[:i+1], strays...)
-		seq = append(seq, tail...)
-		return seq, i + 1, nil
+
+		return &Match{
+			MatchPos: matchPos,
+			Replace: []font.Glyph{
+				{Gid: lig.Out, Text: text},
+			},
+			Next: a + 1,
+		}
 	}
 
-	return seq, -1, nil
+	return nil
 }
 
 // EncodeLen implements the Subtable interface.
@@ -751,16 +750,17 @@ func readGsub8_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !keep(seq[i].Gid) {
-		return seq, -1, nil
+func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
 	}
-	idx, ok := l.Input[seq[i].Gid]
+	idx, ok := l.Input[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
 
-	p := i
+	p := a
 	glyphsNeeded := len(l.Backtrack)
 	for _, cov := range l.Backtrack {
 		p--
@@ -769,11 +769,11 @@ func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph
 			p--
 		}
 		if p-glyphsNeeded < 0 || !cov.Contains(seq[p].Gid) {
-			return seq, -1, nil
+			return nil
 		}
 	}
 
-	p = i
+	p = a
 	glyphsNeeded = len(l.Lookahead)
 	for _, cov := range l.Lookahead {
 		p++
@@ -782,12 +782,17 @@ func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph
 			p++
 		}
 		if p+glyphsNeeded >= len(seq) || !cov.Contains(seq[p].Gid) {
-			return seq, -1, nil
+			return nil
 		}
 	}
 
-	seq[i].Gid = l.SubstituteGlyphIDs[idx]
-	return seq, i + 1, nil
+	return &Match{
+		MatchPos: []int{a},
+		Replace: []font.Glyph{
+			{Gid: l.SubstituteGlyphIDs[idx], Text: seq[a].Text},
+		},
+		Next: a + 1,
+	}
 }
 
 // EncodeLen implements the Subtable interface.

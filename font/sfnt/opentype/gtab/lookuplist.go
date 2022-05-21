@@ -64,15 +64,23 @@ const (
 
 // Subtable represents a subtable of a "GSUB" or "GPOS" lookup table.
 type Subtable interface {
+	EncodeLen() int
+
+	Encode() []byte
+
 	// Apply attempts to apply the subtable at the given position.
 	// If returns the new glyphs and the new position.  If the subtable
 	// cannot be applied, the unchanged glyphs and a negative position
 	// are returned
-	Apply(KeepGlyphFn, []font.Glyph, int) ([]font.Glyph, int, Nested)
+	Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match
+}
 
-	EncodeLen() int
-
-	Encode() []byte
+// Match describes the effect of applying a Lookup to a glyph sequence.
+type Match struct {
+	MatchPos []int // glyph positions to remove, in increasing order, relative to the match position
+	Replace  []font.Glyph
+	Actions  Nested
+	Next     int
 }
 
 // Subtables is a slice of Subtable.
@@ -81,14 +89,14 @@ type Subtables []Subtable
 // Apply tries the subtables one by one and applies the first one that
 // matches.  If no subtable matches, the unchanged glyphs and a negative
 // position are returned.
-func (ss Subtables) Apply(keep KeepGlyphFn, seq []font.Glyph, pos int) ([]font.Glyph, int, Nested) {
+func (ss Subtables) Apply(keep KeepGlyphFn, seq []font.Glyph, pos, b int) *Match {
 	for _, subtable := range ss {
-		newSeq, newPos, nested := subtable.Apply(keep, seq, pos)
-		if newPos >= 0 {
-			return newSeq, newPos, nested
+		match := subtable.Apply(keep, seq, pos, b)
+		if match != nil {
+			return match
 		}
 	}
-	return seq, -1, nil
+	return nil
 }
 
 // subtableReader is a function that can decode a subtable.
@@ -394,7 +402,7 @@ func readExtensionSubtable(p *parser.Parser, subtablePos int64) (Subtable, error
 	return res, nil
 }
 
-func (l *extensionSubtable) Apply(KeepGlyphFn, []font.Glyph, int) ([]font.Glyph, int, Nested) {
+func (l *extensionSubtable) Apply(KeepGlyphFn, []font.Glyph, int, int) *Match {
 	panic("unreachable")
 }
 

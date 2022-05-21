@@ -103,7 +103,7 @@ func Test9737(t *testing.T) {
 	}
 	gsub := fontInfo.Gsub
 	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
-		gg = gsub.ApplyLookup(gg, lookupIndex, nil)
+		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, nil)
 	}
 	// MS Word gives AAAAB
 	// harfbuzz gives AAB
@@ -219,7 +219,7 @@ func Test9738(t *testing.T) {
 	}
 	gsub := fontInfo.Gsub
 	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
-		gg = gsub.ApplyLookup(gg, lookupIndex, fontInfo.Gdef)
+		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, fontInfo.Gdef)
 	}
 
 	got := unpack(gg)

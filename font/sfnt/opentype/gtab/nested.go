@@ -46,21 +46,6 @@ func readNested(p *parser.Parser, seqLookupCount int) (Nested, error) {
 	return res, nil
 }
 
-func (actions Nested) substituteLocations(matchPos []int) Nested {
-	res := make(Nested, 0, len(actions))
-	for _, action := range actions {
-		idx := int(action.SequenceIndex)
-		if idx >= len(matchPos) {
-			continue
-		}
-		res = append(res, SeqLookup{
-			SequenceIndex:   uint16(matchPos[idx]),
-			LookupListIndex: action.LookupListIndex,
-		})
-	}
-	return res
-}
-
 // SeqContext1 is used for GSUB type 5 format 1 subtables and GPOS type 7 format 1 subtables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-1-simple-glyph-contexts
 type SeqContext1 struct {
@@ -156,39 +141,43 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *SeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !keep(seq[i].Gid) {
-		return seq, -1, nil
+func (l *SeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
 	}
-	rulesIdx, ok := l.Cov[seq[i].Gid]
+	rulesIdx, ok := l.Cov[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
 	rules := l.Rules[rulesIdx]
 
 	var matchPos []int
 ruleLoop:
 	for _, rule := range rules {
-		p := i
+		p := a
 		matchPos = append(matchPos[:0], p)
 		glyphsNeeded := len(rule.Input)
 		for _, gid := range rule.Input {
 			glyphsNeeded--
 			p++
-			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
+			for p+glyphsNeeded < b && !keep(seq[p].Gid) {
 				p++
 			}
-			if p+glyphsNeeded >= len(seq) || seq[p].Gid != gid {
+			if p+glyphsNeeded >= b || seq[p].Gid != gid {
 				continue ruleLoop
 			}
 			matchPos = append(matchPos, p)
 		}
 
-		actions := rule.Actions.substituteLocations(matchPos)
-		return seq, p + 1, actions
+		return &Match{
+			MatchPos: matchPos,
+			Actions:  rule.Actions,
+			Next:     p + 1,
+		}
 	}
 
-	return seq, -1, nil
+	return nil
 }
 
 // EncodeLen implements the Subtable interface.
@@ -389,40 +378,44 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *SeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !keep(seq[i].Gid) {
-		return seq, -1, nil
+func (l *SeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
 	}
-	_, ok := l.Cov[seq[i].Gid]
+	_, ok := l.Cov[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
-	ruleIdx := l.Input[seq[i].Gid]
+	ruleIdx := l.Input[gid]
 	rules := l.Rules[ruleIdx]
 
 	var matchPos []int
 ruleLoop:
 	for _, rule := range rules {
-		p := i
+		p := a
 		matchPos = append(matchPos[:0], p)
 		glyphsNeeded := len(rule.Input)
 		for _, cls := range rule.Input {
 			glyphsNeeded--
 			p++
-			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
+			for p+glyphsNeeded < b && !keep(seq[p].Gid) {
 				p++
 			}
-			if p+glyphsNeeded >= len(seq) || l.Input[seq[p].Gid] != cls {
+			if p+glyphsNeeded >= b || l.Input[seq[p].Gid] != cls {
 				continue ruleLoop
 			}
 			matchPos = append(matchPos, p)
 		}
 
-		actions := rule.Actions.substituteLocations(matchPos)
-		return seq, p + 1, actions
+		return &Match{
+			MatchPos: matchPos,
+			Actions:  rule.Actions,
+			Next:     p + 1,
+		}
 	}
 
-	return seq, -1, nil
+	return nil
 }
 
 // EncodeLen implements the Subtable interface.
@@ -566,28 +559,31 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if !l.Input[0].Contains(seq[i].Gid) {
-		return seq, -1, nil
+func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !l.Input[0].Contains(gid) {
+		return nil
 	}
 
-	p := i
+	p := a
 	matchPos := []int{p}
 	glyphsNeeded := len(l.Input) - 1
 	for _, cov := range l.Input[1:] {
 		glyphsNeeded--
 		p++
-		for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
+		for p+glyphsNeeded < b && !keep(seq[p].Gid) {
 			p++
 		}
-		if p+glyphsNeeded >= len(seq) || !cov.Contains(seq[p].Gid) {
-			return seq, -1, nil
+		if p+glyphsNeeded >= b || !cov.Contains(seq[p].Gid) {
+			return nil
 		}
 		matchPos = append(matchPos, p)
 	}
-
-	actions := l.Actions.substituteLocations(matchPos)
-	return seq, p + 1, actions
+	return &Match{
+		MatchPos: matchPos,
+		Actions:  l.Actions,
+		Next:     p + 1,
+	}
 }
 
 // EncodeLen implements the Subtable interface.
@@ -639,7 +635,7 @@ func (l *SeqContext3) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-1-simple-glyph-contexts
 type ChainedSeqContext1 struct {
 	Cov   coverage.Table
-	Rules [][]*ChainedSeqRule
+	Rules [][]*ChainedSeqRule // indexed by coverage index
 }
 
 // ChainedSeqRule is used for GSUB type 6 format 1 and GPOS type 8 format 1 subtables.
@@ -764,18 +760,22 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 }
 
 // Apply implements the Subtable interface.
-func (l *ChainedSeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	rulesIdx, ok := l.Cov[seq[i].Gid]
+func (l *ChainedSeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
+	}
+	rulesIdx, ok := l.Cov[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
 	rules := l.Rules[rulesIdx]
 
 	var matchPos []int
 ruleLoop:
 	for _, rule := range rules {
+		p := a
 		glyphsNeeded := len(rule.Backtrack)
-		p := i
 		for _, gid := range rule.Backtrack {
 			glyphsNeeded--
 			p--
@@ -787,22 +787,23 @@ ruleLoop:
 			}
 		}
 
-		p = i
+		p = a
 		matchPos = append(matchPos[:0], p)
-		glyphsNeeded = len(rule.Input) + len(rule.Lookahead)
+		glyphsNeeded = len(rule.Input)
 		for _, gid := range rule.Input {
 			glyphsNeeded--
 			p++
-			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
+			for p+glyphsNeeded < b && !keep(seq[p].Gid) {
 				p++
 			}
-			if p+glyphsNeeded >= len(seq) || seq[p].Gid != gid {
+			if p+glyphsNeeded >= b || seq[p].Gid != gid {
 				continue ruleLoop
 			}
 			matchPos = append(matchPos, p)
 		}
 		next := p + 1
 
+		glyphsNeeded = len(rule.Lookahead)
 		for _, gid := range rule.Lookahead {
 			glyphsNeeded--
 			p++
@@ -814,11 +815,14 @@ ruleLoop:
 			}
 		}
 
-		actions := rule.Actions.substituteLocations(matchPos)
-		return seq, next, actions
+		return &Match{
+			MatchPos: matchPos,
+			Actions:  rule.Actions,
+			Next:     next,
+		}
 	}
 
-	return seq, -1, nil
+	return nil
 }
 
 // EncodeLen implements the Subtable interface.
@@ -1061,18 +1065,22 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 }
 
 // Apply implements the Subtable interface.
-func (l *ChainedSeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	rulesIdx, ok := l.Cov[seq[i].Gid]
+func (l *ChainedSeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
+	}
+	rulesIdx, ok := l.Cov[gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
 	rules := l.Rules[rulesIdx]
 
 	var matchPos []int
 ruleLoop:
 	for _, rule := range rules {
+		p := a
 		glyphsNeeded := len(rule.Backtrack)
-		p := i
 		for _, cls := range rule.Backtrack {
 			glyphsNeeded--
 			p--
@@ -1084,24 +1092,24 @@ ruleLoop:
 			}
 		}
 
-		p = i
+		p = a
 		matchPos = append(matchPos[:0], p)
-		glyphsNeeded = len(rule.Input) + len(rule.Lookahead)
+		glyphsNeeded = len(rule.Input)
 		for _, cls := range rule.Input {
 			glyphsNeeded--
 			p++
-			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
+			for p+glyphsNeeded < b && !keep(seq[p].Gid) {
 				p++
 			}
-			if p+glyphsNeeded >= len(seq) || l.Input[seq[p].Gid] != cls {
+			if p+glyphsNeeded >= b || l.Input[seq[p].Gid] != cls {
 				continue ruleLoop
 			}
 			matchPos = append(matchPos, p)
 		}
 		next := p + 1
 
+		glyphsNeeded = len(rule.Lookahead)
 		for _, cls := range rule.Lookahead {
-			// TODO(voss): is this right?  What if keep(seq[i].Gid) == false?
 			glyphsNeeded--
 			p++
 			for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
@@ -1112,11 +1120,14 @@ ruleLoop:
 			}
 		}
 
-		actions := rule.Actions.substituteLocations(matchPos)
-		return seq, next, actions
+		return &Match{
+			MatchPos: matchPos,
+			Actions:  rule.Actions,
+			Next:     next,
+		}
 	}
 
-	return seq, -1, nil
+	return nil
 }
 
 // EncodeLen implements the Subtable interface.
@@ -1317,9 +1328,9 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 }
 
 // Apply implements the Subtable interface.
-func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
+func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	p := a
 	glyphsNeeded := len(l.Backtrack)
-	p := i
 	for _, cov := range l.Backtrack {
 		glyphsNeeded--
 		p--
@@ -1327,29 +1338,28 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([
 			p--
 		}
 		if p-glyphsNeeded < 0 || !cov.Contains(seq[p].Gid) {
-			return seq, -1, nil
+			return nil
 		}
 	}
 
-	matchPos := make([]int, 0, len(l.Input))
-
-	p = i
-	matchPos = append(matchPos, p)
-	glyphsNeeded = len(l.Input) + len(l.Lookahead)
+	p = a
+	matchPos := []int{p}
+	glyphsNeeded = len(l.Input)
 	for _, cov := range l.Input {
 		// TODO(voss): is this right?  What if keep(seq[i].Gid) == false?
 		glyphsNeeded--
 		p++
-		for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
+		for p+glyphsNeeded < b && !keep(seq[p].Gid) {
 			p++
 		}
-		if p+glyphsNeeded >= len(seq) || !cov.Contains(seq[p].Gid) {
-			return seq, -1, nil
+		if p+glyphsNeeded >= b || !cov.Contains(seq[p].Gid) {
+			return nil
 		}
 		matchPos = append(matchPos, p)
 	}
 	next := p + 1
 
+	glyphsNeeded = len(l.Lookahead)
 	for _, cov := range l.Lookahead {
 		glyphsNeeded--
 		p++
@@ -1357,13 +1367,15 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([
 			p++
 		}
 		if p+glyphsNeeded >= len(seq) || !cov.Contains(seq[p].Gid) {
-			return seq, -1, nil
+			return nil
 		}
 	}
 
-	actions := l.Actions.substituteLocations(matchPos)
-
-	return seq, next, actions
+	return &Match{
+		MatchPos: matchPos,
+		Actions:  l.Actions,
+		Next:     next,
+	}
 }
 
 // EncodeLen implements the Subtable interface.

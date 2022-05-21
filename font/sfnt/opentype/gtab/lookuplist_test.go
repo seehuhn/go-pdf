@@ -45,8 +45,8 @@ func readDummySubtable(p *parser.Parser, pos int64, info *LookupMetaInfo) (Subta
 
 type dummySubTable []byte
 
-func (st dummySubTable) Apply(_ KeepGlyphFn, glyphs []font.Glyph, pos int) ([]font.Glyph, int, Nested) {
-	return glyphs, -1, nil
+func (st dummySubTable) Apply(_ KeepGlyphFn, glyphs []font.Glyph, a, b int) *Match {
+	return nil
 }
 
 func (st dummySubTable) EncodeLen() int {

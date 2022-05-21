@@ -72,7 +72,7 @@ type notImplementedGposSubtable struct {
 	lookupType, lookupFormat uint16
 }
 
-func (st notImplementedGposSubtable) Apply(_ KeepGlyphFn, _ []font.Glyph, _ int) ([]font.Glyph, int, Nested) {
+func (st notImplementedGposSubtable) Apply(_ KeepGlyphFn, _ []font.Glyph, _, _ int) *Match {
 	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
 		st.lookupType, st.lookupFormat)
 	panic(msg)
@@ -120,13 +120,18 @@ func readGpos1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos1_1) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	_, ok := l.Cov[seq[i].Gid]
+func (l *Gpos1_1) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	g := seq[a]
+	_, ok := l.Cov[g.Gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
-	l.Adjust.Apply(&seq[i])
-	return seq, i + 1, nil
+	l.Adjust.Apply(&g)
+	return &Match{
+		MatchPos: []int{a},
+		Replace:  []font.Glyph{g},
+		Next:     a + 1,
+	}
 }
 
 // EncodeLen implements the Subtable interface.
@@ -193,13 +198,18 @@ func readGpos1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos1_2) Apply(_ KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	idx, ok := l.Cov[seq[i].Gid]
+func (l *Gpos1_2) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	g := seq[a]
+	idx, ok := l.Cov[g.Gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
-	l.Adjust[idx].Apply(&seq[i])
-	return seq, i + 1, nil
+	l.Adjust[idx].Apply(&g)
+	return &Match{
+		MatchPos: []int{a},
+		Replace:  []font.Glyph{g},
+		Next:     a + 1,
+	}
 }
 
 // EncodeLen implements the Subtable interface.
@@ -325,32 +335,41 @@ func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, i int) ([]font.Glyph, int, Nested) {
-	if i+1 >= len(seq) {
-		return seq, -1, nil
+func (l *Gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	if a+1 >= b {
+		return nil
 	}
 
-	idx, ok := l.Cov[seq[i].Gid]
+	g1 := seq[a]
+	idx, ok := l.Cov[g1.Gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
-	adj := l.Adjust[idx]
-	if adj == nil {
-		return seq, -1, nil
+	ruleSet := l.Adjust[idx]
+	if ruleSet == nil {
+		return nil
 	}
 
-	rule, ok := adj[seq[i+1].Gid]
+	g2 := seq[a+1]
+	rule, ok := ruleSet[g2.Gid]
 	if !ok {
-		return seq, -1, nil
+		return nil
 	}
 
-	rule.First.Apply(&seq[i])
-	rule.Second.Apply(&seq[i+1])
-	next := i + 1
-	if rule.Second != nil {
-		next = i + 2
+	rule.First.Apply(&g1)
+	if rule.Second == nil {
+		return &Match{
+			MatchPos: []int{a},
+			Replace:  []font.Glyph{g1},
+			Next:     a + 1,
+		}
 	}
-	return seq, next, nil
+	rule.Second.Apply(&g2)
+	return &Match{
+		MatchPos: []int{a, a + 1},
+		Replace:  []font.Glyph{g1, g2},
+		Next:     a + 2,
+	}
 }
 
 // EncodeLen implements the Subtable interface.
