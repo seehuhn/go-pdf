@@ -670,6 +670,12 @@ func TestGsub(t *testing.T) {
 			in:  "ALAA",
 			out: "XAYZ",
 		},
+		{
+			desc: `GSUB_5: "AB" -> 1@0 0@0, "AAB" -> 1@0 0@0, "AAAB" -> 1@0 0@0
+					GSUB_2: "A" -> "AA"`,
+			in:  "AB",
+			out: "AAAAB",
+		},
 		// { // harfbuzz: XYAZA, Mac: XAYZA, Windows: XAAYZ
 		// 	desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
 		// 			GSUB_5: "AL" -> 2@1

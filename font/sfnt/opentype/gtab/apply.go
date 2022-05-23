@@ -46,6 +46,7 @@ func (ll LookupList) ApplyLookup(seq []font.Glyph, lookupIndex LookupIndex, gdef
 // applyLookupAt applies a single lookup to the given glyphs at position pos.
 func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos, b int) ([]font.Glyph, int) {
 	numLookups := len(ll)
+
 	if int(lookupIndex) >= numLookups {
 		return seq, pos + 1
 	}
@@ -57,31 +58,22 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 		return seq, pos + 1
 	}
 	if match.Actions == nil {
-		fmt.Println(pos, match.MatchPos, match.Next)
 		seq = applyMatch(seq, match, pos)
-		{ // TODO(voss): remove
-			out := make([]rune, len(seq))
-			for i, g := range seq {
-				out[i] = rune(g.Gid) + 'A' - 4
-			}
-			fmt.Println(string(out))
-		}
 		return seq, match.Next
 	}
 
-	if match.Replace != nil {
-		panic("invalid match object")
-	}
-
+	// TODO(voss): turn actions into a stack (new elements at the back)
 	actions := extractActions(match)
 	next := match.Next
 
 	numActions := 1 // we count the original lookup as an action
 	for len(actions) > 0 && numActions < 64 {
-		numActions++
+		fmt.Println(actions)
 
+		numActions++
 		action := actions[0]
 		actions = actions[1:]
+
 		if int(action.lookupListIndex) >= numLookups {
 			continue
 		}
@@ -96,11 +88,64 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 			seq = applyMatch(seq, match, action.a)
 			// TODO(voss): update matchPos for the subsequent actions
 		} else {
+			if match.Replace != nil {
+				panic("invalid match object")
+			}
 			actions = append(extractActions(match), actions...)
 		}
 	}
 
 	return seq, next
+}
+
+func fixMatchPos(actions []recursiveLookup, remove []int, insertPos, numInsert int) {
+	if len(actions) == 0 {
+		return
+	}
+
+	minPos := actions[0].a
+	maxPos := actions[0].b
+	for _, action := range actions[1:] {
+		if action.a < minPos {
+			minPos = action.a
+		}
+		if action.b > maxPos {
+			maxPos = action.b
+		}
+	}
+
+	newPos := make([]int, maxPos-minPos+1)
+	for i := range newPos {
+		newPos[i] = minPos + i
+	}
+	for l := len(remove) - 1; l >= 0; l-- {
+		i := remove[l]
+		if i < minPos {
+			continue
+		}
+		if i < insertPos {
+			panic("inconsistent insert position")
+		}
+		newPos[i-minPos] = -1
+		for j := i + 1; j <= maxPos; j++ {
+			newPos[j-minPos]--
+		}
+	}
+	for i, pos := range newPos {
+		if pos >= insertPos {
+			newPos[i] = pos + numInsert
+		}
+	}
+
+	// 0 1 2 3 4 5 6 7 8 9
+	//
+	// remove 3, 4:
+	// 0 1 2 3 -1 4 5 6 7 8
+	// 0 1 2 -1 -2 3 4 5 6 7
+	// insert single glyph at 3:
+	// 0 1 2 -1 -2 4 5 6 7
+	//
+	// 0 2 4 6 7 -> 0 2 () 5 6
 }
 
 func applyMatch(seq []font.Glyph, m *Match, pos int) []font.Glyph {
