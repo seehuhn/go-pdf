@@ -27,13 +27,13 @@ import (
 
 type debugNestedLookup struct {
 	matchPos []int
-	actions  Nested
+	actions  SeqLookups
 }
 
 func (l *debugNestedLookup) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	if a != 0 {
 		return &Match{
-			MatchPos: []int{a},
+			InputPos: []int{a},
 			Replace: []font.Glyph{
 				{Gid: 3},
 			},
@@ -41,7 +41,7 @@ func (l *debugNestedLookup) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Ma
 		}
 	}
 	return &Match{
-		MatchPos: l.matchPos,
+		InputPos: l.matchPos,
 		Actions:  l.actions,
 		Next:     l.matchPos[len(l.matchPos)-1] + 1,
 	}
@@ -71,7 +71,7 @@ func TestNestedSimple(t *testing.T) {
 		{[]int{1, 3}, []font.GlyphID{1, 1, 2, 1, 1, 3, 3}},
 	}
 	for _, test := range cases {
-		var nested Nested
+		var nested SeqLookups
 		for _, seqenceIndex := range test.sequenceIndex {
 			nested = append(nested, SeqLookup{
 				SequenceIndex:   uint16(seqenceIndex),

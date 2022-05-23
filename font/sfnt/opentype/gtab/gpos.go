@@ -128,7 +128,7 @@ func (l *Gpos1_1) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 	l.Adjust.Apply(&g)
 	return &Match{
-		MatchPos: []int{a},
+		InputPos: []int{a},
 		Replace:  []font.Glyph{g},
 		Next:     a + 1,
 	}
@@ -206,7 +206,7 @@ func (l *Gpos1_2) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 	l.Adjust[idx].Apply(&g)
 	return &Match{
-		MatchPos: []int{a},
+		InputPos: []int{a},
 		Replace:  []font.Glyph{g},
 		Next:     a + 1,
 	}
@@ -359,14 +359,14 @@ func (l *Gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	rule.First.Apply(&g1)
 	if rule.Second == nil {
 		return &Match{
-			MatchPos: []int{a},
+			InputPos: []int{a},
 			Replace:  []font.Glyph{g1},
 			Next:     a + 1,
 		}
 	}
 	rule.Second.Apply(&g2)
 	return &Match{
-		MatchPos: []int{a, a + 1},
+		InputPos: []int{a, a + 1},
 		Replace:  []font.Glyph{g1, g2},
 		Next:     a + 2,
 	}

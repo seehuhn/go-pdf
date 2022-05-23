@@ -17,7 +17,7 @@
 package gtab
 
 import (
-	"fmt"
+	"math"
 	"sort"
 
 	"seehuhn.de/go/pdf/font"
@@ -43,76 +43,104 @@ func (ll LookupList) ApplyLookup(seq []font.Glyph, lookupIndex LookupIndex, gdef
 	return seq
 }
 
+// Match describes the effect of applying a Lookup to a glyph sequence.
+type Match struct {
+	InputPos []int // in increasing order
+	Replace  []font.Glyph
+	Actions  SeqLookups
+	Next     int
+}
+
+type nested struct {
+	InputPos []int
+	Actions  SeqLookups
+	EndPos   int
+}
+
 // applyLookupAt applies a single lookup to the given glyphs at position pos.
 func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos, b int) ([]font.Glyph, int) {
 	numLookups := len(ll)
-
-	if int(lookupIndex) >= numLookups {
-		return seq, pos + 1
-	}
-	lookup := ll[lookupIndex]
-
-	keep := MakeFilter(lookup.Meta, gdef)
-	match := lookup.Subtables.Apply(keep, seq, pos, b)
-	if match == nil {
-		return seq, pos + 1
-	}
-	if match.Actions == nil {
-		seq = applyMatch(seq, match, pos)
-		return seq, match.Next
+	stack := []*nested{
+		{
+			InputPos: []int{pos},
+			Actions: SeqLookups{
+				{SequenceIndex: 0, LookupListIndex: lookupIndex},
+			},
+			EndPos: b,
+		},
 	}
 
-	// TODO(voss): turn actions into a stack (new elements at the back)
-	actions := extractActions(match)
-	next := match.Next
-
-	numActions := 1 // we count the original lookup as an action
-	for len(actions) > 0 && numActions < 64 {
-		fmt.Println(actions)
-
-		numActions++
-		action := actions[0]
-		actions = actions[1:]
-
-		if int(action.lookupListIndex) >= numLookups {
+	next := pos + 1
+	numActions := 0
+	for len(stack) > 0 && numActions < 64 {
+		k := len(stack) - 1
+		if len(stack[k].Actions) == 0 {
+			stack = stack[:k]
 			continue
 		}
-		lookup = ll[action.lookupListIndex]
 
-		keep = MakeFilter(lookup.Meta, gdef)
-		match = lookup.Subtables.Apply(keep, seq, action.a, action.b)
+		numActions++
+
+		lookupIndex := stack[k].Actions[0].LookupListIndex
+		seqIdx := stack[k].Actions[0].SequenceIndex
+		if int(seqIdx) >= len(stack[k].InputPos) {
+			continue
+		}
+		pos := stack[k].InputPos[seqIdx]
+		end := stack[k].EndPos
+		stack[k].Actions = stack[k].Actions[1:]
+
+		if int(lookupIndex) >= numLookups {
+			continue
+		}
+		lookup := ll[lookupIndex]
+
+		keep := MakeFilter(lookup.Meta, gdef)
+		match := lookup.Subtables.Apply(keep, seq, pos, end)
 		if match == nil {
 			continue
 		}
+
 		if match.Actions == nil {
-			seq = applyMatch(seq, match, action.a)
+			seq = applyMatch(seq, match, pos)
 			// TODO(voss): update matchPos for the subsequent actions
 		} else {
 			if match.Replace != nil {
 				panic("invalid match object")
 			}
-			actions = append(extractActions(match), actions...)
+			stack = append(stack, &nested{
+				InputPos: match.InputPos,
+				Actions:  match.Actions,
+				EndPos:   match.InputPos[len(match.InputPos)-1] + 1,
+			})
 		}
 	}
 
 	return seq, next
 }
 
-func fixMatchPos(actions []recursiveLookup, remove []int, insertPos, numInsert int) {
+func fixMatchPos(actions []*nested, remove []int, numInsert int) {
 	if len(actions) == 0 {
 		return
 	}
 
-	minPos := actions[0].a
-	maxPos := actions[0].b
-	for _, action := range actions[1:] {
-		if action.a < minPos {
-			minPos = action.a
+	minPos := math.MaxInt
+	maxPos := math.MinInt
+	for _, action := range actions {
+		for _, pos := range action.InputPos {
+			if pos < minPos {
+				minPos = pos
+			}
+			if pos > maxPos {
+				maxPos = pos
+			}
 		}
-		if action.b > maxPos {
-			maxPos = action.b
+		if action.EndPos > maxPos {
+			maxPos = action.EndPos
 		}
 	}
+
+	insertPos := remove[0]
 
 	newPos := make([]int, maxPos-minPos+1)
 	for i := range newPos {
@@ -120,14 +148,16 @@ func fixMatchPos(actions []recursiveLookup, remove []int, insertPos, numInsert i
 	}
 	for l := len(remove) - 1; l >= 0; l-- {
 		i := remove[l]
-		if i < minPos {
-			continue
-		}
 		if i < insertPos {
 			panic("inconsistent insert position")
 		}
-		newPos[i-minPos] = -1
-		for j := i + 1; j <= maxPos; j++ {
+		start := i + 1
+		if i >= minPos {
+			newPos[i-minPos] = -1
+		} else {
+			start = minPos
+		}
+		for j := start; j <= maxPos; j++ {
 			newPos[j-minPos]--
 		}
 	}
@@ -137,19 +167,38 @@ func fixMatchPos(actions []recursiveLookup, remove []int, insertPos, numInsert i
 		}
 	}
 
-	// 0 1 2 3 4 5 6 7 8 9
-	//
-	// remove 3, 4:
-	// 0 1 2 3 -1 4 5 6 7 8
-	// 0 1 2 -1 -2 3 4 5 6 7
-	// insert single glyph at 3:
-	// 0 1 2 -1 -2 4 5 6 7
-	//
-	// 0 2 4 6 7 -> 0 2 () 5 6
+	for _, action := range actions {
+		numRemoved := 0
+		for _, pos := range remove {
+			if pos < action.EndPos {
+				numRemoved++
+			} else {
+				break
+			}
+		}
+
+		var out []int
+		in := action.InputPos
+		for len(in) > 0 && in[0] < insertPos {
+			out = append(out, in[0])
+			in = in[1:]
+		}
+		for pos := insertPos; pos < insertPos+numInsert; pos++ {
+			out = append(out, pos)
+		}
+		for _, pos := range in {
+			pos = newPos[pos-minPos]
+			if pos >= 0 {
+				out = append(out, pos)
+			}
+		}
+		action.InputPos = out
+		action.EndPos += numInsert - numRemoved
+	}
 }
 
 func applyMatch(seq []font.Glyph, m *Match, pos int) []font.Glyph {
-	matchPos := m.MatchPos
+	matchPos := m.InputPos
 
 	oldLen := len(seq)
 	oldTailPos := matchPos[len(matchPos)-1] + 1
@@ -204,10 +253,10 @@ type recursiveLookup struct {
 func extractActions(match *Match) []recursiveLookup {
 	actions := make([]recursiveLookup, 0, len(match.Actions))
 	for _, nested := range match.Actions {
-		if int(nested.SequenceIndex) >= len(match.MatchPos) {
+		if int(nested.SequenceIndex) >= len(match.InputPos) {
 			continue
 		}
-		actionPos := match.MatchPos[nested.SequenceIndex]
+		actionPos := match.InputPos[nested.SequenceIndex]
 		if actionPos >= match.Next {
 			continue
 		}

@@ -102,7 +102,7 @@ func (l *Gsub1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 		return nil
 	}
 	m := &Match{
-		MatchPos: []int{a},
+		InputPos: []int{a},
 		Replace: []font.Glyph{
 			{Gid: gid + l.Delta, Text: seq[a].Text},
 		},
@@ -179,7 +179,7 @@ func (l *Gsub1_2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 		return nil
 	}
 	m := &Match{
-		MatchPos: []int{a},
+		InputPos: []int{a},
 		Replace: []font.Glyph{
 			{Gid: l.SubstituteGlyphIDs[idx], Text: seq[a].Text},
 		},
@@ -289,7 +289,7 @@ func (l *Gsub2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 
 	return &Match{
-		MatchPos: []int{a},
+		InputPos: []int{a},
 		Replace:  insert,
 		Next:     a + k,
 	}
@@ -416,7 +416,7 @@ func (l *Gsub3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 
 	return &Match{
-		MatchPos: []int{a},
+		InputPos: []int{a},
 		Replace: []font.Glyph{
 			{Gid: alt[0], Text: seq[a].Text},
 		},
@@ -610,7 +610,7 @@ ligLoop:
 		}
 
 		return &Match{
-			MatchPos: matchPos,
+			InputPos: matchPos,
 			Replace: []font.Glyph{
 				{Gid: lig.Out, Text: text},
 			},
@@ -787,7 +787,7 @@ func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 
 	return &Match{
-		MatchPos: []int{a},
+		InputPos: []int{a},
 		Replace: []font.Glyph{
 			{Gid: l.SubstituteGlyphIDs[idx], Text: seq[a].Text},
 		},

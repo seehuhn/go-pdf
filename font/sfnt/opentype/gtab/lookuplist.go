@@ -75,14 +75,6 @@ type Subtable interface {
 	Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match
 }
 
-// Match describes the effect of applying a Lookup to a glyph sequence.
-type Match struct {
-	MatchPos []int // glyph positions to remove, in increasing order, relative to the match position
-	Replace  []font.Glyph
-	Actions  Nested
-	Next     int
-}
-
 // Subtables is a slice of Subtable.
 type Subtables []Subtable
 

@@ -98,7 +98,7 @@ func tryFont(fname string) error {
 	return nil
 }
 
-func printActions(actions gtab.Nested, lookups gtab.LookupList) {
+func printActions(actions gtab.SeqLookups, lookups gtab.LookupList) {
 	for _, a := range actions {
 		fmt.Println("GSUB nested", lookups[a.LookupListIndex].Meta.LookupType)
 	}

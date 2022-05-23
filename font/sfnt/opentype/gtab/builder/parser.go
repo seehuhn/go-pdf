@@ -808,8 +808,8 @@ func (p *parser) readGlyphSet() []font.GlyphID {
 	return unique(res)
 }
 
-func (p *parser) readNestedLookups() gtab.Nested {
-	var res gtab.Nested
+func (p *parser) readNestedLookups() gtab.SeqLookups {
+	var res gtab.SeqLookups
 	for {
 		item := p.readItem()
 		if item.typ != itemInteger {

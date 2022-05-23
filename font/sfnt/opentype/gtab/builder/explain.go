@@ -425,7 +425,7 @@ func (ee *explainer) explainCoverage(cov coverage.Table) {
 	ee.writeGlyphList(keys)
 }
 
-func (ee *explainer) explainNested(actions gtab.Nested) {
+func (ee *explainer) explainNested(actions gtab.SeqLookups) {
 	for i, a := range actions {
 		if i > 0 {
 			ee.w.WriteRune(' ')

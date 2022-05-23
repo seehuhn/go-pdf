@@ -30,11 +30,11 @@ type SeqLookup struct {
 	LookupListIndex LookupIndex
 }
 
-// Nested describes the actions of nested lookups.
-type Nested []SeqLookup
+// SeqLookups describes the actions of nested lookups.
+type SeqLookups []SeqLookup
 
-func readNested(p *parser.Parser, seqLookupCount int) (Nested, error) {
-	res := make(Nested, seqLookupCount)
+func readNested(p *parser.Parser, seqLookupCount int) (SeqLookups, error) {
+	res := make(SeqLookups, seqLookupCount)
 	for i := range res {
 		buf, err := p.ReadBytes(4)
 		if err != nil {
@@ -56,7 +56,7 @@ type SeqContext1 struct {
 // SeqRule describes a sequence of glyphs and the actions to be performed
 type SeqRule struct {
 	Input   []font.GlyphID // excludes the first input glyph, since this is in Cov
-	Actions Nested
+	Actions SeqLookups
 }
 
 func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -171,7 +171,7 @@ ruleLoop:
 		}
 
 		return &Match{
-			MatchPos: matchPos,
+			InputPos: matchPos,
 			Actions:  rule.Actions,
 			Next:     p + 1,
 		}
@@ -276,7 +276,7 @@ type SeqContext2 struct {
 // be performed
 type ClassSeqRule struct {
 	Input   []uint16 // excludes the first input glyph
-	Actions Nested
+	Actions SeqLookups
 }
 
 func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -409,7 +409,7 @@ ruleLoop:
 		}
 
 		return &Match{
-			MatchPos: matchPos,
+			InputPos: matchPos,
 			Actions:  rule.Actions,
 			Next:     p + 1,
 		}
@@ -514,7 +514,7 @@ func (l *SeqContext2) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#sequence-context-format-3-coverage-based-glyph-contexts
 type SeqContext3 struct {
 	Input   []coverage.Table
-	Actions Nested
+	Actions SeqLookups
 }
 
 func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -580,7 +580,7 @@ func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match
 		matchPos = append(matchPos, p)
 	}
 	return &Match{
-		MatchPos: matchPos,
+		InputPos: matchPos,
 		Actions:  l.Actions,
 		Next:     p + 1,
 	}
@@ -643,7 +643,7 @@ type ChainedSeqRule struct {
 	Backtrack []font.GlyphID
 	Input     []font.GlyphID // excludes the first input glyph, since this is in Cov
 	Lookahead []font.GlyphID
-	Actions   Nested
+	Actions   SeqLookups
 }
 
 func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -816,7 +816,7 @@ ruleLoop:
 		}
 
 		return &Match{
-			MatchPos: matchPos,
+			InputPos: matchPos,
 			Actions:  rule.Actions,
 			Next:     next,
 		}
@@ -951,7 +951,7 @@ type ChainedClassSeqRule struct {
 	Backtrack []uint16
 	Input     []uint16 // excludes the first input glyph, since this is in Cov
 	Lookahead []uint16
-	Actions   Nested
+	Actions   SeqLookups
 }
 
 func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -1121,7 +1121,7 @@ ruleLoop:
 		}
 
 		return &Match{
-			MatchPos: matchPos,
+			InputPos: matchPos,
 			Actions:  rule.Actions,
 			Next:     next,
 		}
@@ -1262,7 +1262,7 @@ type ChainedSeqContext3 struct {
 	Backtrack []coverage.Table
 	Input     []coverage.Table
 	Lookahead []coverage.Table
-	Actions   Nested
+	Actions   SeqLookups
 }
 
 func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -1372,7 +1372,7 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 	}
 
 	return &Match{
-		MatchPos: matchPos,
+		InputPos: matchPos,
 		Actions:  l.Actions,
 		Next:     next,
 	}
