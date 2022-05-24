@@ -51,7 +51,7 @@ type KeepGlyphFn func(font.GlyphID) bool
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags
 func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 	if gdefTable == nil {
-		return useAllGlyphs
+		return keepAllGlyphs
 	}
 
 	flags := meta.LookupFlag
@@ -91,7 +91,7 @@ func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 	}
 
 	if sel == 0 {
-		return useAllGlyphs
+		return keepAllGlyphs
 	}
 
 	filterFunc := func(gid font.GlyphID) bool {
@@ -118,4 +118,4 @@ func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
 	return filterFunc
 }
 
-func useAllGlyphs(font.GlyphID) bool { return true }
+func keepAllGlyphs(font.GlyphID) bool { return true }

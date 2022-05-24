@@ -730,7 +730,7 @@ func TestGsub(t *testing.T) {
 	}
 
 	for testIdx, test := range cases {
-		t.Run(fmt.Sprintf("%d", testIdx+1), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%02d", testIdx+1), func(t *testing.T) {
 			lookupList, err := builder.Parse(fontInfo, test.desc)
 			if err != nil {
 				t.Fatal(err)

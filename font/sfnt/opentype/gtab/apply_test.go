@@ -190,9 +190,10 @@ func TestFixMatchPos(t *testing.T) {
 					InputPos: test.in,
 					Actions:  []SeqLookup{},
 					EndPos:   endPos,
+					Keep:     keepAllGlyphs,
 				},
 			}
-			fixMatchPos(actions, test.remove, test.numInsert)
+			fixMatchPos(actions, test.remove, make([]font.Glyph, test.numInsert))
 			if d := cmp.Diff(test.out, actions[0].InputPos); d != "" {
 				t.Errorf("%d: %s", i, d)
 			}

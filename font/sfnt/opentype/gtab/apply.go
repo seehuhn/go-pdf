@@ -55,6 +55,7 @@ type nested struct {
 	InputPos []int
 	Actions  SeqLookups
 	EndPos   int
+	Keep     KeepGlyphFn
 }
 
 // applyLookupAt applies a single lookup to the given glyphs at position pos.
@@ -67,10 +68,13 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 				{SequenceIndex: 0, LookupListIndex: lookupIndex},
 			},
 			EndPos: b,
+			Keep:   keepAllGlyphs,
 		},
 	}
 
 	next := pos + 1
+	nextUpdated := false
+
 	numActions := 0
 	for len(stack) > 0 && numActions < 64 {
 		k := len(stack) - 1
@@ -101,9 +105,15 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 			continue
 		}
 
+		if !nextUpdated {
+			next = match.InputPos[len(match.InputPos)-1] + 1
+			nextUpdated = true
+		}
+
 		if match.Actions == nil {
 			seq = applyMatch(seq, match, pos)
-			// TODO(voss): update matchPos for the subsequent actions
+			fixMatchPos(stack, match.InputPos, match.Replace)
+			next += len(match.Replace) - len(match.InputPos)
 		} else {
 			if match.Replace != nil {
 				panic("invalid match object")
@@ -112,6 +122,7 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 				InputPos: match.InputPos,
 				Actions:  match.Actions,
 				EndPos:   match.InputPos[len(match.InputPos)-1] + 1,
+				Keep:     keep,
 			})
 		}
 	}
@@ -119,7 +130,7 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 	return seq, next
 }
 
-func fixMatchPos(actions []*nested, remove []int, numInsert int) {
+func fixMatchPos(actions []*nested, remove []int, replace []font.Glyph) {
 	if len(actions) == 0 {
 		return
 	}
@@ -161,11 +172,6 @@ func fixMatchPos(actions []*nested, remove []int, numInsert int) {
 			newPos[j-minPos]--
 		}
 	}
-	for i, pos := range newPos {
-		if pos >= insertPos {
-			newPos[i] = pos + numInsert
-		}
-	}
 
 	for _, action := range actions {
 		numRemoved := 0
@@ -183,13 +189,18 @@ func fixMatchPos(actions []*nested, remove []int, numInsert int) {
 			out = append(out, in[0])
 			in = in[1:]
 		}
-		for pos := insertPos; pos < insertPos+numInsert; pos++ {
-			out = append(out, pos)
+		numInsert := 0
+		for j, g := range replace {
+			if !action.Keep(g.Gid) {
+				continue
+			}
+			out = append(out, insertPos+j)
+			numInsert++
 		}
 		for _, pos := range in {
 			pos = newPos[pos-minPos]
 			if pos >= 0 {
-				out = append(out, pos)
+				out = append(out, pos+numInsert)
 			}
 		}
 		action.InputPos = out
@@ -243,30 +254,6 @@ func applyMatch(seq []font.Glyph, m *Match, pos int) []font.Glyph {
 		out = out[:newLen]
 	}
 	return out
-}
-
-type recursiveLookup struct {
-	a, b            int
-	lookupListIndex LookupIndex
-}
-
-func extractActions(match *Match) []recursiveLookup {
-	actions := make([]recursiveLookup, 0, len(match.Actions))
-	for _, nested := range match.Actions {
-		if int(nested.SequenceIndex) >= len(match.InputPos) {
-			continue
-		}
-		actionPos := match.InputPos[nested.SequenceIndex]
-		if actionPos >= match.Next {
-			continue
-		}
-		actions = append(actions, recursiveLookup{
-			a:               actionPos,
-			b:               match.Next,
-			lookupListIndex: nested.LookupListIndex,
-		})
-	}
-	return actions
 }
 
 // FindLookups returns the lookups required to implement the given
