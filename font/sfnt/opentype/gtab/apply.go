@@ -135,6 +135,8 @@ func fixMatchPos(actions []*nested, remove []int, replace []font.Glyph) {
 		return
 	}
 
+	numInsert := len(replace)
+
 	minPos := math.MaxInt
 	maxPos := math.MinInt
 	for _, action := range actions {
@@ -189,13 +191,11 @@ func fixMatchPos(actions []*nested, remove []int, replace []font.Glyph) {
 			out = append(out, in[0])
 			in = in[1:]
 		}
-		numInsert := 0
 		for j, g := range replace {
 			if !action.Keep(g.Gid) {
 				continue
 			}
 			out = append(out, insertPos+j)
-			numInsert++
 		}
 		for _, pos := range in {
 			pos = newPos[pos-minPos]

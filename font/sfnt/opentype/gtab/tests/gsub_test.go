@@ -652,7 +652,35 @@ func TestGsub(t *testing.T) {
 		// 	in:  "ABC",
 		// 	out: "DEI", // ABC -> DEBC -> DEFGC -> DEFHC -> DEI
 		// },
-		{ // harfbuzz, Mac and Windows agree on this
+		{
+			// harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
+					GSUB_5: "AK" -> 2@0
+					GSUB_1: "A" -> "A"
+					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+			in:  "AKAKA",
+			out: "AKXKA",
+		},
+		{
+			// harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
+					GSUB_5: "AK" -> 2@0
+					GSUB_1: "A" -> "L"
+					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+			in:  "AKAKA",
+			out: "LKXKA",
+		},
+		{
+			// harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
+					GSUB_5: "AK" -> 2@1
+					GSUB_1: "K" -> "A"
+					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+			in:  "AKAKA",
+			out: "AAXKA",
+		},
+		{
+			// harfbuzz, Mac and Windows agree on this
 			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
 					GSUB_5: "AK" -> 2@1
 					GSUB_1: "K" -> "L"
@@ -660,6 +688,23 @@ func TestGsub(t *testing.T) {
 			in:  "AKAKA",
 			out: "ALXKA",
 		},
+		{ //  harfbuzz: AXAAKA, Mac: AAXAKA, Windows: AAAXKA
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
+					GSUB_5: "AK" -> 2@1
+					GSUB_2: "K" -> "AA"
+					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+			in:  "AKAKA",
+			out: "AAAXKA",
+		},
+		{ //  harfbuzz: AXLAKA, Mac: ALXAKA, Windows: ALLXKA
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
+					GSUB_5: "AK" -> 2@1
+					GSUB_2: "K" -> "LL"
+					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+			in:  "AKAKA",
+			out: "ALLXKA",
+		},
+
 		{ // harfbuzz, Mac and Windows agree on this
 			desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
 					GSUB_5: "AL" -> 2@1
