@@ -645,6 +645,104 @@ func TestGsub(t *testing.T) {
 			in:  "AAA",
 			out: "XYZA",
 		},
+
+		//
+		// ------------------------------------------------------------------
+		// replacing a glyph does not remove it from the input sequence:
+		//
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: "AA" -> 1@0 2@0
+					GSUB_1: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "AA",
+			out: "XA",
+		},
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: "AA" -> 1@0 2@0
+					GSUB_2: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "AA",
+			out: "XA",
+		},
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: "AA" -> 1@0 2@0
+					GSUB_4: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "AA",
+			out: "XA",
+		},
+		//
+		// The same, but with one more level of nesting.
+		{
+			desc: `GSUB_5: "AA" -> 1@0 3@0
+					GSUB_5: "A" -> 2@0
+					GSUB_1: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "AA",
+			out: "XA",
+		},
+		{
+			desc: `GSUB_5: "AA" -> 1@0 3@0
+					GSUB_5: "A" -> 2@0
+					GSUB_2: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "AA",
+			out: "XA",
+		},
+		{
+			desc: `GSUB_5: "AA" -> 1@0 3@0
+					GSUB_5: "A" -> 2@0
+					GSUB_4: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "AA",
+			out: "XA",
+		},
+		//
+		// ... and with ligatures ignored
+		{
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@0
+					GSUB_5: "A" -> 2@0
+					GSUB_1: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "ALA",
+			out: "XLA",
+		},
+		{
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@0
+					GSUB_5: "AL" -> 2@0
+					GSUB_1: "A" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "X"`,
+			in:  "ALA",
+			out: "XLA",
+		},
+		// ...
+		{ // harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
+					GSUB_5: "AL" -> 2@0
+					GSUB_2: "A" -> "BB", "L" -> "BB"
+					GSUB_1: "A" -> "Y", "B" -> "Y"`,
+			in:  "ALA",
+			out: "BYLA",
+		},
+		// ...
+		{ //  harfbuzz: AYBA, Mac: AABY, Windows: ABBY
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
+					GSUB_5: "AL" -> 2@1
+					GSUB_2: "A" -> "BB", "L" -> "BB"
+					GSUB_1: "A" -> "Y", "B" -> "Y"`,
+			in:  "ALA",
+			out: "ABBY",
+		},
+		// ...
+		{ //  harfbuzz: AXAA, Mac: AAXA, Windows: AAAX
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
+					GSUB_5: "AK" -> 2@1
+					GSUB_2: "K" -> "AA"
+					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+			in:  "AKA",
+			out: "AAAX",
+		},
+
 		// {
 		// 	desc: `GSUB_5: "ABC" -> 1@0 1@2 1@3 2@2
 		// 			GSUB_2: "A" -> "DE", "B" -> "FG", "G" -> "H"
