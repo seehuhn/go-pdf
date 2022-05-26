@@ -55,7 +55,6 @@ type nested struct {
 	InputPos []int
 	Actions  SeqLookups
 	EndPos   int
-	Keep     KeepGlyphFn
 }
 
 // applyLookupAt applies a single lookup to the given glyphs at position pos.
@@ -68,7 +67,6 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 				{SequenceIndex: 0, LookupListIndex: lookupIndex},
 			},
 			EndPos: b,
-			Keep:   keepAllGlyphs,
 		},
 	}
 
@@ -112,7 +110,7 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 
 		if match.Actions == nil {
 			seq = applyMatch(seq, match, pos)
-			fixMatchPos(stack, match.InputPos, match.Replace)
+			fixMatchPos(stack, match.InputPos, len(match.Replace))
 			next += len(match.Replace) - len(match.InputPos)
 		} else {
 			if match.Replace != nil {
@@ -122,7 +120,6 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 				InputPos: match.InputPos,
 				Actions:  match.Actions,
 				EndPos:   match.InputPos[len(match.InputPos)-1] + 1,
-				Keep:     keep,
 			})
 		}
 	}
@@ -130,12 +127,10 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 	return seq, next
 }
 
-func fixMatchPos(actions []*nested, remove []int, replace []font.Glyph) {
+func fixMatchPos(actions []*nested, remove []int, numInsert int) {
 	if len(actions) == 0 {
 		return
 	}
-
-	numInsert := len(replace)
 
 	minPos := math.MaxInt
 	maxPos := math.MinInt
@@ -154,6 +149,7 @@ func fixMatchPos(actions []*nested, remove []int, replace []font.Glyph) {
 	}
 
 	insertPos := remove[0]
+	lastRemoved := remove[len(remove)-1]
 
 	newPos := make([]int, maxPos-minPos+1)
 	for i := range newPos {
@@ -191,11 +187,33 @@ func fixMatchPos(actions []*nested, remove []int, replace []font.Glyph) {
 			out = append(out, in[0])
 			in = in[1:]
 		}
-		for j, g := range replace {
-			if !action.Keep(g.Gid) {
-				continue
+
+		// Decide whether or not to add the new glyphs to the input glyph
+		// sequence of this action. We try to imitate the behavior of the
+		// Windows layout engine, but I failed to reverse engineer the rules
+		// completely.  The rule we are using here is that we include the
+		// new glyphs, if and only if one of the endpoints of the match
+		// was included in the original action input sequence.
+		addToInput := false
+		if len(in) > 0 && in[0] == insertPos {
+			// first matched glyph was present
+			addToInput = true
+		} else {
+			// final matched glyph was present
+			for i := 0; i < len(in); i++ {
+				if in[i] == lastRemoved {
+					addToInput = true
+				}
+				if in[i] >= lastRemoved {
+					break
+				}
 			}
-			out = append(out, insertPos+j)
+		}
+
+		if addToInput {
+			for j := 0; j < numInsert; j++ {
+				out = append(out, insertPos+j)
+			}
 		}
 		for _, pos := range in {
 			pos = newPos[pos-minPos]

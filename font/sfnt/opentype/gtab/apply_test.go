@@ -145,11 +145,11 @@ func TestFixMatchPos(t *testing.T) {
 			numInsert: 1,
 			out:       []int{1, 3},
 		},
-		{ // *******************************
+		{ // glyph 0 was not in input, so is not included in the output either
 			in:        []int{1, 2, 4},
 			remove:    []int{0},
 			numInsert: 1,
-			out:       []int{0, 1, 2, 4},
+			out:       []int{1, 2, 4},
 		},
 		{
 			in:        []int{1, 2, 4},
@@ -163,11 +163,11 @@ func TestFixMatchPos(t *testing.T) {
 			numInsert: 1,
 			out:       []int{1, 2, 4},
 		},
-		{
+		{ // glyph 3 was not in input, so is not included in the output either
 			in:        []int{1, 2, 4},
 			remove:    []int{3},
 			numInsert: 1,
-			out:       []int{1, 2, 3, 4},
+			out:       []int{1, 2, 4},
 		},
 		{
 			in:        []int{1, 2, 4},
@@ -175,11 +175,11 @@ func TestFixMatchPos(t *testing.T) {
 			numInsert: 1,
 			out:       []int{1, 2, 4},
 		},
-		{
+		{ // glyph 5 was not in input, so is not included in the output either
 			in:        []int{1, 2, 4},
 			remove:    []int{5},
 			numInsert: 1,
-			out:       []int{1, 2, 4, 5},
+			out:       []int{1, 2, 4},
 		},
 	}
 	for i, test := range cases {
@@ -190,10 +190,9 @@ func TestFixMatchPos(t *testing.T) {
 					InputPos: test.in,
 					Actions:  []SeqLookup{},
 					EndPos:   endPos,
-					Keep:     keepAllGlyphs,
 				},
 			}
-			fixMatchPos(actions, test.remove, make([]font.Glyph, test.numInsert))
+			fixMatchPos(actions, test.remove, test.numInsert)
 			if d := cmp.Diff(test.out, actions[0].InputPos); d != "" {
 				t.Errorf("%d: %s", i, d)
 			}

@@ -21,12 +21,11 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
-	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab/builder"
@@ -44,482 +43,29 @@ func unpack(seq []font.Glyph) []font.GlyphID {
 
 var exportFonts = flag.Bool("export-fonts", false, "export fonts used in tests")
 
-func exportFont(fontInfo *sfntcff.Info, idx int, desc string) error {
+func exportFont(fontInfo *sfntcff.Info, idx int, in string) {
 	if !*exportFonts {
-		return nil
+		return
 	}
 
 	fontInfo.FamilyName = fmt.Sprintf("Test%04d", idx)
-	fontInfo.Description = desc
+	now := time.Now()
+	fontInfo.CreationTime = now
+	fontInfo.ModificationTime = now
+	fontInfo.SampleText = in
 
 	fname := fmt.Sprintf("test%04d.otf", idx)
 	fd, err := os.Create(fname)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	_, err = fontInfo.Write(fd)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	err = fd.Close()
 	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func DisabledTestGsubOld(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
-	gidA := fontInfo.CMap.Lookup('A')
-	gidB := fontInfo.CMap.Lookup('B')
-	gidC := fontInfo.CMap.Lookup('C')
-	gidM := fontInfo.CMap.Lookup('M') // marked as a mark character, ignored
-	gidN := fontInfo.CMap.Lookup('N')
-	gidX := fontInfo.CMap.Lookup('X')
-
-	type testCase struct {
-		lookupType uint16
-		subtable   gtab.Subtable
-		in, out    string
-		text       string // text content, if different from `in`
-	}
-	cases := []testCase{
-
-		{ // test GSUB 5.1
-			lookupType: 5,
-			subtable: &gtab.SeqContext1{
-				Cov: coverage.Table{gidA: 0, gidM: 1},
-				Rules: [][]*gtab.SeqRule{
-					{
-						{
-							Input: []font.GlyphID{gidA},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 1},
-							},
-						},
-					},
-					{
-						{
-							Input: []font.GlyphID{gidA},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 1},
-							},
-						},
-					},
-				},
-			},
-			in:  "AAMAAA",
-			out: "BAMBAA",
-		},
-		{ // test lookup flags for nested lookups, using GSUB 5.1
-			lookupType: 5,
-			subtable: &gtab.SeqContext1{
-				Cov: coverage.Table{gidA: 0},
-				Rules: [][]*gtab.SeqRule{
-					{
-						{
-							Input: []font.GlyphID{gidA, gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 5},
-							},
-						},
-					},
-				},
-			},
-			in:  "AB",
-			out: "AB",
-		},
-		{ // test infinite loop using GSUB5.1
-			lookupType: 5,
-			subtable: &gtab.SeqContext1{
-				Cov: coverage.Table{gidA: 0},
-				Rules: [][]*gtab.SeqRule{
-					{
-						{
-							Input: []font.GlyphID{},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 3}, // A->AA
-								{SequenceIndex: 0, LookupListIndex: 0}, // repeat
-							},
-						},
-					},
-				},
-			},
-			in:  "AB",
-			out: "AB", // MS Word: "B", harfbuzz&Mac: "A{65}B"
-		},
-		{ // test finite recursion, using GSUB 5.1
-			lookupType: 5,
-			subtable: &gtab.SeqContext1{
-				Cov: coverage.Table{gidA: 0},
-				Rules: [][]*gtab.SeqRule{
-					{
-						{
-							Input: []font.GlyphID{gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 3}, // AB -> AAB
-								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-							},
-						},
-						{
-							Input: []font.GlyphID{gidA, gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 3}, // AAB -> AAAB
-								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-							},
-						},
-						{
-							Input: []font.GlyphID{gidA, gidA, gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 3}, // AAAB -> AAAAB
-								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-							},
-						},
-					},
-				},
-			},
-			in:  "AB",
-			out: "AAAAB",
-		},
-		// TODO(voss): re-enable this test once the code is fixed.
-		// { // test postitions when nested lookups change the sequence length
-		// 	lookupType: 5,
-		// 	subtable: &gtab.SeqContext1{
-		// 		Cov: coverage.Table{gidA: 0},
-		// 		Rules: [][]*gtab.SeqRule{
-		// 			{
-		// 				{
-		// 					Input: []font.GlyphID{gidA, gidA},
-		// 					Actions: []gtab.SeqLookup{
-		// 						{SequenceIndex: 1, LookupListIndex: 3}, // A A A -> A AA A
-		// 						{SequenceIndex: 2, LookupListIndex: 2}, // A AA A -> A AX A
-		// 					},
-		// 				},
-		// 				{
-		// 					Actions: []gtab.SeqLookup{
-		// 						{SequenceIndex: 0, LookupListIndex: 1}, // A -> B
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	in:  "AAAAA",
-		// 	out: "AAXABB",
-		// },
-		{ // test next position when lookup flags are used for nested lookups, using GSUB 5.1
-			lookupType: 5,
-			subtable: &gtab.SeqContext1{
-				Cov: coverage.Table{gidA: 0},
-				Rules: [][]*gtab.SeqRule{
-					{
-						{
-							Input: []font.GlyphID{gidB, gidA},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 1, LookupListIndex: 6}, // B(A*)B -> B\1X
-							},
-						},
-						{
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 2}, // A -> X
-							},
-						},
-					},
-				},
-			},
-			in:  "ABAAAABA",
-			out: "ABAAAAAAX",
-		},
-		{ // test GSUB 5.2
-			lookupType: 5,
-			subtable: &gtab.SeqContext2{
-				Cov:   coverage.Table{gidA: 0, gidB: 1, gidM: 2},
-				Input: classdef.Table{gidA: 1, gidB: 1},
-				Rules: [][]*gtab.ClassSeqRule{
-					{ // class 0 (not used)
-						{
-							Input: []uint16{},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 1, LookupListIndex: 1},
-							},
-						},
-					},
-					{ // class 1
-						{
-							Input: []uint16{1, 1},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 1, LookupListIndex: 2},
-							},
-						},
-					},
-				},
-			},
-			in:  "AAAAMAABBMBMAAA",
-			out: "AXAAMXABXMBMAXA",
-		},
-		{ // test GSUB 5.2
-			lookupType: 5,
-			subtable: &gtab.SeqContext2{
-				Cov:   coverage.Table{gidA: 0},
-				Input: classdef.Table{gidA: 1},
-				Rules: [][]*gtab.ClassSeqRule{
-					{},
-					{
-						{
-							Input: []uint16{1, 1},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 4},
-								{SequenceIndex: 0, LookupListIndex: 4},
-							},
-						},
-					},
-				},
-			},
-			in:   "AMAMA",
-			out:  "AMM",
-			text: "AAAMM",
-		},
-		{ // test GSUB 5.3
-			lookupType: 5,
-			subtable: &gtab.SeqContext3{
-				Input: []coverage.Table{
-					{gidA: 0, gidB: 1},
-					{gidB: 0, gidC: 1},
-					{gidA: 0, gidC: 1},
-				},
-				Actions: []gtab.SeqLookup{
-					{SequenceIndex: 0, LookupListIndex: 5},
-					{SequenceIndex: 2, LookupListIndex: 5},
-				},
-			},
-			in:  "CBBAABC",
-			out: "CXBAABX",
-		},
-		{ // test GSUB 6.1
-			lookupType: 6,
-			subtable: &gtab.ChainedSeqContext1{
-				Cov: coverage.Table{gidA: 0, gidB: 1},
-				Rules: [][]*gtab.ChainedSeqRule{
-					{
-						{
-							Lookahead: []font.GlyphID{gidA},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 2},
-							},
-						},
-					},
-					{
-						{
-							Backtrack: []font.GlyphID{gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 2},
-							},
-						},
-					},
-				},
-			},
-			in:  "AAAAABBBBB",
-			out: "XXXXABXBXB",
-		},
-		{
-			lookupType: 6,
-			subtable: &gtab.ChainedSeqContext1{
-				Cov: coverage.Table{gidA: 0},
-				Rules: [][]*gtab.ChainedSeqRule{
-					{
-						{
-							Lookahead: []font.GlyphID{gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 3}, // A B -> AA B
-								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-							},
-						},
-						{
-							Lookahead: []font.GlyphID{gidA, gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 3}, // AA B -> AAA B
-								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-							},
-						},
-						{
-							Lookahead: []font.GlyphID{gidA, gidA, gidB},
-							Actions: []gtab.SeqLookup{
-								{SequenceIndex: 0, LookupListIndex: 3}, // AAA B -> AAAA B
-								{SequenceIndex: 0, LookupListIndex: 0}, // recurse
-							},
-						},
-					},
-				},
-			},
-			in:  "AB",
-			out: "AAAAB",
-		},
-	}
-
-	gdef := &gdef.Table{
-		GlyphClass: classdef.Table{
-			gidA: gdef.GlyphClassBase,
-			gidM: gdef.GlyphClassMark,
-		},
-	}
-	lookups := gtab.LookupList{
-		{ // lookup index 0
-			Meta: &gtab.LookupMetaInfo{
-				LookupType: 0, // placeholder for test.lookupType
-				LookupFlag: gtab.LookupIgnoreMarks,
-			},
-			Subtables: []gtab.Subtable{
-				nil, // placeholder for test.Subtable
-			},
-		},
-		{ // lookup index 1: A->B, B->C, C->D, M->N, N->O
-			Meta: &gtab.LookupMetaInfo{LookupType: 1},
-			Subtables: []gtab.Subtable{
-				&gtab.Gsub1_1{
-					Cov:   coverage.Table{gidA: 0, gidB: 1, gidC: 2, gidM: 3, gidN: 4},
-					Delta: 1,
-				},
-			},
-		},
-		{ // lookup index 2: A->X, B->X, C->X, M->X, N->X
-			Meta: &gtab.LookupMetaInfo{LookupType: 1},
-			Subtables: []gtab.Subtable{
-				&gtab.Gsub1_2{
-					Cov:                coverage.Table{gidA: 0, gidB: 1, gidC: 2, gidM: 3, gidN: 4},
-					SubstituteGlyphIDs: []font.GlyphID{gidX, gidX, gidX, gidX, gidX},
-				},
-			},
-		},
-		{ // lookup index 3: A -> AA, B -> AA, C -> ABAAC
-			Meta: &gtab.LookupMetaInfo{LookupType: 2},
-			Subtables: []gtab.Subtable{
-				&gtab.Gsub2_1{
-					Cov: coverage.Table{gidA: 0, gidB: 1, gidC: 2},
-					Repl: [][]font.GlyphID{
-						{gidA, gidA},
-						{gidA, gidA},
-						{gidA, gidB, gidA, gidA, gidC},
-					},
-				},
-			},
-		},
-		{ // lookup index 4: A(M*)A -> A\1
-			Meta: &gtab.LookupMetaInfo{
-				LookupType: 4,
-				LookupFlag: gtab.LookupIgnoreMarks,
-			},
-			Subtables: []gtab.Subtable{
-				&gtab.Gsub4_1{
-					Cov: coverage.Table{gidA: 0},
-					Repl: [][]gtab.Ligature{
-						{
-							{
-								In:  []font.GlyphID{gidA},
-								Out: gidA,
-							},
-						},
-					},
-				},
-			},
-		},
-		{ // lookup index 5: B->X, C->X, M->X, N->X (ignore base glyph A)
-			Meta: &gtab.LookupMetaInfo{
-				LookupType: 1,
-				LookupFlag: gtab.LookupIgnoreBaseGlyphs,
-			},
-			Subtables: []gtab.Subtable{
-				&gtab.Gsub1_2{
-					Cov:                coverage.Table{gidB: 0, gidC: 1, gidM: 2, gidN: 3},
-					SubstituteGlyphIDs: []font.GlyphID{gidX, gidX, gidX, gidX},
-				},
-			},
-		},
-		{ // lookup index 6: B(A*)B -> B\1AA
-			Meta: &gtab.LookupMetaInfo{
-				LookupType: 5,
-				LookupFlag: gtab.LookupIgnoreBaseGlyphs,
-			},
-			Subtables: []gtab.Subtable{
-				&gtab.SeqContext1{
-					Cov: map[font.GlyphID]int{gidB: 0},
-					Rules: [][]*gtab.SeqRule{
-						{
-							{
-								Input: []font.GlyphID{gidB},
-								Actions: []gtab.SeqLookup{
-									{SequenceIndex: 1, LookupListIndex: 3},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	gsub := &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
-		},
-		FeatureList: []*gtab.Feature{
-			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
-		},
-		LookupList: lookups,
-	}
-
-	a, b := fontInfo.CMap.CodeRange()
-	rev := make(map[font.GlyphID]rune)
-	for r := a; r <= b; r++ {
-		gid := fontInfo.CMap.Lookup(r)
-		if gid != 0 {
-			rev[gid] = r
-		}
-	}
-
-	for testIdx, test := range cases {
-		t.Run(fmt.Sprintf("%d", testIdx+1), func(t *testing.T) {
-
-			lookups[0].Meta.LookupType = test.lookupType
-			lookups[0].Subtables[0] = test.subtable
-
-			seq := make([]font.Glyph, len(test.in))
-			for i, r := range test.in {
-				seq[i].Gid = fontInfo.CMap.Lookup(r)
-				seq[i].Text = []rune{r}
-			}
-			lookups := gsub.FindLookups(locale.EnUS, nil)
-			for _, lookupIndex := range lookups {
-				seq = gsub.LookupList.ApplyLookup(seq, lookupIndex, gdef)
-			}
-
-			var textRunes []rune
-			var outRunes []rune
-			for _, g := range seq {
-				textRunes = append(textRunes, g.Text...)
-				outRunes = append(outRunes, rev[g.Gid])
-			}
-			text := string(textRunes)
-			out := string(outRunes)
-
-			expectedText := test.text
-			if expectedText == "" {
-				expectedText = test.in
-			}
-			fmt.Printf("test%04d.otf %s -> %s\n", testIdx+1, test.in, test.out)
-			if out != test.out {
-				t.Errorf("expected output %q, got %q", test.out, out)
-			} else if text != expectedText {
-				t.Errorf("expected text %q, got %q", expectedText, text)
-			}
-
-			if *exportFonts {
-				fontInfo.Gdef = gdef
-				fontInfo.Gsub = gsub
-				err := exportFont(fontInfo, testIdx+1, test.in+" -> "+test.out)
-				if err != nil {
-					t.Error(err)
-				}
-			}
-		})
+		panic(err)
 	}
 }
 
@@ -547,7 +93,7 @@ func TestGsub(t *testing.T) {
 		text    string // text content, if different from `in`
 	}
 	cases := []testCase{
-		{
+		{ // test0001.odf
 			desc: "GSUB_1: A->X, C->Z",
 			in:   "ABC",
 			out:  "XBZ",
@@ -605,7 +151,7 @@ func TestGsub(t *testing.T) {
 			in:  "AAA",
 			out: "XYZ",
 		},
-		{
+		{ // test0011.odf
 			desc: `GSUB_5: "XXX" -> 1@0
 					GSUB_1: "X" -> "A"`,
 			in:  "XXXXXXXX",
@@ -648,7 +194,8 @@ func TestGsub(t *testing.T) {
 
 		//
 		// ------------------------------------------------------------------
-		// replacing a glyph does not remove it from the input sequence:
+		// Testing glyph positions in recursive lookups, in particular when the
+		// sequence length changes:
 		//
 		{ // harfbuzz, Mac and Windows agree on this
 			desc: `GSUB_5: "AA" -> 1@0 2@0
@@ -715,78 +262,351 @@ func TestGsub(t *testing.T) {
 			in:  "ALA",
 			out: "XLA",
 		},
-		// ...
 		{ // harfbuzz, Mac and Windows agree on this
 			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
 					GSUB_5: "AL" -> 2@0
-					GSUB_2: "A" -> "BB", "L" -> "BB"
+					GSUB_2: "A" -> "BB"
 					GSUB_1: "A" -> "Y", "B" -> "Y"`,
 			in:  "ALA",
 			out: "BYLA",
 		},
-		// ...
-		{ //  harfbuzz: AYBA, Mac: AABY, Windows: ABBY
+
+		// everything above currently passes ---------------------------------
+
+		// Check under which circumstances new glyphs are added to the
+		// input sequence.
+
+		// ------------------------------------------------------------------
+		// single glyphs:
+		//   A: yes
+		//   M: no
+
+		// We have seen above that if a normal glyph is replaced, the
+		// replacement IS added to the input sequence.
+
+		// If a single ignored glyph is replaced, the replacement is NOT added
+		// to the input sequence:
+		{ // ALA -> ABA -> ABX
+			// harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
+					GSUB_5: "ALA" -> 2@1
+					GSUB_4: "L" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "ALA",
+			out: "ABX",
+		},
+		{ // ALA -> ABBA -> ...
+			// harfbuzz: AYBA, Mac: ABYA, Windows: ABBY
 			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
 					GSUB_5: "AL" -> 2@1
-					GSUB_2: "A" -> "BB", "L" -> "BB"
+					GSUB_2: "L" -> "BB"
 					GSUB_1: "A" -> "Y", "B" -> "Y"`,
 			in:  "ALA",
 			out: "ABBY",
 		},
-		// ...
-		{ //  harfbuzz: AXAA, Mac: AAXA, Windows: AAAX
-			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
-					GSUB_5: "AK" -> 2@1
-					GSUB_2: "K" -> "AA"
-					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
-			in:  "AKA",
-			out: "AAAX",
+
+		// ------------------------------------------------------------------
+		// pairs:
+		//   AA: yes
+		//   MA: yes
+		//   AM: mixed????
+		//   MM: no
+
+		// When a pair of normal glyphs is replaced, the replacement IS added.
+		{ // AAA -> AB -> ...
+			// harfbuzz, Mac and Windows agree on this
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 3@1
+					GSUB_5: "AAA" -> 2@1
+					GSUB_4: "AA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AAA",
+			out: "AY",
 		},
 
-		// {
-		// 	desc: `GSUB_5: "ABC" -> 1@0 1@2 1@3 2@2
-		// 			GSUB_2: "A" -> "DE", "B" -> "FG", "G" -> "H"
-		// 			GSUB_4: "FHC" -> "I"`,
-		// 	in:  "ABC",
-		// 	out: "DEI", // ABC -> DEBC -> DEFGC -> DEFHC -> DEI
+		{ // ALA -> AB -> ...
+			// harfbuzz: AB, Mac: AB, Windows: AY -> yes
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
+					GSUB_5: "ALA" -> 2@1
+					GSUB_4: "LA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "ALA",
+			out: "AY",
+		},
+
+		// normal+ignored
+		{ // harfbuzz: , Mac: YAA, Windows: YAA -> yes
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
+					GSUB_5: "AM" -> 2@0
+					GSUB_4: "AM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAA",
+			out: "YAA",
+		},
+		// { // harfbuzz: AXA, Mac: AXA, Windows: AAX -> no ????????????????????
+		// 	desc: `GSUB_5: -marks "AAA" -> 1@1 2@1
+		// 			GSUB_4: "AM" -> "A"
+		// 			GSUB_1: "A" -> "X"`,
+		// 	in:  "AAMA",
+		// 	out: "AAX",
 		// },
-		{
-			// harfbuzz, Mac and Windows agree on this
-			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
-					GSUB_5: "AK" -> 2@0
-					GSUB_1: "A" -> "A"
-					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
-			in:  "AKAKA",
-			out: "AKXKA",
+		// { // harfbuzz: AXA, Mac: AXA, Windows: AAX -> no ????????????????????
+		// 	desc: `GSUB_5: -marks "ALA" -> 1@1 2@1
+		// 			GSUB_4: "LM" -> "A"
+		// 			GSUB_1: "A" -> "X"`,
+		// 	in:  "ALMA",
+		// 	out: "AAX",
+		// },
+
+		// When a pair of ignored glyphs is replaced, the replacement is NOT
+		// added.
+		{ // ALLA -> ABA -> ...
+			// harfbuzz: ABA, Mac: ABX, Windows: ABX -> no
+			desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
+					GSUB_5: "ALL" -> 2@1
+					GSUB_4: "LL" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "ALLA",
+			out: "ABX",
 		},
-		{
-			// harfbuzz, Mac and Windows agree on this
-			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
-					GSUB_5: "AK" -> 2@0
-					GSUB_1: "A" -> "L"
-					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
-			in:  "AKAKA",
-			out: "LKXKA",
+
+		// ------------------------------------------------------------------
+		// triples:
+		//   AAA: (I assume yes)
+		//   AAM: yes
+		//   AMA: yes
+		//   AMM: yes
+		//   MAA: yes
+		//   MAM: no
+		//   MMA: yes
+		//   MMM: no
+
+		{ // harfbuzz: YA, Mac: YA, Windows: YA -> included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
+					GSUB_5: "AAM" -> 2@0
+					GSUB_4: "AAM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AAMA",
+			out: "YA",
 		},
-		{
-			// harfbuzz, Mac and Windows agree on this
-			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
-					GSUB_5: "AK" -> 2@1
-					GSUB_1: "K" -> "A"
-					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
-			in:  "AKAKA",
-			out: "AAXKA",
+
+		{ // harfbuzz: YA, Mac: YA, Windows: YA -> included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
+					GSUB_5: "AMA" -> 2@0
+					GSUB_4: "AMA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAA",
+			out: "YA",
 		},
-		{
-			// harfbuzz, Mac and Windows agree on this
-			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
-					GSUB_5: "AK" -> 2@1
-					GSUB_1: "K" -> "L"
-					GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
-			in:  "AKAKA",
-			out: "ALXKA",
+		{ // harfbuzz: ABA, Mac: AYA, Windows: AYA -> included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AAMA" -> 2@1
+					GSUB_4: "AMA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AAMAA",
+			out: "AYA",
 		},
-		{ //  harfbuzz: AXAAKA, Mac: AAXAKA, Windows: AAAXKA
+		{ // harfbuzz: ABX, Mac: AYA, Windows: AYA -> included
+			desc: `GSUB_5: -marks "AAAA" -> 1@0 3@1
+					GSUB_5: "AAMA" -> 2@1
+					GSUB_4: "AMA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AAMAA",
+			out: "AYA",
+		},
+
+		{ // harfbuzz: YAA, Mac: YAA, Windows: YAA -> included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
+					GSUB_5: "AMM" -> 2@0
+					GSUB_4: "AMM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMMAA",
+			out: "YAA",
+		},
+
+		{ // harfbuzz: AB, Mac: AB, Windows: AY -> included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AMAA" -> 2@1
+					GSUB_4: "MAA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAA",
+			out: "AY",
+		},
+
+		{ // harfbuzz: ABA, Mac: ABX, Windows: ABX -> not included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AMAM" -> 2@1
+					GSUB_4: "MAM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAMA",
+			out: "ABX",
+		},
+		{ // ALALA -> ABA -> ...
+			// harfbuzz: ABA, Mac: ABX, Windows: ABX -> not included
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 3@1
+					GSUB_5: "ALALA" -> 2@1
+					GSUB_4: "LAL" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "ALALA",
+			out: "ABX",
+		},
+
+		{ // harfbuzz: ABA, Mac: ABX, Windows: AYA -> included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AMMA" -> 2@1
+					GSUB_4: "MMA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMMAA",
+			out: "AYA",
+		},
+
+		{ // harfbuzz: ABAA, Mac: ABXA, Windows: ABXA -> not included
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AMMM" -> 2@1
+					GSUB_4: "MMM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMMMAA",
+			out: "ABXA",
+		},
+
+		// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+		// sequences of length 4
+		//   AAAA -> (yes, I guess)
+		//   AAAM
+		//   AAMA
+		//   AAMM
+		//   AMAA
+		//   AMAM yes
+		//   AMMA
+		//   AMMM yes
+		//   MAAA
+		//   MAAM no
+		//   MAMA yes
+		//   MAMM no
+		//   MMAA
+		//   MMAM no
+		//   MMMA
+		//   MMMM -> (no, I guess)
+
+		{ // harfbuzz: , Mac: YA, Windows: YA -> yes
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
+					GSUB_5: "AMAM" -> 2@0
+					GSUB_4: "AMAM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAMA",
+			out: "YA",
+		},
+
+		{ // harfbuzz: , Mac: YAA, Windows: YAA -> yes
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
+					GSUB_5: "AMMM" -> 2@0
+					GSUB_4: "AMMM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMMMAA",
+			out: "YAA",
+		},
+
+		{ // harfbuzz: , Mac: ABX, Windows: ABX -> no
+			desc: `GSUB_5: -marks "AAAA" -> 1@0 3@1
+					GSUB_5: "AMAAM" -> 2@1
+					GSUB_4: "MAAM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAAMA",
+			out: "ABX",
+		},
+
+		{ // harfbuzz: , Mac: AB, Windows: AY -> yes
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AMAMA" -> 2@1
+					GSUB_4: "MAMA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAMA",
+			out: "AY",
+		},
+
+		{ // harfbuzz: , Mac: ABX, Windows: ABX -> no
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AMAMM" -> 2@1
+					GSUB_4: "MAMM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAMMA",
+			out: "ABX",
+		},
+
+		{ // harfbuzz: , Mac: ABX, Windows: ABX -> no
+			desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
+					GSUB_5: "AMMAM" -> 2@1
+					GSUB_4: "MMAM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMMAMA",
+			out: "ABX",
+		},
+
+		// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+		// The difference between the following two cases is mysterious to me.
+
+		{ // harfbuzz: YAA, Mac: YAA, Windows: YAA -> yes
+			desc: `GSUB_5: -marks "AAA" -> 1@0 2@0
+					GSUB_4: "AM" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMAA",
+			out: "YAA",
+		},
+		// { // harfbuzz: AYA, Mac: AYA, Windows: ABX -> no ????????????????????
+		// 	desc: `GSUB_5: -marks "AAA" -> 1@1 2@1
+		// 			GSUB_4: "AM" -> "B"
+		// 			GSUB_1: "A" -> "X", "B" -> "Y"`,
+		// 	in:  "AAMA",
+		// 	out: "ABX",
+		// },
+
+		// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+		// longer:
+		//   MMMAAA -> yes
+		//   MMAMAA -> yes
+
+		{ // harfbuzz: ABA, Mac: ABX, Windows: AYA -> included
+			desc: `GSUB_5: -marks "AAAAA" -> 1@0 3@1
+					GSUB_5: "AMMMAAA" -> 2@1
+					GSUB_4: "MMMAAA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMMMAAAA",
+			out: "AYA",
+		},
+
+		{ // harfbuzz: ABA, Mac: ABX, Windows: AYA -> included
+			desc: `GSUB_5: -marks "AAAAA" -> 1@0 3@1
+					GSUB_5: "AMMAMAA" -> 2@1
+					GSUB_4: "MMAMAA" -> "B"
+					GSUB_1: "A" -> "X", "B" -> "Y"`,
+			in:  "AMMAMAAA",
+			out: "AYA",
+		},
+
+		// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+		// {
+		// 	// ALMA -> AAA -> ...
+		// 	// harfbuzz: AXA, Mac: AXY, Windows: AAY ????????????????????????
+		// 	desc: `GSUB_5: -ligs -marks "AA" -> 1@0 4@1
+		// 			GSUB_5: -marks "ALA" -> 2@1 3@1
+		// 			GSUB_4: "LM" -> "A"
+		// 			GSUB_1: "A" -> "X"
+		// 			GSUB_1: "A" -> "Y", "X" -> "Y"`,
+		// 	in:  "ALMA",
+		// 	out: "AAY",
+		// },
+
+		{ // harfbuzz: DEI, Mac: DEI, Windows: DEI
+			desc: `GSUB_5: "ABC" -> 1@0 1@2 1@3 2@2
+					GSUB_2: "A" -> "DE", "B" -> "FG", "G" -> "H"
+					GSUB_4: "FHC" -> "I"`,
+			in:  "ABC",
+			out: "DEI", // ABC -> DEBC -> DEFGC -> DEFHC -> DEI
+		},
+		{ // harfbuzz: AXAAKA, Mac: AAXAKA, Windows: AAAXKA
 			desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
 					GSUB_5: "AK" -> 2@1
 					GSUB_2: "K" -> "AA"
@@ -802,7 +622,6 @@ func TestGsub(t *testing.T) {
 			in:  "AKAKA",
 			out: "ALLXKA",
 		},
-
 		{ // harfbuzz, Mac and Windows agree on this
 			desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
 					GSUB_5: "AL" -> 2@1
@@ -813,54 +632,54 @@ func TestGsub(t *testing.T) {
 			in:  "ALAA",
 			out: "XAYZ",
 		},
-		{
+		{ // harfbuzz, Mac and Windows agree on this
 			desc: `GSUB_5: "AB" -> 1@0 0@0, "AAB" -> 1@0 0@0, "AAAB" -> 1@0 0@0
 					GSUB_2: "A" -> "AA"`,
 			in:  "AB",
 			out: "AAAAB",
 		},
-		// { // harfbuzz: XYAZA, Mac: XAYZA, Windows: XAAYZ
-		// 	desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
-		// 			GSUB_5: "AL" -> 2@1
-		// 			GSUB_2: "L" -> "AA"
-		// 			GSUB_1: "A" -> "X"
-		// 			GSUB_1: "A" -> "Y"
-		// 			GSUB_1: "A" -> "Z"`,
-		// 	in:  "ALAA",
-		// 	out: "XAAYZ", // TODO(voss): what shall we do?
-		// },
-		// { // harfbuzz, Mac: XLYZ, Windows: XLYZA
-		// 	desc: `GSUB_5: -ligs "AAAA" -> 1@0 5@2 4@1 3@0
-		// 			GSUB_5: "AL" -> 2@1
-		// 			GSUB_4: "LA" -> "L"
-		// 			GSUB_1: "A" -> "X"
-		// 			GSUB_1: "A" -> "Y"
-		// 			GSUB_1: "A" -> "Z"`,
-		// 	in:  "ALAAA",
-		// 	out: "XLYZ", // TODO(voss): what shall we do?
-		// },
-		// { // harfbuzz, Mac: AKA, Windows: ABAA
-		// 	desc: `GSUB_5: -ligs "AAA" -> 1@0
-		// 			GSUB_5: "AL" -> 2@1 3@1
-		// 			GSUB_4: "LA" -> "K"
-		// 			GSUB_1: "L" -> "B"`,
-		// 	in:  "ALAA",
-		// 	out: "???",
-		// },
-		// {
-		// 	desc: `GSUB_5: -marks "AAA" -> 3@2 1@0 2@1
-		// 			GSUB_1: "A" -> "X"
-		// 			GSUB_1: "A" -> "Y"
-		// 			GSUB_1: "A" -> "Z"`,
-		// 	in:  "MAMAMAM",
-		// 	out: "MXMYMZM",
-		// },
-		// {
-		// 	desc: `GSUB_5: -marks "AAA" -> 1@0 1@1 1@2
-		// 			GSUB_4: "AM" -> "X"`,
-		// 	in:  "MAMAMAM",
-		// 	out: "MXXAM",
-		// },
+		{ // harfbuzz: XYAZA, Mac: XAYZA, Windows: XAAYZ
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
+					GSUB_5: "AL" -> 2@1
+					GSUB_2: "L" -> "AA"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "ALAA",
+			out: "XAAYZ",
+		},
+		{ // harfbuzz: XLYZ, Mac: XLYZ, Windows: XLYZA
+			desc: `GSUB_5: -ligs "AAAA" -> 1@0 5@2 4@1 3@0
+					GSUB_5: "AL" -> 2@1
+					GSUB_4: "LA" -> "L"
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "ALAAA",
+			out: "XLYZA",
+		},
+		{ // harfbuzz: AKA, Mac: AKA, Windows: ABAA
+			desc: `GSUB_5: -ligs "AAA" -> 1@0
+					GSUB_5: "AL" -> 2@1 3@1
+					GSUB_4: "LA" -> "K"
+					GSUB_1: "L" -> "B"`,
+			in:  "ALAA",
+			out: "ABAA",
+		},
+		{ // harfbuzz: LXLYLZL, Mac: LXLYLZL, Windows:
+			desc: `GSUB_5: -ligs "AAA" -> 3@2 1@0 2@1
+					GSUB_1: "A" -> "X"
+					GSUB_1: "A" -> "Y"
+					GSUB_1: "A" -> "Z"`,
+			in:  "LALALAL",
+			out: "LXLYLZL",
+		},
+		{ // harfbuzz: LXALX, Mac: LXXX, Windows: LXXAL
+			desc: `GSUB_5: -ligs "AAA" -> 1@0 1@1 1@2
+					GSUB_4: "AL" -> "X"`,
+			in:  "LALALAL",
+			out: "LXXAL",
+		},
 	}
 
 	a, b := fontInfo.CMap.CodeRange()
@@ -892,10 +711,7 @@ func TestGsub(t *testing.T) {
 			if *exportFonts {
 				fontInfo.Gdef = gdef
 				fontInfo.Gsub = gsub
-				err := exportFont(fontInfo, testIdx+1, test.in+" -> "+test.out)
-				if err != nil {
-					t.Error(err)
-				}
+				exportFont(fontInfo, testIdx+1, test.in)
 			}
 
 			seq := make([]font.Glyph, len(test.in))
@@ -929,443 +745,4 @@ func TestGsub(t *testing.T) {
 			}
 		})
 	}
-}
-
-func Test1000(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
-
-	gidA := fontInfo.CMap.Lookup('A')
-	gidB := fontInfo.CMap.Lookup('B')
-	gidX := fontInfo.CMap.Lookup('X')
-	gidY := fontInfo.CMap.Lookup('Y')
-
-	fontInfo.Gdef = &gdef.Table{
-		GlyphClass: classdef.Table{
-			gidA: gdef.GlyphClassBase,
-		},
-	}
-	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
-		},
-		FeatureList: []*gtab.Feature{
-			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
-		},
-		LookupList: gtab.LookupList{
-			{ // lookup 0
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: coverage.Table{gidA: 0},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{ // ABABA
-									Input: []font.GlyphID{gidB, gidA, gidB, gidA},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 1, LookupListIndex: 1}, // B(A*)B -> B\1Y
-									},
-								},
-								{ // A
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 2}, // A -> X
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 1: B(A*)B -> B\1AA
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-					LookupFlag: gtab.LookupIgnoreBaseGlyphs,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: map[font.GlyphID]int{gidB: 0},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{
-									Input: []font.GlyphID{gidB},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 1, LookupListIndex: 3},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 2: A -> X
-				Meta: &gtab.LookupMetaInfo{LookupType: 1},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_2{
-						Cov:                coverage.Table{gidA: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidX},
-					},
-				},
-			},
-			{ // lookup 3: B -> Y
-				Meta: &gtab.LookupMetaInfo{LookupType: 1},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_2{
-						Cov:                coverage.Table{gidB: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidY},
-					},
-				},
-			},
-		},
-	}
-
-	gg := []font.Glyph{
-		{Gid: gidA}, // 0+-
-		{Gid: gidB}, // 1|
-		{Gid: gidA}, // 2| lookup 0 match
-		{Gid: gidB}, // 3|
-		{Gid: gidA}, // 4+-
-		{Gid: gidA},
-		{Gid: gidA},
-		{Gid: gidA},
-		{Gid: gidB},
-	}
-	gsub := fontInfo.Gsub
-	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
-		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, fontInfo.Gdef)
-	}
-
-	got := unpack(gg)
-	expected := []font.GlyphID{gidA, gidB, gidA, gidX, gidX, gidB}
-
-	if diff := cmp.Diff(expected, got); diff != "" {
-		// TODO(voss): re-enable this test once the code is fixed.
-		// t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
-	}
-
-	exportFont(fontInfo, 1000, "")
-}
-
-func Test1001(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
-
-	gidA := fontInfo.CMap.Lookup('A')
-	gidB := fontInfo.CMap.Lookup('B')
-	gidX := fontInfo.CMap.Lookup('X')
-	gidY := fontInfo.CMap.Lookup('Y')
-
-	fontInfo.Gdef = &gdef.Table{
-		GlyphClass: classdef.Table{
-			gidA: gdef.GlyphClassBase,
-		},
-	}
-	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
-		},
-		FeatureList: []*gtab.Feature{
-			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
-		},
-		LookupList: gtab.LookupList{
-			{ // lookup 0
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: coverage.Table{gidA: 0},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{ // ABABA
-									Input: []font.GlyphID{gidB, gidA, gidB, gidA},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 3, LookupListIndex: 1}, // B(A*)B -> B\1Y
-									},
-								},
-								{ // A
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 2}, // A -> X
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 1: B(A*)B -> B\1AA
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-					LookupFlag: gtab.LookupIgnoreBaseGlyphs,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: map[font.GlyphID]int{gidB: 0},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{
-									Input: []font.GlyphID{gidB},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 1, LookupListIndex: 3},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 2: A -> X
-				Meta: &gtab.LookupMetaInfo{LookupType: 1},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_2{
-						Cov:                coverage.Table{gidA: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidX},
-					},
-				},
-			},
-			{ // lookup 3: B -> Y
-				Meta: &gtab.LookupMetaInfo{LookupType: 1},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_2{
-						Cov:                coverage.Table{gidB: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidY},
-					},
-				},
-			},
-		},
-	}
-
-	gg := []font.Glyph{
-		{Gid: gidA}, // 0+-
-		{Gid: gidB}, // 1|
-		{Gid: gidA}, // 2| lookup 0 match
-		{Gid: gidB}, // 3|
-		{Gid: gidA}, // 4+-
-		{Gid: gidA},
-		{Gid: gidA},
-		{Gid: gidA},
-		{Gid: gidB},
-	}
-	gsub := fontInfo.Gsub
-	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
-		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, fontInfo.Gdef)
-	}
-
-	got := unpack(gg)
-	expected := []font.GlyphID{gidA, gidB, gidA, gidX, gidX, gidB}
-
-	if diff := cmp.Diff(expected, got); diff != "" {
-		// TODO(voss): re-enable this test once the code is fixed.
-		// t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
-	}
-
-	exportFont(fontInfo, 1001, "")
-}
-
-func Test1002(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
-
-	gidA := fontInfo.CMap.Lookup('A')
-	gidB := fontInfo.CMap.Lookup('B')
-	gidX := fontInfo.CMap.Lookup('X')
-	gidY := fontInfo.CMap.Lookup('Y')
-
-	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
-		},
-		FeatureList: []*gtab.Feature{
-			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
-		},
-		LookupList: gtab.LookupList{
-			{ // lookup 0
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: coverage.Table{gidA: 0, gidB: 1},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{ // A
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 2}, // A -> X
-									},
-								},
-							},
-							{
-								{ // BAAAA
-									Input: []font.GlyphID{gidA, gidA, gidA, gidA},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 3, LookupListIndex: 1},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 1: AAA -> AYA
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: map[font.GlyphID]int{gidA: 0},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{
-									Input: []font.GlyphID{gidA, gidA},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 1, LookupListIndex: 3},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 2: A -> X
-				Meta: &gtab.LookupMetaInfo{LookupType: 1},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_2{
-						Cov:                coverage.Table{gidA: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidX},
-					},
-				},
-			},
-			{ // lookup 3: A -> Y
-				Meta: &gtab.LookupMetaInfo{LookupType: 1},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_2{
-						Cov:                coverage.Table{gidA: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidY},
-					},
-				},
-			},
-		},
-	}
-
-	gg := []font.Glyph{
-		{Gid: gidB}, // 0+-
-		{Gid: gidA}, // 1|
-		{Gid: gidA}, // 2| lookup 0 match
-		{Gid: gidA}, // 3|
-		{Gid: gidA}, // 4+-
-		{Gid: gidA},
-		{Gid: gidA},
-	}
-	gsub := fontInfo.Gsub
-	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
-		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, fontInfo.Gdef)
-	}
-
-	got := unpack(gg)
-	expected := []font.GlyphID{gidA, gidB, gidA, gidX, gidX, gidB}
-
-	if diff := cmp.Diff(expected, got); diff != "" {
-		// TODO(voss): re-enable this test once the code is fixed.
-		// t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
-	}
-
-	exportFont(fontInfo, 1002, "")
-}
-
-func Test1003(t *testing.T) {
-	fontInfo := debug.MakeSimpleFont()
-
-	gidA := fontInfo.CMap.Lookup('A')
-	gidB := fontInfo.CMap.Lookup('B')
-	gidX := fontInfo.CMap.Lookup('X')
-	gidY := fontInfo.CMap.Lookup('Y')
-
-	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
-		},
-		FeatureList: []*gtab.Feature{
-			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
-		},
-		LookupList: gtab.LookupList{
-			{ // lookup 0
-				// match "A"; apply 2@0
-				// match "BAAAA"; apply 1@4
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 5,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.SeqContext1{
-						Cov: coverage.Table{gidA: 0, gidB: 1},
-						Rules: [][]*gtab.SeqRule{
-							{
-								{ // A
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 0, LookupListIndex: 2}, // A -> X
-									},
-								},
-							},
-							{
-								{ // BAAAA
-									Input: []font.GlyphID{gidA, gidA, gidA, gidA},
-									Actions: []gtab.SeqLookup{
-										{SequenceIndex: 4, LookupListIndex: 1},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 1: AA -> Y
-				Meta: &gtab.LookupMetaInfo{
-					LookupType: 4,
-				},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub4_1{
-						Cov: map[font.GlyphID]int{gidA: 0},
-						Repl: [][]gtab.Ligature{
-							{
-								{
-									In:  []font.GlyphID{gidA},
-									Out: gidY,
-								},
-							},
-						},
-					},
-				},
-			},
-			{ // lookup 2: A -> X
-				Meta: &gtab.LookupMetaInfo{LookupType: 1},
-				Subtables: []gtab.Subtable{
-					&gtab.Gsub1_2{
-						Cov:                coverage.Table{gidA: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidX},
-					},
-				},
-			},
-		},
-	}
-
-	gg := []font.Glyph{
-		{Gid: gidB}, // 0+-
-		{Gid: gidA}, // 1|
-		{Gid: gidA}, // 2| lookup 0 match
-		{Gid: gidA}, // 3|
-		{Gid: gidA}, // 4+-
-		{Gid: gidA},
-		{Gid: gidA},
-	}
-	gsub := fontInfo.Gsub
-	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
-		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, fontInfo.Gdef)
-	}
-
-	got := unpack(gg)
-	expected := []font.GlyphID{gidA, gidB, gidA, gidX, gidX, gidB}
-
-	if diff := cmp.Diff(expected, got); diff != "" {
-		// TODO(voss): re-enable this test once the code is fixed.
-		// t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
-	}
-
-	exportFont(fontInfo, 1003, "")
 }

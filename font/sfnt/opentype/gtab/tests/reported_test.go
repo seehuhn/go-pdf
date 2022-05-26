@@ -226,9 +226,8 @@ func Test9738(t *testing.T) {
 	expected := []font.GlyphID{gidA, gidB, gidA, gidX, gidX, gidB}
 
 	if diff := cmp.Diff(expected, got); diff != "" {
-		// TODO(voss): re-enable this test once the code is fixed.
-		// t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
+		t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
 	}
 
-	exportFont(fontInfo, 9738, "ABAAAB -> ABAXXB")
+	exportFont(fontInfo, 9738, "ABAAAB")
 }

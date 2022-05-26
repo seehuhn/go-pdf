@@ -278,6 +278,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 
 	if nameTable != nil {
 		info.Description = nameTable.Description
+		info.SampleText = nameTable.SampleText
 	}
 
 	if ver, ok := getNameTableVersion(nameTable); ok {

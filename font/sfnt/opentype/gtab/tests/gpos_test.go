@@ -55,8 +55,5 @@ func TestGpos(t *testing.T) {
 	}
 	fontInfo.Gpos = gpos
 
-	err := exportFont(fontInfo, 1234, "")
-	if err != nil {
-		t.Error(err)
-	}
+	exportFont(fontInfo, 1234, "")
 }

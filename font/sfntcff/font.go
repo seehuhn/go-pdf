@@ -42,6 +42,7 @@ type Info struct {
 	Width       font.Width
 	Weight      font.Weight
 	Description string
+	SampleText  string
 
 	Version          head.Version
 	CreationTime     time.Time

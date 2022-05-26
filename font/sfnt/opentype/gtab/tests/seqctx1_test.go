@@ -185,10 +185,7 @@ func Test9735(t *testing.T) {
 		},
 	}
 
-	err := exportFont(fontInfo, 9735, "")
-	if err != nil {
-		t.Error(err)
-	}
+	exportFont(fontInfo, 9735, "")
 }
 
 func Test9736(t *testing.T) {
@@ -270,8 +267,5 @@ func Test9736(t *testing.T) {
 		},
 	}
 
-	err := exportFont(fontInfo, 9736, "")
-	if err != nil {
-		t.Error(err)
-	}
+	exportFont(fontInfo, 9736, "")
 }
