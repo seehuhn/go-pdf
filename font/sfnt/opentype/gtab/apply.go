@@ -104,22 +104,22 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 		}
 
 		if !nextUpdated {
-			next = match.InputPos[len(match.InputPos)-1] + 1
+			next = match.Next
 			nextUpdated = true
 		}
 
-		if match.Actions == nil {
+		if len(match.Replace) > 0 {
+			if len(match.Actions) > 0 {
+				panic("invalid match object")
+			}
 			seq = applyMatch(seq, match, pos)
 			fixMatchPos(stack, match.InputPos, len(match.Replace))
 			next += len(match.Replace) - len(match.InputPos)
 		} else {
-			if match.Replace != nil {
-				panic("invalid match object")
-			}
 			stack = append(stack, &nested{
 				InputPos: match.InputPos,
 				Actions:  match.Actions,
-				EndPos:   match.InputPos[len(match.InputPos)-1] + 1,
+				EndPos:   match.Next,
 			})
 		}
 	}

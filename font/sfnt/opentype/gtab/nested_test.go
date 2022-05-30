@@ -145,7 +145,7 @@ func TestSeqContext1(t *testing.T) {
 		before, after int
 	}{
 		{0, -1},
-		{1, 4}, // matches 2, 3, 4
+		{1, 5}, // matches 2, 3, 4, also skips 99
 		{2, -1},
 		{3, 6}, // matches 4, [99,] 5
 		{4, -1},
@@ -185,7 +185,7 @@ func TestSeqContext2(t *testing.T) {
 		before, after int
 	}{
 		{0, -1}, // not in coverage table
-		{1, 4},  // matches class0, class1, class0
+		{1, 5},  // matches class0, class1, class0, also skips 99
 		{2, -1}, // no match for class1, class0, class1
 		{3, 6},  // matches 4, [99,] 5
 		{4, -1}, // keep returns false
@@ -276,7 +276,7 @@ func TestChainedSeqContext1(t *testing.T) {
 		{1, -1},
 		{2, -1},
 		{3, -1},
-		{4, 6}, // matches [1, 2,] 3, 4, [5]
+		{4, 7}, // matches [1, 2,] 3, 4, [5], also skips 99
 	}
 	for _, test := range cases {
 		m := l.Apply(keep, in, test.before, len(in))

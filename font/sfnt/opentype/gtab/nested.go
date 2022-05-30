@@ -170,10 +170,15 @@ ruleLoop:
 			matchPos = append(matchPos, p)
 		}
 
+		p++
+		for p < b && !keep(seq[p].Gid) {
+			p++
+		}
+
 		return &Match{
 			InputPos: matchPos,
 			Actions:  rule.Actions,
-			Next:     p + 1,
+			Next:     p,
 		}
 	}
 
@@ -408,10 +413,15 @@ ruleLoop:
 			matchPos = append(matchPos, p)
 		}
 
+		p++
+		for p < b && !keep(seq[p].Gid) {
+			p++
+		}
+
 		return &Match{
 			InputPos: matchPos,
 			Actions:  rule.Actions,
-			Next:     p + 1,
+			Next:     p,
 		}
 	}
 
@@ -579,10 +589,16 @@ func (l *SeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match
 		}
 		matchPos = append(matchPos, p)
 	}
+
+	p++
+	for p < b && !keep(seq[p].Gid) {
+		p++
+	}
+
 	return &Match{
 		InputPos: matchPos,
 		Actions:  l.Actions,
-		Next:     p + 1,
+		Next:     p,
 	}
 }
 
@@ -801,7 +817,7 @@ ruleLoop:
 			}
 			matchPos = append(matchPos, p)
 		}
-		next := p + 1
+		next := p
 
 		glyphsNeeded = len(rule.Lookahead)
 		for _, gid := range rule.Lookahead {
@@ -813,6 +829,11 @@ ruleLoop:
 			if p+glyphsNeeded >= len(seq) || seq[p].Gid != gid {
 				continue ruleLoop
 			}
+		}
+
+		next++
+		for next < b && !keep(seq[next].Gid) {
+			next++
 		}
 
 		return &Match{
@@ -1106,7 +1127,7 @@ ruleLoop:
 			}
 			matchPos = append(matchPos, p)
 		}
-		next := p + 1
+		next := p
 
 		glyphsNeeded = len(rule.Lookahead)
 		for _, cls := range rule.Lookahead {
@@ -1118,6 +1139,11 @@ ruleLoop:
 			if p+glyphsNeeded >= len(seq) || l.Lookahead[seq[p].Gid] != cls {
 				continue ruleLoop
 			}
+		}
+
+		next++
+		for next < b && !keep(seq[next].Gid) {
+			next++
 		}
 
 		return &Match{
@@ -1357,7 +1383,7 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 		}
 		matchPos = append(matchPos, p)
 	}
-	next := p + 1
+	next := p
 
 	glyphsNeeded = len(l.Lookahead)
 	for _, cov := range l.Lookahead {
@@ -1369,6 +1395,11 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 		if p+glyphsNeeded >= len(seq) || !cov.Contains(seq[p].Gid) {
 			return nil
 		}
+	}
+
+	next++
+	for next < b && !keep(seq[next].Gid) {
+		next++
 	}
 
 	return &Match{

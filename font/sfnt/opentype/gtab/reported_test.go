@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tests
+package gtab_test
 
 import (
 	"testing"
@@ -230,4 +230,12 @@ func Test9738(t *testing.T) {
 	}
 
 	exportFont(fontInfo, 9738, "ABAAAB")
+}
+
+func unpack(seq []font.Glyph) []font.GlyphID {
+	res := make([]font.GlyphID, len(seq))
+	for i, g := range seq {
+		res[i] = g.Gid
+	}
+	return res
 }

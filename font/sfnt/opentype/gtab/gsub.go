@@ -291,7 +291,7 @@ func (l *Gsub2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	return &Match{
 		InputPos: []int{a},
 		Replace:  insert,
-		Next:     a + k,
+		Next:     a + 1,
 	}
 }
 
@@ -614,7 +614,7 @@ ligLoop:
 			Replace: []font.Glyph{
 				{Gid: lig.Out, Text: text},
 			},
-			Next: a + 1,
+			Next: p + 1,
 		}
 	}
 
