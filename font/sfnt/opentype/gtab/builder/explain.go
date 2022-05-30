@@ -30,7 +30,7 @@ import (
 )
 
 // ExplainGsub returns a human-readable, textual description of the lookups
-// in a GSUB table.  This function panics if `ll` is not a GSUB table.
+// in a GSUB table.
 func ExplainGsub(fontInfo *sfntcff.Info) string {
 	ee := newExplainer(fontInfo)
 
@@ -43,7 +43,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 
 		for i, subtable := range lookup.Subtables {
 			if i == 0 {
-				fmt.Fprintf(ee.w, "GSUB_%d:", lookup.Meta.LookupType)
+				fmt.Fprintf(ee.w, "GSUB%d:", lookup.Meta.LookupType)
 				ee.explainFlags(lookup.Meta.LookupFlag)
 			} else {
 				ee.w.WriteString(" ||\n\t")
@@ -255,7 +255,41 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 				ee.explainNested(l.Actions)
 
 			default:
-				panic(fmt.Sprintf("unsupported subtable type %T", l))
+				panic(fmt.Sprintf("unsupported GSUB subtable type %T", l))
+			}
+		}
+		ee.w.WriteRune('\n')
+	}
+
+	return ee.w.String()
+}
+
+// ExplainGpos returns a human-readable, textual description of the lookups
+// in a GPOS table.
+func ExplainGpos(fontInfo *sfntcff.Info) string {
+	ee := newExplainer(fontInfo)
+
+	for _, lookup := range fontInfo.Gpos.LookupList {
+		checkType := func(newType int) {
+			if newType != int(lookup.Meta.LookupType) {
+				panic("inconsistent subtable types")
+			}
+		}
+
+		for i, subtable := range lookup.Subtables {
+			if i == 0 {
+				fmt.Fprintf(ee.w, "GPOS%d:", lookup.Meta.LookupType)
+				ee.explainFlags(lookup.Meta.LookupFlag)
+			} else {
+				ee.w.WriteString(" ||\n\t")
+			}
+
+			switch l := subtable.(type) {
+			case *gtab.Gpos1_1:
+				checkType(1)
+
+			default:
+				panic(fmt.Sprintf("unsupported GPOS subtable type %T", l))
 			}
 		}
 		ee.w.WriteRune('\n')

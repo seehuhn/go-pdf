@@ -170,7 +170,7 @@ func lexStart(l *lexer) stateFn {
 		return lexIdentifier
 	case r == '"':
 		return lexString
-	case r >= '0' && r <= '9':
+	case r >= '0' && r <= '9' || r == '+':
 		return lexInteger
 	case isSingleCharToken(r):
 		l.emit(singleCharTokens[r])
@@ -179,6 +179,8 @@ func lexStart(l *lexer) stateFn {
 		r := l.next()
 		if r == '>' {
 			l.emit(itemArrow)
+		} else if r >= '0' && r <= '9' {
+			return lexInteger
 		} else {
 			l.backup()
 			l.emit(itemHyphen)

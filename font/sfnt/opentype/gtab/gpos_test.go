@@ -25,7 +25,7 @@ import (
 func FuzzGpos1_1(f *testing.F) {
 	l := &Gpos1_1{
 		Cov: map[font.GlyphID]int{8: 0, 9: 1},
-		Adjust: &ValueRecord{
+		Adjust: &GposValueRecord{
 			XAdvance: 100,
 		},
 	}
@@ -41,7 +41,7 @@ func FuzzGpos1_2(f *testing.F) {
 	f.Add(l.Encode())
 	l = &Gpos1_2{
 		Cov: map[font.GlyphID]int{8: 0, 9: 1},
-		Adjust: []*ValueRecord{
+		Adjust: []*GposValueRecord{
 			{XAdvance: 100},
 			{XAdvance: 50, XPlacement: -50},
 		},
@@ -61,7 +61,7 @@ func FuzzGpos2_1(f *testing.F) {
 		Adjust: []map[font.GlyphID]*PairAdjust{
 			{
 				2: &PairAdjust{
-					First: &ValueRecord{
+					First: &GposValueRecord{
 						XAdvance: -10,
 					},
 				},
@@ -72,23 +72,23 @@ func FuzzGpos2_1(f *testing.F) {
 	l.Adjust = []map[font.GlyphID]*PairAdjust{
 		{
 			2: &PairAdjust{
-				First: &ValueRecord{
+				First: &GposValueRecord{
 					XAdvance: -10,
 				},
 			},
 			4: &PairAdjust{
-				First: &ValueRecord{
+				First: &GposValueRecord{
 					XAdvance: -10,
 				},
-				Second: &ValueRecord{
+				Second: &GposValueRecord{
 					XPlacement: 5,
 				},
 			},
 			6: &PairAdjust{
-				First: &ValueRecord{
+				First: &GposValueRecord{
 					XAdvance: -10,
 				},
-				Second: &ValueRecord{
+				Second: &GposValueRecord{
 					XPlacement:        1,
 					YPlacement:        2,
 					XAdvance:          3,

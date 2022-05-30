@@ -25,22 +25,22 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 )
 
-func TestParser(t *testing.T) {
+func TestGsubParser(t *testing.T) {
 	fontInfo := debug.MakeSimpleFont()
 	lookups, err := Parse(fontInfo, `
-	GSUB_1: A->B, M->N
-	GSUB_1: A-C -> B-D, M->N, N->O
-	GSUB_1: A->X, B->X, C->X, M->X, N->X
-	GSUB_2: A -> "AA", B -> "AA", C -> "ABAAC"
-	GSUB_3: A -> [ "BCD" ]
-	GSUB_4: -marks A A A -> B, A -> D, A A -> C
-	GSUB_5:
+	GSUB1: A->B, M->N
+	GSUB1: A-C -> B-D, M->N, N->O
+	GSUB1: A->X, B->X, C->X, M->X, N->X
+	GSUB2: A -> "AA", B -> "AA", C -> "ABAAC"
+	GSUB3: A -> [ "BCD" ]
+	GSUB4: -marks A A A -> B, A -> D, A A -> C
+	GSUB5:
 		"AAA" -> 1@0 2@1 1@0, "AAB" -> 1@0 1@1 2@0 ||
 		class :alpha: = [A-K]
 		class :digits: = [L-Z]
 		/A B C/ :alpha: :digits: -> 2@1, :alpha: :: :digits: -> 2@2 ||
 		[A B C] [A C] [A D] -> 3@0
-	GSUB_6:
+	GSUB6:
 		A B | C D | E F -> 1@0 2@1, B | C D E | F -> 1@2 ||
 		inputclass :ABC: = ["ABC"]
 		backtrackclass :DEF: = ["DEF"]
@@ -63,7 +63,7 @@ func FuzzGsub1(f *testing.F) {
 	f.Add("A->X, B->X, C->X, M->X, N->X")
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := Parse(fontInfo, "GSUB_1: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB1: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
@@ -84,14 +84,14 @@ func FuzzGsub2(f *testing.F) {
 	f.Add(`A -> "AA", B -> "AA", C -> "ABAAC"`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := Parse(fontInfo, "GSUB_2: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB2: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
 		fmt.Println("@1@")
-		fmt.Println("GSUB_2: " + desc)
+		fmt.Println("GSUB2: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
 		lookups2, err := Parse(fontInfo, desc2)
@@ -109,14 +109,14 @@ func FuzzGsub3(f *testing.F) {
 	f.Add(`A -> ["AA"], B -> ["AA"], C -> ["ABAAC"]`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := Parse(fontInfo, "GSUB_3: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB3: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
 		fmt.Println("@1@")
-		fmt.Println("GSUB_3: " + desc)
+		fmt.Println("GSUB3: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
 		lookups2, err := Parse(fontInfo, desc2)
@@ -143,14 +143,14 @@ func FuzzGsub5(f *testing.F) {
 		[A B C] [A C] [A D] -> 3@0`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := Parse(fontInfo, "GSUB_5: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB5: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
 		fmt.Println("@1@")
-		fmt.Println("GSUB_5: " + desc)
+		fmt.Println("GSUB5: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
 		lookups2, err := Parse(fontInfo, desc2)
@@ -180,14 +180,14 @@ func FuzzGsub6(f *testing.F) {
 		[A] [A B C] | [A B] [A C] [B C] | [A B C] [A B C] -> 1@0 1@1 1@2`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
-		lookups, err := Parse(fontInfo, "GSUB_6: "+desc)
+		lookups, err := Parse(fontInfo, "GSUB6: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}
 		fontInfo.Gsub = &gtab.Info{LookupList: lookups}
 		desc2 := ExplainGsub(fontInfo)
 		fmt.Println("@1@")
-		fmt.Println("GSUB_6: " + desc)
+		fmt.Println("GSUB6: " + desc)
 		fmt.Println("@2@")
 		fmt.Println(desc2)
 		lookups2, err := Parse(fontInfo, desc2)
@@ -198,4 +198,18 @@ func FuzzGsub6(f *testing.F) {
 			t.Error(d)
 		}
 	})
+}
+
+func TestGposParser(t *testing.T) {
+	fontInfo := debug.MakeSimpleFont()
+	lookups, err := Parse(fontInfo, `
+	GPOS1: A -> dy+10
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fontInfo.Gpos = &gtab.Info{LookupList: lookups}
+
+	explain := ExplainGpos(fontInfo)
+	fmt.Println(explain)
 }

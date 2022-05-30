@@ -480,7 +480,8 @@ type Gsub4_1 struct {
 	Repl [][]Ligature // indexed by coverage index
 }
 
-// Ligature represents a substitution of a sequence of glyphs into a single glyph.
+// Ligature represents a substitution of a sequence of glyphs into a single glyph
+// in a Gsub4_1 subtable.
 type Ligature struct {
 	In  []font.GlyphID // excludes the first input glyph, since this is in Cov
 	Out font.GlyphID

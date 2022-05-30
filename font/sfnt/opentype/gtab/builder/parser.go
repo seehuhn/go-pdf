@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
+// Parse decodes the textual description of a LookupList.
 func Parse(fontInfo *sfntcff.Info, input string) (lookups gtab.LookupList, err error) {
 	numGlyphs := fontInfo.NumGlyphs()
 	byName := make(map[string]font.GlyphID)
@@ -82,23 +83,26 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 			p.fatal("%s", item.val)
 		case item.typ == itemSemicolon || item.typ == itemEOL:
 			// pass
-		case isIdentifier(item, "GSUB_1"):
+		case isIdentifier(item, "GSUB1"):
 			l := p.readGsub1()
 			lookups = append(lookups, l)
-		case isIdentifier(item, "GSUB_2"):
+		case isIdentifier(item, "GSUB2"):
 			l := p.readGsub2()
 			lookups = append(lookups, l)
-		case isIdentifier(item, "GSUB_3"):
+		case isIdentifier(item, "GSUB3"):
 			l := p.readGsub3()
 			lookups = append(lookups, l)
-		case isIdentifier(item, "GSUB_4"):
+		case isIdentifier(item, "GSUB4"):
 			l := p.readGsub4()
 			lookups = append(lookups, l)
-		case isIdentifier(item, "GSUB_5"):
+		case isIdentifier(item, "GSUB5"):
 			l := p.readSeqCtx(5)
 			lookups = append(lookups, l)
-		case isIdentifier(item, "GSUB_6"):
+		case isIdentifier(item, "GSUB6"):
 			l := p.readChainedSeqCtx(6)
+			lookups = append(lookups, l)
+		case isIdentifier(item, "GPOS1"):
+			l := p.readGpos1()
 			lookups = append(lookups, l)
 		default:
 			p.fatal("unexpected %s", item)
@@ -136,7 +140,8 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 		p.fatal("no substitutions found")
 	}
 
-	// TODO(voss): be more clever in choosing format 1/2 subtables
+	// TODO(voss): be more clever in choosing format 1/2 subtables,
+	// or change the format so that the user has to make the decision.
 	cov := makeCoverageTable(maps.Keys(res))
 
 	isConstDelta := true
@@ -316,6 +321,31 @@ func (p *parser) readGsub4() *gtab.LookupTable {
 	}
 	return &gtab.LookupTable{
 		Meta:      &gtab.LookupMetaInfo{LookupType: 4, LookupFlag: flags},
+		Subtables: []gtab.Subtable{subtable},
+	}
+}
+
+func (p *parser) readGpos1() *gtab.LookupTable {
+	p.optional(itemColon)
+	p.optional(itemEOL)
+	flags := p.readLookupFlags()
+
+	from := p.readGlyphList()
+	p.required(itemArrow, "\"->\"")
+	adj := p.readGposValueRecord()
+
+	cov := makeCoverageTable(from)
+
+	subtable := &gtab.Gpos1_1{
+		Cov:    cov,
+		Adjust: adj,
+	}
+
+	return &gtab.LookupTable{
+		Meta: &gtab.LookupMetaInfo{
+			LookupType: 1,
+			LookupFlag: flags,
+		},
 		Subtables: []gtab.Subtable{subtable},
 	}
 }
@@ -870,6 +900,48 @@ func (p *parser) readClassNames() []string {
 			return classNames
 		}
 	}
+}
+
+func (p *parser) readInteger() int {
+	item := p.readItem()
+	if item.typ != itemInteger {
+		p.fatal("expected integer, got %s", item)
+	}
+	x, err := strconv.Atoi(item.val)
+	if err != nil {
+		p.fatal("invalid integer: %q", item.val)
+	}
+	return x
+}
+
+func (p *parser) readInt16() int16 {
+	x := p.readInteger()
+	if x < -32768 || x > 32767 {
+		p.fatal("int16 out of range: %d", x)
+	}
+	return int16(x)
+}
+
+func (p *parser) readGposValueRecord() *gtab.GposValueRecord {
+	res := &gtab.GposValueRecord{}
+valueRecordLoop:
+	for {
+		next := p.readItem()
+		switch {
+		case isIdentifier(next, "x"):
+			res.XPlacement = p.readInt16()
+		case isIdentifier(next, "y"):
+			res.YPlacement = p.readInt16()
+		case isIdentifier(next, "dx"):
+			res.XAdvance = p.readInt16()
+		case isIdentifier(next, "dy"):
+			res.YAdvance = p.readInt16()
+		default:
+			p.backlog = append(p.backlog, next)
+			break valueRecordLoop
+		}
+	}
+	return res
 }
 
 func (p *parser) readItem() item {

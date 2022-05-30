@@ -20,6 +20,22 @@ import (
 	"testing"
 )
 
+func TestLexInteger(t *testing.T) {
+	for _, in := range []string{"0", "123", "-123", "+123"} {
+		_, c := lex(in)
+
+		if x := <-c; x.typ != itemInteger || x.val != in {
+			t.Errorf("%q -> itemInteger expected, got %s(%d)", in, x, x.typ)
+		}
+		if x := <-c; x.typ != itemEOF {
+			t.Error("itemEOF expected")
+		}
+		if _, ok := <-c; ok {
+			t.Error("channel should be closed")
+		}
+	}
+}
+
 func TestLexBackup(t *testing.T) {
 	l := &lexer{
 		input: "abc",

@@ -39,33 +39,25 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 		return nil, err
 	}
 
-	switch 10*meta.LookupType + format {
-	case 1_1:
-		return readGpos1_1(p, pos)
-	case 1_2:
-		return readGpos1_2(p, pos)
-	case 2_1:
-		return readGpos2_1(p, pos)
-
-	case 7_1:
-		return readSeqContext1(p, pos)
-	case 7_2:
-		return readSeqContext2(p, pos)
-	case 7_3:
-		return readSeqContext3(p, pos)
-	case 8_1:
-		return readChainedSeqContext1(p, pos)
-	case 8_2:
-		return readChainedSeqContext2(p, pos)
-	case 8_3:
-		return readChainedSeqContext3(p, pos)
-	case 9_1:
-		return readExtensionSubtable(p, pos)
-
-	default:
+	reader, ok := gposReaders[10*meta.LookupType+format]
+	if !ok {
 		fmt.Println("GPOS", meta.LookupType, format)
 		return notImplementedGposSubtable{meta.LookupType, format}, nil
 	}
+	return reader(p, pos)
+}
+
+var gposReaders = map[uint16]func(p *parser.Parser, pos int64) (Subtable, error){
+	1_1: readGpos1_1,
+	1_2: readGpos1_2,
+	2_1: readGpos2_1,
+	7_1: readSeqContext1,
+	7_2: readSeqContext2,
+	7_3: readSeqContext3,
+	8_1: readChainedSeqContext1,
+	8_2: readChainedSeqContext2,
+	8_3: readChainedSeqContext3,
+	9_1: readExtensionSubtable,
 }
 
 type notImplementedGposSubtable struct {
@@ -90,11 +82,13 @@ func (st notImplementedGposSubtable) Encode() []byte {
 	panic(msg)
 }
 
-// Gpos1_1 is a Single Adjustment Positioning Subtable (GPOS type 1, format 1)
+// Gpos1_1 is a Single Adjustment Positioning Subtable (GPOS type 1, format 1).
+// If specifies a single adjustment to be applied to all glyphs in the
+// coverage table.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#single-adjustment-positioning-format-1-single-positioning-value
 type Gpos1_1 struct {
 	Cov    coverage.Table
-	Adjust *ValueRecord
+	Adjust *GposValueRecord
 }
 
 func readGpos1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -161,7 +155,7 @@ func (l *Gpos1_1) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#single-adjustment-positioning-format-2-array-of-positioning-values
 type Gpos1_2 struct {
 	Cov    coverage.Table
-	Adjust []*ValueRecord
+	Adjust []*GposValueRecord // indexed by coverage index
 }
 
 func readGpos1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -172,7 +166,7 @@ func readGpos1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
 	valueFormat := uint16(buf[2])<<8 | uint16(buf[3])
 	valueCount := int(buf[4])<<8 | int(buf[5])
-	valueRecords := make([]*ValueRecord, valueCount)
+	valueRecords := make([]*GposValueRecord, valueCount)
 	for i := range valueRecords {
 		valueRecords[i], err = readValueRecord(p, valueFormat)
 		if err != nil {
@@ -263,7 +257,7 @@ type Gpos2_1 struct {
 
 // PairAdjust represents information from a PairValueRecord table.
 type PairAdjust struct {
-	First, Second *ValueRecord
+	First, Second *GposValueRecord
 }
 
 func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {

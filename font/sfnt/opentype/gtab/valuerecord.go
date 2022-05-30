@@ -25,9 +25,9 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
-// ValueRecord describes an adjustment to the position of a glyph or set of glyphs.
+// GposValueRecord describes an adjustment to the position of a glyph or set of glyphs.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#value-record
-type ValueRecord struct {
+type GposValueRecord struct {
 	XPlacement        int16  // Horizontal adjustment for placement
 	YPlacement        int16  // Vertical adjustment for placement
 	XAdvance          int16  // Horizontal adjustment for advance
@@ -41,12 +41,12 @@ type ValueRecord struct {
 // readValueRecord reads the binary representation of a valueRecord.  The
 // valueFormat determines which fields are present in the binary
 // representation.
-func readValueRecord(p *parser.Parser, valueFormat uint16) (*ValueRecord, error) {
+func readValueRecord(p *parser.Parser, valueFormat uint16) (*GposValueRecord, error) {
 	if valueFormat == 0 {
 		return nil, nil
 	}
 
-	res := &ValueRecord{}
+	res := &GposValueRecord{}
 	var err error
 	if valueFormat&0x0001 != 0 {
 		res.XPlacement, err = p.ReadInt16()
@@ -99,7 +99,7 @@ func readValueRecord(p *parser.Parser, valueFormat uint16) (*ValueRecord, error)
 	return res, nil
 }
 
-func (vr *ValueRecord) getFormat() uint16 {
+func (vr *GposValueRecord) getFormat() uint16 {
 	if vr == nil {
 		return 0
 	}
@@ -139,11 +139,11 @@ func (vr *ValueRecord) getFormat() uint16 {
 	return format
 }
 
-func (*ValueRecord) encodeLen(format uint16) int {
+func (*GposValueRecord) encodeLen(format uint16) int {
 	return 2 * bits.OnesCount16(format)
 }
 
-func (vr *ValueRecord) encode(format uint16) []byte {
+func (vr *GposValueRecord) encode(format uint16) []byte {
 	bufSize := vr.encodeLen(format)
 	buf := make([]byte, 0, bufSize)
 	if format&0x0001 != 0 {
@@ -176,7 +176,7 @@ func (vr *ValueRecord) encode(format uint16) []byte {
 	return buf
 }
 
-func (vr *ValueRecord) String() string {
+func (vr *GposValueRecord) String() string {
 	if vr == nil {
 		return "<nil>"
 	}
@@ -213,7 +213,7 @@ func (vr *ValueRecord) String() string {
 }
 
 // Apply adjusts the position of a glyph according to the value record.
-func (vr *ValueRecord) Apply(glyph *font.Glyph) {
+func (vr *GposValueRecord) Apply(glyph *font.Glyph) {
 	if vr == nil {
 		return
 	}

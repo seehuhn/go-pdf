@@ -152,18 +152,18 @@ func FuzzGsub(f *testing.F) {
 		for _, lookupIndex := range lookups {
 			seq = gsub.LookupList.ApplyLookup(seq, lookupIndex, gdef)
 
-			expectedCount := len([]rune(in))
-			runeCount := 0
+			runeCountIn := len([]rune(in))
+			runeCountOut := 0
 			for _, g := range seq {
-				runeCount += len([]rune(g.Text))
+				runeCountOut += len([]rune(g.Text))
 			}
-			if runeCount != expectedCount {
+			if runeCountOut != runeCountIn {
 				fmt.Printf("desc = %q\n", desc)
 				fmt.Printf("in = %q\n", in)
 				for i, g := range seq {
 					fmt.Printf("out[%d] = %d %q\n", i, g.Gid, string(g.Text))
 				}
-				t.Errorf("expected %d runes, got %d", expectedCount, runeCount)
+				t.Errorf("expected %d runes, got %d", runeCountIn, runeCountOut)
 			}
 		}
 	})
@@ -205,121 +205,121 @@ type testCase struct {
 
 var gsubTestCases = []testCase{
 	{ // test0001.odf
-		desc: "GSUB_1: A->X, C->Z",
+		desc: "GSUB1: A->X, C->Z",
 		in:   "ABC",
 		out:  "XBZ",
 	},
 	{
-		desc: "GSUB_1: A->B, B->A",
+		desc: "GSUB1: A->B, B->A",
 		in:   "ABC",
 		out:  "BAC",
 	},
 	{
-		desc: "GSUB_1: -base A->B, B->A",
+		desc: "GSUB1: -base A->B, B->A",
 		in:   "ABC",
 		out:  "BBC",
 	},
 	{
-		desc: "GSUB_1: -marks A->B, M->N",
+		desc: "GSUB1: -marks A->B, M->N",
 		in:   "AAMBA",
 		out:  "BBMBB",
 	},
 
 	{
-		desc: `GSUB_2: A->A A`,
+		desc: `GSUB2: A->A A`,
 		in:   "AA",
 		out:  "AAAA",
 	},
 	{
-		desc: `GSUB_2: -marks A -> "ABA", M -> A`,
+		desc: `GSUB2: -marks A -> "ABA", M -> A`,
 		in:   "ABMA",
 		out:  "ABABMABA",
 	},
 
 	{
-		desc: `GSUB_3: A -> [B C D]`,
+		desc: `GSUB3: A -> [B C D]`,
 		in:   "AB",
 		out:  "BB",
 	},
 	{
-		desc: `GSUB_3: -marks A -> [B C], M -> [B C]`,
+		desc: `GSUB3: -marks A -> [B C], M -> [B C]`,
 		in:   "AM",
 		out:  "BM",
 	},
 	{
-		desc: `GSUB_3: A -> []`,
+		desc: `GSUB3: A -> []`,
 		in:   "AB",
 		out:  "AB",
 	},
 
 	{
-		desc: `GSUB_4: "BA" -> B`,
+		desc: `GSUB4: "BA" -> B`,
 		in:   "ABAABA",
 		out:  "ABAB",
 	},
 	{
-		desc: `GSUB_4: "AAA" -> "B", "AA" -> "C", "A" -> "D"`,
+		desc: `GSUB4: "AAA" -> "B", "AA" -> "C", "A" -> "D"`,
 		in:   "AAAAAXA",
 		out:  "BCXD",
 	},
 	{
-		desc: `GSUB_4: -marks "AAA" -> "X"`,
+		desc: `GSUB4: -marks "AAA" -> "X"`,
 		in:   "AAABMAAACAMAADAAMAEAAAM",
 		out:  "XBMXCXMDXMEXM",
 		text: "AAABMAAACAAAMDAAAMEAAAM",
 	},
 	{
-		desc: `GSUB_4: -marks "AAA" -> "C", "AA" -> "B"`,
+		desc: `GSUB4: -marks "AAA" -> "C", "AA" -> "B"`,
 		in:   "AAAMAMAMAAA",
 		out:  "CMCMMB",
 		text: "AAAMAAAMMAA",
 	},
 
 	{
-		desc: `GSUB_5: "AAA" -> 3@2 1@0 2@1
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: "AAA" -> 3@2 1@0 2@1
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "AAA",
 		out: "XYZ",
 	},
 	{ // test0011.odf
-		desc: `GSUB_5: "XXX" -> 1@0
-				GSUB_1: "X" -> "A"`,
+		desc: `GSUB5: "XXX" -> 1@0
+				GSUB1: "X" -> "A"`,
 		in:  "XXXXXXXX",
 		out: "AXXAXXXX",
 	},
 	{
-		desc: `GSUB_5: "ABC" -> 1@0 1@1 1@2
-				GSUB_1: "B" -> "X"`,
+		desc: `GSUB5: "ABC" -> 1@0 1@1 1@2
+				GSUB1: "B" -> "X"`,
 		in:  "ABC",
 		out: "AXC",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: "AAAA" -> 1@0 4@2 3@1 2@0
-				GSUB_4: "AA" -> "A"
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: "AAAA" -> 1@0 4@2 3@1 2@0
+				GSUB4: "AA" -> "A"
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "AAAA",
 		out: "XYZ",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: "AAA" -> 1@0 4@2 3@1 2@0
-				GSUB_2: "A" -> "AA"
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: "AAA" -> 1@0 4@2 3@1 2@0
+				GSUB2: "A" -> "AA"
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "AAA",
 		out: "XYZA",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: "AAA" -> 1@0 5@2 4@1 3@0
-				GSUB_5: "AA" -> 2@1
-				GSUB_2: "A" -> "AA"
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: "AAA" -> 1@0 5@2 4@1 3@0
+				GSUB5: "AA" -> 2@1
+				GSUB2: "A" -> "AA"
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "AAA",
 		out: "XYZA",
 	},
@@ -330,75 +330,75 @@ var gsubTestCases = []testCase{
 	// sequence length changes:
 	//
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: "AA" -> 1@0 2@0
-				GSUB_1: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: "AA" -> 1@0 2@0
+				GSUB1: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "AA",
 		out: "XA",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: "AA" -> 1@0 2@0
-				GSUB_2: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: "AA" -> 1@0 2@0
+				GSUB2: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "AA",
 		out: "XA",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: "AA" -> 1@0 2@0
-				GSUB_4: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: "AA" -> 1@0 2@0
+				GSUB4: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "AA",
 		out: "XA",
 	},
 	//
 	// The same, but with one more level of nesting.
 	{
-		desc: `GSUB_5: "AA" -> 1@0 3@0
-				GSUB_5: "A" -> 2@0
-				GSUB_1: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: "AA" -> 1@0 3@0
+				GSUB5: "A" -> 2@0
+				GSUB1: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "AA",
 		out: "XA",
 	},
 	{
-		desc: `GSUB_5: "AA" -> 1@0 3@0
-				GSUB_5: "A" -> 2@0
-				GSUB_2: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: "AA" -> 1@0 3@0
+				GSUB5: "A" -> 2@0
+				GSUB2: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "AA",
 		out: "XA",
 	},
 	{
-		desc: `GSUB_5: "AA" -> 1@0 3@0
-				GSUB_5: "A" -> 2@0
-				GSUB_4: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: "AA" -> 1@0 3@0
+				GSUB5: "A" -> 2@0
+				GSUB4: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "AA",
 		out: "XA",
 	},
 	//
 	// ... and with ligatures ignored
 	{
-		desc: `GSUB_5: -ligs "AA" -> 1@0 3@0
-				GSUB_5: "A" -> 2@0
-				GSUB_1: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: -ligs "AA" -> 1@0 3@0
+				GSUB5: "A" -> 2@0
+				GSUB1: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "ALA",
 		out: "XLA",
 	},
 	{
-		desc: `GSUB_5: -ligs "AA" -> 1@0 3@0
-				GSUB_5: "AL" -> 2@0
-				GSUB_1: "A" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "X"`,
+		desc: `GSUB5: -ligs "AA" -> 1@0 3@0
+				GSUB5: "AL" -> 2@0
+				GSUB1: "A" -> "B"
+				GSUB1: "A" -> "X", "B" -> "X"`,
 		in:  "ALA",
 		out: "XLA",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
-				GSUB_5: "AL" -> 2@0
-				GSUB_2: "A" -> "BB"
-				GSUB_1: "A" -> "Y", "B" -> "Y"`,
+		desc: `GSUB5: -ligs "AA" -> 1@0 3@1
+				GSUB5: "AL" -> 2@0
+				GSUB2: "A" -> "BB"
+				GSUB1: "A" -> "Y", "B" -> "Y"`,
 		in:  "ALA",
 		out: "BYLA",
 	},
@@ -420,19 +420,19 @@ var gsubTestCases = []testCase{
 	// to the input sequence:
 	{ // ALA -> ABA -> ABX
 		// harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
-				GSUB_5: "ALA" -> 2@1
-				GSUB_4: "L" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -ligs "AA" -> 1@0 3@1
+				GSUB5: "ALA" -> 2@1
+				GSUB4: "L" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "ALA",
 		out: "ABX",
 	},
 	{ // ALA -> ABBA -> ...
 		// harfbuzz: AYBA, Mac: ABYA, Windows: ABBY
-		desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
-				GSUB_5: "AL" -> 2@1
-				GSUB_2: "L" -> "BB"
-				GSUB_1: "A" -> "Y", "B" -> "Y"`,
+		desc: `GSUB5: -ligs "AA" -> 1@0 3@1
+				GSUB5: "AL" -> 2@1
+				GSUB2: "L" -> "BB"
+				GSUB1: "A" -> "Y", "B" -> "Y"`,
 		in:  "ALA",
 		out: "ABBY",
 	},
@@ -447,44 +447,44 @@ var gsubTestCases = []testCase{
 	// When a pair of normal glyphs is replaced, the replacement IS added.
 	{ // AAA -> AB -> ...
 		// harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: -ligs "AAA" -> 1@0 3@1
-				GSUB_5: "AAA" -> 2@1
-				GSUB_4: "AA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@0 3@1
+				GSUB5: "AAA" -> 2@1
+				GSUB4: "AA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AAA",
 		out: "AY",
 	},
 
 	{ // ALA -> AB -> ...
 		// harfbuzz: AB, Mac: AB, Windows: AY -> yes
-		desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
-				GSUB_5: "ALA" -> 2@1
-				GSUB_4: "LA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -ligs "AA" -> 1@0 3@1
+				GSUB5: "ALA" -> 2@1
+				GSUB4: "LA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "ALA",
 		out: "AY",
 	},
 
 	// normal+ignored
 	{ // harfbuzz: , Mac: YAA, Windows: YAA -> yes
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
-				GSUB_5: "AM" -> 2@0
-				GSUB_4: "AM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@0
+				GSUB5: "AM" -> 2@0
+				GSUB4: "AM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAA",
 		out: "YAA",
 	},
 	// { // harfbuzz: AXA, Mac: AXA, Windows: AAX -> no ????????????????????
-	// 	desc: `GSUB_5: -marks "AAA" -> 1@1 2@1
-	// 			GSUB_4: "AM" -> "A"
-	// 			GSUB_1: "A" -> "X"`,
+	// 	desc: `GSUB5: -marks "AAA" -> 1@1 2@1
+	// 			GSUB4: "AM" -> "A"
+	// 			GSUB1: "A" -> "X"`,
 	// 	in:  "AAMA",
 	// 	out: "AAX",
 	// },
 	// { // harfbuzz: AXA, Mac: AXA, Windows: AAX -> no ????????????????????
-	// 	desc: `GSUB_5: -marks "ALA" -> 1@1 2@1
-	// 			GSUB_4: "LM" -> "A"
-	// 			GSUB_1: "A" -> "X"`,
+	// 	desc: `GSUB5: -marks "ALA" -> 1@1 2@1
+	// 			GSUB4: "LM" -> "A"
+	// 			GSUB1: "A" -> "X"`,
 	// 	in:  "ALMA",
 	// 	out: "AAX",
 	// },
@@ -493,10 +493,10 @@ var gsubTestCases = []testCase{
 	// added.
 	{ // ALLA -> ABA -> ...
 		// harfbuzz: ABA, Mac: ABX, Windows: ABX -> no
-		desc: `GSUB_5: -ligs "AA" -> 1@0 3@1
-				GSUB_5: "ALL" -> 2@1
-				GSUB_4: "LL" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -ligs "AA" -> 1@0 3@1
+				GSUB5: "ALL" -> 2@1
+				GSUB4: "LL" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "ALLA",
 		out: "ABX",
 	},
@@ -513,89 +513,89 @@ var gsubTestCases = []testCase{
 	//   MMM: no
 
 	{ // harfbuzz: YA, Mac: YA, Windows: YA -> included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
-				GSUB_5: "AAM" -> 2@0
-				GSUB_4: "AAM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@0
+				GSUB5: "AAM" -> 2@0
+				GSUB4: "AAM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AAMA",
 		out: "YA",
 	},
 
 	{ // harfbuzz: YA, Mac: YA, Windows: YA -> included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
-				GSUB_5: "AMA" -> 2@0
-				GSUB_4: "AMA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@0
+				GSUB5: "AMA" -> 2@0
+				GSUB4: "AMA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAA",
 		out: "YA",
 	},
 	{ // harfbuzz: ABA, Mac: AYA, Windows: AYA -> included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AAMA" -> 2@1
-				GSUB_4: "AMA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AAMA" -> 2@1
+				GSUB4: "AMA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AAMAA",
 		out: "AYA",
 	},
 	{ // harfbuzz: ABX, Mac: AYA, Windows: AYA -> included
-		desc: `GSUB_5: -marks "AAAA" -> 1@0 3@1
-				GSUB_5: "AAMA" -> 2@1
-				GSUB_4: "AMA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAAA" -> 1@0 3@1
+				GSUB5: "AAMA" -> 2@1
+				GSUB4: "AMA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AAMAA",
 		out: "AYA",
 	},
 
 	{ // harfbuzz: YAA, Mac: YAA, Windows: YAA -> included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
-				GSUB_5: "AMM" -> 2@0
-				GSUB_4: "AMM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@0
+				GSUB5: "AMM" -> 2@0
+				GSUB4: "AMM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMMAA",
 		out: "YAA",
 	},
 
 	{ // harfbuzz: AB, Mac: AB, Windows: AY -> included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AMAA" -> 2@1
-				GSUB_4: "MAA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AMAA" -> 2@1
+				GSUB4: "MAA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAA",
 		out: "AY",
 	},
 
 	{ // harfbuzz: ABA, Mac: ABX, Windows: ABX -> not included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AMAM" -> 2@1
-				GSUB_4: "MAM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AMAM" -> 2@1
+				GSUB4: "MAM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAMA",
 		out: "ABX",
 	},
 	{ // ALALA -> ABA -> ...
 		// harfbuzz: ABA, Mac: ABX, Windows: ABX -> not included
-		desc: `GSUB_5: -ligs "AAA" -> 1@0 3@1
-				GSUB_5: "ALALA" -> 2@1
-				GSUB_4: "LAL" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@0 3@1
+				GSUB5: "ALALA" -> 2@1
+				GSUB4: "LAL" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "ALALA",
 		out: "ABX",
 	},
 
 	{ // harfbuzz: ABA, Mac: ABX, Windows: AYA -> included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AMMA" -> 2@1
-				GSUB_4: "MMA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AMMA" -> 2@1
+				GSUB4: "MMA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMMAA",
 		out: "AYA",
 	},
 
 	{ // harfbuzz: ABAA, Mac: ABXA, Windows: ABXA -> not included
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AMMM" -> 2@1
-				GSUB_4: "MMM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AMMM" -> 2@1
+				GSUB4: "MMM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMMMAA",
 		out: "ABXA",
 	},
@@ -621,55 +621,55 @@ var gsubTestCases = []testCase{
 	//   MMMM -> (no, I guess)
 
 	{ // harfbuzz: , Mac: YA, Windows: YA -> yes
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
-				GSUB_5: "AMAM" -> 2@0
-				GSUB_4: "AMAM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@0
+				GSUB5: "AMAM" -> 2@0
+				GSUB4: "AMAM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAMA",
 		out: "YA",
 	},
 
 	{ // harfbuzz: , Mac: YAA, Windows: YAA -> yes
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@0
-				GSUB_5: "AMMM" -> 2@0
-				GSUB_4: "AMMM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@0
+				GSUB5: "AMMM" -> 2@0
+				GSUB4: "AMMM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMMMAA",
 		out: "YAA",
 	},
 
 	{ // harfbuzz: , Mac: ABX, Windows: ABX -> no
-		desc: `GSUB_5: -marks "AAAA" -> 1@0 3@1
-				GSUB_5: "AMAAM" -> 2@1
-				GSUB_4: "MAAM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAAA" -> 1@0 3@1
+				GSUB5: "AMAAM" -> 2@1
+				GSUB4: "MAAM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAAMA",
 		out: "ABX",
 	},
 
 	{ // harfbuzz: , Mac: AB, Windows: AY -> yes
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AMAMA" -> 2@1
-				GSUB_4: "MAMA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AMAMA" -> 2@1
+				GSUB4: "MAMA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAMA",
 		out: "AY",
 	},
 
 	{ // harfbuzz: , Mac: ABX, Windows: ABX -> no
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AMAMM" -> 2@1
-				GSUB_4: "MAMM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AMAMM" -> 2@1
+				GSUB4: "MAMM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAMMA",
 		out: "ABX",
 	},
 
 	{ // harfbuzz: , Mac: ABX, Windows: ABX -> no
-		desc: `GSUB_5: -marks "AAA" -> 1@0 3@1
-				GSUB_5: "AMMAM" -> 2@1
-				GSUB_4: "MMAM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 3@1
+				GSUB5: "AMMAM" -> 2@1
+				GSUB4: "MMAM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMMAMA",
 		out: "ABX",
 	},
@@ -679,16 +679,16 @@ var gsubTestCases = []testCase{
 	// The difference between the following two cases is mysterious to me.
 
 	{ // harfbuzz: YAA, Mac: YAA, Windows: YAA -> yes
-		desc: `GSUB_5: -marks "AAA" -> 1@0 2@0
-				GSUB_4: "AM" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAA" -> 1@0 2@0
+				GSUB4: "AM" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMAA",
 		out: "YAA",
 	},
 	// { // harfbuzz: AYA, Mac: AYA, Windows: ABX -> no ????????????????????
-	// 	desc: `GSUB_5: -marks "AAA" -> 1@1 2@1
-	// 			GSUB_4: "AM" -> "B"
-	// 			GSUB_1: "A" -> "X", "B" -> "Y"`,
+	// 	desc: `GSUB5: -marks "AAA" -> 1@1 2@1
+	// 			GSUB4: "AM" -> "B"
+	// 			GSUB1: "A" -> "X", "B" -> "Y"`,
 	// 	in:  "AAMA",
 	// 	out: "ABX",
 	// },
@@ -700,19 +700,19 @@ var gsubTestCases = []testCase{
 	//   MMAMAA -> yes
 
 	{ // harfbuzz: ABA, Mac: ABX, Windows: AYA -> included
-		desc: `GSUB_5: -marks "AAAAA" -> 1@0 3@1
-				GSUB_5: "AMMMAAA" -> 2@1
-				GSUB_4: "MMMAAA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAAAA" -> 1@0 3@1
+				GSUB5: "AMMMAAA" -> 2@1
+				GSUB4: "MMMAAA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMMMAAAA",
 		out: "AYA",
 	},
 
 	{ // harfbuzz: ABA, Mac: ABX, Windows: AYA -> included
-		desc: `GSUB_5: -marks "AAAAA" -> 1@0 3@1
-				GSUB_5: "AMMAMAA" -> 2@1
-				GSUB_4: "MMAMAA" -> "B"
-				GSUB_1: "A" -> "X", "B" -> "Y"`,
+		desc: `GSUB5: -marks "AAAAA" -> 1@0 3@1
+				GSUB5: "AMMAMAA" -> 2@1
+				GSUB4: "MMAMAA" -> "B"
+				GSUB1: "A" -> "X", "B" -> "Y"`,
 		in:  "AMMAMAAA",
 		out: "AYA",
 	},
@@ -722,118 +722,118 @@ var gsubTestCases = []testCase{
 	// {
 	// 	// ALMA -> AAA -> ...
 	// 	// harfbuzz: AXA, Mac: AXY, Windows: AAY ????????????????????????
-	// 	desc: `GSUB_5: -ligs -marks "AA" -> 1@0 4@1
-	// 			GSUB_5: -marks "ALA" -> 2@1 3@1
-	// 			GSUB_4: "LM" -> "A"
-	// 			GSUB_1: "A" -> "X"
-	// 			GSUB_1: "A" -> "Y", "X" -> "Y"`,
+	// 	desc: `GSUB5: -ligs -marks "AA" -> 1@0 4@1
+	// 			GSUB5: -marks "ALA" -> 2@1 3@1
+	// 			GSUB4: "LM" -> "A"
+	// 			GSUB1: "A" -> "X"
+	// 			GSUB1: "A" -> "Y", "X" -> "Y"`,
 	// 	in:  "ALMA",
 	// 	out: "AAY",
 	// },
 
 	{ // harfbuzz: DEI, Mac: DEI, Windows: DEI
-		desc: `GSUB_5: "ABC" -> 1@0 1@2 1@3 2@2
-				GSUB_2: "A" -> "DE", "B" -> "FG", "G" -> "H"
-				GSUB_4: "FHC" -> "I"`,
+		desc: `GSUB5: "ABC" -> 1@0 1@2 1@3 2@2
+				GSUB2: "A" -> "DE", "B" -> "FG", "G" -> "H"
+				GSUB4: "FHC" -> "I"`,
 		in:  "ABC",
 		out: "DEI", // ABC -> DEBC -> DEFGC -> DEFHC -> DEI
 	},
 	{ // harfbuzz: AXAAKA, Mac: AAXAKA, Windows: AAAXKA
-		desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
-				GSUB_5: "AK" -> 2@1
-				GSUB_2: "K" -> "AA"
-				GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@0 2@1 3@1
+				GSUB5: "AK" -> 2@1
+				GSUB2: "K" -> "AA"
+				GSUB1: "A" -> "X", "K" -> "X", "L" -> "X"`,
 		in:  "AKAKA",
 		out: "AAAXKA",
 	},
 	{ //  harfbuzz: AXLAKA, Mac: ALXAKA, Windows: ALLXKA
-		desc: `GSUB_5: -ligs "AAA" -> 1@0 2@1 3@1
-				GSUB_5: "AK" -> 2@1
-				GSUB_2: "K" -> "LL"
-				GSUB_1: "A" -> "X", "K" -> "X", "L" -> "X"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@0 2@1 3@1
+				GSUB5: "AK" -> 2@1
+				GSUB2: "K" -> "LL"
+				GSUB1: "A" -> "X", "K" -> "X", "L" -> "X"`,
 		in:  "AKAKA",
 		out: "ALLXKA",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
-				GSUB_5: "AL" -> 2@1
-				GSUB_1: "L" -> "A"
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
+				GSUB5: "AL" -> 2@1
+				GSUB1: "L" -> "A"
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "ALAA",
 		out: "XAYZ",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_5: "AB" -> 1@0 0@0, "AAB" -> 1@0 0@0, "AAAB" -> 1@0 0@0
-				GSUB_2: "A" -> "AA"`,
+		desc: `GSUB5: "AB" -> 1@0 0@0, "AAB" -> 1@0 0@0, "AAAB" -> 1@0 0@0
+				GSUB2: "A" -> "AA"`,
 		in:  "AB",
 		out: "AAAAB",
 	},
 	{ // harfbuzz: XYAZA, Mac: XAYZA, Windows: XAAYZ
-		desc: `GSUB_5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
-				GSUB_5: "AL" -> 2@1
-				GSUB_2: "L" -> "AA"
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@0 5@2 4@1 3@0
+				GSUB5: "AL" -> 2@1
+				GSUB2: "L" -> "AA"
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "ALAA",
 		out: "XAAYZ",
 	},
 	{ // harfbuzz: XLYZ, Mac: XLYZ, Windows: XLYZA
-		desc: `GSUB_5: -ligs "AAAA" -> 1@0 5@2 4@1 3@0
-				GSUB_5: "AL" -> 2@1
-				GSUB_4: "LA" -> "L"
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: -ligs "AAAA" -> 1@0 5@2 4@1 3@0
+				GSUB5: "AL" -> 2@1
+				GSUB4: "LA" -> "L"
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "ALAAA",
 		out: "XLYZA",
 	},
 	{ // harfbuzz: AKA, Mac: AKA, Windows: ABAA
-		desc: `GSUB_5: -ligs "AAA" -> 1@0
-				GSUB_5: "AL" -> 2@1 3@1
-				GSUB_4: "LA" -> "K"
-				GSUB_1: "L" -> "B"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@0
+				GSUB5: "AL" -> 2@1 3@1
+				GSUB4: "LA" -> "K"
+				GSUB1: "L" -> "B"`,
 		in:  "ALAA",
 		out: "ABAA",
 	},
 	{ // harfbuzz: LXLYLZL, Mac: LXLYLZL, Windows: LXLYLZL
-		desc: `GSUB_5: -ligs "AAA" -> 3@2 1@0 2@1
-				GSUB_1: "A" -> "X"
-				GSUB_1: "A" -> "Y"
-				GSUB_1: "A" -> "Z"`,
+		desc: `GSUB5: -ligs "AAA" -> 3@2 1@0 2@1
+				GSUB1: "A" -> "X"
+				GSUB1: "A" -> "Y"
+				GSUB1: "A" -> "Z"`,
 		in:  "LALALAL",
 		out: "LXLYLZL",
 	},
 
 	// { // harfbuzz: LXALX, Mac: LXXX, Windows: LXXAL ???????????????????????
-	// 	desc: `GSUB_5: -ligs "AAA" -> 1@0 1@1 1@2
-	// 			GSUB_4: "AL" -> "X"`,
+	// 	desc: `GSUB5: -ligs "AAA" -> 1@0 1@1 1@2
+	// 			GSUB4: "AL" -> "X"`,
 	// 	in:  "LALALAL",
 	// 	out: "LXXAL",
 	// },
 	// { // Mac: LALALX, Windows: LALALAL ????????????????????????????????????
-	// 	desc: `GSUB_5: -ligs "AAA" -> 1@2
-	// 			GSUB_4: "AL" -> "X"`,
+	// 	desc: `GSUB5: -ligs "AAA" -> 1@2
+	// 			GSUB4: "AL" -> "X"`,
 	// 	in:  "LALALAL",
 	// 	out: "LALALAL",
 	// },
 	{ // Mac: LALALXB, Windows: LALALXB -> "AL" WAS added to input here
-		desc: `GSUB_5: -ligs "AAA" -> 1@2
-				GSUB_4: "AL" -> "X"`,
+		desc: `GSUB5: -ligs "AAA" -> 1@2
+				GSUB4: "AL" -> "X"`,
 		in:  "LALALALB",
 		out: "LALALXB",
 	},
 	{ // Mac: ABXD, Windows: ABXD -> "CL" was added to input here
-		desc: `GSUB_5: -ligs "ABC" -> 1@2
-			GSUB_4: C L -> X`,
+		desc: `GSUB5: -ligs "ABC" -> 1@2
+			GSUB4: C L -> X`,
 		in:  "ABCLD",
 		out: "ABXD",
 	},
 
 	{ // Mac: XCEAAAAXFBCAACX, Windows: XCEAAAAXFBCAACX
-		desc: `GSUB_5:
+		desc: `GSUB5:
 				"ACE" -> 1@0 ||
 				class :AB: = [A B]
 				class :CD: = [C D]
@@ -841,24 +841,24 @@ var gsubTestCases = []testCase{
 				/A B/ :AB: :CD: :EF: -> 1@1 ||
 				class :AB: = [A B]
 				/A/ :AB: :: :AB: -> 1@2
-			GSUB_1: A -> X, B -> X, C -> X, D -> X, E -> X, F -> X`,
+			GSUB1: A -> X, B -> X, C -> X, D -> X, E -> X, F -> X`,
 		in:  "ACEAAAACFBCAACB",
 		out: "XCEAAAAXFBCAACX",
 	},
 
 	{ // Mac: XBCFBCXA, Windows: XBCFBCXA
-		desc: `GSUB_5:
+		desc: `GSUB5:
 				[A-E] [A B] [C-X] -> 1@0 ||
 				[B-E] [B-E] [A-C] -> 1@1
-			GSUB_1: A -> X, B -> X, C -> X, D -> X, E -> X, F -> X`,
+			GSUB1: A -> X, B -> X, C -> X, D -> X, E -> X, F -> X`,
 		in:  "ABCFBCEA",
 		out: "XBCFBCXA",
 	},
 	{ // Mac: X, Windows: X
-		desc: `GSUB_5: -ligs
+		desc: `GSUB5: -ligs
 				class :A: = [A]
 				/A/ :A: -> 1@0
-			GSUB_4: A L -> X`,
+			GSUB4: A L -> X`,
 		in:  "AL",
 		out: "X",
 	},
@@ -866,65 +866,65 @@ var gsubTestCases = []testCase{
 	// lookup rules with context
 
 	{
-		desc: `GSUB_6: A B | C D | E F -> 1@0
-			GSUB_1: C -> X`,
+		desc: `GSUB6: A B | C D | E F -> 1@0
+			GSUB1: C -> X`,
 		in:  "ABCDEF",
 		out: "ABXDEF",
 	},
 	{
-		desc: `GSUB_6: A B | C D | E F -> 1@0
-			GSUB_1: C -> X`,
+		desc: `GSUB6: A B | C D | E F -> 1@0
+			GSUB1: C -> X`,
 		in:  "ABCDE",
 		out: "ABCDE",
 	},
 	{
-		desc: `GSUB_6: A B | C D | E F -> 1@0
-			GSUB_1: C -> X`,
+		desc: `GSUB6: A B | C D | E F -> 1@0
+			GSUB1: C -> X`,
 		in:  "ABC",
 		out: "ABC",
 	},
 	{
-		desc: `GSUB_6: A | A | A -> 1@0, X | A | A -> 1@0
-			GSUB_1: A -> X`,
+		desc: `GSUB6: A | A | A -> 1@0, X | A | A -> 1@0
+			GSUB1: A -> X`,
 		in:  "AAAAAA",
 		out: "AXXXXA",
 	},
 	{
-		desc: `GSUB_6: -ligs A | B B | A -> 1@0 2@0
-			GSUB_4: -ligs B B -> X
-			GSUB_1: X -> Y`,
+		desc: `GSUB6: -ligs A | B B | A -> 1@0 2@0
+			GSUB4: -ligs B B -> X
+			GSUB1: X -> Y`,
 		in:   "ABBALBLBLA",
 		out:  "AYALYLLA",
 		text: "ABBALBBLLA",
 	},
 	{ // harfbuzz: AX, Mac: AX, Windows: ABB
-		desc: `GSUB_6: A | B | B -> 1@0
-			GSUB_4: B B -> X`,
+		desc: `GSUB6: A | B | B -> 1@0
+			GSUB4: B B -> X`,
 		in:  "ABB",
 		out: "ABB",
 	},
 	{ // harfbuzz, Mac and Windows agree on this
-		desc: `GSUB_6: B | C | D -> 1@0
-			GSUB_6: A B | C | D E -> 2@0
-			GSUB_4: C -> X`,
+		desc: `GSUB6: B | C | D -> 1@0
+			GSUB6: A B | C | D E -> 2@0
+			GSUB4: C -> X`,
 		in:  "ABCDE",
 		out: "ABXDE",
 	},
 	{
-		desc: `GSUB_6: -ligs A | A A | A -> 1@0
-			GSUB_4: A L A -> X`,
+		desc: `GSUB6: -ligs A | A A | A -> 1@0
+			GSUB4: A L A -> X`,
 		in:  "AALAA",
 		out: "AXA",
 	},
 	{
-		desc: `GSUB_6: -ligs A | A | A -> 1@0
-			GSUB_4: A L A -> X`,
+		desc: `GSUB6: -ligs A | A | A -> 1@0
+			GSUB4: A L A -> X`,
 		in:  "AALA",
 		out: "AALA",
 	},
 	{
-		desc: `GSUB_6: -ligs A | A | A -> 1@0
-			GSUB_4: A L -> X`,
+		desc: `GSUB6: -ligs A | A | A -> 1@0
+			GSUB4: A L -> X`,
 		in:  "AALA",
 		out: "AXA",
 	},

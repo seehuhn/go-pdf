@@ -33,7 +33,7 @@ func TestGpos(t *testing.T) {
 	subtables := gtab.Subtables{
 		&gtab.Gpos1_1{
 			Cov:    coverage.Table{gidA: 0},
-			Adjust: &gtab.ValueRecord{YPlacement: 500},
+			Adjust: &gtab.GposValueRecord{YPlacement: 500},
 		},
 	}
 

@@ -53,7 +53,7 @@ type SeqContext1 struct {
 	Rules [][]*SeqRule // indexed by coverage index
 }
 
-// SeqRule describes a sequence of glyphs and the actions to be performed
+// SeqRule describes a rule in a SeqContext1 subtable.
 type SeqRule struct {
 	Input   []font.GlyphID // excludes the first input glyph, since this is in Cov
 	Actions SeqLookups
@@ -654,7 +654,7 @@ type ChainedSeqContext1 struct {
 	Rules [][]*ChainedSeqRule // indexed by coverage index
 }
 
-// ChainedSeqRule is used for GSUB type 6 format 1 and GPOS type 8 format 1 subtables.
+// ChainedSeqRule describes the rules in a ChainedSeqContext1.
 type ChainedSeqRule struct {
 	Backtrack []font.GlyphID
 	Input     []font.GlyphID // excludes the first input glyph, since this is in Cov
@@ -967,7 +967,11 @@ type ChainedSeqContext2 struct {
 	Rules     [][]*ChainedClassSeqRule // indexed by input glyph class
 }
 
-// ChainedClassSeqRule is used for GSUB type 6 format 2 and GPOS type 8 format 2 subtables.
+// ChainedClassSeqRule is used to represent the rules in a ChainedSeqContext2.
+// It describes a sequence of nested lookups together with the context where
+// they apply.  The Backtrack, Input and Lookahead sequences are given
+// as lists of glyph classes, as defined by the corresponding class definition
+// tables in the ChainedSeqContext2 structure.
 type ChainedClassSeqRule struct {
 	Backtrack []uint16
 	Input     []uint16 // excludes the first input glyph, since this is in Cov
