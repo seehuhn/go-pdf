@@ -161,7 +161,7 @@ type Glyph struct {
 	Text    []rune
 	XOffset int16 // This is in Glyph design units.
 	YOffset int16 // This is in Glyph design units.
-	Advance int32 // This is in Glyph design units.
+	Advance int32 // This is in Glyph design units.  TODO(voss): change to int16 or funit.int16
 }
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of

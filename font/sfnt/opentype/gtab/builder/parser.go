@@ -330,24 +330,61 @@ func (p *parser) readGpos1() *gtab.LookupTable {
 	p.optional(itemEOL)
 	flags := p.readLookupFlags()
 
-	from := p.readGlyphList()
-	p.required(itemArrow, "\"->\"")
-	adj := p.readGposValueRecord()
-
-	cov := makeCoverageTable(from)
-
-	subtable := &gtab.Gpos1_1{
-		Cov:    cov,
-		Adjust: adj,
-	}
-
-	return &gtab.LookupTable{
+	lookup := &gtab.LookupTable{
 		Meta: &gtab.LookupMetaInfo{
 			LookupType: 1,
 			LookupFlag: flags,
 		},
-		Subtables: []gtab.Subtable{subtable},
 	}
+
+	for {
+		if p.peek().typ == itemSquareBracketOpen {
+			from := p.readGlyphSet()
+			p.required(itemArrow, "\"->\"")
+			adj := p.readGposValueRecord()
+
+			cov := makeCoverageTable(from)
+
+			subtable := &gtab.Gpos1_1{
+				Cov:    cov,
+				Adjust: adj,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+		} else {
+			res := make(map[font.GlyphID]*gtab.GposValueRecord)
+			for {
+				gids := p.readGlyphList()
+				if len(gids) != 1 {
+					p.fatal("expected single glyph, got %v", gids)
+				}
+				p.required(itemArrow, "\"->\"")
+				adjust := p.readGposValueRecord()
+				res[gids[0]] = adjust
+
+				if !p.optional(itemComma) {
+					break
+				}
+				p.optional(itemEOL)
+			}
+			cov := makeCoverageTable(maps.Keys(res))
+			adj := make([]*gtab.GposValueRecord, len(cov))
+			for gid, i := range cov {
+				adj[i] = res[gid]
+			}
+			subtable := &gtab.Gpos1_2{
+				Cov:    cov,
+				Adjust: adj,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+		}
+
+		if !p.optional(itemOr) {
+			break
+		}
+		p.optional(itemEOL)
+	}
+
+	return lookup
 }
 
 func (p *parser) readSeqCtx(lookupType uint16) *gtab.LookupTable {

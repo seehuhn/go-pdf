@@ -98,9 +98,8 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 						ee.w.WriteString(", ")
 					}
 					ee.writeGlyphList([]font.GlyphID{gid})
-					ee.w.WriteString(" -> [")
-					ee.writeGlyphList(l.Alternates[i])
-					ee.w.WriteRune(']')
+					ee.w.WriteString(" -> ")
+					ee.writeGlyphSet(l.Alternates[i])
 				}
 
 			case *gtab.Gsub4_1:
@@ -165,9 +164,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					if i > 0 {
 						ee.w.WriteRune(' ')
 					}
-					ee.w.WriteRune('[')
-					ee.explainCoverage(cov)
-					ee.w.WriteRune(']')
+					ee.writeCoveredSet(cov)
 				}
 				ee.w.WriteString(" -> ")
 				ee.explainNested(l.Actions)
@@ -235,21 +232,17 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 					if i > 0 {
 						ee.w.WriteRune(' ')
 					}
-					ee.w.WriteRune('[')
-					ee.explainCoverage(cov)
-					ee.w.WriteRune(']')
+					ee.writeCoveredSet(cov)
 				}
 				ee.w.WriteString(" |")
 				for _, cov := range l.Input {
-					ee.w.WriteString(" [")
-					ee.explainCoverage(cov)
-					ee.w.WriteRune(']')
+					ee.w.WriteRune(' ')
+					ee.writeCoveredSet(cov)
 				}
 				ee.w.WriteString(" |")
 				for _, cov := range l.Lookahead {
-					ee.w.WriteString(" [")
-					ee.explainCoverage(cov)
-					ee.w.WriteRune(']')
+					ee.w.WriteRune(' ')
+					ee.writeCoveredSet(cov)
 				}
 				ee.w.WriteString(" -> ")
 				ee.explainNested(l.Actions)
@@ -287,6 +280,25 @@ func ExplainGpos(fontInfo *sfntcff.Info) string {
 			switch l := subtable.(type) {
 			case *gtab.Gpos1_1:
 				checkType(1)
+				ee.w.WriteRune(' ')
+				ee.writeGlyphSet(maps.Keys(l.Cov))
+				ee.w.WriteString(" -> ")
+				ee.writeValueRecord(l.Adjust)
+
+			case *gtab.Gpos1_2:
+				checkType(1)
+				gids := maps.Keys(l.Cov)
+				sort.Slice(gids, func(i, j int) bool { return gids[i] < gids[j] })
+				for i, gid := range gids {
+					if i > 0 {
+						ee.w.WriteString(", ")
+					} else {
+						ee.w.WriteRune(' ')
+					}
+					ee.writeGlyph(gid)
+					ee.w.WriteString(" -> ")
+					ee.writeValueRecord(l.Adjust[l.Cov[gid]])
+				}
 
 			default:
 				panic(fmt.Sprintf("unsupported GPOS subtable type %T", l))
@@ -404,6 +416,18 @@ func (ee *explainer) explainSeqMappings(mm []mapping) {
 	}
 }
 
+func (ee *explainer) writeGlyph(gid font.GlyphID) {
+	if "\""+ee.names[gid]+"\"" == ee.mapped[gid] {
+		ee.w.WriteString(ee.names[gid])
+	} else if ee.mapped[gid] != "" {
+		ee.w.WriteString(ee.mapped[gid])
+	} else if ee.names[gid] != "" {
+		ee.w.WriteString(ee.names[gid])
+	} else {
+		ee.w.WriteString(fmt.Sprintf("%d", gid))
+	}
+}
+
 func (ee *explainer) writeGlyphList(seq []font.GlyphID) {
 	if len(seq) == 0 {
 		return
@@ -441,6 +465,12 @@ func (ee *explainer) writeGlyphList(seq []font.GlyphID) {
 	}
 }
 
+func (ee *explainer) writeGlyphSet(seq []font.GlyphID) {
+	ee.w.WriteRune('[')
+	ee.writeGlyphList(seq)
+	ee.w.WriteRune(']')
+}
+
 func (ee *explainer) writeClassList(input []uint16) {
 	for _, cls := range input {
 		if cls == 0 {
@@ -457,6 +487,14 @@ func (ee *explainer) explainCoverage(cov coverage.Table) {
 		return keys[i] < keys[j]
 	})
 	ee.writeGlyphList(keys)
+}
+
+func (ee *explainer) writeCoveredSet(cov coverage.Table) {
+	keys := maps.Keys(cov)
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	ee.writeGlyphSet(keys)
 }
 
 func (ee *explainer) explainNested(actions gtab.SeqLookups) {
@@ -479,8 +517,29 @@ func (ee *explainer) defineClasses(classType string, class classdef.Table) {
 			continue
 		}
 		sort.Slice(glyphs[j], func(k, l int) bool { return glyphs[j][k] < glyphs[j][l] })
-		fmt.Fprintf(ee.w, "%s :c%d: = [", classType, j)
-		ee.writeGlyphList(glyphs[j])
-		ee.w.WriteString("]\n\t")
+		fmt.Fprintf(ee.w, "%s :c%d: = ", classType, j)
+		ee.writeGlyphSet(glyphs[j])
+		ee.w.WriteString("\n\t")
+	}
+}
+
+func (ee *explainer) writeValueRecord(adjust *gtab.GposValueRecord) {
+	var parts []string
+	if adjust.XPlacement != 0 {
+		parts = append(parts, fmt.Sprintf("x%+d", adjust.XPlacement))
+	}
+	if adjust.YPlacement != 0 {
+		parts = append(parts, fmt.Sprintf("y%+d", adjust.YPlacement))
+	}
+	if adjust.XAdvance != 0 {
+		parts = append(parts, fmt.Sprintf("dx%+d", adjust.XAdvance))
+	}
+	if adjust.YAdvance != 0 {
+		parts = append(parts, fmt.Sprintf("dy%+d", adjust.YAdvance))
+	}
+	if len(parts) == 0 {
+		ee.w.WriteString("dx+0")
+	} else {
+		ee.w.WriteString(strings.Join(parts, " "))
 	}
 }

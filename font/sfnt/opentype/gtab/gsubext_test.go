@@ -197,13 +197,13 @@ func exportFont(fontInfo *sfntcff.Info, idx int, in string) {
 	}
 }
 
-type testCase struct {
+type gsubTestCase struct {
 	desc    string
 	in, out string
 	text    string // text content, if different from `in`
 }
 
-var gsubTestCases = []testCase{
+var gsubTestCases = []gsubTestCase{
 	{ // test0001.odf
 		desc: "GSUB1: A->X, C->Z",
 		in:   "ABC",

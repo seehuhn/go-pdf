@@ -183,28 +183,28 @@ func (vr *GposValueRecord) String() string {
 
 	var adjust []string
 	if vr.XPlacement != 0 {
-		adjust = append(adjust, fmt.Sprintf("xpos%+d", vr.XPlacement))
+		adjust = append(adjust, fmt.Sprintf("x%+d", vr.XPlacement))
 	}
 	if vr.YPlacement != 0 {
-		adjust = append(adjust, fmt.Sprintf("ypos%+d", vr.YPlacement))
+		adjust = append(adjust, fmt.Sprintf("y%+d", vr.YPlacement))
 	}
 	if vr.XAdvance != 0 {
-		adjust = append(adjust, fmt.Sprintf("xadv%+d", vr.XAdvance))
+		adjust = append(adjust, fmt.Sprintf("dx%+d", vr.XAdvance))
 	}
 	if vr.YAdvance != 0 {
-		adjust = append(adjust, fmt.Sprintf("yadv%+d", vr.YAdvance))
+		adjust = append(adjust, fmt.Sprintf("dy%+d", vr.YAdvance))
 	}
 	if vr.XPlacementDevOffs != 0 {
-		adjust = append(adjust, fmt.Sprintf("xposdev%+d", vr.XPlacementDevOffs))
+		adjust = append(adjust, fmt.Sprintf("xdev%+d", vr.XPlacementDevOffs))
 	}
 	if vr.YPlacementDevOffs != 0 {
-		adjust = append(adjust, fmt.Sprintf("yposdev%+d", vr.YPlacementDevOffs))
+		adjust = append(adjust, fmt.Sprintf("ydev%+d", vr.YPlacementDevOffs))
 	}
 	if vr.XAdvanceDevOffs != 0 {
-		adjust = append(adjust, fmt.Sprintf("xadvdev%+d", vr.XAdvanceDevOffs))
+		adjust = append(adjust, fmt.Sprintf("dxdev%+d", vr.XAdvanceDevOffs))
 	}
 	if vr.YAdvanceDevOffs != 0 {
-		adjust = append(adjust, fmt.Sprintf("yadvdev%+d", vr.YAdvanceDevOffs))
+		adjust = append(adjust, fmt.Sprintf("dydev%+d", vr.YAdvanceDevOffs))
 	}
 	if len(adjust) == 0 {
 		return "_"

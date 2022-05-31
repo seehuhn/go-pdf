@@ -216,6 +216,8 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		unicodeRange[w] |= 1 << b
 	}
 
+	// setUniBit(0) // Basic Latin
+
 	var sel uint16
 	if info.IsRegular {
 		sel |= 0x0040
@@ -289,6 +291,11 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 	binary.Write(buf, binary.BigEndian, v0ms)
 
 	var codePageRange uint64 // TODO(voss)
+	// setCodePageBit := func(b int) {
+	// 	codePageRange |= 1 << b
+	// }
+	// setCodePageBit(0) // Latin 1
+
 	buf.Write([]byte{
 		byte(codePageRange >> 24),
 		byte(codePageRange >> 16),
