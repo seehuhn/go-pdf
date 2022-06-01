@@ -101,14 +101,13 @@ func (l *Gsub1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	if _, ok := l.Cov[gid]; !ok {
 		return nil
 	}
-	m := &Match{
+	return &Match{
 		InputPos: []int{a},
 		Replace: []font.Glyph{
 			{Gid: gid + l.Delta, Text: seq[a].Text},
 		},
 		Next: a + 1,
 	}
-	return m
 }
 
 // EncodeLen implements the Subtable interface.

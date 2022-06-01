@@ -971,8 +971,8 @@ valueRecordLoop:
 			res.YPlacement = p.readInt16()
 		case isIdentifier(next, "dx"):
 			res.XAdvance = p.readInt16()
-		case isIdentifier(next, "dy"):
-			res.YAdvance = p.readInt16()
+		// case isIdentifier(next, "dy"):
+		// 	res.YAdvance = p.readInt16()
 		default:
 			p.backlog = append(p.backlog, next)
 			break valueRecordLoop

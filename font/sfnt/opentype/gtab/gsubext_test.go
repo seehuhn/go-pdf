@@ -117,7 +117,7 @@ func FuzzGsub(f *testing.F) {
 	}
 
 	fontInfo := debug.MakeSimpleFont()
-	gdef := &gdef.Table{
+	gdefTable := &gdef.Table{
 		GlyphClass: classdef.Table{
 			fontInfo.CMap.Lookup('B'): gdef.GlyphClassBase,
 			fontInfo.CMap.Lookup('K'): gdef.GlyphClassLigature,
@@ -150,21 +150,21 @@ func FuzzGsub(f *testing.F) {
 		}
 		lookups := gsub.FindLookups(locale.EnUS, nil)
 		for _, lookupIndex := range lookups {
-			seq = gsub.LookupList.ApplyLookup(seq, lookupIndex, gdef)
+			seq = gsub.LookupList.ApplyLookup(seq, lookupIndex, gdefTable)
+		}
 
-			runeCountIn := len([]rune(in))
-			runeCountOut := 0
-			for _, g := range seq {
-				runeCountOut += len([]rune(g.Text))
+		runeCountIn := len([]rune(in))
+		runeCountOut := 0
+		for _, g := range seq {
+			runeCountOut += len([]rune(g.Text))
+		}
+		if runeCountOut != runeCountIn {
+			fmt.Printf("desc = %q\n", desc)
+			fmt.Printf("in = %q\n", in)
+			for i, g := range seq {
+				fmt.Printf("out[%d] = %d %q\n", i, g.Gid, string(g.Text))
 			}
-			if runeCountOut != runeCountIn {
-				fmt.Printf("desc = %q\n", desc)
-				fmt.Printf("in = %q\n", in)
-				for i, g := range seq {
-					fmt.Printf("out[%d] = %d %q\n", i, g.Gid, string(g.Text))
-				}
-				t.Errorf("expected %d runes, got %d", runeCountIn, runeCountOut)
-			}
+			t.Errorf("expected %d runes, got %d", runeCountIn, runeCountOut)
 		}
 	})
 }

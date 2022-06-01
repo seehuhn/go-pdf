@@ -33,7 +33,7 @@ import (
 func TestGpos(t *testing.T) {
 	fontInfo := debug.MakeSimpleFont()
 
-	gdef := &gdef.Table{
+	gdefTable := &gdef.Table{
 		GlyphClass: classdef.Table{
 			fontInfo.CMap.Lookup('B'): gdef.GlyphClassBase,
 			fontInfo.CMap.Lookup('K'): gdef.GlyphClassLigature,
@@ -45,7 +45,8 @@ func TestGpos(t *testing.T) {
 
 	for testIdx, test := range gposTestCases {
 		t.Run(fmt.Sprintf("%02d", testIdx+501), func(t *testing.T) {
-			fmt.Printf("test%04d.otf %s\n", testIdx+501, test.in)
+			fontName := fmt.Sprintf("test%04d.otf", testIdx+501)
+			fmt.Printf("%s %s\n", fontName, test.in)
 
 			desc := test.desc
 			if strings.Contains(desc, "Δ") {
@@ -81,7 +82,7 @@ func TestGpos(t *testing.T) {
 			}
 
 			if *exportFonts {
-				fontInfo.Gdef = gdef
+				fontInfo.Gdef = gdefTable
 				fontInfo.Gpos = gpos
 				exportFont(fontInfo, testIdx+501, test.in)
 			}
@@ -91,40 +92,205 @@ func TestGpos(t *testing.T) {
 				gid := fontInfo.CMap.Lookup(r)
 				seq[i].Gid = gid
 				seq[i].Text = []rune{r}
-				seq[i].Advance = int32(fontInfo.FGlyphWidth(gid))
+				if gdefTable.GlyphClass[gid] != gdef.GlyphClassMark {
+					seq[i].Advance = int32(fontInfo.FGlyphWidth(gid))
+				}
 			}
 			lookups := gpos.FindLookups(locale.EnUS, nil)
 			for _, lookupIndex := range lookups {
-				seq = gpos.LookupList.ApplyLookup(seq, lookupIndex, gdef)
+				seq = gpos.LookupList.ApplyLookup(seq, lookupIndex, gdefTable)
 			}
 
-			for i, g := range seq {
-				fmt.Println(i, g)
+			for _, check := range test.check {
+				switch check.which {
+				case checkX:
+					if seq[check.idx].XOffset != check.val {
+						t.Errorf("%s: expected XOffset == %d, got %d",
+							fontName, check.val, seq[check.idx].XOffset)
+					}
+				case checkY:
+					if seq[check.idx].YOffset != check.val {
+						t.Errorf("%s: expected YOffset == %d, got %d",
+							fontName, check.val, seq[check.idx].YOffset)
+					}
+				case checkDX:
+					if seq[check.idx].Advance != int32(check.val) {
+						t.Errorf("%s: expected XAdvance == %d, got %d",
+							fontName, check.val, seq[check.idx].Advance)
+					}
+				case checkDXRel:
+					w := fontInfo.FGlyphWidth(seq[check.idx].Gid)
+					expected := int32(check.val) + int32(w)
+					if seq[check.idx].Advance != expected {
+						t.Errorf("%s: expected XAdvance == %d, got %d",
+							fontName, expected, seq[check.idx].Advance)
+					}
+				default:
+					panic("unknown check")
+				}
 			}
 		})
 	}
 }
 
+func FuzzGpos(f *testing.F) {
+	for _, test := range gposTestCases {
+		f.Add(test.desc, test.in)
+	}
+
+	fontInfo := debug.MakeSimpleFont()
+	gdefTable := &gdef.Table{
+		GlyphClass: classdef.Table{
+			fontInfo.CMap.Lookup('B'): gdef.GlyphClassBase,
+			fontInfo.CMap.Lookup('K'): gdef.GlyphClassLigature,
+			fontInfo.CMap.Lookup('L'): gdef.GlyphClassLigature,
+			fontInfo.CMap.Lookup('M'): gdef.GlyphClassMark,
+			fontInfo.CMap.Lookup('N'): gdef.GlyphClassMark,
+		},
+	}
+
+	f.Fuzz(func(t *testing.T, desc string, in string) {
+		if strings.Contains(desc, "Δ") {
+			ax := 0
+			bx := 0
+			pos := 0
+			for _, r := range in {
+				gid := fontInfo.CMap.Lookup(r)
+				if r == '>' {
+					ax = pos
+				} else if r == '<' {
+					bx = pos
+				}
+				pos += int(fontInfo.FGlyphWidth(gid))
+			}
+			delta := fmt.Sprintf("x%+d", ax-bx)
+			desc = strings.Replace(desc, "Δ", delta, 1)
+		}
+		lookupList, err := builder.Parse(fontInfo, desc)
+		if err != nil {
+			return
+		}
+
+		gpos := &gtab.Info{
+			ScriptList: map[gtab.ScriptLang]*gtab.Features{
+				{}: {Required: 0},
+			},
+			FeatureList: []*gtab.Feature{
+				{Tag: "kern", Lookups: []gtab.LookupIndex{0}},
+			},
+			LookupList: lookupList,
+		}
+
+		seq := make([]font.Glyph, len(in))
+		for i, r := range in {
+			gid := fontInfo.CMap.Lookup(r)
+			seq[i].Gid = gid
+			seq[i].Text = []rune{r}
+			if gdefTable.GlyphClass[gid] != gdef.GlyphClassMark {
+				seq[i].Advance = int32(fontInfo.FGlyphWidth(gid))
+			}
+		}
+		lookups := gpos.FindLookups(locale.EnUS, nil)
+		for _, lookupIndex := range lookups {
+			seq = gpos.LookupList.ApplyLookup(seq, lookupIndex, gdefTable)
+		}
+
+		// TODO(voss): put some plausibility checks here.
+	})
+}
+
+type gposCheck struct {
+	idx   int
+	which gposCheckType
+	val   int16
+}
+
+type gposCheckType uint16
+
+const (
+	checkX gposCheckType = iota
+	checkY
+	checkDX
+	checkDXRel
+)
+
 type gposTestCase struct {
-	desc string
-	in   string
+	desc  string
+	in    string
+	check []gposCheck
 }
 
 var gposTestCases = []gposTestCase{
 	{ // test0501.odf
-		desc: "GPOS1: B -> y+500",
+		desc: "GPOS1: [A] -> y+500",
 		in:   "ABC",
+		check: []gposCheck{
+			{0, checkX, 0},
+			{0, checkY, 500},
+		},
+	},
+	{
+		desc: "GPOS1: B -> x+10 y-20 dx+30",
+		in:   "ABC",
+		check: []gposCheck{
+			{1, checkX, 10},
+			{1, checkY, -20},
+			{1, checkDXRel, 30},
+		},
+	},
+	{
+		desc: "GPOS1: [A D] -> y+100 || B -> y+200, E -> y+300",
+		in:   "ABCDE",
+		check: []gposCheck{
+			{0, checkY, 100},
+			{1, checkY, 200},
+			{2, checkY, 0},
+			{3, checkY, 100},
+			{4, checkY, 300},
+		},
 	},
 	{
 		desc: `GPOS1: "<" -> Δ`,
-		in:   ">ABC<",
+		in:   ">ABC<", // visual test only
+	},
+	{
+		desc: "GPOS1: [M] -> y+500",
+		in:   "AMA",
+		check: []gposCheck{
+			{1, checkDX, 0},
+			{1, checkY, 500},
+		},
+	},
+	{
+		desc: "GPOS1: -marks [M] -> y+500",
+		in:   "AMA",
+		check: []gposCheck{
+			{1, checkDX, 0},
+			{1, checkY, 0},
+		},
 	},
 	{
 		desc: "GPOS1: M -> y+500",
 		in:   "AMA",
+		check: []gposCheck{
+			{1, checkDX, 0},
+			{1, checkY, 500},
+		},
 	},
 	{
 		desc: "GPOS1: -marks M -> y+500",
 		in:   "AMA",
+		check: []gposCheck{
+			{1, checkDX, 0},
+			{1, checkY, 0},
+		},
+	},
+	{
+		desc: "GPOS1: [] -> x+0",
+		in:   "AMA",
+		check: []gposCheck{
+			{1, checkDX, 0},
+			{1, checkY, 0},
+		},
 	},
 }
