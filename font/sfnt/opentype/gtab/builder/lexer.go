@@ -40,6 +40,7 @@ const (
 	itemError itemType = iota
 	itemEOF
 	itemEOL
+	itemAmpersand
 	itemArrow
 	itemAt
 	itemBar
@@ -136,6 +137,7 @@ var singleCharTokens = map[rune]itemType{
 	']': itemSquareBracketClose,
 	'@': itemAt,
 	'/': itemSlash,
+	'&': itemAmpersand,
 	'=': itemEqual,
 }
 

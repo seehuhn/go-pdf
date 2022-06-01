@@ -104,6 +104,9 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 		case isIdentifier(item, "GPOS1"):
 			l := p.readGpos1()
 			lookups = append(lookups, l)
+		case isIdentifier(item, "GPOS2"):
+			l := p.readGpos2()
+			lookups = append(lookups, l)
 		default:
 			p.fatal("unexpected %s", item)
 		}
@@ -377,6 +380,68 @@ func (p *parser) readGpos1() *gtab.LookupTable {
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 		}
+
+		if !p.optional(itemOr) {
+			break
+		}
+		p.optional(itemEOL)
+	}
+
+	return lookup
+}
+
+func (p *parser) readGpos2() *gtab.LookupTable {
+	p.optional(itemColon)
+	p.optional(itemEOL)
+	flags := p.readLookupFlags()
+
+	lookup := &gtab.LookupTable{
+		Meta: &gtab.LookupMetaInfo{
+			LookupType: 2,
+			LookupFlag: flags,
+		},
+	}
+
+	for {
+		pairData := make(map[font.GlyphID]map[font.GlyphID]*gtab.PairAdjust)
+		for {
+			from := p.readGlyphList()
+			if len(from) != 2 {
+				p.fatal("expected glyph pair, got %v", from)
+			}
+			p.required(itemArrow, "\"->\"")
+			adj1 := p.readGposValueRecord()
+			var adj2 *gtab.GposValueRecord
+			if p.optional(itemAmpersand) {
+				adj2 = p.readGposValueRecord()
+			}
+			row, ok := pairData[from[0]]
+			if !ok {
+				row = make(map[font.GlyphID]*gtab.PairAdjust)
+				pairData[from[0]] = row
+			}
+			row[from[1]] = &gtab.PairAdjust{
+				First:  adj1,
+				Second: adj2,
+			}
+
+			if !p.optional(itemComma) {
+				break
+			}
+			p.optional(itemEOL)
+		}
+
+		cov := makeCoverageTable(maps.Keys(pairData))
+		adjust := make([]map[font.GlyphID]*gtab.PairAdjust, len(cov))
+		for gid, i := range cov {
+			adjust[i] = pairData[gid]
+		}
+
+		subtable := &gtab.Gpos2_1{
+			Cov:    cov,
+			Adjust: adjust,
+		}
+		lookup.Subtables = append(lookup.Subtables, subtable)
 
 		if !p.optional(itemOr) {
 			break

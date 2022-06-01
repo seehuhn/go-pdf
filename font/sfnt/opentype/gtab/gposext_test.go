@@ -293,4 +293,40 @@ var gposTestCases = []gposTestCase{
 			{1, checkY, 0},
 		},
 	},
+
+	{
+		desc: "GPOS2: A V -> dx-200",
+		in:   "AV",
+		check: []gposCheck{
+			{0, checkDXRel, -200},
+		},
+	},
+	{
+		desc: "GPOS2: A V -> dx-300 & y+200",
+		in:   "AV",
+		check: []gposCheck{
+			{0, checkDXRel, -300},
+			{1, checkY, 200},
+		},
+	},
+	{
+		desc: "GPOS2: A A -> y+200",
+		in:   "AAAAAA",
+		check: []gposCheck{
+			{0, checkY, 200},
+			{1, checkY, 200},
+			{2, checkY, 200},
+			{3, checkY, 200},
+			{4, checkY, 200},
+		},
+	},
+	{
+		desc: "GPOS2: A A -> & y+200",
+		in:   "AAAAAA",
+		check: []gposCheck{
+			{1, checkY, 200},
+			{3, checkY, 200},
+			{5, checkY, 200},
+		},
+	},
 }

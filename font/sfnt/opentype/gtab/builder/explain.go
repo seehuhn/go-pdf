@@ -300,6 +300,34 @@ func ExplainGpos(fontInfo *sfntcff.Info) string {
 					ee.writeValueRecord(l.Adjust[l.Cov[gid]])
 				}
 
+			case *gtab.Gpos2_1:
+				checkType(2)
+				firstGids := maps.Keys(l.Cov)
+				sort.Slice(firstGids, func(i, j int) bool { return firstGids[i] < firstGids[j] })
+				first := true
+				for _, firstGid := range firstGids {
+					idx := l.Cov[firstGid]
+					row := l.Adjust[idx]
+					secondGids := maps.Keys(row)
+					sort.Slice(secondGids, func(i, j int) bool { return secondGids[i] < secondGids[j] })
+					for _, secondGid := range secondGids {
+						if first {
+							ee.w.WriteRune(' ')
+							first = false
+						} else {
+							ee.w.WriteString(", ")
+						}
+						ee.writeGlyphList([]font.GlyphID{firstGid, secondGid})
+						ee.w.WriteString(" -> ")
+						col := row[secondGid]
+						ee.writeValueRecord(col.First)
+						if col.Second != nil {
+							ee.w.WriteString(" & ")
+							ee.writeValueRecord(col.Second)
+						}
+					}
+				}
+
 			default:
 				panic(fmt.Sprintf("unsupported GPOS subtable type %T", l))
 			}
