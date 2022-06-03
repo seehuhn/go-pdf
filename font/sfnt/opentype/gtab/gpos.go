@@ -258,7 +258,7 @@ func (l *Gpos1_2) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
 type Gpos2_1 struct {
 	Cov    coverage.Table
-	Adjust []map[font.GlyphID]*PairAdjust
+	Adjust []map[font.GlyphID]*PairAdjust // TODO(voss): use one map with pairs as keys?
 }
 
 // PairAdjust represents information from a PairValueRecord table.

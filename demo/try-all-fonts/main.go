@@ -19,11 +19,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
-	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/font/sfnt/kern"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 func tryFont(fname string) error {
@@ -33,75 +34,23 @@ func tryFont(fname string) error {
 	}
 	defer r.Close()
 
-	// header, err := table.ReadHeader(r)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// for _, tableName := range []string{"GPOS", "GSUB"} {
-	// 	rec, ok := header.Toc[tableName]
-	// 	if !ok {
-	// 		continue
-	// 	}
-	// 	r := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
-
-	// 	_, err = gtab.Read(tableName, r)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-
-	info, err := sfntcff.Read(r)
+	header, err := table.ReadHeader(r)
 	if err != nil {
 		return err
 	}
 
-	if info.Gsub == nil || len(info.Gsub.LookupList) == 0 {
+	rec, ok := header.Toc["kern"]
+	if !ok {
 		return nil
 	}
-	lookups := info.Gsub.LookupList
-	for _, lookup := range lookups {
-		for _, subtable := range lookup.Subtables {
-			switch l := subtable.(type) {
-			case *gtab.SeqContext1:
-				for _, rules := range l.Rules {
-					for _, rule := range rules {
-						printActions(rule.Actions, lookups)
-					}
-				}
-			case *gtab.SeqContext2:
-				for _, rules := range l.Rules {
-					for _, rule := range rules {
-						printActions(rule.Actions, lookups)
-					}
-				}
-			case *gtab.SeqContext3:
-				printActions(l.Actions, lookups)
-			case *gtab.ChainedSeqContext1:
-				for _, rules := range l.Rules {
-					for _, rule := range rules {
-						printActions(rule.Actions, lookups)
-					}
-				}
-			case *gtab.ChainedSeqContext2:
-				for _, rules := range l.Rules {
-					for _, rule := range rules {
-						printActions(rule.Actions, lookups)
-					}
-				}
-			case *gtab.ChainedSeqContext3:
-				printActions(l.Actions, lookups)
-			}
-		}
+	kernFd := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
+
+	_, err = kern.Read(kernFd)
+	if err != nil {
+		return err
 	}
 
 	return nil
-}
-
-func printActions(actions gtab.SeqLookups, lookups gtab.LookupList) {
-	for _, a := range actions {
-		fmt.Println("GSUB nested", lookups[a.LookupListIndex].Meta.LookupType)
-	}
 }
 
 func main() {

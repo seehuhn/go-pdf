@@ -430,13 +430,13 @@ func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int6
 	})
 
 	// prepare the header
-	sel := bits.Len(uint(numTables)) - 1
+	entrySelector := bits.Len(uint(numTables)) - 1
 	offsets := &offsets{
 		ScalerType:    scalerType,
 		NumTables:     uint16(numTables),
-		SearchRange:   1 << (sel + 4),
-		EntrySelector: uint16(sel),
-		RangeShift:    uint16(16 * (numTables - 1<<sel)),
+		SearchRange:   1 << (entrySelector + 4),
+		EntrySelector: uint16(entrySelector),
+		RangeShift:    uint16(16 * (numTables - 1<<entrySelector)),
 	}
 
 	// temporarily clear the checksum in the "head" table

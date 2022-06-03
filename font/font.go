@@ -166,7 +166,10 @@ type Glyph struct {
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of
 // character codes.  This is used for ligatures and kerning information.
-type GlyphPair [2]GlyphID
+type GlyphPair struct {
+	Left  GlyphID
+	Right GlyphID
+}
 
 func isPrivateRange(r rune) bool {
 	return r >= '\uE000' && r <= '\uF8FF' ||

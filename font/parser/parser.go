@@ -84,6 +84,14 @@ func (p *Parser) SeekPos(filePos int64) error {
 	return nil
 }
 
+// Discard skips the next n bytes in the input.
+func (p *Parser) Discard(n int) error {
+	if n < 0 {
+		panic("negative discard")
+	}
+	return p.SeekPos(p.Pos() + int64(n))
+}
+
 // Read reads len(buf) bytes of data into buf.  It returns the number of bytes
 // read and an error, if any.  The error is non-nil if and only if less than
 // len(buf) bytes were read.
