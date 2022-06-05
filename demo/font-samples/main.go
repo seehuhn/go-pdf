@@ -29,8 +29,9 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cid"
-	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -91,7 +92,7 @@ func main() {
 			log.Print(fname + ":" + err.Error())
 			continue
 		}
-		info, err := sfntcff.Read(r)
+		info, err := sfnt.Read(r)
 		if err != nil {
 			log.Print(fname + ":" + err.Error())
 			r.Close()
@@ -141,7 +142,7 @@ func main() {
 		}
 
 		if len(seq) > 0 {
-			F, err := cid.Embed(w, info, pdf.Name(fmt.Sprintf("F%d", i)))
+			F, err := cid.Embed(w, info, pdf.Name(fmt.Sprintf("F%d", i)), locale.EnUS)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -228,6 +229,7 @@ func makePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFon
 		}
 
 		body = body[:0]
+		pageNo++
 
 		return nil
 	}

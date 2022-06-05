@@ -25,11 +25,11 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab/builder"
-	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/locale"
 )
 
@@ -171,7 +171,7 @@ func FuzzGsub(f *testing.F) {
 
 var exportFonts = flag.Bool("export-fonts", false, "export fonts used in tests")
 
-func exportFont(fontInfo *sfntcff.Info, idx int, in string) {
+func exportFont(fontInfo *sfnt.Info, idx int, in string) {
 	if !*exportFonts {
 		return
 	}

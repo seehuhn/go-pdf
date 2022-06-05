@@ -27,10 +27,11 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cid"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/table"
-	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -54,7 +55,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	tt, err := sfntcff.Read(fd)
+	tt, err := sfnt.Read(fd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,7 +92,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err = cid.Embed(out, tt, "X")
+	theFont, err = cid.Embed(out, tt, "X", locale.EnUS)
 	if err != nil {
 		log.Fatal(err)
 	}

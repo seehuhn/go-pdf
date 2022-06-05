@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 func main() {
@@ -33,17 +33,22 @@ func main() {
 		outName := filepath.Base(strings.TrimSuffix(fname, ".otf") + ".cff")
 		fmt.Println(fname, "->", outName)
 
-		otf, err := sfnt.Open(fname, nil)
+		r, err := os.Open(fname)
 		if err != nil {
 			log.Fatalf("%s: %v", fname, err)
 		}
 
-		cffData, err := otf.Header.ReadTableBytes(otf.Fd, "CFF ")
+		header, err := table.ReadHeader(r)
 		if err != nil {
 			log.Fatalf("%s: %v", fname, err)
 		}
 
-		err = otf.Close()
+		cffData, err := header.ReadTableBytes(r, "CFF ")
+		if err != nil {
+			log.Fatalf("%s: %v", fname, err)
+		}
+
+		err = r.Close()
 		if err != nil {
 			log.Fatalf("%s: %v", fname, err)
 		}

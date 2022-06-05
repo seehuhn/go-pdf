@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,508 +18,297 @@ package sfnt
 
 import (
 	"bytes"
-	"encoding/binary"
 	"io"
-	"math/bits"
-	"sort"
+	"math"
 	"time"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/head"
+	"seehuhn.de/go/pdf/font/sfnt/hmtx"
+	"seehuhn.de/go/pdf/font/sfnt/maxp"
+	"seehuhn.de/go/pdf/font/sfnt/name"
+	"seehuhn.de/go/pdf/font/sfnt/os2"
+	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/locale"
 )
 
-// ExportOptions provides options for the Font.Export() function.
-type ExportOptions struct {
-	IncludeTables map[string]bool   // include a subset of tables
-	Replace       map[string][]byte // replace a table with a custom one
-	IncludeGlyphs []font.GlyphID    // include a subset of glyphs
-	SubsetMapping []font.CMapEntry  // include a generated cmap table
-	ModTime       time.Time
-}
-
-// Export writes the font to the io.Writer w.
-func (tt *Font) Export(w io.Writer, opt *ExportOptions) (int64, error) {
-	var includeTables map[string]bool
-	var includeGlyphs []font.GlyphID
-	var subsetMapping []font.CMapEntry
-	var modTime time.Time
-	if opt != nil {
-		includeTables = opt.IncludeTables
-		includeGlyphs = opt.IncludeGlyphs
-		subsetMapping = opt.SubsetMapping
-		modTime = opt.ModTime
-	}
-
-	var subsetInfo *subsetInfo
+func (info *Info) Write(w io.Writer) (int64, error) {
 	tables := make(map[string][]byte)
-	if includeGlyphs != nil {
-		var err error
-		subsetInfo, err = tt.getSubsetInfo(includeGlyphs)
+
+	hheaData, hmtxData := info.makeHmtx()
+	tables["hhea"] = hheaData
+	tables["hmtx"] = hmtxData
+
+	var ss cmap.Table
+	if info.CMap != nil {
+		uniEncoding := uint16(3)
+		winEncoding := uint16(1)
+		if _, high := info.CMap.CodeRange(); high > 0xFFFF {
+			// TODO(voss): should this check the cmap table format instead?
+			uniEncoding = 4
+			winEncoding = 10
+		}
+		cmapSubtable := info.CMap.Encode(0)
+		ss = cmap.Table{
+			{PlatformID: 0, EncodingID: uniEncoding}: cmapSubtable,
+			{PlatformID: 3, EncodingID: winEncoding}: cmapSubtable,
+		}
+		tables["cmap"] = ss.Encode()
+	}
+
+	tables["OS/2"] = info.makeOS2()
+	tables["name"] = info.makeName(ss)
+	tables["post"] = info.makePost()
+
+	var locaFormat int16
+	var scalerType uint32
+	var maxpTtf *maxp.TTFInfo
+	switch outlines := info.Outlines.(type) {
+	case *cff.Outlines:
+		cffData, err := info.makeCFF(outlines)
 		if err != nil {
 			return 0, err
 		}
-		for name, blob := range subsetInfo.blobs {
-			tables[name] = blob
+		tables["CFF "] = cffData
+		scalerType = table.ScalerTypeCFF
+	case *GlyfOutlines:
+		enc := outlines.Glyphs.Encode()
+		tables["glyf"] = enc.GlyfData
+		tables["loca"] = enc.LocaData
+		locaFormat = enc.LocaFormat
+		for name, data := range outlines.Tables {
+			tables[name] = data
 		}
-		// fix up numGlyphs
-		maxpBytes, err := tt.Header.ReadTableBytes(tt.Fd, "maxp")
-		if err != nil {
-			return 0, err
-		}
-		binary.BigEndian.PutUint16(maxpBytes[4:6], subsetInfo.numGlyphs)
-		tables["maxp"] = maxpBytes
+		scalerType = table.ScalerTypeTrueType
+		maxpTtf = outlines.Maxp
+	default:
+		panic("unexpected font type")
 	}
 
-	if subsetMapping != nil && (includeTables == nil || includeTables["cmap"]) {
-		cmapBytes, err := makeCMap(subsetMapping)
-		if err != nil {
-			return 0, err
-		}
-		tables["cmap"] = cmapBytes
+	maxpInfo := &maxp.Info{
+		NumGlyphs: info.NumGlyphs(),
+		TTF:       maxpTtf,
+	}
+	tables["maxp"] = maxpInfo.Encode()
+
+	tables["head"] = info.makeHead(locaFormat)
+
+	if info.Gdef != nil {
+		tables["GDEF"] = info.Gdef.Encode()
+	}
+	if info.Gsub != nil {
+		tables["GSUB"] = info.Gsub.Encode()
+	}
+	if info.Gpos != nil {
+		tables["GPOS"] = info.Gpos.Encode()
 	}
 
-	if includeTables["hhea"] || includeTables["hmtx"] {
-		info := tt.HmtxInfo
-		if subsetInfo != nil {
-			i2 := *info
-			info = &i2
-
-			info.Widths = subsetInfo.Widths
-			info.LSB = subsetInfo.LSB
-			info.GlyphExtents = subsetInfo.GlyphExtents
-		}
-		hhea, hmtx := info.Encode()
-		tables["hhea"] = hhea
-		tables["hmtx"] = hmtx
-	}
-
-	tableNames := tt.selectTables(includeTables)
-
-	if contains(tableNames, "head") {
-		// write the head table
-		// https://docs.microsoft.com/en-us/typography/opentype/spec/head
-		if !modTime.IsZero() {
-			tt.HeadInfo.Modified = modTime
-		}
-
-		if subsetInfo != nil {
-			// TODO(voss): don't modify the original struct
-			tt.HeadInfo.FontBBox.LLx = subsetInfo.xMin
-			tt.HeadInfo.FontBBox.LLy = subsetInfo.yMin
-			tt.HeadInfo.FontBBox.URx = subsetInfo.xMax
-			tt.HeadInfo.FontBBox.URy = subsetInfo.yMax
-			tt.HeadInfo.LocaFormat = subsetInfo.indexToLocFormat
-		}
-
-		tables["head"] = tt.HeadInfo.Encode()
-	}
-
-	if opt.Replace != nil {
-		for name, repl := range opt.Replace {
-			tables[name] = repl
-		}
-	}
-
-	for _, name := range tableNames {
-		if _, ok := tables[name]; !ok {
-			blob, err := tt.Header.ReadTableBytes(tt.Fd, name)
-			if err != nil {
-				return 0, err
-			}
-			tables[name] = blob
-		}
-	}
-
-	return WriteTables(w, tt.Header.ScalerType, tables)
+	return WriteTables(w, scalerType, tables)
 }
 
-type subsetInfo struct {
-	numGlyphs uint16
-	blobs     map[string][]byte
+// Embed writes the binary form of the font for embedding in a PDF file.
+func (info *Info) Embed(w io.Writer) (int64, error) {
+	tables := make(map[string][]byte)
 
-	// fields for the "hhea" and "hmtx" tables
-	Widths       []funit.Uint16
-	GlyphExtents []funit.Rect
-	LSB          []funit.Int16
+	if info.CMap != nil {
+		ss := cmap.Table{
+			{PlatformID: 1, EncodingID: 0}: info.CMap.Encode(0),
+		}
+		tables["cmap"] = ss.Encode()
+	}
 
-	// fields for the "head" table
-	xMin             funit.Int16 // TODO(voss): are these needed?
-	yMin             funit.Int16
-	xMax             funit.Int16
-	yMax             funit.Int16
-	indexToLocFormat int16 // 0 for short offsets, 1 for long
+	tables["hhea"], tables["hmtx"] = info.makeHmtx()
+
+	outlines := info.Outlines.(*GlyfOutlines)
+	enc := outlines.Glyphs.Encode()
+	tables["glyf"] = enc.GlyfData
+	tables["loca"] = enc.LocaData
+	for name, data := range outlines.Tables {
+		tables[name] = data
+	}
+
+	maxpInfo := &maxp.Info{
+		NumGlyphs: info.NumGlyphs(),
+		TTF:       outlines.Maxp,
+	}
+	tables["maxp"] = maxpInfo.Encode()
+
+	tables["head"] = info.makeHead(enc.LocaFormat)
+
+	return WriteTables(w, table.ScalerTypeTrueType, tables)
 }
 
-func (tt *Font) getSubsetInfo(includeOnly []font.GlyphID) (*subsetInfo, error) {
-	if includeOnly[0] != 0 {
-		panic("missing .notdef glyph")
+// IsFixedPitch returns true if all glyphs in the font have the same width.
+func (info *Info) IsFixedPitch() bool {
+	ww := info.Widths()
+	if len(ww) == 0 {
+		return false
 	}
 
-	origNumGlyphs := tt.NumGlyphs()
-
-	res := &subsetInfo{
-		blobs: make(map[string][]byte),
-		xMin:  32767,
-		yMin:  32767,
-		xMax:  -32768,
-		yMax:  -32768,
-	}
-
-	res.Widths = make([]funit.Uint16, len(includeOnly))
-	if tt.HmtxInfo.LSB != nil {
-		res.LSB = make([]funit.Int16, len(includeOnly))
-	}
-	if tt.HmtxInfo.GlyphExtents != nil {
-		res.GlyphExtents = make([]funit.Rect, len(includeOnly))
-	}
-	for i, gid := range includeOnly {
-		res.Widths[i] = tt.HmtxInfo.Widths[gid]
-		if tt.HmtxInfo.LSB != nil {
-			res.LSB[i] = tt.HmtxInfo.LSB[gid]
-		}
-		if tt.HmtxInfo.GlyphExtents != nil {
-			res.GlyphExtents[i] = tt.HmtxInfo.GlyphExtents[gid]
-		}
-	}
-
-	origOffsets, err := tt.GetGlyfOffsets(origNumGlyphs)
-	if err != nil {
-		return nil, err
-	}
-
-	glyfFd, err := tt.GetTableReader("glyf", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// write the new "glyf" table
-	var newOffsets []uint32
-	buf := &bytes.Buffer{}
-	newGid := 0
-	// Elements may be appended to includeOnly during the loop, so we don't
-	// use a range loop here.
-	for newGid < len(includeOnly) {
-		newOffsets = append(newOffsets, uint32(buf.Len()))
-
-		origGid := includeOnly[newGid]
-		start := origOffsets[origGid]
-		end := origOffsets[origGid+1]
-		length := end - start
-
-		if length > 0 {
-			_, err = glyfFd.Seek(int64(start), io.SeekStart)
-			if err != nil {
-				return nil, err
-			}
-			glyphHeader := &table.GlyphHeader{}
-			err = binary.Read(glyfFd, binary.BigEndian, glyphHeader)
-			if err != nil {
-				return nil, err
-			}
-			err = binary.Write(buf, binary.BigEndian, glyphHeader)
-			if err != nil {
-				return nil, err
-			}
-
-			if glyphHeader.XMin < res.xMin {
-				res.xMin = glyphHeader.XMin
-			}
-			if glyphHeader.YMin < res.yMin {
-				res.yMin = glyphHeader.YMin
-			}
-			if glyphHeader.XMax > res.xMax {
-				res.xMax = glyphHeader.XMax
-			}
-			if glyphHeader.YMax > res.yMax {
-				res.yMax = glyphHeader.YMax
-			}
-
-			todo := int64(length) - 10
-			if glyphHeader.NumberOfContours < 0 { // composite glyph
-				// https://docs.microsoft.com/en-us/typography/opentype/spec/glyf#composite-glyph-description
-				for {
-					var compHead struct {
-						Flags      uint16
-						GlyphIndex uint16
-					}
-					err = binary.Read(glyfFd, binary.BigEndian, &compHead)
-					if err != nil {
-						return nil, err
-					}
-
-					// map the component gid to the new scheme
-					origComponentGid := font.GlyphID(compHead.GlyphIndex)
-					newComponentGid := -1
-					for i, gid := range includeOnly {
-						if gid == origComponentGid {
-							newComponentGid = i
-							break
-						}
-					}
-					if newComponentGid < 0 {
-						newComponentGid = len(includeOnly)
-						includeOnly = append(includeOnly, origComponentGid)
-					}
-					compHead.GlyphIndex = uint16(newComponentGid)
-
-					err = binary.Write(buf, binary.BigEndian, &compHead)
-					if err != nil {
-						return nil, err
-					}
-					todo -= 4
-
-					if compHead.Flags&0x0020 == 0 { // no more components
-						break
-					}
-
-					skip := int64(0)
-					if compHead.Flags&0x0001 != 0 { // ARG_1_AND_2_ARE_WORDS
-						skip += 4
-					} else {
-						skip += 2
-					}
-					if compHead.Flags&0x0008 != 0 { // WE_HAVE_A_SCALE
-						skip += 2
-					} else if compHead.Flags&0x0040 != 0 { // WE_HAVE_AN_X_AND_Y_SCALE
-						skip += 4
-					} else if compHead.Flags&0x0080 != 0 { // WE_HAVE_A_TWO_BY_TWO
-						skip += 8
-					}
-					_, err = io.CopyN(buf, glyfFd, skip)
-					if err != nil {
-						return nil, err
-					}
-					todo -= skip
-				}
-			}
-
-			_, err = io.CopyN(buf, glyfFd, todo)
-			if err != nil {
-				return nil, err
-			}
-
-			for length%4 != 0 {
-				buf.WriteByte(0)
-				length++
-			}
-		}
-
-		newGid++
-	}
-	glyphEnd := buf.Len()
-	newOffsets = append(newOffsets, uint32(glyphEnd))
-	res.numGlyphs = uint16(len(includeOnly))
-	res.blobs["glyf"] = buf.Bytes()
-
-	// write the new "loca" table
-	buf = &bytes.Buffer{}
-	if glyphEnd < 1<<16 { // TODO(voss): should this be glyphEnd/2?
-		res.indexToLocFormat = 0
-		shortOffsets := make([]uint16, len(newOffsets))
-		for i, offs := range newOffsets {
-			shortOffsets[i] = uint16(offs / 2)
-		}
-		err = binary.Write(buf, binary.BigEndian, shortOffsets)
-	} else {
-		res.indexToLocFormat = 1
-		err = binary.Write(buf, binary.BigEndian, newOffsets)
-	}
-	if err != nil {
-		return nil, err
-	}
-	res.blobs["loca"] = buf.Bytes()
-
-	return res, nil
-}
-
-func (tt *Font) selectTables(include map[string]bool) []string {
-	var names []string
-	done := make(map[string]bool)
-
-	// Fix the order of tables in the body of the files.
-	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
-	var candidates []string
-	if _, ok := tt.Header.Toc["CFF "]; ok && (include == nil || include["CFF "]) {
-		candidates = []string{
-			"head", "hhea", "maxp", "OS/2", "name", "cmap", "post", "CFF ",
-		}
-	} else {
-		candidates = []string{
-			"head", "hhea", "maxp", "OS/2", "hmtx", "LTSH", "VDMX", "hdmx", "cmap",
-			"fpgm", "prep", "cvt ", "loca", "glyf", "kern", "name", "post", "gasp",
-		}
-	}
-	for _, name := range candidates {
-		done[name] = true
-		if _, ok := tt.Header.Toc[name]; ok {
-			if include == nil || include[name] {
-				names = append(names, name)
-			}
-		}
-	}
-
-	// Pre-existing digital signatures will no longer be valid after we
-	// re-arranged the tables:
-	done["DSIG"] = true
-
-	extraPos := len(names)
-	for name := range tt.Header.Toc {
-		if done[name] {
+	var width uint16
+	for _, w := range ww {
+		if w == 0 {
 			continue
 		}
-		if include == nil || include[name] {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names[extraPos:])
-
-	return names
-}
-
-func contains(ss []string, s string) bool {
-	for _, si := range ss {
-		if si == s {
-			return true
-		}
-	}
-	return false
-}
-
-// The offsets sub-table forms the first part of Header.
-type offsets struct {
-	ScalerType    uint32
-	NumTables     uint16
-	SearchRange   uint16
-	EntrySelector uint16
-	RangeShift    uint16
-}
-
-// A record is part of the file Header.  It contains data about a single sfnt
-// table.
-type record struct {
-	Tag      table.Tag
-	CheckSum uint32
-	Offset   uint32
-	Length   uint32
-}
-
-// WriteTables writes an sfnt file containing the given tables.
-// Tables where the data is nil are not written, use a zero-length slice
-// to write a table with no data.
-// This changes the checksum in the "head" table in place.
-func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, error) {
-	numTables := len(tables)
-
-	tableNames := make([]string, 0, numTables)
-	for name, data := range tables {
-		if data != nil {
-			tableNames = append(tableNames, name)
+		if width == 0 {
+			width = w
+		} else if width != w {
+			return false
 		}
 	}
 
-	// TODO(voss): sort the table names in the recommended order
-	sort.Slice(tableNames, func(i, j int) bool {
-		iPrio := ttTableOrder[tableNames[i]]
-		jPrio := ttTableOrder[tableNames[j]]
-		if iPrio != jPrio {
-			return iPrio > jPrio
+	return true
+}
+
+func (info *Info) makeHead(locaFormat int16) []byte {
+	var bbox funit.Rect
+	switch outlines := info.Outlines.(type) {
+	case *cff.Outlines:
+		for _, g := range outlines.Glyphs {
+			bbox.Extend(g.Extent())
 		}
-		return tableNames[i] < tableNames[j]
-	})
-
-	// prepare the header
-	entrySelector := bits.Len(uint(numTables)) - 1
-	offsets := &offsets{
-		ScalerType:    scalerType,
-		NumTables:     uint16(numTables),
-		SearchRange:   1 << (entrySelector + 4),
-		EntrySelector: uint16(entrySelector),
-		RangeShift:    uint16(16 * (numTables - 1<<entrySelector)),
+	case *GlyfOutlines:
+		for _, g := range outlines.Glyphs {
+			if g == nil {
+				continue
+			}
+			bbox.Extend(g.Rect)
+		}
 	}
 
-	// temporarily clear the checksum in the "head" table
-	if headData, ok := tables["head"]; ok {
-		head.ClearChecksum(headData)
+	headInfo := head.Info{
+		FontRevision:  info.Version,
+		HasYBaseAt0:   true,
+		HasXBaseAt0:   true,
+		UnitsPerEm:    info.UnitsPerEm,
+		Created:       info.CreationTime,
+		Modified:      info.ModificationTime,
+		FontBBox:      bbox,
+		IsBold:        info.IsBold,
+		IsItalic:      info.ItalicAngle != 0,
+		LowestRecPPEM: 7,
+		LocaFormat:    locaFormat,
+	}
+	return headInfo.Encode()
+}
+
+func (info *Info) makeHmtx() ([]byte, []byte) {
+	hmtxInfo := &hmtx.Info{
+		Widths:       info.fWidths(),
+		GlyphExtents: info.fExtents(),
+		Ascent:       info.Ascent,
+		Descent:      info.Descent,
+		LineGap:      info.LineGap,
+		CaretAngle:   info.ItalicAngle / 180 * math.Pi,
 	}
 
-	var totalSum uint32
-	offset := uint32(12 + 16*numTables)
-	records := make([]record, numTables)
-	for i, name := range tableNames {
-		body := tables[name]
-		length := uint32(len(body))
-		checksum := checksum(body)
+	return hmtxInfo.Encode()
+}
 
-		records[i].Tag = table.MakeTag(name)
-		records[i].CheckSum = checksum
-		records[i].Offset = offset
-		records[i].Length = length
-
-		totalSum += checksum
-		offset += 4 * ((length + 3) / 4)
+func (info *Info) makeOS2() []byte {
+	avgGlyphWidth := 0
+	count := 0
+	ww := info.Widths()
+	for _, w := range ww {
+		if w > 0 {
+			avgGlyphWidth += int(w)
+			count++
+		}
 	}
-	sort.Slice(records, func(i, j int) bool {
-		return bytes.Compare(records[i].Tag[:], records[j].Tag[:]) < 0
-	})
+	if count > 0 {
+		avgGlyphWidth = (avgGlyphWidth + count/2) / count
+	}
+
+	var familyClass int16
+	if info.IsSerif {
+		familyClass = 3 << 8
+	} else if info.IsScript {
+		familyClass = 10 << 8
+	}
+
+	os2Info := &os2.Info{
+		WeightClass: info.Weight,
+		WidthClass:  info.Width,
+
+		IsBold:    info.IsBold,
+		IsItalic:  info.ItalicAngle != 0,
+		IsRegular: info.IsRegular,
+		IsOblique: info.IsOblique,
+
+		Ascent:    info.Ascent,
+		Descent:   info.Descent,
+		LineGap:   info.LineGap,
+		CapHeight: info.CapHeight,
+		XHeight:   info.XHeight,
+
+		AvgGlyphWidth: int16(avgGlyphWidth),
+
+		FamilyClass: familyClass,
+
+		PermUse: info.PermUse,
+	}
+	return os2Info.Encode(info.CMap)
+}
+
+func (info *Info) makeName(ss cmap.Table) []byte {
+	day := info.ModificationTime
+	if day.IsZero() {
+		day = info.CreationTime
+	}
+	if day.IsZero() {
+		day = time.Now()
+	}
+	dayString := day.Format("2006-01-02")
+
+	nameInfo := &name.Info{
+		Tables: map[name.Loc]*name.Table{},
+	}
+	fullName := info.FullName()
+	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryUndefined} {
+		nameInfo.Tables[name.Loc{Language: locale.LangEnglish, Country: country}] = &name.Table{
+			Family:         info.FamilyName,
+			Subfamily:      info.Subfamily(),
+			Description:    info.Description,
+			Copyright:      info.Copyright,
+			Trademark:      info.Trademark,
+			Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
+			FullName:       fullName,
+			Version:        "Version " + info.Version.String(),
+			PostScriptName: string(info.PostscriptName()),
+			SampleText:     info.SampleText,
+		}
+	}
+
+	return nameInfo.Encode(ss)
+}
+
+func (info *Info) makePost() []byte {
+	postInfo := &post.Info{
+		ItalicAngle:        info.ItalicAngle,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		IsFixedPitch:       info.IsFixedPitch(),
+	}
+	if outlines, ok := info.Outlines.(*GlyfOutlines); ok {
+		postInfo.Names = outlines.Names
+	}
+	return postInfo.Encode()
+}
+
+func (info *Info) makeCFF(outlines *cff.Outlines) ([]byte, error) {
+	fontInfo := info.GetFontInfo()
+	myCff := &cff.Font{
+		FontInfo: fontInfo,
+		Outlines: outlines,
+	}
 
 	buf := &bytes.Buffer{}
-	binary.Write(buf, binary.BigEndian, offsets)
-	binary.Write(buf, binary.BigEndian, records)
-	headerBytes := buf.Bytes()
-	totalSum += checksum(headerBytes)
-
-	// set the final checksum in the "head" table
-	if headData, ok := tables["head"]; ok {
-		head.PatchChecksum(headData, totalSum)
-	}
-
-	// write the tables
-	var totalSize int64
-	n, err := w.Write(headerBytes)
-	totalSize += int64(n)
+	err := myCff.Encode(buf)
 	if err != nil {
-		return totalSize, err
+		return nil, err
 	}
-	var pad [3]byte
-	for _, name := range tableNames {
-		body := tables[name]
-		n, err := w.Write(body)
-		totalSize += int64(n)
-		if err != nil {
-			return totalSize, err
-		}
-		if k := n % 4; k != 0 {
-			l, err := w.Write(pad[:4-k])
-			totalSize += int64(l)
-			if err != nil {
-				return totalSize, err
-			}
-		}
-	}
-	return totalSize, nil
-}
-
-// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
-var ttTableOrder = map[string]int{
-	"head": 95,
-	"hhea": 90,
-	"maxp": 85,
-	"OS/2": 80,
-	"hmtx": 75,
-	"LTSH": 70,
-	"VDMX": 65,
-	"hdmx": 60,
-	"cmap": 55,
-	"fpgm": 50,
-	"prep": 45,
-	"cvt ": 40,
-	"loca": 35,
-	"glyf": 30,
-	"kern": 25,
-	"name": 20,
-	"post": 15,
-	"gasp": 10,
-	"DSIG": 5,
+	return buf.Bytes(), nil
 }

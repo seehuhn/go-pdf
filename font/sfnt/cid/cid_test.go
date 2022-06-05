@@ -22,18 +22,19 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
 func TestCID(t *testing.T) {
 	// fd, err := os.Open("../../opentype/otf/SourceSerif4-Regular.otf")
-	fd, err := os.Open("../../truetype/ttf/SourceSerif4-Regular.ttf")
+	fd, err := os.Open("../../ttf/SourceSerif4-Regular.ttf")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fontInfo, err := sfntcff.Read(fd)
+	fontInfo, err := sfnt.Read(fd)
 	if err != nil {
 		fd.Close()
 		t.Fatal(err)
@@ -54,7 +55,7 @@ func TestCID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := Embed(w, fontInfo, "F")
+	F, err := Embed(w, fontInfo, "F", locale.EnUS)
 	if err != nil {
 		t.Fatal(err)
 	}

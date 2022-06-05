@@ -32,7 +32,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
-	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -138,14 +138,26 @@ func main() {
 }
 
 func loadCFFData(fname string) ([]byte, error) {
-	if strings.HasSuffix(fname, ".otf") {
-		f, err := sfnt.Open(fname, nil)
-		if err != nil {
-			return nil, err
-		}
-		return f.Header.ReadTableBytes(f.Fd, "CFF ")
+	if strings.HasSuffix(fname, ".cff") {
+		return os.ReadFile(fname)
 	}
-	return os.ReadFile(fname)
+
+	r, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	header, err := table.ReadHeader(r)
+	if err != nil {
+		return nil, err
+	}
+
+	cffData, err := header.ReadTableBytes(r, "CFF ")
+	if err != nil {
+		return nil, err
+	}
+	return cffData, nil
 }
 
 func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) error {

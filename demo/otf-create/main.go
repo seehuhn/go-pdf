@@ -25,15 +25,15 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/names"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
-	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
 func main() {
 	now := time.Now()
-	info := &sfntcff.Info{
+	info := &sfnt.Info{
 		FamilyName: "Test",
 		Weight:     font.WeightNormal,
 		Width:      font.WidthNormal,

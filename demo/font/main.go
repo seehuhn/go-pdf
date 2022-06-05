@@ -19,10 +19,15 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
-	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/simple"
 	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -37,13 +42,32 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		subset[r] = true
 	}
 
-	// F1, err := builtin.Embed(out, "Times-Roman", "F1", locale.EnGB)
-	// F1, err := truetype.Embed(out, "../../font/truetype/ttf/FreeSerif.ttf", "F1", locale.EnGB)
-	// F1, err := truetype.Embed(out, "../../font/truetype/ttf/Roboto-Regular.ttf", "F1", locale.EnGB)
-	// F1, err := truetype.EmbedSimple(out, "../../font/truetype/ttf/SourceSerif4-Regular.ttf", "F1", locale.EnGB)
-	F1, err := opentype.EmbedSimple(out, "../../font/opentype/otf/SourceSerif4-Regular.otf", "F1", locale.EnGB)
-	if err != nil {
-		return err
+	fontFile := "../../font/otf/SourceSerif4-Regular.otf"
+	var F1 *font.Font
+	if strings.HasSuffix(fontFile, ".ttf") || strings.HasSuffix(fontFile, ".otf") {
+		fd, err := os.Open(fontFile)
+		if err != nil {
+			return err
+		}
+		info, err := sfnt.Read(fd)
+		if err != nil {
+			fd.Close()
+			return err
+		}
+		err = fd.Close()
+		if err != nil {
+			return err
+		}
+		F1, err = simple.Embed(out, info, "F1", locale.EnUS)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		F1, err = builtin.Embed(out, fontFile, "F1")
+		if err != nil {
+			return err
+		}
 	}
 
 	pageTree := pages.NewPageTree(out, nil)
@@ -71,7 +95,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 
 	page.Println("q")
 	page.Println("1 .5 .5 RG")
-	yPos := height - margin - float64(F1.Ascent)
+	yPos := height - margin - float64(F1.Ascent)/1000
 	for y := yPos; y > margin; y -= baseLineSkip {
 		page.Printf("%.1f %.1f m %.1f %.1f l\n", margin, y, width-margin, y)
 	}

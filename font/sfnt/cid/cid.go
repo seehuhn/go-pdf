@@ -24,18 +24,34 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/locale"
 )
 
-// TODO(voss): check PDF versions
-
-// Embed embeds a TrueType or OpenType font into a PDF document.
-func Embed(w *pdf.Writer, info *sfntcff.Info, instName pdf.Name) (*font.Font, error) {
-	isTrueType := info.IsGlyf()
-	isOpenType := info.IsCFF()
-	if !(isTrueType || isOpenType) {
-		return nil, errors.New("no glyph outlines found")
+// Embed embeds a TrueType or OpenType font into a PDF document as a CID font.
+//
+// In comparison, fonts embedded via simple.Embed() lead to smaller PDF files,
+// but only up to 256 glyphs of the font can be accessed via the returned font
+// object.
+//
+// This requires PDF version 1.1 or higher, and
+// use of CFF-based OpenType fonts requires PDF version 1.3 or higher.
+func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
+	if info.IsGlyf() {
+		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
+		if err != nil {
+			return nil, err
+		}
+	} else if info.IsCFF() {
+		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_3)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.New("unsupported glyph format")
 	}
 
 	widths := info.Widths()
@@ -44,22 +60,25 @@ func Embed(w *pdf.Writer, info *sfntcff.Info, instName pdf.Name) (*font.Font, er
 	}
 
 	s := &fontHandler{
-		FontRef: w.Alloc(),
-		info:    info,
-		widths:  widths,
-		text:    map[font.GlyphID][]rune{},
-		used:    map[uint16]bool{},
+		FontRef:     w.Alloc(),
+		info:        info,
+		GsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
+		GposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		text:        map[font.GlyphID][]rune{},
+		used:        map[uint16]bool{},
 	}
 
 	w.OnClose(s.WriteFont)
+
+	q := 1000 / float64(info.UnitsPerEm)
 
 	res := &font.Font{
 		InstName:     instName,
 		Ref:          s.FontRef,
 		Layout:       s.Layout,
 		Enc:          s.Enc,
-		Ascent:       int(info.Ascent),
-		Descent:      int(info.Descent),
+		Ascent:       int(math.Round(float64(info.Ascent) * q)),
+		Descent:      int(math.Round(float64(info.Descent) * q)),
 		GlyphExtents: info.Extents(),
 		Widths:       widths,
 	}
@@ -67,26 +86,46 @@ func Embed(w *pdf.Writer, info *sfntcff.Info, instName pdf.Name) (*font.Font, er
 }
 
 type fontHandler struct {
-	FontRef *pdf.Reference
-	info    *sfntcff.Info
-	widths  []uint16
-	text    map[font.GlyphID][]rune
-	used    map[uint16]bool
+	FontRef     *pdf.Reference
+	info        *sfnt.Info
+	GsubLookups []gtab.LookupIndex
+	GposLookups []gtab.LookupIndex
+	text        map[font.GlyphID][]rune
+	used        map[uint16]bool
 }
 
 func (s *fontHandler) Layout(rr []rune) []font.Glyph {
-	gg := make([]font.Glyph, len(rr))
-	for i, r := range rr {
-		gid := s.info.CMap.Lookup(r)
-		gg[i].Gid = gid
-		gg[i].Text = []rune{r}
-		gg[i].Advance = int32(s.widths[gid])
+	info := s.info
 
-		if _, seen := s.text[gid]; !seen {
-			s.text[gid] = []rune{r}
+	seq := make([]font.Glyph, len(rr))
+	for i, r := range rr {
+		gid := info.CMap.Lookup(r)
+		seq[i].Gid = gid
+		seq[i].Text = []rune{r}
+	}
+
+	for _, lookupIndex := range s.GsubLookups {
+		seq = info.Gsub.LookupList.ApplyLookup(seq, lookupIndex, info.Gdef)
+	}
+
+	for i := range seq {
+		gid := seq[i].Gid
+		if info.Gdef.GlyphClass[gid] != gdef.GlyphClassMark {
+			seq[i].Advance = int32(info.FGlyphWidth(gid))
 		}
 	}
-	return gg
+	for _, lookupIndex := range s.GposLookups {
+		seq = info.Gpos.LookupList.ApplyLookup(seq, lookupIndex, info.Gdef)
+	}
+
+	for _, g := range seq {
+		if _, seen := s.text[g.Gid]; !seen && len(g.Text) > 0 {
+			// copy the slice, in case the caller modifies it later
+			s.text[g.Gid] = append([]rune{}, g.Text...)
+		}
+	}
+
+	return seq
 }
 
 func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
@@ -116,7 +155,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	}
 
 	// subset the font
-	subsetInfo := &sfntcff.Info{}
+	subsetInfo := &sfnt.Info{}
 	*subsetInfo = *s.info
 	switch outlines := s.info.Outlines.(type) {
 	case *cff.Outlines:
@@ -142,7 +181,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		}
 		subsetInfo.Outlines = o2
 
-	case *sfntcff.GlyfOutlines:
+	case *sfnt.GlyfOutlines:
 		newGid := make(map[font.GlyphID]font.GlyphID)
 		todo := make(map[font.GlyphID]bool)
 		nextGid := font.GlyphID(0)
@@ -169,7 +208,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			}
 		}
 
-		o2 := &sfntcff.GlyfOutlines{
+		o2 := &sfnt.GlyfOutlines{
 			Tables: outlines.Tables,
 			Maxp:   outlines.Maxp,
 		}
@@ -182,16 +221,19 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		subsetInfo.Outlines = o2
 		subsetInfo.CMap = nil
 
-	default:
-		panic("unsupported outlines type")
 	}
 
 	fontName := pdf.Name(subsetTag) + "+" + subsetInfo.PostscriptName()
 
+	DW, W := font.EncodeCIDWidths(s.info.Widths())
+
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
 	FontDescriptorRef := w.Alloc()
-	WidthsRef := w.Alloc() // TODO(voss): don't allocte if W == nil.
+	var WidthsRef *pdf.Reference
+	if W != nil {
+		WidthsRef = w.Alloc()
+	}
 	FontFileRef := w.Alloc()
 	ToUnicodeRef := w.Alloc()
 
@@ -205,7 +247,6 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		"ToUnicode":       ToUnicodeRef,
 	}
 
-	DW, W := font.EncodeCIDWidths(s.widths)
 	CIDFont := pdf.Dict{ // See section 9.7.4.1 of PDF 32000-1:2008.
 		"Type":           pdf.Name("Font"),
 		"BaseFont":       fontName,
@@ -222,7 +263,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
-		"Flags":       pdf.Integer(flags(subsetInfo, true)), // TODO(voss)
+		"Flags":       pdf.Integer(subsetInfo.Flags(true)), // TODO(voss)
 		"FontBBox":    subsetInfo.BBox(),
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
 		"Ascent":      pdf.Integer(math.Round(float64(subsetInfo.Ascent) * q)),
@@ -231,15 +272,19 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
 
+	compressedRefs := []*pdf.Reference{s.FontRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
+	compressedObjects := []pdf.Object{Font, CIDFont, CIDSystemInfo, FontDescriptor}
+	if W != nil {
+		compressedRefs = append(compressedRefs, WidthsRef)
+		compressedObjects = append(compressedObjects, W)
+	}
+
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
 		Font["BaseFont"] = fontName + "-" + "Identity-H"
 		CIDFont["Subtype"] = pdf.Name("CIDFontType0")
 		FontDescriptor["FontFile3"] = FontFileRef
-
-		_, err := w.WriteCompressed(
-			[]*pdf.Reference{s.FontRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef, WidthsRef},
-			Font, CIDFont, CIDSystemInfo, FontDescriptor, W)
+		_, err := w.WriteCompressed(compressedRefs, compressedObjects...)
 		if err != nil {
 			return err
 		}
@@ -267,7 +312,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			return err
 		}
 
-	case *sfntcff.GlyfOutlines:
+	case *sfnt.GlyfOutlines:
 		CID2GIDMapRef := w.Alloc()
 
 		Font["BaseFont"] = fontName
@@ -275,9 +320,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		CIDFont["CIDToGIDMap"] = CID2GIDMapRef
 		FontDescriptor["FontFile2"] = FontFileRef
 
-		_, err := w.WriteCompressed(
-			[]*pdf.Reference{s.FontRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef, WidthsRef},
-			Font, CIDFont, CIDSystemInfo, FontDescriptor, W)
+		_, err := w.WriteCompressed(compressedRefs, compressedObjects...)
 		if err != nil {
 			return err
 		}
@@ -333,9 +376,6 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		if err != nil {
 			return err
 		}
-
-	default:
-		panic("unsupported outlines type")
 	}
 
 	var cc2text []font.CIDMapping
@@ -359,26 +399,4 @@ func pop(todo map[font.GlyphID]bool) font.GlyphID {
 		return key
 	}
 	panic("empty map")
-}
-
-func flags(info *sfntcff.Info, symbolic bool) uint32 {
-	var flags uint32
-	if info.IsFixedPitch() {
-		flags |= 1 << (1 - 1)
-	}
-	if info.IsSerif {
-		flags |= 1 << (2 - 1)
-	}
-	if symbolic {
-		flags |= 1 << (3 - 1)
-	} else {
-		flags |= 1 << (6 - 1)
-	}
-	if info.IsScript {
-		flags |= 1 << (4 - 1)
-	}
-	if info.IsItalic {
-		flags |= 1 << (7 - 1)
-	}
-	return flags
 }

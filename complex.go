@@ -63,3 +63,31 @@ func (rect *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
 		math.Abs(rect.URx-other.URx) < eps &&
 		math.Abs(rect.URy-other.URy) < eps)
 }
+
+// IsZero is true if the glyph leaves no marks on the page.
+func (rect Rectangle) IsZero() bool {
+	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
+}
+
+// Extend enlarges the rectangle to also cover `other`.
+func (rect *Rectangle) Extend(other *Rectangle) {
+	if other.IsZero() {
+		return
+	}
+	if rect.IsZero() {
+		*rect = *other
+		return
+	}
+	if other.LLx < rect.LLx {
+		rect.LLx = other.LLx
+	}
+	if other.LLy < rect.LLy {
+		rect.LLy = other.LLy
+	}
+	if other.URx > rect.URx {
+		rect.URx = other.URx
+	}
+	if other.URy > rect.URy {
+		rect.URy = other.URy
+	}
+}

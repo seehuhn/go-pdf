@@ -157,3 +157,23 @@ func (info FeatureListInfo) encode() []byte {
 	}
 	return buf
 }
+
+var (
+	// GsubDefaultFeatures can be used as an argument for the Info.FindLookups()
+	// method.
+	GsubDefaultFeatures = map[string]bool{
+		"calt": true,
+		"ccmp": true,
+		"clig": true,
+		"liga": true,
+		"locl": true,
+	}
+
+	// GposDefaultFeatures can be used as an argument for the Info.FindLookups()
+	// method.
+	GposDefaultFeatures = map[string]bool{
+		"kern": true,
+		"mark": true,
+		"mkmk": true,
+	}
+)

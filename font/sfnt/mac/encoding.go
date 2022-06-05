@@ -16,9 +16,8 @@
 
 // Package mac implements the Mac Roman encoding.
 // This is the standard Roman encoding that is used for PlatformID==1,
-// EncodingID == 0 is the same as the MacRomanEncoding in PDF, with the
-// addition of 15 entries and the replacement of the currency glyph with the
-// Euro glyph.
+// EncodingID == 0.  This is similar to the MacRomanEncoding in PDF, but adds
+// 15 entries and replaces the currency glyph with the Euro glyph.
 // https://en.wikipedia.org/wiki/Mac_OS_Roman
 package mac
 

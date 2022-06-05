@@ -31,6 +31,8 @@ type Subtable interface {
 	CodeRange() (low, high rune)
 }
 
+// TODO(voss): add a way to iterate over CMap Subtables
+
 // From the font files on my laptop, I extracted all cmap subtables
 // and removed duplicates.  The following table is the result.
 //

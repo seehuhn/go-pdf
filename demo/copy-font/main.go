@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"seehuhn.de/go/pdf/font/sfntcff"
+	"seehuhn.de/go/pdf/font/sfnt"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		info, err := sfntcff.Read(fd)
+		info, err := sfnt.Read(fd)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -41,7 +41,6 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 
 	reader, ok := gposReaders[10*meta.LookupType+format]
 	if !ok {
-		fmt.Println("GPOS", meta.LookupType, format)
 		return notImplementedGposSubtable{meta.LookupType, format}, nil
 	}
 	return reader(p, pos)
@@ -65,9 +64,7 @@ type notImplementedGposSubtable struct {
 }
 
 func (st notImplementedGposSubtable) Apply(_ KeepGlyphFn, _ []font.Glyph, _, _ int) *Match {
-	msg := fmt.Sprintf("GPOS lookup type %d, format %d not implemented",
-		st.lookupType, st.lookupFormat)
-	panic(msg)
+	return nil
 }
 
 func (st notImplementedGposSubtable) EncodeLen() int {

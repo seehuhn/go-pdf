@@ -23,14 +23,14 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
-	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
 // Parse decodes the textual description of a LookupList.
-func Parse(fontInfo *sfntcff.Info, input string) (lookups gtab.LookupList, err error) {
+func Parse(fontInfo *sfnt.Info, input string) (lookups gtab.LookupList, err error) {
 	numGlyphs := fontInfo.NumGlyphs()
 	byName := make(map[string]font.GlyphID)
 	for i := font.GlyphID(0); i < font.GlyphID(numGlyphs); i++ {
@@ -69,7 +69,7 @@ type parser struct {
 	tokens  <-chan item
 	backlog []item
 
-	fontInfo *sfntcff.Info
+	fontInfo *sfnt.Info
 	byName   map[string]font.GlyphID
 }
 

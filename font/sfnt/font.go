@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,369 +17,389 @@
 package sfnt
 
 import (
-	"encoding/binary"
-	"errors"
-	"io"
 	"math"
-	"os"
+	"regexp"
+	"strings"
+	"time"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
-	"seehuhn.de/go/pdf/font/sfnt/gtab"
+	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
-	"seehuhn.de/go/pdf/font/sfnt/hmtx"
-	"seehuhn.de/go/pdf/font/sfnt/mac"
 	"seehuhn.de/go/pdf/font/sfnt/maxp"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
-	"seehuhn.de/go/pdf/font/sfnt/table"
-	"seehuhn.de/go/pdf/locale"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
-// Font describes a TrueType or OpenType font file.
-type Font struct {
-	FontName string
-	HeadInfo *head.Info
-	HmtxInfo *hmtx.Info
+// Info contains information about the font.
+type Info struct {
+	FamilyName  string
+	Width       font.Width
+	Weight      font.Weight
+	Description string
+	SampleText  string
 
-	// TODO(voss): tidy the fields below
+	Version          head.Version
+	CreationTime     time.Time
+	ModificationTime time.Time
 
-	Fd     *os.File
-	Header *table.Header
+	Copyright string
+	Trademark string
+	PermUse   os2.Permissions
 
-	CMap  map[rune]font.GlyphID
-	Flags font.Flags
+	UnitsPerEm uint16
 
-	GlyphUnits  int
-	CapHeight   int
-	ItalicAngle float64
+	Ascent    funit.Int16
+	Descent   funit.Int16 // negative
+	LineGap   funit.Int16
+	CapHeight funit.Int16
+	XHeight   funit.Int16
 
-	FontBBox *font.Rect // always uses 1000 units to the em (not GlyphUnits)
+	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
+	UnderlinePosition  int16   // Underline position (negative)
+	UnderlineThickness int16   // Underline thickness
 
-	GSUB, GPOS gtab.Lookups
+	IsItalic  bool // Glyphs have dominant vertical strokes that are slanted.
+	IsBold    bool
+	IsRegular bool
+	IsOblique bool
+	IsSerif   bool
+	IsScript  bool // Glyphs resemble cursive handwriting.
+
+	CMap     cmap.Subtable
+	Outlines interface{} // either *cff.Outlines or *GlyfOutlines
+
+	Gdef *gdef.Table
+	Gsub *gtab.Info
+	Gpos *gtab.Info
 }
 
-// Open loads a TrueType font into memory.
-// The .Close() method must be called once the Font is no longer used.
-func Open(fname string, loc *locale.Locale) (*Font, error) {
-	fd, err := os.Open(fname)
-	if err != nil {
-		return nil, err
-	}
-
-	header, err := table.ReadHeader(fd)
-	if err != nil {
-		if err == io.ErrUnexpectedEOF {
-			err = errors.New("malformed/corrupted font file")
-		}
-		return nil, err
-	}
-
-	tt := &Font{
-		Fd:     fd,
-		Header: header,
-	}
-
-	headFd, err := tt.GetTableReader("head", nil)
-	if err != nil {
-		return nil, err
-	}
-	tt.HeadInfo, err = head.Read(headFd)
-	if err != nil {
-		return nil, err
-	}
-
-	hheaData, err := tt.Header.ReadTableBytes(tt.Fd, "hhea")
-	if err != nil {
-		return nil, err
-	}
-	hmtxData, err := tt.Header.ReadTableBytes(tt.Fd, "hmtx")
-	if err != nil {
-		return nil, err
-	}
-	hmtxInfo, err := hmtx.Decode(hheaData, hmtxData)
-	if err != nil {
-		return nil, err
-	}
-
-	maxpFd, err := tt.GetTableReader("maxp", nil)
-	if err != nil {
-		return nil, err
-	}
-	maxpInfo, err := maxp.Read(maxpFd)
-	if err != nil {
-		return nil, err
-	}
-	NumGlyphs := maxpInfo.NumGlyphs
-	if NumGlyphs != len(hmtxInfo.Widths) {
-		return nil, errors.New("inconsistent number of glyphs")
-	}
-
-	var os2Info *os2.Info
-	os2Fd, err := tt.GetTableReader("OS/2", nil)
-	if table.IsMissing(err) {
-		// pass
-	} else if err != nil {
-		return nil, err
-	} else {
-		os2Info, err = os2.Read(os2Fd)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	glyf, err := tt.getGlyfInfo(NumGlyphs)
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-
-	postInfo, err := tt.getPostInfo()
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-
-	fontName, err := tt.getFontName()
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-	// TODO(voss): if FontName == "", invent a name: The name must be no
-	// longer than 63 characters and restricted to the printable ASCII
-	// subset, codes 33 to 126, except for the 10 characters '[', ']', '(',
-	// ')', '{', '}', '<', '>', '/', '%'.
-
-	cmap, err := tt.SelectCMap()
-	if err != nil {
-		return nil, err
-	}
-
-	var GlyphExtent []funit.Rect
-	if glyf != nil {
-		GlyphExtent = make([]funit.Rect, NumGlyphs)
-		for i := 0; i < NumGlyphs; i++ {
-			GlyphExtent[i].LLx = glyf.Data[i].XMin
-			GlyphExtent[i].LLy = glyf.Data[i].YMin
-			GlyphExtent[i].URx = glyf.Data[i].XMax
-			GlyphExtent[i].URy = glyf.Data[i].YMax
-		}
-	} else {
-		// TODO(voss): get the glyph extents for OpenType fonts
-	}
-	hmtxInfo.GlyphExtents = GlyphExtent
-
-	if os2Info != nil {
-		hmtxInfo.Ascent = os2Info.Ascent
-		hmtxInfo.Descent = os2Info.Descent
-		hmtxInfo.LineGap = os2Info.LineGap
-	}
-
-	var capHeight int
-	if os2Info != nil && os2Info.CapHeight != 0 {
-		capHeight = int(os2Info.CapHeight)
-	} else if H, ok := cmap['H']; ok && GlyphExtent != nil {
-		// CapHeight may be set equal to the top of the unscaled and unhinted
-		// glyph bounding box of the glyph encoded at U+0048 (LATIN CAPITAL
-		// LETTER H)
-		capHeight = int(GlyphExtent[H].URy)
-	} else {
-		capHeight = 800 // TODO(voss): adjust for glyphUnits
-	}
-
-	pars, err := gtab.OldRead(tt.Header, tt.Fd, loc)
-	if err != nil {
-		return nil, err
-	}
-	gsub, err := pars.ReadGsubTable()
-	if err != nil && !table.IsMissing(err) {
-		return nil, err
-	}
-	gpos, err := pars.ReadGposTable()
-	if table.IsMissing(err) { // if no GPOS table is found ...
-		gpos, err = tt.readKernInfo()
-	}
-	if err != nil && !table.IsMissing(err) { // error from either ReadGposTable() or ReadKernInfo()
-		return nil, err
-	}
-
-	var flags font.Flags
-	if os2Info != nil {
-		switch os2Info.FamilyClass >> 8 {
-		case 1, 2, 3, 4, 5, 7:
-			flags |= font.FlagSerif
-		case 10:
-			flags |= font.FlagScript
-		}
-	}
-	if postInfo != nil && postInfo.IsFixedPitch {
-		flags |= font.FlagFixedPitch
-	}
-	IsItalic := tt.HeadInfo.IsItalic
-	if os2Info != nil {
-		// If the "OS/2" table is present, Windows seems to use this table to
-		// decide whether the font is bold/italic.  We follow Window's lead
-		// here (overriding the values from the head table).
-		IsItalic = os2Info.IsItalic
-	}
-	if IsItalic {
-		flags |= font.FlagItalic
-	}
-
-	if isSubset(cmap, font.AdobeStandardLatin) {
-		flags |= font.FlagNonsymbolic
-	} else {
-		flags |= font.FlagSymbolic
-	}
-
-	// TODO(voss): font.FlagAllCap
-	// TODO(voss): font.FlagSmallCap
-
-	q := 1000 / float64(tt.HeadInfo.UnitsPerEm)
-	fbox := tt.HeadInfo.FontBBox
-	bbox := &font.Rect{
-		LLx: int16(math.Round(float64(fbox.LLx) * q)),
-		LLy: int16(math.Round(float64(fbox.LLy) * q)),
-		URx: int16(math.Round(float64(fbox.URx) * q)),
-		URy: int16(math.Round(float64(fbox.URy) * q)),
-	}
-
-	tt.CMap = cmap
-	tt.FontName = fontName
-	tt.HmtxInfo = hmtxInfo
-	tt.GlyphUnits = int(tt.HeadInfo.UnitsPerEm)
-	tt.CapHeight = capHeight
-	if postInfo != nil {
-		tt.ItalicAngle = postInfo.ItalicAngle
-	}
-	tt.FontBBox = bbox
-	tt.Flags = flags
-	tt.GSUB = gsub
-	tt.GPOS = gpos
-
-	return tt, nil
+// GlyfOutlines stores the glyph data of a TrueType font.
+type GlyfOutlines struct {
+	Glyphs glyf.Glyphs
+	Widths []funit.Uint16
+	Names  []string
+	Tables map[string][]byte
+	Maxp   *maxp.TTFInfo
 }
 
-// Close frees all resources associated with the font.  The Font object
-// cannot be used any more after Close() has been called.
-func (tt *Font) Close() error {
-	return tt.Fd.Close()
+// GetFontInfo returns an Adobe FontInfo structure for the given font.
+func (info *Info) GetFontInfo() *type1.FontInfo {
+	q := 1 / float64(info.UnitsPerEm)
+	fontInfo := &type1.FontInfo{
+		FullName:   info.FullName(),
+		FamilyName: info.FamilyName,
+		Weight:     info.Weight.String(),
+		FontName:   info.PostscriptName(),
+		Version:    info.Version.String(),
+
+		Copyright: strings.ReplaceAll(info.Copyright, "©", "(c)"),
+		Notice:    info.Trademark,
+
+		FontMatrix: []float64{q, 0, 0, q, 0, 0}, // TODO(voss): is this right?
+
+		ItalicAngle:  info.ItalicAngle,
+		IsFixedPitch: info.IsFixedPitch(),
+
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+	}
+	return fontInfo
+}
+
+// IsGlyf returns true if the font contains TrueType glyph outlines.
+func (info *Info) IsGlyf() bool {
+	_, ok := info.Outlines.(*GlyfOutlines)
+	return ok
+}
+
+// IsCFF returns true if the font contains CFF glyph outlines.
+func (info *Info) IsCFF() bool {
+	_, ok := info.Outlines.(*cff.Outlines)
+	return ok
+}
+
+// FullName returns the full name of the font.
+func (info *Info) FullName() string {
+	return info.FamilyName + " " + info.Subfamily()
+}
+
+// Subfamily returns the subfamily name of the font.
+func (info *Info) Subfamily() string {
+	var words []string
+	if info.Width != 0 && info.Width != font.WidthNormal {
+		words = append(words, info.Width.String())
+	}
+	if info.Weight != 0 && info.Weight != font.WeightNormal {
+		words = append(words, info.Weight.String())
+	} else if info.IsBold {
+		words = append(words, "Bold")
+	}
+	if info.IsOblique {
+		words = append(words, "Oblique")
+	} else if info.IsItalic {
+		words = append(words, "Italic")
+	}
+	if len(words) == 0 {
+		return "Regular"
+	}
+	return strings.Join(words, " ")
+}
+
+// PostscriptName returns the Postscript name of the font.
+func (info *Info) PostscriptName() pdf.Name {
+	name := info.FamilyName + "-" + info.Subfamily()
+	re := regexp.MustCompile(`[^!-$&-'*-.0-;=?-Z\\^-z|~]+`)
+	return pdf.Name(re.ReplaceAllString(name, ""))
+}
+
+// BBox returns the bounding box of the font.
+func (info *Info) BBox() (bbox *pdf.Rectangle) {
+	first := true
+	for i := 0; i < info.NumGlyphs(); i++ {
+		ext := info.GlyphExtent(font.GlyphID(i))
+		if ext.IsZero() {
+			continue
+		}
+
+		if first {
+			bbox = ext
+			continue
+		}
+
+		bbox.Extend(ext)
+	}
+	return
 }
 
 // NumGlyphs returns the number of glyphs in the font.
-// This value always include the ".notdef" glyph.
-func (tt *Font) NumGlyphs() int {
-	return len(tt.HmtxInfo.Widths)
+func (info *Info) NumGlyphs() int {
+	switch outlines := info.Outlines.(type) {
+	case *cff.Outlines:
+		return len(outlines.Glyphs)
+	case *GlyfOutlines:
+		return len(outlines.Glyphs)
+	default:
+		panic("unexpected font type")
+	}
 }
 
-// HasTables returns true, if all the given tables are present in the font.
-func (tt *Font) HasTables(names ...string) bool {
-	for _, name := range names {
-		if _, ok := tt.Header.Toc[name]; !ok {
-			return false
+func (info *Info) fWidths() []funit.Uint16 {
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		widths := make([]funit.Uint16, info.NumGlyphs())
+		for i, g := range f.Glyphs {
+			widths[i] = g.Width
+		}
+		return widths
+	case *GlyfOutlines:
+		return f.Widths
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// Widths return the advance widths of the glyphs of the font,
+// in PDF glyph space units.
+func (info *Info) Widths() []uint16 {
+	widths := make([]uint16, info.NumGlyphs())
+	q := 1000 / float64(info.UnitsPerEm)
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		for i, g := range f.Glyphs {
+			widths[i] = uint16(math.Round(float64(g.Width) * q))
+		}
+	case *GlyfOutlines:
+		for i, w := range f.Widths {
+			widths[i] = uint16(math.Round(float64(w) * q))
+		}
+	default:
+		panic("unexpected font type")
+	}
+	return widths
+}
+
+func (info *Info) fExtents() []funit.Rect {
+	extents := make([]funit.Rect, info.NumGlyphs())
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		for i, g := range f.Glyphs {
+			extents[i] = g.Extent()
+		}
+		return extents
+	case *GlyfOutlines:
+		for i, g := range f.Glyphs {
+			if g == nil {
+				continue
+			}
+			extents[i] = g.Rect
+		}
+	default:
+		panic("unexpected font type")
+	}
+	return extents
+}
+
+// Extents returns the glyph bounding boxes for the font,
+// in PDF glyph space units.
+func (info *Info) Extents() []font.Rect {
+	q := 1000 / float64(info.UnitsPerEm)
+	extents := make([]font.Rect, info.NumGlyphs())
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		for i, g := range f.Glyphs {
+			ext := g.Extent()
+			extents[i] = font.Rect{
+				LLx: int16(math.Round(float64(ext.LLx) * q)),
+				LLy: int16(math.Round(float64(ext.LLy) * q)),
+				URx: int16(math.Round(float64(ext.URx) * q)),
+				URy: int16(math.Round(float64(ext.URy) * q)),
+			}
+		}
+	case *GlyfOutlines:
+		for i, g := range f.Glyphs {
+			if g == nil {
+				continue
+			}
+			extents[i] = font.Rect{
+				LLx: int16(math.Round(float64(g.Rect.LLx) * q)),
+				LLy: int16(math.Round(float64(g.Rect.LLy) * q)),
+				URx: int16(math.Round(float64(g.Rect.URx) * q)),
+				URy: int16(math.Round(float64(g.Rect.URy) * q)),
+			}
+		}
+	default:
+		panic("unexpected font type")
+	}
+	return extents
+}
+
+// FGlyphWidth returns the advance width of the glyph with the given glyph ID,
+// in font design units.
+func (info *Info) FGlyphWidth(gid font.GlyphID) funit.Uint16 {
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		return f.Glyphs[gid].Width
+	case *GlyfOutlines:
+		if f.Widths == nil {
+			return 0
+		}
+		return f.Widths[gid]
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// GlyphWidth returns the advance width of the glyph with the given glyph ID,
+// in PDF glyph space units.
+func (info *Info) GlyphWidth(gid font.GlyphID) uint16 {
+	q := 1000 / float64(info.UnitsPerEm)
+	return uint16(math.Round(float64(info.FGlyphWidth(gid)) * q))
+}
+
+// FGlyphExtent returns the glyph bounding box for one glyph in font design
+// units.
+func (info *Info) FGlyphExtent(gid font.GlyphID) funit.Rect {
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		return f.Glyphs[gid].Extent()
+	case *GlyfOutlines:
+		g := f.Glyphs[gid]
+		if g == nil {
+			return funit.Rect{}
+		}
+		return g.Rect
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// GlyphExtent returns the glyph bounding box for one glyph in glyph units.
+func (info *Info) GlyphExtent(gid font.GlyphID) *pdf.Rectangle {
+	ext := info.FGlyphExtent(gid)
+	q := 1000 / float64(info.UnitsPerEm)
+	return &pdf.Rectangle{
+		LLx: float64(ext.LLx) * q,
+		LLy: float64(ext.LLy) * q,
+		URx: float64(ext.URx) * q,
+		URy: float64(ext.URy) * q,
+	}
+}
+
+func (info *Info) fGlyphHeight(gid font.GlyphID) funit.Int16 {
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		return f.Glyphs[gid].Extent().URy
+	case *GlyfOutlines:
+		g := f.Glyphs[gid]
+		if g == nil {
+			return 0
+		}
+		return g.Rect.URy
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// GlyphName returns the name if a glyph.  If the name is not known,
+// the empty string is returned.
+func (info *Info) GlyphName(gid font.GlyphID) pdf.Name {
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		return f.Glyphs[gid].Name
+	case *GlyfOutlines:
+		if f.Names == nil {
+			return ""
+		}
+		return pdf.Name(f.Names[gid])
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// Flags returns the PDF font flags for the font.
+// See section 9.8.2 of PDF 32000-1:2008.
+func (info *Info) Flags(symbolic bool) font.Flags {
+	var flags font.Flags
+
+	if info.IsFixedPitch() {
+		flags |= font.FlagFixedPitch
+	}
+	if info.IsSerif {
+		flags |= font.FlagSerif
+	}
+
+	if symbolic {
+		flags |= font.FlagSymbolic
+	} else {
+		flags |= font.FlagNonsymbolic
+	}
+
+	if info.IsScript {
+		flags |= font.FlagScript
+	}
+	if info.IsItalic {
+		flags |= font.FlagItalic
+	}
+
+	if cffInfo, ok := info.Outlines.(*cff.Outlines); ok {
+		if cffInfo.Private[0].ForceBold {
+			flags |= font.FlagForceBold
 		}
 	}
-	return true
+
+	return flags
 }
 
-// IsTrueType checks whether the tables required for a TrueType font are
-// present.
-func (tt *Font) IsTrueType() bool {
-	return tt.HasTables(
-		"cmap", "head", "hhea", "hmtx", "maxp", "name", "post",
-		"glyf", "loca")
-}
-
-// IsOpenType checks whether the tables required for an OpenType font are
-// present.
-func (tt *Font) IsOpenType() bool {
-	if !tt.HasTables(
-		"cmap", "head", "hhea", "hmtx", "maxp", "name", "post", "OS/2") {
-		return false
-	}
-	if tt.HasTables("glyf", "loca") || tt.HasTables("CFF ") {
-		return true
-	}
-	return false
-}
-
-// IsVariable checks whether the font is a "variable font".
-func (tt *Font) IsVariable() bool {
-	return tt.HasTables("fvar")
-}
-
-// GetTableReader returns an io.SectionReader which can be used to read
-// the table data.  If head is non-nil, binary.Read() is used to
-// read the data at the start of the table into the value head points to.
-func (tt *Font) GetTableReader(name string, head interface{}) (*io.SectionReader, error) {
-	rec, err := tt.Header.Find(name)
-	if err != nil {
-		return nil, err
-	}
-	tableFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
-
-	if head != nil {
-		err := binary.Read(tableFd, binary.BigEndian, head)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return tableFd, nil
-}
-
-// SelectCMap chooses one of the sub-tables of the cmap table and reads the
-// font's character encoding from there.  If a full unicode mapping is found,
-// this is used.  Otherwise, the function tries to use a 16 bit BMP encoding.
-// If this fails, a legacy 1,0 record is tried as a last resort.
-func (tt *Font) SelectCMap() (map[rune]font.GlyphID, error) {
-	rec, err := tt.Header.Find("cmap")
-	if err != nil {
-		return nil, err
-	}
-	cmapFd := io.NewSectionReader(tt.Fd, int64(rec.Offset), int64(rec.Length))
-
-	cmapTable, err := table.ReadCMapTable(cmapFd)
-	if err != nil {
-		return nil, err
-	}
-
-	unicode := func(idx int) rune {
-		return rune(idx)
-	}
-	macRoman := func(idx int) rune {
-		// TODO(voss): declutter this
-		return []rune(mac.Decode([]byte{byte(idx)}))[0]
-	}
-	candidates := []struct {
-		PlatformID uint16
-		EncodingID uint16
-		IdxToRune  func(int) rune
-	}{
-		{3, 10, unicode}, // full unicode
-		{0, 4, unicode},
-		{3, 1, unicode}, // BMP
-		{0, 3, unicode},
-		{1, 0, macRoman}, // vintage Apple format
-	}
-
-	for _, cand := range candidates {
-		encRec := cmapTable.Find(cand.PlatformID, cand.EncodingID)
-		if encRec == nil {
-			continue
-		}
-
-		cmap, err := encRec.LoadCMap(cmapFd, cand.IdxToRune)
-		if err != nil {
-			continue
-		}
-
-		return cmap, nil
-	}
-	return nil, errors.New("sfnt/cmap: no supported character encoding found")
-}
-
-// isSubset returns true if the font includes only runes from the
-// given character set.
-func isSubset(cmap map[rune]font.GlyphID, charset map[rune]bool) bool {
-	for r := range cmap {
-		if !charset[r] {
+func isSubset(cmap cmap.Subtable, glyphs map[rune]bool) bool {
+	low, high := cmap.CodeRange()
+	for r := low; r <= high; r++ {
+		if cmap.Lookup(r) != 0 && !glyphs[r] {
 			return false
 		}
 	}

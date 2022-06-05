@@ -23,15 +23,15 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
-	"seehuhn.de/go/pdf/font/sfntcff"
 )
 
 // ExplainGsub returns a human-readable, textual description of the lookups
 // in a GSUB table.
-func ExplainGsub(fontInfo *sfntcff.Info) string {
+func ExplainGsub(fontInfo *sfnt.Info) string {
 	ee := newExplainer(fontInfo)
 
 	for _, lookup := range fontInfo.Gsub.LookupList {
@@ -259,7 +259,7 @@ func ExplainGsub(fontInfo *sfntcff.Info) string {
 
 // ExplainGpos returns a human-readable, textual description of the lookups
 // in a GPOS table.
-func ExplainGpos(fontInfo *sfntcff.Info) string {
+func ExplainGpos(fontInfo *sfnt.Info) string {
 	ee := newExplainer(fontInfo)
 
 	for _, lookup := range fontInfo.Gpos.LookupList {
@@ -344,7 +344,7 @@ type explainer struct {
 	names  []string
 }
 
-func newExplainer(fontInfo *sfntcff.Info) *explainer {
+func newExplainer(fontInfo *sfnt.Info) *explainer {
 	mappings := make([]string, fontInfo.NumGlyphs())
 	a, b := fontInfo.CMap.CodeRange()
 	for r := a; r <= b; r++ {

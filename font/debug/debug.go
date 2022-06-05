@@ -18,7 +18,6 @@ package debug
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"time"
 
@@ -27,15 +26,15 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
-	"seehuhn.de/go/pdf/font/sfntcff"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
 // MakeSimpleFont creates a simple font for use in unit tests.
-func MakeSimpleFont() *sfntcff.Info {
-	info, err := sfntcff.Read(bytes.NewReader(goregular.TTF))
+func MakeSimpleFont() *sfnt.Info {
+	info, err := sfnt.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +79,7 @@ func MakeSimpleFont() *sfntcff.Info {
 		}
 	}
 
-	origOutlines := info.Outlines.(*sfntcff.GlyfOutlines)
+	origOutlines := info.Outlines.(*sfnt.GlyfOutlines)
 	newOutlines := &cff.Outlines{
 		Private: []*type1.PrivateDict{
 			{
@@ -110,7 +109,6 @@ func MakeSimpleFont() *sfntcff.Info {
 		}
 		glyphInfo, err := g.Decode()
 		if err != nil {
-			fmt.Println(err)
 			continue
 		}
 
@@ -207,7 +205,7 @@ func MakeSimpleFont() *sfntcff.Info {
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	now := time.Now()
-	res := &sfntcff.Info{
+	res := &sfnt.Info{
 		FamilyName:       "Debug",
 		Width:            info.Width,
 		Weight:           info.Weight,
@@ -233,8 +231,8 @@ func MakeSimpleFont() *sfntcff.Info {
 }
 
 // MakeCompleteFont creates a font for use in unit tests.
-func MakeCompleteFont() *sfntcff.Info {
-	info, err := sfntcff.Read(bytes.NewReader(goregular.TTF))
+func MakeCompleteFont() *sfnt.Info {
+	info, err := sfnt.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
 		panic(err)
 	}
@@ -265,7 +263,7 @@ func MakeCompleteFont() *sfntcff.Info {
 		}
 	}
 
-	origOutlines := info.Outlines.(*sfntcff.GlyfOutlines)
+	origOutlines := info.Outlines.(*sfnt.GlyfOutlines)
 	newOutlines := &cff.Outlines{
 		Private: []*type1.PrivateDict{
 			{
@@ -384,7 +382,7 @@ func MakeCompleteFont() *sfntcff.Info {
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	now := time.Now()
-	res := &sfntcff.Info{
+	res := &sfnt.Info{
 		FamilyName:       "Debug",
 		Width:            info.Width,
 		Weight:           info.Weight,

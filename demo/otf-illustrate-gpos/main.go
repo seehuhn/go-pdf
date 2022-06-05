@@ -31,13 +31,18 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
-	tt, err := sfnt.Open(fontFileName, nil)
+	fd, err := os.Open(fontFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer tt.Close()
+	defer fd.Close()
 
-	if !tt.HasTables("GPOS") {
+	info, err := sfnt.Read(fd)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if info.Gpos == nil {
 		log.Fatal("font has no GPOS table")
 	}
 }
