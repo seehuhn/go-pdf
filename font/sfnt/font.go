@@ -29,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
-	"seehuhn.de/go/pdf/font/sfnt/maxp"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
@@ -72,20 +71,11 @@ type Info struct {
 	IsScript  bool // Glyphs resemble cursive handwriting.
 
 	CMap     cmap.Subtable
-	Outlines interface{} // either *cff.Outlines or *GlyfOutlines
+	Outlines interface{} // either *cff.Outlines or *glyf.Outlines
 
 	Gdef *gdef.Table
 	Gsub *gtab.Info
 	Gpos *gtab.Info
-}
-
-// GlyfOutlines stores the glyph data of a TrueType font.
-type GlyfOutlines struct {
-	Glyphs glyf.Glyphs
-	Widths []funit.Uint16
-	Names  []string
-	Tables map[string][]byte
-	Maxp   *maxp.TTFInfo
 }
 
 // GetFontInfo returns an Adobe FontInfo structure for the given font.
@@ -101,7 +91,7 @@ func (info *Info) GetFontInfo() *type1.FontInfo {
 		Copyright: strings.ReplaceAll(info.Copyright, "©", "(c)"),
 		Notice:    info.Trademark,
 
-		FontMatrix: []float64{q, 0, 0, q, 0, 0}, // TODO(voss): is this right?
+		FontMatrix: []float64{q, 0, 0, q, 0, 0},
 
 		ItalicAngle:  info.ItalicAngle,
 		IsFixedPitch: info.IsFixedPitch(),
@@ -114,7 +104,7 @@ func (info *Info) GetFontInfo() *type1.FontInfo {
 
 // IsGlyf returns true if the font contains TrueType glyph outlines.
 func (info *Info) IsGlyf() bool {
-	_, ok := info.Outlines.(*GlyfOutlines)
+	_, ok := info.Outlines.(*glyf.Outlines)
 	return ok
 }
 
@@ -182,7 +172,7 @@ func (info *Info) NumGlyphs() int {
 	switch outlines := info.Outlines.(type) {
 	case *cff.Outlines:
 		return len(outlines.Glyphs)
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		return len(outlines.Glyphs)
 	default:
 		panic("unexpected font type")
@@ -197,7 +187,7 @@ func (info *Info) fWidths() []funit.Uint16 {
 			widths[i] = g.Width
 		}
 		return widths
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		return f.Widths
 	default:
 		panic("unexpected font type")
@@ -214,7 +204,7 @@ func (info *Info) Widths() []uint16 {
 		for i, g := range f.Glyphs {
 			widths[i] = uint16(math.Round(float64(g.Width) * q))
 		}
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		for i, w := range f.Widths {
 			widths[i] = uint16(math.Round(float64(w) * q))
 		}
@@ -232,7 +222,7 @@ func (info *Info) fExtents() []funit.Rect {
 			extents[i] = g.Extent()
 		}
 		return extents
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		for i, g := range f.Glyphs {
 			if g == nil {
 				continue
@@ -261,7 +251,7 @@ func (info *Info) Extents() []font.Rect {
 				URy: int16(math.Round(float64(ext.URy) * q)),
 			}
 		}
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		for i, g := range f.Glyphs {
 			if g == nil {
 				continue
@@ -285,7 +275,7 @@ func (info *Info) FGlyphWidth(gid font.GlyphID) funit.Uint16 {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Width
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		if f.Widths == nil {
 			return 0
 		}
@@ -308,7 +298,7 @@ func (info *Info) FGlyphExtent(gid font.GlyphID) funit.Rect {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Extent()
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		g := f.Glyphs[gid]
 		if g == nil {
 			return funit.Rect{}
@@ -335,7 +325,7 @@ func (info *Info) fGlyphHeight(gid font.GlyphID) funit.Int16 {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Extent().URy
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		g := f.Glyphs[gid]
 		if g == nil {
 			return 0
@@ -352,7 +342,7 @@ func (info *Info) GlyphName(gid font.GlyphID) pdf.Name {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Name
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		if f.Names == nil {
 			return ""
 		}

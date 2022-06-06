@@ -79,7 +79,7 @@ func MakeSimpleFont() *sfnt.Info {
 		}
 	}
 
-	origOutlines := info.Outlines.(*sfnt.GlyfOutlines)
+	origOutlines := info.Outlines.(*glyf.Outlines)
 	newOutlines := &cff.Outlines{
 		Private: []*type1.PrivateDict{
 			{
@@ -263,7 +263,7 @@ func MakeCompleteFont() *sfnt.Info {
 		}
 	}
 
-	origOutlines := info.Outlines.(*sfnt.GlyfOutlines)
+	origOutlines := info.Outlines.(*glyf.Outlines)
 	newOutlines := &cff.Outlines{
 		Private: []*type1.PrivateDict{
 			{

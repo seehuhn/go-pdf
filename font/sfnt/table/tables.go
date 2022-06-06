@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package table contains function to read and write the "table directory"
+// of an sfnt file.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#table-directory
 package table
 
 import (
@@ -26,23 +29,34 @@ import (
 )
 
 const (
+	// ScalerTypeTrueType is the scaler type for fonts which use TrueType
+	// outlines.
 	ScalerTypeTrueType = 0x00010000
-	ScalerTypeCFF      = 0x4F54544F
-	ScalerTypeApple    = 0x74727565
+
+	// ScalerTypeCFF is the scaler type for fonts which use CFF
+	// outlines (version 1 or 2).
+	ScalerTypeCFF = 0x4F54544F // "OTTO"
+
+	// ScalerTypeApple is recognised as an alternative for ScalerTypeTrueType
+	// on Apple systems.
+	ScalerTypeApple = 0x74727565 // "true"
 )
 
-type Header struct {
+// Info contains information about the tables present in an sfnt font file.
+type Info struct {
 	ScalerType uint32
 	Toc        map[string]Record
 }
 
+// A Record contains the offset and length of a table in an sfnt font file.
 type Record struct {
 	Offset uint32
 	Length uint32
 }
 
-// ReadHeader reads the file header of an sfnt font file.
-func ReadHeader(r io.ReaderAt) (*Header, error) {
+// ReadSfntHeader reads the file header of an sfnt font file.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#table-directory
+func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 	var buf [16]byte
 	_, err := r.ReadAt(buf[:6], 0)
 	if err != nil {
@@ -60,13 +74,13 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 		}
 	}
 	if numTables > 280 {
-		// the largest value observed on my laptop is 28
+		// the largest value observed amongst the fonts on my laptop is 28
 		return nil, errors.New("sfnt/header: too many tables")
 	}
 
-	h := &Header{
+	h := &Info{
 		ScalerType: scalerType,
-		Toc:        make(map[string]Record),
+		Toc:        make(map[string]Record, numTables),
 	}
 	type alloc struct {
 		Start uint32
@@ -74,7 +88,7 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 	}
 	var coverage []alloc
 	for i := 0; i < numTables; i++ {
-		_, err := r.ReadAt(buf[:], int64(12+i*16))
+		_, err := r.ReadAt(buf[:16], int64(12+i*16))
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +136,8 @@ func ReadHeader(r io.ReaderAt) (*Header, error) {
 	return h, nil
 }
 
-func (h *Header) Has(names ...string) bool {
+// Has returns true if all of the given tables are present in the font.
+func (h *Info) Has(names ...string) bool {
 	for _, name := range names {
 		if _, ok := h.Toc[name]; !ok {
 			return false
@@ -131,25 +146,34 @@ func (h *Header) Has(names ...string) bool {
 	return true
 }
 
-func (h *Header) Find(tableName string) (Record, error) {
+// TableReader returns an io.Reader for the given table.
+func (h *Info) TableReader(r io.ReaderAt, tableName string) (*io.SectionReader, error) {
 	rec, ok := h.Toc[tableName]
 	if !ok {
-		return rec, &ErrNoTable{Name: tableName}
+		return nil, &ErrMissing{TableName: tableName}
 	}
-	return rec, nil
+	return io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length)), nil
 }
 
-func (h *Header) ReadTableBytes(r io.ReaderAt, tableName string) ([]byte, error) {
-	rec, err := h.Find(tableName)
+// ReadTableBytes returns the un-decoded table contents.
+func (h *Info) ReadTableBytes(r io.ReaderAt, tableName string) ([]byte, error) {
+	tableFd, err := h.TableReader(r, tableName)
 	if err != nil {
 		return nil, err
 	}
-	res := make([]byte, rec.Length)
-	n, err := r.ReadAt(res, int64(rec.Offset))
-	if n < len(res) && err != nil {
-		return nil, err
+	return io.ReadAll(tableFd)
+}
+
+// tag represents a tag string composed of 4 ASCII bytes
+type tag [4]byte
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] > 127 {
+			return false
+		}
 	}
-	return res[:n], nil
+	return true
 }
 
 var isKnownTable = map[string]bool{
@@ -157,6 +181,7 @@ var isKnownTable = map[string]bool{
 	"CBDT": true,
 	"CBLC": true,
 	"CFF ": true,
+	"CFF2": true,
 	"cmap": true,
 	"cvt ": true,
 	"DSIG": true,
@@ -190,19 +215,4 @@ var isKnownTable = map[string]bool{
 	"vhea": true,
 	"vmtx": true,
 	"VORG": true,
-}
-
-// Tag represents a tag string composed of 4 ASCII bytes
-type Tag [4]byte
-
-// MakeTag converts a string of length 4 bytes to a Tag.
-func MakeTag(s string) Tag {
-	if len(s) != 4 {
-		panic("tag must be 4 bytes")
-	}
-	return Tag{s[0], s[1], s[2], s[3]}
-}
-
-func (tag Tag) String() string {
-	return string(tag[:])
 }

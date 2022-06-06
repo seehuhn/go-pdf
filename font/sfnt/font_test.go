@@ -17,10 +17,7 @@
 package sfnt
 
 import (
-	"bufio"
 	"bytes"
-	"io"
-	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -50,44 +47,6 @@ func TestPostscriptName(t *testing.T) {
 	if len(psName) != 127-33-10+len("-BoldItalic") {
 		t.Errorf("wrong postscript name: %q", psName)
 	}
-}
-
-func DisabledTestMany(t *testing.T) { // TODO(voss)
-	listFd, err := os.Open("/Users/voss/project/pdflib/demo/try-all-fonts/all-fonts")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	scanner := bufio.NewScanner(listFd)
-	for scanner.Scan() {
-		fname := scanner.Text()
-
-		t.Run(fname, func(t *testing.T) {
-			fd, err := os.Open(fname)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer fd.Close()
-
-			var r io.ReaderAt = fd
-			buf := &bytes.Buffer{}
-			for i := 0; i < 2; i++ {
-				font, err := Read(r)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				buf.Reset()
-				_, err = font.Write(buf)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				r = bytes.NewReader(buf.Bytes())
-			}
-		})
-	}
-	listFd.Close()
 }
 
 func FuzzFont(f *testing.F) {

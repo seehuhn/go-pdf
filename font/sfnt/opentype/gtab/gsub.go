@@ -852,20 +852,11 @@ func (l *Gsub8_1) Encode() []byte {
 		buf = append(buf, byte(gid>>8), byte(gid))
 	}
 
-	if len(buf) != coverageOffset {
-		panic("internal error") // TODO(voss): remove
-	}
 	buf = append(buf, l.Input.Encode()...)
-	for i, cov := range l.Backtrack {
-		if len(buf) != int(backtrackCoverageOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
-		}
+	for _, cov := range l.Backtrack {
 		buf = append(buf, cov.Encode()...)
 	}
-	for i, cov := range l.Lookahead {
-		if len(buf) != int(lookaheadCoverageOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
-		}
+	for _, cov := range l.Lookahead {
 		buf = append(buf, cov.Encode()...)
 	}
 

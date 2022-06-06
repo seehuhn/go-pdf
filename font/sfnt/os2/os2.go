@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
-	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
 // Info contains information from the "OS/2" table.
@@ -59,9 +58,9 @@ type Info struct {
 	StrikeoutSize      int16
 	StrikeoutPosition  int16
 
-	FamilyClass int16     // https://docs.microsoft.com/en-us/typography/opentype/spec/ibmfc
-	Panose      [10]byte  // https://monotype.github.io/panose/
-	Vendor      table.Tag // https://docs.microsoft.com/en-us/typography/opentype/spec/os2#achvendid
+	FamilyClass int16    // https://docs.microsoft.com/en-us/typography/opentype/spec/ibmfc
+	Panose      [10]byte // https://monotype.github.io/panose/
+	Vendor      string   // https://docs.microsoft.com/en-us/typography/opentype/spec/os2#achvendid
 
 	PermUse          Permissions
 	PermNoSubsetting bool // the font may not be subsetted prior to embedding
@@ -137,7 +136,7 @@ func Read(r io.Reader) (*Info, error) {
 
 		FamilyClass: v0.FamilyClass,
 		Panose:      v0.Panose,
-		Vendor:      v0.VendID,
+		Vendor:      string(v0.VendID[:]),
 
 		PermUse:          permUse,
 		PermNoSubsetting: permBits&0x0100 != 0,
@@ -254,6 +253,11 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		}
 	}
 
+	vendor := [4]byte{' ', ' ', ' ', ' '}
+	if len(info.Vendor) == 4 {
+		copy(vendor[:], info.Vendor)
+	}
+
 	buf := &bytes.Buffer{}
 	v0 := &v0Data{
 		Version:            4,
@@ -274,7 +278,7 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		FamilyClass:        info.FamilyClass,
 		Panose:             info.Panose,
 		UnicodeRange:       unicodeRange,
-		VendID:             info.Vendor,
+		VendID:             vendor,
 		Selection:          sel,
 		FirstCharIndex:     firstCharIndex,
 		LastCharIndex:      lastCharIndex,
@@ -338,7 +342,7 @@ type v0Data struct {
 	FamilyClass        int16
 	Panose             [10]byte
 	UnicodeRange       [4]uint32
-	VendID             table.Tag
+	VendID             [4]byte
 	Selection          uint16
 	FirstCharIndex     uint16
 	LastCharIndex      uint16

@@ -14,48 +14,45 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Extract CFF data from OpenType font files.
-package main
+package sfnt_test
 
 import (
+	"bytes"
 	"fmt"
-	"log"
-	"os"
-	"path/filepath"
-	"strings"
+	"testing"
 
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/debug"
 )
 
-func main() {
-	args := os.Args[1:]
-	for _, fname := range args {
-		outName := filepath.Base(strings.TrimSuffix(fname, ".otf") + ".cff")
-		fmt.Println(fname, "->", outName)
+func TestGetFontInfo(t *testing.T) {
+	font := debug.MakeSimpleFont()
+	font.Trademark = "test trademark notice"
+	font.Copyright = "(c) 2022 test copyright notice"
 
-		r, err := os.Open(fname)
-		if err != nil {
-			log.Fatalf("%s: %v", fname, err)
-		}
+	fontInfo1 := font.GetFontInfo()
 
-		header, err := table.ReadSfntHeader(r)
-		if err != nil {
-			log.Fatalf("%s: %v", fname, err)
-		}
+	fmt.Printf("%#v\n", fontInfo1)
 
-		cffData, err := header.ReadTableBytes(r, "CFF ")
-		if err != nil {
-			log.Fatalf("%s: %v", fname, err)
-		}
+	cffFont1 := &cff.Font{
+		FontInfo: fontInfo1,
+		Outlines: font.Outlines.(*cff.Outlines),
+	}
+	buf := &bytes.Buffer{}
+	err := cffFont1.Encode(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cffData := buf.Bytes()
 
-		err = r.Close()
-		if err != nil {
-			log.Fatalf("%s: %v", fname, err)
-		}
+	cffFont2, err := cff.Read(bytes.NewReader(cffData))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fontInfo2 := cffFont2.FontInfo
 
-		err = os.WriteFile(outName, cffData, 0644)
-		if err != nil {
-			log.Fatalf("%s: %v", outName, err)
-		}
+	if d := cmp.Diff(fontInfo1, fontInfo2); d != "" {
+		t.Errorf("font info differs: (-got +want)\n%s", d)
 	}
 }

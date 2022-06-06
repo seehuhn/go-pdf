@@ -229,12 +229,9 @@ func (l *SeqContext1) Encode() []byte {
 	for _, offset := range seqRuleSetOffsets {
 		buf = append(buf, byte(offset>>8), byte(offset))
 	}
-	for i, rules := range l.Rules {
+	for _, rules := range l.Rules {
 		if rules == nil {
 			continue
-		}
-		if len(buf) != int(seqRuleSetOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
 		}
 		seqRuleCount := len(rules)
 		buf = append(buf,
@@ -479,12 +476,9 @@ func (l *SeqContext2) Encode() []byte {
 	for _, offset := range seqRuleSetOffsets {
 		buf = append(buf, byte(offset>>8), byte(offset))
 	}
-	for i, rules := range l.Rules {
+	for _, rules := range l.Rules {
 		if rules == nil {
 			continue
-		}
-		if len(buf) != int(seqRuleSetOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
 		}
 		seqRuleCount := len(rules)
 		buf = append(buf,
@@ -638,10 +632,7 @@ func (l *SeqContext3) Encode() []byte {
 			byte(action.LookupListIndex>>8), byte(action.LookupListIndex),
 		)
 	}
-	for i, cov := range l.Input {
-		if len(buf) != int(coverageOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
-		}
+	for _, cov := range l.Input {
 		buf = append(buf, cov.Encode()...)
 	}
 	return buf
@@ -898,12 +889,9 @@ func (l *ChainedSeqContext1) Encode() []byte {
 
 	buf = append(buf, l.Cov.Encode()...)
 
-	for i, rules := range l.Rules {
+	for _, rules := range l.Rules {
 		if rules == nil {
 			continue
-		}
-		if len(buf) != int(chainedSeqRuleSetOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
 		}
 		chainedSeqRuleCount := len(rules)
 		buf = append(buf,
@@ -1227,12 +1215,9 @@ func (l *ChainedSeqContext2) Encode() []byte {
 	buf = l.Input.Append(buf)
 	buf = l.Lookahead.Append(buf)
 
-	for i, rules := range l.Rules {
+	for _, rules := range l.Rules {
 		if rules == nil {
 			continue
-		}
-		if len(buf) != int(chainedSeqRuleSetOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
 		}
 		chainedSeqRuleCount := len(rules)
 		buf = append(buf,
@@ -1491,22 +1476,13 @@ func (l *ChainedSeqContext3) Encode() []byte {
 		)
 	}
 
-	for i, cov := range l.Backtrack {
-		if len(buf) != int(backtrackCoverageOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
-		}
+	for _, cov := range l.Backtrack {
 		buf = append(buf, cov.Encode()...)
 	}
-	for i, cov := range l.Input {
-		if len(buf) != int(inputCoverageOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
-		}
+	for _, cov := range l.Input {
 		buf = append(buf, cov.Encode()...)
 	}
-	for i, cov := range l.Lookahead {
-		if len(buf) != int(lookaheadCoverageOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
-		}
+	for _, cov := range l.Lookahead {
 		buf = append(buf, cov.Encode()...)
 	}
 	return buf

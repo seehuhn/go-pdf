@@ -30,7 +30,7 @@ import (
 
 func BenchmarkGlyph(b *testing.B) {
 	r := bytes.NewReader(goregular.TTF)
-	header, err := table.ReadHeader(r)
+	header, err := table.ReadSfntHeader(r)
 	if err != nil {
 		b.Fatal(err)
 	}

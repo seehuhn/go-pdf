@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/simple"
+	"seehuhn.de/go/pdf/layout"
 	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -139,7 +140,7 @@ func typesetFile(inName, outName string, V pdf.Version) error {
 	c := make(chan boxes.Box)
 	res := make(chan error)
 	go func() {
-		res <- makePages(out, pageTree, c, labelFont)
+		res <- layout.MakePages(out, pageTree, c, labelFont)
 	}()
 
 	scanner := bufio.NewScanner(in)
@@ -173,83 +174,4 @@ func typesetFile(inName, outName string, V pdf.Version) error {
 	}
 
 	return out.Close()
-}
-
-func makePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFont *font.Font) error {
-	topMargin := 36.
-	rightMargin := 50.
-	bottomMargin := 36.
-	leftMargin := 50.
-	paperWidth := pages.A4.URx
-	textWidth := paperWidth - rightMargin - leftMargin
-	paperHeight := pages.A4.URy
-	maxHeight := paperHeight - topMargin - bottomMargin
-
-	p := boxes.Parameters{
-		BaseLineSkip: 0,
-	}
-
-	var body []boxes.Box
-	pageNo := 1
-	flush := func() error {
-		pageList := []boxes.Box{
-			boxes.Kern(topMargin),
-		}
-		pageList = append(pageList, body...)
-		pageList = append(pageList,
-			boxes.Glue(0, 1, 1, 1, 1),
-			boxes.HBoxTo(textWidth,
-				boxes.Glue(0, 1, 1, 1, 1),
-				boxes.Text(labelFont, 10, fmt.Sprintf("- %d -", pageNo)),
-				boxes.Glue(0, 1, 1, 1, 1),
-			),
-			boxes.Kern(18),
-		)
-		pageBody := p.VBoxTo(paperHeight, pageList...)
-		withMargins := boxes.HBoxTo(paperWidth, boxes.Kern(leftMargin), pageBody)
-
-		pageFonts := pdf.Dict{}
-		boxes.Walk(pageBody, func(box boxes.Box) {
-			switch b := box.(type) {
-			case *boxes.TextBox:
-				font := b.Layout.Font
-				pageFonts[font.InstName] = font.Ref
-			}
-		})
-		attr := &pages.Attributes{
-			Resources: &pages.Resources{
-				Font: pageFonts,
-			},
-		}
-		page, err := tree.NewPage(attr)
-		if err != nil {
-			return err
-		}
-		withMargins.Draw(page, 0, withMargins.Extent().Depth)
-		err = page.Close()
-		if err != nil {
-			return err
-		}
-
-		body = body[:0]
-		pageNo++
-
-		return nil
-	}
-
-	var totalHeight float64
-	for box := range c {
-		ext := box.Extent()
-		h := ext.Height + ext.Depth
-		if len(body) > 0 && totalHeight+h > maxHeight {
-			err := flush()
-			if err != nil {
-				return err
-			}
-			totalHeight = 0
-		}
-		body = append(body, box)
-		totalHeight += h
-	}
-	return flush()
 }

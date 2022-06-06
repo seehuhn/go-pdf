@@ -205,7 +205,6 @@ type binaryHead struct {
 }
 
 // Version represents the font revision in 16.16 fixed point format.
-// TODO(voss): move this into a different package?
 type Version uint32
 
 // VersionFromString parses a version string in the form "1.234" or "Version 1.234".

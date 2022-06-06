@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
 	"seehuhn.de/go/pdf/font/sfnt/maxp"
@@ -36,11 +37,11 @@ import (
 )
 
 func (info *Info) Write(w io.Writer) (int64, error) {
-	tables := make(map[string][]byte)
+	tableData := make(map[string][]byte)
 
 	hheaData, hmtxData := info.makeHmtx()
-	tables["hhea"] = hheaData
-	tables["hmtx"] = hmtxData
+	tableData["hhea"] = hheaData
+	tableData["hmtx"] = hmtxData
 
 	var ss cmap.Table
 	if info.CMap != nil {
@@ -56,12 +57,12 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 			{PlatformID: 0, EncodingID: uniEncoding}: cmapSubtable,
 			{PlatformID: 3, EncodingID: winEncoding}: cmapSubtable,
 		}
-		tables["cmap"] = ss.Encode()
+		tableData["cmap"] = ss.Encode()
 	}
 
-	tables["OS/2"] = info.makeOS2()
-	tables["name"] = info.makeName(ss)
-	tables["post"] = info.makePost()
+	tableData["OS/2"] = info.makeOS2()
+	tableData["name"] = info.makeName(ss)
+	tableData["post"] = info.makePost()
 
 	var locaFormat int16
 	var scalerType uint32
@@ -72,15 +73,15 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
-		tables["CFF "] = cffData
+		tableData["CFF "] = cffData
 		scalerType = table.ScalerTypeCFF
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		enc := outlines.Glyphs.Encode()
-		tables["glyf"] = enc.GlyfData
-		tables["loca"] = enc.LocaData
+		tableData["glyf"] = enc.GlyfData
+		tableData["loca"] = enc.LocaData
 		locaFormat = enc.LocaFormat
 		for name, data := range outlines.Tables {
-			tables[name] = data
+			tableData[name] = data
 		}
 		scalerType = table.ScalerTypeTrueType
 		maxpTtf = outlines.Maxp
@@ -92,53 +93,53 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		NumGlyphs: info.NumGlyphs(),
 		TTF:       maxpTtf,
 	}
-	tables["maxp"] = maxpInfo.Encode()
+	tableData["maxp"] = maxpInfo.Encode()
 
-	tables["head"] = info.makeHead(locaFormat)
+	tableData["head"] = info.makeHead(locaFormat)
 
 	if info.Gdef != nil {
-		tables["GDEF"] = info.Gdef.Encode()
+		tableData["GDEF"] = info.Gdef.Encode()
 	}
 	if info.Gsub != nil {
-		tables["GSUB"] = info.Gsub.Encode()
+		tableData["GSUB"] = info.Gsub.Encode()
 	}
 	if info.Gpos != nil {
-		tables["GPOS"] = info.Gpos.Encode()
+		tableData["GPOS"] = info.Gpos.Encode()
 	}
 
-	return WriteTables(w, scalerType, tables)
+	return table.Write(w, scalerType, tableData)
 }
 
 // Embed writes the binary form of the font for embedding in a PDF file.
 func (info *Info) Embed(w io.Writer) (int64, error) {
-	tables := make(map[string][]byte)
+	tableData := make(map[string][]byte)
 
 	if info.CMap != nil {
 		ss := cmap.Table{
 			{PlatformID: 1, EncodingID: 0}: info.CMap.Encode(0),
 		}
-		tables["cmap"] = ss.Encode()
+		tableData["cmap"] = ss.Encode()
 	}
 
-	tables["hhea"], tables["hmtx"] = info.makeHmtx()
+	tableData["hhea"], tableData["hmtx"] = info.makeHmtx()
 
-	outlines := info.Outlines.(*GlyfOutlines)
+	outlines := info.Outlines.(*glyf.Outlines)
 	enc := outlines.Glyphs.Encode()
-	tables["glyf"] = enc.GlyfData
-	tables["loca"] = enc.LocaData
+	tableData["glyf"] = enc.GlyfData
+	tableData["loca"] = enc.LocaData
 	for name, data := range outlines.Tables {
-		tables[name] = data
+		tableData[name] = data
 	}
 
 	maxpInfo := &maxp.Info{
 		NumGlyphs: info.NumGlyphs(),
 		TTF:       outlines.Maxp,
 	}
-	tables["maxp"] = maxpInfo.Encode()
+	tableData["maxp"] = maxpInfo.Encode()
 
-	tables["head"] = info.makeHead(enc.LocaFormat)
+	tableData["head"] = info.makeHead(enc.LocaFormat)
 
-	return WriteTables(w, table.ScalerTypeTrueType, tables)
+	return table.Write(w, table.ScalerTypeTrueType, tableData)
 }
 
 // IsFixedPitch returns true if all glyphs in the font have the same width.
@@ -170,7 +171,7 @@ func (info *Info) makeHead(locaFormat int16) []byte {
 		for _, g := range outlines.Glyphs {
 			bbox.Extend(g.Extent())
 		}
-	case *GlyfOutlines:
+	case *glyf.Outlines:
 		for _, g := range outlines.Glyphs {
 			if g == nil {
 				continue
@@ -292,7 +293,7 @@ func (info *Info) makePost() []byte {
 		UnderlineThickness: info.UnderlineThickness,
 		IsFixedPitch:       info.IsFixedPitch(),
 	}
-	if outlines, ok := info.Outlines.(*GlyfOutlines); ok {
+	if outlines, ok := info.Outlines.(*glyf.Outlines); ok {
 		postInfo.Names = outlines.Names
 	}
 	return postInfo.Encode()

@@ -32,7 +32,6 @@ func (ll LookupList) ApplyLookup(seq []font.Glyph, lookupIndex LookupIndex, gdef
 		seq, pos = ll.applyLookupAt(seq, lookupIndex, gdef, pos, len(seq))
 		newNumLeft := len(seq) - pos
 		if newNumLeft >= numLeft {
-			// panic("infinite loop")
 			pos = len(seq) - numLeft + 1
 		}
 		numLeft = newNumLeft

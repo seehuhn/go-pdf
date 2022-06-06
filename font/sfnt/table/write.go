@@ -1,4 +1,20 @@
-package sfnt
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package table
 
 import (
 	"bytes"
@@ -8,19 +24,18 @@ import (
 	"sort"
 
 	"seehuhn.de/go/pdf/font/sfnt/head"
-	"seehuhn.de/go/pdf/font/sfnt/table"
 )
 
-// WriteTables writes an sfnt file containing the given tables.
+// Write writes an sfnt file containing the given tables.
 // Tables where the data is nil are not written, use a zero-length slice
 // to write a table with no data.
 // This changes the checksum in the "head" table in place.
-func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, error) {
+func Write(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, error) {
 	numTables := len(tables)
 
 	tableNames := make([]string, 0, numTables)
 	for name, data := range tables {
-		if data != nil {
+		if data != nil && len(name) == 4 && isASCII(name) {
 			tableNames = append(tableNames, name)
 		}
 	}
@@ -37,7 +52,7 @@ func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int6
 
 	// prepare the header
 	entrySelector := bits.Len(uint(numTables)) - 1
-	offsets := &offsets{
+	header := &offsets{
 		ScalerType:    scalerType,
 		NumTables:     uint16(numTables),
 		SearchRange:   1 << (entrySelector + 4),
@@ -52,13 +67,13 @@ func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int6
 
 	var totalSum uint32
 	offset := uint32(12 + 16*numTables)
-	records := make([]record, numTables)
+	records := make([]rawRecord, numTables)
 	for i, name := range tableNames {
 		body := tables[name]
 		length := uint32(len(body))
 		checksum := checksum(body)
 
-		records[i].Tag = table.MakeTag(name)
+		records[i].Tag = tag{name[0], name[1], name[2], name[3]}
 		records[i].CheckSum = checksum
 		records[i].Offset = offset
 		records[i].Length = length
@@ -71,7 +86,7 @@ func WriteTables(w io.Writer, scalerType uint32, tables map[string][]byte) (int6
 	})
 
 	buf := &bytes.Buffer{}
-	binary.Write(buf, binary.BigEndian, offsets)
+	binary.Write(buf, binary.BigEndian, header)
 	binary.Write(buf, binary.BigEndian, records)
 	headerBytes := buf.Bytes()
 	totalSum += checksum(headerBytes)
@@ -116,10 +131,10 @@ type offsets struct {
 	RangeShift    uint16
 }
 
-// A record is part of the file Header.  It contains data about a single sfnt
-// table.
-type record struct {
-	Tag      table.Tag
+// A rawRecord is part of the file Header.  It contains data about a single
+// sfnt table.
+type rawRecord struct {
+	Tag      tag
 	CheckSum uint32
 	Offset   uint32
 	Length   uint32

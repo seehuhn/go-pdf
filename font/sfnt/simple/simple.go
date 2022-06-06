@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
+	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/type1"
@@ -213,7 +214,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		}
 		subsetInfo.Outlines = o2
 
-	case *sfnt.GlyfOutlines:
+	case *glyf.Outlines:
 		newGid := make(map[font.GlyphID]font.GlyphID)
 		todo := make(map[font.GlyphID]bool)
 		nextGid := font.GlyphID(0)
@@ -240,7 +241,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			}
 		}
 
-		o2 := &sfnt.GlyfOutlines{
+		o2 := &glyf.Outlines{
 			Tables: outlines.Tables,
 			Maxp:   outlines.Maxp,
 		}
@@ -337,7 +338,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			return err
 		}
 
-	case *sfnt.GlyfOutlines:
+	case *glyf.Outlines:
 		Font["Subtype"] = pdf.Name("TrueType")
 		FontDescriptor["FontFile2"] = FontFileRef
 

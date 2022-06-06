@@ -427,11 +427,7 @@ func (l *Gpos2_1) Encode() []byte {
 
 	buf = append(buf, l.Cov.Encode()...)
 
-	for i, adj := range l.Adjust {
-		if len(buf) != int(pairSetOffsets[i]) {
-			panic("internal error") // TODO(voss): remove
-		}
-
+	for _, adj := range l.Adjust {
 		pairValueCount := len(adj)
 		buf = append(buf, byte(pairValueCount>>8), byte(pairValueCount))
 
