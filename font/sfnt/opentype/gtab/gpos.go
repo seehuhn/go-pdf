@@ -23,7 +23,9 @@ import (
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/markarray"
 )
 
 // readGposSubtable reads a GPOS subtable.
@@ -441,4 +443,107 @@ func (l *Gpos2_1) Encode() []byte {
 	}
 
 	return buf
+}
+
+// Gpos4_1 is a Mark-to-Base Attachment Positioning Subtable (format 1)
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-to-base-attachment-positioning-format-1-mark-to-base-attachment-point
+type Gpos4_1 struct {
+	Marks     coverage.Table
+	Base      coverage.Table
+	MarkArray markarray.Table
+	BaseArray [][]anchor.Table // indexed by base coverage index, then by mark class
+}
+
+func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(10)
+	if err != nil {
+		return nil, err
+	}
+	markCoverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	baseCoverageOffset := int64(buf[2])<<8 | int64(buf[3])
+	markClassCount := int(buf[4])<<8 | int(buf[5])
+	markArrayOffset := int64(buf[6])<<8 | int64(buf[7])
+	baseArrayOffset := int64(buf[8])<<8 | int64(buf[9])
+
+	markCov, err := coverage.Read(p, subtablePos+markCoverageOffset)
+	if err != nil {
+		return nil, err
+	}
+	baseCov, err := coverage.Read(p, subtablePos+baseCoverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	markArray, err := markarray.Read(p, subtablePos+markArrayOffset, len(markCov))
+	if err != nil {
+		return nil, err
+	}
+	if len(markCov) > len(markArray) {
+		markCov.Prune(len(markArray))
+	}
+
+	baseArrayPos := subtablePos + baseArrayOffset
+	err = p.SeekPos(baseArrayPos)
+	if err != nil {
+		return nil, err
+	}
+
+	baseCount, err := p.ReadUint16()
+	if err != nil {
+		return nil, err
+	}
+	if int(baseCount) > len(baseCov) {
+		baseCount = uint16(len(baseCov))
+	} else {
+		baseCov.Prune(int(baseCount))
+	}
+	numOffsets := uint(baseCount) * uint(markClassCount)
+	if numOffsets > 65536 {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/opentype/gtab",
+			Reason:    "GPOS4.1 table too large",
+		}
+	}
+	offsets := make([]uint16, numOffsets)
+	for i := range offsets {
+		offsets[i], err = p.ReadUint16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	baseArray := make([][]anchor.Table, baseCount)
+	for i := range baseArray {
+		row := make([]anchor.Table, markClassCount)
+		for j := range baseArray[i] {
+			row[j], err = anchor.Read(p, baseArrayPos+int64(offsets[j]))
+			if err != nil {
+				return nil, err
+			}
+		}
+		baseArray[i] = row
+		offsets = offsets[markClassCount:]
+	}
+
+	return &Gpos4_1{
+		Marks:     markCov,
+		Base:      baseCov,
+		MarkArray: markArray,
+		BaseArray: baseArray,
+	}, nil
+}
+
+// Apply implements the Subtable interface.
+func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	panic("not implemented")
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gpos4_1) EncodeLen() int {
+	panic("not implemented")
+}
+
+// Encode implements the Subtable interface.
+func (l *Gpos4_1) Encode() []byte {
+	panic("not implemented")
 }
