@@ -999,11 +999,9 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 		return nil, err
 	}
 
-	// TODO(voss): this is indexed by class, not coverage index!
-	if len(cov) > len(chainedClassSeqRuleSetOffsets) {
-		cov.Prune(len(chainedClassSeqRuleSetOffsets))
-	} else {
-		chainedClassSeqRuleSetOffsets = chainedClassSeqRuleSetOffsets[:len(cov)]
+	numClasses := inputClassDef.NumClasses()
+	if numClasses < len(chainedClassSeqRuleSetOffsets) {
+		chainedClassSeqRuleSetOffsets = chainedClassSeqRuleSetOffsets[:numClasses]
 	}
 
 	rules := make([][]*ChainedClassSeqRule, len(chainedClassSeqRuleSetOffsets))
@@ -1083,8 +1081,12 @@ func (l *ChainedSeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 	if !keep(gid) {
 		return nil
 	}
-	rulesIdx, ok := l.Cov[gid]
+	_, ok := l.Cov[gid]
 	if !ok {
+		return nil
+	}
+	rulesIdx := l.Input[gid]
+	if int(rulesIdx) >= len(l.Rules) {
 		return nil
 	}
 	rules := l.Rules[rulesIdx]
@@ -1344,6 +1346,11 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 
 // Apply implements the Subtable interface.
 func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	gid := seq[a].Gid
+	if !keep(gid) {
+		return nil
+	}
+
 	p := a
 	glyphsNeeded := len(l.Backtrack)
 	for _, cov := range l.Backtrack {
@@ -1361,34 +1368,28 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 	matchPos := []int{p}
 	glyphsNeeded = len(l.Input)
 	for _, cov := range l.Input {
-		// TODO(voss): is this right?  What if keep(seq[i].Gid) == false?
+		if p+glyphsNeeded-1 >= b || !cov.Contains(seq[p].Gid) {
+			return nil
+		}
+		matchPos = append(matchPos, p)
 		glyphsNeeded--
 		p++
 		for p+glyphsNeeded < b && !keep(seq[p].Gid) {
 			p++
 		}
-		if p+glyphsNeeded >= b || !cov.Contains(seq[p].Gid) {
-			return nil
-		}
-		matchPos = append(matchPos, p)
 	}
 	next := p
 
 	glyphsNeeded = len(l.Lookahead)
 	for _, cov := range l.Lookahead {
+		if p+glyphsNeeded-1 >= len(seq) || !cov.Contains(seq[p].Gid) {
+			return nil
+		}
 		glyphsNeeded--
 		p++
 		for p+glyphsNeeded < len(seq) && !keep(seq[p].Gid) {
 			p++
 		}
-		if p+glyphsNeeded >= len(seq) || !cov.Contains(seq[p].Gid) {
-			return nil
-		}
-	}
-
-	next++
-	for next < b && !keep(seq[next].Gid) {
-		next++
 	}
 
 	return &Match{

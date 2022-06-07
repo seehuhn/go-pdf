@@ -48,7 +48,6 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		uniEncoding := uint16(3)
 		winEncoding := uint16(1)
 		if _, high := info.CMap.CodeRange(); high > 0xFFFF {
-			// TODO(voss): should this check the cmap table format instead?
 			uniEncoding = 4
 			winEncoding = 10
 		}
@@ -140,28 +139,6 @@ func (info *Info) Embed(w io.Writer) (int64, error) {
 	tableData["head"] = info.makeHead(enc.LocaFormat)
 
 	return table.Write(w, table.ScalerTypeTrueType, tableData)
-}
-
-// IsFixedPitch returns true if all glyphs in the font have the same width.
-func (info *Info) IsFixedPitch() bool {
-	ww := info.Widths()
-	if len(ww) == 0 {
-		return false
-	}
-
-	var width uint16
-	for _, w := range ww {
-		if w == 0 {
-			continue
-		}
-		if width == 0 {
-			width = w
-		} else if width != w {
-			return false
-		}
-	}
-
-	return true
 }
 
 func (info *Info) makeHead(locaFormat int16) []byte {

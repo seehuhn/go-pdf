@@ -534,6 +534,10 @@ gsubLoop:
 				p.required(itemArrow, "\"->\"")
 				actions := p.readNestedLookups()
 
+				if len(inputClassNames) == 0 {
+					p.fatal("no input classes given")
+				}
+
 				input := make([]uint16, len(inputClassNames))
 				for i, className := range inputClassNames {
 					cls, exists := inputClassIdx[className]
@@ -611,7 +615,12 @@ func (p *parser) readChainedSeqCtx(lookupType uint16) *gtab.LookupTable {
 
 gsubLoop:
 	for {
-		next := p.peek()
+		next := p.readItem()
+		nextType := next.typ
+		if nextType == itemBar {
+			nextType = p.peek().typ
+		}
+		p.backlog = append(p.backlog, next)
 		switch {
 		default: // format 1
 			res := make(map[font.GlyphID][]*gtab.ChainedSeqRule)
@@ -703,7 +712,7 @@ gsubLoop:
 			p.optional(itemEOL)
 			continue gsubLoop
 
-		case next.typ == itemSlash: // format 2
+		case nextType == itemSlash: // format 2
 			p.required(itemSlash, "/")
 			firstGlyphs := p.readGlyphList()
 			p.required(itemSlash, "/")
@@ -719,6 +728,10 @@ gsubLoop:
 				lookaheadClassNames := p.readClassNames()
 				p.required(itemArrow, "\"->\"")
 				actions := p.readNestedLookups()
+
+				if len(inputClassNames) == 0 {
+					p.fatal("no input classes given")
+				}
 
 				input := make([]uint16, len(inputClassNames))
 				for i, className := range inputClassNames {
@@ -779,13 +792,13 @@ gsubLoop:
 			lookaheadClasses = make(classdef.Table) // make sure to not change subtable.Lookahead
 			maps.Clear(lookaheadClassIdx)
 
-		case next.typ == itemSquareBracketOpen: // format 3
+		case nextType == itemSquareBracketOpen: // format 3
 			var input, backtrack, lookahead []coverage.Table
 			for {
-				backtrack = append(backtrack, makeCoverageTable(p.readGlyphSet()))
 				if p.optional(itemBar) {
 					break
 				}
+				backtrack = append(backtrack, makeCoverageTable(p.readGlyphSet()))
 			}
 			for {
 				input = append(input, makeCoverageTable(p.readGlyphSet()))
@@ -794,10 +807,10 @@ gsubLoop:
 				}
 			}
 			for {
-				lookahead = append(lookahead, makeCoverageTable(p.readGlyphSet()))
 				if p.optional(itemArrow) {
 					break
 				}
+				lookahead = append(lookahead, makeCoverageTable(p.readGlyphSet()))
 			}
 			actions := p.readNestedLookups()
 
@@ -994,13 +1007,12 @@ func (p *parser) readClassName() string {
 func (p *parser) readClassNames() []string {
 	var classNames []string
 	for {
-		classNames = append(classNames, p.readClassName())
-
-		next := p.readItem()
-		p.backlog = append(p.backlog, next)
+		next := p.peek()
 		if next.typ != itemColon {
 			return classNames
 		}
+
+		classNames = append(classNames, p.readClassName())
 	}
 }
 

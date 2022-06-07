@@ -30,6 +30,7 @@ import (
 type Table map[font.GlyphID]uint16
 
 // NumClasses returns the number of classes in the table.
+// The count includes the zero class.
 func (info Table) NumClasses() int {
 	maxClass := uint16(0)
 	for _, class := range info {

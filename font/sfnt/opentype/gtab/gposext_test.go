@@ -45,9 +45,6 @@ func TestGpos(t *testing.T) {
 
 	for testIdx, test := range gposTestCases {
 		t.Run(fmt.Sprintf("%02d", testIdx+501), func(t *testing.T) {
-			fontName := fmt.Sprintf("test%04d.otf", testIdx+501)
-			fmt.Printf("%s %s\n", fontName, test.in)
-
 			desc := test.desc
 			if strings.Contains(desc, "Δ") {
 				ax := 0
@@ -81,7 +78,10 @@ func TestGpos(t *testing.T) {
 				LookupList: lookupList,
 			}
 
+			fontName := fmt.Sprintf("test%04d.otf", testIdx+501)
 			if *exportFonts {
+				fmt.Printf("%s %s\n", fontName, test.in)
+
 				fontInfo.Gdef = gdefTable
 				fontInfo.Gpos = gpos
 				exportFont(fontInfo, testIdx+501, test.in)

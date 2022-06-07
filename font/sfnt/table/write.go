@@ -40,7 +40,7 @@ func Write(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, err
 		}
 	}
 
-	// TODO(voss): sort the table names in the recommended order
+	// sort the table names in the recommended order
 	sort.Slice(tableNames, func(i, j int) bool {
 		iPrio := ttTableOrder[tableNames[i]]
 		jPrio := ttTableOrder[tableNames[j]]

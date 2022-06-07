@@ -73,6 +73,8 @@ func TestGsub(t *testing.T) {
 			}
 
 			if *exportFonts {
+				fontName := fmt.Sprintf("test%04d.otf", testIdx+1)
+				fmt.Printf("%s %s -> %s\n", fontName, test.in, test.out)
 				fontInfo.Gdef = gdef
 				fontInfo.Gsub = gsub
 				exportFont(fontInfo, testIdx+1, test.in)
@@ -890,6 +892,18 @@ var gsubTestCases = []gsubTestCase{
 		out: "AXXXXA",
 	},
 	{
+		desc: `GSUB6: | A | A -> 1@0, | A | A -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAAA",
+		out: "XXXXXA",
+	},
+	{
+		desc: `GSUB6: A | A | -> 1@0, X | A | -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAAA",
+		out: "AXXXXX",
+	},
+	{
 		desc: `GSUB6: -ligs A | B B | A -> 1@0 2@0
 			GSUB4: -ligs B B -> X
 			GSUB1: X -> Y`,
@@ -927,5 +941,101 @@ var gsubTestCases = []gsubTestCase{
 			GSUB4: A L -> X`,
 		in:  "AALA",
 		out: "AXA",
+	},
+
+	{
+		desc: `GSUB6:
+				backtrackclass :all: = [A - Z]
+				inputclass :A: = [A B]
+				inputclass :C: = [C D]
+				inputclass :E: = [E F]
+				lookaheadclass :all: = [A - Z]
+				/E F/ :all: | :E: :C: :A: | :all: -> 1@0
+			GSUB1: F -> X`,
+		in:  "GFDBK",
+		out: "GXDBK",
+	},
+	{
+		desc: `GSUB6:
+				backtrackclass :A: = [A]
+				backtrackclass :B: = [B]
+				backtrackclass :C: = [C]
+				inputclass :D: = [D]
+				inputclass :E: = [E]
+				inputclass :F: = [F]
+				lookaheadclass :G: = [G]
+				lookaheadclass :H: = [H]
+				lookaheadclass :I: = [I]
+				/D/ :A: :B: :C: | :D: :E: :F: | :G: :H: :I: -> 1@0
+			GSUB1: D -> X`,
+		in:  "ABCDEFGHI",
+		out: "ABCXEFGHI",
+	},
+	{
+		desc: `GSUB6:
+				backtrackclass :A: = [A X]
+				inputclass :A: = [A]
+				lookaheadclass :A: = [A]
+				/A/ :A: | :A: | :A: -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAA",
+		out: "AXXXA",
+	},
+	{
+		desc: `GSUB6:
+				backtrackclass :A: = [A X]
+				inputclass :A: = [A]
+				/A/ :A: | :A: | -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAA",
+		out: "AXXXX",
+	},
+	{
+		desc: `GSUB6:
+				inputclass :A: = [A]
+				lookaheadclass :A: = [A]
+				/A/ | :A: | :A: -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAA",
+		out: "XXXXA",
+	},
+	{
+		desc: `GSUB6: -ligs
+				backtrackclass :A: = [A]
+				inputclass :LM: = [L M]
+				lookaheadclass :A: = [A]
+				/L M/ :A: | :LM: | :A: -> 1@0
+			GSUB1: L -> X, M -> X`,
+		in:  "ALAMA",
+		out: "ALAXA",
+	},
+
+	{
+		desc: `GSUB6:
+				[A X] | [A] | [A] -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAA",
+		out: "AXXXA",
+	},
+	{
+		desc: `GSUB6:
+				| [A] | [A] -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAA",
+		out: "XXXXA",
+	},
+	{
+		desc: `GSUB6:
+				[A X] | [A] | -> 1@0
+			GSUB1: A -> X`,
+		in:  "AAAAA",
+		out: "AXXXX",
+	},
+	{
+		desc: `GSUB6: -ligs
+				[A] | [L M] | [A] -> 1@0
+			GSUB1: L -> X, M -> X`,
+		in:  "ALAMALMLA",
+		out: "ALAXALXLA",
 	},
 }

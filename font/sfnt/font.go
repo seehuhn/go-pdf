@@ -352,6 +352,28 @@ func (info *Info) GlyphName(gid font.GlyphID) pdf.Name {
 	}
 }
 
+// IsFixedPitch returns true if all glyphs in the font have the same width.
+func (info *Info) IsFixedPitch() bool {
+	ww := info.Widths()
+	if len(ww) == 0 {
+		return false
+	}
+
+	var width uint16
+	for _, w := range ww {
+		if w == 0 {
+			continue
+		}
+		if width == 0 {
+			width = w
+		} else if width != w {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Flags returns the PDF font flags for the font.
 // See section 9.8.2 of PDF 32000-1:2008.
 func (info *Info) Flags(symbolic bool) font.Flags {
@@ -384,14 +406,4 @@ func (info *Info) Flags(symbolic bool) font.Flags {
 	}
 
 	return flags
-}
-
-func isSubset(cmap cmap.Subtable, glyphs map[rune]bool) bool {
-	low, high := cmap.CodeRange()
-	for r := low; r <= high; r++ {
-		if cmap.Lookup(r) != 0 && !glyphs[r] {
-			return false
-		}
-	}
-	return true
 }

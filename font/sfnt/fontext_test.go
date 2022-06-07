@@ -18,7 +18,6 @@ package sfnt_test
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -32,8 +31,6 @@ func TestGetFontInfo(t *testing.T) {
 	font.Copyright = "(c) 2022 test copyright notice"
 
 	fontInfo1 := font.GetFontInfo()
-
-	fmt.Printf("%#v\n", fontInfo1)
 
 	cffFont1 := &cff.Font{
 		FontInfo: fontInfo1,
