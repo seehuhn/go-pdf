@@ -538,7 +538,47 @@ func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 // Apply implements the Subtable interface.
 func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
-	panic("not implemented")
+	// TODO(voss): does this apply to the base or the mark?
+	if !keep(seq[a].Gid) {
+		return nil
+	}
+	markIdx, ok := l.Marks[seq[a].Gid]
+	if !ok {
+		return nil
+	}
+	markRecord := l.MarkArray[markIdx]
+
+	if a == 0 {
+		return nil
+	}
+	p := a - 1
+	var baseIdx int
+	for p >= 0 {
+		baseIdx, ok = l.Base[seq[p].Gid]
+		if ok {
+			break
+		}
+		p--
+	}
+	if p < 0 {
+		return nil
+	}
+	baseRecord := l.BaseArray[baseIdx][markRecord.Class]
+
+	dx := baseRecord.X - markRecord.X
+	dy := baseRecord.Y - markRecord.Y
+	for i := p; i < a; i++ {
+		dx -= int16(seq[i].Advance)
+	}
+	g := seq[a]
+	g.XOffset = dx
+	// g.YOffset = dy
+	_ = dy
+	return &Match{
+		InputPos: []int{a},
+		Replace:  []font.Glyph{g},
+		Next:     a + 1,
+	}
 }
 
 // EncodeLen implements the Subtable interface.

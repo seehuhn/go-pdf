@@ -8,7 +8,7 @@ import (
 // Table is a Mark Array Table.
 // The table defines the class and the anchor point for a set of mark glyphs.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table
-type Table []Record // ordered by mark coverage index
+type Table []Record // indexed by mark coverage index
 
 // Record is a mark record in a Mark Array Table.
 // Each mark record defines the class of the mark and an offset to the Anchor
