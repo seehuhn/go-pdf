@@ -36,18 +36,21 @@ func Read(p *parser.Parser, pos int64, numMarks int) (Table, error) {
 	}
 
 	res := make(Table, markCount)
+	offsets := make([]uint16, markCount)
 	for i := 0; i < int(markCount); i++ {
 		res[i].Class, err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
 
-		markAnchorOffset, err := p.ReadUint16()
+		offsets[i], err = p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
+	}
 
-		res[i].Table, err = anchor.Read(p, pos+int64(markAnchorOffset))
+	for i, offs := range offsets {
+		res[i].Table, err = anchor.Read(p, pos+int64(offs))
 		if err != nil {
 			return nil, err
 		}

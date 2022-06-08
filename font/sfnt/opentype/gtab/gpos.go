@@ -52,6 +52,7 @@ var gposReaders = map[uint16]func(p *parser.Parser, pos int64) (Subtable, error)
 	1_1: readGpos1_1,
 	1_2: readGpos1_2,
 	2_1: readGpos2_1,
+	4_1: readGpos4_1,
 	7_1: readSeqContext1,
 	7_2: readSeqContext2,
 	7_3: readSeqContext3,
@@ -498,7 +499,9 @@ func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		baseCov.Prune(int(baseCount))
 	}
 	numOffsets := uint(baseCount) * uint(markClassCount)
-	if numOffsets > 65536 {
+	if numOffsets > (65536-6-2)/2 {
+		// Offsets are 16-bit from baseArrayPos, and there must still be
+		// space for at least one achor table.
 		return nil, &font.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    "GPOS4.1 table too large",
