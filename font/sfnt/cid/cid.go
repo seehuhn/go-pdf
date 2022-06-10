@@ -19,6 +19,7 @@ package cid
 import (
 	"errors"
 	"math"
+	"os"
 	"sort"
 
 	"seehuhn.de/go/pdf"
@@ -31,6 +32,20 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/locale"
 )
+
+func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	fontInfo, err := sfnt.Read(fd)
+	if err != nil {
+		return nil, err
+	}
+	return Embed(w, fontInfo, instName, loc)
+}
 
 // Embed embeds a TrueType or OpenType font into a PDF document as a CID font.
 //
