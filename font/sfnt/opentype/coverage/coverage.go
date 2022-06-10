@@ -63,12 +63,18 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 			if err != nil {
 				return nil, err
 			}
-			if int(gid) <= prev {
+			if int(gid) < prev {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 1)",
 				}
 			}
+			// Some fonts, for example Google's Roboto, list the same
+			// gid twice.  Thus we write "< prev" instead of "<= prev"
+			// in the test above.
+			//
+			// TODO(voss): Here we need to decide which coverage index to use
+			// in these cases.
 			table[font.GlyphID(gid)] = i
 			prev = int(gid)
 		}

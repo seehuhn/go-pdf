@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf/font"
@@ -69,6 +70,21 @@ type Info struct {
 
 // Permissions describes rights to embed and use a font.
 type Permissions int
+
+func (perm Permissions) String() string {
+	switch perm {
+	case PermInstall:
+		return "can install"
+	case PermEdit:
+		return "can edit"
+	case PermView:
+		return "can view"
+	case PermRestricted:
+		return "restricted"
+	default:
+		return fmt.Sprintf("Permissions(%d)", perm)
+	}
+}
 
 // The possible permission values.
 const (

@@ -159,9 +159,9 @@ func (rect Rect) PDF(w io.Writer) error {
 type Glyph struct {
 	Gid     GlyphID
 	Text    []rune
-	XOffset int16 // This is in Glyph design units.
-	YOffset int16 // This is in Glyph design units.
-	Advance int32 // This is in Glyph design units.  TODO(voss): change to int16 or funit.int16
+	XOffset int16 // Is this in Glyph design units?
+	YOffset int16 // Is this in Glyph design units?
+	Advance int32 // Is this in Glyph design units?  TODO(voss): change to int16 or funit.int16?
 }
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of

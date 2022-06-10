@@ -37,9 +37,16 @@ import (
 
 // Info contains information about the font.
 type Info struct {
-	FamilyName  string
-	Width       font.Width
-	Weight      font.Weight
+	FamilyName string
+	Width      font.Width
+	Weight     font.Weight
+	IsItalic   bool // Glyphs have dominant vertical strokes that are slanted.
+	IsBold     bool
+	IsRegular  bool
+	IsOblique  bool
+	IsSerif    bool
+	IsScript   bool // Glyphs resemble cursive handwriting.
+
 	Description string
 	SampleText  string
 
@@ -62,13 +69,6 @@ type Info struct {
 	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
 	UnderlinePosition  int16   // Underline position (negative)
 	UnderlineThickness int16   // Underline thickness
-
-	IsItalic  bool // Glyphs have dominant vertical strokes that are slanted.
-	IsBold    bool
-	IsRegular bool
-	IsOblique bool
-	IsSerif   bool
-	IsScript  bool // Glyphs resemble cursive handwriting.
 
 	CMap     cmap.Subtable
 	Outlines interface{} // either *cff.Outlines or *glyf.Outlines

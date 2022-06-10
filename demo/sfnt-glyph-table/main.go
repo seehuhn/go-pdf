@@ -22,6 +22,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
@@ -117,13 +118,66 @@ func main() {
 	numGlyph := len(theFont.Widths)
 
 	c <- boxes.Kern(36)
-	c <- boxes.Text(labelFont, 10, "full name: "+tt.FullName())
-	c <- boxes.Text(labelFont, 10, "version: "+tt.Version.String())
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("number of glyphs: %d", numGlyph))
 	c <- boxes.HBox(
 		boxes.Text(labelFont, 10, "input file: "),
 		boxes.Text(courier, 10, fontFileName),
 	)
+	c <- boxes.Kern(12)
+	c <- boxes.Text(labelFont, 10, "family name: "+tt.FamilyName)
+	c <- boxes.Text(labelFont, 10, "width: "+tt.Width.String())
+	c <- boxes.Text(labelFont, 10, "weight: "+tt.Weight.String())
+
+	var flags []string
+	if tt.IsItalic {
+		flags = append(flags, "italic")
+	}
+	if tt.IsBold {
+		flags = append(flags, "bold")
+	}
+	if tt.IsRegular {
+		flags = append(flags, "regular")
+	}
+	if tt.IsOblique {
+		flags = append(flags, "oblique")
+	}
+	if tt.IsSerif {
+		flags = append(flags, "serif")
+	}
+	if tt.IsScript {
+		flags = append(flags, "script")
+	}
+	if len(flags) > 0 {
+		c <- boxes.Text(labelFont, 10, "flags: "+strings.Join(flags, ", "))
+	}
+
+	c <- boxes.Kern(12)
+	if tt.Description != "" {
+		c <- boxes.Text(labelFont, 10, "description: "+tt.Description)
+	}
+	if tt.SampleText != "" {
+		c <- boxes.Text(labelFont, 10, "sample text: "+tt.SampleText)
+	}
+	c <- boxes.Text(labelFont, 10, "version: "+tt.Version.String())
+	c <- boxes.Text(labelFont, 10, "creation time: "+tt.CreationTime.Format("2006-01-02 15:04:05"))
+	c <- boxes.Text(labelFont, 10, "modification time: "+tt.ModificationTime.Format("2006-01-02 15:04:05"))
+	c <- boxes.Kern(12)
+	c <- boxes.Text(labelFont, 10, "copyright: "+tt.Copyright)
+	c <- boxes.Text(labelFont, 10, "trademark: "+tt.Trademark)
+	c <- boxes.Text(labelFont, 10, "permissions: "+tt.PermUse.String())
+	c <- boxes.Kern(12)
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("units/em: %d", tt.UnitsPerEm))
+	c <- boxes.Kern(12)
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("ascent: %d", tt.Ascent))
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("descent: %d", tt.Descent))
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("linegap: %d", tt.LineGap))
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("cap height: %d", tt.CapHeight))
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("x-height: %d", tt.XHeight))
+	c <- boxes.Kern(12)
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("italic angle: %.1f", tt.ItalicAngle))
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("underline position: %d", tt.UnderlinePosition))
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("underline thickness: %d", tt.UnderlineThickness))
+	c <- boxes.Kern(12)
+	c <- boxes.Text(labelFont, 10, fmt.Sprintf("number of glyphs: %d", numGlyph))
 	c <- boxes.Kern(12)
 	c <- boxes.Text(labelFont, 10, "SFNT tables:")
 	var names []string
