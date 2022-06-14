@@ -24,9 +24,11 @@ import (
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/markarray"
 )
 
 // Parse decodes the textual description of a LookupList.
@@ -106,6 +108,9 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 			lookups = append(lookups, l)
 		case isIdentifier(item, "GPOS2"):
 			l := p.readGpos2()
+			lookups = append(lookups, l)
+		case isIdentifier(item, "GPOS4"):
+			l := p.readGpos4()
 			lookups = append(lookups, l)
 		default:
 			p.fatal("unexpected %s", item)
@@ -440,6 +445,107 @@ func (p *parser) readGpos2() *gtab.LookupTable {
 		subtable := &gtab.Gpos2_1{
 			Cov:    cov,
 			Adjust: adjust,
+		}
+		lookup.Subtables = append(lookup.Subtables, subtable)
+
+		if !p.optional(itemOr) {
+			break
+		}
+		p.optional(itemEOL)
+	}
+
+	return lookup
+}
+
+func (p *parser) readGpos4() *gtab.LookupTable {
+	p.optional(itemColon)
+	p.optional(itemEOL)
+	flags := p.readLookupFlags()
+
+	lookup := &gtab.LookupTable{
+		Meta: &gtab.LookupMetaInfo{
+			LookupType: 4,
+			LookupFlag: flags,
+		},
+	}
+	for {
+		var markGlyphs []font.GlyphID
+		var markArray []markarray.Record
+		classesSeen := make(map[uint16]bool)
+		for {
+			if !p.optionalIdentifier("mark") {
+				break
+			}
+			gid := p.readGlyph()
+			if len(markGlyphs) > 0 && markGlyphs[len(markGlyphs)-1] >= gid {
+				p.fatal("mark glyphs not given in ascending order")
+			}
+			markGlyphs = append(markGlyphs, gid)
+			p.optional(itemColon)
+
+			class := p.readUint16()
+			p.required(itemAt, "@")
+			x := p.readInt16()
+			p.required(itemComma, ",")
+			y := p.readInt16()
+			markArray = append(markArray, markarray.Record{
+				Class: class,
+				Table: anchor.Table{
+					X: x,
+					Y: y,
+				},
+			})
+			p.optional(itemSemicolon)
+			p.optional(itemEOL)
+
+			classesSeen[class] = true
+		}
+
+		numClasses := len(classesSeen)
+		for cls := 0; cls < numClasses; cls++ {
+			if !classesSeen[uint16(cls)] {
+				p.fatal("missing mark class %d", cls)
+			}
+		}
+
+		var baseGlyphs []font.GlyphID
+		var baseArray [][]anchor.Table
+		for {
+			if !p.optionalIdentifier("base") {
+				break
+			}
+			gid := p.readGlyph()
+			if len(baseGlyphs) > 0 && baseGlyphs[len(baseGlyphs)-1] >= gid {
+				p.fatal("base glyphs not given in ascending order")
+			}
+			baseGlyphs = append(baseGlyphs, gid)
+			p.optional(itemColon)
+
+			anchors := make([]anchor.Table, numClasses)
+			for i := 0; i < numClasses; i++ {
+				if i > 0 {
+					p.optional(itemComma)
+				}
+				p.required(itemAt, "@")
+				x := p.readInt16()
+				p.required(itemComma, ",")
+				y := p.readInt16()
+				anchors[i] = anchor.Table{
+					X: x,
+					Y: y,
+				}
+			}
+			p.optional(itemSemicolon)
+			p.optional(itemEOL)
+
+			baseArray = append(baseArray, anchors)
+		}
+
+		subtable := &gtab.Gpos4_1{
+			Marks:     makeCoverageTable(markGlyphs),
+			Base:      makeCoverageTable(baseGlyphs),
+			MarkArray: markArray,
+			BaseArray: baseArray,
 		}
 		lookup.Subtables = append(lookup.Subtables, subtable)
 
@@ -950,6 +1056,16 @@ func (p *parser) readGlyphSet() []font.GlyphID {
 	return unique(res)
 }
 
+func (p *parser) readGlyph() font.GlyphID {
+	gids := p.readGlyphList()
+	if len(gids) == 0 {
+		p.fatal("expected glyph, got %s", p.peek())
+	} else if len(gids) > 1 {
+		p.fatal("expected single glyph, got %v", gids)
+	}
+	return gids[0]
+}
+
 func (p *parser) readNestedLookups() gtab.SeqLookups {
 	var res gtab.SeqLookups
 	for {
@@ -1036,6 +1152,14 @@ func (p *parser) readInt16() int16 {
 	return int16(x)
 }
 
+func (p *parser) readUint16() uint16 {
+	x := p.readInteger()
+	if x < 0 || x > 65537 {
+		p.fatal("uint16 out of range: %d", x)
+	}
+	return uint16(x)
+}
+
 func (p *parser) readGposValueRecord() *gtab.GposValueRecord {
 	res := &gtab.GposValueRecord{}
 valueRecordLoop:
@@ -1082,9 +1206,26 @@ func (p *parser) required(typ itemType, desc string) item {
 	return item
 }
 
+func (p *parser) requiredIdentifier(name string) item {
+	next := p.readItem()
+	if next.typ != itemIdentifier || next.val != name {
+		p.fatal("expected identifier %q, got %s", name, next)
+	}
+	return next
+}
+
 func (p *parser) optional(typ itemType) bool {
 	item := p.readItem()
 	if item.typ != typ {
+		p.backlog = append(p.backlog, item)
+		return false
+	}
+	return true
+}
+
+func (p *parser) optionalIdentifier(name string) bool {
+	item := p.readItem()
+	if item.typ != itemIdentifier || item.val != name {
 		p.backlog = append(p.backlog, item)
 		return false
 	}
@@ -1184,14 +1325,15 @@ func copyRev[T any](seq []T) []T {
 }
 
 type parseError struct {
-	msg string
+	next item
+	msg  string
 }
 
 func (err *parseError) Error() string {
-	return err.msg
+	return fmt.Sprintf("%d:%s: %s", err.next.line, err.next.String(), err.msg)
 }
 
 func (p *parser) fatal(format string, a ...interface{}) {
 	msg := fmt.Sprintf(format, a...)
-	panic(&parseError{msg})
+	panic(&parseError{next: p.peek(), msg: msg})
 }

@@ -74,8 +74,7 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 
 			case *gtab.Gsub2_1:
 				checkType(2)
-				inputGlyphs := maps.Keys(l.Cov)
-				sort.Slice(inputGlyphs, func(i, j int) bool { return inputGlyphs[i] < inputGlyphs[j] })
+				inputGlyphs := l.Cov.Glyphs()
 				for i, gid := range inputGlyphs {
 					if i == 0 {
 						ee.w.WriteRune(' ')
@@ -89,8 +88,7 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 
 			case *gtab.Gsub3_1:
 				checkType(3)
-				inputGlyphs := maps.Keys(l.Cov)
-				sort.Slice(inputGlyphs, func(i, j int) bool { return inputGlyphs[i] < inputGlyphs[j] })
+				inputGlyphs := l.Cov.Glyphs()
 				for i, gid := range inputGlyphs {
 					if i == 0 {
 						ee.w.WriteRune(' ')
@@ -117,8 +115,7 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 
 			case *gtab.SeqContext1:
 				checkType(5)
-				firstGlyphs := maps.Keys(l.Cov)
-				sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
+				firstGlyphs := l.Cov.Glyphs()
 				first := true
 				for i, gid := range firstGlyphs {
 					input := []font.GlyphID{gid}
@@ -171,8 +168,7 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 
 			case *gtab.ChainedSeqContext1:
 				checkType(6)
-				firstGlyphs := maps.Keys(l.Cov)
-				sort.Slice(firstGlyphs, func(i, j int) bool { return firstGlyphs[i] < firstGlyphs[j] })
+				firstGlyphs := l.Cov.Glyphs()
 				first := true
 				for i, gid := range firstGlyphs {
 					input := []font.GlyphID{gid}
@@ -284,14 +280,13 @@ func ExplainGpos(fontInfo *sfnt.Info) string {
 			case *gtab.Gpos1_1:
 				checkType(1)
 				ee.w.WriteRune(' ')
-				ee.writeGlyphSet(maps.Keys(l.Cov))
+				ee.writeGlyphSet(l.Cov.Glyphs())
 				ee.w.WriteString(" -> ")
 				ee.writeValueRecord(l.Adjust)
 
 			case *gtab.Gpos1_2:
 				checkType(1)
-				gids := maps.Keys(l.Cov)
-				sort.Slice(gids, func(i, j int) bool { return gids[i] < gids[j] })
+				gids := l.Cov.Glyphs()
 				for i, gid := range gids {
 					if i > 0 {
 						ee.w.WriteString(", ")
@@ -305,8 +300,7 @@ func ExplainGpos(fontInfo *sfnt.Info) string {
 
 			case *gtab.Gpos2_1:
 				checkType(2)
-				firstGids := maps.Keys(l.Cov)
-				sort.Slice(firstGids, func(i, j int) bool { return firstGids[i] < firstGids[j] })
+				firstGids := l.Cov.Glyphs()
 				first := true
 				for _, firstGid := range firstGids {
 					idx := l.Cov[firstGid]
@@ -329,6 +323,30 @@ func ExplainGpos(fontInfo *sfnt.Info) string {
 							ee.writeValueRecord(col.Second)
 						}
 					}
+				}
+
+			case *gtab.Gpos4_1:
+				checkType(4)
+				markGlyphs := l.Marks.Glyphs()
+				for i, gid := range markGlyphs {
+					ee.w.WriteString("\n\tmark ")
+					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.w.WriteRune(':')
+					rec := l.MarkArray[i]
+					fmt.Fprintf(ee.w, " %d@%d,%d", rec.Class, rec.Table.X, rec.Table.Y)
+					ee.w.WriteRune(';')
+				}
+
+				baseGlyphs := l.Base.Glyphs()
+				for i, gid := range baseGlyphs {
+					ee.w.WriteString("\n\tbase ")
+					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.w.WriteRune(':')
+					anchors := l.BaseArray[i]
+					for _, a := range anchors {
+						fmt.Fprintf(ee.w, " @%d,%d", a.X, a.Y)
+					}
+					ee.w.WriteRune(';')
 				}
 
 			default:
@@ -513,19 +531,11 @@ func (ee *explainer) writeClassList(input []uint16) {
 }
 
 func (ee *explainer) explainCoverage(cov coverage.Table) {
-	keys := maps.Keys(cov)
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
-	ee.writeGlyphList(keys)
+	ee.writeGlyphList(cov.Glyphs())
 }
 
 func (ee *explainer) writeCoveredSet(cov coverage.Table) {
-	keys := maps.Keys(cov)
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
-	ee.writeGlyphSet(keys)
+	ee.writeGlyphSet(cov.Glyphs())
 }
 
 func (ee *explainer) explainNested(actions gtab.SeqLookups) {

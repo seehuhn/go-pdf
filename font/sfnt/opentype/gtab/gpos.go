@@ -451,8 +451,8 @@ func (l *Gpos2_1) Encode() []byte {
 type Gpos4_1 struct {
 	Marks     coverage.Table
 	Base      coverage.Table
-	MarkArray markarray.Table
-	BaseArray [][]anchor.Table // indexed by base coverage index, then by mark class
+	MarkArray []markarray.Record // indexed by mark coverage index
+	BaseArray [][]anchor.Table   // indexed by base coverage index, then by mark class
 }
 
 func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {

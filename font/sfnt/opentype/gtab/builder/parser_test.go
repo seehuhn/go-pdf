@@ -189,6 +189,12 @@ func TestGposParser(t *testing.T) {
 		D -> dx-1, E -> dx+1, F -> dx-1, G -> dx+1, H -> x+1, I -> y+1
 	GPOS2: A V -> dx-100, O O -> dx+100, "AW" -> dx-100
 	GPOS2: T E -> y+100 dx-50 & y-100
+	GPOS4:
+	  mark M: 0@100,100;
+	  mark N: 1@200,100;
+	  base A: @400,1000 @500,1000;
+	  base B: @500,1000 @600,900;
+	  base C: @500,1000 @500,-1000;
 	`)
 	if err != nil {
 		t.Fatal(err)
@@ -231,6 +237,34 @@ func FuzzGpos2(f *testing.F) {
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
 		lookups, err := Parse(fontInfo, "GPOS2: "+desc)
+		if err != nil || len(lookups) != 1 {
+			return
+		}
+		fontInfo.Gpos = &gtab.Info{LookupList: lookups}
+		desc2 := ExplainGpos(fontInfo)
+		lookups2, err := Parse(fontInfo, desc2)
+		if err != nil {
+			fmt.Println(desc)
+			fmt.Println(desc2)
+			t.Fatal(err)
+		}
+		if d := cmp.Diff(lookups, lookups2); d != "" {
+			t.Error(d)
+		}
+	})
+}
+
+func FuzzGpos4(f *testing.F) {
+	f.Add(`mark M: 0@100,100;
+		mark N: 1@200,100;
+		base A: @400,1000 @500,1000;
+		base B: @500,1000 @600,900;
+		base C: @500,1000 @500,-1000;`)
+	f.Add(`mark M: 0@100,100;
+		base A: @400,1000`)
+	f.Fuzz(func(t *testing.T, desc string) {
+		fontInfo := debug.MakeSimpleFont()
+		lookups, err := Parse(fontInfo, "GPOS4: "+desc)
 		if err != nil || len(lookups) != 1 {
 			return
 		}

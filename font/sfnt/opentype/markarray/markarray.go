@@ -5,14 +5,9 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 )
 
-// Table is a Mark Array Table.
-// The table defines the class and the anchor point for a set of mark glyphs.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table
-type Table []Record // indexed by mark coverage index
-
 // Record is a mark record in a Mark Array Table.
-// Each mark record defines the class of the mark and an offset to the Anchor
-// table that contains data for a single mark.
+// Each mark record defines the class of the mark and its anchor point.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#mark-array-table
 type Record struct {
 	Class uint16
 	anchor.Table
@@ -21,7 +16,7 @@ type Record struct {
 // Read reads a Mark Array Table from the given parser.
 // If there are more than numMarks entries in the table, the remaining entries
 // are ignored.
-func Read(p *parser.Parser, pos int64, numMarks int) (Table, error) {
+func Read(p *parser.Parser, pos int64, numMarks int) ([]Record, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return nil, err
@@ -35,7 +30,7 @@ func Read(p *parser.Parser, pos int64, numMarks int) (Table, error) {
 		markCount = uint16(numMarks)
 	}
 
-	res := make(Table, markCount)
+	res := make([]Record, markCount)
 	offsets := make([]uint16, markCount)
 	for i := 0; i < int(markCount); i++ {
 		res[i].Class, err = p.ReadUint16()

@@ -20,7 +20,9 @@ package coverage
 
 import (
 	"fmt"
+	"sort"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 )
@@ -35,6 +37,26 @@ type Table map[font.GlyphID]int
 func (table Table) Contains(gid font.GlyphID) bool {
 	_, ok := table[gid]
 	return ok
+}
+
+// Glyphs returns the glyphs covered by the table in increasing order.
+func (table Table) Glyphs() []font.GlyphID {
+	keys := maps.Keys(table)
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
+}
+
+// Prune removes all glyphs from the table that have coverage index >= size.
+func (table Table) Prune(size int) {
+	var gg []font.GlyphID
+	for gid, class := range table {
+		if class >= size {
+			gg = append(gg, gid)
+		}
+	}
+	for _, gid := range gg {
+		delete(table, font.GlyphID(gid))
+	}
 }
 
 // Read reads a coverage table from the given parser.
@@ -117,19 +139,6 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 	}
 
 	return table, nil
-}
-
-// Prune removes all glyphs from the table that have coverage index >= size.
-func (table Table) Prune(size int) {
-	var gg []font.GlyphID
-	for gid, class := range table {
-		if class >= size {
-			gg = append(gg, gid)
-		}
-	}
-	for _, gid := range gg {
-		delete(table, font.GlyphID(gid))
-	}
 }
 
 func (table Table) encInfo() ([]font.GlyphID, int, int) {

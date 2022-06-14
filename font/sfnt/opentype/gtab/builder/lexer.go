@@ -59,8 +59,9 @@ const (
 )
 
 type item struct {
-	typ itemType
-	val string
+	typ  itemType
+	val  string
+	line int
 }
 
 func (i item) String() string {
@@ -93,7 +94,7 @@ func (l *lexer) run() {
 }
 
 func (l *lexer) emit(t itemType) {
-	l.items <- item{typ: t, val: l.input[l.start:l.pos]}
+	l.items <- item{typ: t, val: l.input[l.start:l.pos], line: l.line}
 	l.start = l.pos
 }
 
@@ -167,6 +168,7 @@ func lexStart(l *lexer) stateFn {
 	switch {
 	case r == '\n':
 		l.emit(itemEOL)
+		l.line++
 		return lexStart
 	case unicode.IsLetter(r) || r == '.' || r == '_':
 		return lexIdentifier
