@@ -329,4 +329,17 @@ var gposTestCases = []gposTestCase{
 			{5, checkY, 200},
 		},
 	},
+
+	{
+		desc: `GPOS4:
+			mark M: 0@400,0
+			base A: @400,1000`,
+		in: "AM",
+		check: []gposCheck{
+			{0, checkX, 0},
+			{0, checkY, 0},
+			{1, checkX, 0},
+			{1, checkY, 1000},
+		},
+	},
 }

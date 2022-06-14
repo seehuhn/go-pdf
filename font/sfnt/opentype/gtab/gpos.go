@@ -583,10 +583,22 @@ func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 
 // EncodeLen implements the Subtable interface.
 func (l *Gpos4_1) EncodeLen() int {
-	panic("not implemented")
+	total := 12
+	total += l.Marks.EncodeLen()
+	total += l.Base.EncodeLen()
+	total += 2 + (4+6)*len(l.MarkArray)
+	total += 2 + (2+6)*len(l.BaseArray)*len(l.MarkArray)
+	return total
 }
 
 // Encode implements the Subtable interface.
 func (l *Gpos4_1) Encode() []byte {
+	total := 12
+	total += l.Marks.EncodeLen()
+	total += l.Base.EncodeLen()
+	total += 2 + (4+6)*len(l.MarkArray)
+	total += 2 + (2+6)*len(l.BaseArray)*len(l.MarkArray)
+	res := make([]byte, total)
 	panic("not implemented")
+	return res
 }
