@@ -62,9 +62,21 @@ type Attributes struct {
 // PDF 32000-1:2008.
 type DefaultAttributes struct {
 	Resources *Resources
-	MediaBox  *pdf.Rectangle
-	CropBox   *pdf.Rectangle
-	Rotate    int
+
+	// Mediabox defines the boundaries of the physical
+	// medium on which the page shall be displayed or printed.
+	MediaBox *pdf.Rectangle
+
+	// Cropbox defines the visible region of default user space.  When the page
+	// is displayed or printed, its contents shall be clipped (cropped) to this
+	// rectangle and then shall be imposed on the output medium in some
+	// implementation-defined manner.  Default value: the value of MediaBox.
+	CropBox *pdf.Rectangle
+
+	// Rotate gives the number of degrees by which the page shall be rotated
+	// clockwise when displayed or printed.  The value shall be a multiple of
+	// 90.
+	Rotate int
 }
 
 // Default paper sizes as PDF rectangles.

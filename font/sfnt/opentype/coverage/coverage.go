@@ -63,7 +63,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 			if err != nil {
 				return nil, err
 			}
-			if int(gid) < prev {
+			if int(gid) <= prev {
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 1)",

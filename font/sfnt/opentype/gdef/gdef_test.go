@@ -41,9 +41,9 @@ func FuzzGdef(f *testing.F) {
 		7: 1,
 	}
 	f.Add(table.Encode())
-	table.MarkGlyphSets = []coverage.Table{
-		{12: 0, 13: 1, 14: 2},
-		{10: 0, 15: 1, 16: 2},
+	table.MarkGlyphSets = []coverage.Set{
+		{12: true, 13: true, 14: true},
+		{10: true, 15: true, 16: true},
 	}
 	f.Add(table.Encode())
 

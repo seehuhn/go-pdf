@@ -31,8 +31,8 @@ type Table struct {
 	GlyphClass classdef.Table // class definition table for glyph type
 	// TODO(voss): attachment point list table
 	// TODO(voss): ligature caret list table
-	MarkAttachClass classdef.Table   // class definition table for mark attachment type
-	MarkGlyphSets   []coverage.Table // table of mark glyph set definitions
+	MarkAttachClass classdef.Table // class definition table for mark attachment type
+	MarkGlyphSets   []coverage.Set // table of mark glyph set definitions
 	// TODO(voss): Item Variation Store table
 }
 
@@ -115,9 +115,9 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 			}
 		}
 
-		table.MarkGlyphSets = make([]coverage.Table, markGlyphSetCount)
+		table.MarkGlyphSets = make([]coverage.Set, markGlyphSetCount)
 		for i := range table.MarkGlyphSets {
-			table.MarkGlyphSets[i], err = coverage.Read(p, pos+int64(coverageOffsets[i]))
+			table.MarkGlyphSets[i], err = coverage.ReadSet(p, pos+int64(coverageOffsets[i]))
 			if err != nil {
 				return nil, err
 			}
@@ -154,7 +154,8 @@ func (table *Table) Encode() []byte {
 		markGlyphSetsDefOffset = total
 		total += 4 + 4*len(table.MarkGlyphSets)
 		for _, set := range table.MarkGlyphSets {
-			total += set.EncodeLen()
+			cov := set.ToTable()
+			total += cov.EncodeLen()
 		}
 	}
 
@@ -186,10 +187,12 @@ func (table *Table) Encode() []byte {
 		for _, set := range table.MarkGlyphSets {
 			buf = append(buf,
 				byte(offs>>24), byte(offs>>16), byte(offs>>8), byte(offs))
-			offs += set.EncodeLen()
+			cov := set.ToTable()
+			offs += cov.EncodeLen()
 		}
 		for _, set := range table.MarkGlyphSets {
-			buf = append(buf, set.Encode()...)
+			cov := set.ToTable()
+			buf = append(buf, cov.Encode()...)
 		}
 	}
 	return buf

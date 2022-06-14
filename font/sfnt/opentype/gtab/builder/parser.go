@@ -793,15 +793,15 @@ gsubLoop:
 			maps.Clear(lookaheadClassIdx)
 
 		case nextType == itemSquareBracketOpen: // format 3
-			var input, backtrack, lookahead []coverage.Table
+			var input, backtrack, lookahead []coverage.Set
 			for {
 				if p.optional(itemBar) {
 					break
 				}
-				backtrack = append(backtrack, makeCoverageTable(p.readGlyphSet()))
+				backtrack = append(backtrack, makeCoverageSet(p.readGlyphSet()))
 			}
 			for {
-				input = append(input, makeCoverageTable(p.readGlyphSet()))
+				input = append(input, makeCoverageSet(p.readGlyphSet()))
 				if p.optional(itemBar) {
 					break
 				}
@@ -810,7 +810,7 @@ gsubLoop:
 				if p.optional(itemArrow) {
 					break
 				}
-				lookahead = append(lookahead, makeCoverageTable(p.readGlyphSet()))
+				lookahead = append(lookahead, makeCoverageSet(p.readGlyphSet()))
 			}
 			actions := p.readNestedLookups()
 
@@ -1137,6 +1137,14 @@ func makeCoverageTable(in []font.GlyphID) coverage.Table {
 		cov[gid] = i
 	}
 	return cov
+}
+
+func makeCoverageSet(in []font.GlyphID) coverage.Set {
+	set := make(coverage.Set, len(in))
+	for _, gid := range in {
+		set[gid] = true
+	}
+	return set
 }
 
 // unique removes duplicates from a sorted slice.

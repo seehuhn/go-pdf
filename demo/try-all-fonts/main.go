@@ -19,33 +19,36 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/font/sfnt/kern"
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/font/sfnt"
 )
 
 func tryFont(fname string) error {
-	r, err := os.Open(fname)
-	if err != nil {
-		return err
-	}
-	defer r.Close()
+	// r, err := os.Open(fname)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer r.Close()
 
-	header, err := table.ReadSfntHeader(r)
-	if err != nil {
-		return err
-	}
+	// header, err := table.ReadSfntHeader(r)
+	// if err != nil {
+	// 	return err
+	// }
 
-	rec, ok := header.Toc["kern"]
-	if !ok {
-		return nil
-	}
-	kernFd := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
+	// rec, ok := header.Toc["kern"]
+	// if !ok {
+	// 	return nil
+	// }
+	// kernFd := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
 
-	_, err = kern.Read(kernFd)
+	// _, err = kern.Read(kernFd)
+	// if err != nil {
+	// 	return err
+	// }
+
+	_, err := sfnt.ReadFile(fname)
 	if err != nil {
 		return err
 	}

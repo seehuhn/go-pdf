@@ -228,20 +228,23 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 
 			case *gtab.ChainedSeqContext3:
 				checkType(6)
-				for i, cov := range copyRev(l.Backtrack) {
+				for i, set := range copyRev(l.Backtrack) {
 					if i > 0 {
 						ee.w.WriteRune(' ')
 					}
+					cov := set.ToTable()
 					ee.writeCoveredSet(cov)
 				}
 				ee.w.WriteString(" |")
-				for _, cov := range l.Input {
+				for _, set := range l.Input {
 					ee.w.WriteRune(' ')
+					cov := set.ToTable()
 					ee.writeCoveredSet(cov)
 				}
 				ee.w.WriteString(" |")
-				for _, cov := range l.Lookahead {
+				for _, set := range l.Lookahead {
 					ee.w.WriteRune(' ')
+					cov := set.ToTable()
 					ee.writeCoveredSet(cov)
 				}
 				ee.w.WriteString(" -> ")

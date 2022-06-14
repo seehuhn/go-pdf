@@ -506,15 +506,15 @@ func FuzzChainedSeqContext2(f *testing.F) {
 func FuzzChainedSeqContext3(f *testing.F) {
 	sub := &ChainedSeqContext3{}
 	f.Add(sub.Encode())
-	sub.Backtrack = []coverage.Table{
-		{1: 0, 3: 1},
+	sub.Backtrack = []coverage.Set{
+		{1: true, 3: true},
 	}
-	sub.Input = []coverage.Table{
-		{2: 0, 3: 1},
-		{3: 0, 4: 1},
+	sub.Input = []coverage.Set{
+		{2: true, 3: true},
+		{3: true, 4: true},
 	}
-	sub.Lookahead = []coverage.Table{
-		{4: 0, 5: 1, 6: 2},
+	sub.Lookahead = []coverage.Set{
+		{4: true, 5: true, 6: true},
 	}
 	sub.Actions = []SeqLookup{
 		{SequenceIndex: 0, LookupListIndex: 1},

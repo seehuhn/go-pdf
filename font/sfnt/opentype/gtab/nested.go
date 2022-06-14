@@ -1276,9 +1276,9 @@ func (l *ChainedSeqContext2) Encode() []byte {
 // ChainedSeqContext3 is used for GSUB type 6 and GPOS type 8 format 3 subtables
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#chained-sequence-context-format-3-coverage-based-glyph-contexts
 type ChainedSeqContext3 struct {
-	Backtrack []coverage.Table
-	Input     []coverage.Table
-	Lookahead []coverage.Table
+	Backtrack []coverage.Set
+	Input     []coverage.Set
+	Lookahead []coverage.Set
 	Actions   SeqLookups
 }
 
@@ -1311,25 +1311,25 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 		return nil, err
 	}
 
-	backtrackCov := make([]coverage.Table, len(backtrackCoverageOffsets))
+	backtrackCov := make([]coverage.Set, len(backtrackCoverageOffsets))
 	for i, offset := range backtrackCoverageOffsets {
-		backtrackCov[i], err = coverage.Read(p, subtablePos+int64(offset))
+		backtrackCov[i], err = coverage.ReadSet(p, subtablePos+int64(offset))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	inputCov := make([]coverage.Table, len(inputCoverageOffsets))
+	inputCov := make([]coverage.Set, len(inputCoverageOffsets))
 	for i, offset := range inputCoverageOffsets {
-		inputCov[i], err = coverage.Read(p, subtablePos+int64(offset))
+		inputCov[i], err = coverage.ReadSet(p, subtablePos+int64(offset))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	lookaheadCov := make([]coverage.Table, len(lookaheadCoverageOffsets))
+	lookaheadCov := make([]coverage.Set, len(lookaheadCoverageOffsets))
 	for i, offset := range lookaheadCoverageOffsets {
-		lookaheadCov[i], err = coverage.Read(p, subtablePos+int64(offset))
+		lookaheadCov[i], err = coverage.ReadSet(p, subtablePos+int64(offset))
 		if err != nil {
 			return nil, err
 		}
@@ -1359,7 +1359,7 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 		for p-glyphsNeeded >= 0 && !keep(seq[p].Gid) {
 			p--
 		}
-		if p-glyphsNeeded < 0 || !cov.Contains(seq[p].Gid) {
+		if p-glyphsNeeded < 0 || !cov[seq[p].Gid] {
 			return nil
 		}
 	}
@@ -1368,7 +1368,7 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 	matchPos := []int{p}
 	glyphsNeeded = len(l.Input)
 	for _, cov := range l.Input {
-		if p+glyphsNeeded-1 >= b || !cov.Contains(seq[p].Gid) {
+		if p+glyphsNeeded-1 >= b || !cov[seq[p].Gid] {
 			return nil
 		}
 		matchPos = append(matchPos, p)
@@ -1382,7 +1382,7 @@ func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int)
 
 	glyphsNeeded = len(l.Lookahead)
 	for _, cov := range l.Lookahead {
-		if p+glyphsNeeded-1 >= len(seq) || !cov.Contains(seq[p].Gid) {
+		if p+glyphsNeeded-1 >= len(seq) || !cov[seq[p].Gid] {
 			return nil
 		}
 		glyphsNeeded--
@@ -1406,13 +1406,16 @@ func (l *ChainedSeqContext3) EncodeLen() int {
 	total += 2 * len(l.Input)
 	total += 2 * len(l.Lookahead)
 	total += 4 * len(l.Actions)
-	for _, cov := range l.Backtrack {
+	for _, set := range l.Backtrack {
+		cov := set.ToTable()
 		total += cov.EncodeLen()
 	}
-	for _, cov := range l.Input {
+	for _, set := range l.Input {
+		cov := set.ToTable()
 		total += cov.EncodeLen()
 	}
-	for _, cov := range l.Lookahead {
+	for _, set := range l.Lookahead {
+		cov := set.ToTable()
 		total += cov.EncodeLen()
 	}
 	return total
@@ -1431,18 +1434,21 @@ func (l *ChainedSeqContext3) Encode() []byte {
 	total += 2 * len(l.Lookahead)
 	total += 4 * len(l.Actions)
 	backtrackCoverageOffsets := make([]uint16, backtrackGlyphCount)
-	for i, cov := range l.Backtrack {
+	for i, set := range l.Backtrack {
 		backtrackCoverageOffsets[i] = uint16(total)
+		cov := set.ToTable()
 		total += cov.EncodeLen()
 	}
 	inputCoverageOffsets := make([]uint16, inputGlyphCount)
-	for i, cov := range l.Input {
+	for i, set := range l.Input {
 		inputCoverageOffsets[i] = uint16(total)
+		cov := set.ToTable()
 		total += cov.EncodeLen()
 	}
 	lookaheadCoverageOffsets := make([]uint16, lookaheadGlyphCount)
-	for i, cov := range l.Lookahead {
+	for i, set := range l.Lookahead {
 		lookaheadCoverageOffsets[i] = uint16(total)
+		cov := set.ToTable()
 		total += cov.EncodeLen()
 	}
 
@@ -1477,13 +1483,16 @@ func (l *ChainedSeqContext3) Encode() []byte {
 		)
 	}
 
-	for _, cov := range l.Backtrack {
+	for _, set := range l.Backtrack {
+		cov := set.ToTable()
 		buf = append(buf, cov.Encode()...)
 	}
-	for _, cov := range l.Input {
+	for _, set := range l.Input {
+		cov := set.ToTable()
 		buf = append(buf, cov.Encode()...)
 	}
-	for _, cov := range l.Lookahead {
+	for _, set := range l.Lookahead {
+		cov := set.ToTable()
 		buf = append(buf, cov.Encode()...)
 	}
 	return buf
