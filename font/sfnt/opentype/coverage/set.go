@@ -57,7 +57,7 @@ func ReadSet(p *parser.Parser, pos int64) (Set, error) {
 				startGlyphID < prev ||
 				endGlyphID < startGlyphID {
 				// Some fonts list individual glyphs twice.  To cover most of
-				// these cases, we allow endGlyphID to be equal to prev.
+				// these cases, we allow startGlyphID to be equal to prev.
 				return nil, &font.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 2)",

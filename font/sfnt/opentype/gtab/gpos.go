@@ -581,24 +581,48 @@ func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 }
 
+func countMarkClasses(table []markarray.Record) int {
+	panic("not implemented")
+}
+
 // EncodeLen implements the Subtable interface.
 func (l *Gpos4_1) EncodeLen() int {
 	total := 12
 	total += l.Marks.EncodeLen()
 	total += l.Base.EncodeLen()
 	total += 2 + (4+6)*len(l.MarkArray)
-	total += 2 + (2+6)*len(l.BaseArray)*len(l.MarkArray)
+	markClassCount := countMarkClasses(l.MarkArray)
+	total += 2 + (2+6)*len(l.BaseArray)*markClassCount
 	return total
 }
 
 // Encode implements the Subtable interface.
 func (l *Gpos4_1) Encode() []byte {
 	total := 12
+	markCoverageOffset := total
 	total += l.Marks.EncodeLen()
+	baseCoverageOffset := total
 	total += l.Base.EncodeLen()
+	markArrayOffset := total
 	total += 2 + (4+6)*len(l.MarkArray)
+	baseArrayOffset := total
 	total += 2 + (2+6)*len(l.BaseArray)*len(l.MarkArray)
-	res := make([]byte, total)
-	panic("not implemented")
+	res := make([]byte, 0, total)
+
+	markClassCount := countMarkClasses(l.MarkArray)
+	res = append(res,
+		0, 1, // posFormat
+		byte(markCoverageOffset>>8), byte(markCoverageOffset),
+		byte(baseCoverageOffset>>8), byte(baseCoverageOffset),
+		byte(markClassCount>>8), byte(markClassCount),
+		byte(markArrayOffset>>8), byte(markArrayOffset),
+		byte(baseArrayOffset>>8), byte(baseArrayOffset),
+	)
+	res = append(res, l.Marks.Encode()...)
+	res = append(res, l.Base.Encode()...)
+	if len(res) != markArrayOffset { // TODO(voss): remove
+		panic("internal error")
+	}
+
 	return res
 }
