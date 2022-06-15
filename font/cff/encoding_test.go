@@ -55,7 +55,7 @@ func FuzzEncoding(f *testing.F) {
 		var enc2 []font.GlyphID
 		var data2 []byte
 		if isStandardEncoding(enc1, glyphs) {
-			enc2 = standardEncoding(glyphs)
+			enc2 = StandardEncoding(glyphs)
 		} else if isExpertEncoding(enc1, glyphs) {
 			enc2 = expertEncoding(glyphs)
 		} else {

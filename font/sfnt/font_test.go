@@ -17,14 +17,9 @@
 package sfnt
 
 import (
-	"bytes"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"golang.org/x/image/font/gofont/gobolditalic"
-	"golang.org/x/image/font/gofont/goregular"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cff"
 )
 
 func TestPostscriptName(t *testing.T) {
@@ -47,39 +42,4 @@ func TestPostscriptName(t *testing.T) {
 	if len(psName) != 127-33-10+len("-BoldItalic") {
 		t.Errorf("wrong postscript name: %q", psName)
 	}
-}
-
-func FuzzFont(f *testing.F) {
-	f.Add(goregular.TTF)
-	f.Add(gobolditalic.TTF)
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		font1, err := Read(bytes.NewReader(data))
-		if err != nil {
-			return
-		}
-
-		buf := &bytes.Buffer{}
-		_, err = font1.Write(buf)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		font2, err := Read(bytes.NewReader(buf.Bytes()))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		opt := cmp.Comparer(func(fn1, fn2 cff.FdSelectFn) bool {
-			for gid := 0; gid < font1.NumGlyphs(); gid++ {
-				if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
-					return false
-				}
-			}
-			return true
-		})
-		if diff := cmp.Diff(font1, font2, opt); diff != "" {
-			t.Errorf("different (-old +new):\n%s", diff)
-		}
-	})
 }
