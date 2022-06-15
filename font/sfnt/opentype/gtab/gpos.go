@@ -266,6 +266,44 @@ type PairAdjust struct {
 	First, Second *GposValueRecord
 }
 
+// Apply implements the Subtable interface.
+func (l *Gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	if a+1 >= b {
+		return nil
+	}
+
+	g1 := seq[a]
+	idx, ok := l.Cov[g1.Gid]
+	if !ok {
+		return nil
+	}
+	ruleSet := l.Adjust[idx]
+	if ruleSet == nil {
+		return nil
+	}
+
+	g2 := seq[a+1]
+	rule, ok := ruleSet[g2.Gid]
+	if !ok {
+		return nil
+	}
+
+	rule.First.Apply(&g1)
+	if rule.Second == nil {
+		return &Match{
+			InputPos: []int{a},
+			Replace:  []font.Glyph{g1},
+			Next:     a + 1,
+		}
+	}
+	rule.Second.Apply(&g2)
+	return &Match{
+		InputPos: []int{a, a + 1},
+		Replace:  []font.Glyph{g1, g2},
+		Next:     a + 2,
+	}
+}
+
 func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	buf, err := p.ReadBytes(8)
 	if err != nil {
@@ -332,44 +370,6 @@ func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		Adjust: adjust,
 	}
 	return res, nil
-}
-
-// Apply implements the Subtable interface.
-func (l *Gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
-	if a+1 >= b {
-		return nil
-	}
-
-	g1 := seq[a]
-	idx, ok := l.Cov[g1.Gid]
-	if !ok {
-		return nil
-	}
-	ruleSet := l.Adjust[idx]
-	if ruleSet == nil {
-		return nil
-	}
-
-	g2 := seq[a+1]
-	rule, ok := ruleSet[g2.Gid]
-	if !ok {
-		return nil
-	}
-
-	rule.First.Apply(&g1)
-	if rule.Second == nil {
-		return &Match{
-			InputPos: []int{a},
-			Replace:  []font.Glyph{g1},
-			Next:     a + 1,
-		}
-	}
-	rule.Second.Apply(&g2)
-	return &Match{
-		InputPos: []int{a, a + 1},
-		Replace:  []font.Glyph{g1, g2},
-		Next:     a + 2,
-	}
 }
 
 // EncodeLen implements the Subtable interface.
@@ -455,6 +455,51 @@ type Gpos4_1 struct {
 	BaseArray [][]anchor.Table   // indexed by base coverage index, then by mark class
 }
 
+// Apply implements the Subtable interface.
+func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	// TODO(voss): does this apply to the base or the mark?
+	if !keep(seq[a].Gid) {
+		return nil
+	}
+	markIdx, ok := l.Marks[seq[a].Gid]
+	if !ok {
+		return nil
+	}
+	markRecord := l.MarkArray[markIdx]
+
+	if a == 0 {
+		return nil
+	}
+	p := a - 1
+	var baseIdx int
+	for p >= 0 {
+		baseIdx, ok = l.Base[seq[p].Gid]
+		if ok {
+			break
+		}
+		p--
+	}
+	if p < 0 {
+		return nil
+	}
+	baseRecord := l.BaseArray[baseIdx][markRecord.Class]
+
+	dx := baseRecord.X - markRecord.X
+	dy := baseRecord.Y - markRecord.Y
+	for i := p; i < a; i++ {
+		dx -= int16(seq[i].Advance)
+	}
+	g := seq[a]
+	g.XOffset = dx
+	g.YOffset = dy
+	_ = dy
+	return &Match{
+		InputPos: []int{a},
+		Replace:  []font.Glyph{g},
+		Next:     a + 1,
+	}
+}
+
 func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	buf, err := p.ReadBytes(10)
 	if err != nil {
@@ -481,6 +526,8 @@ func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 	if len(markCov) > len(markArray) {
 		markCov.Prune(len(markArray))
+	} else {
+		markArray = markArray[:len(markCov)]
 	}
 
 	baseArrayPos := subtablePos + baseArrayOffset
@@ -536,53 +583,18 @@ func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}, nil
 }
 
-// Apply implements the Subtable interface.
-func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
-	// TODO(voss): does this apply to the base or the mark?
-	if !keep(seq[a].Gid) {
-		return nil
+func (l *Gpos4_1) countMarkClasses() int {
+	if len(l.BaseArray) > 0 {
+		return len(l.BaseArray[0])
 	}
-	markIdx, ok := l.Marks[seq[a].Gid]
-	if !ok {
-		return nil
-	}
-	markRecord := l.MarkArray[markIdx]
 
-	if a == 0 {
-		return nil
-	}
-	p := a - 1
-	var baseIdx int
-	for p >= 0 {
-		baseIdx, ok = l.Base[seq[p].Gid]
-		if ok {
-			break
+	var maxClass uint16
+	for _, rec := range l.MarkArray {
+		if rec.Class > maxClass {
+			maxClass = rec.Class
 		}
-		p--
 	}
-	if p < 0 {
-		return nil
-	}
-	baseRecord := l.BaseArray[baseIdx][markRecord.Class]
-
-	dx := baseRecord.X - markRecord.X
-	dy := baseRecord.Y - markRecord.Y
-	for i := p; i < a; i++ {
-		dx -= int16(seq[i].Advance)
-	}
-	g := seq[a]
-	g.XOffset = dx
-	// g.YOffset = dy
-	_ = dy
-	return &Match{
-		InputPos: []int{a},
-		Replace:  []font.Glyph{g},
-		Next:     a + 1,
-	}
-}
-
-func countMarkClasses(table []markarray.Record) int {
-	panic("not implemented")
+	return int(maxClass) + 1
 }
 
 // EncodeLen implements the Subtable interface.
@@ -591,25 +603,28 @@ func (l *Gpos4_1) EncodeLen() int {
 	total += l.Marks.EncodeLen()
 	total += l.Base.EncodeLen()
 	total += 2 + (4+6)*len(l.MarkArray)
-	markClassCount := countMarkClasses(l.MarkArray)
+	markClassCount := l.countMarkClasses()
 	total += 2 + (2+6)*len(l.BaseArray)*markClassCount
 	return total
 }
 
 // Encode implements the Subtable interface.
 func (l *Gpos4_1) Encode() []byte {
+	markCount := len(l.MarkArray)
+	markClassCount := l.countMarkClasses()
+	baseCount := len(l.BaseArray)
+
 	total := 12
 	markCoverageOffset := total
 	total += l.Marks.EncodeLen()
 	baseCoverageOffset := total
 	total += l.Base.EncodeLen()
 	markArrayOffset := total
-	total += 2 + (4+6)*len(l.MarkArray)
+	total += 2 + (4+6)*markCount
 	baseArrayOffset := total
-	total += 2 + (2+6)*len(l.BaseArray)*len(l.MarkArray)
+	total += 2 + (2+6)*len(l.BaseArray)*markClassCount
 	res := make([]byte, 0, total)
 
-	markClassCount := countMarkClasses(l.MarkArray)
 	res = append(res,
 		0, 1, // posFormat
 		byte(markCoverageOffset>>8), byte(markCoverageOffset),
@@ -618,9 +633,58 @@ func (l *Gpos4_1) Encode() []byte {
 		byte(markArrayOffset>>8), byte(markArrayOffset),
 		byte(baseArrayOffset>>8), byte(baseArrayOffset),
 	)
+
 	res = append(res, l.Marks.Encode()...)
 	res = append(res, l.Base.Encode()...)
+
 	if len(res) != markArrayOffset { // TODO(voss): remove
+		panic("internal error")
+	}
+	res = append(res,
+		byte(markCount>>8), byte(markCount),
+	)
+	offs := 2 + 4*markCount
+	for _, rec := range l.MarkArray {
+		res = append(res,
+			byte(rec.Class>>8), byte(rec.Class),
+			byte(offs>>8), byte(offs),
+		)
+		offs += 6
+	}
+	for _, rec := range l.MarkArray {
+		res = append(res,
+			0, 1, // anchorFormat
+			byte(rec.X>>8), byte(rec.X),
+			byte(rec.Y>>8), byte(rec.Y),
+		)
+	}
+
+	if len(res) != baseArrayOffset { // TODO(voss): remove
+		panic("internal error")
+	}
+	res = append(res,
+		byte(baseCount>>8), byte(baseCount),
+	)
+	offs = 2 + 2*baseCount*markClassCount
+	for _, row := range l.BaseArray {
+		for range row {
+			res = append(res,
+				byte(offs>>8), byte(offs),
+			)
+			offs += 6
+		}
+	}
+	for _, row := range l.BaseArray {
+		for _, rec := range row {
+			res = append(res,
+				0, 1, // anchorFormat
+				byte(rec.X>>8), byte(rec.X),
+				byte(rec.Y>>8), byte(rec.Y),
+			)
+		}
+	}
+
+	if len(res) != total { // TODO(voss): remove
 		panic("internal error")
 	}
 

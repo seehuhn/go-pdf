@@ -146,6 +146,11 @@ func (*GposValueRecord) encodeLen(format uint16) int {
 func (vr *GposValueRecord) encode(format uint16) []byte {
 	bufSize := vr.encodeLen(format)
 	buf := make([]byte, 0, bufSize)
+
+	if vr == nil && format != 0 {
+		vr = &GposValueRecord{}
+	}
+
 	if format&0x0001 != 0 {
 		buf = append(buf, byte(vr.XPlacement>>8), byte(vr.XPlacement))
 	}

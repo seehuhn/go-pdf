@@ -20,6 +20,9 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/markarray"
 )
 
 func FuzzGpos1_1(f *testing.F) {
@@ -101,8 +104,68 @@ func FuzzGpos2_1(f *testing.F) {
 			},
 		},
 	}
+	f.Add(l.Encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 2, 1, readGpos2_1, data)
+	})
+}
+
+func FuzzGpos4_1(f *testing.F) {
+	l := &Gpos4_1{}
+	f.Add(l.Encode())
+	l = &Gpos4_1{
+		Marks: coverage.Table{
+			1: 0,
+			3: 1,
+			9: 2,
+		},
+		Base: coverage.Table{
+			2: 0,
+			4: 1,
+			6: 2,
+		},
+		MarkArray: []markarray.Record{
+			{
+				Class: 0,
+				Table: anchor.Table{
+					X: -32768,
+					Y: 0,
+				},
+			},
+			{
+				Class: 1,
+				Table: anchor.Table{
+					X: 32767,
+					Y: 0,
+				},
+			},
+			{
+				Class: 0,
+				Table: anchor.Table{
+					X: -1,
+					Y: 1,
+				},
+			},
+		},
+		BaseArray: [][]anchor.Table{
+			{
+				{X: -2, Y: -1},
+				{X: 0, Y: 1},
+			},
+			{
+				{X: 2, Y: 3},
+				{X: 4, Y: 5},
+			},
+			{
+				{X: 6, Y: 7},
+				{X: 8, Y: 255},
+			},
+		},
+	}
+	f.Add(l.Encode())
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 4, 1, readGpos4_1, data)
 	})
 }

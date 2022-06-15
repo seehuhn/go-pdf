@@ -338,7 +338,7 @@ var gposTestCases = []gposTestCase{
 		check: []gposCheck{
 			{0, checkX, 0},
 			{0, checkY, 0},
-			{1, checkX, 0},
+			{1, checkX, -1366},
 			{1, checkY, 1000},
 		},
 	},
