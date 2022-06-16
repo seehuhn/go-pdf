@@ -83,7 +83,8 @@ func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
 	for _, glyph := range glyphs {
 		if int(glyph.YOffset) != yOffs {
 			flush()
-			page.Printf("%d Ts\n", glyph.YOffset)
+			page.Printf("%.1f Ts\n", float64(glyph.YOffset)/100) // TODO(voss)
+			yOffs = int(glyph.YOffset)
 		}
 
 		xOffsWanted := xOffs + int(glyph.XOffset)
