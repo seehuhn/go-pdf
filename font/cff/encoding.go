@@ -207,6 +207,8 @@ func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
 	return buf, nil
 }
 
+// StandardEncoding returns the encoding vector for the standard encoding.
+// The result can be used for the `Outlines.Encoding` field.
 func StandardEncoding(glyphs []*Glyph) []font.GlyphID {
 	encoding := make([]font.GlyphID, 256)
 	for gid, g := range glyphs {

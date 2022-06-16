@@ -84,7 +84,7 @@ func TestSimple(t *testing.T) {
 				Gid:     gid,
 				XOffset: 0,
 				YOffset: 0,
-				Advance: int32(w),
+				Advance: w,
 			}},
 		}
 		dx := (20 - 16*float64(w)/float64(fontInfo.UnitsPerEm)) / 2

@@ -175,8 +175,8 @@ func (info *Info) makeHead(locaFormat int16) []byte {
 
 func (info *Info) makeHmtx() ([]byte, []byte) {
 	hmtxInfo := &hmtx.Info{
-		Widths:       info.fWidths(),
-		GlyphExtents: info.fExtents(),
+		Widths:       info.Widths(),
+		GlyphExtents: info.Extents(),
 		Ascent:       info.Ascent,
 		Descent:      info.Descent,
 		LineGap:      info.LineGap,

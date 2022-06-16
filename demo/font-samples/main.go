@@ -133,7 +133,7 @@ func main() {
 			}
 			seq = append(seq, font.Glyph{
 				Gid:     font.GlyphID(gid),
-				Advance: int32(w),
+				Advance: w,
 			})
 			total += float64(w)
 			if len(seq) >= 27 {

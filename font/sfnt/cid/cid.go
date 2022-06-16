@@ -18,13 +18,13 @@ package cid
 
 import (
 	"errors"
-	"math"
 	"os"
 	"sort"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/locale"
 )
 
+// EmbedFile embeds the named font file into the PDF document.
 func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
@@ -76,38 +77,48 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc *locale.Locale
 	}
 
 	s := &fontHandler{
-		FontRef:     w.Alloc(),
+		FontRef:  w.Alloc(),
+		instName: instName,
+
 		info:        info,
+		widths:      widths,
 		GsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		GposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
-		text:        map[font.GlyphID][]rune{},
-		used:        map[uint16]bool{},
+
+		text: map[font.GlyphID][]rune{},
+		used: map[uint16]bool{},
 	}
 
 	w.OnClose(s.WriteFont)
 
-	q := 1000 / float64(info.UnitsPerEm)
-
 	res := &font.Font{
-		InstName:     instName,
-		Ref:          s.FontRef,
-		Layout:       s.Layout,
-		Enc:          s.Enc,
-		Ascent:       int(math.Round(float64(info.Ascent) * q)),
-		Descent:      int(math.Round(float64(info.Descent) * q)),
-		GlyphExtents: info.Extents(),
-		Widths:       widths,
+		InstName:           instName,
+		Ref:                s.FontRef,
+		Layout:             s.Layout,
+		Enc:                s.Enc,
+		UnitsPerEm:         info.UnitsPerEm,
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		GlyphExtents:       info.Extents(),
+		Widths:             widths,
 	}
 	return res, nil
 }
 
 type fontHandler struct {
-	FontRef     *pdf.Reference
+	FontRef  *pdf.Reference
+	instName pdf.Name
+
 	info        *sfnt.Info
+	widths      []funit.Int16
 	GsubLookups []gtab.LookupIndex
 	GposLookups []gtab.LookupIndex
-	text        map[font.GlyphID][]rune
-	used        map[uint16]bool
+
+	text map[font.GlyphID][]rune
+	used map[uint16]bool
 }
 
 func (s *fontHandler) Layout(rr []rune) []font.Glyph {
@@ -127,7 +138,7 @@ func (s *fontHandler) Layout(rr []rune) []font.Glyph {
 	for i := range seq {
 		gid := seq[i].Gid
 		if info.Gdef.GlyphClass[gid] != gdef.GlyphClassMark {
-			seq[i].Advance = int32(info.FGlyphWidth(gid))
+			seq[i].Advance = s.widths[gid]
 		}
 	}
 	for _, lookupIndex := range s.GposLookups {
@@ -241,7 +252,9 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 
 	fontName := pdf.Name(subsetTag) + "+" + subsetInfo.PostscriptName()
 
-	DW, W := font.EncodeCIDWidths(s.info.Widths())
+	q := 1000 / float64(subsetInfo.UnitsPerEm)
+
+	DW, W := font.EncodeCIDWidths(s.info.Widths(), q)
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
@@ -252,8 +265,6 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	}
 	FontFileRef := w.Alloc()
 	ToUnicodeRef := w.Alloc()
-
-	q := 1000 / float64(subsetInfo.UnitsPerEm)
 
 	Font := pdf.Dict{ // See section 9.7.6.1 of PDF 32000-1:2008.
 		"Type":            pdf.Name("Font"),
@@ -273,18 +284,18 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		CIDFont["W"] = WidthsRef
 	}
 	if DW != 1000 {
-		CIDFont["DW"] = pdf.Integer(DW)
+		CIDFont["DW"] = DW
 	}
 
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
 		"Flags":       pdf.Integer(subsetInfo.Flags(true)), // TODO(voss)
-		"FontBBox":    subsetInfo.BBox(),
+		"FontBBox":    subsetInfo.BBox().AsPDF(q),
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(float64(subsetInfo.Ascent) * q)),
-		"Descent":     pdf.Integer(math.Round(float64(subsetInfo.Descent) * q)),
-		"CapHeight":   pdf.Integer(math.Round(float64(subsetInfo.CapHeight) * q)),
+		"Ascent":      subsetInfo.Ascent.AsInteger(q),
+		"Descent":     subsetInfo.Descent.AsInteger(q),
+		"CapHeight":   subsetInfo.CapHeight.AsInteger(q),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
 

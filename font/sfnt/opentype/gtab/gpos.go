@@ -487,7 +487,7 @@ func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	dx := baseRecord.X - markRecord.X
 	dy := baseRecord.Y - markRecord.Y
 	for i := p; i < a; i++ {
-		dx -= int16(seq[i].Advance)
+		dx -= seq[i].Advance
 	}
 	g := seq[a]
 	g.XOffset = dx

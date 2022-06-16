@@ -305,8 +305,8 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		TypoAscender:  info.Ascent,
 		TypoDescender: info.Descent,
 		TypoLineGap:   info.LineGap,
-		WinAscent:     funit.Uint16(info.Ascent),   // TODO(voss)
-		WinDescent:    funit.Uint16(-info.Descent), // TODO(voss)
+		WinAscent:     info.Ascent,   // TODO(voss)
+		WinDescent:    -info.Descent, // TODO(voss)
 	}
 	binary.Write(buf, binary.BigEndian, v0ms)
 
@@ -368,8 +368,8 @@ type v0MsData struct {
 	TypoAscender  funit.Int16
 	TypoDescender funit.Int16
 	TypoLineGap   funit.Int16
-	WinAscent     funit.Uint16
-	WinDescent    funit.Uint16
+	WinAscent     funit.Int16
+	WinDescent    funit.Int16 // positive
 }
 
 type v2Data struct {

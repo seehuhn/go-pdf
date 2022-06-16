@@ -27,13 +27,14 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 // Info contains information from the "post" table.
 type Info struct {
-	ItalicAngle        float64 // Italic angle in degrees
-	UnderlinePosition  int16   // Underline position (negative)
-	UnderlineThickness int16   // Underline thickness
+	ItalicAngle        float64     // Italic angle in degrees
+	UnderlinePosition  funit.Int16 // Underline position (negative)
+	UnderlineThickness funit.Int16 // Underline thickness
 	IsFixedPitch       bool
 
 	Names []string // can be nil
@@ -170,8 +171,8 @@ func (info *Info) Encode() []byte {
 type postEnc struct {
 	Version            uint32
 	ItalicAngle        int32
-	UnderlinePosition  int16
-	UnderlineThickness int16
+	UnderlinePosition  funit.Int16
+	UnderlineThickness funit.Int16
 	IsFixedPitch       uint32
 	MinMemType42       uint32
 	MaxMemType42       uint32

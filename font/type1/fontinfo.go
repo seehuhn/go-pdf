@@ -58,11 +58,11 @@ type FontInfo struct {
 	// UnderlinePosition is the recommended distance from the baseline for
 	// positioning underlining strokes. This number is the y coordinate (in the
 	// glyph coordinate system) of the center of the stroke.
-	UnderlinePosition int16
+	UnderlinePosition funit.Int16
 
 	// UnderlineThickness is the recommended stroke width for underlining, in
 	// units of the glyph coordinate system.
-	UnderlineThickness int16
+	UnderlineThickness funit.Int16
 
 	FontMatrix []float64
 }

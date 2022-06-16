@@ -30,7 +30,7 @@ func (g glyphBox) Extent() *boxes.BoxExtent {
 	ht := theFont.Ascent
 	if theFont.GlyphExtents != nil {
 		bbox := theFont.GlyphExtents[g]
-		ht = int(bbox.URy)
+		ht = bbox.URy
 	}
 	return &boxes.BoxExtent{
 		Width:  glyphBoxWidth,

@@ -240,7 +240,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 			return nil, errors.New("sfnt: ttf glyph count mismatch")
 		}
 
-		var widths []funit.Uint16
+		var widths []funit.Int16
 		if hmtxInfo != nil && len(hmtxInfo.Widths) > 0 {
 			widths = hmtxInfo.Widths
 		}
@@ -332,13 +332,13 @@ func Read(r io.ReaderAt) (*Info, error) {
 	if info.CapHeight == 0 && cmapSubtable != nil {
 		gid := cmapSubtable.Lookup('H')
 		if gid != 0 {
-			info.CapHeight = info.fGlyphHeight(gid)
+			info.CapHeight = info.glyphHeight(gid)
 		}
 	}
 	if info.XHeight == 0 && cmapSubtable != nil {
 		gid := cmapSubtable.Lookup('x')
 		if gid != 0 {
-			info.XHeight = info.fGlyphHeight(gid)
+			info.XHeight = info.glyphHeight(gid)
 		}
 	}
 

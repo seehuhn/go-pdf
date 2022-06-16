@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
 // AfmInfo represent the font metrics and built-in character encoding
@@ -33,18 +34,18 @@ type AfmInfo struct {
 	IsFixedPitch bool
 	IsDingbats   bool
 
-	Ascent    int
-	Descent   int
-	CapHeight int
-	XHeight   int
+	Ascent    funit.Int16
+	Descent   funit.Int16 // negative
+	CapHeight funit.Int16
+	XHeight   funit.Int16
 
 	Code        []int16 // code byte, or -1 if unmapped
-	GlyphExtent []font.Rect
-	Width       []uint16
+	GlyphExtent []funit.Rect
+	Width       []funit.Int16
 	GlyphName   []string
 
 	Ligatures map[font.GlyphPair]font.GlyphID
-	Kern      map[font.GlyphPair]int
+	Kern      map[font.GlyphPair]funit.Int16
 }
 
 // Afm returns the font metrics for one of the built-in pdf fonts.
@@ -80,7 +81,7 @@ func Afm(fontName string) (*AfmInfo, error) {
 
 	type kernInfo struct {
 		first, second string
-		val           int
+		val           funit.Int16
 	}
 	var nameKern []*kernInfo
 
@@ -98,9 +99,9 @@ func Afm(fontName string) (*AfmInfo, error) {
 		}
 		if charMetrics {
 			var name string
-			var width uint16
+			var width funit.Int16
 			var code int
-			var BBox font.Rect
+			var BBox funit.Rect
 			var ligTmp []*ligInfo
 
 			keyVals := strings.Split(line, ";")
@@ -114,13 +115,13 @@ func Afm(fontName string) (*AfmInfo, error) {
 					code, _ = strconv.Atoi(ff[1])
 				case "WX":
 					tmp, _ := strconv.Atoi(ff[1])
-					width = uint16(tmp)
+					width = funit.Int16(tmp)
 				case "N":
 					name = ff[1]
 				case "B":
-					conv := func(in string) int16 {
+					conv := func(in string) funit.Int16 {
 						x, _ := strconv.Atoi(in)
-						return int16(x)
+						return funit.Int16(x)
 					}
 					BBox.LLx = conv(ff[1])
 					BBox.LLy = conv(ff[2])
@@ -156,11 +157,12 @@ func Afm(fontName string) (*AfmInfo, error) {
 			continue
 		}
 		if kernPairs {
+			x, _ := strconv.Atoi(fields[3])
 			kern := &kernInfo{
 				first:  fields[1],
 				second: fields[2],
+				val:    funit.Int16(x),
 			}
-			kern.val, _ = strconv.Atoi(fields[3])
 			nameKern = append(nameKern, kern)
 			continue
 		}
@@ -175,16 +177,16 @@ func Afm(fontName string) (*AfmInfo, error) {
 			res.IsFixedPitch = fields[1] == "true"
 		case "CapHeight":
 			x, _ := strconv.Atoi(fields[1])
-			res.CapHeight = x
+			res.CapHeight = funit.Int16(x)
 		case "XHeight":
 			x, _ := strconv.Atoi(fields[1])
-			res.XHeight = x
+			res.XHeight = funit.Int16(x)
 		case "Ascender":
 			x, _ := strconv.Atoi(fields[1])
-			res.Ascent = x
+			res.Ascent = funit.Int16(x)
 		case "Descender":
 			x, _ := strconv.Atoi(fields[1])
-			res.Descent = x
+			res.Descent = funit.Int16(x)
 		case "StartCharMetrics":
 			charMetrics = true
 		case "StartKernPairs":
@@ -201,16 +203,16 @@ func Afm(fontName string) (*AfmInfo, error) {
 		b, bOk := nameToGid[lig.second]
 		c, cOk := nameToGid[lig.combined]
 		if aOk && bOk && cOk {
-			res.Ligatures[font.GlyphPair{a, b}] = c
+			res.Ligatures[font.GlyphPair{Left: a, Right: b}] = c
 		}
 	}
 
-	res.Kern = make(map[font.GlyphPair]int)
+	res.Kern = make(map[font.GlyphPair]funit.Int16)
 	for _, kern := range nameKern {
 		a, aOk := nameToGid[kern.first]
 		b, bOk := nameToGid[kern.second]
 		if aOk && bOk && kern.val != 0 {
-			res.Kern[font.GlyphPair{a, b}] = kern.val
+			res.Kern[font.GlyphPair{Left: a, Right: b}] = kern.val
 		}
 	}
 

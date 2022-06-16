@@ -140,9 +140,9 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 	cff.FontInfo.IsFixedPitch = isFixedPitch != 0
 	italicAngle := topDict.getFloat(opItalicAngle, 0)
 	cff.FontInfo.ItalicAngle = normaliseAngle(italicAngle)
-	cff.FontInfo.UnderlinePosition = int16(topDict.getInt(opUnderlinePosition,
+	cff.FontInfo.UnderlinePosition = funit.Int16(topDict.getInt(opUnderlinePosition,
 		defaultUnderlinePosition))
-	cff.FontInfo.UnderlineThickness = int16(topDict.getInt(opUnderlineThickness,
+	cff.FontInfo.UnderlineThickness = funit.Int16(topDict.getInt(opUnderlineThickness,
 		defaultUnderlineThickness))
 
 	// TODO(voss): different default for CIDFonts?
@@ -569,7 +569,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	return nil
 }
 
-func (cff *Font) selectWidths() (funit.Uint16, funit.Uint16) {
+func (cff *Font) selectWidths() (funit.Int16, funit.Int16) {
 	numGlyphs := int32(len(cff.Glyphs))
 	if numGlyphs == 0 {
 		return 0, 0
@@ -577,9 +577,9 @@ func (cff *Font) selectWidths() (funit.Uint16, funit.Uint16) {
 		return cff.Glyphs[0].Width, cff.Glyphs[0].Width
 	}
 
-	widthHist := make(map[funit.Uint16]int32)
+	widthHist := make(map[funit.Int16]int32)
 	var mostFrequentCount int32
-	var defaultWidth funit.Uint16
+	var defaultWidth funit.Int16
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		widthHist[w]++
@@ -591,8 +591,8 @@ func (cff *Font) selectWidths() (funit.Uint16, funit.Uint16) {
 
 	// TODO(voss): the choice of nominalWidth can be improved
 	var sum int32
-	var minWidth funit.Uint16 = math.MaxUint16
-	var maxWidth funit.Uint16 = 0
+	var minWidth funit.Int16 = math.MaxInt16
+	var maxWidth funit.Int16 = math.MinInt16
 	for _, glyph := range cff.Glyphs {
 		w := glyph.Width
 		if w == defaultWidth {
@@ -606,7 +606,7 @@ func (cff *Font) selectWidths() (funit.Uint16, funit.Uint16) {
 			maxWidth = w
 		}
 	}
-	nominalWidth := funit.Uint16((sum + numGlyphs/2) / (numGlyphs - 1))
+	nominalWidth := funit.Int16((sum + numGlyphs/2) / (numGlyphs - 1))
 	if nominalWidth < minWidth+107 {
 		nominalWidth = minWidth + 107
 	} else if nominalWidth > maxWidth-107 {
@@ -615,7 +615,7 @@ func (cff *Font) selectWidths() (funit.Uint16, funit.Uint16) {
 	return defaultWidth, nominalWidth
 }
 
-func (cff *Font) encodeCharStrings() (cffIndex, funit.Uint16, funit.Uint16, error) {
+func (cff *Font) encodeCharStrings() (cffIndex, funit.Int16, funit.Int16, error) {
 	numGlyphs := len(cff.Glyphs)
 	if numGlyphs < 1 || (cff.ROS == nil && cff.Glyphs[0].Name != ".notdef") {
 		return nil, 0, 0, invalidSince("missing .notdef glyph")

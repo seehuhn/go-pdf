@@ -26,8 +26,8 @@ type Outlines struct {
 	// Glyphs is a slice of glyph outlines in the font.
 	Glyphs Glyphs
 
-	// Widths contains the glyph widths
-	Widths []funit.Uint16
+	// Widths contains the glyph widths, indexed by glyph ID.
+	Widths []funit.Int16
 
 	// Names, if non-nil, contains the glyph names.
 	Names []string

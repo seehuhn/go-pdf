@@ -27,7 +27,7 @@ import (
 
 func TestRoundtrip(t *testing.T) {
 	i1 := &Info{
-		Widths: []funit.Uint16{100, 200, 300, 300},
+		Widths: []funit.Int16{100, 200, 300, 300},
 		GlyphExtents: []funit.Rect{
 			{LLx: 10, LLy: 0, URx: 90, URy: 100},
 			{LLx: 20, LLy: 0, URx: 200, URy: 100},
@@ -67,7 +67,7 @@ func TestRoundtrip(t *testing.T) {
 
 func TestLengths(t *testing.T) {
 	info := &Info{
-		Widths: []funit.Uint16{100, 200, 300, 300, 300},
+		Widths: []funit.Int16{100, 200, 300, 300, 300},
 		GlyphExtents: []funit.Rect{
 			{LLx: 0, LLy: 0, URx: 100, URy: 100},
 			{LLx: 10, LLy: 0, URx: 100, URy: 100},
@@ -203,7 +203,7 @@ func FuzzAngle(f *testing.F) {
 
 func FuzzHmtx(f *testing.F) {
 	i1 := &Info{
-		Widths: []funit.Uint16{100, 200, 300, 300},
+		Widths: []funit.Int16{100, 200, 300, 300},
 		GlyphExtents: []funit.Rect{
 			{LLx: 10, LLy: 0, URx: 90, URy: 100},
 			{LLx: 20, LLy: 0, URx: 200, URy: 100},

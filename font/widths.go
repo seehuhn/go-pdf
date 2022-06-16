@@ -18,16 +18,17 @@ package font
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/funit"
 )
 
-func mostFrequent(w []uint16) uint16 {
-	hist := make(map[uint16]int)
+func mostFrequent(w []funit.Int16) funit.Int16 {
+	hist := make(map[funit.Int16]int)
 	for _, wi := range w {
 		hist[wi]++
 	}
 
 	bestCount := 0
-	bestVal := uint16(0)
+	bestVal := funit.Int16(0)
 	for wi, count := range hist {
 		if count > bestCount || count == 1000 && count == bestCount {
 			bestCount = count
@@ -39,12 +40,12 @@ func mostFrequent(w []uint16) uint16 {
 
 type seq struct {
 	start  int
-	values []uint16
+	values []funit.Int16
 }
 
 // EncodeCIDWidths constructs the /W array for PDF CIDFonts.
 // See section 9.7.4.3 of PDF 32000-1:2008 for details.
-func EncodeCIDWidths(w []uint16) (uint16, pdf.Array) {
+func EncodeCIDWidths(w []funit.Int16, scale float64) (pdf.Integer, pdf.Array) {
 	n := len(w)
 
 	dw := mostFrequent(w)
@@ -88,7 +89,7 @@ func EncodeCIDWidths(w []uint16) (uint16, pdf.Array) {
 			if i > a {
 				var ww pdf.Array
 				for _, wi := range v[a:i] {
-					ww = append(ww, pdf.Integer(wi))
+					ww = append(ww, wi.AsInteger(scale))
 				}
 				res = append(res, pdf.Integer(seq.start+a), ww)
 			}
@@ -98,7 +99,7 @@ func EncodeCIDWidths(w []uint16) (uint16, pdf.Array) {
 				i++
 			}
 			res = append(res,
-				pdf.Integer(seq.start+a), pdf.Integer(seq.start+i-1), pdf.Integer(v[a]))
+				pdf.Integer(seq.start+a), pdf.Integer(seq.start+i-1), v[a].AsInteger(scale))
 			a = i
 		}
 		if i < n {
@@ -107,11 +108,11 @@ func EncodeCIDWidths(w []uint16) (uint16, pdf.Array) {
 		if i > a {
 			var ww pdf.Array
 			for _, wi := range v[a:i] {
-				ww = append(ww, pdf.Integer(wi))
+				ww = append(ww, wi.AsInteger(scale))
 			}
 			res = append(res, pdf.Integer(seq.start+a), ww)
 		}
 	}
 
-	return dw, res
+	return dw.AsInteger(scale), res
 }

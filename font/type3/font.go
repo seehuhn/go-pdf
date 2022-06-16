@@ -21,9 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/names"
 )
 
@@ -31,36 +33,38 @@ import (
 // PDF file.  Use .AddGlyph() to add the glyphs, and then call .Close()
 // to embed the font in the PDF file and to get a font.Font object.
 type Builder struct {
-	w          *pdf.Writer
-	width      float64
-	height     float64
-	glyphWidth []uint16
-	cmap       map[rune]font.GlyphID
-	idxToName  map[font.GlyphID]pdf.Name
-	nameToRef  map[pdf.Name]*pdf.Reference
-	used       map[font.GlyphID]bool
+	w *pdf.Writer
+
+	unitsPerEm uint16
+	glyphWidth []funit.Int16
+
+	cmap      map[rune]font.GlyphID
+	idxToName map[font.GlyphID]pdf.Name
+	nameToRef map[pdf.Name]*pdf.Reference
+	used      map[font.GlyphID]bool
 }
 
 // New creates a new Builder for embedding a type 3 font into the PDF file w.
 // The canvas for drawing glyphs is the rectangle between (0,0) and
 // (width,height).  Often width == height == 1000 is used.
-func New(w *pdf.Writer, width, height float64) (*Builder, error) {
+func New(w *pdf.Writer, unitsPerEm uint16) (*Builder, error) {
 	t3 := &Builder{
-		w:          w,
-		width:      width,
-		height:     height,
-		glyphWidth: make([]uint16, 256), // TODO(voss): use the correct length
-		cmap:       make(map[rune]font.GlyphID),
-		idxToName:  make(map[font.GlyphID]pdf.Name),
-		nameToRef:  make(map[pdf.Name]*pdf.Reference),
-		used:       make(map[font.GlyphID]bool),
+		w: w,
+
+		unitsPerEm: unitsPerEm,
+		glyphWidth: make([]funit.Int16, 256),
+
+		cmap:      make(map[rune]font.GlyphID),
+		idxToName: make(map[font.GlyphID]pdf.Name),
+		nameToRef: make(map[pdf.Name]*pdf.Reference),
+		used:      make(map[font.GlyphID]bool),
 	}
 	return t3, nil
 }
 
 // AddGlyph adds a new glyph to the type 3 font.  R is the rune associated with
 // the glyph, and width is the horizontal increment in character position.
-func (t3 *Builder) AddGlyph(r rune, width uint16) (*Glyph, error) {
+func (t3 *Builder) AddGlyph(r rune, width funit.Int16) (*Glyph, error) {
 	if len(t3.cmap) >= 256 {
 		return nil, errors.New("too many glyphs")
 	}
@@ -114,9 +118,12 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 		}
 	}
 
+	q := 1000 / float64(t3.unitsPerEm)
+
 	var Widths pdf.Array
 	for idx := min; idx <= max; idx++ {
-		Widths = append(Widths, pdf.Integer(t3.glyphWidth[idx]))
+		fw := t3.glyphWidth[idx]
+		Widths = append(Widths, pdf.Integer(math.Round(float64(fw)*q)))
 	}
 
 	var Differences pdf.Array
@@ -139,8 +146,8 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type3"),
 		"FontBBox": &pdf.Rectangle{}, // [0,0,0,0] is always valid
-		"FontMatrix": pdf.Array{pdf.Real(1 / float64(t3.width)), pdf.Integer(0),
-			pdf.Integer(0), pdf.Real(1 / float64(t3.height)),
+		"FontMatrix": pdf.Array{pdf.Real(1 / float64(t3.unitsPerEm)), pdf.Integer(0),
+			pdf.Integer(0), pdf.Real(1 / float64(t3.unitsPerEm)),
 			pdf.Integer(0), pdf.Integer(0)},
 		"CharProcs": CharProcs,
 		"Encoding":  Encoding,
@@ -151,11 +158,13 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 	if t3.w.Version == pdf.V1_0 {
 		Font["Name"] = pdf.Name(instName)
 	}
-	FontRef, err := t3.w.Write(Font, nil)
+
 	// TODO(voss): If the following condition is violated, we need to include a
 	// /ToUnicode entry: "the font includes only character names taken from the
 	// Adobe standard Latin character set and the set of named characters in
 	// the Symbol font".
+
+	FontRef, err := t3.w.Write(Font, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -169,9 +178,8 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 				gid := t3.cmap[r]
 				gg[i].Gid = gid
 				gg[i].Text = []rune{r}
-				gg[i].Advance = int32(t3.glyphWidth[gid])
+				gg[i].Advance = t3.glyphWidth[gid]
 			}
-
 			return gg
 		},
 		Enc: func(gid font.GlyphID) pdf.String {
@@ -180,6 +188,8 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 			}
 			return []byte{byte(gid)}
 		},
+		UnitsPerEm: t3.unitsPerEm,
+		// TODO(voss): GlyphExtents etc
 		Widths: t3.glyphWidth,
 	}
 

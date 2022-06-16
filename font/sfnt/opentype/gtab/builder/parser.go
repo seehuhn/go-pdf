@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
@@ -491,8 +492,8 @@ func (p *parser) readGpos4() *gtab.LookupTable {
 			markArray = append(markArray, markarray.Record{
 				Class: class,
 				Table: anchor.Table{
-					X: x,
-					Y: y,
+					X: funit.Int16(x),
+					Y: funit.Int16(y),
 				},
 			})
 			p.optional(itemSemicolon)
@@ -531,8 +532,8 @@ func (p *parser) readGpos4() *gtab.LookupTable {
 				p.required(itemComma, ",")
 				y := p.readInt16()
 				anchors[i] = anchor.Table{
-					X: x,
-					Y: y,
+					X: funit.Int16(x),
+					Y: funit.Int16(y),
 				}
 			}
 			p.optional(itemSemicolon)
@@ -1167,11 +1168,11 @@ valueRecordLoop:
 		next := p.readItem()
 		switch {
 		case isIdentifier(next, "x"):
-			res.XPlacement = p.readInt16()
+			res.XPlacement = funit.Int16(p.readInt16())
 		case isIdentifier(next, "y"):
-			res.YPlacement = p.readInt16()
+			res.YPlacement = funit.Int16(p.readInt16())
 		case isIdentifier(next, "dx"):
-			res.XAdvance = p.readInt16()
+			res.XAdvance = funit.Int16(p.readInt16())
 		// case isIdentifier(next, "dy"):
 		// 	res.YAdvance = p.readInt16()
 		default:

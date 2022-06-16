@@ -22,20 +22,21 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
 // GposValueRecord describes an adjustment to the position of a glyph or set of glyphs.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#value-record
 type GposValueRecord struct {
-	XPlacement        int16  // Horizontal adjustment for placement
-	YPlacement        int16  // Vertical adjustment for placement
-	XAdvance          int16  // Horizontal adjustment for advance
-	YAdvance          int16  // Vertical adjustment for advance
-	XPlacementDevOffs uint16 // Offset to Device table/VariationIndex table for horizontal placement
-	YPlacementDevOffs uint16 // Offset to Device table/VariationIndex table for vertical placement
-	XAdvanceDevOffs   uint16 // Offset to Device table/VariationIndex table for horizontal advance
-	YAdvanceDevOffs   uint16 // Offset to Device table/VariationIndex table for vertical advance
+	XPlacement        funit.Int16 // Horizontal adjustment for placement
+	YPlacement        funit.Int16 // Vertical adjustment for placement
+	XAdvance          funit.Int16 // Horizontal adjustment for advance
+	YAdvance          funit.Int16 // Vertical adjustment for advance
+	XPlacementDevOffs uint16      // Offset to Device table/VariationIndex table for horizontal placement
+	YPlacementDevOffs uint16      // Offset to Device table/VariationIndex table for vertical placement
+	XAdvanceDevOffs   uint16      // Offset to Device table/VariationIndex table for horizontal advance
+	YAdvanceDevOffs   uint16      // Offset to Device table/VariationIndex table for vertical advance
 }
 
 // readValueRecord reads the binary representation of a valueRecord.  The
@@ -49,28 +50,32 @@ func readValueRecord(p *parser.Parser, valueFormat uint16) (*GposValueRecord, er
 	res := &GposValueRecord{}
 	var err error
 	if valueFormat&0x0001 != 0 {
-		res.XPlacement, err = p.ReadInt16()
+		tmp, err := p.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
+		res.XPlacement = funit.Int16(tmp)
 	}
 	if valueFormat&0x0002 != 0 {
-		res.YPlacement, err = p.ReadInt16()
+		tmp, err := p.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
+		res.YPlacement = funit.Int16(tmp)
 	}
 	if valueFormat&0x0004 != 0 {
-		res.XAdvance, err = p.ReadInt16()
+		tmp, err := p.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
+		res.XAdvance = funit.Int16(tmp)
 	}
 	if valueFormat&0x0008 != 0 {
-		res.YAdvance, err = p.ReadInt16()
+		tmp, err := p.ReadInt16()
 		if err != nil {
 			return nil, err
 		}
+		res.YAdvance = funit.Int16(tmp)
 	}
 	if valueFormat&0x0010 != 0 {
 		res.XPlacementDevOffs, err = p.ReadUint16()
@@ -233,5 +238,5 @@ func (vr *GposValueRecord) Apply(glyph *font.Glyph) {
 
 	glyph.XOffset += vr.XPlacement
 	glyph.YOffset += vr.YPlacement
-	glyph.Advance += int32(vr.XAdvance)
+	glyph.Advance += vr.XAdvance
 }

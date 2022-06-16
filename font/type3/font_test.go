@@ -29,7 +29,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Builder, err := New(w, 1000, 1000)
+	F1Builder, err := New(w, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}

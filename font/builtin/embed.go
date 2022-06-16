@@ -50,13 +50,14 @@ func EmbedAfm(w *pdf.Writer, afm *AfmInfo, instName pdf.Name) (*font.Font, error
 		InstName: instName,
 		Ref:      fnt.FontRef,
 
+		Layout: fnt.Layout,
+		Enc:    fnt.Enc,
+
+		UnitsPerEm:   1000,
 		Ascent:       afm.Ascent,
 		Descent:      afm.Descent,
 		GlyphExtents: afm.GlyphExtent,
 		Widths:       afm.Width,
-
-		Layout: fnt.Layout,
-		Enc:    fnt.Enc,
 	}
 	return res, nil
 }
@@ -133,7 +134,7 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 	var res []font.Glyph
 	last := gg[0]
 	for _, g := range gg[1:] {
-		lig, ok := fnt.afm.Ligatures[font.GlyphPair{last.Gid, g.Gid}]
+		lig, ok := fnt.afm.Ligatures[font.GlyphPair{Left: last.Gid, Right: g.Gid}]
 		if ok {
 			last.Gid = lig
 			last.Text = append(last.Text, g.Text...)
@@ -145,14 +146,14 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 	gg = append(res, last)
 
 	for i := range gg {
-		gg[i].Advance = int32(fnt.afm.Width[gg[i].Gid])
+		gg[i].Advance = fnt.afm.Width[gg[i].Gid]
 	}
 	if len(gg) < 2 {
 		return gg
 	}
 	for i := 0; i < len(gg)-1; i++ {
-		kern := fnt.afm.Kern[font.GlyphPair{gg[i].Gid, gg[i+1].Gid}]
-		gg[i].Advance += int32(kern)
+		kern := fnt.afm.Kern[font.GlyphPair{Left: gg[i].Gid, Right: gg[i+1].Gid}]
+		gg[i].Advance += kern
 	}
 
 	return gg

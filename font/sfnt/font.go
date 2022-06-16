@@ -17,7 +17,6 @@
 package sfnt
 
 import (
-	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -62,13 +61,13 @@ type Info struct {
 
 	Ascent    funit.Int16
 	Descent   funit.Int16 // negative
-	LineGap   funit.Int16
+	LineGap   funit.Int16 // LineGap = BaseLineSkip - Ascent + Descent
 	CapHeight funit.Int16
 	XHeight   funit.Int16
 
-	ItalicAngle        float64 // Italic angle (degrees counterclockwise from vertical)
-	UnderlinePosition  int16   // Underline position (negative)
-	UnderlineThickness int16   // Underline thickness
+	ItalicAngle        float64     // Italic angle (degrees counterclockwise from vertical)
+	UnderlinePosition  funit.Int16 // Underline position (negative)
+	UnderlineThickness funit.Int16 // Underline thickness
 
 	CMap     cmap.Subtable
 	Outlines interface{} // either *cff.Outlines or *glyf.Outlines
@@ -149,7 +148,7 @@ func (info *Info) PostscriptName() pdf.Name {
 }
 
 // BBox returns the bounding box of the font.
-func (info *Info) BBox() (bbox *pdf.Rectangle) {
+func (info *Info) BBox() (bbox funit.Rect) {
 	first := true
 	for i := 0; i < info.NumGlyphs(); i++ {
 		ext := info.GlyphExtent(font.GlyphID(i))
@@ -179,12 +178,29 @@ func (info *Info) NumGlyphs() int {
 	}
 }
 
-func (info *Info) fWidths() []funit.Uint16 {
+// GlyphWidth returns the advance width of the glyph with the given glyph ID,
+// in font design units.
+func (info *Info) GlyphWidth(gid font.GlyphID) funit.Int16 {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
-		widths := make([]funit.Uint16, info.NumGlyphs())
-		for i, g := range f.Glyphs {
-			widths[i] = g.Width
+		return f.Glyphs[gid].Width
+	case *glyf.Outlines:
+		if f.Widths == nil {
+			return 0
+		}
+		return f.Widths[gid]
+	default:
+		panic("unexpected font type")
+	}
+}
+
+// Widths returns the advance widths of the glyphs in the font.
+func (info *Info) Widths() []funit.Int16 {
+	switch f := info.Outlines.(type) {
+	case *cff.Outlines:
+		widths := make([]funit.Int16, info.NumGlyphs())
+		for gid, g := range f.Glyphs {
+			widths[gid] = g.Width
 		}
 		return widths
 	case *glyf.Outlines:
@@ -194,27 +210,8 @@ func (info *Info) fWidths() []funit.Uint16 {
 	}
 }
 
-// Widths return the advance widths of the glyphs of the font,
-// in PDF glyph space units.
-func (info *Info) Widths() []uint16 {
-	widths := make([]uint16, info.NumGlyphs())
-	q := 1000 / float64(info.UnitsPerEm)
-	switch f := info.Outlines.(type) {
-	case *cff.Outlines:
-		for i, g := range f.Glyphs {
-			widths[i] = uint16(math.Round(float64(g.Width) * q))
-		}
-	case *glyf.Outlines:
-		for i, w := range f.Widths {
-			widths[i] = uint16(math.Round(float64(w) * q))
-		}
-	default:
-		panic("unexpected font type")
-	}
-	return widths
-}
-
-func (info *Info) fExtents() []funit.Rect {
+// Extents returns the glyph bounding boxes for the font.
+func (info *Info) Extents() []funit.Rect {
 	extents := make([]funit.Rect, info.NumGlyphs())
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
@@ -235,66 +232,9 @@ func (info *Info) fExtents() []funit.Rect {
 	return extents
 }
 
-// Extents returns the glyph bounding boxes for the font,
-// in PDF glyph space units.
-func (info *Info) Extents() []font.Rect {
-	q := 1000 / float64(info.UnitsPerEm)
-	extents := make([]font.Rect, info.NumGlyphs())
-	switch f := info.Outlines.(type) {
-	case *cff.Outlines:
-		for i, g := range f.Glyphs {
-			ext := g.Extent()
-			extents[i] = font.Rect{
-				LLx: int16(math.Round(float64(ext.LLx) * q)),
-				LLy: int16(math.Round(float64(ext.LLy) * q)),
-				URx: int16(math.Round(float64(ext.URx) * q)),
-				URy: int16(math.Round(float64(ext.URy) * q)),
-			}
-		}
-	case *glyf.Outlines:
-		for i, g := range f.Glyphs {
-			if g == nil {
-				continue
-			}
-			extents[i] = font.Rect{
-				LLx: int16(math.Round(float64(g.Rect.LLx) * q)),
-				LLy: int16(math.Round(float64(g.Rect.LLy) * q)),
-				URx: int16(math.Round(float64(g.Rect.URx) * q)),
-				URy: int16(math.Round(float64(g.Rect.URy) * q)),
-			}
-		}
-	default:
-		panic("unexpected font type")
-	}
-	return extents
-}
-
-// FGlyphWidth returns the advance width of the glyph with the given glyph ID,
-// in font design units.
-func (info *Info) FGlyphWidth(gid font.GlyphID) funit.Uint16 {
-	switch f := info.Outlines.(type) {
-	case *cff.Outlines:
-		return f.Glyphs[gid].Width
-	case *glyf.Outlines:
-		if f.Widths == nil {
-			return 0
-		}
-		return f.Widths[gid]
-	default:
-		panic("unexpected font type")
-	}
-}
-
-// GlyphWidth returns the advance width of the glyph with the given glyph ID,
-// in PDF glyph space units.
-func (info *Info) GlyphWidth(gid font.GlyphID) uint16 {
-	q := 1000 / float64(info.UnitsPerEm)
-	return uint16(math.Round(float64(info.FGlyphWidth(gid)) * q))
-}
-
-// FGlyphExtent returns the glyph bounding box for one glyph in font design
+// GlyphExtent returns the glyph bounding box for one glyph in font design
 // units.
-func (info *Info) FGlyphExtent(gid font.GlyphID) funit.Rect {
+func (info *Info) GlyphExtent(gid font.GlyphID) funit.Rect {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Extent()
@@ -309,19 +249,7 @@ func (info *Info) FGlyphExtent(gid font.GlyphID) funit.Rect {
 	}
 }
 
-// GlyphExtent returns the glyph bounding box for one glyph in glyph units.
-func (info *Info) GlyphExtent(gid font.GlyphID) *pdf.Rectangle {
-	ext := info.FGlyphExtent(gid)
-	q := 1000 / float64(info.UnitsPerEm)
-	return &pdf.Rectangle{
-		LLx: float64(ext.LLx) * q,
-		LLy: float64(ext.LLy) * q,
-		URx: float64(ext.URx) * q,
-		URy: float64(ext.URy) * q,
-	}
-}
-
-func (info *Info) fGlyphHeight(gid font.GlyphID) funit.Int16 {
+func (info *Info) glyphHeight(gid font.GlyphID) funit.Int16 {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Extent().URy
@@ -359,7 +287,7 @@ func (info *Info) IsFixedPitch() bool {
 		return false
 	}
 
-	var width uint16
+	var width funit.Int16
 	for _, w := range ww {
 		if w == 0 {
 			continue

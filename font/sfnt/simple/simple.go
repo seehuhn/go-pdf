@@ -19,12 +19,13 @@ package simple
 import (
 	"errors"
 	"fmt"
-	"math"
+	"os"
 	"sort"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
@@ -33,6 +34,21 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/locale"
 )
+
+// EmbedFile embeds the named font file into the PDF document.
+func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	fontInfo, err := sfnt.Read(fd)
+	if err != nil {
+		return nil, err
+	}
+	return Embed(w, fontInfo, instName, loc)
+}
 
 // Embed embeds a TrueType or OpenType font into a PDF document as a simple font.
 // Up to 256 arbitrary glyphs from the font file can be accessed via the
@@ -64,36 +80,46 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc *locale.Locale
 	}
 
 	s := &fontHandler{
-		FontRef:     w.Alloc(),
+		FontRef:  w.Alloc(),
+		instName: instName,
+
 		info:        info,
+		widths:      widths,
 		GsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		GposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
-		text:        map[font.GlyphID][]rune{},
-		enc:         map[font.GlyphID]byte{},
+
+		text: map[font.GlyphID][]rune{},
+		enc:  map[font.GlyphID]byte{},
 	}
 
 	w.OnClose(s.WriteFont)
 
-	q := 1000 / float64(info.UnitsPerEm)
-
 	res := &font.Font{
-		InstName:     instName,
-		Ref:          s.FontRef,
-		Layout:       s.Layout,
-		Enc:          s.Enc,
-		Ascent:       int(math.Round(float64(info.Ascent) * q)),
-		Descent:      int(math.Round(float64(info.Descent) * q)),
-		GlyphExtents: info.Extents(),
-		Widths:       widths,
+		InstName:           instName,
+		Ref:                s.FontRef,
+		Layout:             s.Layout,
+		Enc:                s.Enc,
+		UnitsPerEm:         info.UnitsPerEm,
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		GlyphExtents:       info.Extents(),
+		Widths:             widths,
 	}
 	return res, nil
 }
 
 type fontHandler struct {
-	FontRef      *pdf.Reference
-	info         *sfnt.Info
-	GsubLookups  []gtab.LookupIndex
-	GposLookups  []gtab.LookupIndex
+	FontRef  *pdf.Reference
+	instName pdf.Name
+
+	info        *sfnt.Info
+	widths      []funit.Int16
+	GsubLookups []gtab.LookupIndex
+	GposLookups []gtab.LookupIndex
+
 	text         map[font.GlyphID][]rune
 	enc          map[font.GlyphID]byte
 	nextCharCode int
@@ -116,7 +142,7 @@ func (s *fontHandler) Layout(rr []rune) []font.Glyph {
 	for i := range seq {
 		gid := seq[i].Gid
 		if info.Gdef.GlyphClass[gid] != gdef.GlyphClassMark {
-			seq[i].Advance = int32(info.FGlyphWidth(gid))
+			seq[i].Advance = s.widths[gid]
 		}
 	}
 	for _, lookupIndex := range s.GposLookups {
@@ -148,7 +174,7 @@ func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	if s.nextCharCode > 256 {
 		return fmt.Errorf("too many different glyphs for simple font %q",
-			s.info.FullName())
+			s.instName)
 	}
 
 	// Determine the subset of glyphs to include.
@@ -262,24 +288,24 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 
 	fontName := pdf.Name(subsetTag) + "+" + subsetInfo.PostscriptName()
 
+	q := 1000 / float64(subsetInfo.UnitsPerEm)
+
 	var Widths pdf.Array
 	pos := 0
 	for i := firstCharCode; i <= lastCharCode; i++ {
-		width := 0
+		var width pdf.Integer
 		if i == mapping[pos].CharCode {
 			gid := mapping[pos].GID
-			width = int(s.info.GlyphWidth(gid))
+			width = s.widths[gid].AsInteger(q)
 			pos++
 		}
-		Widths = append(Widths, pdf.Integer(width))
+		Widths = append(Widths, width)
 	}
 
 	FontDescriptorRef := w.Alloc()
 	WidthsRef := w.Alloc()
 	FontFileRef := w.Alloc()
 	ToUnicodeRef := w.Alloc()
-
-	q := 1000 / float64(subsetInfo.UnitsPerEm)
 
 	Font := pdf.Dict{ // See section 9.6.2.1 of PDF 32000-1:2008.
 		"Type":           pdf.Name("Font"),
@@ -295,11 +321,11 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
 		"Flags":       pdf.Integer(subsetInfo.Flags(true)), // TODO(voss)
-		"FontBBox":    subsetInfo.BBox(),
+		"FontBBox":    subsetInfo.BBox().AsPDF(q),
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(float64(subsetInfo.Ascent) * q)),
-		"Descent":     pdf.Integer(math.Round(float64(subsetInfo.Descent) * q)),
-		"CapHeight":   pdf.Integer(math.Round(float64(subsetInfo.CapHeight) * q)),
+		"Ascent":      subsetInfo.Ascent.AsInteger(q),
+		"Descent":     subsetInfo.Descent.AsInteger(q),
+		"CapHeight":   subsetInfo.CapHeight.AsInteger(q),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
 

@@ -58,7 +58,7 @@ func MakeSimpleFont() *sfnt.Info {
 		encoding[c] = font.GlyphID(len(includeGid))
 		includeGid = append(includeGid, gid)
 
-		ext := info.FGlyphExtent(gid)
+		ext := info.GlyphExtent(gid)
 		top := ext.URy
 		if c == 'A' || top < topMin {
 			topMin = top
@@ -96,7 +96,7 @@ func MakeSimpleFont() *sfnt.Info {
 
 	for _, gid := range includeGid {
 		origGlyph := origOutlines.Glyphs[gid]
-		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.FGlyphWidth(gid))
+		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.GlyphWidth(gid))
 
 		var g glyf.SimpleGlyph
 		var ok bool
@@ -172,12 +172,12 @@ func MakeSimpleFont() *sfnt.Info {
 		newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 	}
 
-	ext := info.FGlyphExtent(info.CMap.Lookup('M'))
+	ext := info.GlyphExtent(info.CMap.Lookup('M'))
 	xMid := math.Round(float64(ext.URx+ext.LLx) / 2)
 	yMid := math.Round(float64(ext.URy+ext.LLy) / 2)
 	a := math.Round(math.Min(xMid, yMid) * 0.8)
 
-	cffGlyph := cff.NewGlyph("marker.left", funit.Uint16(ext.URx))
+	cffGlyph := cff.NewGlyph("marker.left", ext.URx)
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid-a, yMid-a)
 	cffGlyph.LineTo(xMid-a, yMid+a)
@@ -185,7 +185,7 @@ func MakeSimpleFont() *sfnt.Info {
 	cmap[uint16('>')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
-	cffGlyph = cff.NewGlyph("marker.right", funit.Uint16(ext.URx))
+	cffGlyph = cff.NewGlyph("marker.right", ext.URx)
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
@@ -193,7 +193,7 @@ func MakeSimpleFont() *sfnt.Info {
 	cmap[uint16('<')] = font.GlyphID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
-	cffGlyph = cff.NewGlyph("marker", funit.Uint16(ext.URx))
+	cffGlyph = cff.NewGlyph("marker", ext.URx)
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid-a, yMid-a)
 	cffGlyph.LineTo(xMid-a, yMid+a)
@@ -242,7 +242,7 @@ func MakeCompleteFont() *sfnt.Info {
 	for c := 'A'; c <= 'Z'; c++ {
 		gid := info.CMap.Lookup(c)
 
-		ext := info.FGlyphExtent(gid)
+		ext := info.GlyphExtent(gid)
 		top := ext.URy
 		if c == 'A' || top < topMin {
 			topMin = top
@@ -279,7 +279,7 @@ func MakeCompleteFont() *sfnt.Info {
 
 	for i, origGlyph := range origOutlines.Glyphs {
 		gid := font.GlyphID(i)
-		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.FGlyphWidth(gid))
+		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.GlyphWidth(gid))
 
 		var g glyf.SimpleGlyph
 		var ok bool
@@ -355,24 +355,24 @@ func MakeCompleteFont() *sfnt.Info {
 		newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 	}
 
-	ext := info.FGlyphExtent(info.CMap.Lookup('M'))
+	ext := info.GlyphExtent(info.CMap.Lookup('M'))
 	xMid := math.Round(float64(ext.URx+ext.LLx) / 2)
 	yMid := math.Round(float64(ext.URy+ext.LLy) / 2)
 	a := math.Round(math.Min(xMid, yMid) * 0.8)
 
-	cffGlyph := cff.NewGlyph("marker.left", funit.Uint16(ext.URx))
+	cffGlyph := cff.NewGlyph("marker.left", ext.URx)
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid-a, yMid-a)
 	cffGlyph.LineTo(xMid-a, yMid+a)
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
-	cffGlyph = cff.NewGlyph("marker.right", funit.Uint16(ext.URx))
+	cffGlyph = cff.NewGlyph("marker.right", ext.URx)
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
-	cffGlyph = cff.NewGlyph("marker", funit.Uint16(ext.URx))
+	cffGlyph = cff.NewGlyph("marker", ext.URx)
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid-a, yMid-a)
 	cffGlyph.LineTo(xMid-a, yMid+a)

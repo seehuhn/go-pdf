@@ -18,10 +18,11 @@ package font
 
 import (
 	"fmt"
-	"io"
+	"math"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -35,11 +36,15 @@ type Font struct {
 	Layout func([]rune) []Glyph
 	Enc    func(GlyphID) pdf.String
 
-	Ascent  int // PDF glyph space units
-	Descent int // PDF glyph space units, negative
+	UnitsPerEm         uint16
+	Ascent             funit.Int16
+	Descent            funit.Int16 // negative
+	BaseLineSkip       funit.Int16 // PDF glyph space units
+	UnderlinePosition  funit.Int16
+	UnderlineThickness funit.Int16
 
-	GlyphExtents []Rect   // PDF glyph space units
-	Widths       []uint16 // PDF glyph space units
+	GlyphExtents []funit.Rect
+	Widths       []funit.Int16
 }
 
 // NumGlyphs returns the number of glyphs in a font.
@@ -47,122 +52,18 @@ func (font *Font) NumGlyphs() int {
 	return len(font.Widths)
 }
 
-// Draw emits PDF text mode commands to show the glyphs on the page.
-// This must be used between BT and ET, with the correct font already
-// set up.
-func (font *Font) Draw(page *pages.Page, glyphs []Glyph) {
-	var run pdf.String
-	var data pdf.Array
-	flushRun := func() {
-		if len(run) > 0 {
-			data = append(data, run)
-			run = nil
-		}
-	}
-	flush := func() {
-		flushRun()
-		if len(data) == 0 {
-			return
-		}
-		if len(data) == 1 {
-			if s, ok := data[0].(pdf.String); ok {
-				_ = s.PDF(page)
-				page.Println(" Tj")
-				data = nil
-				return
-			}
-		}
-		_ = data.PDF(page)
-		page.Println(" TJ")
-		data = nil
-	}
-
-	xOffsAuto := 0
-	xOffs := 0
-	yOffs := 0
-	for _, glyph := range glyphs {
-		if int(glyph.YOffset) != yOffs {
-			flush()
-			page.Printf("%.1f Ts\n", float64(glyph.YOffset)/100) // TODO(voss)
-			yOffs = int(glyph.YOffset)
-		}
-
-		xOffsWanted := xOffs + int(glyph.XOffset)
-
-		gid := glyph.Gid
-		if int(gid) >= len(font.Widths) {
-			gid = 0
-		}
-
-		delta := xOffsWanted - xOffsAuto
-		if delta != 0 {
-			flushRun()
-			data = append(data, -pdf.Integer(delta))
-		}
-		run = append(run, font.Enc(gid)...)
-
-		xOffs += int(glyph.Advance)
-		xOffsAuto = xOffsWanted + int(font.Widths[gid])
-	}
-	flush()
-}
-
 // GlyphID is used to enumerate the glyphs in a font.  The first glyph
 // has index 0 and is used to indicate a missing character (usually rendered
 // as an empty box).
 type GlyphID uint16
 
-// Rect represents a rectangle with integer coordinates.
-type Rect struct {
-	LLx, LLy, URx, URy int16
-}
-
-// IsZero is true if the glyph leaves no marks on the page.
-func (rect Rect) IsZero() bool {
-	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
-}
-
-// Extend enlarges the rectangle to also cover `other`.
-func (rect *Rect) Extend(other Rect) {
-	if other.IsZero() {
-		return
-	}
-	if rect.IsZero() {
-		*rect = other
-		return
-	}
-	if other.LLx < rect.LLx {
-		rect.LLx = other.LLx
-	}
-	if other.LLy < rect.LLy {
-		rect.LLy = other.LLy
-	}
-	if other.URx > rect.URx {
-		rect.URx = other.URx
-	}
-	if other.URy > rect.URy {
-		rect.URy = other.URy
-	}
-}
-
-// PDF implements the pdf.Object interface.
-func (rect Rect) PDF(w io.Writer) error {
-	res := pdf.Array{
-		pdf.Integer(rect.LLx),
-		pdf.Integer(rect.LLy),
-		pdf.Integer(rect.URx),
-		pdf.Integer(rect.URy),
-	}
-	return res.PDF(w)
-}
-
 // Glyph contains layout information for a single glyph in a run
 type Glyph struct {
 	Gid     GlyphID
 	Text    []rune
-	XOffset int16 // Is this in Glyph design units?
-	YOffset int16 // Is this in Glyph design units?
-	Advance int32 // Is this in Glyph design units?  TODO(voss): change to int16 or funit.int16?
+	XOffset funit.Int16
+	YOffset funit.Int16
+	Advance funit.Int16
 }
 
 // GlyphPair represents two consecutive glyphs, specified by a pair of
@@ -219,12 +120,69 @@ type Layout struct {
 //
 // TODO(voss): This should maybe not use pages.Page for the first argument.
 func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
+	font := layout.Font
+
 	page.Println("BT")
-	_ = layout.Font.InstName.PDF(page)
+	_ = font.InstName.PDF(page)
 	fmt.Fprintf(page, " %f Tf\n", layout.FontSize)
 	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
 
-	layout.Font.Draw(page, layout.Glyphs)
+	var run pdf.String
+	var data pdf.Array
+	flushRun := func() {
+		if len(run) > 0 {
+			data = append(data, run)
+			run = nil
+		}
+	}
+	flush := func() {
+		flushRun()
+		if len(data) == 0 {
+			return
+		}
+		if len(data) == 1 {
+			if s, ok := data[0].(pdf.String); ok {
+				_ = s.PDF(page)
+				page.Println(" Tj")
+				data = nil
+				return
+			}
+		}
+		_ = data.PDF(page)
+		page.Println(" TJ")
+		data = nil
+	}
+
+	xOffsFont := 0
+	yOffs := 0
+	xOffsPDF := 0
+	for _, glyph := range layout.Glyphs {
+		gid := glyph.Gid
+		if int(gid) >= len(font.Widths) {
+			gid = 0
+		}
+
+		if int(glyph.YOffset) != yOffs {
+			flush()
+			page.Printf("%.1f Ts\n", glyph.YOffset.AsFloat(1/float64(font.UnitsPerEm)))
+			yOffs = int(glyph.YOffset)
+		}
+
+		xOffsWanted := xOffsFont + int(glyph.XOffset)
+
+		delta := xOffsWanted - xOffsPDF
+		if delta != 0 {
+			flushRun()
+			deltaScaled := float64(delta) / float64(font.UnitsPerEm) * 1000
+			data = append(data, -pdf.Integer(math.Round(deltaScaled)))
+			xOffsPDF += delta
+		}
+		run = append(run, font.Enc(gid)...)
+
+		xOffsFont += int(glyph.Advance)
+		xOffsPDF = xOffsWanted + int(font.Widths[gid])
+	}
+	flush()
 
 	page.Println("ET")
 }

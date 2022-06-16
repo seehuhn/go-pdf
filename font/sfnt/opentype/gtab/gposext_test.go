@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
+	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
@@ -57,7 +58,7 @@ func TestGpos(t *testing.T) {
 					} else if r == '<' {
 						bx = pos
 					}
-					pos += int(fontInfo.FGlyphWidth(gid))
+					pos += int(fontInfo.GlyphWidth(gid))
 				}
 				delta := fmt.Sprintf("x%+d", ax-bx)
 				desc = strings.Replace(desc, "Δ", delta, 1)
@@ -93,7 +94,7 @@ func TestGpos(t *testing.T) {
 				seq[i].Gid = gid
 				seq[i].Text = []rune{r}
 				if gdefTable.GlyphClass[gid] != gdef.GlyphClassMark {
-					seq[i].Advance = int32(fontInfo.FGlyphWidth(gid))
+					seq[i].Advance = fontInfo.GlyphWidth(gid)
 				}
 			}
 			lookups := gpos.FindLookups(locale.EnUS, nil)
@@ -114,13 +115,13 @@ func TestGpos(t *testing.T) {
 							fontName, check.val, seq[check.idx].YOffset)
 					}
 				case checkDX:
-					if seq[check.idx].Advance != int32(check.val) {
+					if seq[check.idx].Advance != check.val {
 						t.Errorf("%s: expected XAdvance == %d, got %d",
 							fontName, check.val, seq[check.idx].Advance)
 					}
 				case checkDXRel:
-					w := fontInfo.FGlyphWidth(seq[check.idx].Gid)
-					expected := int32(check.val) + int32(w)
+					w := fontInfo.GlyphWidth(seq[check.idx].Gid)
+					expected := check.val + w
 					if seq[check.idx].Advance != expected {
 						t.Errorf("%s: expected XAdvance == %d, got %d",
 							fontName, expected, seq[check.idx].Advance)
@@ -161,7 +162,7 @@ func FuzzGpos(f *testing.F) {
 				} else if r == '<' {
 					bx = pos
 				}
-				pos += int(fontInfo.FGlyphWidth(gid))
+				pos += int(fontInfo.GlyphWidth(gid))
 			}
 			delta := fmt.Sprintf("x%+d", ax-bx)
 			desc = strings.Replace(desc, "Δ", delta, 1)
@@ -187,7 +188,7 @@ func FuzzGpos(f *testing.F) {
 			seq[i].Gid = gid
 			seq[i].Text = []rune{r}
 			if gdefTable.GlyphClass[gid] != gdef.GlyphClassMark {
-				seq[i].Advance = int32(fontInfo.FGlyphWidth(gid))
+				seq[i].Advance = fontInfo.GlyphWidth(gid)
 			}
 		}
 		lookups := gpos.FindLookups(locale.EnUS, nil)
@@ -202,7 +203,7 @@ func FuzzGpos(f *testing.F) {
 type gposCheck struct {
 	idx   int
 	which gposCheckType
-	val   int16
+	val   funit.Int16
 }
 
 type gposCheckType uint16
