@@ -36,8 +36,6 @@ import (
 )
 
 func main() {
-	// panic("The font 'YRMIPR+Loopiejuice-Regular' contains bad /Widths.") // TODO(voss): fix this
-
 	fontNamesFile := flag.String("f", "", "file containing font names")
 	flag.Parse()
 
@@ -103,6 +101,10 @@ func main() {
 			log.Fatal(err)
 		}
 
+		info.Gdef = nil
+		info.Gsub = nil
+		info.Gpos = nil
+
 		var title []string
 		title = append(title, info.FullName())
 		title = append(title, fmt.Sprintf("%d glyphs", info.NumGlyphs()))
@@ -128,15 +130,16 @@ func main() {
 				continue
 			}
 			w := info.GlyphWidth(font.GlyphID(gid))
-			if total+float64(w) > float64(info.UnitsPerEm)*24*72*5 {
+			wf := w.AsFloat(24 / float64(info.UnitsPerEm))
+			if total+wf > 72*6 {
 				break
 			}
 			seq = append(seq, font.Glyph{
 				Gid:     font.GlyphID(gid),
 				Advance: w,
 			})
-			total += float64(w)
-			if len(seq) >= 27 {
+			total += wf
+			if len(seq) >= 100 {
 				break
 			}
 		}

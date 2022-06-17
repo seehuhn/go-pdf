@@ -110,23 +110,23 @@ func Text(F *font.Font, ptSize float64, text string) *TextBox {
 // Extent implements the Box interface
 func (obj *TextBox) Extent() *BoxExtent {
 	font := obj.Layout.Font
-	q := obj.Layout.FontSize / 1000
+	q := obj.Layout.FontSize / float64(font.UnitsPerEm)
 
 	width := 0.0
 	height := math.Inf(-1)
 	depth := math.Inf(-1)
 	for _, glyph := range obj.Layout.Glyphs {
-		width += float64(glyph.Advance) * q
+		width += glyph.Advance.AsFloat(q)
 
-		thisDepth := float64(font.Descent)
-		thisHeight := float64(font.Ascent)
+		thisDepth := font.Descent.AsFloat(q)
+		thisHeight := font.Ascent.AsFloat(q)
 		if font.GlyphExtents != nil {
 			bbox := &font.GlyphExtents[glyph.Gid]
 			if bbox.IsZero() {
 				continue
 			}
-			thisDepth = -float64(bbox.LLy+glyph.YOffset) * q
-			thisHeight = float64(bbox.URy+glyph.YOffset) * q
+			thisDepth = -(bbox.LLy + glyph.YOffset).AsFloat(q)
+			thisHeight = (bbox.URy + glyph.YOffset).AsFloat(q)
 		}
 		if thisDepth > depth {
 			depth = thisDepth
@@ -137,11 +137,11 @@ func (obj *TextBox) Extent() *BoxExtent {
 	}
 
 	// TODO(voss): is the following wise?
-	if height < float64(font.Ascent)*q {
-		height = float64(font.Ascent) * q
+	if x := font.Ascent.AsFloat(q); height < x {
+		height = x
 	}
-	if depth < float64(-font.Descent) {
-		depth = -float64(font.Descent) * q
+	if x := -font.Descent.AsFloat(q); depth < x {
+		depth = x
 	}
 
 	return &BoxExtent{
