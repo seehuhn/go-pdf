@@ -117,8 +117,6 @@ type Layout struct {
 }
 
 // Draw shows the text layout on a page.
-//
-// TODO(voss): This should maybe not use pages.Page for the first argument.
 func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 	font := layout.Font
 
@@ -164,7 +162,7 @@ func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 
 		if int(glyph.YOffset) != yOffs {
 			flush()
-			page.Printf("%.1f Ts\n", glyph.YOffset.AsFloat(1/float64(font.UnitsPerEm)))
+			page.Printf("%.1f Ts\n", glyph.YOffset.AsFloat(layout.FontSize/float64(font.UnitsPerEm)))
 			yOffs = int(glyph.YOffset)
 		}
 

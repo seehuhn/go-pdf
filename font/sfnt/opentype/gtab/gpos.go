@@ -565,7 +565,7 @@ func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	baseArray := make([][]anchor.Table, baseCount)
 	for i := range baseArray {
 		row := make([]anchor.Table, markClassCount)
-		for j := range baseArray[i] {
+		for j := range row {
 			row[j], err = anchor.Read(p, baseArrayPos+int64(offsets[j]))
 			if err != nil {
 				return nil, err

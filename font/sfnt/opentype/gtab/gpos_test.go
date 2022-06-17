@@ -17,13 +17,50 @@
 package gtab
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/markarray"
 )
+
+func TestGpos4_1(t *testing.T) {
+	l1 := &Gpos4_1{
+		Marks: coverage.Table{1: 0},
+		Base:  coverage.Table{2: 0},
+		MarkArray: []markarray.Record{
+			{
+				Class: 0,
+				Table: anchor.Table{
+					X: 1,
+					Y: 2,
+				},
+			},
+		},
+		BaseArray: [][]anchor.Table{
+			{
+				{
+					X: 3,
+					Y: 4,
+				},
+			},
+		},
+	}
+	data := l1.Encode()
+	p := parser.New("test", bytes.NewReader(data))
+	p.Discard(2)
+	l2, err := readGpos4_1(p, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := cmp.Diff(l1, l2); d != "" {
+		t.Errorf("mismatch (-want +got):\n%s", d)
+	}
+}
 
 func FuzzGpos1_1(f *testing.F) {
 	l := &Gpos1_1{

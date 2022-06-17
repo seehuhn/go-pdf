@@ -29,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/locale"
@@ -141,7 +140,7 @@ func (s *fontHandler) Layout(rr []rune) []font.Glyph {
 
 	for i := range seq {
 		gid := seq[i].Gid
-		if info.Gdef.GlyphClass[gid] != gdef.GlyphClassMark {
+		if !info.Gdef.IsMark(gid) {
 			seq[i].Advance = s.widths[gid]
 		}
 	}
@@ -299,6 +298,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			width = s.widths[gid].AsInteger(q)
 			pos++
 		}
+
 		Widths = append(Widths, width)
 	}
 

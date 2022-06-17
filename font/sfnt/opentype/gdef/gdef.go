@@ -36,6 +36,13 @@ type Table struct {
 	// TODO(voss): Item Variation Store table
 }
 
+func (table *Table) IsMark(gid font.GlyphID) bool {
+	if table == nil || table.GlyphClass == nil {
+		return false
+	}
+	return table.GlyphClass[gid] == GlyphClassMark
+}
+
 // Read reads the GDEF table.
 func Read(r parser.ReadSeekSizer) (*Table, error) {
 	p := parser.New("GDEF", r)
