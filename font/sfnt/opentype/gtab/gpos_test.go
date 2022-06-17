@@ -24,9 +24,74 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/markarray"
 )
+
+func TestGpos2_2(t *testing.T) {
+	l1 := &Gpos2_2{
+		Cov:    coverage.Set{1: true, 12: true},
+		Class1: classdef.Table{1: 1, 2: 1, 12: 2},
+		Class2: classdef.Table{3: 1, 4: 2},
+		Adjust: [][]*PairAdjust{
+			{
+				{
+					First: &GposValueRecord{
+						XPlacement: 1,
+						YPlacement: 2,
+						XAdvance:   3,
+						YAdvance:   4,
+					},
+					Second: &GposValueRecord{
+						XPlacement: 5,
+						YPlacement: 6,
+						XAdvance:   7,
+						YAdvance:   8,
+					},
+				},
+				{
+					First: &GposValueRecord{
+						XPlacement: 9,
+						YPlacement: 10,
+						XAdvance:   11,
+						YAdvance:   12,
+					},
+					Second: &GposValueRecord{
+						XPlacement: 13,
+						YPlacement: 14,
+						XAdvance:   15,
+						YAdvance:   16,
+					},
+				},
+				{
+					First: &GposValueRecord{
+						XPlacement: 1000,
+						YPlacement: 2000,
+						XAdvance:   3000,
+						YAdvance:   4000,
+					},
+					Second: &GposValueRecord{
+						XPlacement: 5000,
+						YPlacement: 6000,
+						XAdvance:   7000,
+						YAdvance:   8000,
+					},
+				},
+			},
+		},
+	}
+	data := l1.Encode()
+	p := parser.New("test", bytes.NewReader(data))
+	p.Discard(2)
+	l2, err := readGpos2_2(p, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := cmp.Diff(l1, l2); d != "" {
+		t.Errorf("mismatch (-want +got):\n%s", d)
+	}
+}
 
 func TestGpos4_1(t *testing.T) {
 	l1 := &Gpos4_1{

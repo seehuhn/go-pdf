@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/markarray"
 )
@@ -43,6 +44,7 @@ func readGposSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 
 	reader, ok := gposReaders[10*meta.LookupType+format]
 	if !ok {
+		fmt.Println("GPOS", meta.LookupType, format)
 		return notImplementedGposSubtable{meta.LookupType, format}, nil
 	}
 	return reader(p, pos)
@@ -283,20 +285,20 @@ func (l *Gpos2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 
 	g2 := seq[a+1]
-	rule, ok := ruleSet[g2.Gid]
+	adj, ok := ruleSet[g2.Gid]
 	if !ok {
 		return nil
 	}
 
-	rule.First.Apply(&g1)
-	if rule.Second == nil {
+	adj.First.Apply(&g1)
+	if adj.Second == nil {
 		return &Match{
 			InputPos: []int{a},
 			Replace:  []font.Glyph{g1},
 			Next:     a + 1,
 		}
 	}
-	rule.Second.Apply(&g2)
+	adj.Second.Apply(&g2)
 	return &Match{
 		InputPos: []int{a, a + 1},
 		Replace:  []font.Glyph{g1, g2},
@@ -444,6 +446,210 @@ func (l *Gpos2_1) Encode() []byte {
 	}
 
 	return buf
+}
+
+// Gpos2_2 is a Pair Adjustment Positioning Subtable (format 2)
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-2-class-pair-adjustment
+type Gpos2_2 struct {
+	Cov            coverage.Set
+	Class1, Class2 classdef.Table
+	Adjust         [][]*PairAdjust // indexed by class1 index, then class2 index
+}
+
+// Apply implements the Subtable interface.
+func (l *Gpos2_2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	g1 := seq[a]
+	_, ok := l.Cov[g1.Gid]
+	if !ok {
+		return nil
+	}
+
+	p := a + 1
+	for p < b && !keep(seq[p].Gid) {
+		p++
+	}
+	if p >= b {
+		return nil
+	}
+	g2 := seq[p]
+
+	class1 := l.Class1[g1.Gid]
+	if int(class1) >= len(l.Adjust) {
+		return nil
+	}
+	row := l.Adjust[class1]
+	class2 := l.Class2[g2.Gid]
+	if int(class2) >= len(row) {
+		return nil
+	}
+	adj := row[class2]
+
+	adj.First.Apply(&g1)
+	if adj.Second == nil {
+		return &Match{
+			InputPos: []int{a},
+			Replace:  []font.Glyph{g1},
+			Next:     a + 1,
+		}
+	}
+	adj.Second.Apply(&g2)
+	return &Match{
+		InputPos: []int{a, a + 1},
+		Replace:  []font.Glyph{g1, g2},
+		Next:     a + 2,
+	}
+}
+
+func readGpos2_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(14)
+	if err != nil {
+		return nil, err
+	}
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	valueFormat1 := uint16(buf[2])<<8 | uint16(buf[3])
+	valueFormat2 := uint16(buf[4])<<8 | uint16(buf[5])
+	classDef1Offset := int64(buf[6])<<8 | int64(buf[7])
+	classDef2Offset := int64(buf[8])<<8 | int64(buf[9])
+	class1Count := uint16(buf[10])<<8 | uint16(buf[11])
+	class2Count := uint16(buf[12])<<8 | uint16(buf[13])
+
+	numRecords := int(class1Count) * int(class2Count)
+	if numRecords >= 65536 {
+		return nil, &font.InvalidFontError{
+			SubSystem: "sfnt/opentype/gtab",
+			Reason:    "GPOS2.1 table too large",
+		}
+	}
+	records := make([]*PairAdjust, numRecords)
+	for i := 0; i < numRecords; i++ {
+		first, err := readValueRecord(p, valueFormat1)
+		if err != nil {
+			return nil, err
+		}
+		second, err := readValueRecord(p, valueFormat2)
+		if err != nil {
+			return nil, err
+		}
+		records[i] = &PairAdjust{
+			First:  first,
+			Second: second,
+		}
+	}
+
+	cov, err := coverage.ReadSet(p, subtablePos+coverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	classDef1, err := classdef.Read(p, subtablePos+classDef1Offset)
+	if err != nil {
+		return nil, err
+	}
+	classDef2, err := classdef.Read(p, subtablePos+classDef2Offset)
+	if err != nil {
+		return nil, err
+	}
+
+	adjust := make([][]*PairAdjust, class1Count)
+	for i := 0; i < int(class1Count); i++ {
+		adjust[i] = records[i*int(class2Count) : (i+1)*int(class2Count)]
+	}
+
+	return &Gpos2_2{
+		Cov:    cov,
+		Class1: classDef1,
+		Class2: classDef2,
+		Adjust: adjust,
+	}, nil
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gpos2_2) EncodeLen() int {
+	var valueFormat1, valueFormat2 uint16
+	for _, adj := range l.Adjust {
+		for _, v := range adj {
+			valueFormat1 |= v.First.getFormat()
+			valueFormat2 |= v.Second.getFormat()
+		}
+	}
+	var vr *GposValueRecord
+	recLen := vr.encodeLen(valueFormat1) + vr.encodeLen(valueFormat2)
+
+	class1Count := len(l.Adjust)
+	var class2Count int
+	if class1Count > 0 {
+		class2Count = len(l.Adjust[0])
+	}
+
+	total := 16
+	total += class1Count * class2Count * recLen
+	total += l.Cov.ToTable().EncodeLen()
+	total += l.Class1.AppendLen()
+	total += l.Class2.AppendLen()
+	return total
+}
+
+// Encode implements the Subtable interface.
+func (l *Gpos2_2) Encode() []byte {
+	var valueFormat1, valueFormat2 uint16
+	for _, adj := range l.Adjust {
+		for _, v := range adj {
+			valueFormat1 |= v.First.getFormat()
+			valueFormat2 |= v.Second.getFormat()
+		}
+	}
+	var vr *GposValueRecord
+	recLen := vr.encodeLen(valueFormat1) + vr.encodeLen(valueFormat2)
+
+	class1Count := len(l.Adjust)
+	var class2Count int
+	if class1Count > 0 {
+		class2Count = len(l.Adjust[0])
+	}
+
+	total := 16
+	total += class1Count * class2Count * recLen
+	coverageOffset := total
+	total += l.Cov.ToTable().EncodeLen()
+	classDef1Offset := total
+	total += l.Class1.AppendLen()
+	classDef2Offset := total
+	total += l.Class2.AppendLen()
+
+	res := make([]byte, 0, total)
+	res = append(res,
+		0, 2, // posFormat
+		byte(coverageOffset>>8), byte(coverageOffset),
+		byte(valueFormat1>>8), byte(valueFormat1),
+		byte(valueFormat2>>8), byte(valueFormat2),
+		byte(classDef1Offset>>8), byte(classDef1Offset),
+		byte(classDef2Offset>>8), byte(classDef2Offset),
+		byte(class1Count>>8), byte(class1Count),
+		byte(class2Count>>8), byte(class2Count),
+	)
+	for _, row := range l.Adjust {
+		for _, adj := range row {
+			res = append(res, adj.First.encode(valueFormat1)...)
+			res = append(res, adj.Second.encode(valueFormat2)...)
+		}
+	}
+	if len(res) != coverageOffset { // TODO(voss): remove
+		panic("internal error")
+	}
+	res = append(res, l.Cov.ToTable().Encode()...)
+	if len(res) != classDef1Offset { // TODO(voss): remove
+		panic("internal error")
+	}
+	res = l.Class1.Append(res)
+	if len(res) != classDef2Offset { // TODO(voss): remove
+		panic("internal error")
+	}
+	res = l.Class2.Append(res)
+	if len(res) != total { // TODO(voss): remove
+		panic("internal error")
+	}
+
+	return res
 }
 
 // Gpos4_1 is a Mark-to-Base Attachment Positioning Subtable (format 1)

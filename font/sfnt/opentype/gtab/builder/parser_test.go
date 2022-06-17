@@ -189,6 +189,13 @@ func TestGposParser(t *testing.T) {
 		D -> dx-1, E -> dx+1, F -> dx-1, G -> dx+1, H -> x+1, I -> y+1
 	GPOS2: A V -> dx-100, O O -> dx+100, "AW" -> dx-100
 	GPOS2: T E -> y+100 dx-50 & y-100
+	GPOS2:
+	    /A L V W/
+	    first V W, A L;
+		second e o, v w;
+		_, _, _,
+		_, dx-50 & y-10, dx+10,
+		_, dx-10 & y+10, dx-30
 	GPOS4:
 	  mark M: 0@100,100;
 	  mark N: 1@200,100;
