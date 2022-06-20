@@ -18,6 +18,7 @@ package builder
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -192,7 +193,7 @@ func TestGposParser(t *testing.T) {
 	GPOS2:
 	    /A L V W/
 	    first V W, A L;
-		second e o, v w;
+		second E O, V W;
 		_, _, _,
 		_, dx-50 & y-10, dx+10,
 		_, dx-10 & y+10, dx-30
@@ -225,7 +226,8 @@ func FuzzGpos1(f *testing.F) {
 			return
 		}
 		fontInfo.Gpos = &gtab.Info{LookupList: lookups}
-		desc2 := ExplainGpos(fontInfo)
+		explained := ExplainGpos(fontInfo)
+		desc2 := strings.Join(explained, "\n")
 		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			t.Fatal(err)
@@ -241,6 +243,12 @@ func FuzzGpos2(f *testing.F) {
 	f.Add(`A V -> dx-100, O O -> dx+100, "AW" -> dx-100`)
 	f.Add(`T E -> y+100 dx-50 & y-100`)
 	f.Add(`A B -> x-1, A C -> x+1 || A D -> y-1`)
+	f.Add(`/A L V W/
+		first V W, A L;
+		second E O, V W;
+		_, _, _,
+		_, dx-50 & y-10, dx+10,
+		_, dx-10 & y+10, dx-30`)
 	f.Fuzz(func(t *testing.T, desc string) {
 		fontInfo := debug.MakeSimpleFont()
 		lookups, err := Parse(fontInfo, "GPOS2: "+desc)
@@ -248,7 +256,8 @@ func FuzzGpos2(f *testing.F) {
 			return
 		}
 		fontInfo.Gpos = &gtab.Info{LookupList: lookups}
-		desc2 := ExplainGpos(fontInfo)
+		explained := ExplainGpos(fontInfo)
+		desc2 := strings.Join(explained, "\n")
 		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			fmt.Println(desc)
@@ -276,7 +285,8 @@ func FuzzGpos4(f *testing.F) {
 			return
 		}
 		fontInfo.Gpos = &gtab.Info{LookupList: lookups}
-		desc2 := ExplainGpos(fontInfo)
+		explained := ExplainGpos(fontInfo)
+		desc2 := strings.Join(explained, "\n")
 		lookups2, err := Parse(fontInfo, desc2)
 		if err != nil {
 			fmt.Println(desc)

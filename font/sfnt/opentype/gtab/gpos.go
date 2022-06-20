@@ -54,6 +54,7 @@ var gposReaders = map[uint16]func(p *parser.Parser, pos int64) (Subtable, error)
 	1_1: readGpos1_1,
 	1_2: readGpos1_2,
 	2_1: readGpos2_1,
+	2_2: readGpos2_2,
 	4_1: readGpos4_1,
 	7_1: readSeqContext1,
 	7_2: readSeqContext2,

@@ -20,6 +20,7 @@ package classdef
 
 import (
 	"fmt"
+	"sort"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
@@ -39,6 +40,25 @@ func (info Table) NumClasses() int {
 		}
 	}
 	return int(maxClass) + 1
+}
+
+// Glyphs returns the glyphs for each non-zero class in the Table.
+// The first entry of the returned slice, corresponding to class 0,
+// is always nil.
+func (info Table) Glyphs() [][]font.GlyphID {
+	numClasses := info.NumClasses()
+	glyphs := make([][]font.GlyphID, numClasses)
+	for gid, cls := range info {
+		if cls == 0 {
+			continue
+		}
+		glyphs[cls] = append(glyphs[cls], gid)
+	}
+	for i := 1; i < numClasses; i++ {
+		sort.Slice(glyphs[i],
+			func(k, l int) bool { return glyphs[i][k] < glyphs[i][l] })
+	}
+	return glyphs
 }
 
 // Read reads and decodes an OpenType "Class Definition Table".

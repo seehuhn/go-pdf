@@ -409,45 +409,117 @@ func (p *parser) readGpos2() *gtab.LookupTable {
 	}
 
 	for {
-		pairData := make(map[font.GlyphID]map[font.GlyphID]*gtab.PairAdjust)
-		for {
-			from := p.readGlyphList()
-			if len(from) != 2 {
-				p.fatal("expected glyph pair, got %v", from)
-			}
-			p.required(itemArrow, "\"->\"")
-			adj1 := p.readGposValueRecord()
-			var adj2 *gtab.GposValueRecord
-			if p.optional(itemAmpersand) {
-				adj2 = p.readGposValueRecord()
-			}
-			row, ok := pairData[from[0]]
-			if !ok {
-				row = make(map[font.GlyphID]*gtab.PairAdjust)
-				pairData[from[0]] = row
-			}
-			row[from[1]] = &gtab.PairAdjust{
-				First:  adj1,
-				Second: adj2,
+		switch p.peek().typ {
+		default: // format 1
+			pairData := make(map[font.GlyphID]map[font.GlyphID]*gtab.PairAdjust)
+			for {
+				from := p.readGlyphList()
+				if len(from) == 0 {
+					p.fatal("expected glyph pair, got %s", p.peek())
+				} else if len(from) != 2 {
+					p.fatal("expected glyph pair, got %v", from)
+				}
+				p.required(itemArrow, "\"->\"")
+				pair := p.readPairAdjust()
+
+				row, ok := pairData[from[0]]
+				if !ok {
+					row = make(map[font.GlyphID]*gtab.PairAdjust)
+					pairData[from[0]] = row
+				}
+				row[from[1]] = pair
+
+				if !p.optional(itemComma) {
+					break
+				}
+				p.optional(itemEOL)
 			}
 
-			if !p.optional(itemComma) {
-				break
+			cov := makeCoverageTable(maps.Keys(pairData))
+			adjust := make([]map[font.GlyphID]*gtab.PairAdjust, len(cov))
+			for gid, i := range cov {
+				adjust[i] = pairData[gid]
 			}
+
+			subtable := &gtab.Gpos2_1{
+				Cov:    cov,
+				Adjust: adjust,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
+		case itemSlash: // format 2
+			p.required(itemSlash, "/")
+			cov := makeCoverageSet(p.readGlyphList())
+			p.required(itemSlash, "/")
 			p.optional(itemEOL)
-		}
 
-		cov := makeCoverageTable(maps.Keys(pairData))
-		adjust := make([]map[font.GlyphID]*gtab.PairAdjust, len(cov))
-		for gid, i := range cov {
-			adjust[i] = pairData[gid]
-		}
+			p.requiredIdentifier("first")
+			class1 := classdef.Table{}
+			class1Count := 1
+			for i := 0; ; i++ {
+				if p.optional(itemSemicolon) {
+					break
+				}
+				if i > 0 {
+					p.required(itemComma, ",")
+				}
+				gg := p.readGlyphList()
+				for _, g := range gg {
+					if _, ok := class1[g]; ok {
+						p.fatal("duplicate class for glyph %d", g)
+					}
+					class1[g] = uint16(class1Count)
+				}
+				class1Count++
+			}
+			// We re-count the classes, in case there were empty
+			// classes listed at the end.
+			class1Count = class1.NumClasses()
+			p.optional(itemEOL)
 
-		subtable := &gtab.Gpos2_1{
-			Cov:    cov,
-			Adjust: adjust,
+			p.requiredIdentifier("second")
+			class2 := classdef.Table{}
+			class2Count := 1
+			for i := 0; ; i++ {
+				if p.optional(itemSemicolon) {
+					break
+				}
+				if i > 0 {
+					p.required(itemComma, ",")
+				}
+				gg := p.readGlyphList()
+				for _, g := range gg {
+					if _, ok := class2[g]; ok {
+						p.fatal("duplicate class for glyph %d", g)
+					}
+					class2[g] = uint16(class2Count)
+				}
+				class2Count++
+			}
+			class2Count = class2.NumClasses()
+			p.optional(itemEOL)
+
+			aa := make([]*gtab.PairAdjust, class1Count*class2Count)
+			adjust := make([][]*gtab.PairAdjust, class1Count)
+			for i := 0; i < class1Count; i++ {
+				adjust[i] = aa[i*class2Count : (i+1)*class2Count]
+				for j := 0; j < class2Count; j++ {
+					if j > 0 {
+						p.optional(itemComma)
+					}
+					adjust[i][j] = p.readPairAdjust()
+				}
+				p.optional(itemComma, itemSemicolon)
+				p.optional(itemEOL)
+			}
+
+			subtable := &gtab.Gpos2_2{
+				Cov:    cov,
+				Class1: class1,
+				Class2: class2,
+				Adjust: adjust,
+			}
+			lookup.Subtables = append(lookup.Subtables, subtable)
 		}
-		lookup.Subtables = append(lookup.Subtables, subtable)
 
 		if !p.optional(itemOr) {
 			break
@@ -1162,6 +1234,10 @@ func (p *parser) readUint16() uint16 {
 }
 
 func (p *parser) readGposValueRecord() *gtab.GposValueRecord {
+	if p.optionalIdentifier("_") {
+		return nil
+	}
+
 	res := &gtab.GposValueRecord{}
 valueRecordLoop:
 	for {
@@ -1180,7 +1256,25 @@ valueRecordLoop:
 			break valueRecordLoop
 		}
 	}
+	if res.XPlacement == 0 &&
+		res.YPlacement == 0 &&
+		res.XAdvance == 0 {
+		return nil
+	}
 	return res
+}
+
+func (p *parser) readPairAdjust() *gtab.PairAdjust {
+	adj1 := p.readGposValueRecord()
+	var adj2 *gtab.GposValueRecord
+	if p.optional(itemAmpersand) {
+		adj2 = p.readGposValueRecord()
+	}
+	pair := &gtab.PairAdjust{
+		First:  adj1,
+		Second: adj2,
+	}
+	return pair
 }
 
 func (p *parser) readItem() item {
@@ -1202,7 +1296,7 @@ func (p *parser) peek() item {
 func (p *parser) required(typ itemType, desc string) item {
 	item := p.readItem()
 	if item.typ != typ {
-		p.fatal("expected %s, got %s", desc, item)
+		p.fatal("expected %q, got %s", desc, item)
 	}
 	return item
 }
@@ -1215,13 +1309,15 @@ func (p *parser) requiredIdentifier(name string) item {
 	return next
 }
 
-func (p *parser) optional(typ itemType) bool {
+func (p *parser) optional(types ...itemType) bool {
 	item := p.readItem()
-	if item.typ != typ {
-		p.backlog = append(p.backlog, item)
-		return false
+	for _, typ := range types {
+		if item.typ == typ {
+			return true
+		}
 	}
-	return true
+	p.backlog = append(p.backlog, item)
+	return false
 }
 
 func (p *parser) optionalIdentifier(name string) bool {

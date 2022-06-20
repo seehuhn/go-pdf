@@ -9,8 +9,29 @@ import (
 	"seehuhn.de/go/pdf/font/parser"
 )
 
+// Set is a coverage table, but with the coverage indices omitted.
 type Set map[font.GlyphID]bool
 
+// Glyphs returned the glyphs covered by the Set, in order of increasing glyph ID.
+func (set Set) Glyphs() []font.GlyphID {
+	glyphs := maps.Keys(set)
+	sort.Slice(glyphs, func(i, j int) bool { return glyphs[i] < glyphs[j] })
+	return glyphs
+}
+
+// ToTable converts the Set to a Coverage table.
+func (set Set) ToTable() Table {
+	glyphs := set.Glyphs()
+	table := make(Table)
+	for i, gid := range glyphs {
+		table[gid] = i
+	}
+	return table
+}
+
+// ReadSet reads a coverage table from a parser.
+// This function allows for some duplicate glyphs to be included.  This is
+// forbidden by the spec, but occurs in some widely used fonts.
 func ReadSet(p *parser.Parser, pos int64) (Set, error) {
 	err := p.SeekPos(pos)
 	if err != nil {
@@ -78,14 +99,4 @@ func ReadSet(p *parser.Parser, pos int64) (Set, error) {
 	}
 
 	return table, nil
-}
-
-func (set Set) ToTable() Table {
-	glyphs := maps.Keys(set)
-	sort.Slice(glyphs, func(i, j int) bool { return glyphs[i] < glyphs[j] })
-	table := make(Table)
-	for i, gid := range glyphs {
-		table[gid] = i
-	}
-	return table
 }

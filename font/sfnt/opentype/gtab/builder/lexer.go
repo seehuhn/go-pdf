@@ -77,6 +77,23 @@ func (i item) String() string {
 	return fmt.Sprintf("%q", i.val)
 }
 
+var singleCharTokens = map[rune]itemType{
+	',': itemComma,
+	';': itemSemicolon,
+	':': itemColon,
+	'[': itemSquareBracketOpen,
+	']': itemSquareBracketClose,
+	'@': itemAt,
+	'/': itemSlash,
+	'&': itemAmpersand,
+	'=': itemEqual,
+}
+
+func isSingleCharToken(r rune) bool {
+	_, ok := singleCharTokens[r]
+	return ok
+}
+
 type lexer struct {
 	input string
 	line  int
@@ -129,23 +146,6 @@ const eof = rune(0)
 // stateFn represents the state of the scanner
 // as a function that returns the next state.
 type stateFn func(*lexer) stateFn
-
-var singleCharTokens = map[rune]itemType{
-	',': itemComma,
-	';': itemSemicolon,
-	':': itemColon,
-	'[': itemSquareBracketOpen,
-	']': itemSquareBracketClose,
-	'@': itemAt,
-	'/': itemSlash,
-	'&': itemAmpersand,
-	'=': itemEqual,
-}
-
-func isSingleCharToken(r rune) bool {
-	_, ok := singleCharTokens[r]
-	return ok
-}
 
 func lexStart(l *lexer) stateFn {
 	// Skip whitespace.

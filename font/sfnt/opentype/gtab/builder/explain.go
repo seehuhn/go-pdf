@@ -115,136 +115,27 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 
 			case *gtab.SeqContext1:
 				checkType(5)
-				firstGlyphs := l.Cov.Glyphs()
-				first := true
-				for i, gid := range firstGlyphs {
-					input := []font.GlyphID{gid}
-					for _, rule := range l.Rules[i] {
-						input = append(input[:1], rule.Input...)
-						if first {
-							ee.w.WriteRune(' ')
-							first = false
-						} else {
-							ee.w.WriteString(", ")
-						}
-						ee.writeGlyphList(input)
-						ee.w.WriteString(" -> ")
-						ee.explainNested(rule.Actions)
-					}
-				}
+				ee.explainSeqContext1(l)
 
 			case *gtab.SeqContext2:
 				checkType(5)
-				ee.defineClasses("class", l.Input)
-				ee.w.WriteString("/")
-				ee.explainCoverage(l.Cov)
-				ee.w.WriteRune('/')
-				first := true
-				for cls, rules := range l.Rules {
-					input := []uint16{uint16(cls)}
-					for _, rule := range rules {
-						if first {
-							first = false
-						} else {
-							ee.w.WriteRune(',')
-						}
-						input = append(input[:1], rule.Input...)
-						ee.writeClassList(input)
-						ee.w.WriteString(" -> ")
-						ee.explainNested(rule.Actions)
-					}
-				}
+				ee.explainSeqContext2(l)
 
 			case *gtab.SeqContext3:
 				checkType(5)
-				for i, cov := range l.Input {
-					if i > 0 {
-						ee.w.WriteRune(' ')
-					}
-					ee.writeCoveredSet(cov)
-				}
-				ee.w.WriteString(" -> ")
-				ee.explainNested(l.Actions)
+				ee.explainSeqContext3(l)
 
 			case *gtab.ChainedSeqContext1:
 				checkType(6)
-				firstGlyphs := l.Cov.Glyphs()
-				first := true
-				for i, gid := range firstGlyphs {
-					input := []font.GlyphID{gid}
-					for _, rule := range l.Rules[i] {
-						backtrack := copyRev(rule.Backtrack)
-						input = append(input[:1], rule.Input...)
-						lookahead := rule.Lookahead
-						if first {
-							ee.w.WriteRune(' ')
-							first = false
-						} else {
-							ee.w.WriteString(", ")
-						}
-						ee.writeGlyphList(backtrack)
-						ee.w.WriteString(" | ")
-						ee.writeGlyphList(input)
-						ee.w.WriteString(" | ")
-						ee.writeGlyphList(lookahead)
-						ee.w.WriteString(" -> ")
-						ee.explainNested(rule.Actions)
-					}
-				}
+				ee.explainChainedSeqContext1(l)
 
 			case *gtab.ChainedSeqContext2:
 				checkType(6)
-				ee.defineClasses("backtrackclass", l.Backtrack)
-				ee.defineClasses("inputclass", l.Input)
-				ee.defineClasses("lookaheadclass", l.Lookahead)
-				ee.w.WriteString("/")
-				ee.explainCoverage(l.Cov)
-				ee.w.WriteRune('/')
-				first := true
-				for cls, rules := range l.Rules {
-					input := []uint16{uint16(cls)}
-					for _, rule := range rules {
-						if first {
-							first = false
-						} else {
-							ee.w.WriteRune(',')
-						}
-						backtrack := copyRev(rule.Backtrack)
-						input = append(input[:1], rule.Input...)
-						lookahead := rule.Lookahead
-						ee.writeClassList(backtrack)
-						ee.w.WriteString(" | ")
-						ee.writeClassList(input)
-						ee.w.WriteString(" | ")
-						ee.writeClassList(lookahead)
-						ee.w.WriteString(" -> ")
-						ee.explainNested(rule.Actions)
-					}
-				}
+				ee.explainChainedSeqContext2(l)
 
 			case *gtab.ChainedSeqContext3:
 				checkType(6)
-				for i, set := range copyRev(l.Backtrack) {
-					if i > 0 {
-						ee.w.WriteRune(' ')
-					}
-					cov := set.ToTable()
-					ee.writeCoveredSet(cov)
-				}
-				ee.w.WriteString(" |")
-				for _, set := range l.Input {
-					ee.w.WriteRune(' ')
-					cov := set.ToTable()
-					ee.writeCoveredSet(cov)
-				}
-				ee.w.WriteString(" |")
-				for _, set := range l.Lookahead {
-					ee.w.WriteRune(' ')
-					cov := set.ToTable()
-					ee.writeCoveredSet(cov)
-				}
-				ee.w.WriteString(" -> ")
-				ee.explainNested(l.Actions)
+				ee.explainChainedSeqContext3(l)
 
 			default:
 				panic(fmt.Sprintf("unsupported GSUB subtable type %T", l))
@@ -258,10 +149,10 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 
 // ExplainGpos returns a human-readable, textual description of the lookups
 // in a GPOS table.
-func ExplainGpos(fontInfo *sfnt.Info) string {
-	ee := newExplainer(fontInfo)
-
+func ExplainGpos(fontInfo *sfnt.Info) []string {
+	var res []string
 	for _, lookup := range fontInfo.Gpos.LookupList {
+		ee := newExplainer(fontInfo)
 		checkType := func(newType int) {
 			if newType != int(lookup.Meta.LookupType) {
 				panic("inconsistent subtable types")
@@ -317,12 +208,46 @@ func ExplainGpos(fontInfo *sfnt.Info) string {
 						ee.writeGlyphList([]font.GlyphID{firstGid, secondGid})
 						ee.w.WriteString(" -> ")
 						col := row[secondGid]
-						ee.writeValueRecord(col.First)
-						if col.Second != nil {
-							ee.w.WriteString(" & ")
-							ee.writeValueRecord(col.Second)
-						}
+						ee.writePairAdjust(col)
 					}
+				}
+
+			case *gtab.Gpos2_2:
+				checkType(2)
+				ee.w.WriteString("\n\t")
+				ee.w.WriteRune('/')
+				ee.writeGlyphList(l.Cov.Glyphs())
+				ee.w.WriteRune('/')
+				ee.w.WriteString("\n\t")
+				ee.w.WriteString("first")
+				class1 := l.Class1.Glyphs()
+				for i, gg := range class1[1:] {
+					if i > 0 {
+						ee.w.WriteRune(',')
+					}
+					ee.w.WriteRune(' ')
+					ee.writeGlyphList(gg)
+				}
+				ee.w.WriteString(";\n\t")
+				ee.w.WriteString("second")
+				class2 := l.Class2.Glyphs()
+				for i, gg := range class2[1:] {
+					if i > 0 {
+						ee.w.WriteRune(',')
+					}
+					ee.w.WriteRune(' ')
+					ee.writeGlyphList(gg)
+				}
+				ee.w.WriteRune(';')
+				for i := range class1 {
+					ee.w.WriteString("\n\t")
+					for j := range class2 {
+						if j > 0 {
+							ee.w.WriteString(", ")
+						}
+						ee.writePairAdjust(l.Adjust[i][j])
+					}
+					ee.w.WriteRune(';')
 				}
 
 			case *gtab.Gpos4_1:
@@ -349,14 +274,38 @@ func ExplainGpos(fontInfo *sfnt.Info) string {
 					ee.w.WriteRune(';')
 				}
 
+			case *gtab.SeqContext1:
+				checkType(7)
+				ee.explainSeqContext1(l)
+
+			case *gtab.SeqContext2:
+				checkType(7)
+				ee.explainSeqContext2(l)
+
+			case *gtab.SeqContext3:
+				checkType(7)
+				ee.explainSeqContext3(l)
+
+			case *gtab.ChainedSeqContext1:
+				checkType(8)
+				ee.explainChainedSeqContext1(l)
+
+			case *gtab.ChainedSeqContext2:
+				checkType(8)
+				ee.explainChainedSeqContext2(l)
+
+			case *gtab.ChainedSeqContext3:
+				checkType(8)
+				ee.explainChainedSeqContext3(l)
+
 			default:
-				panic(fmt.Sprintf("unsupported GPOS subtable type %T", l))
+				// panic(fmt.Sprintf("unsupported GPOS subtable type %T", l))
+				fmt.Fprintf(ee.w, "# unsupported GPOS subtable type %T", l)
 			}
 		}
-		ee.w.WriteRune('\n')
+		res = append(res, ee.w.String())
 	}
-
-	return ee.w.String()
+	return res
 }
 
 type explainer struct {
@@ -548,23 +497,22 @@ func (ee *explainer) explainNested(actions gtab.SeqLookups) {
 }
 
 func (ee *explainer) defineClasses(classType string, class classdef.Table) {
-	numClasses := class.NumClasses()
-	glyphs := make([][]font.GlyphID, numClasses)
-	for gid, cls := range class {
-		glyphs[cls] = append(glyphs[cls], gid)
-	}
-	for j := 0; j < numClasses; j++ {
-		if j == 0 {
+	glyphs := class.Glyphs()
+	for i, gg := range glyphs {
+		if i == 0 {
 			continue
 		}
-		sort.Slice(glyphs[j], func(k, l int) bool { return glyphs[j][k] < glyphs[j][l] })
-		fmt.Fprintf(ee.w, "%s :c%d: = ", classType, j)
-		ee.writeGlyphSet(glyphs[j])
+		fmt.Fprintf(ee.w, "%s :c%d: = ", classType, i)
+		ee.writeGlyphSet(gg)
 		ee.w.WriteString("\n\t")
 	}
 }
 
 func (ee *explainer) writeValueRecord(adjust *gtab.GposValueRecord) {
+	if adjust == nil {
+		ee.w.WriteRune('_')
+		return
+	}
 	var parts []string
 	if adjust.XPlacement != 0 {
 		parts = append(parts, fmt.Sprintf("x%+d", adjust.XPlacement))
@@ -579,8 +527,149 @@ func (ee *explainer) writeValueRecord(adjust *gtab.GposValueRecord) {
 		parts = append(parts, fmt.Sprintf("dy%+d", adjust.YAdvance))
 	}
 	if len(parts) == 0 {
-		ee.w.WriteString("dx+0")
+		ee.w.WriteRune('_')
 	} else {
 		ee.w.WriteString(strings.Join(parts, " "))
 	}
+}
+
+func (ee *explainer) writePairAdjust(pair *gtab.PairAdjust) {
+	ee.writeValueRecord(pair.First)
+	if pair.Second != nil {
+		ee.w.WriteString(" & ")
+		ee.writeValueRecord(pair.Second)
+	}
+}
+
+func (ee *explainer) explainSeqContext1(l *gtab.SeqContext1) {
+	firstGlyphs := l.Cov.Glyphs()
+	first := true
+	for i, gid := range firstGlyphs {
+		input := []font.GlyphID{gid}
+		for _, rule := range l.Rules[i] {
+			input = append(input[:1], rule.Input...)
+			if first {
+				ee.w.WriteRune(' ')
+				first = false
+			} else {
+				ee.w.WriteString(", ")
+			}
+			ee.writeGlyphList(input)
+			ee.w.WriteString(" -> ")
+			ee.explainNested(rule.Actions)
+		}
+	}
+}
+
+func (ee *explainer) explainSeqContext2(l *gtab.SeqContext2) {
+	ee.defineClasses("class", l.Input)
+	ee.w.WriteRune('/')
+	ee.explainCoverage(l.Cov)
+	ee.w.WriteRune('/')
+	first := true
+	for cls, rules := range l.Rules {
+		input := []uint16{uint16(cls)}
+		for _, rule := range rules {
+			if first {
+				first = false
+			} else {
+				ee.w.WriteRune(',')
+			}
+			input = append(input[:1], rule.Input...)
+			ee.writeClassList(input)
+			ee.w.WriteString(" -> ")
+			ee.explainNested(rule.Actions)
+		}
+	}
+}
+
+func (ee *explainer) explainSeqContext3(l *gtab.SeqContext3) {
+	for i, cov := range l.Input {
+		if i > 0 {
+			ee.w.WriteRune(' ')
+		}
+		ee.writeCoveredSet(cov)
+	}
+	ee.w.WriteString(" -> ")
+	ee.explainNested(l.Actions)
+}
+
+func (ee *explainer) explainChainedSeqContext1(l *gtab.ChainedSeqContext1) {
+	firstGlyphs := l.Cov.Glyphs()
+	first := true
+	for i, gid := range firstGlyphs {
+		input := []font.GlyphID{gid}
+		for _, rule := range l.Rules[i] {
+			backtrack := copyRev(rule.Backtrack)
+			input = append(input[:1], rule.Input...)
+			lookahead := rule.Lookahead
+			if first {
+				ee.w.WriteRune(' ')
+				first = false
+			} else {
+				ee.w.WriteString(", ")
+			}
+			ee.writeGlyphList(backtrack)
+			ee.w.WriteString(" | ")
+			ee.writeGlyphList(input)
+			ee.w.WriteString(" | ")
+			ee.writeGlyphList(lookahead)
+			ee.w.WriteString(" -> ")
+			ee.explainNested(rule.Actions)
+		}
+	}
+}
+
+func (ee *explainer) explainChainedSeqContext2(l *gtab.ChainedSeqContext2) {
+	ee.defineClasses("backtrackclass", l.Backtrack)
+	ee.defineClasses("inputclass", l.Input)
+	ee.defineClasses("lookaheadclass", l.Lookahead)
+	ee.w.WriteRune('/')
+	ee.explainCoverage(l.Cov)
+	ee.w.WriteRune('/')
+	first := true
+	for cls, rules := range l.Rules {
+		input := []uint16{uint16(cls)}
+		for _, rule := range rules {
+			if first {
+				first = false
+			} else {
+				ee.w.WriteRune(',')
+			}
+			backtrack := copyRev(rule.Backtrack)
+			input = append(input[:1], rule.Input...)
+			lookahead := rule.Lookahead
+			ee.writeClassList(backtrack)
+			ee.w.WriteString(" | ")
+			ee.writeClassList(input)
+			ee.w.WriteString(" | ")
+			ee.writeClassList(lookahead)
+			ee.w.WriteString(" -> ")
+			ee.explainNested(rule.Actions)
+		}
+	}
+}
+
+func (ee *explainer) explainChainedSeqContext3(l *gtab.ChainedSeqContext3) {
+	for i, set := range copyRev(l.Backtrack) {
+		if i > 0 {
+			ee.w.WriteRune(' ')
+		}
+		cov := set.ToTable()
+		ee.writeCoveredSet(cov)
+	}
+	ee.w.WriteString(" |")
+	for _, set := range l.Input {
+		ee.w.WriteRune(' ')
+		cov := set.ToTable()
+		ee.writeCoveredSet(cov)
+	}
+	ee.w.WriteString(" |")
+	for _, set := range l.Lookahead {
+		ee.w.WriteRune(' ')
+		cov := set.ToTable()
+		ee.writeCoveredSet(cov)
+	}
+	ee.w.WriteString(" -> ")
+	ee.explainNested(l.Actions)
 }

@@ -22,11 +22,12 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab/builder"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: tt-illustrate-gpos font.ttf")
+		fmt.Fprintln(os.Stderr, "usage: otf-illustrate-gpos font.otf")
 		os.Exit(1)
 	}
 	fontFileName := os.Args[1]
@@ -44,5 +45,10 @@ func main() {
 
 	if info.Gpos == nil {
 		log.Fatal("font has no GPOS table")
+	}
+
+	explained := builder.ExplainGpos(info)
+	for i, e := range explained {
+		fmt.Printf("%d: %s\n", i, e)
 	}
 }
