@@ -106,25 +106,25 @@ func TestGpos(t *testing.T) {
 				switch check.which {
 				case checkX:
 					if seq[check.idx].XOffset != check.val {
-						t.Errorf("%s: expected XOffset == %d, got %d",
-							fontName, check.val, seq[check.idx].XOffset)
+						t.Errorf("%s[%d]: expected XOffset == %d, got %d",
+							fontName, check.idx, check.val, seq[check.idx].XOffset)
 					}
 				case checkY:
 					if seq[check.idx].YOffset != check.val {
-						t.Errorf("%s: expected YOffset == %d, got %d",
-							fontName, check.val, seq[check.idx].YOffset)
+						t.Errorf("%s[%d]: expected YOffset == %d, got %d",
+							fontName, check.idx, check.val, seq[check.idx].YOffset)
 					}
 				case checkDX:
 					if seq[check.idx].Advance != check.val {
-						t.Errorf("%s: expected XAdvance == %d, got %d",
-							fontName, check.val, seq[check.idx].Advance)
+						t.Errorf("%s[%d]: expected XAdvance == %d, got %d",
+							fontName, check.idx, check.val, seq[check.idx].Advance)
 					}
 				case checkDXRel:
 					w := fontInfo.GlyphWidth(seq[check.idx].Gid)
 					expected := check.val + w
 					if seq[check.idx].Advance != expected {
-						t.Errorf("%s: expected XAdvance == %d, got %d",
-							fontName, expected, seq[check.idx].Advance)
+						t.Errorf("%s[%d]: expected XAdvance == %d, got %d",
+							fontName, check.idx, expected, seq[check.idx].Advance)
 					}
 				default:
 					panic("unknown check")
@@ -328,6 +328,22 @@ var gposTestCases = []gposTestCase{
 			{1, checkY, 200},
 			{3, checkY, 200},
 			{5, checkY, 200},
+		},
+	},
+	{
+		desc: `GPOS2:
+			/A/
+			first A;
+			second A;
+			_, _;
+			_, y+500`,
+		in: "AAAAAA",
+		check: []gposCheck{
+			{0, checkY, 500},
+			{1, checkY, 500},
+			{2, checkY, 500},
+			{3, checkY, 500},
+			{4, checkY, 500},
 		},
 	},
 
