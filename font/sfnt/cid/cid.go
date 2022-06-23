@@ -395,11 +395,11 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		if err != nil {
 			return err
 		}
-		err = fontFileStream.Close()
+		err = size.Set(pdf.Integer(n))
 		if err != nil {
 			return err
 		}
-		err = size.Set(pdf.Integer(n)) // TODO(voss): move this earlier once Placeholder is fixed
+		err = fontFileStream.Close()
 		if err != nil {
 			return err
 		}

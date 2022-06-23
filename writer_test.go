@@ -241,6 +241,7 @@ func TestPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.Catalog.Pages = &Reference{}
 
 	length := w.NewPlaceholder(5)
 	testRef, err := w.Write(Dict{
@@ -251,7 +252,9 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w.Catalog.Pages = &Reference{}
+	if length.ref != nil {
+		t.Error("failed to detect that file is seekable")
+	}
 
 	err = length.Set(Integer(testVal))
 	if err != nil {

@@ -38,15 +38,18 @@ type Writer struct {
 	// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 	Catalog *Catalog
 
+	info *Info
+
 	w               *posWriter
 	origW           io.WriteCloser
 	closeDownstream bool
 
-	id       [][]byte
-	xref     map[int]*xRefEntry
-	nextRef  int
-	inStream bool
-	info     *Info
+	id      [][]byte
+	xref    map[int]*xRefEntry
+	nextRef int
+
+	inStream    bool
+	afterStream []func(*Writer) error
 
 	onClose []func(*Writer) error
 }
@@ -549,7 +552,7 @@ type streamWriter struct {
 	parent   *Writer
 	dict     Dict
 	ref      *Reference
-	started  bool // TODO(voss): can this be replaced by `buf == nil`?
+	started  bool
 	startPos int64
 	length   *Placeholder
 	buf      []byte
@@ -562,7 +565,7 @@ func (w *streamWriter) Write(p []byte) (int, error) {
 			return len(p), nil
 		}
 
-		err := w.flush()
+		err := w.startWriting()
 		if err != nil {
 			return 0, err
 		}
@@ -571,7 +574,7 @@ func (w *streamWriter) Write(p []byte) (int, error) {
 	return w.parent.w.Write(p)
 }
 
-func (w *streamWriter) flush() error {
+func (w *streamWriter) startWriting() error {
 	_, err := fmt.Fprintf(w.parent.w, "%d %d obj\n",
 		w.ref.Number, w.ref.Generation)
 	if err != nil {
@@ -596,19 +599,20 @@ func (w *streamWriter) flush() error {
 }
 
 func (w *streamWriter) Close() error {
-	var endPos int64
-	if !w.started {
+	if w.started {
+		err := w.length.Set(Integer(w.parent.w.pos - w.startPos))
+		if err != nil {
+			return err
+		}
+	} else {
 		err := w.length.Set(Integer(len(w.buf)))
 		if err != nil {
 			return err
 		}
-		err = w.flush()
+		err = w.startWriting()
 		if err != nil {
 			return err
 		}
-		endPos = -1
-	} else {
-		endPos = w.parent.w.pos
 	}
 
 	_, err := w.Write([]byte("\nendstream\nendobj\n"))
@@ -617,13 +621,13 @@ func (w *streamWriter) Close() error {
 	}
 
 	w.parent.inStream = false
-
-	if endPos >= 0 {
-		err = w.length.Set(Integer(endPos - w.startPos))
+	for _, fn := range w.parent.afterStream {
+		err = fn(w.parent)
 		if err != nil {
 			return err
 		}
 	}
+	w.parent.afterStream = nil
 
 	return nil
 }
@@ -634,15 +638,12 @@ func (w *streamWriter) Close() error {
 // are created using Writer.NewPlaceholder(). As soon as the value is known, it
 // can be filled in using the Set() method.
 type Placeholder struct {
-	value string
+	value []byte
 	size  int
 
-	alloc func() *Reference
-	write func(Object, *Reference) (*Reference, error)
-	ref   *Reference
-
-	fill io.WriteSeeker
-	pos  []int64
+	pdf *Writer
+	pos []int64
+	ref *Reference
 }
 
 // NewPlaceholder creates a new placeholder for a value which is not yet known.
@@ -651,9 +652,8 @@ type Placeholder struct {
 // method.
 func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
 	return &Placeholder{
-		size:  size,
-		alloc: pdf.Alloc,
-		write: pdf.Write,
+		size: size,
+		pdf:  pdf,
 	}
 }
 
@@ -661,45 +661,32 @@ func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
 func (x *Placeholder) PDF(w io.Writer) error {
 	// method 1: If the value is already known, we can just write it to the
 	// file.
-	if x.value != "" {
-		_, err := w.Write([]byte(x.value))
+	if x.value != nil {
+		_, err := w.Write(x.value)
 		return err
 	}
 
-	u := w
-	if uu, ok := w.(*posWriter); ok {
-		u = uu.w
-	}
-	fill, ok := u.(io.WriteSeeker)
-	if ok {
-		// method 2: If we can seek back, write whitespace for now and fill in
-		// the actual value later.
-		// TODO(voss): verify that this is triggered when embedding fonts
-		pos, err := fill.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return err
-		}
+	// method 2: If we can seek, write whitespace for now and fill in
+	// the actual value later.
+	if _, ok := x.pdf.origW.(io.WriteSeeker); ok {
+		// TODO(voss): verify that this case is triggered when embedding fonts
 
-		x.fill = fill
-		x.pos = append(x.pos, pos)
+		x.pos = append(x.pos, x.pdf.w.pos)
 
 		buf := bytes.Repeat([]byte{' '}, x.size)
-		_, err = w.Write(buf)
+		_, err := w.Write(buf)
 		return err
 	}
 
 	// method 3: If all else fails, use an indirect reference.
-	if x.alloc == nil {
-		return errors.New("cannot seek to fill in placeholder")
-	}
-	x.ref = x.alloc()
+	x.ref = x.pdf.Alloc()
 	buf := &bytes.Buffer{}
 	err := x.ref.PDF(buf)
 	if err != nil {
 		return err
 	}
-	x.value = buf.String()
-	_, err = w.Write([]byte(x.value))
+	x.value = buf.Bytes()
+	_, err = w.Write(x.value)
 	return err
 }
 
@@ -707,10 +694,16 @@ func (x *Placeholder) PDF(w io.Writer) error {
 // as soon as possible after the value becomes known.
 func (x *Placeholder) Set(val Object) error {
 	if x.ref != nil {
-		// TODO(voss): what happens if we are in a stream?
-		ref, err := x.write(val, x.ref)
-		x.ref = ref
-		return err
+		pdf := x.pdf
+		if pdf.inStream {
+			pdf.afterStream = append(pdf.afterStream, func(w *Writer) error {
+				_, err := w.Write(val, x.ref)
+				return err
+			})
+		} else {
+			_, err := pdf.Write(val, x.ref)
+			return err
+		}
 	}
 
 	buf := &bytes.Buffer{}
@@ -721,29 +714,32 @@ func (x *Placeholder) Set(val Object) error {
 	if buf.Len() > x.size {
 		return errors.New("Placeholder: replacement text too long")
 	}
-	x.value = buf.String()
+	x.value = buf.Bytes()
 
 	if len(x.pos) == 0 {
 		return nil
 	}
 
-	currentPos, err := x.fill.Seek(0, io.SeekCurrent)
+	x.pdf.w.Flush()
+
+	fill := x.pdf.origW.(io.WriteSeeker)
+	currentPos, err := fill.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
 
 	for _, pos := range x.pos {
-		_, err = x.fill.Seek(pos, io.SeekStart)
+		_, err = fill.Seek(pos, io.SeekStart)
 		if err != nil {
 			return err
 		}
-		_, err = x.fill.Write([]byte(x.value))
+		_, err = fill.Write(x.value)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = x.fill.Seek(currentPos, io.SeekStart)
+	_, err = fill.Seek(currentPos, io.SeekStart)
 	return err
 }
 
@@ -777,4 +773,8 @@ func (w *posWriter) Write(p []byte) (int, error) {
 	n, err := w.w.Write(p)
 	w.pos += int64(n)
 	return n, err
+}
+
+func (w *posWriter) Flush() error {
+	return w.w.Flush()
 }
