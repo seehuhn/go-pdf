@@ -669,8 +669,6 @@ func (x *Placeholder) PDF(w io.Writer) error {
 	// method 2: If we can seek, write whitespace for now and fill in
 	// the actual value later.
 	if _, ok := x.pdf.origW.(io.WriteSeeker); ok {
-		// TODO(voss): verify that this case is triggered when embedding fonts
-
 		x.pos = append(x.pos, x.pdf.w.pos)
 
 		buf := bytes.Repeat([]byte{' '}, x.size)

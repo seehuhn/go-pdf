@@ -349,17 +349,6 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 	return cff, nil
 }
 
-// GlyphExtents returns the boundig boxes of all glyphs.
-// TODO(voss): is this method needed?
-func (cff *Font) GlyphExtents() []funit.Rect {
-	numGlyphs := len(cff.Glyphs)
-	extents := make([]funit.Rect, numGlyphs)
-	for i := 0; i < numGlyphs; i++ {
-		extents[i] = cff.Glyphs[i].Extent()
-	}
-	return extents
-}
-
 // Encode writes the binary form of a CFF font.
 func (cff *Font) Encode(w io.Writer) error {
 	numGlyphs := uint16(len(cff.Glyphs))
