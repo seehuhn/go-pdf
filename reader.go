@@ -579,7 +579,7 @@ func (r *Reader) errPos(obj Object) int64 {
 // Version represent the version of PDF standard used in a file.
 type Version int
 
-// Constants for the known PDF versions.
+// PDF versions supported by this library.
 const (
 	_ Version = iota
 	V1_0
@@ -617,7 +617,7 @@ func ParseVersion(verString string) (Version, error) {
 }
 
 // ToString returns the string representation of ver, e.g. "1.7".
-// If ver does not correspond to a supported PDF version, and error is
+// If ver does not correspond to a supported PDF version, an error is
 // returned.
 func (ver Version) ToString() (string, error) {
 	if ver >= V1_0 && ver <= V1_7 {

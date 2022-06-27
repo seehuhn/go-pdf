@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font
+package cid
 
 import (
 	"bytes"
@@ -98,7 +98,7 @@ func TestWidths(t *testing.T) {
 		},
 	}
 	for i, test := range cases {
-		DW, W := EncodeCIDWidths(test.in, 1)
+		DW, W := encodeWidths(test.in, 1)
 		buf := &bytes.Buffer{}
 		_ = W.PDF(buf)
 		fmt.Println(i, buf.String())

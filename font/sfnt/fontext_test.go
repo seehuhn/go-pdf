@@ -17,7 +17,9 @@
 package sfnt_test
 
 import (
+	"bufio"
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -145,4 +147,38 @@ func FuzzFont(f *testing.F) {
 			t.Errorf("different (-old +new):\n%s", diff)
 		}
 	})
+}
+
+func TestAll(t *testing.T) {
+	fd, err := os.Open("../../demo/try-all-fonts/all-fonts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fontFiles []string
+	scanner := bufio.NewScanner(fd)
+	for scanner.Scan() {
+		fontFiles = append(fontFiles, scanner.Text())
+	}
+	err = fd.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	numSuccess := 0
+	numFail := 0
+	for _, fname := range fontFiles {
+		info, err := sfnt.ReadFile(fname)
+		if err != nil {
+			numFail++
+			continue
+		}
+		numSuccess++
+
+		_ = info
+		// _, err = info.Write(io.Discard)
+		// if err != nil {
+		// 	t.Error(err)
+		// }
+	}
+	t.Errorf("%d read, %d failed", numSuccess, numFail)
 }

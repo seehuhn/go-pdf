@@ -550,7 +550,6 @@ func (enc encoder) Length(e edge) int {
 const maxStack = 48
 
 // GlyphOp is a CFF glyph drawing command.
-// TODO(voss): try to find a more memory efficient representation?
 type GlyphOp struct {
 	Op   GlyphOpType
 	Args []Fixed16

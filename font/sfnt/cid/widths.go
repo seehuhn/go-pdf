@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font
+package cid
 
 import (
 	"seehuhn.de/go/pdf"
@@ -43,9 +43,9 @@ type seq struct {
 	values []funit.Int16
 }
 
-// EncodeCIDWidths constructs the /W array for PDF CIDFonts.
+// encodeWidths constructs the /W array for PDF CIDFonts.
 // See section 9.7.4.3 of PDF 32000-1:2008 for details.
-func EncodeCIDWidths(w []funit.Int16, scale float64) (pdf.Integer, pdf.Array) {
+func encodeWidths(w []funit.Int16, scale float64) (pdf.Integer, pdf.Array) {
 	n := len(w)
 
 	dw := mostFrequent(w)

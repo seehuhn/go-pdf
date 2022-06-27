@@ -16,38 +16,6 @@
 
 package font
 
-import (
-	"sort"
-)
-
-// CMapEntry describes the association between a character code and
-// a glyph ID.
-type CMapEntry struct {
-	CharCode uint16
-	GID      GlyphID
-}
-
-// MakeSubset converts a mapping from a full font to a subsetted font.
-// It also returns the list of original glyphs to include in the subset.
-func MakeSubset(origMapping []CMapEntry) ([]CMapEntry, []GlyphID) {
-	newMapping := append([]CMapEntry(nil), origMapping...)
-	sort.Slice(newMapping, func(i, j int) bool {
-		return newMapping[i].CharCode < newMapping[j].CharCode
-	})
-
-	newToOrigGid := []GlyphID{0} // always include the .notdef glyph
-	for i, m := range newMapping {
-		if m.GID == 0 {
-			continue
-		}
-		newGid := GlyphID(len(newToOrigGid))
-		newToOrigGid = append(newToOrigGid, m.GID)
-		newMapping[i].GID = newGid
-	}
-
-	return newMapping, newToOrigGid
-}
-
 const subsetModulus = 26 * 26 * 26 * 26 * 26 * 26
 
 // GetSubsetTag constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe

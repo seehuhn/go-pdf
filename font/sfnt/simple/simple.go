@@ -170,6 +170,13 @@ func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
 	return pdf.String{c}
 }
 
+// cMapEntry describes the association between a character code and
+// a glyph ID.
+type cMapEntry struct {
+	CharCode uint16
+	GID      font.GlyphID
+}
+
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	if s.nextCharCode > 256 {
 		return fmt.Errorf("too many different glyphs for simple font %q",
@@ -177,9 +184,9 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	}
 
 	// Determine the subset of glyphs to include.
-	mapping := make([]font.CMapEntry, 0, len(s.enc))
+	mapping := make([]cMapEntry, 0, len(s.enc))
 	for gid, c := range s.enc {
-		mapping = append(mapping, font.CMapEntry{
+		mapping = append(mapping, cMapEntry{
 			CharCode: uint16(c),
 			GID:      gid,
 		})

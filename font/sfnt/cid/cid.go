@@ -254,7 +254,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 
 	q := 1000 / float64(subsetInfo.UnitsPerEm)
 
-	DW, W := font.EncodeCIDWidths(s.info.Widths(), q)
+	DW, W := encodeWidths(s.info.Widths(), q)
 
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
