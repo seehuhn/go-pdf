@@ -212,7 +212,6 @@ func encodePaths(commands []GlyphOp) [][]byte {
 			} else {
 				res = append(res, mov.Args[0].Code, mov.Args[1].Code, t2rmoveto.Bytes())
 			}
-
 			cmds = cmds[1:]
 
 		case OpLineTo, OpCurveTo:
@@ -221,9 +220,8 @@ func encodePaths(commands []GlyphOp) [][]byte {
 				k++
 			}
 			path := cmds[:k]
-			cmds = cmds[k:]
-
 			res = append(res, encodeSubPath(path)...)
+			cmds = cmds[k:]
 
 		case OpHintMask, OpCntrMask:
 			op := t2hintmask
@@ -231,8 +229,8 @@ func encodePaths(commands []GlyphOp) [][]byte {
 				op = t2cntrmask
 			}
 			res = append(res, append(op.Bytes(), cmds[0].Args[0].Code...))
-
 			cmds = cmds[1:]
+
 		default:
 			panic("unhandled command")
 		}
@@ -319,17 +317,21 @@ func (enc encoder) Edges(from int) []edge {
 
 	var edges []edge
 
-	// TODO(voss): avoid generating unnecessary edges.
-
-	if cmds[0].Op == OpLineTo {
+	switch cmds[0].Op {
+	case OpLineTo:
 		// {dx dy}+  rlineto
 		var code [][]byte
 		pos := 0
 		for pos < len(cmds) && cmds[pos].Op == OpLineTo && len(code)+2 <= maxStack {
-			code = append(code,
-				cmds[pos].Args[0].Code,
-				cmds[pos].Args[1].Code)
+			code = cmds[pos].appendArgs(code)
 			pos++
+			if pos < len(cmds) &&
+				cmds[pos].Op == OpLineTo &&
+				!cmds[pos].Args[0].IsZero() &&
+				!cmds[pos].Args[1].IsZero() &&
+				len(code)+2 <= maxStack {
+				continue
+			}
 			edges = append(edges, edge{
 				code: copyOp(code, t2rlineto),
 				to:   from + pos,
@@ -346,91 +348,82 @@ func (enc encoder) Edges(from int) []edge {
 
 		// dx {dy dx}* dy?  hlineto
 		// dy {dx dy}* dx?  vlineto
-		code = nil
-		var aligned []int // +1=horizontal, -1=vertical
-		for _, cmd := range cmds {
-			if cmd.Op != OpLineTo {
-				break
-			}
-			dir := 0
-			if cmd.Args[1].IsZero() {
-				dir = 1
-			} else if cmd.Args[0].IsZero() {
-				dir = -1
-			}
-			aligned = append(aligned, dir) // TODO(voss): can we avoid this allocation?
-		}
-
-		sign := aligned[0]
-		if sign != 0 {
-			op := []t2op{t2hlineto, t2vlineto}[(1-sign)/2]
+		ops := []t2op{t2vlineto, t2hlineto}
+		for checkIdx, op := range ops {
+			code = code[:0]
 			pos = 0
-			sign = 1 // TODO(voss): double-check this
-			for pos < len(aligned) && sign*aligned[pos] > 0 && len(code)+1 <= maxStack {
-				code = append(code, cmds[pos].Args[(1-sign)/2].Code)
-				sign = -sign
+			for pos < len(cmds) && cmds[pos].Op == OpLineTo && len(code)+1 <= maxStack {
+				if !cmds[pos].Args[checkIdx].IsZero() {
+					break
+				}
+				checkIdx = 1 - checkIdx
+				code = append(code, cmds[pos].Args[checkIdx].Code)
 				pos++
 			}
-
-			edges = append(edges, edge{
-				code: copyOp(code, op),
-				to:   from + pos,
-			})
+			if len(code) > 0 {
+				edges = append(edges, edge{
+					code: copyOp(code, op),
+					to:   from + pos,
+				})
+			}
 		}
-	} else { // Cmds[0].Op == CmdCurveTo
+
+	case OpCurveTo:
 		// (dxa dya dxb dyb dxc dyc)+ rrcurveto
 		pos := 0
 		var code [][]byte
-		if pos < len(cmds) && cmds[pos].Op == OpCurveTo && len(code)+6 <= maxStack {
+		for pos < len(cmds) && cmds[pos].Op == OpCurveTo && len(code)+6 <= maxStack {
 			code = cmds[pos].appendArgs(code)
+			pos++
+			if pos < len(cmds) &&
+				cmds[pos].Op == OpCurveTo &&
+				!cmds[pos].Args[0].IsZero() &&
+				!cmds[pos].Args[1].IsZero() &&
+				!cmds[pos].Args[4].IsZero() &&
+				!cmds[pos].Args[5].IsZero() &&
+				len(code)+6 <= maxStack {
+				continue
+			}
 			edges = append(edges, edge{
 				code: copyOp(code, t2rrcurveto),
-				to:   from + pos + 1,
+				to:   from + pos,
 			})
-			pos++
 		}
 
 		// (dxa dya dxb dyb dxc dyc)+ dxd dyd rcurveline
 		if pos < len(cmds) && cmds[pos].Op == OpLineTo && len(code)+2 <= maxStack {
-			code = cmds[pos].appendArgs(code)
 			edges = append(edges, edge{
-				code: copyOp(code, t2rcurveline),
+				code: copyOp(code, t2rcurveline, cmds[pos].Args...),
 				to:   from + pos + 1,
 			})
 		}
 
 		// dya? (dxa dxb dyb dxc)+ hhcurveto
 		// dxa? (dya dxb dyb dyc)+ vvcurveto
-		hhvv := []struct {
-			op   t2op
-			offs int
-		}{
-			{t2hhcurveto, 1},
-			{t2vvcurveto, 0},
-		}
-		for _, hv := range hhvv {
-			code = nil
+		ops := []t2op{t2vvcurveto, t2hhcurveto}
+		for offs, op := range ops {
+			code = code[:0]
 			pos = 0
 			// 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
 			for pos < len(cmds) && cmds[pos].Op == OpCurveTo && len(code)+4 <= maxStack {
-				if !cmds[pos].Args[4+hv.offs].IsZero() {
+				if !cmds[pos].Args[4+offs].IsZero() {
 					break
 				}
-				if !cmds[pos].Args[0+hv.offs].IsZero() {
+				if !cmds[pos].Args[0+offs].IsZero() {
 					if pos == 0 && len(code)+5 <= maxStack {
-						code = append(code, cmds[0].Args[0+hv.offs].Code)
+						code = append(code, cmds[0].Args[0+offs].Code)
 					} else {
 						break
 					}
 				}
 				code = append(code,
-					cmds[pos].Args[1-hv.offs].Code,
+					cmds[pos].Args[1-offs].Code,
 					cmds[pos].Args[2].Code,
 					cmds[pos].Args[3].Code,
-					cmds[pos].Args[5-hv.offs].Code)
+					cmds[pos].Args[5-offs].Code)
 				pos++
 				edges = append(edges, edge{
-					code: copyOp(code, hv.op),
+					code: copyOp(code, op),
 					to:   from + pos,
 				})
 			}
@@ -438,13 +431,14 @@ func (enc encoder) Edges(from int) []edge {
 
 		// dx1 dx2 dy2 dy3 (dya dxb dyb dxc  dxd dxe dye dyf)* dxf?  hvcurveto
 		// ... vhcurveto
-		for offs, op := range []t2op{t2hvcurveto, t2vhcurveto} {
-			code = nil
+		ops = []t2op{t2hvcurveto, t2vhcurveto}
+		for offs, op := range ops {
+			code = code[:0]
+			pos = 0
 
 			origOffs := offs
 
 			// Args: 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
-			pos = 0
 			for pos < len(cmds) && cmds[pos].Op == OpCurveTo {
 				if !cmds[pos].Args[1-offs].IsZero() {
 					break
@@ -488,7 +482,7 @@ func (enc encoder) Edges(from int) []edge {
 			cmds[0].Args[5].IsZero() && cmds[1].Args[1].IsZero() {
 			// Args: 0=dxa 1=dya   2=dxb 3=dyb   4=dxc 5=dyc
 
-			code = nil
+			code = code[:0]
 
 			dy := cmds[0].Args[3].Val + cmds[1].Args[3].Val
 			if cmds[0].Args[1].IsZero() && cmds[1].Args[5].IsZero() &&
@@ -530,6 +524,9 @@ func (enc encoder) Edges(from int) []edge {
 			// dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd  flex
 			// dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6  flex1
 		}
+
+	default:
+		panic("unexpected command type")
 	}
 
 	return edges

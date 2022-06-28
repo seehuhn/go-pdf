@@ -101,7 +101,7 @@ func (x Fixed16) Abs() Fixed16 {
 }
 
 // decodeCharString returns the commands for the given charstring.
-func decodeCharString(info *decodeInfo, code []byte) (*Glyph, error) {
+func (info *decodeInfo) decodeCharString(code []byte) (*Glyph, error) {
 	res := &Glyph{
 		Width: info.defaultWidth,
 	}

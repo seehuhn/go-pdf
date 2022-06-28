@@ -302,7 +302,7 @@ func TestType2EncodeNumber(t *testing.T) {
 		code = append(code, t2hmoveto.Bytes()...)
 		code = append(code, t2endchar.Bytes()...)
 
-		glyph, err := decodeCharString(info, code)
+		glyph, err := info.decodeCharString(code)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -325,7 +325,7 @@ func TestType2EncodeInt(t *testing.T) {
 		code = append(code, t2rmoveto.Bytes()...)
 		code = append(code, t2endchar.Bytes()...)
 
-		glyph, err := decodeCharString(info, code)
+		glyph, err := info.decodeCharString(code)
 		if err != nil {
 			t.Fatal(err)
 		}

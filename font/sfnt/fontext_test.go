@@ -149,7 +149,7 @@ func FuzzFont(f *testing.F) {
 	})
 }
 
-func TestAll(t *testing.T) {
+func DisabledTestAll(t *testing.T) {
 	fd, err := os.Open("../../demo/try-all-fonts/all-fonts")
 	if err != nil {
 		t.Fatal(err)

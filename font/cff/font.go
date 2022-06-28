@@ -306,7 +306,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 		fdIdx := fdSelect(font.GlyphID(gid))
 		info := decoders[fdIdx]
 
-		glyph, err := decodeCharString(info, code)
+		glyph, err := info.decodeCharString(code)
 		if err != nil {
 			return nil, err
 		}

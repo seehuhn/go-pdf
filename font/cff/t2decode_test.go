@@ -44,7 +44,7 @@ func FuzzT2Decode(f *testing.F) {
 			defaultWidth: 500,
 			nominalWidth: 666,
 		}
-		g1, err := decodeCharString(info, data1)
+		g1, err := info.decodeCharString(data1)
 		if err != nil {
 			return
 		}
@@ -54,7 +54,7 @@ func FuzzT2Decode(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		g2, err := decodeCharString(info, data2)
+		g2, err := info.decodeCharString(data2)
 		if err != nil {
 			fmt.Printf("A % x\n", data1)
 			fmt.Printf("A %s\n", g1)
