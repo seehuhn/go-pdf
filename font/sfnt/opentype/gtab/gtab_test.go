@@ -70,7 +70,7 @@ func TestGetLookups(t *testing.T) {
 
 func FuzzGtab(f *testing.F) {
 	info := &Info{}
-	f.Add(info.Encode())
+	f.Add(info.Encode(999))
 
 	info.ScriptList = ScriptListInfo{
 		{Script: locale.ScriptUndefined, Lang: locale.LangUndefined}: {
@@ -165,7 +165,7 @@ func FuzzGtab(f *testing.F) {
 			},
 		},
 	}
-	f.Add(info.Encode())
+	f.Add(info.Encode(999))
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
 		info1, err := doRead("test", bytes.NewReader(data1), readDummySubtable)
@@ -173,7 +173,7 @@ func FuzzGtab(f *testing.F) {
 			return
 		}
 
-		data2 := info1.Encode()
+		data2 := info1.Encode(999)
 
 		info2, err := doRead("test", bytes.NewReader(data2), readDummySubtable)
 		if err != nil {

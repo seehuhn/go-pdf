@@ -128,10 +128,10 @@ func doRead(tableName string, r parser.ReadSeekSizer, sr subtableReader) (*Info,
 }
 
 // Encode returns the binary representation of a "GSUB" or "GPOS" table.
-func (info *Info) Encode() []byte {
+func (info *Info) Encode(extLookupType uint16) []byte {
 	scriptList := info.ScriptList.encode()
 	featureList := info.FeatureList.encode()
-	lookupList := info.LookupList.encode()
+	lookupList := info.LookupList.encode(extLookupType)
 
 	total := 10
 	var scriptListOffset int

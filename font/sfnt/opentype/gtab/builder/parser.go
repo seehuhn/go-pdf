@@ -615,8 +615,8 @@ func (p *parser) readGpos4() *gtab.LookupTable {
 		}
 
 		subtable := &gtab.Gpos4_1{
-			Marks:     makeCoverageTable(markGlyphs),
-			Base:      makeCoverageTable(baseGlyphs),
+			MarkCov:   makeCoverageTable(markGlyphs),
+			BaseCov:   makeCoverageTable(baseGlyphs),
 			MarkArray: markArray,
 			BaseArray: baseArray,
 		}

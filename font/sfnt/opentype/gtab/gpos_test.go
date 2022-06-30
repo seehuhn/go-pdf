@@ -83,7 +83,10 @@ func TestGpos2_2(t *testing.T) {
 	}
 	data := l1.Encode()
 	p := parser.New("test", bytes.NewReader(data))
-	p.Discard(2)
+	err := p.Discard(2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	l2, err := readGpos2_2(p, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -95,8 +98,8 @@ func TestGpos2_2(t *testing.T) {
 
 func TestGpos4_1(t *testing.T) {
 	l1 := &Gpos4_1{
-		Marks: coverage.Table{1: 0},
-		Base:  coverage.Table{2: 0},
+		MarkCov: coverage.Table{1: 0},
+		BaseCov: coverage.Table{2: 0},
 		MarkArray: []markarray.Record{
 			{
 				Class: 0,
@@ -117,7 +120,10 @@ func TestGpos4_1(t *testing.T) {
 	}
 	data := l1.Encode()
 	p := parser.New("test", bytes.NewReader(data))
-	p.Discard(2)
+	err := p.Discard(2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	l2, err := readGpos4_1(p, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -217,12 +223,12 @@ func FuzzGpos4_1(f *testing.F) {
 	l := &Gpos4_1{}
 	f.Add(l.Encode())
 	l = &Gpos4_1{
-		Marks: coverage.Table{
+		MarkCov: coverage.Table{
 			1: 0,
 			3: 1,
 			9: 2,
 		},
-		Base: coverage.Table{
+		BaseCov: coverage.Table{
 			2: 0,
 			4: 1,
 			6: 2,
@@ -269,5 +275,64 @@ func FuzzGpos4_1(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		doFuzz(t, 4, 1, readGpos4_1, data)
+	})
+}
+
+func FuzzGpos6_1(f *testing.F) {
+	l := &Gpos6_1{}
+	f.Add(l.Encode())
+	l = &Gpos6_1{
+		Mark1Cov: coverage.Table{
+			1: 0,
+			3: 1,
+			9: 2,
+		},
+		Mark2Cov: coverage.Table{
+			2: 0,
+			4: 1,
+			6: 2,
+		},
+		Mark1Array: []markarray.Record{
+			{
+				Class: 0,
+				Table: anchor.Table{
+					X: -32768,
+					Y: 0,
+				},
+			},
+			{
+				Class: 1,
+				Table: anchor.Table{
+					X: 32767,
+					Y: 0,
+				},
+			},
+			{
+				Class: 0,
+				Table: anchor.Table{
+					X: -1,
+					Y: 1,
+				},
+			},
+		},
+		Mark2Array: [][]anchor.Table{
+			{
+				{X: -2, Y: -1},
+				{X: 0, Y: 1},
+			},
+			{
+				{X: 2, Y: 3},
+				{X: 4, Y: 5},
+			},
+			{
+				{X: 6, Y: 7},
+				{X: 8, Y: 255},
+			},
+		},
+	}
+	f.Add(l.Encode())
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 6, 1, readGpos6_1, data)
 	})
 }

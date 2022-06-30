@@ -86,8 +86,8 @@ func Write(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, err
 	})
 
 	buf := &bytes.Buffer{}
-	binary.Write(buf, binary.BigEndian, header)
-	binary.Write(buf, binary.BigEndian, records)
+	_ = binary.Write(buf, binary.BigEndian, header)
+	_ = binary.Write(buf, binary.BigEndian, records)
 	headerBytes := buf.Bytes()
 	totalSum += checksum(headerBytes)
 

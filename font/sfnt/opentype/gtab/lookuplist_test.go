@@ -66,7 +66,7 @@ func FuzzLookupList(f *testing.F) {
 			},
 		},
 	}
-	f.Add(l.encode())
+	f.Add(l.encode(999))
 
 	l = LookupList{
 		&LookupTable{
@@ -79,7 +79,7 @@ func FuzzLookupList(f *testing.F) {
 			},
 		},
 	}
-	f.Add(l.encode())
+	f.Add(l.encode(999))
 
 	l = LookupList{
 		&LookupTable{
@@ -112,7 +112,7 @@ func FuzzLookupList(f *testing.F) {
 			},
 		},
 	}
-	f.Add(l.encode())
+	f.Add(l.encode(999))
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
 		p := parser.New("lookupList test", bytes.NewReader(data1))
@@ -121,7 +121,7 @@ func FuzzLookupList(f *testing.F) {
 			return
 		}
 
-		data2 := l1.encode()
+		data2 := l1.encode(999)
 
 		p = parser.New("lookupList test", bytes.NewReader(data2))
 		l2, err := readLookupList(p, 0, readDummySubtable)

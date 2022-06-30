@@ -19,6 +19,7 @@ package sfnt_test
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"os"
 	"testing"
 
@@ -174,11 +175,10 @@ func DisabledTestAll(t *testing.T) {
 		}
 		numSuccess++
 
-		_ = info
-		// _, err = info.Write(io.Discard)
-		// if err != nil {
-		// 	t.Error(err)
-		// }
+		_, err = info.Write(io.Discard)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 	t.Errorf("%d read, %d failed", numSuccess, numFail)
 }

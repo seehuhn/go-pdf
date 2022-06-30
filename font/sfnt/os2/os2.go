@@ -299,7 +299,7 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		FirstCharIndex:     firstCharIndex,
 		LastCharIndex:      lastCharIndex,
 	}
-	binary.Write(buf, binary.BigEndian, v0)
+	_ = binary.Write(buf, binary.BigEndian, v0)
 
 	v0ms := &v0MsData{
 		TypoAscender:  info.Ascent,
@@ -308,7 +308,7 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		WinAscent:     info.Ascent,   // TODO(voss)
 		WinDescent:    -info.Descent, // TODO(voss)
 	}
-	binary.Write(buf, binary.BigEndian, v0ms)
+	_ = binary.Write(buf, binary.BigEndian, v0ms)
 
 	var codePageRange uint64 // TODO(voss)
 	// setCodePageBit := func(b int) {

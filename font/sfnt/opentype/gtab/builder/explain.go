@@ -252,7 +252,7 @@ func ExplainGpos(fontInfo *sfnt.Info) []string {
 
 			case *gtab.Gpos4_1:
 				checkType(4)
-				markGlyphs := l.Marks.Glyphs()
+				markGlyphs := l.MarkCov.Glyphs()
 				for i, gid := range markGlyphs {
 					ee.w.WriteString("\n\tmark ")
 					ee.writeGlyphList([]font.GlyphID{gid})
@@ -262,7 +262,7 @@ func ExplainGpos(fontInfo *sfnt.Info) []string {
 					ee.w.WriteRune(';')
 				}
 
-				baseGlyphs := l.Base.Glyphs()
+				baseGlyphs := l.BaseCov.Glyphs()
 				for i, gid := range baseGlyphs {
 					ee.w.WriteString("\n\tbase ")
 					ee.writeGlyphList([]font.GlyphID{gid})

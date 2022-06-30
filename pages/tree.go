@@ -101,6 +101,13 @@ func (tree *PageTree) NewPage(attr *Attributes) (*Page, error) {
 	return pp.NewPage(attr)
 }
 
+func (tree *PageTree) defaultPageRange() *PageRange {
+	if len(tree.ranges) == 0 {
+		return tree.NewPageRange(tree.attr)
+	}
+	return tree.ranges[len(tree.ranges)-1]
+}
+
 // NewPageRange creates a new page range, which can be used to later add
 // pages inside the PDF file.
 func (tree *PageTree) NewPageRange(attr *DefaultAttributes) *PageRange {
@@ -110,13 +117,6 @@ func (tree *PageTree) NewPageRange(attr *DefaultAttributes) *PageRange {
 	}
 	tree.ranges = append(tree.ranges, r)
 	return r
-}
-
-func (tree *PageTree) defaultPageRange() *PageRange {
-	if len(tree.ranges) == 0 {
-		return tree.NewPageRange(tree.attr)
-	}
-	return tree.ranges[len(tree.ranges)-1]
 }
 
 // A PageRange represents a consecutive range of pages in a PDF file.
@@ -187,6 +187,9 @@ func (pp *PageRange) finish() (pdf.Dict, *pdf.Reference, error) {
 	return res, pp.refs[0], nil
 }
 
+// Merge writes the child nodes k, k+1, ... to the PDF file, replacing them
+// with a \Pages node.  Nodes 0, 1, ..., k-1 are kept unchanged.
+// On return, the list of children has k+1 elements.
 func (pp *PageRange) merge(k int) error {
 	kids := pp.dicts[k:]
 	kidsRefs := pp.refs[k:]

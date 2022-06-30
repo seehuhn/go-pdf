@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
 	"seehuhn.de/go/pdf/font/sfnt/maxp"
 	"seehuhn.de/go/pdf/font/sfnt/name"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
@@ -100,10 +101,10 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		tableData["GDEF"] = info.Gdef.Encode()
 	}
 	if info.Gsub != nil {
-		tableData["GSUB"] = info.Gsub.Encode()
+		tableData["GSUB"] = info.Gsub.Encode(gtab.GsubExtensionLookupType)
 	}
 	if info.Gpos != nil {
-		tableData["GPOS"] = info.Gpos.Encode()
+		tableData["GPOS"] = info.Gpos.Encode(gtab.GposExtensionLookupType)
 	}
 
 	return table.Write(w, scalerType, tableData)

@@ -17,7 +17,6 @@
 package gtab
 
 import (
-	"fmt"
 	"sort"
 
 	"seehuhn.de/go/pdf/font"
@@ -212,15 +211,33 @@ func isExtension(ss Subtables) (uint16, bool) {
 	return l.ExtensionLookupType, true
 }
 
-func (info LookupList) encode() []byte {
+type chunkCode uint32
+
+const (
+	chunkHeader chunkCode = iota << 28
+	chunkTable
+	chunkSubtable
+	chunkExtReplace
+
+	chunkTypeMask     chunkCode = 0b1111_00000000000000_00000000000000
+	chunkTableMask    chunkCode = 0b0000_11111111111111_00000000000000
+	chunkSubtableMask chunkCode = 0b0000_00000000000000_11111111111111
+)
+
+func (info LookupList) encode(extLookupType uint16) []byte {
 	if info == nil {
 		return nil
 	}
 
 	lookupCount := len(info)
+	if lookupCount >= 1<<14 {
+		panic("too many lookup tables")
+	}
 
+	// Make a list of all chunks which need to be written.
 	var chunks []layoutChunk
 	chunks = append(chunks, layoutChunk{
+		code: chunkHeader,
 		size: 2 + 2*uint32(lookupCount),
 	})
 	for i, l := range info {
@@ -228,66 +245,84 @@ func (info LookupList) encode() []byte {
 		if l.Meta.LookupFlag&LookupUseMarkFilteringSet != 0 {
 			lookupHeaderLen += 2
 		}
-		lCode := (uint32(i) & 0x3FFF) << 14
+		tCode := chunkCode(i) << 14
 		chunks = append(chunks, layoutChunk{
-			code: 1<<28 | lCode,
+			code: chunkTable | tCode,
 			size: uint32(lookupHeaderLen),
 		})
+		if len(l.Subtables) >= 1<<14 {
+			panic("too many subtables")
+		}
 		for j, subtable := range l.Subtables {
-			sCode := uint32(j) & 0x3FFF
+			sCode := chunkCode(j)
 			chunks = append(chunks, layoutChunk{
-				code: 2<<28 | lCode | sCode,
+				code: chunkSubtable | tCode | sCode,
 				size: uint32(subtable.EncodeLen()),
 			})
 		}
 	}
 
-	chunkPos := make(map[uint32]uint32, len(chunks))
-	total := uint32(0)
+	// If needed, reorder the chunks or introduce extension records.
 	isTooLarge := false
+	var total uint32
 	for i := range chunks {
 		code := chunks[i].code
-		if code>>28 == 1 && total > 0xFFFF {
+		if code&chunkTypeMask == chunkTable && total > 0xFFFF {
 			isTooLarge = true
 			break
 		}
+		total += chunks[i].size
+	}
+	if isTooLarge {
+		chunks = info.tryReorder(chunks)
+	}
+
+	// Layout the chunks.
+	chunkPos := make(map[chunkCode]uint32, len(chunks))
+	total = 0
+	for i := range chunks {
+		code := chunks[i].code
 		chunkPos[code] = total
 		total += chunks[i].size
 	}
 
-	if isTooLarge {
-		// reorder chunks and use extension records as needed.
-		chunks = info.tryReorder(chunks)
-	}
-
+	// Construct the lookup table in memory.
 	buf := make([]byte, 0, total)
 	for k := range chunks {
 		code := chunks[k].code
-		if chunkPos[code] != uint32(len(buf)) {
+		if chunkPos[code] != uint32(len(buf)) { // TODO(voss): remove?
 			panic("internal error")
 		}
-		switch code >> 28 {
-		case 0: // LookupList table
+		switch code & chunkTypeMask {
+		case chunkHeader:
 			buf = append(buf, byte(lookupCount>>8), byte(lookupCount))
 			for i := range info {
-				lCode := (uint32(i) & 0x3FFF) << 14
-				lookupOffset := chunkPos[1<<28|lCode]
+				tCode := chunkCode(i) << 14
+				lookupOffset := chunkPos[chunkTable|tCode]
 				buf = append(buf, byte(lookupOffset>>8), byte(lookupOffset))
 			}
-		case 1: // Lookup table
-			lCode := code & 0x0FFFC000
-			i := int(lCode >> 14)
+		case chunkTable:
+			tCode := code & chunkTableMask
+			i := int(tCode) >> 14
 			li := info[i]
 			subTableCount := len(li.Subtables)
+			lookupType := li.Meta.LookupType
+			if _, replaced := chunkPos[chunkExtReplace|tCode]; replaced {
+				// fix the lookup type in case of replaced subtables
+				lookupType = extLookupType
+			}
 			buf = append(buf,
-				byte(li.Meta.LookupType>>8), byte(li.Meta.LookupType),
+				byte(lookupType>>8), byte(lookupType),
 				byte(li.Meta.LookupFlag>>8), byte(li.Meta.LookupFlag),
 				byte(subTableCount>>8), byte(subTableCount),
 			)
 			base := chunkPos[code]
 			for j := range li.Subtables {
-				sCode := uint32(j) & 0x3FFF
-				subtablePos := chunkPos[2<<28|lCode|sCode]
+				sCode := chunkCode(j)
+				subtablePos, replaced := chunkPos[chunkExtReplace|tCode|sCode]
+				if !replaced {
+					subtablePos = chunkPos[chunkSubtable|tCode|sCode]
+				}
 				subtableOffset := subtablePos - base
 				buf = append(buf, byte(subtableOffset>>8), byte(subtableOffset))
 			}
@@ -296,9 +331,20 @@ func (info LookupList) encode() []byte {
 					byte(li.Meta.MarkFilteringSet>>8), byte(li.Meta.MarkFilteringSet),
 				)
 			}
-		case 2: // lookup subtable
-			i := int((code >> 14) & 0x3FFF)
-			j := int(code & 0x3FFF)
+		case chunkExtReplace:
+			tCode := code & chunkTableMask
+			sCode := code & chunkSubtableMask
+			lookup := info[tCode>>14]
+			pos := chunkPos[code]
+			extPos := chunkPos[chunkSubtable|tCode|sCode]
+			subtable := &extensionSubtable{
+				ExtensionLookupType: lookup.Meta.LookupType,
+				ExtensionOffset:     int64(extPos - pos),
+			}
+			buf = append(buf, subtable.Encode()...)
+		case chunkSubtable:
+			i := code & chunkTableMask >> 14
+			j := code & chunkSubtableMask
 			subtable := info[i].Subtables[j]
 			buf = append(buf, subtable.Encode()...)
 		}
@@ -307,74 +353,98 @@ func (info LookupList) encode() []byte {
 }
 
 type layoutChunk struct {
-	code uint32
+	code chunkCode
 	size uint32
 }
 
 func (info LookupList) tryReorder(chunks []layoutChunk) []layoutChunk {
-	lookupSize := make(map[uint32]uint32)
-
-	type lInfo struct {
-		lCode uint32
-		size  uint32
-	}
-	var lookups []lInfo
-
 	total := uint32(0)
 	for i := range chunks {
 		total += chunks[i].size
-		code := chunks[i].code
-		if code == 0 {
-			continue
-		}
-		lCode := (code >> 14) & 0x3FFF
-		lookupSize[lCode] += chunks[i].size
-		if code>>28 == 1 {
-			lookups = append(lookups, lInfo{lCode: lCode})
-		}
 	}
 
-	for i := range lookups {
-		lookups[i].size = lookupSize[lookups[i].lCode]
-	}
-	sort.Slice(lookups, func(i, j int) bool {
-		if lookups[i].size != lookups[j].size {
-			return lookups[i].size > lookups[j].size
+	lookupSize := make(map[chunkCode]uint32)
+	var lookups []chunkCode
+	for i := range chunks {
+		code := chunks[i].code
+		tp := code & chunkTypeMask
+		tCode := code & chunkTableMask
+		if tp == chunkHeader {
+			continue
+		} else if tp == chunkTable {
+			lookups = append(lookups, tCode)
 		}
-		return lookups[i].lCode > lookups[j].lCode
+		lookupSize[tCode] += chunks[i].size
+	}
+	sort.SliceStable(lookups, func(i, j int) bool {
+		return lookupSize[lookups[i]] < lookupSize[lookups[j]]
 	})
 
-	replace := make(map[uint32]bool)
-	largestLookup := lookups[0].lCode
-	largestOffset := total - lookups[0].size
-	pos := 1
-	for largestOffset > 0xFFFF {
-		l := info[lookups[pos].lCode]
+	// Move the largest table to the end and introduce extension subtables
+	// as needed.
+	biggestLookup := lookups[len(lookups)-1]
+	lastPos := total - lookupSize[biggestLookup]
+	idx := len(lookups) - 2
+	replace := make(map[chunkCode]bool)
+	extra := 0
+	for lastPos > 0xFFFF && idx >= 0 {
+		tCode := lookups[idx]
+
+		oldSize := lookupSize[tCode]
+		l := info[tCode>>14]
 		lookupHeaderLen := 6 + 2*len(l.Subtables)
 		if l.Meta.LookupFlag&LookupUseMarkFilteringSet != 0 {
 			lookupHeaderLen += 2
 		}
-
-		oldSize := lookups[pos].size
 		newSize := uint32(lookupHeaderLen) + 8*uint32(len(l.Subtables))
+
 		if newSize < oldSize {
-			replace[lookups[pos].lCode] = true
-			largestOffset -= oldSize - newSize
+			replace[tCode] = true
+			extra += len(l.Subtables)
+			lastPos -= oldSize - newSize
 		}
 
-		pos++
+		idx--
+	}
+	if lastPos > 0xFFFF {
+		panic("too much data for lookup list table")
 	}
 
-	for i := range info {
-		li := uint32(i)
-		fmt.Println(i, lookupSize[li], replace[li], li == largestLookup)
+	res := make([]layoutChunk, 0, len(chunks)+extra)
+	var moved, ext []layoutChunk
+	for _, chunk := range chunks {
+		code := chunk.code
+		tp := code & chunkTypeMask
+		tCode := code & chunkTableMask
+		switch {
+		case tp == chunkHeader:
+			res = append(res, chunk)
+		case tCode == biggestLookup:
+			moved = append(moved, chunk)
+		case replace[tCode]:
+			sCode := code & chunkSubtableMask
+			if tp == chunkSubtable {
+				res = append(res, layoutChunk{
+					code: chunkExtReplace | tCode | sCode,
+					size: 8,
+				})
+				ext = append(ext, chunk)
+			} else {
+				res = append(res, chunk)
+			}
+		default:
+			res = append(res, chunk)
+		}
 	}
+	res = append(res, moved...)
+	res = append(res, ext...)
 
-	panic("not implemented") // TODO(voss): finish this
+	return res
 }
 
-// Extension Substitution Subtable Format 1
+// Extension Substitution/Positioning Subtable Format 1
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#71-extension-substitution-subtable-format-1
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#lookuptype-9-extension-positioning
 type extensionSubtable struct {
 	ExtensionLookupType uint16
 	ExtensionOffset     int64
@@ -478,3 +548,10 @@ func (info *Info) FindLookups(loc *locale.Locale, includeFeature map[string]bool
 	})
 	return ll
 }
+
+// Lookuptypes for extension lookup records.
+// This can be used as an argument for the [Info.Encode] method.
+const (
+	GposExtensionLookupType uint16 = 9
+	GsubExtensionLookupType uint16 = 7
+)

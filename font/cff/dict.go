@@ -722,21 +722,21 @@ const (
 	opItalicAngle        dictOp = 0x0C02
 	opUnderlinePosition  dictOp = 0x0C03
 	opUnderlineThickness dictOp = 0x0C04
-	opPaintType          dictOp = 0x0C05
-	opCharstringType     dictOp = 0x0C06
-	opFontMatrix         dictOp = 0x0C07
-	opSyntheticBase      dictOp = 0x0C14
-	opPostScript         dictOp = 0x0C15
-	opBaseFontName       dictOp = 0x0C16
-	opROS                dictOp = 0x0C1E
-	opCIDFontVersion     dictOp = 0x0C1F
-	opCIDFontRevision    dictOp = 0x0C20
-	opCIDFontType        dictOp = 0x0C21
-	opCIDCount           dictOp = 0x0C22
-	opUIDBase            dictOp = 0x0C23
-	opFDArray            dictOp = 0x0C24
-	opFDSelect           dictOp = 0x0C25
-	opFontName           dictOp = 0x0C26
+	// opPaintType          dictOp = 0x0C05
+	opCharstringType  dictOp = 0x0C06
+	opFontMatrix      dictOp = 0x0C07
+	opSyntheticBase   dictOp = 0x0C14
+	opPostScript      dictOp = 0x0C15
+	opBaseFontName    dictOp = 0x0C16
+	opROS             dictOp = 0x0C1E
+	opCIDFontVersion  dictOp = 0x0C1F
+	opCIDFontRevision dictOp = 0x0C20
+	opCIDFontType     dictOp = 0x0C21
+	opCIDCount        dictOp = 0x0C22
+	opUIDBase         dictOp = 0x0C23
+	opFDArray         dictOp = 0x0C24
+	opFDSelect        dictOp = 0x0C25
+	opFontName        dictOp = 0x0C26
 
 	// private DICT operators
 	opBlueValues       dictOp = 0x0006
