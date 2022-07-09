@@ -691,6 +691,10 @@ func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 		return nil
 	}
 	baseRecord := l.BaseArray[baseIdx][markRecord.Class]
+	if baseRecord.IsEmpty() {
+		// TODO(voss): verify that this is what others do, too.
+		return nil
+	}
 
 	dx := baseRecord.X - markRecord.X
 	dy := baseRecord.Y - markRecord.Y
@@ -774,6 +778,9 @@ func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	for i := range baseArray {
 		row := make([]anchor.Table, markClassCount)
 		for j := range row {
+			if offsets[j] == 0 {
+				continue
+			}
 			row[j], err = anchor.Read(p, baseArrayPos+int64(offsets[j]))
 			if err != nil {
 				return nil, err
@@ -811,8 +818,16 @@ func (l *Gpos4_1) EncodeLen() int {
 	total += l.MarkCov.EncodeLen()
 	total += l.BaseCov.EncodeLen()
 	total += 2 + (4+6)*len(l.MarkArray)
-	markClassCount := l.countMarkClasses()
-	total += 2 + (2+6)*len(l.BaseArray)*markClassCount
+
+	total += 2
+	for _, row := range l.BaseArray {
+		for _, rec := range row {
+			total += 2
+			if !rec.IsEmpty() {
+				total += 6
+			}
+		}
+	}
 	return total
 }
 
@@ -830,7 +845,15 @@ func (l *Gpos4_1) Encode() []byte {
 	markArrayOffset := total
 	total += 2 + (4+6)*markCount
 	baseArrayOffset := total
-	total += 2 + (2+6)*len(l.BaseArray)*markClassCount
+	total += 2
+	for _, row := range l.BaseArray {
+		for _, rec := range row {
+			total += 2
+			if !rec.IsEmpty() {
+				total += 6
+			}
+		}
+	}
 	res := make([]byte, 0, total)
 
 	res = append(res,
@@ -875,7 +898,11 @@ func (l *Gpos4_1) Encode() []byte {
 	)
 	offs = 2 + 2*baseCount*markClassCount
 	for _, row := range l.BaseArray {
-		for range row {
+		for _, rec := range row {
+			if rec.IsEmpty() {
+				res = append(res, 0, 0)
+				continue
+			}
 			res = append(res,
 				byte(offs>>8), byte(offs),
 			)
@@ -884,6 +911,9 @@ func (l *Gpos4_1) Encode() []byte {
 	}
 	for _, row := range l.BaseArray {
 		for _, rec := range row {
+			if rec.IsEmpty() {
+				continue
+			}
 			res = append(res,
 				0, 1, // anchorFormat
 				byte(rec.X>>8), byte(rec.X),

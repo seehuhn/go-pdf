@@ -40,3 +40,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 	// We ignore the hinting information in formats 2 and 3
 	return Table{X: x, Y: y}, nil
 }
+
+func (rec Table) IsEmpty() bool {
+	return rec.X == 0 && rec.Y == 0
+}
