@@ -372,7 +372,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if total > 0xFFFF {
 		return nil, &font.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
-			Reason:    "too large SeqContext2",
+			Reason:    "SeqContext2 too large",
 		}
 	}
 
@@ -1065,6 +1065,38 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 		}
 	}
 
+	total := 12 + 2*len(rules)
+	total += cov.EncodeLen()
+	total += backtrackClassDef.AppendLen()
+	total += inputClassDef.AppendLen()
+	total += lookaheadClassDef.AppendLen()
+	for _, rr := range rules {
+		if rr == nil {
+			continue
+		}
+		if total > 0xFFFF {
+			return nil, &font.InvalidFontError{
+				SubSystem: "sfnt/opentype/gtab",
+				Reason:    "ChainedSeqContext2 too large",
+			}
+		}
+
+		pos := 2 + 2*len(rr)
+		for _, rule := range rr {
+			if pos > 0xFFFF {
+				return nil, &font.InvalidFontError{
+					SubSystem: "sfnt/opentype/gtab",
+					Reason:    "ChainedSeqContext2 too large",
+				}
+			}
+			pos += 2 + 2*len(rule.Backtrack)
+			pos += 2 + 2*len(rule.Input)
+			pos += 2 + 2*len(rule.Lookahead)
+			pos += 2 + 4*len(rule.Actions)
+		}
+		total += pos
+	}
+
 	res := &ChainedSeqContext2{
 		Cov:       cov,
 		Backtrack: backtrackClassDef,
@@ -1185,13 +1217,16 @@ func (l *ChainedSeqContext2) Encode() []byte {
 	lookaheadOffset := total
 	total += l.Lookahead.AppendLen()
 	chainedSeqRuleSetOffsets := make([]uint16, chainedSeqRuleSetCount)
-	for i, rules := range l.Rules {
-		if rules == nil {
+	for i, rr := range l.Rules {
+		if rr == nil {
 			continue
 		}
+		if total > 0xFFFF {
+			panic("ChainedSeqContext2 too large")
+		}
 		chainedSeqRuleSetOffsets[i] = uint16(total)
-		total += 2 + 2*len(rules)
-		for _, rule := range rules {
+		total += 2 + 2*len(rr)
+		for _, rule := range rr {
 			total += 2 + 2*len(rule.Backtrack)
 			total += 2 + 2*len(rule.Input)
 			total += 2 + 2*len(rule.Lookahead)
@@ -1217,17 +1252,20 @@ func (l *ChainedSeqContext2) Encode() []byte {
 	buf = l.Input.Append(buf)
 	buf = l.Lookahead.Append(buf)
 
-	for _, rules := range l.Rules {
-		if rules == nil {
+	for _, rr := range l.Rules {
+		if rr == nil {
 			continue
 		}
-		chainedSeqRuleCount := len(rules)
+		chainedSeqRuleCount := len(rr)
 		buf = append(buf,
 			byte(chainedSeqRuleCount>>8), byte(chainedSeqRuleCount),
 		)
 
 		pos := 2 + 2*chainedSeqRuleCount
-		for _, rule := range rules {
+		for _, rule := range rr {
+			if pos > 0xFFFF {
+				panic("ChainedSeqContext2 too large")
+			}
 			buf = append(buf,
 				byte(pos>>8), byte(pos),
 			)
@@ -1236,7 +1274,7 @@ func (l *ChainedSeqContext2) Encode() []byte {
 			pos += 2 + 2*len(rule.Lookahead)
 			pos += 2 + 4*len(rule.Actions)
 		}
-		for _, rule := range rules {
+		for _, rule := range rr {
 			backtrackGlyphCount := len(rule.Backtrack)
 			buf = append(buf,
 				byte(backtrackGlyphCount>>8), byte(backtrackGlyphCount),

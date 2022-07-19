@@ -182,3 +182,17 @@ func DisabledTestAll(t *testing.T) {
 	}
 	t.Errorf("%d read, %d failed", numSuccess, numFail)
 }
+
+func DisabledTestOne(t *testing.T) {
+	fname := "/usr/local/texlive/2022/texmf-dist/fonts/opentype/public/coelacanth/Coelacanth.otf"
+
+	info, err := sfnt.ReadFile(fname)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = info.Write(io.Discard)
+	if err != nil {
+		t.Error(err)
+	}
+}
