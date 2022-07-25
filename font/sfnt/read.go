@@ -30,8 +30,10 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
 	"seehuhn.de/go/pdf/font/sfnt/hmtx"
+	"seehuhn.de/go/pdf/font/sfnt/kern"
 	"seehuhn.de/go/pdf/font/sfnt/maxp"
 	"seehuhn.de/go/pdf/font/sfnt/name"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/os2"
@@ -435,6 +437,50 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.Gpos, err = gtab.Read("GPOS", gposFd)
 		if err != nil {
 			return nil, err
+		}
+	} else if header.Has("kern") {
+		kernFd, err := header.TableReader(r, "kern")
+		if err != nil {
+			return nil, err
+		}
+		kern, err := kern.Read(kernFd)
+		if err != nil {
+			return nil, err
+		}
+
+		leftSet := coverage.Set{}
+		for pair := range kern {
+			leftSet[pair.Left] = true
+		}
+		cov := leftSet.ToTable()
+		adjust := make([]map[font.GlyphID]*gtab.PairAdjust, len(cov))
+		for i := range adjust {
+			adjust[i] = make(map[font.GlyphID]*gtab.PairAdjust)
+		}
+		for pair, val := range kern {
+			adjust[cov[pair.Left]][pair.Right] = &gtab.PairAdjust{
+				First: &gtab.GposValueRecord{
+					XAdvance: val,
+				},
+			}
+		}
+		subtable := &gtab.Gpos2_1{
+			Cov:    cov,
+			Adjust: adjust,
+		}
+		info.Gpos = &gtab.Info{
+			ScriptList: map[gtab.ScriptLang]*gtab.Features{
+				{}: {Required: 0},
+			},
+			FeatureList: []*gtab.Feature{
+				{Tag: "kern", Lookups: []gtab.LookupIndex{0}},
+			},
+			LookupList: []*gtab.LookupTable{
+				{
+					Meta:      &gtab.LookupMetaInfo{LookupType: 2},
+					Subtables: []gtab.Subtable{subtable},
+				},
+			},
 		}
 	}
 

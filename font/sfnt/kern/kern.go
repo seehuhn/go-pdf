@@ -30,6 +30,9 @@ import (
 )
 
 // Info contains information from the "kern" table.
+// If the value for a glyph pair is greater than zero, the characters will be moved apart.
+// If the value is less than zero, the character will be moved closer together.
+// https://docs.microsoft.com/en-us/typography/opentype/spec/kern
 type Info map[font.GlyphPair]funit.Int16
 
 // Read reads the "kern" table.

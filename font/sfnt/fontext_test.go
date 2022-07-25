@@ -119,6 +119,33 @@ func FuzzFont(f *testing.F) {
 	}
 	f.Add(buf.Bytes())
 
+	// fd, err := os.Open("../../demo/try-all-fonts/all-fonts")
+	// if err != nil {
+	// 	f.Fatal(err)
+	// }
+	// var fontFiles []string
+	// scanner := bufio.NewScanner(fd)
+	// for scanner.Scan() {
+	// 	fontFiles = append(fontFiles, scanner.Text())
+	// }
+	// err = fd.Close()
+	// if err != nil {
+	// 	f.Fatal(err)
+	// }
+	// for _, fname := range fontFiles {
+	// 	body, err := os.ReadFile(fname)
+	// 	if err != nil {
+	// 		f.Fatal(err)
+	// 	}
+	// 	if len(body) > 65536 {
+	// 		fmt.Print(".")
+	// 		continue
+	// 	}
+	// 	fmt.Print("*")
+	// 	f.Add(body)
+	// }
+	// fmt.Println()
+
 	f.Fuzz(func(t *testing.T, data []byte) {
 		font1, err := sfnt.Read(bytes.NewReader(data))
 		if err != nil {
