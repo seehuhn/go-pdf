@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"math"
 	"os"
 	"testing"
 
@@ -163,7 +164,7 @@ func FuzzFont(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		opt := cmp.Comparer(func(fn1, fn2 cff.FdSelectFn) bool {
+		cmpFdSelectFn := cmp.Comparer(func(fn1, fn2 cff.FdSelectFn) bool {
 			for gid := 0; gid < font1.NumGlyphs(); gid++ {
 				if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
 					return false
@@ -171,7 +172,11 @@ func FuzzFont(f *testing.F) {
 			}
 			return true
 		})
-		if diff := cmp.Diff(font1, font2, opt); diff != "" {
+		cmpFloat := cmp.Comparer(func(x1, x2 float64) bool {
+			d := math.Max(math.Abs(x1), math.Abs(x2)) * 1e-8
+			return math.Abs(x2-x1) <= d
+		})
+		if diff := cmp.Diff(font1, font2, cmpFdSelectFn, cmpFloat); diff != "" {
 			t.Errorf("different (-old +new):\n%s", diff)
 		}
 	})

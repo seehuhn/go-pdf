@@ -81,6 +81,13 @@ func (w Weight) String() string {
 	}
 }
 
+// SimpleString converts the Weight to a string, prefering the nearest
+// textual description over the precise numeric value where needed.
+func (w Weight) SimpleString() string {
+	w = (w + 50) / 100 * 100
+	return w.String()
+}
+
 // Pre-defined weight classes.
 const (
 	WeightThin       Weight = 100

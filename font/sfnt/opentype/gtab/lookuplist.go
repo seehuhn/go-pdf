@@ -450,7 +450,7 @@ type extensionSubtable struct {
 	ExtensionOffset     int64
 }
 
-func readExtensionSubtable(p *parser.Parser, subtablePos int64) (Subtable, error) {
+func readExtensionSubtable(p *parser.Parser, _ int64) (Subtable, error) {
 	buf, err := p.ReadBytes(6)
 	if err != nil {
 		return nil, err

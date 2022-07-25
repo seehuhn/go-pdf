@@ -387,12 +387,14 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.IsBold = true
 	}
 
-	if os2Info != nil {
-		info.IsRegular = os2Info.IsRegular
+	if !(info.IsItalic || info.IsBold) {
+		if os2Info != nil {
+			info.IsRegular = os2Info.IsRegular
+		}
+		// if nameTable != nil && nameTable.Subfamily == "Regular" {
+		// 	info.IsRegular = true
+		// }
 	}
-	// if !(info.IsItalic || info.IsBold) && nameTable != nil && nameTable.Subfamily == "Regular" {
-	// 	info.IsRegular = true
-	// }
 
 	if os2Info != nil {
 		info.IsOblique = os2Info.IsOblique
@@ -470,7 +472,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 		info.Gpos = &gtab.Info{
 			ScriptList: map[gtab.ScriptLang]*gtab.Features{
-				{}: {Required: 0},
+				{}: {Required: 0, Optional: []gtab.FeatureIndex{}},
 			},
 			FeatureList: []*gtab.Feature{
 				{Tag: "kern", Lookups: []gtab.LookupIndex{0}},

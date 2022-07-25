@@ -125,7 +125,7 @@ func (info *Info) Subfamily() string {
 		words = append(words, info.Width.String())
 	}
 	if info.Weight != 0 && info.Weight != font.WeightNormal {
-		words = append(words, info.Weight.String())
+		words = append(words, info.Weight.SimpleString())
 	} else if info.IsBold {
 		words = append(words, "Bold")
 	}
