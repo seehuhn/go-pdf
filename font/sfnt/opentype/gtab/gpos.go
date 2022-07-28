@@ -23,6 +23,7 @@ import (
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
+	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
@@ -650,4 +651,83 @@ func (l *Gpos2_2) Encode() []byte {
 	}
 
 	return res
+}
+
+// Gpos3_1 is a Cursive Attachment Positioning subtable (format 1).
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#cursive-attachment-positioning-format1-cursive-attachment
+type Gpos3_1 struct {
+	Cov     coverage.Table
+	Records []EntryExitRecord // indexed by coverage index
+}
+
+// EntryExitRecord is an OpenType EntryExitRecord table.
+// The Exit anchor point of a glyph is aligned with the Entry anchor point of
+// the following glyph.
+type EntryExitRecord struct {
+	Entry anchor.Table
+	Exit  anchor.Table
+}
+
+// Apply implements the Subtable interface.
+func (l *Gpos3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+	panic("not implemented")
+}
+
+func readGpos3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
+	buf, err := p.ReadBytes(4)
+	if err != nil {
+		return nil, err
+	}
+	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
+	entryExitCount := int(buf[2])<<8 | int(buf[3])
+
+	offsets := make([]uint16, 2*entryExitCount)
+	for i := range offsets {
+		offsets[i], err = p.ReadUint16()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	records := make([]EntryExitRecord, entryExitCount)
+	for i := range records {
+		if offsets[2*i] != 0 {
+			records[i].Entry, err = anchor.Read(p, subtablePos+int64(offsets[2*i]))
+			if err != nil {
+				return nil, err
+			}
+		}
+		if offsets[2*i+1] != 0 {
+			records[i].Exit, err = anchor.Read(p, subtablePos+int64(offsets[2*i+1]))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	cov, err := coverage.Read(p, subtablePos+coverageOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	if entryExitCount > len(cov) {
+		records = records[:len(cov)]
+	} else if entryExitCount < len(cov) {
+		cov.Prune(entryExitCount)
+	}
+
+	return &Gpos3_1{
+		Cov:     cov,
+		Records: records,
+	}, nil
+}
+
+// EncodeLen implements the Subtable interface.
+func (l *Gpos3_1) EncodeLen() int {
+	panic("not implemented")
+}
+
+// Encode implements the Subtable interface.
+func (l *Gpos3_1) Encode() []byte {
+	panic("not implemented")
 }

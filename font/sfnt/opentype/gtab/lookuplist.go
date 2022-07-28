@@ -64,15 +64,15 @@ const (
 
 // Subtable represents a subtable of a "GSUB" or "GPOS" lookup table.
 type Subtable interface {
-	EncodeLen() int
-
-	Encode() []byte
-
 	// Apply attempts to apply the subtable at the given position.
 	// If returns the new glyphs and the new position.  If the subtable
 	// cannot be applied, the unchanged glyphs and a negative position
 	// are returned
 	Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match
+
+	EncodeLen() int
+
+	Encode() []byte
 }
 
 // Subtables is a slice of Subtable.
