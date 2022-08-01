@@ -247,7 +247,6 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		}
 		subsetInfo.Outlines = o2
 		subsetInfo.CMap = nil
-
 	}
 
 	fontName := pdf.Name(subsetTag) + "+" + subsetInfo.PostscriptName()

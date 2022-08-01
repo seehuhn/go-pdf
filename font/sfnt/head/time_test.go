@@ -37,7 +37,6 @@ func TestTimeEncoding(t *testing.T) {
 					t.Errorf("decodeTime(%d+1) != decodeTime(%d)+1", x, x)
 				}
 			}
-
 		}
 	}
 }

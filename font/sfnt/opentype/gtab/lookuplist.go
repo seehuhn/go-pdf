@@ -224,12 +224,12 @@ const (
 	chunkSubtableMask chunkCode = 0b0000_00000000000000_11111111111111
 )
 
-func (info LookupList) encode(extLookupType uint16) []byte {
-	if info == nil {
+func (ll LookupList) encode(extLookupType uint16) []byte {
+	if ll == nil {
 		return nil
 	}
 
-	lookupCount := len(info)
+	lookupCount := len(ll)
 	if lookupCount >= 1<<14 {
 		panic("too many lookup tables")
 	}
@@ -240,7 +240,7 @@ func (info LookupList) encode(extLookupType uint16) []byte {
 		code: chunkHeader,
 		size: 2 + 2*uint32(lookupCount),
 	})
-	for i, l := range info {
+	for i, l := range ll {
 		lookupHeaderLen := 6 + 2*len(l.Subtables)
 		if l.Meta.LookupFlag&LookupUseMarkFilteringSet != 0 {
 			lookupHeaderLen += 2
@@ -274,7 +274,7 @@ func (info LookupList) encode(extLookupType uint16) []byte {
 		total += chunks[i].size
 	}
 	if isTooLarge {
-		chunks = info.tryReorder(chunks)
+		chunks = ll.tryReorder(chunks)
 	}
 
 	// Layout the chunks.
@@ -296,7 +296,7 @@ func (info LookupList) encode(extLookupType uint16) []byte {
 		switch code & chunkTypeMask {
 		case chunkHeader:
 			buf = append(buf, byte(lookupCount>>8), byte(lookupCount))
-			for i := range info {
+			for i := range ll {
 				tCode := chunkCode(i) << 14
 				lookupOffset := chunkPos[chunkTable|tCode]
 				buf = append(buf, byte(lookupOffset>>8), byte(lookupOffset))
@@ -304,7 +304,7 @@ func (info LookupList) encode(extLookupType uint16) []byte {
 		case chunkTable:
 			tCode := code & chunkTableMask
 			i := int(tCode) >> 14
-			li := info[i]
+			li := ll[i]
 			subTableCount := len(li.Subtables)
 			lookupType := li.Meta.LookupType
 			if _, replaced := chunkPos[chunkExtReplace|tCode]; replaced {
@@ -334,7 +334,7 @@ func (info LookupList) encode(extLookupType uint16) []byte {
 		case chunkExtReplace:
 			tCode := code & chunkTableMask
 			sCode := code & chunkSubtableMask
-			lookup := info[tCode>>14]
+			lookup := ll[tCode>>14]
 			pos := chunkPos[code]
 			extPos := chunkPos[chunkSubtable|tCode|sCode]
 			subtable := &extensionSubtable{
@@ -345,7 +345,7 @@ func (info LookupList) encode(extLookupType uint16) []byte {
 		case chunkSubtable:
 			i := code & chunkTableMask >> 14
 			j := code & chunkSubtableMask
-			subtable := info[i].Subtables[j]
+			subtable := ll[i].Subtables[j]
 			buf = append(buf, subtable.Encode()...)
 		}
 	}
@@ -357,7 +357,7 @@ type layoutChunk struct {
 	size uint32
 }
 
-func (info LookupList) tryReorder(chunks []layoutChunk) []layoutChunk {
+func (ll LookupList) tryReorder(chunks []layoutChunk) []layoutChunk {
 	total := uint32(0)
 	for i := range chunks {
 		total += chunks[i].size
@@ -391,7 +391,7 @@ func (info LookupList) tryReorder(chunks []layoutChunk) []layoutChunk {
 		tCode := lookups[idx]
 
 		oldSize := lookupSize[tCode]
-		l := info[tCode>>14]
+		l := ll[tCode>>14]
 		lookupHeaderLen := 6 + 2*len(l.Subtables)
 		if l.Meta.LookupFlag&LookupUseMarkFilteringSet != 0 {
 			lookupHeaderLen += 2

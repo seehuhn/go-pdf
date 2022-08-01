@@ -32,4 +32,4 @@ func decodeTime(t int64) time.Time {
 	return time.Unix(zeroTime+t, 0)
 }
 
-var zeroTime int64 = -2082844800 // start of January 1904 in GMT/UTC time zone
+const zeroTime int64 = -2082844800 // start of January 1904 in GMT/UTC time zone

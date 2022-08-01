@@ -119,7 +119,6 @@ func TestApplyMatch(t *testing.T) {
 
 	for i, test := range cases {
 		t.Run(fmt.Sprintf("%02d", i+1), func(t *testing.T) {
-
 			seq := make([]font.Glyph, 7)
 			for i := range seq {
 				seq[i].Gid = font.GlyphID(i)

@@ -174,7 +174,6 @@ func TestAngle(t *testing.T) {
 	if rise != 0 || run != 1 {
 		t.Errorf("rise=%d, run=%d", rise, run)
 	}
-
 }
 
 func FuzzAngle(f *testing.F) {
