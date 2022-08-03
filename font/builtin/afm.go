@@ -51,20 +51,20 @@ type AfmInfo struct {
 // Afm returns the font metrics for one of the built-in pdf fonts.
 // FontName must be one of the following:
 //
-//     Courier
-//     Courier-Bold
-//     Courier-BoldOblique
-//     Courier-Oblique
-//     Helvetica
-//     Helvetica-Bold
-//     Helvetica-BoldOblique
-//     Helvetica-Oblique
-//     Times-Roman
-//     Times-Bold
-//     Times-BoldItalic
-//     Times-Italic
-//     Symbol
-//     ZapfDingbats
+//	Courier
+//	Courier-Bold
+//	Courier-BoldOblique
+//	Courier-Oblique
+//	Helvetica
+//	Helvetica-Bold
+//	Helvetica-BoldOblique
+//	Helvetica-Oblique
+//	Times-Roman
+//	Times-Bold
+//	Times-BoldItalic
+//	Times-Italic
+//	Symbol
+//	ZapfDingbats
 func Afm(fontName string) (*AfmInfo, error) {
 	fd, err := afmData.Open("afm/" + fontName + ".afm")
 	if err != nil {

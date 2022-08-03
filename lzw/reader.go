@@ -47,19 +47,19 @@
 //     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Package lzw implements the Lempel-Ziv-Welch compressed data format,
-// described in T. A. Welch, ``A Technique for High-Performance Data
-// Compression'', Computer, 17(6) (June 1984), pp 8-19.
+// described in T. A. Welch, “A Technique for High-Performance Data
+// Compression”, Computer, 17(6) (June 1984), pp 8-19.
 //
 // In particular, it implements LZW as used by the PDF file
 // format, which means variable-width codes up to 12 bits and the first
 // two non-literal codes are a clear code and an EOF code.
 // Both the correct and the "early change" variant are implemented.
 //
-// The main differences to the "compress/lzw" package are:
-//   * the pdf/lzw package sends a clear code as the first code
+// The main differences to the [compress/lzw] package are:
+//   - the pdf/lzw package sends a clear code as the first code
 //     (required for Preview on MacOS)
-//   * pdf/lzw implements the "early change" variant
-//   * pdf/lzw always uses MSB bit order and 8-bit literals
+//   - pdf/lzw optionally implements the "early change" variant
+//   - pdf/lzw always uses MSB bit order and 8-bit literals
 package lzw
 
 import (
@@ -78,7 +78,7 @@ const (
 	decoderInvalidCode = 0xffff
 )
 
-// Reader is an io.Reader which can be used to read compressed data in the
+// Reader is an [io.Reader] which can be used to read compressed data in the
 // LZW format.
 type Reader struct {
 	src          io.ByteReader
@@ -122,11 +122,11 @@ type Reader struct {
 	earlyChange uint16 // the off-by-one error allowed by the PDF spec
 }
 
-// NewReader creates a new io.ReadCloser.
+// NewReader creates a new [io.ReadCloser].
 // Reads from the returned io.ReadCloser read and decompress data from src.
-// If src does not also implement io.ByteReader,
+// If src does not also implement [io.ByteReader],
 // the decompressor may read more data than necessary from src.
-// It is the caller's responsibility to call Close() on the ReadCloser when
+// It is the caller's responsibility to call [Close] on the ReadCloser when
 // finished reading.
 //
 // It is guaranteed that the underlying type of the returned io.ReadCloser

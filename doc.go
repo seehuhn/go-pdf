@@ -24,48 +24,48 @@
 //
 // A `Reader` can be used to read objects from an existing PDF file:
 //
-//      r, err := pdf.Open("in.pdf")
-//      if err != nil {
-//          log.Fatal(err)
-//      }
-//      defer r.Close()
-//      catalog, err := r.GetCatalog()
-//      if err != nil {
-//          log.Fatal(err)
-//      }
-//      ... use catalog to locate objects in the file ...
+//	r, err := pdf.Open("in.pdf")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer r.Close()
+//	catalog, err := r.GetCatalog()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	... use catalog to locate objects in the file ...
 //
 // A `Writer` can be used to write objects to a new PDF file:
 //
-//     w, err := pdf.Create("out.pdf")
-//     if err != nil {
-//         log.Fatal(err)
-//     }
+//	w, err := pdf.Create("out.pdf")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //
-//     ... add objects to the document using w.Write() and w.OpenStream() ...
+//	... add objects to the document using w.Write() and w.OpenStream() ...
 //
-//     err = w.SetCatalog(pdf.Struct(&pdf.Catalog{
-//         Pages: pages,
-//     }))
-//     if err != nil {
-//         log.Fatal(err)
-//     }
+//	err = w.SetCatalog(pdf.Struct(&pdf.Catalog{
+//	    Pages: pages,
+//	}))
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //
-//     err = out.Close()
-//     if err != nil {
-//         log.Fatal(err)
-//     }
+//	err = out.Close()
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //
 // The following classes represent the native PDF object types.  All of these
 // implement the `pdf.Object` interface:
 //
-//     Array
-//     Bool
-//     Dict
-//     Integer
-//     Name
-//     Real
-//     Reference
-//     Stream
-//     String
+//	Array
+//	Bool
+//	Dict
+//	Integer
+//	Name
+//	Real
+//	Reference
+//	Stream
+//	String
 package pdf

@@ -79,7 +79,7 @@ const (
 )
 
 // Writer is an LZW compressor. It writes the compressed form of the data
-// to an underlying writer (see NewWriter).
+// to an underlying writer (see [NewWriter]).
 type Writer struct {
 	// dst is the writer that compressed bytes are written to.
 	dst writer

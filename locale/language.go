@@ -89,7 +89,8 @@ type languageCodes struct {
 // selected languages from
 // https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
 // The columns are:
-//    code, 639-1, 639-2/T, Iso Language Name
+//
+//	code, 639-1, 639-2/T, Iso Language Name
 var languages = map[Language]languageCodes{
 	LangArabic:          {"ar", "ara", "Arabic"},
 	LangAzerbaijani:     {"az", "aze", "Azerbaijani"},
