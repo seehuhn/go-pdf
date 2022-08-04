@@ -128,10 +128,7 @@ type Reader struct {
 // the decompressor may read more data than necessary from src.
 // It is the caller's responsibility to call [Close] on the ReadCloser when
 // finished reading.
-//
-// It is guaranteed that the underlying type of the returned io.ReadCloser
-// is a *Reader.
-func NewReader(src io.Reader, earlyChange bool) io.ReadCloser {
+func NewReader(src io.Reader, earlyChange bool) *Reader {
 	br, ok := src.(io.ByteReader)
 	if !ok && src != nil {
 		br = bufio.NewReader(src)

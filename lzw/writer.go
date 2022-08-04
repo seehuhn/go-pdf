@@ -111,10 +111,7 @@ type Writer struct {
 // Writes to the returned io.WriteCloser are compressed and written to dst.
 // It is the caller's responsibility to call Close on the WriteCloser when
 // finished writing.
-//
-// It is guaranteed that the underlying type of the returned io.WriteCloser
-// is a *Writer.
-func NewWriter(dst io.Writer, earlyChange bool) (io.WriteCloser, error) {
+func NewWriter(dst io.Writer, earlyChange bool) (*Writer, error) {
 	bw, ok := dst.(writer)
 	if !ok && dst != nil {
 		bw = bufio.NewWriter(dst)
