@@ -18,6 +18,8 @@ package locale
 
 import "fmt"
 
+// TODO(voss): read https://go.dev/blog/matchlang
+
 // Locale information is used in the following places:
 //
 // * The /Lang entry in the catalog dictionary:
