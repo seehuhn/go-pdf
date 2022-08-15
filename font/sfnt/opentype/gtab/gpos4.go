@@ -56,8 +56,8 @@ func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 		dx -= seq[i].Advance
 	}
 	g := seq[a]
-	g.XOffset = dx
-	g.YOffset = dy
+	g.XOffset += dx
+	g.YOffset += dy
 	_ = dy
 	return &Match{
 		InputPos: []int{a},

@@ -724,10 +724,18 @@ func readGpos3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 // EncodeLen implements the Subtable interface.
 func (l *Gpos3_1) EncodeLen() int {
-	panic("not implemented")
+	total := 6
+	total += (4 + 6) * len(l.Records)
+	total += l.Cov.EncodeLen()
+	return total
 }
 
 // Encode implements the Subtable interface.
 func (l *Gpos3_1) Encode() []byte {
+	total := 6
+	entryExitCount := len(l.Records)
+	total += 4 * entryExitCount
+	total += 6 * len(l.Records)
+	total += l.Cov.EncodeLen()
 	panic("not implemented")
 }

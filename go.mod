@@ -10,4 +10,4 @@ require (
 	seehuhn.de/go/dijkstra v0.9.0
 )
 
-require golang.org/x/sys v0.0.0-20220731174439-a90be440212d // indirect
+require golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
