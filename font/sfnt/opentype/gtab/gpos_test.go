@@ -219,6 +219,39 @@ func FuzzGpos2_1(f *testing.F) {
 	})
 }
 
+func FuzzGpos3_1(f *testing.F) {
+	l := &Gpos3_1{}
+	f.Add(l.Encode())
+	l = &Gpos3_1{
+		Cov: coverage.Table{
+			1: 0,
+			3: 1,
+			5: 2,
+			6: 3,
+		},
+		Records: []EntryExitRecord{
+			{
+				Entry: anchor.Table{X: 1, Y: 2},
+				Exit:  anchor.Table{X: 3, Y: 4},
+			},
+			{
+				Entry: anchor.Table{X: -1, Y: -2},
+				Exit:  anchor.Table{X: -3, Y: -4},
+			},
+			{
+				Entry: anchor.Table{X: 0, Y: 1},
+			},
+			{
+				Exit: anchor.Table{X: 1, Y: 0},
+			},
+		},
+	}
+	f.Add(l.Encode())
+	f.Fuzz(func(t *testing.T, data []byte) {
+		doFuzz(t, 3, 1, readGpos3_1, data)
+	})
+}
+
 func FuzzGpos4_1(f *testing.F) {
 	l := &Gpos4_1{}
 	f.Add(l.Encode())

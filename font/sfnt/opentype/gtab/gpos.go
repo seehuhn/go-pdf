@@ -54,6 +54,7 @@ var gposReaders = map[uint16]func(p *parser.Parser, pos int64) (Subtable, error)
 	1_2: readGpos1_2,
 	2_1: readGpos2_1,
 	2_2: readGpos2_2,
+	3_1: readGpos3_1,
 	4_1: readGpos4_1,
 	6_1: readGpos6_1,
 	7_1: readSeqContext1,
@@ -670,7 +671,39 @@ type EntryExitRecord struct {
 
 // Apply implements the Subtable interface.
 func (l *Gpos3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
-	panic("not implemented")
+	// TODO(voss): this only works if the RIGHT_TO_LEFT flag is not set.
+
+	g := seq[a]
+	if !keep(g.Gid) {
+		return nil
+	}
+	idx, ok := l.Cov[g.Gid]
+	if !ok {
+		return nil
+	}
+	rec := l.Records[idx]
+	if a > 0 {
+		prevGlyph := seq[a-1]
+		prev, ok := l.Cov[prevGlyph.Gid]
+		if ok {
+			prevRec := l.Records[prev]
+			g.YOffset = prevGlyph.YOffset + prevRec.Exit.Y - rec.Entry.Y
+		}
+	}
+	if a < b-1 {
+		nextGlyph := seq[a+1]
+		next, ok := l.Cov[nextGlyph.Gid]
+		if ok {
+			nextRec := l.Records[next]
+			g.Advance = g.XOffset + rec.Exit.X - nextGlyph.XOffset - nextRec.Entry.X
+		}
+	}
+
+	return &Match{
+		InputPos: []int{a},
+		Replace:  []font.Glyph{g},
+		Next:     a + 1,
+	}
 }
 
 func readGpos3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -725,7 +758,15 @@ func readGpos3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // EncodeLen implements the Subtable interface.
 func (l *Gpos3_1) EncodeLen() int {
 	total := 6
-	total += (4 + 6) * len(l.Records)
+	total += 4 * len(l.Records)
+	for _, rec := range l.Records {
+		if !rec.Entry.IsEmpty() {
+			total += 6
+		}
+		if !rec.Exit.IsEmpty() {
+			total += 6
+		}
+	}
 	total += l.Cov.EncodeLen()
 	return total
 }
@@ -735,7 +776,53 @@ func (l *Gpos3_1) Encode() []byte {
 	total := 6
 	entryExitCount := len(l.Records)
 	total += 4 * entryExitCount
-	total += 6 * len(l.Records)
+	entryOffs := make([]uint16, entryExitCount)
+	exitOffs := make([]uint16, entryExitCount)
+	for i, rec := range l.Records {
+		if !rec.Entry.IsEmpty() {
+			entryOffs[i] = uint16(total)
+			total += 6
+		}
+		if !rec.Exit.IsEmpty() {
+			exitOffs[i] = uint16(total)
+			total += 6
+		}
+	}
+	coverageOffset := total
 	total += l.Cov.EncodeLen()
-	panic("not implemented")
+
+	res := make([]byte, 0, total)
+
+	res = append(res,
+		0, 1, // posFormat
+		byte(coverageOffset>>8), byte(coverageOffset),
+		byte(entryExitCount>>8), byte(entryExitCount),
+	)
+	for i := 0; i < entryExitCount; i++ {
+		res = append(res,
+			byte(entryOffs[i]>>8), byte(entryOffs[i]),
+			byte(exitOffs[i]>>8), byte(exitOffs[i]),
+		)
+	}
+	for i := 0; i < entryExitCount; i++ {
+		if entryOffs[i] != 0 {
+			if len(res) != int(entryOffs[i]) { // TODO(voss): remove
+				panic("internal error")
+			}
+			res = l.Records[i].Entry.Append(res)
+		}
+		if exitOffs[i] != 0 {
+			if len(res) != int(exitOffs[i]) { // TODO(voss): remove
+				panic("internal error")
+			}
+			res = l.Records[i].Exit.Append(res)
+		}
+	}
+
+	if len(res) != coverageOffset { // TODO(voss): remove
+		panic("internal error")
+	}
+	res = append(res, l.Cov.Encode()...)
+
+	return res
 }

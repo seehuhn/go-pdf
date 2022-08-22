@@ -237,11 +237,7 @@ func (l *Gpos6_1) Encode() []byte {
 		offs += 6
 	}
 	for _, rec := range l.Mark1Array {
-		res = append(res,
-			0, 1, // anchorFormat
-			byte(rec.X>>8), byte(rec.X),
-			byte(rec.Y>>8), byte(rec.Y),
-		)
+		res = rec.Append(res)
 	}
 
 	if len(res) != mark2ArrayOffset { // TODO(voss): remove
@@ -268,11 +264,7 @@ func (l *Gpos6_1) Encode() []byte {
 			if rec.IsEmpty() {
 				continue
 			}
-			res = append(res,
-				0, 1, // anchorFormat
-				byte(rec.X>>8), byte(rec.X),
-				byte(rec.Y>>8), byte(rec.Y),
-			)
+			res = rec.Append(res)
 		}
 	}
 

@@ -41,6 +41,16 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 	return Table{X: x, Y: y}, nil
 }
 
+// IsEmpty returns true if the Anchor Table has not been initialised.
 func (rec Table) IsEmpty() bool {
 	return rec.X == 0 && rec.Y == 0
+}
+
+// Append appends the binary representation of the Anchor Table to buf.
+func (rec Table) Append(buf []byte) []byte {
+	return append(buf,
+		0, 1, // anchorFormat
+		byte(rec.X>>8), byte(rec.X),
+		byte(rec.Y>>8), byte(rec.Y),
+	)
 }
