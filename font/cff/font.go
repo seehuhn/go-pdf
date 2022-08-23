@@ -21,7 +21,6 @@ import (
 	"io"
 	"math"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
 	"seehuhn.de/go/pdf/font/parser"
@@ -98,7 +97,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 		return nil, unsupported("fontsets with more than one font")
 	}
 	cff.FontInfo = &type1.FontInfo{
-		FontName: pdf.Name(fontNames[0]),
+		FontName: string(fontNames[0]),
 	}
 
 	// section 2: top DICT INDEX
@@ -319,7 +318,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 			if err != nil {
 				return nil, err
 			}
-			glyph.Name = pdf.Name(name)
+			glyph.Name = name
 		}
 		cff.Glyphs[gid] = glyph
 	}
@@ -411,7 +410,7 @@ func (cff *Font) Encode(w io.Writer) error {
 	if cff.ROS == nil {
 		glyphNames = make([]int32, numGlyphs)
 		for i := uint16(0); i < numGlyphs; i++ {
-			glyphNames[i] = strings.lookup(string(cff.Glyphs[i].Name))
+			glyphNames[i] = strings.lookup(cff.Glyphs[i].Name)
 		}
 
 		if len(cff.Encoding) == 0 || isStandardEncoding(cff.Encoding, cff.Glyphs) {
@@ -450,7 +449,7 @@ func (cff *Font) Encode(w io.Writer) error {
 
 	// section 8: charstrings INDEX
 	secCharStringsIndex := len(blobs)
-	blobs = append(blobs, cffIndex(charStrings).encode())
+	blobs = append(blobs, charStrings.encode())
 
 	// section 9: font DICT INDEX
 	numFonts := len(cff.Private)

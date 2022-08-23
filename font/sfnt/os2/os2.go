@@ -170,8 +170,8 @@ func Read(r io.Reader) (*Info, error) {
 		info.Ascent = v0ms.TypoAscender
 		info.Descent = v0ms.TypoDescender
 	} else {
-		info.Ascent = funit.Int16(v0ms.WinAscent)
-		info.Descent = -funit.Int16(v0ms.WinDescent)
+		info.Ascent = v0ms.WinAscent
+		info.Descent = -v0ms.WinDescent
 	}
 	info.LineGap = v0ms.TypoLineGap
 

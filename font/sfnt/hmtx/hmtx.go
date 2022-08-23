@@ -195,7 +195,7 @@ func (info *Info) Encode() (hheaData []byte, hmtxData []byte) {
 			if ext.IsZero() {
 				continue
 			}
-			rsb := funit.Int16(info.Widths[i]) - ext.URx
+			rsb := info.Widths[i] - ext.URx
 			if first || rsb < hhea.MinRightSideBearing {
 				hhea.MinRightSideBearing = rsb
 			}

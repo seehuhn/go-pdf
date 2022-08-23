@@ -80,7 +80,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 		}
 		startGlyphID := font.GlyphID(data[0])<<8 | font.GlyphID(data[1])
 		glyphCount := int(data[2])<<8 | int(data[3])
-		if int(startGlyphID)+int(glyphCount)-1 > 0xFFFF {
+		if int(startGlyphID)+glyphCount-1 > 0xFFFF {
 			return nil, &font.InvalidFontError{
 				SubSystem: "opentype/classdef",
 				Reason:    "glyph count too large in class definition table",

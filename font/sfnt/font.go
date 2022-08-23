@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
@@ -141,10 +140,10 @@ func (info *Info) Subfamily() string {
 }
 
 // PostscriptName returns the Postscript name of the font.
-func (info *Info) PostscriptName() pdf.Name {
+func (info *Info) PostscriptName() string {
 	name := info.FamilyName + "-" + info.Subfamily()
 	re := regexp.MustCompile(`[^!-$&-'*-.0-;=?-Z\\^-z|~]+`)
-	return pdf.Name(re.ReplaceAllString(name, ""))
+	return re.ReplaceAllString(name, "")
 }
 
 // BBox returns the bounding box of the font.
@@ -266,7 +265,7 @@ func (info *Info) glyphHeight(gid font.GlyphID) funit.Int16 {
 
 // GlyphName returns the name if a glyph.  If the name is not known,
 // the empty string is returned.
-func (info *Info) GlyphName(gid font.GlyphID) pdf.Name {
+func (info *Info) GlyphName(gid font.GlyphID) string {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Name
@@ -274,7 +273,7 @@ func (info *Info) GlyphName(gid font.GlyphID) pdf.Name {
 		if f.Names == nil {
 			return ""
 		}
-		return pdf.Name(f.Names[gid])
+		return f.Names[gid]
 	default:
 		panic("unexpected font type")
 	}

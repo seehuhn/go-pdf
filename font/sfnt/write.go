@@ -256,7 +256,7 @@ func (info *Info) makeName(ss cmap.Table) []byte {
 			Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
 			FullName:       fullName,
 			Version:        "Version " + info.Version.String(),
-			PostScriptName: string(info.PostscriptName()),
+			PostScriptName: info.PostscriptName(),
 			SampleText:     info.SampleText,
 		}
 	}

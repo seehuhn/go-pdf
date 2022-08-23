@@ -249,7 +249,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		subsetInfo.CMap = nil
 	}
 
-	fontName := pdf.Name(subsetTag) + "+" + subsetInfo.PostscriptName()
+	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
 
 	q := 1000 / float64(subsetInfo.UnitsPerEm)
 

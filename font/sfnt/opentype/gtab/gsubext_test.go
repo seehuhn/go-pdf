@@ -158,7 +158,7 @@ func FuzzGsub(f *testing.F) {
 		runeCountIn := len([]rune(in))
 		runeCountOut := 0
 		for _, g := range seq {
-			runeCountOut += len([]rune(g.Text))
+			runeCountOut += len(g.Text)
 		}
 		if runeCountOut != runeCountIn {
 			fmt.Printf("desc = %q\n", desc)

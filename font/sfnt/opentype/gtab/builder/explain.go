@@ -345,7 +345,7 @@ func newExplainer(fontInfo *sfnt.Info) *explainer {
 	for i := range names {
 		name := fontInfo.GlyphName(font.GlyphID(i))
 		if name != "" {
-			names[i] = string(name)
+			names[i] = name
 		} else {
 			names[i] = fmt.Sprintf("%d", i)
 		}

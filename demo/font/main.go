@@ -135,8 +135,8 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		if !bbox.IsZero() {
 			x := xPos + gl.XOffset.AsFloat(q) + bbox.LLx
 			y := yPos + gl.YOffset.AsFloat(q) + bbox.LLy
-			w := float64(bbox.URx - bbox.LLx)
-			h := float64(bbox.URy - bbox.LLy)
+			w := bbox.URx - bbox.LLx
+			h := bbox.URy - bbox.LLy
 			page.Printf("%.2f %.2f %.2f %.2f re\n", x, y, w, h)
 		}
 		xPos += gl.Advance.AsFloat(q)

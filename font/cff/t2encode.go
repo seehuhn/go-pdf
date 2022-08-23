@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"seehuhn.de/go/dijkstra"
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/funit"
 )
 
@@ -31,12 +30,12 @@ type Glyph struct {
 	Cmds  []GlyphOp
 	HStem []int16
 	VStem []int16
-	Name  pdf.Name
+	Name  string
 	Width funit.Int16
 }
 
 // NewGlyph allocates a new glyph.
-func NewGlyph(name pdf.Name, width funit.Int16) *Glyph {
+func NewGlyph(name string, width funit.Int16) *Glyph {
 	return &Glyph{
 		Name:  name,
 		Width: width,

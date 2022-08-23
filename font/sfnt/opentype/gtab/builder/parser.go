@@ -39,7 +39,7 @@ func Parse(fontInfo *sfnt.Info, input string) (lookups gtab.LookupList, err erro
 	for i := font.GlyphID(0); i < font.GlyphID(numGlyphs); i++ {
 		glyphName := fontInfo.GlyphName(i)
 		if glyphName != "" {
-			byName[string(glyphName)] = i
+			byName[glyphName] = i
 		}
 	}
 
@@ -162,8 +162,8 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 	for gid, idx := range res {
 		if first {
 			first = false
-			delta = font.GlyphID(idx) - gid
-		} else if font.GlyphID(idx)-gid != delta {
+			delta = idx - gid
+		} else if idx-gid != delta {
 			isConstDelta = false
 			break
 		}

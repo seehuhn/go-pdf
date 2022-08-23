@@ -138,10 +138,10 @@ func (info FeatureListInfo) encode() []byte {
 	buf[1] = byte(len(info))
 	for i, f := range info {
 		tag := []byte(f.Tag)
-		buf[2+6*i] = byte(tag[0])
-		buf[3+6*i] = byte(tag[1])
-		buf[4+6*i] = byte(tag[2])
-		buf[5+6*i] = byte(tag[3])
+		buf[2+6*i] = tag[0]
+		buf[3+6*i] = tag[1]
+		buf[4+6*i] = tag[2]
+		buf[5+6*i] = tag[3]
 		buf[6+6*i] = byte(offs[i] >> 8)
 		buf[7+6*i] = byte(offs[i])
 	}

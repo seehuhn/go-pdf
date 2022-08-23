@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
 )
@@ -41,7 +40,7 @@ func FuzzEncoding(f *testing.F) {
 		} else {
 			name = fmt.Sprintf("%d", i)
 		}
-		glyphs = append(glyphs, &Glyph{Name: pdf.Name(name)})
+		glyphs = append(glyphs, &Glyph{Name: name})
 		cc = append(cc, ss.lookup(name))
 	}
 

@@ -85,7 +85,7 @@ func main() {
 			if bbox.LLx < left {
 				left = bbox.LLx
 			}
-			right := funit.Int16(cffFont.Glyphs[i].Width)
+			right := cffFont.Glyphs[i].Width
 			if right < 300 {
 				right = 300
 			}

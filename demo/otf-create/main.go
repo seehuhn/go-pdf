@@ -108,7 +108,7 @@ func main() {
 func makeCMap(gg []*cff.Glyph) cmap.Subtable {
 	cmap := cmap.Format4{}
 	for i, g := range gg {
-		rr := names.ToUnicode(string(g.Name), false)
+		rr := names.ToUnicode(g.Name, false)
 		if len(rr) == 1 {
 			r := uint16(rr[0])
 			if _, ok := cmap[r]; !ok {

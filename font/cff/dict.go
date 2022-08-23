@@ -141,7 +141,7 @@ func (d cffDict) encode(ss *cffStrings) []byte {
 		var args []interface{}
 		for _, arg := range d[op] {
 			if s, ok := arg.(string); ok {
-				arg = int32(ss.lookup(s))
+				arg = ss.lookup(s)
 			}
 			args = append(args, arg)
 		}

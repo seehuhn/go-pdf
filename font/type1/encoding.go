@@ -16,14 +16,12 @@
 
 package type1
 
-import "seehuhn.de/go/pdf"
-
 // TODO(voss): There is some redundancy between the following files:
 //     font/type1/encoding.go
 //     font/encoding.go
 
 // StandardEncoding is the standard encoding for Type 1 fonts.
-var StandardEncoding = map[pdf.Name]byte{
+var StandardEncoding = map[string]byte{
 	"space":        32,
 	"exclam":       33,
 	"quotedbl":     34,
@@ -189,7 +187,7 @@ var StandardEncoding = map[pdf.Name]byte{
 }
 
 // ExpertEncoding is the expert encoding for Type 1 fonts.
-var ExpertEncoding = map[pdf.Name]byte{
+var ExpertEncoding = map[string]byte{
 	"space":             32,
 	"exclamsmall":       33,
 	"Hungarumlautsmall": 34,

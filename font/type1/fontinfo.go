@@ -25,7 +25,7 @@ import (
 
 type FontInfo struct {
 	// PostScript language name (FontName or CIDFontName) of the font.
-	FontName pdf.Name
+	FontName string
 
 	// Version is the version number of the font program.
 	Version string

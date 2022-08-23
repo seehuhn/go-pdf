@@ -55,7 +55,7 @@ func (table Table) Prune(size int) {
 		}
 	}
 	for _, gid := range gg {
-		delete(table, font.GlyphID(gid))
+		delete(table, gid)
 	}
 }
 

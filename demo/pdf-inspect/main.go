@@ -46,7 +46,7 @@ func main() {
 			return *passwdArg
 		}
 		fmt.Print("password: ")
-		passwd, err := term.ReadPassword(int(syscall.Stdin))
+		passwd, err := term.ReadPassword(syscall.Stdin)
 		fmt.Println("***")
 		check(err)
 		return string(passwd)

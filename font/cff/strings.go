@@ -69,7 +69,7 @@ func (ss *cffStrings) lookup(s string) int32 {
 		ss.data = append(ss.data, s)
 		ss.rev[s] = res
 	}
-	return int32(res)
+	return res
 }
 
 func (ss *cffStrings) encode() []byte {
