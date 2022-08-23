@@ -334,7 +334,7 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		// BreakChar:   0, // TODO(voss)
 		// MaxContext:  0, // TODO(voss)
 	}
-	binary.Write(buf, binary.BigEndian, v2)
+	_ = binary.Write(buf, binary.BigEndian, v2)
 
 	return buf.Bytes()
 }

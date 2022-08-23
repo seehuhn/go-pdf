@@ -194,7 +194,7 @@ func TestSeqContext2(t *testing.T) {
 	for _, test := range cases {
 		m := l.Apply(keep, in, test.before, len(in))
 		next := -1
-		if m != nil {
+		if keep(in[test.before].Gid) && m != nil {
 			next = m.Next
 		}
 		if next != test.after {

@@ -180,9 +180,6 @@ func (vr *GposValueRecord) encode(format uint16) []byte {
 	if format&0x0080 != 0 {
 		buf = append(buf, byte(vr.YAdvanceDevOffs>>8), byte(vr.YAdvanceDevOffs))
 	}
-	if len(buf) != bufSize {
-		panic("unexpected buffer size") // TODO(voss): remove
-	}
 	return buf
 }
 

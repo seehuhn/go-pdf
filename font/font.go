@@ -171,7 +171,7 @@ func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 			flushRun()
 			deltaScaled := float64(delta) / float64(font.UnitsPerEm) * 1000
 			data = append(data, -pdf.Integer(math.Round(deltaScaled)))
-			xOffsPDF += delta
+			xOffsPDF += delta // TODO(voss): use this
 		}
 		run = append(run, font.Enc(gid)...)
 

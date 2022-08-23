@@ -635,21 +635,9 @@ func (l *Gpos2_2) Encode() []byte {
 			res = append(res, adj.Second.encode(valueFormat2)...)
 		}
 	}
-	if len(res) != coverageOffset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = append(res, l.Cov.ToTable().Encode()...)
-	if len(res) != classDef1Offset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = l.Class1.Append(res)
-	if len(res) != classDef2Offset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = l.Class2.Append(res)
-	if len(res) != total { // TODO(voss): remove
-		panic("internal error")
-	}
 
 	return res
 }
@@ -806,22 +794,13 @@ func (l *Gpos3_1) Encode() []byte {
 	}
 	for i := 0; i < entryExitCount; i++ {
 		if entryOffs[i] != 0 {
-			if len(res) != int(entryOffs[i]) { // TODO(voss): remove
-				panic("internal error")
-			}
 			res = l.Records[i].Entry.Append(res)
 		}
 		if exitOffs[i] != 0 {
-			if len(res) != int(exitOffs[i]) { // TODO(voss): remove
-				panic("internal error")
-			}
 			res = l.Records[i].Exit.Append(res)
 		}
 	}
 
-	if len(res) != coverageOffset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = append(res, l.Cov.Encode()...)
 
 	return res

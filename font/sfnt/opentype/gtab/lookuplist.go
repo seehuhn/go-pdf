@@ -68,6 +68,12 @@ type Subtable interface {
 	// If returns the new glyphs and the new position.  If the subtable
 	// cannot be applied, the unchanged glyphs and a negative position
 	// are returned
+	//
+	// This checks whether the Subtable can be applied to seq[a:b-1].
+	// The function keep represents the lookup flags, glyphs for which
+	// keep(seq[i].Gid) is false must be ignored.  The caller already
+	// checks the glyph at location a, so only subsequent glyphs need to
+	// be tested by the Subtable implementation.
 	Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match
 
 	EncodeLen() int
@@ -290,9 +296,6 @@ func (ll LookupList) encode(extLookupType uint16) []byte {
 	buf := make([]byte, 0, total)
 	for k := range chunks {
 		code := chunks[k].code
-		if chunkPos[code] != uint32(len(buf)) { // TODO(voss): remove?
-			panic("internal error")
-		}
 		switch code & chunkTypeMask {
 		case chunkHeader:
 			buf = append(buf, byte(lookupCount>>8), byte(lookupCount))

@@ -143,9 +143,6 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *SeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	rulesIdx, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -382,9 +379,6 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *SeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	_, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -769,9 +763,6 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 // Apply implements the Subtable interface.
 func (l *ChainedSeqContext1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	rulesIdx, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -1110,9 +1101,6 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 // Apply implements the Subtable interface.
 func (l *ChainedSeqContext2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	_, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -1384,11 +1372,6 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 
 // Apply implements the Subtable interface.
 func (l *ChainedSeqContext3) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
-	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
-
 	p := a
 	glyphsNeeded := len(l.Backtrack)
 	for _, cov := range l.Backtrack {

@@ -95,9 +95,6 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gsub1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	if _, ok := l.Cov[gid]; !ok {
 		return nil
 	}
@@ -170,9 +167,6 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gsub1_2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	idx, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -268,9 +262,6 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gsub2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	idx, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -401,9 +392,6 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gsub3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	idx, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -572,9 +560,6 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gsub4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	ligSetIdx, ok := l.Cov[gid]
 	if !ok {
 		return nil
@@ -752,9 +737,6 @@ func readGsub8_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
-	if !keep(gid) {
-		return nil
-	}
 	idx, ok := l.Input[gid]
 	if !ok {
 		return nil

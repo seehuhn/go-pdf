@@ -20,9 +20,6 @@ type Gpos4_1 struct {
 // Apply implements the Subtable interface.
 func (l *Gpos4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	// TODO(voss): does this apply to the base or the mark?
-	if !keep(seq[a].Gid) {
-		return nil
-	}
 	markIdx, ok := l.MarkCov[seq[a].Gid]
 	if !ok {
 		return nil
@@ -222,9 +219,6 @@ func (l *Gpos4_1) Encode() []byte {
 	res = append(res, l.MarkCov.Encode()...)
 	res = append(res, l.BaseCov.Encode()...)
 
-	if len(res) != markArrayOffset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = append(res,
 		byte(markCount>>8), byte(markCount),
 	)
@@ -240,9 +234,6 @@ func (l *Gpos4_1) Encode() []byte {
 		res = rec.Append(res)
 	}
 
-	if len(res) != baseArrayOffset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = append(res,
 		byte(baseCount>>8), byte(baseCount),
 	)
@@ -266,10 +257,6 @@ func (l *Gpos4_1) Encode() []byte {
 			}
 			res = rec.Append(res)
 		}
-	}
-
-	if len(res) != total { // TODO(voss): remove
-		panic("internal error")
 	}
 
 	return res

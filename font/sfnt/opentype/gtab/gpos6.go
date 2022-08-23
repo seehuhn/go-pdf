@@ -19,10 +19,6 @@ type Gpos6_1 struct {
 
 // Apply implements the Subtable interface.
 func (l *Gpos6_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
-	// TODO(voss): does this apply to mark1 or mark2?
-	if !keep(seq[a].Gid) {
-		return nil
-	}
 	mark1Idx, ok := l.Mark1Cov[seq[a].Gid]
 	if !ok {
 		return nil
@@ -222,9 +218,6 @@ func (l *Gpos6_1) Encode() []byte {
 	res = append(res, l.Mark1Cov.Encode()...)
 	res = append(res, l.Mark2Cov.Encode()...)
 
-	if len(res) != mark1ArrayOffset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = append(res,
 		byte(mark1Count>>8), byte(mark1Count),
 	)
@@ -240,9 +233,6 @@ func (l *Gpos6_1) Encode() []byte {
 		res = rec.Append(res)
 	}
 
-	if len(res) != mark2ArrayOffset { // TODO(voss): remove
-		panic("internal error")
-	}
 	res = append(res,
 		byte(mark2Count>>8), byte(mark2Count),
 	)
@@ -266,10 +256,6 @@ func (l *Gpos6_1) Encode() []byte {
 			}
 			res = rec.Append(res)
 		}
-	}
-
-	if len(res) != total { // TODO(voss): remove
-		panic("internal error")
 	}
 
 	return res

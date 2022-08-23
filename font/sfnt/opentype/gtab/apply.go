@@ -95,9 +95,12 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 		lookup := ll[lookupIndex]
 
 		keep := MakeFilter(lookup.Meta, gdef)
-		// TODO(voss): can we apply `keep` right here instead of passing it
-		// down into the individual Apply() functions?
-		match := lookup.Subtables.Apply(keep, seq, pos, end)
+		var match *Match
+		if keep(seq[pos].Gid) {
+			// We have to pass keep into Apply, so that lookups operating on
+			// sequences of glyphs can check the glyps different from seq[pos].
+			match = lookup.Subtables.Apply(keep, seq, pos, end)
+		}
 		if match == nil {
 			continue
 		}
