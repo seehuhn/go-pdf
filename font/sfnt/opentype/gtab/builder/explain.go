@@ -81,7 +81,7 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 					} else {
 						ee.w.WriteString(", ")
 					}
-					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.writeGlyph(gid)
 					ee.w.WriteString(" -> ")
 					ee.writeGlyphList(l.Repl[i])
 				}
@@ -95,7 +95,7 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 					} else {
 						ee.w.WriteString(", ")
 					}
-					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.writeGlyph(gid)
 					ee.w.WriteString(" -> ")
 					ee.writeGlyphSet(l.Alternates[i])
 				}
@@ -250,12 +250,29 @@ func ExplainGpos(fontInfo *sfnt.Info) []string {
 					ee.w.WriteRune(';')
 				}
 
+			case *gtab.Gpos3_1:
+				checkType(3)
+				glyphs := l.Cov.Glyphs()
+				for j, gid := range glyphs {
+					if j > 0 {
+						ee.w.WriteRune(';')
+					}
+					if i == 0 || j > 0 {
+						ee.w.WriteString("\n\t")
+					}
+					ee.writeGlyph(gid)
+					rec := l.Records[j]
+					fmt.Fprintf(ee.w, ": %d,%d to %d,%d",
+						rec.Entry.X, rec.Entry.Y,
+						rec.Exit.X, rec.Exit.Y)
+				}
+
 			case *gtab.Gpos4_1:
 				checkType(4)
 				markGlyphs := l.MarkCov.Glyphs()
 				for i, gid := range markGlyphs {
 					ee.w.WriteString("\n\tmark ")
-					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.writeGlyph(gid)
 					ee.w.WriteRune(':')
 					rec := l.MarkArray[i]
 					fmt.Fprintf(ee.w, " %d@%d,%d", rec.Class, rec.Table.X, rec.Table.Y)
@@ -265,7 +282,7 @@ func ExplainGpos(fontInfo *sfnt.Info) []string {
 				baseGlyphs := l.BaseCov.Glyphs()
 				for i, gid := range baseGlyphs {
 					ee.w.WriteString("\n\tbase ")
-					ee.writeGlyphList([]font.GlyphID{gid})
+					ee.writeGlyph(gid)
 					ee.w.WriteRune(':')
 					anchors := l.BaseArray[i]
 					for _, a := range anchors {
@@ -433,8 +450,8 @@ func (ee *explainer) writeGlyphList(seq []font.GlyphID) {
 
 	w := ee.w
 
-	if len(seq) == 1 && "\""+ee.names[seq[0]]+"\"" == ee.mapped[seq[0]] {
-		w.WriteString(ee.names[seq[0]])
+	if len(seq) == 1 {
+		ee.writeGlyph(seq[0])
 		return
 	}
 

@@ -110,6 +110,9 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 		case isIdentifier(item, "GPOS2"):
 			l := p.readGpos2()
 			lookups = append(lookups, l)
+		case isIdentifier(item, "GPOS3"):
+			l := p.readGpos3()
+			lookups = append(lookups, l)
 		case isIdentifier(item, "GPOS4"):
 			l := p.readGpos4()
 			lookups = append(lookups, l)
@@ -530,6 +533,68 @@ func (p *parser) readGpos2() *gtab.LookupTable {
 	return lookup
 }
 
+func (p *parser) readGpos3() *gtab.LookupTable {
+	p.optional(itemColon)
+	p.optional(itemEOL)
+	flags := p.readLookupFlags()
+
+	lookup := &gtab.LookupTable{
+		Meta: &gtab.LookupMetaInfo{
+			LookupType: 3,
+			LookupFlag: flags,
+		},
+	}
+
+	for {
+		data := make(map[font.GlyphID]gtab.EntryExitRecord)
+
+		for {
+			gid := p.readGlyph()
+			p.optional(itemColon)
+			x1 := p.readInt16()
+			p.required(itemComma, ",")
+			y1 := p.readInt16()
+			p.requiredIdentifier("to")
+			x2 := p.readInt16()
+			p.required(itemComma, ",")
+			y2 := p.readInt16()
+			data[gid] = gtab.EntryExitRecord{
+				Entry: anchor.Table{
+					X: x1,
+					Y: y1,
+				},
+				Exit: anchor.Table{
+					X: x2,
+					Y: y2,
+				},
+			}
+
+			if !p.optional(itemSemicolon) {
+				break
+			}
+			p.optional(itemEOL)
+		}
+
+		cov := makeCoverageTable(maps.Keys(data))
+		records := make([]gtab.EntryExitRecord, len(cov))
+		for gid, i := range cov {
+			records[i] = data[gid]
+		}
+		subtable := &gtab.Gpos3_1{
+			Cov:     cov,
+			Records: records,
+		}
+		lookup.Subtables = append(lookup.Subtables, subtable)
+
+		if !p.optional(itemOr) {
+			break
+		}
+		p.optional(itemEOL)
+	}
+
+	return lookup
+}
+
 func (p *parser) readGpos4() *gtab.LookupTable {
 	p.optional(itemColon)
 	p.optional(itemEOL)
@@ -564,8 +629,8 @@ func (p *parser) readGpos4() *gtab.LookupTable {
 			markArray = append(markArray, markarray.Record{
 				Class: class,
 				Table: anchor.Table{
-					X: funit.Int16(x),
-					Y: funit.Int16(y),
+					X: x,
+					Y: y,
 				},
 			})
 			p.optional(itemSemicolon)
@@ -604,8 +669,8 @@ func (p *parser) readGpos4() *gtab.LookupTable {
 				p.required(itemComma, ",")
 				y := p.readInt16()
 				anchors[i] = anchor.Table{
-					X: funit.Int16(x),
-					Y: funit.Int16(y),
+					X: x,
+					Y: y,
 				}
 			}
 			p.optional(itemSemicolon)
@@ -1217,12 +1282,12 @@ func (p *parser) readInteger() int {
 	return x
 }
 
-func (p *parser) readInt16() int16 {
+func (p *parser) readInt16() funit.Int16 {
 	x := p.readInteger()
 	if x < -32768 || x > 32767 {
 		p.fatal("int16 out of range: %d", x)
 	}
-	return int16(x)
+	return funit.Int16(x)
 }
 
 func (p *parser) readUint16() uint16 {
@@ -1244,11 +1309,11 @@ valueRecordLoop:
 		next := p.readItem()
 		switch {
 		case isIdentifier(next, "x"):
-			res.XPlacement = funit.Int16(p.readInt16())
+			res.XPlacement = p.readInt16()
 		case isIdentifier(next, "y"):
-			res.YPlacement = funit.Int16(p.readInt16())
+			res.YPlacement = p.readInt16()
 		case isIdentifier(next, "dx"):
-			res.XAdvance = funit.Int16(p.readInt16())
+			res.XAdvance = p.readInt16()
 		// case isIdentifier(next, "dy"):
 		// 	res.YAdvance = p.readInt16()
 		default:
