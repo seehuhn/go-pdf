@@ -120,9 +120,6 @@ func readGpos1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gpos1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	g := seq[a]
-	if !keep(g.Gid) {
-		return nil
-	}
 	_, ok := l.Cov[g.Gid]
 	if !ok {
 		return nil
@@ -201,9 +198,6 @@ func readGpos1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 // Apply implements the Subtable interface.
 func (l *Gpos1_2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	g := seq[a]
-	if !keep(g.Gid) {
-		return nil
-	}
 	idx, ok := l.Cov[g.Gid]
 	if !ok {
 		return nil
@@ -659,12 +653,9 @@ type EntryExitRecord struct {
 
 // Apply implements the Subtable interface.
 func (l *Gpos3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
-	// TODO(voss): this only works if the RIGHT_TO_LEFT flag is not set.
+	// TODO(voss): this is only correct if the RIGHT_TO_LEFT flag is not set.
 
 	g := seq[a]
-	if !keep(g.Gid) {
-		return nil
-	}
 	idx, ok := l.Cov[g.Gid]
 	if !ok {
 		return nil
