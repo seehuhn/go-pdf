@@ -264,7 +264,7 @@ var msBCP = map[uint16]string{
 	0x101a: "hr-BA",       // Croatian (Latin), Bosnia and Herzegovina
 	0x0405: "cs-CZ",       // Czech, Czech Republic
 	0x0406: "da-DK",       // Danish, Denmark
-	0x048c: "prs-AF",      // Dari, Afghanistan
+	0x048c: "fa-AF",       // Dari, Afghanistan
 	0x0465: "dv-MV",       // Divehi, Maldives
 	0x0813: "nl-BE",       // Dutch, Belgium
 	0x0413: "nl-NL",       // Dutch, Netherlands
@@ -343,12 +343,12 @@ var msBCP = map[uint16]string{
 	0x047a: "arn-CL",      // Mapudungun, Chile
 	0x044e: "mr-IN",       // Marathi, India
 	0x047c: "moh",         // Mohawk, Mohawk
-	0x0450: "mn-MN",       // Mongolian (Cyrillic), Mongolia
+	0x0450: "mn-Cyrl-MN",  // Mongolian (Cyrillic), Mongolia
 	0x0850: "mn-Mong-CN",  // Mongolian (Traditional), People’s Republic of China
 	0x0461: "ne-NP",       // Nepali, Nepal
 	0x0414: "nb-NO",       // Norwegian (Bokmal), Norway
 	0x0814: "nn-NO",       // Norwegian (Nynorsk), Norway
-	0x0482: "XXX",         // Occitan, France
+	0x0482: "oc-FR",       // Occitan, France
 	0x0448: "or-IN",       // Odia (formerly Oriya), India
 	0x0463: "ps-AF",       // Pashto, Afghanistan
 	0x0415: "pl-PL",       // Polish, Poland
@@ -361,19 +361,19 @@ var msBCP = map[uint16]string{
 	0x0418: "ro-RO",       // Romanian, Romania
 	0x0417: "rm-CH",       // Romansh, Switzerland
 	0x0419: "ru-RU",       // Russian, Russia
-	0x243b: "XXX",         // Sami (Inari), Finland
-	0x103b: "XXX",         // Sami (Lule), Norway
-	0x143b: "XXX",         // Sami (Lule), Sweden
-	0x0c3b: "XXX",         // Sami (Northern), Finland
+	0x243b: "smn-FI",      // Sami (Inari), Finland
+	0x103b: "smj-NO",      // Sami (Lule), Norway
+	0x143b: "smj-SE",      // Sami (Lule), Sweden
+	0x0c3b: "se-FI",       // Sami (Northern), Finland
 	0x043b: "se-NO",       // Sami (Northern), Norway
-	0x083b: "XXX",         // Sami (Northern), Sweden
-	0x203b: "XXX",         // Sami (Skolt), Finland
-	0x183b: "XXX",         // Sami (Southern), Norway
-	0x1c3b: "XXX",         // Sami (Southern), Sweden
+	0x083b: "se-SE",       // Sami (Northern), Sweden
+	0x203b: "sms-FI",      // Sami (Skolt), Finland
+	0x183b: "sma-NO",      // Sami (Southern), Norway
+	0x1c3b: "sma-SE",      // Sami (Southern), Sweden
 	0x044f: "sa-IN",       // Sanskrit, India
-	0x1c1a: "XXX",         // Serbian (Cyrillic), Bosnia and Herzegovina
+	0x1c1a: "sr-Cyrl-BA",  // Serbian (Cyrillic), Bosnia and Herzegovina
 	0x0c1a: "sr-Cyrl-CS",  // Serbian (Cyrillic), Serbia
-	0x181a: "XXX",         // Serbian (Latin), Bosnia and Herzegovina
+	0x181a: "sr-Latn-BA",  // Serbian (Latin), Bosnia and Herzegovina
 	0x081a: "sr-Latn-CS",  // Serbian (Latin), Serbia
 	0x046c: "nso-ZA",      // Sesotho sa Leboa, South Africa
 	0x0432: "tn-ZA",       // Setswana, South Africa
@@ -415,14 +415,14 @@ var msBCP = map[uint16]string{
 	0x0442: "tk-TM",       // Turkmen, Turkmenistan
 	0x0480: "ug-Arab-CN",  // Uighur, PRC
 	0x0422: "uk-UA",       // Ukrainian, Ukraine
-	0x042e: "wen-DE",      // Upper Sorbian, Germany
+	0x042e: "hsb-DE",      // Upper Sorbian, Germany
 	0x0420: "ur-PK",       // Urdu, Islamic Republic of Pakistan
 	0x0843: "uz-Cyrl-UZ",  // Uzbek (Cyrillic), Uzbekistan
 	0x0443: "uz-Latn-UZ",  // Uzbek (Latin), Uzbekistan
 	0x042a: "vi-VN",       // Vietnamese, Vietnam
 	0x0452: "cy-GB",       // Welsh, United Kingdom
-	0x0488: "XXX",         // Wolof, Senegal
-	0x0485: "XXX",         // Yakut, Russia
+	0x0488: "wo-SN",       // Wolof, Senegal
+	0x0485: "sah-RU",      // Yakut, Russia
 	0x0478: "ii-CN",       // Yi, PRC
 	0x046a: "yo-NG",       // Yoruba, Nigeria
 }

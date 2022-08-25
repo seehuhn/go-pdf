@@ -16,7 +16,28 @@
 
 package name
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
+)
+
+func TestLanguageTags(t *testing.T) {
+	en := display.English.Tags()
+	for _, list := range []map[uint16]string{appleBCP, msBCP} {
+		for _, lang := range list {
+			tag := language.MustParse(lang)
+			region, _ := tag.Region()
+			script, _ := tag.Script()
+			if script.String() == "Zzzz" {
+				t.Error(lang)
+			}
+			fmt.Println(en.Name(tag), script, region)
+		}
+	}
+}
 
 func TestUTF16(t *testing.T) {
 	cases := []string{

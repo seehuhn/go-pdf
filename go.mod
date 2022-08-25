@@ -7,6 +7,7 @@ require (
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 	golang.org/x/image v0.0.0-20220722155232-062f8c9fd539
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
+	golang.org/x/text v0.3.7
 	seehuhn.de/go/dijkstra v0.9.0
 )
 
