@@ -26,8 +26,12 @@ import (
 
 func TestLanguageTags(t *testing.T) {
 	en := display.English.Tags()
+	seen := make(map[string]bool)
 	for _, list := range []map[uint16]string{appleBCP, msBCP} {
 		for _, lang := range list {
+			if seen[lang] {
+				t.Errorf("duplicate language code %q", lang)
+			}
 			tag := language.MustParse(lang)
 			region, _ := tag.Region()
 			script, _ := tag.Script()
