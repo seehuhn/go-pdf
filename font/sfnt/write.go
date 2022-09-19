@@ -34,7 +34,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/os2"
 	"seehuhn.de/go/pdf/font/sfnt/post"
 	"seehuhn.de/go/pdf/font/sfnt/table"
-	"seehuhn.de/go/pdf/locale"
 )
 
 func (info *Info) Write(w io.Writer) (int64, error) {
@@ -242,26 +241,29 @@ func (info *Info) makeName(ss cmap.Table) []byte {
 	}
 	dayString := day.Format("2006-01-02")
 
-	nameInfo := &name.Info{
-		Tables: map[name.Loc]*name.Table{},
-	}
 	fullName := info.FullName()
-	for _, country := range []locale.Country{locale.CountryUSA, locale.CountryUndefined} {
-		nameInfo.Tables[name.Loc{Language: locale.LangEnglish, Country: country}] = &name.Table{
-			Family:         info.FamilyName,
-			Subfamily:      info.Subfamily(),
-			Description:    info.Description,
-			Copyright:      info.Copyright,
-			Trademark:      info.Trademark,
-			Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
-			FullName:       fullName,
-			Version:        "Version " + info.Version.String(),
-			PostScriptName: info.PostscriptName(),
-			SampleText:     info.SampleText,
-		}
+	nameTable := &name.Table{
+		Family:         info.FamilyName,
+		Subfamily:      info.Subfamily(),
+		Description:    info.Description,
+		Copyright:      info.Copyright,
+		Trademark:      info.Trademark,
+		Identifier:     fullName + "; " + info.Version.String() + "; " + dayString,
+		FullName:       fullName,
+		Version:        "Version " + info.Version.String(),
+		PostScriptName: info.PostscriptName(),
+		SampleText:     info.SampleText,
+	}
+	nameInfo := &name.Info{
+		Mac: name.Tables{
+			"en": nameTable,
+		},
+		Windows: name.Tables{
+			"en-US": nameTable,
+		},
 	}
 
-	return nameInfo.Encode(ss)
+	return nameInfo.Encode(1)
 }
 
 func (info *Info) makePost() []byte {

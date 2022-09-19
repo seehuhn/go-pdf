@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
@@ -146,7 +147,12 @@ func Read(r io.ReaderAt) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		nameTable = nameInfo.Tables.Get()
+		winTab, winConf := nameInfo.Windows.Choose(language.AmericanEnglish)
+		macTab, macConf := nameInfo.Mac.Choose(language.AmericanEnglish)
+		nameTable = winTab
+		if winConf < language.High && macConf > winConf || nameTable == nil {
+			nameTable = macTab
+		}
 	}
 
 	var postInfo *post.Info

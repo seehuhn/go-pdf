@@ -21,38 +21,47 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
-	"seehuhn.de/go/pdf/locale"
 )
+
+func TestUTF16(t *testing.T) {
+	cases := []string{
+		"",
+		"hello",
+		"♠♡♢♣",
+	}
+	for _, c := range cases {
+		buf := utf16Encode(c)
+		d := utf16Decode(buf)
+		if d != c {
+			t.Errorf("%q -> % x -> %q", c, buf, d)
+		}
+	}
+}
 
 func FuzzNames(f *testing.F) {
 	info := &Info{
-		Tables: map[Loc]*Table{
-			{locale.LangEnglish, locale.CountryUSA}: {
+		Mac: Tables{
+			"en": {
 				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
 				Description: "This is a test.",
 			},
-			{locale.LangEnglish, locale.CountryUndefined}: {
-				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
-				Description: "This is a test.",
-			},
-			{locale.LangGerman, locale.CountryDEU}: {
+			"de": {
 				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
 				Description: "Dies ist ein Test.",
 			},
-			{locale.LangGerman, locale.CountryUndefined}: {
+		},
+		Windows: Tables{
+			"en-US": {
+				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
+				Description: "This is a test.",
+			},
+			"de-DE": {
 				Copyright:   "Copyright (c) 2022 Jochen Voss <voss@seehuhn.de>",
 				Description: "Dies ist ein Test.",
 			},
 		},
 	}
-	ss := cmap.Table{
-		{PlatformID: 0, EncodingID: 4}:              nil,
-		{PlatformID: 1, EncodingID: 0}:              nil,
-		{PlatformID: 1, EncodingID: 0, Language: 2}: nil,
-		{PlatformID: 3, EncodingID: 1}:              nil,
-		{PlatformID: 3, EncodingID: 1}:              nil,
-	}
-	f.Add(info.Encode(ss))
+	f.Add(info.Encode(1))
 
 	f.Fuzz(func(t *testing.T, in []byte) {
 		n1, err := Decode(in)
@@ -61,18 +70,9 @@ func FuzzNames(f *testing.F) {
 		}
 
 		ss := make(cmap.Table)
-		for key := range n1.Tables {
-			languageID, ok := appleCode(key.Language)
-			if ok {
-				ss[cmap.Key{PlatformID: 1, EncodingID: 0, Language: languageID}] = nil
-			}
-			languageID = msCode(key)
-			if languageID != 0xFFFF {
-				ss[cmap.Key{PlatformID: 3, EncodingID: 1}] = nil
-			}
-		}
+		ss[cmap.Key{PlatformID: 3, EncodingID: 1}] = nil
 
-		buf := n1.Encode(ss)
+		buf := n1.Encode(1)
 		n2, err := Decode(buf)
 		if err != nil {
 			t.Fatal(err)

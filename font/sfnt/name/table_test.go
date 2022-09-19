@@ -17,20 +17,18 @@
 package name
 
 import (
+	"fmt"
 	"testing"
-
-	"golang.org/x/text/language"
 )
 
-func TestLanguageTags(t *testing.T) {
-	for _, list := range []map[uint16]string{appleBCP, msBCP} {
-		for _, lang := range list {
-			tag := language.MustParse(lang)
-			// region, _ := tag.Region()
-			script, _ := tag.Script()
-			if script.String() == "Zzzz" {
-				t.Error(lang)
-			}
+func TestTable(t *testing.T) {
+	table := &Table{}
+	for i := ID(0); i < 300; i++ {
+		val := fmt.Sprint(i)
+		table.set(i, val)
+		val2 := table.get(i)
+		if val != val2 {
+			t.Errorf("table[%d]: %q != %q", i, val, val2)
 		}
 	}
 }

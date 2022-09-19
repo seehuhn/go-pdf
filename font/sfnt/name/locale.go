@@ -16,209 +16,131 @@
 
 package name
 
-import (
-	"seehuhn.de/go/pdf/locale"
-)
-
-// Loc contains locale information for name table entries.
-// Tables from entries with PlatformID == 3 (Apple) have only language set,
-// while tables from entries with PlatformID == 1 (Microsoft) have language
-// and country set.
-type Loc struct {
-	Language locale.Language
-	Country  locale.Country
-}
-
-func (loc Loc) String() string {
-	if loc.Country == 0 {
-		return loc.Language.String()
-	}
-	return loc.Language.String() + "_" + loc.Country.String()
-}
-
-// Selected Macintosh language codes
+// Macintosh language codes
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#macintosh-language-ids
-var appleLang = map[uint16]Loc{
-	0:  {Language: locale.LangEnglish},
-	1:  {Language: locale.LangFrench},
-	2:  {Language: locale.LangGerman},
-	3:  {Language: locale.LangItalian},
-	4:  {Language: locale.LangDutch},
-	6:  {Language: locale.LangSpanish},
-	11: {Language: locale.LangJapanese},
-	12: {Language: locale.LangArabic},
-	14: {Language: locale.LangGreek},
-	19: {Language: locale.LangChinese}, // traditional
-	21: {Language: locale.LangHindi},
-	23: {Language: locale.LangTurkish},
-	32: {Language: locale.LangRussian},
-	33: {Language: locale.LangChinese}, // simplified
-	37: {Language: locale.LangRomanian},
-	67: {Language: locale.LangBengali},
-}
-
 var appleBCP = map[uint16]string{
-	0:   "en",         // English
-	1:   "fr",         // French
-	2:   "de",         // German
-	3:   "it",         // Italian
-	4:   "nl",         // Dutch
-	5:   "sv",         // Swedish
-	6:   "es",         // Spanish
-	7:   "da",         // Danish
-	8:   "pt",         // Portuguese
-	9:   "no",         // Norwegian
-	10:  "he",         // Hebrew
-	11:  "ja",         // Japanese
-	12:  "ar",         // Arabic
-	13:  "fi",         // Finnish
-	14:  "el",         // Greek
-	15:  "is",         // Icelandic
-	16:  "mt",         // Maltese
-	17:  "tr",         // Turkish
-	18:  "hr",         // Croatian
-	19:  "zh-Hant",    // Chinese (traditional)
-	20:  "ur",         // Urdu
-	21:  "hi",         // Hindi
-	22:  "th",         // Thai
-	23:  "ko",         // Korean
-	24:  "lt",         // Lithuanian
-	25:  "pl",         // Polish
-	26:  "hu",         // Hungarian
-	27:  "et",         // Estonian
-	28:  "lv",         // Latvian
-	29:  "se",         // Sami, TODO(voss): is this correct?
-	30:  "fo",         // Faroese
-	31:  "fa",         // Farsi/Persian
-	32:  "ru",         // Russian
-	33:  "zh-Hans",    // Chinese (simplified)
-	34:  "nl_BE",      // Flemish
-	35:  "ga",         // Irish Gaelic
-	36:  "sq",         // Albanian
-	37:  "ro",         // Romanian
-	38:  "cs",         // Czech
-	39:  "sk",         // Slovak
-	40:  "sl",         // Slovenian
-	41:  "yi",         // Yiddish
-	42:  "sr",         // Serbian
-	43:  "mk",         // Macedonian
-	44:  "bg",         // Bulgarian
-	45:  "uk",         // Ukrainian
-	46:  "be",         // Byelorussian
-	47:  "uz",         // Uzbek
-	48:  "kk",         // Kazakh
-	49:  "az-Cyrl",    // Azerbaijani (Cyrillic script)
-	50:  "az-Arab",    // Azerbaijani (Arabic script)
-	51:  "hy",         // Armenian
-	52:  "ka",         // Georgian
-	53:  "mo",         // Moldavian
-	54:  "ky",         // Kirghiz
-	55:  "tg",         // Tajiki, TODO(voss): is this correct?
-	56:  "tk",         // Turkmen
-	57:  "mn-Mong",    // Mongolian (Mongolian script)
-	58:  "mn-Cyrl",    // Mongolian (Cyrillic script)
-	59:  "ps",         // Pashto
-	60:  "ku",         // Kurdish
-	61:  "ks",         // Kashmiri
-	62:  "sd",         // Sindhi
-	63:  "bo",         // Tibetan
-	64:  "ne",         // Nepali
-	65:  "sa",         // Sanskrit
-	66:  "mr",         // Marathi
-	67:  "bn",         // Bengali
-	68:  "as",         // Assamese
-	69:  "gu",         // Gujarati
-	70:  "pa",         // Punjabi
-	71:  "or",         // Oriya
-	72:  "ml",         // Malayalam
-	73:  "kn",         // Kannada
-	74:  "ta",         // Tamil
-	75:  "te",         // Telugu
-	76:  "si",         // Sinhalese
-	77:  "my",         // Burmese
-	78:  "km",         // Khmer
-	79:  "lo",         // Lao
-	80:  "vi",         // Vietnamese
-	81:  "id",         // Indonesian
-	82:  "tl",         // Tagalog
-	83:  "ms-Latn",    // Malay (Roman script)
-	84:  "ms-Arab",    // Malay (Arabic script)
-	85:  "am",         // Amharic
-	86:  "ti",         // Tigrinya
-	87:  "om",         // Galla, TODO(voss): is this correct???
-	88:  "so",         // Somali
-	89:  "sw",         // Swahili
-	90:  "rw",         // Kinyarwanda/Ruanda
-	91:  "rn",         // Rundi
-	92:  "ny",         // Nyanja/Chewa
-	93:  "mg",         // Malagasy
-	94:  "eo",         // Esperanto
-	128: "cy",         // Welsh
-	129: "eu",         // Basque
-	130: "ca",         // Catalan
-	131: "la",         // Latin
-	132: "qu",         // Quechua
-	133: "gn",         // Guarani
-	134: "ay",         // Aymara
-	135: "tt",         // Tatar
-	136: "ug",         // Uighur
-	137: "dz",         // Dzongkha
-	138: "jv-Latn",    // Javanese (Roman script)
-	139: "su-Latn",    // Sundanese (Roman script)
-	140: "gl",         // Galician
-	141: "af",         // Afrikaans
-	142: "br",         // Breton
-	143: "iu",         // Inuktitut
-	144: "gd",         // Scottish Gaelic
-	145: "gv",         // Manx Gaelic
-	146: "ga",         // Irish Gaelic (with dot above), TODO(voss): what to append for overdot?
-	147: "to",         // Tongan
-	148: "el-polyton", // Greek (polytonic), TODO(voss): is this correct?
-	149: "kl",         // Greenlandic
-	150: "az-Latn",    // Azerbaijani (Roman script)
+	0:   "en",      // English
+	1:   "fr",      // French
+	2:   "de",      // German
+	3:   "it",      // Italian
+	4:   "nl",      // Dutch
+	5:   "sv",      // Swedish
+	6:   "es",      // Spanish
+	7:   "da",      // Danish
+	8:   "pt",      // Portuguese
+	9:   "nb",      // Norwegian
+	10:  "he",      // Hebrew
+	11:  "ja",      // Japanese
+	12:  "ar",      // Arabic
+	13:  "fi",      // Finnish
+	14:  "el",      // Greek
+	15:  "is",      // Icelandic
+	16:  "mt",      // Maltese
+	17:  "tr",      // Turkish
+	18:  "hr",      // Croatian
+	19:  "zh-Hant", // Chinese (traditional)
+	20:  "ur",      // Urdu
+	21:  "hi",      // Hindi
+	22:  "th",      // Thai
+	23:  "ko",      // Korean
+	24:  "lt",      // Lithuanian
+	25:  "pl",      // Polish
+	26:  "hu",      // Hungarian
+	27:  "et",      // Estonian
+	28:  "lv",      // Latvian
+	29:  "se",      // Sami
+	30:  "fo",      // Faroese
+	31:  "fa",      // Farsi/Persian
+	32:  "ru",      // Russian
+	33:  "zh-Hans", // Chinese (simplified)
+	34:  "nl-BE",   // Flemish
+	35:  "ga",      // Irish Gaelic
+	36:  "sq",      // Albanian
+	37:  "ro",      // Romanian
+	38:  "cs",      // Czech
+	39:  "sk",      // Slovak
+	40:  "sl",      // Slovenian
+	41:  "yi",      // Yiddish
+	42:  "sr",      // Serbian
+	43:  "mk",      // Macedonian
+	44:  "bg",      // Bulgarian
+	45:  "uk",      // Ukrainian
+	46:  "be",      // Byelorussian
+	47:  "uz",      // Uzbek
+	48:  "kk",      // Kazakh
+	49:  "az-Cyrl", // Azerbaijani (Cyrillic script)
+	50:  "az-Arab", // Azerbaijani (Arabic script)
+	51:  "hy",      // Armenian
+	52:  "ka",      // Georgian
+	53:  "mo",      // Moldavian
+	54:  "ky",      // Kirghiz
+	55:  "tg",      // Tajiki
+	56:  "tk-Cyrl", // Turkmen
+	57:  "mn-Mong", // Mongolian (Mongolian script)
+	58:  "mn",      // Mongolian (Cyrillic script)
+	59:  "ps",      // Pashto
+	60:  "ku",      // Kurdish
+	61:  "ks",      // Kashmiri
+	62:  "sd",      // Sindhi
+	63:  "bo",      // Tibetan
+	64:  "ne",      // Nepali
+	65:  "sa",      // Sanskrit
+	66:  "mr",      // Marathi
+	67:  "bn",      // Bengali
+	68:  "as",      // Assamese
+	69:  "gu",      // Gujarati
+	70:  "pa",      // Punjabi
+	71:  "or",      // Oriya
+	72:  "ml",      // Malayalam
+	73:  "kn",      // Kannada
+	74:  "ta",      // Tamil
+	75:  "te",      // Telugu
+	76:  "si",      // Sinhalese
+	77:  "my",      // Burmese
+	78:  "km",      // Khmer
+	79:  "lo",      // Lao
+	80:  "vi",      // Vietnamese
+	81:  "id",      // Indonesian
+	82:  "fil",     // Tagalog
+	83:  "ms",      // Malay (Roman script)
+	84:  "ms-Arab", // Malay (Arabic script)
+	85:  "am",      // Amharic
+	86:  "ti",      // Tigrinya
+	87:  "om",      // Galla
+	88:  "so",      // Somali
+	89:  "sw",      // Swahili
+	90:  "rw",      // Kinyarwanda/Ruanda
+	91:  "rn",      // Rundi
+	92:  "ny",      // Nyanja/Chewa
+	93:  "mg",      // Malagasy
+	94:  "eo",      // Esperanto
+	128: "cy",      // Welsh
+	129: "eu",      // Basque
+	130: "ca",      // Catalan
+	131: "la",      // Latin
+	132: "qu",      // Quechua
+	133: "gn",      // Guarani
+	134: "ay",      // Aymara
+	135: "tt-Cyrl", // Tatar
+	136: "ug",      // Uighur
+	137: "dz",      // Dzongkha
+	138: "jv",      // Javanese (Roman script)
+	139: "su",      // Sundanese (Roman script)
+	140: "gl",      // Galician
+	141: "af",      // Afrikaans
+	142: "br",      // Breton
+	143: "iu",      // Inuktitut
+	144: "gd",      // Scottish Gaelic
+	145: "gv",      // Manx Gaelic
+	146: "ga-Latg", // Irish Gaelic (with dot above)
+	147: "to",      // Tongan
+	148: "grc",     // Greek (polytonic)
+	149: "kl",      // Greenlandic
+	150: "az",      // Azerbaijani (Roman script)
 }
 
-// Selected Windows language codes
+// Windows language codes
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name#windows-language-ids
-var msLang = map[uint16]Loc{
-	0x0401: {Language: locale.LangArabic, Country: locale.CountrySAU},
-	0x0403: {Language: locale.LangCatalan, Country: locale.CountryESP},
-	0x0405: {Language: locale.LangCzech, Country: locale.CountryCZE},
-	0x0406: {Language: locale.LangDanish, Country: locale.CountryDNK},
-	0x0407: {Language: locale.LangGerman, Country: locale.CountryDEU},
-	0x0408: {Language: locale.LangGreek, Country: locale.CountryGRC},
-	0x0409: {Language: locale.LangEnglish, Country: locale.CountryUSA},
-	0x040A: {Language: locale.LangSpanish, Country: locale.CountryESP}, // traditional sort
-	0x040B: {Language: locale.LangFinnish, Country: locale.CountryFIN},
-	0x040C: {Language: locale.LangFrench, Country: locale.CountryFRA},
-	0x040E: {Language: locale.LangHungarian, Country: locale.CountryHUN},
-	0x0410: {Language: locale.LangItalian, Country: locale.CountryITA},
-	0x0411: {Language: locale.LangJapanese, Country: locale.CountryJPN},
-	0x0412: {Language: locale.LangKorean, Country: locale.CountryKOR},
-	0x0413: {Language: locale.LangDutch, Country: locale.CountryNLD},
-	0x0414: {Language: locale.LangNorwegianBokmal, Country: locale.CountryNOR},
-	0x0415: {Language: locale.LangPolish, Country: locale.CountryPOL},
-	0x0416: {Language: locale.LangPortuguese, Country: locale.CountryBRA},
-	0x0418: {Language: locale.LangRomanian, Country: locale.CountryROU},
-	0x0419: {Language: locale.LangRussian, Country: locale.CountryRUS},
-	0x041B: {Language: locale.LangSlovak, Country: locale.CountrySVK},
-	0x041D: {Language: locale.LangSwedish, Country: locale.CountrySWE},
-	0x041F: {Language: locale.LangTurkish, Country: locale.CountryTUR},
-	0x0424: {Language: locale.LangSlovenian, Country: locale.CountrySVN},
-	0x042D: {Language: locale.LangBasque, Country: locale.CountryESP},
-	0x0439: {Language: locale.LangHindi, Country: locale.CountryIND},
-	0x0445: {Language: locale.LangBengali, Country: locale.CountryIND},
-	0x0804: {Language: locale.LangChinese, Country: locale.CountryCHN},
-	0x0809: {Language: locale.LangEnglish, Country: locale.CountryGBR},
-	0x080A: {Language: locale.LangSpanish, Country: locale.CountryMEX},
-	0x0816: {Language: locale.LangPortuguese, Country: locale.CountryPRT},
-	0x0845: {Language: locale.LangBengali, Country: locale.CountryBGD},
-	0x0C0A: {Language: locale.LangSpanish, Country: locale.CountryESP}, // modern sort
-	0x0C0C: {Language: locale.LangFrench, Country: locale.CountryCAN},
-}
-
-// TODO(voss): fill this in
-// https://docs.microsoft.com/en-us/openspecs/office_standards/ms-oe376/6c085406-a698-4e12-9d4d-c3b0ee3dbc4a
 var msBCP = map[uint16]string{
 	0x0436: "af-ZA",       // Afrikaans, South Africa
 	0x041c: "sq-AL",       // Albanian, Albania
@@ -425,22 +347,4 @@ var msBCP = map[uint16]string{
 	0x0485: "sah-RU",      // Yakut, Russia
 	0x0478: "ii-CN",       // Yi, PRC
 	0x046a: "yo-NG",       // Yoruba, Nigeria
-}
-
-func appleCode(lang locale.Language) (uint16, bool) {
-	for k, v := range appleLang {
-		if v.Language == lang {
-			return k, true
-		}
-	}
-	return 0, false
-}
-
-func msCode(loc Loc) uint16 {
-	for k, v := range msLang {
-		if v == loc {
-			return k
-		}
-	}
-	return 0xFFFF
 }
