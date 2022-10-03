@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
@@ -32,7 +33,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/simple"
 	"seehuhn.de/go/pdf/layout"
-	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -117,7 +117,7 @@ func typesetFile(inName, outName string, V pdf.Version) error {
 		if err != nil {
 			return err
 		}
-		Font, err = simple.Embed(out, info, "F", locale.EnUS)
+		Font, err = simple.Embed(out, info, "F", language.AmericanEnglish)
 		if err != nil {
 			return err
 		}

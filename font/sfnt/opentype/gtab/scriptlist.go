@@ -18,17 +18,12 @@ package gtab
 
 import (
 	"sort"
+	"strings"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
-	"seehuhn.de/go/pdf/locale"
 )
-
-// ScriptLang is a pair of script and language.
-type ScriptLang struct {
-	Script locale.Script
-	Lang   locale.Language
-}
 
 // Features describes the mandatory and optional features for a script/language.
 type Features struct {
@@ -37,7 +32,8 @@ type Features struct {
 }
 
 // ScriptListInfo contains the information of a ScriptList table.
-type ScriptListInfo map[ScriptLang]*Features
+// It maps BCP 47 tags to OpenType font features.
+type ScriptListInfo map[string]*Features // TODO(voss): use language.Tag instead of string
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-list-table-and-script-record
 func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
@@ -59,7 +55,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 
 	type scriptTableEntry struct {
 		offset uint16
-		script locale.Script
+		script string
 	}
 
 	var entries []scriptTableEntry
@@ -69,7 +65,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 			return nil, err
 		}
 
-		script, ok := otfScript[string(buf[:4])]
+		script, ok := scriptBcp47[string(buf[:4])]
 		if !ok {
 			continue
 		}
@@ -105,7 +101,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#script-table-and-language-system-record
-func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info ScriptListInfo) error {
+func readScriptTable(p *parser.Parser, pos int64, script string, info ScriptListInfo) error {
 	err := p.SeekPos(pos)
 	if err != nil {
 		return err
@@ -134,44 +130,46 @@ func readScriptTable(p *parser.Parser, pos int64, script locale.Script, info Scr
 
 	type langSysRecord struct {
 		offset uint16
-		lang   locale.Language
+		lang   string
 	}
 
 	var records []langSysRecord
+	if defaultLangSysOffset != 0 {
+		records = append(records, langSysRecord{
+			offset: defaultLangSysOffset,
+			lang:   "und",
+		})
+	}
 	for i := 0; i < int(langSysCount); i++ {
 		buf, err := p.ReadBytes(6)
 		if err != nil {
 			return err
 		}
 
-		lang, ok := otfLanguage[string(buf[:4])]
+		lang, ok := langBcp47[string(buf[:4])]
 		if !ok {
 			continue
 		}
 
-		entry := langSysRecord{
+		records = append(records, langSysRecord{
 			offset: uint16(buf[4])<<8 | uint16(buf[5]),
 			lang:   lang,
-		}
-		records = append(records, entry)
+		})
 	}
 	sort.Slice(records, func(i, j int) bool {
 		return records[i].offset < records[j].offset
 	})
 
-	if defaultLangSysOffset != 0 {
-		ff, err := readLangSysTable(p, pos+int64(defaultLangSysOffset))
-		if err != nil {
-			return err
-		}
-		info[ScriptLang{Script: script, Lang: locale.LangUndefined}] = ff
-	}
 	for _, record := range records {
 		ff, err := readLangSysTable(p, pos+int64(record.offset))
 		if err != nil {
 			return err
 		}
-		info[ScriptLang{Script: script, Lang: record.lang}] = ff
+		tag := record.lang
+		if !strings.Contains(tag, "-") {
+			tag = tag + "-" + script
+		}
+		info[tag] = ff
 	}
 
 	return nil
@@ -220,50 +218,51 @@ func (info ScriptListInfo) encode() []byte {
 		return nil
 	}
 
-	rScript := map[locale.Script]string{}
-	for tag, code := range otfScript {
+	rScript := map[string]string{}
+	for tag, code := range scriptBcp47 {
 		rScript[code] = tag
 	}
-	rLang := map[locale.Language]string{}
-	for tag, code := range otfLanguage {
-		rLang[code] = tag
+	rLang := map[language.Tag]string{}
+	for tag, code := range langBcp47 {
+		rLang[language.MustParse(code)] = tag
 	}
 
-	scripts := map[locale.Script][]locale.Language{}
-	for key := range info {
-		scripts[key.Script] = append(scripts[key.Script], key.Lang)
+	scriptLangs := map[string][]language.Tag{}
+	for lang := range info {
+		tag := language.MustParse(lang)
+		bcmScript, _ := tag.Script()
+		otfScript := rScript[bcmScript.String()]
+		if otfScript == "" {
+			panic("invalid script for " + lang)
+		}
+		scriptLangs[otfScript] = append(scriptLangs[otfScript], tag)
 	}
 
 	type scriptRecord struct {
-		tag    string
-		script locale.Script
-		offs   uint16
+		otfScript string
+		offs      uint16
 	}
 	var scriptList []*scriptRecord
-	for script := range scripts {
-		tag, ok := rScript[script]
-		if !ok || len(tag) != 4 {
-			panic("invalid script")
-		}
+	for otfScript := range scriptLangs {
 		scriptList = append(scriptList, &scriptRecord{
-			tag:    tag,
-			script: script,
+			otfScript: otfScript,
 		})
 	}
 	sort.Slice(scriptList, func(i, j int) bool {
-		return scriptList[i].tag < scriptList[j].tag
+		return scriptList[i].otfScript < scriptList[j].otfScript
 	})
 
-	totalSize := 2 + 6*len(scripts) // scriptCount, scriptRecords
+	totalSize := 2 + 6*len(scriptLangs) // scriptCount, scriptRecords
 	for _, sRec := range scriptList {
 		sRec.offs = uint16(totalSize)
-		langs := scripts[sRec.script]
+		langs := scriptLangs[sRec.otfScript]
 		langCount := 0
 		for _, lang := range langs {
-			if lang != locale.LangUndefined {
+			base, _, _ := lang.Raw()
+			if base.String() != "und" {
 				langCount++
 			}
-			langSys := info[ScriptLang{Script: sRec.script, Lang: lang}]
+			langSys := info[lang.String()]
 			// lookupOrderOffset, requiredFeatureIndex, featureIndexCount, featureIndices:
 			totalSize += 6 + len(langSys.Optional)*2
 		}
@@ -277,13 +276,13 @@ func (info ScriptListInfo) encode() []byte {
 	buf[1] = byte(len(scriptList))
 	for i, rec := range scriptList {
 		p := 2 + i*6
-		copy(buf[p:p+4], []byte(rec.tag))
+		copy(buf[p:p+4], []byte(rec.otfScript))
 		buf[p+4] = byte(rec.offs >> 8)
 		buf[p+5] = byte(rec.offs)
 	}
 	for _, sRec := range scriptList {
 		scriptTablePos := int(sRec.offs)
-		langs := scripts[sRec.script]
+		langs := scriptLangs[sRec.otfScript]
 
 		type langSysRecord struct {
 			langSys *Features
@@ -293,8 +292,9 @@ func (info ScriptListInfo) encode() []byte {
 		var defaultRecord *langSysRecord
 		var langSysRecords []*langSysRecord
 		for _, lang := range langs {
-			langSys := info[ScriptLang{Script: sRec.script, Lang: lang}]
-			if lang == locale.LangUndefined {
+			langSys := info[lang.String()]
+			base, _, _ := lang.Raw()
+			if base.String() == "und" {
 				defaultRecord = &langSysRecord{
 					langSys: langSys,
 				}

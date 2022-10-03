@@ -22,6 +22,7 @@ import (
 	"os"
 	"sort"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
@@ -31,11 +32,10 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/locale"
 )
 
 // EmbedFile embeds the named font file into the PDF document.
-func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
+func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc language.Tag) (*font.Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Local
 //
 // This requires PDF version 1.1 or higher, and
 // use of CFF-based OpenType fonts requires PDF version 1.2 or higher.
-func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
+func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) (*font.Font, error) {
 	if info.IsGlyf() {
 		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
 		if err != nil {

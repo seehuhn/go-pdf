@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt"
@@ -30,7 +31,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab/builder"
-	"seehuhn.de/go/pdf/locale"
 )
 
 func TestGsub(t *testing.T) {
@@ -63,8 +63,8 @@ func TestGsub(t *testing.T) {
 			}
 
 			gsub := &gtab.Info{
-				ScriptList: map[gtab.ScriptLang]*gtab.Features{
-					{}: {Required: 0},
+				ScriptList: map[string]*gtab.Features{
+					"und-Zyyy": {Required: 0},
 				},
 				FeatureList: []*gtab.Feature{
 					{Tag: "test", Lookups: []gtab.LookupIndex{0}},
@@ -85,7 +85,7 @@ func TestGsub(t *testing.T) {
 				seq[i].Gid = fontInfo.CMap.Lookup(r)
 				seq[i].Text = []rune{r}
 			}
-			lookups := gsub.FindLookups(locale.EnUS, nil)
+			lookups := gsub.FindLookups(language.AmericanEnglish, nil)
 			for _, lookupIndex := range lookups {
 				seq = gsub.LookupList.ApplyLookup(seq, lookupIndex, gdef)
 			}
@@ -136,8 +136,8 @@ func FuzzGsub(f *testing.F) {
 		}
 
 		gsub := &gtab.Info{
-			ScriptList: map[gtab.ScriptLang]*gtab.Features{
-				{}: {Required: 0},
+			ScriptList: map[string]*gtab.Features{
+				"und-Zyyy": {Required: 0},
 			},
 			FeatureList: []*gtab.Feature{
 				{Tag: "test", Lookups: []gtab.LookupIndex{0}},
@@ -150,7 +150,7 @@ func FuzzGsub(f *testing.F) {
 			seq[i].Gid = fontInfo.CMap.Lookup(r)
 			seq[i].Text = []rune{r}
 		}
-		lookups := gsub.FindLookups(locale.EnUS, nil)
+		lookups := gsub.FindLookups(language.AmericanEnglish, nil)
 		for _, lookupIndex := range lookups {
 			seq = gsub.LookupList.ApplyLookup(seq, lookupIndex, gdefTable)
 		}

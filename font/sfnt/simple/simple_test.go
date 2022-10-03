@@ -20,10 +20,10 @@ import (
 	"os"
 	"testing"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -50,7 +50,7 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := Embed(w, fontInfo, "F", locale.EnGB)
+	F, err := Embed(w, fontInfo, "F", language.BritishEnglish)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,37 +22,37 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/parser"
-	"seehuhn.de/go/pdf/locale"
 )
 
 func FuzzScriptList(f *testing.F) {
 	info := ScriptListInfo{}
-	info[ScriptLang{Script: locale.ScriptUndefined, Lang: locale.LangUndefined}] = &Features{
+	info["und-Zyyy"] = &Features{
+		Required: 0xFFFF,
 		Optional: []FeatureIndex{0},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info[ScriptLang{Script: locale.ScriptLatin, Lang: locale.LangEnglish}] = &Features{
-		Required: FeatureIndex(0xFFFF),
+	info["en-Latn"] = &Features{
+		Required: 0xFFFF,
 		Optional: []FeatureIndex{1, 2, 3, 4},
 	}
-	info[ScriptLang{Script: locale.ScriptLatin, Lang: locale.LangUndefined}] = &Features{
+	info["und-Latn"] = &Features{
 		Required: 7,
 		Optional: []FeatureIndex{5, 6},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info[ScriptLang{Script: locale.ScriptArabic, Lang: locale.LangUndefined}] = &Features{
+	info["und-Arab"] = &Features{
 		Required: FeatureIndex(0),
 		Optional: []FeatureIndex{1, 2},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info[ScriptLang{Script: locale.ScriptUndefined, Lang: locale.LangArabic}] = &Features{
+	info["ar"] = &Features{
 		Required: FeatureIndex(0xFFFF),
 		Optional: []FeatureIndex{1, 3, 5},
 	}
-	info[ScriptLang{Script: locale.ScriptUndefined, Lang: locale.LangAzerbaijani}] = &Features{
+	info["az"] = &Features{
 		Required: FeatureIndex(0xFFFF),
 		Optional: []FeatureIndex{2, 4, 6},
 	}

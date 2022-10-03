@@ -19,9 +19,10 @@ package gtab
 import (
 	"sort"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
-	"seehuhn.de/go/pdf/locale"
 )
 
 // LookupIndex enumerates lookups.
@@ -484,35 +485,22 @@ func (l *extensionSubtable) Encode() []byte {
 }
 
 // FindLookups returns the lookups required to implement the given
-// features in the specified locale.
-func (info *Info) FindLookups(loc *locale.Locale, includeFeature map[string]bool) []LookupIndex {
+// features in the specified language.
+func (info *Info) FindLookups(wantLang language.Tag, includeFeature map[string]bool) []LookupIndex {
 	if info == nil || len(info.ScriptList) == 0 {
 		return nil
 	}
 
-	candidates := []ScriptLang{
-		{Script: locale.ScriptUndefined, Lang: locale.LangUndefined},
+	haveLangs := maps.Keys(info.ScriptList)
+	sort.Strings(haveLangs)
+	tags := make([]language.Tag, len(haveLangs))
+	for i, val := range haveLangs {
+		tags[i] = language.MustParse(val)
 	}
-	if loc.Script != locale.ScriptUndefined {
-		candidates = append(candidates,
-			ScriptLang{Script: loc.Script, Lang: locale.LangUndefined})
-	}
-	if loc.Language != locale.LangUndefined {
-		candidates = append(candidates,
-			ScriptLang{Script: locale.ScriptUndefined, Lang: loc.Language})
-	}
-	if len(candidates) == 3 { // both are defined
-		candidates = append(candidates,
-			ScriptLang{Script: loc.Script, Lang: loc.Language})
-	}
-	var features *Features
-	for _, cand := range candidates {
-		f, ok := info.ScriptList[cand]
-		if ok {
-			features = f
-			break
-		}
-	}
+	matcher := language.NewMatcher(tags)
+	_, index, _ := matcher.Match(wantLang)
+
+	features := info.ScriptList[haveLangs[index]]
 	if features == nil {
 		return nil
 	}

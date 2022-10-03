@@ -24,6 +24,7 @@ import (
 	"os"
 	"strings"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
@@ -31,7 +32,6 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cid"
-	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -145,7 +145,7 @@ func main() {
 		}
 
 		if len(seq) > 0 {
-			F, err := cid.Embed(w, info, pdf.Name(fmt.Sprintf("F%d", i)), locale.EnUS)
+			F, err := cid.Embed(w, info, pdf.Name(fmt.Sprintf("F%d", i)), language.AmericanEnglish)
 			if err != nil {
 				log.Fatal(err)
 			}

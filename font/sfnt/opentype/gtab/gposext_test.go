@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/funit"
@@ -28,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab/builder"
-	"seehuhn.de/go/pdf/locale"
 )
 
 func TestGpos(t *testing.T) {
@@ -70,8 +70,8 @@ func TestGpos(t *testing.T) {
 			}
 
 			gpos := &gtab.Info{
-				ScriptList: map[gtab.ScriptLang]*gtab.Features{
-					{}: {Required: 0},
+				ScriptList: map[string]*gtab.Features{
+					"und-Zyyy": {Required: 0},
 				},
 				FeatureList: []*gtab.Feature{
 					{Tag: "kern", Lookups: []gtab.LookupIndex{0}},
@@ -97,7 +97,7 @@ func TestGpos(t *testing.T) {
 					seq[i].Advance = fontInfo.GlyphWidth(gid)
 				}
 			}
-			lookups := gpos.FindLookups(locale.EnUS, nil)
+			lookups := gpos.FindLookups(language.AmericanEnglish, nil)
 			for _, lookupIndex := range lookups {
 				seq = gpos.LookupList.ApplyLookup(seq, lookupIndex, gdefTable)
 			}
@@ -173,8 +173,8 @@ func FuzzGpos(f *testing.F) {
 		}
 
 		gpos := &gtab.Info{
-			ScriptList: map[gtab.ScriptLang]*gtab.Features{
-				{}: {Required: 0},
+			ScriptList: map[string]*gtab.Features{
+				"und-Zyyy": {Required: 0},
 			},
 			FeatureList: []*gtab.Feature{
 				{Tag: "kern", Lookups: []gtab.LookupIndex{0}},
@@ -191,7 +191,7 @@ func FuzzGpos(f *testing.F) {
 				seq[i].Advance = fontInfo.GlyphWidth(gid)
 			}
 		}
-		lookups := gpos.FindLookups(locale.EnUS, nil)
+		lookups := gpos.FindLookups(language.AmericanEnglish, nil)
 		for _, lookupIndex := range lookups {
 			seq = gpos.LookupList.ApplyLookup(seq, lookupIndex, gdefTable)
 		}

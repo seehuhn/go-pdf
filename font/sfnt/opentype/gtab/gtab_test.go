@@ -22,14 +22,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font/parser"
-	"seehuhn.de/go/pdf/locale"
 )
 
 func TestGetLookups(t *testing.T) {
 	gtabInfo := Info{
-		ScriptList: map[ScriptLang]*Features{
-			{Script: locale.ScriptLatin}: {
+		ScriptList: map[string]*Features{
+			"und-Latn": {
 				Required: 0,
 				Optional: []FeatureIndex{
 					1, 2, 3,
@@ -61,7 +61,7 @@ func TestGetLookups(t *testing.T) {
 		for _, tag := range test.tags {
 			includeFeature[tag] = true
 		}
-		ll := gtabInfo.FindLookups(locale.EnGB, includeFeature)
+		ll := gtabInfo.FindLookups(language.BritishEnglish, includeFeature)
 		if len(ll) != len(test.expected) {
 			t.Errorf("GetLookups(%v) = %v, expected %v", test.tags, ll, test.expected)
 		}
@@ -73,15 +73,15 @@ func FuzzGtab(f *testing.F) {
 	f.Add(info.Encode(999))
 
 	info.ScriptList = ScriptListInfo{
-		{Script: locale.ScriptUndefined, Lang: locale.LangUndefined}: {
+		"und-Zyyy": {
 			Required: 0xFFFF,
 			Optional: []FeatureIndex{1, 2, 3, 4},
 		},
-		{Script: locale.ScriptLatin, Lang: locale.LangUndefined}: {
+		"und-Latn": {
 			Required: 0,
 			Optional: []FeatureIndex{2, 4, 5},
 		},
-		{Script: locale.ScriptLatin, Lang: locale.LangGerman}: {
+		"de": {
 			Required: 6,
 		},
 	}

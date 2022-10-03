@@ -22,12 +22,12 @@ import (
 	"os"
 	"strings"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/simple"
-	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -79,7 +79,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 			return err
 		}
 
-		F1, err = simple.Embed(out, info, "F1", locale.EnUS)
+		F1, err = simple.Embed(out, info, "F1", language.AmericanEnglish)
 		if err != nil {
 			return err
 		}

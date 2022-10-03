@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
-	"seehuhn.de/go/pdf/locale"
 )
 
 // Test9737 tests a situation where HarfBuzz and MS Word disagree.
@@ -39,8 +39,8 @@ func Test9737(t *testing.T) {
 	gidB := fontInfo.CMap.Lookup('B')
 
 	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
+		ScriptList: map[string]*gtab.Features{
+			"und-Zyyy": {Required: 0},
 		},
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
@@ -102,7 +102,7 @@ func Test9737(t *testing.T) {
 		{Gid: gidB},
 	}
 	gsub := fontInfo.Gsub
-	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
+	for _, lookupIndex := range gsub.FindLookups(language.AmericanEnglish, nil) {
 		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, nil)
 	}
 	// MS Word gives AAAAB
@@ -133,8 +133,8 @@ func Test9738(t *testing.T) {
 		},
 	}
 	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[gtab.ScriptLang]*gtab.Features{
-			{}: {}, // Required: 0
+		ScriptList: map[string]*gtab.Features{
+			"und-Zyyy": {Required: 0},
 		},
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
@@ -218,7 +218,7 @@ func Test9738(t *testing.T) {
 		{Gid: gidB},
 	}
 	gsub := fontInfo.Gsub
-	for _, lookupIndex := range gsub.FindLookups(locale.EnUS, nil) {
+	for _, lookupIndex := range gsub.FindLookups(language.AmericanEnglish, nil) {
 		gg = gsub.LookupList.ApplyLookup(gg, lookupIndex, fontInfo.Gdef)
 	}
 

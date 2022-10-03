@@ -21,6 +21,7 @@ import (
 	"os"
 	"sort"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
@@ -45,7 +46,7 @@ func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Local
 	if err != nil {
 		return nil, err
 	}
-	return Embed(w, fontInfo, instName, loc)
+	return Embed(w, fontInfo, instName, language.AmericanEnglish)
 }
 
 // Embed embeds a TrueType or OpenType font into a PDF document as a CID font.
@@ -56,7 +57,7 @@ func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Local
 //
 // This requires PDF version 1.1 or higher, and
 // use of CFF-based OpenType fonts requires PDF version 1.3 or higher.
-func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
+func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) (*font.Font, error) {
 	if info.IsGlyf() {
 		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
 		if err != nil {

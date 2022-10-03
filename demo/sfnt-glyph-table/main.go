@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
@@ -32,7 +33,6 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/cid"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/table"
-	"seehuhn.de/go/pdf/locale"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -93,7 +93,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err = cid.Embed(out, tt, "X", locale.EnUS)
+	theFont, err = cid.Embed(out, tt, "X", language.AmericanEnglish)
 	if err != nil {
 		log.Fatal(err)
 	}

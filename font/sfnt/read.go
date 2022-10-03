@@ -477,8 +477,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 			Adjust: adjust,
 		}
 		info.Gpos = &gtab.Info{
-			ScriptList: map[gtab.ScriptLang]*gtab.Features{
-				{}: {Required: 0, Optional: []gtab.FeatureIndex{}},
+			ScriptList: map[string]*gtab.Features{
+				"und-Zyyy": {Required: 0, Optional: []gtab.FeatureIndex{}},
 			},
 			FeatureList: []*gtab.Feature{
 				{Tag: "kern", Lookups: []gtab.LookupIndex{0}},
