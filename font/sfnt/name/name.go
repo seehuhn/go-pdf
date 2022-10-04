@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package name has code for reading and wrinting the "name" table.
+// Package name has code for reading and wrinting OpenType "name" tables.
+// These tables contain localized strings associated with a font.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/name
 package name
 
