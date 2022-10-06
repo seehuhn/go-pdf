@@ -21,38 +21,39 @@ import (
 	"reflect"
 	"testing"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
 func FuzzScriptList(f *testing.F) {
 	info := ScriptListInfo{}
-	info["und-Zyyy"] = &Features{
+	info[language.MustParse("und-Zzzz")] = &Features{
 		Required: 0xFFFF,
 		Optional: []FeatureIndex{0},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info["en-Latn"] = &Features{
+	info[language.English] = &Features{
 		Required: 0xFFFF,
 		Optional: []FeatureIndex{1, 2, 3, 4},
 	}
-	info["und-Latn"] = &Features{
+	info[language.MustParse("und-Latn")] = &Features{
 		Required: 7,
 		Optional: []FeatureIndex{5, 6},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info["und-Arab"] = &Features{
+	info[language.MustParse("und-Arab")] = &Features{
 		Required: FeatureIndex(0),
 		Optional: []FeatureIndex{1, 2},
 	}
 	f.Add(info.encode())
 	info = ScriptListInfo{}
-	info["ar"] = &Features{
+	info[language.Arabic] = &Features{
 		Required: FeatureIndex(0xFFFF),
 		Optional: []FeatureIndex{1, 3, 5},
 	}
-	info["az"] = &Features{
+	info[language.Azerbaijani] = &Features{
 		Required: FeatureIndex(0xFFFF),
 		Optional: []FeatureIndex{2, 4, 6},
 	}

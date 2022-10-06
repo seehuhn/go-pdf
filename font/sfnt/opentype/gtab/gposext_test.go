@@ -70,8 +70,8 @@ func TestGpos(t *testing.T) {
 			}
 
 			gpos := &gtab.Info{
-				ScriptList: map[string]*gtab.Features{
-					"und-Zyyy": {Required: 0},
+				ScriptList: map[language.Tag]*gtab.Features{
+					language.MustParse("und-Zzzz"): {Required: 0},
 				},
 				FeatureList: []*gtab.Feature{
 					{Tag: "kern", Lookups: []gtab.LookupIndex{0}},
@@ -173,8 +173,8 @@ func FuzzGpos(f *testing.F) {
 		}
 
 		gpos := &gtab.Info{
-			ScriptList: map[string]*gtab.Features{
-				"und-Zyyy": {Required: 0},
+			ScriptList: map[language.Tag]*gtab.Features{
+				language.MustParse("und-Zzzz"): {Required: 0},
 			},
 			FeatureList: []*gtab.Feature{
 				{Tag: "kern", Lookups: []gtab.LookupIndex{0}},

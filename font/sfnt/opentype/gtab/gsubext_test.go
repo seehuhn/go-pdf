@@ -63,8 +63,8 @@ func TestGsub(t *testing.T) {
 			}
 
 			gsub := &gtab.Info{
-				ScriptList: map[string]*gtab.Features{
-					"und-Zyyy": {Required: 0},
+				ScriptList: map[language.Tag]*gtab.Features{
+					language.MustParse("und-Zzzz"): {Required: 0},
 				},
 				FeatureList: []*gtab.Feature{
 					{Tag: "test", Lookups: []gtab.LookupIndex{0}},
@@ -136,8 +136,8 @@ func FuzzGsub(f *testing.F) {
 		}
 
 		gsub := &gtab.Info{
-			ScriptList: map[string]*gtab.Features{
-				"und-Zyyy": {Required: 0},
+			ScriptList: map[language.Tag]*gtab.Features{
+				language.MustParse("und-Zzzz"): {Required: 0},
 			},
 			FeatureList: []*gtab.Feature{
 				{Tag: "test", Lookups: []gtab.LookupIndex{0}},

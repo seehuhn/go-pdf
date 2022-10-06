@@ -39,8 +39,8 @@ func Test9737(t *testing.T) {
 	gidB := fontInfo.CMap.Lookup('B')
 
 	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[string]*gtab.Features{
-			"und-Zyyy": {Required: 0},
+		ScriptList: map[language.Tag]*gtab.Features{
+			language.MustParse("und-Zzzz"): {Required: 0},
 		},
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},
@@ -133,8 +133,8 @@ func Test9738(t *testing.T) {
 		},
 	}
 	fontInfo.Gsub = &gtab.Info{
-		ScriptList: map[string]*gtab.Features{
-			"und-Zyyy": {Required: 0},
+		ScriptList: map[language.Tag]*gtab.Features{
+			language.MustParse("und-Zzzz"): {Required: 0},
 		},
 		FeatureList: []*gtab.Feature{
 			{Tag: "test", Lookups: []gtab.LookupIndex{0}},

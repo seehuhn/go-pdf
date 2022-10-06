@@ -19,7 +19,6 @@ package gtab
 import (
 	"sort"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/parser"
@@ -491,16 +490,17 @@ func (info *Info) FindLookups(wantLang language.Tag, includeFeature map[string]b
 		return nil
 	}
 
-	haveLangs := maps.Keys(info.ScriptList)
-	sort.Strings(haveLangs)
-	tags := make([]language.Tag, len(haveLangs))
-	for i, val := range haveLangs {
-		tags[i] = language.MustParse(val)
+	// TODO(voss): make sure a sensible default comes first.
+	// TODO(voss): why does maps.Keys(info.Scriptlist) not work?
+	tags := make([]language.Tag, 0, len(info.ScriptList))
+	for tag := range info.ScriptList {
+		tags = append(tags, tag)
 	}
+
 	matcher := language.NewMatcher(tags)
 	_, index, _ := matcher.Match(wantLang)
 
-	features := info.ScriptList[haveLangs[index]]
+	features := info.ScriptList[tags[index]]
 	if features == nil {
 		return nil
 	}

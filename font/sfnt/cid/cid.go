@@ -31,11 +31,10 @@ import (
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/locale"
 )
 
 // EmbedFile embeds the named font file into the PDF document.
-func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc *locale.Locale) (*font.Font, error) {
+func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc language.Tag) (*font.Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err

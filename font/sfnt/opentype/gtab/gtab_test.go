@@ -28,8 +28,8 @@ import (
 
 func TestGetLookups(t *testing.T) {
 	gtabInfo := Info{
-		ScriptList: map[string]*Features{
-			"und-Latn": {
+		ScriptList: map[language.Tag]*Features{
+			language.MustParse("und-Latn"): {
 				Required: 0,
 				Optional: []FeatureIndex{
 					1, 2, 3,
@@ -73,15 +73,15 @@ func FuzzGtab(f *testing.F) {
 	f.Add(info.Encode(999))
 
 	info.ScriptList = ScriptListInfo{
-		"und-Zyyy": {
+		language.MustParse("und-Zzzz"): {
 			Required: 0xFFFF,
 			Optional: []FeatureIndex{1, 2, 3, 4},
 		},
-		"und-Latn": {
+		language.MustParse("und-Latn"): {
 			Required: 0,
 			Optional: []FeatureIndex{2, 4, 5},
 		},
-		"de": {
+		language.German: {
 			Required: 6,
 		},
 	}

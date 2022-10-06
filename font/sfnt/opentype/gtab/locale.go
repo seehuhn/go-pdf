@@ -17,32 +17,97 @@
 package gtab
 
 import (
-	"errors"
+	"fmt"
+	"strings"
 
 	"golang.org/x/text/language"
 )
 
-func getOtfScript(tag string) (string, error) {
-	t, err := language.Parse(tag)
-	if err != nil {
-		return "", err
+func otfToBCP47(script otfScript, lang otfLang) (language.Tag, error) {
+	bcpScript, ok := scriptBcp47[script]
+	if !ok {
+		return language.MustParse("und-Zzzz"), fmt.Errorf("unknown script %q", script)
 	}
-	script, _ := t.Script()
-	scriptName := script.String()
-	for key, val := range scriptBcp47 {
-		if val == scriptName {
-			return key, nil
+	bcpLang, ok := langBcp47[lang]
+	if !ok {
+		if lang == "" {
+			bcpLang = "und"
+		} else {
+			return language.MustParse("und-Zzzz"), fmt.Errorf("unknown language %q", lang)
+		}
+	}
+	tag := bcpLang
+	if !strings.Contains(bcpLang, "-") {
+		tag += "-" + bcpScript
+	}
+	tag += "-x-" + string(script)
+	for len(lang) > 0 && lang[len(lang)-1] == ' ' {
+		lang = lang[:len(lang)-1]
+	}
+	if lang != "" {
+		tag += "-" + string(lang)
+	}
+	return language.Parse(tag)
+}
+
+func bcp47ToOtf(tag language.Tag) (otfScript, otfLang, error) {
+	var script string
+	var lang string
+
+	ext, ok := tag.Extension('x')
+	if ok {
+		m := strings.Split(ext.String(), "-")
+		if len(m) < 2 || len(m) > 3 {
+			return "", "", fmt.Errorf("BCP47 tag %q has invalid x extension", tag)
+		}
+		script = m[1]
+		if script == "dflt" {
+			script = "DFLT"
+		}
+		if len(m) > 2 {
+			lang = strings.ToUpper(m[2])
+			for len(lang) < 4 {
+				lang += " "
+			}
+		}
+	} else if tag == language.Chinese {
+		script = "hani"
+		lang = "ZHP "
+	} else if tag == language.SimplifiedChinese {
+		script = "hani"
+		lang = "ZHS "
+	} else if tag == language.TraditionalChinese {
+		script = "hani"
+		lang = "ZHT "
+	} else {
+		langTag, _, _ := tag.Raw()
+		bcpLang := langTag.String()
+		scriptTag, _ := tag.Script()
+		bcpScript := scriptTag.String()
+
+		for key, val := range langBcp47 {
+			if val == bcpLang {
+				lang = string(key)
+				break
+			}
+		}
+
+		for key, val := range scriptBcp47 {
+			if val == bcpScript {
+				script = string(key)
+				break
+			}
 		}
 	}
 
-	// TODO(voss): how to choose non-unique values
-
-	return "", errors.New("no matching OpenType script")
+	return otfScript(script), otfLang(lang), nil
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/scripttags
-var scriptBcp47 = map[string]string{
-	"DFLT": "Zyyy", // Default
+type otfScript string
+
+var scriptBcp47 = map[otfScript]string{
+	"DFLT": "Zzzz", // Default
 
 	"adlm": "Adlm", // Adlam
 	"ahom": "Ahom", // Ahom
@@ -62,7 +127,7 @@ var scriptBcp47 = map[string]string{
 	"brai": "Brai", // Braille
 	"bugi": "Bugi", // Buginese
 	"buhd": "Buhd", // Buhid
-	"byzm": "Zzzz", // Byzantine Music
+	// "byzm": "Byzm", // Byzantine Music
 	"cans": "Cans", // Unified Canadian Aboriginal Syllabics
 	"cari": "Cari", // Carian
 	"aghb": "Aghb", // Caucasian Albanian
@@ -70,7 +135,7 @@ var scriptBcp47 = map[string]string{
 	"cham": "Cham", // Cham
 	"cher": "Cher", // Cherokee
 	"chrs": "Chrs", // Chorasmian
-	"hani": "Hani", // Han
+	"hani": "Hani", // Han, Hanzi, Kanji, Hanja
 	"copt": "Copt", // Coptic
 	"cprt": "Cprt", // Cypriot syllabary
 	"cpmn": "Cpmn", // Cypro-Minoan
@@ -132,7 +197,7 @@ var scriptBcp47 = map[string]string{
 	"mani": "Mani", // Manichaean
 	"marc": "Marc", // Marchen
 	"gonm": "Gonm", // Masaram Gondi
-	"math": "Zzzz", // Mathematical Alphanumeric Symbols
+	// "math": "Math", // Mathematical Alphanumeric Symbols
 	"medf": "Medf", // Medefaidrin
 	"mtei": "Mtei", // Meitei Mayek
 	"mend": "Mend", // Mende Kikakui
@@ -143,7 +208,7 @@ var scriptBcp47 = map[string]string{
 	"mong": "Mong", // Mongolian
 	"mroo": "Mroo", // Mro
 	"mult": "Mult", // Multani
-	"musc": "Zzzz", // Musical Symbols
+	// "musc": "Musc", // Musical Symbols
 	"mymr": "Mymr", // Myanmar
 	"mym2": "Mymr", // Myanmar v.2
 	"nbat": "Nbat", // Nabataean
@@ -219,7 +284,9 @@ var scriptBcp47 = map[string]string{
 }
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/languagetags
-var langBcp47 = map[string]string{
+type otfLang string
+
+var langBcp47 = map[otfLang]string{
 	"ABA ": "abq",        // Abaza
 	"ABK ": "ab",         // Abkhazian
 	"ACH ": "ach",        // Acoli
