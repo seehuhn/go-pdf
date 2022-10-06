@@ -93,7 +93,7 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub1_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
 	if _, ok := l.Cov[gid]; !ok {
 		return nil
@@ -165,7 +165,7 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_2) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub1_2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
@@ -260,7 +260,7 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub2_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub2_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
@@ -390,7 +390,7 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub3_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub3_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
@@ -558,7 +558,7 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub4_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub4_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
 	ligSetIdx, ok := l.Cov[gid]
 	if !ok {
@@ -735,7 +735,7 @@ func readGsub8_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub8_1) Apply(keep KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub8_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Input[gid]
 	if !ok {

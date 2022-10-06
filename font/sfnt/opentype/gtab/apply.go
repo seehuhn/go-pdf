@@ -94,7 +94,7 @@ func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gd
 		}
 		lookup := ll[lookupIndex]
 
-		keep := MakeFilter(lookup.Meta, gdef)
+		keep := makeFilter(lookup.Meta, gdef)
 		var match *Match
 		if keep(seq[pos].Gid) {
 			// We have to pass keep into Apply, so that lookups operating on

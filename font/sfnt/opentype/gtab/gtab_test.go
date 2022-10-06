@@ -168,14 +168,14 @@ func FuzzGtab(f *testing.F) {
 	f.Add(info.Encode(999))
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
-		info1, err := doRead("test", bytes.NewReader(data1), readDummySubtable)
+		info1, err := readGtab(bytes.NewReader(data1), "test", readDummySubtable)
 		if err != nil {
 			return
 		}
 
 		data2 := info1.Encode(999)
 
-		info2, err := doRead("test", bytes.NewReader(data2), readDummySubtable)
+		info2, err := readGtab(bytes.NewReader(data2), "test", readDummySubtable)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -41,15 +41,15 @@ import (
 //      6  |    .      .      X      .      X
 //      4  |    X      X      .      X      .
 
-// KeepGlyphFn is used to drop ignored characters in lookups with non-zero
+// keepGlyphFn is used to drop ignored characters in lookups with non-zero
 // lookup flags.  Functions of this type return true if the glyph should be
 // used, and false if the glyph should be ignored.
-type KeepGlyphFn func(font.GlyphID) bool
+type keepGlyphFn func(font.GlyphID) bool
 
-// MakeFilter returns a function which filters glyphs according to the
+// makeFilter returns a function which filters glyphs according to the
 // lookup flags.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags
-func MakeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) KeepGlyphFn {
+func makeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) keepGlyphFn {
 	if gdefTable == nil {
 		return keepAllGlyphs
 	}

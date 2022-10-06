@@ -31,24 +31,21 @@ type Info struct {
 	LookupList  LookupList
 }
 
-// Read reads and decodes a "GSUB" or "GPOS" table from r.
+// ReadGSUB reads and decodes a "GSUB" or "GPOS" table from r.
 // TableName must be either "GSUB" or "GPOS".
-// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#gpos-header
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#gsub-header
-func Read(tableName string, r parser.ReadSeekSizer) (*Info, error) {
-	var sr subtableReader
-	switch tableName {
-	case "GPOS":
-		sr = readGposSubtable
-	case "GSUB":
-		sr = readGsubSubtable
-	default:
-		panic("invalid table name")
-	}
-	return doRead(tableName, r, sr)
+func ReadGSUB(r parser.ReadSeekSizer) (*Info, error) {
+	return readGtab(r, "GSUB", readGsubSubtable)
 }
 
-func doRead(tableName string, r parser.ReadSeekSizer, sr subtableReader) (*Info, error) {
+// ReadGPOS reads and decodes a "GSUB" or "GPOS" table from r.
+// TableName must be either "GSUB" or "GPOS".
+// https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#gpos-header
+func ReadGPOS(r parser.ReadSeekSizer) (*Info, error) {
+	return readGtab(r, "GPOS", readGposSubtable)
+}
+
+func readGtab(r parser.ReadSeekSizer, tableName string, sr subtableReader) (*Info, error) {
 	p := parser.New(tableName, r)
 
 	var header struct {

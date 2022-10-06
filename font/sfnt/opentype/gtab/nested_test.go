@@ -30,7 +30,7 @@ type debugNestedLookup struct {
 	actions  SeqLookups
 }
 
-func (l *debugNestedLookup) Apply(_ KeepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *debugNestedLookup) Apply(_ keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	if a != 0 {
 		return &Match{
 			InputPos: []int{a},
