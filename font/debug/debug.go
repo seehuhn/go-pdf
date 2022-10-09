@@ -23,9 +23,9 @@ import (
 
 	"golang.org/x/image/font/gofont/goregular"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
@@ -39,23 +39,23 @@ func MakeSimpleFont() *sfnt.Info {
 		panic(err)
 	}
 
-	var includeGid []font.GlyphID
+	var includeGid []glyph.ID
 	cmap := cmap.Format4{}
-	encoding := make([]font.GlyphID, 256)
+	encoding := make([]glyph.ID, 256)
 
 	includeGid = append(includeGid, 0, 1, 2, 3)
-	cmap[0x000D] = font.GlyphID(2)
-	cmap[0x0020] = font.GlyphID(3)
-	encoding[0] = font.GlyphID(1)
-	encoding[0x000D] = font.GlyphID(2)
-	encoding[0x0020] = font.GlyphID(3)
+	cmap[0x000D] = glyph.ID(2)
+	cmap[0x0020] = glyph.ID(3)
+	encoding[0] = glyph.ID(1)
+	encoding[0x000D] = glyph.ID(2)
+	encoding[0x0020] = glyph.ID(3)
 
 	var topMin, topMax funit.Int16
 	var bottomMin, bottomMax funit.Int16
 	for c := 'A'; c <= 'Z'; c++ {
 		gid := info.CMap.Lookup(c)
-		cmap[uint16(c)] = font.GlyphID(len(includeGid))
-		encoding[c] = font.GlyphID(len(includeGid))
+		cmap[uint16(c)] = glyph.ID(len(includeGid))
+		encoding[c] = glyph.ID(len(includeGid))
 		includeGid = append(includeGid, gid)
 
 		ext := info.GlyphExtent(gid)
@@ -88,7 +88,7 @@ func MakeSimpleFont() *sfnt.Info {
 				},
 			},
 		},
-		FdSelect: func(font.GlyphID) int {
+		FdSelect: func(glyph.ID) int {
 			return 0
 		},
 		Encoding: encoding,
@@ -181,16 +181,16 @@ func MakeSimpleFont() *sfnt.Info {
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid-a, yMid-a)
 	cffGlyph.LineTo(xMid-a, yMid+a)
-	encoding['>'] = font.GlyphID(len(newOutlines.Glyphs))
-	cmap[uint16('>')] = font.GlyphID(len(newOutlines.Glyphs))
+	encoding['>'] = glyph.ID(len(newOutlines.Glyphs))
+	cmap[uint16('>')] = glyph.ID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	cffGlyph = cff.NewGlyph("marker.right", ext.URx)
 	cffGlyph.MoveTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
-	encoding['<'] = font.GlyphID(len(newOutlines.Glyphs))
-	cmap[uint16('<')] = font.GlyphID(len(newOutlines.Glyphs))
+	encoding['<'] = glyph.ID(len(newOutlines.Glyphs))
+	cmap[uint16('<')] = glyph.ID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	cffGlyph = cff.NewGlyph("marker", ext.URx)
@@ -200,8 +200,8 @@ func MakeSimpleFont() *sfnt.Info {
 	cffGlyph.LineTo(xMid, yMid)
 	cffGlyph.LineTo(xMid+a, yMid+a)
 	cffGlyph.LineTo(xMid+a, yMid-a)
-	encoding['='] = font.GlyphID(len(newOutlines.Glyphs))
-	cmap[uint16('=')] = font.GlyphID(len(newOutlines.Glyphs))
+	encoding['='] = glyph.ID(len(newOutlines.Glyphs))
+	cmap[uint16('=')] = glyph.ID(len(newOutlines.Glyphs))
 	newOutlines.Glyphs = append(newOutlines.Glyphs, cffGlyph)
 
 	now := time.Now()
@@ -272,13 +272,13 @@ func MakeCompleteFont() *sfnt.Info {
 				},
 			},
 		},
-		FdSelect: func(font.GlyphID) int {
+		FdSelect: func(glyph.ID) int {
 			return 0
 		},
 	}
 
 	for i, origGlyph := range origOutlines.Glyphs {
-		gid := font.GlyphID(i)
+		gid := glyph.ID(i)
 		cffGlyph := cff.NewGlyph(info.GlyphName(gid), info.GlyphWidth(gid))
 
 		var g glyf.SimpleGlyph

@@ -18,6 +18,7 @@ package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
@@ -34,7 +35,7 @@ type Gpos6_1 struct {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos6_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gpos6_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	mark1Idx, ok := l.Mark1Cov[seq[a].Gid]
 	if !ok {
 		return nil
@@ -73,7 +74,7 @@ func (l *Gpos6_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	_ = dy
 	return &Match{
 		InputPos: []int{a},
-		Replace:  []font.Glyph{g},
+		Replace:  []glyph.Info{g},
 		Next:     a + 1,
 	}
 }

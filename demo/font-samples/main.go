@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cid"
 	"seehuhn.de/go/pdf/pages"
@@ -123,19 +124,19 @@ func main() {
 		c <- boxes.Text(labelFont, 10, strings.Join(title, ", "))
 		c <- boxes.Text(labelFont, 7, fname)
 
-		var seq []font.Glyph
+		var seq []glyph.Info
 		total := 0.
 		for gid := 0; gid < info.NumGlyphs(); gid++ {
-			if info.GlyphExtent(font.GlyphID(gid)).IsZero() {
+			if info.GlyphExtent(glyph.ID(gid)).IsZero() {
 				continue
 			}
-			w := info.GlyphWidth(font.GlyphID(gid))
+			w := info.GlyphWidth(glyph.ID(gid))
 			wf := w.AsFloat(24 / float64(info.UnitsPerEm))
 			if total+wf > 72*6 {
 				break
 			}
-			seq = append(seq, font.Glyph{
-				Gid:     font.GlyphID(gid),
+			seq = append(seq, glyph.Info{
+				Gid:     glyph.ID(gid),
 				Advance: w,
 			})
 			total += wf

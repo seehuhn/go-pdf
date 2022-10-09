@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
@@ -31,16 +32,16 @@ import (
 // A Coverage table defines a unique index value, the Coverage Index, for each covered glyph.
 // The Coverage Indexes are sequential, from 0 to the number of covered glyphs minus 1.
 // The map from glyph ID to Coverage Index must be strictly monotonic.
-type Table map[font.GlyphID]int
+type Table map[glyph.ID]int
 
 // Contains returns true if the given glyph ID is covered by the table.
-func (table Table) Contains(gid font.GlyphID) bool {
+func (table Table) Contains(gid glyph.ID) bool {
 	_, ok := table[gid]
 	return ok
 }
 
 // Glyphs returns the glyphs covered by the table in increasing order.
-func (table Table) Glyphs() []font.GlyphID {
+func (table Table) Glyphs() []glyph.ID {
 	keys := maps.Keys(table)
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	return keys
@@ -48,7 +49,7 @@ func (table Table) Glyphs() []font.GlyphID {
 
 // Prune removes all glyphs from the table that have coverage index >= size.
 func (table Table) Prune(size int) {
-	var gg []font.GlyphID
+	var gg []glyph.ID
 	for gid, class := range table {
 		if class >= size {
 			gg = append(gg, gid)
@@ -97,7 +98,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 			//
 			// TODO(voss): Here we need to decide which coverage index to use
 			// in these cases.
-			table[font.GlyphID(gid)] = i
+			table[glyph.ID(gid)] = i
 			prev = int(gid)
 		}
 
@@ -125,7 +126,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 				}
 			}
 			for gid := startGlyphID; gid <= endGlyphID; gid++ {
-				table[font.GlyphID(gid)] = pos
+				table[glyph.ID(gid)] = pos
 				pos++
 			}
 			prev = endGlyphID
@@ -141,8 +142,8 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 	return table, nil
 }
 
-func (table Table) encInfo() ([]font.GlyphID, int, int) {
-	rev := make([]font.GlyphID, len(table))
+func (table Table) encInfo() ([]glyph.ID, int, int) {
+	rev := make([]glyph.ID, len(table))
 	for gid, i := range table {
 		rev[i] = gid
 	}
@@ -201,7 +202,7 @@ func (table Table) Encode() []byte {
 	buf[1] = 2
 	buf[2] = byte(rangeCount >> 8)
 	buf[3] = byte(rangeCount)
-	var startGlyphID font.GlyphID
+	var startGlyphID glyph.ID
 	var startCoverageIndex int
 	prev := 0xFFFF
 	for i, gid := range rev {

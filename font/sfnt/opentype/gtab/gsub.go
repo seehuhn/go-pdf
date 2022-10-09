@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
@@ -71,7 +72,7 @@ var gsubReaders = map[uint16]func(p *parser.Parser, pos int64) (Subtable, error)
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#11-single-substitution-format-1
 type Gsub1_1 struct {
 	Cov   coverage.Table
-	Delta font.GlyphID
+	Delta glyph.ID
 }
 
 func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -80,7 +81,7 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		return nil, err
 	}
 	coverageOffset := int64(buf[0])<<8 | int64(buf[1])
-	deltaGlyphID := font.GlyphID(buf[2])<<8 | font.GlyphID(buf[3])
+	deltaGlyphID := glyph.ID(buf[2])<<8 | glyph.ID(buf[3])
 	cov, err := coverage.Read(p, subtablePos+coverageOffset)
 	if err != nil {
 		return nil, err
@@ -93,14 +94,14 @@ func readGsub1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub1_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	if _, ok := l.Cov[gid]; !ok {
 		return nil
 	}
 	return &Match{
 		InputPos: []int{a},
-		Replace: []font.Glyph{
+		Replace: []glyph.Info{
 			{Gid: gid + l.Delta, Text: seq[a].Text},
 		},
 		Next: a + 1,
@@ -133,7 +134,7 @@ func (l *Gsub1_1) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#12-single-substitution-format-2
 type Gsub1_2 struct {
 	Cov                coverage.Table
-	SubstituteGlyphIDs []font.GlyphID // indexed by coverage index
+	SubstituteGlyphIDs []glyph.ID // indexed by coverage index
 }
 
 func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -165,7 +166,7 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub1_2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub1_2) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
@@ -173,7 +174,7 @@ func (l *Gsub1_2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	}
 	m := &Match{
 		InputPos: []int{a},
-		Replace: []font.Glyph{
+		Replace: []glyph.Info{
 			{Gid: l.SubstituteGlyphIDs[idx], Text: seq[a].Text},
 		},
 		Next: a + 1,
@@ -215,7 +216,7 @@ func (l *Gsub1_2) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#21-multiple-substitution-format-1
 type Gsub2_1 struct {
 	Cov  coverage.Table
-	Repl [][]font.GlyphID // indexed by coverage table
+	Repl [][]glyph.ID // indexed by coverage table
 }
 
 func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -240,7 +241,7 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	sequenceCount := len(sequenceOffsets)
-	repl := make([][]font.GlyphID, sequenceCount)
+	repl := make([][]glyph.ID, sequenceCount)
 	for i := 0; i < sequenceCount; i++ {
 		err := p.SeekPos(subtablePos + int64(sequenceOffsets[i]))
 		if err != nil {
@@ -260,7 +261,7 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub2_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub2_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
@@ -270,9 +271,9 @@ func (l *Gsub2_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	repl := l.Repl[idx]
 	k := len(repl)
 
-	insert := make([]font.Glyph, k)
+	insert := make([]glyph.Info, k)
 	for i, replGid := range repl {
-		insert[i] = font.Glyph{Gid: replGid}
+		insert[i] = glyph.Info{Gid: replGid}
 	}
 	if k > 0 {
 		insert[0].Text = seq[a].Text
@@ -337,7 +338,7 @@ func (l *Gsub2_1) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#31-alternate-substitution-format-1
 type Gsub3_1 struct {
 	Cov        coverage.Table
-	Alternates [][]font.GlyphID
+	Alternates [][]glyph.ID
 }
 
 func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -362,7 +363,7 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 
 	alternateSetCount := len(alternateSetOffsets)
-	alt := make([][]font.GlyphID, alternateSetCount)
+	alt := make([][]glyph.ID, alternateSetCount)
 	for i := 0; i < alternateSetCount; i++ {
 		err := p.SeekPos(subtablePos + int64(alternateSetOffsets[i]))
 		if err != nil {
@@ -372,13 +373,13 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		alt[i] = make([]font.GlyphID, glyphCount)
+		alt[i] = make([]glyph.ID, glyphCount)
 		for j := 0; j < int(glyphCount); j++ {
 			gid, err := p.ReadUint16()
 			if err != nil {
 				return nil, err
 			}
-			alt[i][j] = font.GlyphID(gid)
+			alt[i][j] = glyph.ID(gid)
 		}
 	}
 
@@ -390,7 +391,7 @@ func readGsub3_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub3_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub3_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Cov[gid]
 	if !ok {
@@ -404,7 +405,7 @@ func (l *Gsub3_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 
 	return &Match{
 		InputPos: []int{a},
-		Replace: []font.Glyph{
+		Replace: []glyph.Info{
 			{Gid: alt[0], Text: seq[a].Text},
 		},
 		Next: a + 1,
@@ -470,8 +471,8 @@ type Gsub4_1 struct {
 // Ligature represents a substitution of a sequence of glyphs into a single glyph
 // in a Gsub4_1 subtable.
 type Ligature struct {
-	In  []font.GlyphID // excludes the first input glyph, since this is in Cov
-	Out font.GlyphID
+	In  []glyph.ID // excludes the first input glyph, since this is in Cov
+	Out glyph.ID
 }
 
 func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -521,17 +522,17 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			if err != nil {
 				return nil, err
 			}
-			componentGlyphIDs := make([]font.GlyphID, componentCount-1)
+			componentGlyphIDs := make([]glyph.ID, componentCount-1)
 			for k := range componentGlyphIDs {
 				gid, err := p.ReadUint16()
 				if err != nil {
 					return nil, err
 				}
-				componentGlyphIDs[k] = font.GlyphID(gid)
+				componentGlyphIDs[k] = glyph.ID(gid)
 			}
 
 			repl[i][j].In = componentGlyphIDs
-			repl[i][j].Out = font.GlyphID(ligatureGlyph)
+			repl[i][j].Out = glyph.ID(ligatureGlyph)
 		}
 	}
 
@@ -558,7 +559,7 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub4_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub4_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	ligSetIdx, ok := l.Cov[gid]
 	if !ok {
@@ -596,7 +597,7 @@ ligLoop:
 
 		return &Match{
 			InputPos: matchPos,
-			Replace: []font.Glyph{
+			Replace: []glyph.Info{
 				{Gid: lig.Out, Text: text},
 			},
 			Next: p + 1,
@@ -678,7 +679,7 @@ type Gsub8_1 struct {
 	Input              coverage.Table
 	Backtrack          []coverage.Table
 	Lookahead          []coverage.Table
-	SubstituteGlyphIDs []font.GlyphID // indexed by input coverage index
+	SubstituteGlyphIDs []glyph.ID // indexed by input coverage index
 }
 
 func readGsub8_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
@@ -735,7 +736,7 @@ func readGsub8_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gsub8_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gsub8_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	idx, ok := l.Input[gid]
 	if !ok {
@@ -770,7 +771,7 @@ func (l *Gsub8_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 
 	return &Match{
 		InputPos: []int{a},
-		Replace: []font.Glyph{
+		Replace: []glyph.Info{
 			{Gid: l.SubstituteGlyphIDs[idx], Text: seq[a].Text},
 		},
 		Next: a + 1,

@@ -20,7 +20,7 @@ import (
 	"errors"
 	"sort"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 // format12 represents a format 12 cmap subtable.
@@ -30,7 +30,7 @@ type format12 []format12segment
 type format12segment struct {
 	StartCharCode rune
 	EndCharCode   rune
-	StartGlyphID  font.GlyphID
+	StartGlyphID  glyph.ID
 }
 
 func decodeFormat12(data []byte, code2rune func(c int) rune) (Subtable, error) {
@@ -61,7 +61,7 @@ func decodeFormat12(data []byte, code2rune func(c int) rune) (Subtable, error) {
 			startGlyphID+uint32(segments[i].EndCharCode-segments[i].StartCharCode) > 0x10_FFFF {
 			return nil, errMalformedSubtable
 		}
-		segments[i].StartGlyphID = font.GlyphID(startGlyphID)
+		segments[i].StartGlyphID = glyph.ID(startGlyphID)
 
 		prevEnd = segments[i].EndCharCode
 	}
@@ -97,14 +97,14 @@ func (cmap format12) Encode(language uint16) []byte {
 	return out
 }
 
-func (cmap format12) Lookup(code rune) font.GlyphID {
+func (cmap format12) Lookup(code rune) glyph.ID {
 	idx := sort.Search(len(cmap), func(i int) bool {
 		return code <= cmap[i].EndCharCode
 	})
 	if idx == len(cmap) || cmap[idx].StartCharCode > code {
 		return 0
 	}
-	return cmap[idx].StartGlyphID + font.GlyphID(code-cmap[idx].StartCharCode)
+	return cmap[idx].StartGlyphID + glyph.ID(code-cmap[idx].StartCharCode)
 }
 
 func (cmap format12) CodeRange() (low, high rune) {

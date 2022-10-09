@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
@@ -461,9 +462,9 @@ func Read(r io.ReaderAt) (*Info, error) {
 			leftSet[pair.Left] = true
 		}
 		cov := leftSet.ToTable()
-		adjust := make([]map[font.GlyphID]*gtab.PairAdjust, len(cov))
+		adjust := make([]map[glyph.ID]*gtab.PairAdjust, len(cov))
 		for i := range adjust {
-			adjust[i] = make(map[font.GlyphID]*gtab.PairAdjust)
+			adjust[i] = make(map[glyph.ID]*gtab.PairAdjust)
 		}
 		for pair, val := range kern {
 			adjust[cov[pair.Left]][pair.Right] = &gtab.PairAdjust{

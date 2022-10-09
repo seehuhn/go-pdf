@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
@@ -85,7 +86,7 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) 
 		GsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		GposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 
-		text: map[font.GlyphID][]rune{},
+		text: map[glyph.ID][]rune{},
 		used: map[uint16]bool{},
 	}
 
@@ -117,14 +118,14 @@ type fontHandler struct {
 	GsubLookups []gtab.LookupIndex
 	GposLookups []gtab.LookupIndex
 
-	text map[font.GlyphID][]rune
+	text map[glyph.ID][]rune
 	used map[uint16]bool
 }
 
-func (s *fontHandler) Layout(rr []rune) []font.Glyph {
+func (s *fontHandler) Layout(rr []rune) []glyph.Info {
 	info := s.info
 
-	seq := make([]font.Glyph, len(rr))
+	seq := make([]glyph.Info, len(rr))
 	for i, r := range rr {
 		gid := info.CMap.Lookup(r)
 		seq[i].Gid = gid
@@ -155,7 +156,7 @@ func (s *fontHandler) Layout(rr []rune) []font.Glyph {
 	return seq
 }
 
-func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
+func (s *fontHandler) Enc(gid glyph.ID) pdf.String {
 	var c uint16
 	if gid <= 0xFFFF {
 		c = uint16(gid)
@@ -167,9 +168,9 @@ func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
 	s.used[0] = true // always include .notdef
-	includeGlyphs := make([]font.GlyphID, 0, len(s.used))
+	includeGlyphs := make([]glyph.ID, 0, len(s.used))
 	for c := range s.used {
-		includeGlyphs = append(includeGlyphs, font.GlyphID(c))
+		includeGlyphs = append(includeGlyphs, glyph.ID(c))
 	}
 	sort.Slice(includeGlyphs, func(i, j int) bool { return includeGlyphs[i] < includeGlyphs[j] })
 	subsetTag := font.GetSubsetTag(includeGlyphs, s.info.NumGlyphs())
@@ -198,7 +199,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
 			}
 		}
-		o2.FdSelect = func(gid font.GlyphID) int {
+		o2.FdSelect = func(gid glyph.ID) int {
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
 		o2.ROS = CIDSystemInfo
@@ -209,9 +210,9 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		subsetInfo.Outlines = o2
 
 	case *glyf.Outlines:
-		newGid := make(map[font.GlyphID]font.GlyphID)
-		todo := make(map[font.GlyphID]bool)
-		nextGid := font.GlyphID(0)
+		newGid := make(map[glyph.ID]glyph.ID)
+		todo := make(map[glyph.ID]bool)
+		nextGid := glyph.ID(0)
 		for _, gid := range includeGlyphs {
 			newGid[gid] = nextGid
 			nextGid++
@@ -419,7 +420,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	return nil
 }
 
-func pop(todo map[font.GlyphID]bool) font.GlyphID {
+func pop(todo map[glyph.ID]bool) glyph.ID {
 	for key := range todo {
 		delete(todo, key)
 		return key

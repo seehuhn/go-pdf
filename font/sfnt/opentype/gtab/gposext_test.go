@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gtab"
@@ -88,7 +88,7 @@ func TestGpos(t *testing.T) {
 				exportFont(fontInfo, testIdx+501, test.in)
 			}
 
-			seq := make([]font.Glyph, len(test.in))
+			seq := make([]glyph.Info, len(test.in))
 			for i, r := range test.in {
 				gid := fontInfo.CMap.Lookup(r)
 				seq[i].Gid = gid
@@ -182,7 +182,7 @@ func FuzzGpos(f *testing.F) {
 			LookupList: lookupList,
 		}
 
-		seq := make([]font.Glyph, len(in))
+		seq := make([]glyph.Info, len(in))
 		for i, r := range in {
 			gid := fontInfo.CMap.Lookup(r)
 			seq[i].Gid = gid

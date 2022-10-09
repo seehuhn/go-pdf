@@ -19,12 +19,12 @@ package gtab
 import (
 	"math"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 )
 
 // ApplyLookup applies a single lookup to the given glyphs.
-func (ll LookupList) ApplyLookup(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table) []font.Glyph {
+func (ll LookupList) ApplyLookup(seq []glyph.Info, lookupIndex LookupIndex, gdef *gdef.Table) []glyph.Info {
 	pos := 0
 	numLeft := len(seq)
 	for pos < len(seq) {
@@ -43,7 +43,7 @@ func (ll LookupList) ApplyLookup(seq []font.Glyph, lookupIndex LookupIndex, gdef
 // Match describes the effect of applying a Lookup to a glyph sequence.
 type Match struct {
 	InputPos []int // in increasing order
-	Replace  []font.Glyph
+	Replace  []glyph.Info
 	Actions  SeqLookups
 	Next     int
 }
@@ -55,7 +55,7 @@ type nested struct {
 }
 
 // applyLookupAt applies a single lookup to the given glyphs at position pos.
-func (ll LookupList) applyLookupAt(seq []font.Glyph, lookupIndex LookupIndex, gdef *gdef.Table, pos, b int) ([]font.Glyph, int) {
+func (ll LookupList) applyLookupAt(seq []glyph.Info, lookupIndex LookupIndex, gdef *gdef.Table, pos, b int) ([]glyph.Info, int) {
 	numLookups := len(ll)
 	stack := []*nested{
 		{
@@ -228,7 +228,7 @@ func fixMatchPos(actions []*nested, remove []int, numInsert int) {
 	}
 }
 
-func applyMatch(seq []font.Glyph, m *Match, pos int) []font.Glyph {
+func applyMatch(seq []glyph.Info, m *Match, pos int) []glyph.Info {
 	matchPos := m.InputPos
 
 	oldLen := len(seq)
@@ -246,7 +246,7 @@ func applyMatch(seq []font.Glyph, m *Match, pos int) []font.Glyph {
 
 	if newLen > oldLen {
 		// In case the sequence got longer, move the tail out of the way first.
-		out = append(out, make([]font.Glyph, newLen-oldLen)...)
+		out = append(out, make([]glyph.Info, newLen-oldLen)...)
 		copy(out[newTailPos:], out[oldTailPos:])
 	}
 

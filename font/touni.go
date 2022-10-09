@@ -31,6 +31,7 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 // SimpleMapping describes the unicode text corresponding to a character code
@@ -319,7 +320,7 @@ func formatPDFName(args ...interface{}) (string, error) {
 	return buf.String(), err
 }
 
-func hex(idx GlyphID) string {
+func hex(idx glyph.ID) string {
 	return fmt.Sprintf("<%x>", []byte{byte(idx >> 8), byte(idx)})
 }
 

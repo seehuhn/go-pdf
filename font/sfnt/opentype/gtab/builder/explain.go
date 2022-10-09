@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
@@ -55,8 +55,8 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 				var mappings []mapping
 				for key := range l.Cov {
 					mappings = append(mappings, mapping{
-						from: []font.GlyphID{key},
-						to:   []font.GlyphID{key + l.Delta},
+						from: []glyph.ID{key},
+						to:   []glyph.ID{key + l.Delta},
 					})
 				}
 				ee.explainSeqMappings(mappings)
@@ -66,8 +66,8 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 				var mappings []mapping
 				for key, idx := range l.Cov {
 					mappings = append(mappings, mapping{
-						from: []font.GlyphID{key},
-						to:   []font.GlyphID{l.SubstituteGlyphIDs[idx]},
+						from: []glyph.ID{key},
+						to:   []glyph.ID{l.SubstituteGlyphIDs[idx]},
 					})
 				}
 				ee.explainSeqMappings(mappings)
@@ -106,8 +106,8 @@ func ExplainGsub(fontInfo *sfnt.Info) string {
 				for gid, idx := range l.Cov {
 					for _, lig := range l.Repl[idx] {
 						mappings = append(mappings, mapping{
-							from: append([]font.GlyphID{gid}, lig.In...),
-							to:   []font.GlyphID{lig.Out},
+							from: append([]glyph.ID{gid}, lig.In...),
+							to:   []glyph.ID{lig.Out},
 						})
 					}
 				}
@@ -205,7 +205,7 @@ func ExplainGpos(fontInfo *sfnt.Info) []string {
 						} else {
 							ee.w.WriteString(", ")
 						}
-						ee.writeGlyphList([]font.GlyphID{firstGid, secondGid})
+						ee.writeGlyphList([]glyph.ID{firstGid, secondGid})
 						ee.w.WriteString(" -> ")
 						col := row[secondGid]
 						ee.writePairAdjust(col)
@@ -343,7 +343,7 @@ func newExplainer(fontInfo *sfnt.Info) *explainer {
 
 	names := make([]string, fontInfo.NumGlyphs())
 	for i := range names {
-		name := fontInfo.GlyphName(font.GlyphID(i))
+		name := fontInfo.GlyphName(glyph.ID(i))
 		if name != "" {
 			names[i] = name
 		} else {
@@ -380,8 +380,8 @@ func (ee *explainer) explainFlags(flags gtab.LookupFlags) {
 }
 
 type mapping struct {
-	from []font.GlyphID
-	to   []font.GlyphID
+	from []glyph.ID
+	to   []glyph.ID
 }
 
 func (ee *explainer) explainSeqMappings(mm []mapping) {
@@ -431,7 +431,7 @@ func (ee *explainer) explainSeqMappings(mm []mapping) {
 	}
 }
 
-func (ee *explainer) writeGlyph(gid font.GlyphID) {
+func (ee *explainer) writeGlyph(gid glyph.ID) {
 	if "\""+ee.names[gid]+"\"" == ee.mapped[gid] {
 		ee.w.WriteString(ee.names[gid])
 	} else if ee.mapped[gid] != "" {
@@ -443,7 +443,7 @@ func (ee *explainer) writeGlyph(gid font.GlyphID) {
 	}
 }
 
-func (ee *explainer) writeGlyphList(seq []font.GlyphID) {
+func (ee *explainer) writeGlyphList(seq []glyph.ID) {
 	if len(seq) == 0 {
 		return
 	}
@@ -480,7 +480,7 @@ func (ee *explainer) writeGlyphList(seq []font.GlyphID) {
 	}
 }
 
-func (ee *explainer) writeGlyphSet(seq []font.GlyphID) {
+func (ee *explainer) writeGlyphSet(seq []glyph.ID) {
 	ee.w.WriteRune('[')
 	ee.writeGlyphList(seq)
 	ee.w.WriteRune(']')
@@ -562,7 +562,7 @@ func (ee *explainer) explainSeqContext1(l *gtab.SeqContext1) {
 	firstGlyphs := l.Cov.Glyphs()
 	first := true
 	for i, gid := range firstGlyphs {
-		input := []font.GlyphID{gid}
+		input := []glyph.ID{gid}
 		for _, rule := range l.Rules[i] {
 			input = append(input[:1], rule.Input...)
 			if first {
@@ -615,7 +615,7 @@ func (ee *explainer) explainChainedSeqContext1(l *gtab.ChainedSeqContext1) {
 	firstGlyphs := l.Cov.Glyphs()
 	first := true
 	for i, gid := range firstGlyphs {
-		input := []font.GlyphID{gid}
+		input := []glyph.ID{gid}
 		for _, rule := range l.Rules[i] {
 			backtrack := copyRev(rule.Backtrack)
 			input = append(input[:1], rule.Input...)

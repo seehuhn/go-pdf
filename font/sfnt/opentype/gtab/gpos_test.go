@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
@@ -135,7 +135,7 @@ func TestGpos4_1(t *testing.T) {
 
 func FuzzGpos1_1(f *testing.F) {
 	l := &Gpos1_1{
-		Cov: map[font.GlyphID]int{8: 0, 9: 1},
+		Cov: map[glyph.ID]int{8: 0, 9: 1},
 		Adjust: &GposValueRecord{
 			XAdvance: 100,
 		},
@@ -151,7 +151,7 @@ func FuzzGpos1_2(f *testing.F) {
 	l := &Gpos1_2{}
 	f.Add(l.Encode())
 	l = &Gpos1_2{
-		Cov: map[font.GlyphID]int{8: 0, 9: 1},
+		Cov: map[glyph.ID]int{8: 0, 9: 1},
 		Adjust: []*GposValueRecord{
 			{XAdvance: 100},
 			{XAdvance: 50, XPlacement: -50},
@@ -168,8 +168,8 @@ func FuzzGpos2_1(f *testing.F) {
 	l := &Gpos2_1{}
 	f.Add(l.Encode())
 	l = &Gpos2_1{
-		Cov: map[font.GlyphID]int{1: 0, 3: 1},
-		Adjust: []map[font.GlyphID]*PairAdjust{
+		Cov: map[glyph.ID]int{1: 0, 3: 1},
+		Adjust: []map[glyph.ID]*PairAdjust{
 			{
 				2: &PairAdjust{
 					First: &GposValueRecord{
@@ -180,7 +180,7 @@ func FuzzGpos2_1(f *testing.F) {
 		},
 	}
 	f.Add(l.Encode())
-	l.Adjust = []map[font.GlyphID]*PairAdjust{
+	l.Adjust = []map[glyph.ID]*PairAdjust{
 		{
 			2: &PairAdjust{
 				First: &GposValueRecord{

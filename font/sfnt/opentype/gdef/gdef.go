@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
@@ -36,7 +37,7 @@ type Table struct {
 	// TODO(voss): Item Variation Store table
 }
 
-func (table *Table) IsMark(gid font.GlyphID) bool {
+func (table *Table) IsMark(gid glyph.ID) bool {
 	if table == nil || table.GlyphClass == nil {
 		return false
 	}

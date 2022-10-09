@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/debug"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -109,7 +110,7 @@ func FuzzFont(f *testing.F) {
 					StdVW:      70,
 				},
 			},
-			FdSelect: func(font.GlyphID) int { return 0 },
+			FdSelect: func(glyph.ID) int { return 0 },
 			Encoding: cff.StandardEncoding(gg),
 		},
 	}
@@ -166,7 +167,7 @@ func FuzzFont(f *testing.F) {
 
 		cmpFdSelectFn := cmp.Comparer(func(fn1, fn2 cff.FdSelectFn) bool {
 			for gid := 0; gid < font1.NumGlyphs(); gid++ {
-				if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+				if fn1(glyph.ID(gid)) != fn2(glyph.ID(gid)) {
 					return false
 				}
 			}

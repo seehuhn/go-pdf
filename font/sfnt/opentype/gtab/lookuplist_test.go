@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
@@ -45,7 +45,7 @@ func readDummySubtable(p *parser.Parser, pos int64, info *LookupMetaInfo) (Subta
 
 type dummySubTable []byte
 
-func (st dummySubTable) Apply(_ keepGlyphFn, glyphs []font.Glyph, a, b int) *Match {
+func (st dummySubTable) Apply(_ keepGlyphFn, glyphs []glyph.Info, a, b int) *Match {
 	return nil
 }
 

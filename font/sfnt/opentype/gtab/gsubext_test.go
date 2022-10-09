@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
@@ -47,7 +47,7 @@ func TestGsub(t *testing.T) {
 	}
 
 	a, b := fontInfo.CMap.CodeRange()
-	rev := make(map[font.GlyphID]rune)
+	rev := make(map[glyph.ID]rune)
 	for r := a; r <= b; r++ {
 		gid := fontInfo.CMap.Lookup(r)
 		if gid != 0 {
@@ -80,7 +80,7 @@ func TestGsub(t *testing.T) {
 				exportFont(fontInfo, testIdx+1, test.in)
 			}
 
-			seq := make([]font.Glyph, len(test.in))
+			seq := make([]glyph.Info, len(test.in))
 			for i, r := range test.in {
 				seq[i].Gid = fontInfo.CMap.Lookup(r)
 				seq[i].Text = []rune{r}
@@ -145,7 +145,7 @@ func FuzzGsub(f *testing.F) {
 			LookupList: lookupList,
 		}
 
-		seq := make([]font.Glyph, len(in))
+		seq := make([]glyph.Info, len(in))
 		for i, r := range in {
 			seq[i].Gid = fontInfo.CMap.Lookup(r)
 			seq[i].Text = []rune{r}

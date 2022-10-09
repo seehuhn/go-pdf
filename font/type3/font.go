@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/names"
 )
 
@@ -38,10 +39,10 @@ type Builder struct {
 	unitsPerEm uint16
 	glyphWidth []funit.Int16
 
-	cmap      map[rune]font.GlyphID
-	idxToName map[font.GlyphID]pdf.Name
+	cmap      map[rune]glyph.ID
+	idxToName map[glyph.ID]pdf.Name
 	nameToRef map[pdf.Name]*pdf.Reference
-	used      map[font.GlyphID]bool
+	used      map[glyph.ID]bool
 }
 
 // New creates a new Builder for embedding a type 3 font into the PDF file w.
@@ -54,10 +55,10 @@ func New(w *pdf.Writer, unitsPerEm uint16) (*Builder, error) {
 		unitsPerEm: unitsPerEm,
 		glyphWidth: make([]funit.Int16, 256),
 
-		cmap:      make(map[rune]font.GlyphID),
-		idxToName: make(map[font.GlyphID]pdf.Name),
+		cmap:      make(map[rune]glyph.ID),
+		idxToName: make(map[glyph.ID]pdf.Name),
 		nameToRef: make(map[pdf.Name]*pdf.Reference),
-		used:      make(map[font.GlyphID]bool),
+		used:      make(map[glyph.ID]bool),
 	}
 	return t3, nil
 }
@@ -81,7 +82,7 @@ func (t3 *Builder) AddGlyph(r rune, width funit.Int16) (*Glyph, error) {
 		return nil, err
 	}
 
-	idx := font.GlyphID(r % 256)
+	idx := glyph.ID(r % 256)
 	for t3.used[idx] {
 		idx = (idx + 1) % 256
 	}
@@ -107,8 +108,8 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 		CharProcs[name] = ref
 	}
 
-	var min font.GlyphID = 256
-	var max font.GlyphID = 0
+	var min glyph.ID = 256
+	var max glyph.ID = 0
 	for idx := range t3.used {
 		if idx < min {
 			min = idx
@@ -127,7 +128,7 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 	}
 
 	var Differences pdf.Array
-	var prevIdx font.GlyphID = 256
+	var prevIdx glyph.ID = 256
 	for idx := min; idx <= max; idx++ {
 		name, ok := t3.idxToName[idx]
 		if ok {
@@ -172,8 +173,8 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 	font := &font.Font{
 		InstName: pdf.Name(instName),
 		Ref:      FontRef,
-		Layout: func(rr []rune) []font.Glyph {
-			gg := make([]font.Glyph, len(rr))
+		Layout: func(rr []rune) []glyph.Info {
+			gg := make([]glyph.Info, len(rr))
 			for i, r := range rr {
 				gid := t3.cmap[r]
 				gg[i].Gid = gid
@@ -182,7 +183,7 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 			}
 			return gg
 		},
-		Enc: func(gid font.GlyphID) pdf.String {
+		Enc: func(gid glyph.ID) pdf.String {
 			if !t3.used[gid] {
 				return nil
 			}

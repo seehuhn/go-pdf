@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 func FuzzFont(f *testing.F) {
@@ -47,7 +47,7 @@ func FuzzFont(f *testing.F) {
 
 		cmpFdSelectFn := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
 			for gid := 0; gid < len(cff1.Glyphs); gid++ {
-				if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+				if fn1(glyph.ID(gid)) != fn2(glyph.ID(gid)) {
 					return false
 				}
 			}

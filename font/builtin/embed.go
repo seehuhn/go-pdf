@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/names"
 )
 
@@ -68,10 +69,10 @@ type simple struct {
 
 	FontRef *pdf.Reference
 
-	CMap map[rune]font.GlyphID
+	CMap map[rune]glyph.ID
 	char []rune
 
-	enc        map[font.GlyphID]byte
+	enc        map[glyph.ID]byte
 	candidates []*candidate
 	used       map[byte]bool // is CharCode used or not?
 
@@ -79,7 +80,7 @@ type simple struct {
 }
 
 func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple {
-	cmap := make(map[rune]font.GlyphID)
+	cmap := make(map[rune]glyph.ID)
 	char := make([]rune, len(afm.Code))
 	thisFontEnc := make(fontEnc)
 	for gid, code := range afm.Code {
@@ -90,7 +91,7 @@ func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple 
 			continue
 		}
 		r := rr[0]
-		cmap[r] = font.GlyphID(gid)
+		cmap[r] = glyph.ID(gid)
 		char[gid] = r
 		if code >= 0 {
 			thisFontEnc[r] = byte(code)
@@ -105,7 +106,7 @@ func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple 
 
 		CMap: cmap,
 		char: char,
-		enc:  make(map[font.GlyphID]byte),
+		enc:  make(map[glyph.ID]byte),
 		used: map[byte]bool{},
 
 		candidates: []*candidate{
@@ -119,22 +120,22 @@ func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple 
 	return res
 }
 
-func (fnt *simple) Layout(rr []rune) []font.Glyph {
+func (fnt *simple) Layout(rr []rune) []glyph.Info {
 	if len(rr) == 0 {
 		return nil
 	}
 
-	gg := make([]font.Glyph, len(rr))
+	gg := make([]glyph.Info, len(rr))
 	for i, r := range rr {
 		gid, _ := fnt.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Text = []rune{r}
 	}
 
-	var res []font.Glyph
+	var res []glyph.Info
 	last := gg[0]
 	for _, g := range gg[1:] {
-		lig, ok := fnt.afm.Ligatures[font.GlyphPair{Left: last.Gid, Right: g.Gid}]
+		lig, ok := fnt.afm.Ligatures[glyph.Pair{Left: last.Gid, Right: g.Gid}]
 		if ok {
 			last.Gid = lig
 			last.Text = append(last.Text, g.Text...)
@@ -152,14 +153,14 @@ func (fnt *simple) Layout(rr []rune) []font.Glyph {
 		return gg
 	}
 	for i := 0; i < len(gg)-1; i++ {
-		kern := fnt.afm.Kern[font.GlyphPair{Left: gg[i].Gid, Right: gg[i+1].Gid}]
+		kern := fnt.afm.Kern[glyph.Pair{Left: gg[i].Gid, Right: gg[i+1].Gid}]
 		gg[i].Advance += kern
 	}
 
 	return gg
 }
 
-func (fnt *simple) Enc(gid font.GlyphID) pdf.String {
+func (fnt *simple) Enc(gid glyph.ID) pdf.String {
 	c, ok := fnt.enc[gid]
 	if ok {
 		return pdf.String{c}

@@ -20,11 +20,11 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/boxes"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/pages"
 )
 
-type glyphBox font.GlyphID
+type glyphBox glyph.ID
 
 func (g glyphBox) Extent() *boxes.BoxExtent {
 	ht := theFont.Ascent
@@ -45,7 +45,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	shift := (glyphBoxWidth - glyphWidth) / 2
 
 	if theFont.GlyphExtents != nil {
-		ext := theFont.GlyphExtents[font.GlyphID(g)]
+		ext := theFont.GlyphExtents[glyph.ID(g)]
 		page.Println("q")
 		page.Println(".4 1 .4 rg")
 		page.Printf("%.2f %.2f %.2f %.2f re\n",
@@ -69,7 +69,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	page.Println("s")
 	page.Println("Q")
 
-	r := rev[font.GlyphID(g)]
+	r := rev[glyph.ID(g)]
 	var label string
 	if r != 0 {
 		label = fmt.Sprintf("%04X", r)
@@ -82,7 +82,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 		yPos+float64(theFont.Descent)*q-6)
 
 	if gdefInfo != nil {
-		class := gdefInfo.GlyphClass[font.GlyphID(g)]
+		class := gdefInfo.GlyphClass[glyph.ID(g)]
 		var classLabel string
 		switch class {
 		case 1:
@@ -112,7 +112,7 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	fmt.Fprintf(page, "%f %f Td\n",
 		xPos+shift,
 		yPos)
-	buf := theFont.Enc(font.GlyphID(g))
+	buf := theFont.Enc(glyph.ID(g))
 	_ = buf.PDF(page)
 	page.Println(" Tj")
 	page.Println("ET")

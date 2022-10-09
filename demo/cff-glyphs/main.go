@@ -190,9 +190,9 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 	// glyphImage := &font.Layout{
 	// 	Font:     X,
 	// 	FontSize: 1000,
-	// 	Glyphs: []font.Glyph{
+	// 	Glyphs: []glyph.Info{
 	// 		{
-	// 			Gid:     font.GlyphID(i),
+	// 			Gid:     glyph.ID(i),
 	// 			Advance: int32(fnt.Glyphs[i].Width),
 	// 		},
 	// 	},

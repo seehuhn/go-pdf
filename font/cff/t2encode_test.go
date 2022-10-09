@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -59,7 +59,7 @@ func TestRoundTrip(t *testing.T) {
 		FontInfo: meta,
 		Outlines: &Outlines{
 			Private:  private,
-			FdSelect: func(gi font.GlyphID) int { return 0 },
+			FdSelect: func(gi glyph.ID) int { return 0 },
 		},
 	}
 
@@ -106,7 +106,7 @@ func TestRoundTrip(t *testing.T) {
 
 	opt := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
 		for gid := 0; gid < len(in.Glyphs); gid++ {
-			if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+			if fn1(glyph.ID(gid)) != fn2(glyph.ID(gid)) {
 				return false
 			}
 		}
@@ -127,7 +127,7 @@ func TestFindEdges(t *testing.T) {
 		FontInfo: meta,
 		Outlines: &Outlines{
 			Private:  []*type1.PrivateDict{{}},
-			FdSelect: func(gi font.GlyphID) int { return 0 },
+			FdSelect: func(gi glyph.ID) int { return 0 },
 		},
 	}
 
@@ -266,7 +266,7 @@ func TestFindEdges(t *testing.T) {
 
 	opt := cmp.Comparer(func(fn1, fn2 FdSelectFn) bool {
 		for gid := 0; gid < len(in.Glyphs); gid++ {
-			if fn1(font.GlyphID(gid)) != fn2(font.GlyphID(gid)) {
+			if fn1(glyph.ID(gid)) != fn2(glyph.ID(gid)) {
 				return false
 			}
 		}

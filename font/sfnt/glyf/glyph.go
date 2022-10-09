@@ -19,6 +19,7 @@ package glyf
 import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 // Glyph represents a single glyph in a TrueType font.
@@ -36,7 +37,7 @@ type CompositeGlyph struct {
 // GlyphComponent is a single component of a composite glyph.
 type GlyphComponent struct {
 	Flags      uint16
-	GlyphIndex font.GlyphID
+	GlyphIndex glyph.ID
 	Args       []byte
 }
 
@@ -121,7 +122,7 @@ func decodeGlyphComposite(data []byte) (*CompositeGlyph, error) {
 
 		components = append(components, GlyphComponent{
 			Flags:      flags,
-			GlyphIndex: font.GlyphID(glyphIndex),
+			GlyphIndex: glyph.ID(glyphIndex),
 			Args:       args,
 		})
 
@@ -225,7 +226,7 @@ func (g *Glyph) append(buf []byte) []byte {
 
 // Components returns the components of a composite glyph, or nil if the glyph
 // is simple.
-func (g *Glyph) Components() []font.GlyphID {
+func (g *Glyph) Components() []glyph.ID {
 	if g == nil {
 		return nil
 	}
@@ -233,7 +234,7 @@ func (g *Glyph) Components() []font.GlyphID {
 	case SimpleGlyph:
 		return nil
 	case CompositeGlyph:
-		res := make([]font.GlyphID, len(d.Components))
+		res := make([]glyph.ID, len(d.Components))
 		for i, comp := range d.Components {
 			res[i] = comp.GlyphIndex
 		}
@@ -244,7 +245,7 @@ func (g *Glyph) Components() []font.GlyphID {
 }
 
 // FixComponents changes the glyph component IDs of a composite glyph.
-func (g *Glyph) FixComponents(newGid map[font.GlyphID]font.GlyphID) *Glyph {
+func (g *Glyph) FixComponents(newGid map[glyph.ID]glyph.ID) *Glyph {
 	if g == nil {
 		return nil
 	}

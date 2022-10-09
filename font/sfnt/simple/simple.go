@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
@@ -87,8 +88,8 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) 
 		GsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		GposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 
-		text: map[font.GlyphID][]rune{},
-		enc:  map[font.GlyphID]byte{},
+		text: map[glyph.ID][]rune{},
+		enc:  map[glyph.ID]byte{},
 	}
 
 	w.OnClose(s.WriteFont)
@@ -119,15 +120,15 @@ type fontHandler struct {
 	GsubLookups []gtab.LookupIndex
 	GposLookups []gtab.LookupIndex
 
-	text         map[font.GlyphID][]rune
-	enc          map[font.GlyphID]byte
+	text         map[glyph.ID][]rune
+	enc          map[glyph.ID]byte
 	nextCharCode int
 }
 
-func (s *fontHandler) Layout(rr []rune) []font.Glyph {
+func (s *fontHandler) Layout(rr []rune) []glyph.Info {
 	info := s.info
 
-	seq := make([]font.Glyph, len(rr))
+	seq := make([]glyph.Info, len(rr))
 	for i, r := range rr {
 		gid := info.CMap.Lookup(r)
 		seq[i].Gid = gid
@@ -158,7 +159,7 @@ func (s *fontHandler) Layout(rr []rune) []font.Glyph {
 	return seq
 }
 
-func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
+func (s *fontHandler) Enc(gid glyph.ID) pdf.String {
 	c, ok := s.enc[gid]
 	if ok {
 		return pdf.String{c}
@@ -174,7 +175,7 @@ func (s *fontHandler) Enc(gid font.GlyphID) pdf.String {
 // a glyph ID.
 type cMapEntry struct {
 	CharCode uint16
-	GID      font.GlyphID
+	GID      glyph.ID
 }
 
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {
@@ -196,7 +197,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	firstCharCode := mapping[0].CharCode
 	lastCharCode := mapping[len(mapping)-1].CharCode
 
-	includeGlyphs := make([]font.GlyphID, 0, len(mapping)+1)
+	includeGlyphs := make([]glyph.ID, 0, len(mapping)+1)
 	includeGlyphs = append(includeGlyphs, 0) // always include the .notdef glyph
 	for _, m := range mapping {
 		if m.GID == 0 {
@@ -223,7 +224,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
 			}
 		}
-		o2.FdSelect = func(gid font.GlyphID) int {
+		o2.FdSelect = func(gid glyph.ID) int {
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
 		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
@@ -239,17 +240,17 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			}
 		} else {
 			// Embed as a simple CFF font.
-			o2.Encoding = make([]font.GlyphID, 256)
+			o2.Encoding = make([]glyph.ID, 256)
 			for i, gid := range includeGlyphs {
-				o2.Encoding[s.enc[gid]] = font.GlyphID(i)
+				o2.Encoding[s.enc[gid]] = glyph.ID(i)
 			}
 		}
 		subsetInfo.Outlines = o2
 
 	case *glyf.Outlines:
-		newGid := make(map[font.GlyphID]font.GlyphID)
-		todo := make(map[font.GlyphID]bool)
-		nextGid := font.GlyphID(0)
+		newGid := make(map[glyph.ID]glyph.ID)
+		todo := make(map[glyph.ID]bool)
+		nextGid := glyph.ID(0)
 		for _, gid := range includeGlyphs {
 			newGid[gid] = nextGid
 			nextGid++
@@ -423,7 +424,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	return nil
 }
 
-func pop(todo map[font.GlyphID]bool) font.GlyphID {
+func pop(todo map[glyph.ID]bool) glyph.ID {
 	for key := range todo {
 		delete(todo, key)
 		return key

@@ -19,13 +19,13 @@ package gtab
 import (
 	"testing"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
 
 func FuzzGsub1_1(f *testing.F) {
 	l := &Gsub1_1{
-		Cov:   map[font.GlyphID]int{3: 0},
+		Cov:   map[glyph.ID]int{3: 0},
 		Delta: 26,
 	}
 	f.Add(l.Encode())
@@ -37,8 +37,8 @@ func FuzzGsub1_1(f *testing.F) {
 
 func FuzzGsub1_2(f *testing.F) {
 	l := &Gsub1_2{
-		Cov:                map[font.GlyphID]int{2: 0, 3: 1},
-		SubstituteGlyphIDs: []font.GlyphID{6, 7},
+		Cov:                map[glyph.ID]int{2: 0, 3: 1},
+		SubstituteGlyphIDs: []glyph.ID{6, 7},
 	}
 	f.Add(l.Encode())
 
@@ -49,8 +49,8 @@ func FuzzGsub1_2(f *testing.F) {
 
 func FuzzGsub2_1(f *testing.F) {
 	l := &Gsub2_1{
-		Cov: map[font.GlyphID]int{2: 0, 3: 1},
-		Repl: [][]font.GlyphID{
+		Cov: map[glyph.ID]int{2: 0, 3: 1},
+		Repl: [][]glyph.ID{
 			{4, 5},
 			{1, 2, 3},
 		},
@@ -64,8 +64,8 @@ func FuzzGsub2_1(f *testing.F) {
 
 func FuzzGsub3_1(f *testing.F) {
 	l := &Gsub3_1{
-		Cov: map[font.GlyphID]int{1: 0, 2: 1},
-		Alternates: [][]font.GlyphID{
+		Cov: map[glyph.ID]int{1: 0, 2: 1},
+		Alternates: [][]glyph.ID{
 			{3, 4},
 			{5, 6, 7},
 		},
@@ -79,16 +79,16 @@ func FuzzGsub3_1(f *testing.F) {
 
 func FuzzGsub4_1(f *testing.F) {
 	l := &Gsub4_1{
-		Cov: map[font.GlyphID]int{1: 0, 2: 1},
+		Cov: map[glyph.ID]int{1: 0, 2: 1},
 		Repl: [][]Ligature{
 			{
-				{In: []font.GlyphID{1, 2, 3}, Out: 10},
-				{In: []font.GlyphID{1, 2}, Out: 11},
-				{In: []font.GlyphID{1}, Out: 12},
+				{In: []glyph.ID{1, 2, 3}, Out: 10},
+				{In: []glyph.ID{1, 2}, Out: 11},
+				{In: []glyph.ID{1}, Out: 12},
 			},
 			{
-				{In: []font.GlyphID{1, 2}, Out: 13},
-				{In: []font.GlyphID{1}, Out: 14},
+				{In: []glyph.ID{1, 2}, Out: 13},
+				{In: []glyph.ID{1}, Out: 14},
 			},
 		},
 	}
@@ -102,7 +102,7 @@ func FuzzGsub4_1(f *testing.F) {
 func FuzzGsub8_1(f *testing.F) {
 	l := &Gsub8_1{
 		Input:              coverage.Table{1: 0},
-		SubstituteGlyphIDs: []font.GlyphID{2},
+		SubstituteGlyphIDs: []glyph.ID{2},
 	}
 	f.Add(l.Encode())
 	l = &Gsub8_1{
@@ -116,7 +116,7 @@ func FuzzGsub8_1(f *testing.F) {
 			{3: 0},
 			{3: 0, 4: 1},
 		},
-		SubstituteGlyphIDs: []font.GlyphID{2},
+		SubstituteGlyphIDs: []glyph.ID{2},
 	}
 	f.Add(l.Encode())
 

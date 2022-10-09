@@ -23,12 +23,13 @@ import (
 	"sort"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
 // Table contains the information from an OpenType "Class Definition Table".
 // All glyphs not assigned to a class fall into Class 0.
-type Table map[font.GlyphID]uint16
+type Table map[glyph.ID]uint16
 
 // NumClasses returns the number of classes in the table.
 // The count includes the zero class.
@@ -45,9 +46,9 @@ func (info Table) NumClasses() int {
 // Glyphs returns the glyphs for each non-zero class in the Table.
 // The first entry of the returned slice, corresponding to class 0,
 // is always nil.
-func (info Table) Glyphs() [][]font.GlyphID {
+func (info Table) Glyphs() [][]glyph.ID {
 	numClasses := info.NumClasses()
-	glyphs := make([][]font.GlyphID, numClasses)
+	glyphs := make([][]glyph.ID, numClasses)
 	for gid, cls := range info {
 		if cls == 0 {
 			continue
@@ -78,7 +79,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 		if err != nil {
 			return nil, err
 		}
-		startGlyphID := font.GlyphID(data[0])<<8 | font.GlyphID(data[1])
+		startGlyphID := glyph.ID(data[0])<<8 | glyph.ID(data[1])
 		glyphCount := int(data[2])<<8 | int(data[3])
 		if int(startGlyphID)+glyphCount-1 > 0xFFFF {
 			return nil, &font.InvalidFontError{
@@ -94,7 +95,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 				return nil, err
 			}
 			if classValue != 0 {
-				res[startGlyphID+font.GlyphID(i)] = classValue
+				res[startGlyphID+glyph.ID(i)] = classValue
 			}
 		}
 		return res, nil
@@ -106,14 +107,14 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 		}
 
 		res := Table{}
-		var prevEnd font.GlyphID
+		var prevEnd glyph.ID
 		for i := 0; i < int(classRangeCount); i++ {
 			data, err := p.ReadBytes(6)
 			if err != nil {
 				return nil, err
 			}
-			startGlyphID := font.GlyphID(data[0])<<8 | font.GlyphID(data[1])
-			endGlyphID := font.GlyphID(data[2])<<8 | font.GlyphID(data[3])
+			startGlyphID := glyph.ID(data[0])<<8 | glyph.ID(data[1])
+			endGlyphID := glyph.ID(data[2])<<8 | glyph.ID(data[3])
 			classValue := uint16(data[4])<<8 | uint16(data[5])
 
 			if i > 0 && startGlyphID <= prevEnd {
@@ -126,7 +127,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 
 			if classValue != 0 {
 				for j := int(startGlyphID); j <= int(endGlyphID); j++ {
-					res[font.GlyphID(j)] = classValue
+					res[glyph.ID(j)] = classValue
 				}
 			}
 		}
@@ -141,14 +142,14 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 }
 
 type encInfo struct {
-	minGid, maxGid font.GlyphID
+	minGid, maxGid glyph.ID
 	format1Size    int
 	format2Size    int
 }
 
 func (info Table) getEncInfo() *encInfo {
-	minGid := font.GlyphID(0xFFFF)
-	maxGid := font.GlyphID(0)
+	minGid := glyph.ID(0xFFFF)
+	maxGid := glyph.ID(0)
 	for key := range info {
 		if key < minGid {
 			minGid = key
@@ -164,7 +165,7 @@ func (info Table) getEncInfo() *encInfo {
 	segStart := -1
 	var segClass uint16
 	for i := int(minGid); i <= int(maxGid) && 4+6*segCount < format1Size; i++ {
-		class := info[font.GlyphID(i)]
+		class := info[glyph.ID(i)]
 
 		if segStart >= 0 && class != segClass {
 			segCount++
@@ -218,7 +219,7 @@ func (info Table) Append(buf []byte) []byte {
 			byte(encInfo.minGid>>8), byte(encInfo.minGid),
 			byte(count>>8), byte(count))
 		for i := 0; i < int(count); i++ {
-			class := info[encInfo.minGid+font.GlyphID(i)]
+			class := info[encInfo.minGid+glyph.ID(i)]
 			buf = append(buf, byte(class>>8), byte(class))
 		}
 		return buf
@@ -229,7 +230,7 @@ func (info Table) Append(buf []byte) []byte {
 	segStart := -1
 	var segClass uint16
 	for i := int(encInfo.minGid); i <= int(encInfo.maxGid); i++ {
-		class := info[font.GlyphID(i)]
+		class := info[glyph.ID(i)]
 
 		if segStart >= 0 && class != segClass {
 			buf = append(buf,

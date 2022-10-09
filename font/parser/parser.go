@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 const bufferSize = 1024
@@ -164,18 +164,18 @@ func (p *Parser) ReadUint16Slice() ([]uint16, error) {
 }
 
 // ReadGIDSlice reads a length followed by a sequence of GlyphID values.
-func (p *Parser) ReadGIDSlice() ([]font.GlyphID, error) {
+func (p *Parser) ReadGIDSlice() ([]glyph.ID, error) {
 	n, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
-	res := make([]font.GlyphID, n)
+	res := make([]glyph.ID, n)
 	for i := range res {
 		val, err := p.ReadUint16()
 		if err != nil {
 			return nil, err
 		}
-		res[i] = font.GlyphID(val)
+		res[i] = glyph.ID(val)
 	}
 	return res, nil
 }

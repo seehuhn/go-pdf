@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -57,14 +58,14 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	text := map[font.GlyphID]rune{}
+	text := map[glyph.ID]rune{}
 	for i, name := range afm.GlyphName {
 		rr := names.ToUnicode(name, false)
 		if len(rr) != 1 {
 			continue
 		}
 		r := rr[0]
-		gid := font.GlyphID(i)
+		gid := glyph.ID(i)
 		rOld, ok := text[gid]
 		if !ok || r < rOld {
 			text[gid] = r
@@ -74,11 +75,11 @@ func TestSimple(t *testing.T) {
 	for i := 0; i < 256; i++ {
 		row := i / 16
 		col := i % 16
-		gid := font.GlyphID(i + 2)
+		gid := glyph.ID(i + 2)
 
 		gg := F.Layout([]rune{text[gid]}) // try to establish glyph -> rune mapping
 		if len(gg) != 1 || gg[0].Gid != gid {
-			gg = []font.Glyph{
+			gg = []glyph.Info{
 				{Gid: gid},
 			}
 		}
@@ -108,7 +109,7 @@ func TestEnc(t *testing.T) {
 		b := newSimple(afm, nil, "F")
 
 		rr := []rune("ý×A×˚")
-		gids := make([]font.GlyphID, len(rr))
+		gids := make([]glyph.ID, len(rr))
 		for i, r := range rr {
 			gid, ok := b.CMap[r]
 			if !ok {

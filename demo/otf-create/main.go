@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
@@ -84,7 +85,7 @@ func main() {
 			BlueValues: []funit.Int16{-10, 0, 700, 710},
 		},
 	}
-	cffInfo.FdSelect = func(gi font.GlyphID) int { return 0 }
+	cffInfo.FdSelect = func(gi glyph.ID) int { return 0 }
 
 	info.Outlines = cffInfo
 	info.CMap = makeCMap(cffInfo.Glyphs)
@@ -112,7 +113,7 @@ func makeCMap(gg []*cff.Glyph) cmap.Subtable {
 		if len(rr) == 1 {
 			r := uint16(rr[0])
 			if _, ok := cmap[r]; !ok {
-				cmap[r] = font.GlyphID(i)
+				cmap[r] = glyph.ID(i)
 			}
 		}
 	}

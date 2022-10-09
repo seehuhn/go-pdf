@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/cmap"
 	"seehuhn.de/go/pdf/font/sfnt/glyf"
 	"seehuhn.de/go/pdf/font/sfnt/head"
@@ -150,7 +151,7 @@ func (info *Info) PostscriptName() string {
 func (info *Info) BBox() (bbox funit.Rect) {
 	first := true
 	for i := 0; i < info.NumGlyphs(); i++ {
-		ext := info.GlyphExtent(font.GlyphID(i))
+		ext := info.GlyphExtent(glyph.ID(i))
 		if ext.IsZero() {
 			continue
 		}
@@ -179,7 +180,7 @@ func (info *Info) NumGlyphs() int {
 
 // GlyphWidth returns the advance width of the glyph with the given glyph ID,
 // in font design units.
-func (info *Info) GlyphWidth(gid font.GlyphID) funit.Int16 {
+func (info *Info) GlyphWidth(gid glyph.ID) funit.Int16 {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Width
@@ -233,7 +234,7 @@ func (info *Info) Extents() []funit.Rect {
 
 // GlyphExtent returns the glyph bounding box for one glyph in font design
 // units.
-func (info *Info) GlyphExtent(gid font.GlyphID) funit.Rect {
+func (info *Info) GlyphExtent(gid glyph.ID) funit.Rect {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Extent()
@@ -248,7 +249,7 @@ func (info *Info) GlyphExtent(gid font.GlyphID) funit.Rect {
 	}
 }
 
-func (info *Info) glyphHeight(gid font.GlyphID) funit.Int16 {
+func (info *Info) glyphHeight(gid glyph.ID) funit.Int16 {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Extent().URy
@@ -265,7 +266,7 @@ func (info *Info) glyphHeight(gid font.GlyphID) funit.Int16 {
 
 // GlyphName returns the name if a glyph.  If the name is not known,
 // the empty string is returned.
-func (info *Info) GlyphName(gid font.GlyphID) string {
+func (info *Info) GlyphName(gid glyph.ID) string {
 	switch f := info.Outlines.(type) {
 	case *cff.Outlines:
 		return f.Glyphs[gid].Name

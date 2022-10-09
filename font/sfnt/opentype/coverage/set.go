@@ -22,14 +22,15 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
 // Set is a coverage table, but with the coverage indices omitted.
-type Set map[font.GlyphID]bool
+type Set map[glyph.ID]bool
 
 // Glyphs returned the glyphs covered by the Set, in order of increasing glyph ID.
-func (set Set) Glyphs() []font.GlyphID {
+func (set Set) Glyphs() []glyph.ID {
 	glyphs := maps.Keys(set)
 	sort.Slice(glyphs, func(i, j int) bool { return glyphs[i] < glyphs[j] })
 	return glyphs
@@ -72,7 +73,7 @@ func ReadSet(p *parser.Parser, pos int64) (Set, error) {
 			if err != nil {
 				return nil, err
 			}
-			table[font.GlyphID(gid)] = true
+			table[glyph.ID(gid)] = true
 		}
 
 	case 2: // Coverage Format 2
@@ -101,7 +102,7 @@ func ReadSet(p *parser.Parser, pos int64) (Set, error) {
 				}
 			}
 			for gid := startGlyphID; gid <= endGlyphID; gid++ {
-				table[font.GlyphID(gid)] = true
+				table[glyph.ID(gid)] = true
 				pos++
 			}
 			prev = endGlyphID

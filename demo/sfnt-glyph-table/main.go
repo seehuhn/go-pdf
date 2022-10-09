@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/cid"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
@@ -42,7 +43,7 @@ const (
 )
 
 var courier, theFont *font.Font
-var rev map[font.GlyphID]rune
+var rev map[glyph.ID]rune
 var gdefInfo *gdef.Table
 
 func main() {
@@ -196,7 +197,7 @@ func main() {
 	}
 	c <- nil // new page
 
-	rev = make(map[font.GlyphID]rune)
+	rev = make(map[glyph.ID]rune)
 	min, max := tt.CMap.CodeRange()
 	for r := min; r <= max; r++ {
 		gid := tt.CMap.Lookup(r)

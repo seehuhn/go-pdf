@@ -16,12 +16,14 @@
 
 package font
 
+import "seehuhn.de/go/pdf/font/glyph"
+
 const subsetModulus = 26 * 26 * 26 * 26 * 26 * 26
 
 // GetSubsetTag constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe
 // a subset of glyphs of a font.  This is used for the /BaseFont entry in PDF
 // Font dictionaries and the /FontName entry in FontDescriptor dictionaries.
-func GetSubsetTag(gg []GlyphID, origNumGlyphs int) string {
+func GetSubsetTag(gg []glyph.ID, origNumGlyphs int) string {
 	// mix all the information into a single uint32
 	X := uint32(origNumGlyphs)
 	for _, g := range gg {

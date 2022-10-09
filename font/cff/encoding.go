@@ -20,19 +20,19 @@ import (
 	"fmt"
 	"io"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
-func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
+func readEncoding(p *parser.Parser, charset []int32) ([]glyph.ID, error) {
 	format, err := p.ReadUint8()
 	if err != nil {
 		return nil, err
 	}
 
-	res := make([]font.GlyphID, 256)
-	currentGid := font.GlyphID(1)
+	res := make([]glyph.ID, 256)
+	currentGid := glyph.ID(1)
 	switch format & 127 {
 	case 0:
 		nCodes, err := p.ReadUint8()
@@ -86,9 +86,9 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 	}
 
 	if (format & 128) != 0 {
-		lookup := make(map[uint16]font.GlyphID)
+		lookup := make(map[uint16]glyph.ID)
 		for gid, sid := range charset {
-			lookup[uint16(sid)] = font.GlyphID(gid)
+			lookup[uint16(sid)] = glyph.ID(gid)
 		}
 		nSups, err := p.ReadUint8()
 		if err != nil {
@@ -118,12 +118,12 @@ func readEncoding(p *parser.Parser, charset []int32) ([]font.GlyphID, error) {
 	return res, nil
 }
 
-func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
-	var maxGid font.GlyphID
-	codes := map[font.GlyphID]uint8{}
+func encodeEncoding(encoding []glyph.ID, cc []int32) ([]byte, error) {
+	var maxGid glyph.ID
+	codes := map[glyph.ID]uint8{}
 	type suppl struct {
 		code uint8
-		gid  font.GlyphID
+		gid  glyph.ID
 	}
 	var extra []suppl
 	for code, gid := range encoding {
@@ -147,9 +147,9 @@ func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
 	}
 	var ss []seg
 
-	startGid := font.GlyphID(1)
+	startGid := glyph.ID(1)
 	startCode := codes[startGid]
-	for gid := font.GlyphID(1); gid <= maxGid; gid++ {
+	for gid := glyph.ID(1); gid <= maxGid; gid++ {
 		code, ok := codes[gid]
 		if !ok {
 			msg := fmt.Sprintf("glyph %d not in encoding", gid)
@@ -179,7 +179,7 @@ func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
 		buf = make([]byte, format0Len+extraLen)
 		// buf[0] = 0
 		buf[1] = byte(maxGid)
-		for i := font.GlyphID(1); i <= maxGid; i++ {
+		for i := glyph.ID(1); i <= maxGid; i++ {
 			buf[i+1] = codes[i]
 		}
 	} else {
@@ -209,18 +209,18 @@ func encodeEncoding(encoding []font.GlyphID, cc []int32) ([]byte, error) {
 
 // StandardEncoding returns the encoding vector for the standard encoding.
 // The result can be used for the `Outlines.Encoding` field.
-func StandardEncoding(glyphs []*Glyph) []font.GlyphID {
-	encoding := make([]font.GlyphID, 256)
+func StandardEncoding(glyphs []*Glyph) []glyph.ID {
+	encoding := make([]glyph.ID, 256)
 	for gid, g := range glyphs {
 		code, ok := type1.StandardEncoding[g.Name]
 		if ok {
-			encoding[code] = font.GlyphID(gid)
+			encoding[code] = glyph.ID(gid)
 		}
 	}
 	return encoding
 }
 
-func isStandardEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {
+func isStandardEncoding(encoding []glyph.ID, glyphs []*Glyph) bool {
 	tmp := StandardEncoding(glyphs)
 	for i, gid := range tmp {
 		if encoding[i] != gid {
@@ -230,18 +230,18 @@ func isStandardEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {
 	return true
 }
 
-func expertEncoding(glyphs []*Glyph) []font.GlyphID {
-	res := make([]font.GlyphID, 256)
+func expertEncoding(glyphs []*Glyph) []glyph.ID {
+	res := make([]glyph.ID, 256)
 	for gid, g := range glyphs {
 		code, ok := type1.ExpertEncoding[g.Name]
 		if ok {
-			res[code] = font.GlyphID(gid)
+			res[code] = glyph.ID(gid)
 		}
 	}
 	return res
 }
 
-func isExpertEncoding(encoding []font.GlyphID, glyphs []*Glyph) bool {
+func isExpertEncoding(encoding []glyph.ID, glyphs []*Glyph) bool {
 	tmp := expertEncoding(glyphs)
 	for i, gid := range tmp {
 		if encoding[i] != gid {

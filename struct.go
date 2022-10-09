@@ -257,7 +257,7 @@ type Catalog struct {
 	MetaData          *Reference `pdf:"optional"`
 	StructTreeRoot    Object     `pdf:"optional"`
 	MarkInfo          Object     `pdf:"optional"`
-	Lang              string     `pdf:"text string,optional"` // TODO(voss): use locale.Language
+	Lang              string     `pdf:"text string,optional"` // TODO(voss): use language.Tag?
 	SpiderInfo        Object     `pdf:"optional"`
 	OutputIntents     Object     `pdf:"optional"`
 	PieceInfo         Object     `pdf:"optional"`

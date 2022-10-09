@@ -26,6 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
@@ -33,7 +34,7 @@ import (
 // If the value for a glyph pair is greater than zero, the characters will be moved apart.
 // If the value is less than zero, the character will be moved closer together.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/kern
-type Info map[font.GlyphPair]funit.Int16
+type Info map[glyph.Pair]funit.Int16
 
 // Read reads the "kern" table.
 func Read(r parser.ReadSeekSizer) (Info, error) {
@@ -99,10 +100,10 @@ func Read(r parser.ReadSeekSizer) (Info, error) {
 			if err != nil {
 				return nil, err
 			}
-			left := font.GlyphID(buf[0])<<8 | font.GlyphID(buf[1])
-			right := font.GlyphID(buf[2])<<8 | font.GlyphID(buf[3])
+			left := glyph.ID(buf[0])<<8 | glyph.ID(buf[1])
+			right := glyph.ID(buf[2])<<8 | glyph.ID(buf[3])
 			value := funit.Int16(buf[4])<<8 | funit.Int16(buf[5])
-			key := font.GlyphPair{Left: left, Right: right}
+			key := glyph.Pair{Left: left, Right: right}
 			if isMinimum {
 				if res[key] < value {
 					res[key] = value

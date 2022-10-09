@@ -16,9 +16,7 @@
 
 package cmap
 
-import (
-	"seehuhn.de/go/pdf/font"
-)
+import "seehuhn.de/go/pdf/font/glyph"
 
 func decodeFormat6(data []byte, code2rune func(c int) rune) (Subtable, error) {
 	if code2rune == nil {
@@ -43,7 +41,7 @@ func decodeFormat6(data []byte, code2rune func(c int) rune) (Subtable, error) {
 
 	res := make(Format4)
 	for i := 0; i < count; i++ {
-		gid := font.GlyphID(data[2*i])<<8 | font.GlyphID(data[2*i+1])
+		gid := glyph.ID(data[2*i])<<8 | glyph.ID(data[2*i+1])
 		if gid != 0 {
 			res[uint16(code2rune(i+firstCode))] = gid
 		}

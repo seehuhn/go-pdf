@@ -22,6 +22,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
@@ -70,7 +71,7 @@ type notImplementedGposSubtable struct {
 	lookupType, lookupFormat uint16
 }
 
-func (st notImplementedGposSubtable) Apply(_ keepGlyphFn, _ []font.Glyph, _, _ int) *Match {
+func (st notImplementedGposSubtable) Apply(_ keepGlyphFn, _ []glyph.Info, _, _ int) *Match {
 	return nil
 }
 
@@ -118,7 +119,7 @@ func readGpos1_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos1_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gpos1_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	g := seq[a]
 	_, ok := l.Cov[g.Gid]
 	if !ok {
@@ -127,7 +128,7 @@ func (l *Gpos1_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	l.Adjust.Apply(&g)
 	return &Match{
 		InputPos: []int{a},
-		Replace:  []font.Glyph{g},
+		Replace:  []glyph.Info{g},
 		Next:     a + 1,
 	}
 }
@@ -196,7 +197,7 @@ func readGpos1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos1_2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gpos1_2) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	g := seq[a]
 	idx, ok := l.Cov[g.Gid]
 	if !ok {
@@ -205,7 +206,7 @@ func (l *Gpos1_2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	l.Adjust[idx].Apply(&g)
 	return &Match{
 		InputPos: []int{a},
-		Replace:  []font.Glyph{g},
+		Replace:  []glyph.Info{g},
 		Next:     a + 1,
 	}
 }
@@ -256,7 +257,7 @@ func (l *Gpos1_2) Encode() []byte {
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#pair-adjustment-positioning-format-1-adjustments-for-glyph-pairs
 type Gpos2_1 struct {
 	Cov    coverage.Table
-	Adjust []map[font.GlyphID]*PairAdjust // TODO(voss): use one map with pairs as keys?
+	Adjust []map[glyph.ID]*PairAdjust // TODO(voss): use one map with pairs as keys?
 }
 
 // PairAdjust represents information from a PairValueRecord table.
@@ -265,7 +266,7 @@ type PairAdjust struct {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos2_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gpos2_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	if a+1 >= b {
 		return nil
 	}
@@ -290,14 +291,14 @@ func (l *Gpos2_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	if adj.Second == nil {
 		return &Match{
 			InputPos: []int{a},
-			Replace:  []font.Glyph{g1},
+			Replace:  []glyph.Info{g1},
 			Next:     a + 1,
 		}
 	}
 	adj.Second.Apply(&g2)
 	return &Match{
 		InputPos: []int{a, a + 1},
-		Replace:  []font.Glyph{g1, g2},
+		Replace:  []glyph.Info{g1, g2},
 		Next:     a + 2,
 	}
 }
@@ -331,7 +332,7 @@ func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		cov.Prune(len(pairSetOffsets))
 	}
 
-	adjust := make([]map[font.GlyphID]*PairAdjust, len(pairSetOffsets))
+	adjust := make([]map[glyph.ID]*PairAdjust, len(pairSetOffsets))
 	for i, offset := range pairSetOffsets {
 		err = p.SeekPos(subtablePos + int64(offset))
 		if err != nil {
@@ -341,7 +342,7 @@ func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		adj := make(map[font.GlyphID]*PairAdjust, pairValueCount)
+		adj := make(map[glyph.ID]*PairAdjust, pairValueCount)
 		for j := 0; j < int(pairValueCount); j++ {
 			secondGlyph, err := p.ReadUint16()
 			if err != nil {
@@ -355,7 +356,7 @@ func readGpos2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			if err != nil {
 				return nil, err
 			}
-			adj[font.GlyphID(secondGlyph)] = &PairAdjust{
+			adj[glyph.ID(secondGlyph)] = &PairAdjust{
 				First:  first,
 				Second: second,
 			}
@@ -453,7 +454,7 @@ type Gpos2_2 struct {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos2_2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gpos2_2) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	g1 := seq[a]
 	_, ok := l.Cov[g1.Gid]
 	if !ok {
@@ -484,14 +485,14 @@ func (l *Gpos2_2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 	if adj.Second == nil {
 		return &Match{
 			InputPos: []int{a},
-			Replace:  []font.Glyph{g1},
+			Replace:  []glyph.Info{g1},
 			Next:     a + 1,
 		}
 	}
 	adj.Second.Apply(&g2)
 	return &Match{
 		InputPos: []int{a, a + 1},
-		Replace:  []font.Glyph{g1, g2},
+		Replace:  []glyph.Info{g1, g2},
 		Next:     a + 2,
 	}
 }
@@ -652,7 +653,7 @@ type EntryExitRecord struct {
 }
 
 // Apply implements the Subtable interface.
-func (l *Gpos3_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *Gpos3_1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	// TODO(voss): this is only correct if the RIGHT_TO_LEFT flag is not set.
 
 	g := seq[a]
@@ -680,7 +681,7 @@ func (l *Gpos3_1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
 
 	return &Match{
 		InputPos: []int{a},
-		Replace:  []font.Glyph{g},
+		Replace:  []glyph.Info{g},
 		Next:     a + 1,
 	}
 }

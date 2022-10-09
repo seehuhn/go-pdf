@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
@@ -51,7 +51,7 @@ func FuzzEncoding(f *testing.F) {
 			return
 		}
 
-		var enc2 []font.GlyphID
+		var enc2 []glyph.ID
 		var data2 []byte
 		if isStandardEncoding(enc1, glyphs) {
 			enc2 = StandardEncoding(glyphs)

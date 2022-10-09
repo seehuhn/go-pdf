@@ -21,8 +21,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/debug"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
@@ -56,21 +56,21 @@ func Test9737(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									Input: []font.GlyphID{gidB},
+									Input: []glyph.ID{gidB},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 0, LookupListIndex: 1}, // AB -> AAB
 										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
 									},
 								},
 								{
-									Input: []font.GlyphID{gidA, gidB},
+									Input: []glyph.ID{gidA, gidB},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 0, LookupListIndex: 1}, // AAB -> AAAB
 										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
 									},
 								},
 								{
-									Input: []font.GlyphID{gidA, gidA, gidB},
+									Input: []glyph.ID{gidA, gidA, gidB},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 0, LookupListIndex: 1}, // AAAB -> AAAAB
 										{SequenceIndex: 0, LookupListIndex: 0}, // recurse
@@ -88,7 +88,7 @@ func Test9737(t *testing.T) {
 				Subtables: []gtab.Subtable{
 					&gtab.Gsub2_1{
 						Cov: coverage.Table{gidA: 0},
-						Repl: [][]font.GlyphID{
+						Repl: [][]glyph.ID{
 							{gidA, gidA}, // A -> AA
 						},
 					},
@@ -97,7 +97,7 @@ func Test9737(t *testing.T) {
 		},
 	}
 
-	gg := []font.Glyph{
+	gg := []glyph.Info{
 		{Gid: gidA},
 		{Gid: gidB},
 	}
@@ -109,7 +109,7 @@ func Test9737(t *testing.T) {
 	// harfbuzz gives AAB
 
 	got := unpack(gg)
-	expected := []font.GlyphID{gidA, gidA, gidA, gidA, gidB}
+	expected := []glyph.ID{gidA, gidA, gidA, gidA, gidB}
 
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
@@ -150,7 +150,7 @@ func Test9738(t *testing.T) {
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									Input: []font.GlyphID{gidB, gidA},
+									Input: []glyph.ID{gidB, gidA},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 2}, // B(A*)B -> B\1AA
 									},
@@ -170,7 +170,7 @@ func Test9738(t *testing.T) {
 				Subtables: []gtab.Subtable{
 					&gtab.Gsub1_2{
 						Cov:                coverage.Table{gidA: 0},
-						SubstituteGlyphIDs: []font.GlyphID{gidX},
+						SubstituteGlyphIDs: []glyph.ID{gidX},
 					},
 				},
 			},
@@ -181,11 +181,11 @@ func Test9738(t *testing.T) {
 				},
 				Subtables: []gtab.Subtable{
 					&gtab.SeqContext1{
-						Cov: map[font.GlyphID]int{gidB: 0},
+						Cov: map[glyph.ID]int{gidB: 0},
 						Rules: [][]*gtab.SeqRule{
 							{
 								{
-									Input: []font.GlyphID{gidB},
+									Input: []glyph.ID{gidB},
 									Actions: []gtab.SeqLookup{
 										{SequenceIndex: 1, LookupListIndex: 3},
 									},
@@ -200,7 +200,7 @@ func Test9738(t *testing.T) {
 				Subtables: []gtab.Subtable{
 					&gtab.Gsub2_1{
 						Cov: coverage.Table{gidB: 0},
-						Repl: [][]font.GlyphID{
+						Repl: [][]glyph.ID{
 							{gidA, gidA},
 						},
 					},
@@ -209,7 +209,7 @@ func Test9738(t *testing.T) {
 		},
 	}
 
-	gg := []font.Glyph{
+	gg := []glyph.Info{
 		{Gid: gidA},
 		{Gid: gidB},
 		{Gid: gidA},
@@ -223,7 +223,7 @@ func Test9738(t *testing.T) {
 	}
 
 	got := unpack(gg)
-	expected := []font.GlyphID{gidA, gidB, gidA, gidX, gidX, gidB}
+	expected := []glyph.ID{gidA, gidB, gidA, gidX, gidX, gidB}
 
 	if diff := cmp.Diff(expected, got); diff != "" {
 		t.Errorf("unexpected glyphs (-want +got):\n%s", diff)
@@ -232,8 +232,8 @@ func Test9738(t *testing.T) {
 	exportFont(fontInfo, 9738, "ABAAAB")
 }
 
-func unpack(seq []font.Glyph) []font.GlyphID {
-	res := make([]font.GlyphID, len(seq))
+func unpack(seq []glyph.Info) []glyph.ID {
+	res := make([]glyph.ID, len(seq))
 	for i, g := range seq {
 		res[i] = g.Gid
 	}

@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 )
@@ -30,11 +30,11 @@ type debugNestedLookup struct {
 	actions  SeqLookups
 }
 
-func (l *debugNestedLookup) Apply(_ keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *debugNestedLookup) Apply(_ keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	if a != 0 {
 		return &Match{
 			InputPos: []int{a},
-			Replace: []font.Glyph{
+			Replace: []glyph.Info{
 				{Gid: 3},
 			},
 			Next: a + 1,
@@ -60,15 +60,15 @@ func (l *debugNestedLookup) Encode() []byte {
 func TestNestedSimple(t *testing.T) {
 	type testCase struct {
 		sequenceIndex []int
-		out           []font.GlyphID
+		out           []glyph.ID
 	}
 	cases := []testCase{
-		{[]int{0}, []font.GlyphID{2, 1, 1, 1, 1, 3, 3}},
-		{[]int{1}, []font.GlyphID{1, 1, 2, 1, 1, 3, 3}},
-		{[]int{2}, []font.GlyphID{1, 1, 1, 1, 2, 3, 3}},
-		{[]int{3}, []font.GlyphID{1, 1, 1, 1, 1, 3, 3}},
-		{[]int{1, 2}, []font.GlyphID{1, 1, 2, 1, 2, 3, 3}},
-		{[]int{1, 3}, []font.GlyphID{1, 1, 2, 1, 1, 3, 3}},
+		{[]int{0}, []glyph.ID{2, 1, 1, 1, 1, 3, 3}},
+		{[]int{1}, []glyph.ID{1, 1, 2, 1, 1, 3, 3}},
+		{[]int{2}, []glyph.ID{1, 1, 1, 1, 2, 3, 3}},
+		{[]int{3}, []glyph.ID{1, 1, 1, 1, 1, 3, 3}},
+		{[]int{1, 2}, []glyph.ID{1, 1, 2, 1, 2, 3, 3}},
+		{[]int{1, 3}, []glyph.ID{1, 1, 2, 1, 1, 3, 3}},
 	}
 	for _, test := range cases {
 		var nested SeqLookups
@@ -102,11 +102,11 @@ func TestNestedSimple(t *testing.T) {
 				},
 			},
 		}
-		seq := []font.Glyph{
+		seq := []glyph.Info{
 			{Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1}, {Gid: 1},
 		}
 		seq = info.LookupList.ApplyLookup(seq, 0, nil)
-		var out []font.GlyphID
+		var out []glyph.ID
 		for _, g := range seq {
 			out = append(out, g.Gid)
 		}
@@ -117,29 +117,29 @@ func TestNestedSimple(t *testing.T) {
 }
 
 func TestSeqContext1(t *testing.T) {
-	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
+	in := []glyph.Info{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext1{
-		Cov: map[font.GlyphID]int{2: 0, 3: 1, 4: 2},
+		Cov: map[glyph.ID]int{2: 0, 3: 1, 4: 2},
 		Rules: [][]*SeqRule{
 			{ // seq = 2, ...
-				{Input: []font.GlyphID{2}},
-				{Input: []font.GlyphID{3, 4, 6}},
-				{Input: []font.GlyphID{3, 4}},
-				{Input: []font.GlyphID{3, 4, 5}}, // does not match since it comes last
+				{Input: []glyph.ID{2}},
+				{Input: []glyph.ID{3, 4, 6}},
+				{Input: []glyph.ID{3, 4}},
+				{Input: []glyph.ID{3, 4, 5}}, // does not match since it comes last
 			},
 			{ // seq = 3, ...
-				{Input: []font.GlyphID{3}},
-				{Input: []font.GlyphID{5}},
-				{Input: []font.GlyphID{4, 5, 6}},
+				{Input: []glyph.ID{3}},
+				{Input: []glyph.ID{5}},
+				{Input: []glyph.ID{4, 5, 6}},
 			},
 			{ // seq = 4, ...
-				{Input: []font.GlyphID{5, 6}},
-				{Input: []font.GlyphID{4}},
-				{Input: []font.GlyphID{5}},
+				{Input: []glyph.ID{5, 6}},
+				{Input: []glyph.ID{4}},
+				{Input: []glyph.ID{5}},
 			},
 		},
 	}
-	keep := func(g font.GlyphID) bool { return g < 50 }
+	keep := func(g glyph.ID) bool { return g < 50 }
 
 	cases := []struct {
 		before, after int
@@ -164,9 +164,9 @@ func TestSeqContext1(t *testing.T) {
 }
 
 func TestSeqContext2(t *testing.T) {
-	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
+	in := []glyph.Info{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext2{
-		Cov:   map[font.GlyphID]int{2: 0, 3: 1, 4: 2, 99: 3},
+		Cov:   map[glyph.ID]int{2: 0, 3: 1, 4: 2, 99: 3},
 		Input: classdef.Table{1: 1, 3: 1, 5: 1},
 		Rules: [][]*ClassSeqRule{
 			{ // seq = class0, ...
@@ -179,7 +179,7 @@ func TestSeqContext2(t *testing.T) {
 			},
 		},
 	}
-	keep := func(g font.GlyphID) bool { return g < 50 }
+	keep := func(g glyph.ID) bool { return g < 50 }
 
 	cases := []struct {
 		before, after int
@@ -204,7 +204,7 @@ func TestSeqContext2(t *testing.T) {
 }
 
 func TestSeqContext3(t *testing.T) {
-	in := []font.Glyph{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
+	in := []glyph.Info{{Gid: 1}, {Gid: 2}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5}}
 	l := &SeqContext3{
 		Input: []coverage.Table{
 			{1: 0, 3: 1, 4: 2},
@@ -212,7 +212,7 @@ func TestSeqContext3(t *testing.T) {
 			{3: 0, 5: 1},
 		},
 	}
-	keep := func(g font.GlyphID) bool { return g < 50 }
+	keep := func(g glyph.ID) bool { return g < 50 }
 
 	cases := []struct {
 		before, after int
@@ -237,37 +237,37 @@ func TestSeqContext3(t *testing.T) {
 }
 
 func TestChainedSeqContext1(t *testing.T) {
-	in := []font.Glyph{
+	in := []glyph.Info{
 		{Gid: 1}, {Gid: 99}, {Gid: 2}, {Gid: 99}, {Gid: 3}, {Gid: 4}, {Gid: 99}, {Gid: 5},
 	}
 	l := &ChainedSeqContext1{
-		Cov: map[font.GlyphID]int{2: 0, 3: 1, 4: 2},
+		Cov: map[glyph.ID]int{2: 0, 3: 1, 4: 2},
 		Rules: [][]*ChainedSeqRule{
 			{ // seq = 2, ...
 				{
-					Input: []font.GlyphID{2},
+					Input: []glyph.ID{2},
 				},
 				{
-					Input:     []font.GlyphID{3, 4},
-					Lookahead: []font.GlyphID{99},
+					Input:     []glyph.ID{3, 4},
+					Lookahead: []glyph.ID{99},
 				},
 				{
-					Input:     []font.GlyphID{3, 4, 5},
-					Backtrack: []font.GlyphID{2},
+					Input:     []glyph.ID{3, 4, 5},
+					Backtrack: []glyph.ID{2},
 				},
 			},
 			{ // seq = 3, ...
 				{
-					Input:     []font.GlyphID{4},
-					Lookahead: []font.GlyphID{5},
-					Backtrack: []font.GlyphID{2, 1},
+					Input:     []glyph.ID{4},
+					Lookahead: []glyph.ID{5},
+					Backtrack: []glyph.ID{2, 1},
 				},
 			},
 			{ // seq = 4, ...
 			},
 		},
 	}
-	keep := func(g font.GlyphID) bool { return g < 50 }
+	keep := func(g glyph.ID) bool { return g < 50 }
 
 	cases := []struct {
 		before, after int
@@ -302,7 +302,7 @@ func FuzzSeqContext1(f *testing.F) {
 	sub.Rules = [][]*SeqRule{
 		{
 			{
-				Input: []font.GlyphID{4},
+				Input: []glyph.ID{4},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 5},
@@ -312,13 +312,13 @@ func FuzzSeqContext1(f *testing.F) {
 		},
 		{
 			{
-				Input: []font.GlyphID{6, 7},
+				Input: []glyph.ID{6, 7},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 2},
 				},
 			},
 			{
-				Input: []font.GlyphID{6},
+				Input: []glyph.ID{6},
 				Actions: []SeqLookup{
 					{SequenceIndex: 2, LookupListIndex: 1},
 					{SequenceIndex: 1, LookupListIndex: 2},
@@ -403,26 +403,26 @@ func FuzzChainedSeqContext1(f *testing.F) {
 	sub.Rules = [][]*ChainedSeqRule{
 		{
 			{
-				Backtrack: []font.GlyphID{},
-				Input:     []font.GlyphID{1},
-				Lookahead: []font.GlyphID{2, 3},
+				Backtrack: []glyph.ID{},
+				Input:     []glyph.ID{1},
+				Lookahead: []glyph.ID{2, 3},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1},
 					{SequenceIndex: 0, LookupListIndex: 2},
 				},
 			},
 			{
-				Backtrack: []font.GlyphID{4, 5, 6},
-				Input:     []font.GlyphID{7, 8},
-				Lookahead: []font.GlyphID{9},
+				Backtrack: []glyph.ID{4, 5, 6},
+				Input:     []glyph.ID{7, 8},
+				Lookahead: []glyph.ID{9},
 				Actions: []SeqLookup{
 					{SequenceIndex: 1, LookupListIndex: 0},
 				},
 			},
 			{
-				Backtrack: []font.GlyphID{10, 11},
-				Input:     []font.GlyphID{12},
-				Lookahead: []font.GlyphID{},
+				Backtrack: []glyph.ID{10, 11},
+				Input:     []glyph.ID{12},
+				Lookahead: []glyph.ID{},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1000},
 				},
@@ -430,9 +430,9 @@ func FuzzChainedSeqContext1(f *testing.F) {
 		},
 		{
 			{
-				Backtrack: []font.GlyphID{},
-				Input:     []font.GlyphID{13},
-				Lookahead: []font.GlyphID{},
+				Backtrack: []glyph.ID{},
+				Input:     []glyph.ID{13},
+				Lookahead: []glyph.ID{},
 				Actions: []SeqLookup{
 					{SequenceIndex: 0, LookupListIndex: 1},
 					{SequenceIndex: 0, LookupListIndex: 2},

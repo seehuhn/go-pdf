@@ -21,8 +21,8 @@ import (
 	"io"
 	"math"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -52,7 +52,7 @@ type Outlines struct {
 	// Encoding lists the glyphs corresponding to the 256 one-byte
 	// character codes in simple fonts.  For CIDFonts (where ROS != nil),
 	// this must be nil.
-	Encoding []font.GlyphID
+	Encoding []glyph.ID
 
 	// Gid2cid lists the character identifiers corresponding to the glyphs.
 	// This is only present for CIDFonts.
@@ -230,7 +230,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 			return nil, err
 		}
 	} else {
-		cff.FdSelect = func(gid font.GlyphID) int { return 0 }
+		cff.FdSelect = func(gid glyph.ID) int { return 0 }
 	}
 
 	// read the list of glyph names
@@ -302,7 +302,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 	cff.Glyphs = make([]*Glyph, nGlyphs)
 	fdSelect := cff.FdSelect
 	for gid, code := range charStrings {
-		fdIdx := fdSelect(font.GlyphID(gid))
+		fdIdx := fdSelect(glyph.ID(gid))
 		info := decoders[fdIdx]
 
 		glyph, err := info.decodeCharString(code)
@@ -326,7 +326,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 	// read the encoding
 	if !isCIDFont {
 		encodingOffs := topDict.getInt(opEncoding, 0)
-		var enc []font.GlyphID
+		var enc []glyph.ID
 		switch {
 		case encodingOffs == 0:
 			enc = StandardEncoding(cff.Glyphs)

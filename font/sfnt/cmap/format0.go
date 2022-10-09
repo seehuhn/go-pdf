@@ -19,7 +19,7 @@ package cmap
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-0-byte-encoding-table
@@ -39,7 +39,7 @@ func decodeFormat0(data []byte, code2rune func(c int) rune) (Subtable, error) {
 			continue
 		}
 		r := code2rune(code)
-		res[uint16(r)] = font.GlyphID(gid)
+		res[uint16(r)] = glyph.ID(gid)
 	}
 	return res, nil
 }

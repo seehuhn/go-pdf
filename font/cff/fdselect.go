@@ -21,12 +21,12 @@ import (
 	"io"
 	"sort"
 
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
 // FdSelectFn maps glyphID values to private dicts in Font.Info.Private.
-type FdSelectFn func(font.GlyphID) int
+type FdSelectFn func(glyph.ID) int
 
 func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 	format, err := p.ReadUint8()
@@ -46,7 +46,7 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 				return nil, invalidSince("FDSelect out of range")
 			}
 		}
-		return func(gid font.GlyphID) int {
+		return func(gid glyph.ID) int {
 			return int(buf[gid])
 		}, nil
 	case 3:
@@ -58,7 +58,7 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 			return nil, invalidSince("no FDSelect data found")
 		}
 
-		var end []font.GlyphID
+		var end []glyph.ID
 		var fdIdx []uint8
 
 		prev := uint16(0)
@@ -76,7 +76,7 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 				return nil, invalidSince("FDSelect out of range")
 			}
 			if i > 0 {
-				end = append(end, font.GlyphID(first))
+				end = append(end, glyph.ID(first))
 			}
 			fdIdx = append(fdIdx, fd)
 			prev = first
@@ -87,9 +87,9 @@ func readFDSelect(p *parser.Parser, nGlyphs, nPrivate int) (FdSelectFn, error) {
 		} else if int(sentinel) != nGlyphs {
 			return nil, invalidSince("wrong FDSelect sentinel")
 		}
-		end = append(end, font.GlyphID(nGlyphs))
+		end = append(end, glyph.ID(nGlyphs))
 
-		return func(gid font.GlyphID) int {
+		return func(gid glyph.ID) int {
 			idx := sort.Search(int(nRanges),
 				func(i int) bool { return gid < end[i] })
 			return int(fdIdx[idx])
@@ -106,7 +106,7 @@ func (fdSelect FdSelectFn) encode(nGlyphs int) []byte {
 	var currendFD int
 	nSeg := 0
 	for i := 0; i < nGlyphs; i++ {
-		fd := fdSelect(font.GlyphID(i))
+		fd := fdSelect(glyph.ID(i))
 		if i > 0 && fd == currendFD {
 			continue
 		}
@@ -125,7 +125,7 @@ func (fdSelect FdSelectFn) encode(nGlyphs int) []byte {
 useFormat0:
 	buf = make([]byte, nGlyphs+1)
 	for i := 0; i < nGlyphs; i++ {
-		buf[i+1] = byte(fdSelect(font.GlyphID(i)))
+		buf[i+1] = byte(fdSelect(glyph.ID(i)))
 	}
 	return buf
 }

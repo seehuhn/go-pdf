@@ -14,40 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package kern
+package glyph
 
-import (
-	"bytes"
-	"testing"
+import "seehuhn.de/go/pdf/font/funit"
 
-	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font/glyph"
-)
+// ID is used to enumerate the glyphs in a font.  The first glyph
+// has index 0 and is used to indicate a missing character (usually rendered
+// as an empty box).
+type ID uint16
 
-func FuzzKern(f *testing.F) {
-	kern := Info{}
-	f.Add(kern.Encode())
-	kern[glyph.Pair{Left: 0, Right: 0}] = 0
-	f.Add(kern.Encode())
-	kern[glyph.Pair{Left: 1, Right: 2}] = -10
-	kern[glyph.Pair{Left: 2, Right: 2}] = 10
-	kern[glyph.Pair{Left: 3, Right: 2}] = 100
-	f.Add(kern.Encode())
+// Pair represents two consecutive glyphs, specified by a pair of
+// character codes.  This is sometimes used for ligatures and kerning
+// information.
+type Pair struct {
+	Left  ID
+	Right ID
+}
 
-	f.Fuzz(func(t *testing.T, data1 []byte) {
-		info1, err := Read(bytes.NewReader(data1))
-		if err != nil {
-			return
-		}
-
-		data2 := info1.Encode()
-		info2, err := Read(bytes.NewReader(data2))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if d := cmp.Diff(info1, info2); d != "" {
-			t.Errorf("kern mismatch (-want +got):\n%s", d)
-		}
-	})
+// Info contains layout information for a single glyph.
+type Info struct {
+	Gid     ID
+	Text    []rune
+	XOffset funit.Int16
+	YOffset funit.Int16
+	Advance funit.Int16
 }

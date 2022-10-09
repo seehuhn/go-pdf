@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -31,8 +32,8 @@ type Font struct {
 	InstName pdf.Name
 	Ref      *pdf.Reference
 
-	Layout func([]rune) []Glyph
-	Enc    func(GlyphID) pdf.String
+	Layout func([]rune) []glyph.Info
+	Enc    func(glyph.ID) pdf.String
 
 	UnitsPerEm         uint16
 	Ascent             funit.Int16
@@ -48,27 +49,6 @@ type Font struct {
 // NumGlyphs returns the number of glyphs in a font.
 func (font *Font) NumGlyphs() int {
 	return len(font.Widths)
-}
-
-// GlyphID is used to enumerate the glyphs in a font.  The first glyph
-// has index 0 and is used to indicate a missing character (usually rendered
-// as an empty box).
-type GlyphID uint16
-
-// Glyph contains layout information for a single glyph in a run
-type Glyph struct {
-	Gid     GlyphID
-	Text    []rune
-	XOffset funit.Int16
-	YOffset funit.Int16
-	Advance funit.Int16
-}
-
-// GlyphPair represents two consecutive glyphs, specified by a pair of
-// character codes.  This is used for ligatures and kerning information.
-type GlyphPair struct {
-	Left  GlyphID
-	Right GlyphID
 }
 
 func isPrivateRange(r rune) bool {
@@ -94,7 +74,7 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 		runs = append(runs, run)
 	}
 
-	var glyphs []Glyph
+	var glyphs []glyph.Info
 	for _, run := range runs {
 		seq := font.Layout(run)
 		glyphs = append(glyphs, seq...)
@@ -111,7 +91,7 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 type Layout struct {
 	Font     *Font
 	FontSize float64
-	Glyphs   []Glyph
+	Glyphs   []glyph.Info
 }
 
 // Draw shows the text layout on a page.

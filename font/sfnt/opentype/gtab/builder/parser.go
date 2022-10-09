@@ -22,8 +22,8 @@ import (
 	"strconv"
 
 	"golang.org/x/exp/maps"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
@@ -35,8 +35,8 @@ import (
 // Parse decodes the textual description of a LookupList.
 func Parse(fontInfo *sfnt.Info, input string) (lookups gtab.LookupList, err error) {
 	numGlyphs := fontInfo.NumGlyphs()
-	byName := make(map[string]font.GlyphID)
-	for i := font.GlyphID(0); i < font.GlyphID(numGlyphs); i++ {
+	byName := make(map[string]glyph.ID)
+	for i := glyph.ID(0); i < glyph.ID(numGlyphs); i++ {
 		glyphName := fontInfo.GlyphName(i)
 		if glyphName != "" {
 			byName[glyphName] = i
@@ -73,7 +73,7 @@ type parser struct {
 	backlog []item
 
 	fontInfo *sfnt.Info
-	byName   map[string]font.GlyphID
+	byName   map[string]glyph.ID
 }
 
 func (p *parser) parse() (lookups gtab.LookupList) {
@@ -123,7 +123,7 @@ func (p *parser) parse() (lookups gtab.LookupList) {
 }
 
 func (p *parser) readGsub1() *gtab.LookupTable {
-	res := make(map[font.GlyphID]font.GlyphID)
+	res := make(map[glyph.ID]glyph.ID)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
@@ -157,7 +157,7 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 	cov := makeCoverageTable(maps.Keys(res))
 
 	isConstDelta := true
-	var delta font.GlyphID
+	var delta glyph.ID
 	first := true
 	for gid, idx := range res {
 		if first {
@@ -176,7 +176,7 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 			Delta: delta,
 		}
 	} else {
-		subst := make([]font.GlyphID, len(cov))
+		subst := make([]glyph.ID, len(cov))
 		for gid, i := range cov {
 			subst[i] = res[gid]
 		}
@@ -195,7 +195,7 @@ func (p *parser) readGsub1() *gtab.LookupTable {
 }
 
 func (p *parser) readGsub2() *gtab.LookupTable {
-	data := make(map[font.GlyphID][]font.GlyphID)
+	data := make(map[glyph.ID][]glyph.ID)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
@@ -228,7 +228,7 @@ func (p *parser) readGsub2() *gtab.LookupTable {
 	}
 
 	cov := makeCoverageTable(maps.Keys(data))
-	repl := make([][]font.GlyphID, len(cov))
+	repl := make([][]glyph.ID, len(cov))
 	for gid, i := range cov {
 		repl[i] = data[gid]
 	}
@@ -247,7 +247,7 @@ func (p *parser) readGsub2() *gtab.LookupTable {
 }
 
 func (p *parser) readGsub3() *gtab.LookupTable {
-	res := make(map[font.GlyphID][]font.GlyphID)
+	res := make(map[glyph.ID][]glyph.ID)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
@@ -277,7 +277,7 @@ func (p *parser) readGsub3() *gtab.LookupTable {
 	}
 
 	cov := makeCoverageTable(maps.Keys(res))
-	repl := make([][]font.GlyphID, len(cov))
+	repl := make([][]glyph.ID, len(cov))
 	for gid, i := range cov {
 		repl[i] = res[gid]
 	}
@@ -296,7 +296,7 @@ func (p *parser) readGsub3() *gtab.LookupTable {
 }
 
 func (p *parser) readGsub4() *gtab.LookupTable {
-	data := make(map[font.GlyphID][]gtab.Ligature)
+	data := make(map[glyph.ID][]gtab.Ligature)
 
 	p.optional(itemColon)
 	p.optional(itemEOL)
@@ -363,7 +363,7 @@ func (p *parser) readGpos1() *gtab.LookupTable {
 			}
 			lookup.Subtables = append(lookup.Subtables, subtable)
 		} else {
-			res := make(map[font.GlyphID]*gtab.GposValueRecord)
+			res := make(map[glyph.ID]*gtab.GposValueRecord)
 			for {
 				gids := p.readGlyphList()
 				if len(gids) != 1 {
@@ -414,7 +414,7 @@ func (p *parser) readGpos2() *gtab.LookupTable {
 	for {
 		switch p.peek().typ {
 		default: // format 1
-			pairData := make(map[font.GlyphID]map[font.GlyphID]*gtab.PairAdjust)
+			pairData := make(map[glyph.ID]map[glyph.ID]*gtab.PairAdjust)
 			for {
 				from := p.readGlyphList()
 				if len(from) == 0 {
@@ -427,7 +427,7 @@ func (p *parser) readGpos2() *gtab.LookupTable {
 
 				row, ok := pairData[from[0]]
 				if !ok {
-					row = make(map[font.GlyphID]*gtab.PairAdjust)
+					row = make(map[glyph.ID]*gtab.PairAdjust)
 					pairData[from[0]] = row
 				}
 				row[from[1]] = pair
@@ -439,7 +439,7 @@ func (p *parser) readGpos2() *gtab.LookupTable {
 			}
 
 			cov := makeCoverageTable(maps.Keys(pairData))
-			adjust := make([]map[font.GlyphID]*gtab.PairAdjust, len(cov))
+			adjust := make([]map[glyph.ID]*gtab.PairAdjust, len(cov))
 			for gid, i := range cov {
 				adjust[i] = pairData[gid]
 			}
@@ -546,7 +546,7 @@ func (p *parser) readGpos3() *gtab.LookupTable {
 	}
 
 	for {
-		data := make(map[font.GlyphID]gtab.EntryExitRecord)
+		data := make(map[glyph.ID]gtab.EntryExitRecord)
 
 		for {
 			gid := p.readGlyph()
@@ -607,7 +607,7 @@ func (p *parser) readGpos4() *gtab.LookupTable {
 		},
 	}
 	for {
-		var markGlyphs []font.GlyphID
+		var markGlyphs []glyph.ID
 		var markArray []markarray.Record
 		classesSeen := make(map[uint16]bool)
 		for {
@@ -646,7 +646,7 @@ func (p *parser) readGpos4() *gtab.LookupTable {
 			}
 		}
 
-		var baseGlyphs []font.GlyphID
+		var baseGlyphs []glyph.ID
 		var baseArray [][]anchor.Table
 		for {
 			if !p.optionalIdentifier("base") {
@@ -714,7 +714,7 @@ gsubLoop:
 		next := p.peek()
 		switch {
 		default: // format 1
-			res := make(map[font.GlyphID][]*gtab.SeqRule)
+			res := make(map[glyph.ID][]*gtab.SeqRule)
 			for {
 				input := p.readGlyphList()
 				p.required(itemArrow, "\"->\"")
@@ -867,7 +867,7 @@ gsubLoop:
 		p.backlog = append(p.backlog, next)
 		switch {
 		default: // format 1
-			res := make(map[font.GlyphID][]*gtab.ChainedSeqRule)
+			res := make(map[glyph.ID][]*gtab.ChainedSeqRule)
 			for {
 				backtrack := p.readGlyphList()
 				p.required(itemBar, "|")
@@ -1097,7 +1097,7 @@ func (p *parser) readLookupFlags() gtab.LookupFlags {
 	return flags
 }
 
-func (p *parser) parseClassDef() (string, []font.GlyphID) {
+func (p *parser) parseClassDef() (string, []glyph.ID) {
 	p.readIdentifier() // "class"
 	p.required(itemColon, ":")
 	className := p.readIdentifier()
@@ -1110,15 +1110,15 @@ func (p *parser) parseClassDef() (string, []font.GlyphID) {
 	return className, gidList
 }
 
-func (p *parser) readGlyphList() []font.GlyphID {
-	var res []font.GlyphID
+func (p *parser) readGlyphList() []glyph.ID {
+	var res []glyph.ID
 
 	var item item
 	hyphenSeen := false
 	for {
 		item = p.readItem()
 
-		var next []font.GlyphID
+		var next []glyph.ID
 		switch item.typ {
 		case itemIdentifier:
 			gid, ok := p.byName[item.val]
@@ -1141,7 +1141,7 @@ func (p *parser) readGlyphList() []font.GlyphID {
 			if err != nil || x < 0 || x >= p.fontInfo.NumGlyphs() {
 				p.fatal("invalid glyph id %q", item.val)
 			}
-			next = append(next, font.GlyphID(x))
+			next = append(next, glyph.ID(x))
 
 		case itemHyphen:
 			if hyphenSeen {
@@ -1161,7 +1161,7 @@ func (p *parser) readGlyphList() []font.GlyphID {
 				start := res[len(res)-1]
 				if gid < start {
 					for i := int(start) - 1; i >= int(gid); i-- {
-						res = append(res, font.GlyphID(i))
+						res = append(res, glyph.ID(i))
 					}
 				} else if gid > start {
 					for i := start + 1; i <= gid; i++ {
@@ -1186,7 +1186,7 @@ done:
 
 // readGlyphSet returns a set of glyph IDs.
 // This sorts the glyphs in order of increasing GID and removes duplicates
-func (p *parser) readGlyphSet() []font.GlyphID {
+func (p *parser) readGlyphSet() []glyph.ID {
 	p.required(itemSquareBracketOpen, "[")
 	res := p.readGlyphList()
 	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
@@ -1194,7 +1194,7 @@ func (p *parser) readGlyphSet() []font.GlyphID {
 	return unique(res)
 }
 
-func (p *parser) readGlyph() font.GlyphID {
+func (p *parser) readGlyph() glyph.ID {
 	gids := p.readGlyphList()
 	if len(gids) == 0 {
 		p.fatal("expected glyph, got %s", p.peek())
@@ -1432,7 +1432,7 @@ func isIdentifier(i item, val string) bool {
 	return i.val == val
 }
 
-func makeCoverageTable(in []font.GlyphID) coverage.Table {
+func makeCoverageTable(in []glyph.ID) coverage.Table {
 	sort.Slice(in, func(i, j int) bool { return in[i] < in[j] })
 	in = unique(in)
 	cov := make(coverage.Table, len(in))
@@ -1442,7 +1442,7 @@ func makeCoverageTable(in []font.GlyphID) coverage.Table {
 	return cov
 }
 
-func makeCoverageSet(in []font.GlyphID) coverage.Set {
+func makeCoverageSet(in []glyph.ID) coverage.Set {
 	set := make(coverage.Set, len(in))
 	for _, gid := range in {
 		set[gid] = true

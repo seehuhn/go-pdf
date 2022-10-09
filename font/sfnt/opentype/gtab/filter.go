@@ -17,7 +17,7 @@
 package gtab
 
 import (
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
 )
@@ -44,7 +44,7 @@ import (
 // keepGlyphFn is used to drop ignored characters in lookups with non-zero
 // lookup flags.  Functions of this type return true if the glyph should be
 // used, and false if the glyph should be ignored.
-type keepGlyphFn func(font.GlyphID) bool
+type keepGlyphFn func(glyph.ID) bool
 
 // makeFilter returns a function which filters glyphs according to the
 // lookup flags.
@@ -94,7 +94,7 @@ func makeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) keepGlyphFn {
 		return keepAllGlyphs
 	}
 
-	filterFunc := func(gid font.GlyphID) bool {
+	filterFunc := func(gid glyph.ID) bool {
 		if sel&filterBase != 0 && gdefTable.GlyphClass[gid] == gdef.GlyphClassBase {
 			return false
 		}
@@ -118,4 +118,4 @@ func makeFilter(meta *LookupMetaInfo, gdefTable *gdef.Table) keepGlyphFn {
 	return filterFunc
 }
 
-func keepAllGlyphs(font.GlyphID) bool { return true }
+func keepAllGlyphs(glyph.ID) bool { return true }

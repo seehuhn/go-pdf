@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 // AfmInfo represent the font metrics and built-in character encoding
@@ -44,8 +44,8 @@ type AfmInfo struct {
 	Width       []funit.Int16
 	GlyphName   []string
 
-	Ligatures map[font.GlyphPair]font.GlyphID
-	Kern      map[font.GlyphPair]funit.Int16
+	Ligatures map[glyph.Pair]glyph.ID
+	Kern      map[glyph.Pair]funit.Int16
 }
 
 // Afm returns the font metrics for one of the built-in pdf fonts.
@@ -85,7 +85,7 @@ func Afm(fontName string) (*AfmInfo, error) {
 	}
 	var nameKern []*kernInfo
 
-	nameToGid := make(map[string]font.GlyphID)
+	nameToGid := make(map[string]glyph.ID)
 
 	charMetrics := false
 	kernPairs := false
@@ -135,7 +135,7 @@ func Afm(fontName string) (*AfmInfo, error) {
 				}
 			}
 
-			nameToGid[name] = font.GlyphID(len(res.Code))
+			nameToGid[name] = glyph.ID(len(res.Code))
 
 			res.Code = append(res.Code, int16(code))
 			res.Width = append(res.Width, width)
@@ -197,22 +197,22 @@ func Afm(fontName string) (*AfmInfo, error) {
 		panic("corrupted afm data for " + fontName)
 	}
 
-	res.Ligatures = make(map[font.GlyphPair]font.GlyphID)
+	res.Ligatures = make(map[glyph.Pair]glyph.ID)
 	for _, lig := range nameLigs {
 		a, aOk := nameToGid[lig.first]
 		b, bOk := nameToGid[lig.second]
 		c, cOk := nameToGid[lig.combined]
 		if aOk && bOk && cOk {
-			res.Ligatures[font.GlyphPair{Left: a, Right: b}] = c
+			res.Ligatures[glyph.Pair{Left: a, Right: b}] = c
 		}
 	}
 
-	res.Kern = make(map[font.GlyphPair]funit.Int16)
+	res.Kern = make(map[glyph.Pair]funit.Int16)
 	for _, kern := range nameKern {
 		a, aOk := nameToGid[kern.first]
 		b, bOk := nameToGid[kern.second]
 		if aOk && bOk && kern.val != 0 {
-			res.Kern[font.GlyphPair{Left: a, Right: b}] = kern.val
+			res.Kern[glyph.Pair{Left: a, Right: b}] = kern.val
 		}
 	}
 

@@ -22,12 +22,12 @@ import (
 	"math/bits"
 
 	"seehuhn.de/go/dijkstra"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 )
 
 // Format4 represents a format 4 cmap subtable.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
-type Format4 map[uint16]font.GlyphID
+type Format4 map[uint16]glyph.ID
 
 func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 	if code2rune == nil {
@@ -69,7 +69,7 @@ func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 		if idRangeOffset[k] == 0 {
 			delta := idDelta[k]
 			for idx := start; idx < end; idx++ {
-				c := font.GlyphID(uint16(idx) + delta)
+				c := glyph.ID(uint16(idx) + delta)
 				if c != 0 {
 					cmap[uint16(code2rune(int(idx)))] = c
 				}
@@ -84,7 +84,7 @@ func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 				return nil, errMalformedSubtable
 			}
 			for idx := start; idx < end; idx++ {
-				c := font.GlyphID(glyphIDArray[d+int(idx-start)])
+				c := glyph.ID(glyphIDArray[d+int(idx-start)])
 				if c != 0 {
 					cmap[uint16(code2rune(int(idx)))] = c
 				}
@@ -95,7 +95,7 @@ func decodeFormat4(in []byte, code2rune func(c int) rune) (Subtable, error) {
 }
 
 // Lookup implements the Subtable interface.
-func (cmap Format4) Lookup(r rune) font.GlyphID {
+func (cmap Format4) Lookup(r rune) glyph.ID {
 	return cmap[uint16(r)]
 }
 
@@ -175,7 +175,7 @@ type segment struct {
 	useValues bool
 }
 
-type makeSegments map[uint16]font.GlyphID
+type makeSegments map[uint16]glyph.ID
 
 func (ms makeSegments) Edges(v uint32) []*segment {
 	if v > 0xFFFF {

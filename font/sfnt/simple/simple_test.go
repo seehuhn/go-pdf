@@ -23,6 +23,7 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/sfnt"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -74,13 +75,13 @@ func TestSimple(t *testing.T) {
 	for i := 0; i < 256; i++ {
 		row := i / 16
 		col := i % 16
-		gid := font.GlyphID(i + 2)
+		gid := glyph.ID(i + 2)
 
 		w := fontInfo.GlyphWidth(gid)
 		layout := &font.Layout{
 			Font:     F,
 			FontSize: 16,
-			Glyphs: []font.Glyph{{
+			Glyphs: []glyph.Info{{
 				Gid:     gid,
 				XOffset: 0,
 				YOffset: 0,

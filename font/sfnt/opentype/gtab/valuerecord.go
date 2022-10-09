@@ -21,8 +21,8 @@ import (
 	"math/bits"
 	"strings"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/funit"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 )
 
@@ -220,7 +220,7 @@ func (vr *GposValueRecord) String() string {
 }
 
 // Apply adjusts the position of a glyph according to the value record.
-func (vr *GposValueRecord) Apply(glyph *font.Glyph) {
+func (vr *GposValueRecord) Apply(glyph *glyph.Info) {
 	if vr == nil {
 		return
 	}

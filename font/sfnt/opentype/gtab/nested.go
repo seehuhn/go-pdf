@@ -18,6 +18,7 @@ package gtab
 
 import (
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/parser"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/font/sfnt/opentype/coverage"
@@ -55,7 +56,7 @@ type SeqContext1 struct {
 
 // SeqRule describes a rule in a SeqContext1 subtable.
 type SeqRule struct {
-	Input   []font.GlyphID // excludes the first input glyph, since this is in Cov
+	Input   []glyph.ID // excludes the first input glyph, since this is in Cov
 	Actions SeqLookups
 }
 
@@ -118,13 +119,13 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 				}
 			}
 			seqLookupCount := int(buf[2])<<8 | int(buf[3])
-			inputSequence := make([]font.GlyphID, glyphCount-1)
+			inputSequence := make([]glyph.ID, glyphCount-1)
 			for k := range inputSequence {
 				xk, err := p.ReadUint16()
 				if err != nil {
 					return nil, err
 				}
-				inputSequence[k] = font.GlyphID(xk)
+				inputSequence[k] = glyph.ID(xk)
 			}
 			actions, err := readNested(p, seqLookupCount)
 			if err != nil {
@@ -141,7 +142,7 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *SeqContext1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *SeqContext1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	rulesIdx, ok := l.Cov[gid]
 	if !ok {
@@ -377,7 +378,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *SeqContext2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *SeqContext2) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	_, ok := l.Cov[gid]
 	if !ok {
@@ -557,7 +558,7 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 }
 
 // Apply implements the Subtable interface.
-func (l *SeqContext3) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *SeqContext3) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	if !l.Input[0].Contains(gid) {
 		return nil
@@ -641,9 +642,9 @@ type ChainedSeqContext1 struct {
 
 // ChainedSeqRule describes the rules in a ChainedSeqContext1.
 type ChainedSeqRule struct {
-	Backtrack []font.GlyphID
-	Input     []font.GlyphID // excludes the first input glyph, since this is in Cov
-	Lookahead []font.GlyphID
+	Backtrack []glyph.ID
+	Input     []glyph.ID // excludes the first input glyph, since this is in Cov
+	Lookahead []glyph.ID
 	Actions   SeqLookups
 }
 
@@ -711,13 +712,13 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 			if err != nil {
 				return nil, err
 			}
-			inputSequence := make([]font.GlyphID, inputGlyphCount-1)
+			inputSequence := make([]glyph.ID, inputGlyphCount-1)
 			for k := range inputSequence {
 				val, err := p.ReadUint16()
 				if err != nil {
 					return nil, err
 				}
-				inputSequence[k] = font.GlyphID(val)
+				inputSequence[k] = glyph.ID(val)
 			}
 			lookaheadSequence, err := p.ReadGIDSlice()
 			if err != nil {
@@ -761,7 +762,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 }
 
 // Apply implements the Subtable interface.
-func (l *ChainedSeqContext1) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *ChainedSeqContext1) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	rulesIdx, ok := l.Cov[gid]
 	if !ok {
@@ -1099,7 +1100,7 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 }
 
 // Apply implements the Subtable interface.
-func (l *ChainedSeqContext2) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *ChainedSeqContext2) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	gid := seq[a].Gid
 	_, ok := l.Cov[gid]
 	if !ok {
@@ -1371,7 +1372,7 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 }
 
 // Apply implements the Subtable interface.
-func (l *ChainedSeqContext3) Apply(keep keepGlyphFn, seq []font.Glyph, a, b int) *Match {
+func (l *ChainedSeqContext3) Apply(keep keepGlyphFn, seq []glyph.Info, a, b int) *Match {
 	p := a
 	glyphsNeeded := len(l.Backtrack)
 	for _, cov := range l.Backtrack {
