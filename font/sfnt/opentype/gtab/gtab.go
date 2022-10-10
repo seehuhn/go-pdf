@@ -31,15 +31,13 @@ type Info struct {
 	LookupList  LookupList
 }
 
-// ReadGSUB reads and decodes a "GSUB" or "GPOS" table from r.
-// TableName must be either "GSUB" or "GPOS".
+// ReadGSUB reads and decodes an OpenType "GSUB" table from r.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gsub#gsub-header
 func ReadGSUB(r parser.ReadSeekSizer) (*Info, error) {
 	return readGtab(r, "GSUB", readGsubSubtable)
 }
 
-// ReadGPOS reads and decodes a "GSUB" or "GPOS" table from r.
-// TableName must be either "GSUB" or "GPOS".
+// ReadGPOS reads and decodes an OpenType "GPOS" table from r.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/gpos#gpos-header
 func ReadGPOS(r parser.ReadSeekSizer) (*Info, error) {
 	return readGtab(r, "GPOS", readGposSubtable)
