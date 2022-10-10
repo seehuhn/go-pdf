@@ -22,9 +22,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 func TestSimple(t *testing.T) {

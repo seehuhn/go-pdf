@@ -29,11 +29,11 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/glyph"
-	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/cid"
+	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/sfnt"
+	"seehuhn.de/go/pdf/sfnt/cff"
+	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 func main() {

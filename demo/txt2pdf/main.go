@@ -30,10 +30,10 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/simple"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/layout"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/sfnt"
 )
 
 const tabWidth = 4

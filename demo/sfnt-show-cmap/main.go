@@ -23,8 +23,8 @@ import (
 	"sort"
 
 	"golang.org/x/exp/maps"
-	"seehuhn.de/go/pdf/font/sfnt/cmap"
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/sfnt/cmap"
+	"seehuhn.de/go/pdf/sfnt/table"
 )
 
 func tryFont(fname string) error {

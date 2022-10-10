@@ -30,10 +30,10 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/funit"
-	"seehuhn.de/go/pdf/font/sfnt/table"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/sfnt/cff"
+	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/pdf/sfnt/table"
 )
 
 var q float64 = 0.4

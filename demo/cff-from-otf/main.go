@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/sfnt/table"
 )
 
 func main() {

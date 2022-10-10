@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"seehuhn.de/go/pdf/font/sfnt"
+	"seehuhn.de/go/pdf/sfnt"
 )
 
 func main() {

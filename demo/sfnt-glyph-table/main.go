@@ -29,12 +29,12 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/font/glyph"
-	"seehuhn.de/go/pdf/font/sfnt"
-	"seehuhn.de/go/pdf/font/sfnt/cid"
-	"seehuhn.de/go/pdf/font/sfnt/opentype/gdef"
-	"seehuhn.de/go/pdf/font/sfnt/table"
+	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/sfnt"
+	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/pdf/sfnt/opentype/gdef"
+	"seehuhn.de/go/pdf/sfnt/table"
 )
 
 const (

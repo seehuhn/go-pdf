@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/boxes"
-	"seehuhn.de/go/pdf/font/glyph"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 type glyphBox glyph.ID
