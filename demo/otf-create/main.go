@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/sfnt"
 	"seehuhn.de/go/pdf/sfnt/cff"
@@ -36,8 +35,8 @@ func main() {
 	now := time.Now()
 	info := &sfnt.Info{
 		FamilyName: "Test",
-		Weight:     font.WeightNormal,
-		Width:      font.WidthNormal,
+		Weight:     os2.WeightNormal,
+		Width:      os2.WidthNormal,
 
 		Version:          0x00010000,
 		CreationTime:     now,

@@ -27,12 +27,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/image/font/gofont/gobolditalic"
 	"golang.org/x/image/font/gofont/goregular"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/sfnt"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/debug"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/pdf/sfnt/os2"
 	"seehuhn.de/go/pdf/sfnt/type1"
 )
 
@@ -90,8 +90,8 @@ func FuzzFont(f *testing.F) {
 	gg := []*cff.Glyph{g0, g1}
 	fontInfo = &sfnt.Info{
 		FamilyName:         "Test",
-		Width:              font.WidthNormal,
-		Weight:             font.WeightNormal,
+		Width:              os2.WidthNormal,
+		Weight:             os2.WeightNormal,
 		UnitsPerEm:         1234,
 		Ascent:             800,
 		Descent:            -200,

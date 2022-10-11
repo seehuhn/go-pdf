@@ -328,7 +328,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
-		"Flags":       pdf.Integer(subsetInfo.Flags(true)), // TODO(voss)
+		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)), // TODO(voss)
 		"FontBBox":    subsetInfo.BBox().AsPDF(q),
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
 		"Ascent":      subsetInfo.Ascent.AsInteger(q),

@@ -16,6 +16,45 @@
 
 package font
 
+import (
+	"seehuhn.de/go/pdf/sfnt"
+	"seehuhn.de/go/pdf/sfnt/cff"
+)
+
+// MakeFlags returns the PDF font flags for the font.
+// See section 9.8.2 of PDF 32000-1:2008.
+func MakeFlags(info *sfnt.Info, symbolic bool) Flags {
+	var flags Flags
+
+	if info.IsFixedPitch() {
+		flags |= FlagFixedPitch
+	}
+	if info.IsSerif {
+		flags |= FlagSerif
+	}
+
+	if symbolic {
+		flags |= FlagSymbolic
+	} else {
+		flags |= FlagNonsymbolic
+	}
+
+	if info.IsScript {
+		flags |= FlagScript
+	}
+	if info.IsItalic {
+		flags |= FlagItalic
+	}
+
+	if cffInfo, ok := info.Outlines.(*cff.Outlines); ok {
+		if cffInfo.Private[0].ForceBold {
+			flags |= FlagForceBold
+		}
+	}
+
+	return flags
+}
+
 // Flags represents PDF Font Descriptor Flags.
 // See section 9.8.2 of PDF 32000-1:2008.
 type Flags uint32

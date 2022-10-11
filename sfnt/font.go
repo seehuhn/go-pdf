@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/cmap"
 	"seehuhn.de/go/pdf/sfnt/funit"
@@ -37,8 +36,8 @@ import (
 // Info contains information about the font.
 type Info struct {
 	FamilyName string
-	Width      font.Width
-	Weight     font.Weight
+	Width      os2.Width
+	Weight     os2.Weight
 	IsItalic   bool // Glyphs have dominant vertical strokes that are slanted.
 	IsBold     bool
 	IsRegular  bool
@@ -121,10 +120,10 @@ func (info *Info) FullName() string {
 // Subfamily returns the subfamily name of the font.
 func (info *Info) Subfamily() string {
 	var words []string
-	if info.Width != 0 && info.Width != font.WidthNormal {
+	if info.Width != 0 && info.Width != os2.WidthNormal {
 		words = append(words, info.Width.String())
 	}
-	if info.Weight != 0 && info.Weight != font.WeightNormal {
+	if info.Weight != 0 && info.Weight != os2.WeightNormal {
 		words = append(words, info.Weight.SimpleString())
 	} else if info.IsBold {
 		words = append(words, "Bold")
@@ -300,38 +299,4 @@ func (info *Info) IsFixedPitch() bool {
 	}
 
 	return true
-}
-
-// Flags returns the PDF font flags for the font.
-// See section 9.8.2 of PDF 32000-1:2008.
-func (info *Info) Flags(symbolic bool) font.Flags {
-	var flags font.Flags
-
-	if info.IsFixedPitch() {
-		flags |= font.FlagFixedPitch
-	}
-	if info.IsSerif {
-		flags |= font.FlagSerif
-	}
-
-	if symbolic {
-		flags |= font.FlagSymbolic
-	} else {
-		flags |= font.FlagNonsymbolic
-	}
-
-	if info.IsScript {
-		flags |= font.FlagScript
-	}
-	if info.IsItalic {
-		flags |= font.FlagItalic
-	}
-
-	if cffInfo, ok := info.Outlines.(*cff.Outlines); ok {
-		if cffInfo.Private[0].ForceBold {
-			flags |= font.FlagForceBold
-		}
-	}
-
-	return flags
 }

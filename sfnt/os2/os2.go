@@ -25,15 +25,14 @@ import (
 	"fmt"
 	"io"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/sfnt/cmap"
 	"seehuhn.de/go/pdf/sfnt/funit"
 )
 
 // Info contains information from the "OS/2" table.
 type Info struct {
-	WeightClass font.Weight
-	WidthClass  font.Width
+	WeightClass Weight
+	WidthClass  Width
 
 	IsBold    bool
 	IsItalic  bool
@@ -127,8 +126,8 @@ func Read(r io.Reader) (*Info, error) {
 	}
 
 	info := &Info{
-		WeightClass: font.Weight(v0.WeightClass),
-		WidthClass:  font.Width(v0.WidthClass),
+		WeightClass: Weight(v0.WeightClass),
+		WidthClass:  Width(v0.WidthClass),
 
 		IsBold:   sel&0x0060 == 0x0020,
 		IsItalic: sel&0x0041 == 0x0001,

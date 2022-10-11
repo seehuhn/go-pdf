@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/cmap"
 	"seehuhn.de/go/pdf/sfnt/fonterror"
@@ -287,7 +286,7 @@ func Read(r io.ReaderAt) (*Info, error) {
 		info.Weight = os2Info.WeightClass
 	}
 	if info.Weight == 0 && fontInfo != nil {
-		info.Weight = font.WeightFromString(fontInfo.Weight)
+		info.Weight = os2.WeightFromString(fontInfo.Weight)
 	}
 
 	if nameTable != nil {

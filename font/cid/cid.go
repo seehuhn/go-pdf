@@ -181,6 +181,11 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		Ordering:   "Identity",
 		Supplement: 0,
 	}
+	ROS := pdf.Dict{
+		"Registry":   pdf.String(CIDSystemInfo.Registry),
+		"Ordering":   pdf.String(CIDSystemInfo.Ordering),
+		"Supplement": pdf.Integer(CIDSystemInfo.Supplement),
+	}
 
 	// subset the font
 	subsetInfo := &sfnt.Info{}
@@ -290,7 +295,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
-		"Flags":       pdf.Integer(subsetInfo.Flags(true)), // TODO(voss)
+		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)), // TODO(voss)
 		"FontBBox":    subsetInfo.BBox().AsPDF(q),
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
 		"Ascent":      subsetInfo.Ascent.AsInteger(q),
@@ -300,7 +305,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	}
 
 	compressedRefs := []*pdf.Reference{s.FontRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
-	compressedObjects := []pdf.Object{Font, CIDFont, CIDSystemInfo, FontDescriptor}
+	compressedObjects := []pdf.Object{Font, CIDFont, ROS, FontDescriptor}
 	if W != nil {
 		compressedRefs = append(compressedRefs, WidthsRef)
 		compressedObjects = append(compressedObjects, W)

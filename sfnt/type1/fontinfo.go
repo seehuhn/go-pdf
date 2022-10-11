@@ -17,9 +17,6 @@
 package type1
 
 import (
-	"io"
-
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/sfnt/funit"
 )
 
@@ -100,14 +97,4 @@ type ROS struct {
 	Registry   string
 	Ordering   string
 	Supplement int32
-}
-
-// PDF implements the pdf.Object interface.
-func (ros *ROS) PDF(w io.Writer) error {
-	d := pdf.Dict{
-		"Registry":   pdf.String(ros.Registry),
-		"Ordering":   pdf.String(ros.Ordering),
-		"Supplement": pdf.Integer(ros.Supplement),
-	}
-	return d.PDF(w)
 }
