@@ -19,15 +19,14 @@
 package post
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
 
 	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 // Info contains information from the "post" table.
@@ -44,9 +43,11 @@ type Info struct {
 // The slice in the .Names field in the returned structure, if non-nil,
 // may point to shared internal storage and must not be shared.
 // The function may read r beyond the end of the table.
-func Read(r io.Reader) (*Info, error) {
+func Read(rr parser.ReadSeekSizer) (*Info, error) {
+	p := parser.New("post", rr)
+
 	post := &postEnc{}
-	if err := binary.Read(r, binary.BigEndian, post); err != nil {
+	if err := binary.Read(p, binary.BigEndian, post); err != nil {
 		return nil, err
 	}
 
@@ -62,40 +63,32 @@ func Read(r io.Reader) (*Info, error) {
 		info.Names = macRoman
 
 	case 0x00020000:
-		r := bufio.NewReader(r)
-		var buf [2]byte
-		_, err := io.ReadFull(r, buf[:])
+		glyphNameIndex, err := p.ReadUint16Slice()
 		if err != nil {
 			return nil, err
 		}
-		numGlyphs := int(buf[0])<<8 | int(buf[1])
-		indexBuf := make([]byte, 2*numGlyphs)
-		_, err = io.ReadFull(r, indexBuf)
-		if err != nil {
-			return nil, err
-		}
+		numGlyphs := len(glyphNameIndex)
 
 		var names []string
 
 		info.Names = make([]string, numGlyphs)
-		nameBuf := make([]byte, 255)
 		nMac := len(macRoman)
-		for i := 0; i < numGlyphs; i++ {
-			idx := int(indexBuf[2*i])<<8 | int(indexBuf[2*i+1])
+		for i, idx := range glyphNameIndex {
+			idx := int(idx)
 			if idx < nMac {
 				info.Names[i] = macRoman[idx]
 			} else {
 				idx -= nMac
 				for len(names) <= idx {
-					l, err := r.ReadByte()
+					l, err := p.ReadUint8()
 					if err != nil {
 						return nil, err
 					}
-					_, err = io.ReadFull(r, nameBuf[:l])
+					buf, err := p.ReadBytes(int(l))
 					if err != nil {
 						return nil, err
 					}
-					names = append(names, string(nameBuf[:l]))
+					names = append(names, string(buf))
 				}
 				info.Names[i] = names[idx]
 			}
