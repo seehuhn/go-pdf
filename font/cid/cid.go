@@ -18,6 +18,7 @@ package cid
 
 import (
 	"errors"
+	"math"
 	"os"
 	"sort"
 
@@ -292,15 +293,23 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		CIDFont["DW"] = DW
 	}
 
+	rect := subsetInfo.BBox()
+	fontBBox := &pdf.Rectangle{
+		LLx: rect.LLx.AsFloat(q),
+		LLy: rect.LLy.AsFloat(q),
+		URx: rect.URx.AsFloat(q),
+		URy: rect.URy.AsFloat(q),
+	}
+
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
 		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)), // TODO(voss)
-		"FontBBox":    subsetInfo.BBox().AsPDF(q),
+		"FontBBox":    fontBBox,
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
-		"Ascent":      subsetInfo.Ascent.AsInteger(q),
-		"Descent":     subsetInfo.Descent.AsInteger(q),
-		"CapHeight":   subsetInfo.CapHeight.AsInteger(q),
+		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
+		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
+		"CapHeight":   pdf.Integer(math.Round(subsetInfo.CapHeight.AsFloat(q))),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
 

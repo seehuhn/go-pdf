@@ -16,43 +16,17 @@
 
 package funit
 
-import (
-	"math"
-
-	"seehuhn.de/go/pdf"
-)
-
 // Int16 is a 16-bit integer in font design units.
 type Int16 int16
-
-// AsInteger returns x*scale as a pdf.Integer.
-func (x Int16) AsInteger(scale float64) pdf.Integer {
-	return pdf.Integer(math.Round(float64(x) * scale))
-}
 
 // AsFloat returns x*scale as a float64.
 func (x Int16) AsFloat(scale float64) float64 {
 	return float64(x) * scale
 }
 
-// AsNumber returns x*scale as a pdf.Number.
-func (x Int16) AsNumber(scale float64) pdf.Number {
-	return pdf.Number(float64(x) * scale)
-}
-
 // Rect represents a rectangle in font design units.
 type Rect struct {
 	LLx, LLy, URx, URy Int16
-}
-
-// AsPDF returns the rectangle as a pdf.Rectangle.
-func (rect Rect) AsPDF(scale float64) *pdf.Rectangle {
-	return &pdf.Rectangle{
-		LLx: rect.LLx.AsFloat(scale),
-		LLy: rect.LLy.AsFloat(scale),
-		URx: rect.URx.AsFloat(scale),
-		URy: rect.URy.AsFloat(scale),
-	}
 }
 
 // IsZero is true if the glyph leaves no marks on the page.

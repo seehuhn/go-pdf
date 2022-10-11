@@ -131,7 +131,13 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	page.Println(".2 1 .2 RG")
 	for _, gl := range glyphs {
 		c := gl.Gid
-		bbox := F1.GlyphExtents[c].AsPDF(q)
+		rect := F1.GlyphExtents[c]
+		bbox := &pdf.Rectangle{
+			LLx: rect.LLx.AsFloat(q),
+			LLy: rect.LLy.AsFloat(q),
+			URx: rect.URx.AsFloat(q),
+			URy: rect.URy.AsFloat(q),
+		}
 		if !bbox.IsZero() {
 			x := xPos + gl.XOffset.AsFloat(q) + bbox.LLx
 			y := yPos + gl.YOffset.AsFloat(q) + bbox.LLy

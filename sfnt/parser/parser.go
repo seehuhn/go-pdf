@@ -43,8 +43,7 @@ type ReadSeekSizer interface {
 	Size() int64
 }
 
-// New allocates a new Parser.  SetRegion() must be called before the
-// parser can be used.
+// New allocates a new Parser.
 func New(tableName string, r ReadSeekSizer) *Parser {
 	p := &Parser{
 		r:         r,
@@ -84,7 +83,7 @@ func (p *Parser) SeekPos(filePos int64) error {
 	return nil
 }
 
-// Discard skips the next n bytes in the input.
+// Discard skips the next n bytes of input.
 func (p *Parser) Discard(n int) error {
 	if n < 0 {
 		panic("negative discard")

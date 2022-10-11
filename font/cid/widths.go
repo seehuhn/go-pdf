@@ -17,6 +17,8 @@
 package cid
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/sfnt/funit"
 )
@@ -89,7 +91,7 @@ func encodeWidths(w []funit.Int16, scale float64) (pdf.Integer, pdf.Array) {
 			if i > a {
 				var ww pdf.Array
 				for _, wi := range v[a:i] {
-					ww = append(ww, wi.AsInteger(scale))
+					ww = append(ww, pdf.Integer(math.Round(wi.AsFloat(scale))))
 				}
 				res = append(res, pdf.Integer(seq.start+a), ww)
 			}
@@ -99,7 +101,9 @@ func encodeWidths(w []funit.Int16, scale float64) (pdf.Integer, pdf.Array) {
 				i++
 			}
 			res = append(res,
-				pdf.Integer(seq.start+a), pdf.Integer(seq.start+i-1), v[a].AsInteger(scale))
+				pdf.Integer(seq.start+a),
+				pdf.Integer(seq.start+i-1),
+				pdf.Integer(math.Round(v[a].AsFloat(scale))))
 			a = i
 		}
 		if i < n {
@@ -108,11 +112,11 @@ func encodeWidths(w []funit.Int16, scale float64) (pdf.Integer, pdf.Array) {
 		if i > a {
 			var ww pdf.Array
 			for _, wi := range v[a:i] {
-				ww = append(ww, wi.AsInteger(scale))
+				ww = append(ww, pdf.Integer(math.Round(wi.AsFloat(scale))))
 			}
 			res = append(res, pdf.Integer(seq.start+a), ww)
 		}
 	}
 
-	return dw.AsInteger(scale), res
+	return pdf.Integer(math.Round(dw.AsFloat(scale))), res
 }

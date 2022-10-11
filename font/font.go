@@ -95,6 +95,7 @@ type Layout struct {
 }
 
 // Draw shows the text layout on a page.
+// TODO(voss): remove the dependency on the pages package?
 func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 	font := layout.Font
 
