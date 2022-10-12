@@ -17,18 +17,14 @@
 package parser
 
 import (
-	"fmt"
 	"io"
-
-	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 const bufferSize = 1024
 
 // Parser allows to read data from an sfnt file.
 type Parser struct {
-	r         ReadSeekSizer
-	tableName string
+	r ReadSeekSizer
 
 	buf       []byte
 	from      int64
@@ -44,10 +40,9 @@ type ReadSeekSizer interface {
 }
 
 // New allocates a new Parser.
-func New(tableName string, r ReadSeekSizer) *Parser {
+func New(r ReadSeekSizer) *Parser {
 	p := &Parser{
-		r:         r,
-		tableName: tableName,
+		r: r,
 	}
 	err := p.SeekPos(0)
 	if err != nil {
@@ -162,23 +157,6 @@ func (p *Parser) ReadUint16Slice() ([]uint16, error) {
 	return res, nil
 }
 
-// ReadGIDSlice reads a length followed by a sequence of GlyphID values.
-func (p *Parser) ReadGIDSlice() ([]glyph.ID, error) {
-	n, err := p.ReadUint16()
-	if err != nil {
-		return nil, err
-	}
-	res := make([]glyph.ID, n)
-	for i := range res {
-		val, err := p.ReadUint16()
-		if err != nil {
-			return nil, err
-		}
-		res[i] = glyph.ID(val)
-	}
-	return res, nil
-}
-
 // ReadBytes reads n bytes from the file, starting at the current position.  The
 // returned slice points into the internal buffer, slice contents must not be
 // modified by the caller and are only valid until the next call to one of the
@@ -211,7 +189,7 @@ func (p *Parser) ReadBytes(n int) ([]byte, error) {
 			}
 		}
 		if err != nil {
-			return nil, p.Error("read failed: %w", err)
+			return nil, err
 		}
 		p.used += l
 	}
@@ -219,13 +197,4 @@ func (p *Parser) ReadBytes(n int) ([]byte, error) {
 	res := p.buf[p.pos : p.pos+n]
 	p.pos += n
 	return res, nil
-}
-
-func (p *Parser) Error(format string, a ...interface{}) error {
-	tableName := p.tableName
-	if tableName == "" {
-		tableName = "header"
-	}
-	a = append([]interface{}{tableName, p.lastRead}, a...)
-	return fmt.Errorf("%s%+d: "+format, a...)
 }

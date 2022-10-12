@@ -45,7 +45,7 @@ func FuzzEncoding(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
-		p := parser.New("test", bytes.NewReader(data1))
+		p := parser.New(bytes.NewReader(data1))
 		enc1, err := readEncoding(p, cc)
 		if err != nil {
 			return
@@ -63,7 +63,7 @@ func FuzzEncoding(f *testing.F) {
 				t.Fatal(err)
 			}
 
-			p = parser.New("test", bytes.NewReader(data2))
+			p = parser.New(bytes.NewReader(data2))
 			enc2, err = readEncoding(p, cc)
 			if err != nil {
 				t.Fatal(err)

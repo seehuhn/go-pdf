@@ -21,7 +21,6 @@ import (
 	"sort"
 
 	"golang.org/x/exp/maps"
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/sfnt/opentype/classdef"
@@ -512,7 +511,7 @@ func readGpos2_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 
 	numRecords := int(class1Count) * int(class2Count)
 	if numRecords >= 65536 {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    "GPOS2.1 table too large",
 		}

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package table
+package header
 
 import (
 	"bytes"
@@ -25,7 +25,7 @@ import (
 
 func FuzzTables(f *testing.F) {
 	buf := &bytes.Buffer{}
-	Write(buf, ScalerTypeTrueType, map[string][]byte{
+	_, _ = Write(buf, ScalerTypeTrueType, map[string][]byte{
 		"OS/2": {},
 		"hhea": {1},
 		"maxp": {2, 3},
@@ -35,7 +35,7 @@ func FuzzTables(f *testing.F) {
 	})
 	f.Add(buf.Bytes())
 	buf.Reset()
-	Write(buf, ScalerTypeCFF, map[string][]byte{
+	_, _ = Write(buf, ScalerTypeCFF, map[string][]byte{
 		"head": {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, // must be at least 12 bytes, to hold the checksum
 		"hdmx": {12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26},
 	})

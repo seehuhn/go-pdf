@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"seehuhn.de/go/pdf/sfnt/table"
+	"seehuhn.de/go/pdf/sfnt/header"
 )
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 			log.Fatalf("%s: %v", fname, err)
 		}
 
-		header, err := table.ReadSfntHeader(r)
+		header, err := header.ReadSfntHeader(r)
 		if err != nil {
 			log.Fatalf("%s: %v", fname, err)
 		}

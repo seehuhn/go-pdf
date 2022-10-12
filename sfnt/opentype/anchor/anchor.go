@@ -19,7 +19,6 @@ package anchor
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
@@ -47,7 +46,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 	y := funit.Int16(buf[4])<<8 | funit.Int16(buf[5])
 
 	if format == 0 || format > 3 {
-		return Table{}, &fonterror.InvalidFontError{
+		return Table{}, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/anchor",
 			Reason:    fmt.Sprintf("invalid anchor table format %d", format),
 		}

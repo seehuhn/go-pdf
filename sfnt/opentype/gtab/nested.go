@@ -17,7 +17,6 @@
 package gtab
 
 import (
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/sfnt/opentype/coverage"
@@ -113,7 +112,7 @@ func readSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			}
 			glyphCount := int(buf[0])<<8 | int(buf[1])
 			if glyphCount == 0 {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/opentype/gtab",
 					Reason:    "invalid glyph count in SeqContext1",
 				}
@@ -340,7 +339,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 			}
 			glyphCount := int(buf[0])<<8 | int(buf[1])
 			if glyphCount == 0 {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/opentype/gtab",
 					Reason:    "invalid glyph count in SeqContext2",
 				}
@@ -368,7 +367,7 @@ func readSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	total += cov.EncodeLen()
 
 	if total > 0xFFFF {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    "SeqContext2 too large",
 		}
@@ -523,7 +522,7 @@ func readSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	}
 	glyphCount := int(buf[0])<<8 | int(buf[1])
 	if glyphCount < 1 {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    "invalid glyph count in SeqContext3",
 		}
@@ -690,7 +689,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 		}
 
 		if total > 0xFFFF {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/opentype/gtab",
 				Reason:    "ChainedSeqContext1 too large",
 			}
@@ -704,7 +703,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 				return nil, err
 			}
 
-			backtrackSequence, err := p.ReadGIDSlice()
+			backtrackSequence, err := readGIDSlice(p)
 			if err != nil {
 				return nil, err
 			}
@@ -720,7 +719,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 				}
 				inputSequence[k] = glyph.ID(val)
 			}
-			lookaheadSequence, err := p.ReadGIDSlice()
+			lookaheadSequence, err := readGIDSlice(p)
 			if err != nil {
 				return nil, err
 			}
@@ -734,7 +733,7 @@ func readChainedSeqContext1(p *parser.Parser, subtablePos int64) (Subtable, erro
 			}
 
 			if ruleSetSize > 0xFFFF {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/opentype/gtab",
 					Reason:    "ChainedSeqContext1 ruleset too large",
 				}
@@ -1067,7 +1066,7 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 			continue
 		}
 		if total > 0xFFFF {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/opentype/gtab",
 				Reason:    "ChainedSeqContext2 too large",
 			}
@@ -1076,7 +1075,7 @@ func readChainedSeqContext2(p *parser.Parser, subtablePos int64) (Subtable, erro
 		pos := 2 + 2*len(rr)
 		for _, rule := range rr {
 			if pos > 0xFFFF {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/opentype/gtab",
 					Reason:    "ChainedSeqContext2 too large",
 				}
@@ -1323,7 +1322,7 @@ func readChainedSeqContext3(p *parser.Parser, subtablePos int64) (Subtable, erro
 		return nil, err
 	}
 	if len(inputCoverageOffsets) < 1 {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    "invalid glyph count in ChainedSeqContext3",
 		}

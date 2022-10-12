@@ -23,8 +23,8 @@ import (
 	"sort"
 	"unicode/utf16"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/mac"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 // Info contains information from the "name" table.
@@ -276,7 +276,7 @@ func utf16Decode(buf []byte) string {
 	return string(utf16.Decode(nameWords))
 }
 
-var errMalformedNames = &fonterror.InvalidFontError{
+var errMalformedNames = &parser.InvalidFontError{
 	SubSystem: "sfnt/name",
 	Reason:    "malformed name table",
 }

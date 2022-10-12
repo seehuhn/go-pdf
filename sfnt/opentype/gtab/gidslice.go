@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,37 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package parser
+package gtab
 
 import (
-	"bytes"
-	"testing"
+	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
-func TestPos(t *testing.T) {
-	buf := bytes.NewReader([]byte{'0', '1', '2', '3', '4', '5', '6', '7'})
-	p := New(buf)
-
-	pos := p.Pos()
-	if pos != 0 {
-		t.Errorf("wrong position, expected 0 but got %d", pos)
-	}
-
-	_, err := p.ReadUint16()
+// ReadGIDSlice reads a length followed by a sequence of GlyphID values.
+func readGIDSlice(p *parser.Parser) ([]glyph.ID, error) {
+	n, err := p.ReadUint16()
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-
-	pos = p.Pos()
-	if pos != 2 {
-		t.Errorf("wrong position, expected 2 but got %d", pos)
+	res := make([]glyph.ID, n)
+	for i := range res {
+		val, err := p.ReadUint16()
+		if err != nil {
+			return nil, err
+		}
+		res[i] = glyph.ID(val)
 	}
-
-	err = p.SeekPos(5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.Pos() != 5 {
-		t.Errorf("wrong position, expected 5 but got %d", p.Pos())
-	}
+	return res, nil
 }

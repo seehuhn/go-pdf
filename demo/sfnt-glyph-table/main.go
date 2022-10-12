@@ -33,8 +33,8 @@ import (
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt"
 	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/pdf/sfnt/header"
 	"seehuhn.de/go/pdf/sfnt/opentype/gdef"
-	"seehuhn.de/go/pdf/sfnt/table"
 )
 
 const (
@@ -61,7 +61,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	header, err := table.ReadSfntHeader(fd)
+	header, err := header.ReadSfntHeader(fd)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -17,7 +17,6 @@
 package gtab
 
 import (
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/opentype/anchor"
 	"seehuhn.de/go/pdf/sfnt/opentype/coverage"
@@ -129,7 +128,7 @@ func readGpos4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if numOffsets > (65536-6-2)/2 {
 		// Offsets are 16-bit from baseArrayPos, and there must still be
 		// space for at least one achor table.
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    "GPOS4.1 table too large",
 		}

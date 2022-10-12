@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/sfnt/cmap"
-	"seehuhn.de/go/pdf/sfnt/table"
+	"seehuhn.de/go/pdf/sfnt/header"
 )
 
 func tryFont(fname string) error {
@@ -36,7 +36,7 @@ func tryFont(fname string) error {
 		return err
 	}
 	defer fd.Close()
-	header, err := table.ReadSfntHeader(fd)
+	header, err := header.ReadSfntHeader(fd)
 	if err != nil {
 		return err
 	}

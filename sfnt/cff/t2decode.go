@@ -16,8 +16,6 @@
 
 package cff
 
-// TODO(voss): split this out into a separate "type2" module?
-
 import (
 	"errors"
 	"fmt"
@@ -77,13 +75,11 @@ func (x Fixed16) Int() int {
 
 // Floor returns the largest int16 not greater than x.
 func (x Fixed16) Floor() int16 {
-	// TODO(voss)
 	return int16(math.Floor(float64(x) / 65536))
 }
 
 // Ceil returns the smallest int16 not less than x.
 func (x Fixed16) Ceil() int16 {
-	// TODO(voss)
 	return int16(math.Ceil(float64(x) / 65536))
 }
 

@@ -14,50 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package table
+package header
 
-import (
-	"encoding/binary"
-)
+import "testing"
 
-type check struct {
-	sum  uint32
-	buf  [4]byte
-	used int
-}
+func TestChecksum(t *testing.T) {
+	cases := []struct {
+		Body     []byte
+		Expected uint32
+	}{
+		{[]byte{0, 1, 2, 3}, 0x00010203},
+		{[]byte{0, 1, 2, 3, 4, 5, 6, 7}, 0x0406080a},
+		{[]byte{1}, 0x01000000},
+		{[]byte{1, 2, 3}, 0x01020300},
+		{[]byte{1, 0, 0, 0, 1}, 0x02000000},
+		{[]byte{255, 255, 255, 255, 0, 0, 0, 1}, 0},
+	}
 
-func (s *check) Write(p []byte) (int, error) {
-	n := 0
-	for len(p) > 0 {
-		k := copy(s.buf[s.used:], p)
-		p = p[k:]
-		n += k
-		s.used += k
-
-		if s.used == 4 {
-			s.sum += binary.BigEndian.Uint32(s.buf[:])
-			s.used = 0
+	for i, test := range cases {
+		computed := checksum(test.Body)
+		if computed != test.Expected {
+			t.Errorf("test %d failed: %08x != %08x",
+				i+1, computed, test.Expected)
 		}
 	}
-	return n, nil
-}
-
-func (s *check) Sum() uint32 {
-	if s.used != 0 {
-		_, _ = s.Write([]byte{0, 0, 0}[:4-s.used])
-	}
-	return s.sum
-}
-
-func (s *check) Reset() {
-	s.sum = 0
-	s.used = 0
-}
-
-// checksum implements the sfnt checksum algorithm.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#calculating-checksums
-func checksum(data []byte) uint32 {
-	cc := &check{}
-	_, _ = cc.Write(data)
-	return cc.Sum()
 }

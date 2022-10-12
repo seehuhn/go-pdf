@@ -33,7 +33,7 @@ func FuzzFeatureList(f *testing.F) {
 	f.Add(info.encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		p := parser.New("featureList test", bytes.NewReader(data))
+		p := parser.New(bytes.NewReader(data))
 		info, err := readFeatureList(p, 0)
 		if err != nil {
 			return
@@ -47,7 +47,7 @@ func FuzzFeatureList(f *testing.F) {
 		// 	t.Errorf("encode: %d > %d", len(data2), len(data))
 		// }
 
-		p = parser.New("featureList test", bytes.NewReader(data2))
+		p = parser.New(bytes.NewReader(data2))
 		info2, err := readFeatureList(p, 0)
 		if err != nil {
 			fmt.Printf("A % x\n", data)

@@ -115,7 +115,7 @@ func FuzzLookupList(f *testing.F) {
 	f.Add(l.encode(999))
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
-		p := parser.New("lookupList test", bytes.NewReader(data1))
+		p := parser.New(bytes.NewReader(data1))
 		l1, err := readLookupList(p, 0, readDummySubtable)
 		if err != nil {
 			return
@@ -123,7 +123,7 @@ func FuzzLookupList(f *testing.F) {
 
 		data2 := l1.encode(999)
 
-		p = parser.New("lookupList test", bytes.NewReader(data2))
+		p = parser.New(bytes.NewReader(data2))
 		l2, err := readLookupList(p, 0, readDummySubtable)
 		if err != nil {
 			t.Fatal(err)

@@ -19,7 +19,6 @@ package gtab
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/opentype/coverage"
 	"seehuhn.de/go/pdf/sfnt/parser"
@@ -40,7 +39,7 @@ func readGsubSubtable(p *parser.Parser, pos int64, meta *LookupMetaInfo) (Subtab
 
 	reader, ok := gsubReaders[10*meta.LookupType+format]
 	if !ok {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason: fmt.Sprintf("unknown GSUB subtable format %d.%d",
 				meta.LookupType, format),
@@ -142,7 +141,7 @@ func readGsub1_2(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if err != nil {
 		return nil, err
 	}
-	substituteGlyphIDs, err := p.ReadGIDSlice()
+	substituteGlyphIDs, err := readGIDSlice(p)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +246,7 @@ func readGsub2_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 		if err != nil {
 			return nil, err
 		}
-		repl[i], err = p.ReadGIDSlice()
+		repl[i], err = readGIDSlice(p)
 		if err != nil {
 			return nil, err
 		}
@@ -546,7 +545,7 @@ func readGsub4_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	// Now total is the coverage offset when encoding the subtable without
 	// overlapping data.
 	if total > 0xFFFF {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    "GSUB 4.1 too large",
 		}
@@ -695,7 +694,7 @@ func readGsub8_1(p *parser.Parser, subtablePos int64) (Subtable, error) {
 	if err != nil {
 		return nil, err
 	}
-	substituteGlyphIDs, err := p.ReadGIDSlice()
+	substituteGlyphIDs, err := readGIDSlice(p)
 	if err != nil {
 		return nil, err
 	}

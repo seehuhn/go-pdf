@@ -144,7 +144,7 @@ func MakeSimpleFont() *sfnt.Info {
 			for i < n {
 				i0 := (i + offs) % n
 				if !extended[i0].OnCurve {
-					panic("not on curve") // TODO(voss): remove
+					panic("not on curve")
 				}
 				i1 := (i0 + 1) % n
 				if extended[i1].OnCurve {
@@ -327,7 +327,7 @@ func MakeCompleteFont() *sfnt.Info {
 			for i < n {
 				i0 := (i + offs) % n
 				if !extended[i0].OnCurve {
-					panic("not on curve") // TODO(voss): remove
+					panic("not on curve")
 				}
 				i1 := (i0 + 1) % n
 				if extended[i1].OnCurve {

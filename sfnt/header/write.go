@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package table
+package header
 
 import (
 	"bytes"
@@ -22,8 +22,6 @@ import (
 	"io"
 	"math/bits"
 	"sort"
-
-	"seehuhn.de/go/pdf/sfnt/head"
 )
 
 // Write writes an sfnt file containing the given tables.
@@ -62,7 +60,7 @@ func Write(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, err
 
 	// temporarily clear the checksum in the "head" table
 	if headData, ok := tables["head"]; ok {
-		head.ClearChecksum(headData)
+		clearChecksum(headData)
 	}
 
 	var totalSum uint32
@@ -93,7 +91,7 @@ func Write(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, err
 
 	// set the final checksum in the "head" table
 	if headData, ok := tables["head"]; ok {
-		head.PatchChecksum(headData, totalSum)
+		patchChecksum(headData, totalSum)
 	}
 
 	// write the tables
@@ -120,6 +118,17 @@ func Write(w io.Writer, scalerType uint32, tables map[string][]byte) (int64, err
 		}
 	}
 	return totalSize, nil
+}
+
+// clearChecksum zeros the checksum field of the head table.
+func clearChecksum(head []byte) {
+	binary.BigEndian.PutUint32(head[8:12], 0)
+}
+
+// patchChecksum updates the checksum of the head table.
+// The argument is the checksum of the entire font before patching.
+func patchChecksum(head []byte, checksum uint32) {
+	binary.BigEndian.PutUint32(head[8:12], 0xB1B0AFBA-checksum)
 }
 
 // The offsets sub-table forms the first part of Header.

@@ -192,7 +192,7 @@ func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
 
 	// t.Helper()
 
-	p := parser.New("test", bytes.NewReader(data1))
+	p := parser.New(bytes.NewReader(data1))
 	format, err := p.ReadUint16()
 	if err != nil || format != lookupFormat {
 		return
@@ -208,7 +208,7 @@ func doFuzz(t *testing.T, lookupType, lookupFormat uint16,
 		t.Errorf("encodeLen mismatch: %d != %d", len(data2), l1.EncodeLen())
 	}
 
-	p = parser.New("test", bytes.NewReader(data2))
+	p = parser.New(bytes.NewReader(data2))
 	format, err = p.ReadUint16()
 	if err != nil {
 		t.Fatal(err)

@@ -14,28 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package table
+package header
 
-import "testing"
+// ErrMissing indicates that a required table is missing from a TrueType or
+// OpenType font file.
+type ErrMissing struct {
+	TableName string
+}
 
-func TestChecksum(t *testing.T) {
-	cases := []struct {
-		Body     []byte
-		Expected uint32
-	}{
-		{[]byte{0, 1, 2, 3}, 0x00010203},
-		{[]byte{0, 1, 2, 3, 4, 5, 6, 7}, 0x0406080a},
-		{[]byte{1}, 0x01000000},
-		{[]byte{1, 2, 3}, 0x01020300},
-		{[]byte{1, 0, 0, 0, 1}, 0x02000000},
-		{[]byte{255, 255, 255, 255, 0, 0, 0, 1}, 0},
-	}
+func (err *ErrMissing) Error() string {
+	return "sfnt: missing " + err.TableName + " table"
+}
 
-	for i, test := range cases {
-		computed := checksum(test.Body)
-		if computed != test.Expected {
-			t.Errorf("test %d failed: %08x != %08x",
-				i+1, computed, test.Expected)
-		}
-	}
+// IsMissing returns true, if err indicates a missing sfnt table.
+func IsMissing(err error) bool {
+	_, missing := err.(*ErrMissing)
+	return missing
 }

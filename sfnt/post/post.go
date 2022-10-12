@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
@@ -43,8 +42,8 @@ type Info struct {
 // The slice in the .Names field in the returned structure, if non-nil,
 // may point to shared internal storage and must not be shared.
 // The function may read r beyond the end of the table.
-func Read(rr parser.ReadSeekSizer) (*Info, error) {
-	p := parser.New("post", rr)
+func Read(r parser.ReadSeekSizer) (*Info, error) {
+	p := parser.New(r)
 
 	post := &postEnc{}
 	if err := binary.Read(p, binary.BigEndian, post); err != nil {
@@ -102,7 +101,7 @@ func Read(rr parser.ReadSeekSizer) (*Info, error) {
 		// pass
 
 	default:
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "sfnt/post",
 			Feature:   fmt.Sprintf("table version %08x", post.Version),
 		}

@@ -23,7 +23,6 @@ import (
 	"sort"
 
 	"golang.org/x/exp/maps"
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
@@ -87,7 +86,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 				return nil, err
 			}
 			if int(gid) <= prev {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 1)",
 				}
@@ -120,7 +119,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 			if startCoverageIndex != pos ||
 				startGlyphID <= prev ||
 				endGlyphID < startGlyphID {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/opentype/coverage",
 					Reason:    "invalid coverage table (format 2)",
 				}
@@ -133,7 +132,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 		}
 
 	default:
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "sfnt/opentype/coverage",
 			Feature:   fmt.Sprintf("coverage format %d", format),
 		}

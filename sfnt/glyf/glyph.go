@@ -17,9 +17,9 @@
 package glyf
 
 import (
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 // Glyph represents a single glyph in a TrueType font.
@@ -46,7 +46,7 @@ func decodeGlyph(data []byte) (*Glyph, error) {
 	if len(data) == 0 {
 		return nil, nil
 	} else if len(data) < 10 {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/glyf",
 			Reason:    "incomplete glyph header",
 		}
@@ -276,7 +276,7 @@ func (g *Glyph) FixComponents(newGid map[glyph.ID]glyph.ID) *Glyph {
 
 const glyfAlign = 2
 
-var errIncompleteGlyph = &fonterror.InvalidFontError{
+var errIncompleteGlyph = &parser.InvalidFontError{
 	SubSystem: "sfnt/glyf",
 	Reason:    "incomplete glyph",
 }

@@ -37,7 +37,7 @@ func FuzzFdSelect(f *testing.F) {
 		f.Add(fd.encode(nGlyphs))
 	}
 	f.Fuzz(func(t *testing.T, in []byte) {
-		p := parser.New("FDSelect", bytes.NewReader(in))
+		p := parser.New(bytes.NewReader(in))
 		fdSelect, err := readFDSelect(p, nGlyphs, 10)
 		if err != nil {
 			return
@@ -48,7 +48,7 @@ func FuzzFdSelect(f *testing.F) {
 			t.Error("inefficient encoding")
 		}
 
-		p = parser.New("FDSelect", bytes.NewReader(in2))
+		p = parser.New(bytes.NewReader(in2))
 		fdSelect2, err := readFDSelect(p, nGlyphs, 25)
 		if err != nil {
 			t.Fatal(err)

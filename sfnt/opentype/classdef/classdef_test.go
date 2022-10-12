@@ -30,14 +30,14 @@ func FuzzClassDef(f *testing.F) {
 	f.Add([]byte{0, 1, 0, 0, 0, 0})
 	f.Add([]byte{0, 2, 0, 0})
 	f.Fuzz(func(t *testing.T, data []byte) {
-		info, err := Read(parser.New("test", bytes.NewReader(data)), 0)
+		info, err := Read(parser.New(bytes.NewReader(data)), 0)
 		if err != nil {
 			return
 		}
 
 		data2 := info.Append(nil)
 
-		info2, err := Read(parser.New("test", bytes.NewReader(data2)), 0)
+		info2, err := Read(parser.New(bytes.NewReader(data2)), 0)
 		if err != nil {
 			fmt.Printf("A % x\n", data)
 			fmt.Printf("B % x\n", data2)

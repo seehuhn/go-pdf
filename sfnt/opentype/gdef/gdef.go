@@ -19,7 +19,6 @@ package gdef
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/opentype/classdef"
 	"seehuhn.de/go/pdf/sfnt/opentype/coverage"
@@ -37,6 +36,7 @@ type Table struct {
 	// TODO(voss): Item Variation Store table
 }
 
+// IsMark returns true if it is known that the glyph represents a mark character.
 func (table *Table) IsMark(gid glyph.ID) bool {
 	if table == nil || table.GlyphClass == nil {
 		return false
@@ -46,7 +46,7 @@ func (table *Table) IsMark(gid glyph.ID) bool {
 
 // Read reads the GDEF table.
 func Read(r parser.ReadSeekSizer) (*Table, error) {
-	p := parser.New("GDEF", r)
+	p := parser.New(r)
 	buf, err := p.ReadBytes(12)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 	majorVersion := uint16(buf[0])<<8 | uint16(buf[1])
 	minorVersion := uint16(buf[2])<<8 | uint16(buf[3])
 	if majorVersion != 1 || (minorVersion != 0 && minorVersion != 2 && minorVersion != 3) {
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "sfnt/opentype/gdef",
 			Feature:   fmt.Sprintf("GDEF table version %d.%d", majorVersion, minorVersion),
 		}
@@ -109,7 +109,7 @@ func Read(r parser.ReadSeekSizer) (*Table, error) {
 		}
 		format := uint16(buf[0])<<8 | uint16(buf[1])
 		if format != 1 {
-			return nil, &fonterror.NotSupportedError{
+			return nil, &parser.NotSupportedError{
 				SubSystem: "sfnt/opentype/gdef",
 				Feature:   fmt.Sprintf("mark glyph sets format %d", format),
 			}

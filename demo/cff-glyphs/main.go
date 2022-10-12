@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/funit"
-	"seehuhn.de/go/pdf/sfnt/table"
+	"seehuhn.de/go/pdf/sfnt/header"
 )
 
 var q float64 = 0.4
@@ -148,7 +148,7 @@ func loadCFFData(fname string) ([]byte, error) {
 	}
 	defer r.Close()
 
-	header, err := table.ReadSfntHeader(r)
+	header, err := header.ReadSfntHeader(r)
 	if err != nil {
 		return nil, err
 	}

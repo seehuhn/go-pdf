@@ -20,7 +20,6 @@ import (
 	"sort"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
@@ -51,7 +50,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 		return nil, err
 	}
 	if 6*int64(scriptCount) > p.Size() {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/gtab",
 			Reason:    "invalid scriptCount",
 		}
@@ -76,7 +75,7 @@ func readScriptList(p *parser.Parser, pos int64) (ScriptListInfo, error) {
 
 	for _, entry := range entries {
 		if int(entry.offset) < 2+6*len(entries) {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/gtab",
 				Reason:    "invalid script table offset",
 			}
@@ -110,13 +109,13 @@ func (info ScriptListInfo) readScriptTable(script otfScript, p *parser.Parser, p
 	langSysCount := uint16(data[2])<<8 | uint16(data[3])
 
 	if defaultLangSysOffset > 0 && defaultLangSysOffset < 4+6*langSysCount {
-		return &fonterror.InvalidFontError{
+		return &parser.InvalidFontError{
 			SubSystem: "sfnt/gtab",
 			Reason:    "invalid defaultLangSysOffset",
 		}
 	}
 	if 8+int64(langSysCount)*12 > p.Size() {
-		return &fonterror.InvalidFontError{
+		return &parser.InvalidFontError{
 			SubSystem: "sfnt/gtab",
 			Reason:    "invalid langSysCount",
 		}
@@ -181,7 +180,7 @@ func readLangSysTable(p *parser.Parser, pos int64) (*Features, error) {
 	requiredFeatureIndex := FeatureIndex(data[2])<<8 | FeatureIndex(data[3])
 	featureIndexCount := uint16(data[4])<<8 | uint16(data[5])
 	if lookupOrderOffset != 0 {
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "sfnt/gtab",
 			Feature:   "use of reordering tables",
 		}

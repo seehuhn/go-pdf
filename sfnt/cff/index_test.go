@@ -43,7 +43,7 @@ func TestIndex(t *testing.T) {
 			t.Error("wrong length for empty INDEX")
 		}
 
-		p := parser.New("CFF", bytes.NewReader(buf))
+		p := parser.New(bytes.NewReader(buf))
 
 		out, err := readIndex(p)
 		if err != nil {
@@ -74,7 +74,7 @@ func FuzzIndex(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		p := parser.New("CFF", bytes.NewReader(data))
+		p := parser.New(bytes.NewReader(data))
 		i1, err := readIndex(p)
 		if err != nil {
 			return
@@ -85,7 +85,7 @@ func FuzzIndex(f *testing.F) {
 			t.Error("inefficient encoding")
 		}
 
-		p = parser.New("CFF", bytes.NewReader(buf))
+		p = parser.New(bytes.NewReader(buf))
 		i2, err := readIndex(p)
 		if err != nil {
 			t.Fatal(err)

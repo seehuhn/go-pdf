@@ -38,7 +38,7 @@ func TestCharsetDecode(t *testing.T) {
 	}
 
 	for _, test := range cases {
-		p := parser.New("CFF", bytes.NewReader(test.blob))
+		p := parser.New(bytes.NewReader(test.blob))
 		names, err := readCharset(p, test.nGlyph)
 		if err != nil {
 			t.Fatal(err)
@@ -97,7 +97,7 @@ func TestCharsetRoundtrip(t *testing.T) {
 			t.Errorf("expected format %d, got %d", i, data[0])
 		}
 
-		p := parser.New("CFF", bytes.NewReader(data))
+		p := parser.New(bytes.NewReader(data))
 
 		out, err := readCharset(p, len(names))
 		if err != nil {
@@ -147,7 +147,7 @@ func TestISOAdobe(t *testing.T) {
 func FuzzCharset(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte, nGlyphs int) {
 		r := bytes.NewReader(data)
-		p := parser.New("CFF", r)
+		p := parser.New(r)
 		names1, err := readCharset(p, nGlyphs)
 		if err != nil {
 			return
@@ -161,7 +161,7 @@ func FuzzCharset(f *testing.F) {
 		}
 
 		r = bytes.NewReader(buf)
-		p = parser.New("CFF", r)
+		p = parser.New(r)
 		names2, err := readCharset(p, nGlyphs)
 		if err != nil {
 			t.Fatal(err)

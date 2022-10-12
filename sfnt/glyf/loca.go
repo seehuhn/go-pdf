@@ -19,7 +19,7 @@ package glyf
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 func decodeLoca(enc *Encoded) ([]int, error) {
@@ -28,7 +28,7 @@ func decodeLoca(enc *Encoded) ([]int, error) {
 	case 0:
 		n := len(enc.LocaData)
 		if n < 4 || n%2 != 0 {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/loca",
 				Reason:    "invalid table length",
 			}
@@ -39,7 +39,7 @@ func decodeLoca(enc *Encoded) ([]int, error) {
 			x := int(enc.LocaData[2*i])<<8 | int(enc.LocaData[2*i+1])
 			pos := 2 * x
 			if pos < prev || pos > len(enc.GlyfData) {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/loca",
 					Reason:    fmt.Sprintf("invalid offset %d", pos),
 				}
@@ -50,7 +50,7 @@ func decodeLoca(enc *Encoded) ([]int, error) {
 	case 1:
 		n := len(enc.LocaData)
 		if n < 8 || n%4 != 0 {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/loca",
 				Reason:    "invalid table length",
 			}
@@ -61,7 +61,7 @@ func decodeLoca(enc *Encoded) ([]int, error) {
 			pos := int(enc.LocaData[4*i])<<24 | int(enc.LocaData[4*i+1])<<16 |
 				int(enc.LocaData[4*i+2])<<8 | int(enc.LocaData[4*i+3])
 			if pos < prev || pos > len(enc.GlyfData) {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/loca",
 					Reason:    "invalid offset",
 				}
@@ -70,7 +70,7 @@ func decodeLoca(enc *Encoded) ([]int, error) {
 			prev = pos
 		}
 	default:
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "sfnt/loca",
 			Feature:   fmt.Sprintf("loca table format %d", enc.LocaFormat),
 		}

@@ -66,7 +66,10 @@ func readIndex(p *parser.Parser) (cffIndex, error) {
 			offs = offs<<8 | uint32(x)
 		}
 		if offs < prevOffset || int64(offs) >= size {
-			return nil, p.Error("invalid CFF INDEX")
+			return nil, &parser.InvalidFontError{
+				SubSystem: "sfnt/cff",
+				Reason:    "invalid INDEX offset",
+			}
 		}
 		offsets = append(offsets, offs-1)
 		prevOffset = offs

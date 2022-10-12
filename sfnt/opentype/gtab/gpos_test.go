@@ -82,7 +82,7 @@ func TestGpos2_2(t *testing.T) {
 		},
 	}
 	data := l1.Encode()
-	p := parser.New("test", bytes.NewReader(data))
+	p := parser.New(bytes.NewReader(data))
 	err := p.Discard(2)
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +119,7 @@ func TestGpos4_1(t *testing.T) {
 		},
 	}
 	data := l1.Encode()
-	p := parser.New("test", bytes.NewReader(data))
+	p := parser.New(bytes.NewReader(data))
 	err := p.Discard(2)
 	if err != nil {
 		t.Fatal(err)

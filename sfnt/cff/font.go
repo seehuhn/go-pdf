@@ -65,7 +65,7 @@ func Read(r parser.ReadSeekSizer) (*Font, error) {
 		Outlines: &Outlines{},
 	}
 
-	p := parser.New("CFF", r)
+	p := parser.New(r)
 
 	// section 0: header
 	x, err := p.ReadUint32()

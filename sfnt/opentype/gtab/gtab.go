@@ -20,7 +20,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
@@ -44,7 +43,7 @@ func ReadGPOS(r parser.ReadSeekSizer) (*Info, error) {
 }
 
 func readGtab(r parser.ReadSeekSizer, tableName string, sr subtableReader) (*Info, error) {
-	p := parser.New(tableName, r)
+	p := parser.New(r)
 
 	var header struct {
 		MajorVersion      uint16
@@ -60,7 +59,7 @@ func readGtab(r parser.ReadSeekSizer, tableName string, sr subtableReader) (*Inf
 		return nil, err
 	}
 	if header.MajorVersion != 1 || header.MinorVersion > 1 {
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "sfnt/opentype/gtab",
 			Feature: fmt.Sprintf("%s table version %d.%d",
 				tableName, header.MajorVersion, header.MinorVersion),
@@ -88,7 +87,7 @@ func readGtab(r parser.ReadSeekSizer, tableName string, sr subtableReader) (*Inf
 		uint32(header.LookupListOffset),
 	} {
 		if offset < endOfHeader || int64(offset) >= fileSize {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/opentype/gtab",
 				Reason: fmt.Sprintf("%s header has invalid offset %d",
 					tableName, offset),
@@ -97,7 +96,7 @@ func readGtab(r parser.ReadSeekSizer, tableName string, sr subtableReader) (*Inf
 	}
 	if FeatureVariationsOffset != 0 && FeatureVariationsOffset < endOfHeader ||
 		int64(FeatureVariationsOffset) >= fileSize {
-		return nil, &fonterror.InvalidFontError{
+		return nil, &parser.InvalidFontError{
 			SubSystem: "sfnt/opentype/gtab",
 			Reason:    fmt.Sprintf("%s header has invalid FeatureVariationsOffset", tableName),
 		}

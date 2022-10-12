@@ -19,7 +19,6 @@ package gtab
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
@@ -92,7 +91,7 @@ func readFeatureList(p *parser.Parser, pos int64) (FeatureListInfo, error) {
 
 		if totalSize > 0xFFFF {
 			// this condition also ensures featureCount < 0xFFFF
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/gtab",
 				Reason:    "feature list overflow",
 			}

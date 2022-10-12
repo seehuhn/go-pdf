@@ -60,7 +60,7 @@ func FuzzScriptList(f *testing.F) {
 	f.Add(info.encode())
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		p := parser.New("scriptList test", bytes.NewReader(data))
+		p := parser.New(bytes.NewReader(data))
 		info, err := readScriptList(p, 0)
 		if err != nil {
 			return
@@ -74,7 +74,7 @@ func FuzzScriptList(f *testing.F) {
 		// 	t.Errorf("encode: %d > %d", len(data2), len(data))
 		// }
 
-		p = parser.New("scriptList test", bytes.NewReader(data2))
+		p = parser.New(bytes.NewReader(data2))
 		info2, err := readScriptList(p, 0)
 		if err != nil {
 			t.Fatal(err)

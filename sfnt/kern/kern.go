@@ -24,7 +24,6 @@ import (
 	"math/bits"
 	"sort"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/parser"
@@ -38,14 +37,14 @@ type Info map[glyph.Pair]funit.Int16
 
 // Read reads the "kern" table.
 func Read(r parser.ReadSeekSizer) (Info, error) {
-	p := parser.New("kern", r)
+	p := parser.New(r)
 
 	version, err := p.ReadUint16()
 	if err != nil {
 		return nil, err
 	}
 	if version != 0 {
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "sfnt/kern",
 			Feature:   fmt.Sprintf("\"kern\" table version %d", version),
 		}
@@ -74,7 +73,7 @@ func Read(r parser.ReadSeekSizer) (Info, error) {
 		flags := buf[5]
 
 		if length < 6+8 {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/kern",
 				Reason:    fmt.Sprintf("invalid kern subtable length %d", length),
 			}

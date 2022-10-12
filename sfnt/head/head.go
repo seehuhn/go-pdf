@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package head supports reading and writing the HEAD table.
+// Package head supports reading and writing the "head" table.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/head
 package head
 
@@ -167,17 +167,6 @@ func (info *Info) Encode() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0, headLength))
 	_ = binary.Write(buf, binary.BigEndian, enc)
 	return buf.Bytes()
-}
-
-// ClearChecksum zeros the checksum field of the head table.
-func ClearChecksum(head []byte) {
-	binary.BigEndian.PutUint32(head[8:12], 0)
-}
-
-// PatchChecksum updates the checksum of the head table.
-// The argument is the checksum of the entire font before patching.
-func PatchChecksum(head []byte, checksum uint32) {
-	binary.BigEndian.PutUint32(head[8:12], 0xB1B0AFBA-checksum)
 }
 
 type binaryHead struct {

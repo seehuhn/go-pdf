@@ -16,17 +16,17 @@
 
 package cff
 
-import "seehuhn.de/go/pdf/sfnt/fonterror"
+import "seehuhn.de/go/pdf/sfnt/parser"
 
 func unsupported(feature string) error {
-	return &fonterror.NotSupportedError{
+	return &parser.NotSupportedError{
 		SubSystem: "cff",
 		Feature:   feature,
 	}
 }
 
 func invalidSince(reason string) error {
-	return &fonterror.InvalidFontError{
+	return &parser.InvalidFontError{
 		SubSystem: "cff",
 		Reason:    reason,
 	}

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"sort"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
@@ -82,7 +81,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 		startGlyphID := glyph.ID(data[0])<<8 | glyph.ID(data[1])
 		glyphCount := int(data[2])<<8 | int(data[3])
 		if int(startGlyphID)+glyphCount-1 > 0xFFFF {
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "opentype/classdef",
 				Reason:    "glyph count too large in class definition table",
 			}
@@ -118,7 +117,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 			classValue := uint16(data[4])<<8 | uint16(data[5])
 
 			if i > 0 && startGlyphID <= prevEnd {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "opentype/classdef",
 					Reason:    "overlapping ranges in class definition table",
 				}
@@ -134,7 +133,7 @@ func Read(p *parser.Parser, pos int64) (Table, error) {
 		return res, nil
 
 	default:
-		return nil, &fonterror.NotSupportedError{
+		return nil, &parser.NotSupportedError{
 			SubSystem: "opentype/classdef",
 			Feature:   fmt.Sprintf("class definition table version %d", version),
 		}

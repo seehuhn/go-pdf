@@ -625,7 +625,7 @@ func encodeNumber(x Fixed16) encodedNumber {
 	var code []byte
 
 	// TODO(voss): consider using t2dup here.
-	// TODO(voss): also consider fractions of two one-byte integers.
+	// TODO(voss): also consider fractions of two one-byte integers?
 
 	if x%65536 == 0 {
 		code = encodeInt(x.Int16())

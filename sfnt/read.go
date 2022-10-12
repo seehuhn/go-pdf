@@ -26,11 +26,11 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/cmap"
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/glyf"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/head"
+	"seehuhn.de/go/pdf/sfnt/header"
 	"seehuhn.de/go/pdf/sfnt/hmtx"
 	"seehuhn.de/go/pdf/sfnt/kern"
 	"seehuhn.de/go/pdf/sfnt/maxp"
@@ -39,8 +39,8 @@ import (
 	"seehuhn.de/go/pdf/sfnt/opentype/gdef"
 	"seehuhn.de/go/pdf/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/sfnt/os2"
+	"seehuhn.de/go/pdf/sfnt/parser"
 	"seehuhn.de/go/pdf/sfnt/post"
-	"seehuhn.de/go/pdf/sfnt/table"
 	"seehuhn.de/go/pdf/sfnt/type1"
 )
 
@@ -56,14 +56,14 @@ func ReadFile(fname string) (*Info, error) {
 
 // Read reads a TrueType or OpenType font from an io.ReaderAt.
 func Read(r io.ReaderAt) (*Info, error) {
-	header, err := table.ReadSfntHeader(r)
+	dir, err := header.ReadSfntHeader(r)
 	if err != nil {
 		return nil, err
 	}
 
-	if !(header.Has("glyf", "loca") || header.Has("CFF ")) {
-		if header.Has("CFF2") {
-			return nil, &fonterror.NotSupportedError{
+	if !(dir.Has("glyf", "loca") || dir.Has("CFF ")) {
+		if dir.Has("CFF2") {
+			return nil, &parser.NotSupportedError{
 				SubSystem: "sfnt",
 				Feature:   "CFF2-based fonts",
 			}
@@ -75,8 +75,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 	// https://docs.microsoft.com/en-us/typography/opentype/spec/recom#optimized-table-ordering
 
 	var headInfo *head.Info
-	headFd, err := header.TableReader(r, "head")
-	if err != nil && !table.IsMissing(err) {
+	headFd, err := dir.TableReader(r, "head")
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 	if headFd != nil {
@@ -86,24 +86,24 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	hheaData, err := header.ReadTableBytes(r, "hhea")
-	if err != nil && !table.IsMissing(err) {
+	hheaData, err := dir.ReadTableBytes(r, "hhea")
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 	// decoded below when reading "hmtx"
 
-	maxpFd, err := header.TableReader(r, "maxp")
+	maxpFd, err := dir.TableReader(r, "maxp")
 	if err != nil {
 		return nil, err
 	}
 	maxpInfo, err := maxp.Read(maxpFd)
-	if err != nil && !table.IsMissing(err) {
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 
 	var os2Info *os2.Info
-	os2Fd, err := header.TableReader(r, "OS/2")
-	if err != nil && !table.IsMissing(err) {
+	os2Fd, err := dir.TableReader(r, "OS/2")
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 	if os2Fd != nil {
@@ -114,8 +114,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 	}
 
 	var hmtxInfo *hmtx.Info
-	hmtxData, err := header.ReadTableBytes(r, "hmtx")
-	if err != nil && !table.IsMissing(err) {
+	hmtxData, err := dir.ReadTableBytes(r, "hmtx")
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 	if hheaData != nil {
@@ -126,8 +126,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 	}
 
 	var cmapSubtable cmap.Subtable
-	cmapData, err := header.ReadTableBytes(r, "cmap")
-	if err != nil && !table.IsMissing(err) {
+	cmapData, err := dir.ReadTableBytes(r, "cmap")
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 	if cmapData != nil {
@@ -139,8 +139,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 	}
 
 	var nameTable *name.Table
-	nameData, err := header.ReadTableBytes(r, "name")
-	if err != nil && !table.IsMissing(err) {
+	nameData, err := dir.ReadTableBytes(r, "name")
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 	if nameData != nil {
@@ -157,8 +157,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 	}
 
 	var postInfo *post.Info
-	postFd, err := header.TableReader(r, "post")
-	if err != nil && !table.IsMissing(err) {
+	postFd, err := dir.TableReader(r, "post")
+	if err != nil && !header.IsMissing(err) {
 		return nil, err
 	}
 	if postFd != nil {
@@ -186,10 +186,10 @@ func Read(r io.ReaderAt) (*Info, error) {
 	// Read the glyph data.
 	var Outlines interface{}
 	var fontInfo *type1.FontInfo
-	switch header.ScalerType {
-	case table.ScalerTypeCFF:
+	switch dir.ScalerType {
+	case header.ScalerTypeCFF:
 		var cffInfo *cff.Font
-		cffFd, err := header.TableReader(r, "CFF ")
+		cffFd, err := dir.TableReader(r, "CFF ")
 		if err != nil {
 			return nil, err
 		}
@@ -207,19 +207,19 @@ func Read(r io.ReaderAt) (*Info, error) {
 				cffInfo.Glyphs[i].Width = w
 			}
 		}
-	case table.ScalerTypeTrueType, table.ScalerTypeApple:
+	case header.ScalerTypeTrueType, header.ScalerTypeApple:
 		if headInfo == nil {
-			return nil, &table.ErrMissing{TableName: "head"}
+			return nil, &header.ErrMissing{TableName: "head"}
 		}
 		if maxpInfo == nil {
-			return nil, &table.ErrMissing{TableName: "maxp"}
+			return nil, &header.ErrMissing{TableName: "maxp"}
 		}
 
-		locaData, err := header.ReadTableBytes(r, "loca")
+		locaData, err := dir.ReadTableBytes(r, "loca")
 		if err != nil {
 			return nil, err
 		}
-		glyfData, err := header.ReadTableBytes(r, "glyf")
+		glyfData, err := dir.ReadTableBytes(r, "glyf")
 		if err != nil {
 			return nil, err
 		}
@@ -235,10 +235,10 @@ func Read(r io.ReaderAt) (*Info, error) {
 
 		tables := make(map[string][]byte)
 		for _, name := range []string{"cvt ", "fpgm", "prep", "gasp"} {
-			if !header.Has(name) {
+			if !dir.Has(name) {
 				continue
 			}
-			data, err := header.ReadTableBytes(r, name)
+			data, err := dir.ReadTableBytes(r, name)
 			if err != nil {
 				return nil, err
 			}
@@ -416,8 +416,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	if header.Has("GDEF") {
-		gdefFd, err := header.TableReader(r, "GDEF")
+	if dir.Has("GDEF") {
+		gdefFd, err := dir.TableReader(r, "GDEF")
 		if err != nil {
 			return nil, err
 		}
@@ -427,8 +427,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	if header.Has("GSUB") {
-		gsubFd, err := header.TableReader(r, "GSUB")
+	if dir.Has("GSUB") {
+		gsubFd, err := dir.TableReader(r, "GSUB")
 		if err != nil {
 			return nil, err
 		}
@@ -438,8 +438,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 		}
 	}
 
-	if header.Has("GPOS") {
-		gposFd, err := header.TableReader(r, "GPOS")
+	if dir.Has("GPOS") {
+		gposFd, err := dir.TableReader(r, "GPOS")
 		if err != nil {
 			return nil, err
 		}
@@ -447,8 +447,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else if header.Has("kern") {
-		kernFd, err := header.TableReader(r, "kern")
+	} else if dir.Has("kern") {
+		kernFd, err := dir.TableReader(r, "kern")
 		if err != nil {
 			return nil, err
 		}

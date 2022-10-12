@@ -25,12 +25,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/image/font/gofont/goregular"
-	"seehuhn.de/go/pdf/sfnt/table"
+	"seehuhn.de/go/pdf/sfnt/header"
 )
 
 func BenchmarkGlyph(b *testing.B) {
 	r := bytes.NewReader(goregular.TTF)
-	header, err := table.ReadSfntHeader(r)
+	header, err := header.ReadSfntHeader(r)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -20,7 +20,6 @@ import (
 	"sort"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/parser"
 )
@@ -138,7 +137,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 			// The condition ensures that we can always store the lookup
 			// data (using extension subtables if necessary), without
 			// exceeding the maximum offset size in the lookup list table.
-			return nil, &fonterror.InvalidFontError{
+			return nil, &parser.InvalidFontError{
 				SubSystem: "sfnt/opentype/gtab",
 				Reason:    "too many lookup (sub-)tables",
 			}
@@ -176,7 +175,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 
 		if tp, ok := isExtension(subtables); ok {
 			if tp == meta.LookupType {
-				return nil, &fonterror.InvalidFontError{
+				return nil, &parser.InvalidFontError{
 					SubSystem: "sfnt/opentype/gtab",
 					Reason:    "invalid extension subtable",
 				}
@@ -185,7 +184,7 @@ func readLookupList(p *parser.Parser, pos int64, sr subtableReader) (LookupList,
 			for j, subtable := range subtables {
 				l, ok := subtable.(*extensionSubtable)
 				if !ok || l.ExtensionLookupType != tp {
-					return nil, &fonterror.InvalidFontError{
+					return nil, &parser.InvalidFontError{
 						SubSystem: "sfnt/opentype/gtab",
 						Reason:    "inconsistent extension subtables",
 					}
@@ -492,7 +491,6 @@ func (info *Info) FindLookups(wantLang language.Tag, includeFeature map[string]b
 	}
 
 	// TODO(voss): make sure a sensible default comes first.
-	// TODO(voss): why does maps.Keys(info.Scriptlist) not work?
 	tags := make([]language.Tag, 0, len(info.ScriptList))
 	for tag := range info.ScriptList {
 		tags = append(tags, tag)

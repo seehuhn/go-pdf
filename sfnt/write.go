@@ -27,13 +27,13 @@ import (
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/glyf"
 	"seehuhn.de/go/pdf/sfnt/head"
+	"seehuhn.de/go/pdf/sfnt/header"
 	"seehuhn.de/go/pdf/sfnt/hmtx"
 	"seehuhn.de/go/pdf/sfnt/maxp"
 	"seehuhn.de/go/pdf/sfnt/name"
 	"seehuhn.de/go/pdf/sfnt/opentype/gtab"
 	"seehuhn.de/go/pdf/sfnt/os2"
 	"seehuhn.de/go/pdf/sfnt/post"
-	"seehuhn.de/go/pdf/sfnt/table"
 )
 
 func (info *Info) Write(w io.Writer) (int64, error) {
@@ -73,7 +73,7 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 			return 0, err
 		}
 		tableData["CFF "] = cffData
-		scalerType = table.ScalerTypeCFF
+		scalerType = header.ScalerTypeCFF
 	case *glyf.Outlines:
 		enc := outlines.Glyphs.Encode()
 		tableData["glyf"] = enc.GlyfData
@@ -82,7 +82,7 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		for name, data := range outlines.Tables {
 			tableData[name] = data
 		}
-		scalerType = table.ScalerTypeTrueType
+		scalerType = header.ScalerTypeTrueType
 		maxpTtf = outlines.Maxp
 	default:
 		panic("unexpected font type")
@@ -106,7 +106,7 @@ func (info *Info) Write(w io.Writer) (int64, error) {
 		tableData["GPOS"] = info.Gpos.Encode(gtab.GposExtensionLookupType)
 	}
 
-	return table.Write(w, scalerType, tableData)
+	return header.Write(w, scalerType, tableData)
 }
 
 // Embed writes the binary form of the font for embedding in a PDF file.
@@ -138,7 +138,7 @@ func (info *Info) Embed(w io.Writer) (int64, error) {
 
 	tableData["head"] = info.makeHead(enc.LocaFormat)
 
-	return table.Write(w, table.ScalerTypeTrueType, tableData)
+	return header.Write(w, header.ScalerTypeTrueType, tableData)
 }
 
 func (info *Info) makeHead(locaFormat int16) []byte {

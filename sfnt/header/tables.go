@@ -14,18 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package table contains function to read and write the "table directory"
-// of an sfnt file.
+// Package header contains function to read and write the "table directory"
+// of an sfnt (TrueType or OpenType) file.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#table-directory
-package table
+package header
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"sort"
 
-	"seehuhn.de/go/pdf/sfnt/fonterror"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 const (
@@ -55,7 +54,6 @@ type Record struct {
 }
 
 // ReadSfntHeader reads the file header of an sfnt font file.
-// https://docs.microsoft.com/en-us/typography/opentype/spec/otff#table-directory
 func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 	var buf [16]byte
 	_, err := r.ReadAt(buf[:6], 0)
@@ -68,14 +66,17 @@ func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 	if scalerType != ScalerTypeTrueType &&
 		scalerType != ScalerTypeCFF &&
 		scalerType != ScalerTypeApple {
-		return nil, &fonterror.NotSupportedError{
-			SubSystem: "sfnt/header",
+		return nil, &parser.NotSupportedError{
+			SubSystem: "sfnt/table",
 			Feature:   fmt.Sprintf("scaler type 0x%x", scalerType),
 		}
 	}
 	if numTables > 280 {
 		// the largest value observed amongst the fonts on my laptop is 28
-		return nil, errors.New("sfnt/header: too many tables")
+		return nil, &parser.NotSupportedError{
+			SubSystem: "sfnt/table",
+			Feature:   "too many tables",
+		}
 	}
 
 	h := &Info{
@@ -108,7 +109,10 @@ func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 		})
 	}
 	if len(h.Toc) == 0 {
-		return nil, errors.New("sfnt/header: no tables found")
+		return nil, &parser.NotSupportedError{
+			SubSystem: "sfnt/table",
+			Feature:   "no tables found",
+		}
 	}
 
 	// perform some sanity checks
@@ -119,16 +123,25 @@ func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 		return coverage[i].End < coverage[j].End
 	})
 	if coverage[0].Start < 12 {
-		return nil, errors.New("sfnt/header: invalid table offset")
+		return nil, &parser.NotSupportedError{
+			SubSystem: "sfnt/table",
+			Feature:   "invalid table offset",
+		}
 	}
 	for i := 1; i < len(coverage); i++ {
 		if coverage[i-1].End > coverage[i].Start {
-			return nil, errors.New("sfnt/header: overlapping tables")
+			return nil, &parser.NotSupportedError{
+				SubSystem: "sfnt/table",
+				Feature:   "overlapping tables",
+			}
 		}
 	}
 	_, err = r.ReadAt(buf[:1], int64(coverage[len(coverage)-1].End)-1)
 	if err == io.EOF {
-		return nil, errors.New("sfnt/header: table extends beyond EOF")
+		return nil, &parser.NotSupportedError{
+			SubSystem: "sfnt/table",
+			Feature:   "table extends beyond EOF",
+		}
 	} else if err != nil {
 		return nil, err
 	}

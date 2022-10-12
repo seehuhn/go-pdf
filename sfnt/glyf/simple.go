@@ -17,8 +17,8 @@
 package glyf
 
 import (
-	"seehuhn.de/go/pdf/sfnt/fonterror"
 	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 // SimpleGlyph is a simple glyph.
@@ -238,7 +238,7 @@ const (
 	flagYSameOrPos = 0x20 // Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR
 )
 
-var errInvalidGlyphData = &fonterror.InvalidFontError{
+var errInvalidGlyphData = &parser.InvalidFontError{
 	SubSystem: "sfnt/glyf",
 	Reason:    "invalid glyph data",
 }
