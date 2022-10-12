@@ -61,7 +61,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	header, err := header.ReadSfntHeader(fd)
+	header, err := header.Read(fd)
 	if err != nil {
 		log.Fatal(err)
 	}

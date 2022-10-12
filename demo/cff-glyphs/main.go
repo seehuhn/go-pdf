@@ -148,7 +148,7 @@ func loadCFFData(fname string) ([]byte, error) {
 	}
 	defer r.Close()
 
-	header, err := header.ReadSfntHeader(r)
+	header, err := header.Read(r)
 	if err != nil {
 		return nil, err
 	}

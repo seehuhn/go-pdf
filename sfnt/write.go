@@ -207,6 +207,19 @@ func (info *Info) makeOS2() []byte {
 		familyClass = 10 << 8
 	}
 
+	var firstCharIndex, lastCharIndex uint16
+	if info.CMap != nil {
+		low, high := info.CMap.CodeRange()
+		firstCharIndex = uint16(low)
+		if low > 0xFFFF {
+			firstCharIndex = 0xFFFF
+		}
+		lastCharIndex = uint16(high)
+		if high > 0xFFFF {
+			lastCharIndex = 0xFFFF
+		}
+	}
+
 	os2Info := &os2.Info{
 		WeightClass: info.Weight,
 		WidthClass:  info.Width,
@@ -215,6 +228,9 @@ func (info *Info) makeOS2() []byte {
 		IsItalic:  info.ItalicAngle != 0,
 		IsRegular: info.IsRegular,
 		IsOblique: info.IsOblique,
+
+		FirstCharIndex: firstCharIndex,
+		LastCharIndex:  lastCharIndex,
 
 		Ascent:    info.Ascent,
 		Descent:   info.Descent,
@@ -228,7 +244,7 @@ func (info *Info) makeOS2() []byte {
 
 		PermUse: info.PermUse,
 	}
-	return os2Info.Encode(info.CMap)
+	return os2Info.Encode()
 }
 
 func (info *Info) makeName(ss cmap.Table) []byte {

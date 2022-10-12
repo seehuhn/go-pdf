@@ -56,7 +56,7 @@ func ReadFile(fname string) (*Info, error) {
 
 // Read reads a TrueType or OpenType font from an io.ReaderAt.
 func Read(r io.ReaderAt) (*Info, error) {
-	dir, err := header.ReadSfntHeader(r)
+	dir, err := header.Read(r)
 	if err != nil {
 		return nil, err
 	}

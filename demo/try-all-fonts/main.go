@@ -19,39 +19,61 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/sfnt"
+	"seehuhn.de/go/pdf/sfnt/cff"
+	"seehuhn.de/go/pdf/sfnt/head"
+	"seehuhn.de/go/pdf/sfnt/header"
+	"seehuhn.de/go/pdf/sfnt/os2"
 )
 
+func wrap[T any, R io.Reader](f func(r R) (T, error)) func(r io.Reader) error {
+	return func(r io.Reader) error {
+		_, err := f(r.(R))
+		return err
+	}
+}
+
+type tableReader struct {
+	name   string
+	reader func(r io.Reader) error
+}
+
+var tableReaders = []tableReader{
+	{"OS/2", wrap(os2.Read)},
+	{"head", wrap(head.Read)},
+	{"CFF ", wrap(cff.Read)},
+}
+
 func tryFont(fname string) error {
-	// r, err := os.Open(fname)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer r.Close()
-
-	// header, err := header.ReadSfntHeader(r)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// rec, ok := header.Toc["kern"]
-	// if !ok {
-	// 	return nil
-	// }
-	// kernFd := io.NewSectionReader(r, int64(rec.Offset), int64(rec.Length))
-
-	// _, err = kern.Read(kernFd)
-	// if err != nil {
-	// 	return err
-	// }
-
-	_, err := sfnt.ReadFile(fname)
+	r, err := os.Open(fname)
 	if err != nil {
 		return err
 	}
+	defer r.Close()
+
+	tables, err := header.Read(r)
+	if err != nil {
+		return err
+	}
+
+	for _, rec := range tableReaders {
+		fd, err := tables.TableReader(r, rec.name)
+		if header.IsMissing(err) {
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		err = rec.reader(fd)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// _, err := sfnt.ReadFile(fname)
 
 	return nil
 }

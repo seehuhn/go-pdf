@@ -21,12 +21,11 @@ package os2
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 
-	"seehuhn.de/go/pdf/sfnt/cmap"
 	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 // Info contains information from the "OS/2" table.
@@ -38,6 +37,9 @@ type Info struct {
 	IsItalic  bool
 	IsRegular bool
 	IsOblique bool
+
+	FirstCharIndex uint16
+	LastCharIndex  uint16
 
 	Ascent    funit.Int16
 	Descent   funit.Int16 // as a negative number
@@ -100,7 +102,10 @@ func Read(r io.Reader) (*Info, error) {
 	if err != nil {
 		return nil, err
 	} else if v0.Version > 5 {
-		return nil, errors.New("OS/2: unsupported version")
+		return nil, &parser.NotSupportedError{
+			SubSystem: "sfnt/os2",
+			Feature:   fmt.Sprintf("OS/2 table version %d", v0.Version),
+		}
 	}
 
 	var permUse Permissions
@@ -135,6 +140,9 @@ func Read(r io.Reader) (*Info, error) {
 		// IsOutlined:   sel&0x0048 == 0x0008,
 		IsRegular: sel&0x0040 != 0,
 		IsOblique: sel&0x0200 != 0,
+
+		FirstCharIndex: v0.FirstCharIndex,
+		LastCharIndex:  v0.LastCharIndex,
 
 		AvgGlyphWidth: v0.AvgCharWidth,
 
@@ -206,7 +214,7 @@ func Read(r io.Reader) (*Info, error) {
 }
 
 // Encode converts the info to a "OS/2" table.
-func (info *Info) Encode(cc cmap.Subtable) []byte {
+func (info *Info) Encode() []byte {
 	var permBits uint16
 	switch info.PermUse {
 	case PermRestricted:
@@ -254,18 +262,8 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 	}
 	sel |= 0x0080 // always use Typo{A,De}scender
 
-	var firstCharIndex, lastCharIndex uint16
-	if cc != nil {
-		low, high := cc.CodeRange()
-		firstCharIndex = uint16(low)
-		if low > 0xFFFF {
-			firstCharIndex = 0xFFFF
-		}
-		lastCharIndex = uint16(high)
-		if high > 0xFFFF {
-			lastCharIndex = 0xFFFF
-			setUniBit(57)
-		}
+	if info.LastCharIndex == 0xFFFF {
+		setUniBit(57) // TODO(voss)
 	}
 
 	vendor := [4]byte{' ', ' ', ' ', ' '}
@@ -295,8 +293,8 @@ func (info *Info) Encode(cc cmap.Subtable) []byte {
 		UnicodeRange:       unicodeRange,
 		VendID:             vendor,
 		Selection:          sel,
-		FirstCharIndex:     firstCharIndex,
-		LastCharIndex:      lastCharIndex,
+		FirstCharIndex:     info.FirstCharIndex,
+		LastCharIndex:      info.LastCharIndex,
 	}
 	_ = binary.Write(buf, binary.BigEndian, v0)
 

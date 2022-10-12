@@ -43,7 +43,7 @@ func FuzzTables(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
 		r1 := bytes.NewReader(data1)
-		info1, err := ReadSfntHeader(r1)
+		info1, err := Read(r1)
 		if err != nil {
 			return
 		}
@@ -64,7 +64,7 @@ func FuzzTables(f *testing.F) {
 
 		data2 := buf.Bytes()
 		r2 := bytes.NewReader(data2)
-		info2, err := ReadSfntHeader(r2)
+		info2, err := Read(r2)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -38,7 +38,7 @@ func main() {
 			log.Fatalf("%s: %v", fname, err)
 		}
 
-		header, err := header.ReadSfntHeader(r)
+		header, err := header.Read(r)
 		if err != nil {
 			log.Fatalf("%s: %v", fname, err)
 		}

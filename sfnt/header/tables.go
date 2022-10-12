@@ -52,8 +52,8 @@ type Record struct {
 	Length uint32
 }
 
-// ReadSfntHeader reads the file header of an sfnt font file.
-func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
+// Read reads the file header of an sfnt font file.
+func Read(r io.ReaderAt) (*Info, error) {
 	var buf [16]byte
 	_, err := r.ReadAt(buf[:6], 0)
 	if err != nil {
@@ -66,15 +66,15 @@ func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 		scalerType != ScalerTypeCFF &&
 		scalerType != ScalerTypeApple {
 		return nil, &parser.NotSupportedError{
-			SubSystem: "sfnt/table",
+			SubSystem: "sfnt/header",
 			Feature:   fmt.Sprintf("scaler type 0x%x", scalerType),
 		}
 	}
 	if numTables > 280 {
 		// the largest value observed amongst the fonts on my laptop is 28
-		return nil, &parser.NotSupportedError{
-			SubSystem: "sfnt/table",
-			Feature:   "too many tables",
+		return nil, &parser.InvalidFontError{
+			SubSystem: "sfnt/header",
+			Reason:    "too many tables",
 		}
 	}
 
@@ -108,9 +108,9 @@ func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 		})
 	}
 	if len(h.Toc) == 0 {
-		return nil, &parser.NotSupportedError{
-			SubSystem: "sfnt/table",
-			Feature:   "no tables found",
+		return nil, &parser.InvalidFontError{
+			SubSystem: "sfnt/header",
+			Reason:    "no tables",
 		}
 	}
 
@@ -122,24 +122,24 @@ func ReadSfntHeader(r io.ReaderAt) (*Info, error) {
 		return coverage[i].End < coverage[j].End
 	})
 	if coverage[0].Start < 12 {
-		return nil, &parser.NotSupportedError{
-			SubSystem: "sfnt/table",
-			Feature:   "invalid table offset",
+		return nil, &parser.InvalidFontError{
+			SubSystem: "sfnt/header",
+			Reason:    "invalid table offset",
 		}
 	}
 	for i := 1; i < len(coverage); i++ {
 		if coverage[i-1].End > coverage[i].Start {
-			return nil, &parser.NotSupportedError{
-				SubSystem: "sfnt/table",
-				Feature:   "overlapping tables",
+			return nil, &parser.InvalidFontError{
+				SubSystem: "sfnt/header",
+				Reason:    "overlapping tables",
 			}
 		}
 	}
 	_, err = r.ReadAt(buf[:1], int64(coverage[len(coverage)-1].End)-1)
 	if err == io.EOF {
-		return nil, &parser.NotSupportedError{
-			SubSystem: "sfnt/table",
-			Feature:   "table extends beyond EOF",
+		return nil, &parser.InvalidFontError{
+			SubSystem: "sfnt/header",
+			Reason:    "table extends beyond EOF",
 		}
 	} else if err != nil {
 		return nil, err

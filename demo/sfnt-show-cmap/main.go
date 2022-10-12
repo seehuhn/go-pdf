@@ -36,7 +36,7 @@ func tryFont(fname string) error {
 		return err
 	}
 	defer fd.Close()
-	header, err := header.ReadSfntHeader(fd)
+	header, err := header.Read(fd)
 	if err != nil {
 		return err
 	}
