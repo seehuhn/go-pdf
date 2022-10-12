@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package coverage reads and writes OpenType "Coverage Tables"
+// Package coverage reads and writes OpenType "Coverage Tables".
 // https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#coverage-table
 package coverage
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package maxp has code for reading and wrinting the "OS/2" table.
+// Package maxp implements reading and wrinting "maxp" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/maxp
 package maxp
 

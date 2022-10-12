@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package hmtx has code for reading and wrinting the "hhea" and "hmtx" tables.
+// Package hmtx implements reading and wrinting "hhea" and "hmtx" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/hhea
 package hmtx
 

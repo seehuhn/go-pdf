@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package glyf implements reading and writing the "glyf" and "loca" tables.
+// Package glyf reads and writes "glyf" and "loca" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/glyf
 // https://docs.microsoft.com/en-us/typography/opentype/spec/loca
 package glyf

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package os2 has code for reading and wrinting the "OS/2" table.
+// Package os2 implements reading and wrinting "OS/2" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/os2
 package os2
 

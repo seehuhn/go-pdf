@@ -14,6 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package gtab implements the OpenType GSUB and GPOS tables.
+// Package gtab reads and writes "GSUB" and "GPOS" tables.
 // The main entry point is the [Info] type, which represents a parsed GSUB or GPOS table.
 package gtab

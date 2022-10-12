@@ -46,11 +46,11 @@
 //     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 //     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Package lzw implements the Lempel-Ziv-Welch compressed data format,
-// described in T. A. Welch, “A Technique for High-Performance Data
-// Compression”, Computer, 17(6) (June 1984), pp 8-19.
+// Package lzw implements the Lempel-Ziv-Welch compressed data format.
+// This is the format described in T. A. Welch, “A Technique for
+// High-Performance Data Compression”, Computer, 17(6) (June 1984), pp 8-19.
 //
-// In particular, it implements LZW as used by the PDF file
+// In particular, the package implements LZW as used by the PDF file
 // format, which means variable-width codes up to 12 bits and the first
 // two non-literal codes are a clear code and an EOF code.
 // Both the correct and the "early change" variant are implemented.

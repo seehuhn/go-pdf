@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package kern has code for reading and writing the "kern" table.
+// Package kern reads and writes "kern" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/kern
 package kern
 

@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package header contains function to read and write the "table directory"
-// of an sfnt (TrueType or OpenType) file.
+// Package header contains function to read and write TrueType/OpenType headers.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#table-directory
 package header
 

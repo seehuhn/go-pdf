@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package head supports reading and writing the "head" table.
+// Package head reads and writes "head" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/head
 package head
 

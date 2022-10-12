@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/sfnt/type1"
 )
 
-// Info contains information about the font.
+// Info contains information about a font.
 type Info struct {
 	FamilyName string
 	Width      os2.Width
