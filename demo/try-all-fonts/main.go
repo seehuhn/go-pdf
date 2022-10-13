@@ -42,9 +42,10 @@ type tableReader struct {
 }
 
 var tableReaders = []tableReader{
+	{"CFF ", wrap(cff.Read)},
+	// {"cmap ", wrap(cmap.Read)},
 	{"OS/2", wrap(os2.Read)},
 	{"head", wrap(head.Read)},
-	{"CFF ", wrap(cff.Read)},
 }
 
 func tryFont(fname string) error {

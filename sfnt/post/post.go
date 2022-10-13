@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package post implements reading and wrinting "post" tables.
+// Package post reads and writes "post" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/post
 package post
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package header contains function to read and write TrueType/OpenType headers.
+// Package header reads and writes TrueType and OpenType file headers.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff#table-directory
 package header
 
@@ -149,8 +149,8 @@ func Read(r io.ReaderAt) (*Info, error) {
 }
 
 // Has returns true if all of the given tables are present in the font.
-func (h *Info) Has(names ...string) bool {
-	for _, name := range names {
+func (h *Info) Has(tableNames ...string) bool {
+	for _, name := range tableNames {
 		if _, ok := h.Toc[name]; !ok {
 			return false
 		}

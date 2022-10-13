@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package maxp implements reading and wrinting "maxp" tables.
+// Package maxp reads and writes "maxp" tables.
 // https://docs.microsoft.com/en-us/typography/opentype/spec/maxp
 package maxp
 

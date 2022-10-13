@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package cff implements support for reading, writing and subsetting CFF fonts.
+// Package cff implements reads and writes CFF fonts.
 //
 // CFF fonts are typically embedded in OpenType font files,
 // rather than being used as stand-alone font files.

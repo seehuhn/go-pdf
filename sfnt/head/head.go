@@ -19,7 +19,6 @@
 package head
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -30,6 +29,7 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/pdf/sfnt/parser"
 )
 
 const headLength = 54
@@ -64,10 +64,16 @@ func Read(r io.Reader) (*Info, error) {
 	}
 
 	if enc.Version != 0x00010000 {
-		return nil, fmt.Errorf("sfnt/head: unsupported table version %08x", enc.Version)
+		return nil, &parser.NotSupportedError{
+			SubSystem: "sfnt/head",
+			Feature:   fmt.Sprintf("table version 0x%08x", enc.Version),
+		}
 	}
 	if enc.MagicNumber != 0x5F0F3CF5 {
-		return nil, fmt.Errorf("sfnt/head: invalid magic number %08x", enc.MagicNumber)
+		return nil, &parser.InvalidFontError{
+			SubSystem: "sfnt/head",
+			Reason:    fmt.Sprintf("invalid magic number %08x", enc.MagicNumber),
+		}
 	}
 
 	info := &Info{}
@@ -146,27 +152,31 @@ func (info *Info) Encode() []byte {
 		macStyle |= 1 << 6
 	}
 
-	enc := &binaryHead{
-		Version:           0x00010000,
-		FontRevision:      uint32(info.FontRevision),
-		MagicNumber:       0x5F0F3CF5,
-		Flags:             flags,
-		UnitsPerEm:        info.UnitsPerEm,
-		Created:           encodeTime(info.Created),
-		Modified:          encodeTime(info.Modified),
-		XMin:              info.FontBBox.LLx,
-		YMin:              info.FontBBox.LLy,
-		XMax:              info.FontBBox.URx,
-		YMax:              info.FontBBox.URy,
-		MacStyle:          macStyle,
-		LowestRecPPEM:     info.LowestRecPPEM,
-		FontDirectionHint: 2,
-		IndexToLocFormat:  info.LocaFormat,
+	rev := info.FontRevision
+	tc := encodeTime(info.Created)
+	tm := encodeTime(info.Modified)
+	res := []byte{
+		0, 1, 0, 0, // Version
+		byte(rev >> 24), byte(rev >> 16), byte(rev >> 8), byte(rev), // FontRevision
+		0, 0, 0, 0, // CheckSumAdjustment
+		0x5F, 0x0F, 0x3C, 0xF5, // MagicNumber
+		byte(flags >> 8), byte(flags), // Flags
+		byte(info.UnitsPerEm >> 8), byte(info.UnitsPerEm), // UnitsPerEm
+		byte(tc >> 56), byte(tc >> 48), byte(tc >> 40), byte(tc >> 32),
+		byte(tc >> 24), byte(tc >> 16), byte(tc >> 8), byte(tc), // Created
+		byte(tm >> 56), byte(tm >> 48), byte(tm >> 40), byte(tm >> 32),
+		byte(tm >> 24), byte(tm >> 16), byte(tm >> 8), byte(tm), // Modified
+		byte(info.FontBBox.LLx >> 8), byte(info.FontBBox.LLx), // XMin
+		byte(info.FontBBox.LLy >> 8), byte(info.FontBBox.LLy), // YMin
+		byte(info.FontBBox.URx >> 8), byte(info.FontBBox.URx), // XMax
+		byte(info.FontBBox.URy >> 8), byte(info.FontBBox.URy), // YMax
+		byte(macStyle >> 8), byte(macStyle), // MacStyle
+		byte(info.LowestRecPPEM >> 8), byte(info.LowestRecPPEM), // LowestRecPPEM
+		0, 2, // FontDirectionHint
+		byte(info.LocaFormat >> 8), byte(info.LocaFormat), // IndexToLocFormat
+		0, 0, // GlyphDataFormat
 	}
-
-	buf := bytes.NewBuffer(make([]byte, 0, headLength))
-	_ = binary.Write(buf, binary.BigEndian, enc)
-	return buf.Bytes()
+	return res
 }
 
 type binaryHead struct {
