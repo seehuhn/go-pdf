@@ -47,18 +47,18 @@ type Info struct {
 	CapHeight funit.Int16
 	XHeight   funit.Int16
 
-	AvgGlyphWidth int16 // arithmetic average of the width of all non-zero width glyphs
+	AvgGlyphWidth funit.Int16 // arithmetic average of the width of all non-zero width glyphs
 
-	SubscriptXSize     int16
-	SubscriptYSize     int16
-	SubscriptXOffset   int16
-	SubscriptYOffset   int16
-	SuperscriptXSize   int16
-	SuperscriptYSize   int16
-	SuperscriptXOffset int16
-	SuperscriptYOffset int16
-	StrikeoutSize      int16
-	StrikeoutPosition  int16
+	SubscriptXSize     funit.Int16
+	SubscriptYSize     funit.Int16
+	SubscriptXOffset   funit.Int16
+	SubscriptYOffset   funit.Int16
+	SuperscriptXSize   funit.Int16
+	SuperscriptYSize   funit.Int16
+	SuperscriptXOffset funit.Int16
+	SuperscriptYOffset funit.Int16
+	StrikeoutSize      funit.Int16
+	StrikeoutPosition  funit.Int16
 
 	FamilyClass int16    // https://docs.microsoft.com/en-us/typography/opentype/spec/ibmfc
 	Panose      [10]byte // https://monotype.github.io/panose/
@@ -110,7 +110,7 @@ func Read(r io.Reader) (*Info, error) {
 
 	var permUse Permissions
 	permBits := v0.Type
-	if v0.Version == 0 {
+	if v0.Version < 3 {
 		permBits &= 0xF
 	}
 	if permBits&8 != 0 {
@@ -338,20 +338,20 @@ func (info *Info) Encode() []byte {
 
 type v0Data struct {
 	Version            uint16
-	AvgCharWidth       int16
+	AvgCharWidth       funit.Int16
 	WeightClass        uint16
 	WidthClass         uint16
-	Type               uint16
-	SubscriptXSize     int16
-	SubscriptYSize     int16
-	SubscriptXOffset   int16
-	SubscriptYOffset   int16
-	SuperscriptXSize   int16
-	SuperscriptYSize   int16
-	SuperscriptXOffset int16
-	SuperscriptYOffset int16
-	StrikeoutSize      int16
-	StrikeoutPosition  int16
+	Type               uint16 // embedding licensing rights for the font
+	SubscriptXSize     funit.Int16
+	SubscriptYSize     funit.Int16
+	SubscriptXOffset   funit.Int16
+	SubscriptYOffset   funit.Int16
+	SuperscriptXSize   funit.Int16
+	SuperscriptYSize   funit.Int16
+	SuperscriptXOffset funit.Int16
+	SuperscriptYOffset funit.Int16
+	StrikeoutSize      funit.Int16
+	StrikeoutPosition  funit.Int16
 	FamilyClass        int16
 	Panose             [10]byte
 	UnicodeRange       [4]uint32

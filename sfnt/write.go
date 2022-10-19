@@ -238,7 +238,7 @@ func (info *Info) makeOS2() []byte {
 		CapHeight: info.CapHeight,
 		XHeight:   info.XHeight,
 
-		AvgGlyphWidth: int16(avgGlyphWidth),
+		AvgGlyphWidth: funit.Int16(avgGlyphWidth),
 
 		FamilyClass: familyClass,
 

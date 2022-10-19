@@ -45,12 +45,12 @@ type Info struct {
 	IsSerif    bool
 	IsScript   bool // Glyphs resemble cursive handwriting.
 
-	Description string
-	SampleText  string
-
 	Version          head.Version
 	CreationTime     time.Time
 	ModificationTime time.Time
+
+	Description string
+	SampleText  string
 
 	Copyright string
 	Trademark string
