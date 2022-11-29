@@ -20,6 +20,7 @@ package graphics
 type LineCapStyle uint8
 
 // Possible values for LineCapStyle.
+// See section 8.4.3.3 of PDF 32000-1:2008.
 const (
 	LineCapButt   LineCapStyle = 0
 	LineCapRound  LineCapStyle = 1

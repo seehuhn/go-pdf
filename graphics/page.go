@@ -42,9 +42,25 @@ func (p *Page) valid(cmd string, ss ...state) bool {
 	return false
 }
 
+// PushGraphicsState saves the current graphics state.
+func (p *Page) PushGraphicsState() {
+	if !p.valid("PushGraphicsState", stateGlobal, stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.w, "q")
+}
+
+// PopGraphicsState restores the previous graphics state.
+func (p *Page) PopGraphicsState() {
+	if !p.valid("PopGraphicsState", stateGlobal, stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.w, "Q")
+}
+
 // Translate moves the origin of the coordinate system.
 func (p *Page) Translate(x, y float64) {
-	if !p.valid("Translate", stateGlobal) {
+	if !p.valid("Translate", stateGlobal, stateText) {
 		return
 	}
 	_, p.err = fmt.Fprintln(p.w, 1, 0, 0, 1, coord(x), coord(y), "cm")
@@ -52,10 +68,18 @@ func (p *Page) Translate(x, y float64) {
 
 // SetLineWidth sets the line width.
 func (p *Page) SetLineWidth(width float64) {
-	if !p.valid("SetLineWidth", stateGlobal) {
+	if !p.valid("SetLineWidth", stateGlobal, stateText) {
 		return
 	}
 	_, p.err = fmt.Fprintln(p.w, coord(width), "w")
+}
+
+// SetLineCap sets the line cap style.
+func (p *Page) SetLineCap(cap LineCapStyle) {
+	if !p.valid("SetLineCap", stateGlobal, stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.w, int(cap), "J")
 }
 
 type coord float64

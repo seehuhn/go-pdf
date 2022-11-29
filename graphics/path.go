@@ -20,6 +20,11 @@ func (p *Page) Rectangle(x, y, width, height float64) {
 	_, p.err = fmt.Fprintln(p.w, coord(x), coord(y), coord(width), coord(height), "re")
 }
 
+// Arc appends an arc of a circle to the current path.
+func (p *Page) Arc(x, y, radius, startAngle, endAngle float64) {
+	panic("not implemented")
+}
+
 // LineTo appends a straight line segment to the current path.
 func (p *Page) LineTo(x, y float64) {
 	if !p.valid("LineTo", statePath, stateClipped) {
@@ -54,12 +59,4 @@ func (p *Page) Fill() {
 	}
 	p.state = stateGlobal
 	_, p.err = fmt.Fprintln(p.w, "f")
-}
-
-func (p *Page) Arc(x, y, radius, startAngle, endAngle float64) {
-	if !p.valid("Arc", stateGlobal, statePath) {
-		return
-	}
-	p.state = statePath
-	_, p.err = fmt.Fprintln(p.w, coord(x), coord(y), coord(radius), coord(startAngle), coord(endAngle), "ar")
 }
