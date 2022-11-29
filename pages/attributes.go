@@ -34,9 +34,10 @@ type Resources struct {
 	Properties pdf.Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
 }
 
-// Attributes specifies Page DefaultAttributes.
+// Attributes specifies Page attributes.
 //
 // These attributes are documented in section 7.7.3.3 of PDF 32000-1:2008.
+// TODO(voss): add support for the other attributes.
 type Attributes struct {
 	Resources *Resources
 
