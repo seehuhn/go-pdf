@@ -16,40 +16,20 @@
 
 package graphics
 
-type State struct {
-	CTM Matrix
-	// Clipping Path
-	// Color Space
-	// Color
-	// Text State
-	LineWidth   float64
-	LineCap     LineCapStyle
-	LineJoin    LineJoinStyle
-	MiterLimit  float64
-	DashPattern []float64
-	DashPhase   float64
-	// Rendering Intent
-	StrokeAdjustment bool
-	// Blend Mode
-	// Soft Mask
-	// Alpha Constant
-	// Alpha Source
-
-	// Also Table 53 – Device-Dependent Graphics State Parameters (page 123)
-}
-
-type Matrix [6]float64
-
+// LineCapStyle is the style of the end of a line.
 type LineCapStyle uint8
 
+// Possible values for LineCapStyle.
 const (
 	LineCapButt   LineCapStyle = 0
 	LineCapRound  LineCapStyle = 1
 	LineCapSquare LineCapStyle = 2
 )
 
+// LineJoinStyle is the style of the corner of a line.
 type LineJoinStyle uint8
 
+// Possible values for LineJoinStyle.
 const (
 	LineJoinMiter LineJoinStyle = 0
 	LineJoinRound LineJoinStyle = 1
