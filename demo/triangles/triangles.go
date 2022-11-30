@@ -93,7 +93,6 @@ func main() {
 			URx: 440,
 			URy: mu + 60,
 		},
-		Rotate: 0,
 	})
 	if err != nil {
 		log.Fatal(err)
