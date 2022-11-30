@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -16,8 +17,18 @@ func main() {
 	}
 	defer w.Close()
 
+	F, err := builtin.Embed(w, builtin.Helvetica, "F")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	pageTree := pages.NewPageTree(w, nil)
 	page, err := pageTree.NewPage(&pages.Attributes{
+		Resources: &pages.Resources{
+			Font: pdf.Dict{
+				F.InstName: F.Ref,
+			},
+		},
 		MediaBox: pages.A4,
 	})
 	if err != nil {
@@ -36,6 +47,18 @@ func main() {
 	g.MoveTo(x, y)
 	g.LineToArc(x, y, r, 0, 1.5*math.Pi)
 	g.CloseAndStroke()
+
+	x = 72
+	y -= 72
+	g.BeginText()
+	g.SetFont(F, 12)
+	g.StartLine(x, y)
+	g.ShowString("AWAY again")
+	g.StartNextLine(0, -15)
+	g.ShowString("line 2")
+	g.NewLine()
+	g.ShowString("line 3")
+	g.EndText()
 
 	err = g.Close()
 	if err != nil {

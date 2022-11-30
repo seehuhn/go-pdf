@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 )
 
 // Page is a PDF page.
@@ -11,6 +14,10 @@ type Page struct {
 	w     io.Writer
 	state state
 	err   error
+
+	font     *font.Font
+	fontSize float64
+	textRise pdf.Integer
 }
 
 // NewPage creates a new page.
@@ -42,55 +49,13 @@ func (p *Page) valid(cmd string, ss ...state) bool {
 	return false
 }
 
-// PushGraphicsState saves the current graphics state.
-func (p *Page) PushGraphicsState() {
-	if !p.valid("PushGraphicsState", stateGlobal, stateText) {
-		return
-	}
-	_, p.err = fmt.Fprintln(p.w, "q")
-}
-
-// PopGraphicsState restores the previous graphics state.
-func (p *Page) PopGraphicsState() {
-	if !p.valid("PopGraphicsState", stateGlobal, stateText) {
-		return
-	}
-	_, p.err = fmt.Fprintln(p.w, "Q")
-}
-
-// Translate moves the origin of the coordinate system.
-func (p *Page) Translate(x, y float64) {
-	if !p.valid("Translate", stateGlobal, stateText) {
-		return
-	}
-	_, p.err = fmt.Fprintln(p.w, 1, 0, 0, 1, coord(x), coord(y), "cm")
-}
-
-// SetLineWidth sets the line width.
-func (p *Page) SetLineWidth(width float64) {
-	if !p.valid("SetLineWidth", stateGlobal, stateText) {
-		return
-	}
-	_, p.err = fmt.Fprintln(p.w, coord(width), "w")
-}
-
-// SetLineCap sets the line cap style.
-func (p *Page) SetLineCap(cap LineCapStyle) {
-	if !p.valid("SetLineCap", stateGlobal, stateText) {
-		return
-	}
-	_, p.err = fmt.Fprintln(p.w, int(cap), "J")
-}
-
-type coord float64
-
-func (x coord) String() string {
+func (p *Page) coord(x float64) string {
 	// TODO(voss): think about this some more
 	xInt := int(x)
-	if math.Abs(float64(x)-float64(xInt)) < 1e-6 {
+	if math.Abs(x-float64(xInt)) < 1e-6 {
 		return fmt.Sprintf("%d", xInt)
 	}
-	return fmt.Sprintf("%g", float64(x))
+	return fmt.Sprintf("%g", x)
 }
 
 type state int

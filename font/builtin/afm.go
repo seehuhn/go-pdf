@@ -219,23 +219,41 @@ func Afm(fontName string) (*AfmInfo, error) {
 	return res, nil
 }
 
-// FontNames lists the names of the 14 built-in PDF fonts.
+// The names of the 14 built-in PDF fonts.
 // These are the valid arguments for the Afm() function.
+const (
+	Courier              = "Courier"
+	CourierBold          = "Courier-Bold"
+	CourierBoldOblique   = "Courier-BoldOblique"
+	CourierOblique       = "Courier-Oblique"
+	Helvetica            = "Helvetica"
+	HelveticaBold        = "Helvetica-Bold"
+	HelveticaBoldOblique = "Helvetica-BoldOblique"
+	HelveticaOblique     = "Helvetica-Oblique"
+	TimesRoman           = "Times-Roman"
+	TimesBold            = "Times-Bold"
+	TimesBoldItalic      = "Times-BoldItalic"
+	TimesItalic          = "Times-Italic"
+	Symbol               = "Symbol"
+	ZapfDingbats         = "ZapfDingbats"
+)
+
+// FontNames contains the names of the 14 built-in PDF fonts.zx
 var FontNames = []string{
-	"Courier",
-	"Courier-Bold",
-	"Courier-BoldOblique",
-	"Courier-Oblique",
-	"Helvetica",
-	"Helvetica-Bold",
-	"Helvetica-BoldOblique",
-	"Helvetica-Oblique",
-	"Times-Roman",
-	"Times-Bold",
-	"Times-BoldItalic",
-	"Times-Italic",
-	"Symbol",
-	"ZapfDingbats",
+	Courier,
+	CourierBold,
+	CourierBoldOblique,
+	CourierOblique,
+	Helvetica,
+	HelveticaBold,
+	HelveticaBoldOblique,
+	HelveticaOblique,
+	TimesRoman,
+	TimesBold,
+	TimesBoldItalic,
+	TimesItalic,
+	Symbol,
+	ZapfDingbats,
 }
 
 //go:embed afm/*.afm

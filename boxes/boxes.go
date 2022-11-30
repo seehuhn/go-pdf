@@ -103,7 +103,7 @@ type TextBox struct {
 // Text returns a new Text object.
 func Text(F *font.Font, ptSize float64, text string) *TextBox {
 	return &TextBox{
-		Layout: F.Typeset(text, ptSize),
+		Layout: F.TypesetOld(text, ptSize),
 	}
 }
 

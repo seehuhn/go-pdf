@@ -11,7 +11,7 @@ func (p *Page) MoveTo(x, y float64) {
 		return
 	}
 	p.state = statePath
-	_, p.err = fmt.Fprintln(p.w, coord(x), coord(y), "m")
+	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), "m")
 }
 
 // LineTo appends a straight line segment to the current path.
@@ -19,7 +19,7 @@ func (p *Page) LineTo(x, y float64) {
 	if !p.valid("LineTo", statePath, stateClipped) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, coord(x), coord(y), "l")
+	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), "l")
 }
 
 // Rectangle appends a rectangle to the current path as a closed subpath.
@@ -28,7 +28,7 @@ func (p *Page) Rectangle(x, y, width, height float64) {
 		return
 	}
 	p.state = statePath
-	_, p.err = fmt.Fprintln(p.w, coord(x), coord(y), coord(width), coord(height), "re")
+	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), p.coord(width), p.coord(height), "re")
 }
 
 // MoveToArc appends a circular arc to the current path,
@@ -77,13 +77,13 @@ func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 		y3 := y + radius*math.Sin(phi)
 		x2 := x3 + k*math.Sin(phi)
 		y2 := y3 - k*math.Cos(phi)
-		_, p.err = fmt.Fprintln(p.w, coord(x1), coord(y1), coord(x2), coord(y2), coord(x3), coord(y3), "c")
+		_, p.err = fmt.Fprintln(p.w, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
 		x0 = x3
 		y0 = y3
 	}
 }
 
-// Circle appends a circle to the current path as a closed subpath.
+// Circle appends a circle to the current path, as a closed subpath.
 func (p *Page) Circle(x, y, radius float64) {
 	p.MoveToArc(x, y, radius, 0, 2*math.Pi)
 	p.ClosePath()

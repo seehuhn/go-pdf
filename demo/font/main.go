@@ -105,7 +105,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	layout := F1.Typeset(text, fontSize)
+	layout := F1.TypesetOld(text, fontSize)
 	glyphs := layout.Glyphs
 	for _, glyph := range glyphs {
 		fmt.Printf("%q %v\n", string(glyph.Text), glyph)

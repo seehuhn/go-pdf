@@ -33,7 +33,7 @@ type Font struct {
 	Ref      *pdf.Reference
 
 	Layout func([]rune) []glyph.Info
-	Enc    func(glyph.ID) pdf.String
+	Enc    func(glyph.ID) pdf.String // TODO(voss): turn this into an append function
 
 	UnitsPerEm         uint16
 	Ascent             funit.Int16
@@ -57,9 +57,21 @@ func isPrivateRange(r rune) bool {
 		r >= '\U00100000' && r <= '\U0010FFFD'
 }
 
+// TypesetOld computes all glyph and layout information required to typeset a
+// string in a PDF file.
+// TODO(voss): remove
+func (font *Font) TypesetOld(s string, ptSize float64) *Layout {
+	glyphs := font.Typeset(s, ptSize)
+	return &Layout{
+		Font:     font,
+		FontSize: ptSize,
+		Glyphs:   glyphs,
+	}
+}
+
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
-func (font *Font) Typeset(s string, ptSize float64) *Layout {
+func (font *Font) Typeset(s string, ptSize float64) []glyph.Info {
 	var runs [][]rune
 	var run []rune
 	for _, r := range s {
@@ -79,12 +91,7 @@ func (font *Font) Typeset(s string, ptSize float64) *Layout {
 		seq := font.Layout(run)
 		glyphs = append(glyphs, seq...)
 	}
-
-	return &Layout{
-		Font:     font,
-		FontSize: ptSize,
-		Glyphs:   glyphs,
-	}
+	return glyphs
 }
 
 // Layout contains the information needed to typeset a run of text.
