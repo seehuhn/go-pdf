@@ -69,6 +69,14 @@ const (
 	LineCapSquare LineCapStyle = 2
 )
 
+// SetLineJoin sets the line join style.
+func (p *Page) SetLineJoin(join LineJoinStyle) {
+	if !p.valid("SetLineJoin", stateGlobal, stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.w, int(join), "j")
+}
+
 // LineJoinStyle is the style of the corner of a line.
 type LineJoinStyle uint8
 

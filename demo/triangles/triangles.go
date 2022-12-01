@@ -17,47 +17,16 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"log"
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
 
 func norm(x, y float64) float64 {
 	return math.Sqrt(x*x + y*y)
-}
-
-func arc(w io.Writer, x, y, radius, startAngle, endAngle float64) {
-	// thanks to https://www.tinaja.com/glib/bezcirc2.pdf
-	// TODO(voss): also have a look at https://pomax.github.io/bezierinfo/
-	nSegment := int(math.Ceil(math.Abs(endAngle-startAngle) / (0.5 * math.Pi)))
-	dPhi := (endAngle - startAngle) / float64(nSegment)
-	x0 := math.Cos(dPhi / 2)
-	y0 := math.Sin(dPhi / 2)
-	x1 := (4 - x0) / 3
-	y1 := (1 - x0) * (3 - x0) / (3 * y0)
-	x2 := x1
-	y2 := -y1
-	x3 := x0
-	y3 := -y0
-
-	for i := 0; i < nSegment; i++ {
-		// we need to rotate -dPhi/2 to startAngle+i*dPhi
-		rot := startAngle + (float64(i)+.5)*dPhi
-		cr := math.Cos(rot)
-		sr := math.Sin(rot)
-		// the rotation matrix is
-		//    / cr -sr \
-		//    \ sr  cr /
-		fmt.Fprintf(w, "%f %f m %f %f %f %f %f %f c\n",
-			x+(cr*x3-sr*y3)*radius, y+(sr*x3+cr*y3)*radius,
-			x+(cr*x2-sr*y2)*radius, y+(sr*x2+cr*y2)*radius,
-			x+(cr*x1-sr*y1)*radius, y+(sr*x1+cr*y1)*radius,
-			x+(cr*x0-sr*y0)*radius, y+(sr*x0+cr*y0)*radius)
-	}
 }
 
 func main() {
@@ -98,30 +67,65 @@ func main() {
 		log.Fatal(err)
 	}
 
-	page.Println("1 0 0 1 20 20 cm 1 j 1 J")
-	page.Printf("2 w %f %f m 0 0 l 400 0 l %f %f l S\n", xL, yL, xR, yR)
-	page.Printf("1 w 200 0 m 200 %f l S\n", mu+20)
+	g := graphics.NewPage(page)
+	g.Translate(20, 20)
+	g.SetLineJoin(graphics.LineJoinRound)
+	g.SetLineCap(graphics.LineCapRound)
 
-	page.Println(".1 .1 1 RG")
-	page.Printf("2 w %f %f m %f %f l S\n", xL, yL, xR, yR)
-	page.Printf("1 w %f %f m %f %f l S\n",
-		xM, yM, xM+(lambda+20)*nx, yM+(lambda+20)*ny)
+	g.SetLineWidth(2)
+	g.MoveTo(xL, yL)
+	g.LineTo(0, 0)
+	g.LineTo(400, 0)
+	g.LineTo(xR, yR)
+	g.Stroke()
 
-	page.Printf("1 0 0 RG 2 w 0 0 m 200 %f l 400 0 l S\n", mu)
-	page.Printf("0 0.8 0 RG 2 w %f %f m 200 %f l %f %f l S\n",
-		xL, yL, mu, xR, yR)
+	g.SetLineWidth(1)
+	g.MoveTo(200, 0)
+	g.LineTo(200, mu+20)
+	g.Stroke()
+
+	g.SetStrokeRGB(.1, .1, 1)
+	g.SetLineWidth(2)
+	g.MoveTo(xL, yL)
+	g.LineTo(xR, yR)
+	g.Stroke()
+	g.SetLineWidth(1)
+	g.MoveTo(xM, yM)
+	g.LineTo(xM+(lambda+20)*nx, yM+(lambda+20)*ny)
+	g.Stroke()
+
+	g.SetStrokeRGB(1, 0, 0)
+	g.SetLineWidth(2)
+	g.MoveTo(0, 0)
+	g.LineTo(200, mu)
+	g.LineTo(400, 0)
+	g.Stroke()
+	g.SetStrokeRGB(0, 0.8, 0)
+	g.SetLineWidth(2)
+	g.MoveTo(xL, yL)
+	g.LineTo(200, mu)
+	g.LineTo(xR, yR)
+	g.Stroke()
 
 	phi := math.Atan(mu / 200)
-	page.Println("q 0 J 1 0 0 RG 5 w")
-	arc(page, 0, 0, 20, 0, phi)
-	arc(page, 400, 0, 20, math.Pi-phi, math.Pi)
-	page.Println("S Q")
+	g.PushGraphicsState()
+	g.SetLineCap(graphics.LineCapButt)
+	g.SetStrokeRGB(1, 0, 0)
+	g.SetLineWidth(5)
+	g.MoveToArc(0, 0, 20, 0, phi)
+	g.MoveToArc(400, 0, 20, math.Pi-phi, math.Pi)
+	g.Stroke()
+	g.PopGraphicsState()
 
 	psi := math.Pi/2 - math.Atan(lambda/(d/2))
-	page.Println("q 0 J 0 0.8 0 RG 5 w")
-	arc(page, 0, 0, 20, phi, phi+psi)
-	arc(page, 400, 0, 30, math.Pi-phi, math.Pi-phi+psi)
-	page.Println("S Q")
+	g.PushGraphicsState()
+	g.SetLineCap(graphics.LineCapButt)
+	g.SetStrokeRGB(0, 0.8, 0)
+	g.SetLineWidth(5)
+	g.MoveToArc(0, 0, 20, phi, phi+psi)
+	g.MoveToArc(400, 0, 30, math.Pi-phi, math.Pi-phi+psi)
+	g.Stroke()
+	g.PopGraphicsState()
 
 	// Draw black circles over the joining points of differently coloured
 	// lines.
@@ -132,11 +136,18 @@ func main() {
 		{xR, yR},
 		{200, mu},
 	}
-	page.Println("0 G 2 w")
+	g.SetStrokeGray(0)
+	g.SetLineWidth(2)
 	for _, p := range pp {
-		page.Printf("%f %f m %f %f l\n", p.x, p.y, p.x, p.y)
+		g.MoveTo(p.x, p.y)
+		g.LineTo(p.x, p.y)
 	}
-	page.Println("S")
+	g.Stroke()
+
+	err = g.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	err = page.Close()
 	if err != nil {

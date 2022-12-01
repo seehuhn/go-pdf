@@ -71,7 +71,7 @@ func doOneFile(fname string) error {
 		}
 		if good {
 			fmt.Println(fname, ref)
-			stm.Dict.PDF(os.Stdout)
+			_ = stm.Dict.PDF(os.Stdout)
 		}
 	}
 

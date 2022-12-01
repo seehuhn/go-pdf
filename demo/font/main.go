@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"golang.org/x/text/language"
@@ -28,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/sfnt"
 )
 
 const (
@@ -64,31 +62,14 @@ func main() {
 func writePage(out *pdf.Writer, text string, width, height float64) error {
 	fontFile := "../../font/otf/SourceSerif4-Regular.otf"
 	var F1 *font.Font
+	var err error
 	if strings.HasSuffix(fontFile, ".ttf") || strings.HasSuffix(fontFile, ".otf") {
-		fd, err := os.Open(fontFile)
-		if err != nil {
-			return err
-		}
-		info, err := sfnt.Read(fd)
-		if err != nil {
-			fd.Close()
-			return err
-		}
-		err = fd.Close()
-		if err != nil {
-			return err
-		}
-
-		F1, err = simple.Embed(out, info, "F1", language.AmericanEnglish)
-		if err != nil {
-			return err
-		}
+		F1, err = simple.EmbedFile(out, fontFile, "F1", language.AmericanEnglish)
 	} else {
-		var err error
 		F1, err = builtin.Embed(out, fontFile, "F1")
-		if err != nil {
-			return err
-		}
+	}
+	if err != nil {
+		return err
 	}
 
 	pageTree := pages.NewPageTree(out, nil)

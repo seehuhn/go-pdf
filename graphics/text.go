@@ -7,6 +7,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 // BeginText starts a new text object.
@@ -73,20 +74,32 @@ func (p *Page) ShowString(s string) {
 	p.ShowStringAligned(s, 0, 0)
 }
 
-// ShowStringAligned draws a string and align it.
+// ShowStringAligned draws a string and aligns it.
 // The beginning of the string is shifted right by a*w+b, where w
 // is the width of the string.
 func (p *Page) ShowStringAligned(s string, a, b float64) {
-	if !p.valid("ShowStrings", stateText) {
+	font := p.font
+	if font == nil {
+		p.err = errors.New("no font set")
 		return
 	}
-	if p.font == nil {
+	gg := font.Typeset(s, p.fontSize)
+	p.ShowGlyphsAligned(gg, a, b)
+}
+
+// ShowGlyphsAligned draws a sequence of glyphs and aligns it.
+// The beginning of the string is shifted right by a*w+b, where w
+// is the width of the string.
+func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
+	if !p.valid("ShowGlyphsAligned", stateText) {
+		return
+	}
+	font := p.font
+	if font == nil {
 		p.err = errors.New("no font set")
 		return
 	}
 
-	font := p.font
-	gg := font.Typeset(s, p.fontSize)
 	if len(gg) == 0 {
 		return
 	}
