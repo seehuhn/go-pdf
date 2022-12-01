@@ -124,3 +124,13 @@ func (p *Page) Fill() {
 	p.state = stateGlobal
 	_, p.err = fmt.Fprintln(p.w, "f")
 }
+
+// FillAndStroke fills and strokes the current path.  Any subpaths that are
+// open are implicitly closed before being filled.
+func (p *Page) FillAndStroke() {
+	if !p.valid("FillAndStroke", statePath, stateClipped) {
+		return
+	}
+	p.state = stateGlobal
+	_, p.err = fmt.Fprintln(p.w, "B")
+}
