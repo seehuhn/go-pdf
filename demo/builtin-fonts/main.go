@@ -49,11 +49,11 @@ func (gl *glyphBox) Extent() *boxes.BoxExtent {
 
 func (gl *glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 	page.Println("q")
-	font := gl.text.Layout.Font
+	font := gl.text.Font
 	x := xPos
 	y := yPos
 	page.Println(".4 1 .4 rg")
-	for _, glyph := range gl.text.Layout.Glyphs {
+	for _, glyph := range gl.text.Glyphs {
 		gid := glyph.Gid
 		ext := font.GlyphExtents[gid]
 		page.Printf("%.2f %.2f %.2f %.2f re\n",
@@ -206,10 +206,10 @@ func (f *fontTables) DoFlush() error {
 	boxes.Walk(pageBody, func(box boxes.Box) {
 		switch b := box.(type) {
 		case *boxes.TextBox:
-			font := b.Layout.Font
+			font := b.Font
 			pageFonts[font.InstName] = font.Ref
 		case *glyphBox:
-			font := b.text.Layout.Font
+			font := b.text.Font
 			pageFonts[font.InstName] = font.Ref
 		}
 	})

@@ -62,7 +62,7 @@ func MakePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFon
 		boxes.Walk(pageBody, func(box boxes.Box) {
 			switch b := box.(type) {
 			case *boxes.TextBox:
-				font := b.Layout.Font
+				font := b.Font
 				pageFonts[font.InstName] = font.Ref
 			}
 		})

@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/simple"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -60,7 +61,7 @@ func main() {
 }
 
 func writePage(out *pdf.Writer, text string, width, height float64) error {
-	fontFile := "../../font/otf/SourceSerif4-Regular.otf"
+	fontFile := "../../sfnt/otf/SourceSerif4-Regular.otf"
 	var F1 *font.Font
 	var err error
 	if strings.HasSuffix(fontFile, ".ttf") || strings.HasSuffix(fontFile, ".otf") {
@@ -86,8 +87,9 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	layout := F1.TypesetOld(text, fontSize)
-	glyphs := layout.Glyphs
+	g := graphics.NewPage(page)
+
+	glyphs := F1.Typeset(text, fontSize)
 	for _, glyph := range glyphs {
 		fmt.Printf("%q %v\n", string(glyph.Text), glyph)
 	}
@@ -100,16 +102,17 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	yPos := height - margin - F1.Ascent.AsFloat(q)
 
 	// draw red horizontal rules
-	page.Println("q")
-	page.Println("1 .5 .5 RG")
+	g.PushGraphicsState()
+	g.SetStrokeRGB(1, .5, .5)
 	for y := yPos; y > margin; y -= baseLineSkip {
-		page.Printf("%.1f %.1f m %.1f %.1f l\n", margin, y, width-margin, y)
+		g.MoveTo(margin, y)
+		g.LineTo(width-margin, y)
 	}
-	page.Println("s")
-	page.Println("Q")
+	g.Stroke()
+	g.PopGraphicsState()
 
-	page.Println("q")
-	page.Println(".2 1 .2 RG")
+	g.PushGraphicsState()
+	g.SetStrokeRGB(.2, 1, .2)
 	for _, gl := range glyphs {
 		c := gl.Gid
 		rect := F1.GlyphExtents[c]
@@ -124,15 +127,23 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 			y := yPos + gl.YOffset.AsFloat(q) + bbox.LLy
 			w := bbox.URx - bbox.LLx
 			h := bbox.URy - bbox.LLy
-			page.Printf("%.2f %.2f %.2f %.2f re\n", x, y, w, h)
+			g.Rectangle(x, y, w, h)
 		}
 		xPos += gl.Advance.AsFloat(q)
 	}
-	page.Println("s")
-	page.Println("Q")
+	g.Stroke()
+	g.PopGraphicsState()
 
 	xPos = margin
-	layout.Draw(page, xPos, yPos)
+	g.BeginText()
+	g.SetFont(F1, fontSize)
+	g.StartLine(xPos, yPos)
+	g.ShowGlyphsAligned(glyphs, 0, 0)
+
+	err = g.Close()
+	if err != nil {
+		return err
+	}
 
 	return page.Close()
 }

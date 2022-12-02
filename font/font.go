@@ -57,18 +57,6 @@ func isPrivateRange(r rune) bool {
 		r >= '\U00100000' && r <= '\U0010FFFD'
 }
 
-// TypesetOld computes all glyph and layout information required to typeset a
-// string in a PDF file.
-// TODO(voss): remove
-func (font *Font) TypesetOld(s string, ptSize float64) *Layout {
-	glyphs := font.Typeset(s, ptSize)
-	return &Layout{
-		Font:     font,
-		FontSize: ptSize,
-		Glyphs:   glyphs,
-	}
-}
-
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
 func (font *Font) Typeset(s string, ptSize float64) []glyph.Info {
@@ -95,6 +83,7 @@ func (font *Font) Typeset(s string, ptSize float64) []glyph.Info {
 }
 
 // Layout contains the information needed to typeset a run of text.
+// TODO(voss): remove
 type Layout struct {
 	Font     *Font
 	FontSize float64
@@ -102,7 +91,6 @@ type Layout struct {
 }
 
 // Draw shows the text layout on a page.
-// TODO(voss): remove the dependency on the pages package?
 // TODO(voss): replace with [graphics.ShowString]?
 func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
 	font := layout.Font

@@ -150,13 +150,10 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			l := &font.Layout{
+			c <- &boxes.TextBox{
 				Font:     F,
 				FontSize: 24,
 				Glyphs:   seq,
-			}
-			c <- &boxes.TextBox{
-				Layout: l,
 			}
 		} else {
 			c <- boxes.Text(labelFont, 10, "(no glyphs)")
@@ -213,7 +210,7 @@ func makePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFon
 		boxes.Walk(pageBody, func(box boxes.Box) {
 			switch b := box.(type) {
 			case *boxes.TextBox:
-				font := b.Layout.Font
+				font := b.Font
 				pageFonts[font.InstName] = font.Ref
 			}
 		})

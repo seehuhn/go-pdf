@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 // Parameters contains the parameter values used by the layout engine.
@@ -97,25 +98,29 @@ func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
 
 // TextBox represents a typeset string of characters as a Box object.
 type TextBox struct {
-	Layout *font.Layout
+	Font     *font.Font
+	FontSize float64
+	Glyphs   []glyph.Info
 }
 
 // Text returns a new Text object.
 func Text(F *font.Font, ptSize float64, text string) *TextBox {
 	return &TextBox{
-		Layout: F.TypesetOld(text, ptSize),
+		Font:     F,
+		FontSize: ptSize,
+		Glyphs:   F.Typeset(text, ptSize),
 	}
 }
 
 // Extent implements the Box interface
 func (obj *TextBox) Extent() *BoxExtent {
-	font := obj.Layout.Font
-	q := obj.Layout.FontSize / float64(font.UnitsPerEm)
+	font := obj.Font
+	q := obj.FontSize / float64(font.UnitsPerEm)
 
 	width := 0.0
 	height := math.Inf(-1)
 	depth := math.Inf(-1)
-	for _, glyph := range obj.Layout.Glyphs {
+	for _, glyph := range obj.Glyphs {
 		width += glyph.Advance.AsFloat(q)
 
 		thisDepth := font.Descent.AsFloat(q)
@@ -153,7 +158,71 @@ func (obj *TextBox) Extent() *BoxExtent {
 
 // Draw implements the Box interface.
 func (obj *TextBox) Draw(page *pages.Page, xPos, yPos float64) {
-	obj.Layout.Draw(page, xPos, yPos)
+	font := obj.Font
+
+	page.Println("BT")
+	_ = font.InstName.PDF(page)
+	fmt.Fprintf(page, " %f Tf\n", obj.FontSize)
+	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
+
+	var run pdf.String
+	var data pdf.Array
+	flushRun := func() {
+		if len(run) > 0 {
+			data = append(data, run)
+			run = nil
+		}
+	}
+	flush := func() {
+		flushRun()
+		if len(data) == 0 {
+			return
+		}
+		if len(data) == 1 {
+			if s, ok := data[0].(pdf.String); ok {
+				_ = s.PDF(page)
+				page.Println(" Tj")
+				data = nil
+				return
+			}
+		}
+		_ = data.PDF(page)
+		page.Println(" TJ")
+		data = nil
+	}
+
+	xOffsFont := 0
+	yOffs := 0
+	xOffsPDF := 0
+	for _, glyph := range obj.Glyphs {
+		gid := glyph.Gid
+		if int(gid) >= len(font.Widths) {
+			gid = 0
+		}
+
+		if int(glyph.YOffset) != yOffs {
+			flush()
+			page.Printf("%.1f Ts\n", glyph.YOffset.AsFloat(obj.FontSize/float64(font.UnitsPerEm)))
+			yOffs = int(glyph.YOffset)
+		}
+
+		xOffsWanted := xOffsFont + int(glyph.XOffset)
+
+		delta := xOffsWanted - xOffsPDF
+		if delta != 0 {
+			flushRun()
+			deltaScaled := float64(delta) / float64(font.UnitsPerEm) * 1000
+			data = append(data, -pdf.Integer(math.Round(deltaScaled)))
+			xOffsPDF += delta // TODO(voss): use this
+		}
+		run = append(run, font.Enc(gid)...)
+
+		xOffsFont += int(glyph.Advance)
+		xOffsPDF = xOffsWanted + int(font.Widths[gid])
+	}
+	flush()
+
+	page.Println("ET")
 }
 
 type raiseBox struct {
