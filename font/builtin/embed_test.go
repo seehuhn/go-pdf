@@ -21,8 +21,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/names"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
@@ -58,6 +58,8 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	g := graphics.NewPage(page)
+
 	text := map[glyph.ID]rune{}
 	for i, name := range afm.GlyphName {
 		rr := names.ToUnicode(name, false)
@@ -84,14 +86,22 @@ func TestSimple(t *testing.T) {
 			}
 		}
 
-		layout := &font.Layout{
-			Font:     F,
-			FontSize: 16,
-			Glyphs:   gg,
-		}
-		layout.Draw(page, float64(10+20*col), float64(16*20-10-20*row))
+		g.BeginText()
+		g.SetFont(F, 16)
+		g.StartLine(float64(5+20*col+10), float64(16*20-10-20*row))
+		g.ShowGlyphsAligned(gg, -0.5, 0)
+		g.EndText()
 	}
-	page.Close()
+
+	err = g.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = page.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = w.Close()
 	if err != nil {
@@ -176,7 +186,7 @@ func TestCommaAccent(t *testing.T) {
 }
 
 func TestComplicatedGyphs(t *testing.T) {
-	w, err := pdf.Create("test-builtin-gylphs.pdf")
+	w, err := pdf.Create("test-builtin-glyphs.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
