@@ -33,11 +33,7 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	afm, err := Afm("Times-Roman")
-	if err != nil {
-		t.Fatal(err)
-	}
-	F, err := EmbedAfm(w, afm, "F")
+	F, err := Embed(w, "Times-Roman", "F")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,30 +56,17 @@ func TestSimple(t *testing.T) {
 
 	g := graphics.NewPage(page)
 
-	text := map[glyph.ID]rune{}
-	for i, name := range afm.GlyphName {
-		rr := names.ToUnicode(name, false)
-		if len(rr) != 1 {
-			continue
-		}
-		r := rr[0]
-		gid := glyph.ID(i)
-		rOld, ok := text[gid]
-		if !ok || r < rOld {
-			text[gid] = r
-		}
-	}
-
 	for i := 0; i < 256; i++ {
 		row := i / 16
 		col := i % 16
 		gid := glyph.ID(i + 2)
 
-		gg := F.Layout([]rune{text[gid]}) // try to establish glyph -> rune mapping
-		if len(gg) != 1 || gg[0].Gid != gid {
-			gg = []glyph.Info{
-				{Gid: gid},
-			}
+		w := F.Widths[gid]
+		gg := []glyph.Info{
+			{
+				Gid:     gid,
+				Advance: w,
+			},
 		}
 
 		g.BeginText()
