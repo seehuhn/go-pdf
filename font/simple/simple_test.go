@@ -32,7 +32,7 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := EmbedFile(w, "../../sfnt/otf/SourceSerif4-Regular.otf", "F", language.BritishEnglish)
+	F, err := EmbedFile(w, "../../sfnt/otf/SourceSerif4-Regular.otf", "F", language.AmericanEnglish)
 	if err != nil {
 		t.Fatal(err)
 	}

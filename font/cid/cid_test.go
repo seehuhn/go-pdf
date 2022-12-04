@@ -17,46 +17,22 @@
 package cid
 
 import (
-	"os"
 	"testing"
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/sfnt"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 func TestCID(t *testing.T) {
-	// fd, err := os.Open("../../sfnt/otf/SourceSerif4-Regular.otf")
-	fd, err := os.Open("../../sfnt/ttf/SourceSerif4-Regular.ttf")
+	w, err := pdf.Create("test-otf-cid.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fontInfo, err := sfnt.Read(fd)
-	if err != nil {
-		fd.Close()
-		t.Fatal(err)
-	}
-
-	err = fd.Close()
-	if err != nil {
-		t.Error(err)
-	}
-
-	frag := "ttf"
-	if fontInfo.IsCFF() {
-		frag = "otf"
-	}
-
-	w, err := pdf.Create("test-" + frag + "-cid.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	F, err := Embed(w, fontInfo, "F", language.AmericanEnglish)
+	F, err := EmbedFile(w, "../../sfnt/otf/SourceSerif4-Regular.otf", "F", language.AmericanEnglish)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,26 +53,37 @@ func TestCID(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	g := graphics.NewPage(page)
+
 	for i := 0; i < 512; i++ {
 		row := i / 16
 		col := i % 16
 		gid := glyph.ID(i + 2)
 
-		w := fontInfo.GlyphWidth(gid)
-		layout := &font.Layout{
-			Font:     F,
-			FontSize: 16,
-			Glyphs: []glyph.Info{{
+		w := F.Widths[gid]
+		gg := []glyph.Info{
+			{
 				Gid:     gid,
-				XOffset: 0,
-				YOffset: 0,
 				Advance: w,
-			}},
+			},
 		}
-		dx := (20 - 16*float64(w)/float64(fontInfo.UnitsPerEm)) / 2
-		layout.Draw(page, float64(5+20*col)+dx, float64(32*20-10-20*row))
+
+		g.BeginText()
+		g.SetFont(F, 16)
+		g.StartLine(float64(5+20*col+10), float64(32*20-10-20*row))
+		g.ShowGlyphsAligned(gg, -0.5, 0)
+		g.EndText()
 	}
-	page.Close()
+
+	err = g.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = page.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = w.Close()
 	if err != nil {

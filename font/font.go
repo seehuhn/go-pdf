@@ -17,12 +17,9 @@
 package font
 
 import (
-	"fmt"
-	"math"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
@@ -80,82 +77,4 @@ func (font *Font) Typeset(s string, ptSize float64) []glyph.Info {
 		glyphs = append(glyphs, seq...)
 	}
 	return glyphs
-}
-
-// Layout contains the information needed to typeset a run of text.
-// TODO(voss): remove
-type Layout struct {
-	Font     *Font
-	FontSize float64
-	Glyphs   []glyph.Info
-}
-
-// Draw shows the text layout on a page.
-// TODO(voss): replace with [graphics.ShowString]?
-func (layout *Layout) Draw(page *pages.Page, xPos float64, yPos float64) {
-	font := layout.Font
-
-	page.Println("BT")
-	_ = font.InstName.PDF(page)
-	fmt.Fprintf(page, " %f Tf\n", layout.FontSize)
-	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
-
-	var run pdf.String
-	var data pdf.Array
-	flushRun := func() {
-		if len(run) > 0 {
-			data = append(data, run)
-			run = nil
-		}
-	}
-	flush := func() {
-		flushRun()
-		if len(data) == 0 {
-			return
-		}
-		if len(data) == 1 {
-			if s, ok := data[0].(pdf.String); ok {
-				_ = s.PDF(page)
-				page.Println(" Tj")
-				data = nil
-				return
-			}
-		}
-		_ = data.PDF(page)
-		page.Println(" TJ")
-		data = nil
-	}
-
-	xOffsFont := 0
-	yOffs := 0
-	xOffsPDF := 0
-	for _, glyph := range layout.Glyphs {
-		gid := glyph.Gid
-		if int(gid) >= len(font.Widths) {
-			gid = 0
-		}
-
-		if int(glyph.YOffset) != yOffs {
-			flush()
-			page.Printf("%.1f Ts\n", glyph.YOffset.AsFloat(layout.FontSize/float64(font.UnitsPerEm)))
-			yOffs = int(glyph.YOffset)
-		}
-
-		xOffsWanted := xOffsFont + int(glyph.XOffset)
-
-		delta := xOffsWanted - xOffsPDF
-		if delta != 0 {
-			flushRun()
-			deltaScaled := float64(delta) / float64(font.UnitsPerEm) * 1000
-			data = append(data, -pdf.Integer(math.Round(deltaScaled)))
-			xOffsPDF += delta // TODO(voss): use this
-		}
-		run = append(run, font.Enc(gid)...)
-
-		xOffsFont += int(glyph.Advance)
-		xOffsPDF = xOffsWanted + int(font.Widths[gid])
-	}
-	flush()
-
-	page.Println("ET")
 }
