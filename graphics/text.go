@@ -69,15 +69,19 @@ func (p *Page) SetFont(font *font.Font, size float64) {
 	_, p.err = fmt.Fprintln(p.w, "", size, "Tf")
 }
 
-// ShowString draws a string.
-func (p *Page) ShowString(s string) {
-	p.ShowStringAligned(s, 0, 0)
+// ShowText draws a string.
+func (p *Page) ShowText(s string) {
+	p.ShowTextAligned(s, 0, 0)
 }
 
-// ShowStringAligned draws a string and aligns it.
+// ShowTextAligned draws a string and aligns it.
 // The beginning of the string is shifted right by a*w+b, where w
 // is the width of the string.
-func (p *Page) ShowStringAligned(s string, a, b float64) {
+func (p *Page) ShowTextAligned(s string, a, b float64) {
+	if !p.valid("ShowTextAligned", stateText) {
+		return
+	}
+
 	font := p.font
 	if font == nil {
 		p.err = errors.New("no font set")

@@ -48,7 +48,10 @@ type Writer struct {
 	xref    map[int]*xRefEntry
 	nextRef int
 
-	inStream    bool
+	inStream bool
+	// TODO(voss): change afterStream into a list of (*Reference, Object)
+	// pairs to be written as soon as possible.  Change the Write() method
+	// to append to afterStream if inStream is true.
 	afterStream []func(*Writer) error
 
 	onClose []func(*Writer) error

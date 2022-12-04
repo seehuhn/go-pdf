@@ -21,41 +21,10 @@ import (
 	"log"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
-
-// WritePage emits a single page to the PDF file and returns the page dict.
-func WritePage(out *pdf.Writer, i int) (pdf.Dict, error) {
-	stream, contentNode, err := out.OpenStream(nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	if i != 3 {
-		_, err = stream.Write([]byte(fmt.Sprintf(`BT
-		/F1 12 Tf
-		30 30 Td
-		(page %d) Tj
-		ET`, i)))
-	} else {
-		_, err = stream.Write([]byte(`BT
-		/F1 36 Tf
-		10 50 Td
-		(OXO) Tj
-		ET`))
-	}
-	if err != nil {
-		return nil, err
-	}
-	err = stream.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	return pdf.Dict{
-		"Type":     pdf.Name("Page"),
-		"Contents": contentNode,
-	}, nil
-}
 
 func main() {
 	out, err := pdf.Create("test.pdf")
@@ -63,39 +32,62 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO(voss): convert this to a newer system
-	font, err := out.Write(pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name("Helvetica"),
-		"Encoding": pdf.Name("MacRomanEncoding"),
-	}, nil)
+	font, err := builtin.Embed(out, builtin.Helvetica, "F1")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
 		Resources: &pages.Resources{
-			Font: pdf.Dict{"F1": font},
+			Font: pdf.Dict{font.InstName: font.Ref},
 		},
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
 	pp := pageTree.NewPageRange(nil)
-	for i := 1; i <= 100; i++ {
-		page, err := WritePage(out, i)
+	for i := 0; i <= 100; i++ {
+		page, err := pp.NewPage(nil)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = pp.Append(page) // TODO(voss): Use pageTree.AddPage() instead
+
+		g := graphics.NewPage(page)
+
+		g.BeginText()
+		g.SetFont(font, 12)
+		g.StartLine(30, 30)
+		switch i {
+		case 0:
+			g.ShowText("Title")
+		case 3:
+			g.ShowText("OXO")
+		default:
+			g.ShowText(fmt.Sprintf("page %d", i))
+		}
+		g.EndText()
+
+		err = g.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = page.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	out.SetInfo(&pdf.Info{
-		Title:  "PDF Test Document",
-		Author: "Jochen Voß",
-	})
+	out.Catalog.PageLabels = pdf.Dict{
+		"Nums": pdf.Array{
+			pdf.Integer(0),
+			pdf.Dict{
+				"P": pdf.TextString("Title"),
+			},
+			pdf.Integer(1),
+			pdf.Dict{
+				"S": pdf.Name("D"),
+			},
+		},
+	}
 
 	err = out.Close()
 	if err != nil {
