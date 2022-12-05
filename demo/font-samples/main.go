@@ -215,7 +215,7 @@ func makePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFon
 			}
 		})
 		attr := &pages.Attributes{
-			Resources: &pages.Resources{
+			Resources: &pdf.Resources{
 				Font: pageFonts,
 			},
 		}

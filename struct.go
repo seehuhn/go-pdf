@@ -231,6 +231,14 @@ fieldLoop:
 	return firstErr
 }
 
+var (
+	objectType  = reflect.TypeOf((*Object)(nil)).Elem()
+	refType     = reflect.TypeOf(&Reference{})
+	nameType    = reflect.TypeOf(Name(""))
+	versionType = reflect.TypeOf(V1_7)
+	timeType    = reflect.TypeOf(time.Time{})
+)
+
 // Catalog represents a PDF Document Catalog. This can be used together with
 // the `Struct()` function to construct the argument for
 // `Writer.SetCatalog()`. The only required field in this structure is
@@ -292,10 +300,16 @@ type Info struct {
 	Custom map[string]string `pdf:"extra"`
 }
 
-var (
-	objectType  = reflect.TypeOf((*Object)(nil)).Elem()
-	refType     = reflect.TypeOf(&Reference{})
-	nameType    = reflect.TypeOf(Name(""))
-	versionType = reflect.TypeOf(V1_7)
-	timeType    = reflect.TypeOf(time.Time{})
-)
+// Resources describes a PDF Resource Dictionary
+// See section 7.8.3 of PDF 32000-1:2008 for details.
+// TODO(voss): use []*font.Font for the .Font field?
+type Resources struct {
+	ExtGState  Dict  `pdf:"optional"` // maps resource names to graphics state parameter dictionaries
+	ColorSpace Dict  `pdf:"optional"` // maps each resource name to either the name of a device-dependent colour space or an array describing a colour space
+	Pattern    Dict  `pdf:"optional"` // maps resource names to pattern objects
+	Shading    Dict  `pdf:"optional"` // maps resource names to shading dictionaries
+	XObject    Dict  `pdf:"optional"` // maps resource names to external objects
+	Font       Dict  `pdf:"optional"` // maps resource names to font dictionaries
+	ProcSet    Array `pdf:"optional"` // predefined procedure set names
+	Properties Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
+}

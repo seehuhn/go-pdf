@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
+// MakePages breaks a streams of boxes into pages.
 func MakePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFont *font.Font) error {
 	topMargin := 36.
 	rightMargin := 50.
@@ -67,7 +68,7 @@ func MakePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFon
 			}
 		})
 		attr := &pages.Attributes{
-			Resources: &pages.Resources{
+			Resources: &pdf.Resources{
 				Font: pageFonts,
 			},
 		}

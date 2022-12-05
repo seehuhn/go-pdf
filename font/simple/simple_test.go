@@ -39,7 +39,7 @@ func TestSimple(t *testing.T) {
 
 	pageTree := pages.NewPageTree(w, nil)
 	page, err := pageTree.NewPage(&pages.Attributes{
-		Resources: &pages.Resources{
+		Resources: &pdf.Resources{
 			Font: pdf.Dict{
 				F.InstName: F.Ref,
 			},

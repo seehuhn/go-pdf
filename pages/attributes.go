@@ -20,26 +20,12 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Resources describes a PDF Resource Dictionary
-// See section 7.8.3 of PDF 32000-1:2008 for details.
-// TODO(voss): use []*font.Font for the .Font field?
-type Resources struct {
-	ExtGState  pdf.Dict  `pdf:"optional"` // maps resource names to graphics state parameter dictionaries
-	ColorSpace pdf.Dict  `pdf:"optional"` // maps each resource name to either the name of a device-dependent colour space or an array describing a colour space
-	Pattern    pdf.Dict  `pdf:"optional"` // maps resource names to pattern objects
-	Shading    pdf.Dict  `pdf:"optional"` // maps resource names to shading dictionaries
-	XObject    pdf.Dict  `pdf:"optional"` // maps resource names to external objects
-	Font       pdf.Dict  `pdf:"optional"` // maps resource names to font dictionaries
-	ProcSet    pdf.Array `pdf:"optional"` // predefined procedure set names
-	Properties pdf.Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
-}
-
 // Attributes specifies Page attributes.
 //
 // These attributes are documented in section 7.7.3.3 of PDF 32000-1:2008.
 // TODO(voss): add support for the other attributes.
 type Attributes struct {
-	Resources *Resources
+	Resources *pdf.Resources
 
 	// Mediabox defines the boundaries of the physical
 	// medium on which the page shall be displayed or printed.
@@ -62,7 +48,7 @@ type Attributes struct {
 // These attributes are documented in sections 7.7.3.3 and 7.7.3.4 of
 // PDF 32000-1:2008.
 type DefaultAttributes struct {
-	Resources *Resources
+	Resources *pdf.Resources
 
 	// Mediabox defines the boundaries of the physical
 	// medium on which the page shall be displayed or printed.

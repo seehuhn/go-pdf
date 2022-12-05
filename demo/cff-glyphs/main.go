@@ -52,7 +52,7 @@ func main() {
 	}
 
 	tree := pages.NewPageTree(out, &pages.DefaultAttributes{
-		Resources: &pages.Resources{
+		Resources: &pdf.Resources{
 			Font: pdf.Dict{
 				F.InstName: F.Ref,
 			},
@@ -108,7 +108,7 @@ func main() {
 					URx: q*float64(right) + 20,
 					URy: q*float64(top) + 12 + 20,
 				},
-				Resources: &pages.Resources{
+				Resources: &pdf.Resources{
 					Font: pdf.Dict{
 						// X.InstName: X.Ref,
 					},

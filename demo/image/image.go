@@ -92,7 +92,7 @@ func imagePage(img *image.NRGBA) error {
 	}
 	pageTree := pages.NewPageTree(out, nil)
 	page, err := pageTree.NewPage(&pages.Attributes{
-		Resources: &pages.Resources{
+		Resources: &pdf.Resources{
 			XObject: pdf.Dict{
 				"I1": image,
 			},

@@ -38,14 +38,15 @@ func main() {
 	}
 
 	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
-		Resources: &pages.Resources{
+		Resources: &pdf.Resources{
 			Font: pdf.Dict{font.InstName: font.Ref},
 		},
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
-	pp := pageTree.NewPageRange(nil)
+	frontMatter := pageTree.NewPageRange(nil)
+	var extra *pages.PageRange
 	for i := 0; i <= 100; i++ {
-		page, err := pp.NewPage(nil)
+		page, err := pageTree.NewPage(nil)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -55,13 +56,13 @@ func main() {
 		g.BeginText()
 		g.SetFont(font, 12)
 		g.StartLine(30, 30)
-		switch i {
-		case 0:
-			g.ShowText("Title")
-		case 3:
-			g.ShowText("OXO")
-		default:
+		if i == 3 {
+			extra = pageTree.NewPageRange(nil)
+		}
+		if i < 3 {
 			g.ShowText(fmt.Sprintf("page %d", i))
+		} else {
+			g.ShowText(fmt.Sprintf("page %d", i+1))
 		}
 		g.EndText()
 
@@ -74,6 +75,44 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+	}
+
+	page, err := frontMatter.NewPage(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	g := graphics.NewPage(page)
+	g.BeginText()
+	g.SetFont(font, 12)
+	g.StartLine(30, 30)
+	g.ShowText("Title")
+	g.EndText()
+	err = g.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = page.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	page, err = extra.NewPage(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	g = graphics.NewPage(page)
+	g.BeginText()
+	g.SetFont(font, 12)
+	g.StartLine(30, 30)
+	g.ShowText("extra")
+	g.EndText()
+	err = g.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = page.Close()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	out.Catalog.PageLabels = pdf.Dict{

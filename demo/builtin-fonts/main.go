@@ -214,7 +214,7 @@ func (f *fontTables) DoFlush() error {
 		}
 	})
 	attr := &pages.Attributes{
-		Resources: &pages.Resources{
+		Resources: &pdf.Resources{
 			Font: pageFonts,
 		},
 	}

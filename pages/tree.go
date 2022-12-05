@@ -25,6 +25,7 @@ import (
 const pageTreeWidth = 12
 
 // PageTree represents a PDF page tree.
+// Page trees are describe in section 7.7.3 of PDF 32000-1:2008.
 type PageTree struct {
 	w      *pdf.Writer
 	attr   *DefaultAttributes
@@ -133,7 +134,7 @@ type PageRange struct {
 	dicts []pdf.Dict
 	refs  []*pdf.Reference
 
-	// TODO(voss): add page labels here, see section 12.4.2
+	// TODO(voss): add page labels here, see section 12.4.2?
 }
 
 // Append adds a new page to the page range.
