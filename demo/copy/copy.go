@@ -127,10 +127,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	catalog, err := r.GetCatalog()
-	if err != nil {
-		log.Fatal(err)
-	}
+	catalog := r.Catalog
 
 	trans := &walker{
 		trans: map[pdf.Reference]*pdf.Reference{},

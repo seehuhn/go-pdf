@@ -136,11 +136,6 @@ ET
 		t.Fatal(err)
 	}
 
-	_, err = r.GetCatalog()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	info, err := r.GetInfo()
 	if err != nil {
 		t.Fatal(err)

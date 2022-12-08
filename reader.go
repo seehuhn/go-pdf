@@ -37,6 +37,8 @@ type Reader struct {
 	// the file does not specify an ID.
 	ID [][]byte
 
+	Catalog *Catalog
+
 	size int64
 	r    io.ReaderAt
 
@@ -47,7 +49,6 @@ type Reader struct {
 
 	xref    map[int]*xRefEntry
 	trailer Dict
-	catalog *Catalog
 
 	enc *encryptInfo
 }
@@ -126,15 +127,15 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 	if err != nil {
 		return nil, err
 	}
-	r.catalog = &Catalog{}
-	err = catalogDict.Decode(r.catalog, r.Resolve)
+	r.Catalog = &Catalog{}
+	err = catalogDict.Decode(r.Catalog, r.Resolve)
 	if err != nil {
 		return nil, err
 	}
 
-	if r.catalog.Version > r.Version {
+	if r.Catalog.Version > r.Version {
 		// if unset, r.catalog.Version is zero and thus smaller than r.Version
-		r.Version = r.catalog.Version
+		r.Version = r.Catalog.Version
 	}
 
 	return r, nil
@@ -163,11 +164,6 @@ func (r *Reader) Close() error {
 		return closer.Close()
 	}
 	return nil
-}
-
-// GetCatalog returns the PDF Catalog for the file.
-func (r *Reader) GetCatalog() (*Catalog, error) {
-	return r.catalog, nil
 }
 
 // GetInfo returns the PDF Info dictionary for the file.

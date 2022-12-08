@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 func main() {
@@ -37,28 +37,43 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(out, &pages.DefaultAttributes{
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if out.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+	}
+
+	pageTree := pages2.NewTree(out, &pages2.InheritableAttributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{font.InstName: font.Ref},
 		},
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
-	frontMatter := pageTree.NewPageRange(nil)
-	var extra *pages.PageRange
-	for i := 0; i <= 100; i++ {
-		page, err := pageTree.NewPage(nil)
+	frontMatter := pageTree.NewSubTree(nil)
+	var extra *pages2.Tree
+	for i := 1; i <= 99; i++ {
+		if i == 3 {
+			extra = pageTree.NewSubTree(nil)
+		}
+
+		contentRef := out.Alloc()
+		dict := pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"Contents": contentRef,
+		}
+		_, err := pageTree.AppendPage(dict)
+		if err != nil {
+			log.Fatal(err)
+		}
+		stream, _, err := out.OpenStream(nil, contentRef, compress)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		g := graphics.NewPage(page)
+		g := graphics.NewPage(stream)
 
 		g.BeginText()
 		g.SetFont(font, 12)
 		g.StartLine(30, 30)
-		if i == 3 {
-			extra = pageTree.NewPageRange(nil)
-		}
 		if i < 3 {
 			g.ShowText(fmt.Sprintf("page %d", i))
 		} else {
@@ -71,49 +86,81 @@ func main() {
 			log.Fatal(err)
 		}
 
-		err = page.Close()
+		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	page, err := frontMatter.NewPage(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	g := graphics.NewPage(page)
-	g.BeginText()
-	g.SetFont(font, 12)
-	g.StartLine(30, 30)
-	g.ShowText("Title")
-	g.EndText()
-	err = g.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = page.Close()
-	if err != nil {
-		log.Fatal(err)
+	{
+		contentRef := out.Alloc()
+		dict := pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"Contents": contentRef,
+		}
+		_, err := frontMatter.AppendPage(dict)
+		if err != nil {
+			log.Fatal(err)
+		}
+		stream, _, err := out.OpenStream(nil, contentRef, compress)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		g := graphics.NewPage(stream)
+		g.BeginText()
+		g.SetFont(font, 12)
+		g.StartLine(30, 30)
+		g.ShowText("Title")
+		g.EndText()
+		err = g.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = stream.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	page, err = extra.NewPage(nil)
+	{
+		contentRef := out.Alloc()
+		dict := pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"Contents": contentRef,
+		}
+		_, err := extra.AppendPage(dict)
+		if err != nil {
+			log.Fatal(err)
+		}
+		stream, _, err := out.OpenStream(nil, contentRef, compress)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		g := graphics.NewPage(stream)
+		g.BeginText()
+		g.SetFont(font, 12)
+		g.StartLine(30, 30)
+		g.ShowText("three")
+		g.EndText()
+		err = g.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = stream.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	pageTreeRef, err := pageTree.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	g = graphics.NewPage(page)
-	g.BeginText()
-	g.SetFont(font, 12)
-	g.StartLine(30, 30)
-	g.ShowText("extra")
-	g.EndText()
-	err = g.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = page.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
+	out.Catalog.Pages = pageTreeRef
 
 	out.Catalog.PageLabels = pdf.Dict{
 		"Nums": pdf.Array{

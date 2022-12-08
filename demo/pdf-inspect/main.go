@@ -74,9 +74,7 @@ func main() {
 	var obj pdf.Object
 	switch {
 	case len(args) < 2 || args[1] == "catalog":
-		var cat *pdf.Catalog
-		cat, err = r.GetCatalog()
-		obj = pdf.AsDict(cat)
+		obj = pdf.AsDict(r.Catalog)
 	case args[1] == "info":
 		var info *pdf.Info
 		info, err = r.GetInfo()
