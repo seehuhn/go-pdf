@@ -40,11 +40,11 @@ func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
 		return nil, errors.New("page tree is closed")
 	}
 
-	ref := t.w.Alloc()
+	pageRef := t.w.Alloc()
 	node := &nodeInfo{
 		dictInfo: &dictInfo{
 			dict: pageDict,
-			ref:  ref,
+			ref:  pageRef,
 		},
 		count: 1,
 		depth: 0,
@@ -59,24 +59,25 @@ func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
 		if n > maxDegree && t.tail[n-maxDegree].depth+1 != t.tail[n-maxDegree-1].depth {
 			panic("missed a collapse") // TODO(voss): remove
 		}
-		tail, err := t.makeInternalNode(t.tail, n-maxDegree, n)
+		t.tail = t.makeInternalNode(t.tail, n-maxDegree, n)
+	}
+
+	if len(t.outObjects) > objStreamChunkSize {
+		err := t.flush()
 		if err != nil {
 			return nil, err
 		}
-		t.tail = tail
 	}
 
-	return ref, nil
+	return pageRef, nil
 }
 
-func (t *Tree) merge(a, b []*nodeInfo) ([]*nodeInfo, error) {
-	var err error
-
+func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
 	if len(a) == 0 {
-		return b, nil
+		return b
 	}
 	if len(b) == 0 {
-		return a, nil
+		return a
 	}
 
 	nextDepth := b[0].depth
@@ -88,10 +89,7 @@ func (t *Tree) merge(a, b []*nodeInfo) ([]*nodeInfo, error) {
 		for start > 0 && a[start-1].depth == a[start].depth {
 			start++
 		}
-		a, err = t.makeInternalNode(a, start, len(a))
-		if err != nil {
-			return nil, err
-		}
+		a = t.makeInternalNode(a, start, len(a))
 	}
 	if len(a) == 1 && a[0].depth < nextDepth {
 		a[0].depth = nextDepth
@@ -118,10 +116,7 @@ func (t *Tree) merge(a, b []*nodeInfo) ([]*nodeInfo, error) {
 	for depth := nextDepth; ; depth++ {
 		changed := false
 		for end >= start+maxDegree {
-			a, err = t.makeInternalNode(a, start, start+maxDegree)
-			if err != nil {
-				return nil, err
-			}
+			a = t.makeInternalNode(a, start, start+maxDegree)
 			start++
 			end -= maxDegree - 1
 			changed = true
@@ -137,44 +132,38 @@ func (t *Tree) merge(a, b []*nodeInfo) ([]*nodeInfo, error) {
 		}
 	}
 
-	return a, nil
+	return a
 }
 
 // makeInternalNode collapses nodes a, ..., b-1 into a new \Pages object.
-func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) ([]*nodeInfo, error) {
+func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	if a < 0 || b > len(nodes) || b-a < 2 {
-		return nil, fmt.Errorf("invalid subtree node range %d, %d", a, b)
+		// TODO(voss): remove
+		panic(fmt.Errorf("invalid subtree node range %d, %d", a, b))
 	}
 	if a == b {
-		return nodes, nil
+		return nodes
 	}
 
 	childNodes := nodes[a:b]
 
-	childRefs := make([]*pdf.Reference, len(childNodes))
-	childDicts := make([]pdf.Object, len(childNodes))
+	kids := make(pdf.Array, len(childNodes))
 	parentRef := t.w.Alloc()
 	var total pdf.Integer
 	depth := 0
 	for i, node := range childNodes {
 		node.dict["Parent"] = parentRef
-		childDicts[i] = node.dict
-		childRefs[i] = node.ref
+		kids[i] = node.ref
+
+		t.outRefs = append(t.outRefs, node.ref)
+		t.outObjects = append(t.outObjects, node.dict)
 
 		total += node.count
 		if node.depth > depth {
 			depth = node.depth
 		}
 	}
-	_, err := t.w.WriteCompressed(childRefs, childDicts...)
-	if err != nil {
-		return nil, err
-	}
 
-	kids := make(pdf.Array, len(childRefs))
-	for i, ref := range childRefs {
-		kids[i] = ref
-	}
 	parentNode := &nodeInfo{
 		dictInfo: &dictInfo{
 			dict: pdf.Dict{
@@ -190,30 +179,31 @@ func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) ([]*nodeInfo, error
 
 	nodes[a] = parentNode
 	nodes = append(nodes[:a+1], nodes[b:]...)
-	return nodes, nil
+	return nodes
 }
 
 // wrapIfNeeded ensures that the given dictionary is a /Pages object.
 // A wrapper /Pages object is created if necessary.
-func (t *Tree) wrapIfNeeded(info *dictInfo) (*dictInfo, error) {
+func (t *Tree) wrapIfNeeded(info *dictInfo) *dictInfo {
 	if info.dict["Type"] == pdf.Name("Pages") {
-		return info, nil
+		return info
 	}
 
 	wrapperRef := t.w.Alloc()
 	info.dict["Parent"] = wrapperRef
-	ref, err := t.w.Write(info.dict, info.ref)
-	if err != nil {
-		return nil, err
-	}
+	t.outRefs = append(t.outRefs, info.ref)
+	t.outObjects = append(t.outObjects, info.dict)
 
 	wrapper := pdf.Dict{
 		"Type":  pdf.Name("Pages"),
 		"Count": pdf.Integer(1),
-		"Kids":  pdf.Array{ref},
+		"Kids":  pdf.Array{info.ref},
 	}
 
-	return &dictInfo{dict: wrapper, ref: wrapperRef}, nil
+	return &dictInfo{dict: wrapper, ref: wrapperRef}
 }
 
-const maxDegree = 16
+const (
+	maxDegree          = 16
+	objStreamChunkSize = 100
+)

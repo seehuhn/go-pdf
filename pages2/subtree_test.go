@@ -145,10 +145,7 @@ func TestMerge(t *testing.T) {
 		for _, depth := range test.b {
 			b = append(b, &nodeInfo{dictInfo: dd, depth: depth})
 		}
-		out, err := tree.merge(a, b)
-		if err != nil {
-			t.Fatal(err)
-		}
+		out := tree.merge(a, b)
 		err = checkInvariants(out)
 		if err != nil {
 			t.Error(err)

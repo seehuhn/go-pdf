@@ -29,11 +29,10 @@ type Tree struct {
 	attr   *InheritableAttributes
 
 	children []*Tree
+	tail     []*nodeInfo
 
-	// tail contains all \Page and \Pages objects which still need to be
-	// written to the pdf file.  The depth of nodes in the list is decreasing,
-	// with at most maxDegree-1 nodes for each depth.
-	tail []*nodeInfo
+	outRefs    []*pdf.Reference
+	outObjects []pdf.Object
 
 	isClosed bool
 }
@@ -68,15 +67,9 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 		if err != nil {
 			return nil, err
 		}
-		nodes, err = t.merge(nodes, child.tail)
-		if err != nil {
-			return nil, err
-		}
+		nodes = t.merge(nodes, child.tail)
 	}
-	nodes, err = t.merge(nodes, t.tail)
-	if err != nil {
-		return nil, err
-	}
+	nodes = t.merge(nodes, t.tail)
 	t.children = nil
 
 	if t.attr != nil || t.parent == nil {
@@ -89,18 +82,11 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 			for start > 0 && nodes[start-1].depth == nodes[start].depth {
 				start++
 			}
-			var err error
-			nodes, err = t.makeInternalNode(nodes, start, len(nodes))
-			if err != nil {
-				return nil, err
-			}
+			nodes = t.makeInternalNode(nodes, start, len(nodes))
 		}
 
-		if t.parent == nil && len(nodes) > 0 { // be careful in case are no pages
-			nodes[0].dictInfo, err = t.wrapIfNeeded(nodes[0].dictInfo)
-			if err != nil {
-				return nil, err
-			}
+		if t.parent == nil && len(nodes) > 0 { // be careful in case there are no pages
+			nodes[0].dictInfo = t.wrapIfNeeded(nodes[0].dictInfo)
 		}
 
 		if t.attr != nil {
@@ -109,11 +95,26 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 	}
 
 	if t.parent == nil {
+		t.tail = nil
+
 		if len(nodes) == 0 {
 			return nil, errors.New("no pages in document")
 		}
-		t.tail = nil
-		return t.w.Write(nodes[0].dict, nodes[0].ref)
+		rootRef := nodes[0].ref
+		t.outRefs = append(t.outRefs, nodes[0].ref)
+		t.outObjects = append(t.outObjects, nodes[0].dict)
+		return rootRef, t.flush()
+	}
+
+	t.parent.outRefs = append(t.parent.outRefs, t.outRefs...)
+	t.parent.outObjects = append(t.parent.outObjects, t.outObjects...)
+	t.outRefs = nil
+	t.outObjects = nil
+	if len(t.parent.outObjects) > objStreamChunkSize {
+		err = t.parent.flush()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	t.tail = nodes
@@ -144,4 +145,19 @@ func (t *Tree) NewSubTree(attr *InheritableAttributes) *Tree {
 	}
 	t.children = append(t.children, subTree)
 	return subTree
+}
+
+func (t *Tree) flush() error {
+	if len(t.outObjects) == 0 {
+		return nil
+	}
+
+	_, err := t.w.WriteCompressed(t.outRefs, t.outObjects...)
+	if err != nil {
+		return err
+	}
+
+	t.outRefs = t.outRefs[:0]
+	t.outObjects = t.outObjects[:0]
+	return nil
 }
