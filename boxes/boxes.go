@@ -26,11 +26,6 @@ import (
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
-// Parameters contains the parameter values used by the layout engine.
-type Parameters struct {
-	BaseLineSkip float64
-}
-
 // Box represents marks on a page within a rectangular area of known size.
 type Box interface {
 	Extent() *BoxExtent
@@ -52,8 +47,10 @@ func (obj BoxExtent) String() string {
 }
 
 // Extent implements the Box interface.
-func (obj BoxExtent) Extent() *BoxExtent {
-	return &obj
+// This allows for objects to embed a BoxExtent in order to implement the
+// part of the Box interface.
+func (obj *BoxExtent) Extent() *BoxExtent {
+	return obj
 }
 
 // A RuleBox is a solidly filled rectangular region on the page.
@@ -65,10 +62,9 @@ type RuleBox struct {
 func Rule(width, height, depth float64) Box {
 	return &RuleBox{
 		BoxExtent: BoxExtent{
-			Width:          width,
-			Height:         height,
-			Depth:          depth,
-			WhiteSpaceOnly: false,
+			Width:  width,
+			Height: height,
+			Depth:  depth,
 		},
 	}
 }
@@ -281,4 +277,9 @@ func Walk(box Box, fn func(Box)) {
 			Walk(child, fn)
 		})
 	}
+}
+
+// Parameters contains the parameter values used by the layout engine.
+type Parameters struct {
+	BaseLineSkip float64
 }
