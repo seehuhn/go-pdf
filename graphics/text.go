@@ -32,7 +32,7 @@ func (p *Page) BeginText() {
 		return
 	}
 	p.state = stateText
-	_, p.err = fmt.Fprintln(p.w, "BT")
+	_, p.err = fmt.Fprintln(p.content, "BT")
 }
 
 // EndText ends the current text object.
@@ -42,7 +42,7 @@ func (p *Page) EndText() {
 	}
 	p.state = stateGlobal
 	p.font = nil
-	_, p.err = fmt.Fprintln(p.w, "ET")
+	_, p.err = fmt.Fprintln(p.content, "ET")
 }
 
 // StartLine moves to the start of the next line of text.
@@ -50,7 +50,7 @@ func (p *Page) StartLine(x, y float64) {
 	if !p.valid("StartLine", stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), "Td")
+	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "Td")
 }
 
 // StartNextLine moves to the start of the next line of text.
@@ -58,7 +58,7 @@ func (p *Page) StartNextLine(x, y float64) {
 	if !p.valid("StartNextLine", stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), "TD")
+	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "TD")
 }
 
 // NewLine moves to the start of the next line of text.
@@ -66,23 +66,36 @@ func (p *Page) NewLine() {
 	if !p.valid("NewLine", stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, "T*")
+	_, p.err = fmt.Fprintln(p.content, "T*")
 }
 
 // SetFont sets the font and font size.
 func (p *Page) SetFont(font *font.Font, size float64) {
-	// TODO(voss): should this enter the font in the Resources dictionary?
 	if !p.valid("SetFont", stateText) {
 		return
 	}
+
+	if p.resources == nil {
+		p.resources = &pdf.Resources{}
+	}
+	if p.resources.Font == nil {
+		p.resources.Font = pdf.Dict{}
+	}
+	oldFont, ok := p.resources.Font[font.InstName].(*pdf.Reference)
+	if ok && *oldFont != *font.Ref {
+		p.err = fmt.Errorf("font %q already defined", font.InstName)
+		return
+	}
+	p.resources.Font[font.InstName] = font.Ref
+
 	p.font = font
 	p.fontSize = size
-	err := font.InstName.PDF(p.w)
+	err := font.InstName.PDF(p.content)
 	if err != nil {
 		p.err = err
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, "", size, "Tf")
+	_, p.err = fmt.Fprintln(p.content, "", size, "Tf")
 }
 
 // ShowText draws a string.
@@ -151,11 +164,11 @@ func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
 				if p.err != nil {
 					return
 				}
-				p.err = s.PDF(p.w)
+				p.err = s.PDF(p.content)
 				if p.err != nil {
 					return
 				}
-				_, p.err = fmt.Fprintln(p.w, " Tj")
+				_, p.err = fmt.Fprintln(p.content, " Tj")
 				out = nil
 				return
 			}
@@ -164,11 +177,11 @@ func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
 		if p.err != nil {
 			return
 		}
-		p.err = out.PDF(p.w)
+		p.err = out.PDF(p.content)
 		if p.err != nil {
 			return
 		}
-		_, p.err = fmt.Fprintln(p.w, " TJ")
+		_, p.err = fmt.Fprintln(p.content, " TJ")
 		if p.err != nil {
 			return
 		}
@@ -195,11 +208,11 @@ func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
 			if p.err != nil {
 				return
 			}
-			p.err = p.textRise.PDF(p.w)
+			p.err = p.textRise.PDF(p.content)
 			if p.err != nil {
 				return
 			}
-			_, p.err = fmt.Fprintln(p.w, " Ts")
+			_, p.err = fmt.Fprintln(p.content, " Ts")
 		}
 
 		gid := glyph.Gid

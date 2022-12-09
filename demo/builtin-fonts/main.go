@@ -288,7 +288,7 @@ func main() {
 	}
 
 	paper := pages.A4
-	tree := pages.NewPageTree(w, &pages.DefaultAttributes{
+	tree := pages.NewTree(w, &pages.DefaultAttributes{
 		MediaBox: paper,
 	})
 

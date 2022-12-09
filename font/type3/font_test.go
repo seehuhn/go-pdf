@@ -65,7 +65,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(w, nil)
+	pageTree := pages.NewTree(w, nil)
 	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{

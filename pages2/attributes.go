@@ -72,3 +72,12 @@ const (
 	Rotate180 // rotate 180 degrees clockwise
 	Rotate270 // rotate 270 degrees clockwise
 )
+
+// Default paper sizes as PDF rectangles.
+// TODO(voss): should these be rounded to integers?
+var (
+	A4     = &pdf.Rectangle{URx: 595.275, URy: 841.889}
+	A5     = &pdf.Rectangle{URx: 419.527, URy: 595.275}
+	Letter = &pdf.Rectangle{URx: 612, URy: 792}
+	Legal  = &pdf.Rectangle{URx: 612, URy: 1008}
+)

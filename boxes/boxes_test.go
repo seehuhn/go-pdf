@@ -44,7 +44,7 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(out, nil)
+	pageTree := pages.NewTree(out, nil)
 	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{

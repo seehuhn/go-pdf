@@ -32,9 +32,9 @@ type PageTree struct {
 	ranges []*PageRange
 }
 
-// NewPageTree allocates a new PageTree object.
+// NewTree allocates a new PageTree object.
 // Use .AddPage() to add pages to the tree.
-func NewPageTree(w *pdf.Writer, defaults *DefaultAttributes) *PageTree {
+func NewTree(w *pdf.Writer, defaults *DefaultAttributes) *PageTree {
 	tree := &PageTree{
 		w:    w,
 		attr: defaults,

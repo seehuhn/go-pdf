@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 const (
@@ -73,21 +73,12 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	pageTree := pages.NewPageTree(out, nil)
-	page, err := pageTree.NewPage(&pages.Attributes{
-		Resources: &pdf.Resources{
-			Font: pdf.Dict{F1.InstName: F1.Ref},
-		},
-		MediaBox: &pdf.Rectangle{
-			URx: width,
-			URy: height,
-		},
-	})
+	pageTree := pages2.NewTree(out, nil)
+
+	g, err := graphics.NewPage(out)
 	if err != nil {
 		return err
 	}
-
-	g := graphics.NewPage(page)
 
 	glyphs := F1.Typeset(text, fontSize)
 	for _, glyph := range glyphs {
@@ -140,10 +131,24 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	g.StartLine(xPos, yPos)
 	g.ShowGlyphsAligned(glyphs, 0, 0)
 
-	err = g.Close()
+	dict, err := g.Close()
 	if err != nil {
 		return err
 	}
 
-	return page.Close()
+	dict["MediaBox"] = &pdf.Rectangle{
+		URx: width,
+		URy: height,
+	}
+	_, err = pageTree.AppendPage(dict)
+	if err != nil {
+		return err
+	}
+
+	ref, err := pageTree.Close()
+	if err != nil {
+		return err
+	}
+	out.Catalog.Pages = ref
+	return nil
 }

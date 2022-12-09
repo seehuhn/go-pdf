@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
@@ -38,23 +39,12 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(w, nil)
-	page, err := pageTree.NewPage(&pages.Attributes{
-		Resources: &pdf.Resources{
-			Font: pdf.Dict{
-				F.InstName: F.Ref,
-			},
-		},
-		MediaBox: &pdf.Rectangle{
-			URx: 10 + 16*20,
-			URy: 5 + 16*20 + 5,
-		},
-	})
+	pageTree := pages2.NewTree(w, nil)
+
+	g, err := graphics.NewPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	g := graphics.NewPage(page)
 
 	for i := 0; i < 256; i++ {
 		row := i / 16
@@ -76,15 +66,24 @@ func TestSimple(t *testing.T) {
 		g.EndText()
 	}
 
-	err = g.Close()
+	dict, err := g.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dict["MediaBox"] = &pdf.Rectangle{
+		URx: 10 + 16*20,
+		URy: 5 + 16*20 + 5,
+	}
+	_, err = pageTree.AppendPage(dict)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = page.Close()
+	ref, err := pageTree.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.Catalog.Pages = ref
 
 	err = w.Close()
 	if err != nil {
@@ -185,7 +184,7 @@ func TestComplicatedGyphs(t *testing.T) {
 	text = append(text, names.ToUnicode("lcommaaccent", false)...)
 	text = append(text, 'C')
 
-	pageTree := pages.NewPageTree(w, nil)
+	pageTree := pages.NewTree(w, nil)
 	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{

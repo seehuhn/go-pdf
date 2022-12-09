@@ -90,7 +90,7 @@ func imagePage(img *image.NRGBA) error {
 		URx: float64(b.Dx()) / dpi * 72,
 		URy: float64(b.Dy()) / dpi * 72,
 	}
-	pageTree := pages.NewPageTree(out, nil)
+	pageTree := pages.NewTree(out, nil)
 	page, err := pageTree.NewPage(&pages.Attributes{
 		Resources: &pdf.Resources{
 			XObject: pdf.Dict{

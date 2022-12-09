@@ -27,7 +27,7 @@ func (p *Page) MoveTo(x, y float64) {
 		return
 	}
 	p.state = statePath
-	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), "m")
+	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "m")
 }
 
 // LineTo appends a straight line segment to the current path.
@@ -35,7 +35,7 @@ func (p *Page) LineTo(x, y float64) {
 	if !p.valid("LineTo", statePath, stateClipped) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), "l")
+	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "l")
 }
 
 // Rectangle appends a rectangle to the current path as a closed subpath.
@@ -44,7 +44,7 @@ func (p *Page) Rectangle(x, y, width, height float64) {
 		return
 	}
 	p.state = statePath
-	_, p.err = fmt.Fprintln(p.w, p.coord(x), p.coord(y), p.coord(width), p.coord(height), "re")
+	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), p.coord(width), p.coord(height), "re")
 }
 
 // MoveToArc appends a circular arc to the current path,
@@ -93,7 +93,7 @@ func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 		y3 := y + radius*math.Sin(phi)
 		x2 := x3 + k*math.Sin(phi)
 		y2 := y3 - k*math.Cos(phi)
-		_, p.err = fmt.Fprintln(p.w, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
+		_, p.err = fmt.Fprintln(p.content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
 		x0 = x3
 		y0 = y3
 	}
@@ -110,7 +110,7 @@ func (p *Page) ClosePath() {
 	if !p.valid("ClosePath", statePath) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, "h")
+	_, p.err = fmt.Fprintln(p.content, "h")
 }
 
 // Stroke strokes the current path.
@@ -119,7 +119,7 @@ func (p *Page) Stroke() {
 		return
 	}
 	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.w, "S")
+	_, p.err = fmt.Fprintln(p.content, "S")
 }
 
 // CloseAndStroke closes and strokes the current path.
@@ -128,7 +128,7 @@ func (p *Page) CloseAndStroke() {
 		return
 	}
 	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.w, "s")
+	_, p.err = fmt.Fprintln(p.content, "s")
 }
 
 // Fill fills the current path.  Any subpaths that are open are implicitly
@@ -138,7 +138,7 @@ func (p *Page) Fill() {
 		return
 	}
 	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.w, "f")
+	_, p.err = fmt.Fprintln(p.content, "f")
 }
 
 // FillAndStroke fills and strokes the current path.  Any subpaths that are
@@ -148,5 +148,5 @@ func (p *Page) FillAndStroke() {
 		return
 	}
 	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.w, "B")
+	_, p.err = fmt.Fprintln(p.content, "B")
 }

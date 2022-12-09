@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 func main() {
@@ -38,23 +38,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(w, nil)
-	page, err := pageTree.NewPage(&pages.Attributes{
-		Resources: &pdf.Resources{
-			Font: pdf.Dict{
-				F.InstName: F.Ref,
-			},
-		},
-		MediaBox: pages.A4,
-	})
+	pageTree := pages2.NewTree(w, nil)
+
+	bbox := pages2.A4
+	g, err := graphics.NewPage(w)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	g := graphics.NewPage(page)
-
 	x := 72.0
-	y := page.BBox.URy - 72.0
+	y := bbox.URy - 72.0
 	r := 50.0
 	g.Circle(x, y, r)
 	g.Stroke()
@@ -76,13 +69,19 @@ func main() {
 	g.ShowText("line 3")
 	g.EndText()
 
-	err = g.Close()
+	dict, err := g.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	dict["MediaBox"] = bbox
+	_, err = pageTree.AppendPage(dict)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = page.Close()
+	ref, err := pageTree.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
+	w.Catalog.Pages = ref
 }

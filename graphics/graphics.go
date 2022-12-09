@@ -23,7 +23,7 @@ func (p *Page) PushGraphicsState() {
 	if !p.valid("PushGraphicsState", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, "q")
+	_, p.err = fmt.Fprintln(p.content, "q")
 }
 
 // PopGraphicsState restores the previous graphics state.
@@ -31,7 +31,7 @@ func (p *Page) PopGraphicsState() {
 	if !p.valid("PopGraphicsState", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, "Q")
+	_, p.err = fmt.Fprintln(p.content, "Q")
 }
 
 // Translate moves the origin of the coordinate system.
@@ -39,7 +39,7 @@ func (p *Page) Translate(x, y float64) {
 	if !p.valid("Translate", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, 1, 0, 0, 1, p.coord(x), p.coord(y), "cm")
+	_, p.err = fmt.Fprintln(p.content, 1, 0, 0, 1, p.coord(x), p.coord(y), "cm")
 }
 
 // SetLineWidth sets the line width.
@@ -47,7 +47,7 @@ func (p *Page) SetLineWidth(width float64) {
 	if !p.valid("SetLineWidth", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, p.coord(width), "w")
+	_, p.err = fmt.Fprintln(p.content, p.coord(width), "w")
 }
 
 // SetLineCap sets the line cap style.
@@ -55,7 +55,7 @@ func (p *Page) SetLineCap(cap LineCapStyle) {
 	if !p.valid("SetLineCap", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, int(cap), "J")
+	_, p.err = fmt.Fprintln(p.content, int(cap), "J")
 }
 
 // LineCapStyle is the style of the end of a line.
@@ -74,7 +74,7 @@ func (p *Page) SetLineJoin(join LineJoinStyle) {
 	if !p.valid("SetLineJoin", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.w, int(join), "j")
+	_, p.err = fmt.Fprintln(p.content, int(join), "j")
 }
 
 // LineJoinStyle is the style of the corner of a line.

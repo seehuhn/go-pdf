@@ -37,15 +37,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if out.Version >= pdf.V1_2 {
-		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-	}
-
 	pageTree := pages2.NewTree(out, &pages2.InheritableAttributes{
-		Resources: &pdf.Resources{
-			Font: pdf.Dict{font.InstName: font.Ref},
-		},
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
 	frontMatter := pageTree.NewSubTree(nil)
@@ -55,21 +47,10 @@ func main() {
 			extra = pageTree.NewSubTree(nil)
 		}
 
-		contentRef := out.Alloc()
-		dict := pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"Contents": contentRef,
-		}
-		_, err := pageTree.AppendPage(dict)
+		g, err := graphics.NewPage(out)
 		if err != nil {
 			log.Fatal(err)
 		}
-		stream, _, err := out.OpenStream(nil, contentRef, compress)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		g := graphics.NewPage(stream)
 
 		g.BeginText()
 		g.SetFont(font, 12)
@@ -81,76 +62,55 @@ func main() {
 		}
 		g.EndText()
 
-		err = g.Close()
+		dict, err := g.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		err = stream.Close()
+		_, err = pageTree.AppendPage(dict)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	{
-		contentRef := out.Alloc()
-		dict := pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"Contents": contentRef,
-		}
-		_, err := frontMatter.AppendPage(dict)
-		if err != nil {
-			log.Fatal(err)
-		}
-		stream, _, err := out.OpenStream(nil, contentRef, compress)
+		g, err := graphics.NewPage(out)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		g := graphics.NewPage(stream)
 		g.BeginText()
 		g.SetFont(font, 12)
 		g.StartLine(30, 30)
 		g.ShowText("Title")
 		g.EndText()
-		err = g.Close()
+
+		dict, err := g.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		err = stream.Close()
+		_, err = frontMatter.AppendPage(dict)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	{
-		contentRef := out.Alloc()
-		dict := pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"Contents": contentRef,
-		}
-		_, err := extra.AppendPage(dict)
-		if err != nil {
-			log.Fatal(err)
-		}
-		stream, _, err := out.OpenStream(nil, contentRef, compress)
+		g, err := graphics.NewPage(out)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		g := graphics.NewPage(stream)
 		g.BeginText()
 		g.SetFont(font, 12)
 		g.StartLine(30, 30)
 		g.ShowText("three")
 		g.EndText()
-		err = g.Close()
+
+		dict, err := g.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		err = stream.Close()
+		_, err = extra.AppendPage(dict)
 		if err != nil {
 			log.Fatal(err)
 		}

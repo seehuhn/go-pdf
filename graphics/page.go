@@ -27,7 +27,11 @@ import (
 
 // Page is a PDF page.
 type Page struct {
-	w     io.Writer
+	w          *pdf.Writer
+	content    io.WriteCloser
+	contentRef *pdf.Reference
+	resources  *pdf.Resources
+
 	state state
 	err   error
 
@@ -37,17 +41,47 @@ type Page struct {
 }
 
 // NewPage creates a new page.
-func NewPage(w io.Writer) *Page {
-	return &Page{
-		w:     w,
-		state: stateGlobal,
+func NewPage(w *pdf.Writer) (*Page, error) {
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if w.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
+
+	stream, contentRef, err := w.OpenStream(nil, nil, compress)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Page{
+		w:          w,
+		content:    stream,
+		contentRef: contentRef,
+
+		state: stateGlobal,
+	}, nil
 }
 
 // Close must be called after drawing the page is complete.
 // Any error that occurred during drawing is returned here.
-func (p *Page) Close() error {
-	return p.err
+func (p *Page) Close() (pdf.Dict, error) {
+	if p.err != nil {
+		return nil, p.err
+	}
+
+	err := p.content.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	dict := pdf.Dict{
+		"Type":     pdf.Name("Page"),
+		"Contents": p.contentRef,
+	}
+	if p.resources != nil {
+		dict["Resources"] = pdf.AsDict(p.resources)
+	}
+
+	return dict, nil
 }
 
 func (p *Page) valid(cmd string, ss ...state) bool {

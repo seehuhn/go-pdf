@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 func norm(x, y float64) float64 {
@@ -56,18 +56,10 @@ func main() {
 	lambda := (200 - xM) / nx
 	mu := yM + lambda*ny
 
-	pageTree := pages.NewPageTree(w, nil)
-	page, err := pageTree.NewPage(&pages.Attributes{
-		MediaBox: &pdf.Rectangle{
-			URx: 440,
-			URy: mu + 60,
-		},
-	})
+	g, err := graphics.NewPage(w)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	g := graphics.NewPage(page)
 	g.Translate(20, 20)
 	g.SetLineJoin(graphics.LineJoinRound)
 	g.SetLineCap(graphics.LineCapRound)
@@ -144,13 +136,24 @@ func main() {
 	}
 	g.Stroke()
 
-	err = g.Close()
+	dict, err := g.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = page.Close()
+	dict["MediaBox"] = &pdf.Rectangle{
+		URx: 440,
+		URy: mu + 60,
+	}
+
+	pageTree := pages2.NewTree(w, nil)
+	_, err = pageTree.AppendPage(dict)
 	if err != nil {
 		log.Fatal(err)
 	}
+	ref, err := pageTree.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	w.Catalog.Pages = ref
 }

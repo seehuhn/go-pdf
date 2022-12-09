@@ -55,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewPageTree(w, &pages.DefaultAttributes{
+	pageTree := pages.NewTree(w, &pages.DefaultAttributes{
 		MediaBox: pages.A4,
 	})
 

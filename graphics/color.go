@@ -24,7 +24,7 @@ func (p *Page) SetFillGray(g float64) {
 	if !p.valid("SetFillGray", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintf(p.w, "%g g\n", g)
+	_, p.err = fmt.Fprintf(p.content, "%g g\n", g)
 }
 
 // SetStrokeGray sets the stroke color to the given gray value.
@@ -33,7 +33,7 @@ func (p *Page) SetStrokeGray(g float64) {
 	if !p.valid("SetStrokeGray", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintf(p.w, "%g G\n", g)
+	_, p.err = fmt.Fprintf(p.content, "%g G\n", g)
 }
 
 // SetFillRGB sets the fill color to the given RGB values.
@@ -42,7 +42,7 @@ func (p *Page) SetFillRGB(r, g, b float64) {
 	if !p.valid("SetFillRGB", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintf(p.w, "%g %g %g rg\n", r, g, b)
+	_, p.err = fmt.Fprintf(p.content, "%g %g %g rg\n", r, g, b)
 }
 
 // SetStrokeRGB sets the stroke color to the given RGB values.
@@ -51,5 +51,5 @@ func (p *Page) SetStrokeRGB(r, g, b float64) {
 	if !p.valid("SetStrokeRGB", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintf(p.w, "%g %g %g RG\n", r, g, b)
+	_, p.err = fmt.Fprintf(p.content, "%g %g %g RG\n", r, g, b)
 }

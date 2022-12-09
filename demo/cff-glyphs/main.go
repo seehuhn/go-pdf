@@ -51,7 +51,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pages.NewPageTree(out, &pages.DefaultAttributes{
+	tree := pages.NewTree(out, &pages.DefaultAttributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{
 				F.InstName: F.Ref,
