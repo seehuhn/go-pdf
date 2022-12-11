@@ -30,7 +30,8 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/pages2"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/header"
@@ -51,7 +52,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pages.NewTree(out, &pages.DefaultAttributes{
+	tree := pages2.NewTree(out, &pages2.InheritableAttributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{
 				F.InstName: F.Ref,
@@ -73,63 +74,68 @@ func main() {
 			continue
 		}
 
-		// X, err := cff.EmbedFontCID(out, cffFont, "X")
-		// if err != nil {
-		// 	log.Printf("%s: %v", fname, err)
-		// 	continue
-		// }
-
 		for i := range cffFont.Glyphs {
-			bbox := cffFont.Glyphs[i].Extent()
+			glyphBBox := cffFont.Glyphs[i].Extent()
 			left := funit.Int16(0)
-			if bbox.LLx < left {
-				left = bbox.LLx
+			if glyphBBox.LLx < left {
+				left = glyphBBox.LLx
 			}
 			right := cffFont.Glyphs[i].Width
 			if right < 300 {
 				right = 300
 			}
-			if bbox.URx > right {
-				right = bbox.URx
+			if glyphBBox.URx > right {
+				right = glyphBBox.URx
 			}
 			top := funit.Int16(100)
-			if bbox.URy > top {
-				top = bbox.URy
+			if glyphBBox.URy > top {
+				top = glyphBBox.URy
 			}
 			bottom := funit.Int16(0)
-			if bbox.LLy < bottom {
-				bottom = bbox.LLy
+			if glyphBBox.LLy < bottom {
+				bottom = glyphBBox.LLy
+			}
+			pageBBox := &pdf.Rectangle{
+				LLx: q*float64(left) - 20,
+				LLy: q*float64(bottom) - 20,
+				URx: q*float64(right) + 20,
+				URy: q*float64(top) + 12 + 20,
 			}
 
-			page, err := tree.NewPage(&pages.Attributes{
-				MediaBox: &pdf.Rectangle{
-					LLx: q*float64(left) - 20,
-					LLy: q*float64(bottom) - 20,
-					URx: q*float64(right) + 20,
-					URy: q*float64(top) + 12 + 20,
-				},
-				Resources: &pdf.Resources{
-					Font: pdf.Dict{
-						// X.InstName: X.Ref,
-					},
-				},
-			})
+			page, err := graphics.NewPage(out)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			var X *font.Font // TODO(voss)
-			err = illustrateGlyph(page, F, X, cffFont, i)
+			ctx := &context{
+				page:      page,
+				pageBBox:  pageBBox,
+				labelFont: F,
+				labelSize: 12,
+			}
+			err = illustrateGlyph(ctx, cffFont, i)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			err = page.Close()
+			dict, err := page.Close()
+			if err != nil {
+				log.Fatal(err)
+			}
+			dict["MediaBox"] = pageBBox
+
+			_, err = tree.AppendPage(dict)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
 	}
+
+	rootRef, err := tree.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	out.Catalog.Pages = rootRef
 
 	err = out.Close()
 	if err != nil {
@@ -160,7 +166,16 @@ func loadCFFData(fname string) ([]byte, error) {
 	return cffData, nil
 }
 
-func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) error {
+type context struct {
+	page      *graphics.Page
+	pageBBox  *pdf.Rectangle
+	labelFont *font.Font
+	labelSize float64
+}
+
+func illustrateGlyph(ctx *context, fnt *cff.Font, i int) error {
+	page := ctx.page
+
 	hss := boxes.Glue(0, 1, 1, 1, 1)
 
 	var label string
@@ -169,77 +184,71 @@ func illustrateGlyph(page *pages.Page, F, X *font.Font, fnt *cff.Font, i int) er
 	} else {
 		label = fmt.Sprintf("glyph %d", i)
 	}
-	nameBox := boxes.Text(F, 12, label)
-	titleBox := boxes.HBoxTo(page.BBox.URx-page.BBox.LLx, hss, nameBox, hss)
-	titleBox.Draw(page, page.BBox.LLx, page.BBox.URy-20)
+	nameBox := boxes.Text(ctx.labelFont, ctx.labelSize, label)
+	titleBox := boxes.HBoxTo(ctx.pageBBox.URx-ctx.pageBBox.LLx, hss, nameBox, hss)
+	titleBox.Draw(page, ctx.pageBBox.LLx, ctx.pageBBox.URy-20)
 
-	page.Printf("%.3f 0 0 %.3f 0 0 cm\n", q, q)
+	page.Scale(q, q)
 
+	// illustrate the advance width by drawing an arrow
 	w := fnt.Glyphs[i].Width
-	page.Println("q")
-	page.Println("0.1 0.9 0.1 RG 3 w")
-	page.Println("0 -10 m 0 10 l")
-	page.Printf("0 0 m %d 0 l\n", w)
-	page.Printf("%d -10 m %d 0 l %d 10 l\n", w-10, w, w-10)
-	page.Println("S Q")
+	page.PushGraphicsState()
+	page.SetStrokeRGB(0.1, 0.9, 0.1)
+	page.SetLineWidth(3)
+	page.MoveTo(0, -10)
+	page.LineTo(0, 10)
+	page.MoveTo(0, 0)
+	page.LineTo(float64(w), 0)
+	page.MoveTo(float64(w)-10, -10)
+	page.LineTo(float64(w), 0)
+	page.LineTo(float64(w-10), 10)
+	page.Stroke()
+	page.PopGraphicsState()
 
-	glyph := fnt.Glyphs[i]
-
-	// page.Println("q")
-	// page.Println("0.5 0.9 0.9 rg")
-	// glyphImage := &font.Layout{
-	// 	Font:     X,
-	// 	FontSize: 1000,
-	// 	Glyphs: []glyph.Info{
-	// 		{
-	// 			Gid:     glyph.ID(i),
-	// 			Advance: int32(fnt.Glyphs[i].Width),
-	// 		},
-	// 	},
-	// }
-	// glyphImage.Draw(page, 0, 0)
-	// page.Println("Q")
-
+	// draw the glyph outline
 	var xx []cff.Fixed16
 	var yy []cff.Fixed16
-	var ink bool
-	for _, cmd := range glyph.Cmds {
-		switch cmd.Op {
-		case cff.OpMoveTo:
-			if ink {
-				page.Println("h")
+	glyph := fnt.Glyphs[i]
+	if len(glyph.Cmds) > 0 {
+		var ink bool
+		for _, cmd := range glyph.Cmds {
+			switch cmd.Op {
+			case cff.OpMoveTo:
+				if ink {
+					page.ClosePath()
+				}
+				page.MoveTo(cmd.Args[0].Float64(), cmd.Args[1].Float64())
+				xx = append(xx, cmd.Args[0])
+				yy = append(yy, cmd.Args[1])
+			case cff.OpLineTo:
+				page.LineTo(cmd.Args[0].Float64(), cmd.Args[1].Float64())
+				xx = append(xx, cmd.Args[0])
+				yy = append(yy, cmd.Args[1])
+				ink = true
+			case cff.OpCurveTo:
+				page.CurveTo(cmd.Args[0].Float64(), cmd.Args[1].Float64(),
+					cmd.Args[2].Float64(), cmd.Args[3].Float64(),
+					cmd.Args[4].Float64(), cmd.Args[5].Float64())
+				xx = append(xx, cmd.Args[4])
+				yy = append(yy, cmd.Args[5])
+				ink = true
 			}
-			page.Printf("%.3f %.3f m\n", cmd.Args[0].Float64(), cmd.Args[1].Float64())
-			xx = append(xx, cmd.Args[0])
-			yy = append(yy, cmd.Args[1])
-		case cff.OpLineTo:
-			page.Printf("%.3f %.3f l\n", cmd.Args[0].Float64(), cmd.Args[1].Float64())
-			xx = append(xx, cmd.Args[0])
-			yy = append(yy, cmd.Args[1])
-			ink = true
-		case cff.OpCurveTo:
-			page.Printf("%.3f %.3f %.3f %.3f %.3f %.3f c\n",
-				cmd.Args[0].Float64(), cmd.Args[1].Float64(),
-				cmd.Args[2].Float64(), cmd.Args[3].Float64(),
-				cmd.Args[4].Float64(), cmd.Args[5].Float64())
-			xx = append(xx, cmd.Args[4])
-			yy = append(yy, cmd.Args[5])
-			ink = true
 		}
+		if ink {
+			page.ClosePath()
+		}
+		page.Stroke()
 	}
-	if ink {
-		page.Println("h")
-	}
-	page.Println("S")
 
-	page.Println("q 0 0 0.8 rg")
+	page.PushGraphicsState()
+	page.SetFillRGB(0, 0, 0.8)
 	for i := range xx {
 		x := xx[i]
 		y := yy[i]
-		label := boxes.Text(F, 16, fmt.Sprintf("%d", i))
+		label := boxes.Text(ctx.labelFont, 16, fmt.Sprintf("%d", i))
 		label.Draw(page, x.Float64(), y.Float64())
 	}
-	page.Println("Q")
+	page.PopGraphicsState()
 
 	return nil
 }

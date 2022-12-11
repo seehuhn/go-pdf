@@ -22,7 +22,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 var (
@@ -36,7 +38,7 @@ var (
 	maxHeight    = paperHeight - topMargin - bottomMargin
 )
 
-func makePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFont *font.Font) error {
+func makePages(w *pdf.Writer, tree *pages2.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
 	p := boxes.Parameters{
 		BaseLineSkip: 12,
 	}
@@ -60,25 +62,18 @@ func makePages(w *pdf.Writer, tree *pages.PageTree, c <-chan boxes.Box, labelFon
 		pageBody := p.VBoxTo(paperHeight, pageList...)
 		withMargins := boxes.HBoxTo(paperWidth, boxes.Kern(leftMargin), pageBody)
 
-		pageFonts := pdf.Dict{}
-		boxes.Walk(pageBody, func(box boxes.Box) {
-			switch b := box.(type) {
-			case *boxes.TextBox:
-				font := b.Font
-				pageFonts[font.InstName] = font.Ref
-			}
-		})
-		attr := &pages.Attributes{
-			Resources: &pdf.Resources{
-				Font: pageFonts,
-			},
-		}
-		page, err := tree.NewPage(attr)
+		page, err := graphics.NewPage(w)
 		if err != nil {
 			return err
 		}
+
 		withMargins.Draw(page, 0, withMargins.Extent().Depth)
-		err = page.Close()
+
+		dict, err := page.Close()
+		if err != nil {
+			return err
+		}
+		_, err = tree.AppendPage(dict)
 		if err != nil {
 			return err
 		}

@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 	"seehuhn.de/go/pdf/sfnt"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/header"
@@ -99,12 +100,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(out, &pages.DefaultAttributes{
-		Resources: &pdf.Resources{
-			Font: pdf.Dict{
-				theFont.InstName: theFont.Ref,
-			},
-		},
+	pageTree := pages2.NewTree(out, &pages2.InheritableAttributes{
 		MediaBox: pages.A4,
 	})
 
@@ -238,6 +234,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	rootRef, err := pageTree.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	out.Catalog.Pages = rootRef
 
 	err = out.Close()
 	if err != nil {

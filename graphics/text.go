@@ -120,6 +120,11 @@ func (p *Page) ShowTextAligned(s string, a, b float64) {
 	p.ShowGlyphsAligned(gg, a, b)
 }
 
+// ShowGlyphs draws a sequence of glyphs.
+func (p *Page) ShowGlyphs(gg []glyph.Info) {
+	p.ShowGlyphsAligned(gg, 0, 0)
+}
+
 // ShowGlyphsAligned draws a sequence of glyphs and aligns it.
 // The beginning of the string is shifted right by a*w+b, where w
 // is the width of the string.

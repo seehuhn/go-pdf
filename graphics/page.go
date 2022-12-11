@@ -33,6 +33,7 @@ type Page struct {
 	resources  *pdf.Resources
 
 	state state
+	stack []state
 	err   error
 
 	font     *font.Font

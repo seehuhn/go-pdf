@@ -20,16 +20,15 @@ import (
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
 // Box represents marks on a page within a rectangular area of known size.
 type Box interface {
 	Extent() *BoxExtent
-	Draw(page *pages.Page, xPos, yPos float64)
+	Draw(page *graphics.Page, xPos, yPos float64)
 }
 
 // BoxExtent gives the dimensions of a Box.
@@ -70,10 +69,10 @@ func Rule(width, height, depth float64) Box {
 }
 
 // Draw implements the Box interface.
-func (obj *RuleBox) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj *RuleBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	if obj.Width > 0 && obj.Depth+obj.Height > 0 {
-		fmt.Fprintf(page, "%f %f %f %f re f\n",
-			xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
+		page.Rectangle(xPos, yPos-obj.Depth, obj.Width, obj.Depth+obj.Height)
+		page.Fill()
 	}
 }
 
@@ -90,7 +89,7 @@ func (obj Kern) Extent() *BoxExtent {
 }
 
 // Draw implements the Box interface.
-func (obj Kern) Draw(page *pages.Page, xPos, yPos float64) {}
+func (obj Kern) Draw(page *graphics.Page, xPos, yPos float64) {}
 
 // TextBox represents a typeset string of characters as a Box object.
 type TextBox struct {
@@ -153,73 +152,15 @@ func (obj *TextBox) Extent() *BoxExtent {
 }
 
 // Draw implements the Box interface.
-func (obj *TextBox) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj *TextBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	// TODO(voss): use the code in the graphics package instead.
 	font := obj.Font
 
-	page.Println("BT")
-	_ = font.InstName.PDF(page)
-	fmt.Fprintf(page, " %f Tf\n", obj.FontSize)
-	fmt.Fprintf(page, "%f %f Td\n", xPos, yPos)
-
-	var run pdf.String
-	var data pdf.Array
-	flushRun := func() {
-		if len(run) > 0 {
-			data = append(data, run)
-			run = nil
-		}
-	}
-	flush := func() {
-		flushRun()
-		if len(data) == 0 {
-			return
-		}
-		if len(data) == 1 {
-			if s, ok := data[0].(pdf.String); ok {
-				_ = s.PDF(page)
-				page.Println(" Tj")
-				data = nil
-				return
-			}
-		}
-		_ = data.PDF(page)
-		page.Println(" TJ")
-		data = nil
-	}
-
-	xOffsFont := 0
-	yOffs := 0
-	xOffsPDF := 0
-	for _, glyph := range obj.Glyphs {
-		gid := glyph.Gid
-		if int(gid) >= len(font.Widths) {
-			gid = 0
-		}
-
-		if int(glyph.YOffset) != yOffs {
-			flush()
-			page.Printf("%.1f Ts\n", glyph.YOffset.AsFloat(obj.FontSize/float64(font.UnitsPerEm)))
-			yOffs = int(glyph.YOffset)
-		}
-
-		xOffsWanted := xOffsFont + int(glyph.XOffset)
-
-		delta := xOffsWanted - xOffsPDF
-		if delta != 0 {
-			flushRun()
-			deltaScaled := float64(delta) / float64(font.UnitsPerEm) * 1000
-			data = append(data, -pdf.Integer(math.Round(deltaScaled)))
-			xOffsPDF += delta // TODO(voss): use this
-		}
-		run = append(run, font.Enc(gid)...)
-
-		xOffsFont += int(glyph.Advance)
-		xOffsPDF = xOffsWanted + int(font.Widths[gid])
-	}
-	flush()
-
-	page.Println("ET")
+	page.BeginText()
+	page.SetFont(font, obj.FontSize)
+	page.StartLine(xPos, yPos)
+	page.ShowGlyphs(obj.Glyphs)
+	page.EndText()
 }
 
 type raiseBox struct {
@@ -234,7 +175,7 @@ func (obj raiseBox) Extent() *BoxExtent {
 	return extent
 }
 
-func (obj raiseBox) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj raiseBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	obj.Box.Draw(page, xPos, yPos+obj.delta)
 }
 
@@ -244,25 +185,6 @@ func Raise(delta float64, box Box) Box {
 		Box:   box,
 		delta: delta,
 	}
-}
-
-// Ship appends the box to the page tree as a new page.
-func Ship(tree *pages.PageTree, box Box) error {
-	ext := box.Extent()
-	attr := &pages.Attributes{
-		MediaBox: &pdf.Rectangle{
-			LLx: 0,
-			LLy: 0,
-			URx: ext.Width,
-			URy: ext.Depth + ext.Height,
-		},
-	}
-	page, err := tree.NewPage(attr)
-	if err != nil {
-		return err
-	}
-	box.Draw(page, 0, ext.Depth)
-	return page.Close()
 }
 
 type walker interface {

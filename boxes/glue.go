@@ -16,7 +16,7 @@
 
 package boxes
 
-import "seehuhn.de/go/pdf/pages"
+import "seehuhn.de/go/pdf/graphics"
 
 type stretcher interface {
 	Stretch() *stretchAmount
@@ -55,7 +55,7 @@ func (obj *glue) Extent() *BoxExtent {
 	}
 }
 
-func (obj *glue) Draw(page *pages.Page, xPos, yPos float64) {}
+func (obj *glue) Draw(page *graphics.Page, xPos, yPos float64) {}
 
 func (obj *glue) Stretch() *stretchAmount {
 	return &obj.Plus

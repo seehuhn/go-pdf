@@ -19,7 +19,7 @@ package boxes
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // vBox represents a Box which contains a column of sub-objects.
@@ -118,7 +118,7 @@ func (p *Parameters) VBoxTo(total float64, children ...Box) Box {
 }
 
 // Draw implements the Box interface.
-func (obj *vBox) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj *vBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	boxTotal := obj.Depth + obj.Height
 	contentsTotal := 0.0
 	for _, child := range obj.Contents {

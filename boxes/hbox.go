@@ -19,7 +19,7 @@ package boxes
 import (
 	"math"
 
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // hBox represents a Box which contains a row of sub-objects.
@@ -74,7 +74,7 @@ func HBoxTo(total float64, boxes ...Box) Box {
 }
 
 // Draw implements the Box interface.
-func (obj *hBox) Draw(page *pages.Page, xPos, yPos float64) {
+func (obj *hBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	boxTotal := obj.Width
 	contentsTotal := 0.0
 	for _, child := range obj.Contents {

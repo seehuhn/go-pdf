@@ -26,7 +26,9 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/names"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 const documentTitle = "The 14 Built-in PDF Fonts"
@@ -47,30 +49,30 @@ func (gl *glyphBox) Extent() *boxes.BoxExtent {
 	return gl.text.Extent()
 }
 
-func (gl *glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
-	page.Println("q")
+func (gl *glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
+	page.PushGraphicsState()
 	font := gl.text.Font
 	x := xPos
 	y := yPos
-	page.Println(".4 1 .4 rg")
+	page.SetFillRGB(.4, 1, .4)
 	for _, glyph := range gl.text.Glyphs {
 		gid := glyph.Gid
 		ext := font.GlyphExtents[gid]
-		page.Printf("%.2f %.2f %.2f %.2f re\n",
+		page.Rectangle(
 			x+float64(ext.LLx)+float64(glyph.XOffset),
 			y+float64(ext.LLy)+float64(glyph.YOffset),
 			float64(ext.URx-ext.LLx),
 			float64(ext.URy-ext.LLy))
 		x += float64(glyph.Advance)
 	}
-	page.Println("f")
-	page.Println("Q")
+	page.Fill()
+	page.PopGraphicsState()
 	gl.text.Draw(page, xPos, yPos)
 }
 
 type fontTables struct {
 	w           *pdf.Writer
-	tree        *pages.PageTree
+	tree        *pages2.Tree
 	paperHeight float64
 	paperWidth  float64
 	textWidth   float64
@@ -202,28 +204,17 @@ func (f *fontTables) DoFlush() error {
 	pageBody := p.VBoxTo(f.paperHeight, pageList...)
 	withMargins := boxes.HBox(boxes.Kern(50), pageBody)
 
-	pageFonts := pdf.Dict{}
-	boxes.Walk(pageBody, func(box boxes.Box) {
-		switch b := box.(type) {
-		case *boxes.TextBox:
-			font := b.Font
-			pageFonts[font.InstName] = font.Ref
-		case *glyphBox:
-			font := b.text.Font
-			pageFonts[font.InstName] = font.Ref
-		}
-	})
-	attr := &pages.Attributes{
-		Resources: &pdf.Resources{
-			Font: pageFonts,
-		},
-	}
-	page, err := f.tree.NewPage(attr)
+	g, err := graphics.NewPage(f.w)
 	if err != nil {
 		return err
 	}
-	withMargins.Draw(page, 0, withMargins.Extent().Depth)
-	err = page.Close()
+	withMargins.Draw(g, 0, withMargins.Extent().Depth)
+	dict, err := g.Close()
+	if err != nil {
+		return err
+	}
+
+	_, err = f.tree.AppendPage(dict)
 	if err != nil {
 		return err
 	}
@@ -288,7 +279,7 @@ func main() {
 	}
 
 	paper := pages.A4
-	tree := pages.NewTree(w, &pages.DefaultAttributes{
+	tree := pages2.NewTree(w, &pages2.InheritableAttributes{
 		MediaBox: paper,
 	})
 

@@ -20,18 +20,24 @@ import "fmt"
 
 // PushGraphicsState saves the current graphics state.
 func (p *Page) PushGraphicsState() {
-	if !p.valid("PushGraphicsState", stateGlobal, stateText) {
-		return
+	// TODO(voss): does this require certain states?
+	p.stack = append(p.stack, p.state)
+	_, err := fmt.Fprintln(p.content, "q")
+	if p.err == nil {
+		p.err = err
 	}
-	_, p.err = fmt.Fprintln(p.content, "q")
 }
 
 // PopGraphicsState restores the previous graphics state.
 func (p *Page) PopGraphicsState() {
-	if !p.valid("PopGraphicsState", stateGlobal, stateText) {
-		return
+	// TODO(voss): does this require certain states?
+	n := len(p.stack) - 1
+	p.state = p.stack[n]
+	p.stack = p.stack[:n]
+	_, err := fmt.Fprintln(p.content, "Q")
+	if p.err == nil {
+		p.err = err
 	}
-	_, p.err = fmt.Fprintln(p.content, "Q")
 }
 
 // Translate moves the origin of the coordinate system.
@@ -40,6 +46,14 @@ func (p *Page) Translate(x, y float64) {
 		return
 	}
 	_, p.err = fmt.Fprintln(p.content, 1, 0, 0, 1, p.coord(x), p.coord(y), "cm")
+}
+
+// Scale scales the coordinate system.
+func (p *Page) Scale(x, y float64) {
+	if !p.valid("Scale", stateGlobal, stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.content, p.coord(x), 0, 0, p.coord(y), 0, 0, "cm")
 }
 
 // SetLineWidth sets the line width.

@@ -38,6 +38,14 @@ func (p *Page) LineTo(x, y float64) {
 	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "l")
 }
 
+// CurveTo appends a cubic Bezier curve to the current path.
+func (p *Page) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
+	if !p.valid("CurveTo", statePath, stateClipped) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
+}
+
 // Rectangle appends a rectangle to the current path as a closed subpath.
 func (p *Page) Rectangle(x, y, width, height float64) {
 	if !p.valid("Rectangle", stateGlobal, statePath) {

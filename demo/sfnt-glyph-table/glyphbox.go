@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/boxes"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
@@ -39,35 +39,35 @@ func (g glyphBox) Extent() *boxes.BoxExtent {
 	}
 }
 
-func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
+func (g glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	q := float64(glyphFontSize) / 1000
 	glyphWidth := float64(theFont.Widths[g]) * q
 	shift := (glyphBoxWidth - glyphWidth) / 2
 
 	if theFont.GlyphExtents != nil {
 		ext := theFont.GlyphExtents[glyph.ID(g)]
-		page.Println("q")
-		page.Println(".4 1 .4 rg")
-		page.Printf("%.2f %.2f %.2f %.2f re\n",
+		page.PushGraphicsState()
+		page.SetFillRGB(.4, 1, .4)
+		page.Rectangle(
 			xPos+float64(ext.LLx)*q+shift, yPos+float64(ext.LLy)*q,
 			float64(ext.URx-ext.LLx)*q, float64(ext.URy-ext.LLy)*q)
-		page.Println("f")
-		page.Println("Q")
+		page.Fill()
+		page.PopGraphicsState()
 	}
 
 	yLow := yPos + float64(theFont.Descent)*q
 	yHigh := yPos + float64(theFont.Ascent)*q
-	page.Println("q")
-	page.Println("1 0 0 RG")
-	page.Println(".5 w")
+	page.PushGraphicsState()
+	page.SetStrokeRGB(1, 0, 0)
+	page.SetLineWidth(.5)
 	x := xPos + shift
-	page.Printf("%.2f %.2f m\n", x, yLow)
-	page.Printf("%.2f %.2f l\n", x, yHigh)
+	page.MoveTo(x, yLow)
+	page.LineTo(x, yHigh)
 	x += glyphWidth
-	page.Printf("%.2f %.2f m\n", x, yLow)
-	page.Printf("%.2f %.2f l\n", x, yHigh)
-	page.Println("s")
-	page.Println("Q")
+	page.MoveTo(x, yLow)
+	page.LineTo(x, yHigh)
+	page.Stroke()
+	page.PopGraphicsState()
 
 	r := rev[glyph.ID(g)]
 	var label string
@@ -90,33 +90,34 @@ func (g glyphBox) Draw(page *pages.Page, xPos, yPos float64) {
 		case 2:
 			classLabel = "l" // Ligature glyph (multiple character, spacing glyph)
 		case 3:
-			classLabel = "m" // Mark glyph (non-spacing combining glyph)
+			classLabel = "m" // Mark glyph (non-spacing, combining glyph)
 		case 4:
 			classLabel = "c" // Component glyph (part of single character, spacing glyph)
 		}
 		if classLabel != "" {
 			cBox := boxes.Text(courier, 8, classLabel)
-			page.Println("q")
-			page.Println("0.5 g")
+			page.PushGraphicsState()
+			page.SetFillGray(.5)
 			cBox.Draw(page,
 				xPos+glyphBoxWidth-cBox.Extent().Width-1,
 				yPos+float64(theFont.Descent)*q-6)
-			page.Println("Q")
+			page.PopGraphicsState()
 		}
 	}
 
-	page.Println("q")
-	page.Println("BT")
-	_ = theFont.InstName.PDF(page)
-	fmt.Fprintf(page, " %f Tf\n", float64(glyphFontSize))
-	fmt.Fprintf(page, "%f %f Td\n",
-		xPos+shift,
-		yPos)
-	buf := theFont.Enc(glyph.ID(g))
-	_ = buf.PDF(page)
-	page.Println(" Tj")
-	page.Println("ET")
-	page.Println("Q")
+	page.PushGraphicsState()
+	page.BeginText()
+	page.SetFont(theFont, glyphFontSize)
+	page.StartLine(xPos+shift, yPos)
+	gg := []glyph.Info{
+		{
+			Gid:     glyph.ID(g),
+			Advance: theFont.Widths[glyph.ID(g)],
+		},
+	}
+	page.ShowGlyphs(gg)
+	page.EndText()
+	page.PopGraphicsState()
 }
 
 type rules struct{}
@@ -129,27 +130,26 @@ func (r rules) Extent() *boxes.BoxExtent {
 	}
 }
 
-func (r rules) Draw(page *pages.Page, xPos, yPos float64) {
+func (r rules) Draw(page *graphics.Page, xPos, yPos float64) {
 	yLow := yPos + float64(theFont.Descent)*glyphFontSize/1000
 	yHigh := yPos + float64(theFont.Ascent)*glyphFontSize/1000
 
-	page.Println("q")
-	page.Println(".3 .3 1 RG")
-	page.Println(".5 w")
+	page.PushGraphicsState()
+	page.SetStrokeRGB(.3, .3, 1)
+	page.SetLineWidth(.5)
 	for _, y := range []float64{
 		yLow,
 		yPos,
 		yHigh,
 	} {
-		page.Printf("%.2f %.2f m\n", xPos, y)
-		page.Printf("%.2f %.2f l\n", xPos+10*glyphBoxWidth, y)
+		page.MoveTo(xPos, y)
+		page.LineTo(xPos+10*glyphBoxWidth, y)
 	}
 	for i := 0; i <= 10; i++ {
 		x := xPos + float64(i)*glyphBoxWidth
-		page.Printf("%.2f %.2f m\n", x, yLow)
-		page.Printf("%.2f %.2f l\n", x, yHigh)
+		page.MoveTo(x, yLow)
+		page.LineTo(x, yHigh)
 	}
-
-	page.Println("s")
-	page.Println("Q")
+	page.Stroke()
+	page.PopGraphicsState()
 }
