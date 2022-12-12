@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/pages2"
 )
 
@@ -278,7 +277,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	paper := pages.A4
+	paper := pages2.A4
 	tree := pages2.NewTree(w, &pages2.InheritableAttributes{
 		MediaBox: paper,
 	})

@@ -17,16 +17,16 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/draw"
-	"image/jpeg"
 	_ "image/png"
 	"log"
 	"os"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/graphics"
+	pdfimage "seehuhn.de/go/pdf/image"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 const dpi = 300
@@ -55,58 +55,50 @@ func imagePage(img *image.NRGBA) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
-	out.Catalog.ViewerPreferences = pdf.Dict{
-		"FitWindow":    pdf.Bool(true),
-		"HideWindowUI": pdf.Bool(true),
-	}
-
-	stream, image, err := out.OpenStream(pdf.Dict{
-		"Type":             pdf.Name("XObject"),
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(img.Bounds().Dx()),
-		"Height":           pdf.Integer(img.Bounds().Dy()),
-		"ColorSpace":       pdf.Name("DeviceRGB"),
-		"BitsPerComponent": pdf.Integer(8),
-		"Filter":           pdf.Name("DCTDecode"),
-	}, nil)
+	imageRef, err := pdfimage.EmbedAsJPEG(out, img, nil, nil)
 	if err != nil {
 		return err
 	}
 
-	err = jpeg.Encode(stream, img, nil)
-	if err != nil {
-		return err
-	}
-
-	err = stream.Close()
-	if err != nil {
-		return err
-	}
+	pageTree := pages2.NewTree(out, nil)
 
 	b := img.Bounds()
 	pageBox := &pdf.Rectangle{
 		URx: float64(b.Dx()) / dpi * 72,
 		URy: float64(b.Dy()) / dpi * 72,
 	}
-	pageTree := pages.NewTree(out, nil)
-	page, err := pageTree.NewPage(&pages.Attributes{
-		Resources: &pdf.Resources{
-			XObject: pdf.Dict{
-				"I1": image,
-			},
-		},
-		MediaBox: pageBox,
-	})
+
+	page, err := graphics.NewPage(out)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(page, "%f 0 0 %f 0 0 cm\n", pageBox.URx, pageBox.URy)
-	fmt.Fprintln(page, "/I1 Do")
+	page.Scale(pageBox.URx, pageBox.URy)
+	page.DrawImage(imageRef)
 
-	return page.Close()
+	dict, err := page.Close()
+	if err != nil {
+		return err
+	}
+	dict["MediaBox"] = pageBox
+
+	_, err = pageTree.AppendPage(dict)
+	if err != nil {
+		return err
+	}
+
+	rootRef, err := pageTree.Close()
+	if err != nil {
+		return err
+	}
+
+	out.Catalog.Pages = rootRef
+	out.Catalog.ViewerPreferences = pdf.Dict{
+		"FitWindow":    pdf.Bool(true),
+		"HideWindowUI": pdf.Bool(true),
+	}
+	return out.Close()
 }
 
 func main() {

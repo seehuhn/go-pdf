@@ -20,7 +20,8 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/pages2"
 )
 
 func TestType3(t *testing.T) {
@@ -65,24 +66,37 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(w, nil)
-	page, err := pageTree.NewPage(&pages.Attributes{
-		Resources: &pdf.Resources{
-			Font: pdf.Dict{
-				F1.InstName: F1.Ref,
-			},
-		},
-		MediaBox: pages.A5,
-	})
+	pageTree := pages2.NewTree(w, nil)
+
+	page, err := graphics.NewPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
-	page.Println("BT")
-	page.Println("/F1 12 Tf")
-	page.Println("72 340 Td")
-	page.Println("(ABABAB) Tj")
-	page.Println("ET")
-	page.Close()
+
+	page.BeginText()
+	page.SetFont(F1, 12)
+	page.StartLine(72, 340)
+	page.ShowText("ABABAB")
+	page.EndText()
+
+	dict, err := page.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dict["MediaBox"] = pages2.A5
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = pageTree.AppendPage(dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootRef, err := pageTree.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Catalog.Pages = rootRef
 
 	err = w.Close()
 	if err != nil {

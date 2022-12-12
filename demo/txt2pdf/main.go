@@ -32,7 +32,6 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/layout"
-	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/pages2"
 	"seehuhn.de/go/pdf/sfnt"
 )
@@ -135,7 +134,7 @@ func typesetFile(inName, outName string, V pdf.Version) error {
 	}
 
 	pageTree := pages2.NewTree(out, &pages2.InheritableAttributes{
-		MediaBox: pages.A4,
+		MediaBox: pages2.A4,
 	})
 
 	c := make(chan boxes.Box)

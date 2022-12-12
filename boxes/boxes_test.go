@@ -22,7 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/pages2"
 )
 
@@ -57,15 +56,15 @@ func TestFrame(t *testing.T) {
 	gg2 := F2.Typeset(text2, 12)
 	box := &vBox{
 		BoxExtent: BoxExtent{
-			Width:  pages.A5.URx - pages.A5.LLx,
-			Height: pages.A5.URy - pages.A5.LLy,
+			Width:  pages2.A5.URx - pages2.A5.LLx,
+			Height: pages2.A5.URy - pages2.A5.LLy,
 			Depth:  0,
 		},
 		Contents: []Box{
 			Kern(30),
 			&hBox{
 				BoxExtent: BoxExtent{
-					Width:  pages.A5.URx - pages.A5.LLx,
+					Width:  pages2.A5.URx - pages2.A5.LLx,
 					Height: 10,
 					Depth:  2,
 				},
@@ -100,7 +99,7 @@ func TestFrame(t *testing.T) {
 			},
 			&hBox{
 				BoxExtent: BoxExtent{
-					Width:  pages.A5.URx - pages.A5.LLx,
+					Width:  pages2.A5.URx - pages2.A5.LLx,
 					Height: 10,
 					Depth:  2,
 				},
@@ -132,7 +131,7 @@ func TestFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dict["MediaBox"] = pages.A5
+	dict["MediaBox"] = pages2.A5
 
 	_, err = pageTree.AppendPage(dict)
 	if err != nil {

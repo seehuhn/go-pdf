@@ -39,6 +39,8 @@ type Page struct {
 	font     *font.Font
 	fontSize float64
 	textRise pdf.Integer
+
+	imageNames map[pdf.Reference]pdf.Name
 }
 
 // NewPage creates a new page.
