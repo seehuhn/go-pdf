@@ -31,7 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/glyph"
@@ -56,8 +56,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages2.NewTree(w, &pages2.InheritableAttributes{
-		MediaBox: pages2.A4,
+	pageTree := pages.NewTree(w, &pages.InheritableAttributes{
+		MediaBox: pages.A4,
 	})
 
 	c := make(chan boxes.Box)
@@ -180,14 +180,14 @@ func main() {
 	}
 }
 
-func makePages(w *pdf.Writer, tree *pages2.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
+func makePages(w *pdf.Writer, tree *pages.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
 	topMargin := 36.
 	rightMargin := 50.
 	bottomMargin := 36.
 	leftMargin := 50.
-	paperWidth := pages2.A4.URx
+	paperWidth := pages.A4.URx
 	textWidth := paperWidth - rightMargin - leftMargin
-	paperHeight := pages2.A4.URy
+	paperHeight := pages.A4.URy
 	maxHeight := paperHeight - topMargin - bottomMargin
 
 	p := boxes.Parameters{

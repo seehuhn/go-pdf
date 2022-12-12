@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 const documentTitle = "The 14 Built-in PDF Fonts"
@@ -71,7 +71,7 @@ func (gl *glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 
 type fontTables struct {
 	w           *pdf.Writer
-	tree        *pages2.Tree
+	tree        *pages.Tree
 	paperHeight float64
 	paperWidth  float64
 	textWidth   float64
@@ -277,8 +277,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	paper := pages2.A4
-	tree := pages2.NewTree(w, &pages2.InheritableAttributes{
+	paper := pages.A4
+	tree := pages.NewTree(w, &pages.InheritableAttributes{
 		MediaBox: paper,
 	})
 

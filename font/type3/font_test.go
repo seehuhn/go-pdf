@@ -21,7 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 func TestType3(t *testing.T) {
@@ -66,7 +66,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages2.NewTree(w, nil)
+	pageTree := pages.NewTree(w, nil)
 
 	page, err := graphics.NewPage(w)
 	if err != nil {
@@ -83,7 +83,7 @@ func TestType3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dict["MediaBox"] = pages2.A5
+	dict["MediaBox"] = pages.A5
 	if err != nil {
 		t.Fatal(err)
 	}

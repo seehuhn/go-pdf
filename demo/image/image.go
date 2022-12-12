@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	pdfimage "seehuhn.de/go/pdf/image"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 const dpi = 300
@@ -61,7 +61,7 @@ func imagePage(img *image.NRGBA) error {
 		return err
 	}
 
-	pageTree := pages2.NewTree(out, nil)
+	pageTree := pages.NewTree(out, nil)
 
 	b := img.Bounds()
 	pageBox := &pdf.Rectangle{

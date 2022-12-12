@@ -23,18 +23,18 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 // MakePages breaks a stream of boxes into pages.
-func MakePages(w *pdf.Writer, tree *pages2.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
+func MakePages(w *pdf.Writer, tree *pages.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
 	topMargin := 36.
 	rightMargin := 50.
 	bottomMargin := 36.
 	leftMargin := 50.
-	paperWidth := pages2.A4.URx
+	paperWidth := pages.A4.URx
 	textWidth := paperWidth - rightMargin - leftMargin
-	paperHeight := pages2.A4.URy
+	paperHeight := pages.A4.URy
 	maxHeight := paperHeight - topMargin - bottomMargin
 
 	p := boxes.Parameters{

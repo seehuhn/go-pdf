@@ -31,7 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt/cff"
 	"seehuhn.de/go/pdf/sfnt/funit"
 	"seehuhn.de/go/pdf/sfnt/header"
@@ -52,7 +52,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pages2.NewTree(out, &pages2.InheritableAttributes{
+	tree := pages.NewTree(out, &pages.InheritableAttributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{
 				F.InstName: F.Ref,

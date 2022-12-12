@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 func main() {
@@ -37,11 +37,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages2.NewTree(out, &pages2.InheritableAttributes{
+	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
 	frontMatter := pageTree.NewSubTree(nil)
-	var extra *pages2.Tree
+	var extra *pages.Tree
 	for i := 1; i <= 99; i++ {
 		if i == 3 {
 			extra = pageTree.NewSubTree(nil)

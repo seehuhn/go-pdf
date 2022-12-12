@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 func norm(x, y float64) float64 {
@@ -146,7 +146,7 @@ func main() {
 		URy: mu + 60,
 	}
 
-	pageTree := pages2.NewTree(w, nil)
+	pageTree := pages.NewTree(w, nil)
 	_, err = pageTree.AppendPage(dict)
 	if err != nil {
 		log.Fatal(err)

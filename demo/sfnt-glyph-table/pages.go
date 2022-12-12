@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 var (
@@ -31,13 +31,13 @@ var (
 	rightMargin  = 50.
 	bottomMargin = 36.
 	leftMargin   = 50.
-	paperWidth   = pages2.A4.URx
+	paperWidth   = pages.A4.URx
 	textWidth    = paperWidth - rightMargin - leftMargin
-	paperHeight  = pages2.A4.URy
+	paperHeight  = pages.A4.URy
 	maxHeight    = paperHeight - topMargin - bottomMargin
 )
 
-func makePages(w *pdf.Writer, tree *pages2.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
+func makePages(w *pdf.Writer, tree *pages.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
 	p := boxes.Parameters{
 		BaseLineSkip: 12,
 	}

@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 	"seehuhn.de/go/pdf/sfnt/header"
@@ -99,8 +99,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages2.NewTree(out, &pages2.InheritableAttributes{
-		MediaBox: pages2.A4,
+	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
+		MediaBox: pages.A4,
 	})
 
 	c := make(chan boxes.Box)

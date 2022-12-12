@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 func main() {
@@ -31,12 +31,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	bbox := pages2.A4
-	pageTree := pages2.NewTree(w, &pages2.InheritableAttributes{
+	bbox := pages.A4
+	pageTree := pages.NewTree(w, &pages.InheritableAttributes{
 		MediaBox: bbox,
 	})
 
-	rmax := (pages2.A4.URy - 72) / 2
+	rmax := (pages.A4.URy - 72) / 2
 	rr := []float64{
 		4 / 25.4 * 72, // 4mm
 		8 / 25.4 * 72, // 8mm

@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 )
 
 const (
@@ -73,7 +73,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	pageTree := pages2.NewTree(out, nil)
+	pageTree := pages.NewTree(out, nil)
 
 	g, err := graphics.NewPage(out)
 	if err != nil {

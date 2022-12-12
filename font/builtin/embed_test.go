@@ -22,7 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages2"
+	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
@@ -37,7 +37,7 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages2.NewTree(w, nil)
+	pageTree := pages.NewTree(w, nil)
 
 	g, err := graphics.NewPage(w)
 	if err != nil {
@@ -182,7 +182,7 @@ func TestComplicatedGyphs(t *testing.T) {
 	text = append(text, names.ToUnicode("lcommaaccent", false)...)
 	text = append(text, 'C')
 
-	pageTree := pages2.NewTree(w, nil)
+	pageTree := pages.NewTree(w, nil)
 
 	g, err := graphics.NewPage(w)
 	if err != nil {
