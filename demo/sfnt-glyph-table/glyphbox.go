@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf/boxes"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/sfnt/glyph"
 )
@@ -47,7 +48,7 @@ func (g glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	if theFont.GlyphExtents != nil {
 		ext := theFont.GlyphExtents[glyph.ID(g)]
 		page.PushGraphicsState()
-		page.SetFillRGB(.4, 1, .4)
+		page.SetFillColor(color.RGB(.4, 1, .4))
 		page.Rectangle(
 			xPos+float64(ext.LLx)*q+shift, yPos+float64(ext.LLy)*q,
 			float64(ext.URx-ext.LLx)*q, float64(ext.URy-ext.LLy)*q)
@@ -58,7 +59,7 @@ func (g glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	yLow := yPos + float64(theFont.Descent)*q
 	yHigh := yPos + float64(theFont.Ascent)*q
 	page.PushGraphicsState()
-	page.SetStrokeRGB(1, 0, 0)
+	page.SetStrokeColor(color.RGB(1, 0, 0))
 	page.SetLineWidth(.5)
 	x := xPos + shift
 	page.MoveTo(x, yLow)
@@ -97,7 +98,7 @@ func (g glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 		if classLabel != "" {
 			cBox := boxes.Text(courier, 8, classLabel)
 			page.PushGraphicsState()
-			page.SetFillGray(.5)
+			page.SetFillColor(color.Gray(.5))
 			cBox.Draw(page,
 				xPos+glyphBoxWidth-cBox.Extent().Width-1,
 				yPos+float64(theFont.Descent)*q-6)
@@ -135,7 +136,7 @@ func (r rules) Draw(page *graphics.Page, xPos, yPos float64) {
 	yHigh := yPos + float64(theFont.Ascent)*glyphFontSize/1000
 
 	page.PushGraphicsState()
-	page.SetStrokeRGB(.3, .3, 1)
+	page.SetStrokeColor(color.RGB(.3, .3, 1))
 	page.SetLineWidth(.5)
 	for _, y := range []float64{
 		yLow,

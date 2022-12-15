@@ -19,10 +19,10 @@ package graphics
 import (
 	"fmt"
 	"io"
-	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/internal/float"
 )
 
 // Page is a PDF page.
@@ -104,11 +104,7 @@ func (p *Page) valid(cmd string, ss ...state) bool {
 
 func (p *Page) coord(x float64) string {
 	// TODO(voss): think about this some more
-	xInt := int(x)
-	if math.Abs(x-float64(xInt)) < 1e-6 {
-		return fmt.Sprintf("%d", xInt)
-	}
-	return fmt.Sprintf("%g", x)
+	return float.Format(x, 2)
 }
 
 type state int

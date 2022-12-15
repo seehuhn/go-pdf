@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/simple"
@@ -94,7 +95,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 
 	// draw red horizontal rules
 	g.PushGraphicsState()
-	g.SetStrokeRGB(1, .5, .5)
+	g.SetStrokeColor(color.RGB(1, .5, .5))
 	for y := yPos; y > margin; y -= baseLineSkip {
 		g.MoveTo(margin, y)
 		g.LineTo(width-margin, y)
@@ -103,7 +104,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	g.PopGraphicsState()
 
 	g.PushGraphicsState()
-	g.SetStrokeRGB(.2, 1, .2)
+	g.SetStrokeColor(color.RGB(.2, 1, .2))
 	for _, gl := range glyphs {
 		c := gl.Gid
 		rect := F1.GlyphExtents[c]

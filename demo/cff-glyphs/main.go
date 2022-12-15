@@ -28,6 +28,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
@@ -193,7 +194,7 @@ func illustrateGlyph(ctx *context, fnt *cff.Font, i int) error {
 	// illustrate the advance width by drawing an arrow
 	w := fnt.Glyphs[i].Width
 	page.PushGraphicsState()
-	page.SetStrokeRGB(0.1, 0.9, 0.1)
+	page.SetStrokeColor(color.RGB(0.1, 0.9, 0.1))
 	page.SetLineWidth(3)
 	page.MoveTo(0, -10)
 	page.LineTo(0, 10)
@@ -241,7 +242,7 @@ func illustrateGlyph(ctx *context, fnt *cff.Font, i int) error {
 	}
 
 	page.PushGraphicsState()
-	page.SetFillRGB(0, 0, 0.8)
+	page.SetFillColor(color.RGB(0, 0, 0.8))
 	for i := range xx {
 		x := xx[i]
 		y := yy[i]

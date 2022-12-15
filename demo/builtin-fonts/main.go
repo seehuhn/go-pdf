@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/names"
@@ -53,7 +54,7 @@ func (gl *glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 	font := gl.text.Font
 	x := xPos
 	y := yPos
-	page.SetFillRGB(.4, 1, .4)
+	page.SetFillColor(color.RGB(.4, 1, .4))
 	for _, glyph := range gl.text.Glyphs {
 		gid := glyph.Gid
 		ext := font.GlyphExtents[gid]

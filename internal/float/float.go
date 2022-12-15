@@ -14,30 +14,48 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package float
 
 import (
-	"seehuhn.de/go/pdf/color"
+	"math"
+	"strconv"
 )
 
-// SetFillColor sets the fill color in the graphics state.
-// If col is nil, the fill color is not changed.
-func (p *Page) SetFillColor(col color.Color) {
-	if !p.valid("SetFillColor", stateGlobal, stateText) {
-		return
+func Format(x float64, digits int) string {
+	signPart := ""
+	if x < 0 {
+		signPart = "-"
+		x = -x
 	}
-	if col != nil {
-		p.err = col.SetFill(p.content)
-	}
-}
 
-// SetStrokeColor sets the stroke color in the graphics state.
-// If col is nil, the stroke color is not changed.
-func (p *Page) SetStrokeColor(col color.Color) {
-	if !p.valid("SetStrokeColor", stateGlobal, stateText) {
-		return
+	for i := 0; i < digits; i++ {
+		x *= 10
 	}
-	if col != nil {
-		p.err = col.SetStroke(p.content)
+	xInt := int64(math.Round(x))
+	if xInt == 0 {
+		return "0"
 	}
+	s := strconv.FormatInt(xInt, 10)
+	var intPart, fracPart string
+	if len(s) > digits {
+		intPart = s[:len(s)-digits]
+		fracPart = s[len(s)-digits:]
+	} else {
+		intPart = "0"
+		fracPart = s
+		for len(fracPart) < digits {
+			fracPart = "0" + fracPart
+		}
+	}
+	for fracPart != "" && fracPart[len(fracPart)-1] == '0' {
+		fracPart = fracPart[:len(fracPart)-1]
+	}
+	if fracPart != "" {
+		fracPart = "." + fracPart
+	}
+
+	if signPart == "" && intPart == "0" && fracPart != "" {
+		intPart = ""
+	}
+	return signPart + intPart + fracPart
 }

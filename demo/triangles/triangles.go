@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -76,7 +77,7 @@ func main() {
 	g.LineTo(200, mu+20)
 	g.Stroke()
 
-	g.SetStrokeRGB(.1, .1, 1)
+	g.SetStrokeColor(color.RGB(.1, .1, 1))
 	g.SetLineWidth(2)
 	g.MoveTo(xL, yL)
 	g.LineTo(xR, yR)
@@ -86,13 +87,13 @@ func main() {
 	g.LineTo(xM+(lambda+20)*nx, yM+(lambda+20)*ny)
 	g.Stroke()
 
-	g.SetStrokeRGB(1, 0, 0)
+	g.SetStrokeColor(color.RGB(1, 0, 0))
 	g.SetLineWidth(2)
 	g.MoveTo(0, 0)
 	g.LineTo(200, mu)
 	g.LineTo(400, 0)
 	g.Stroke()
-	g.SetStrokeRGB(0, 0.8, 0)
+	g.SetStrokeColor(color.RGB(0, 0.8, 0))
 	g.SetLineWidth(2)
 	g.MoveTo(xL, yL)
 	g.LineTo(200, mu)
@@ -102,7 +103,7 @@ func main() {
 	phi := math.Atan(mu / 200)
 	g.PushGraphicsState()
 	g.SetLineCap(graphics.LineCapButt)
-	g.SetStrokeRGB(1, 0, 0)
+	g.SetStrokeColor(color.RGB(1, 0, 0))
 	g.SetLineWidth(5)
 	g.MoveToArc(0, 0, 20, 0, phi)
 	g.MoveToArc(400, 0, 20, math.Pi-phi, math.Pi)
@@ -112,7 +113,7 @@ func main() {
 	psi := math.Pi/2 - math.Atan(lambda/(d/2))
 	g.PushGraphicsState()
 	g.SetLineCap(graphics.LineCapButt)
-	g.SetStrokeRGB(0, 0.8, 0)
+	g.SetStrokeColor(color.RGB(0, 0.8, 0))
 	g.SetLineWidth(5)
 	g.MoveToArc(0, 0, 20, phi, phi+psi)
 	g.MoveToArc(400, 0, 30, math.Pi-phi, math.Pi-phi+psi)
@@ -128,7 +129,7 @@ func main() {
 		{xR, yR},
 		{200, mu},
 	}
-	g.SetStrokeGray(0)
+	g.SetStrokeColor(color.Gray(0))
 	g.SetLineWidth(2)
 	for _, p := range pp {
 		g.MoveTo(p.x, p.y)
