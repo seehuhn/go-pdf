@@ -125,6 +125,44 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 	return rootRef, nil
 }
 
+// AppendPage adds a new page to the page tree.
+func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
+	if t.isClosed {
+		return nil, errors.New("page tree is closed")
+	}
+
+	pageRef := t.w.Alloc()
+	node := &nodeInfo{
+		dictInfo: &dictInfo{
+			dict: pageDict,
+			ref:  pageRef,
+		},
+		count: 1,
+		depth: 0,
+	}
+	t.tail = append(t.tail, node)
+
+	for {
+		n := len(t.tail)
+		if n < maxDegree || t.tail[n-1].depth < t.tail[n-maxDegree].depth {
+			break
+		}
+		if n > maxDegree && t.tail[n-maxDegree].depth+1 != t.tail[n-maxDegree-1].depth {
+			panic("missed a collapse") // TODO(voss): remove
+		}
+		t.tail = t.makeInternalNode(t.tail, n-maxDegree, n)
+	}
+
+	if len(t.outObjects) > objStreamChunkSize {
+		err := t.flush()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pageRef, nil
+}
+
 // NewSubTree creates a new Tree, which inserts pages into the document at the
 // position of the current end of the parent tree.  Pages added to the parent
 // tree will be inserted after the pages in the sub-tree.

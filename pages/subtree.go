@@ -17,7 +17,6 @@
 package pages
 
 import (
-	"errors"
 	"fmt"
 
 	"seehuhn.de/go/pdf"
@@ -32,44 +31,6 @@ type nodeInfo struct {
 	*dictInfo
 	count pdf.Integer
 	depth int // upper bound
-}
-
-// AppendPage adds a new page to the page tree.
-func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
-	if t.isClosed {
-		return nil, errors.New("page tree is closed")
-	}
-
-	pageRef := t.w.Alloc()
-	node := &nodeInfo{
-		dictInfo: &dictInfo{
-			dict: pageDict,
-			ref:  pageRef,
-		},
-		count: 1,
-		depth: 0,
-	}
-	t.tail = append(t.tail, node)
-
-	for {
-		n := len(t.tail)
-		if n < maxDegree || t.tail[n-1].depth < t.tail[n-maxDegree].depth {
-			break
-		}
-		if n > maxDegree && t.tail[n-maxDegree].depth+1 != t.tail[n-maxDegree-1].depth {
-			panic("missed a collapse") // TODO(voss): remove
-		}
-		t.tail = t.makeInternalNode(t.tail, n-maxDegree, n)
-	}
-
-	if len(t.outObjects) > objStreamChunkSize {
-		err := t.flush()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return pageRef, nil
 }
 
 func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
