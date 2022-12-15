@@ -41,19 +41,39 @@ func (p *Page) PopGraphicsState() {
 }
 
 // Translate moves the origin of the coordinate system.
-func (p *Page) Translate(x, y float64) {
+// Drawing the unit square [0, 1] x [0, 1] after this call is equivalent to
+// drawing the rectangle [dx, dx+1] x [dy, dy+1] in the original
+// coordinate system.
+func (p *Page) Translate(dx, dy float64) {
 	if !p.valid("Translate", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, 1, 0, 0, 1, p.coord(x), p.coord(y), "cm")
+	_, p.err = fmt.Fprintln(p.content, 1, 0, 0, 1,
+		p.coord(dx), p.coord(dy), "cm")
 }
 
 // Scale scales the coordinate system.
-func (p *Page) Scale(x, y float64) {
+// Drawing the unit square [0, 1] x [0, 1] after this call is equivalent to
+// drawing the rectangle [0, xScale] x [0, yScale] in the original
+// coordinate system.
+func (p *Page) Scale(xScale, yScale float64) {
 	if !p.valid("Scale", stateGlobal, stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(x), 0, 0, p.coord(y), 0, 0, "cm")
+	_, p.err = fmt.Fprintln(p.content, p.coord(xScale), 0, 0, p.coord(yScale),
+		0, 0, "cm")
+}
+
+// TranslateAndScale scales the coordinate system.
+// Drawing the unit square [0, 1] x [0, 1] after this call is equivalent to
+// drawing the rectangle [dx, dx+xScale] x [dy, dy+yScale] in the original
+// coordinate system.
+func (p *Page) TranslateAndScale(dx, dy, xScale, yScale float64) {
+	if !p.valid("TranslateAndScale", stateGlobal, stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.content, p.coord(xScale), 0, 0, p.coord(yScale),
+		p.coord(dx), p.coord(dy), "cm")
 }
 
 // SetLineWidth sets the line width.
