@@ -37,7 +37,7 @@ type Tree struct {
 	isClosed bool
 }
 
-// NewTree creates a new page tree.
+// NewTree creates a new page tree which adds pages to the PDF document w.
 func NewTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 	t := &Tree{
 		w:    w,
