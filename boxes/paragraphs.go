@@ -45,8 +45,7 @@ func tryLength(contents []Box, width float64) lineFillInfo {
 	stretchTotal := 0.0
 	if contentsTotal < width-1e-3 {
 		level := -1
-		var ii []int
-		for i, child := range contents {
+		for _, child := range contents {
 			stretch, ok := child.(stretcher)
 			if !ok {
 				continue
@@ -55,10 +54,8 @@ func tryLength(contents []Box, width float64) lineFillInfo {
 
 			if info.Level > level {
 				level = info.Level
-				ii = nil
 				stretchTotal = 0
 			}
-			ii = append(ii, i)
 			stretchTotal += info.Val
 		}
 
@@ -71,9 +68,8 @@ func tryLength(contents []Box, width float64) lineFillInfo {
 		}
 	} else if contentsTotal > width+1e-3 {
 		level := -1
-		var ii []int
 		shrinkTotal := 0.0
-		for i, child := range contents {
+		for _, child := range contents {
 			shrink, ok := child.(shrinker)
 			if !ok {
 				continue
@@ -82,10 +78,8 @@ func tryLength(contents []Box, width float64) lineFillInfo {
 
 			if info.Level > level {
 				level = info.Level
-				ii = nil
 				shrinkTotal = 0
 			}
-			ii = append(ii, i)
 			shrinkTotal += info.Val
 		}
 

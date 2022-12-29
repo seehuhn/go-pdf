@@ -52,8 +52,6 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	gg1 := F1.Typeset(text1, 12)
-	gg2 := F2.Typeset(text2, 12)
 	box := &vBox{
 		BoxExtent: BoxExtent{
 			Width:  pages.A5.URx - pages.A5.LLx,
@@ -70,16 +68,8 @@ func TestFrame(t *testing.T) {
 				},
 				Contents: []Box{
 					Kern(36),
-					&TextBox{
-						Font:     F1,
-						FontSize: 12,
-						Glyphs:   gg1,
-					},
-					&TextBox{
-						Font:     F2,
-						FontSize: 12,
-						Glyphs:   gg2,
-					},
+					Text(F1, 12, text1),
+					Text(F2, 12, text2),
 					&RuleBox{
 						BoxExtent: BoxExtent{
 							Width:  30,

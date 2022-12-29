@@ -92,6 +92,7 @@ func (obj Kern) Extent() *BoxExtent {
 func (obj Kern) Draw(page *graphics.Page, xPos, yPos float64) {}
 
 // TextBox represents a typeset string of characters as a Box object.
+// The text is typeset using a single font and font size.
 type TextBox struct {
 	Font     *font.Font
 	FontSize float64
@@ -184,20 +185,6 @@ func Raise(delta float64, box Box) Box {
 	return raiseBox{
 		Box:   box,
 		delta: delta,
-	}
-}
-
-type walker interface {
-	Walk(func(Box))
-}
-
-// Walk calls fn for every box in the tree rooted at box.
-func Walk(box Box, fn func(Box)) {
-	fn(box)
-	if w, ok := box.(walker); ok {
-		w.Walk(func(child Box) {
-			Walk(child, fn)
-		})
 	}
 }
 

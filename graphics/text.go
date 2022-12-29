@@ -53,12 +53,13 @@ func (p *Page) StartLine(x, y float64) {
 	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "Td")
 }
 
-// StartNextLine moves to the start of the next line of text.
-func (p *Page) StartNextLine(x, y float64) {
+// StartNextLine moves to the start of the next line of text and sets
+// the leading.  Usually, dy is negative.
+func (p *Page) StartNextLine(dx, dy float64) {
 	if !p.valid("StartNextLine", stateText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "TD")
+	_, p.err = fmt.Fprintln(p.content, p.coord(dx), p.coord(dy), "TD")
 }
 
 // NewLine moves to the start of the next line of text.

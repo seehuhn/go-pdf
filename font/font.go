@@ -29,13 +29,18 @@ type Font struct {
 	InstName pdf.Name
 	Ref      *pdf.Reference
 
+	// Layout converts a sequence of runes into a sequence of glyphs.
+	// Runes missing from the font are replaced by the glyph for the
+	// .notdef character (glyph ID 0).  Glyph substitutions, e.g. from
+	// OpenType GSUB tables, are applied.
 	Layout func([]rune) []glyph.Info
-	Enc    func(glyph.ID) pdf.String // TODO(voss): turn this into an append function
+
+	Enc func(glyph.ID) pdf.String // TODO(voss): turn this into an append function
 
 	UnitsPerEm         uint16
 	Ascent             funit.Int16
 	Descent            funit.Int16 // negative
-	BaseLineSkip       funit.Int16 // PDF glyph space units
+	BaseLineSkip       funit.Int16
 	UnderlinePosition  funit.Int16
 	UnderlineThickness funit.Int16
 

@@ -24,6 +24,14 @@ func (x Int16) AsFloat(scale float64) float64 {
 	return float64(x) * scale
 }
 
+// Int is an integer in font design units.
+type Int int
+
+// AsFloat returns x*scale as a float64.
+func (x Int) AsFloat(scale float64) float64 {
+	return float64(x) * scale
+}
+
 // Rect represents a rectangle in font design units.
 type Rect struct {
 	LLx, LLy, URx, URy Int16
