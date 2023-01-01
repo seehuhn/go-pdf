@@ -60,18 +60,14 @@ func MakePages(w *pdf.Writer, tree *pages.Tree, c <-chan boxes.Box, labelFont *f
 		pageBody := p.VBoxTo(paperHeight, pageList...)
 		withMargins := boxes.HBoxTo(paperWidth, boxes.Kern(leftMargin), pageBody)
 
-		page, err := graphics.NewPage(w)
+		page, err := graphics.AppendPage(tree)
 		if err != nil {
 			return err
 		}
 
 		withMargins.Draw(page, 0, withMargins.Extent().Depth)
 
-		dict, err := page.Close()
-		if err != nil {
-			return err
-		}
-		_, err = tree.AppendPage(dict)
+		_, err = page.Close()
 		if err != nil {
 			return err
 		}

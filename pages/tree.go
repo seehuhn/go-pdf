@@ -24,8 +24,9 @@ import (
 
 // Tree represents a PDF page tree.
 type Tree struct {
+	Out *pdf.Writer
+
 	parent *Tree
-	w      *pdf.Writer
 	attr   *InheritableAttributes
 
 	children []*Tree
@@ -57,7 +58,7 @@ func InstallTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 // NewTree creates a new page tree which adds pages to the PDF document w.
 func NewTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 	t := &Tree{
-		w:    w,
+		Out:  w,
 		attr: attr,
 	}
 	return t
@@ -148,7 +149,7 @@ func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
 		return nil, errors.New("page tree is closed")
 	}
 
-	pageRef := t.w.Alloc()
+	pageRef := t.Out.Alloc()
 	node := &nodeInfo{
 		dictInfo: &dictInfo{
 			dict: pageDict,
@@ -187,7 +188,7 @@ func (t *Tree) NewSubTree(attr *InheritableAttributes) *Tree {
 	if len(t.tail) > 0 {
 		before := &Tree{
 			parent: t,
-			w:      t.w,
+			Out:    t.Out,
 			tail:   t.tail,
 		}
 		t.children = append(t.children, before)
@@ -195,7 +196,7 @@ func (t *Tree) NewSubTree(attr *InheritableAttributes) *Tree {
 	}
 	subTree := &Tree{
 		parent: t,
-		w:      t.w,
+		Out:    t.Out,
 		attr:   attr,
 	}
 	t.children = append(t.children, subTree)
@@ -207,7 +208,7 @@ func (t *Tree) flush() error {
 		return nil
 	}
 
-	_, err := t.w.WriteCompressed(t.outRefs, t.outObjects...)
+	_, err := t.Out.WriteCompressed(t.outRefs, t.outObjects...)
 	if err != nil {
 		return err
 	}

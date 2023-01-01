@@ -45,9 +45,11 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.InstallTree(out, nil)
+	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
+		MediaBox: pages.A5,
+	})
 
-	g, err := graphics.NewPage(out)
+	g, err := graphics.AppendPage(pageTree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,13 +119,7 @@ func TestFrame(t *testing.T) {
 
 	box.Draw(g, 0, box.Depth)
 
-	dict, err := g.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dict["MediaBox"] = pages.A5
-
-	_, err = pageTree.AppendPage(dict)
+	_, err = g.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

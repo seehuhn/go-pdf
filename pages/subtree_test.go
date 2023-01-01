@@ -41,7 +41,7 @@ func TestSubtree(t *testing.T) {
 		}
 
 		s := &Tree{
-			w: w,
+			Out: w,
 		}
 		for i := 0; i < numPages; i++ {
 			pageDict := pdf.Dict{
@@ -131,7 +131,7 @@ func TestMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	tree := &Tree{
-		w: w,
+		Out: w,
 	}
 
 	dd := &dictInfo{

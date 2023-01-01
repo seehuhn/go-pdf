@@ -207,17 +207,12 @@ func (f *fontTables) DoFlush() error {
 	pageBody := p.VBoxTo(f.paperHeight, pageList...)
 	withMargins := boxes.HBox(boxes.Kern(50), pageBody)
 
-	g, err := graphics.NewPage(f.w)
+	g, err := graphics.AppendPage(f.tree)
 	if err != nil {
 		return err
 	}
 	withMargins.Draw(g, 0, withMargins.Extent().Depth)
-	dict, err := g.Close()
-	if err != nil {
-		return err
-	}
-
-	_, err = f.tree.AppendPage(dict)
+	_, err = g.Close()
 	if err != nil {
 		return err
 	}

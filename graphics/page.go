@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/float"
+	"seehuhn.de/go/pdf/pages"
 )
 
 // Page is a PDF page.
@@ -31,6 +32,8 @@ type Page struct {
 	content    io.WriteCloser
 	contentRef *pdf.Reference
 	resources  *pdf.Resources
+
+	tree *pages.Tree
 
 	state state
 	stack []state
@@ -41,6 +44,18 @@ type Page struct {
 	textRise pdf.Integer
 
 	imageNames map[pdf.Reference]pdf.Name
+}
+
+// AppendPage creates a new page and appends it to a page tree.
+func AppendPage(tree *pages.Tree) (*Page, error) {
+	p, err := NewPage(tree.Out)
+	if err != nil {
+		return nil, err
+	}
+
+	p.tree = tree
+
+	return p, nil
 }
 
 // NewPage creates a new page.
@@ -66,6 +81,8 @@ func NewPage(w *pdf.Writer) (*Page, error) {
 
 // Close must be called after drawing the page is complete.
 // Any error that occurred during drawing is returned here.
+// If the page was created with AppendPage, the returned page dictionary
+// has already been added to the page tree and must not be modified.
 func (p *Page) Close() (pdf.Dict, error) {
 	if p.err != nil {
 		return nil, p.err
@@ -82,6 +99,13 @@ func (p *Page) Close() (pdf.Dict, error) {
 	}
 	if p.resources != nil {
 		dict["Resources"] = pdf.AsDict(p.resources)
+	}
+
+	if p.tree != nil {
+		_, err = p.tree.AppendPage(dict)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return dict, nil

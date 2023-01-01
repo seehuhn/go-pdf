@@ -109,7 +109,7 @@ func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	childNodes := nodes[a:b]
 
 	kids := make(pdf.Array, len(childNodes))
-	parentRef := t.w.Alloc()
+	parentRef := t.Out.Alloc()
 	var total pdf.Integer
 	depth := 0
 	for i, node := range childNodes {
@@ -150,7 +150,7 @@ func (t *Tree) wrapIfNeeded(info *dictInfo) *dictInfo {
 		return info
 	}
 
-	wrapperRef := t.w.Alloc()
+	wrapperRef := t.Out.Alloc()
 	info.dict["Parent"] = wrapperRef
 	t.outRefs = append(t.outRefs, info.ref)
 	t.outObjects = append(t.outObjects, info.dict)

@@ -44,7 +44,7 @@ func TestTryLength(t *testing.T) {
 		MediaBox: pages.A4,
 	})
 
-	g, err := graphics.NewPage(out)
+	g, err := graphics.AppendPage(pageTree)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,11 +107,7 @@ func TestTryLength(t *testing.T) {
 	}
 	g.EndText()
 
-	dict, err := g.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = pageTree.AppendPage(dict)
+	_, err = g.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
