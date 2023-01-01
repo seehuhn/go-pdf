@@ -45,7 +45,7 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(out, nil)
+	pageTree := pages.InstallTree(out, nil)
 
 	g, err := graphics.NewPage(out)
 	if err != nil {
@@ -128,19 +128,13 @@ func TestFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ref, err := pageTree.Close()
-	if err != nil {
-		t.Error(err)
-	}
-	out.Catalog.Pages = ref
-
 	err = out.Close()
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-// compile-time test: we implement the correct interfaces
+// compile-time test: we implement the Box interface
 var _ Box = &RuleBox{}
 var _ Box = &vBox{}
 var _ Box = Kern(0)

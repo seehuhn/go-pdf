@@ -40,13 +40,15 @@ func TestTryLength(t *testing.T) {
 	q := fontSize / float64(F1.UnitsPerEm)
 	lineLength := funit.Int(math.Round(15 / 2.54 * 72 / q))
 
-	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
+	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
 		MediaBox: pages.A4,
 	})
+
 	g, err := graphics.NewPage(out)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	g.BeginText()
 	g.SetFont(F1, fontSize)
 
@@ -103,23 +105,16 @@ func TestTryLength(t *testing.T) {
 		g.ShowGlyphs(line)
 		lineNo++
 	}
-
 	g.EndText()
+
 	dict, err := g.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	_, err = pageTree.AppendPage(dict)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	ref, err := pageTree.Close()
-	if err != nil {
-		t.Error(err)
-	}
-	out.Catalog.Pages = ref
 
 	err = out.Close()
 	if err != nil {

@@ -74,7 +74,7 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	pageTree := pages.NewTree(out, nil)
+	pageTree := pages.InstallTree(out, nil)
 
 	g, err := graphics.NewPage(out)
 	if err != nil {
@@ -146,10 +146,5 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 		return err
 	}
 
-	ref, err := pageTree.Close()
-	if err != nil {
-		return err
-	}
-	out.Catalog.Pages = ref
 	return nil
 }

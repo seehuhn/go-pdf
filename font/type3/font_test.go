@@ -66,7 +66,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(w, nil)
+	pageTree := pages.InstallTree(w, nil)
 
 	page, err := graphics.NewPage(w)
 	if err != nil {
@@ -91,12 +91,6 @@ func TestType3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	rootRef, err := pageTree.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.Catalog.Pages = rootRef
 
 	err = w.Close()
 	if err != nil {

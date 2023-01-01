@@ -50,8 +50,10 @@ func (gl *glyphBox) Extent() *boxes.BoxExtent {
 }
 
 func (gl *glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
-	page.PushGraphicsState()
 	font := gl.text.Font
+	sz := gl.text.FontSize
+
+	page.PushGraphicsState()
 	x := xPos
 	y := yPos
 	page.SetFillColor(color.RGB(.4, 1, .4))
@@ -59,14 +61,15 @@ func (gl *glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 		gid := glyph.Gid
 		ext := font.GlyphExtents[gid]
 		page.Rectangle(
-			x+float64(ext.LLx)+float64(glyph.XOffset),
-			y+float64(ext.LLy)+float64(glyph.YOffset),
-			float64(ext.URx-ext.LLx),
-			float64(ext.URy-ext.LLy))
-		x += float64(glyph.Advance)
+			x+font.ToPDF(sz, ext.LLx+glyph.XOffset),
+			y+font.ToPDF(sz, ext.LLy+glyph.YOffset),
+			font.ToPDF(sz, ext.URx-ext.LLx),
+			font.ToPDF(sz, ext.URy-ext.LLy))
+		x += font.ToPDF(sz, glyph.Advance)
 	}
 	page.Fill()
 	page.PopGraphicsState()
+
 	gl.text.Draw(page, xPos, yPos)
 }
 
@@ -279,7 +282,7 @@ func main() {
 	}
 
 	paper := pages.A4
-	tree := pages.NewTree(w, &pages.InheritableAttributes{
+	tree := pages.InstallTree(w, &pages.InheritableAttributes{
 		MediaBox: paper,
 	})
 

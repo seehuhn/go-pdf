@@ -37,7 +37,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
+	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
 	frontMatter := pageTree.NewSubTree(nil)
@@ -115,12 +115,6 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-
-	pageTreeRef, err := pageTree.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-	out.Catalog.Pages = pageTreeRef
 
 	out.Catalog.PageLabels = pdf.Dict{
 		"Nums": pdf.Array{

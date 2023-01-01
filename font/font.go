@@ -53,10 +53,8 @@ func (font *Font) NumGlyphs() int {
 	return len(font.Widths)
 }
 
-func isPrivateRange(r rune) bool {
-	return r >= '\uE000' && r <= '\uF8FF' ||
-		r >= '\U000F0000' && r <= '\U000FFFFD' ||
-		r >= '\U00100000' && r <= '\U0010FFFD'
+func (font *Font) ToPDF(fontSize float64, x funit.Int16) float64 {
+	return float64(x) * fontSize / float64(font.UnitsPerEm)
 }
 
 // Typeset computes all glyph and layout information required to typeset a
@@ -82,4 +80,10 @@ func (font *Font) Typeset(s string, ptSize float64) []glyph.Info {
 		glyphs = append(glyphs, seq...)
 	}
 	return glyphs
+}
+
+func isPrivateRange(r rune) bool {
+	return r >= '\uE000' && r <= '\uF8FF' ||
+		r >= '\U000F0000' && r <= '\U000FFFFD' ||
+		r >= '\U00100000' && r <= '\U0010FFFD'
 }

@@ -37,6 +37,23 @@ type Tree struct {
 	isClosed bool
 }
 
+// InstallTree installs a page tree as the root of the PDF document.
+// The tree is automatically closed when the PDF document is closed,
+// and a reference to the root node is written to the \Pages entry
+// of the PDF document catalog (overwriting any previous value).
+func InstallTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
+	t := NewTree(w, attr)
+	w.OnClose(func(w *pdf.Writer) error {
+		ref, err := t.Close()
+		if err != nil {
+			return err
+		}
+		w.Catalog.Pages = ref
+		return nil
+	})
+	return t
+}
+
 // NewTree creates a new page tree which adds pages to the PDF document w.
 func NewTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 	t := &Tree{

@@ -31,14 +31,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer w.Close()
 
 	F, err := builtin.Embed(w, builtin.Helvetica, "F")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(w, nil)
+	pageTree := pages.InstallTree(w, nil)
 
 	bbox := pages.A4
 	g, err := graphics.NewPage(w)
@@ -79,9 +78,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ref, err := pageTree.Close()
+	err = w.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	w.Catalog.Pages = ref
 }

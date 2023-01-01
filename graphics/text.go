@@ -82,8 +82,8 @@ func (p *Page) SetFont(font *font.Font, size float64) {
 	if p.resources.Font == nil {
 		p.resources.Font = pdf.Dict{}
 	}
-	oldFont, ok := p.resources.Font[font.InstName].(*pdf.Reference)
-	if ok && *oldFont != *font.Ref {
+	prevFont, ok := p.resources.Font[font.InstName].(*pdf.Reference)
+	if ok && *prevFont != *font.Ref {
 		p.err = fmt.Errorf("font %q already defined", font.InstName)
 		return
 	}

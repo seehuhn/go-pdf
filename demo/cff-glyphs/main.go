@@ -53,7 +53,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pages.NewTree(out, &pages.InheritableAttributes{
+	tree := pages.InstallTree(out, &pages.InheritableAttributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{
 				F.InstName: F.Ref,
@@ -131,12 +131,6 @@ func main() {
 			}
 		}
 	}
-
-	rootRef, err := tree.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-	out.Catalog.Pages = rootRef
 
 	err = out.Close()
 	if err != nil {

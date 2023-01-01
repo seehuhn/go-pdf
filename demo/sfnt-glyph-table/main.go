@@ -99,7 +99,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
+	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
 		MediaBox: pages.A4,
 	})
 
@@ -233,12 +233,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	rootRef, err := pageTree.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-	out.Catalog.Pages = rootRef
 
 	err = out.Close()
 	if err != nil {

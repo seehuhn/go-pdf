@@ -35,7 +35,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer w.Close()
 
 	R := 150.0
 	alpha := 60. / 360. * 2. * math.Pi
@@ -147,14 +146,14 @@ func main() {
 		URy: mu + 60,
 	}
 
-	pageTree := pages.NewTree(w, nil)
+	pageTree := pages.InstallTree(w, nil)
 	_, err = pageTree.AppendPage(dict)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ref, err := pageTree.Close()
+
+	err = w.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	w.Catalog.Pages = ref
 }

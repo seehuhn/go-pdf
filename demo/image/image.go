@@ -61,7 +61,7 @@ func imagePage(img *image.NRGBA) error {
 		return err
 	}
 
-	pageTree := pages.NewTree(out, nil)
+	pageTree := pages.InstallTree(out, nil)
 
 	b := img.Bounds()
 	pageBox := &pdf.Rectangle{
@@ -88,12 +88,6 @@ func imagePage(img *image.NRGBA) error {
 		return err
 	}
 
-	rootRef, err := pageTree.Close()
-	if err != nil {
-		return err
-	}
-
-	out.Catalog.Pages = rootRef
 	out.Catalog.ViewerPreferences = pdf.Dict{
 		"FitWindow":    pdf.Bool(true),
 		"HideWindowUI": pdf.Bool(true),

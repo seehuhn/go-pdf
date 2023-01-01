@@ -133,7 +133,7 @@ func typesetFile(inName, outName string, V pdf.Version) error {
 		log.Fatal(err)
 	}
 
-	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
+	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
 		MediaBox: pages.A4,
 	})
 
