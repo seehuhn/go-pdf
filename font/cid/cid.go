@@ -173,6 +173,12 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	for c := range s.used {
 		includeGlyphs = append(includeGlyphs, glyph.ID(c))
 	}
+
+	if len(includeGlyphs) == 1 {
+		// only the .notdef glyph is used, so we don't need to write the font
+		return nil
+	}
+
 	sort.Slice(includeGlyphs, func(i, j int) bool { return includeGlyphs[i] < includeGlyphs[j] })
 	subsetTag := font.GetSubsetTag(includeGlyphs, s.info.NumGlyphs())
 

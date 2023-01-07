@@ -256,14 +256,14 @@ func (ms makeSegments) Edges(v uint32) []*segment {
 	return segs
 }
 
-func (ms makeSegments) Length(e *segment) int {
+func (ms makeSegments) Length(_ uint32, e *segment) int {
 	if e.useValues {
 		return 4 + (int(e.last-e.first) + 1)
 	}
 	return 4
 }
 
-func (ms makeSegments) To(e *segment) uint32 {
+func (ms makeSegments) To(_ uint32, e *segment) uint32 {
 	return uint32(e.last) + 1
 }
 

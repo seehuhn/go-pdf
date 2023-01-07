@@ -531,11 +531,11 @@ func (enc encoder) Edges(from int) []edge {
 	return edges
 }
 
-func (enc encoder) To(e edge) int {
+func (enc encoder) To(_ int, e edge) int {
 	return e.to
 }
 
-func (enc encoder) Length(e edge) int {
+func (enc encoder) Length(_ int, e edge) int {
 	l := 0
 	for _, b := range e.code {
 		l += len(b)

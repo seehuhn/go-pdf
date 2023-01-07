@@ -195,6 +195,11 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	}
 	sort.Slice(mapping, func(i, j int) bool { return mapping[i].CharCode < mapping[j].CharCode })
 
+	if len(mapping) == 0 {
+		// no glyphs are encoded, so we don't need to write the font
+		return nil
+	}
+
 	firstCharCode := mapping[0].CharCode
 	lastCharCode := mapping[len(mapping)-1].CharCode
 
