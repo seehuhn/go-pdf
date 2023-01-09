@@ -1,6 +1,7 @@
 package boxes
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -18,7 +19,7 @@ import (
 func TestLineBreaks1(t *testing.T) {
 	const fontSize = 10
 
-	out, err := pdf.Create("test_tryLength.pdf")
+	out, err := pdf.Create("test_tryLength1.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,7 @@ func TestLineBreaks1(t *testing.T) {
 	}
 
 	q := fontSize / float64(F1.UnitsPerEm)
-	lineLength := funit.Int(math.Round(15 / 2.54 * 72 / q))
+	textWidth := funit.Int(math.Round(15 / 2.54 * 72 / q))
 
 	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
 		MediaBox: pages.A4,
@@ -66,7 +67,7 @@ func TestLineBreaks1(t *testing.T) {
 		if len(line) == 0 {
 			line = append(line, gg...)
 			xPos = totalLength
-		} else if xPos+spaceWidth+totalLength <= lineLength {
+		} else if xPos+spaceWidth+totalLength <= textWidth {
 			// there is space for another word
 			if space != nil {
 				line = append(line, space...)
@@ -120,8 +121,9 @@ func TestLineBreaks1(t *testing.T) {
 
 func TestLineBreaks2(t *testing.T) {
 	const fontSize = 10
+	textWidth := math.Round(15 / 2.54 * 72)
 
-	out, err := pdf.Create("test_tryLength.pdf")
+	out, err := pdf.Create("test_tryLength2.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,40 +134,117 @@ func TestLineBreaks2(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	space := F1.Layout([]rune{' '})
+	var spaceWidth funit.Int
+	if len(space) == 1 && space[0].Gid != 0 {
+		spaceWidth = funit.Int(space[0].Advance)
+	} else {
+		space = nil
+		spaceWidth = funit.Int(F1.UnitsPerEm / 4)
+	}
+	pdfSpaceWidth := F1.ToPDF(fontSize, spaceWidth)
+
 	var hModeMaterial []interface{}
 	endOfSentence := false
 	for i, f := range strings.Fields(testText) {
 		if i > 0 {
 			if endOfSentence {
-				hModeMaterial = append(hModeMaterial, "  ")
+				hModeMaterial = append(hModeMaterial, &hGlue{
+					Length: 1.5 * pdfSpaceWidth,
+					Plus:   1.5 * pdfSpaceWidth,
+					Minus:  0.5 * pdfSpaceWidth,
+					glyphs: space,
+				})
 				endOfSentence = false
 			} else {
-				hModeMaterial = append(hModeMaterial, " ")
+				hModeMaterial = append(hModeMaterial, &hGlue{
+					Length: pdfSpaceWidth,
+					Plus:   pdfSpaceWidth,
+					Minus:  0.2 * pdfSpaceWidth,
+					glyphs: space,
+				})
 			}
 		}
 		gg := F1.Typeset(f, fontSize)
-		hModeMaterial = append(hModeMaterial, gg)
+		hModeMaterial = append(hModeMaterial, &hGlyphs{
+			glyphs:   gg,
+			font:     F1,
+			fontSize: fontSize,
+			width:    F1.ToPDF(fontSize, gg.AdvanceWidth()),
+		})
 	}
 
-	var candidates []int
-	textSeen := false
-	for i, token := range hModeMaterial {
-		if i == 0 {
-			continue
-		}
-		if _, ok := token.(string); ok && textSeen {
-			candidates = append(candidates, i)
-			textSeen = false
-		}
-		if _, ok := token.([]glyph.Info); ok {
-			textSeen = true // TODO(voss): move this into the tokenization pass?
-		}
+	// TODO(voss):
+	// - remove trailing space or glue, if any
+	// - add infinite penalty, followed by ParFillSkip glue
+	hModeMaterial = append(hModeMaterial, &hGlue{
+		Length: 0,
+		Plus:   textWidth,
+	})
+
+	// TODO(voss):
+	// - check that no node has infinite shrinkability (since otherwise the
+	//   whole paragraph would fit into a single line)
+
+	g := &lineBreakGraph{
+		hlist:           hModeMaterial,
+		textWidth:       textWidth,
+		lineFillWidth:   0,
+		lineFillStretch: 0,
 	}
-	if len(candidates) > 0 && !textSeen {
-		candidates = candidates[:len(candidates)-1]
+	start := &breakNode{}
+	breaks, err := dijkstra.ShortestPathSet[*breakNode, int, float64](g, start, func(v *breakNode) bool {
+		return v.pos == len(g.hlist)
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	_ = candidates
+	parms := &Parameters{
+		BaseLineSkip: F1.ToPDF16(fontSize, F1.BaseLineSkip),
+	}
+
+	var lines []Box
+	v := start
+	for _, e := range breaks {
+		var line []Box
+		for _, item := range g.hlist[v.pos:e] {
+			switch h := item.(type) {
+			case *hGlue:
+				line = append(line, Glue(h.Length, h.Plus, 0, h.Minus, 0))
+			case *hGlyphs:
+				line = append(line, &TextBox{
+					Font:     h.font,
+					FontSize: h.fontSize,
+					Glyphs:   h.glyphs,
+				})
+			default:
+				panic(fmt.Sprintf("unexpected type %T in horizontal mode list", h))
+			}
+		}
+		if g.lineFillWidth != 0 || g.lineFillStretch != 0 {
+			line = append(line, Glue(g.lineFillWidth, g.lineFillStretch, 0, 0, 0))
+		}
+		lines = append(lines, HBoxTo(g.textWidth, line...))
+		v = g.To(v, e)
+	}
+	paragraph := parms.VTop(lines...)
+
+	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
+		MediaBox: pages.A4,
+	})
+
+	gr, err := graphics.AppendPage(pageTree)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paragraph.Draw(gr, 72, 25/2.54*72)
+
+	_, err = gr.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = out.Close()
 	if err != nil {
@@ -173,28 +252,6 @@ func TestLineBreaks2(t *testing.T) {
 	}
 }
 
-type lineBreakGraph struct {
-	candidates []int
-}
-
-func (g *lineBreakGraph) Edges(v int) []int {
-	// edges are indices into the candidates slice, indicating the next
-	// line break position.
-	if v >= len(g.candidates) {
-		return nil
-	}
-	return g.candidates[v+1:]
-}
-
-func (g *lineBreakGraph) To(_ int, e int) int {
-	// A vertex is the position of the last line break.
-	return e
-}
-
-func (g *lineBreakGraph) Length(_ int, e int) int {
-	panic("not implemented")
-}
-
-var _ dijkstra.Graph[int, int, int] = (*lineBreakGraph)(nil)
+var _ dijkstra.Graph[*breakNode, int, float64] = (*lineBreakGraph)(nil)
 
 const testText = `Call me Ishmael. Some years ago—never mind how long precisely—having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world. It is a way I have of driving off the spleen and regulating the circulation. Whenever I find myself growing grim about the mouth; whenever it is a damp, drizzly November in my soul; whenever I find myself involuntarily pausing before coffin warehouses, and bringing up the rear of every funeral I meet; and especially whenever my hypos get such an upper hand of me, that it requires a strong moral principle to prevent me from deliberately stepping into the street, and methodically knocking people’s hats off—then, I account it high time to get to sea as soon as I can. This is my substitute for pistol and ball. With a philosophical flourish Cato throws himself upon his sword; I quietly take to the ship. There is nothing surprising in this. If they but knew it, almost all men in their degree, some time or other, cherish very nearly the same feelings towards the ocean with me.`

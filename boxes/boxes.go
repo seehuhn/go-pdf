@@ -96,7 +96,7 @@ func (obj Kern) Draw(page *graphics.Page, xPos, yPos float64) {}
 type TextBox struct {
 	Font     *font.Font
 	FontSize float64
-	Glyphs   []glyph.Info
+	Glyphs   glyph.Seq
 }
 
 // Text returns a new Text object.

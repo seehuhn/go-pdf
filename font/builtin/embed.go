@@ -120,19 +120,19 @@ func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple 
 	return res
 }
 
-func (fnt *simple) Layout(rr []rune) []glyph.Info {
+func (fnt *simple) Layout(rr []rune) glyph.Seq {
 	if len(rr) == 0 {
 		return nil
 	}
 
-	gg := make([]glyph.Info, len(rr))
+	gg := make(glyph.Seq, len(rr))
 	for i, r := range rr {
-		gid, _ := fnt.CMap[r]
+		gid := fnt.CMap[r]
 		gg[i].Gid = gid
 		gg[i].Text = []rune{r}
 	}
 
-	var res []glyph.Info
+	var res glyph.Seq
 	last := gg[0]
 	for _, g := range gg[1:] {
 		lig, ok := fnt.afm.Ligatures[glyph.Pair{Left: last.Gid, Right: g.Gid}]

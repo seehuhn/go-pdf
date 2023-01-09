@@ -173,8 +173,8 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 	font := &font.Font{
 		InstName: pdf.Name(instName),
 		Ref:      FontRef,
-		Layout: func(rr []rune) []glyph.Info {
-			gg := make([]glyph.Info, len(rr))
+		Layout: func(rr []rune) glyph.Seq {
+			gg := make(glyph.Seq, len(rr))
 			for i, r := range rr {
 				gid := t3.cmap[r]
 				gg[i].Gid = gid

@@ -39,3 +39,23 @@ type Info struct {
 	YOffset funit.Int16
 	Advance funit.Int16
 }
+
+// Seq is a sequence of glyphs.
+type Seq []Info
+
+func (s Seq) Runes() []rune {
+	var runes []rune
+	for _, g := range s {
+		runes = append(runes, g.Text...)
+	}
+	return runes
+}
+
+// AdvanceWidth returns the total advance width of the sequence.
+func (s Seq) AdvanceWidth() funit.Int {
+	var width funit.Int
+	for _, g := range s {
+		width += funit.Int(g.Advance)
+	}
+	return width
+}

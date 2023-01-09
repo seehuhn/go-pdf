@@ -33,7 +33,7 @@ type Font struct {
 	// Runes missing from the font are replaced by the glyph for the
 	// .notdef character (glyph ID 0).  Glyph substitutions, e.g. from
 	// OpenType GSUB tables, are applied.
-	Layout func([]rune) []glyph.Info
+	Layout func([]rune) glyph.Seq
 
 	Enc func(glyph.ID) pdf.String // TODO(voss): turn this into an append function
 
@@ -53,13 +53,18 @@ func (font *Font) NumGlyphs() int {
 	return len(font.Widths)
 }
 
-func (font *Font) ToPDF(fontSize float64, x funit.Int16) float64 {
+func (font *Font) ToPDF(fontSize float64, x funit.Int) float64 {
+	return float64(x) * fontSize / float64(font.UnitsPerEm)
+}
+
+func (font *Font) ToPDF16(fontSize float64, x funit.Int16) float64 {
 	return float64(x) * fontSize / float64(font.UnitsPerEm)
 }
 
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
-func (font *Font) Typeset(s string, ptSize float64) []glyph.Info {
+// TODO(voss): remove a structure like boxes.hGlyphs instead?
+func (font *Font) Typeset(s string, ptSize float64) glyph.Seq {
 	var runs [][]rune
 	var run []rune
 	for _, r := range s {

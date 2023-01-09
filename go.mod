@@ -8,7 +8,7 @@ require (
 	golang.org/x/image v0.0.0-20220722155232-062f8c9fd539
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
 	golang.org/x/text v0.3.8
-	seehuhn.de/go/dijkstra v0.9.1
+	seehuhn.de/go/dijkstra v0.9.2
 )
 
 require golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect

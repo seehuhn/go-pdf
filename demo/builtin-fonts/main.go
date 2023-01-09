@@ -61,11 +61,11 @@ func (gl *glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 		gid := glyph.Gid
 		ext := font.GlyphExtents[gid]
 		page.Rectangle(
-			x+font.ToPDF(sz, ext.LLx+glyph.XOffset),
-			y+font.ToPDF(sz, ext.LLy+glyph.YOffset),
-			font.ToPDF(sz, ext.URx-ext.LLx),
-			font.ToPDF(sz, ext.URy-ext.LLy))
-		x += font.ToPDF(sz, glyph.Advance)
+			x+font.ToPDF16(sz, ext.LLx+glyph.XOffset),
+			y+font.ToPDF16(sz, ext.LLy+glyph.YOffset),
+			font.ToPDF16(sz, ext.URx-ext.LLx),
+			font.ToPDF16(sz, ext.URy-ext.LLy))
+		x += font.ToPDF16(sz, glyph.Advance)
 	}
 	page.Fill()
 	page.PopGraphicsState()

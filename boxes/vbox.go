@@ -170,10 +170,3 @@ func (obj *vBox) Draw(page *graphics.Page, xPos, yPos float64) {
 		y -= ext.Depth
 	}
 }
-
-// Call fn for every child box.
-func (obj *vBox) Walk(fn func(Box)) {
-	for _, child := range obj.Contents {
-		fn(child)
-	}
-}

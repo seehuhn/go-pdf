@@ -126,10 +126,10 @@ type fontHandler struct {
 	nextCharCode int
 }
 
-func (s *fontHandler) Layout(rr []rune) []glyph.Info {
+func (s *fontHandler) Layout(rr []rune) glyph.Seq {
 	info := s.info
 
-	seq := make([]glyph.Info, len(rr))
+	seq := make(glyph.Seq, len(rr))
 	for i, r := range rr {
 		gid := info.CMap.Lookup(r)
 		seq[i].Gid = gid
