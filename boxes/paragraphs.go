@@ -25,10 +25,10 @@ import (
 )
 
 type lineBreakGraph struct {
-	hlist           []interface{}
-	textWidth       float64
-	lineFillWidth   float64
-	lineFillStretch float64
+	hlist     []interface{}
+	textWidth float64
+	leftSkip  *glue
+	rightSkip *glue
 }
 
 // Edge returns the outgoing edges of the given vertex.
@@ -39,12 +39,12 @@ func (g *lineBreakGraph) Edges(v *breakNode) []int {
 	glyphsSeen := false
 	for pos := v.pos + 1; pos < len(g.hlist); pos++ {
 		switch h := g.hlist[pos].(type) {
-		case *hGlue:
+		case *glue:
 			if glyphsSeen {
 				res = append(res, pos)
 				glyphsSeen = false
 			}
-			totalWidth += h.Length - h.Minus
+			totalWidth += h.Length - h.Minus.Val
 		case *hGlyphs:
 			glyphsSeen = true
 			totalWidth += h.width
@@ -67,29 +67,32 @@ func (g *lineBreakGraph) Edges(v *breakNode) []int {
 }
 
 func (g *lineBreakGraph) getRelStretch(v *breakNode, e int) float64 {
-	var width, stretch, shrink float64
+	width := &glue{}
+	width = width.Add(g.leftSkip)
 	for pos := v.pos; pos < e; pos++ {
 		switch h := g.hlist[pos].(type) {
-		case *hGlue:
-			width += h.Length
-			stretch += h.Plus
-			shrink += h.Minus
+		case *glue:
+			width = width.Add(h)
 		case *hGlyphs:
-			width += h.width
+			width.Length += h.width
 		default:
 			panic(fmt.Sprintf("unexpected type %T in horizontal mode list", h))
 		}
 	}
-	width += g.lineFillWidth
-	stretch += g.lineFillStretch
+	width = width.Add(g.rightSkip)
 
-	absStretch := g.textWidth - width
+	absStretch := g.textWidth - width.Length
 
 	var relStretch float64
 	if absStretch >= 0 {
-		relStretch = absStretch / stretch
+		if width.Plus.Level == 0 {
+			relStretch = absStretch / width.Plus.Val
+		}
 	} else {
-		relStretch = absStretch / shrink
+		if width.Minus.Level > 0 {
+			panic("infinite shrinkage")
+		}
+		relStretch = absStretch / width.Minus.Val
 	}
 	return relStretch
 }
@@ -107,7 +110,7 @@ func (g *lineBreakGraph) Length(v *breakNode, e int) float64 {
 	if v.lineNo > 0 && math.Abs(q-v.prevRelStretch) > 0.1 {
 		cost += 10
 	}
-	return cost
+	return cost * cost
 }
 
 // To returns the endpoint of a edge e starting at vertex v.
@@ -125,7 +128,7 @@ func (g *lineBreakGraph) To(v *breakNode, e int) *breakNode {
 
 func discardible(h interface{}) bool {
 	switch h.(type) {
-	case *hGlue:
+	case *glue:
 		return true
 	case *hGlyphs:
 		return false
@@ -138,13 +141,6 @@ type breakNode struct {
 	lineNo         int
 	pos            int
 	prevRelStretch float64
-}
-
-type hGlue struct {
-	Length float64
-	Plus   float64
-	Minus  float64
-	glyphs glyph.Seq
 }
 
 type hGlyphs struct {

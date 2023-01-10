@@ -167,8 +167,13 @@ func (r *Reader) Close() error {
 }
 
 // GetInfo returns the PDF Info dictionary for the file.
+// If no Info dictionary is present, nil is returned.
 func (r *Reader) GetInfo() (*Info, error) {
-	infoDict, err := r.getDict(r.trailer["Info"])
+	infoObj := r.trailer["Info"]
+	if infoObj == nil {
+		return nil, nil
+	}
+	infoDict, err := r.getDict(infoObj)
 	if err != nil {
 		return nil, err
 	}

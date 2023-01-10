@@ -121,7 +121,8 @@ func TestLineBreaks1(t *testing.T) {
 
 func TestLineBreaks2(t *testing.T) {
 	const fontSize = 10
-	textWidth := math.Round(15 / 2.54 * 72)
+	hSize := math.Round(15 / 2.54 * 72)
+	parFillSkip := &glue{Plus: stretchAmount{Val: 1, Level: 1}}
 
 	out, err := pdf.Create("test_tryLength2.pdf")
 	if err != nil {
@@ -147,21 +148,20 @@ func TestLineBreaks2(t *testing.T) {
 	var hModeMaterial []interface{}
 	endOfSentence := false
 	for i, f := range strings.Fields(testText) {
+		// TODO(voss): remember that there were spaces
 		if i > 0 {
 			if endOfSentence {
-				hModeMaterial = append(hModeMaterial, &hGlue{
+				hModeMaterial = append(hModeMaterial, &glue{
 					Length: 1.5 * pdfSpaceWidth,
-					Plus:   1.5 * pdfSpaceWidth,
-					Minus:  0.5 * pdfSpaceWidth,
-					glyphs: space,
+					Plus:   stretchAmount{Val: pdfSpaceWidth * 1.5},
+					Minus:  stretchAmount{Val: pdfSpaceWidth},
 				})
 				endOfSentence = false
 			} else {
-				hModeMaterial = append(hModeMaterial, &hGlue{
+				hModeMaterial = append(hModeMaterial, &glue{
 					Length: pdfSpaceWidth,
-					Plus:   pdfSpaceWidth,
-					Minus:  0.2 * pdfSpaceWidth,
-					glyphs: space,
+					Plus:   stretchAmount{Val: pdfSpaceWidth / 2},
+					Minus:  stretchAmount{Val: pdfSpaceWidth / 3},
 				})
 			}
 		}
@@ -176,21 +176,17 @@ func TestLineBreaks2(t *testing.T) {
 
 	// TODO(voss):
 	// - remove trailing space or glue, if any
-	// - add infinite penalty, followed by ParFillSkip glue
-	hModeMaterial = append(hModeMaterial, &hGlue{
-		Length: 0,
-		Plus:   textWidth,
-	})
+	// - add infinite penalty before the ParFillSkip glue
+	hModeMaterial = append(hModeMaterial, parFillSkip)
 
 	// TODO(voss):
 	// - check that no node has infinite shrinkability (since otherwise the
 	//   whole paragraph would fit into a single line)
 
 	g := &lineBreakGraph{
-		hlist:           hModeMaterial,
-		textWidth:       textWidth,
-		lineFillWidth:   0,
-		lineFillStretch: 0,
+		hlist:     hModeMaterial,
+		textWidth: hSize,
+		rightSkip: &glue{Plus: stretchAmount{Val: 36, Level: 0}},
 	}
 	start := &breakNode{}
 	breaks, err := dijkstra.ShortestPathSet[*breakNode, int, float64](g, start, func(v *breakNode) bool {
@@ -208,10 +204,13 @@ func TestLineBreaks2(t *testing.T) {
 	v := start
 	for _, e := range breaks {
 		var line []Box
+		if g.leftSkip != nil {
+			line = append(line, g.leftSkip)
+		}
 		for _, item := range g.hlist[v.pos:e] {
 			switch h := item.(type) {
-			case *hGlue:
-				line = append(line, Glue(h.Length, h.Plus, 0, h.Minus, 0))
+			case *glue:
+				line = append(line, h)
 			case *hGlyphs:
 				line = append(line, &TextBox{
 					Font:     h.font,
@@ -222,8 +221,8 @@ func TestLineBreaks2(t *testing.T) {
 				panic(fmt.Sprintf("unexpected type %T in horizontal mode list", h))
 			}
 		}
-		if g.lineFillWidth != 0 || g.lineFillStretch != 0 {
-			line = append(line, Glue(g.lineFillWidth, g.lineFillStretch, 0, 0, 0))
+		if g.rightSkip != nil {
+			line = append(line, g.rightSkip)
 		}
 		lines = append(lines, HBoxTo(g.textWidth, line...))
 		v = g.To(v, e)

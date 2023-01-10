@@ -37,6 +37,36 @@ type glue struct {
 	Minus  stretchAmount
 }
 
+func (obj *glue) Add(other *glue) *glue {
+	if other == nil {
+		return obj
+	}
+	res := &glue{
+		Length: obj.Length + other.Length,
+	}
+	if obj.Plus.Level > other.Plus.Level {
+		res.Plus = obj.Plus
+	} else if obj.Plus.Level < other.Plus.Level {
+		res.Plus = other.Plus
+	} else {
+		res.Plus = stretchAmount{
+			Val:   obj.Plus.Val + other.Plus.Val,
+			Level: obj.Plus.Level,
+		}
+	}
+	if obj.Minus.Level > other.Minus.Level {
+		res.Minus = obj.Minus
+	} else if obj.Minus.Level < other.Minus.Level {
+		res.Minus = other.Minus
+	} else {
+		res.Minus = stretchAmount{
+			Val:   obj.Minus.Val + other.Minus.Val,
+			Level: obj.Minus.Level,
+		}
+	}
+	return res
+}
+
 // Glue returns a new "glue" box with the given natural length and
 // stretchability.
 func Glue(length float64, plus float64, plusLevel int, minus float64, minusLevel int) Box {

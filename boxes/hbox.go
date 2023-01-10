@@ -135,9 +135,7 @@ func (obj *hBox) Draw(page *graphics.Page, xPos, yPos float64) {
 
 		if shrinkTotal > 0 {
 			q := (contentsTotal - boxTotal) / shrinkTotal
-			if level == 0 && q > 1 {
-				q = 1
-			}
+			// glue can stretch beyond its natural width, if needed
 			for _, i := range ii {
 				child := obj.Contents[i]
 				ext := child.Extent()

@@ -27,6 +27,10 @@ import (
 
 // AsDict creates a PDF Dict object, encoding the fields of a Go struct.
 func AsDict(s interface{}) Dict {
+	if s == nil {
+		return nil
+	}
+
 	v := reflect.Indirect(reflect.ValueOf(s))
 	if v.Kind() != reflect.Struct {
 		return nil
