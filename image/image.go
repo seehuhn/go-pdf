@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package image provides functions for embedding images in PDF files.
 package image
 
 import (
@@ -63,9 +64,9 @@ func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref *pdf.Reference, opts *jpeg.
 
 // EmbedAsPNG writes the image img to the PDF file w, using a lossless representation
 // very similar to the PNG format.
-func EmbedAsPNG(w *pdf.Writer, img image.Image, ref *pdf.Reference) (*pdf.Reference, error) {
-	width := img.Bounds().Dx()
-	height := img.Bounds().Dy()
+func EmbedAsPNG(w *pdf.Writer, src image.Image, ref *pdf.Reference) (*pdf.Reference, error) {
+	width := src.Bounds().Dx()
+	height := src.Bounds().Dy()
 	filter := &pdf.FilterInfo{
 		Name: "FlateDecode",
 		Parms: pdf.Dict{
@@ -91,7 +92,7 @@ func EmbedAsPNG(w *pdf.Writer, img image.Image, ref *pdf.Reference) (*pdf.Refere
 	alpha := make([]byte, 0, width*height)
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			r, g, b, a := img.At(x, y).RGBA()
+			r, g, b, a := src.At(x, y).RGBA()
 			_, err = stream.Write([]byte{byte(r >> 8), byte(g >> 8), byte(b >> 8)})
 			if err != nil {
 				return nil, err

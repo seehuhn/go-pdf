@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package builtin implements support for the 14 built-in PDF fonts.
 package builtin
 
 import (
@@ -57,8 +58,12 @@ func EmbedAfm(w *pdf.Writer, afm *AfmInfo, instName pdf.Name) (*font.Font, error
 		UnitsPerEm:   1000,
 		Ascent:       afm.Ascent,
 		Descent:      afm.Descent,
-		GlyphExtents: afm.GlyphExtent,
-		Widths:       afm.Width,
+		BaseLineSkip: 1200, // TODO(voss): is this ok?
+		// TODO(voss): UnderlinePosition
+		// TODO(voss): UnderlineThickness
+
+		GlyphExtents: afm.GlyphExtents,
+		Widths:       afm.Widths,
 	}
 	return res, nil
 }
@@ -147,7 +152,7 @@ func (fnt *simple) Layout(rr []rune) glyph.Seq {
 	gg = append(res, last)
 
 	for i := range gg {
-		gg[i].Advance = fnt.afm.Width[gg[i].Gid]
+		gg[i].Advance = fnt.afm.Widths[gg[i].Gid]
 	}
 	if len(gg) < 2 {
 		return gg

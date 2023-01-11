@@ -58,7 +58,9 @@ func AppendPage(tree *pages.Tree) (*Page, error) {
 	return p, nil
 }
 
-// NewPage creates a new page.
+// NewPage creates a new page without appending it to the page tree.
+// Once the page is finished, the page dictionary returned by the [Close]
+// method can be used to add the page to the page tree.
 func NewPage(w *pdf.Writer) (*Page, error) {
 	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
 	if w.Version >= pdf.V1_2 {

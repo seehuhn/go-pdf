@@ -101,58 +101,77 @@ func (p *Page) SetFont(font *font.Font, size float64) {
 
 // ShowText draws a string.
 func (p *Page) ShowText(s string) {
-	p.ShowTextAligned(s, 0, 0)
-}
-
-// ShowTextAligned draws a string and aligns it.
-// The beginning of the string is shifted right by a*w+b, where w
-// is the width of the string.
-func (p *Page) ShowTextAligned(s string, a, b float64) {
-	if !p.valid("ShowTextAligned", stateText) {
+	if !p.valid("ShowText", stateText) {
 		return
 	}
-
-	font := p.font
-	if font == nil {
+	if p.font == nil {
 		p.err = errors.New("no font set")
 		return
 	}
-	gg := font.Typeset(s, p.fontSize)
-	p.ShowGlyphsAligned(gg, a, b)
+	p.showGlyphsWithMargins(p.font.Typeset(s, p.fontSize), 0, 0)
+}
+
+// ShowTextAligned draws a string and aligns it.
+// The beginning is aligned in a space of width w.
+// q=0 means left alignment, q=1 means right alignment
+// and q=0.5 means center alignment.
+func (p *Page) ShowTextAligned(s string, w, q float64) {
+	if !p.valid("ShowTextAligned", stateText) {
+		return
+	}
+	if p.font == nil {
+		p.err = errors.New("no font set")
+		return
+	}
+	p.showGlyphsAligned(p.font.Typeset(s, p.fontSize), w, q)
 }
 
 // ShowGlyphs draws a sequence of glyphs.
-func (p *Page) ShowGlyphs(gg []glyph.Info) {
-	p.ShowGlyphsAligned(gg, 0, 0)
+func (p *Page) ShowGlyphs(gg glyph.Seq) {
+	if !p.valid("ShowGlyphs", stateText) {
+		return
+	}
+	if p.font == nil {
+		p.err = errors.New("no font set")
+		return
+	}
+
+	p.showGlyphsWithMargins(gg, 0, 0)
 }
 
 // ShowGlyphsAligned draws a sequence of glyphs and aligns it.
 // The beginning of the string is shifted right by a*w+b, where w
 // is the width of the string.
-func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
+func (p *Page) ShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 	if !p.valid("ShowGlyphsAligned", stateText) {
 		return
 	}
-	font := p.font
-	if font == nil {
+	if p.font == nil {
 		p.err = errors.New("no font set")
 		return
 	}
+	p.showGlyphsAligned(gg, w, q)
+}
 
+func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
+	total := p.font.ToPDF(p.fontSize, gg.AdvanceWidth())
+	delta := w - total
+
+	// we interpolate between the following:
+	// q = 0: left = 0, right = delta
+	// q = 1: left = delta, right = 0
+	left := q * delta
+	right := (1 - q) * delta
+
+	p.showGlyphsWithMargins(gg, left*1000/p.fontSize, right*1000/p.fontSize)
+}
+
+func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 	if len(gg) == 0 {
 		return
 	}
 
-	q := 1000 / float64(font.UnitsPerEm)
-
-	leftOffset := 1000 * b / p.fontSize
-	if a != 0 {
-		totalWidth := 0.0
-		for _, g := range gg {
-			totalWidth += float64(g.Advance)
-		}
-		leftOffset += a * totalWidth * q
-	}
+	font := p.font
 
 	var out pdf.Array
 	var run pdf.String
@@ -194,10 +213,9 @@ func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
 		out = nil
 	}
 
-	xOffset := leftOffset
+	xOffset := left
 	for _, glyph := range gg {
-		xOffset += float64(glyph.XOffset) * q
-
+		xOffset += font.ToPDF16(1000, glyph.XOffset)
 		xOffsetInt := pdf.Integer(math.Round(xOffset))
 		if xOffsetInt != 0 {
 			if len(run) > 0 {
@@ -208,7 +226,7 @@ func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
 			xOffset -= float64(xOffsetInt)
 		}
 
-		if newYPos := pdf.Integer(math.Round(float64(glyph.YOffset) * q)); newYPos != p.textRise {
+		if newYPos := pdf.Integer(math.Round(font.ToPDF16(1000, glyph.YOffset))); newYPos != p.textRise {
 			flush()
 			p.textRise = newYPos
 			if p.err != nil {
@@ -227,7 +245,18 @@ func (p *Page) ShowGlyphsAligned(gg []glyph.Info, a, b float64) {
 		}
 		run = append(run, font.Enc(gid)...)
 
-		xOffset += (float64(glyph.Advance) - float64(glyph.XOffset) - float64(font.Widths[gid])) * q
+		xOffset += font.ToPDF16(1000, glyph.Advance-glyph.XOffset-font.Widths[gid])
 	}
+
+	xOffset += right
+	xOffsetInt := pdf.Integer(math.Round(xOffset))
+	if xOffsetInt != 0 {
+		if len(run) > 0 {
+			out = append(out, run)
+			run = nil
+		}
+		out = append(out, -xOffsetInt)
+	}
+
 	flush()
 }

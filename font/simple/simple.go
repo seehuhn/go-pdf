@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package simple provides support for embedding simple fonts into PDF documents.
 package simple
 
 import (
@@ -24,6 +25,7 @@ import (
 	"sort"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/sfnt"

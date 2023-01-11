@@ -39,10 +39,10 @@ type AfmInfo struct {
 	CapHeight funit.Int16
 	XHeight   funit.Int16
 
-	Code        []int16 // code byte, or -1 if unmapped
-	GlyphExtent []funit.Rect
-	Width       []funit.Int16
-	GlyphName   []string
+	Code         []int16 // code byte, or -1 if unmapped
+	GlyphExtents []funit.Rect
+	Widths       []funit.Int16
+	GlyphName    []string
 
 	Ligatures map[glyph.Pair]glyph.ID
 	Kern      map[glyph.Pair]funit.Int16
@@ -138,8 +138,8 @@ func Afm(fontName string) (*AfmInfo, error) {
 			nameToGid[name] = glyph.ID(len(res.Code))
 
 			res.Code = append(res.Code, int16(code))
-			res.Width = append(res.Width, width)
-			res.GlyphExtent = append(res.GlyphExtent, BBox)
+			res.Widths = append(res.Widths, width)
+			res.GlyphExtents = append(res.GlyphExtents, BBox)
 			res.GlyphName = append(res.GlyphName, name)
 
 			for _, lig := range ligTmp {
@@ -238,7 +238,7 @@ const (
 	ZapfDingbats         = "ZapfDingbats"
 )
 
-// FontNames contains the names of the 14 built-in PDF fonts.zx
+// FontNames contains the names of the 14 built-in PDF fonts.
 var FontNames = []string{
 	Courier,
 	CourierBold,

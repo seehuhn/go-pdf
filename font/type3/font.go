@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package type3 provides support for embedding type 3 fonts into PDF documents.
 package type3
 
 import (

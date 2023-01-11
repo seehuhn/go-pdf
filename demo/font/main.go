@@ -130,7 +130,8 @@ func writePage(out *pdf.Writer, text string, width, height float64) error {
 	g.BeginText()
 	g.SetFont(F1, fontSize)
 	g.StartLine(xPos, yPos)
-	g.ShowGlyphsAligned(glyphs, 0, 0)
+	g.ShowGlyphs(glyphs)
+	g.EndText()
 
 	dict, err := g.Close()
 	if err != nil {

@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package cid provides support for embedding CID fonts into PDF documents.
 package cid
 
 import (
@@ -23,6 +24,7 @@ import (
 	"sort"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/sfnt"

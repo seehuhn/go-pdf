@@ -60,7 +60,7 @@ func TestCID(t *testing.T) {
 		g.BeginText()
 		g.SetFont(F, 16)
 		g.StartLine(float64(5+20*col+10), float64(32*20-10-20*row))
-		g.ShowGlyphsAligned(gg, -0.5, 0)
+		g.ShowGlyphsAligned(gg, 0, 0.5)
 		g.EndText()
 	}
 
