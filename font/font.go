@@ -20,8 +20,8 @@ import (
 	"unicode"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/sfnt/funit"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // Font represents a font embedded in the PDF file.

@@ -23,7 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // BeginText starts a new text object.

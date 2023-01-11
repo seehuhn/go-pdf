@@ -32,9 +32,9 @@ import (
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/sfnt"
-	"seehuhn.de/go/pdf/sfnt/cff"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 func main() {

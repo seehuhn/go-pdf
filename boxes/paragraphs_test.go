@@ -12,7 +12,7 @@ import (
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/sfnt/funit"
 )
 
 func TestLineBreaks(t *testing.T) {
@@ -28,7 +28,7 @@ func TestLineBreaks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1, err := simple.EmbedFile(out, "../sfnt/otf/SourceSerif4-Regular.otf", "F1",
+	F1, err := simple.EmbedFile(out, "../font/otf/SourceSerif4-Regular.otf", "F1",
 		language.BritishEnglish)
 	if err != nil {
 		t.Fatal(err)

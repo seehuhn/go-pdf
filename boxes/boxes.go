@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // Box represents marks on a page within a rectangular area of known size.

@@ -1,3 +1,0 @@
-go test fuzz v1
-float64(-8.5)
-uint16(8)

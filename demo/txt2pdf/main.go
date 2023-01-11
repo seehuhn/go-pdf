@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/layout"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/sfnt"
+	"seehuhn.de/go/sfnt"
 )
 
 const tabWidth = 4

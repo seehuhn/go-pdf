@@ -22,13 +22,13 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf/font/names"
-	"seehuhn.de/go/pdf/sfnt"
-	"seehuhn.de/go/pdf/sfnt/cff"
-	"seehuhn.de/go/pdf/sfnt/cmap"
-	"seehuhn.de/go/pdf/sfnt/funit"
-	"seehuhn.de/go/pdf/sfnt/glyph"
-	"seehuhn.de/go/pdf/sfnt/os2"
-	"seehuhn.de/go/pdf/sfnt/type1"
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/os2"
+	"seehuhn.de/go/sfnt/type1"
 )
 
 func main() {

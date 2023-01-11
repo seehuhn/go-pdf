@@ -21,8 +21,8 @@ import (
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/sfnt"
-	"seehuhn.de/go/pdf/sfnt/opentype/gtab/builder"
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/opentype/gtab/builder"
 )
 
 func main() {

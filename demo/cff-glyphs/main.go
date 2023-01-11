@@ -33,9 +33,9 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/sfnt/cff"
-	"seehuhn.de/go/pdf/sfnt/funit"
-	"seehuhn.de/go/pdf/sfnt/header"
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/header"
 )
 
 var q float64 = 0.4

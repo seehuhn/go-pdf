@@ -26,14 +26,14 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/sfnt"
-	"seehuhn.de/go/pdf/sfnt/cff"
-	"seehuhn.de/go/pdf/sfnt/cmap"
-	"seehuhn.de/go/pdf/sfnt/funit"
-	"seehuhn.de/go/pdf/sfnt/glyf"
-	"seehuhn.de/go/pdf/sfnt/glyph"
-	"seehuhn.de/go/pdf/sfnt/opentype/gtab"
-	"seehuhn.de/go/pdf/sfnt/type1"
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/glyf"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+	"seehuhn.de/go/sfnt/type1"
 )
 
 // EmbedFile embeds the named font file into the PDF document.
@@ -411,7 +411,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		if err != nil {
 			return err
 		}
-		n, err := subsetInfo.Embed(fontFileStream)
+		n, err := subsetInfo.PDFEmbedTrueType(fontFileStream)
 		if err != nil {
 			return err
 		}

@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/sfnt/funit"
 )
 
 func TestWidths(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/sfnt/funit"
+	"seehuhn.de/go/sfnt/funit"
 )
 
 func mostFrequent(w []funit.Int16) funit.Int16 {

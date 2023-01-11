@@ -22,7 +22,7 @@ import (
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 type glyphBox glyph.ID

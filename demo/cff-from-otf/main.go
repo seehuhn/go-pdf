@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"seehuhn.de/go/pdf/sfnt/header"
+	"seehuhn.de/go/sfnt/header"
 )
 
 func main() {

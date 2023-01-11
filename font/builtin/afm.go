@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
-	"seehuhn.de/go/pdf/sfnt/funit"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // AfmInfo represent the font metrics and built-in character encoding

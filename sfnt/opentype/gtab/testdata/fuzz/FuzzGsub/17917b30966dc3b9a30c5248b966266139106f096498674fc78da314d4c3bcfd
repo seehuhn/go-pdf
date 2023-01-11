@@ -1,3 +1,0 @@
-go test fuzz v1
-string("GSUB_5-marks\"AAAA\"->")
-string("AAAA000")

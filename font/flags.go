@@ -17,8 +17,8 @@
 package font
 
 import (
-	"seehuhn.de/go/pdf/sfnt"
-	"seehuhn.de/go/pdf/sfnt/cff"
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
 )
 
 // MakeFlags returns the PDF font flags for the font.

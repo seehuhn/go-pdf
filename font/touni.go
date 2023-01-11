@@ -31,7 +31,7 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // SimpleMapping describes the unicode text corresponding to a character code

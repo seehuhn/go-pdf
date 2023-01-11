@@ -23,10 +23,10 @@ import (
 	"log"
 	"os"
 
-	"seehuhn.de/go/pdf/sfnt/cff"
-	"seehuhn.de/go/pdf/sfnt/head"
-	"seehuhn.de/go/pdf/sfnt/header"
-	"seehuhn.de/go/pdf/sfnt/os2"
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/head"
+	"seehuhn.de/go/sfnt/header"
+	"seehuhn.de/go/sfnt/os2"
 )
 
 func wrap[T any, R io.Reader](f func(r R) (T, error)) func(r io.Reader) error {

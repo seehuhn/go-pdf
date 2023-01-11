@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestSimple(t *testing.T) {
@@ -32,7 +32,7 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := EmbedFile(w, "../../sfnt/otf/SourceSerif4-Regular.otf", "F", language.AmericanEnglish)
+	F, err := EmbedFile(w, "../../font/otf/SourceSerif4-Regular.otf", "F", language.AmericanEnglish)
 	if err != nil {
 		t.Fatal(err)
 	}

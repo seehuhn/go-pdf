@@ -62,7 +62,7 @@ func main() {
 }
 
 func writePage(out *pdf.Writer, text string, width, height float64) error {
-	fontFile := "../../sfnt/otf/SourceSerif4-Regular.otf"
+	fontFile := "../../font/otf/SourceSerif4-Regular.otf"
 	var F1 *font.Font
 	var err error
 	if strings.HasSuffix(fontFile, ".ttf") || strings.HasSuffix(fontFile, ".otf") {

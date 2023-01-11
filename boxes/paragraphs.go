@@ -21,7 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/sfnt/glyph"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 type lineBreakGraph struct {
