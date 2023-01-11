@@ -16,7 +16,9 @@
 
 package boxes
 
-import "seehuhn.de/go/pdf/graphics"
+import (
+	"seehuhn.de/go/pdf/graphics"
+)
 
 type stretcher interface {
 	Stretch() *stretchAmount
@@ -35,6 +37,7 @@ type glue struct {
 	Length float64
 	Plus   stretchAmount
 	Minus  stretchAmount
+	Text   string
 }
 
 func (obj *glue) Add(other *glue) *glue {

@@ -73,9 +73,7 @@ func HBoxTo(total float64, boxes ...Box) Box {
 	return hbox
 }
 
-// Draw implements the Box interface.
-func (obj *hBox) Draw(page *graphics.Page, xPos, yPos float64) {
-	boxTotal := obj.Width
+func (obj *hBox) stretchTo(boxTotal float64) {
 	contentsTotal := 0.0
 	for _, child := range obj.Contents {
 		ext := child.Extent()
@@ -104,6 +102,7 @@ func (obj *hBox) Draw(page *graphics.Page, xPos, yPos float64) {
 		if stretchTotal > 0 {
 			q := (boxTotal - contentsTotal) / stretchTotal
 			if level == 0 && q > 1 {
+				// glue can't shrink beyond its minimum width
 				q = 1
 			}
 			for _, i := range ii {
@@ -144,6 +143,11 @@ func (obj *hBox) Draw(page *graphics.Page, xPos, yPos float64) {
 			}
 		}
 	}
+}
+
+// Draw implements the Box interface.
+func (obj *hBox) Draw(page *graphics.Page, xPos, yPos float64) {
+	obj.stretchTo(obj.Width)
 
 	x := xPos
 	for _, child := range obj.Contents {

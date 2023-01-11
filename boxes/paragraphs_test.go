@@ -13,118 +13,17 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/pdf/sfnt/funit"
-	"seehuhn.de/go/pdf/sfnt/glyph"
 )
 
-func TestLineBreaks1(t *testing.T) {
-	const fontSize = 10
-
-	out, err := pdf.Create("test_tryLength1.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	F1, err := simple.EmbedFile(out, "../sfnt/otf/SourceSerif4-Regular.otf", "F1",
-		language.BritishEnglish)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	space := F1.Layout([]rune{' '})
-	var spaceWidth funit.Int
-	if len(space) == 1 && space[0].Gid != 0 {
-		spaceWidth = funit.Int(space[0].Advance)
-	} else {
-		space = nil
-		spaceWidth = funit.Int(F1.UnitsPerEm / 4)
-	}
-
-	q := fontSize / float64(F1.UnitsPerEm)
-	textWidth := funit.Int(math.Round(15 / 2.54 * 72 / q))
-
-	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
-		MediaBox: pages.A4,
-	})
-
-	g, err := graphics.AppendPage(pageTree)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	g.BeginText()
-	g.SetFont(F1, fontSize)
-
-	var xPos funit.Int
-	var line []glyph.Info
-	lineNo := 0
-	for _, f := range strings.Fields(testText) {
-		gg := F1.Typeset(f, fontSize)
-		var totalLength funit.Int
-		for _, g := range gg {
-			totalLength += funit.Int(g.Advance)
-		}
-
-		if len(line) == 0 {
-			line = append(line, gg...)
-			xPos = totalLength
-		} else if xPos+spaceWidth+totalLength <= textWidth {
-			// there is space for another word
-			if space != nil {
-				line = append(line, space...)
-			} else {
-				line[len(line)-1].Advance += funit.Int16(spaceWidth)
-			}
-			xPos += spaceWidth
-
-			line = append(line, gg...)
-			xPos += totalLength
-		} else {
-			// add the line to the page ...
-			if lineNo == 0 {
-				g.StartLine(72, 25/2.54*72)
-			} else if lineNo == 1 {
-				g.StartNextLine(0, -float64(F1.BaseLineSkip)*q)
-			} else {
-				g.NewLine()
-			}
-			g.ShowGlyphs(line)
-			lineNo++
-
-			// ... and start a new line
-			line = append(line[:0], gg...)
-			xPos = totalLength
-		}
-	}
-	if len(line) > 0 {
-		if lineNo == 0 {
-			g.StartLine(72, 25/2.54*72)
-		} else if lineNo == 1 {
-			g.StartNextLine(0, -float64(F1.BaseLineSkip)*q)
-		} else {
-			g.NewLine()
-		}
-		g.ShowGlyphs(line)
-		lineNo++
-	}
-	g.EndText()
-
-	_, err = g.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = out.Close()
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-func TestLineBreaks2(t *testing.T) {
+func TestLineBreaks(t *testing.T) {
 	const fontSize = 10
 	hSize := math.Round(15 / 2.54 * 72)
-	parFillSkip := &glue{Plus: stretchAmount{Val: 1, Level: 1}}
+	parFillSkip := &glue{
+		Plus: stretchAmount{Val: 1, Level: 1},
+		Text: "\n",
+	}
 
-	out, err := pdf.Create("test_tryLength2.pdf")
+	out, err := pdf.Create("test_LineBreaks.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,24 +44,28 @@ func TestLineBreaks2(t *testing.T) {
 	}
 	pdfSpaceWidth := F1.ToPDF(fontSize, spaceWidth)
 
+	spaceGlue := &glue{
+		Length: pdfSpaceWidth,
+		Plus:   stretchAmount{Val: pdfSpaceWidth / 2},
+		Minus:  stretchAmount{Val: pdfSpaceWidth / 3},
+		Text:   " ",
+	}
+	xSpaceGlue := &glue{
+		Length: 1.5 * pdfSpaceWidth,
+		Plus:   stretchAmount{Val: pdfSpaceWidth * 1.5},
+		Minus:  stretchAmount{Val: pdfSpaceWidth},
+		Text:   " ",
+	}
+
 	var hModeMaterial []interface{}
 	endOfSentence := false
 	for i, f := range strings.Fields(testText) {
-		// TODO(voss): remember that there were spaces
 		if i > 0 {
 			if endOfSentence {
-				hModeMaterial = append(hModeMaterial, &glue{
-					Length: 1.5 * pdfSpaceWidth,
-					Plus:   stretchAmount{Val: pdfSpaceWidth * 1.5},
-					Minus:  stretchAmount{Val: pdfSpaceWidth},
-				})
+				hModeMaterial = append(hModeMaterial, xSpaceGlue)
 				endOfSentence = false
 			} else {
-				hModeMaterial = append(hModeMaterial, &glue{
-					Length: pdfSpaceWidth,
-					Plus:   stretchAmount{Val: pdfSpaceWidth / 2},
-					Minus:  stretchAmount{Val: pdfSpaceWidth / 3},
-				})
+				hModeMaterial = append(hModeMaterial, spaceGlue)
 			}
 		}
 		gg := F1.Typeset(f, fontSize)
@@ -175,13 +78,11 @@ func TestLineBreaks2(t *testing.T) {
 	}
 
 	// TODO(voss):
-	// - remove trailing space or glue, if any
-	// - add infinite penalty before the ParFillSkip glue
-	hModeMaterial = append(hModeMaterial, parFillSkip)
-
-	// TODO(voss):
 	// - check that no node has infinite shrinkability (since otherwise the
 	//   whole paragraph would fit into a single line)
+	// - remove trailing space or glue, if any
+	// - add an infinite penalty before the ParFillSkip glue
+	hModeMaterial = append(hModeMaterial, parFillSkip)
 
 	g := &lineBreakGraph{
 		hlist:     hModeMaterial,
