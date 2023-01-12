@@ -267,7 +267,7 @@ func TestPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	obj, err := r.getDict(testRef)
+	obj, err := r.GetDict(testRef, "")
 	if err != nil {
 		t.Fatal(err)
 	}

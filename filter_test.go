@@ -18,7 +18,6 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"testing"
 )
@@ -56,8 +55,6 @@ func TestFlate(t *testing.T) {
 					t.Error(in, err)
 					continue
 				}
-
-				fmt.Printf("%d %q\n", buf.Len(), buf.String())
 
 				r, err := ff.Decode(buf)
 				if err != nil {

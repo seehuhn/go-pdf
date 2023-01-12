@@ -19,6 +19,7 @@ package pdf
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -123,7 +124,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 	}
 
 	root := trailer["Root"]
-	catalogDict, err := r.getDict(root)
+	catalogDict, err := r.GetDict(root, "")
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +174,7 @@ func (r *Reader) GetInfo() (*Info, error) {
 	if infoObj == nil {
 		return nil, nil
 	}
-	infoDict, err := r.getDict(infoObj)
+	infoDict, err := r.GetDict(infoObj, "")
 	if err != nil {
 		return nil, err
 	}
@@ -456,9 +457,10 @@ func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error
 	return contents.s.ReadObject()
 }
 
-// getDict resolves references to indirect objects and makes sure the resulting
-// object is a dictionary.
-func (r *Reader) getDict(obj Object) (Dict, error) {
+// GetDict resolves references to indirect objects and makes sure the resulting
+// object is a dictionary.  If Type is not the empty string, the /Type entry of
+// the dictionary is checked to match.
+func (r *Reader) GetDict(obj Object, Type Name) (Dict, error) {
 	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return nil, err
@@ -467,9 +469,17 @@ func (r *Reader) getDict(obj Object) (Dict, error) {
 	if !ok {
 		return nil, &MalformedFileError{
 			Pos: r.errPos(obj),
-			Err: errors.New("wrong type (expected Dict)"),
+			Err: errors.New("wrong object type (expected Dict)"),
 		}
 	}
+
+	if Type != "" && val["Type"] != Type {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: fmt.Errorf("wrong dictonary /Type, expected %s, got %s", Type, val["Type"]),
+		}
+	}
+
 	return val, nil
 }
 
@@ -484,7 +494,7 @@ func (r *Reader) getInt(obj Object) (Integer, error) {
 	if !ok {
 		return 0, &MalformedFileError{
 			Pos: r.errPos(obj),
-			Err: errors.New("wrong type (expected Integer)"),
+			Err: errors.New("wrong object type (expected Integer)"),
 		}
 	}
 	return val, nil
@@ -501,7 +511,7 @@ func (r *Reader) getName(obj Object) (Name, error) {
 	if !ok {
 		return "", &MalformedFileError{
 			Pos: r.errPos(obj),
-			Err: errors.New("wrong type (expected Name)"),
+			Err: errors.New("wrong object type (expected Name)"),
 		}
 	}
 	return val, nil
@@ -518,7 +528,7 @@ func (r *Reader) getString(obj Object) (String, error) {
 	if !ok {
 		return nil, &MalformedFileError{
 			Pos: r.errPos(obj),
-			Err: errors.New("wrong type (expected String)"),
+			Err: errors.New("wrong object type (expected String)"),
 		}
 	}
 	return val, nil

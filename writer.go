@@ -493,7 +493,9 @@ func (pdf *Writer) OpenStream(dict Dict, ref *Reference, filters ...*FilterInfo)
 		d2[key] = val
 	}
 	length := pdf.NewPlaceholder(12)
-	d2["Length"] = length
+	if _, exists := d2["Length"]; !exists {
+		d2["Length"] = length
+	}
 
 	var w io.WriteCloser = &streamWriter{
 		parent: pdf,
@@ -602,13 +604,16 @@ func (w *streamWriter) startWriting() error {
 }
 
 func (w *streamWriter) Close() error {
+	var length Integer
 	if w.started {
-		err := w.length.Set(Integer(w.parent.w.pos - w.startPos))
+		length = Integer(w.parent.w.pos - w.startPos)
+		err := w.length.Set(length)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := w.length.Set(Integer(len(w.buf)))
+		length = Integer(len(w.buf))
+		err := w.length.Set(length)
 		if err != nil {
 			return err
 		}
@@ -616,6 +621,11 @@ func (w *streamWriter) Close() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if l, isInteger := w.dict["Length"].(Integer); isInteger && l != length {
+		return fmt.Errorf("stream length mismatch: %d (specified) != %d (actual)",
+			l, length)
 	}
 
 	_, err := w.Write([]byte("\nendstream\nendobj\n"))

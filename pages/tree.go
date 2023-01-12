@@ -19,6 +19,7 @@ package pages
 
 import (
 	"errors"
+	"fmt"
 
 	"seehuhn.de/go/pdf"
 )
@@ -30,13 +31,61 @@ type Tree struct {
 	parent *Tree
 	attr   *InheritableAttributes
 
+	// Children contains potentially incomplete subtrees of the current
+	// tree, in page order.
 	children []*Tree
-	tail     []*nodeInfo
 
-	outRefs    []*pdf.Reference
+	// Tail contains completed, partial subtrees of the current tree, in
+	// page order.  The depth of the subtrees is weakly decreasing, and for
+	// every depth there are at most maxDegree-1 subtrees of this depth.
+	tail []*nodeInfo
+
+	// OutObjects contains completed objects which still need to be written to
+	// the PDF file.  OutRefs contains the PDF references for these objects.
 	outObjects []pdf.Object
+	outRefs    []*pdf.Reference
 
 	isClosed bool
+}
+
+func (t *Tree) checkInvariants() {
+	// TODO(voss): once things have settled, move this function
+	// into the test suite.
+
+	for _, child := range t.children {
+		child.checkInvariants()
+		if child.parent != t {
+			panic("child.parent != t")
+		}
+	}
+
+	var curDepth, numAtDepth int
+	first := true
+	for i, node := range t.tail {
+		invalid := false
+		if first || node.depth < curDepth {
+			curDepth = node.depth
+			numAtDepth = 1
+		} else if node.depth > curDepth {
+			invalid = true
+		} else {
+			numAtDepth++
+			if numAtDepth > maxDegree {
+				invalid = true
+			}
+		}
+		if invalid {
+			var dd []int
+			for j := 0; j <= i; j++ {
+				dd = append(dd, t.tail[j].depth)
+			}
+			panic(fmt.Sprintf("invalid depth seq %d", dd))
+		}
+	}
+
+	if len(t.outObjects) != len(t.outRefs) {
+		panic("len(outObjects) != len(outRefs)")
+	}
 }
 
 // InstallTree installs a page tree as the root of the PDF document.
@@ -79,49 +128,51 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 	t.isClosed = true
 
 	// closed trees have no children, and all nodes are in tail
-	var nodes []*nodeInfo
-	var err error
-	for _, child := range t.children {
-		_, err = child.Close()
-		if err != nil {
-			return nil, err
+	{
+		var nodes []*nodeInfo
+		var err error
+		for _, child := range t.children {
+			_, err = child.Close()
+			if err != nil {
+				return nil, err
+			}
+			nodes = t.merge(nodes, child.tail)
 		}
-		nodes = t.merge(nodes, child.tail)
+		t.children = nil
+		t.tail = t.merge(nodes, t.tail)
 	}
-	nodes = t.merge(nodes, t.tail)
-	t.children = nil
+
+	t.checkInvariants()
 
 	if t.attr != nil || t.parent == nil {
 		// reduce to one node, if needed
-		for len(nodes) > 1 {
-			start := len(nodes) - maxDegree
+		for len(t.tail) > 1 {
+			start := len(t.tail) - maxDegree
 			if start < 0 {
 				start = 0
 			}
-			for start > 0 && nodes[start-1].depth == nodes[start].depth {
+			for start > 0 && t.tail[start-1].depth == t.tail[start].depth {
 				start++
 			}
-			nodes = t.makeInternalNode(nodes, start, len(nodes))
-		}
-
-		if t.parent == nil && len(nodes) > 0 { // be careful in case there are no pages
-			nodes[0].dictInfo = t.wrapIfNeeded(nodes[0].dictInfo)
-		}
-
-		if t.attr != nil {
-			mergeAttributes(nodes[0].dict, t.attr)
+			t.tail = t.mergeNodes(t.tail, start, len(t.tail))
 		}
 	}
 
-	if t.parent == nil {
-		t.tail = nil
+	if t.parent == nil && len(t.tail) > 0 { // be careful in case there are no pages
+		t.tail[0].dictInfo = t.wrapIfNeeded(t.tail[0].dictInfo)
+	}
 
-		if len(nodes) == 0 {
+	if t.attr != nil && len(t.tail) > 0 {
+		mergeAttributes(t.tail[0].dict, t.attr)
+	}
+
+	if t.parent == nil {
+		if len(t.tail) == 0 {
 			return nil, errors.New("no pages in document")
 		}
-		rootRef := nodes[0].ref
-		t.outRefs = append(t.outRefs, nodes[0].ref)
-		t.outObjects = append(t.outObjects, nodes[0].dict)
+		rootRef := t.tail[0].ref
+		t.outRefs = append(t.outRefs, t.tail[0].ref)
+		t.outObjects = append(t.outObjects, t.tail[0].dict)
 		return rootRef, t.flush()
 	}
 
@@ -130,16 +181,15 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 	t.outRefs = nil
 	t.outObjects = nil
 	if len(t.parent.outObjects) > objStreamChunkSize {
-		err = t.parent.flush()
+		err := t.parent.flush()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	t.tail = nodes
 	var rootRef *pdf.Reference
-	if len(nodes) == 1 {
-		rootRef = nodes[0].dictInfo.ref
+	if len(t.tail) == 1 {
+		rootRef = t.tail[0].dictInfo.ref
 	}
 	return rootRef, nil
 }
@@ -156,23 +206,21 @@ func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
 			dict: pageDict,
 			ref:  pageRef,
 		},
-		count: 1,
-		depth: 0,
+		pageCount: 1,
+		depth:     0,
 	}
 	t.tail = append(t.tail, node)
 
 	for {
 		n := len(t.tail)
-		if n < maxDegree || t.tail[n-1].depth < t.tail[n-maxDegree].depth {
+		if n < maxDegree || t.tail[n-1].depth != t.tail[n-maxDegree].depth {
 			break
 		}
-		if n > maxDegree && t.tail[n-maxDegree].depth+1 != t.tail[n-maxDegree-1].depth {
-			panic("missed a collapse") // TODO(voss): remove
-		}
-		t.tail = t.makeInternalNode(t.tail, n-maxDegree, n)
+		t.tail = t.mergeNodes(t.tail, n-maxDegree, n)
 	}
+	t.checkInvariants()
 
-	if len(t.outObjects) > objStreamChunkSize {
+	if len(t.outObjects) >= objStreamChunkSize {
 		err := t.flush()
 		if err != nil {
 			return nil, err
@@ -185,7 +233,11 @@ func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
 // NewSubTree creates a new Tree, which inserts pages into the document at the
 // position of the current end of the parent tree.  Pages added to the parent
 // tree will be inserted after the pages in the sub-tree.
-func (t *Tree) NewSubTree(attr *InheritableAttributes) *Tree {
+func (t *Tree) NewSubTree(attr *InheritableAttributes) (*Tree, error) {
+	if t.isClosed {
+		return nil, errors.New("page tree is closed")
+	}
+
 	if len(t.tail) > 0 {
 		before := &Tree{
 			parent: t,
@@ -201,9 +253,10 @@ func (t *Tree) NewSubTree(attr *InheritableAttributes) *Tree {
 		attr:   attr,
 	}
 	t.children = append(t.children, subTree)
-	return subTree
+	return subTree, nil
 }
 
+// Flush writes a batch finished objects to the output file.
 func (t *Tree) flush() error {
 	if len(t.outObjects) == 0 {
 		return nil
@@ -214,7 +267,7 @@ func (t *Tree) flush() error {
 		return err
 	}
 
-	t.outRefs = t.outRefs[:0]
 	t.outObjects = t.outObjects[:0]
+	t.outRefs = t.outRefs[:0]
 	return nil
 }

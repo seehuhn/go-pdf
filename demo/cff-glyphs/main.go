@@ -20,7 +20,6 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -41,14 +40,17 @@ import (
 var q float64 = 0.4
 
 func main() {
-	flag.Parse()
+	fileNames := os.Args[1:]
+	if len(fileNames) == 0 {
+		fmt.Fprintf(os.Stderr, "usage: %s font.ttf font.otf ...\n", os.Args[0])
+	}
 
 	out, err := pdf.Create("out.pdf")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	F, err := builtin.Embed(out, "Courier", "F")
+	labelFont, err := builtin.Embed(out, "Courier", "F")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,24 +58,24 @@ func main() {
 	tree := pages.InstallTree(out, &pages.InheritableAttributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{
-				F.InstName: F.Ref,
+				labelFont.InstName: labelFont.Ref,
 			},
 		},
 	})
 
-	names := flag.Args()
-	for _, fname := range names {
+	for _, fname := range fileNames {
 		cffData, err := loadCFFData(fname)
 		if err != nil {
 			log.Printf("%s: %v", fname, err)
 			continue
 		}
-
 		cffFont, err := cff.Read(bytes.NewReader(cffData))
 		if err != nil {
 			log.Printf("%s: %v", fname, err)
 			continue
 		}
+
+		// fontBBox := getFontBBox(cffFont)
 
 		for i := range cffFont.Glyphs {
 			glyphBBox := cffFont.Glyphs[i].Extent()
@@ -111,7 +113,7 @@ func main() {
 			ctx := &context{
 				page:      page,
 				pageBBox:  pageBBox,
-				labelFont: F,
+				labelFont: labelFont,
 				labelSize: 12,
 			}
 			err = illustrateGlyph(ctx, cffFont, i)
@@ -159,6 +161,14 @@ func loadCFFData(fname string) ([]byte, error) {
 		return nil, err
 	}
 	return cffData, nil
+}
+
+func getFontBBox(fnt *cff.Font) *funit.Rect {
+	bbox := &funit.Rect{}
+	for _, g := range fnt.Glyphs {
+		bbox.Extend(g.Extent())
+	}
+	return bbox
 }
 
 type context struct {

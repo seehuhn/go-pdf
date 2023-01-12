@@ -40,11 +40,17 @@ func main() {
 	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
-	frontMatter := pageTree.NewSubTree(nil)
+	frontMatter, err := pageTree.NewSubTree(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	var extra *pages.Tree
 	for i := 1; i <= 99; i++ {
 		if i == 3 {
-			extra = pageTree.NewSubTree(nil)
+			extra, err = pageTree.NewSubTree(nil)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
 		g, err := graphics.NewPage(out)

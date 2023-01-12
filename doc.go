@@ -29,11 +29,7 @@
 //	    log.Fatal(err)
 //	}
 //	defer r.Close()
-//	catalog, err := r.GetCatalog()
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	... use catalog to locate objects in the file ...
+//	... use r.Catalog to locate objects in the file ...
 //
 // A `Writer` can be used to write objects to a new PDF file:
 //

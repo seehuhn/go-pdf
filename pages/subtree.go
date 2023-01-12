@@ -29,8 +29,8 @@ type dictInfo struct {
 
 type nodeInfo struct {
 	*dictInfo
-	count pdf.Integer
-	depth int // upper bound
+	pageCount pdf.Integer
+	depth     int // upper bound
 }
 
 func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
@@ -50,7 +50,7 @@ func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
 		for start > 0 && a[start-1].depth == a[start].depth {
 			start++
 		}
-		a = t.makeInternalNode(a, start, len(a))
+		a = t.mergeNodes(a, start, len(a))
 	}
 	if len(a) == 1 && a[0].depth < nextDepth {
 		a[0].depth = nextDepth
@@ -77,7 +77,7 @@ func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
 	for depth := nextDepth; ; depth++ {
 		changed := false
 		for end >= start+maxDegree {
-			a = t.makeInternalNode(a, start, start+maxDegree)
+			a = t.mergeNodes(a, start, start+maxDegree)
 			start++
 			end -= maxDegree - 1
 			changed = true
@@ -96,9 +96,9 @@ func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
 	return a
 }
 
-// makeInternalNode collapses nodes a, ..., b-1 into a new \Pages object.
-func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) []*nodeInfo {
-	if a < 0 || b > len(nodes) || b-a < 2 {
+// mergeNodes collapses nodes a, ..., b-1 into a new internal node.
+func (t *Tree) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
+	if a < 0 || b > len(nodes) || b-a < 2 || b-a > maxDegree {
 		// TODO(voss): remove
 		panic(fmt.Errorf("invalid subtree node range %d, %d", a, b))
 	}
@@ -110,8 +110,8 @@ func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) []*nodeInfo {
 
 	kids := make(pdf.Array, len(childNodes))
 	parentRef := t.Out.Alloc()
-	var total pdf.Integer
-	depth := 0
+	var pageCount pdf.Integer
+	maxDepth := 0
 	for i, node := range childNodes {
 		node.dict["Parent"] = parentRef
 		kids[i] = node.ref
@@ -119,9 +119,9 @@ func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) []*nodeInfo {
 		t.outRefs = append(t.outRefs, node.ref)
 		t.outObjects = append(t.outObjects, node.dict)
 
-		total += node.count
-		if node.depth > depth {
-			depth = node.depth
+		pageCount += node.pageCount
+		if node.depth > maxDepth {
+			maxDepth = node.depth
 		}
 	}
 
@@ -130,12 +130,12 @@ func (t *Tree) makeInternalNode(nodes []*nodeInfo, a, b int) []*nodeInfo {
 			dict: pdf.Dict{
 				"Type":  pdf.Name("Pages"),
 				"Kids":  kids,
-				"Count": total,
+				"Count": pageCount,
 			},
 			ref: parentRef,
 		},
-		count: total,
-		depth: depth,
+		pageCount: pageCount,
+		depth:     maxDepth + 1,
 	}
 
 	nodes[a] = parentNode

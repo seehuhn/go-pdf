@@ -296,11 +296,7 @@ func (x Array) PDF(w io.Writer) error {
 				return err
 			}
 		}
-		if val == nil {
-			_, err = w.Write([]byte("null"))
-		} else {
-			err = val.PDF(w)
-		}
+		err = writeObject(w, val)
 		if err != nil {
 			return err
 		}
@@ -553,4 +549,12 @@ func (x *Reference) PDF(w io.Writer) error {
 		_, err = fmt.Fprintf(w, "%d %d R", x.Number, x.Generation)
 	}
 	return err
+}
+
+func writeObject(w io.Writer, obj Object) error {
+	if obj == nil {
+		_, err := w.Write([]byte("null"))
+		return err
+	}
+	return obj.PDF(w)
 }

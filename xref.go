@@ -455,6 +455,7 @@ func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 
 func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	ref := pdf.Alloc()
+	// no more object allocations after this point
 
 	xRefDict["Type"] = Name("XRef")
 	xRefDict["Size"] = Integer(pdf.nextRef)
@@ -494,72 +495,98 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	W := Array{Integer(1), Integer(w2), Integer(w3)}
 	xRefDict["W"] = W
 
+	// Since we can't allocate any more PDF objects, compress the xref stream
+	// in memory, to make sure we know the size of the stream before writing
+	// the xref stream object.
 	filter := &FilterInfo{
 		Name:  "FlateDecode",
 		Parms: Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)},
 	}
-	swx, _, err := pdf.OpenStream(xRefDict, ref, filter)
+	fff, err := filter.getFilter()
 	if err != nil {
 		return err
 	}
-	sw := bufio.NewWriter(swx)
+	xRefBuf := &bytes.Buffer{}
+	wxRaw, err := fff.Encode(withDummyClose{xRefBuf})
+	if err != nil {
+		return err
+	}
+	wx := bufio.NewWriter(wxRaw)
 	for i := 0; i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
 		if entry == nil {
-			err = sw.WriteByte(0)
+			err := wx.WriteByte(0)
 			if err != nil {
 				return err
 			}
-			err = encodeInt64(sw, 0, w2)
+			err = encodeInt64(wx, 0, w2)
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(sw, 0, w3)
+			err = encodeInt16(wx, 0, w3)
 			if err != nil {
 				return err
 			}
 		} else if entry.Pos < 0 {
-			err = sw.WriteByte(0)
+			err := wx.WriteByte(0)
 			if err != nil {
 				return err
 			}
-			err = encodeInt64(sw, 0, w2)
+			err = encodeInt64(wx, 0, w2)
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(sw, entry.Generation, w3)
+			err = encodeInt16(wx, entry.Generation, w3)
 			if err != nil {
 				return err
 			}
 		} else if entry.InStream == nil {
-			err = sw.WriteByte(1)
+			err := wx.WriteByte(1)
 			if err != nil {
 				return err
 			}
-			err = encodeInt64(sw, uint64(entry.Pos), w2)
+			err = encodeInt64(wx, uint64(entry.Pos), w2)
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(sw, entry.Generation, w3)
+			err = encodeInt16(wx, entry.Generation, w3)
 			if err != nil {
 				return err
 			}
 		} else {
-			err = sw.WriteByte(2)
+			err := wx.WriteByte(2)
 			if err != nil {
 				return err
 			}
-			err = encodeInt64(sw, uint64(entry.InStream.Number), w2)
+			err = encodeInt64(wx, uint64(entry.InStream.Number), w2)
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(sw, uint16(entry.Pos), w3)
+			err = encodeInt16(wx, uint16(entry.Pos), w3)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	err = sw.Flush()
+	err = wx.Flush()
+	if err != nil {
+		return err
+	}
+	err = wxRaw.Close()
+	if err != nil {
+		return err
+	}
+	xRefData := xRefBuf.Bytes()
+
+	xRefDict["Filter"] = filter.Name
+	xRefDict["DecodeParms"] = filter.Parms
+	xRefDict["Length"] = Integer(len(xRefData))
+
+	swx, _, err := pdf.OpenStream(xRefDict, ref, nil)
+	if err != nil {
+		return err
+	}
+	_, err = swx.Write(xRefData)
 	if err != nil {
 		return err
 	}
