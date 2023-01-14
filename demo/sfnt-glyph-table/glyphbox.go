@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"unicode"
 
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/color"
@@ -72,10 +73,12 @@ func (g glyphBox) Draw(page *graphics.Page, xPos, yPos float64) {
 
 	r := rev[glyph.ID(g)]
 	var label string
-	if r != 0 {
-		label = fmt.Sprintf("%04X", r)
-	} else {
+	if r == 0 {
 		label = "—"
+	} else if unicode.IsPrint(r) {
+		label = fmt.Sprintf("%q", r)
+	} else {
+		label = fmt.Sprintf("%04X", r)
 	}
 	lBox := boxes.Text(courier, 8, label)
 	lBox.Draw(page,

@@ -25,6 +25,11 @@ import (
 	"strings"
 
 	"golang.org/x/text/language"
+
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
@@ -32,9 +37,6 @@ import (
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 func main() {
@@ -50,15 +52,28 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	titleFont, err := builtin.Embed(w, "Helvetica-Bold", "T")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	paper := pages.A4
 	pageTree := pages.InstallTree(w, &pages.InheritableAttributes{
 		MediaBox: pages.A4,
 	})
+
+	const margin = 50
+	f := fontSamples{
+		tree: pageTree,
+
+		textWidth:  paper.URx - 2*margin,
+		textHeight: paper.URy - 2*margin,
+		margin:     margin,
+
+		bodyFont:  labelFont,
+		titleFont: titleFont,
+	}
+	_ = f // TODO(voss): finish the conversion to the system
 
 	c := make(chan boxes.Box)
 	res := make(chan error)
@@ -172,6 +187,82 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+type fontSamples struct {
+	tree *pages.Tree
+
+	textWidth  float64
+	textHeight float64
+	margin     float64
+
+	used float64 // vertical amount of page space currently used
+
+	bodyFont  *font.Font
+	titleFont *font.Font
+
+	page *graphics.Page
+
+	pageNo int
+	fontNo int
+}
+
+func (f *fontSamples) ClosePage() error {
+	if f.page == nil {
+		return nil
+	}
+
+	f.pageNo++
+	f.page.BeginText()
+	f.page.SetFont(f.bodyFont, 10)
+	f.page.StartLine(f.margin+0.5*f.textWidth, f.margin-20)
+	f.page.ShowTextAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
+	f.page.EndText()
+
+	_, err := f.page.Close()
+	f.page = nil
+
+	return err
+}
+
+func (f *fontSamples) MakeSpace(vSpace float64) error {
+	if f.page != nil && f.used+vSpace < f.textWidth {
+		// If we have enough space, just return ...
+		return nil
+	}
+
+	// ... otherwise start a new page.
+	err := f.ClosePage()
+	if err != nil {
+		return err
+	}
+
+	page, err := graphics.AppendPage(f.tree)
+	if err != nil {
+		return err
+	}
+
+	f.page = page
+	f.used = 0
+	return nil
+}
+
+func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
+	err := f.MakeSpace(a + b + 72)
+	if err != nil {
+		return err
+	}
+
+	f.used += a
+	f.page.BeginText()
+	f.page.SetFont(f.titleFont, fontSize)
+	f.page.StartLine(f.margin+0.5*f.textWidth, f.margin+f.textHeight-f.used)
+	f.page.ShowTextAligned(title, 0, 0.5)
+	f.page.EndText()
+
+	f.used += b
+
+	return nil
 }
 
 func makePages(w *pdf.Writer, tree *pages.Tree, c <-chan boxes.Box, labelFont *font.Font) error {

@@ -139,14 +139,24 @@ func (p *Page) CloseAndStroke() {
 	_, p.err = fmt.Fprintln(p.content, "s")
 }
 
-// Fill fills the current path.  Any subpaths that are open are implicitly
-// closed before being filled.
+// Fill fills the current path, using the nonzero winding number rule.  Any
+// subpaths that are open are implicitly closed before being filled.
 func (p *Page) Fill() {
 	if !p.valid("Fill", statePath, stateClipped) {
 		return
 	}
 	p.state = stateGlobal
 	_, p.err = fmt.Fprintln(p.content, "f")
+}
+
+// Fill fills the current path, using the even-odd rule.  Any
+// subpaths that are open are implicitly closed before being filled.
+func (p *Page) FillEvenOdd() {
+	if !p.valid("FillEvenOdd", statePath, stateClipped) {
+		return
+	}
+	p.state = stateGlobal
+	_, p.err = fmt.Fprintln(p.content, "f*")
 }
 
 // FillAndStroke fills and strokes the current path.  Any subpaths that are

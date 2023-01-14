@@ -48,7 +48,7 @@ var gdefInfo *gdef.Table
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: tt-glyph-table font.ttf")
+		fmt.Fprintln(os.Stderr, "usage: sfnt-glyph-table (font.ttf|font.otf)")
 		os.Exit(1)
 	}
 	fontFileName := os.Args[1]
@@ -157,8 +157,18 @@ func main() {
 	c <- boxes.Text(labelFont, 10, "creation time: "+tt.CreationTime.Format("2006-01-02 15:04:05"))
 	c <- boxes.Text(labelFont, 10, "modification time: "+tt.ModificationTime.Format("2006-01-02 15:04:05"))
 	c <- boxes.Kern(12)
-	c <- boxes.Text(labelFont, 10, "copyright: "+tt.Copyright)
-	c <- boxes.Text(labelFont, 10, "trademark: "+tt.Trademark)
+	if tt.Copyright != "" {
+		c <- boxes.Text(labelFont, 10, "copyright: "+tt.Copyright)
+	}
+	if tt.Trademark != "" {
+		c <- boxes.Text(labelFont, 10, "trademark: "+tt.Trademark)
+	}
+	if tt.License != "" {
+		c <- boxes.Text(labelFont, 10, "license: "+tt.License)
+	}
+	if tt.LicenseURL != "" {
+		c <- boxes.Text(labelFont, 10, "licenseURL: "+tt.LicenseURL)
+	}
 	c <- boxes.Text(labelFont, 10, "permissions: "+tt.PermUse.String())
 	c <- boxes.Kern(12)
 	c <- boxes.Text(labelFont, 10, fmt.Sprintf("units/em: %d", tt.UnitsPerEm))

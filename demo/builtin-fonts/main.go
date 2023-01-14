@@ -53,7 +53,6 @@ func main() {
 	}
 
 	f := fontTables{
-		w:    w,
 		tree: tree,
 
 		textWidth:  paper.URx - 2*margin,
@@ -91,7 +90,6 @@ func main() {
 }
 
 type fontTables struct {
-	w    *pdf.Writer
 	tree *pages.Tree
 
 	textWidth  float64
@@ -129,10 +127,11 @@ func (f *fontTables) ClosePage() error {
 
 func (f *fontTables) MakeSpace(vSpace float64) error {
 	if f.page != nil && f.used+vSpace < f.textWidth {
-		// there is enough space left
+		// If we have enough space, just return ...
 		return nil
 	}
 
+	// ... otherwise start a new page.
 	err := f.ClosePage()
 	if err != nil {
 		return err
