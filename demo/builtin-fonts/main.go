@@ -126,7 +126,7 @@ func (f *fontTables) ClosePage() error {
 }
 
 func (f *fontTables) MakeSpace(vSpace float64) error {
-	if f.page != nil && f.used+vSpace < f.textWidth {
+	if f.page != nil && f.used+vSpace < f.textHeight {
 		// If we have enough space, just return ...
 		return nil
 	}

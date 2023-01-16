@@ -20,31 +20,19 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sort"
-	"strconv"
-	"strings"
+	"unicode"
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/boxes"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/header"
-	"seehuhn.de/go/sfnt/opentype/gdef"
 )
-
-const (
-	glyphBoxWidth = 36
-	glyphFontSize = 24
-)
-
-var courier, theFont *font.Font
-var rev map[glyph.ID]rune
-var gdefInfo *gdef.Table
 
 func main() {
 	if len(os.Args) < 2 {
@@ -52,157 +40,12 @@ func main() {
 		os.Exit(1)
 	}
 	fontFileName := os.Args[1]
-
-	fd, err := os.Open(fontFileName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	tt, err := sfnt.Read(fd)
-	if err != nil {
-		log.Fatal(err)
-	}
-	header, err := header.Read(fd)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = fd.Close()
+	tt, err := sfnt.ReadFile(fontFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	gdefInfo = tt.Gdef
-
-	// gsub, err := gtab.ReadGsubTable()
-	// if err != nil && !table.IsMissing(err) {
-	// 	log.Fatal(err)
-	// }
-
-	out, err := pdf.Create("test.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	labelFont, err := builtin.Embed(out, "Helvetica", "L")
-	if err != nil {
-		log.Fatal(err)
-	}
-	courier, err = builtin.Embed(out, "Courier", "C")
-	if err != nil {
-		log.Fatal(err)
-	}
-	italic, err := builtin.Embed(out, "Times-Italic", "I")
-	if err != nil {
-		log.Fatal(err)
-	}
-	theFont, err = cid.Embed(out, tt, "X", language.AmericanEnglish)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
-		MediaBox: pages.A4,
-	})
-
-	c := make(chan boxes.Box)
-	res := make(chan error)
-	go func() {
-		res <- makePages(out, pageTree, c, labelFont)
-	}()
-
-	stretch := boxes.Glue(0, 1, 1, 1, 1)
-
-	numGlyph := len(theFont.Widths)
-
-	c <- boxes.Kern(36)
-	c <- boxes.HBox(
-		boxes.Text(labelFont, 10, "input file: "),
-		boxes.Text(courier, 10, fontFileName),
-	)
-	c <- boxes.Kern(12)
-	c <- boxes.Text(labelFont, 10, "family name: "+tt.FamilyName)
-	c <- boxes.Text(labelFont, 10, "width: "+tt.Width.String())
-	c <- boxes.Text(labelFont, 10, "weight: "+tt.Weight.String())
-
-	var flags []string
-	if tt.IsItalic {
-		flags = append(flags, "italic")
-	}
-	if tt.IsBold {
-		flags = append(flags, "bold")
-	}
-	if tt.IsRegular {
-		flags = append(flags, "regular")
-	}
-	if tt.IsOblique {
-		flags = append(flags, "oblique")
-	}
-	if tt.IsSerif {
-		flags = append(flags, "serif")
-	}
-	if tt.IsScript {
-		flags = append(flags, "script")
-	}
-	if len(flags) > 0 {
-		c <- boxes.Text(labelFont, 10, "flags: "+strings.Join(flags, ", "))
-	}
-
-	c <- boxes.Kern(12)
-	if tt.Description != "" {
-		c <- boxes.Text(labelFont, 10, "description: "+tt.Description)
-	}
-	if tt.SampleText != "" {
-		c <- boxes.Text(labelFont, 10, "sample text: "+tt.SampleText)
-	}
-	c <- boxes.Text(labelFont, 10, "version: "+tt.Version.String())
-	c <- boxes.Text(labelFont, 10, "creation time: "+tt.CreationTime.Format("2006-01-02 15:04:05"))
-	c <- boxes.Text(labelFont, 10, "modification time: "+tt.ModificationTime.Format("2006-01-02 15:04:05"))
-	c <- boxes.Kern(12)
-	if tt.Copyright != "" {
-		c <- boxes.Text(labelFont, 10, "copyright: "+tt.Copyright)
-	}
-	if tt.Trademark != "" {
-		c <- boxes.Text(labelFont, 10, "trademark: "+tt.Trademark)
-	}
-	if tt.License != "" {
-		c <- boxes.Text(labelFont, 10, "license: "+tt.License)
-	}
-	if tt.LicenseURL != "" {
-		c <- boxes.Text(labelFont, 10, "licenseURL: "+tt.LicenseURL)
-	}
-	c <- boxes.Text(labelFont, 10, "permissions: "+tt.PermUse.String())
-	c <- boxes.Kern(12)
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("units/em: %d", tt.UnitsPerEm))
-	c <- boxes.Kern(12)
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("ascent: %d", tt.Ascent))
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("descent: %d", tt.Descent))
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("linegap: %d", tt.LineGap))
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("cap height: %d", tt.CapHeight))
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("x-height: %d", tt.XHeight))
-	c <- boxes.Kern(12)
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("italic angle: %.1f", tt.ItalicAngle))
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("underline position: %d", tt.UnderlinePosition))
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("underline thickness: %d", tt.UnderlineThickness))
-	c <- boxes.Kern(12)
-	c <- boxes.Text(labelFont, 10, fmt.Sprintf("number of glyphs: %d", numGlyph))
-	c <- boxes.Kern(12)
-	c <- boxes.Text(labelFont, 10, "SFNT tables:")
-	var names []string
-	for name := range header.Toc {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		c <- boxes.HBox(
-			boxes.Text(courier, 10, "  •"+name+" "),
-			boxes.HBoxTo(72,
-				stretch,
-				boxes.Text(labelFont, 10, fmt.Sprintf("%d bytes", header.Toc[name].Length)),
-			),
-		)
-	}
-	c <- nil // new page
-
-	rev = make(map[glyph.ID]rune)
+	rev := make(map[glyph.ID]rune)
 	min, max := tt.CMap.CodeRange()
 	for r := min; r <= max; r++ {
 		gid := tt.CMap.Lookup(r)
@@ -214,32 +57,60 @@ func main() {
 			rev[gid] = r
 		}
 	}
-	for row := 0; 10*row < numGlyph; row++ {
-		colBoxes := []boxes.Box{stretch}
-		label := strconv.Itoa(row)
-		if label == "0" {
-			label = ""
-		}
-		h := boxes.HBoxTo(20,
-			stretch,
-			boxes.Text(courier, 10, label),
-			boxes.Text(italic, 10, "x"),
-		)
-		colBoxes = append(colBoxes, h, boxes.Kern(20), rules{})
-		for col := 0; col < 10; col++ {
-			idx := col + 10*row
-			if idx < numGlyph {
-				colBoxes = append(colBoxes, glyphBox(idx))
-			} else {
-				colBoxes = append(colBoxes, boxes.Kern(glyphBoxWidth))
-			}
-		}
-		colBoxes = append(colBoxes, stretch)
-		c <- boxes.HBoxTo(textWidth, colBoxes...)
+
+	out, err := pdf.Create("test.pdf")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	close(c)
-	err = <-res
+	helvetica, err := builtin.Embed(out, "Helvetica", "R")
+	if err != nil {
+		log.Fatal(err)
+	}
+	italic, err := builtin.Embed(out, "Times-Italic", "I")
+	if err != nil {
+		log.Fatal(err)
+	}
+	courier, err := builtin.Embed(out, "Courier", "T")
+	if err != nil {
+		log.Fatal(err)
+	}
+	theFont, err := cid.Embed(out, tt, "X", language.AmericanEnglish)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	paper := pages.A4
+	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
+		MediaBox: paper,
+	})
+
+	const margin = 36
+	f := &fontTables{
+		tree:       pageTree,
+		textWidth:  paper.URx - 2*margin,
+		textHeight: paper.URy - 2*margin,
+		margin:     margin,
+		bodyFont:   helvetica,
+		italicFont: italic,
+		monoFont:   courier,
+		rev:        rev,
+	}
+
+	err = f.WriteHeader(tt.FullName(), fontFileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	numGlyphs := theFont.NumGlyphs()
+	for i := 0; i < numGlyphs; i += 10 {
+		err = f.WriteGlyphRow(theFont, i)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err = f.ClosePage()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -248,4 +119,211 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+type fontTables struct {
+	tree *pages.Tree
+
+	textWidth  float64
+	textHeight float64
+	margin     float64
+
+	bodyFont   *font.Font
+	italicFont *font.Font
+	monoFont   *font.Font
+
+	page   *graphics.Page
+	pageNo int
+
+	used float64 // vertical amount of page space currently used
+
+	rev map[glyph.ID]rune
+}
+
+func (f *fontTables) ClosePage() error {
+	if f.page == nil {
+		return nil
+	}
+
+	f.pageNo++
+	f.page.BeginText()
+	f.page.SetFont(f.bodyFont, 10)
+	f.page.StartLine(f.margin+0.5*f.textWidth, f.margin-20)
+	f.page.ShowTextAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
+	f.page.EndText()
+
+	_, err := f.page.Close()
+	f.page = nil
+
+	return err
+}
+
+func (f *fontTables) MakeSpace(vSpace float64) error {
+	if f.page != nil && f.used+vSpace < f.textHeight {
+		// If we have enough space, just return ...
+		return nil
+	}
+
+	// ... otherwise start a new page.
+	err := f.ClosePage()
+	if err != nil {
+		return err
+	}
+
+	page, err := graphics.AppendPage(f.tree)
+	if err != nil {
+		return err
+	}
+
+	f.page = page
+	f.used = 0
+	return nil
+}
+
+func (f *fontTables) WriteHeader(title, fileName string) error {
+	v1 := f.bodyFont.ToPDF16(12, f.bodyFont.Ascent)
+	v2 := f.bodyFont.ToPDF16(12, f.bodyFont.BaseLineSkip-f.bodyFont.Ascent) +
+		f.monoFont.ToPDF16(10, f.monoFont.Ascent)
+	v3 := f.monoFont.ToPDF16(10, f.monoFont.BaseLineSkip-f.monoFont.Ascent) +
+		12
+	total := v1 + v2 + v3
+
+	err := f.MakeSpace(total)
+	if err != nil {
+		return err
+	}
+
+	f.page.BeginText()
+	f.page.SetFont(f.bodyFont, 12)
+	f.page.StartLine(f.margin, f.margin+f.textHeight-f.used-v1)
+	f.page.ShowText(title)
+	f.page.SetFont(f.monoFont, 10)
+	f.page.StartNextLine(0, -v2)
+	f.page.ShowText(fileName)
+	f.page.EndText()
+
+	f.used += total
+	return nil
+}
+
+func (f *fontTables) WriteGlyphRow(theFont *font.Font, start int) error {
+	const glyphSize = 24
+
+	gid := make([]glyph.ID, 0, 10)
+	for i := start; i < start+10; i++ {
+		if i >= theFont.NumGlyphs() {
+			break
+		}
+		gid = append(gid, glyph.ID(i))
+	}
+
+	v1 := theFont.ToPDF16(glyphSize, theFont.Ascent)
+	v2 := theFont.ToPDF16(glyphSize, -theFont.Descent)
+	v3 := 12.0
+	total := v1 + v2 + v3
+
+	err := f.MakeSpace(total)
+	if err != nil {
+		return err
+	}
+
+	page := f.page
+
+	yBase := f.margin + f.textHeight - f.used - v1
+	left := f.margin + 72
+	right := f.margin + f.textWidth
+	dx := (right - left) / 10
+
+	// row label on the left
+	page.BeginText()
+	page.StartLine(left-24, yBase)
+	page.SetFont(f.bodyFont, 10)
+	var label string
+	if start > 0 {
+		label = fmt.Sprintf("%d", start/10)
+	}
+	page.ShowTextAligned(label, 0, 1)
+	page.SetFont(f.italicFont, 10)
+	page.ShowText("x")
+	page.EndText()
+
+	// grid of boxes
+	page.PushGraphicsState()
+	page.SetStrokeColor(color.RGB(.3, .3, 1))
+	page.SetLineWidth(.5)
+	page.MoveTo(left, yBase+v1)
+	page.LineTo(right, yBase+v1)
+	page.MoveTo(left, yBase)
+	page.LineTo(right, yBase)
+	page.MoveTo(left, yBase-v2)
+	page.LineTo(right, yBase-v2)
+	for i := 0; i <= 10; i++ {
+		x := left + float64(i)*dx
+		page.MoveTo(x, yBase+v1)
+		page.LineTo(x, yBase-v2)
+	}
+	page.Stroke()
+	xPos := make([]float64, len(gid))
+	page.SetStrokeColor(color.RGB(1, 0, 0))
+	for i, gid := range gid {
+		w := theFont.ToPDF16(glyphSize, theFont.Widths[gid])
+		xPos[i] = left + (float64(i)+0.5)*dx - 0.5*w
+		page.MoveTo(xPos[i], yBase+v1)
+		page.LineTo(xPos[i], yBase-v2)
+		page.MoveTo(xPos[i]+w, yBase+v1)
+		page.LineTo(xPos[i]+w, yBase-v2)
+	}
+	page.Stroke()
+	page.PopGraphicsState()
+
+	// boxes for glyph extent
+	page.PushGraphicsState()
+	page.SetFillColor(color.RGB(.4, 1, .4))
+	for i, gid := range gid {
+		ext := theFont.GlyphExtents[gid]
+		page.Rectangle(
+			xPos[i]+theFont.ToPDF16(glyphSize, ext.LLx),
+			yBase+theFont.ToPDF16(glyphSize, ext.LLy),
+			theFont.ToPDF16(glyphSize, ext.URx-ext.LLx),
+			theFont.ToPDF16(glyphSize, ext.URy-ext.LLy))
+	}
+	page.Fill()
+	page.PopGraphicsState()
+
+	// draw the glyphs and labels
+	for i, gid := range gid {
+		g := glyph.Info{
+			Gid:     gid,
+			Advance: theFont.Widths[gid],
+		}
+
+		r := f.rev[gid]
+		var label string
+		if r > 0 {
+			if r, ok := f.rev[gid]; ok {
+				g.Text = []rune{r}
+
+				// Try to establish a mapping from glyph ID to rune in the embedded
+				// font (called for side effects only).
+				_ = theFont.Layout([]rune{r})
+			}
+			if unicode.IsPrint(r) && r < 128 {
+				label = fmt.Sprintf("%q", r)
+			} else {
+				label = fmt.Sprintf("U+%04X", r)
+			}
+		}
+
+		page.BeginText()
+		page.SetFont(theFont, glyphSize)
+		page.StartLine(xPos[i], yBase)
+		page.ShowGlyphs(glyph.Seq{g})
+		page.SetFont(f.bodyFont, 8)
+		page.StartLine(left+float64(i)*dx-xPos[i], -v2-7.5)
+		page.ShowTextAligned(label, dx, 0.5)
+		page.EndText()
+	}
+
+	f.used += total
+	return nil
 }

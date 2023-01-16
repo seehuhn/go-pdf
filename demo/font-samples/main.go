@@ -25,13 +25,11 @@ import (
 	"strings"
 
 	"golang.org/x/text/language"
-
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/boxes"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
@@ -73,15 +71,8 @@ func main() {
 		bodyFont:  labelFont,
 		titleFont: titleFont,
 	}
-	_ = f // TODO(voss): finish the conversion to the system
 
-	c := make(chan boxes.Box)
-	res := make(chan error)
-	go func() {
-		res <- makePages(w, pageTree, c, labelFont)
-	}()
-
-	var fnames []string
+	var fileNames []string
 	if *fontNamesFile != "" {
 		f, err := os.Open(*fontNamesFile)
 		if err != nil {
@@ -89,27 +80,26 @@ func main() {
 		}
 		sc := bufio.NewScanner(f)
 		for sc.Scan() {
-			fnames = append(fnames, sc.Text())
+			fileNames = append(fileNames, sc.Text())
 		}
 		if err := sc.Err(); err != nil {
 			log.Fatal(err)
 		}
 	}
-	fnames = append(fnames, flag.Args()...)
+	fileNames = append(fileNames, flag.Args()...)
 
-	title := boxes.Text(titleFont, 10, fmt.Sprintf("%d Font Samples", len(fnames)))
-	c <- title
-	c <- boxes.Kern(12)
+	title := fmt.Sprintf("%d Font Samples", len(fileNames))
+	f.AddTitle(title, 10, 0, 24)
 
-	for i, fname := range fnames {
-		r, err := os.Open(fname)
+	for _, fileName := range fileNames {
+		r, err := os.Open(fileName)
 		if err != nil {
-			log.Print(fname + ":" + err.Error())
+			log.Print(fileName + ":" + err.Error())
 			continue
 		}
 		info, err := sfnt.Read(r)
 		if err != nil {
-			log.Print(fname + ":" + err.Error())
+			log.Print(fileName + ":" + err.Error())
 			r.Close()
 			continue
 		}
@@ -118,67 +108,18 @@ func main() {
 			log.Fatal(err)
 		}
 
+		// disable any interaction between the glyphs
 		info.Gdef = nil
 		info.Gsub = nil
 		info.Gpos = nil
 
-		var title []string
-		title = append(title, info.FullName())
-		title = append(title, fmt.Sprintf("%d glyphs", info.NumGlyphs()))
-		if info.IsGlyf() {
-			title = append(title, "glyf outlines")
-		} else if info.IsCFF() {
-			title = append(title, "CFF outlines")
-			outlines := info.Outlines.(*cff.Outlines)
-			if outlines.ROS != nil {
-				title = append(title, "CID-keyed")
-			}
+		err = f.AddFontSample(fileName, info)
+		if err != nil {
+			log.Print(fileName + ":" + err.Error())
 		}
-		if info.UnitsPerEm != 1000 {
-			title = append(title, fmt.Sprintf("%d/em", info.UnitsPerEm))
-		}
-		c <- boxes.Text(labelFont, 10, strings.Join(title, ", "))
-		c <- boxes.Text(labelFont, 7, fname)
-
-		var seq []glyph.Info
-		total := 0.
-		for gid := 0; gid < info.NumGlyphs(); gid++ {
-			if info.GlyphExtent(glyph.ID(gid)).IsZero() {
-				continue
-			}
-			w := info.GlyphWidth(glyph.ID(gid))
-			wf := w.AsFloat(24 / float64(info.UnitsPerEm))
-			if total+wf > 72*6 {
-				break
-			}
-			seq = append(seq, glyph.Info{
-				Gid:     glyph.ID(gid),
-				Advance: w,
-			})
-			total += wf
-			if len(seq) >= 100 {
-				break
-			}
-		}
-
-		if len(seq) > 0 {
-			F, err := cid.Embed(w, info, pdf.Name(fmt.Sprintf("F%d", i)), language.AmericanEnglish)
-			if err != nil {
-				log.Fatal(err)
-			}
-			c <- &boxes.TextBox{
-				Font:     F,
-				FontSize: 24,
-				Glyphs:   seq,
-			}
-		} else {
-			c <- boxes.Text(labelFont, 10, "(no glyphs)")
-		}
-		c <- boxes.Kern(12)
 	}
 
-	close(c)
-	err = <-res
+	err = f.ClosePage()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -226,7 +167,7 @@ func (f *fontSamples) ClosePage() error {
 }
 
 func (f *fontSamples) MakeSpace(vSpace float64) error {
-	if f.page != nil && f.used+vSpace < f.textWidth {
+	if f.page != nil && f.used+vSpace < f.textHeight {
 		// If we have enough space, just return ...
 		return nil
 	}
@@ -256,8 +197,8 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 	f.used += a
 	f.page.BeginText()
 	f.page.SetFont(f.titleFont, fontSize)
-	f.page.StartLine(f.margin+0.5*f.textWidth, f.margin+f.textHeight-f.used)
-	f.page.ShowTextAligned(title, 0, 0.5)
+	f.page.StartLine(f.margin, f.margin+f.textHeight-f.used)
+	f.page.ShowText(title)
 	f.page.EndText()
 
 	f.used += b
@@ -265,74 +206,74 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 	return nil
 }
 
-func makePages(w *pdf.Writer, tree *pages.Tree, c <-chan boxes.Box, labelFont *font.Font) error {
-	topMargin := 36.
-	rightMargin := 50.
-	bottomMargin := 36.
-	leftMargin := 50.
-	paperWidth := pages.A4.URx
-	textWidth := paperWidth - rightMargin - leftMargin
-	paperHeight := pages.A4.URy
-	maxHeight := paperHeight - topMargin - bottomMargin
-
-	p := boxes.Parameters{
-		BaseLineSkip: 0,
+func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Info) error {
+	instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
+	f.fontNo++
+	X, err := cid.Embed(f.tree.Out, info, instName, language.AmericanEnglish)
+	if err != nil {
+		return err
 	}
 
-	var body []boxes.Box
-	pageNo := 1
-	flush := func() error {
-		pageList := []boxes.Box{
-			boxes.Kern(topMargin),
+	bodyFont := f.bodyFont
+	v1 := bodyFont.ToPDF16(10, bodyFont.Ascent)
+	v2 := bodyFont.ToPDF16(10, bodyFont.BaseLineSkip-bodyFont.Ascent) +
+		bodyFont.ToPDF16(7, bodyFont.Ascent)
+	v3 := bodyFont.ToPDF16(7, bodyFont.BaseLineSkip-bodyFont.Ascent) +
+		X.ToPDF16(24, X.Ascent)
+	v4 := X.ToPDF16(24, X.BaseLineSkip-X.Ascent) + 12
+	totalPartHeight := v1 + v2 + v3 + v4
+
+	var parts []string
+	parts = append(parts, info.FullName())
+	parts = append(parts, fmt.Sprintf("%d glyphs", info.NumGlyphs()))
+	if info.IsGlyf() {
+		parts = append(parts, "glyf outlines")
+	} else if info.IsCFF() {
+		parts = append(parts, "CFF outlines")
+		outlines := info.Outlines.(*cff.Outlines)
+		if outlines.ROS != nil {
+			parts = append(parts, "CID-keyed")
 		}
-		pageList = append(pageList, body...)
-		pageList = append(pageList,
-			boxes.Glue(0, 1, 1, 1, 1),
-			boxes.HBoxTo(textWidth,
-				boxes.Glue(0, 1, 1, 1, 1),
-				boxes.Text(labelFont, 10, fmt.Sprintf("- %d -", pageNo)),
-				boxes.Glue(0, 1, 1, 1, 1),
-			),
-			boxes.Kern(18),
-		)
-		pageBody := p.VBoxTo(paperHeight, pageList...)
-		withMargins := boxes.HBoxTo(paperWidth, boxes.Kern(leftMargin), pageBody)
+	}
+	if info.UnitsPerEm != 1000 {
+		parts = append(parts, fmt.Sprintf("%d/em", info.UnitsPerEm))
+	}
+	subTitle := strings.Join(parts, ", ")
 
-		page, err := graphics.NewPage(w)
-		if err != nil {
-			return err
+	var seq []glyph.Info
+	total := 0.
+	for gid := 0; gid < info.NumGlyphs() && len(seq) < 256; gid++ {
+		if info.GlyphExtent(glyph.ID(gid)).IsZero() {
+			continue
 		}
-
-		withMargins.Draw(page, 0, withMargins.Extent().Depth)
-
-		dict, err := page.Close()
-		if err != nil {
-			return err
+		w := info.GlyphWidth(glyph.ID(gid))
+		wf := X.ToPDF16(24, w)
+		if total+wf > f.textWidth {
+			break
 		}
-		_, err = tree.AppendPage(dict)
-		if err != nil {
-			return err
-		}
-
-		body = body[:0]
-		pageNo++
-
-		return nil
+		seq = append(seq, glyph.Info{
+			Gid:     glyph.ID(gid),
+			Advance: w,
+		})
+		total += wf
 	}
 
-	var totalHeight float64
-	for box := range c {
-		ext := box.Extent()
-		h := ext.Height + ext.Depth
-		if len(body) > 0 && totalHeight+h > maxHeight {
-			err := flush()
-			if err != nil {
-				return err
-			}
-			totalHeight = 0
-		}
-		body = append(body, box)
-		totalHeight += h
-	}
-	return flush()
+	f.MakeSpace(totalPartHeight)
+
+	page := f.page
+	page.BeginText()
+	page.StartLine(f.margin, f.margin+f.textHeight-f.used-v1)
+	page.SetFont(bodyFont, 10)
+	page.ShowText(subTitle)
+	page.StartLine(0, -v2)
+	page.SetFont(bodyFont, 7)
+	page.ShowText(fileName)
+	page.StartLine(0, -v3)
+	page.SetFont(X, 24)
+	page.ShowGlyphs(seq)
+	page.EndText()
+
+	f.used += totalPartHeight
+
+	return nil
 }
