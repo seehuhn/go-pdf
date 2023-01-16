@@ -89,7 +89,10 @@ func main() {
 	fileNames = append(fileNames, flag.Args()...)
 
 	title := fmt.Sprintf("%d Font Samples", len(fileNames))
-	f.AddTitle(title, 10, 0, 24)
+	err = f.AddTitle(title, 10, 0, 24)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for _, fileName := range fileNames {
 		r, err := os.Open(fileName)
@@ -258,7 +261,10 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Info) error {
 		total += wf
 	}
 
-	f.MakeSpace(totalPartHeight)
+	err = f.MakeSpace(totalPartHeight)
+	if err != nil {
+		return err
+	}
 
 	page := f.page
 	page.BeginText()

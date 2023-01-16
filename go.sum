@@ -11,5 +11,5 @@ golang.org/x/text v0.6.0 h1:3XmdazWV+ubf7QgHSTWeykHOci5oeekaGJBLkrkaw4k=
 golang.org/x/text v0.6.0/go.mod h1:mrYo+phRRbMaCq/xk9113O4dZlRixOauAjOtrjsXDZ8=
 seehuhn.de/go/dijkstra v0.9.2 h1:mu4jjs96BmNty4L6pZHepUdkWB8OmUNT6bjkiZjO4F4=
 seehuhn.de/go/dijkstra v0.9.2/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
-seehuhn.de/go/sfnt v0.0.0-20230112140415-1856ca7ed9fc h1:eFfTvNWv9tw8e0BhMHQBPzjIWJcZkAMycf0daXwXorw=
-seehuhn.de/go/sfnt v0.0.0-20230112140415-1856ca7ed9fc/go.mod h1:xund9dDSlWxfSBWx2SwuuJH8HGmMYWf+RrJNAU4d0SE=
+seehuhn.de/go/sfnt v0.0.0-20230116154855-e7ed0e1f4172 h1:ClpRFVUGyVWOY9+7wi2WUS+TaBgIvR62c3yoYzBU0Ps=
+seehuhn.de/go/sfnt v0.0.0-20230116154855-e7ed0e1f4172/go.mod h1:xund9dDSlWxfSBWx2SwuuJH8HGmMYWf+RrJNAU4d0SE=

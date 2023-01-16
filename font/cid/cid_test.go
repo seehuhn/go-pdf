@@ -32,7 +32,7 @@ func TestCID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := EmbedFile(w, "../../font/otf/SourceSerif4-Regular.otf", "F", language.AmericanEnglish)
+	F, err := EmbedFile(w, "../../../otf/SourceSerif4-Regular.otf", "F", language.AmericanEnglish)
 	if err != nil {
 		t.Fatal(err)
 	}

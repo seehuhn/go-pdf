@@ -21,7 +21,7 @@ import (
 	"testing"
 	"unicode"
 
-	"seehuhn.de/go/pdf/font/names"
+	"seehuhn.de/go/sfnt/type1/names"
 )
 
 // OldEncoding describes the correspondence between character codes and unicode

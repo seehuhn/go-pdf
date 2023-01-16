@@ -23,8 +23,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/type1/names"
 )
 
 // Embed returns a Font structure representing one of the 14 builtin fonts.

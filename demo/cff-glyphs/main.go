@@ -35,9 +35,9 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/font/names"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/sfnt/type1/names"
 )
 
 const (
