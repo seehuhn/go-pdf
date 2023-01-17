@@ -29,8 +29,10 @@ import (
 )
 
 // Object represents an object in a PDF file.  There are nine native types of
-// PDF objects, which implement this interface: Array, Bool, Dict, Integer,
-// Name, Real, Reference, Stream, and String.
+// PDF objects, which implement this interface: [Array], [Bool], [Dict],
+// [Integer], [Name], [Real], [Reference], [Stream], and [String].
+// Custom types can be constructed of these basic types, by implementing the
+// Object interface.
 type Object interface {
 	// PDF writes the PDF file representation of the object to w.
 	PDF(w io.Writer) error
@@ -39,7 +41,7 @@ type Object interface {
 // Bool represents a boolean value in a PDF file.
 type Bool bool
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x Bool) PDF(w io.Writer) error {
 	var s string
 	if x {
@@ -54,7 +56,7 @@ func (x Bool) PDF(w io.Writer) error {
 // Integer represents an integer constant in a PDF file.
 type Integer int64
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x Integer) PDF(w io.Writer) error {
 	s := strconv.FormatInt(int64(x), 10)
 	_, err := w.Write([]byte(s))
@@ -64,7 +66,7 @@ func (x Integer) PDF(w io.Writer) error {
 // Real represents an real number in a PDF file.
 type Real float64
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x Real) PDF(w io.Writer) error {
 	s := strconv.FormatFloat(float64(x), 'f', -1, 64)
 	if !strings.Contains(s, ".") {
@@ -78,7 +80,7 @@ func (x Real) PDF(w io.Writer) error {
 // if any, is determined by the context.
 type String []byte
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x String) PDF(w io.Writer) error {
 	l := []byte(x)
 
@@ -231,10 +233,10 @@ func Date(t time.Time) String {
 	return String(s)
 }
 
-// Name represents a name in a PDF file.
+// Name represents a name object in a PDF file.
 type Name string
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x Name) PDF(w io.Writer) error {
 	l := []byte(x)
 
@@ -283,7 +285,7 @@ func (x Array) String() string {
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x Array) PDF(w io.Writer) error {
 	_, err := w.Write([]byte("["))
 	if err != nil {
@@ -320,7 +322,7 @@ func (x Dict) String() string {
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x Dict) PDF(w io.Writer) error {
 	if x == nil {
 		_, err := w.Write([]byte("null"))
@@ -411,7 +413,7 @@ func (x *Stream) String() string {
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x *Stream) PDF(w io.Writer) error {
 	err := x.Dict.PDF(w)
 	if err != nil {
@@ -540,7 +542,7 @@ func (x *Reference) String() string {
 	return strings.Join(res, "")
 }
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x *Reference) PDF(w io.Writer) error {
 	var err error
 	if x == nil {

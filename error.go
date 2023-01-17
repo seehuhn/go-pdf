@@ -65,7 +65,7 @@ func (err *MalformedFileError) Unwrap() error {
 }
 
 // VersionError is returned when trying to use a feature in a PDF file which is
-// not supported by the PDF version used. Use Writer.CheckVersion to create
+// not supported by the PDF version used.  Use [Writer.CheckVersion] to create
 // VersionError objects.
 type VersionError struct {
 	Operation string

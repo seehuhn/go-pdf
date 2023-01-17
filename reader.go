@@ -25,8 +25,8 @@ import (
 	"strconv"
 )
 
-// Reader represents a pdf file opened for reading. Use the function Open() or
-// NewReader() to create a new Reader.
+// Reader represents a pdf file opened for reading. Use the functions [Open] or
+// [NewReader] to create a new Reader.
 type Reader struct {
 	// Version is the PDF version used in this file.  This is specified in
 	// the initial comment at the start of the file, and may be overridden by
@@ -59,11 +59,11 @@ type Reader struct {
 // authentication attempt has try == 0.  If the returned password was wrong,
 // the function is called again, repeatedly, with sequentially increasing
 // values of try.  If the ReadPwdFunc return the empty string, the
-// authentication attempt is aborted and an AuthenticationError is reported to
+// authentication attempt is aborted and an [AuthenticationError] is reported to
 // the caller.
 type ReadPwdFunc func(ID []byte, try int) string
 
-// Open opens the named PDF file for reading.  After use, Close() must be
+// Open opens the named PDF file for reading.  After use, [Reader.Close] must be
 // called to close the file the Reader is reading from.
 func Open(fname string) (*Reader, error) {
 	fd, err := os.Open(fname)
@@ -143,10 +143,10 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 }
 
 // AuthenticateOwner tries to authenticate the owner of a document. If a
-// password is required, this calls the `readPwd()` function specified in the
-// call to `NewReader()`.  The return value is nil if the owner was
-// authenticated (or if no authentication is required), and ErrNoAuth if the
-// required password was not supplied.
+// password is required, this calls the readPwd function specified in the call
+// to [NewReader].  The return value is nil if the owner was authenticated (or
+// if no authentication is required), and an object of type
+// [AuthenticationError] if the required password was not supplied.
 func (r *Reader) AuthenticateOwner() error {
 	if r.enc == nil || r.enc.sec.OwnerAuthenticated {
 		return nil
@@ -156,8 +156,8 @@ func (r *Reader) AuthenticateOwner() error {
 }
 
 // Close closes the file underlying the reader.  This call only has an effect
-// if the io.ReaderAt passed to NewReader() has a Close() method, or if the
-// Reader was created using Open().  Otherwise, Close() has no effect and
+// if the io.ReaderAt passed to [NewReader] has a Close method, or if the
+// Reader was created using [Open].  Otherwise, Close has no effect and
 // returns nil.
 func (r *Reader) Close() error {
 	closer, ok := r.r.(io.Closer)
@@ -167,7 +167,7 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// GetInfo returns the PDF Info dictionary for the file.
+// GetInfo reads the PDF /Info dictionary for the file.
 // If no Info dictionary is present, nil is returned.
 func (r *Reader) GetInfo() (*Info, error) {
 	infoObj := r.trailer["Info"]
@@ -188,15 +188,16 @@ func (r *Reader) GetInfo() (*Info, error) {
 
 // ReadSequential returns the objects in a PDF file in the order they are
 // stored in the file.  When the end of file has been reached, io.EOF is
-// returned.  The read position is not affected by other methods of the Reader,
-// sequential access can safely be interspersed with calls to `Resolve()`.
+// returned.
 //
 // The function returns the next object in the file, together with a Reference
-// which can be used to read the object using `Resolve()`.
+// which can be used to read the object using [Reder.Resolce].  The read
+// position is not affected by other methods of the Reader, sequential access
+// can safely be interspersed with calls to [Reader.Resolve].
 //
 // ReadSequential makes some effort to repair problems in corrupted or
-// malformed PDF files.  In particular, it may still work when the `Resolve()`
-// method fails with errors.
+// malformed PDF files.  In particular, it may still work when the
+// [Reader.Resolve] method fails with errors.
 func (r *Reader) ReadSequential() (Object, *Reference, error) {
 	s := r.scannerAt(r.pos)
 
@@ -304,7 +305,7 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 
 // Resolve resolves references to indirect objects.
 //
-// If obj is of type *Reference, the function loads the corresponding object
+// If obj is of type [*Reference], the function loads the corresponding object
 // from the file and returns the result.  Otherwise, obj is returned unchanged.
 func (r *Reader) Resolve(obj Object) (Object, error) {
 	return r.doGet(obj, true)

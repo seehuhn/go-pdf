@@ -28,7 +28,7 @@ import (
 )
 
 // Writer represents a PDF file open for writing.
-// Use the functions Create() or NewWriter() to create a new Writer.
+// Use the functions [Create] or [NewWriter] to create a new Writer.
 type Writer struct {
 	// Version is the PDF version used in this file.  This field is
 	// read-only.  Use the opt argument of NewWriter to set the PDF version for
@@ -73,10 +73,10 @@ var defaultOptions = &WriterOptions{
 
 // Create creates the named PDF file and opens it for output.  If a previous
 // file with the same name exists, it is overwritten.  After writing is
-// complete, Close() must be called to write the trailer and to close the
+// complete, [Writer.Close] must be called to write the trailer and to close the
 // underlying file.
 //
-// If non-default settings are required, NewWriter() can be used to set
+// If non-default settings are required, [NewWriter] can be used to set
 // options.
 func Create(name string) (*Writer, error) {
 	fd, err := os.Create(name)
@@ -93,8 +93,9 @@ func Create(name string) (*Writer, error) {
 
 // NewWriter prepares a PDF file for writing.
 //
-// The .Close() method must be called after the file contents have been
-// written.  It is the callers responsibility, to close the writer w after
+// The [Writer.Close] method must be called after the file contents have been
+// written, to add the trailer and the cross reference table to the PDF file.
+// It is the callers responsibility, to close the writer w after
 // the pdf.Writer has been closed.
 func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
@@ -292,8 +293,6 @@ func (pdf *Writer) OnClose(callback func(*Writer) error) {
 }
 
 // SetInfo sets the Document Information Dictionary for the file.
-// The Document Information Dictionary is documented in section 14.3.3 of PDF
-// 32000-1:2008.
 func (pdf *Writer) SetInfo(info *Info) {
 	info2 := *info
 	pdf.info = &info2
@@ -646,10 +645,9 @@ func (w *streamWriter) Close() error {
 }
 
 // A Placeholder can be used to reserve space in a PDF file where some value
-// can be filled in later.  This is for example used to store the content
-// length of a compressed stream in the stream dictionary. Placeholer objects
-// are created using Writer.NewPlaceholder(). As soon as the value is known, it
-// can be filled in using the Set() method.
+// can be filled in later.  This is, for example, used to store the content
+// length of a compressed stream in a PDF stream dictionary.  Placeholer
+// objects are created using [Writer.NewPlaceholder].
 type Placeholder struct {
 	value []byte
 	size  int
@@ -661,8 +659,8 @@ type Placeholder struct {
 
 // NewPlaceholder creates a new placeholder for a value which is not yet known.
 // The argument size must be an upper bound to the length of the replacement
-// text.  Once the value becomes known, it can be filled in using the Set()
-// method.
+// text.  Once the value becomes known, it can be filled in using the
+// [Placeholder.Set] method.
 func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
 	return &Placeholder{
 		size: size,
@@ -670,7 +668,7 @@ func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
 	}
 }
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x *Placeholder) PDF(w io.Writer) error {
 	// method 1: If the value is already known, we can just write it to the
 	// file.
@@ -756,7 +754,7 @@ func (x *Placeholder) Set(val Object) error {
 
 // CheckVersion checks whether the PDF file being written has version
 // minVersion or later.  If the version is new enough, nil is returned.
-// Otherwise a VersionError for the given operation is returned.
+// Otherwise a [VersionError] for the given operation is returned.
 func (pdf *Writer) CheckVersion(operation string, minVersion Version) error {
 	if pdf.Version >= minVersion {
 		return nil

@@ -887,6 +887,8 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 
 // Perm describes which operations are permitted when accessing the document
 // with User access (but not Owner access).
+// This library just reports the permissions as specified in the PDF file.
+// It is up to the caller to enforce the permissions.
 type Perm int
 
 const (

@@ -95,8 +95,8 @@ fieldLoop:
 
 // Decode initialises a tagged struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
-// The function get(), if non-nil, is used to resolve references to indirect
-// objects, where needed; the `Reader.Resolve()` method can be used for this
+// The function get, if non-nil, is used to resolve references to indirect
+// objects, where needed; the [Reader.Resolve] method can be used for this
 // argument.
 func (d Dict) Decode(s interface{}, get func(Object) (Object, error)) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
@@ -243,10 +243,8 @@ var (
 	timeType    = reflect.TypeOf(time.Time{})
 )
 
-// Catalog represents a PDF Document Catalog. This can be used together with
-// the `Struct()` function to construct the argument for
-// `Writer.SetCatalog()`. The only required field in this structure is
-// `Pages`, which specifies the root of the page tree.
+// Catalog represents a PDF Document Catalog.  The only required field in this
+// structure is Pages, which specifies the root of the page tree.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 type Catalog struct {
@@ -282,10 +280,6 @@ type Catalog struct {
 }
 
 // Info represents a PDF Document Information Dictionary.
-//
-// This can be used together with the `Struct() function to construct
-// the argument for `Writer.SetInfo()`.
-//
 // All fields in this structure are optional.
 //
 // The Document Information Dictionary is documented in section
@@ -304,7 +298,7 @@ type Info struct {
 	Custom map[string]string `pdf:"extra"`
 }
 
-// Resources describes a PDF Resource Dictionary
+// Resources describes a PDF Resource Dictionary.
 // See section 7.8.3 of PDF 32000-1:2008 for details.
 // TODO(voss): use []*font.Font for the .Font field?
 type Resources struct {

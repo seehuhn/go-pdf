@@ -22,7 +22,7 @@
 // images and so on.  Subpackages implement support to produce PDF files
 // representing pages of text and images.
 //
-// A `Reader` can be used to read objects from an existing PDF file:
+// A [Reader] can be used to read objects from an existing PDF file:
 //
 //	r, err := pdf.Open("in.pdf")
 //	if err != nil {
@@ -31,7 +31,7 @@
 //	defer r.Close()
 //	... use r.Catalog to locate objects in the file ...
 //
-// A `Writer` can be used to write objects to a new PDF file:
+// A [Writer] can be used to write objects to a new PDF file:
 //
 //	w, err := pdf.Create("out.pdf")
 //	if err != nil {
@@ -40,12 +40,7 @@
 //
 //	... add objects to the document using w.Write() and w.OpenStream() ...
 //
-//	err = w.SetCatalog(pdf.Struct(&pdf.Catalog{
-//	    Pages: pages,
-//	}))
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
+//	w.Catalog.Pages = ... // set the page tree
 //
 //	err = out.Close()
 //	if err != nil {
@@ -53,15 +48,6 @@
 //	}
 //
 // The following classes represent the native PDF object types.  All of these
-// implement the `pdf.Object` interface:
-//
-//	Array
-//	Bool
-//	Dict
-//	Integer
-//	Name
-//	Real
-//	Reference
-//	Stream
-//	String
+// implement the [Object] interface: [Array], [Bool], [Dict], [Integer],
+// [Name], [Real], [Reference], [Stream], [String].
 package pdf

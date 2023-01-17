@@ -27,7 +27,7 @@ import (
 // A Number is either an Integer or a Real.
 type Number float64
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (x Number) PDF(w io.Writer) error {
 	var obj Object
 	if i := Integer(x); Number(i) == x {
@@ -45,7 +45,7 @@ type Rectangle struct {
 	LLx, LLy, URx, URy float64
 }
 
-// PDF implements the Object interface.
+// PDF implements the [Object] interface.
 func (rect *Rectangle) PDF(w io.Writer) error {
 	res := Array{}
 	for _, x := range []float64{rect.LLx, rect.LLy, rect.URx, rect.URy} {
@@ -64,7 +64,7 @@ func (rect *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
 		math.Abs(rect.URy-other.URy) < eps)
 }
 
-// IsZero is true if the glyph leaves no marks on the page.
+// IsZero is true if the rectangle is the zero rectangle object.
 func (rect Rectangle) IsZero() bool {
 	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
 }
