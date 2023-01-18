@@ -74,3 +74,5 @@ func (c gray) SetFill(w io.Writer) error {
 	_, err := fmt.Fprintln(w, gString, "g")
 	return err
 }
+
+var Default = gray(0) // black in the /DeviceGray color space

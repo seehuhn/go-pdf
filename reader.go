@@ -124,7 +124,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 	}
 
 	root := trailer["Root"]
-	catalogDict, err := r.GetDict(root, "")
+	catalogDict, err := r.GetDict(root)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (r *Reader) GetInfo() (*Info, error) {
 	if infoObj == nil {
 		return nil, nil
 	}
-	infoDict, err := r.GetDict(infoObj, "")
+	infoDict, err := r.GetDict(infoObj)
 	if err != nil {
 		return nil, err
 	}
@@ -458,32 +458,6 @@ func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error
 	return contents.s.ReadObject()
 }
 
-// GetDict resolves references to indirect objects and makes sure the resulting
-// object is a dictionary.  If Type is not the empty string, the /Type entry of
-// the dictionary is checked to match.
-func (r *Reader) GetDict(obj Object, Type Name) (Dict, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-	val, ok := candidate.(Dict)
-	if !ok {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: errors.New("wrong object type (expected Dict)"),
-		}
-	}
-
-	if Type != "" && val["Type"] != Type {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: fmt.Errorf("wrong dictonary /Type, expected %s, got %s", Type, val["Type"]),
-		}
-	}
-
-	return val, nil
-}
-
 // getInt resolves references to indirect objects and makes sure the resulting
 // object is an Integer.
 func (r *Reader) getInt(obj Object) (Integer, error) {
@@ -498,6 +472,42 @@ func (r *Reader) getInt(obj Object) (Integer, error) {
 			Err: errors.New("wrong object type (expected Integer)"),
 		}
 	}
+	return val, nil
+}
+
+// GetDict resolves references to indirect objects and makes sure the resulting
+// object is a dictionary.
+func (r *Reader) GetDict(obj Object) (Dict, error) {
+	candidate, err := r.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+	val, ok := candidate.(Dict)
+	if !ok {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: fmt.Errorf("wrong object type: expected Dict, got %T", candidate),
+		}
+	}
+
+	return val, nil
+}
+
+// GetArray resolves references to indirect objects and makes sure the resulting
+// object is an array.
+func (r *Reader) GetArray(obj Object) (Array, error) {
+	candidate, err := r.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+	val, ok := candidate.(Array)
+	if !ok {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: fmt.Errorf("wrong object type: expected Array, got %T", candidate),
+		}
+	}
+
 	return val, nil
 }
 

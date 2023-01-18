@@ -37,7 +37,7 @@ type encryptInfo struct {
 }
 
 func (r *Reader) parseEncryptDict(encObj Object, readPwd ReadPwdFunc) (*encryptInfo, error) {
-	enc, err := r.GetDict(encObj, "")
+	enc, err := r.GetDict(encObj)
 	if err != nil {
 		return nil, err
 	}

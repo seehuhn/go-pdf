@@ -567,7 +567,7 @@ func (w *withClose) Close() error {
 
 type filter interface {
 	ToDict() Dict
-	// TODO(voss): should Encode take a io.Writer instead?
+	// TODO(voss): should Encode take an io.Writer instead?
 	// TODO(voss): can Encode really return an error?
 	Encode(w io.WriteCloser) (io.WriteCloser, error)
 	Decode(r io.Reader) (io.Reader, error)

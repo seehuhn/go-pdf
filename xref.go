@@ -186,6 +186,7 @@ func readXRefTable(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		err = s.SkipWhiteSpace()
 		if err != nil {
 			return nil, err
@@ -277,7 +278,13 @@ func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) erro
 			}
 		}
 
-		s.pos += 20
+		if buf[19] == '\n' || buf[19] == '\r' {
+			s.pos += 20
+		} else {
+			// Some mal-formed PDF files use one-byte line endings.
+			// Try to fix this up ...
+			s.pos += 19
+		}
 	}
 	return nil
 }
