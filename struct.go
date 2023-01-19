@@ -178,6 +178,8 @@ fieldLoop:
 				vString = string(x)
 			case String:
 				vString = x.AsTextString()
+			case Real:
+				vString = fmt.Sprintf("%.1f", x)
 			default:
 				if firstErr == nil {
 					firstErr = fmt.Errorf("/%s: expected pdf.Name but got %T",

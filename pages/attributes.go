@@ -74,10 +74,8 @@ const (
 )
 
 // Default paper sizes as PDF rectangles.
-// TODO(voss): should these be rounded to integers?
 var (
-	A4     = &pdf.Rectangle{URx: 595.275, URy: 841.889}
-	A5     = &pdf.Rectangle{URx: 419.527, URy: 595.275}
+	A4     = &pdf.Rectangle{URx: 595.276, URy: 841.890}
+	A5     = &pdf.Rectangle{URx: 420.945, URy: 595.276}
 	Letter = &pdf.Rectangle{URx: 612, URy: 792}
-	Legal  = &pdf.Rectangle{URx: 612, URy: 1008}
 )

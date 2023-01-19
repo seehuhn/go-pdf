@@ -138,3 +138,18 @@ func TestStructVersion(t *testing.T) {
 		t.Errorf("invalid type not detected")
 	}
 }
+
+func TestDecodeVersion(t *testing.T) {
+	for _, version := range []Object{Name("1.5"), Real(1.5), String("1.5")} {
+		res := &Catalog{}
+		dict := Dict{"Version": version, "Pages": &Reference{}}
+		err := dict.Decode(res, nil)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		if res.Version != V1_5 {
+			t.Errorf("wrong version: %s", res.Version)
+		}
+	}
+}
