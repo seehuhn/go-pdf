@@ -458,9 +458,9 @@ func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error
 	return contents.s.ReadObject()
 }
 
-// getInt resolves references to indirect objects and makes sure the resulting
+// GetInt resolves references to indirect objects and makes sure the resulting
 // object is an Integer.
-func (r *Reader) getInt(obj Object) (Integer, error) {
+func (r *Reader) GetInt(obj Object) (Integer, error) {
 	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return 0, err
@@ -511,6 +511,29 @@ func (r *Reader) GetArray(obj Object) (Array, error) {
 	return val, nil
 }
 
+// GetRectangle resolves references to indirect objects and makes sure the
+// resulting object is a PDF rectangle object.
+// If the object is null, nil is returned.
+func (r *Reader) GetRectangle(obj Object) (*Rectangle, error) {
+	candidate, err := r.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+	if candidate == nil {
+		return nil, nil
+	}
+
+	val, ok := candidate.(Array)
+	if !ok && len(val) != 4 {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: fmt.Errorf("wrong object type: expected Rectangle, got %T", candidate),
+		}
+	}
+
+	return val.AsRectangle()
+}
+
 // getName resolves references to indirect objects and makes sure the resulting
 // object is a Name.
 func (r *Reader) getName(obj Object) (Name, error) {
@@ -557,7 +580,7 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 		}
 	}
 	r.level++
-	val, err := r.getInt(obj)
+	val, err := r.GetInt(obj)
 	r.level--
 	return val, err
 }

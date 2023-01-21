@@ -272,7 +272,7 @@ func TestPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lengthOut, err := r.getInt(obj["Length"])
+	lengthOut, err := r.GetInt(obj["Length"])
 	if err != nil {
 		t.Fatal(err)
 	}

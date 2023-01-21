@@ -20,6 +20,7 @@ package pdf
 // of the elementary types from "objects.go".
 
 import (
+	"fmt"
 	"io"
 	"math"
 )
@@ -45,6 +46,10 @@ type Rectangle struct {
 	LLx, LLy, URx, URy float64
 }
 
+func (rect *Rectangle) String() string {
+	return fmt.Sprintf("[%.2f %.2f %.2f %.2f]", rect.LLx, rect.LLy, rect.URx, rect.URy)
+}
+
 // PDF implements the [Object] interface.
 func (rect *Rectangle) PDF(w io.Writer) error {
 	res := Array{}
@@ -55,6 +60,11 @@ func (rect *Rectangle) PDF(w io.Writer) error {
 	return res.PDF(w)
 }
 
+// IsZero is true if the rectangle is the zero rectangle object.
+func (rect Rectangle) IsZero() bool {
+	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
+}
+
 // NearlyEqual reports whether the corner coordinates of two rectangles
 // differ by less than `eps`.
 func (rect *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
@@ -62,11 +72,6 @@ func (rect *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
 		math.Abs(rect.LLy-other.LLy) < eps &&
 		math.Abs(rect.URx-other.URx) < eps &&
 		math.Abs(rect.URy-other.URy) < eps)
-}
-
-// IsZero is true if the rectangle is the zero rectangle object.
-func (rect Rectangle) IsZero() bool {
-	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
 }
 
 // Extend enlarges the rectangle to also cover `other`.
@@ -91,3 +96,56 @@ func (rect *Rectangle) Extend(other *Rectangle) {
 		rect.URy = other.URy
 	}
 }
+
+// PageRotation describes how a page shall be rotated when displayed or
+// printed.  The possible values are [RotateInherit], [Rotate0], [Rotate90],
+// [Rotate180], [Rotate270].
+type PageRotation int
+
+func DecodeRotation(rot Integer) (PageRotation, error) {
+	rot = rot % 360
+	if rot < 0 {
+		rot += 360
+	}
+	switch rot {
+	case 0:
+		return Rotate0, nil
+	case 90:
+		return Rotate90, nil
+	case 180:
+		return Rotate180, nil
+	case 270:
+		return Rotate270, nil
+	default:
+		return 0, errNoRotation
+	}
+}
+
+func (r PageRotation) ToPDF() Integer {
+	switch r {
+	case Rotate0:
+		return 0
+	case Rotate90:
+		return 90
+	case Rotate180:
+		return 180
+	case Rotate270:
+		return 270
+	default:
+		return 0
+	}
+}
+
+// Valid values for PageRotation.
+//
+// We can't use the pdf integer values directly, because then
+// we could not tell apart 0 degree rotations from unspecified
+// rotations.
+const (
+	RotateInherit PageRotation = iota // use inherited value
+
+	Rotate0   // don't rotate
+	Rotate90  // rotate 90 degrees clockwise
+	Rotate180 // rotate 180 degrees clockwise
+	Rotate270 // rotate 270 degrees clockwise
+)

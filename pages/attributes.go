@@ -38,7 +38,7 @@ type InheritableAttributes struct {
 
 	// Rotate describes how the page shall be rotated when displayed or
 	// printed.  Default value: RotateInherit.
-	Rotate PageRotation
+	Rotate pdf.PageRotation
 }
 
 func mergeAttributes(dict pdf.Dict, attr *InheritableAttributes) {
@@ -53,25 +53,10 @@ func mergeAttributes(dict pdf.Dict, attr *InheritableAttributes) {
 	if attr.CropBox != nil && dict["CropBox"] == nil {
 		dict["CropBox"] = attr.CropBox
 	}
-	if attr.Rotate != RotateInherit && dict["Rotate"] == nil {
-		dict["Rotate"] = pdf.Integer(attr.Rotate)
+	if attr.Rotate != pdf.RotateInherit && dict["Rotate"] == nil {
+		dict["Rotate"] = attr.Rotate.ToPDF()
 	}
 }
-
-// PageRotation describes how a page shall be rotated when displayed or
-// printed.  The possible values are [RotateInherit], [Rotate0], [Rotate90],
-// [Rotate180], [Rotate270].
-type PageRotation int
-
-// Valid values for PageRotation.
-const (
-	RotateInherit PageRotation = iota // use inherited value
-
-	Rotate0   // don't rotate
-	Rotate90  // rotate 90 degrees clockwise
-	Rotate180 // rotate 180 degrees clockwise
-	Rotate270 // rotate 270 degrees clockwise
-)
 
 // Default paper sizes as PDF rectangles.
 var (
