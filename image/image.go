@@ -105,7 +105,7 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref *pdf.Reference) (*pdf.Refere
 		return nil, err
 	}
 
-	// TODO(voss): is there a more appropriate compression type the mask?
+	// TODO(voss): is there a more appropriate compression type for the mask?
 	filter = &pdf.FilterInfo{
 		Name: "FlateDecode",
 		Parms: pdf.Dict{
