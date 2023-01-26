@@ -95,20 +95,10 @@ func main() {
 	}
 
 	for _, fileName := range fileNames {
-		r, err := os.Open(fileName)
+		info, err := sfnt.ReadFile(fileName)
 		if err != nil {
 			log.Print(fileName + ":" + err.Error())
 			continue
-		}
-		info, err := sfnt.Read(r)
-		if err != nil {
-			log.Print(fileName + ":" + err.Error())
-			r.Close()
-			continue
-		}
-		err = r.Close()
-		if err != nil {
-			log.Fatal(err)
 		}
 
 		// disable any interaction between the glyphs
