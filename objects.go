@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -306,34 +305,6 @@ func (x Array) PDF(w io.Writer) error {
 	}
 	_, err = w.Write([]byte("]"))
 	return err
-}
-
-// AsRectangle converts an array of 4 numbers to a Rectangle object.
-// If the array does not have the correct format, an error is returned.
-func (x Array) AsRectangle() (*Rectangle, error) {
-	if len(x) != 4 {
-		return nil, errNoRectangle
-	}
-	values := [4]float64{}
-	for i, obj := range x {
-		switch obj := obj.(type) {
-		case Integer:
-			values[i] = float64(obj)
-		case Number:
-			values[i] = float64(obj)
-		case Real:
-			values[i] = float64(obj)
-		default:
-			return nil, errNoRectangle
-		}
-	}
-	rect := &Rectangle{
-		LLx: math.Min(values[0], values[2]),
-		LLy: math.Min(values[1], values[3]),
-		URx: math.Max(values[0], values[2]),
-		URy: math.Max(values[1], values[3]),
-	}
-	return rect, nil
 }
 
 // Dict represent a Dictionary object in a PDF file.

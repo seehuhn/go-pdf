@@ -39,11 +39,37 @@ func (x Number) PDF(w io.Writer) error {
 	return obj.PDF(w)
 }
 
-// Rectangle represents a PDF rectangle, given by the coordinates of
-// two diagonally opposite corners in a PDF Array.
-// TODO(voss): should the values be integers?
+// Rectangle represents a PDF rectangle.
 type Rectangle struct {
 	LLx, LLy, URx, URy float64
+}
+
+// AsRectangle converts an array of 4 numbers to a Rectangle object.
+// If the array does not have the correct format, an error is returned.
+func (x Array) AsRectangle() (*Rectangle, error) {
+	if len(x) != 4 {
+		return nil, errNoRectangle
+	}
+	values := [4]float64{}
+	for i, obj := range x {
+		switch obj := obj.(type) {
+		case Integer:
+			values[i] = float64(obj)
+		case Number:
+			values[i] = float64(obj)
+		case Real:
+			values[i] = float64(obj)
+		default:
+			return nil, errNoRectangle
+		}
+	}
+	rect := &Rectangle{
+		LLx: math.Min(values[0], values[2]),
+		LLy: math.Min(values[1], values[3]),
+		URx: math.Max(values[0], values[2]),
+		URy: math.Max(values[1], values[3]),
+	}
+	return rect, nil
 }
 
 func (rect *Rectangle) String() string {
