@@ -49,8 +49,8 @@ type Tree struct {
 }
 
 func (t *Tree) checkInvariants() {
-	// TODO(voss): once things have settled, move this function
-	// into the test suite.
+	// TODO(voss): once things have settled, move this function into the test
+	// suite.
 
 	for _, child := range t.children {
 		child.checkInvariants()

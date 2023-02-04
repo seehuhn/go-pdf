@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"golang.org/x/text/language"
 )
 
 // TODO(voss): document the struct tags
@@ -81,6 +83,11 @@ fieldLoop:
 			}
 		case fInfo.Type == timeType:
 			res[key] = Date(fVal.Interface().(time.Time))
+		case fInfo.Type == languageType:
+			tag := fVal.Interface().(language.Tag)
+			if !tag.IsRoot() {
+				res[key] = TextString(tag.String())
+			}
 		case fVal.Kind() == reflect.Bool:
 			res[key] = Bool(fVal.Bool())
 		default:
@@ -206,6 +213,21 @@ fieldLoop:
 				firstErr = fmt.Errorf("/%s: expected pdf.String but got %T",
 					fInfo.Name, dictVal)
 			}
+		case fInfo.Type == languageType:
+			s, ok := dictVal.(String)
+			if ok {
+				tagString := s.AsTextString()
+				tag, err := language.Parse(tagString)
+				if err == nil {
+					fVal.Set(reflect.ValueOf(tag))
+				} else if firstErr == nil {
+					firstErr = fmt.Errorf("/%s: %s: %s",
+						fInfo.Name, tagString, err)
+				}
+			} else if firstErr == nil {
+				firstErr = fmt.Errorf("/%s: expected pdf.String but got %T",
+					fInfo.Name, dictVal)
+			}
 		case fInfo.Type.Kind() == reflect.Bool:
 			fVal.SetBool(dictVal == Bool(true))
 		case reflect.TypeOf(dictVal).AssignableTo(fInfo.Type):
@@ -238,11 +260,12 @@ fieldLoop:
 }
 
 var (
-	objectType  = reflect.TypeOf((*Object)(nil)).Elem()
-	refType     = reflect.TypeOf(&Reference{})
-	nameType    = reflect.TypeOf(Name(""))
-	versionType = reflect.TypeOf(V1_7)
-	timeType    = reflect.TypeOf(time.Time{})
+	objectType   = reflect.TypeOf((*Object)(nil)).Elem()
+	refType      = reflect.TypeOf(&Reference{})
+	nameType     = reflect.TypeOf(Name(""))
+	versionType  = reflect.TypeOf(V1_7)
+	timeType     = reflect.TypeOf(time.Time{})
+	languageType = reflect.TypeOf(language.Tag{})
 )
 
 // Catalog represents a PDF Document Catalog.  The only required field in this
@@ -254,31 +277,31 @@ type Catalog struct {
 	Version           Version  `pdf:"optional"`
 	Extensions        Object   `pdf:"optional"`
 	Pages             *Reference
-	PageLabels        Object     `pdf:"optional"`
-	Names             Object     `pdf:"optional"`
-	Dests             Object     `pdf:"optional"`
-	ViewerPreferences Object     `pdf:"optional"`
-	PageLayout        Name       `pdf:"optional"`
-	PageMode          Name       `pdf:"optional"`
-	Outlines          *Reference `pdf:"optional"`
-	Threads           *Reference `pdf:"optional"`
-	OpenAction        Object     `pdf:"optional"`
-	AA                Object     `pdf:"optional"`
-	URI               Object     `pdf:"optional"`
-	AcroForm          Object     `pdf:"optional"`
-	MetaData          *Reference `pdf:"optional"`
-	StructTreeRoot    Object     `pdf:"optional"`
-	MarkInfo          Object     `pdf:"optional"`
-	Lang              string     `pdf:"text string,optional"` // TODO(voss): use language.Tag?
-	SpiderInfo        Object     `pdf:"optional"`
-	OutputIntents     Object     `pdf:"optional"`
-	PieceInfo         Object     `pdf:"optional"`
-	OCProperties      Object     `pdf:"optional"`
-	Perms             Object     `pdf:"optional"`
-	Legal             Object     `pdf:"optional"`
-	Requirements      Object     `pdf:"optional"`
-	Collection        Object     `pdf:"optional"`
-	NeedsRendering    bool       `pdf:"optional"`
+	PageLabels        Object       `pdf:"optional"`
+	Names             Object       `pdf:"optional"`
+	Dests             Object       `pdf:"optional"`
+	ViewerPreferences Object       `pdf:"optional"`
+	PageLayout        Name         `pdf:"optional"`
+	PageMode          Name         `pdf:"optional"`
+	Outlines          *Reference   `pdf:"optional"`
+	Threads           *Reference   `pdf:"optional"`
+	OpenAction        Object       `pdf:"optional"`
+	AA                Object       `pdf:"optional"`
+	URI               Object       `pdf:"optional"`
+	AcroForm          Object       `pdf:"optional"`
+	MetaData          *Reference   `pdf:"optional"`
+	StructTreeRoot    Object       `pdf:"optional"`
+	MarkInfo          Object       `pdf:"optional"`
+	Lang              language.Tag `pdf:"optional"`
+	SpiderInfo        Object       `pdf:"optional"`
+	OutputIntents     Object       `pdf:"optional"`
+	PieceInfo         Object       `pdf:"optional"`
+	OCProperties      Object       `pdf:"optional"`
+	Perms             Object       `pdf:"optional"`
+	Legal             Object       `pdf:"optional"`
+	Requirements      Object       `pdf:"optional"`
+	Collection        Object       `pdf:"optional"`
+	NeedsRendering    bool         `pdf:"optional"`
 }
 
 // Info represents a PDF Document Information Dictionary.

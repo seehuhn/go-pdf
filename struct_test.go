@@ -18,6 +18,8 @@ package pdf
 
 import (
 	"testing"
+
+	"golang.org/x/text/language"
 )
 
 func TestCatalog(t *testing.T) {
@@ -151,5 +153,47 @@ func TestDecodeVersion(t *testing.T) {
 		if res.Version != V1_5 {
 			t.Errorf("wrong version: %s", res.Version)
 		}
+	}
+}
+
+func TestDecodeLanguageTag(t *testing.T) {
+	type testStruct struct {
+		Lang language.Tag
+	}
+
+	d1 := Dict{"Lang": TextString("en-GB")}
+	s1 := &testStruct{}
+	err := d1.Decode(s1, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	if s1.Lang != language.BritishEnglish {
+		t.Errorf("wrong language: %s", s1.Lang)
+	}
+}
+
+func TestEncodeLanguageTag(t *testing.T) {
+	type testStruct struct {
+		Lang language.Tag
+	}
+
+	s2 := &testStruct{
+		Lang: language.BrazilianPortuguese,
+	}
+	d2 := AsDict(s2)
+	if s, ok := d2["Lang"].(String); !ok || s.AsTextString() != "pt-BR" {
+		t.Errorf("wrong language: %s", d2["Lang"])
+	}
+}
+
+func TestEmptyLanguageTag(t *testing.T) {
+	type testStruct struct {
+		Lang language.Tag
+	}
+
+	s3 := &testStruct{}
+	d3 := AsDict(s3)
+	if _, present := d3["Lang"]; present {
+		t.Errorf("empty language tag not ignored, got %q", d3["Lang"])
 	}
 }
