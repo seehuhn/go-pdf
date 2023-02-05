@@ -100,6 +100,14 @@ func (rect *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
 		math.Abs(rect.URy-other.URy) < eps)
 }
 
+func (rect *Rectangle) XPos(rel float64) float64 {
+	return rect.LLx + rel*(rect.URx-rect.LLx)
+}
+
+func (rect *Rectangle) YPos(rel float64) float64 {
+	return rect.LLy + rel*(rect.URy-rect.LLy)
+}
+
 // Extend enlarges the rectangle to also cover `other`.
 func (rect *Rectangle) Extend(other *Rectangle) {
 	if other.IsZero() {

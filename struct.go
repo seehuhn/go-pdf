@@ -310,16 +310,38 @@ type Catalog struct {
 // The Document Information Dictionary is documented in section
 // 14.3.3 of PDF 32000-1:2008.
 type Info struct {
-	Title        string    `pdf:"text string,optional"`
-	Author       string    `pdf:"text string,optional"`
-	Subject      string    `pdf:"text string,optional"`
-	Keywords     string    `pdf:"text string,optional"`
-	Creator      string    `pdf:"text string,optional"`
-	Producer     string    `pdf:"text string,optional"`
-	CreationDate time.Time `pdf:"optional"`
-	ModDate      time.Time `pdf:"optional"`
-	Trapped      Name      `pdf:"optional,allowstring"`
+	Title    string `pdf:"text string,optional"`
+	Author   string `pdf:"text string,optional"`
+	Subject  string `pdf:"text string,optional"`
+	Keywords string `pdf:"text string,optional"`
 
+	// Creator gives the name of the application that created the original
+	// document, if the document was converted to PDF from another format.
+	Creator string `pdf:"text string,optional"`
+
+	// Producer gives the name of the application that converted the document,
+	// if the document was converted to PDF from another format.
+	Producer string `pdf:"text string,optional"`
+
+	// CreationDate gives the date and time the document was created.
+	CreationDate time.Time `pdf:"optional"`
+
+	// ModDate gives the date and time the document was most recently modified.
+	ModDate time.Time `pdf:"optional"`
+
+	// Trapped indicates whether the document has been modified to include
+	// trapping information.  (A trap is an overlap between adjacent areas of
+	// of different colours, used to avoid visual problems caused by imprecise
+	// alignment of different layers of ink.) Possible values are:
+	//   * "True": The document has been fully trapped.  No further trapping is
+	//     necessary.
+	//   * "False": The document has not been trapped.
+	//   * "Unknown" (default): Either it is unknown whether the document has
+	//     been trapped, or the document has been partially trapped.  Further
+	//     trapping may be necessary.
+	Trapped Name `pdf:"optional,allowstring"`
+
+	// Custom contains all non-standard fields in the Info dictionary.
 	Custom map[string]string `pdf:"extra"`
 }
 
