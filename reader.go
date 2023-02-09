@@ -493,6 +493,24 @@ func (r *Reader) GetDict(obj Object) (Dict, error) {
 	return val, nil
 }
 
+// GetStream resolves references to indirect objects and makes sure the resulting
+// object is a dictionary.
+func (r *Reader) GetStream(obj Object) (*Stream, error) {
+	candidate, err := r.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+	val, ok := candidate.(*Stream)
+	if !ok {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: fmt.Errorf("wrong object type: expected Stream, got %T", candidate),
+		}
+	}
+
+	return val, nil
+}
+
 // GetArray resolves references to indirect objects and makes sure the resulting
 // object is an array.
 func (r *Reader) GetArray(obj Object) (Array, error) {

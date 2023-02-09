@@ -36,7 +36,10 @@ type Font struct {
 	// OpenType GSUB tables, are applied.
 	Layout func([]rune) glyph.Seq
 
-	Enc func(glyph.ID) pdf.String // TODO(voss): turn this into an append function
+	// Enc maps a glyph ID to a string that can be used in a PDF file.
+	// As a side effect, this function records that the corresponding
+	// glyph must be included in our subset of the font.
+	Enc func(pdf.String, glyph.ID) pdf.String
 
 	UnitsPerEm         uint16
 	Ascent             funit.Int16
@@ -64,7 +67,8 @@ func (font *Font) ToPDF16(fontSize float64, x funit.Int16) float64 {
 
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
-// TODO(voss): remove a structure like boxes.hGlyphs instead?
+// TODO(voss): do we need this function?
+// TODO(voss): return a structure like boxes.hGlyphs instead?
 func (font *Font) Typeset(s string, ptSize float64) glyph.Seq {
 	var runs [][]rune
 	var run []rune

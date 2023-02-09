@@ -81,8 +81,7 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) 
 	}
 
 	s := &fontHandler{
-		FontRef:  w.Alloc(),
-		instName: instName,
+		FontRef: w.Alloc(),
 
 		info:        info,
 		widths:      widths,
@@ -113,8 +112,7 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) 
 }
 
 type fontHandler struct {
-	FontRef  *pdf.Reference
-	instName pdf.Name
+	FontRef *pdf.Reference
 
 	info        *sfnt.Info
 	widths      []funit.Int16
@@ -159,13 +157,13 @@ func (s *fontHandler) Layout(rr []rune) glyph.Seq {
 	return seq
 }
 
-func (s *fontHandler) Enc(gid glyph.ID) pdf.String {
+func (s *fontHandler) Enc(enc pdf.String, gid glyph.ID) pdf.String {
 	var c uint16
 	if gid <= 0xFFFF {
 		c = uint16(gid)
 	}
 	s.used[c] = true
-	return pdf.String{byte(c >> 8), byte(c)}
+	return append(enc, byte(c>>8), byte(c))
 }
 
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {

@@ -83,8 +83,7 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) 
 	}
 
 	s := &fontHandler{
-		FontRef:  w.Alloc(),
-		instName: instName,
+		FontRef: w.Alloc(),
 
 		info:        info,
 		widths:      widths,
@@ -115,8 +114,7 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) 
 }
 
 type fontHandler struct {
-	FontRef  *pdf.Reference
-	instName pdf.Name
+	FontRef *pdf.Reference
 
 	info        *sfnt.Info
 	widths      []funit.Int16
@@ -162,7 +160,7 @@ func (s *fontHandler) Layout(rr []rune) glyph.Seq {
 	return seq
 }
 
-func (s *fontHandler) Enc(gid glyph.ID) pdf.String {
+func (s *fontHandler) Enc(enc pdf.String, gid glyph.ID) pdf.String {
 	c, ok := s.enc[gid]
 	if ok {
 		return pdf.String{c}
@@ -171,7 +169,7 @@ func (s *fontHandler) Enc(gid glyph.ID) pdf.String {
 	c = byte(s.nextCharCode)
 	s.nextCharCode++
 	s.enc[gid] = c
-	return pdf.String{c}
+	return append(enc, c)
 }
 
 // cMapEntry describes the association between a character code and
@@ -184,7 +182,7 @@ type cMapEntry struct {
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	if s.nextCharCode > 256 {
 		return fmt.Errorf("too many different glyphs for simple font %q",
-			s.instName)
+			s.info.FullName())
 	}
 
 	// Determine the subset of glyphs to include.

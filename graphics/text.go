@@ -243,7 +243,7 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 		if int(gid) >= len(font.Widths) {
 			gid = 0
 		}
-		run = append(run, font.Enc(gid)...)
+		run = font.Enc(run, gid)
 
 		xOffset += font.ToPDF16(1000, glyph.Advance-glyph.XOffset-font.Widths[gid])
 	}

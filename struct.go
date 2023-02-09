@@ -220,7 +220,7 @@ fieldLoop:
 				tag, err := language.Parse(tagString)
 				if err == nil {
 					fVal.Set(reflect.ValueOf(tag))
-				} else if firstErr == nil {
+				} else if tagString != "" && firstErr == nil {
 					firstErr = fmt.Errorf("/%s: %s: %s",
 						fInfo.Name, tagString, err)
 				}

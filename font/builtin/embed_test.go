@@ -116,7 +116,7 @@ func TestEnc(t *testing.T) {
 		}
 
 		for i, gid := range gids {
-			s := b.Enc(gid)
+			s := b.Enc(nil, gid)
 			if len(s) != 1 {
 				t.Fatal("wrong number of codes")
 			}

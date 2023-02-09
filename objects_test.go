@@ -85,6 +85,24 @@ func TestDateString(t *testing.T) {
 	}
 }
 
+func TestDecodeDate(t *testing.T) {
+	cases := []string{
+		"D:19981223195200-08'00'",
+		"D:20000101000000Z",
+		"D:20201224163012+01'30'",
+		"D:20010809191510 ", // trailing space, seen in some PDF files
+	}
+	for i, test := range cases {
+		enc := TextString(test)
+		out, err := enc.AsDate()
+		if err != nil {
+			t.Errorf("%d %q %s\n", i, test, err)
+		} else {
+			fmt.Println(out, string(enc))
+		}
+	}
+}
+
 func TestStream(t *testing.T) {
 	dataIn := "\nbinary stream data\000123\n   "
 	rIn := strings.NewReader(dataIn)

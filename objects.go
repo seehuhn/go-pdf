@@ -197,10 +197,14 @@ useUTF:
 // If the string does not have the correct format, an error is returned.
 func (x String) AsDate() (time.Time, error) {
 	s := x.AsTextString()
-	if s == "D:" {
+	if s == "D:" || s == "" {
 		return time.Time{}, nil
 	}
 	s = strings.ReplaceAll(s, "'", "")
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "19") || strings.HasPrefix(s, "20") {
+		s = "D:" + s
+	}
 
 	formats := []string{
 		"D:20060102150405-0700",
@@ -526,6 +530,8 @@ func (x *Stream) Decode(resolve func(Object) (Object, error)) (io.Reader, error)
 }
 
 // Reference represents a reference to an indirect object in a PDF file.
+// TODO(voss): use the struct directly, rather than pointers to the struct?
+// TODO(voss): use a fixed-size type for Number?
 type Reference struct {
 	Number     int
 	Generation uint16

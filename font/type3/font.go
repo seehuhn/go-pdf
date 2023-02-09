@@ -184,11 +184,11 @@ func (t3 *Builder) Embed(instName string) (*font.Font, error) {
 			}
 			return gg
 		},
-		Enc: func(gid glyph.ID) pdf.String {
+		Enc: func(enc pdf.String, gid glyph.ID) pdf.String {
 			if !t3.used[gid] {
 				return nil
 			}
-			return []byte{byte(gid)}
+			return append(enc, byte(gid))
 		},
 		UnitsPerEm: t3.unitsPerEm,
 		// TODO(voss): GlyphExtents etc

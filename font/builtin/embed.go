@@ -69,8 +69,7 @@ func EmbedAfm(w *pdf.Writer, afm *AfmInfo, instName pdf.Name) (*font.Font, error
 }
 
 type simple struct {
-	instName pdf.Name
-	afm      *AfmInfo
+	afm *AfmInfo
 
 	FontRef *pdf.Reference
 
@@ -104,8 +103,7 @@ func newSimple(afm *AfmInfo, fontRef *pdf.Reference, instName pdf.Name) *simple 
 	}
 
 	res := &simple{
-		instName: instName,
-		afm:      afm,
+		afm: afm,
 
 		FontRef: fontRef,
 
@@ -165,10 +163,10 @@ func (fnt *simple) Layout(rr []rune) glyph.Seq {
 	return gg
 }
 
-func (fnt *simple) Enc(gid glyph.ID) pdf.String {
+func (fnt *simple) Enc(enc pdf.String, gid glyph.ID) pdf.String {
 	c, ok := fnt.enc[gid]
 	if ok {
-		return pdf.String{c}
+		return append(enc, c)
 	}
 
 	r := fnt.char[gid]
@@ -201,7 +199,7 @@ func (fnt *simple) Enc(gid glyph.ID) pdf.String {
 		// we try to write the font dictionary at the end.
 		fnt.overflowed = true
 		fnt.enc[gid] = 0
-		return pdf.String{0}
+		return append(enc, 0)
 	}
 
 	fnt.used[c] = true
@@ -214,7 +212,7 @@ func (fnt *simple) Enc(gid glyph.ID) pdf.String {
 		}
 	}
 
-	return pdf.String{c}
+	return append(enc, c)
 }
 
 func (fnt *simple) WriteFont(w *pdf.Writer) error {
@@ -234,9 +232,8 @@ func (fnt *simple) WriteFont(w *pdf.Writer) error {
 		Font["Encoding"] = enc
 	}
 
-	if w.Version == pdf.V1_0 {
-		Font["Name"] = pdf.Name(fnt.instName)
-	}
+	// According to the spec, we need to set the \Name entry for PDF 1.0.
+	// Hopefully, nobody cares about that anymore.
 
 	_, err := w.Write(Font, fnt.FontRef)
 	return err
