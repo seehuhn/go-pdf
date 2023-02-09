@@ -47,6 +47,60 @@ func TestFormat(t *testing.T) {
 	}
 }
 
+func TestParseString(t *testing.T) {
+	type testCase struct {
+		in  string
+		out String
+	}
+	cases := []testCase{
+		{`()`, String(nil)},
+		{"(test string)", String("test string")},
+		{`(hello)`, String("hello")},
+		{`(he(ll)o)`, String("he(ll)o")},
+		{`(he\)ll\(o)`, String("he)ll(o")},
+		{"(hello\n)", String("hello\n")},
+		{"(hello\r)", String("hello\r")},
+		{"(hello\r\n)", String("hello\r\n")},
+		{"(hello\n\r)", String("hello\n\r")},
+		{"(hell\\\no)", String("hello")},
+		{"(hell\\\ro)", String("hello")},
+		{"(hell\\\r\no)", String("hello")},
+		{`(h\145llo)`, String("hello")},
+		{`(\0612)`, String("12")},
+		{"<>", String(nil)},
+		{"<68656c6c6f>", String("hello")},
+		{"<68656C6C6F>", String("hello")},
+		{"<68 65 6C 6C 6F>", String("hello")},
+		{"<68656C70>", String("help")},
+		{"<68656C7>", String("help")},
+	}
+	for i, test := range cases {
+		out, err := ParseString([]byte(test.in))
+		if err != nil {
+			t.Errorf("%d %q: %s", i, test.in, err)
+		} else if !bytes.Equal(out, test.out) {
+			t.Errorf("wrong string: %q != %q", out, test.out)
+		}
+	}
+}
+
+func FuzzString(f *testing.F) {
+	f.Add([]byte(""))
+	f.Add([]byte("ABC"))
+	f.Add([]byte{0, 1, 2})
+	f.Add([]byte{0xFF, 0x00})
+	f.Fuzz(func(t *testing.T, data []byte) {
+		s1 := String(data)
+		enc := format(s1)
+		s2, err := ParseString([]byte(enc))
+		if err != nil {
+			t.Error(err)
+		} else if !bytes.Equal(s1, s2) {
+			t.Errorf("wrong string: %q != %q", s1, s2)
+		}
+	})
+}
+
 func TestTextString(t *testing.T) {
 	cases := []string{
 		"",
@@ -94,11 +148,9 @@ func TestDecodeDate(t *testing.T) {
 	}
 	for i, test := range cases {
 		enc := TextString(test)
-		out, err := enc.AsDate()
+		_, err := enc.AsDate()
 		if err != nil {
 			t.Errorf("%d %q %s\n", i, test, err)
-		} else {
-			fmt.Println(out, string(enc))
 		}
 	}
 }

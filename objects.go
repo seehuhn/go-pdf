@@ -80,6 +80,35 @@ func (x Real) PDF(w io.Writer) error {
 // if any, is determined by the context.
 type String []byte
 
+// ParseString parses a string from the given buffer.  The buffer must include
+// the surrounding parentheses or angle brackets.
+func ParseString(buf []byte) (String, error) {
+	scanner := newScanner(bytes.NewReader(buf), 0, nil, nil)
+	b, err := scanner.Peek(1)
+	if len(b) < 1 {
+		return nil, errInvalidString
+	}
+	var s String
+	if b[0] == '(' {
+		scanner.pos += 1
+		s, err = scanner.ReadQuotedString()
+	} else if b[0] == '<' {
+		scanner.pos += 1
+		s, err = scanner.ReadHexString()
+	} else {
+		err = errInvalidString
+	}
+	if err != nil {
+		return nil, err
+	}
+	if scanner.currentPos() != int64(len(buf)) {
+		return nil, errInvalidString
+	}
+	return s, nil
+}
+
+var errInvalidString = errors.New("malformed PDF string")
+
 // PDF implements the [Object] interface.
 func (x String) PDF(w io.Writer) error {
 	l := []byte(x)

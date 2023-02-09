@@ -101,7 +101,7 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestReaderGoFuzz(t *testing.T) {
-	// found by go-fuzz - check that the code doesn't panic
+	// found by go-fuzz - check that the reader doesn't panic
 	cases := []string{
 		"%PDF-1.0\n0 0obj<startxref8",
 		"%PDF-1.0\n0 0obj(startxref8",
