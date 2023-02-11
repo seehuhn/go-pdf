@@ -4,22 +4,24 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
-	"strconv"
 	"strings"
+	"text/template"
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 func (info *Info) Write(w io.Writer) error {
-	data := &toUnicodeData{}
-
-	panic("not implemented")
-
-	err := toUnicodeTmpl.Execute(w, data)
+	tmpl := template.Must(template.New("CMap").Funcs(template.FuncMap{
+		"PDFString":    formatPDFString,
+		"PDFName":      formatPDFName,
+		"SingleChunks": singleChunks,
+		"Single":       info.formatSingle,
+		"RangeChunks":  rangeChunks,
+		"Range":        info.formatRange,
+	}).Parse(toUnicodeTmpl))
+	err := tmpl.Execute(w, info)
 	if err != nil {
 		return err
 	}
@@ -27,75 +29,65 @@ func (info *Info) Write(w io.Writer) error {
 	return nil
 }
 
-type toUnicodeData struct {
-	Registry     string
-	Ordering     string
-	Supplement   int
-	SkipComments bool
-	CodeSpace    []string
-	Chars        []bfChar
-	Ranges       []bfRange
+func (info *Info) formatCharCode(code CharCode) (string, error) {
+	for _, r := range info.CodeSpace {
+		if code >= r.First && code <= r.Last {
+			var format string
+			if r.Last >= 1<<24 {
+				format = "%08x"
+			} else if r.Last >= 1<<16 {
+				format = "%06x"
+			} else if r.Last >= 1<<8 {
+				format = "%04x"
+			} else {
+				format = "%02x"
+			}
+
+			return fmt.Sprintf("<"+format+">", code), nil
+		}
+	}
+	return "", errors.New("code not in code space")
 }
 
-type bfChar struct {
-	Code pdf.String
-	Text []rune
-}
-
-func (bfc bfChar) String() string {
+func formatText(s string) string {
 	var text []byte
-	for _, x := range utf16.Encode(bfc.Text) {
+	for _, x := range utf16.Encode([]rune(s)) {
 		text = append(text, byte(x>>8), byte(x))
 	}
-	return fmt.Sprintf("<%02X> <%02X>", []byte(bfc.Code), text)
+	return fmt.Sprintf("<%02X>", text)
 }
 
-type bfRange struct {
-	From, To pdf.String
-	FromText [][]rune
+func (info *Info) formatSingle(s Single) (string, error) {
+	code, err := info.formatCharCode(s.Code)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s %s", code, formatText(s.Text)), nil
 }
 
-func (bfr bfRange) String() string {
-	if len(bfr.FromText) == 1 {
-		var text []byte
-		for _, x := range utf16.Encode(bfr.FromText[0]) {
-			text = append(text, byte(x>>8), byte(x))
-		}
-		return fmt.Sprintf("<%02X> <%02X> <%02X>",
-			[]byte(bfr.From), []byte(bfr.To), text)
+func (info *Info) formatRange(r Range) (string, error) {
+	a, err := info.formatCharCode(r.First)
+	if err != nil {
+		return "", err
+	}
+	b, err := info.formatCharCode(r.Last)
+	if err != nil {
+		return "", err
+	}
+
+	if len(r.Text) == 1 {
+		return fmt.Sprintf("%s %s %s", a, b, formatText(r.Text[0])), nil
 	}
 
 	var texts []string
-	for _, in := range bfr.FromText {
-		var text []byte
-		for _, x := range utf16.Encode(in) {
-			text = append(text, byte(x>>8), byte(x))
-		}
-		texts = append(texts, fmt.Sprintf("<%02X>", text))
+	for _, t := range r.Text {
+		texts = append(texts, formatText(t))
 	}
-	repl := strings.Join(texts, " ")
-	return fmt.Sprintf("<%02X> <%02X> [%s]",
-		[]byte(bfr.From), []byte(bfr.To), repl)
+	return fmt.Sprintf("%s %s [%s]", a, b, strings.Join(texts, " ")), nil
 }
 
-func formatPDFString(args ...interface{}) (string, error) {
-	var s pdf.String
-	for _, arg := range args {
-		switch x := arg.(type) {
-		case string:
-			s = append(s, x...)
-		case []byte:
-			s = append(s, x...)
-		case byte:
-			s = append(s, x)
-		case rune:
-			s = append(s, string(x)...)
-		case int:
-			s = append(s, strconv.Itoa(x)...)
-		default:
-			return "", errors.New("invalid argument type for {{PDFString ...}}")
-		}
-	}
+func formatPDFString(s pdf.String) (string, error) {
 	buf := &bytes.Buffer{}
 	err := s.PDF(buf)
 	return buf.String(), err
@@ -116,23 +108,10 @@ func formatPDFName(args ...interface{}) (string, error) {
 	return buf.String(), err
 }
 
-func hex(idx glyph.ID) string {
-	return fmt.Sprintf("<%x>", []byte{byte(idx >> 8), byte(idx)})
-}
-
-func runehex(r rune) string {
-	x := utf16.Encode([]rune{r})
-	var buf []byte
-	for _, xi := range x {
-		buf = append(buf, byte(xi>>8), byte(xi))
-	}
-	return fmt.Sprintf("<%x>", buf)
-}
-
 const chunkSize = 100
 
-func charChunks(x []bfChar) [][]bfChar {
-	var res [][]bfChar
+func singleChunks(x []Single) [][]Single {
+	var res [][]Single
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -143,8 +122,8 @@ func charChunks(x []bfChar) [][]bfChar {
 	return res
 }
 
-func rangeChunks(x []bfRange) [][]bfRange {
-	var res [][]bfRange
+func rangeChunks(x []Range) [][]Range {
+	var res [][]Range
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -155,42 +134,34 @@ func rangeChunks(x []bfRange) [][]bfRange {
 	return res
 }
 
-var toUnicodeTmpl = template.Must(template.New("CMap").Funcs(template.FuncMap{
-	"PDFString":   formatPDFString,
-	"PDFName":     formatPDFName,
-	"hex":         hex,
-	"runehex":     runehex,
-	"charChunks":  charChunks,
-	"rangeChunks": rangeChunks,
-}).Parse(
-	`/CIDInit /ProcSet findresource begin
+var toUnicodeTmpl = `/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
-/CIDSystemInfo 3 dict dup begin
+/CMapType 2 def
+/CMapName {{printf "%s-%s-%03d" .Registry .Ordering .Supplement | PDFName}} def
+/CIDSystemInfo <<
 /Registry {{PDFString .Registry}} def
 /Ordering {{PDFString .Ordering}} def
 /Supplement {{.Supplement}} def
-end def
-/CMapName {{printf "%s-%s-%03d" .Registry .Ordering .Supplement | PDFName}} def
-/CMapType 2 def
+>> def
 /WMode 0 def
 {{len .CodeSpace}} begincodespacerange
 {{range .CodeSpace -}}
 {{.}}
 {{end -}}
 endcodespacerange
-{{range charChunks .Chars -}}
+{{range SingleChunks .Singles -}}
 {{len .}} beginbfchar
 {{range . -}}
-{{.}}
+{{Single .}}
 {{end -}}
 endbfchar
 {{end -}}
 
-{{range rangeChunks .Ranges -}}
+{{range RangeChunks .Ranges -}}
 {{len .}} beginbfrange
 {{range . -}}
-{{.}}
+{{Range .}}
 {{end -}}
 endbfrange
 {{end -}}
@@ -199,4 +170,4 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end
-`))
+`
