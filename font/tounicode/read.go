@@ -3,7 +3,6 @@ package tounicode
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"regexp"
 	"strconv"
@@ -32,7 +31,7 @@ func Read(r io.Reader) (*Info, error) {
 		}
 	}
 
-	res := &Info{}
+	info := &Info{}
 
 	// read the code space ranges
 	mm := codespaceRegexp.FindAllSubmatch(body, -1)
@@ -58,7 +57,7 @@ func Read(r io.Reader) (*Info, error) {
 				return nil, err
 			}
 
-			res.CodeSpace = append(res.CodeSpace, CodeSpaceRange{
+			info.CodeSpace = append(info.CodeSpace, CodeSpaceRange{
 				First: first,
 				Last:  last,
 			})
@@ -90,10 +89,12 @@ func Read(r io.Reader) (*Info, error) {
 				return nil, err
 			}
 
-			res.Singles = append(res.Singles, Single{
-				Code: code,
-				Text: string(rr),
-			})
+			if info.ContainsCode(code) {
+				info.Singles = append(info.Singles, Single{
+					Code: code,
+					Text: string(rr),
+				})
+			}
 		}
 	}
 
@@ -146,7 +147,6 @@ func Read(r io.Reader) (*Info, error) {
 
 					nextRange.Text = append(nextRange.Text, string(rr))
 				}
-				continue
 			} else {
 				inner, rr, err = parseString(inner)
 				if err != nil {
@@ -155,38 +155,43 @@ func Read(r io.Reader) (*Info, error) {
 				nextRange.Text = []string{string(rr)}
 			}
 
-			res.Ranges = append(res.Ranges, nextRange)
+			if nextRange.First <= nextRange.Last && info.ContainsRange(nextRange.First, nextRange.Last) {
+				info.Ranges = append(info.Ranges, nextRange)
+			}
 		}
 	}
 
 	// read meta information
 	m = nameRegexp.FindSubmatch(body)
 	if len(m) == 2 {
-		res.Name = pdf.Name(m[1]) // TODO(voss): parse the name
+		n, err := pdf.ParseName(m[1])
+		if err == nil {
+			info.Name = n
+		}
 	}
 	m = registryRegexp.FindSubmatch(body)
 	if len(m) == 2 {
 		s, err := pdf.ParseString(m[1])
 		if err == nil {
-			res.Registry = s
+			info.Registry = s
 		}
 	}
 	m = orderingRegexp.FindSubmatch(body)
 	if len(m) == 2 {
 		s, err := pdf.ParseString(m[1])
 		if err == nil {
-			res.Ordering = s
+			info.Ordering = s
 		}
 	}
 	m = supplementRegexp.FindSubmatch(body)
 	if len(m) == 2 {
 		x, err := strconv.Atoi(string(m[1]))
 		if err == nil {
-			res.Supplement = pdf.Integer(x)
+			info.Supplement = pdf.Integer(x)
 		}
 	}
 
-	return res, nil
+	return info, nil
 }
 
 func skipComments(buf []byte) []byte {
@@ -228,7 +233,6 @@ func parseString(buf []byte) ([]byte, []rune, error) {
 	for len(q) > 0 {
 		x, err := strconv.ParseUint(string(q[:4]), 16, 16)
 		if err != nil {
-			fmt.Printf("C %q\n", buf)
 			return nil, nil, ErrInvalid
 		}
 		s = append(s, uint16(x))

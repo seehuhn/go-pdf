@@ -84,11 +84,12 @@ type String []byte
 // the surrounding parentheses or angle brackets.
 func ParseString(buf []byte) (String, error) {
 	scanner := newScanner(bytes.NewReader(buf), 0, nil, nil)
-	b, err := scanner.Peek(1)
+	b, _ := scanner.Peek(1)
 	if len(b) < 1 {
 		return nil, errInvalidString
 	}
 	var s String
+	var err error
 	if b[0] == '(' {
 		scanner.pos += 1
 		s, err = scanner.ReadQuotedString()
@@ -268,6 +269,26 @@ func Date(t time.Time) String {
 
 // Name represents a name object in a PDF file.
 type Name string
+
+// ParseName parses a PDF name from the given buffer.  The buffer must include
+// the leading slash.
+func ParseName(buf []byte) (Name, error) {
+	scanner := newScanner(bytes.NewReader(buf), 0, nil, nil)
+	b, _ := scanner.Peek(1)
+	if len(b) < 1 || b[0] != '/' {
+		return "", errInvalidName
+	}
+	n, err := scanner.ReadName()
+	if err != nil {
+		return "", err
+	}
+	if scanner.currentPos() != int64(len(buf)) {
+		return "", errInvalidString
+	}
+	return n, nil
+}
+
+var errInvalidName = errors.New("malformed PDF name")
 
 // PDF implements the [Object] interface.
 func (x Name) PDF(w io.Writer) error {

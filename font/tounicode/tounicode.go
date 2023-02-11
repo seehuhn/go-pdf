@@ -2,7 +2,6 @@ package tounicode
 
 import (
 	"fmt"
-	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
 )
@@ -21,6 +20,24 @@ type Info struct {
 	Supplement pdf.Integer
 }
 
+func (info *Info) ContainsCode(code CharCode) bool {
+	for _, r := range info.CodeSpace {
+		if r.First <= code && code <= r.Last {
+			return true
+		}
+	}
+	return false
+}
+
+func (info *Info) ContainsRange(first, last CharCode) bool {
+	for _, r := range info.CodeSpace {
+		if r.First <= first && last <= r.Last {
+			return true
+		}
+	}
+	return false
+}
+
 type CodeSpaceRange struct {
 	First CharCode
 	Last  CharCode
@@ -29,13 +46,13 @@ type CodeSpaceRange struct {
 func (c CodeSpaceRange) String() string {
 	var format string
 	if c.Last >= 1<<24 {
-		format = "%08x"
+		format = "%08X"
 	} else if c.Last >= 1<<16 {
-		format = "%06x"
+		format = "%06X"
 	} else if c.Last >= 1<<8 {
-		format = "%04x"
+		format = "%04X"
 	} else {
-		format = "%02x"
+		format = "%02X"
 	}
 	return fmt.Sprintf("<"+format+"> <"+format+">", c.First, c.Last)
 }
@@ -43,25 +60,6 @@ func (c CodeSpaceRange) String() string {
 type Single struct {
 	Code CharCode
 	Text string
-}
-
-func (bfc Single) String() string {
-	var format string
-	if bfc.Code >= 1<<24 {
-		format = "%08x"
-	} else if bfc.Code >= 1<<16 {
-		format = "%06x"
-	} else if bfc.Code >= 1<<8 {
-		format = "%04x"
-	} else {
-		format = "%02x"
-	}
-
-	var text []byte
-	for _, x := range utf16.Encode([]rune(bfc.Text)) {
-		text = append(text, byte(x>>8), byte(x))
-	}
-	return fmt.Sprintf("<"+format+"> <%02X>", bfc.Code, text)
 }
 
 type Range struct {

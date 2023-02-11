@@ -14,8 +14,7 @@ import (
 
 func (info *Info) Write(w io.Writer) error {
 	tmpl := template.Must(template.New("CMap").Funcs(template.FuncMap{
-		"PDFString":    formatPDFString,
-		"PDFName":      formatPDFName,
+		"PDF":          formatPDF,
 		"SingleChunks": singleChunks,
 		"Single":       info.formatSingle,
 		"RangeChunks":  rangeChunks,
@@ -34,13 +33,13 @@ func (info *Info) formatCharCode(code CharCode) (string, error) {
 		if code >= r.First && code <= r.Last {
 			var format string
 			if r.Last >= 1<<24 {
-				format = "%08x"
+				format = "%08X"
 			} else if r.Last >= 1<<16 {
-				format = "%06x"
+				format = "%06X"
 			} else if r.Last >= 1<<8 {
-				format = "%04x"
+				format = "%04X"
 			} else {
-				format = "%02x"
+				format = "%02X"
 			}
 
 			return fmt.Sprintf("<"+format+">", code), nil
@@ -50,11 +49,11 @@ func (info *Info) formatCharCode(code CharCode) (string, error) {
 }
 
 func formatText(s string) string {
-	var text []byte
+	var text []string
 	for _, x := range utf16.Encode([]rune(s)) {
-		text = append(text, byte(x>>8), byte(x))
+		text = append(text, fmt.Sprintf("%04X", x))
 	}
-	return fmt.Sprintf("<%02X>", text)
+	return "<" + strings.Join(text, " ") + ">"
 }
 
 func (info *Info) formatSingle(s Single) (string, error) {
@@ -87,24 +86,9 @@ func (info *Info) formatRange(r Range) (string, error) {
 	return fmt.Sprintf("%s %s [%s]", a, b, strings.Join(texts, " ")), nil
 }
 
-func formatPDFString(s pdf.String) (string, error) {
+func formatPDF(obj pdf.Object) (string, error) {
 	buf := &bytes.Buffer{}
-	err := s.PDF(buf)
-	return buf.String(), err
-}
-
-func formatPDFName(args ...interface{}) (string, error) {
-	var name pdf.Name
-	for _, arg := range args {
-		switch x := arg.(type) {
-		case string:
-			name = name + pdf.Name(x)
-		default:
-			return "", errors.New("invalid argument type for {{PDFName ...}}")
-		}
-	}
-	buf := &bytes.Buffer{}
-	err := name.PDF(buf)
+	err := obj.PDF(buf)
 	return buf.String(), err
 }
 
@@ -137,14 +121,13 @@ func rangeChunks(x []Range) [][]Range {
 var toUnicodeTmpl = `/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
+/CMapName {{PDF .Name}} def
 /CMapType 2 def
-/CMapName {{printf "%s-%s-%03d" .Registry .Ordering .Supplement | PDFName}} def
 /CIDSystemInfo <<
-/Registry {{PDFString .Registry}} def
-/Ordering {{PDFString .Ordering}} def
-/Supplement {{.Supplement}} def
+  /Registry {{PDF .Registry}}
+  /Ordering {{PDF .Ordering}}
+  /Supplement {{.Supplement}}
 >> def
-/WMode 0 def
 {{len .CodeSpace}} begincodespacerange
 {{range .CodeSpace -}}
 {{.}}

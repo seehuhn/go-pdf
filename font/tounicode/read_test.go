@@ -1,28 +1,84 @@
 package tounicode
 
 import (
-	"os"
-	"path/filepath"
+	"bytes"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-func TestRead(t *testing.T) {
-	ff, err := filepath.Glob("../../../examples/try-all-pdfs/toUnicode/*.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range ff {
-		fd, err := os.Open(f)
+func FuzzToUnicode(f *testing.F) {
+	f.Add([]byte(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapType 2 def
+1 begincodespacerange
+<00><ff>
+endcodespacerange
+1 beginbfrange
+<21><29><1078>
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end end`))
+	f.Add([]byte(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapType 2 def
+1 begincodespacerange
+<00><ffff>
+endcodespacerange
+1 beginbfrange
+<0020> <0020>
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end end`))
+	f.Add([]byte(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /Jochen-Chaotic-UCS2 def
+/CMapType 2 def
+/CIDSystemInfo <<
+  /Registry (Jochen)
+  /Ordering (Chaotic)
+  /Supplement 12
+>> def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+2 beginbfchar
+<20> <006C 006F 0074 0027 0073 0020 006F 0066 0020 0073 0070 0061 0063 0065>
+<21> <>
+endbfchar
+2 beginbfrange
+<41> <5A> <0041>
+<64> <66> [<0066 0069> <0066 006C> <0066 0066 006C>]
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end`))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		info, err := Read(bytes.NewReader(data))
 		if err != nil {
-			t.Error(err)
-			continue
+			return
 		}
 
-		_, err = Read(fd)
+		buf := &bytes.Buffer{}
+		err = info.Write(buf)
 		if err != nil {
-			t.Error(f, err)
+			t.Fatal(err)
 		}
 
-		fd.Close()
-	}
+		info2, err := Read(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if d := cmp.Diff(info, info2); d != "" {
+			t.Fatal(d)
+		}
+	})
 }

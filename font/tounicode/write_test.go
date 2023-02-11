@@ -1,20 +1,20 @@
 package tounicode
 
 import (
-	"os"
+	"bytes"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestWrite(t *testing.T) {
 	info := &Info{
 		CodeSpace: []CodeSpaceRange{
-			{First: 0, Last: 0xffff},
+			{First: 0, Last: 0xff},
 		},
 		Singles: []Single{
-			{
-				Code: 32,
-				Text: "lot's of space",
-			},
+			{Code: 32, Text: "lot's of space"},
+			{Code: 33, Text: ""},
 		},
 		Ranges: []Range{
 			{
@@ -25,17 +25,26 @@ func TestWrite(t *testing.T) {
 			{
 				First: 100,
 				Last:  102,
-				Text:  []string{"d'", "e'", "ffl"},
+				Text:  []string{"fi", "fl", "ffl"},
 			},
 		},
-		Name:       "",
+		Name:       "Jochen-Chaotic-UCS2",
 		Registry:   []byte("Jochen"),
 		Ordering:   []byte("Chaotic"),
 		Supplement: 12,
 	}
-	err := info.Write(os.Stdout)
+
+	buf := &bytes.Buffer{}
+	err := info.Write(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Error("fish")
+
+	info2, err := Read(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := cmp.Diff(info, info2); d != "" {
+		t.Fatal(d)
+	}
 }
