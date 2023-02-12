@@ -163,7 +163,7 @@ func (s *fontHandler) Layout(rr []rune) glyph.Seq {
 func (s *fontHandler) Enc(enc pdf.String, gid glyph.ID) pdf.String {
 	c, ok := s.enc[gid]
 	if ok {
-		return pdf.String{c}
+		return append(enc, c)
 	}
 
 	c = byte(s.nextCharCode)
