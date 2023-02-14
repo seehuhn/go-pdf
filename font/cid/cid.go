@@ -32,7 +32,6 @@ import (
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gdef"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 	"seehuhn.de/go/sfnt/type1"
 )
@@ -124,28 +123,7 @@ type fontHandler struct {
 }
 
 func (s *fontHandler) Layout(rr []rune) glyph.Seq {
-	info := s.info
-
-	seq := make(glyph.Seq, len(rr))
-	for i, r := range rr {
-		gid := info.CMap.Lookup(r)
-		seq[i].Gid = gid
-		seq[i].Text = []rune{r}
-	}
-
-	for _, lookupIndex := range s.GsubLookups {
-		seq = info.Gsub.LookupList.ApplyLookup(seq, lookupIndex, info.Gdef)
-	}
-
-	for i := range seq {
-		gid := seq[i].Gid
-		if info.Gdef.GlyphClass[gid] != gdef.GlyphClassMark {
-			seq[i].Advance = s.widths[gid]
-		}
-	}
-	for _, lookupIndex := range s.GposLookups {
-		seq = info.Gpos.LookupList.ApplyLookup(seq, lookupIndex, info.Gdef)
-	}
+	seq := s.info.Layout(rr, s.GsubLookups, s.GposLookups)
 
 	for _, g := range seq {
 		if _, seen := s.text[g.Gid]; !seen && len(g.Text) > 0 {

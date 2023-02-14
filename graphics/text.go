@@ -62,7 +62,12 @@ func (p *Page) SetNewFont(F *font.NewFont, size float64) {
 	fontDict, ok := fontDictObj.(font.Dict)
 	if !ok {
 		// embed font into the PDF file
-		fontDict = F.GetDict(p.w)
+		var err error
+		fontDict, err = F.GetDict(p.w)
+		if err != nil {
+			p.err = err
+			return
+		}
 		p.w.Resources[F] = fontDict
 	}
 

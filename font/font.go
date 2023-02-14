@@ -44,10 +44,11 @@ type NewFont struct {
 	Layout func([]rune) glyph.Seq
 
 	ResourceName pdf.Name
-	GetDict      func(w *pdf.Writer) Dict
+	GetDict      func(w *pdf.Writer) (Dict, error)
 }
 
 type Dict interface {
+	AppendEncoded(s pdf.String, g glyph.ID) pdf.String
 	Reference() *pdf.Reference
 	Write(w *pdf.Writer) error
 }
