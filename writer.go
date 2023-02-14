@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 )
 
@@ -51,9 +52,12 @@ type Writer struct {
 	inStream bool
 	// TODO(voss): change afterStream into a list of (*Reference, Object)
 	// pairs to be written as soon as possible.  Change the Write() method
-	// to append to afterStream if inStream is true.
+	// to append to afterStream if inStream is true?
 	afterStream []func(*Writer) error
 
+	Resources map[interface{}]Resource
+
+	// TODO(voss): remove
 	onClose []func(*Writer) error
 }
 
@@ -65,6 +69,14 @@ type WriterOptions struct {
 	UserPassword   string
 	OwnerPassword  string
 	UserPermission Perm
+}
+
+type Resource interface {
+	// Write writes the resource to the PDF file.  No changes can be
+	// made to the resource after it has been written.
+	Write(w *Writer) error
+
+	Reference() *Reference
 }
 
 var defaultOptions = &WriterOptions{
@@ -130,6 +142,8 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 
 		nextRef: 1,
 		xref:    make(map[int]*xRefEntry),
+
+		Resources: make(map[interface{}]Resource),
 	}
 	pdf.xref[0] = &xRefEntry{
 		Pos:        -1,
@@ -219,6 +233,25 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 // Close closes the Writer, flushing any unwritten data to the underlying
 // io.Writer.
 func (pdf *Writer) Close() error {
+	var rr []Resource
+	for _, r := range pdf.Resources {
+		rr = append(rr, r)
+	}
+	sort.Slice(rr, func(i, j int) bool {
+		ri := rr[i].Reference()
+		rj := rr[j].Reference()
+		if ri.Generation != rj.Generation {
+			return ri.Generation < rj.Generation
+		}
+		return ri.Number < rj.Number
+	})
+	for _, r := range rr {
+		err := r.Write(pdf)
+		if err != nil {
+			return err
+		}
+	}
+
 	for i := len(pdf.onClose) - 1; i >= 0; i-- {
 		err := pdf.onClose[i](pdf)
 		if err != nil {
@@ -288,6 +321,8 @@ func (pdf *Writer) Close() error {
 // OnClose registers a callback function which is called before the writer is
 // closed.  Callbacks are executed in the reverse order, i.e. the last callback
 // registered is the first one to run.
+//
+// TODO(voss): remove?
 func (pdf *Writer) OnClose(callback func(*Writer) error) {
 	pdf.onClose = append(pdf.onClose, callback)
 }

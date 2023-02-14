@@ -39,10 +39,12 @@ type Page struct {
 	stack []state
 	err   error
 
+	newFont  font.Dict
 	font     *font.Font
 	fontSize float64
 	textRise pdf.Integer
 
+	fonts      map[font.Dict]pdf.Name
 	imageNames map[pdf.Reference]pdf.Name
 }
 
@@ -78,6 +80,8 @@ func NewPage(w *pdf.Writer) (*Page, error) {
 		contentRef: contentRef,
 
 		state: stateGlobal,
+
+		fonts: make(map[font.Dict]pdf.Name),
 	}, nil
 }
 

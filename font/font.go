@@ -26,6 +26,33 @@ import (
 )
 
 // Font represents a font embedded in the PDF file.
+type NewFont struct {
+	UnitsPerEm         uint16
+	Ascent             funit.Int16
+	Descent            funit.Int16 // negative
+	BaseLineSkip       funit.Int16
+	UnderlinePosition  funit.Int16
+	UnderlineThickness funit.Int16
+
+	GlyphExtents []funit.Rect
+	Widths       []funit.Int16
+
+	// Layout converts a sequence of runes into a sequence of glyphs.  Runes
+	// missing from the font are replaced by the glyph for the .notdef
+	// character (glyph ID 0).  Glyph substitutions (e.g. from OpenType GSUB
+	// tables) and positioning rules (e.g. kerning) are applied.
+	Layout func([]rune) glyph.Seq
+
+	ResourceName pdf.Name
+	GetDict      func(w *pdf.Writer) Dict
+}
+
+type Dict interface {
+	Reference() *pdf.Reference
+	Write(w *pdf.Writer) error
+}
+
+// Font represents a font embedded in the PDF file.
 type Font struct {
 	InstName pdf.Name
 	Ref      *pdf.Reference

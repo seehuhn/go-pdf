@@ -38,6 +38,27 @@ import (
 	"seehuhn.de/go/sfnt/type1"
 )
 
+func New(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) *font.NewFont {
+	res := &font.NewFont{
+		UnitsPerEm:         info.UnitsPerEm,
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		GlyphExtents:       info.Extents(),
+		Widths:             info.Widths(),
+		Layout: func([]rune) glyph.Seq {
+			panic("not implemented")
+		},
+		ResourceName: resourceName,
+		GetDict: func(w *pdf.Writer) font.Dict {
+			panic("not implemented")
+		},
+	}
+	return res
+}
+
 // EmbedFile embeds the named font file into the PDF document.
 func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc language.Tag) (*font.Font, error) {
 	fd, err := os.Open(fname)

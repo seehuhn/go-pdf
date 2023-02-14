@@ -45,34 +45,60 @@ func (p *Page) EndText() {
 	_, p.err = fmt.Fprintln(p.content, "ET")
 }
 
-// StartLine moves to the start of the next line of text.
-func (p *Page) StartLine(x, y float64) {
-	if !p.valid("StartLine", stateText) {
+// SetFont sets the font and font size.
+func (p *Page) SetNewFont(F *font.NewFont, size float64) {
+	if !p.valid("SetFont", stateText, stateGlobal) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "Td")
-}
 
-// StartNextLine moves to the start of the next line of text and sets
-// the leading.  Usually, dy is negative.
-func (p *Page) StartNextLine(dx, dy float64) {
-	if !p.valid("StartNextLine", stateText) {
-		return
+	if p.resources == nil {
+		p.resources = &pdf.Resources{}
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(dx), p.coord(dy), "TD")
-}
+	if p.resources.Font == nil {
+		p.resources.Font = pdf.Dict{}
+	}
 
-// NewLine moves to the start of the next line of text.
-func (p *Page) NewLine() {
-	if !p.valid("NewLine", stateText) {
+	fontDictObj := p.w.Resources[F]
+	fontDict, ok := fontDictObj.(font.Dict)
+	if !ok {
+		// embed font into the PDF file
+		fontDict = F.GetDict(p.w)
+		p.w.Resources[F] = fontDict
+	}
+
+	resourceName, seen := p.fonts[fontDict]
+	if !seen {
+		resourceName = F.ResourceName
+		if resourceName != "" && p.resources.Font[resourceName] != nil {
+			// clash: the font name is already in use
+			resourceName = ""
+		}
+		if resourceName == "" {
+			// choose a new name for the font
+			for k := len(p.resources.Font); ; k++ {
+				resourceName = pdf.Name(fmt.Sprintf("F%d", k))
+				if p.resources.Font[resourceName] == nil {
+					break
+				}
+			}
+		}
+		p.fonts[fontDict] = resourceName
+		p.resources.Font[resourceName] = fontDict.Reference()
+	}
+
+	p.newFont = fontDict
+	p.fontSize = size
+	err := resourceName.PDF(p.content)
+	if err != nil {
+		p.err = err
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, "T*")
+	_, p.err = fmt.Fprintln(p.content, "", size, "Tf")
 }
 
 // SetFont sets the font and font size.
 func (p *Page) SetFont(font *font.Font, size float64) {
-	if !p.valid("SetFont", stateText) {
+	if !p.valid("SetFont", stateText, stateGlobal) {
 		return
 	}
 
@@ -97,6 +123,31 @@ func (p *Page) SetFont(font *font.Font, size float64) {
 		return
 	}
 	_, p.err = fmt.Fprintln(p.content, "", size, "Tf")
+}
+
+// StartLine moves to the start of the next line of text.
+func (p *Page) StartLine(x, y float64) {
+	if !p.valid("StartLine", stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "Td")
+}
+
+// StartNextLine moves to the start of the next line of text and sets
+// the leading.  Usually, dy is negative.
+func (p *Page) StartNextLine(dx, dy float64) {
+	if !p.valid("StartNextLine", stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.content, p.coord(dx), p.coord(dy), "TD")
+}
+
+// NewLine moves to the start of the next line of text.
+func (p *Page) NewLine() {
+	if !p.valid("NewLine", stateText) {
+		return
+	}
+	_, p.err = fmt.Fprintln(p.content, "T*")
 }
 
 // ShowText draws a string.

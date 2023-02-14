@@ -287,7 +287,7 @@ func (fnt *simple) DescribeEncoding() pdf.Object {
 	}
 
 	return pdf.Dict{
-		"Type":         pdf.Name("Encoding"),
+		// "Type":         pdf.Name("Encoding"), // optional
 		"BaseEncoding": baseName,
 		"Differences":  Differences,
 	}
