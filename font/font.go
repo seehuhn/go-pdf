@@ -48,7 +48,7 @@ type NewFont struct {
 }
 
 type Dict interface {
-	AppendEncoded(s pdf.String, g glyph.ID) pdf.String
+	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 	Reference() *pdf.Reference
 	Write(w *pdf.Writer) error
 }

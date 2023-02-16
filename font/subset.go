@@ -16,7 +16,9 @@
 
 package font
 
-import "seehuhn.de/go/sfnt/glyph"
+import (
+	"seehuhn.de/go/sfnt/glyph"
+)
 
 const subsetModulus = 26 * 26 * 26 * 26 * 26 * 26
 

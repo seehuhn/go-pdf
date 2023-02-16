@@ -27,6 +27,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/funit"
@@ -35,6 +36,395 @@ import (
 	"seehuhn.de/go/sfnt/opentype/gtab"
 	"seehuhn.de/go/sfnt/type1"
 )
+
+// LoadFont loads a fonts from a file and embeds it into a PDF document as a
+// simple font. At the moment, only TrueType and OpenType fonts are supported.
+//
+// Up to 256 distinct glyphs from the font file can be accessed via the
+// returned font object.  In comparison, fonts embedded via cid.LoadFont() lead
+// to larger PDF files but there is no limit on the number of distinct glyphs
+// which can be accessed.
+func LoadFont(fname string, resourceName pdf.Name, loc language.Tag) (*font.NewFont, error) {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	info, err := sfnt.Read(fd)
+	if err != nil {
+		return nil, err
+	}
+	return Font(info, resourceName, loc)
+}
+
+// Embed embeds a font into a PDF document as a simple font.
+// At the moment, only TrueType and OpenType fonts are supported.
+//
+// Up to 256 distinct glyphs from the font file can be accessed via the
+// returned font object.  In comparison, fonts embedded via cid.NewFile() lead
+// to larger PDF files but there is no limit on the number of distinct glyphs
+// which can be accessed.
+func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFont, error) {
+	gsubLookups := info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures)
+	gposLookups := info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures)
+
+	defaultText := make(map[glyph.ID][]rune)
+	low, high := info.CMap.CodeRange()
+	for r := low; r <= high; r++ {
+		gid := info.CMap.Lookup(r)
+		if gid != 0 {
+			defaultText[gid] = []rune{r}
+		}
+	}
+
+	res := &font.NewFont{
+		UnitsPerEm:         info.UnitsPerEm,
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		GlyphExtents:       info.Extents(),
+		Widths:             info.Widths(),
+		Layout: func(rr []rune) glyph.Seq {
+			gg := info.Layout(rr, gsubLookups, gposLookups)
+			for _, g := range gg {
+				if g.Text != nil && defaultText[g.Gid] == nil {
+					defaultText[g.Gid] = g.Text
+				}
+			}
+			return gg
+		},
+		ResourceName: resourceName,
+		GetDict: func(w *pdf.Writer) (font.Dict, error) {
+			return getDict(info, defaultText, w)
+		},
+	}
+	return res, nil
+}
+
+type fontDict struct {
+	ref *pdf.Reference
+
+	info *sfnt.Info
+
+	defaultText map[glyph.ID][]rune
+	enc         cmap.CIDEncoder
+}
+
+func getDict(info *sfnt.Info, defaultText map[glyph.ID][]rune, w *pdf.Writer) (font.Dict, error) {
+	if info.IsGlyf() {
+		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
+		if err != nil {
+			return nil, err
+		}
+	} else if info.IsCFF() {
+		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_3)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		panic("unexpected glyph format")
+	}
+
+	return &fontDict{
+		ref: w.Alloc(),
+
+		info: info,
+
+		defaultText: defaultText,
+		enc:         cmap.NewCIDEncoder(),
+	}, nil
+}
+
+func (fd *fontDict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	if rr == nil {
+		rr = fd.defaultText[gid]
+	}
+	return append(s, fd.enc.Encode(gid, rr)...)
+}
+
+func (fd *fontDict) Reference() *pdf.Reference {
+	return fd.ref
+}
+
+func (fd *fontDict) Write(w *pdf.Writer) error {
+	// Determine the subset of glyphs to include.
+	encoding := fd.enc.Encoding()
+
+	if len(encoding) == 1 {
+		// only the .notdef glyph is used, so we don't need to write the font
+		return nil
+	}
+
+	var subsetGlyphs []glyph.ID
+	for _, p := range encoding {
+		subsetGlyphs = append(subsetGlyphs, glyph.ID(p.CID))
+	}
+
+	// There are three cases for mapping CID to GID values:
+	// - For TrueType fonts, /CidToGidMap in the CIDFont dictionary is used.
+	// - For CFF-based CIDFonts, [cff.Outlines.Gid2cid] is used.
+	// - For CFF-based simple fonts we have CID == GID.
+	//   (We can avoid this case writing any CFF font as a CIDFont.)
+
+	subsetTag := font.GetSubsetTag(subsetGlyphs, fd.info.NumGlyphs())
+
+	// TODO(voss): make sure there is only one copy of this per PDF file.
+	CIDSystemInfo := &type1.ROS{
+		Registry:   "Adobe",
+		Ordering:   "Identity",
+		Supplement: 0,
+	}
+	ROS := pdf.Dict{
+		"Registry":   pdf.String(CIDSystemInfo.Registry),
+		"Ordering":   pdf.String(CIDSystemInfo.Ordering),
+		"Supplement": pdf.Integer(CIDSystemInfo.Supplement),
+	}
+
+	// subset the font
+	subsetInfo := &sfnt.Info{}
+	*subsetInfo = *fd.info
+	switch outlines := fd.info.Outlines.(type) {
+	case *cff.Outlines:
+		o2 := &cff.Outlines{}
+		pIdxMap := make(map[int]int)
+		for _, gid := range subsetGlyphs {
+			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
+			oldPIdx := outlines.FdSelect(gid)
+			_, ok := pIdxMap[oldPIdx]
+			if !ok {
+				newPIdx := len(o2.Private)
+				pIdxMap[oldPIdx] = newPIdx
+				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
+			}
+		}
+		o2.FdSelect = func(gid glyph.ID) int {
+			// TODO(voss): translate the gid values?
+			return pIdxMap[outlines.FdSelect(gid)]
+		}
+		o2.ROS = CIDSystemInfo
+		o2.Gid2cid = make([]int32, len(subsetGlyphs))
+		for subsetGid, origGid := range subsetGlyphs {
+			o2.Gid2cid[subsetGid] = int32(origGid)
+		}
+		subsetInfo.Outlines = o2
+
+	case *glyf.Outlines:
+		newGid := make(map[glyph.ID]glyph.ID)
+		todo := make(map[glyph.ID]bool)
+		nextGid := glyph.ID(0)
+		for _, gid := range subsetGlyphs {
+			newGid[gid] = nextGid
+			nextGid++
+
+			for _, gid2 := range outlines.Glyphs[gid].Components() {
+				if _, ok := newGid[gid2]; !ok {
+					todo[gid2] = true
+				}
+			}
+		}
+		for len(todo) > 0 {
+			gid := pop(todo)
+			subsetGlyphs = append(subsetGlyphs, gid)
+			newGid[gid] = nextGid
+			nextGid++
+
+			for _, gid2 := range outlines.Glyphs[gid].Components() {
+				if _, ok := newGid[gid2]; !ok {
+					todo[gid2] = true
+				}
+			}
+		}
+
+		o2 := &glyf.Outlines{
+			Tables: outlines.Tables,
+			Maxp:   outlines.Maxp,
+		}
+		for _, gid := range subsetGlyphs {
+			g := outlines.Glyphs[gid]
+			o2.Glyphs = append(o2.Glyphs, g.FixComponents(newGid))
+			o2.Widths = append(o2.Widths, outlines.Widths[gid])
+		}
+		subsetInfo.Outlines = o2
+		subsetInfo.CMap = nil
+	}
+
+	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
+
+	q := 1000 / float64(subsetInfo.UnitsPerEm)
+
+	DW, W := encodeWidths(fd.info.Widths(), q)
+
+	FontDictRef := fd.ref
+	CIDFontRef := w.Alloc()
+	CIDSystemInfoRef := w.Alloc()
+	FontDescriptorRef := w.Alloc()
+	var WidthsRef *pdf.Reference
+	if W != nil {
+		WidthsRef = w.Alloc()
+	}
+	FontFileRef := w.Alloc()
+	ToUnicodeRef := w.Alloc()
+
+	FontDict := pdf.Dict{ // See section 9.7.6.1 of PDF 32000-1:2008.
+		"Type":            pdf.Name("Font"),
+		"Subtype":         pdf.Name("Type0"),
+		"Encoding":        pdf.Name("Identity-H"),
+		"DescendantFonts": pdf.Array{CIDFontRef},
+		"ToUnicode":       ToUnicodeRef,
+	}
+
+	CIDFont := pdf.Dict{ // See section 9.7.4.1 of PDF 32000-1:2008.
+		"Type":           pdf.Name("Font"),
+		"BaseFont":       fontName,
+		"CIDSystemInfo":  CIDSystemInfoRef,
+		"FontDescriptor": FontDescriptorRef,
+	}
+	if W != nil {
+		CIDFont["W"] = WidthsRef
+	}
+	if DW != 1000 {
+		CIDFont["DW"] = DW
+	}
+
+	rect := subsetInfo.BBox()
+	fontBBox := &pdf.Rectangle{
+		LLx: rect.LLx.AsFloat(q),
+		LLy: rect.LLy.AsFloat(q),
+		URx: rect.URx.AsFloat(q),
+		URy: rect.URy.AsFloat(q),
+	}
+
+	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
+		"Type":        pdf.Name("FontDescriptor"),
+		"FontName":    fontName,
+		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)), // TODO(voss)
+		"FontBBox":    fontBBox,
+		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
+		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
+		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
+		"CapHeight":   pdf.Integer(math.Round(subsetInfo.CapHeight.AsFloat(q))),
+		"StemV":       pdf.Integer(70), // information not available in sfnt files
+	}
+
+	compressedRefs := []*pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
+	compressedObjects := []pdf.Object{FontDict, CIDFont, ROS, FontDescriptor}
+	if W != nil {
+		compressedRefs = append(compressedRefs, WidthsRef)
+		compressedObjects = append(compressedObjects, W)
+	}
+
+	switch outlines := subsetInfo.Outlines.(type) {
+	case *cff.Outlines:
+		FontDict["BaseFont"] = fontName + "-" + "Identity-H"
+		CIDFont["Subtype"] = pdf.Name("CIDFontType0")
+		FontDescriptor["FontFile3"] = FontFileRef
+
+		// Write the "font program".
+		// See section 9.9 of PDF 32000-1:2008 for details.
+		fontFileDict := pdf.Dict{
+			"Subtype": pdf.Name("CIDFontType0C"),
+		}
+		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
+			&pdf.FilterInfo{Name: "FlateDecode"})
+		if err != nil {
+			return err
+		}
+		fontFile := cff.Font{
+			FontInfo: subsetInfo.GetFontInfo(),
+			Outlines: outlines,
+		}
+		err = fontFile.Encode(fontFileStream)
+		if err != nil {
+			return err
+		}
+		err = fontFileStream.Close()
+		if err != nil {
+			return err
+		}
+
+	case *glyf.Outlines:
+		CID2GIDMapRef := w.Alloc()
+
+		FontDict["BaseFont"] = fontName
+		CIDFont["Subtype"] = pdf.Name("CIDFontType2")
+		CIDFont["CIDToGIDMap"] = CID2GIDMapRef
+		FontDescriptor["FontFile2"] = FontFileRef
+
+		cid2gidStream, _, err := w.OpenStream(nil, CID2GIDMapRef,
+			&pdf.FilterInfo{
+				Name: "FlateDecode",
+				Parms: pdf.Dict{
+					"Predictor": pdf.Integer(12),
+					"Columns":   pdf.Integer(2),
+				},
+			})
+		if err != nil {
+			return err
+		}
+		cid2gid := make([]byte, 2*fd.info.NumGlyphs())
+		for gid, cid := range subsetGlyphs {
+			cid2gid[2*cid] = byte(gid >> 8)
+			cid2gid[2*cid+1] = byte(gid)
+		}
+		_, err = cid2gidStream.Write(cid2gid)
+		if err != nil {
+			return err
+		}
+		err = cid2gidStream.Close()
+		if err != nil {
+			return err
+		}
+
+		// Write the "font program".
+		// See section 9.9 of PDF 32000-1:2008 for details.
+		size := w.NewPlaceholder(10)
+		fontFileDict := pdf.Dict{
+			"Length1": size,
+		}
+		compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+		if w.Version >= pdf.V1_2 {
+			compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+		}
+		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef, compress)
+		if err != nil {
+			return err
+		}
+		n, err := subsetInfo.PDFEmbedTrueType(fontFileStream)
+		if err != nil {
+			return err
+		}
+		err = size.Set(pdf.Integer(n))
+		if err != nil {
+			return err
+		}
+		err = fontFileStream.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	if err != nil {
+		return err
+	}
+
+	// var cc2text []font.CIDMapping
+	// for gid, text := range fd.text {
+	// 	cc2text = append(cc2text, font.CIDMapping{
+	// 		CharCode: uint16(gid),
+	// 		Text:     text,
+	// 	})
+	// }
+	// err = font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
+	// if err != nil {
+	// 	return err
+	// }
+
+	return nil
+}
 
 // EmbedFile embeds the named font file into the PDF document.
 func EmbedFile(w *pdf.Writer, fname string, instName pdf.Name, loc language.Tag) (*font.Font, error) {
@@ -147,18 +537,18 @@ func (s *fontHandler) Enc(enc pdf.String, gid glyph.ID) pdf.String {
 func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
 	s.used[0] = true // always include .notdef
-	includeGlyphs := make([]glyph.ID, 0, len(s.used))
+	subsetGlyphs := make([]glyph.ID, 0, len(s.used))
 	for c := range s.used {
-		includeGlyphs = append(includeGlyphs, glyph.ID(c))
+		subsetGlyphs = append(subsetGlyphs, glyph.ID(c))
 	}
 
-	if len(includeGlyphs) == 1 {
+	if len(subsetGlyphs) == 1 {
 		// only the .notdef glyph is used, so we don't need to write the font
 		return nil
 	}
 
-	sort.Slice(includeGlyphs, func(i, j int) bool { return includeGlyphs[i] < includeGlyphs[j] })
-	subsetTag := font.GetSubsetTag(includeGlyphs, s.info.NumGlyphs())
+	sort.Slice(subsetGlyphs, func(i, j int) bool { return subsetGlyphs[i] < subsetGlyphs[j] })
+	subsetTag := font.GetSubsetTag(subsetGlyphs, s.info.NumGlyphs())
 
 	// TODO(voss): make sure there is only one copy of this per PDF file.
 	CIDSystemInfo := &type1.ROS{
@@ -179,7 +569,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	case *cff.Outlines:
 		o2 := &cff.Outlines{}
 		pIdxMap := make(map[int]int)
-		for _, gid := range includeGlyphs {
+		for _, gid := range subsetGlyphs {
 			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
 			oldPIdx := outlines.FdSelect(gid)
 			_, ok := pIdxMap[oldPIdx]
@@ -193,8 +583,8 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
 		o2.ROS = CIDSystemInfo
-		o2.Gid2cid = make([]int32, len(includeGlyphs))
-		for i, gid := range includeGlyphs {
+		o2.Gid2cid = make([]int32, len(subsetGlyphs))
+		for i, gid := range subsetGlyphs {
 			o2.Gid2cid[i] = int32(gid)
 		}
 		subsetInfo.Outlines = o2
@@ -203,7 +593,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		newGid := make(map[glyph.ID]glyph.ID)
 		todo := make(map[glyph.ID]bool)
 		nextGid := glyph.ID(0)
-		for _, gid := range includeGlyphs {
+		for _, gid := range subsetGlyphs {
 			newGid[gid] = nextGid
 			nextGid++
 
@@ -215,7 +605,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		}
 		for len(todo) > 0 {
 			gid := pop(todo)
-			includeGlyphs = append(includeGlyphs, gid)
+			subsetGlyphs = append(subsetGlyphs, gid)
 			newGid[gid] = nextGid
 			nextGid++
 
@@ -230,7 +620,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			Tables: outlines.Tables,
 			Maxp:   outlines.Maxp,
 		}
-		for _, gid := range includeGlyphs {
+		for _, gid := range subsetGlyphs {
 			g := outlines.Glyphs[gid]
 			o2.Glyphs = append(o2.Glyphs, g.FixComponents(newGid))
 			o2.Widths = append(o2.Widths, outlines.Widths[gid])
@@ -362,7 +752,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			return err
 		}
 		cid2gid := make([]byte, 2*s.info.NumGlyphs())
-		for gid, cid := range includeGlyphs {
+		for gid, cid := range subsetGlyphs {
 			cid2gid[2*cid] = byte(gid >> 8)
 			cid2gid[2*cid+1] = byte(gid)
 		}

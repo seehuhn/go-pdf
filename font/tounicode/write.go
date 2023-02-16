@@ -10,6 +10,7 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 func (info *Info) Write(w io.Writer) error {
@@ -28,7 +29,7 @@ func (info *Info) Write(w io.Writer) error {
 	return nil
 }
 
-func (info *Info) formatCharCode(code CharCode) (string, error) {
+func (info *Info) formatCharCode(code cmap.CharCode) (string, error) {
 	for _, r := range info.CodeSpace {
 		if code >= r.First && code <= r.Last {
 			var format string

@@ -9,6 +9,7 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 func Read(r io.Reader) (*Info, error) {
@@ -38,7 +39,7 @@ func Read(r io.Reader) (*Info, error) {
 	for _, m := range mm {
 		inner := m[1]
 		for {
-			var first, last CharCode
+			var first, last cmap.CharCode
 
 			inner = skipComments(inner)
 			if len(inner) == 0 {
@@ -69,7 +70,7 @@ func Read(r io.Reader) (*Info, error) {
 	for _, m := range mm {
 		inner := m[1]
 		for {
-			var code CharCode
+			var code cmap.CharCode
 			var rr []rune
 
 			inner = skipComments(inner)
@@ -103,7 +104,7 @@ func Read(r io.Reader) (*Info, error) {
 	for _, m := range mm {
 		inner := m[1]
 		for {
-			var first, last CharCode
+			var first, last cmap.CharCode
 			var rr []rune
 
 			inner = skipComments(inner)
@@ -204,7 +205,7 @@ func skipComments(buf []byte) []byte {
 	}
 }
 
-func parseCharCode(buf []byte) ([]byte, CharCode, error) {
+func parseCharCode(buf []byte) ([]byte, cmap.CharCode, error) {
 	m := charCodeRegexp.FindSubmatch(buf)
 	if m == nil {
 		return nil, 0, ErrInvalid
@@ -215,7 +216,7 @@ func parseCharCode(buf []byte) ([]byte, CharCode, error) {
 		return nil, 0, ErrInvalid
 	}
 
-	return buf[len(m[0]):], CharCode(x), nil
+	return buf[len(m[0]):], cmap.CharCode(x), nil
 }
 
 func parseString(buf []byte) ([]byte, []rune, error) {

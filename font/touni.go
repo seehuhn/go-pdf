@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
@@ -66,8 +67,8 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 		}
 		if next > pos+1 {
 			bf := tounicode.Range{
-				First: tounicode.CharCode(mm[pos].CharCode),
-				Last:  tounicode.CharCode(mm[next-1].CharCode),
+				First: cmap.CharCode(mm[pos].CharCode),
+				Last:  cmap.CharCode(mm[next-1].CharCode),
 				Text:  []string{string(mm[pos].Text)},
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -90,8 +91,8 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 				repl = append(repl, string(mm[i].Text))
 			}
 			bf := tounicode.Range{
-				First: tounicode.CharCode(mm[pos].CharCode),
-				Last:  tounicode.CharCode(mm[next-1].CharCode),
+				First: cmap.CharCode(mm[pos].CharCode),
+				Last:  cmap.CharCode(mm[next-1].CharCode),
 				Text:  repl,
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -100,7 +101,7 @@ func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, to
 		}
 
 		data.Singles = append(data.Singles, tounicode.Single{
-			Code: tounicode.CharCode(mm[pos].CharCode),
+			Code: cmap.CharCode(mm[pos].CharCode),
 			Text: string(mm[pos].Text),
 		})
 		pos++
@@ -154,8 +155,8 @@ func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Referen
 			start := mm[pos].CharCode
 			end := mm[next-1].CharCode
 			bf := tounicode.Range{
-				First: tounicode.CharCode(start),
-				Last:  tounicode.CharCode(end),
+				First: cmap.CharCode(start),
+				Last:  cmap.CharCode(end),
 				Text:  []string{string(mm[pos].Text)},
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -180,8 +181,8 @@ func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Referen
 			from := mm[pos].CharCode
 			to := mm[next-1].CharCode
 			bf := tounicode.Range{
-				First: tounicode.CharCode(from),
-				Last:  tounicode.CharCode(to),
+				First: cmap.CharCode(from),
+				Last:  cmap.CharCode(to),
 				Text:  repl,
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -191,7 +192,7 @@ func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Referen
 
 		code := mm[pos].CharCode
 		data.Singles = append(data.Singles, tounicode.Single{
-			Code: tounicode.CharCode(code),
+			Code: cmap.CharCode(code),
 			Text: string(mm[pos].Text),
 		})
 		pos++

@@ -26,16 +26,18 @@ import (
 
 	"golang.org/x/text/language"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/cmap"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 	"seehuhn.de/go/sfnt/type1"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 // LoadFont loads a fonts from a file and embeds it into a PDF document as a
@@ -70,12 +72,12 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 	gsubLookups := info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures)
 	gposLookups := info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures)
 
-	defaultRune := make(map[glyph.ID][]rune)
+	defaultText := make(map[glyph.ID][]rune)
 	low, high := info.CMap.CodeRange()
 	for r := low; r <= high; r++ {
 		gid := info.CMap.Lookup(r)
 		if gid != 0 {
-			defaultRune[gid] = []rune{r}
+			defaultText[gid] = []rune{r}
 		}
 	}
 
@@ -91,15 +93,15 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 		Layout: func(rr []rune) glyph.Seq {
 			gg := info.Layout(rr, gsubLookups, gposLookups)
 			for _, g := range gg {
-				if g.Text != nil && defaultRune[g.Gid] == nil {
-					defaultRune[g.Gid] = g.Text
+				if g.Text != nil && defaultText[g.Gid] == nil {
+					defaultText[g.Gid] = g.Text
 				}
 			}
 			return gg
 		},
 		ResourceName: resourceName,
 		GetDict: func(w *pdf.Writer) (font.Dict, error) {
-			return getDict(info, defaultRune, w)
+			return getDict(info, defaultText, w)
 		},
 	}
 	return res, nil
@@ -110,12 +112,11 @@ type fontDict struct {
 
 	info *sfnt.Info
 
-	defaultRune map[glyph.ID][]rune
-	codeLookup  map[glyph.ID]byte
-	codeIsUsed  map[byte]bool
+	defaultText map[glyph.ID][]rune
+	enc         cmap.SimpleEncoder
 }
 
-func getDict(info *sfnt.Info, defaultRune map[glyph.ID][]rune, w *pdf.Writer) (font.Dict, error) {
+func getDict(info *sfnt.Info, defaultText map[glyph.ID][]rune, w *pdf.Writer) (font.Dict, error) {
 	if info.IsGlyf() {
 		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
 		if err != nil {
@@ -135,50 +136,16 @@ func getDict(info *sfnt.Info, defaultRune map[glyph.ID][]rune, w *pdf.Writer) (f
 
 		info: info,
 
-		defaultRune: defaultRune,
-		codeLookup:  make(map[glyph.ID]byte),
-		codeIsUsed:  make(map[byte]bool),
+		defaultText: defaultText,
+		enc:         cmap.NewSimpleEncoder(),
 	}, nil
 }
 
-func (fd *fontDict) AppendEncoded(s pdf.String, gid glyph.ID) pdf.String {
-	c, alreadyAllocated := fd.codeLookup[gid]
-	if !alreadyAllocated {
-		c = fd.selectNewCharCode(gid)
-		fd.codeLookup[gid] = c
-		fd.codeIsUsed[c] = true
+func (fd *fontDict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	if rr == nil {
+		rr = fd.defaultText[gid]
 	}
-
-	return append(s, c)
-}
-
-func (fd *fontDict) selectNewCharCode(gid glyph.ID) byte {
-	// Try to keep the PDF somewhat human-readable.
-	if rr, ok := fd.defaultRune[gid]; ok && len(rr) == 1 {
-		r := rr[0]
-		if r > 0 && r < 128 && !fd.codeIsUsed[byte(r)] {
-			return byte(r)
-		}
-	}
-
-	// If we need to allocate a new code, first try codes which don't clash
-	// with the ASCII range.
-	for c := 128; c < 256; c++ {
-		if !fd.codeIsUsed[byte(c)] {
-			return byte(c)
-		}
-	}
-
-	// If this isn't enough, use all codes available.
-	for c := 127; c > 0; c-- {
-		if !fd.codeIsUsed[byte(c)] {
-			return byte(c)
-		}
-	}
-
-	// In case we run out of codes, we map everything to zero here and
-	// return an error in [fontDict.Write].
-	return 0
+	return append(s, fd.enc.Encode(gid, rr))
 }
 
 func (fd *fontDict) Reference() *pdf.Reference {
@@ -186,37 +153,28 @@ func (fd *fontDict) Reference() *pdf.Reference {
 }
 
 func (fd *fontDict) Write(w *pdf.Writer) error {
-	if len(fd.codeLookup) > 256 {
-		return fmt.Errorf("too many different glyphs for simple font %q",
+	if fd.enc.Overflow() {
+		return fmt.Errorf("too many distinct glyphs for simple font %q",
 			fd.info.FullName())
 	}
 
 	// Determine the subset of glyphs to include.
-	mapping := make([]cMapEntry, 0, len(fd.codeLookup))
-	for gid, c := range fd.codeLookup {
-		mapping = append(mapping, cMapEntry{
-			CharCode: uint16(c),
-			GID:      gid,
-		})
+	encoding := fd.enc.Encoding()
+	var firstChar cmap.CharCode
+	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
+		firstChar++
 	}
-	sort.Slice(mapping, func(i, j int) bool { return mapping[i].CharCode < mapping[j].CharCode })
-
-	if len(mapping) == 0 {
+	if int(firstChar) >= len(encoding) {
 		// no glyphs are encoded, so we don't need to write the font
 		return nil
 	}
-
-	firstChar := mapping[0].CharCode
-	lastChar := mapping[len(mapping)-1].CharCode
-
-	includeGlyphs := make([]glyph.ID, 0, len(mapping)+1)
-	includeGlyphs = append(includeGlyphs, 0) // always include the .notdef glyph
-	for _, m := range mapping {
-		if m.GID > 0 {
-			includeGlyphs = append(includeGlyphs, m.GID)
-		}
+	lastChar := cmap.CharCode(len(encoding) - 1)
+	for encoding[lastChar] == 0 {
+		lastChar--
 	}
-	subsetTag := font.GetSubsetTag(includeGlyphs, fd.info.NumGlyphs())
+
+	subsetEncoding, subsetGlyphs := makeSubset(encoding)
+	subsetTag := font.GetSubsetTag(subsetGlyphs, fd.info.NumGlyphs())
 
 	// subset the font
 	subsetInfo := &sfnt.Info{}
@@ -225,7 +183,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 	case *cff.Outlines:
 		o2 := &cff.Outlines{}
 		pIdxMap := make(map[int]int)
-		for _, gid := range includeGlyphs {
+		for _, gid := range subsetGlyphs {
 			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
 			oldPIdx := outlines.FdSelect(gid)
 			_, ok := pIdxMap[oldPIdx]
@@ -236,25 +194,24 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			}
 		}
 		o2.FdSelect = func(gid glyph.ID) int {
+			// TODO(voss): translate the gid values?
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
 		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
 			// Embed as a CID-keyed CFF font.
+			// TODO(voss): is this right?
 			o2.ROS = &type1.ROS{
 				Registry:   "Adobe",
 				Ordering:   "Identity",
 				Supplement: 0,
 			}
-			o2.Gid2cid = make([]int32, len(includeGlyphs))
-			for i, gid := range includeGlyphs {
-				o2.Gid2cid[i] = int32(fd.codeLookup[gid])
+			o2.Gid2cid = make([]int32, len(subsetGlyphs))
+			for code, subsetGid := range subsetEncoding {
+				o2.Gid2cid[subsetGid] = int32(code)
 			}
 		} else {
 			// Embed as a simple CFF font.
-			o2.Encoding = make([]glyph.ID, 256)
-			for i, gid := range includeGlyphs {
-				o2.Encoding[fd.codeLookup[gid]] = glyph.ID(i)
-			}
+			o2.Encoding = subsetEncoding
 		}
 		subsetInfo.Outlines = o2
 
@@ -262,7 +219,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		newGid := make(map[glyph.ID]glyph.ID)
 		todo := make(map[glyph.ID]bool)
 		nextGid := glyph.ID(0)
-		for _, gid := range includeGlyphs {
+		for _, gid := range subsetGlyphs {
 			newGid[gid] = nextGid
 			nextGid++
 
@@ -274,7 +231,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		}
 		for len(todo) > 0 {
 			gid := pop(todo)
-			includeGlyphs = append(includeGlyphs, gid)
+			subsetGlyphs = append(subsetGlyphs, gid)
 			newGid[gid] = nextGid
 			nextGid++
 
@@ -289,7 +246,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			Tables: outlines.Tables,
 			Maxp:   outlines.Maxp,
 		}
-		for _, gid := range includeGlyphs {
+		for _, gid := range subsetGlyphs {
 			g := outlines.Glyphs[gid]
 			o2.Glyphs = append(o2.Glyphs, g.FixComponents(newGid))
 			o2.Widths = append(o2.Widths, outlines.Widths[gid])
@@ -297,9 +254,9 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		}
 		subsetInfo.Outlines = o2
 
-		encoding := cmap.Format4{}
-		for gid, c := range fd.codeLookup {
-			encoding[uint16(c)] = newGid[gid]
+		encoding := sfntcmap.Format4{}
+		for code, subsetGid := range subsetEncoding {
+			encoding[uint16(code)] = subsetGid
 		}
 		subsetInfo.CMap = encoding
 	}
@@ -309,15 +266,12 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 	q := 1000 / float64(subsetInfo.UnitsPerEm)
 
 	var Widths pdf.Array
-	pos := 0
 	for i := firstChar; i <= lastChar; i++ {
 		var width pdf.Integer
-		if i == mapping[pos].CharCode {
-			gid := mapping[pos].GID
+		gid := encoding[i]
+		if gid != 0 {
 			width = pdf.Integer(math.Round(fd.info.GlyphWidth(gid).AsFloat(q)))
-			pos++
 		}
-
 		Widths = append(Widths, width)
 	}
 
@@ -356,6 +310,9 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		"CapHeight":   pdf.Integer(math.Round(subsetInfo.CapHeight.AsFloat(q))),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
+
+	compressedRefs := []*pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
+	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
 
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
@@ -417,17 +374,18 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		}
 	}
 
-	_, err := w.WriteCompressed(
-		[]*pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef},
-		FontDict, FontDescriptor, Widths)
+	_, err := w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
 
 	var cc2text []font.SimpleMapping
-	for gid, text := range fd.defaultRune {
-		charCode := fd.codeLookup[gid]
-		cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
+	for code, gid := range encoding {
+		if gid != 0 {
+			continue
+		}
+		text := fd.defaultText[gid]
+		cc2text = append(cc2text, font.SimpleMapping{CharCode: byte(code), Text: text})
 	}
 	err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
 	if err != nil {
@@ -435,6 +393,28 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 	}
 
 	return nil
+}
+
+func makeSubset(origEncoding []glyph.ID) (subsetEncoding, glyphs []glyph.ID) {
+	subsetEncoding = make([]glyph.ID, 256)
+	glyphs = append(glyphs, 0) // always include the .notdef glyph
+	for code, origGid := range origEncoding {
+		if origGid == 0 {
+			continue
+		}
+		newGid := glyph.ID(len(glyphs))
+		subsetEncoding[code] = newGid
+		glyphs = append(glyphs, origGid)
+	}
+	return subsetEncoding, glyphs
+}
+
+func pop(todo map[glyph.ID]bool) glyph.ID {
+	for key := range todo {
+		delete(todo, key)
+		return key
+	}
+	panic("empty map")
 }
 
 // EmbedFile embeds the named font file into the PDF document.
@@ -670,7 +650,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		}
 		subsetInfo.Outlines = o2
 
-		encoding := cmap.Format4{}
+		encoding := sfntcmap.Format4{}
 		for gid, c := range s.enc {
 			encoding[uint16(c)] = newGid[gid]
 		}
@@ -814,12 +794,4 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	}
 
 	return nil
-}
-
-func pop(todo map[glyph.ID]bool) glyph.ID {
-	for key := range todo {
-		delete(todo, key)
-		return key
-	}
-	panic("empty map")
 }
