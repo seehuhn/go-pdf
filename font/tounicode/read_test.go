@@ -7,6 +7,26 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestIsValidVCString(t *testing.T) {
+	testCases := []struct {
+		s      string
+		expect bool
+	}{
+		{"a", true},
+		{"abc", true},
+		{"a1_b2", true},
+		{"a b", false},
+		{"aβc", false},
+		{"a\tb", false},
+		{"0\n", false},
+	}
+	for _, tc := range testCases {
+		if isValidVCString(tc.s) != tc.expect {
+			t.Errorf("isValidVCString(%q) = %v, want %v", tc.s, !tc.expect, tc.expect)
+		}
+	}
+}
+
 func FuzzToUnicode(f *testing.F) {
 	f.Add([]byte(`/CIDInit /ProcSet findresource begin
 12 dict begin

@@ -1,7 +1,5 @@
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-golang.org/x/exp v0.0.0-20230111222715-75897c7a292a h1:/YWeLOBWYV5WAQORVPkZF3Pq9IppkcT72GKnWjNf5W8=
-golang.org/x/exp v0.0.0-20230111222715-75897c7a292a/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
 golang.org/x/exp v0.0.0-20230118134722-a68e582fa157 h1:fiNkyhJPUvxbRPbCqY/D9qdjmPzfHcpK3P4bM4gioSY=
 golang.org/x/exp v0.0.0-20230118134722-a68e582fa157/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
 golang.org/x/image v0.3.0 h1:HTDXbdK9bjfSWkPzDJIw89W8CAtfFGduujWs33NLLsg=
@@ -13,7 +11,5 @@ golang.org/x/text v0.6.0 h1:3XmdazWV+ubf7QgHSTWeykHOci5oeekaGJBLkrkaw4k=
 golang.org/x/text v0.6.0/go.mod h1:mrYo+phRRbMaCq/xk9113O4dZlRixOauAjOtrjsXDZ8=
 seehuhn.de/go/dijkstra v0.9.2 h1:mu4jjs96BmNty4L6pZHepUdkWB8OmUNT6bjkiZjO4F4=
 seehuhn.de/go/dijkstra v0.9.2/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
-seehuhn.de/go/sfnt v0.0.0-20230116154855-e7ed0e1f4172 h1:ClpRFVUGyVWOY9+7wi2WUS+TaBgIvR62c3yoYzBU0Ps=
-seehuhn.de/go/sfnt v0.0.0-20230116154855-e7ed0e1f4172/go.mod h1:xund9dDSlWxfSBWx2SwuuJH8HGmMYWf+RrJNAU4d0SE=
 seehuhn.de/go/sfnt v0.0.0-20230119181350-fc0db9c6f2af h1:6TzbBje70tKWOyfQ7+sp08GobZpACYVMhhFR4sfv9zo=
 seehuhn.de/go/sfnt v0.0.0-20230119181350-fc0db9c6f2af/go.mod h1:LFWRVq8pHKX7HQ5vbLSZezcnSwo9qQuJ5/n3lwkt31Q=

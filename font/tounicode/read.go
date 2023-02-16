@@ -6,10 +6,10 @@ import (
 	"io"
 	"regexp"
 	"strconv"
-	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/sfnt/type1"
 )
 
 func Read(r io.Reader) (*Info, error) {
@@ -32,14 +32,16 @@ func Read(r io.Reader) (*Info, error) {
 		}
 	}
 
-	info := &Info{}
+	info := &Info{
+		ROS: &type1.CIDSystemInfo{},
+	}
 
 	// read the code space ranges
 	mm := codespaceRegexp.FindAllSubmatch(body, -1)
 	for _, m := range mm {
 		inner := m[1]
 		for {
-			var first, last cmap.CharCode
+			var first, last cmap.CID
 
 			inner = skipComments(inner)
 			if len(inner) == 0 {
@@ -70,8 +72,8 @@ func Read(r io.Reader) (*Info, error) {
 	for _, m := range mm {
 		inner := m[1]
 		for {
-			var code cmap.CharCode
-			var rr []rune
+			var code cmap.CID
+			var rr []uint16
 
 			inner = skipComments(inner)
 			if len(inner) == 0 {
@@ -90,10 +92,10 @@ func Read(r io.Reader) (*Info, error) {
 				return nil, err
 			}
 
-			if info.ContainsCode(code) {
+			if info.containsCode(code) {
 				info.Singles = append(info.Singles, Single{
-					Code: code,
-					Text: string(rr),
+					Code:  code,
+					UTF16: rr,
 				})
 			}
 		}
@@ -104,8 +106,8 @@ func Read(r io.Reader) (*Info, error) {
 	for _, m := range mm {
 		inner := m[1]
 		for {
-			var first, last cmap.CharCode
-			var rr []rune
+			var first, last cmap.CID
+			var rr []uint16
 
 			inner = skipComments(inner)
 			if len(inner) == 0 {
@@ -146,17 +148,17 @@ func Read(r io.Reader) (*Info, error) {
 						return nil, err
 					}
 
-					nextRange.Text = append(nextRange.Text, string(rr))
+					nextRange.UTF16 = append(nextRange.UTF16, rr)
 				}
 			} else {
 				inner, rr, err = parseString(inner)
 				if err != nil {
 					return nil, err
 				}
-				nextRange.Text = []string{string(rr)}
+				nextRange.UTF16 = [][]uint16{rr}
 			}
 
-			if nextRange.First <= nextRange.Last && info.ContainsRange(nextRange.First, nextRange.Last) {
+			if nextRange.First <= nextRange.Last && info.containsRange(nextRange.First, nextRange.Last) {
 				info.Ranges = append(info.Ranges, nextRange)
 			}
 		}
@@ -172,27 +174,40 @@ func Read(r io.Reader) (*Info, error) {
 	}
 	m = registryRegexp.FindSubmatch(body)
 	if len(m) == 2 {
-		s, err := pdf.ParseString(m[1])
-		if err == nil {
-			info.Registry = s
+		sRaw, err := pdf.ParseString(m[1])
+		s := sRaw.AsTextString()
+		if err == nil && isValidVCString(s) {
+			info.ROS.Registry = s
 		}
 	}
 	m = orderingRegexp.FindSubmatch(body)
 	if len(m) == 2 {
-		s, err := pdf.ParseString(m[1])
-		if err == nil {
-			info.Ordering = s
+		sRaw, err := pdf.ParseString(m[1])
+		s := sRaw.AsTextString()
+		if err == nil && isValidVCString(s) {
+			info.ROS.Ordering = s
 		}
 	}
 	m = supplementRegexp.FindSubmatch(body)
 	if len(m) == 2 {
-		x, err := strconv.Atoi(string(m[1]))
+		x, err := strconv.ParseInt(string(m[1]), 10, 32)
 		if err == nil {
-			info.Supplement = pdf.Integer(x)
+			info.ROS.Supplement = int32(x)
 		}
 	}
 
 	return info, nil
+}
+
+func isValidVCString(s string) bool {
+	// Version control strings (Registry and Ordering) must consist only
+	// of alphanumeric ASCII characters and the underscore character.
+	for _, r := range s {
+		if !(r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func skipComments(buf []byte) []byte {
@@ -205,7 +220,7 @@ func skipComments(buf []byte) []byte {
 	}
 }
 
-func parseCharCode(buf []byte) ([]byte, cmap.CharCode, error) {
+func parseCharCode(buf []byte) ([]byte, cmap.CID, error) {
 	m := charCodeRegexp.FindSubmatch(buf)
 	if m == nil {
 		return nil, 0, ErrInvalid
@@ -216,10 +231,10 @@ func parseCharCode(buf []byte) ([]byte, cmap.CharCode, error) {
 		return nil, 0, ErrInvalid
 	}
 
-	return buf[len(m[0]):], cmap.CharCode(x), nil
+	return buf[len(m[0]):], cmap.CID(x), nil
 }
 
-func parseString(buf []byte) ([]byte, []rune, error) {
+func parseString(buf []byte) ([]byte, []uint16, error) {
 	m := stringRegexp.FindSubmatch(buf)
 	if m == nil {
 		return nil, nil, ErrInvalid
@@ -240,7 +255,7 @@ func parseString(buf []byte) ([]byte, []rune, error) {
 		q = q[4:]
 	}
 
-	return buf[len(m[0]):], utf16.Decode(s), nil
+	return buf[len(m[0]):], s, nil
 }
 
 var (

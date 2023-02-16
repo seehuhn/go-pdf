@@ -108,7 +108,7 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 }
 
 type fontDict struct {
-	ref *pdf.Reference
+	fontDictRef *pdf.Reference
 
 	info *sfnt.Info
 
@@ -132,7 +132,7 @@ func getDict(info *sfnt.Info, defaultText map[glyph.ID][]rune, w *pdf.Writer) (f
 	}
 
 	return &fontDict{
-		ref: w.Alloc(),
+		fontDictRef: w.Alloc(),
 
 		info: info,
 
@@ -149,7 +149,7 @@ func (fd *fontDict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.Str
 }
 
 func (fd *fontDict) Reference() *pdf.Reference {
-	return fd.ref
+	return fd.fontDictRef
 }
 
 func (fd *fontDict) Write(w *pdf.Writer) error {
@@ -160,21 +160,22 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 
 	// Determine the subset of glyphs to include.
 	encoding := fd.enc.Encoding()
-	var firstChar cmap.CharCode
+	var firstChar cmap.CID
 	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
 		firstChar++
 	}
-	if int(firstChar) >= len(encoding) {
-		// no glyphs are encoded, so we don't need to write the font
-		return nil
-	}
-	lastChar := cmap.CharCode(len(encoding) - 1)
-	for encoding[lastChar] == 0 {
+	lastChar := cmap.CID(len(encoding) - 1)
+	for lastChar >= firstChar && encoding[lastChar] == 0 {
 		lastChar--
 	}
 
 	subsetEncoding, subsetGlyphs := makeSubset(encoding)
 	subsetTag := font.GetSubsetTag(subsetGlyphs, fd.info.NumGlyphs())
+
+	if len(subsetGlyphs) == 1 {
+		// only the .notdef glyph is used, so we don't need to write the font
+		return nil
+	}
 
 	// subset the font
 	subsetInfo := &sfnt.Info{}
@@ -194,13 +195,12 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			}
 		}
 		o2.FdSelect = func(gid glyph.ID) int {
-			// TODO(voss): translate the gid values?
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
 		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
 			// Embed as a CID-keyed CFF font.
 			// TODO(voss): is this right?
-			o2.ROS = &type1.ROS{
+			o2.ROS = &type1.CIDSystemInfo{
 				Registry:   "Adobe",
 				Ordering:   "Identity",
 				Supplement: 0,
@@ -254,6 +254,8 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		}
 		subsetInfo.Outlines = o2
 
+		// Use a TrueType cmap format 4 to specify the mapping from
+		// character codes to glyph indices.
 		encoding := sfntcmap.Format4{}
 		for code, subsetGid := range subsetEncoding {
 			encoding[uint16(code)] = subsetGid
@@ -275,7 +277,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		Widths = append(Widths, width)
 	}
 
-	FontDictRef := fd.ref
+	FontDictRef := fd.fontDictRef
 	FontDescriptorRef := w.Alloc()
 	WidthsRef := w.Alloc()
 	FontFileRef := w.Alloc()
@@ -314,6 +316,11 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 	compressedRefs := []*pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
 
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if w.Version >= pdf.V1_2 {
+		compress.Name = "FlateDecode"
+	}
+
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
 		FontDict["Subtype"] = pdf.Name("Type1")
@@ -325,7 +332,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			"Subtype": pdf.Name("Type1C"),
 		}
 		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
-			&pdf.FilterInfo{Name: "FlateDecode"})
+			compress)
 		if err != nil {
 			return err
 		}
@@ -351,10 +358,6 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		size := w.NewPlaceholder(10)
 		fontFileDict := pdf.Dict{
 			"Length1": size,
-		}
-		compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-		if w.Version >= pdf.V1_2 {
-			compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 		}
 		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef, compress)
 		if err != nil {
@@ -385,9 +388,9 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			continue
 		}
 		text := fd.defaultText[gid]
-		cc2text = append(cc2text, font.SimpleMapping{CharCode: byte(code), Text: text})
+		cc2text = append(cc2text, font.SimpleMapping{Code: byte(code), Text: text})
 	}
-	err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
+	_, err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
 	if err != nil {
 		return err
 	}
@@ -593,7 +596,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 		}
 		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
 			// Embed as a CID-keyed CFF font.
-			o2.ROS = &type1.ROS{
+			o2.ROS = &type1.CIDSystemInfo{
 				Registry:   "Adobe",
 				Ordering:   "Identity",
 				Supplement: 0,
@@ -786,9 +789,9 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	var cc2text []font.SimpleMapping
 	for gid, text := range s.text {
 		charCode := s.enc[gid]
-		cc2text = append(cc2text, font.SimpleMapping{CharCode: charCode, Text: text})
+		cc2text = append(cc2text, font.SimpleMapping{Code: charCode, Text: text})
 	}
-	err := font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
+	_, err := font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
 	if err != nil {
 		return err
 	}

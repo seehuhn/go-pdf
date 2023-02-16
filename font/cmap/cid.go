@@ -1,48 +1,72 @@
 package cmap
 
-import "seehuhn.de/go/sfnt/glyph"
+import (
+	"bytes"
+	"sort"
 
-type CIDEncoder interface {
-	Encode(glyph.ID, []rune) []byte
-	Encoding() []Pair
-}
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/type1"
+)
 
-type Pair struct {
-	Code []byte
-	CID  uint32
-}
+// character code (sequence of bytes) -> CID -> glyph identifier (GID)
 
-func NewCIDEncoder() CIDEncoder {
-	enc := &defaultCIDEncoder{
-		used: make(map[glyph.ID]bool),
-	}
-	enc.used[0] = true // always include .notdef
-	return enc
-}
-
-type defaultCIDEncoder struct {
-	used map[glyph.ID]bool
-}
-
-func (enc *defaultCIDEncoder) Encode(gid glyph.ID, _ []rune) []byte {
-	enc.used[gid] = true
-	return []byte{byte(gid >> 8), byte(gid)}
-}
-
-func (enc *defaultCIDEncoder) Encoding() []Pair {
-	var encs []Pair
-	for gid := range enc.used {
-		encs = append(encs, Pair{[]byte{byte(gid >> 8), byte(gid)}, uint32(gid)})
-	}
-	return encs
-}
-
-// sequence of bytes (character code) -> character identifier (CID) -> glyph identifier (GID)
-
-// A character identifier gives the index of character in a character
+// A character identifier (CID) gives the index of character in a character
 // collection. The character collection is specified by the CIDSystemInfo
 // dictionary.
 //
 // A CMap specifies a mapping from character codes to a font number (always 0
 // for PDF), and a character selector (the CID).
-// The Adobe-Identity-0 ROS uses (32 bit) unicode character codes as CID values.
+
+type CIDEncoder interface {
+	Encode(glyph.ID, []rune) []byte
+	Encoding() []Record
+	CIDSystemInfo() *type1.CIDSystemInfo
+}
+
+type Record struct {
+	Code []byte
+	CID  CID
+	GID  glyph.ID
+	Text []rune
+}
+
+func NewCIDEncoder() CIDEncoder {
+	enc := &defaultCIDEncoder{
+		used: make(map[glyph.ID]bool),
+		text: make(map[CID][]rune),
+	}
+	return enc
+}
+
+type defaultCIDEncoder struct {
+	used map[glyph.ID]bool
+	text map[CID][]rune
+}
+
+func (enc *defaultCIDEncoder) Encode(gid glyph.ID, rr []rune) []byte {
+	enc.used[gid] = true
+	enc.text[CID(gid)] = rr
+	return []byte{byte(gid >> 8), byte(gid)}
+}
+
+func (enc *defaultCIDEncoder) Encoding() []Record {
+	var encs []Record
+	for gid := range enc.used {
+		code := []byte{byte(gid >> 8), byte(gid)}
+		cid := CID(gid)
+		encs = append(encs, Record{code, cid, gid, enc.text[cid]})
+	}
+	sort.Slice(encs, func(i, j int) bool {
+		return bytes.Compare(encs[i].Code, encs[j].Code) < 0
+	})
+	return encs
+}
+
+func (enc *defaultCIDEncoder) CIDSystemInfo() *type1.CIDSystemInfo {
+	// TODO(voss): is this right?
+	return &type1.CIDSystemInfo{
+		Registry:   "Adobe",
+		Ordering:   "Identity",
+		Supplement: 0,
+	}
+}

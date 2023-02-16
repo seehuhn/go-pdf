@@ -3,8 +3,10 @@ package tounicode
 import (
 	"bytes"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/sfnt/type1"
 )
 
 func TestWrite(t *testing.T) {
@@ -13,25 +15,27 @@ func TestWrite(t *testing.T) {
 			{First: 0, Last: 0xff},
 		},
 		Singles: []Single{
-			{Code: 32, Text: "lot's of space"},
-			{Code: 33, Text: ""},
+			{Code: 32, UTF16: utf16.Encode([]rune("lot's of space"))},
+			{Code: 33, UTF16: nil},
 		},
 		Ranges: []Range{
 			{
 				First: 65,
 				Last:  90,
-				Text:  []string{"A"},
+				UTF16: [][]uint16{utf16.Encode([]rune("A"))},
 			},
 			{
 				First: 100,
 				Last:  102,
-				Text:  []string{"fi", "fl", "ffl"},
+				UTF16: [][]uint16{utf16.Encode([]rune("fi")), utf16.Encode([]rune("fl")), utf16.Encode([]rune("ffl"))},
 			},
 		},
-		Name:       "Jochen-Chaotic-UCS2",
-		Registry:   []byte("Jochen"),
-		Ordering:   []byte("Chaotic"),
-		Supplement: 12,
+		Name: "Jochen-Chaotic-UCS2",
+		ROS: &type1.CIDSystemInfo{
+			Registry:   "Jochen",
+			Ordering:   "Chaotic",
+			Supplement: 12,
+		},
 	}
 
 	buf := &bytes.Buffer{}

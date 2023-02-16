@@ -7,15 +7,46 @@ import (
 	"io"
 	"strings"
 	"text/template"
-	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
+func (info *Info) Embed(w *pdf.Writer, ref *pdf.Reference) (*pdf.Reference, error) {
+	compress := &pdf.FilterInfo{
+		Name: pdf.Name("LZWDecode"),
+	}
+	if w.Version >= pdf.V1_2 {
+		compress.Name = "FlateDecode"
+	}
+
+	cmapStream, ref, err := w.OpenStream(nil, ref, compress)
+	if err != nil {
+		return nil, err
+	}
+	err = info.Write(cmapStream)
+	if err != nil {
+		return nil, err
+	}
+	err = cmapStream.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return ref, nil
+}
+
 func (info *Info) Write(w io.Writer) error {
+	if !isValidVCString(info.ROS.Registry) {
+		return errors.New("invalid registry")
+	}
+	if !isValidVCString(info.ROS.Ordering) {
+		return errors.New("invalid ordering")
+	}
+
 	tmpl := template.Must(template.New("CMap").Funcs(template.FuncMap{
 		"PDF":          formatPDF,
+		"PDFString":    formatPDFString,
 		"SingleChunks": singleChunks,
 		"Single":       info.formatSingle,
 		"RangeChunks":  rangeChunks,
@@ -29,7 +60,7 @@ func (info *Info) Write(w io.Writer) error {
 	return nil
 }
 
-func (info *Info) formatCharCode(code cmap.CharCode) (string, error) {
+func (info *Info) formatCharCode(code cmap.CID) (string, error) {
 	for _, r := range info.CodeSpace {
 		if code >= r.First && code <= r.Last {
 			var format string
@@ -49,9 +80,9 @@ func (info *Info) formatCharCode(code cmap.CharCode) (string, error) {
 	return "", errors.New("code not in code space")
 }
 
-func formatText(s string) string {
+func formatText(xx []uint16) string {
 	var text []string
-	for _, x := range utf16.Encode([]rune(s)) {
+	for _, x := range xx {
 		text = append(text, fmt.Sprintf("%04X", x))
 	}
 	return "<" + strings.Join(text, " ") + ">"
@@ -63,7 +94,7 @@ func (info *Info) formatSingle(s Single) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s %s", code, formatText(s.Text)), nil
+	return fmt.Sprintf("%s %s", code, formatText(s.UTF16)), nil
 }
 
 func (info *Info) formatRange(r Range) (string, error) {
@@ -76,12 +107,12 @@ func (info *Info) formatRange(r Range) (string, error) {
 		return "", err
 	}
 
-	if len(r.Text) == 1 {
-		return fmt.Sprintf("%s %s %s", a, b, formatText(r.Text[0])), nil
+	if len(r.UTF16) == 1 {
+		return fmt.Sprintf("%s %s %s", a, b, formatText(r.UTF16[0])), nil
 	}
 
 	var texts []string
-	for _, t := range r.Text {
+	for _, t := range r.UTF16 {
 		texts = append(texts, formatText(t))
 	}
 	return fmt.Sprintf("%s %s [%s]", a, b, strings.Join(texts, " ")), nil
@@ -91,6 +122,10 @@ func formatPDF(obj pdf.Object) (string, error) {
 	buf := &bytes.Buffer{}
 	err := obj.PDF(buf)
 	return buf.String(), err
+}
+
+func formatPDFString(s string) (string, error) {
+	return formatPDF(pdf.TextString(s))
 }
 
 const chunkSize = 100
@@ -125,9 +160,9 @@ begincmap
 /CMapName {{PDF .Name}} def
 /CMapType 2 def
 /CIDSystemInfo <<
-  /Registry {{PDF .Registry}}
-  /Ordering {{PDF .Ordering}}
-  /Supplement {{.Supplement}}
+  /Registry {{PDFString .ROS.Registry}}
+  /Ordering {{PDFString .ROS.Ordering}}
+  /Supplement {{.ROS.Supplement}}
 >> def
 {{len .CodeSpace}} begincodespacerange
 {{range .CodeSpace -}}

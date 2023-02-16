@@ -25,9 +25,6 @@ import (
 
 	"golang.org/x/text/language"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/funit"
@@ -35,6 +32,10 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 	"seehuhn.de/go/sfnt/type1"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 // LoadFont loads a fonts from a file and embeds it into a PDF document as a
@@ -105,7 +106,7 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 }
 
 type fontDict struct {
-	ref *pdf.Reference
+	fontDictRef *pdf.Reference
 
 	info *sfnt.Info
 
@@ -129,7 +130,7 @@ func getDict(info *sfnt.Info, defaultText map[glyph.ID][]rune, w *pdf.Writer) (f
 	}
 
 	return &fontDict{
-		ref: w.Alloc(),
+		fontDictRef: w.Alloc(),
 
 		info: info,
 
@@ -146,42 +147,37 @@ func (fd *fontDict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.Str
 }
 
 func (fd *fontDict) Reference() *pdf.Reference {
-	return fd.ref
+	return fd.fontDictRef
 }
 
 func (fd *fontDict) Write(w *pdf.Writer) error {
 	// Determine the subset of glyphs to include.
 	encoding := fd.enc.Encoding()
+	var subsetGlyphs []glyph.ID
+	subsetGlyphs = append(subsetGlyphs, 0) // always include the .notdef glyph
+	for _, p := range encoding {
+		subsetGlyphs = append(subsetGlyphs, p.GID)
+	}
+	subsetTag := font.GetSubsetTag(subsetGlyphs, fd.info.NumGlyphs())
 
-	if len(encoding) == 1 {
+	if len(subsetGlyphs) == 1 {
 		// only the .notdef glyph is used, so we don't need to write the font
 		return nil
 	}
 
-	var subsetGlyphs []glyph.ID
-	for _, p := range encoding {
-		subsetGlyphs = append(subsetGlyphs, glyph.ID(p.CID))
-	}
-
-	// There are three cases for mapping CID to GID values:
-	// - For TrueType fonts, /CidToGidMap in the CIDFont dictionary is used.
-	// - For CFF-based CIDFonts, [cff.Outlines.Gid2cid] is used.
-	// - For CFF-based simple fonts we have CID == GID.
-	//   (We can avoid this case writing any CFF font as a CIDFont.)
-
-	subsetTag := font.GetSubsetTag(subsetGlyphs, fd.info.NumGlyphs())
-
 	// TODO(voss): make sure there is only one copy of this per PDF file.
-	CIDSystemInfo := &type1.ROS{
-		Registry:   "Adobe",
-		Ordering:   "Identity",
-		Supplement: 0,
-	}
+	CIDSystemInfo := fd.enc.CIDSystemInfo()
 	ROS := pdf.Dict{
 		"Registry":   pdf.String(CIDSystemInfo.Registry),
 		"Ordering":   pdf.String(CIDSystemInfo.Ordering),
 		"Supplement": pdf.Integer(CIDSystemInfo.Supplement),
 	}
+
+	// There are three cases for mapping CID to GID values:
+	// - For CFF-based CIDFonts, [cff.Outlines.Gid2cid] is used.
+	// - For CFF-based simple fonts we have CID == GID.
+	//   (We can avoid this case writing any CFF font as a CIDFont.)
+	// - For TrueType fonts, /CidToGidMap in the CIDFont dictionary is used.
 
 	// subset the font
 	subsetInfo := &sfnt.Info{}
@@ -201,12 +197,12 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			}
 		}
 		o2.FdSelect = func(gid glyph.ID) int {
-			// TODO(voss): translate the gid values?
 			return pIdxMap[outlines.FdSelect(gid)]
 		}
 		o2.ROS = CIDSystemInfo
 		o2.Gid2cid = make([]int32, len(subsetGlyphs))
 		for subsetGid, origGid := range subsetGlyphs {
+			// TODO(voss): we need to properly translate GID -> CID here.
 			o2.Gid2cid[subsetGid] = int32(origGid)
 		}
 		subsetInfo.Outlines = o2
@@ -248,6 +244,9 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			o2.Widths = append(o2.Widths, outlines.Widths[gid])
 		}
 		subsetInfo.Outlines = o2
+
+		// Use /CidToGidMap in the CIDFont dictionary (below) to specify the
+		// mapping from CID to GID values.
 		subsetInfo.CMap = nil
 	}
 
@@ -257,21 +256,17 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 
 	DW, W := encodeWidths(fd.info.Widths(), q)
 
-	FontDictRef := fd.ref
+	FontDictRef := fd.fontDictRef
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
 	FontDescriptorRef := w.Alloc()
-	var WidthsRef *pdf.Reference
-	if W != nil {
-		WidthsRef = w.Alloc()
-	}
 	FontFileRef := w.Alloc()
 	ToUnicodeRef := w.Alloc()
 
 	FontDict := pdf.Dict{ // See section 9.7.6.1 of PDF 32000-1:2008.
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
-		"Encoding":        pdf.Name("Identity-H"),
+		"Encoding":        pdf.Name("Identity-H"), // TODO(voss)
 		"DescendantFonts": pdf.Array{CIDFontRef},
 		"ToUnicode":       ToUnicodeRef,
 	}
@@ -281,12 +276,6 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		"BaseFont":       fontName,
 		"CIDSystemInfo":  CIDSystemInfoRef,
 		"FontDescriptor": FontDescriptorRef,
-	}
-	if W != nil {
-		CIDFont["W"] = WidthsRef
-	}
-	if DW != 1000 {
-		CIDFont["DW"] = DW
 	}
 
 	rect := subsetInfo.BBox()
@@ -311,16 +300,28 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 
 	compressedRefs := []*pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, ROS, FontDescriptor}
+
 	if W != nil {
+		WidthsRef := w.Alloc()
+		CIDFont["W"] = WidthsRef
+		if DW != 1000 {
+			CIDFont["DW"] = DW
+		}
+
 		compressedRefs = append(compressedRefs, WidthsRef)
 		compressedObjects = append(compressedObjects, W)
 	}
 
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if w.Version >= pdf.V1_2 {
+		compress.Name = "FlateDecode"
+	}
+
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
-		FontDict["BaseFont"] = fontName + "-" + "Identity-H"
 		CIDFont["Subtype"] = pdf.Name("CIDFontType0")
 		FontDescriptor["FontFile3"] = FontFileRef
+		FontDict["BaseFont"] = fontName + "-" + "Identity-H"
 
 		// Write the "font program".
 		// See section 9.9 of PDF 32000-1:2008 for details.
@@ -328,7 +329,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 			"Subtype": pdf.Name("CIDFontType0C"),
 		}
 		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
-			&pdf.FilterInfo{Name: "FlateDecode"})
+			compress)
 		if err != nil {
 			return err
 		}
@@ -348,14 +349,14 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 	case *glyf.Outlines:
 		CID2GIDMapRef := w.Alloc()
 
-		FontDict["BaseFont"] = fontName
 		CIDFont["Subtype"] = pdf.Name("CIDFontType2")
 		CIDFont["CIDToGIDMap"] = CID2GIDMapRef
 		FontDescriptor["FontFile2"] = FontFileRef
+		FontDict["BaseFont"] = fontName
 
 		cid2gidStream, _, err := w.OpenStream(nil, CID2GIDMapRef,
 			&pdf.FilterInfo{
-				Name: "FlateDecode",
+				Name: compress.Name,
 				Parms: pdf.Dict{
 					"Predictor": pdf.Integer(12),
 					"Columns":   pdf.Integer(2),
@@ -384,10 +385,6 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		fontFileDict := pdf.Dict{
 			"Length1": size,
 		}
-		compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-		if w.Version >= pdf.V1_2 {
-			compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-		}
 		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef, compress)
 		if err != nil {
 			return err
@@ -411,17 +408,17 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		return err
 	}
 
-	// var cc2text []font.CIDMapping
-	// for gid, text := range fd.text {
-	// 	cc2text = append(cc2text, font.CIDMapping{
-	// 		CharCode: uint16(gid),
-	// 		Text:     text,
-	// 	})
-	// }
-	// err = font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
-	// if err != nil {
-	// 	return err
-	// }
+	var cc2text []font.CIDMapping
+	for _, e := range encoding {
+		cc2text = append(cc2text, font.CIDMapping{
+			CharCode: uint16(e.CID),
+			Text:     e.Text,
+		})
+	}
+	_, err = font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -551,7 +548,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 	subsetTag := font.GetSubsetTag(subsetGlyphs, s.info.NumGlyphs())
 
 	// TODO(voss): make sure there is only one copy of this per PDF file.
-	CIDSystemInfo := &type1.ROS{
+	CIDSystemInfo := &type1.CIDSystemInfo{
 		Registry:   "Adobe",
 		Ordering:   "Identity",
 		Supplement: 0,
@@ -800,7 +797,7 @@ func (s *fontHandler) WriteFont(w *pdf.Writer) error {
 			Text:     text,
 		})
 	}
-	err := font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
+	_, err := font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
 	if err != nil {
 		return err
 	}
