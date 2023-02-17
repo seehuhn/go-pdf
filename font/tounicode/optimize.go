@@ -4,25 +4,22 @@ import (
 	"sort"
 
 	"golang.org/x/exp/slices"
-	"seehuhn.de/go/dijkstra"
+
+	"seehuhn.de/go/dag"
+
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 func (info *Info) ToMapping() []Single {
-	var mappings []Single
+	res := make(map[cmap.CID][]uint16)
 	for _, s := range info.Singles {
-		mappings = append(mappings, Single{
-			Code:  s.Code,
-			UTF16: s.UTF16,
-		})
+		res[s.Code] = s.UTF16
 	}
 	for _, r := range info.Ranges {
 		if len(r.UTF16) == 1 {
 			xx := r.UTF16[0]
 			for code := r.First; code <= r.Last; code++ {
-				mappings = append(mappings, Single{
-					Code:  code,
-					UTF16: slices.Clone(xx),
-				})
+				res[code] = xx
 				if canInc(xx) {
 					xx = slices.Clone(xx)
 					inc(xx)
@@ -30,12 +27,14 @@ func (info *Info) ToMapping() []Single {
 			}
 		} else {
 			for code := r.First; code <= r.Last; code++ {
-				mappings = append(mappings, Single{
-					Code:  code,
-					UTF16: r.UTF16[code-r.First],
-				})
+				res[code] = r.UTF16[code-r.First]
 			}
 		}
+	}
+
+	mappings := make([]Single, 0, len(res))
+	for code, utf16 := range res {
+		mappings = append(mappings, Single{code, utf16})
 	}
 	sort.Slice(mappings, func(i, j int) bool { return mappings[i].Code < mappings[j].Code })
 	return mappings
@@ -44,14 +43,12 @@ func (info *Info) ToMapping() []Single {
 func FromMappings(mappings []Single) *Info {
 	for i := 1; i < len(mappings); i++ {
 		if mappings[i-1].Code >= mappings[i].Code {
-			panic("mappings must be sorted by code")
+			panic("mappings must have strictly increasing codes")
 		}
 	}
 
 	graph := optimizer(mappings)
-	ee, err := dijkstra.ShortestPathSet[vertex, edge, int](graph, vertex{}, func(v vertex) bool {
-		return v.pos == len(graph)
-	})
+	ee, err := dag.ShortestPathHist[edge, pathHistory, int](graph, len(mappings))
 	if err != nil {
 		panic(err)
 	}
@@ -59,16 +56,16 @@ func FromMappings(mappings []Single) *Info {
 	info := &Info{
 		CodeSpace: []CodeSpaceRange{{0x0000, 0xFFFF}},
 	}
-	v := vertex{}
+	v := 0
 	for _, e := range ee {
 		if e.to < 0 {
 			info.Singles = append(info.Singles, Single{
-				Code:  graph[v.pos].Code,
+				Code:  graph[v].Code,
 				UTF16: e.repl[0],
 			})
 		} else {
 			info.Ranges = append(info.Ranges, Range{
-				First: graph[v.pos].Code,
+				First: graph[v].Code,
 				Last:  graph[e.to].Code,
 				UTF16: e.repl,
 			})
@@ -85,98 +82,96 @@ type edge struct {
 	repl [][]uint16
 }
 
-type vertex struct {
-	pos                 int
+type pathHistory struct {
 	numSingle, numRange int
 }
 
-func (o optimizer) Edges(vv vertex) []edge {
-	v := vv.pos
-
+func (o optimizer) AppendEdges(ee []edge, v int) []edge {
 	thisRepl := o[v].UTF16
+	onlyThis := [][]uint16{thisRepl}
 
-	res := make([]edge, 0, 3)
-
-	// a bfchar
-	res = append(res, edge{
-		to: -1,
-		repl: [][]uint16{
-			thisRepl,
-		},
+	// bfchar
+	ee = append(ee, edge{
+		to:   -1,
+		repl: onlyThis,
 	})
 
-	// a bfrange with incrementing substitutions
+	// bfrange with incrementing substitutions
 	w1 := v + 1
-	if len(thisRepl) == 1 {
-		delta := int(thisRepl[0]) - int(o[v].Code)
-		for w1 < len(o) && canInc(o[w1].UTF16) && int(o[w1].UTF16[0])-int(o[w1].Code) == delta && o[w1].Code%256 != 0 {
+	if canInc(thisRepl) {
+		repl := slices.Clone(thisRepl)
+		for w1 < len(o) && o[w1].Code == o[w1-1].Code+1 && o[w1].Code%256 != 0 {
+			inc(repl)
+			if !slices.Equal(repl, o[w1].UTF16) {
+				break
+			}
 			w1++
 		}
 	}
-	res = append(res, edge{
-		to: w1 - 1,
-		repl: [][]uint16{
-			thisRepl,
-		},
+	ee = append(ee, edge{
+		to:   w1 - 1,
+		repl: onlyThis,
 	})
 
-	// a bfrange with an array of substitutions
+	// bfrange with an array of substitutions
 	w2 := v + 1
-	for w2 < len(o) && int(w2)-int(v) == int(o[w2].Code)-int(o[v].Code) && o[w2].Code%256 != 0 {
+	for w2 < len(o) && o[w2].Code == o[w2-1].Code+1 && o[w2].Code%256 != 0 {
 		w2++
 	}
 	if w2 > w1 {
 		e := edge{
 			to: w2 - 1,
 		}
+		e.repl = make([][]uint16, w2-v)
 		for i := v; i < w2; i++ {
-			e.repl = append(e.repl, o[i].UTF16)
+			e.repl[i-v] = o[i].UTF16
 		}
-		res = append(res, e)
+		ee = append(ee, e)
 	}
 
-	return res
+	return ee
 }
 
-func (o optimizer) Length(vv vertex, e edge) int {
+func (o optimizer) Length(v int, h pathHistory, e edge) int {
 	var length int
 	if e.to < 0 { // a bfchar
-		if vv.numSingle%100 == 0 {
+		if h.numSingle%100 == 0 {
 			length += 22 // len("beginbfchar\nendbfchar\n")
 		}
 
 		length += 10 + 4*len(e.repl[0]) // len("<xxxx> <yyyy>\n")
 	} else {
-		if vv.numRange%100 == 0 {
+		if h.numRange%100 == 0 {
 			length += 24 // len("beginbfrange\nendbfrange\n")
 		}
 
 		if len(e.repl) == 1 { // a bfrange with incrementing substitutions
-			length += 21 // len("<xxxx> <yyyy> <zzzz>\n")
+			length += 17 + 4*len(e.repl[0]) // len("<xxxx> <yyyy> <zzzz>\n")
 		} else { // a bfrange with an array of substitutions
-			length += 16 // len("<xxxx> <yyyy> []\n")-1
+			length += 16 // len("<xxxx> <yyyy> []\n") - 1
 			for _, repl := range e.repl {
-				length += 1 + 4*len(repl) // len(" <xxxx>")
+				length += 3 + 4*len(repl) // len(" <xxxx>")
 			}
 		}
 	}
 	return length
 }
 
-func (o optimizer) To(v vertex, e edge) vertex {
+func (o optimizer) To(v int, e edge) int {
 	if e.to < 0 {
-		return vertex{
-			pos:       v.pos + 1,
-			numSingle: v.numSingle + 1,
-			numRange:  v.numRange,
-		}
+		return v + 1
 	} else {
-		return vertex{
-			pos:       e.to + 1,
-			numSingle: v.numSingle,
-			numRange:  v.numRange + 1,
-		}
+		return e.to + 1
 	}
+}
+
+func (o optimizer) UpdateHistory(h pathHistory, _ int, e edge) pathHistory {
+	if e.to < 0 {
+		h.numSingle++
+	} else {
+		h.numRange++
+	}
+	return h
 }
 
 func canInc(xx []uint16) bool {
