@@ -48,7 +48,7 @@ func FromMappings(mappings []Single) *Info {
 	}
 
 	graph := optimizer(mappings)
-	ee, err := dag.ShortestPathHist[edge, pathHistory, int](graph, len(mappings))
+	ee, err := dag.ShortestPathDyn[vertex, edge, int](graph, vertex{}, vertex{len(mappings), 0, 0})
 	if err != nil {
 		panic(err)
 	}
@@ -56,16 +56,16 @@ func FromMappings(mappings []Single) *Info {
 	info := &Info{
 		CodeSpace: []CodeSpaceRange{{0x0000, 0xFFFF}},
 	}
-	v := 0
+	v := vertex{}
 	for _, e := range ee {
 		if e.to < 0 {
 			info.Singles = append(info.Singles, Single{
-				Code:  graph[v].Code,
+				Code:  graph[v.pos].Code,
 				UTF16: e.repl[0],
 			})
 		} else {
 			info.Ranges = append(info.Ranges, Range{
-				First: graph[v].Code,
+				First: graph[v.pos].Code,
 				Last:  graph[e.to].Code,
 				UTF16: e.repl,
 			})
@@ -75,18 +75,42 @@ func FromMappings(mappings []Single) *Info {
 	return info
 }
 
-type optimizer []Single
-
 type edge struct {
 	to   int
 	repl [][]uint16
 }
 
-type pathHistory struct {
+type vertex struct {
+	pos                 int
 	numSingle, numRange int
 }
 
-func (o optimizer) AppendEdges(ee []edge, v int) []edge {
+func (v vertex) Before(other vertex) bool {
+	if v.pos != other.pos {
+		return v.pos < other.pos
+	}
+
+	// The following would be accurate, but too expensive:
+	//
+	//     if v.numSingle != other.numSingle {
+	//         return v.numSingle < other.numSingle
+	//     }
+	//     return v.numRange < other.numRange
+	//
+	// instead, we use the following heuristic:
+
+	if v.numSingle == 0 && other.numSingle > 0 {
+		return true
+	} else if v.numSingle > 0 && other.numSingle == 0 {
+		return false
+	}
+	return v.numRange == 0 && other.numRange > 0
+}
+
+type optimizer []Single
+
+func (o optimizer) AppendEdges(ee []edge, vert vertex) []edge {
+	v := vert.pos
 	thisRepl := o[v].UTF16
 	onlyThis := [][]uint16{thisRepl}
 
@@ -132,16 +156,16 @@ func (o optimizer) AppendEdges(ee []edge, v int) []edge {
 	return ee
 }
 
-func (o optimizer) Length(v int, h pathHistory, e edge) int {
+func (o optimizer) Length(v vertex, e edge) int {
 	var length int
 	if e.to < 0 { // a bfchar
-		if h.numSingle%100 == 0 {
+		if v.numSingle%100 == 0 {
 			length += 22 // len("beginbfchar\nendbfchar\n")
 		}
 
 		length += 10 + 4*len(e.repl[0]) // len("<xxxx> <yyyy>\n")
 	} else {
-		if h.numRange%100 == 0 {
+		if v.numRange%100 == 0 {
 			length += 24 // len("beginbfrange\nendbfrange\n")
 		}
 
@@ -157,21 +181,20 @@ func (o optimizer) Length(v int, h pathHistory, e edge) int {
 	return length
 }
 
-func (o optimizer) To(v int, e edge) int {
+func (o optimizer) To(v vertex, e edge) vertex {
 	if e.to < 0 {
-		return v + 1
+		return vertex{
+			pos:       v.pos + 1,
+			numSingle: v.numSingle + 1,
+			numRange:  v.numRange,
+		}
 	} else {
-		return e.to + 1
+		return vertex{
+			pos:       e.to + 1,
+			numSingle: v.numSingle,
+			numRange:  v.numRange + 1,
+		}
 	}
-}
-
-func (o optimizer) UpdateHistory(h pathHistory, _ int, e edge) pathHistory {
-	if e.to < 0 {
-		h.numSingle++
-	} else {
-		h.numRange++
-	}
-	return h
 }
 
 func canInc(xx []uint16) bool {

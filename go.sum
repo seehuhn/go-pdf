@@ -13,5 +13,7 @@ seehuhn.de/go/dag v0.0.0-20230217151937-aec859152b2f h1:uNfBn4sdNP5KNbRhUUTuRJLF
 seehuhn.de/go/dag v0.0.0-20230217151937-aec859152b2f/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
 seehuhn.de/go/dijkstra v0.9.2 h1:mu4jjs96BmNty4L6pZHepUdkWB8OmUNT6bjkiZjO4F4=
 seehuhn.de/go/dijkstra v0.9.2/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
+seehuhn.de/go/dijkstra v0.9.3 h1:uVbFjlAuhlwV45qM7S4Wz+C7XlfbgAaTfcZX1r8OgIA=
+seehuhn.de/go/dijkstra v0.9.3/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
 seehuhn.de/go/sfnt v0.0.0-20230119181350-fc0db9c6f2af h1:6TzbBje70tKWOyfQ7+sp08GobZpACYVMhhFR4sfv9zo=
 seehuhn.de/go/sfnt v0.0.0-20230119181350-fc0db9c6f2af/go.mod h1:LFWRVq8pHKX7HQ5vbLSZezcnSwo9qQuJ5/n3lwkt31Q=

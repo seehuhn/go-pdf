@@ -37,11 +37,13 @@ func (info *Info) Embed(w *pdf.Writer, ref *pdf.Reference) (*pdf.Reference, erro
 }
 
 func (info *Info) Write(w io.Writer) error {
-	if !isValidVCString(info.ROS.Registry) {
-		return errors.New("invalid registry")
-	}
-	if !isValidVCString(info.ROS.Ordering) {
-		return errors.New("invalid ordering")
+	if info.ROS != nil {
+		if !isValidVCString(info.ROS.Registry) {
+			return errors.New("invalid registry")
+		}
+		if !isValidVCString(info.ROS.Ordering) {
+			return errors.New("invalid ordering")
+		}
 	}
 
 	tmpl := template.Must(template.New("CMap").Funcs(template.FuncMap{
@@ -157,13 +159,17 @@ func rangeChunks(x []Range) [][]Range {
 var toUnicodeTmpl = `/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
+{{if .Name -}}
 /CMapName {{PDF .Name}} def
+{{end -}}
 /CMapType 2 def
+{{if .ROS -}}
 /CIDSystemInfo <<
   /Registry {{PDFString .ROS.Registry}}
   /Ordering {{PDFString .ROS.Ordering}}
   /Supplement {{.ROS.Supplement}}
 >> def
+{{end -}}
 {{len .CodeSpace}} begincodespacerange
 {{range .CodeSpace -}}
 {{.}}

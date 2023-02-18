@@ -13,5 +13,5 @@ require (
 
 require (
 	golang.org/x/sys v0.1.0 // indirect
-	seehuhn.de/go/dijkstra v0.9.2 // indirect
+	seehuhn.de/go/dijkstra v0.9.3 // indirect
 )
