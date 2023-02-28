@@ -137,6 +137,16 @@ func (p *Page) coord(x float64) string {
 	return float.Format(x, 2)
 }
 
+func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
+	if p.resources == nil {
+		p.resources = &pdf.Resources{}
+	}
+	if p.resources.ExtGState == nil {
+		p.resources.ExtGState = pdf.Dict{}
+	}
+	p.resources.ExtGState[name] = dict
+}
+
 type state int
 
 // See Figure 9 (p. 113) of PDF 32000-1:2008.

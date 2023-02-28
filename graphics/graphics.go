@@ -17,7 +17,11 @@
 // Package graphics allows to draw on a PDF page.
 package graphics
 
-import "fmt"
+import (
+	"fmt"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PushGraphicsState saves the current graphics state.
 func (p *Page) PushGraphicsState() {
@@ -39,6 +43,22 @@ func (p *Page) PopGraphicsState() {
 	if p.err == nil {
 		p.err = err
 	}
+}
+
+// SetGraphicsState sets selected graphics state parameters.
+// The argument dictName must be the name of a graphics state dictionary
+// that has been defined using the [Page.AddExtGState] method.
+func (p *Page) SetGraphicsState(dictName pdf.Name) {
+	if !p.valid("SetGraphicsState", stateGlobal, stateText) {
+		return
+	}
+
+	err := dictName.PDF(p.content)
+	if err != nil {
+		p.err = err
+		return
+	}
+	_, p.err = fmt.Fprintln(p.content, " gs")
 }
 
 // Translate moves the origin of the coordinate system.

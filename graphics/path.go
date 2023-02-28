@@ -168,3 +168,29 @@ func (p *Page) FillAndStroke() {
 	p.state = stateGlobal
 	_, p.err = fmt.Fprintln(p.content, "B")
 }
+
+// EndPath ends the path without filling and stroking it.
+// This is for use after the [Page.ClipNonZero] and [Page.ClipEvenOdd] methods.
+func (p *Page) EndPath() {
+	if !p.valid("EndPath", statePath, stateClipped) {
+		return
+	}
+	p.state = stateGlobal
+	_, p.err = fmt.Fprintln(p.content, "n")
+}
+
+func (p *Page) ClipNonZero() {
+	if !p.valid("ClipNonZero", statePath) {
+		return
+	}
+	p.state = stateClipped
+	_, p.err = fmt.Fprintln(p.content, "W")
+}
+
+func (p *Page) ClipEvenOdd() {
+	if !p.valid("ClipEvenOdd", statePath) {
+		return
+	}
+	p.state = stateClipped
+	_, p.err = fmt.Fprintln(p.content, "W*")
+}
