@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package tounicode
 
 import (
@@ -41,6 +57,8 @@ func (info *Info) containsRange(first, last cmap.CID) bool {
 	return false
 }
 
+// A CodeSpaceRange describes a range of character codes, like "<00> <FF>"
+// for one-byte codes or "<0000> <FFFF>" for two-byte codes.
 type CodeSpaceRange struct {
 	First cmap.CID
 	Last  cmap.CID
@@ -60,11 +78,20 @@ func (c CodeSpaceRange) String() string {
 	return fmt.Sprintf("<"+format+"> <"+format+">", c.First, c.Last)
 }
 
+// Single describes a single character code.
+// It specifies that character code Code represents the given UTF16-encoded
+// unicode string.
 type Single struct {
 	Code  cmap.CID
 	UTF16 []uint16
 }
 
+// Range describes a range of character codes.
+// First and Last are the first and last code points in the range. UTF16 is a
+// list of UTF16-encoded unicode strings.  If the list has length one, then the
+// replacement character is incremented by one for each code point in the
+// range.  Otherwise, the list must have the length Last-First+1, and specify
+// the UTF16 encoding for each code point in the range.
 type Range struct {
 	First cmap.CID
 	Last  cmap.CID

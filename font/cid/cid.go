@@ -38,13 +38,11 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
-// LoadFont loads a fonts from a file and embeds it into a PDF document as a
-// simple font. At the moment, only TrueType and OpenType fonts are supported.
+// LoadFont loads a font from a file as a PDF CIDFont.
+// At the moment, only TrueType and OpenType fonts are supported.
 //
-// Up to 256 distinct glyphs from the font file can be accessed via the
-// returned font object.  In comparison, fonts embedded via cid.LoadFont() lead
-// to larger PDF files but there is no limit on the number of distinct glyphs
-// which can be accessed.
+// CIDFonts lead to larger PDF files than simple fonts, but there is no limit
+// on the number of distinct glyphs which can be accessed.
 func LoadFont(fname string, resourceName pdf.Name, loc language.Tag) (*font.NewFont, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
@@ -59,13 +57,10 @@ func LoadFont(fname string, resourceName pdf.Name, loc language.Tag) (*font.NewF
 	return Font(info, resourceName, loc)
 }
 
-// Embed embeds a font into a PDF document as a simple font.
-// At the moment, only TrueType and OpenType fonts are supported.
+// Font creates a PDF CIDFont.
 //
-// Up to 256 distinct glyphs from the font file can be accessed via the
-// returned font object.  In comparison, fonts embedded via cid.NewFile() lead
-// to larger PDF files but there is no limit on the number of distinct glyphs
-// which can be accessed.
+// CIDFonts lead to larger PDF files than simple fonts, but there is no limit
+// on the number of distinct glyphs which can be accessed.
 func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFont, error) {
 	gsubLookups := info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures)
 	gposLookups := info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures)
@@ -159,11 +154,6 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		subsetGlyphs = append(subsetGlyphs, p.GID)
 	}
 	subsetTag := font.GetSubsetTag(subsetGlyphs, fd.info.NumGlyphs())
-
-	if len(subsetGlyphs) == 1 {
-		// only the .notdef glyph is used, so we don't need to write the font
-		return nil
-	}
 
 	// TODO(voss): make sure there is only one copy of this per PDF file.
 	CIDSystemInfo := fd.enc.CIDSystemInfo()

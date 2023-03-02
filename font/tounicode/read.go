@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package tounicode
 
 import (
@@ -12,6 +28,7 @@ import (
 	"seehuhn.de/go/sfnt/type1"
 )
 
+// Read reads and parses a ToUnicode CMap from the given reader.
 func Read(r io.Reader) (*Info, error) {
 	outer, err := io.ReadAll(r)
 	if err != nil {
@@ -277,4 +294,5 @@ var (
 	supplementRegexp = regexp.MustCompile(`(?is)/CIDSystemInfo\s*<<.*?/Supplement\s*([0-9]+)`)
 )
 
+// ErrInvalid is returned when a ToUnicode CMap cannot be parsed.
 var ErrInvalid = errors.New("invalid ToUnicode CMap")

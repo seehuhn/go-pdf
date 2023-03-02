@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// Font represents a font embedded in the PDF file.
+// Font represents a font which can be embedded in a PDF file.
 type NewFont struct {
 	UnitsPerEm         uint16
 	Ascent             funit.Int16

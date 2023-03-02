@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package tounicode
 
 import (
@@ -10,6 +26,9 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
+// ToMapping converts the ToUnicode CMap to a list of mappings.
+// All ranges are expanded to single mappings.
+// The returned mappings are sorted by the character code.
 func (info *Info) ToMapping() []Single {
 	res := make(map[cmap.CID][]uint16)
 	for _, s := range info.Singles {
@@ -40,6 +59,10 @@ func (info *Info) ToMapping() []Single {
 	return mappings
 }
 
+// FromMappings creates a ToUnicode CMap from a list of mappings.
+// The mappings must be sorted by code, and the code values must be
+// strictly increasing.
+// The returned CMap is optimized to minimize encoded CMap size.
 func FromMappings(mappings []Single) *Info {
 	for i := 1; i < len(mappings); i++ {
 		if mappings[i-1].Code >= mappings[i].Code {

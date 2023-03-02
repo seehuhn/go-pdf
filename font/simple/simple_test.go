@@ -82,3 +82,30 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMakeSubset(t *testing.T) {
+	origEncoding := make([]glyph.ID, 256)
+	for i := 0; i < 10; i++ {
+		origEncoding[32+10*i] = glyph.ID(2*i + 4)
+	}
+
+	subsetEncoding, subsetGlyphs := makeSubset(origEncoding)
+	if len(subsetGlyphs) != 11 {
+		t.Errorf("wrong number of glyphs: %d", len(subsetGlyphs))
+	}
+	if subsetGlyphs[0] != 0 {
+		t.Errorf("wrong glyph ID for .notdef: %d", subsetGlyphs[0])
+	}
+	for i := 0; i < 10; i++ {
+		if subsetGlyphs[i+1] != glyph.ID(2*i+4) {
+			t.Errorf("wrong glyph ID for %d: %d", i, subsetGlyphs[i+1])
+		}
+	}
+
+	for i, subsetGID := range subsetEncoding {
+		origGid := subsetGlyphs[subsetGID]
+		if origGid != origEncoding[i] {
+			t.Errorf("wrong mapping for %d: %d", i, origGid)
+		}
+	}
+}

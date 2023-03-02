@@ -40,8 +40,8 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
-// LoadFont loads a fonts from a file and embeds it into a PDF document as a
-// simple font. At the moment, only TrueType and OpenType fonts are supported.
+// LoadFont loads a font from a file as a simple PDF font.
+// At the moment, only TrueType and OpenType fonts are supported.
 //
 // Up to 256 distinct glyphs from the font file can be accessed via the
 // returned font object.  In comparison, fonts embedded via cid.LoadFont() lead
@@ -61,11 +61,10 @@ func LoadFont(fname string, resourceName pdf.Name, loc language.Tag) (*font.NewF
 	return Font(info, resourceName, loc)
 }
 
-// Embed embeds a font into a PDF document as a simple font.
-// At the moment, only TrueType and OpenType fonts are supported.
+// Font creates a simple PDF font.
 //
 // Up to 256 distinct glyphs from the font file can be accessed via the
-// returned font object.  In comparison, fonts embedded via cid.NewFile() lead
+// returned font object.  In comparison, fonts embedded via cid.Font() lead
 // to larger PDF files but there is no limit on the number of distinct glyphs
 // which can be accessed.
 func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFont, error) {
@@ -165,17 +164,12 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		firstChar++
 	}
 	lastChar := cmap.CID(len(encoding) - 1)
-	for lastChar >= firstChar && encoding[lastChar] == 0 {
+	for lastChar > firstChar && encoding[lastChar] == 0 {
 		lastChar--
 	}
 
 	subsetEncoding, subsetGlyphs := makeSubset(encoding)
 	subsetTag := font.GetSubsetTag(subsetGlyphs, fd.info.NumGlyphs())
-
-	if len(subsetGlyphs) == 1 {
-		// only the .notdef glyph is used, so we don't need to write the font
-		return nil
-	}
 
 	// subset the font
 	subsetInfo := &sfnt.Info{}
@@ -199,6 +193,7 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 		}
 		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
 			// Embed as a CID-keyed CFF font.
+
 			// TODO(voss): is this right?
 			o2.ROS = &type1.CIDSystemInfo{
 				Registry:   "Adobe",
@@ -398,6 +393,8 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 	return nil
 }
 
+// MakeSubset returns a new encoding vector for the subsetted font,
+// and a list of glyph IDs to include in the subsetted font.
 func makeSubset(origEncoding []glyph.ID) (subsetEncoding, glyphs []glyph.ID) {
 	subsetEncoding = make([]glyph.ID, 256)
 	glyphs = append(glyphs, 0) // always include the .notdef glyph

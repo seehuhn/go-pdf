@@ -14,21 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cmap
-
-import (
-	"embed"
-
-	"seehuhn.de/go/pdf"
-)
-
-// go:embed predefined/*.gz
-var predefined embed.FS
-
-func Load(name pdf.Name) ([]byte, error) {
-	data, err := predefined.ReadFile("predefined/" + string(name) + ".gz")
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
+// Package tounicode reads and writes PDF /ToUnicode CMaps.
+// This is a special kind of CMap that maps character codes to Unicode
+// code points.  It is used to allow PDF readers to extract text from
+// PDF files.
+package tounicode
