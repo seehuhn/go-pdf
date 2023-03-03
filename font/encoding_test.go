@@ -17,10 +17,11 @@
 package font
 
 import (
-	"fmt"
 	"testing"
 	"unicode"
 
+	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/sfnt/type1"
 	"seehuhn.de/go/sfnt/type1/names"
 )
 
@@ -33,7 +34,7 @@ type OldEncoding interface {
 
 	// Decode returns the rune corresponding to a given character code.  This
 	// is the inverse of Encode for all runes where Encode returns true in the
-	// second return value.  DecodeX() returns unicode.ReplacementChar for
+	// second return value.  Decode() returns unicode.ReplacementChar for
 	// undefined code points.
 	Decode(c byte) rune
 }
@@ -85,14 +86,38 @@ func TestBuiltinEncodings(t *testing.T) {
 	}
 }
 
-func TestXXX(t *testing.T) {
+func TestStandardEncoding(t *testing.T) {
+	std := StandardEncoding
+
+	m1 := make(map[byte]rune)
 	for i := 0; i < 256; i++ {
 		c := byte(i)
-		r := MacExpertEncoding.Decode(c)
+		r := std.Decode(c)
 		if r == unicode.ReplacementChar {
 			continue
 		}
-		name := names.FromUnicode(r)
-		fmt.Printf("  %d: %q\n", c, name)
+		m1[c] = r
+	}
+
+	m2 := make(map[byte]rune)
+	for name, code := range type1.StandardEncoding {
+		rr := names.ToUnicode(name, false)
+		if len(rr) != 1 {
+			t.Errorf("bad name: %s", name)
+			continue
+		}
+		r := rr[0]
+		c, ok := std.Encode(r)
+		if !ok {
+			t.Errorf("Encoding failed: %04x->xxx", r)
+		}
+		if c != code {
+			t.Errorf("Encoding failed: %04x->%d", r, c)
+		}
+		m2[code] = r
+	}
+
+	if d := cmp.Diff(m1, m2); d != "" {
+		t.Errorf("mismatch: %s", d)
 	}
 }

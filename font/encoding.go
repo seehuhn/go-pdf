@@ -60,8 +60,8 @@ func (enc *tables) Decode(c byte) rune {
 }
 
 // TODO(voss): There is some redundancy between the following files:
-//     font/type1/encoding.go
-//     font/encoding.go
+//     go-sfnt/type1/encoding.go
+//     go-pdf/font/encoding.go
 
 var fromStandard = []rune{
 	noRune, noRune, noRune, noRune, noRune, noRune, noRune, noRune,

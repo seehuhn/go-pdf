@@ -107,6 +107,7 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 }
 
 type fontDict struct {
+	w           *pdf.Writer
 	fontDictRef *pdf.Reference
 
 	info *sfnt.Info
@@ -131,6 +132,7 @@ func getDict(info *sfnt.Info, defaultText map[glyph.ID][]rune, w *pdf.Writer) (f
 	}
 
 	return &fontDict{
+		w:           w,
 		fontDictRef: w.Alloc(),
 
 		info: info,
@@ -151,10 +153,16 @@ func (fd *fontDict) Reference() *pdf.Reference {
 	return fd.fontDictRef
 }
 
-func (fd *fontDict) Write(w *pdf.Writer) error {
+func (fd *fontDict) Close() error {
 	if fd.enc.Overflow() {
 		return fmt.Errorf("too many distinct glyphs for simple font %q",
 			fd.info.FullName())
+	}
+
+	w := fd.w
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if w.Version >= pdf.V1_2 {
+		compress.Name = "FlateDecode"
 	}
 
 	// Determine the subset of glyphs to include.
@@ -310,11 +318,6 @@ func (fd *fontDict) Write(w *pdf.Writer) error {
 
 	compressedRefs := []*pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
-
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if w.Version >= pdf.V1_2 {
-		compress.Name = "FlateDecode"
-	}
 
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:

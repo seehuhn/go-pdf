@@ -101,6 +101,7 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 }
 
 type fontDict struct {
+	w           *pdf.Writer
 	fontDictRef *pdf.Reference
 
 	info *sfnt.Info
@@ -125,6 +126,7 @@ func getDict(info *sfnt.Info, defaultText map[glyph.ID][]rune, w *pdf.Writer) (f
 	}
 
 	return &fontDict{
+		w:           w,
 		fontDictRef: w.Alloc(),
 
 		info: info,
@@ -145,7 +147,9 @@ func (fd *fontDict) Reference() *pdf.Reference {
 	return fd.fontDictRef
 }
 
-func (fd *fontDict) Write(w *pdf.Writer) error {
+func (fd *fontDict) Close() error {
+	w := fd.w
+
 	// Determine the subset of glyphs to include.
 	encoding := fd.enc.Encoding()
 	var subsetGlyphs []glyph.ID

@@ -17,3 +17,5 @@ seehuhn.de/go/sfnt v0.0.0-20230221152810-19ee833c296e h1:shpzvLLfxUTct8L/ouPGSC0
 seehuhn.de/go/sfnt v0.0.0-20230221152810-19ee833c296e/go.mod h1:RKgZDBBqBN+2fWeDy9XCo7h43c/oKLcoNORfiGDVek4=
 seehuhn.de/go/sfnt v0.0.0-20230302122842-6cdfbf51962a h1:UZynjbLu6+9qd+XE08S0CIhEurLYczxcbRUMFLh8tm0=
 seehuhn.de/go/sfnt v0.0.0-20230302122842-6cdfbf51962a/go.mod h1:5c8lCHyX7n5Wy0G2xsz3sitI4WbqEYhV5hq5hrvBfSE=
+seehuhn.de/go/sfnt v0.0.0-20230303175840-8ba52fbc4bee h1:5A2581L3K4EjLdrA6GLWwv3sIwgIl5SPs5Belvnvf10=
+seehuhn.de/go/sfnt v0.0.0-20230303175840-8ba52fbc4bee/go.mod h1:5c8lCHyX7n5Wy0G2xsz3sitI4WbqEYhV5hq5hrvBfSE=

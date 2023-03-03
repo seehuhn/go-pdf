@@ -50,7 +50,7 @@ type NewFont struct {
 type Dict interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 	Reference() *pdf.Reference
-	Write(w *pdf.Writer) error
+	Close() error
 }
 
 // Font represents a font embedded in the PDF file.

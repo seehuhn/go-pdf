@@ -39,6 +39,8 @@ type Writer struct {
 	// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 	Catalog *Catalog
 
+	Tagged bool
+
 	info *Info
 
 	w               *posWriter
@@ -74,7 +76,7 @@ type WriterOptions struct {
 type Resource interface {
 	// Write writes the resource to the PDF file.  No changes can be
 	// made to the resource after it has been written.
-	Write(w *Writer) error
+	Close() error
 
 	Reference() *Reference
 }
@@ -246,7 +248,7 @@ func (pdf *Writer) Close() error {
 		return ri.Number < rj.Number
 	})
 	for _, r := range rr {
-		err := r.Write(pdf)
+		err := r.Close()
 		if err != nil {
 			return err
 		}
@@ -261,6 +263,14 @@ func (pdf *Writer) Close() error {
 
 	if pdf.Catalog.Pages == nil {
 		return errors.New("no pages in PDF")
+	}
+	if pdf.Tagged {
+		MarkInfo, _ := pdf.Catalog.MarkInfo.(Dict)
+		if MarkInfo == nil {
+			MarkInfo = Dict{}
+		}
+		MarkInfo["Marked"] = Bool(true)
+		pdf.Catalog.MarkInfo = MarkInfo
 	}
 	catRef, err := pdf.Write(AsDict(pdf.Catalog), nil)
 	if err != nil {

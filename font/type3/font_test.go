@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/sfnt/funit"
 )
 
 func TestType3(t *testing.T) {
@@ -30,16 +31,15 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Builder, err := New(w, 1000)
+	F1Builder, err := New(1000)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	g, err := F1Builder.AddGlyph('A', 1000)
+	g, err := F1Builder.AddGlyph(pdf.Name("A"), 1000, funit.Rect{0, 0, 750, 750}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g.Println("1000 0 0 0 750 750 d1")
 	g.Println("0 0 750 750 re")
 	g.Println("f")
 	err = g.Close()
@@ -47,11 +47,10 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g, err = F1Builder.AddGlyph('B', 1000)
+	g, err = F1Builder.AddGlyph(pdf.Name("B"), 1000, funit.Rect{0, 0, 750, 750}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g.Println("1000 0 0 0 750 750 d1")
 	g.Println("0 0 m")
 	g.Println("375 750 l")
 	g.Println("750 0 l")
@@ -61,10 +60,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1, err := F1Builder.Embed("F1")
-	if err != nil {
-		t.Fatal(err)
-	}
+	F1 := F1Builder.MakeFont("F1")
 
 	pageTree := pages.InstallTree(w, nil)
 
@@ -74,7 +70,7 @@ func TestType3(t *testing.T) {
 	}
 
 	page.BeginText()
-	page.SetFont(F1, 12)
+	page.SetNewFont(F1, 12)
 	page.StartLine(72, 340)
 	page.ShowText("ABABAB")
 	page.EndText()
