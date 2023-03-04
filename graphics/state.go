@@ -21,15 +21,16 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/color"
 )
 
 // PushGraphicsState saves the current graphics state.
 func (p *Page) PushGraphicsState() {
 	// TODO(voss): does this require certain states?
-	p.stack = append(p.stack, p.state)
-	_, err := fmt.Fprintln(p.content, "q")
-	if p.err == nil {
-		p.err = err
+	p.stack = append(p.stack, p.currentObject)
+	_, err := fmt.Fprintln(p.Content, "q")
+	if p.Err == nil {
+		p.Err = err
 	}
 }
 
@@ -37,28 +38,38 @@ func (p *Page) PushGraphicsState() {
 func (p *Page) PopGraphicsState() {
 	// TODO(voss): does this require certain states?
 	n := len(p.stack) - 1
-	p.state = p.stack[n]
+	p.currentObject = p.stack[n]
 	p.stack = p.stack[:n]
-	_, err := fmt.Fprintln(p.content, "Q")
-	if p.err == nil {
-		p.err = err
+	_, err := fmt.Fprintln(p.Content, "Q")
+	if p.Err == nil {
+		p.Err = err
 	}
 }
 
-// SetGraphicsState sets selected graphics state parameters.
+// SetExtGState sets selected graphics state parameters.
 // The argument dictName must be the name of a graphics state dictionary
 // that has been defined using the [Page.AddExtGState] method.
-func (p *Page) SetGraphicsState(dictName pdf.Name) {
-	if !p.valid("SetGraphicsState", stateGlobal, stateText) {
+func (p *Page) SetExtGState(dictName pdf.Name) {
+	if !p.valid("SetGraphicsState", objPage, objText) {
 		return
 	}
 
-	err := dictName.PDF(p.content)
+	err := dictName.PDF(p.Content)
 	if err != nil {
-		p.err = err
+		p.Err = err
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, " gs")
+	_, p.Err = fmt.Fprintln(p.Content, " gs")
+}
+
+func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
+	if p.Resources == nil {
+		p.Resources = &pdf.Resources{}
+	}
+	if p.Resources.ExtGState == nil {
+		p.Resources.ExtGState = pdf.Dict{}
+	}
+	p.Resources.ExtGState[name] = dict
 }
 
 // Translate moves the origin of the coordinate system.
@@ -66,10 +77,10 @@ func (p *Page) SetGraphicsState(dictName pdf.Name) {
 // drawing the rectangle [dx, dx+1] x [dy, dy+1] in the original
 // coordinate system.
 func (p *Page) Translate(dx, dy float64) {
-	if !p.valid("Translate", stateGlobal, stateText) {
+	if !p.valid("Translate", objPage, objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, 1, 0, 0, 1,
+	_, p.Err = fmt.Fprintln(p.Content, 1, 0, 0, 1,
 		p.coord(dx), p.coord(dy), "cm")
 }
 
@@ -78,10 +89,10 @@ func (p *Page) Translate(dx, dy float64) {
 // drawing the rectangle [0, xScale] x [0, yScale] in the original
 // coordinate system.
 func (p *Page) Scale(xScale, yScale float64) {
-	if !p.valid("Scale", stateGlobal, stateText) {
+	if !p.valid("Scale", objPage, objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(xScale), 0, 0, p.coord(yScale),
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(xScale), 0, 0, p.coord(yScale),
 		0, 0, "cm")
 }
 
@@ -90,27 +101,27 @@ func (p *Page) Scale(xScale, yScale float64) {
 // drawing the rectangle [dx, dx+xScale] x [dy, dy+yScale] in the original
 // coordinate system.
 func (p *Page) TranslateAndScale(dx, dy, xScale, yScale float64) {
-	if !p.valid("TranslateAndScale", stateGlobal, stateText) {
+	if !p.valid("TranslateAndScale", objPage, objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(xScale), 0, 0, p.coord(yScale),
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(xScale), 0, 0, p.coord(yScale),
 		p.coord(dx), p.coord(dy), "cm")
 }
 
 // SetLineWidth sets the line width.
 func (p *Page) SetLineWidth(width float64) {
-	if !p.valid("SetLineWidth", stateGlobal, stateText) {
+	if !p.valid("SetLineWidth", objPage, objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(width), "w")
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(width), "w")
 }
 
 // SetLineCap sets the line cap style.
 func (p *Page) SetLineCap(cap LineCapStyle) {
-	if !p.valid("SetLineCap", stateGlobal, stateText) {
+	if !p.valid("SetLineCap", objPage, objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, int(cap), "J")
+	_, p.Err = fmt.Fprintln(p.Content, int(cap), "J")
 }
 
 // LineCapStyle is the style of the end of a line.
@@ -126,10 +137,10 @@ const (
 
 // SetLineJoin sets the line join style.
 func (p *Page) SetLineJoin(join LineJoinStyle) {
-	if !p.valid("SetLineJoin", stateGlobal, stateText) {
+	if !p.valid("SetLineJoin", objPage, objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, int(join), "j")
+	_, p.Err = fmt.Fprintln(p.Content, int(join), "j")
 }
 
 // LineJoinStyle is the style of the corner of a line.
@@ -141,3 +152,25 @@ const (
 	LineJoinRound LineJoinStyle = 1
 	LineJoinBevel LineJoinStyle = 2
 )
+
+// SetFillColor sets the fill color in the graphics state.
+// If col is nil, the fill color is not changed.
+func (p *Page) SetFillColor(col color.Color) {
+	if !p.valid("SetFillColor", objPage, objText) {
+		return
+	}
+	if col != nil {
+		p.Err = col.SetFill(p.Content)
+	}
+}
+
+// SetStrokeColor sets the stroke color in the graphics state.
+// If col is nil, the stroke color is not changed.
+func (p *Page) SetStrokeColor(col color.Color) {
+	if !p.valid("SetStrokeColor", objPage, objText) {
+		return
+	}
+	if col != nil {
+		p.Err = col.SetStroke(p.Content)
+	}
+}

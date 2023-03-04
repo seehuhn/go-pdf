@@ -80,6 +80,16 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 		}
 	}
 
+	widths := info.Widths()
+
+	sfi := &sharedFontInfo{
+		info:        info,
+		widths:      widths,
+		gsubLookups: gsubLookups,
+		gposLookups: gposLookups,
+		defaultText: defaultText,
+	}
+
 	res := &font.NewFont{
 		UnitsPerEm:         info.UnitsPerEm,
 		Ascent:             info.Ascent,
@@ -88,58 +98,67 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 		GlyphExtents:       info.Extents(),
-		Widths:             info.Widths(),
-		Layout: func(rr []rune) glyph.Seq {
-			gg := info.Layout(rr, gsubLookups, gposLookups)
-			for _, g := range gg {
-				if g.Text != nil && defaultText[g.Gid] == nil {
-					defaultText[g.Gid] = g.Text
-				}
-			}
-			return gg
-		},
-		ResourceName: resourceName,
-		GetDict: func(w *pdf.Writer) (font.Dict, error) {
-			return getDict(info, defaultText, w)
+		Widths:             widths,
+		Layout:             sfi.Typeset,
+		ResourceName:       resourceName,
+		GetDict: func(w *pdf.Writer, resName pdf.Name) (font.Dict, error) {
+			return getDict(w, resName, sfi)
 		},
 	}
 	return res, nil
 }
 
+type sharedFontInfo struct {
+	info        *sfnt.Info
+	widths      []funit.Int16
+	gsubLookups []gtab.LookupIndex
+	gposLookups []gtab.LookupIndex
+	defaultText map[glyph.ID][]rune
+}
+
+func (sfi *sharedFontInfo) Typeset(s string, ptSize float64) glyph.Seq {
+	rr := []rune(s)
+	return sfi.info.Layout(rr, sfi.gsubLookups, sfi.gposLookups)
+}
+
 type fontDict struct {
 	w           *pdf.Writer
 	fontDictRef *pdf.Reference
-
-	info *sfnt.Info
-
-	defaultText map[glyph.ID][]rune
-	enc         cmap.SimpleEncoder
+	resName     pdf.Name
+	*sharedFontInfo
+	enc cmap.SimpleEncoder
 }
 
-func getDict(info *sfnt.Info, defaultText map[glyph.ID][]rune, w *pdf.Writer) (font.Dict, error) {
-	if info.IsGlyf() {
+func getDict(w *pdf.Writer, resName pdf.Name, sfi *sharedFontInfo) (font.Dict, error) {
+	if sfi.info.IsGlyf() {
 		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
 		if err != nil {
 			return nil, err
 		}
-	} else if info.IsCFF() {
+	} else if sfi.info.IsCFF() {
 		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_2)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		panic("unexpected glyph format")
+		return nil, errors.New("unsupported font format")
 	}
 
 	return &fontDict{
-		w:           w,
-		fontDictRef: w.Alloc(),
-
-		info: info,
-
-		defaultText: defaultText,
-		enc:         cmap.NewSimpleEncoder(),
+		w:              w,
+		fontDictRef:    w.Alloc(),
+		resName:        resName,
+		sharedFontInfo: sfi,
+		enc:            cmap.NewSimpleEncoder(),
 	}, nil
+}
+
+func (fd *fontDict) Reference() *pdf.Reference {
+	return fd.fontDictRef
+}
+
+func (fd *fontDict) ResourceName() pdf.Name {
+	return fd.resName
 }
 
 func (fd *fontDict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
@@ -149,8 +168,12 @@ func (fd *fontDict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.Str
 	return append(s, fd.enc.Encode(gid, rr))
 }
 
-func (fd *fontDict) Reference() *pdf.Reference {
-	return fd.fontDictRef
+func (fd *fontDict) GetUnitsPerEm() uint16 {
+	return fd.info.UnitsPerEm
+}
+
+func (fd *fontDict) GetWidths() []funit.Int16 {
+	return fd.widths
 }
 
 func (fd *fontDict) Close() error {

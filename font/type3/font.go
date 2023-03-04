@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/tounicode"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/os2"
@@ -86,21 +87,31 @@ func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, sh
 	if _, exists := b.idx[name]; exists {
 		return nil, errors.New("glyph already present")
 	}
+
+	if len(b.glyphs) == 0 && name != ".notdef" {
+		b.names = append(b.names, "")
+		b.glyphs = append(b.glyphs, nil)
+		b.widths = append(b.widths, 0)
+		b.glyphExtents = append(b.glyphExtents, funit.Rect{})
+	}
+
 	gid := len(b.glyphs)
+	b.names = append(b.names, name)
 	b.glyphs = append(b.glyphs, nil)
 	b.widths = append(b.widths, width)
 	b.glyphExtents = append(b.glyphExtents, bbox)
 
 	glyph := &Glyph{
-		b:   b,
-		w:   &bytes.Buffer{},
-		gid: gid,
+		Page: graphics.NewPage(&bytes.Buffer{}),
+		b:    b,
+		gid:  gid,
 	}
 
 	if shapeOnly {
-		glyph.Printf("%d 0 %d %d %d %d d1\n", width, bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)
+		fmt.Fprintf(glyph.Content,
+			"%d 0 %d %d %d %d d1\n", width, bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)
 	} else {
-		glyph.Printf("%d 0 d0\n", width)
+		fmt.Fprintf(glyph.Content, "%d 0 d0\n", width)
 	}
 
 	return glyph, nil
@@ -141,9 +152,10 @@ func (b *Builder) MakeFont(resourceName pdf.Name) *font.NewFont {
 	return res
 }
 
-func (b *Builder) layout(runes []rune) glyph.Seq {
-	res := make(glyph.Seq, len(runes))
-	for i, r := range runes {
+func (b *Builder) layout(s string, ptSize float64) glyph.Seq {
+	rr := []rune(s)
+	res := make(glyph.Seq, len(rr))
+	for i, r := range rr {
 		gid := b.cmap[r]
 		res[i].Gid = glyph.ID(gid)
 		res[i].Advance = b.widths[gid]
@@ -152,29 +164,47 @@ func (b *Builder) layout(runes []rune) glyph.Seq {
 	return res
 }
 
-func (b *Builder) getDict(w *pdf.Writer) (font.Dict, error) {
+func (b *Builder) getDict(w *pdf.Writer, resName pdf.Name) (font.Dict, error) {
 	fd := &t3dict{
-		w:   w,
-		ref: w.Alloc(),
-		b:   b,
-		enc: cmap.NewSimpleEncoder(),
+		w:       w,
+		ref:     w.Alloc(),
+		resName: resName,
+		b:       b,
+		enc:     cmap.NewSimpleEncoder(),
 	}
 	return fd, nil
 }
 
 type t3dict struct {
-	w   *pdf.Writer
-	ref *pdf.Reference
-	b   *Builder
-	enc cmap.SimpleEncoder
+	w       *pdf.Writer
+	ref     *pdf.Reference
+	resName pdf.Name
+	b       *Builder
+	enc     cmap.SimpleEncoder
+}
+
+func (fd *t3dict) Reference() *pdf.Reference {
+	return fd.ref
+}
+
+func (fd *t3dict) ResourceName() pdf.Name {
+	return fd.resName
+}
+
+func (fd *t3dict) Typeset(s string, ptSize float64) glyph.Seq {
+	return fd.b.layout(s, ptSize)
 }
 
 func (fd *t3dict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	return append(s, fd.enc.Encode(gid, rr))
 }
 
-func (fd *t3dict) Reference() *pdf.Reference {
-	return fd.ref
+func (fd *t3dict) GetUnitsPerEm() uint16 {
+	return fd.b.unitsPerEm
+}
+
+func (fd *t3dict) GetWidths() []funit.Int16 {
+	return fd.b.widths
 }
 
 func (fd *t3dict) Close() error {
@@ -218,6 +248,9 @@ func (fd *t3dict) Close() error {
 
 	CharProcs := pdf.Dict{}
 	for _, gid := range encoding {
+		if gid == 0 && fd.b.names[0] == "" {
+			continue
+		}
 		if fd.b.glyphRefs[gid] == nil {
 			stream, ref, err := w.OpenStream(nil, nil, compress)
 			if err != nil {
@@ -364,40 +397,14 @@ func symbolNames() map[pdf.Name]bool {
 // 9.6.5 of PDF 32000-1:2008.  The .Close() method must be called after
 // the description has been written.
 type Glyph struct {
+	*graphics.Page
 	b   *Builder
-	w   *bytes.Buffer
 	gid int
 }
 
 // Close most be called after the glyph description has been written.
 func (g *Glyph) Close() error {
-	g.b.glyphs[g.gid] = g.w.Bytes()
+	w := g.Content.(*bytes.Buffer)
+	g.b.glyphs[g.gid] = w.Bytes()
 	return nil
-}
-
-// Write writes the contents of buf to the content stream.  It returns the
-// number of bytes written.  If nn < len(p), it also returns an error
-// explaining why the write is short.
-func (g *Glyph) Write(buf []byte) (int, error) {
-	return g.w.Write(buf)
-}
-
-// Print formats the arguments using their default formats and writes the
-// resulting string to the content stream.  Spaces are added between operands
-// when neither is a string.
-func (g *Glyph) Print(a ...interface{}) (int, error) {
-	return g.w.WriteString(fmt.Sprint(a...))
-}
-
-// Printf formats the arguments according to a format specifier and writes the
-// resulting string to the content stream.
-func (g *Glyph) Printf(format string, a ...interface{}) (int, error) {
-	return g.w.WriteString(fmt.Sprintf(format, a...))
-}
-
-// Println formats its arguments using their default formats and writes the
-// resulting string to the content stream.  Spaces are always added between
-// operands and a newline is appended.
-func (g *Glyph) Println(a ...interface{}) (int, error) {
-	return g.w.WriteString(fmt.Sprintln(a...))
 }

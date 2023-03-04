@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -37,7 +36,7 @@ func TestBalance(t *testing.T) {
 		MediaBox: pages.A4,
 	})
 	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
-		page, err := graphics.AppendPage(tree)
+		page, err := pages.AppendPage(tree)
 		if err != nil {
 			t.Fatal(err)
 		}

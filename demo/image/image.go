@@ -24,7 +24,6 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	pdfimage "seehuhn.de/go/pdf/image"
 	"seehuhn.de/go/pdf/pages"
 )
@@ -50,6 +49,18 @@ func readImage(fname string) (*image.NRGBA, error) {
 	return img, nil
 }
 
+type imageWrapper struct {
+	ref *pdf.Reference
+}
+
+func (im *imageWrapper) Reference() *pdf.Reference {
+	return im.ref
+}
+
+func (im *imageWrapper) ResourceName() pdf.Name {
+	return "I"
+}
+
 func imagePage(img *image.NRGBA) error {
 	out, err := pdf.Create("test.pdf")
 	if err != nil {
@@ -69,13 +80,13 @@ func imagePage(img *image.NRGBA) error {
 		URy: float64(b.Dy()) / dpi * 72,
 	}
 
-	page, err := graphics.NewPage(out)
+	page, err := pages.NewPage(out)
 	if err != nil {
 		return err
 	}
 
 	page.Scale(pageBox.URx, pageBox.URy)
-	page.DrawImage(imageRef)
+	page.DrawImage(&imageWrapper{imageRef})
 
 	dict, err := page.Close()
 	if err != nil {

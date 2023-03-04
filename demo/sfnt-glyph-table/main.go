@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
@@ -132,7 +131,7 @@ type fontTables struct {
 	italicFont *font.Font
 	monoFont   *font.Font
 
-	page   *graphics.Page
+	page   *pages.Page
 	pageNo int
 
 	used float64 // vertical amount of page space currently used
@@ -170,7 +169,7 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 		return err
 	}
 
-	page, err := graphics.AppendPage(f.tree)
+	page, err := pages.AppendPage(f.tree)
 	if err != nil {
 		return err
 	}

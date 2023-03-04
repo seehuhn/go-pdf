@@ -33,7 +33,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -135,7 +134,7 @@ type fontSamples struct {
 	bodyFont  *font.Font
 	titleFont *font.Font
 
-	page *graphics.Page
+	page *pages.Page
 
 	pageNo int
 	fontNo int
@@ -171,7 +170,7 @@ func (f *fontSamples) MakeSpace(vSpace float64) error {
 		return err
 	}
 
-	page, err := graphics.AppendPage(f.tree)
+	page, err := pages.AppendPage(f.tree)
 	if err != nil {
 		return err
 	}

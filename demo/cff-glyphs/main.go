@@ -35,7 +35,6 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt/type1/names"
 )
@@ -152,7 +151,7 @@ type illustrator struct {
 
 func (ctx *illustrator) Show(fnt *cff.Font) error {
 	for i, g := range fnt.Glyphs {
-		page, err := graphics.AppendPage(ctx.pageTree)
+		page, err := pages.AppendPage(ctx.pageTree)
 		if err != nil {
 			return err
 		}

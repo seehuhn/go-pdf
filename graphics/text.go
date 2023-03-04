@@ -22,146 +22,94 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+type Font interface {
+	Resource
+	Typeset(s string, ptSize float64) glyph.Seq
+	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
+	GetUnitsPerEm() uint16
+	GetWidths() []funit.Int16
+}
+
 // BeginText starts a new text object.
 func (p *Page) BeginText() {
-	if !p.valid("BeginText", stateGlobal) {
+	if !p.valid("BeginText", objPage) {
 		return
 	}
-	p.state = stateText
-	_, p.err = fmt.Fprintln(p.content, "BT")
+	p.currentObject = objText
+	_, p.Err = fmt.Fprintln(p.Content, "BT")
 }
 
 // EndText ends the current text object.
 func (p *Page) EndText() {
-	if !p.valid("EndText", stateText) {
+	if !p.valid("EndText", objText) {
 		return
 	}
-	p.state = stateGlobal
+	p.currentObject = objPage
 	p.font = nil
-	_, p.err = fmt.Fprintln(p.content, "ET")
+	_, p.Err = fmt.Fprintln(p.Content, "ET")
 }
 
 // SetFont sets the font and font size.
-func (p *Page) SetNewFont(F *font.NewFont, size float64) {
-	if !p.valid("SetFont", stateText, stateGlobal) {
+func (p *Page) SetFont(font Font, size float64) {
+	if !p.valid("SetFont", objText, objPage) {
 		return
 	}
 
-	if p.resources == nil {
-		p.resources = &pdf.Resources{}
+	if p.Resources == nil {
+		p.Resources = &pdf.Resources{}
 	}
-	if p.resources.Font == nil {
-		p.resources.Font = pdf.Dict{}
+	if p.Resources.Font == nil {
+		p.Resources.Font = pdf.Dict{}
 	}
-
-	fontDictObj := p.w.Resources[F]
-	fontDict, ok := fontDictObj.(font.Dict)
-	if !ok {
-		// embed font into the PDF file
-		var err error
-		fontDict, err = F.GetDict(p.w)
-		if err != nil {
-			p.err = err
-			return
-		}
-		p.w.Resources[F] = fontDict
-	}
-
-	resourceName, seen := p.fonts[fontDict]
-	if !seen {
-		resourceName = F.ResourceName
-		if resourceName != "" && p.resources.Font[resourceName] != nil {
-			// clash: the font name is already in use
-			resourceName = ""
-		}
-		if resourceName == "" {
-			// choose a new name for the font
-			for k := len(p.resources.Font); ; k++ {
-				resourceName = pdf.Name(fmt.Sprintf("F%d", k))
-				if p.resources.Font[resourceName] == nil {
-					break
-				}
-			}
-		}
-		p.fonts[fontDict] = resourceName
-		p.resources.Font[resourceName] = fontDict.Reference()
-	}
-
-	p.newFont = fontDict
-	p.fontSize = size
-	err := resourceName.PDF(p.content)
-	if err != nil {
-		p.err = err
-		return
-	}
-	_, p.err = fmt.Fprintln(p.content, "", size, "Tf")
-}
-
-// SetFont sets the font and font size.
-func (p *Page) SetFont(font *font.Font, size float64) {
-	if !p.valid("SetFont", stateText, stateGlobal) {
-		return
-	}
-
-	if p.resources == nil {
-		p.resources = &pdf.Resources{}
-	}
-	if p.resources.Font == nil {
-		p.resources.Font = pdf.Dict{}
-	}
-	prevFont, ok := p.resources.Font[font.InstName].(*pdf.Reference)
-	if ok && *prevFont != *font.Ref {
-		p.err = fmt.Errorf("font %q already defined", font.InstName)
-		return
-	}
-	p.resources.Font[font.InstName] = font.Ref
+	name := p.resourceName(font, p.Resources.Font, "F%d")
 
 	p.font = font
 	p.fontSize = size
-	err := font.InstName.PDF(p.content)
+
+	err := name.PDF(p.Content)
 	if err != nil {
-		p.err = err
+		p.Err = err
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, "", size, "Tf")
+	_, p.Err = fmt.Fprintln(p.Content, "", size, "Tf")
 }
 
 // StartLine moves to the start of the next line of text.
 func (p *Page) StartLine(x, y float64) {
-	if !p.valid("StartLine", stateText) {
+	if !p.valid("StartLine", objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "Td")
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "Td")
 }
 
 // StartNextLine moves to the start of the next line of text and sets
 // the leading.  Usually, dy is negative.
 func (p *Page) StartNextLine(dx, dy float64) {
-	if !p.valid("StartNextLine", stateText) {
+	if !p.valid("StartNextLine", objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(dx), p.coord(dy), "TD")
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(dx), p.coord(dy), "TD")
 }
 
 // NewLine moves to the start of the next line of text.
 func (p *Page) NewLine() {
-	if !p.valid("NewLine", stateText) {
+	if !p.valid("NewLine", objText) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, "T*")
+	_, p.Err = fmt.Fprintln(p.Content, "T*")
 }
 
 // ShowText draws a string.
 func (p *Page) ShowText(s string) {
-	if !p.valid("ShowText", stateText) {
+	if !p.valid("ShowText", objText) {
 		return
 	}
 	if p.font == nil {
-		p.err = errors.New("no font set")
+		p.Err = errors.New("no font set")
 		return
 	}
 	p.showGlyphsWithMargins(p.font.Typeset(s, p.fontSize), 0, 0)
@@ -172,11 +120,11 @@ func (p *Page) ShowText(s string) {
 // q=0 means left alignment, q=1 means right alignment
 // and q=0.5 means center alignment.
 func (p *Page) ShowTextAligned(s string, w, q float64) {
-	if !p.valid("ShowTextAligned", stateText) {
+	if !p.valid("ShowTextAligned", objText) {
 		return
 	}
 	if p.font == nil {
-		p.err = errors.New("no font set")
+		p.Err = errors.New("no font set")
 		return
 	}
 	p.showGlyphsAligned(p.font.Typeset(s, p.fontSize), w, q)
@@ -184,11 +132,11 @@ func (p *Page) ShowTextAligned(s string, w, q float64) {
 
 // ShowGlyphs draws a sequence of glyphs.
 func (p *Page) ShowGlyphs(gg glyph.Seq) {
-	if !p.valid("ShowGlyphs", stateText) {
+	if !p.valid("ShowGlyphs", objText) {
 		return
 	}
 	if p.font == nil {
-		p.err = errors.New("no font set")
+		p.Err = errors.New("no font set")
 		return
 	}
 
@@ -199,18 +147,20 @@ func (p *Page) ShowGlyphs(gg glyph.Seq) {
 // The beginning of the string is shifted right by a*w+b, where w
 // is the width of the string.
 func (p *Page) ShowGlyphsAligned(gg glyph.Seq, w, q float64) {
-	if !p.valid("ShowGlyphsAligned", stateText) {
+	if !p.valid("ShowGlyphsAligned", objText) {
 		return
 	}
 	if p.font == nil {
-		p.err = errors.New("no font set")
+		p.Err = errors.New("no font set")
 		return
 	}
 	p.showGlyphsAligned(gg, w, q)
 }
 
 func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
-	total := p.font.ToPDF(p.fontSize, gg.AdvanceWidth())
+	advanceWidth := gg.AdvanceWidth()
+	unitsPerEm := p.font.GetUnitsPerEm()
+	total := float64(advanceWidth) * p.fontSize / float64(unitsPerEm)
 	delta := w - total
 
 	// we interpolate between the following:
@@ -228,6 +178,9 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 	}
 
 	font := p.font
+	widths := p.font.GetWidths()
+	unitsPerEm := font.GetUnitsPerEm()
+	q := 1000 / float64(unitsPerEm)
 
 	var out pdf.Array
 	var run pdf.String
@@ -242,28 +195,28 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 		}
 		if len(out) == 1 {
 			if s, ok := out[0].(pdf.String); ok {
-				if p.err != nil {
+				if p.Err != nil {
 					return
 				}
-				p.err = s.PDF(p.content)
-				if p.err != nil {
+				p.Err = s.PDF(p.Content)
+				if p.Err != nil {
 					return
 				}
-				_, p.err = fmt.Fprintln(p.content, " Tj")
+				_, p.Err = fmt.Fprintln(p.Content, " Tj")
 				out = nil
 				return
 			}
 		}
 
-		if p.err != nil {
+		if p.Err != nil {
 			return
 		}
-		p.err = out.PDF(p.content)
-		if p.err != nil {
+		p.Err = out.PDF(p.Content)
+		if p.Err != nil {
 			return
 		}
-		_, p.err = fmt.Fprintln(p.content, " TJ")
-		if p.err != nil {
+		_, p.Err = fmt.Fprintln(p.Content, " TJ")
+		if p.Err != nil {
 			return
 		}
 		out = nil
@@ -271,7 +224,7 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 
 	xOffset := left
 	for _, glyph := range gg {
-		xOffset += font.ToPDF16(1000, glyph.XOffset)
+		xOffset += float64(glyph.XOffset) * q
 		xOffsetInt := pdf.Integer(math.Round(xOffset))
 		if xOffsetInt != 0 {
 			if len(run) > 0 {
@@ -282,26 +235,27 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 			xOffset -= float64(xOffsetInt)
 		}
 
-		if newYPos := pdf.Integer(math.Round(font.ToPDF16(1000, glyph.YOffset))); newYPos != p.textRise {
+		if newYPos := pdf.Integer(math.Round(float64(glyph.YOffset) * q)); newYPos != p.textRise {
 			flush()
 			p.textRise = newYPos
-			if p.err != nil {
+			if p.Err != nil {
 				return
 			}
-			p.err = p.textRise.PDF(p.content)
-			if p.err != nil {
+			p.Err = p.textRise.PDF(p.Content)
+			if p.Err != nil {
 				return
 			}
-			_, p.err = fmt.Fprintln(p.content, " Ts")
+			_, p.Err = fmt.Fprintln(p.Content, " Ts")
 		}
 
 		gid := glyph.Gid
-		if int(gid) >= len(font.Widths) {
+		if int(gid) > len(widths) {
+			// TODO(voss): Is this the right thing to do?
 			gid = 0
 		}
-		run = font.Enc(run, gid)
+		run = font.AppendEncoded(run, glyph.Gid, glyph.Text)
 
-		xOffset += font.ToPDF16(1000, glyph.Advance-glyph.XOffset-font.Widths[gid])
+		xOffset += float64(glyph.Advance-glyph.XOffset-widths[gid]) * q
 	}
 
 	xOffset += right

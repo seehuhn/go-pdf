@@ -21,114 +21,78 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/float"
-	"seehuhn.de/go/pdf/pages"
 )
 
-// Page is a PDF page.
 type Page struct {
-	w          *pdf.Writer
-	content    io.WriteCloser
-	contentRef *pdf.Reference
-	resources  *pdf.Resources
+	Content   io.Writer
+	Resources *pdf.Resources
+	Err       error
 
-	tree *pages.Tree
+	currentObject objectType
+	stack         []objectType
 
-	state state
-	stack []state
-	err   error
-
-	newFont  font.Dict
-	font     *font.Font
+	font     Font
 	fontSize float64
 	textRise pdf.Integer
 
-	fonts      map[font.Dict]pdf.Name
-	imageNames map[pdf.Reference]pdf.Name
+	resNames map[pdf.Reference]pdf.Name
 }
 
-// AppendPage creates a new page and appends it to a page tree.
-func AppendPage(tree *pages.Tree) (*Page, error) {
-	p, err := NewPage(tree.Out)
-	if err != nil {
-		return nil, err
-	}
-
-	p.tree = tree
-
-	return p, nil
-}
-
-// NewPage creates a new page without appending it to the page tree.
-// Once the page is finished, the page dictionary returned by the [Close]
-// method can be used to add the page to the page tree.
-func NewPage(w *pdf.Writer) (*Page, error) {
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if w.Version >= pdf.V1_2 {
-		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-	}
-
-	stream, contentRef, err := w.OpenStream(nil, nil, compress)
-	if err != nil {
-		return nil, err
-	}
-
+func NewPage(w io.Writer) *Page {
 	return &Page{
-		w:          w,
-		content:    stream,
-		contentRef: contentRef,
-
-		state: stateGlobal,
-
-		fonts: make(map[font.Dict]pdf.Name),
-	}, nil
+		Content:       w,
+		currentObject: objPage,
+		resNames:      make(map[pdf.Reference]pdf.Name),
+	}
 }
 
-// Close must be called after drawing the page is complete.
-// Any error that occurred during drawing is returned here.
-// If the page was created with AppendPage, the returned page dictionary
-// has already been added to the page tree and must not be modified.
-func (p *Page) Close() (pdf.Dict, error) {
-	if p.err != nil {
-		return nil, p.err
-	}
+type objectType int
 
-	err := p.content.Close()
-	if err != nil {
-		return nil, err
-	}
+// See Figure 9 (p. 113) of PDF 32000-1:2008.
+const (
+	objPage objectType = iota
+	objPath
+	objText
+	objClippingPath
+	objShading
+	objInlineImage
+	objExternal
+)
 
-	dict := pdf.Dict{
-		"Type":     pdf.Name("Page"),
-		"Contents": p.contentRef,
+func (s objectType) String() string {
+	switch s {
+	case objPage:
+		return "page"
+	case objPath:
+		return "path"
+	case objText:
+		return "text"
+	case objClippingPath:
+		return "clipping path"
+	case objShading:
+		return "shading"
+	case objInlineImage:
+		return "inline image"
+	case objExternal:
+		return "external"
+	default:
+		return fmt.Sprintf("objectType(%d)", s)
 	}
-	if p.resources != nil {
-		dict["Resources"] = pdf.AsDict(p.resources)
-	}
-
-	if p.tree != nil {
-		_, err = p.tree.AppendPage(dict)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return dict, nil
 }
 
-func (p *Page) valid(cmd string, ss ...state) bool {
-	if p.err != nil {
+func (p *Page) valid(cmd string, ss ...objectType) bool {
+	if p.Err != nil {
 		return false
 	}
 
 	for _, s := range ss {
-		if p.state == s {
+		if p.currentObject == s {
 			return true
 		}
 	}
 
-	p.err = fmt.Errorf("unexpected state %q for %q", p.state, cmd)
+	p.Err = fmt.Errorf("unexpected state %q for %q", p.currentObject, cmd)
 	return false
 }
 
@@ -137,49 +101,33 @@ func (p *Page) coord(x float64) string {
 	return float.Format(x, 2)
 }
 
-func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
-	if p.resources == nil {
-		p.resources = &pdf.Resources{}
-	}
-	if p.resources.ExtGState == nil {
-		p.resources.ExtGState = pdf.Dict{}
-	}
-	p.resources.ExtGState[name] = dict
+type Resource interface {
+	Reference() *pdf.Reference
+	ResourceName() pdf.Name
 }
 
-type state int
+func (p *Page) resourceName(obj Resource, d pdf.Dict, nameTmpl string) pdf.Name {
+	ref := obj.Reference()
+	name, ok := p.resNames[*ref]
+	if ok {
+		return name
+	}
 
-// See Figure 9 (p. 113) of PDF 32000-1:2008.
-const (
-	stateNone state = iota
-	stateGlobal
-	statePath
-	stateText
-	stateClipped
-	stateShading
-	stateImage
-	stateExternal
-)
+	name = obj.ResourceName()
+	if _, exists := d[name]; name != "" && !exists {
+		d[name] = ref
+		p.resNames[*ref] = name
+		return name
+	}
 
-func (s state) String() string {
-	switch s {
-	case stateNone:
-		return "none"
-	case stateGlobal:
-		return "global"
-	case statePath:
-		return "path"
-	case stateText:
-		return "text"
-	case stateClipped:
-		return "clipped"
-	case stateShading:
-		return "shading"
-	case stateImage:
-		return "image"
-	case stateExternal:
-		return "external"
-	default:
-		return fmt.Sprintf("state(%d)", s)
+	for k := len(d) + 1; ; k-- {
+		name = pdf.Name(fmt.Sprintf(nameTmpl, k))
+		if _, exists := d[name]; exists {
+			continue
+		}
+
+		d[name] = ref
+		p.resNames[*ref] = name
+		return name
 	}
 }

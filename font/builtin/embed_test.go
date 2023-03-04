@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/type1/names"
@@ -39,7 +38,7 @@ func TestSimple(t *testing.T) {
 
 	pageTree := pages.InstallTree(w, nil)
 
-	g, err := graphics.NewPage(w)
+	g, err := pages.NewPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +177,7 @@ func TestComplicatedGyphs(t *testing.T) {
 
 	pageTree := pages.InstallTree(w, nil)
 
-	g, err := graphics.NewPage(w)
+	g, err := pages.NewPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}

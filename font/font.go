@@ -21,6 +21,7 @@ import (
 	"unicode"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -41,15 +42,14 @@ type NewFont struct {
 	// missing from the font are replaced by the glyph for the .notdef
 	// character (glyph ID 0).  Glyph substitutions (e.g. from OpenType GSUB
 	// tables) and positioning rules (e.g. kerning) are applied.
-	Layout func([]rune) glyph.Seq
+	Layout func(s string, ptSize float64) glyph.Seq
 
 	ResourceName pdf.Name
-	GetDict      func(w *pdf.Writer) (Dict, error)
+	GetDict      func(w *pdf.Writer, resName pdf.Name) (Dict, error)
 }
 
 type Dict interface {
-	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	Reference() *pdf.Reference
+	graphics.Font
 	Close() error
 }
 
@@ -93,10 +93,16 @@ func (font *Font) ToPDF16(fontSize float64, x funit.Int16) float64 {
 	return float64(x) * fontSize / float64(font.UnitsPerEm)
 }
 
+func (font *Font) Reference() *pdf.Reference {
+	return font.Ref
+}
+
+func (font *Font) ResourceName() pdf.Name {
+	return font.InstName
+}
+
 // Typeset computes all glyph and layout information required to typeset a
 // string in a PDF file.
-// TODO(voss): do we need this function?
-// TODO(voss): return a structure like boxes.hGlyphs instead?
 func (font *Font) Typeset(s string, ptSize float64) glyph.Seq {
 	var runs [][]rune
 	var run []rune
@@ -118,6 +124,18 @@ func (font *Font) Typeset(s string, ptSize float64) glyph.Seq {
 		glyphs = append(glyphs, seq...)
 	}
 	return glyphs
+}
+
+func (font *Font) AppendEncoded(s pdf.String, gid glyph.ID, runes []rune) pdf.String {
+	return font.Enc(s, gid)
+}
+
+func (font *Font) GetUnitsPerEm() uint16 {
+	return font.UnitsPerEm
+}
+
+func (font *Font) GetWidths() []funit.Int16 {
+	return font.Widths
 }
 
 func isPrivateRange(r rune) bool {

@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -53,7 +52,7 @@ func main() {
 			}
 		}
 
-		g, err := graphics.NewPage(out)
+		g, err := pages.NewPage(out)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -79,7 +78,7 @@ func main() {
 	}
 
 	{
-		g, err := graphics.NewPage(out)
+		g, err := pages.NewPage(out)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -101,7 +100,7 @@ func main() {
 	}
 
 	{
-		g, err := graphics.NewPage(out)
+		g, err := pages.NewPage(out)
 		if err != nil {
 			log.Fatal(err)
 		}

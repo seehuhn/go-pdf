@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -40,7 +39,7 @@ func main() {
 	pageTree := pages.InstallTree(w, nil)
 
 	bbox := pages.A4
-	g, err := graphics.NewPage(w)
+	g, err := pages.NewPage(w)
 	if err != nil {
 		log.Fatal(err)
 	}

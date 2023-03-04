@@ -23,42 +23,42 @@ import (
 
 // MoveTo starts a new path at the given coordinates.
 func (p *Page) MoveTo(x, y float64) {
-	if !p.valid("MoveTo", stateGlobal, statePath) {
+	if !p.valid("MoveTo", objPage, objPath) {
 		return
 	}
-	p.state = statePath
-	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "m")
+	p.currentObject = objPath
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "m")
 }
 
 // LineTo appends a straight line segment to the current path.
 func (p *Page) LineTo(x, y float64) {
-	if !p.valid("LineTo", statePath, stateClipped) {
+	if !p.valid("LineTo", objPath, objClippingPath) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), "l")
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "l")
 }
 
 // CurveTo appends a cubic Bezier curve to the current path.
 func (p *Page) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
-	if !p.valid("CurveTo", statePath, stateClipped) {
+	if !p.valid("CurveTo", objPath, objClippingPath) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
 }
 
 // Rectangle appends a rectangle to the current path as a closed subpath.
 func (p *Page) Rectangle(x, y, width, height float64) {
-	if !p.valid("Rectangle", stateGlobal, statePath) {
+	if !p.valid("Rectangle", objPage, objPath) {
 		return
 	}
-	p.state = statePath
-	_, p.err = fmt.Fprintln(p.content, p.coord(x), p.coord(y), p.coord(width), p.coord(height), "re")
+	p.currentObject = objPath
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), p.coord(width), p.coord(height), "re")
 }
 
 // MoveToArc appends a circular arc to the current path,
 // starting a new subpath.
 func (p *Page) MoveToArc(x, y, radius, startAngle, endAngle float64) {
-	if !p.valid("MoveToArc", stateGlobal, statePath) {
+	if !p.valid("MoveToArc", objPage, objPath) {
 		return
 	}
 	p.arc(x, y, radius, startAngle, endAngle, true)
@@ -67,7 +67,7 @@ func (p *Page) MoveToArc(x, y, radius, startAngle, endAngle float64) {
 // LineToArc appends a circular arc to the current subpath,
 // connecting the arc to the previous point with a straight line.
 func (p *Page) LineToArc(x, y, radius, startAngle, endAngle float64) {
-	if !p.valid("LineToArc", statePath) {
+	if !p.valid("LineToArc", objPath) {
 		return
 	}
 	p.arc(x, y, radius, startAngle, endAngle, false)
@@ -75,7 +75,7 @@ func (p *Page) LineToArc(x, y, radius, startAngle, endAngle float64) {
 
 // arc appends a circular to the current path.
 func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
-	p.state = statePath
+	p.currentObject = objPath
 
 	// also see https://www.tinaja.com/glib/bezcirc2.pdf
 	// from https://pomax.github.io/bezierinfo/ , section 42
@@ -101,7 +101,7 @@ func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 		y3 := y + radius*math.Sin(phi)
 		x2 := x3 + k*math.Sin(phi)
 		y2 := y3 - k*math.Cos(phi)
-		_, p.err = fmt.Fprintln(p.content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
+		_, p.Err = fmt.Fprintln(p.Content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
 		x0 = x3
 		y0 = y3
 	}
@@ -115,82 +115,82 @@ func (p *Page) Circle(x, y, radius float64) {
 
 // ClosePath closes the current subpath.
 func (p *Page) ClosePath() {
-	if !p.valid("ClosePath", statePath) {
+	if !p.valid("ClosePath", objPath) {
 		return
 	}
-	_, p.err = fmt.Fprintln(p.content, "h")
+	_, p.Err = fmt.Fprintln(p.Content, "h")
 }
 
 // Stroke strokes the current path.
 func (p *Page) Stroke() {
-	if !p.valid("Stroke", statePath, stateClipped) {
+	if !p.valid("Stroke", objPath, objClippingPath) {
 		return
 	}
-	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.content, "S")
+	p.currentObject = objPage
+	_, p.Err = fmt.Fprintln(p.Content, "S")
 }
 
 // CloseAndStroke closes and strokes the current path.
 func (p *Page) CloseAndStroke() {
-	if !p.valid("CloseAndStroke", statePath, stateClipped) {
+	if !p.valid("CloseAndStroke", objPath, objClippingPath) {
 		return
 	}
-	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.content, "s")
+	p.currentObject = objPage
+	_, p.Err = fmt.Fprintln(p.Content, "s")
 }
 
 // Fill fills the current path, using the nonzero winding number rule.  Any
 // subpaths that are open are implicitly closed before being filled.
 func (p *Page) Fill() {
-	if !p.valid("Fill", statePath, stateClipped) {
+	if !p.valid("Fill", objPath, objClippingPath) {
 		return
 	}
-	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.content, "f")
+	p.currentObject = objPage
+	_, p.Err = fmt.Fprintln(p.Content, "f")
 }
 
 // Fill fills the current path, using the even-odd rule.  Any
 // subpaths that are open are implicitly closed before being filled.
 func (p *Page) FillEvenOdd() {
-	if !p.valid("FillEvenOdd", statePath, stateClipped) {
+	if !p.valid("FillEvenOdd", objPath, objClippingPath) {
 		return
 	}
-	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.content, "f*")
+	p.currentObject = objPage
+	_, p.Err = fmt.Fprintln(p.Content, "f*")
 }
 
 // FillAndStroke fills and strokes the current path.  Any subpaths that are
 // open are implicitly closed before being filled.
 func (p *Page) FillAndStroke() {
-	if !p.valid("FillAndStroke", statePath, stateClipped) {
+	if !p.valid("FillAndStroke", objPath, objClippingPath) {
 		return
 	}
-	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.content, "B")
+	p.currentObject = objPage
+	_, p.Err = fmt.Fprintln(p.Content, "B")
 }
 
 // EndPath ends the path without filling and stroking it.
 // This is for use after the [Page.ClipNonZero] and [Page.ClipEvenOdd] methods.
 func (p *Page) EndPath() {
-	if !p.valid("EndPath", statePath, stateClipped) {
+	if !p.valid("EndPath", objPath, objClippingPath) {
 		return
 	}
-	p.state = stateGlobal
-	_, p.err = fmt.Fprintln(p.content, "n")
+	p.currentObject = objPage
+	_, p.Err = fmt.Fprintln(p.Content, "n")
 }
 
 func (p *Page) ClipNonZero() {
-	if !p.valid("ClipNonZero", statePath) {
+	if !p.valid("ClipNonZero", objPath) {
 		return
 	}
-	p.state = stateClipped
-	_, p.err = fmt.Fprintln(p.content, "W")
+	p.currentObject = objClippingPath
+	_, p.Err = fmt.Fprintln(p.Content, "W")
 }
 
 func (p *Page) ClipEvenOdd() {
-	if !p.valid("ClipEvenOdd", statePath) {
+	if !p.valid("ClipEvenOdd", objPath) {
 		return
 	}
-	p.state = stateClipped
-	_, p.err = fmt.Fprintln(p.content, "W*")
+	p.currentObject = objClippingPath
+	_, p.Err = fmt.Fprintln(p.Content, "W*")
 }
