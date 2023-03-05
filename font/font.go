@@ -26,8 +26,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// Font represents a font which can be embedded in a PDF file.
-type NewFont struct {
+type Geometry struct {
 	UnitsPerEm         uint16
 	Ascent             funit.Int16
 	Descent            funit.Int16 // negative
@@ -37,6 +36,11 @@ type NewFont struct {
 
 	GlyphExtents []funit.Rect
 	Widths       []funit.Int16
+}
+
+// Font represents a font which can be embedded in a PDF file.
+type NewFont struct {
+	Geometry
 
 	// Layout converts a sequence of runes into a sequence of glyphs.  Runes
 	// missing from the font are replaced by the glyph for the .notdef
@@ -69,15 +73,7 @@ type Font struct {
 	// glyph must be included in our subset of the font.
 	Enc func(pdf.String, glyph.ID) pdf.String
 
-	UnitsPerEm         uint16
-	Ascent             funit.Int16
-	Descent            funit.Int16 // negative
-	BaseLineSkip       funit.Int16
-	UnderlinePosition  funit.Int16
-	UnderlineThickness funit.Int16
-
-	GlyphExtents []funit.Rect
-	Widths       []funit.Int16
+	Geometry
 }
 
 // NumGlyphs returns the number of glyphs in a font.

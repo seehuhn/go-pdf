@@ -55,15 +55,17 @@ func EmbedAfm(w *pdf.Writer, afm *AfmInfo, instName pdf.Name) (*font.Font, error
 		Layout: fnt.Layout,
 		Enc:    fnt.Enc,
 
-		UnitsPerEm:   1000,
-		Ascent:       afm.Ascent,
-		Descent:      afm.Descent,
-		BaseLineSkip: 1200, // TODO(voss): is this ok?
-		// TODO(voss): UnderlinePosition
-		// TODO(voss): UnderlineThickness
+		Geometry: font.Geometry{
+			UnitsPerEm:   1000,
+			Ascent:       afm.Ascent,
+			Descent:      afm.Descent,
+			BaseLineSkip: 1200, // TODO(voss): is this ok?
+			// TODO(voss): UnderlinePosition
+			// TODO(voss): UnderlineThickness
 
-		GlyphExtents: afm.GlyphExtents,
-		Widths:       afm.Widths,
+			GlyphExtents: afm.GlyphExtents,
+			Widths:       afm.Widths,
+		},
 	}
 	return res, nil
 }

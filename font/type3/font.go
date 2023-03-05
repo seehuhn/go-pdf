@@ -137,17 +137,19 @@ func (b *Builder) MakeFont(resourceName pdf.Name) *font.NewFont {
 	}
 
 	res := &font.NewFont{
-		UnitsPerEm:         b.unitsPerEm,
-		Ascent:             0,
-		Descent:            0,
-		BaseLineSkip:       0,
-		UnderlinePosition:  0,
-		UnderlineThickness: 0,
-		GlyphExtents:       b.glyphExtents,
-		Widths:             b.widths,
-		Layout:             b.layout,
-		ResourceName:       resourceName,
-		GetDict:            b.getDict,
+		Geometry: font.Geometry{
+			UnitsPerEm:         b.unitsPerEm,
+			Ascent:             0,
+			Descent:            0,
+			BaseLineSkip:       0,
+			UnderlinePosition:  0,
+			UnderlineThickness: 0,
+			GlyphExtents:       b.glyphExtents,
+			Widths:             b.widths,
+		},
+		Layout:       b.layout,
+		ResourceName: resourceName,
+		GetDict:      b.getDict,
 	}
 	return res
 }

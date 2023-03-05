@@ -85,16 +85,18 @@ func Font(info *sfnt.Info, resourceName pdf.Name, loc language.Tag) (*font.NewFo
 	}
 
 	res := &font.NewFont{
-		UnitsPerEm:         info.UnitsPerEm,
-		Ascent:             info.Ascent,
-		Descent:            info.Descent,
-		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-		GlyphExtents:       info.Extents(),
-		Widths:             widths,
-		Layout:             sfi.Typeset,
-		ResourceName:       resourceName,
+		Geometry: font.Geometry{
+			UnitsPerEm:         info.UnitsPerEm,
+			Ascent:             info.Ascent,
+			Descent:            info.Descent,
+			BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+			UnderlinePosition:  info.UnderlinePosition,
+			UnderlineThickness: info.UnderlineThickness,
+			GlyphExtents:       info.Extents(),
+			Widths:             widths,
+		},
+		Layout:       sfi.Typeset,
+		ResourceName: resourceName,
 		GetDict: func(w *pdf.Writer, resName pdf.Name) (font.Dict, error) {
 			return getDict(w, resName, sfi)
 		},
@@ -498,18 +500,20 @@ func Embed(w *pdf.Writer, info *sfnt.Info, instName pdf.Name, loc language.Tag) 
 	w.OnClose(s.WriteFont)
 
 	res := &font.Font{
-		InstName:           instName,
-		Ref:                s.FontRef,
-		Layout:             s.Layout,
-		Enc:                s.Enc,
-		UnitsPerEm:         info.UnitsPerEm,
-		Ascent:             info.Ascent,
-		Descent:            info.Descent,
-		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-		GlyphExtents:       info.Extents(),
-		Widths:             widths,
+		InstName: instName,
+		Ref:      s.FontRef,
+		Layout:   s.Layout,
+		Enc:      s.Enc,
+		Geometry: font.Geometry{
+			UnitsPerEm:         info.UnitsPerEm,
+			Ascent:             info.Ascent,
+			Descent:            info.Descent,
+			BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+			UnderlinePosition:  info.UnderlinePosition,
+			UnderlineThickness: info.UnderlineThickness,
+			GlyphExtents:       info.Extents(),
+			Widths:             widths,
+		},
 	}
 	return res, nil
 }
