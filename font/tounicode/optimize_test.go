@@ -17,13 +17,8 @@
 package tounicode
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestRange(t *testing.T) {
@@ -82,55 +77,5 @@ func TestExtendedPlane(t *testing.T) {
 	info := FromMappings(entries)
 	if len(info.Ranges) != 1 {
 		t.Errorf("expected 1 ranges, got %d", len(info.Ranges))
-	}
-}
-
-// TODO(voss): remove
-func TestOne(t *testing.T) {
-	fname := "../../../examples/try-all-pdfs/tounicode/0a3ff11a856c425e.txt"
-
-	body, err := os.ReadFile(fname)
-	if err != nil {
-		t.Fatal(err)
-	}
-	info1, err := Read(bytes.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	mappings1 := info1.ToMapping()
-	fmt.Println(len(mappings1))
-
-	info2 := FromMappings(mappings1)
-	mappings2 := info2.ToMapping()
-
-	if d := cmp.Diff(mappings1, mappings2); d != "" {
-		t.Errorf("mismatch (-want +got):\n%s", d)
-	}
-}
-
-// TODO(voss): remove
-func TestMany(t *testing.T) {
-	files, err := filepath.Glob("../../../examples/try-all-pdfs/tounicode/*.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, fname := range files {
-		fmt.Println(fname)
-		body, err := os.ReadFile(fname)
-		if err != nil {
-			t.Fatal(err)
-		}
-		info1, err := Read(bytes.NewReader(body))
-		if err != nil {
-			t.Fatal(err)
-		}
-		mappings1 := info1.ToMapping()
-
-		info2 := FromMappings(mappings1)
-		mappings2 := info2.ToMapping()
-
-		if d := cmp.Diff(mappings1, mappings2); d != "" {
-			t.Errorf("mismatch (-want +got):\n%s", d)
-		}
 	}
 }

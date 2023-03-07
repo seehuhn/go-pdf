@@ -63,7 +63,7 @@ func main() {
 	tree := pages.InstallTree(out, &pages.InheritableAttributes{
 		Resources: &pdf.Resources{
 			Font: pdf.Dict{
-				labelFont.InstName: labelFont.Ref,
+				labelFont.ResourceName(): labelFont.Reference(),
 			},
 		},
 	})
@@ -144,7 +144,7 @@ func getFontBBox(fnt *cff.Font) *funit.Rect {
 }
 
 type illustrator struct {
-	labelFont *font.Font
+	labelFont font.Embedded
 	pageTree  *pages.Tree
 	pageSize  *pdf.Rectangle
 }

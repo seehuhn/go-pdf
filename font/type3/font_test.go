@@ -60,7 +60,10 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1 := F1Builder.MakeFont("F1")
+	F1, err := F1Builder.MakeFont()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	pageTree := pages.InstallTree(w, nil)
 
@@ -69,7 +72,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Dict, err := F1.GetDict(w, "F")
+	F1Dict, err := F1.Embed(w, "F")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,11 +92,6 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = pageTree.AppendPage(dict)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = F1Dict.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

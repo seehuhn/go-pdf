@@ -31,7 +31,11 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := EmbedFile(w, "../../../otf/SourceSerif4-Regular.otf", "F", language.AmericanEnglish)
+	FF, err := LoadFont("../../../otf/SourceSerif4-Regular.otf", language.AmericanEnglish)
+	if err != nil {
+		t.Fatal(err)
+	}
+	F, err := FF.Embed(w, "F")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,12 +47,13 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	geom := F.GetGeometry()
 	for i := 0; i < 256; i++ {
 		row := i / 16
 		col := i % 16
 		gid := glyph.ID(i + 2)
 
-		w := F.Widths[gid]
+		w := geom.Widths[gid]
 		gg := []glyph.Info{
 			{
 				Gid:     gid,

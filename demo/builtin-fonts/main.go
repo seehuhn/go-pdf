@@ -97,8 +97,8 @@ type fontTables struct {
 
 	used float64 // vertical amount of page space currently used
 
-	bodyFont  *font.Font
-	titleFont *font.Font
+	bodyFont  font.Embedded
+	titleFont font.Embedded
 
 	page *pages.Page
 
@@ -177,7 +177,8 @@ func (f *fontTables) MakeColumns(fontName string) error {
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4
 
-	var font *font.Font
+	var F font.Embedded
+	var geom *font.Geometry
 
 	curGlyph := 0
 	for curGlyph < nGlyph {
@@ -237,10 +238,11 @@ func (f *fontTables) MakeColumns(fontName string) error {
 				if curGlyph%256 == 0 {
 					instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
 					f.fontNo++
-					font, err = builtin.EmbedAfm(f.tree.Out, afm, instName)
+					F, err = builtin.EmbedAfm(f.tree.Out, afm, instName)
 					if err != nil {
 						return err
 					}
+					geom = F.GetGeometry()
 				}
 
 				y := yTop - baseLineSkip*float64(i)
@@ -260,11 +262,11 @@ func (f *fontTables) MakeColumns(fontName string) error {
 				page.SetFont(f.bodyFont, fontSize)
 				page.ShowTextAligned(code, 16, 1)
 
-				page.SetFont(font, fontSize)
+				page.SetFont(F, fontSize)
 				g := glyph.Seq{
 					{
 						Gid:     glyph.ID(curGlyph),
-						Advance: font.Widths[curGlyph],
+						Advance: geom.Widths[curGlyph],
 					},
 				}
 				page.ShowGlyphsAligned(g, 32, 0.5)

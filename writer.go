@@ -57,7 +57,7 @@ type Writer struct {
 	// to append to afterStream if inStream is true?
 	afterStream []func(*Writer) error
 
-	Resources map[interface{}]Resource
+	Resources map[Reference]Resource
 
 	// TODO(voss): remove
 	onClose []func(*Writer) error
@@ -145,7 +145,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		nextRef: 1,
 		xref:    make(map[int]*xRefEntry),
 
-		Resources: make(map[interface{}]Resource),
+		Resources: make(map[Reference]Resource),
 	}
 	pdf.xref[0] = &xRefEntry{
 		Pos:        -1,
@@ -332,9 +332,14 @@ func (pdf *Writer) Close() error {
 // closed.  Callbacks are executed in the reverse order, i.e. the last callback
 // registered is the first one to run.
 //
-// TODO(voss): remove?
+// TODO(voss): remove
 func (pdf *Writer) OnClose(callback func(*Writer) error) {
 	pdf.onClose = append(pdf.onClose, callback)
+}
+
+func (pdf *Writer) AutoClose(res Resource) {
+	ref := res.Reference()
+	pdf.Resources[*ref] = res
 }
 
 // SetInfo sets the Document Information Dictionary for the file.

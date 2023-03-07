@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/float"
 )
 
@@ -32,7 +33,7 @@ type Page struct {
 	currentObject objectType
 	stack         []objectType
 
-	font     Font
+	font     font.Embedded
 	fontSize float64
 	textRise pdf.Integer
 

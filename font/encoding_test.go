@@ -27,6 +27,7 @@ import (
 
 // OldEncoding describes the correspondence between character codes and unicode
 // characters for a simple PDF font.
+// TODO(voss): remove
 type OldEncoding interface {
 	// Encode gives the character code for a given rune.  The second
 	// return code indicates whether a mapping is available.

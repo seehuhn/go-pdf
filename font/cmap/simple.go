@@ -24,6 +24,8 @@ type SimpleEncoder interface {
 	Encoding() []glyph.ID
 }
 
+// TODO(voss): try different encoders
+
 func NewSimpleEncoder() SimpleEncoder {
 	enc := &keepAscii{
 		codeLookup: make(map[glyph.ID]byte),
@@ -87,4 +89,37 @@ func (enc *keepAscii) Encoding() []glyph.ID {
 		res[c] = gid
 	}
 	return res
+}
+
+type frozenSimpleEncoder struct {
+	toCode   map[glyph.ID]byte
+	fromCode []glyph.ID
+}
+
+func NewFrozenSimpleEncoder(enc SimpleEncoder) frozenSimpleEncoder {
+	fromCode := enc.Encoding()
+	toCode := make(map[glyph.ID]byte)
+	for c, gid := range fromCode {
+		if gid == 0 {
+			continue
+		}
+		toCode[gid] = byte(c)
+	}
+	return frozenSimpleEncoder{toCode: toCode, fromCode: fromCode}
+}
+
+func (enc frozenSimpleEncoder) Encode(gid glyph.ID, _ []rune) byte {
+	c, ok := enc.toCode[gid]
+	if !ok {
+		panic("glyphs cannot be added after a font has been closed")
+	}
+	return c
+}
+
+func (enc frozenSimpleEncoder) Overflow() bool {
+	return false
+}
+
+func (enc frozenSimpleEncoder) Encoding() []glyph.ID {
+	return enc.fromCode
 }

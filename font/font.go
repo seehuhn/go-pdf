@@ -18,10 +18,7 @@
 package font
 
 import (
-	"unicode"
-
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -38,104 +35,37 @@ type Geometry struct {
 	Widths       []funit.Int16
 }
 
+func (g *Geometry) ToPDF(fontSize float64, x funit.Int) float64 {
+	return float64(x) * fontSize / float64(g.UnitsPerEm)
+}
+
+func (g *Geometry) ToPDF16(fontSize float64, x funit.Int16) float64 {
+	return float64(x) * fontSize / float64(g.UnitsPerEm)
+}
+
+type Layouter interface {
+	GetGeometry() *Geometry
+	Layout(s string, ptSize float64) glyph.Seq
+}
+
 // Font represents a font which can be embedded in a PDF file.
-type NewFont struct {
-	Geometry
-
-	// Layout converts a sequence of runes into a sequence of glyphs.  Runes
-	// missing from the font are replaced by the glyph for the .notdef
-	// character (glyph ID 0).  Glyph substitutions (e.g. from OpenType GSUB
-	// tables) and positioning rules (e.g. kerning) are applied.
-	Layout func(s string, ptSize float64) glyph.Seq
-
-	ResourceName pdf.Name
-	GetDict      func(w *pdf.Writer, resName pdf.Name) (Dict, error)
+type Font interface {
+	Layouter
+	Embed(w *pdf.Writer, resName pdf.Name) (Embedded, error)
 }
 
-type Dict interface {
-	graphics.Font
-	Close() error
-}
+// Embedded represents a font embedded in a PDF file.
+type Embedded interface {
+	Layouter
+	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
-// Font represents a font embedded in the PDF file.
-type Font struct {
-	InstName pdf.Name
-	Ref      *pdf.Reference
+	ResourceName() pdf.Name
 
-	// Layout converts a sequence of runes into a sequence of glyphs.
-	// Runes missing from the font are replaced by the glyph for the
-	// .notdef character (glyph ID 0).  Glyph substitutions, e.g. from
-	// OpenType GSUB tables, are applied.
-	Layout func([]rune) glyph.Seq
-
-	// Enc maps a glyph ID to a string that can be used in a PDF file.
-	// As a side effect, this function records that the corresponding
-	// glyph must be included in our subset of the font.
-	Enc func(pdf.String, glyph.ID) pdf.String
-
-	Geometry
+	pdf.Resource
 }
 
 // NumGlyphs returns the number of glyphs in a font.
-func (font *Font) NumGlyphs() int {
-	return len(font.Widths)
-}
-
-func (font *Font) ToPDF(fontSize float64, x funit.Int) float64 {
-	return float64(x) * fontSize / float64(font.UnitsPerEm)
-}
-
-func (font *Font) ToPDF16(fontSize float64, x funit.Int16) float64 {
-	return float64(x) * fontSize / float64(font.UnitsPerEm)
-}
-
-func (font *Font) Reference() *pdf.Reference {
-	return font.Ref
-}
-
-func (font *Font) ResourceName() pdf.Name {
-	return font.InstName
-}
-
-// Typeset computes all glyph and layout information required to typeset a
-// string in a PDF file.
-func (font *Font) Typeset(s string, ptSize float64) glyph.Seq {
-	var runs [][]rune
-	var run []rune
-	for _, r := range s {
-		if unicode.IsGraphic(r) || isPrivateRange(r) {
-			run = append(run, r)
-		} else if len(run) > 0 {
-			runs = append(runs, run)
-			run = nil
-		}
-	}
-	if len(run) > 0 {
-		runs = append(runs, run)
-	}
-
-	var glyphs []glyph.Info
-	for _, run := range runs {
-		seq := font.Layout(run)
-		glyphs = append(glyphs, seq...)
-	}
-	return glyphs
-}
-
-func (font *Font) AppendEncoded(s pdf.String, gid glyph.ID, runes []rune) pdf.String {
-	return font.Enc(s, gid)
-}
-
-func (font *Font) GetUnitsPerEm() uint16 {
-	return font.UnitsPerEm
-}
-
-func (font *Font) GetWidths() []funit.Int16 {
-	return font.Widths
-}
-
-func isPrivateRange(r rune) bool {
-	return r >= '\uE000' && r <= '\uF8FF' ||
-		r >= '\U000F0000' && r <= '\U000FFFFD' ||
-		r >= '\U00100000' && r <= '\U0010FFFD'
+func NumGlyphs(font Layouter) int {
+	g := font.GetGeometry()
+	return len(g.Widths)
 }

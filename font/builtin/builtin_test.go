@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,24 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cid
+package builtin
 
 import (
 	"testing"
 
-	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func TestCID(t *testing.T) {
-	w, err := pdf.Create("test-otf-cid.pdf")
+func TestSimple(t *testing.T) {
+	w, err := pdf.Create("test-builtin-simple.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	FF, err := LoadFont("../../../otf/SourceSerif4-Regular.otf", language.AmericanEnglish)
+	FF, err := Font("Times-Roman")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +48,7 @@ func TestCID(t *testing.T) {
 	}
 
 	geom := F.GetGeometry()
-	for i := 0; i < 512; i++ {
+	for i := 0; i < 256; i++ {
 		row := i / 16
 		col := i % 16
 		gid := glyph.ID(i + 2)
@@ -64,7 +63,7 @@ func TestCID(t *testing.T) {
 
 		g.BeginText()
 		g.SetFont(F, 16)
-		g.StartLine(float64(5+20*col+10), float64(32*20-10-20*row))
+		g.StartLine(float64(5+20*col+10), float64(16*20-10-20*row))
 		g.ShowGlyphsAligned(gg, 0, 0.5)
 		g.EndText()
 	}
@@ -75,7 +74,7 @@ func TestCID(t *testing.T) {
 	}
 	dict["MediaBox"] = &pdf.Rectangle{
 		URx: 10 + 16*20,
-		URy: 5 + 32*20 + 5,
+		URy: 5 + 16*20 + 5,
 	}
 	_, err = pageTree.AppendPage(dict)
 	if err != nil {

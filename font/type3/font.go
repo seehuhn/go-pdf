@@ -40,14 +40,21 @@ import (
 
 // A Builder is used to construct a type 3 font for inclusion in PDF file.
 type Builder struct {
-	// The following fields must be set before the font is made,
-	// if the PDF file is "tagged".  Otherwise, they are ignored.
-	FontName    pdf.Name // The PostScript name of the font.
+	// If the PDF file is "tagged", Otherwise, these fields are ignored.
+	FontName    pdf.Name // PostScript name of the font
 	FontFamily  string
 	Width       os2.Width
 	Weight      os2.Weight
 	Flags       font.Flags
 	ItalicAngle float64 // Italic angle (degrees counterclockwise from vertical)
+
+	// The following fields are simply copied into the font's [font.Geometry]
+	// struct.  They are not otherwise used.
+	Ascent             funit.Int16
+	Descent            funit.Int16
+	BaseLineSkip       funit.Int16
+	UnderlinePosition  funit.Int16
+	UnderlineThickness funit.Int16
 
 	names        []pdf.Name
 	glyphs       [][]byte
@@ -56,8 +63,7 @@ type Builder struct {
 	idx          map[pdf.Name]int
 	unitsPerEm   uint16
 
-	cmap      map[rune]int
-	glyphRefs []*pdf.Reference
+	made bool
 }
 
 // New creates a new Builder for embedding a type 3 font into the PDF file w.
@@ -81,7 +87,7 @@ func New(unitsPerEm uint16) (*Builder, error) {
 // operator is added at the start of the glyph description.  In this case, the
 // glyph description may specify both the shape and the color of the glyph.
 func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, shapeOnly bool) (*Glyph, error) {
-	if b.cmap != nil {
+	if b.made {
 		return nil, errors.New("font already made")
 	}
 	if _, exists := b.idx[name]; exists {
@@ -117,106 +123,113 @@ func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, sh
 	return glyph, nil
 }
 
-func (b *Builder) MakeFont(resourceName pdf.Name) *font.NewFont {
-	if b.cmap == nil {
-		b.cmap = make(map[rune]int)
-		for i, name := range b.names {
-			rr := names.ToUnicode(string(name), false)
-			if len(rr) != 1 {
-				continue
-			}
-			r := rr[0]
-			if j, exists := b.cmap[r]; exists && b.names[j] < name {
-				// In case two names map to the same rune, use the
-				// one with the lexicographically earlier name.
-				continue
-			}
-			b.cmap[r] = i
+func (b *Builder) MakeFont() (font.Font, error) {
+	if len(b.glyphs) == 0 {
+		return nil, errors.New("no glyphs in font")
+	}
+	b.made = true
+
+	g := &font.Geometry{
+		UnitsPerEm:   b.unitsPerEm,
+		GlyphExtents: b.glyphExtents,
+		Widths:       b.widths,
+
+		Ascent:             b.Ascent,
+		Descent:            b.Descent,
+		BaseLineSkip:       b.BaseLineSkip,
+		UnderlinePosition:  b.UnderlinePosition,
+		UnderlineThickness: b.UnderlineThickness,
+	}
+
+	cmap := make(map[rune]int)
+	for i, name := range b.names {
+		rr := names.ToUnicode(string(name), false)
+		if len(rr) != 1 {
+			continue
 		}
-		b.glyphRefs = make([]*pdf.Reference, len(b.names))
+		r := rr[0]
+		if j, exists := cmap[r]; exists && b.names[j] < name {
+			// In case two names map to the same rune, use the
+			// one with the lexicographically earlier name.
+			continue
+		}
+		cmap[r] = i
 	}
 
-	res := &font.NewFont{
-		Geometry: font.Geometry{
-			UnitsPerEm:         b.unitsPerEm,
-			Ascent:             0,
-			Descent:            0,
-			BaseLineSkip:       0,
-			UnderlinePosition:  0,
-			UnderlineThickness: 0,
-			GlyphExtents:       b.glyphExtents,
-			Widths:             b.widths,
-		},
-		Layout:       b.layout,
-		ResourceName: resourceName,
-		GetDict:      b.getDict,
-	}
-	return res
+	return &type3{
+		b:    b,
+		g:    g,
+		cmap: cmap,
+	}, nil
 }
 
-func (b *Builder) layout(s string, ptSize float64) glyph.Seq {
+type type3 struct {
+	b    *Builder
+	g    *font.Geometry
+	cmap map[rune]int
+}
+
+func (t3 *type3) GetGeometry() *font.Geometry {
+	return t3.g
+}
+
+func (t3 *type3) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
-	res := make(glyph.Seq, len(rr))
+	gg := make(glyph.Seq, len(rr))
 	for i, r := range rr {
-		gid := b.cmap[r]
-		res[i].Gid = glyph.ID(gid)
-		res[i].Advance = b.widths[gid]
-		res[i].Text = []rune{r}
+		gid := t3.cmap[r]
+		gg[i].Gid = glyph.ID(gid)
+		gg[i].Advance = t3.g.Widths[gid]
+		gg[i].Text = []rune{r}
 	}
-	return res
+	return gg
 }
 
-func (b *Builder) getDict(w *pdf.Writer, resName pdf.Name) (font.Dict, error) {
-	fd := &t3dict{
-		w:       w,
-		ref:     w.Alloc(),
-		resName: resName,
-		b:       b,
-		enc:     cmap.NewSimpleEncoder(),
+func (t3 *type3) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
+	return &embedded{
+		w:         w,
+		ref:       w.Alloc(),
+		resName:   resName,
+		enc:       cmap.NewSimpleEncoder(),
+		glyphRefs: make([]*pdf.Reference, len(t3.b.names)),
+		type3:     t3,
+	}, nil
+}
+
+type embedded struct {
+	w         *pdf.Writer
+	ref       *pdf.Reference
+	resName   pdf.Name
+	enc       cmap.SimpleEncoder
+	glyphRefs []*pdf.Reference
+	*type3
+}
+
+func (e3 *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	return append(s, e3.enc.Encode(gid, rr))
+}
+
+func (e3 *embedded) Reference() *pdf.Reference {
+	return e3.ref
+}
+
+func (e3 *embedded) ResourceName() pdf.Name {
+	return e3.resName
+}
+
+func (e3 *embedded) Close() error {
+	if e3.enc.Overflow() {
+		return fmt.Errorf("too many distinct glyphs used from type 3 font %q",
+			e3.resName)
 	}
-	return fd, nil
-}
 
-type t3dict struct {
-	w       *pdf.Writer
-	ref     *pdf.Reference
-	resName pdf.Name
-	b       *Builder
-	enc     cmap.SimpleEncoder
-}
-
-func (fd *t3dict) Reference() *pdf.Reference {
-	return fd.ref
-}
-
-func (fd *t3dict) ResourceName() pdf.Name {
-	return fd.resName
-}
-
-func (fd *t3dict) Typeset(s string, ptSize float64) glyph.Seq {
-	return fd.b.layout(s, ptSize)
-}
-
-func (fd *t3dict) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	return append(s, fd.enc.Encode(gid, rr))
-}
-
-func (fd *t3dict) GetUnitsPerEm() uint16 {
-	return fd.b.unitsPerEm
-}
-
-func (fd *t3dict) GetWidths() []funit.Int16 {
-	return fd.b.widths
-}
-
-func (fd *t3dict) Close() error {
-	w := fd.w
+	w := e3.w
 	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
 	if w.Version >= pdf.V1_2 {
 		compress.Name = "FlateDecode"
 	}
 
-	encoding := fd.enc.Encoding()
+	encoding := e3.enc.Encoding()
 	var firstChar cmap.CID
 	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
 		firstChar++
@@ -226,9 +239,9 @@ func (fd *t3dict) Close() error {
 		lastChar--
 	}
 
-	q := 1000 / float64(fd.b.unitsPerEm)
+	q := 1000 / float64(e3.b.unitsPerEm)
 
-	FontDictRef := fd.ref
+	FontDictRef := e3.ref
 	CharProcsRef := w.Alloc()
 	EncodingRef := w.Alloc()
 	WidthsRef := w.Alloc()
@@ -238,8 +251,8 @@ func (fd *t3dict) Close() error {
 		"Subtype":  pdf.Name("Type3"),
 		"FontBBox": &pdf.Rectangle{}, // [0,0,0,0] is always valid
 		"FontMatrix": pdf.Array{
-			pdf.Real(1 / float64(fd.b.unitsPerEm)), pdf.Integer(0), pdf.Integer(0),
-			pdf.Real(1 / float64(fd.b.unitsPerEm)), pdf.Integer(0), pdf.Integer(0)},
+			pdf.Real(1 / float64(e3.b.unitsPerEm)), pdf.Integer(0), pdf.Integer(0),
+			pdf.Real(1 / float64(e3.b.unitsPerEm)), pdf.Integer(0), pdf.Integer(0)},
 		"CharProcs": CharProcsRef,
 		"Encoding":  EncodingRef,
 		"FirstChar": pdf.Integer(firstChar),
@@ -250,15 +263,15 @@ func (fd *t3dict) Close() error {
 
 	CharProcs := pdf.Dict{}
 	for _, gid := range encoding {
-		if gid == 0 && fd.b.names[0] == "" {
+		if gid == 0 && e3.b.names[0] == "" {
 			continue
 		}
-		if fd.b.glyphRefs[gid] == nil {
+		if e3.glyphRefs[gid] == nil {
 			stream, ref, err := w.OpenStream(nil, nil, compress)
 			if err != nil {
 				return err
 			}
-			_, err = stream.Write(fd.b.glyphs[gid])
+			_, err = stream.Write(e3.b.glyphs[gid])
 			if err != nil {
 				return err
 			}
@@ -266,10 +279,10 @@ func (fd *t3dict) Close() error {
 			if err != nil {
 				return err
 			}
-			fd.b.glyphRefs[gid] = ref
+			e3.glyphRefs[gid] = ref
 		}
-		name := fd.b.names[gid]
-		CharProcs[name] = fd.b.glyphRefs[gid]
+		name := e3.b.names[gid]
+		CharProcs[name] = e3.glyphRefs[gid]
 	}
 
 	var Differences pdf.Array
@@ -283,7 +296,7 @@ func (fd *t3dict) Close() error {
 		if idx != prevIdx+1 {
 			Differences = append(Differences, pdf.Integer(idx))
 		}
-		Differences = append(Differences, fd.b.names[gid])
+		Differences = append(Differences, e3.b.names[gid])
 		prevIdx = idx
 	}
 	Encoding := pdf.Dict{
@@ -295,7 +308,7 @@ func (fd *t3dict) Close() error {
 		var width pdf.Integer
 		gid := encoding[i]
 		if gid != 0 {
-			width = pdf.Integer(math.Round(fd.b.widths[gid].AsFloat(q)))
+			width = pdf.Integer(math.Round(e3.b.widths[gid].AsFloat(q)))
 		}
 		Widths = append(Widths, width)
 	}
@@ -304,25 +317,25 @@ func (fd *t3dict) Close() error {
 	compressedObjects := []pdf.Object{FontDict, CharProcs, Encoding, Widths}
 
 	if w.Tagged {
-		if fd.b.FontName == "" || fd.b.Flags == 0 {
+		if e3.b.FontName == "" || e3.b.Flags == 0 {
 			return errors.New("FontName/Flags required for Type 3 fonts in tagged PDF files")
 		}
 
 		FontDescriptorRef := w.Alloc()
 		FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 			"Type":        pdf.Name("FontDescriptor"),
-			"FontName":    fd.b.FontName,
-			"Flags":       pdf.Integer(fd.b.Flags),
-			"ItalicAngle": pdf.Number(fd.b.ItalicAngle),
+			"FontName":    e3.b.FontName,
+			"Flags":       pdf.Integer(e3.b.Flags),
+			"ItalicAngle": pdf.Number(e3.b.ItalicAngle),
 		}
-		if fd.b.FontFamily != "" {
-			FontDescriptor["FontFamily"] = pdf.String(fd.b.FontFamily)
+		if e3.b.FontFamily != "" {
+			FontDescriptor["FontFamily"] = pdf.String(e3.b.FontFamily)
 		}
-		if fd.b.Width != 0 {
-			FontDescriptor["FontStretch"] = pdf.Name(strings.ReplaceAll(fd.b.Width.String(), " ", ""))
+		if e3.b.Width != 0 {
+			FontDescriptor["FontStretch"] = pdf.Name(strings.ReplaceAll(e3.b.Width.String(), " ", ""))
 		}
-		if fd.b.Weight != 0 {
-			FontDescriptor["FontWeight"] = pdf.Integer(fd.b.Weight.Rounded())
+		if e3.b.Weight != 0 {
+			FontDescriptor["FontWeight"] = pdf.Integer(e3.b.Weight.Rounded())
 		}
 
 		FontDict["FontDescriptor"] = FontDescriptorRef
@@ -337,7 +350,7 @@ func (fd *t3dict) Close() error {
 	needToUnicode := false
 	inSymbolFont := symbolNames()
 	for _, gid := range encoding {
-		name := fd.b.names[gid]
+		name := e3.b.names[gid]
 		if name == ".notdef" {
 			continue
 		}
@@ -367,7 +380,7 @@ func (fd *t3dict) Close() error {
 			if gid == 0 {
 				continue
 			}
-			name := fd.b.names[gid]
+			name := e3.b.names[gid]
 			mappings = append(mappings, tounicode.Single{
 				Code:  cmap.CID(code),
 				UTF16: utf16.Encode(names.ToUnicode(string(name), false)),

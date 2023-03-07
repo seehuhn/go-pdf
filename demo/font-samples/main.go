@@ -131,8 +131,8 @@ type fontSamples struct {
 
 	used float64 // vertical amount of page space currently used
 
-	bodyFont  *font.Font
-	titleFont *font.Font
+	bodyFont  font.Embedded
+	titleFont font.Embedded
 
 	page *pages.Page
 
@@ -205,14 +205,16 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Info) error {
 	if err != nil {
 		return err
 	}
+	gX := X.GetGeometry()
 
 	bodyFont := f.bodyFont
-	v1 := bodyFont.ToPDF16(10, bodyFont.Ascent)
-	v2 := bodyFont.ToPDF16(10, bodyFont.BaseLineSkip-bodyFont.Ascent) +
-		bodyFont.ToPDF16(7, bodyFont.Ascent)
-	v3 := bodyFont.ToPDF16(7, bodyFont.BaseLineSkip-bodyFont.Ascent) +
-		X.ToPDF16(24, X.Ascent)
-	v4 := X.ToPDF16(24, X.BaseLineSkip-X.Ascent) + 12
+	gBody := bodyFont.GetGeometry()
+	v1 := gBody.ToPDF16(10, gBody.Ascent)
+	v2 := gBody.ToPDF16(10, gBody.BaseLineSkip-gBody.Ascent) +
+		gBody.ToPDF16(7, gBody.Ascent)
+	v3 := gBody.ToPDF16(7, gBody.BaseLineSkip-gBody.Ascent) +
+		gX.ToPDF16(24, gX.Ascent)
+	v4 := gX.ToPDF16(24, gX.BaseLineSkip-gX.Ascent) + 12
 	totalPartHeight := v1 + v2 + v3 + v4
 
 	var parts []string
@@ -239,7 +241,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Info) error {
 			continue
 		}
 		w := info.GlyphWidth(glyph.ID(gid))
-		wf := X.ToPDF16(24, w)
+		wf := gX.ToPDF16(24, w)
 		if total+wf > f.textWidth {
 			break
 		}

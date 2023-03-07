@@ -16,7 +16,110 @@
 
 package font
 
-import "unicode"
+import (
+	"unicode"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/type1/names"
+)
+
+type decoder interface {
+	Decode(c byte) rune
+}
+
+type candidate struct {
+	name pdf.Name
+	dec  decoder
+}
+
+// See section 9.6.6.1 of PDF 32000-1:2008
+func DescribeEncoding(enc []glyph.ID, builtin []glyph.ID, glyphNames []string, dingbats bool) pdf.Object {
+	type D struct {
+		code byte
+		name string
+	}
+	var bestName pdf.Name
+	var bestDiff []D
+
+	if builtin != nil {
+		bestName = "builtin"
+		for c, gid := range enc {
+			if gid == 0 || builtin[c] == gid {
+				continue
+			}
+			name := glyphNames[gid]
+			bestDiff = append(bestDiff, D{
+				code: byte(c),
+				name: name,
+			})
+		}
+	}
+
+	candidates := []candidate{
+		{name: "MacRomanEncoding", dec: MacRomanEncoding},
+		{name: "WinAnsiEncoding", dec: WinAnsiEncoding},
+		{name: "MacExpertEncoding", dec: MacExpertEncoding},
+	}
+	for _, e1 := range candidates {
+		var diff []D
+		for c, gid := range enc {
+			if gid == 0 {
+				continue
+			}
+			name := glyphNames[gid]
+
+			rr := names.ToUnicode(name, dingbats)
+			if len(rr) != 1 {
+				continue
+			}
+			r1 := rr[0]
+
+			r2 := e1.dec.Decode(byte(c))
+			if r1 == r2 {
+				continue
+			}
+			diff = append(diff, D{
+				code: byte(c),
+				name: name,
+			})
+
+			if bestName != "" && len(diff) > len(bestDiff) { // shortcut
+				break
+			}
+		}
+		if bestName == "" || len(diff) < len(bestDiff) {
+			bestName = e1.name
+			bestDiff = diff
+		}
+	}
+
+	if len(bestDiff) == 0 {
+		if bestName == "builtin" {
+			return nil
+		}
+		return bestName
+	}
+
+	Differences := pdf.Array{}
+	// bestDiff is already sorted by code
+	next := len(enc) + 1
+	for _, d := range bestDiff {
+		if int(d.code) != next {
+			Differences = append(Differences, pdf.Integer(d.code))
+		}
+		Differences = append(Differences, pdf.Name(d.name))
+		next = int(d.code) + 1
+	}
+
+	res := pdf.Dict{
+		"Differences": Differences,
+	}
+	if bestName != "builtin" {
+		res["BaseEncoding"] = bestName
+	}
+	return res
+}
 
 var (
 	// StandardEncoding is one of the PDF Latin-text encodings.

@@ -101,7 +101,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	numGlyphs := theFont.NumGlyphs()
+	numGlyphs := font.NumGlyphs(theFont)
 	for i := 0; i < numGlyphs; i += 10 {
 		err = f.WriteGlyphRow(theFont, i)
 		if err != nil {
@@ -127,9 +127,9 @@ type fontTables struct {
 	textHeight float64
 	margin     float64
 
-	bodyFont   *font.Font
-	italicFont *font.Font
-	monoFont   *font.Font
+	bodyFont   font.Embedded
+	italicFont font.Embedded
+	monoFont   font.Embedded
 
 	page   *pages.Page
 	pageNo int
@@ -180,10 +180,12 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 }
 
 func (f *fontTables) WriteHeader(title, fileName string) error {
-	v1 := f.bodyFont.ToPDF16(12, f.bodyFont.Ascent)
-	v2 := f.bodyFont.ToPDF16(12, f.bodyFont.BaseLineSkip-f.bodyFont.Ascent) +
-		f.monoFont.ToPDF16(10, f.monoFont.Ascent)
-	v3 := f.monoFont.ToPDF16(10, f.monoFont.BaseLineSkip-f.monoFont.Ascent) +
+	gBody := f.bodyFont.GetGeometry()
+	gMono := f.monoFont.GetGeometry()
+	v1 := gBody.ToPDF16(12, gBody.Ascent)
+	v2 := gBody.ToPDF16(12, gBody.BaseLineSkip-gBody.Ascent) +
+		gMono.ToPDF16(10, gMono.Ascent)
+	v3 := gMono.ToPDF16(10, gMono.BaseLineSkip-gMono.Ascent) +
 		12
 	total := v1 + v2 + v3
 
@@ -205,19 +207,21 @@ func (f *fontTables) WriteHeader(title, fileName string) error {
 	return nil
 }
 
-func (f *fontTables) WriteGlyphRow(theFont *font.Font, start int) error {
+func (f *fontTables) WriteGlyphRow(theFont font.Embedded, start int) error {
 	const glyphSize = 24
+
+	geom := theFont.GetGeometry()
 
 	gid := make([]glyph.ID, 0, 10)
 	for i := start; i < start+10; i++ {
-		if i >= theFont.NumGlyphs() {
+		if i >= len(geom.Widths) {
 			break
 		}
 		gid = append(gid, glyph.ID(i))
 	}
 
-	v1 := theFont.ToPDF16(glyphSize, theFont.Ascent)
-	v2 := theFont.ToPDF16(glyphSize, -theFont.Descent)
+	v1 := geom.ToPDF16(glyphSize, geom.Ascent)
+	v2 := geom.ToPDF16(glyphSize, -geom.Descent)
 	v3 := 12.0
 	total := v1 + v2 + v3
 
@@ -265,7 +269,7 @@ func (f *fontTables) WriteGlyphRow(theFont *font.Font, start int) error {
 	xPos := make([]float64, len(gid))
 	page.SetStrokeColor(color.RGB(1, 0, 0))
 	for i, gid := range gid {
-		w := theFont.ToPDF16(glyphSize, theFont.Widths[gid])
+		w := geom.ToPDF16(glyphSize, geom.Widths[gid])
 		xPos[i] = left + (float64(i)+0.5)*dx - 0.5*w
 		page.MoveTo(xPos[i], yBase+v1)
 		page.LineTo(xPos[i], yBase-v2)
@@ -279,12 +283,12 @@ func (f *fontTables) WriteGlyphRow(theFont *font.Font, start int) error {
 	page.PushGraphicsState()
 	page.SetFillColor(color.RGB(.4, 1, .4))
 	for i, gid := range gid {
-		ext := theFont.GlyphExtents[gid]
+		ext := geom.GlyphExtents[gid]
 		page.Rectangle(
-			xPos[i]+theFont.ToPDF16(glyphSize, ext.LLx),
-			yBase+theFont.ToPDF16(glyphSize, ext.LLy),
-			theFont.ToPDF16(glyphSize, ext.URx-ext.LLx),
-			theFont.ToPDF16(glyphSize, ext.URy-ext.LLy))
+			xPos[i]+geom.ToPDF16(glyphSize, ext.LLx),
+			yBase+geom.ToPDF16(glyphSize, ext.LLy),
+			geom.ToPDF16(glyphSize, ext.URx-ext.LLx),
+			geom.ToPDF16(glyphSize, ext.URy-ext.LLy))
 	}
 	page.Fill()
 	page.PopGraphicsState()
@@ -293,7 +297,7 @@ func (f *fontTables) WriteGlyphRow(theFont *font.Font, start int) error {
 	for i, gid := range gid {
 		g := glyph.Info{
 			Gid:     gid,
-			Advance: theFont.Widths[gid],
+			Advance: geom.Widths[gid],
 		}
 
 		r := f.rev[gid]
@@ -304,7 +308,7 @@ func (f *fontTables) WriteGlyphRow(theFont *font.Font, start int) error {
 
 				// Try to establish a mapping from glyph ID to rune in the embedded
 				// font (called for side effects only).
-				_ = theFont.Layout([]rune{r})
+				_ = theFont.Layout(string([]rune{r}), glyphSize)
 			}
 			if unicode.IsPrint(r) && r < 128 {
 				label = fmt.Sprintf("%q", r)

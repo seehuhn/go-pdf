@@ -22,17 +22,9 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/sfnt/glyph"
 )
-
-type Font interface {
-	Resource
-	Typeset(s string, ptSize float64) glyph.Seq
-	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	GetUnitsPerEm() uint16
-	GetWidths() []funit.Int16
-}
 
 // BeginText starts a new text object.
 func (p *Page) BeginText() {
@@ -54,7 +46,7 @@ func (p *Page) EndText() {
 }
 
 // SetFont sets the font and font size.
-func (p *Page) SetFont(font Font, size float64) {
+func (p *Page) SetFont(font font.Embedded, size float64) {
 	if !p.valid("SetFont", objText, objPage) {
 		return
 	}
@@ -112,7 +104,7 @@ func (p *Page) ShowText(s string) {
 		p.Err = errors.New("no font set")
 		return
 	}
-	p.showGlyphsWithMargins(p.font.Typeset(s, p.fontSize), 0, 0)
+	p.showGlyphsWithMargins(p.font.Layout(s, p.fontSize), 0, 0)
 }
 
 // ShowTextAligned draws a string and aligns it.
@@ -127,7 +119,7 @@ func (p *Page) ShowTextAligned(s string, w, q float64) {
 		p.Err = errors.New("no font set")
 		return
 	}
-	p.showGlyphsAligned(p.font.Typeset(s, p.fontSize), w, q)
+	p.showGlyphsAligned(p.font.Layout(s, p.fontSize), w, q)
 }
 
 // ShowGlyphs draws a sequence of glyphs.
@@ -159,7 +151,7 @@ func (p *Page) ShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 
 func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
 	advanceWidth := gg.AdvanceWidth()
-	unitsPerEm := p.font.GetUnitsPerEm()
+	unitsPerEm := p.font.GetGeometry().UnitsPerEm
 	total := float64(advanceWidth) * p.fontSize / float64(unitsPerEm)
 	delta := w - total
 
@@ -178,8 +170,9 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 	}
 
 	font := p.font
-	widths := p.font.GetWidths()
-	unitsPerEm := font.GetUnitsPerEm()
+	geom := font.GetGeometry()
+	widths := geom.Widths
+	unitsPerEm := geom.UnitsPerEm
 	q := 1000 / float64(unitsPerEm)
 
 	var out pdf.Array
