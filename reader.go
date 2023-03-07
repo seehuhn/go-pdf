@@ -43,7 +43,7 @@ type Reader struct {
 	size int64
 	r    io.ReaderAt
 
-	pos     int64
+	Pos     int64
 	objStm  *objStm
 	level   int
 	special map[Reference]bool
@@ -78,6 +78,7 @@ func Open(fname string) (*Reader, error) {
 }
 
 // NewReader creates a new Reader object.
+// TODO(voss): use an options struct
 func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, error) {
 	r := &Reader{
 		size:    size,
@@ -199,7 +200,7 @@ func (r *Reader) GetInfo() (*Info, error) {
 // malformed PDF files.  In particular, it may still work when the
 // [Reader.Resolve] method fails with errors.
 func (r *Reader) ReadSequential() (Object, *Reference, error) {
-	s := r.scannerAt(r.pos)
+	s := r.scannerAt(r.Pos)
 
 	for {
 		if r.objStm != nil && len(r.objStm.idx) > 0 {
@@ -230,7 +231,7 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		r.pos = s.currentPos()
+		r.Pos = s.currentPos()
 
 		buf, _ := s.Peek(9)
 		switch {
@@ -279,7 +280,7 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 		obj, ref, err := s.ReadIndirectObject()
 		if err != nil {
 			if err == io.ErrUnexpectedEOF {
-				r.pos = s.currentPos()
+				r.Pos = s.currentPos()
 				err = io.EOF
 			}
 			return nil, nil, err
@@ -289,16 +290,16 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 			continue
 		}
 		if stm, ok := obj.(*Stream); ok && stm.Dict["Type"] == Name("ObjStm") {
-			contents, err := r.objStmScanner(stm, r.pos)
+			contents, err := r.objStmScanner(stm, r.Pos)
 			if err != nil {
 				return nil, nil, err
 			}
 			r.objStm = contents
-			r.pos = s.currentPos()
+			r.Pos = s.currentPos()
 			continue
 		}
 
-		r.pos = s.currentPos()
+		r.Pos = s.currentPos()
 		return obj, ref, nil
 	}
 }
