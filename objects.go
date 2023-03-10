@@ -581,9 +581,8 @@ func (x *Stream) Decode(resolve func(Object) (Object, error)) (io.Reader, error)
 
 // Reference represents a reference to an indirect object in a PDF file.
 // TODO(voss): use the struct directly, rather than pointers to the struct?
-// TODO(voss): use a fixed-size type for Number?
 type Reference struct {
-	Number     int
+	Number     uint32
 	Generation uint16
 }
 

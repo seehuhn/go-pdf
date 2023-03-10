@@ -48,7 +48,7 @@ type Reader struct {
 	level   int
 	special map[Reference]bool
 
-	xref    map[int]*xRefEntry
+	xref    map[uint32]*xRefEntry
 	trailer Dict
 
 	enc *encryptInfo
@@ -364,7 +364,8 @@ type objStm struct {
 }
 
 type stmObj struct {
-	number, offs int
+	number uint32
+	offs   int
 }
 
 func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
@@ -401,7 +402,8 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 		if err != nil {
 			return nil, err
 		}
-		idx[i].number = int(no)
+		// TODO(voss): check for overflow
+		idx[i].number = uint32(no)
 		idx[i].offs = int(offs)
 	}
 
@@ -420,7 +422,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 	return &objStm{s: s, idx: idx}, nil
 }
 
-func (r *Reader) getFromObjectStream(number int, sRef *Reference) (Object, error) {
+func (r *Reader) getFromObjectStream(number uint32, sRef *Reference) (Object, error) {
 	container, err := r.doGet(sRef, false)
 	if err != nil {
 		return nil, err

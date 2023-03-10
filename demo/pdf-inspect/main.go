@@ -80,8 +80,8 @@ func main() {
 		info, err = r.GetInfo()
 		obj = pdf.AsDict(info)
 	default:
-		var number int
-		number, err = strconv.Atoi(args[1])
+		var number uint64
+		number, err = strconv.ParseUint(args[1], 10, 32)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -95,7 +95,7 @@ func main() {
 		}
 
 		ref := &pdf.Reference{
-			Number:     number,
+			Number:     uint32(number),
 			Generation: generation,
 		}
 		obj, err = r.Resolve(ref)

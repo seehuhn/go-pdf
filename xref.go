@@ -77,13 +77,13 @@ func (r *Reader) lastOccurence(pat string) (int64, error) {
 	}
 }
 
-func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
+func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 	start, err := r.findXRef()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	xref := make(map[int]*xRefEntry)
+	xref := make(map[uint32]*xRefEntry)
 	trailer := Dict{}
 	first := true
 	seen := make(map[int64]bool)
@@ -159,7 +159,7 @@ func (r *Reader) readXRef() (map[int]*xRefEntry, Dict, error) {
 	return xref, trailer, nil
 }
 
-func readXRefTable(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
+func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 	err := s.SkipString("xref")
 	if err != nil {
 		return nil, err
@@ -192,7 +192,8 @@ func readXRefTable(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 			return nil, err
 		}
 
-		err = decodeXRefSection(xref, s, int(start), int(start+length))
+		// TODO(voss): check for overflows
+		err = decodeXRefSection(xref, s, uint32(start), uint32(start+length))
 		if err != nil {
 			return nil, err
 		}
@@ -217,8 +218,8 @@ func readXRefTable(xref map[int]*xRefEntry, s *scanner) (Dict, error) {
 	return s.ReadDict()
 }
 
-func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) error {
-	offByOne := 0
+func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32) error {
+	offByOne := uint32(0)
 	for i := start; i < end; i++ {
 		if xref[i] != nil {
 			err := s.Discard(20)
@@ -289,7 +290,7 @@ func decodeXRefSection(xref map[int]*xRefEntry, s *scanner, start, end int) erro
 	return nil
 }
 
-func readXRefStream(xref map[int]*xRefEntry, s *scanner) (Dict, *Reference, error) {
+func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, *Reference, error) {
 	obj, ref, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, nil, err
@@ -340,7 +341,7 @@ func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	Index := dict["Index"]
 	var ss []*xRefSubSection
 	if Index == nil {
-		ss = append(ss, &xRefSubSection{0, int(size)})
+		ss = append(ss, &xRefSubSection{0, uint32(size)})
 	} else {
 		ind, ok := Index.(Array)
 		if !ok || len(ind)%2 != 0 {
@@ -352,13 +353,14 @@ func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 			if !ok1 || !ok2 {
 				return nil, nil, &MalformedFileError{}
 			}
-			ss = append(ss, &xRefSubSection{int(start), int(size)})
+			// TODO(voss): check for overflows
+			ss = append(ss, &xRefSubSection{uint32(start), uint32(size)})
 		}
 	}
 	return w, ss, nil
 }
 
-func decodeXRefStream(xref map[int]*xRefEntry, r io.Reader, w []int, ss []*xRefSubSection) error {
+func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xRefSubSection) error {
 	wTotal := 0
 	for _, wi := range w {
 		wTotal += wi
@@ -409,7 +411,7 @@ func decodeXRefStream(xref map[int]*xRefEntry, r io.Reader, w []int, ss []*xRefS
 				xref[i] = &xRefEntry{
 					Pos: b,
 					InStream: &Reference{
-						Number:     int(a),
+						Number:     uint32(a),
 						Generation: 0,
 					},
 				}
@@ -431,7 +433,7 @@ func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < pdf.nextRef; i++ {
+	for i := uint32(0); i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
 		if entry != nil && entry.InStream != nil {
 			return errors.New("cannot use xref tables with object streams")
@@ -469,7 +471,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 
 	maxField2 := int64(0)
 	maxField3 := uint16(0)
-	for i := 0; i < pdf.nextRef; i++ {
+	for i := uint32(0); i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
 		if entry == nil {
 			continue
@@ -519,7 +521,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 		return err
 	}
 	wx := bufio.NewWriter(wxRaw)
-	for i := 0; i < pdf.nextRef; i++ {
+	for i := uint32(0); i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
 		if entry == nil {
 			err := wx.WriteByte(0)
@@ -622,7 +624,7 @@ func encodeInt16(data io.ByteWriter, x uint16, w int) error {
 }
 
 type xRefSubSection struct {
-	Start, Size int
+	Start, Size uint32
 }
 
 type xRefEntry struct {

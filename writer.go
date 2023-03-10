@@ -48,8 +48,8 @@ type Writer struct {
 	closeDownstream bool
 
 	id      [][]byte
-	xref    map[int]*xRefEntry
-	nextRef int
+	xref    map[uint32]*xRefEntry
+	nextRef uint32
 
 	inStream bool
 	// TODO(voss): change afterStream into a list of (*Reference, Object)
@@ -143,7 +143,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		origW: origW,
 
 		nextRef: 1,
-		xref:    make(map[int]*xRefEntry),
+		xref:    make(map[uint32]*xRefEntry),
 
 		Resources: make(map[Reference]Resource),
 	}
@@ -451,7 +451,7 @@ func (pdf *Writer) WriteCompressed(refs []*Reference, objects ...Object) ([]*Ref
 	sRef := pdf.Alloc()
 	for i := 0; i < N; i++ {
 		ref := refs[i]
-		idx := strconv.Itoa(ref.Number) + " " + strconv.Itoa(body.Len()) + "\n"
+		idx := strconv.Itoa(int(ref.Number)) + " " + strconv.Itoa(body.Len()) + "\n"
 		_, err := head.WriteString(idx)
 		if err != nil {
 			return nil, err

@@ -83,7 +83,7 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 		return nil, nil, err
 	}
 
-	ref := &Reference{int(number), uint16(generation)}
+	ref := &Reference{uint32(number), uint16(generation)}
 	if s.special[*ref] {
 		// some objects are not encrypted, e.g. xref dictionaries
 		s.enc = nil
@@ -121,8 +121,9 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 				return nil, nil, err
 			}
 
+			// TODO(voss): check for overflow
 			obj = &Reference{
-				Number:     int(a),
+				Number:     uint32(a),
 				Generation: uint16(b),
 			}
 		}
@@ -465,7 +466,8 @@ func (s *scanner) ReadArray() (Array, error) {
 		if integersSeen >= 2 && buf[0] == 'R' {
 			s.pos++
 			k := len(array)
-			a := int(array[k-2].(Integer))
+			// TODO(voss): check for overflow
+			a := uint32(array[k-2].(Integer))
 			b := uint16(array[k-1].(Integer))
 			array = append(array[:k-2], &Reference{a, b})
 			integersSeen = 0
@@ -568,7 +570,8 @@ func (s *scanner) ReadDict() (Dict, error) {
 					return nil, err
 				}
 
-				val = &Reference{int(a), uint16(b)}
+				// TODO(voss): check for overflow
+				val = &Reference{uint32(a), uint16(b)}
 			}
 		}
 
