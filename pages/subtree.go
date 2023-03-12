@@ -143,27 +143,6 @@ func (t *Tree) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	return nodes
 }
 
-// wrapIfNeeded ensures that the given dictionary is a /Pages object.
-// A wrapper /Pages object is created if necessary.
-func (t *Tree) wrapIfNeeded(info *dictInfo) *dictInfo {
-	if info.dict["Type"] == pdf.Name("Pages") {
-		return info
-	}
-
-	wrapperRef := t.Out.Alloc()
-	info.dict["Parent"] = wrapperRef
-	t.outRefs = append(t.outRefs, info.ref)
-	t.outObjects = append(t.outObjects, info.dict)
-
-	wrapper := pdf.Dict{
-		"Type":  pdf.Name("Pages"),
-		"Count": pdf.Integer(1),
-		"Kids":  pdf.Array{info.ref},
-	}
-
-	return &dictInfo{dict: wrapper, ref: wrapperRef}
-}
-
 const (
 	maxDegree          = 16
 	objStreamChunkSize = 100

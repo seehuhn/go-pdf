@@ -1,8 +1,27 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package numtree
 
 import (
+	"errors"
 	"io"
+	"sort"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 )
 
@@ -46,22 +65,46 @@ func Write(w *pdf.Writer, tree NumberTree) (*pdf.Reference, error) {
 }
 
 type SequentialWriter struct {
-	w   *pdf.Writer
-	ref *pdf.Reference
+	w    *pdf.Writer
+	ref  *pdf.Reference
+	data map[pdf.Integer]pdf.Object
 }
 
 func NewSequentialWriter(w *pdf.Writer) *SequentialWriter {
-	res := &SequentialWriter{w: w}
-	_ = res
-	panic("not implemented")
+	sw := &SequentialWriter{
+		w:    w,
+		ref:  w.Alloc(),
+		data: make(map[pdf.Integer]pdf.Object),
+	}
+	return sw
 }
 
 func (sw *SequentialWriter) Append(key pdf.Integer, val pdf.Object) error {
-	panic("not implemented")
+	sw.data[key] = val
+	return nil
 }
 
 func (sw *SequentialWriter) Close() error {
-	panic("not implemented")
+	if len(sw.data) == 0 {
+		return errors.New("numtree: empty tree")
+	}
+
+	keys := maps.Keys(sw.data)
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	min := keys[0]
+	max := keys[len(keys)-1]
+
+	var Nums pdf.Array
+	for _, key := range keys {
+		Nums = append(Nums, key, sw.data[key])
+	}
+
+	dict := pdf.Dict{
+		"Nums":   Nums,
+		"Limits": pdf.Array{min, max},
+	}
+	_, err := sw.w.Write(dict, sw.ref)
+	return err
 }
 
 func (sw *SequentialWriter) Reference() *pdf.Reference {

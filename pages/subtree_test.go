@@ -41,7 +41,8 @@ func TestSubtree(t *testing.T) {
 		}
 
 		s := &Tree{
-			Out: w,
+			Out:    w,
+			pageNo: &futureInt{},
 		}
 		for i := 0; i < numPages; i++ {
 			pageDict := pdf.Dict{

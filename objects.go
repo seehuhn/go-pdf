@@ -608,6 +608,11 @@ func (x *Reference) PDF(w io.Writer) error {
 	return err
 }
 
+func (x *Reference) IsNil() bool {
+	return x == nil
+}
+
+// TODO(voss): either use this more widely, or merge it into the called.
 func writeObject(w io.Writer, obj Object) error {
 	if obj == nil {
 		_, err := w.Write([]byte("null"))

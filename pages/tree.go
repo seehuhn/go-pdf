@@ -46,46 +46,18 @@ type Tree struct {
 	outRefs    []*pdf.Reference
 
 	isClosed bool
-}
 
-func (t *Tree) checkInvariants() {
-	// TODO(voss): once things have settled, move this function into the test
-	// suite.
+	// pageNo is the page number (0 based) of the next page to be added to
+	// the tree.  It is incremented automatically when a page is added.
+	pageNo *futureInt
 
-	for _, child := range t.children {
-		child.checkInvariants()
-		if child.parent != t {
-			panic("child.parent != t")
-		}
-	}
+	// NumPagesCb is a list of callbacks which are called when the subtree
+	// is closed, to report the total number of pages in the subtree.
+	numPagesCb []func(int)
 
-	var curDepth, numAtDepth int
-	first := true
-	for i, node := range t.tail {
-		invalid := false
-		if first || node.depth < curDepth {
-			curDepth = node.depth
-			numAtDepth = 1
-		} else if node.depth > curDepth {
-			invalid = true
-		} else {
-			numAtDepth++
-			if numAtDepth > maxDegree {
-				invalid = true
-			}
-		}
-		if invalid {
-			var dd []int
-			for j := 0; j <= i; j++ {
-				dd = append(dd, t.tail[j].depth)
-			}
-			panic(fmt.Sprintf("invalid depth seq %d", dd))
-		}
-	}
-
-	if len(t.outObjects) != len(t.outRefs) {
-		panic("len(outObjects) != len(outRefs)")
-	}
+	// NextPageCb is a list of callbacks which are called when the next page
+	// is added to the tree, to report the page number of the new page.
+	nextPageCb []func(int)
 }
 
 // InstallTree installs a page tree as the root of the PDF document.
@@ -108,19 +80,18 @@ func InstallTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 // NewTree creates a new page tree which adds pages to the PDF document w.
 func NewTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 	t := &Tree{
-		Out:  w,
-		attr: attr,
+		Out:    w,
+		attr:   attr,
+		pageNo: &futureInt{},
 	}
 	return t
 }
 
 // Close closes the current tree and all subtrees.
-// After a tree is closed, no more pages can be appended to it.
+// After a tree is closed, no more pages can be added to it.
 // If the tree is the root of a page tree, the complete tree is written
 // to the PDF file and a reference to the root node is returned.
-// In case of subtrees, if the tree has attributes or consists of a single
-// page, a reference to the subtree-root is returned.  Otherwise, the
-// returned reference is nil.
+// Otherwise, the returned reference is nil.
 func (t *Tree) Close() (*pdf.Reference, error) {
 	if t.isClosed {
 		return nil, errors.New("page tree is closed")
@@ -144,36 +115,44 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 
 	t.checkInvariants()
 
-	if t.attr != nil || t.parent == nil {
-		// reduce to one node, if needed
-		for len(t.tail) > 1 {
-			start := len(t.tail) - maxDegree
-			if start < 0 {
-				start = 0
-			}
-			for start > 0 && t.tail[start-1].depth == t.tail[start].depth {
-				start++
-			}
-			t.tail = t.mergeNodes(t.tail, start, len(t.tail))
+	if len(t.numPagesCb) != 0 {
+		numPages := 0
+		for _, node := range t.tail {
+			numPages += int(node.pageCount)
+		}
+		for _, fn := range t.numPagesCb {
+			fn(numPages)
 		}
 	}
-
-	if t.parent == nil && len(t.tail) > 0 { // be careful in case there are no pages
-		t.tail[0].dictInfo = t.wrapIfNeeded(t.tail[0].dictInfo)
+	for _, cb := range t.nextPageCb {
+		cb(-1)
 	}
 
-	if t.attr != nil && len(t.tail) > 0 {
-		mergeAttributes(t.tail[0].dict, t.attr)
-	}
-
-	if t.parent == nil {
+	if t.IsRoot() {
+		t.collapse()
 		if len(t.tail) == 0 {
 			return nil, errors.New("no pages in document")
 		}
-		rootRef := t.tail[0].ref
-		t.outRefs = append(t.outRefs, t.tail[0].ref)
-		t.outObjects = append(t.outObjects, t.tail[0].dict)
-		return rootRef, t.flush()
+		rootNode := t.tail[0]
+		t.tail = nil
+
+		// the root node cannot be a leaf
+		rootNode.dictInfo = t.wrapIfLeaf(rootNode.dictInfo)
+
+		if t.attr != nil {
+			mergeAttributes(rootNode.dict, t.attr)
+		}
+
+		t.outRefs = append(t.outRefs, rootNode.ref)
+		t.outObjects = append(t.outObjects, rootNode.dict)
+		return rootNode.ref, t.flush()
+	}
+
+	// If we reach this point, we are a subtree.
+
+	if t.attr != nil && len(t.tail) > 0 {
+		t.collapse()
+		mergeAttributes(t.tail[0].dict, t.attr)
 	}
 
 	t.parent.outRefs = append(t.parent.outRefs, t.outRefs...)
@@ -186,12 +165,7 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 			return nil, err
 		}
 	}
-
-	var rootRef *pdf.Reference
-	if len(t.tail) == 1 {
-		rootRef = t.tail[0].dictInfo.ref
-	}
-	return rootRef, nil
+	return nil, nil
 }
 
 // AppendPage adds a new page to the page tree.
@@ -210,6 +184,16 @@ func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
 		depth:     0,
 	}
 	t.tail = append(t.tail, node)
+
+	if len(t.nextPageCb) != 0 {
+		for _, fn := range t.nextPageCb {
+			t.pageNo.WhenAvailable(fn)
+		}
+		t.nextPageCb = t.nextPageCb[:0]
+	}
+
+	// increment the page number
+	t.pageNo = t.pageNo.Inc()
 
 	for {
 		n := len(t.tail)
@@ -251,9 +235,59 @@ func (t *Tree) NewSubTree(attr *InheritableAttributes) (*Tree, error) {
 		parent: t,
 		Out:    t.Out,
 		attr:   attr,
+		pageNo: t.pageNo,
 	}
+	t.pageNo = &futureInt{numMissing: 2}
+	subTree.pageNo.WhenAvailable(t.pageNo.AddMissing)
+	subTree.numPagesCb = append(subTree.numPagesCb, t.pageNo.AddMissing)
+
 	t.children = append(t.children, subTree)
 	return subTree, nil
+}
+
+func (t *Tree) RecordNextPageNumber(cb func(int)) {
+	if t.isClosed {
+		// there will be no next page
+		cb(-1)
+		return
+	}
+
+	t.nextPageCb = append(t.nextPageCb, cb)
+}
+
+// wrapIfLeaf ensures that the given dictionary is a /Pages object.
+// A wrapper /Pages object is created if necessary.
+func (t *Tree) wrapIfLeaf(info *dictInfo) *dictInfo {
+	if info.dict["Type"] == pdf.Name("Pages") {
+		return info
+	}
+
+	wrapperRef := t.Out.Alloc()
+	info.dict["Parent"] = wrapperRef
+	t.outRefs = append(t.outRefs, info.ref)
+	t.outObjects = append(t.outObjects, info.dict)
+
+	wrapper := pdf.Dict{
+		"Type":  pdf.Name("Pages"),
+		"Count": pdf.Integer(1),
+		"Kids":  pdf.Array{info.ref},
+	}
+
+	return &dictInfo{dict: wrapper, ref: wrapperRef}
+}
+
+// Collapse reduces the tail to (at most) one node.
+func (t *Tree) collapse() {
+	for len(t.tail) > 1 {
+		start := len(t.tail) - maxDegree
+		if start < 0 {
+			start = 0
+		}
+		for start > 0 && t.tail[start-1].depth == t.tail[start].depth {
+			start++
+		}
+		t.tail = t.mergeNodes(t.tail, start, len(t.tail))
+	}
 }
 
 // Flush writes a batch finished objects to the output file.
@@ -270,4 +304,57 @@ func (t *Tree) flush() error {
 	t.outObjects = t.outObjects[:0]
 	t.outRefs = t.outRefs[:0]
 	return nil
+}
+
+func (t *Tree) IsRoot() bool {
+	return t.parent == nil
+}
+
+// NumPages returns the number of pages in the tree, excluding child trees.
+func (t *Tree) numPages() int {
+	total := 0
+	for _, node := range t.tail {
+		total += int(node.pageCount)
+	}
+	return total
+}
+
+func (t *Tree) checkInvariants() {
+	// TODO(voss): once things have settled, move this function into the test
+	// suite.
+
+	for _, child := range t.children {
+		child.checkInvariants()
+		if child.parent != t {
+			panic("child.parent != t")
+		}
+	}
+
+	var curDepth, numAtDepth int
+	first := true
+	for i, node := range t.tail {
+		invalid := false
+		if first || node.depth < curDepth {
+			curDepth = node.depth
+			numAtDepth = 1
+		} else if node.depth > curDepth {
+			invalid = true
+		} else {
+			numAtDepth++
+			if numAtDepth > maxDegree {
+				invalid = true
+			}
+		}
+		if invalid {
+			var dd []int
+			for j := 0; j <= i; j++ {
+				dd = append(dd, t.tail[j].depth)
+			}
+			panic(fmt.Sprintf("invalid depth seq %d", dd))
+		}
+	}
+
+	if len(t.outObjects) != len(t.outRefs) {
+		panic("len(outObjects) != len(outRefs)")
+	}
 }
