@@ -76,7 +76,7 @@ func TestSimple(t *testing.T) {
 		URx: 10 + 16*20,
 		URy: 5 + 16*20 + 5,
 	}
-	_, err = pageTree.AppendPage(dict)
+	_, err = pageTree.AppendPage(dict, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

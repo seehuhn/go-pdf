@@ -94,7 +94,7 @@ func imagePage(img *image.NRGBA) error {
 	}
 	dict["MediaBox"] = pageBox
 
-	_, err = pageTree.AppendPage(dict)
+	_, err = pageTree.AppendPage(dict, nil)
 	if err != nil {
 		return err
 	}

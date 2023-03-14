@@ -33,6 +33,7 @@ type Page struct {
 }
 
 // AppendPage creates a new page and appends it to a page tree.
+// TODO(voss): is this really worth keeping?  It makes the Page struct more ugly.
 func AppendPage(tree *Tree) (*Page, error) {
 	p, err := NewPage(tree.Out)
 	if err != nil {
@@ -88,7 +89,7 @@ func (p *Page) Close() (pdf.Dict, error) {
 	}
 
 	if p.tree != nil {
-		_, err = p.tree.AppendPage(dict)
+		_, err = p.tree.AppendPage(dict, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -72,7 +72,7 @@ func main() {
 		log.Fatal(err)
 	}
 	dict["MediaBox"] = bbox
-	_, err = pageTree.AppendPage(dict)
+	_, err = pageTree.AppendPage(dict, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

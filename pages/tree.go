@@ -183,12 +183,14 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 }
 
 // AppendPage adds a new page to the page tree.
-func (t *Tree) AppendPage(pageDict pdf.Dict) (*pdf.Reference, error) {
+func (t *Tree) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Reference, error) {
 	if t.isClosed {
 		return nil, errors.New("page tree is closed")
 	}
 
-	pageRef := t.Out.Alloc()
+	if pageRef == nil {
+		pageRef = t.Out.Alloc()
+	}
 	node := &nodeInfo{
 		dictInfo: &dictInfo{
 			dict: pageDict,

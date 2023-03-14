@@ -71,7 +71,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, err = pageTree.AppendPage(dict)
+		_, err = pageTree.AppendPage(dict, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, err = frontMatter.AppendPage(dict)
+		_, err = frontMatter.AppendPage(dict, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, err = extra.AppendPage(dict)
+		_, err = extra.AppendPage(dict, nil)
 		if err != nil {
 			log.Fatal(err)
 		}

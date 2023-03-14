@@ -91,7 +91,7 @@ func TestType3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = pageTree.AppendPage(dict)
+	_, err = pageTree.AppendPage(dict, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
