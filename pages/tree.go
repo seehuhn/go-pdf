@@ -52,11 +52,6 @@ type Tree struct {
 	// automatically when a page is added.
 	absPageNo *futureInt
 
-	// relPageNo is the page number (0 based, from the start of the document)
-	// of the next page to be added to the tree.  It is incremented
-	// automatically when a page is added.
-	relPageNo *futureInt
-
 	// NumPagesCb is a list of callbacks which are called when the subtree
 	// is closed, to report the total number of pages in the subtree.
 	numPagesCb []func(int)
@@ -64,10 +59,6 @@ type Tree struct {
 	// NextPageAbsCb is a list of callbacks which are called when the next page
 	// is added to the tree, to report the absolute page number of the new page.
 	nextPageAbsCb []func(int)
-
-	// NextPageRelCb is a list of callbacks which are called when the next page
-	// is added to the tree, to report the relative page number of the new page.
-	nextPageRelCb []func(int)
 }
 
 // InstallTree installs a page tree as the root of the PDF document.
@@ -93,7 +84,6 @@ func NewTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 		Out:       w,
 		attr:      attr,
 		absPageNo: &futureInt{},
-		relPageNo: &futureInt{},
 	}
 	return t
 }
@@ -114,9 +104,11 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 		var nodes []*nodeInfo
 		var err error
 		for _, child := range t.children {
-			_, err = child.Close()
-			if err != nil {
-				return nil, err
+			if !child.isClosed {
+				_, err = child.Close()
+				if err != nil {
+					return nil, err
+				}
 			}
 			nodes = t.merge(nodes, child.tail)
 		}
@@ -136,9 +128,6 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 		}
 	}
 	for _, cb := range t.nextPageAbsCb {
-		cb(-1)
-	}
-	for _, cb := range t.nextPageRelCb {
 		cb(-1)
 	}
 
@@ -205,14 +194,9 @@ func (t *Tree) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Refer
 		t.absPageNo.WhenAvailable(fn)
 	}
 	t.nextPageAbsCb = t.nextPageAbsCb[:0]
-	for _, fn := range t.nextPageRelCb {
-		t.relPageNo.WhenAvailable(fn)
-	}
-	t.nextPageRelCb = t.nextPageRelCb[:0]
 
 	// increment the page numbers
 	t.absPageNo = t.absPageNo.Inc()
-	t.relPageNo = t.relPageNo.Inc()
 
 	for {
 		n := len(t.tail)
@@ -255,13 +239,10 @@ func (t *Tree) NewSubTree(attr *InheritableAttributes) (*Tree, error) {
 		Out:       t.Out,
 		attr:      attr,
 		absPageNo: t.absPageNo,
-		relPageNo: &futureInt{},
 	}
 	t.absPageNo = &futureInt{numMissing: 2}
 	subTree.absPageNo.WhenAvailable(t.absPageNo.AddMissing)
 	subTree.numPagesCb = append(subTree.numPagesCb, t.absPageNo.AddMissing)
-	t.relPageNo.numMissing++
-	subTree.numPagesCb = append(subTree.numPagesCb, t.relPageNo.AddMissing)
 
 	t.children = append(t.children, subTree)
 	return subTree, nil
@@ -281,22 +262,6 @@ func (t *Tree) NextPageNumberAbs(cb func(int)) {
 	}
 
 	t.nextPageAbsCb = append(t.nextPageAbsCb, cb)
-}
-
-// NextPageNumberRel registers a callback that will be called when the next
-// page number is known.  Page numbers are relative to the start of the
-// sub-tree, starting at 0.
-//
-// The callback will be called with -1 if the page tree is closed before
-// another page is added.
-func (t *Tree) NextPageNumberRel(cb func(int)) {
-	if t.isClosed {
-		// there will be no next page
-		cb(-1)
-		return
-	}
-
-	t.nextPageRelCb = append(t.nextPageRelCb, cb)
 }
 
 // wrapIfLeaf ensures that the given dictionary is a /Pages object.
