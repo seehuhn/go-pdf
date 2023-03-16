@@ -72,6 +72,12 @@ func Afm(fontName string) (*AfmInfo, error) {
 
 	nameToGid := make(map[string]glyph.ID)
 
+	// add the .notdef glyph
+	res.Code = append(res.Code, -1)
+	res.Widths = append(res.Widths, 0) // TODO(voss): how to find the width?
+	res.GlyphExtents = append(res.GlyphExtents, funit.Rect{})
+	res.GlyphName = append(res.GlyphName, ".notdef")
+
 	charMetrics := false
 	kernPairs := false
 	res.IsDingbats = fontName == "ZapfDingbats"
@@ -200,6 +206,9 @@ func Afm(fontName string) (*AfmInfo, error) {
 			res.Kern[glyph.Pair{Left: a, Right: b}] = kern.val
 		}
 	}
+
+	// guess: maybe the notdef character has the same width as the space character?
+	res.Widths[0] = res.Widths[nameToGid["space"]]
 
 	return res, nil
 }

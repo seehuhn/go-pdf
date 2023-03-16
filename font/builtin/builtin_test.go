@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -84,5 +85,19 @@ func TestSimple(t *testing.T) {
 	err = w.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSpace(t *testing.T) {
+	for _, name := range FontNames {
+		F, err := Font(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		gid, width := font.GetGID(F, ' ')
+		if gid == 0 || width == 0 {
+			t.Errorf("%s: space not found", name)
+		}
 	}
 }
