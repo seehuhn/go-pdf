@@ -18,6 +18,8 @@
 package font
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
@@ -35,37 +37,45 @@ type Geometry struct {
 	Widths       []funit.Int16
 }
 
-func (g *Geometry) ToPDF(fontSize float64, x funit.Int) float64 {
-	return float64(x) * fontSize / float64(g.UnitsPerEm)
+func (g *Geometry) ToPDF(fontSize float64, a funit.Int) float64 {
+	return float64(a) * fontSize / float64(g.UnitsPerEm)
 }
 
-func (g *Geometry) ToPDF16(fontSize float64, x funit.Int16) float64 {
-	return float64(x) * fontSize / float64(g.UnitsPerEm)
+func (g *Geometry) ToPDF16(fontSize float64, a funit.Int16) float64 {
+	return float64(a) * fontSize / float64(g.UnitsPerEm)
 }
 
-type Layouter interface {
-	GetGeometry() *Geometry
-	Layout(s string, ptSize float64) glyph.Seq
+func (g *Geometry) FromPDF16(fontSize float64, x float64) funit.Int16 {
+	return funit.Int16(math.Round(x / fontSize * float64(g.UnitsPerEm)))
 }
 
 // Font represents a font which can be embedded in a PDF file.
 type Font interface {
-	Layouter
 	Embed(w *pdf.Writer, resName pdf.Name) (Embedded, error)
+	GetGeometry() *Geometry
+	Layout(s string, ptSize float64) glyph.Seq
 }
 
 // Embedded represents a font embedded in a PDF file.
 type Embedded interface {
-	Layouter
+	Font
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-
 	ResourceName() pdf.Name
-
 	pdf.Resource
 }
 
 // NumGlyphs returns the number of glyphs in a font.
-func NumGlyphs(font Layouter) int {
+func NumGlyphs(font Font) int {
 	g := font.GetGeometry()
 	return len(g.Widths)
+}
+
+// GetGID returns the glyph ID and advance width for a given rune.
+// A glyph ID of 0 indicates that the rune is not supported by the font.
+func GetGID(font Font, r rune) (glyph.ID, funit.Int16) {
+	gg := font.Layout(string(r), 10)
+	if len(gg) != 1 {
+		return 0, 0
+	}
+	return gg[0].Gid, gg[0].Advance
 }
