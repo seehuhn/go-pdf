@@ -47,7 +47,9 @@ func AppendPage(tree *Tree) (*Page, error) {
 
 // NewPage creates a new page without appending it to the page tree.
 // Once the page is finished, the page dictionary returned by the [Close]
-// method can be used to add the page to the page tree.
+// method can be used to add the page to a page tree.
+//
+// TODO(voss): should this be moved into a different package?
 func NewPage(w *pdf.Writer) (*Page, error) {
 	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
 	if w.Version >= pdf.V1_2 {

@@ -67,7 +67,7 @@ import (
 	"seehuhn.de/go/pdf/lzw"
 )
 
-// FilterInfo describes one PDF stream filter.
+// FilterInfo describes a single PDF stream filter.
 type FilterInfo struct {
 	Name  Name
 	Parms Dict
@@ -124,6 +124,7 @@ func flateFromDict(parms Dict, isLZW bool) *flateFilter {
 	return res
 }
 
+// ToDict implements the filter interface.
 func (ff *flateFilter) ToDict() Dict {
 	res := Dict{}
 	if ff.Predictor != 1 {
@@ -147,6 +148,7 @@ func (ff *flateFilter) ToDict() Dict {
 	return res
 }
 
+// Decode implements the filter interface.
 func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
 	var res io.Reader
 	var err error
@@ -233,6 +235,7 @@ func (r *pngReader) Read(b []byte) (int, error) {
 	return n, nil
 }
 
+// Encode implements the filter interface.
 func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 	var zw io.WriteCloser
 	var err error

@@ -25,17 +25,17 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-type NumberTree interface {
+type Tree interface {
 	Get(key pdf.Integer) (pdf.Object, error)
 	First() (pdf.Integer, error)
 	Next(after pdf.Integer) (pdf.Integer, error)
 }
 
-func Read(r pdf.Reader, root pdf.Object) (NumberTree, error) {
+func Read(r pdf.Reader, root pdf.Object) (Tree, error) {
 	panic("not implemented")
 }
 
-func Write(w *pdf.Writer, tree NumberTree) (*pdf.Reference, error) {
+func Write(w *pdf.Writer, tree Tree) (*pdf.Reference, error) {
 	sw := NewSequentialWriter(w)
 	pos, err := tree.First()
 	if err != nil {
