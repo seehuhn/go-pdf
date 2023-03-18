@@ -26,7 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	pdfimage "seehuhn.de/go/pdf/image"
-	"seehuhn.de/go/pdf/simple"
+	"seehuhn.de/go/pdf/quickly"
 )
 
 const dpi = 300
@@ -73,7 +73,7 @@ func main() {
 	b := img.Bounds()
 	width := float64(b.Dx()) / dpi * 72
 	height := float64(b.Dy()) / dpi * 72
-	doc, err := simple.CreateSinglePage("test.pdf", width, height)
+	doc, err := quickly.CreateSinglePage("test.pdf", width, height)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -20,26 +20,20 @@ import (
 	"log"
 	"math"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/quickly"
 )
 
 func main() {
-	w, err := pdf.Create("graphics.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	F, err := builtin.Embed(w, builtin.Helvetica, "F")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pageTree := pages.InstallTree(w, nil)
-
 	bbox := pages.A4
-	g, err := pages.NewPage(w)
+
+	w, err := quickly.CreateSinglePage("graphics.pdf", bbox.URx, bbox.URy)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	F, err := builtin.Embed(w.Out, builtin.Helvetica, "F")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,35 +41,25 @@ func main() {
 	x := 72.0
 	y := bbox.URy - 72.0
 	r := 50.0
-	g.Circle(x, y, r)
-	g.Stroke()
+	w.Circle(x, y, r)
+	w.Stroke()
 
 	x += 120
-	g.MoveTo(x, y)
-	g.LineToArc(x, y, r, 0, 1.5*math.Pi)
-	g.CloseAndStroke()
+	w.MoveTo(x, y)
+	w.LineToArc(x, y, r, 0, 1.5*math.Pi)
+	w.CloseAndStroke()
 
 	x = 72
 	y -= 72
-	g.BeginText()
-	g.SetFont(F, 12)
-	g.StartLine(x, y)
-	g.ShowText("AWAY again")
-	g.StartNextLine(0, -15)
-	g.ShowText("line 2")
-	g.NewLine()
-	g.ShowText("line 3")
-	g.EndText()
-
-	dict, err := g.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-	dict["MediaBox"] = bbox
-	_, err = pageTree.AppendPage(dict, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	w.BeginText()
+	w.SetFont(F, 12)
+	w.StartLine(x, y)
+	w.ShowText("AWAY again")
+	w.StartNextLine(0, -15)
+	w.ShowText("line 2")
+	w.NewLine()
+	w.ShowText("line 3")
+	w.EndText()
 
 	err = w.Close()
 	if err != nil {

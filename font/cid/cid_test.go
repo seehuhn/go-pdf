@@ -20,13 +20,12 @@ import (
 	"testing"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/quickly"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestCID(t *testing.T) {
-	w, err := pdf.Create("test-otf-cid.pdf")
+	w, err := quickly.CreateSinglePage("test-otf-cid.pdf", 10+16*20, 5+32*20+5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,15 +34,7 @@ func TestCID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	F, err := FF.Embed(w, "F")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pageTree := pages.InstallTree(w, nil)
-
-	g, err := pages.NewPage(w)
+	F, err := FF.Embed(w.Out, "F")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,32 +45,19 @@ func TestCID(t *testing.T) {
 		col := i % 16
 		gid := glyph.ID(i + 2)
 
-		w := geom.Widths[gid]
+		width := geom.Widths[gid]
 		gg := []glyph.Info{
 			{
 				Gid:     gid,
-				Advance: w,
+				Advance: width,
 			},
 		}
 
-		g.BeginText()
-		g.SetFont(F, 16)
-		g.StartLine(float64(5+20*col+10), float64(32*20-10-20*row))
-		g.ShowGlyphsAligned(gg, 0, 0.5)
-		g.EndText()
-	}
-
-	dict, err := g.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dict["MediaBox"] = &pdf.Rectangle{
-		URx: 10 + 16*20,
-		URy: 5 + 32*20 + 5,
-	}
-	_, err = pageTree.AppendPage(dict, nil)
-	if err != nil {
-		t.Fatal(err)
+		w.BeginText()
+		w.SetFont(F, 16)
+		w.StartLine(float64(5+20*col+10), float64(32*20-10-20*row))
+		w.ShowGlyphsAligned(gg, 0, 0.5)
+		w.EndText()
 	}
 
 	err = w.Close()
