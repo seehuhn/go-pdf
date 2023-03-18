@@ -302,23 +302,33 @@ func (x Name) PDF(w io.Writer) error {
 	}
 	n := len(l)
 
-	buf := &bytes.Buffer{}
-	buf.WriteString("/")
+	_, err := w.Write([]byte{'/'})
+	if err != nil {
+		return err
+	}
 	pos := 0
 	for _, i := range funny {
 		if pos < i {
-			buf.Write(l[pos:i])
+			_, err = w.Write(l[pos:i])
+			if err != nil {
+				return err
+			}
 		}
 		c := l[i]
-		fmt.Fprintf(buf, "#%02x", c)
+		_, err = fmt.Fprintf(w, "#%02x", c)
+		if err != nil {
+			return err
+		}
 		pos = i + 1
 	}
 	if pos < n {
-		buf.Write(l[pos:n])
+		_, err = w.Write(l[pos:n])
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err := w.Write(buf.Bytes())
-	return err
+	return nil
 }
 
 func toName(obj Object) (Name, error) {
@@ -555,28 +565,6 @@ func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, e
 		return nil, errors.New("invalid /Filter field")
 	}
 	return filters, nil
-}
-
-// Decode returns a reader for the decoded stream data.
-//
-// TODO(voss): allow to decode only the first few filters?
-func (x *Stream) Decode(resolve func(Object) (Object, error)) (io.Reader, error) {
-	filters, err := x.Filters(resolve)
-	if err != nil {
-		return nil, err
-	}
-	r := x.R
-	for _, fi := range filters {
-		filter, err := fi.getFilter()
-		if err != nil {
-			return nil, err
-		}
-		r, err = filter.Decode(r)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return r, nil
 }
 
 // Reference represents a reference to an indirect object in a PDF file.

@@ -113,12 +113,12 @@ func main() {
 			fmt.Println("% decoded")
 			fmt.Println("stream")
 		}
-		r, err := stm.Decode(r.Resolve)
+		stmData, err := r.DecodeStream(stm, 0)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		_, err = io.Copy(os.Stdout, r)
+		_, err = io.Copy(os.Stdout, stmData)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)

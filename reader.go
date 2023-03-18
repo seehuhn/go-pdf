@@ -383,7 +383,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 		dec = r.enc
 	}
 
-	decoded, err := stream.Decode(r.Resolve)
+	decoded, err := r.DecodeStream(stream, 0)
 	if err != nil {
 		return nil, &MalformedFileError{
 			Pos: errPos,
@@ -604,6 +604,35 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 	val, err := r.GetInt(obj)
 	r.level--
 	return val, err
+}
+
+// DecodeStream returns a reader for the decoded stream data.
+// If numFilters is non-zero, only the first numFilters filters are decoded.
+func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
+	var resolve func(Object) (Object, error)
+	if r != nil {
+		resolve = r.Resolve
+	}
+	filters, err := x.Filters(resolve)
+	if err != nil {
+		return nil, err
+	}
+
+	out := x.R
+	for i, fi := range filters {
+		if numFilters > 0 && i >= numFilters {
+			break
+		}
+		filter, err := fi.getFilter()
+		if err != nil {
+			return nil, err
+		}
+		out, err = filter.Decode(out)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func (r *Reader) scannerAt(pos int64) *scanner {

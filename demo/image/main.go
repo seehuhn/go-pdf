@@ -19,13 +19,14 @@ package main
 import (
 	"image"
 	"image/draw"
+	_ "image/jpeg"
 	_ "image/png"
 	"log"
 	"os"
 
 	"seehuhn.de/go/pdf"
 	pdfimage "seehuhn.de/go/pdf/image"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/simple"
 )
 
 const dpi = 300
@@ -61,58 +62,36 @@ func (im *imageWrapper) ResourceName() pdf.Name {
 	return "I"
 }
 
-func imagePage(img *image.NRGBA) error {
-	out, err := pdf.Create("test.pdf")
-	if err != nil {
-		return err
-	}
-
-	imageRef, err := pdfimage.EmbedAsJPEG(out, img, nil, nil)
-	if err != nil {
-		return err
-	}
-
-	pageTree := pages.InstallTree(out, nil)
-
-	b := img.Bounds()
-	pageBox := &pdf.Rectangle{
-		URx: float64(b.Dx()) / dpi * 72,
-		URy: float64(b.Dy()) / dpi * 72,
-	}
-
-	page, err := pages.NewPage(out)
-	if err != nil {
-		return err
-	}
-
-	page.Scale(pageBox.URx, pageBox.URy)
-	page.DrawImage(&imageWrapper{imageRef})
-
-	dict, err := page.Close()
-	if err != nil {
-		return err
-	}
-	dict["MediaBox"] = pageBox
-
-	_, err = pageTree.AppendPage(dict, nil)
-	if err != nil {
-		return err
-	}
-
-	out.Catalog.ViewerPreferences = pdf.Dict{
-		"FitWindow":    pdf.Bool(true),
-		"HideWindowUI": pdf.Bool(true),
-	}
-	return out.Close()
-}
-
 func main() {
-	img, err := readImage(os.Args[1])
+	name := os.Args[1]
+
+	img, err := readImage(name)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = imagePage(img)
+	b := img.Bounds()
+	width := float64(b.Dx()) / dpi * 72
+	height := float64(b.Dy()) / dpi * 72
+	doc, err := simple.CreateSinglePage("test.pdf", width, height)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	imageRef, err := pdfimage.EmbedAsJPEG(doc.Out, img, nil, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	doc.Scale(width, height)
+	doc.DrawImage(&imageWrapper{imageRef})
+
+	doc.Out.Catalog.ViewerPreferences = pdf.Dict{
+		"FitWindow":    pdf.Bool(true),
+		"HideWindowUI": pdf.Bool(true),
+	}
+
+	err = doc.Close()
 	if err != nil {
 		log.Fatal(err)
 	}

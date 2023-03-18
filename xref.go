@@ -308,7 +308,7 @@ func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, *Reference, e
 	if err != nil {
 		return nil, nil, err
 	}
-	decoded, err := stream.Decode(nil)
+	decoded, err := (*Reader)(nil).DecodeStream(stream, 0)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,6 +1,7 @@
 package simple
 
 import (
+	"bytes"
 	"io"
 	"os"
 
@@ -46,21 +47,12 @@ func WriteSinglePage(w io.Writer, width, height float64) (*Document, error) {
 		},
 	})
 
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if out.Version >= pdf.V1_2 {
-		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-	}
-	stream, contentRef, err := out.OpenStream(nil, nil, compress)
-	if err != nil {
-		return nil, err
-	}
-	page := graphics.NewPage(stream)
+	page := graphics.NewPage(&bytes.Buffer{})
 
 	return &Document{
 		Page: page,
 		PageDict: pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"Contents": contentRef,
+			"Type": pdf.Name("Page"),
 		},
 
 		base:  w,
@@ -73,10 +65,24 @@ func (doc *Document) Close() error {
 	if doc.Page.Err != nil {
 		return doc.Page.Err
 	}
-	err := doc.Page.Content.(io.Closer).Close()
+
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if doc.Out.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+	}
+	stream, contentRef, err := doc.Out.OpenStream(nil, nil, compress)
 	if err != nil {
 		return err
 	}
+	_, err = io.Copy(stream, doc.Page.Content.(*bytes.Buffer))
+	if err != nil {
+		return err
+	}
+	err = stream.Close()
+	if err != nil {
+		return err
+	}
+	doc.PageDict["Contents"] = contentRef
 
 	if doc.Page.Resources != nil {
 		doc.PageDict["Resources"] = pdf.AsDict(doc.Page.Resources)

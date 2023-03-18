@@ -63,6 +63,7 @@ import (
 	"errors"
 	"io"
 	"strconv"
+	"sync"
 
 	"seehuhn.de/go/pdf/lzw"
 )
@@ -235,6 +236,13 @@ func (r *pngReader) Read(b []byte) (int, error) {
 	return n, nil
 }
 
+var zlibPool = sync.Pool{
+	New: func() interface{} {
+		zw, _ := zlib.NewWriterLevel(nil, zlib.BestCompression)
+		return zw
+	},
+}
+
 // Encode implements the filter interface.
 func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 	var zw io.WriteCloser
@@ -242,7 +250,10 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 	if ff.IsLZW {
 		zw, err = lzw.NewWriter(w, ff.EarlyChange)
 	} else {
-		zw, err = zlib.NewWriterLevel(w, zlib.BestCompression)
+		// zw, err = zlib.NewWriterLevel(w, zlib.BestCompression)
+		tmp := zlibPool.Get().(*zlib.Writer)
+		tmp.Reset(w)
+		zw = tmp
 	}
 	if err != nil {
 		return nil, err
@@ -252,6 +263,9 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 		err := zw.Close()
 		if err != nil {
 			return err
+		}
+		if !ff.IsLZW {
+			zlibPool.Put(zw)
 		}
 		return w.Close()
 	}
