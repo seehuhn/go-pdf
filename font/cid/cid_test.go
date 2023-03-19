@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/quickly"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestCID(t *testing.T) {
-	w, err := quickly.CreateSinglePage("test-otf-cid.pdf", 10+16*20, 5+32*20+5)
+	w, err := document.CreateSinglePage("test-otf-cid.pdf", 10+16*20, 5+32*20+5)
 	if err != nil {
 		t.Fatal(err)
 	}

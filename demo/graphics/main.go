@@ -20,15 +20,15 @@ import (
 	"log"
 	"math"
 
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
-	"seehuhn.de/go/pdf/quickly"
 )
 
 func main() {
 	bbox := pages.A4
 
-	w, err := quickly.CreateSinglePage("graphics.pdf", bbox.URx, bbox.URy)
+	w, err := document.CreateSinglePage("graphics.pdf", bbox.URx, bbox.URy)
 	if err != nil {
 		log.Fatal(err)
 	}

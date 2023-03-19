@@ -1,4 +1,4 @@
-package quickly
+package document
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"seehuhn.de/go/pdf/pages"
 )
 
-type Document struct {
+type SinglePage struct {
 	*graphics.Page
 	PageDict pdf.Dict
 	Out      *pdf.Writer
@@ -20,7 +20,7 @@ type Document struct {
 	pages     *pages.Tree
 }
 
-func CreateSinglePage(name string, width, height float64) (*Document, error) {
+func CreateSinglePage(name string, width, height float64) (*SinglePage, error) {
 	fd, err := os.Create(name)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func CreateSinglePage(name string, width, height float64) (*Document, error) {
 	return doc, nil
 }
 
-func WriteSinglePage(w io.Writer, width, height float64) (*Document, error) {
+func WriteSinglePage(w io.Writer, width, height float64) (*SinglePage, error) {
 	out, err := pdf.NewWriter(w, nil)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func WriteSinglePage(w io.Writer, width, height float64) (*Document, error) {
 
 	page := graphics.NewPage(&bytes.Buffer{})
 
-	return &Document{
+	return &SinglePage{
 		Page: page,
 		PageDict: pdf.Dict{
 			"Type": pdf.Name("Page"),
@@ -61,7 +61,7 @@ func WriteSinglePage(w io.Writer, width, height float64) (*Document, error) {
 	}, nil
 }
 
-func (doc *Document) Close() error {
+func (doc *SinglePage) Close() error {
 	if doc.Page.Err != nil {
 		return doc.Page.Err
 	}

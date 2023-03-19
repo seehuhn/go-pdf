@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
@@ -40,28 +41,24 @@ func main() {
 	fontNamesFile := flag.String("f", "", "file containing font names")
 	flag.Parse()
 
-	w, err := pdf.Create("out.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	labelFont, err := builtin.Embed(w, "Helvetica", "L")
-	if err != nil {
-		log.Fatal(err)
-	}
-	titleFont, err := builtin.Embed(w, "Helvetica-Bold", "T")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	paper := pages.A4
-	pageTree := pages.InstallTree(w, &pages.InheritableAttributes{
-		MediaBox: pages.A4,
-	})
+	doc, err := document.CreateMultiPage("out.pdf", paper.URx, paper.URy)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	labelFont, err := builtin.Embed(doc.Out, "Helvetica", "L")
+	if err != nil {
+		log.Fatal(err)
+	}
+	titleFont, err := builtin.Embed(doc.Out, "Helvetica-Bold", "T")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	const margin = 50
 	f := fontSamples{
-		tree: pageTree,
+		doc: doc,
 
 		textWidth:  paper.URx - 2*margin,
 		textHeight: paper.URy - 2*margin,
@@ -116,14 +113,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = w.Close()
+	err = doc.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 type fontSamples struct {
-	tree *pages.Tree
+	doc *document.MultiPage
 
 	textWidth  float64
 	textHeight float64
@@ -134,7 +131,7 @@ type fontSamples struct {
 	bodyFont  font.Embedded
 	titleFont font.Embedded
 
-	page *pages.Page
+	page *document.Page
 
 	pageNo int
 	fontNo int
@@ -152,9 +149,8 @@ func (f *fontSamples) ClosePage() error {
 	f.page.ShowTextAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
 	f.page.EndText()
 
-	_, err := f.page.Close()
+	err := f.page.Close()
 	f.page = nil
-
 	return err
 }
 
@@ -170,12 +166,7 @@ func (f *fontSamples) MakeSpace(vSpace float64) error {
 		return err
 	}
 
-	page, err := pages.AppendPage(f.tree)
-	if err != nil {
-		return err
-	}
-
-	f.page = page
+	f.page = f.doc.AddPage()
 	f.used = 0
 	return nil
 }
@@ -201,7 +192,7 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Info) error {
 	instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
 	f.fontNo++
-	X, err := cid.Embed(f.tree.Out, info, instName, language.AmericanEnglish)
+	X, err := cid.Embed(f.doc.Out, info, instName, language.AmericanEnglish)
 	if err != nil {
 		return err
 	}

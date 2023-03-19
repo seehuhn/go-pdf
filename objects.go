@@ -393,18 +393,18 @@ func (x Dict) PDF(w io.Writer) error {
 		return err
 	}
 
-	_, err := w.Write([]byte("<<"))
-	if err != nil {
-		return err
-	}
-
-	var keys []Name
+	keys := make([]Name, 0, len(x))
 	for key := range x {
 		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i int, j int) bool {
 		return keys[i] < keys[j]
 	})
+
+	_, err := w.Write([]byte("<<"))
+	if err != nil {
+		return err
+	}
 
 	for _, name := range keys {
 		val := x[name]

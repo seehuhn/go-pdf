@@ -236,7 +236,7 @@ func (r *pngReader) Read(b []byte) (int, error) {
 	return n, nil
 }
 
-var zlibPool = sync.Pool{
+var zlibWriterPool = sync.Pool{
 	New: func() interface{} {
 		zw, _ := zlib.NewWriterLevel(nil, zlib.BestCompression)
 		return zw
@@ -251,7 +251,7 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 		zw, err = lzw.NewWriter(w, ff.EarlyChange)
 	} else {
 		// zw, err = zlib.NewWriterLevel(w, zlib.BestCompression)
-		tmp := zlibPool.Get().(*zlib.Writer)
+		tmp := zlibWriterPool.Get().(*zlib.Writer)
 		tmp.Reset(w)
 		zw = tmp
 	}
@@ -265,7 +265,7 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 			return err
 		}
 		if !ff.IsLZW {
-			zlibPool.Put(zw)
+			zlibWriterPool.Put(zw)
 		}
 		return w.Close()
 	}

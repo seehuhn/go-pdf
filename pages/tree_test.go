@@ -36,11 +36,10 @@ func TestBalance(t *testing.T) {
 		MediaBox: pages.A4,
 	})
 	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
-		page, err := pages.AppendPage(tree)
-		if err != nil {
-			t.Fatal(err)
+		dict := pdf.Dict{
+			"Type": pdf.Name("Page"),
 		}
-		_, err = page.Close()
+		_, err := tree.AppendPage(dict, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +72,7 @@ func TestBalance(t *testing.T) {
 				}
 			}
 		case "Page":
-			if depth > 2 {
+			if depth != 2 {
 				return fmt.Errorf("page at depth %d", depth)
 			}
 		}

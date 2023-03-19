@@ -23,8 +23,8 @@ import (
 	"unicode"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
@@ -57,36 +57,32 @@ func main() {
 		}
 	}
 
-	out, err := pdf.Create("test.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	helvetica, err := builtin.Embed(out, "Helvetica", "R")
-	if err != nil {
-		log.Fatal(err)
-	}
-	italic, err := builtin.Embed(out, "Times-Italic", "I")
-	if err != nil {
-		log.Fatal(err)
-	}
-	courier, err := builtin.Embed(out, "Courier", "T")
-	if err != nil {
-		log.Fatal(err)
-	}
-	theFont, err := cid.Embed(out, tt, "X", language.AmericanEnglish)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	paper := pages.A4
-	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
-		MediaBox: paper,
-	})
+	doc, err := document.CreateMultiPage("test.pdf", paper.URx, paper.URy)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	helvetica, err := builtin.Embed(doc.Out, "Helvetica", "R")
+	if err != nil {
+		log.Fatal(err)
+	}
+	italic, err := builtin.Embed(doc.Out, "Times-Italic", "I")
+	if err != nil {
+		log.Fatal(err)
+	}
+	courier, err := builtin.Embed(doc.Out, "Courier", "T")
+	if err != nil {
+		log.Fatal(err)
+	}
+	theFont, err := cid.Embed(doc.Out, tt, "X", language.Und)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	const margin = 36
 	f := &fontTables{
-		tree:       pageTree,
+		doc:        doc,
 		textWidth:  paper.URx - 2*margin,
 		textHeight: paper.URy - 2*margin,
 		margin:     margin,
@@ -114,14 +110,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = out.Close()
+	err = doc.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 type fontTables struct {
-	tree *pages.Tree
+	doc *document.MultiPage
 
 	textWidth  float64
 	textHeight float64
@@ -131,7 +127,7 @@ type fontTables struct {
 	italicFont font.Embedded
 	monoFont   font.Embedded
 
-	page   *pages.Page
+	page   *document.Page
 	pageNo int
 
 	used float64 // vertical amount of page space currently used
@@ -151,9 +147,8 @@ func (f *fontTables) ClosePage() error {
 	f.page.ShowTextAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
 	f.page.EndText()
 
-	_, err := f.page.Close()
+	err := f.page.Close()
 	f.page = nil
-
 	return err
 }
 
@@ -169,12 +164,7 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 		return err
 	}
 
-	page, err := pages.AppendPage(f.tree)
-	if err != nil {
-		return err
-	}
-
-	f.page = page
+	f.page = f.doc.AddPage()
 	f.used = 0
 	return nil
 }

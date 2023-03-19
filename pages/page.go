@@ -26,14 +26,13 @@ import (
 // Page is a PDF page.
 type Page struct {
 	*graphics.Page
-	w          *pdf.Writer
 	contentRef *pdf.Reference
 
 	tree *Tree
 }
 
 // AppendPage creates a new page and appends it to a page tree.
-// TODO(voss): is this really worth keeping?  It makes the Page struct more ugly.
+// TODO(voss): Remove!  It makes the Page struct more ugly.
 func AppendPage(tree *Tree) (*Page, error) {
 	p, err := NewPage(tree.Out)
 	if err != nil {
@@ -49,7 +48,7 @@ func AppendPage(tree *Tree) (*Page, error) {
 // Once the page is finished, the page dictionary returned by the [Close]
 // method can be used to add the page to a page tree.
 //
-// TODO(voss): should this be moved into a different package?
+// TODO(voss): should this be removed or moved into a different package?
 func NewPage(w *pdf.Writer) (*Page, error) {
 	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
 	if w.Version >= pdf.V1_2 {
@@ -63,7 +62,6 @@ func NewPage(w *pdf.Writer) (*Page, error) {
 
 	return &Page{
 		Page:       graphics.NewPage(stream),
-		w:          w,
 		contentRef: contentRef,
 	}, nil
 }

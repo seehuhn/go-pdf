@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/pages"
@@ -32,27 +33,23 @@ func main() {
 	const documentTitle = "The 14 Built-in PDF Fonts"
 	const margin = 50
 
-	w, err := pdf.Create("builtin.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	paper := pages.A4
-	tree := pages.InstallTree(w, &pages.InheritableAttributes{
-		MediaBox: paper,
-	})
-
-	labelFont, err := builtin.Embed(w, "Times-Roman", "F")
+	doc, err := document.CreateMultiPage("builtin.pdf", paper.URx, paper.URy)
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := builtin.Embed(w, "Times-Bold", "B")
+
+	labelFont, err := builtin.Embed(doc.Out, "Times-Roman", "F")
+	if err != nil {
+		log.Fatal(err)
+	}
+	titleFont, err := builtin.Embed(doc.Out, "Times-Bold", "B")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	f := fontTables{
-		tree: tree,
+		doc: doc,
 
 		textWidth:  paper.URx - 2*margin,
 		textHeight: paper.URy - 2*margin,
@@ -82,14 +79,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = w.Close()
+	err = doc.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 type fontTables struct {
-	tree *pages.Tree
+	doc *document.MultiPage
 
 	textWidth  float64
 	textHeight float64
@@ -100,7 +97,7 @@ type fontTables struct {
 	bodyFont  font.Embedded
 	titleFont font.Embedded
 
-	page *pages.Page
+	page *document.Page
 
 	pageNo int
 	fontNo int
@@ -118,9 +115,8 @@ func (f *fontTables) ClosePage() error {
 	f.page.ShowTextAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
 	f.page.EndText()
 
-	_, err := f.page.Close()
+	err := f.page.Close()
 	f.page = nil
-
 	return err
 }
 
@@ -136,12 +132,7 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 		return err
 	}
 
-	page, err := pages.AppendPage(f.tree)
-	if err != nil {
-		return err
-	}
-
-	f.page = page
+	f.page = f.doc.AddPage()
 	f.used = 0
 	return nil
 }
@@ -238,7 +229,7 @@ func (f *fontTables) MakeColumns(fontName string) error {
 				if curGlyph%256 == 0 {
 					instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
 					f.fontNo++
-					F, err = builtin.EmbedAfm(f.tree.Out, afm, instName)
+					F, err = builtin.EmbedAfm(f.doc.Out, afm, instName)
 					if err != nil {
 						return err
 					}
