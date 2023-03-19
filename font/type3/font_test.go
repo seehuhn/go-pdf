@@ -20,12 +20,14 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt/funit"
 )
 
 func TestType3(t *testing.T) {
-	w, err := pdf.Create("test-type3.pdf")
+	paper := pages.A5
+	doc, err := document.CreateSinglePage("test-type3.pdf", paper.URx, paper.URy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,38 +67,18 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pageTree := pages.InstallTree(w, nil)
-
-	page, err := pages.NewPage(w)
+	F1Dict, err := F1.Embed(doc.Out, "F")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	F1Dict, err := F1.Embed(w, "F")
-	if err != nil {
-		t.Fatal(err)
-	}
+	doc.BeginText()
+	doc.SetFont(F1Dict, 12)
+	doc.StartLine(72, 340)
+	doc.ShowText("ABABAB")
+	doc.EndText()
 
-	page.BeginText()
-	page.SetFont(F1Dict, 12)
-	page.StartLine(72, 340)
-	page.ShowText("ABABAB")
-	page.EndText()
-
-	dict, err := page.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dict["MediaBox"] = pages.A5
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = pageTree.AppendPage(dict, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = w.Close()
+	err = doc.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

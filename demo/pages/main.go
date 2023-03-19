@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 )
 
@@ -34,6 +35,11 @@ func main() {
 	font, err := builtin.Embed(out, builtin.Helvetica, "F1")
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if out.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
 
 	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
@@ -52,10 +58,11 @@ func main() {
 			}
 		}
 
-		g, err := pages.NewPage(out)
+		stream, contentRef, err := out.OpenStream(nil, nil, compress)
 		if err != nil {
 			log.Fatal(err)
 		}
+		g := graphics.NewPage(stream)
 
 		g.BeginText()
 		g.SetFont(font, 12)
@@ -67,9 +74,16 @@ func main() {
 		}
 		g.EndText()
 
-		dict, err := g.Close()
+		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
+		}
+		dict := pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"Contents": contentRef,
+		}
+		if g.Resources != nil {
+			dict["Resources"] = pdf.AsDict(g.Resources)
 		}
 		_, err = pageTree.AppendPage(dict, nil)
 		if err != nil {
@@ -78,10 +92,11 @@ func main() {
 	}
 
 	{
-		g, err := pages.NewPage(out)
+		stream, contentRef, err := out.OpenStream(nil, nil, compress)
 		if err != nil {
 			log.Fatal(err)
 		}
+		g := graphics.NewPage(stream)
 
 		g.BeginText()
 		g.SetFont(font, 12)
@@ -89,9 +104,16 @@ func main() {
 		g.ShowText("Title")
 		g.EndText()
 
-		dict, err := g.Close()
+		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
+		}
+		dict := pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"Contents": contentRef,
+		}
+		if g.Resources != nil {
+			dict["Resources"] = pdf.AsDict(g.Resources)
 		}
 		_, err = frontMatter.AppendPage(dict, nil)
 		if err != nil {
@@ -100,7 +122,11 @@ func main() {
 	}
 
 	{
-		g, err := pages.NewPage(out)
+		stream, contentRef, err := out.OpenStream(nil, nil, compress)
+		if err != nil {
+			log.Fatal(err)
+		}
+		g := graphics.NewPage(stream)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -111,9 +137,16 @@ func main() {
 		g.ShowText("three")
 		g.EndText()
 
-		dict, err := g.Close()
+		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
+		}
+		dict := pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"Contents": contentRef,
+		}
+		if g.Resources != nil {
+			dict["Resources"] = pdf.AsDict(g.Resources)
 		}
 		_, err = extra.AppendPage(dict, nil)
 		if err != nil {

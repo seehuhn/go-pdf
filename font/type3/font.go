@@ -186,14 +186,16 @@ func (t3 *type3) Layout(s string, ptSize float64) glyph.Seq {
 }
 
 func (t3 *type3) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
-	return &embedded{
+	res := &embedded{
 		w:         w,
 		ref:       w.Alloc(),
 		resName:   resName,
 		enc:       cmap.NewSimpleEncoder(),
 		glyphRefs: make([]*pdf.Reference, len(t3.b.names)),
 		type3:     t3,
-	}, nil
+	}
+	w.AutoClose(res)
+	return res, nil
 }
 
 type embedded struct {

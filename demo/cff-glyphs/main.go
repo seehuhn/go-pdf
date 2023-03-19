@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pages"
 	"seehuhn.de/go/sfnt/type1/names"
 )
@@ -60,13 +61,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pages.InstallTree(out, &pages.InheritableAttributes{
-		Resources: &pdf.Resources{
-			Font: pdf.Dict{
-				labelFont.ResourceName(): labelFont.Reference(),
-			},
-		},
-	})
+	tree := pages.InstallTree(out, nil)
 
 	for _, fname := range fileNames {
 		cffData, err := loadCFFData(fname)
@@ -150,11 +145,17 @@ type illustrator struct {
 }
 
 func (ctx *illustrator) Show(fnt *cff.Font) error {
+	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
+	if ctx.pageTree.Out.Version >= pdf.V1_2 {
+		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
+	}
+
 	for i, g := range fnt.Glyphs {
-		page, err := pages.AppendPage(ctx.pageTree)
+		stream, contentRef, err := ctx.pageTree.Out.OpenStream(nil, nil, compress)
 		if err != nil {
 			return err
 		}
+		page := graphics.NewPage(stream)
 
 		// show the glyph extent as a shaded rectangle
 		bbox := g.Extent()
@@ -264,7 +265,19 @@ func (ctx *illustrator) Show(fnt *cff.Font) error {
 			page.PopGraphicsState()
 		}
 
-		_, err = page.Close()
+		err = stream.Close()
+		if err != nil {
+			return err
+		}
+
+		pageDict := pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"Contents": contentRef,
+		}
+		if page.Resources != nil {
+			pageDict["Resources"] = pdf.AsDict(page.Resources)
+		}
+		_, err = ctx.pageTree.AppendPage(pageDict, nil)
 		if err != nil {
 			return err
 		}

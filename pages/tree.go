@@ -65,6 +65,8 @@ type Tree struct {
 // The tree is automatically closed when the PDF document is closed,
 // and a reference to the root node is written to the \Pages entry
 // of the PDF document catalog (overwriting any previous value).
+//
+// TODO(voss): remove?
 func InstallTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 	t := NewTree(w, attr)
 	w.OnClose(func(w *pdf.Writer) error {

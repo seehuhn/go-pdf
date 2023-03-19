@@ -20,29 +20,17 @@ import (
 	"testing"
 
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestSimple(t *testing.T) {
-	w, err := pdf.Create("test-otf-simple.pdf")
+	doc, err := document.CreateSinglePage("test-otf-simple.pdf", 10+16*20, 5+16*20+5)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	FF, err := LoadFont("../../../otf/SourceSerif4-Regular.otf", language.AmericanEnglish)
-	if err != nil {
-		t.Fatal(err)
-	}
-	F, err := FF.Embed(w, "F")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pageTree := pages.InstallTree(w, nil)
-
-	g, err := pages.NewPage(w)
+	F, err := EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "F", language.Und)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,27 +49,14 @@ func TestSimple(t *testing.T) {
 			},
 		}
 
-		g.BeginText()
-		g.SetFont(F, 16)
-		g.StartLine(float64(5+20*col+10), float64(16*20-10-20*row))
-		g.ShowGlyphsAligned(gg, 0, 0.5)
-		g.EndText()
+		doc.BeginText()
+		doc.SetFont(F, 16)
+		doc.StartLine(float64(5+20*col+10), float64(16*20-10-20*row))
+		doc.ShowGlyphsAligned(gg, 0, 0.5)
+		doc.EndText()
 	}
 
-	dict, err := g.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dict["MediaBox"] = &pdf.Rectangle{
-		URx: 10 + 16*20,
-		URy: 5 + 16*20 + 5,
-	}
-	_, err = pageTree.AppendPage(dict, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = w.Close()
+	err = doc.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
