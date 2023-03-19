@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pages_test
+package pagetree_test
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pagetree"
 )
 
 func TestBalance(t *testing.T) {
@@ -32,8 +32,8 @@ func TestBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree := pages.NewTree(out, &pages.InheritableAttributes{
-		MediaBox: pages.A4,
+	tree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
+		MediaBox: pagetree.A4,
 	})
 	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
 		dict := pdf.Dict{

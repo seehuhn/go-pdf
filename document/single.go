@@ -7,7 +7,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pagetree"
 )
 
 type SinglePage struct {
@@ -17,7 +17,7 @@ type SinglePage struct {
 
 	base      io.Writer
 	closeBase bool
-	pages     *pages.Tree
+	pages     *pagetree.Writer
 }
 
 func CreateSinglePage(name string, width, height float64) (*SinglePage, error) {
@@ -40,7 +40,7 @@ func WriteSinglePage(w io.Writer, width, height float64) (*SinglePage, error) {
 		return nil, err
 	}
 
-	tree := pages.NewTree(out, &pages.InheritableAttributes{
+	tree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{
 			URx: width,
 			URy: height,

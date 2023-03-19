@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pages
+package pagetree
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ type nodeInfo struct {
 	depth     int // upper bound
 }
 
-func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
+func (t *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 	if len(a) == 0 {
 		return b
 	}
@@ -97,7 +97,7 @@ func (t *Tree) merge(a, b []*nodeInfo) []*nodeInfo {
 }
 
 // mergeNodes collapses nodes a, ..., b-1 into a new internal node.
-func (t *Tree) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
+func (t *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	if a < 0 || b > len(nodes) || b-a < 2 || b-a > maxDegree {
 		// TODO(voss): remove
 		panic(fmt.Errorf("invalid subtree node range %d, %d", a, b))

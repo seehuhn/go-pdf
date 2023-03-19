@@ -36,7 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/sfnt/type1/names"
 )
 
@@ -61,7 +61,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pages.NewTree(out, nil)
+	tree := pagetree.NewWriter(out, nil)
 
 	for _, fname := range fileNames {
 		cffData, err := loadCFFData(fname)
@@ -82,7 +82,7 @@ func main() {
 			URy: fontBBox.URy.AsFloat(q) + margin,
 		}
 
-		subTree, err := tree.NewSubTree(&pages.InheritableAttributes{
+		subTree, err := tree.NewSubTree(&pagetree.InheritableAttributes{
 			MediaBox: pageSize,
 		})
 		if err != nil {
@@ -146,7 +146,7 @@ func getFontBBox(fnt *cff.Font) *funit.Rect {
 
 type illustrator struct {
 	labelFont font.Embedded
-	pageTree  *pages.Tree
+	pageTree  *pagetree.Writer
 	pageSize  *pdf.Rectangle
 }
 

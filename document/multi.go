@@ -8,11 +8,11 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pagetree"
 )
 
 type MultiPage struct {
-	*pages.Tree
+	*pagetree.Writer
 	Out *pdf.Writer
 
 	numOpen   int
@@ -40,7 +40,7 @@ func WriteMultiPage(w io.Writer, width, height float64) (*MultiPage, error) {
 		return nil, err
 	}
 
-	tree := pages.NewTree(out, &pages.InheritableAttributes{
+	tree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{
 			URx: width,
 			URy: height,
@@ -48,9 +48,9 @@ func WriteMultiPage(w io.Writer, width, height float64) (*MultiPage, error) {
 	})
 
 	return &MultiPage{
-		base: w,
-		Out:  out,
-		Tree: tree,
+		base:   w,
+		Out:    out,
+		Writer: tree,
 	}, nil
 }
 
@@ -59,7 +59,7 @@ func (doc *MultiPage) Close() error {
 		return fmt.Errorf("%d pages still open", doc.numOpen)
 	}
 
-	ref, err := doc.Tree.Close()
+	ref, err := doc.Writer.Close()
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (p *Page) Close() error {
 	p.Page = nil
 	p.doc.numOpen--
 
-	_, err = p.doc.Tree.AppendPage(p.PageDict, nil)
+	_, err = p.doc.Writer.AppendPage(p.PageDict, nil)
 	if err != nil {
 		return err
 	}

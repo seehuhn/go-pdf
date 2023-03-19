@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pages
+package pagetree
 
 import (
 	"bytes"
@@ -40,9 +40,9 @@ func TestSubtree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		s := &Tree{
-			Out:       w,
-			absPageNo: &futureInt{},
+		s := &Writer{
+			Out:            w,
+			nextPageNumber: &futureInt{},
 		}
 		for i := 0; i < numPages; i++ {
 			pageDict := pdf.Dict{
@@ -131,7 +131,7 @@ func TestMerge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree := &Tree{
+	tree := &Writer{
 		Out: w,
 	}
 

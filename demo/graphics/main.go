@@ -22,11 +22,11 @@ import (
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pagetree"
 )
 
 func main() {
-	bbox := pages.A4
+	bbox := pagetree.A4
 
 	w, err := document.CreateSinglePage("graphics.pdf", bbox.URx, bbox.URy)
 	if err != nil {

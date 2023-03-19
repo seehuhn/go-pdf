@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package pages implements PDF page trees.
-package pages
+// Package pagetree implements PDF page trees.
+package pagetree
 
 import (
 	"errors"
@@ -24,16 +24,16 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Tree represents a PDF page tree.
-type Tree struct {
+// Writer writes a page tree to a PDF file.
+type Writer struct {
 	Out *pdf.Writer
 
-	parent *Tree
+	parent *Writer
 	attr   *InheritableAttributes
 
 	// Children contains potentially incomplete subtrees of the current
 	// tree, in page order.
-	children []*Tree
+	children []*Writer
 
 	// Tail contains completed, partial subtrees of the current tree, in
 	// page order.  The depth of the subtrees is weakly decreasing, and for
@@ -47,10 +47,10 @@ type Tree struct {
 
 	isClosed bool
 
-	// absPageNo is the page number (0 based, from the start of the document)
+	// nextPageNumber is the page number (0 based, from the start of the document)
 	// of the next page to be added to the tree.  It is incremented
 	// automatically when a page is added.
-	absPageNo *futureInt
+	nextPageNumber *futureInt
 
 	// NumPagesCb is a list of callbacks which are called when the subtree
 	// is closed, to report the total number of pages in the subtree.
@@ -58,15 +58,15 @@ type Tree struct {
 
 	// NextPageAbsCb is a list of callbacks which are called when the next page
 	// is added to the tree, to report the absolute page number of the new page.
-	nextPageAbsCb []func(int)
+	nextPageNumberCb []func(int)
 }
 
-// NewTree creates a new page tree which adds pages to the PDF document w.
-func NewTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
-	t := &Tree{
-		Out:       w,
-		attr:      attr,
-		absPageNo: &futureInt{},
+// NewWriter creates a new page tree which adds pages to the PDF document w.
+func NewWriter(w *pdf.Writer, attr *InheritableAttributes) *Writer {
+	t := &Writer{
+		Out:            w,
+		attr:           attr,
+		nextPageNumber: &futureInt{},
 	}
 	return t
 }
@@ -76,7 +76,7 @@ func NewTree(w *pdf.Writer, attr *InheritableAttributes) *Tree {
 // If the tree is the root of a page tree, the complete tree is written
 // to the PDF file and a reference to the root node is returned.
 // Otherwise, the returned reference is nil.
-func (t *Tree) Close() (*pdf.Reference, error) {
+func (t *Writer) Close() (*pdf.Reference, error) {
 	if t.isClosed {
 		return nil, errors.New("page tree is closed")
 	}
@@ -110,11 +110,11 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 			fn(numPages)
 		}
 	}
-	for _, cb := range t.nextPageAbsCb {
+	for _, cb := range t.nextPageNumberCb {
 		cb(-1)
 	}
 
-	if t.IsRoot() {
+	if t.isRoot() {
 		t.collapse()
 		if len(t.tail) == 0 {
 			return nil, errors.New("no pages in document")
@@ -155,7 +155,7 @@ func (t *Tree) Close() (*pdf.Reference, error) {
 }
 
 // AppendPage adds a new page to the page tree.
-func (t *Tree) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Reference, error) {
+func (t *Writer) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Reference, error) {
 	if t.isClosed {
 		return nil, errors.New("page tree is closed")
 	}
@@ -173,13 +173,13 @@ func (t *Tree) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Refer
 	}
 	t.tail = append(t.tail, node)
 
-	for _, fn := range t.nextPageAbsCb {
-		t.absPageNo.WhenAvailable(fn)
+	for _, fn := range t.nextPageNumberCb {
+		t.nextPageNumber.WhenAvailable(fn)
 	}
-	t.nextPageAbsCb = t.nextPageAbsCb[:0]
+	t.nextPageNumberCb = t.nextPageNumberCb[:0]
 
 	// increment the page numbers
-	t.absPageNo = t.absPageNo.Inc()
+	t.nextPageNumber = t.nextPageNumber.Inc()
 
 	for {
 		n := len(t.tail)
@@ -203,13 +203,13 @@ func (t *Tree) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Refer
 // NewSubTree creates a new Tree, which inserts pages into the document at the
 // position of the current end of the parent tree.  Pages added to the parent
 // tree will be inserted after the pages in the sub-tree.
-func (t *Tree) NewSubTree(attr *InheritableAttributes) (*Tree, error) {
+func (t *Writer) NewSubTree(attr *InheritableAttributes) (*Writer, error) {
 	if t.isClosed {
 		return nil, errors.New("page tree is closed")
 	}
 
 	if len(t.tail) > 0 {
-		before := &Tree{
+		before := &Writer{
 			parent: t,
 			Out:    t.Out,
 			tail:   t.tail,
@@ -217,39 +217,39 @@ func (t *Tree) NewSubTree(attr *InheritableAttributes) (*Tree, error) {
 		t.children = append(t.children, before)
 		t.tail = nil
 	}
-	subTree := &Tree{
-		parent:    t,
-		Out:       t.Out,
-		attr:      attr,
-		absPageNo: t.absPageNo,
+	subTree := &Writer{
+		parent:         t,
+		Out:            t.Out,
+		attr:           attr,
+		nextPageNumber: t.nextPageNumber,
 	}
-	t.absPageNo = &futureInt{numMissing: 2}
-	subTree.absPageNo.WhenAvailable(t.absPageNo.AddMissing)
-	subTree.numPagesCb = append(subTree.numPagesCb, t.absPageNo.AddMissing)
+	t.nextPageNumber = &futureInt{numMissing: 2}
+	subTree.nextPageNumber.WhenAvailable(t.nextPageNumber.AddMissing)
+	subTree.numPagesCb = append(subTree.numPagesCb, t.nextPageNumber.AddMissing)
 
 	t.children = append(t.children, subTree)
 	return subTree, nil
 }
 
-// NextPageNumberAbs registers a callback that will be called when the next
+// NextPageNumber registers a callback that will be called when the next
 // page number is known.  Page numbers are relative to the start of the
 // document, starting at 0.
 //
 // The callback will be called with -1 if the page tree is closed before
 // another page is added.
-func (t *Tree) NextPageNumberAbs(cb func(int)) {
+func (t *Writer) NextPageNumber(cb func(int)) {
 	if t.isClosed {
 		// there will be no next page
 		cb(-1)
 		return
 	}
 
-	t.nextPageAbsCb = append(t.nextPageAbsCb, cb)
+	t.nextPageNumberCb = append(t.nextPageNumberCb, cb)
 }
 
 // wrapIfLeaf ensures that the given dictionary is a /Pages object.
 // A wrapper /Pages object is created if necessary.
-func (t *Tree) wrapIfLeaf(info *dictInfo) *dictInfo {
+func (t *Writer) wrapIfLeaf(info *dictInfo) *dictInfo {
 	if info.dict["Type"] == pdf.Name("Pages") {
 		return info
 	}
@@ -269,7 +269,7 @@ func (t *Tree) wrapIfLeaf(info *dictInfo) *dictInfo {
 }
 
 // Collapse reduces the tail to (at most) one node.
-func (t *Tree) collapse() {
+func (t *Writer) collapse() {
 	for len(t.tail) > 1 {
 		start := len(t.tail) - maxDegree
 		if start < 0 {
@@ -283,7 +283,7 @@ func (t *Tree) collapse() {
 }
 
 // Flush writes a batch finished objects to the output file.
-func (t *Tree) flush() error {
+func (t *Writer) flush() error {
 	if len(t.outObjects) == 0 {
 		return nil
 	}
@@ -298,11 +298,11 @@ func (t *Tree) flush() error {
 	return nil
 }
 
-func (t *Tree) IsRoot() bool {
+func (t *Writer) isRoot() bool {
 	return t.parent == nil
 }
 
-func (t *Tree) checkInvariants() {
+func (t *Writer) checkInvariants() {
 	// TODO(voss): once things have settled, move this function into the test
 	// suite.
 

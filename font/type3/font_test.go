@@ -21,12 +21,12 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/sfnt/funit"
 )
 
 func TestType3(t *testing.T) {
-	paper := pages.A5
+	paper := pagetree.A5
 	doc, err := document.CreateSinglePage("test-type3.pdf", paper.URx, paper.URy)
 	if err != nil {
 		t.Fatal(err)

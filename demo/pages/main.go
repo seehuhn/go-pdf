@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/pages"
+	"seehuhn.de/go/pdf/pagetree"
 )
 
 func main() {
@@ -42,7 +42,7 @@ func main() {
 		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
 
-	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
+	pageTree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
 
@@ -50,7 +50,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var extra *pages.Tree
+	var extra *pagetree.Writer
 	for i := 1; i <= 99; i++ {
 		if i == 3 {
 			extra, err = pageTree.NewSubTree(nil)
