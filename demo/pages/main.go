@@ -32,7 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	font, err := builtin.Embed(out, builtin.Helvetica, "F1")
+	font, err := builtin.Embed(out, builtin.Helvetica, "F")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,9 +42,10 @@ func main() {
 		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
 
-	pageTree := pages.InstallTree(out, &pages.InheritableAttributes{
+	pageTree := pages.NewTree(out, &pages.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
+
 	frontMatter, err := pageTree.NewSubTree(nil)
 	if err != nil {
 		log.Fatal(err)
@@ -153,6 +154,12 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+
+	ref, err := pageTree.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	out.Catalog.Pages = ref
 
 	out.Catalog.PageLabels = pdf.Dict{
 		"Nums": pdf.Array{

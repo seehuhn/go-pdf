@@ -58,9 +58,6 @@ type Writer struct {
 	afterStream []func(*Writer) error
 
 	Resources map[Reference]Resource
-
-	// TODO(voss): remove
-	onClose []func(*Writer) error
 }
 
 // WriterOptions allows to influence the way a PDF file is generated.
@@ -254,13 +251,6 @@ func (pdf *Writer) Close() error {
 		}
 	}
 
-	for i := len(pdf.onClose) - 1; i >= 0; i-- {
-		err := pdf.onClose[i](pdf)
-		if err != nil {
-			return err
-		}
-	}
-
 	if pdf.Catalog.Pages == nil {
 		return errors.New("no pages in PDF")
 	}
@@ -326,15 +316,6 @@ func (pdf *Writer) Close() error {
 	pdf.w = nil
 
 	return nil
-}
-
-// OnClose registers a callback function which is called before the writer is
-// closed.  Callbacks are executed in the reverse order, i.e. the last callback
-// registered is the first one to run.
-//
-// TODO(voss): remove
-func (pdf *Writer) OnClose(callback func(*Writer) error) {
-	pdf.onClose = append(pdf.onClose, callback)
 }
 
 func (pdf *Writer) AutoClose(res Resource) {

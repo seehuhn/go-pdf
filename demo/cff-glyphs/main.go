@@ -61,7 +61,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pages.InstallTree(out, nil)
+	tree := pages.NewTree(out, nil)
 
 	for _, fname := range fileNames {
 		cffData, err := loadCFFData(fname)
@@ -100,6 +100,12 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+
+	ref, err := tree.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	out.Catalog.Pages = ref
 
 	err = out.Close()
 	if err != nil {

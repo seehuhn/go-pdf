@@ -32,7 +32,7 @@ func TestBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree := pages.InstallTree(out, &pages.InheritableAttributes{
+	tree := pages.NewTree(out, &pages.InheritableAttributes{
 		MediaBox: pages.A4,
 	})
 	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
@@ -44,6 +44,11 @@ func TestBalance(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	ref, err := tree.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out.Catalog.Pages = ref
 	err = out.Close()
 	if err != nil {
 		t.Fatal(err)
