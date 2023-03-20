@@ -732,7 +732,7 @@ func (s *scanner) Peek(n int) ([]byte, error) {
 
 func (s *scanner) Discard(n int64) error {
 	if n < 0 {
-		panic("negative offset for Discard()")
+		panic(fmt.Sprintf("negative discard offset %d", n))
 	}
 	unread := int64(s.used - s.pos)
 	if n <= unread {

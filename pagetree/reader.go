@@ -29,8 +29,10 @@ func (r *Reader) NumPages() (pdf.Integer, error) {
 }
 
 func (r *Reader) Get(pageNo pdf.Integer) (pdf.Dict, error) {
+	var pos pdf.Integer
 	dict := r.root
-	for {
+treeLoop:
+	for dict["Type"] != pdf.Name("Page") {
 		children, err := r.r.GetArray(dict["Kids"])
 		if err != nil {
 			return nil, err
@@ -52,14 +54,17 @@ func (r *Reader) Get(pageNo pdf.Integer) (pdf.Dict, error) {
 			default:
 				return nil, fmt.Errorf("unexpected page type %v", childDict["Type"])
 			}
-			if pageNo < count {
+
+			if pageNo < pos+count {
 				dict = childDict
-				break
+				continue treeLoop
 			}
-			pageNo -= count
+			pos += count
 		}
-		if dict["Type"] == pdf.Name("Page") {
-			return dict, nil
-		}
+		return nil, fmt.Errorf("page %d not found", pageNo)
 	}
+	if pageNo != pos {
+		return nil, fmt.Errorf("page %d not found", pageNo)
+	}
+	return dict, nil
 }

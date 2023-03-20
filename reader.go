@@ -52,6 +52,8 @@ type Reader struct {
 	trailer Dict
 
 	enc *encryptInfo
+
+	cache *lruCache
 }
 
 // ReadPwdFunc describes a function which can be used to query the user for a
@@ -84,6 +86,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 		size:    size,
 		r:       data,
 		special: make(map[Reference]bool),
+		cache:   newCache(100), // TODO(voss): make this configurable?
 	}
 
 	s := r.scannerAt(0)
@@ -318,6 +321,11 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 		return obj, nil
 	}
 
+	cachedObj, ok := r.cache.Get(ref)
+	if ok {
+		return cachedObj, nil
+	}
+
 	if r.xref == nil {
 		return nil, &MalformedFileError{
 			Pos: 0,
@@ -353,6 +361,10 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 			Pos: 0,
 			Err: errors.New("xref corrupted"),
 		}
+	}
+
+	if _, isStream := obj.(*Stream); !isStream {
+		r.cache.Put(ref, obj)
 	}
 
 	return obj, nil
@@ -440,25 +452,59 @@ func (r *Reader) getFromObjectStream(number uint32, sRef *Reference) (Object, er
 		return nil, err
 	}
 
-	found := false
-	for _, info := range contents.idx {
+	m := -1
+	for i, info := range contents.idx {
 		if info.number == number {
-			err = contents.s.Discard(int64(info.offs) - contents.s.bytesRead())
-			if err != nil {
-				return nil, err
-			}
-			found = true
+			m = i
 			break
 		}
 	}
-	if !found {
+	if m < 0 {
 		return nil, &MalformedFileError{
 			Pos: r.errPos(sRef),
 			Err: errors.New("object missing from stream"),
 		}
 	}
 
-	return contents.s.ReadObject()
+	const readAhead = 7
+
+	a := m - readAhead
+	if a < 0 {
+		a = 0
+	}
+	b := a + (2*readAhead + 1)
+	if b > len(contents.idx) {
+		b = len(contents.idx)
+	}
+	var res Object
+	for i := a; i < b; i++ {
+		info := contents.idx[i]
+		key := &Reference{Number: info.number, Generation: 0}
+		if r.cache.Has(key) {
+			if i == m {
+				panic("should not happen")
+			}
+			continue
+		}
+
+		delta := int64(info.offs) - contents.s.bytesRead()
+		if delta != -1 { // allow for the separating white space to be included in both adjacent objects
+			err = contents.s.Discard(delta)
+			if err != nil {
+				return nil, err
+			}
+		}
+		obj, err := contents.s.ReadObject()
+		if err != nil {
+			return nil, err
+		}
+		if i == m {
+			res = obj
+		}
+		r.cache.Put(key, obj)
+	}
+
+	return res, nil
 }
 
 // GetInt resolves references to indirect objects and makes sure the resulting

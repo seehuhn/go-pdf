@@ -341,3 +341,8 @@ func (t *Writer) checkInvariants() {
 		panic("len(outObjects) != len(outRefs)")
 	}
 }
+
+const (
+	maxDegree          = 16
+	objStreamChunkSize = maxDegree + 1
+)

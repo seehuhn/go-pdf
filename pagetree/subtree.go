@@ -142,8 +142,3 @@ func (t *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	nodes = append(nodes[:a+1], nodes[b:]...)
 	return nodes
 }
-
-const (
-	maxDegree          = 16
-	objStreamChunkSize = 100
-)
