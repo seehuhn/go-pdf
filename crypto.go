@@ -47,7 +47,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd ReadPwdFunc) (*encryptI
 
 	res := &encryptInfo{}
 
-	filter, err := r.getName(enc["Filter"])
+	filter, err := r.GetName(enc["Filter"])
 	if err != nil {
 		return nil, err
 	}

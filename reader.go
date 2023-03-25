@@ -601,9 +601,9 @@ func (r *Reader) GetRectangle(obj Object) (*Rectangle, error) {
 	return val.AsRectangle()
 }
 
-// getName resolves references to indirect objects and makes sure the resulting
+// GetName resolves references to indirect objects and makes sure the resulting
 // object is a Name.
-func (r *Reader) getName(obj Object) (Name, error) {
+func (r *Reader) GetName(obj Object) (Name, error) {
 	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return "", err
