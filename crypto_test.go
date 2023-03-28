@@ -140,7 +140,7 @@ func TestEncryptBytes(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
 	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
 		for length := 40; length <= 128; length += 8 {
-			ref := &Reference{Number: 1, Generation: 2}
+			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{
@@ -172,7 +172,7 @@ func TestEncryptStream(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
 	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
 		for length := 40; length <= 128; length += 8 {
-			ref := &Reference{Number: 1, Generation: 2}
+			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
 				enc := encryptInfo{

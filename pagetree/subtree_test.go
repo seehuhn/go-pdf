@@ -49,7 +49,7 @@ func TestSubtree(t *testing.T) {
 				"Type": pdf.Name("Page"),
 				"Test": pdf.Integer(i),
 			}
-			_, err := s.AppendPage(pageDict, nil)
+			_, err := s.AppendPage(pageDict, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -80,7 +80,7 @@ func TestSubtree(t *testing.T) {
 		}
 
 		test := pdf.Integer(0)
-		total, err := walk(r, r.Catalog.Pages, nil, &test)
+		total, err := walk(r, r.Catalog.Pages, 0, &test)
 		if err != nil {
 			t.Fatal(err)
 		} else if total != pdf.Integer(numPages) {
@@ -173,7 +173,7 @@ func checkInvariants(nodes []*nodeInfo) error {
 	return nil
 }
 
-func walk(r *pdf.Reader, nodeRef, parentRef *pdf.Reference, test *pdf.Integer) (pdf.Integer, error) {
+func walk(r *pdf.Reader, nodeRef, parentRef pdf.Reference, test *pdf.Integer) (pdf.Integer, error) {
 	node, err := r.Resolve(nodeRef)
 	if err != nil {
 		return 0, err
@@ -200,7 +200,7 @@ func walk(r *pdf.Reader, nodeRef, parentRef *pdf.Reference, test *pdf.Integer) (
 		}
 		var subTotal pdf.Integer
 		for _, kid := range kidsArray {
-			kidRef, ok := kid.(*pdf.Reference)
+			kidRef, ok := kid.(pdf.Reference)
 			if !ok {
 				return 0, fmt.Errorf("not a reference: %T", kid)
 			}
@@ -218,9 +218,9 @@ func walk(r *pdf.Reader, nodeRef, parentRef *pdf.Reference, test *pdf.Integer) (
 	default:
 		return 0, fmt.Errorf("unknown type: %v", dict["Type"])
 	}
-	if parentRef != nil {
-		want := dict["Parent"].(*pdf.Reference)
-		if *want != *parentRef {
+	if parentRef != 0 {
+		want := dict["Parent"].(pdf.Reference)
+		if want != parentRef {
 			return 0, fmt.Errorf("parent mismatch: %s != %s", want, parentRef)
 		}
 	} else {

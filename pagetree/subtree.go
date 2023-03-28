@@ -24,7 +24,7 @@ import (
 
 type dictInfo struct {
 	dict pdf.Dict // a \Page or \Pages object
-	ref  *pdf.Reference
+	ref  pdf.Reference
 }
 
 type nodeInfo struct {

@@ -38,22 +38,22 @@ func newCache(capacity int) *lruCache {
 }
 
 // Put adds an object to the cache.
-func (l *lruCache) Put(key *Reference, obj Object) {
+func (l *lruCache) Put(key Reference, obj Object) {
 	if l.capacity <= 0 {
 		return
 	}
 
-	if ent, ok := l.entries[*key]; ok {
+	if ent, ok := l.entries[key]; ok {
 		ent.obj = obj
 		l.moveToFront(ent)
 		return
 	}
 
 	ent := &cacheEntry{
-		key: *key,
+		key: key,
 		obj: obj,
 	}
-	l.entries[*key] = ent
+	l.entries[key] = ent
 	l.moveToFront(ent)
 
 	if len(l.entries) > l.capacity {
@@ -62,8 +62,8 @@ func (l *lruCache) Put(key *Reference, obj Object) {
 }
 
 // Get returns an object from the cache and markes it as recently used.
-func (l *lruCache) Get(key *Reference) (Object, bool) {
-	ent, ok := l.entries[*key]
+func (l *lruCache) Get(key Reference) (Object, bool) {
+	ent, ok := l.entries[key]
 	if !ok {
 		return nil, false
 	}
@@ -74,8 +74,8 @@ func (l *lruCache) Get(key *Reference) (Object, bool) {
 
 // Has returns true if the cache contains the given key.
 // The object is not marked as recently used.
-func (l *lruCache) Has(key *Reference) bool {
-	_, ok := l.entries[*key]
+func (l *lruCache) Has(key Reference) bool {
+	_, ok := l.entries[key]
 	return ok
 }
 

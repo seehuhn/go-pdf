@@ -23,7 +23,7 @@ import (
 )
 
 func TestCatalog(t *testing.T) {
-	pRef := &Reference{Number: 1, Generation: 2}
+	pRef := NewReference(1, 2)
 
 	// test a round-trip
 	cat0 := &Catalog{
@@ -144,7 +144,7 @@ func TestStructVersion(t *testing.T) {
 func TestDecodeVersion(t *testing.T) {
 	for _, version := range []Object{Name("1.5"), Real(1.5), String("1.5")} {
 		res := &Catalog{}
-		dict := Dict{"Version": version, "Pages": &Reference{}}
+		dict := Dict{"Version": version, "Pages": Reference(0)}
 		err := dict.Decode(res, nil)
 		if err != nil {
 			t.Error(err)

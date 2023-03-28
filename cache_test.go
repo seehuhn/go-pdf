@@ -22,10 +22,10 @@ import (
 
 func TestLRUCache(t *testing.T) {
 	cache := newCache(12)
-	cache.Put(&Reference{Number: 100}, Integer(100))
-	cache.Put(&Reference{Number: 101}, Integer(101))
-	cache.Put(&Reference{Number: 102}, Integer(102))
-	obj, ok := cache.Get(&Reference{Number: 100})
+	cache.Put(NewReference(100, 0), Integer(100))
+	cache.Put(NewReference(101, 0), Integer(101))
+	cache.Put(NewReference(102, 0), Integer(102))
+	obj, ok := cache.Get(NewReference(100, 0))
 	if !ok {
 		t.Error("cache miss")
 	}
@@ -34,7 +34,7 @@ func TestLRUCache(t *testing.T) {
 	}
 	// now 101 is the oldest entry and should drop out later
 
-	obj, ok = cache.Get(&Reference{Number: 0})
+	obj, ok = cache.Get(NewReference(0, 0))
 	if ok {
 		t.Error("cache hit")
 	}
@@ -44,7 +44,7 @@ func TestLRUCache(t *testing.T) {
 
 	for i := 0; i < 25; i++ {
 		x := i % 10
-		key := &Reference{Number: uint32(x)}
+		key := NewReference(uint32(x), 0)
 		val := Integer(x)
 
 		obj, ok := cache.Get(key)
@@ -60,15 +60,15 @@ func TestLRUCache(t *testing.T) {
 		}
 	}
 
-	_, ok = cache.Get(&Reference{Number: 100})
+	_, ok = cache.Get(NewReference(100, 0))
 	if !ok {
 		t.Error("cache miss")
 	}
-	_, ok = cache.Get(&Reference{Number: 101})
+	_, ok = cache.Get(NewReference(101, 0))
 	if ok {
 		t.Error("cache hit")
 	}
-	_, ok = cache.Get(&Reference{Number: 102})
+	_, ok = cache.Get(NewReference(102, 0))
 	if !ok {
 		t.Error("cache miss")
 	}

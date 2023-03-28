@@ -129,10 +129,7 @@ func (e *explainer) locate(desc ...string) (pdf.Object, error) {
 				generation = uint16(tmp)
 			}
 
-			ref := &pdf.Reference{
-				Number:     uint32(number),
-				Generation: generation,
-			}
+			ref := pdf.NewReference(uint32(number), generation)
 			obj, err = e.r.Resolve(ref)
 			if err != nil {
 				return nil, err

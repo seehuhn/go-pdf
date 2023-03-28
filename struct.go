@@ -261,7 +261,7 @@ fieldLoop:
 
 var (
 	objectType   = reflect.TypeOf((*Object)(nil)).Elem()
-	refType      = reflect.TypeOf(&Reference{})
+	refType      = reflect.TypeOf(Reference(0))
 	nameType     = reflect.TypeOf(Name(""))
 	versionType  = reflect.TypeOf(V1_7)
 	timeType     = reflect.TypeOf(time.Time{})
@@ -276,20 +276,20 @@ type Catalog struct {
 	_                 struct{} `pdf:"Type=Catalog"`
 	Version           Version  `pdf:"optional"`
 	Extensions        Object   `pdf:"optional"`
-	Pages             *Reference
+	Pages             Reference
 	PageLabels        Object       `pdf:"optional"`
 	Names             Object       `pdf:"optional"`
 	Dests             Object       `pdf:"optional"`
 	ViewerPreferences Object       `pdf:"optional"`
 	PageLayout        Name         `pdf:"optional"`
 	PageMode          Name         `pdf:"optional"`
-	Outlines          *Reference   `pdf:"optional"`
-	Threads           *Reference   `pdf:"optional"`
+	Outlines          Reference    `pdf:"optional"`
+	Threads           Reference    `pdf:"optional"`
 	OpenAction        Object       `pdf:"optional"`
 	AA                Object       `pdf:"optional"`
 	URI               Object       `pdf:"optional"`
 	AcroForm          Object       `pdf:"optional"`
-	MetaData          *Reference   `pdf:"optional"`
+	MetaData          Reference    `pdf:"optional"`
 	StructTreeRoot    Object       `pdf:"optional"`
 	MarkInfo          Object       `pdf:"optional"`
 	Lang              language.Tag `pdf:"optional"`

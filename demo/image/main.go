@@ -51,10 +51,10 @@ func readImage(fname string) (*image.NRGBA, error) {
 }
 
 type imageWrapper struct {
-	ref *pdf.Reference
+	ref pdf.Reference
 }
 
-func (im *imageWrapper) Reference() *pdf.Reference {
+func (im *imageWrapper) Reference() pdf.Reference {
 	return im.ref
 }
 
@@ -78,7 +78,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	imageRef, err := pdfimage.EmbedAsJPEG(doc.Out, img, nil, nil)
+	imageRef, err := pdfimage.EmbedAsJPEG(doc.Out, img, 0, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

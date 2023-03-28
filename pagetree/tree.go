@@ -43,7 +43,7 @@ type Writer struct {
 	// OutObjects contains completed objects which still need to be written to
 	// the PDF file.  OutRefs contains the PDF references for these objects.
 	outObjects []pdf.Object
-	outRefs    []*pdf.Reference
+	outRefs    []pdf.Reference
 
 	isClosed bool
 
@@ -76,9 +76,9 @@ func NewWriter(w *pdf.Writer, attr *InheritableAttributes) *Writer {
 // If the tree is the root of a page tree, the complete tree is written
 // to the PDF file and a reference to the root node is returned.
 // Otherwise, the returned reference is nil.
-func (t *Writer) Close() (*pdf.Reference, error) {
+func (t *Writer) Close() (pdf.Reference, error) {
 	if t.isClosed {
-		return nil, errors.New("page tree is closed")
+		return 0, errors.New("page tree is closed")
 	}
 	t.isClosed = true
 
@@ -90,7 +90,7 @@ func (t *Writer) Close() (*pdf.Reference, error) {
 			if !child.isClosed {
 				_, err = child.Close()
 				if err != nil {
-					return nil, err
+					return 0, err
 				}
 			}
 			nodes = t.merge(nodes, child.tail)
@@ -117,7 +117,7 @@ func (t *Writer) Close() (*pdf.Reference, error) {
 	if t.isRoot() {
 		t.collapse()
 		if len(t.tail) == 0 {
-			return nil, errors.New("no pages in document")
+			return 0, errors.New("no pages in document")
 		}
 		rootNode := t.tail[0]
 		t.tail = nil
@@ -148,19 +148,19 @@ func (t *Writer) Close() (*pdf.Reference, error) {
 	if len(t.parent.outObjects) > objStreamChunkSize {
 		err := t.parent.flush()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 	}
-	return nil, nil
+	return 0, nil
 }
 
 // AppendPage adds a new page to the page tree.
-func (t *Writer) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Reference, error) {
+func (t *Writer) AppendPage(pageDict pdf.Dict, pageRef pdf.Reference) (pdf.Reference, error) {
 	if t.isClosed {
-		return nil, errors.New("page tree is closed")
+		return 0, errors.New("page tree is closed")
 	}
 
-	if pageRef == nil {
+	if pageRef == 0 {
 		pageRef = t.Out.Alloc()
 	}
 	node := &nodeInfo{
@@ -193,7 +193,7 @@ func (t *Writer) AppendPage(pageDict pdf.Dict, pageRef *pdf.Reference) (*pdf.Ref
 	if len(t.outObjects) >= objStreamChunkSize {
 		err := t.flush()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 	}
 

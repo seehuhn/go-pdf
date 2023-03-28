@@ -59,7 +59,7 @@ func TestWriter(t *testing.T) {
 	}
 	font := refs[0]
 
-	stream, contentNode, err := w.OpenStream(Dict{}, nil)
+	stream, contentNode, err := w.OpenStream(Dict{}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ ET
 		"Resources": resources,
 		"Contents":  contentNode,
 		"Parent":    pagesRef,
-	}, nil)
+	}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestClose(t *testing.T) {
 		}
 		out.closeDownstream = doClose
 
-		out.Catalog.Pages = &Reference{} // pretend we have pages
+		out.Catalog.Pages = out.Alloc() // pretend we have pages
 
 		err = out.Close()
 		if err != nil {
@@ -192,18 +192,18 @@ func TestPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Catalog.Pages = &Reference{}
+	w.Catalog.Pages = w.Alloc() // pretend we have pages
 
 	length := w.NewPlaceholder(5)
 	testRef, err := w.Write(Dict{
 		"Test":   Bool(true),
 		"Length": length,
-	}, nil)
+	}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if length.ref != nil {
+	if length.ref != 0 {
 		t.Error("failed to detect that file is seekable")
 	}
 

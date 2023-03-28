@@ -86,7 +86,7 @@ func (doc *SinglePage) Close() error {
 	if doc.Out.Version >= pdf.V1_2 {
 		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
-	stream, contentRef, err := doc.Out.OpenStream(nil, nil, compress)
+	stream, contentRef, err := doc.Out.OpenStream(nil, 0, compress)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (doc *SinglePage) Close() error {
 	if doc.Page.Resources != nil {
 		doc.PageDict["Resources"] = pdf.AsDict(doc.Page.Resources)
 	}
-	_, err = doc.pages.AppendPage(doc.PageDict, nil)
+	_, err = doc.pages.AppendPage(doc.PageDict, 0)
 	if err != nil {
 		return err
 	}

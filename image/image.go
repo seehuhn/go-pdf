@@ -28,7 +28,7 @@ import (
 // EmbedAsJPEG writes the image src to the PDF file w, using lossy .  If ref is nil, a new
 // reference is allocated, otherwise ref is used for the image stream.  In
 // either case, the reference to the image stream is returned.
-func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref *pdf.Reference, opts *jpeg.Options) (*pdf.Reference, error) {
+func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref pdf.Reference, opts *jpeg.Options) (pdf.Reference, error) {
 	// convert to NRGBA format
 	// TODO(voss): needed????
 	b := src.Bounds()
@@ -46,17 +46,17 @@ func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref *pdf.Reference, opts *jpeg.
 		"Filter":           pdf.Name("DCTDecode"),
 	}, ref)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	err = jpeg.Encode(stream, img, opts)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	err = stream.Close()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	return ref, nil
@@ -64,7 +64,7 @@ func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref *pdf.Reference, opts *jpeg.
 
 // EmbedAsPNG writes the image img to the PDF file w, using a lossless representation
 // very similar to the PNG format.
-func EmbedAsPNG(w *pdf.Writer, src image.Image, ref *pdf.Reference) (*pdf.Reference, error) {
+func EmbedAsPNG(w *pdf.Writer, src image.Image, ref pdf.Reference) (pdf.Reference, error) {
 	width := src.Bounds().Dx()
 	height := src.Bounds().Dy()
 	filter := &pdf.FilterInfo{
@@ -87,7 +87,7 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref *pdf.Reference) (*pdf.Refere
 		"SMask":            maskRef,
 	}, ref, filter)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	alpha := make([]byte, 0, width*height)
 	for y := 0; y < height; y++ {
@@ -95,14 +95,14 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref *pdf.Reference) (*pdf.Refere
 			r, g, b, a := src.At(x, y).RGBA()
 			_, err = stream.Write([]byte{byte(r >> 8), byte(g >> 8), byte(b >> 8)})
 			if err != nil {
-				return nil, err
+				return 0, err
 			}
 			alpha = append(alpha, byte(a>>8))
 		}
 	}
 	err = stream.Close()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	// TODO(voss): is there a more appropriate compression type for the mask?
@@ -122,15 +122,15 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref *pdf.Reference) (*pdf.Refere
 		"BitsPerComponent": pdf.Integer(8),
 	}, maskRef, filter)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	_, err = stream.Write(alpha)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	err = stream.Close()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	return imageRef, nil

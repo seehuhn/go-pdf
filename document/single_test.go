@@ -47,7 +47,7 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref, err := doc.Out.Write(testVal, nil)
+	ref, err := doc.Out.Write(testVal, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ref, err := doc.Out.Write(testVal, nil)
+		ref, err := doc.Out.Write(testVal, 0)
 		if err != nil {
 			b.Fatal(err)
 		}

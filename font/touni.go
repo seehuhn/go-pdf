@@ -35,7 +35,7 @@ type SimpleMapping struct {
 
 // WriteToUnicodeSimple writes the ToUnicode stream for a simple font.
 // This modifies mm.
-func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, toUnicodeRef *pdf.Reference) (*pdf.Reference, error) {
+func WriteToUnicodeSimple(w *pdf.Writer, ordering string, mm []SimpleMapping, toUnicodeRef pdf.Reference) (pdf.Reference, error) {
 	data := &tounicode.Info{
 		Name: "Seehuhn-" + pdf.Name(ordering) + "-UCS2",
 		ROS: &type1.CIDSystemInfo{
@@ -123,7 +123,7 @@ type CIDMapping struct {
 
 // WriteToUnicodeCID writes the ToUnicode stream for a CIDFont.
 // This modifies mm.
-func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef *pdf.Reference) (*pdf.Reference, error) {
+func WriteToUnicodeCID(w *pdf.Writer, mm []CIDMapping, toUnicodeRef pdf.Reference) (pdf.Reference, error) {
 	data := &tounicode.Info{
 		Name: "Adobe-Identity-UCS",
 		ROS: &type1.CIDSystemInfo{

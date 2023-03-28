@@ -40,11 +40,11 @@ func (tree *Tree) AddChild(title string) *Tree {
 
 func Read(r *pdf.Reader) (*Tree, error) {
 	root := r.Catalog.Outlines
-	if root == nil {
+	if root == 0 {
 		return nil, nil
 	}
 
-	seen := map[*pdf.Reference]bool{}
+	seen := map[pdf.Reference]bool{}
 	tree, _, err := readNode(r, seen, root)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func Read(r *pdf.Reader) (*Tree, error) {
 	return tree, nil
 }
 
-func readNode(r *pdf.Reader, seen map[*pdf.Reference]bool, node *pdf.Reference) (*Tree, pdf.Dict, error) {
+func readNode(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) (*Tree, pdf.Dict, error) {
 	if seen[node] {
 		return nil, nil, fmt.Errorf("outline tree contains a loop")
 	}
@@ -91,7 +91,7 @@ func readNode(r *pdf.Reader, seen map[*pdf.Reference]bool, node *pdf.Reference) 
 		tree.Action = a
 	}
 
-	ccPtr, _ := dict["First"].(*pdf.Reference)
+	ccPtr, _ := dict["First"].(pdf.Reference)
 	cc, err := readChildren(r, seen, ccPtr)
 	if err != nil {
 		return nil, nil, err
@@ -101,9 +101,9 @@ func readNode(r *pdf.Reader, seen map[*pdf.Reference]bool, node *pdf.Reference) 
 	return tree, dict, nil
 }
 
-func readChildren(r *pdf.Reader, seen map[*pdf.Reference]bool, node *pdf.Reference) ([]*Tree, error) {
+func readChildren(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) ([]*Tree, error) {
 	var res []*Tree
-	for node != nil {
+	for node != 0 {
 		tree, dict, err := readNode(r, seen, node)
 		if err != nil {
 			return nil, err
@@ -111,7 +111,7 @@ func readChildren(r *pdf.Reader, seen map[*pdf.Reference]bool, node *pdf.Referen
 
 		res = append(res, tree)
 
-		node, _ = dict["Next"].(*pdf.Reference)
+		node, _ = dict["Next"].(pdf.Reference)
 	}
 	return res, nil
 }
@@ -150,7 +150,7 @@ func (tree *Tree) Write(w *pdf.Writer) error {
 type writer struct {
 	out     *pdf.Writer
 	root    *Tree
-	refs    []*pdf.Reference
+	refs    []pdf.Reference
 	objs    []pdf.Object
 	count   map[*Tree]int
 	hasOpen bool
@@ -178,7 +178,7 @@ func (ww *writer) getCount(tree *Tree) int {
 	return total
 }
 
-func (ww *writer) writeNode(ref *pdf.Reference, dict pdf.Dict, tree *Tree) error {
+func (ww *writer) writeNode(ref pdf.Reference, dict pdf.Dict, tree *Tree) error {
 	if tree.Title != "" && tree != ww.root {
 		dict["Title"] = pdf.TextString(tree.Title)
 	}
@@ -190,7 +190,7 @@ func (ww *writer) writeNode(ref *pdf.Reference, dict pdf.Dict, tree *Tree) error
 		}
 	}
 
-	var first, last *pdf.Reference
+	var first, last pdf.Reference
 	if len(tree.Children) > 0 {
 		first = ww.out.Alloc()
 		if len(tree.Children) > 1 {
@@ -221,8 +221,8 @@ func (ww *writer) writeNode(ref *pdf.Reference, dict pdf.Dict, tree *Tree) error
 	return nil
 }
 
-func (ww *writer) writeChildren(parent, first, last *pdf.Reference, cc []*Tree) error {
-	ccRef := make([]*pdf.Reference, len(cc))
+func (ww *writer) writeChildren(parent, first, last pdf.Reference, cc []*Tree) error {
+	ccRef := make([]pdf.Reference, len(cc))
 	for i := range cc {
 		if i == 0 {
 			ccRef[i] = first

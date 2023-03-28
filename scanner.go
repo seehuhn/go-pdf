@@ -37,7 +37,7 @@ type scanner struct {
 	skipped int64
 
 	enc     *encryptInfo
-	encRef  *Reference
+	encRef  Reference
 	special map[Reference]bool // objects with no encryption
 }
 
@@ -60,31 +60,31 @@ func (s *scanner) bytesRead() int64 {
 	return s.skipped + int64(s.pos)
 }
 
-func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
+func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 	number, err := s.ReadInteger()
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 	generation, err := s.ReadInteger()
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 	err = s.SkipWhiteSpace()
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 
 	err = s.SkipString("obj")
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 	err = s.SkipWhiteSpace()
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 
-	ref := &Reference{uint32(number), uint16(generation)}
-	if s.special[*ref] {
+	ref := NewReference(uint32(number), uint16(generation))
+	if s.special[ref] {
 		// some objects are not encrypted, e.g. xref dictionaries
 		s.enc = nil
 	} else {
@@ -93,11 +93,11 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 
 	obj, err := s.ReadObject()
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 	err = s.SkipWhiteSpace()
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 
 	if a, ok := obj.(Integer); ok {
@@ -105,33 +105,30 @@ func (s *scanner) ReadIndirectObject() (Object, *Reference, error) {
 		// object.
 		buf, err := s.Peek(6)
 		if err != nil {
-			return nil, nil, err
+			return nil, 0, err
 		}
 		if !bytes.Equal(buf, []byte("endobj")) {
 			b, err := s.ReadInteger()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			err = s.SkipString("R")
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			err = s.SkipWhiteSpace()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 
 			// TODO(voss): check for overflow
-			obj = &Reference{
-				Number:     uint32(a),
-				Generation: uint16(b),
-			}
+			obj = NewReference(uint32(a), uint16(b))
 		}
 	}
 
 	err = s.SkipString("endobj")
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 
 	return obj, ref, nil
@@ -345,7 +342,7 @@ func (s *scanner) ReadQuotedString() (String, error) {
 		return nil, err
 	}
 
-	if s.enc != nil && s.encRef != nil {
+	if s.enc != nil && s.encRef != 0 {
 		res, err = s.enc.DecryptBytes(s.encRef, res)
 		if err != nil {
 			return nil, err
@@ -394,7 +391,7 @@ func (s *scanner) ReadHexString() (String, error) {
 		return nil, err
 	}
 
-	if s.enc != nil && s.encRef != nil {
+	if s.enc != nil && s.encRef != 0 {
 		res, err = s.enc.DecryptBytes(s.encRef, res)
 		if err != nil {
 			return nil, err
@@ -469,7 +466,7 @@ func (s *scanner) ReadArray() (Array, error) {
 			// TODO(voss): check for overflow
 			a := uint32(array[k-2].(Integer))
 			b := uint16(array[k-1].(Integer))
-			array = append(array[:k-2], &Reference{a, b})
+			array = append(array[:k-2], NewReference(a, b))
 			integersSeen = 0
 			continue
 		}
@@ -571,7 +568,7 @@ func (s *scanner) ReadDict() (Dict, error) {
 				}
 
 				// TODO(voss): check for overflow
-				val = &Reference{uint32(a), uint16(b)}
+				val = NewReference(uint32(a), uint16(b))
 			}
 		}
 

@@ -154,7 +154,7 @@ func (f *simple) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
 type embedded struct {
 	*simple
 	w       *pdf.Writer
-	ref     *pdf.Reference
+	ref     pdf.Reference
 	resName pdf.Name
 	enc     cmap.SimpleEncoder
 	text    map[glyph.ID][]rune
@@ -166,7 +166,7 @@ func (e *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.Stri
 	return append(s, e.enc.Encode(gid, rr))
 }
 
-func (e *embedded) Reference() *pdf.Reference {
+func (e *embedded) Reference() pdf.Reference {
 	return e.ref
 }
 
@@ -343,7 +343,7 @@ func (e *embedded) Close() error {
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
 
-	compressedRefs := []*pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
+	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
 
 	switch outlines := subsetInfo.Outlines.(type) {

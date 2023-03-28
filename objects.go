@@ -568,36 +568,47 @@ func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, e
 }
 
 // Reference represents a reference to an indirect object in a PDF file.
-// TODO(voss): use the struct directly, rather than pointers to the struct?
-type Reference struct {
-	Number     uint32
-	Generation uint16
+// The lower 32 bits represent the object number, the next 16 bits the
+// generation number.
+type Reference uint64
+
+func NewReference(number uint32, generation uint16) Reference {
+	return Reference(uint64(number) | uint64(generation)<<32)
 }
 
-func (x *Reference) String() string {
+func (x Reference) Number() uint32 {
+	return uint32(x)
+}
+
+func (x Reference) Generation() uint16 {
+	return uint16(x >> 32)
+}
+
+func (x Reference) String() string {
 	res := []string{
 		"obj_",
-		strconv.FormatInt(int64(x.Number), 10),
+		strconv.FormatInt(int64(x.Number()), 10),
 	}
-	if x.Generation > 0 {
-		res = append(res, "@", strconv.FormatUint(uint64(x.Generation), 10))
+	gen := x.Generation()
+	if gen > 0 {
+		res = append(res, "@", strconv.FormatUint(uint64(gen), 10))
 	}
 	return strings.Join(res, "")
 }
 
 // PDF implements the [Object] interface.
-func (x *Reference) PDF(w io.Writer) error {
+func (x Reference) PDF(w io.Writer) error {
+	if x>>48 != 0 {
+		return fmt.Errorf("invalid reference: %016x", x)
+	}
+
 	var err error
-	if x == nil {
+	if x == 0 {
 		_, err = fmt.Fprint(w, "null")
 	} else {
-		_, err = fmt.Fprintf(w, "%d %d R", x.Number, x.Generation)
+		_, err = fmt.Fprintf(w, "%d %d R", x.Number(), x.Generation())
 	}
 	return err
-}
-
-func (x *Reference) IsNil() bool {
-	return x == nil
 }
 
 // TODO(voss): either use this more widely, or merge it into the caller.

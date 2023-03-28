@@ -103,13 +103,13 @@ func (p *Page) coord(x float64) string {
 }
 
 type Resource interface {
-	Reference() *pdf.Reference
+	Reference() pdf.Reference
 	ResourceName() pdf.Name
 }
 
 func (p *Page) resourceName(obj Resource, d pdf.Dict, nameTmpl string) pdf.Name {
 	ref := obj.Reference()
-	name, ok := p.resNames[*ref]
+	name, ok := p.resNames[ref]
 	if ok {
 		return name
 	}
@@ -117,7 +117,7 @@ func (p *Page) resourceName(obj Resource, d pdf.Dict, nameTmpl string) pdf.Name 
 	name = obj.ResourceName()
 	if _, exists := d[name]; name != "" && !exists {
 		d[name] = ref
-		p.resNames[*ref] = name
+		p.resNames[ref] = name
 		return name
 	}
 
@@ -128,7 +128,7 @@ func (p *Page) resourceName(obj Resource, d pdf.Dict, nameTmpl string) pdf.Name 
 		}
 
 		d[name] = ref
-		p.resNames[*ref] = name
+		p.resNames[ref] = name
 		return name
 	}
 }

@@ -28,7 +28,7 @@ import (
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 type walker struct {
-	trans map[pdf.Reference]*pdf.Reference
+	trans map[pdf.Reference]pdf.Reference
 	r     *pdf.Reader
 	w     *pdf.Writer
 }
@@ -68,13 +68,13 @@ func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
 			res.Dict[key] = repl
 		}
 		return res, nil
-	case *pdf.Reference:
-		other, ok := w.trans[*x]
+	case pdf.Reference:
+		other, ok := w.trans[x]
 		if ok {
 			return other, nil
 		}
 		other = w.w.Alloc()
-		w.trans[*x] = other
+		w.trans[x] = other
 
 		val, err := w.r.Resolve(x)
 		if err != nil {
@@ -130,7 +130,7 @@ func main() {
 	catalog := r.Catalog
 
 	trans := &walker{
-		trans: map[pdf.Reference]*pdf.Reference{},
+		trans: map[pdf.Reference]pdf.Reference{},
 		r:     r,
 		w:     w,
 	}

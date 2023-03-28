@@ -101,7 +101,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			return nil, nil, err
 		}
 		var dict Dict
-		var ref *Reference
+		var ref Reference
 		switch {
 		case bytes.Equal(buf, []byte("xref")):
 			dict, err = readXRefTable(xref, s)
@@ -128,8 +128,8 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 				return nil, nil, err
 			}
 		}
-		if ref != nil {
-			r.special[*ref] = true
+		if ref != 0 {
+			r.special[ref] = true
 		}
 
 		if first {
@@ -290,14 +290,14 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 	return nil
 }
 
-func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, *Reference, error) {
+func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, Reference, error) {
 	obj, ref, err := s.ReadIndirectObject()
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 	stream, ok := obj.(*Stream)
 	if !ok {
-		return nil, nil, &MalformedFileError{
+		return nil, 0, &MalformedFileError{
 			Pos: s.currentPos(),
 			Err: errors.New("invalid xref stream"),
 		}
@@ -306,15 +306,15 @@ func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, *Reference, e
 
 	w, ss, err := checkXRefStreamDict(dict)
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 	decoded, err := (*Reader)(nil).DecodeStream(stream, 0)
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 	err = decodeXRefStream(xref, decoded, w, ss)
 	if err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 
 	return dict, ref, nil
@@ -409,11 +409,8 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				// a = object number of the compressed stream (generation number 0)
 				// b = index within the stream
 				xref[i] = &xRefEntry{
-					Pos: b,
-					InStream: &Reference{
-						Number:     uint32(a),
-						Generation: 0,
-					},
+					Pos:      b,
+					InStream: NewReference(uint32(a), 0),
 				}
 			}
 		}
@@ -435,7 +432,7 @@ func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 	}
 	for i := uint32(0); i < pdf.nextRef; i++ {
 		entry := pdf.xref[i]
-		if entry != nil && entry.InStream != nil {
+		if entry != nil && entry.InStream != 0 {
 			return errors.New("cannot use xref tables with object streams")
 		}
 		if entry != nil && entry.Pos >= 0 {
@@ -478,8 +475,8 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 		}
 		var f2 int64
 		var f3 uint16
-		if entry.InStream != nil {
-			f2 = int64(entry.InStream.Number)
+		if entry.InStream != 0 {
+			f2 = int64(entry.InStream.Number())
 			f3 = uint16(entry.Pos)
 		} else if entry.Pos >= 0 {
 			f2 = entry.Pos
@@ -549,7 +546,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 			if err != nil {
 				return err
 			}
-		} else if entry.InStream == nil {
+		} else if entry.InStream == 0 {
 			err := wx.WriteByte(1)
 			if err != nil {
 				return err
@@ -567,7 +564,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 			if err != nil {
 				return err
 			}
-			err = encodeInt64(wx, uint64(entry.InStream.Number), w2)
+			err = encodeInt64(wx, uint64(entry.InStream.Number()), w2)
 			if err != nil {
 				return err
 			}
@@ -628,7 +625,7 @@ type xRefSubSection struct {
 }
 
 type xRefEntry struct {
-	InStream   *Reference
+	InStream   Reference
 	Pos        int64
 	Generation uint16
 }

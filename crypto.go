@@ -211,16 +211,18 @@ func (enc *encryptInfo) ToDict() Dict {
 	return dict
 }
 
-func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, error) {
+func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref Reference) ([]byte, error) {
 	h := md5.New()
 	key, err := enc.sec.GetKey(false)
 	if err != nil {
 		return nil, err
 	}
 	_, _ = h.Write(key)
+	num := ref.Number()
+	gen := ref.Generation()
 	_, _ = h.Write([]byte{
-		byte(ref.Number), byte(ref.Number >> 8), byte(ref.Number >> 16),
-		byte(ref.Generation), byte(ref.Generation >> 8)})
+		byte(num), byte(num >> 8), byte(num >> 16),
+		byte(gen), byte(gen >> 8)})
 	if cf.Cipher == cipherAES {
 		_, _ = h.Write([]byte("sAlT"))
 	}
@@ -233,7 +235,7 @@ func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref *Reference) ([]byte, erro
 
 // EncryptBytes encrypts the bytes in buf using Algorithm 1 in the PDF spec.
 // This function modfies the contents of buf and may return buf.
-func (enc *encryptInfo) EncryptBytes(ref *Reference, buf []byte) ([]byte, error) {
+func (enc *encryptInfo) EncryptBytes(ref Reference, buf []byte) ([]byte, error) {
 	cf := enc.strF
 	if cf == nil {
 		return buf, nil
@@ -282,7 +284,7 @@ func (enc *encryptInfo) EncryptBytes(ref *Reference, buf []byte) ([]byte, error)
 
 // DecryptBytes decrypts the bytes in buf using Algorithm 1 in the PDF spec.
 // This function modfies the contents of buf and may return buf.
-func (enc *encryptInfo) DecryptBytes(ref *Reference, buf []byte) ([]byte, error) {
+func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) {
 	cf := enc.strF
 	if cf == nil {
 		return buf, nil
@@ -321,7 +323,7 @@ func (enc *encryptInfo) DecryptBytes(ref *Reference, buf []byte) ([]byte, error)
 	}
 }
 
-func (enc *encryptInfo) DecryptStream(ref *Reference, r io.Reader) (io.Reader, error) {
+func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, error) {
 	cf := enc.stmF
 	if cf == nil {
 		return r, nil
@@ -670,7 +672,7 @@ type encryptWriter struct {
 	pos int
 }
 
-func (enc *encryptInfo) cryptFilter(ref *Reference, w io.WriteCloser) (io.WriteCloser, error) {
+func (enc *encryptInfo) cryptFilter(ref Reference, w io.WriteCloser) (io.WriteCloser, error) {
 	cf := enc.stmF
 	if cf == nil {
 		return w, nil

@@ -39,12 +39,12 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ref, err := w.Write(TextString(msg), nil)
+			ref, err := w.Write(TextString(msg), 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			w.Catalog.Pages = &Reference{}
+			w.Catalog.Pages = w.Alloc()
 
 			err = w.Close()
 			if err != nil {

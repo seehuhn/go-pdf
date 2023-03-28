@@ -191,7 +191,7 @@ func (t3 *type3) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
 		ref:       w.Alloc(),
 		resName:   resName,
 		enc:       cmap.NewSimpleEncoder(),
-		glyphRefs: make([]*pdf.Reference, len(t3.b.names)),
+		glyphRefs: make([]pdf.Reference, len(t3.b.names)),
 		type3:     t3,
 	}
 	w.AutoClose(res)
@@ -200,10 +200,10 @@ func (t3 *type3) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
 
 type embedded struct {
 	w         *pdf.Writer
-	ref       *pdf.Reference
+	ref       pdf.Reference
 	resName   pdf.Name
 	enc       cmap.SimpleEncoder
-	glyphRefs []*pdf.Reference
+	glyphRefs []pdf.Reference
 	*type3
 }
 
@@ -211,7 +211,7 @@ func (e3 *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.Str
 	return append(s, e3.enc.Encode(gid, rr))
 }
 
-func (e3 *embedded) Reference() *pdf.Reference {
+func (e3 *embedded) Reference() pdf.Reference {
 	return e3.ref
 }
 
@@ -268,8 +268,8 @@ func (e3 *embedded) Close() error {
 		if gid == 0 && e3.b.names[0] == "" {
 			continue
 		}
-		if e3.glyphRefs[gid] == nil {
-			stream, ref, err := w.OpenStream(nil, nil, compress)
+		if e3.glyphRefs[gid] == 0 {
+			stream, ref, err := w.OpenStream(nil, 0, compress)
 			if err != nil {
 				return err
 			}
@@ -315,7 +315,7 @@ func (e3 *embedded) Close() error {
 		Widths = append(Widths, width)
 	}
 
-	compressedRefs := []*pdf.Reference{FontDictRef, CharProcsRef, EncodingRef, WidthsRef}
+	compressedRefs := []pdf.Reference{FontDictRef, CharProcsRef, EncodingRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, CharProcs, Encoding, Widths}
 
 	if w.Tagged {
@@ -365,7 +365,7 @@ func (e3 *embedded) Close() error {
 		needToUnicode = true
 		break
 	}
-	var ToUnicodeRef *pdf.Reference
+	var ToUnicodeRef pdf.Reference
 	if needToUnicode {
 		ToUnicodeRef = w.Alloc()
 		FontDict["ToUnicode"] = ToUnicodeRef

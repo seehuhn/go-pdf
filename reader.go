@@ -118,8 +118,8 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 	}
 
 	if encObj, ok := trailer["Encrypt"]; ok {
-		if ref, ok := encObj.(*Reference); ok {
-			r.special[*ref] = true
+		if ref, ok := encObj.(Reference); ok {
+			r.special[ref] = true
 		}
 		r.enc, err = r.parseEncryptDict(encObj, readPwd)
 		if err != nil {
@@ -202,7 +202,7 @@ func (r *Reader) GetInfo() (*Info, error) {
 // ReadSequential makes some effort to repair problems in corrupted or
 // malformed PDF files.  In particular, it may still work when the
 // [Reader.Resolve] method fails with errors.
-func (r *Reader) ReadSequential() (Object, *Reference, error) {
+func (r *Reader) ReadSequential() (Object, Reference, error) {
 	s := r.scannerAt(r.Pos)
 
 	for {
@@ -210,16 +210,13 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 			s2 := r.objStm.s
 			err := s2.Discard(int64(r.objStm.idx[0].offs) - s2.bytesRead())
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			obj, err := s2.ReadObject()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
-			ref := &Reference{
-				Number:     r.objStm.idx[0].number,
-				Generation: 0,
-			}
+			ref := NewReference(r.objStm.idx[0].number, 0)
 
 			if len(r.objStm.idx) > 1 {
 				r.objStm.idx = r.objStm.idx[1:]
@@ -232,7 +229,7 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 
 		err := s.SkipWhiteSpace()
 		if err != nil {
-			return nil, nil, err
+			return nil, 0, err
 		}
 		r.Pos = s.currentPos()
 
@@ -241,42 +238,42 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 		case bytes.HasPrefix(buf, []byte("xref")):
 			err = s.SkipAfter("trailer")
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			err = s.SkipWhiteSpace()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			_, err = s.ReadDict()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			err = s.SkipWhiteSpace()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			continue
 
 		case bytes.HasPrefix(buf, []byte("startxref")):
 			err = s.SkipString("startxref")
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			_, err = s.ReadInteger()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			continue
 
 		case len(buf) == 0:
-			return nil, nil, io.EOF
+			return nil, 0, io.EOF
 
 		case buf[0] < '0' || buf[0] > '9':
 			// Some PDF files embed random data.  Try to skip to the
 			// next object.
 			err = s.skipToNextObject()
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 		}
 
@@ -286,7 +283,7 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 				r.Pos = s.currentPos()
 				err = io.EOF
 			}
-			return nil, nil, err
+			return nil, 0, err
 		}
 		if stm, ok := obj.(*Stream); ok && stm.Dict["Type"] == Name("XRef") {
 			// skip xref streams when reading objects sequentially
@@ -295,7 +292,7 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 		if stm, ok := obj.(*Stream); ok && stm.Dict["Type"] == Name("ObjStm") {
 			contents, err := r.objStmScanner(stm, r.Pos)
 			if err != nil {
-				return nil, nil, err
+				return nil, 0, err
 			}
 			r.objStm = contents
 			r.Pos = s.currentPos()
@@ -309,14 +306,14 @@ func (r *Reader) ReadSequential() (Object, *Reference, error) {
 
 // Resolve resolves references to indirect objects.
 //
-// If obj is of type [*Reference], the function loads the corresponding object
+// If obj is of type [Reference], the function loads the corresponding object
 // from the file and returns the result.  Otherwise, obj is returned unchanged.
 func (r *Reader) Resolve(obj Object) (Object, error) {
 	return r.doGet(obj, true)
 }
 
 func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
-	ref, ok := obj.(*Reference)
+	ref, ok := obj.(Reference)
 	if !ok {
 		return obj, nil
 	}
@@ -333,12 +330,12 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 		}
 	}
 
-	entry := r.xref[ref.Number]
-	if entry.IsFree() || entry.Generation != ref.Generation {
+	entry := r.xref[ref.Number()]
+	if entry.IsFree() || entry.Generation != ref.Generation() {
 		return nil, nil
 	}
 
-	if entry.InStream != nil {
+	if entry.InStream != 0 {
 		if !canStream {
 			return nil, &MalformedFileError{
 				Pos: 0,
@@ -346,7 +343,7 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 			}
 		}
 
-		return r.getFromObjectStream(ref.Number, entry.InStream)
+		return r.getFromObjectStream(ref.Number(), entry.InStream)
 	}
 
 	// TODO(voss): keep the scanner between calls?
@@ -356,7 +353,7 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 		return nil, err
 	}
 
-	if *ref != *fileRef {
+	if ref != fileRef {
 		return nil, &MalformedFileError{
 			Pos: 0,
 			Err: errors.New("xref corrupted"),
@@ -434,7 +431,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 	return &objStm{s: s, idx: idx}, nil
 }
 
-func (r *Reader) getFromObjectStream(number uint32, sRef *Reference) (Object, error) {
+func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, error) {
 	container, err := r.doGet(sRef, false)
 	if err != nil {
 		return nil, err
@@ -479,7 +476,7 @@ func (r *Reader) getFromObjectStream(number uint32, sRef *Reference) (Object, er
 	var res Object
 	for i := a; i < b; i++ {
 		info := contents.idx[i]
-		key := &Reference{Number: info.number, Generation: 0}
+		key := NewReference(info.number, 0)
 		if r.cache.Has(key) {
 			if i == m {
 				panic("should not happen")
@@ -693,7 +690,7 @@ func (r *Reader) scannerAt(pos int64) *scanner {
 }
 
 func (r *Reader) errPos(obj Object) int64 {
-	ref, ok := obj.(*Reference)
+	ref, ok := obj.(Reference)
 	if !ok {
 		return 0
 	}
@@ -701,19 +698,19 @@ func (r *Reader) errPos(obj Object) int64 {
 		return 0
 	}
 
-	number := ref.Number
-	gen := ref.Generation
+	number := ref.Number()
+	gen := ref.Generation()
 	for {
 		entry := r.xref[number]
 		if entry.IsFree() || entry.Generation != gen {
 			return 0
 		}
 
-		if entry.InStream == nil {
+		if entry.InStream == 0 {
 			return entry.Pos
 		}
-		number = entry.InStream.Number
-		gen = entry.InStream.Generation
+		number = entry.InStream.Number()
+		gen = entry.InStream.Generation()
 	}
 }
 

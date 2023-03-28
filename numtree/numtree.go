@@ -35,38 +35,38 @@ func Read(r pdf.Reader, root pdf.Object) (Tree, error) {
 	panic("not implemented")
 }
 
-func Write(w *pdf.Writer, tree Tree) (*pdf.Reference, error) {
+func Write(w *pdf.Writer, tree Tree) (pdf.Reference, error) {
 	sw := NewSequentialWriter(w)
 	pos, err := tree.First()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	for {
 		val, err := tree.Get(pos)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		err = sw.Append(pos, val)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		pos, err = tree.Next(pos)
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, err
+			return 0, err
 		}
 	}
 	err = sw.Close()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	return sw.Reference(), nil
 }
 
 type SequentialWriter struct {
 	w    *pdf.Writer
-	ref  *pdf.Reference
+	ref  pdf.Reference
 	data map[pdf.Integer]pdf.Object
 }
 
@@ -107,6 +107,6 @@ func (sw *SequentialWriter) Close() error {
 	return err
 }
 
-func (sw *SequentialWriter) Reference() *pdf.Reference {
+func (sw *SequentialWriter) Reference() pdf.Reference {
 	return sw.ref
 }

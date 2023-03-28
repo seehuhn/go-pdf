@@ -186,10 +186,10 @@ func FuzzScanner(f *testing.F) {
 		switch x := obj.(type) {
 		case Integer:
 			return x, nil
-		case *Reference:
+		case Reference:
 			// Allow the fuzzer to generate different indirect integer values,
 			// both positive and negative.
-			return Integer(x.Number) - Integer(x.Generation), nil
+			return Integer(x - 1000000), nil
 		default:
 			return 0, errors.New("not an integer")
 		}
@@ -306,7 +306,7 @@ var testCases = []struct {
 	{"<68656C7>", String("help"), true, nil},
 
 	{"[1 2 3]", Array{Integer(1), Integer(2), Integer(3)}, true, nil},
-	{"[1 2 3 R 4]", Array{Integer(1), &Reference{2, 3}, Integer(4)}, true, nil},
+	{"[1 2 3 R 4]", Array{Integer(1), NewReference(2, 3), Integer(4)}, true, nil},
 
 	{"<< /key 12 /val /23 >>", Dict{
 		Name("key"): Integer(12),
@@ -314,7 +314,7 @@ var testCases = []struct {
 	}, true, nil},
 	{"<< /key1 1 /key2 2 2 R /key3 3 >>", Dict{
 		Name("key1"): Integer(1),
-		Name("key2"): &Reference{2, 2},
+		Name("key2"): NewReference(2, 2),
 		Name("key3"): Integer(3),
 	}, true, nil},
 
