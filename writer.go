@@ -675,10 +675,10 @@ func (w *streamWriter) Close() error {
 	return nil
 }
 
-// A Placeholder can be used to reserve space in a PDF file where some value
-// can be filled in later.  This is, for example, used to store the content
-// length of a compressed stream in a PDF stream dictionary.  Placeholer
-// objects are created using [Writer.NewPlaceholder].
+// A Placeholder is a space reserved in a PDF file that can later be filled
+// with a value.  One common use case is to store the length of compressed
+// content in a PDF stream dictionary.  To create Placeholder objects,
+// use the [Writer.NewPlaceholder] method.
 type Placeholder struct {
 	value []byte
 	size  int

@@ -16,7 +16,11 @@
 
 package pagetree
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // InheritableAttributes specifies inheritable Page Attributes.
 //
@@ -38,7 +42,7 @@ type InheritableAttributes struct {
 
 	// Rotate describes how the page shall be rotated when displayed or
 	// printed.  Default value: RotateInherit.
-	Rotate pdf.PageRotation
+	Rotate PageRotation
 }
 
 func mergeAttributes(dict pdf.Dict, attr *InheritableAttributes) {
@@ -53,7 +57,7 @@ func mergeAttributes(dict pdf.Dict, attr *InheritableAttributes) {
 	if attr.CropBox != nil && dict["CropBox"] == nil {
 		dict["CropBox"] = attr.CropBox
 	}
-	if attr.Rotate != pdf.RotateInherit && dict["Rotate"] == nil {
+	if attr.Rotate != RotateInherit && dict["Rotate"] == nil {
 		dict["Rotate"] = attr.Rotate.ToPDF()
 	}
 }
@@ -64,3 +68,58 @@ var (
 	A5     = &pdf.Rectangle{URx: 420.945, URy: 595.276}
 	Letter = &pdf.Rectangle{URx: 612, URy: 792}
 )
+
+// PageRotation describes how a page shall be rotated when displayed or
+// printed.  The possible values are [RotateInherit], [Rotate0], [Rotate90],
+// [Rotate180], [Rotate270].
+type PageRotation int
+
+func DecodeRotation(rot pdf.Integer) (PageRotation, error) {
+	rot = rot % 360
+	if rot < 0 {
+		rot += 360
+	}
+	switch rot {
+	case 0:
+		return Rotate0, nil
+	case 90:
+		return Rotate90, nil
+	case 180:
+		return Rotate180, nil
+	case 270:
+		return Rotate270, nil
+	default:
+		return 0, errNoRotation
+	}
+}
+
+func (r PageRotation) ToPDF() pdf.Integer {
+	switch r {
+	case Rotate0:
+		return 0
+	case Rotate90:
+		return 90
+	case Rotate180:
+		return 180
+	case Rotate270:
+		return 270
+	default:
+		return 0
+	}
+}
+
+// Valid values for PageRotation.
+//
+// We can't use the pdf integer values directly, because then
+// we could not tell apart 0 degree rotations from unspecified
+// rotations.
+const (
+	RotateInherit PageRotation = iota // use inherited value
+
+	Rotate0   // don't rotate
+	Rotate90  // rotate 90 degrees clockwise
+	Rotate180 // rotate 180 degrees clockwise
+	Rotate270 // rotate 270 degrees clockwise
+)
+
+var errNoRotation = errors.New("not a valid PDF rotation")

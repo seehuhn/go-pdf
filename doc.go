@@ -47,7 +47,7 @@
 //	    log.Fatal(err)
 //	}
 //
-// The following classes represent the native PDF object types.  All of these
-// implement the [Object] interface: [Array], [Bool], [Dict], [Integer],
-// [Name], [Real], [Reference], [Stream], [String].
+// The following classes represent the native PDF object types: [Array],
+// [Bool], [Dict], [Integer], [Name], [Real], [Reference], [Stream], [String].
+// All of these implement the [Object] interface.
 package pdf

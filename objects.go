@@ -31,8 +31,8 @@ import (
 // Object represents an object in a PDF file.  There are nine native types of
 // PDF objects, which implement this interface: [Array], [Bool], [Dict],
 // [Integer], [Name], [Real], [Reference], [Stream], and [String].
-// Custom types can be constructed of these basic types, by implementing the
-// Object interface.
+// Custom types can be constructed out of these basic types, by implementing
+// the Object interface.
 type Object interface {
 	// PDF writes the PDF file representation of the object to w.
 	PDF(w io.Writer) error
@@ -600,7 +600,7 @@ func (x *Reference) IsNil() bool {
 	return x == nil
 }
 
-// TODO(voss): either use this more widely, or merge it into the called.
+// TODO(voss): either use this more widely, or merge it into the caller.
 func writeObject(w io.Writer, obj Object) error {
 	if obj == nil {
 		_, err := w.Write([]byte("null"))

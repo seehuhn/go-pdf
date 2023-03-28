@@ -27,7 +27,6 @@ var (
 	errCorrupted    = errors.New("corrupted ciphertext")
 	errNoDate       = errors.New("not a valid date string")
 	errNoRectangle  = errors.New("not a valid PDF rectangle")
-	errNoRotation   = errors.New("not a valid PDF rotation")
 	errDuplicateRef = errors.New("object already written")
 )
 
