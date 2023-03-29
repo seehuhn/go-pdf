@@ -70,16 +70,16 @@ type WriterOptions struct {
 	UserPermission Perm
 }
 
+var defaultWriterOptions = &WriterOptions{
+	Version: V1_7,
+}
+
 type Resource interface {
 	// Write writes the resource to the PDF file.  No changes can be
 	// made to the resource after it has been written.
 	Close() error
 
 	Reference() Reference
-}
-
-var defaultOptions = &WriterOptions{
-	Version: V1_7,
 }
 
 // Create creates the named PDF file and opens it for output.  If a previous
@@ -110,12 +110,12 @@ func Create(name string) (*Writer, error) {
 // the pdf.Writer has been closed.
 func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
-		opt = defaultOptions
+		opt = defaultWriterOptions
 	}
 
 	version := opt.Version
 	if version == 0 {
-		version = defaultOptions.Version
+		version = defaultWriterOptions.Version
 	}
 	versionString, err := version.ToString()
 	if err != nil {

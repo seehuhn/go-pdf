@@ -39,6 +39,10 @@ type Reader struct {
 	ID [][]byte
 
 	Catalog *Catalog
+	infoObj Object // the /Info entry of the trailer dictionary
+	enc     *encryptInfo
+
+	xref map[uint32]*xRefEntry
 
 	size int64
 	r    io.ReaderAt
@@ -48,22 +52,19 @@ type Reader struct {
 	level   int
 	special map[Reference]bool
 
-	xref    map[uint32]*xRefEntry
-	trailer Dict
-
-	enc *encryptInfo
-
 	cache *lruCache
 }
 
-// ReadPwdFunc describes a function which can be used to query the user for a
-// password for the document with the given ID.  The first call for each
-// authentication attempt has try == 0.  If the returned password was wrong,
-// the function is called again, repeatedly, with sequentially increasing
-// values of try.  If the ReadPwdFunc return the empty string, the
-// authentication attempt is aborted and an [AuthenticationError] is reported to
-// the caller.
-type ReadPwdFunc func(ID []byte, try int) string
+type ReaderOptions struct {
+	// ReadPassword is a function which can be used to query the user for a
+	// password for the document with the given ID.  The first call for each
+	// authentication attempt has try == 0.  If the returned password was
+	// wrong, the function is called again, repeatedly, with sequentially
+	// increasing values of try.  If the function return the empty string, the
+	// authentication attempt is aborted and an [AuthenticationError] is
+	// reported to the caller.
+	ReadPassword func(ID []byte, try int) string
+}
 
 // Open opens the named PDF file for reading.  After use, [Reader.Close] must be
 // called to close the file the Reader is reading from.
@@ -79,9 +80,14 @@ func Open(fname string) (*Reader, error) {
 	return NewReader(fd, fi.Size(), nil)
 }
 
+var defaultReaderOptions = &ReaderOptions{}
+
 // NewReader creates a new Reader object.
-// TODO(voss): use an options struct
-func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, error) {
+func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error) {
+	if opt == nil {
+		opt = defaultReaderOptions
+	}
+
 	r := &Reader{
 		size:    size,
 		r:       data,
@@ -101,7 +107,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 		return nil, err
 	}
 	r.xref = xref
-	r.trailer = trailer
+	r.infoObj = trailer["Info"]
 
 	ID, ok := trailer["ID"].(Array)
 	if ok && len(ID) >= 2 {
@@ -121,7 +127,7 @@ func NewReader(data io.ReaderAt, size int64, readPwd ReadPwdFunc) (*Reader, erro
 		if ref, ok := encObj.(Reference); ok {
 			r.special[ref] = true
 		}
-		r.enc, err = r.parseEncryptDict(encObj, readPwd)
+		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
 			return nil, err
 		}
@@ -174,11 +180,10 @@ func (r *Reader) Close() error {
 // GetInfo reads the PDF /Info dictionary for the file.
 // If no Info dictionary is present, nil is returned.
 func (r *Reader) GetInfo() (*Info, error) {
-	infoObj := r.trailer["Info"]
-	if infoObj == nil {
+	if r.infoObj == nil {
 		return nil, nil
 	}
-	infoDict, err := r.GetDict(infoObj)
+	infoDict, err := r.GetDict(r.infoObj)
 	if err != nil {
 		return nil, err
 	}

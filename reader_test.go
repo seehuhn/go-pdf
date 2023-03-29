@@ -67,7 +67,10 @@ func TestAuthentication(t *testing.T) {
 			}
 
 			in := bytes.NewReader(out.Bytes())
-			r, err := NewReader(in, in.Size(), pwdFunc)
+			rOpt := &ReaderOptions{
+				ReadPassword: pwdFunc,
+			}
+			r, err := NewReader(in, in.Size(), rOpt)
 			if err != nil {
 				t.Fatal(err, i)
 			}

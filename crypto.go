@@ -36,7 +36,7 @@ type encryptInfo struct {
 	eff  *cryptFilter
 }
 
-func (r *Reader) parseEncryptDict(encObj Object, readPwd ReadPwdFunc) (*encryptInfo, error) {
+func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) string) (*encryptInfo, error) {
 	enc, err := r.GetDict(encObj)
 	if err != nil {
 		return nil, err
@@ -371,7 +371,7 @@ type stdSecHandler struct {
 	u        []byte
 	KeyBytes int
 
-	readPwd ReadPwdFunc
+	readPwd func([]byte, int) string
 	key     []byte
 
 	// We use the negation of /EncryptMetadata from the PDF spec, so that
@@ -385,7 +385,7 @@ type stdSecHandler struct {
 	OwnerAuthenticated bool
 }
 
-func openStdSecHandler(enc Dict, length int, ID []byte, readPwd ReadPwdFunc) (*stdSecHandler, error) {
+func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func([]byte, int) string) (*stdSecHandler, error) {
 	R, ok := enc["R"].(Integer)
 	if !ok || R < 2 || R > 4 {
 		return nil, errors.New("invalid Encrypt.R")
