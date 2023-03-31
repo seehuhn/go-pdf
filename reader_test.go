@@ -70,7 +70,7 @@ func TestAuthentication(t *testing.T) {
 			rOpt := &ReaderOptions{
 				ReadPassword: pwdFunc,
 			}
-			r, err := NewReader(in, in.Size(), rOpt)
+			r, err := NewReader(in, rOpt)
 			if err != nil {
 				t.Fatal(err, i)
 			}
@@ -113,7 +113,7 @@ func TestReaderGoFuzz(t *testing.T) {
 	}
 	for _, test := range cases {
 		buf := strings.NewReader(test)
-		_, _ = NewReader(buf, buf.Size(), nil)
+		_, _ = NewReader(buf, nil)
 	}
 }
 

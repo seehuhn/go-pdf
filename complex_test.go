@@ -38,7 +38,7 @@ func TestRectangle1(t *testing.T) {
 	for _, test := range cases {
 		t.Run(test.in, func(t *testing.T) {
 			r := strings.NewReader(test.in)
-			s := newScanner(r, 0, nil, nil)
+			s := newScanner(r, nil, nil)
 			obj, err := s.ReadObject()
 			if err != nil {
 				t.Fatal(err)
@@ -72,7 +72,7 @@ func TestRectangle2(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			s := newScanner(buf, 0, nil, nil)
+			s := newScanner(buf, nil, nil)
 			obj, err := s.ReadObject()
 			if err != nil {
 				t.Fatal(err)

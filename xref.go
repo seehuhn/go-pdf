@@ -129,7 +129,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			}
 		}
 		if ref != 0 {
-			r.special[ref] = true
+			r.cleartext[ref] = true
 		}
 
 		if first {
@@ -280,11 +280,11 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		}
 
 		if buf[19] == '\n' || buf[19] == '\r' {
-			s.pos += 20
+			s.bufPos += 20
 		} else {
 			// Some mal-formed PDF files use one-byte line endings.
 			// Try to fix this up ...
-			s.pos += 19
+			s.bufPos += 19
 		}
 	}
 	return nil

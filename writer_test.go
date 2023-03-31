@@ -116,7 +116,7 @@ ET
 	// os.WriteFile("debug.pdf", out.Bytes(), 0o644)
 
 	outR := bytes.NewReader(out.Bytes())
-	r, err := NewReader(outR, outR.Size(), nil)
+	r, err := NewReader(outR, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

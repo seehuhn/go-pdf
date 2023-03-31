@@ -17,7 +17,6 @@
 package pdf
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -47,10 +46,8 @@ type Reader struct {
 	size int64
 	r    io.ReaderAt
 
-	Pos     int64
-	objStm  *objStm
-	level   int
-	special map[Reference]bool
+	level     int
+	cleartext map[Reference]bool
 
 	cache *lruCache
 }
@@ -73,26 +70,27 @@ func Open(fname string) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	fi, err := fd.Stat()
-	if err != nil {
-		return nil, err
-	}
-	return NewReader(fd, fi.Size(), nil)
+	return NewReader(fd, nil)
 }
 
 var defaultReaderOptions = &ReaderOptions{}
 
 // NewReader creates a new Reader object.
-func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error) {
+func NewReader(data io.ReaderAt, opt *ReaderOptions) (*Reader, error) {
 	if opt == nil {
 		opt = defaultReaderOptions
 	}
 
+	size, err := getSize(data)
+	if err != nil {
+		return nil, err
+	}
+
 	r := &Reader{
-		size:    size,
-		r:       data,
-		special: make(map[Reference]bool),
-		cache:   newCache(100), // TODO(voss): make this configurable?
+		size:      size,
+		r:         data,
+		cleartext: make(map[Reference]bool),
+		cache:     newCache(100), // TODO(voss): make this configurable?
 	}
 
 	s := r.scannerAt(0)
@@ -125,7 +123,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 
 	if encObj, ok := trailer["Encrypt"]; ok {
 		if ref, ok := encObj.(Reference); ok {
-			r.special[ref] = true
+			r.cleartext[ref] = true
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
@@ -193,120 +191,6 @@ func (r *Reader) GetInfo() (*Info, error) {
 		return nil, err
 	}
 	return info, nil
-}
-
-// ReadSequential returns the objects in a PDF file in the order they are
-// stored in the file.  When the end of file has been reached, io.EOF is
-// returned.
-//
-// The function returns the next object in the file, together with a Reference
-// which can be used to read the object using [Reder.Resolce].  The read
-// position is not affected by other methods of the Reader, sequential access
-// can safely be interspersed with calls to [Reader.Resolve].
-//
-// ReadSequential makes some effort to repair problems in corrupted or
-// malformed PDF files.  In particular, it may still work when the
-// [Reader.Resolve] method fails with errors.
-func (r *Reader) ReadSequential() (Object, Reference, error) {
-	s := r.scannerAt(r.Pos)
-
-	for {
-		if r.objStm != nil && len(r.objStm.idx) > 0 {
-			s2 := r.objStm.s
-			err := s2.Discard(int64(r.objStm.idx[0].offs) - s2.bytesRead())
-			if err != nil {
-				return nil, 0, err
-			}
-			obj, err := s2.ReadObject()
-			if err != nil {
-				return nil, 0, err
-			}
-			ref := NewReference(r.objStm.idx[0].number, 0)
-
-			if len(r.objStm.idx) > 1 {
-				r.objStm.idx = r.objStm.idx[1:]
-			} else {
-				r.objStm = nil
-			}
-
-			return obj, ref, nil
-		}
-
-		err := s.SkipWhiteSpace()
-		if err != nil {
-			return nil, 0, err
-		}
-		r.Pos = s.currentPos()
-
-		buf, _ := s.Peek(9)
-		switch {
-		case bytes.HasPrefix(buf, []byte("xref")):
-			err = s.SkipAfter("trailer")
-			if err != nil {
-				return nil, 0, err
-			}
-			err = s.SkipWhiteSpace()
-			if err != nil {
-				return nil, 0, err
-			}
-			_, err = s.ReadDict()
-			if err != nil {
-				return nil, 0, err
-			}
-			err = s.SkipWhiteSpace()
-			if err != nil {
-				return nil, 0, err
-			}
-			continue
-
-		case bytes.HasPrefix(buf, []byte("startxref")):
-			err = s.SkipString("startxref")
-			if err != nil {
-				return nil, 0, err
-			}
-			_, err = s.ReadInteger()
-			if err != nil {
-				return nil, 0, err
-			}
-			continue
-
-		case len(buf) == 0:
-			return nil, 0, io.EOF
-
-		case buf[0] < '0' || buf[0] > '9':
-			// Some PDF files embed random data.  Try to skip to the
-			// next object.
-			err = s.skipToNextObject()
-			if err != nil {
-				return nil, 0, err
-			}
-		}
-
-		obj, ref, err := s.ReadIndirectObject()
-		if err != nil {
-			if err == io.ErrUnexpectedEOF {
-				r.Pos = s.currentPos()
-				err = io.EOF
-			}
-			return nil, 0, err
-		}
-		if stm, ok := obj.(*Stream); ok && stm.Dict["Type"] == Name("XRef") {
-			// skip xref streams when reading objects sequentially
-			continue
-		}
-		if stm, ok := obj.(*Stream); ok && stm.Dict["Type"] == Name("ObjStm") {
-			contents, err := r.objStmScanner(stm, r.Pos)
-			if err != nil {
-				return nil, 0, err
-			}
-			r.objStm = contents
-			r.Pos = s.currentPos()
-			continue
-		}
-
-		r.Pos = s.currentPos()
-		return obj, ref, nil
-	}
 }
 
 // Resolve resolves references to indirect objects.
@@ -404,7 +288,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 			Err: err,
 		}
 	}
-	s := newScanner(decoded, 0, r.safeGetInt, dec)
+	s := newScanner(decoded, r.safeGetInt, dec)
 
 	idx := make([]stmObj, n)
 	for i := 0; i < n; i++ {
@@ -421,7 +305,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 		idx[i].offs = int(offs)
 	}
 
-	pos := s.bytesRead()
+	pos := s.currentPos()
 	first, ok := stream.Dict["First"].(Integer)
 	if !ok || first < Integer(pos) {
 		return nil, &MalformedFileError{
@@ -489,7 +373,7 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 			continue
 		}
 
-		delta := int64(info.offs) - contents.s.bytesRead()
+		delta := int64(info.offs) - contents.s.currentPos()
 		if delta != -1 { // allow for the separating white space to be included in both adjacent objects
 			err = contents.s.Discard(delta)
 			if err != nil {
@@ -684,13 +568,9 @@ func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 }
 
 func (r *Reader) scannerAt(pos int64) *scanner {
-	var enc *encryptInfo
-	if r.enc != nil {
-		enc = r.enc
-	}
-	s := newScanner(io.NewSectionReader(r.r, pos, r.size-pos), pos,
-		r.safeGetInt, enc)
-	s.special = r.special
+	s := newScanner(io.NewSectionReader(r.r, pos, r.size-pos),
+		r.safeGetInt, r.enc)
+	s.unencrypted = r.cleartext
 	return s
 }
 

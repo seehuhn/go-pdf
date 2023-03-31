@@ -44,7 +44,7 @@ func TestReader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func BenchmarkReader(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		r, err := pdf.NewReader(bytes.NewReader(body), int64(len(body)), nil)
+		r, err := pdf.NewReader(bytes.NewReader(body), nil)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -56,7 +56,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+		r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 		if err != nil {
 			b.Fatal(err)
 		}

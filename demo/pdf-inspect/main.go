@@ -56,15 +56,10 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fi, err := fd.Stat()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
 	opt := &pdf.ReaderOptions{
 		ReadPassword: tryPasswd,
 	}
-	r, err := pdf.NewReader(fd, fi.Size(), opt)
+	r, err := pdf.NewReader(fd, opt)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

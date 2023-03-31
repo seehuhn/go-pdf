@@ -83,7 +83,7 @@ type String []byte
 // ParseString parses a string from the given buffer.  The buffer must include
 // the surrounding parentheses or angle brackets.
 func ParseString(buf []byte) (String, error) {
-	scanner := newScanner(bytes.NewReader(buf), 0, nil, nil)
+	scanner := newScanner(bytes.NewReader(buf), nil, nil)
 	b, _ := scanner.Peek(1)
 	if len(b) < 1 {
 		return nil, errInvalidString
@@ -91,10 +91,10 @@ func ParseString(buf []byte) (String, error) {
 	var s String
 	var err error
 	if b[0] == '(' {
-		scanner.pos += 1
+		scanner.bufPos += 1
 		s, err = scanner.ReadQuotedString()
 	} else if b[0] == '<' {
-		scanner.pos += 1
+		scanner.bufPos += 1
 		s, err = scanner.ReadHexString()
 	} else {
 		err = errInvalidString
@@ -273,7 +273,7 @@ type Name string
 // ParseName parses a PDF name from the given buffer.  The buffer must include
 // the leading slash.
 func ParseName(buf []byte) (Name, error) {
-	scanner := newScanner(bytes.NewReader(buf), 0, nil, nil)
+	scanner := newScanner(bytes.NewReader(buf), nil, nil)
 	b, _ := scanner.Peek(1)
 	if len(b) < 1 || b[0] != '/' {
 		return "", errInvalidName

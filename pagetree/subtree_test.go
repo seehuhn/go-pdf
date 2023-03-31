@@ -74,7 +74,7 @@ func TestSubtree(t *testing.T) {
 		// stage 2: Read back the file and check the page tree
 
 		body := buf.Bytes()
-		r, err := pdf.NewReader(bytes.NewReader(body), int64(len(body)), nil)
+		r, err := pdf.NewReader(bytes.NewReader(body), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -25,27 +25,29 @@ import (
 	"strconv"
 )
 
-const scannerBufSize = 1024
+const (
+	scannerBufSize = 1024
+	regexpOverlap  = 64
+)
 
 type scanner struct {
 	r       io.Reader
-	base    int64
-	getInt  func(Object) (Integer, error)
+	filePos int64 // how far into the reader the start of buf is
 	buf     []byte
-	pos     int
-	used    int
-	skipped int64
+	bufPos  int // current position within buf
+	bufEnd  int // end of valid data within buf
 
-	enc     *encryptInfo
-	encRef  Reference
-	special map[Reference]bool // objects with no encryption
+	getInt func(Object) (Integer, error)
+
+	enc         *encryptInfo
+	encRef      Reference
+	unencrypted map[Reference]bool // objects with no encryption
 }
 
-func newScanner(r io.Reader, base int64, getInt func(Object) (Integer, error),
+func newScanner(r io.Reader, getInt func(Object) (Integer, error),
 	dec *encryptInfo) *scanner {
 	return &scanner{
 		r:      r,
-		base:   base,
 		buf:    make([]byte, scannerBufSize),
 		getInt: getInt,
 		enc:    dec,
@@ -53,11 +55,7 @@ func newScanner(r io.Reader, base int64, getInt func(Object) (Integer, error),
 }
 
 func (s *scanner) currentPos() int64 {
-	return s.base + s.skipped + int64(s.pos)
-}
-
-func (s *scanner) bytesRead() int64 {
-	return s.skipped + int64(s.pos)
+	return s.filePos + int64(s.bufPos)
 }
 
 func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
@@ -84,7 +82,7 @@ func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 	}
 
 	ref := NewReference(uint32(number), uint16(generation))
-	if s.special[ref] {
+	if s.unencrypted[ref] {
 		// some objects are not encrypted, e.g. xref dictionaries
 		s.enc = nil
 	} else {
@@ -151,13 +149,13 @@ func (s *scanner) ReadObject() (Object, error) {
 		// Test this first, so that we can use buf[0] in the following cases.
 		return nil, err
 	case bytes.HasPrefix(buf, []byte("null")):
-		s.pos += 4
+		s.bufPos += 4
 		return nil, nil
 	case bytes.HasPrefix(buf, []byte("true")):
-		s.pos += 4
+		s.bufPos += 4
 		return Bool(true), nil
 	case bytes.HasPrefix(buf, []byte("false")):
-		s.pos += 5
+		s.bufPos += 5
 		return Bool(false), nil
 	case buf[0] == '/':
 		return s.ReadName()
@@ -186,13 +184,13 @@ func (s *scanner) ReadObject() (Object, error) {
 		}
 		return s.ReadStreamData(dict)
 	case buf[0] == '(':
-		s.pos++
+		s.bufPos++
 		return s.ReadQuotedString()
 	case buf[0] == '<':
-		s.pos++
+		s.bufPos++
 		return s.ReadHexString()
 	case buf[0] == '[':
-		s.pos++
+		s.bufPos++
 		return s.ReadArray()
 	}
 	return nil, err
@@ -461,7 +459,7 @@ func (s *scanner) ReadArray() (Array, error) {
 			break
 		}
 		if integersSeen >= 2 && buf[0] == 'R' {
-			s.pos++
+			s.bufPos++
 			k := len(array)
 			// TODO(voss): check for overflow
 			a := uint32(array[k-2].(Integer))
@@ -484,7 +482,7 @@ func (s *scanner) ReadArray() (Array, error) {
 
 		array = append(array, obj)
 	}
-	s.pos++ // we have already seen the closing "]"
+	s.bufPos++ // we have already seen the closing "]"
 
 	return array, nil
 }
@@ -561,7 +559,7 @@ func (s *scanner) ReadDict() (Dict, error) {
 						Err: errors.New("expected /Name but found Integer"),
 					}
 				}
-				s.pos++
+				s.bufPos++
 				err = s.SkipWhiteSpace()
 				if err != nil {
 					return nil, err
@@ -604,17 +602,17 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		return nil, err
 	}
 	if len(buf) >= 1 && buf[0] == '\n' {
-		s.pos++
+		s.bufPos++
 	} else if len(buf) >= 2 && buf[0] == '\r' && buf[1] == '\n' {
-		s.pos += 2
+		s.bufPos += 2
 	} else if len(buf) >= 1 && buf[0] == '\r' {
 		// not allowed by the spec, but seen in the wild
-		s.pos++
+		s.bufPos++
 	} else {
 		return nil, &MalformedFileError{}
 	}
 
-	start := s.bytesRead()
+	start := s.currentPos()
 	l := int64(length)
 
 	var streamData io.Reader
@@ -692,18 +690,19 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 // possible.  Once the end of file is reached, s.used will be smaller than the
 // buffer size, but no error will be returned.
 func (s *scanner) refill() error {
-	s.skipped += int64(s.pos)
-	copy(s.buf, s.buf[s.pos:s.used])
-	s.used -= s.pos
-	s.pos = 0
+	// move the remaining data to the beginning of the buffer
+	s.filePos += int64(s.bufPos)
+	copy(s.buf, s.buf[s.bufPos:s.bufEnd])
+	s.bufEnd -= s.bufPos
+	s.bufPos = 0
 
-	n, err := io.ReadFull(s.r, s.buf[s.used:])
-	s.used += n
+	// try to read more data
+	n, err := io.ReadFull(s.r, s.buf[s.bufEnd:])
+	s.bufEnd += n
 
-	if s.used > 0 || err == io.ErrUnexpectedEOF || err == io.EOF {
+	if n > 0 || err == io.ErrUnexpectedEOF || err == io.EOF {
 		err = nil
 	}
-
 	return err
 }
 
@@ -716,34 +715,34 @@ func (s *scanner) Peek(n int) ([]byte, error) {
 	}
 
 	var err error
-	if s.pos+n > s.used {
+	if s.bufPos+n > s.bufEnd {
 		err = s.refill()
 	}
 
-	if s.pos+n > s.used {
-		return s.buf[s.pos:s.used], err
+	if s.bufPos+n > s.bufEnd {
+		return s.buf[s.bufPos:s.bufEnd], err
 	}
 
-	return s.buf[s.pos : s.pos+n], nil
+	return s.buf[s.bufPos : s.bufPos+n], nil
 }
 
 func (s *scanner) Discard(n int64) error {
 	if n < 0 {
 		panic(fmt.Sprintf("negative discard offset %d", n))
 	}
-	unread := int64(s.used - s.pos)
+	unread := int64(s.bufEnd - s.bufPos)
 	if n <= unread {
-		s.pos += int(n)
+		s.bufPos += int(n)
 		return nil
 	}
 
 	n -= unread
-	s.skipped += int64(s.used)
-	s.pos = 0
-	s.used = 0
+	s.filePos += int64(s.bufEnd)
+	s.bufPos = 0
+	s.bufEnd = 0
 
 	n, err := io.CopyN(io.Discard, s.r, n)
-	s.skipped += n
+	s.filePos += n
 	return err
 }
 
@@ -753,18 +752,18 @@ func (s *scanner) Discard(n int64) error {
 func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 	empty := true
 	for {
-		for s.pos < s.used {
-			if !accept(s.buf[s.pos]) {
+		for s.bufPos < s.bufEnd {
+			if !accept(s.buf[s.bufPos]) {
 				return nil
 			}
-			s.pos++
+			s.bufPos++
 			empty = false
 		}
 		err := s.refill()
 		if err == io.EOF && !empty {
 			return nil
 		}
-		if s.used == 0 {
+		if s.bufEnd == 0 {
 			if err == nil {
 				err = io.EOF
 			}
@@ -802,7 +801,7 @@ func (s *scanner) SkipString(pat string) error {
 			Err: fmt.Errorf("expected %q but found %q", pat, string(buf)),
 		}
 	}
-	s.pos += n
+	s.bufPos += n
 	return nil
 }
 
@@ -814,49 +813,54 @@ func (s *scanner) SkipAfter(pat string) error {
 	}
 
 	for {
-		idx := bytes.Index(s.buf[s.pos:s.used], patBytes)
+		idx := bytes.Index(s.buf[s.bufPos:s.bufEnd], patBytes)
 		if idx >= 0 {
-			s.pos += idx + n
+			s.bufPos += idx + n
 			return nil
 		}
-		s.pos = s.used
+		s.bufPos = s.bufEnd
 		err := s.refill()
 		if err != nil {
 			return err
 		}
-		if s.used == 0 {
+		if s.bufEnd == 0 {
 			return io.EOF
 		}
 	}
 }
 
-func (s *scanner) skipToNextObject() error {
-	pat := regexp.MustCompile(`^\d{1,12}\s+\d{1,12}\s+obj\s`)
+// find returns the next non-overlapping occurrence of the regular expression pat
+// in the file. It returns the position of the match, and the submatches as
+// returned by regexp.FindStringSubmatch.
+func (s *scanner) find(pat *regexp.Regexp) (int64, []string, error) {
 	for {
-		afterEOL := false
-		err := s.ScanBytes(func(c byte) bool {
-			if afterEOL {
-				if c >= '0' && c <= '9' {
-					return false
+		// search for a match in the current buffer
+		m := pat.FindSubmatchIndex(s.buf[s.bufPos:s.bufEnd])
+		if m != nil {
+			matchPos := s.filePos + int64(s.bufPos+m[0])
+
+			// found a match
+			res := make([]string, len(m)/2)
+			for i := range res {
+				a, b := m[2*i], m[2*i+1]
+				if a >= 0 && b > a {
+					res[i] = string(s.buf[s.bufPos+a : s.bufPos+b])
 				}
-				afterEOL = isSpace[c]
-			} else if c == '\r' || c == '\n' {
-				afterEOL = true
 			}
-			return true
-		})
-		if err != nil {
-			return err
+
+			s.bufPos += m[1]
+			return matchPos, res, nil
 		}
 
-		buf, err := s.Peek(32)
-		if err != nil {
-			return err
-		} else if len(buf) == 0 {
-			return io.EOF
+		// There are no more matches in the current buffer, so we read more data.
+		// We need to be prepared for a partial match at the end of the buffer.
+		nextPos := s.bufEnd - regexpOverlap
+		if nextPos > s.bufPos {
+			s.bufPos = nextPos
 		}
-		if pat.Find(buf) != nil {
-			return nil
+		err := s.refill()
+		if err != nil {
+			return 0, nil, err
 		}
 	}
 }
