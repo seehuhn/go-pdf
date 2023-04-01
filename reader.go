@@ -44,7 +44,7 @@ type Reader struct {
 	xref map[uint32]*xRefEntry
 
 	size int64
-	r    io.ReaderAt
+	r    io.ReadSeeker
 
 	level     int
 	cleartext map[Reference]bool
@@ -76,7 +76,7 @@ func Open(fname string) (*Reader, error) {
 var defaultReaderOptions = &ReaderOptions{}
 
 // NewReader creates a new Reader object.
-func NewReader(data io.ReaderAt, opt *ReaderOptions) (*Reader, error) {
+func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	if opt == nil {
 		opt = defaultReaderOptions
 	}
@@ -93,7 +93,10 @@ func NewReader(data io.ReaderAt, opt *ReaderOptions) (*Reader, error) {
 		cache:     newCache(100), // TODO(voss): make this configurable?
 	}
 
-	s := r.scannerAt(0)
+	s, err := r.scannerFrom(0)
+	if err != nil {
+		return nil, err
+	}
 	version, err := s.readHeaderVersion()
 	if err != nil {
 		return nil, err
@@ -151,9 +154,9 @@ func NewReader(data io.ReaderAt, opt *ReaderOptions) (*Reader, error) {
 }
 
 // AuthenticateOwner tries to authenticate the owner of a document. If a
-// password is required, this calls the readPwd function specified in the call
-// to [NewReader].  The return value is nil if the owner was authenticated (or
-// if no authentication is required), and an object of type
+// password is required, this calls the ReadPassword function specified in the
+// [ReaderOptions] struct.  The return value is nil if the owner was
+// authenticated (or if no authentication is required), and an object of type
 // [AuthenticationError] if the required password was not supplied.
 func (r *Reader) AuthenticateOwner() error {
 	if r.enc == nil || r.enc.sec.OwnerAuthenticated {
@@ -164,7 +167,7 @@ func (r *Reader) AuthenticateOwner() error {
 }
 
 // Close closes the file underlying the reader.  This call only has an effect
-// if the io.ReaderAt passed to [NewReader] has a Close method, or if the
+// if the io.ReadSeeker passed to [NewReader] has a Close method, or if the
 // Reader was created using [Open].  Otherwise, Close has no effect and
 // returns nil.
 func (r *Reader) Close() error {
@@ -236,7 +239,10 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 	}
 
 	// TODO(voss): keep the scanner between calls?
-	s := r.scannerAt(entry.Pos)
+	s, err := r.scannerFrom(entry.Pos)
+	if err != nil {
+		return nil, err
+	}
 	obj, fileRef, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, err
@@ -533,9 +539,20 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 		}
 	}
 	r.level++
+	pos, err := r.r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
 	val, err := r.GetInt(obj)
+	if err != nil {
+		return 0, err
+	}
+	_, err = r.r.Seek(pos, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
 	r.level--
-	return val, err
+	return val, nil
 }
 
 // DecodeStream returns a reader for the decoded stream data.
@@ -567,11 +584,17 @@ func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 	return out, nil
 }
 
-func (r *Reader) scannerAt(pos int64) *scanner {
-	s := newScanner(io.NewSectionReader(r.r, pos, r.size-pos),
-		r.safeGetInt, r.enc)
-	s.unencrypted = r.cleartext
-	return s
+func (r *Reader) scannerFrom(pos int64) (*scanner, error) {
+	s := newScanner(r.r, r.safeGetInt, r.enc)
+	s.cleartext = r.cleartext
+
+	_, err := r.r.Seek(pos, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+	s.filePos = pos
+
+	return s, nil
 }
 
 func (r *Reader) errPos(obj Object) int64 {

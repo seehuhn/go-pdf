@@ -17,10 +17,7 @@
 package pdf
 
 import (
-	"bytes"
 	"io"
-	"os"
-	"strings"
 )
 
 // A SequentialScanner reads a PDF file sequentially, extracting information
@@ -32,60 +29,33 @@ type SequentialScanner struct {
 }
 
 // NewSequentialScanner creates a new SequentialScanner that reads from r.
-func NewSequentialScanner(r io.Reader) (*SequentialScanner, error) {
+func NewSequentialScanner(r io.ReadSeeker) (*SequentialScanner, error) {
+	_, err := r.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
 	ss := &SequentialScanner{
 		s: newScanner(r, nil, nil),
 	}
 	return ss, nil
 }
 
-func getSize(r io.ReaderAt) (int64, error) {
-	if f, ok := r.(*os.File); ok {
-		fi, err := f.Stat()
-		if err != nil {
-			return 0, err
-		}
-		return fi.Size(), nil
-	}
-	if b, ok := r.(*bytes.Reader); ok {
-		return int64(b.Size()), nil
-	}
-	if s, ok := r.(*strings.Reader); ok {
-		return int64(s.Size()), nil
-	}
-
-	buf := make([]byte, 1024)
-	n, err := r.ReadAt(buf, 0)
-	if err == io.EOF {
-		return int64(n), nil
-	} else if err != nil {
+func getSize(r io.Seeker) (int64, error) {
+	cur, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
 		return 0, err
 	}
 
-	lowerBound := int64(n) // all bytes before lowerBound are known to be present
-	var upperBound int64   // at least one byte before upperBound is known to be missing
-	for {
-		test := 2 * lowerBound
-		_, err := r.ReadAt(buf[:1], test-1)
-		if err == io.EOF {
-			upperBound = test
-			break
-		} else if err != nil {
-			return 0, err
-		}
-		lowerBound = test
+	size, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
 	}
 
-	for lowerBound+1 < upperBound {
-		test := (lowerBound + upperBound + 1) / 2
-		_, err := r.ReadAt(buf[:1], test-1)
-		if err == io.EOF {
-			upperBound = test
-		} else if err != nil {
-			return 0, err
-		} else {
-			lowerBound = test
-		}
+	_, err = r.Seek(cur, io.SeekStart)
+	if err != nil {
+		return 0, err
 	}
-	return lowerBound, nil
+
+	return size, nil
 }

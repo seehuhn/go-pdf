@@ -39,9 +39,9 @@ type scanner struct {
 
 	getInt func(Object) (Integer, error)
 
-	enc         *encryptInfo
-	encRef      Reference
-	unencrypted map[Reference]bool // objects with no encryption
+	enc       *encryptInfo
+	encRef    Reference
+	cleartext map[Reference]bool // objects with no encryption
 }
 
 func newScanner(r io.Reader, getInt func(Object) (Integer, error),
@@ -81,8 +81,9 @@ func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 		return nil, 0, err
 	}
 
+	// TODO(voss): check for overflow
 	ref := NewReference(uint32(number), uint16(generation))
-	if s.unencrypted[ref] {
+	if s.cleartext[ref] {
 		// some objects are not encrypted, e.g. xref dictionaries
 		s.enc = nil
 	} else {
@@ -616,8 +617,12 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 	l := int64(length)
 
 	var streamData io.Reader
-	if origReader, ok := s.r.(io.ReaderAt); ok {
-		streamData = io.NewSectionReader(origReader, start, l)
+	if origReader, ok := s.r.(io.ReadSeeker); ok {
+		streamData = &streamReader{
+			r:   origReader,
+			pos: start,
+			end: start + l,
+		}
 		err = s.Discard(l)
 		if err != nil {
 			return nil, err
@@ -863,6 +868,43 @@ func (s *scanner) find(pat *regexp.Regexp) (int64, []string, error) {
 			return 0, nil, err
 		}
 	}
+}
+
+type streamReader struct {
+	r   io.ReadSeeker
+	pos int64
+	end int64
+}
+
+func (r *streamReader) Read(buf []byte) (int, error) {
+	if r.pos >= r.end {
+		return 0, io.EOF
+	}
+	if int64(len(buf)) > r.end-r.pos {
+		buf = buf[:r.end-r.pos]
+	}
+
+	prevPos, err := r.r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = r.r.Seek(r.pos, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
+	n, err := r.r.Read(buf)
+	r.pos += int64(n)
+	if err != nil {
+		return n, err
+	}
+
+	_, err = r.r.Seek(prevPos, io.SeekStart)
+	if err != nil {
+		return n, err
+	}
+
+	return n, nil
 }
 
 var (

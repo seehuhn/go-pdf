@@ -31,7 +31,10 @@ func (r *Reader) findXRef() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	s := r.scannerAt(pos + 9)
+	s, err := r.scannerFrom(pos + 9)
+	if err != nil {
+		return 0, err
+	}
 
 	xRefPos, err := s.ReadInteger()
 	if err != nil {
@@ -59,7 +62,11 @@ func (r *Reader) lastOccurence(pat string) (int64, error) {
 		if start < 0 {
 			start = 0
 		}
-		n, err := r.r.ReadAt(buf[:pos-start], start)
+		_, err := r.r.Seek(start, io.SeekStart)
+		if err != nil {
+			return 0, err
+		}
+		n, err := r.r.Read(buf[:pos-start])
 		if err != nil && err != io.EOF {
 			return 0, err
 		}
@@ -94,7 +101,10 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		}
 		seen[start] = true
 
-		s := r.scannerAt(start)
+		s, err := r.scannerFrom(start)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		buf, err := s.Peek(4)
 		if err != nil {
@@ -116,7 +126,10 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 						Err: errors.New("wrong type for XRefStm (expected Integer)"),
 					}
 				}
-				s = r.scannerAt(int64(zStart))
+				s, err = r.scannerFrom(int64(zStart))
+				if err != nil {
+					return nil, nil, err
+				}
 				_, ref, err = readXRefStream(xref, s)
 				if err != nil {
 					return nil, nil, err

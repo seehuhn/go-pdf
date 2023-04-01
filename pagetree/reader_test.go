@@ -26,12 +26,14 @@ import (
 )
 
 func TestReader(t *testing.T) {
+	const numPages = 300
+
 	buf := &bytes.Buffer{}
-	w, err := document.WriteMultiPage(buf, 0, 0)
+	w, err := document.WriteMultiPage(buf, 100, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 300; i++ {
+	for i := 0; i < numPages; i++ {
 		page := w.AddPage()
 		page.PageDict["Test"] = pdf.Integer(99 - 2*i)
 		err = page.Close()
@@ -56,13 +58,13 @@ func TestReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 300 {
+	if n != numPages {
 		t.Fatalf("expected 300 pages, got %d", n)
 	}
-	for i := 0; i < 300; i++ {
+	for i := 0; i < numPages; i++ {
 		page, err := pages.Get(pdf.Integer(i))
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("page %d: %s", i, err)
 		}
 		v, err := r.GetInt(page["Test"])
 		if err != nil {

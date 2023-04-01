@@ -328,3 +328,38 @@ var testCases = []struct {
 	{"fals", nil, false, nil},
 	{"abc", nil, false, nil},
 }
+
+func TestStreamReader(t *testing.T) {
+	in := "<< /Length 6 >>\nstream\nABCDEF\nendstream 1 2"
+	s := newScanner(strings.NewReader(in), func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
+	stmObj, err := s.ReadObject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stm, ok := stmObj.(*Stream)
+	if !ok {
+		t.Fatalf("expected stream, got %T", stmObj)
+	}
+
+	x1, err := s.ReadInteger()
+	if err != nil {
+		t.Error(err)
+	} else if x1 != 1 {
+		t.Errorf("expected 1, got %d", x1)
+	}
+
+	stmData, err := io.ReadAll(stm.R)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(stmData) != "ABCDEF" {
+		t.Errorf("expected ABCDEF, got %q", stmData)
+	}
+
+	x2, err := s.ReadInteger()
+	if err != nil {
+		t.Error(err)
+	} else if x2 != 2 {
+		t.Errorf("expected 2, got %d", x2)
+	}
+}

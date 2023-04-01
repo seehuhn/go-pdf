@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -155,6 +156,65 @@ func TestVersion(t *testing.T) {
 		}
 		if s != test.in {
 			t.Errorf("wrong version %q != %q", s, test.in)
+		}
+	}
+}
+
+func TestObjectStream(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Catalog.Pages = w.Alloc() // pretend that we have a page tree
+
+	refs := make([]Reference, 9)
+	objs := make([]Object, len(refs))
+	for i := range refs {
+		refs[i] = w.Alloc()
+		objs[i] = Name("obj" + strconv.Itoa(i))
+	}
+
+	_, err = w.Write(objs[1], refs[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.WriteCompressed([]Reference{refs[0], refs[3], refs[6]},
+		objs[0], objs[3], objs[6])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(objs[4], refs[4])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.WriteCompressed([]Reference{refs[2], refs[5], refs[8]},
+		objs[2], objs[5], objs[8])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(objs[7], refs[7])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, ref := range refs {
+		obj, err := r.Resolve(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if obj != objs[i] {
+			t.Errorf("%d: got %s, want %s", i, obj, objs[i])
 		}
 	}
 }
