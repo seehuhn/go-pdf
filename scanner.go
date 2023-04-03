@@ -54,6 +54,7 @@ func newScanner(r io.Reader, getInt func(Object) (Integer, error),
 	}
 }
 
+// currentPos returns the current position in the file.
 func (s *scanner) currentPos() int64 {
 	return s.filePos + int64(s.bufPos)
 }
@@ -662,8 +663,7 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 	err := s.SkipString("%PDF-")
 	if err != nil {
 		if e, ok := err.(*MalformedFileError); ok {
-			// Give a clearer message if this is not a PDF file.
-			e.Err = errors.New("PDF header not found")
+			e.Err = ErrNoPDF
 		}
 		return 0, err
 	}
@@ -692,7 +692,7 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 }
 
 // Refill discards the read part of the buffer and reads as much new data as
-// possible.  Once the end of file is reached, s.used will be smaller than the
+// possible.  Once the end of file is reached, s.bufEnd will be smaller than the
 // buffer size, but no error will be returned.
 func (s *scanner) refill() error {
 	// move the remaining data to the beginning of the buffer
@@ -863,9 +863,14 @@ func (s *scanner) find(pat *regexp.Regexp) (int64, []string, error) {
 		if nextPos > s.bufPos {
 			s.bufPos = nextPos
 		}
+		endBefore := s.bufEnd
 		err := s.refill()
 		if err != nil {
 			return 0, nil, err
+		}
+		endAfter := s.bufEnd
+		if endBefore < scannerBufSize && endBefore == endAfter {
+			return 0, nil, io.EOF
 		}
 	}
 }

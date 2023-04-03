@@ -76,7 +76,7 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err, i)
 			}
 			if userFirst {
-				dec, err := r.getString(ref)
+				dec, err := r.GetString(ref)
 				if err != nil {
 					t.Fatal(err, i)
 				}
@@ -115,48 +115,6 @@ func TestReaderGoFuzz(t *testing.T) {
 	for _, test := range cases {
 		buf := strings.NewReader(test)
 		_, _ = NewReader(buf, nil)
-	}
-}
-
-func TestVersion(t *testing.T) {
-	cases := []struct {
-		in  string
-		out Version
-		ok  bool
-	}{
-		{"1.0", V1_0, true},
-		{"1.1", V1_1, true},
-		{"1.2", V1_2, true},
-		{"1.3", V1_3, true},
-		{"1.4", V1_4, true},
-		{"1.5", V1_5, true},
-		{"1.6", V1_6, true},
-		{"1.7", V1_7, true},
-		{"", 0, false},
-		{"0.9", 0, false},
-		{"1.8", 0, false},
-	}
-	for _, test := range cases {
-		v, err := ParseVersion(test.in)
-		if (err == nil) != test.ok {
-			t.Errorf("unexpected err = %s", err)
-			continue
-		}
-		if v != test.out {
-			t.Errorf("wrong version %d != %d", int(v), int(test.out))
-			continue
-		}
-		if !test.ok {
-			continue
-		}
-		s, err := v.ToString()
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-		if s != test.in {
-			t.Errorf("wrong version %q != %q", s, test.in)
-		}
 	}
 }
 

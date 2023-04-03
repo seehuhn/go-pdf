@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 )
 
 // Reader represents a pdf file opened for reading. Use the functions [Open] or
@@ -38,33 +37,35 @@ type Reader struct {
 	ID [][]byte
 
 	Catalog *Catalog
-	infoObj Object // the /Info entry of the trailer dictionary
-	enc     *encryptInfo
+
+	infoObj   Object // the /Info entry of the trailer dictionary
+	enc       *encryptInfo
+	cleartext map[Reference]bool
 
 	xref map[uint32]*xRefEntry
 
-	size int64
 	r    io.ReadSeeker
+	size int64
 
-	level     int
-	cleartext map[Reference]bool
+	level int
 
 	cache *lruCache
 }
 
 type ReaderOptions struct {
-	// ReadPassword is a function which can be used to query the user for a
-	// password for the document with the given ID.  The first call for each
-	// authentication attempt has try == 0.  If the returned password was
-	// wrong, the function is called again, repeatedly, with sequentially
-	// increasing values of try.  If the function return the empty string, the
+	// ReadPassword is a function that queries the user for a password for the
+	// document with the given ID.  The function is called repeatedly, with
+	// sequentially increasing values of try (starting at 0), until the correct
+	// password is entered.  If the function returns the empty string, the
 	// authentication attempt is aborted and an [AuthenticationError] is
 	// reported to the caller.
 	ReadPassword func(ID []byte, try int) string
 }
 
-// Open opens the named PDF file for reading.  After use, [Reader.Close] must be
-// called to close the file the Reader is reading from.
+var defaultReaderOptions = &ReaderOptions{}
+
+// Open opens the named PDF file for reading.  After use, [Reader.Close] must
+// be called to close the file the Reader is reading from.
 func Open(fname string) (*Reader, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
@@ -72,8 +73,6 @@ func Open(fname string) (*Reader, error) {
 	}
 	return NewReader(fd, nil)
 }
-
-var defaultReaderOptions = &ReaderOptions{}
 
 // NewReader creates a new Reader object.
 func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
@@ -108,7 +107,6 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		return nil, err
 	}
 	r.xref = xref
-	r.infoObj = trailer["Info"]
 
 	ID, ok := trailer["ID"].(Array)
 	if ok && len(ID) >= 2 {
@@ -132,6 +130,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		if err != nil {
 			return nil, err
 		}
+		// TODO(voss): extract the permission bits
 	}
 
 	root := trailer["Root"]
@@ -149,6 +148,8 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		// if unset, r.catalog.Version is zero and thus smaller than r.Version
 		r.Version = r.Catalog.Version
 	}
+
+	r.infoObj = trailer["Info"]
 
 	return r, nil
 }
@@ -170,6 +171,8 @@ func (r *Reader) AuthenticateOwner() error {
 // if the io.ReadSeeker passed to [NewReader] has a Close method, or if the
 // Reader was created using [Open].  Otherwise, Close has no effect and
 // returns nil.
+//
+// TODO(voss): don't unconditionally close the underlying file
 func (r *Reader) Close() error {
 	closer, ok := r.r.(io.Closer)
 	if ok {
@@ -218,7 +221,7 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 	if r.xref == nil {
 		return nil, &MalformedFileError{
 			Pos: 0,
-			Err: errors.New("cannot use references while reading xref table"),
+			Err: errors.New("cannot resolve references while reading xref table"),
 		}
 	}
 
@@ -231,14 +234,13 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 		if !canStream {
 			return nil, &MalformedFileError{
 				Pos: 0,
-				Err: errors.New("object streams inside streams not allowed"),
+				Err: errors.New("streams inside streams not allowed"),
 			}
 		}
 
 		return r.getFromObjectStream(ref.Number(), entry.InStream)
 	}
 
-	// TODO(voss): keep the scanner between calls?
 	s, err := r.scannerFrom(entry.Pos)
 	if err != nil {
 		return nil, err
@@ -282,9 +284,10 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 	}
 	n := int(N)
 
-	var dec *encryptInfo
-	if r.enc != nil && !stream.isEncrypted {
-		dec = r.enc
+	dec := r.enc
+	if stream.isEncrypted {
+		// Objects in encrypted streams are not encrypted again.
+		dec = nil
 	}
 
 	decoded, err := r.DecodeStream(stream, 0)
@@ -470,29 +473,6 @@ func (r *Reader) GetArray(obj Object) (Array, error) {
 	return val, nil
 }
 
-// GetRectangle resolves references to indirect objects and makes sure the
-// resulting object is a PDF rectangle object.
-// If the object is null, nil is returned.
-func (r *Reader) GetRectangle(obj Object) (*Rectangle, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-	if candidate == nil {
-		return nil, nil
-	}
-
-	val, ok := candidate.(Array)
-	if !ok && len(val) != 4 {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: fmt.Errorf("wrong object type: expected Rectangle, got %T", candidate),
-		}
-	}
-
-	return val.AsRectangle()
-}
-
 // GetName resolves references to indirect objects and makes sure the resulting
 // object is a Name.
 func (r *Reader) GetName(obj Object) (Name, error) {
@@ -510,9 +490,9 @@ func (r *Reader) GetName(obj Object) (Name, error) {
 	return val, nil
 }
 
-// getString resolves references to indirect objects and makes sure the resulting
-// object is a String.
-func (r *Reader) getString(obj Object) (String, error) {
+// GetString resolves references to indirect objects and makes sure the
+// resulting object is a String.
+func (r *Reader) GetString(obj Object) (String, error) {
 	candidate, err := r.Resolve(obj)
 	if err != nil {
 		return nil, err
@@ -525,6 +505,30 @@ func (r *Reader) getString(obj Object) (String, error) {
 		}
 	}
 	return val, nil
+}
+
+// GetRectangle resolves references to indirect objects and makes sure the
+// resulting object is a PDF rectangle object.
+// If the object is null, nil is returned.
+func (r *Reader) GetRectangle(obj Object) (*Rectangle, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	candidate, err := r.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	val, ok := candidate.(Array)
+	if !ok && len(val) != 4 {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(obj),
+			Err: fmt.Errorf("wrong object type: expected Rectangle, got %T", candidate),
+		}
+	}
+
+	return val.AsRectangle()
 }
 
 func (r *Reader) safeGetInt(obj Object) (Integer, error) {
@@ -622,60 +626,21 @@ func (r *Reader) errPos(obj Object) int64 {
 	}
 }
 
-// Version represent the version of PDF standard used in a file.
-type Version int
-
-// PDF versions supported by this library.
-const (
-	_ Version = iota
-	V1_0
-	V1_1
-	V1_2
-	V1_3
-	V1_4
-	V1_5
-	V1_6
-	V1_7
-	tooHighVersion
-)
-
-// ParseVersion parses a PDF version string.
-func ParseVersion(verString string) (Version, error) {
-	switch verString {
-	case "1.0":
-		return V1_0, nil
-	case "1.1":
-		return V1_1, nil
-	case "1.2":
-		return V1_2, nil
-	case "1.3":
-		return V1_3, nil
-	case "1.4":
-		return V1_4, nil
-	case "1.5":
-		return V1_5, nil
-	case "1.6":
-		return V1_6, nil
-	case "1.7":
-		return V1_7, nil
-	}
-	return 0, errVersion
-}
-
-// ToString returns the string representation of ver, e.g. "1.7".
-// If ver does not correspond to a supported PDF version, an error is
-// returned.
-func (ver Version) ToString() (string, error) {
-	if ver >= V1_0 && ver <= V1_7 {
-		return "1." + string([]byte{byte(ver - V1_0 + '0')}), nil
-	}
-	return "", errVersion
-}
-
-func (ver Version) String() string {
-	versionString, err := ver.ToString()
+func getSize(r io.Seeker) (int64, error) {
+	cur, err := r.Seek(0, io.SeekCurrent)
 	if err != nil {
-		versionString = "pdf.Version(" + strconv.Itoa(int(ver)) + ")"
+		return 0, err
 	}
-	return versionString
+
+	size, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = r.Seek(cur, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
+
+	return size, nil
 }
