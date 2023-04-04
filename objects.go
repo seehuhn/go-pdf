@@ -382,7 +382,11 @@ func (x Dict) String() string {
 	} else {
 		res = append(res, "Dict")
 	}
-	res = append(res, strconv.FormatInt(int64(len(x)), 10)+" entries")
+	if len(x) != 1 {
+		res = append(res, strconv.FormatInt(int64(len(x)), 10)+" entries")
+	} else {
+		res = append(res, "1 entry")
+	}
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
@@ -394,7 +398,10 @@ func (x Dict) PDF(w io.Writer) error {
 	}
 
 	keys := make([]Name, 0, len(x))
-	for key := range x {
+	for key, val := range x {
+		if val == nil || val == Reference(0) {
+			continue
+		}
 		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i int, j int) bool {
@@ -408,9 +415,6 @@ func (x Dict) PDF(w io.Writer) error {
 
 	for _, name := range keys {
 		val := x[name]
-		if val == nil {
-			continue
-		}
 
 		_, err = w.Write([]byte("\n"))
 		if err != nil {

@@ -18,12 +18,14 @@ package pdf
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"strconv"
 )
 
 type FileInfo struct {
+	R             io.ReadSeeker
 	StartPos      int64
 	Size          int64
 	HeaderVersion string
@@ -42,13 +44,12 @@ type FileSection struct {
 }
 
 type FileObject struct {
-	Pos        int64
-	End        int64
-	Number     uint32
-	Generation uint16
-	Broken     bool
-	Type       string
-	SubType    Name
+	Pos int64
+	End int64
+	Reference
+	Broken  bool
+	Type    string
+	SubType Name
 }
 
 // SequentialScan reads a PDF file sequentially, extracting information
@@ -56,27 +57,135 @@ type FileObject struct {
 // This can be used to attempt to read damaged PDF files, in particular
 // in cases where the cross-reference table is missing or corrupt.
 func SequentialScan(r io.ReadSeeker) (*FileInfo, error) {
-	ss := &seqScanner{r: r}
-	err := ss.init()
+	fi := &FileInfo{R: r}
+	err := fi.init()
 	if err != nil {
 		return nil, err
 	}
 
-	err = ss.CheckObjects()
+	err = fi.checkObjects()
 	if err != nil {
 		return nil, err
 	}
 
-	return ss.info, nil
+	return fi, nil
 }
 
-type seqScanner struct {
-	r    io.ReadSeeker
-	info *FileInfo
+func (fi *FileInfo) Read(objInfo *FileObject) (Object, error) {
+	var getInt func(Object) (Integer, error)
+	if objInfo.Type == "Stream" {
+		getInt = fi.makeSafeGetInt()
+	}
+	obj, _, err := fi.doRead(objInfo, getInt)
+	return obj, err
 }
 
-func (ss *seqScanner) init() error {
-	r := ss.r
+func (fi *FileInfo) doRead(objInfo *FileObject, getInt func(Object) (Integer, error)) (Object, int64, error) {
+	if objInfo == nil {
+		return nil, 0, nil
+	}
+
+	// safe the current file position and restore it later
+	prevPos, err := fi.R.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer fi.R.Seek(prevPos, io.SeekStart)
+
+	_, err = fi.R.Seek(objInfo.Pos, io.SeekStart)
+	if err != nil {
+		return nil, 0, err
+	}
+	s := newScanner(fi.R, getInt, nil)
+	s.filePos = objInfo.Pos
+
+	x, ref, err := s.ReadIndirectObject()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if ref != objInfo.Reference {
+		panic("unreachable") // TODO(voss): remove
+	}
+
+	return x, s.currentPos(), nil
+}
+
+func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
+	// TODO(voss): unify as much code as possible with NewReader
+
+	if opt == nil {
+		opt = defaultReaderOptions
+	}
+
+	r := &Reader{
+		size:      fi.Size,
+		r:         fi.R,
+		cleartext: make(map[Reference]bool),
+		cache:     newCache(100), // TODO(voss): make this configurable?
+	}
+
+	version, err := ParseVersion(fi.HeaderVersion)
+	if err != nil {
+		return nil, err
+	}
+	r.Version = version
+
+	r.xref = fi.makeXRef()
+
+	trailer, err := fi.getTrailer()
+	if err != nil {
+		return nil, err
+	}
+
+	ID, ok := trailer["ID"].(Array)
+	if ok && len(ID) >= 2 {
+		for i := 0; i < 2; i++ {
+			s, ok := ID[i].(String)
+			if !ok {
+				break
+			}
+			r.ID = append(r.ID, []byte(s))
+		}
+		if len(r.ID) != 2 {
+			r.ID = nil
+		}
+	}
+
+	if encObj, ok := trailer["Encrypt"]; ok {
+		if ref, ok := encObj.(Reference); ok {
+			r.cleartext[ref] = true
+		}
+		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
+		if err != nil {
+			return nil, err
+		}
+		// TODO(voss): extract the permission bits
+	}
+
+	root := trailer["Root"]
+	catalogDict, err := r.GetDict(root)
+	if err != nil {
+		return nil, err
+	}
+	r.Catalog = &Catalog{}
+	err = catalogDict.Decode(r.Catalog, r.Resolve)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.Catalog.Version > r.Version {
+		// if unset, r.catalog.Version is zero and thus smaller than r.Version
+		r.Version = r.Catalog.Version
+	}
+
+	r.infoObj = trailer["Info"]
+
+	return r, nil
+}
+
+func (fi *FileInfo) init() error {
+	r := fi.R
 
 	_, err := r.Seek(0, io.SeekStart)
 	if err != nil {
@@ -84,16 +193,14 @@ func (ss *seqScanner) init() error {
 	}
 	s := newScanner(r, nil, nil)
 
-	info := &FileInfo{}
-
 	pos, m, err := s.find(startRegexp)
 	if err == io.EOF {
 		return ErrNoPDF
 	} else if err != nil {
 		return err
 	}
-	info.StartPos = pos
-	info.HeaderVersion = m[1]
+	fi.StartPos = pos
+	fi.HeaderVersion = m[1]
 
 	section := &FileSection{}
 
@@ -101,7 +208,7 @@ func (ss *seqScanner) init() error {
 	inTrailer := false
 	finish := func() {
 		if used {
-			info.Sections = append(info.Sections, section)
+			fi.Sections = append(fi.Sections, section)
 		}
 		inTrailer = false
 		used = false
@@ -135,9 +242,8 @@ scanLoop:
 				finish()
 			}
 			obj := &FileObject{
-				Pos:        pos,
-				Number:     uint32(n),
-				Generation: uint16(g),
+				Pos:       pos,
+				Reference: NewReference(uint32(n), uint16(g)),
 			}
 			section.Objects = append(section.Objects, obj)
 			used = true
@@ -162,95 +268,211 @@ scanLoop:
 	}
 	finish()
 
-	info.Size, err = getSize(r)
+	if len(fi.Sections) == 0 {
+		return &MalformedFileError{
+			Err: errors.New("no PDF content found in file"),
+		}
+	}
+
+	fi.Size, err = getSize(r)
 	if err != nil {
 		return err
 	}
 
-	ss.info = info
 	return nil
 }
 
-func (ss *seqScanner) CheckObjects() error {
-	for _, section := range ss.info.Sections {
-		for _, obj := range section.Objects {
-			x, endPos, err := ss.readObject(obj)
+func (fi *FileInfo) checkObjects() error {
+	for _, section := range fi.Sections {
+		for _, objInfo := range section.Objects {
+			x, endPos, err := fi.doRead(objInfo, dummyGetInt)
 			if err != nil {
 				if _, isBroken := err.(*MalformedFileError); isBroken {
-					obj.Broken = true
+					objInfo.Broken = true
 					continue
 				}
 				return err
 			}
-			obj.End = endPos
+			objInfo.End = endPos
 
 			switch o := x.(type) {
 			case Array:
-				obj.Type = "Array"
+				objInfo.Type = "Array"
 			case Bool:
-				obj.Type = "Bool"
+				objInfo.Type = "Bool"
 			case Dict:
-				obj.Type = "Dict"
+				objInfo.Type = "Dict"
 				if t, ok := o["Type"].(Name); ok {
-					obj.SubType = t
+					objInfo.SubType = t
 
 					if t == "Catalog" {
 						_, hasPages := o["Pages"]
 						if section.Catalog == nil || hasPages {
-							section.Catalog = obj
+							section.Catalog = objInfo
 						}
 					}
 				}
 			case Integer:
-				obj.Type = "Integer"
+				objInfo.Type = "Integer"
 			case Name:
-				obj.Type = "Name"
+				objInfo.Type = "Name"
 			case Real:
-				obj.Type = "Real"
+				objInfo.Type = "Real"
 			case Reference:
-				obj.Type = "Reference"
+				objInfo.Type = "Reference"
 			case *Stream:
-				obj.Type = "Stream"
+				objInfo.Type = "Stream"
 				if t, ok := o.Dict["Type"].(Name); ok {
-					obj.SubType = t
+					objInfo.SubType = t
 
 					if t == "ObjStm" {
 						// TODO(voss): what to do if the generation number is not 0?
 						_, hasFirst := o.Dict["First"]
 						if hasFirst {
-							section.ObjectStreams = append(section.ObjectStreams, obj)
+							section.ObjectStreams = append(section.ObjectStreams, objInfo)
 						}
 					}
 				}
 			case String:
-				obj.Type = "String"
+				objInfo.Type = "String"
 			}
 		}
 	}
 	return nil
 }
 
-func (ss *seqScanner) readObject(obj *FileObject) (Object, int64, error) {
-	_, err := ss.r.Seek(obj.Pos, io.SeekStart)
-	if err != nil {
-		return nil, 0, err
-	}
-	dummyGetInt := func(o Object) (Integer, error) {
-		if i, ok := o.(Integer); ok {
-			return i, nil
+func (fi *FileInfo) findObject(ref Reference) *FileObject {
+	// If an object is defined repeatedly, we use the last definition.
+	for i := len(fi.Sections) - 1; i >= 0; i-- {
+		sec := fi.Sections[i]
+		for j := len(sec.Objects) - 1; j >= 0; j-- {
+			obj := sec.Objects[j]
+			if obj.Reference == ref {
+				return obj
+			}
 		}
-		return 0, nil // We ignore stream data for now, so the length doesn't matter.
 	}
-	s := newScanner(ss.r, dummyGetInt, nil)
-	s.filePos = obj.Pos
-	x, ref, err := s.ReadIndirectObject()
+	return nil
+}
+
+func (fi *FileInfo) makeSafeGetInt() func(Object) (Integer, error) {
+	var getInt func(obj Object) (Integer, error)
+
+	seen := make(map[Reference]bool)
+	getInt = func(obj Object) (Integer, error) {
+		for {
+			ref, isReference := obj.(Reference)
+			if !isReference {
+				break
+			}
+
+			if seen[ref] || len(seen) > 8 {
+				return 0, errors.New("circular reference")
+			}
+			seen[ref] = true
+
+			x, _, err := fi.doRead(fi.findObject(ref), getInt)
+			if err != nil {
+				return 0, err
+			}
+			obj = x
+		}
+
+		switch x := obj.(type) {
+		case Integer:
+			return x, nil
+		case nil:
+			return 0, errors.New("expected integer, got null")
+		default:
+			return 0, fmt.Errorf("expected integer, got %T", obj)
+		}
+	}
+	return getInt
+}
+
+func (fi *FileInfo) makeXRef() map[uint32]*xRefEntry {
+	// TODO(voss): locate objects in object streams.
+	xref := make(map[uint32]*xRefEntry)
+	for _, section := range fi.Sections {
+		for _, obj := range section.Objects {
+			if obj.Broken {
+				continue
+			}
+			if entry, ok := xref[obj.Reference.Number()]; ok && obj.Reference.Generation() < entry.Generation {
+				continue
+			}
+
+			xref[obj.Reference.Number()] = &xRefEntry{
+				Pos:        obj.Pos,
+				Generation: obj.Reference.Generation(),
+			}
+		}
+	}
+	return xref
+}
+
+func (fi *FileInfo) getTrailer() (Dict, error) {
+	for j := len(fi.Sections) - 1; j >= 0; j-- {
+		sect := fi.Sections[j]
+
+		// method 1: Try to find a cross-reference stream.  If there are several,
+		// use the last one.
+		var xrefStream *FileObject
+		for _, obj := range sect.Objects {
+			if obj.Type == "Stream" && obj.SubType == "XRef" {
+				xrefStream = obj
+			}
+		}
+		if xrefStream != nil {
+			xref, err := fi.Read(xrefStream)
+			if err == nil {
+				stm, ok := xref.(*Stream)
+				if ok && stm.Dict["Root"] != nil {
+					return stm.Dict, nil
+				}
+			}
+		}
+
+		// method 2: Try to find a trailer dictionary.
+		trailer, err := fi.readTrailer(sect)
+		if err == nil {
+			return trailer, nil
+		}
+
+		// TODO(voss): method 3: Try to collect all the pieces to build
+		// our own trailer dictionary.
+	}
+	return nil, errors.New("no trailer found")
+}
+
+func (fi *FileInfo) readTrailer(sect *FileSection) (Dict, error) {
+	if sect.TrailerPos == 0 {
+		return nil, errors.New("no trailer found in section")
+	}
+
+	// safe the current file position and restore it later
+	prevPos, err := fi.R.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	if ref != NewReference(obj.Number, obj.Generation) {
-		panic("unreachable") // TODO(voss): remove
+	defer fi.R.Seek(prevPos, io.SeekStart)
+
+	_, err = fi.R.Seek(sect.TrailerPos, io.SeekStart)
+	if err != nil {
+		return nil, err
 	}
-	return x, s.currentPos(), nil
+	s := newScanner(fi.R, dummyGetInt, nil)
+	s.filePos = sect.TrailerPos
+
+	err = s.SkipString("trailer")
+	if err != nil {
+		return nil, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return nil, err
+	}
+	return s.ReadDict()
 }
 
 // countLeadingSpaces returns the number of leading whitespace characters in s.
@@ -262,6 +484,16 @@ func countLeadingSpaces(s string) int64 {
 	return n
 }
 
+// dummyGetInt is a dummy function that implements the getInt function.
+// It can be used if we don't care about the the contents of streams,
+// but only want to read the stream dictionary.
+func dummyGetInt(o Object) (Integer, error) {
+	if i, ok := o.(Integer); ok {
+		return i, nil
+	}
+	return 0, nil
+}
+
 var (
 	ErrNoPDF = errors.New("PDF header not found")
 )
@@ -270,7 +502,7 @@ var (
 	startRegexp = regexp.MustCompile(`%PDF-([12]\.[0-9])[^0-9]`)
 
 	whiteSpacePat = `[\000\011\014 ]+`
-	eolPat        = `(?:\r|\n|\r\n)`
+	eolPat        = `(?:\r|\n|\r\n|^)`
 	objectPat     = `([0-9]+)` + whiteSpacePat + `([0-9]+)` + whiteSpacePat + `obj`
 	markerPat     = eolPat + `(` + objectPat + `|xref|trailer|startxref|%%EOF)\b`
 	markerRegexp  = regexp.MustCompile(markerPat)

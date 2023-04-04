@@ -17,24 +17,102 @@
 package pdf
 
 import (
+	"bytes"
 	"fmt"
-	"os"
+	"sort"
+	"strings"
 	"testing"
+
+	"golang.org/x/exp/maps"
 )
 
 func TestSequential(t *testing.T) {
-	fd, err := os.Open("../specs/ISO_32000-2_2020(en).pdf")
+	file := `%PDF-1.7
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 36
+>>
+stream
+0 0 m
+100 0 l
+100 100 l
+0 100 l
+h
+f
+endstream
+endobj
+trailer
+<<
+/Root 1 0 R
+>>
+`
+	info, err := SequentialScan(strings.NewReader(file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := info.MakeReader(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info, err := SequentialScan(fd)
-	if err != nil {
-		t.Error(err)
+	type objInfo struct {
+		pos int64
+		gen uint16
 	}
-	fmt.Println(len(info.Sections))
+	objs := make(map[uint32]objInfo)
+	for _, sect := range info.Sections {
+		for _, obj := range sect.Objects {
+			n := obj.Reference.Number()
+			if obj.Broken || obj.Reference.Generation() < objs[n].gen {
+				continue
+			}
+			objs[n] = objInfo{obj.Pos, obj.Reference.Generation()}
+		}
+	}
+	keys := maps.Keys(objs)
+	sort.Slice(keys, func(i, j int) bool {
+		return objs[keys[i]].pos < objs[keys[j]].pos
+	})
 
-	err = fd.Close()
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range keys {
+		ref := NewReference(n, objs[n].gen)
+		obj, err := r.Resolve(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Printf("%s %T\n", ref, obj)
+		_, err = w.Write(obj, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.Catalog = r.Catalog
+	err = w.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

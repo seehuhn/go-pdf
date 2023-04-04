@@ -351,6 +351,9 @@ func (pdf *Writer) Write(obj Object, ref Reference) (Reference, error) {
 		if seen {
 			return 0, errDuplicateRef
 		}
+		if pdf.nextRef <= ref.Number() {
+			pdf.nextRef = ref.Number() + 1
+		}
 	}
 	pdf.w.ref = ref
 
@@ -407,6 +410,9 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) ([]Refer
 			_, seen := pdf.xref[ref.Number()]
 			if seen {
 				return nil, errDuplicateRef
+			}
+			if pdf.nextRef <= ref.Number() {
+				pdf.nextRef = ref.Number() + 1
 			}
 		}
 	}

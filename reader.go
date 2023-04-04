@@ -47,7 +47,7 @@ type Reader struct {
 	r    io.ReadSeeker
 	size int64
 
-	level int
+	level int // TODO(voss): remove and use a closure instead
 
 	cache *lruCache
 }
@@ -547,11 +547,9 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer r.r.Seek(pos, io.SeekStart)
+
 	val, err := r.GetInt(obj)
-	if err != nil {
-		return 0, err
-	}
-	_, err = r.r.Seek(pos, io.SeekStart)
 	if err != nil {
 		return 0, err
 	}

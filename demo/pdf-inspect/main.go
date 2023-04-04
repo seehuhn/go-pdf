@@ -253,7 +253,11 @@ func (e *explainer) explainSingleLine(obj pdf.Object) (string, error) {
 		} else {
 			parts = append(parts, "dict")
 		}
-		parts = append(parts, fmt.Sprintf("%d entries", len(obj)))
+		if len(obj) != 1 {
+			parts = append(parts, fmt.Sprintf("%d entries", len(obj)))
+		} else {
+			parts = append(parts, "1 entry")
+		}
 		return "<" + strings.Join(parts, ", ") + ">", nil
 	case pdf.Array:
 		if len(obj) <= 8 {
