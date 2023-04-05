@@ -86,7 +86,7 @@ trailer
 			if obj.Broken || obj.Reference.Generation() < objs[n].gen {
 				continue
 			}
-			objs[n] = objInfo{obj.Pos, obj.Reference.Generation()}
+			objs[n] = objInfo{obj.ObjStart, obj.Reference.Generation()}
 		}
 	}
 	keys := maps.Keys(objs)

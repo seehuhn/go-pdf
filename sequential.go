@@ -26,14 +26,14 @@ import (
 
 type FileInfo struct {
 	R             io.ReadSeeker
-	StartPos      int64
-	Size          int64
+	FileSize      int64
+	PDFStart      int64
+	PDFEnd        int64
 	HeaderVersion string
 	Sections      []*FileSection
 }
 
 type FileSection struct {
-	StartPos      int64
 	XRefPos       int64
 	TrailerPos    int64
 	StartXRefPos  int64
@@ -44,12 +44,12 @@ type FileSection struct {
 }
 
 type FileObject struct {
-	Pos int64
-	End int64
 	Reference
-	Broken  bool
-	Type    string
-	SubType Name
+	ObjStart int64
+	ObjEnd   int64
+	Broken   bool
+	Type     string
+	SubType  Name
 }
 
 // SequentialScan reads a PDF file sequentially, extracting information
@@ -58,7 +58,7 @@ type FileObject struct {
 // in cases where the cross-reference table is missing or corrupt.
 func SequentialScan(r io.ReadSeeker) (*FileInfo, error) {
 	fi := &FileInfo{R: r}
-	err := fi.init()
+	err := fi.locateObjects()
 	if err != nil {
 		return nil, err
 	}
@@ -71,8 +71,10 @@ func SequentialScan(r io.ReadSeeker) (*FileInfo, error) {
 	return fi, nil
 }
 
+type getIntFn func(Object) (Integer, error)
+
 func (fi *FileInfo) Read(objInfo *FileObject) (Object, error) {
-	var getInt func(Object) (Integer, error)
+	var getInt getIntFn
 	if objInfo.Type == "Stream" {
 		getInt = fi.makeSafeGetInt()
 	}
@@ -80,7 +82,7 @@ func (fi *FileInfo) Read(objInfo *FileObject) (Object, error) {
 	return obj, err
 }
 
-func (fi *FileInfo) doRead(objInfo *FileObject, getInt func(Object) (Integer, error)) (Object, int64, error) {
+func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn) (Object, int64, error) {
 	if objInfo == nil {
 		return nil, 0, nil
 	}
@@ -92,12 +94,12 @@ func (fi *FileInfo) doRead(objInfo *FileObject, getInt func(Object) (Integer, er
 	}
 	defer fi.R.Seek(prevPos, io.SeekStart)
 
-	_, err = fi.R.Seek(objInfo.Pos, io.SeekStart)
+	_, err = fi.R.Seek(objInfo.ObjStart, io.SeekStart)
 	if err != nil {
 		return nil, 0, err
 	}
 	s := newScanner(fi.R, getInt, nil)
-	s.filePos = objInfo.Pos
+	s.filePos = objInfo.ObjStart
 
 	x, ref, err := s.ReadIndirectObject()
 	if err != nil {
@@ -119,7 +121,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	}
 
 	r := &Reader{
-		size:      fi.Size,
+		size:      fi.FileSize,
 		r:         fi.R,
 		cleartext: make(map[Reference]bool),
 		cache:     newCache(100), // TODO(voss): make this configurable?
@@ -184,10 +186,16 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	return r, nil
 }
 
-func (fi *FileInfo) init() error {
+func (fi *FileInfo) locateObjects() error {
 	r := fi.R
 
-	_, err := r.Seek(0, io.SeekStart)
+	size, err := getSize(r)
+	if err != nil {
+		return err
+	}
+	fi.FileSize = size
+
+	_, err = r.Seek(0, io.SeekStart)
 	if err != nil {
 		return err
 	}
@@ -199,7 +207,7 @@ func (fi *FileInfo) init() error {
 	} else if err != nil {
 		return err
 	}
-	fi.StartPos = pos
+	fi.PDFStart = pos
 	fi.HeaderVersion = m[1]
 
 	section := &FileSection{}
@@ -242,7 +250,7 @@ scanLoop:
 				finish()
 			}
 			obj := &FileObject{
-				Pos:       pos,
+				ObjStart:  pos,
 				Reference: NewReference(uint32(n), uint16(g)),
 			}
 			section.Objects = append(section.Objects, obj)
@@ -268,15 +276,16 @@ scanLoop:
 	}
 	finish()
 
+	err = s.SkipWhiteSpace()
+	if err != nil && err != io.EOF {
+		return err
+	}
+	fi.PDFEnd = s.currentPos()
+
 	if len(fi.Sections) == 0 {
 		return &MalformedFileError{
 			Err: errors.New("no PDF content found in file"),
 		}
-	}
-
-	fi.Size, err = getSize(r)
-	if err != nil {
-		return err
 	}
 
 	return nil
@@ -293,7 +302,7 @@ func (fi *FileInfo) checkObjects() error {
 				}
 				return err
 			}
-			objInfo.End = endPos
+			objInfo.ObjEnd = endPos
 
 			switch o := x.(type) {
 			case Array:
@@ -355,7 +364,7 @@ func (fi *FileInfo) findObject(ref Reference) *FileObject {
 	return nil
 }
 
-func (fi *FileInfo) makeSafeGetInt() func(Object) (Integer, error) {
+func (fi *FileInfo) makeSafeGetInt() getIntFn {
 	var getInt func(obj Object) (Integer, error)
 
 	seen := make(map[Reference]bool)
@@ -398,12 +407,13 @@ func (fi *FileInfo) makeXRef() map[uint32]*xRefEntry {
 			if obj.Broken {
 				continue
 			}
-			if entry, ok := xref[obj.Reference.Number()]; ok && obj.Reference.Generation() < entry.Generation {
+			ref := obj.Reference
+			if entry, ok := xref[ref.Number()]; ok && ref.Generation() < entry.Generation {
 				continue
 			}
 
 			xref[obj.Reference.Number()] = &xRefEntry{
-				Pos:        obj.Pos,
+				Pos:        obj.ObjStart,
 				Generation: obj.Reference.Generation(),
 			}
 		}
@@ -502,7 +512,7 @@ var (
 	startRegexp = regexp.MustCompile(`%PDF-([12]\.[0-9])[^0-9]`)
 
 	whiteSpacePat = `[\000\011\014 ]+`
-	eolPat        = `(?:\r|\n|\r\n|^)`
+	eolPat        = `(?:\r\n|\r|\n|^)`
 	objectPat     = `([0-9]+)` + whiteSpacePat + `([0-9]+)` + whiteSpacePat + `obj`
 	markerPat     = eolPat + `(` + objectPat + `|xref|trailer|startxref|%%EOF)\b`
 	markerRegexp  = regexp.MustCompile(markerPat)
