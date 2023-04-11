@@ -208,57 +208,74 @@ func (r *Reader) Resolve(obj Object) (Object, error) {
 }
 
 func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
-	ref, ok := obj.(Reference)
+	origRef, ok := obj.(Reference)
 	if !ok {
 		return obj, nil
 	}
-
-	cachedObj, ok := r.cache.Get(ref)
-	if ok {
-		return cachedObj, nil
-	}
-
 	if r.xref == nil {
 		return nil, &MalformedFileError{
 			Pos: 0,
 			Err: errors.New("cannot resolve references while reading xref table"),
 		}
 	}
-
-	entry := r.xref[ref.Number()]
-	if entry.IsFree() || entry.Generation != ref.Generation() {
-		return nil, nil
+	cachedObj, ok := r.cache.Get(origRef)
+	if ok {
+		return cachedObj, nil
 	}
 
-	if entry.InStream != 0 {
-		if !canStream {
+	count := 0
+	for {
+		ref, ok := obj.(Reference)
+		if !ok {
+			break
+		}
+		count++
+		if count > 8 {
 			return nil, &MalformedFileError{
 				Pos: 0,
-				Err: errors.New("streams inside streams not allowed"),
+				Err: errors.New("too many indirection levels"),
 			}
 		}
 
-		return r.getFromObjectStream(ref.Number(), entry.InStream)
-	}
+		entry := r.xref[ref.Number()]
+		if entry.IsFree() || entry.Generation != ref.Generation() {
+			obj = nil
+			break
+		}
 
-	s, err := r.scannerFrom(entry.Pos)
-	if err != nil {
-		return nil, err
-	}
-	obj, fileRef, err := s.ReadIndirectObject()
-	if err != nil {
-		return nil, err
-	}
+		if entry.InStream != 0 {
+			if !canStream {
+				return nil, &MalformedFileError{
+					Pos: 0,
+					Err: errors.New("streams inside streams not allowed"),
+				}
+			}
 
-	if ref != fileRef {
-		return nil, &MalformedFileError{
-			Pos: 0,
-			Err: errors.New("xref corrupted"),
+			var err error
+			obj, err = r.getFromObjectStream(ref.Number(), entry.InStream)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			s, err := r.scannerFrom(entry.Pos)
+			if err != nil {
+				return nil, err
+			}
+			var fileRef Reference
+			obj, fileRef, err = s.ReadIndirectObject()
+			if err != nil {
+				return nil, err
+			} else if ref != fileRef {
+				return nil, &MalformedFileError{
+					Pos: 0,
+					Err: errors.New("xref corrupted"),
+				}
+			}
 		}
 	}
 
 	if _, isStream := obj.(*Stream); !isStream {
-		r.cache.Put(ref, obj)
+		r.cache.Put(origRef, obj)
 	}
 
 	return obj, nil

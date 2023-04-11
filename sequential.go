@@ -33,6 +33,7 @@ type FileInfo struct {
 	Sections      []*FileSection
 }
 
+// TODO(voss): add start and end offsets
 type FileSection struct {
 	XRefPos       int64
 	TrailerPos    int64

@@ -23,6 +23,81 @@ import (
 	"testing"
 )
 
+func TestReferenceChain(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Catalog.Pages = w.Alloc() // pretend that we have a page tree
+	a := w.Alloc()
+	b := w.Alloc()
+	_, err = w.Write(b, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(Integer(42), b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// err = os.WriteFile("test_ReferenceChain.pdf", buf.Bytes(), 0o666)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x, err := r.Resolve(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if x != Integer(42) {
+		t.Errorf("got %v, want 42", x)
+	}
+}
+
+func TestReferenceLoop(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Catalog.Pages = w.Alloc() // pretend that we have a page tree
+	a := w.Alloc()
+	b := w.Alloc()
+	_, err = w.Write(b, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(a, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// err = os.WriteFile("test_ReferenceLoop.pdf", buf.Bytes(), 0o666)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.Resolve(a)
+	if err == nil {
+		t.Error("reference loop not detected")
+	}
+}
+
 func TestAuthentication(t *testing.T) {
 	msg := "super sécret"
 	for i, ver := range []Version{V1_6, V1_4, V1_3} {
