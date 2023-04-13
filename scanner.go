@@ -37,6 +37,8 @@ type scanner struct {
 	bufPos  int // current position within buf
 	bufEnd  int // end of valid data within buf
 
+	// GetInt is used to get the length of a stream, when the length is
+	// specified as an indirect object.
 	getInt func(Object) (Integer, error)
 
 	enc       *encryptInfo

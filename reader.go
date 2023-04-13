@@ -47,7 +47,7 @@ type Reader struct {
 	r    io.ReadSeeker
 	size int64
 
-	level int // TODO(voss): remove and use a closure instead
+	level int
 
 	cache *lruCache
 }

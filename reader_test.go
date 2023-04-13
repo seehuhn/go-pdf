@@ -18,6 +18,9 @@ package pdf
 
 import (
 	"bytes"
+	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,7 +32,10 @@ func TestReferenceChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Catalog.Pages = w.Alloc() // pretend that we have a page tree
+	err = addEmptyPage(w)
+	if err != nil {
+		t.Fatal(err)
+	}
 	a := w.Alloc()
 	b := w.Alloc()
 	_, err = w.Write(b, a)
@@ -68,7 +74,10 @@ func TestReferenceLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Catalog.Pages = w.Alloc() // pretend that we have a page tree
+	err = addEmptyPage(w)
+	if err != nil {
+		t.Fatal(err)
+	}
 	a := w.Alloc()
 	b := w.Alloc()
 	_, err = w.Write(b, a)
@@ -93,6 +102,258 @@ func TestReferenceLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = r.Resolve(a)
+	if err == nil {
+		t.Error("reference loop not detected")
+	}
+}
+
+func TestIndirectStreamLength(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = addEmptyPage(w)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sLength := w.Alloc()
+	sDict := Dict{
+		"Length": sLength,
+	}
+	s, sRef, err := w.OpenStream(sDict, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Write([]byte("123456"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(Integer(6), sLength)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile("test_IndirectStreamLength.pdf", buf.Bytes(), 0o666)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sObj, err := r.GetStream(sRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sObj.Dict["Length"] != sLength {
+		t.Errorf("wrong stream length: got %v, want %v", sObj.Dict["Length"], sLength)
+	}
+	sData, err := io.ReadAll(sObj.R)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sData) != "123456" {
+		t.Errorf("wrong stream data: got %q, want %q", sData, "123456")
+	}
+}
+
+func TestStreamLengthInStream(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = addEmptyPage(w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sLength := w.Alloc()
+	sDict := Dict{
+		"Length": sLength,
+	}
+	s, sRef, err := w.OpenStream(sDict, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Write([]byte("123456"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.WriteCompressed([]Reference{sLength}, Integer(6))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile("test_StreamLengthInStream.pdf", buf.Bytes(), 0o666)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sObj, err := r.GetStream(sRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sObj.Dict["Length"] != sLength {
+		t.Errorf("wrong stream length: got %v, want %v", sObj.Dict["Length"], sLength)
+	}
+	sData, err := io.ReadAll(sObj.R)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sData) != "123456" {
+		t.Errorf("wrong stream data: got %q, want %q", sData, "123456")
+	}
+}
+
+func TestStreamLengthCycle(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sLength := w.Alloc()
+	sDict := Dict{
+		"Length": sLength,
+	}
+	s, sRef, err := w.OpenStream(sDict, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Write([]byte("123456"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(sLength, sLength) // infinite reference cycle
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = addEmptyPage(w, Name("Contents"), sRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile("test_StreamLengthCycle.pdf", buf.Bytes(), 0o666)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.GetStream(sRef)
+	if err == nil {
+		t.Error("reference loop not detected")
+	}
+}
+
+func TestStreamLengthCycle2(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	xRef := w.Alloc()
+	err = addEmptyPage(w, Name("Rotate"), xRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Manually construct two object streams, so that the length of each
+	// stream is contained in the other stream.
+	L1 := w.Alloc()
+	L2 := w.Alloc()
+	sDict1 := Dict{
+		"Length": L2,
+		"Type":   Name("ObjStm"),
+		"N":      Integer(2),
+		"First":  Integer(8),
+	}
+	s1, sRef1, err := w.OpenStream(sDict1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s1.Write([]byte(fmt.Sprintf("%d 0\n%d 2\n6\n90",
+		L1.Number(), xRef.Number())))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sDict2 := Dict{
+		"Length": L1,
+		"Type":   Name("ObjStm"),
+		"N":      Integer(1),
+		"First":  Integer(4),
+	}
+	s2, sRef2, err := w.OpenStream(sDict2, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s2.Write([]byte(fmt.Sprintf("%d 0\n12", L2.Number())))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.xref[L2.Number()] = &xRefEntry{
+		InStream: sRef2,
+		Pos:      0,
+	}
+	w.xref[L1.Number()] = &xRefEntry{
+		InStream: sRef1,
+		Pos:      0,
+	}
+	w.xref[xRef.Number()] = &xRefEntry{
+		InStream: sRef1,
+		Pos:      1,
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile("test_StreamLengthCycle2.pdf", buf.Bytes(), 0o666)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.GetStream(xRef)
 	if err == nil {
 		t.Error("reference loop not detected")
 	}
@@ -199,7 +460,10 @@ func TestObjectStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Catalog.Pages = w.Alloc() // pretend that we have a page tree
+	err = addEmptyPage(w)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	refs := make([]Reference, 9)
 	objs := make([]Object, len(refs))
@@ -250,4 +514,32 @@ func TestObjectStream(t *testing.T) {
 			t.Errorf("%d: got %s, want %s", i, obj, objs[i])
 		}
 	}
+}
+
+func addEmptyPage(w *Writer, args ...Object) error {
+	pRef := w.Alloc()
+	ppRef := w.Alloc()
+	pageDict := Dict{
+		"Type":      Name("Page"),
+		"Parent":    ppRef,
+		"Resources": Dict{},
+		"MediaBox":  &Rectangle{URx: 100, URy: 100},
+	}
+	for i := 0; i < len(args); i += 2 {
+		pageDict[args[i].(Name)] = args[i+1]
+	}
+	_, err := w.Write(pageDict, pRef)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(Dict{
+		"Type":  Name("Pages"),
+		"Kids":  Array{pRef},
+		"Count": Integer(1),
+	}, ppRef)
+	if err != nil {
+		return err
+	}
+	w.Catalog.Pages = ppRef
+	return nil
 }
