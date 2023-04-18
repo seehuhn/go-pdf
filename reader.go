@@ -199,15 +199,41 @@ func (r *Reader) GetInfo() (*Info, error) {
 	return info, nil
 }
 
-// Resolve resolves references to indirect objects.
-//
-// If obj is of type [Reference], the function loads the corresponding object
-// from the file and returns the result.  Otherwise, obj is returned unchanged.
-func (r *Reader) Resolve(obj Object) (Object, error) {
-	return r.doGet(obj, true)
+// Read reads an indirect object from the PDF file.  If the object is not
+// present, nil is returned without an error.
+func (r *Reader) Read(ref Reference) (Object, error) {
+	entry := r.xref[ref.Number()]
+	if entry.IsFree() || entry.Generation != ref.Generation() {
+		return nil, nil
+	}
+
+	if entry.InStream != 0 {
+		return r.getFromObjectStream(ref.Number(), entry.InStream)
+	} else {
+		s, err := r.scannerFrom(entry.Pos)
+		if err != nil {
+			return nil, err
+		}
+		var fileRef Reference
+		obj, fileRef, err := s.ReadIndirectObject()
+		if err != nil {
+			return nil, err
+		}
+		if ref != fileRef {
+			return nil, &MalformedFileError{
+				Pos: 0,
+				Err: errors.New("xref corrupted"),
+			}
+		}
+		return obj, nil
+	}
 }
 
-func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
+// Resolve resolves references to indirect objects.
+//
+// If obj is of type [Reference], the function reads the corresponding object
+// from the file and returns the result.  Otherwise, obj is returned unchanged.
+func (r *Reader) Resolve(obj Object) (Object, error) {
 	origRef, ok := obj.(Reference)
 	if !ok {
 		return obj, nil
@@ -237,40 +263,10 @@ func (r *Reader) doGet(obj Object, canStream bool) (Object, error) {
 			}
 		}
 
-		entry := r.xref[ref.Number()]
-		if entry.IsFree() || entry.Generation != ref.Generation() {
-			obj = nil
-			break
-		}
-
-		if entry.InStream != 0 {
-			if !canStream {
-				return nil, &MalformedFileError{
-					Pos: 0,
-					Err: errors.New("streams inside streams not allowed"),
-				}
-			}
-
-			var err error
-			obj, err = r.getFromObjectStream(ref.Number(), entry.InStream)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			s, err := r.scannerFrom(entry.Pos)
-			if err != nil {
-				return nil, err
-			}
-			var fileRef Reference
-			obj, fileRef, err = s.ReadIndirectObject()
-			if err != nil {
-				return nil, err
-			} else if ref != fileRef {
-				return nil, &MalformedFileError{
-					Pos: 0,
-					Err: errors.New("xref corrupted"),
-				}
-			}
+		var err error
+		obj, err = r.Read(ref)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -347,7 +343,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 }
 
 func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, error) {
-	container, err := r.doGet(sRef, false)
+	container, err := r.Resolve(sRef)
 	if err != nil {
 		return nil, err
 	}
@@ -409,6 +405,10 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 		obj, err := contents.s.ReadObject()
 		if err != nil {
 			return nil, err
+		}
+		if _, isStream := obj.(*Stream); isStream {
+			// Streams inside object streams are not allowed.
+			obj = nil
 		}
 		if i == m {
 			res = obj

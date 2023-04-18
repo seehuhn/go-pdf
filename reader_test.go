@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -142,10 +141,10 @@ func TestIndirectStreamLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.WriteFile("test_IndirectStreamLength.pdf", buf.Bytes(), 0o666)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// err = os.WriteFile("test_IndirectStreamLength.pdf", buf.Bytes(), 0o666)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {
@@ -201,10 +200,10 @@ func TestStreamLengthInStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.WriteFile("test_StreamLengthInStream.pdf", buf.Bytes(), 0o666)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// err = os.WriteFile("test_StreamLengthInStream.pdf", buf.Bytes(), 0o666)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {
@@ -260,10 +259,10 @@ func TestStreamLengthCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.WriteFile("test_StreamLengthCycle.pdf", buf.Bytes(), 0o666)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// err = os.WriteFile("test_StreamLengthCycle.pdf", buf.Bytes(), 0o666)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {
@@ -344,10 +343,10 @@ func TestStreamLengthCycle2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.WriteFile("test_StreamLengthCycle2.pdf", buf.Bytes(), 0o666)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// err = os.WriteFile("test_StreamLengthCycle2.pdf", buf.Bytes(), 0o666)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {
