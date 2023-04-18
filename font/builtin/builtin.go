@@ -219,6 +219,6 @@ func (e *embedded) Close() error {
 		Font["Name"] = e.resName
 	}
 
-	_, err := e.w.Write(Font, e.ref)
+	err := e.w.Write(e.ref, Font)
 	return err
 }

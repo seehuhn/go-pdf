@@ -269,7 +269,8 @@ func (e3 *embedded) Close() error {
 			continue
 		}
 		if e3.glyphRefs[gid] == 0 {
-			stream, ref, err := w.OpenStream(nil, 0, compress)
+			ref := w.Alloc()
+			stream, err := w.OpenStream(ref, nil, compress)
 			if err != nil {
 				return err
 			}
@@ -371,7 +372,7 @@ func (e3 *embedded) Close() error {
 		FontDict["ToUnicode"] = ToUnicodeRef
 	}
 
-	_, err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	err := w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
@@ -389,7 +390,7 @@ func (e3 *embedded) Close() error {
 			})
 		}
 		info := tounicode.FromMappings(mappings)
-		_, err := info.Embed(w, ToUnicodeRef)
+		err := info.Embed(ToUnicodeRef, w)
 		if err != nil {
 			return err
 		}

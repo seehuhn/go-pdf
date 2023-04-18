@@ -47,7 +47,8 @@ func TestWriter(t *testing.T) {
 		CreationDate: time.Now(),
 	})
 
-	refs, err := w.WriteCompressed(nil,
+	refs := w.AllocN(1)
+	err = w.WriteCompressed(refs,
 		Dict{
 			"Type":     Name("Font"),
 			"Subtype":  Name("Type1"),
@@ -59,7 +60,8 @@ func TestWriter(t *testing.T) {
 	}
 	font := refs[0]
 
-	stream, contentNode, err := w.OpenStream(Dict{}, 0)
+	contentNode := w.Alloc()
+	stream, err := w.OpenStream(contentNode, Dict{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,20 +90,21 @@ ET
 		"Count": Integer(0),
 	}
 
-	page1, err := w.Write(Dict{
+	page1 := w.Alloc()
+	err = w.Write(page1, Dict{
 		"Type":      Name("Page"),
 		"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
 		"Resources": resources,
 		"Contents":  contentNode,
 		"Parent":    pagesRef,
-	}, 0)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	pages["Kids"] = append(pages["Kids"].(Array), page1)
 	pages["Count"] = pages["Count"].(Integer) + 1
-	_, err = w.Write(pages, pagesRef)
+	err = w.Write(pagesRef, pages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,10 +198,11 @@ func TestPlaceholder(t *testing.T) {
 	w.Catalog.Pages = w.Alloc() // pretend we have pages
 
 	length := w.NewPlaceholder(5)
-	testRef, err := w.Write(Dict{
+	testRef := w.Alloc()
+	err = w.Write(testRef, Dict{
 		"Test":   Bool(true),
 		"Length": length,
-	}, 0)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

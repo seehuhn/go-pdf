@@ -103,7 +103,7 @@ func (sw *SequentialWriter) Close() error {
 		"Nums":   Nums,
 		"Limits": pdf.Array{min, max},
 	}
-	_, err := sw.w.Write(dict, sw.ref)
+	err := sw.w.Write(sw.ref, dict)
 	return err
 }
 

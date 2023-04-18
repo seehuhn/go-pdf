@@ -39,7 +39,7 @@ func TestBalance(t *testing.T) {
 		dict := pdf.Dict{
 			"Type": pdf.Name("Page"),
 		}
-		_, err := tree.AppendPage(dict, 0)
+		err := tree.AppendPage(dict)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -123,7 +123,8 @@ func (p *Page) Close() error {
 	if p.doc.Out.Version >= pdf.V1_2 {
 		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
 	}
-	stream, contentRef, err := p.doc.Out.OpenStream(nil, 0, compress)
+	contentRef := p.doc.Out.Alloc()
+	stream, err := p.doc.Out.OpenStream(contentRef, nil, compress)
 	if err != nil {
 		return err
 	}
@@ -147,7 +148,7 @@ func (p *Page) Close() error {
 	p.Page = nil
 	p.doc.numOpen--
 
-	_, err = p.doc.Writer.AppendPage(p.PageDict, 0)
+	err = p.doc.Writer.AppendPage(p.PageDict)
 	if err != nil {
 		return err
 	}

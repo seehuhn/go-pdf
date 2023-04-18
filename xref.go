@@ -438,6 +438,23 @@ func decodeInt(buf []byte) (res int64) {
 	return res
 }
 
+func (pdf *Writer) setXRef(ref Reference, entry *xRefEntry) error {
+	if ref == 0 {
+		panic("invalid reference") // TODO(voss): remove
+	}
+
+	_, seen := pdf.xref[ref.Number()]
+	if seen {
+		return errDuplicateRef
+	}
+	if pdf.nextRef <= ref.Number() {
+		pdf.nextRef = ref.Number() + 1
+	}
+	pdf.xref[ref.Number()] = entry
+
+	return nil
+}
+
 func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 	_, err := fmt.Fprintf(pdf.w, "xref\n0 %d\n", pdf.nextRef)
 	if err != nil {
@@ -601,7 +618,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	xRefDict["DecodeParms"] = filter.Parms
 	xRefDict["Length"] = Integer(len(xRefData))
 
-	swx, _, err := pdf.OpenStream(xRefDict, ref, nil)
+	swx, err := pdf.OpenStream(ref, xRefDict, nil)
 	if err != nil {
 		return err
 	}

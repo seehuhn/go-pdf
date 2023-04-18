@@ -255,7 +255,7 @@ func (ww *writer) flush() error {
 	if len(ww.objs) == 0 {
 		return nil
 	}
-	_, err := ww.out.WriteCompressed(ww.refs, ww.objs...)
+	err := ww.out.WriteCompressed(ww.refs, ww.objs...)
 	if err != nil {
 		return err
 	}

@@ -341,8 +341,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Subtype": pdf.Name("CIDFontType0C"),
 		}
-		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
-			compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
 		if err != nil {
 			return err
 		}
@@ -367,7 +366,7 @@ func (e *embedded) Close() error {
 		FontDescriptor["FontFile2"] = FontFileRef
 		FontDict["BaseFont"] = fontName
 
-		cid2gidStream, _, err := w.OpenStream(nil, CID2GIDMapRef,
+		cid2gidStream, err := w.OpenStream(CID2GIDMapRef, nil,
 			&pdf.FilterInfo{
 				Name: compress.Name,
 				Parms: pdf.Dict{
@@ -398,7 +397,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Length1": size,
 		}
-		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef, compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
 		if err != nil {
 			return err
 		}
@@ -416,7 +415,7 @@ func (e *embedded) Close() error {
 		}
 	}
 
-	_, err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	err := w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
@@ -431,7 +430,7 @@ func (e *embedded) Close() error {
 			Text:     e.Text,
 		})
 	}
-	_, err = font.WriteToUnicodeCID(w, cc2text, ToUnicodeRef)
+	err = font.WriteToUnicodeCID(ToUnicodeRef, w, cc2text)
 	if err != nil {
 		return err
 	}

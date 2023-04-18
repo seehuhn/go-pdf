@@ -157,7 +157,8 @@ func (ctx *illustrator) Show(fnt *cff.Font) error {
 	}
 
 	for i, g := range fnt.Glyphs {
-		stream, contentRef, err := ctx.pageTree.Out.OpenStream(nil, 0, compress)
+		contentRef := ctx.pageTree.Out.Alloc()
+		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, compress)
 		if err != nil {
 			return err
 		}
@@ -283,7 +284,7 @@ func (ctx *illustrator) Show(fnt *cff.Font) error {
 		if page.Resources != nil {
 			pageDict["Resources"] = pdf.AsDict(page.Resources)
 		}
-		_, err = ctx.pageTree.AppendPage(pageDict, 0)
+		err = ctx.pageTree.AppendPage(pageDict)
 		if err != nil {
 			return err
 		}

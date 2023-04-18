@@ -29,9 +29,7 @@ import (
 )
 
 // Embed writes the ToUnicode CMap as a stream object to the given PDF file.
-// If ref is nil, a new reference is allocated, otherwise the given reference
-// is used.  In either case, the reference of the stream object is returned.
-func (info *Info) Embed(w *pdf.Writer, ref pdf.Reference) (pdf.Reference, error) {
+func (info *Info) Embed(ref pdf.Reference, w *pdf.Writer) error {
 	compress := &pdf.FilterInfo{
 		Name: pdf.Name("LZWDecode"),
 	}
@@ -39,20 +37,20 @@ func (info *Info) Embed(w *pdf.Writer, ref pdf.Reference) (pdf.Reference, error)
 		compress.Name = "FlateDecode"
 	}
 
-	cmapStream, ref, err := w.OpenStream(nil, ref, compress)
+	cmapStream, err := w.OpenStream(ref, nil, compress)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	err = info.Write(cmapStream)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	err = cmapStream.Close()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return ref, nil
+	return nil
 }
 
 // Write writes the ToUnicode CMap to the given writer.

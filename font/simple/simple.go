@@ -356,8 +356,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Subtype": pdf.Name("Type1C"),
 		}
-		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef,
-			compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
 		if err != nil {
 			return err
 		}
@@ -384,7 +383,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Length1": size,
 		}
-		fontFileStream, _, err := w.OpenStream(fontFileDict, FontFileRef, compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
 		if err != nil {
 			return err
 		}
@@ -402,7 +401,7 @@ func (e *embedded) Close() error {
 		}
 	}
 
-	_, err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	err := w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
@@ -415,7 +414,7 @@ func (e *embedded) Close() error {
 		rr := e.text[gid]
 		cc2text = append(cc2text, font.SimpleMapping{Code: byte(code), Text: rr})
 	}
-	_, err = font.WriteToUnicodeSimple(w, subsetTag, cc2text, ToUnicodeRef)
+	err = font.WriteToUnicodeSimple(w, ToUnicodeRef, subsetTag, cc2text)
 	if err != nil {
 		return err
 	}

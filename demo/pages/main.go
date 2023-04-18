@@ -59,7 +59,8 @@ func main() {
 			}
 		}
 
-		stream, contentRef, err := out.OpenStream(nil, 0, compress)
+		contentRef := out.Alloc()
+		stream, err := out.OpenStream(contentRef, nil, compress)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -86,14 +87,15 @@ func main() {
 		if g.Resources != nil {
 			dict["Resources"] = pdf.AsDict(g.Resources)
 		}
-		_, err = pageTree.AppendPage(dict, 0)
+		err = pageTree.AppendPage(dict)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	{
-		stream, contentRef, err := out.OpenStream(nil, 0, compress)
+		contentRef := out.Alloc()
+		stream, err := out.OpenStream(contentRef, nil, compress)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -116,14 +118,15 @@ func main() {
 		if g.Resources != nil {
 			dict["Resources"] = pdf.AsDict(g.Resources)
 		}
-		_, err = frontMatter.AppendPage(dict, 0)
+		err = frontMatter.AppendPage(dict)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	{
-		stream, contentRef, err := out.OpenStream(nil, 0, compress)
+		contentRef := out.Alloc()
+		stream, err := out.OpenStream(contentRef, nil, compress)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -149,7 +152,7 @@ func main() {
 		if g.Resources != nil {
 			dict["Resources"] = pdf.AsDict(g.Resources)
 		}
-		_, err = extra.AppendPage(dict, 0)
+		err = extra.AppendPage(dict)
 		if err != nil {
 			log.Fatal(err)
 		}

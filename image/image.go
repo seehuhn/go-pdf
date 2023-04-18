@@ -25,10 +25,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// EmbedAsJPEG writes the image src to the PDF file w, using lossy .  If ref is nil, a new
-// reference is allocated, otherwise ref is used for the image stream.  In
-// either case, the reference to the image stream is returned.
-func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref pdf.Reference, opts *jpeg.Options) (pdf.Reference, error) {
+// EmbedAsJPEG writes the image src to the PDF file w, using lossy compression.
+func EmbedAsJPEG(w *pdf.Writer, ref pdf.Reference, src image.Image, opts *jpeg.Options) error {
 	// convert to NRGBA format
 	// TODO(voss): needed????
 	b := src.Bounds()
@@ -36,7 +34,7 @@ func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref pdf.Reference, opts *jpeg.O
 	draw.Draw(img, img.Bounds(), src, b.Min, draw.Src)
 
 	// TODO(voss): write a mask if there is an alpha channel
-	stream, ref, err := w.OpenStream(pdf.Dict{
+	stream, err := w.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(img.Bounds().Dx()),
@@ -44,27 +42,27 @@ func EmbedAsJPEG(w *pdf.Writer, src image.Image, ref pdf.Reference, opts *jpeg.O
 		"ColorSpace":       pdf.Name("DeviceRGB"),
 		"BitsPerComponent": pdf.Integer(8),
 		"Filter":           pdf.Name("DCTDecode"),
-	}, ref)
+	})
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	err = jpeg.Encode(stream, img, opts)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	err = stream.Close()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return ref, nil
+	return nil
 }
 
 // EmbedAsPNG writes the image img to the PDF file w, using a lossless representation
 // very similar to the PNG format.
-func EmbedAsPNG(w *pdf.Writer, src image.Image, ref pdf.Reference) (pdf.Reference, error) {
+func EmbedAsPNG(w *pdf.Writer, ref pdf.Reference, src image.Image) error {
 	width := src.Bounds().Dx()
 	height := src.Bounds().Dy()
 	filter := &pdf.FilterInfo{
@@ -77,7 +75,7 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref pdf.Reference) (pdf.Referenc
 	}
 	// TODO(voss): only write the mask if there is an alpha channel
 	maskRef := w.Alloc()
-	stream, imageRef, err := w.OpenStream(pdf.Dict{
+	stream, err := w.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(width),
@@ -85,9 +83,9 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref pdf.Reference) (pdf.Referenc
 		"ColorSpace":       pdf.Name("DeviceRGB"),
 		"BitsPerComponent": pdf.Integer(8),
 		"SMask":            maskRef,
-	}, ref, filter)
+	}, filter)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	alpha := make([]byte, 0, width*height)
 	for y := 0; y < height; y++ {
@@ -95,14 +93,14 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref pdf.Reference) (pdf.Referenc
 			r, g, b, a := src.At(x, y).RGBA()
 			_, err = stream.Write([]byte{byte(r >> 8), byte(g >> 8), byte(b >> 8)})
 			if err != nil {
-				return 0, err
+				return err
 			}
 			alpha = append(alpha, byte(a>>8))
 		}
 	}
 	err = stream.Close()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// TODO(voss): is there a more appropriate compression type for the mask?
@@ -113,25 +111,25 @@ func EmbedAsPNG(w *pdf.Writer, src image.Image, ref pdf.Reference) (pdf.Referenc
 			"Predictor": pdf.Integer(15),
 		},
 	}
-	stream, _, err = w.OpenStream(pdf.Dict{
+	stream, err = w.OpenStream(maskRef, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(width),
 		"Height":           pdf.Integer(height),
 		"ColorSpace":       pdf.Name("DeviceGray"),
 		"BitsPerComponent": pdf.Integer(8),
-	}, maskRef, filter)
+	}, filter)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	_, err = stream.Write(alpha)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	err = stream.Close()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return imageRef, nil
+	return nil
 }

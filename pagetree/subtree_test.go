@@ -49,7 +49,7 @@ func TestSubtree(t *testing.T) {
 				"Type": pdf.Name("Page"),
 				"Test": pdf.Integer(i),
 			}
-			_, err := s.AppendPage(pageDict, 0)
+			err := s.AppendPage(pageDict)
 			if err != nil {
 				t.Fatal(err)
 			}

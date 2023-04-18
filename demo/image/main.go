@@ -78,7 +78,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	imageRef, err := pdfimage.EmbedAsJPEG(doc.Out, img, 0, nil)
+	imageRef := doc.Out.Alloc()
+	err = pdfimage.EmbedAsJPEG(doc.Out, imageRef, img, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

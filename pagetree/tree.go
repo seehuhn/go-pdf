@@ -155,18 +155,19 @@ func (t *Writer) Close() (pdf.Reference, error) {
 }
 
 // AppendPage adds a new page to the page tree.
-func (t *Writer) AppendPage(pageDict pdf.Dict, pageRef pdf.Reference) (pdf.Reference, error) {
+func (t *Writer) AppendPage(pageDict pdf.Dict) error {
+	return t.AppendPageRef(t.Out.Alloc(), pageDict)
+}
+
+func (t *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
 	if t.isClosed {
-		return 0, errors.New("page tree is closed")
+		return errors.New("page tree is closed")
 	}
 
-	if pageRef == 0 {
-		pageRef = t.Out.Alloc()
-	}
 	node := &nodeInfo{
 		dictInfo: &dictInfo{
 			dict: pageDict,
-			ref:  pageRef,
+			ref:  ref,
 		},
 		pageCount: 1,
 		depth:     0,
@@ -193,11 +194,11 @@ func (t *Writer) AppendPage(pageDict pdf.Dict, pageRef pdf.Reference) (pdf.Refer
 	if len(t.outObjects) >= objStreamChunkSize {
 		err := t.flush()
 		if err != nil {
-			return 0, err
+			return err
 		}
 	}
 
-	return pageRef, nil
+	return nil
 }
 
 // NewSubTree creates a new Tree, which inserts pages into the document at the
@@ -288,7 +289,7 @@ func (t *Writer) flush() error {
 		return nil
 	}
 
-	_, err := t.Out.WriteCompressed(t.outRefs, t.outObjects...)
+	err := t.Out.WriteCompressed(t.outRefs, t.outObjects...)
 	if err != nil {
 		return err
 	}

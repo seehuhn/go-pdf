@@ -37,11 +37,11 @@ func TestReferenceChain(t *testing.T) {
 	}
 	a := w.Alloc()
 	b := w.Alloc()
-	_, err = w.Write(b, a)
+	err = w.Write(a, b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.Write(Integer(42), b)
+	err = w.Write(b, Integer(42))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +79,11 @@ func TestReferenceLoop(t *testing.T) {
 	}
 	a := w.Alloc()
 	b := w.Alloc()
-	_, err = w.Write(b, a)
+	err = w.Write(a, b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.Write(a, b)
+	err = w.Write(b, a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,8 @@ func TestIndirectStreamLength(t *testing.T) {
 	sDict := Dict{
 		"Length": sLength,
 	}
-	s, sRef, err := w.OpenStream(sDict, 0)
+	sRef := w.Alloc()
+	s, err := w.OpenStream(sRef, sDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +134,7 @@ func TestIndirectStreamLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.Write(Integer(6), sLength)
+	err = w.Write(sLength, Integer(6))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +181,8 @@ func TestStreamLengthInStream(t *testing.T) {
 	sDict := Dict{
 		"Length": sLength,
 	}
-	s, sRef, err := w.OpenStream(sDict, 0)
+	sRef := w.Alloc()
+	s, err := w.OpenStream(sRef, sDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +194,7 @@ func TestStreamLengthInStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.WriteCompressed([]Reference{sLength}, Integer(6))
+	err = w.WriteCompressed([]Reference{sLength}, Integer(6))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +237,8 @@ func TestStreamLengthCycle(t *testing.T) {
 	sDict := Dict{
 		"Length": sLength,
 	}
-	s, sRef, err := w.OpenStream(sDict, 0)
+	sRef := w.Alloc()
+	s, err := w.OpenStream(sRef, sDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +250,7 @@ func TestStreamLengthCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.Write(sLength, sLength) // infinite reference cycle
+	err = w.Write(sLength, sLength) // infinite reference cycle
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +298,8 @@ func TestStreamLengthCycle2(t *testing.T) {
 		"N":      Integer(2),
 		"First":  Integer(8),
 	}
-	s1, sRef1, err := w.OpenStream(sDict1, 0)
+	sRef1 := w.Alloc()
+	s1, err := w.OpenStream(sRef1, sDict1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +318,8 @@ func TestStreamLengthCycle2(t *testing.T) {
 		"N":      Integer(1),
 		"First":  Integer(4),
 	}
-	s2, sRef2, err := w.OpenStream(sDict2, 0)
+	sRef2 := w.Alloc()
+	s2, err := w.OpenStream(sRef2, sDict2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +380,8 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ref, err := w.Write(TextString(msg), 0)
+			ref := w.Alloc()
+			err = w.Write(ref, TextString(msg))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -471,25 +477,25 @@ func TestObjectStream(t *testing.T) {
 		objs[i] = Name("obj" + strconv.Itoa(i))
 	}
 
-	_, err = w.Write(objs[1], refs[1])
+	err = w.Write(refs[1], objs[1])
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.WriteCompressed([]Reference{refs[0], refs[3], refs[6]},
+	err = w.WriteCompressed([]Reference{refs[0], refs[3], refs[6]},
 		objs[0], objs[3], objs[6])
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.Write(objs[4], refs[4])
+	err = w.Write(refs[4], objs[4])
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.WriteCompressed([]Reference{refs[2], refs[5], refs[8]},
+	err = w.WriteCompressed([]Reference{refs[2], refs[5], refs[8]},
 		objs[2], objs[5], objs[8])
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.Write(objs[7], refs[7])
+	err = w.Write(refs[7], objs[7])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,15 +533,15 @@ func addEmptyPage(w *Writer, args ...Object) error {
 	for i := 0; i < len(args); i += 2 {
 		pageDict[args[i].(Name)] = args[i+1]
 	}
-	_, err := w.Write(pageDict, pRef)
+	err := w.Write(pRef, pageDict)
 	if err != nil {
 		return err
 	}
-	_, err = w.Write(Dict{
+	err = w.Write(ppRef, Dict{
 		"Type":  Name("Pages"),
 		"Kids":  Array{pRef},
 		"Count": Integer(1),
-	}, ppRef)
+	})
 	if err != nil {
 		return err
 	}
