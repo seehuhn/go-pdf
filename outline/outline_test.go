@@ -107,19 +107,19 @@ func TestReadLoop(t *testing.T) {
 			"Last":  refC,
 		}
 
-		err = out.Write(refA, A)
+		err = out.Put(refA, A)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = out.Write(refB, B)
+		err = out.Put(refB, B)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = out.Write(refC, C)
+		err = out.Put(refC, C)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = out.Write(refRoot, root)
+		err = out.Put(refRoot, root)
 		if err != nil {
 			t.Fatal(err)
 		}

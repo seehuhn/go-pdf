@@ -345,10 +345,13 @@ func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	var w []int
 	for i, Wi := range W {
 		wi, ok := Wi.(Integer)
-		if !ok || i < 3 && (wi < 0 || wi > 8) {
+		if !ok || wi < 0 || i < 3 && wi > 8 {
 			return nil, nil, &MalformedFileError{}
 		}
 		w = append(w, int(wi))
+	}
+	if w[0]+w[1]+w[2] == 0 {
+		return nil, nil, &MalformedFileError{}
 	}
 
 	Index := dict["Index"]
@@ -531,9 +534,8 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	W := Array{Integer(1), Integer(w2), Integer(w3)}
 	xRefDict["W"] = W
 
-	// Since we can't allocate any more PDF objects, compress the xref stream
-	// in memory, to make sure we know the size of the stream before writing
-	// the xref stream object.
+	// Compress the xref stream in memory, to make sure we know the size of the
+	// stream before writing the xref stream object.
 	filter := &FilterInfo{
 		Name:  "FlateDecode",
 		Parms: Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)},

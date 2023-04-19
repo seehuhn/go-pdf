@@ -399,7 +399,7 @@ func (x Dict) PDF(w io.Writer) error {
 
 	keys := make([]Name, 0, len(x))
 	for key, val := range x {
-		if val == nil || val == Reference(0) {
+		if val == nil {
 			continue
 		}
 		keys = append(keys, key)
@@ -603,15 +603,10 @@ func (x Reference) String() string {
 // PDF implements the [Object] interface.
 func (x Reference) PDF(w io.Writer) error {
 	if x>>48 != 0 {
-		return fmt.Errorf("invalid reference: %016x", x)
+		return fmt.Errorf("invalid reference: 0x%016x", x)
 	}
 
-	var err error
-	if x == 0 {
-		_, err = fmt.Fprint(w, "null")
-	} else {
-		_, err = fmt.Fprintf(w, "%d %d R", x.Number(), x.Generation())
-	}
+	_, err := fmt.Fprintf(w, "%d %d R", x.Number(), x.Generation())
 	return err
 }
 

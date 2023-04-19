@@ -91,7 +91,7 @@ ET
 	}
 
 	page1 := w.Alloc()
-	err = w.Write(page1, Dict{
+	err = w.Put(page1, Dict{
 		"Type":      Name("Page"),
 		"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
 		"Resources": resources,
@@ -104,7 +104,7 @@ ET
 
 	pages["Kids"] = append(pages["Kids"].(Array), page1)
 	pages["Count"] = pages["Count"].(Integer) + 1
-	err = w.Write(pagesRef, pages)
+	err = w.Put(pagesRef, pages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ ET
 		t.Fatal(err)
 	}
 
-	info, err := r.GetInfo()
+	info, err := r.ReadInfo()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func TestPlaceholder(t *testing.T) {
 
 	length := w.NewPlaceholder(5)
 	testRef := w.Alloc()
-	err = w.Write(testRef, Dict{
+	err = w.Put(testRef, Dict{
 		"Test":   Bool(true),
 		"Length": length,
 	})

@@ -102,7 +102,7 @@ func (e *explainer) locate(desc ...string) (pdf.Object, error) {
 		case key == "":
 			return nil, errors.New("empty selector")
 		case key == "@info":
-			x, err := e.r.GetInfo()
+			x, err := e.r.ReadInfo()
 			if err != nil {
 				return nil, err
 			}

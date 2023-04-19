@@ -251,9 +251,6 @@ func (pdf *Writer) Close() error {
 		}
 	}
 
-	if pdf.Catalog.Pages == 0 {
-		return errors.New("no pages in PDF")
-	}
 	if pdf.Tagged {
 		MarkInfo, _ := pdf.Catalog.MarkInfo.(Dict)
 		if MarkInfo == nil {
@@ -263,7 +260,7 @@ func (pdf *Writer) Close() error {
 		pdf.Catalog.MarkInfo = MarkInfo
 	}
 	catRef := pdf.Alloc()
-	err := pdf.Write(catRef, AsDict(pdf.Catalog))
+	err := pdf.Put(catRef, AsDict(pdf.Catalog))
 	if err != nil {
 		return err
 	}
@@ -274,7 +271,7 @@ func (pdf *Writer) Close() error {
 	}
 	if pdf.info != nil {
 		infoRef := pdf.Alloc()
-		err := pdf.Write(infoRef, AsDict(pdf.info))
+		err := pdf.Put(infoRef, AsDict(pdf.info))
 		if err != nil {
 			return err
 		}
@@ -327,8 +324,12 @@ func (pdf *Writer) AutoClose(res Resource) {
 
 // SetInfo sets the Document Information Dictionary for the file.
 func (pdf *Writer) SetInfo(info *Info) {
-	info2 := *info
-	pdf.info = &info2
+	if info == nil {
+		pdf.info = nil
+		return
+	}
+	infoCopy := *info
+	pdf.info = &infoCopy
 }
 
 // Alloc allocates an object number for an indirect object.
@@ -338,11 +339,11 @@ func (pdf *Writer) Alloc() Reference {
 	return res
 }
 
-// Write writes an object to the PDF file, as an indirect object using the
+// Put writes an object to the PDF file, as an indirect object using the
 // given reference.
-func (pdf *Writer) Write(ref Reference, obj Object) error {
+func (pdf *Writer) Put(ref Reference, obj Object) error {
 	if pdf.inStream {
-		return errors.New("Write() while stream is open")
+		return errors.New("Put() while stream is open")
 	}
 
 	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
@@ -372,9 +373,11 @@ func (pdf *Writer) Write(ref Reference, obj Object) error {
 }
 
 // WriteCompressed writes a number of objects to the file as a compressed
-// object stream.  Object streams are only available for PDF version 1.5 and
-// newer; in case the file version is too low, the objects are written directly
-// into the PDF file, without compression.
+// object stream.
+//
+// Object streams are only available for PDF version 1.5 and newer; in case the
+// file version is too low, the objects are written directly into the PDF file,
+// without compression.
 func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	if pdf.inStream {
 		return errors.New("WriteCompressed() while stream is open")
@@ -402,7 +405,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	if pdf.Version < V1_5 {
 		// Object streams are only availble in PDF version 1.5 and higher.
 		for i, obj := range objects {
-			err := pdf.Write(refs[i], obj)
+			err := pdf.Put(refs[i], obj)
 			if err != nil {
 				return err
 			}
@@ -713,11 +716,11 @@ func (x *Placeholder) Set(val Object) error {
 		pdf := x.pdf
 		if pdf.inStream {
 			pdf.afterStream = append(pdf.afterStream, func(w *Writer) error {
-				err := w.Write(x.ref, val)
+				err := w.Put(x.ref, val)
 				return err
 			})
 		} else {
-			err := pdf.Write(x.ref, val)
+			err := pdf.Put(x.ref, val)
 			return err
 		}
 	}

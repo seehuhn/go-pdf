@@ -106,7 +106,7 @@ trailer
 			t.Fatal(err)
 		}
 		fmt.Printf("%s %T\n", ref, obj)
-		err = w.Write(ref, obj)
+		err = w.Put(ref, obj)
 		if err != nil {
 			t.Fatal(err)
 		}

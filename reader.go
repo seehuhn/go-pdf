@@ -48,8 +48,6 @@ type Reader struct {
 	size int64
 
 	level int
-
-	cache *lruCache
 }
 
 type ReaderOptions struct {
@@ -89,7 +87,6 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		size:      size,
 		r:         data,
 		cleartext: make(map[Reference]bool),
-		cache:     newCache(100), // TODO(voss): make this configurable?
 	}
 
 	s, err := r.scannerFrom(0)
@@ -102,11 +99,15 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 	r.Version = version
 
+	// Install a temporary xref table, so that we don't crash if the trailer
+	// dictionary refers to indirect objects.
+	r.xref = make(map[uint32]*xRefEntry)
+
 	xref, trailer, err := r.readXRef()
 	if err != nil {
 		return nil, err
 	}
-	r.xref = xref
+	r.xref = xref // this is the real xref table
 
 	ID, ok := trailer["ID"].(Array)
 	if ok && len(ID) >= 2 {
@@ -181,9 +182,9 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// GetInfo reads the PDF /Info dictionary for the file.
+// ReadInfo reads the PDF /Info dictionary for the file.
 // If no Info dictionary is present, nil is returned.
-func (r *Reader) GetInfo() (*Info, error) {
+func (r *Reader) ReadInfo() (*Info, error) {
 	if r.infoObj == nil {
 		return nil, nil
 	}
@@ -199,9 +200,9 @@ func (r *Reader) GetInfo() (*Info, error) {
 	return info, nil
 }
 
-// Read reads an indirect object from the PDF file.  If the object is not
+// Get reads an indirect object from the PDF file.  If the object is not
 // present, nil is returned without an error.
-func (r *Reader) Read(ref Reference) (Object, error) {
+func (r *Reader) Get(ref Reference) (Object, error) {
 	entry := r.xref[ref.Number()]
 	if entry.IsFree() || entry.Generation != ref.Generation() {
 		return nil, nil
@@ -234,20 +235,9 @@ func (r *Reader) Read(ref Reference) (Object, error) {
 // If obj is of type [Reference], the function reads the corresponding object
 // from the file and returns the result.  Otherwise, obj is returned unchanged.
 func (r *Reader) Resolve(obj Object) (Object, error) {
-	origRef, ok := obj.(Reference)
-	if !ok {
+	_, isReference := obj.(Reference)
+	if !isReference {
 		return obj, nil
-	}
-	if r.xref == nil {
-		// TODO(voss): is this check still needed?
-		return nil, &MalformedFileError{
-			Pos: 0,
-			Err: errors.New("cannot resolve references while reading xref table"),
-		}
-	}
-	cachedObj, ok := r.cache.Get(origRef)
-	if ok {
-		return cachedObj, nil
 	}
 
 	count := 0
@@ -260,22 +250,51 @@ func (r *Reader) Resolve(obj Object) (Object, error) {
 		if count > 8 {
 			return nil, &MalformedFileError{
 				Pos: 0,
-				Err: errors.New("too many indirection levels"),
+				Err: errors.New("too many levels of indirection"),
 			}
 		}
 
 		var err error
-		obj, err = r.Read(ref)
+		obj, err = r.Get(ref)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if _, isStream := obj.(*Stream); !isStream {
-		r.cache.Put(origRef, obj)
-	}
-
 	return obj, nil
+}
+
+// resolveNoStream is like Resolve, but returns nil if the resolved object is
+// inside an object stream.
+func (r *Reader) resolveNoStream(obj Object) (Object, error) {
+	for {
+		ref, isIndirect := obj.(Reference)
+		if !isIndirect {
+			return obj, nil
+		}
+
+		entry := r.xref[ref.Number()]
+		if entry.IsFree() || entry.Generation != ref.Generation() || entry.InStream != 0 {
+			return nil, nil
+		}
+
+		s, err := r.scannerFrom(entry.Pos)
+		if err != nil {
+			return nil, err
+		}
+		var fileRef Reference
+		next, fileRef, err := s.ReadIndirectObject()
+		if err != nil {
+			return nil, err
+		} else if ref != fileRef {
+			return nil, &MalformedFileError{
+				Pos: 0,
+				Err: errors.New("xref corrupted"),
+			}
+		}
+
+		obj = next
+	}
 }
 
 type objStm struct {
@@ -344,7 +363,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 }
 
 func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, error) {
-	container, err := r.Resolve(sRef)
+	container, err := r.resolveNoStream(sRef)
 	if err != nil {
 		return nil, err
 	}
@@ -375,49 +394,27 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 		}
 	}
 
-	const readAhead = 7
+	info := contents.idx[m]
 
-	a := m - readAhead
-	if a < 0 {
-		a = 0
+	delta := int64(info.offs) - contents.s.currentPos()
+	if delta < 0 {
+		return nil, nil
 	}
-	b := a + (2*readAhead + 1)
-	if b > len(contents.idx) {
-		b = len(contents.idx)
-	}
-	var res Object
-	for i := a; i < b; i++ {
-		info := contents.idx[i]
-		key := NewReference(info.number, 0)
-		if r.cache.Has(key) {
-			if i == m {
-				panic("should not happen")
-			}
-			continue
-		}
-
-		delta := int64(info.offs) - contents.s.currentPos()
-		if delta != -1 { // allow for the separating white space to be included in both adjacent objects
-			err = contents.s.Discard(delta)
-			if err != nil {
-				return nil, err
-			}
-		}
-		obj, err := contents.s.ReadObject()
-		if err != nil {
-			return nil, err
-		}
-		if _, isStream := obj.(*Stream); isStream {
-			// Streams inside object streams are not allowed.
-			obj = nil
-		}
-		if i == m {
-			res = obj
-		}
-		r.cache.Put(key, obj)
+	err = contents.s.Discard(delta)
+	if err != nil {
+		return nil, err
 	}
 
-	return res, nil
+	obj, err := contents.s.ReadObject()
+	if err != nil {
+		return nil, err
+	}
+	if _, isStream := obj.(*Stream); isStream {
+		// Streams inside object streams are not allowed.
+		return nil, nil
+	}
+
+	return obj, nil
 }
 
 // GetInt resolves references to indirect objects and makes sure the resulting
@@ -580,7 +577,7 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 	var resolve func(Object) (Object, error)
 	if r != nil {
-		resolve = r.Resolve
+		resolve = r.resolveNoStream
 	}
 	filters, err := x.Filters(resolve)
 	if err != nil {
@@ -628,7 +625,7 @@ func (r *Reader) errPos(obj Object) int64 {
 
 	number := ref.Number()
 	gen := ref.Generation()
-	for {
+	for i := 0; i < 8; i++ {
 		entry := r.xref[number]
 		if entry.IsFree() || entry.Generation != gen {
 			return 0
@@ -640,6 +637,7 @@ func (r *Reader) errPos(obj Object) int64 {
 		number = entry.InStream.Number()
 		gen = entry.InStream.Generation()
 	}
+	return 0
 }
 
 func getSize(r io.Seeker) (int64, error) {

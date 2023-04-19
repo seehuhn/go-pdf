@@ -37,11 +37,11 @@ func TestReferenceChain(t *testing.T) {
 	}
 	a := w.Alloc()
 	b := w.Alloc()
-	err = w.Write(a, b)
+	err = w.Put(a, b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.Write(b, Integer(42))
+	err = w.Put(b, Integer(42))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +79,11 @@ func TestReferenceLoop(t *testing.T) {
 	}
 	a := w.Alloc()
 	b := w.Alloc()
-	err = w.Write(a, b)
+	err = w.Put(a, b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.Write(b, a)
+	err = w.Put(b, a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestIndirectStreamLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.Write(sLength, Integer(6))
+	err = w.Put(sLength, Integer(6))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestStreamLengthCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.Write(sLength, sLength) // infinite reference cycle
+	err = w.Put(sLength, sLength) // infinite reference cycle
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,7 +381,7 @@ func TestAuthentication(t *testing.T) {
 			}
 
 			ref := w.Alloc()
-			err = w.Write(ref, TextString(msg))
+			err = w.Put(ref, TextString(msg))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -477,7 +477,7 @@ func TestObjectStream(t *testing.T) {
 		objs[i] = Name("obj" + strconv.Itoa(i))
 	}
 
-	err = w.Write(refs[1], objs[1])
+	err = w.Put(refs[1], objs[1])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +486,7 @@ func TestObjectStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.Write(refs[4], objs[4])
+	err = w.Put(refs[4], objs[4])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +495,7 @@ func TestObjectStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = w.Write(refs[7], objs[7])
+	err = w.Put(refs[7], objs[7])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,11 +533,11 @@ func addEmptyPage(w *Writer, args ...Object) error {
 	for i := 0; i < len(args); i += 2 {
 		pageDict[args[i].(Name)] = args[i+1]
 	}
-	err := w.Write(pRef, pageDict)
+	err := w.Put(pRef, pageDict)
 	if err != nil {
 		return err
 	}
-	err = w.Write(ppRef, Dict{
+	err = w.Put(ppRef, Dict{
 		"Type":  Name("Pages"),
 		"Kids":  Array{pRef},
 		"Count": Integer(1),

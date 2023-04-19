@@ -125,7 +125,6 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		size:      fi.FileSize,
 		r:         fi.R,
 		cleartext: make(map[Reference]bool),
-		cache:     newCache(100), // TODO(voss): make this configurable?
 	}
 
 	version, err := ParseVersion(fi.HeaderVersion)

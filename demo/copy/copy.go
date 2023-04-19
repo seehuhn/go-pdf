@@ -84,7 +84,7 @@ func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = w.w.Write(other, trans)
+		err = w.w.Put(other, trans)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +148,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	info, err := r.GetInfo()
+	info, err := r.ReadInfo()
 	if err != nil {
 		log.Fatal(err)
 	}
