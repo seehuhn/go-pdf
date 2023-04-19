@@ -143,7 +143,7 @@ func main() {
 		}
 		newCatDict[key] = obj
 	}
-	err = newCatDict.Decode(catalog, r.Resolve)
+	err = r.DecodeDict(catalog, newCatDict)
 	if err != nil {
 		log.Fatal(err)
 	}

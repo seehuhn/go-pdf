@@ -172,7 +172,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		return nil, err
 	}
 	r.Catalog = &Catalog{}
-	err = catalogDict.Decode(r.Catalog, r.Resolve)
+	err = r.DecodeDict(r.Catalog, catalogDict)
 	if err != nil {
 		return nil, err
 	}

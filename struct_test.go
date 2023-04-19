@@ -34,7 +34,7 @@ func TestCatalog(t *testing.T) {
 		t.Errorf("wrong Catalog dict: %s", format(d1))
 	}
 	cat1 := &Catalog{}
-	err := d1.Decode(cat1, nil)
+	err := (*Reader)(nil).DecodeDict(cat1, d1)
 	if err != nil {
 		t.Error(err)
 	} else if *cat0 != *cat1 {
@@ -64,7 +64,7 @@ func TestInfo(t *testing.T) {
 		t.Errorf("wrong dict for empty Info struct: %s", format(d1))
 	}
 	info1 := &Info{}
-	err := d1.Decode(info1, nil)
+	err := (*Reader)(nil).DecodeDict(info1, d1)
 	if err != nil {
 		t.Error(err)
 	} else if info0.Author != info1.Author || info0.CreationDate != info1.CreationDate {
@@ -76,7 +76,7 @@ func TestInfo(t *testing.T) {
 		"grumpy": TextString("bärbeißig"),
 		"funny":  TextString("\000\001\002 \\<>'\")("),
 	}
-	err = d1.Decode(info1, nil)
+	err = (*Reader)(nil).DecodeDict(info1, d1)
 	if err != nil {
 		t.Error(err)
 	}
@@ -104,7 +104,7 @@ func TestStructVersion(t *testing.T) {
 	for v := V1_0; v < tooHighVersion; v++ {
 		a := &testStruct{V: v}
 		aDict := AsDict(a)
-		err := aDict.Decode(res, nil)
+		err := (*Reader)(nil).DecodeDict(res, aDict)
 		if err != nil {
 			t.Error(err)
 		}
@@ -123,19 +123,19 @@ func TestStructVersion(t *testing.T) {
 
 	// test that missing versions in a Dict are detected
 	aDict = Dict{}
-	err := aDict.Decode(res, nil)
+	err := (*Reader)(nil).DecodeDict(res, aDict)
 	if err == nil {
 		t.Errorf("missing version not detected")
 	}
 
 	// test that invalid versions in a Dict are detected
 	aDict = Dict{"V": Name("9.9")}
-	err = aDict.Decode(res, nil)
+	err = (*Reader)(nil).DecodeDict(res, aDict)
 	if err == nil {
 		t.Errorf("invalid version not detected")
 	}
 	aDict = Dict{"V": Number(1.7)}
-	err = aDict.Decode(res, nil)
+	err = (*Reader)(nil).DecodeDict(res, aDict)
 	if err == nil {
 		t.Errorf("invalid type not detected")
 	}
@@ -145,7 +145,7 @@ func TestDecodeVersion(t *testing.T) {
 	for _, version := range []Object{Name("1.5"), Real(1.5), String("1.5")} {
 		res := &Catalog{}
 		dict := Dict{"Version": version, "Pages": Reference(0)}
-		err := dict.Decode(res, nil)
+		err := (*Reader)(nil).DecodeDict(res, dict)
 		if err != nil {
 			t.Error(err)
 			continue
@@ -163,7 +163,7 @@ func TestDecodeLanguageTag(t *testing.T) {
 
 	d1 := Dict{"Lang": TextString("en-GB")}
 	s1 := &testStruct{}
-	err := d1.Decode(s1, nil)
+	err := (*Reader)(nil).DecodeDict(s1, d1)
 	if err != nil {
 		t.Error(err)
 	}

@@ -139,7 +139,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		return nil, err
 	}
 	r.Catalog = &Catalog{}
-	err = catalogDict.Decode(r.Catalog, r.Resolve)
+	err = r.DecodeDict(r.Catalog, catalogDict)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (r *Reader) GetInfo() (*Info, error) {
 		return nil, err
 	}
 	info := &Info{}
-	err = infoDict.Decode(info, r.Resolve)
+	err = r.DecodeDict(info, infoDict)
 	if err != nil {
 		return nil, err
 	}
@@ -239,6 +239,7 @@ func (r *Reader) Resolve(obj Object) (Object, error) {
 		return obj, nil
 	}
 	if r.xref == nil {
+		// TODO(voss): is this check still needed?
 		return nil, &MalformedFileError{
 			Pos: 0,
 			Err: errors.New("cannot resolve references while reading xref table"),
@@ -545,7 +546,7 @@ func (r *Reader) GetRectangle(obj Object) (*Rectangle, error) {
 		}
 	}
 
-	return val.AsRectangle()
+	return val.asRectangle()
 }
 
 func (r *Reader) safeGetInt(obj Object) (Integer, error) {

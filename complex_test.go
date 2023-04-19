@@ -44,7 +44,7 @@ func TestRectangle1(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rect, err := obj.(Array).AsRectangle()
+			rect, err := obj.(Array).asRectangle()
 
 			if err != nil {
 				t.Errorf("Decode(%q) returned error %v", test.in, err)
@@ -78,7 +78,7 @@ func TestRectangle2(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rect, err := obj.(Array).AsRectangle()
+			rect, err := obj.(Array).asRectangle()
 			if err != nil {
 				t.Errorf("Decode(%q) returned error %v", test.String(), err)
 			}

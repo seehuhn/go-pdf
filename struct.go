@@ -100,12 +100,9 @@ fieldLoop:
 	return res
 }
 
-// Decode initialises a tagged struct using the data from a PDF dictionary.
+// DecodeDict initialises a tagged struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
-// The function get, if non-nil, is used to resolve references to indirect
-// objects, where needed; the [Reader.Resolve] method can be used for this
-// argument.
-func (d Dict) Decode(s interface{}, get func(Object) (Object, error)) error {
+func (r *Reader) DecodeDict(s interface{}, d Dict) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
 
@@ -146,9 +143,9 @@ fieldLoop:
 
 		// get and fix up the value from the Dict
 		dictVal := d[Name(fInfo.Name)]
-		if fInfo.Type != objectType && fInfo.Type != refType && get != nil {
+		if fInfo.Type != objectType && fInfo.Type != refType {
 			// follow references to indirect objects where needed
-			obj, err := get(dictVal)
+			obj, err := r.Resolve(dictVal)
 			if err != nil {
 				firstErr = err
 				continue

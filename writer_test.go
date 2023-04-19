@@ -47,7 +47,7 @@ func TestWriter(t *testing.T) {
 		CreationDate: time.Now(),
 	})
 
-	refs := w.AllocN(1)
+	refs := []Reference{w.Alloc()}
 	err = w.WriteCompressed(refs,
 		Dict{
 			"Type":     Name("Font"),

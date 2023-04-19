@@ -44,9 +44,9 @@ type Rectangle struct {
 	LLx, LLy, URx, URy float64
 }
 
-// AsRectangle converts an array of 4 numbers to a Rectangle object.
+// asRectangle converts an array of 4 numbers to a Rectangle object.
 // If the array does not have the correct format, an error is returned.
-func (x Array) AsRectangle() (*Rectangle, error) {
+func (x Array) asRectangle() (*Rectangle, error) {
 	if len(x) != 4 {
 		return nil, errNoRectangle
 	}

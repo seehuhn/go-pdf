@@ -338,16 +338,6 @@ func (pdf *Writer) Alloc() Reference {
 	return res
 }
 
-// AllocN allocates a slice of object references, for n indirect objects.
-func (pdf *Writer) AllocN(n int) []Reference {
-	res := make([]Reference, n)
-	for i := range res {
-		res[i] = NewReference(pdf.nextRef, 0)
-		pdf.nextRef++
-	}
-	return res
-}
-
 // Write writes an object to the PDF file, as an indirect object using the
 // given reference.
 func (pdf *Writer) Write(ref Reference, obj Object) error {

@@ -456,11 +456,6 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 	return sec
 }
 
-func (sec *stdSecHandler) deauthenticate() {
-	sec.key = nil
-	sec.OwnerAuthenticated = false
-}
-
 // GetKey returns the key to decrypt string and stream data.  Passwords will
 // be requested via the getPasswd callback.  If the correct owner password was
 // supplied, the OwnerAuthenticated field will be set to true, in addition to

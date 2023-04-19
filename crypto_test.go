@@ -51,6 +51,12 @@ func TestComputeOU(t *testing.T) {
 	}
 }
 
+// TODO(voss): remove?
+func (sec *stdSecHandler) deauthenticate() {
+	sec.key = nil
+	sec.OwnerAuthenticated = false
+}
+
 func TestAuth(t *testing.T) {
 	cases := []struct {
 		user, owner string
