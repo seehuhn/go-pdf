@@ -28,7 +28,7 @@ type Reader struct {
 }
 
 func NewReader(r *pdf.Reader) (*Reader, error) {
-	root, err := r.GetDict(r.Catalog.Pages)
+	root, err := pdf.GetDict(r, r.Catalog.Pages)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func NewReader(r *pdf.Reader) (*Reader, error) {
 }
 
 func (r *Reader) NumPages() (pdf.Integer, error) {
-	return r.r.GetInt(r.root["Count"])
+	return pdf.GetInt(r.r, r.root["Count"])
 }
 
 func (r *Reader) Get(pageNo pdf.Integer) (pdf.Dict, error) {
@@ -49,19 +49,19 @@ func (r *Reader) Get(pageNo pdf.Integer) (pdf.Dict, error) {
 	dict := r.root
 treeLoop:
 	for dict["Type"] != pdf.Name("Page") {
-		children, err := r.r.GetArray(dict["Kids"])
+		children, err := pdf.GetArray(r.r, dict["Kids"])
 		if err != nil {
 			return nil, err
 		}
 		for _, kid := range children {
-			childDict, err := r.r.GetDict(kid)
+			childDict, err := pdf.GetDict(r.r, kid)
 			if err != nil {
 				return nil, err
 			}
 			var count pdf.Integer
 			switch childDict["Type"] {
 			case pdf.Name("Pages"):
-				count, err = r.r.GetInt(childDict["Count"])
+				count, err = pdf.GetInt(r.r, childDict["Count"])
 				if err != nil {
 					return nil, err
 				}

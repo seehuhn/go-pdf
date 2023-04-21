@@ -63,7 +63,7 @@ func TestBalance(t *testing.T) {
 	}
 	var walk func(pages pdf.Object, depth int) error
 	walk = func(obj pdf.Object, depth int) error {
-		node, err := in.GetDict(obj)
+		node, err := pdf.GetDict(in, obj)
 		if err != nil {
 			return err
 		}

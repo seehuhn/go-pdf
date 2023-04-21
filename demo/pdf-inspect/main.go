@@ -128,7 +128,7 @@ func (e *explainer) locate(desc ...string) (pdf.Object, error) {
 			}
 
 			ref := pdf.NewReference(uint32(number), generation)
-			obj, err = e.r.Resolve(ref)
+			obj, err = pdf.Resolve(e.r, ref)
 			if err != nil {
 				return nil, err
 			}
@@ -139,7 +139,7 @@ func (e *explainer) locate(desc ...string) (pdf.Object, error) {
 				if !ok {
 					return nil, fmt.Errorf("key %q not present in dict", key)
 				}
-				obj, err = e.r.Resolve(val)
+				obj, err = pdf.Resolve(e.r, val)
 				if err != nil {
 					return nil, err
 				}
@@ -154,7 +154,7 @@ func (e *explainer) locate(desc ...string) (pdf.Object, error) {
 				if idx < 0 || idx >= int64(len(x)) {
 					return nil, fmt.Errorf("index %d out of range 0...%d", keyInt, len(x)-1)
 				}
-				obj, err = e.r.Resolve(x[idx])
+				obj, err = pdf.Resolve(e.r, x[idx])
 				if err != nil {
 					return nil, err
 				}
@@ -201,23 +201,23 @@ func (e *explainer) explainSingleLine(obj pdf.Object) (string, error) {
 	switch obj := obj.(type) {
 	case *pdf.Stream:
 		var parts []string
-		tp, err := e.r.GetName(obj.Dict["Type"])
+		tp, err := pdf.GetName(e.r, obj.Dict["Type"])
 		if err == nil {
 			parts = append(parts, string(tp)+" stream")
 		} else {
 			parts = append(parts, "stream")
 		}
-		length, err := e.r.GetInt(obj.Dict["Length"])
+		length, err := pdf.GetInt(e.r, obj.Dict["Length"])
 		if err == nil {
 			parts = append(parts, fmt.Sprintf("%d bytes", length))
 		}
 		ff, ok := obj.Dict["Filter"]
 		if ok {
-			if name, err := e.r.GetName(ff); err == nil {
+			if name, err := pdf.GetName(e.r, ff); err == nil {
 				parts = append(parts, string(name))
-			} else if arr, err := e.r.GetArray(ff); err == nil {
+			} else if arr, err := pdf.GetArray(e.r, ff); err == nil {
 				for _, elem := range arr {
-					if name, err := e.r.GetName(elem); err == nil {
+					if name, err := pdf.GetName(e.r, elem); err == nil {
 						parts = append(parts, string(name))
 					} else {
 						parts = append(parts, "???")
@@ -247,7 +247,7 @@ func (e *explainer) explainSingleLine(obj pdf.Object) (string, error) {
 			}
 			return "<<" + strings.Join(parts, " ") + ">>", nil
 		}
-		tp, err := e.r.GetName(obj["Type"])
+		tp, err := pdf.GetName(e.r, obj["Type"])
 		if err == nil {
 			parts = append(parts, string(tp)+" dict")
 		} else {

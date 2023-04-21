@@ -39,29 +39,57 @@ func (x Number) PDF(w io.Writer) error {
 	return obj.PDF(w)
 }
 
+func GetNumber(r Getter, obj Object) (Number, error) {
+	obj, err := Resolve(r, obj)
+	if err != nil {
+		return 0, err
+	}
+	switch x := obj.(type) {
+	case Integer:
+		return Number(x), nil
+	case Real:
+		return Number(x), nil
+	default:
+		return 0, &MalformedFileError{
+			// TODO(voss): how to get the position?
+			Err: fmt.Errorf("wrong object type (expected %T but got %T)", x, obj),
+		}
+	}
+}
+
 // Rectangle represents a PDF rectangle.
 type Rectangle struct {
 	LLx, LLy, URx, URy float64
 }
 
+// GetRectangle resolves references to indirect objects and makes sure the
+// resulting object is a PDF rectangle object.
+// If the object is null, nil is returned.
+func GetRectangle(r Getter, obj Object) (*Rectangle, error) {
+	a, err := GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+	if a == nil {
+		return nil, nil
+	}
+
+	return asRectangle(r, a)
+}
+
 // asRectangle converts an array of 4 numbers to a Rectangle object.
 // If the array does not have the correct format, an error is returned.
-func (x Array) asRectangle() (*Rectangle, error) {
-	if len(x) != 4 {
+func asRectangle(r Getter, a Array) (*Rectangle, error) {
+	if len(a) != 4 {
 		return nil, errNoRectangle
 	}
 	values := [4]float64{}
-	for i, obj := range x {
-		switch obj := obj.(type) {
-		case Integer:
-			values[i] = float64(obj)
-		case Number:
-			values[i] = float64(obj)
-		case Real:
-			values[i] = float64(obj)
-		default:
-			return nil, errNoRectangle
+	for i, obj := range a {
+		xi, err := GetNumber(r, obj)
+		if err != nil {
+			return nil, err
 		}
+		values[i] = float64(xi)
 	}
 	rect := &Rectangle{
 		LLx: math.Min(values[0], values[2]),

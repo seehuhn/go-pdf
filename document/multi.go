@@ -36,8 +36,8 @@ type MultiPage struct {
 	closeBase bool
 }
 
-func CreateMultiPage(name string, width, height float64) (*MultiPage, error) {
-	fd, err := os.Create(name)
+func CreateMultiPage(fileName string, width, height float64) (*MultiPage, error) {
+	fd, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
 	}

@@ -135,7 +135,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 
 	root := trailer["Root"]
-	catalogDict, err := r.GetDict(root)
+	catalogDict, err := GetDict(r, root)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (r *Reader) ReadInfo() (*Info, error) {
 	if r.infoObj == nil {
 		return nil, nil
 	}
-	infoDict, err := r.GetDict(r.infoObj)
+	infoDict, err := GetDict(r, r.infoObj)
 	if err != nil {
 		return nil, err
 	}
@@ -228,40 +228,6 @@ func (r *Reader) Get(ref Reference) (Object, error) {
 		}
 		return obj, nil
 	}
-}
-
-// Resolve resolves references to indirect objects.
-//
-// If obj is of type [Reference], the function reads the corresponding object
-// from the file and returns the result.  Otherwise, obj is returned unchanged.
-func (r *Reader) Resolve(obj Object) (Object, error) {
-	_, isReference := obj.(Reference)
-	if !isReference {
-		return obj, nil
-	}
-
-	count := 0
-	for {
-		ref, ok := obj.(Reference)
-		if !ok {
-			break
-		}
-		count++
-		if count > 8 {
-			return nil, &MalformedFileError{
-				Pos: 0,
-				Err: errors.New("too many levels of indirection"),
-			}
-		}
-
-		var err error
-		obj, err = r.Get(ref)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return obj, nil
 }
 
 // resolveNoStream is like Resolve, but returns nil if the resolved object is
@@ -417,135 +383,6 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 	return obj, nil
 }
 
-// GetInt resolves references to indirect objects and makes sure the resulting
-// object is an Integer.
-func (r *Reader) GetInt(obj Object) (Integer, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return 0, err
-	}
-	val, ok := candidate.(Integer)
-	if !ok {
-		return 0, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: errors.New("wrong object type (expected Integer)"),
-		}
-	}
-	return val, nil
-}
-
-// GetDict resolves references to indirect objects and makes sure the resulting
-// object is a dictionary.
-func (r *Reader) GetDict(obj Object) (Dict, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-	val, ok := candidate.(Dict)
-	if !ok {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: fmt.Errorf("wrong object type: expected Dict, got %T", candidate),
-		}
-	}
-
-	return val, nil
-}
-
-// GetStream resolves references to indirect objects and makes sure the resulting
-// object is a dictionary.
-func (r *Reader) GetStream(obj Object) (*Stream, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-	val, ok := candidate.(*Stream)
-	if !ok {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: fmt.Errorf("wrong object type: expected Stream, got %T", candidate),
-		}
-	}
-
-	return val, nil
-}
-
-// GetArray resolves references to indirect objects and makes sure the resulting
-// object is an array.
-func (r *Reader) GetArray(obj Object) (Array, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-	val, ok := candidate.(Array)
-	if !ok {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: fmt.Errorf("wrong object type: expected Array, got %T", candidate),
-		}
-	}
-
-	return val, nil
-}
-
-// GetName resolves references to indirect objects and makes sure the resulting
-// object is a Name.
-func (r *Reader) GetName(obj Object) (Name, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return "", err
-	}
-	val, ok := candidate.(Name)
-	if !ok {
-		return "", &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: errors.New("wrong object type (expected Name)"),
-		}
-	}
-	return val, nil
-}
-
-// GetString resolves references to indirect objects and makes sure the
-// resulting object is a String.
-func (r *Reader) GetString(obj Object) (String, error) {
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-	val, ok := candidate.(String)
-	if !ok {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: errors.New("wrong object type (expected String)"),
-		}
-	}
-	return val, nil
-}
-
-// GetRectangle resolves references to indirect objects and makes sure the
-// resulting object is a PDF rectangle object.
-// If the object is null, nil is returned.
-func (r *Reader) GetRectangle(obj Object) (*Rectangle, error) {
-	if obj == nil {
-		return nil, nil
-	}
-
-	candidate, err := r.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	val, ok := candidate.(Array)
-	if !ok && len(val) != 4 {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: fmt.Errorf("wrong object type: expected Rectangle, got %T", candidate),
-		}
-	}
-
-	return val.asRectangle()
-}
-
 func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 	if x, ok := obj.(Integer); ok {
 		return x, nil
@@ -564,7 +401,7 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 	}
 	defer r.r.Seek(pos, io.SeekStart)
 
-	val, err := r.GetInt(obj)
+	val, err := GetInt(r, obj)
 	if err != nil {
 		return 0, err
 	}
@@ -658,3 +495,74 @@ func getSize(r io.Seeker) (int64, error) {
 
 	return size, nil
 }
+
+type Getter interface {
+	Get(Reference) (Object, error)
+}
+
+// Resolve resolves references to indirect objects.
+//
+// If obj is a [Reference], the function reads the corresponding object from
+// the file and returns the result.  If obj is not a [Reference], it is
+// returned unchanged.  The function recursively follows chains of references
+// until it resolves to a non-reference object.
+//
+// If a reference loop is encountered, the function returns an error of type
+// [MalformedFileError].
+func Resolve(r Getter, obj Object) (Object, error) {
+	count := 0
+	for {
+		ref, isReference := obj.(Reference)
+		if !isReference {
+			break
+		}
+		count++
+		if count > 16 {
+			return nil, &MalformedFileError{
+				Pos: 0,
+				Err: errors.New("too many levels of indirection"),
+			}
+		}
+
+		var err error
+		obj, err = r.Get(ref)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return obj, nil
+}
+
+func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
+	obj, err = Resolve(r, obj)
+	if err != nil {
+		return x, err
+	}
+
+	var isCorrectType bool
+	x, isCorrectType = obj.(T)
+	if isCorrectType {
+		return x, nil
+	}
+
+	return x, &MalformedFileError{
+		// Pos: r.errPos(obj), // TODO(voss): how to get the position?
+		Err: fmt.Errorf("wrong object type (expected %T but got %T)", x, obj),
+	}
+}
+
+// Helper functions for getting objects of a specific type.  Each of these
+// functions calls Resolve on the object before attempting to convert it to the
+// desired type.  If the object is `null`, nil is returned. If the object is of
+// the wrong type, an error is returned.
+var (
+	GetArray  = resolveAndCast[Array]
+	GetBool   = resolveAndCast[Bool]
+	GetDict   = resolveAndCast[Dict]
+	GetInt    = resolveAndCast[Integer]
+	GetName   = resolveAndCast[Name]
+	GetReal   = resolveAndCast[Real]
+	GetStream = resolveAndCast[*Stream]
+	GetString = resolveAndCast[String]
+)

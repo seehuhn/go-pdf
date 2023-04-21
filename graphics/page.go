@@ -102,6 +102,8 @@ func (p *Page) coord(x float64) string {
 	return float.Format(x, 2)
 }
 
+// Resource is currently only used for images.
+// TODO(voss): remove
 type Resource interface {
 	Reference() pdf.Reference
 	ResourceName() pdf.Name

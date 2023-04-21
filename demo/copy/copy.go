@@ -76,7 +76,7 @@ func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
 		other = w.w.Alloc()
 		w.trans[x] = other
 
-		val, err := w.r.Resolve(x)
+		val, err := pdf.Resolve(w.r, x)
 		if err != nil {
 			return nil, err
 		}

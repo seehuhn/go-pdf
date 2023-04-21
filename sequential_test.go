@@ -101,7 +101,7 @@ trailer
 	}
 	for _, n := range keys {
 		ref := NewReference(n, objs[n].gen)
-		obj, err := r.Resolve(ref)
+		obj, err := Resolve(r, ref)
 		if err != nil {
 			t.Fatal(err)
 		}

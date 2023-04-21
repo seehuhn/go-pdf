@@ -66,7 +66,7 @@ func TestReader(t *testing.T) {
 		if err != nil {
 			t.Fatalf("page %d: %s", i, err)
 		}
-		v, err := r.GetInt(page["Test"])
+		v, err := pdf.GetInt(r, page["Test"])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func BenchmarkReader(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			v, err := r.GetInt(page["Test"])
+			v, err := pdf.GetInt(r, page["Test"])
 			if err != nil {
 				b.Fatal(err)
 			}

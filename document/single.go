@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 )
 
+// TODO(voss): can we merge SinglePage and Page?
 type SinglePage struct {
 	*graphics.Page
 	PageDict pdf.Dict
@@ -36,8 +37,8 @@ type SinglePage struct {
 	pages     *pagetree.Writer
 }
 
-func CreateSinglePage(name string, width, height float64) (*SinglePage, error) {
-	fd, err := os.Create(name)
+func CreateSinglePage(fileName string, width, height float64) (*SinglePage, error) {
+	fd, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
 	}

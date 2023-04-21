@@ -61,7 +61,7 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	obj, err := r.Resolve(ref)
+	obj, err := pdf.Resolve(r, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		obj, err := r.Resolve(ref)
+		obj, err := pdf.Resolve(r, ref)
 		if err != nil {
 			b.Fatal(err)
 		}

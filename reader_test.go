@@ -58,7 +58,7 @@ func TestReferenceChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	x, err := r.Resolve(a)
+	x, err := Resolve(r, a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestReferenceLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = r.Resolve(a)
+	_, err = Resolve(r, a)
 	if err == nil {
 		t.Error("reference loop not detected")
 	}
@@ -151,7 +151,7 @@ func TestIndirectStreamLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sObj, err := r.GetStream(sRef)
+	sObj, err := GetStream(r, sRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestStreamLengthInStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sObj, err := r.GetStream(sRef)
+	sObj, err := GetStream(r, sRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestStreamLengthCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = r.GetStream(sRef)
+	_, err = GetStream(r, sRef)
 	if err == nil {
 		t.Error("reference loop not detected")
 	}
@@ -357,7 +357,7 @@ func TestStreamLengthCycle2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = r.GetStream(xRef)
+	_, err = GetStream(r, xRef)
 	if err == nil {
 		t.Error("reference loop not detected")
 	}
@@ -417,7 +417,7 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err, i)
 			}
 			if userFirst {
-				dec, err := r.GetString(ref)
+				dec, err := GetString(r, ref)
 				if err != nil {
 					t.Fatal(err, i)
 				}
@@ -511,7 +511,7 @@ func TestObjectStream(t *testing.T) {
 	}
 
 	for i, ref := range refs {
-		obj, err := r.Resolve(ref)
+		obj, err := Resolve(r, ref)
 		if err != nil {
 			t.Fatal(err)
 		}

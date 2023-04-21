@@ -145,7 +145,7 @@ fieldLoop:
 		dictVal := d[Name(fInfo.Name)]
 		if fInfo.Type != objectType && fInfo.Type != refType {
 			// follow references to indirect objects where needed
-			obj, err := r.Resolve(dictVal)
+			obj, err := Resolve(r, dictVal)
 			if err != nil {
 				firstErr = err
 				continue

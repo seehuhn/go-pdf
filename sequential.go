@@ -166,7 +166,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	}
 
 	root := trailer["Root"]
-	catalogDict, err := r.GetDict(root)
+	catalogDict, err := GetDict(r, root)
 	if err != nil {
 		return nil, err
 	}

@@ -62,14 +62,14 @@ func readNode(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) (*
 		return nil, nil, errors.New("outline too large")
 	}
 
-	dict, err := r.GetDict(node)
+	dict, err := pdf.GetDict(r, node)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	tree := &Tree{}
 
-	titleObj, err := r.Resolve(dict["Title"])
+	titleObj, err := pdf.Resolve(r, dict["Title"])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -82,12 +82,12 @@ func readNode(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) (*
 	count, _ := dict["Count"].(pdf.Integer)
 	tree.Open = count > 0
 
-	if dest, _ := r.Resolve(dict["Dest"]); dest != nil {
+	if dest, _ := pdf.Resolve(r, dict["Dest"]); dest != nil {
 		tree.Action = pdf.Dict{
 			"S": pdf.Name("GoTo"),
 			"D": dest,
 		}
-	} else if a, _ := r.GetDict(dict["A"]); a != nil {
+	} else if a, _ := pdf.GetDict(r, dict["A"]); a != nil {
 		tree.Action = a
 	}
 
