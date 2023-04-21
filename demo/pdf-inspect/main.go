@@ -102,11 +102,7 @@ func (e *explainer) locate(desc ...string) (pdf.Object, error) {
 		case key == "":
 			return nil, errors.New("empty selector")
 		case key == "@info":
-			x, err := e.r.ReadInfo()
-			if err != nil {
-				return nil, err
-			}
-			obj = pdf.AsDict(x)
+			obj = pdf.AsDict(e.r.Info)
 		case key[0] == '@':
 			ff := strings.Split(key[1:], ".")
 			if len(ff) > 2 {

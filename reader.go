@@ -23,8 +23,8 @@ import (
 	"os"
 )
 
-// Reader represents a pdf file opened for reading. Use the functions [Open] or
-// [NewReader] to create a new Reader.
+// Reader represents a pdf file opened for reading.  Use [Open] or
+// [NewReader] to create a Reader.
 type Reader struct {
 	// Version is the PDF version used in this file.  This is specified in
 	// the initial comment at the start of the file, and may be overridden by
@@ -36,18 +36,26 @@ type Reader struct {
 	// the file does not specify an ID.
 	ID [][]byte
 
+	// Catalog is the document catalog for this file.
 	Catalog *Catalog
 
-	infoObj   Object // the /Info entry of the trailer dictionary
-	enc       *encryptInfo
-	cleartext map[Reference]bool
+	// Info is the document information dictionary for this file.
+	// This is nil if the file does not contain a document information
+	// dictionary.
+	Info *Info
+
+	// Errors is a list of errors encountered while opening the file.
+	// This is only used if the ErrorHandling option is set to
+	// ErrorHandlingReport.
+	Errors []*MalformedFileError
+
+	r          io.ReadSeeker
+	needsClose bool
 
 	xref map[uint32]*xRefEntry
 
-	r    io.ReadSeeker
-	size int64
-
-	level int
+	enc         *encryptInfo
+	unencrypted map[Reference]bool
 }
 
 type ReaderOptions struct {
@@ -58,7 +66,26 @@ type ReaderOptions struct {
 	// authentication attempt is aborted and an [AuthenticationError] is
 	// reported to the caller.
 	ReadPassword func(ID []byte, try int) string
+
+	ErrorHandling ReaderErrorHandling
 }
+
+type ReaderErrorHandling int
+
+const (
+	// ErrorHandlingRecover means that the reader will try to recover from
+	// errors and continue parsing the file.  This is the default.
+	ErrorHandlingRecover = iota
+
+	// ErrorHandlingReport means that the reader will try to recover from
+	// errors and continue parsing the file, but will report errors to the
+	// caller.
+	ErrorHandlingReport
+
+	// ErrorHandlingStop means that the reader will stop parsing the file as
+	// soon as an error is encountered.
+	ErrorHandlingStop
+)
 
 var defaultReaderOptions = &ReaderOptions{}
 
@@ -69,7 +96,13 @@ func Open(fname string) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewReader(fd, nil)
+	r, err := NewReader(fd, nil)
+	if err != nil {
+		fd.Close()
+		return nil, err
+	}
+	r.needsClose = true
+	return r, nil
 }
 
 // NewReader creates a new Reader object.
@@ -78,15 +111,9 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		opt = defaultReaderOptions
 	}
 
-	size, err := getSize(data)
-	if err != nil {
-		return nil, err
-	}
-
 	r := &Reader{
-		size:      size,
-		r:         data,
-		cleartext: make(map[Reference]bool),
+		r:           data,
+		unencrypted: make(map[Reference]bool),
 	}
 
 	s, err := r.scannerFrom(0)
@@ -99,15 +126,16 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 	r.Version = version
 
-	// Install a temporary xref table, so that we don't crash if the trailer
-	// dictionary refers to indirect objects.
+	// Install a dummy xref table first, so that we don't crash if the trailer
+	// dictionary tries to use indirect objects.
 	r.xref = make(map[uint32]*xRefEntry)
 
 	xref, trailer, err := r.readXRef()
 	if err != nil {
 		return nil, err
 	}
-	r.xref = xref // this is the real xref table
+	// Now we can install the real xref table.
+	r.xref = xref
 
 	ID, ok := trailer["ID"].(Array)
 	if ok && len(ID) >= 2 {
@@ -125,7 +153,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 
 	if encObj, ok := trailer["Encrypt"]; ok {
 		if ref, ok := encObj.(Reference); ok {
-			r.cleartext[ref] = true
+			r.unencrypted[ref] = true
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
@@ -134,25 +162,58 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		// TODO(voss): extract the permission bits
 	}
 
-	root := trailer["Root"]
-	catalogDict, err := GetDict(r, root)
+	shouldExit := func(err error) bool {
+		if err == nil {
+			return false
+		}
+		if opt.ErrorHandling == ErrorHandlingReport {
+			if e, ok := err.(*MalformedFileError); ok {
+				r.Errors = append(r.Errors, e)
+				return false
+			}
+		}
+		return opt.ErrorHandling != ErrorHandlingRecover
+	}
+
+	catalogDict, err := GetDict(r, trailer["Root"])
 	if err != nil {
 		return nil, err
 	}
 	r.Catalog = &Catalog{}
 	err = r.DecodeDict(r.Catalog, catalogDict)
-	if err != nil {
+	if shouldExit(err) || (err != nil && r.Catalog.Pages == 0) {
 		return nil, err
 	}
-
 	if r.Catalog.Version > r.Version {
 		// if unset, r.catalog.Version is zero and thus smaller than r.Version
 		r.Version = r.Catalog.Version
 	}
 
-	r.infoObj = trailer["Info"]
+	infoDict, err := GetDict(r, trailer["Info"])
+	if shouldExit(err) {
+		return nil, err
+	}
+	if infoDict != nil {
+		r.Info = &Info{}
+		err = r.DecodeDict(r.Info, infoDict)
+		if shouldExit(err) {
+			return nil, err
+		}
+	}
 
 	return r, nil
+}
+
+// Close closes the file underlying the reader.  This call only has an effect
+// if the Reader was created by [Open].
+func (r *Reader) Close() error {
+	if r.needsClose {
+		err := r.r.(io.Closer).Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AuthenticateOwner tries to authenticate the owner of a document. If a
@@ -166,38 +227,6 @@ func (r *Reader) AuthenticateOwner() error {
 	}
 	_, err := r.enc.sec.GetKey(true)
 	return err
-}
-
-// Close closes the file underlying the reader.  This call only has an effect
-// if the io.ReadSeeker passed to [NewReader] has a Close method, or if the
-// Reader was created using [Open].  Otherwise, Close has no effect and
-// returns nil.
-//
-// TODO(voss): don't unconditionally close the underlying file
-func (r *Reader) Close() error {
-	closer, ok := r.r.(io.Closer)
-	if ok {
-		return closer.Close()
-	}
-	return nil
-}
-
-// ReadInfo reads the PDF /Info dictionary for the file.
-// If no Info dictionary is present, nil is returned.
-func (r *Reader) ReadInfo() (*Info, error) {
-	if r.infoObj == nil {
-		return nil, nil
-	}
-	infoDict, err := GetDict(r, r.infoObj)
-	if err != nil {
-		return nil, err
-	}
-	info := &Info{}
-	err = r.DecodeDict(info, infoDict)
-	if err != nil {
-		return nil, err
-	}
-	return info, nil
 }
 
 // Get reads an indirect object from the PDF file.  If the object is not
@@ -215,7 +244,6 @@ func (r *Reader) Get(ref Reference) (Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		var fileRef Reference
 		obj, fileRef, err := s.ReadIndirectObject()
 		if err != nil {
 			return nil, err
@@ -230,9 +258,65 @@ func (r *Reader) Get(ref Reference) (Object, error) {
 	}
 }
 
-// resolveNoStream is like Resolve, but returns nil if the resolved object is
-// inside an object stream.
-func (r *Reader) resolveNoStream(obj Object) (Object, error) {
+func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, error) {
+	// We need to be careful to avoid infinite loops, when reading an object
+	// from an object stream requires opening other object streams first. This
+	// could be either caused by the stream object being contained in another
+	// object stream, or by the length of the stream object being contained in
+	// another object stream.  (Both cases are forbidden by the PDF spec.)
+	container, err := r.resolveNoObjStreams(sRef)
+	if err != nil {
+		return nil, err
+	}
+	objectStream, isStream := container.(*Stream)
+	if !isStream {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(sRef),
+			Err: errors.New("wrong type for object stream"),
+		}
+	}
+
+	contents, err := r.objStmScanner(objectStream, r.errPos(sRef))
+	if err != nil {
+		return nil, err
+	}
+
+	m := -1
+	for i, info := range contents.idx {
+		if info.number == number {
+			m = i
+			break
+		}
+	}
+	if m < 0 {
+		return nil, &MalformedFileError{
+			Pos: r.errPos(sRef),
+			Err: errors.New("object missing from stream"),
+		}
+	}
+
+	info := contents.idx[m]
+
+	delta := int64(info.offs) - contents.s.currentPos()
+	if delta < 0 {
+		return nil, nil
+	}
+	err = contents.s.Discard(delta)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := contents.s.ReadObject()
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+// resolveNoObjStreams is like Resolve, but returns an error if the resolved
+// object is inside an object stream.
+func (r *Reader) resolveNoObjStreams(obj Object) (Object, error) {
 	for {
 		ref, isIndirect := obj.(Reference)
 		if !isIndirect {
@@ -240,14 +324,19 @@ func (r *Reader) resolveNoStream(obj Object) (Object, error) {
 		}
 
 		entry := r.xref[ref.Number()]
-		if entry.IsFree() || entry.Generation != ref.Generation() || entry.InStream != 0 {
+		if entry.IsFree() || entry.Generation != ref.Generation() {
 			return nil, nil
+		}
+		if entry.InStream != 0 {
+			return nil, errors.New("forbidden object inside object stream")
 		}
 
 		s, err := r.scannerFrom(entry.Pos)
 		if err != nil {
 			return nil, err
 		}
+		s.getInt = r.safeGetIntNoObjectStreams
+
 		var fileRef Reference
 		next, fileRef, err := s.ReadIndirectObject()
 		if err != nil {
@@ -261,6 +350,35 @@ func (r *Reader) resolveNoStream(obj Object) (Object, error) {
 
 		obj = next
 	}
+}
+
+// DecodeStream returns a reader for the decoded stream data.
+// If numFilters is non-zero, only the first numFilters filters are decoded.
+func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
+	var resolve func(Object) (Object, error)
+	if r != nil {
+		resolve = r.resolveNoObjStreams
+	}
+	filters, err := x.Filters(resolve)
+	if err != nil {
+		return nil, err
+	}
+
+	out := x.R
+	for i, fi := range filters {
+		if numFilters > 0 && i >= numFilters {
+			break
+		}
+		filter, err := fi.getFilter()
+		if err != nil {
+			return nil, err
+		}
+		out, err = filter.Decode(out)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 type objStm struct {
@@ -328,119 +446,65 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 	return &objStm{s: s, idx: idx}, nil
 }
 
-func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, error) {
-	container, err := r.resolveNoStream(sRef)
-	if err != nil {
-		return nil, err
-	}
-	stream, ok := container.(*Stream)
-	if !ok {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(sRef),
-			Err: errors.New("wrong type for object stream"),
-		}
-	}
-
-	contents, err := r.objStmScanner(stream, r.errPos(sRef))
-	if err != nil {
-		return nil, err
-	}
-
-	m := -1
-	for i, info := range contents.idx {
-		if info.number == number {
-			m = i
-			break
-		}
-	}
-	if m < 0 {
-		return nil, &MalformedFileError{
-			Pos: r.errPos(sRef),
-			Err: errors.New("object missing from stream"),
-		}
-	}
-
-	info := contents.idx[m]
-
-	delta := int64(info.offs) - contents.s.currentPos()
-	if delta < 0 {
-		return nil, nil
-	}
-	err = contents.s.Discard(delta)
-	if err != nil {
-		return nil, err
-	}
-
-	obj, err := contents.s.ReadObject()
-	if err != nil {
-		return nil, err
-	}
-	if _, isStream := obj.(*Stream); isStream {
-		// Streams inside object streams are not allowed.
-		return nil, nil
-	}
-
-	return obj, nil
-}
-
+// safeGetInt is like GetInt, but it restores the file position after reading.
 func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 	if x, ok := obj.(Integer); ok {
 		return x, nil
 	}
 
-	if r.level > 2 {
-		return 0, &MalformedFileError{
-			Pos: r.errPos(obj),
-			Err: errors.New("length in ObjStm with Length in ... exceeded"),
-		}
-	}
-	r.level++
 	pos, err := r.r.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return 0, err
 	}
-	defer r.r.Seek(pos, io.SeekStart)
 
-	val, err := GetInt(r, obj)
+	i, err := GetInt(r, obj)
+	if err != nil {
+		r.r.Seek(pos, io.SeekStart)
+		return 0, err
+	}
+
+	_, err = r.r.Seek(pos, io.SeekStart)
 	if err != nil {
 		return 0, err
 	}
-	r.level--
-	return val, nil
+	return i, nil
 }
 
-// DecodeStream returns a reader for the decoded stream data.
-// If numFilters is non-zero, only the first numFilters filters are decoded.
-func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
-	var resolve func(Object) (Object, error)
-	if r != nil {
-		resolve = r.resolveNoStream
-	}
-	filters, err := x.Filters(resolve)
-	if err != nil {
-		return nil, err
+// safeGetIntNoObjectStreams is like safeGetInt, but it returns an error if the
+// integer is stored inside an object stream.
+func (r *Reader) safeGetIntNoObjectStreams(obj Object) (Integer, error) {
+	if x, ok := obj.(Integer); ok {
+		return x, nil
 	}
 
-	out := x.R
-	for i, fi := range filters {
-		if numFilters > 0 && i >= numFilters {
-			break
-		}
-		filter, err := fi.getFilter()
-		if err != nil {
-			return nil, err
-		}
-		out, err = filter.Decode(out)
-		if err != nil {
-			return nil, err
+	pos, err := r.r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	obj, err = r.resolveNoObjStreams(obj)
+	if err != nil {
+		return 0, err
+	}
+
+	i, isInt := obj.(Integer)
+	if !isInt {
+		return i, &MalformedFileError{
+			// Pos: r.errPos(obj), // TODO(voss): how to get the position?
+			Err: fmt.Errorf("wrong object type (expected Integer but got %T)", obj),
 		}
 	}
-	return out, nil
+
+	_, err = r.r.Seek(pos, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
+	return i, nil
 }
 
 func (r *Reader) scannerFrom(pos int64) (*scanner, error) {
 	s := newScanner(r.r, r.safeGetInt, r.enc)
-	s.cleartext = r.cleartext
+	s.unencrypted = r.unencrypted
 
 	_, err := r.r.Seek(pos, io.SeekStart)
 	if err != nil {
@@ -475,25 +539,6 @@ func (r *Reader) errPos(obj Object) int64 {
 		gen = entry.InStream.Generation()
 	}
 	return 0
-}
-
-func getSize(r io.Seeker) (int64, error) {
-	cur, err := r.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return 0, err
-	}
-
-	size, err := r.Seek(0, io.SeekEnd)
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.Seek(cur, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-
-	return size, nil
 }
 
 type Getter interface {
@@ -554,8 +599,8 @@ func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
 
 // Helper functions for getting objects of a specific type.  Each of these
 // functions calls Resolve on the object before attempting to convert it to the
-// desired type.  If the object is `null`, nil is returned. If the object is of
-// the wrong type, an error is returned.
+// desired type.  If the object is `null`, a zero object is returned.  If the
+// object is of the wrong type, an error is returned.
 var (
 	GetArray  = resolveAndCast[Array]
 	GetBool   = resolveAndCast[Bool]

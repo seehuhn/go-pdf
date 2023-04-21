@@ -138,12 +138,7 @@ ET
 		t.Fatal(err)
 	}
 
-	info, err := r.ReadInfo()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if x := info.Author; x != author {
+	if x := r.Info.Author; x != author {
 		t.Error("wrong author " + x)
 	}
 }

@@ -122,9 +122,8 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	}
 
 	r := &Reader{
-		size:      fi.FileSize,
-		r:         fi.R,
-		cleartext: make(map[Reference]bool),
+		r:           fi.R,
+		unencrypted: make(map[Reference]bool),
 	}
 
 	version, err := ParseVersion(fi.HeaderVersion)
@@ -156,7 +155,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 
 	if encObj, ok := trailer["Encrypt"]; ok {
 		if ref, ok := encObj.(Reference); ok {
-			r.cleartext[ref] = true
+			r.unencrypted[ref] = true
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
@@ -165,23 +164,44 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		// TODO(voss): extract the permission bits
 	}
 
-	root := trailer["Root"]
-	catalogDict, err := GetDict(r, root)
+	shouldExit := func(err error) bool {
+		if err == nil {
+			return false
+		}
+		if opt.ErrorHandling == ErrorHandlingReport {
+			if e, ok := err.(*MalformedFileError); ok {
+				r.Errors = append(r.Errors, e)
+				return false
+			}
+		}
+		return opt.ErrorHandling != ErrorHandlingRecover
+	}
+
+	catalogDict, err := GetDict(r, trailer["Root"])
 	if err != nil {
 		return nil, err
 	}
 	r.Catalog = &Catalog{}
 	err = r.DecodeDict(r.Catalog, catalogDict)
-	if err != nil {
+	if shouldExit(err) || r.Catalog.Pages == 0 {
 		return nil, err
 	}
-
 	if r.Catalog.Version > r.Version {
 		// if unset, r.catalog.Version is zero and thus smaller than r.Version
 		r.Version = r.Catalog.Version
 	}
 
-	r.infoObj = trailer["Info"]
+	infoDict, err := GetDict(r, trailer["Info"])
+	if shouldExit(err) {
+		return nil, err
+	}
+	if infoDict != nil {
+		r.Info = &Info{}
+		err = r.DecodeDict(r.Info, infoDict)
+		if shouldExit(err) {
+			return nil, err
+		}
+	}
 
 	return r, nil
 }

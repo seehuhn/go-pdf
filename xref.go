@@ -26,8 +26,8 @@ import (
 	"strconv"
 )
 
-func (r *Reader) findXRef() (int64, error) {
-	pos, err := r.lastOccurence("startxref")
+func (r *Reader) findXRef(size int64) (int64, error) {
+	pos, err := r.lastOccurence("startxref", size)
 	if err != nil {
 		return 0, err
 	}
@@ -41,7 +41,7 @@ func (r *Reader) findXRef() (int64, error) {
 		return 0, err
 	}
 
-	if xRefPos <= 0 || int64(xRefPos) >= r.size {
+	if xRefPos <= 0 || int64(xRefPos) >= size {
 		return 0, &MalformedFileError{
 			Pos: s.currentPos(),
 			Err: errors.New("invalid xref position"),
@@ -51,41 +51,13 @@ func (r *Reader) findXRef() (int64, error) {
 	return int64(xRefPos), nil
 }
 
-func (r *Reader) lastOccurence(pat string) (int64, error) {
-	const chunkSize = 1024
-
-	buf := make([]byte, chunkSize)
-	k := int64(len(pat))
-	pos := r.size
-	for pos >= k {
-		start := pos - chunkSize
-		if start < 0 {
-			start = 0
-		}
-		_, err := r.r.Seek(start, io.SeekStart)
-		if err != nil {
-			return 0, err
-		}
-		n, err := r.r.Read(buf[:pos-start])
-		if err != nil && err != io.EOF {
-			return 0, err
-		}
-
-		idx := bytes.LastIndex(buf[:n], []byte(pat))
-		if idx >= 0 {
-			return start + int64(idx), nil
-		}
-
-		pos = start + k - 1
-	}
-	return 0, &MalformedFileError{
-		Pos: 0,
-		Err: errors.New("startxref not found"),
-	}
-}
-
 func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
-	start, err := r.findXRef()
+	size, err := getSize(r.r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	start, err := r.findXRef(size)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,7 +114,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			}
 		}
 		if ref != 0 {
-			r.cleartext[ref] = true
+			r.unencrypted[ref] = true
 		}
 
 		if first {
@@ -160,7 +132,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			break
 		}
 		prevStart, ok := prev.(Integer)
-		if !ok || prevStart <= 0 || int64(prevStart) >= r.size {
+		if !ok || prevStart <= 0 || int64(prevStart) >= size {
 			return nil, nil, &MalformedFileError{
 				Pos: start,
 				Err: errors.New("invalid /Prev value"),
@@ -441,6 +413,39 @@ func decodeInt(buf []byte) (res int64) {
 	return res
 }
 
+func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
+	const chunkSize = 1024
+
+	buf := make([]byte, chunkSize)
+	k := int64(len(pat))
+	pos := size
+	for pos >= k {
+		start := pos - chunkSize
+		if start < 0 {
+			start = 0
+		}
+		_, err := r.r.Seek(start, io.SeekStart)
+		if err != nil {
+			return 0, err
+		}
+		n, err := r.r.Read(buf[:pos-start])
+		if err != nil && err != io.EOF {
+			return 0, err
+		}
+
+		idx := bytes.LastIndex(buf[:n], []byte(pat))
+		if idx >= 0 {
+			return start + int64(idx), nil
+		}
+
+		pos = start + k - 1
+	}
+	return 0, &MalformedFileError{
+		Pos: 0, // TODO(voss)
+		Err: errors.New(pat + " not found"),
+	}
+}
+
 func (pdf *Writer) setXRef(ref Reference, entry *xRefEntry) error {
 	if ref == 0 {
 		panic("invalid reference") // TODO(voss): remove
@@ -664,4 +669,23 @@ type xRefEntry struct {
 
 func (entry *xRefEntry) IsFree() bool {
 	return entry == nil || entry.Pos < 0
+}
+
+func getSize(r io.Seeker) (int64, error) {
+	cur, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	size, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = r.Seek(cur, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
+
+	return size, nil
 }

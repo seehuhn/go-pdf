@@ -25,10 +25,9 @@ import (
 func TestFindXref(t *testing.T) {
 	in := "%PDF-1.7\nhello\nstartxref\n9\n%%EOF"
 	r := &Reader{
-		size: int64(len(in)),
-		r:    strings.NewReader(in),
+		r: strings.NewReader(in),
 	}
-	start, err := r.findXRef()
+	start, err := r.findXRef(int64(len(in)))
 	if err != nil {
 		t.Error(err)
 	}
@@ -43,10 +42,9 @@ func TestLastOccurence(t *testing.T) {
 	copy(buf[1023:], pat)
 
 	r := &Reader{
-		size: int64(len(buf)),
-		r:    bytes.NewReader(buf),
+		r: bytes.NewReader(buf),
 	}
-	pos, err := r.lastOccurence(pat)
+	pos, err := r.lastOccurence(pat, int64(len(buf)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -41,9 +41,9 @@ type scanner struct {
 	// specified as an indirect object.
 	getInt func(Object) (Integer, error)
 
-	enc       *encryptInfo
-	encRef    Reference
-	cleartext map[Reference]bool // objects with no encryption
+	enc         *encryptInfo
+	encRef      Reference
+	unencrypted map[Reference]bool // objects with no encryption
 }
 
 func newScanner(r io.Reader, getInt func(Object) (Integer, error),
@@ -86,7 +86,7 @@ func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 
 	// TODO(voss): check for overflow
 	ref := NewReference(uint32(number), uint16(generation))
-	if s.cleartext[ref] {
+	if s.unencrypted[ref] {
 		// some objects are not encrypted, e.g. xref dictionaries
 		s.enc = nil
 	} else {

@@ -40,14 +40,10 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 		return nil, err
 	}
 
-	info, err := pdf.ReadInfo()
-	if err != nil {
-		return nil, err
-	}
 	res := &Data{
 		Version: pdf.Version,
 		Catalog: pdf.Catalog,
-		Info:    info,
+		Info:    pdf.Info,
 		ID:      pdf.ID,
 		Objects: map[Reference]Object{},
 	}

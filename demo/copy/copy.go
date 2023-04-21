@@ -148,11 +148,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	info, err := r.ReadInfo()
-	if err != nil {
-		log.Fatal(err)
-	}
-	trans.w.SetInfo(info)
+	trans.w.SetInfo(r.Info)
 
 	trans.w.Catalog = catalog
 

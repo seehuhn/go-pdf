@@ -35,6 +35,7 @@ func TestReferenceChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	a := w.Alloc()
 	b := w.Alloc()
 	err = w.Put(a, b)
@@ -77,6 +78,7 @@ func TestReferenceLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	a := w.Alloc()
 	b := w.Alloc()
 	err = w.Put(a, b)
