@@ -137,31 +137,6 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	// Now we can install the real xref table.
 	r.xref = xref
 
-	ID, ok := trailer["ID"].(Array)
-	if ok && len(ID) >= 2 {
-		for i := 0; i < 2; i++ {
-			s, ok := ID[i].(String)
-			if !ok {
-				break
-			}
-			r.ID = append(r.ID, []byte(s))
-		}
-		if len(r.ID) != 2 {
-			r.ID = nil
-		}
-	}
-
-	if encObj, ok := trailer["Encrypt"]; ok {
-		if ref, ok := encObj.(Reference); ok {
-			r.unencrypted[ref] = true
-		}
-		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
-		if err != nil {
-			return nil, err
-		}
-		// TODO(voss): extract the permission bits
-	}
-
 	shouldExit := func(err error) bool {
 		if err == nil {
 			return false
@@ -173,6 +148,28 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 			}
 		}
 		return opt.ErrorHandling != ErrorHandlingRecover
+	}
+
+	IDObj := trailer["ID"]
+	r.ID = getDirectID(IDObj)
+	if encObj, ok := trailer["Encrypt"]; ok {
+		if r.ID == nil {
+			return nil, errors.New("file is encrypted, but has no ID")
+		}
+		if ref, ok := encObj.(Reference); ok {
+			r.unencrypted[ref] = true
+		}
+		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
+		if err != nil {
+			return nil, err
+		}
+		// TODO(voss): extract the permission bits
+	} else if r.ID == nil && IDObj != nil {
+		// If the file is not encrypted, ID may be an indirect object.
+		r.ID, err = r.getID(IDObj)
+		if shouldExit(err) {
+			return nil, err
+		}
 	}
 
 	catalogDict, err := GetDict(r, trailer["Root"])
@@ -379,6 +376,46 @@ func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 		}
 	}
 	return out, nil
+}
+
+func (r *Reader) getID(obj Object) ([][]byte, error) {
+	arr, err := GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+	if len(arr) != 2 {
+		return nil, &MalformedFileError{
+			Err: errors.New("invalid ID"),
+		}
+	}
+	id := make([][]byte, 2)
+	for i, obj := range arr {
+		s, err := GetString(r, obj)
+		if err != nil {
+			return nil, err
+		}
+		id[i] = []byte(s)
+	}
+	return id, nil
+}
+
+func getDirectID(obj Object) [][]byte {
+	if obj == nil {
+		return nil
+	}
+	arr, ok := obj.(Array)
+	if !ok || len(arr) != 2 {
+		return nil
+	}
+	id := make([][]byte, 2)
+	for i, obj := range arr {
+		s, ok := obj.(String)
+		if !ok {
+			return nil
+		}
+		id[i] = []byte(s)
+	}
+	return id
 }
 
 type objStm struct {
