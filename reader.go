@@ -151,7 +151,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 
 	IDObj := trailer["ID"]
-	r.ID = getDirectID(IDObj)
+	r.ID = getIDDirect(IDObj)
 	if encObj, ok := trailer["Encrypt"]; ok {
 		if r.ID == nil {
 			return nil, errors.New("file is encrypted, but has no ID")
@@ -399,7 +399,7 @@ func (r *Reader) getID(obj Object) ([][]byte, error) {
 	return id, nil
 }
 
-func getDirectID(obj Object) [][]byte {
+func getIDDirect(obj Object) [][]byte {
 	if obj == nil {
 		return nil
 	}
@@ -622,6 +622,10 @@ func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
 		return x, err
 	}
 
+	if obj == nil {
+		return x, nil
+	}
+
 	var isCorrectType bool
 	x, isCorrectType = obj.(T)
 	if isCorrectType {
@@ -636,8 +640,8 @@ func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
 
 // Helper functions for getting objects of a specific type.  Each of these
 // functions calls Resolve on the object before attempting to convert it to the
-// desired type.  If the object is `null`, a zero object is returned.  If the
-// object is of the wrong type, an error is returned.
+// desired type.  If the object is `null`, a zero object is returned witout
+// error.  If the object is of the wrong type, an error is returned.
 var (
 	GetArray  = resolveAndCast[Array]
 	GetBool   = resolveAndCast[Bool]

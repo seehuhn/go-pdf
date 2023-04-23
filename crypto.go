@@ -51,13 +51,16 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	if err != nil {
 		return nil, err
 	}
-	var subFilter string
-	if obj, ok := enc["SubFilter"].(Name); ok {
-		subFilter = string(obj)
+	subFilter, err := GetName(r, enc["SubFilter"])
+	if err != nil {
+		return nil, err
 	}
 
 	// version of the encryption/decryption algorithm
-	V, _ := enc["V"].(Integer)
+	V, err := GetInt(r, enc["V"])
+	if err != nil {
+		return nil, err
+	}
 
 	length := 40
 	if obj, ok := enc["Length"].(Integer); ok && V > 1 {
@@ -542,7 +545,7 @@ func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 	}
 }
 
-// algorithm 2: compute the encryption key
+// Algorithm 2: compute the encryption key.
 // key must either be nil or have length of at least 16 bytes.
 // pw must be the padded password
 func (sec *stdSecHandler) computeKey(key []byte, pw []byte) []byte {
@@ -603,7 +606,7 @@ func (sec *stdSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
 	return o
 }
 
-// algorithm 4/5: compute U
+// Algorithm 4/5: compute U.
 // U must be a slice of length 32.
 // key must be the encryption key computed from the user password.
 func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
@@ -640,7 +643,7 @@ func padPasswd(passwd string) []byte {
 	pw := make([]byte, 32)
 	i := 0
 	for _, r := range passwd {
-		// Convert password to Latin-1.  We can do this by just taking the
+		// Convert password to Latin-1.  We do this by just taking the
 		// lower byte of every rune.
 		pw[i] = byte(r)
 		i++
