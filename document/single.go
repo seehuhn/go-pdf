@@ -37,12 +37,12 @@ type SinglePage struct {
 	pages     *pagetree.Writer
 }
 
-func CreateSinglePage(fileName string, width, height float64) (*SinglePage, error) {
+func CreateSinglePage(fileName string, width, height float64, opt *pdf.WriterOptions) (*SinglePage, error) {
 	fd, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
 	}
-	doc, err := WriteSinglePage(fd, width, height)
+	doc, err := WriteSinglePage(fd, width, height, opt)
 	if err != nil {
 		fd.Close()
 		return nil, err
@@ -51,8 +51,8 @@ func CreateSinglePage(fileName string, width, height float64) (*SinglePage, erro
 	return doc, nil
 }
 
-func WriteSinglePage(w io.Writer, width, height float64) (*SinglePage, error) {
-	out, err := pdf.NewWriter(w, nil)
+func WriteSinglePage(w io.Writer, width, height float64, opt *pdf.WriterOptions) (*SinglePage, error) {
+	out, err := pdf.NewWriter(w, opt)
 	if err != nil {
 		return nil, err
 	}

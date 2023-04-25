@@ -262,7 +262,7 @@ func (pdf *Writer) Close() error {
 	catRef := pdf.Alloc()
 	err := pdf.Put(catRef, AsDict(pdf.Catalog))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write document catalog: %w", err)
 	}
 
 	xRefDict := Dict{
@@ -348,7 +348,7 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 
 	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
 	if err != nil {
-		return err
+		return fmt.Errorf("Writer.Put: %w", err)
 	}
 	pdf.w.ref = ref
 
@@ -394,23 +394,23 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		}
 	}
 
-	sRef := pdf.Alloc()
-	for i, ref := range refs {
-		err := pdf.setXRef(ref, &xRefEntry{InStream: sRef, Pos: int64(i)})
-		if err != nil {
-			return err
-		}
-	}
-
 	if pdf.Version < V1_5 {
 		// Object streams are only availble in PDF version 1.5 and higher.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)
 			if err != nil {
-				return err
+				return fmt.Errorf("Writer.WriteCompressed (V<1.5): %w", err)
 			}
 		}
 		return nil
+	}
+
+	sRef := pdf.Alloc()
+	for i, ref := range refs {
+		err := pdf.setXRef(ref, &xRefEntry{InStream: sRef, Pos: int64(i)})
+		if err != nil {
+			return fmt.Errorf("Writer.WriteCompressed: %w", err)
+		}
 	}
 
 	// get the offsets
@@ -483,7 +483,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 
 	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Writer.OpenStream: %w", err)
 	}
 	pdf.w.ref = ref
 
@@ -717,11 +717,11 @@ func (x *Placeholder) Set(val Object) error {
 		if pdf.inStream {
 			pdf.afterStream = append(pdf.afterStream, func(w *Writer) error {
 				err := w.Put(x.ref, val)
-				return err
+				return fmt.Errorf("Placeholder.Set (afterstream): %w", err)
 			})
 		} else {
 			err := pdf.Put(x.ref, val)
-			return err
+			return fmt.Errorf("Placeholder.Set: %w", err)
 		}
 	}
 

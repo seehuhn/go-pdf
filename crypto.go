@@ -428,7 +428,7 @@ func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func([]byte, int
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
 // Handler.
 func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) *stdSecHandler {
-	P := stdSecPerm(perm)
+	P := stdSecPermToP(perm)
 	var R int
 	const rev3Perms = 1<<(9-1) | 1<<(10-1) | 1<<(11-1) | 1<<(12-1)
 	if V < 2 && P&rev3Perms == rev3Perms {
@@ -663,6 +663,53 @@ var passwdPad = []byte{
 	0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80, 0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
 }
 
+func stdSecPToPerm(V int, P uint32) Perm {
+	perm := PermAll
+	if V == 2 {
+		if P&1<<(3-1) == 0 {
+			perm &= ^(PermPrint | PermPrintDegraded)
+		}
+	} else if V >= 3 {
+		// bit 3 | 12
+		//     0 | 0 -> no printing (both forbidden)
+		//     0 | 1 -> full printing
+		//     1 | 0 -> only degraded printing (full printing forbidden)
+		//     1 | 1 -> full printing
+		if P&1<<(3-1) == 0 && P&1<<(12-1) == 0 {
+			perm &= ^(PermPrint | PermPrintDegraded)
+		} else if P&1<<(3-1) != 0 && P&1<<(12-1) == 0 {
+			perm &= ^PermPrint
+		}
+	}
+	return perm
+}
+
+func stdSecPermToP(perm Perm) uint32 {
+	forbidden := uint32(0)
+	if perm&PermCopy == 0 {
+		forbidden |= 1 << (5 - 1)
+	}
+	if perm&PermPrint == 0 {
+		forbidden |= 1 << (12 - 1)
+		if perm&PermPrintDegraded == 0 {
+			forbidden |= 1 << (3 - 1)
+		}
+	}
+	if perm&PermAnnotate == 0 {
+		forbidden |= 1 << (6 - 1)
+		if perm&PermForms == 0 {
+			forbidden |= 1 << (9 - 1)
+		}
+	}
+	if perm&PermAssemble == 0 {
+		forbidden |= 1 << (11 - 1)
+	}
+	if perm&PermModify == 0 {
+		forbidden |= 1 << (4 - 1)
+	}
+	return ^forbidden
+}
+
 type encryptWriter struct {
 	w   io.WriteCloser
 	cbc cipher.BlockMode
@@ -886,7 +933,9 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 }
 
 // Perm describes which operations are permitted when accessing the document
-// with User access (but not Owner access).
+// with User access (but not Owner access).  The user can always view the
+// document.
+//
 // This library just reports the permissions as specified in the PDF file.
 // It is up to the caller to enforce the permissions.
 type Perm int
@@ -924,29 +973,3 @@ const (
 	// Owner access.
 	PermAll = permNext - 1
 )
-
-func stdSecPerm(perm Perm) uint32 {
-	forbidden := uint32(0)
-	if perm&PermCopy == 0 {
-		forbidden |= 1 << (5 - 1)
-	}
-	if perm&PermPrint == 0 {
-		forbidden |= 1 << (12 - 1)
-		if perm&PermPrintDegraded == 0 {
-			forbidden |= 1 << (3 - 1)
-		}
-	}
-	if perm&PermAnnotate == 0 {
-		forbidden |= 1 << (6 - 1)
-		if perm&PermForms == 0 {
-			forbidden |= 1 << (9 - 1)
-		}
-	}
-	if perm&PermAssemble == 0 {
-		forbidden |= 1 << (11 - 1)
-	}
-	if perm&PermModify == 0 {
-		forbidden |= 1 << (4 - 1)
-	}
-	return ^forbidden
-}

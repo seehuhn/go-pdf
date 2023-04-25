@@ -27,7 +27,7 @@ import (
 
 func TestType3(t *testing.T) {
 	paper := pagetree.A5
-	doc, err := document.CreateSinglePage("test-type3.pdf", paper.URx, paper.URy)
+	doc, err := document.CreateSinglePage("test-type3.pdf", paper.URx, paper.URy, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

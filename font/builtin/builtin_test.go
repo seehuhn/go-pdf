@@ -25,7 +25,7 @@ import (
 )
 
 func TestSimple(t *testing.T) {
-	doc, err := document.CreateSinglePage("test-builtin-simple.pdf", 10+16*20, 5+16*20+5)
+	doc, err := document.CreateSinglePage("test-builtin-simple.pdf", 10+16*20, 5+16*20+5, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

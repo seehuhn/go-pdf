@@ -25,7 +25,7 @@ import (
 
 func TestSinglePage(t *testing.T) {
 	buf := &bytes.Buffer{}
-	doc, err := WriteSinglePage(buf, 100, 100)
+	doc, err := WriteSinglePage(buf, 100, 100, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestRoundTrip(t *testing.T) {
 	testVal := pdf.Integer(42)
 
 	buf := &bytes.Buffer{}
-	doc, err := WriteSinglePage(buf, 100, 100)
+	doc, err := WriteSinglePage(buf, 100, 100, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func BenchmarkSinglePage(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
 
-		doc, err := WriteSinglePage(buf, 100, 100)
+		doc, err := WriteSinglePage(buf, 100, 100, nil)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -96,7 +96,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 	buf := &bytes.Buffer{}
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		doc, err := WriteSinglePage(buf, 100, 100)
+		doc, err := WriteSinglePage(buf, 100, 100, nil)
 		if err != nil {
 			b.Fatal(err)
 		}

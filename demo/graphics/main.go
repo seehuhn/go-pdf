@@ -28,7 +28,7 @@ import (
 func main() {
 	bbox := pagetree.A4
 
-	w, err := document.CreateSinglePage("graphics.pdf", bbox.URx, bbox.URy)
+	w, err := document.CreateSinglePage("graphics.pdf", bbox.URx, bbox.URy, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

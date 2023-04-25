@@ -25,7 +25,7 @@ import (
 )
 
 func TestCID(t *testing.T) {
-	w, err := document.CreateSinglePage("test-otf-cid.pdf", 10+16*20, 5+32*20+5)
+	w, err := document.CreateSinglePage("test-otf-cid.pdf", 10+16*20, 5+32*20+5, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
