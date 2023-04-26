@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -28,10 +29,10 @@ func TestComputeOU(t *testing.T) {
 	P := -4
 	sec := &stdSecHandler{
 		P: uint32(P),
-		id: []byte{0xac, 0xac, 0x29, 0xb4, 0x19, 0x2f, 0xd9, 0x23,
+		ID: []byte{0xac, 0xac, 0x29, 0xb4, 0x19, 0x2f, 0xd9, 0x23,
 			0xc2, 0x4f, 0xe6, 0x04, 0x24, 0x79, 0xb2, 0xa9},
 		R:        4,
-		KeyBytes: 16,
+		keyBytes: 16,
 	}
 
 	O := sec.computeO(passwd, "")
@@ -39,11 +40,11 @@ func TestComputeOU(t *testing.T) {
 	if fmt.Sprintf("%x", O) != goodO {
 		t.Fatal("wrong O value")
 	}
-	sec.o = O
+	sec.O = O
 
 	U := make([]byte, 32)
 	pw := padPasswd(passwd)
-	key := sec.computeKey(nil, pw)
+	key := sec.computeFileEncyptionKey(nil, pw)
 	U = sec.computeU(U, key)
 	goodU := "a5b5fc1fcc399c6845fedcdfac82027c00000000000000000000000000000000"
 	if fmt.Sprintf("%x", U) != goodU {
@@ -54,7 +55,7 @@ func TestComputeOU(t *testing.T) {
 // TODO(voss): remove?
 func (sec *stdSecHandler) deauthenticate() {
 	sec.key = nil
-	sec.OwnerAuthenticated = false
+	sec.ownerAuthenticated = false
 }
 
 func TestCryptV1(t *testing.T) {
@@ -88,7 +89,7 @@ func TestCryptV1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// os.WriteFile("test_TestV1.pdf", buf.Bytes(), 0o666)
+	os.WriteFile("test_TestV1.pdf", buf.Bytes(), 0o666)
 
 	in := bytes.NewReader(buf.Bytes())
 	pwdFunc := func(_ []byte, try int) string {
@@ -186,7 +187,7 @@ func TestAuthentication(t *testing.T) {
 					t.Error("wrong user password used", i)
 				}
 			}
-			if r.enc.sec.OwnerAuthenticated {
+			if r.enc.sec.ownerAuthenticated {
 				t.Fatal("owner wrongly authenticated")
 			}
 			err = r.AuthenticateOwner()
@@ -194,7 +195,7 @@ func TestAuthentication(t *testing.T) {
 				t.Error(err, "PDF-"+ver.String(), i, userFirst)
 				continue
 			}
-			if !r.enc.sec.OwnerAuthenticated {
+			if !r.enc.sec.ownerAuthenticated {
 				t.Fatal("owner not authenticated")
 			}
 			if len(pwdList) != 1 {
@@ -260,10 +261,10 @@ func TestAuth(t *testing.T) {
 				t.Errorf("wrong key")
 			}
 
-			if (lastPwd == test.owner) != sec.OwnerAuthenticated {
+			if (lastPwd == test.owner) != sec.ownerAuthenticated {
 				t.Errorf("%d.%d: wrong value for .OwnerAuthenticated"+
 					" (%q %q %t)",
-					i, j, lastPwd, test.owner, sec.OwnerAuthenticated)
+					i, j, lastPwd, test.owner, sec.ownerAuthenticated)
 			}
 		}
 	}
@@ -291,7 +292,7 @@ func TestAuth2(t *testing.T) {
 
 func TestEncryptBytes(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
-	for _, cipher := range []cipherType{cipherRC4, cipherAES128} {
+	for _, cipher := range []cipherType{cipherRC4, cipherAESV2} {
 		for length := 40; length <= 128; length += 8 {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
@@ -323,7 +324,7 @@ func TestEncryptBytes(t *testing.T) {
 
 func TestEncryptStream(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
-	for _, cipher := range []cipherType{cipherRC4, cipherAES128} {
+	for _, cipher := range []cipherType{cipherRC4, cipherAESV2} {
 		for length := 40; length <= 128; length += 8 {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",

@@ -191,7 +191,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		var V int
 		if pdf.Version >= V1_6 {
 			cf = &cryptFilter{
-				Cipher: cipherAES128,
+				Cipher: cipherAESV2,
 				Length: 128,
 			}
 			V = 4
@@ -278,7 +278,7 @@ func (pdf *Writer) Close() error {
 		xRefDict["ID"] = Array{String(pdf.id[0]), String(pdf.id[1])}
 	}
 	if pdf.w.enc != nil {
-		xRefDict["Encrypt"] = pdf.w.enc.ToDict(pdf.Version)
+		xRefDict["Encrypt"] = pdf.w.enc.AsDict(pdf.Version)
 	}
 
 	// don't encrypt the encryption dictionary and the xref dict

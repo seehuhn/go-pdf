@@ -232,7 +232,7 @@ func (r *Reader) Close() error {
 // authenticated (or if no authentication is required), and an object of type
 // [AuthenticationError] if the required password was not supplied.
 func (r *Reader) AuthenticateOwner() error {
-	if r.enc == nil || r.enc.sec.OwnerAuthenticated {
+	if r.enc == nil || r.enc.sec.ownerAuthenticated {
 		return nil
 	}
 	_, err := r.enc.sec.GetKey(true)
@@ -245,7 +245,7 @@ func (r *Reader) AuthenticateOwner() error {
 // authenticated (or if no authentication is required), and an object of type
 // [AuthenticationError] if the required password was not supplied.
 func (r *Reader) Authenticate(perm Perm) error {
-	if r.enc == nil || r.enc.sec.OwnerAuthenticated {
+	if r.enc == nil || r.enc.sec.ownerAuthenticated {
 		return nil
 	}
 	perm = perm & PermAll

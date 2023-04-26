@@ -53,10 +53,10 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	if err != nil {
 		return nil, err
 	}
-	subFilter, err := GetName(r, enc["SubFilter"])
-	if err != nil {
-		return nil, err
-	}
+	// subFilter, err := GetName(r, enc["SubFilter"])
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// version of the encryption/decryption algorithm
 	V, err := GetInt(r, enc["V"])
@@ -90,50 +90,46 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 				}
 			}
 		}
-
 		res.stmF = cf
 		res.strF = cf
 		res.efF = cf
-
 		keyBytes = cf.Length / 8 // TODO(voss): ???
 	case 4, 5:
 		var CF Dict
 		if obj, ok := enc["CF"].(Dict); ok {
 			CF = obj
 		}
-
 		if obj, ok := enc["StmF"].(Name); ok {
-			ciph, err := getCipher(obj, CF)
+			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
 				return nil, &MalformedFileError{
 					Pos: r.errPos(encObj),
 					Err: err,
 				}
 			}
-			res.stmF = ciph
+			res.stmF = cf
 		}
 		if obj, ok := enc["StrF"].(Name); ok {
-			ciph, err := getCipher(obj, CF)
+			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
 				return nil, &MalformedFileError{
 					Pos: r.errPos(encObj),
 					Err: err,
 				}
 			}
-			res.strF = ciph
+			res.strF = cf
 		}
 		res.efF = res.stmF // default
 		if obj, ok := enc["EFF"].(Name); ok {
-			ciph, err := getCipher(obj, CF)
+			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
 				return nil, &MalformedFileError{
 					Pos: r.errPos(encObj),
 					Err: err,
 				}
 			}
-			res.efF = ciph
+			res.efF = cf
 		}
-
 		if V == 4 {
 			keyBytes = 16
 		} else {
@@ -148,7 +144,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	}
 
 	switch {
-	case filter == "Standard" && subFilter == "":
+	case filter == "Standard":
 		sec, err := openStdSecHandler(enc, keyBytes, r.ID[0], readPwd)
 		if err != nil {
 			return nil, &MalformedFileError{
@@ -168,7 +164,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	return res, nil
 }
 
-func (enc *encryptInfo) ToDict(version Version) Dict {
+func (enc *encryptInfo) AsDict(version Version) Dict {
 	dict := Dict{
 		"Filter": Name("Standard"),
 	}
@@ -199,7 +195,7 @@ func (enc *encryptInfo) ToDict(version Version) Dict {
 		panic("not implemented: mixed ciphers")
 	}
 
-	if cipher == cipherAES256 && length == 256 && version >= V2_0 {
+	if cipher == cipherAESV3 && length == 256 && version >= V2_0 {
 		// In PDF 2.0, all V values less than 5 are deprecated,
 		// so we try this first.
 		dict["V"] = Integer(5)
@@ -213,7 +209,7 @@ func (enc *encryptInfo) ToDict(version Version) Dict {
 	} else if cipher == cipherRC4 && version >= V1_4 {
 		dict["V"] = Integer(2)
 		dict["Length"] = Integer(length)
-	} else if cipher == cipherAES128 && version >= V1_6 {
+	} else if cipher == cipherAESV2 && version >= V1_6 {
 		dict["V"] = Integer(4)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
@@ -226,8 +222,8 @@ func (enc *encryptInfo) ToDict(version Version) Dict {
 
 	sec := enc.sec
 	dict["R"] = Integer(sec.R)
-	dict["O"] = String(sec.o)
-	dict["U"] = String(sec.u)
+	dict["O"] = String(sec.O)
+	dict["U"] = String(sec.U)
 	dict["P"] = Integer(int32(sec.P))
 	if sec.unencryptedMetaData {
 		dict["EncryptMetadata"] = Bool(false)
@@ -242,16 +238,16 @@ func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref Reference) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	_, _ = h.Write(key)
+	h.Write(key)
 	num := ref.Number()
 	gen := ref.Generation()
-	_, _ = h.Write([]byte{
+	h.Write([]byte{
 		byte(num), byte(num >> 8), byte(num >> 16),
 		byte(gen), byte(gen >> 8)})
-	if cf.Cipher == cipherAES128 {
-		_, _ = h.Write([]byte("sAlT"))
+	if cf.Cipher == cipherAESV2 {
+		h.Write([]byte("sAlT"))
 	}
-	l := enc.sec.KeyBytes + 5
+	l := enc.sec.keyBytes + 5
 	if l > 16 {
 		l = 16
 	}
@@ -271,7 +267,7 @@ func (enc *encryptInfo) EncryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return nil, err
 	}
 	switch cf.Cipher {
-	case cipherAES128:
+	case cipherAESV2:
 		n := len(buf)
 		nPad := 16 - n%16
 		out := make([]byte, 16+n+nPad) // iv | c(data|padding)
@@ -320,7 +316,7 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return nil, err
 	}
 	switch cf.Cipher {
-	case cipherAES128:
+	case cipherAESV2:
 		if len(buf) < 32 {
 			return nil, errCorrupted
 		}
@@ -360,7 +356,10 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 	}
 
 	switch cf.Cipher {
-	case cipherAES128:
+	case cipherRC4:
+		c, _ := rc4.NewCipher(key)
+		return &cipher.StreamReader{S: c, R: r}, nil
+	case cipherAESV2:
 		buf := make([]byte, 32)
 		iv := buf[:16]
 		_, err := io.ReadFull(r, iv)
@@ -378,9 +377,6 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 			r:   r,
 			buf: buf,
 		}, nil
-	case cipherRC4:
-		c, _ := rc4.NewCipher(key)
-		return &cipher.StreamReader{S: c, R: r}, nil
 	default:
 		panic("unknown cipher")
 	}
@@ -390,37 +386,69 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 // The "user password" is used to access the contents of the document, the
 // "owner password" can be used to control additional permissions, e.g.
 // permission to print the document.
+//
+// This represents the PDF standard security handler, which is specified in
+// section 7.6.3 of PDF 32000-1:2008.
 type stdSecHandler struct {
-	id       []byte
-	o        []byte
-	u        []byte
-	KeyBytes int
+	// R specified the revision of the standard security handler used.
+	R int
+
+	// ID is the original PDF document ID, i.e. the first element of the ID
+	// array in the trailer dictionary.
+	ID []byte
+
+	// O is a byte string, based on the owner password, that is used in
+	// computing the file encryption key and in determining whether a valid
+	// owner password was entered.
+	O []byte
+
+	// U is a byte string, based on the owner and user password, that is used
+	// in determining whether to prompt the user for a password and, if so,
+	// whether a valid user or owner password was entered.
+	U []byte
+
+	// P is a set of flags specifying which operations shall be permitted when
+	// the document is opened with user access.
+	P uint32
+
+	keyBytes int
 
 	readPwd func([]byte, int) string
 	key     []byte
 
+	// unencryptedMetaData specifies whether document-level XMP metadata
+	// streams are encrypted.
+	//
 	// We use the negation of /EncryptMetadata from the PDF spec, so that
 	// the Go default value (unencryptedMetaData==false) corresponds to the
 	// PDF default value (/EncryptMetadata true).
 	unencryptedMetaData bool
 
-	R int
-	P uint32
-
-	OwnerAuthenticated bool
+	ownerAuthenticated bool
 }
 
+// openStdSecHandler creates a new stdSecHandler from the encryption dictionary
+// and the document ID.  This is used when reading existing PDF documents.
 func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, int) string) (*stdSecHandler, error) {
 	R, ok := enc["R"].(Integer)
-	if !ok || R < 2 || R > 4 {
+	if !ok || R < 2 || R == 5 || R > 6 {
 		return nil, errors.New("invalid Encrypt.R")
 	}
+	ouLength := 32
+	if R == 6 {
+		ouLength = 48
+	}
+
+	// V has already been checked when this function is called, so we know
+	// it is present and valid.
+	V := enc["V"].(Integer)
+
 	O, ok := enc["O"].(String)
-	if !ok || len(O) != 32 {
+	if !ok || len(O) != ouLength {
 		return nil, errors.New("invalid Encrypt.O")
 	}
 	U, ok := enc["U"].(String)
-	if !ok || len(U) != 32 {
+	if !ok || len(U) != ouLength {
 		return nil, errors.New("invalid Encrypt.U")
 	}
 	P, ok := enc["P"].(Integer)
@@ -428,18 +456,18 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 		return nil, errors.New("invalid Encrypt.P")
 	}
 	emd := true
-	if obj, ok := enc["EncryptMetaData"].(Bool); ok && R == 4 {
+	if obj, ok := enc["EncryptMetaData"].(Bool); ok && V >= 4 {
 		emd = bool(obj)
 	}
 
 	sec := &stdSecHandler{
-		id:       ID,
-		KeyBytes: keyBytes,
+		ID:       ID,
+		keyBytes: keyBytes,
 		readPwd:  readPwd,
 
 		R: int(R),
-		o: []byte(O),
-		u: []byte(U),
+		O: []byte(O),
+		U: []byte(U),
 		P: uint32(P),
 
 		unencryptedMetaData: !emd,
@@ -448,32 +476,37 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 }
 
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
-// Handler.
+// Handler.  This is used when creating new PDF documents.
 func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) *stdSecHandler {
 	var R int
-	if V < 2 && perm.canR2() {
+	switch {
+	case V < 2 && perm.canR2():
 		R = 2
-	} else if V <= 3 {
+	case V <= 3:
 		R = 3
-	} else {
+	case V == 4:
 		R = 4
+	case V == 5:
+		R = 6
+	default:
+		panic("invalid V")
 	}
 	keyBytes := 16
 	if V == 1 {
 		keyBytes = 5
 	}
 	sec := &stdSecHandler{
-		id:       id,
-		KeyBytes: keyBytes,
+		ID:       id,
+		keyBytes: keyBytes,
 		R:        R,
 		P:        stdSecPermToP(perm),
 
-		OwnerAuthenticated: true,
+		ownerAuthenticated: true,
 	}
-	sec.o = sec.computeO(userPwd, ownerPwd)
+	sec.O = sec.computeO(userPwd, ownerPwd)
 
-	key := sec.computeKey(nil, padPasswd(userPwd))
-	sec.u = sec.computeU(make([]byte, 32), key)
+	key := sec.computeFileEncyptionKey(nil, padPasswd(userPwd))
+	sec.U = sec.computeU(make([]byte, 32), key)
 	sec.key = key
 
 	return sec
@@ -484,38 +517,37 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 // supplied, the OwnerAuthenticated field will be set to true, in addition to
 // returning the key.
 func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
-	// TODO(voss): key length for crypt filters???
-	if sec.key != nil && (sec.OwnerAuthenticated || !needOwner) {
+	if sec.key != nil && (sec.ownerAuthenticated || !needOwner) {
 		return sec.key, nil
 	}
 
 	key := make([]byte, 16)
-	u := make([]byte, 32)
+	U := make([]byte, 32)
 
 	passwd := ""
 	passWdTry := 0
-	for {
+	for { // try different passwords until one succeeds
 		for try := 0; try < 2; try++ {
 			// try == 0: check whether passwd is the owner password
 			// try == 1: check whether passwd is the user password
 
-			pw := padPasswd(passwd)
+			passwd := padPasswd(passwd)
 
 			if try == 0 {
 				// try to decrypt sec.O
 				h := md5.New()
-				_, _ = h.Write(pw)
+				h.Write(passwd)
 				sum := h.Sum(nil)
 				if sec.R >= 3 {
 					for i := 0; i < 50; i++ {
 						h.Reset()
-						_, _ = h.Write(sum) // sum[:sec.n]?
+						h.Write(sum[:sec.keyBytes])
 						sum = h.Sum(sum[:0])
 					}
 				}
-				key := sum[:sec.KeyBytes]
+				key := sum[:sec.keyBytes]
 
-				copy(pw, sec.o)
+				copy(passwd, sec.O)
 				if sec.R >= 3 {
 					tmpKey := make([]byte, len(key))
 					for i := byte(19); i > 0; i-- {
@@ -523,26 +555,26 @@ func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 							tmpKey[j] = key[j] ^ i
 						}
 						c, _ := rc4.NewCipher(tmpKey)
-						c.XORKeyStream(pw, pw)
+						c.XORKeyStream(passwd, passwd)
 					}
 				}
 				c, _ := rc4.NewCipher(key)
-				c.XORKeyStream(pw, pw)
+				c.XORKeyStream(passwd, passwd)
 			}
 
-			key = sec.computeKey(key, pw)
-			u = sec.computeU(u, key)
+			key = sec.computeFileEncyptionKey(key, passwd)
+			U = sec.computeU(U, key)
 			var ok bool
 			if sec.R >= 3 {
-				ok = bytes.Equal(sec.u[:16], u[:16])
+				ok = bytes.Equal(sec.U[:16], U[:16])
 			} else {
-				ok = bytes.Equal(sec.u, u)
+				ok = bytes.Equal(sec.U, U)
 			}
 
 			if ok {
 				sec.key = key
 				if try == 0 {
-					sec.OwnerAuthenticated = true
+					sec.ownerAuthenticated = true
 				}
 				return key, nil
 			}
@@ -554,65 +586,67 @@ func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 
 		// wrong password, try another one
 		if sec.readPwd != nil {
-			passwd = sec.readPwd(sec.id, passWdTry)
+			passwd = sec.readPwd(sec.ID, passWdTry)
 			passWdTry++
 		} else {
 			passwd = ""
 		}
 		if passwd == "" {
-			return nil, &AuthenticationError{sec.id}
+			return nil, &AuthenticationError{sec.ID}
 		}
 	}
 }
 
-// Algorithm 2: compute the encryption key.
+// Algorithm 2: compute the file encryption key.
 // key must either be nil or have length of at least 16 bytes.
 // pw must be the padded password
-func (sec *stdSecHandler) computeKey(key []byte, pw []byte) []byte {
+func (sec *stdSecHandler) computeFileEncyptionKey(key []byte, pw []byte) []byte {
 	h := md5.New()
-	_, _ = h.Write(pw)
-	_, _ = h.Write(sec.o)
-	_, _ = h.Write([]byte{
+	h.Write(pw)
+	h.Write(sec.O)
+	h.Write([]byte{
 		byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
-	_, _ = h.Write(sec.id)
-	if sec.unencryptedMetaData {
-		_, _ = h.Write([]byte{255, 255, 255, 255})
+	h.Write(sec.ID)
+	if sec.unencryptedMetaData && sec.R >= 4 {
+		h.Write([]byte{255, 255, 255, 255})
 	}
 	key = h.Sum(key[:0])
 
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			_, _ = h.Write(key[:sec.KeyBytes])
+			h.Write(key[:sec.keyBytes])
 			key = h.Sum(key[:0])
 		}
 	}
 
-	return key[:sec.KeyBytes]
+	return key[:sec.keyBytes]
 }
 
-// this uses only the .R field of sec.
+// algorithm 3: compute O.
+// This uses only the .R field of sec.
+// The algorithm is documented in section 7.6.3.4 of ISO 32000-1:2008.
 func (sec *stdSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
 	if ownerPasswd == "" {
 		ownerPasswd = userPasswd
 	}
-	pwo := padPasswd(ownerPasswd)
+	paddedPasswd := padPasswd(ownerPasswd)
 
 	h := md5.New()
-	_, _ = h.Write(pwo)
+	h.Write(paddedPasswd)
 	sum := h.Sum(nil)
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			_, _ = h.Write(sum[:sec.KeyBytes])
+			h.Write(sum[:sec.keyBytes]) // TODO(voss): is this correct?
 			sum = h.Sum(sum[:0])
 		}
 	}
-	rc4key := sum[:sec.KeyBytes]
+	rc4key := sum[:sec.keyBytes]
 
 	c, _ := rc4.NewCipher(rc4key)
-	o := padPasswd(userPasswd)
-	c.XORKeyStream(o, o)
+	O := padPasswd(userPasswd)
+	c.XORKeyStream(O, O)
 	if sec.R >= 3 {
 		key := make([]byte, len(rc4key))
 		for i := byte(1); i <= 19; i++ {
@@ -620,14 +654,14 @@ func (sec *stdSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
 				key[j] = rc4key[j] ^ i
 			}
 			c, _ = rc4.NewCipher(key)
-			c.XORKeyStream(o, o)
+			c.XORKeyStream(O, O)
 		}
 	}
-	return o
+	return O
 }
 
 // Algorithm 4/5: compute U.
-// U must be a slice of length 32.
+// U must be a slice of length 32, and is only used for storage.
 // key must be the encryption key computed from the user password.
 func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
 	c, _ := rc4.NewCipher(key)
@@ -637,8 +671,8 @@ func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
 		c.XORKeyStream(U, U)
 	} else {
 		h := md5.New()
-		_, _ = h.Write(passwdPad)
-		_, _ = h.Write(sec.id)
+		h.Write(passwdPad)
+		h.Write(sec.ID)
 		U = h.Sum(U[:0])
 		c.XORKeyStream(U, U)
 
@@ -652,7 +686,9 @@ func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
 		}
 		// This gives the first 16 bytes of U, the remaining 16 bytes
 		// are "arbitrary padding".
-		U = append(U[:16], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+		U = append(U[:16],
+			0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0)
 	}
 
 	return U
@@ -660,6 +696,8 @@ func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
 
 // returns a slice of length 32
 func padPasswd(passwd string) []byte {
+	// TODO(voss): convert the password to PDFDocEncoding
+
 	pw := make([]byte, 32)
 	i := 0
 	for _, r := range passwd {
@@ -691,7 +729,7 @@ func stdSecPToPerm(R int, P uint32) Perm {
 		}
 	} else if R >= 3 {
 		// bit 3 | 12
-		//     0 | 0 -> no printing (both forbidden)
+		//     0 | 0 -> neither full nor degraded printing
 		//     0 | 1 -> full printing
 		//     1 | 0 -> only degraded printing (full printing forbidden)
 		//     1 | 1 -> full printing
@@ -778,7 +816,7 @@ func (enc *encryptInfo) cryptFilter(ref Reference, w io.WriteCloser) (io.WriteCl
 	}
 
 	switch cf.Cipher {
-	case cipherAES128:
+	case cipherAESV2:
 		c, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, err
@@ -913,56 +951,20 @@ func (cf *cryptFilter) String() string {
 	return fmt.Sprintf("%s-%d", cf.Cipher, cf.Length)
 }
 
-// cipherType denotes the type of encryption used in (parts of) a PDF file.
-type cipherType int
-
-const (
-	// cipherUnknown indicates that the encryption scheme has not yet been
-	// determined.
-	cipherUnknown cipherType = iota
-
-	// cipherAES128 indicates that AES encryption in CBC mode is used.  This
-	// corresponds to the StdCF crypt filter with a CFM value of AESV2 in the
-	// PDF specification.
-	cipherAES128
-
-	// cipherAES256 indicates that AES encryption in CBC mode is used.  This
-	// corresponds to the StdCF crypt filter with a CFM value of AESV3 in the
-	// PDF specification.
-	cipherAES256
-
-	// cipherRC4 indicates that RC4 encryption is used.  This corresponds to
-	// the StdCF crypt filter with a CFM value of V2 in the PDF specification.
-	cipherRC4
-)
-
-func (c cipherType) String() string {
-	switch c {
-	case cipherUnknown:
-		return "unknown"
-	case cipherAES128:
-		return "AES"
-	case cipherRC4:
-		return "RC4"
-	default:
-		return fmt.Sprintf("cipher#%d", c)
-	}
-}
-
-func getCipher(name Name, CF Dict) (*cryptFilter, error) {
-	if name == "Identity" {
+func getCryptFilter(cryptFilterName Name, CF Dict) (*cryptFilter, error) {
+	if cryptFilterName == "Identity" {
 		return nil, nil
 	}
-	if name != "StdCF" {
-		return nil, errors.New("unknown crypt filter " + string(name))
+	if cryptFilterName != "StdCF" {
+		return nil, errors.New("unknown crypt filter " + string(cryptFilterName))
 	}
 	if CF == nil {
 		return nil, errors.New("missing CF dictionary")
 	}
 
-	cfDict, ok := CF[name].(Dict)
+	cfDict, ok := CF[cryptFilterName].(Dict)
 	if !ok {
-		return nil, errors.New("missing " + string(name) + " entry in CF dict")
+		return nil, errors.New("missing " + string(cryptFilterName) + " entry in CF dict")
 	}
 
 	res := &cryptFilter{}
@@ -978,14 +980,52 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 	case Name("V2"):
 		res.Cipher = cipherRC4
 	case Name("AESV2"):
-		res.Cipher = cipherAES128
+		res.Cipher = cipherAESV2
 	case Name("AESV3"):
-		res.Cipher = cipherAES256
+		res.Cipher = cipherAESV3
 		res.Length = 256
 	default:
 		return nil, errors.New("unknown cipher")
 	}
 	return res, nil
+}
+
+// cipherType denotes the type of encryption used in (parts of) a PDF file.
+type cipherType int
+
+const (
+	// cipherUnknown indicates that the encryption scheme has not yet been
+	// determined.
+	cipherUnknown cipherType = iota
+
+	// cipherRC4 indicates that RC4 encryption is used.  This corresponds to
+	// the StdCF crypt filter with a CFM value of V2 in the PDF specification.
+	cipherRC4
+
+	// cipherAESV2 indicates that AES encryption in CBC mode is used.  This
+	// corresponds to the StdCF crypt filter with a CFM value of AESV2 in the
+	// PDF specification.
+	cipherAESV2
+
+	// cipherAESV3 indicates that AES encryption in CBC mode is used.  This
+	// corresponds to the StdCF crypt filter with a CFM value of AESV3 in the
+	// PDF specification.
+	cipherAESV3
+)
+
+func (c cipherType) String() string {
+	switch c {
+	case cipherUnknown:
+		return "unknown"
+	case cipherRC4:
+		return "RC4"
+	case cipherAESV2:
+		return "AESV2"
+	case cipherAESV3:
+		return "AESV3"
+	default:
+		return fmt.Sprintf("cipher#%d", c)
+	}
 }
 
 // Perm describes which operations are permitted when accessing the document
