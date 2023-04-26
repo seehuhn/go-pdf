@@ -9,12 +9,16 @@ import (
 )
 
 func main() {
-	for _, V := range []pdf.Version{pdf.V1_1, pdf.V1_3, pdf.V1_4, pdf.V1_5, pdf.V1_7, pdf.V2_0} {
+	// PDF1.1: 40 bit RC4
+	// PDF1.4: 128 bit RC4
+	// PDF1.6: 128 bit AES
+	// PDF2.0: 256 bit AES
+	for _, V := range []pdf.Version{pdf.V1_1, pdf.V1_4, pdf.V1_6, pdf.V2_0} {
 		opt := &pdf.WriterOptions{
-			Version:        V,
-			UserPassword:   "A",
-			OwnerPassword:  "B",
-			UserPermission: pdf.PermCopy,
+			Version:         V,
+			UserPassword:    "A",
+			OwnerPassword:   "B",
+			UserPermissions: pdf.PermCopy,
 		}
 
 		fname := "encrypted-" + V.String() + ".pdf"

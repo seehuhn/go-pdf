@@ -28,6 +28,7 @@ var (
 	errNoDate       = errors.New("not a valid date string")
 	errNoRectangle  = errors.New("not a valid PDF rectangle")
 	errDuplicateRef = errors.New("object already written")
+	errShortID      = errors.New("PDF file identifier too short")
 )
 
 // AuthenticationError indicates that authentication failed because the correct

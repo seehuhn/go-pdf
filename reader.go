@@ -153,6 +153,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	IDObj := trailer["ID"]
 	r.ID = getIDDirect(IDObj)
 	if encObj, ok := trailer["Encrypt"]; ok {
+		// If the file is encrypted, ID is guaranteed to be a direct object.
 		if r.ID == nil {
 			return nil, errors.New("file is encrypted, but has no ID")
 		}
@@ -163,12 +164,24 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		if err != nil {
 			return nil, err
 		}
-		// TODO(voss): extract the permission bits
 	} else if r.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
 		r.ID, err = r.getID(IDObj)
 		if shouldExit(err) {
 			return nil, err
+		}
+	}
+	for _, id := range r.ID {
+		if len(id) < 16 {
+			err := &MalformedFileError{
+				Err: errShortID,
+			}
+			if shouldExit(err) {
+				return nil, err
+			} else {
+				r.ID = nil
+				break
+			}
 		}
 	}
 
@@ -220,6 +233,23 @@ func (r *Reader) Close() error {
 // [AuthenticationError] if the required password was not supplied.
 func (r *Reader) AuthenticateOwner() error {
 	if r.enc == nil || r.enc.sec.OwnerAuthenticated {
+		return nil
+	}
+	_, err := r.enc.sec.GetKey(true)
+	return err
+}
+
+// AuthenticateOwner tries to authentica the actions given in perm.  If a
+// password is required, this calls the ReadPassword function specified in the
+// [ReaderOptions] struct.  The return value is nil if the owner was
+// authenticated (or if no authentication is required), and an object of type
+// [AuthenticationError] if the required password was not supplied.
+func (r *Reader) Authenticate(perm Perm) error {
+	if r.enc == nil || r.enc.sec.OwnerAuthenticated {
+		return nil
+	}
+	perm = perm & PermAll
+	if perm&r.enc.UserPermissions == perm {
 		return nil
 	}
 	_, err := r.enc.sec.GetKey(true)

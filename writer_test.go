@@ -28,15 +28,15 @@ func TestWriter(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	opt := &WriterOptions{
-		ID:             [][]byte{},
-		OwnerPassword:  "test",
-		UserPermission: PermCopy,
+		ID:              [][]byte{},
+		OwnerPassword:   "test",
+		UserPermissions: PermCopy,
 	}
 	w, err := NewWriter(out, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	encInfo1 := format(w.w.enc.ToDict())
+	encInfo1 := format(w.w.enc.ToDict(w.Version))
 
 	author := "Jochen Voß"
 	w.SetInfo(&Info{
@@ -123,7 +123,7 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	encInfo2 := format(r.enc.ToDict())
+	encInfo2 := format(r.enc.ToDict(w.Version))
 
 	if encInfo1 != encInfo2 {
 		fmt.Println()

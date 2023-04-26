@@ -65,9 +65,9 @@ type WriterOptions struct {
 	Version Version
 	ID      [][]byte
 
-	UserPassword   string
-	OwnerPassword  string
-	UserPermission Perm
+	UserPassword    string
+	OwnerPassword   string
+	UserPermissions Perm
 }
 
 var defaultWriterOptions = &WriterOptions{
@@ -148,7 +148,12 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		Pos:        -1,
 		Generation: 65535,
 	}
-	if opt.ID != nil {
+
+	needID := opt.ID != nil ||
+		version >= V2_0 ||
+		opt.UserPassword != "" ||
+		opt.OwnerPassword != ""
+	if needID {
 		switch len(opt.ID) {
 		case 0:
 			id := make([]byte, 16)
@@ -161,9 +166,9 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			for i := 0; i < 2; i++ {
 				id := make([]byte, 16)
 				if i < len(opt.ID) && opt.ID[i] != nil {
-					id = append(id[:0], opt.ID[i]...) // copy the value
-					if len(id) != 16 {
-						return nil, errors.New("wrong File Identifier length")
+					id = append(id[:0], opt.ID[i]...)
+					if len(id) < 16 {
+						return nil, errShortID
 					}
 				} else {
 					_, err := io.ReadFull(rand.Reader, id)
@@ -182,19 +187,11 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		if err := pdf.CheckVersion("encryption", V1_1); err != nil {
 			return nil, err
 		}
-		if pdf.id == nil {
-			id := make([]byte, 16)
-			_, err := io.ReadFull(rand.Reader, id)
-			if err != nil {
-				return nil, err
-			}
-			pdf.id = [][]byte{id, id}
-		}
 		var cf *cryptFilter
 		var V int
 		if pdf.Version >= V1_6 {
 			cf = &cryptFilter{
-				Cipher: cipherAES,
+				Cipher: cipherAES128,
 				Length: 128,
 			}
 			V = 4
@@ -212,12 +209,12 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			V = 1
 		}
 		sec := createStdSecHandler(pdf.id[0], opt.UserPassword,
-			opt.OwnerPassword, opt.UserPermission, V)
+			opt.OwnerPassword, opt.UserPermissions, V)
 		pdf.w.enc = &encryptInfo{
 			sec:  sec,
 			stmF: cf,
 			strF: cf,
-			eff:  cf,
+			efF:  cf,
 		}
 	}
 
@@ -281,7 +278,7 @@ func (pdf *Writer) Close() error {
 		xRefDict["ID"] = Array{String(pdf.id[0]), String(pdf.id[1])}
 	}
 	if pdf.w.enc != nil {
-		xRefDict["Encrypt"] = pdf.w.enc.ToDict()
+		xRefDict["Encrypt"] = pdf.w.enc.ToDict(pdf.Version)
 	}
 
 	// don't encrypt the encryption dictionary and the xref dict
@@ -717,11 +714,17 @@ func (x *Placeholder) Set(val Object) error {
 		if pdf.inStream {
 			pdf.afterStream = append(pdf.afterStream, func(w *Writer) error {
 				err := w.Put(x.ref, val)
-				return fmt.Errorf("Placeholder.Set (afterstream): %w", err)
+				if err != nil {
+					return fmt.Errorf("Placeholder.Set (afterstream): %w", err)
+				}
+				return nil
 			})
 		} else {
 			err := pdf.Put(x.ref, val)
-			return fmt.Errorf("Placeholder.Set: %w", err)
+			if err != nil {
+				return fmt.Errorf("Placeholder.Set: %w", err)
+			}
+			return nil
 		}
 	}
 

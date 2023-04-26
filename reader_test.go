@@ -31,7 +31,7 @@ func TestReferenceChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addEmptyPage(w)
+	err = addPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestReferenceLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addEmptyPage(w)
+	err = addPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestIndirectStreamLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addEmptyPage(w)
+	err = addPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestStreamLengthInStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addEmptyPage(w)
+	err = addPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestStreamLengthCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addEmptyPage(w, Name("Contents"), sRef)
+	err = addPage(w, Name("Contents"), sRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestStreamLengthCycle2(t *testing.T) {
 		t.Fatal(err)
 	}
 	xRef := w.Alloc()
-	err = addEmptyPage(w, Name("Rotate"), xRef)
+	err = addPage(w, Name("Rotate"), xRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,88 +365,6 @@ func TestStreamLengthCycle2(t *testing.T) {
 	}
 }
 
-func TestAuthentication(t *testing.T) {
-	msg := "super sécret"
-	for i, ver := range []Version{V1_6, V1_4, V1_3} {
-		for _, userFirst := range []bool{true, false} {
-			out := &bytes.Buffer{}
-
-			opt := &WriterOptions{
-				Version:        ver,
-				UserPassword:   "user",
-				OwnerPassword:  "owner",
-				UserPermission: PermAll,
-			}
-			w, err := NewWriter(out, opt)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			ref := w.Alloc()
-			err = w.Put(ref, TextString(msg))
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			w.Catalog.Pages = w.Alloc()
-
-			err = w.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// ---------------------------------------------------------
-			// os.WriteFile(fmt.Sprintf("xxx%d.pdf", i), out.Bytes(), 0o666)
-			// ---------------------------------------------------------
-
-			var pwdList []string
-			if userFirst {
-				pwdList = append(pwdList, "don't know", "user")
-			}
-			pwdList = append(pwdList, "friend", "owner")
-			pwdFunc := func([]byte, int) string {
-				res := pwdList[0]
-				pwdList = pwdList[1:]
-				return res
-			}
-
-			in := bytes.NewReader(out.Bytes())
-			rOpt := &ReaderOptions{
-				ReadPassword: pwdFunc,
-			}
-			r, err := NewReader(in, rOpt)
-			if err != nil {
-				t.Fatal(err, i)
-			}
-			if userFirst {
-				dec, err := GetString(r, ref)
-				if err != nil {
-					t.Fatal(err, i)
-				}
-				if dec.AsTextString() != msg {
-					t.Error("got wrong message", i)
-				}
-				if len(pwdList) != 2 {
-					t.Error("wrong user password used", i)
-				}
-			}
-			if r.enc.sec.OwnerAuthenticated {
-				t.Fatal("owner wrongly authenticated")
-			}
-			err = r.AuthenticateOwner()
-			if err != nil {
-				t.Fatal(err, i)
-			}
-			if !r.enc.sec.OwnerAuthenticated {
-				t.Fatal("owner not authenticated")
-			}
-			if len(pwdList) != 0 {
-				t.Error("wrong owner password used", i)
-			}
-		}
-	}
-}
-
 func TestReaderGoFuzz(t *testing.T) {
 	// found by go-fuzz - check that the reader doesn't panic
 	cases := []string{
@@ -467,7 +385,7 @@ func TestObjectStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = addEmptyPage(w)
+	err = addPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -523,7 +441,7 @@ func TestObjectStream(t *testing.T) {
 	}
 }
 
-func addEmptyPage(w *Writer, args ...Object) error {
+func addPage(w *Writer, args ...Object) error {
 	pRef := w.Alloc()
 	ppRef := w.Alloc()
 	pageDict := Dict{

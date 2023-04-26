@@ -31,9 +31,11 @@ import (
 type encryptInfo struct {
 	sec *stdSecHandler
 
-	stmF *cryptFilter
-	strF *cryptFilter
-	eff  *cryptFilter
+	strF *cryptFilter // strings
+	stmF *cryptFilter // streams
+	efF  *cryptFilter // embedded files
+
+	UserPermissions Perm
 }
 
 func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) string) (*encryptInfo, error) {
@@ -62,17 +64,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		return nil, err
 	}
 
-	length := 40
-	if obj, ok := enc["Length"].(Integer); ok && V > 1 {
-		length = int(obj)
-		if length < 40 || length > 128 || length%8 != 0 {
-			return nil, &MalformedFileError{
-				Pos: r.errPos(encObj),
-				Err: errors.New("unsupported Encrypt.Length value"),
-			}
-		}
-	}
-
+	var keyBytes int
 	switch V {
 	case 1:
 		cf := &cryptFilter{
@@ -81,21 +73,35 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		}
 		res.stmF = cf
 		res.strF = cf
-		res.eff = cf
+		res.efF = cf
+
+		keyBytes = 5
 	case 2:
 		cf := &cryptFilter{
 			Cipher: cipherRC4,
-			Length: length,
+			Length: 40, // default
 		}
+		if obj, ok := enc["Length"].(Integer); ok && (V == 2 || V == 3) {
+			cf.Length = int(obj)
+			if cf.Length < 40 || cf.Length > 128 || cf.Length%8 != 0 {
+				return nil, &MalformedFileError{
+					Pos: r.errPos(encObj),
+					Err: errors.New("unsupported Encrypt.Length value"),
+				}
+			}
+		}
+
 		res.stmF = cf
 		res.strF = cf
-		res.eff = cf
-	case 4:
-		// TODO(voss): lengths in CF Dicts overrides global /Length?
+		res.efF = cf
+
+		keyBytes = cf.Length / 8 // TODO(voss): ???
+	case 4, 5:
 		var CF Dict
 		if obj, ok := enc["CF"].(Dict); ok {
 			CF = obj
 		}
+
 		if obj, ok := enc["StmF"].(Name); ok {
 			ciph, err := getCipher(obj, CF)
 			if err != nil {
@@ -116,7 +122,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 			}
 			res.strF = ciph
 		}
-		res.eff = res.stmF
+		res.efF = res.stmF // default
 		if obj, ok := enc["EFF"].(Name); ok {
 			ciph, err := getCipher(obj, CF)
 			if err != nil {
@@ -125,8 +131,15 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 					Err: err,
 				}
 			}
-			res.eff = ciph
+			res.efF = ciph
 		}
+
+		if V == 4 {
+			keyBytes = 16
+		} else {
+			keyBytes = 32
+		}
+
 	default:
 		return nil, &MalformedFileError{
 			Pos: r.errPos(encObj),
@@ -136,7 +149,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 
 	switch {
 	case filter == "Standard" && subFilter == "":
-		sec, err := openStdSecHandler(enc, length, r.ID[0], readPwd)
+		sec, err := openStdSecHandler(enc, keyBytes, r.ID[0], readPwd)
 		if err != nil {
 			return nil, &MalformedFileError{
 				Pos: r.errPos(encObj),
@@ -144,6 +157,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 			}
 		}
 		res.sec = sec
+		res.UserPermissions = stdSecPToPerm(sec.R, sec.P)
 	default:
 		return nil, &MalformedFileError{
 			Pos: r.errPos(encObj),
@@ -154,52 +168,60 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	return res, nil
 }
 
-func (enc *encryptInfo) ToDict() Dict {
+func (enc *encryptInfo) ToDict(version Version) Dict {
 	dict := Dict{
 		"Filter": Name("Standard"),
 	}
 
-	canV1 := true
-	canV2 := true
-
-	length := 0
+	length := -1
 	var cipher cipherType
-	for _, cf := range []*cryptFilter{enc.stmF, enc.strF, enc.eff} {
-		if length == 0 {
+	for _, cf := range []*cryptFilter{enc.stmF, enc.strF, enc.efF} {
+		if length < 0 {
 			length = cf.Length
 			cipher = cf.Cipher
-		} else if length != cf.Length {
-			panic("not implemented: unequal key length")
-		} else if cipher != cf.Cipher {
-			panic("not implemented: mixed ciphers")
+		} else {
+			if length > 0 && length != cf.Length {
+				length = 0
+			}
+			if cipher != cf.Cipher {
+				cipher = cipherUnknown
+			}
 		}
-		switch cf.Cipher {
-		case cipherAES:
-			canV1 = false
-			canV2 = false
-		case cipherRC4:
-			// pass
-		default:
-			panic("not implemented: " + cf.Cipher.String())
+
+		if cf.Length%8 != 0 {
+			panic("invalid key length")
 		}
 	}
-	if length != 40 {
-		canV1 = false
+	if length == 0 {
+		panic("not implemented: unequal key length")
+	}
+	if cipher == cipherUnknown {
+		panic("not implemented: mixed ciphers")
 	}
 
-	if canV1 {
+	if cipher == cipherAES256 && length == 256 && version >= V2_0 {
+		// In PDF 2.0, all V values less than 5 are deprecated,
+		// so we try this first.
+		dict["V"] = Integer(5)
+		dict["StmF"] = Name("StdCF")
+		dict["StrF"] = Name("StdCF")
+		dict["CF"] = Dict{
+			"StdCF": Dict{"Length": Integer(length / 8), "CFM": Name("AESV3")},
+		}
+	} else if cipher == cipherRC4 && length == 40 {
 		dict["V"] = Integer(1)
-	} else if canV2 {
+	} else if cipher == cipherRC4 && version >= V1_4 {
 		dict["V"] = Integer(2)
 		dict["Length"] = Integer(length)
-	} else {
+	} else if cipher == cipherAES128 && version >= V1_6 {
 		dict["V"] = Integer(4)
-		dict["Length"] = Integer(length)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
 		dict["CF"] = Dict{
 			"StdCF": Dict{"Length": Integer(length / 8), "CFM": Name("AESV2")},
 		}
+	} else {
+		panic("no supported encryption scheme found")
 	}
 
 	sec := enc.sec
@@ -226,7 +248,7 @@ func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref Reference) ([]byte, error
 	_, _ = h.Write([]byte{
 		byte(num), byte(num >> 8), byte(num >> 16),
 		byte(gen), byte(gen >> 8)})
-	if cf.Cipher == cipherAES {
+	if cf.Cipher == cipherAES128 {
 		_, _ = h.Write([]byte("sAlT"))
 	}
 	l := enc.sec.KeyBytes + 5
@@ -249,7 +271,7 @@ func (enc *encryptInfo) EncryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return nil, err
 	}
 	switch cf.Cipher {
-	case cipherAES:
+	case cipherAES128:
 		n := len(buf)
 		nPad := 16 - n%16
 		out := make([]byte, 16+n+nPad) // iv | c(data|padding)
@@ -298,7 +320,7 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return nil, err
 	}
 	switch cf.Cipher {
-	case cipherAES:
+	case cipherAES128:
 		if len(buf) < 32 {
 			return nil, errCorrupted
 		}
@@ -338,7 +360,7 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 	}
 
 	switch cf.Cipher {
-	case cipherAES:
+	case cipherAES128:
 		buf := make([]byte, 32)
 		iv := buf[:16]
 		_, err := io.ReadFull(r, iv)
@@ -388,7 +410,7 @@ type stdSecHandler struct {
 	OwnerAuthenticated bool
 }
 
-func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func([]byte, int) string) (*stdSecHandler, error) {
+func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, int) string) (*stdSecHandler, error) {
 	R, ok := enc["R"].(Integer)
 	if !ok || R < 2 || R > 4 {
 		return nil, errors.New("invalid Encrypt.R")
@@ -412,7 +434,7 @@ func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func([]byte, int
 
 	sec := &stdSecHandler{
 		id:       ID,
-		KeyBytes: length / 8,
+		KeyBytes: keyBytes,
 		readPwd:  readPwd,
 
 		R: int(R),
@@ -428,10 +450,8 @@ func openStdSecHandler(enc Dict, length int, ID []byte, readPwd func([]byte, int
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
 // Handler.
 func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) *stdSecHandler {
-	P := stdSecPermToP(perm)
 	var R int
-	const rev3Perms = 1<<(9-1) | 1<<(10-1) | 1<<(11-1) | 1<<(12-1)
-	if V < 2 && P&rev3Perms == rev3Perms {
+	if V < 2 && perm.canR2() {
 		R = 2
 	} else if V <= 3 {
 		R = 3
@@ -446,7 +466,7 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 		id:       id,
 		KeyBytes: keyBytes,
 		R:        R,
-		P:        P,
+		P:        stdSecPermToP(perm),
 
 		OwnerAuthenticated: true,
 	}
@@ -663,29 +683,58 @@ var passwdPad = []byte{
 	0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80, 0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
 }
 
-func stdSecPToPerm(V int, P uint32) Perm {
+func stdSecPToPerm(R int, P uint32) Perm {
 	perm := PermAll
-	if V == 2 {
-		if P&1<<(3-1) == 0 {
+	if R == 2 {
+		if P&(1<<(3-1)) == 0 {
 			perm &= ^(PermPrint | PermPrintDegraded)
 		}
-	} else if V >= 3 {
+	} else if R >= 3 {
 		// bit 3 | 12
 		//     0 | 0 -> no printing (both forbidden)
 		//     0 | 1 -> full printing
 		//     1 | 0 -> only degraded printing (full printing forbidden)
 		//     1 | 1 -> full printing
-		if P&1<<(3-1) == 0 && P&1<<(12-1) == 0 {
+		if P&(1<<(3-1)) == 0 && P&(1<<(12-1)) == 0 {
 			perm &= ^(PermPrint | PermPrintDegraded)
-		} else if P&1<<(3-1) != 0 && P&1<<(12-1) == 0 {
+		} else if P&(1<<(3-1)) != 0 && P&(1<<(12-1)) == 0 {
 			perm &= ^PermPrint
 		}
 	}
+
+	// bit 4 | 11
+	//     0 | 0 -> no modifications, no assembly
+	//     0 | 1 -> no modifications, assembly allowed
+	//     1 | 0 -> modifications allowed, assembly allowed
+	//     1 | 1 -> modifications allowed, assembly allowed
+	if P&(1<<(4-1)) == 0 {
+		perm &= ^PermModify
+		if P&(1<<(11-1)) == 0 {
+			perm &= ^PermAssemble
+		}
+	}
+
+	if P&(1<<(5-1)) == 0 {
+		perm &= ^PermCopy
+	}
+
+	// bit 6 | 9
+	//     0 | 0 -> no annotations, don't fill form fields
+	//     0 | 1 -> no annotations, fill form fields
+	//     1 | 0 -> annotations allowed, fill form fields
+	//     1 | 1 -> annotations allowed, fill form fields
+	if P&(1<<(6-1)) == 0 {
+		perm &= ^PermAnnotate
+		if P&(1<<(9-1)) == 0 {
+			perm &= ^PermForms
+		}
+	}
+
 	return perm
 }
 
 func stdSecPermToP(perm Perm) uint32 {
-	forbidden := uint32(0)
+	forbidden := uint32(3)
 	if perm&PermCopy == 0 {
 		forbidden |= 1 << (5 - 1)
 	}
@@ -729,7 +778,7 @@ func (enc *encryptInfo) cryptFilter(ref Reference, w io.WriteCloser) (io.WriteCl
 	}
 
 	switch cf.Cipher {
-	case cipherAES:
+	case cipherAES128:
 		c, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, err
@@ -872,10 +921,15 @@ const (
 	// determined.
 	cipherUnknown cipherType = iota
 
-	// cipherAES indicates that AES encryption in CBC mode is used.  This
+	// cipherAES128 indicates that AES encryption in CBC mode is used.  This
 	// corresponds to the StdCF crypt filter with a CFM value of AESV2 in the
 	// PDF specification.
-	cipherAES
+	cipherAES128
+
+	// cipherAES256 indicates that AES encryption in CBC mode is used.  This
+	// corresponds to the StdCF crypt filter with a CFM value of AESV3 in the
+	// PDF specification.
+	cipherAES256
 
 	// cipherRC4 indicates that RC4 encryption is used.  This corresponds to
 	// the StdCF crypt filter with a CFM value of V2 in the PDF specification.
@@ -886,7 +940,7 @@ func (c cipherType) String() string {
 	switch c {
 	case cipherUnknown:
 		return "unknown"
-	case cipherAES:
+	case cipherAES128:
 		return "AES"
 	case cipherRC4:
 		return "RC4"
@@ -908,28 +962,30 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 
 	cfDict, ok := CF[name].(Dict)
 	if !ok {
-		return nil, errors.New("missing StdCF entry in CF dict")
+		return nil, errors.New("missing " + string(name) + " entry in CF dict")
 	}
 
 	res := &cryptFilter{}
-	res.Length = 0 // TODO(voss): is there a default?
 	if obj, ok := cfDict["Length"].(Integer); ok {
 		res.Length = int(obj) * 8
+	} else {
+		res.Length = 40 // TODO(voss): is this the correct default?
 	}
-	if res.Length < 40 || res.Length > 128 || res.Length%8 != 0 {
+	if res.Length < 40 || res.Length > 256 || res.Length%8 != 0 {
 		return nil, errors.New("invalid key length")
 	}
-
-	switch {
-	case cfDict["CFM"] == Name("V2"):
+	switch cfDict["CFM"] {
+	case Name("V2"):
 		res.Cipher = cipherRC4
-		return res, nil
-	case cfDict["CFM"] == Name("AESV2"):
-		res.Cipher = cipherAES
-		return res, nil
+	case Name("AESV2"):
+		res.Cipher = cipherAES128
+	case Name("AESV3"):
+		res.Cipher = cipherAES256
+		res.Length = 256
 	default:
 		return nil, errors.New("unknown cipher")
 	}
+	return res, nil
 }
 
 // Perm describes which operations are permitted when accessing the document
@@ -939,6 +995,21 @@ func getCipher(name Name, CF Dict) (*cryptFilter, error) {
 // This library just reports the permissions as specified in the PDF file.
 // It is up to the caller to enforce the permissions.
 type Perm int
+
+// canR2 checks whether the permissions can be represented by revision 2 of the
+// standard security handler.
+func (perm Perm) canR2() bool {
+	if perm&PermPrint == 0 && perm&PermPrintDegraded != 0 {
+		return true
+	}
+	if perm&PermAnnotate == 0 && perm&PermForms != 0 {
+		return true
+	}
+	if perm&PermModify == 0 && perm&PermAssemble != 0 {
+		return true
+	}
+	return false
+}
 
 const (
 	// PermCopy allows to extract text and graphics.

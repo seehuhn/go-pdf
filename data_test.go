@@ -91,6 +91,7 @@ func FuzzReadWrite(f *testing.F) {
 		f.Fatal(err)
 	}
 	f.Add(buf.Bytes())
+
 	f.Fuzz(func(t *testing.T, raw []byte) {
 		r := bytes.NewReader(raw)
 		pdf1, err := pdf.Read(r, nil)

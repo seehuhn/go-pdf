@@ -57,6 +57,153 @@ func (sec *stdSecHandler) deauthenticate() {
 	sec.OwnerAuthenticated = false
 }
 
+func TestCryptV1(t *testing.T) {
+	opt := &WriterOptions{
+		Version:       V1_1,
+		UserPassword:  "AA",
+		OwnerPassword: "BB",
+		// UserPermissions: PermAll,
+	}
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentsRef := w.Alloc()
+	s, err := w.OpenStream(contentsRef, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Write([]byte("0 0 m 100 100 l s"))
+	err = s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	addPage(w, Name("Contents"), contentsRef)
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// os.WriteFile("test_TestV1.pdf", buf.Bytes(), 0o666)
+
+	in := bytes.NewReader(buf.Bytes())
+	pwdFunc := func(_ []byte, try int) string {
+		switch try {
+		case 0:
+			return "BB"
+		default:
+			return ""
+		}
+	}
+	rOpt := &ReaderOptions{
+		ReadPassword: pwdFunc,
+	}
+	r, err := NewReader(in, rOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = r.AuthenticateOwner()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestAuthentication(t *testing.T) {
+	msg := "super secret"
+	for i, ver := range []Version{V1_6, V1_4, V1_3, V1_1} {
+		for _, userFirst := range []bool{true, false} {
+			buf := &bytes.Buffer{}
+
+			opt := &WriterOptions{
+				Version:         ver,
+				UserPassword:    "user",
+				OwnerPassword:   "owner",
+				UserPermissions: PermAll,
+			}
+			w, err := NewWriter(buf, opt)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			contentsRef := w.Alloc()
+			s, err := w.OpenStream(contentsRef, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.Write([]byte("0 0 m 100 100 l s"))
+			err = s.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			addPage(w, Name("Contents"), contentsRef)
+
+			ref := w.Alloc()
+			err = w.Put(ref, TextString(msg))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = w.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// os.WriteFile(fmt.Sprintf("xxx%d.pdf", i), buf.Bytes(), 0o666)
+
+			var pwdList []string
+			if userFirst {
+				pwdList = append(pwdList, "don't know", "user")
+			}
+			pwdList = append(pwdList, "friend", "owner", "")
+			pwdFunc := func([]byte, int) string {
+				res := pwdList[0]
+				pwdList = pwdList[1:]
+				return res
+			}
+
+			in := bytes.NewReader(buf.Bytes())
+			rOpt := &ReaderOptions{
+				ReadPassword: pwdFunc,
+			}
+			r, err := NewReader(in, rOpt)
+			if err != nil {
+				t.Fatal(err, i)
+			}
+			if userFirst {
+				dec, err := GetString(r, ref)
+				if err != nil {
+					t.Error(err, i, userFirst)
+					continue
+				}
+				if dec.AsTextString() != msg {
+					t.Error("got wrong message", i)
+				}
+				if len(pwdList) != 3 {
+					t.Error("wrong user password used", i)
+				}
+			}
+			if r.enc.sec.OwnerAuthenticated {
+				t.Fatal("owner wrongly authenticated")
+			}
+			err = r.AuthenticateOwner()
+			if err != nil {
+				t.Error(err, "PDF-"+ver.String(), i, userFirst)
+				continue
+			}
+			if !r.enc.sec.OwnerAuthenticated {
+				t.Fatal("owner not authenticated")
+			}
+			if len(pwdList) != 1 {
+				t.Error("wrong owner password used", i, userFirst)
+			}
+		}
+	}
+}
+
 func TestAuth(t *testing.T) {
 	cases := []struct {
 		user, owner string
@@ -144,7 +291,7 @@ func TestAuth2(t *testing.T) {
 
 func TestEncryptBytes(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
-	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
+	for _, cipher := range []cipherType{cipherRC4, cipherAES128} {
 		for length := 40; length <= 128; length += 8 {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
@@ -176,7 +323,7 @@ func TestEncryptBytes(t *testing.T) {
 
 func TestEncryptStream(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
-	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
+	for _, cipher := range []cipherType{cipherRC4, cipherAES128} {
 		for length := 40; length <= 128; length += 8 {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
@@ -213,6 +360,54 @@ func TestEncryptStream(t *testing.T) {
 					t.Error("round-trip failed")
 				}
 			}
+		}
+	}
+}
+
+func TestPerm(t *testing.T) {
+	// We iterate over all combinations of bits
+	// 3, 4, 5, 6, 9, 11, and 12 (1-based).
+	for b := uint32(0); b < 127; b++ {
+		// bit in b -> bit in P
+		//       0  ->  3-1 = 2
+		//       1  ->  4-1 = 3
+		//       2  ->  5-1 = 4
+		//       3  ->  6-1 = 5
+		//       4  ->  9-1 = 8
+		//       5  -> 11-1 = 10
+		//       6  -> 12-1 = 11
+		var P uint32 = 0b11111111_11111111_11110010_11000000
+		P |= (b&15)<<2 | (b&16)<<4 | (b&96)<<5
+
+		perm := stdSecPToPerm(3, P)
+
+		if perm&PermPrint != 0 && perm&PermPrintDegraded == 0 {
+			t.Error("print permission without degraded print permission")
+		}
+		if perm&PermAnnotate != 0 && perm&PermForms == 0 {
+			t.Error("annotate permission without forms permission")
+		}
+		if perm&PermModify != 0 && perm&PermAssemble == 0 {
+			t.Error("modify permission without assemble permission")
+		}
+
+		// Remove some combinations which make no sense, e.g. full print
+		// permission without degraded print permission.
+		if P&(1<<(4-1)) != 0 && P&(1<<(11-1)) == 0 {
+			continue
+		}
+		if P&(1<<(6-1)) != 0 && P&(1<<(9-1)) == 0 {
+			continue
+		}
+		if P&(1<<(12-1)) != 0 && P&(1<<(3-1)) == 0 {
+			continue
+		}
+
+		P2 := stdSecPermToP(perm)
+		if P != P2 {
+			mask := uint32(0b00001111_11111111)
+			t.Errorf("perm=%07b P1=%012b P2=%012b diff=%012b",
+				perm, P&mask, P2&mask, P^P2)
 		}
 	}
 }

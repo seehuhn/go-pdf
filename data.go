@@ -79,6 +79,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 			if err != nil {
 				return nil, err
 			}
+			s.Dict["Length"] = Integer(len(data))
 			obj = &Stream{
 				Dict: s.Dict,
 				R:    bytes.NewReader(data),
