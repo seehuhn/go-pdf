@@ -250,7 +250,7 @@ func (enc *encryptInfo) EncryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return buf, nil
 	}
 
-	key, err := enc.keyForRef(cf, ref)
+	key, err := enc.sec.KeyForRef(cf, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +299,7 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return buf, nil
 	}
 
-	key, err := enc.keyForRef(cf, ref)
+	key, err := enc.sec.KeyForRef(cf, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -332,13 +332,55 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 	}
 }
 
+func (enc *encryptInfo) EncryptStream(ref Reference, w io.WriteCloser) (io.WriteCloser, error) {
+	cf := enc.stmF
+	if cf == nil {
+		return w, nil
+	}
+
+	key, err := enc.sec.KeyForRef(cf, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cf.Cipher {
+	case cipherAESV2:
+		c, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+
+		// generate and write the IV
+		buf := make([]byte, 16)
+		_, err = io.ReadFull(rand.Reader, buf)
+		if err != nil {
+			return nil, err
+		}
+		_, err = w.Write(buf)
+		if err != nil {
+			return nil, err
+		}
+
+		return &encryptWriter{
+			w:   w,
+			cbc: cipher.NewCBCEncrypter(c, buf),
+			buf: buf,
+		}, nil
+	case cipherRC4:
+		c, _ := rc4.NewCipher(key)
+		return &cipher.StreamWriter{S: c, W: w}, nil
+	default:
+		panic("unknown cipher")
+	}
+}
+
 func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, error) {
 	cf := enc.stmF
 	if cf == nil {
 		return r, nil
 	}
 
-	key, err := enc.keyForRef(cf, ref)
+	key, err := enc.sec.KeyForRef(cf, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +389,7 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
 		return &cipher.StreamReader{S: c, R: r}, nil
-	case cipherAESV2:
+	case cipherAESV2, cipherAESV3:
 		buf := make([]byte, 32)
 		iv := buf[:16]
 		_, err := io.ReadFull(r, iv)
@@ -368,28 +410,6 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 	default:
 		panic("unknown cipher")
 	}
-}
-
-func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref Reference) ([]byte, error) {
-	h := md5.New()
-	key, err := enc.sec.GetKey(false)
-	if err != nil {
-		return nil, err
-	}
-	h.Write(key)
-	num := ref.Number()
-	gen := ref.Generation()
-	h.Write([]byte{
-		byte(num), byte(num >> 8), byte(num >> 16),
-		byte(gen), byte(gen >> 8)})
-	if cf.Cipher == cipherAESV2 {
-		h.Write([]byte("sAlT"))
-	}
-	l := enc.sec.keyBytes + 5
-	if l > 16 {
-		l = 16
-	}
-	return h.Sum(nil)[:l], nil
 }
 
 // The stdSecHandler authenticates the user via a pair of passwords.
@@ -597,6 +617,36 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 	}
 
 	return sec, nil
+}
+
+func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, error) {
+	key, err := sec.GetKey(false)
+	if err != nil {
+		return nil, err
+	}
+	switch sec.R {
+	case 2, 3, 4:
+		h := md5.New()
+		h.Write(key)
+		num := ref.Number()
+		gen := ref.Generation()
+		h.Write([]byte{
+			byte(num), byte(num >> 8), byte(num >> 16),
+			byte(gen), byte(gen >> 8)})
+		if cf.Cipher == cipherAESV2 {
+			h.Write([]byte("sAlT"))
+		}
+		// TODO(voss): should this use cf.Length instead of sec.keyBytes?
+		l := sec.keyBytes + 5
+		if l > 16 {
+			l = 16
+		}
+		return h.Sum(nil)[:l], nil
+	case 6:
+		return key, nil
+	default:
+		panic("invalid R")
+	}
 }
 
 // GetKey returns the file encryption key to decrypt string and stream data.
@@ -1151,48 +1201,6 @@ type encryptWriter struct {
 	cbc cipher.BlockMode
 	buf []byte // must have length cbc.BlockSize()
 	pos int
-}
-
-func (enc *encryptInfo) cryptFilter(ref Reference, w io.WriteCloser) (io.WriteCloser, error) {
-	cf := enc.stmF
-	if cf == nil {
-		return w, nil
-	}
-
-	key, err := enc.keyForRef(cf, ref)
-	if err != nil {
-		return nil, err
-	}
-
-	switch cf.Cipher {
-	case cipherAESV2:
-		c, err := aes.NewCipher(key)
-		if err != nil {
-			return nil, err
-		}
-
-		// generate and write the IV
-		buf := make([]byte, 16)
-		_, err = io.ReadFull(rand.Reader, buf)
-		if err != nil {
-			return nil, err
-		}
-		_, err = w.Write(buf)
-		if err != nil {
-			return nil, err
-		}
-
-		return &encryptWriter{
-			w:   w,
-			cbc: cipher.NewCBCEncrypter(c, buf),
-			buf: buf,
-		}, nil
-	case cipherRC4:
-		c, _ := rc4.NewCipher(key)
-		return &cipher.StreamWriter{S: c, W: w}, nil
-	default:
-		panic("unknown cipher")
-	}
 }
 
 func (w *encryptWriter) Write(p []byte) (int, error) {

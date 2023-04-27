@@ -520,7 +520,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 		length: length,
 	}
 	if pdf.w.enc != nil {
-		enc, err := pdf.w.enc.cryptFilter(ref, w)
+		enc, err := pdf.w.enc.EncryptStream(ref, w)
 		if err != nil {
 			return nil, err
 		}

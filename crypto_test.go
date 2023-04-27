@@ -429,7 +429,7 @@ func TestEncryptStream(t *testing.T) {
 				}
 
 				buf := &bytes.Buffer{}
-				w, err := enc.cryptFilter(ref, withDummyClose{buf})
+				w, err := enc.EncryptStream(ref, withDummyClose{buf})
 				if err != nil {
 					t.Fatal(err)
 				}
