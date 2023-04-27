@@ -25,6 +25,18 @@ func isUTF16(s string) bool {
 	return len(s) >= 2 && s[0] == 0xFE && s[1] == 0xFF
 }
 
+func utf16Encode(s string) String {
+	enc := utf16.Encode([]rune(s))
+	buf := make([]byte, 2*len(enc)+2)
+	buf[0] = 0xFE
+	buf[1] = 0xFF
+	for i, c := range enc {
+		buf[2*i+2] = byte(c >> 8)
+		buf[2*i+3] = byte(c)
+	}
+	return String(buf)
+}
+
 func utf16Decode(s String) string {
 	var u []uint16
 	for i := 0; i < len(s)-1; i += 2 {
@@ -36,6 +48,21 @@ func utf16Decode(s String) string {
 // PDFDocEncoding is an encoding used for metadata in PDF files.
 // It is not normally used to show text from fonts in PDF content streams.
 // See PDF 32000-1:2008, Table D.3
+
+func pdfDocEncode(s string) (String, bool) {
+	rr := []rune(s)
+	res := make([]byte, len(rr))
+	for i, r := range rr {
+		if c, ok := toPDFDoc[r]; ok {
+			res[i] = c
+		} else if r <= 255 && fromPDFDoc[r] == r {
+			res[i] = byte(r)
+		} else {
+			return nil, false
+		}
+	}
+	return String(res), true
+}
 
 func pdfDocDecode(s String) string {
 	for i := 0; i < len(s); i++ {
@@ -51,17 +78,6 @@ Decode:
 		r[i] = fromPDFDoc[s[i]]
 	}
 	return string(r)
-}
-
-func pdfDocEncode(r rune) (byte, bool) {
-	c, ok := toPDFDoc[r]
-	if ok {
-		return c, true
-	}
-	if r <= 255 && fromPDFDoc[r] == r {
-		return byte(r), true
-	}
-	return 0, false
 }
 
 var fromPDFDoc = [256]rune{

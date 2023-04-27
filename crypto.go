@@ -23,9 +23,15 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/rc4"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
+
+	"github.com/xdg-go/stringprep"
 )
 
 type encryptInfo struct {
@@ -165,6 +171,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 }
 
 func (enc *encryptInfo) AsDict(version Version) Dict {
+	// TODO(voss): turn the panics below into error returns
 	dict := Dict{
 		"Filter": Name("Standard"),
 	}
@@ -196,8 +203,6 @@ func (enc *encryptInfo) AsDict(version Version) Dict {
 	}
 
 	if cipher == cipherAESV3 && length == 256 && version >= V2_0 {
-		// In PDF 2.0, all V values less than 5 are deprecated,
-		// so we try this first.
 		dict["V"] = Integer(5)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
@@ -228,30 +233,13 @@ func (enc *encryptInfo) AsDict(version Version) Dict {
 	if sec.unencryptedMetaData {
 		dict["EncryptMetadata"] = Bool(false)
 	}
+	if sec.R == 6 {
+		dict["OE"] = String(sec.OE)
+		dict["UE"] = String(sec.UE)
+		dict["Perms"] = String(sec.Perms)
+	}
 
 	return dict
-}
-
-func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref Reference) ([]byte, error) {
-	h := md5.New()
-	key, err := enc.sec.GetKey(false)
-	if err != nil {
-		return nil, err
-	}
-	h.Write(key)
-	num := ref.Number()
-	gen := ref.Generation()
-	h.Write([]byte{
-		byte(num), byte(num >> 8), byte(num >> 16),
-		byte(gen), byte(gen >> 8)})
-	if cf.Cipher == cipherAESV2 {
-		h.Write([]byte("sAlT"))
-	}
-	l := enc.sec.keyBytes + 5
-	if l > 16 {
-		l = 16
-	}
-	return h.Sum(nil)[:l], nil
 }
 
 // EncryptBytes encrypts the bytes in buf using Algorithm 1 in the PDF spec.
@@ -382,6 +370,28 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 	}
 }
 
+func (enc *encryptInfo) keyForRef(cf *cryptFilter, ref Reference) ([]byte, error) {
+	h := md5.New()
+	key, err := enc.sec.GetKey(false)
+	if err != nil {
+		return nil, err
+	}
+	h.Write(key)
+	num := ref.Number()
+	gen := ref.Generation()
+	h.Write([]byte{
+		byte(num), byte(num >> 8), byte(num >> 16),
+		byte(gen), byte(gen >> 8)})
+	if cf.Cipher == cipherAESV2 {
+		h.Write([]byte("sAlT"))
+	}
+	l := enc.sec.keyBytes + 5
+	if l > 16 {
+		l = 16
+	}
+	return h.Sum(nil)[:l], nil
+}
+
 // The stdSecHandler authenticates the user via a pair of passwords.
 // The "user password" is used to access the contents of the document, the
 // "owner password" can be used to control additional permissions, e.g.
@@ -406,6 +416,12 @@ type stdSecHandler struct {
 	// in determining whether to prompt the user for a password and, if so,
 	// whether a valid user or owner password was entered.
 	U []byte
+
+	OE []byte
+
+	UE []byte
+
+	Perms []byte
 
 	// P is a set of flags specifying which operations shall be permitted when
 	// the document is opened with user access.
@@ -447,14 +463,17 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 	if !ok || len(O) != ouLength {
 		return nil, errors.New("invalid Encrypt.O")
 	}
+
 	U, ok := enc["U"].(String)
 	if !ok || len(U) != ouLength {
 		return nil, errors.New("invalid Encrypt.U")
 	}
+
 	P, ok := enc["P"].(Integer)
 	if !ok {
 		return nil, errors.New("invalid Encrypt.P")
 	}
+
 	emd := true
 	if obj, ok := enc["EncryptMetaData"].(Bool); ok && V >= 4 {
 		emd = bool(obj)
@@ -472,12 +491,37 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 
 		unencryptedMetaData: !emd,
 	}
+
+	if R == 6 {
+		OE, ok := enc["OE"].(String)
+		if !ok || len(OE) != 32 {
+			return nil, errors.New("invalid Encrypt.OE")
+		}
+		sec.OE = []byte(OE)
+
+		UE, ok := enc["UE"].(String)
+		if !ok || len(UE) != 32 {
+			return nil, errors.New("invalid Encrypt.UE")
+		}
+		sec.UE = []byte(UE)
+
+		Perms, ok := enc["Perms"].(String)
+		if !ok || len(Perms) != 16 {
+			return nil, errors.New("invalid Encrypt.Perms")
+		}
+		sec.Perms = []byte(Perms)
+	}
+
 	return sec, nil
 }
 
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
 // Handler.  This is used when creating new PDF documents.
-func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) *stdSecHandler {
+func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) (*stdSecHandler, error) {
+	if ownerPwd == "" {
+		ownerPwd = userPwd
+	}
+
 	var R int
 	switch {
 	case V < 2 && perm.canR2():
@@ -489,12 +533,15 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 	case V == 5:
 		R = 6
 	default:
-		panic("invalid V")
+		return nil, &MalformedFileError{
+			Err: errors.New("invalid Encrypt.V"),
+		}
 	}
 	keyBytes := 16
 	if V == 1 {
 		keyBytes = 5
 	}
+
 	sec := &stdSecHandler{
 		ID:       id,
 		keyBytes: keyBytes,
@@ -503,84 +550,96 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 
 		ownerAuthenticated: true,
 	}
-	sec.O = sec.computeO(userPwd, ownerPwd)
 
-	key := sec.computeFileEncyptionKey(nil, padPasswd(userPwd))
-	sec.U = sec.computeU(make([]byte, 32), key)
-	sec.key = key
+	switch R {
+	case 2, 3, 4:
+		paddedUserPwd, err := padPasswd(userPwd)
+		if err != nil {
+			return nil, err
+		}
+		paddedOwnerPwd, err := padPasswd(ownerPwd)
+		if err != nil {
+			return nil, err
+		}
+		sec.O, err = sec.computeO(paddedUserPwd, paddedOwnerPwd)
+		if err != nil {
+			return nil, err
+		}
+		fileEncryptionKey := sec.computeFileEncyptionKey(paddedUserPwd)
+		sec.U = sec.computeU(fileEncryptionKey)
+		sec.key = fileEncryptionKey
+	case 6:
+		utf8UserPwd, err := utf8Passwd(userPwd)
+		if err != nil {
+			return nil, err
+		}
+		utf8OwnerPwd, err := utf8Passwd(ownerPwd)
+		if err != nil {
+			return nil, err
+		}
+		fileEncyptionKey := make([]byte, 32)
+		_, err = rand.Read(fileEncyptionKey)
+		if err != nil {
+			return nil, err
+		}
+		sec.key = fileEncyptionKey
+		sec.O, sec.OE, err = sec.computeOAndOE(utf8OwnerPwd, fileEncyptionKey)
+		if err != nil {
+			return nil, err
+		}
+		sec.U, sec.UE, err = sec.computeUAndUE(utf8UserPwd, fileEncyptionKey)
+		if err != nil {
+			return nil, err
+		}
+		sec.Perms = sec.computePerms(fileEncyptionKey)
+	default:
+		panic("unreachable")
+	}
 
-	return sec
+	return sec, nil
 }
 
-// GetKey returns the key to decrypt string and stream data.  Passwords will
-// be requested via the getPasswd callback.  If the correct owner password was
-// supplied, the OwnerAuthenticated field will be set to true, in addition to
-// returning the key.
+// GetKey returns the file encryption key to decrypt string and stream data.
+// Passwords will be requested via the getPasswd callback.  If the correct
+// owner password was supplied, the OwnerAuthenticated field will be set to
+// true, in addition to returning the key.
 func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 	if sec.key != nil && (sec.ownerAuthenticated || !needOwner) {
 		return sec.key, nil
 	}
 
-	key := make([]byte, 16)
-	U := make([]byte, 32)
-
 	passwd := ""
 	passWdTry := 0
 	for { // try different passwords until one succeeds
-		for try := 0; try < 2; try++ {
-			// try == 0: check whether passwd is the owner password
-			// try == 1: check whether passwd is the user password
-
-			passwd := padPasswd(passwd)
-
-			if try == 0 {
-				// try to decrypt sec.O
-				h := md5.New()
-				h.Write(passwd)
-				sum := h.Sum(nil)
-				if sec.R >= 3 {
-					for i := 0; i < 50; i++ {
-						h.Reset()
-						h.Write(sum[:sec.keyBytes])
-						sum = h.Sum(sum[:0])
-					}
-				}
-				key := sum[:sec.keyBytes]
-
-				copy(passwd, sec.O)
-				if sec.R >= 3 {
-					tmpKey := make([]byte, len(key))
-					for i := byte(19); i > 0; i-- {
-						for j := range tmpKey {
-							tmpKey[j] = key[j] ^ i
-						}
-						c, _ := rc4.NewCipher(tmpKey)
-						c.XORKeyStream(passwd, passwd)
-					}
-				}
-				c, _ := rc4.NewCipher(key)
-				c.XORKeyStream(passwd, passwd)
+		if sec.R < 6 {
+			padded, err := padPasswd(passwd)
+			if err != nil {
+				continue
 			}
-
-			key = sec.computeFileEncyptionKey(key, passwd)
-			U = sec.computeU(U, key)
-			var ok bool
-			if sec.R >= 3 {
-				ok = bytes.Equal(sec.U[:16], U[:16])
-			} else {
-				ok = bytes.Equal(sec.U, U)
+			err = sec.authenticateOwner(padded)
+			if err == nil {
+				return sec.key, nil
 			}
-
-			if ok {
-				sec.key = key
-				if try == 0 {
-					sec.ownerAuthenticated = true
+			if !needOwner {
+				err = sec.authenticateUser(padded)
+				if err == nil {
+					return sec.key, nil
 				}
-				return key, nil
 			}
-
-			if needOwner {
-				break
+		} else {
+			prepared, err := utf8Passwd(passwd)
+			if err != nil {
+				continue
+			}
+			err = sec.authenticateOwner6(prepared)
+			if err == nil {
+				return sec.key, nil
+			}
+			if !needOwner {
+				err = sec.authenticateUser6(prepared)
+				if err == nil {
+					return sec.key, nil
+				}
 			}
 		}
 
@@ -597,12 +656,11 @@ func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
 	}
 }
 
-// Algorithm 2: compute the file encryption key.
-// key must either be nil or have length of at least 16 bytes.
-// pw must be the padded password
-func (sec *stdSecHandler) computeFileEncyptionKey(key []byte, pw []byte) []byte {
+// Algorithm 2: compute the file encryption key for R <= 4.
+// pw must be the padded password.
+func (sec *stdSecHandler) computeFileEncyptionKey(paddedUserPwd []byte) []byte {
 	h := md5.New()
-	h.Write(pw)
+	h.Write(paddedUserPwd)
 	h.Write(sec.O)
 	h.Write([]byte{
 		byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
@@ -610,7 +668,7 @@ func (sec *stdSecHandler) computeFileEncyptionKey(key []byte, pw []byte) []byte 
 	if sec.unencryptedMetaData && sec.R >= 4 {
 		h.Write([]byte{255, 255, 255, 255})
 	}
-	key = h.Sum(key[:0])
+	key := h.Sum(nil)
 
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
@@ -623,30 +681,108 @@ func (sec *stdSecHandler) computeFileEncyptionKey(key []byte, pw []byte) []byte 
 	return key[:sec.keyBytes]
 }
 
-// algorithm 3: compute O.
-// This uses only the .R field of sec.
-// The algorithm is documented in section 7.6.3.4 of ISO 32000-1:2008.
-func (sec *stdSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
-	if ownerPasswd == "" {
-		ownerPasswd = userPasswd
+// Algorithm 2.B: Computing a hash (revision 6 and later)
+func (sec *stdSecHandler) slowHash(checkOwner bool, in ...[]byte) []byte {
+	// Take the SHA-256 hash of the original input to the algorithm and name
+	// the resulting 32 bytes, K.
+	h := sha256.New()
+	for _, data := range in {
+		h.Write(data)
 	}
-	paddedPasswd := padPasswd(ownerPasswd)
+	K := h.Sum(nil)
 
+	// Perform the following steps (a)-(d) 64 times:
+	for i := 0; ; i++ {
+		// a) Make a new string, K1, consisting of 64 repetitions of the sequence:
+		// input password, K, the 48-byte user key. The 48 byte user key is only
+		// used when checking the owner password or creating the owner key. If
+		// checking the user password or creating the user key, K1 is the
+		// concatenation of the input password and K.
+		var K1 []byte
+		for j := 0; j < 64; j++ {
+			K1 = append(K1, in[0]...) // ???
+			K1 = append(K1, K...)
+			if checkOwner {
+				K1 = append(K1, sec.U...) // ???
+			}
+		}
+
+		// b) Encrypt K1 with the AES-128 (CBC, no padding) algorithm, using the
+		// first 16 bytes of K as the key and the second 16 bytes of K as the
+		// initialization vector. The result of this encryption is E.
+		c, _ := aes.NewCipher(K[:16])
+		cbc := cipher.NewCBCEncrypter(c, K[16:32])
+		E := make([]byte, len(K1)) // multiple of block size?
+		// TODO(voss): do we really need to allocate K1?
+		cbc.CryptBlocks(E, K1)
+
+		// c) Taking the first 16 bytes of E as an unsigned big-endian integer,
+		// compute the remainder, modulo 3.
+		// Since (a*256)%3 = (a*255)%3+a%3 = a%3, we can just add all bytes.
+		var rem int
+		for _, b := range E[:16] {
+			rem += int(b)
+		}
+		rem %= 3
+
+		// If the result is 0, the next hash used is SHA-256,
+		// if the result is 1, the next hash used is SHA-384,
+		// if the result is 2, the next hash used is SHA-512.
+		var h hash.Hash
+		switch rem {
+		case 0:
+			h = sha256.New()
+		case 1:
+			h = sha512.New384()
+		case 2:
+			h = sha512.New()
+		}
+
+		// d) Using the hash algorithm determined in step c, take the hash of E.
+		// The result is a new value of K, which will be 32, 48, or 64 bytes in
+		// length.
+		h.Write(E)
+		K = h.Sum(nil)
+
+		// Repeat the process (a-d) with this new value for K. Following 64 rounds
+		// (round number 0 to round number 63), do the following, starting with
+		// round number 64:
+		//
+		// e) Look at the very last byte of E. If the value of that byte (taken as
+		// an unsigned integer) is greater than the round number - 32, repeat steps
+		// (a-d) again.
+		//
+		// f) Repeat from steps (a-e) until the value of the last byte is ≤ (round
+		// number) - 32.
+		if i >= 64 && E[len(E)-1] <= byte(i-32) {
+			break
+		}
+	}
+
+	// The first 32 bytes of the final K are the output of the algorithm.
+	return K[:32]
+}
+
+// algorithm 3: compute O.
+// The algorithm is documented in section 7.6.3.4 of ISO 32000-1:2008.
+func (sec *stdSecHandler) computeO(paddedUserPwd, paddedOwnerPwd []byte) ([]byte, error) {
 	h := md5.New()
-	h.Write(paddedPasswd)
+	h.Write(paddedOwnerPwd)
 	sum := h.Sum(nil)
 	if sec.R >= 3 {
 		for i := 0; i < 50; i++ {
 			h.Reset()
-			h.Write(sum[:sec.keyBytes]) // TODO(voss): is this correct?
+			// The spec does not mention the truncation, but this seems to be
+			// required anyway.
+			h.Write(sum[:sec.keyBytes])
 			sum = h.Sum(sum[:0])
 		}
 	}
 	rc4key := sum[:sec.keyBytes]
 
 	c, _ := rc4.NewCipher(rc4key)
-	O := padPasswd(userPasswd)
-	c.XORKeyStream(O, O)
+	O := make([]byte, 32)
+	c.XORKeyStream(O, paddedUserPwd)
 	if sec.R >= 3 {
 		key := make([]byte, len(rc4key))
 		for i := byte(1); i <= 19; i++ {
@@ -657,29 +793,28 @@ func (sec *stdSecHandler) computeO(userPasswd, ownerPasswd string) []byte {
 			c.XORKeyStream(O, O)
 		}
 	}
-	return O
+	return O, nil
 }
 
 // Algorithm 4/5: compute U.
-// U must be a slice of length 32, and is only used for storage.
-// key must be the encryption key computed from the user password.
-func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
-	c, _ := rc4.NewCipher(key)
-
-	if sec.R < 3 {
-		copy(U, passwdPad)
-		c.XORKeyStream(U, U)
-	} else {
+func (sec *stdSecHandler) computeU(fileEncyptionKey []byte) []byte {
+	U := make([]byte, 32)
+	switch sec.R {
+	case 2:
+		c, _ := rc4.NewCipher(fileEncyptionKey)
+		c.XORKeyStream(U, passwdPad)
+	case 3, 4:
 		h := md5.New()
 		h.Write(passwdPad)
 		h.Write(sec.ID)
 		U = h.Sum(U[:0])
+		c, _ := rc4.NewCipher(fileEncyptionKey)
 		c.XORKeyStream(U, U)
 
-		tmpKey := make([]byte, len(key))
+		tmpKey := make([]byte, len(fileEncyptionKey))
 		for i := byte(1); i <= 19; i++ {
 			for j := range tmpKey {
-				tmpKey[j] = key[j] ^ i
+				tmpKey[j] = fileEncyptionKey[j] ^ i
 			}
 			c, _ = rc4.NewCipher(tmpKey)
 			c.XORKeyStream(U, U)
@@ -689,36 +824,250 @@ func (sec *stdSecHandler) computeU(U []byte, key []byte) []byte {
 		U = append(U[:16],
 			0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0)
+	default:
+		panic("invalid security handler revision")
 	}
 
 	return U
 }
 
-// returns a slice of length 32
-func padPasswd(passwd string) []byte {
-	// TODO(voss): convert the password to PDFDocEncoding
+// Algorithm 6: Authenticating the user password (Security handlers of revision 4 and earlier)
+func (sec *stdSecHandler) authenticateUser(paddedUserPwd []byte) error {
+	key := sec.computeFileEncyptionKey(paddedUserPwd)
+	U := sec.computeU(key)
+	switch sec.R {
+	case 2:
+		if bytes.Equal(U, sec.U) {
+			sec.key = key
+			return nil
+		}
+	case 3, 4:
+		if bytes.Equal(U[:16], sec.U[:16]) {
+			sec.key = key
+			return nil
+		}
+	default:
+		panic("invalid security handler revision")
+	}
+	return &AuthenticationError{sec.ID}
+}
 
-	pw := make([]byte, 32)
-	i := 0
-	for _, r := range passwd {
-		// Convert password to Latin-1.  We do this by just taking the
-		// lower byte of every rune.
-		pw[i] = byte(r)
-		i++
+// Algorithm 7: Authenticating the owner password (Security handlers of revision 4 and earlier)
+func (sec *stdSecHandler) authenticateOwner(paddedOwnerPwd []byte) error {
+	h := md5.New()
+	h.Write(paddedOwnerPwd)
+	sum := h.Sum(nil)
+	if sec.R >= 3 {
+		for i := 0; i < 50; i++ {
+			h.Reset()
+			// The spec does not mention the truncation, but this seems to be
+			// required anyway.
+			h.Write(sum[:sec.keyBytes])
+			sum = h.Sum(sum[:0])
+		}
+	}
+	key := sum[:sec.keyBytes]
 
-		if i >= 32 {
-			break
+	buf := make([]byte, 32)
+	copy(buf, sec.O)
+	switch sec.R {
+	case 2:
+		c, _ := rc4.NewCipher(key)
+		c.XORKeyStream(buf, buf)
+	case 3, 4:
+		tmpKey := make([]byte, len(key))
+		for i := 19; i >= 0; i-- {
+			for j := range tmpKey {
+				tmpKey[j] = key[j] ^ byte(i)
+			}
+			c, _ := rc4.NewCipher(tmpKey)
+			c.XORKeyStream(buf, buf)
 		}
 	}
 
-	copy(pw[i:], passwdPad)
+	err := sec.authenticateUser(buf)
+	if err != nil {
+		return err
+	}
+	sec.ownerAuthenticated = true
+	return nil
+}
 
-	return pw
+// Algorithm 8: Computing U and UE (Security handlers of revision 6)
+func (sec *stdSecHandler) computeUAndUE(utf8UserPwd, fileEncryptionKey []byte) ([]byte, []byte, error) {
+	buf := make([]byte, 16)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out := sec.slowHash(false, utf8UserPwd, buf[:8]) // user validation salt
+	U := make([]byte, 0, 48)
+	U = append(U, out...)
+	U = append(U, buf...)
+
+	key := sec.slowHash(false, utf8UserPwd, buf[8:]) // user key salt
+	c, _ := aes.NewCipher(key)
+	cbc := cipher.NewCBCEncrypter(c, zero16)
+	UE := make([]byte, len(fileEncryptionKey))
+	cbc.CryptBlocks(UE, fileEncryptionKey)
+
+	return U, UE, nil
+}
+
+// Algorithm 9: Computing O and OE (Security handlers of revision 6)
+func (sec *stdSecHandler) computeOAndOE(utf8OwnerPwd, fileEncryptionKey []byte) ([]byte, []byte, error) {
+	buf := make([]byte, 16)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out := sec.slowHash(true, utf8OwnerPwd, buf[:8], sec.U) // owner validation salt
+	O := make([]byte, 0, 48)
+	O = append(O, out...)
+	O = append(O, buf...)
+
+	key := sec.slowHash(true, utf8OwnerPwd, buf[8:], sec.U) // owner key salt
+	c, _ := aes.NewCipher(key)
+	cbc := cipher.NewCBCEncrypter(c, zero16)
+	OE := make([]byte, len(fileEncryptionKey))
+	cbc.CryptBlocks(OE, fileEncryptionKey)
+
+	return O, OE, nil
+}
+
+// Algorithm 10: Computing the Perms value (Security handlers of revision 6)
+func (sec *stdSecHandler) computePerms(fileEncryptionKey []byte) []byte {
+	buf := make([]byte, 16)
+	binary.LittleEndian.PutUint32(buf, sec.P)
+	buf[4] = 0xFF
+	buf[5] = 0xFF
+	buf[6] = 0xFF
+	buf[7] = 0xFF
+	if sec.unencryptedMetaData {
+		buf[8] = 'F'
+	} else {
+		buf[8] = 'T'
+	}
+	buf[9] = 'a'
+	buf[10] = 'd'
+	buf[11] = 'b'
+
+	c, _ := aes.NewCipher(fileEncryptionKey)
+	c.Encrypt(buf, buf)
+	return buf
+}
+
+// Algorithm 11: Authenticating the user password (Security handlers of revision 6)
+func (sec *stdSecHandler) authenticateUser6(utf8Passwd []byte) error {
+	hash := sec.slowHash(false, utf8Passwd, sec.U[32:40])
+	if !bytes.Equal(hash, sec.U[:32]) {
+		return &AuthenticationError{sec.ID}
+	}
+
+	key := sec.slowHash(false, utf8Passwd, sec.U[40:48]) // user key salt
+	c, _ := aes.NewCipher(key)
+	cbc := cipher.NewCBCDecrypter(c, zero16)
+	fileEncryptionKey := make([]byte, 32)
+	cbc.CryptBlocks(fileEncryptionKey, sec.UE)
+
+	err := sec.checkPerms(fileEncryptionKey)
+	if err != nil {
+		return err
+	}
+
+	sec.key = fileEncryptionKey
+	return nil
+}
+
+// Algorithm 12: Authenticating the owner password (Security handlers of revision 6)
+func (sec *stdSecHandler) authenticateOwner6(utf8Passwd []byte) error {
+	hash := sec.slowHash(true, utf8Passwd, sec.O[32:40], sec.U)
+	if !bytes.Equal(hash, sec.O[:32]) {
+		return &AuthenticationError{sec.ID}
+	}
+
+	key := sec.slowHash(true, utf8Passwd, sec.O[40:48], sec.U) // owner key salt
+	c, _ := aes.NewCipher(key)
+	cbc := cipher.NewCBCDecrypter(c, zero16)
+	fileEncryptionKey := make([]byte, 32)
+	cbc.CryptBlocks(fileEncryptionKey, sec.OE)
+
+	err := sec.checkPerms(fileEncryptionKey)
+	if err != nil {
+		return err
+	}
+
+	sec.key = fileEncryptionKey
+	sec.ownerAuthenticated = true
+	return nil
+}
+
+func (sec *stdSecHandler) checkPerms(fileEncryptionKey []byte) error {
+	buf := make([]byte, 16)
+
+	c, err := aes.NewCipher(fileEncryptionKey)
+	if err != nil {
+		panic(err)
+	}
+	c.Decrypt(buf, sec.Perms)
+	if !bytes.Equal(buf[9:12], []byte{'a', 'd', 'b'}) {
+		return &AuthenticationError{sec.ID}
+	}
+	perms := binary.LittleEndian.Uint32(buf[:4])
+	if perms != sec.P {
+		return &AuthenticationError{sec.ID}
+	}
+
+	var emdCode byte
+	if sec.unencryptedMetaData {
+		emdCode = 'F'
+	} else {
+		emdCode = 'T'
+	}
+	if buf[8] != emdCode {
+		return &AuthenticationError{sec.ID}
+	}
+
+	return nil
+}
+
+func utf8Passwd(passwd string) ([]byte, error) {
+	prepped, err := stringprep.SASLprep.Prepare(passwd)
+	if err != nil {
+		return nil, errInvalidPassword
+	}
+	buf := []byte(prepped)
+	if len(buf) > 127 {
+		buf = buf[:127]
+	}
+	return buf, nil
+}
+
+// returns a slice of length 32
+func padPasswd(passwd string) ([]byte, error) {
+	buf, ok := pdfDocEncode(passwd)
+	if !ok {
+		return nil, errInvalidPassword
+	}
+
+	padded := make([]byte, 32)
+	n := copy(padded, buf)
+	copy(padded[n:], passwdPad)
+
+	return padded, nil
 }
 
 var passwdPad = []byte{
-	0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41, 0x64, 0x00, 0x4E, 0x56, 0xFF, 0xFA, 0x01, 0x08,
-	0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80, 0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
+	0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41,
+	0x64, 0x00, 0x4E, 0x56, 0xFF, 0xFA, 0x01, 0x08,
+	0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80,
+	0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,
+}
+
+var zero16 = []byte{
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }
 
 func stdSecPToPerm(R int, P uint32) Perm {
@@ -1040,15 +1389,15 @@ type Perm int
 // standard security handler.
 func (perm Perm) canR2() bool {
 	if perm&PermPrint == 0 && perm&PermPrintDegraded != 0 {
-		return true
+		return false
 	}
 	if perm&PermAnnotate == 0 && perm&PermForms != 0 {
-		return true
+		return false
 	}
 	if perm&PermModify == 0 && perm&PermAssemble != 0 {
-		return true
+		return false
 	}
-	return false
+	return true
 }
 
 const (

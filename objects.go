@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf16"
 )
 
 // Object represents an object in a PDF file.  There are nine native types of
@@ -199,28 +198,11 @@ func (x String) AsTextString() string {
 // TextString creates a String object using the "text string" encoding,
 // i.e. using either UTF-16BE encoding (with a BOM) or PdfDocEncoding.
 func TextString(s string) String {
-	rr := []rune(s)
-	buf := make([]byte, len(rr))
-	for i, r := range rr {
-		c, ok := pdfDocEncode(r)
-		if ok {
-			buf[i] = c
-		} else {
-			goto useUTF
-		}
+	buf, ok := pdfDocEncode(s)
+	if ok {
+		return buf
 	}
-	return String(buf)
-
-useUTF:
-	enc := utf16.Encode(rr)
-	buf = make([]byte, 2*len(enc)+2)
-	buf[0] = 0xFE
-	buf[1] = 0xFF
-	for i, c := range enc {
-		buf[2*i+2] = byte(c >> 8)
-		buf[2*i+3] = byte(c)
-	}
-	return String(buf)
+	return utf16Encode(s)
 }
 
 // AsDate converts a PDF date string to a time.Time object.

@@ -7,7 +7,6 @@
 - implement public key encryption?
 - implement crypt filters?
 - add a way to repair broken xref tables?
-- attempt to add pdf-2.0 support?
 
 - https://pkg.go.dev/rsc.io/pdf
 - https://github.com/pdfcpu/pdfcpu

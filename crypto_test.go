@@ -35,24 +35,32 @@ func TestComputeOU(t *testing.T) {
 		keyBytes: 16,
 	}
 
-	O := sec.computeO(passwd, "")
+	padded, err := padPasswd(passwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	O, err := sec.computeO(padded, padded)
+	if err != nil {
+		t.Fatal(err)
+	}
 	goodO := "badad1e86442699427116d3e5d5271bc80a27814fc5e80f815efeef839354c5f"
 	if fmt.Sprintf("%x", O) != goodO {
 		t.Fatal("wrong O value")
 	}
 	sec.O = O
 
-	U := make([]byte, 32)
-	pw := padPasswd(passwd)
-	key := sec.computeFileEncyptionKey(nil, pw)
-	U = sec.computeU(U, key)
+	pw, err := padPasswd(passwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc := sec.computeFileEncyptionKey(pw)
+	U := sec.computeU(enc)
 	goodU := "a5b5fc1fcc399c6845fedcdfac82027c00000000000000000000000000000000"
 	if fmt.Sprintf("%x", U) != goodU {
 		t.Fatalf("wrong U value:\n  %x\n  %s", U, goodU)
 	}
 }
 
-// TODO(voss): remove?
 func (sec *stdSecHandler) deauthenticate() {
 	sec.key = nil
 	sec.ownerAuthenticated = false
@@ -123,7 +131,7 @@ func TestAuthentication(t *testing.T) {
 				Version:         ver,
 				UserPassword:    "user",
 				OwnerPassword:   "owner",
-				UserPermissions: PermAll,
+				UserPermissions: PermCopy,
 			}
 			w, err := NewWriter(buf, opt)
 			if err != nil {
@@ -147,7 +155,6 @@ func TestAuthentication(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			err = w.Close()
 			if err != nil {
 				t.Fatal(err)
@@ -159,8 +166,11 @@ func TestAuthentication(t *testing.T) {
 			if userFirst {
 				pwdList = append(pwdList, "don't know", "user")
 			}
-			pwdList = append(pwdList, "friend", "owner", "")
+			pwdList = append(pwdList, "friend", "owner")
 			pwdFunc := func([]byte, int) string {
+				if len(pwdList) == 0 {
+					return ""
+				}
 				res := pwdList[0]
 				pwdList = pwdList[1:]
 				return res
@@ -183,7 +193,7 @@ func TestAuthentication(t *testing.T) {
 				if dec.AsTextString() != msg {
 					t.Error("got wrong message", i)
 				}
-				if len(pwdList) != 3 {
+				if len(pwdList) != 2 {
 					t.Error("wrong user password used", i)
 				}
 			}
@@ -198,8 +208,8 @@ func TestAuthentication(t *testing.T) {
 			if !r.enc.sec.ownerAuthenticated {
 				t.Fatal("owner not authenticated")
 			}
-			if len(pwdList) != 1 {
-				t.Error("wrong owner password used", i, userFirst)
+			if len(pwdList) != 0 {
+				t.Error("wrong owner password used", i, userFirst, pwdList)
 			}
 		}
 	}
@@ -222,7 +232,10 @@ func TestAuth(t *testing.T) {
 		}
 		for j, pwds := range trials {
 			id := []byte("0123456789ABCDEF")
-			sec := createStdSecHandler(id, test.user, test.owner, PermModify, 4)
+			sec, err := createStdSecHandler(id, test.user, test.owner, PermModify, 4)
+			if err != nil {
+				t.Fatal(err)
+			}
 			key := sec.key
 
 			sec.deauthenticate()
@@ -273,7 +286,10 @@ func TestAuth(t *testing.T) {
 func TestAuth2(t *testing.T) {
 	id := []byte{0xfb, 0xa6, 0x25, 0xd9, 0xcd, 0xfb, 0x88, 0x11,
 		0x9a, 0xd5, 0xa0, 0x94, 0x33, 0x68, 0x42, 0x95}
-	sec := createStdSecHandler(id, "", "test", PermCopy, 4)
+	sec, err := createStdSecHandler(id, "", "test", PermCopy, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	key, err := sec.GetKey(false)
 	if err != nil {
@@ -290,6 +306,76 @@ func TestAuth2(t *testing.T) {
 	}
 }
 
+func TestAuth3(t *testing.T) {
+	id := []byte{0x3d, 0xe8, 0x0b, 0x6f, 0x8a, 0x2c, 0xd4, 0x79,
+		0x54, 0xae, 0x62, 0x91, 0x17, 0xf0, 0x7e, 0xc8}
+	cases := []struct {
+		perm Perm
+		V    int
+		R    int
+	}{
+		{PermAll, 1, 2},
+		{PermPrintDegraded, 1, 3},
+		{PermCopy, 4, 4},
+		// {PermCopy, 5, 6},
+	}
+	const userPasswd = "secret"
+	const ownerPasswd = "geheim"
+	for _, test := range cases {
+		sec, err := createStdSecHandler(id, userPasswd, ownerPasswd, test.perm, test.V)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sec.R != test.R {
+			t.Errorf("wrong R: %d != %d", sec.R, test.R)
+		}
+
+		// test 1: the user password works
+		sec.deauthenticate()
+		padded, err := padPasswd(userPasswd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sec.authenticateUser(padded)
+		if err != nil {
+			t.Error(err)
+		} else if sec.key == nil {
+			t.Error("key not set")
+		} else if sec.ownerAuthenticated {
+			t.Error("ownerAuthenticated true")
+		}
+
+		// test 2: the owner password works
+		sec.deauthenticate()
+		padded, err = padPasswd(ownerPasswd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sec.authenticateOwner(padded)
+		if err != nil {
+			t.Error(err)
+		} else if sec.key == nil {
+			t.Error("key not set")
+		} else if !sec.ownerAuthenticated {
+			t.Error("ownerAuthenticated false")
+		}
+
+		// test 3: the user password does not authenticate the owner
+		sec.deauthenticate()
+		padded, err = padPasswd(userPasswd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sec.authenticateOwner(padded)
+		if err == nil || sec.key != nil || sec.ownerAuthenticated {
+			t.Error("wrong password accepted")
+		}
+		if _, ok := err.(*AuthenticationError); !ok {
+			t.Error("wrong error", err)
+		}
+	}
+}
+
 func TestEncryptBytes(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
 	for _, cipher := range []cipherType{cipherRC4, cipherAESV2} {
@@ -297,9 +383,13 @@ func TestEncryptBytes(t *testing.T) {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
+				sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 4)
+				if err != nil {
+					t.Fatal(err)
+				}
 				enc := encryptInfo{
 					strF: &cryptFilter{Cipher: cipher, Length: length},
-					sec:  createStdSecHandler(id, "secret", "supersecret", PermPrint, 4),
+					sec:  sec,
 				}
 
 				plainText := []byte(msg)
@@ -329,9 +419,13 @@ func TestEncryptStream(t *testing.T) {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
+				sec, err := createStdSecHandler(id, "secret", "supersecret", PermAll, 4)
+				if err != nil {
+					t.Fatal(err)
+				}
 				enc := encryptInfo{
 					stmF: &cryptFilter{Cipher: cipher, Length: 128},
-					sec:  createStdSecHandler(id, "secret", "supersecret", PermAll, 4),
+					sec:  sec,
 				}
 
 				buf := &bytes.Buffer{}

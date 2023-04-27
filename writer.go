@@ -189,6 +189,13 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		}
 		var cf *cryptFilter
 		var V int
+		// if pdf.Version >= V2_0 {
+		// 	cf = &cryptFilter{
+		// 		Cipher: cipherAESV3,
+		// 		Length: 256,
+		// 	}
+		// 	V = 5
+		// } else
 		if pdf.Version >= V1_6 {
 			cf = &cryptFilter{
 				Cipher: cipherAESV2,
@@ -208,8 +215,11 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			}
 			V = 1
 		}
-		sec := createStdSecHandler(pdf.id[0], opt.UserPassword,
+		sec, err := createStdSecHandler(pdf.id[0], opt.UserPassword,
 			opt.OwnerPassword, opt.UserPermissions, V)
+		if err != nil {
+			return nil, err
+		}
 		pdf.w.enc = &encryptInfo{
 			sec:  sec,
 			stmF: cf,
