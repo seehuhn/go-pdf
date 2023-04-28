@@ -206,21 +206,22 @@ func (enc *encryptInfo) AsDict(version Version) Dict {
 		dict["V"] = Integer(5)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
+		dict["Length"] = Integer(256)
 		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(length / 8), "CFM": Name("AESV3")},
+			"StdCF": Dict{"Length": Integer(256), "CFM": Name("AESV3")},
 		}
-	} else if cipher == cipherRC4 && length == 40 {
-		dict["V"] = Integer(1)
-	} else if cipher == cipherRC4 && version >= V1_4 {
-		dict["V"] = Integer(2)
-		dict["Length"] = Integer(length)
-	} else if cipher == cipherAESV2 && version >= V1_6 {
+	} else if cipher == cipherAESV2 && length == 128 && version >= V1_6 {
 		dict["V"] = Integer(4)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
 		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(length / 8), "CFM": Name("AESV2")},
+			"StdCF": Dict{"Length": Integer(128), "CFM": Name("AESV2")},
 		}
+	} else if cipher == cipherRC4 && length == 40 && version >= V1_1 {
+		dict["V"] = Integer(1)
+	} else if cipher == cipherRC4 && version >= V1_4 {
+		dict["V"] = Integer(2)
+		dict["Length"] = Integer(length)
 	} else {
 		panic("no supported encryption scheme found")
 	}
@@ -1320,19 +1321,20 @@ func getCryptFilter(cryptFilterName Name, CF Dict) (*cryptFilter, error) {
 	}
 
 	res := &cryptFilter{}
-	if obj, ok := cfDict["Length"].(Integer); ok {
-		res.Length = int(obj) * 8
-	} else {
-		res.Length = 40 // TODO(voss): is this the correct default?
-	}
-	if res.Length < 40 || res.Length > 256 || res.Length%8 != 0 {
-		return nil, errors.New("invalid key length")
-	}
 	switch cfDict["CFM"] {
 	case Name("V2"):
 		res.Cipher = cipherRC4
+		if obj, ok := cfDict["Length"].(Integer); ok {
+			res.Length = int(obj) * 8
+		} else {
+			res.Length = 40 // TODO(voss): is this the correct default?
+		}
+		if res.Length < 40 || res.Length > 256 || res.Length%8 != 0 {
+			return nil, errors.New("invalid key length")
+		}
 	case Name("AESV2"):
 		res.Cipher = cipherAESV2
+		res.Length = 128
 	case Name("AESV3"):
 		res.Cipher = cipherAESV3
 		res.Length = 256
