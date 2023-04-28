@@ -189,14 +189,13 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		}
 		var cf *cryptFilter
 		var V int
-		// if pdf.Version >= V2_0 {
-		// 	cf = &cryptFilter{
-		// 		Cipher: cipherAESV3,
-		// 		Length: 256,
-		// 	}
-		// 	V = 5
-		// } else
-		if pdf.Version >= V1_6 {
+		if pdf.Version >= V2_0 {
+			cf = &cryptFilter{
+				Cipher: cipherAESV3,
+				Length: 256,
+			}
+			V = 5
+		} else if pdf.Version >= V1_6 {
 			cf = &cryptFilter{
 				Cipher: cipherAESV2,
 				Length: 128,

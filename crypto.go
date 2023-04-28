@@ -344,27 +344,27 @@ func (enc *encryptInfo) EncryptStream(ref Reference, w io.WriteCloser) (io.Write
 	}
 
 	switch cf.Cipher {
-	case cipherAESV2:
+	case cipherAESV2, cipherAESV3:
 		c, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, err
 		}
 
 		// generate and write the IV
-		buf := make([]byte, 16)
-		_, err = io.ReadFull(rand.Reader, buf)
+		iv := make([]byte, 16)
+		_, err = io.ReadFull(rand.Reader, iv)
 		if err != nil {
 			return nil, err
 		}
-		_, err = w.Write(buf)
+		_, err = w.Write(iv)
 		if err != nil {
 			return nil, err
 		}
 
 		return &encryptWriter{
 			w:   w,
-			cbc: cipher.NewCBCEncrypter(c, buf),
-			buf: buf,
+			cbc: cipher.NewCBCEncrypter(c, iv),
+			buf: iv,
 		}, nil
 	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
@@ -597,21 +597,20 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 		if err != nil {
 			return nil, err
 		}
-		fileEncyptionKey := make([]byte, 32)
-		_, err = rand.Read(fileEncyptionKey)
+		sec.key = make([]byte, 32)
+		_, err = rand.Read(sec.key)
 		if err != nil {
 			return nil, err
 		}
-		sec.key = fileEncyptionKey
-		sec.O, sec.OE, err = sec.computeOAndOE(utf8OwnerPwd, fileEncyptionKey)
+		sec.U, sec.UE, err = sec.computeUAndUE(utf8UserPwd)
 		if err != nil {
 			return nil, err
 		}
-		sec.U, sec.UE, err = sec.computeUAndUE(utf8UserPwd, fileEncyptionKey)
+		sec.O, sec.OE, err = sec.computeOAndOE(utf8OwnerPwd)
 		if err != nil {
 			return nil, err
 		}
-		sec.Perms = sec.computePerms(fileEncyptionKey)
+		sec.Perms = sec.computePerms(sec.key)
 	default:
 		panic("unreachable")
 	}
@@ -732,29 +731,29 @@ func (sec *stdSecHandler) computeFileEncyptionKey(paddedUserPwd []byte) []byte {
 }
 
 // Algorithm 2.B: Computing a hash (revision 6 and later)
-func (sec *stdSecHandler) slowHash(checkOwner bool, in ...[]byte) []byte {
+func slowHash(passwd, salt, U []byte) []byte {
 	// Take the SHA-256 hash of the original input to the algorithm and name
-	// the resulting 32 bytes, K.
+	// the resulting 32 bytes K.
 	h := sha256.New()
-	for _, data := range in {
-		h.Write(data)
-	}
+	h.Write(passwd)
+	h.Write(salt)
+	h.Write(U)
 	K := h.Sum(nil)
 
+	K1 := make([]byte, 64*(len(passwd)+64+len(U)))
+
 	// Perform the following steps (a)-(d) 64 times:
-	for i := 0; ; i++ {
+	for i := 0; i < 64 || K1[len(K1)-1] > byte(i-32); i++ {
 		// a) Make a new string, K1, consisting of 64 repetitions of the sequence:
 		// input password, K, the 48-byte user key. The 48 byte user key is only
 		// used when checking the owner password or creating the owner key. If
 		// checking the user password or creating the user key, K1 is the
 		// concatenation of the input password and K.
-		var K1 []byte
+		K1 = K1[:0]
 		for j := 0; j < 64; j++ {
-			K1 = append(K1, in[0]...) // ???
+			K1 = append(K1, passwd...)
 			K1 = append(K1, K...)
-			if checkOwner {
-				K1 = append(K1, sec.U...) // ???
-			}
+			K1 = append(K1, U...)
 		}
 
 		// b) Encrypt K1 with the AES-128 (CBC, no padding) algorithm, using the
@@ -762,15 +761,14 @@ func (sec *stdSecHandler) slowHash(checkOwner bool, in ...[]byte) []byte {
 		// initialization vector. The result of this encryption is E.
 		c, _ := aes.NewCipher(K[:16])
 		cbc := cipher.NewCBCEncrypter(c, K[16:32])
-		E := make([]byte, len(K1)) // multiple of block size?
-		// TODO(voss): do we really need to allocate K1?
-		cbc.CryptBlocks(E, K1)
+		// The length of K1 is a multiple of 64, so this is safe.
+		cbc.CryptBlocks(K1, K1)
 
 		// c) Taking the first 16 bytes of E as an unsigned big-endian integer,
 		// compute the remainder, modulo 3.
 		// Since (a*256)%3 = (a*255)%3+a%3 = a%3, we can just add all bytes.
 		var rem int
-		for _, b := range E[:16] {
+		for _, b := range K1[:16] {
 			rem += int(b)
 		}
 		rem %= 3
@@ -791,8 +789,8 @@ func (sec *stdSecHandler) slowHash(checkOwner bool, in ...[]byte) []byte {
 		// d) Using the hash algorithm determined in step c, take the hash of E.
 		// The result is a new value of K, which will be 32, 48, or 64 bytes in
 		// length.
-		h.Write(E)
-		K = h.Sum(nil)
+		h.Write(K1)
+		K = h.Sum(K[:0])
 
 		// Repeat the process (a-d) with this new value for K. Following 64 rounds
 		// (round number 0 to round number 63), do the following, starting with
@@ -802,11 +800,8 @@ func (sec *stdSecHandler) slowHash(checkOwner bool, in ...[]byte) []byte {
 		// an unsigned integer) is greater than the round number - 32, repeat steps
 		// (a-d) again.
 		//
-		// f) Repeat from steps (a-e) until the value of the last byte is ≤ (round
+		// f) Repeat steps (a-e) until the value of the last byte is ≤ (round
 		// number) - 32.
-		if i >= 64 && E[len(E)-1] <= byte(i-32) {
-			break
-		}
 	}
 
 	// The first 32 bytes of the final K are the output of the algorithm.
@@ -944,45 +939,45 @@ func (sec *stdSecHandler) authenticateOwner(paddedOwnerPwd []byte) error {
 }
 
 // Algorithm 8: Computing U and UE (Security handlers of revision 6)
-func (sec *stdSecHandler) computeUAndUE(utf8UserPwd, fileEncryptionKey []byte) ([]byte, []byte, error) {
+func (sec *stdSecHandler) computeUAndUE(utf8UserPwd []byte) ([]byte, []byte, error) {
 	buf := make([]byte, 16)
 	_, err := rand.Read(buf)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	out := sec.slowHash(false, utf8UserPwd, buf[:8]) // user validation salt
+	out := slowHash(utf8UserPwd, buf[:8], nil) // user validation salt
 	U := make([]byte, 0, 48)
 	U = append(U, out...)
 	U = append(U, buf...)
 
-	key := sec.slowHash(false, utf8UserPwd, buf[8:]) // user key salt
+	key := slowHash(utf8UserPwd, buf[8:], nil) // user key salt
 	c, _ := aes.NewCipher(key)
 	cbc := cipher.NewCBCEncrypter(c, zero16)
-	UE := make([]byte, len(fileEncryptionKey))
-	cbc.CryptBlocks(UE, fileEncryptionKey)
+	UE := make([]byte, 32)
+	cbc.CryptBlocks(UE, sec.key)
 
 	return U, UE, nil
 }
 
 // Algorithm 9: Computing O and OE (Security handlers of revision 6)
-func (sec *stdSecHandler) computeOAndOE(utf8OwnerPwd, fileEncryptionKey []byte) ([]byte, []byte, error) {
+func (sec *stdSecHandler) computeOAndOE(utf8OwnerPwd []byte) ([]byte, []byte, error) {
 	buf := make([]byte, 16)
 	_, err := rand.Read(buf)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	out := sec.slowHash(true, utf8OwnerPwd, buf[:8], sec.U) // owner validation salt
+	out := slowHash(utf8OwnerPwd, buf[:8], sec.U) // owner validation salt
 	O := make([]byte, 0, 48)
 	O = append(O, out...)
 	O = append(O, buf...)
 
-	key := sec.slowHash(true, utf8OwnerPwd, buf[8:], sec.U) // owner key salt
+	key := slowHash(utf8OwnerPwd, buf[8:], sec.U) // owner key salt
 	c, _ := aes.NewCipher(key)
 	cbc := cipher.NewCBCEncrypter(c, zero16)
-	OE := make([]byte, len(fileEncryptionKey))
-	cbc.CryptBlocks(OE, fileEncryptionKey)
+	OE := make([]byte, 32)
+	cbc.CryptBlocks(OE, sec.key)
 
 	return O, OE, nil
 }
@@ -1011,12 +1006,12 @@ func (sec *stdSecHandler) computePerms(fileEncryptionKey []byte) []byte {
 
 // Algorithm 11: Authenticating the user password (Security handlers of revision 6)
 func (sec *stdSecHandler) authenticateUser6(utf8Passwd []byte) error {
-	hash := sec.slowHash(false, utf8Passwd, sec.U[32:40])
+	hash := slowHash(utf8Passwd, sec.U[32:40], nil)
 	if !bytes.Equal(hash, sec.U[:32]) {
 		return &AuthenticationError{sec.ID}
 	}
 
-	key := sec.slowHash(false, utf8Passwd, sec.U[40:48]) // user key salt
+	key := slowHash(utf8Passwd, sec.U[40:48], nil) // user key salt
 	c, _ := aes.NewCipher(key)
 	cbc := cipher.NewCBCDecrypter(c, zero16)
 	fileEncryptionKey := make([]byte, 32)
@@ -1033,12 +1028,12 @@ func (sec *stdSecHandler) authenticateUser6(utf8Passwd []byte) error {
 
 // Algorithm 12: Authenticating the owner password (Security handlers of revision 6)
 func (sec *stdSecHandler) authenticateOwner6(utf8Passwd []byte) error {
-	hash := sec.slowHash(true, utf8Passwd, sec.O[32:40], sec.U)
+	hash := slowHash(utf8Passwd, sec.O[32:40], sec.U)
 	if !bytes.Equal(hash, sec.O[:32]) {
 		return &AuthenticationError{sec.ID}
 	}
 
-	key := sec.slowHash(true, utf8Passwd, sec.O[40:48], sec.U) // owner key salt
+	key := slowHash(utf8Passwd, sec.O[40:48], sec.U) // owner key salt
 	c, _ := aes.NewCipher(key)
 	cbc := cipher.NewCBCDecrypter(c, zero16)
 	fileEncryptionKey := make([]byte, 32)
