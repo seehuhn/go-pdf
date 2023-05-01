@@ -22,12 +22,31 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/font"
 )
+
+type graphicsState struct {
+	object      objectType
+	fillColor   color.Color
+	strokeColor color.Color
+
+	font     font.Embedded
+	fontSize float64
+}
 
 // PushGraphicsState saves the current graphics state.
 func (p *Page) PushGraphicsState() {
 	// TODO(voss): does this require certain states?
-	p.stack = append(p.stack, p.currentObject)
+
+	state := &graphicsState{
+		object:      p.currentObject,
+		fillColor:   p.fillColor,
+		strokeColor: p.strokeColor,
+		font:        p.font,
+		fontSize:    p.fontSize,
+	}
+	p.stack = append(p.stack, state)
+
 	_, err := fmt.Fprintln(p.Content, "q")
 	if p.Err == nil {
 		p.Err = err
@@ -37,9 +56,17 @@ func (p *Page) PushGraphicsState() {
 // PopGraphicsState restores the previous graphics state.
 func (p *Page) PopGraphicsState() {
 	// TODO(voss): does this require certain states?
+
 	n := len(p.stack) - 1
-	p.currentObject = p.stack[n]
+	state := p.stack[n]
 	p.stack = p.stack[:n]
+
+	p.currentObject = state.object
+	p.fillColor = state.fillColor
+	p.strokeColor = state.strokeColor
+	p.font = state.font
+	p.fontSize = state.fontSize
+
 	_, err := fmt.Fprintln(p.Content, "Q")
 	if p.Err == nil {
 		p.Err = err
@@ -159,9 +186,13 @@ func (p *Page) SetFillColor(col color.Color) {
 	if !p.valid("SetFillColor", objPage, objText) {
 		return
 	}
-	if col != nil {
-		p.Err = col.SetFill(p.Content)
+	if col == nil || col == p.fillColor {
+		return
 	}
+
+	p.fillColor = col
+
+	p.Err = col.SetFill(p.Content)
 }
 
 // SetStrokeColor sets the stroke color in the graphics state.
@@ -170,7 +201,11 @@ func (p *Page) SetStrokeColor(col color.Color) {
 	if !p.valid("SetStrokeColor", objPage, objText) {
 		return
 	}
-	if col != nil {
-		p.Err = col.SetStroke(p.Content)
+	if col == nil || col == p.strokeColor {
+		return
 	}
+
+	p.strokeColor = col
+
+	p.Err = col.SetStroke(p.Content)
 }

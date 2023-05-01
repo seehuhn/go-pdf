@@ -123,6 +123,18 @@ func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, sh
 	return glyph, nil
 }
 
+func (b *Builder) EmbedFont(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
+	F, err := b.MakeFont()
+	if err != nil {
+		return nil, err
+	}
+	E, err := F.Embed(w, resName)
+	if err != nil {
+		return nil, err
+	}
+	return E, nil
+}
+
 func (b *Builder) MakeFont() (font.Font, error) {
 	if len(b.glyphs) == 0 {
 		return nil, errors.New("no glyphs in font")

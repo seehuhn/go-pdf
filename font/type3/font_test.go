@@ -72,11 +72,11 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	doc.BeginText()
-	doc.SetFont(F1Dict, 12)
-	doc.StartLine(72, 340)
-	doc.ShowText("ABABAB")
-	doc.EndText()
+	doc.TextStart()
+	doc.TextSetFont(F1Dict, 12)
+	doc.TextFirstLine(72, 340)
+	doc.TextShow("ABABAB")
+	doc.TextEnd()
 
 	err = doc.Close()
 	if err != nil {

@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/float"
 )
@@ -31,7 +32,10 @@ type Page struct {
 	Err       error
 
 	currentObject objectType
-	stack         []objectType
+	stack         []*graphicsState
+
+	fillColor   color.Color
+	strokeColor color.Color
 
 	font     font.Embedded
 	fontSize float64
@@ -44,57 +48,12 @@ func NewPage(w io.Writer) *Page {
 	return &Page{
 		Content:       w,
 		currentObject: objPage,
-		resNames:      make(map[pdf.Reference]pdf.Name),
+
+		fillColor:   color.Gray(0),
+		strokeColor: color.Gray(0),
+
+		resNames: make(map[pdf.Reference]pdf.Name),
 	}
-}
-
-type objectType int
-
-// See Figure 9 (p. 113) of PDF 32000-1:2008.
-const (
-	objPage objectType = iota
-	objPath
-	objText
-	objClippingPath
-	objShading
-	objInlineImage
-	objExternal
-)
-
-func (s objectType) String() string {
-	switch s {
-	case objPage:
-		return "page"
-	case objPath:
-		return "path"
-	case objText:
-		return "text"
-	case objClippingPath:
-		return "clipping path"
-	case objShading:
-		return "shading"
-	case objInlineImage:
-		return "inline image"
-	case objExternal:
-		return "external"
-	default:
-		return fmt.Sprintf("objectType(%d)", s)
-	}
-}
-
-func (p *Page) valid(cmd string, ss ...objectType) bool {
-	if p.Err != nil {
-		return false
-	}
-
-	for _, s := range ss {
-		if p.currentObject == s {
-			return true
-		}
-	}
-
-	p.Err = fmt.Errorf("unexpected state %q for %q", p.currentObject, cmd)
-	return false
 }
 
 func (p *Page) coord(x float64) string {
@@ -133,4 +92,55 @@ func (p *Page) resourceName(obj Resource, d pdf.Dict, nameTmpl string) pdf.Name 
 		p.resNames[ref] = name
 		return name
 	}
+}
+
+type objectType int
+
+// See Figure 9 (p. 113) of PDF 32000-1:2008.
+const (
+	objPage objectType = iota
+	objPath
+	objText
+	objClippingPath
+	objShading
+	objInlineImage
+	objExternal
+)
+
+func (s objectType) String() string {
+	switch s {
+	case objPage:
+		return "page"
+	case objPath:
+		return "path"
+	case objText:
+		return "text"
+	case objClippingPath:
+		return "clipping path"
+	case objShading:
+		return "shading"
+	case objInlineImage:
+		return "inline image"
+	case objExternal:
+		return "external"
+	default:
+		return fmt.Sprintf("objectType(%d)", s)
+	}
+}
+
+// valid returns true, if the current object is one of the given types.
+// Otherwise it sets p.Err and returns false.
+func (p *Page) valid(cmd string, ss ...objectType) bool {
+	if p.Err != nil {
+		return false
+	}
+
+	for _, s := range ss {
+		if p.currentObject == s {
+			return true
+		}
+	}
+
+	p.Err = fmt.Errorf("unexpected state %q for %q", p.currentObject, cmd)
+	return false
 }

@@ -109,11 +109,11 @@ func (f *fontTables) ClosePage() error {
 	}
 
 	f.pageNo++
-	f.page.BeginText()
-	f.page.SetFont(f.bodyFont, 10)
-	f.page.StartLine(f.margin+0.5*f.textWidth, f.margin-20)
-	f.page.ShowTextAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
-	f.page.EndText()
+	f.page.TextStart()
+	f.page.TextSetFont(f.bodyFont, 10)
+	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin-20)
+	f.page.TextShowAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
+	f.page.TextEnd()
 
 	err := f.page.Close()
 	f.page = nil
@@ -144,11 +144,11 @@ func (f *fontTables) AddTitle(title string, fontSize, a, b float64) error {
 	}
 
 	f.used += a
-	f.page.BeginText()
-	f.page.SetFont(f.titleFont, fontSize)
-	f.page.StartLine(f.margin+0.5*f.textWidth, f.margin+f.textHeight-f.used)
-	f.page.ShowTextAligned(title, 0, 0.5)
-	f.page.EndText()
+	f.page.TextStart()
+	f.page.TextSetFont(f.titleFont, fontSize)
+	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin+f.textHeight-f.used)
+	f.page.TextShowAligned(title, 0, 0.5)
+	f.page.TextEnd()
 
 	f.used += b
 
@@ -219,7 +219,7 @@ func (f *fontTables) MakeColumns(fontName string) error {
 
 		// draw the colunmns of text
 		for col := 0; col < 4; col++ {
-			page.BeginText()
+			page.TextStart()
 			x := f.margin + float64(col)*colWidth
 			for i := 0; i < nRows; i++ {
 				if curGlyph >= nGlyph {
@@ -239,35 +239,35 @@ func (f *fontTables) MakeColumns(fontName string) error {
 				y := yTop - baseLineSkip*float64(i)
 
 				if i == 0 {
-					page.StartLine(x, y)
+					page.TextFirstLine(x, y)
 				} else if i == 1 {
-					page.StartNextLine(0, -baseLineSkip)
+					page.TextSecondLine(0, -baseLineSkip)
 				} else {
-					page.NewLine()
+					page.TextNewLine()
 				}
 
 				code := "—"
 				if afm.Code[curGlyph] >= 0 {
 					code = fmt.Sprintf("%d", afm.Code[curGlyph])
 				}
-				page.SetFont(f.bodyFont, fontSize)
-				page.ShowTextAligned(code, 16, 1)
+				page.TextSetFont(f.bodyFont, fontSize)
+				page.TextShowAligned(code, 16, 1)
 
-				page.SetFont(F, fontSize)
+				page.TextSetFont(F, fontSize)
 				g := glyph.Seq{
 					{
 						Gid:     glyph.ID(curGlyph),
 						Advance: geom.Widths[curGlyph],
 					},
 				}
-				page.ShowGlyphsAligned(g, 32, 0.5)
+				page.TextShowGlyphsAligned(g, 32, 0.5)
 
-				page.SetFont(f.bodyFont, fontSize)
-				page.ShowText(afm.GlyphName[curGlyph])
+				page.TextSetFont(f.bodyFont, fontSize)
+				page.TextShow(afm.GlyphName[curGlyph])
 
 				curGlyph++
 			}
-			page.EndText()
+			page.TextEnd()
 		}
 		f.used += float64(nRows) * baseLineSkip
 	}

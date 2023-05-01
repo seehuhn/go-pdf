@@ -25,6 +25,68 @@ import (
 	"testing"
 )
 
+func TestObjectStream(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = addPage(w)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs := make([]Reference, 9)
+	objs := make([]Object, len(refs))
+	for i := range refs {
+		refs[i] = w.Alloc()
+		objs[i] = Name("obj" + strconv.Itoa(i))
+	}
+
+	err = w.Put(refs[1], objs[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.WriteCompressed([]Reference{refs[0], refs[3], refs[6]},
+		objs[0], objs[3], objs[6])
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(refs[4], objs[4])
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.WriteCompressed([]Reference{refs[2], refs[5], refs[8]},
+		objs[2], objs[5], objs[8])
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(refs[7], objs[7])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, ref := range refs {
+		obj, err := Resolve(r, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if obj != objs[i] {
+			t.Errorf("%d: got %s, want %s", i, obj, objs[i])
+		}
+	}
+}
+
 func TestReferenceChain(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w, err := NewWriter(buf, nil)
@@ -376,68 +438,6 @@ func TestReaderGoFuzz(t *testing.T) {
 	for _, test := range cases {
 		buf := strings.NewReader(test)
 		_, _ = NewReader(buf, nil)
-	}
-}
-
-func TestObjectStream(t *testing.T) {
-	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = addPage(w)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	refs := make([]Reference, 9)
-	objs := make([]Object, len(refs))
-	for i := range refs {
-		refs[i] = w.Alloc()
-		objs[i] = Name("obj" + strconv.Itoa(i))
-	}
-
-	err = w.Put(refs[1], objs[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = w.WriteCompressed([]Reference{refs[0], refs[3], refs[6]},
-		objs[0], objs[3], objs[6])
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = w.Put(refs[4], objs[4])
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = w.WriteCompressed([]Reference{refs[2], refs[5], refs[8]},
-		objs[2], objs[5], objs[8])
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = w.Put(refs[7], objs[7])
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = w.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i, ref := range refs {
-		obj, err := Resolve(r, ref)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if obj != objs[i] {
-			t.Errorf("%d: got %s, want %s", i, obj, objs[i])
-		}
 	}
 }
 

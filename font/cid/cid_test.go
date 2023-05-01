@@ -53,11 +53,11 @@ func TestCID(t *testing.T) {
 			},
 		}
 
-		w.BeginText()
-		w.SetFont(F, 16)
-		w.StartLine(float64(5+20*col+10), float64(32*20-10-20*row))
-		w.ShowGlyphsAligned(gg, 0, 0.5)
-		w.EndText()
+		w.TextStart()
+		w.TextSetFont(F, 16)
+		w.TextFirstLine(float64(5+20*col+10), float64(32*20-10-20*row))
+		w.TextShowGlyphsAligned(gg, 0, 0.5)
+		w.TextEnd()
 	}
 
 	err = w.Close()

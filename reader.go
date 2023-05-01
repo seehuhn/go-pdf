@@ -91,12 +91,12 @@ var defaultReaderOptions = &ReaderOptions{}
 
 // Open opens the named PDF file for reading.  After use, [Reader.Close] must
 // be called to close the file the Reader is reading from.
-func Open(fname string) (*Reader, error) {
+func Open(fname string, opt *ReaderOptions) (*Reader, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err
 	}
-	r, err := NewReader(fd, nil)
+	r, err := NewReader(fd, opt)
 	if err != nil {
 		fd.Close()
 		return nil, err

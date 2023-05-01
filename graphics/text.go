@@ -26,28 +26,31 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// BeginText starts a new text object.
-func (p *Page) BeginText() {
-	if !p.valid("BeginText", objPage) {
+// TextStart starts a new text object.
+func (p *Page) TextStart() {
+	if !p.valid("TextStart", objPage) {
 		return
 	}
 	p.currentObject = objText
 	_, p.Err = fmt.Fprintln(p.Content, "BT")
 }
 
-// EndText ends the current text object.
-func (p *Page) EndText() {
-	if !p.valid("EndText", objText) {
+// TextEnd ends the current text object.
+func (p *Page) TextEnd() {
+	if !p.valid("TextEnd", objText) {
 		return
 	}
 	p.currentObject = objPage
-	p.font = nil
 	_, p.Err = fmt.Fprintln(p.Content, "ET")
 }
 
-// SetFont sets the font and font size.
-func (p *Page) SetFont(font font.Embedded, size float64) {
-	if !p.valid("SetFont", objText, objPage) {
+// TextSetFont sets the font and font size.
+func (p *Page) TextSetFont(font font.Embedded, size float64) {
+	if !p.valid("TextSetFont", objText, objPage) {
+		return
+	}
+
+	if p.font == font && p.fontSize == size {
 		return
 	}
 
@@ -70,34 +73,34 @@ func (p *Page) SetFont(font font.Embedded, size float64) {
 	_, p.Err = fmt.Fprintln(p.Content, "", size, "Tf")
 }
 
-// StartLine moves to the start of the next line of text.
-func (p *Page) StartLine(x, y float64) {
-	if !p.valid("StartLine", objText) {
+// TextFirstLine moves to the start of the next line of text.
+func (p *Page) TextFirstLine(x, y float64) {
+	if !p.valid("TextFirstLine", objText) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "Td")
 }
 
-// StartNextLine moves to the start of the next line of text and sets
+// TextSecondLine moves to the start of the next line of text and sets
 // the leading.  Usually, dy is negative.
-func (p *Page) StartNextLine(dx, dy float64) {
-	if !p.valid("StartNextLine", objText) {
+func (p *Page) TextSecondLine(dx, dy float64) {
+	if !p.valid("TextSecondLine", objText) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(dx), p.coord(dy), "TD")
 }
 
-// NewLine moves to the start of the next line of text.
-func (p *Page) NewLine() {
-	if !p.valid("NewLine", objText) {
+// TextNewLine moves to the start of the next line of text.
+func (p *Page) TextNewLine() {
+	if !p.valid("TextNewLine", objText) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, "T*")
 }
 
-// ShowText draws a string.
-func (p *Page) ShowText(s string) {
-	if !p.valid("ShowText", objText) {
+// TextShow draws a string.
+func (p *Page) TextShow(s string) {
+	if !p.valid("TextShow", objText) {
 		return
 	}
 	if p.font == nil {
@@ -107,12 +110,12 @@ func (p *Page) ShowText(s string) {
 	p.showGlyphsWithMargins(p.font.Layout(s, p.fontSize), 0, 0)
 }
 
-// ShowTextAligned draws a string and aligns it.
+// TextShowAligned draws a string and aligns it.
 // The beginning is aligned in a space of width w.
 // q=0 means left alignment, q=1 means right alignment
 // and q=0.5 means center alignment.
-func (p *Page) ShowTextAligned(s string, w, q float64) {
-	if !p.valid("ShowTextAligned", objText) {
+func (p *Page) TextShowAligned(s string, w, q float64) {
+	if !p.valid("TextShowAligned", objText) {
 		return
 	}
 	if p.font == nil {
@@ -122,9 +125,9 @@ func (p *Page) ShowTextAligned(s string, w, q float64) {
 	p.showGlyphsAligned(p.font.Layout(s, p.fontSize), w, q)
 }
 
-// ShowGlyphs draws a sequence of glyphs.
-func (p *Page) ShowGlyphs(gg glyph.Seq) {
-	if !p.valid("ShowGlyphs", objText) {
+// TextShowGlyphs draws a sequence of glyphs.
+func (p *Page) TextShowGlyphs(gg glyph.Seq) {
+	if !p.valid("TextShowGlyphs", objText) {
 		return
 	}
 	if p.font == nil {
@@ -135,11 +138,11 @@ func (p *Page) ShowGlyphs(gg glyph.Seq) {
 	p.showGlyphsWithMargins(gg, 0, 0)
 }
 
-// ShowGlyphsAligned draws a sequence of glyphs and aligns it.
+// TextShowGlyphsAligned draws a sequence of glyphs and aligns it.
 // The beginning of the string is shifted right by a*w+b, where w
 // is the width of the string.
-func (p *Page) ShowGlyphsAligned(gg glyph.Seq, w, q float64) {
-	if !p.valid("ShowGlyphsAligned", objText) {
+func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
+	if !p.valid("TextShowGlyphsAligned", objText) {
 		return
 	}
 	if p.font == nil {

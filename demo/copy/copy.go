@@ -108,7 +108,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	r, err := pdf.Open(flag.Arg(0))
+	r, err := pdf.Open(flag.Arg(0), nil)
 	if err != nil {
 		log.Fatal(err)
 	}

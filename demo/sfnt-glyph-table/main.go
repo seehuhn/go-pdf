@@ -141,11 +141,11 @@ func (f *fontTables) ClosePage() error {
 	}
 
 	f.pageNo++
-	f.page.BeginText()
-	f.page.SetFont(f.bodyFont, 10)
-	f.page.StartLine(f.margin+0.5*f.textWidth, f.margin-20)
-	f.page.ShowTextAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
-	f.page.EndText()
+	f.page.TextStart()
+	f.page.TextSetFont(f.bodyFont, 10)
+	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin-20)
+	f.page.TextShowAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
+	f.page.TextEnd()
 
 	err := f.page.Close()
 	f.page = nil
@@ -184,14 +184,14 @@ func (f *fontTables) WriteHeader(title, fileName string) error {
 		return err
 	}
 
-	f.page.BeginText()
-	f.page.SetFont(f.bodyFont, 12)
-	f.page.StartLine(f.margin, f.margin+f.textHeight-f.used-v1)
-	f.page.ShowText(title)
-	f.page.SetFont(f.monoFont, 10)
-	f.page.StartNextLine(0, -v2)
-	f.page.ShowText(fileName)
-	f.page.EndText()
+	f.page.TextStart()
+	f.page.TextSetFont(f.bodyFont, 12)
+	f.page.TextFirstLine(f.margin, f.margin+f.textHeight-f.used-v1)
+	f.page.TextShow(title)
+	f.page.TextSetFont(f.monoFont, 10)
+	f.page.TextSecondLine(0, -v2)
+	f.page.TextShow(fileName)
+	f.page.TextEnd()
 
 	f.used += total
 	return nil
@@ -228,17 +228,17 @@ func (f *fontTables) WriteGlyphRow(theFont font.Embedded, start int) error {
 	dx := (right - left) / 10
 
 	// row label on the left
-	page.BeginText()
-	page.StartLine(left-24, yBase)
-	page.SetFont(f.bodyFont, 10)
+	page.TextStart()
+	page.TextFirstLine(left-24, yBase)
+	page.TextSetFont(f.bodyFont, 10)
 	var label string
 	if start > 0 {
 		label = fmt.Sprintf("%d", start/10)
 	}
-	page.ShowTextAligned(label, 0, 1)
-	page.SetFont(f.italicFont, 10)
-	page.ShowText("x")
-	page.EndText()
+	page.TextShowAligned(label, 0, 1)
+	page.TextSetFont(f.italicFont, 10)
+	page.TextShow("x")
+	page.TextEnd()
 
 	// grid of boxes
 	page.PushGraphicsState()
@@ -307,14 +307,14 @@ func (f *fontTables) WriteGlyphRow(theFont font.Embedded, start int) error {
 			}
 		}
 
-		page.BeginText()
-		page.SetFont(theFont, glyphSize)
-		page.StartLine(xPos[i], yBase)
-		page.ShowGlyphs(glyph.Seq{g})
-		page.SetFont(f.bodyFont, 8)
-		page.StartLine(left+float64(i)*dx-xPos[i], -v2-7.5)
-		page.ShowTextAligned(label, dx, 0.5)
-		page.EndText()
+		page.TextStart()
+		page.TextSetFont(theFont, glyphSize)
+		page.TextFirstLine(xPos[i], yBase)
+		page.TextShowGlyphs(glyph.Seq{g})
+		page.TextSetFont(f.bodyFont, 8)
+		page.TextFirstLine(left+float64(i)*dx-xPos[i], -v2-7.5)
+		page.TextShowAligned(label, dx, 0.5)
+		page.TextEnd()
 	}
 
 	f.used += total

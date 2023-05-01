@@ -51,15 +51,15 @@ func main() {
 
 	x = 72
 	y -= 72
-	w.BeginText()
-	w.SetFont(F, 12)
-	w.StartLine(x, y)
-	w.ShowText("AWAY again")
-	w.StartNextLine(0, -15)
-	w.ShowText("line 2")
-	w.NewLine()
-	w.ShowText("line 3")
-	w.EndText()
+	w.TextStart()
+	w.TextSetFont(F, 12)
+	w.TextFirstLine(x, y)
+	w.TextShow("AWAY again")
+	w.TextSecondLine(0, -15)
+	w.TextShow("line 2")
+	w.TextNewLine()
+	w.TextShow("line 3")
+	w.TextEnd()
 
 	err = w.Close()
 	if err != nil {

@@ -26,21 +26,6 @@ import (
 	"seehuhn.de/go/pdf/document"
 )
 
-func TestRead(t *testing.T) {
-	r, err := pdf.Open("/Users/voss/project/pdf/specs/PDF32000_2008.pdf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-
-	o, err := Read(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	printTree(o, "")
-}
-
 func printTree(node *Tree, pfx string) {
 	if node == nil {
 		fmt.Printf("%snull\n", pfx)

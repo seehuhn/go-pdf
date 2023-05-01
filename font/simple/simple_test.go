@@ -49,11 +49,11 @@ func TestSimple(t *testing.T) {
 			},
 		}
 
-		doc.BeginText()
-		doc.SetFont(F, 16)
-		doc.StartLine(float64(5+20*col+10), float64(16*20-10-20*row))
-		doc.ShowGlyphsAligned(gg, 0, 0.5)
-		doc.EndText()
+		doc.TextStart()
+		doc.TextSetFont(F, 16)
+		doc.TextFirstLine(float64(5+20*col+10), float64(16*20-10-20*row))
+		doc.TextShowGlyphsAligned(gg, 0, 0.5)
+		doc.TextEnd()
 	}
 
 	err = doc.Close()

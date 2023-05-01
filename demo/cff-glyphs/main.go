@@ -183,19 +183,19 @@ func (ctx *illustrator) Show(fnt *cff.Font) error {
 		} else {
 			label = fmt.Sprintf("glyph %d", i)
 		}
-		page.BeginText()
-		page.SetFont(ctx.labelFont, 12)
-		page.StartLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
-		page.ShowText(label)
+		page.TextStart()
+		page.TextSetFont(ctx.labelFont, 12)
+		page.TextFirstLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
+		page.TextShow(label)
 		if g.Name != "" {
 			rr := names.ToUnicode(g.Name, false)
 			if len(rr) == 1 {
 				runeName := runenames.Name(rr[0])
-				page.StartNextLine(0, -15)
-				page.ShowText(runeName)
+				page.TextSecondLine(0, -15)
+				page.TextShow(runeName)
 			}
 		}
-		page.EndText()
+		page.TextEnd()
 
 		page.Scale(q, q)
 
@@ -254,8 +254,8 @@ func (ctx *illustrator) Show(fnt *cff.Font) error {
 			// label the points
 			page.PushGraphicsState()
 			page.SetFillColor(color.RGB(0, 0, 0.8))
-			page.BeginText()
-			page.SetFont(ctx.labelFont, 8/q)
+			page.TextStart()
+			page.TextSetFont(ctx.labelFont, 8/q)
 			xPrev := 0.0
 			yPrev := 0.0
 			for i := range xx {
@@ -263,12 +263,12 @@ func (ctx *illustrator) Show(fnt *cff.Font) error {
 				y := yy[i].Float64() - 2
 				dx := x - xPrev
 				dy := y - yPrev
-				page.StartLine(dx, dy)
-				page.ShowTextAligned(fmt.Sprintf("%d", i), 0, 0.5)
+				page.TextFirstLine(dx, dy)
+				page.TextShowAligned(fmt.Sprintf("%d", i), 0, 0.5)
 				xPrev = x
 				yPrev = y
 			}
-			page.EndText()
+			page.TextEnd()
 			page.PopGraphicsState()
 		}
 

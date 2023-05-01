@@ -13,34 +13,38 @@ func FuzzEncrypted(f *testing.F) {
 	buf := &bytes.Buffer{}
 
 	passwd := "secret"
-	opt := &pdf.WriterOptions{
-		UserPassword:    passwd,
-		UserPermissions: pdf.PermPrintDegraded,
-	}
 
-	// minimal PDF file
-	w, err := pdf.NewWriter(buf, opt)
-	if err != nil {
-		f.Fatal(err)
-	}
-	w.Catalog.Pages = w.Alloc() // pretend we have a page tree
-	err = w.Close()
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Add(buf.Bytes())
+	for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_2, pdf.V1_3, pdf.V1_4, pdf.V1_5, pdf.V1_6, pdf.V1_7, pdf.V2_0} {
+		opt := &pdf.WriterOptions{
+			Version:         v,
+			UserPassword:    passwd,
+			UserPermissions: pdf.PermPrintDegraded,
+		}
 
-	// minimal working PDF file
-	buf = &bytes.Buffer{}
-	page, err := document.WriteSinglePage(buf, 100, 100, opt)
-	if err != nil {
-		f.Fatal(err)
+		// minimal PDF file
+		w, err := pdf.NewWriter(buf, opt)
+		if err != nil {
+			f.Fatal(err)
+		}
+		w.Catalog.Pages = w.Alloc() // pretend we have a page tree
+		err = w.Close()
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(buf.Bytes())
+
+		// minimal working PDF file
+		buf = &bytes.Buffer{}
+		page, err := document.WriteSinglePage(buf, 100, 100, opt)
+		if err != nil {
+			f.Fatal(err)
+		}
+		err = page.Close()
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(buf.Bytes())
 	}
-	err = page.Close()
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Add(buf.Bytes())
 
 	ropt := &pdf.ReaderOptions{
 		ReadPassword: func(ID []byte, try int) string {

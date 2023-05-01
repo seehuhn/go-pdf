@@ -218,7 +218,7 @@ func TestPlaceholder(t *testing.T) {
 
 	// try to read back the file
 
-	r, err := Open(tmpFile)
+	r, err := Open(tmpFile, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

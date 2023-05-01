@@ -41,25 +41,25 @@ func main() {
 			}
 			geom := F.GetGeometry()
 
-			page.BeginText()
-			page.SetFont(F, 12)
-			page.StartLine(50, 250)
-			page.ShowText("PDF version " + V.String())
-			page.StartNextLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
+			page.TextStart()
+			page.TextSetFont(F, 12)
+			page.TextFirstLine(50, 250)
+			page.TextShow("PDF version " + V.String())
+			page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
 			if enc == "enc" {
-				page.ShowText("encrypted text")
+				page.TextShow("encrypted text")
 			} else {
-				page.ShowText("unencrypted text")
+				page.TextShow("unencrypted text")
 			}
-			page.NewLine()
-			page.ShowText("user can copy")
-			page.NewLine()
+			page.TextNewLine()
+			page.TextShow("user can copy")
+			page.TextNewLine()
 			if enc == "plain" {
-				page.ShowText("user can print")
+				page.TextShow("user can print")
 			} else {
-				page.ShowText("only owner can print")
+				page.TextShow("only owner can print")
 			}
-			page.EndText()
+			page.TextEnd()
 
 			err = page.Close()
 			if err != nil {

@@ -66,15 +66,15 @@ func main() {
 		}
 		g := graphics.NewPage(stream)
 
-		g.BeginText()
-		g.SetFont(font, 12)
-		g.StartLine(30, 30)
+		g.TextStart()
+		g.TextSetFont(font, 12)
+		g.TextFirstLine(30, 30)
 		if i < 3 {
-			g.ShowText(fmt.Sprintf("page %d", i))
+			g.TextShow(fmt.Sprintf("page %d", i))
 		} else {
-			g.ShowText(fmt.Sprintf("page %d", i+1))
+			g.TextShow(fmt.Sprintf("page %d", i+1))
 		}
-		g.EndText()
+		g.TextEnd()
 
 		err = stream.Close()
 		if err != nil {
@@ -101,11 +101,11 @@ func main() {
 		}
 		g := graphics.NewPage(stream)
 
-		g.BeginText()
-		g.SetFont(font, 12)
-		g.StartLine(30, 30)
-		g.ShowText("Title")
-		g.EndText()
+		g.TextStart()
+		g.TextSetFont(font, 12)
+		g.TextFirstLine(30, 30)
+		g.TextShow("Title")
+		g.TextEnd()
 
 		err = stream.Close()
 		if err != nil {
@@ -135,11 +135,11 @@ func main() {
 			log.Fatal(err)
 		}
 
-		g.BeginText()
-		g.SetFont(font, 12)
-		g.StartLine(30, 30)
-		g.ShowText("three")
-		g.EndText()
+		g.TextStart()
+		g.TextSetFont(font, 12)
+		g.TextFirstLine(30, 30)
+		g.TextShow("three")
+		g.TextEnd()
 
 		err = stream.Close()
 		if err != nil {
