@@ -239,7 +239,7 @@ func (r *Reader) AuthenticateOwner() error {
 	return err
 }
 
-// AuthenticateOwner tries to authentica the actions given in perm.  If a
+// AuthenticateOwner tries to authenticate the actions given in perm.  If a
 // password is required, this calls the ReadPassword function specified in the
 // [ReaderOptions] struct.  The return value is nil if the owner was
 // authenticated (or if no authentication is required), and an object of type
