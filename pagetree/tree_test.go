@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -33,7 +34,7 @@ func TestBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 	tree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
-		MediaBox: pagetree.A4,
+		MediaBox: document.A4,
 	})
 	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
 		dict := pdf.Dict{

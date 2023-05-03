@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -33,8 +32,8 @@ func main() {
 	const documentTitle = "The 14 Built-in PDF Fonts"
 	const margin = 50
 
-	paper := pagetree.A4
-	doc, err := document.CreateMultiPage("builtin.pdf", paper.URx, paper.URy)
+	paper := document.A4
+	doc, err := document.CreateMultiPage("builtin.pdf", paper, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

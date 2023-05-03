@@ -22,13 +22,12 @@ import (
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/pdf/pagetree"
 )
 
 func main() {
-	bbox := pagetree.A4
+	bbox := document.A4
 
-	w, err := document.CreateSinglePage("graphics.pdf", bbox.URx, bbox.URy, nil)
+	w, err := document.CreateSinglePage("graphics.pdf", bbox, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -159,7 +159,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
-			return nil, err
+			return nil, wrap(err, "encryption dictionary")
 		}
 		// TODO(voss): extract the permission bits
 	}
@@ -223,7 +223,7 @@ func (fi *FileInfo) locateObjects() error {
 
 	pos, m, err := s.find(startRegexp)
 	if err == io.EOF {
-		return ErrNoPDF
+		return errNoPDF
 	} else if err != nil {
 		return err
 	}
@@ -523,10 +523,6 @@ func dummyGetInt(o Object) (Integer, error) {
 	}
 	return 0, nil
 }
-
-var (
-	ErrNoPDF = errors.New("PDF header not found")
-)
 
 var (
 	startRegexp = regexp.MustCompile(`%PDF-([12]\.[0-9])[^0-9]`)

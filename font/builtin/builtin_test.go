@@ -19,13 +19,15 @@ package builtin
 import (
 	"testing"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestSimple(t *testing.T) {
-	doc, err := document.CreateSinglePage("test-builtin-simple.pdf", 10+16*20, 5+16*20+5, nil)
+	paper := &pdf.Rectangle{URx: 10 + 16*20, URy: 5 + 16*20 + 5}
+	doc, err := document.CreateSinglePage("test-builtin-simple.pdf", paper, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

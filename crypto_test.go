@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"testing"
 )
 
@@ -97,7 +96,7 @@ func TestCryptV1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	os.WriteFile("test_TestV1.pdf", buf.Bytes(), 0o666)
+	// os.WriteFile("test_TestV1.pdf", buf.Bytes(), 0o666)
 
 	in := bytes.NewReader(buf.Bytes())
 	pwdFunc := func(_ []byte, try int) string {

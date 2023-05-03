@@ -38,13 +38,13 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 
 	xRefPos, err := s.ReadInteger()
 	if err != nil {
-		return 0, err
+		return 0, wrap(err, fmt.Sprintf("byte %d", pos+9))
 	}
 
 	if xRefPos <= 0 || int64(xRefPos) >= size {
 		return 0, &MalformedFileError{
-			Pos: s.currentPos(),
-			Err: errors.New("invalid xref position"),
+			Err: fmt.Errorf("invalid xref position %d", xRefPos),
+			Loc: []string{fmt.Sprintf("byte %d", pos+9)},
 		}
 	}
 
@@ -88,7 +88,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		case bytes.Equal(buf, []byte("xref")):
 			dict, err = readXRefTable(xref, s)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, wrap(err, fmt.Sprintf("table at byte %d", start))
 			}
 
 			if xRefStm, ok := dict["XRefStm"]; ok {
@@ -104,13 +104,13 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 				}
 				_, ref, err = readXRefStream(xref, s)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, wrap(err, "XRefStm")
 				}
 			}
 		default:
 			dict, ref, err = readXRefStream(xref, s)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, wrap(err, fmt.Sprintf("stream at byte %d", start))
 			}
 		}
 		if ref != 0 {
@@ -134,8 +134,8 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		prevStart, ok := prev.(Integer)
 		if !ok || prevStart <= 0 || int64(prevStart) >= size {
 			return nil, nil, &MalformedFileError{
-				Pos: start,
-				Err: errors.New("invalid /Prev value"),
+				Err: errors.New("invalid /Prev"),
+				Loc: []string{fmt.Sprintf("xref at byte %d", start)},
 			}
 		}
 		start = int64(prevStart)
@@ -165,11 +165,11 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 
 		start, err := s.ReadInteger()
 		if err != nil {
-			return nil, err
+			return nil, wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 		length, err := s.ReadInteger()
 		if err != nil {
-			return nil, err
+			return nil, wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 
 		err = s.SkipWhiteSpace()
@@ -220,7 +220,6 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		}
 		if len(buf) < 20 {
 			return &MalformedFileError{
-				Pos: s.currentPos(),
 				Err: io.ErrUnexpectedEOF,
 			}
 		}
@@ -259,8 +258,8 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			}
 		default:
 			return &MalformedFileError{
-				Pos: s.currentPos(),
 				Err: errors.New("malformed xref table"),
+				Loc: []string{fmt.Sprintf("byte %d", s.currentPos())},
 			}
 		}
 
@@ -283,8 +282,7 @@ func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, Reference, er
 	stream, ok := obj.(*Stream)
 	if !ok {
 		return nil, 0, &MalformedFileError{
-			Pos: s.currentPos(),
-			Err: errors.New("invalid xref stream"),
+			Err: fmt.Errorf("found %T instead of xref stream", obj),
 		}
 	}
 	dict := stream.Dict
@@ -441,8 +439,7 @@ func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
 		pos = start + k - 1
 	}
 	return 0, &MalformedFileError{
-		Pos: 0, // TODO(voss)
-		Err: errors.New(pat + " not found"),
+		Err: fmt.Errorf("pattern %q not found", pat),
 	}
 }
 

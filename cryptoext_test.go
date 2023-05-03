@@ -30,6 +30,11 @@ func FuzzEncrypted(f *testing.F) {
 
 	passwd := "secret"
 
+	paper := &pdf.Rectangle{
+		URx: 100,
+		URy: 100,
+	}
+
 	for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_2, pdf.V1_3, pdf.V1_4, pdf.V1_5, pdf.V1_6, pdf.V1_7, pdf.V2_0} {
 		opt := &pdf.WriterOptions{
 			Version:         v,
@@ -52,7 +57,7 @@ func FuzzEncrypted(f *testing.F) {
 
 		// minimal working PDF file
 		buf = &bytes.Buffer{}
-		page, err := document.WriteSinglePage(buf, 100, 100, opt)
+		page, err := document.WriteSinglePage(buf, paper, opt)
 		if err != nil {
 			f.Fatal(err)
 		}

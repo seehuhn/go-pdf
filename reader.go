@@ -134,7 +134,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 
 	xref, trailer, err := r.readXRef()
 	if err != nil {
-		return nil, err
+		return nil, wrap(err, "xref")
 	}
 	// Now we can install the real xref table.
 	r.xref = xref
@@ -164,7 +164,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
-			return nil, err
+			return nil, wrap(err, "encryption dictionary")
 		}
 	} else if r.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
@@ -189,11 +189,14 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 
 	catalogDict, err := GetDict(r, trailer["Root"])
 	if err != nil {
-		return nil, err
+		err = wrap(err, "document catalog")
+		if shouldExit(err) {
+			return nil, err
+		}
 	}
 	r.Catalog = &Catalog{}
 	err = r.DecodeDict(r.Catalog, catalogDict)
-	if shouldExit(err) || (err != nil && r.Catalog.Pages == 0) {
+	if shouldExit(err) || (err != nil && opt.ErrorHandling == ErrorHandlingRecover && r.Catalog.Pages == 0) {
 		return nil, err
 	}
 	if r.Catalog.Version > r.Version {
@@ -268,7 +271,13 @@ func (r *Reader) Authenticate(perm Perm) error {
 
 // Get reads an indirect object from the PDF file.  If the object is not
 // present, nil is returned without an error.
-func (r *Reader) Get(ref Reference) (Object, error) {
+func (r *Reader) Get(ref Reference) (_ Object, err error) {
+	defer func() {
+		if err != nil {
+			err = wrap(err, "object "+ref.String())
+		}
+	}()
+
 	entry := r.xref[ref.Number()]
 	if entry.IsFree() || entry.Generation != ref.Generation() {
 		return nil, nil
@@ -287,7 +296,6 @@ func (r *Reader) Get(ref Reference) (Object, error) {
 		}
 		if ref != fileRef {
 			return nil, &MalformedFileError{
-				Pos: 0,
 				Err: errors.New("xref corrupted"),
 			}
 		}
@@ -308,14 +316,14 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 	objectStream, isStream := container.(*Stream)
 	if !isStream {
 		return nil, &MalformedFileError{
-			Pos: r.errPos(sRef),
-			Err: errors.New("wrong type for object stream"),
+			Err: fmt.Errorf("got %T instead object stream", container),
+			Loc: []string{"object " + sRef.String()},
 		}
 	}
 
-	contents, err := r.objStmScanner(objectStream, r.errPos(sRef))
+	contents, err := r.objStmScanner(objectStream)
 	if err != nil {
-		return nil, err
+		return nil, wrap(err, "object stream "+sRef.String())
 	}
 
 	m := -1
@@ -327,8 +335,8 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 	}
 	if m < 0 {
 		return nil, &MalformedFileError{
-			Pos: r.errPos(sRef),
-			Err: errors.New("object missing from stream"),
+			Err: fmt.Errorf("object %d not found", number),
+			Loc: []string{"object stream " + sRef.String()},
 		}
 	}
 
@@ -380,8 +388,8 @@ func (r *Reader) resolveNoObjStreams(obj Object) (Object, error) {
 			return nil, err
 		} else if ref != fileRef {
 			return nil, &MalformedFileError{
-				Pos: 0,
 				Err: errors.New("xref corrupted"),
+				Loc: []string{"object " + ref.String() + "*"},
 			}
 		}
 
@@ -468,13 +476,16 @@ type stmObj struct {
 	offs   int
 }
 
-func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
+func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
+	defer func() {
+		if err != nil {
+			err = wrap(err, "decoding ObjStm")
+		}
+	}()
+
 	N, ok := stream.Dict["N"].(Integer)
 	if !ok || N < 0 || N > 10000 {
-		return nil, &MalformedFileError{
-			Pos: errPos,
-			Err: errors.New("no valid /N for ObjStm"),
-		}
+		return nil, &MalformedFileError{Err: errors.New("no valid /N")}
 	}
 	n := int(N)
 
@@ -486,10 +497,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 
 	decoded, err := r.DecodeStream(stream, 0)
 	if err != nil {
-		return nil, &MalformedFileError{
-			Pos: errPos,
-			Err: err,
-		}
+		return nil, err
 	}
 	s := newScanner(decoded, r.safeGetInt, dec)
 
@@ -511,10 +519,7 @@ func (r *Reader) objStmScanner(stream *Stream, errPos int64) (*objStm, error) {
 	pos := s.currentPos()
 	first, ok := stream.Dict["First"].(Integer)
 	if !ok || first < Integer(pos) {
-		return nil, &MalformedFileError{
-			Pos: errPos,
-			Err: errors.New("no valid /First for ObjStm"),
-		}
+		return nil, &MalformedFileError{Err: errors.New("no valid /First")}
 	}
 	for i := range idx {
 		idx[i].offs += int(first)
@@ -592,32 +597,6 @@ func (r *Reader) scannerFrom(pos int64) (*scanner, error) {
 	return s, nil
 }
 
-func (r *Reader) errPos(obj Object) int64 {
-	ref, ok := obj.(Reference)
-	if !ok {
-		return 0
-	}
-	if r.xref == nil {
-		return 0
-	}
-
-	number := ref.Number()
-	gen := ref.Generation()
-	for i := 0; i < 8; i++ {
-		entry := r.xref[number]
-		if entry.IsFree() || entry.Generation != gen {
-			return 0
-		}
-
-		if entry.InStream == 0 {
-			return entry.Pos
-		}
-		number = entry.InStream.Number()
-		gen = entry.InStream.Generation()
-	}
-	return 0
-}
-
 type Getter interface {
 	Get(Reference) (Object, error)
 }
@@ -632,6 +611,8 @@ type Getter interface {
 // If a reference loop is encountered, the function returns an error of type
 // [MalformedFileError].
 func Resolve(r Getter, obj Object) (Object, error) {
+	origObj := obj
+
 	count := 0
 	for {
 		ref, isReference := obj.(Reference)
@@ -641,8 +622,8 @@ func Resolve(r Getter, obj Object) (Object, error) {
 		count++
 		if count > 16 {
 			return nil, &MalformedFileError{
-				Pos: 0,
 				Err: errors.New("too many levels of indirection"),
+				Loc: []string{"object " + origObj.(Reference).String()},
 			}
 		}
 

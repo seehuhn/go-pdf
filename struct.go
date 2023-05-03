@@ -253,7 +253,10 @@ fieldLoop:
 		v.Field(extra).Set(reflect.ValueOf(extraDict))
 	}
 
-	return firstErr
+	if firstErr != nil {
+		return &MalformedFileError{Err: firstErr}
+	}
+	return nil
 }
 
 var (

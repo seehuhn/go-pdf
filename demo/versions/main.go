@@ -46,7 +46,7 @@ func main() {
 			if enc == "enc" {
 				opt.UserPassword = "A"
 			}
-			page, err := document.CreateSinglePage(fname, 300, 300, opt)
+			page, err := document.CreateSinglePage(fname, &pdf.Rectangle{URx: 300, URy: 300}, opt)
 			if err != nil {
 				log.Fatal(err)
 			}

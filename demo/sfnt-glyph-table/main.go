@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
-	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -57,8 +56,8 @@ func main() {
 		}
 	}
 
-	paper := pagetree.A4
-	doc, err := document.CreateMultiPage("test.pdf", paper.URx, paper.URy)
+	paper := document.A4
+	doc, err := document.CreateMultiPage("test.pdf", paper, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

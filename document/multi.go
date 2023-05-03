@@ -28,20 +28,20 @@ import (
 )
 
 type MultiPage struct {
-	*pagetree.Writer
-	Out *pdf.Writer
+	Out  *pdf.Writer
+	Tree *pagetree.Writer
 
 	numOpen   int
 	base      io.Writer
 	closeBase bool
 }
 
-func CreateMultiPage(fileName string, width, height float64) (*MultiPage, error) {
+func CreateMultiPage(fileName string, pageSize *pdf.Rectangle, opt *pdf.WriterOptions) (*MultiPage, error) {
 	fd, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
 	}
-	doc, err := WriteMultiPage(fd, width, height)
+	doc, err := WriteMultiPage(fd, pageSize, opt)
 	if err != nil {
 		fd.Close()
 		return nil, err
@@ -50,23 +50,20 @@ func CreateMultiPage(fileName string, width, height float64) (*MultiPage, error)
 	return doc, nil
 }
 
-func WriteMultiPage(w io.Writer, width, height float64) (*MultiPage, error) {
-	out, err := pdf.NewWriter(w, nil)
+func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOptions) (*MultiPage, error) {
+	out, err := pdf.NewWriter(w, opt)
 	if err != nil {
 		return nil, err
 	}
 
 	tree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
-		MediaBox: &pdf.Rectangle{
-			URx: width,
-			URy: height,
-		},
+		MediaBox: pageSize,
 	})
 
 	return &MultiPage{
-		base:   w,
-		Out:    out,
-		Writer: tree,
+		base: w,
+		Out:  out,
+		Tree: tree,
 	}, nil
 }
 
@@ -75,7 +72,7 @@ func (doc *MultiPage) Close() error {
 		return fmt.Errorf("%d pages still open", doc.numOpen)
 	}
 
-	ref, err := doc.Writer.Close()
+	ref, err := doc.Tree.Close()
 	if err != nil {
 		return err
 	}
@@ -99,60 +96,13 @@ func (doc *MultiPage) AddPage() *Page {
 
 	page := graphics.NewPage(&bytes.Buffer{})
 	return &Page{
-		Page: page,
-		PageDict: pdf.Dict{
-			"Type": pdf.Name("Page"),
+		Page:     page,
+		PageDict: pdf.Dict{"Type": pdf.Name("Page")},
+		Out:      doc.Out,
+		tree:     doc.Tree,
+		closeFn: func(p *Page) error {
+			doc.numOpen--
+			return nil
 		},
-		doc: doc,
 	}
-}
-
-// TODO(voss): can we merge SinglePage and Page?
-type Page struct {
-	*graphics.Page
-	PageDict pdf.Dict
-
-	doc *MultiPage
-}
-
-func (p *Page) Close() error {
-	if p.Page.Err != nil {
-		return p.Page.Err
-	}
-
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if p.doc.Out.Version >= pdf.V1_2 {
-		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-	}
-	contentRef := p.doc.Out.Alloc()
-	stream, err := p.doc.Out.OpenStream(contentRef, nil, compress)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(stream, p.Page.Content.(*bytes.Buffer))
-	if err != nil {
-		return err
-	}
-	err = stream.Close()
-	if err != nil {
-		return err
-	}
-	p.PageDict["Contents"] = contentRef
-
-	if p.Page.Resources != nil {
-		p.PageDict["Resources"] = pdf.AsDict(p.Page.Resources)
-	}
-
-	// Disable the page, since it has been written out and cannot be modified
-	// anymore.
-	p.Page.Content = nil
-	p.Page = nil
-	p.doc.numOpen--
-
-	err = p.doc.Writer.AppendPage(p.PageDict)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

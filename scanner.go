@@ -142,20 +142,14 @@ func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 
 func (s *scanner) ReadObject() (Object, error) {
 	buf, err := s.Peek(5) // len("false") == 5
-	if err == nil {
-		// Below, we return `err` if we cannot detect an object.  Use
-		// &MalformedFileError{} when there was no problem reading the input.
-		if len(buf) < 5 {
-			err = &MalformedFileError{Err: io.EOF}
-		} else {
-			err = &MalformedFileError{Pos: s.currentPos()}
-		}
+	if err != nil {
+		return nil, err
 	}
 
 	switch {
 	case len(buf) == 0:
 		// Test this first, so that we can use buf[0] in the following cases.
-		return nil, err
+		return nil, &MalformedFileError{Err: io.EOF}
 	case bytes.HasPrefix(buf, []byte("null")):
 		s.bufPos += 4
 		return nil, nil
@@ -180,10 +174,7 @@ func (s *scanner) ReadObject() (Object, error) {
 
 		// check whether this is the start of a stream
 		err = s.SkipWhiteSpace()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return dict, nil
-			}
+		if err != nil && err != io.EOF {
 			return nil, err
 		}
 		buf, _ = s.Peek(6) // len("stream") == 6
@@ -201,7 +192,10 @@ func (s *scanner) ReadObject() (Object, error) {
 		s.bufPos++
 		return s.ReadArray()
 	}
-	return nil, err
+
+	return nil, &MalformedFileError{
+		Err: fmt.Errorf("unexpected character %q", buf[0]),
+	}
 }
 
 // ReadInteger reads an integer, optionally preceeded by white space.
@@ -231,8 +225,8 @@ func (s *scanner) ReadInteger() (Integer, error) {
 	x, err := strconv.ParseInt(string(res), 10, 64)
 	if err != nil {
 		return 0, &MalformedFileError{
-			Pos: s.currentPos(),
 			Err: err,
+			Loc: []string{"ReadInteger"},
 		}
 	}
 	return Integer(x), nil
@@ -496,8 +490,21 @@ func (s *scanner) ReadArray() (Array, error) {
 }
 
 // ReadDict reads a PDF dictionary.
-func (s *scanner) ReadDict() (Dict, error) {
-	err := s.SkipString("<<")
+func (s *scanner) ReadDict() (dict Dict, err error) {
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+		if err == io.ErrUnexpectedEOF {
+			err = &MalformedFileError{
+				Err: errors.New("unexpected EOF while reading Dict"),
+			}
+		} else if err != nil {
+			err = wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+		}
+	}()
+
+	err = s.SkipString("<<")
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +513,7 @@ func (s *scanner) ReadDict() (Dict, error) {
 		return nil, err
 	}
 
-	dict := make(map[Name]Object)
+	dict = make(map[Name]Object)
 	for {
 		var key Name
 		key, err = s.ReadName()
@@ -539,14 +546,9 @@ func (s *scanner) ReadDict() (Dict, error) {
 				return nil, err
 			}
 			if len(buf) == 0 {
-				return nil, &MalformedFileError{
-					Pos: s.currentPos(),
-					Err: io.ErrUnexpectedEOF,
-				}
+				return nil, &MalformedFileError{Err: io.ErrUnexpectedEOF}
 			}
 			if buf[0] != '/' && buf[0] != '>' {
-				errPos := s.currentPos()
-
 				b, err := s.ReadInteger()
 				if err != nil {
 					return nil, err
@@ -562,10 +564,7 @@ func (s *scanner) ReadDict() (Dict, error) {
 					return nil, err
 				}
 				if buf[0] != 'R' {
-					return nil, &MalformedFileError{
-						Pos: errPos,
-						Err: errors.New("expected /Name but found Integer"),
-					}
+					return nil, &MalformedFileError{Err: errors.New("expected /Name but found Integer")}
 				}
 				s.bufPos++
 				err = s.SkipWhiteSpace()
@@ -589,13 +588,25 @@ func (s *scanner) ReadDict() (Dict, error) {
 }
 
 // ReadStreamData reads the data of a PDF Stream, starting after the Dict.
-func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
+func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+		if err == io.ErrUnexpectedEOF {
+			err = &MalformedFileError{
+				Err: errors.New("unexpected EOF while reading Stream"),
+			}
+		} else if err != nil {
+			err = wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+		}
+	}()
+
 	length, err := s.getInt(dict["Length"])
 	if err != nil {
-		return nil, err
+		return nil, wrap(err, "reading Length")
 	} else if length < 0 {
 		return nil, &MalformedFileError{
-			Pos: s.currentPos(),
 			Err: errors.New("stream with negative length"),
 		}
 	}
@@ -617,7 +628,9 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 		// not allowed by the spec, but seen in the wild
 		s.bufPos++
 	} else {
-		return nil, &MalformedFileError{}
+		return nil, &MalformedFileError{
+			Err: errors.New("stream does not start with newline"),
+		}
 	}
 
 	start := s.currentPos()
@@ -635,8 +648,11 @@ func (s *scanner) ReadStreamData(dict Dict) (*Stream, error) {
 			return nil, err
 		}
 	} else {
-		// the spec does not allow streams inside streams
-		return nil, &MalformedFileError{}
+		// Does not happen in valid PDF files.
+		// TODO(voss): can this be reached at all?
+		return nil, &MalformedFileError{
+			Err: errors.New("cannot seek"),
+		}
 	}
 
 	isEncrypted := false
@@ -669,7 +685,7 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 	err := s.SkipString("%PDF-")
 	if err != nil {
 		if e, ok := err.(*MalformedFileError); ok {
-			e.Err = ErrNoPDF
+			e.Err = errNoPDF
 		}
 		return 0, err
 	}
@@ -689,8 +705,8 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 	ver, err := ParseVersion(string(buf))
 	if err != nil {
 		return 0, &MalformedFileError{
-			Pos: 5,
 			Err: err,
+			Loc: []string{"PDF header"},
 		}
 	}
 
@@ -717,9 +733,10 @@ func (s *scanner) refill() error {
 	return err
 }
 
-// Peek returns a view of the next n bytes of input.  The function panics, if n
-// is larger than scannerBufSize.  On EOF, short buffers without an error code
-// will be returned.
+// Peek returns a view of the next n bytes of input from the scanner's buffer.
+// If n is larger than scannerBufSize, the function panics.
+// If an EOF is encountered before n bytes can be read, the function returns
+// the remaining bytes without an error code.
 func (s *scanner) Peek(n int) ([]byte, error) {
 	if n > scannerBufSize {
 		panic("peek window too large")
@@ -757,9 +774,11 @@ func (s *scanner) Discard(n int64) error {
 	return err
 }
 
-// ScanBytes iterates over the bytes of s until `accept()` returns false.  The
+// ScanBytes iterates over the bytes of s until `accept()` returns false. The
 // scanner position after the call returns is the byte for which `accept()`
-// returned false, the next read will start with this byte.
+// returned false; the next read will start with this byte.
+// If the end of the input is reached before `accept()` returns false,
+// `ScanBytes` returns io.EOF.
 func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 	empty := true
 	for {
@@ -783,6 +802,9 @@ func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 	}
 }
 
+// SkipWhiteSpace skips over all whitespace characters until the next
+// non-whitespace character. If the end of the input is reached, the function
+// returns io.EOF.
 func (s *scanner) SkipWhiteSpace() error {
 	isComment := false
 	return s.ScanBytes(func(c byte) bool {
@@ -799,6 +821,8 @@ func (s *scanner) SkipWhiteSpace() error {
 	})
 }
 
+// SkipString skips over the given string.
+// If the string is not found, the function returns a MalformedFileError.
 func (s *scanner) SkipString(pat string) error {
 	patBytes := []byte(pat)
 	n := len(patBytes)
@@ -808,7 +832,6 @@ func (s *scanner) SkipString(pat string) error {
 	}
 	if !bytes.Equal(buf, patBytes) {
 		return &MalformedFileError{
-			Pos: s.currentPos(),
 			Err: fmt.Errorf("expected %q but found %q", pat, string(buf)),
 		}
 	}

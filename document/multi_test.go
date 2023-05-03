@@ -19,10 +19,12 @@ package document
 import (
 	"bytes"
 	"testing"
+
+	"seehuhn.de/go/pdf"
 )
 
 func TestMultiPage(t *testing.T) {
-	doc, err := CreateMultiPage("test.pdf", 100, 100)
+	doc, err := CreateMultiPage("test.pdf", &pdf.Rectangle{URx: 100, URy: 100}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +66,7 @@ func BenchmarkMultiPage(b *testing.B) {
 	buf := &bytes.Buffer{}
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		doc, err := WriteMultiPage(buf, 100, 100)
+		doc, err := WriteMultiPage(buf, &pdf.Rectangle{URx: 100, URy: 100}, nil)
 		if err != nil {
 			b.Fatal(err)
 		}

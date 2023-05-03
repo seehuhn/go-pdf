@@ -64,9 +64,9 @@ func TestReadObject(t *testing.T) {
 			s := testScanner(body)
 
 			val, err := s.ReadObject()
-			if stm2, ok := test.val.(*Stream); ok {
-				stm1, ok := val.(*Stream)
-				if !ok {
+			if stm2, expectStm := test.val.(*Stream); expectStm {
+				stm1, haveStm := val.(*Stream)
+				if !haveStm {
 					t.Errorf("%q: wrong type: expected *Stream, got %T",
 						body, val)
 					continue
@@ -98,18 +98,14 @@ func TestReadObject(t *testing.T) {
 					body, format(test.val), format(val))
 			}
 
-			if test.ok && err != nil {
+			switch {
+			case test.ok && err != nil:
 				t.Errorf("%q: unexpected error %q", body, err)
-			} else if !test.ok {
-				var e2 *MalformedFileError
-				if err == nil {
-					t.Errorf("%q: missing error", body)
-				} else if errors.As(err, &e2) {
-					if test.err != nil && !errors.Is(err, test.err) {
-						t.Errorf("%q: error does not wrap %q",
-							body, test.err)
-					}
-				} else {
+			case !test.ok && err == nil:
+				t.Errorf("%q: missing error", body)
+			case !test.ok:
+				_, ok := err.(*MalformedFileError)
+				if !ok {
 					t.Errorf("%q: wrong error %q", body, err)
 				}
 			}
@@ -238,95 +234,94 @@ var testCases = []struct {
 	in  string
 	val Object
 	ok  bool
-	err error
 }{
-	{"", nil, false, io.EOF},
-	{"null", nil, true, nil},
+	{"", nil, false},
+	{"null", nil, true},
 
-	{"true", Bool(true), true, nil},
-	{"false", Bool(false), true, nil},
-	{"TRUE", nil, false, nil},
-	{"FALSE", nil, false, nil},
+	{"true", Bool(true), true},
+	{"false", Bool(false), true},
+	{"TRUE", nil, false},
+	{"FALSE", nil, false},
 
-	{"0", Integer(0), true, nil},
-	{"+0", Integer(0), true, nil},
-	{"-0", Integer(0), true, nil},
-	{"1", Integer(1), true, nil},
-	{"+1", Integer(1), true, nil},
-	{"-1", Integer(-1), true, nil},
-	{"12", Integer(12), true, nil},
-	{"+12", Integer(12), true, nil},
-	{"-12", Integer(-12), true, nil},
-	{"123", Integer(123), true, nil},
-	{"-4567", Integer(-4567), true, nil},
-	{"999999999999999999", Integer(999999999999999999), true, nil},
-	{"-999999999999999999", Integer(-999999999999999999), true, nil},
+	{"0", Integer(0), true},
+	{"+0", Integer(0), true},
+	{"-0", Integer(0), true},
+	{"1", Integer(1), true},
+	{"+1", Integer(1), true},
+	{"-1", Integer(-1), true},
+	{"12", Integer(12), true},
+	{"+12", Integer(12), true},
+	{"-12", Integer(-12), true},
+	{"123", Integer(123), true},
+	{"-4567", Integer(-4567), true},
+	{"999999999999999999", Integer(999999999999999999), true},
+	{"-999999999999999999", Integer(-999999999999999999), true},
 
-	{".5", Real(.5), true, nil},
-	{"+.5", Real(.5), true, nil},
-	{"-.5", Real(-.5), true, nil},
-	{"0.5", Real(.5), true, nil},
-	{"+0.5", Real(.5), true, nil},
-	{"-0.5", Real(-.5), true, nil},
-	{".", nil, false, nil},
-	{".+5", nil, false, nil},
+	{".5", Real(.5), true},
+	{"+.5", Real(.5), true},
+	{"-.5", Real(-.5), true},
+	{"0.5", Real(.5), true},
+	{"+0.5", Real(.5), true},
+	{"-0.5", Real(-.5), true},
+	{".", nil, false},
+	{".+5", nil, false},
 
-	{"/a", Name("a"), true, nil},
-	{"/1234567890123456789012345678901", Name("1234567890123456789012345678901"), true, nil},
-	{"/12345678901234567890123456789012", Name("12345678901234567890123456789012"), true, nil},
-	{"/123456789012345678901234567890123", Name("123456789012345678901234567890123"), true, nil},
-	{"/A;Name_With-Various***Characters?", Name("A;Name_With-Various***Characters?"), true, nil},
-	{"/1.2", Name("1.2"), true, nil},
-	{"/A#42", Name("AB"), true, nil},
-	{"/F#23#20minor", Name("F# minor"), true, nil},
-	{"/1#2E5", Name("1.5"), true, nil},
-	{"/ß", Name("ß"), true, nil},
-	{"/", Name(""), true, nil},
+	{"/a", Name("a"), true},
+	{"/1234567890123456789012345678901", Name("1234567890123456789012345678901"), true},
+	{"/12345678901234567890123456789012", Name("12345678901234567890123456789012"), true},
+	{"/123456789012345678901234567890123", Name("123456789012345678901234567890123"), true},
+	{"/A;Name_With-Various***Characters?", Name("A;Name_With-Various***Characters?"), true},
+	{"/1.2", Name("1.2"), true},
+	{"/A#42", Name("AB"), true},
+	{"/F#23#20minor", Name("F# minor"), true},
+	{"/1#2E5", Name("1.5"), true},
+	{"/ß", Name("ß"), true},
+	{"/", Name(""), true},
 
-	{`()`, String(nil), true, nil},
-	{"(test string)", String("test string"), true, nil},
-	{`(hello)`, String("hello"), true, nil},
-	{`(he(ll)o)`, String("he(ll)o"), true, nil},
-	{`(he\)ll\(o)`, String("he)ll(o"), true, nil},
-	{"(hello\n)", String("hello\n"), true, nil},
-	{"(hello\r)", String("hello\r"), true, nil},
-	{"(hello\r\n)", String("hello\r\n"), true, nil},
-	{"(hello\n\r)", String("hello\n\r"), true, nil},
-	{"(hell\\\no)", String("hello"), true, nil},
-	{"(hell\\\ro)", String("hello"), true, nil},
-	{"(hell\\\r\no)", String("hello"), true, nil},
-	{`(h\145llo)`, String("hello"), true, nil},
-	{`(\0612)`, String("12"), true, nil},
+	{`()`, String(nil), true},
+	{"(test string)", String("test string"), true},
+	{`(hello)`, String("hello"), true},
+	{`(he(ll)o)`, String("he(ll)o"), true},
+	{`(he\)ll\(o)`, String("he)ll(o"), true},
+	{"(hello\n)", String("hello\n"), true},
+	{"(hello\r)", String("hello\r"), true},
+	{"(hello\r\n)", String("hello\r\n"), true},
+	{"(hello\n\r)", String("hello\n\r"), true},
+	{"(hell\\\no)", String("hello"), true},
+	{"(hell\\\ro)", String("hello"), true},
+	{"(hell\\\r\no)", String("hello"), true},
+	{`(h\145llo)`, String("hello"), true},
+	{`(\0612)`, String("12"), true},
 
-	{"<>", String(nil), true, nil},
-	{"<68656c6c6f>", String("hello"), true, nil},
-	{"<68656C6C6F>", String("hello"), true, nil},
-	{"<68 65 6C 6C 6F>", String("hello"), true, nil},
-	{"<68656C70>", String("help"), true, nil},
-	{"<68656C7>", String("help"), true, nil},
+	{"<>", String(nil), true},
+	{"<68656c6c6f>", String("hello"), true},
+	{"<68656C6C6F>", String("hello"), true},
+	{"<68 65 6C 6C 6F>", String("hello"), true},
+	{"<68656C70>", String("help"), true},
+	{"<68656C7>", String("help"), true},
 
-	{"[1 2 3]", Array{Integer(1), Integer(2), Integer(3)}, true, nil},
-	{"[1 2 3 R 4]", Array{Integer(1), NewReference(2, 3), Integer(4)}, true, nil},
+	{"[1 2 3]", Array{Integer(1), Integer(2), Integer(3)}, true},
+	{"[1 2 3 R 4]", Array{Integer(1), NewReference(2, 3), Integer(4)}, true},
 
 	{"<< /key 12 /val /23 >>", Dict{
 		Name("key"): Integer(12),
 		Name("val"): Name("23"),
-	}, true, nil},
+	}, true},
 	{"<< /key1 1 /key2 2 2 R /key3 3 >>", Dict{
 		Name("key1"): Integer(1),
 		Name("key2"): NewReference(2, 2),
 		Name("key3"): Integer(3),
-	}, true, nil},
+	}, true},
 
 	{"<< /Length 5 >>\nstream\nhello\nendstream", &Stream{
 		Dict: Dict{
 			Name("Length"): Integer(5),
 		},
 		R: strings.NewReader("hello"),
-	}, true, nil},
+	}, true},
 
-	{"fals", nil, false, nil},
-	{"abc", nil, false, nil},
+	{"fals", nil, false},
+	{"abc", nil, false},
 }
 
 func TestStreamReader(t *testing.T) {

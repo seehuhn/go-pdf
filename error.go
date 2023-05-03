@@ -19,10 +19,11 @@ package pdf
 import (
 	"errors"
 	"fmt"
-	"strconv"
+	"strings"
 )
 
 var (
+	errNoPDF           = errors.New("no header")
 	errVersion         = errors.New("unsupported PDF version")
 	errCorrupted       = errors.New("corrupted ciphertext")
 	errNoDate          = errors.New("not a valid date string")
@@ -45,26 +46,32 @@ func (err *AuthenticationError) Error() string {
 	return fmt.Sprintf("authentication failed for document ID %x", err.ID)
 }
 
-// MalformedFileError indicates that the PDF file could not be parsed.
+// MalformedFileError indicates that a PDF file could not be parsed.
 type MalformedFileError struct {
 	Err error
-	Pos int64
+	Loc []string
 }
 
 func (err *MalformedFileError) Error() string {
-	middle := ""
-	if err.Err != nil {
-		middle = ": " + err.Err.Error()
+	parts := make([]string, 0, len(err.Loc)+2)
+	parts = append(parts, "invalid PDF: ")
+	for i := len(err.Loc) - 1; i >= 0; i-- {
+		parts = append(parts, err.Loc[i]+": ")
 	}
-	tail := ""
-	if err.Pos > 0 {
-		tail = " (at byte " + strconv.FormatInt(err.Pos, 10) + ")"
-	}
-	return "not a valid PDF file" + middle + tail
+	parts = append(parts, err.Err.Error())
+	return strings.Join(parts, "")
 }
 
 func (err *MalformedFileError) Unwrap() error {
 	return err.Err
+}
+
+func wrap(err error, loc string) error {
+	if e, ok := err.(*MalformedFileError); ok {
+		e.Loc = append(e.Loc, loc)
+		return e
+	}
+	return fmt.Errorf("%s: %w", loc, err)
 }
 
 // VersionError is returned when trying to use a feature in a PDF file which is

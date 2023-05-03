@@ -86,15 +86,12 @@ type Resource interface {
 // file with the same name exists, it is overwritten.  After writing is
 // complete, [Writer.Close] must be called to write the trailer and to close the
 // underlying file.
-//
-// If non-default settings are required, [NewWriter] can be used to set
-// options.
-func Create(name string) (*Writer, error) {
+func Create(name string, opt *WriterOptions) (*Writer, error) {
 	fd, err := os.Create(name)
 	if err != nil {
 		return nil, err
 	}
-	pdf, err := NewWriter(fd, nil)
+	pdf, err := NewWriter(fd, opt)
 	if err != nil {
 		return nil, err
 	}

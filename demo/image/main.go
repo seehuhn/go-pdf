@@ -73,7 +73,11 @@ func main() {
 	b := img.Bounds()
 	width := float64(b.Dx()) / dpi * 72
 	height := float64(b.Dy()) / dpi * 72
-	doc, err := document.CreateSinglePage("test.pdf", width, height, nil)
+	paper := &pdf.Rectangle{
+		URx: width,
+		URy: height,
+	}
+	doc, err := document.CreateSinglePage("test.pdf", paper, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -25,7 +25,8 @@ import (
 // go:embed predefined/*.gz
 var predefined embed.FS
 
-func Load(name pdf.Name) ([]byte, error) {
+// TODO(voss): use this
+func LoadPredefined(name pdf.Name) ([]byte, error) {
 	data, err := predefined.ReadFile("predefined/" + string(name) + ".gz")
 	if err != nil {
 		return nil, err

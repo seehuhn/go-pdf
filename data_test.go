@@ -44,7 +44,7 @@ func FuzzReadWrite(f *testing.F) {
 
 	// minimal working PDF file
 	buf = &bytes.Buffer{}
-	page, err := document.WriteSinglePage(buf, 100, 100, nil)
+	page, err := document.WriteSinglePage(buf, document.A4, nil)
 	if err != nil {
 		f.Fatal(err)
 	}

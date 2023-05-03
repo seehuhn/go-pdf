@@ -18,7 +18,6 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -105,7 +104,6 @@ trailer
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("%s %T\n", ref, obj)
 		err = w.Put(ref, obj)
 		if err != nil {
 			t.Fatal(err)

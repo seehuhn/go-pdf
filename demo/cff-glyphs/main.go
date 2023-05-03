@@ -51,7 +51,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "usage: %s font.ttf font.otf ...\n", os.Args[0])
 	}
 
-	out, err := pdf.Create("out.pdf")
+	out, err := pdf.Create("out.pdf", nil)
 	if err != nil {
 		log.Fatal(err)
 	}

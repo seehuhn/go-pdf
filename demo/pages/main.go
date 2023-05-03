@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	out, err := pdf.Create("test.pdf")
+	out, err := pdf.Create("test.pdf", nil)
 	if err != nil {
 		log.Fatal(err)
 	}

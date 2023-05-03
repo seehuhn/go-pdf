@@ -29,7 +29,7 @@ func TestReader(t *testing.T) {
 	const numPages = 300
 
 	buf := &bytes.Buffer{}
-	w, err := document.WriteMultiPage(buf, 100, 100)
+	w, err := document.WriteMultiPage(buf, &pdf.Rectangle{URx: 100, URy: 100}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestReader(t *testing.T) {
 
 func BenchmarkReader(b *testing.B) {
 	buf := &bytes.Buffer{}
-	w, err := document.WriteMultiPage(buf, 0, 0)
+	w, err := document.WriteMultiPage(buf, nil, nil)
 	if err != nil {
 		b.Fatal(err)
 	}

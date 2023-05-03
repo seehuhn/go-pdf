@@ -34,15 +34,14 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
-	"seehuhn.de/go/pdf/pagetree"
 )
 
 func main() {
 	fontNamesFile := flag.String("f", "", "file containing font names")
 	flag.Parse()
 
-	paper := pagetree.A4
-	doc, err := document.CreateMultiPage("out.pdf", paper.URx, paper.URy)
+	paper := document.A4
+	doc, err := document.CreateMultiPage("out.pdf", paper, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

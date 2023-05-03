@@ -91,8 +91,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 			cf.Length = int(obj)
 			if cf.Length < 40 || cf.Length > 128 || cf.Length%8 != 0 {
 				return nil, &MalformedFileError{
-					Pos: r.errPos(encObj),
-					Err: errors.New("unsupported Encrypt.Length value"),
+					Err: fmt.Errorf("invalid Length=%d", cf.Length),
 				}
 			}
 		}
@@ -108,20 +107,14 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		if obj, ok := enc["StmF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, &MalformedFileError{
-					Pos: r.errPos(encObj),
-					Err: err,
-				}
+				return nil, wrap(err, "StmF")
 			}
 			res.stmF = cf
 		}
 		if obj, ok := enc["StrF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, &MalformedFileError{
-					Pos: r.errPos(encObj),
-					Err: err,
-				}
+				return nil, wrap(err, "StrF")
 			}
 			res.strF = cf
 		}
@@ -129,10 +122,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		if obj, ok := enc["EFF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, &MalformedFileError{
-					Pos: r.errPos(encObj),
-					Err: err,
-				}
+				return nil, wrap(err, "EFF")
 			}
 			res.efF = cf
 		}
@@ -144,8 +134,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 
 	default:
 		return nil, &MalformedFileError{
-			Pos: r.errPos(encObj),
-			Err: errors.New("unsupported Encrypt.V value"),
+			Err: fmt.Errorf("invalid V=%d", V),
 		}
 	}
 
@@ -153,17 +142,13 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	case filter == "Standard":
 		sec, err := openStdSecHandler(enc, keyBytes, r.ID[0], readPwd)
 		if err != nil {
-			return nil, &MalformedFileError{
-				Pos: r.errPos(encObj),
-				Err: err,
-			}
+			return nil, wrap(err, "standard security handler")
 		}
 		res.sec = sec
 		res.UserPermissions = stdSecPToPerm(sec.R, sec.P)
 	default:
 		return nil, &MalformedFileError{
-			Pos: r.errPos(encObj),
-			Err: errors.New("unsupported security handler"),
+			Err: fmt.Errorf("unsupported Filter=%s", filter),
 		}
 	}
 
