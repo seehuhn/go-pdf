@@ -68,9 +68,8 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 		if err != nil {
 			return nil, err
 		}
-		if d, isDict := obj.(Dict); isDict {
-			if d["Type"] == Name("Catalog") {
-				// TODO(voss): find a better way to find the Document Catalog
+		if _, isDict := obj.(Dict); isDict {
+			if pdf.Trailer["Root"] == ref || pdf.Trailer["Info"] == ref {
 				continue
 			}
 		}

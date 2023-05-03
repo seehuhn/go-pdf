@@ -170,8 +170,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	return res, nil
 }
 
-func (enc *encryptInfo) AsDict(version Version) Dict {
-	// TODO(voss): turn the panics below into error returns
+func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 	dict := Dict{
 		"Filter": Name("Standard"),
 	}
@@ -192,17 +191,17 @@ func (enc *encryptInfo) AsDict(version Version) Dict {
 		}
 
 		if cf.Length%8 != 0 {
-			panic("invalid key length")
+			return nil, errors.New("invalid key length")
 		}
 	}
 	if length == 0 {
-		panic("not implemented: unequal key length")
+		return nil, errors.New("not implemented: mixed key length")
 	}
 	if cipher == cipherUnknown {
-		panic("not implemented: mixed ciphers")
+		return nil, errors.New("not implemented: mixed key ciphers")
 	}
 
-	if cipher == cipherAESV3 && length == 256 && version >= V2_0 {
+	if cipher == cipherAES && length == 256 && version >= V2_0 {
 		dict["V"] = Integer(5)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
@@ -210,7 +209,7 @@ func (enc *encryptInfo) AsDict(version Version) Dict {
 		dict["CF"] = Dict{
 			"StdCF": Dict{"Length": Integer(256), "CFM": Name("AESV3")},
 		}
-	} else if cipher == cipherAESV2 && length == 128 && version >= V1_6 {
+	} else if cipher == cipherAES && length == 128 && version >= V1_6 {
 		dict["V"] = Integer(4)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
@@ -223,7 +222,7 @@ func (enc *encryptInfo) AsDict(version Version) Dict {
 		dict["V"] = Integer(2)
 		dict["Length"] = Integer(length)
 	} else {
-		panic("no supported encryption scheme found")
+		return nil, errors.New("no supported encryption scheme found")
 	}
 
 	sec := enc.sec
@@ -240,7 +239,7 @@ func (enc *encryptInfo) AsDict(version Version) Dict {
 		dict["Perms"] = String(sec.Perms)
 	}
 
-	return dict
+	return dict, nil
 }
 
 // EncryptBytes encrypts the bytes in buf using Algorithm 1 in the PDF spec.
@@ -256,7 +255,7 @@ func (enc *encryptInfo) EncryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return nil, err
 	}
 	switch cf.Cipher {
-	case cipherAESV2:
+	case cipherAES:
 		n := len(buf)
 		nPad := 16 - n%16
 		out := make([]byte, 16+n+nPad) // iv | c(data|padding)
@@ -305,7 +304,7 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		return nil, err
 	}
 	switch cf.Cipher {
-	case cipherAESV2:
+	case cipherAES:
 		if len(buf) < 32 {
 			return nil, errCorrupted
 		}
@@ -345,7 +344,7 @@ func (enc *encryptInfo) EncryptStream(ref Reference, w io.WriteCloser) (io.Write
 	}
 
 	switch cf.Cipher {
-	case cipherAESV2, cipherAESV3:
+	case cipherAES:
 		c, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, err
@@ -390,7 +389,7 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
 		return &cipher.StreamReader{S: c, R: r}, nil
-	case cipherAESV2, cipherAESV3:
+	case cipherAES:
 		buf := make([]byte, 32)
 		iv := buf[:16]
 		_, err := io.ReadFull(r, iv)
@@ -633,10 +632,9 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 		h.Write([]byte{
 			byte(num), byte(num >> 8), byte(num >> 16),
 			byte(gen), byte(gen >> 8)})
-		if cf.Cipher == cipherAESV2 {
+		if cf.Cipher == cipherAES {
 			h.Write([]byte("sAlT"))
 		}
-		// TODO(voss): should this use cf.Length instead of sec.keyBytes?
 		l := sec.keyBytes + 5
 		if l > 16 {
 			l = 16
@@ -1333,10 +1331,10 @@ func getCryptFilter(cryptFilterName Name, CF Dict) (*cryptFilter, error) {
 			return nil, errors.New("invalid key length")
 		}
 	case Name("AESV2"):
-		res.Cipher = cipherAESV2
+		res.Cipher = cipherAES
 		res.Length = 128
 	case Name("AESV3"):
-		res.Cipher = cipherAESV3
+		res.Cipher = cipherAES
 		res.Length = 256
 	default:
 		return nil, errors.New("unknown cipher")
@@ -1356,15 +1354,10 @@ const (
 	// the StdCF crypt filter with a CFM value of V2 in the PDF specification.
 	cipherRC4
 
-	// cipherAESV2 indicates that AES encryption in CBC mode is used.  This
-	// corresponds to the StdCF crypt filter with a CFM value of AESV2 in the
-	// PDF specification.
-	cipherAESV2
-
-	// cipherAESV3 indicates that AES encryption in CBC mode is used.  This
-	// corresponds to the StdCF crypt filter with a CFM value of AESV3 in the
-	// PDF specification.
-	cipherAESV3
+	// cipherAES indicates that AES encryption in CBC mode is used.  This
+	// corresponds to the StdCF crypt filter with a CFM value of AESV2 or
+	// AESV3.
+	cipherAES
 )
 
 func (c cipherType) String() string {
@@ -1373,10 +1366,8 @@ func (c cipherType) String() string {
 		return "unknown"
 	case cipherRC4:
 		return "RC4"
-	case cipherAESV2:
-		return "AESV2"
-	case cipherAESV3:
-		return "AESV3"
+	case cipherAES:
+		return "AES"
 	default:
 		return fmt.Sprintf("cipher#%d", c)
 	}

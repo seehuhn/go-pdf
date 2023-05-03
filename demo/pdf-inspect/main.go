@@ -286,7 +286,10 @@ func (e *explainer) show(obj pdf.Object) error {
 
 	switch obj := obj.(type) {
 	case *pdf.Stream:
-		e.show(obj.Dict)
+		err := e.show(obj.Dict)
+		if err != nil {
+			return err
+		}
 		fmt.Println()
 
 		stmData, err := e.r.DecodeStream(obj, 0)

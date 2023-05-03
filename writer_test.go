@@ -36,7 +36,11 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encInfo1 := format(w.w.enc.AsDict(w.Version))
+	encryptDict, err := w.w.enc.AsDict(w.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encInfo1 := format(encryptDict)
 
 	author := "Jochen Voß"
 	w.SetInfo(&Info{
@@ -123,7 +127,11 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	encInfo2 := format(r.enc.AsDict(w.Version))
+	encryptDict, err = r.enc.AsDict(w.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encInfo2 := format(encryptDict)
 
 	if encInfo1 != encInfo2 {
 		fmt.Println()

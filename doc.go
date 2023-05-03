@@ -16,7 +16,7 @@
 
 // Package pdf provides support for reading and writing PDF files.
 //
-// The package treats PDF files as containers containing a sequence of objects
+// This package treats PDF files as containers containing a sequence of objects
 // (typically Dictionaries and Streams).  Object are written sequentially, but
 // can be read in any order.  These objects represent pages of text, fonts,
 // images and so on.  Subpackages implement support to produce PDF files

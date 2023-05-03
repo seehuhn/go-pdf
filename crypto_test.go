@@ -317,7 +317,7 @@ func TestAuth3(t *testing.T) {
 		{PermAll, 1, 2},
 		{PermPrintDegraded, 1, 3},
 		{PermCopy, 4, 4},
-		// {PermCopy, 5, 6},
+		{PermCopy, 5, 6},
 	}
 	const userPasswd = "secret"
 	const ownerPasswd = "geheim"
@@ -330,55 +330,101 @@ func TestAuth3(t *testing.T) {
 			t.Errorf("wrong R: %d != %d", sec.R, test.R)
 		}
 
-		// test 1: the user password works
-		sec.deauthenticate()
-		padded, err := padPasswd(userPasswd)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = sec.authenticateUser(padded)
-		if err != nil {
-			t.Error(err)
-		} else if sec.key == nil {
-			t.Error("key not set")
-		} else if sec.ownerAuthenticated {
-			t.Error("ownerAuthenticated true")
-		}
+		if sec.R < 6 {
+			// test 1: the user password works
+			sec.deauthenticate()
+			padded, err := padPasswd(userPasswd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = sec.authenticateUser(padded)
+			if err != nil {
+				t.Error(err)
+			} else if sec.key == nil {
+				t.Error("key not set")
+			} else if sec.ownerAuthenticated {
+				t.Error("ownerAuthenticated true")
+			}
 
-		// test 2: the owner password works
-		sec.deauthenticate()
-		padded, err = padPasswd(ownerPasswd)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = sec.authenticateOwner(padded)
-		if err != nil {
-			t.Error(err)
-		} else if sec.key == nil {
-			t.Error("key not set")
-		} else if !sec.ownerAuthenticated {
-			t.Error("ownerAuthenticated false")
-		}
+			// test 2: the owner password works
+			sec.deauthenticate()
+			padded, err = padPasswd(ownerPasswd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = sec.authenticateOwner(padded)
+			if err != nil {
+				t.Error(err)
+			} else if sec.key == nil {
+				t.Error("key not set")
+			} else if !sec.ownerAuthenticated {
+				t.Error("ownerAuthenticated false")
+			}
 
-		// test 3: the user password does not authenticate the owner
-		sec.deauthenticate()
-		padded, err = padPasswd(userPasswd)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = sec.authenticateOwner(padded)
-		if err == nil || sec.key != nil || sec.ownerAuthenticated {
-			t.Error("wrong password accepted")
-		}
-		if _, ok := err.(*AuthenticationError); !ok {
-			t.Error("wrong error", err)
+			// test 3: the user password does not authenticate the owner
+			sec.deauthenticate()
+			padded, err = padPasswd(userPasswd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = sec.authenticateOwner(padded)
+			if err == nil || sec.key != nil || sec.ownerAuthenticated {
+				t.Error("wrong password accepted")
+			}
+			if _, ok := err.(*AuthenticationError); !ok {
+				t.Error("wrong error", err)
+			}
+		} else {
+			// test 1: the user password works
+			sec.deauthenticate()
+			padded, err := utf8Passwd(userPasswd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = sec.authenticateUser6(padded)
+			if err != nil {
+				t.Error(err)
+			} else if sec.key == nil {
+				t.Error("key not set")
+			} else if sec.ownerAuthenticated {
+				t.Error("ownerAuthenticated true")
+			}
+
+			// test 2: the owner password works
+			sec.deauthenticate()
+			padded, err = utf8Passwd(ownerPasswd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = sec.authenticateOwner6(padded)
+			if err != nil {
+				t.Error(err)
+			} else if sec.key == nil {
+				t.Error("key not set")
+			} else if !sec.ownerAuthenticated {
+				t.Error("ownerAuthenticated false")
+			}
+
+			// test 3: the user password does not authenticate the owner
+			sec.deauthenticate()
+			padded, err = utf8Passwd(userPasswd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = sec.authenticateOwner6(padded)
+			if err == nil || sec.key != nil || sec.ownerAuthenticated {
+				t.Error("wrong password accepted")
+			}
+			if _, ok := err.(*AuthenticationError); !ok {
+				t.Error("wrong error", err)
+			}
 		}
 	}
 }
 
 func TestEncryptBytes(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
-	for _, cipher := range []cipherType{cipherRC4, cipherAESV2} {
+	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
 		for length := 40; length <= 128; length += 8 {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
@@ -414,7 +460,7 @@ func TestEncryptBytes(t *testing.T) {
 
 func TestEncryptStream(t *testing.T) {
 	id := []byte("0123456789ABCDEF")
-	for _, cipher := range []cipherType{cipherRC4, cipherAESV2} {
+	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
 		for length := 40; length <= 128; length += 8 {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",

@@ -44,6 +44,8 @@ type Reader struct {
 	// dictionary.
 	Info *Info
 
+	Trailer Dict
+
 	// Errors is a list of errors encountered while opening the file.
 	// This is only used if the ErrorHandling option is set to
 	// ErrorHandlingReport.
@@ -127,7 +129,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	r.Version = version
 
 	// Install a dummy xref table first, so that we don't crash if the trailer
-	// dictionary tries to use indirect objects.
+	// dictionary attempts to use indirect objects.
 	r.xref = make(map[uint32]*xRefEntry)
 
 	xref, trailer, err := r.readXRef()
@@ -210,6 +212,14 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 			return nil, err
 		}
 	}
+
+	// remove xref-related information from trailer dictionary
+	delete(trailer, "Size")
+	delete(trailer, "Prev")
+	delete(trailer, "Type")
+	delete(trailer, "Index")
+	delete(trailer, "W")
+	r.Trailer = trailer
 
 	return r, nil
 }

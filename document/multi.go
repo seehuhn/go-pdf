@@ -107,6 +107,7 @@ func (doc *MultiPage) AddPage() *Page {
 	}
 }
 
+// TODO(voss): can we merge SinglePage and Page?
 type Page struct {
 	*graphics.Page
 	PageDict pdf.Dict
