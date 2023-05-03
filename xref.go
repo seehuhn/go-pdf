@@ -444,10 +444,6 @@ func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
 }
 
 func (pdf *Writer) setXRef(ref Reference, entry *xRefEntry) error {
-	if ref == 0 {
-		panic("invalid reference") // TODO(voss): remove
-	}
-
 	_, seen := pdf.xref[ref.Number()]
 	if seen {
 		return errDuplicateRef
@@ -456,7 +452,6 @@ func (pdf *Writer) setXRef(ref Reference, entry *xRefEntry) error {
 		pdf.nextRef = ref.Number() + 1
 	}
 	pdf.xref[ref.Number()] = entry
-
 	return nil
 }
 

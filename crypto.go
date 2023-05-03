@@ -98,7 +98,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		res.stmF = cf
 		res.strF = cf
 		res.efF = cf
-		keyBytes = cf.Length / 8 // TODO(voss): ???
+		keyBytes = cf.Length / 8
 	case 4, 5:
 		var CF Dict
 		if obj, ok := enc["CF"].(Dict); ok {
@@ -522,7 +522,7 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
 // Handler.  This is used when creating new PDF documents.
-func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) (*stdSecHandler, error) {
+func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length, V int) (*stdSecHandler, error) {
 	if ownerPwd == "" {
 		ownerPwd = userPwd
 	}
@@ -542,10 +542,7 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, V int) 
 			Err: errors.New("invalid Encrypt.V"),
 		}
 	}
-	keyBytes := 16
-	if V == 1 {
-		keyBytes = 5
-	}
+	keyBytes := length / 8
 
 	sec := &stdSecHandler{
 		ID:       id,
@@ -1036,10 +1033,7 @@ func (sec *stdSecHandler) authenticateOwner6(utf8Passwd []byte) error {
 func (sec *stdSecHandler) checkPerms(fileEncryptionKey []byte) error {
 	buf := make([]byte, 16)
 
-	c, err := aes.NewCipher(fileEncryptionKey)
-	if err != nil {
-		panic(err)
-	}
+	c, _ := aes.NewCipher(fileEncryptionKey)
 	c.Decrypt(buf, sec.Perms)
 	if !bytes.Equal(buf[9:12], []byte{'a', 'd', 'b'}) {
 		return &AuthenticationError{sec.ID}
@@ -1280,6 +1274,8 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 
 type cryptFilter struct {
 	Cipher cipherType
+
+	// Length is the key length in bits.
 	Length int
 }
 
@@ -1307,14 +1303,7 @@ func getCryptFilter(cryptFilterName Name, CF Dict) (*cryptFilter, error) {
 	switch cfDict["CFM"] {
 	case Name("V2"):
 		res.Cipher = cipherRC4
-		if obj, ok := cfDict["Length"].(Integer); ok {
-			res.Length = int(obj) * 8
-		} else {
-			res.Length = 40 // TODO(voss): is this the correct default?
-		}
-		if res.Length < 40 || res.Length > 256 || res.Length%8 != 0 {
-			return nil, errors.New("invalid key length")
-		}
+		res.Length = 128
 	case Name("AESV2"):
 		res.Cipher = cipherAES
 		res.Length = 128

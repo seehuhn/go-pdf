@@ -212,7 +212,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			V = 1
 		}
 		sec, err := createStdSecHandler(pdf.id[0], opt.UserPassword,
-			opt.OwnerPassword, opt.UserPermissions, V)
+			opt.OwnerPassword, opt.UserPermissions, cf.Length, V)
 		if err != nil {
 			return nil, err
 		}
@@ -363,11 +363,7 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 	if err != nil {
 		return err
 	}
-	if obj == nil {
-		_, err = fmt.Fprint(pdf.w, "null")
-	} else {
-		err = obj.PDF(pdf.w)
-	}
+	err = writeObject(pdf.w, obj)
 	if err != nil {
 		return err
 	}

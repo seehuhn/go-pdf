@@ -51,8 +51,7 @@ func GetNumber(r Getter, obj Object) (Number, error) {
 		return Number(x), nil
 	default:
 		return 0, &MalformedFileError{
-			// TODO(voss): how to get the position?
-			Err: fmt.Errorf("wrong object type (expected %T but got %T)", x, obj),
+			Err: fmt.Errorf("expected number but got %T", obj),
 		}
 	}
 }

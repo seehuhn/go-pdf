@@ -572,8 +572,7 @@ func (r *Reader) safeGetIntNoObjectStreams(obj Object) (Integer, error) {
 	i, isInt := obj.(Integer)
 	if !isInt {
 		return i, &MalformedFileError{
-			// Pos: r.errPos(obj), // TODO(voss): how to get the position?
-			Err: fmt.Errorf("wrong object type (expected Integer but got %T)", obj),
+			Err: fmt.Errorf("expected Integer but got %T", obj),
 		}
 	}
 
@@ -654,8 +653,7 @@ func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
 	}
 
 	return x, &MalformedFileError{
-		// Pos: r.errPos(obj), // TODO(voss): how to get the position?
-		Err: fmt.Errorf("wrong object type (expected %T but got %T)", x, obj),
+		Err: fmt.Errorf("expected %T but got %T", x, obj),
 	}
 }
 

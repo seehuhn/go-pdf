@@ -592,7 +592,6 @@ func (x Reference) PDF(w io.Writer) error {
 	return err
 }
 
-// TODO(voss): either use this more widely, or merge it into the caller.
 func writeObject(w io.Writer, obj Object) error {
 	if obj == nil {
 		_, err := w.Write([]byte("null"))

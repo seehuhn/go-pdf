@@ -179,10 +179,6 @@ func TestStream(t *testing.T) {
 
 func format(x Object) string {
 	buf := &bytes.Buffer{}
-	if x == nil {
-		buf.WriteString("null")
-	} else {
-		_ = x.PDF(buf)
-	}
+	writeObject(buf, x)
 	return buf.String()
 }
