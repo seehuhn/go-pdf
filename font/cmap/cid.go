@@ -24,15 +24,6 @@ import (
 	"seehuhn.de/go/sfnt/type1"
 )
 
-// character code (sequence of bytes) -> CID -> glyph identifier (GID)
-
-// A character identifier (CID) gives the index of character in a character
-// collection. The character collection is specified by the CIDSystemInfo
-// dictionary.
-//
-// A CMap specifies a mapping from character codes to a font number (always 0
-// for PDF), and a character selector (the CID).
-
 type CIDEncoder interface {
 	Encode(glyph.ID, []rune) []byte
 	Encoding() []Record

@@ -16,6 +16,24 @@
 
 package cmap
 
-// CID represents a character identifier (CID) in a CIDFont.
+// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
+// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
+
+// A CMap specifies a mapping from character codes to
+// a font number (always 0 for PDF), and a character selector (the CID).
+//
+// A character identifier (CID) gives the index of character in a character
+// collection. The character collection is specified by the CIDSystemInfo
+// dictionary.
+
+// character code (sequence of bytes) -> CID -> glyph identifier (GID)
+
+// --------------------
+
+// CID (short for character identifier) gives the index of character in a
+// character collection.
+//
 // TODO(voss): should this be a uint16?
 type CID uint32
+
+type Info struct{}
