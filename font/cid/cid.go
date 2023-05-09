@@ -35,6 +35,16 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
+// EmbedFile loads a font from a file and embeds it into a PDF file.
+// At the moment, only TrueType and OpenType fonts are supported.
+func EmbedFile(w *pdf.Writer, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+	font, err := LoadFont(fname, loc)
+	if err != nil {
+		return nil, err
+	}
+	return font.Embed(w, resName)
+}
+
 // Embed creates a PDF CIDFont and embeds it into a PDF file.
 func Embed(w *pdf.Writer, info *sfnt.Info, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
 	f, err := Font(info, loc)
@@ -191,10 +201,10 @@ func (e *embedded) Close() error {
 	}
 
 	// There are three cases for mapping CID to GID values:
-	// - For CFF-based CIDFonts, [cff.Outlines.Gid2cid] is used.
-	// - For CFF-based simple fonts we have CID == GID.
-	//   (We can avoid this case writing any CFF font as a CIDFont.)
-	// - For TrueType fonts, /CidToGidMap in the CIDFont dictionary is used.
+	// - For TrueType-based CIDFonts (Type 2 CIDFonts), /CidToGidMap in the CIDFont dictionary is used.
+	// - For CFF-based CIDFonts (Type 0 CIDFonts), [cff.Outlines.Gid2cid] is used.
+	// - When CFF-based simple fonts are used as CIDFonts we have CID == GID.
+	//   (We can avoid this case by converting the CFF font to a CIDFont.)
 
 	// subset the font
 	subsetInfo := &sfnt.Info{}
@@ -209,8 +219,8 @@ func (e *embedded) Close() error {
 			_, ok := pIdxMap[oldPIdx]
 			if !ok {
 				newPIdx := len(o2.Private)
-				pIdxMap[oldPIdx] = newPIdx
 				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
+				pIdxMap[oldPIdx] = newPIdx
 			}
 		}
 		o2.FdSelect = func(gid glyph.ID) int {
@@ -219,9 +229,15 @@ func (e *embedded) Close() error {
 		}
 		o2.ROS = CIDSystemInfo
 		o2.Gid2cid = make([]int32, len(subsetGlyphs))
-		for subsetGid, origGid := range subsetGlyphs {
-			// TODO(voss): do we need to translate GID -> CID here?
-			o2.Gid2cid[subsetGid] = int32(origGid)
+		if len(outlines.Gid2cid) > 0 {
+			for subsetGid, origGid := range subsetGlyphs {
+				o2.Gid2cid[subsetGid] = outlines.Gid2cid[origGid]
+			}
+		} else {
+			// TODO(voss): what to do here?
+			for subsetGid, origGid := range subsetGlyphs {
+				o2.Gid2cid[subsetGid] = int32(origGid)
+			}
 		}
 		subsetInfo.Outlines = o2
 
@@ -272,8 +288,6 @@ func (e *embedded) Close() error {
 
 	q := 1000 / float64(subsetInfo.UnitsPerEm)
 
-	DW, W := encodeWidths(e.info.Widths(), q)
-
 	FontDictRef := e.ref
 	CIDFontRef := w.Alloc()
 	CIDSystemInfoRef := w.Alloc()
@@ -304,6 +318,7 @@ func (e *embedded) Close() error {
 		URy: rect.URy.AsFloat(q),
 	}
 
+	// TODO(voss): For CFF fonts we can get StemV from the PrivateDict structure.
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
@@ -319,6 +334,7 @@ func (e *embedded) Close() error {
 	compressedRefs := []pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, ROS, FontDescriptor}
 
+	DW, W := encodeWidths(e.info.Widths(), q)
 	if W != nil {
 		WidthsRef := w.Alloc()
 		CIDFont["W"] = WidthsRef

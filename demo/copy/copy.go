@@ -143,7 +143,7 @@ func main() {
 		}
 		newCatDict[key] = obj
 	}
-	err = r.DecodeDict(catalog, newCatDict)
+	err = pdf.DecodeDict(r, catalog, newCatDict)
 	if err != nil {
 		log.Fatal(err)
 	}

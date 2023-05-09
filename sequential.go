@@ -182,7 +182,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		return nil, err
 	}
 	r.Catalog = &Catalog{}
-	err = r.DecodeDict(r.Catalog, catalogDict)
+	err = DecodeDict(r, r.Catalog, catalogDict)
 	if shouldExit(err) || r.Catalog.Pages == 0 {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	}
 	if infoDict != nil {
 		r.Info = &Info{}
-		err = r.DecodeDict(r.Info, infoDict)
+		err = DecodeDict(r, r.Info, infoDict)
 		if shouldExit(err) {
 			return nil, err
 		}

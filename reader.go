@@ -195,7 +195,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		}
 	}
 	r.Catalog = &Catalog{}
-	err = r.DecodeDict(r.Catalog, catalogDict)
+	err = DecodeDict(r, r.Catalog, catalogDict)
 	if shouldExit(err) || (err != nil && opt.ErrorHandling == ErrorHandlingRecover && r.Catalog.Pages == 0) {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 	if infoDict != nil {
 		r.Info = &Info{}
-		err = r.DecodeDict(r.Info, infoDict)
+		err = DecodeDict(r, r.Info, infoDict)
 		if shouldExit(err) {
 			return nil, err
 		}
@@ -269,9 +269,13 @@ func (r *Reader) Authenticate(perm Perm) error {
 	return err
 }
 
-// Get reads an indirect object from the PDF file.  If the object is not
+func (r *Reader) GetCatalog() *Catalog {
+	return r.Catalog
+}
+
+// GetObject reads an indirect object from the PDF file.  If the object is not
 // present, nil is returned without an error.
-func (r *Reader) Get(ref Reference) (_ Object, err error) {
+func (r *Reader) GetObject(ref Reference) (_ Object, err error) {
 	defer func() {
 		if err != nil {
 			err = wrap(err, "object "+ref.String())
@@ -596,8 +600,10 @@ func (r *Reader) scannerFrom(pos int64) (*scanner, error) {
 	return s, nil
 }
 
+// TODO(voss): find a better name for this
 type Getter interface {
-	Get(Reference) (Object, error)
+	GetCatalog() *Catalog
+	GetObject(Reference) (Object, error)
 }
 
 // Resolve resolves references to indirect objects.
@@ -627,7 +633,7 @@ func Resolve(r Getter, obj Object) (Object, error) {
 		}
 
 		var err error
-		obj, err = r.Get(ref)
+		obj, err = r.GetObject(ref)
 		if err != nil {
 			return nil, err
 		}

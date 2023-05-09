@@ -102,7 +102,7 @@ fieldLoop:
 
 // DecodeDict initialises a tagged struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
-func (r *Reader) DecodeDict(s interface{}, d Dict) error {
+func DecodeDict(r Getter, s interface{}, d Dict) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
 

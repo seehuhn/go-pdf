@@ -64,7 +64,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 			continue
 		}
 
-		obj, err := pdf.Get(ref)
+		obj, err := pdf.GetObject(ref)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +125,11 @@ func (d *Data) Write(w io.Writer) error {
 	return nil
 }
 
-func (d *Data) Get(ref Reference) (Object, error) {
+func (d *Data) GetCatalog() *Catalog {
+	return d.Catalog
+}
+
+func (d *Data) GetObject(ref Reference) (Object, error) {
 	return d.Objects[ref], nil
 }
 

@@ -27,6 +27,11 @@ import (
 // These attributes are documented in sections 7.7.3.3 and 7.7.3.4 of
 // PDF 32000-1:2008.
 type InheritableAttributes struct {
+	// Resources is a dictionary containing any resources required by the
+	// page.
+	//
+	// The resources dictionary is documented in section 7.8.3 of
+	// PDF 32000-1:2008.
 	Resources *pdf.Resources
 
 	// Mediabox defines the boundaries of the physical
@@ -37,18 +42,19 @@ type InheritableAttributes struct {
 	// the page is displayed or printed, its contents shall be clipped
 	// (cropped) to this rectangle and then shall be imposed on the output
 	// medium in some implementation-defined manner.
+	//
 	// Default value: the value of MediaBox.
 	CropBox *pdf.Rectangle
 
 	// Rotate describes how the page shall be rotated when displayed or
-	// printed.  Default value: RotateInherit.
+	// printed.
+	//
+	// Default value: RotateInherit.
 	Rotate PageRotation
 }
 
 func mergeAttributes(dict pdf.Dict, attr *InheritableAttributes) {
 	if attr.Resources != nil && dict["Resources"] == nil {
-		// TODO(voss): is inheritance per field, or for the whole resources
-		// dictionary?
 		dict["Resources"] = pdf.AsDict(attr.Resources)
 	}
 	if attr.MediaBox != nil && dict["MediaBox"] == nil {
