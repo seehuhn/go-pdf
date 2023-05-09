@@ -26,6 +26,10 @@ import (
 )
 
 func TestReader(t *testing.T) {
+
+}
+
+func TestOldReader(t *testing.T) {
 	const numPages = 300
 
 	buf := &bytes.Buffer{}
@@ -50,7 +54,7 @@ func TestReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pages, err := pagetree.NewReader(r)
+	pages, err := pagetree.NewOldReader(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +116,7 @@ func BenchmarkReader(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		pages, err := pagetree.NewReader(r)
+		pages, err := pagetree.NewOldReader(r)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -31,9 +31,8 @@ type MultiPage struct {
 	Out  *pdf.Writer
 	Tree *pagetree.Writer
 
-	numOpen   int
-	base      io.Writer
-	closeBase bool
+	numOpen int
+	base    io.Closer
 }
 
 func CreateMultiPage(fileName string, pageSize *pdf.Rectangle, opt *pdf.WriterOptions) (*MultiPage, error) {
@@ -46,7 +45,7 @@ func CreateMultiPage(fileName string, pageSize *pdf.Rectangle, opt *pdf.WriterOp
 		fd.Close()
 		return nil, err
 	}
-	doc.closeBase = true
+	doc.base = fd
 	return doc, nil
 }
 
@@ -61,7 +60,6 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOptions
 	})
 
 	return &MultiPage{
-		base: w,
 		Out:  out,
 		Tree: tree,
 	}, nil
@@ -82,8 +80,8 @@ func (doc *MultiPage) Close() error {
 	if err != nil {
 		return err
 	}
-	if doc.closeBase {
-		err = doc.base.(io.Closer).Close()
+	if doc.base != nil {
+		err = doc.base.Close()
 		if err != nil {
 			return err
 		}

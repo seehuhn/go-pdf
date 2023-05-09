@@ -565,6 +565,13 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 	return w, nil
 }
 
+// TODO(voss): find a better name for this
+type Putter interface {
+	Alloc() Reference
+	Put(ref Reference, obj Object) error
+	OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) (io.WriteCloser, error)
+}
+
 type streamWriter struct {
 	parent   *Writer
 	dict     Dict
