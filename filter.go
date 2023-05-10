@@ -54,6 +54,7 @@ import (
 	"strconv"
 	"sync"
 
+	"seehuhn.de/go/pdf/ascii85"
 	"seehuhn.de/go/pdf/lzw"
 )
 
@@ -69,16 +70,14 @@ import (
 //          5 RunLengthDecode
 
 type filter interface {
-	ToDict() Dict
-
 	Encode(w io.WriteCloser) (io.WriteCloser, error)
-
 	Decode(r io.Reader) (io.Reader, error)
 }
 
 const (
-	FlateDecode Name = "FlateDecode"
-	LZWDecode   Name = "LZWDecode"
+	ASCII85Decode Name = "ASCII85Decode"
+	FlateDecode   Name = "FlateDecode"
+	LZWDecode     Name = "LZWDecode"
 
 	// CompressFilter is a special filter name, which is used to select the
 	// best available compression filter when writing PDF streams.  This is
@@ -105,6 +104,8 @@ func (fi *FilterInfo) getFilter(v Version) (filter, error) {
 	}
 
 	switch name {
+	case ASCII85Decode:
+		return ascii85.NewFilter(), nil
 	case FlateDecode:
 		return newFlateFilter(fi.Parms, false), nil
 	case LZWDecode:
@@ -150,30 +151,6 @@ func newFlateFilter(parms Dict, isLZW bool) *flateFilter {
 	}
 	if val, ok := parms["EarlyChange"].(Integer); ok {
 		res.EarlyChange = (val != 0)
-	}
-	return res
-}
-
-// ToDict implements the [filter] interface.
-func (ff *flateFilter) ToDict() Dict {
-	res := Dict{}
-	if ff.Predictor != 1 {
-		res["Predictor"] = Integer(ff.Predictor)
-	}
-	if ff.Predictor > 1 && ff.Colors != 1 {
-		res["Colors"] = Integer(ff.Colors)
-	}
-	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
-		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
-	}
-	if ff.Predictor > 1 && ff.Columns != 1 {
-		res["Columns"] = Integer(ff.Columns)
-	}
-	if ff.IsLZW && !ff.EarlyChange {
-		res["EarlyChange"] = Integer(0)
-	}
-	if len(res) == 0 {
-		return nil
 	}
 	return res
 }
