@@ -30,13 +30,7 @@ import (
 
 // Embed writes the ToUnicode CMap as a stream object to the given PDF file.
 func (info *Info) Embed(ref pdf.Reference, w *pdf.Writer) error {
-	compress := &pdf.FilterInfo{
-		Name: pdf.Name("LZWDecode"),
-	}
-	if w.Version >= pdf.V1_2 {
-		compress.Name = "FlateDecode"
-	}
-
+	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 	cmapStream, err := w.OpenStream(ref, nil, compress)
 	if err != nil {
 		return err

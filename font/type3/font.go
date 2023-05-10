@@ -238,10 +238,7 @@ func (e3 *embedded) Close() error {
 	}
 
 	w := e3.w
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if w.Version >= pdf.V1_2 {
-		compress.Name = "FlateDecode"
-	}
+	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 
 	encoding := e3.enc.Encoding()
 	var firstChar cmap.CID

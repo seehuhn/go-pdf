@@ -37,10 +37,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if out.Version >= pdf.V1_2 {
-		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-	}
+	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 
 	pageTree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},

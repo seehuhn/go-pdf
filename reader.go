@@ -418,7 +418,7 @@ func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 		if numFilters > 0 && i >= numFilters {
 			break
 		}
-		filter, err := fi.getFilter()
+		filter, err := fi.getFilter(0)
 		if err != nil {
 			return nil, err
 		}

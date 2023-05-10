@@ -178,10 +178,7 @@ func (e *embedded) Close() error {
 	e.closed = true
 
 	w := e.w
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if w.Version >= pdf.V1_2 {
-		compress.Name = "FlateDecode"
-	}
+	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 
 	// Determine the subset of glyphs to include.
 	encoding := e.enc.Encoding()

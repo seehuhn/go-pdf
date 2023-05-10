@@ -37,7 +37,7 @@ func TestFlate(t *testing.T) {
 				}
 				parms["EarlyChange"] = Integer(0)
 			}
-			ff := flateFromDict(parms, isLZW)
+			ff := newFlateFilter(parms, isLZW)
 			for _, in := range []string{"", "12345", "1234567890"} {
 				buf := &bytes.Buffer{}
 				w, err := ff.Encode(withDummyClose{buf})

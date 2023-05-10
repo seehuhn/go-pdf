@@ -45,17 +45,6 @@
 //     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 //     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Frequencies of filter types used in the PDF files on my system:
-//     165622 FlateDecode
-//      11334 CCITTFaxDecode
-//       7595 DCTDecode
-//       3440 LZWDecode
-//       3431 ASCII85Decode
-//        455 JBIG2Decode
-//        166 ASCIIHexDecode
-//         78 JPXDecode
-//          5 RunLengthDecode
-
 package pdf
 
 import (
@@ -68,18 +57,58 @@ import (
 	"seehuhn.de/go/pdf/lzw"
 )
 
+// Frequencies of filter types used in the PDF files on my system:
+//     165622 FlateDecode
+//      11334 CCITTFaxDecode
+//       7595 DCTDecode
+//       3440 LZWDecode
+//       3431 ASCII85Decode
+//        455 JBIG2Decode
+//        166 ASCIIHexDecode
+//         78 JPXDecode
+//          5 RunLengthDecode
+
+type filter interface {
+	ToDict() Dict
+
+	Encode(w io.WriteCloser) (io.WriteCloser, error)
+
+	Decode(r io.Reader) (io.Reader, error)
+}
+
+const (
+	FlateDecode Name = "FlateDecode"
+	LZWDecode   Name = "LZWDecode"
+
+	// CompressFilter is a special filter name, which is used to select the
+	// best available compression filter when writing PDF streams.  This is
+	// FlateDecode for PDF versions 1.2 and above, and LZWDecode for older
+	// versions.
+	CompressFilter Name = "compress"
+)
+
 // FilterInfo describes a single PDF stream filter.
 type FilterInfo struct {
 	Name  Name
 	Parms Dict
 }
 
-func (fi *FilterInfo) getFilter() (filter, error) {
-	switch fi.Name {
-	case "LZWDecode":
-		return flateFromDict(fi.Parms, true), nil
-	case "FlateDecode":
-		return flateFromDict(fi.Parms, false), nil
+func (fi *FilterInfo) getFilter(v Version) (filter, error) {
+	name := fi.Name
+
+	if name == CompressFilter {
+		if v >= V1_2 {
+			name = FlateDecode
+		} else if v > 0 {
+			name = LZWDecode
+		}
+	}
+
+	switch name {
+	case FlateDecode:
+		return newFlateFilter(fi.Parms, false), nil
+	case LZWDecode:
+		return newFlateFilter(fi.Parms, true), nil
 	default:
 		return nil, errors.New("unsupported filter type " + string(fi.Name))
 	}
@@ -94,7 +123,7 @@ type flateFilter struct {
 	IsLZW            bool
 }
 
-func flateFromDict(parms Dict, isLZW bool) *flateFilter {
+func newFlateFilter(parms Dict, isLZW bool) *flateFilter {
 	res := &flateFilter{ // set defaults
 		Predictor:        1,
 		Colors:           1,
@@ -125,7 +154,7 @@ func flateFromDict(parms Dict, isLZW bool) *flateFilter {
 	return res
 }
 
-// ToDict implements the filter interface.
+// ToDict implements the [filter] interface.
 func (ff *flateFilter) ToDict() Dict {
 	res := Dict{}
 	if ff.Predictor != 1 {
@@ -149,7 +178,7 @@ func (ff *flateFilter) ToDict() Dict {
 	return res
 }
 
-// Decode implements the filter interface.
+// Decode implements the [filter] interface.
 func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
 	var res io.Reader
 	var err error
@@ -243,20 +272,20 @@ var zlibWriterPool = sync.Pool{
 	},
 }
 
-// Encode implements the filter interface.
+// Encode implements the [filter] interface.
 func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 	var zw io.WriteCloser
 	var err error
 	if ff.IsLZW {
 		zw, err = lzw.NewWriter(w, ff.EarlyChange)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		// zw, err = zlib.NewWriterLevel(w, zlib.BestCompression)
 		tmp := zlibWriterPool.Get().(*zlib.Writer)
 		tmp.Reset(w)
 		zw = tmp
-	}
-	if err != nil {
-		return nil, err
 	}
 
 	close := func() error {
@@ -565,6 +594,7 @@ func abs8(d uint8) int {
 	return 256 - int(d)
 }
 
+// withDummyClose turns and io.Writer into an io.WriteCloser.
 type withDummyClose struct {
 	io.Writer
 }
@@ -580,12 +610,4 @@ type withClose struct {
 
 func (w *withClose) Close() error {
 	return w.close()
-}
-
-type filter interface {
-	ToDict() Dict
-	// TODO(voss): should Encode take an io.Writer instead?
-	// TODO(voss): can Encode really return an error?
-	Encode(w io.WriteCloser) (io.WriteCloser, error)
-	Decode(r io.Reader) (io.Reader, error)
 }

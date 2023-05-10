@@ -39,10 +39,7 @@ func (p *Page) Close() error {
 		return p.Page.Err
 	}
 
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if p.Out.Version >= pdf.V1_2 {
-		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-	}
+	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 	contentRef := p.Out.Alloc()
 	stream, err := p.Out.OpenStream(contentRef, nil, compress)
 	if err != nil {

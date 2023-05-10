@@ -443,6 +443,8 @@ func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
 	}
 }
 
+// setXRef adds a new entry to the xref table.
+// If the entry is already present, an error is returned.
 func (pdf *Writer) setXRef(ref Reference, entry *xRefEntry) error {
 	_, seen := pdf.xref[ref.Number()]
 	if seen {
@@ -534,10 +536,10 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	// Compress the xref stream in memory, to make sure we know the size of the
 	// stream before writing the xref stream object.
 	filter := &FilterInfo{
-		Name:  "FlateDecode",
+		Name:  FlateDecode,
 		Parms: Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)},
 	}
-	fff, err := filter.getFilter()
+	fff, err := filter.getFilter(0)
 	if err != nil {
 		return err
 	}

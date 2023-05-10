@@ -151,10 +151,7 @@ type illustrator struct {
 }
 
 func (ctx *illustrator) Show(fnt *cff.Font) error {
-	compress := &pdf.FilterInfo{Name: pdf.Name("LZWDecode")}
-	if ctx.pageTree.Out.Version >= pdf.V1_2 {
-		compress = &pdf.FilterInfo{Name: pdf.Name("FlateDecode")}
-	}
+	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 
 	for i, g := range fnt.Glyphs {
 		contentRef := ctx.pageTree.Out.Alloc()

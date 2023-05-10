@@ -25,10 +25,6 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 )
 
-func TestReader(t *testing.T) {
-
-}
-
 func TestOldReader(t *testing.T) {
 	const numPages = 300
 

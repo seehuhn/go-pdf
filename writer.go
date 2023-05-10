@@ -492,7 +492,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 
 	// Copy dict and dict["Filter"] as well as dict["DecodeParms"], so that
 	// we can register the new filters without changing the caller's dict.
-	d2 := make(Dict)
+	streamDict := make(Dict)
 	for key, val := range dict {
 		if key == "Filter" || key == "DecodeParms" {
 			if a, ok := val.(Array); ok {
@@ -502,18 +502,18 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 				val = append(Array{}, a...)
 			}
 		}
-		d2[key] = val
+		streamDict[key] = val
 	}
 	length := pdf.NewPlaceholder(12)
-	if _, exists := d2["Length"]; !exists {
-		d2["Length"] = length
+	if _, exists := streamDict["Length"]; !exists {
+		streamDict["Length"] = length
 	}
 
 	var w io.WriteCloser = &streamWriter{
-		parent: pdf,
-		dict:   d2,
-		ref:    ref,
-		length: length,
+		parent:     pdf,
+		streamDict: streamDict,
+		ref:        ref,
+		length:     length,
 	}
 	if pdf.w.enc != nil {
 		enc, err := pdf.w.enc.EncryptStream(ref, w)
@@ -527,7 +527,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 			continue
 		}
 
-		filter, err := fi.getFilter()
+		filter, err := fi.getFilter(pdf.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -536,28 +536,28 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 			return nil, err
 		}
 
-		switch x := d2["Filter"].(type) {
-		case nil:
-			d2["Filter"] = fi.Name
+		switch x := streamDict["Filter"].(type) {
+		case nil: // first filter
+			streamDict["Filter"] = fi.Name
 			if len(fi.Parms) > 0 {
-				d2["DecodeParms"] = fi.Parms
+				streamDict["DecodeParms"] = fi.Parms
 			}
-		case Name:
-			d2["Filter"] = Array{x, fi.Name}
-			if d2["DecodeParms"] != nil || len(fi.Parms) > 0 {
-				d2["DecodeParms"] = Array{d2["DecodeParms"], fi.Parms}
+		case Name: // second filter
+			streamDict["Filter"] = Array{x, fi.Name}
+			if streamDict["DecodeParms"] != nil || len(fi.Parms) > 0 {
+				streamDict["DecodeParms"] = Array{streamDict["DecodeParms"], fi.Parms}
 			}
 		case Array:
-			d2["Filter"] = append(x, fi.Name)
-			b, ok := d2["DecodeParms"].(Array)
-			if d2["DecodeParms"] != nil && !ok {
+			streamDict["Filter"] = append(x, fi.Name)
+			b, ok := streamDict["DecodeParms"].(Array)
+			if streamDict["DecodeParms"] != nil && !ok {
 				return nil, errors.New("wrong type for /DecodeParms")
 			}
 			if len(b) > 0 || len(fi.Parms) > 0 {
 				for len(b) < len(x) {
 					b = append(b, nil)
 				}
-				d2["DecodeParms"] = append(b, fi.Parms)
+				streamDict["DecodeParms"] = append(b, fi.Parms)
 			}
 		}
 	}
@@ -569,17 +569,18 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 type Putter interface {
 	Alloc() Reference
 	Put(ref Reference, obj Object) error
+	WriteCompressed(refs []Reference, objects ...Object) error
 	OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) (io.WriteCloser, error)
 }
 
 type streamWriter struct {
-	parent   *Writer
-	dict     Dict
-	ref      Reference
-	started  bool
-	startPos int64
-	length   *Placeholder
-	buf      []byte
+	parent     *Writer
+	streamDict Dict
+	ref        Reference
+	started    bool
+	startPos   int64
+	length     *Placeholder
+	buf        []byte
 }
 
 func (w *streamWriter) Write(p []byte) (int, error) {
@@ -604,7 +605,7 @@ func (w *streamWriter) startWriting() error {
 	if err != nil {
 		return err
 	}
-	err = w.dict.PDF(w.parent.w)
+	err = w.streamDict.PDF(w.parent.w)
 	if err != nil {
 		return err
 	}
@@ -642,7 +643,7 @@ func (w *streamWriter) Close() error {
 		}
 	}
 
-	if l, isInteger := w.dict["Length"].(Integer); isInteger && l != length {
+	if l, isInteger := w.streamDict["Length"].(Integer); isInteger && l != length {
 		return fmt.Errorf("stream length mismatch: %d (specified) != %d (actual)",
 			l, length)
 	}
