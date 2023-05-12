@@ -105,7 +105,7 @@ func (fi *FilterInfo) getFilter(v Version) (filter, error) {
 
 	switch name {
 	case ASCII85Decode:
-		return ascii85.NewFilter(), nil
+		return ascii85.Filter, nil
 	case FlateDecode:
 		return newFlateFilter(fi.Parms, false), nil
 	case LZWDecode:

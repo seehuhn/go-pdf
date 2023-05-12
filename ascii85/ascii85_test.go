@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package ascii85
 
 import (
@@ -17,7 +33,7 @@ func FuzzReader(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		for _, c := range data {
-			if c <= ' ' && !isSpace[c] {
+			if c <= ' ' && !isSpace(c) {
 				return
 			}
 		}
@@ -30,7 +46,7 @@ func FuzzReader(f *testing.F) {
 		copy(data2, data)
 		data2 = append(data2, '~', '>')
 		in = bytes.NewReader(data2)
-		enc2, err := (*Filter)(nil).Decode(in)
+		enc2, err := (*Info)(nil).Decode(in)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,11 +66,9 @@ func FuzzWriter(f *testing.F) {
 	f.Add([]byte("Hello world!"))
 	f.Add([]byte("\000"))
 
-	filter := NewFilter()
-
 	f.Fuzz(func(t *testing.T, in []byte) {
 		buf := &bytes.Buffer{}
-		enc, err := filter.Encode(withDummyClose{buf})
+		enc, err := Filter.Encode(withDummyClose{buf})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,7 +81,7 @@ func FuzzWriter(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		dec, err := filter.Decode(bytes.NewReader(buf.Bytes()))
+		dec, err := Filter.Decode(bytes.NewReader(buf.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,9 +97,49 @@ func FuzzWriter(f *testing.F) {
 	})
 }
 
+type funnyReader struct {
+	pos int
+}
+
+func (r *funnyReader) Read(p []byte) (n int, err error) {
+	for i := range p {
+		p[i] = byte(r.pos%85) + '!'
+		r.pos++
+	}
+	return len(p), nil
+}
+
+func BenchmarkReader(b *testing.B) {
+	r, err := Filter.Decode(&funnyReader{})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	blockSize := 1019
+	buf := make([]byte, blockSize)
+
+	b.ResetTimer()
+	b.SetBytes(int64(blockSize))
+	for i := 0; i < b.N; i++ {
+		io.ReadFull(r, buf)
+	}
+}
+
+func BenchmarkReaderStdLib(b *testing.B) {
+	r := ascii85.NewDecoder(&funnyReader{})
+
+	blockSize := 1019
+	buf := make([]byte, blockSize)
+
+	b.ResetTimer()
+	b.SetBytes(int64(blockSize))
+	for i := 0; i < b.N; i++ {
+		io.ReadFull(r, buf)
+	}
+}
+
 func BenchmarkWriter(b *testing.B) {
-	filter := NewFilter()
-	w, err := filter.Encode(withDummyClose{io.Discard})
+	w, err := Filter.Encode(withDummyClose{io.Discard})
 	if err != nil {
 		b.Fatal(err)
 	}
