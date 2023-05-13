@@ -69,11 +69,6 @@ import (
 //         78 JPXDecode
 //          5 RunLengthDecode
 
-type filter interface {
-	Encode(w io.WriteCloser) (io.WriteCloser, error)
-	Decode(r io.Reader) (io.Reader, error)
-}
-
 const (
 	ASCII85Decode Name = "ASCII85Decode"
 	FlateDecode   Name = "FlateDecode"
@@ -92,18 +87,30 @@ type FilterInfo struct {
 	Parms Dict
 }
 
-func (fi *FilterInfo) getFilter(v Version) (filter, error) {
-	name := fi.Name
+func (fi *FilterInfo) Encode(w io.WriteCloser, canFlate bool) (io.WriteCloser, error) {
+	panic("not implemented")
+}
 
-	if name == CompressFilter {
+func (fi *FilterInfo) Decode(r io.Reader) (io.Reader, error) {
+	panic("not implemented")
+}
+
+type filter interface {
+	Encode(w io.WriteCloser) (io.WriteCloser, error)
+	Decode(r io.Reader) (io.Reader, error)
+}
+
+func (fi *FilterInfo) getFilter(v Version) (filter, error) {
+	if fi.Name == CompressFilter && v > 0 {
+		// TODO(voss): don't change this in place
 		if v >= V1_2 {
-			name = FlateDecode
+			fi.Name = FlateDecode
 		} else if v > 0 {
-			name = LZWDecode
+			fi.Name = LZWDecode
 		}
 	}
 
-	switch name {
+	switch fi.Name {
 	case ASCII85Decode:
 		return ascii85.Filter, nil
 	case FlateDecode:
@@ -151,6 +158,29 @@ func newFlateFilter(parms Dict, isLZW bool) *flateFilter {
 	}
 	if val, ok := parms["EarlyChange"].(Integer); ok {
 		res.EarlyChange = (val != 0)
+	}
+	return res
+}
+
+func (ff *flateFilter) ToDict() Dict {
+	res := Dict{}
+	if ff.Predictor != 1 {
+		res["Predictor"] = Integer(ff.Predictor)
+	}
+	if ff.Predictor > 1 && ff.Colors != 1 {
+		res["Colors"] = Integer(ff.Colors)
+	}
+	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
+		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
+	}
+	if ff.Predictor > 1 && ff.Columns != 1 {
+		res["Columns"] = Integer(ff.Columns)
+	}
+	if ff.IsLZW && !ff.EarlyChange {
+		res["EarlyChange"] = Integer(0)
+	}
+	if len(res) == 0 {
+		return nil
 	}
 	return res
 }

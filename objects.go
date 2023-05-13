@@ -491,6 +491,8 @@ func (x *Stream) PDF(w io.Writer) error {
 
 // Filters extracts the information contained in the /Filter and /DecodeParms
 // entries of the stream dictionary.
+//
+// TODO(voss): remove
 func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, error) {
 	if resolve == nil {
 		resolve = func(obj Object) (Object, error) {

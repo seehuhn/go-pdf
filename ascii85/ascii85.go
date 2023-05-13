@@ -25,7 +25,8 @@ type Info struct{}
 
 var Filter = &Info{}
 
-// Encode
+// Encode returns a new WriteCloser which encodes data in ASCII85 format.
+// The returned WriteCloser] must be closed to flush all data.
 func (f *Info) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 	return &ascii85Writer{
 		w:   w,
@@ -33,6 +34,7 @@ func (f *Info) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 	}, nil
 }
 
+// Decode returns a new Reader which decodes data in ASCII85 format.
 func (f *Info) Decode(r io.Reader) (io.Reader, error) {
 	return &ascii85Reader{r: r}, nil
 }
