@@ -535,16 +535,12 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 
 	// Compress the xref stream in memory, to make sure we know the size of the
 	// stream before writing the xref stream object.
-	filter := &FilterInfo{
-		Name:  FlateDecode,
-		Parms: Dict{"Predictor": Integer(12), "Columns": Integer(1 + w2 + w3)},
-	}
-	fff, err := filter.getFilter(0)
-	if err != nil {
-		return err
+	filter := FilterFlate{
+		"Predictor": Integer(12),
+		"Columns":   Integer(1 + w2 + w3),
 	}
 	xRefBuf := &bytes.Buffer{}
-	wxRaw, err := fff.Encode(withDummyClose{xRefBuf})
+	wxRaw, err := filter.Encode(pdf.Version, withDummyClose{xRefBuf})
 	if err != nil {
 		return err
 	}
@@ -615,8 +611,12 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	}
 	xRefData := xRefBuf.Bytes()
 
-	xRefDict["Filter"] = filter.Name
-	xRefDict["DecodeParms"] = filter.Parms
+	name, parms, err := filter.Info(pdf.Version)
+	if err != nil {
+		return err
+	}
+	xRefDict["Filter"] = name
+	xRefDict["DecodeParms"] = parms
 	xRefDict["Length"] = Integer(len(xRefData))
 
 	swx, err := pdf.OpenStream(ref, xRefDict, nil)

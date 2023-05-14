@@ -187,7 +187,6 @@ func (e *embedded) Close() error {
 	e.enc = cmap.NewFrozenSimpleEncoder(e.enc)
 
 	w := e.w
-	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 
 	// Determine the subset of glyphs to include.
 	encoding := e.enc.Encoding()
@@ -353,7 +352,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Subtype": pdf.Name("Type1C"),
 		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}
@@ -380,7 +379,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Length1": size,
 		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}

@@ -37,8 +37,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
-
 	pageTree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
 	})
@@ -57,7 +55,7 @@ func main() {
 		}
 
 		contentRef := out.Alloc()
-		stream, err := out.OpenStream(contentRef, nil, compress)
+		stream, err := out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -92,7 +90,7 @@ func main() {
 
 	{
 		contentRef := out.Alloc()
-		stream, err := out.OpenStream(contentRef, nil, compress)
+		stream, err := out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -123,7 +121,7 @@ func main() {
 
 	{
 		contentRef := out.Alloc()
-		stream, err := out.OpenStream(contentRef, nil, compress)
+		stream, err := out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			log.Fatal(err)
 		}

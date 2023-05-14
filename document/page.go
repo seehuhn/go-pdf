@@ -39,9 +39,8 @@ func (p *Page) Close() error {
 		return p.Page.Err
 	}
 
-	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 	contentRef := p.Out.Alloc()
-	stream, err := p.Out.OpenStream(contentRef, nil, compress)
+	stream, err := p.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err
 	}

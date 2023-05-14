@@ -50,6 +50,7 @@ package pdf
 import (
 	"compress/zlib"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"sync"
@@ -69,57 +70,269 @@ import (
 //         78 JPXDecode
 //          5 RunLengthDecode
 
-const (
-	ASCII85Decode Name = "ASCII85Decode"
-	FlateDecode   Name = "FlateDecode"
-	LZWDecode     Name = "LZWDecode"
+type Filter interface {
+	Info(Version) (Name, Dict, error)
+	Encode(Version, io.WriteCloser) (io.WriteCloser, error)
+	Decode(Version, io.Reader) (io.Reader, error)
+}
 
-	// CompressFilter is a special filter name, which is used to select the
-	// best available compression filter when writing PDF streams.  This is
-	// FlateDecode for PDF versions 1.2 and above, and LZWDecode for older
-	// versions.
-	CompressFilter Name = "compress"
-)
+func makeFilter(filter Name, param Dict) Filter {
+	switch filter {
+	case "ASCII85Decode":
+		return FilterASCII85{}
+	case "FlateDecode":
+		return FilterFlate(param)
+	case "LZWDecode":
+		return FilterLZW(param)
+	default:
+		return &filterNotImplemented{Name: filter, Param: param}
+	}
+}
+
+type filterNotImplemented struct {
+	Name  Name
+	Param Dict
+}
+
+func (f *filterNotImplemented) Info(Version) (Name, Dict, error) {
+	return f.Name, f.Param, nil
+}
+
+func (f *filterNotImplemented) Encode(Version, io.WriteCloser) (io.WriteCloser, error) {
+	return nil, fmt.Errorf("filter %s not implemented", f.Name)
+}
+
+func (f *filterNotImplemented) Decode(Version, io.Reader) (io.Reader, error) {
+	return nil, fmt.Errorf("filter %s not implemented", f.Name)
+}
+
+type FilterASCII85 struct{}
+
+func (f FilterASCII85) Info(_ Version) (Name, Dict, error) {
+	return "ASCII85Decode", nil, nil
+}
+
+func (f FilterASCII85) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
+	return ascii85.Encode(w, 79)
+}
+
+func (f FilterASCII85) Decode(_ Version, r io.Reader) (io.Reader, error) {
+	return ascii85.Decode(r)
+}
+
+// FilterCompress is a special filter name, which is used to select the
+// best available compression filter when writing PDF streams.  This is
+// FlateDecode for PDF versions 1.2 and above, and LZWDecode for older
+// versions.
+type FilterCompress Dict
+
+func (f FilterCompress) Info(v Version) (Name, Dict, error) {
+	if v >= V1_2 {
+		return FilterFlate(f).Info(v)
+	}
+	return FilterLZW(f).Info(v)
+
+}
+
+func (f FilterCompress) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
+	if v >= V1_2 {
+		return FilterFlate(f).Encode(v, w)
+	}
+	return FilterLZW(f).Encode(v, w)
+}
+
+func (f FilterCompress) Decode(v Version, r io.Reader) (io.Reader, error) {
+	if v >= V1_2 {
+		return FilterFlate(f).Decode(v, r)
+	}
+	return FilterLZW(f).Decode(v, r)
+}
+
+type FilterFlate Dict
+
+func (f FilterFlate) Info(v Version) (Name, Dict, error) {
+	ff, err := f.parseParameters(v)
+	if err != nil {
+		return "", nil, err
+	}
+
+	res := Dict{}
+	if ff.Predictor != 1 {
+		switch ff.Predictor {
+		case 1, 2, 10, 11, 12, 13, 14, 15:
+			// pass
+		default:
+			return "", nil, fmt.Errorf("unsupported predictor %d", ff.Predictor)
+		}
+		res["Predictor"] = Integer(ff.Predictor)
+	}
+	if ff.Predictor > 1 && ff.Colors != 1 {
+		if ff.Colors < 1 || v < V1_3 && ff.Colors > 4 {
+			return "", nil, fmt.Errorf("invalid number of colour channels %d", ff.Colors)
+		}
+		res["Colors"] = Integer(ff.Colors)
+	}
+	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
+		// Valid values are 1, 2, 4, 8, and (PDF 1.5) 16
+		switch ff.BitsPerComponent {
+		case 1, 2, 4, 8, 16:
+			if v >= V1_5 || ff.BitsPerComponent <= 8 {
+				break
+			}
+			fallthrough
+		default:
+			return "", nil, fmt.Errorf("invalid number of bits per component %d", ff.BitsPerComponent)
+		}
+		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
+	}
+	if ff.Predictor > 1 && ff.Columns != 1 {
+		if ff.Columns < 1 || ff.Columns > 1<<20 {
+			return "", nil, fmt.Errorf("invalid number of columns %d", ff.Columns)
+		}
+		res["Columns"] = Integer(ff.Columns)
+	}
+
+	return "FlateDecode", res, nil
+}
+
+func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
+	ff, err := f.parseParameters(v)
+	if err != nil {
+		return nil, err
+	}
+	return ff.Encode(w)
+}
+
+func (f FilterFlate) Decode(v Version, r io.Reader) (io.Reader, error) {
+	ff, err := f.parseParameters(v)
+	if err != nil {
+		return nil, err
+	}
+	return ff.Decode(r)
+}
+
+func (f FilterFlate) parseParameters(v Version) (*flateFilter, error) {
+	if v < V1_2 {
+		return nil, &VersionError{Operation: "FlateDecode filter", Earliest: V1_2}
+	}
+	res := &flateFilter{ // set defaults
+		Predictor:        1,
+		Colors:           1,
+		BitsPerComponent: 8,
+		Columns:          1,
+	}
+	if val, ok := f["Predictor"].(Integer); ok {
+		res.Predictor = int(val)
+	}
+	if val, ok := f["Colors"].(Integer); ok {
+		res.Colors = int(val)
+	}
+	if val, ok := f["BitsPerComponent"].(Integer); ok {
+		res.BitsPerComponent = int(val)
+	}
+	if val, ok := f["Columns"].(Integer); ok {
+		res.Columns = int(val)
+	}
+	return res, nil
+}
+
+type FilterLZW Dict
+
+func (f FilterLZW) Info(v Version) (Name, Dict, error) {
+	ff, err := f.parseParameters(v)
+	if err != nil {
+		return "", nil, err
+	}
+
+	res := Dict{}
+	if ff.Predictor != 1 {
+		switch ff.Predictor {
+		case 1, 2, 10, 11, 12, 13, 14, 15:
+			// pass
+		default:
+			return "", nil, fmt.Errorf("unsupported predictor %d", ff.Predictor)
+		}
+		res["Predictor"] = Integer(ff.Predictor)
+	}
+	if ff.Predictor > 1 && ff.Colors != 1 {
+		if ff.Colors < 1 || v < V1_3 && ff.Colors > 4 {
+			return "", nil, fmt.Errorf("invalid number of colour channels %d", ff.Colors)
+		}
+		res["Colors"] = Integer(ff.Colors)
+	}
+	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
+		// Valid values are 1, 2, 4, 8, and (PDF 1.5) 16
+		switch ff.BitsPerComponent {
+		case 1, 2, 4, 8, 16:
+			if v >= V1_5 || ff.BitsPerComponent <= 8 {
+				break
+			}
+			fallthrough
+		default:
+			return "", nil, fmt.Errorf("invalid number of bits per component %d", ff.BitsPerComponent)
+		}
+		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
+	}
+	if ff.Predictor > 1 && ff.Columns != 1 {
+		if ff.Columns < 1 || ff.Columns > 1<<20 {
+			return "", nil, fmt.Errorf("invalid number of columns %d", ff.Columns)
+		}
+		res["Columns"] = Integer(ff.Columns)
+	}
+	if !ff.EarlyChange {
+		res["EarlyChange"] = Integer(0)
+	}
+
+	return "LZWDecode", res, nil
+}
+
+func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
+	ff, err := f.parseParameters(v)
+	if err != nil {
+		return nil, err
+	}
+	return ff.Encode(w)
+}
+
+func (f FilterLZW) Decode(v Version, r io.Reader) (io.Reader, error) {
+	ff, err := f.parseParameters(v)
+	if err != nil {
+		return nil, err
+	}
+	return ff.Decode(r)
+}
+
+func (f FilterLZW) parseParameters(v Version) (*flateFilter, error) {
+	res := &flateFilter{ // set defaults
+		Predictor:        1,
+		Colors:           1,
+		BitsPerComponent: 8,
+		Columns:          1,
+		EarlyChange:      true,
+		IsLZW:            true,
+	}
+	if val, ok := f["Predictor"].(Integer); ok {
+		res.Predictor = int(val)
+	}
+	if val, ok := f["Colors"].(Integer); ok {
+		res.Colors = int(val)
+	}
+	if val, ok := f["BitsPerComponent"].(Integer); ok {
+		res.BitsPerComponent = int(val)
+	}
+	if val, ok := f["Columns"].(Integer); ok {
+		res.Columns = int(val)
+	}
+	if val, ok := f["EarlyChange"].(Integer); ok {
+		res.EarlyChange = (val != 0)
+	}
+	return res, nil
+}
 
 // FilterInfo describes a single PDF stream filter.
 type FilterInfo struct {
 	Name  Name
 	Parms Dict
-}
-
-func (fi *FilterInfo) Encode(w io.WriteCloser, canFlate bool) (io.WriteCloser, error) {
-	panic("not implemented")
-}
-
-func (fi *FilterInfo) Decode(r io.Reader) (io.Reader, error) {
-	panic("not implemented")
-}
-
-type filter interface {
-	Encode(w io.WriteCloser) (io.WriteCloser, error)
-	Decode(r io.Reader) (io.Reader, error)
-}
-
-func (fi *FilterInfo) getFilter(v Version) (filter, error) {
-	if fi.Name == CompressFilter && v > 0 {
-		// TODO(voss): don't change this in place
-		if v >= V1_2 {
-			fi.Name = FlateDecode
-		} else if v > 0 {
-			fi.Name = LZWDecode
-		}
-	}
-
-	switch fi.Name {
-	case ASCII85Decode:
-		return ascii85.Filter, nil
-	case FlateDecode:
-		return newFlateFilter(fi.Parms, false), nil
-	case LZWDecode:
-		return newFlateFilter(fi.Parms, true), nil
-	default:
-		return nil, errors.New("unsupported filter type " + string(fi.Name))
-	}
 }
 
 type flateFilter struct {

@@ -313,14 +313,6 @@ func (x Name) PDF(w io.Writer) error {
 	return nil
 }
 
-func toName(obj Object) (Name, error) {
-	name, ok := obj.(Name)
-	if !ok {
-		return "", fmt.Errorf("wrong type, expected Name but got %T", obj)
-	}
-	return name, nil
-}
-
 // Array represent an array of objects in a PDF file.
 type Array []Object
 
@@ -419,6 +411,7 @@ func (x Dict) PDF(w io.Writer) error {
 	return err
 }
 
+// TODO(voss): remove this function
 func toDict(obj Object) (Dict, error) {
 	if obj == nil {
 		return nil, nil
@@ -487,72 +480,6 @@ func (x *Stream) PDF(w io.Writer) error {
 	}
 	_, err = w.Write([]byte("\nendstream"))
 	return err
-}
-
-// Filters extracts the information contained in the /Filter and /DecodeParms
-// entries of the stream dictionary.
-//
-// TODO(voss): remove
-func (x *Stream) Filters(resolve func(Object) (Object, error)) ([]*FilterInfo, error) {
-	if resolve == nil {
-		resolve = func(obj Object) (Object, error) {
-			return obj, nil
-		}
-	}
-	parms, err := resolve(x.Dict["DecodeParms"])
-	if err != nil {
-		return nil, err
-	}
-	var filters []*FilterInfo
-	filter, err := resolve(x.Dict["Filter"])
-	if err != nil {
-		return nil, err
-	}
-	switch f := filter.(type) {
-	case nil:
-		// pass
-	case Array:
-		pa, _ := parms.(Array)
-		for i, fi := range f {
-			fi, err := resolve(fi)
-			if err != nil {
-				return nil, err
-			}
-			name, err := toName(fi)
-			if err != nil {
-				return nil, err
-			}
-			var pDict Dict
-			if len(pa) > i {
-				pai, err := resolve(pa[i])
-				if err != nil {
-					return nil, err
-				}
-				x, err := toDict(pai)
-				if err != nil {
-					return nil, err
-				}
-				pDict = x
-			}
-			filter := &FilterInfo{
-				Name:  name,
-				Parms: pDict,
-			}
-			filters = append(filters, filter)
-		}
-	case Name:
-		pDict, err := toDict(parms)
-		if err != nil {
-			return nil, err
-		}
-		filters = append(filters, &FilterInfo{
-			Name:  f,
-			Parms: pDict,
-		})
-	default:
-		return nil, errors.New("invalid /Filter field")
-	}
-	return filters, nil
 }
 
 // Reference represents a reference to an indirect object in a PDF file.

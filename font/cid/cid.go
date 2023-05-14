@@ -178,7 +178,6 @@ func (e *embedded) Close() error {
 	e.closed = true
 
 	w := e.w
-	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 
 	// Determine the subset of glyphs to include.
 	encoding := e.enc.Encoding()
@@ -354,7 +353,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Subtype": pdf.Name("CIDFontType0C"),
 		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}
@@ -380,12 +379,9 @@ func (e *embedded) Close() error {
 		FontDict["BaseFont"] = fontName
 
 		cid2gidStream, err := w.OpenStream(CID2GIDMapRef, nil,
-			&pdf.FilterInfo{
-				Name: compress.Name,
-				Parms: pdf.Dict{
-					"Predictor": pdf.Integer(12),
-					"Columns":   pdf.Integer(2),
-				},
+			pdf.FilterCompress{
+				"Predictor": pdf.Integer(12),
+				"Columns":   pdf.Integer(2),
 			})
 		if err != nil {
 			return err
@@ -410,7 +406,7 @@ func (e *embedded) Close() error {
 		fontFileDict := pdf.Dict{
 			"Length1": size,
 		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, compress)
+		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}

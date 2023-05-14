@@ -404,13 +404,14 @@ func (r *Reader) resolveNoObjStreams(obj Object) (Object, error) {
 // DecodeStream returns a reader for the decoded stream data.
 // If numFilters is non-zero, only the first numFilters filters are decoded.
 func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
-	var resolve func(Object) (Object, error)
-	if r != nil {
-		resolve = r.resolveNoObjStreams
-	}
-	filters, err := x.Filters(resolve)
+	filters, err := r.getFilters(x)
 	if err != nil {
 		return nil, err
+	}
+
+	v := V1_2
+	if r != nil {
+		v = r.Version
 	}
 
 	out := x.R
@@ -418,16 +419,70 @@ func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 		if numFilters > 0 && i >= numFilters {
 			break
 		}
-		filter, err := fi.getFilter(0)
-		if err != nil {
-			return nil, err
-		}
-		out, err = filter.Decode(out)
+		out, err = fi.Decode(v, out)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
+}
+
+// Filters extracts the information contained in the /Filter and /DecodeParms
+// entries of the stream dictionary.
+//
+// TODO(voss): remove
+func (r *Reader) getFilters(x *Stream) ([]Filter, error) {
+	decodeParams, err := r.resolveNoObjStreams(x.Dict["DecodeParms"])
+	if err != nil {
+		return nil, err
+	}
+	filter, err := r.resolveNoObjStreams(x.Dict["Filter"])
+	if err != nil {
+		return nil, err
+	}
+
+	var res []Filter
+	switch f := filter.(type) {
+	case nil:
+		// pass
+	case Name:
+		pDict, err := toDict(decodeParams)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, makeFilter(f, pDict))
+	case Array:
+		pa, ok := decodeParams.(Array)
+		if !ok {
+			return nil, errors.New("invalid /DecodeParms field")
+		}
+		for i, fi := range f {
+			fi, err := r.resolveNoObjStreams(fi)
+			if err != nil {
+				return nil, err
+			}
+			name, ok := fi.(Name)
+			if !ok {
+				return nil, fmt.Errorf("wrong type, expected Name but got %T", fi)
+			}
+			var pDict Dict
+			if len(pa) > i {
+				pai, err := r.resolveNoObjStreams(pa[i])
+				if err != nil {
+					return nil, err
+				}
+				x, err := toDict(pai)
+				if err != nil {
+					return nil, err
+				}
+				pDict = x
+			}
+			res = append(res, makeFilter(name, pDict))
+		}
+	default:
+		return nil, errors.New("invalid /Filter field")
+	}
+	return res, nil
 }
 
 func (r *Reader) getID(obj Object) ([][]byte, error) {

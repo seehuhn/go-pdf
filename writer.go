@@ -447,7 +447,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		"N":     Integer(N),
 		"First": Integer(head.Len()),
 	}
-	w, err := pdf.OpenStream(sRef, dict, &FilterInfo{Name: "FlateDecode"})
+	w, err := pdf.OpenStream(sRef, dict, FilterFlate{})
 	if err != nil {
 		return err
 	}
@@ -479,7 +479,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 // OpenStream adds a PDF Stream to the file and returns an io.Writer which can
 // be used to add the stream's data.  No other objects can be added to the file
 // until the stream is closed.
-func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) (io.WriteCloser, error) {
+func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
 	if pdf.inStream {
 		return nil, errors.New("OpenStream() while stream is open")
 	}
@@ -522,45 +522,47 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) 
 		}
 		w = enc
 	}
-	for _, fi := range filters {
-		if fi == nil {
+	haveParameters := false
+	var filterNames Array
+	var decodeParms Array
+	for _, filter := range filters {
+		if filter == nil {
 			continue
 		}
 
-		filter, err := fi.getFilter(pdf.Version)
-		if err != nil {
-			return nil, err
-		}
-		w, err = filter.Encode(w)
+		w, err = filter.Encode(pdf.Version, w)
 		if err != nil {
 			return nil, err
 		}
 
-		switch x := streamDict["Filter"].(type) {
-		case nil: // first filter
-			streamDict["Filter"] = fi.Name
-			if len(fi.Parms) > 0 {
-				streamDict["DecodeParms"] = fi.Parms
-			}
-		case Name: // second filter
-			streamDict["Filter"] = Array{x, fi.Name}
-			if streamDict["DecodeParms"] != nil || len(fi.Parms) > 0 {
-				streamDict["DecodeParms"] = Array{streamDict["DecodeParms"], fi.Parms}
-			}
-		case Array:
-			streamDict["Filter"] = append(x, fi.Name)
-			b, ok := streamDict["DecodeParms"].(Array)
-			if streamDict["DecodeParms"] != nil && !ok {
-				return nil, errors.New("wrong type for /DecodeParms")
-			}
-			if len(b) > 0 || len(fi.Parms) > 0 {
-				for len(b) < len(x) {
-					b = append(b, nil)
-				}
-				streamDict["DecodeParms"] = append(b, fi.Parms)
-			}
+		name, parms, err := filter.Info(pdf.Version)
+		if err != nil {
+			return nil, err
+		}
+		if len(parms) > 0 {
+			haveParameters = true
+		} else {
+			parms = nil
+		}
+
+		filterNames = append(filterNames, name)
+		decodeParms = append(decodeParms, parms)
+	}
+	switch len(filterNames) {
+	case 0:
+		// no filters
+	case 1:
+		streamDict["Filter"] = filterNames[0]
+		if haveParameters {
+			streamDict["DecodeParms"] = decodeParms[0]
+		}
+	default:
+		streamDict["Filter"] = filterNames
+		if haveParameters {
+			streamDict["DecodeParms"] = decodeParms
 		}
 	}
+
 	pdf.inStream = true
 	return w, nil
 }

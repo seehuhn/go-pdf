@@ -65,13 +65,10 @@ func EmbedAsJPEG(w *pdf.Writer, ref pdf.Reference, src image.Image, opts *jpeg.O
 func EmbedAsPNG(w *pdf.Writer, ref pdf.Reference, src image.Image) error {
 	width := src.Bounds().Dx()
 	height := src.Bounds().Dy()
-	filter := &pdf.FilterInfo{
-		Name: pdf.FlateDecode,
-		Parms: pdf.Dict{
-			"Columns":   pdf.Integer(width),
-			"Colors":    pdf.Integer(3),
-			"Predictor": pdf.Integer(15),
-		},
+	filter := pdf.FilterFlate{
+		"Columns":   pdf.Integer(width),
+		"Colors":    pdf.Integer(3),
+		"Predictor": pdf.Integer(15),
 	}
 	// TODO(voss): only write the mask if there is an alpha channel
 	maskRef := w.Alloc()
@@ -104,12 +101,9 @@ func EmbedAsPNG(w *pdf.Writer, ref pdf.Reference, src image.Image) error {
 	}
 
 	// TODO(voss): is there a more appropriate compression type for the mask?
-	filter = &pdf.FilterInfo{
-		Name: pdf.FlateDecode,
-		Parms: pdf.Dict{
-			"Columns":   pdf.Integer(width),
-			"Predictor": pdf.Integer(15),
-		},
+	filter = pdf.FilterFlate{
+		"Columns":   pdf.Integer(width),
+		"Predictor": pdf.Integer(15),
 	}
 	stream, err = w.OpenStream(maskRef, pdf.Dict{
 		"Type":             pdf.Name("XObject"),

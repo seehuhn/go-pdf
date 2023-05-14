@@ -238,7 +238,6 @@ func (e3 *embedded) Close() error {
 	}
 
 	w := e3.w
-	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
 
 	encoding := e3.enc.Encoding()
 	var firstChar cmap.CID
@@ -279,7 +278,7 @@ func (e3 *embedded) Close() error {
 		}
 		if e3.glyphRefs[gid] == 0 {
 			ref := w.Alloc()
-			stream, err := w.OpenStream(ref, nil, compress)
+			stream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 			if err != nil {
 				return err
 			}

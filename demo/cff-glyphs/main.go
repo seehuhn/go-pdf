@@ -151,11 +151,9 @@ type illustrator struct {
 }
 
 func (ctx *illustrator) Show(fnt *cff.Font) error {
-	compress := &pdf.FilterInfo{Name: pdf.CompressFilter}
-
 	for i, g := range fnt.Glyphs {
 		contentRef := ctx.pageTree.Out.Alloc()
-		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, compress)
+		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}
