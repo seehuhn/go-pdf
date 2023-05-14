@@ -269,6 +269,7 @@ func (r *Reader) Authenticate(perm Perm) error {
 	return err
 }
 
+// GetCatalog implements the [Getter] interface.
 func (r *Reader) GetCatalog() *Catalog {
 	return r.Catalog
 }
@@ -722,6 +723,12 @@ func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
 // functions calls Resolve on the object before attempting to convert it to the
 // desired type.  If the object is `null`, a zero object is returned witout
 // error.  If the object is of the wrong type, an error is returned.
+//
+// The signature of these functions is
+//
+//	func GetT(r Getter, obj Object) (x T, err error)
+//
+// where T is the type of the object to be returned.
 var (
 	GetArray  = resolveAndCast[Array]
 	GetBool   = resolveAndCast[Bool]

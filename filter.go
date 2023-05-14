@@ -70,9 +70,23 @@ import (
 //         78 JPXDecode
 //          5 RunLengthDecode
 
+// Filter represents a PDF stream filter.
+//
+// Currently, the following filter types are represented by this library:
+// [FilterASCII85], [FilterFlate], [FilterLZW].  In addition, [FilterCompress]
+// can be used to select the best available compression filter when writing PDF
+// streams.  This is FilterFlate for PDF versions 1.2 and above, and FilterLZW
+// for older versions.
 type Filter interface {
+	// Info returns the name and parameters of the filter,
+	// as they should be written to the PDF file.
 	Info(Version) (Name, Dict, error)
+
+	// Encode returns a writer which encodes data written to it.
+	// The returned writer must be closed after use.
 	Encode(Version, io.WriteCloser) (io.WriteCloser, error)
+
+	// Decode returns a reader which decodes data read from it.
 	Decode(Version, io.Reader) (io.Reader, error)
 }
 
@@ -106,26 +120,32 @@ func (f *filterNotImplemented) Decode(Version, io.Reader) (io.Reader, error) {
 	return nil, fmt.Errorf("filter %s not implemented", f.Name)
 }
 
+// FilterASCII85 is the ASCII85Decode filter.
+// This filter has no parameters.
 type FilterASCII85 struct{}
 
+// Info implements the [Filter] interface.
 func (f FilterASCII85) Info(_ Version) (Name, Dict, error) {
 	return "ASCII85Decode", nil, nil
 }
 
+// Encode implements the [Filter] interface.
 func (f FilterASCII85) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
 	return ascii85.Encode(w, 79)
 }
 
+// Decode implements the [Filter] interface.
 func (f FilterASCII85) Decode(_ Version, r io.Reader) (io.Reader, error) {
 	return ascii85.Decode(r)
 }
 
 // FilterCompress is a special filter name, which is used to select the
 // best available compression filter when writing PDF streams.  This is
-// FlateDecode for PDF versions 1.2 and above, and LZWDecode for older
+// [FilterFlate] for PDF versions 1.2 and above, and [FilterLZW] for older
 // versions.
 type FilterCompress Dict
 
+// Info implements the [Filter] interface.
 func (f FilterCompress) Info(v Version) (Name, Dict, error) {
 	if v >= V1_2 {
 		return FilterFlate(f).Info(v)
@@ -134,6 +154,7 @@ func (f FilterCompress) Info(v Version) (Name, Dict, error) {
 
 }
 
+// Encode implements the [Filter] interface.
 func (f FilterCompress) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
 	if v >= V1_2 {
 		return FilterFlate(f).Encode(v, w)
@@ -141,6 +162,7 @@ func (f FilterCompress) Encode(v Version, w io.WriteCloser) (io.WriteCloser, err
 	return FilterLZW(f).Encode(v, w)
 }
 
+// Decode implements the [Filter] interface.
 func (f FilterCompress) Decode(v Version, r io.Reader) (io.Reader, error) {
 	if v >= V1_2 {
 		return FilterFlate(f).Decode(v, r)
@@ -148,8 +170,29 @@ func (f FilterCompress) Decode(v Version, r io.Reader) (io.Reader, error) {
 	return FilterLZW(f).Decode(v, r)
 }
 
+// FilterFlate is the FlateDecode filter.
+//
+// The filter is represented by a dictionary of tiler parameters. The following
+// parameters are supported:
+//
+//   - "Predictor": A code that selects the predictor algorithm, if any.
+//     If the value is greater than 1, the data were differenced before being
+//     encoded. (Default: 1)
+//
+//   - "Colors": The number of interleaved color components per sample.
+//     (Default: 1)
+//
+//   - "BitsPerComponent": The number of bits used to represent each color.
+//     (Default: 8)
+//
+//   - "Columns": The number of samples in each row. (Default: 1)
+//
+// The parameters are explained in detail in section 7.4.4 of PDF 32000-1:2008.
+//
+// This filter requires PDF versions 1.2 or higher.
 type FilterFlate Dict
 
+// Info implements the [Filter] interface.
 func (f FilterFlate) Info(v Version) (Name, Dict, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
@@ -195,6 +238,7 @@ func (f FilterFlate) Info(v Version) (Name, Dict, error) {
 	return "FlateDecode", res, nil
 }
 
+// Encode implements the [Filter] interface.
 func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
@@ -203,6 +247,7 @@ func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error)
 	return ff.Encode(w)
 }
 
+// Decode implements the [Filter] interface.
 func (f FilterFlate) Decode(v Version, r io.Reader) (io.Reader, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
@@ -236,8 +281,33 @@ func (f FilterFlate) parseParameters(v Version) (*flateFilter, error) {
 	return res, nil
 }
 
+// FilterFlate is the LZWDecode filter.
+// This is only useful to read legacy PDF files.  For new files, use
+// [FilterFlate] instead.
+//
+// The filter is represented by a dictionary of tiler parameters. The following
+// parameters are supported:
+//
+//   - "Predictor": A code that selects the predictor algorithm, if any.
+//     If the value is greater than 1, the data were differenced before being
+//     encoded. (Default: 1)
+//
+//   - "Colors": The number of interleaved color components per sample.
+//     (Default: 1)
+//
+//   - "BitsPerComponent": The number of bits used to represent each color.
+//     (Default: 8)
+//
+//   - "Columns": The number of samples in each row. (Default: 1)
+//
+//   - "EarlyChange": An integer value specifying whether the data
+//     is encoded using the correct LZW algorithm (value 0), or whether
+//     code with an off-by-one error is used (value 1).  (Default: 1)
+//
+// The parameters are explained in detail in section 7.4.4 of PDF 32000-1:2008.
 type FilterLZW Dict
 
+// Info implements the [Filter] interface.
 func (f FilterLZW) Info(v Version) (Name, Dict, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
@@ -286,6 +356,7 @@ func (f FilterLZW) Info(v Version) (Name, Dict, error) {
 	return "LZWDecode", res, nil
 }
 
+// Encode implements the [Filter] interface.
 func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
@@ -294,6 +365,7 @@ func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
 	return ff.Encode(w)
 }
 
+// Decode implements the [Filter] interface.
 func (f FilterLZW) Decode(v Version, r io.Reader) (io.Reader, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
@@ -327,12 +399,6 @@ func (f FilterLZW) parseParameters(v Version) (*flateFilter, error) {
 		res.EarlyChange = (val != 0)
 	}
 	return res, nil
-}
-
-// FilterInfo describes a single PDF stream filter.
-type FilterInfo struct {
-	Name  Name
-	Parms Dict
 }
 
 type flateFilter struct {

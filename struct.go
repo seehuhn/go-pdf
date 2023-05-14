@@ -25,9 +25,8 @@ import (
 	"golang.org/x/text/language"
 )
 
-// TODO(voss): document the struct tags
-
 // AsDict creates a PDF Dict object, encoding the fields of a Go struct.
+// This is the converse of [DecodeDict].
 func AsDict(s interface{}) Dict {
 	if s == nil {
 		return nil
@@ -100,8 +99,20 @@ fieldLoop:
 	return res
 }
 
-// DecodeDict initialises a tagged struct using the data from a PDF dictionary.
+// DecodeDict initialises a struct using the data from a PDF dictionary.
 // The argument s must be a pointer to a struct, or the function will panic.
+//
+// Go struct tags can be used to control the decoding process.  The following
+// tags are supported:
+//   - "optional": the field is optional and may be omitted from the PDF
+//     dictionary.  Omitted fields correspond to the Go zero value for the
+//     field type.
+//   - "text string": the field is a string which should be encoded as a PDF
+//     text string.
+//   - "allowstring": the field is a Name, but the PDF dictionary may contain
+//     a String instead.  The String will be converted to a Name.
+//   - "extra": the field is a map[string]string which should contain all
+//     entries in the PDF dictionary which are not otherwise decoded.
 func DecodeDict(r Getter, s interface{}, d Dict) error {
 	v := reflect.Indirect(reflect.ValueOf(s))
 	vt := v.Type()
@@ -270,6 +281,7 @@ var (
 
 // Catalog represents a PDF Document Catalog.  The only required field in this
 // structure is Pages, which specifies the root of the page tree.
+// This struct can be used with the [DecodeDict] and [AsDict] functions.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 type Catalog struct {

@@ -125,6 +125,18 @@ func (d *Data) Write(w io.Writer) error {
 	return nil
 }
 
+// Alloc allocates an object number for an indirect object.
+func (d *Data) Alloc() Reference {
+	number := uint32(len(d.Objects) + 1)
+	for {
+		ref := NewReference(number, 0)
+		if _, ok := d.Objects[ref]; !ok {
+			return ref
+		}
+		number++
+	}
+}
+
 func (d *Data) GetCatalog() *Catalog {
 	return d.Catalog
 }

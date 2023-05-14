@@ -572,7 +572,7 @@ type Putter interface {
 	Alloc() Reference
 	Put(ref Reference, obj Object) error
 	WriteCompressed(refs []Reference, objects ...Object) error
-	OpenStream(ref Reference, dict Dict, filters ...*FilterInfo) (io.WriteCloser, error)
+	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
 }
 
 type streamWriter struct {

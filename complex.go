@@ -39,6 +39,9 @@ func (x Number) PDF(w io.Writer) error {
 	return obj.PDF(w)
 }
 
+// GetNumber is a helper function for reading numeric values from a PDF file.
+// This resolves indirect references and makes sure the resulting object is an
+// Integer or a Real.
 func GetNumber(r Getter, obj Object) (Number, error) {
 	obj, err := Resolve(r, obj)
 	if err != nil {

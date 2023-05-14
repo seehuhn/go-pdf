@@ -244,3 +244,6 @@ func TestPlaceholder(t *testing.T) {
 		t.Errorf("wrong /Length: %d vs %d", lengthOut, testVal)
 	}
 }
+
+// compile time test
+var _ Putter = &Writer{}

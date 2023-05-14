@@ -468,3 +468,6 @@ func addPage(w *Writer, args ...Object) error {
 	w.Catalog.Pages = ppRef
 	return nil
 }
+
+// compile time test
+var _ Getter = &Reader{}
