@@ -53,13 +53,15 @@ type Writer struct {
 	xref    map[uint32]*xRefEntry
 	nextRef uint32
 
-	inStream bool
-	// TODO(voss): change afterStream into a list of (Reference, Object)
-	// pairs to be written as soon as possible.  Maybe change the Put() method
-	// to append to afterStream if inStream is true?
-	afterStream []func(*Writer) error
+	inStream    bool
+	afterStream []refObject
 
 	Resources map[Reference]Resource
+}
+
+type refObject struct {
+	ref Reference
+	obj Object
 }
 
 // WriterOptions allows to influence the way a PDF file is generated.
@@ -352,7 +354,8 @@ func (pdf *Writer) Alloc() Reference {
 // given reference.
 func (pdf *Writer) Put(ref Reference, obj Object) error {
 	if pdf.inStream {
-		return errors.New("Put() while stream is open")
+		pdf.afterStream = append(pdf.afterStream, refObject{ref, obj})
+		return nil
 	}
 
 	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
@@ -671,13 +674,13 @@ func (w *streamWriter) Close() error {
 	}
 
 	w.parent.inStream = false
-	for _, fn := range w.parent.afterStream {
-		err = fn(w.parent)
+	for _, pair := range w.parent.afterStream {
+		err = w.parent.Put(pair.ref, pair.obj)
 		if err != nil {
 			return err
 		}
 	}
-	w.parent.afterStream = nil
+	w.parent.afterStream = w.parent.afterStream[:0]
 
 	return nil
 }
@@ -742,21 +745,11 @@ func (x *Placeholder) PDF(w io.Writer) error {
 func (x *Placeholder) Set(val Object) error {
 	if x.ref != 0 {
 		pdf := x.pdf
-		if pdf.inStream {
-			pdf.afterStream = append(pdf.afterStream, func(w *Writer) error {
-				err := w.Put(x.ref, val)
-				if err != nil {
-					return fmt.Errorf("Placeholder.Set (afterstream): %w", err)
-				}
-				return nil
-			})
-		} else {
-			err := pdf.Put(x.ref, val)
-			if err != nil {
-				return fmt.Errorf("Placeholder.Set: %w", err)
-			}
-			return nil
+		err := pdf.Put(x.ref, val)
+		if err != nil {
+			return fmt.Errorf("Placeholder.Set: %w", err)
 		}
+		return nil
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, x.size))
