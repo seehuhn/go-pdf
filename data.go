@@ -148,8 +148,65 @@ func (d *Data) GetObject(ref Reference) (Object, error) {
 func (d *Data) Put(ref Reference, obj Object) error {
 	if obj == nil {
 		delete(d.Objects, ref)
-		return nil
+	} else {
+		d.Objects[ref] = obj
 	}
-	d.Objects[ref] = obj
+	return nil
+}
+
+func (d *Data) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
+	// Copy dict, dict["Filter"], and dict["DecodeParms"], so that we don't
+	// change the caller's dict.
+	streamDict := maps.Clone(dict)
+	if filter, ok := streamDict["Filter"].(Array); ok {
+		streamDict["Filter"] = append(Array{}, filter...)
+	}
+	if decodeParms, ok := streamDict["DecodeParms"].(Array); ok {
+		streamDict["DecodeParms"] = append(Array{}, decodeParms...)
+	}
+
+	s := &Stream{
+		Dict: streamDict,
+	}
+	d.Objects[ref] = s
+
+	var w io.WriteCloser = &dataStreamWriter{s: s}
+	var err error
+	for _, filter := range filters {
+		w, err = filter.Encode(d.Version, w)
+		if err != nil {
+			return nil, err
+		}
+
+		name, parms, err := filter.Info(d.Version)
+		if err != nil {
+			return nil, err
+		}
+		appendFilter(streamDict, name, parms)
+	}
+	return w, err
+}
+
+type dataStreamWriter struct {
+	bytes.Buffer
+	s *Stream
+}
+
+func (w *dataStreamWriter) Close() error {
+	w.s.R = bytes.NewReader(w.Bytes())
+	w.s.Dict["Length"] = Integer(w.Len())
+	return nil
+}
+
+func (d *Data) WriteCompressed(refs []Reference, objects ...Object) error {
+	err := checkCompressed(refs, objects)
+	if err != nil {
+		return err
+	}
+
+	// TODO(voss): implement this
+	for i, obj := range objects {
+		d.Put(refs[i], obj)
+	}
 	return nil
 }

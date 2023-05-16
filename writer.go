@@ -26,6 +26,8 @@ import (
 	"os"
 	"sort"
 	"strconv"
+
+	"golang.org/x/exp/maps"
 )
 
 // Writer represents a PDF file open for writing.
@@ -384,17 +386,10 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	if pdf.inStream {
 		return errors.New("WriteCompressed() while stream is open")
-	} else if len(refs) != len(objects) {
-		return errors.New("lengths of refs and objects differ")
 	}
-	for i, ref := range refs {
-		if _, isStream := objects[i].(*Stream); isStream {
-			return errors.New("cannot store streams in object streams")
-		} else if _, isRef := objects[i].(Reference); isRef {
-			return errors.New("cannot store references in object streams")
-		} else if ref.Generation() > 0 {
-			return errors.New("cannot use non-zero generation inside object stream")
-		}
+	err := checkCompressed(refs, objects)
+	if err != nil {
+		return err
 	}
 
 	if pdf.Version < V1_5 {
@@ -408,7 +403,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return nil
 	}
 
-	sRef := pdf.Alloc()
+	sRef := pdf.Alloc() // TODO(voss): pass this in as an argument?
 	for i, ref := range refs {
 		err := pdf.setXRef(ref, &xRefEntry{InStream: sRef, Pos: int64(i)})
 		if err != nil {
@@ -476,6 +471,22 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	return nil
 }
 
+func checkCompressed(refs []Reference, objects []Object) error {
+	if len(refs) != len(objects) {
+		return errors.New("lengths of refs and objects differ")
+	}
+	for i, ref := range refs {
+		if _, isStream := objects[i].(*Stream); isStream {
+			return errors.New("cannot store streams in object streams")
+		} else if _, isRef := objects[i].(Reference); isRef {
+			return errors.New("cannot store references in object streams")
+		} else if ref.Generation() > 0 {
+			return errors.New("cannot use non-zero generation inside object stream")
+		}
+	}
+	return nil
+}
+
 // OpenStream adds a PDF Stream to the file and returns an io.Writer which can
 // be used to add the stream's data.  No other objects can be added to the file
 // until the stream is closed.
@@ -490,20 +501,19 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 	}
 	pdf.w.ref = ref
 
-	// Copy dict and dict["Filter"] as well as dict["DecodeParms"], so that
-	// we can register the new filters without changing the caller's dict.
-	streamDict := make(Dict)
-	for key, val := range dict {
-		if key == "Filter" || key == "DecodeParms" {
-			if a, ok := val.(Array); ok {
-				if len(a) == 0 {
-					continue
-				}
-				val = append(Array{}, a...)
-			}
-		}
-		streamDict[key] = val
+	// Copy dict, dict["Filter"], and dict["DecodeParms"], so that we don't
+	// change the caller's dict.
+	streamDict := maps.Clone(dict)
+	if streamDict == nil {
+		streamDict = Dict{}
 	}
+	if filter, ok := streamDict["Filter"].(Array); ok {
+		streamDict["Filter"] = append(Array{}, filter...)
+	}
+	if decodeParms, ok := streamDict["DecodeParms"].(Array); ok {
+		streamDict["DecodeParms"] = append(Array{}, decodeParms...)
+	}
+
 	length := pdf.NewPlaceholder(12)
 	if _, exists := streamDict["Length"]; !exists {
 		streamDict["Length"] = length
@@ -522,14 +532,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 		}
 		w = enc
 	}
-	haveParameters := false
-	var filterNames Array
-	var decodeParms Array
 	for _, filter := range filters {
-		if filter == nil {
-			continue
-		}
-
 		w, err = filter.Encode(pdf.Version, w)
 		if err != nil {
 			return nil, err
@@ -539,32 +542,44 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 		if err != nil {
 			return nil, err
 		}
-		if len(parms) > 0 {
-			haveParameters = true
-		} else {
-			parms = nil
-		}
-
-		filterNames = append(filterNames, name)
-		decodeParms = append(decodeParms, parms)
-	}
-	switch len(filterNames) {
-	case 0:
-		// no filters
-	case 1:
-		streamDict["Filter"] = filterNames[0]
-		if haveParameters {
-			streamDict["DecodeParms"] = decodeParms[0]
-		}
-	default:
-		streamDict["Filter"] = filterNames
-		if haveParameters {
-			streamDict["DecodeParms"] = decodeParms
-		}
+		appendFilter(streamDict, name, parms)
 	}
 
 	pdf.inStream = true
 	return w, nil
+}
+
+func appendFilter(dict Dict, name Name, parms Dict) {
+	switch filter := dict["Filter"].(type) {
+	case Name:
+		dict["Filter"] = Array{filter, name}
+		p0, _ := dict["DecodeParms"].(Dict)
+		if len(p0)+len(parms) > 0 {
+			dict["DecodeParms"] = Array{p0, parms}
+		}
+
+	case Array:
+		dict["Filter"] = append(filter, name)
+		pp, _ := dict["DecodeParms"].(Array)
+		needsParms := len(parms) > 0
+		for i := 0; i < len(pp) && !needsParms; i++ {
+			pi, _ := pp[i].(Dict)
+			needsParms = len(pi) > 0
+		}
+		if needsParms {
+			for len(pp) < len(filter) {
+				pp = append(pp, nil)
+			}
+			pp := pp[:len(filter)]
+			dict["DecodeParms"] = append(pp, parms)
+		}
+
+	default:
+		dict["Filter"] = name
+		if len(parms) > 0 {
+			dict["DecodeParms"] = parms
+		}
+	}
 }
 
 // TODO(voss): find a better name for this

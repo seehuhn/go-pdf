@@ -29,7 +29,7 @@ import (
 )
 
 // Embed writes the ToUnicode CMap as a stream object to the given PDF file.
-func (info *Info) Embed(ref pdf.Reference, w *pdf.Writer) error {
+func (info *Info) Embed(ref pdf.Reference, w pdf.Putter) error {
 	cmapStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err

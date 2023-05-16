@@ -35,7 +35,7 @@ type SimpleMapping struct {
 
 // WriteToUnicodeSimple writes the ToUnicode stream for a simple font.
 // This modifies mm.
-func WriteToUnicodeSimple(w *pdf.Writer, ref pdf.Reference, ordering string, mm []SimpleMapping) error {
+func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm []SimpleMapping) error {
 	data := &tounicode.Info{
 		Name: "Seehuhn-" + pdf.Name(ordering) + "-UCS2",
 		ROS: &type1.CIDSystemInfo{

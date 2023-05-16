@@ -619,7 +619,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	xRefDict["DecodeParms"] = parms
 	xRefDict["Length"] = Integer(len(xRefData))
 
-	swx, err := pdf.OpenStream(ref, xRefDict, nil)
+	swx, err := pdf.OpenStream(ref, xRefDict)
 	if err != nil {
 		return err
 	}

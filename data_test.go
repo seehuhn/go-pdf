@@ -127,5 +127,4 @@ func FuzzReadWrite(f *testing.F) {
 
 // compile time test
 var _ pdf.Getter = &pdf.Data{}
-
-// var _ pdf.Putter = &pdf.Data{} // TODO(voss): add the missing methods
+var _ pdf.Putter = &pdf.Data{} // TODO(voss): add the missing methods
