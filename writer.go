@@ -55,7 +55,7 @@ type Writer struct {
 
 	inStream bool
 	// TODO(voss): change afterStream into a list of (Reference, Object)
-	// pairs to be written as soon as possible.  Change the Write() method
+	// pairs to be written as soon as possible.  Maybe change the Put() method
 	// to append to afterStream if inStream is true?
 	afterStream []func(*Writer) error
 
@@ -514,7 +514,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 		streamDict["DecodeParms"] = append(Array{}, decodeParms...)
 	}
 
-	length := pdf.NewPlaceholder(12)
+	length := NewPlaceholder(pdf, 12)
 	if _, exists := streamDict["Length"]; !exists {
 		streamDict["Length"] = length
 	}
@@ -699,7 +699,7 @@ type Placeholder struct {
 // The argument size must be an upper bound to the length of the replacement
 // text.  Once the value becomes known, it can be filled in using the
 // [Placeholder.Set] method.
-func (pdf *Writer) NewPlaceholder(size int) *Placeholder {
+func NewPlaceholder(pdf *Writer, size int) *Placeholder {
 	return &Placeholder{
 		size: size,
 		pdf:  pdf,
@@ -759,7 +759,7 @@ func (x *Placeholder) Set(val Object) error {
 		}
 	}
 
-	buf := &bytes.Buffer{}
+	buf := bytes.NewBuffer(make([]byte, 0, x.size))
 	err := val.PDF(buf)
 	if err != nil {
 		return err

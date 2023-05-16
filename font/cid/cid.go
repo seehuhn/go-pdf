@@ -402,7 +402,7 @@ func (e *embedded) Close() error {
 
 		// Write the "font program".
 		// See section 9.9 of PDF 32000-1:2008 for details.
-		size := w.NewPlaceholder(10)
+		size := pdf.NewPlaceholder(w, 10)
 		fontFileDict := pdf.Dict{
 			"Length1": size,
 		}

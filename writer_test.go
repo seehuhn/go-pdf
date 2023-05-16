@@ -200,7 +200,7 @@ func TestPlaceholder(t *testing.T) {
 	}
 	w.Catalog.Pages = w.Alloc() // pretend we have pages
 
-	length := w.NewPlaceholder(5)
+	length := NewPlaceholder(w, 5)
 	testRef := w.Alloc()
 	err = w.Put(testRef, Dict{
 		"Test":   Bool(true),
