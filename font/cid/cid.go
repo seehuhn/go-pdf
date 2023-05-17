@@ -119,14 +119,14 @@ func (f *cidfont) Layout(s string, ptSize float64) glyph.Seq {
 	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
 }
 
-func (f *cidfont) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
+func (f *cidfont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	if f.info.IsGlyf() {
-		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
+		err := pdf.CheckVersion(w, "use of TrueType glyph outlines", pdf.V1_1)
 		if err != nil {
 			return nil, err
 		}
 	} else if f.info.IsCFF() {
-		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_3)
+		err := pdf.CheckVersion(w, "use of CFF glyph outlines", pdf.V1_3)
 		if err != nil {
 			return nil, err
 		}

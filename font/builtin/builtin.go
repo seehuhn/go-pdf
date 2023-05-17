@@ -150,7 +150,7 @@ func (f *builtin) Layout(s string, ptSize float64) glyph.Seq {
 	return gg
 }
 
-func (f *builtin) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
+func (f *builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	res := &embedded{
 		builtin: f,
 		w:       w,
@@ -166,7 +166,7 @@ func (f *builtin) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) 
 
 type embedded struct {
 	*builtin
-	w       *pdf.Writer
+	w       pdf.Putter
 	ref     pdf.Reference
 	resName pdf.Name
 	enc     cmap.SimpleEncoder
@@ -215,7 +215,7 @@ func (e *embedded) Close() error {
 	if enc != nil {
 		Font["Encoding"] = enc
 	}
-	if e.w.Version == pdf.V1_0 {
+	if e.w.Version() == pdf.V1_0 {
 		Font["Name"] = e.resName
 	}
 

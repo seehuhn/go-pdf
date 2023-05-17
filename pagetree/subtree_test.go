@@ -65,7 +65,7 @@ func TestSubtree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		w.Catalog.Pages = rootRef // pretend we have pages
+		w.GetCatalog().Pages = rootRef // pretend we have pages
 		err = w.Close()
 		if err != nil {
 			t.Fatal(err)

@@ -51,7 +51,7 @@ func (g *Geometry) FromPDF16(fontSize float64, x float64) funit.Int16 {
 
 // Font represents a font which can be embedded in a PDF file.
 type Font interface {
-	Embed(w *pdf.Writer, resName pdf.Name) (Embedded, error)
+	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error)
 	GetGeometry() *Geometry
 	Layout(s string, ptSize float64) glyph.Seq
 }

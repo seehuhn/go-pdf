@@ -26,11 +26,13 @@ import (
 
 // Data is an in-memory representation of a PDF document.
 type Data struct {
-	Version Version
+	version Version
 	Catalog *Catalog
 	Info    *Info
 	ID      [][]byte
 	Objects map[Reference]Object
+
+	autoclose map[Reference]Resource
 }
 
 // Read reads a complete PDF document into memory.
@@ -41,11 +43,13 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 	}
 
 	res := &Data{
-		Version: pdf.Version,
+		version: pdf.Version,
 		Catalog: pdf.Catalog,
 		Info:    pdf.Info,
 		ID:      pdf.ID,
 		Objects: map[Reference]Object{},
+
+		autoclose: map[Reference]Resource{},
 	}
 
 	isObjectStream := make(map[Reference]bool)
@@ -95,7 +99,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 // Write writes the PDF document to w.
 func (d *Data) Write(w io.Writer) error {
 	opt := &WriterOptions{
-		Version: d.Version,
+		Version: d.version,
 		ID:      d.ID,
 	}
 	pdf, err := NewWriter(w, opt)
@@ -125,6 +129,36 @@ func (d *Data) Write(w io.Writer) error {
 	return nil
 }
 
+func (d *Data) Close() error {
+	var rr []Resource
+	for _, r := range d.autoclose {
+		rr = append(rr, r)
+	}
+	sort.Slice(rr, func(i, j int) bool {
+		ri := rr[i].Reference()
+		rj := rr[j].Reference()
+		if ri.Generation() != rj.Generation() {
+			return ri.Generation() < rj.Generation()
+		}
+		return ri.Number() < rj.Number()
+	})
+	for _, r := range rr {
+		err := r.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Data) Version() Version {
+	return d.version
+}
+
+func (d *Data) GetCatalog() *Catalog {
+	return d.Catalog
+}
+
 // Alloc allocates an object number for an indirect object.
 func (d *Data) Alloc() Reference {
 	number := uint32(len(d.Objects) + 1)
@@ -135,10 +169,6 @@ func (d *Data) Alloc() Reference {
 		}
 		number++
 	}
-}
-
-func (d *Data) GetCatalog() *Catalog {
-	return d.Catalog
 }
 
 func (d *Data) GetObject(ref Reference) (Object, error) {
@@ -173,12 +203,12 @@ func (d *Data) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Write
 	var w io.WriteCloser = &dataStreamWriter{s: s}
 	var err error
 	for _, filter := range filters {
-		w, err = filter.Encode(d.Version, w)
+		w, err = filter.Encode(d.version, w)
 		if err != nil {
 			return nil, err
 		}
 
-		name, parms, err := filter.Info(d.Version)
+		name, parms, err := filter.Info(d.version)
 		if err != nil {
 			return nil, err
 		}
@@ -209,4 +239,9 @@ func (d *Data) WriteCompressed(refs []Reference, objects ...Object) error {
 		d.Put(refs[i], obj)
 	}
 	return nil
+}
+
+func (d *Data) AutoClose(res Resource) {
+	ref := res.Reference()
+	d.autoclose[ref] = res
 }

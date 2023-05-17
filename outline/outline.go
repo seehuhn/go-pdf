@@ -143,7 +143,7 @@ func (tree *Tree) Write(w *pdf.Writer) error {
 		return err
 	}
 
-	w.Catalog.Outlines = rootRef
+	w.GetCatalog().Outlines = rootRef
 	return nil
 }
 

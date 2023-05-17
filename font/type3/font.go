@@ -66,14 +66,14 @@ type Builder struct {
 	made bool
 }
 
-// New creates a new Builder for embedding a type 3 font into the PDF file w.
+// New creates a new Builder for drawing the glyphs of a type 3 font.
 // A typical value for unitsPerEm is 1000.
-func New(unitsPerEm uint16) (*Builder, error) {
+func New(unitsPerEm uint16) *Builder {
 	b := &Builder{
 		idx:        make(map[pdf.Name]int),
 		unitsPerEm: unitsPerEm,
 	}
-	return b, nil
+	return b
 }
 
 // AddGlyph adds a new glyph to the type 3 font.
@@ -197,7 +197,7 @@ func (t3 *type3) Layout(s string, ptSize float64) glyph.Seq {
 	return gg
 }
 
-func (t3 *type3) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
+func (t3 *type3) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	res := &embedded{
 		w:         w,
 		ref:       w.Alloc(),
@@ -211,7 +211,7 @@ func (t3 *type3) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
 }
 
 type embedded struct {
-	w         *pdf.Writer
+	w         pdf.Putter
 	ref       pdf.Reference
 	resName   pdf.Name
 	enc       cmap.SimpleEncoder
@@ -327,7 +327,7 @@ func (e3 *embedded) Close() error {
 	compressedRefs := []pdf.Reference{FontDictRef, CharProcsRef, EncodingRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, CharProcs, Encoding, Widths}
 
-	if w.Tagged {
+	if pdf.IsTagged(w) {
 		if e3.b.FontName == "" || e3.b.Flags == 0 {
 			return errors.New("FontName/Flags required for Type 3 fonts in tagged PDF files")
 		}

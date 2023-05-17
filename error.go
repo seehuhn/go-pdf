@@ -75,11 +75,24 @@ func wrap(err error, loc string) error {
 }
 
 // VersionError is returned when trying to use a feature in a PDF file which is
-// not supported by the PDF version used.  Use [Writer.CheckVersion] to create
+// not supported by the PDF version used.  Use [CheckVersion] to create
 // VersionError objects.
 type VersionError struct {
 	Operation string
 	Earliest  Version
+}
+
+// CheckVersion checks whether the PDF file being written has version
+// minVersion or later.  If the version is new enough, nil is returned.
+// Otherwise a [VersionError] for the given operation is returned.
+func CheckVersion(pdf Putter, operation string, minVersion Version) error {
+	if pdf.Version() >= minVersion {
+		return nil
+	}
+	return &VersionError{
+		Earliest:  minVersion,
+		Operation: operation,
+	}
 }
 
 func (err *VersionError) Error() string {

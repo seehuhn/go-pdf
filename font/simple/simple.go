@@ -122,14 +122,14 @@ func (f *simple) Layout(s string, ptSize float64) glyph.Seq {
 	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
 }
 
-func (f *simple) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
+func (f *simple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	if f.info.IsGlyf() {
-		err := w.CheckVersion("use of TrueType glyph outlines", pdf.V1_1)
+		err := pdf.CheckVersion(w, "use of TrueType glyph outlines", pdf.V1_1)
 		if err != nil {
 			return nil, err
 		}
 	} else if f.info.IsCFF() {
-		err := w.CheckVersion("use of CFF glyph outlines", pdf.V1_2)
+		err := pdf.CheckVersion(w, "use of CFF glyph outlines", pdf.V1_2)
 		if err != nil {
 			return nil, err
 		}

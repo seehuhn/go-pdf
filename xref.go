@@ -540,7 +540,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 		"Columns":   Integer(1 + w2 + w3),
 	}
 	xRefBuf := &bytes.Buffer{}
-	wxRaw, err := filter.Encode(pdf.Version, withDummyClose{xRefBuf})
+	wxRaw, err := filter.Encode(pdf.version, withDummyClose{xRefBuf})
 	if err != nil {
 		return err
 	}
@@ -611,7 +611,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	}
 	xRefData := xRefBuf.Bytes()
 
-	name, parms, err := filter.Info(pdf.Version)
+	name, parms, err := filter.Info(pdf.version)
 	if err != nil {
 		return err
 	}

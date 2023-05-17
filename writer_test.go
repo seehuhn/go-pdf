@@ -36,7 +36,7 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encryptDict, err := w.w.enc.AsDict(w.Version)
+	encryptDict, err := w.w.enc.AsDict(w.version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	encryptDict, err = r.enc.AsDict(w.Version)
+	encryptDict, err = r.enc.AsDict(w.version)
 	if err != nil {
 		t.Fatal(err)
 	}

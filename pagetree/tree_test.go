@@ -49,7 +49,7 @@ func TestBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out.Catalog.Pages = ref
+	out.GetCatalog().Pages = ref
 	err = out.Close()
 	if err != nil {
 		t.Fatal(err)

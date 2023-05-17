@@ -36,12 +36,10 @@ type Writer struct {
 	// Version is the PDF version used in this file.  This field is
 	// read-only.  Use the opt argument of NewWriter to set the PDF version for
 	// a new file.
-	Version Version
+	version Version
 
 	// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 	Catalog *Catalog
-
-	Tagged bool
 
 	info *Info
 
@@ -56,7 +54,7 @@ type Writer struct {
 	inStream    bool
 	afterStream []refObject
 
-	Resources map[Reference]Resource
+	autoclose map[Reference]Resource
 }
 
 type refObject struct {
@@ -134,7 +132,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	}
 
 	pdf := &Writer{
-		Version: version,
+		version: version,
 		Catalog: &Catalog{},
 
 		w:     &posWriter{w: ww},
@@ -143,7 +141,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		nextRef: 1,
 		xref:    make(map[uint32]*xRefEntry),
 
-		Resources: make(map[Reference]Resource),
+		autoclose: make(map[Reference]Resource),
 	}
 	pdf.xref[0] = &xRefEntry{
 		Pos:        -1,
@@ -185,24 +183,24 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	}
 
 	if opt.UserPassword != "" || opt.OwnerPassword != "" {
-		if err := pdf.CheckVersion("encryption", V1_1); err != nil {
+		if err := CheckVersion(pdf, "encryption", V1_1); err != nil {
 			return nil, err
 		}
 		var cf *cryptFilter
 		var V int
-		if pdf.Version >= V2_0 {
+		if pdf.version >= V2_0 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 256,
 			}
 			V = 5
-		} else if pdf.Version >= V1_6 {
+		} else if pdf.version >= V1_6 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 128,
 			}
 			V = 4
-		} else if pdf.Version >= V1_4 {
+		} else if pdf.version >= V1_4 {
 			cf = &cryptFilter{
 				Cipher: cipherRC4,
 				Length: 128,
@@ -240,7 +238,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 // io.Writer.
 func (pdf *Writer) Close() error {
 	var rr []Resource
-	for _, r := range pdf.Resources {
+	for _, r := range pdf.autoclose {
 		rr = append(rr, r)
 	}
 	sort.Slice(rr, func(i, j int) bool {
@@ -258,14 +256,6 @@ func (pdf *Writer) Close() error {
 		}
 	}
 
-	if pdf.Tagged {
-		MarkInfo, _ := pdf.Catalog.MarkInfo.(Dict)
-		if MarkInfo == nil {
-			MarkInfo = Dict{}
-		}
-		MarkInfo["Marked"] = Bool(true)
-		pdf.Catalog.MarkInfo = MarkInfo
-	}
 	catRef := pdf.Alloc()
 	err := pdf.Put(catRef, AsDict(pdf.Catalog))
 	if err != nil {
@@ -288,7 +278,7 @@ func (pdf *Writer) Close() error {
 		xRefDict["ID"] = Array{String(pdf.id[0]), String(pdf.id[1])}
 	}
 	if pdf.w.enc != nil {
-		encryptDict, err := pdf.w.enc.AsDict(pdf.Version)
+		encryptDict, err := pdf.w.enc.AsDict(pdf.version)
 		if err != nil {
 			return err
 		}
@@ -299,7 +289,7 @@ func (pdf *Writer) Close() error {
 	pdf.w.enc = nil
 
 	xRefPos := pdf.w.pos
-	if pdf.Version < V1_5 {
+	if pdf.version < V1_5 {
 		err = pdf.writeXRefTable(xRefDict)
 	} else {
 		err = pdf.writeXRefStream(xRefDict)
@@ -328,9 +318,17 @@ func (pdf *Writer) Close() error {
 	return nil
 }
 
+func (pdf *Writer) Version() Version {
+	return pdf.version
+}
+
+func (pdf *Writer) GetCatalog() *Catalog {
+	return pdf.Catalog
+}
+
 func (pdf *Writer) AutoClose(res Resource) {
 	ref := res.Reference()
-	pdf.Resources[ref] = res
+	pdf.autoclose[ref] = res
 }
 
 // SetInfo sets the Document Information Dictionary for the file.
@@ -395,7 +393,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if pdf.Version < V1_5 {
+	if pdf.version < V1_5 {
 		// Object streams are only availble in PDF version 1.5 and higher.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)
@@ -536,12 +534,12 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 		w = enc
 	}
 	for _, filter := range filters {
-		w, err = filter.Encode(pdf.Version, w)
+		w, err = filter.Encode(pdf.version, w)
 		if err != nil {
 			return nil, err
 		}
 
-		name, parms, err := filter.Info(pdf.Version)
+		name, parms, err := filter.Info(pdf.version)
 		if err != nil {
 			return nil, err
 		}
@@ -587,10 +585,14 @@ func appendFilter(dict Dict, name Name, parms Dict) {
 
 // TODO(voss): find a better name for this
 type Putter interface {
+	Close() error
+	Version() Version
+	GetCatalog() *Catalog
 	Alloc() Reference
 	Put(ref Reference, obj Object) error
-	WriteCompressed(refs []Reference, objects ...Object) error
 	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
+	WriteCompressed(refs []Reference, objects ...Object) error
+	AutoClose(res Resource)
 }
 
 type streamWriter struct {
@@ -793,19 +795,6 @@ func (x *Placeholder) Set(val Object) error {
 	return err
 }
 
-// CheckVersion checks whether the PDF file being written has version
-// minVersion or later.  If the version is new enough, nil is returned.
-// Otherwise a [VersionError] for the given operation is returned.
-func (pdf *Writer) CheckVersion(operation string, minVersion Version) error {
-	if pdf.Version >= minVersion {
-		return nil
-	}
-	return &VersionError{
-		Earliest:  minVersion,
-		Operation: operation,
-	}
-}
-
 type writeFlusher interface {
 	io.Writer
 	Flush() error
@@ -827,4 +816,15 @@ func (w *posWriter) Write(p []byte) (int, error) {
 
 func (w *posWriter) Flush() error {
 	return w.w.Flush()
+}
+
+func IsTagged(pdf Putter) bool {
+	// TODO(voss): what can we do if catalog.MarkInfo is an indirect object?
+	catalog := pdf.GetCatalog()
+	markInfo, _ := catalog.MarkInfo.(Dict)
+	if markInfo == nil {
+		return false
+	}
+	marked, _ := markInfo["Marked"].(Bool)
+	return bool(marked)
 }

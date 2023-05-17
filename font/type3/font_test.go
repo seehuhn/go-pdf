@@ -31,10 +31,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Builder, err := New(1000)
-	if err != nil {
-		t.Fatal(err)
-	}
+	F1Builder := New(1000)
 
 	bbox := funit.Rect{LLx: 0, LLy: 0, URx: 750, URy: 750}
 	g, err := F1Builder.AddGlyph(pdf.Name("A"), 1000, bbox, true)
