@@ -150,7 +150,7 @@ func (f *cidfont) Embed(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) 
 
 type embedded struct {
 	*cidfont
-	w       *pdf.Writer
+	w       pdf.Putter
 	ref     pdf.Reference
 	resName pdf.Name
 	enc     cmap.CIDEncoder

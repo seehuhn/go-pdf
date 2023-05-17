@@ -693,7 +693,7 @@ type Placeholder struct {
 	value []byte
 	size  int
 
-	pdf *Writer
+	pdf Putter
 	pos []int64
 	ref Reference
 }
@@ -702,7 +702,7 @@ type Placeholder struct {
 // The argument size must be an upper bound to the length of the replacement
 // text.  Once the value becomes known, it can be filled in using the
 // [Placeholder.Set] method.
-func NewPlaceholder(pdf *Writer, size int) *Placeholder {
+func NewPlaceholder(pdf Putter, size int) *Placeholder {
 	return &Placeholder{
 		size: size,
 		pdf:  pdf,
@@ -720,12 +720,14 @@ func (x *Placeholder) PDF(w io.Writer) error {
 
 	// method 2: If we can seek, write whitespace for now and fill in
 	// the actual value later.
-	if _, ok := x.pdf.origW.(io.WriteSeeker); ok {
-		x.pos = append(x.pos, x.pdf.w.pos)
+	if pdf, ok := x.pdf.(*Writer); ok {
+		if _, ok := pdf.origW.(io.WriteSeeker); ok {
+			x.pos = append(x.pos, pdf.w.pos)
 
-		buf := bytes.Repeat([]byte{' '}, x.size)
-		_, err := w.Write(buf)
-		return err
+			buf := bytes.Repeat([]byte{' '}, x.size)
+			_, err := w.Write(buf)
+			return err
+		}
 	}
 
 	// method 3: If all else fails, use an indirect reference.
@@ -766,9 +768,11 @@ func (x *Placeholder) Set(val Object) error {
 		return nil
 	}
 
-	x.pdf.w.Flush()
+	pdf := x.pdf.(*Writer)
 
-	fill := x.pdf.origW.(io.WriteSeeker)
+	pdf.w.Flush()
+
+	fill := pdf.origW.(io.WriteSeeker)
 	currentPos, err := fill.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err

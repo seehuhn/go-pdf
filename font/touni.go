@@ -123,7 +123,7 @@ type CIDMapping struct {
 
 // WriteToUnicodeCID writes the ToUnicode stream for a CIDFont.
 // This modifies mm.
-func WriteToUnicodeCID(ref pdf.Reference, w *pdf.Writer, mm []CIDMapping) error {
+func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
 	data := &tounicode.Info{
 		Name: "Adobe-Identity-UCS",
 		ROS: &type1.CIDSystemInfo{
