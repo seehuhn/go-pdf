@@ -118,7 +118,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	// TODO(voss): unify as much code as possible with NewReader
 
 	if opt == nil {
-		opt = defaultReaderOptions
+		opt = &ReaderOptions{}
 	}
 
 	r := &Reader{
@@ -130,7 +130,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Version = version
+	r.meta.Version = version
 
 	r.xref = fi.makeXRef()
 
@@ -146,10 +146,10 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 			if !ok {
 				break
 			}
-			r.ID = append(r.ID, []byte(s))
+			r.meta.ID = append(r.meta.ID, []byte(s))
 		}
-		if len(r.ID) != 2 {
-			r.ID = nil
+		if len(r.meta.ID) != 2 {
+			r.meta.ID = nil
 		}
 	}
 
@@ -181,14 +181,14 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Catalog = &Catalog{}
-	err = DecodeDict(r, r.Catalog, catalogDict)
-	if shouldExit(err) || r.Catalog.Pages == 0 {
+	r.meta.Catalog = &Catalog{}
+	err = DecodeDict(r, r.meta.Catalog, catalogDict)
+	if shouldExit(err) || r.meta.Catalog.Pages == 0 {
 		return nil, err
 	}
-	if r.Catalog.Version > r.Version {
-		// if unset, r.catalog.Version is zero and thus smaller than r.Version
-		r.Version = r.Catalog.Version
+	if r.meta.Catalog.Version > r.meta.Version {
+		// if unset, r.meta.Catalog.Version is zero and thus smaller than r.Version
+		r.meta.Version = r.meta.Catalog.Version
 	}
 
 	infoDict, err := GetDict(r, trailer["Info"])
@@ -196,8 +196,8 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		return nil, err
 	}
 	if infoDict != nil {
-		r.Info = &Info{}
-		err = DecodeDict(r, r.Info, infoDict)
+		r.meta.Info = &Info{}
+		err = DecodeDict(r, r.meta.Info, infoDict)
 		if shouldExit(err) {
 			return nil, err
 		}

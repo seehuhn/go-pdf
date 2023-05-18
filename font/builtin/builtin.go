@@ -215,7 +215,7 @@ func (e *embedded) Close() error {
 	if enc != nil {
 		Font["Encoding"] = enc
 	}
-	if e.w.Version() == pdf.V1_0 {
+	if e.w.GetMeta().Version == pdf.V1_0 {
 		Font["Name"] = e.resName
 	}
 

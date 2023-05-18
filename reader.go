@@ -23,50 +23,14 @@ import (
 	"os"
 )
 
-// Reader represents a pdf file opened for reading.  Use [Open] or
-// [NewReader] to create a Reader.
-type Reader struct {
-	// Version is the PDF version used in this file.  This is specified in
-	// the initial comment at the start of the file, and may be overridden by
-	// the /Version entry in the document catalog.
-	Version Version
-
-	// The ID of the file.  This is either a slice of two byte slices (the
-	// original ID of the file, and the ID of the current version), or nil if
-	// the file does not specify an ID.
-	ID [][]byte
-
-	// Catalog is the document catalog for this file.
-	Catalog *Catalog
-
-	// Info is the document information dictionary for this file.
-	// This is nil if the file does not contain a document information
-	// dictionary.
-	Info *Info
-
-	Trailer Dict
-
-	// Errors is a list of errors encountered while opening the file.
-	// This is only used if the ErrorHandling option is set to
-	// ErrorHandlingReport.
-	Errors []*MalformedFileError
-
-	r          io.ReadSeeker
-	needsClose bool
-
-	xref map[uint32]*xRefEntry
-
-	enc         *encryptInfo
-	unencrypted map[Reference]bool
-}
-
+// ReaderOptions provides additional information for opening a PDF file.
 type ReaderOptions struct {
 	// ReadPassword is a function that queries the user for a password for the
 	// document with the given ID.  The function is called repeatedly, with
 	// sequentially increasing values of try (starting at 0), until the correct
 	// password is entered.  If the function returns the empty string, the
-	// authentication attempt is aborted and an [AuthenticationError] is
-	// reported to the caller.
+	// authentication attempt is aborted and [AuthenticationError] is reported
+	// to the caller.
 	ReadPassword func(ID []byte, try int) string
 
 	ErrorHandling ReaderErrorHandling
@@ -89,7 +53,24 @@ const (
 	ErrorHandlingStop
 )
 
-var defaultReaderOptions = &ReaderOptions{}
+// Reader represents a pdf file opened for reading.  Use [Open] or
+// [NewReader] to create a Reader.
+type Reader struct {
+	meta MetaInfo
+
+	r      io.ReadSeeker
+	closeR bool
+
+	xref map[uint32]*xRefEntry
+
+	enc         *encryptInfo
+	unencrypted map[Reference]bool
+
+	// Errors is a list of errors encountered while opening the file.
+	// This is only used if the ErrorHandling option is set to
+	// ErrorHandlingReport.
+	Errors []*MalformedFileError
+}
 
 // Open opens the named PDF file for reading.  After use, [Reader.Close] must
 // be called to close the file the Reader is reading from.
@@ -103,14 +84,14 @@ func Open(fname string, opt *ReaderOptions) (*Reader, error) {
 		fd.Close()
 		return nil, err
 	}
-	r.needsClose = true
+	r.closeR = true
 	return r, nil
 }
 
 // NewReader creates a new Reader object.
 func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	if opt == nil {
-		opt = defaultReaderOptions
+		opt = &ReaderOptions{}
 	}
 
 	r := &Reader{
@@ -126,18 +107,17 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.Version = version
+	r.meta.Version = version
 
-	// Install a dummy xref table first, so that we don't crash if the trailer
-	// dictionary attempts to use indirect objects.
+	// Install a dummy xref table first, so that we don't crash if an invalid
+	// trailer dictionary attempts to use indirect objects.
 	r.xref = make(map[uint32]*xRefEntry)
 
 	xref, trailer, err := r.readXRef()
 	if err != nil {
 		return nil, wrap(err, "xref")
 	}
-	// Now we can install the real xref table.
-	r.xref = xref
+	r.xref = xref // Now we can install the real xref table.
 
 	shouldExit := func(err error) bool {
 		if err == nil {
@@ -153,11 +133,11 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 
 	IDObj := trailer["ID"]
-	r.ID = getIDDirect(IDObj)
+	r.meta.ID = getIDDirect(IDObj)
 	if encObj, ok := trailer["Encrypt"]; ok {
 		// If the file is encrypted, ID is guaranteed to be a direct object.
-		if r.ID == nil {
-			return nil, errors.New("file is encrypted, but has no ID")
+		if r.meta.ID == nil {
+			return nil, errors.New("file is encrypted, but no ID found")
 		}
 		if ref, ok := encObj.(Reference); ok {
 			r.unencrypted[ref] = true
@@ -166,22 +146,20 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		if err != nil {
 			return nil, wrap(err, "encryption dictionary")
 		}
-	} else if r.ID == nil && IDObj != nil {
+	} else if r.meta.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
-		r.ID, err = r.getID(IDObj)
+		r.meta.ID, err = r.getID(IDObj)
 		if shouldExit(err) {
 			return nil, err
 		}
 	}
-	for _, id := range r.ID {
+	for _, id := range r.meta.ID {
 		if len(id) < 16 {
-			err := &MalformedFileError{
-				Err: errShortID,
-			}
+			err := &MalformedFileError{Err: errInvalidID}
 			if shouldExit(err) {
 				return nil, err
 			} else {
-				r.ID = nil
+				r.meta.ID = nil
 				break
 			}
 		}
@@ -194,14 +172,15 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 			return nil, err
 		}
 	}
-	r.Catalog = &Catalog{}
-	err = DecodeDict(r, r.Catalog, catalogDict)
-	if shouldExit(err) || (err != nil && opt.ErrorHandling == ErrorHandlingRecover && r.Catalog.Pages == 0) {
+	r.meta.Catalog = &Catalog{}
+	err = DecodeDict(r, r.meta.Catalog, catalogDict)
+	if shouldExit(err) {
 		return nil, err
+	} else if opt.ErrorHandling == ErrorHandlingRecover && r.meta.Catalog.Pages == 0 {
+		return nil, errors.New("no pages found in document catalog")
 	}
-	if r.Catalog.Version > r.Version {
-		// if unset, r.catalog.Version is zero and thus smaller than r.Version
-		r.Version = r.Catalog.Version
+	if r.meta.Catalog.Version > r.meta.Version {
+		r.meta.Version = r.meta.Catalog.Version
 	}
 
 	infoDict, err := GetDict(r, trailer["Info"])
@@ -209,8 +188,8 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		return nil, err
 	}
 	if infoDict != nil {
-		r.Info = &Info{}
-		err = DecodeDict(r, r.Info, infoDict)
+		r.meta.Info = &Info{}
+		err = DecodeDict(r, r.meta.Info, infoDict)
 		if shouldExit(err) {
 			return nil, err
 		}
@@ -222,15 +201,16 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	delete(trailer, "Type")
 	delete(trailer, "Index")
 	delete(trailer, "W")
-	r.Trailer = trailer
+	r.meta.Trailer = trailer
 
 	return r, nil
 }
 
-// Close closes the file underlying the reader.  This call only has an effect
-// if the Reader was created by [Open].
+// Close closes the Reader.
+//
+// This call only has an effect if the Reader was created by [Open].
 func (r *Reader) Close() error {
-	if r.needsClose {
+	if r.closeR {
 		err := r.r.(io.Closer).Close()
 		if err != nil {
 			return err
@@ -269,9 +249,8 @@ func (r *Reader) Authenticate(perm Perm) error {
 	return err
 }
 
-// GetCatalog implements the [Getter] interface.
-func (r *Reader) GetCatalog() *Catalog {
-	return r.Catalog
+func (r *Reader) GetMeta() *MetaInfo {
+	return &r.meta
 }
 
 // GetObject reads an indirect object from the PDF file.  If the object is not
@@ -412,7 +391,7 @@ func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 
 	v := V1_2
 	if r != nil {
-		v = r.Version
+		v = r.meta.Version
 	}
 
 	out := x.R
@@ -431,7 +410,7 @@ func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
 // Filters extracts the information contained in the /Filter and /DecodeParms
 // entries of the stream dictionary.
 //
-// TODO(voss): remove
+// TODO(voss): remove?
 func (r *Reader) getFilters(x *Stream) ([]Filter, error) {
 	decodeParams, err := r.resolveNoObjStreams(x.Dict["DecodeParms"])
 	if err != nil {
@@ -486,27 +465,11 @@ func (r *Reader) getFilters(x *Stream) ([]Filter, error) {
 	return res, nil
 }
 
-func (r *Reader) getID(obj Object) ([][]byte, error) {
-	arr, err := GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	if len(arr) != 2 {
-		return nil, &MalformedFileError{
-			Err: errors.New("invalid ID"),
-		}
-	}
-	id := make([][]byte, 2)
-	for i, obj := range arr {
-		s, err := GetString(r, obj)
-		if err != nil {
-			return nil, err
-		}
-		id[i] = []byte(s)
-	}
-	return id, nil
-}
-
+// getIDDirect tries to extract the ID from an object without resolving
+// references to indirect objects.  If the object is not a valid ID, or if it
+// contains indirect references, nil is returned.
+//
+// This is only used before the encryption dictionary is parsed.
 func getIDDirect(obj Object) [][]byte {
 	if obj == nil {
 		return nil
@@ -524,6 +487,27 @@ func getIDDirect(obj Object) [][]byte {
 		id[i] = []byte(s)
 	}
 	return id
+}
+
+func (r *Reader) getID(obj Object) ([][]byte, error) {
+	arr, err := GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+	if len(arr) != 2 {
+		return nil, &MalformedFileError{
+			Err: errInvalidID,
+		}
+	}
+	id := make([][]byte, 2)
+	for i, obj := range arr {
+		s, err := GetString(r, obj)
+		if err != nil {
+			return nil, err
+		}
+		id[i] = []byte(s)
+	}
+	return id, nil
 }
 
 type objStm struct {
@@ -658,7 +642,7 @@ func (r *Reader) scannerFrom(pos int64) (*scanner, error) {
 
 // TODO(voss): find a better name for this
 type Getter interface {
-	GetCatalog() *Catalog
+	GetMeta() *MetaInfo
 	GetObject(Reference) (Object, error)
 }
 

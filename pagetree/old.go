@@ -27,8 +27,9 @@ type OldReader struct {
 	root pdf.Dict
 }
 
+// TODO(voss): remove
 func NewOldReader(r *pdf.Reader) (*OldReader, error) {
-	root, err := pdf.GetDict(r, r.Catalog.Pages)
+	root, err := pdf.GetDict(r, r.GetMeta().Catalog.Pages)
 	if err != nil {
 		return nil, err
 	}

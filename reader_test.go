@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestObjectStream(t *testing.T) {
@@ -441,6 +442,69 @@ func TestReaderGoFuzz(t *testing.T) {
 	}
 }
 
+// FuzzReader tests that NewReader does not panic on random inputs.
+func FuzzReader(f *testing.F) {
+	vv := []Version{V1_0, V1_1, V1_2, V1_3, V1_4,
+		V1_5, V1_6, V1_7, V2_0}
+	buf := &bytes.Buffer{}
+	for i := 0; i < 5; i++ {
+		for _, V := range vv {
+			buf.Reset()
+
+			opt := &WriterOptions{
+				Version: V,
+			}
+			w, err := NewWriter(buf, opt)
+			if err != nil {
+				f.Fatal(err)
+			}
+			err = addPage(w)
+			if err != nil {
+				f.Fatal(err)
+			}
+			switch i {
+			case 0:
+				// pass
+			case 1:
+				w.meta.Info.Title = "test"
+			case 2:
+				w.meta.Info.ModDate = time.Now()
+			case 3:
+				w.meta.Catalog.AA = Dict{
+					"O": Integer(1),
+				}
+			case 4:
+				err = w.Put(w.Alloc(), String("AAAAAAAAAAAAAAAAAA"))
+				if err != nil {
+					f.Fatal(err)
+				}
+			}
+			err = w.Close()
+			if err != nil {
+				f.Fatal(err)
+			}
+
+			new := make([]byte, buf.Len())
+			copy(new, buf.Bytes())
+			f.Add(new)
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, in []byte) {
+		buf := bytes.NewReader(in)
+		r, err := NewReader(buf, nil)
+		if err != nil {
+			return
+		}
+		for key, entry := range r.xref {
+			if entry.IsFree() {
+				continue
+			}
+			r.GetObject(NewReference(key, entry.Generation))
+		}
+	})
+}
+
 func addPage(w *Writer, args ...Object) error {
 	pRef := w.Alloc()
 	ppRef := w.Alloc()
@@ -465,7 +529,7 @@ func addPage(w *Writer, args ...Object) error {
 	if err != nil {
 		return err
 	}
-	w.Catalog.Pages = ppRef
+	w.GetMeta().Catalog.Pages = ppRef
 	return nil
 }
 

@@ -105,7 +105,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	out.GetCatalog().Pages = ref
+	out.GetMeta().Catalog.Pages = ref
 
 	err = out.Close()
 	if err != nil {

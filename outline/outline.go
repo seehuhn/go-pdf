@@ -39,7 +39,7 @@ func (tree *Tree) AddChild(title string) *Tree {
 }
 
 func Read(r *pdf.Reader) (*Tree, error) {
-	root := r.Catalog.Outlines
+	root := r.GetMeta().Catalog.Outlines
 	if root == 0 {
 		return nil, nil
 	}
@@ -143,7 +143,7 @@ func (tree *Tree) Write(w *pdf.Writer) error {
 		return err
 	}
 
-	w.GetCatalog().Outlines = rootRef
+	w.GetMeta().Catalog.Outlines = rootRef
 	return nil
 }
 

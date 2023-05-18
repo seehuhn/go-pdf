@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -174,6 +175,63 @@ func TestStream(t *testing.T) {
 	}
 	if string(dataOut) != dataIn {
 		t.Errorf("wrong result:\n  %q\n  %q", dataIn, dataOut)
+	}
+}
+
+func TestPlaceholder(t *testing.T) {
+	const testVal = 12345
+
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.pdf")
+
+	w, err := Create(tmpFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
+
+	length := NewPlaceholder(w, 5)
+	testRef := w.Alloc()
+	err = w.Put(testRef, Dict{
+		"Test":   Bool(true),
+		"Length": length,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if length.ref != 0 {
+		t.Error("failed to detect that file is seekable")
+	}
+
+	err = length.Set(Integer(testVal))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// try to read back the file
+
+	r, err := Open(tmpFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := GetDict(r, testRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lengthOut, err := GetInt(r, obj["Length"])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if lengthOut != testVal {
+		t.Errorf("wrong /Length: %d vs %d", lengthOut, testVal)
 	}
 }
 

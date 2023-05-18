@@ -89,6 +89,11 @@ fieldLoop:
 			}
 		case fVal.Kind() == reflect.Bool:
 			res[key] = Bool(fVal.Bool())
+		case fInfo.Type == referenceType:
+			ref := fVal.Interface().(Reference)
+			if ref != 0 {
+				res[key] = ref
+			}
 		default:
 			if fVal.CanInterface() {
 				res[key] = fVal.Interface().(Object)
@@ -271,91 +276,14 @@ fieldLoop:
 }
 
 var (
-	objectType   = reflect.TypeOf((*Object)(nil)).Elem()
-	refType      = reflect.TypeOf(Reference(0))
-	nameType     = reflect.TypeOf(Name(""))
-	versionType  = reflect.TypeOf(V1_7)
-	timeType     = reflect.TypeOf(time.Time{})
-	languageType = reflect.TypeOf(language.Tag{})
+	objectType    = reflect.TypeOf((*Object)(nil)).Elem()
+	refType       = reflect.TypeOf(Reference(0))
+	nameType      = reflect.TypeOf(Name(""))
+	versionType   = reflect.TypeOf(V1_7)
+	timeType      = reflect.TypeOf(time.Time{})
+	languageType  = reflect.TypeOf(language.Tag{})
+	referenceType = reflect.TypeOf(Reference(0))
 )
-
-// Catalog represents a PDF Document Catalog.  The only required field in this
-// structure is Pages, which specifies the root of the page tree.
-// This struct can be used with the [DecodeDict] and [AsDict] functions.
-//
-// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
-type Catalog struct {
-	_                 struct{} `pdf:"Type=Catalog"`
-	Version           Version  `pdf:"optional"`
-	Extensions        Object   `pdf:"optional"`
-	Pages             Reference
-	PageLabels        Object       `pdf:"optional"`
-	Names             Object       `pdf:"optional"`
-	Dests             Object       `pdf:"optional"`
-	ViewerPreferences Object       `pdf:"optional"`
-	PageLayout        Name         `pdf:"optional"`
-	PageMode          Name         `pdf:"optional"`
-	Outlines          Reference    `pdf:"optional"`
-	Threads           Reference    `pdf:"optional"`
-	OpenAction        Object       `pdf:"optional"`
-	AA                Object       `pdf:"optional"`
-	URI               Object       `pdf:"optional"`
-	AcroForm          Object       `pdf:"optional"`
-	MetaData          Reference    `pdf:"optional"`
-	StructTreeRoot    Object       `pdf:"optional"`
-	MarkInfo          Object       `pdf:"optional"`
-	Lang              language.Tag `pdf:"optional"`
-	SpiderInfo        Object       `pdf:"optional"`
-	OutputIntents     Object       `pdf:"optional"`
-	PieceInfo         Object       `pdf:"optional"`
-	OCProperties      Object       `pdf:"optional"`
-	Perms             Object       `pdf:"optional"`
-	Legal             Object       `pdf:"optional"`
-	Requirements      Object       `pdf:"optional"`
-	Collection        Object       `pdf:"optional"`
-	NeedsRendering    bool         `pdf:"optional"`
-}
-
-// Info represents a PDF Document Information Dictionary.
-// All fields in this structure are optional.
-//
-// The Document Information Dictionary is documented in section
-// 14.3.3 of PDF 32000-1:2008.
-type Info struct {
-	Title    string `pdf:"text string,optional"`
-	Author   string `pdf:"text string,optional"`
-	Subject  string `pdf:"text string,optional"`
-	Keywords string `pdf:"text string,optional"`
-
-	// Creator gives the name of the application that created the original
-	// document, if the document was converted to PDF from another format.
-	Creator string `pdf:"text string,optional"`
-
-	// Producer gives the name of the application that converted the document,
-	// if the document was converted to PDF from another format.
-	Producer string `pdf:"text string,optional"`
-
-	// CreationDate gives the date and time the document was created.
-	CreationDate time.Time `pdf:"optional"`
-
-	// ModDate gives the date and time the document was most recently modified.
-	ModDate time.Time `pdf:"optional"`
-
-	// Trapped indicates whether the document has been modified to include
-	// trapping information.  (A trap is an overlap between adjacent areas of
-	// of different colours, used to avoid visual problems caused by imprecise
-	// alignment of different layers of ink.) Possible values are:
-	//   * "True": The document has been fully trapped.  No further trapping is
-	//     necessary.
-	//   * "False": The document has not been trapped.
-	//   * "Unknown" (default): Either it is unknown whether the document has
-	//     been trapped, or the document has been partially trapped.  Further
-	//     trapping may be necessary.
-	Trapped Name `pdf:"optional,allowstring"`
-
-	// Custom contains all non-standard fields in the Info dictionary.
-	Custom map[string]string `pdf:"extra"`
-}
 
 // Resources describes a PDF Resource Dictionary.
 // See section 7.8.3 of PDF 32000-1:2008 for details.

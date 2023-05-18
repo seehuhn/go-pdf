@@ -74,7 +74,7 @@ func (doc *MultiPage) Close() error {
 	if err != nil {
 		return err
 	}
-	doc.Out.Catalog.Pages = ref
+	doc.Out.GetMeta().Catalog.Pages = ref
 
 	err = doc.Out.Close()
 	if err != nil {

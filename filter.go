@@ -410,37 +410,6 @@ type flateFilter struct {
 	IsLZW            bool
 }
 
-func newFlateFilter(parms Dict, isLZW bool) *flateFilter {
-	res := &flateFilter{ // set defaults
-		Predictor:        1,
-		Colors:           1,
-		BitsPerComponent: 8,
-		Columns:          1,
-		EarlyChange:      true,
-		IsLZW:            isLZW,
-	}
-	if parms == nil {
-		return res
-	}
-
-	if val, ok := parms["Predictor"].(Integer); ok {
-		res.Predictor = int(val)
-	}
-	if val, ok := parms["Colors"].(Integer); ok {
-		res.Colors = int(val)
-	}
-	if val, ok := parms["BitsPerComponent"].(Integer); ok {
-		res.BitsPerComponent = int(val)
-	}
-	if val, ok := parms["Columns"].(Integer); ok {
-		res.Columns = int(val)
-	}
-	if val, ok := parms["EarlyChange"].(Integer); ok {
-		res.EarlyChange = (val != 0)
-	}
-	return res
-}
-
 func (ff *flateFilter) ToDict() Dict {
 	res := Dict{}
 	if ff.Predictor != 1 {
@@ -896,4 +865,37 @@ type withClose struct {
 
 func (w *withClose) Close() error {
 	return w.close()
+}
+
+func appendFilter(dict Dict, name Name, parms Dict) {
+	switch filter := dict["Filter"].(type) {
+	case Name:
+		dict["Filter"] = Array{filter, name}
+		p0, _ := dict["DecodeParms"].(Dict)
+		if len(p0)+len(parms) > 0 {
+			dict["DecodeParms"] = Array{p0, parms}
+		}
+
+	case Array:
+		dict["Filter"] = append(filter, name)
+		pp, _ := dict["DecodeParms"].(Array)
+		needsParms := len(parms) > 0
+		for i := 0; i < len(pp) && !needsParms; i++ {
+			pi, _ := pp[i].(Dict)
+			needsParms = len(pi) > 0
+		}
+		if needsParms {
+			for len(pp) < len(filter) {
+				pp = append(pp, nil)
+			}
+			pp := pp[:len(filter)]
+			dict["DecodeParms"] = append(pp, parms)
+		}
+
+	default:
+		dict["Filter"] = name
+		if len(parms) > 0 {
+			dict["DecodeParms"] = parms
+		}
+	}
 }

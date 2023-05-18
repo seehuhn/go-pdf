@@ -86,7 +86,7 @@ type explainer struct {
 }
 
 func (e *explainer) locate(desc ...string) (pdf.Object, error) {
-	var obj pdf.Object = pdf.AsDict(e.r.Catalog)
+	var obj pdf.Object = pdf.AsDict(e.r.GetMeta().Catalog)
 
 	debug := false
 
@@ -106,7 +106,7 @@ func (e *explainer) locate(desc ...string) (pdf.Object, error) {
 		case key == "":
 			return nil, errors.New("empty selector")
 		case key == "@info":
-			obj = pdf.AsDict(e.r.Info)
+			obj = pdf.AsDict(e.r.GetMeta().Info)
 		case key[0] == '@':
 			ff := strings.Split(key[1:], ".")
 			if len(ff) > 2 {

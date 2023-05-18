@@ -121,13 +121,13 @@ func main() {
 	defer out.Close()
 
 	w, err := pdf.NewWriter(out, &pdf.WriterOptions{
-		Version: r.Version,
+		Version: r.GetMeta().Version,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	catalog := r.Catalog
+	catalog := r.GetMeta().Catalog
 
 	trans := &walker{
 		trans: map[pdf.Reference]pdf.Reference{},
@@ -148,9 +148,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	trans.w.SetInfo(r.Info)
-
-	trans.w.Catalog = catalog
+	trans.w.GetMeta().Info = r.GetMeta().Info
+	trans.w.GetMeta().Catalog = catalog
 
 	err = w.Close()
 	if err != nil {

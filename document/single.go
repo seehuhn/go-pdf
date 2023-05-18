@@ -63,7 +63,7 @@ func closePage(p *Page) error {
 	if err != nil {
 		return err
 	}
-	p.Out.Catalog.Pages = ref
+	p.Out.GetMeta().Catalog.Pages = ref
 
 	return p.Out.Close()
 }

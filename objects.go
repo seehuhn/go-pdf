@@ -521,10 +521,110 @@ func (x Reference) PDF(w io.Writer) error {
 	return err
 }
 
-func writeObject(w io.Writer, obj Object) error {
-	if obj == nil {
-		_, err := w.Write([]byte("null"))
+// A Placeholder is a space reserved in a PDF file that can later be filled
+// with a value.  One common use case is to store the length of compressed
+// content in a PDF stream dictionary.  To create Placeholder objects,
+// use the [Writer.NewPlaceholder] method.
+type Placeholder struct {
+	value []byte
+	size  int
+
+	pdf Putter
+	pos []int64
+	ref Reference
+}
+
+// NewPlaceholder creates a new placeholder for a value which is not yet known.
+// The argument size must be an upper bound to the length of the replacement
+// text.  Once the value becomes known, it can be filled in using the
+// [Placeholder.Set] method.
+func NewPlaceholder(pdf Putter, size int) *Placeholder {
+	return &Placeholder{
+		size: size,
+		pdf:  pdf,
+	}
+}
+
+// PDF implements the [Object] interface.
+func (x *Placeholder) PDF(w io.Writer) error {
+	// method 1: If the value is already known, we can just write it to the
+	// file.
+	if x.value != nil {
+		_, err := w.Write(x.value)
 		return err
 	}
-	return obj.PDF(w)
+
+	// method 2: If we can seek, write whitespace for now and fill in
+	// the actual value later.
+	if pdf, ok := x.pdf.(*Writer); ok {
+		if _, ok := pdf.origW.(io.WriteSeeker); ok {
+			x.pos = append(x.pos, pdf.w.pos)
+
+			buf := bytes.Repeat([]byte{' '}, x.size)
+			_, err := w.Write(buf)
+			return err
+		}
+	}
+
+	// method 3: If all else fails, use an indirect reference.
+	x.ref = x.pdf.Alloc()
+	buf := &bytes.Buffer{}
+	err := x.ref.PDF(buf)
+	if err != nil {
+		return err
+	}
+	x.value = buf.Bytes()
+	_, err = w.Write(x.value)
+	return err
+}
+
+// Set fills in the value of the placeholder object.  This should be called
+// as soon as possible after the value becomes known.
+func (x *Placeholder) Set(val Object) error {
+	if x.ref != 0 {
+		pdf := x.pdf
+		err := pdf.Put(x.ref, val)
+		if err != nil {
+			return fmt.Errorf("Placeholder.Set: %w", err)
+		}
+		return nil
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, x.size))
+	err := val.PDF(buf)
+	if err != nil {
+		return err
+	}
+	if buf.Len() > x.size {
+		return errors.New("Placeholder: replacement text too long")
+	}
+	x.value = buf.Bytes()
+
+	if len(x.pos) == 0 {
+		return nil
+	}
+
+	pdf := x.pdf.(*Writer)
+
+	pdf.w.Flush()
+
+	fill := pdf.origW.(io.WriteSeeker)
+	currentPos, err := fill.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	for _, pos := range x.pos {
+		_, err = fill.Seek(pos, io.SeekStart)
+		if err != nil {
+			return err
+		}
+		_, err = fill.Write(x.value)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = fill.Seek(currentPos, io.SeekStart)
+	return err
 }

@@ -26,10 +26,8 @@ import (
 
 // Data is an in-memory representation of a PDF document.
 type Data struct {
-	version Version
-	Catalog *Catalog
-	Info    *Info
-	ID      [][]byte
+	meta MetaInfo
+
 	Objects map[Reference]Object
 
 	autoclose map[Reference]Resource
@@ -43,10 +41,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 	}
 
 	res := &Data{
-		version: pdf.Version,
-		Catalog: pdf.Catalog,
-		Info:    pdf.Info,
-		ID:      pdf.ID,
+		meta:    pdf.meta,
 		Objects: map[Reference]Object{},
 
 		autoclose: map[Reference]Resource{},
@@ -73,7 +68,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 			return nil, err
 		}
 		if _, isDict := obj.(Dict); isDict {
-			if pdf.Trailer["Root"] == ref || pdf.Trailer["Info"] == ref {
+			if pdf.meta.Trailer["Root"] == ref || pdf.meta.Trailer["Info"] == ref {
 				continue
 			}
 		}
@@ -99,15 +94,16 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 // Write writes the PDF document to w.
 func (d *Data) Write(w io.Writer) error {
 	opt := &WriterOptions{
-		Version: d.version,
-		ID:      d.ID,
+		Version: d.meta.Version,
+		ID:      d.meta.ID,
 	}
 	pdf, err := NewWriter(w, opt)
 	if err != nil {
 		return err
 	}
-	pdf.Catalog = d.Catalog
-	pdf.SetInfo(d.Info)
+	meta := pdf.GetMeta()
+	meta.Catalog = d.meta.Catalog
+	meta.Info = d.meta.Info
 
 	refs := maps.Keys(d.Objects)
 	sort.Slice(refs, func(i, j int) bool {
@@ -151,12 +147,8 @@ func (d *Data) Close() error {
 	return nil
 }
 
-func (d *Data) Version() Version {
-	return d.version
-}
-
-func (d *Data) GetCatalog() *Catalog {
-	return d.Catalog
+func (d *Data) GetMeta() *MetaInfo {
+	return &d.meta
 }
 
 // Alloc allocates an object number for an indirect object.
@@ -203,12 +195,12 @@ func (d *Data) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Write
 	var w io.WriteCloser = &dataStreamWriter{s: s}
 	var err error
 	for _, filter := range filters {
-		w, err = filter.Encode(d.version, w)
+		w, err = filter.Encode(d.meta.Version, w)
 		if err != nil {
 			return nil, err
 		}
 
-		name, parms, err := filter.Info(d.version)
+		name, parms, err := filter.Info(d.meta.Version)
 		if err != nil {
 			return nil, err
 		}

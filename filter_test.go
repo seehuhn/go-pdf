@@ -22,6 +22,38 @@ import (
 	"testing"
 )
 
+// TODO(voss): remove
+func newFlateFilter(parms Dict, isLZW bool) *flateFilter {
+	res := &flateFilter{ // set defaults
+		Predictor:        1,
+		Colors:           1,
+		BitsPerComponent: 8,
+		Columns:          1,
+		EarlyChange:      true,
+		IsLZW:            isLZW,
+	}
+	if parms == nil {
+		return res
+	}
+
+	if val, ok := parms["Predictor"].(Integer); ok {
+		res.Predictor = int(val)
+	}
+	if val, ok := parms["Colors"].(Integer); ok {
+		res.Colors = int(val)
+	}
+	if val, ok := parms["BitsPerComponent"].(Integer); ok {
+		res.BitsPerComponent = int(val)
+	}
+	if val, ok := parms["Columns"].(Integer); ok {
+		res.Columns = int(val)
+	}
+	if val, ok := parms["EarlyChange"].(Integer); ok {
+		res.EarlyChange = (val != 0)
+	}
+	return res
+}
+
 func TestFlate(t *testing.T) {
 	parmsss := []Dict{
 		nil,

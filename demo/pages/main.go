@@ -157,9 +157,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	out.GetCatalog().Pages = ref
+	out.GetMeta().Catalog.Pages = ref
 
-	out.GetCatalog().PageLabels = pdf.Dict{
+	out.GetMeta().Catalog.PageLabels = pdf.Dict{
 		"Nums": pdf.Array{
 			pdf.Integer(0),
 			pdf.Dict{

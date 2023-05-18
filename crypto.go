@@ -49,7 +49,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	if err != nil {
 		return nil, err
 	}
-	if len(r.ID) != 2 {
+	if len(r.meta.ID) != 2 {
 		return nil, &MalformedFileError{Err: errors.New("found Encrypt but no ID")}
 	}
 
@@ -140,7 +140,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 
 	switch {
 	case filter == "Standard":
-		sec, err := openStdSecHandler(enc, keyBytes, r.ID[0], readPwd)
+		sec, err := openStdSecHandler(enc, keyBytes, r.meta.ID[0], readPwd)
 		if err != nil {
 			return nil, wrap(err, "standard security handler")
 		}

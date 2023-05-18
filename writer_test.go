@@ -19,7 +19,6 @@ package pdf
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -36,20 +35,20 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encryptDict, err := w.w.enc.AsDict(w.version)
+	encryptDict, err := w.w.enc.AsDict(w.meta.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
 	encInfo1 := format(encryptDict)
 
 	author := "Jochen Voß"
-	w.SetInfo(&Info{
+	w.GetMeta().Info = &Info{
 		Title:        "PDF Test Document",
 		Author:       author,
 		Subject:      "Testing",
 		Keywords:     "PDF, testing, Go",
 		CreationDate: time.Now(),
-	})
+	}
 
 	refs := []Reference{w.Alloc()}
 	err = w.WriteCompressed(refs,
@@ -64,8 +63,8 @@ func TestWriter(t *testing.T) {
 	}
 	font := refs[0]
 
-	contentNode := w.Alloc()
-	stream, err := w.OpenStream(contentNode, Dict{})
+	contentRef := w.Alloc()
+	stream, err := w.OpenStream(contentRef, Dict{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +98,7 @@ ET
 		"Type":      Name("Page"),
 		"MediaBox":  Array{Integer(0), Integer(0), Integer(200), Integer(100)},
 		"Resources": resources,
-		"Contents":  contentNode,
+		"Contents":  contentRef,
 		"Parent":    pagesRef,
 	})
 	if err != nil {
@@ -113,7 +112,7 @@ ET
 		t.Fatal(err)
 	}
 
-	w.Catalog.Pages = pagesRef
+	w.GetMeta().Catalog.Pages = pagesRef
 
 	err = w.Close()
 	if err != nil {
@@ -127,7 +126,7 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	encryptDict, err = r.enc.AsDict(w.version)
+	encryptDict, err = r.enc.AsDict(w.meta.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +145,7 @@ ET
 		t.Fatal(err)
 	}
 
-	if x := r.Info.Author; x != author {
+	if x := r.meta.Info.Author; x != author {
 		t.Error("wrong author " + x)
 	}
 }
@@ -173,9 +172,9 @@ func TestClose(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		out.closeDownstream = doClose
+		out.closeOrigW = doClose
 
-		out.Catalog.Pages = out.Alloc() // pretend we have pages
+		out.GetMeta().Catalog.Pages = out.Alloc() // pretend we have pages
 
 		err = out.Close()
 		if err != nil {
@@ -185,63 +184,6 @@ func TestClose(t *testing.T) {
 		if doClose != w.isClosed {
 			t.Errorf("expected %v, got %v", doClose, w.isClosed)
 		}
-	}
-}
-
-func TestPlaceholder(t *testing.T) {
-	const testVal = 12345
-
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "test.pdf")
-
-	w, err := Create(tmpFile, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.Catalog.Pages = w.Alloc() // pretend we have pages
-
-	length := NewPlaceholder(w, 5)
-	testRef := w.Alloc()
-	err = w.Put(testRef, Dict{
-		"Test":   Bool(true),
-		"Length": length,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if length.ref != 0 {
-		t.Error("failed to detect that file is seekable")
-	}
-
-	err = length.Set(Integer(testVal))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = w.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// try to read back the file
-
-	r, err := Open(tmpFile, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	obj, err := GetDict(r, testRef)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	lengthOut, err := GetInt(r, obj["Length"])
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if lengthOut != testVal {
-		t.Errorf("wrong /Length: %d vs %d", lengthOut, testVal)
 	}
 }
 

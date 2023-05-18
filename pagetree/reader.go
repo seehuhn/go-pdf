@@ -50,7 +50,7 @@ type Reader struct {
 }
 
 func NewReader(r pdf.Getter) (*Reader, error) {
-	catalog := r.GetCatalog()
+	catalog := r.GetMeta().Catalog
 
 	res := &Reader{
 		r: r,

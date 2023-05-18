@@ -42,6 +42,29 @@ func TestCatalog(t *testing.T) {
 	}
 }
 
+func TestCatalogReadMissingPages(t *testing.T) {
+	ref := NewReference(123, 0)
+	catalogDict := Dict{
+		"MetaData": ref,
+	}
+	catalog := &Catalog{}
+	err := DecodeDict(nil, catalog, catalogDict)
+	if err == nil {
+		t.Errorf("missing Pages not detected")
+	}
+	if catalog.MetaData != ref {
+		t.Errorf("wrong MetaData: %v", catalog.MetaData)
+	}
+}
+
+func TestCatalogWriteMissingPages(t *testing.T) {
+	catalog := &Catalog{}
+	dict := AsDict(catalog)
+	if _, present := dict["Pages"]; present {
+		t.Errorf("missing Pages not ignored")
+	}
+}
+
 func TestInfo(t *testing.T) {
 	// test missing struct
 	var info0 *Info

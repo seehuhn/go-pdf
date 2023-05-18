@@ -47,8 +47,8 @@ func FuzzEncrypted(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		w.SetInfo(&pdf.Info{Title: "a string to encrypt"})
-		w.Catalog.Pages = w.Alloc() // pretend we have a page tree
+		w.GetMeta().Info.Title = "a string to encrypt"
+		w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have a page tree
 		err = w.Close()
 		if err != nil {
 			f.Fatal(err)

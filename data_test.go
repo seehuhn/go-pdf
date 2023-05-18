@@ -35,7 +35,7 @@ func FuzzReadWrite(f *testing.F) {
 	if err != nil {
 		f.Fatal(err)
 	}
-	w.Catalog.Pages = w.Alloc() // pretend we have a page tree
+	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have a page tree
 	err = w.Close()
 	if err != nil {
 		f.Fatal(err)
@@ -60,7 +60,7 @@ func FuzzReadWrite(f *testing.F) {
 	if err != nil {
 		f.Fatal(err)
 	}
-	w.Catalog.Pages = w.Alloc() // pretend we have a page tree
+	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have a page tree
 	objs := []pdf.Object{
 		pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)},
 		pdf.Bool(true),
@@ -127,4 +127,4 @@ func FuzzReadWrite(f *testing.F) {
 
 // compile time test
 var _ pdf.Getter = &pdf.Data{}
-var _ pdf.Putter = &pdf.Data{} // TODO(voss): add the missing methods
+var _ pdf.Putter = &pdf.Data{}

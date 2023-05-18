@@ -65,7 +65,7 @@ func TestSubtree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		w.GetCatalog().Pages = rootRef // pretend we have pages
+		w.GetMeta().Catalog.Pages = rootRef // pretend we have pages
 		err = w.Close()
 		if err != nil {
 			t.Fatal(err)
@@ -80,7 +80,7 @@ func TestSubtree(t *testing.T) {
 		}
 
 		test := pdf.Integer(0)
-		total, err := walk(r, r.Catalog.Pages, 0, &test)
+		total, err := walk(r, r.GetMeta().Catalog.Pages, 0, &test)
 		if err != nil {
 			t.Fatal(err)
 		} else if total != pdf.Integer(numPages) {

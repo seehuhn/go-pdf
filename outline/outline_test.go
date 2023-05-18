@@ -109,7 +109,7 @@ func TestReadLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		out.GetCatalog().Outlines = refRoot
+		out.GetMeta().Catalog.Outlines = refRoot
 
 		err = doc.Close()
 		if err != nil {

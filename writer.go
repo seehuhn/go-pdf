@@ -30,38 +30,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// Writer represents a PDF file open for writing.
-// Use the functions [Create] or [NewWriter] to create a new Writer.
-type Writer struct {
-	// Version is the PDF version used in this file.  This field is
-	// read-only.  Use the opt argument of NewWriter to set the PDF version for
-	// a new file.
-	version Version
-
-	// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
-	Catalog *Catalog
-
-	info *Info
-
-	w               *posWriter
-	origW           io.WriteCloser
-	closeDownstream bool
-
-	id      [][]byte
-	xref    map[uint32]*xRefEntry
-	nextRef uint32
-
-	inStream    bool
-	afterStream []refObject
-
-	autoclose map[Reference]Resource
-}
-
-type refObject struct {
-	ref Reference
-	obj Object
-}
-
 // WriterOptions allows to influence the way a PDF file is generated.
 type WriterOptions struct {
 	Version Version
@@ -76,6 +44,29 @@ var defaultWriterOptions = &WriterOptions{
 	Version: V1_7,
 }
 
+// Writer represents a PDF file open for writing.
+// Use [Create] or [NewWriter] to create a new Writer.
+type Writer struct {
+	meta MetaInfo
+
+	w          *posWriter
+	origW      io.Writer
+	closeOrigW bool
+
+	xref    map[uint32]*xRefEntry
+	nextRef uint32
+
+	inStream    bool
+	afterStream []allocatedObject
+
+	autoclose map[Reference]Resource
+}
+
+type allocatedObject struct {
+	ref Reference
+	obj Object
+}
+
 type Resource interface {
 	// Write writes the resource to the PDF file.  No changes can be
 	// made to the resource after it has been written.
@@ -84,10 +75,11 @@ type Resource interface {
 	Reference() Reference
 }
 
-// Create creates the named PDF file and opens it for output.  If a previous
-// file with the same name exists, it is overwritten.  After writing is
-// complete, [Writer.Close] must be called to write the trailer and to close the
-// underlying file.
+// Create creates a PDF file with the given name and opens it for output. If a
+// file with the same name already exists, it will be overwritten.
+//
+// After writing the content to the file, [Writer.Close] must be called to
+// write the PDF trailer and close the underlying file.
 func Create(name string, opt *WriterOptions) (*Writer, error) {
 	fd, err := os.Create(name)
 	if err != nil {
@@ -97,16 +89,14 @@ func Create(name string, opt *WriterOptions) (*Writer, error) {
 	if err != nil {
 		return nil, err
 	}
-	pdf.closeDownstream = true
+	pdf.closeOrigW = true
 	return pdf, nil
 }
 
-// NewWriter prepares a PDF file for writing.
+// NewWriter prepares a PDF file for writing, using the provided io.Writer.
 //
-// The [Writer.Close] method must be called after the file contents have been
-// written, to add the trailer and the cross reference table to the PDF file.
-// It is the callers responsibility, to close the writer w after
-// the pdf.Writer has been closed.
+// After writing the content to the file, [Writer.Close] must be called to
+// write the PDF trailer.
 func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
 		opt = defaultWriterOptions
@@ -116,43 +106,29 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if version == 0 {
 		version = defaultWriterOptions.Version
 	}
-	versionString, err := version.ToString()
+	versionString, err := version.ToString() // check for valid version
 	if err != nil {
 		return nil, err
 	}
 
-	var origW io.WriteCloser
-	if wc, ok := w.(io.WriteCloser); ok {
-		origW = wc
+	useEncryption := opt.UserPassword != "" || opt.OwnerPassword != ""
+	if useEncryption && version == V1_0 {
+		return nil, &VersionError{Operation: "PDF encryption", Earliest: V1_1}
+	}
+	needID := opt.ID != nil || useEncryption || version >= V2_0
+	if needID && version == V1_0 {
+		return nil, &VersionError{Operation: "PDF file identifiers", Earliest: V1_1}
 	}
 
-	ww, ok := w.(writeFlusher)
-	if !ok {
-		ww = bufio.NewWriter(w)
-	}
+	trailer := Dict{}
 
-	pdf := &Writer{
-		version: version,
-		Catalog: &Catalog{},
-
-		w:     &posWriter{w: ww},
-		origW: origW,
-
-		nextRef: 1,
-		xref:    make(map[uint32]*xRefEntry),
-
-		autoclose: make(map[Reference]Resource),
-	}
-	pdf.xref[0] = &xRefEntry{
-		Pos:        -1,
-		Generation: 65535,
-	}
-
-	needID := opt.ID != nil ||
-		version >= V2_0 ||
-		opt.UserPassword != "" ||
-		opt.OwnerPassword != ""
+	var ID [][]byte
 	if needID {
+		for _, id := range opt.ID {
+			if len(id) < 16 {
+				return nil, errInvalidID
+			}
+		}
 		switch len(opt.ID) {
 		case 0:
 			id := make([]byte, 16)
@@ -160,47 +136,37 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			if err != nil {
 				return nil, err
 			}
-			pdf.id = [][]byte{id, id}
-		case 1, 2:
-			for i := 0; i < 2; i++ {
-				id := make([]byte, 16)
-				if i < len(opt.ID) && opt.ID[i] != nil {
-					id = append(id[:0], opt.ID[i]...)
-					if len(id) < 16 {
-						return nil, errShortID
-					}
-				} else {
-					_, err := io.ReadFull(rand.Reader, id)
-					if err != nil {
-						return nil, err
-					}
-				}
-				pdf.id = append(pdf.id, id)
+			ID = [][]byte{id, id}
+		case 1:
+			id := make([]byte, 16)
+			_, err := io.ReadFull(rand.Reader, id)
+			if err != nil {
+				return nil, err
 			}
+			ID = [][]byte{opt.ID[0], id}
 		default:
-			return nil, errors.New("more than 2 File Identifiers given")
+			ID = opt.ID[:2]
 		}
+		trailer["ID"] = Array{String(ID[0]), String(ID[1])}
 	}
 
-	if opt.UserPassword != "" || opt.OwnerPassword != "" {
-		if err := CheckVersion(pdf, "encryption", V1_1); err != nil {
-			return nil, err
-		}
+	var enc *encryptInfo
+	if useEncryption {
 		var cf *cryptFilter
 		var V int
-		if pdf.version >= V2_0 {
+		if version >= V2_0 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 256,
 			}
 			V = 5
-		} else if pdf.version >= V1_6 {
+		} else if version >= V1_6 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 128,
 			}
 			V = 4
-		} else if pdf.version >= V1_4 {
+		} else if version >= V1_4 {
 			cf = &cryptFilter{
 				Cipher: cipherRC4,
 				Length: 128,
@@ -213,17 +179,55 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			}
 			V = 1
 		}
-		sec, err := createStdSecHandler(pdf.id[0], opt.UserPassword,
+		sec, err := createStdSecHandler(ID[0], opt.UserPassword,
 			opt.OwnerPassword, opt.UserPermissions, cf.Length, V)
 		if err != nil {
 			return nil, err
 		}
-		pdf.w.enc = &encryptInfo{
+		enc = &encryptInfo{
 			sec:  sec,
 			stmF: cf,
 			strF: cf,
 			efF:  cf,
 		}
+
+		encryptDict, err := enc.AsDict(version)
+		if err != nil {
+			return nil, err
+		}
+		trailer["Encrypt"] = encryptDict
+	}
+
+	bufferedW, ok := w.(writeFlusher)
+	if !ok {
+		bufferedW = bufio.NewWriter(w)
+	}
+
+	xref := make(map[uint32]*xRefEntry)
+	xref[0] = &xRefEntry{
+		Pos:        -1,
+		Generation: 65535,
+	}
+
+	pdf := &Writer{
+		meta: MetaInfo{
+			Version: version,
+			Catalog: &Catalog{},
+			Info:    &Info{},
+			ID:      ID,
+			Trailer: trailer,
+		},
+
+		w: &posWriter{
+			w:   bufferedW,
+			enc: enc,
+		},
+		origW: w,
+
+		nextRef: 1,
+		xref:    xref,
+
+		autoclose: make(map[Reference]Resource),
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -237,6 +241,10 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 // Close closes the Writer, flushing any unwritten data to the underlying
 // io.Writer.
 func (pdf *Writer) Close() error {
+	if pdf.inStream {
+		return errors.New("Close() while stream is open")
+	}
+
 	var rr []Resource
 	for _, r := range pdf.autoclose {
 		rr = append(rr, r)
@@ -256,48 +264,39 @@ func (pdf *Writer) Close() error {
 		}
 	}
 
+	trailer := pdf.meta.Trailer
+
 	catRef := pdf.Alloc()
-	err := pdf.Put(catRef, AsDict(pdf.Catalog))
+	err := pdf.Put(catRef, AsDict(pdf.meta.Catalog))
 	if err != nil {
 		return fmt.Errorf("failed to write document catalog: %w", err)
 	}
+	trailer["Root"] = catRef
 
-	xRefDict := Dict{
-		"Root": catRef,
-		"Size": Integer(pdf.nextRef),
-	}
-	if pdf.info != nil {
+	infoDict := AsDict(pdf.meta.Info)
+	if len(infoDict) > 0 {
 		infoRef := pdf.Alloc()
-		err := pdf.Put(infoRef, AsDict(pdf.info))
+		err := pdf.Put(infoRef, infoDict)
 		if err != nil {
 			return err
 		}
-		xRefDict["Info"] = infoRef
-	}
-	if len(pdf.id) == 2 {
-		xRefDict["ID"] = Array{String(pdf.id[0]), String(pdf.id[1])}
-	}
-	if pdf.w.enc != nil {
-		encryptDict, err := pdf.w.enc.AsDict(pdf.version)
-		if err != nil {
-			return err
-		}
-		xRefDict["Encrypt"] = encryptDict
+		trailer["Info"] = infoRef
 	}
 
 	// don't encrypt the encryption dictionary and the xref dict
 	pdf.w.enc = nil
 
+	// write the cross reference table and trailer
 	xRefPos := pdf.w.pos
-	if pdf.version < V1_5 {
-		err = pdf.writeXRefTable(xRefDict)
+	trailer["Size"] = Integer(pdf.nextRef)
+	if pdf.meta.Version < V1_5 {
+		err = pdf.writeXRefTable(trailer)
 	} else {
-		err = pdf.writeXRefStream(xRefDict)
+		err = pdf.writeXRefStream(trailer)
 	}
 	if err != nil {
 		return err
 	}
-
 	_, err = fmt.Fprintf(pdf.w, "startxref\n%d\n%%%%EOF\n", xRefPos)
 	if err != nil {
 		return err
@@ -307,9 +306,11 @@ func (pdf *Writer) Close() error {
 	if err != nil {
 		return err
 	}
-
-	if pdf.closeDownstream && pdf.origW != nil {
-		return pdf.origW.Close()
+	if pdf.closeOrigW {
+		err = pdf.origW.(io.Closer).Close()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Make sure we don't accidentally write beyond the end of file.
@@ -318,27 +319,13 @@ func (pdf *Writer) Close() error {
 	return nil
 }
 
-func (pdf *Writer) Version() Version {
-	return pdf.version
-}
-
-func (pdf *Writer) GetCatalog() *Catalog {
-	return pdf.Catalog
-}
-
 func (pdf *Writer) AutoClose(res Resource) {
 	ref := res.Reference()
 	pdf.autoclose[ref] = res
 }
 
-// SetInfo sets the Document Information Dictionary for the file.
-func (pdf *Writer) SetInfo(info *Info) {
-	if info == nil {
-		pdf.info = nil
-		return
-	}
-	infoCopy := *info
-	pdf.info = &infoCopy
+func (pdf *Writer) GetMeta() *MetaInfo {
+	return &pdf.meta
 }
 
 // Alloc allocates an object number for an indirect object.
@@ -348,11 +335,10 @@ func (pdf *Writer) Alloc() Reference {
 	return res
 }
 
-// Put writes an object to the PDF file, as an indirect object using the
-// given reference.
+// Put writes an indirect object to the PDF file, using the given reference.
 func (pdf *Writer) Put(ref Reference, obj Object) error {
 	if pdf.inStream {
-		pdf.afterStream = append(pdf.afterStream, refObject{ref, obj})
+		pdf.afterStream = append(pdf.afterStream, allocatedObject{ref, obj})
 		return nil
 	}
 
@@ -393,7 +379,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if pdf.version < V1_5 {
+	if pdf.meta.Version < V1_5 {
 		// Object streams are only availble in PDF version 1.5 and higher.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)
@@ -404,7 +390,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return nil
 	}
 
-	sRef := pdf.Alloc() // TODO(voss): pass this in as an argument?
+	sRef := pdf.Alloc()
 	for i, ref := range refs {
 		err := pdf.setXRef(ref, &xRefEntry{InStream: sRef, Pos: int64(i)})
 		if err != nil {
@@ -534,12 +520,12 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 		w = enc
 	}
 	for _, filter := range filters {
-		w, err = filter.Encode(pdf.version, w)
+		w, err = filter.Encode(pdf.meta.Version, w)
 		if err != nil {
 			return nil, err
 		}
 
-		name, parms, err := filter.Info(pdf.version)
+		name, parms, err := filter.Info(pdf.meta.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -548,51 +534,6 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 
 	pdf.inStream = true
 	return w, nil
-}
-
-func appendFilter(dict Dict, name Name, parms Dict) {
-	switch filter := dict["Filter"].(type) {
-	case Name:
-		dict["Filter"] = Array{filter, name}
-		p0, _ := dict["DecodeParms"].(Dict)
-		if len(p0)+len(parms) > 0 {
-			dict["DecodeParms"] = Array{p0, parms}
-		}
-
-	case Array:
-		dict["Filter"] = append(filter, name)
-		pp, _ := dict["DecodeParms"].(Array)
-		needsParms := len(parms) > 0
-		for i := 0; i < len(pp) && !needsParms; i++ {
-			pi, _ := pp[i].(Dict)
-			needsParms = len(pi) > 0
-		}
-		if needsParms {
-			for len(pp) < len(filter) {
-				pp = append(pp, nil)
-			}
-			pp := pp[:len(filter)]
-			dict["DecodeParms"] = append(pp, parms)
-		}
-
-	default:
-		dict["Filter"] = name
-		if len(parms) > 0 {
-			dict["DecodeParms"] = parms
-		}
-	}
-}
-
-// TODO(voss): find a better name for this
-type Putter interface {
-	Close() error
-	Version() Version
-	GetCatalog() *Catalog
-	Alloc() Reference
-	Put(ref Reference, obj Object) error
-	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
-	WriteCompressed(refs []Reference, objects ...Object) error
-	AutoClose(res Resource)
 }
 
 type streamWriter struct {
@@ -687,114 +628,6 @@ func (w *streamWriter) Close() error {
 	return nil
 }
 
-// A Placeholder is a space reserved in a PDF file that can later be filled
-// with a value.  One common use case is to store the length of compressed
-// content in a PDF stream dictionary.  To create Placeholder objects,
-// use the [Writer.NewPlaceholder] method.
-type Placeholder struct {
-	value []byte
-	size  int
-
-	pdf Putter
-	pos []int64
-	ref Reference
-}
-
-// NewPlaceholder creates a new placeholder for a value which is not yet known.
-// The argument size must be an upper bound to the length of the replacement
-// text.  Once the value becomes known, it can be filled in using the
-// [Placeholder.Set] method.
-func NewPlaceholder(pdf Putter, size int) *Placeholder {
-	return &Placeholder{
-		size: size,
-		pdf:  pdf,
-	}
-}
-
-// PDF implements the [Object] interface.
-func (x *Placeholder) PDF(w io.Writer) error {
-	// method 1: If the value is already known, we can just write it to the
-	// file.
-	if x.value != nil {
-		_, err := w.Write(x.value)
-		return err
-	}
-
-	// method 2: If we can seek, write whitespace for now and fill in
-	// the actual value later.
-	if pdf, ok := x.pdf.(*Writer); ok {
-		if _, ok := pdf.origW.(io.WriteSeeker); ok {
-			x.pos = append(x.pos, pdf.w.pos)
-
-			buf := bytes.Repeat([]byte{' '}, x.size)
-			_, err := w.Write(buf)
-			return err
-		}
-	}
-
-	// method 3: If all else fails, use an indirect reference.
-	x.ref = x.pdf.Alloc()
-	buf := &bytes.Buffer{}
-	err := x.ref.PDF(buf)
-	if err != nil {
-		return err
-	}
-	x.value = buf.Bytes()
-	_, err = w.Write(x.value)
-	return err
-}
-
-// Set fills in the value of the placeholder object.  This should be called
-// as soon as possible after the value becomes known.
-func (x *Placeholder) Set(val Object) error {
-	if x.ref != 0 {
-		pdf := x.pdf
-		err := pdf.Put(x.ref, val)
-		if err != nil {
-			return fmt.Errorf("Placeholder.Set: %w", err)
-		}
-		return nil
-	}
-
-	buf := bytes.NewBuffer(make([]byte, 0, x.size))
-	err := val.PDF(buf)
-	if err != nil {
-		return err
-	}
-	if buf.Len() > x.size {
-		return errors.New("Placeholder: replacement text too long")
-	}
-	x.value = buf.Bytes()
-
-	if len(x.pos) == 0 {
-		return nil
-	}
-
-	pdf := x.pdf.(*Writer)
-
-	pdf.w.Flush()
-
-	fill := pdf.origW.(io.WriteSeeker)
-	currentPos, err := fill.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
-
-	for _, pos := range x.pos {
-		_, err = fill.Seek(pos, io.SeekStart)
-		if err != nil {
-			return err
-		}
-		_, err = fill.Write(x.value)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = fill.Seek(currentPos, io.SeekStart)
-	return err
-}
-
 type writeFlusher interface {
 	io.Writer
 	Flush() error
@@ -818,9 +651,28 @@ func (w *posWriter) Flush() error {
 	return w.w.Flush()
 }
 
+func writeObject(w io.Writer, obj Object) error {
+	if obj == nil {
+		_, err := w.Write([]byte("null"))
+		return err
+	}
+	return obj.PDF(w)
+}
+
+// TODO(voss): find a better name for this
+type Putter interface {
+	Close() error
+	GetMeta() *MetaInfo
+	Alloc() Reference
+	Put(ref Reference, obj Object) error
+	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
+	WriteCompressed(refs []Reference, objects ...Object) error
+	AutoClose(res Resource)
+}
+
 func IsTagged(pdf Putter) bool {
 	// TODO(voss): what can we do if catalog.MarkInfo is an indirect object?
-	catalog := pdf.GetCatalog()
+	catalog := pdf.GetMeta().Catalog
 	markInfo, _ := catalog.MarkInfo.(Dict)
 	if markInfo == nil {
 		return false

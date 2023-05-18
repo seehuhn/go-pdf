@@ -91,7 +91,7 @@ func main() {
 	doc.Scale(width, height)
 	doc.DrawImage(&imageWrapper{imageRef})
 
-	doc.Out.Catalog.ViewerPreferences = pdf.Dict{
+	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{
 		"FitWindow":    pdf.Bool(true),
 		"HideWindowUI": pdf.Bool(true),
 	}

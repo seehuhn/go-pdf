@@ -29,7 +29,7 @@ var (
 	errNoDate          = errors.New("not a valid date string")
 	errNoRectangle     = errors.New("not a valid PDF rectangle")
 	errDuplicateRef    = errors.New("object already written")
-	errShortID         = errors.New("PDF file identifier too short")
+	errInvalidID       = errors.New("invalid PDF file identifier")
 	errInvalidPassword = errors.New("invalid password")
 )
 
@@ -67,6 +67,9 @@ func (err *MalformedFileError) Unwrap() error {
 }
 
 func wrap(err error, loc string) error {
+	if err == nil {
+		return nil
+	}
 	if e, ok := err.(*MalformedFileError); ok {
 		e.Loc = append(e.Loc, loc)
 		return e
@@ -86,7 +89,7 @@ type VersionError struct {
 // minVersion or later.  If the version is new enough, nil is returned.
 // Otherwise a [VersionError] for the given operation is returned.
 func CheckVersion(pdf Putter, operation string, minVersion Version) error {
-	if pdf.Version() >= minVersion {
+	if pdf.GetMeta().Version >= minVersion {
 		return nil
 	}
 	return &VersionError{

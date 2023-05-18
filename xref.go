@@ -102,13 +102,13 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 				if err != nil {
 					return nil, nil, err
 				}
-				_, ref, err = readXRefStream(xref, s)
+				_, ref, err = r.readXRefStream(xref, s)
 				if err != nil {
 					return nil, nil, wrap(err, "XRefStm")
 				}
 			}
 		default:
-			dict, ref, err = readXRefStream(xref, s)
+			dict, ref, err = r.readXRefStream(xref, s)
 			if err != nil {
 				return nil, nil, wrap(err, fmt.Sprintf("stream at byte %d", start))
 			}
@@ -274,7 +274,7 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 	return nil
 }
 
-func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, Reference, error) {
+func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, Reference, error) {
 	obj, ref, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, 0, err
@@ -291,7 +291,7 @@ func readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, Reference, er
 	if err != nil {
 		return nil, 0, err
 	}
-	decoded, err := (*Reader)(nil).DecodeStream(stream, 0)
+	decoded, err := r.DecodeStream(stream, 0)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -540,7 +540,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 		"Columns":   Integer(1 + w2 + w3),
 	}
 	xRefBuf := &bytes.Buffer{}
-	wxRaw, err := filter.Encode(pdf.version, withDummyClose{xRefBuf})
+	wxRaw, err := filter.Encode(pdf.meta.Version, withDummyClose{xRefBuf})
 	if err != nil {
 		return err
 	}
@@ -611,7 +611,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	}
 	xRefData := xRefBuf.Bytes()
 
-	name, parms, err := filter.Info(pdf.version)
+	name, parms, err := filter.Info(pdf.meta.Version)
 	if err != nil {
 		return err
 	}

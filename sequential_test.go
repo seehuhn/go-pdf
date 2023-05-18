@@ -109,7 +109,7 @@ trailer
 			t.Fatal(err)
 		}
 	}
-	w.Catalog = r.Catalog
+	*w.GetMeta().Catalog = *r.GetMeta().Catalog
 	err = w.Close()
 	if err != nil {
 		t.Fatal(err)
