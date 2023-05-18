@@ -30,7 +30,7 @@ import (
 
 // Embed loads one of the 14 builtin fonts and embeds it into a PDF file.
 // The valid font names are given in [FontNames].
-func Embed(w *pdf.Writer, fontName string, resName pdf.Name) (font.Embedded, error) {
+func Embed(w pdf.Putter, fontName string, resName pdf.Name) (font.Embedded, error) {
 	font, err := Font(fontName)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func Embed(w *pdf.Writer, fontName string, resName pdf.Name) (font.Embedded, err
 
 // EmbedAfm loads a simple Type 1 font described by `afm` and embeds it
 // into a PDF file.
-func EmbedAfm(w *pdf.Writer, afm *AfmInfo, resName pdf.Name) (font.Embedded, error) {
+func EmbedAfm(w pdf.Putter, afm *AfmInfo, resName pdf.Name) (font.Embedded, error) {
 	font, err := FontAfm(afm)
 	if err != nil {
 		return nil, err

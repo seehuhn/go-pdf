@@ -123,7 +123,7 @@ func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, sh
 	return glyph, nil
 }
 
-func (b *Builder) EmbedFont(w *pdf.Writer, resName pdf.Name) (font.Embedded, error) {
+func (b *Builder) EmbedFont(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	F, err := b.MakeFont()
 	if err != nil {
 		return nil, err

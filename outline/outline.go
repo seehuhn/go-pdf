@@ -116,7 +116,7 @@ func readChildren(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference
 	return res, nil
 }
 
-func (tree *Tree) Write(w *pdf.Writer) error {
+func (tree *Tree) Write(w pdf.Putter) error {
 	if tree == nil {
 		return nil
 	}
@@ -148,7 +148,7 @@ func (tree *Tree) Write(w *pdf.Writer) error {
 }
 
 type writer struct {
-	out     *pdf.Writer
+	out     pdf.Putter
 	root    *Tree
 	refs    []pdf.Reference
 	objs    []pdf.Object

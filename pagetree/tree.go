@@ -26,7 +26,7 @@ import (
 
 // Writer writes a page tree to a PDF file.
 type Writer struct {
-	Out *pdf.Writer
+	Out pdf.Putter
 
 	parent *Writer
 	attr   *InheritableAttributes
@@ -62,7 +62,7 @@ type Writer struct {
 }
 
 // NewWriter creates a new page tree which adds pages to the PDF document w.
-func NewWriter(w *pdf.Writer, attr *InheritableAttributes) *Writer {
+func NewWriter(w pdf.Putter, attr *InheritableAttributes) *Writer {
 	t := &Writer{
 		Out:            w,
 		attr:           attr,

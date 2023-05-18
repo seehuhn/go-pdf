@@ -41,7 +41,7 @@ func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOption
 	return singlePage(out, pageSize)
 }
 
-func singlePage(w *pdf.Writer, pageSize *pdf.Rectangle) (*Page, error) {
+func singlePage(w pdf.Putter, pageSize *pdf.Rectangle) (*Page, error) {
 	tree := pagetree.NewWriter(w, &pagetree.InheritableAttributes{
 		MediaBox: pageSize,
 	})

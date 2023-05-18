@@ -28,7 +28,7 @@ import (
 )
 
 type MultiPage struct {
-	Out  *pdf.Writer
+	Out  pdf.Putter
 	Tree *pagetree.Writer
 
 	numOpen int

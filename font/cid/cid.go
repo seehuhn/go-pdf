@@ -37,7 +37,7 @@ import (
 
 // EmbedFile loads a font from a file and embeds it into a PDF file.
 // At the moment, only TrueType and OpenType fonts are supported.
-func EmbedFile(w *pdf.Writer, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+func EmbedFile(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
 	font, err := LoadFont(fname, loc)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func EmbedFile(w *pdf.Writer, fname string, resName pdf.Name, loc language.Tag) 
 }
 
 // Embed creates a PDF CIDFont and embeds it into a PDF file.
-func Embed(w *pdf.Writer, info *sfnt.Info, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+func Embed(w pdf.Putter, info *sfnt.Info, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
 	f, err := Font(info, loc)
 	if err != nil {
 		return nil, err

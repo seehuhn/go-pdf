@@ -26,7 +26,7 @@ import (
 )
 
 // EmbedAsJPEG writes the image src to the PDF file w, using lossy compression.
-func EmbedAsJPEG(w *pdf.Writer, ref pdf.Reference, src image.Image, opts *jpeg.Options) error {
+func EmbedAsJPEG(w pdf.Putter, ref pdf.Reference, src image.Image, opts *jpeg.Options) error {
 	// convert to NRGBA format
 	// TODO(voss): needed????
 	b := src.Bounds()
@@ -62,7 +62,7 @@ func EmbedAsJPEG(w *pdf.Writer, ref pdf.Reference, src image.Image, opts *jpeg.O
 
 // EmbedAsPNG writes the image img to the PDF file w, using a lossless representation
 // very similar to the PNG format.
-func EmbedAsPNG(w *pdf.Writer, ref pdf.Reference, src image.Image) error {
+func EmbedAsPNG(w pdf.Putter, ref pdf.Reference, src image.Image) error {
 	width := src.Bounds().Dx()
 	height := src.Bounds().Dy()
 	filter := pdf.FilterFlate{

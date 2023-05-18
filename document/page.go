@@ -28,7 +28,7 @@ import (
 type Page struct {
 	*graphics.Page
 	PageDict pdf.Dict
-	Out      *pdf.Writer
+	Out      pdf.Putter
 
 	tree    *pagetree.Writer
 	closeFn func(p *Page) error
