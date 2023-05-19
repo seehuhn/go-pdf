@@ -26,10 +26,9 @@ import (
 
 // Data is an in-memory representation of a PDF document.
 type Data struct {
-	meta MetaInfo
-
-	Objects map[Reference]Object
-
+	meta      MetaInfo
+	objects   map[Reference]Object
+	lastRef   uint32
 	autoclose map[Reference]Resource
 }
 
@@ -42,7 +41,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 
 	res := &Data{
 		meta:    pdf.meta,
-		Objects: map[Reference]Object{},
+		objects: map[Reference]Object{},
 
 		autoclose: map[Reference]Resource{},
 	}
@@ -63,7 +62,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 			continue
 		}
 
-		obj, err := pdf.GetObject(ref)
+		obj, err := pdf.Get(ref)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +83,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 			}
 		}
 		if obj != nil {
-			res.Objects[ref] = obj
+			res.objects[ref] = obj
 		}
 	}
 
@@ -105,13 +104,13 @@ func (d *Data) Write(w io.Writer) error {
 	meta.Catalog = d.meta.Catalog
 	meta.Info = d.meta.Info
 
-	refs := maps.Keys(d.Objects)
+	refs := maps.Keys(d.objects)
 	sort.Slice(refs, func(i, j int) bool {
 		return refs[i].Number() < refs[j].Number()
 	})
 
 	for _, ref := range refs {
-		err := pdf.Put(ref, d.Objects[ref])
+		err := pdf.Put(ref, d.objects[ref])
 		if err != nil {
 			return err
 		}
@@ -151,27 +150,35 @@ func (d *Data) GetMeta() *MetaInfo {
 	return &d.meta
 }
 
-// Alloc allocates an object number for an indirect object.
+// Alloc allocates a new object number for an indirect object.
 func (d *Data) Alloc() Reference {
-	number := uint32(len(d.Objects) + 1)
 	for {
-		ref := NewReference(number, 0)
-		if _, ok := d.Objects[ref]; !ok {
+		d.lastRef++
+		ref := NewReference(d.lastRef, 0)
+		if _, ok := d.objects[ref]; !ok {
 			return ref
 		}
-		number++
 	}
 }
 
-func (d *Data) GetObject(ref Reference) (Object, error) {
-	return d.Objects[ref], nil
+func (d *Data) Get(ref Reference) (Object, error) {
+	obj := d.objects[ref]
+	if s, ok := obj.(*Stream); ok {
+		if ss, ok := s.R.(io.Seeker); ok {
+			_, err := ss.Seek(0, io.SeekStart)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return obj, nil
 }
 
 func (d *Data) Put(ref Reference, obj Object) error {
 	if obj == nil {
-		delete(d.Objects, ref)
+		delete(d.objects, ref)
 	} else {
-		d.Objects[ref] = obj
+		d.objects[ref] = obj
 	}
 	return nil
 }
@@ -190,7 +197,7 @@ func (d *Data) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Write
 	s := &Stream{
 		Dict: streamDict,
 	}
-	d.Objects[ref] = s
+	d.objects[ref] = s
 
 	var w io.WriteCloser = &dataStreamWriter{s: s}
 	var err error

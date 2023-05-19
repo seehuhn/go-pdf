@@ -9,7 +9,7 @@ import (
 // TODO(voss): find a better name for this
 type Getter interface {
 	GetMeta() *MetaInfo
-	GetObject(Reference) (Object, error)
+	Get(Reference) (Object, error)
 }
 
 // Resolve resolves references to indirect objects.
@@ -39,7 +39,7 @@ func Resolve(r Getter, obj Object) (Object, error) {
 		}
 
 		var err error
-		obj, err = r.GetObject(ref)
+		obj, err = r.Get(ref)
 		if err != nil {
 			return nil, err
 		}

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/bits"
 	"strconv"
 )
@@ -95,7 +96,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 				zStart, ok := xRefStm.(Integer)
 				if !ok {
 					return nil, nil, &MalformedFileError{
-						Err: errors.New("wrong type for XRefStm (expected Integer)"),
+						Err: errInvalidXref,
 					}
 				}
 				s, err = r.scannerFrom(int64(zStart))
@@ -172,12 +173,18 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 			return nil, wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 
+		if start < 0 || length <= 0 || start > math.MaxUint32 || start+length > math.MaxUint32 {
+			return nil, &MalformedFileError{
+				Err: errInvalidXref,
+				Loc: []string{fmt.Sprintf("byte %d", s.currentPos())},
+			}
+		}
+
 		err = s.SkipWhiteSpace()
 		if err != nil {
 			return nil, err
 		}
 
-		// TODO(voss): check for overflows
 		err = decodeXRefSection(xref, s, uint32(start), uint32(start+length))
 		if err != nil {
 			return nil, err
@@ -258,7 +265,7 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			}
 		default:
 			return &MalformedFileError{
-				Err: errors.New("malformed xref table"),
+				Err: errInvalidXref,
 				Loc: []string{fmt.Sprintf("byte %d", s.currentPos())},
 			}
 		}
@@ -306,22 +313,30 @@ func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, R
 func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	size, ok := dict["Size"].(Integer)
 	if !ok {
-		return nil, nil, &MalformedFileError{}
+		return nil, nil, &MalformedFileError{
+			Err: errInvalidXref,
+		}
 	}
 	W, ok := dict["W"].(Array)
 	if !ok || len(W) < 3 {
-		return nil, nil, &MalformedFileError{}
+		return nil, nil, &MalformedFileError{
+			Err: errInvalidXref,
+		}
 	}
 	var w []int
 	for i, Wi := range W {
 		wi, ok := Wi.(Integer)
 		if !ok || wi < 0 || i < 3 && wi > 8 {
-			return nil, nil, &MalformedFileError{}
+			return nil, nil, &MalformedFileError{
+				Err: errInvalidXref,
+			}
 		}
 		w = append(w, int(wi))
 	}
 	if w[0]+w[1]+w[2] == 0 {
-		return nil, nil, &MalformedFileError{}
+		return nil, nil, &MalformedFileError{
+			Err: errInvalidXref,
+		}
 	}
 
 	Index := dict["Index"]
@@ -337,9 +352,14 @@ func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 			start, ok1 := ind[i].(Integer)
 			size, ok2 := ind[i+1].(Integer)
 			if !ok1 || !ok2 {
-				return nil, nil, &MalformedFileError{}
+				return nil, nil, &MalformedFileError{
+					Err: errInvalidXref,
+				}
+			} else if start < 0 || size <= 0 || start > math.MaxUint32 || start+size > math.MaxUint32 {
+				return nil, nil, &MalformedFileError{
+					Err: errInvalidXref,
+				}
 			}
-			// TODO(voss): check for overflows
 			ss = append(ss, &xRefSubSection{uint32(start), uint32(size)})
 		}
 	}

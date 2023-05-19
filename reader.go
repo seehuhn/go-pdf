@@ -262,7 +262,7 @@ func (r *Reader) GetMeta() *MetaInfo {
 
 // GetObject reads an indirect object from the PDF file.  If the object is not
 // present, nil is returned without an error.
-func (r *Reader) GetObject(ref Reference) (_ Object, err error) {
+func (r *Reader) Get(ref Reference) (_ Object, err error) {
 	defer func() {
 		if err != nil {
 			err = wrap(err, "object "+ref.String())

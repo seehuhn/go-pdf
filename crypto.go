@@ -851,7 +851,7 @@ func (sec *stdSecHandler) computeU(fileEncyptionKey []byte) []byte {
 			0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0)
 	default:
-		panic("invalid security handler revision")
+		panic("invalid R")
 	}
 
 	return U
@@ -873,7 +873,7 @@ func (sec *stdSecHandler) authenticateUser(paddedUserPwd []byte) error {
 			return nil
 		}
 	default:
-		panic("invalid security handler revision")
+		panic("invalid R")
 	}
 	return &AuthenticationError{sec.ID}
 }
@@ -1239,7 +1239,7 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 
 		if k < 16 {
 			if k > 0 {
-				panic("inconsistent buffer state")
+				panic("unreachable") // TODO(voss): remove
 			}
 			return 0, io.EOF
 		}
@@ -1257,7 +1257,7 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 		if r.r == nil {
 			// remove the padding
 			if l != k {
-				panic("inconsistent buffer state")
+				panic("unreachable") // TODO(voss): remove
 			}
 			nPad := int(r.buf[l-1])
 			if nPad < 1 || nPad > 16 || nPad > l {
