@@ -658,25 +658,3 @@ func writeObject(w io.Writer, obj Object) error {
 	}
 	return obj.PDF(w)
 }
-
-// TODO(voss): find a better name for this
-type Putter interface {
-	Close() error
-	GetMeta() *MetaInfo
-	Alloc() Reference
-	Put(ref Reference, obj Object) error
-	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
-	WriteCompressed(refs []Reference, objects ...Object) error
-	AutoClose(res Resource)
-}
-
-func IsTagged(pdf Putter) bool {
-	// TODO(voss): what can we do if catalog.MarkInfo is an indirect object?
-	catalog := pdf.GetMeta().Catalog
-	markInfo, _ := catalog.MarkInfo.(Dict)
-	if markInfo == nil {
-		return false
-	}
-	marked, _ := markInfo["Marked"].(Bool)
-	return bool(marked)
-}
