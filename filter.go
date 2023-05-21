@@ -459,8 +459,11 @@ func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
 			return nil, errors.New("invalid number of columns")
 		}
 		res = ff.newPngReader(res)
+	case ff.Predictor == 2:
+		// TODO(voss): implement TIFF predictor
+		return nil, errors.New("TIFF predictor not implemented")
 	default:
-		return nil, errors.New("unsupported predictor " + strconv.Itoa(ff.Predictor))
+		return nil, errors.New("invalid predictor " + strconv.Itoa(ff.Predictor))
 	}
 	return res, nil
 }
@@ -592,6 +595,12 @@ func (ff *flateFilter) newPngWriter(w io.Writer, close func() error) *pngWriter 
 		predictor:    ff.Predictor - 10,
 		bitsPerPixel: ff.BitsPerComponent * ff.Colors,
 	}
+
+	// TODO(voss): are we implementing this correctly? The spec says: " the PNG
+	// function group shall predict each byte of data as a function of the
+	// corresponding byte of one or more previous image samples, regardless of
+	// whether there are multiple colour components in a byte or whether a
+	// single colour component spans multiple bytes."
 
 	// cr[*] and pr are the bytes for the current and previous row. cr[0] is
 	// unfiltered (or equivalently, filtered with the ftNone filter). cr[ft],

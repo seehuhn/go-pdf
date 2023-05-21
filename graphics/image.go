@@ -20,14 +20,11 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/image"
 )
 
-type Image interface {
-	Resource
-}
-
 // DrawImage draws an image on the page.
-func (p *Page) DrawImage(img Image) {
+func (p *Page) DrawImage(img image.Embedded) {
 	if !p.valid("DrawImage", objPage) {
 		return
 	}

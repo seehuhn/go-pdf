@@ -57,18 +57,19 @@ func NewPage(w io.Writer) *Page {
 }
 
 func (p *Page) coord(x float64) string {
-	// TODO(voss): think about this some more
+	// TODO(voss): Think about this some more.  Once we track the current
+	// transformation matrix, we can use this to determine the number of digits
+	// to keep.
 	return float.Format(x, 2)
 }
 
-// Resource is currently only used for images.
-// TODO(voss): remove
-type Resource interface {
+// TODO(voss): remove?
+type resource interface {
 	Reference() pdf.Reference
 	ResourceName() pdf.Name
 }
 
-func (p *Page) resourceName(obj Resource, d pdf.Dict, nameTmpl string) pdf.Name {
+func (p *Page) resourceName(obj resource, d pdf.Dict, nameTmpl string) pdf.Name {
 	ref := obj.Reference()
 	name, ok := p.resNames[ref]
 	if ok {

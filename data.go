@@ -29,7 +29,7 @@ type Data struct {
 	meta      MetaInfo
 	objects   map[Reference]Object
 	lastRef   uint32
-	autoclose map[Reference]Resource
+	autoclose map[Reference]Closer
 }
 
 // Read reads a complete PDF document into memory.
@@ -43,7 +43,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 		meta:    pdf.meta,
 		objects: map[Reference]Object{},
 
-		autoclose: map[Reference]Resource{},
+		autoclose: map[Reference]Closer{},
 	}
 
 	isObjectStream := make(map[Reference]bool)
@@ -125,7 +125,7 @@ func (d *Data) Write(w io.Writer) error {
 }
 
 func (d *Data) Close() error {
-	var rr []Resource
+	var rr []Closer
 	for _, r := range d.autoclose {
 		rr = append(rr, r)
 	}
@@ -240,7 +240,7 @@ func (d *Data) WriteCompressed(refs []Reference, objects ...Object) error {
 	return nil
 }
 
-func (d *Data) AutoClose(res Resource) {
+func (d *Data) AutoClose(res Closer) {
 	ref := res.Reference()
 	d.autoclose[ref] = res
 }

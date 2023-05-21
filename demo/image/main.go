@@ -50,18 +50,6 @@ func readImage(fname string) (*image.NRGBA, error) {
 	return img, nil
 }
 
-type imageWrapper struct {
-	ref pdf.Reference
-}
-
-func (im *imageWrapper) Reference() pdf.Reference {
-	return im.ref
-}
-
-func (im *imageWrapper) ResourceName() pdf.Name {
-	return "I"
-}
-
 func main() {
 	name := os.Args[1]
 
@@ -82,14 +70,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	imageRef := doc.Out.Alloc()
-	err = pdfimage.EmbedAsJPEG(doc.Out, imageRef, img, nil)
+	embedded, err := pdfimage.EmbedJPEG(doc.Out, img, nil, "I")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	doc.Scale(width, height)
-	doc.DrawImage(&imageWrapper{imageRef})
+	doc.DrawImage(embedded)
 
 	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{
 		"FitWindow":    pdf.Bool(true),

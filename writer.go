@@ -59,7 +59,7 @@ type Writer struct {
 	inStream    bool
 	afterStream []allocatedObject
 
-	autoclose map[Reference]Resource
+	autoclose map[Reference]Closer
 }
 
 type allocatedObject struct {
@@ -67,7 +67,7 @@ type allocatedObject struct {
 	obj Object
 }
 
-type Resource interface {
+type Closer interface {
 	// Write writes the resource to the PDF file.  No changes can be
 	// made to the resource after it has been written.
 	Close() error
@@ -227,7 +227,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		nextRef: 1,
 		xref:    xref,
 
-		autoclose: make(map[Reference]Resource),
+		autoclose: make(map[Reference]Closer),
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -245,7 +245,7 @@ func (pdf *Writer) Close() error {
 		return errors.New("Close() while stream is open")
 	}
 
-	var rr []Resource
+	var rr []Closer
 	for _, r := range pdf.autoclose {
 		rr = append(rr, r)
 	}
@@ -319,7 +319,7 @@ func (pdf *Writer) Close() error {
 	return nil
 }
 
-func (pdf *Writer) AutoClose(res Resource) {
+func (pdf *Writer) AutoClose(res Closer) {
 	ref := res.Reference()
 	pdf.autoclose[ref] = res
 }
