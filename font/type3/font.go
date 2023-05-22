@@ -38,9 +38,12 @@ import (
 	"seehuhn.de/go/sfnt/type1/names"
 )
 
+// TODO(voss): do type3 fonts without a .notdef character work properly
+// everywhere?
+
 // A Builder is used to construct a type 3 font for inclusion in PDF file.
 type Builder struct {
-	// If the PDF file is "tagged", Otherwise, these fields are ignored.
+	// Required, if the PDF file is "tagged", Otherwise, these fields are ignored.
 	FontName    pdf.Name // PostScript name of the font
 	FontFamily  string
 	Width       os2.Width
@@ -78,8 +81,7 @@ func New(unitsPerEm uint16) *Builder {
 
 // AddGlyph adds a new glyph to the type 3 font.
 //
-// Glyph IDs are allocated in the order the glyphs are added.  The first glyph
-// should be the ".notdef" glyph.
+// Glyph IDs are allocated in the order the glyphs are added.
 //
 // If shapeOnly is true, a call to the "d1" operator is added at the start of
 // the glyph description.  In this case, the glyph description may only specify

@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/internal/float"
 )
 
 type graphicsState struct {
@@ -179,6 +180,29 @@ const (
 	LineJoinRound LineJoinStyle = 1
 	LineJoinBevel LineJoinStyle = 2
 )
+
+func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
+	if !p.valid("SetDashPattern", objPage, objText) {
+		return
+	}
+
+	_, p.Err = fmt.Fprint(p.Content, "[")
+	if p.Err != nil {
+		return
+	}
+	sep := ""
+	for _, x := range pattern {
+		_, p.Err = fmt.Fprint(p.Content, sep, float.Format(x, 3))
+		if p.Err != nil {
+			return
+		}
+		sep = " "
+	}
+	_, p.Err = fmt.Fprint(p.Content, "] ", float.Format(phase, 3), " d\n")
+	if p.Err != nil {
+		return
+	}
+}
 
 // SetFillColor sets the fill color in the graphics state.
 // If col is nil, the fill color is not changed.
