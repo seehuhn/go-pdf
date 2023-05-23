@@ -115,6 +115,8 @@ func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, sh
 		gid:  gid,
 	}
 
+	glyph.Page.ForgetGraphicsState()
+
 	if shapeOnly {
 		fmt.Fprintf(glyph.Content,
 			"%d 0 %d %d %d %d d1\n", width, bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)

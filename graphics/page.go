@@ -56,6 +56,11 @@ func NewPage(w io.Writer) *Page {
 	}
 }
 
+func (p *Page) ForgetGraphicsState() {
+	p.fillColor = nil
+	p.strokeColor = nil
+}
+
 func (p *Page) coord(x float64) string {
 	// TODO(voss): Think about this some more.  Once we track the current
 	// transformation matrix, we can use this to determine the number of digits
