@@ -18,18 +18,29 @@
 package image
 
 import (
-	"image"
-
 	"seehuhn.de/go/pdf"
 )
 
 type Image interface {
 	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error)
-	Bounds() image.Rectangle
+	Bounds() Rectangle
 }
 
 type Embedded interface {
 	Image
 	Reference() pdf.Reference
 	ResourceName() pdf.Name
+}
+
+// Rectangle gives the dimensions of an image.
+type Rectangle struct {
+	XMin, YMin, XMax, YMax int
+}
+
+func (r Rectangle) Dx() int {
+	return r.XMax - r.XMin
+}
+
+func (r Rectangle) Dy() int {
+	return r.YMax - r.YMin
 }

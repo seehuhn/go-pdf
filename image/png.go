@@ -37,12 +37,18 @@ func PNG(src image.Image) (Image, error) {
 }
 
 type pngImage struct {
-	image.Image
+	im image.Image
+}
+
+// Bounds implements the [Image] interface.
+func (im *pngImage) Bounds() Rectangle {
+	b := im.im.Bounds()
+	return Rectangle{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}
 }
 
 func (im *pngImage) Embed(w pdf.Putter, resName pdf.Name) (Embedded, error) {
 	ref := w.Alloc()
-	src := im.Image
+	src := im.im
 
 	width := src.Bounds().Dx()
 	height := src.Bounds().Dy()

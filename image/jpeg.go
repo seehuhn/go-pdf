@@ -40,23 +40,30 @@ func JPEG(src image.Image, opts *jpeg.Options) (Image, error) {
 	draw.Draw(img, img.Bounds(), src, b.Min, draw.Src)
 
 	im := &jpegImage{
-		NRGBA: &image.NRGBA{},
-		opts:  opts,
+		im:   &image.NRGBA{},
+		opts: opts,
 	}
 	return im, nil
 }
 
 type jpegImage struct {
-	*image.NRGBA
+	im   *image.NRGBA
 	opts *jpeg.Options
 }
 
+// Bounds implements the [Image] interface.
+func (im *jpegImage) Bounds() Rectangle {
+	b := im.im.Bounds()
+	return Rectangle{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}
+}
+
+// Embed implements the [Image] interface.
 func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (Embedded, error) {
 	ref := w.Alloc()
 
 	// TODO(voss): write a mask if there is an alpha channel
 
-	img := im.NRGBA
+	img := im.im
 	stream, err := w.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
