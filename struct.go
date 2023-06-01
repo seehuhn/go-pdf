@@ -284,17 +284,3 @@ var (
 	languageType  = reflect.TypeOf(language.Tag{})
 	referenceType = reflect.TypeOf(Reference(0))
 )
-
-// Resources describes a PDF Resource Dictionary.
-// See section 7.8.3 of PDF 32000-1:2008 for details.
-// TODO(voss): use []*font.Font for the .Font field?
-type Resources struct {
-	ExtGState  Dict  `pdf:"optional"` // maps resource names to graphics state parameter dictionaries
-	ColorSpace Dict  `pdf:"optional"` // maps each resource name to either the name of a device-dependent colour space or an array describing a colour space
-	Pattern    Dict  `pdf:"optional"` // maps resource names to pattern objects
-	Shading    Dict  `pdf:"optional"` // maps resource names to shading dictionaries
-	XObject    Dict  `pdf:"optional"` // maps resource names to external objects
-	Font       Dict  `pdf:"optional"` // maps resource names to font dictionaries
-	ProcSet    Array `pdf:"optional"` // predefined procedure set names
-	Properties Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
-}

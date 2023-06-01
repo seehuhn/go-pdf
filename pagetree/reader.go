@@ -64,7 +64,7 @@ func NewReader(r pdf.Getter) (*Reader, error) {
 	if dict["Type"] != pdf.Name("Pages") {
 		return nil, fmt.Errorf("unexpected page type %v", dict["Type"])
 	}
-	attr := &InheritableAttributes{Rotate: Rotate0}
+	attr := &InheritableAttributes{Rotate: pdf.Rotate0}
 	node, err := res.decodePageTreeDict(dict, attr)
 	if err != nil {
 		return nil, err
@@ -194,11 +194,11 @@ func (r *Reader) decodeAttrs(dict pdf.Dict, parentAttr *InheritableAttributes) (
 	if err != nil {
 		return nil, err
 	}
-	rotate, err := DecodeRotation(rotateInt)
+	rotate, err := pdf.DecodeRotation(rotateInt)
 	if err != nil {
 		return nil, err
 	}
-	if rotate != RotateInherit {
+	if rotate != pdf.RotateInherit {
 		attr.Rotate = rotate
 	}
 	return attr, nil
