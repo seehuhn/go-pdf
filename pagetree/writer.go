@@ -28,6 +28,8 @@ import (
 type Writer struct {
 	Out pdf.Putter
 
+	isClosed bool
+
 	parent *Writer
 
 	// Children contains potentially incomplete subtrees of the current
@@ -44,20 +46,20 @@ type Writer struct {
 	outObjects []pdf.Object
 	outRefs    []pdf.Reference
 
-	isClosed bool
-
-	// nextPageNumber is the page number (0 based, from the start of the document)
-	// of the next page to be added to the tree.  It is incremented
-	// automatically when a page is added.
+	// nextPageNumber is the page number (0 based, from the start of the
+	// document) of the next page to be added to the tree.  This is incremented
+	// automatically whenever a new page is added.
 	nextPageNumber *futureInt
+
+	// NextPageNumberCb is a list of callbacks which are called once the
+	// absolute page number of the next page to be added is known.
+	// The callbacks are called with the argument -1, if the tree is closed
+	// without another page having been added.
+	nextPageNumberCb []func(int)
 
 	// NumPagesCb is a list of callbacks which are called when the subtree
 	// is closed, to report the total number of pages in the subtree.
 	numPagesCb []func(int)
-
-	// NextPageAbsCb is a list of callbacks which are called when the next page
-	// is added to the tree, to report the absolute page number of the new page.
-	nextPageNumberCb []func(int)
 }
 
 // NewWriter creates a new page tree which adds pages to the PDF document w.
@@ -70,7 +72,7 @@ func NewWriter(w pdf.Putter) *Writer {
 }
 
 // Close closes the current tree and all subtrees.
-// After a tree is closed, no more pages can be added to it.
+// After a tree has been closed, no more pages can be added.
 // If the tree is the root of a page tree, the complete tree is written
 // to the PDF file and a reference to the root node is returned.
 // Otherwise, the returned reference is nil.
@@ -93,8 +95,8 @@ func (t *Writer) Close() (pdf.Reference, error) {
 			}
 			nodes = t.merge(nodes, child.tail)
 		}
-		t.children = nil
 		t.tail = t.merge(nodes, t.tail)
+		t.children = nil
 	}
 
 	t.checkInvariants()
@@ -111,6 +113,7 @@ func (t *Writer) Close() (pdf.Reference, error) {
 	for _, cb := range t.nextPageNumberCb {
 		cb(-1)
 	}
+	t.nextPageNumberCb = nil
 
 	if t.isRoot() {
 		t.collapse()
@@ -219,9 +222,9 @@ func (t *Writer) NewSubTree() (*Writer, error) {
 	return subTree, nil
 }
 
-// NextPageNumber registers a callback that will be called when the next
-// page number is known.  Page numbers are relative to the start of the
-// document, starting at 0.
+// NextPageNumber registers a callback that will be called when the absolute
+// page number of the next page to be added is known.  Page numbers are
+// relative to the start of the document, starting at 0.
 //
 // The callback will be called with -1 if the page tree is closed before
 // another page is added.
