@@ -40,7 +40,7 @@ func JPEG(src image.Image, opts *jpeg.Options) (Image, error) {
 	draw.Draw(img, img.Bounds(), src, b.Min, draw.Src)
 
 	im := &jpegImage{
-		im:   &image.NRGBA{},
+		im:   img,
 		opts: opts,
 	}
 	return im, nil

@@ -42,18 +42,19 @@ func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOption
 }
 
 func singlePage(w pdf.Putter, pageSize *pdf.Rectangle) (*Page, error) {
-	tree := pagetree.NewWriter(w, &pagetree.InheritableAttributes{
-		MediaBox: pageSize,
-	})
+	tree := pagetree.NewWriter(w)
 
 	page := graphics.NewPage(&bytes.Buffer{})
 
 	p := &Page{
-		Page:     page,
-		PageDict: pdf.Dict{"Type": pdf.Name("Page")},
-		Out:      w,
-		tree:     tree,
-		closeFn:  closePage,
+		Page: page,
+		PageDict: pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"MediaBox": pageSize,
+		},
+		Out:     w,
+		tree:    tree,
+		closeFn: closePage,
 	}
 	return p, nil
 }

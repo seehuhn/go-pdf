@@ -37,18 +37,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pageTree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
-		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
-	})
+	mediaBox := &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200}
+	pageTree := pagetree.NewWriter(out)
 
-	frontMatter, err := pageTree.NewSubTree(nil)
+	frontMatter, err := pageTree.NewSubTree()
 	if err != nil {
 		log.Fatal(err)
 	}
 	var extra *pagetree.Writer
 	for i := 1; i <= 99; i++ {
 		if i == 3 {
-			extra, err = pageTree.NewSubTree(nil)
+			extra, err = pageTree.NewSubTree()
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -78,6 +77,7 @@ func main() {
 		dict := pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"Contents": contentRef,
+			"MediaBox": mediaBox,
 		}
 		if g.Resources != nil {
 			dict["Resources"] = pdf.AsDict(g.Resources)
@@ -109,6 +109,7 @@ func main() {
 		dict := pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"Contents": contentRef,
+			"MediaBox": mediaBox,
 		}
 		if g.Resources != nil {
 			dict["Resources"] = pdf.AsDict(g.Resources)
@@ -143,6 +144,7 @@ func main() {
 		dict := pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"Contents": contentRef,
+			"MediaBox": mediaBox,
 		}
 		if g.Resources != nil {
 			dict["Resources"] = pdf.AsDict(g.Resources)

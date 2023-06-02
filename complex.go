@@ -297,6 +297,8 @@ type Info struct {
 // PageDict represents a PDF page dictionary.
 //
 // This structure is described in section 7.7.3.3 of PDF 32000-1:2008.
+//
+// TODO(voss): is this actually useful?
 type PageDict struct {
 	_ struct{} `pdf:"Type=Page"`
 
@@ -421,6 +423,7 @@ type PageDict struct {
 	// UserUnit specifies the default user space unit in multiples of 1/72.
 	//
 	// Default value: 1.0.
+	// TODO(voss): make the default work!
 	UserUnit Number `pdf:"optional"`
 
 	// VP is an array of viewport dictionaries that define the regions of the

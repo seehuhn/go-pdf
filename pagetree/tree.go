@@ -29,7 +29,6 @@ type Writer struct {
 	Out pdf.Putter
 
 	parent *Writer
-	attr   *InheritableAttributes
 
 	// Children contains potentially incomplete subtrees of the current
 	// tree, in page order.
@@ -62,10 +61,9 @@ type Writer struct {
 }
 
 // NewWriter creates a new page tree which adds pages to the PDF document w.
-func NewWriter(w pdf.Putter, attr *InheritableAttributes) *Writer {
+func NewWriter(w pdf.Putter) *Writer {
 	t := &Writer{
 		Out:            w,
-		attr:           attr,
 		nextPageNumber: &futureInt{},
 	}
 	return t
@@ -125,22 +123,12 @@ func (t *Writer) Close() (pdf.Reference, error) {
 		// the root node cannot be a leaf
 		rootNode.dictInfo = t.wrapIfLeaf(rootNode.dictInfo)
 
-		if t.attr != nil {
-			mergeAttributes(rootNode.dict, t.attr)
-		}
-
 		t.outRefs = append(t.outRefs, rootNode.ref)
 		t.outObjects = append(t.outObjects, rootNode.dict)
 		return rootNode.ref, t.flush()
 	}
 
 	// If we reach this point, we are in a subtree.
-
-	if t.attr != nil && len(t.tail) > 0 {
-		t.collapse()
-		mergeAttributes(t.tail[0].dict, t.attr)
-	}
-
 	t.parent.outRefs = append(t.parent.outRefs, t.outRefs...)
 	t.parent.outObjects = append(t.parent.outObjects, t.outObjects...)
 	t.outRefs = nil
@@ -204,7 +192,7 @@ func (t *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
 // NewSubTree creates a new Tree, which inserts pages into the document at the
 // position of the current end of the parent tree.  Pages added to the parent
 // tree will be inserted after the pages in the sub-tree.
-func (t *Writer) NewSubTree(attr *InheritableAttributes) (*Writer, error) {
+func (t *Writer) NewSubTree() (*Writer, error) {
 	if t.isClosed {
 		return nil, errors.New("page tree is closed")
 	}
@@ -221,7 +209,6 @@ func (t *Writer) NewSubTree(attr *InheritableAttributes) (*Writer, error) {
 	subTree := &Writer{
 		parent:         t,
 		Out:            t.Out,
-		attr:           attr,
 		nextPageNumber: t.nextPageNumber,
 	}
 	t.nextPageNumber = &futureInt{numMissing: 2}

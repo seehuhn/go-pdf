@@ -33,12 +33,11 @@ func TestBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
-		MediaBox: document.A4,
-	})
+	tree := pagetree.NewWriter(out)
 	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
 		dict := pdf.Dict{
-			"Type": pdf.Name("Page"),
+			"Type":     pdf.Name("Page"),
+			"MediaBox": document.A4,
 		}
 		err := tree.AppendPage(dict)
 		if err != nil {

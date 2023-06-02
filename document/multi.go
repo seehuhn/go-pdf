@@ -31,6 +31,8 @@ type MultiPage struct {
 	Out  pdf.Putter
 	Tree *pagetree.Writer
 
+	mediaBox *pdf.Rectangle
+
 	numOpen int
 	base    io.Closer
 }
@@ -55,13 +57,12 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOptions
 		return nil, err
 	}
 
-	tree := pagetree.NewWriter(out, &pagetree.InheritableAttributes{
-		MediaBox: pageSize,
-	})
+	tree := pagetree.NewWriter(out)
 
 	return &MultiPage{
-		Out:  out,
-		Tree: tree,
+		Out:      out,
+		Tree:     tree,
+		mediaBox: pageSize,
 	}, nil
 }
 
@@ -94,10 +95,13 @@ func (doc *MultiPage) AddPage() *Page {
 
 	page := graphics.NewPage(&bytes.Buffer{})
 	return &Page{
-		Page:     page,
-		PageDict: pdf.Dict{"Type": pdf.Name("Page")},
-		Out:      doc.Out,
-		tree:     doc.Tree,
+		Page: page,
+		PageDict: pdf.Dict{
+			"Type":     pdf.Name("Page"),
+			"MediaBox": doc.mediaBox,
+		},
+		Out:  doc.Out,
+		tree: doc.Tree,
 		closeFn: func(p *Page) error {
 			doc.numOpen--
 			return nil

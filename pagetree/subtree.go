@@ -98,6 +98,9 @@ func (t *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 
 // mergeNodes collapses nodes a, ..., b-1 into a new internal node.
 func (t *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
+	// TODO(voss): move inheritable attributes to the new node,
+	// where possible.
+
 	if a < 0 || b > len(nodes) || b-a < 2 || b-a > maxDegree {
 		// TODO(voss): remove
 		panic(fmt.Errorf("invalid subtree node range %d, %d", a, b))

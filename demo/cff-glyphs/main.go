@@ -61,7 +61,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tree := pagetree.NewWriter(out, nil)
+	tree := pagetree.NewWriter(out)
 
 	for _, fname := range fileNames {
 		cffData, err := loadCFFData(fname)
@@ -82,9 +82,7 @@ func main() {
 			URy: fontBBox.URy.AsFloat(q) + margin,
 		}
 
-		subTree, err := tree.NewSubTree(&pagetree.InheritableAttributes{
-			MediaBox: pageSize,
-		})
+		subTree, err := tree.NewSubTree()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -95,7 +93,7 @@ func main() {
 			pageSize:  pageSize,
 		}
 
-		err = ctx.Show(cffFont)
+		err = ctx.Show(cffFont, pageSize)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -150,7 +148,7 @@ type illustrator struct {
 	pageSize  *pdf.Rectangle
 }
 
-func (ctx *illustrator) Show(fnt *cff.Font) error {
+func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 	for i, g := range fnt.Glyphs {
 		contentRef := ctx.pageTree.Out.Alloc()
 		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
@@ -275,6 +273,7 @@ func (ctx *illustrator) Show(fnt *cff.Font) error {
 		pageDict := pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"Contents": contentRef,
+			"MediaBox": pageSize,
 		}
 		if page.Resources != nil {
 			pageDict["Resources"] = pdf.AsDict(page.Resources)
