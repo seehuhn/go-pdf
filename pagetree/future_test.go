@@ -40,7 +40,7 @@ func TestFutureInt1(t *testing.T) {
 		t.Fatal("callback for a called too early")
 	}
 
-	a.AddMissing(2)
+	a.Update(2)
 	if xa != 3 || len(a.cb) != 0 {
 		t.Fatalf("xa = %d, want 3; len(a.cb) = %d, want empty", xa, len(a.cb))
 	}
@@ -69,7 +69,7 @@ func TestFutureInt2(t *testing.T) {
 		t.Fatal("callbacks called too early")
 	}
 
-	a.AddMissing(0)
+	a.Update(0)
 	if xa != 1 || xc != 3 || xd != 6 {
 		t.Fatalf("xa = %d, want 1; xc = %d, want 3; xd = %d, want 6", xa, xc, xd)
 	}
@@ -98,7 +98,7 @@ func TestFutureInt3(t *testing.T) {
 		t.Fatal("callbacks called too early")
 	}
 
-	a.AddMissing(0)
+	a.Update(0)
 	if xa != 1 || xc != 3 || xd != 5 {
 		t.Fatalf("xa = %d, want 1; xc = %d, want 3; xd = %d, want 5", xa, xc, xd)
 	}

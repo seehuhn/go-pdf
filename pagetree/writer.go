@@ -33,7 +33,8 @@ type Writer struct {
 	parent *Writer
 
 	// Children contains potentially incomplete subtrees of the current
-	// tree, in page order.
+	// tree, in page order.  This is only used until the tree is closed,
+	// afterwards all nodes are in tail.
 	children []*Writer
 
 	// Tail contains completed, partial subtrees of the current tree, in
@@ -52,9 +53,9 @@ type Writer struct {
 	nextPageNumber *futureInt
 
 	// NextPageNumberCb is a list of callbacks which are called once the
-	// absolute page number of the next page to be added is known.
-	// The callbacks are called with the argument -1, if the tree is closed
-	// without another page having been added.
+	// absolute page number of the next page added is known. If the tree is
+	// closed without another page having been added, the callbacks are called
+	// with the argument -1.
 	nextPageNumberCb []func(int)
 
 	// NumPagesCb is a list of callbacks which are called when the subtree
@@ -73,71 +74,76 @@ func NewWriter(w pdf.Putter) *Writer {
 
 // Close closes the current tree and all subtrees.
 // After a tree has been closed, no more pages can be added.
+//
 // If the tree is the root of a page tree, the complete tree is written
 // to the PDF file and a reference to the root node is returned.
 // Otherwise, the returned reference is nil.
-func (t *Writer) Close() (pdf.Reference, error) {
-	if t.isClosed {
+//
+// TODO(voss): get rid of the Reference return value
+func (w *Writer) Close() (pdf.Reference, error) {
+	if w.isClosed {
 		return 0, errors.New("page tree is closed")
 	}
-	t.isClosed = true
+	w.isClosed = true
 
 	// closed trees have no children, and all nodes are in tail
 	{
 		var nodes []*nodeInfo
 		var err error
-		for _, child := range t.children {
+		for _, child := range w.children {
 			if !child.isClosed {
 				_, err = child.Close()
 				if err != nil {
 					return 0, err
 				}
 			}
-			nodes = t.merge(nodes, child.tail)
+			nodes = w.merge(nodes, child.tail)
 		}
-		t.tail = t.merge(nodes, t.tail)
-		t.children = nil
+		w.tail = w.merge(nodes, w.tail)
+		w.children = nil
 	}
 
-	t.checkInvariants()
+	w.checkInvariants()
 
-	if len(t.numPagesCb) != 0 {
+	if len(w.numPagesCb) != 0 {
 		numPages := 0
-		for _, node := range t.tail {
+		for _, node := range w.tail {
 			numPages += int(node.pageCount)
 		}
-		for _, fn := range t.numPagesCb {
+		for _, fn := range w.numPagesCb {
 			fn(numPages)
 		}
 	}
-	for _, cb := range t.nextPageNumberCb {
+
+	for _, cb := range w.nextPageNumberCb {
 		cb(-1)
 	}
-	t.nextPageNumberCb = nil
+	w.nextPageNumberCb = nil
 
-	if t.isRoot() {
-		t.collapse()
-		if len(t.tail) == 0 {
+	if w.parent == nil { // If we are at the root of the tree ...
+		w.collapse()
+		if len(w.tail) == 0 {
 			return 0, errors.New("no pages in document")
 		}
-		rootNode := t.tail[0]
-		t.tail = nil
+		rootNode := w.tail[0]
+		w.tail = nil
 
 		// the root node cannot be a leaf
-		rootNode.dictInfo = t.wrapIfLeaf(rootNode.dictInfo)
+		rootNode.dictInfo = w.wrapIfLeaf(rootNode.dictInfo)
 
-		t.outRefs = append(t.outRefs, rootNode.ref)
-		t.outObjects = append(t.outObjects, rootNode.dict)
-		return rootNode.ref, t.flush()
+		w.outRefs = append(w.outRefs, rootNode.ref)
+		w.outObjects = append(w.outObjects, rootNode.dict)
+		return rootNode.ref, w.flush()
 	}
 
-	// If we reach this point, we are in a subtree.
-	t.parent.outRefs = append(t.parent.outRefs, t.outRefs...)
-	t.parent.outObjects = append(t.parent.outObjects, t.outObjects...)
-	t.outRefs = nil
-	t.outObjects = nil
-	if len(t.parent.outObjects) > objStreamChunkSize {
-		err := t.parent.flush()
+	// If we are in a subtree ...
+	w.parent.outRefs = append(w.parent.outRefs, w.outRefs...)
+	w.outRefs = nil
+	w.parent.outObjects = append(w.parent.outObjects, w.outObjects...)
+	w.outObjects = nil
+	if len(w.parent.outObjects) >= objStreamChunkSize {
+		// TODO(voss): strictly obey the chunk size?
+		err := w.parent.flush()
 		if err != nil {
 			return 0, err
 		}
@@ -146,12 +152,12 @@ func (t *Writer) Close() (pdf.Reference, error) {
 }
 
 // AppendPage adds a new page to the page tree.
-func (t *Writer) AppendPage(pageDict pdf.Dict) error {
-	return t.AppendPageRef(t.Out.Alloc(), pageDict)
+func (w *Writer) AppendPage(pageDict pdf.Dict) error {
+	return w.AppendPageRef(w.Out.Alloc(), pageDict)
 }
 
-func (t *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
-	if t.isClosed {
+func (w *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
+	if w.isClosed {
 		return errors.New("page tree is closed")
 	}
 
@@ -163,27 +169,27 @@ func (t *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
 		pageCount: 1,
 		depth:     0,
 	}
-	t.tail = append(t.tail, node)
+	w.tail = append(w.tail, node)
 
-	for _, fn := range t.nextPageNumberCb {
-		t.nextPageNumber.WhenAvailable(fn)
+	for _, fn := range w.nextPageNumberCb {
+		w.nextPageNumber.WhenAvailable(fn)
 	}
-	t.nextPageNumberCb = t.nextPageNumberCb[:0]
+	w.nextPageNumberCb = w.nextPageNumberCb[:0]
 
 	// increment the page numbers
-	t.nextPageNumber = t.nextPageNumber.Inc()
+	w.nextPageNumber = w.nextPageNumber.Inc()
 
 	for {
-		n := len(t.tail)
-		if n < maxDegree || t.tail[n-1].depth != t.tail[n-maxDegree].depth {
+		n := len(w.tail)
+		if n < maxDegree || w.tail[n-1].depth != w.tail[n-maxDegree].depth {
 			break
 		}
-		t.tail = t.mergeNodes(t.tail, n-maxDegree, n)
+		w.tail = w.mergeNodes(w.tail, n-maxDegree, n)
 	}
-	t.checkInvariants()
+	w.checkInvariants()
 
-	if len(t.outObjects) >= objStreamChunkSize {
-		err := t.flush()
+	if len(w.outObjects) >= objStreamChunkSize {
+		err := w.flush()
 		if err != nil {
 			return err
 		}
@@ -192,33 +198,34 @@ func (t *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
 	return nil
 }
 
-// NewSubTree creates a new Tree, which inserts pages into the document at the
-// position of the current end of the parent tree.  Pages added to the parent
-// tree will be inserted after the pages in the sub-tree.
-func (t *Writer) NewSubTree() (*Writer, error) {
-	if t.isClosed {
+// NewRange creates a new Writer that can insert pages into a PDF document at
+// position position current at the time of the call.  Pages added to the parent
+// Writer will be inserted after the pages from the newly returned Writer.
+func (w *Writer) NewRange() (*Writer, error) {
+	if w.isClosed {
 		return nil, errors.New("page tree is closed")
 	}
 
-	if len(t.tail) > 0 {
+	if len(w.tail) > 0 {
 		before := &Writer{
-			parent: t,
-			Out:    t.Out,
-			tail:   t.tail,
+			parent: w,
+			Out:    w.Out,
+			tail:   w.tail,
 		}
-		t.children = append(t.children, before)
-		t.tail = nil
+		// TODO(voss): should we close this child already here?
+		w.children = append(w.children, before)
+		w.tail = nil
 	}
 	subTree := &Writer{
-		parent:         t,
-		Out:            t.Out,
-		nextPageNumber: t.nextPageNumber,
+		parent:         w,
+		Out:            w.Out,
+		nextPageNumber: w.nextPageNumber,
 	}
-	t.nextPageNumber = &futureInt{numMissing: 2}
-	subTree.nextPageNumber.WhenAvailable(t.nextPageNumber.AddMissing)
-	subTree.numPagesCb = append(subTree.numPagesCb, t.nextPageNumber.AddMissing)
+	w.nextPageNumber = &futureInt{numMissing: 2}
+	subTree.nextPageNumber.WhenAvailable(w.nextPageNumber.Update)
+	subTree.numPagesCb = append(subTree.numPagesCb, w.nextPageNumber.Update)
 
-	t.children = append(t.children, subTree)
+	w.children = append(w.children, subTree)
 	return subTree, nil
 }
 
@@ -228,27 +235,27 @@ func (t *Writer) NewSubTree() (*Writer, error) {
 //
 // The callback will be called with -1 if the page tree is closed before
 // another page is added.
-func (t *Writer) NextPageNumber(cb func(int)) {
-	if t.isClosed {
+func (w *Writer) NextPageNumber(cb func(int)) {
+	if w.isClosed {
 		// there will be no next page
 		cb(-1)
 		return
 	}
 
-	t.nextPageNumberCb = append(t.nextPageNumberCb, cb)
+	w.nextPageNumberCb = append(w.nextPageNumberCb, cb)
 }
 
 // wrapIfLeaf ensures that the given dictionary is a /Pages object.
 // A wrapper /Pages object is created if necessary.
-func (t *Writer) wrapIfLeaf(info *dictInfo) *dictInfo {
+func (w *Writer) wrapIfLeaf(info *dictInfo) *dictInfo {
 	if info.dict["Type"] == pdf.Name("Pages") {
 		return info
 	}
 
-	wrapperRef := t.Out.Alloc()
+	wrapperRef := w.Out.Alloc()
 	info.dict["Parent"] = wrapperRef
-	t.outRefs = append(t.outRefs, info.ref)
-	t.outObjects = append(t.outObjects, info.dict)
+	w.outRefs = append(w.outRefs, info.ref)
+	w.outObjects = append(w.outObjects, info.dict)
 
 	wrapper := pdf.Dict{
 		"Type":  pdf.Name("Pages"),
@@ -260,53 +267,49 @@ func (t *Writer) wrapIfLeaf(info *dictInfo) *dictInfo {
 }
 
 // Collapse reduces the tail to (at most) one node.
-func (t *Writer) collapse() {
-	for len(t.tail) > 1 {
-		start := len(t.tail) - maxDegree
+func (w *Writer) collapse() {
+	for len(w.tail) > 1 {
+		start := len(w.tail) - maxDegree
 		if start < 0 {
 			start = 0
 		}
-		for start > 0 && t.tail[start-1].depth == t.tail[start].depth {
+		for start > 0 && w.tail[start-1].depth == w.tail[start].depth {
 			start++
 		}
-		t.tail = t.mergeNodes(t.tail, start, len(t.tail))
+		w.tail = w.mergeNodes(w.tail, start, len(w.tail))
 	}
 }
 
-// Flush writes a batch finished objects to the output file.
-func (t *Writer) flush() error {
-	if len(t.outObjects) == 0 {
+// Flush completes all pending writes to the output file.
+func (w *Writer) flush() error {
+	if len(w.outObjects) == 0 {
 		return nil
 	}
 
-	err := t.Out.WriteCompressed(t.outRefs, t.outObjects...)
+	err := w.Out.WriteCompressed(w.outRefs, w.outObjects...)
 	if err != nil {
 		return err
 	}
 
-	t.outObjects = t.outObjects[:0]
-	t.outRefs = t.outRefs[:0]
+	w.outObjects = w.outObjects[:0]
+	w.outRefs = w.outRefs[:0]
 	return nil
 }
 
-func (t *Writer) isRoot() bool {
-	return t.parent == nil
-}
-
-func (t *Writer) checkInvariants() {
+func (w *Writer) checkInvariants() {
 	// TODO(voss): once things have settled, move this function into the test
 	// suite.
 
-	for _, child := range t.children {
+	for _, child := range w.children {
 		child.checkInvariants()
-		if child.parent != t {
+		if child.parent != w {
 			panic("child.parent != t")
 		}
 	}
 
 	var curDepth, numAtDepth int
 	first := true
-	for i, node := range t.tail {
+	for i, node := range w.tail {
 		invalid := false
 		if first || node.depth < curDepth {
 			curDepth = node.depth
@@ -322,13 +325,13 @@ func (t *Writer) checkInvariants() {
 		if invalid {
 			var dd []int
 			for j := 0; j <= i; j++ {
-				dd = append(dd, t.tail[j].depth)
+				dd = append(dd, w.tail[j].depth)
 			}
 			panic(fmt.Sprintf("invalid depth seq %d", dd))
 		}
 	}
 
-	if len(t.outObjects) != len(t.outRefs) {
+	if len(w.outObjects) != len(w.outRefs) {
 		panic("len(outObjects) != len(outRefs)")
 	}
 }

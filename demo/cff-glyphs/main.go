@@ -82,7 +82,7 @@ func main() {
 			URy: fontBBox.URy.AsFloat(q) + margin,
 		}
 
-		subTree, err := tree.NewSubTree()
+		subTree, err := tree.NewRange()
 		if err != nil {
 			log.Fatal(err)
 		}

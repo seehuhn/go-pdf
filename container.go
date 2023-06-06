@@ -113,7 +113,10 @@ type Putter interface {
 	Alloc() Reference
 	Put(ref Reference, obj Object) error
 	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
+
+	// TODO(voss): allow to set the object ID for the containing stream?
 	WriteCompressed(refs []Reference, objects ...Object) error
+
 	AutoClose(res Closer)
 }
 

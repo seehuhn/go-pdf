@@ -48,7 +48,7 @@ func (f *futureInt) WhenAvailable(cb func(int)) {
 	}
 }
 
-func (f *futureInt) AddMissing(n int) {
+func (f *futureInt) Update(n int) {
 	f.numMissing--
 	if n < 0 || f.val < 0 {
 		f.val = -1
@@ -74,7 +74,7 @@ func (f *futureInt) Inc() *futureInt {
 		val:        1,
 		numMissing: 1,
 	}
-	f.WhenAvailable(res.AddMissing)
+	f.WhenAvailable(res.Update)
 	return res
 }
 
@@ -82,7 +82,7 @@ func (f *futureInt) Add(g *futureInt) *futureInt {
 	res := &futureInt{
 		numMissing: 2,
 	}
-	f.WhenAvailable(res.AddMissing)
-	g.WhenAvailable(res.AddMissing)
+	f.WhenAvailable(res.Update)
+	g.WhenAvailable(res.Update)
 	return res
 }

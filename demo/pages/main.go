@@ -40,14 +40,14 @@ func main() {
 	mediaBox := &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200}
 	pageTree := pagetree.NewWriter(out)
 
-	frontMatter, err := pageTree.NewSubTree()
+	frontMatter, err := pageTree.NewRange()
 	if err != nil {
 		log.Fatal(err)
 	}
 	var extra *pagetree.Writer
 	for i := 1; i <= 99; i++ {
 		if i == 3 {
-			extra, err = pageTree.NewSubTree()
+			extra, err = pageTree.NewRange()
 			if err != nil {
 				log.Fatal(err)
 			}

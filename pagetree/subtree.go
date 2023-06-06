@@ -33,7 +33,7 @@ type nodeInfo struct {
 	depth     int // upper bound
 }
 
-func (t *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
+func (w *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 	if len(a) == 0 {
 		return b
 	}
@@ -50,7 +50,7 @@ func (t *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 		for start > 0 && a[start-1].depth == a[start].depth {
 			start++
 		}
-		a = t.mergeNodes(a, start, len(a))
+		a = w.mergeNodes(a, start, len(a))
 	}
 	if len(a) == 1 && a[0].depth < nextDepth {
 		a[0].depth = nextDepth
@@ -77,7 +77,7 @@ func (t *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 	for depth := nextDepth; ; depth++ {
 		changed := false
 		for end >= start+maxDegree {
-			a = t.mergeNodes(a, start, start+maxDegree)
+			a = w.mergeNodes(a, start, start+maxDegree)
 			start++
 			end -= maxDegree - 1
 			changed = true
@@ -97,7 +97,7 @@ func (t *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 }
 
 // mergeNodes collapses nodes a, ..., b-1 into a new internal node.
-func (t *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
+func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	// TODO(voss): move inheritable attributes to the new node,
 	// where possible.
 
@@ -112,15 +112,15 @@ func (t *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	childNodes := nodes[a:b]
 
 	kids := make(pdf.Array, len(childNodes))
-	parentRef := t.Out.Alloc()
+	parentRef := w.Out.Alloc()
 	var pageCount pdf.Integer
 	maxDepth := 0
 	for i, node := range childNodes {
 		node.dict["Parent"] = parentRef
 		kids[i] = node.ref
 
-		t.outRefs = append(t.outRefs, node.ref)
-		t.outObjects = append(t.outObjects, node.dict)
+		w.outRefs = append(w.outRefs, node.ref)
+		w.outObjects = append(w.outObjects, node.dict)
 
 		pageCount += node.pageCount
 		if node.depth > maxDepth {
