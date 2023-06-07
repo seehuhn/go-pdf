@@ -105,6 +105,9 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 	version, err := s.readHeaderVersion()
 	if err != nil {
+		// TODO(voss): A PDF processor shall attempt to read any PDF file, even
+		// if the PDF file’s version is more recent than that for which the PDF
+		// processor was created.
 		return nil, err
 	}
 	r.meta.Version = version

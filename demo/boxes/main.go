@@ -30,8 +30,8 @@ func doit() error {
 	geom := F.GetGeometry()
 
 	// Draw the contents of the page.
-	cRef := w.Alloc()
-	c, err := w.OpenStream(cRef, nil, pdf.FilterCompress{})
+	contentRef := w.Alloc()
+	c, err := w.OpenStream(contentRef, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err
 	}
@@ -83,14 +83,13 @@ func doit() error {
 	for _, y := range []float64{72, 522} {
 		page.TextStart()
 		for i := 0; i <= 600; i += 50 {
-			gg := F.Layout(fmt.Sprintf("%d", i), 9)
 			switch i {
 			case 0:
 				page.TextFirstLine(0, y)
 			default:
 				page.TextFirstLine(50, 0)
 			}
-			page.TextShowGlyphsAligned(gg, 0, 0.5)
+			page.TextShowAligned(fmt.Sprintf("%d", i), 0, 0.5)
 		}
 		page.TextEnd()
 	}
@@ -99,22 +98,57 @@ func doit() error {
 	page.TextSetFont(F, 12)
 
 	page.TextStart()
-	page.TextFirstLine(60, 574)
+	page.TextFirstLine(10, 574)
 	page.TextShow("This text is outside the CropBox.  It will not be visible on most PDF viewers.")
 	page.TextEnd()
 
 	page.TextStart()
 	page.TextFirstLine(60, 480)
-	page.TextShow("Every PDF page has a MediaBox.  The MediaBox is the largest page box.")
+	page.TextShow("Every PDF page has a MediaBox.  The MediaBox contains all other page boxes.")
 	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
-	page.TextShow("On this page, the MediaBox is the rectangle [0,0]×[600,600].")
+	page.TextShow("On this page, the MediaBox is the rectangle [0,600]×[0,600].")
 	page.TextEnd()
 
 	page.TextStart()
 	page.TextFirstLine(60, 430)
-	page.TextShow("Inside the MediaBox is the CropBox.  PDF viewers should only display the CropBox.")
+	page.TextShow("PDF viewers restrict display of a page to the CropBox.")
 	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
-	page.TextShow("On this page, the CropBox is the rectangle [50,50]×[550,550].")
+	page.TextShow("On this page, the CropBox is the rectangle [50,550]×[50,550].")
+	page.TextEnd()
+
+	page.TextStart()
+	page.TextFirstLine(60, 336)
+	page.TextShow("In professional production, the TrimBox gives the outline of the finished page after trimming.")
+	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
+	page.TextShow("On this page, the TrimBox is [100,500]×[100,500].  If your viewer supports BoxColorInfo,")
+	page.TextNewLine()
+	page.TextShow("the TrimBox may be shown in ")
+	page.SetFillColor(color.RGB(0.8, 0.4, 0))
+	page.TextShow("orange.")
+	page.SetFillColor(color.Gray(0))
+	page.TextEnd()
+
+	page.TextStart()
+	page.TextFirstLine(60, 286)
+	page.TextShow("In professional production, the BleedBox gives the print area before trimming.")
+	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
+	page.TextShow("On this page, the BleedBox is [85,515]×[85,515].  If your viewer supports BoxColorInfo,")
+	page.TextNewLine()
+	page.TextShow("the BleedBox may be shown in ")
+	page.SetFillColor(color.RGB(0, 0, 0.8))
+	page.TextShow("blue.")
+	page.SetFillColor(color.Gray(0))
+	page.TextEnd()
+
+	page.TextStart()
+	page.TextFirstLine(60, 186)
+	page.TextShow("The final page box is the ArtBox.")
+	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
+	page.TextShow("On this page, the ArtBox is [150,450]×[150,450].  If your viewer supports BoxColorInfo,")
+	page.TextNewLine()
+	page.TextShow("the ArtBox may be shown in ")
+	page.SetFillColor(color.RGB(0, 0.8, 0))
+	page.TextShow("green.")
 	page.TextEnd()
 
 	err = c.Close()
@@ -143,28 +177,28 @@ func doit() error {
 	w.Put(pageRef, pdf.Dict{
 		"Type":      pdf.Name("Page"),
 		"Parent":    midRef,
-		"Contents":  cRef,
+		"Contents":  contentRef,
 		"Resources": pdf.AsDict(page.Resources),
 
-		"BleedBox": &pdf.Rectangle{LLx: 100, LLy: 50, URx: 550, URy: 550},
-		"TrimBox":  &pdf.Rectangle{LLx: 50, LLy: 100, URx: 550, URy: 550},
-		"ArtBox":   &pdf.Rectangle{LLx: 150, LLy: 150, URx: 550, URy: 550},
+		"TrimBox":  &pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 500},
+		"BleedBox": &pdf.Rectangle{LLx: 85, LLy: 85, URx: 515, URy: 515},
+		"ArtBox":   &pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 450},
 
 		"BoxColorInfo": pdf.Dict{
 			"CropBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(166.0 / 255), pdf.Real(97.0 / 255), pdf.Real(26.0 / 255)},
-				"W": pdf.Integer(2),
-			},
-			"BleedBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(223.0 / 255), pdf.Real(194.0 / 255), pdf.Real(125.0 / 255)},
+				"C": pdf.Array{pdf.Real(0.4), pdf.Real(0), pdf.Real(0.8)}, // purple
 				"W": pdf.Integer(2),
 			},
 			"TrimBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(128.0 / 255), pdf.Real(205.0 / 255), pdf.Real(193.0 / 255)},
+				"C": pdf.Array{pdf.Real(0.8), pdf.Real(0.4), pdf.Real(0)}, // orange
+				"W": pdf.Integer(2),
+			},
+			"BleedBox": pdf.Dict{
+				"C": pdf.Array{pdf.Real(0), pdf.Real(0), pdf.Real(0.8)}, // blue
 				"W": pdf.Integer(2),
 			},
 			"ArtBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(1.0 / 255), pdf.Real(133.0 / 255), pdf.Real(113.0 / 255)},
+				"C": pdf.Array{pdf.Real(0), pdf.Real(0.8), pdf.Real(0)}, // green
 				"W": pdf.Integer(2),
 			},
 		},

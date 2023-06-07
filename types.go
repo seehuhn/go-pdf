@@ -628,3 +628,14 @@ func (x *Placeholder) Set(val Object) error {
 	_, err = fill.Seek(currentPos, io.SeekStart)
 	return err
 }
+
+// Format formats a PDF object as a string, in the same way as the
+// it would be written to a PDF file.
+func Format(obj Object) (string, error) {
+	if obj == nil {
+		return "null", nil
+	}
+	buf := &bytes.Buffer{}
+	err := obj.PDF(buf)
+	return buf.String(), err
+}

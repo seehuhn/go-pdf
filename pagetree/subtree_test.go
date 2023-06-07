@@ -233,3 +233,28 @@ func walk(r *pdf.Reader, nodeRef, parentRef pdf.Reference, test *pdf.Integer) (p
 	}
 	return total, nil
 }
+
+func TestInheritRotate(t *testing.T) {
+	n := maxDegree
+	cc := make([]*nodeInfo, n)
+	for i := 0; i < n; i++ {
+		dict := pdf.Dict{}
+		switch i {
+		case 0:
+			dict["Rotate"] = pdf.Integer(0)
+		case 1:
+			dict["Rotate"] = pdf.Integer(90)
+		default:
+			dict["Rotate"] = pdf.Integer(180)
+		}
+		cc[i] = &nodeInfo{dictInfo: &dictInfo{dict: dict}}
+	}
+	parentDict := pdf.Dict{}
+	inheritRotate(parentDict, cc)
+	s, _ := pdf.Format(parentDict)
+	fmt.Println("parent:", s)
+	for i := 0; i < n; i++ {
+		s, _ := pdf.Format(cc[i].dict)
+		fmt.Printf("child %d: %s\n", i, s)
+	}
+}

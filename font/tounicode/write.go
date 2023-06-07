@@ -17,7 +17,6 @@
 package tounicode
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -58,7 +57,7 @@ func (info *Info) Write(w io.Writer) error {
 	}
 
 	tmpl := template.Must(template.New("CMap").Funcs(template.FuncMap{
-		"PDF":          formatPDF,
+		"PDF":          pdf.Format,
 		"PDFString":    formatPDFString,
 		"SingleChunks": singleChunks,
 		"Single":       info.formatSingle,
@@ -131,14 +130,8 @@ func (info *Info) formatRange(r Range) (string, error) {
 	return fmt.Sprintf("%s %s [%s]", a, b, strings.Join(texts, " ")), nil
 }
 
-func formatPDF(obj pdf.Object) (string, error) {
-	buf := &bytes.Buffer{}
-	err := obj.PDF(buf)
-	return buf.String(), err
-}
-
 func formatPDFString(s string) (string, error) {
-	return formatPDF(pdf.TextString(s))
+	return pdf.Format(pdf.TextString(s))
 }
 
 const chunkSize = 100

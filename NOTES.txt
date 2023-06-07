@@ -1,0 +1,27 @@
+List of PDF viewers/renderers
+=============================
+
+- Adobe Acrobat Reader
+
+- MacOS Preview
+
+- Google Chrome
+  based on "Foxit PDF SDK"
+  open source
+  https://github.com/PDFium/PDFium
+
+- Firefox
+  https://github.com/mozilla/gecko-dev/tree/master/gfx/skia/skia/src/pdf
+  I'm not sure where this comes from.  The copyright notices
+  refer to Google and Android.
+
+- https://github.com/mozilla/pdf.js/
+
+- xpdf / poppler / evince
+  based on XpdfWidget/Qt™, by Glyph & Cog
+  https://github.com/oudream/xpdf
+  https://gitlab.freedesktop.org/poppler/poppler
+
+- mupdf / ghostscript
+  https://github.com/ArtifexSoftware/mupdf
+  https://github.com/ArtifexSoftware/ghostpdl
