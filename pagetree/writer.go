@@ -86,7 +86,7 @@ func (w *Writer) Close() (pdf.Reference, error) {
 	}
 	w.isClosed = true
 
-	// closed trees have no children, and all nodes are in tail
+	// closed trees have no children, all nodes are in tail
 	{
 		var nodes []*nodeInfo
 		var err error

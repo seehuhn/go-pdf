@@ -33,7 +33,7 @@ type Geometry struct {
 	UnderlinePosition  funit.Int16
 	UnderlineThickness funit.Int16
 
-	GlyphExtents []funit.Rect
+	GlyphExtents []funit.Rect16
 	Widths       []funit.Int16
 }
 
@@ -47,6 +47,30 @@ func (g *Geometry) ToPDF16(fontSize float64, a funit.Int16) float64 {
 
 func (g *Geometry) FromPDF16(fontSize float64, x float64) funit.Int16 {
 	return funit.Int16(math.Round(x / fontSize * float64(g.UnitsPerEm)))
+}
+
+func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
+	var bbox funit.Rect
+	var xPos funit.Int
+	for _, glyph := range gg {
+		b16 := g.GlyphExtents[glyph.Gid]
+		b := funit.Rect{
+			LLx: funit.Int(b16.LLx+glyph.XOffset) + xPos,
+			LLy: funit.Int(b16.LLy + glyph.YOffset),
+			URx: funit.Int(b16.URx+glyph.XOffset) + xPos,
+			URy: funit.Int(b16.URy + glyph.YOffset),
+		}
+		bbox.Extend(b)
+		xPos += funit.Int(glyph.Advance)
+	}
+
+	res := &pdf.Rectangle{
+		LLx: g.ToPDF(fontSize, bbox.LLx),
+		LLy: g.ToPDF(fontSize, bbox.LLy),
+		URx: g.ToPDF(fontSize, bbox.URx),
+		URy: g.ToPDF(fontSize, bbox.URy),
+	}
+	return res
 }
 
 // Font represents a font which can be embedded in a PDF file.

@@ -40,7 +40,7 @@ type AfmInfo struct {
 	XHeight   funit.Int16
 
 	Code         []int16 // code byte, or -1 if unmapped
-	GlyphExtents []funit.Rect
+	GlyphExtents []funit.Rect16
 	Widths       []funit.Int16
 	GlyphName    []string
 
@@ -75,7 +75,7 @@ func Afm(fontName string) (*AfmInfo, error) {
 	// add the .notdef glyph
 	res.Code = append(res.Code, -1)
 	res.Widths = append(res.Widths, 0) // TODO(voss): how to find the width?
-	res.GlyphExtents = append(res.GlyphExtents, funit.Rect{})
+	res.GlyphExtents = append(res.GlyphExtents, funit.Rect16{})
 	res.GlyphName = append(res.GlyphName, ".notdef")
 
 	charMetrics := false
@@ -92,7 +92,7 @@ func Afm(fontName string) (*AfmInfo, error) {
 			var name string
 			var width funit.Int16
 			var code int
-			var BBox funit.Rect
+			var BBox funit.Rect16
 			var ligTmp []*ligInfo
 
 			keyVals := strings.Split(line, ";")

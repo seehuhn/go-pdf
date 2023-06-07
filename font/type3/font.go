@@ -62,7 +62,7 @@ type Builder struct {
 	names        []pdf.Name
 	glyphs       [][]byte
 	widths       []funit.Int16
-	glyphExtents []funit.Rect
+	glyphExtents []funit.Rect16
 	idx          map[pdf.Name]int
 	unitsPerEm   uint16
 
@@ -88,7 +88,7 @@ func New(unitsPerEm uint16) *Builder {
 // the shape of the glyph, but not its color.  Otherwise, a call to the "d0"
 // operator is added at the start of the glyph description.  In this case, the
 // glyph description may specify both the shape and the color of the glyph.
-func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, shapeOnly bool) (*Glyph, error) {
+func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect16, shapeOnly bool) (*Glyph, error) {
 	if b.made {
 		return nil, errors.New("font already made")
 	}
@@ -100,7 +100,7 @@ func (b *Builder) AddGlyph(name pdf.Name, width funit.Int16, bbox funit.Rect, sh
 		b.names = append(b.names, "")
 		b.glyphs = append(b.glyphs, nil)
 		b.widths = append(b.widths, 0)
-		b.glyphExtents = append(b.glyphExtents, funit.Rect{})
+		b.glyphExtents = append(b.glyphExtents, funit.Rect16{})
 	}
 
 	gid := len(b.glyphs)

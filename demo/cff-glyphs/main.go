@@ -134,8 +134,8 @@ func loadCFFData(fname string) ([]byte, error) {
 	return cffData, nil
 }
 
-func getFontBBox(fnt *cff.Font) *funit.Rect {
-	bbox := &funit.Rect{}
+func getFontBBox(fnt *cff.Font) *funit.Rect16 {
+	bbox := &funit.Rect16{}
 	for _, g := range fnt.Glyphs {
 		bbox.Extend(g.Extent())
 	}

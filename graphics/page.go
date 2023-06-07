@@ -47,6 +47,7 @@ type Page struct {
 func NewPage(w io.Writer) *Page {
 	return &Page{
 		Content:       w,
+		Resources:     &pdf.Resources{},
 		currentObject: objPage,
 
 		fillColor:   color.Gray(0),

@@ -91,9 +91,6 @@ func (p *Page) SetExtGState(dictName pdf.Name) {
 }
 
 func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
-	if p.Resources == nil {
-		p.Resources = &pdf.Resources{}
-	}
 	if p.Resources.ExtGState == nil {
 		p.Resources.ExtGState = pdf.Dict{}
 	}

@@ -54,9 +54,6 @@ func (p *Page) TextSetFont(font font.Embedded, size float64) {
 		return
 	}
 
-	if p.Resources == nil {
-		p.Resources = &pdf.Resources{}
-	}
 	if p.Resources.Font == nil {
 		p.Resources.Font = pdf.Dict{}
 	}

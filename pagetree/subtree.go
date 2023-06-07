@@ -108,8 +108,13 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	if a == b {
 		return nodes
 	}
-
 	childNodes := nodes[a:b]
+
+	parentDict := pdf.Dict{
+		"Type": pdf.Name("Pages"),
+	}
+
+	extractInheritable(parentDict, childNodes)
 
 	kids := make(pdf.Array, len(childNodes))
 	parentRef := w.Out.Alloc()
@@ -127,15 +132,13 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 			maxDepth = node.depth
 		}
 	}
+	parentDict["Kids"] = kids
+	parentDict["Count"] = pageCount
 
 	parentNode := &nodeInfo{
 		dictInfo: &dictInfo{
-			dict: pdf.Dict{
-				"Type":  pdf.Name("Pages"),
-				"Kids":  kids,
-				"Count": pageCount,
-			},
-			ref: parentRef,
+			dict: parentDict,
+			ref:  parentRef,
 		},
 		pageCount: pageCount,
 		depth:     maxDepth + 1,
@@ -144,4 +147,22 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	nodes[a] = parentNode
 	nodes = append(nodes[:a+1], nodes[b:]...)
 	return nodes
+}
+
+func extractInheritable(parentDict pdf.Dict, childNodes []*nodeInfo) {
+	// TODO(voss): the PDF-2.0 spec says that Resources "should not"
+	// be inherited for newly written documents.  Should we obey this?
+
+	// n := len(childNodes)
+	// repr := make([]string, n)
+	// isDefault := make([]bool, n)
+	// for _, key := range []pdf.Name{"Resources", "MediaBox", "CropBox", "Rotate"} {
+	// 	var default pdf.Object
+	// 	for i, node := range childNodes {
+	// 		val, ok := node.dict[key]
+
+	// 		buf := &bytes.Buffer{}
+
+	// 	}
+	// }
 }

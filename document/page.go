@@ -53,9 +53,7 @@ func (p *Page) Close() error {
 		return err
 	}
 	p.PageDict["Contents"] = contentRef
-	if p.Page.Resources != nil {
-		p.PageDict["Resources"] = pdf.AsDict(p.Page.Resources)
-	}
+	p.PageDict["Resources"] = pdf.AsDict(p.Page.Resources)
 
 	// Disable the page, since it has been written out and cannot be modified
 	// anymore.

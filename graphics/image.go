@@ -29,9 +29,6 @@ func (p *Page) DrawImage(img image.Embedded) {
 		return
 	}
 
-	if p.Resources == nil {
-		p.Resources = &pdf.Resources{}
-	}
 	if p.Resources.XObject == nil {
 		p.Resources.XObject = make(pdf.Dict)
 	}
