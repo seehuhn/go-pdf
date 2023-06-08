@@ -258,3 +258,72 @@ func TestInheritRotate(t *testing.T) {
 		fmt.Printf("child %d: %s\n", i, s)
 	}
 }
+
+func FuzzInherit(f *testing.F) {
+	f.Add([]byte{0, 1, 2, 3})
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) == 0 {
+			return
+		}
+
+		mediaBox := make([]pdf.Object, len(data))
+		for i, c := range data {
+			mb := uint32(c>>2) & 3
+			if mb != 0 {
+				mediaBox[i] = pdf.NewReference(mb+10, 0)
+			}
+		}
+		cropBox := make([]pdf.Object, len(data))
+		for i, c := range data {
+			cb := uint32(c>>4) & 3
+			if cb != 0 {
+				cropBox[i] = pdf.NewReference(cb+20, 0)
+			}
+		}
+
+		doc := pdf.NewData(pdf.V1_7)
+		pp := NewWriter(doc)
+		for i, c := range data {
+			dict := pdf.Dict{
+				"Type":   pdf.Name("Page"),
+				"Rotate": pdf.Integer(c&3) * 90,
+			}
+			if mediaBox[i] != nil {
+				dict["MediaBox"] = mediaBox[i]
+			}
+			if cropBox[i] != nil {
+				dict["CropBox"] = cropBox[i]
+			}
+			err := pp.AppendPage(dict)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		rootRef, err := pp.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc.GetMeta().Catalog.Pages = rootRef
+
+		for i, c := range data {
+			dict, err := GetPage(doc, i)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rotate, err := pdf.GetInt(doc, dict["Rotate"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rotate != pdf.Integer(c&3)*90 {
+				t.Error("wrong rotate:", rotate, "expected", pdf.Integer(c&3)*90)
+			}
+			if obj := dict["MediaBox"]; obj != mediaBox[i] {
+				t.Error("wrong media box:", obj, "expected", mediaBox[i])
+			}
+			if obj := dict["CropBox"]; obj != cropBox[i] {
+				t.Error("wrong crop box:", obj, "expected", cropBox[i])
+			}
+		}
+	})
+}

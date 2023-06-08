@@ -32,6 +32,19 @@ type Data struct {
 	autoclose map[Reference]Closer
 }
 
+func NewData(v Version) *Data {
+	res := &Data{
+		meta: MetaInfo{
+			Version: v,
+			Catalog: &Catalog{},
+		},
+		objects:   map[Reference]Object{},
+		lastRef:   0,
+		autoclose: map[Reference]Closer{},
+	}
+	return res
+}
+
 // Read reads a complete PDF document into memory.
 func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 	pdf, err := NewReader(r, opt)

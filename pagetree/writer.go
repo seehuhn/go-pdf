@@ -156,10 +156,17 @@ func (w *Writer) AppendPage(pageDict pdf.Dict) error {
 	return w.AppendPageRef(w.Out.Alloc(), pageDict)
 }
 
+// AppendPageRef adds a new page to the page tree, using the given reference
+// for the page dictionary.
+//
+// This function takes ownership of the pageDict object, and
+// adds the /Parent entry before writing the object to the PDF file.
 func (w *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
 	if w.isClosed {
 		return errors.New("page tree is closed")
 	}
+
+	sanitize(pageDict)
 
 	node := &nodeInfo{
 		dictInfo: &dictInfo{

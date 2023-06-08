@@ -18,6 +18,7 @@ package pagetree
 
 import (
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/pdf"
 )
@@ -111,7 +112,7 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 		"Type": pdf.Name("Pages"),
 	}
 
-	extractInheritable(parentDict, childNodes)
+	inherit(parentDict, childNodes)
 
 	kids := make(pdf.Array, len(childNodes))
 	parentRef := w.Out.Alloc()
@@ -146,24 +147,97 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	return nodes
 }
 
-// extractInheritable extracts inheritable attributes from the child nodes
-// and adds them to the parentDict.
-func extractInheritable(parentDict pdf.Dict, childNodes []*nodeInfo) {
-	inheritRotate(parentDict, childNodes)
+func sanitize(pageDict pdf.Dict) {
+	if _, ok := pageDict["Resources"]; !ok {
+		// This is required by the spec.  We fill in an empty
+		// resource dict here in case the caller failed to do so.
+		pageDict["Resources"] = pdf.Dict{}
+	}
 
-	// TODO(voss): the PDF-2.0 spec says that Resources "should not"
-	// be inherited for newly written documents.  Should we obey this?
+	if _, ok := pageDict["Rotate"]; !ok {
+		// This is the default value.  We add it here to help the function
+		// [inherit].  Our convention:
+		//
+		// - 0: At least one page in this subtree inherits the value
+		//   and expects the inherited value to be 0.
+		// - unset (on internal nodes): all child nodes set the value
+		//   explicitly, so the value in the current node does not matter.
+		// - anything else: the value is set explicitly in this node.
+		//
+		// If possible, [inherit] will remove this entry again before writing
+		// the node to the output.
+		pageDict["Rotate"] = pdf.Integer(0)
+	}
+}
+
+// inherit extracts inheritable attributes from the child nodes
+// and adds them to the parentDict.
+func inherit(parentDict pdf.Dict, childNodes []*nodeInfo) {
+	// We don't try to inherit /Resources, since (a) it is uncommon
+	// for different pages to use exactly the same resources, and
+	// (b) the PDF-2.0 spec recommends against it.
+	inheritKey("MediaBox", parentDict, childNodes)
+	inheritKey("CropBox", parentDict, childNodes)
+	inheritRotate(parentDict, childNodes)
+}
+
+func inheritKey(key pdf.Name, parentDict pdf.Dict, childNodes []*nodeInfo) {
+	n := len(childNodes)
+	repr := make([]string, n)
+	count := make(map[string]int)
+
+	for i, node := range childNodes {
+		val, ok := node.dict[key]
+		if !ok {
+			// If a child lacks the field, we can't use inheritance,
+			// because there is no way to override an inherited
+			// value with the "unset" value.
+			return
+		}
+		r, err := pdf.Format(val)
+		if err != nil {
+			// Can't format value??!  Let someone else deal with this.
+			return
+		}
+		repr[i] = r
+		count[r]++
+	}
+
+	bestDiff := math.MaxInt
+	var bestRepr string
+	l := len(key) + 3 // len("/" + key + " " + ... + "\n")
+	for repr, k := range count {
+		// Compute the change in (uncompressed) file size if we were to use
+		// `repr` for the parent instead of leaving the parent value unset.
+		var diff int
+		diff += (l + len(repr))     // add entry in parent dict
+		diff -= k * (l + len(repr)) // remove entry from k child dicts
+
+		if diff < bestDiff {
+			bestDiff = diff
+			bestRepr = repr
+		}
+	}
+
+	if bestRepr == "" {
+		return
+	}
+
+	// find a PDF object corresponding to bestRepr and copy this to the parent
+	for i, node := range childNodes {
+		if repr[i] == bestRepr {
+			parentDict[key] = node.dict[key]
+			break
+		}
+	}
+	for i, child := range childNodes {
+		if repr[i] == bestRepr {
+			delete(child.dict, key)
+		}
+	}
 }
 
 func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
-	// TODO(voss): in an internal node, an unset Rotate value
-	// can mean either of two things:
-	//   - some children need to inherit 0 (via the default value)
-	//   - all children set their own value, so the parent value
-	//     does not matter.
-	// This distinction is important for follow-up merges.
-	// Implement this distinction.
-
 	n := len(childNodes)
 	repr := make([]string, n)
 	count := make(map[string]int)
@@ -176,7 +250,9 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 	for i, node := range childNodes {
 		val, ok := node.dict[key]
 		if !ok {
-			val = defaultValue
+			// Missing entries indicate that this child does not
+			// use the inherited value.
+			continue
 		}
 		r, err := pdf.Format(val)
 		if err != nil {
@@ -186,35 +262,46 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 		repr[i] = r
 		count[r]++
 		if r == defaultString {
+			// This indicates that the child needs to inherit the
+			// default value or have the default value set explicitly.
 			numDefault++
 			delete(node.dict, key)
 		}
 	}
 
-	var bestDiff int
+	bestDiff := 0
 	bestRepr := defaultString
-	for r, k := range count {
-		if r == defaultString {
+	l := len(key) + 3 // len("/" + key + " " + ... + "\n")
+	for repr, k := range count {
+		if repr == defaultString {
 			continue
 		}
 
-		// Compute the change in (uncompressed) file size if we
-		// were to use this value for the parent instead of leaving
-		// the parent value unset.
+		// Compute the change in (uncompressed) file size if we were to use
+		// `repr` for the parent instead of leaving the parent value unset.
 		var diff int
-		diff += 1 + len(key) + 1 + len(r) + 1       // entry in parent dict
-		diff -= k * (1 + len(key) + 1 + len(r) + 1) // entries in child dicts
-		diff += numDefault * (1 + len(key) + 1 + len(defaultString) + 1)
+		diff += (l + len(repr))                       // add entry in parent dict
+		diff -= k * (l + len(repr))                   // remove entry from k child dicts
+		diff += numDefault * (l + len(defaultString)) // explicitly set defaults where needed
 
 		if diff <= bestDiff {
+			// Use "<=" instead of "<" to prefer moving the value to the
+			// parent.  This potentially allows to move the values further
+			// towards the root.
 			bestDiff = diff
-			bestRepr = r
+			bestRepr = repr
 		}
 	}
 
 	if bestRepr == defaultString {
+		if numDefault != 0 {
+			// Record the fact that our children need to inherit the
+			// default value.
+			parentDict[key] = defaultValue
+		}
 		return
 	}
+
 	// find a PDF object corresponding to bestRepr and copy this to the parent
 	for i, node := range childNodes {
 		if repr[i] == bestRepr {
