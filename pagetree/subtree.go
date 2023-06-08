@@ -18,9 +18,7 @@ package pagetree
 
 import (
 	"fmt"
-	"sort"
 
-	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 )
 
@@ -155,48 +153,28 @@ func extractInheritable(parentDict pdf.Dict, childNodes []*nodeInfo) {
 
 	// TODO(voss): the PDF-2.0 spec says that Resources "should not"
 	// be inherited for newly written documents.  Should we obey this?
-
-	n := len(childNodes)
-	repr := make([]string, n)
-	for _, key := range []pdf.Name{"Resources", "MediaBox", "CropBox"} {
-		var defVal pdf.Object
-		switch key {
-		case "Rotate":
-			defVal = pdf.Integer(0)
-		}
-		defString, _ := pdf.Format(defVal)
-
-		count := make(map[string]int)
-		for i, node := range childNodes {
-			valString := defString
-			if val, ok := node.dict[key]; ok {
-				valString, _ = pdf.Format(val)
-			}
-			repr[i] = valString
-			count[valString]++
-		}
-
-		keys := maps.Keys(count)
-		sort.Slice(keys, func(i, j int) bool {
-			return count[keys[i]] > count[keys[j]]
-		})
-
-		// add to parent:
-		// - new key and val: len(key) + 1 + len(val) + 1
-		// remove from children:
-		// - old key and val: k*(len(key) + 1 + len(val) + 1)
-	}
 }
 
 func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
+	// TODO(voss): in an internal node, an unset Rotate value
+	// can mean either of two things:
+	//   - some children need to inherit 0 (via the default value)
+	//   - all children set their own value, so the parent value
+	//     does not matter.
+	// This distinction is important for follow-up merges.
+	// Implement this distinction.
+
 	n := len(childNodes)
 	repr := make([]string, n)
 	count := make(map[string]int)
+
+	key := pdf.Name("Rotate")
+
 	defaultValue := pdf.Integer(0)
 	defaultString, _ := pdf.Format(defaultValue)
 	numDefault := 0
 	for i, node := range childNodes {
-		val, ok := node.dict["Rotate"]
+		val, ok := node.dict[key]
 		if !ok {
 			val = defaultValue
 		}
@@ -209,7 +187,7 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 		count[r]++
 		if r == defaultString {
 			numDefault++
-			delete(node.dict, "Rotate")
+			delete(node.dict, key)
 		}
 	}
 
@@ -224,9 +202,9 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 		// were to use this value for the parent instead of leaving
 		// the parent value unset.
 		var diff int
-		diff += len("/Rotate") + 1 + len(r) + 1       // entry in parent dict
-		diff -= k * (len("/Rotate") + 1 + len(r) + 1) // entries in child dicts
-		diff += numDefault * (len("/Rotate") + 1 + len(defaultString) + 1)
+		diff += 1 + len(key) + 1 + len(r) + 1       // entry in parent dict
+		diff -= k * (1 + len(key) + 1 + len(r) + 1) // entries in child dicts
+		diff += numDefault * (1 + len(key) + 1 + len(defaultString) + 1)
 
 		if diff <= bestDiff {
 			bestDiff = diff
@@ -237,19 +215,19 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 	if bestRepr == defaultString {
 		return
 	}
-	// find a PDF object which translates to bestRepr and copy this to the parent
+	// find a PDF object corresponding to bestRepr and copy this to the parent
 	for i, node := range childNodes {
 		if repr[i] == bestRepr {
-			parentDict["Rotate"] = node.dict["Rotate"]
+			parentDict[key] = node.dict[key]
 			break
 		}
 	}
 	for i, child := range childNodes {
 		switch repr[i] {
 		case bestRepr:
-			delete(child.dict, "Rotate")
+			delete(child.dict, key)
 		case defaultString:
-			child.dict["Rotate"] = defaultValue
+			child.dict[key] = defaultValue
 		}
 	}
 }
