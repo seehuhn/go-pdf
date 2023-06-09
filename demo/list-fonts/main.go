@@ -161,10 +161,10 @@ func doit(fname string) error {
 			desc = "CFF"
 		case subtype == "TrueType" && f3Subtype == "OpenType":
 			tp = "S"
-			desc = "OpenType/glyph"
+			desc = "OpenType/glyf"
 		case subtype == "CIDFontType2" && f3Subtype == "OpenType":
 			tp = "C"
-			desc = "OpenType/glyph"
+			desc = "OpenType/glyf"
 		case subtype == "CIDFontType0" && f3Subtype == "OpenType":
 			tp = "C"
 			desc = "OpenType/CFF"
