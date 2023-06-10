@@ -136,7 +136,7 @@ func (x String) PDF(w io.Writer) error {
 
 	var funny []int
 	for i, c := range l {
-		if c < 32 || c >= 127 || c == '\\' ||
+		if c < 32 || c == '\\' ||
 			!balanced && (c == '(' || c == ')') {
 			funny = append(funny, i)
 		}

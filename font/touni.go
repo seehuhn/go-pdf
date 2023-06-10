@@ -117,7 +117,7 @@ func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm [
 // CIDMapping describes the unicode text corresponding to a character code
 // in a CIDFont.
 type CIDMapping struct {
-	CharCode uint16
+	CharCode uint16 // TODO(voss): match the type in cff.Outlines.Gid2cid
 	Text     []rune
 }
 

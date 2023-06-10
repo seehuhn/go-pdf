@@ -32,7 +32,7 @@ func mostFrequent(w []funit.Int16) funit.Int16 {
 	bestCount := 0
 	bestVal := funit.Int16(0)
 	for wi, count := range hist {
-		if count > bestCount || count == 1000 && count == bestCount {
+		if count > bestCount || wi == 1000 && count == bestCount {
 			bestCount = count
 			bestVal = wi
 		}
