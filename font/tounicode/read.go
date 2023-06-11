@@ -217,6 +217,7 @@ func Read(r io.Reader) (*Info, error) {
 }
 
 func isValidVCString(s string) bool {
+	// According to CIDFont spec (Adobe tech note #5014):
 	// Version control strings (Registry and Ordering) must consist only
 	// of alphanumeric ASCII characters and the underscore character.
 	for _, r := range s {

@@ -263,7 +263,7 @@ func (e3 *embedded) Close() error {
 	FontDict := pdf.Dict{ // See section 9.6.5 of PDF 32000-1:2008.
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type3"),
-		"FontBBox": &pdf.Rectangle{}, // [0,0,0,0] is always valid
+		"FontBBox": &pdf.Rectangle{}, // empty rectangle is allowed here
 		"FontMatrix": pdf.Array{
 			pdf.Real(1 / float64(e3.b.unitsPerEm)), pdf.Integer(0), pdf.Integer(0),
 			pdf.Real(1 / float64(e3.b.unitsPerEm)), pdf.Integer(0), pdf.Integer(0)},

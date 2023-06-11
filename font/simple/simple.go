@@ -319,19 +319,11 @@ func (e *embedded) Close() error {
 		"ToUnicode":      ToUnicodeRef,
 	}
 
-	rect := subsetInfo.BBox()
-	fontBBox := &pdf.Rectangle{
-		LLx: rect.LLx.AsFloat(q),
-		LLy: rect.LLy.AsFloat(q),
-		URx: rect.URx.AsFloat(q),
-		URy: rect.URy.AsFloat(q),
-	}
-
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
-		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)), // TODO(voss)
-		"FontBBox":    fontBBox,
+		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)),
+		"FontBBox":    &pdf.Rectangle{}, // empty rectangle is allowed here
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
 		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
 		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
@@ -341,6 +333,11 @@ func (e *embedded) Close() error {
 
 	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
+
+	err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	if err != nil {
+		return err
+	}
 
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
@@ -395,11 +392,6 @@ func (e *embedded) Close() error {
 		if err != nil {
 			return err
 		}
-	}
-
-	err := w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return err
 	}
 
 	var cc2text []font.SimpleMapping

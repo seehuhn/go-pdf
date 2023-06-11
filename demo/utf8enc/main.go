@@ -85,7 +85,7 @@ func doit() error {
 	page.TextSetFont(F, 36)
 	page.TextStart()
 	page.TextFirstLine(100, 700)
-	page.TextShow("Grüß Gott!")
+	page.TextShow("Größenwaffel")
 	page.TextEnd()
 
 	return page.Close()
@@ -135,7 +135,7 @@ func (f *funkel) Reference() pdf.Reference {
 func (f *funkel) Close() error {
 	ROS := &type1.CIDSystemInfo{
 		Registry:   "Seehuhn",
-		Ordering:   "unicode",
+		Ordering:   "Unicode",
 		Supplement: 0,
 	}
 
@@ -179,13 +179,6 @@ func (f *funkel) Close() error {
 	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
 
 	q := 1000 / float64(subsetInfo.UnitsPerEm)
-	rect := subsetInfo.BBox()
-	fontBBox := &pdf.Rectangle{
-		LLx: rect.LLx.AsFloat(q),
-		LLy: rect.LLy.AsFloat(q),
-		URx: rect.URx.AsFloat(q),
-		URy: rect.URy.AsFloat(q),
-	}
 
 	w := f.w
 	FontDictRef := f.ref
@@ -199,7 +192,7 @@ func (f *funkel) Close() error {
 	FontDict := pdf.Dict{ // See section 9.7.6.1 of PDF 32000-1:2008.
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        fontName + "-Jochen-Unicode",
+		"BaseFont":        fontName + "-Seehuhn-Unicode",
 		"Encoding":        CMapRef,
 		"DescendantFonts": pdf.Array{CIDFontRef},
 		"ToUnicode":       ToUnicodeRef,
@@ -224,7 +217,7 @@ func (f *funkel) Close() error {
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
 		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)),
-		"FontBBox":    fontBBox,
+		"FontBBox":    &pdf.Rectangle{}, // empty rectangle is allowed here
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
 		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
 		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
@@ -258,6 +251,11 @@ func (f *funkel) Close() error {
 		compressedObjects = append(compressedObjects, W)
 	}
 
+	err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	if err != nil {
+		return err
+	}
+
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
 		// Write the "font program".
@@ -285,14 +283,9 @@ func (f *funkel) Close() error {
 		panic("not implemented")
 	}
 
-	err := w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return err
-	}
-
 	cmapDict := pdf.Dict{
 		"Type":          pdf.Name("CMap"),
-		"CMapName":      pdf.Name("Jochen-Unicode"),
+		"CMapName":      pdf.Name("Seehuhn-Unicode"),
 		"CIDSystemInfo": CIDSystemInfoRef,
 	}
 	cmapStream, err := w.OpenStream(CMapRef, cmapDict, pdf.FilterCompress{})
@@ -311,7 +304,7 @@ func (f *funkel) Close() error {
 	// TODO(voss): include all the CIDs
 	toUniName := pdf.Name("Seehuhn-Unicode-000")
 	toUniInfo := &tounicode.Info{
-		CodeSpace: []tounicode.CodeSpaceRange{{First: 0x0000, Last: 0xffff}},
+		CodeSpace: []tounicode.CodeSpaceRange{{First: 0x0000, Last: 0x10_ffff}},
 		Ranges: []tounicode.Range{{
 			First: 1,
 			Last:  255,
@@ -346,11 +339,11 @@ const cmap = `%!PS-Adobe-3.0 Resource-CMap
 12 dict begin
 begincmap
 /CIDSystemInfo 3 dict dup begin
-  /Registry (Jochen) def
+  /Registry (Seehuhn) def
   /Ordering (Unicode) def
   /Supplement 0 def
 end def
-/CMapName /Jochen-Unicode def
+/CMapName /Seehuhn-Unicode def
 /CMapVersion 0.001 def
 /CMapType 1 def
 /WMode 0 def
