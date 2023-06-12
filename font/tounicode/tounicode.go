@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/sfnt/type1"
 )
 
@@ -28,7 +27,7 @@ import (
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 // https://www.adobe.com/content/dam/acom/en/devnet/acrobat/pdfs/5411.ToUnicode.pdf
 
-// Info describes a mapping from character codes to Unicode characters
+// Info describes a mapping from character indices to Unicode character
 // sequences.
 type Info struct {
 	CodeSpace []CodeSpaceRange
@@ -39,7 +38,7 @@ type Info struct {
 	ROS  *type1.CIDSystemInfo
 }
 
-func (info *Info) containsCode(code cmap.CID) bool {
+func (info *Info) containsCode(code type1.CID) bool {
 	for _, r := range info.CodeSpace {
 		if r.First <= code && code <= r.Last {
 			return true
@@ -48,7 +47,7 @@ func (info *Info) containsCode(code cmap.CID) bool {
 	return false
 }
 
-func (info *Info) containsRange(first, last cmap.CID) bool {
+func (info *Info) containsRange(first, last type1.CID) bool {
 	for _, r := range info.CodeSpace {
 		if r.First <= first && last <= r.Last {
 			return true
@@ -60,8 +59,8 @@ func (info *Info) containsRange(first, last cmap.CID) bool {
 // A CodeSpaceRange describes a range of character codes, like "<00> <FF>"
 // for one-byte codes or "<0000> <FFFF>" for two-byte codes.
 type CodeSpaceRange struct {
-	First cmap.CID
-	Last  cmap.CID
+	First type1.CID
+	Last  type1.CID
 }
 
 func (c CodeSpaceRange) String() string {
@@ -82,7 +81,7 @@ func (c CodeSpaceRange) String() string {
 // It specifies that character code Code represents the given UTF16-encoded
 // unicode string.
 type Single struct {
-	Code  cmap.CID
+	Code  type1.CID
 	UTF16 []uint16
 }
 
@@ -93,7 +92,7 @@ type Single struct {
 // range.  Otherwise, the list must have the length Last-First+1, and specify
 // the UTF16 encoding for each code point in the range.
 type Range struct {
-	First cmap.CID
-	Last  cmap.CID
+	First type1.CID
+	Last  type1.CID
 	UTF16 [][]uint16
 }

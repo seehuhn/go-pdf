@@ -24,10 +24,11 @@ import (
 	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/type1"
 )
 
 type widthRec struct {
-	CID uint32
+	CID type1.CID
 	W   funit.Int16
 }
 

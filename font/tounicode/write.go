@@ -24,7 +24,7 @@ import (
 	"text/template"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/sfnt/type1"
 )
 
 // Embed writes the ToUnicode CMap as a stream object to the given PDF file.
@@ -72,7 +72,7 @@ func (info *Info) Write(w io.Writer) error {
 	return nil
 }
 
-func (info *Info) formatCharCode(code cmap.CID) (string, error) {
+func (info *Info) formatCharCode(code type1.CID) (string, error) {
 	for _, r := range info.CodeSpace {
 		if code >= r.First && code <= r.Last {
 			var format string

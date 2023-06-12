@@ -149,8 +149,9 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 
 func sanitize(pageDict pdf.Dict) {
 	if _, ok := pageDict["Resources"]; !ok {
-		// This is required by the spec.  We fill in an empty
-		// resource dict here in case the caller failed to do so.
+		// This field is required by the spec.  If the called failed to assign
+		// a value, we use an empty dict (indicating that no resources are
+		// required by the page).
 		pageDict["Resources"] = pdf.Dict{}
 	}
 

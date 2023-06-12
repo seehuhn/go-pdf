@@ -190,11 +190,11 @@ func (e *embedded) Close() error {
 
 	// Determine the subset of glyphs to include.
 	encoding := e.enc.Encoding()
-	var firstChar cmap.CID
+	var firstChar type1.CID
 	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
 		firstChar++
 	}
-	lastChar := cmap.CID(len(encoding) - 1)
+	lastChar := type1.CID(len(encoding) - 1)
 	for lastChar > firstChar && encoding[lastChar] == 0 {
 		lastChar--
 	}
@@ -231,9 +231,9 @@ func (e *embedded) Close() error {
 				Ordering:   "Identity",
 				Supplement: 0,
 			}
-			o2.Gid2cid = make([]int32, len(subsetGlyphs))
+			o2.Gid2cid = make([]type1.CID, len(subsetGlyphs))
 			for code, subsetGid := range subsetEncoding {
-				o2.Gid2cid[subsetGid] = int32(code)
+				o2.Gid2cid[subsetGid] = type1.CID(code)
 			}
 		} else {
 			// Embed as a simple CFF font.

@@ -28,12 +28,4 @@ package cmap
 
 // character code (sequence of bytes) -> CID -> glyph identifier (GID)
 
-// --------------------
-
-// CID (short for character identifier) gives the index of character in a
-// character collection.
-//
-// TODO(voss): should this be a uint16?
-type CID uint32
-
 type Info struct{}

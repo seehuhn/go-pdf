@@ -22,15 +22,14 @@ import (
 	"golang.org/x/exp/slices"
 
 	"seehuhn.de/go/dag"
-
-	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/sfnt/type1"
 )
 
 // ToMapping converts the ToUnicode CMap to a list of mappings.
 // All ranges are expanded to single mappings.
 // The returned mappings are sorted by the character code.
 func (info *Info) ToMapping() []Single {
-	res := make(map[cmap.CID][]uint16)
+	res := make(map[type1.CID][]uint16)
 	for _, s := range info.Singles {
 		res[s.Code] = s.UTF16
 	}

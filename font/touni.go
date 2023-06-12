@@ -21,7 +21,6 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/sfnt/type1"
 )
@@ -71,8 +70,8 @@ func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm [
 		}
 		if next > pos+1 {
 			bf := tounicode.Range{
-				First: cmap.CID(mm[pos].Code),
-				Last:  cmap.CID(mm[next-1].Code),
+				First: type1.CID(mm[pos].Code),
+				Last:  type1.CID(mm[next-1].Code),
 				UTF16: [][]uint16{utf16.Encode(mm[pos].Text)},
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -95,8 +94,8 @@ func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm [
 				repl = append(repl, utf16.Encode(mm[i].Text))
 			}
 			bf := tounicode.Range{
-				First: cmap.CID(mm[pos].Code),
-				Last:  cmap.CID(mm[next-1].Code),
+				First: type1.CID(mm[pos].Code),
+				Last:  type1.CID(mm[next-1].Code),
 				UTF16: repl,
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -105,7 +104,7 @@ func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm [
 		}
 
 		data.Singles = append(data.Singles, tounicode.Single{
-			Code:  cmap.CID(mm[pos].Code),
+			Code:  type1.CID(mm[pos].Code),
 			UTF16: utf16.Encode(mm[pos].Text),
 		})
 		pos++
@@ -161,8 +160,8 @@ func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
 			start := mm[pos].CharCode
 			end := mm[next-1].CharCode
 			bf := tounicode.Range{
-				First: cmap.CID(start),
-				Last:  cmap.CID(end),
+				First: type1.CID(start),
+				Last:  type1.CID(end),
 				UTF16: [][]uint16{utf16.Encode(mm[pos].Text)},
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -187,8 +186,8 @@ func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
 			from := mm[pos].CharCode
 			to := mm[next-1].CharCode
 			bf := tounicode.Range{
-				First: cmap.CID(from),
-				Last:  cmap.CID(to),
+				First: type1.CID(from),
+				Last:  type1.CID(to),
 				UTF16: repl,
 			}
 			data.Ranges = append(data.Ranges, bf)
@@ -198,7 +197,7 @@ func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
 
 		code := mm[pos].CharCode
 		data.Singles = append(data.Singles, tounicode.Single{
-			Code:  cmap.CID(code),
+			Code:  type1.CID(code),
 			UTF16: utf16.Encode(mm[pos].Text),
 		})
 		pos++

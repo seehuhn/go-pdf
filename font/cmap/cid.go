@@ -32,7 +32,7 @@ type CIDEncoder interface {
 
 type Record struct {
 	Code []byte
-	CID  CID
+	CID  type1.CID
 	GID  glyph.ID
 	Text []rune
 }
@@ -40,19 +40,19 @@ type Record struct {
 func NewCIDEncoder() CIDEncoder {
 	enc := &defaultCIDEncoder{
 		used: make(map[glyph.ID]bool),
-		text: make(map[CID][]rune),
+		text: make(map[type1.CID][]rune),
 	}
 	return enc
 }
 
 type defaultCIDEncoder struct {
 	used map[glyph.ID]bool
-	text map[CID][]rune
+	text map[type1.CID][]rune
 }
 
 func (enc *defaultCIDEncoder) Encode(gid glyph.ID, rr []rune) []byte {
 	enc.used[gid] = true
-	enc.text[CID(gid)] = rr
+	enc.text[type1.CID(gid)] = rr
 	return []byte{byte(gid >> 8), byte(gid)}
 }
 
@@ -60,7 +60,7 @@ func (enc *defaultCIDEncoder) Encoding() []Record {
 	var encs []Record
 	for gid := range enc.used {
 		code := []byte{byte(gid >> 8), byte(gid)}
-		cid := CID(gid)
+		cid := type1.CID(gid)
 		encs = append(encs, Record{code, cid, gid, enc.text[cid]})
 	}
 	sort.Slice(encs, func(i, j int) bool {

@@ -244,11 +244,11 @@ func (e3 *embedded) Close() error {
 	w := e3.w
 
 	encoding := e3.enc.Encoding()
-	var firstChar cmap.CID
+	var firstChar type1.CID
 	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
 		firstChar++
 	}
-	lastChar := cmap.CID(len(encoding) - 1)
+	lastChar := type1.CID(len(encoding) - 1)
 	for lastChar > firstChar && encoding[lastChar] == 0 {
 		lastChar--
 	}
@@ -301,7 +301,7 @@ func (e3 *embedded) Close() error {
 	}
 
 	var Differences pdf.Array
-	var prevIdx cmap.CID = lastChar + 1
+	var prevIdx type1.CID = lastChar + 1
 	for idx := firstChar; idx <= lastChar; idx++ {
 		gid := encoding[idx]
 		if gid == 0 {
@@ -397,7 +397,7 @@ func (e3 *embedded) Close() error {
 			}
 			name := e3.b.names[gid]
 			mappings = append(mappings, tounicode.Single{
-				Code:  cmap.CID(code),
+				Code:  type1.CID(code),
 				UTF16: utf16.Encode(names.ToUnicode(string(name), false)),
 			})
 		}
