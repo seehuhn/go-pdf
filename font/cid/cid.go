@@ -214,12 +214,6 @@ func (e *embedded) Close() error {
 		"Supplement": pdf.Integer(CIDSystemInfo.Supplement),
 	}
 
-	// There are three cases for mapping CID to GID values:
-	// - For TrueType-based CIDFonts (Type 2 CIDFonts), /CidToGidMap in the CIDFont dictionary is used.
-	// - For CFF-based CIDFonts (Type 0 CIDFonts), [cff.Outlines.Gid2cid] is used.
-	// - When CFF-based simple fonts are used as CIDFonts we have CID == GID.
-	//   (We can avoid this case by converting the CFF font to a CIDFont.)
-
 	// subset the font
 	subsetInfo := &sfnt.Info{}
 	*subsetInfo = *e.info

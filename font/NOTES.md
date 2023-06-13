@@ -6,7 +6,8 @@ Notes about PDF Fonts
 ## Simple PDF Fonts
 
 Simple fonts always use a single byte per character.
-Thus, only 256 distinct characters can be encoded.
+Thus, only 256 distinct glyphs can be used, even if the font contains more
+glyphs.
 
 ### Type1 Fonts
 
@@ -34,10 +35,6 @@ character codes to glyph names is described by the "builtin encoding" of the
 CFF font.  The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font
 must not contain a `ROS` operator.
 
-Usually, `Encoding` is omitted from the font dictionary, and the mapping from
-character codes to glyph names is described by the "builtin encoding" of the
-CFF font.
-
 ### CFF-based OpenType Fonts (PDF 1.6)
 
 These use `Type1` as the `Subtype` in the font dictionary.
@@ -46,11 +43,11 @@ and the `Subtype` entry in the font file stream dictionary is `OpenType`.
 
 Usually, `Encoding` is omitted from the font dictionary, and the mapping from
 character codes to glyph names is described by the "builtin encoding" of the
-CFF font.  The CFF data embedded in the OpenType font is not allowed to be
+OpenType font.  The CFF data embedded in the OpenType font is not allowed to be
 CID-keyed, *i.e.* the CFF font must not contain a `ROS` operator.
 
 There seems little reasson to use this font type, since the OpenType wrapper
-could be omitted and the CFF font data could be embedded as a CFF font.
+could be omitted and the CFF font data could directly be embedded as a CFF font.
 
 ### TrueType Fonts (PDF 1.1)
 
@@ -79,7 +76,6 @@ could equally be embedded as a TrueType font.
 
 These use `Type3` as the `Subtype` in the font dictionary.
 The font data is embedded via the `CharProcs` entry in the font dictionary.
-The font data is embedded via the `FontFile` entry in the font descriptor.
 
 The `Encoding` entry in the font dictionary describes the mapping from
 character codes to glyph names (*i.e.* to the keys in the `CharProcs`

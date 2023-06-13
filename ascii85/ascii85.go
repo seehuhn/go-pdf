@@ -22,7 +22,7 @@ import (
 )
 
 // Encode returns a new WriteCloser which encodes data in ASCII85 format.
-// The returned WriteCloser] must be closed to flush all data.
+// The returned WriteCloser must be closed to flush all data.
 func Encode(w io.WriteCloser, width int) (io.WriteCloser, error) {
 	return &ascii85Writer{
 		w:   w,
