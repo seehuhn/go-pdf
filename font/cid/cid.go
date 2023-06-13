@@ -311,18 +311,19 @@ func (e *embedded) Close() error {
 		"FontDescriptor": FontDescriptorRef,
 	}
 
-	// TODO(voss): For CFF fonts we can get StemV from the PrivateDict structure.
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
 		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)),
-		"FontBBox":    &pdf.Rectangle{}, // empty rectangle is allowed here
+		"FontBBox":    &pdf.Rectangle{}, // empty rectangle is always allowed
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
 		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
 		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
 		"CapHeight":   pdf.Integer(math.Round(subsetInfo.CapHeight.AsFloat(q))),
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
+
+	// TODO(voss): use PrivateDict.StdVW from StemV in CFF fonts?
 
 	compressedRefs := []pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, ROS, FontDescriptor}

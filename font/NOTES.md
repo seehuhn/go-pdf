@@ -30,10 +30,10 @@ These use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `Type1C`.
 
-Usually, `Encoding` is omitted from the font dictionary, and the mapping from
-character codes to glyph names is described by the "builtin encoding" of the
-CFF font.  The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font
-must not contain a `ROS` operator.
+The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font must not
+contain a `ROS` operator.  Usually, `Encoding` is omitted from the font
+dictionary, and the mapping from character codes to glyph names is described by
+the "builtin encoding" of the CFF font.
 
 ### CFF-based OpenType Fonts (PDF 1.6)
 
@@ -41,13 +41,13 @@ These use `Type1` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `OpenType`.
 
-Usually, `Encoding` is omitted from the font dictionary, and the mapping from
-character codes to glyph names is described by the "builtin encoding" of the
-OpenType font.  The CFF data embedded in the OpenType font is not allowed to be
-CID-keyed, *i.e.* the CFF font must not contain a `ROS` operator.
+The CFF data embedded in the OpenType font is not allowed to be CID-keyed,
+*i.e.* the CFF font must not contain a `ROS` operator.  Usually, `Encoding` is
+omitted from the font dictionary, and the mapping from character codes to glyph
+names is described by the "builtin encoding" of the OpenType font.
 
-There seems little reasson to use this font type, since the OpenType wrapper
-could be omitted and the CFF font data could directly be embedded as a CFF font.
+There seems little reasson to use this font type, since the CFF font data
+can be embedded directly without the OpenType wrapper.
 
 ### TrueType Fonts (PDF 1.1)
 
@@ -100,7 +100,7 @@ The `Encoding` entry in the font dictionary specifies a CMap which
 describes the mapping from character codes to CIDs.
 If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
-glyphs.  Otherwise, the CID is used the glyph index directly.
+glyphs.  Otherwise, the CID is used as the glyph index directly.
 
 ### CFF-based OpenType Fonts (PDF 1.6)
 
@@ -113,7 +113,7 @@ The `Encoding` entry in the font dictionary specifies a CMap which
 describes the mapping from character codes to CIDs.
 If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
-glyphs.  Otherwise, the CID is used the glyph index directly.
+glyphs.  Otherwise, the CID is used as the glyph index directly.
 
 There seems little reasson to use this font type, since the OpenType wrapper
 could be omitted and the CFF font data could be embedded as a CFF font.

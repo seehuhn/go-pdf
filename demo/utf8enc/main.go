@@ -229,7 +229,6 @@ func (f *funkel) Close() error {
 		"Supplement": pdf.Integer(ROS.Supplement),
 	}
 
-	// TODO(voss): For CFF fonts we can get StemV from the PrivateDict structure.
 	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
@@ -242,6 +241,8 @@ func (f *funkel) Close() error {
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 		"FontFile3":   FontFileRef,
 	}
+
+	// TODO(voss): use PrivateDict.StdVW from StemV in CFF fonts?
 
 	compressedRefs := []pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, pdfROS, FontDescriptor}
