@@ -334,11 +334,6 @@ func (e *embedded) Close() error {
 	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
 
-	err := w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return err
-	}
-
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
 		FontDict["Subtype"] = pdf.Name("Type1")
@@ -392,6 +387,11 @@ func (e *embedded) Close() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	if err != nil {
+		return err
 	}
 
 	var cc2text []font.SimpleMapping
