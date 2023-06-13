@@ -50,6 +50,12 @@ func TestEncodeWidths(t *testing.T) {
 			out: pdf.Array{pdf.Integer(1), pdf.Array{pdf.Integer(1), pdf.Integer(2)},
 				pdf.Integer(3), pdf.Integer(6), pdf.Integer(3)},
 		},
+		{
+			in: [][]funit.Int16{{1, 2, 2, 2, 2, 2, 3}},
+			out: pdf.Array{pdf.Integer(1), pdf.Array{pdf.Integer(1)},
+				pdf.Integer(2), pdf.Integer(6), pdf.Integer(2),
+				pdf.Integer(7), pdf.Array{pdf.Integer(3)}},
+		},
 	}
 	for i, test := range testCases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {

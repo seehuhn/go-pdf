@@ -106,22 +106,9 @@ func (g wwGraph) AppendEdges(ee []wwEdge, v int) []wwEdge {
 	}
 
 	// negative edges: sequences of consecutive CIDs
-	i = v + 1
+	i = v
 	for i < n && int(ww[i].CID)-int(ww[v].CID) == i-v {
 		i++
-	}
-	for i > v+1 && ww[i-1].GlyphWidth == g.dw {
-		// no need to to include default width entries
-		i--
-	}
-	ee = append(ee, wwEdge(v-i))
-
-	// if possible, also try to encode the end of the sequence as a
-	// positive edge
-	if i < n && ww[i].GlyphWidth == ww[i-1].GlyphWidth {
-		for i > v+1 && ww[i].GlyphWidth == ww[i-1].GlyphWidth {
-			i--
-		}
 		ee = append(ee, wwEdge(v-i))
 	}
 

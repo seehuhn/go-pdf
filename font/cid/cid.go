@@ -350,11 +350,6 @@ func (e *embedded) Close() error {
 		compressedObjects = append(compressedObjects, W)
 	}
 
-	err := w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return err
-	}
-
 	switch outlines := subsetInfo.Outlines.(type) {
 	case *cff.Outlines:
 		CIDFont["Subtype"] = pdf.Name("CIDFontType0")
@@ -435,6 +430,11 @@ func (e *embedded) Close() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	if err != nil {
+		return err
 	}
 
 	var cc2text []font.CIDMapping
