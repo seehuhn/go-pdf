@@ -17,97 +17,67 @@
 package cid
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/type1"
 )
 
-func TestWidths(t *testing.T) {
-	type A = pdf.Array
-	type I = pdf.Integer
-
-	cases := []struct {
-		in  []funit.Int16
-		dw  pdf.Integer
-		out A
-	}{
-		// test sequence detection
+func TestEncodeWidths(t *testing.T) {
+	type testCase struct {
+		in  [][]funit.Int16
+		out pdf.Object
+	}
+	testCases := []testCase{
 		{
-			in: []funit.Int16{1, 2, 3, 9, 9, 9, 9, 9, 9, 4, 5, 6},
-			dw: 9,
-			out: A{
-				I(0), A{I(1), I(2), I(3)},
-				I(9), A{I(4), I(5), I(6)},
-			},
+			in:  [][]funit.Int16{{1, 2, 3}},
+			out: pdf.Array{pdf.Integer(1), pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)}},
 		},
 		{
-			in:  []funit.Int16{},
-			out: nil,
+			in:  [][]funit.Int16{{1, 1, 1, 1}},
+			out: pdf.Array{pdf.Integer(1), pdf.Integer(4), pdf.Integer(1)},
 		},
 		{
-			in: []funit.Int16{1, 1, 1, 1, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0},
-			out: A{
-				I(0), I(4), I(1),
-				I(5), A{I(2), I(3), I(4)},
-			},
+			in: [][]funit.Int16{{1, 2, 3, 0}, {4}},
+			out: pdf.Array{pdf.Integer(1), pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)},
+				pdf.Integer(6), pdf.Array{pdf.Integer(4)}},
 		},
 		{
-			in: []funit.Int16{2, 1, 4, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0},
-			out: A{
-				I(0), A{I(2), I(1), I(4)},
-				I(3), I(7), I(1),
-			},
-		},
-		{
-			in: []funit.Int16{1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0},
-			out: A{
-				I(0), I(4), I(1),
-			},
-		},
-
-		// test default widths
-		{
-			in: []funit.Int16{1, 0, 2, 0},
-			out: A{
-				I(0), A{I(1), I(0), I(2)},
-			},
-		},
-		{
-			in: []funit.Int16{0, 1, 0, 2, 0},
-			out: A{
-				I(1), A{I(1), I(0), I(2)},
-			},
-		},
-		{
-			in: []funit.Int16{1, 0, 0, 2},
-			out: A{
-				I(0), A{I(1)},
-				I(3), A{I(2)},
-			},
-		},
-		{
-			in: []funit.Int16{0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0},
-			out: A{
-				I(4), A{I(1)},
-				I(7), A{I(2)},
-			},
+			in: [][]funit.Int16{{1, 2, 3}, {3, 3}},
+			out: pdf.Array{pdf.Integer(1), pdf.Array{pdf.Integer(1), pdf.Integer(2)},
+				pdf.Integer(3), pdf.Integer(6), pdf.Integer(3)},
 		},
 	}
-	for i, test := range cases {
-		DW, W := encodeWidths(test.in, 1)
-		buf := &bytes.Buffer{}
-		_ = W.PDF(buf)
-		fmt.Println(i, buf.String())
-		if DW != test.dw {
-			t.Errorf("%d: wrong default width: expected %d but got %d",
-				i, test.dw, DW)
-		}
-		if d := cmp.Diff(test.out, W); d != "" {
-			t.Errorf("%d: wrong widths (-expected, +got): %s", i, d)
-		}
+	for i, test := range testCases {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			var ww []WidthRec
+			pos := type1.CID(1)
+			for _, run := range test.in {
+				for _, w := range run {
+					ww = append(ww, WidthRec{pos, w})
+					pos++
+				}
+				pos++
+			}
+
+			// make sure 0 is the most frequent width
+			n := len(ww) + 1
+			for i := 0; i < n; i++ {
+				ww = append(ww, WidthRec{pos, 0})
+				pos++
+			}
+
+			dw, w := EncodeWidths(ww, 1000)
+			if dw != 0 {
+				t.Errorf("dw=%v, want 0", dw)
+			}
+
+			if d := cmp.Diff(w, test.out); d != "" {
+				t.Errorf("w mismatch (-want +got):\n%s", d)
+			}
+		})
 	}
 }

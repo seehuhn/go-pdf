@@ -243,15 +243,8 @@ func (e *embedded) Close() error {
 		}
 		o2.ROS = CIDSystemInfo
 		o2.Gid2cid = make([]type1.CID, len(subsetGlyphs))
-		if len(outlines.Gid2cid) > 0 {
-			for subsetGid, origGid := range subsetGlyphs {
-				o2.Gid2cid[subsetGid] = outlines.Gid2cid[origGid]
-			}
-		} else {
-			// TODO(voss): what to do here?
-			for subsetGid, origGid := range subsetGlyphs {
-				o2.Gid2cid[subsetGid] = type1.CID(origGid)
-			}
+		for subsetGid, origGid := range subsetGlyphs {
+			o2.Gid2cid[subsetGid] = type1.CID(origGid)
 		}
 		subsetInfo.Outlines = o2
 
@@ -340,7 +333,12 @@ func (e *embedded) Close() error {
 	compressedRefs := []pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, ROS, FontDescriptor}
 
-	DW, W := encodeWidths(e.info.Widths(), q)
+	var ww []WidthRec
+	widths := e.info.Widths()
+	for _, origGid := range subsetGlyphs {
+		ww = append(ww, WidthRec{type1.CID(origGid), widths[origGid]})
+	}
+	DW, W := EncodeWidths(ww, e.info.UnitsPerEm)
 	if W != nil {
 		WidthsRef := w.Alloc()
 		CIDFont["W"] = WidthsRef

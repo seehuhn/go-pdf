@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -245,18 +246,17 @@ func (f *funkel) Close() error {
 	compressedRefs := []pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, pdfROS, FontDescriptor}
 
-	var ww []widthRec
+	var ww []cid.WidthRec
 	for gid := range f.used {
 		if gid == 0 {
 			continue
 		}
-		cid := f.enc[gid]
-		ww = append(ww, widthRec{
-			CID: type1.CID(cid),
-			W:   f.info.GlyphWidth(gid),
+		ww = append(ww, cid.WidthRec{
+			CID:        type1.CID(f.enc[gid]),
+			GlyphWidth: f.info.GlyphWidth(gid),
 		})
 	}
-	DW, W := encodeWidths(ww, q)
+	DW, W := cid.EncodeWidths(ww, subsetInfo.UnitsPerEm)
 	if DW != 1000 {
 		CIDFont["DW"] = DW
 	}

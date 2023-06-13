@@ -18,105 +18,153 @@ package cid
 
 import (
 	"math"
+	"sort"
 
+	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/sfnt/type1"
 )
 
-func mostFrequent(w []funit.Int16) funit.Int16 {
+// WidthRec maps a character identifier (CID) to a glyph width in font units.
+type WidthRec struct {
+	CID        type1.CID
+	GlyphWidth funit.Int16
+}
+
+// EncodeWidths constructs the W and DW entries for a CIDFont dictionary.
+// This function modifies ww, sorting it by increasing CID.
+func EncodeWidths(ww []WidthRec, unitsPerEm uint16) (pdf.Integer, pdf.Array) {
+	sort.Slice(ww, func(i, j int) bool {
+		return ww[i].CID < ww[j].CID
+	})
+
+	dw := mostFrequent(ww) // TODO(voss): be more clever here?
+
+	g := wwGraph{ww, dw}
+	ee, err := dag.ShortestPath[wwEdge, int](g, len(ww))
+	if err != nil {
+		panic(err)
+	}
+
+	q := 1000 / float64(unitsPerEm)
+	dwScaled := pdf.Integer(math.Round(dw.AsFloat(q)))
+
+	var res pdf.Array
+	pos := 0
+	for _, e := range ee {
+		switch {
+		case e > 0:
+			wiScaled := pdf.Integer(math.Round(ww[pos].GlyphWidth.AsFloat(q)))
+			res = append(res,
+				pdf.Integer(ww[pos].CID),
+				pdf.Integer(ww[pos+int(e)-1].CID),
+				wiScaled)
+		case e < 0:
+			var wi pdf.Array
+			for i := pos; i < pos+int(-e); i++ {
+				wi = append(wi, pdf.Integer(math.Round(ww[i].GlyphWidth.AsFloat(q))))
+			}
+			res = append(res,
+				pdf.Integer(ww[pos].CID),
+				wi)
+		}
+		pos = g.To(pos, e)
+	}
+
+	return dwScaled, res
+}
+
+type wwGraph struct {
+	ww []WidthRec
+	dw funit.Int16
+}
+
+// An Edge encodes how the next CID width is encoded.
+// The edge values have the following meaning:
+//
+//	e=0: the width of the next CID is the default width, so no entry is needed
+//	e>0: the next e CIDs have the same width, encode as a range
+//	e<0: the next -e entries have consecutive CIDs, encode as an array
+type wwEdge int16
+
+func (g wwGraph) AppendEdges(ee []wwEdge, v int) []wwEdge {
+	ww := g.ww
+	if ww[v].GlyphWidth == g.dw {
+		return append(ee, 0)
+	}
+
+	n := len(ww)
+
+	// positive edges: sequences of CIDS with the same width
+	i := v + 1
+	for i < n && ww[i].GlyphWidth == ww[v].GlyphWidth {
+		i++
+	}
+	if i > v+1 {
+		ee = append(ee, wwEdge(i-v))
+	}
+
+	// negative edges: sequences of consecutive CIDs
+	i = v + 1
+	for i < n && int(ww[i].CID)-int(ww[v].CID) == i-v {
+		i++
+	}
+	for i > v+1 && ww[i-1].GlyphWidth == g.dw {
+		// no need to to include default width entries
+		i--
+	}
+	ee = append(ee, wwEdge(v-i))
+
+	// if possible, also try to encode the end of the sequence as a
+	// positive edge
+	if i < n && ww[i].GlyphWidth == ww[i-1].GlyphWidth {
+		for i > v+1 && ww[i].GlyphWidth == ww[i-1].GlyphWidth {
+			i--
+		}
+		ee = append(ee, wwEdge(v-i))
+	}
+
+	return ee
+}
+
+func (g wwGraph) Length(v int, e wwEdge) int {
+	// for simplicity we assume that all integers in the output have 3 digits
+	if e == 0 {
+		return 0
+	} else if e > 0 {
+		// "%d %d %d\n"
+		return 12
+	} else {
+		// "%d [%d ... %d]\n"
+		return 6 + 4*int(-e)
+	}
+}
+
+func (g wwGraph) To(v int, e wwEdge) int {
+	if e == 0 {
+		return v + 1
+	}
+	step := int(e)
+	if step < 0 {
+		step = -step
+	}
+	return v + step
+}
+
+func mostFrequent(ww []WidthRec) funit.Int16 {
 	hist := make(map[funit.Int16]int)
-	for _, wi := range w {
-		hist[wi]++
+	for _, wi := range ww {
+		hist[wi.GlyphWidth]++
 	}
 
 	bestCount := 0
 	bestVal := funit.Int16(0)
 	for wi, count := range hist {
-		if count > bestCount || wi == 1000 && count == bestCount {
+		if count > bestCount || (count == bestCount && wi < bestVal) {
 			bestCount = count
 			bestVal = wi
 		}
 	}
 	return bestVal
-}
-
-type seq struct {
-	start  int
-	values []funit.Int16
-}
-
-// encodeWidths constructs the /W array for PDF CIDFonts.
-// See section 9.7.4.3 of PDF 32000-1:2008 for details.
-func encodeWidths(w []funit.Int16, scale float64) (pdf.Integer, pdf.Array) {
-	n := len(w)
-
-	dw := mostFrequent(w)
-
-	// remove any occurence of two or more consecutive dw values
-	var seqs []*seq
-	a := 0
-	for {
-		for a < n && w[a] == dw {
-			a++
-		}
-		if a >= n {
-			break
-		}
-
-		b := a + 1
-		for b < n && !(w[b] == dw && (b == n-1 || w[b+1] == dw)) {
-			b++
-		}
-		seqs = append(seqs, &seq{
-			start:  a,
-			values: w[a:b],
-		})
-
-		a = b + 2
-	}
-
-	// find any runs of length > 4
-	var res pdf.Array
-	for _, seq := range seqs {
-		v := seq.values
-		n = len(v)
-		a := 0
-		i := 0
-		for i < n-4 {
-			if v[i] != v[i+1] || v[i] != v[i+2] || v[i] != v[i+3] || v[i] != v[i+4] {
-				i++
-				continue
-			}
-
-			if i > a {
-				var ww pdf.Array
-				for _, wi := range v[a:i] {
-					ww = append(ww, pdf.Integer(math.Round(wi.AsFloat(scale))))
-				}
-				res = append(res, pdf.Integer(seq.start+a), ww)
-			}
-			a, i = i, i+4
-
-			for i < n && v[i] == v[a] {
-				i++
-			}
-			res = append(res,
-				pdf.Integer(seq.start+a),
-				pdf.Integer(seq.start+i-1),
-				pdf.Integer(math.Round(v[a].AsFloat(scale))))
-			a = i
-		}
-		if i < n {
-			i = n
-		}
-		if i > a {
-			var ww pdf.Array
-			for _, wi := range v[a:i] {
-				ww = append(ww, pdf.Integer(math.Round(wi.AsFloat(scale))))
-			}
-			res = append(res, pdf.Integer(seq.start+a), ww)
-		}
-	}
-
-	return pdf.Integer(math.Round(dw.AsFloat(scale))), res
 }
