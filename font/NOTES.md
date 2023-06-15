@@ -125,7 +125,7 @@ and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.
 The font data is embedded via the `FontFile2` entry in the font descriptor.
 Only a subset of the TrueType tables is required for embedded fonts.
 
-The `Encoding` entry in the font dictionary specifies a CMap which
+The `Encoding` entry in the PDF font dictionary specifies a CMap which
 describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 

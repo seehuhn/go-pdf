@@ -215,7 +215,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Info) error {
 	} else if info.IsCFF() {
 		parts = append(parts, "CFF outlines")
 		outlines := info.Outlines.(*cff.Outlines)
-		if outlines.ROS != nil {
+		if outlines.IsCIDKeyed() {
 			parts = append(parts, "CID-keyed")
 		}
 	}

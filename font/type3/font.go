@@ -38,6 +38,9 @@ import (
 	"seehuhn.de/go/sfnt/type1/names"
 )
 
+// TODO(voss): The spec says "Type 3 fonts do not support the concept of a
+// default glyph name." Does this refer to the ".notdef" glyph?
+
 // TODO(voss): do type3 fonts without a .notdef character work properly
 // everywhere?
 

@@ -224,14 +224,14 @@ func (e *embedded) Close() error {
 		for _, gid := range subsetGlyphs {
 			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
 			oldPIdx := outlines.FdSelect(gid)
-			_, ok := pIdxMap[oldPIdx]
-			if !ok {
+			if _, ok := pIdxMap[oldPIdx]; !ok {
 				newPIdx := len(o2.Private)
 				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
 				pIdxMap[oldPIdx] = newPIdx
 			}
 		}
 		o2.FdSelect = func(gid glyph.ID) int {
+			// TODO(voss): is this correct???
 			origGid := glyph.ID(o2.Gid2cid[gid])
 			return pIdxMap[outlines.FdSelect(origGid)]
 		}
