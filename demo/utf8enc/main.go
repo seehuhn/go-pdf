@@ -170,7 +170,7 @@ func (f *funkel) Close() error {
 		pIdxMap := make(map[int]int)
 		for _, gid := range subsetGlyphs {
 			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
-			oldPIdx := outlines.FdSelect(gid)
+			oldPIdx := outlines.FDSelect(gid)
 			_, ok := pIdxMap[oldPIdx]
 			if !ok {
 				newPIdx := len(o2.Private)
@@ -178,14 +178,17 @@ func (f *funkel) Close() error {
 				pIdxMap[oldPIdx] = newPIdx
 			}
 		}
-		o2.FdSelect = func(gid glyph.ID) int {
-			origGid := glyph.ID(o2.Gid2cid[gid])
-			return pIdxMap[outlines.FdSelect(origGid)]
+		o2.FDSelect = func(gid glyph.ID) int {
+			origGid := glyph.ID(o2.Gid2Cid[gid])
+			return pIdxMap[outlines.FDSelect(origGid)]
 		}
 		o2.ROS = ROS
-		o2.Gid2cid = make([]type1.CID, len(subsetGlyphs))
+		o2.Gid2Cid = make([]type1.CID, len(subsetGlyphs))
 		for subsetGid, origGid := range subsetGlyphs {
-			o2.Gid2cid[subsetGid] = type1.CID(f.enc[origGid])
+			if origGid == 0 {
+				continue
+			}
+			o2.Gid2Cid[subsetGid] = type1.CID(f.enc[origGid])
 		}
 		subsetInfo.Outlines = o2
 

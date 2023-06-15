@@ -193,6 +193,10 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		r.meta.Version = r.meta.Catalog.Version
 	}
 
+	if r.meta.Version == V1_0 {
+		r.meta.ID = nil
+	}
+
 	infoDict, err := GetDict(r, trailer["Info"])
 	if shouldExit(err) {
 		return nil, err

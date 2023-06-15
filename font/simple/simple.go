@@ -27,7 +27,6 @@ import (
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
-	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
@@ -190,6 +189,27 @@ func (e *embedded) Close() error {
 
 	// Determine the subset of glyphs to include.
 	encoding := e.enc.Encoding()
+	_, subsetGlyphs := makeSubset(encoding)
+	subsetTag := font.GetSubsetTag(subsetGlyphs, e.info.NumGlyphs())
+
+	// subset the font
+	var ss []sfnt.SubsetGlyph
+	ss = append(ss, sfnt.SubsetGlyph{OrigGID: 0, CID: 0})
+	for cid, gid := range encoding {
+		if gid != 0 {
+			ss = append(ss, sfnt.SubsetGlyph{OrigGID: gid, CID: type1.CID(cid)})
+		}
+	}
+	subsetInfo, err := e.info.SubsetSimple(ss)
+	if err != nil {
+		return fmt.Errorf("font subset: %w", err)
+	}
+
+	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
+
+	q := 1000 / float64(subsetInfo.UnitsPerEm)
+
+	var Widths pdf.Array
 	var firstChar type1.CID
 	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
 		firstChar++
@@ -198,102 +218,6 @@ func (e *embedded) Close() error {
 	for lastChar > firstChar && encoding[lastChar] == 0 {
 		lastChar--
 	}
-
-	subsetEncoding, subsetGlyphs := makeSubset(encoding)
-	subsetTag := font.GetSubsetTag(subsetGlyphs, e.info.NumGlyphs())
-
-	// subset the font
-	subsetInfo := &sfnt.Info{}
-	*subsetInfo = *e.info
-	switch outlines := e.info.Outlines.(type) {
-	case *cff.Outlines:
-		o2 := &cff.Outlines{}
-		pIdxMap := make(map[int]int)
-		for _, gid := range subsetGlyphs {
-			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
-			oldPIdx := outlines.FdSelect(gid)
-			_, ok := pIdxMap[oldPIdx]
-			if !ok {
-				newPIdx := len(o2.Private)
-				pIdxMap[oldPIdx] = newPIdx
-				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
-			}
-		}
-		o2.FdSelect = func(gid glyph.ID) int {
-			return pIdxMap[outlines.FdSelect(gid)]
-		}
-		if len(o2.Private) > 1 || o2.Glyphs[0].Name == "" {
-			// Embed as a CID-keyed CFF font.
-
-			// TODO(voss): is this right?
-			o2.ROS = &type1.CIDSystemInfo{
-				Registry:   "Adobe",
-				Ordering:   "Identity",
-				Supplement: 0,
-			}
-			o2.Gid2cid = make([]type1.CID, len(subsetGlyphs))
-			for code, subsetGid := range subsetEncoding {
-				o2.Gid2cid[subsetGid] = type1.CID(code)
-			}
-		} else {
-			// Embed as a simple CFF font.
-			o2.Encoding = subsetEncoding
-		}
-		subsetInfo.Outlines = o2
-
-	case *glyf.Outlines:
-		newGid := make(map[glyph.ID]glyph.ID)
-		todo := make(map[glyph.ID]bool)
-		nextGid := glyph.ID(0)
-		for _, gid := range subsetGlyphs {
-			newGid[gid] = nextGid
-			nextGid++
-
-			for _, gid2 := range outlines.Glyphs[gid].Components() {
-				if _, ok := newGid[gid2]; !ok {
-					todo[gid2] = true
-				}
-			}
-		}
-		for len(todo) > 0 {
-			gid := pop(todo)
-			subsetGlyphs = append(subsetGlyphs, gid)
-			newGid[gid] = nextGid
-			nextGid++
-
-			for _, gid2 := range outlines.Glyphs[gid].Components() {
-				if _, ok := newGid[gid2]; !ok {
-					todo[gid2] = true
-				}
-			}
-		}
-
-		o2 := &glyf.Outlines{
-			Tables: outlines.Tables,
-			Maxp:   outlines.Maxp,
-		}
-		for _, gid := range subsetGlyphs {
-			g := outlines.Glyphs[gid]
-			o2.Glyphs = append(o2.Glyphs, g.FixComponents(newGid))
-			o2.Widths = append(o2.Widths, outlines.Widths[gid])
-			// o2.Names = append(o2.Names, outlines.Names[gid])
-		}
-		subsetInfo.Outlines = o2
-
-		// Use a TrueType cmap format 4 to specify the mapping from
-		// character codes to glyph indices.
-		encoding := sfntcmap.Format4{}
-		for code, subsetGid := range subsetEncoding {
-			encoding[uint16(code)] = subsetGid
-		}
-		subsetInfo.CMap = encoding
-	}
-
-	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
-
-	q := 1000 / float64(subsetInfo.UnitsPerEm)
-
-	var Widths pdf.Array
 	for i := firstChar; i <= lastChar; i++ {
 		var width pdf.Integer
 		gid := encoding[i]
@@ -356,7 +280,7 @@ func (e *embedded) Close() error {
 		}
 		err = fontFile.Encode(fontFileStream)
 		if err != nil {
-			return err
+			return fmt.Errorf("embedding CFF font %q: %w", fontName, err)
 		}
 		err = fontFileStream.Close()
 		if err != nil {
@@ -377,7 +301,7 @@ func (e *embedded) Close() error {
 		if err != nil {
 			return err
 		}
-		n, err := subsetInfo.PDFEmbedTrueType(fontFileStream)
+		n, err := subsetInfo.WriteTrueTypePDF(fontFileStream)
 		if err != nil {
 			return err
 		}
@@ -391,7 +315,7 @@ func (e *embedded) Close() error {
 		}
 	}
 
-	err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
@@ -426,12 +350,4 @@ func makeSubset(origEncoding []glyph.ID) (subsetEncoding, glyphs []glyph.ID) {
 		glyphs = append(glyphs, origGid)
 	}
 	return subsetEncoding, glyphs
-}
-
-func pop(todo map[glyph.ID]bool) glyph.ID {
-	for key := range todo {
-		delete(todo, key)
-		return key
-	}
-	panic("empty map")
 }

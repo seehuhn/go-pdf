@@ -19,6 +19,7 @@ package cid
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"os"
 
@@ -215,74 +216,14 @@ func (e *embedded) Close() error {
 	}
 
 	// subset the font
-	subsetInfo := &sfnt.Info{}
-	*subsetInfo = *e.info
-	switch outlines := e.info.Outlines.(type) {
-	case *cff.Outlines:
-		o2 := &cff.Outlines{}
-		pIdxMap := make(map[int]int)
-		for _, gid := range subsetGlyphs {
-			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
-			oldPIdx := outlines.FdSelect(gid)
-			if _, ok := pIdxMap[oldPIdx]; !ok {
-				newPIdx := len(o2.Private)
-				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
-				pIdxMap[oldPIdx] = newPIdx
-			}
-		}
-		o2.FdSelect = func(gid glyph.ID) int {
-			// TODO(voss): is this correct???
-			origGid := glyph.ID(o2.Gid2cid[gid])
-			return pIdxMap[outlines.FdSelect(origGid)]
-		}
-		o2.ROS = CIDSystemInfo
-		o2.Gid2cid = make([]type1.CID, len(subsetGlyphs))
-		for subsetGid, origGid := range subsetGlyphs {
-			o2.Gid2cid[subsetGid] = type1.CID(origGid)
-		}
-		subsetInfo.Outlines = o2
-
-	case *glyf.Outlines:
-		newGid := make(map[glyph.ID]glyph.ID)
-		todo := make(map[glyph.ID]bool)
-		nextGid := glyph.ID(0)
-		for _, gid := range subsetGlyphs {
-			newGid[gid] = nextGid
-			nextGid++
-
-			for _, gid2 := range outlines.Glyphs[gid].Components() {
-				if _, ok := newGid[gid2]; !ok {
-					todo[gid2] = true
-				}
-			}
-		}
-		for len(todo) > 0 {
-			gid := pop(todo)
-			subsetGlyphs = append(subsetGlyphs, gid)
-			newGid[gid] = nextGid
-			nextGid++
-
-			for _, gid2 := range outlines.Glyphs[gid].Components() {
-				if _, ok := newGid[gid2]; !ok {
-					todo[gid2] = true
-				}
-			}
-		}
-
-		o2 := &glyf.Outlines{
-			Tables: outlines.Tables,
-			Maxp:   outlines.Maxp,
-		}
-		for _, gid := range subsetGlyphs {
-			g := outlines.Glyphs[gid]
-			o2.Glyphs = append(o2.Glyphs, g.FixComponents(newGid))
-			o2.Widths = append(o2.Widths, outlines.Widths[gid])
-		}
-		subsetInfo.Outlines = o2
-
-		// Use /CidToGidMap in the CIDFont dictionary (below) to specify the
-		// mapping from CID to GID values.
-		subsetInfo.CMap = nil
+	var ss []sfnt.SubsetGlyph
+	ss = append(ss, sfnt.SubsetGlyph{OrigGID: 0, CID: 0})
+	for _, p := range encoding {
+		ss = append(ss, sfnt.SubsetGlyph{OrigGID: p.GID, CID: p.CID})
+	}
+	subsetInfo, err := e.info.SubsetCID(ss, CIDSystemInfo)
+	if err != nil {
+		return fmt.Errorf("font subset: %w", err)
 	}
 
 	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
@@ -413,7 +354,7 @@ func (e *embedded) Close() error {
 		if err != nil {
 			return err
 		}
-		n, err := subsetInfo.PDFEmbedTrueType(fontFileStream)
+		n, err := subsetInfo.WriteTrueTypePDF(fontFileStream)
 		if err != nil {
 			return err
 		}
@@ -427,7 +368,7 @@ func (e *embedded) Close() error {
 		}
 	}
 
-	err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
@@ -448,12 +389,4 @@ func (e *embedded) Close() error {
 	}
 
 	return nil
-}
-
-func pop(todo map[glyph.ID]bool) glyph.ID {
-	for key := range todo {
-		delete(todo, key)
-		return key
-	}
-	panic("empty map")
 }
