@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/subset"
 )
 
 // EmbedFile loads a font from a file and embeds it into a PDF file.
@@ -187,20 +188,17 @@ func (e *embedded) Close() error {
 
 	w := e.w
 
-	// Determine the subset of glyphs to include.
-	encoding := e.enc.Encoding()
-	_, subsetGlyphs := makeSubset(encoding)
-	subsetTag := font.GetSubsetTag(subsetGlyphs, e.info.NumGlyphs())
-
 	// subset the font
-	var ss []sfnt.SubsetGlyph
-	ss = append(ss, sfnt.SubsetGlyph{OrigGID: 0, CID: 0})
+	var ss []subset.Glyph
+	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
+	encoding := e.enc.Encoding()
 	for cid, gid := range encoding {
 		if gid != 0 {
-			ss = append(ss, sfnt.SubsetGlyph{OrigGID: gid, CID: type1.CID(cid)})
+			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
 		}
 	}
-	subsetInfo, err := e.info.SubsetSimple(ss)
+	subsetTag := subset.Tag(ss, e.info.NumGlyphs())
+	subsetInfo, err := subset.Simple(e.info, ss)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
@@ -334,20 +332,4 @@ func (e *embedded) Close() error {
 	}
 
 	return nil
-}
-
-// MakeSubset returns a new encoding vector for the subsetted font,
-// and a list of glyph IDs to include in the subsetted font.
-func makeSubset(origEncoding []glyph.ID) (subsetEncoding, glyphs []glyph.ID) {
-	subsetEncoding = make([]glyph.ID, 256)
-	glyphs = append(glyphs, 0) // always include the .notdef glyph
-	for code, origGid := range origEncoding {
-		if origGid == 0 {
-			continue
-		}
-		newGid := glyph.ID(len(glyphs))
-		subsetEncoding[code] = newGid
-		glyphs = append(glyphs, origGid)
-	}
-	return subsetEncoding, glyphs
 }

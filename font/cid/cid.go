@@ -30,11 +30,11 @@ import (
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
-	"seehuhn.de/go/sfnt/type1"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/subset"
 )
 
 // Inside the PDF documents on my laptop, the following encodings are used
@@ -205,7 +205,6 @@ func (e *embedded) Close() error {
 	for _, p := range encoding {
 		subsetGlyphs = append(subsetGlyphs, p.GID)
 	}
-	subsetTag := font.GetSubsetTag(subsetGlyphs, e.info.NumGlyphs())
 
 	// TODO(voss): make sure there is only one copy of this per PDF file.
 	CIDSystemInfo := e.enc.CIDSystemInfo()
@@ -216,15 +215,16 @@ func (e *embedded) Close() error {
 	}
 
 	// subset the font
-	var ss []sfnt.SubsetGlyph
-	ss = append(ss, sfnt.SubsetGlyph{OrigGID: 0, CID: 0})
+	var ss []subset.Glyph
+	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
 	for _, p := range encoding {
-		ss = append(ss, sfnt.SubsetGlyph{OrigGID: p.GID, CID: p.CID})
+		ss = append(ss, subset.Glyph{OrigGID: p.GID, CID: p.CID})
 	}
-	subsetInfo, err := e.info.SubsetCID(ss, CIDSystemInfo)
+	subsetInfo, err := subset.CID(e.info, ss, CIDSystemInfo)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
+	subsetTag := subset.Tag(ss, e.info.NumGlyphs())
 
 	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
 
@@ -264,17 +264,17 @@ func (e *embedded) Close() error {
 		"StemV":       pdf.Integer(70), // information not available in sfnt files
 	}
 
-	// TODO(voss): use PrivateDict.StdVW from StemV in CFF fonts?
+	// TODO(voss): use PrivateDict.StdVW for StemV in CFF fonts?
 
 	compressedRefs := []pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, ROS, FontDescriptor}
 
 	var ww []WidthRec
-	widths := e.info.Widths()
-	for _, origGid := range subsetGlyphs {
-		ww = append(ww, WidthRec{type1.CID(origGid), widths[origGid]})
+	widths := subsetInfo.Widths()
+	for subsetGid, g := range ss {
+		ww = append(ww, WidthRec{g.CID, widths[subsetGid]})
 	}
-	DW, W := EncodeWidths(ww, e.info.UnitsPerEm)
+	DW, W := EncodeWidths(ww, subsetInfo.UnitsPerEm)
 	if W != nil {
 		WidthsRef := w.Alloc()
 		CIDFont["W"] = WidthsRef

@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,15 +14,45 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font
+package main
 
 import (
-	"testing"
+	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/builtin"
 )
 
-func TestGetSubsetTag(t *testing.T) {
-	tag := GetSubsetTag(nil, 0)
-	if tag != "AAAAAA" {
-		t.Error("wrong tag " + tag)
+func main() {
+	err := doit()
+	if err != nil {
+		panic(err)
 	}
+}
+
+func doit() error {
+	doc, err := document.CreateMultiPage("test.pdf", document.A4, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < 6; i++ {
+		page := doc.AddPage()
+
+		var F font.Font
+		var title string
+		switch i {
+		case 0:
+			F, err = builtin.Font(builtin.Helvetica)
+			title = "Helvetica"
+		default:
+			title = "To Be Done"
+		}
+
+		err = page.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return doc.Close()
 }

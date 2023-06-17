@@ -20,12 +20,12 @@ import (
 	"math"
 	"sort"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cid"
+	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -157,43 +157,22 @@ func (f *funkel) Close() error {
 	}
 
 	f.used[0] = true // always include the .notdef glyph
-	subsetGlyphs := maps.Keys(f.used)
-	sort.Slice(subsetGlyphs, func(i, j int) bool { return subsetGlyphs[i] < subsetGlyphs[j] })
-	subsetTag := font.GetSubsetTag(subsetGlyphs, f.info.NumGlyphs())
+
+	var ss []subset.Glyph
+	for gid := range f.used {
+		cid := type1.CID(f.enc[gid])
+		ss = append(ss, subset.Glyph{
+			OrigGID: gid,
+			CID:     cid,
+		})
+	}
+	sort.Slice(ss, func(i, j int) bool { return ss[i].OrigGID < ss[j].OrigGID })
+	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
 
 	// subset the font
-	subsetInfo := &sfnt.Info{}
-	*subsetInfo = *f.info
-	switch outlines := f.info.Outlines.(type) {
-	case *cff.Outlines:
-		o2 := &cff.Outlines{}
-		pIdxMap := make(map[int]int)
-		for _, gid := range subsetGlyphs {
-			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[gid])
-			oldPIdx := outlines.FDSelect(gid)
-			_, ok := pIdxMap[oldPIdx]
-			if !ok {
-				newPIdx := len(o2.Private)
-				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
-				pIdxMap[oldPIdx] = newPIdx
-			}
-		}
-		o2.FDSelect = func(gid glyph.ID) int {
-			origGid := glyph.ID(o2.Gid2Cid[gid])
-			return pIdxMap[outlines.FDSelect(origGid)]
-		}
-		o2.ROS = ROS
-		o2.Gid2Cid = make([]type1.CID, len(subsetGlyphs))
-		for subsetGid, origGid := range subsetGlyphs {
-			if origGid == 0 {
-				continue
-			}
-			o2.Gid2Cid[subsetGid] = type1.CID(f.enc[origGid])
-		}
-		subsetInfo.Outlines = o2
-
-	default:
-		panic("not implemented")
+	subsetInfo, err := subset.CID(f.info, ss, ROS)
+	if err != nil {
+		return err
 	}
 
 	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
@@ -271,7 +250,7 @@ func (f *funkel) Close() error {
 		compressedObjects = append(compressedObjects, W)
 	}
 
-	err := w.WriteCompressed(compressedRefs, compressedObjects...)
+	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
