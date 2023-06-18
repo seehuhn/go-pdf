@@ -90,7 +90,7 @@ func doit() error {
 			case 50:
 				page.TextSecondLine(0, 50)
 			default:
-				page.TextNewLine()
+				page.TextNextLine()
 			}
 			page.TextShowAligned(fmt.Sprintf("%d", i), 0, 1)
 		}
@@ -137,7 +137,7 @@ func doit() error {
 	page.TextShow("In professional production, the TrimBox gives the outline of the finished page after trimming.")
 	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
 	page.TextShow("On this page, the TrimBox is [100,500]×[100,500].  If your viewer supports BoxColorInfo,")
-	page.TextNewLine()
+	page.TextNextLine()
 	page.TextShow("the TrimBox may be shown in ")
 	page.SetFillColor(color.RGB(0.8, 0.4, 0))
 	page.TextShow("orange.")
@@ -149,7 +149,7 @@ func doit() error {
 	page.TextShow("In professional production, the BleedBox gives the print area before trimming.")
 	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
 	page.TextShow("On this page, the BleedBox is [85,515]×[85,515].  If your viewer supports BoxColorInfo,")
-	page.TextNewLine()
+	page.TextNextLine()
 	page.TextShow("the BleedBox may be shown in ")
 	page.SetFillColor(color.RGB(0, 0, 0.8))
 	page.TextShow("blue.")
@@ -161,7 +161,7 @@ func doit() error {
 	page.TextShow("The final page box is the ArtBox.")
 	page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
 	page.TextShow("On this page, the ArtBox is [150,450]×[150,450].  If your viewer supports BoxColorInfo,")
-	page.TextNewLine()
+	page.TextNextLine()
 	page.TextShow("the ArtBox may be shown in ")
 	page.SetFillColor(color.RGB(0, 0.8, 0))
 	page.TextShow("green.")

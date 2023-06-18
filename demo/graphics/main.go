@@ -56,7 +56,7 @@ func main() {
 	w.TextShow("AWAY again")
 	w.TextSecondLine(0, -15)
 	w.TextShow("line 2")
-	w.TextNewLine()
+	w.TextNextLine()
 	w.TextShow("line 3")
 	w.TextEnd()
 

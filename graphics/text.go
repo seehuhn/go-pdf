@@ -87,8 +87,8 @@ func (p *Page) TextSecondLine(dx, dy float64) {
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(dx), p.coord(dy), "TD")
 }
 
-// TextNewLine moves to the start of the next line of text.
-func (p *Page) TextNewLine() {
+// TextNextLine moves to the start of the next line of text.
+func (p *Page) TextNextLine() {
 	if !p.valid("TextNewLine", objText) {
 		return
 	}

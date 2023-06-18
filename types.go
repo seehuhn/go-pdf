@@ -631,11 +631,15 @@ func (x *Placeholder) Set(val Object) error {
 
 // Format formats a PDF object as a string, in the same way as the
 // it would be written to a PDF file.
-func Format(obj Object) (string, error) {
+func Format(obj Object) string {
 	if obj == nil {
-		return "null", nil
+		return "null"
 	}
 	buf := &bytes.Buffer{}
 	err := obj.PDF(buf)
-	return buf.String(), err
+	if err != nil {
+		// TODO(voss): what to do here?
+		panic(err)
+	}
+	return buf.String()
 }

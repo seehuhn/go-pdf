@@ -200,6 +200,9 @@ func (d *Data) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Write
 	// Copy dict, dict["Filter"], and dict["DecodeParms"], so that we don't
 	// change the caller's dict.
 	streamDict := maps.Clone(dict)
+	if streamDict == nil {
+		streamDict = Dict{}
+	}
 	if filter, ok := streamDict["Filter"].(Array); ok {
 		streamDict["Filter"] = append(Array{}, filter...)
 	}

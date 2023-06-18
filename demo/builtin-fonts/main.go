@@ -242,7 +242,7 @@ func (f *fontTables) MakeColumns(fontName string) error {
 				} else if i == 1 {
 					page.TextSecondLine(0, -baseLineSkip)
 				} else {
-					page.TextNewLine()
+					page.TextNextLine()
 				}
 
 				code := "—"

@@ -11,7 +11,7 @@ glyphs.
 
 ### Type1 Fonts
 
-These use `Type1` as the `Subtype` in the font dictionary.
+These fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile` entry in the font descriptor.
 The 14 built-in standard fonts are of this type.
 

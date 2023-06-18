@@ -131,7 +131,7 @@ func (info *Info) formatRange(r Range) (string, error) {
 }
 
 func formatPDFString(s string) (string, error) {
-	return pdf.Format(pdf.TextString(s))
+	return pdf.Format(pdf.TextString(s)), nil
 }
 
 const chunkSize = 100

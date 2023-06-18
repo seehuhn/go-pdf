@@ -66,6 +66,16 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOptions
 	}, nil
 }
 
+func AddMultiPage(out pdf.Putter, pageSize *pdf.Rectangle) (*MultiPage, error) {
+	tree := pagetree.NewWriter(out)
+
+	return &MultiPage{
+		Out:      out,
+		Tree:     tree,
+		mediaBox: pageSize,
+	}, nil
+}
+
 func (doc *MultiPage) Close() error {
 	if doc.numOpen != 0 {
 		return fmt.Errorf("%d pages still open", doc.numOpen)

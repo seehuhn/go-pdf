@@ -67,9 +67,9 @@ func main() {
 			} else {
 				page.TextShow("unencrypted text")
 			}
-			page.TextNewLine()
+			page.TextNextLine()
 			page.TextShow("user can copy")
-			page.TextNewLine()
+			page.TextNextLine()
 			if enc == "plain" {
 				page.TextShow("user can print")
 			} else {
