@@ -18,11 +18,13 @@ package main
 
 import (
 	"os"
+	"regexp"
 	"sort"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
@@ -64,6 +66,7 @@ func doit() error {
 	if err != nil {
 		return err
 	}
+	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
 	SB, err := builtin.Embed(doc.Out, builtin.HelveticaBold, "B")
@@ -97,6 +100,16 @@ func doit() error {
 			ffKey = "FontFile"
 		case 1:
 			title = "CFF Fonts"
+			intro = []string{
+				"These use `Type1` as the `Subtype` in the font dictionary.",
+				"Font data is embedded via the `FontFile3` entry in the font descriptor,",
+				"and the `Subtype` entry in the font file stream dictionary is `Type1C`.",
+				"",
+				"The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font must not",
+				"contain a `ROS` operator.  Usually, `Encoding` is omitted from the font dictionary,",
+				"and the mapping from character codes to glyph names is described by",
+				"the “builtin encoding” of the CFF font.",
+			}
 			X, err = simple.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
 			if err != nil {
 				return err
@@ -149,6 +162,7 @@ func doit() error {
 		l.yPos -= -l.F["title"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
 
 		page.TextStart()
+		intro = append(intro, "", "Example:")
 		for i, line := range intro {
 			switch i {
 			case 0:
@@ -160,22 +174,34 @@ func doit() error {
 				page.TextNextLine()
 			}
 			if line != "" {
-				page.TextShow(line)
+				mmm := findCode.FindAllStringIndex(line, -1)
+				start := 0
+				for _, mm := range mmm {
+					if start < mm[0] {
+						page.TextShow(line[start:mm[0]])
+					}
+					page.TextSetFont(l.F["code"].F, l.F["code"].ptSize)
+					page.TextShow(line[mm[0]+1 : mm[1]-1])
+					page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
+					start = mm[1]
+				}
+				if start < len(line) {
+					page.TextShow(line[start:])
+				}
 			}
 			l.yPos -= l.F["text"].baseLineSkip
 		}
 		page.TextEnd()
+		l.yPos -= -l.F["text"].descent
 
 		if X == nil {
 			page.Close()
 			continue
 		}
 
-		l.yPos -= -l.F["text"].descent + 20
+		l.yPos -= 20
 		page.TextStart()
 		page.TextFirstLine(l.leftMargin, l.yPos)
-		page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
-		page.TextShow("example: ")
 		page.TextSetFont(X, 24)
 		page.TextShow("Hello World!")
 		page.TextEnd()
@@ -190,7 +216,7 @@ func doit() error {
 		if err != nil {
 			return err
 		}
-		l.ShowDict(page, fontDict, "Font Dictionary")
+		yFD := l.ShowDict(page, fontDict, "Font Dictionary")
 		fd := fontDict["FontDescriptor"]
 
 		df := fontDict["DescendantFonts"]
@@ -203,8 +229,10 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			l.ShowDict(page, cidFontDict, "CIDFont Dictionary")
+			yCF := l.ShowDict(page, cidFontDict, "CIDFont Dictionary")
 			fd = cidFontDict["FontDescriptor"]
+
+			l.connect(page, yFD["DescendantFonts"], yCF[""], 20)
 		}
 
 		if fd != nil {
@@ -258,7 +286,8 @@ type layout struct {
 	rightMargin float64
 }
 
-func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) {
+func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) map[pdf.Name]float64 {
+	yy := make(map[pdf.Name]float64)
 	keys := maps.Keys(fontDict)
 	sort.Slice(keys, func(i, j int) bool {
 		if order(keys[i]) != order(keys[j]) {
@@ -296,6 +325,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) 
 	l.yPos -= l.F["text"].baseLineSkip
 	l.yPos -= 9
 	y1 := l.yPos + 5
+	yy[""] = y1
 	titleWitdhPDF := l.F["text"].geom.ToPDF(l.F["text"].ptSize, gg.AdvanceWidth())
 
 	page.TextStart()
@@ -310,6 +340,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) 
 			page.TextNextLine()
 		}
 		lineNo++
+		yy[key] = l.yPos - 0.6*l.F["dict"].ascent
 		l.yPos -= l.F["dict"].baseLineSkip
 
 		gg := keyGlyphs[i]
@@ -340,6 +371,27 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) 
 	page.Stroke()
 
 	l.yPos -= 10
+
+	return yy
+}
+
+func (l *layout) connect(page *document.Page, y0, y1 float64, delta float64) {
+	vLinePos := l.leftMargin - delta
+	page.PushGraphicsState()
+	col := color.Gray(0.5)
+	page.SetFillColor(col)
+	page.SetStrokeColor(col)
+	page.MoveTo(l.leftMargin-4, y0)
+	page.LineTo(vLinePos, y0)
+	page.LineTo(vLinePos, y1)
+	page.LineTo(l.leftMargin-4, y1)
+	page.Stroke()
+	// draw an arrow head
+	page.MoveTo(l.leftMargin-4, y1)
+	page.LineTo(l.leftMargin-4-6, y1-3)
+	page.LineTo(l.leftMargin-4-6, y1+3)
+	page.Fill()
+	page.PopGraphicsState()
 }
 
 func (l *layout) addFont(key string, F font.Embedded, ptSize float64) {
@@ -387,3 +439,5 @@ func order(key pdf.Name) int {
 		return 999
 	}
 }
+
+var findCode = regexp.MustCompile("`.*?`")
