@@ -95,16 +95,23 @@ func (p *Page) TextNextLine() {
 	_, p.Err = fmt.Fprintln(p.Content, "T*")
 }
 
+// TextLayout returns the glyph sequence for a string.
+// The function panics if no font is set.
+func (p *Page) TextLayout(s string) glyph.Seq {
+	return p.font.Layout(s, p.fontSize)
+}
+
 // TextShow draws a string.
-func (p *Page) TextShow(s string) {
+func (p *Page) TextShow(s string) float64 {
 	if !p.valid("TextShow", objText) {
-		return
+		return 0
 	}
 	if p.font == nil {
 		p.Err = errors.New("no font set")
-		return
+		return 0
 	}
-	p.showGlyphsWithMargins(p.font.Layout(s, p.fontSize), 0, 0)
+	gg := p.TextLayout(s)
+	return p.showGlyphsWithMargins(gg, 0, 0)
 }
 
 // TextShowAligned draws a string and aligns it.
@@ -123,16 +130,16 @@ func (p *Page) TextShowAligned(s string, w, q float64) {
 }
 
 // TextShowGlyphs draws a sequence of glyphs.
-func (p *Page) TextShowGlyphs(gg glyph.Seq) {
+func (p *Page) TextShowGlyphs(gg glyph.Seq) float64 {
 	if !p.valid("TextShowGlyphs", objText) {
-		return
+		return 0
 	}
 	if p.font == nil {
 		p.Err = errors.New("no font set")
-		return
+		return 0
 	}
 
-	p.showGlyphsWithMargins(gg, 0, 0)
+	return p.showGlyphsWithMargins(gg, 0, 0)
 }
 
 // TextShowGlyphsAligned draws a sequence of glyphs and aligns it.
@@ -164,20 +171,13 @@ func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
 	p.showGlyphsWithMargins(gg, left*1000/p.fontSize, right*1000/p.fontSize)
 }
 
-func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
+func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 {
 	if len(gg) == 0 {
-		return
+		return 0
 	}
 
-	font := p.font
-	geom := font.GetGeometry()
-	widths := geom.Widths
-	unitsPerEm := geom.UnitsPerEm
-	q := 1000 / float64(unitsPerEm)
-
-	var out pdf.Array
 	var run pdf.String
-
+	var out pdf.Array
 	flush := func() {
 		if len(run) > 0 {
 			out = append(out, run)
@@ -186,11 +186,12 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 		if len(out) == 0 {
 			return
 		}
+
+		if p.Err != nil {
+			return
+		}
 		if len(out) == 1 {
 			if s, ok := out[0].(pdf.String); ok {
-				if p.Err != nil {
-					return
-				}
 				p.Err = s.PDF(p.Content)
 				if p.Err != nil {
 					return
@@ -201,20 +202,24 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 			}
 		}
 
-		if p.Err != nil {
-			return
-		}
 		p.Err = out.PDF(p.Content)
 		if p.Err != nil {
 			return
 		}
 		_, p.Err = fmt.Fprintln(p.Content, " TJ")
-		if p.Err != nil {
-			return
-		}
 		out = nil
 	}
 
+	font := p.font
+	geom := font.GetGeometry()
+	widths := geom.Widths
+	unitsPerEm := geom.UnitsPerEm
+	q := 1000 / float64(unitsPerEm)
+
+	var advanceWidth float64
+
+	// xOffset is the difference between the wanted x position and the
+	// actual x position, in PDF font units.
 	xOffset := left
 	for _, glyph := range gg {
 		xOffset += float64(glyph.XOffset) * q
@@ -224,31 +229,35 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 				out = append(out, run)
 				run = nil
 			}
+			// advance the actual x position by xOffsetInt
 			out = append(out, -xOffsetInt)
 			xOffset -= float64(xOffsetInt)
+			advanceWidth += float64(xOffsetInt)
 		}
 
 		if newYPos := pdf.Integer(math.Round(float64(glyph.YOffset) * q)); newYPos != p.textRise {
 			flush()
 			p.textRise = newYPos
 			if p.Err != nil {
-				return
+				return 0
 			}
 			p.Err = p.textRise.PDF(p.Content)
 			if p.Err != nil {
-				return
+				return 0
 			}
 			_, p.Err = fmt.Fprintln(p.Content, " Ts")
 		}
 
 		gid := glyph.Gid
 		if int(gid) > len(widths) {
-			// TODO(voss): Is this the right thing to do?
 			gid = 0
 		}
 		run = font.AppendEncoded(run, glyph.Gid, glyph.Text)
 
+		// Advance the wanted x position by the glyph advance width, minus the xOffset.
+		// Advance the actual x position by the PDF glyph width.
 		xOffset += float64(glyph.Advance-glyph.XOffset-widths[gid]) * q
+		advanceWidth += float64(widths[gid]) * q
 	}
 
 	xOffset += right
@@ -259,7 +268,9 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) {
 			run = nil
 		}
 		out = append(out, -xOffsetInt)
+		advanceWidth += float64(xOffsetInt)
 	}
 
 	flush()
+	return advanceWidth * p.fontSize / 1000
 }

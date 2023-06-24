@@ -17,6 +17,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"sort"
@@ -30,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/font/simple"
+	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -61,6 +63,12 @@ func doit() error {
 		return err
 	}
 	l.addFont("text", F, 10)
+
+	I, err := builtin.Embed(doc.Out, builtin.TimesItalic, "I")
+	if err != nil {
+		return err
+	}
+	l.addFont("it", I, 10)
 
 	S, err := builtin.Embed(doc.Out, builtin.Helvetica, "S")
 	if err != nil {
@@ -101,7 +109,7 @@ func doit() error {
 		case 1:
 			title = "CFF Fonts"
 			intro = []string{
-				"These use `Type1` as the `Subtype` in the font dictionary.",
+				"These fonts use `Type1` as the `Subtype` in the font dictionary.",
 				"Font data is embedded via the `FontFile3` entry in the font descriptor,",
 				"and the `Subtype` entry in the font file stream dictionary is `Type1C`.",
 				"",
@@ -117,8 +125,36 @@ func doit() error {
 			ffKey = "FontFile3"
 		case 2:
 			title = "CFF-based OpenType Fonts"
+			intro = []string{
+				"These fonts use `Type1` as the `Subtype` in the font dictionary.",
+				"The font data is embedded via the `FontFile3` entry in the font descriptor,",
+				"and the `Subtype` entry in the font file stream dictionary is `OpenType`.",
+				"Only a subset of the OpenType tables is required for embedded fonts.",
+				"",
+				"The CFF data embedded in the OpenType font is not allowed to be CID-keyed,",
+				"*i.e.* the CFF font must not contain a `ROS` operator.  Usually, `Encoding` is",
+				"omitted from the font dictionary, and the mapping from character codes to glyph",
+				"names is described by the “builtin encoding” of the OpenType font.",
+				"",
+				"There seems little reasson to use this font type, since the CFF font data",
+				"can be embedded directly without the OpenType wrapper.",
+			}
+			X, err = embedOpenTypeSimple(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
+			if err != nil {
+				return err
+			}
+			ffKey = "FontFile3"
 		case 3:
 			title = "TrueType Fonts"
+			intro = []string{
+				"These fonts use `TrueType` as the `Subtype` in the font dictionary.",
+				"The font data is embedded via the `FontFile2` entry in the font descriptor.",
+				"Only a subset of the TrueType tables is required for embedded fonts.",
+				"",
+				"Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`",
+				"table describes the mapping from character codes to glyphs (see section 9.6.6.4",
+				"of PDF 32000-1:2008).",
+			}
 			X, err = simple.EmbedFile(doc.Out, "../../../ttf/SourceSerif4-Regular.ttf", "X", language.English)
 			if err != nil {
 				return err
@@ -126,8 +162,33 @@ func doit() error {
 			ffKey = "FontFile2"
 		case 4:
 			title = "Glypf-based OpenType Fonts"
+			intro = []string{
+				"These fonts use `TrueType` as the `Subtype` in the font dictionary.",
+				"The font data is embedded via the `FontFile3` entry in the font descriptor,",
+				"and the `Subtype` entry in the font file stream dictionary is `OpenType`.",
+				"",
+				"Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`",
+				"table describes the mapping from character codes to glyphs (see section 9.6.6.4",
+				"of PDF 32000-1:2008).",
+				"",
+				"There seems little reasson to use this font type, since the font data",
+				"could equally be embedded as a TrueType font.",
+			}
+			ffKey = "FontFile2"
 		case 5:
 			title = "Type3 Fonts"
+			intro = []string{
+				"These fonts use `Type3` as the `Subtype` in the font dictionary.",
+				"The font data is embedded via the `CharProcs` entry in the font dictionary.",
+				"",
+				"The `Encoding` entry in the font dictionary describes the mapping from",
+				"character codes to glyph names (*i.e.* to the keys in the `CharProcs`",
+				"dictionary).",
+			}
+			X, err = embedType3Font(doc.Out)
+			if err != nil {
+				return err
+			}
 		case 6:
 			title = "CFF CIDFonts"
 			X, err = cid.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
@@ -180,7 +241,12 @@ func doit() error {
 					if start < mm[0] {
 						page.TextShow(line[start:mm[0]])
 					}
-					page.TextSetFont(l.F["code"].F, l.F["code"].ptSize)
+					switch line[mm[0]] {
+					case '`':
+						page.TextSetFont(l.F["code"].F, l.F["code"].ptSize)
+					case '*':
+						page.TextSetFont(l.F["it"].F, l.F["it"].ptSize)
+					}
 					page.TextShow(line[mm[0]+1 : mm[1]-1])
 					page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
 					start = mm[1]
@@ -203,7 +269,11 @@ func doit() error {
 		page.TextStart()
 		page.TextFirstLine(l.leftMargin, l.yPos)
 		page.TextSetFont(X, 24)
-		page.TextShow("Hello World!")
+		if i != 5 {
+			page.TextShow("Hello World!")
+		} else {
+			page.TextShow("ABC")
+		}
 		page.TextEnd()
 		l.yPos -= 30
 
@@ -216,8 +286,9 @@ func doit() error {
 		if err != nil {
 			return err
 		}
-		yFD := l.ShowDict(page, fontDict, "Font Dictionary")
+		yFD := l.ShowDict(page, fontDict, "Font Dictionary", X.Reference())
 		fd := fontDict["FontDescriptor"]
+		y0FontDesc := yFD["FontDescriptor"]
 
 		df := fontDict["DescendantFonts"]
 		if df != nil {
@@ -229,8 +300,10 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			yCF := l.ShowDict(page, cidFontDict, "CIDFont Dictionary")
+			ref, _ := dfArray[0].(pdf.Reference)
+			yCF := l.ShowDict(page, cidFontDict, "CIDFont Dictionary", ref)
 			fd = cidFontDict["FontDescriptor"]
+			y0FontDesc = yCF["FontDescriptor"]
 
 			l.connect(page, yFD["DescendantFonts"], yCF[""], 20)
 		}
@@ -240,7 +313,9 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			l.ShowDict(page, fdDict, "Font Descriptor")
+			ref, _ := fd.(pdf.Reference)
+			yFontDesc := l.ShowDict(page, fdDict, "Font Descriptor", ref)
+			l.connect(page, y0FontDesc, yFontDesc[""], 20)
 
 			ff := fdDict[ffKey]
 			if ff != nil {
@@ -249,9 +324,20 @@ func doit() error {
 					return err
 				}
 				if ffStream != nil {
-					l.ShowDict(page, ffStream.Dict, "Font file stream dictionary")
+					ref, _ := ff.(pdf.Reference)
+					yStreamDict := l.ShowDict(page, ffStream.Dict, "Font file stream dictionary", ref)
+					l.connect(page, yFontDesc[ffKey], yStreamDict[""], 20)
 				}
 			}
+		}
+
+		if i == 5 {
+			cp, err := pdf.GetDict(data, fontDict["CharProcs"])
+			if err != nil {
+				return err
+			}
+			yCP := l.ShowDict(page, cp, "CharProcs", 0)
+			l.connect(page, yFD["CharProcs"], yCP[""], 20)
 		}
 
 		err = page.Close()
@@ -286,7 +372,7 @@ type layout struct {
 	rightMargin float64
 }
 
-func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) map[pdf.Name]float64 {
+func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, ref pdf.Reference) map[pdf.Name]float64 {
 	yy := make(map[pdf.Name]float64)
 	keys := maps.Keys(fontDict)
 	sort.Slice(keys, func(i, j int) bool {
@@ -315,25 +401,32 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) 
 		}
 	}
 
+	xBase := l.leftMargin + 5
+
 	y0 := l.yPos + 2
 	page.TextStart()
-	page.TextFirstLine(l.leftMargin, l.yPos-l.F["text"].ascent)
+	page.TextFirstLine(xBase, l.yPos-l.F["text"].ascent)
 	page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
-	gg := l.F["text"].F.Layout(title, l.F["text"].ptSize)
-	page.TextShowGlyphs(gg)
+	titleWitdhPDF := page.TextShow(title)
+	if ref != 0 {
+		titleWitdhPDF += page.TextShow(" (")
+		page.TextSetFont(l.F["code"].F, l.F["code"].ptSize)
+		titleWitdhPDF += page.TextShow(fmt.Sprintf("%d %d obj", ref.Number(), ref.Generation()))
+		page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
+		titleWitdhPDF += page.TextShow(")")
+	}
 	page.TextEnd()
 	l.yPos -= l.F["text"].baseLineSkip
 	l.yPos -= 9
 	y1 := l.yPos + 5
 	yy[""] = y1
-	titleWitdhPDF := l.F["text"].geom.ToPDF(l.F["text"].ptSize, gg.AdvanceWidth())
 
 	page.TextStart()
 	lineNo := 0
 	for i, key := range keys {
 		switch lineNo {
 		case 0:
-			page.TextFirstLine(l.leftMargin, l.yPos-l.F["dict"].ascent)
+			page.TextFirstLine(xBase, l.yPos-l.F["dict"].ascent)
 		case 1:
 			page.TextSecondLine(0, -l.F["dict"].baseLineSkip)
 		default:
@@ -365,9 +458,9 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) 
 	}
 
 	_ = y1
-	page.Rectangle(l.leftMargin-4, y2, wPDF+8, y0-y2)
-	page.MoveTo(l.leftMargin-4, y1)
-	page.LineTo(l.leftMargin+wPDF+4, y1)
+	page.Rectangle(xBase-4, y2, wPDF+8, y0-y2)
+	page.MoveTo(xBase-4, y1)
+	page.LineTo(xBase+wPDF+4, y1)
 	page.Stroke()
 
 	l.yPos -= 10
@@ -377,19 +470,21 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string) 
 
 func (l *layout) connect(page *document.Page, y0, y1 float64, delta float64) {
 	vLinePos := l.leftMargin - delta
+	xBase := l.leftMargin
 	page.PushGraphicsState()
 	col := color.Gray(0.5)
 	page.SetFillColor(col)
 	page.SetStrokeColor(col)
-	page.MoveTo(l.leftMargin-4, y0)
+	page.MoveTo(xBase+3.5, y0)
 	page.LineTo(vLinePos, y0)
 	page.LineTo(vLinePos, y1)
-	page.LineTo(l.leftMargin-4, y1)
+	page.LineTo(xBase-5, y1)
 	page.Stroke()
 	// draw an arrow head
-	page.MoveTo(l.leftMargin-4, y1)
-	page.LineTo(l.leftMargin-4-6, y1-3)
-	page.LineTo(l.leftMargin-4-6, y1+3)
+	page.MoveTo(xBase, y1)
+	page.LineTo(xBase-6, y1-2.5)
+	page.LineTo(xBase-5.5, y1)
+	page.LineTo(xBase-6, y1+2.5)
 	page.Fill()
 	page.PopGraphicsState()
 }
@@ -440,4 +535,51 @@ func order(key pdf.Name) int {
 	}
 }
 
-var findCode = regexp.MustCompile("`.*?`")
+func embedType3Font(out pdf.Putter) (font.Embedded, error) {
+	b := type3.New(1000)
+	b.Ascent = 800
+	b.Descent = -200
+	b.BaseLineSkip = 1000
+
+	A, err := b.AddGlyph("A", 1000, funit.Rect16{LLx: 0, LLy: 0, URx: 800, URy: 800}, true)
+	if err != nil {
+		return nil, err
+	}
+	A.MoveTo(0, 0)
+	A.LineTo(800, 0)
+	A.LineTo(800, 800)
+	A.LineTo(0, 800)
+	A.Fill()
+	err = A.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	B, err := b.AddGlyph("B", 900, funit.Rect16{LLx: 0, LLy: 0, URx: 800, URy: 800}, true)
+	if err != nil {
+		return nil, err
+	}
+	B.Circle(400, 400, 400)
+	B.Fill()
+	err = B.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	C, err := b.AddGlyph("C", 1000, funit.Rect16{LLx: 0, LLy: 0, URx: 800, URy: 800}, true)
+	if err != nil {
+		return nil, err
+	}
+	C.MoveTo(0, 0)
+	C.LineTo(800, 0)
+	C.LineTo(400, 800)
+	C.Fill()
+	err = C.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return b.EmbedFont(out, "X")
+}
+
+var findCode = regexp.MustCompile("`.*?`|\\*.*?\\*")

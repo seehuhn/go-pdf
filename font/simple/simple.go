@@ -81,10 +81,7 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 // to larger PDF files but there is no limit on the number of distinct glyphs
 // which can be accessed.
 func Font(info *sfnt.Info, loc language.Tag) (font.Font, error) {
-	gsubLookups := info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures)
-	gposLookups := info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures)
-
-	g := &font.Geometry{
+	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
 		GlyphExtents: info.Extents(),
 		Widths:       info.Widths(),
@@ -98,9 +95,9 @@ func Font(info *sfnt.Info, loc language.Tag) (font.Font, error) {
 
 	res := &simple{
 		info:        info,
-		gsubLookups: gsubLookups,
-		gposLookups: gposLookups,
-		g:           g,
+		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
+		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		g:           geometry,
 	}
 
 	return res, nil

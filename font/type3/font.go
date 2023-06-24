@@ -57,7 +57,7 @@ type Builder struct {
 	// The following fields are simply copied into the font's [font.Geometry]
 	// struct.  They are not otherwise used.
 	Ascent             funit.Int16
-	Descent            funit.Int16
+	Descent            funit.Int16 // negative
 	BaseLineSkip       funit.Int16
 	UnderlinePosition  funit.Int16
 	UnderlineThickness funit.Int16

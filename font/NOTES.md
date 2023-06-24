@@ -26,7 +26,7 @@ weight, width, etc.). Multiple master Type1 fonts use `MMType1` as the
 
 ### CFF Fonts (PDF 1.2)
 
-These use `Type1` as the `Subtype` in the font dictionary.
+These fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `Type1C`.
 
@@ -37,7 +37,7 @@ the "builtin encoding" of the CFF font.
 
 ### CFF-based OpenType Fonts (PDF 1.6)
 
-These use `Type1` as the `Subtype` in the font dictionary.
+These fonts use `Type1` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `OpenType`.
 
@@ -51,21 +51,21 @@ can be embedded directly without the OpenType wrapper.
 
 ### TrueType Fonts (PDF 1.1)
 
-These use `TrueType` as the `Subtype` in the font dictionary.
+These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile2` entry in the font descriptor.
 Only a subset of the TrueType tables is required for embedded fonts.
 
-Usually, `Encoding` is omitted from the font dictionary, and a TrueType "cmap"
+Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`
 table describes the mapping from character codes to glyphs (see section 9.6.6.4
 of PDF 32000-1:2008).
 
 ### Glyf-based OpenType Fonts (PDF 1.6)
 
-These use `TrueType` as the `Subtype` in the font dictionary.
+These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `OpenType`.
 
-Usually, `Encoding` is omitted from the font dictionary, and a TrueType "cmap"
+Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`
 table describes the mapping from character codes to glyphs (see section 9.6.6.4
 of PDF 32000-1:2008).
 
@@ -74,7 +74,7 @@ could equally be embedded as a TrueType font.
 
 ### Type3 Fonts
 
-These use `Type3` as the `Subtype` in the font dictionary.
+These fonts use `Type3` as the `Subtype` in the font dictionary.
 The font data is embedded via the `CharProcs` entry in the font dictionary.
 
 The `Encoding` entry in the font dictionary describes the mapping from
@@ -96,7 +96,7 @@ and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `CIDFontType0C`.
 
-The `Encoding` entry in the font dictionary specifies a CMap which
+The `Encoding` entry in the font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.
 If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
@@ -108,8 +108,9 @@ These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `OpenType`.
+Only a subset of the OpenType tables is required for embedded fonts.
 
-The `Encoding` entry in the font dictionary specifies a CMap which
+The `Encoding` entry in the font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.
 If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
@@ -125,7 +126,7 @@ and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.
 The font data is embedded via the `FontFile2` entry in the font descriptor.
 Only a subset of the TrueType tables is required for embedded fonts.
 
-The `Encoding` entry in the PDF font dictionary specifies a CMap which
+The `Encoding` entry in the PDF font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 
@@ -135,8 +136,9 @@ These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `OpenType`.
+Only a subset of the OpenType tables is required for embedded fonts.
 
-The `Encoding` entry in the font dictionary specifies a CMap which
+The `Encoding` entry in the font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 
