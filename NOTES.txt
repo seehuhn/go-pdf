@@ -1,3 +1,13 @@
+Related Projects
+================
+
+- https://pkg.go.dev/rsc.io/pdf
+- https://github.com/pdfcpu/pdfcpu
+- https://www.adobe.com/devnet/font.html
+- https://github.com/speedata/boxesandglue
+- https://github.com/benoitkugler/pdf
+
+
 List of PDF viewers/renderers
 =============================
 

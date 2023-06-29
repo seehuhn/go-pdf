@@ -17,10 +17,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
@@ -45,6 +47,11 @@ func main() {
 
 func doit() error {
 	paper := document.A4
+
+	sections, err := parseNotes("NOTES.md")
+	if err != nil {
+		return err
+	}
 
 	data := pdf.NewData(pdf.V1_7)
 	doc, err := document.AddMultiPage(data, paper)
@@ -83,133 +90,63 @@ func doit() error {
 	}
 	l.addFont("title", SB, 18)
 
-	for i := 0; i < 10; i++ {
-		page := doc.AddPage()
+	for _, s := range sections {
+		title := s.title
+		intro := s.lines
+		example := "Hello World!"
 
 		var X font.Embedded
-		var title string
-		var intro []string
 		var ffKey pdf.Name
-		switch i {
-		case 0:
-			title = "Type1 Fonts"
-			intro = []string{
-				"Type1 fonts use `Type1` as the `Subtype` in the font dictionary.",
-				"Font data is embedded via the `FontFile` entry in the font descriptor.",
-				"The 14 built-in standard fonts are of this type.",
-				"",
-				"The `Encoding` entry in the font dictionary describes the mapping from",
-				"character codes to glyph names.",
-			}
+		switch title {
+		case "Type1 Fonts":
 			X, err = builtin.Embed(doc.Out, builtin.TimesRoman, "F")
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile"
-		case 1:
-			title = "CFF Fonts"
-			intro = []string{
-				"These fonts use `Type1` as the `Subtype` in the font dictionary.",
-				"Font data is embedded via the `FontFile3` entry in the font descriptor,",
-				"and the `Subtype` entry in the font file stream dictionary is `Type1C`.",
-				"",
-				"The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font must not",
-				"contain a `ROS` operator.  Usually, `Encoding` is omitted from the font dictionary,",
-				"and the mapping from character codes to glyph names is described by",
-				"the “builtin encoding” of the CFF font.",
-			}
+		case "CFF Fonts":
 			X, err = simple.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile3"
-		case 2:
-			title = "CFF-based OpenType Fonts"
-			intro = []string{
-				"These fonts use `Type1` as the `Subtype` in the font dictionary.",
-				"The font data is embedded via the `FontFile3` entry in the font descriptor,",
-				"and the `Subtype` entry in the font file stream dictionary is `OpenType`.",
-				"Only a subset of the OpenType tables is required for embedded fonts.",
-				"",
-				"The CFF data embedded in the OpenType font is not allowed to be CID-keyed,",
-				"*i.e.* the CFF font must not contain a `ROS` operator.  Usually, `Encoding` is",
-				"omitted from the font dictionary, and the mapping from character codes to glyph",
-				"names is described by the “builtin encoding” of the OpenType font.",
-				"",
-				"There seems little reasson to use this font type, since the CFF font data",
-				"can be embedded directly without the OpenType wrapper.",
-			}
+		case "CFF-based OpenType Fonts":
 			X, err = embedOpenTypeSimple(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile3"
-		case 3:
-			title = "TrueType Fonts"
-			intro = []string{
-				"These fonts use `TrueType` as the `Subtype` in the font dictionary.",
-				"The font data is embedded via the `FontFile2` entry in the font descriptor.",
-				"Only a subset of the TrueType tables is required for embedded fonts.",
-				"",
-				"Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`",
-				"table describes the mapping from character codes to glyphs (see section 9.6.6.4",
-				"of PDF 32000-1:2008).",
-			}
+		case "TrueType Fonts":
 			X, err = simple.EmbedFile(doc.Out, "../../../ttf/SourceSerif4-Regular.ttf", "X", language.English)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile2"
-		case 4:
-			title = "Glypf-based OpenType Fonts"
-			intro = []string{
-				"These fonts use `TrueType` as the `Subtype` in the font dictionary.",
-				"The font data is embedded via the `FontFile3` entry in the font descriptor,",
-				"and the `Subtype` entry in the font file stream dictionary is `OpenType`.",
-				"",
-				"Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`",
-				"table describes the mapping from character codes to glyphs (see section 9.6.6.4",
-				"of PDF 32000-1:2008).",
-				"",
-				"There seems little reasson to use this font type, since the font data",
-				"could equally be embedded as a TrueType font.",
-			}
+		case "Glyf-based OpenType Fonts":
 			ffKey = "FontFile2"
-		case 5:
-			title = "Type3 Fonts"
-			intro = []string{
-				"These fonts use `Type3` as the `Subtype` in the font dictionary.",
-				"The font data is embedded via the `CharProcs` entry in the font dictionary.",
-				"",
-				"The `Encoding` entry in the font dictionary describes the mapping from",
-				"character codes to glyph names (*i.e.* to the keys in the `CharProcs`",
-				"dictionary).",
-			}
+		case "Type3 Fonts":
 			X, err = embedType3Font(doc.Out)
 			if err != nil {
 				return err
 			}
-		case 6:
-			title = "CFF CIDFonts"
+			example = "ABC"
+		case "CFF CIDFonts":
 			X, err = cid.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile3"
-		case 7:
-			title = "CFF-based OpenType CIDFonts"
-		case 8:
-			title = "TrueType CIDFonts"
+		case "CFF-based OpenType CIDFonts":
+		case "TrueType CIDFonts":
 			X, err = cid.EmbedFile(doc.Out, "../../../ttf/SourceSerif4-Regular.ttf", "X", language.English)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile2"
-		case 9:
-			title = "Glypf-based OpenType CIDFonts"
-		default:
-			title = "To Be Done"
+		case "Glyf-based OpenType CIDFonts":
 		}
+
+		page := doc.AddPage()
 
 		gg := SB.Layout(title, 18)
 		w := l.F["title"].geom.ToPDF(l.F["title"].ptSize, gg.AdvanceWidth())
@@ -223,7 +160,9 @@ func doit() error {
 		l.yPos -= -l.F["title"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
 
 		page.TextStart()
-		intro = append(intro, "", "Example:")
+		if X != nil {
+			intro = append(intro, "", "Example:")
+		}
 		for i, line := range intro {
 			switch i {
 			case 0:
@@ -269,11 +208,7 @@ func doit() error {
 		page.TextStart()
 		page.TextFirstLine(l.leftMargin, l.yPos)
 		page.TextSetFont(X, 24)
-		if i != 5 {
-			page.TextShow("Hello World!")
-		} else {
-			page.TextShow("ABC")
-		}
+		page.TextShow(example)
 		page.TextEnd()
 		l.yPos -= 30
 
@@ -331,7 +266,7 @@ func doit() error {
 			}
 		}
 
-		if i == 5 {
+		if title == "Type3 Fonts" {
 			cp, err := pdf.GetDict(data, fontDict["CharProcs"])
 			if err != nil {
 				return err
@@ -362,6 +297,41 @@ func doit() error {
 	}
 
 	return nil
+}
+
+type section struct {
+	title string
+	lines []string
+}
+
+func parseNotes(fname string) ([]section, error) {
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var sections []section
+	var current section
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "### ") {
+			if current.title != "" {
+				sections = append(sections, current)
+			}
+			title := line[4:]
+			title = pdfVersion.ReplaceAllString(title, "")
+			current = section{title: title}
+		} else {
+			current.lines = append(current.lines, line)
+		}
+	}
+	if current.title != "" {
+		sections = append(sections, current)
+	}
+
+	return sections, nil
 }
 
 type layout struct {
@@ -582,4 +552,7 @@ func embedType3Font(out pdf.Putter) (font.Embedded, error) {
 	return b.EmbedFont(out, "X")
 }
 
-var findCode = regexp.MustCompile("`.*?`|\\*.*?\\*")
+var (
+	pdfVersion = regexp.MustCompile(`\s+\(PDF \d\.\d\)\s*$`)
+	findCode   = regexp.MustCompile("`.*?`|\\*.*?\\*")
+)

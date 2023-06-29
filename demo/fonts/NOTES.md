@@ -18,15 +18,17 @@ The 14 built-in standard fonts are of this type.
 The `Encoding` entry in the font dictionary describes the mapping from
 character codes to glyph names.
 
-### Multiple Master Type1 Fonts
+### Multiple Master Fonts
 
-These are fonts which can be modified using one or more parameters (e.g.
-weight, width, etc.). Multiple master Type1 fonts use `MMType1` as the
+These are Type1 fonts which can be modified using one or more parameters
+(weight, width, *etc.*).  Multiple Master fonts use `MMType1` as the
 `Subtype` in the font dictionary.
+
+Multiple Master Fonts are not supported by this library.
 
 ### CFF Fonts (PDF 1.2)
 
-These fonts use `Type1` as the `Subtype` in the font dictionary.
+CFF fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `Type1C`.
 
@@ -89,7 +91,7 @@ CIDFonts can use multiple bytes to encode a character, the exact encoding is
 configurable.  The most common encoding is `Identity-H` which uses two bytes
 for every character.
 
-### CFF Fonts (PDF 1.3)
+### CFF CIDFonts (PDF 1.3)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.
@@ -102,7 +104,7 @@ If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
 glyphs.  Otherwise, the CID is used as the glyph index directly.
 
-### CFF-based OpenType Fonts (PDF 1.6)
+### CFF-based OpenType CIDFonts (PDF 1.6)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.
@@ -119,7 +121,7 @@ glyphs.  Otherwise, the CID is used as the glyph index directly.
 There seems little reasson to use this font type, since the OpenType wrapper
 could be omitted and the CFF font data could be embedded as a CFF font.
 
-### TrueType Fonts (PDF 1.3)
+### TrueType CIDFonts (PDF 1.3)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.
@@ -130,7 +132,7 @@ The `Encoding` entry in the PDF font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 
-### Glyf-based OpenType Fonts (PDF 1.6)
+### Glyf-based OpenType CIDFonts (PDF 1.6)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.
