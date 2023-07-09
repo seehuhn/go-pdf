@@ -73,7 +73,7 @@ func (p *Page) LineToArc(x, y, radius, startAngle, endAngle float64) {
 	p.arc(x, y, radius, startAngle, endAngle, false)
 }
 
-// arc appends a circular to the current path.
+// arc appends a circular path to the current path.
 func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 	p.currentObject = objPath
 
@@ -101,7 +101,7 @@ func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 		y3 := y + radius*math.Sin(phi)
 		x2 := x3 + k*math.Sin(phi)
 		y2 := y3 - k*math.Cos(phi)
-		_, p.Err = fmt.Fprintln(p.Content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
+		p.CurveTo(x1, y1, x2, y2, x3, y3)
 		x0 = x3
 		y0 = y3
 	}

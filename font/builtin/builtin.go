@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/sfnt/afm"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/type1/names"
 )
@@ -40,7 +41,7 @@ func Embed(w pdf.Putter, fontName string, resName pdf.Name) (font.Embedded, erro
 
 // EmbedAfm loads a simple Type 1 font described by `afm` and embeds it
 // into a PDF file.
-func EmbedAfm(w pdf.Putter, afm *AfmInfo, resName pdf.Name) (font.Embedded, error) {
+func EmbedAfm(w pdf.Putter, afm *afm.Info, resName pdf.Name) (font.Embedded, error) {
 	font, err := FontAfm(afm)
 	if err != nil {
 		return nil, err
@@ -60,7 +61,7 @@ func Font(fontName string) (font.Font, error) {
 
 // FontAfm returns a Font structure representing a simple Type 1 font,
 // described by `afm`.
-func FontAfm(afm *AfmInfo) (font.Font, error) {
+func FontAfm(afm *afm.Info) (font.Font, error) {
 	if len(afm.Code) == 0 {
 		return nil, errors.New("no glyphs in font")
 	}
@@ -101,7 +102,7 @@ func FontAfm(afm *AfmInfo) (font.Font, error) {
 }
 
 type builtin struct {
-	afm  *AfmInfo
+	afm  *afm.Info
 	g    *font.Geometry
 	cmap map[rune]int
 }

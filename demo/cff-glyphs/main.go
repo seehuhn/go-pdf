@@ -208,8 +208,8 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		page.PopGraphicsState()
 
 		if len(g.Cmds) > 0 {
-			var xx []cff.Fixed16
-			var yy []cff.Fixed16
+			var xx []float64
+			var yy []float64
 
 			// draw the glyph outline
 			var ink bool
@@ -221,18 +221,18 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 					if ink {
 						page.ClosePath()
 					}
-					page.MoveTo(cmd.Args[0].Float64(), cmd.Args[1].Float64())
+					page.MoveTo(cmd.Args[0], cmd.Args[1])
 					xx = append(xx, cmd.Args[0])
 					yy = append(yy, cmd.Args[1])
 				case cff.OpLineTo:
-					page.LineTo(cmd.Args[0].Float64(), cmd.Args[1].Float64())
+					page.LineTo(cmd.Args[0], cmd.Args[1])
 					xx = append(xx, cmd.Args[0])
 					yy = append(yy, cmd.Args[1])
 					ink = true
 				case cff.OpCurveTo:
-					page.CurveTo(cmd.Args[0].Float64(), cmd.Args[1].Float64(),
-						cmd.Args[2].Float64(), cmd.Args[3].Float64(),
-						cmd.Args[4].Float64(), cmd.Args[5].Float64())
+					page.CurveTo(cmd.Args[0], cmd.Args[1],
+						cmd.Args[2], cmd.Args[3],
+						cmd.Args[4], cmd.Args[5])
 					xx = append(xx, cmd.Args[4])
 					yy = append(yy, cmd.Args[5])
 					ink = true
@@ -252,8 +252,8 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 			xPrev := 0.0
 			yPrev := 0.0
 			for i := range xx {
-				x := xx[i].Float64()
-				y := yy[i].Float64() - 2
+				x := xx[i]
+				y := yy[i] - 2
 				dx := x - xPrev
 				dy := y - yPrev
 				page.TextFirstLine(dx, dy)
