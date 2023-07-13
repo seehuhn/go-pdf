@@ -62,7 +62,7 @@ func Font(fontName string) (font.Font, error) {
 // FontAfm returns a Font structure representing a simple Type 1 font,
 // described by `afm`.
 func FontAfm(afm *afm.Info) (font.Font, error) {
-	if len(afm.Code) == 0 {
+	if len(afm.Widths) == 0 {
 		return nil, errors.New("no glyphs in font")
 	}
 
@@ -78,9 +78,11 @@ func FontAfm(afm *afm.Info) (font.Font, error) {
 		// TODO(voss): UnderlineThickness
 	}
 
+	isDingbats := afm.FontName == "ZapfDingbats"
+
 	cmap := make(map[rune]int)
 	for gid, name := range afm.GlyphName {
-		rr := names.ToUnicode(name, afm.IsDingbats)
+		rr := names.ToUnicode(name, isDingbats)
 		if len(rr) != 1 {
 			continue
 		}
@@ -206,13 +208,18 @@ func (e *embedded) Close() error {
 	}
 
 	builtinEncoding := make([]glyph.ID, 256)
-	for gid, code := range e.afm.Code {
-		if code > 0 && code < 256 {
-			builtinEncoding[code] = glyph.ID(gid)
-		}
+	glyphID := make(map[string]glyph.ID)
+	for gid, name := range e.afm.GlyphName {
+		glyphID[name] = glyph.ID(gid)
 	}
+	for code, name := range e.afm.Encoding {
+		builtinEncoding[code] = glyphID[name]
+	}
+
+	isDingbats := e.afm.FontName == "ZapfDingbats"
+
 	enc := font.DescribeEncoding(e.enc.Encoding(), builtinEncoding,
-		e.afm.GlyphName, e.afm.IsDingbats)
+		e.afm.GlyphName, isDingbats)
 	if enc != nil {
 		Font["Encoding"] = enc
 	}

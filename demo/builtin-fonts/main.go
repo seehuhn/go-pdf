@@ -162,7 +162,15 @@ func (f *fontTables) MakeColumns(fontName string) error {
 		return err
 	}
 
-	nGlyph := len(afm.Code)
+	glyphCode := make(map[string]int)
+	for i, name := range afm.Encoding {
+		if name == ".notdef" {
+			continue
+		}
+		glyphCode[name] = i
+	}
+
+	nGlyph := len(afm.Widths)
 
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4
@@ -188,7 +196,7 @@ func (f *fontTables) MakeColumns(fontName string) error {
 
 		yTop := f.margin + f.textHeight - f.used - afm.Ascent.AsFloat(fontSize/1000)
 
-		// draw the rectanges for the glyph extents in the background
+		// draw the rectangles for the glyph extents in the background
 		tmpGlyph := curGlyph
 		page.PushGraphicsState()
 		page.SetFillColor(color.RGB(.4, 1, .4))
@@ -245,9 +253,10 @@ func (f *fontTables) MakeColumns(fontName string) error {
 					page.TextNextLine()
 				}
 
+				name := afm.GlyphName[curGlyph]
 				code := "—"
-				if afm.Code[curGlyph] >= 0 {
-					code = fmt.Sprintf("%d", afm.Code[curGlyph])
+				if glyphCode[name] >= 0 {
+					code = fmt.Sprintf("%d", glyphCode[name])
 				}
 				page.TextSetFont(f.bodyFont, fontSize)
 				page.TextShowAligned(code, 16, 1)
@@ -262,7 +271,7 @@ func (f *fontTables) MakeColumns(fontName string) error {
 				page.TextShowGlyphsAligned(g, 32, 0.5)
 
 				page.TextSetFont(f.bodyFont, fontSize)
-				page.TextShow(afm.GlyphName[curGlyph])
+				page.TextShow(name)
 
 				curGlyph++
 			}
