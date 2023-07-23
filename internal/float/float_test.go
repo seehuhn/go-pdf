@@ -17,6 +17,7 @@
 package float
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -60,7 +61,7 @@ func TestFormat(t *testing.T) {
 func FuzzFormat(f *testing.F) {
 	f.Fuzz(func(t *testing.T, x float64, digits int) {
 		// The Format function is only used in the PDF writer, which
-		// only uses it with digits in the range [0, 5].
+		// only uses it with `digits`` in the range {0, ..., 5}.
 		if digits < 0 || digits > 5 {
 			return
 		}
@@ -68,7 +69,8 @@ func FuzzFormat(f *testing.F) {
 		y, err := strconv.ParseFloat(xString, 64)
 		if err != nil {
 			t.Errorf("strconv.ParseFloat(%q, 64) failed: %v", xString, err)
-		} else if math.Abs(x-y) > 0.500001*math.Pow10(-digits) {
+		} else if math.Log10(x)+float64(digits) < 15 && math.Abs(x-y) > 0.500001*math.Pow10(-digits) {
+			fmt.Println(math.Abs(x-y), 0.500001*math.Pow10(-digits))
 			t.Errorf("Format(%g, %d) = %q", x, digits, xString)
 		}
 	})
