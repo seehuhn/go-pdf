@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/gofont"
 )
 
 func main() {
@@ -117,7 +118,15 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "TrueType Fonts":
-			X, err = simple.EmbedFile(doc.Out, "../../../ttf/SourceSerif4-Regular.ttf", "X", language.English)
+			ttf, err := gofont.TrueType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			F, err := simple.Font(ttf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
 			if err != nil {
 				return err
 			}
