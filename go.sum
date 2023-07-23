@@ -5,8 +5,6 @@ github.com/xdg-go/stringprep v1.0.4/go.mod h1:mPGuuIYwz7CmR2bT9j4GbQqutWS1zV24gi
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
-golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 h1:5llv2sWeaMSnA3w2kS57ouQQ4pudlXrR0dCgw51QK9o=
-golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53/go.mod h1:V1LtkGg67GoY2N1AnLN78QLrzxkLyJw7RJb1gzOOz9w=
 golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 h1:MGwJjxBy0HJshjDNfLsYO8xppfqWlA5ZT9OhtUUhTNw=
 golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1/go.mod h1:FXUEEKJgO7OQYeo8N01OfiKP8RXMtf6e8aTskBGqWdc=
 golang.org/x/image v0.7.0 h1:gzS29xtG1J5ybQlv0PuyfE3nmc6R4qB73m6LUUmvFuw=
@@ -41,11 +39,7 @@ seehuhn.de/go/dag v0.0.0-20230228001113-19b4e3c37e21 h1:lxbISEHVNtjW+p0IJAYNq40V
 seehuhn.de/go/dag v0.0.0-20230228001113-19b4e3c37e21/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
 seehuhn.de/go/dijkstra v0.9.3 h1:uVbFjlAuhlwV45qM7S4Wz+C7XlfbgAaTfcZX1r8OgIA=
 seehuhn.de/go/dijkstra v0.9.3/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
-seehuhn.de/go/postscript v0.0.0-20230704184248-9032502d53ec h1:bgR1salNhhR7IOEIzGWK++oMo6zrzYItZwM0y+A9AzI=
-seehuhn.de/go/postscript v0.0.0-20230704184248-9032502d53ec/go.mod h1:Om+T+I6k21epqQrwh6+Wx0VwyZroPN9nXkd5o2PX4sM=
 seehuhn.de/go/postscript v0.3.4 h1:EGkb8pxUptFxM0+NGrhMdqgOrjUV/UbI19JnD2pq500=
 seehuhn.de/go/postscript v0.3.4/go.mod h1:eULPCCLjgEc6gJe0Fwn9xmTFIRR/+P/3oSe5SBEnJaQ=
-seehuhn.de/go/sfnt v0.3.1-0.20230713095033-c8282668990f h1:vmByVk9QGL6nrLq+aSpbHH0OcGBj6lnPn74XTIP/qn4=
-seehuhn.de/go/sfnt v0.3.1-0.20230713095033-c8282668990f/go.mod h1:rD+dhHVdPvNNjhgT97qeDI/k62jxAirCPU5Rz7EiBG4=
 seehuhn.de/go/sfnt v0.3.4 h1:xsM381Kow0emoNS1899rqfkXbj13STeD3joEoLfnTBE=
 seehuhn.de/go/sfnt v0.3.4/go.mod h1:EBRVPFe1p8c2400WePGTYP3EfpYrHHXAkbvPmwWBTTA=
