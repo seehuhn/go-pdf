@@ -18,6 +18,16 @@ The 14 built-in standard fonts are of this type.
 The `Encoding` entry in the font dictionary describes the mapping from
 character codes to glyph names.
 
+### Builtin Fonts
+
+There are 14 standard fonts which are built into every PDF viewer.  These fonts
+have standardised names.  They use `Type1` as the `Subtype` in the font
+dictionary, but no font descripter is required and no font data needs to be
+embedded.
+
+The `Encoding` entry in the font dictionary describes the mapping from
+character codes to glyph names.
+
 ### Multiple Master Fonts
 
 These are Type1 fonts which can be modified using one or more parameters

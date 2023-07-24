@@ -54,7 +54,7 @@ func TestFDSelect(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		o1.Gid2Cid[i] = type1.CID(i)
 	}
-	i1 := &sfnt.Info{
+	i1 := &sfnt.Font{
 		FamilyName: "Test",
 		UnitsPerEm: 1000,
 		Outlines:   o1,
@@ -78,7 +78,7 @@ func TestFDSelect(t *testing.T) {
 	if len(o2.Gid2Cid) != len(ss) {
 		t.Fatalf("expected %d Gid2Cid entries, got %d", len(ss), len(o2.Gid2Cid))
 	}
-	for i, info := range []*sfnt.Info{i1, i2} {
+	for i, info := range []*sfnt.Font{i1, i2} {
 		o := info.Outlines.(*cff.Outlines)
 		for gidInt, cid := range o.Gid2Cid {
 			gid := glyph.ID(gidInt)

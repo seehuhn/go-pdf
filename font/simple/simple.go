@@ -80,7 +80,7 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 // returned font object.  In comparison, fonts embedded via cid.Font() lead
 // to larger PDF files but there is no limit on the number of distinct glyphs
 // which can be accessed.
-func Font(info *sfnt.Info, loc language.Tag) (font.Font, error) {
+func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
 		GlyphExtents: info.Extents(),
@@ -104,7 +104,7 @@ func Font(info *sfnt.Info, loc language.Tag) (font.Font, error) {
 }
 
 type simple struct {
-	info        *sfnt.Info
+	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	g           *font.Geometry

@@ -33,7 +33,6 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/font/simple"
-	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/gofont"
@@ -100,6 +99,9 @@ func doit() error {
 		var ffKey pdf.Name
 		switch title {
 		case "Type1 Fonts":
+		case "Builtin Fonts":
+			// TODO(voss): have separate sections for builtin fonts
+			// and type 1 fonts from files?
 			X, err = builtin.Embed(doc.Out, builtin.TimesRoman, "F")
 			if err != nil {
 				return err
@@ -112,7 +114,11 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "CFF-based OpenType Fonts":
-			X, err = embedOpenTypeSimple(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
+			ttf, err := gofont.OpenType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			X, err = embedOpenTypeSimple(doc.Out, ttf, "X", language.English)
 			if err != nil {
 				return err
 			}
@@ -512,53 +518,6 @@ func order(key pdf.Name) int {
 	default:
 		return 999
 	}
-}
-
-func embedType3Font(out pdf.Putter) (font.Embedded, error) {
-	b := type3.New(1000)
-	b.Ascent = 800
-	b.Descent = -200
-	b.BaseLineSkip = 1000
-
-	A, err := b.AddGlyph("A", 1000, funit.Rect16{LLx: 0, LLy: 0, URx: 800, URy: 800}, true)
-	if err != nil {
-		return nil, err
-	}
-	A.MoveTo(0, 0)
-	A.LineTo(800, 0)
-	A.LineTo(800, 800)
-	A.LineTo(0, 800)
-	A.Fill()
-	err = A.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	B, err := b.AddGlyph("B", 900, funit.Rect16{LLx: 0, LLy: 0, URx: 800, URy: 800}, true)
-	if err != nil {
-		return nil, err
-	}
-	B.Circle(400, 400, 400)
-	B.Fill()
-	err = B.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	C, err := b.AddGlyph("C", 1000, funit.Rect16{LLx: 0, LLy: 0, URx: 800, URy: 800}, true)
-	if err != nil {
-		return nil, err
-	}
-	C.MoveTo(0, 0)
-	C.LineTo(800, 0)
-	C.LineTo(400, 800)
-	C.Fill()
-	err = C.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	return b.EmbedFont(out, "X")
 }
 
 var (

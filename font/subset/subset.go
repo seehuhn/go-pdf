@@ -36,7 +36,7 @@ type Glyph struct {
 }
 
 // Simple constructs a subset of the font, for use in a simple PDF font.
-func Simple(info *sfnt.Info, subset []Glyph) (*sfnt.Info, error) {
+func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
 	if len(subset) == 0 || subset[0].OrigGID != 0 {
 		return nil, errors.New("subset does not start with .notdef")
 	}
@@ -46,7 +46,7 @@ func Simple(info *sfnt.Info, subset []Glyph) (*sfnt.Info, error) {
 		}
 	}
 
-	res := &sfnt.Info{}
+	res := &sfnt.Font{}
 	*res = *info
 
 	switch outlines := info.Outlines.(type) {
@@ -142,7 +142,7 @@ func Simple(info *sfnt.Info, subset []Glyph) (*sfnt.Info, error) {
 }
 
 // CID constructs a subset of the font for use as a CID-keyed PDF font.
-func CID(info *sfnt.Info, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Info, error) {
+func CID(info *sfnt.Font, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Font, error) {
 	if len(subset) == 0 || subset[0].OrigGID != 0 {
 		return nil, errors.New("subset does not start with .notdef")
 	}
@@ -150,7 +150,7 @@ func CID(info *sfnt.Info, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Info,
 		return nil, errors.New("ROS cannot be nil for CID-keyed font")
 	}
 
-	res := &sfnt.Info{}
+	res := &sfnt.Font{}
 	*res = *info
 
 	switch outlines := info.Outlines.(type) {

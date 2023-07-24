@@ -111,7 +111,7 @@ func doit() error {
 type funkel struct {
 	w pdf.Putter
 
-	info        *sfnt.Info
+	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	geometry    *font.Geometry

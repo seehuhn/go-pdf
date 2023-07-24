@@ -23,7 +23,7 @@ import (
 
 // MakeFlags returns the PDF font flags for the font.
 // See section 9.8.2 of PDF 32000-1:2008.
-func MakeFlags(info *sfnt.Info, symbolic bool) Flags {
+func MakeFlags(info *sfnt.Font, symbolic bool) Flags {
 	var flags Flags
 
 	if info.IsFixedPitch() {

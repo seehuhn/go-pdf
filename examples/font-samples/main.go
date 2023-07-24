@@ -188,7 +188,7 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 	return nil
 }
 
-func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Info) error {
+func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
 	f.fontNo++
 	X, err := cid.Embed(f.doc.Out, info, instName, language.AmericanEnglish)

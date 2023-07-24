@@ -33,7 +33,7 @@ import (
 )
 
 type openTypeSimple struct {
-	info        *sfnt.Info
+	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	geometry    *font.Geometry
@@ -47,16 +47,11 @@ type openTypeSimple struct {
 	closed bool
 }
 
-func embedOpenTypeSimple(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
-	info, err := sfnt.ReadFile(fname)
-	if err != nil {
-		return nil, err
-	}
-
+func embedOpenTypeSimple(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
-	err = pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}

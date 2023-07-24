@@ -65,7 +65,7 @@ func EmbedFile(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (
 
 // Embed creates a PDF CIDFont and embeds it into a PDF file.
 // At the moment, only TrueType and OpenType fonts are supported.
-func Embed(w pdf.Putter, info *sfnt.Info, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+func Embed(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
 	f, err := Font(info, loc)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 //
 // CIDFonts lead to larger PDF files than simple fonts, but there is no limit
 // on the number of distinct glyphs which can be accessed.
-func Font(info *sfnt.Info, loc language.Tag) (font.Font, error) {
+func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
 	gsubLookups := info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures)
 	gposLookups := info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures)
 
@@ -123,7 +123,7 @@ func Font(info *sfnt.Info, loc language.Tag) (font.Font, error) {
 }
 
 type cidfont struct {
-	info        *sfnt.Info
+	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	g           *font.Geometry
