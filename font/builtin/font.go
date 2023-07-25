@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package builtin
 
 import (
@@ -49,12 +65,8 @@ type fontInfo struct {
 	geom     *font.Geometry
 	encoding []glyph.ID
 	cmap     map[rune]glyph.ID
-	lig      map[pair]glyph.ID
-	kern     map[pair]funit.Int16
-}
-
-type pair struct {
-	left, right glyph.ID
+	lig      map[glyph.Pair]glyph.ID
+	kern     map[glyph.Pair]funit.Int16
 }
 
 func getFontInfo(f Font) (*fontInfo, error) {
@@ -102,7 +114,7 @@ func getFontInfo(f Font) (*fontInfo, error) {
 	}
 
 	cmap := make(map[rune]glyph.ID)
-	isDingbats := f == "ZapfDingbats"
+	isDingbats := afm.Info.FontName == "ZapfDingbats"
 	for gid, name := range glyphNames {
 		rr := names.ToUnicode(name, isDingbats)
 		if len(rr) != 1 {
@@ -116,18 +128,18 @@ func getFontInfo(f Font) (*fontInfo, error) {
 		cmap[r] = glyph.ID(gid)
 	}
 
-	lig := make(map[pair]glyph.ID)
+	lig := make(map[glyph.Pair]glyph.ID)
 	for left, name := range glyphNames {
 		gi := afm.GlyphInfo[name]
 		for right, repl := range gi.Ligatures {
-			lig[pair{left: glyph.ID(left), right: nameGid[right]}] = nameGid[repl]
+			lig[glyph.Pair{Left: glyph.ID(left), Right: nameGid[right]}] = nameGid[repl]
 		}
 	}
 
-	kern := make(map[pair]funit.Int16)
+	kern := make(map[glyph.Pair]funit.Int16)
 	for _, k := range afm.Kern {
 		left, right := nameGid[k.Left], nameGid[k.Right]
-		kern[pair{left: left, right: right}] = k.Adjust
+		kern[glyph.Pair{Left: left, Right: right}] = k.Adjust
 	}
 
 	res := &fontInfo{
@@ -150,27 +162,28 @@ func (info *fontInfo) GetGeometry() *font.Geometry {
 func (info *fontInfo) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
 
-	gg := make(glyph.Seq, len(rr))
+	gg := make(glyph.Seq, 0, len(rr))
 	var prev glyph.ID
 	for i, r := range rr {
 		gid := info.cmap[r]
 		if i > 0 {
-			if repl, ok := info.lig[pair{left: prev, right: gid}]; ok {
-				gg[i-1].Gid = repl
-				gg[i-1].Text = append(gg[i-1].Text, r)
-				gg = gg[:len(gg)-1]
+			if repl, ok := info.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
+				gg[len(gg)-1].Gid = repl
+				gg[len(gg)-1].Text = append(gg[len(gg)-1].Text, r)
 				prev = repl
 				continue
 			}
 		}
-		gg[i].Gid = glyph.ID(gid)
-		gg[i].Text = []rune{r}
+		gg = append(gg, glyph.Info{
+			Gid:  gid,
+			Text: []rune{r},
+		})
 		prev = gid
 	}
 
 	for i, g := range gg {
 		if i > 0 {
-			if adj, ok := info.kern[pair{left: prev, right: g.Gid}]; ok {
+			if adj, ok := info.kern[glyph.Pair{Left: prev, Right: g.Gid}]; ok {
 				gg[i-1].Advance += adj
 			}
 		}

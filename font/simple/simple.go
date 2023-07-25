@@ -289,9 +289,9 @@ func (e *embedded) Close() error {
 
 		// Write the "font program".
 		// See section 9.9 of PDF 32000-1:2008 for details.
-		size := pdf.NewPlaceholder(w, 10)
+		length1 := pdf.NewPlaceholder(w, 10)
 		fontFileDict := pdf.Dict{
-			"Length1": size,
+			"Length1": length1,
 		}
 		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
 		if err != nil {
@@ -301,7 +301,7 @@ func (e *embedded) Close() error {
 		if err != nil {
 			return err
 		}
-		err = size.Set(pdf.Integer(n))
+		err = length1.Set(pdf.Integer(n))
 		if err != nil {
 			return err
 		}

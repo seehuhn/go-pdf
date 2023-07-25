@@ -102,6 +102,15 @@ func doit() error {
 		var ffKey pdf.Name
 		switch title {
 		case "Type1 Fonts":
+			t1, err := gofont.Type1(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			X, err = embedType1(doc.Out, t1, "X")
+			if err != nil {
+				return err
+			}
+			ffKey = "FontFile"
 		case "Builtin Fonts":
 			// TODO(voss): have separate sections for builtin fonts
 			// and type 1 fonts from files?
@@ -109,7 +118,6 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			ffKey = "FontFile"
 		case "CFF Fonts":
 			X, err = simple.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
 			if err != nil {
