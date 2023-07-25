@@ -46,11 +46,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := builtin.Embed(doc.Out, "Helvetica", "L")
+	labelFont, err := builtin.Helvetica.Embed(doc.Out, "L")
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := builtin.Embed(doc.Out, "Helvetica-Bold", "T")
+	titleFont, err := builtin.HelveticaBold.Embed(doc.Out, "T")
 	if err != nil {
 		log.Fatal(err)
 	}

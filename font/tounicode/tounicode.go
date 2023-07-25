@@ -19,8 +19,9 @@ package tounicode
 import (
 	"fmt"
 
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf

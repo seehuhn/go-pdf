@@ -22,14 +22,17 @@ import (
 	"math"
 
 	"golang.org/x/text/language"
+
+	"seehuhn.de/go/postscript/type1"
+
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gtab"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 type openTypeSimple struct {
@@ -84,57 +87,57 @@ func embedOpenTypeSimple(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc la
 	return res, nil
 }
 
-func (o *openTypeSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	return o, nil
+func (f *openTypeSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	return f, nil
 }
 
-func (o *openTypeSimple) GetGeometry() *font.Geometry {
-	return o.geometry
+func (f *openTypeSimple) GetGeometry() *font.Geometry {
+	return f.geometry
 }
 
-func (o *openTypeSimple) ResourceName() pdf.Name {
-	return o.resName
+func (f *openTypeSimple) ResourceName() pdf.Name {
+	return f.resName
 }
 
-func (o *openTypeSimple) Reference() pdf.Reference {
-	return o.ref
+func (f *openTypeSimple) Reference() pdf.Reference {
+	return f.ref
 }
 
-func (o *openTypeSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *openTypeSimple) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
-	return o.info.Layout(rr, o.gsubLookups, o.gposLookups)
+	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
 }
 
-func (o *openTypeSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	o.text[gid] = rr
-	return append(s, o.enc.Encode(gid, rr))
+func (f *openTypeSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	f.text[gid] = rr
+	return append(s, f.enc.Encode(gid, rr))
 }
 
-func (o *openTypeSimple) Close() error {
-	if o.closed {
+func (f *openTypeSimple) Close() error {
+	if f.closed {
 		return nil
 	}
-	o.closed = true
+	f.closed = true
 
-	if o.enc.Overflow() {
+	if f.enc.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			o.resName, o.info.PostscriptName())
+			f.resName, f.info.PostscriptName())
 	}
-	o.enc = cmap.NewFrozenSimpleEncoder(o.enc)
+	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
 
-	w := o.w
+	w := f.w
 
 	// subset the font
 	var ss []subset.Glyph
 	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	encoding := o.enc.Encoding()
+	encoding := f.enc.Encoding()
 	for cid, gid := range encoding {
 		if gid != 0 {
 			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
 		}
 	}
-	subsetTag := subset.Tag(ss, o.info.NumGlyphs())
-	subsetInfo, err := subset.Simple(o.info, ss)
+	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
+	subsetInfo, err := subset.Simple(f.info, ss)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
@@ -156,12 +159,12 @@ func (o *openTypeSimple) Close() error {
 		var width pdf.Integer
 		gid := encoding[i]
 		if gid != 0 {
-			width = pdf.Integer(math.Round(o.info.GlyphWidth(gid).AsFloat(q)))
+			width = pdf.Integer(math.Round(f.info.GlyphWidth(gid).AsFloat(q)))
 		}
 		Widths = append(Widths, width)
 	}
 
-	FontDictRef := o.ref
+	FontDictRef := f.ref
 	FontDescriptorRef := w.Alloc()
 	WidthsRef := w.Alloc()
 	FontFileRef := w.Alloc()
@@ -224,10 +227,10 @@ func (o *openTypeSimple) Close() error {
 
 	var cc2text []font.SimpleMapping
 	for code, gid := range encoding {
-		if gid == 0 || len(o.text[gid]) == 0 {
+		if gid == 0 || len(f.text[gid]) == 0 {
 			continue
 		}
-		rr := o.text[gid]
+		rr := f.text[gid]
 		cc2text = append(cc2text, font.SimpleMapping{Code: byte(code), Text: rr})
 	}
 	err = font.WriteToUnicodeSimple(w, ToUnicodeRef, subsetTag, cc2text)

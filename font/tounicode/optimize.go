@@ -20,9 +20,9 @@ import (
 	"sort"
 
 	"golang.org/x/exp/slices"
-
 	"seehuhn.de/go/dag"
-	"seehuhn.de/go/sfnt/type1"
+
+	"seehuhn.de/go/postscript/type1"
 )
 
 // ToMapping converts the ToUnicode CMap to a list of mappings.

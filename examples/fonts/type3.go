@@ -17,10 +17,11 @@
 package main
 
 import (
+	"seehuhn.de/go/postscript/funit"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/sfnt/funit"
 )
 
 func embedType3Font(out pdf.Putter) (font.Embedded, error) {

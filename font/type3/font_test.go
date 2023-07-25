@@ -19,9 +19,10 @@ package type3
 import (
 	"testing"
 
+	"seehuhn.de/go/postscript/funit"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/sfnt/funit"
 )
 
 func TestType3(t *testing.T) {

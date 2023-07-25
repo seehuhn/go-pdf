@@ -20,9 +20,11 @@ package font
 import (
 	"math"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/funit"
+	"seehuhn.de/go/postscript/funit"
+
 	"seehuhn.de/go/sfnt/glyph"
+
+	"seehuhn.de/go/pdf"
 )
 
 type Geometry struct {
@@ -30,8 +32,8 @@ type Geometry struct {
 	Ascent             funit.Int16
 	Descent            funit.Int16 // negative
 	BaseLineSkip       funit.Int16
-	UnderlinePosition  funit.Int16
-	UnderlineThickness funit.Int16
+	UnderlinePosition  funit.Float64
+	UnderlineThickness funit.Float64
 
 	GlyphExtents []funit.Rect16
 	Widths       []funit.Int16

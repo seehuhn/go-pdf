@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"log"
 
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 func main() {
@@ -38,11 +39,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := builtin.Embed(doc.Out, "Times-Roman", "F")
+	labelFont, err := builtin.TimesRoman.Embed(doc.Out, "F")
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := builtin.Embed(doc.Out, "Times-Bold", "B")
+	titleFont, err := builtin.TimesBold.Embed(doc.Out, "B")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,8 +63,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, fontName := range builtin.FontNames {
-		err = f.AddTitle(fontName, 10, 36, 12)
+	for _, fontName := range builtin.All {
+		err = f.AddTitle(string(fontName), 10, 36, 12)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -154,10 +155,10 @@ func (f *fontTables) AddTitle(title string, fontSize, a, b float64) error {
 	return nil
 }
 
-func (f *fontTables) MakeColumns(fontName string) error {
+func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 	fontSize := 10.0
 
-	afm, err := builtin.Afm(fontName)
+	afm, err := fnt.Afm()
 	if err != nil {
 		return err
 	}
@@ -170,7 +171,7 @@ func (f *fontTables) MakeColumns(fontName string) error {
 		glyphCode[name] = i
 	}
 
-	nGlyph := len(afm.Widths)
+	nGlyph := afm.NumGlyphs()
 
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4

@@ -21,9 +21,11 @@ import (
 	"sort"
 
 	"seehuhn.de/go/dag"
+
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/funit"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 // WidthRec maps a character identifier (CID) to a glyph width in font units.

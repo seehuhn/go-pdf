@@ -20,9 +20,10 @@ import (
 	"sort"
 	"unicode/utf16"
 
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/tounicode"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 // SimpleMapping describes the unicode text corresponding to a character code

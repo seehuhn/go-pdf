@@ -27,8 +27,10 @@ import (
 
 	"golang.org/x/text/unicode/runenames"
 
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/funit"
 	"seehuhn.de/go/sfnt/header"
 
 	"seehuhn.de/go/pdf"
@@ -37,7 +39,6 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/sfnt/type1/names"
 )
 
 const (
@@ -56,7 +57,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := builtin.Embed(out, "Courier", "F")
+	labelFont, err := builtin.Courier.Embed(out, "F")
 	if err != nil {
 		log.Fatal(err)
 	}

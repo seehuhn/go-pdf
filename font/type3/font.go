@@ -25,17 +25,19 @@ import (
 	"strings"
 	"unicode/utf16"
 
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/type1/names"
+
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/os2"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/sfnt/funit"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/os2"
-	"seehuhn.de/go/sfnt/type1"
-	"seehuhn.de/go/sfnt/type1/names"
 )
 
 // TODO(voss): The spec says "Type 3 fonts do not support the concept of a
@@ -59,8 +61,8 @@ type Builder struct {
 	Ascent             funit.Int16
 	Descent            funit.Int16 // negative
 	BaseLineSkip       funit.Int16
-	UnderlinePosition  funit.Int16
-	UnderlineThickness funit.Int16
+	UnderlinePosition  funit.Float64
+	UnderlineThickness funit.Float64
 
 	names        []pdf.Name
 	glyphs       [][]byte
@@ -415,12 +417,12 @@ func (e3 *embedded) Close() error {
 }
 
 func symbolNames() map[pdf.Name]bool {
-	symbolAfm, err := builtin.Afm(builtin.Symbol)
+	symbolAfm, err := builtin.Symbol.Afm()
 	if err != nil {
 		panic(err)
 	}
 	symbolNames := make(map[pdf.Name]bool)
-	for _, name := range symbolAfm.GlyphName {
+	for name := range symbolAfm.Outlines {
 		symbolNames[pdf.Name(name)] = true
 	}
 	return symbolNames

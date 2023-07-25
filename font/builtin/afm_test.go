@@ -26,25 +26,26 @@ func Test14Fonts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(known) != len(FontNames) {
+	if len(known) != len(All) {
 		t.Error("wrong number of afm files:", len(known))
 	}
 
-	for _, fontName := range FontNames {
-		afm, err := Afm(fontName)
+	for _, fontName := range All {
+		afm, err := fontName.Afm()
 		if err != nil {
 			t.Error(err)
 			continue
 		}
 
-		if afm.FontName != fontName {
-			t.Errorf("wrong font name: %q != %q", afm.FontName, fontName)
+		if afm.Info.FontName != string(fontName) {
+			t.Errorf("wrong font name: %q != %q", afm.Info.FontName, fontName)
 		}
 	}
 }
 
 func TestError(t *testing.T) {
-	_, err := Afm("unknown font")
+	F := Font("unknown font")
+	_, err := F.Afm()
 	if !os.IsNotExist(err) {
 		t.Errorf("wrong error: %s", err)
 	}

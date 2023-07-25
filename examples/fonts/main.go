@@ -26,6 +26,12 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
+
+	"seehuhn.de/go/postscript/funit"
+
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/gofont"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
@@ -33,9 +39,6 @@ import (
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/font/simple"
-	"seehuhn.de/go/sfnt/funit"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/gofont"
 )
 
 func main() {
@@ -65,26 +68,26 @@ func doit() error {
 		rightMargin: 72.0,
 	}
 
-	F, err := builtin.Embed(doc.Out, builtin.TimesRoman, "F")
+	F, err := builtin.TimesRoman.Embed(doc.Out, "F")
 	if err != nil {
 		return err
 	}
 	l.addFont("text", F, 10)
 
-	I, err := builtin.Embed(doc.Out, builtin.TimesItalic, "I")
+	I, err := builtin.TimesItalic.Embed(doc.Out, "I")
 	if err != nil {
 		return err
 	}
 	l.addFont("it", I, 10)
 
-	S, err := builtin.Embed(doc.Out, builtin.Helvetica, "S")
+	S, err := builtin.Helvetica.Embed(doc.Out, "S")
 	if err != nil {
 		return err
 	}
 	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
-	SB, err := builtin.Embed(doc.Out, builtin.HelveticaBold, "B")
+	SB, err := builtin.HelveticaBold.Embed(doc.Out, "B")
 	if err != nil {
 		return err
 	}
@@ -102,7 +105,7 @@ func doit() error {
 		case "Builtin Fonts":
 			// TODO(voss): have separate sections for builtin fonts
 			// and type 1 fonts from files?
-			X, err = builtin.Embed(doc.Out, builtin.TimesRoman, "F")
+			X, err = builtin.TimesRoman.Embed(doc.Out, "F")
 			if err != nil {
 				return err
 			}

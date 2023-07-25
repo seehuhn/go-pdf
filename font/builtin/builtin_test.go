@@ -32,7 +32,7 @@ func TestSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := Embed(doc.Out, "Times-Roman", "F")
+	F, err := TimesRoman.Embed(doc.Out, "F")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,15 +65,10 @@ func TestSimple(t *testing.T) {
 }
 
 func TestSpace(t *testing.T) {
-	for _, name := range FontNames {
-		F, err := Font(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+	for _, F := range All {
 		gid, width := font.GetGID(F, ' ')
 		if gid == 0 || width == 0 {
-			t.Errorf("%s: space not found", name)
+			t.Errorf("%s: space not found", string(F))
 		}
 	}
 }

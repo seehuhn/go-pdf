@@ -62,15 +62,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	helvetica, err := builtin.Embed(doc.Out, "Helvetica", "R")
+	helvetica, err := builtin.Helvetica.Embed(doc.Out, "R")
 	if err != nil {
 		log.Fatal(err)
 	}
-	italic, err := builtin.Embed(doc.Out, "Times-Italic", "I")
+	italic, err := builtin.TimesItalic.Embed(doc.Out, "I")
 	if err != nil {
 		log.Fatal(err)
 	}
-	courier, err := builtin.Embed(doc.Out, "Courier", "T")
+	courier, err := builtin.Courier.Embed(doc.Out, "T")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -21,9 +21,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/funit"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 func TestEncodeWidths(t *testing.T) {

@@ -19,9 +19,11 @@ package font
 import (
 	"unicode"
 
-	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/type1/names"
+
+	"seehuhn.de/go/pdf"
 )
 
 type decoder interface {

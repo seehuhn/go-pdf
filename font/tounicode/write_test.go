@@ -22,7 +22,8 @@ import (
 	"unicode/utf16"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/sfnt/type1"
+
+	"seehuhn.de/go/postscript/type1"
 )
 
 func TestWrite(t *testing.T) {

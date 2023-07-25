@@ -21,8 +21,9 @@ import (
 	"unicode"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/sfnt/type1"
-	"seehuhn.de/go/sfnt/type1/names"
+
+	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/type1/names"
 )
 
 // OldEncoding describes the correspondence between character codes and unicode

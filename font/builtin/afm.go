@@ -19,13 +19,13 @@ package builtin
 import (
 	"embed"
 
-	"seehuhn.de/go/sfnt/afm"
+	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/postscript/type1"
 )
 
 // Afm returns the font metrics for one of the built-in pdf fonts.
-// FontName must be one of the names listed in [FontNames].
-func Afm(fontName string) (*afm.Info, error) {
-	fd, err := afmData.Open("afm/" + fontName + ".afm")
+func (f Font) Afm() (*type1.Font, error) {
+	fd, err := afmData.Open("afm/" + string(f) + ".afm")
 	if err != nil {
 		return nil, err
 	}
@@ -37,43 +37,6 @@ func Afm(fontName string) (*afm.Info, error) {
 	}
 
 	return res, nil
-}
-
-// The names of the 14 built-in PDF fonts.
-// These are the valid arguments for the Afm() function.
-const (
-	Courier              = "Courier"
-	CourierBold          = "Courier-Bold"
-	CourierBoldOblique   = "Courier-BoldOblique"
-	CourierOblique       = "Courier-Oblique"
-	Helvetica            = "Helvetica"
-	HelveticaBold        = "Helvetica-Bold"
-	HelveticaBoldOblique = "Helvetica-BoldOblique"
-	HelveticaOblique     = "Helvetica-Oblique"
-	TimesRoman           = "Times-Roman"
-	TimesBold            = "Times-Bold"
-	TimesBoldItalic      = "Times-BoldItalic"
-	TimesItalic          = "Times-Italic"
-	Symbol               = "Symbol"
-	ZapfDingbats         = "ZapfDingbats"
-)
-
-// FontNames contains the names of the 14 built-in PDF fonts.
-var FontNames = []string{
-	Courier,
-	CourierBold,
-	CourierBoldOblique,
-	CourierOblique,
-	Helvetica,
-	HelveticaBold,
-	HelveticaBoldOblique,
-	HelveticaOblique,
-	TimesRoman,
-	TimesBold,
-	TimesBoldItalic,
-	TimesItalic,
-	Symbol,
-	ZapfDingbats,
 }
 
 //go:embed afm/*.afm

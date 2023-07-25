@@ -32,7 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	F, err := builtin.Embed(w.Out, builtin.Helvetica, "F")
+	F, err := builtin.Helvetica.Embed(w.Out, "F")
 	if err != nil {
 		log.Fatal(err)
 	}

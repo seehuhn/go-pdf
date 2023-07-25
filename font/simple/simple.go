@@ -25,12 +25,13 @@ import (
 
 	"golang.org/x/text/language"
 
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
-	"seehuhn.de/go/sfnt/type1"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"

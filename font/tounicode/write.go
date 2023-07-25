@@ -23,8 +23,9 @@ import (
 	"strings"
 	"text/template"
 
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 // Embed writes the ToUnicode CMap as a stream object to the given PDF file.

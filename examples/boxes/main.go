@@ -39,7 +39,7 @@ func doit() error {
 		return err
 	}
 
-	F, err := builtin.Embed(w, builtin.Helvetica, "F")
+	F, err := builtin.Helvetica.Embed(w, "F")
 	if err != nil {
 		return err
 	}

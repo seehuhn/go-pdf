@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"sort"
 
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 type CIDEncoder interface {

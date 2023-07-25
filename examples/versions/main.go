@@ -51,7 +51,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			F, err := builtin.Embed(page.Out, builtin.TimesRoman, "F")
+			F, err := builtin.TimesRoman.Embed(page.Out, "F")
 			if err != nil {
 				log.Fatal(err)
 			}

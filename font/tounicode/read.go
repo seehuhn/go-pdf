@@ -23,8 +23,9 @@ import (
 	"regexp"
 	"strconv"
 
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt/type1"
 )
 
 // Read reads and parses a ToUnicode CMap from the given reader.
