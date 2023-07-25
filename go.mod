@@ -8,7 +8,7 @@ require (
 	golang.org/x/term v0.5.0
 	golang.org/x/text v0.9.0
 	seehuhn.de/go/dag v0.0.0-20230228001113-19b4e3c37e21
-	seehuhn.de/go/sfnt v0.3.5-0.20230723232110-61e78cdb7a08
+	seehuhn.de/go/sfnt v0.3.5-0.20230724165215-02d78f9b8d4f
 )
 
 require (
