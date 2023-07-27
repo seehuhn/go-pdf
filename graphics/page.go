@@ -26,6 +26,8 @@ import (
 	"seehuhn.de/go/pdf/internal/float"
 )
 
+// TODO(voss): fill in the ProcSet resource.
+
 type Page struct {
 	Content   io.Writer
 	Resources *pdf.Resources

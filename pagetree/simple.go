@@ -20,6 +20,7 @@ import (
 	"errors"
 	"math"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 )
 
@@ -42,6 +43,9 @@ func NumPages(r pdf.Getter) (int, error) {
 	return int(count), nil
 }
 
+// GetPage returns the page tree node for a given page number.
+// Inheritable attributes are copied from the parent nodes.
+// The /Parent attribute is removed from the returned dictionary.
 func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 	if pageNo < 0 {
 		return nil, errors.New("invalid page number")
@@ -88,6 +92,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 				break
 			}
 
+			pageTreeNode = maps.Clone(pageTreeNode)
 			for _, name := range inheritable {
 				if _, ok := pageTreeNode[name]; !ok {
 					if val, ok := inherited[name]; ok {
@@ -95,6 +100,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 					}
 				}
 			}
+			delete(pageTreeNode, "Parent")
 			return pageTreeNode, nil
 
 		case "Pages":
