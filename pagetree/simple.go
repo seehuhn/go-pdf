@@ -30,7 +30,7 @@ func NumPages(r pdf.Getter) (int, error) {
 		return 0, err
 	}
 
-	count, err := pdf.GetInt(r, pageTreeNode["Count"])
+	count, err := pdf.GetInteger(r, pageTreeNode["Count"])
 	if err != nil {
 		return 0, err
 	}
@@ -98,7 +98,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 			return pageTreeNode, nil
 
 		case "Pages":
-			count, err := pdf.GetInt(r, pageTreeNode["Count"])
+			count, err := pdf.GetInteger(r, pageTreeNode["Count"])
 			if err != nil {
 				return nil, err
 			}

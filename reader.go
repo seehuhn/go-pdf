@@ -597,7 +597,7 @@ func (r *Reader) safeGetInt(obj Object) (Integer, error) {
 		return 0, err
 	}
 
-	i, err := GetInt(r, obj)
+	i, err := GetInteger(r, obj)
 	if err != nil {
 		r.r.Seek(pos, io.SeekStart)
 		return 0, err

@@ -207,7 +207,7 @@ func (e *explainer) explainSingleLine(obj pdf.Object) (string, error) {
 		} else {
 			parts = append(parts, "stream")
 		}
-		length, err := pdf.GetInt(e.r, obj.Dict["Length"])
+		length, err := pdf.GetInteger(e.r, obj.Dict["Length"])
 		if err == nil {
 			parts = append(parts, fmt.Sprintf("%d bytes", length))
 		}

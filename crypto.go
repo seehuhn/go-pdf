@@ -65,7 +65,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	// }
 
 	// version of the encryption/decryption algorithm
-	V, err := GetInt(r, enc["V"])
+	V, err := GetInteger(r, enc["V"])
 	if err != nil {
 		return nil, err
 	}

@@ -96,14 +96,14 @@ func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
 //
 // where T is the type of the object to be returned.
 var (
-	GetArray  = resolveAndCast[Array]
-	GetBool   = resolveAndCast[Bool]
-	GetDict   = resolveAndCast[Dict]
-	GetInt    = resolveAndCast[Integer]
-	GetName   = resolveAndCast[Name]
-	GetReal   = resolveAndCast[Real]
-	GetStream = resolveAndCast[*Stream]
-	GetString = resolveAndCast[String]
+	GetArray   = resolveAndCast[Array]
+	GetBool    = resolveAndCast[Bool]
+	GetDict    = resolveAndCast[Dict]
+	GetInteger = resolveAndCast[Integer]
+	GetName    = resolveAndCast[Name]
+	GetReal    = resolveAndCast[Real]
+	GetStream  = resolveAndCast[*Stream]
+	GetString  = resolveAndCast[String]
 )
 
 // TODO(voss): find a better name for this

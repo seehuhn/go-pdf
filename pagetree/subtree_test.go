@@ -309,7 +309,7 @@ func FuzzInherit(f *testing.F) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			rotate, err := pdf.GetInt(doc, dict["Rotate"])
+			rotate, err := pdf.GetInteger(doc, dict["Rotate"])
 			if err != nil {
 				t.Fatal(err)
 			}

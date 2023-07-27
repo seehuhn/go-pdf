@@ -162,6 +162,14 @@ func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 	if err != nil {
 		return err
 	}
+	glyphNames := afm.GlyphList()
+	nGlyph := afm.NumGlyphs()
+	if nGlyph != len(glyphNames) {
+		fmt.Println(nGlyph, len(glyphNames))
+		_, ok := afm.GlyphInfo[".notdef"]
+		fmt.Println(len(afm.GlyphInfo), ok)
+		panic("fish" + string(fnt))
+	}
 
 	glyphCode := make(map[string]int)
 	for i, name := range afm.Encoding {
@@ -170,8 +178,6 @@ func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 		}
 		glyphCode[name] = i
 	}
-
-	nGlyph := afm.NumGlyphs()
 
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4
@@ -209,9 +215,11 @@ func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 				}
 				y := yTop - baseLineSkip*float64(i)
 
-				ext := afm.GlyphExtents[tmpGlyph]
+				gi := afm.GlyphInfo[glyphNames[tmpGlyph]]
+				ext := gi.Extent
+				fmt.Println(tmpGlyph, nGlyph, glyphNames[tmpGlyph], gi)
 				if !ext.IsZero() {
-					w := afm.Widths[tmpGlyph].AsFloat(fontSize / 1000)
+					w := gi.WidthX.AsFloat(fontSize / 1000)
 					page.Rectangle(
 						x+32-w/2+ext.LLx.AsFloat(fontSize/1000),
 						y+ext.LLy.AsFloat(fontSize/1000),
@@ -237,7 +245,7 @@ func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 				if curGlyph%256 == 0 {
 					instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
 					f.fontNo++
-					F, err = builtin.EmbedAfm(f.doc.Out, afm, instName)
+					F, err = fnt.Embed(f.doc.Out, instName)
 					if err != nil {
 						return err
 					}
@@ -254,7 +262,7 @@ func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 					page.TextNextLine()
 				}
 
-				name := afm.GlyphName[curGlyph]
+				name := glyphNames[curGlyph]
 				code := "—"
 				if glyphCode[name] >= 0 {
 					code = fmt.Sprintf("%d", glyphCode[name])
