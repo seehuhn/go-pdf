@@ -26,6 +26,7 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -374,7 +375,7 @@ func (e3 *embedded) Close() error {
 		if name == ".notdef" {
 			continue
 		}
-		if _, ok := type1.StandardEncoding[string(name)]; ok {
+		if _, ok := psenc.StandardEncodingRev[string(name)]; ok {
 			continue
 		}
 		if inSymbolFont[name] {

@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1/names"
 )
 
@@ -102,7 +102,7 @@ func TestStandardEncoding(t *testing.T) {
 	}
 
 	m2 := make(map[byte]rune)
-	for name, code := range type1.StandardEncoding {
+	for name, code := range psenc.StandardEncodingRev {
 		rr := names.ToUnicode(name, false)
 		if len(rr) != 1 {
 			t.Errorf("bad name: %s", name)
@@ -121,5 +121,18 @@ func TestStandardEncoding(t *testing.T) {
 
 	if d := cmp.Diff(m1, m2); d != "" {
 		t.Errorf("mismatch: %s", d)
+	}
+}
+
+func TestStandardEncoding2(t *testing.T) {
+	for c := 0; c < 256; c++ {
+		psName := psenc.StandardEncoding[c]
+		r := StandardEncoding.Decode(byte(c))
+		if r == unicode.ReplacementChar && psName == ".notdef" {
+			continue
+		}
+		if string(names.ToUnicode(psName, false)) != string([]rune{r}) {
+			t.Errorf("bad mapping: %d %s %04x", c, psName, r)
+		}
 	}
 }
