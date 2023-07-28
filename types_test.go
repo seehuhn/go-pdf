@@ -165,7 +165,7 @@ func TestStream(t *testing.T) {
 		},
 		R: rIn,
 	}
-	rOut, err := (*Reader)(nil).DecodeStream(stream, 0)
+	rOut, err := DecodeStream(nil, stream, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestPlaceholder(t *testing.T) {
 	length := NewPlaceholder(w, 5)
 	testRef := w.Alloc()
 	err = w.Put(testRef, Dict{
-		"Test":   Bool(true),
+		"Test":   Boolean(true),
 		"Length": length,
 	})
 	if err != nil {

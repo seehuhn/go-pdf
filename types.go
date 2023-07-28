@@ -37,11 +37,11 @@ type Object interface {
 	PDF(w io.Writer) error
 }
 
-// Bool represents a boolean value in a PDF file.
-type Bool bool
+// Boolean represents a boolean value in a PDF file.
+type Boolean bool
 
 // PDF implements the [Object] interface.
-func (x Bool) PDF(w io.Writer) error {
+func (x Boolean) PDF(w io.Writer) error {
 	var s string
 	if x {
 		s = "true"

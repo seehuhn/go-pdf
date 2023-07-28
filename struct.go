@@ -88,7 +88,7 @@ fieldLoop:
 				res[key] = TextString(tag.String())
 			}
 		case fVal.Kind() == reflect.Bool:
-			res[key] = Bool(fVal.Bool())
+			res[key] = Boolean(fVal.Bool())
 		case fInfo.Type == referenceType:
 			ref := fVal.Interface().(Reference)
 			if ref != 0 {
@@ -242,7 +242,7 @@ fieldLoop:
 					fInfo.Name, dictVal)
 			}
 		case fInfo.Type.Kind() == reflect.Bool:
-			fVal.SetBool(dictVal == Bool(true))
+			fVal.SetBool(dictVal == Boolean(true))
 		case reflect.TypeOf(dictVal).AssignableTo(fInfo.Type):
 			fVal.Set(reflect.ValueOf(dictVal))
 		default:

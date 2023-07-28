@@ -296,7 +296,7 @@ func (e *explainer) show(obj pdf.Object) error {
 		}
 		fmt.Println()
 
-		stmData, err := e.r.DecodeStream(obj, 0)
+		stmData, err := pdf.DecodeStream(e.r, obj, 0)
 		if err != nil {
 			return err
 		}

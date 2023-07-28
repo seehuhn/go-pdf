@@ -63,7 +63,7 @@ func FuzzReadWrite(f *testing.F) {
 	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have a page tree
 	objs := []pdf.Object{
 		pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)},
-		pdf.Bool(true),
+		pdf.Boolean(true),
 		pdf.Dict{
 			"foo": pdf.Integer(1),
 			"bar": pdf.Integer(2),
@@ -74,7 +74,7 @@ func FuzzReadWrite(f *testing.F) {
 		pdf.Real(math.Pi),
 		pdf.NewReference(999, 1),
 		&pdf.Stream{
-			Dict: pdf.Dict{"Test": pdf.Bool(true), "Length": pdf.Integer(11)},
+			Dict: pdf.Dict{"Test": pdf.Boolean(true), "Length": pdf.Integer(11)},
 			R:    strings.NewReader("test stream"),
 		},
 		pdf.String("test string"),

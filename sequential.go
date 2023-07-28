@@ -327,7 +327,7 @@ func (fi *FileInfo) checkObjects() error {
 			switch o := x.(type) {
 			case Array:
 				objInfo.Type = "Array"
-			case Bool:
+			case Boolean:
 				objInfo.Type = "Bool"
 			case Dict:
 				objInfo.Type = "Dict"

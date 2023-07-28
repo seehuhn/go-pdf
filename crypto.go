@@ -216,7 +216,7 @@ func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 	dict["U"] = String(sec.U)
 	dict["P"] = Integer(int32(sec.P))
 	if sec.unencryptedMetaData {
-		dict["EncryptMetadata"] = Bool(false)
+		dict["EncryptMetadata"] = Boolean(false)
 	}
 	if sec.R == 6 {
 		dict["OE"] = String(sec.OE)
@@ -290,7 +290,7 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 	}
 	switch cf.Cipher {
 	case cipherAES:
-		if len(buf) < 32 {
+		if len(buf) < 32 || len(buf)%16 != 0 {
 			return nil, errCorrupted
 		}
 		iv := buf[:16]
@@ -480,7 +480,7 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 	}
 
 	emd := true
-	if obj, ok := enc["EncryptMetaData"].(Bool); ok && V >= 4 {
+	if obj, ok := enc["EncryptMetaData"].(Boolean); ok && V >= 4 {
 		emd = bool(obj)
 	}
 

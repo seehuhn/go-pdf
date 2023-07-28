@@ -25,7 +25,7 @@ import (
 // TODO(voss): find a better name for this
 type Getter interface {
 	GetMeta() *MetaInfo
-	Get(Reference) (Object, error)
+	Get(Reference, bool) (Object, error)
 }
 
 // Resolve resolves references to indirect objects.
@@ -38,6 +38,10 @@ type Getter interface {
 // If a reference loop is encountered, the function returns an error of type
 // [MalformedFileError].
 func Resolve(r Getter, obj Object) (Object, error) {
+	return resolve(r, obj, true)
+}
+
+func resolve(r Getter, obj Object, canObjStm bool) (Object, error) {
 	origObj := obj
 
 	count := 0
@@ -55,7 +59,7 @@ func Resolve(r Getter, obj Object) (Object, error) {
 		}
 
 		var err error
-		obj, err = r.Get(ref)
+		obj, err = r.Get(ref, canObjStm)
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +101,7 @@ func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
 // where T is the type of the object to be returned.
 var (
 	GetArray   = resolveAndCast[Array]
-	GetBool    = resolveAndCast[Bool]
+	GetBoolean = resolveAndCast[Boolean]
 	GetDict    = resolveAndCast[Dict]
 	GetInteger = resolveAndCast[Integer]
 	GetName    = resolveAndCast[Name]
@@ -105,6 +109,90 @@ var (
 	GetStream  = resolveAndCast[*Stream]
 	GetString  = resolveAndCast[String]
 )
+
+// DecodeStream returns a reader for the decoded stream data.
+// If numFilters is non-zero, only the first numFilters filters are decoded.
+func DecodeStream(r Getter, x *Stream, numFilters int) (io.Reader, error) {
+	filters, err := getFilters(r, x)
+	if err != nil {
+		return nil, err
+	}
+
+	v := V1_2
+	if r != nil {
+		v = r.GetMeta().Version
+	}
+
+	out := x.R
+	for i, fi := range filters {
+		if numFilters > 0 && i >= numFilters {
+			break
+		}
+		out, err = fi.Decode(v, out)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// Filters extracts the information contained in the /Filter and /DecodeParms
+// entries of the stream dictionary.
+//
+// TODO(voss): remove?
+func getFilters(r Getter, x *Stream) ([]Filter, error) {
+	decodeParams, err := resolve(r, x.Dict["DecodeParms"], false)
+	if err != nil {
+		return nil, err
+	}
+	filter, err := resolve(r, x.Dict["Filter"], false)
+	if err != nil {
+		return nil, err
+	}
+
+	var res []Filter
+	switch f := filter.(type) {
+	case nil:
+		// pass
+	case Name:
+		pDict, err := toDict(decodeParams)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, makeFilter(f, pDict))
+	case Array:
+		pa, ok := decodeParams.(Array)
+		if !ok {
+			return nil, errors.New("invalid /DecodeParms field")
+		}
+		for i, fi := range f {
+			fi, err := resolve(r, fi, false)
+			if err != nil {
+				return nil, err
+			}
+			name, ok := fi.(Name)
+			if !ok {
+				return nil, fmt.Errorf("wrong type, expected Name but got %T", fi)
+			}
+			var pDict Dict
+			if len(pa) > i {
+				pai, err := resolve(r, pa[i], false)
+				if err != nil {
+					return nil, err
+				}
+				x, err := toDict(pai)
+				if err != nil {
+					return nil, err
+				}
+				pDict = x
+			}
+			res = append(res, makeFilter(name, pDict))
+		}
+	default:
+		return nil, errors.New("invalid /Filter field")
+	}
+	return res, nil
+}
 
 // TODO(voss): find a better name for this
 type Putter interface {
@@ -127,6 +215,6 @@ func IsTagged(pdf Putter) bool {
 	if markInfo == nil {
 		return false
 	}
-	marked, _ := markInfo["Marked"].(Bool)
+	marked, _ := markInfo["Marked"].(Boolean)
 	return bool(marked)
 }

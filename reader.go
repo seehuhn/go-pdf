@@ -99,7 +99,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		unencrypted: make(map[Reference]bool),
 	}
 
-	s, err := r.scannerFrom(0)
+	s, err := r.scannerFrom(0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,11 @@ func (r *Reader) GetMeta() *MetaInfo {
 
 // GetObject reads an indirect object from the PDF file.  If the object is not
 // present, nil is returned without an error.
-func (r *Reader) Get(ref Reference) (_ Object, err error) {
+//
+// The argument canObjStm specifies whether the object may be read from an
+// object stream.  Normally, this should be set to true.  If canObjStm is false
+// and the object is in an object stream, an error is returned.
+func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
 	defer func() {
 		if err != nil {
 			err = wrap(err, "object "+ref.String())
@@ -282,9 +286,15 @@ func (r *Reader) Get(ref Reference) (_ Object, err error) {
 	}
 
 	if entry.InStream != 0 {
+		if !canObjStm {
+			return nil, &MalformedFileError{
+				Err: errors.New("object in object stream"),
+				Loc: []string{"object " + ref.String()},
+			}
+		}
 		return r.getFromObjectStream(ref.Number(), entry.InStream)
 	} else {
-		s, err := r.scannerFrom(entry.Pos)
+		s, err := r.scannerFrom(entry.Pos, canObjStm)
 		if err != nil {
 			return nil, err
 		}
@@ -295,6 +305,7 @@ func (r *Reader) Get(ref Reference) (_ Object, err error) {
 		if ref != fileRef {
 			return nil, &MalformedFileError{
 				Err: errors.New("xref corrupted"),
+				Loc: []string{"object " + ref.String() + "*"},
 			}
 		}
 		return obj, nil
@@ -307,7 +318,7 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 	// could be either caused by the stream object being contained in another
 	// object stream, or by the length of the stream object being contained in
 	// another object stream.  (Both cases are forbidden by the PDF spec.)
-	container, err := r.resolveNoObjStreams(sRef)
+	container, err := resolve(r, sRef, false)
 	if err != nil {
 		return nil, err
 	}
@@ -357,126 +368,25 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 	return obj, nil
 }
 
-// resolveNoObjStreams is like Resolve, but returns an error if the resolved
-// object is inside an object stream.
-func (r *Reader) resolveNoObjStreams(obj Object) (Object, error) {
-	for {
-		ref, isIndirect := obj.(Reference)
-		if !isIndirect {
-			return obj, nil
-		}
-
-		entry := r.xref[ref.Number()]
-		if entry.IsFree() || entry.Generation != ref.Generation() {
-			return nil, nil
-		}
-		if entry.InStream != 0 {
-			return nil, errors.New("forbidden object inside object stream")
-		}
-
-		s, err := r.scannerFrom(entry.Pos)
-		if err != nil {
-			return nil, err
-		}
-		s.getInt = r.safeGetIntNoObjectStreams
-
-		var fileRef Reference
-		next, fileRef, err := s.ReadIndirectObject()
-		if err != nil {
-			return nil, err
-		} else if ref != fileRef {
-			return nil, &MalformedFileError{
-				Err: errors.New("xref corrupted"),
-				Loc: []string{"object " + ref.String() + "*"},
-			}
-		}
-
-		obj = next
-	}
-}
-
-// DecodeStream returns a reader for the decoded stream data.
-// If numFilters is non-zero, only the first numFilters filters are decoded.
-func (r *Reader) DecodeStream(x *Stream, numFilters int) (io.Reader, error) {
-	filters, err := r.getFilters(x)
+func (r *Reader) getID(obj Object) ([][]byte, error) {
+	arr, err := GetArray(r, obj)
 	if err != nil {
 		return nil, err
 	}
-
-	v := V1_2
-	if r != nil {
-		v = r.meta.Version
-	}
-
-	out := x.R
-	for i, fi := range filters {
-		if numFilters > 0 && i >= numFilters {
-			break
+	if len(arr) != 2 {
+		return nil, &MalformedFileError{
+			Err: errInvalidID,
 		}
-		out, err = fi.Decode(v, out)
+	}
+	id := make([][]byte, 2)
+	for i, obj := range arr {
+		s, err := GetString(r, obj)
 		if err != nil {
 			return nil, err
 		}
+		id[i] = []byte(s)
 	}
-	return out, nil
-}
-
-// Filters extracts the information contained in the /Filter and /DecodeParms
-// entries of the stream dictionary.
-//
-// TODO(voss): remove?
-func (r *Reader) getFilters(x *Stream) ([]Filter, error) {
-	decodeParams, err := r.resolveNoObjStreams(x.Dict["DecodeParms"])
-	if err != nil {
-		return nil, err
-	}
-	filter, err := r.resolveNoObjStreams(x.Dict["Filter"])
-	if err != nil {
-		return nil, err
-	}
-
-	var res []Filter
-	switch f := filter.(type) {
-	case nil:
-		// pass
-	case Name:
-		pDict, err := toDict(decodeParams)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, makeFilter(f, pDict))
-	case Array:
-		pa, ok := decodeParams.(Array)
-		if !ok {
-			return nil, errors.New("invalid /DecodeParms field")
-		}
-		for i, fi := range f {
-			fi, err := r.resolveNoObjStreams(fi)
-			if err != nil {
-				return nil, err
-			}
-			name, ok := fi.(Name)
-			if !ok {
-				return nil, fmt.Errorf("wrong type, expected Name but got %T", fi)
-			}
-			var pDict Dict
-			if len(pa) > i {
-				pai, err := r.resolveNoObjStreams(pa[i])
-				if err != nil {
-					return nil, err
-				}
-				x, err := toDict(pai)
-				if err != nil {
-					return nil, err
-				}
-				pDict = x
-			}
-			res = append(res, makeFilter(name, pDict))
-		}
-	default:
-		return nil, errors.New("invalid /Filter field")
-	}
-	return res, nil
+	return id, nil
 }
 
 // getIDDirect tries to extract the ID from an object without resolving
@@ -501,27 +411,6 @@ func getIDDirect(obj Object) [][]byte {
 		id[i] = []byte(s)
 	}
 	return id
-}
-
-func (r *Reader) getID(obj Object) ([][]byte, error) {
-	arr, err := GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	if len(arr) != 2 {
-		return nil, &MalformedFileError{
-			Err: errInvalidID,
-		}
-	}
-	id := make([][]byte, 2)
-	for i, obj := range arr {
-		s, err := GetString(r, obj)
-		if err != nil {
-			return nil, err
-		}
-		id[i] = []byte(s)
-	}
-	return id, nil
 }
 
 type objStm struct {
@@ -553,7 +442,7 @@ func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 		dec = nil
 	}
 
-	decoded, err := r.DecodeStream(stream, 0)
+	decoded, err := DecodeStream(r, stream, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -622,14 +511,14 @@ func (r *Reader) safeGetIntNoObjectStreams(obj Object) (Integer, error) {
 		return 0, err
 	}
 
-	obj, err = r.resolveNoObjStreams(obj)
+	obj, err = resolve(r, obj, false)
 	if err != nil {
 		return 0, err
 	}
 
-	i, isInt := obj.(Integer)
+	x, isInt := obj.(Integer)
 	if !isInt {
-		return i, &MalformedFileError{
+		return x, &MalformedFileError{
 			Err: fmt.Errorf("expected Integer but got %T", obj),
 		}
 	}
@@ -638,11 +527,15 @@ func (r *Reader) safeGetIntNoObjectStreams(obj Object) (Integer, error) {
 	if err != nil {
 		return 0, err
 	}
-	return i, nil
+	return x, nil
 }
 
-func (r *Reader) scannerFrom(pos int64) (*scanner, error) {
-	s := newScanner(r.r, r.safeGetInt, r.enc)
+func (r *Reader) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
+	getInt := r.safeGetInt
+	if !canObjStm {
+		getInt = r.safeGetIntNoObjectStreams
+	}
+	s := newScanner(r.r, getInt, r.enc)
 	s.unencrypted = r.unencrypted
 
 	_, err := r.r.Seek(pos, io.SeekStart)

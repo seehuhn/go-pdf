@@ -155,10 +155,10 @@ func (s *scanner) ReadObject() (Object, error) {
 		return nil, nil
 	case bytes.HasPrefix(buf, []byte("true")):
 		s.bufPos += 4
-		return Bool(true), nil
+		return Boolean(true), nil
 	case bytes.HasPrefix(buf, []byte("false")):
 		s.bufPos += 5
-		return Bool(false), nil
+		return Boolean(false), nil
 	case buf[0] == '/':
 		return s.ReadName()
 	case buf[0] >= '0' && buf[0] <= '9', buf[0] == '+', buf[0] == '-', buf[0] == '.':

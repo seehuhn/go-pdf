@@ -79,8 +79,8 @@ func main() {
 	doc.DrawImage(embedded)
 
 	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{
-		"FitWindow":    pdf.Bool(true),
-		"HideWindowUI": pdf.Bool(true),
+		"FitWindow":    pdf.Boolean(true),
+		"HideWindowUI": pdf.Boolean(true),
 	}
 
 	err = doc.Close()

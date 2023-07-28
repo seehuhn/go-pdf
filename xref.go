@@ -32,7 +32,7 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	s, err := r.scannerFrom(pos + 9)
+	s, err := r.scannerFrom(pos+9, false)
 	if err != nil {
 		return 0, err
 	}
@@ -74,7 +74,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		}
 		seen[start] = true
 
-		s, err := r.scannerFrom(start)
+		s, err := r.scannerFrom(start, false)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -99,7 +99,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 						Err: errInvalidXref,
 					}
 				}
-				s, err = r.scannerFrom(int64(zStart))
+				s, err = r.scannerFrom(int64(zStart), false)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -298,7 +298,7 @@ func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, R
 	if err != nil {
 		return nil, 0, err
 	}
-	decoded, err := r.DecodeStream(stream, 0)
+	decoded, err := DecodeStream(r, stream, 0)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -500,7 +500,7 @@ func FuzzReader(f *testing.F) {
 			if entry.IsFree() {
 				continue
 			}
-			r.Get(NewReference(key, entry.Generation))
+			r.Get(NewReference(key, entry.Generation), true)
 		}
 	})
 }

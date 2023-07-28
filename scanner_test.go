@@ -238,8 +238,8 @@ var testCases = []struct {
 	{"", nil, false},
 	{"null", nil, true},
 
-	{"true", Bool(true), true},
-	{"false", Bool(false), true},
+	{"true", Boolean(true), true},
+	{"false", Boolean(false), true},
 	{"TRUE", nil, false},
 	{"FALSE", nil, false},
 

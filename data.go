@@ -75,7 +75,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 			continue
 		}
 
-		obj, err := pdf.Get(ref)
+		obj, err := pdf.Get(ref, true)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +174,7 @@ func (d *Data) Alloc() Reference {
 	}
 }
 
-func (d *Data) Get(ref Reference) (Object, error) {
+func (d *Data) Get(ref Reference, _ bool) (Object, error) {
 	obj := d.objects[ref]
 	if s, ok := obj.(*Stream); ok {
 		if ss, ok := s.R.(io.Seeker); ok {
