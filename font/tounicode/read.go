@@ -30,6 +30,8 @@ import (
 
 // Read reads and parses a ToUnicode CMap from the given reader.
 func Read(r io.Reader) (*Info, error) {
+	// TODO(voss): use the PostScript interpreter?
+
 	outer, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
