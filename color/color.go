@@ -29,6 +29,28 @@ type Color interface {
 	SetFill(w io.Writer) error
 }
 
+type gray float64
+
+// Gray returns a color in the /DeviceGray color space.
+// The value must be in the range from 0 (black) to 1 (white).
+func Gray(g float64) Color {
+	return gray(g)
+}
+
+func (c gray) SetStroke(w io.Writer) error {
+	gString := float.Format(float64(c), 3)
+	_, err := fmt.Fprintln(w, gString, "G")
+	return err
+}
+
+func (c gray) SetFill(w io.Writer) error {
+	gString := float.Format(float64(c), 3)
+	_, err := fmt.Fprintln(w, gString, "g")
+	return err
+}
+
+var Default = gray(0) // black in the /DeviceGray color space
+
 type rgb struct {
 	R, G, B float64
 }
@@ -55,24 +77,28 @@ func (c *rgb) SetFill(w io.Writer) error {
 	return err
 }
 
-type gray float64
-
-// Gray returns a color in the /DeviceGray color space.
-// The value must be in the range from 0 (black) to 1 (white).
-func Gray(g float64) Color {
-	return gray(g)
+type cmyk struct {
+	C, M, Y, K float64
 }
 
-func (c gray) SetStroke(w io.Writer) error {
-	gString := float.Format(float64(c), 3)
-	_, err := fmt.Fprintln(w, gString, "G")
+func CMYK(c, m, y, k float64) Color {
+	return &cmyk{c, m, y, k}
+}
+
+func (c *cmyk) SetStroke(w io.Writer) error {
+	cString := float.Format(c.C, 3)
+	mString := float.Format(c.M, 3)
+	yString := float.Format(c.Y, 3)
+	kString := float.Format(c.K, 3)
+	_, err := fmt.Fprintln(w, cString, mString, yString, kString, "K")
 	return err
 }
 
-func (c gray) SetFill(w io.Writer) error {
-	gString := float.Format(float64(c), 3)
-	_, err := fmt.Fprintln(w, gString, "g")
+func (c *cmyk) SetFill(w io.Writer) error {
+	cString := float.Format(c.C, 3)
+	mString := float.Format(c.M, 3)
+	yString := float.Format(c.Y, 3)
+	kString := float.Format(c.K, 3)
+	_, err := fmt.Fprintln(w, cString, mString, yString, kString, "k")
 	return err
 }
-
-var Default = gray(0) // black in the /DeviceGray color space

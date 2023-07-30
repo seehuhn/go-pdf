@@ -43,6 +43,7 @@ func (p *Page) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 	if !p.valid("CurveTo", objPath, objClippingPath) {
 		return
 	}
+	// TODO(voss): generate "v" or "y" when possible
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
 }
 
