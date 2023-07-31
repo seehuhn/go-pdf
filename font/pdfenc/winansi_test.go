@@ -24,20 +24,22 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 )
 
-func TestMacRomanEncoding(t *testing.T) {
-	for code, name := range MacRomanEncoding {
-		r1 := font.MacRomanEncoding.Decode(byte(code))
-
-		if name == ".notdef" && r1 == unicode.ReplacementChar {
-			continue
+// TestWinAnsiEncoding verifies that the standard encoding here and
+// in seehuh.de/pdf/font are consistent.
+func TestWinAnsiEncoding(t *testing.T) {
+	for code, name := range WinAnsiEncoding {
+		r1 := font.WinAnsiEncoding.Decode(byte(code))
+		var r2 rune
+		if name == ".notdef" {
+			r2 = unicode.ReplacementChar
+		} else {
+			rr2 := names.ToUnicode(string(name), false)
+			if len(rr2) != 1 {
+				t.Errorf("bad name: %s", name)
+				continue
+			}
+			r2 = rr2[0]
 		}
-		rr := names.ToUnicode(string(MacRomanEncoding[code]), false)
-		if len(rr) != 1 {
-			t.Errorf("len(rr) != 1 for %d", code)
-			continue
-		}
-		r2 := rr[0]
-
 		if r1 != r2 {
 			t.Errorf("WinAnsiEncoding[0o%03o] = %q != %q", code, r1, r2)
 		}

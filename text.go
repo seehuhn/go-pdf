@@ -47,7 +47,7 @@ func utf16Decode(s String) string {
 
 // PDFDocEncoding is an encoding used for metadata in PDF files.
 // It is not normally used to show text from fonts in PDF content streams.
-// See PDF 32000-1:2008, Table D.3
+// See PDF 32000-1:2008, Tables D.2 and D.3
 
 func pdfDocEncode(s string) (String, bool) {
 	rr := []rune(s)
