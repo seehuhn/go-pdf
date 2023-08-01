@@ -38,6 +38,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = run2("data2")
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type record struct {
@@ -103,6 +107,49 @@ func run(fname string) error {
 	return nil
 }
 
+func run2(fname string) error {
+	fd, err := os.Open(fname)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+
+	data := make(map[pdf.Name]record)
+
+	scanner := bufio.NewScanner(fd)
+	for scanner.Scan() {
+		line := scanner.Text()
+		ff := strings.Fields(line)
+		if len(ff) == 2 && ff[0] == "space" {
+			ff = append([]string{" "}, ff...)
+		}
+		if len(ff) != 3 {
+			return fmt.Errorf("invalid line: %q", line)
+		}
+
+		name := pdf.Name(ff[1])
+		data[name] = record{
+			val:  ff[0],
+			code: [4]int{oct(ff[2]), 0, 0, 0},
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	// err = sanityCheck(data)
+	// if err != nil {
+	// 	return err
+	// }
+
+	err = writeTable(data, "macexpert.go", "MacExpertEncoding", 0)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func oct(s string) int {
 	if s == "—" {
 		return -1
@@ -118,7 +165,7 @@ func sanityCheck(data map[pdf.Name]record) error {
 	for name, r := range data {
 		rr := names.ToUnicode(string(name), false)
 		if string(rr) != r.val {
-			return fmt.Errorf("%q: %q != %q", name, string(rr), r.val)
+			return fmt.Errorf("%q: %q != %q %s", name, r.val, string(rr), string(rr))
 		}
 	}
 	return nil
@@ -155,28 +202,39 @@ func writeTable(data map[pdf.Name]record, fname string, encName string, col int)
 		// Footnote 5 after table D.2: The hyphen (U+002D) character is also
 		// encoded as 255 (octal) in WinAnsiEncoding.
 		encoding[0o255] = "hyphen"
+		val[0o255] = "-"
 		// Footnote 6 after table D.2: The space (U+0020) character is also
 		// encoded [...] as 240 (octal) in WinAnsiEncoding.
 		encoding[0o240] = "space"
+		val[0o240] = " "
 	case "MacRomanEncoding":
 		// Footnote 6 after table D.2: The space (U+0020) character is also
 		// encoded as 312 (octal) in MacRomanEncoding [...].
 		encoding[0o312] = "space"
+		val[0o312] = " "
 	}
 
 	_, err = w.WriteString(comment[col])
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(w, "var %s = [256]pdf.Name{\n", encName)
+	wd := 18
+	if encName == "MacExpertEncoding" {
+		wd = 23
+	}
+	fmt.Fprintf(w, "var %s = [256]string{\n", encName)
 	for i := 0; i < 256; i++ {
 		name := encoding[i]
 		if name == "" {
 			name = ".notdef"
 		}
 		nameString := fmt.Sprintf("%q,", name)
-		fmt.Fprintf(w, "\t%-18s// %-3d 0x%02x \\%03o %q\n",
-			nameString, i, i, i, val[i])
+		var valString string
+		if name != ".notdef" {
+			valString = fmt.Sprintf(" %q", val[i])
+		}
+		fmt.Fprintf(w, "\t%-*s// %-3d 0x%02x \\%03o%s\n",
+			wd, nameString, i, i, i, valString)
 	}
 	fmt.Fprintln(w, "}")
 	return nil
@@ -198,9 +256,9 @@ var header = `// seehuhn.de/go/pdf - a library for reading and writing PDF files
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pdfenc
+// Code generated .* DO NOT EDIT\.$
 
-import "seehuhn.de/go/pdf"
+package pdfenc
 
 `
 

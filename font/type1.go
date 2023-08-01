@@ -36,20 +36,23 @@ type Type1Info struct {
 	// or the empty string if Font is the full font.
 	SubsetTag string
 
-	// Encoding is the encoding vector used by the client.
-	// This is used to determine the `Encoding` entry of the font dictionary.
-	Encoding []pdf.Name
+	// Encoding (a slice of length 256) is the encoding vector used by the client.
+	// This is used to determine the `Encoding` entry of the PDF font dictionary.
+	Encoding []string
+
+	// ToUnicode (optional) is a map from character codes to unicode strings
+	ToUnicode map[byte][]rune
 }
 
 func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
-	var fontName pdf.Name
+	var fontName string
 	if info.SubsetTag == "" {
-		fontName = pdf.Name(info.Font.Info.FontName)
+		fontName = info.Font.Info.FontName
 	} else {
-		fontName = pdf.Name(info.SubsetTag + "+" + info.Font.Info.FontName)
+		fontName = info.SubsetTag + "+" + info.Font.Info.FontName
 	}
 
-	if len(info.Font.Encoding) != 256 {
+	if len(info.Encoding) != 256 || len(info.Font.Encoding) != 256 {
 		panic("unreachable") // TODO(voss): remove
 	}
 
@@ -66,31 +69,44 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 	if info.Font.Outlines != nil {
 		FontFileRef = w.Alloc()
 	}
+	var toUnicodeRef pdf.Reference
+	if info.ToUnicode != nil {
+		toUnicodeRef = w.Alloc()
+	}
 
 	q := 1000 / float64(info.Font.UnitsPerEm)
+	bbox := info.Font.BBox()
+	fontBBox := &pdf.Rectangle{
+		LLx: bbox.LLx.AsFloat(q),
+		LLy: bbox.LLy.AsFloat(q),
+		URx: bbox.URx.AsFloat(q),
+		URy: bbox.URy.AsFloat(q),
+	}
 
 	// See section 9.6.2.1 of PDF 32000-1:2008.
 	FontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       fontName,
+		"BaseFont":       pdf.Name(fontName),
 		"FirstChar":      widthsInfo.FirstChar,
 		"LastChar":       widthsInfo.LastChar,
 		"Widths":         WidthsRef,
 		"FontDescriptor": FontDescriptorRef,
-		// "Encoding":
-		// "ToUnicode":      ToUnicodeRef,
+		"Encoding":       DescribeEncoding(info.Encoding, info.Font.Encoding),
 	}
 	if w.GetMeta().Version == pdf.V1_0 {
 		FontDict["Name"] = info.ResName
+	}
+	if toUnicodeRef != 0 {
+		FontDict["ToUnicode"] = toUnicodeRef
 	}
 
 	// See section 9.8.1 of PDF 32000-1:2008.
 	FontDescriptor := pdf.Dict{
 		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
+		"FontName":    pdf.Name(fontName),
 		"Flags":       pdf.Integer(type1MakeFlags(info.Font, true)),
-		"FontBBox":    &pdf.Rectangle{}, // TODO(voss): fill this in
+		"FontBBox":    fontBBox,
 		"ItalicAngle": pdf.Number(info.Font.Info.ItalicAngle),
 		"Ascent":      pdf.Integer(math.Round(info.Font.Ascent.AsFloat(q))),
 		"Descent":     pdf.Integer(math.Round(info.Font.Descent.AsFloat(q))),
@@ -140,6 +156,10 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 		}
 	}
 
+	if toUnicodeRef != 0 {
+		// a CMap file that maps character codes to Unicode values
+	}
+
 	return nil
 }
 
@@ -169,33 +189,4 @@ func type1MakeFlags(info *type1.Font, symbolic bool) Flags {
 	}
 
 	return flags
-}
-
-func describeEncodingType1(encoding, builtin []string) pdf.Object {
-	if len(encoding) != 256 || len(builtin) != 256 {
-		panic("unreachable") // TODO: remove
-	}
-
-	type cand struct {
-		name pdf.Object
-		enc  []string
-	}
-	candidates := []cand{
-		{nil, builtin},
-		// {pdf.Name("MacRomanEncoding"), macRomanEncoding},
-	}
-
-	isBuiltin := true
-	for i, name := range encoding {
-		if name != ".notdef" && name != builtin[i] {
-			isBuiltin = false
-			break
-		}
-	}
-	if isBuiltin {
-		return nil // no /Encoding entry needed
-	}
-
-	_ = candidates
-	panic("not implemented")
 }

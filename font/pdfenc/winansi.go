@@ -14,43 +14,43 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Code generated .* DO NOT EDIT\.$
+
 package pdfenc
 
-import "seehuhn.de/go/pdf"
-
-var WinAnsiEncoding = [256]pdf.Name{
-	".notdef",        // 0   0x00 \000 ""
-	".notdef",        // 1   0x01 \001 ""
-	".notdef",        // 2   0x02 \002 ""
-	".notdef",        // 3   0x03 \003 ""
-	".notdef",        // 4   0x04 \004 ""
-	".notdef",        // 5   0x05 \005 ""
-	".notdef",        // 6   0x06 \006 ""
-	".notdef",        // 7   0x07 \007 ""
-	".notdef",        // 8   0x08 \010 ""
-	".notdef",        // 9   0x09 \011 ""
-	".notdef",        // 10  0x0a \012 ""
-	".notdef",        // 11  0x0b \013 ""
-	".notdef",        // 12  0x0c \014 ""
-	".notdef",        // 13  0x0d \015 ""
-	".notdef",        // 14  0x0e \016 ""
-	".notdef",        // 15  0x0f \017 ""
-	".notdef",        // 16  0x10 \020 ""
-	".notdef",        // 17  0x11 \021 ""
-	".notdef",        // 18  0x12 \022 ""
-	".notdef",        // 19  0x13 \023 ""
-	".notdef",        // 20  0x14 \024 ""
-	".notdef",        // 21  0x15 \025 ""
-	".notdef",        // 22  0x16 \026 ""
-	".notdef",        // 23  0x17 \027 ""
-	".notdef",        // 24  0x18 \030 ""
-	".notdef",        // 25  0x19 \031 ""
-	".notdef",        // 26  0x1a \032 ""
-	".notdef",        // 27  0x1b \033 ""
-	".notdef",        // 28  0x1c \034 ""
-	".notdef",        // 29  0x1d \035 ""
-	".notdef",        // 30  0x1e \036 ""
-	".notdef",        // 31  0x1f \037 ""
+var WinAnsiEncoding = [256]string{
+	".notdef",        // 0   0x00 \000
+	".notdef",        // 1   0x01 \001
+	".notdef",        // 2   0x02 \002
+	".notdef",        // 3   0x03 \003
+	".notdef",        // 4   0x04 \004
+	".notdef",        // 5   0x05 \005
+	".notdef",        // 6   0x06 \006
+	".notdef",        // 7   0x07 \007
+	".notdef",        // 8   0x08 \010
+	".notdef",        // 9   0x09 \011
+	".notdef",        // 10  0x0a \012
+	".notdef",        // 11  0x0b \013
+	".notdef",        // 12  0x0c \014
+	".notdef",        // 13  0x0d \015
+	".notdef",        // 14  0x0e \016
+	".notdef",        // 15  0x0f \017
+	".notdef",        // 16  0x10 \020
+	".notdef",        // 17  0x11 \021
+	".notdef",        // 18  0x12 \022
+	".notdef",        // 19  0x13 \023
+	".notdef",        // 20  0x14 \024
+	".notdef",        // 21  0x15 \025
+	".notdef",        // 22  0x16 \026
+	".notdef",        // 23  0x17 \027
+	".notdef",        // 24  0x18 \030
+	".notdef",        // 25  0x19 \031
+	".notdef",        // 26  0x1a \032
+	".notdef",        // 27  0x1b \033
+	".notdef",        // 28  0x1c \034
+	".notdef",        // 29  0x1d \035
+	".notdef",        // 30  0x1e \036
+	".notdef",        // 31  0x1f \037
 	"space",          // 32  0x20 \040 " "
 	"exclam",         // 33  0x21 \041 "!"
 	"quotedbl",       // 34  0x22 \042 "\""
@@ -146,9 +146,9 @@ var WinAnsiEncoding = [256]pdf.Name{
 	"bar",            // 124 0x7c \174 "|"
 	"braceright",     // 125 0x7d \175 "}"
 	"asciitilde",     // 126 0x7e \176 "~"
-	".notdef",        // 127 0x7f \177 ""
+	".notdef",        // 127 0x7f \177
 	"Euro",           // 128 0x80 \200 "€"
-	".notdef",        // 129 0x81 \201 ""
+	".notdef",        // 129 0x81 \201
 	"quotesinglbase", // 130 0x82 \202 "‚"
 	"florin",         // 131 0x83 \203 "ƒ"
 	"quotedblbase",   // 132 0x84 \204 "„"
@@ -160,10 +160,10 @@ var WinAnsiEncoding = [256]pdf.Name{
 	"Scaron",         // 138 0x8a \212 "Š"
 	"guilsinglleft",  // 139 0x8b \213 "‹"
 	"OE",             // 140 0x8c \214 "Œ"
-	".notdef",        // 141 0x8d \215 ""
+	".notdef",        // 141 0x8d \215
 	"Zcaron",         // 142 0x8e \216 "Ž"
-	".notdef",        // 143 0x8f \217 ""
-	".notdef",        // 144 0x90 \220 ""
+	".notdef",        // 143 0x8f \217
+	".notdef",        // 144 0x90 \220
 	"quoteleft",      // 145 0x91 \221 "‘"
 	"quoteright",     // 146 0x92 \222 "’"
 	"quotedblleft",   // 147 0x93 \223 "“"
@@ -176,10 +176,10 @@ var WinAnsiEncoding = [256]pdf.Name{
 	"scaron",         // 154 0x9a \232 "š"
 	"guilsinglright", // 155 0x9b \233 "›"
 	"oe",             // 156 0x9c \234 "œ"
-	".notdef",        // 157 0x9d \235 ""
+	".notdef",        // 157 0x9d \235
 	"zcaron",         // 158 0x9e \236 "ž"
 	"Ydieresis",      // 159 0x9f \237 "Ÿ"
-	"space",          // 160 0xa0 \240 ""
+	"space",          // 160 0xa0 \240 " "
 	"exclamdown",     // 161 0xa1 \241 "¡"
 	"cent",           // 162 0xa2 \242 "¢"
 	"sterling",       // 163 0xa3 \243 "£"
@@ -192,7 +192,7 @@ var WinAnsiEncoding = [256]pdf.Name{
 	"ordfeminine",    // 170 0xaa \252 "ª"
 	"guillemotleft",  // 171 0xab \253 "«"
 	"logicalnot",     // 172 0xac \254 "¬"
-	"hyphen",         // 173 0xad \255 ""
+	"hyphen",         // 173 0xad \255 "-"
 	"registered",     // 174 0xae \256 "®"
 	"macron",         // 175 0xaf \257 "¯"
 	"degree",         // 176 0xb0 \260 "°"

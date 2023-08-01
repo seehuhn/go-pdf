@@ -22,9 +22,162 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1/names"
 )
+
+func TestDescribeEncoding(t *testing.T) {
+	funnyEncoding := make([]string, 256)
+	for i := range funnyEncoding {
+		funnyEncoding[i] = ".notdef"
+	}
+	funnyEncoding[0o001] = "funny"  // non-standard name
+	funnyEncoding[0o101] = "A"      // common to all encodings
+	funnyEncoding[0o102] = "C"      // clashes with all encodings
+	funnyEncoding[0o103] = "B"      // clashes with all encodings
+	funnyEncoding[0o104] = "D"      // common to all encodings
+	funnyEncoding[0o142] = "Bsmall" // only in MacExpertEncoding
+	funnyEncoding[0o201] = "A"      // double encode some characters
+	funnyEncoding[0o202] = "B"      // double encode some characters
+	funnyEncoding[0o203] = "C"      // double encode some characters
+	funnyEncoding[0o204] = "D"      // double encode some characters
+	funnyEncoding[0o214] = "OE"     // only in WinAnsiEncoding
+	funnyEncoding[0o227] = "Scaron" // only in PdfDocEncoding
+	funnyEncoding[0o341] = "AE"     // only in StandardEncoding
+	funnyEncoding[0o347] = "Aacute" // only in MacRomanEncoding
+
+	encodings := [][]string{
+		pdfenc.StandardEncoding[:],
+		pdfenc.MacRomanEncoding[:],
+		pdfenc.MacExpertEncoding[:],
+		pdfenc.WinAnsiEncoding[:],
+		pdfenc.PDFDocEncoding[:],
+		funnyEncoding,
+	}
+
+	for i, enc := range encodings {
+		for j, builtin := range encodings {
+			desc := DescribeEncoding(enc, builtin)
+			if i == j {
+				if desc != nil {
+					t.Errorf("DescribeEncoding(%d, %d) = %v", i, j, desc)
+				}
+			}
+
+			enc2, err := UndescribeEncoding(nil, desc, builtin)
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+
+			for c, name := range enc {
+				if name == ".notdef" {
+					continue
+				}
+				if enc2[c] != name {
+					t.Errorf("UndescribeEncoding(%d, %d) = %v", i, j, enc2)
+					break
+				}
+			}
+		}
+	}
+}
+
+// TestStandardEncoding verifies that the standard encodings in
+// seehuhn.de/pdf/font/pdfenc and in seehuh.de/pdf/font are consistent.
+func TestStandardEncodin(t *testing.T) {
+	for code, name := range pdfenc.StandardEncoding {
+		r1 := StandardEncoding.Decode(byte(code))
+		var r2 rune
+		if name == ".notdef" {
+			r2 = unicode.ReplacementChar
+		} else {
+			rr2 := names.ToUnicode(string(name), false)
+			if len(rr2) != 1 {
+				t.Errorf("bad name: %s", name)
+				continue
+			}
+			r2 = rr2[0]
+		}
+		if r1 != r2 {
+			t.Errorf("StandardEncoding[%d] = %q != %q", code, r1, r2)
+		}
+	}
+}
+
+// TestWinAnsiEncoding verifies that the WinAnsiEncodings in
+// seehuhn.de/pdf/font/pdfenc and in seehuh.de/pdf/font are consistent.
+func TestWinAnsiEncoding(t *testing.T) {
+	for code, name := range pdfenc.WinAnsiEncoding {
+		r1 := WinAnsiEncoding.Decode(byte(code))
+		var r2 rune
+		if name == ".notdef" {
+			r2 = unicode.ReplacementChar
+		} else {
+			rr2 := names.ToUnicode(string(name), false)
+			if len(rr2) != 1 {
+				t.Errorf("bad name: %s", name)
+				continue
+			}
+			r2 = rr2[0]
+		}
+		if code == 0o240 && r1 == '\u00a0' {
+			r1 = ' '
+		}
+		if code == 0o255 && r1 == '\u00ad' {
+			r1 = '-'
+		}
+		if r1 != r2 {
+			t.Errorf("WinAnsiEncoding[0o%03o] = %q != %q", code, r1, r2)
+		}
+	}
+}
+
+func TestMacRomanEncoding(t *testing.T) {
+	for code, name := range pdfenc.MacRomanEncoding {
+		r1 := MacRomanEncoding.Decode(byte(code))
+
+		if name == ".notdef" && r1 == unicode.ReplacementChar {
+			continue
+		}
+		rr := names.ToUnicode(string(pdfenc.MacRomanEncoding[code]), false)
+		if len(rr) != 1 {
+			t.Errorf("len(rr) != 1 for %d", code)
+			continue
+		}
+		r2 := rr[0]
+
+		if code == 0o312 && r1 == '\u00a0' {
+			r1 = ' '
+		}
+
+		if r1 != r2 {
+			t.Errorf("MacRomanEncoding[0o%03o] = %q != %q", code, r1, r2)
+		}
+	}
+}
+
+func TestMacExpertEncoding(t *testing.T) {
+	t.Skip()
+	for code, name := range pdfenc.MacExpertEncoding {
+		r1 := MacExpertEncoding.Decode(byte(code))
+
+		if name == ".notdef" && r1 == unicode.ReplacementChar {
+			continue
+		}
+		rr := names.ToUnicode(string(pdfenc.MacExpertEncoding[code]), false)
+		if len(rr) != 1 {
+			t.Errorf("len(rr) != 1 for %d", code)
+			continue
+		}
+		r2 := rr[0]
+
+		if r1 != r2 {
+			t.Errorf("MacExpertEncoding[0o%03o] = %q != %q", code, r1, r2)
+		}
+	}
+}
 
 // OldEncoding describes the correspondence between character codes and unicode
 // characters for a simple PDF font.
@@ -88,7 +241,7 @@ func TestBuiltinEncodings(t *testing.T) {
 	}
 }
 
-func TestStandardEncoding(t *testing.T) {
+func TestStandardEncoding2(t *testing.T) {
 	std := StandardEncoding
 
 	m1 := make(map[byte]rune)
@@ -124,7 +277,7 @@ func TestStandardEncoding(t *testing.T) {
 	}
 }
 
-func TestStandardEncoding2(t *testing.T) {
+func TestStandardEncoding3(t *testing.T) {
 	for c := 0; c < 256; c++ {
 		psName := psenc.StandardEncoding[c]
 		r := StandardEncoding.Decode(byte(c))

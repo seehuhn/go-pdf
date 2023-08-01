@@ -24,10 +24,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
-// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
-// https://www.adobe.com/content/dam/acom/en/devnet/acrobat/pdfs/5411.ToUnicode.pdf
-
 // Info describes a mapping from character indices to Unicode character
 // sequences.
 type Info struct {

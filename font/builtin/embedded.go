@@ -85,7 +85,7 @@ func (f *embedded) Close() error {
 
 	isDingbats := f.afm.Info.FontName == "ZapfDingbats"
 
-	enc := font.DescribeEncoding(f.enc.Encoding(), f.fontInfo.encoding,
+	enc := font.DescribeEncodingOld(f.enc.Encoding(), f.fontInfo.encoding,
 		f.fontInfo.names, isDingbats)
 	if enc != nil {
 		Font["Encoding"] = enc

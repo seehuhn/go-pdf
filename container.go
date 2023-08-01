@@ -194,6 +194,20 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 	return res, nil
 }
 
+func CheckDictType(r Getter, dict Dict, tp Name, optional bool) error {
+	val, err := GetName(r, dict["Type"])
+	if err != nil {
+		return err
+	}
+	if optional && val == "" {
+		return nil
+	}
+	if val != tp {
+		return fmt.Errorf("expected dict type %q, got %q", tp, val)
+	}
+	return nil
+}
+
 // TODO(voss): find a better name for this
 type Putter interface {
 	Close() error

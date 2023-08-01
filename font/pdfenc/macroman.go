@@ -14,47 +14,47 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pdfenc
+// Code generated .* DO NOT EDIT\.$
 
-import "seehuhn.de/go/pdf"
+package pdfenc
 
 // MacRomanEncoding is the PDF version of the MacOS standard encoding for Latin
 // text in Western writing systems.
 //
 // See Appendix D.2 of PDF 32000-1:2008.
-var MacRomanEncoding = [256]pdf.Name{
-	".notdef",        // 0   0x00 \000 ""
-	".notdef",        // 1   0x01 \001 ""
-	".notdef",        // 2   0x02 \002 ""
-	".notdef",        // 3   0x03 \003 ""
-	".notdef",        // 4   0x04 \004 ""
-	".notdef",        // 5   0x05 \005 ""
-	".notdef",        // 6   0x06 \006 ""
-	".notdef",        // 7   0x07 \007 ""
-	".notdef",        // 8   0x08 \010 ""
-	".notdef",        // 9   0x09 \011 ""
-	".notdef",        // 10  0x0a \012 ""
-	".notdef",        // 11  0x0b \013 ""
-	".notdef",        // 12  0x0c \014 ""
-	".notdef",        // 13  0x0d \015 ""
-	".notdef",        // 14  0x0e \016 ""
-	".notdef",        // 15  0x0f \017 ""
-	".notdef",        // 16  0x10 \020 ""
-	".notdef",        // 17  0x11 \021 ""
-	".notdef",        // 18  0x12 \022 ""
-	".notdef",        // 19  0x13 \023 ""
-	".notdef",        // 20  0x14 \024 ""
-	".notdef",        // 21  0x15 \025 ""
-	".notdef",        // 22  0x16 \026 ""
-	".notdef",        // 23  0x17 \027 ""
-	".notdef",        // 24  0x18 \030 ""
-	".notdef",        // 25  0x19 \031 ""
-	".notdef",        // 26  0x1a \032 ""
-	".notdef",        // 27  0x1b \033 ""
-	".notdef",        // 28  0x1c \034 ""
-	".notdef",        // 29  0x1d \035 ""
-	".notdef",        // 30  0x1e \036 ""
-	".notdef",        // 31  0x1f \037 ""
+var MacRomanEncoding = [256]string{
+	".notdef",        // 0   0x00 \000
+	".notdef",        // 1   0x01 \001
+	".notdef",        // 2   0x02 \002
+	".notdef",        // 3   0x03 \003
+	".notdef",        // 4   0x04 \004
+	".notdef",        // 5   0x05 \005
+	".notdef",        // 6   0x06 \006
+	".notdef",        // 7   0x07 \007
+	".notdef",        // 8   0x08 \010
+	".notdef",        // 9   0x09 \011
+	".notdef",        // 10  0x0a \012
+	".notdef",        // 11  0x0b \013
+	".notdef",        // 12  0x0c \014
+	".notdef",        // 13  0x0d \015
+	".notdef",        // 14  0x0e \016
+	".notdef",        // 15  0x0f \017
+	".notdef",        // 16  0x10 \020
+	".notdef",        // 17  0x11 \021
+	".notdef",        // 18  0x12 \022
+	".notdef",        // 19  0x13 \023
+	".notdef",        // 20  0x14 \024
+	".notdef",        // 21  0x15 \025
+	".notdef",        // 22  0x16 \026
+	".notdef",        // 23  0x17 \027
+	".notdef",        // 24  0x18 \030
+	".notdef",        // 25  0x19 \031
+	".notdef",        // 26  0x1a \032
+	".notdef",        // 27  0x1b \033
+	".notdef",        // 28  0x1c \034
+	".notdef",        // 29  0x1d \035
+	".notdef",        // 30  0x1e \036
+	".notdef",        // 31  0x1f \037
 	"space",          // 32  0x20 \040 " "
 	"exclam",         // 33  0x21 \041 "!"
 	"quotedbl",       // 34  0x22 \042 "\""
@@ -150,7 +150,7 @@ var MacRomanEncoding = [256]pdf.Name{
 	"bar",            // 124 0x7c \174 "|"
 	"braceright",     // 125 0x7d \175 "}"
 	"asciitilde",     // 126 0x7e \176 "~"
-	".notdef",        // 127 0x7f \177 ""
+	".notdef",        // 127 0x7f \177
 	"Adieresis",      // 128 0x80 \200 "Ä"
 	"Aring",          // 129 0x81 \201 "Å"
 	"Ccedilla",       // 130 0x82 \202 "Ç"
@@ -196,36 +196,36 @@ var MacRomanEncoding = [256]pdf.Name{
 	"trademark",      // 170 0xaa \252 "™"
 	"acute",          // 171 0xab \253 "´"
 	"dieresis",       // 172 0xac \254 "¨"
-	".notdef",        // 173 0xad \255 ""
+	".notdef",        // 173 0xad \255
 	"AE",             // 174 0xae \256 "Æ"
 	"Oslash",         // 175 0xaf \257 "Ø"
-	".notdef",        // 176 0xb0 \260 ""
+	".notdef",        // 176 0xb0 \260
 	"plusminus",      // 177 0xb1 \261 "±"
-	".notdef",        // 178 0xb2 \262 ""
-	".notdef",        // 179 0xb3 \263 ""
+	".notdef",        // 178 0xb2 \262
+	".notdef",        // 179 0xb3 \263
 	"yen",            // 180 0xb4 \264 "¥"
 	"mu",             // 181 0xb5 \265 "µ"
-	".notdef",        // 182 0xb6 \266 ""
-	".notdef",        // 183 0xb7 \267 ""
-	".notdef",        // 184 0xb8 \270 ""
-	".notdef",        // 185 0xb9 \271 ""
-	".notdef",        // 186 0xba \272 ""
+	".notdef",        // 182 0xb6 \266
+	".notdef",        // 183 0xb7 \267
+	".notdef",        // 184 0xb8 \270
+	".notdef",        // 185 0xb9 \271
+	".notdef",        // 186 0xba \272
 	"ordfeminine",    // 187 0xbb \273 "ª"
 	"ordmasculine",   // 188 0xbc \274 "º"
-	".notdef",        // 189 0xbd \275 ""
+	".notdef",        // 189 0xbd \275
 	"ae",             // 190 0xbe \276 "æ"
 	"oslash",         // 191 0xbf \277 "ø"
 	"questiondown",   // 192 0xc0 \300 "¿"
 	"exclamdown",     // 193 0xc1 \301 "¡"
 	"logicalnot",     // 194 0xc2 \302 "¬"
-	".notdef",        // 195 0xc3 \303 ""
+	".notdef",        // 195 0xc3 \303
 	"florin",         // 196 0xc4 \304 "ƒ"
-	".notdef",        // 197 0xc5 \305 ""
-	".notdef",        // 198 0xc6 \306 ""
+	".notdef",        // 197 0xc5 \305
+	".notdef",        // 198 0xc6 \306
 	"guillemotleft",  // 199 0xc7 \307 "«"
 	"guillemotright", // 200 0xc8 \310 "»"
 	"ellipsis",       // 201 0xc9 \311 "…"
-	"space",          // 202 0xca \312 ""
+	"space",          // 202 0xca \312 " "
 	"Agrave",         // 203 0xcb \313 "À"
 	"Atilde",         // 204 0xcc \314 "Ã"
 	"Otilde",         // 205 0xcd \315 "Õ"
@@ -238,7 +238,7 @@ var MacRomanEncoding = [256]pdf.Name{
 	"quoteleft",      // 212 0xd4 \324 "‘"
 	"quoteright",     // 213 0xd5 \325 "’"
 	"divide",         // 214 0xd6 \326 "÷"
-	".notdef",        // 215 0xd7 \327 ""
+	".notdef",        // 215 0xd7 \327
 	"ydieresis",      // 216 0xd8 \330 "ÿ"
 	"Ydieresis",      // 217 0xd9 \331 "Ÿ"
 	"fraction",       // 218 0xda \332 "⁄"
@@ -263,7 +263,7 @@ var MacRomanEncoding = [256]pdf.Name{
 	"Igrave",         // 237 0xed \355 "Ì"
 	"Oacute",         // 238 0xee \356 "Ó"
 	"Ocircumflex",    // 239 0xef \357 "Ô"
-	".notdef",        // 240 0xf0 \360 ""
+	".notdef",        // 240 0xf0 \360
 	"Ograve",         // 241 0xf1 \361 "Ò"
 	"Uacute",         // 242 0xf2 \362 "Ú"
 	"Ucircumflex",    // 243 0xf3 \363 "Û"

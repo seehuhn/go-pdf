@@ -168,7 +168,7 @@ func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 		fmt.Println(nGlyph, len(glyphNames))
 		_, ok := afm.GlyphInfo[".notdef"]
 		fmt.Println(len(afm.GlyphInfo), ok)
-		panic("fish" + string(fnt))
+		panic("something is wrong: " + string(fnt))
 	}
 
 	glyphCode := make(map[string]int)

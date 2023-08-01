@@ -14,43 +14,43 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Code generated .* DO NOT EDIT\.$
+
 package pdfenc
 
-import "seehuhn.de/go/pdf"
-
-var StandardEncoding = [256]pdf.Name{
-	".notdef",        // 0   0x00 \000 ""
-	".notdef",        // 1   0x01 \001 ""
-	".notdef",        // 2   0x02 \002 ""
-	".notdef",        // 3   0x03 \003 ""
-	".notdef",        // 4   0x04 \004 ""
-	".notdef",        // 5   0x05 \005 ""
-	".notdef",        // 6   0x06 \006 ""
-	".notdef",        // 7   0x07 \007 ""
-	".notdef",        // 8   0x08 \010 ""
-	".notdef",        // 9   0x09 \011 ""
-	".notdef",        // 10  0x0a \012 ""
-	".notdef",        // 11  0x0b \013 ""
-	".notdef",        // 12  0x0c \014 ""
-	".notdef",        // 13  0x0d \015 ""
-	".notdef",        // 14  0x0e \016 ""
-	".notdef",        // 15  0x0f \017 ""
-	".notdef",        // 16  0x10 \020 ""
-	".notdef",        // 17  0x11 \021 ""
-	".notdef",        // 18  0x12 \022 ""
-	".notdef",        // 19  0x13 \023 ""
-	".notdef",        // 20  0x14 \024 ""
-	".notdef",        // 21  0x15 \025 ""
-	".notdef",        // 22  0x16 \026 ""
-	".notdef",        // 23  0x17 \027 ""
-	".notdef",        // 24  0x18 \030 ""
-	".notdef",        // 25  0x19 \031 ""
-	".notdef",        // 26  0x1a \032 ""
-	".notdef",        // 27  0x1b \033 ""
-	".notdef",        // 28  0x1c \034 ""
-	".notdef",        // 29  0x1d \035 ""
-	".notdef",        // 30  0x1e \036 ""
-	".notdef",        // 31  0x1f \037 ""
+var StandardEncoding = [256]string{
+	".notdef",        // 0   0x00 \000
+	".notdef",        // 1   0x01 \001
+	".notdef",        // 2   0x02 \002
+	".notdef",        // 3   0x03 \003
+	".notdef",        // 4   0x04 \004
+	".notdef",        // 5   0x05 \005
+	".notdef",        // 6   0x06 \006
+	".notdef",        // 7   0x07 \007
+	".notdef",        // 8   0x08 \010
+	".notdef",        // 9   0x09 \011
+	".notdef",        // 10  0x0a \012
+	".notdef",        // 11  0x0b \013
+	".notdef",        // 12  0x0c \014
+	".notdef",        // 13  0x0d \015
+	".notdef",        // 14  0x0e \016
+	".notdef",        // 15  0x0f \017
+	".notdef",        // 16  0x10 \020
+	".notdef",        // 17  0x11 \021
+	".notdef",        // 18  0x12 \022
+	".notdef",        // 19  0x13 \023
+	".notdef",        // 20  0x14 \024
+	".notdef",        // 21  0x15 \025
+	".notdef",        // 22  0x16 \026
+	".notdef",        // 23  0x17 \027
+	".notdef",        // 24  0x18 \030
+	".notdef",        // 25  0x19 \031
+	".notdef",        // 26  0x1a \032
+	".notdef",        // 27  0x1b \033
+	".notdef",        // 28  0x1c \034
+	".notdef",        // 29  0x1d \035
+	".notdef",        // 30  0x1e \036
+	".notdef",        // 31  0x1f \037
 	"space",          // 32  0x20 \040 " "
 	"exclam",         // 33  0x21 \041 "!"
 	"quotedbl",       // 34  0x22 \042 "\""
@@ -146,40 +146,40 @@ var StandardEncoding = [256]pdf.Name{
 	"bar",            // 124 0x7c \174 "|"
 	"braceright",     // 125 0x7d \175 "}"
 	"asciitilde",     // 126 0x7e \176 "~"
-	".notdef",        // 127 0x7f \177 ""
-	".notdef",        // 128 0x80 \200 ""
-	".notdef",        // 129 0x81 \201 ""
-	".notdef",        // 130 0x82 \202 ""
-	".notdef",        // 131 0x83 \203 ""
-	".notdef",        // 132 0x84 \204 ""
-	".notdef",        // 133 0x85 \205 ""
-	".notdef",        // 134 0x86 \206 ""
-	".notdef",        // 135 0x87 \207 ""
-	".notdef",        // 136 0x88 \210 ""
-	".notdef",        // 137 0x89 \211 ""
-	".notdef",        // 138 0x8a \212 ""
-	".notdef",        // 139 0x8b \213 ""
-	".notdef",        // 140 0x8c \214 ""
-	".notdef",        // 141 0x8d \215 ""
-	".notdef",        // 142 0x8e \216 ""
-	".notdef",        // 143 0x8f \217 ""
-	".notdef",        // 144 0x90 \220 ""
-	".notdef",        // 145 0x91 \221 ""
-	".notdef",        // 146 0x92 \222 ""
-	".notdef",        // 147 0x93 \223 ""
-	".notdef",        // 148 0x94 \224 ""
-	".notdef",        // 149 0x95 \225 ""
-	".notdef",        // 150 0x96 \226 ""
-	".notdef",        // 151 0x97 \227 ""
-	".notdef",        // 152 0x98 \230 ""
-	".notdef",        // 153 0x99 \231 ""
-	".notdef",        // 154 0x9a \232 ""
-	".notdef",        // 155 0x9b \233 ""
-	".notdef",        // 156 0x9c \234 ""
-	".notdef",        // 157 0x9d \235 ""
-	".notdef",        // 158 0x9e \236 ""
-	".notdef",        // 159 0x9f \237 ""
-	".notdef",        // 160 0xa0 \240 ""
+	".notdef",        // 127 0x7f \177
+	".notdef",        // 128 0x80 \200
+	".notdef",        // 129 0x81 \201
+	".notdef",        // 130 0x82 \202
+	".notdef",        // 131 0x83 \203
+	".notdef",        // 132 0x84 \204
+	".notdef",        // 133 0x85 \205
+	".notdef",        // 134 0x86 \206
+	".notdef",        // 135 0x87 \207
+	".notdef",        // 136 0x88 \210
+	".notdef",        // 137 0x89 \211
+	".notdef",        // 138 0x8a \212
+	".notdef",        // 139 0x8b \213
+	".notdef",        // 140 0x8c \214
+	".notdef",        // 141 0x8d \215
+	".notdef",        // 142 0x8e \216
+	".notdef",        // 143 0x8f \217
+	".notdef",        // 144 0x90 \220
+	".notdef",        // 145 0x91 \221
+	".notdef",        // 146 0x92 \222
+	".notdef",        // 147 0x93 \223
+	".notdef",        // 148 0x94 \224
+	".notdef",        // 149 0x95 \225
+	".notdef",        // 150 0x96 \226
+	".notdef",        // 151 0x97 \227
+	".notdef",        // 152 0x98 \230
+	".notdef",        // 153 0x99 \231
+	".notdef",        // 154 0x9a \232
+	".notdef",        // 155 0x9b \233
+	".notdef",        // 156 0x9c \234
+	".notdef",        // 157 0x9d \235
+	".notdef",        // 158 0x9e \236
+	".notdef",        // 159 0x9f \237
+	".notdef",        // 160 0xa0 \240
 	"exclamdown",     // 161 0xa1 \241 "¡"
 	"cent",           // 162 0xa2 \242 "¢"
 	"sterling",       // 163 0xa3 \243 "£"
@@ -195,12 +195,12 @@ var StandardEncoding = [256]pdf.Name{
 	"guilsinglright", // 173 0xad \255 "›"
 	"fi",             // 174 0xae \256 "ﬁ"
 	"fl",             // 175 0xaf \257 "ﬂ"
-	".notdef",        // 176 0xb0 \260 ""
+	".notdef",        // 176 0xb0 \260
 	"endash",         // 177 0xb1 \261 "–"
 	"dagger",         // 178 0xb2 \262 "†"
 	"daggerdbl",      // 179 0xb3 \263 "‡"
 	"periodcentered", // 180 0xb4 \264 "·"
-	".notdef",        // 181 0xb5 \265 ""
+	".notdef",        // 181 0xb5 \265
 	"paragraph",      // 182 0xb6 \266 "¶"
 	"bullet",         // 183 0xb7 \267 "•"
 	"quotesinglbase", // 184 0xb8 \270 "‚"
@@ -209,9 +209,9 @@ var StandardEncoding = [256]pdf.Name{
 	"guillemotright", // 187 0xbb \273 "»"
 	"ellipsis",       // 188 0xbc \274 "…"
 	"perthousand",    // 189 0xbd \275 "‰"
-	".notdef",        // 190 0xbe \276 ""
+	".notdef",        // 190 0xbe \276
 	"questiondown",   // 191 0xbf \277 "¿"
-	".notdef",        // 192 0xc0 \300 ""
+	".notdef",        // 192 0xc0 \300
 	"grave",          // 193 0xc1 \301 "`"
 	"acute",          // 194 0xc2 \302 "´"
 	"circumflex",     // 195 0xc3 \303 "ˆ"
@@ -220,59 +220,59 @@ var StandardEncoding = [256]pdf.Name{
 	"breve",          // 198 0xc6 \306 "˘"
 	"dotaccent",      // 199 0xc7 \307 "˙"
 	"dieresis",       // 200 0xc8 \310 "¨"
-	".notdef",        // 201 0xc9 \311 ""
+	".notdef",        // 201 0xc9 \311
 	"ring",           // 202 0xca \312 "˚"
 	"cedilla",        // 203 0xcb \313 "¸"
-	".notdef",        // 204 0xcc \314 ""
+	".notdef",        // 204 0xcc \314
 	"hungarumlaut",   // 205 0xcd \315 "˝"
 	"ogonek",         // 206 0xce \316 "˛"
 	"caron",          // 207 0xcf \317 "ˇ"
 	"emdash",         // 208 0xd0 \320 "—"
-	".notdef",        // 209 0xd1 \321 ""
-	".notdef",        // 210 0xd2 \322 ""
-	".notdef",        // 211 0xd3 \323 ""
-	".notdef",        // 212 0xd4 \324 ""
-	".notdef",        // 213 0xd5 \325 ""
-	".notdef",        // 214 0xd6 \326 ""
-	".notdef",        // 215 0xd7 \327 ""
-	".notdef",        // 216 0xd8 \330 ""
-	".notdef",        // 217 0xd9 \331 ""
-	".notdef",        // 218 0xda \332 ""
-	".notdef",        // 219 0xdb \333 ""
-	".notdef",        // 220 0xdc \334 ""
-	".notdef",        // 221 0xdd \335 ""
-	".notdef",        // 222 0xde \336 ""
-	".notdef",        // 223 0xdf \337 ""
-	".notdef",        // 224 0xe0 \340 ""
+	".notdef",        // 209 0xd1 \321
+	".notdef",        // 210 0xd2 \322
+	".notdef",        // 211 0xd3 \323
+	".notdef",        // 212 0xd4 \324
+	".notdef",        // 213 0xd5 \325
+	".notdef",        // 214 0xd6 \326
+	".notdef",        // 215 0xd7 \327
+	".notdef",        // 216 0xd8 \330
+	".notdef",        // 217 0xd9 \331
+	".notdef",        // 218 0xda \332
+	".notdef",        // 219 0xdb \333
+	".notdef",        // 220 0xdc \334
+	".notdef",        // 221 0xdd \335
+	".notdef",        // 222 0xde \336
+	".notdef",        // 223 0xdf \337
+	".notdef",        // 224 0xe0 \340
 	"AE",             // 225 0xe1 \341 "Æ"
-	".notdef",        // 226 0xe2 \342 ""
+	".notdef",        // 226 0xe2 \342
 	"ordfeminine",    // 227 0xe3 \343 "ª"
-	".notdef",        // 228 0xe4 \344 ""
-	".notdef",        // 229 0xe5 \345 ""
-	".notdef",        // 230 0xe6 \346 ""
-	".notdef",        // 231 0xe7 \347 ""
+	".notdef",        // 228 0xe4 \344
+	".notdef",        // 229 0xe5 \345
+	".notdef",        // 230 0xe6 \346
+	".notdef",        // 231 0xe7 \347
 	"Lslash",         // 232 0xe8 \350 "Ł"
 	"Oslash",         // 233 0xe9 \351 "Ø"
 	"OE",             // 234 0xea \352 "Œ"
 	"ordmasculine",   // 235 0xeb \353 "º"
-	".notdef",        // 236 0xec \354 ""
-	".notdef",        // 237 0xed \355 ""
-	".notdef",        // 238 0xee \356 ""
-	".notdef",        // 239 0xef \357 ""
-	".notdef",        // 240 0xf0 \360 ""
+	".notdef",        // 236 0xec \354
+	".notdef",        // 237 0xed \355
+	".notdef",        // 238 0xee \356
+	".notdef",        // 239 0xef \357
+	".notdef",        // 240 0xf0 \360
 	"ae",             // 241 0xf1 \361 "æ"
-	".notdef",        // 242 0xf2 \362 ""
-	".notdef",        // 243 0xf3 \363 ""
-	".notdef",        // 244 0xf4 \364 ""
+	".notdef",        // 242 0xf2 \362
+	".notdef",        // 243 0xf3 \363
+	".notdef",        // 244 0xf4 \364
 	"dotlessi",       // 245 0xf5 \365 "ı"
-	".notdef",        // 246 0xf6 \366 ""
-	".notdef",        // 247 0xf7 \367 ""
+	".notdef",        // 246 0xf6 \366
+	".notdef",        // 247 0xf7 \367
 	"lslash",         // 248 0xf8 \370 "ł"
 	"oslash",         // 249 0xf9 \371 "ø"
 	"oe",             // 250 0xfa \372 "œ"
 	"germandbls",     // 251 0xfb \373 "ß"
-	".notdef",        // 252 0xfc \374 ""
-	".notdef",        // 253 0xfd \375 ""
-	".notdef",        // 254 0xfe \376 ""
-	".notdef",        // 255 0xff \377 ""
+	".notdef",        // 252 0xfc \374
+	".notdef",        // 253 0xfd \375
+	".notdef",        // 254 0xfe \376
+	".notdef",        // 255 0xff \377
 }

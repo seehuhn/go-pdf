@@ -17,14 +17,151 @@
 package font
 
 import (
+	"bytes"
+	"fmt"
+	"math"
 	"unicode"
 
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 )
+
+func DescribeEncoding(encoding, builtin []string) pdf.Object {
+	if len(encoding) != 256 || len(builtin) != 256 {
+		panic("unreachable") // TODO: remove
+	}
+
+	type cand struct {
+		name pdf.Object
+		enc  []string
+	}
+	candidates := []cand{
+		{nil, builtin},
+		{pdf.Name("WinAnsiEncoding"), pdfenc.WinAnsiEncoding[:]},
+		{pdf.Name("MacRomanEncoding"), pdfenc.MacRomanEncoding[:]},
+		{pdf.Name("MacExpertEncoding"), pdfenc.MacExpertEncoding[:]},
+	}
+
+	type D struct {
+		code    int
+		newName pdf.Name
+	}
+	var diff []D
+	var desc pdf.Dict
+	descLen := math.MaxInt
+	for _, c := range candidates {
+		diff = diff[:0]
+		for i, name := range encoding {
+			if name != ".notdef" && name != c.enc[i] {
+				diff = append(diff, D{i, pdf.Name(name)})
+			}
+		}
+		if len(diff) == 0 {
+			return c.name
+		}
+
+		newDesc := pdf.Dict{}
+		if c.name != nil {
+			newDesc["BaseEncoding"] = c.name
+		}
+		var a pdf.Array
+		prev := 256
+		for _, d := range diff {
+			if d.code != prev+1 {
+				a = append(a, pdf.Integer(d.code))
+			}
+			a = append(a, d.newName)
+			prev = d.code
+		}
+		newDesc["Differences"] = a
+
+		b := &bytes.Buffer{}
+		err := newDesc.PDF(b)
+		if err != nil {
+			panic(err)
+		}
+		if b.Len() < descLen {
+			desc = newDesc
+			descLen = b.Len()
+		}
+	}
+
+	return desc
+}
+
+func UndescribeEncoding(r pdf.Getter, desc pdf.Object, builtin []string) ([]string, error) {
+	desc, err := pdf.Resolve(r, desc)
+	if err != nil {
+		return nil, err
+	}
+
+	switch desc := desc.(type) {
+	case nil:
+		return builtin, nil
+	case pdf.Name:
+		return namedEncoding(desc)
+	case pdf.Dict:
+		err = pdf.CheckDictType(r, desc, "Encoding", true)
+		if err != nil {
+			return nil, err
+		}
+
+		base, err := pdf.GetName(r, desc["BaseEncoding"])
+		if err != nil {
+			return nil, err
+		}
+		res := make([]string, 256)
+		baseEnc := builtin
+		if base != "" {
+			baseEnc, err = namedEncoding(base)
+			if err != nil {
+				return nil, err
+			}
+		}
+		copy(res, baseEnc)
+
+		a, err := pdf.GetArray(r, desc["Differences"])
+		if err != nil {
+			return nil, err
+		}
+		code := -1
+		for _, x := range a {
+			switch x := x.(type) {
+			case pdf.Integer:
+				code = int(x)
+			case pdf.Name:
+				if code < 0 || code >= 256 {
+					return nil, fmt.Errorf("encoding: invalid code %d", code)
+				}
+				res[code] = string(x)
+				code++
+			default:
+				return nil, fmt.Errorf("encoding: expected Integer or Name, got %T", x)
+			}
+		}
+
+		return res, nil
+	default:
+		return nil, fmt.Errorf("encoding: expected Name or Dict, got %T", desc)
+	}
+}
+
+func namedEncoding(name pdf.Name) ([]string, error) {
+	switch name {
+	case "WinAnsiEncoding":
+		return pdfenc.WinAnsiEncoding[:], nil
+	case "MacRomanEncoding":
+		return pdfenc.MacRomanEncoding[:], nil
+	case "MacExpertEncoding":
+		return pdfenc.MacExpertEncoding[:], nil
+	default:
+		return nil, fmt.Errorf("unknown encoding %q", name)
+	}
+}
 
 type decoder interface {
 	Decode(c byte) rune
@@ -36,7 +173,7 @@ type candidate struct {
 }
 
 // See section 9.6.6.1 of PDF 32000-1:2008
-func DescribeEncoding(enc []glyph.ID, builtin []glyph.ID, glyphNames []string, dingbats bool) pdf.Object {
+func DescribeEncodingOld(enc []glyph.ID, builtin []glyph.ID, glyphNames []string, dingbats bool) pdf.Object {
 	type D struct {
 		code byte
 		name string

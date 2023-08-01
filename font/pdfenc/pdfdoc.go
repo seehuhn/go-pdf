@@ -14,35 +14,35 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Code generated .* DO NOT EDIT\.$
+
 package pdfenc
 
-import "seehuhn.de/go/pdf"
-
-var PDFDocEncoding = [256]pdf.Name{
-	".notdef",        // 0   0x00 \000 ""
-	".notdef",        // 1   0x01 \001 ""
-	".notdef",        // 2   0x02 \002 ""
-	".notdef",        // 3   0x03 \003 ""
-	".notdef",        // 4   0x04 \004 ""
-	".notdef",        // 5   0x05 \005 ""
-	".notdef",        // 6   0x06 \006 ""
-	".notdef",        // 7   0x07 \007 ""
-	".notdef",        // 8   0x08 \010 ""
-	".notdef",        // 9   0x09 \011 ""
-	".notdef",        // 10  0x0a \012 ""
-	".notdef",        // 11  0x0b \013 ""
-	".notdef",        // 12  0x0c \014 ""
-	".notdef",        // 13  0x0d \015 ""
-	".notdef",        // 14  0x0e \016 ""
-	".notdef",        // 15  0x0f \017 ""
-	".notdef",        // 16  0x10 \020 ""
-	".notdef",        // 17  0x11 \021 ""
-	".notdef",        // 18  0x12 \022 ""
-	".notdef",        // 19  0x13 \023 ""
-	".notdef",        // 20  0x14 \024 ""
-	".notdef",        // 21  0x15 \025 ""
-	".notdef",        // 22  0x16 \026 ""
-	".notdef",        // 23  0x17 \027 ""
+var PDFDocEncoding = [256]string{
+	".notdef",        // 0   0x00 \000
+	".notdef",        // 1   0x01 \001
+	".notdef",        // 2   0x02 \002
+	".notdef",        // 3   0x03 \003
+	".notdef",        // 4   0x04 \004
+	".notdef",        // 5   0x05 \005
+	".notdef",        // 6   0x06 \006
+	".notdef",        // 7   0x07 \007
+	".notdef",        // 8   0x08 \010
+	".notdef",        // 9   0x09 \011
+	".notdef",        // 10  0x0a \012
+	".notdef",        // 11  0x0b \013
+	".notdef",        // 12  0x0c \014
+	".notdef",        // 13  0x0d \015
+	".notdef",        // 14  0x0e \016
+	".notdef",        // 15  0x0f \017
+	".notdef",        // 16  0x10 \020
+	".notdef",        // 17  0x11 \021
+	".notdef",        // 18  0x12 \022
+	".notdef",        // 19  0x13 \023
+	".notdef",        // 20  0x14 \024
+	".notdef",        // 21  0x15 \025
+	".notdef",        // 22  0x16 \026
+	".notdef",        // 23  0x17 \027
 	"breve",          // 24  0x18 \030 "˘"
 	"caron",          // 25  0x19 \031 "ˇ"
 	"circumflex",     // 26  0x1a \032 "ˆ"
@@ -146,7 +146,7 @@ var PDFDocEncoding = [256]pdf.Name{
 	"bar",            // 124 0x7c \174 "|"
 	"braceright",     // 125 0x7d \175 "}"
 	"asciitilde",     // 126 0x7e \176 "~"
-	".notdef",        // 127 0x7f \177 ""
+	".notdef",        // 127 0x7f \177
 	"bullet",         // 128 0x80 \200 "•"
 	"dagger",         // 129 0x81 \201 "†"
 	"daggerdbl",      // 130 0x82 \202 "‡"
@@ -178,7 +178,7 @@ var PDFDocEncoding = [256]pdf.Name{
 	"oe",             // 156 0x9c \234 "œ"
 	"scaron",         // 157 0x9d \235 "š"
 	"zcaron",         // 158 0x9e \236 "ž"
-	".notdef",        // 159 0x9f \237 ""
+	".notdef",        // 159 0x9f \237
 	"Euro",           // 160 0xa0 \240 "€"
 	"exclamdown",     // 161 0xa1 \241 "¡"
 	"cent",           // 162 0xa2 \242 "¢"
@@ -192,7 +192,7 @@ var PDFDocEncoding = [256]pdf.Name{
 	"ordfeminine",    // 170 0xaa \252 "ª"
 	"guillemotleft",  // 171 0xab \253 "«"
 	"logicalnot",     // 172 0xac \254 "¬"
-	".notdef",        // 173 0xad \255 ""
+	".notdef",        // 173 0xad \255
 	"registered",     // 174 0xae \256 "®"
 	"macron",         // 175 0xaf \257 "¯"
 	"degree",         // 176 0xb0 \260 "°"
