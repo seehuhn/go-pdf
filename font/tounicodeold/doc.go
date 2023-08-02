@@ -18,4 +18,4 @@
 // This is a special kind of CMap that maps character codes to Unicode
 // code points.  It is used to allow PDF readers to extract text from
 // PDF files.
-package tounicode
+package tounicodeold

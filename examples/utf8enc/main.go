@@ -34,7 +34,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
+	"seehuhn.de/go/pdf/font/tounicodeold"
 )
 
 func main() {
@@ -305,9 +305,9 @@ func (f *funkel) Close() error {
 
 	// TODO(voss): include all the CIDs
 	toUniName := pdf.Name("Seehuhn-Unicode-000")
-	toUniInfo := &tounicode.Info{
-		CodeSpace: []tounicode.CodeSpaceRange{{First: 0x0000, Last: 0x10_ffff}},
-		Ranges: []tounicode.Range{{
+	toUniInfo := &tounicodeold.Info{
+		CodeSpace: []tounicodeold.CodeSpaceRange{{First: 0x0000, Last: 0x10_ffff}},
+		Ranges: []tounicodeold.Range{{
 			First: 1,
 			Last:  255,
 			UTF16: [][]uint16{{1}},

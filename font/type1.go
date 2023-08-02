@@ -17,9 +17,16 @@
 package font
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
 	"math"
+	"sort"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 )
@@ -40,16 +47,17 @@ type Type1Info struct {
 	// This is used to determine the `Encoding` entry of the PDF font dictionary.
 	Encoding []string
 
-	// ToUnicode (optional) is a map from character codes to unicode strings
-	ToUnicode map[byte][]rune
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	// Character codes must be in the range 0, ..., 255.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
-	var fontName string
+	var fontName pdf.Name
 	if info.SubsetTag == "" {
-		fontName = info.Font.Info.FontName
+		fontName = pdf.Name(info.Font.Info.FontName)
 	} else {
-		fontName = info.SubsetTag + "+" + info.Font.Info.FontName
+		fontName = pdf.Name(info.SubsetTag + "+" + info.Font.Info.FontName)
 	}
 
 	if len(info.Encoding) != 256 || len(info.Font.Encoding) != 256 {
@@ -87,7 +95,7 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 	FontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       pdf.Name(fontName),
+		"BaseFont":       fontName,
 		"FirstChar":      widthsInfo.FirstChar,
 		"LastChar":       widthsInfo.LastChar,
 		"Widths":         WidthsRef,
@@ -104,7 +112,7 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 	// See section 9.8.1 of PDF 32000-1:2008.
 	FontDescriptor := pdf.Dict{
 		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    pdf.Name(fontName),
+		"FontName":    fontName,
 		"Flags":       pdf.Integer(type1MakeFlags(info.Font, true)),
 		"FontBBox":    fontBBox,
 		"ItalicAngle": pdf.Number(info.Font.Info.ItalicAngle),
@@ -133,23 +141,21 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 		// See section 9.9 of PDF 32000-1:2008.
 		length1 := pdf.NewPlaceholder(w, 10)
 		length2 := pdf.NewPlaceholder(w, 10)
-		length3 := pdf.NewPlaceholder(w, 10)
 		fontFileDict := pdf.Dict{
 			"Length1": length1,
 			"Length2": length2,
-			"Length3": length3,
+			"Length3": pdf.Integer(0),
 		}
 		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}
-		l1, l2, l3, err := info.Font.WritePDF(fontFileStream)
+		l1, l2, err := info.Font.WritePDF(fontFileStream)
 		if err != nil {
 			return err
 		}
 		length1.Set(pdf.Integer(l1))
 		length2.Set(pdf.Integer(l2))
-		length3.Set(pdf.Integer(l3))
 		err = fontFileStream.Close()
 		if err != nil {
 			return err
@@ -157,10 +163,42 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 	}
 
 	if toUnicodeRef != 0 {
-		// a CMap file that maps character codes to Unicode values
+		touni := &tounicode.Info{
+			Name:      makeCMapName(info.ToUnicode),
+			ROS:       &type1.CIDSystemInfo{},
+			CodeSpace: charcode.Simple,
+		}
+		touni.FromMapping(info.ToUnicode)
+		touniStream, err := w.OpenStream(FontFileRef, nil, pdf.FilterCompress{})
+		if err != nil {
+			return err
+		}
+		err = touni.Write(touniStream)
+		if err != nil {
+			return err
+		}
+		err = touniStream.Close()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func makeCMapName(m map[charcode.CharCode][]rune) pdf.Name {
+	codes := maps.Keys(m)
+	sort.Slice(codes, func(i, j int) bool {
+		return codes[i] < codes[j]
+	})
+	h := sha256.New()
+	for _, k := range codes {
+		binary.Write(h, binary.BigEndian, uint32(k))
+		h.Write([]byte{byte(len(m[k]))})
+		binary.Write(h, binary.BigEndian, m[k])
+	}
+	sum := h.Sum(nil)
+	return pdf.Name(fmt.Sprintf("Seehuhn-%x", sum[:8]))
 }
 
 // MakeFlags returns the PDF font flags for the font.

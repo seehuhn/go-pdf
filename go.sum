@@ -45,7 +45,7 @@ seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5 h1:X3EdZgozH+/MKCx+N/1ZkEfN
 seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
 seehuhn.de/go/dijkstra v0.9.3 h1:uVbFjlAuhlwV45qM7S4Wz+C7XlfbgAaTfcZX1r8OgIA=
 seehuhn.de/go/dijkstra v0.9.3/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
-seehuhn.de/go/postscript v0.3.5-0.20230802053641-7eddd99aa017 h1:PlnQSqBA0tVss/f9cuKAG3U/TQg4iMQPKHnMBMKM0SE=
-seehuhn.de/go/postscript v0.3.5-0.20230802053641-7eddd99aa017/go.mod h1:eULPCCLjgEc6gJe0Fwn9xmTFIRR/+P/3oSe5SBEnJaQ=
+seehuhn.de/go/postscript v0.3.5-0.20230802192714-7e28eccdc0af h1:EbHQ2JDxPSNUVwRdteZe6l8MMfxad9rfzQP+2LA6cyg=
+seehuhn.de/go/postscript v0.3.5-0.20230802192714-7e28eccdc0af/go.mod h1:eULPCCLjgEc6gJe0Fwn9xmTFIRR/+P/3oSe5SBEnJaQ=
 seehuhn.de/go/sfnt v0.3.5-0.20230727075140-ad53c584f411 h1:HqbvHRDx3HqbRTcUMpMdKKJzAnjy4V1sKkycgN5jEaY=
 seehuhn.de/go/sfnt v0.3.5-0.20230727075140-ad53c584f411/go.mod h1:s8SJe5njYVMd3LLljXy5HocVp4d3SCoqJkO/VTrY1nk=

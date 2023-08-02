@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
@@ -216,8 +215,6 @@ func (f *type1Simple) Close() error {
 	}
 	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
 
-	fontName := pdf.Name(subsetTag + "+" + f.info.Info.FontName)
-
 	subset := &type1.Font{}
 	*subset = *f.info
 	subset.Outlines = make(map[string]*type1.Glyph, len(includeGlyph))
@@ -231,90 +228,15 @@ func (f *type1Simple) Close() error {
 		subset.Encoding[i] = f.names[gid]
 	}
 
-	q := 1000 / float64(subset.UnitsPerEm)
-
-	var Widths pdf.Array
-	var firstChar type1.CID
-	for int(firstChar) < len(encodingGid) && encodingGid[firstChar] == 0 {
-		firstChar++
-	}
-	lastChar := type1.CID(len(encodingGid) - 1)
-	for lastChar > firstChar && encodingGid[lastChar] == 0 {
-		lastChar--
-	}
-	for i := firstChar; i <= lastChar; i++ {
-		var width pdf.Integer
-		gid := encodingGid[i]
-		if gid != 0 {
-			w := f.info.GlyphInfo[f.names[gid]].WidthX
-			width = pdf.Integer(math.Round(w.AsFloat(q)))
-		}
-		Widths = append(Widths, width)
-	}
-	// TODO(voss): use "MissingWidth"
-
-	FontDictRef := f.ref
-	FontDescriptorRef := f.w.Alloc()
-	WidthsRef := f.w.Alloc()
-	FontFileRef := f.w.Alloc()
-
-	// See section 9.6.2.1 of PDF 32000-1:2008.
-	FontDict := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       fontName,
-		"FirstChar":      pdf.Integer(firstChar),
-		"LastChar":       pdf.Integer(lastChar),
-		"Widths":         WidthsRef,
-		"FontDescriptor": FontDescriptorRef,
-		// "ToUnicode":      ToUnicodeRef,
-	}
-	if f.w.GetMeta().Version == pdf.V1_0 {
-		// TODO(voss): check this
-		FontDict["Name"] = f.resName
+	t1info := font.Type1Info{
+		Font:      subset,
+		ResName:   f.resName,
+		SubsetTag: subsetTag,
+		Encoding:  subset.Encoding,
+		// ToUnicode: map[charcode.CharCode][]rune{},
 	}
 
-	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
-		"Flags":       pdf.Integer(makeFlags(subset, true)),
-		"FontBBox":    &pdf.Rectangle{}, // empty rectangle is always allowed
-		"ItalicAngle": pdf.Number(subset.Info.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(subset.Ascent.AsFloat(q))),
-		"Descent":     pdf.Integer(math.Round(subset.Descent.AsFloat(q))),
-		"CapHeight":   pdf.Integer(math.Round(subset.CapHeight.AsFloat(q))),
-		"StemV":       pdf.Integer(subset.Private.StdVW),
-		"FontFile":    FontFileRef,
-	}
-
-	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
-	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
-	err := f.w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return err
-	}
-
-	// See section 9.9 of PDF 32000-1:2008.
-	length1 := pdf.NewPlaceholder(f.w, 10)
-	length2 := pdf.NewPlaceholder(f.w, 10)
-	length3 := pdf.NewPlaceholder(f.w, 10)
-	fontFileDict := pdf.Dict{
-		"Length1": length1,
-		"Length2": length2,
-		"Length3": length3,
-	}
-	fontFileStream, err := f.w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	l1, l2, l3, err := subset.WritePDF(fontFileStream)
-	if err != nil {
-		return err
-	}
-	length1.Set(pdf.Integer(l1))
-	length2.Set(pdf.Integer(l2))
-	length3.Set(pdf.Integer(l3))
-	err = fontFileStream.Close()
+	err := t1info.Embed(f.w, f.ref)
 	if err != nil {
 		return err
 	}

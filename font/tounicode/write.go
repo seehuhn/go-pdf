@@ -17,122 +17,19 @@
 package tounicode
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"text/template"
-
-	"seehuhn.de/go/postscript/type1"
+	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/postscript"
 )
 
-// Embed writes the ToUnicode CMap as a stream object to the given PDF file.
-func (info *Info) Embed(ref pdf.Reference, w pdf.Putter) error {
-	cmapStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	err = info.Write(cmapStream)
-	if err != nil {
-		return err
-	}
-	err = cmapStream.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Write writes the ToUnicode CMap to the given writer.
 func (info *Info) Write(w io.Writer) error {
-	if info.ROS != nil {
-		if !isValidVCString(info.ROS.Registry) {
-			return errors.New("invalid registry")
-		}
-		if !isValidVCString(info.ROS.Ordering) {
-			return errors.New("invalid ordering")
-		}
-	}
-
-	tmpl := template.Must(template.New("CMap").Funcs(template.FuncMap{
-		"PDF":          pdf.Format,
-		"PDFString":    formatPDFString,
-		"SingleChunks": singleChunks,
-		"Single":       info.formatSingle,
-		"RangeChunks":  rangeChunks,
-		"Range":        info.formatRange,
-	}).Parse(toUnicodeTmpl))
-	err := tmpl.Execute(w, info)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (info *Info) formatCharCode(code type1.CID) (string, error) {
-	for _, r := range info.CodeSpace {
-		if code >= r.First && code <= r.Last {
-			var format string
-			if r.Last >= 1<<24 {
-				format = "%08X"
-			} else if r.Last >= 1<<16 {
-				format = "%06X"
-			} else if r.Last >= 1<<8 {
-				format = "%04X"
-			} else {
-				format = "%02X"
-			}
-
-			return fmt.Sprintf("<"+format+">", code), nil
-		}
-	}
-	return "", errors.New("code not in code space")
-}
-
-func formatText(xx []uint16) string {
-	var text []string
-	for _, x := range xx {
-		text = append(text, fmt.Sprintf("%04X", x))
-	}
-	return "<" + strings.Join(text, " ") + ">"
-}
-
-func (info *Info) formatSingle(s Single) (string, error) {
-	code, err := info.formatCharCode(s.Code)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s %s", code, formatText(s.UTF16)), nil
-}
-
-func (info *Info) formatRange(r Range) (string, error) {
-	a, err := info.formatCharCode(r.First)
-	if err != nil {
-		return "", err
-	}
-	b, err := info.formatCharCode(r.Last)
-	if err != nil {
-		return "", err
-	}
-
-	if len(r.UTF16) == 1 {
-		return fmt.Sprintf("%s %s %s", a, b, formatText(r.UTF16[0])), nil
-	}
-
-	var texts []string
-	for _, t := range r.UTF16 {
-		texts = append(texts, formatText(t))
-	}
-	return fmt.Sprintf("%s %s [%s]", a, b, strings.Join(texts, " ")), nil
-}
-
-func formatPDFString(s string) (string, error) {
-	return pdf.Format(pdf.TextString(s)), nil
+	return toUnicodeTmpl.Execute(w, info)
 }
 
 const chunkSize = 100
@@ -161,29 +58,78 @@ func rangeChunks(x []Range) [][]Range {
 	return res
 }
 
-var toUnicodeTmpl = `/CIDInit /ProcSet findresource begin
+func hexRunes(rr []rune) string {
+	val := utf16.Encode(rr)
+	if len(val) == 1 {
+		return fmt.Sprintf("<%04x>", val[0])
+	}
+
+	valStrings := make([]string, len(val))
+	for i, v := range val {
+		valStrings[i] = fmt.Sprintf("%04x", v)
+	}
+	return "<" + strings.Join(valStrings, "") + ">"
+}
+
+var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncMap{
+	"PS": func(s string) string {
+		x := postscript.String(s)
+		return x.PS()
+	},
+	"PN": func(s pdf.Name) string {
+		x := postscript.Name(s)
+		return x.PS()
+	},
+	"B": func(x []byte) string {
+		return fmt.Sprintf("<%02x>", x)
+	},
+	"SingleChunks": singleChunks,
+	"Single": func(cs charcode.CodeSpaceRange, s Single) string {
+		var buf []byte
+		buf = cs.Append(buf, s.Code)
+		val := hexRunes(s.Value)
+		return fmt.Sprintf("<%x> %s", buf, val)
+	},
+	"RangeChunks": rangeChunks,
+	"Range": func(cs charcode.CodeSpaceRange, s Range) string {
+		var first, last []byte
+		first = cs.Append(first, s.First)
+		last = cs.Append(last, s.Last)
+		if len(s.Values) == 1 {
+			return fmt.Sprintf("<%x> <%x> %s", first, last, hexRunes(s.Values[0]))
+		}
+		var repl []string
+		for _, v := range s.Values {
+			repl = append(repl, hexRunes(v))
+		}
+		return fmt.Sprintf("<%x> <%x> [%s]", first, last, strings.Join(repl, " "))
+	},
+}).Parse(`/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
-{{if .Name -}}
-/CMapName {{PDF .Name}} def
-{{end -}}
+/CMapName {{PN .Name}} def
 /CMapType 2 def
 {{if .ROS -}}
 /CIDSystemInfo <<
-  /Registry {{PDFString .ROS.Registry}}
-  /Ordering {{PDFString .ROS.Ordering}}
-  /Supplement {{.ROS.Supplement}}
+/Registry {{PS .ROS.Registry}}
+/Ordering {{PS .ROS.Ordering}}
+/Supplement {{.ROS.Supplement}}
 >> def
 {{end -}}
-{{len .CodeSpace}} begincodespacerange
-{{range .CodeSpace -}}
-{{.}}
+
+{{with .CodeSpace.Ranges -}}
+{{len .}} begincodespacerange
+{{range . -}}
+{{B .Low}} {{B .High}}
+{{end -}}
 {{end -}}
 endcodespacerange
+{{$cs := .CodeSpace -}}
+
 {{range SingleChunks .Singles -}}
 {{len .}} beginbfchar
 {{range . -}}
-{{Single .}}
+{{Single $cs .}}
 {{end -}}
 endbfchar
 {{end -}}
@@ -191,7 +137,7 @@ endbfchar
 {{range RangeChunks .Ranges -}}
 {{len .}} beginbfrange
 {{range . -}}
-{{Range .}}
+{{Range $cs .}}
 {{end -}}
 endbfrange
 {{end -}}
@@ -200,4 +146,4 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end
-`
+`))

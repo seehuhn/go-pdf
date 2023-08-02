@@ -27,6 +27,14 @@ their cmaps, but the name does not follow the pattern described above.
 
 ### A CIDSystemInfo dictionary
 
+The example in the PDF spec uses the following CIDSystemInfo dictionary:
+
+```
+/Registry (Adobe)
+/Ordering (UCS2)
+/Supplement 0
+```
+
 ### The code space ranges
 
 PDF spec: "Use the beginbfchar, endbfchar, beginbfrange, and endbfrange

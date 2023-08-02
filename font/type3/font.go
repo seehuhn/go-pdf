@@ -37,7 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/tounicode"
+	"seehuhn.de/go/pdf/font/tounicodeold"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -396,18 +396,18 @@ func (e3 *embedded) Close() error {
 	}
 
 	if needToUnicode {
-		var mappings []tounicode.Single
+		var mappings []tounicodeold.Single
 		for code, gid := range encoding {
 			if gid == 0 {
 				continue
 			}
 			name := e3.b.names[gid]
-			mappings = append(mappings, tounicode.Single{
+			mappings = append(mappings, tounicodeold.Single{
 				Code:  type1.CID(code),
 				UTF16: utf16.Encode(names.ToUnicode(string(name), false)),
 			})
 		}
-		info := tounicode.FromMappings(mappings)
+		info := tounicodeold.FromMappings(mappings)
 		err := info.Embed(ToUnicodeRef, w)
 		if err != nil {
 			return err

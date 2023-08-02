@@ -156,6 +156,21 @@ func TestDecodeDate(t *testing.T) {
 	}
 }
 
+func TestDict(t *testing.T) {
+	d := Dict{
+		"good": Name("value"),
+		"bad":  nil,
+	}
+	buf := &bytes.Buffer{}
+	err := d.PDF(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "bad") {
+		t.Error("nil entry in dict")
+	}
+}
+
 func TestStream(t *testing.T) {
 	dataIn := "\nbinary stream data\000123\n   "
 	rIn := strings.NewReader(dataIn)

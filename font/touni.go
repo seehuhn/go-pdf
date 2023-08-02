@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/tounicode"
+	"seehuhn.de/go/pdf/font/tounicodeold"
 )
 
 // SimpleMapping describes the unicode text corresponding to a character code
@@ -36,14 +36,14 @@ type SimpleMapping struct {
 // WriteToUnicodeSimple writes the ToUnicode stream for a simple font.
 // This modifies mm.
 func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm []SimpleMapping) error {
-	data := &tounicode.Info{
+	data := &tounicodeold.Info{
 		Name: "Seehuhn-" + pdf.Name(ordering) + "-UCS2",
 		ROS: &type1.CIDSystemInfo{
 			Registry:   "Seehuhn",
 			Ordering:   ordering,
 			Supplement: 0,
 		},
-		CodeSpace: []tounicode.CodeSpaceRange{{First: 0x00, Last: 0xFF}},
+		CodeSpace: []tounicodeold.CodeSpaceRange{{First: 0x00, Last: 0xFF}},
 	}
 
 	sort.Slice(mm, func(i, j int) bool { return mm[i].Code < mm[j].Code })
@@ -70,7 +70,7 @@ func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm [
 			next++
 		}
 		if next > pos+1 {
-			bf := tounicode.Range{
+			bf := tounicodeold.Range{
 				First: type1.CID(mm[pos].Code),
 				Last:  type1.CID(mm[next-1].Code),
 				UTF16: [][]uint16{utf16.Encode(mm[pos].Text)},
@@ -94,7 +94,7 @@ func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm [
 				}
 				repl = append(repl, utf16.Encode(mm[i].Text))
 			}
-			bf := tounicode.Range{
+			bf := tounicodeold.Range{
 				First: type1.CID(mm[pos].Code),
 				Last:  type1.CID(mm[next-1].Code),
 				UTF16: repl,
@@ -104,7 +104,7 @@ func WriteToUnicodeSimple(w pdf.Putter, ref pdf.Reference, ordering string, mm [
 			continue
 		}
 
-		data.Singles = append(data.Singles, tounicode.Single{
+		data.Singles = append(data.Singles, tounicodeold.Single{
 			Code:  type1.CID(mm[pos].Code),
 			UTF16: utf16.Encode(mm[pos].Text),
 		})
@@ -124,14 +124,14 @@ type CIDMapping struct {
 // WriteToUnicodeCID writes the ToUnicode stream for a CIDFont.
 // This modifies mm.
 func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
-	data := &tounicode.Info{
+	data := &tounicodeold.Info{
 		Name: "Adobe-Identity-UCS",
 		ROS: &type1.CIDSystemInfo{
 			Registry:   "Adobe",
 			Ordering:   "UCS",
 			Supplement: 0,
 		},
-		CodeSpace: []tounicode.CodeSpaceRange{{First: 0x0000, Last: 0xFFFF}},
+		CodeSpace: []tounicodeold.CodeSpaceRange{{First: 0x0000, Last: 0xFFFF}},
 	}
 
 	sort.Slice(mm, func(i, j int) bool { return mm[i].CharCode < mm[j].CharCode })
@@ -160,7 +160,7 @@ func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
 		if next > pos+1 {
 			start := mm[pos].CharCode
 			end := mm[next-1].CharCode
-			bf := tounicode.Range{
+			bf := tounicodeold.Range{
 				First: type1.CID(start),
 				Last:  type1.CID(end),
 				UTF16: [][]uint16{utf16.Encode(mm[pos].Text)},
@@ -186,7 +186,7 @@ func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
 			}
 			from := mm[pos].CharCode
 			to := mm[next-1].CharCode
-			bf := tounicode.Range{
+			bf := tounicodeold.Range{
 				First: type1.CID(from),
 				Last:  type1.CID(to),
 				UTF16: repl,
@@ -197,7 +197,7 @@ func WriteToUnicodeCID(ref pdf.Reference, w pdf.Putter, mm []CIDMapping) error {
 		}
 
 		code := mm[pos].CharCode
-		data.Singles = append(data.Singles, tounicode.Single{
+		data.Singles = append(data.Singles, tounicodeold.Single{
 			Code:  type1.CID(code),
 			UTF16: utf16.Encode(mm[pos].Text),
 		})

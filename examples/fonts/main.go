@@ -24,7 +24,6 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
@@ -370,7 +369,13 @@ type layout struct {
 
 func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, ref pdf.Reference) map[pdf.Name]float64 {
 	yy := make(map[pdf.Name]float64)
-	keys := maps.Keys(fontDict)
+	var keys []pdf.Name
+	for key, val := range fontDict {
+		if val == nil {
+			continue
+		}
+		keys = append(keys, key)
+	}
 	sort.Slice(keys, func(i, j int) bool {
 		if order(keys[i]) != order(keys[j]) {
 			return order(keys[i]) < order(keys[j])

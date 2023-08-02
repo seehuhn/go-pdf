@@ -17,79 +17,33 @@
 package tounicode
 
 import (
-	"fmt"
-
-	"seehuhn.de/go/postscript/type1"
-
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/postscript/type1"
 )
 
-// Info describes a mapping from character indices to Unicode character
-// sequences.
 type Info struct {
-	CodeSpace []CodeSpaceRange
+	Name      pdf.Name
+	ROS       *type1.CIDSystemInfo
+	CodeSpace charcode.CodeSpaceRange
 	Singles   []Single
 	Ranges    []Range
-
-	Name pdf.Name
-	ROS  *type1.CIDSystemInfo
 }
 
-func (info *Info) containsCode(code type1.CID) bool {
-	for _, r := range info.CodeSpace {
-		if r.First <= code && code <= r.Last {
-			return true
-		}
-	}
-	return false
-}
-
-func (info *Info) containsRange(first, last type1.CID) bool {
-	for _, r := range info.CodeSpace {
-		if r.First <= first && last <= r.Last {
-			return true
-		}
-	}
-	return false
-}
-
-// A CodeSpaceRange describes a range of character codes, like "<00> <FF>"
-// for one-byte codes or "<0000> <FFFF>" for two-byte codes.
-type CodeSpaceRange struct {
-	First type1.CID
-	Last  type1.CID
-}
-
-func (c CodeSpaceRange) String() string {
-	var format string
-	if c.Last >= 1<<24 {
-		format = "%08X"
-	} else if c.Last >= 1<<16 {
-		format = "%06X"
-	} else if c.Last >= 1<<8 {
-		format = "%04X"
-	} else {
-		format = "%02X"
-	}
-	return fmt.Sprintf("<"+format+"> <"+format+">", c.First, c.Last)
-}
-
-// Single describes a single character code.
-// It specifies that character code Code represents the given UTF16-encoded
-// unicode string.
+// Single specifies that character code Code represents the given unicode string.
 type Single struct {
-	Code  type1.CID
-	UTF16 []uint16
+	Code  charcode.CharCode
+	Value []rune
 }
 
 // Range describes a range of character codes.
-// First and Last are the first and last code points in the range. UTF16 is a
-// list of UTF16-encoded unicode strings.  If the list has length one, then the
+// First and Last are the first and last code points in the range.
+// Values is a list of unicode strings.  If the list has length one, then the
 // replacement character is incremented by one for each code point in the
 // range.  Otherwise, the list must have the length Last-First+1, and specify
-// the UTF16 encoding for each code point in the range.
+// the value for each code point in the range.
 type Range struct {
-	First type1.CID
-	Last  type1.CID
-	UTF16 [][]uint16
+	First  charcode.CharCode
+	Last   charcode.CharCode
+	Values [][]rune
 }
