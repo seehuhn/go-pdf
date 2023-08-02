@@ -16,7 +16,10 @@
 
 package charcode
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestCustom(t *testing.T) {
 	ranges := []Range{
@@ -30,5 +33,38 @@ func TestCustom(t *testing.T) {
 	}
 	if custom[0].NumCodes != (0xf0-0x00+1)*(0xff-0x00+1) {
 		t.Errorf("expected %d codes, got %d", (0xf0-0x00+1)*(0xff-0x00+1), custom[0].NumCodes)
+	}
+}
+
+func TestCustom2(t *testing.T) {
+	ranges := []Range{
+		{Low: []byte{0x10, 0x80}, High: []byte{0x30, 0xA0}},
+	}
+	cs := NewCodeSpace(ranges)
+
+	_, ok := cs.(customCS)
+	if !ok {
+		t.Fatal("test is broken")
+	}
+
+	seen := make(map[CharCode]bool)
+	var buf []byte
+	for c1 := byte(0x10); c1 <= 0x30; c1++ {
+		for c2 := byte(0x80); c2 <= 0xA0; c2++ {
+			buf = append(buf[:0], c1, c2)
+			code, k := cs.Decode(buf)
+			if k != 2 {
+				t.Errorf("expected 2 bytes, got %d", k)
+			}
+			if seen[code] {
+				t.Errorf("code %d seen twice", code)
+			}
+			seen[code] = true
+
+			buf = cs.Append(buf[:0], code)
+			if !bytes.Equal(buf, []byte{c1, c2}) {
+				t.Fatalf("expected %v, got %v", []byte{c1, c2}, buf)
+			}
+		}
 	}
 }

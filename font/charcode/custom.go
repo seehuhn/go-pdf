@@ -59,8 +59,8 @@ func (c customCS) Append(s pdf.String, code CharCode) pdf.String {
 			s = append(s, 0)
 		}
 		for i := len(r.Low) - 1; i >= 0; i-- {
-			k := CharCode(r.High[i] - r.Low[i] + 1)
-			s[n+i] = byte(code % k)
+			k := CharCode(r.High[i]-r.Low[i]) + 1
+			s[n+i] = byte(code%k) + r.Low[i]
 			code /= k
 		}
 		break

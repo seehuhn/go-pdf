@@ -123,6 +123,7 @@ end`)
 		if err != nil {
 			return
 		}
+
 		buf := &bytes.Buffer{}
 		err = info1.Write(buf)
 		if err != nil {

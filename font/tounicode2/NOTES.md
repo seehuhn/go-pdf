@@ -54,6 +54,10 @@ the claim that a ToUnicode CMap file maps CIDs (instead of character codes) to U
 
 ### The character mappings
 
+Adobe Technical Note #5411: "Lastly, if a CID does not map to a Unicode code
+point, the value 0xFFFD (expressed as <FFFD> in the ToUnicode mapping file)
+shall be used as its Unicode code point."
+
 ## Examples
 
 ### Page 358 of ISO 32000-2:2020
@@ -78,6 +82,8 @@ endcodespacerange
   Information about CMap files can also be found in Section 9.7.5.4, "CMap example and operator summary".
 
 - Adobe Technical Note #5014, "Adobe CMap and CID Font Files Specification" (June 1993).
+  This describes CMap files in general, but has no information specific to ToUnicode CMaps.
+  Section 1.6 discusses CMap names.
   https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 
 - Adobe Technical Note #5099, "Developing CMap Resources for CID-Keyed Fonts" (March 2012).

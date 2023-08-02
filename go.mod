@@ -7,7 +7,7 @@ require (
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/term v0.5.0
 	golang.org/x/text v0.9.0
-	seehuhn.de/go/dag v0.0.0-20230228001113-19b4e3c37e21
+	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
 	seehuhn.de/go/postscript v0.3.5-0.20230802053641-7eddd99aa017
 	seehuhn.de/go/sfnt v0.3.5-0.20230727075140-ad53c584f411
 )
