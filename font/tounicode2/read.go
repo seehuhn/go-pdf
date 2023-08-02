@@ -17,6 +17,7 @@
 package tounicode
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"unicode/utf16"
@@ -38,7 +39,7 @@ func Read(r io.Reader) (*Info, error) {
 	if tp != postscript.Integer(2) {
 		return nil, fmt.Errorf("tounicode: invalid CMap type %v", tp)
 	}
-	codeMap := cmap["CodeMap"].(*postscript.CmapInfo)
+	codeMap := cmap["CodeMap"].(*postscript.CMapInfo)
 
 	cmapName, _ := cmap["CMapName"].(postscript.Name)
 	var ROS *type1.CIDSystemInfo
@@ -106,7 +107,7 @@ func Read(r io.Reader) (*Info, error) {
 			})
 		case postscript.Array:
 			if len(r) != int(high)-int(low)+1 {
-				return nil, fmt.Errorf("invalid CMap")
+				return nil, errors.New("invalid CMap")
 			}
 			var values [][]rune
 			for code := low; code <= high; code++ {

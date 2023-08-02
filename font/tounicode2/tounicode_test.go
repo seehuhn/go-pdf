@@ -119,12 +119,12 @@ CMapName currentdict /CMap defineresource pop
 end
 end`)
 	f.Fuzz(func(t *testing.T, s string) {
-		infoq, err := Read(strings.NewReader(s))
+		info1, err := Read(strings.NewReader(s))
 		if err != nil {
 			return
 		}
 		buf := &bytes.Buffer{}
-		err = infoq.Write(buf)
+		err = info1.Write(buf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,7 +132,7 @@ end`)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if d := cmp.Diff(infoq, info2); d != "" {
+		if d := cmp.Diff(info1, info2); d != "" {
 			t.Fatalf("unexpected diff (-want +got):\n%s", d)
 		}
 	})

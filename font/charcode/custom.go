@@ -36,11 +36,11 @@ func NewCodeSpace(ranges []Range) CodeSpaceRange {
 	res := make(customCS, len(ranges))
 	for i, r := range ranges {
 		var numCodes CharCode = 1
-		for i := 0; i < len(r.Low); i++ {
-			numCodes *= CharCode(r.High[i] - r.Low[i] + 1)
+		for i := range r.Low {
+			numCodes *= CharCode(r.High[i]-r.Low[i]) + 1
 		}
 		res[i].Range = r
-		res[i].numCodes = CharCode(len(r.Low))
+		res[i].NumCodes = numCodes
 	}
 	return res
 }
@@ -49,8 +49,8 @@ type customCS []customRange
 
 func (c customCS) Append(s pdf.String, code CharCode) pdf.String {
 	for _, r := range c {
-		if code >= r.numCodes {
-			code -= r.numCodes
+		if code >= r.NumCodes {
+			code -= r.NumCodes
 			continue
 		}
 
@@ -104,5 +104,5 @@ func (c customCS) Ranges() []Range {
 
 type customRange struct {
 	Range
-	numCodes CharCode
+	NumCodes CharCode
 }

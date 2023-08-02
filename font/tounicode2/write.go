@@ -71,7 +71,7 @@ func hexRunes(rr []rune) string {
 	return "<" + strings.Join(valStrings, "") + ">"
 }
 
-var toUnicodeTmpl = template.Must(template.New("type1").Funcs(template.FuncMap{
+var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncMap{
 	"PS": func(s string) string {
 		x := postscript.String(s)
 		return x.PS()
@@ -90,6 +90,7 @@ var toUnicodeTmpl = template.Must(template.New("type1").Funcs(template.FuncMap{
 		val := hexRunes(s.Value)
 		return fmt.Sprintf("<%x> %s", buf, val)
 	},
+	"RangeChunks": rangeChunks,
 	"Range": func(cs charcode.CodeSpaceRange, s Range) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)
@@ -103,13 +104,10 @@ var toUnicodeTmpl = template.Must(template.New("type1").Funcs(template.FuncMap{
 		}
 		return fmt.Sprintf("<%x> <%x> [%s]", first, last, strings.Join(repl, " "))
 	},
-	"RangeChunks": rangeChunks,
 }).Parse(`/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
-{{if .Name -}}
 /CMapName {{PN .Name}} def
-{{end -}}
 /CMapType 2 def
 {{if .ROS -}}
 /CIDSystemInfo <<
