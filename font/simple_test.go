@@ -91,7 +91,7 @@ func TestCompressWidths(t *testing.T) {
 					ww[i] = 600 + 2*funit.Int16(i)
 				}
 			}
-			info := compressWidths(ww, u)
+			info := CompressWidths(ww, u)
 
 			for i := 0; i < 256; i++ {
 				var w pdf.Object = info.MissingWidth

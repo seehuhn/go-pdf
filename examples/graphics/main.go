@@ -21,7 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	F, err := builtin.Helvetica.Embed(w.Out, "F")
+	F, err := type1.Helvetica.Embed(w.Out, "F")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -35,9 +35,9 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/font/simple"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 func main() {
@@ -67,26 +67,26 @@ func doit() error {
 		rightMargin: 72.0,
 	}
 
-	F, err := builtin.TimesRoman.Embed(doc.Out, "F")
+	F, err := type1.TimesRoman.Embed(doc.Out, "F")
 	if err != nil {
 		return err
 	}
 	l.addFont("text", F, 10)
 
-	I, err := builtin.TimesItalic.Embed(doc.Out, "I")
+	I, err := type1.TimesItalic.Embed(doc.Out, "I")
 	if err != nil {
 		return err
 	}
 	l.addFont("it", I, 10)
 
-	S, err := builtin.Helvetica.Embed(doc.Out, "S")
+	S, err := type1.Helvetica.Embed(doc.Out, "S")
 	if err != nil {
 		return err
 	}
 	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
-	SB, err := builtin.HelveticaBold.Embed(doc.Out, "B")
+	SB, err := type1.HelveticaBold.Embed(doc.Out, "B")
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func doit() error {
 	for _, s := range sections {
 		title := s.title
 		intro := s.lines
-		example := "Hello World!"
+		example := `“Hello World!”`
 
 		var X font.Embedded
 		var ffKey pdf.Name
@@ -113,7 +113,7 @@ func doit() error {
 		case "Builtin Fonts":
 			// TODO(voss): have separate sections for builtin fonts
 			// and type 1 fonts from files?
-			X, err = builtin.TimesRoman.Embed(doc.Out, "F")
+			X, err = type1.TimesRoman.Embed(doc.Out, "F")
 			if err != nil {
 				return err
 			}
@@ -464,7 +464,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	page.LineTo(xBase+wPDF+4, y1)
 	page.Stroke()
 
-	l.yPos -= 10
+	l.yPos -= 18
 
 	return yy
 }

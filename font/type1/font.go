@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builtin
+package type1
 
 import (
 	"sync"
@@ -29,6 +29,42 @@ import (
 )
 
 type Font string
+
+// The 14 built-in PDF fonts.
+const (
+	Courier              Font = "Courier"
+	CourierBold          Font = "Courier-Bold"
+	CourierBoldOblique   Font = "Courier-BoldOblique"
+	CourierOblique       Font = "Courier-Oblique"
+	Helvetica            Font = "Helvetica"
+	HelveticaBold        Font = "Helvetica-Bold"
+	HelveticaBoldOblique Font = "Helvetica-BoldOblique"
+	HelveticaOblique     Font = "Helvetica-Oblique"
+	TimesRoman           Font = "Times-Roman"
+	TimesBold            Font = "Times-Bold"
+	TimesBoldItalic      Font = "Times-BoldItalic"
+	TimesItalic          Font = "Times-Italic"
+	Symbol               Font = "Symbol"
+	ZapfDingbats         Font = "ZapfDingbats"
+)
+
+// All contains the 14 built-in PDF fonts.
+var All = []Font{
+	Courier,
+	CourierBold,
+	CourierBoldOblique,
+	CourierOblique,
+	Helvetica,
+	HelveticaBold,
+	HelveticaBoldOblique,
+	HelveticaOblique,
+	TimesRoman,
+	TimesBold,
+	TimesBoldItalic,
+	TimesItalic,
+	Symbol,
+	ZapfDingbats,
+}
 
 func (f Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	info, err := getFontInfo(f)
@@ -198,39 +234,3 @@ var (
 	fontCache     = make(map[Font]*fontInfo)
 	fontCacheLock sync.Mutex
 )
-
-// The 14 built-in PDF fonts.
-const (
-	Courier              Font = "Courier"
-	CourierBold          Font = "Courier-Bold"
-	CourierBoldOblique   Font = "Courier-BoldOblique"
-	CourierOblique       Font = "Courier-Oblique"
-	Helvetica            Font = "Helvetica"
-	HelveticaBold        Font = "Helvetica-Bold"
-	HelveticaBoldOblique Font = "Helvetica-BoldOblique"
-	HelveticaOblique     Font = "Helvetica-Oblique"
-	TimesRoman           Font = "Times-Roman"
-	TimesBold            Font = "Times-Bold"
-	TimesBoldItalic      Font = "Times-BoldItalic"
-	TimesItalic          Font = "Times-Italic"
-	Symbol               Font = "Symbol"
-	ZapfDingbats         Font = "ZapfDingbats"
-)
-
-// All contains the 14 built-in PDF fonts.
-var All = []Font{
-	Courier,
-	CourierBold,
-	CourierBoldOblique,
-	CourierOblique,
-	Helvetica,
-	HelveticaBold,
-	HelveticaBoldOblique,
-	HelveticaOblique,
-	TimesRoman,
-	TimesBold,
-	TimesBoldItalic,
-	TimesItalic,
-	Symbol,
-	ZapfDingbats,
-}

@@ -35,9 +35,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/builtin"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/tounicodeold"
+	type11 "seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -418,7 +418,7 @@ func (e3 *embedded) Close() error {
 }
 
 func symbolNames() map[pdf.Name]bool {
-	symbolAfm, err := builtin.Symbol.Afm()
+	symbolAfm, err := type11.Symbol.Afm()
 	if err != nil {
 		panic(err)
 	}

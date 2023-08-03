@@ -21,7 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 func main() {
@@ -51,7 +51,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			F, err := builtin.TimesRoman.Embed(page.Out, "F")
+			F, err := type1.TimesRoman.Embed(page.Out, "F")
 			if err != nil {
 				log.Fatal(err)
 			}

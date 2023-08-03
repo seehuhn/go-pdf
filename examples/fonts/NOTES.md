@@ -14,18 +14,20 @@ glyphs.
 These fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile` entry in the font descriptor.
 
-The `Encoding` entry in the font dictionary describes the mapping from
-character codes to glyph names.
+If the encoding used in PDF content streams is different from the font's
+builtin encoding, the `Encoding` entry in the font dictionary describes the
+mapping from character codes to glyph names,
 
 ### Builtin Fonts
 
-There are 14 standard fonts which are built into every PDF viewer.  These fonts
-have standardised names.  They use `Type1` as the `Subtype` in the font
-dictionary, but no font descripter is required and no font data needs to be
-embedded.
+There are 14 fonts which are built into every PDF viewer.  These fonts
+have standardised names.  They use `Type1` as the `Subtype` in the font dictionary,
+but no font data needs to be embedded and (for PDF versions before 2.0)
+neither glyph width information nor a font descriptor are required.
 
-The `Encoding` entry in the font dictionary describes the mapping from
-character codes to glyph names.
+If the encoding used in PDF content streams is different from the font's
+builtin encoding, the `Encoding` entry in the font dictionary describes the
+mapping from character codes to glyph names,
 
 ### Multiple Master Fonts
 

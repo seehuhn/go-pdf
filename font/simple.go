@@ -32,7 +32,7 @@ type widthInfo struct {
 	MissingWidth pdf.Integer
 }
 
-func compressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
+func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
 	q := 1000 / float64(unitsPerEm)
 
 	// find FirstChar and LastChar

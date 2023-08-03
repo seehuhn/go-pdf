@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builtin
+package type1
 
 import (
 	"fmt"
 
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 type embedded struct {
@@ -74,26 +75,15 @@ func (f *embedded) Close() error {
 	}
 	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
 
-	// See section 9.6.2.1 of PDF 32000-1:2008.
-	Font := pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name(f.afm.Info.FontName),
+	encoding := make([]string, 256)
+	for i, gid := range f.enc.Encoding() {
+		encoding[i] = f.names[gid]
 	}
 
-	// TODO(voss): more information is required for pdf-2.0
-
-	isDingbats := f.afm.Info.FontName == "ZapfDingbats"
-
-	enc := font.DescribeEncodingOld(f.enc.Encoding(), f.fontInfo.encoding,
-		f.fontInfo.names, isDingbats)
-	if enc != nil {
-		Font["Encoding"] = enc
+	t1 := &PDFFont{
+		PSFont:   f.afm,
+		ResName:  f.resName,
+		Encoding: encoding,
 	}
-	if f.w.GetMeta().Version == pdf.V1_0 {
-		Font["Name"] = f.resName
-	}
-
-	err := f.w.Put(f.ref, Font)
-	return err
+	return t1.Embed(f.w, f.ref)
 }

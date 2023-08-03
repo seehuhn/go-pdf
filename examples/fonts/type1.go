@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
+	pst1 "seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
@@ -29,11 +29,12 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 type type1Simple struct {
 	names []string
-	info  *type1.Font
+	info  *pst1.Font
 	geom  *font.Geometry
 	cmap  map[rune]glyph.ID
 	lig   map[glyph.Pair]glyph.ID
@@ -48,7 +49,7 @@ type type1Simple struct {
 	closed bool
 }
 
-func embedType1(w pdf.Putter, f *type1.Font, resName pdf.Name) (font.Embedded, error) {
+func embedType1(w pdf.Putter, f *pst1.Font, resName pdf.Name) (font.Embedded, error) {
 	glyphNames := f.GlyphList()
 	nameGid := make(map[string]glyph.ID, len(glyphNames))
 	for i, name := range glyphNames {
@@ -210,15 +211,15 @@ func (f *type1Simple) Close() error {
 	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0}) // .notdef
 	for code, gid := range encodingGid {
 		if gid != 0 {
-			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(code)})
+			ss = append(ss, subset.Glyph{OrigGID: gid, CID: pst1.CID(code)})
 		}
 	}
 	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
 
-	subset := &type1.Font{}
+	subset := &pst1.Font{}
 	*subset = *f.info
-	subset.Outlines = make(map[string]*type1.Glyph, len(includeGlyph))
-	subset.GlyphInfo = make(map[string]*type1.GlyphInfo, len(includeGlyph))
+	subset.Outlines = make(map[string]*pst1.Glyph, len(includeGlyph))
+	subset.GlyphInfo = make(map[string]*pst1.GlyphInfo, len(includeGlyph))
 	for name := range includeGlyph {
 		subset.Outlines[name] = f.info.Outlines[name]
 		subset.GlyphInfo[name] = f.info.GlyphInfo[name]
@@ -228,8 +229,8 @@ func (f *type1Simple) Close() error {
 		subset.Encoding[i] = f.names[gid]
 	}
 
-	t1info := font.Type1Info{
-		Font:      subset,
+	t1info := type1.PDFFont{
+		PSFont:    subset,
 		ResName:   f.resName,
 		SubsetTag: subsetTag,
 		Encoding:  subset.Encoding,
@@ -246,7 +247,7 @@ func (f *type1Simple) Close() error {
 
 // MakeFlags returns the PDF font flags for the font.
 // See section 9.8.2 of PDF 32000-1:2008.
-func makeFlags(info *type1.Font, symbolic bool) font.Flags {
+func makeFlags(info *pst1.Font, symbolic bool) font.Flags {
 	var flags font.Flags
 
 	if info.Info.IsFixedPitch {

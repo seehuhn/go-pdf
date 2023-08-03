@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builtin
+package type1
 
 import (
 	"embed"
@@ -25,7 +25,7 @@ import (
 
 // Afm returns the font metrics for one of the built-in pdf fonts.
 func (f Font) Afm() (*type1.Font, error) {
-	fd, err := afmData.Open("afm/" + string(f) + ".afm")
+	fd, err := afmData.Open("builtin/" + string(f) + ".afm")
 	if err != nil {
 		return nil, err
 	}
@@ -39,5 +39,24 @@ func (f Font) Afm() (*type1.Font, error) {
 	return res, nil
 }
 
-//go:embed afm/*.afm
+func IsBuiltin(f *type1.Font) bool {
+	b, err := Font(f.Info.FontName).Afm()
+	if err != nil || b.UnitsPerEm != f.UnitsPerEm {
+		return false
+	}
+
+	for name, fi := range f.GlyphInfo {
+		bi, ok := b.GlyphInfo[name]
+		if !ok {
+			return false
+		}
+		if fi.WidthX != bi.WidthX {
+			return false
+		}
+	}
+
+	return true
+}
+
+//go:embed builtin/*.afm
 var afmData embed.FS

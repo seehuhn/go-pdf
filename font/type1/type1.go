@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font
+package type1
 
 import (
 	"crypto/sha256"
@@ -25,15 +25,17 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
+
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 )
 
-type Type1Info struct {
-	// Font is the (subsetted as needed) font to embed.
-	Font *type1.Font
+type PDFFont struct {
+	// PSFont is the (subsetted as needed) font to embed.
+	PSFont *type1.Font
 
 	// ResName is the resource name for the font.
 	// This is only used for PDF version 1.0.
@@ -52,92 +54,100 @@ type Type1Info struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
-func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
-	var fontName pdf.Name
-	if info.SubsetTag == "" {
-		fontName = pdf.Name(info.Font.Info.FontName)
-	} else {
-		fontName = pdf.Name(info.SubsetTag + "+" + info.Font.Info.FontName)
-	}
+func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+	useBuiltin := w.GetMeta().Version < pdf.V2_0 && IsBuiltin(info.PSFont)
 
-	if len(info.Encoding) != 256 || len(info.Font.Encoding) != 256 {
+	if len(info.Encoding) != 256 || len(info.PSFont.Encoding) != 256 {
 		panic("unreachable") // TODO(voss): remove
 	}
 
-	ww := make([]funit.Int16, 256)
-	for i := range ww {
-		ww[i] = info.Font.GlyphInfo[info.Font.Encoding[i]].WidthX
+	var fontName pdf.Name
+	if info.SubsetTag == "" {
+		fontName = pdf.Name(info.PSFont.Info.FontName)
+	} else {
+		fontName = pdf.Name(info.SubsetTag + "+" + info.PSFont.Info.FontName)
 	}
-	widthsInfo := compressWidths(ww, info.Font.UnitsPerEm)
 
-	FontDictRef := ref
-	FontDescriptorRef := w.Alloc()
-	WidthsRef := w.Alloc()
-	var FontFileRef pdf.Reference
-	if info.Font.Outlines != nil {
-		FontFileRef = w.Alloc()
-	}
 	var toUnicodeRef pdf.Reference
-	if info.ToUnicode != nil {
-		toUnicodeRef = w.Alloc()
-	}
-
-	q := 1000 / float64(info.Font.UnitsPerEm)
-	bbox := info.Font.BBox()
-	fontBBox := &pdf.Rectangle{
-		LLx: bbox.LLx.AsFloat(q),
-		LLy: bbox.LLy.AsFloat(q),
-		URx: bbox.URx.AsFloat(q),
-		URy: bbox.URy.AsFloat(q),
-	}
+	var fontFileRef pdf.Reference
 
 	// See section 9.6.2.1 of PDF 32000-1:2008.
 	FontDict := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       fontName,
-		"FirstChar":      widthsInfo.FirstChar,
-		"LastChar":       widthsInfo.LastChar,
-		"Widths":         WidthsRef,
-		"FontDescriptor": FontDescriptorRef,
-		"Encoding":       DescribeEncoding(info.Encoding, info.Font.Encoding),
+		"Type":     pdf.Name("Font"),
+		"Subtype":  pdf.Name("Type1"),
+		"BaseFont": fontName,
+	}
+	if enc := font.DescribeEncoding(info.Encoding, info.PSFont.Encoding); enc != nil {
+		FontDict["Encoding"] = enc
 	}
 	if w.GetMeta().Version == pdf.V1_0 {
 		FontDict["Name"] = info.ResName
 	}
-	if toUnicodeRef != 0 {
+	if info.ToUnicode != nil {
+		toUnicodeRef = w.Alloc()
 		FontDict["ToUnicode"] = toUnicodeRef
 	}
+	compressedRefs := []pdf.Reference{fontDictRef}
+	compressedObjects := []pdf.Object{FontDict}
 
-	// See section 9.8.1 of PDF 32000-1:2008.
-	FontDescriptor := pdf.Dict{
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
-		"Flags":       pdf.Integer(type1MakeFlags(info.Font, true)),
-		"FontBBox":    fontBBox,
-		"ItalicAngle": pdf.Number(info.Font.Info.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(info.Font.Ascent.AsFloat(q))),
-		"Descent":     pdf.Integer(math.Round(info.Font.Descent.AsFloat(q))),
-		"StemV":       pdf.Integer(math.Round(info.Font.Private.StdVW * q)),
-	}
-	if info.Font.CapHeight != 0 {
-		FontDescriptor["CapHeight"] = pdf.Integer(math.Round(info.Font.CapHeight.AsFloat(q)))
-	}
-	if widthsInfo.MissingWidth != 0 {
-		FontDescriptor["MissingWidth"] = widthsInfo.MissingWidth
-	}
-	if FontFileRef != 0 {
-		FontDescriptor["FontFile"] = FontFileRef
+	if !useBuiltin {
+		psFont := info.PSFont
+
+		widthsRef := w.Alloc()
+		ww := make([]funit.Int16, 256)
+		for i := range ww {
+			ww[i] = psFont.GlyphInfo[info.Encoding[i]].WidthX
+		}
+		widthsInfo := font.CompressWidths(ww, psFont.UnitsPerEm)
+		FontDict["FirstChar"] = widthsInfo.FirstChar
+		FontDict["LastChar"] = widthsInfo.LastChar
+		FontDict["Widths"] = widthsRef
+		compressedRefs = append(compressedRefs, widthsRef)
+		compressedObjects = append(compressedObjects, widthsInfo.Widths)
+
+		FontDescriptorRef := w.Alloc()
+		FontDict["FontDescriptor"] = FontDescriptorRef
+
+		q := 1000 / float64(psFont.UnitsPerEm)
+		bbox := psFont.BBox()
+		fontBBox := &pdf.Rectangle{
+			LLx: bbox.LLx.AsFloat(q),
+			LLy: bbox.LLy.AsFloat(q),
+			URx: bbox.URx.AsFloat(q),
+			URy: bbox.URy.AsFloat(q),
+		}
+
+		// See section 9.8.1 of PDF 32000-1:2008.
+		FontDescriptor := pdf.Dict{
+			"Type":        pdf.Name("FontDescriptor"),
+			"FontName":    fontName,
+			"Flags":       pdf.Integer(type1MakeFlags(psFont, true)),
+			"FontBBox":    fontBBox,
+			"ItalicAngle": pdf.Number(psFont.Info.ItalicAngle),
+			"Ascent":      pdf.Integer(math.Round(psFont.Ascent.AsFloat(q))),
+			"Descent":     pdf.Integer(math.Round(psFont.Descent.AsFloat(q))),
+			"StemV":       pdf.Integer(math.Round(psFont.Private.StdVW * q)),
+		}
+		if psFont.CapHeight != 0 {
+			FontDescriptor["CapHeight"] = pdf.Integer(math.Round(psFont.CapHeight.AsFloat(q)))
+		}
+		if widthsInfo.MissingWidth != 0 {
+			FontDescriptor["MissingWidth"] = widthsInfo.MissingWidth
+		}
+		if psFont.Outlines != nil {
+			fontFileRef = w.Alloc()
+			FontDescriptor["FontFile"] = fontFileRef
+		}
+		compressedRefs = append(compressedRefs, FontDescriptorRef)
+		compressedObjects = append(compressedObjects, FontDescriptor)
 	}
 
-	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
-	compressedObjects := []pdf.Object{FontDict, FontDescriptor, widthsInfo.Widths}
 	err := w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
 	}
 
-	if FontFileRef != 0 {
+	if fontFileRef != 0 {
 		// See section 9.9 of PDF 32000-1:2008.
 		length1 := pdf.NewPlaceholder(w, 10)
 		length2 := pdf.NewPlaceholder(w, 10)
@@ -146,11 +156,11 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 			"Length2": length2,
 			"Length3": pdf.Integer(0),
 		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
+		fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}
-		l1, l2, err := info.Font.WritePDF(fontFileStream)
+		l1, l2, err := info.PSFont.WritePDF(fontFileStream)
 		if err != nil {
 			return err
 		}
@@ -169,7 +179,7 @@ func (info *Type1Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 			CodeSpace: charcode.Simple,
 		}
 		touni.FromMapping(info.ToUnicode)
-		touniStream, err := w.OpenStream(FontFileRef, nil, pdf.FilterCompress{})
+		touniStream, err := w.OpenStream(fontFileRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}
@@ -203,27 +213,27 @@ func makeCMapName(m map[charcode.CharCode][]rune) pdf.Name {
 
 // MakeFlags returns the PDF font flags for the font.
 // See section 9.8.2 of PDF 32000-1:2008.
-func type1MakeFlags(info *type1.Font, symbolic bool) Flags {
-	var flags Flags
+func type1MakeFlags(info *type1.Font, symbolic bool) font.Flags {
+	var flags font.Flags
 
 	if info.Info.IsFixedPitch {
-		flags |= FlagFixedPitch
+		flags |= font.FlagFixedPitch
 	}
 	// TODO(voss): flags |= font.FlagSerif
 
 	if symbolic {
-		flags |= FlagSymbolic
+		flags |= font.FlagSymbolic
 	} else {
-		flags |= FlagNonsymbolic
+		flags |= font.FlagNonsymbolic
 	}
 
 	// flags |= FlagScript
 	if info.Info.ItalicAngle != 0 {
-		flags |= FlagItalic
+		flags |= font.FlagItalic
 	}
 
 	if info.Private.ForceBold {
-		flags |= FlagForceBold
+		flags |= font.FlagForceBold
 	}
 
 	return flags

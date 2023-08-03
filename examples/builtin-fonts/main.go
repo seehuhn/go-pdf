@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/builtin"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 func main() {
@@ -39,11 +39,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := builtin.TimesRoman.Embed(doc.Out, "F")
+	labelFont, err := type1.TimesRoman.Embed(doc.Out, "F")
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := builtin.TimesBold.Embed(doc.Out, "B")
+	titleFont, err := type1.TimesBold.Embed(doc.Out, "B")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, fontName := range builtin.All {
+	for _, fontName := range type1.All {
 		err = f.AddTitle(string(fontName), 10, 36, 12)
 		if err != nil {
 			log.Fatal(err)
@@ -155,7 +155,7 @@ func (f *fontTables) AddTitle(title string, fontSize, a, b float64) error {
 	return nil
 }
 
-func (f *fontTables) MakeColumns(fnt builtin.Font) error {
+func (f *fontTables) MakeColumns(fnt type1.Font) error {
 	fontSize := 10.0
 
 	afm, err := fnt.Afm()
@@ -217,7 +217,6 @@ func (f *fontTables) MakeColumns(fnt builtin.Font) error {
 
 				gi := afm.GlyphInfo[glyphNames[tmpGlyph]]
 				ext := gi.Extent
-				fmt.Println(tmpGlyph, nGlyph, glyphNames[tmpGlyph], gi)
 				if !ext.IsZero() {
 					w := gi.WidthX.AsFloat(fontSize / 1000)
 					page.Rectangle(

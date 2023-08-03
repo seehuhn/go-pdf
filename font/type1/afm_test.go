@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builtin
+package type1
 
 import (
 	"os"
@@ -22,7 +22,7 @@ import (
 )
 
 func Test14Fonts(t *testing.T) {
-	known, err := afmData.ReadDir("afm")
+	known, err := afmData.ReadDir("builtin")
 	if err != nil {
 		t.Fatal(err)
 	}
