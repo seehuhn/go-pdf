@@ -29,15 +29,7 @@ If the encoding used in PDF content streams is different from the font's
 builtin encoding, the `Encoding` entry in the font dictionary describes the
 mapping from character codes to glyph names,
 
-### Multiple Master Fonts
-
-These are Type1 fonts which can be modified using one or more parameters
-(weight, width, *etc.*).  Multiple Master fonts use `MMType1` as the
-`Subtype` in the font dictionary.
-
-Multiple Master Fonts are not supported by this library.
-
-### CFF Fonts (PDF 1.2)
+### Simple CFF Fonts (PDF 1.2)
 
 CFF fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile3` entry in the font descriptor,
@@ -48,7 +40,7 @@ contain a `ROS` operator.  Usually, `Encoding` is omitted from the font
 dictionary, and the mapping from character codes to glyph names is described by
 the "builtin encoding" of the CFF font.
 
-### CFF-based OpenType Fonts (PDF 1.6)
+### Simple CFF-based OpenType Fonts (PDF 1.6)
 
 These fonts use `Type1` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
@@ -59,8 +51,16 @@ The CFF data embedded in the OpenType font is not allowed to be CID-keyed,
 omitted from the font dictionary, and the mapping from character codes to glyph
 names is described by the "builtin encoding" of the OpenType font.
 
-There seems little reasson to use this font type, since the CFF font data
+There seems little reason to use this font type, since the CFF font data
 can be embedded directly without the OpenType wrapper.
+
+### Multiple Master Fonts
+
+These are Type1 fonts which can be modified using one or more parameters
+(weight, width, *etc.*).  Multiple Master fonts use `MMType1` as the
+`Subtype` in the font dictionary.
+
+Multiple Master Fonts are not supported by this library.
 
 ### TrueType Fonts (PDF 1.1)
 
@@ -82,7 +82,7 @@ Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`
 table describes the mapping from character codes to glyphs (see section 9.6.6.4
 of PDF 32000-1:2008).
 
-There seems little reasson to use this font type, since the font data
+There seems little reason to use this font type, since the font data
 could equally be embedded as a TrueType font.
 
 ### Type3 Fonts
@@ -129,7 +129,7 @@ If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
 glyphs.  Otherwise, the CID is used as the glyph index directly.
 
-There seems little reasson to use this font type, since the OpenType wrapper
+There seems little reason to use this font type, since the OpenType wrapper
 could be omitted and the CFF font data could be embedded as a CFF font.
 
 ### TrueType CIDFonts (PDF 1.3)
@@ -155,5 +155,5 @@ The `Encoding` entry in the font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 
-There seems little reasson to use this font type, since the font data
+There seems little reason to use this font type, since the font data
 could equally be embedded as a TrueType font.

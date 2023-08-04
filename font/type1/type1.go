@@ -17,13 +17,8 @@
 package type1
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
-	"fmt"
 	"math"
-	"sort"
 
-	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 
 	"seehuhn.de/go/pdf/font"
@@ -42,7 +37,7 @@ type PDFFont struct {
 	ResName pdf.Name
 
 	// SubsetTag should be a unique tag for the font subset,
-	// or the empty string if Font is the full font.
+	// or the empty string if this is the full font.
 	SubsetTag string
 
 	// Encoding (a slice of length 256) is the encoding vector used by the client.
@@ -63,9 +58,9 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 
 	var fontName pdf.Name
 	if info.SubsetTag == "" {
-		fontName = pdf.Name(info.PSFont.Info.FontName)
+		fontName = pdf.Name(info.PSFont.FontInfo.FontName)
 	} else {
-		fontName = pdf.Name(info.SubsetTag + "+" + info.PSFont.Info.FontName)
+		fontName = pdf.Name(info.SubsetTag + "+" + info.PSFont.FontInfo.FontName)
 	}
 
 	var toUnicodeRef pdf.Reference
@@ -77,11 +72,11 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		"Subtype":  pdf.Name("Type1"),
 		"BaseFont": fontName,
 	}
-	if enc := font.DescribeEncoding(info.Encoding, info.PSFont.Encoding); enc != nil {
-		FontDict["Encoding"] = enc
-	}
 	if w.GetMeta().Version == pdf.V1_0 {
 		FontDict["Name"] = info.ResName
+	}
+	if enc := font.DescribeEncoding(info.Encoding, info.PSFont.Encoding); enc != nil {
+		FontDict["Encoding"] = enc
 	}
 	if info.ToUnicode != nil {
 		toUnicodeRef = w.Alloc()
@@ -123,7 +118,7 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			"FontName":    fontName,
 			"Flags":       pdf.Integer(type1MakeFlags(psFont, true)),
 			"FontBBox":    fontBBox,
-			"ItalicAngle": pdf.Number(psFont.Info.ItalicAngle),
+			"ItalicAngle": pdf.Number(psFont.FontInfo.ItalicAngle),
 			"Ascent":      pdf.Integer(math.Round(psFont.Ascent.AsFloat(q))),
 			"Descent":     pdf.Integer(math.Round(psFont.Descent.AsFloat(q))),
 			"StemV":       pdf.Integer(math.Round(psFont.Private.StdVW * q)),
@@ -173,21 +168,7 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	if toUnicodeRef != 0 {
-		touni := &tounicode.Info{
-			Name:      makeCMapName(info.ToUnicode),
-			ROS:       &type1.CIDSystemInfo{},
-			CodeSpace: charcode.Simple,
-		}
-		touni.FromMapping(info.ToUnicode)
-		touniStream, err := w.OpenStream(fontFileRef, nil, pdf.FilterCompress{})
-		if err != nil {
-			return err
-		}
-		err = touni.Write(touniStream)
-		if err != nil {
-			return err
-		}
-		err = touniStream.Close()
+		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
 		if err != nil {
 			return err
 		}
@@ -196,27 +177,14 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	return nil
 }
 
-func makeCMapName(m map[charcode.CharCode][]rune) pdf.Name {
-	codes := maps.Keys(m)
-	sort.Slice(codes, func(i, j int) bool {
-		return codes[i] < codes[j]
-	})
-	h := sha256.New()
-	for _, k := range codes {
-		binary.Write(h, binary.BigEndian, uint32(k))
-		h.Write([]byte{byte(len(m[k]))})
-		binary.Write(h, binary.BigEndian, m[k])
-	}
-	sum := h.Sum(nil)
-	return pdf.Name(fmt.Sprintf("Seehuhn-%x", sum[:8]))
-}
-
-// MakeFlags returns the PDF font flags for the font.
+// type1MakeFlags returns the PDF font flags for the font.
 // See section 9.8.2 of PDF 32000-1:2008.
+//
+// TODO(voss): try to unify with cffMakeFlags.
 func type1MakeFlags(info *type1.Font, symbolic bool) font.Flags {
 	var flags font.Flags
 
-	if info.Info.IsFixedPitch {
+	if info.FontInfo.IsFixedPitch {
 		flags |= font.FlagFixedPitch
 	}
 	// TODO(voss): flags |= font.FlagSerif
@@ -228,7 +196,7 @@ func type1MakeFlags(info *type1.Font, symbolic bool) font.Flags {
 	}
 
 	// flags |= FlagScript
-	if info.Info.ItalicAngle != 0 {
+	if info.FontInfo.ItalicAngle != 0 {
 		flags |= font.FlagItalic
 	}
 

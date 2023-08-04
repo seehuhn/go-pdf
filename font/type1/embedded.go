@@ -71,7 +71,7 @@ func (f *embedded) Close() error {
 
 	if f.enc.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.resName, f.afm.Info.FontName)
+			f.resName, f.afm.FontInfo.FontName)
 	}
 	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
 

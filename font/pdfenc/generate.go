@@ -26,9 +26,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/type1/names"
 )
@@ -83,6 +85,8 @@ func run(fname string) error {
 	if err != nil {
 		return err
 	}
+
+	err = writeLatin(data, "latin.go")
 
 	err = writeTable(data, "standard.go", "StandardEncoding", 0)
 	if err != nil {
@@ -171,6 +175,42 @@ func sanityCheck(data map[pdf.Name]record) error {
 	return nil
 }
 
+func writeLatin(data map[pdf.Name]record, fname string) error {
+	w, err := os.Create(fname)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	names := maps.Keys(data)
+	sort.Slice(names, func(i, j int) bool {
+		return names[i] < names[j]
+	})
+
+	_, err = w.WriteString(header)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.WriteString("var IsStandardLatin = map[string]bool{\n")
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		quoted := fmt.Sprintf("%q:", name)
+		_, err = fmt.Fprintf(w, "\t%-18strue,\n", quoted)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = w.WriteString("}\n")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func writeTable(data map[pdf.Name]record, fname string, encName string, col int) error {
 	w, err := os.Create(fname)
 	if err != nil {
@@ -214,13 +254,22 @@ func writeTable(data map[pdf.Name]record, fname string, encName string, col int)
 		val[0o312] = " "
 	}
 
-	_, err = w.WriteString(comment[col])
-	if err != nil {
-		return err
-	}
 	wd := 18
 	if encName == "MacExpertEncoding" {
 		wd = 23
+		_, err = w.WriteString(comment1[4])
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = w.WriteString(comment1[col])
+		if err != nil {
+			return err
+		}
+	}
+	_, err = w.WriteString(comment2)
+	if err != nil {
+		return err
 	}
 	fmt.Fprintf(w, "var %s = [256]string{\n", encName)
 	for i := 0; i < 256; i++ {
@@ -256,19 +305,25 @@ var header = `// seehuhn.de/go/pdf - a library for reading and writing PDF files
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Code generated .* DO NOT EDIT\.$
+// Code generated - DO NOT EDIT.
 
 package pdfenc
 
 `
 
-var comment = [4]string{
-	``,
-	`// MacRomanEncoding is the PDF version of the MacOS standard encoding for Latin
-// text in Western writing systems.
+var (
+	comment1 = [5]string{
+		`// StandardEncoding is the Adobe Standard Encoding for Latin text.`,
+		`// MacRomanEncoding is the PDF version of the MacOS standard encoding for Latin
+// text in Western writing systems.`,
+		`// WinAnsiEncoding is the PDF version of the standard Microsoft Windows specific
+// encoding for Latin text in Western writing systems.`,
+		`// PDFDocEncoding is an encoding for text strings in a PDF document outside the
+// document's content streams.`,
+		`// MacExpertEncoding is an encoding which contains more obscure characters.`,
+	}
+	comment2 = `
 //
 // See Appendix D.2 of PDF 32000-1:2008.
-`,
-	``,
-	``,
-}
+`
+)

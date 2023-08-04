@@ -37,8 +37,8 @@ func Test14Fonts(t *testing.T) {
 			continue
 		}
 
-		if afm.Info.FontName != string(fontName) {
-			t.Errorf("wrong font name: %q != %q", afm.Info.FontName, fontName)
+		if afm.FontInfo.FontName != string(fontName) {
+			t.Errorf("wrong font name: %q != %q", afm.FontInfo.FontName, fontName)
 		}
 	}
 }

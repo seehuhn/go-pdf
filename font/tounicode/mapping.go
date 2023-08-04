@@ -18,8 +18,12 @@ package tounicode
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
 	"sort"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -210,4 +214,19 @@ func (g *encoder) To(v int, e int16) int {
 		return v - int(e)
 	}
 	return v + int(e)
+}
+
+func makeName(m map[charcode.CharCode][]rune) pdf.Name {
+	codes := maps.Keys(m)
+	sort.Slice(codes, func(i, j int) bool {
+		return codes[i] < codes[j]
+	})
+	h := sha256.New()
+	for _, k := range codes {
+		binary.Write(h, binary.BigEndian, uint32(k))
+		h.Write([]byte{byte(len(m[k]))})
+		binary.Write(h, binary.BigEndian, m[k])
+	}
+	sum := h.Sum(nil)
+	return pdf.Name(fmt.Sprintf("Seehuhn-%x", sum[:8]))
 }

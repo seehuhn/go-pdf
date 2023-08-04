@@ -113,17 +113,25 @@ func doit() error {
 		case "Builtin Fonts":
 			// TODO(voss): have separate sections for builtin fonts
 			// and type 1 fonts from files?
-			X, err = type1.TimesRoman.Embed(doc.Out, "F")
+			X, err = type1.Helvetica.Embed(doc.Out, "F")
 			if err != nil {
 				return err
 			}
-		case "CFF Fonts":
-			X, err = simple.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
+		case "Simple CFF Fonts":
+			otf, err := gofont.OpenType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			F, err := simple.Font(otf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile3"
-		case "CFF-based OpenType Fonts":
+		case "Simple CFF-based OpenType Fonts":
 			ttf, err := gofont.OpenType(gofont.GoRegular)
 			if err != nil {
 				return err

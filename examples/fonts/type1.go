@@ -72,12 +72,12 @@ func embedType1(w pdf.Putter, f *pst1.Font, resName pdf.Name) (font.Embedded, er
 		Ascent:             f.Ascent,
 		Descent:            f.Descent,
 		BaseLineSkip:       (f.Ascent - f.Descent) * 6 / 5, // TODO(voss)
-		UnderlinePosition:  f.Info.UnderlinePosition,
-		UnderlineThickness: f.Info.UnderlineThickness,
+		UnderlinePosition:  f.FontInfo.UnderlinePosition,
+		UnderlineThickness: f.FontInfo.UnderlineThickness,
 	}
 
 	cMap := make(map[rune]glyph.ID)
-	isDingbats := f.Info.FontName == "ZapfDingbats"
+	isDingbats := f.FontInfo.FontName == "ZapfDingbats"
 	for gid, name := range glyphNames {
 		rr := names.ToUnicode(name, isDingbats)
 		if len(rr) != 1 {
@@ -196,7 +196,7 @@ func (f *type1Simple) Close() error {
 
 	if f.enc.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.resName, f.info.Info.FontName)
+			f.resName, f.info.FontInfo.FontName)
 	}
 	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
 
@@ -243,32 +243,4 @@ func (f *type1Simple) Close() error {
 	}
 
 	return nil
-}
-
-// MakeFlags returns the PDF font flags for the font.
-// See section 9.8.2 of PDF 32000-1:2008.
-func makeFlags(info *pst1.Font, symbolic bool) font.Flags {
-	var flags font.Flags
-
-	if info.Info.IsFixedPitch {
-		flags |= font.FlagFixedPitch
-	}
-	// TODO(voss): flags |= font.FlagSerif
-
-	if symbolic {
-		flags |= font.FlagSymbolic
-	} else {
-		flags |= font.FlagNonsymbolic
-	}
-
-	// flags |= FlagScript
-	if info.Info.ItalicAngle != 0 {
-		flags |= font.FlagItalic
-	}
-
-	if info.Private.ForceBold {
-		flags |= font.FlagForceBold
-	}
-
-	return flags
 }

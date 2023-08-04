@@ -8,8 +8,8 @@ require (
 	golang.org/x/term v0.5.0
 	golang.org/x/text v0.9.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
-	seehuhn.de/go/postscript v0.3.5-0.20230802192714-7e28eccdc0af
-	seehuhn.de/go/sfnt v0.3.5-0.20230727075140-ad53c584f411
+	seehuhn.de/go/postscript v0.3.5-0.20230804121654-4b6bb35b126e
+	seehuhn.de/go/sfnt v0.3.5-0.20230804121820-dda29b5ec35e
 )
 
 require golang.org/x/image v0.7.0 // indirect

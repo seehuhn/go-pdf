@@ -17,6 +17,8 @@
 package tounicode
 
 import (
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/type1"
@@ -46,4 +48,27 @@ type Range struct {
 	First  charcode.CharCode
 	Last   charcode.CharCode
 	Values [][]rune
+}
+
+func Embed(w pdf.Putter, ref pdf.Reference, cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) error {
+	// TODO(voss): is the CIDSystemInfo correct?
+	touni := &Info{
+		Name: makeName(m),
+		ROS: &type1.CIDSystemInfo{
+			Registry:   "Adobe",
+			Ordering:   "UCS",
+			Supplement: 0,
+		},
+		CodeSpace: cs,
+	}
+	touni.FromMapping(m)
+	touniStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
+	if err != nil {
+		return err
+	}
+	err = touni.Write(touniStream)
+	if err != nil {
+		return fmt.Errorf("embedding ToUnicode cmap: %w", err)
+	}
+	return touniStream.Close()
 }

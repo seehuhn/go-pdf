@@ -140,8 +140,8 @@ func getFontInfo(f Font) (*fontInfo, error) {
 		Ascent:             afm.Ascent,
 		Descent:            afm.Descent,
 		BaseLineSkip:       1200, // TODO(voss): is this ok?
-		UnderlinePosition:  afm.Info.UnderlinePosition,
-		UnderlineThickness: afm.Info.UnderlineThickness,
+		UnderlinePosition:  afm.FontInfo.UnderlinePosition,
+		UnderlineThickness: afm.FontInfo.UnderlineThickness,
 	}
 
 	encoding := make([]glyph.ID, 256)
@@ -150,7 +150,7 @@ func getFontInfo(f Font) (*fontInfo, error) {
 	}
 
 	cmap := make(map[rune]glyph.ID)
-	isDingbats := afm.Info.FontName == "ZapfDingbats"
+	isDingbats := afm.FontInfo.FontName == "ZapfDingbats"
 	for gid, name := range glyphNames {
 		rr := names.ToUnicode(name, isDingbats)
 		if len(rr) != 1 {

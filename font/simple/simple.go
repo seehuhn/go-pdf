@@ -29,12 +29,13 @@ import (
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	pdfcff "seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 )
@@ -201,6 +202,31 @@ func (e *embedded) Close() error {
 		return fmt.Errorf("font subset: %w", err)
 	}
 
+	if subsetInfo.IsCFF() {
+		cffFont := &cff.Font{
+			FontInfo: subsetInfo.GetFontInfo(),
+			Outlines: subsetInfo.Outlines.(*cff.Outlines),
+		}
+		m := make(map[charcode.CharCode][]rune)
+		for code, gid := range encoding {
+			if gid == 0 || len(e.text[gid]) == 0 {
+				continue
+			}
+			m[charcode.CharCode(code)] = e.text[gid]
+		}
+		data := &pdfcff.PDFFont{
+			Font:       cffFont,
+			UnitsPerEm: subsetInfo.UnitsPerEm,
+			Ascent:     subsetInfo.Ascent,
+			Descent:    subsetInfo.Descent,
+			CapHeight:  subsetInfo.CapHeight,
+			SubsetTag:  subsetTag,
+			Encoding:   cffFont.Outlines.Encoding,
+			ToUnicode:  map[charcode.CharCode][]rune{},
+		}
+		return data.Embed(w, e.ref)
+	}
+
 	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
 
 	q := 1000 / float64(subsetInfo.UnitsPerEm)
@@ -243,72 +269,41 @@ func (e *embedded) Close() error {
 		"Type":        pdf.Name("FontDescriptor"),
 		"FontName":    fontName,
 		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)),
-		"FontBBox":    &pdf.Rectangle{}, // empty rectangle is always allowed
+		"FontBBox":    &pdf.Rectangle{}, // TODO(voss): fill this in
 		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
 		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
 		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
 		"CapHeight":   pdf.Integer(math.Round(subsetInfo.CapHeight.AsFloat(q))),
-		"StemV":       pdf.Integer(70), // information not available in sfnt files
+		"StemV":       pdf.Integer(0), // information not available in sfnt files
 	}
-
-	// TODO(voss): use PrivateDict.StdVW from StemV in CFF fonts?
 
 	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
 	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
 
-	switch outlines := subsetInfo.Outlines.(type) {
-	case *cff.Outlines:
-		FontDict["Subtype"] = pdf.Name("Type1")
-		FontDescriptor["FontFile3"] = FontFileRef
+	FontDict["Subtype"] = pdf.Name("TrueType")
+	FontDescriptor["FontFile2"] = FontFileRef
 
-		// Write the "font program".
-		// See section 9.9 of PDF 32000-1:2008 for details.
-		fontFileDict := pdf.Dict{
-			"Subtype": pdf.Name("Type1C"),
-		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
-		if err != nil {
-			return err
-		}
-		fontFile := cff.Font{
-			FontInfo: subsetInfo.GetFontInfo(),
-			Outlines: outlines,
-		}
-		err = fontFile.Encode(fontFileStream)
-		if err != nil {
-			return fmt.Errorf("embedding CFF font %q: %w", fontName, err)
-		}
-		err = fontFileStream.Close()
-		if err != nil {
-			return err
-		}
-
-	case *glyf.Outlines:
-		FontDict["Subtype"] = pdf.Name("TrueType")
-		FontDescriptor["FontFile2"] = FontFileRef
-
-		// Write the "font program".
-		// See section 9.9 of PDF 32000-1:2008 for details.
-		length1 := pdf.NewPlaceholder(w, 10)
-		fontFileDict := pdf.Dict{
-			"Length1": length1,
-		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
-		if err != nil {
-			return err
-		}
-		n, err := subsetInfo.WriteTrueTypePDF(fontFileStream)
-		if err != nil {
-			return err
-		}
-		err = length1.Set(pdf.Integer(n))
-		if err != nil {
-			return err
-		}
-		err = fontFileStream.Close()
-		if err != nil {
-			return err
-		}
+	// Write the "font program".
+	// See section 9.9 of PDF 32000-1:2008 for details.
+	length1 := pdf.NewPlaceholder(w, 10)
+	fontFileDict := pdf.Dict{
+		"Length1": length1,
+	}
+	fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
+	if err != nil {
+		return err
+	}
+	n, err := subsetInfo.WriteTrueTypePDF(fontFileStream)
+	if err != nil {
+		return err
+	}
+	err = length1.Set(pdf.Integer(n))
+	if err != nil {
+		return err
+	}
+	err = fontFileStream.Close()
+	if err != nil {
+		return err
 	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)

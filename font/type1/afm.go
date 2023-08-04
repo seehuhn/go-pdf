@@ -40,7 +40,7 @@ func (f Font) Afm() (*type1.Font, error) {
 }
 
 func IsBuiltin(f *type1.Font) bool {
-	b, err := Font(f.Info.FontName).Afm()
+	b, err := Font(f.FontInfo.FontName).Afm()
 	if err != nil || b.UnitsPerEm != f.UnitsPerEm {
 		return false
 	}

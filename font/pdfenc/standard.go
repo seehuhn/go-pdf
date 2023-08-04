@@ -14,10 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Code generated .* DO NOT EDIT\.$
+// Code generated - DO NOT EDIT.
 
 package pdfenc
 
+// StandardEncoding is the Adobe Standard Encoding for Latin text.
+//
+// See Appendix D.2 of PDF 32000-1:2008.
 var StandardEncoding = [256]string{
 	".notdef",        // 0   0x00 \000
 	".notdef",        // 1   0x01 \001

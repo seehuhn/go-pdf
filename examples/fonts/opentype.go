@@ -19,19 +19,21 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
@@ -125,8 +127,6 @@ func (f *openTypeSimple) Close() error {
 	}
 	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
 
-	w := f.w
-
 	// subset the font
 	var ss []subset.Glyph
 	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
@@ -142,101 +142,18 @@ func (f *openTypeSimple) Close() error {
 		return fmt.Errorf("font subset: %w", err)
 	}
 
-	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
-
-	q := 1000 / float64(subsetInfo.UnitsPerEm)
-
-	var Widths pdf.Array
-	var firstChar type1.CID
-	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
-		firstChar++
-	}
-	lastChar := type1.CID(len(encoding) - 1)
-	for lastChar > firstChar && encoding[lastChar] == 0 {
-		lastChar--
-	}
-	for i := firstChar; i <= lastChar; i++ {
-		var width pdf.Integer
-		gid := encoding[i]
-		if gid != 0 {
-			width = pdf.Integer(math.Round(f.info.GlyphWidth(gid).AsFloat(q)))
-		}
-		Widths = append(Widths, width)
-	}
-
-	FontDictRef := f.ref
-	FontDescriptorRef := w.Alloc()
-	WidthsRef := w.Alloc()
-	FontFileRef := w.Alloc()
-	ToUnicodeRef := w.Alloc()
-
-	FontDict := pdf.Dict{ // See section 9.6.2.1 of PDF 32000-1:2008.
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       fontName,
-		"FirstChar":      pdf.Integer(firstChar),
-		"LastChar":       pdf.Integer(lastChar),
-		"Widths":         WidthsRef,
-		"FontDescriptor": FontDescriptorRef,
-		"ToUnicode":      ToUnicodeRef,
-	}
-
-	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
-		"FontFile3":   FontFileRef,
-		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)),
-		"FontBBox":    &pdf.Rectangle{}, // empty rectangle is always allowed
-		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
-		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
-		"CapHeight":   pdf.Integer(math.Round(subsetInfo.CapHeight.AsFloat(q))),
-		"StemV":       pdf.Integer(70), // information not available in sfnt files
-	}
-
-	// TODO(voss): use PrivateDict.StdVW from StemV in CFF fonts?
-
-	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
-	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
-
-	// Write the "font program".
-	// See section 9.9 of PDF 32000-1:2008 for details.
-	fontFileDict := pdf.Dict{
-		"Subtype": pdf.Name("OpenType"),
-	}
-	fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	_, err = subsetInfo.WriteCFFOpenTypePDF(fontFileStream)
-	if err != nil {
-		return err
-	}
-	if err != nil {
-		return fmt.Errorf("embedding OpenType font %q: %w", fontName, err)
-	}
-	err = fontFileStream.Close()
-	if err != nil {
-		return err
-	}
-
-	err = w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return err
-	}
-
-	var cc2text []font.SimpleMapping
+	m := make(map[charcode.CharCode][]rune)
 	for code, gid := range encoding {
 		if gid == 0 || len(f.text[gid]) == 0 {
 			continue
 		}
-		rr := f.text[gid]
-		cc2text = append(cc2text, font.SimpleMapping{Code: byte(code), Text: rr})
+		m[charcode.CharCode(code)] = f.text[gid]
 	}
-	err = font.WriteToUnicodeSimple(w, ToUnicodeRef, subsetTag, cc2text)
-	if err != nil {
-		return err
+	info := opentype.PDFFont{
+		Font:      subsetInfo,
+		SubsetTag: subsetTag,
+		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
+		ToUnicode: m,
 	}
-
-	return nil
+	return info.Embed(f.w, f.ref)
 }
