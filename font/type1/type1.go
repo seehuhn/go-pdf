@@ -112,11 +112,14 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			URy: bbox.URy.AsFloat(q),
 		}
 
+		// TODO(voss): correctly set the symbolic flag
+		symbolic := true
+
 		// See section 9.8.1 of PDF 32000-1:2008.
 		FontDescriptor := pdf.Dict{
 			"Type":        pdf.Name("FontDescriptor"),
 			"FontName":    fontName,
-			"Flags":       pdf.Integer(type1MakeFlags(psFont, true)),
+			"Flags":       pdf.Integer(type1MakeFlags(psFont, symbolic)),
 			"FontBBox":    fontBBox,
 			"ItalicAngle": pdf.Number(psFont.FontInfo.ItalicAngle),
 			"Ascent":      pdf.Integer(math.Round(psFont.Ascent.AsFloat(q))),

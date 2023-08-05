@@ -125,6 +125,8 @@ func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
 
 		// Use a format 4 TrueType cmap to specify the mapping from
 		// character codes to glyph indices.
+		//
+		// TODO(voss): Is this correct/needed?
 		encoding := cmap.Format4{}
 		for subsetGid, g := range subset {
 			if subsetGid == 0 {

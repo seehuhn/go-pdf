@@ -20,7 +20,6 @@ package simple
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 
 	"golang.org/x/text/language"
@@ -38,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/truetype"
 )
 
 // EmbedFile loads a font from a file and embeds it into a PDF file.
@@ -202,17 +202,18 @@ func (e *embedded) Close() error {
 		return fmt.Errorf("font subset: %w", err)
 	}
 
+	m := make(map[charcode.CharCode][]rune)
+	for code, gid := range encoding {
+		if gid == 0 || len(e.text[gid]) == 0 {
+			continue
+		}
+		m[charcode.CharCode(code)] = e.text[gid]
+	}
+
 	if subsetInfo.IsCFF() {
 		cffFont := &cff.Font{
 			FontInfo: subsetInfo.GetFontInfo(),
 			Outlines: subsetInfo.Outlines.(*cff.Outlines),
-		}
-		m := make(map[charcode.CharCode][]rune)
-		for code, gid := range encoding {
-			if gid == 0 || len(e.text[gid]) == 0 {
-				continue
-			}
-			m[charcode.CharCode(code)] = e.text[gid]
 		}
 		data := &pdfcff.PDFFont{
 			Font:       cffFont,
@@ -222,107 +223,23 @@ func (e *embedded) Close() error {
 			CapHeight:  subsetInfo.CapHeight,
 			SubsetTag:  subsetTag,
 			Encoding:   cffFont.Outlines.Encoding,
-			ToUnicode:  map[charcode.CharCode][]rune{},
+			ToUnicode:  m,
 		}
 		return data.Embed(w, e.ref)
 	}
 
-	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
-
-	q := 1000 / float64(subsetInfo.UnitsPerEm)
-
-	var Widths pdf.Array
-	var firstChar type1.CID
-	for int(firstChar) < len(encoding) && encoding[firstChar] == 0 {
-		firstChar++
-	}
-	lastChar := type1.CID(len(encoding) - 1)
-	for lastChar > firstChar && encoding[lastChar] == 0 {
-		lastChar--
-	}
-	for i := firstChar; i <= lastChar; i++ {
-		var width pdf.Integer
-		gid := encoding[i]
-		if gid != 0 {
-			width = pdf.Integer(math.Round(e.info.GlyphWidth(gid).AsFloat(q)))
-		}
-		Widths = append(Widths, width)
-	}
-
-	FontDictRef := e.ref
-	FontDescriptorRef := w.Alloc()
-	WidthsRef := w.Alloc()
-	FontFileRef := w.Alloc()
-	ToUnicodeRef := w.Alloc()
-
-	FontDict := pdf.Dict{ // See section 9.6.2.1 of PDF 32000-1:2008.
-		"Type":           pdf.Name("Font"),
-		"BaseFont":       fontName,
-		"FirstChar":      pdf.Integer(firstChar),
-		"LastChar":       pdf.Integer(lastChar),
-		"Widths":         WidthsRef,
-		"FontDescriptor": FontDescriptorRef,
-		"ToUnicode":      ToUnicodeRef,
-	}
-
-	FontDescriptor := pdf.Dict{ // See section 9.8.1 of PDF 32000-1:2008.
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
-		"Flags":       pdf.Integer(font.MakeFlags(subsetInfo, true)),
-		"FontBBox":    &pdf.Rectangle{}, // TODO(voss): fill this in
-		"ItalicAngle": pdf.Number(subsetInfo.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(subsetInfo.Ascent.AsFloat(q))),
-		"Descent":     pdf.Integer(math.Round(subsetInfo.Descent.AsFloat(q))),
-		"CapHeight":   pdf.Integer(math.Round(subsetInfo.CapHeight.AsFloat(q))),
-		"StemV":       pdf.Integer(0), // information not available in sfnt files
-	}
-
-	compressedRefs := []pdf.Reference{FontDictRef, FontDescriptorRef, WidthsRef}
-	compressedObjects := []pdf.Object{FontDict, FontDescriptor, Widths}
-
-	FontDict["Subtype"] = pdf.Name("TrueType")
-	FontDescriptor["FontFile2"] = FontFileRef
-
-	// Write the "font program".
-	// See section 9.9 of PDF 32000-1:2008 for details.
-	length1 := pdf.NewPlaceholder(w, 10)
-	fontFileDict := pdf.Dict{
-		"Length1": length1,
-	}
-	fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	n, err := subsetInfo.WriteTrueTypePDF(fontFileStream)
-	if err != nil {
-		return err
-	}
-	err = length1.Set(pdf.Integer(n))
-	if err != nil {
-		return err
-	}
-	err = fontFileStream.Close()
-	if err != nil {
-		return err
-	}
-
-	err = w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return err
-	}
-
-	var cc2text []font.SimpleMapping
-	for code, gid := range encoding {
-		if gid == 0 || len(e.text[gid]) == 0 {
+	subsetEncoding := make([]glyph.ID, 256)
+	for subsetGid, g := range ss {
+		if subsetGid == 0 {
 			continue
 		}
-		rr := e.text[gid]
-		cc2text = append(cc2text, font.SimpleMapping{Code: byte(code), Text: rr})
+		subsetEncoding[g.CID] = glyph.ID(subsetGid)
 	}
-	err = font.WriteToUnicodeSimple(w, ToUnicodeRef, subsetTag, cc2text)
-	if err != nil {
-		return err
+	ttFont := &truetype.PDFFont{
+		Font:      subsetInfo,
+		SubsetTag: subsetTag,
+		Encoding:  subsetEncoding,
+		ToUnicode: m,
 	}
-
-	return nil
+	return ttFont.Embed(w, e.ref)
 }

@@ -68,9 +68,9 @@ These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile2` entry in the font descriptor.
 Only a subset of the TrueType tables is required for embedded fonts.
 
-Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`
-table describes the mapping from character codes to glyphs (see section 9.6.6.4
-of PDF 32000-1:2008).
+The encoding used in PDF content streams is described by a combination of
+the `Encoding` entry in the font dictionary, the `cmap` table in the TrueType,
+and the symbolic/nonsymbolic flags in the font descriptor.
 
 ### Glyf-based OpenType Fonts (PDF 1.6)
 

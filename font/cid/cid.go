@@ -27,6 +27,7 @@ import (
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
+	ttfcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
@@ -354,7 +355,14 @@ func (e *embedded) Close() error {
 		if err != nil {
 			return err
 		}
-		n, err := subsetInfo.WriteTrueTypePDF(fontFileStream)
+		var cmapData []byte
+		if subsetInfo.CMap != nil {
+			ss := ttfcmap.Table{
+				{PlatformID: 1, EncodingID: 0}: subsetInfo.CMap.Encode(0),
+			}
+			cmapData = ss.Encode()
+		}
+		n, err := subsetInfo.WriteTrueTypePDF(fontFileStream, cmapData)
 		if err != nil {
 			return err
 		}

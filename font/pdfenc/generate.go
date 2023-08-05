@@ -32,6 +32,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/type1/names"
 )
 
@@ -182,9 +183,9 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 	}
 	defer w.Close()
 
-	names := maps.Keys(data)
-	sort.Slice(names, func(i, j int) bool {
-		return names[i] < names[j]
+	glyphNames := maps.Keys(data)
+	sort.Slice(glyphNames, func(i, j int) bool {
+		return glyphNames[i] < glyphNames[j]
 	})
 
 	_, err = w.WriteString(header)
@@ -196,9 +197,42 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 	if err != nil {
 		return err
 	}
-	for _, name := range names {
+	for _, name := range glyphNames {
 		quoted := fmt.Sprintf("%q:", name)
 		_, err = fmt.Fprintf(w, "\t%-18strue,\n", quoted)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = w.WriteString("}\n\n")
+	if err != nil {
+		return err
+	}
+
+	rev := make(map[rune]string)
+	for name := range pdfenc.IsStandardLatin {
+		rr := names.ToUnicode(name, false)
+		if len(rr) != 1 {
+			return fmt.Errorf("name %s has %d runes", name, len(rr))
+		}
+		r := rr[0]
+
+		if _, exists := rev[r]; exists {
+			return fmt.Errorf("rune %04x has multiple names", r)
+		}
+		rev[r] = name
+	}
+	glyphRunes := maps.Keys(rev)
+	sort.Slice(glyphRunes, func(i, j int) bool {
+		return glyphRunes[i] < glyphRunes[j]
+	})
+
+	_, err = w.WriteString("var ToStandardLatin = map[rune]string{\n")
+	if err != nil {
+		return err
+	}
+	for _, r := range glyphRunes {
+		_, err = fmt.Fprintf(w, "\t0x%04x: %q,\n", r, rev[r])
 		if err != nil {
 			return err
 		}
