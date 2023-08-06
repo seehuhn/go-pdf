@@ -22,7 +22,6 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strings"
 
 	"golang.org/x/text/language"
 
@@ -49,6 +48,7 @@ func main() {
 
 func doit() error {
 	paper := document.A4
+	example := `“Hello World!”`
 
 	sections, err := parseNotes("NOTES.md")
 	if err != nil {
@@ -90,12 +90,12 @@ func doit() error {
 	if err != nil {
 		return err
 	}
-	l.addFont("title", SB, 18)
+	l.addFont("chapter", SB, 24)
+	l.addFont("section", SB, 18)
 
 	for _, s := range sections {
 		title := s.title
 		intro := s.lines
-		example := `“Hello World!”`
 
 		var X font.Embedded
 		var ffKey pdf.Name
@@ -192,16 +192,26 @@ func doit() error {
 
 		page := doc.AddPage()
 
-		gg := SB.Layout(title, 18)
-		w := l.F["title"].geom.ToPDF(l.F["title"].ptSize, gg.AdvanceWidth())
-		l.yPos = paper.URy - l.topMargin - l.F["title"].ascent
-		xPos := (paper.URx-l.rightMargin-l.leftMargin-w)/2 + l.leftMargin
 		page.TextStart()
-		page.TextSetFont(l.F["title"].F, l.F["title"].ptSize)
-		page.TextFirstLine(xPos, l.yPos)
+		if s.level == 1 {
+			gg := SB.Layout(title, l.F["chapter"].ptSize)
+			w := l.F["chapter"].geom.ToPDF(l.F["chapter"].ptSize, gg.AdvanceWidth())
+			l.yPos = paper.URy - l.topMargin - l.F["chapter"].ascent
+			xPos := (paper.URx-l.rightMargin-l.leftMargin-w)/2 + l.leftMargin
+			page.SetFillColor(color.Gray(0.3))
+			page.TextSetFont(l.F["chapter"].F, l.F["chapter"].ptSize)
+			page.TextFirstLine(xPos, l.yPos)
+			l.yPos -= -l.F["chapter"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
+		} else {
+			l.yPos = paper.URy - l.topMargin - l.F["section"].ascent
+			page.SetFillColor(color.Gray(0.15))
+			page.TextSetFont(l.F["section"].F, l.F["section"].ptSize)
+			page.TextFirstLine(l.leftMargin, l.yPos)
+			l.yPos -= -l.F["section"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
+		}
 		page.TextShow(title)
 		page.TextEnd()
-		l.yPos -= -l.F["title"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
+		page.SetFillColor(color.Gray(0))
 
 		page.TextStart()
 		if X != nil {
@@ -344,6 +354,7 @@ func doit() error {
 }
 
 type section struct {
+	level int
 	title string
 	lines []string
 }
@@ -360,13 +371,16 @@ func parseNotes(fname string) ([]section, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "## ") {
+		if m := heading.FindStringSubmatch(line); m != nil {
 			if current.title != "" {
 				sections = append(sections, current)
 			}
-			title := line[3:]
+			title := m[2]
 			title = pdfVersion.ReplaceAllString(title, "")
-			current = section{title: title}
+			current = section{
+				level: len(m[1]),
+				title: title,
+			}
 		} else {
 			current.lines = append(current.lines, line)
 		}
@@ -556,6 +570,7 @@ func order(key pdf.Name) int {
 }
 
 var (
+	heading    = regexp.MustCompile(`^(#+)\s+(.*?)\s*$`)
 	pdfVersion = regexp.MustCompile(`\s+\(PDF \d\.\d\)\s*$`)
 	findCode   = regexp.MustCompile("`.*?`|\\*.*?\\*")
 )
