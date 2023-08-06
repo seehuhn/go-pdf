@@ -136,7 +136,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = embedOpenTypeSimple(doc.Out, ttf, "X", language.English)
+			X, err = embedOpenTypeSimpleCFF(doc.Out, ttf, "X", language.English)
 			if err != nil {
 				return err
 			}
@@ -156,7 +156,18 @@ func doit() error {
 			}
 			ffKey = "FontFile2"
 		case "Glyf-based OpenType Fonts":
-			ffKey = "FontFile2"
+			ttf, err := gofont.TrueType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			X, err = embedOpenTypeSimpleGlyf(doc.Out, ttf, "X", language.English)
+			if err != nil {
+				return err
+			}
+			if err != nil {
+				return err
+			}
+			ffKey = "FontFile3"
 		case "Type3 Fonts":
 			X, err = embedType3Font(doc.Out)
 			if err != nil {
@@ -349,11 +360,11 @@ func parseNotes(fname string) ([]section, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "### ") {
+		if strings.HasPrefix(line, "## ") {
 			if current.title != "" {
 				sections = append(sections, current)
 			}
-			title := line[4:]
+			title := line[3:]
 			title = pdfVersion.ReplaceAllString(title, "")
 			current = section{title: title}
 		} else {

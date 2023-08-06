@@ -1,15 +1,13 @@
-Notes about PDF Fonts
-=====================
+Supported Fonts Types in PDF Files
+==================================
 
-# Supported Types of Fonts
+# Simple PDF Fonts
 
-## Simple PDF Fonts
-
-Simple fonts always use a single byte per character.
+Simple fonts always use a single byte per character in the PDF content stream.
 Thus, only 256 distinct glyphs can be used, even if the font contains more
 glyphs.
 
-### Type1 Fonts
+## Type1 Fonts
 
 These fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile` entry in the font descriptor.
@@ -18,7 +16,7 @@ If the encoding used in PDF content streams is different from the font's
 builtin encoding, the `Encoding` entry in the font dictionary describes the
 mapping from character codes to glyph names,
 
-### Builtin Fonts
+## Builtin Fonts
 
 There are 14 fonts which are built into every PDF viewer.  These fonts
 have standardised names.  They use `Type1` as the `Subtype` in the font dictionary,
@@ -29,7 +27,7 @@ If the encoding used in PDF content streams is different from the font's
 builtin encoding, the `Encoding` entry in the font dictionary describes the
 mapping from character codes to glyph names,
 
-### Simple CFF Fonts (PDF 1.2)
+## Simple CFF Fonts (PDF 1.2)
 
 CFF fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile3` entry in the font descriptor,
@@ -40,7 +38,7 @@ contain a `ROS` operator.  Usually, `Encoding` is omitted from the font
 dictionary, and the mapping from character codes to glyph names is described by
 the "builtin encoding" of the CFF font.
 
-### Simple CFF-based OpenType Fonts (PDF 1.6)
+## Simple CFF-based OpenType Fonts (PDF 1.6)
 
 These fonts use `Type1` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
@@ -54,7 +52,7 @@ names is described by the "builtin encoding" of the OpenType font.
 There seems little reason to use this font type, since the CFF font data
 can be embedded directly without the OpenType wrapper.
 
-### Multiple Master Fonts
+## Multiple Master Fonts
 
 These are Type1 fonts which can be modified using one or more parameters
 (weight, width, *etc.*).  Multiple Master fonts use `MMType1` as the
@@ -62,7 +60,7 @@ These are Type1 fonts which can be modified using one or more parameters
 
 Multiple Master Fonts are not supported by this library.
 
-### TrueType Fonts (PDF 1.1)
+## TrueType Fonts (PDF 1.1)
 
 These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile2` entry in the font descriptor.
@@ -72,20 +70,21 @@ The encoding used in PDF content streams is described by a combination of
 the `Encoding` entry in the font dictionary, the `cmap` table in the TrueType,
 and the symbolic/nonsymbolic flags in the font descriptor.
 
-### Glyf-based OpenType Fonts (PDF 1.6)
+## Glyf-based OpenType Fonts (PDF 1.6)
 
 These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `OpenType`.
 
-Usually, `Encoding` is omitted from the font dictionary, and a TrueType `cmap`
-table describes the mapping from character codes to glyphs (see section 9.6.6.4
-of PDF 32000-1:2008).
+The encoding used in PDF content streams is described by a combination of
+the `Encoding` entry in the font dictionary, the `cmap` table in the TrueType,
+and the symbolic/nonsymbolic flags in the font descriptor.
 
 There seems little reason to use this font type, since the font data
-could equally be embedded as a TrueType font.
+could equally be embedded as a TrueType font.  Glyf-based OpenType fonts
+seem not to be supported by the MacOS Preview application.
 
-### Type3 Fonts
+## Type3 Fonts
 
 These fonts use `Type3` as the `Subtype` in the font dictionary.
 The font data is embedded via the `CharProcs` entry in the font dictionary.
@@ -96,13 +95,13 @@ dictionary).
 
 
 
-## PDF CIDFonts
+# PDF CIDFonts
 
 CIDFonts can use multiple bytes to encode a character, the exact encoding is
 configurable.  The most common encoding is `Identity-H` which uses two bytes
 for every character.
 
-### CFF CIDFonts (PDF 1.3)
+## CFF CIDFonts (PDF 1.3)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.
@@ -115,7 +114,7 @@ If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
 glyphs.  Otherwise, the CID is used as the glyph index directly.
 
-### CFF-based OpenType CIDFonts (PDF 1.6)
+## CFF-based OpenType CIDFonts (PDF 1.6)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.
@@ -132,7 +131,7 @@ glyphs.  Otherwise, the CID is used as the glyph index directly.
 There seems little reason to use this font type, since the OpenType wrapper
 could be omitted and the CFF font data could be embedded as a CFF font.
 
-### TrueType CIDFonts (PDF 1.3)
+## TrueType CIDFonts (PDF 1.3)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.
@@ -143,7 +142,7 @@ The `Encoding` entry in the PDF font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 
-### Glyf-based OpenType CIDFonts (PDF 1.6)
+## Glyf-based OpenType CIDFonts (PDF 1.6)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.

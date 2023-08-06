@@ -37,7 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-type openTypeSimple struct {
+type openTypeSimpleCFF struct {
 	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -52,7 +52,7 @@ type openTypeSimple struct {
 	closed bool
 }
 
-func embedOpenTypeSimple(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+func embedOpenTypeSimpleCFF(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -73,7 +73,7 @@ func embedOpenTypeSimple(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc la
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &openTypeSimple{
+	res := &openTypeSimpleCFF{
 		info:        info,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
@@ -89,33 +89,33 @@ func embedOpenTypeSimple(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc la
 	return res, nil
 }
 
-func (f *openTypeSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *openTypeSimpleCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	return f, nil
 }
 
-func (f *openTypeSimple) GetGeometry() *font.Geometry {
+func (f *openTypeSimpleCFF) GetGeometry() *font.Geometry {
 	return f.geometry
 }
 
-func (f *openTypeSimple) ResourceName() pdf.Name {
+func (f *openTypeSimpleCFF) ResourceName() pdf.Name {
 	return f.resName
 }
 
-func (f *openTypeSimple) Reference() pdf.Reference {
+func (f *openTypeSimpleCFF) Reference() pdf.Reference {
 	return f.ref
 }
 
-func (f *openTypeSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *openTypeSimpleCFF) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
 	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
 }
 
-func (f *openTypeSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+func (f *openTypeSimpleCFF) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	f.text[gid] = rr
 	return append(s, f.enc.Encode(gid, rr))
 }
 
-func (f *openTypeSimple) Close() error {
+func (f *openTypeSimpleCFF) Close() error {
 	if f.closed {
 		return nil
 	}
@@ -149,10 +149,140 @@ func (f *openTypeSimple) Close() error {
 		}
 		m[charcode.CharCode(code)] = f.text[gid]
 	}
-	info := opentype.PDFFont{
+	info := opentype.FontCFF{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
+		ToUnicode: m,
+	}
+	return info.Embed(f.w, f.ref)
+}
+
+type openTypeSimpleGlyf struct {
+	info        *sfnt.Font
+	gsubLookups []gtab.LookupIndex
+	gposLookups []gtab.LookupIndex
+	geometry    *font.Geometry
+
+	w       pdf.Putter
+	ref     pdf.Reference
+	resName pdf.Name
+
+	enc    cmap.SimpleEncoder
+	text   map[glyph.ID][]rune
+	closed bool
+}
+
+func embedOpenTypeSimpleGlyf(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+	if !info.IsGlyf() {
+		return nil, errors.New("wrong font type")
+	}
+	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
+	if err != nil {
+		return nil, err
+	}
+
+	geometry := &font.Geometry{
+		UnitsPerEm:   info.UnitsPerEm,
+		GlyphExtents: info.Extents(),
+		Widths:       info.Widths(),
+
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+	}
+
+	res := &openTypeSimpleGlyf{
+		info:        info,
+		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
+		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		geometry:    geometry,
+
+		w:       w,
+		ref:     w.Alloc(),
+		resName: resName,
+
+		enc:  cmap.NewSimpleEncoder(),
+		text: make(map[glyph.ID][]rune),
+	}
+	return res, nil
+}
+
+func (f *openTypeSimpleGlyf) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	return f, nil
+}
+
+func (f *openTypeSimpleGlyf) GetGeometry() *font.Geometry {
+	return f.geometry
+}
+
+func (f *openTypeSimpleGlyf) ResourceName() pdf.Name {
+	return f.resName
+}
+
+func (f *openTypeSimpleGlyf) Reference() pdf.Reference {
+	return f.ref
+}
+
+func (f *openTypeSimpleGlyf) Layout(s string, ptSize float64) glyph.Seq {
+	rr := []rune(s)
+	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+}
+
+func (f *openTypeSimpleGlyf) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	f.text[gid] = rr
+	return append(s, f.enc.Encode(gid, rr))
+}
+
+func (f *openTypeSimpleGlyf) Close() error {
+	if f.closed {
+		return nil
+	}
+	f.closed = true
+
+	if f.enc.Overflow() {
+		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
+			f.resName, f.info.PostscriptName())
+	}
+	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
+
+	// subset the font
+	var ss []subset.Glyph
+	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
+	encoding := f.enc.Encoding()
+	for cid, gid := range encoding {
+		if gid != 0 {
+			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
+		}
+	}
+	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
+	subsetInfo, err := subset.Simple(f.info, ss)
+	if err != nil {
+		return fmt.Errorf("font subset: %w", err)
+	}
+
+	subsetEncoding := make([]glyph.ID, 256)
+	for subsetGid, g := range ss {
+		if subsetGid == 0 {
+			continue
+		}
+		subsetEncoding[g.CID] = glyph.ID(subsetGid)
+	}
+
+	m := make(map[charcode.CharCode][]rune)
+	for code, gid := range encoding {
+		if gid == 0 || len(f.text[gid]) == 0 {
+			continue
+		}
+		m[charcode.CharCode(code)] = f.text[gid]
+	}
+
+	info := opentype.FontGlyf{
+		Font:      subsetInfo,
+		SubsetTag: subsetTag,
+		Encoding:  subsetEncoding,
 		ToUnicode: m,
 	}
 	return info.Embed(f.w, f.ref)
