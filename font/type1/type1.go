@@ -32,10 +32,6 @@ type PDFFont struct {
 	// PSFont is the (subsetted as needed) font to embed.
 	PSFont *type1.Font
 
-	// ResName is the resource name for the font.
-	// This is only used for PDF version 1.0.
-	ResName pdf.Name
-
 	// SubsetTag should be a unique tag for the font subset,
 	// or the empty string if this is the full font.
 	SubsetTag string
@@ -47,6 +43,10 @@ type PDFFont struct {
 	// ToUnicode (optional) is a map from character codes to unicode strings.
 	// Character codes must be in the range 0, ..., 255.
 	ToUnicode map[charcode.CharCode][]rune
+
+	// ResName is the resource name for the font.
+	// This is only used for PDF version 1.0.
+	ResName pdf.Name
 }
 
 func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
