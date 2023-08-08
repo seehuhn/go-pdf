@@ -95,7 +95,7 @@ dictionary).
 
 
 
-# PDF CIDFonts
+# Composite PDF Fonts
 
 CIDFonts can use multiple bytes to encode a character, the exact encoding is
 configurable.  The most common encoding is `Identity-H` which uses two bytes

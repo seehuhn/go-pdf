@@ -94,6 +94,42 @@ func (enc *keepAscii) Encoding() []glyph.ID {
 	return res
 }
 
+func NewSimpleEncoderSequential() SimpleEncoder {
+	enc := &sequential{
+		codeLookup: make(map[glyph.ID]byte),
+	}
+	return enc
+}
+
+type sequential struct {
+	codeLookup map[glyph.ID]byte
+	numUsed    int
+}
+
+func (enc *sequential) Encode(gid glyph.ID, rr []rune) byte {
+	if c, alreadyAllocated := enc.codeLookup[gid]; alreadyAllocated {
+		return c
+	}
+
+	c := byte(enc.numUsed)
+	enc.numUsed++
+
+	enc.codeLookup[gid] = c
+	return c
+}
+
+func (enc *sequential) Overflow() bool {
+	return enc.numUsed > 256
+}
+
+func (enc *sequential) Encoding() []glyph.ID {
+	res := make([]glyph.ID, 256)
+	for gid, c := range enc.codeLookup {
+		res[c] = gid
+	}
+	return res
+}
+
 type frozenSimpleEncoder struct {
 	toCode   map[glyph.ID]byte
 	fromCode []glyph.ID

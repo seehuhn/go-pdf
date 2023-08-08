@@ -37,12 +37,15 @@ func (e *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.Stri
 
 func (e *embedded) Close() error {
 	encoding := e.Encoding()
+	encodingNames := make([]string, 256)
 
-	subset := make(map[pdf.Name]*Glyph)
-	for _, gid := range encoding {
+	subset := make(map[string]*Glyph)
+	for i, gid := range encoding {
 		// Gid 0 maps to the empty glyph name, which is not in the charProcs map.
 		if glyph := e.charProcs[e.glyphNames[gid]]; glyph != nil {
-			subset[e.glyphNames[gid]] = glyph
+			name := e.glyphNames[gid]
+			encodingNames[i] = name
+			subset[name] = glyph
 		}
 	}
 
@@ -64,13 +67,16 @@ func (e *embedded) Close() error {
 		}
 	}
 
-	info := &PDFFont{
+	var toUnicode map[charcode.CharCode][]rune
+	// TODO(voss): construct a toUnicode map, when needed
+
+	info := &FontInfo{
 		FontMatrix: e.fontMatrix,
 		Glyphs:     subset,
 		Resources:  e.resources,
 		Descriptor: descriptor,
-		Encoding:   []string{},
-		ToUnicode:  map[charcode.CharCode][]rune{},
+		Encoding:   encodingNames,
+		ToUnicode:  toUnicode,
 		ResName:    e.Name,
 	}
 	return info.Embed(e.w, e.Ref)

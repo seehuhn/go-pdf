@@ -49,9 +49,9 @@ type Font struct {
 	ForceBold          bool
 
 	fontMatrix [6]float64
-	charProcs  map[pdf.Name]*Glyph
+	charProcs  map[string]*Glyph
 	resources  *pdf.Resources
-	glyphNames []pdf.Name
+	glyphNames []string
 	cmap       map[rune]glyph.ID
 	numOpen    int
 }
@@ -64,9 +64,9 @@ func New(unitsPerEm uint16) *Font {
 	}
 	f := &Font{
 		fontMatrix: m,
-		charProcs:  map[pdf.Name]*Glyph{},
+		charProcs:  map[string]*Glyph{},
 		resources:  &pdf.Resources{},
-		glyphNames: []pdf.Name{""},
+		glyphNames: []string{""},
 		cmap:       map[rune]glyph.ID{},
 	}
 	return f
@@ -83,7 +83,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 			Name: resName,
 			Ref:  w.Alloc(),
 		},
-		SimpleEncoder: cmap.NewSimpleEncoder(),
+		SimpleEncoder: cmap.NewSimpleEncoderSequential(),
 	}
 	return res, nil
 }
@@ -137,7 +137,7 @@ func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 // the shape of the glyph, but not its color.  Otherwise, a call to the "d0"
 // operator is added at the start of the glyph description.  In this case, the
 // glyph description may specify both the shape and the color of the glyph.
-func (f *Font) AddGlyph(name pdf.Name, widthX funit.Int16, bbox funit.Rect16, shapeOnly bool) (*GlyphBuilder, error) {
+func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shapeOnly bool) (*GlyphBuilder, error) {
 	if _, exists := f.charProcs[name]; exists {
 		return nil, fmt.Errorf("glyph %q already present", name)
 	} else if name == "" {
@@ -178,7 +178,7 @@ func (f *Font) AddGlyph(name pdf.Name, widthX funit.Int16, bbox funit.Rect16, sh
 // the description has been written.
 type GlyphBuilder struct {
 	*graphics.Page
-	name   pdf.Name
+	name   string
 	widthX funit.Int16
 	widthY funit.Int16
 	bbox   funit.Rect16

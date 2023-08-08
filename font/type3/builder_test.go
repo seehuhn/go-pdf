@@ -21,7 +21,6 @@ import (
 
 	"seehuhn.de/go/postscript/funit"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 )
 
@@ -35,7 +34,7 @@ func TestType3(t *testing.T) {
 	F1 := New(1000)
 
 	bbox := funit.Rect16{LLx: 0, LLy: 0, URx: 750, URy: 750}
-	g, err := F1.AddGlyph(pdf.Name("A"), 1000, bbox, true)
+	g, err := F1.AddGlyph("A", 1000, bbox, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +45,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g, err = F1.AddGlyph(pdf.Name("B"), 1000, bbox, true)
+	g, err = F1.AddGlyph("B", 1000, bbox, true)
 	if err != nil {
 		t.Fatal(err)
 	}

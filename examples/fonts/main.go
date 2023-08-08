@@ -28,13 +28,13 @@ import (
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/gofont"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cid"
+	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -111,8 +111,6 @@ func doit() error {
 			}
 			ffKey = "FontFile"
 		case "Builtin Fonts":
-			// TODO(voss): have separate sections for builtin fonts
-			// and type 1 fonts from files?
 			X, err = type1.Helvetica.Embed(doc.Out, "F")
 			if err != nil {
 				return err
@@ -169,11 +167,14 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Type3 Fonts":
-			X, err = embedType3Font(doc.Out)
+			t3, err := gofont.Type3(gofont.GoRegular)
 			if err != nil {
 				return err
 			}
-			example = "ABC"
+			X, err = t3.Embed(doc.Out, "X")
+			if err != nil {
+				return err
+			}
 		case "CFF CIDFonts":
 			X, err = cid.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
 			if err != nil {
@@ -471,7 +472,11 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 		l.yPos -= l.F["dict"].baseLineSkip
 
 		gg := keyGlyphs[i]
-		gg = append(gg, l.F["dict"].F.Layout(pdf.Format(fontDict[key]), l.F["dict"].ptSize)...)
+		desc := pdf.Format(fontDict[key])
+		if key == "CharProcs" && len(desc) > 20 {
+			desc = "<< ... >>"
+		}
+		gg = append(gg, l.F["dict"].F.Layout(desc, l.F["dict"].ptSize)...)
 
 		page.TextSetFont(l.F["dict"].F, l.F["dict"].ptSize)
 		page.TextShowGlyphs(gg)

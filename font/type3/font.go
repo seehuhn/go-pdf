@@ -34,9 +34,9 @@ type Glyph struct {
 	Content []byte
 }
 
-type PDFFont struct {
+type FontInfo struct {
 	FontMatrix [6]float64
-	Glyphs     map[pdf.Name]*Glyph
+	Glyphs     map[string]*Glyph
 	Resources  *pdf.Resources
 	*font.Descriptor
 
@@ -53,7 +53,7 @@ type PDFFont struct {
 	ResName pdf.Name
 }
 
-func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if len(info.Encoding) != 256 {
 		panic("unreachable") // TODO(voss): remove
 	}
@@ -68,8 +68,7 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 
 	charProcs := make(pdf.Dict, len(info.Glyphs))
 	for name := range info.Glyphs {
-		// TODO(voss): should this only include encoded glyphs?
-		charProcs[name] = w.Alloc()
+		charProcs[pdf.Name(name)] = w.Alloc()
 	}
 
 	differences := pdf.Array{}
@@ -91,7 +90,7 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 
 	ww := make([]funit.Int16, 256)
 	for i := range ww {
-		name := pdf.Name(info.Encoding[i])
+		name := info.Encoding[i]
 		g := info.Glyphs[name]
 		if g != nil {
 			ww[i] = g.WidthX
@@ -166,7 +165,7 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	for name, g := range info.Glyphs {
-		gRef := charProcs[name].(pdf.Reference)
+		gRef := charProcs[pdf.Name(name)].(pdf.Reference)
 		stm, err := w.OpenStream(gRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			return nil
