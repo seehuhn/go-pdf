@@ -232,3 +232,7 @@ func IsTagged(pdf Putter) bool {
 	marked, _ := markInfo["Marked"].(Boolean)
 	return bool(marked)
 }
+
+func GetVersion(pdf Putter) Version {
+	return pdf.GetMeta().Version
+}

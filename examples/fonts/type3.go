@@ -68,5 +68,5 @@ func embedType3Font(out pdf.Putter) (font.Embedded, error) {
 		return nil, err
 	}
 
-	return b.EmbedFont(out, "X")
+	return b.Embed(out, "X")
 }

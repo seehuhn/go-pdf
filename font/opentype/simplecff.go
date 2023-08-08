@@ -112,7 +112,7 @@ func (info *FontCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		"Widths":         widthsRef,
 		"FontDescriptor": fontDescriptorRef,
 	}
-	if enc := font.DescribeEncoding(encoding, builtin); enc != nil {
+	if enc := font.DescribeEncodingType1(encoding, builtin); enc != nil {
 		fontDict["Encoding"] = enc
 	}
 	var toUnicodeRef pdf.Reference

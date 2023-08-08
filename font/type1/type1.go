@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-type PDFFont struct {
+type Font struct {
 	// PSFont is the (subsetted as needed) font to embed.
 	PSFont *type1.Font
 
@@ -49,7 +49,7 @@ type PDFFont struct {
 	ResName pdf.Name
 }
 
-func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *Font) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	useBuiltin := w.GetMeta().Version < pdf.V2_0 && IsBuiltin(info.PSFont)
 
 	if len(info.Encoding) != 256 || len(info.PSFont.Encoding) != 256 {
@@ -67,23 +67,23 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	var fontFileRef pdf.Reference
 
 	// See section 9.6.2.1 of PDF 32000-1:2008.
-	FontDict := pdf.Dict{
+	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
 		"BaseFont": fontName,
 	}
 	if w.GetMeta().Version == pdf.V1_0 {
-		FontDict["Name"] = info.ResName
+		fontDict["Name"] = info.ResName
 	}
-	if enc := font.DescribeEncoding(info.Encoding, info.PSFont.Encoding); enc != nil {
-		FontDict["Encoding"] = enc
+	if enc := font.DescribeEncodingType1(info.Encoding, info.PSFont.Encoding); enc != nil {
+		fontDict["Encoding"] = enc
 	}
 	if info.ToUnicode != nil {
 		toUnicodeRef = w.Alloc()
-		FontDict["ToUnicode"] = toUnicodeRef
+		fontDict["ToUnicode"] = toUnicodeRef
 	}
 	compressedRefs := []pdf.Reference{fontDictRef}
-	compressedObjects := []pdf.Object{FontDict}
+	compressedObjects := []pdf.Object{fontDict}
 
 	if !useBuiltin {
 		psFont := info.PSFont
@@ -94,14 +94,14 @@ func (info *PDFFont) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			ww[i] = psFont.GlyphInfo[info.Encoding[i]].WidthX
 		}
 		widthsInfo := font.CompressWidths(ww, psFont.UnitsPerEm)
-		FontDict["FirstChar"] = widthsInfo.FirstChar
-		FontDict["LastChar"] = widthsInfo.LastChar
-		FontDict["Widths"] = widthsRef
+		fontDict["FirstChar"] = widthsInfo.FirstChar
+		fontDict["LastChar"] = widthsInfo.LastChar
+		fontDict["Widths"] = widthsRef
 		compressedRefs = append(compressedRefs, widthsRef)
 		compressedObjects = append(compressedObjects, widthsInfo.Widths)
 
 		FontDescriptorRef := w.Alloc()
-		FontDict["FontDescriptor"] = FontDescriptorRef
+		fontDict["FontDescriptor"] = FontDescriptorRef
 
 		q := 1000 / float64(psFont.UnitsPerEm)
 		bbox := psFont.BBox()

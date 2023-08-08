@@ -255,3 +255,34 @@ type Resources struct {
 	ProcSet    Array `pdf:"optional"` // predefined procedure set names
 	Properties Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
 }
+
+func (r *Resources) IsEmpty() bool {
+	if r == nil {
+		return true
+	}
+	if len(r.ExtGState) > 0 {
+		return false
+	}
+	if len(r.ColorSpace) > 0 {
+		return false
+	}
+	if len(r.Pattern) > 0 {
+		return false
+	}
+	if len(r.Shading) > 0 {
+		return false
+	}
+	if len(r.XObject) > 0 {
+		return false
+	}
+	if len(r.Font) > 0 {
+		return false
+	}
+	if len(r.ProcSet) > 0 {
+		return false
+	}
+	if len(r.Properties) > 0 {
+		return false
+	}
+	return true
+}

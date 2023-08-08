@@ -28,28 +28,28 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-type Font string
+type Builtin string
 
 // The 14 built-in PDF fonts.
 const (
-	Courier              Font = "Courier"
-	CourierBold          Font = "Courier-Bold"
-	CourierBoldOblique   Font = "Courier-BoldOblique"
-	CourierOblique       Font = "Courier-Oblique"
-	Helvetica            Font = "Helvetica"
-	HelveticaBold        Font = "Helvetica-Bold"
-	HelveticaBoldOblique Font = "Helvetica-BoldOblique"
-	HelveticaOblique     Font = "Helvetica-Oblique"
-	TimesRoman           Font = "Times-Roman"
-	TimesBold            Font = "Times-Bold"
-	TimesBoldItalic      Font = "Times-BoldItalic"
-	TimesItalic          Font = "Times-Italic"
-	Symbol               Font = "Symbol"
-	ZapfDingbats         Font = "ZapfDingbats"
+	Courier              Builtin = "Courier"
+	CourierBold          Builtin = "Courier-Bold"
+	CourierBoldOblique   Builtin = "Courier-BoldOblique"
+	CourierOblique       Builtin = "Courier-Oblique"
+	Helvetica            Builtin = "Helvetica"
+	HelveticaBold        Builtin = "Helvetica-Bold"
+	HelveticaBoldOblique Builtin = "Helvetica-BoldOblique"
+	HelveticaOblique     Builtin = "Helvetica-Oblique"
+	TimesRoman           Builtin = "Times-Roman"
+	TimesBold            Builtin = "Times-Bold"
+	TimesBoldItalic      Builtin = "Times-BoldItalic"
+	TimesItalic          Builtin = "Times-Italic"
+	Symbol               Builtin = "Symbol"
+	ZapfDingbats         Builtin = "ZapfDingbats"
 )
 
 // All contains the 14 built-in PDF fonts.
-var All = []Font{
+var All = []Builtin{
 	Courier,
 	CourierBold,
 	CourierBoldOblique,
@@ -66,7 +66,7 @@ var All = []Font{
 	ZapfDingbats,
 }
 
-func (f Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	info, err := getFontInfo(f)
 	if err != nil {
 		return nil, err
@@ -85,12 +85,12 @@ func (f Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	return res, nil
 }
 
-func (f Font) GetGeometry() *font.Geometry {
+func (f Builtin) GetGeometry() *font.Geometry {
 	info, _ := getFontInfo(f)
 	return info.GetGeometry()
 }
 
-func (f Font) Layout(s string, ptSize float64) glyph.Seq {
+func (f Builtin) Layout(s string, ptSize float64) glyph.Seq {
 	info, _ := getFontInfo(f)
 	return info.Layout(s, ptSize)
 }
@@ -105,7 +105,7 @@ type fontInfo struct {
 	kern     map[glyph.Pair]funit.Int16
 }
 
-func getFontInfo(f Font) (*fontInfo, error) {
+func getFontInfo(f Builtin) (*fontInfo, error) {
 	fontCacheLock.Lock()
 	defer fontCacheLock.Unlock()
 
@@ -129,7 +129,7 @@ func getFontInfo(f Font) (*fontInfo, error) {
 	for i, name := range glyphNames {
 		gi := afm.GlyphInfo[name]
 		widths[i] = gi.WidthX
-		extents[i] = gi.Extent
+		extents[i] = gi.BBox
 	}
 
 	geom := &font.Geometry{
@@ -231,6 +231,6 @@ func (info *fontInfo) Layout(s string, ptSize float64) glyph.Seq {
 }
 
 var (
-	fontCache     = make(map[Font]*fontInfo)
+	fontCache     = make(map[Builtin]*fontInfo)
 	fontCacheLock sync.Mutex
 )

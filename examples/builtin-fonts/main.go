@@ -155,7 +155,7 @@ func (f *fontTables) AddTitle(title string, fontSize, a, b float64) error {
 	return nil
 }
 
-func (f *fontTables) MakeColumns(fnt type1.Font) error {
+func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 	fontSize := 10.0
 
 	afm, err := fnt.Afm()
@@ -216,7 +216,7 @@ func (f *fontTables) MakeColumns(fnt type1.Font) error {
 				y := yTop - baseLineSkip*float64(i)
 
 				gi := afm.GlyphInfo[glyphNames[tmpGlyph]]
-				ext := gi.Extent
+				ext := gi.BBox
 				if !ext.IsZero() {
 					w := gi.WidthX.AsFloat(fontSize / 1000)
 					page.Rectangle(

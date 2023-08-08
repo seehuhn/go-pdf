@@ -75,6 +75,19 @@ type Closer interface {
 	Reference() Reference
 }
 
+type Resource struct {
+	Ref  Reference
+	Name Name
+}
+
+func (r Resource) Reference() Reference {
+	return r.Ref
+}
+
+func (r Resource) ResourceName() Name {
+	return r.Name
+}
+
 // Create creates a PDF file with the given name and opens it for output. If a
 // file with the same name already exists, it will be overwritten.
 //

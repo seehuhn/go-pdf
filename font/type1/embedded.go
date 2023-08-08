@@ -80,7 +80,7 @@ func (f *embedded) Close() error {
 		encoding[i] = f.names[gid]
 	}
 
-	t1 := &PDFFont{
+	t1 := &Font{
 		PSFont:   f.afm,
 		ResName:  f.resName,
 		Encoding: encoding,

@@ -19,7 +19,10 @@ package cmap
 import "seehuhn.de/go/sfnt/glyph"
 
 type SimpleEncoder interface {
+	// TODO(voss): change the signature to
+	// AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 	Encode(glyph.ID, []rune) byte
+
 	Overflow() bool
 	Encoding() []glyph.ID
 }

@@ -79,15 +79,18 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 type Font interface {
 	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error)
 	GetGeometry() *Geometry
-	Layout(s string, ptSize float64) glyph.Seq
+	Layout(s string, ptSize float64) glyph.Seq // TODO(voss): remove
 }
 
 // Embedded represents a font embedded in a PDF file.
 type Embedded interface {
-	Font
+	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error) // TODO(voss): remove
+	GetGeometry() *Geometry
+	Layout(s string, ptSize float64) glyph.Seq
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 	ResourceName() pdf.Name
-	pdf.Closer
+	Reference() pdf.Reference
+	Close() error
 }
 
 // NumGlyphs returns the number of glyphs in a font.

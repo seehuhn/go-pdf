@@ -26,7 +26,10 @@ import (
 )
 
 type CIDEncoder interface {
+	// TODO(voss): change the signature to
+	// AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 	Encode(glyph.ID, []rune) []byte
+
 	Encoding() []Record
 	CIDSystemInfo() *type1.CIDSystemInfo
 }

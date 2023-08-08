@@ -58,7 +58,7 @@ func TestDescribeEncoding(t *testing.T) {
 
 	for i, enc := range encodings {
 		for j, builtin := range encodings {
-			desc := DescribeEncoding(enc, builtin)
+			desc := DescribeEncodingType1(enc, builtin)
 			if i == j {
 				if desc != nil {
 					t.Errorf("DescribeEncoding(%d, %d) = %v", i, j, desc)

@@ -44,7 +44,7 @@ func Test14Fonts(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	F := Font("unknown font")
+	F := Builtin("unknown font")
 	_, err := F.Afm()
 	if !os.IsNotExist(err) {
 		t.Errorf("wrong error: %s", err)

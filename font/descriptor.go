@@ -78,9 +78,12 @@ func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
 
 	dict := pdf.Dict{
 		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    d.FontName,
 		"Flags":       flags,
 		"ItalicAngle": pdf.Number(d.ItalicAngle),
+	}
+	if d.FontName != "" {
+		// optional for Type 3 fonts
+		dict["FontName"] = d.FontName
 	}
 	if d.FontFamily != "" {
 		dict["FontFamily"] = d.FontFamily

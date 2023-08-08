@@ -24,7 +24,7 @@ import (
 )
 
 // Afm returns the font metrics for one of the built-in pdf fonts.
-func (f Font) Afm() (*type1.Font, error) {
+func (f Builtin) Afm() (*type1.Font, error) {
 	fd, err := afmData.Open("builtin/" + string(f) + ".afm")
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func (f Font) Afm() (*type1.Font, error) {
 }
 
 func IsBuiltin(f *type1.Font) bool {
-	b, err := Font(f.FontInfo.FontName).Afm()
+	b, err := Builtin(f.FontInfo.FontName).Afm()
 	if err != nil || b.UnitsPerEm != f.UnitsPerEm {
 		return false
 	}

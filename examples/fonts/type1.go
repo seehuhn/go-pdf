@@ -61,7 +61,7 @@ func embedType1(w pdf.Putter, f *pst1.Font, resName pdf.Name) (font.Embedded, er
 	for i, name := range glyphNames {
 		gi := f.GlyphInfo[name]
 		widths[i] = gi.WidthX
-		extents[i] = gi.Extent
+		extents[i] = gi.BBox
 	}
 
 	geometry := &font.Geometry{
@@ -229,7 +229,7 @@ func (f *type1Simple) Close() error {
 		subset.Encoding[i] = f.names[gid]
 	}
 
-	t1info := type1.PDFFont{
+	t1info := type1.Font{
 		PSFont:    subset,
 		ResName:   f.resName,
 		SubsetTag: subsetTag,

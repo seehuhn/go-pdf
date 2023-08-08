@@ -32,10 +32,10 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Builder := New(1000)
+	F1 := New(1000)
 
 	bbox := funit.Rect16{LLx: 0, LLy: 0, URx: 750, URy: 750}
-	g, err := F1Builder.AddGlyph(pdf.Name("A"), 1000, bbox, true)
+	g, err := F1.AddGlyph(pdf.Name("A"), 1000, bbox, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g, err = F1Builder.AddGlyph(pdf.Name("B"), 1000, bbox, true)
+	g, err = F1.AddGlyph(pdf.Name("B"), 1000, bbox, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,11 +55,6 @@ func TestType3(t *testing.T) {
 	g.LineTo(750, 0)
 	g.Fill()
 	err = g.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	F1, err := F1Builder.MakeFont()
 	if err != nil {
 		t.Fatal(err)
 	}

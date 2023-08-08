@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-func DescribeEncoding(encoding, builtin []string) pdf.Object {
+func DescribeEncodingType1(encoding, builtin []string) pdf.Object {
 	if len(encoding) != 256 || len(builtin) != 256 {
 		panic("unreachable") // TODO: remove
 	}
