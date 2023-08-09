@@ -137,12 +137,14 @@ func (f *simple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	}
 
 	res := &embedded{
-		simple:  f,
-		w:       w,
-		ref:     w.Alloc(),
-		resName: resName,
-		enc:     cmap.NewSimpleEncoder(),
-		text:    make(map[glyph.ID][]rune),
+		simple: f,
+		w:      w,
+		Resource: pdf.Resource{
+			Ref:  w.Alloc(),
+			Name: resName,
+		},
+		SimpleEncoder: cmap.NewSimpleEncoder(),
+		text:          make(map[glyph.ID][]rune),
 	}
 
 	w.AutoClose(res)
@@ -152,25 +154,11 @@ func (f *simple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 
 type embedded struct {
 	*simple
-	w       pdf.Putter
-	ref     pdf.Reference
-	resName pdf.Name
-	enc     cmap.SimpleEncoder
-	text    map[glyph.ID][]rune
-	closed  bool
-}
-
-func (e *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	e.text[gid] = rr
-	return append(s, e.enc.Encode(gid, rr))
-}
-
-func (e *embedded) Reference() pdf.Reference {
-	return e.ref
-}
-
-func (e *embedded) ResourceName() pdf.Name {
-	return e.resName
+	w pdf.Putter
+	pdf.Resource
+	cmap.SimpleEncoder
+	text   map[glyph.ID][]rune
+	closed bool
 }
 
 func (e *embedded) Close() error {
@@ -179,18 +167,18 @@ func (e *embedded) Close() error {
 	}
 	e.closed = true
 
-	if e.enc.Overflow() {
+	if e.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			e.resName, e.info.PostscriptName())
+			e.Name, e.info.PostscriptName())
 	}
-	e.enc = cmap.NewFrozenSimpleEncoder(e.enc)
+	e.SimpleEncoder = cmap.NewFrozenSimpleEncoder(e.SimpleEncoder)
 
 	w := e.w
 
 	// subset the font
 	var ss []subset.Glyph
 	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	encoding := e.enc.Encoding()
+	encoding := e.SimpleEncoder.Encoding()
 	for cid, gid := range encoding {
 		if gid != 0 {
 			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
@@ -225,7 +213,7 @@ func (e *embedded) Close() error {
 			Encoding:   cffFont.Outlines.Encoding,
 			ToUnicode:  m,
 		}
-		return data.Embed(w, e.ref)
+		return data.Embed(w, e.Ref)
 	}
 
 	subsetEncoding := make([]glyph.ID, 256)
@@ -235,11 +223,11 @@ func (e *embedded) Close() error {
 		}
 		subsetEncoding[g.CID] = glyph.ID(subsetGid)
 	}
-	ttFont := &truetype.PDFFont{
+	ttFont := &truetype.EmbedInfo{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
 		ToUnicode: m,
 	}
-	return ttFont.Embed(w, e.ref)
+	return ttFont.Embed(w, e.Ref)
 }

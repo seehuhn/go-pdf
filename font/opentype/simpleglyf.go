@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-type FontGlyf struct {
+type GlyfEmbedInfo struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -52,7 +52,7 @@ type FontGlyf struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
-func (info *FontGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *GlyfEmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "embedding of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err
@@ -208,7 +208,7 @@ func (info *FontGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	return nil
 }
 
-func (info *FontGlyf) makeNameEncoding() []string {
+func (info *GlyfEmbedInfo) makeNameEncoding() []string {
 	encoding := make([]string, 256)
 	seen := make(map[string]bool)
 

@@ -19,71 +19,94 @@ package type1
 import (
 	"fmt"
 
-	"seehuhn.de/go/sfnt/glyph"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 type embedded struct {
-	*fontInfo
+	*Font
 
-	w       pdf.Putter
-	ref     pdf.Reference
-	resName pdf.Name
+	w pdf.Putter
+	pdf.Resource
 
-	enc    cmap.SimpleEncoder
+	cmap.SimpleEncoder
 	closed bool
 }
 
-func (f *embedded) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	res := &embedded{
-		fontInfo: f.fontInfo,
-		w:        w,
-		ref:      w.Alloc(),
-		resName:  resName,
-		enc:      cmap.NewSimpleEncoder(),
+func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	e := &embedded{
+		Font: f,
+		w:    w,
+		Resource: pdf.Resource{
+			Ref:  w.Alloc(),
+			Name: resName,
+		},
+		SimpleEncoder: cmap.NewSimpleEncoder(),
 	}
-
-	w.AutoClose(res)
-
-	return res, nil
+	return e, nil
 }
 
-func (e *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	return append(s, e.enc.Encode(gid, rr))
-}
-
-func (f *embedded) ResourceName() pdf.Name {
-	return f.resName
-}
-
-func (f *embedded) Reference() pdf.Reference {
-	return f.ref
-}
-
-func (f *embedded) Close() error {
-	if f.closed {
+func (e *embedded) Close() error {
+	if e.closed {
 		return nil
 	}
-	f.closed = true
+	e.closed = true
 
-	if f.enc.Overflow() {
+	if e.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.resName, f.afm.FontInfo.FontName)
+			e.Name, e.outlines.FontInfo.FontName)
 	}
-	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
+	e.SimpleEncoder = cmap.NewFrozenSimpleEncoder(e.SimpleEncoder)
 
+	encodingGid := e.SimpleEncoder.Encoding()
 	encoding := make([]string, 256)
-	for i, gid := range f.enc.Encoding() {
-		encoding[i] = f.names[gid]
+	for i, gid := range encodingGid {
+		encoding[i] = e.names[gid]
 	}
 
-	t1 := &Font{
-		PSFont:   f.afm,
-		ResName:  f.resName,
-		Encoding: encoding,
+	psFont := e.outlines
+	var subsetTag string
+	if psFont.Outlines != nil {
+		psSubset := &type1.Font{}
+		*psSubset = *psFont
+		psSubset.Outlines = make(map[string]*type1.Glyph)
+		psSubset.GlyphInfo = make(map[string]*type1.GlyphInfo)
+
+		if _, ok := psFont.Outlines[".notdef"]; ok {
+			psSubset.Outlines[".notdef"] = psFont.Outlines[".notdef"]
+			psSubset.GlyphInfo[".notdef"] = psFont.GlyphInfo[".notdef"]
+		}
+		for _, name := range encoding {
+			if _, ok := psFont.Outlines[name]; ok {
+				psSubset.Outlines[name] = psFont.Outlines[name]
+				psSubset.GlyphInfo[name] = psFont.GlyphInfo[name]
+			}
+		}
+		psSubset.Encoding = encoding
+
+		var ss []subset.Glyph
+		for origGid, name := range e.names {
+			if _, ok := psSubset.Outlines[name]; ok {
+				ss = append(ss, subset.Glyph{
+					OrigGID: glyph.ID(origGid),
+					CID:     type1.CID(len(ss)),
+				})
+			}
+		}
+		subsetTag = subset.Tag(ss, psFont.NumGlyphs())
 	}
-	return t1.Embed(f.w, f.ref)
+
+	// TODO(voss): implement ToUnicode
+
+	t1 := &EmbedInfo{
+		PSFont:    psFont,
+		SubsetTag: subsetTag,
+		Encoding:  encoding,
+		ResName:   e.Name,
+	}
+	return t1.Embed(e.w, e.Ref)
 }

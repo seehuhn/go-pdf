@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-type Font struct {
+type EmbedInfo struct {
 	// PSFont is the (subsetted as needed) font to embed.
 	PSFont *type1.Font
 
@@ -49,7 +49,7 @@ type Font struct {
 	ResName pdf.Name
 }
 
-func (info *Font) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	useBuiltin := w.GetMeta().Version < pdf.V2_0 && IsBuiltin(info.PSFont)
 
 	if len(info.Encoding) != 256 || len(info.PSFont.Encoding) != 256 {

@@ -21,7 +21,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 type embedded struct {
@@ -29,10 +28,6 @@ type embedded struct {
 	*Font
 	pdf.Resource
 	cmap.SimpleEncoder
-}
-
-func (e *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	return append(s, e.Encode(gid, rr))
 }
 
 func (e *embedded) Close() error {
@@ -62,7 +57,8 @@ func (e *embedded) Close() error {
 			ItalicAngle:  e.ItalicAngle,
 		}
 		if pdf.GetVersion(e.w) == pdf.V1_0 {
-			// required by the amended PDF 2.0 specification
+			// required by PDF 2.0 specification errata:
+			// https://pdf-issues.pdfa.org/32000-2-2020/clause09.html#H9.8.1
 			descriptor.FontName = e.Name
 		}
 	}
@@ -70,7 +66,7 @@ func (e *embedded) Close() error {
 	var toUnicode map[charcode.CharCode][]rune
 	// TODO(voss): construct a toUnicode map, when needed
 
-	info := &FontInfo{
+	info := &EmbedInfo{
 		FontMatrix: e.fontMatrix,
 		Glyphs:     subset,
 		Resources:  e.resources,

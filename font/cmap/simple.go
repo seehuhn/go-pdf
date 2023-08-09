@@ -16,13 +16,13 @@
 
 package cmap
 
-import "seehuhn.de/go/sfnt/glyph"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/sfnt/glyph"
+)
 
 type SimpleEncoder interface {
-	// TODO(voss): change the signature to
-	// AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	Encode(glyph.ID, []rune) byte
-
+	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 	Overflow() bool
 	Encoding() []glyph.ID
 }
@@ -42,15 +42,14 @@ type keepAscii struct {
 	codeIsUsed map[byte]bool
 }
 
-func (enc *keepAscii) Encode(gid glyph.ID, rr []rune) byte {
-	if c, alreadyAllocated := enc.codeLookup[gid]; alreadyAllocated {
-		return c
+func (enc *keepAscii) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	c, alreadyAllocated := enc.codeLookup[gid]
+	if !alreadyAllocated {
+		c = enc.selectNewCharCode(gid, rr)
+		enc.codeLookup[gid] = c
+		enc.codeIsUsed[c] = true
 	}
-
-	c := enc.selectNewCharCode(gid, rr)
-	enc.codeLookup[gid] = c
-	enc.codeIsUsed[c] = true
-	return c
+	return append(s, c)
 }
 
 func (enc *keepAscii) selectNewCharCode(gid glyph.ID, rr []rune) byte {
@@ -106,16 +105,14 @@ type sequential struct {
 	numUsed    int
 }
 
-func (enc *sequential) Encode(gid glyph.ID, rr []rune) byte {
-	if c, alreadyAllocated := enc.codeLookup[gid]; alreadyAllocated {
-		return c
+func (enc *sequential) AppendEncoded(s pdf.String, gid glyph.ID, _ []rune) pdf.String {
+	c, alreadyAllocated := enc.codeLookup[gid]
+	if !alreadyAllocated {
+		c = byte(enc.numUsed)
+		enc.numUsed++
+		enc.codeLookup[gid] = c
 	}
-
-	c := byte(enc.numUsed)
-	enc.numUsed++
-
-	enc.codeLookup[gid] = c
-	return c
+	return append(s, c)
 }
 
 func (enc *sequential) Overflow() bool {
@@ -147,12 +144,12 @@ func NewFrozenSimpleEncoder(enc SimpleEncoder) frozenSimpleEncoder {
 	return frozenSimpleEncoder{toCode: toCode, fromCode: fromCode}
 }
 
-func (enc frozenSimpleEncoder) Encode(gid glyph.ID, _ []rune) byte {
+func (enc frozenSimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, _ []rune) pdf.String {
 	c, ok := enc.toCode[gid]
 	if !ok {
 		panic("glyphs cannot be added after a font has been closed")
 	}
-	return c
+	return append(s, c)
 }
 
 func (enc frozenSimpleEncoder) Overflow() bool {

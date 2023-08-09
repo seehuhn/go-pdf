@@ -41,13 +41,12 @@ type openTypeSimpleCFF struct {
 	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
-	geometry    *font.Geometry
+	*font.Geometry
 
-	w       pdf.Putter
-	ref     pdf.Reference
-	resName pdf.Name
+	w pdf.Putter
+	pdf.Resource
 
-	enc    cmap.SimpleEncoder
+	cmap.SimpleEncoder
 	text   map[glyph.ID][]rune
 	closed bool
 }
@@ -77,32 +76,18 @@ func embedOpenTypeSimpleCFF(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc
 		info:        info,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
-		geometry:    geometry,
+		Geometry:    geometry,
 
-		w:       w,
-		ref:     w.Alloc(),
-		resName: resName,
+		w: w,
+		Resource: pdf.Resource{
+			Ref:  w.Alloc(),
+			Name: resName,
+		},
 
-		enc:  cmap.NewSimpleEncoder(),
-		text: make(map[glyph.ID][]rune),
+		SimpleEncoder: cmap.NewSimpleEncoder(),
+		text:          make(map[glyph.ID][]rune),
 	}
 	return res, nil
-}
-
-func (f *openTypeSimpleCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	return f, nil
-}
-
-func (f *openTypeSimpleCFF) GetGeometry() *font.Geometry {
-	return f.geometry
-}
-
-func (f *openTypeSimpleCFF) ResourceName() pdf.Name {
-	return f.resName
-}
-
-func (f *openTypeSimpleCFF) Reference() pdf.Reference {
-	return f.ref
 }
 
 func (f *openTypeSimpleCFF) Layout(s string, ptSize float64) glyph.Seq {
@@ -112,7 +97,7 @@ func (f *openTypeSimpleCFF) Layout(s string, ptSize float64) glyph.Seq {
 
 func (f *openTypeSimpleCFF) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	f.text[gid] = rr
-	return append(s, f.enc.Encode(gid, rr))
+	return f.SimpleEncoder.AppendEncoded(s, gid, rr)
 }
 
 func (f *openTypeSimpleCFF) Close() error {
@@ -121,16 +106,16 @@ func (f *openTypeSimpleCFF) Close() error {
 	}
 	f.closed = true
 
-	if f.enc.Overflow() {
+	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.resName, f.info.PostscriptName())
+			f.Name, f.info.PostscriptName())
 	}
-	f.enc = cmap.NewFrozenSimpleEncoder(f.enc)
+	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
 
 	// subset the font
 	var ss []subset.Glyph
 	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	encoding := f.enc.Encoding()
+	encoding := f.SimpleEncoder.Encoding()
 	for cid, gid := range encoding {
 		if gid != 0 {
 			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
@@ -149,13 +134,13 @@ func (f *openTypeSimpleCFF) Close() error {
 		}
 		m[charcode.CharCode(code)] = f.text[gid]
 	}
-	info := opentype.FontCFF{
+	info := opentype.CFFEmbedInfo{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
 		ToUnicode: m,
 	}
-	return info.Embed(f.w, f.ref)
+	return info.Embed(f.w, f.Ref)
 }
 
 type openTypeSimpleGlyf struct {
@@ -233,7 +218,7 @@ func (f *openTypeSimpleGlyf) Layout(s string, ptSize float64) glyph.Seq {
 
 func (f *openTypeSimpleGlyf) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	f.text[gid] = rr
-	return append(s, f.enc.Encode(gid, rr))
+	return f.enc.AppendEncoded(s, gid, rr)
 }
 
 func (f *openTypeSimpleGlyf) Close() error {
@@ -279,7 +264,7 @@ func (f *openTypeSimpleGlyf) Close() error {
 		m[charcode.CharCode(code)] = f.text[gid]
 	}
 
-	info := opentype.FontGlyf{
+	info := opentype.GlyfEmbedInfo{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,

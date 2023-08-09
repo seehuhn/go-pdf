@@ -39,6 +39,10 @@ type Geometry struct {
 	Widths       []funit.Int16
 }
 
+func (g *Geometry) GetGeometry() *Geometry {
+	return g
+}
+
 func (g *Geometry) ToPDF(fontSize float64, a funit.Int) float64 {
 	return float64(a) * fontSize / float64(g.UnitsPerEm)
 }
@@ -75,18 +79,21 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 	return res
 }
 
+type Layouter interface {
+	Layout(s string, ptSize float64) glyph.Seq
+}
+
 // Font represents a font which can be embedded in a PDF file.
 type Font interface {
 	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error)
 	GetGeometry() *Geometry
-	Layout(s string, ptSize float64) glyph.Seq // TODO(voss): remove
+	Layouter // TODO(voss): remove?
 }
 
 // Embedded represents a font embedded in a PDF file.
 type Embedded interface {
-	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error) // TODO(voss): remove
 	GetGeometry() *Geometry
-	Layout(s string, ptSize float64) glyph.Seq
+	Layouter
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 	ResourceName() pdf.Name
 	Reference() pdf.Reference
@@ -94,14 +101,14 @@ type Embedded interface {
 }
 
 // NumGlyphs returns the number of glyphs in a font.
-func NumGlyphs(font Font) int {
+func NumGlyphs(font interface{ GetGeometry() *Geometry }) int {
 	g := font.GetGeometry()
 	return len(g.Widths)
 }
 
 // GetGID returns the glyph ID and advance width for a given rune.
 // A glyph ID of 0 indicates that the rune is not supported by the font.
-func GetGID(font Font, r rune) (glyph.ID, funit.Int16) {
+func GetGID(font Layouter, r rune) (glyph.ID, funit.Int16) {
 	gg := font.Layout(string(r), 10)
 	if len(gg) != 1 {
 		return 0, 0

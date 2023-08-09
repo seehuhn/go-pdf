@@ -105,7 +105,11 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = embedType1(doc.Out, t1, "X")
+			F, err := type1.New(t1)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
 			if err != nil {
 				return err
 			}

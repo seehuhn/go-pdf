@@ -31,7 +31,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-type FontCFF struct {
+type CFFEmbedInfo struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -50,7 +50,7 @@ type FontCFF struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
-func (info *FontCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *CFFEmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "embedding of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err

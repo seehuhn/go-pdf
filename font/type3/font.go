@@ -34,7 +34,7 @@ type Glyph struct {
 	Content []byte
 }
 
-type FontInfo struct {
+type EmbedInfo struct {
 	FontMatrix [6]float64
 	Glyphs     map[string]*Glyph
 	Resources  *pdf.Resources
@@ -53,7 +53,7 @@ type FontInfo struct {
 	ResName pdf.Name
 }
 
-func (info *FontInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if len(info.Encoding) != 256 {
 		panic("unreachable") // TODO(voss): remove
 	}
