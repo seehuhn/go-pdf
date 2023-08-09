@@ -59,7 +59,7 @@ func (e *embedded) Close() error {
 		if pdf.GetVersion(e.w) == pdf.V1_0 {
 			// required by PDF 2.0 specification errata:
 			// https://pdf-issues.pdfa.org/32000-2-2020/clause09.html#H9.8.1
-			descriptor.FontName = e.Name
+			descriptor.FontName = string(e.Name)
 		}
 	}
 

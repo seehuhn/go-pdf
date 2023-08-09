@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cid"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -138,7 +139,11 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = embedOpenTypeSimpleCFF(doc.Out, ttf, "X", language.English)
+			F, err := opentype.NewSimpleCFF(ttf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
 			if err != nil {
 				return err
 			}
@@ -162,7 +167,11 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = embedOpenTypeSimpleGlyf(doc.Out, ttf, "X", language.English)
+			F, err := opentype.NewSimpleGlyf(ttf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
 			if err != nil {
 				return err
 			}

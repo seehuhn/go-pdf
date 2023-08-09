@@ -21,8 +21,98 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript"
+	"seehuhn.de/go/postscript/type1"
 )
+
+func Read(r io.Reader) (*Info, error) {
+	cmap, err := ReadRaw(r)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &Info{
+		CS:    nil,
+		CMap:  map[charcode.CharCode]type1.CID{},
+		ROS:   &type1.CIDSystemInfo{},
+		WMode: 0,
+	}
+
+	if tp, ok := cmap["CMapType"].(postscript.Integer); !ok || !(tp == 0 || tp == 1) {
+		return nil, fmt.Errorf("invalid CMapType: %v", tp)
+	}
+	if name, ok := cmap["CMapName"].(postscript.Name); ok {
+		res.Name = string(name)
+	} else {
+		return nil, fmt.Errorf("invalid CMapName: %v", cmap["CMapName"])
+	}
+	if wmode, ok := cmap["WMode"].(postscript.Integer); ok {
+		res.WMode = int(wmode)
+	}
+	if ROS, ok := cmap["CIDSystemInfo"].(postscript.Dict); !ok {
+		return nil, fmt.Errorf("invalid CIDSystemInfo: %v", cmap["CIDSystemInfo"])
+	} else {
+		ros := &type1.CIDSystemInfo{}
+		if registry, ok := ROS["Registry"].(postscript.String); !ok {
+			return nil, fmt.Errorf("invalid Registry: %v", ROS["Registry"])
+		} else {
+			ros.Registry = string(registry)
+		}
+		if ordering, ok := ROS["Ordering"].(postscript.String); !ok {
+			return nil, fmt.Errorf("invalid Ordering: %v", ROS["Ordering"])
+		} else {
+			ros.Ordering = string(ordering)
+		}
+		if supplement, ok := ROS["Supplement"].(postscript.Integer); !ok {
+			return nil, fmt.Errorf("invalid Supplement: %v", ROS["Supplement"])
+		} else {
+			ros.Supplement = int32(supplement)
+		}
+		res.ROS = ros
+	}
+
+	codeMap, ok := cmap["CodeMap"].(*postscript.CMapInfo)
+	if !ok {
+		return nil, fmt.Errorf("unsupported CMap format")
+	}
+
+	var rr []charcode.Range
+	for _, r := range codeMap.CodeSpaceRanges {
+		rr = append(rr, charcode.Range{Low: r.Low, High: r.High})
+	}
+	res.CS = charcode.NewCodeSpace(rr)
+	for _, m := range codeMap.Chars {
+		code, k := res.CS.Decode(m.Src)
+		if k != len(m.Src) || code < 0 {
+			return nil, fmt.Errorf("invalid code <%02x>", m.Src)
+		}
+		if cid, ok := m.Dst.(postscript.Integer); !ok {
+			return nil, fmt.Errorf("invalid CID %v", m.Dst)
+		} else {
+			fmt.Println(code, "->", cid)
+			res.CMap[code] = type1.CID(cid)
+		}
+	}
+
+	for _, m := range codeMap.Ranges {
+		low, k := res.CS.Decode(m.Low)
+		if k != len(m.Low) || low < 0 {
+			return nil, fmt.Errorf("invalid code <%02x>", m.Low)
+		}
+		high, k := res.CS.Decode(m.High)
+		if k != len(m.High) || high < 0 {
+			return nil, fmt.Errorf("invalid code <%02x>", m.High)
+		}
+		if cid, ok := m.Dst.(postscript.Integer); !ok {
+			return nil, fmt.Errorf("invalid CID %v", m.Dst)
+		} else {
+			fmt.Println(low, high, "->", cid)
+		}
+	}
+
+	return res, nil
+}
 
 func ExtractRaw(r pdf.Getter, ref pdf.Object) (postscript.Dict, error) {
 	stream, err := pdf.GetStream(r, ref)

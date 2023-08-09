@@ -21,17 +21,135 @@ import (
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/tounicode"
+	"golang.org/x/text/language"
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-type CFFEmbedInfo struct {
+type SimpleFontCFF struct {
+	info        *sfnt.Font
+	gsubLookups []gtab.LookupIndex
+	gposLookups []gtab.LookupIndex
+	*font.Geometry
+}
+
+func NewSimpleCFF(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
+	if !info.IsCFF() {
+		return nil, errors.New("wrong font type")
+	}
+
+	geometry := &font.Geometry{
+		UnitsPerEm:   info.UnitsPerEm,
+		GlyphExtents: info.Extents(),
+		Widths:       info.Widths(),
+
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+	}
+
+	res := &SimpleFontCFF{
+		info:        info,
+		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
+		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		Geometry:    geometry,
+	}
+	return res, nil
+}
+
+func (f *SimpleFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
+	if err != nil {
+		return nil, err
+	}
+	res := &embeddedSimpleCFF{
+		SimpleFontCFF: f,
+		w:             w,
+		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
+		SimpleEncoder: cmap.NewSimpleEncoder(),
+		text:          map[glyph.ID][]rune{},
+	}
+	return res, nil
+}
+
+func (f *SimpleFontCFF) Layout(s string, ptSize float64) glyph.Seq {
+	rr := []rune(s)
+	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+}
+
+type embeddedSimpleCFF struct {
+	*SimpleFontCFF
+	w pdf.Putter
+	pdf.Resource
+
+	cmap.SimpleEncoder
+	text   map[glyph.ID][]rune
+	closed bool
+}
+
+func (f *embeddedSimpleCFF) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	f.text[gid] = rr
+	return f.SimpleEncoder.AppendEncoded(s, gid, rr)
+}
+
+func (f *embeddedSimpleCFF) Close() error {
+	if f.closed {
+		return nil
+	}
+	f.closed = true
+
+	if f.SimpleEncoder.Overflow() {
+		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
+			f.Name, f.info.PostscriptName())
+	}
+	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
+
+	// subset the font
+	var ss []subset.Glyph
+	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
+	encoding := f.SimpleEncoder.Encoding()
+	for cid, gid := range encoding {
+		if gid != 0 {
+			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
+		}
+	}
+	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
+	subsetInfo, err := subset.Simple(f.info, ss)
+	if err != nil {
+		return fmt.Errorf("font subset: %w", err)
+	}
+
+	m := make(map[charcode.CharCode][]rune)
+	for code, gid := range encoding {
+		if gid == 0 || len(f.text[gid]) == 0 {
+			continue
+		}
+		m[charcode.CharCode(code)] = f.text[gid]
+	}
+	info := PDFInfoCFF{
+		Font:      subsetInfo,
+		SubsetTag: subsetTag,
+		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
+		ToUnicode: m,
+	}
+	return info.WritePDF(f.w, f.Ref)
+}
+
+type PDFInfoCFF struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -50,7 +168,7 @@ type CFFEmbedInfo struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
-func (info *CFFEmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *PDFInfoCFF) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "embedding of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err

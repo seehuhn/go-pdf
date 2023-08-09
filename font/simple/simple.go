@@ -203,7 +203,7 @@ func (e *embedded) Close() error {
 			FontInfo: subsetInfo.GetFontInfo(),
 			Outlines: subsetInfo.Outlines.(*cff.Outlines),
 		}
-		data := &pdfcff.PDFFont{
+		data := &pdfcff.PDFInfoSimple{
 			Font:       cffFont,
 			UnitsPerEm: subsetInfo.UnitsPerEm,
 			Ascent:     subsetInfo.Ascent,
@@ -213,7 +213,7 @@ func (e *embedded) Close() error {
 			Encoding:   cffFont.Outlines.Encoding,
 			ToUnicode:  m,
 		}
-		return data.Embed(w, e.Ref)
+		return data.WritePDF(w, e.Ref)
 	}
 
 	subsetEncoding := make([]glyph.ID, 256)
@@ -223,11 +223,11 @@ func (e *embedded) Close() error {
 		}
 		subsetEncoding[g.CID] = glyph.ID(subsetGid)
 	}
-	ttFont := &truetype.EmbedInfo{
+	ttFont := &truetype.PDFInfo{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
 		ToUnicode: m,
 	}
-	return ttFont.Embed(w, e.Ref)
+	return ttFont.WritePDF(w, e.Ref)
 }

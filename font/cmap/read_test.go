@@ -16,18 +16,16 @@
 
 package cmap
 
-import (
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
-)
+import "testing"
 
-// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
-// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
+func TestRead(t *testing.T) {
+	r, err := OpenPredefined("78-H")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-type Info struct {
-	Name  string
-	CS    charcode.CodeSpaceRange
-	CMap  map[charcode.CharCode]type1.CID
-	ROS   *type1.CIDSystemInfo
-	WMode int
+	_, err = Read(r)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

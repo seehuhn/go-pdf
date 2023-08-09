@@ -17,19 +17,20 @@
 package cmap
 
 import (
+	"compress/gzip"
 	"embed"
+	"io"
 
 	"seehuhn.de/go/pdf"
 )
 
-// go:embed predefined/*.gz
+//go:embed predefined/*.gz
 var predefined embed.FS
 
-// TODO(voss): use this
-func LoadPredefined(name pdf.Name) ([]byte, error) {
-	data, err := predefined.ReadFile("predefined/" + string(name) + ".gz")
+func OpenPredefined(name pdf.Name) (io.ReadCloser, error) {
+	fd, err := predefined.Open("predefined/" + string(name) + ".gz")
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return gzip.NewReader(fd)
 }

@@ -29,7 +29,7 @@ type widthInfo struct {
 	FirstChar    pdf.Integer
 	LastChar     pdf.Integer
 	Widths       pdf.Array
-	MissingWidth pdf.Integer
+	MissingWidth pdf.Number
 }
 
 func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
@@ -42,7 +42,7 @@ func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
 	bestGain := 0
 	FirstChar := 0
 	LastChar := 255
-	var MissingWidth pdf.Integer
+	var MissingWidth pdf.Number
 	for w := range cand {
 		b := 255
 		for b > 0 && ww[b] == w {
@@ -60,7 +60,7 @@ func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
 			bestGain = gain
 			FirstChar = a
 			LastChar = b
-			MissingWidth = pdf.Integer(math.Round(w.AsFloat(q)))
+			MissingWidth = pdf.Number(math.Round(w.AsFloat(q)))
 		}
 	}
 

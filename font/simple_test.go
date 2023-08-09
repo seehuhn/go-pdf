@@ -99,7 +99,7 @@ func TestCompressWidths(t *testing.T) {
 					w = info.Widths[i-int(info.FirstChar)]
 				}
 				if int(w.(pdf.Integer)) != int(ww[i])*1000/int(u) {
-					t.Errorf("case %d, u=%d: got w[%d] = %d, want %d (L=%d, R=%d, D=%d)",
+					t.Errorf("case %d, u=%d: got w[%d] = %d, want %d (L=%d, R=%d, D=%f)",
 						k, u, i, w, int(ww[i])*1000/int(u),
 						info.FirstChar, info.LastChar, info.MissingWidth)
 				}

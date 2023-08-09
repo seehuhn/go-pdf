@@ -25,8 +25,8 @@ import (
 //
 // See section 9.8.1 of PDF 32000-1:2008.
 type Descriptor struct {
-	FontName     pdf.Name
-	FontFamily   pdf.Name
+	FontName     string
+	FontFamily   string
 	FontStretch  os2.Width
 	FontWeight   os2.Weight
 	IsFixedPitch bool
@@ -45,6 +45,7 @@ type Descriptor struct {
 	XHeight      float64
 	StemV        float64 // set to -1 for Type 3 fonts
 	StemH        float64
+	MissingWidth float64
 }
 
 func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
@@ -83,10 +84,10 @@ func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
 	}
 	if d.FontName != "" {
 		// optional for Type 3 fonts
-		dict["FontName"] = d.FontName
+		dict["FontName"] = pdf.Name(d.FontName)
 	}
 	if d.FontFamily != "" {
-		dict["FontFamily"] = d.FontFamily
+		dict["FontFamily"] = pdf.Name(d.FontFamily)
 	}
 	switch d.FontStretch {
 	case os2.WidthUltraCondensed:
@@ -134,6 +135,9 @@ func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
 	}
 	if d.StemH != 0 {
 		dict["StemH"] = pdf.Number(d.StemH)
+	}
+	if d.MissingWidth != 0 {
+		dict["MissingWidth"] = pdf.Number(d.MissingWidth)
 	}
 
 	return dict

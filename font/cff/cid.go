@@ -17,7 +17,6 @@
 package cff
 
 import (
-	"errors"
 	"fmt"
 
 	"seehuhn.de/go/pdf"
@@ -25,13 +24,18 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
-type PDFInfoSimple struct {
-	// Font is the font to embed (already subsetted, if needed).
-	Font *cff.Font
+type PDFInfoCID struct {
+	Font      *cff.Font
+	SubsetTag string
+	ToUnicode map[charcode.CharCode][]rune
+
+	CS   charcode.CodeSpaceRange
+	CMap map[charcode.CharCode]type1.CID
+	ROS  *type1.CIDSystemInfo
 
 	UnitsPerEm uint16 // TODO(voss): get this from the font matrix instead
 
@@ -43,57 +47,44 @@ type PDFInfoSimple struct {
 	Ascent    funit.Int16
 	Descent   funit.Int16
 	CapHeight funit.Int16
-
-	// SubsetTag should be a unique tag for the font subset,
-	// or the empty string if this is the full font.
-	SubsetTag string
-
-	// Encoding is the encoding vector used by the client (a slice of length 256).
-	// Together with the font's built-in encoding, this is used to determine
-	// the `Encoding` entry of the PDF font dictionary.
-	Encoding []glyph.ID
-
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	// Character codes must be in the range 0, ..., 255.
-	// TODO(voss): or else?
-	ToUnicode map[charcode.CharCode][]rune
 }
 
-func (info *PDFInfoSimple) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "CFF fonts", pdf.V1_2)
+// Section 9.7.4.2 of ISO-32000-2 ("Glyph selection in CIDFonts"):
+//
+// If the "CFF" font program has a Top DICT that does not use CIDFont
+// operators: The CIDs shall be used directly as GID values, and the glyph
+// procedure shall be retrieved using the CharStrings INDEX.
+//
+// If the "CFF" font program has a Top DICT that uses CIDFont operators:
+// The CIDs shall be used to determine the GID value for the glyph
+// procedure using the charset table in the CFF program. The GID value
+// shall then be used to look up the glyph procedure using the CharStrings
+// INDEX table.
+
+func (info *PDFInfoCID) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
+	err := pdf.CheckVersion(w, "CFF CIDFonts", pdf.V1_3)
 	if err != nil {
 		return err
 	}
 
 	cffFont := info.Font
-	if len(cffFont.Encoding) != 256 ||
-		len(cffFont.Private) != 1 ||
-		len(cffFont.Glyphs) == 0 ||
-		len(cffFont.Glyphs[0].Name) == 0 {
-		return errors.New("font is not a simple CFF font")
+
+	// CidFontName shall be the value of the CIDFontName entry in the CIDFont program.
+	// The name may have a subset prefix if appropriate.
+	var cidFontName string
+	if info.SubsetTag == "" {
+		cidFontName = cffFont.FontInfo.FontName
+	} else {
+		cidFontName = info.SubsetTag + "+" + cffFont.FontInfo.FontName
 	}
 
-	var fontName string
-	if info.SubsetTag == "" {
-		fontName = cffFont.FontInfo.FontName
-	} else {
-		fontName = info.SubsetTag + "+" + cffFont.FontInfo.FontName
-	}
+	var cmapName string     // TODO
+	var encoding pdf.Object // TODO
 
 	unitsPerEm := info.UnitsPerEm
 
-	ww := make([]funit.Int16, 256)
-	for i := range ww {
-		ww[i] = cffFont.Glyphs[info.Encoding[i]].Width
-	}
-	widthsInfo := font.CompressWidths(ww, unitsPerEm)
-
-	encoding := make([]string, 256)
-	builtin := make([]string, 256)
-	for i := 0; i < 256; i++ {
-		encoding[i] = cffFont.Glyphs[info.Encoding[i]].Name
-		builtin[i] = cffFont.Glyphs[cffFont.Encoding[i]].Name
-	}
+	var DW pdf.Number // TODO
+	var W pdf.Array   // TODO
 
 	q := 1000 / float64(unitsPerEm)
 	bbox := cffFont.BBox()
@@ -104,32 +95,47 @@ func (info *PDFInfoSimple) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) err
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	widthsRef := w.Alloc()
+	var isSymbolic bool // TODO
+
+	cidFontRef := w.Alloc()
+	var toUnicodeRef pdf.Reference
 	fontDescriptorRef := w.Alloc()
 	fontFileRef := w.Alloc()
 
-	// See section 9.6.2.1 of PDF 32000-1:2008.
 	fontDict := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       pdf.Name(fontName),
-		"FirstChar":      widthsInfo.FirstChar,
-		"LastChar":       widthsInfo.LastChar,
-		"Widths":         widthsRef,
-		"FontDescriptor": fontDescriptorRef,
+		"Type":            pdf.Name("Font"),
+		"Subtype":         pdf.Name("Type0"),
+		"BaseFont":        pdf.Name(cidFontName + "-" + cmapName),
+		"Encoding":        encoding,
+		"DescendantFonts": pdf.Array{cidFontRef},
 	}
-	if enc := font.DescribeEncodingType1(encoding, builtin); enc != nil {
-		fontDict["Encoding"] = enc
-	}
-	var toUnicodeRef pdf.Reference
 	if info.ToUnicode != nil {
 		toUnicodeRef = w.Alloc()
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
 
-	// See section 9.8.1 of PDF 32000-1:2008.
+	ROS := pdf.Dict{
+		"Registry":   pdf.String(info.ROS.Registry),
+		"Ordering":   pdf.String(info.ROS.Ordering),
+		"Supplement": pdf.Integer(info.ROS.Supplement),
+	}
+
+	cidFontDict := pdf.Dict{
+		"Type":           pdf.Name("Font"),
+		"Subtype":        pdf.Name("CIDFontType0"),
+		"BaseFont":       pdf.Name(cidFontName),
+		"CIDSystemInfo":  ROS,
+		"FontDescriptor": fontDescriptorRef,
+	}
+	if DW != 1000 {
+		cidFontDict["DW"] = DW
+	}
+	if W != nil {
+		cidFontDict["W"] = W
+	}
+
 	fd := &font.Descriptor{
-		FontName:     fontName,
+		FontName:     cidFontName,
 		IsFixedPitch: info.Font.IsFixedPitch,
 		IsSerif:      info.IsSerif,
 		IsScript:     info.IsScript,
@@ -142,14 +148,12 @@ func (info *PDFInfoSimple) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) err
 		Ascent:       info.Ascent.AsFloat(q),
 		Descent:      info.Descent.AsFloat(q),
 		CapHeight:    info.CapHeight.AsFloat(q),
-		StemV:        cffFont.Private[0].StdVW * q,
-		MissingWidth: float64(widthsInfo.MissingWidth),
 	}
-	fontDescriptor := fd.AsDict(true)
+	fontDescriptor := fd.AsDict(isSymbolic)
 	fontDescriptor["FontFile3"] = fontFileRef
 
-	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
-	compressedObjects := []pdf.Object{fontDict, fontDescriptor, widthsInfo.Widths}
+	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fontDescriptorRef}
+	compressedObjects := []pdf.Object{fontDict, cidFontDict, fontDescriptor}
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return err
@@ -157,7 +161,7 @@ func (info *PDFInfoSimple) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) err
 
 	// See section 9.9 of PDF 32000-1:2008 for details.
 	fontFileDict := pdf.Dict{
-		"Subtype": pdf.Name("Type1C"),
+		"Subtype": pdf.Name("CIDFontType0C"),
 	}
 	fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
 	if err != nil {
@@ -165,7 +169,7 @@ func (info *PDFInfoSimple) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) err
 	}
 	err = cffFont.Encode(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding CFF font %q: %w", fontName, err)
+		return fmt.Errorf("embedding CFF CIDFont %q: %w", cidFontName, err)
 	}
 	err = fontFileStream.Close()
 	if err != nil {
