@@ -25,6 +25,7 @@ import (
 
 	"golang.org/x/text/language"
 
+	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	ttfcmap "seehuhn.de/go/sfnt/cmap"
@@ -34,11 +35,13 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	pdfcff "seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-// Inside the PDF documents on my laptop, the following encodings are used
+// Inside the PDF documents on my laptop, the following encoding CMaps are used
 // for CIDFonts.  The numbers are the number of occurences of the encoding:
 //
 //   3110 /Identity-H
@@ -155,12 +158,11 @@ func (f *cidfont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	}
 
 	res := &embedded{
-		cidfont: f,
-		w:       w,
-		ref:     w.Alloc(),
-		resName: resName,
-		enc:     cmap.NewCIDEncoder(),
-		text:    make(map[glyph.ID][]rune),
+		cidfont:    f,
+		w:          w,
+		ref:        w.Alloc(),
+		resName:    resName,
+		CIDEncoder: cmap.NewCIDEncoder(),
 	}
 
 	w.AutoClose(res)
@@ -173,14 +175,8 @@ type embedded struct {
 	w       pdf.Putter
 	ref     pdf.Reference
 	resName pdf.Name
-	enc     cmap.CIDEncoder
-	text    map[glyph.ID][]rune
-	closed  bool
-}
-
-func (e *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	e.text[gid] = rr
-	return append(s, e.enc.Encode(gid, rr)...)
+	cmap.CIDEncoder
+	closed bool
 }
 
 func (e *embedded) Reference() pdf.Reference {
@@ -200,7 +196,7 @@ func (e *embedded) Close() error {
 	w := e.w
 
 	// Determine the subset of glyphs to include.
-	encoding := e.enc.Encoding()
+	encoding := e.CIDEncoder.Encoding()
 	var subsetGlyphs []glyph.ID
 	subsetGlyphs = append(subsetGlyphs, 0) // always include the .notdef glyph
 	for _, p := range encoding {
@@ -208,7 +204,7 @@ func (e *embedded) Close() error {
 	}
 
 	// TODO(voss): make sure there is only one copy of this per PDF file.
-	CIDSystemInfo := e.enc.CIDSystemInfo()
+	CIDSystemInfo := e.CIDEncoder.CIDSystemInfo()
 	ROS := pdf.Dict{
 		"Registry":   pdf.String(CIDSystemInfo.Registry),
 		"Ordering":   pdf.String(CIDSystemInfo.Ordering),
@@ -226,6 +222,32 @@ func (e *embedded) Close() error {
 		return fmt.Errorf("font subset: %w", err)
 	}
 	subsetTag := subset.Tag(ss, e.info.NumGlyphs())
+
+	if _, ok := subsetInfo.Outlines.(*cff.Outlines); ok {
+		cmap := make(map[charcode.CharCode]type1.CID)
+		for _, s := range ss {
+			cmap[charcode.CharCode(s.CID)] = s.CID
+		}
+		toUnicode := make(map[charcode.CharCode][]rune)
+		for _, e := range encoding {
+			toUnicode[charcode.CharCode(e.CID)] = e.Text
+		}
+		info := &pdfcff.PDFInfoCID{
+			Font:       subsetInfo.AsCFF(),
+			SubsetTag:  subsetTag,
+			CS:         charcode.UCS2,
+			ROS:        CIDSystemInfo,
+			CMap:       cmap,
+			ToUnicode:  toUnicode,
+			UnitsPerEm: subsetInfo.UnitsPerEm,
+			Ascent:     subsetInfo.Ascent,
+			Descent:    subsetInfo.Descent,
+			CapHeight:  subsetInfo.CapHeight,
+			IsSerif:    subsetInfo.IsSerif,
+			IsScript:   subsetInfo.IsScript,
+		}
+		return info.Embed(w, e.ref)
+	}
 
 	fontName := pdf.Name(subsetTag + "+" + subsetInfo.PostscriptName())
 
@@ -287,34 +309,7 @@ func (e *embedded) Close() error {
 		compressedObjects = append(compressedObjects, W)
 	}
 
-	switch outlines := subsetInfo.Outlines.(type) {
-	case *cff.Outlines:
-		CIDFont["Subtype"] = pdf.Name("CIDFontType0")
-		FontDescriptor["FontFile3"] = FontFileRef
-		FontDict["BaseFont"] = fontName + "-" + "Identity-H"
-
-		// Write the "font program".
-		// See section 9.9 of PDF 32000-1:2008 for details.
-		fontFileDict := pdf.Dict{
-			"Subtype": pdf.Name("CIDFontType0C"),
-		}
-		fontFileStream, err := w.OpenStream(FontFileRef, fontFileDict, pdf.FilterCompress{})
-		if err != nil {
-			return err
-		}
-		fontFile := cff.Font{
-			FontInfo: subsetInfo.GetFontInfo(),
-			Outlines: outlines,
-		}
-		err = fontFile.Encode(fontFileStream)
-		if err != nil {
-			return err
-		}
-		err = fontFileStream.Close()
-		if err != nil {
-			return err
-		}
-
+	switch subsetInfo.Outlines.(type) {
 	case *glyf.Outlines:
 		CID2GIDMapRef := w.Alloc()
 

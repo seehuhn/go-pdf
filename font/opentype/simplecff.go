@@ -273,7 +273,7 @@ func (info *PDFInfoCFF) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error 
 	if err != nil {
 		return err
 	}
-	_, err = openTypeFont.WriteCFFOpenTypePDF(fontFileStream)
+	err = openTypeFont.WriteCFFOpenTypePDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding OpenType font %q: %w", fontName, err)
 	}

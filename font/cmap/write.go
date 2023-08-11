@@ -80,7 +80,8 @@ var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 		last = cs.Append(last, s.Last)
 		return fmt.Sprintf("<%x> <%x> %d", first, last, s.Value)
 	},
-}).Parse(`%!PS-Adobe-3.0 Resource-CMap
+}).Parse(`{{if .Comments -}}
+%!PS-Adobe-3.0 Resource-CMap
 %%DocumentNeededResources: ProcSet (CIDInit)
 %%IncludeResource: ProcSet (CIDInit)
 %%BeginResource: CMap {{PS .Name}}
@@ -91,26 +92,25 @@ var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 %%IncludeResource: CMap {{PN .UseCMap}}
 {{end -}}
 %%EndComments
+{{end -}}
 
 /CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
-
 {{if .UseCMap -}}
 {{PN .UseCMap}} usecmap
 {{end -}}
 
 {{if .ROS -}}
 /CIDSystemInfo 3 dict dup begin
-	/Registry {{PS .ROS.Registry}} def
-	/Ordering {{PS .ROS.Ordering}} def
-	/Supplement {{.ROS.Supplement}} def
+/Registry {{PS .ROS.Registry}} def
+/Ordering {{PS .ROS.Ordering}} def
+/Supplement {{.ROS.Supplement}} def
 end def
 {{end -}}
 /CMapName {{PN .Name}} def
 /CMapType 1 def
 /WMode {{.WMode}} def
-
 {{with .CSFile.Ranges -}}
 {{len .}} begincodespacerange
 {{range . -}}

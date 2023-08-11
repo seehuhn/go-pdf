@@ -323,7 +323,6 @@ func (e *explainer) show(obj pdf.Object) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println()
 	case pdf.Dict:
 		keys := dictKeys(obj)
 		fmt.Println("<<")

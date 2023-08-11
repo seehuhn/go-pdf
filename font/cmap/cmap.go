@@ -32,15 +32,16 @@ import (
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 
 type Info struct {
-	Name    string
-	Version float64
-	ROS     *type1.CIDSystemInfo
-	CS      charcode.CodeSpaceRange
-	CSFile  charcode.CodeSpaceRange
-	WMode   int
-	UseCMap string
-	Singles []Single
-	Ranges  []Range
+	Name     string
+	Version  float64
+	ROS      *type1.CIDSystemInfo
+	CS       charcode.CodeSpaceRange
+	CSFile   charcode.CodeSpaceRange
+	WMode    int
+	UseCMap  string
+	Singles  []Single
+	Ranges   []Range
+	Comments bool
 }
 
 // Single specifies that character code Code represents the given CID.

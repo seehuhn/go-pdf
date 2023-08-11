@@ -64,7 +64,7 @@ func doit() error {
 
 	l := &layout{
 		topMargin:   54.0,
-		leftMargin:  72.0,
+		leftMargin:  72.0 + 36.0,
 		rightMargin: 72.0,
 	}
 
@@ -94,6 +94,7 @@ func doit() error {
 	l.addFont("chapter", SB, 24)
 	l.addFont("section", SB, 18)
 
+	pageNo := 1
 	for _, s := range sections {
 		title := s.title
 		intro := s.lines
@@ -163,11 +164,11 @@ func doit() error {
 			}
 			ffKey = "FontFile2"
 		case "Glyf-based OpenType Fonts":
-			ttf, err := gofont.TrueType(gofont.GoRegular)
+			otf, err := gofont.TrueType(gofont.GoRegular)
 			if err != nil {
 				return err
 			}
-			F, err := opentype.NewSimpleGlyf(ttf, language.English)
+			F, err := opentype.NewSimpleGlyf(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -188,13 +189,30 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-		case "CFF CIDFonts":
-			X, err = cid.EmbedFile(doc.Out, "../../../otf/SourceSerif4-Regular.otf", "X", language.English)
+		case "Composite CFF Fonts":
+			otf, err := gofont.OpenType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			X, err = cid.Embed(doc.Out, otf, "X", language.English)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile3"
-		case "CFF-based OpenType CIDFonts":
+		case "Composite CFF-based OpenType Fonts":
+			otf, err := gofont.OpenType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			F, err := opentype.NewCompositeCFF(otf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
+			if err != nil {
+				return err
+			}
+			ffKey = "FontFile3"
 		case "TrueType CIDFonts":
 			X, err = cid.EmbedFile(doc.Out, "../../../ttf/SourceSerif4-Regular.ttf", "X", language.English)
 			if err != nil {
@@ -267,81 +285,87 @@ func doit() error {
 		page.TextEnd()
 		l.yPos -= -l.F["text"].descent
 
-		if X == nil {
-			page.Close()
-			continue
-		}
+		if X != nil {
+			l.yPos -= 20
+			page.TextStart()
+			page.TextFirstLine(l.leftMargin, l.yPos)
+			page.TextSetFont(X, 24)
+			page.TextShow(example)
+			page.TextEnd()
+			l.yPos -= 30
 
-		l.yPos -= 20
-		page.TextStart()
-		page.TextFirstLine(l.leftMargin, l.yPos)
-		page.TextSetFont(X, 24)
-		page.TextShow(example)
-		page.TextEnd()
-		l.yPos -= 30
-
-		err = X.Close()
-		if err != nil {
-			return err
-		}
-
-		fontDict, err := pdf.GetDict(data, X.Reference())
-		if err != nil {
-			return err
-		}
-		yFD := l.ShowDict(page, fontDict, "Font Dictionary", X.Reference())
-		fd := fontDict["FontDescriptor"]
-		y0FontDesc := yFD["FontDescriptor"]
-
-		df := fontDict["DescendantFonts"]
-		if df != nil {
-			dfArray, err := pdf.GetArray(data, df)
+			err = X.Close()
 			if err != nil {
 				return err
 			}
-			cidFontDict, err := pdf.GetDict(data, dfArray[0])
+
+			fontDict, err := pdf.GetDict(data, X.Reference())
 			if err != nil {
 				return err
 			}
-			ref, _ := dfArray[0].(pdf.Reference)
-			yCF := l.ShowDict(page, cidFontDict, "CIDFont Dictionary", ref)
-			fd = cidFontDict["FontDescriptor"]
-			y0FontDesc = yCF["FontDescriptor"]
+			yFD := l.ShowDict(page, fontDict, "Font Dictionary", X.Reference())
+			fd := fontDict["FontDescriptor"]
+			y0FontDesc := yFD["FontDescriptor"]
 
-			l.connect(page, yFD["DescendantFonts"], yCF[""], 20)
-		}
-
-		if fd != nil {
-			fdDict, err := pdf.GetDict(data, fd)
-			if err != nil {
-				return err
-			}
-			ref, _ := fd.(pdf.Reference)
-			yFontDesc := l.ShowDict(page, fdDict, "Font Descriptor", ref)
-			l.connect(page, y0FontDesc, yFontDesc[""], 20)
-
-			ff := fdDict[ffKey]
-			if ff != nil {
-				ffStream, err := pdf.GetStream(data, ff)
+			df := fontDict["DescendantFonts"]
+			if df != nil {
+				dfArray, err := pdf.GetArray(data, df)
 				if err != nil {
 					return err
 				}
-				if ffStream != nil {
-					ref, _ := ff.(pdf.Reference)
-					yStreamDict := l.ShowDict(page, ffStream.Dict, "Font file stream dictionary", ref)
-					l.connect(page, yFontDesc[ffKey], yStreamDict[""], 20)
+				cidFontDict, err := pdf.GetDict(data, dfArray[0])
+				if err != nil {
+					return err
 				}
+				ref, _ := dfArray[0].(pdf.Reference)
+				yCF := l.ShowDict(page, cidFontDict, "CIDFont Dictionary", ref)
+				fd = cidFontDict["FontDescriptor"]
+				y0FontDesc = yCF["FontDescriptor"]
+
+				l.connect(page, yFD["DescendantFonts"], yCF[""], 20)
+			}
+
+			if fd != nil {
+				fdDict, err := pdf.GetDict(data, fd)
+				if err != nil {
+					return err
+				}
+				ref, _ := fd.(pdf.Reference)
+				yFontDesc := l.ShowDict(page, fdDict, "Font Descriptor", ref)
+				l.connect(page, y0FontDesc, yFontDesc[""], 20)
+
+				ff := fdDict[ffKey]
+				if ff != nil {
+					ffStream, err := pdf.GetStream(data, ff)
+					if err != nil {
+						return err
+					}
+					if ffStream != nil {
+						ref, _ := ff.(pdf.Reference)
+						yStreamDict := l.ShowDict(page, ffStream.Dict, "Font file stream dictionary", ref)
+						l.connect(page, yFontDesc[ffKey], yStreamDict[""], 20)
+					}
+				}
+			}
+
+			if title == "Type3 Fonts" {
+				cp, err := pdf.GetDict(data, fontDict["CharProcs"])
+				if err != nil {
+					return err
+				}
+				yCP := l.ShowDict(page, cp, "CharProcs", 0)
+				l.connect(page, yFD["CharProcs"], yCP[""], 20)
 			}
 		}
 
-		if title == "Type3 Fonts" {
-			cp, err := pdf.GetDict(data, fontDict["CharProcs"])
-			if err != nil {
-				return err
-			}
-			yCP := l.ShowDict(page, cp, "CharProcs", 0)
-			l.connect(page, yFD["CharProcs"], yCP[""], 20)
-		}
+		// add the page number
+		page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
+		page.TextStart()
+		xMid := paper.URx / 2
+		page.TextFirstLine(xMid, 36)
+		page.TextShowAligned(fmt.Sprintf("%d", pageNo), 0, 0.5)
+		page.TextEnd()
+		pageNo++
 
 		err = page.Close()
 		if err != nil {

@@ -101,7 +101,7 @@ CIDFonts can use multiple bytes to encode a character, the exact encoding is
 configurable.  The most common encoding is `Identity-H` which uses two bytes
 for every character.
 
-## CFF CIDFonts (PDF 1.3)
+## Composite CFF Fonts (PDF 1.3)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.
@@ -114,7 +114,7 @@ If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 then the `charset` table in the CFF font describes the mapping from CIDs to
 glyphs.  Otherwise, the CID is used as the glyph index directly.
 
-## CFF-based OpenType CIDFonts (PDF 1.6)
+## Composite CFF-based OpenType Fonts (PDF 1.6)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType0` as the `Subtype` in the CIDFont dictionary.

@@ -20,15 +20,14 @@ import (
 	"bytes"
 	"sort"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 type CIDEncoder interface {
-	// TODO(voss): change the signature to
-	// AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	Encode(glyph.ID, []rune) []byte
+	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
 	Encoding() []Record
 	CIDSystemInfo() *type1.CIDSystemInfo
@@ -54,10 +53,10 @@ type defaultCIDEncoder struct {
 	text map[type1.CID][]rune
 }
 
-func (enc *defaultCIDEncoder) Encode(gid glyph.ID, rr []rune) []byte {
+func (enc *defaultCIDEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	enc.used[gid] = true
 	enc.text[type1.CID(gid)] = rr
-	return []byte{byte(gid >> 8), byte(gid)}
+	return append(s, byte(gid>>8), byte(gid))
 }
 
 func (enc *defaultCIDEncoder) Encoding() []Record {
