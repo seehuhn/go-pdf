@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
@@ -70,5 +71,13 @@ func TestPredefined(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestConsistency(t *testing.T) {
+	names := maps.Keys(builtinCS)
+	slices.Sort(names)
+	if d := cmp.Diff(names, AllPredefined); d != "" {
+		t.Errorf("wrong names:\n%s", d)
 	}
 }

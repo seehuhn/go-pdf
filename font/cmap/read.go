@@ -26,7 +26,40 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-func Read(r io.Reader, other map[string]charcode.CodeSpaceRange) (*Info, error) {
+func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
+	obj, err := pdf.Resolve(r, obj)
+	if err != nil {
+		return nil, err
+	}
+	switch obj := obj.(type) {
+	case pdf.Name:
+		r, err := OpenPredefined(string(obj))
+		if err != nil {
+			return nil, err
+		}
+		defer r.Close()
+		return Read(r, nil)
+	case *pdf.Stream:
+		err := pdf.CheckDictType(r, obj.Dict, "CMap")
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := obj.Dict["UseCMap"].(pdf.Name); ok {
+			panic("not implemented: UseCMap") // TODO(voss): implement this
+		}
+
+		r, err := pdf.DecodeStream(r, obj, 0)
+		if err != nil {
+			return nil, err
+		}
+		return Read(r, nil)
+	default:
+		return nil, fmt.Errorf("invalid CMap object: %v", obj)
+	}
+}
+
+func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	cmap, err := ReadRaw(r)
 	if err != nil {
 		return nil, err
@@ -83,10 +116,10 @@ func Read(r io.Reader, other map[string]charcode.CodeSpaceRange) (*Info, error) 
 	var rr []charcode.Range
 	if codeMap.UseCMap != "" {
 		if other == nil {
-			other = make(map[string]charcode.CodeSpaceRange)
+			other = make(map[string]*Info)
 		}
 		if other, ok := other[codeMap.UseCMap]; ok {
-			rr = append(rr, other.Ranges()...)
+			rr = append(rr, other.CS.Ranges()...)
 		} else if other, ok := builtinCS[codeMap.UseCMap]; ok {
 			rr = append(rr, other...)
 		} else {

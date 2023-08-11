@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
@@ -199,10 +198,7 @@ func (e *embedded) Close() error {
 	}
 
 	if subsetInfo.IsCFF() {
-		cffFont := &cff.Font{
-			FontInfo: subsetInfo.GetFontInfo(),
-			Outlines: subsetInfo.Outlines.(*cff.Outlines),
-		}
+		cffFont := subsetInfo.AsCFF()
 		data := &pdfcff.PDFInfoSimple{
 			Font:       cffFont,
 			UnitsPerEm: subsetInfo.UnitsPerEm,

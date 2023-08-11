@@ -19,6 +19,7 @@ package tounicode
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
@@ -36,9 +37,9 @@ func TestFromMapping(t *testing.T) {
 		Name: "Test",
 		CS:   charcode.Simple,
 	}
-	info.FromMapping(m)
+	info.SetMapping(m)
 	if len(info.Singles) != 2 {
-		t.Fatalf("expected 2 singles, got %d", len(info.Singles))
+		t.Fatalf("expected 2 singles, got %d:\n%v", len(info.Singles), info)
 	}
 	if info.Singles[0].Code != 'A' {
 		t.Errorf("expected 'A', got %d", info.Singles[0].Code)
@@ -51,5 +52,33 @@ func TestFromMapping(t *testing.T) {
 	}
 	if info.Ranges[0].First != 'C' {
 		t.Errorf("expected 'C', got %d", info.Ranges[0].First)
+	}
+}
+
+func TestFromMapping2(t *testing.T) {
+	m := map[charcode.CharCode][]rune{
+		'A': []rune("A"), // range ...
+		'C': []rune("C"),
+		'E': []rune("E"),
+	}
+	info := &Info{
+		Name: "Test",
+		CS:   charcode.Simple,
+	}
+	info.SetMapping(m)
+	if len(info.Singles) != 0 {
+		t.Fatalf("expected 0 singles, got %d", len(info.Singles))
+	}
+	if len(info.Ranges) != 1 {
+		t.Fatalf("expected 1 range, got %d", len(info.Ranges))
+	}
+	r := info.Ranges[0]
+	rExpected := Range{
+		First:  'A',
+		Last:   'E',
+		Values: [][]rune{[]rune("A")},
+	}
+	if d := cmp.Diff(r, rExpected); d != "" {
+		t.Errorf("unexpected range: %s", d)
 	}
 }

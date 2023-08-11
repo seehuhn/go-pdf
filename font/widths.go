@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cid
+package font
 
 import (
 	"math"
@@ -28,15 +28,15 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// WidthRec maps a character identifier (CID) to a glyph width in font units.
-type WidthRec struct {
+// CIDWidth maps a character identifier (CID) to a glyph width in font units.
+type CIDWidth struct {
 	CID        type1.CID
 	GlyphWidth funit.Int16
 }
 
-// EncodeWidths constructs the W and DW entries for a CIDFont dictionary.
+// EncodeCIDWidths constructs the W and DW entries for a CIDFont dictionary.
 // This function modifies ww, sorting it by increasing CID.
-func EncodeWidths(ww []WidthRec, unitsPerEm uint16) (pdf.Integer, pdf.Array) {
+func EncodeCIDWidths(ww []CIDWidth, unitsPerEm uint16) (pdf.Integer, pdf.Array) {
 	sort.Slice(ww, func(i, j int) bool {
 		return ww[i].CID < ww[j].CID
 	})
@@ -78,7 +78,7 @@ func EncodeWidths(ww []WidthRec, unitsPerEm uint16) (pdf.Integer, pdf.Array) {
 }
 
 type wwGraph struct {
-	ww []WidthRec
+	ww []CIDWidth
 	dw funit.Int16
 }
 
@@ -141,7 +141,7 @@ func (g wwGraph) To(v int, e wwEdge) int {
 	return v + step
 }
 
-func mostFrequent(ww []WidthRec) funit.Int16 {
+func mostFrequent(ww []CIDWidth) funit.Int16 {
 	hist := make(map[funit.Int16]int)
 	for _, wi := range ww {
 		hist[wi.GlyphWidth]++

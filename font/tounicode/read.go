@@ -29,6 +29,20 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
+func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
+	stm, err := pdf.GetStream(r, obj)
+	if err != nil {
+		return nil, err
+	} else if stm == nil {
+		return nil, nil
+	}
+	data, err := pdf.DecodeStream(r, stm, 0)
+	if err != nil {
+		return nil, err
+	}
+	return Read(data)
+}
+
 func Read(r io.Reader) (*Info, error) {
 	cmap, err := cmap.ReadRaw(r)
 	if err != nil {

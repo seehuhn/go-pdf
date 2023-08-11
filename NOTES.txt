@@ -1,3 +1,9 @@
+PDF Spec Errata
+===============
+
+- https://pdf-issues.pdfa.org/32000-2-2020/index.html
+- https://github.com/pdf-association/pdf-issues/issues
+
 Related Projects
 ================
 

@@ -32,8 +32,11 @@ func TestRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			info, err := Read(r, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = r.Close()
 			if err != nil {
 				t.Fatal(err)
 			}

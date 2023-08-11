@@ -24,6 +24,9 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
+// TODO(voss): restrict the list of predefined CMaps to the ones which are
+// listed in the PDF specification.
+
 //go:embed predefined/*.gz
 var predefined embed.FS
 
@@ -33,6 +36,11 @@ func OpenPredefined(name string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return gzip.NewReader(fd)
+}
+
+func IsPredefined(cmap *Info) bool {
+	_, ok := builtinCS[cmap.Name]
+	return ok
 }
 
 var AllPredefined = []string{

@@ -270,12 +270,12 @@ func (e *embedded) Close() error {
 	compressedRefs := []pdf.Reference{FontDictRef, CIDFontRef, CIDSystemInfoRef, FontDescriptorRef}
 	compressedObjects := []pdf.Object{FontDict, CIDFont, ROS, FontDescriptor}
 
-	var ww []WidthRec
+	var ww []font.CIDWidth
 	widths := subsetInfo.Widths()
 	for subsetGid, g := range ss {
-		ww = append(ww, WidthRec{g.CID, widths[subsetGid]})
+		ww = append(ww, font.CIDWidth{CID: g.CID, GlyphWidth: widths[subsetGid]})
 	}
-	DW, W := EncodeWidths(ww, subsetInfo.UnitsPerEm)
+	DW, W := font.EncodeCIDWidths(ww, subsetInfo.UnitsPerEm)
 	if W != nil {
 		WidthsRef := w.Alloc()
 		CIDFont["W"] = WidthsRef

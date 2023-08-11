@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cid
+package font
 
 import (
 	"fmt"
@@ -61,11 +61,11 @@ func TestEncodeWidths(t *testing.T) {
 	}
 	for i, test := range testCases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			var ww []WidthRec
+			var ww []CIDWidth
 			pos := type1.CID(1)
 			for _, run := range test.in {
 				for _, w := range run {
-					ww = append(ww, WidthRec{pos, w})
+					ww = append(ww, CIDWidth{pos, w})
 					pos++
 				}
 				pos++
@@ -74,11 +74,11 @@ func TestEncodeWidths(t *testing.T) {
 			// make sure 0 is the most frequent width
 			n := len(ww) + 1
 			for i := 0; i < n; i++ {
-				ww = append(ww, WidthRec{pos, 0})
+				ww = append(ww, CIDWidth{pos, 0})
 				pos++
 			}
 
-			dw, w := EncodeWidths(ww, 1000)
+			dw, w := EncodeCIDWidths(ww, 1000)
 			if dw != 0 {
 				t.Errorf("dw=%v, want 0", dw)
 			}

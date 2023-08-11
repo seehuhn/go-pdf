@@ -17,6 +17,7 @@
 package gofont
 
 import (
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
@@ -60,6 +61,16 @@ func OpenType(font FontID) (*sfnt.Font, error) {
 
 	// convert glypf outlines to cff outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)
+	encoding := make([]glyph.ID, 256)
+	if origOutlines.Names != nil {
+		rev := make(map[string]glyph.ID)
+		for gid, name := range origOutlines.Names {
+			rev[name] = glyph.ID(gid)
+		}
+		for i, name := range pdfenc.StandardEncoding {
+			encoding[i] = rev[name]
+		}
+	}
 	newOutlines := &cff.Outlines{
 		Private: []*type1.PrivateDict{
 			{
@@ -68,6 +79,7 @@ func OpenType(font FontID) (*sfnt.Font, error) {
 				},
 			},
 		},
+		Encoding: encoding,
 		FDSelect: func(glyph.ID) int { return 0 },
 	}
 

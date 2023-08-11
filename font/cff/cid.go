@@ -17,11 +17,16 @@
 package cff
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"math"
+	"regexp"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
@@ -31,22 +36,22 @@ import (
 type PDFInfoCID struct {
 	Font      *cff.Font
 	SubsetTag string
-	ToUnicode map[charcode.CharCode][]rune
 
 	CS   charcode.CodeSpaceRange
-	CMap map[charcode.CharCode]type1.CID
 	ROS  *type1.CIDSystemInfo
+	CMap map[charcode.CharCode]type1.CID
 
-	UnitsPerEm uint16 // TODO(voss): get this from the font matrix instead
+	ToUnicode map[charcode.CharCode][]rune
+
+	UnitsPerEm uint16 // TODO(voss): get this from the font matrix instead?
+	Ascent     funit.Int16
+	Descent    funit.Int16
+	CapHeight  funit.Int16
 
 	IsSerif    bool
 	IsScript   bool
 	IsAllCap   bool
 	IsSmallCap bool
-
-	Ascent    funit.Int16
-	Descent   funit.Int16
-	CapHeight funit.Int16
 }
 
 // Section 9.7.4.2 of ISO-32000-2 ("Glyph selection in CIDFonts"):
@@ -61,7 +66,7 @@ type PDFInfoCID struct {
 // shall then be used to look up the glyph procedure using the CharStrings
 // INDEX table.
 
-func (info *PDFInfoCID) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "CFF CIDFonts", pdf.V1_3)
 	if err != nil {
 		return err
@@ -78,13 +83,29 @@ func (info *PDFInfoCID) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error 
 		cidFontName = info.SubsetTag + "+" + cffFont.FontInfo.FontName
 	}
 
-	var cmapName string     // TODO
-	var encoding pdf.Object // TODO
+	// make a CMap
+	cmapInfo := cmap.New(info.ROS, info.CS, info.CMap)
+	var encoding pdf.Object
+	if cmap.IsPredefined(cmapInfo) {
+		encoding = pdf.Name(cmapInfo.Name)
+	} else {
+		encoding = w.Alloc()
+	}
 
 	unitsPerEm := info.UnitsPerEm
 
-	var DW pdf.Number // TODO
-	var W pdf.Array   // TODO
+	var ww []font.CIDWidth
+	widths := cffFont.Widths()
+	if cffFont.Gid2Cid != nil { // CID-keyed CFF font
+		for gid, w := range widths {
+			ww = append(ww, font.CIDWidth{CID: cffFont.Gid2Cid[gid], GlyphWidth: w})
+		}
+	} else { // simple CFF font
+		for gid, w := range widths {
+			ww = append(ww, font.CIDWidth{CID: type1.CID(gid), GlyphWidth: w})
+		}
+	}
+	DW, W := font.EncodeCIDWidths(ww, info.UnitsPerEm)
 
 	q := 1000 / float64(unitsPerEm)
 	bbox := cffFont.BBox()
@@ -105,7 +126,7 @@ func (info *PDFInfoCID) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error 
 	fontDict := pdf.Dict{
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        pdf.Name(cidFontName + "-" + cmapName),
+		"BaseFont":        pdf.Name(cidFontName + "-" + cmapInfo.Name),
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 	}
@@ -131,20 +152,21 @@ func (info *PDFInfoCID) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error 
 		cidFontDict["DW"] = DW
 	}
 	if W != nil {
+		// TODO(voss): use an indirect object?
 		cidFontDict["W"] = W
 	}
 
 	fd := &font.Descriptor{
 		FontName:     cidFontName,
-		IsFixedPitch: info.Font.IsFixedPitch,
+		IsFixedPitch: cffFont.IsFixedPitch,
 		IsSerif:      info.IsSerif,
 		IsScript:     info.IsScript,
-		IsItalic:     info.Font.ItalicAngle != 0,
+		IsItalic:     cffFont.ItalicAngle != 0,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
-		ForceBold:    info.Font.Private[0].ForceBold,
+		ForceBold:    cffFont.Private[0].ForceBold,
 		FontBBox:     fontBBox,
-		ItalicAngle:  info.Font.ItalicAngle,
+		ItalicAngle:  cffFont.ItalicAngle,
 		Ascent:       info.Ascent.AsFloat(q),
 		Descent:      info.Descent.AsFloat(q),
 		CapHeight:    info.CapHeight.AsFloat(q),
@@ -176,6 +198,13 @@ func (info *PDFInfoCID) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error 
 		return err
 	}
 
+	if ref, ok := encoding.(pdf.Reference); ok {
+		err = cmapInfo.Embed(w, ref, nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	if toUnicodeRef != 0 {
 		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
 		if err != nil {
@@ -185,3 +214,127 @@ func (info *PDFInfoCID) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error 
 
 	return nil
 }
+
+func ExtractCIDInfo(r pdf.Getter, ref pdf.Reference) (*PDFInfoCID, error) {
+	fontDict, err := pdf.GetDict(r, ref)
+	if err != nil {
+		return nil, err
+	}
+	err = pdf.CheckDictType(r, fontDict, "Font")
+	if err != nil {
+		return nil, err
+	}
+	subType, err := pdf.GetName(r, fontDict["Subtype"])
+	if err != nil || (subType != "Type0" && subType != "") {
+		return nil, fmt.Errorf("invalid font subtype: %v", fontDict["Subtype"])
+	}
+
+	cmap, err := cmap.Extract(r, fontDict["Encoding"])
+	if err != nil {
+		return nil, err
+	}
+
+	descendantFonts, err := pdf.GetArray(r, fontDict["DescendantFonts"])
+	if err != nil {
+		return nil, err
+	} else if len(descendantFonts) != 1 {
+		return nil, fmt.Errorf("invalid descendant fonts: %v", descendantFonts)
+	}
+
+	var toUnicode map[charcode.CharCode][]rune
+	if info, _ := tounicode.Extract(r, fontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		toUnicode = info.GetMapping()
+	}
+
+	cidFontDict, err := pdf.GetDict(r, descendantFonts[0])
+	if err != nil {
+		return nil, err
+	}
+	err = pdf.CheckDictType(r, cidFontDict, "Font")
+	if err != nil {
+		return nil, err
+	}
+
+	postScriptName, _ := pdf.GetName(r, cidFontDict["BaseFont"])
+	var subsetTag string
+	if m := subsetTagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
+		subsetTag = m[1]
+	}
+	var ROS *type1.CIDSystemInfo
+	if rosDict, _ := pdf.GetDict(r, cidFontDict["CIDSystemInfo"]); rosDict != nil {
+		registry, _ := pdf.GetString(r, rosDict["Registry"])
+		ordering, _ := pdf.GetString(r, rosDict["Ordering"])
+		supplement, _ := pdf.GetInteger(r, rosDict["Supplement"])
+		ROS = &type1.CIDSystemInfo{
+			Registry:   string(registry),
+			Ordering:   string(ordering),
+			Supplement: int32(supplement),
+		}
+	}
+	if ROS == nil {
+		ROS = cmap.ROS
+	}
+
+	fontDescriptor, err := pdf.GetDict(r, cidFontDict["FontDescriptor"])
+	if err != nil {
+		return nil, err
+	}
+	err = pdf.CheckDictType(r, fontDescriptor, "FontDescriptor")
+	if err != nil {
+		return nil, err
+	}
+	ascent, _ := pdf.GetNumber(r, fontDescriptor["Ascent"])
+	descent, _ := pdf.GetNumber(r, fontDescriptor["Descent"])
+	capHeight, _ := pdf.GetNumber(r, fontDescriptor["CapHeight"])
+	flagsInt, _ := pdf.GetInteger(r, fontDescriptor["Flags"])
+	flags := font.Flags(flagsInt)
+
+	fontProgramStm, err := pdf.GetStream(r, fontDescriptor["FontFile3"])
+	if err != nil {
+		return nil, err
+	}
+	subType, err = pdf.GetName(r, fontProgramStm.Dict["Subtype"])
+	if err != nil {
+		return nil, err
+	} else if subType != "CIDFontType0C" {
+		return nil, fmt.Errorf("invalid font program subtype: %v", subType)
+	}
+	stm, err := pdf.DecodeStream(r, fontProgramStm, 0)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(stm)
+	if err != nil {
+		return nil, err
+	}
+	cffFont, err := cff.Read(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(voss): be more robust here
+	unitsPerEm := uint16(math.Round(1 / float64(cffFont.FontMatrix[0])))
+	q := 1000 / float64(unitsPerEm)
+
+	res := &PDFInfoCID{
+		Font:      cffFont,
+		SubsetTag: subsetTag,
+		CS:        cmap.CS,
+		ROS:       ROS,
+		CMap:      cmap.GetMapping(),
+		ToUnicode: toUnicode,
+
+		UnitsPerEm: unitsPerEm,
+		Ascent:     funit.Int16(math.Round(float64(ascent) / q)),
+		Descent:    funit.Int16(math.Round(float64(descent) / q)),
+		CapHeight:  funit.Int16(math.Round(float64(capHeight) / q)),
+		IsSerif:    flags&font.FlagSerif != 0,
+		IsScript:   flags&font.FlagScript != 0,
+		IsAllCap:   flags&font.FlagAllCap != 0,
+		IsSmallCap: flags&font.FlagSmallCap != 0,
+	}
+	return res, nil
+}
+
+var subsetTagRegexp = regexp.MustCompile(`^([A-Z]{6})\+(.*)$`)

@@ -55,6 +55,8 @@ func GetNumber(r Getter, obj Object) (Number, error) {
 		return Number(x), nil
 	case Real:
 		return Number(x), nil
+	case Number:
+		return x, nil
 	default:
 		return 0, &MalformedFileError{
 			Err: fmt.Errorf("expected number but got %T", obj),

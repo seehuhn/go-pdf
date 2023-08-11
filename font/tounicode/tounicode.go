@@ -17,8 +17,12 @@
 package tounicode
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
+	"slices"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/type1"
@@ -51,7 +55,6 @@ type Range struct {
 }
 
 func Embed(w pdf.Putter, ref pdf.Reference, cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) error {
-	// TODO(voss): is the CIDSystemInfo correct?
 	touni := &Info{
 		Name: makeName(m),
 		ROS: &type1.CIDSystemInfo{
@@ -61,7 +64,7 @@ func Embed(w pdf.Putter, ref pdf.Reference, cs charcode.CodeSpaceRange, m map[ch
 		},
 		CS: cs,
 	}
-	touni.FromMapping(m)
+	touni.SetMapping(m)
 	touniStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err
@@ -71,4 +74,17 @@ func Embed(w pdf.Putter, ref pdf.Reference, cs charcode.CodeSpaceRange, m map[ch
 		return fmt.Errorf("embedding ToUnicode cmap: %w", err)
 	}
 	return touniStream.Close()
+}
+
+func makeName(m map[charcode.CharCode][]rune) pdf.Name {
+	codes := maps.Keys(m)
+	slices.Sort(codes)
+	h := sha256.New()
+	for _, k := range codes {
+		binary.Write(h, binary.BigEndian, uint32(k))
+		h.Write([]byte{byte(len(m[k]))})
+		binary.Write(h, binary.BigEndian, m[k])
+	}
+	sum := h.Sum(nil)
+	return pdf.Name(fmt.Sprintf("Seehuhn-%x", sum[:8]))
 }
