@@ -70,7 +70,7 @@ func (info *Info) FromMapping(m map[charcode.CharCode][]rune) {
 	})
 
 	g := &encoder{
-		cs: info.CodeSpace,
+		cs: info.CS,
 		mm: entries,
 	}
 	ee, err := dag.ShortestPath[int16, uint32](g, len(entries))

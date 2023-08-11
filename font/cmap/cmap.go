@@ -25,9 +25,28 @@ import (
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 
 type Info struct {
-	Name  string
-	CS    charcode.CodeSpaceRange
-	CMap  map[charcode.CharCode]type1.CID
-	ROS   *type1.CIDSystemInfo
-	WMode int
+	Name    string
+	Version float64
+	ROS     *type1.CIDSystemInfo
+	CS      charcode.CodeSpaceRange
+	CSFile  charcode.CodeSpaceRange
+	WMode   int
+	UseCMap string
+	Singles []Single
+	Ranges  []Range
+}
+
+// Single specifies that character code Code represents the given CID.
+type Single struct {
+	Code  charcode.CharCode
+	Value type1.CID
+}
+
+// Range describes a range of character codes with consecutive CIDs.
+// First and Last are the first and last code points in the range.
+// Value is the CID of the first code point in the range.
+type Range struct {
+	First charcode.CharCode
+	Last  charcode.CharCode
+	Value type1.CID
 }

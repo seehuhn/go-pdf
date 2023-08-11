@@ -34,7 +34,7 @@ func TestRoundtrip(t *testing.T) {
 			Ordering:   "Identity",
 			Supplement: 0,
 		},
-		CodeSpace: charcode.Simple,
+		CS: charcode.Simple,
 		Singles: []Single{
 			{
 				Code:  65,

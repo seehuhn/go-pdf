@@ -17,8 +17,6 @@
 package font
 
 import (
-	"math"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 )
@@ -36,9 +34,9 @@ func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
 	q := 1000 / float64(unitsPerEm)
 
 	// find FirstChar and LastChar
-	cand := make(map[funit.Int16]int)
-	cand[ww[0]] = 0
-	cand[ww[255]] = 0
+	cand := make(map[funit.Int16]bool)
+	cand[ww[0]] = true
+	cand[ww[255]] = true
 	bestGain := 0
 	FirstChar := 0
 	LastChar := 255
@@ -60,14 +58,14 @@ func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
 			bestGain = gain
 			FirstChar = a
 			LastChar = b
-			MissingWidth = pdf.Number(math.Round(w.AsFloat(q)))
+			MissingWidth = pdf.Number(w.AsFloat(q))
 		}
 	}
 
 	Widths := make(pdf.Array, LastChar-FirstChar+1)
 	for i := range Widths {
 		w := ww[FirstChar+i]
-		Widths[i] = pdf.Integer(math.Round(w.AsFloat(q)))
+		Widths[i] = pdf.Number(w.AsFloat(q))
 	}
 
 	return &widthInfo{

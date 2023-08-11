@@ -59,8 +59,8 @@ func (c customCS) Append(s pdf.String, code CharCode) pdf.String {
 			s = append(s, 0)
 		}
 		for i := len(r.Low) - 1; i >= 0; i-- {
-			k := CharCode(r.High[i]-r.Low[i]) + 1
-			s[n+i] = byte(code%k) + r.Low[i]
+			k := CharCode(r.High[i]) - CharCode(r.Low[i]) + 1
+			s[n+i] = r.Low[i] + byte(code%k)
 			code /= k
 		}
 		break
@@ -69,23 +69,26 @@ func (c customCS) Append(s pdf.String, code CharCode) pdf.String {
 }
 
 func (c customCS) Decode(s pdf.String) (CharCode, int) {
+	var base CharCode
 tryNextRange:
 	for _, r := range c {
 		if len(s) < len(r.Low) {
-			continue
+			base += r.NumCodes
+			continue tryNextRange
 		}
 
 		var code CharCode
 		for i := 0; i < len(r.Low); i++ {
 			b := s[i]
 			if b < r.Low[i] || b > r.High[i] {
+				base += r.NumCodes
 				continue tryNextRange
 			}
 
-			k := CharCode(r.High[i] - r.Low[i] + 1)
+			k := CharCode(r.High[i]) - CharCode(r.Low[i]) + 1
 			code = code*k + CharCode(b-r.Low[i])
 		}
-		return code, len(r.Low)
+		return code + base, len(r.Low)
 	}
 
 	if len(s) == 0 {

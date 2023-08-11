@@ -63,11 +63,11 @@ func Read(r io.Reader) (*Info, error) {
 	cs := charcode.NewCodeSpace(csRanges)
 
 	res := &Info{
-		Name:      pdf.Name(cmapName),
-		ROS:       ROS,
-		CodeSpace: cs,
-		Singles:   []Single{},
-		Ranges:    []Range{},
+		Name:    pdf.Name(cmapName),
+		ROS:     ROS,
+		CS:      cs,
+		Singles: []Single{},
+		Ranges:  []Range{},
 	}
 
 	for _, c := range codeMap.Chars {

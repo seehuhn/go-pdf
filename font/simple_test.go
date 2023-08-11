@@ -17,6 +17,7 @@
 package font
 
 import (
+	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -98,7 +99,7 @@ func TestCompressWidths(t *testing.T) {
 				if i >= int(info.FirstChar) && i <= int(info.LastChar) {
 					w = info.Widths[i-int(info.FirstChar)]
 				}
-				if int(w.(pdf.Integer)) != int(ww[i])*1000/int(u) {
+				if math.Abs(float64(w.(pdf.Number)-pdf.Number(ww[i])*1000/pdf.Number(u))) > 1e-6 {
 					t.Errorf("case %d, u=%d: got w[%d] = %d, want %d (L=%d, R=%d, D=%f)",
 						k, u, i, w, int(ww[i])*1000/int(u),
 						info.FirstChar, info.LastChar, info.MissingWidth)

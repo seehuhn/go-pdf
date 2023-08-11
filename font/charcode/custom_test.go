@@ -68,3 +68,51 @@ func TestCustom2(t *testing.T) {
 		}
 	}
 }
+
+func TestCustom3(t *testing.T) {
+	ranges := []Range{ // from the EUC-H cmap
+		{Low: []byte{0x00}, High: []byte{0x80}},
+		{Low: []byte{0x8E, 0xA0}, High: []byte{0x8E, 0xDF}},
+		{Low: []byte{0xA1, 0xA1}, High: []byte{0xFE, 0xFE}},
+	}
+	cs := NewCodeSpace(ranges)
+
+	_, ok := cs.(customCS)
+	if !ok {
+		t.Fatal("test is broken")
+	}
+
+	testCases := [][]byte{
+		{0x00},
+		{0x41},
+		{0x80},
+		{0x8E, 0xA0},
+		{0x8E, 0xDF},
+		{0xA1, 0xA1},
+		{0xC1, 0xD2},
+		{0xFE, 0xFE},
+	}
+	for _, in := range testCases {
+		code, k := cs.Decode(in)
+		if k != len(in) {
+			t.Errorf("expected %d bytes, got %d", len(in), k)
+		} else if code < 0 {
+			t.Errorf("expected positive code, got %d", code)
+		}
+		out := cs.Append(nil, code)
+		if !bytes.Equal(in, out) {
+			t.Fatalf("%d: expected <%x>, got <%x>", code, in, out)
+		}
+	}
+
+	for code := CharCode(0); code < 1000; code++ {
+		buf := cs.Append(nil, code)
+		code2, k := cs.Decode(buf)
+		if k != len(buf) {
+			t.Errorf("expected %d bytes, got %d", len(buf), k)
+		}
+		if code2 != code {
+			t.Errorf("expected code %d, got %d", code, code2)
+		}
+	}
+}

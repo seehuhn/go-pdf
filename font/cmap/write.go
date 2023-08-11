@@ -14,22 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tounicode
+package cmap
 
 import (
 	"fmt"
 	"io"
-	"strings"
 	"text/template"
-	"unicode/utf16"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript"
 )
 
 func (info *Info) Write(w io.Writer) error {
-	return toUnicodeTmpl.Execute(w, info)
+	return cmapTmpl.Execute(w, info)
 }
 
 const chunkSize = 100
@@ -58,25 +55,12 @@ func rangeChunks(x []Range) [][]Range {
 	return res
 }
 
-func hexRunes(rr []rune) string {
-	val := utf16.Encode(rr)
-	if len(val) == 1 {
-		return fmt.Sprintf("<%04x>", val[0])
-	}
-
-	valStrings := make([]string, len(val))
-	for i, v := range val {
-		valStrings[i] = fmt.Sprintf("%04x", v)
-	}
-	return "<" + strings.Join(valStrings, "") + ">"
-}
-
-var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncMap{
+var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"PS": func(s string) string {
 		x := postscript.String(s)
 		return x.PS()
 	},
-	"PN": func(s pdf.Name) string {
+	"PN": func(s string) string {
 		x := postscript.Name(s)
 		return x.PS()
 	},
@@ -87,37 +71,47 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 	"Single": func(cs charcode.CodeSpaceRange, s Single) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
-		val := hexRunes(s.Value)
-		return fmt.Sprintf("<%x> %s", buf, val)
+		return fmt.Sprintf("<%x> %d", buf, s.Value)
 	},
 	"RangeChunks": rangeChunks,
 	"Range": func(cs charcode.CodeSpaceRange, s Range) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)
 		last = cs.Append(last, s.Last)
-		if len(s.Values) == 1 {
-			return fmt.Sprintf("<%x> <%x> %s", first, last, hexRunes(s.Values[0]))
-		}
-		var repl []string
-		for _, v := range s.Values {
-			repl = append(repl, hexRunes(v))
-		}
-		return fmt.Sprintf("<%x> <%x> [%s]", first, last, strings.Join(repl, " "))
+		return fmt.Sprintf("<%x> <%x> %d", first, last, s.Value)
 	},
-}).Parse(`/CIDInit /ProcSet findresource begin
+}).Parse(`%!PS-Adobe-3.0 Resource-CMap
+%%DocumentNeededResources: ProcSet (CIDInit)
+%%IncludeResource: ProcSet (CIDInit)
+%%BeginResource: CMap {{PS .Name}}
+%%Title: {{printf "%s %s %s %d" .Name .ROS.Registry .ROS.Ordering .ROS.Supplement | PS}}
+%%Version: {{printf "%.3f" .Version}}
+{{if .UseCMap -}}
+%%DocumentNeededResources: CMap {{PN .UseCMap}}
+%%IncludeResource: CMap {{PN .UseCMap}}
+{{end -}}
+%%EndComments
+
+/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
-/CMapName {{PN .Name}} def
-/CMapType 2 def
-{{if .ROS -}}
-/CIDSystemInfo <<
-/Registry {{PS .ROS.Registry}}
-/Ordering {{PS .ROS.Ordering}}
-/Supplement {{.ROS.Supplement}}
->> def
+
+{{if .UseCMap -}}
+{{PN .UseCMap}} usecmap
 {{end -}}
 
-{{with .CS.Ranges -}}
+{{if .ROS -}}
+/CIDSystemInfo 3 dict dup begin
+	/Registry {{PS .ROS.Registry}} def
+	/Ordering {{PS .ROS.Ordering}} def
+	/Supplement {{.ROS.Supplement}} def
+end def
+{{end -}}
+/CMapName {{PN .Name}} def
+/CMapType 1 def
+/WMode {{.WMode}} def
+
+{{with .CSFile.Ranges -}}
 {{len .}} begincodespacerange
 {{range . -}}
 {{B .Low}} {{B .High}}
@@ -127,19 +121,19 @@ endcodespacerange
 {{$cs := .CS -}}
 
 {{range SingleChunks .Singles -}}
-{{len .}} beginbfchar
+{{len .}} begincidchar
 {{range . -}}
 {{Single $cs .}}
 {{end -}}
-endbfchar
+endcidchar
 {{end -}}
 
 {{range RangeChunks .Ranges -}}
-{{len .}} beginbfrange
+{{len .}} begincidrange
 {{range . -}}
 {{Range $cs .}}
 {{end -}}
-endbfrange
+endcidrange
 {{end -}}
 
 endcmap

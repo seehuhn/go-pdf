@@ -25,11 +25,11 @@ import (
 )
 
 type Info struct {
-	Name      pdf.Name
-	ROS       *type1.CIDSystemInfo
-	CodeSpace charcode.CodeSpaceRange
-	Singles   []Single
-	Ranges    []Range
+	Name    pdf.Name
+	ROS     *type1.CIDSystemInfo
+	CS      charcode.CodeSpaceRange
+	Singles []Single
+	Ranges  []Range
 }
 
 // Single specifies that character code Code represents the given unicode string.
@@ -59,7 +59,7 @@ func Embed(w pdf.Putter, ref pdf.Reference, cs charcode.CodeSpaceRange, m map[ch
 			Ordering:   "UCS",
 			Supplement: 0,
 		},
-		CodeSpace: cs,
+		CS: cs,
 	}
 	touni.FromMapping(m)
 	touniStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})

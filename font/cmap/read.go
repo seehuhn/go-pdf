@@ -26,16 +26,15 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-func Read(r io.Reader) (*Info, error) {
+func Read(r io.Reader, other map[string]charcode.CodeSpaceRange) (*Info, error) {
 	cmap, err := ReadRaw(r)
 	if err != nil {
 		return nil, err
 	}
 
 	res := &Info{
-		CS:    nil,
-		CMap:  map[charcode.CharCode]type1.CID{},
 		ROS:   &type1.CIDSystemInfo{},
+		CS:    nil,
 		WMode: 0,
 	}
 
@@ -77,11 +76,30 @@ func Read(r io.Reader) (*Info, error) {
 		return nil, fmt.Errorf("unsupported CMap format")
 	}
 
-	var rr []charcode.Range
-	for _, r := range codeMap.CodeSpaceRanges {
-		rr = append(rr, charcode.Range{Low: r.Low, High: r.High})
+	if codeMap.UseCMap != "" {
+		res.UseCMap = string(codeMap.UseCMap)
 	}
-	res.CS = charcode.NewCodeSpace(rr)
+
+	var rr []charcode.Range
+	if codeMap.UseCMap != "" {
+		if other == nil {
+			other = make(map[string]charcode.CodeSpaceRange)
+		}
+		if other, ok := other[codeMap.UseCMap]; ok {
+			rr = append(rr, other.Ranges()...)
+		} else if other, ok := builtinCS[codeMap.UseCMap]; ok {
+			rr = append(rr, other...)
+		} else {
+			return nil, fmt.Errorf("unknown CMap %q", codeMap.UseCMap)
+		}
+	}
+	var rrFile []charcode.Range
+	for _, r := range codeMap.CodeSpaceRanges {
+		rrFile = append(rrFile, charcode.Range{Low: r.Low, High: r.High})
+	}
+	res.CS = charcode.NewCodeSpace(append(rr, rrFile...))
+	res.CSFile = charcode.NewCodeSpace(rrFile)
+
 	for _, m := range codeMap.Chars {
 		code, k := res.CS.Decode(m.Src)
 		if k != len(m.Src) || code < 0 {
@@ -90,8 +108,10 @@ func Read(r io.Reader) (*Info, error) {
 		if cid, ok := m.Dst.(postscript.Integer); !ok {
 			return nil, fmt.Errorf("invalid CID %v", m.Dst)
 		} else {
-			fmt.Println(code, "->", cid)
-			res.CMap[code] = type1.CID(cid)
+			res.Singles = append(res.Singles, Single{
+				Code:  code,
+				Value: type1.CID(cid),
+			})
 		}
 	}
 
@@ -107,7 +127,11 @@ func Read(r io.Reader) (*Info, error) {
 		if cid, ok := m.Dst.(postscript.Integer); !ok {
 			return nil, fmt.Errorf("invalid CID %v", m.Dst)
 		} else {
-			fmt.Println(low, high, "->", cid)
+			res.Ranges = append(res.Ranges, Range{
+				First: low,
+				Last:  high,
+				Value: type1.CID(cid),
+			})
 		}
 	}
 

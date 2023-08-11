@@ -33,8 +33,8 @@ func TestFromMapping(t *testing.T) {
 		'G': []rune("G"),
 	}
 	info := &Info{
-		Name:      "Test",
-		CodeSpace: charcode.Simple,
+		Name: "Test",
+		CS:   charcode.Simple,
 	}
 	info.FromMapping(m)
 	if len(info.Singles) != 2 {
