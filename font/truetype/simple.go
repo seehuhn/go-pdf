@@ -17,21 +17,150 @@
 package truetype
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/font/tounicode"
+	"golang.org/x/text/language"
+
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	pdfcmap "seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/tounicode"
 )
+
+type SimpleFont struct {
+	info        *sfnt.Font
+	gsubLookups []gtab.LookupIndex
+	gposLookups []gtab.LookupIndex
+	*font.Geometry
+}
+
+func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
+	if !info.IsGlyf() {
+		return nil, errors.New("wrong font type")
+	}
+
+	geometry := &font.Geometry{
+		UnitsPerEm:   info.UnitsPerEm,
+		GlyphExtents: info.Extents(),
+		Widths:       info.Widths(),
+
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+	}
+
+	res := &SimpleFont{
+		info:        info,
+		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
+		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		Geometry:    geometry,
+	}
+	return res, nil
+}
+
+func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
+	if err != nil {
+		return nil, err
+	}
+	res := &embeddedSimpleGlyf{
+		SimpleFont:    f,
+		w:             w,
+		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
+		SimpleEncoder: pdfcmap.NewSimpleEncoder(),
+		text:          map[glyph.ID][]rune{},
+	}
+	return res, nil
+}
+
+func (f *SimpleFont) Layout(s string, ptSize float64) glyph.Seq {
+	rr := []rune(s)
+	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+}
+
+type embeddedSimpleGlyf struct {
+	*SimpleFont
+	w pdf.Putter
+	pdf.Resource
+
+	pdfcmap.SimpleEncoder
+	text   map[glyph.ID][]rune
+	closed bool
+}
+
+func (f *embeddedSimpleGlyf) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	f.text[gid] = rr
+	return f.SimpleEncoder.AppendEncoded(s, gid, rr)
+}
+
+func (f *embeddedSimpleGlyf) Close() error {
+	if f.closed {
+		return nil
+	}
+	f.closed = true
+
+	if f.SimpleEncoder.Overflow() {
+		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
+			f.Name, f.info.PostscriptName())
+	}
+	f.SimpleEncoder = pdfcmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
+
+	// subset the font
+	var ss []subset.Glyph
+	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
+	encoding := f.SimpleEncoder.Encoding()
+	for cid, gid := range encoding {
+		if gid != 0 {
+			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
+		}
+	}
+	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
+	subsetInfo, err := subset.Simple(f.info, ss)
+	if err != nil {
+		return fmt.Errorf("font subset: %w", err)
+	}
+
+	subsetEncoding := make([]glyph.ID, 256)
+	for subsetGid, g := range ss {
+		if subsetGid == 0 {
+			continue
+		}
+		subsetEncoding[g.CID] = glyph.ID(subsetGid)
+	}
+
+	m := make(map[charcode.CharCode][]rune)
+	for code, gid := range encoding {
+		if gid == 0 || len(f.text[gid]) == 0 {
+			continue
+		}
+		m[charcode.CharCode(code)] = f.text[gid]
+	}
+
+	info := PDFInfo{
+		Font:      subsetInfo,
+		SubsetTag: subsetTag,
+		Encoding:  subsetEncoding,
+		ToUnicode: m,
+	}
+	return info.WritePDF(f.w, f.Ref)
+}
 
 type PDFInfo struct {
 	// Font is the font to embed (already subsetted, if needed).

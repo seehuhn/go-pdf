@@ -60,7 +60,7 @@ These are Type1 fonts which can be modified using one or more parameters
 
 Multiple Master Fonts are not supported by this library.
 
-## TrueType Fonts (PDF 1.1)
+## Simple TrueType Fonts (PDF 1.1)
 
 These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile2` entry in the font descriptor.
@@ -131,7 +131,7 @@ glyphs.  Otherwise, the CID is used as the glyph index directly.
 There seems little reason to use this font type, since the OpenType wrapper
 could be omitted and the CFF font data could be embedded as a CFF font.
 
-## TrueType CIDFonts (PDF 1.3)
+## Composite TrueType Fonts (PDF 1.3)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.
@@ -142,7 +142,7 @@ The `Encoding` entry in the PDF font dictionary specifies a PDF CMap which
 describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 
-## Glyf-based OpenType CIDFonts (PDF 1.6)
+## Composite Glyf-based OpenType Fonts (PDF 1.6)
 
 These fonts use `Type0` as the `Subtype` in the font dictionary,
 and `CIDFontType2` as the `Subtype` in the CIDFont dictionary.

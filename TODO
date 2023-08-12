@@ -1,3 +1,8 @@
+- font support:
+  * make the naming consistent
+  * make the PDF version checking consistent
+  * should cmaps internally map character codes to GIDs (instead of CIDs)?
+
 - make sure that unit tests don't leave stray files behind
 - rationalize the error handling
 - make sure that supporting incremental updates to PDF files will not require

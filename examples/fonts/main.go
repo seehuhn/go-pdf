@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/simple"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -64,8 +65,8 @@ func doit() error {
 
 	l := &layout{
 		topMargin:   54.0,
-		leftMargin:  72.0 + 36.0,
-		rightMargin: 72.0,
+		leftMargin:  108.0,
+		rightMargin: 144.0,
 	}
 
 	F, err := type1.TimesRoman.Embed(doc.Out, "F")
@@ -102,6 +103,7 @@ func doit() error {
 		var X font.Embedded
 		var ffKey pdf.Name
 		switch title {
+		case "Simple PDF Fonts":
 		case "Type1 Fonts":
 			t1, err := gofont.Type1(gofont.GoRegular)
 			if err != nil {
@@ -149,12 +151,13 @@ func doit() error {
 				return err
 			}
 			ffKey = "FontFile3"
-		case "TrueType Fonts":
+		case "Multiple Master Fonts":
+		case "Simple TrueType Fonts":
 			ttf, err := gofont.TrueType(gofont.GoRegular)
 			if err != nil {
 				return err
 			}
-			F, err := simple.Font(ttf, language.English)
+			F, err := truetype.NewSimple(ttf, language.English)
 			if err != nil {
 				return err
 			}
@@ -189,6 +192,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
+		case "Composite PDF Fonts":
 		case "Composite CFF Fonts":
 			otf, err := gofont.OpenType(gofont.GoRegular)
 			if err != nil {
@@ -213,13 +217,36 @@ func doit() error {
 				return err
 			}
 			ffKey = "FontFile3"
-		case "TrueType CIDFonts":
-			X, err = cid.EmbedFile(doc.Out, "../../../ttf/SourceSerif4-Regular.ttf", "X", language.English)
+		case "Composite TrueType Fonts":
+			ttf, err := gofont.TrueType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			F, err := truetype.NewComposite(ttf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile2"
-		case "Glyf-based OpenType CIDFonts":
+		case "Composite Glyf-based OpenType Fonts":
+			otf, err := gofont.TrueType(gofont.GoRegular)
+			if err != nil {
+				return err
+			}
+			F, err := opentype.NewCompositeGlyf(otf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
+			if err != nil {
+				return err
+			}
+			ffKey = "FontFile3"
+		default:
+			panic("unexpected section " + title)
 		}
 
 		page := doc.AddPage()
@@ -228,7 +255,7 @@ func doit() error {
 		if s.level == 1 {
 			gg := SB.Layout(title, l.F["chapter"].ptSize)
 			w := l.F["chapter"].geom.ToPDF(l.F["chapter"].ptSize, gg.AdvanceWidth())
-			l.yPos = paper.URy - l.topMargin - l.F["chapter"].ascent
+			l.yPos = paper.URy - l.topMargin - 72 - l.F["chapter"].ascent
 			xPos := (paper.URx-l.rightMargin-l.leftMargin-w)/2 + l.leftMargin
 			page.SetFillColor(color.Gray(0.3))
 			page.TextSetFont(l.F["chapter"].F, l.F["chapter"].ptSize)
@@ -361,7 +388,7 @@ func doit() error {
 		// add the page number
 		page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
 		page.TextStart()
-		xMid := paper.URx / 2
+		xMid := (l.leftMargin + (paper.URx - l.rightMargin)) / 2
 		page.TextFirstLine(xMid, 36)
 		page.TextShowAligned(fmt.Sprintf("%d", pageNo), 0, 0.5)
 		page.TextEnd()
