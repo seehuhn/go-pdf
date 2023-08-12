@@ -45,7 +45,7 @@ type Descriptor struct {
 	XHeight      float64
 	StemV        float64 // set to -1 for Type 3 fonts
 	StemH        float64
-	MissingWidth float64
+	MissingWidth pdf.Number
 }
 
 func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {

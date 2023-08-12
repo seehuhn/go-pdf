@@ -51,7 +51,7 @@ func TestRoundTripCID(t *testing.T) {
 	for code := charcode.CharCode(0); code < 8; code++ {
 		toUnicode[code] = []rune{'X', '0' + rune(code)}
 	}
-	info := &PDFInfoCIDCFF{
+	info := &EmbedInfoCIDCFF{
 		Font:      otf,
 		SubsetTag: "ABCDEF",
 		CS:        cs,
@@ -67,7 +67,7 @@ func TestRoundTripCID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info2, err := ExtractCIDInfoCFF(rw, ref)
+	info2, err := ExtractEmbedInfoCFF(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

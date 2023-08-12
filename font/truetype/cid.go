@@ -37,14 +37,14 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-type CIDFont struct {
+type CompositeFont struct {
 	ttf         *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
-func NewComposite(info *sfnt.Font, loc language.Tag) (*CIDFont, error) {
+func NewComposite(info *sfnt.Font, loc language.Tag) (*CompositeFont, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -61,7 +61,7 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*CIDFont, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &CIDFont{
+	res := &CompositeFont{
 		ttf:         info,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
@@ -70,27 +70,27 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*CIDFont, error) {
 	return res, nil
 }
 
-func (f *CIDFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *CompositeFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedCID{
-		CIDFont:    f,
-		w:          w,
-		Resource:   pdf.Resource{Ref: w.Alloc(), Name: resName},
-		CIDEncoder: cmap.NewCIDEncoder(),
+		CompositeFont: f,
+		w:             w,
+		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
+		CIDEncoder:    cmap.NewCIDEncoder(),
 	}
 	return res, nil
 }
 
-func (f *CIDFont) Layout(s string, ptSize float64) glyph.Seq {
+func (f *CompositeFont) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
 	return f.ttf.Layout(rr, f.gsubLookups, f.gposLookups)
 }
 
 type embeddedCID struct {
-	*CIDFont
+	*CompositeFont
 	w pdf.Putter
 	pdf.Resource
 
@@ -133,7 +133,7 @@ func (f *embeddedCID) Close() error {
 		toUnicode[charcode.CharCode(e.CID)] = e.Text
 	}
 
-	info := PDFInfoCID{
+	info := EmbedInfoCID{
 		Font:      ttfSubset,
 		SubsetTag: subsetTag,
 		CS:        charcode.UCS2,
@@ -145,7 +145,7 @@ func (f *embeddedCID) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-type PDFInfoCID struct {
+type EmbedInfoCID struct {
 	Font      *sfnt.Font
 	SubsetTag string
 
@@ -161,8 +161,8 @@ type PDFInfoCID struct {
 	ForceBold  bool
 }
 
-func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "composite True fonts", pdf.V1_3)
+func (info *EmbedInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
 		return err
 	}
@@ -173,11 +173,9 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 	outlines := ttf.Outlines.(*glyf.Outlines)
 
-	// CidFontName shall be the value of the CIDFontName entry in the CIDFont program.
-	// The name may have a subset prefix if appropriate.
-	cidFontName := ttf.PostscriptName()
+	fontName := ttf.PostscriptName()
 	if info.SubsetTag != "" {
-		cidFontName = info.SubsetTag + "+" + cidFontName
+		fontName = info.SubsetTag + "+" + fontName
 	}
 
 	// make a CMap
@@ -197,6 +195,8 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		ww = append(ww, font.CIDWidth{CID: type1.CID(cid), GlyphWidth: widths[gid]})
 	}
 	DW, W := font.EncodeCIDWidths(ww, ttf.UnitsPerEm)
+
+	isSymbolic := true
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true
@@ -221,8 +221,6 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := true // TODO
-
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
 	fontDescriptorRef := w.Alloc()
@@ -231,7 +229,7 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	fontDict := pdf.Dict{
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        pdf.Name(cidFontName),
+		"BaseFont":        pdf.Name(fontName),
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 	}
@@ -249,7 +247,7 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	cidFontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("CIDFontType2"),
-		"BaseFont":       pdf.Name(cidFontName),
+		"BaseFont":       pdf.Name(fontName),
 		"CIDSystemInfo":  ROS,
 		"FontDescriptor": fontDescriptorRef,
 		"CIDToGIDMap":    CIDToGIDMap,
@@ -263,7 +261,7 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	fd := &font.Descriptor{
-		FontName:     cidFontName,
+		FontName:     fontName,
 		IsFixedPitch: ttf.IsFixedPitch(),
 		IsSerif:      ttf.IsSerif,
 		IsScript:     ttf.IsScript,
@@ -299,7 +297,7 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 	n, err := ttf.WriteTrueTypePDF(fontFileStream, nil)
 	if err != nil {
-		return fmt.Errorf("composite TrueType Font %q: %w", cidFontName, err)
+		return fmt.Errorf("composite TrueType Font %q: %w", fontName, err)
 	}
 	err = length1.Set(pdf.Integer(n))
 	if err != nil {

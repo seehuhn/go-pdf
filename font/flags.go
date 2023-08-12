@@ -23,6 +23,8 @@ import (
 
 // MakeFlags returns the PDF font flags for the font.
 // See section 9.8.2 of PDF 32000-1:2008.
+//
+// TODO(voss): remove
 func MakeFlags(info *sfnt.Font, symbolic bool) Flags {
 	var flags Flags
 

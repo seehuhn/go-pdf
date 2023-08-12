@@ -48,7 +48,7 @@ func TestRoundTripCID(t *testing.T) {
 	for code := charcode.CharCode(0); code < 8; code++ {
 		toUnicode[code] = []rune{'X', '0' + rune(code)}
 	}
-	info := &PDFInfoCID{
+	info := &EmbedInfoComposite{
 		Font:       otf.AsCFF(),
 		SubsetTag:  "ABCDEF",
 		CS:         cs,

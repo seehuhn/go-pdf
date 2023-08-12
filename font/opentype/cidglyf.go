@@ -133,7 +133,7 @@ func (f *embeddedCIDGlyf) Close() error {
 		toUnicode[charcode.CharCode(e.CID)] = e.Text
 	}
 
-	info := PDFInfoCIDGlyf{
+	info := EmbedInfoCIDGlyf{
 		Font:      otfSubset,
 		SubsetTag: subsetTag,
 		CS:        charcode.UCS2,
@@ -145,7 +145,7 @@ func (f *embeddedCIDGlyf) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-type PDFInfoCIDGlyf struct {
+type EmbedInfoCIDGlyf struct {
 	Font      *sfnt.Font
 	SubsetTag string
 
@@ -161,7 +161,7 @@ type PDFInfoCIDGlyf struct {
 	ForceBold  bool
 }
 
-func (info *PDFInfoCIDGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoCIDGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite glyf-based OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err

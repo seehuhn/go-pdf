@@ -98,7 +98,7 @@ func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
 		info:        info,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
-		g:           geometry,
+		Geometry:    geometry,
 	}
 
 	return res, nil
@@ -108,11 +108,7 @@ type simple struct {
 	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
-	g           *font.Geometry
-}
-
-func (f *simple) GetGeometry() *font.Geometry {
-	return f.g
+	*font.Geometry
 }
 
 func (f *simple) Layout(s string, ptSize float64) glyph.Seq {
@@ -155,6 +151,7 @@ type embedded struct {
 	*simple
 	w pdf.Putter
 	pdf.Resource
+
 	cmap.SimpleEncoder
 	text   map[glyph.ID][]rune
 	closed bool
@@ -199,7 +196,7 @@ func (e *embedded) Close() error {
 
 	if subsetInfo.IsCFF() {
 		cffFont := subsetInfo.AsCFF()
-		data := &pdfcff.PDFInfoSimple{
+		data := &pdfcff.EmbedInfoSimple{
 			Font:       cffFont,
 			UnitsPerEm: subsetInfo.UnitsPerEm,
 			Ascent:     subsetInfo.Ascent,
@@ -209,7 +206,7 @@ func (e *embedded) Close() error {
 			Encoding:   cffFont.Outlines.Encoding,
 			ToUnicode:  m,
 		}
-		return data.WritePDF(w, e.Ref)
+		return data.Embed(w, e.Ref)
 	}
 
 	subsetEncoding := make([]glyph.ID, 256)
@@ -219,11 +216,11 @@ func (e *embedded) Close() error {
 		}
 		subsetEncoding[g.CID] = glyph.ID(subsetGid)
 	}
-	ttFont := &truetype.PDFInfo{
+	ttFont := &truetype.EmbedInfo{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
 		ToUnicode: m,
 	}
-	return ttFont.WritePDF(w, e.Ref)
+	return ttFont.Embed(w, e.Ref)
 }

@@ -159,7 +159,7 @@ func DescribeEncodingTrueType(encoding []string) pdf.Object {
 	return desc
 }
 
-func UndescribeEncoding(r pdf.Getter, desc pdf.Object, builtin []string) ([]string, error) {
+func UndescribeEncodingType1(r pdf.Getter, desc pdf.Object, builtin []string) ([]string, error) {
 	desc, err := pdf.Resolve(r, desc)
 	if err != nil {
 		return nil, err

@@ -17,17 +17,21 @@
 package type1
 
 import (
+	"errors"
 	"math"
 
 	"seehuhn.de/go/pdf"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 )
 
+// EmbedInfo is all the information about a Type 1 font which is stored when
+// the font is embedded in a PDF file.
 type EmbedInfo struct {
 	// PSFont is the (subsetted as needed) font to embed.
 	PSFont *type1.Font
@@ -47,6 +51,11 @@ type EmbedInfo struct {
 	// ResName is the resource name for the font.
 	// This is only used for PDF version 1.0.
 	ResName pdf.Name
+
+	IsSerif    bool
+	IsScript   bool
+	IsAllCap   bool
+	IsSmallCap bool
 }
 
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
@@ -56,11 +65,9 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		panic("unreachable") // TODO(voss): remove
 	}
 
-	var fontName pdf.Name
-	if info.SubsetTag == "" {
-		fontName = pdf.Name(info.PSFont.FontInfo.FontName)
-	} else {
-		fontName = pdf.Name(info.SubsetTag + "+" + info.PSFont.FontInfo.FontName)
+	fontName := info.PSFont.FontInfo.FontName
+	if info.SubsetTag != "" {
+		fontName = info.SubsetTag + "+" + fontName
 	}
 
 	var toUnicodeRef pdf.Reference
@@ -70,7 +77,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": fontName,
+		"BaseFont": pdf.Name(fontName),
 	}
 	if w.GetMeta().Version == pdf.V1_0 {
 		fontDict["Name"] = info.ResName
@@ -112,32 +119,33 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			URy: bbox.URy.AsFloat(q),
 		}
 
-		// TODO(voss): correctly set the symbolic flag
-		symbolic := true
+		// TODO(voss): correctly set the isSymbolic flag?
+		isSymbolic := true
 
-		// See section 9.8.1 of PDF 32000-1:2008.
-		FontDescriptor := pdf.Dict{
-			"Type":        pdf.Name("FontDescriptor"),
-			"FontName":    fontName,
-			"Flags":       pdf.Integer(type1MakeFlags(psFont, symbolic)),
-			"FontBBox":    fontBBox,
-			"ItalicAngle": pdf.Number(psFont.FontInfo.ItalicAngle),
-			"Ascent":      pdf.Integer(math.Round(psFont.Ascent.AsFloat(q))),
-			"Descent":     pdf.Integer(math.Round(psFont.Descent.AsFloat(q))),
-			"StemV":       pdf.Integer(math.Round(psFont.Private.StdVW * q)),
+		fd := &font.Descriptor{
+			FontName:     fontName,
+			IsFixedPitch: psFont.FontInfo.IsFixedPitch,
+			IsSerif:      info.IsSerif,
+			IsScript:     info.IsScript,
+			IsItalic:     psFont.FontInfo.ItalicAngle != 0,
+			IsAllCap:     info.IsAllCap,
+			IsSmallCap:   info.IsSmallCap,
+			ForceBold:    psFont.Private.ForceBold,
+			FontBBox:     fontBBox,
+			ItalicAngle:  psFont.FontInfo.ItalicAngle,
+			Ascent:       math.Round(psFont.Ascent.AsFloat(q)),
+			Descent:      math.Round(psFont.Descent.AsFloat(q)),
+			CapHeight:    math.Round(psFont.CapHeight.AsFloat(q)),
+			StemV:        math.Round(psFont.Private.StdVW * q),
+			MissingWidth: widthsInfo.MissingWidth,
 		}
-		if psFont.CapHeight != 0 {
-			FontDescriptor["CapHeight"] = pdf.Integer(math.Round(psFont.CapHeight.AsFloat(q)))
-		}
-		if widthsInfo.MissingWidth != 0 {
-			FontDescriptor["MissingWidth"] = widthsInfo.MissingWidth
-		}
+		fontDescriptor := fd.AsDict(isSymbolic)
 		if psFont.Outlines != nil {
 			fontFileRef = w.Alloc()
-			FontDescriptor["FontFile"] = fontFileRef
+			fontDescriptor["FontFile"] = fontFileRef
 		}
 		compressedRefs = append(compressedRefs, FontDescriptorRef)
-		compressedObjects = append(compressedObjects, FontDescriptor)
+		compressedObjects = append(compressedObjects, fontDescriptor)
 	}
 
 	err := w.WriteCompressed(compressedRefs, compressedObjects...)
@@ -180,32 +188,62 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	return nil
 }
 
-// type1MakeFlags returns the PDF font flags for the font.
-// See section 9.8.2 of PDF 32000-1:2008.
-//
-// TODO(voss): try to unify with cffMakeFlags.
-func type1MakeFlags(info *type1.Font, symbolic bool) font.Flags {
-	var flags font.Flags
-
-	if info.FontInfo.IsFixedPitch {
-		flags |= font.FlagFixedPitch
+func ExtractEmbedInfo(r pdf.Getter, ref pdf.Reference) (*EmbedInfo, error) {
+	dicts, err := font.ExtractDicts(r, ref)
+	if err != nil {
+		return nil, err
 	}
-	// TODO(voss): flags |= font.FlagSerif
-
-	if symbolic {
-		flags |= font.FlagSymbolic
-	} else {
-		flags |= font.FlagNonsymbolic
+	subType, err := pdf.GetName(r, dicts.FontDict["Subtype"])
+	if err != nil || subType != "Type1" {
+		return nil, errors.New("not a Type 1 font")
 	}
 
-	// flags |= FlagScript
-	if info.FontInfo.ItalicAngle != 0 {
-		flags |= font.FlagItalic
+	res := &EmbedInfo{}
+
+	if dicts.FontProgramKey == "FontFile" {
+		stmObj, err := pdf.GetStream(r, dicts.FontProgram)
+		if err != nil {
+			return nil, err
+		}
+		stm, err := pdf.DecodeStream(r, stmObj, 0)
+		if err != nil {
+			return nil, err
+		}
+		psFont, err := type1.Read(stm)
+		if err != nil {
+			return nil, err
+		}
+		res.PSFont = psFont
 	}
 
-	if info.Private.ForceBold {
-		flags |= font.FlagForceBold
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
 	}
 
-	return flags
+	if res.PSFont != nil {
+		builtinEncoding := res.PSFont.Encoding
+		encoding, err := font.UndescribeEncodingType1(
+			r, dicts.FontDict["Encoding"], builtinEncoding)
+		if err != nil {
+			return nil, err
+		}
+		res.Encoding = encoding
+	}
+
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
+	}
+
+	res.ResName, _ = pdf.GetName(r, dicts.FontDict["Name"])
+
+	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
+	flags := font.Flags(flagsInt)
+	res.IsSerif = flags&font.FlagSerif != 0
+	res.IsScript = flags&font.FlagScript != 0
+	res.IsAllCap = flags&font.FlagAllCap != 0
+	res.IsSmallCap = flags&font.FlagSmallCap != 0
+
+	return res, nil
 }

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp"
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
@@ -127,7 +126,7 @@ func (f *embeddedCIDCFF) Close() error {
 		toUnicode[charcode.CharCode(e.CID)] = e.Text
 	}
 
-	info := PDFInfoCIDCFF{
+	info := EmbedInfoCIDCFF{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		CS:        charcode.UCS2,
@@ -138,7 +137,7 @@ func (f *embeddedCIDCFF) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-type PDFInfoCIDCFF struct {
+type EmbedInfoCIDCFF struct {
 	Font      *sfnt.Font
 	SubsetTag string
 
@@ -152,7 +151,7 @@ type PDFInfoCIDCFF struct {
 	IsSmallCap bool
 }
 
-func (info *PDFInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err
@@ -204,7 +203,7 @@ func (info *PDFInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	var isSymbolic bool // TODO
+	isSymbolic := true
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
@@ -303,7 +302,7 @@ func (info *PDFInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 	return nil
 }
 
-func ExtractCIDInfoCFF(r pdf.Getter, ref pdf.Reference) (*PDFInfoCIDCFF, error) {
+func ExtractEmbedInfoCFF(r pdf.Getter, ref pdf.Reference) (*EmbedInfoCIDCFF, error) {
 	fontDict, err := pdf.GetDict(r, ref)
 	if err != nil {
 		return nil, err
@@ -346,7 +345,7 @@ func ExtractCIDInfoCFF(r pdf.Getter, ref pdf.Reference) (*PDFInfoCIDCFF, error) 
 
 	postScriptName, _ := pdf.GetName(r, cidFontDict["BaseFont"])
 	var subsetTag string
-	if m := subsetTagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
+	if m := subset.TagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
 		subsetTag = m[1]
 	}
 	var ROS *type1.CIDSystemInfo
@@ -406,7 +405,7 @@ func ExtractCIDInfoCFF(r pdf.Getter, ref pdf.Reference) (*PDFInfoCIDCFF, error) 
 	otf.Descent = funit.Int16(math.Round(float64(descent) / q))
 	otf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
 
-	res := &PDFInfoCIDCFF{
+	res := &EmbedInfoCIDCFF{
 		Font:      otf,
 		SubsetTag: subsetTag,
 		CS:        cmap.CS,
@@ -419,5 +418,3 @@ func ExtractCIDInfoCFF(r pdf.Getter, ref pdf.Reference) (*PDFInfoCIDCFF, error) 
 	}
 	return res, nil
 }
-
-var subsetTagRegexp = regexp.MustCompile(`^([A-Z]{6})\+(.*)$`)

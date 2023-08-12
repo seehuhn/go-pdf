@@ -33,10 +33,9 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cid"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -104,6 +103,7 @@ func doit() error {
 		var ffKey pdf.Name
 		switch title {
 		case "Simple PDF Fonts":
+			// part 1
 		case "Type1 Fonts":
 			t1, err := gofont.Type1(gofont.GoRegular)
 			if err != nil {
@@ -128,7 +128,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := simple.Font(otf, language.English)
+			F, err := cff.NewSimple(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -152,6 +152,7 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Multiple Master Fonts":
+			// not supported
 		case "Simple TrueType Fonts":
 			ttf, err := gofont.TrueType(gofont.GoRegular)
 			if err != nil {
@@ -193,12 +194,17 @@ func doit() error {
 				return err
 			}
 		case "Composite PDF Fonts":
+			// part 2
 		case "Composite CFF Fonts":
 			otf, err := gofont.OpenType(gofont.GoRegular)
 			if err != nil {
 				return err
 			}
-			X, err = cid.Embed(doc.Out, otf, "X", language.English)
+			F, err := cff.NewComposite(otf, language.English)
+			if err != nil {
+				return err
+			}
+			X, err = F.Embed(doc.Out, "X")
 			if err != nil {
 				return err
 			}

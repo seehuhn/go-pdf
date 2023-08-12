@@ -140,16 +140,16 @@ func (f *embeddedSimpleCFF) Close() error {
 		}
 		m[charcode.CharCode(code)] = f.text[gid]
 	}
-	info := PDFInfoCFF{
+	info := EmbedInfoCFF{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
 		ToUnicode: m,
 	}
-	return info.WritePDF(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref)
 }
 
-type PDFInfoCFF struct {
+type EmbedInfoCFF struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -168,7 +168,7 @@ type PDFInfoCFF struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
-func (info *PDFInfoCFF) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "embedding of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err

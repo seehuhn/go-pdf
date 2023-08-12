@@ -232,7 +232,7 @@ func (e *embedded) Close() error {
 		for _, e := range encoding {
 			toUnicode[charcode.CharCode(e.CID)] = e.Text
 		}
-		info := &pdfcff.PDFInfoCID{
+		info := &pdfcff.EmbedInfoComposite{
 			Font:       subsetInfo.AsCFF(),
 			SubsetTag:  subsetTag,
 			CS:         charcode.UCS2,

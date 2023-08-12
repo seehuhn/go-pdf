@@ -65,7 +65,7 @@ func TestDescribeEncoding(t *testing.T) {
 				}
 			}
 
-			enc2, err := UndescribeEncoding(nil, desc, builtin)
+			enc2, err := UndescribeEncodingType1(nil, desc, builtin)
 			if err != nil {
 				t.Error(err)
 				continue

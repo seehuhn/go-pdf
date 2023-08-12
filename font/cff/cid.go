@@ -18,22 +18,136 @@ package cff
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"regexp"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
 )
 
-type PDFInfoCID struct {
+type CIDFontCFF struct {
+	info        *sfnt.Font
+	gsubLookups []gtab.LookupIndex
+	gposLookups []gtab.LookupIndex
+	*font.Geometry
+}
+
+func NewComposite(info *sfnt.Font, loc language.Tag) (*CIDFontCFF, error) {
+	if !info.IsCFF() {
+		return nil, errors.New("wrong font type")
+	}
+
+	geometry := &font.Geometry{
+		UnitsPerEm:   info.UnitsPerEm,
+		GlyphExtents: info.Extents(),
+		Widths:       info.Widths(),
+
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+	}
+
+	res := &CIDFontCFF{
+		info:        info,
+		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
+		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		Geometry:    geometry,
+	}
+	return res, nil
+}
+
+func (f *CIDFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
+	if err != nil {
+		return nil, err
+	}
+	res := &embeddedCIDCFF{
+		CIDFontCFF: f,
+		w:          w,
+		Resource:   pdf.Resource{Ref: w.Alloc(), Name: resName},
+		CIDEncoder: cmap.NewCIDEncoder(),
+	}
+	return res, nil
+}
+
+func (f *CIDFontCFF) Layout(s string, ptSize float64) glyph.Seq {
+	rr := []rune(s)
+	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+}
+
+type embeddedCIDCFF struct {
+	*CIDFontCFF
+	w pdf.Putter
+	pdf.Resource
+
+	cmap.CIDEncoder
+	closed bool
+}
+
+func (f *embeddedCIDCFF) Close() error {
+	if f.closed {
+		return nil
+	}
+	f.closed = true
+
+	// subset the font
+	encoding := f.CIDEncoder.Encoding()
+	CIDSystemInfo := f.CIDEncoder.CIDSystemInfo()
+	var ss []subset.Glyph
+	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
+	for _, p := range encoding {
+		ss = append(ss, subset.Glyph{OrigGID: p.GID, CID: p.CID})
+	}
+	subsetInfo, err := subset.CID(f.info, ss, CIDSystemInfo)
+	if err != nil {
+		return fmt.Errorf("font subset: %w", err)
+	}
+	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
+
+	cmap := make(map[charcode.CharCode]type1.CID)
+	for _, s := range ss {
+		cmap[charcode.CharCode(s.CID)] = s.CID
+	}
+
+	toUnicode := make(map[charcode.CharCode][]rune)
+	for _, e := range encoding {
+		toUnicode[charcode.CharCode(e.CID)] = e.Text
+	}
+
+	info := EmbedInfoComposite{
+		Font:       subsetInfo.AsCFF(),
+		SubsetTag:  subsetTag,
+		CS:         charcode.UCS2,
+		ROS:        CIDSystemInfo,
+		CMap:       cmap,
+		ToUnicode:  toUnicode,
+		UnitsPerEm: f.info.UnitsPerEm,
+		Ascent:     f.info.Ascent,
+		Descent:    f.info.Descent,
+		CapHeight:  f.info.CapHeight,
+		IsSerif:    f.info.IsSerif,
+		IsScript:   f.info.IsScript,
+	}
+	return info.Embed(f.w, f.Ref)
+}
+
+type EmbedInfoComposite struct {
 	Font      *cff.Font
 	SubsetTag string
 
@@ -66,7 +180,7 @@ type PDFInfoCID struct {
 // shall then be used to look up the glyph procedure using the CharStrings
 // INDEX table.
 
-func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "CFF CIDFonts", pdf.V1_3)
 	if err != nil {
 		return err
@@ -116,7 +230,7 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	var isSymbolic bool // TODO
+	isSymbolic := true
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
@@ -215,7 +329,7 @@ func (info *PDFInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	return nil
 }
 
-func ExtractCIDInfo(r pdf.Getter, ref pdf.Reference) (*PDFInfoCID, error) {
+func ExtractCIDInfo(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, error) {
 	fontDict, err := pdf.GetDict(r, ref)
 	if err != nil {
 		return nil, err
@@ -317,7 +431,7 @@ func ExtractCIDInfo(r pdf.Getter, ref pdf.Reference) (*PDFInfoCID, error) {
 	unitsPerEm := uint16(math.Round(1 / float64(cffFont.FontMatrix[0])))
 	q := 1000 / float64(unitsPerEm)
 
-	res := &PDFInfoCID{
+	res := &EmbedInfoComposite{
 		Font:      cffFont,
 		SubsetTag: subsetTag,
 		CS:        cmap.CS,

@@ -18,6 +18,7 @@ package subset
 
 import (
 	"errors"
+	"regexp"
 
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
@@ -253,3 +254,5 @@ func pop(todo map[glyph.ID]bool) glyph.ID {
 	}
 	panic("empty map")
 }
+
+var TagRegexp = regexp.MustCompile(`^([A-Z]{6})\+(.*)$`)

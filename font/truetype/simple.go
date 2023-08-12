@@ -19,17 +19,14 @@ package truetype
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cmap"
-	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
@@ -37,13 +34,12 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	pdfcmap "seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
 type SimpleFont struct {
-	info        *sfnt.Font
+	ttf         *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
@@ -67,7 +63,7 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
 	}
 
 	res := &SimpleFont{
-		info:        info,
+		ttf:         info,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
@@ -80,7 +76,7 @@ func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	if err != nil {
 		return nil, err
 	}
-	res := &embeddedSimpleGlyf{
+	res := &embeddedSimple{
 		SimpleFont:    f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
@@ -92,10 +88,10 @@ func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 
 func (f *SimpleFont) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
-	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.ttf.Layout(rr, f.gsubLookups, f.gposLookups)
 }
 
-type embeddedSimpleGlyf struct {
+type embeddedSimple struct {
 	*SimpleFont
 	w pdf.Putter
 	pdf.Resource
@@ -105,12 +101,12 @@ type embeddedSimpleGlyf struct {
 	closed bool
 }
 
-func (f *embeddedSimpleGlyf) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	f.text[gid] = rr
 	return f.SimpleEncoder.AppendEncoded(s, gid, rr)
 }
 
-func (f *embeddedSimpleGlyf) Close() error {
+func (f *embeddedSimple) Close() error {
 	if f.closed {
 		return nil
 	}
@@ -118,7 +114,7 @@ func (f *embeddedSimpleGlyf) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.Name, f.info.PostscriptName())
+			f.Name, f.ttf.PostscriptName())
 	}
 	f.SimpleEncoder = pdfcmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
 
@@ -131,8 +127,8 @@ func (f *embeddedSimpleGlyf) Close() error {
 			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
 		}
 	}
-	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
-	subsetInfo, err := subset.Simple(f.info, ss)
+	subsetTag := subset.Tag(ss, f.ttf.NumGlyphs())
+	ttfSubset, err := subset.Simple(f.ttf, ss)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
@@ -145,24 +141,25 @@ func (f *embeddedSimpleGlyf) Close() error {
 		subsetEncoding[g.CID] = glyph.ID(subsetGid)
 	}
 
-	m := make(map[charcode.CharCode][]rune)
+	toUnicode := make(map[charcode.CharCode][]rune)
 	for code, gid := range encoding {
 		if gid == 0 || len(f.text[gid]) == 0 {
 			continue
 		}
-		m[charcode.CharCode(code)] = f.text[gid]
+		toUnicode[charcode.CharCode(code)] = f.text[gid]
 	}
 
-	info := PDFInfo{
-		Font:      subsetInfo,
+	info := EmbedInfo{
+		Font:      ttfSubset,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
-		ToUnicode: m,
+		ToUnicode: toUnicode,
 	}
-	return info.WritePDF(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref)
 }
 
-type PDFInfo struct {
+// TODO(voss): should this be merged with opentype.PDFInfoGlyf?
+type EmbedInfo struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -179,75 +176,56 @@ type PDFInfo struct {
 	// Character codes must be in the range 0, ..., 255.
 	// TODO(voss): or else?
 	ToUnicode map[charcode.CharCode][]rune
+
+	IsAllCap   bool
+	IsSmallCap bool
+	ForceBold  bool
 }
 
-func (info *PDFInfo) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "embedding of TrueType fonts", pdf.V1_1)
+func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
 		return err
 	}
 
-	trueTypeFont := info.Font
-
-	var fontName pdf.Name
-	postScriptName := trueTypeFont.PostscriptName()
-	if info.SubsetTag == "" {
-		fontName = pdf.Name(postScriptName)
-	} else {
-		fontName = pdf.Name(info.SubsetTag + "+" + postScriptName)
+	ttf := info.Font
+	if !ttf.IsGlyf() {
+		return fmt.Errorf("not a TrueType font")
 	}
 
-	unitsPerEm := trueTypeFont.UnitsPerEm
+	fontName := ttf.PostscriptName()
+	if info.SubsetTag != "" {
+		fontName = info.SubsetTag + "+" + fontName
+	}
+
+	unitsPerEm := ttf.UnitsPerEm
 
 	ww := make([]funit.Int16, 256)
 	for i := range ww {
-		ww[i] = trueTypeFont.GlyphWidth(info.Encoding[i])
+		ww[i] = ttf.GlyphWidth(info.Encoding[i])
 	}
 	widthsInfo := font.CompressWidths(ww, unitsPerEm)
 
-	var isSymbolic bool
 	var encoding pdf.Object
 	var cmapTable cmap.Table
-	toUnicode := info.ToUnicode
-	if glyphNames := info.makeNameEncoding(); glyphNames != nil && w.GetMeta().Version >= pdf.V1_3 {
-		// Mark the font as "nonsymbolic", set "/Encoding", and use a (3, 1)
-		// "cmap" subtable to map unicode values to glyphs.
-		isSymbolic = false
 
-		encoding = font.DescribeEncodingTrueType(glyphNames)
-
-		subtable := cmap.Format4{}
-		for i, name := range glyphNames {
-			if name == ".notdef" {
-				continue
-			}
-			r := names.ToUnicode(name, false)[0]
-			subtable[uint16(r)] = info.Encoding[i]
+	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
+	// character codes to glyphs.
+	isSymbolic := true
+	subtable := cmap.Format4{}
+	for i, gid := range info.Encoding {
+		if gid == 0 || i >= 256 {
+			continue
 		}
-		cmapTable = cmap.Table{
-			{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
-		}
-		// TODO(voss): check whether the toUnicode map still needs to be embedded.
-	} else {
-		// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
-		// character codes to glyphs.
-		isSymbolic = true
-
-		subtable := cmap.Format4{}
-		for i, gid := range info.Encoding {
-			if gid == 0 || i >= 256 {
-				continue
-			}
-			subtable[uint16(i)] = gid
-		}
-		cmapTable = cmap.Table{
-			{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
-		}
+		subtable[uint16(i)] = gid
+	}
+	cmapTable = cmap.Table{
+		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 	cmapData := cmapTable.Encode()
 
 	q := 1000 / float64(unitsPerEm)
-	bbox := trueTypeFont.BBox()
+	bbox := ttf.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -263,7 +241,7 @@ func (info *PDFInfo) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
 	fontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("TrueType"),
-		"BaseFont":       fontName,
+		"BaseFont":       pdf.Name(fontName),
 		"FirstChar":      widthsInfo.FirstChar,
 		"LastChar":       widthsInfo.LastChar,
 		"Widths":         widthsRef,
@@ -273,29 +251,28 @@ func (info *PDFInfo) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
 		fontDict["Encoding"] = encoding
 	}
 	var toUnicodeRef pdf.Reference
-	if toUnicode != nil {
+	if info.ToUnicode != nil {
 		toUnicodeRef = w.Alloc()
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
-
-	// See section 9.8.1 of PDF 32000-1:2008.
-	fontDescriptor := pdf.Dict{
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
-		"Flags":       pdf.Integer(font.MakeFlags(trueTypeFont, isSymbolic)),
-		"FontBBox":    fontBBox,
-		"ItalicAngle": pdf.Number(trueTypeFont.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(trueTypeFont.Ascent.AsFloat(q))),
-		"Descent":     pdf.Integer(math.Round(trueTypeFont.Descent.AsFloat(q))),
-		"StemV":       pdf.Integer(0), // TODO(voss): can we do better?
-		"FontFile2":   fontFileRef,
+	fd := &font.Descriptor{
+		FontName:     fontName,
+		IsFixedPitch: ttf.IsFixedPitch(),
+		IsSerif:      ttf.IsSerif,
+		IsScript:     ttf.IsScript,
+		IsItalic:     ttf.ItalicAngle != 0,
+		IsAllCap:     info.IsAllCap,
+		IsSmallCap:   info.IsSmallCap,
+		ForceBold:    info.ForceBold,
+		FontBBox:     fontBBox,
+		ItalicAngle:  ttf.ItalicAngle,
+		Ascent:       ttf.Ascent.AsFloat(q),
+		Descent:      ttf.Descent.AsFloat(q),
+		CapHeight:    ttf.CapHeight.AsFloat(q),
+		MissingWidth: widthsInfo.MissingWidth,
 	}
-	if trueTypeFont.CapHeight != 0 {
-		fontDescriptor["CapHeight"] = pdf.Integer(math.Round(trueTypeFont.CapHeight.AsFloat(q)))
-	}
-	if widthsInfo.MissingWidth != 0 {
-		fontDescriptor["MissingWidth"] = widthsInfo.MissingWidth
-	}
+	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor["FontFile2"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
 	compressedObjects := []pdf.Object{fontDict, fontDescriptor, widthsInfo.Widths}
@@ -313,7 +290,7 @@ func (info *PDFInfo) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if err != nil {
 		return err
 	}
-	n, err := trueTypeFont.WriteTrueTypePDF(fontFileStream, cmapData)
+	n, err := ttf.WriteTrueTypePDF(fontFileStream, cmapData)
 	if err != nil {
 		return fmt.Errorf("embedding TrueType font %q: %w", fontName, err)
 	}
@@ -327,85 +304,11 @@ func (info *PDFInfo) WritePDF(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, toUnicode)
+		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-func (info *PDFInfo) makeNameEncoding() []string {
-	encoding := make([]string, 256)
-	seen := make(map[string]bool)
-
-	// step 1: mark the .notdef entries
-	for code, gid := range info.Encoding {
-		if gid == 0 {
-			encoding[code] = ".notdef"
-			continue
-		}
-	}
-
-	// step 2: try to determine glyph names from the ToUnicode map
-	if info.ToUnicode != nil {
-		for code, name := range encoding {
-			if name != "" {
-				continue
-			}
-
-			rr := info.ToUnicode[charcode.CharCode(code)]
-			if len(rr) != 1 {
-				continue
-			}
-			r := rr[0]
-
-			name, ok := pdfenc.ToStandardLatin[r]
-			if ok && !seen[name] {
-				encoding[code] = name
-				seen[name] = true
-			}
-		}
-	}
-
-	// step 3: use info.Font.CMap to determine glyph names
-	// TODO(voss): implement this
-
-	// step 4: check whether the font has usable glyph names
-	namesInFont := info.Font.Outlines.(*glyf.Outlines).Names
-	if len(namesInFont) > 0 {
-		for code, gid := range info.Encoding {
-			if encoding[code] != "" || int(gid) >= len(namesInFont) {
-				continue
-			}
-			name := namesInFont[gid]
-
-			// If possible, use the name as is, ...
-			if pdfenc.IsStandardLatin[name] && !seen[name] {
-				encoding[code] = name
-				seen[name] = true
-				continue
-			}
-
-			// ... otherwise try to normalize the name.
-			rr := names.ToUnicode(name, false)
-			if len(rr) != 1 {
-				continue
-			}
-			name = names.FromUnicode(rr[0])
-			if pdfenc.IsStandardLatin[name] && !seen[name] {
-				encoding[code] = name
-				seen[name] = true
-				continue
-			}
-		}
-	}
-
-	for _, name := range encoding {
-		if name == "" {
-			return nil
-		}
-	}
-	return encoding
 }
