@@ -129,11 +129,11 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Simple CFF-based OpenType Fonts":
-			ttf, err := gofont.OpenType(gofont.GoRegular)
+			otf, err := gofont.OpenType(gofont.GoRegular)
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewSimpleCFF(ttf, language.English)
+			X, err = opentype.NewSimpleCFF(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -156,9 +156,6 @@ func doit() error {
 				return err
 			}
 			X, err = opentype.NewSimpleGlyf(otf, language.English)
-			if err != nil {
-				return err
-			}
 			if err != nil {
 				return err
 			}

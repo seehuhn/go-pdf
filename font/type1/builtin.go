@@ -17,7 +17,11 @@
 package type1
 
 import (
+	"embed"
 	"sync"
+
+	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -64,6 +68,7 @@ var All = []Builtin{
 	ZapfDingbats,
 }
 
+// Embed implements the [font.Font] interface.
 func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	info, err := getBuiltin(f)
 	if err != nil {
@@ -85,11 +90,13 @@ func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	return res, nil
 }
 
+// GetGeometry implements the [font.Font] interface.
 func (f Builtin) GetGeometry() *font.Geometry {
 	info, _ := getBuiltin(f)
 	return info.GetGeometry()
 }
 
+// Layout implements the [font.Font] interface.
 func (f Builtin) Layout(s string, ptSize float64) glyph.Seq {
 	info, _ := getBuiltin(f)
 	return info.Layout(s, ptSize)
@@ -115,6 +122,44 @@ func getBuiltin(f Builtin) (*Font, error) {
 	fontCache[f] = res
 	return res, nil
 }
+
+// Afm returns the font metrics for one of the built-in pdf fonts.
+func (f Builtin) Afm() (*type1.Font, error) {
+	fd, err := afmData.Open("builtin/" + string(f) + ".afm")
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	res, err := afm.Read(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func IsBuiltin(f *type1.Font) bool {
+	b, err := Builtin(f.FontInfo.FontName).Afm()
+	if err != nil || b.UnitsPerEm != f.UnitsPerEm {
+		return false
+	}
+
+	for name, fi := range f.GlyphInfo {
+		bi, ok := b.GlyphInfo[name]
+		if !ok {
+			return false
+		}
+		if fi.WidthX != bi.WidthX {
+			return false
+		}
+	}
+
+	return true
+}
+
+//go:embed builtin/*.afm
+var afmData embed.FS
 
 var (
 	fontCache     = make(map[Builtin]*Font)

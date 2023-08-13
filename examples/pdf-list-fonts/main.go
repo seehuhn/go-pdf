@@ -199,7 +199,7 @@ func doit(fname string) error {
 			panic("unknown font type")
 		}
 
-		fmt.Printf("%10s %s %-12s %-20s %s\n", fontRef, tp, desc, encoding, fontName)
+		fmt.Printf("%-10s %s %-14s %-20s %s\n", fontRef, tp, desc, encoding, fontName)
 	}
 	fmt.Println()
 

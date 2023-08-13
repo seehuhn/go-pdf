@@ -43,11 +43,14 @@ func Type3(font FontID) (*type3.Font, error) {
 	res.IsScript = info.IsScript
 	res.IsItalic = info.IsItalic
 
-	// convert glypf outlines to type1 outlines
+	// convert glypf outlines to type 3 outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)
 	for i, origGlyph := range origOutlines.Glyphs {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
+		if name == ".notdef" {
+			continue
+		}
 
 		var bbox funit.Rect16
 		if origGlyph != nil {

@@ -7,7 +7,7 @@ Simple fonts always use a single byte per character in the PDF content stream.
 Thus, only 256 distinct glyphs can be used, even if the font contains more
 glyphs.
 
-## Type1 Fonts
+## Type 1 Fonts
 
 These fonts use `Type1` as the `Subtype` in the font dictionary.
 Font data is embedded via the `FontFile` entry in the font descriptor.
@@ -35,8 +35,8 @@ and the `Subtype` entry in the font file stream dictionary is `Type1C`.
 
 The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font must not
 contain a `ROS` operator.  Usually, `Encoding` is omitted from the font
-dictionary, and the mapping from character codes to glyph names is described by
-the "builtin encoding" of the CFF font.
+dictionary, and the mapping from character codes to glyphs is described by the
+"builtin encoding" of the CFF font.
 
 ## Simple CFF-based OpenType Fonts (PDF 1.6)
 
@@ -46,8 +46,8 @@ and the `Subtype` entry in the font file stream dictionary is `OpenType`.
 
 The CFF data embedded in the OpenType font is not allowed to be CID-keyed,
 *i.e.* the CFF font must not contain a `ROS` operator.  Usually, `Encoding` is
-omitted from the font dictionary, and the mapping from character codes to glyph
-names is described by the "builtin encoding" of the OpenType font.
+omitted from the font dictionary, and the mapping from character codes to
+glyphs is described by the "builtin encoding" of the OpenType font.
 
 There seems little reason to use this font type, since the CFF font data
 can be embedded directly without the OpenType wrapper.
@@ -66,9 +66,8 @@ These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile2` entry in the font descriptor.
 Only a subset of the TrueType tables is required for embedded fonts.
 
-The encoding used in PDF content streams is described by a combination of
-the `Encoding` entry in the font dictionary, the `cmap` table in the TrueType,
-and the symbolic/nonsymbolic flags in the font descriptor.
+Usually, `Encoding` is omitted from the font dictionary, and the mapping from
+character codes to glyphs is described by a `cmap` table in the TrueType font.
 
 ## Glyf-based OpenType Fonts (PDF 1.6)
 
@@ -84,7 +83,7 @@ There seems little reason to use this font type, since the font data
 could equally be embedded as a TrueType font.  Glyf-based OpenType fonts
 seem not to be supported by the MacOS Preview application.
 
-## Type3 Fonts
+## Type 3 Fonts
 
 These fonts use `Type3` as the `Subtype` in the font dictionary.
 The font data is embedded via the `CharProcs` entry in the font dictionary.

@@ -42,19 +42,6 @@ type embedded struct {
 	closed bool
 }
 
-func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	e := &embedded{
-		Font: f,
-		w:    w,
-		Resource: pdf.Resource{
-			Ref:  w.Alloc(),
-			Name: resName,
-		},
-		SimpleEncoder: cmap.NewSimpleEncoder(),
-	}
-	return e, nil
-}
-
 func (e *embedded) Close() error {
 	if e.closed {
 		return nil
@@ -311,7 +298,6 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		t1.Descent = funit.Int16(math.Round(float64(descent) / q))
 		capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
 		t1.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
-
 		xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"]) // optional
 		t1.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
 

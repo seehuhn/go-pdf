@@ -1,0 +1,177 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package debug
+
+import (
+	"golang.org/x/text/language"
+
+	pstype1 "seehuhn.de/go/postscript/type1"
+
+	scff "seehuhn.de/go/sfnt/cff"
+
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/type1"
+)
+
+type FontSample struct {
+	Desc string
+	Font font.Font
+}
+
+func MakeSimpleFonts() ([]FontSample, error) {
+	var res []FontSample
+	var F font.Font
+
+	// a Type 1 font
+	t1, err := gofont.Type1(gofont.GoRegular)
+	if err != nil {
+		return nil, err
+	}
+	F, err = type1.New(t1)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"Type 1", F})
+
+	// a built-in font
+	res = append(res, FontSample{"builtin", type1.Helvetica})
+
+	// a CFF font, embedded directly ...
+	otf, err := gofont.OpenType(gofont.GoRegular)
+	if err != nil {
+		return nil, err
+	}
+	F, err = cff.NewSimple(otf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"CFF", F})
+
+	// ... or with the OpenType wrapper
+	F, err = opentype.NewSimpleCFF(otf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"OpenType (CFF)", F})
+
+	// a TrueType font, embedded directly ...
+	ttf, err := gofont.TrueType(gofont.GoRegular)
+	if err != nil {
+		return nil, err
+	}
+	F, err = truetype.NewSimple(ttf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"TrueType", F})
+
+	// ... or using an OpenType wrapper
+	F, err = opentype.NewSimpleGlyf(ttf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"OpenType (glyf)", F})
+
+	// a Type 3 font
+	F, err = gofont.Type3(gofont.GoRegular)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"Type 3", F})
+
+	return res, nil
+}
+
+func MakeCompositeFonts() ([]FontSample, error) {
+	var res []FontSample
+	var F font.Font
+
+	// a CFF font without CIDFont operators, embedded directly ...
+	otf, err := gofont.OpenType(gofont.GoRegular)
+	if err != nil {
+		return nil, err
+	}
+	outlines := otf.Outlines.(*scff.Outlines)
+	if len(outlines.Encoding) != 256 || outlines.ROS != nil || len(outlines.Gid2Cid) != 0 {
+		panic("CFF font unexpectedly has CIDFont operators")
+	}
+	F, err = cff.NewComposite(otf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"CFF (no CIDFont operators)", F})
+
+	// ... or with the OpenType wrapper
+	F, err = opentype.NewCompositeCFF(otf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"OpenType (CFF, no CIDFont operators)", F})
+
+	// a CFF font with CIDFont operators, embedded directly ...
+	otf, err = gofont.OpenType(gofont.GoRegular) // allocate a new copy
+	if err != nil {
+		return nil, err
+	}
+	outlines = otf.Outlines.(*scff.Outlines) // convert to use CIDFont operators
+	outlines.Encoding = nil
+	outlines.ROS = &pstype1.CIDSystemInfo{
+		Registry:   "Seehuhn",
+		Ordering:   "Sonderbar",
+		Supplement: 0,
+	}
+	outlines.Gid2Cid = make([]pstype1.CID, len(outlines.Glyphs))
+	for i := range outlines.Gid2Cid {
+		outlines.Gid2Cid[i] = pstype1.CID(i)
+	}
+	F, err = cff.NewComposite(otf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"CFF (with CIDFont operators)", F})
+
+	// ... or with the OpenType wrapper
+	F, err = opentype.NewCompositeCFF(otf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"OpenType (CFF, with CIDFont operators)", F})
+
+	// a TrueType font, embedded directly ...
+	ttf, err := gofont.TrueType(gofont.GoRegular)
+	if err != nil {
+		return nil, err
+	}
+	F, err = truetype.NewComposite(ttf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"TrueType", F})
+
+	// ... or using an OpenType wrapper
+	F, err = opentype.NewCompositeGlyf(ttf, language.English)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, FontSample{"OpenType (glyf)", F})
+
+	return res, nil
+}

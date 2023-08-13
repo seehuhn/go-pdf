@@ -17,54 +17,43 @@
 package type1
 
 import (
+	"os"
 	"testing"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
-func TestSimple(t *testing.T) {
-	paper := &pdf.Rectangle{URx: 10 + 16*20, URy: 5 + 16*20 + 5}
-	doc, err := document.CreateSinglePage("test-builtin-simple.pdf", paper, nil)
+func TestBuiltin(t *testing.T) {
+	known, err := afmData.ReadDir("builtin")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	F, err := TimesRoman.Embed(doc.Out, "F")
-	if err != nil {
-		t.Fatal(err)
+	if len(known) != len(All) {
+		t.Error("wrong number of afm files:", len(known))
 	}
 
-	geom := F.GetGeometry()
-	for i := 0; i < 256; i++ {
-		row := i / 16
-		col := i % 16
-		gid := glyph.ID(i + 2)
-
-		w := geom.Widths[gid]
-		gg := []glyph.Info{
-			{
-				Gid:     gid,
-				Advance: w,
-			},
+	for _, fontName := range All {
+		afm, err := fontName.Afm()
+		if err != nil {
+			t.Error(err)
+			continue
 		}
 
-		doc.TextStart()
-		doc.TextSetFont(F, 16)
-		doc.TextFirstLine(float64(5+20*col+10), float64(16*20-10-20*row))
-		doc.TextShowGlyphsAligned(gg, 0, 0.5)
-		doc.TextEnd()
-	}
-
-	err = doc.Close()
-	if err != nil {
-		t.Fatal(err)
+		if afm.FontInfo.FontName != string(fontName) {
+			t.Errorf("wrong font name: %q != %q", afm.FontInfo.FontName, fontName)
+		}
 	}
 }
 
-func TestSpace(t *testing.T) {
+func TestUnknownBuiltin(t *testing.T) {
+	F := Builtin("unknown font")
+	_, err := F.Afm()
+	if !os.IsNotExist(err) {
+		t.Errorf("wrong error: %s", err)
+	}
+}
+
+func TestBuiltinSpace(t *testing.T) {
 	for _, F := range All {
 		gid, width := font.GetGID(F, ' ')
 		if gid == 0 || width == 0 {
@@ -72,3 +61,5 @@ func TestSpace(t *testing.T) {
 		}
 	}
 }
+
+var _ font.Font = TimesRoman

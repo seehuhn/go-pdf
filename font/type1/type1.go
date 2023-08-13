@@ -17,6 +17,7 @@
 package type1
 
 import (
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
@@ -24,6 +25,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 type Font struct {
@@ -101,6 +103,19 @@ func New(psFont *type1.Font) (*Font, error) {
 		kern:     kern,
 	}
 	return res, nil
+}
+
+func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	e := &embedded{
+		Font: f,
+		w:    w,
+		Resource: pdf.Resource{
+			Ref:  w.Alloc(),
+			Name: resName,
+		},
+		SimpleEncoder: cmap.NewSimpleEncoder(),
+	}
+	return e, nil
 }
 
 func (f *Font) Layout(s string, ptSize float64) glyph.Seq {

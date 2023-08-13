@@ -1,0 +1,141 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"seehuhn.de/go/sfnt/glyph"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/internal/debug"
+)
+
+func main() {
+	err := run()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	doc, err := document.CreateMultiPage("test.pdf", nil, nil)
+	if err != nil {
+		return err
+	}
+
+	H, err := type1.Helvetica.Embed(doc.Out, "H")
+	if err != nil {
+		return err
+	}
+
+	simpleFonts, err := debug.MakeSimpleFonts()
+	if err != nil {
+		return err
+	}
+	for _, s := range simpleFonts {
+		page := doc.AddPage()
+
+		F, err := s.Font.Embed(page.Out, "F")
+		if err != nil {
+			return err
+		}
+
+		drawPage(H, 16, page, F, fmt.Sprintf("simple font: %s", s.Desc))
+
+		err = F.Close()
+		if err != nil {
+			return err
+		}
+
+		err = page.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	compositeFonts, err := debug.MakeCompositeFonts()
+	if err != nil {
+		return err
+	}
+	for _, s := range compositeFonts {
+		page := doc.AddPage()
+
+		F, err := s.Font.Embed(page.Out, "F")
+		if err != nil {
+			return err
+		}
+
+		drawPage(H, 32, page, F, fmt.Sprintf("composite font: %s", s.Desc))
+
+		err = F.Close()
+		if err != nil {
+			return err
+		}
+
+		err = page.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return doc.Close()
+}
+
+func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Embedded, desc string) {
+	paper := &pdf.Rectangle{URx: 10 + 16*20, URy: 5 + float64(nRow)*20 + 15}
+	page.SetPageSize(paper)
+
+	page.PushGraphicsState()
+	page.TextSetFont(F, 16)
+	geom := F.GetGeometry()
+	gid := glyph.ID(1)
+	for i := 0; i < 16*nRow; i++ {
+		row := i / 16
+		col := i % 16
+
+		for geom.GlyphExtents[gid].IsZero() {
+			gid++
+		}
+		w := geom.Widths[gid]
+		gg := []glyph.Info{
+			{
+				Gid:     gid,
+				Advance: w,
+			},
+		}
+		gid++
+
+		page.TextStart()
+		page.TextFirstLine(float64(5+20*col+10), float64(20*nRow-10-20*row))
+		page.TextShowGlyphsAligned(gg, 0, 0.5)
+		page.TextEnd()
+	}
+	page.PopGraphicsState()
+
+	page.TextSetFont(H, 8)
+	page.SetFillColor(color.Gray(0.5))
+	page.TextStart()
+	page.TextFirstLine(5, paper.URy-10)
+	page.TextShow(desc)
+	page.TextEnd()
+}

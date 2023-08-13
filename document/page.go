@@ -34,6 +34,15 @@ type Page struct {
 	closeFn func(p *Page) error
 }
 
+func (p *Page) SetPageSize(paper *pdf.Rectangle) {
+	p.PageDict["MediaBox"] = paper
+}
+
+func (p *Page) GetPageSize() *pdf.Rectangle {
+	paper, _ := p.PageDict["MediaBox"].(*pdf.Rectangle)
+	return paper
+}
+
 func (p *Page) Close() error {
 	if p.Page.Err != nil {
 		return p.Page.Err
