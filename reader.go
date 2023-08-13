@@ -118,7 +118,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 
 	xref, trailer, err := r.readXRef()
 	if err != nil {
-		return nil, wrap(err, "xref")
+		return nil, Wrap(err, "xref")
 	}
 	r.xref = xref // Now we can install the real xref table.
 
@@ -147,7 +147,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
-			return nil, wrap(err, "encryption dictionary")
+			return nil, Wrap(err, "encryption dictionary")
 		}
 	} else if r.meta.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
@@ -170,7 +170,7 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 
 	catalogDict, err := GetDict(r, trailer["Root"])
 	if err != nil {
-		err = wrap(err, "document catalog")
+		err = Wrap(err, "document catalog")
 		if shouldExit(err) {
 			return nil, err
 		}
@@ -276,7 +276,7 @@ func (r *Reader) GetMeta() *MetaInfo {
 func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
 	defer func() {
 		if err != nil {
-			err = wrap(err, "object "+ref.String())
+			err = Wrap(err, "object "+ref.String())
 		}
 	}()
 
@@ -332,7 +332,7 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 
 	contents, err := r.objStmScanner(objectStream)
 	if err != nil {
-		return nil, wrap(err, "object stream "+sRef.String())
+		return nil, Wrap(err, "object stream "+sRef.String())
 	}
 
 	m := -1
@@ -426,7 +426,7 @@ type stmObj struct {
 func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 	defer func() {
 		if err != nil {
-			err = wrap(err, "decoding ObjStm")
+			err = Wrap(err, "decoding ObjStm")
 		}
 	}()
 

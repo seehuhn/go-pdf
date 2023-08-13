@@ -67,7 +67,7 @@ func (err *MalformedFileError) Unwrap() error {
 	return err.Err
 }
 
-func wrap(err error, loc string) error {
+func Wrap(err error, loc string) error {
 	if err == nil {
 		return nil
 	}

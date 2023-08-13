@@ -17,8 +17,11 @@
 package cff
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"math"
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
@@ -300,4 +303,98 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	}
 
 	return nil
+}
+
+func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
+	subType, err := pdf.GetName(r, dicts.FontDict["Subtype"])
+	if err != nil || subType != "Type1" {
+		return nil, errors.New("not a Type 1 font")
+	}
+
+	res := &EmbedInfoSimple{}
+
+	if dicts.FontProgramKey == "FontFile3" {
+		stmObj, err := pdf.GetStream(r, dicts.FontProgram)
+		if err != nil {
+			return nil, pdf.Wrap(err, "opening CFF font stream")
+		}
+		stm, err := pdf.DecodeStream(r, stmObj, 0)
+		if err != nil {
+			return nil, pdf.Wrap(err, "uncompressing CFF font stream")
+		}
+		data, err := io.ReadAll(stm)
+		if err != nil {
+			return nil, pdf.Wrap(err, "reading CFF font stream")
+		}
+		cff, err := cff.Read(bytes.NewReader(data))
+		if err != nil {
+			return nil, pdf.Wrap(err, "decoding CFF font")
+		}
+
+		res.Font = cff
+	}
+
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
+	}
+
+	var unitsPerEm uint16 = 1000
+	if res.Font != nil {
+		cff := res.Font
+		builtin := make([]string, 256)
+		for i := 0; i < 256; i++ {
+			builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
+		}
+		nameEncoding, err := font.UndescribeEncodingType1(
+			r, dicts.FontDict["Encoding"], builtin)
+		if err != nil {
+			return nil, pdf.Wrap(err, "font encoding")
+		}
+
+		rev := make(map[string]glyph.ID)
+		for i, g := range cff.Glyphs {
+			rev[g.Name] = glyph.ID(i)
+		}
+
+		encoding := make([]glyph.ID, 256)
+		for i, name := range nameEncoding {
+			encoding[i] = rev[name]
+		}
+		res.Encoding = encoding
+
+		if cff.FontMatrix[0] != 0 {
+			unitsPerEm = uint16(math.Round(1 / cff.FontMatrix[0]))
+		}
+	}
+
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
+	}
+
+	res.UnitsPerEm = unitsPerEm
+
+	q := 1000 / float64(unitsPerEm)
+	ascent, err := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
+	if err == nil {
+		res.Ascent = funit.Int16(math.Round(float64(ascent) / q))
+	}
+	descent, err := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
+	if err == nil {
+		res.Descent = funit.Int16(math.Round(float64(descent) / q))
+	}
+	capHeight, err := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+	if err == nil {
+		res.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+	}
+
+	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
+	flags := font.Flags(flagsInt)
+	res.IsSerif = flags&font.FlagSerif != 0
+	res.IsScript = flags&font.FlagScript != 0
+	res.IsAllCap = flags&font.FlagAllCap != 0
+	res.IsSmallCap = flags&font.FlagSmallCap != 0
+
+	return res, nil
 }

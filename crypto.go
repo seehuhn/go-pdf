@@ -107,14 +107,14 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		if obj, ok := enc["StmF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, wrap(err, "StmF")
+				return nil, Wrap(err, "StmF")
 			}
 			res.stmF = cf
 		}
 		if obj, ok := enc["StrF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, wrap(err, "StrF")
+				return nil, Wrap(err, "StrF")
 			}
 			res.strF = cf
 		}
@@ -122,7 +122,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		if obj, ok := enc["EFF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, wrap(err, "EFF")
+				return nil, Wrap(err, "EFF")
 			}
 			res.efF = cf
 		}
@@ -142,7 +142,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 	case filter == "Standard":
 		sec, err := openStdSecHandler(enc, keyBytes, r.meta.ID[0], readPwd)
 		if err != nil {
-			return nil, wrap(err, "standard security handler")
+			return nil, Wrap(err, "standard security handler")
 		}
 		res.sec = sec
 		res.UserPermissions = stdSecPToPerm(sec.R, sec.P)

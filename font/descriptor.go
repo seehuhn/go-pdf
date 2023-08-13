@@ -25,27 +25,29 @@ import (
 //
 // See section 9.8.1 of PDF 32000-1:2008.
 type Descriptor struct {
-	FontName     string
-	FontFamily   string
-	FontStretch  os2.Width
-	FontWeight   os2.Weight
-	IsFixedPitch bool
-	IsSerif      bool
-	IsScript     bool
-	IsItalic     bool
-	IsAllCap     bool
-	IsSmallCap   bool
-	ForceBold    bool
-	FontBBox     *pdf.Rectangle
-	ItalicAngle  float64
-	Ascent       float64
-	Descent      float64
-	Leading      float64
-	CapHeight    float64
-	XHeight      float64
-	StemV        float64 // set to -1 for Type 3 fonts
-	StemH        float64
-	MissingWidth pdf.Number
+	FontName     string         // required
+	FontFamily   string         // optional
+	FontStretch  os2.Width      // optional
+	FontWeight   os2.Weight     // optional
+	IsFixedPitch bool           // required
+	IsSerif      bool           // required
+	IsScript     bool           // required
+	IsItalic     bool           // required
+	IsAllCap     bool           // required
+	IsSmallCap   bool           // required
+	ForceBold    bool           // required
+	FontBBox     *pdf.Rectangle // required, except for Type 3 fonts
+	ItalicAngle  float64        // required
+	Ascent       float64        // required, except for Type 3 fonts
+	Descent      float64        // required, except for Type 3 fonts
+	Leading      float64        // optional (default: 0)
+	CapHeight    float64        // required, except if no latin chars and for Type 3 fonts
+	XHeight      float64        // optional (default: 0)
+	StemV        float64        // required, except for Type 3 fonts (set to -1 for Type 3 fonts)
+	StemH        float64        // optional (default: 0)
+	MaxWidth     float64        // optional (default: 0)
+	AvgWidth     float64        // optional (default: 0)
+	MissingWidth pdf.Number     // optional (default: 0)
 }
 
 func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
@@ -135,6 +137,12 @@ func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
 	}
 	if d.StemH != 0 {
 		dict["StemH"] = pdf.Number(d.StemH)
+	}
+	if d.MaxWidth != 0 {
+		dict["MaxWidth"] = pdf.Number(d.MaxWidth)
+	}
+	if d.AvgWidth != 0 {
+		dict["AvgWidth"] = pdf.Number(d.AvgWidth)
 	}
 	if d.MissingWidth != 0 {
 		dict["MissingWidth"] = pdf.Number(d.MissingWidth)

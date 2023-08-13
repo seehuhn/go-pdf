@@ -39,7 +39,7 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 
 	xRefPos, err := s.ReadInteger()
 	if err != nil {
-		return 0, wrap(err, fmt.Sprintf("byte %d", pos+9))
+		return 0, Wrap(err, fmt.Sprintf("byte %d", pos+9))
 	}
 
 	if xRefPos <= 0 || int64(xRefPos) >= size {
@@ -89,7 +89,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		case bytes.Equal(buf, []byte("xref")):
 			dict, err = readXRefTable(xref, s)
 			if err != nil {
-				return nil, nil, wrap(err, fmt.Sprintf("table at byte %d", start))
+				return nil, nil, Wrap(err, fmt.Sprintf("table at byte %d", start))
 			}
 
 			if xRefStm, ok := dict["XRefStm"]; ok {
@@ -105,13 +105,13 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 				}
 				_, ref, err = r.readXRefStream(xref, s)
 				if err != nil {
-					return nil, nil, wrap(err, "XRefStm")
+					return nil, nil, Wrap(err, "XRefStm")
 				}
 			}
 		default:
 			dict, ref, err = r.readXRefStream(xref, s)
 			if err != nil {
-				return nil, nil, wrap(err, fmt.Sprintf("stream at byte %d", start))
+				return nil, nil, Wrap(err, fmt.Sprintf("stream at byte %d", start))
 			}
 		}
 		if ref != 0 {
@@ -166,11 +166,11 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 
 		start, err := s.ReadInteger()
 		if err != nil {
-			return nil, wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			return nil, Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 		length, err := s.ReadInteger()
 		if err != nil {
-			return nil, wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			return nil, Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 
 		if start < 0 || length <= 0 || start > math.MaxUint32 || start+length > math.MaxUint32 {

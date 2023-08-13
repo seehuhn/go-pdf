@@ -500,7 +500,7 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 				Err: errors.New("unexpected EOF while reading Dict"),
 			}
 		} else if err != nil {
-			err = wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			err = Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 	}()
 
@@ -598,13 +598,13 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 				Err: errors.New("unexpected EOF while reading Stream"),
 			}
 		} else if err != nil {
-			err = wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			err = Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 	}()
 
 	length, err := s.getInt(dict["Length"])
 	if err != nil {
-		return nil, wrap(err, "reading Length")
+		return nil, Wrap(err, "reading Length")
 	} else if length < 0 {
 		return nil, &MalformedFileError{
 			Err: errors.New("stream with negative length"),

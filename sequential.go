@@ -159,7 +159,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
-			return nil, wrap(err, "encryption dictionary")
+			return nil, Wrap(err, "encryption dictionary")
 		}
 		// TODO(voss): extract the permission bits
 	}

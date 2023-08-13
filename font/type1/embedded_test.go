@@ -17,10 +17,12 @@
 package type1
 
 import (
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
 )
@@ -43,7 +45,7 @@ func TestRoundTrip(t *testing.T) {
 		66: {'B'},
 	}
 
-	info := &EmbedInfo{
+	info1 := &EmbedInfo{
 		PSFont:    t1,
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -52,17 +54,40 @@ func TestRoundTrip(t *testing.T) {
 
 	rw := pdf.NewData(pdf.V1_7)
 	ref := rw.Alloc()
-	err = info.Embed(rw, ref)
+	err = info1.Embed(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info2, err := ExtractEmbedInfo(rw, ref)
+	dicts, err := font.ExtractDicts(rw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info2, err := Extract(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if d := cmp.Diff(info, info2); d != "" {
+	// Compare encodings:
+	if len(info1.Encoding) != len(info2.Encoding) {
+		t.Fatalf("len(info1.Encoding) != len(info2.Encoding): %d != %d", len(info1.Encoding), len(info2.Encoding))
+	}
+	for i := range info1.Encoding {
+		if info1.Encoding[i] != ".notdef" && info1.Encoding[i] != info2.Encoding[i] {
+			t.Fatalf("info1.Encoding[%d] != info2.Encoding[%d]: %q != %q", i, i, info1.Encoding[i], info2.Encoding[i])
+		}
+	}
+
+	for _, info := range []*EmbedInfo{info1, info2} {
+		info.Encoding = nil         // already compared above
+		info.PSFont.XHeight = 0     // optional entry in FontDescriptor
+		info.PSFont.GlyphInfo = nil // the bounding boxes sometimes differ
+	}
+
+	cmpFloat := cmp.Comparer(func(x, y float64) bool {
+		return math.Abs(x-y) < 1/65536.
+	})
+	if d := cmp.Diff(info1, info2, cmpFloat); d != "" {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }

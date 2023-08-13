@@ -47,9 +47,10 @@ func main() {
 	}
 }
 
+const exampleText = `“Hello World!”`
+
 func doit() error {
 	paper := document.A4
-	example := `“Hello World!”`
 
 	sections, err := parseNotes("NOTES.md")
 	if err != nil {
@@ -95,11 +96,12 @@ func doit() error {
 	l.addFont("section", SB, 18)
 
 	pageNo := 1
+	fontNo := 1
 	for _, s := range sections {
 		title := s.title
 		intro := s.lines
 
-		var X font.Embedded
+		var X font.Font
 		var ffKey pdf.Name
 		switch title {
 		case "Simple PDF Fonts":
@@ -109,30 +111,19 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := type1.New(t1)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = type1.New(t1)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile"
 		case "Builtin Fonts":
-			X, err = type1.Helvetica.Embed(doc.Out, "F")
-			if err != nil {
-				return err
-			}
+			X = type1.Helvetica
 		case "Simple CFF Fonts":
 			otf, err := gofont.OpenType(gofont.GoRegular)
 			if err != nil {
 				return err
 			}
-			F, err := cff.NewSimple(otf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = cff.NewSimple(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -142,11 +133,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := opentype.NewSimpleCFF(ttf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = opentype.NewSimpleCFF(ttf, language.English)
 			if err != nil {
 				return err
 			}
@@ -158,11 +145,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := truetype.NewSimple(ttf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = truetype.NewSimple(ttf, language.English)
 			if err != nil {
 				return err
 			}
@@ -172,11 +155,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := opentype.NewSimpleGlyf(otf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = opentype.NewSimpleGlyf(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -185,11 +164,7 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Type3 Fonts":
-			t3, err := gofont.Type3(gofont.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = t3.Embed(doc.Out, "X")
+			X, err = gofont.Type3(gofont.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -200,11 +175,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := cff.NewComposite(otf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = cff.NewComposite(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -214,11 +185,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := opentype.NewCompositeCFF(otf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = opentype.NewCompositeCFF(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -228,11 +195,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := truetype.NewComposite(ttf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = truetype.NewComposite(ttf, language.English)
 			if err != nil {
 				return err
 			}
@@ -242,11 +205,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			F, err := opentype.NewCompositeGlyf(otf, language.English)
-			if err != nil {
-				return err
-			}
-			X, err = F.Embed(doc.Out, "X")
+			X, err = opentype.NewCompositeGlyf(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -280,7 +239,7 @@ func doit() error {
 
 		page.TextStart()
 		if X != nil {
-			intro = append(intro, "", "Example:")
+			intro = append(intro, "", fmt.Sprintf("Example (see `fonts%02d.pdf`):", fontNo))
 		}
 		for i, line := range intro {
 			switch i {
@@ -319,24 +278,37 @@ func doit() error {
 		l.yPos -= -l.F["text"].descent
 
 		if X != nil {
+			err = writeSinglePage(X, fontNo)
+			if err != nil {
+				return err
+			}
+			fontNo++
+		}
+
+		if X != nil {
+			Y, err := X.Embed(doc.Out, "X")
+			if err != nil {
+				return err
+			}
+
 			l.yPos -= 20
 			page.TextStart()
 			page.TextFirstLine(l.leftMargin, l.yPos)
-			page.TextSetFont(X, 24)
-			page.TextShow(example)
+			page.TextSetFont(Y, 24)
+			page.TextShow(exampleText)
 			page.TextEnd()
 			l.yPos -= 30
 
-			err = X.Close()
+			err = Y.Close()
 			if err != nil {
 				return err
 			}
 
-			fontDict, err := pdf.GetDict(data, X.Reference())
+			fontDict, err := pdf.GetDict(data, Y.Reference())
 			if err != nil {
 				return err
 			}
-			yFD := l.ShowDict(page, fontDict, "Font Dictionary", X.Reference())
+			yFD := l.ShowDict(page, fontDict, "Font Dictionary", Y.Reference())
 			fd := fontDict["FontDescriptor"]
 			y0FontDesc := yFD["FontDescriptor"]
 
@@ -422,6 +394,33 @@ func doit() error {
 	}
 
 	return nil
+}
+
+func writeSinglePage(F font.Font, no int) error {
+	fname := fmt.Sprintf("fonts%02d.pdf", no)
+
+	page, err := document.CreateSinglePage(fname, document.A5r, nil)
+	if err != nil {
+		return err
+	}
+
+	X, err := F.Embed(page.Out, "X")
+	if err != nil {
+		return err
+	}
+
+	page.TextStart()
+	page.TextFirstLine(72, 72)
+	page.TextSetFont(X, 24)
+	page.TextShow(exampleText)
+	page.TextEnd()
+
+	err = X.Close()
+	if err != nil {
+		return err
+	}
+
+	return page.Close()
 }
 
 type section struct {
