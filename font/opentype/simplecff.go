@@ -263,7 +263,7 @@ func (info *EmbedInfoCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	compressedObjects := []pdf.Object{fontDict, fontDescriptor, widthsInfo.Widths}
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return err
+		return pdf.Wrap(err, "simple OpenType/CFF font dicts")
 	}
 
 	// See section 9.9 of PDF 32000-1:2008 for details.

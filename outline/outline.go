@@ -257,7 +257,7 @@ func (ww *writer) flush() error {
 	}
 	err := ww.out.WriteCompressed(ww.refs, ww.objs...)
 	if err != nil {
-		return err
+		return pdf.Wrap(err, "document outline tree nodes")
 	}
 	ww.refs = ww.refs[:0]
 	ww.objs = ww.objs[:0]

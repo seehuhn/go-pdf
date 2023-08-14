@@ -28,9 +28,15 @@ type embedded struct {
 	*Font
 	pdf.Resource
 	cmap.SimpleEncoder
+	closed bool
 }
 
 func (e *embedded) Close() error {
+	if e.closed {
+		return nil
+	}
+	e.closed = true
+
 	encoding := e.Encoding()
 	encodingNames := make([]string, 256)
 

@@ -161,7 +161,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 
 	err := w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return err
+		return pdf.Wrap(err, "Type 3 font dicts")
 	}
 
 	for name, g := range info.Glyphs {

@@ -285,7 +285,7 @@ func (info *EmbedInfoCIDGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) err
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fontDescriptor}
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return err
+		return pdf.Wrap(err, "composite OpenType/glyf font dicts")
 	}
 
 	// See section 9.9 of PDF 32000-1:2008 for details.

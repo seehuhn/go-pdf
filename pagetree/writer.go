@@ -295,7 +295,7 @@ func (w *Writer) flush() error {
 
 	err := w.Out.WriteCompressed(w.outRefs, w.outObjects...)
 	if err != nil {
-		return err
+		return pdf.Wrap(err, "page tree nodes")
 	}
 
 	w.outObjects = w.outObjects[:0]

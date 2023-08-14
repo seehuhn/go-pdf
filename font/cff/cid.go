@@ -293,7 +293,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fontDescriptor}
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return err
+		return pdf.Wrap(err, "composite CFF font dicts")
 	}
 
 	// See section 9.9 of PDF 32000-1:2008 for details.

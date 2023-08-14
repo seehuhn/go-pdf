@@ -9,7 +9,7 @@ require (
 	golang.org/x/text v0.9.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
 	seehuhn.de/go/postscript v0.3.5-0.20230811095027-86e1857cf919
-	seehuhn.de/go/sfnt v0.3.5-0.20230811211107-b2322297bfb7
+	seehuhn.de/go/sfnt v0.3.5-0.20230814123027-5af1767be82b
 )
 
 require golang.org/x/image v0.7.0
