@@ -144,9 +144,9 @@ func (f *funkel) Close() error {
 		Supplement: 0,
 	}
 
-	// TODO(voss): subset the font
-
 	cffFont := f.info.AsCFF()
+
+	// convert to CID-keyed font
 	cffFont.Encoding = nil
 	cffFont.ROS = ROS
 	gid2cid := make([]type1.CID, len(cffFont.Glyphs))
@@ -154,6 +154,10 @@ func (f *funkel) Close() error {
 		gid2cid[gid] = type1.CID(r)
 	}
 	cffFont.Gid2Cid = gid2cid
+
+	cffFont = cffFont.Subset(func(gid glyph.ID) bool {
+		return f.used[gid]
+	})
 
 	cmap := make(map[charcode.CharCode]type1.CID)
 	tounicode := make(map[charcode.CharCode][]rune)
