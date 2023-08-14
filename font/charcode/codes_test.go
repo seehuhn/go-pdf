@@ -14,8 +14,34 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package tounicode reads and writes PDF /ToUnicode CMaps.
-// This is a special kind of CMap that maps character codes to Unicode
-// code points.  It is used to allow PDF readers to extract text from
-// PDF files.
-package tounicodeold
+package charcode
+
+import (
+	"bytes"
+	"testing"
+
+	"seehuhn.de/go/pdf"
+)
+
+func TestUTF8(t *testing.T) {
+	// verify that the encoding equals standard UTF-8 encoding
+
+	var buf pdf.String
+	for r := rune(0); r <= 0x10_FFFF; r++ {
+		if r >= 0xD800 && r <= 0xDFFF || r == 0xFFFD {
+			continue
+		}
+
+		code := CharCode(r)
+		buf = UTF8.Append(buf[:0], code)
+		buf2 := []byte(string(r))
+		if !bytes.Equal(buf, buf2) {
+			t.Fatalf("UTF8.Append(%#x) = %v, want %v", code, buf, buf2)
+		}
+
+		code2, size := UTF8.Decode(buf2)
+		if code2 != code || size != len(buf2) {
+			t.Fatalf("UTF8.Decode(%v) = %#x:%d, want %#x:%d", buf2, code2, size, code, len(buf2))
+		}
+	}
+}

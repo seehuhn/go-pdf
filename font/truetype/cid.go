@@ -81,6 +81,7 @@ func (f *CompositeFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		CIDEncoder:    cmap.NewCIDEncoder(),
 	}
+	w.AutoClose(res)
 	return res, nil
 }
 
@@ -133,7 +134,7 @@ func (f *embeddedCID) Close() error {
 		toUnicode[charcode.CharCode(e.CID)] = e.Text
 	}
 
-	info := EmbedInfoCID{
+	info := EmbedInfoComposite{
 		Font:      ttfSubset,
 		SubsetTag: subsetTag,
 		CS:        charcode.UCS2,
@@ -145,7 +146,7 @@ func (f *embeddedCID) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-type EmbedInfoCID struct {
+type EmbedInfoComposite struct {
 	Font      *sfnt.Font
 	SubsetTag string
 
@@ -161,7 +162,7 @@ type EmbedInfoCID struct {
 	ForceBold  bool
 }
 
-func (info *EmbedInfoCID) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
 		return err

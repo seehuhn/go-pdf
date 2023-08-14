@@ -85,6 +85,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 		},
 		SimpleEncoder: cmap.NewSimpleEncoderSequential(),
 	}
+	w.AutoClose(res)
 	return res, nil
 }
 

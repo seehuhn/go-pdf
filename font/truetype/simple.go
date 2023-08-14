@@ -83,6 +83,7 @@ func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 		SimpleEncoder: pdfcmap.NewSimpleEncoder(),
 		text:          map[glyph.ID][]rune{},
 	}
+	w.AutoClose(res)
 	return res, nil
 }
 

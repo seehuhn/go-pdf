@@ -81,6 +81,7 @@ func (f *CIDFontGlyf) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, erro
 		Resource:    pdf.Resource{Ref: w.Alloc(), Name: resName},
 		CIDEncoder:  cmap.NewCIDEncoder(),
 	}
+	w.AutoClose(res)
 	return res, nil
 }
 

@@ -18,24 +18,15 @@
 package simple
 
 import (
-	"errors"
-	"fmt"
 	"os"
 
 	"golang.org/x/text/language"
 
-	"seehuhn.de/go/postscript/type1"
-
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	pdfcff "seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
@@ -82,145 +73,8 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 // to larger PDF files but there is no limit on the number of distinct glyphs
 // which can be accessed.
 func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
-	geometry := &font.Geometry{
-		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
-		Widths:       info.Widths(),
-
-		Ascent:             info.Ascent,
-		Descent:            info.Descent,
-		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
+	if info.IsCFF() {
+		return cff.NewSimple(info, loc)
 	}
-
-	res := &simple{
-		info:        info,
-		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
-		Geometry:    geometry,
-	}
-
-	return res, nil
-}
-
-type simple struct {
-	info        *sfnt.Font
-	gsubLookups []gtab.LookupIndex
-	gposLookups []gtab.LookupIndex
-	*font.Geometry
-}
-
-func (f *simple) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
-}
-
-func (f *simple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	if f.info.IsGlyf() {
-		err := pdf.CheckVersion(w, "use of TrueType glyph outlines", pdf.V1_1)
-		if err != nil {
-			return nil, err
-		}
-	} else if f.info.IsCFF() {
-		err := pdf.CheckVersion(w, "use of CFF glyph outlines", pdf.V1_2)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, errors.New("unsupported font format")
-	}
-
-	res := &embedded{
-		simple: f,
-		w:      w,
-		Resource: pdf.Resource{
-			Ref:  w.Alloc(),
-			Name: resName,
-		},
-		SimpleEncoder: cmap.NewSimpleEncoder(),
-		text:          make(map[glyph.ID][]rune),
-	}
-
-	w.AutoClose(res)
-
-	return res, nil
-}
-
-type embedded struct {
-	*simple
-	w pdf.Putter
-	pdf.Resource
-
-	cmap.SimpleEncoder
-	text   map[glyph.ID][]rune
-	closed bool
-}
-
-func (e *embedded) Close() error {
-	if e.closed {
-		return nil
-	}
-	e.closed = true
-
-	if e.SimpleEncoder.Overflow() {
-		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			e.Name, e.info.PostscriptName())
-	}
-	e.SimpleEncoder = cmap.NewFrozenSimpleEncoder(e.SimpleEncoder)
-
-	w := e.w
-
-	// subset the font
-	var ss []subset.Glyph
-	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	encoding := e.SimpleEncoder.Encoding()
-	for cid, gid := range encoding {
-		if gid != 0 {
-			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
-		}
-	}
-	subsetTag := subset.Tag(ss, e.info.NumGlyphs())
-	subsetInfo, err := subset.Simple(e.info, ss)
-	if err != nil {
-		return fmt.Errorf("font subset: %w", err)
-	}
-
-	m := make(map[charcode.CharCode][]rune)
-	for code, gid := range encoding {
-		if gid == 0 || len(e.text[gid]) == 0 {
-			continue
-		}
-		m[charcode.CharCode(code)] = e.text[gid]
-	}
-
-	if subsetInfo.IsCFF() {
-		cffFont := subsetInfo.AsCFF()
-		data := &pdfcff.EmbedInfoSimple{
-			Font:       cffFont,
-			UnitsPerEm: subsetInfo.UnitsPerEm,
-			Ascent:     subsetInfo.Ascent,
-			Descent:    subsetInfo.Descent,
-			CapHeight:  subsetInfo.CapHeight,
-			SubsetTag:  subsetTag,
-			Encoding:   cffFont.Outlines.Encoding,
-			ToUnicode:  m,
-		}
-		return data.Embed(w, e.Ref)
-	}
-
-	subsetEncoding := make([]glyph.ID, 256)
-	for subsetGid, g := range ss {
-		if subsetGid == 0 {
-			continue
-		}
-		subsetEncoding[g.CID] = glyph.ID(subsetGid)
-	}
-	ttFont := &truetype.EmbedInfo{
-		Font:      subsetInfo,
-		SubsetTag: subsetTag,
-		Encoding:  subsetEncoding,
-		ToUnicode: m,
-	}
-	return ttFont.Embed(w, e.Ref)
+	return truetype.NewSimple(info, loc)
 }
