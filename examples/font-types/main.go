@@ -106,7 +106,7 @@ func doit() error {
 		switch title {
 		case "Simple PDF Fonts":
 			// part 1
-		case "Type1 Fonts":
+		case "Type 1 Fonts":
 			t1, err := gofont.Type1(gofont.GoRegular)
 			if err != nil {
 				return err
@@ -160,7 +160,7 @@ func doit() error {
 				return err
 			}
 			ffKey = "FontFile3"
-		case "Type3 Fonts":
+		case "Type 3 Fonts":
 			X, err = gofont.Type3(gofont.GoRegular)
 			if err != nil {
 				return err

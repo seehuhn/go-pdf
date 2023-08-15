@@ -17,7 +17,6 @@
 package type1
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -266,19 +265,15 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 }
 
 func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
-	subType, err := pdf.GetName(r, dicts.FontDict["Subtype"])
-	if err != nil || subType != "Type1" {
-		return nil, errors.New("not a Type 1 font")
+	if dicts.Type != font.Type1 && dicts.Type != font.Builtin {
+		return nil, fmt.Errorf("expected %q or %q, got %q",
+			font.Type1, font.Builtin, dicts.Type)
 	}
 
 	res := &EmbedInfo{}
 
-	if dicts.FontProgramKey == "FontFile" {
-		stmObj, err := pdf.GetStream(r, dicts.FontProgram)
-		if err != nil {
-			return nil, err
-		}
-		stm, err := pdf.DecodeStream(r, stmObj, 0)
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -312,10 +307,16 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	if res.PSFont != nil {
 		encoding, err := font.UndescribeEncodingType1(
 			r, dicts.FontDict["Encoding"], res.PSFont.Encoding)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			res.Encoding = encoding
 		}
-		res.Encoding = encoding
+	} else if t1, err := Builtin(baseFont).PSFont(); err == nil {
+		res.PSFont = t1
+		encoding, err := font.UndescribeEncodingType1(
+			r, dicts.FontDict["Encoding"], t1.Encoding)
+		if err == nil {
+			res.Encoding = encoding
+		}
 	}
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {

@@ -33,7 +33,7 @@ func TestBuiltin(t *testing.T) {
 	}
 
 	for _, fontName := range All {
-		afm, err := fontName.Afm()
+		afm, err := fontName.PSFont()
 		if err != nil {
 			t.Error(err)
 			continue
@@ -47,7 +47,7 @@ func TestBuiltin(t *testing.T) {
 
 func TestUnknownBuiltin(t *testing.T) {
 	F := Builtin("unknown font")
-	_, err := F.Afm()
+	_, err := F.PSFont()
 	if !os.IsNotExist(err) {
 		t.Errorf("wrong error: %s", err)
 	}

@@ -91,3 +91,67 @@ func TestRoundTrip(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
+
+func TestDefaultFontRoundTrip(t *testing.T) {
+	t1, err := TimesItalic.PSFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	encoding := make([]string, 256)
+	for i := range encoding {
+		encoding[i] = ".notdef"
+	}
+	encoding[65] = "A"
+	encoding[66] = "C"
+
+	toUnicode := map[charcode.CharCode][]rune{
+		65: {'A'},
+		66: {'C'},
+	}
+
+	info1 := &EmbedInfo{
+		PSFont:    t1,
+		Encoding:  encoding,
+		ToUnicode: toUnicode,
+	}
+
+	rw := pdf.NewData(pdf.V1_7)
+	ref := rw.Alloc()
+	err = info1.Embed(rw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dicts, err := font.ExtractDicts(rw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info2, err := Extract(rw, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Compare encodings:
+	if len(info1.Encoding) != len(info2.Encoding) {
+		t.Fatalf("len(info1.Encoding) != len(info2.Encoding): %d != %d", len(info1.Encoding), len(info2.Encoding))
+	}
+	for i := range info1.Encoding {
+		if info1.Encoding[i] != ".notdef" && info1.Encoding[i] != info2.Encoding[i] {
+			t.Fatalf("info1.Encoding[%d] != info2.Encoding[%d]: %q != %q", i, i, info1.Encoding[i], info2.Encoding[i])
+		}
+	}
+
+	for _, info := range []*EmbedInfo{info1, info2} {
+		info.Encoding = nil         // already compared above
+		info.PSFont.XHeight = 0     // optional entry in FontDescriptor
+		info.PSFont.GlyphInfo = nil // the bounding boxes sometimes differ
+	}
+
+	cmpFloat := cmp.Comparer(func(x, y float64) bool {
+		return math.Abs(x-y) < 1/65536.
+	})
+	if d := cmp.Diff(info1, info2, cmpFloat); d != "" {
+		t.Errorf("info mismatch (-want +got):\n%s", d)
+	}
+}

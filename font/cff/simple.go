@@ -307,19 +307,13 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 }
 
 func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
-	subType, err := pdf.GetName(r, dicts.FontDict["Subtype"])
-	if err != nil || subType != "Type1" {
-		return nil, errors.New("not a Type 1 font")
+	if dicts.Type != font.SimpleCFF {
+		return nil, fmt.Errorf("expected %q, got %q", font.SimpleCFF, dicts.Type)
 	}
-
 	res := &EmbedInfoSimple{}
 
-	if dicts.FontProgramKey == "FontFile3" {
-		stmObj, err := pdf.GetStream(r, dicts.FontProgram)
-		if err != nil {
-			return nil, pdf.Wrap(err, "opening CFF font stream")
-		}
-		stm, err := pdf.DecodeStream(r, stmObj, 0)
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 		if err != nil {
 			return nil, pdf.Wrap(err, "uncompressing CFF font stream")
 		}

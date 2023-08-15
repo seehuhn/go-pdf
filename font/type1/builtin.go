@@ -108,7 +108,7 @@ func getBuiltin(f Builtin) (*Font, error) {
 		return res, nil
 	}
 
-	psFont, err := f.Afm()
+	psFont, err := f.PSFont()
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +121,8 @@ func getBuiltin(f Builtin) (*Font, error) {
 	return res, nil
 }
 
-// Afm returns the font metrics for one of the built-in pdf fonts.
-func (f Builtin) Afm() (*type1.Font, error) {
+// PSFont returns the font metrics for one of the built-in pdf fonts.
+func (f Builtin) PSFont() (*type1.Font, error) {
 	fd, err := afmData.Open("builtin/" + string(f) + ".afm")
 	if err != nil {
 		return nil, err
@@ -138,11 +138,12 @@ func (f Builtin) Afm() (*type1.Font, error) {
 }
 
 func IsBuiltin(f *type1.Font) bool {
-	b, err := Builtin(f.FontInfo.FontName).Afm()
+	b, err := Builtin(f.FontInfo.FontName).PSFont()
 	if err != nil || b.UnitsPerEm != f.UnitsPerEm {
 		return false
 	}
 
+	// TODO(voss): Is the following test too strict?
 	for name, fi := range f.GlyphInfo {
 		bi, ok := b.GlyphInfo[name]
 		if !ok {

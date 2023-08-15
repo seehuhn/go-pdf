@@ -158,7 +158,7 @@ func (f *fontTables) AddTitle(title string, fontSize, a, b float64) error {
 func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 	fontSize := 10.0
 
-	afm, err := fnt.Afm()
+	afm, err := fnt.PSFont()
 	if err != nil {
 		return err
 	}

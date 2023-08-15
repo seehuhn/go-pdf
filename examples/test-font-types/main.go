@@ -48,11 +48,11 @@ func run() error {
 		return err
 	}
 
-	simpleFonts, err := debug.MakeSimpleFonts()
+	fonts, err := debug.MakeFonts()
 	if err != nil {
 		return err
 	}
-	for _, s := range simpleFonts {
+	for _, s := range fonts {
 		page := doc.AddPage()
 
 		F, err := s.Font.Embed(page.Out, "F")
@@ -60,32 +60,11 @@ func run() error {
 			return err
 		}
 
-		drawPage(H, 16, page, F, fmt.Sprintf("simple font: %s", s.Desc))
-
-		err = F.Close()
-		if err != nil {
-			return err
+		if s.Type.IsComposite() {
+			drawPage(H, 32, page, F, fmt.Sprintf("composite font: %s", s.Type.String()))
+		} else {
+			drawPage(H, 16, page, F, fmt.Sprintf("simple font: %s", s.Type.String()))
 		}
-
-		err = page.Close()
-		if err != nil {
-			return err
-		}
-	}
-
-	compositeFonts, err := debug.MakeCompositeFonts()
-	if err != nil {
-		return err
-	}
-	for _, s := range compositeFonts {
-		page := doc.AddPage()
-
-		F, err := s.Font.Embed(page.Out, "F")
-		if err != nil {
-			return err
-		}
-
-		drawPage(H, 32, page, F, fmt.Sprintf("composite font: %s", s.Desc))
 
 		err = F.Close()
 		if err != nil {
