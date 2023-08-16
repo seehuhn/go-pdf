@@ -167,6 +167,9 @@ type EmbedInfoSimpleCFF struct {
 	// Character codes must be in the range 0, ..., 255.
 	// TODO(voss): or else?
 	ToUnicode map[charcode.CharCode][]rune
+
+	IsAllCap   bool
+	IsSmallCap bool
 }
 
 func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
@@ -175,41 +178,38 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		return err
 	}
 
-	openTypeFont := info.Font
-	cffOutlines, ok := openTypeFont.Outlines.(*cff.Outlines)
+	otf := info.Font
+	cff, ok := otf.Outlines.(*cff.Outlines)
 	if !ok ||
-		len(cffOutlines.Encoding) != 256 ||
-		len(cffOutlines.Private) != 1 ||
-		len(cffOutlines.Glyphs) == 0 ||
-		len(cffOutlines.Glyphs[0].Name) == 0 {
+		len(cff.Encoding) != 256 ||
+		len(cff.Private) != 1 ||
+		len(cff.Glyphs) == 0 ||
+		len(cff.Glyphs[0].Name) == 0 {
 		return errors.New("not a CFF-based simple OpenType font")
 	}
 
-	var fontName pdf.Name
-	postScriptName := openTypeFont.PostscriptName()
-	if info.SubsetTag == "" {
-		fontName = pdf.Name(postScriptName)
-	} else {
-		fontName = pdf.Name(info.SubsetTag + "+" + postScriptName)
+	fontName := otf.PostscriptName()
+	if info.SubsetTag != "" {
+		fontName = info.SubsetTag + "+" + fontName
 	}
 
-	unitsPerEm := openTypeFont.UnitsPerEm
+	unitsPerEm := otf.UnitsPerEm
 
 	ww := make([]funit.Int16, 256)
 	for i := range ww {
-		ww[i] = openTypeFont.GlyphWidth(info.Encoding[i])
+		ww[i] = otf.GlyphWidth(info.Encoding[i])
 	}
 	widthsInfo := font.CompressWidths(ww, unitsPerEm)
 
 	encoding := make([]string, 256)
 	builtin := make([]string, 256)
 	for i := 0; i < 256; i++ {
-		encoding[i] = openTypeFont.GlyphName(info.Encoding[i])
-		builtin[i] = openTypeFont.GlyphName(cffOutlines.Encoding[i])
+		encoding[i] = otf.GlyphName(info.Encoding[i])
+		builtin[i] = otf.GlyphName(cff.Encoding[i])
 	}
 
 	q := 1000 / float64(unitsPerEm)
-	bbox := openTypeFont.BBox()
+	bbox := otf.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -225,7 +225,7 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	fontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       fontName,
+		"BaseFont":       pdf.Name(fontName),
 		"FirstChar":      widthsInfo.FirstChar,
 		"LastChar":       widthsInfo.LastChar,
 		"Widths":         widthsRef,
@@ -240,24 +240,28 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
 
+	isSymbolic := true // TODO(voss): check this
+
 	// See section 9.8.1 of PDF 32000-1:2008.
-	fontDescriptor := pdf.Dict{
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
-		"Flags":       pdf.Integer(font.MakeFlags(openTypeFont, true)),
-		"FontBBox":    fontBBox,
-		"ItalicAngle": pdf.Number(openTypeFont.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(openTypeFont.Ascent.AsFloat(q))),
-		"Descent":     pdf.Integer(math.Round(openTypeFont.Descent.AsFloat(q))),
-		"StemV":       pdf.Integer(math.Round(cffOutlines.Private[0].StdVW * q)),
-		"FontFile3":   fontFileRef,
+	fd := &font.Descriptor{
+		FontName:     fontName,
+		IsFixedPitch: otf.IsFixedPitch(),
+		IsSerif:      otf.IsSerif,
+		IsScript:     otf.IsScript,
+		IsItalic:     otf.IsItalic,
+		IsAllCap:     info.IsAllCap,
+		IsSmallCap:   info.IsSmallCap,
+		ForceBold:    cff.Private[0].ForceBold,
+		FontBBox:     fontBBox,
+		ItalicAngle:  otf.ItalicAngle,
+		Ascent:       otf.Ascent.AsFloat(q),
+		Descent:      otf.Descent.AsFloat(q),
+		CapHeight:    otf.CapHeight.AsFloat(q),
+		StemV:        cff.Private[0].StdVW * q,
+		MissingWidth: widthsInfo.MissingWidth,
 	}
-	if openTypeFont.CapHeight != 0 {
-		fontDescriptor["CapHeight"] = pdf.Integer(math.Round(openTypeFont.CapHeight.AsFloat(q)))
-	}
-	if widthsInfo.MissingWidth != 0 {
-		fontDescriptor["MissingWidth"] = widthsInfo.MissingWidth
-	}
+	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor["FontFile3"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
 	compressedObjects := []pdf.Object{fontDict, fontDescriptor, widthsInfo.Widths}
@@ -274,7 +278,7 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	if err != nil {
 		return err
 	}
-	err = openTypeFont.WriteCFFOpenTypePDF(fontFileStream)
+	err = otf.WriteCFFOpenTypePDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding OpenType font %q: %w", fontName, err)
 	}
@@ -298,9 +302,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, error) {
 		return nil, fmt.Errorf("expected %q, got %q", font.SimpleOpenTypeCFF, dicts.Type)
 	}
 
-	res := &EmbedInfoSimpleCFF{
-		ToUnicode: map[charcode.CharCode][]rune{},
-	}
+	res := &EmbedInfoSimpleCFF{}
 
 	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 	if err != nil {
@@ -310,6 +312,10 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, error) {
 	if err != nil {
 		return nil, err
 	}
+	cff, ok := otf.Outlines.(*cff.Outlines)
+	if !ok {
+		return nil, fmt.Errorf("expected CFF outlines, got %T", otf.Outlines)
+	}
 	res.Font = otf
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
@@ -317,10 +323,6 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, error) {
 		res.SubsetTag = m[1]
 	}
 
-	cff, ok := otf.Outlines.(*cff.Outlines)
-	if !ok {
-		return nil, fmt.Errorf("expected CFF outlines, got %T", otf.Outlines)
-	}
 	builtin := make([]string, 256)
 	for i := 0; i < 256; i++ {
 		builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
@@ -358,6 +360,11 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, error) {
 	if ascent-descent < leading {
 		otf.LineGap = funit.Int16(math.Round(float64(leading-ascent+descent) / q))
 	}
+
+	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
+	flags := font.Flags(flagsInt)
+	res.IsAllCap = flags&font.FlagAllCap != 0
+	res.IsSmallCap = flags&font.FlagSmallCap != 0
 
 	return res, nil
 }

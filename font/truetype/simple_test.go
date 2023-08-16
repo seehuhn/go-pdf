@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cff
+package truetype
 
 import (
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,18 +25,19 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func TestRoundTrip(t *testing.T) {
-	otf, err := gofont.OpenType(gofont.GoRegular)
+func TestRoundTripSimple(t *testing.T) {
+	ttf, err := gofont.TrueType(gofont.GoItalic)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	encoding := make([]glyph.ID, 256)
-	encoding[65] = otf.CMap.Lookup('A')
-	encoding[66] = otf.CMap.Lookup('C')
+	encoding[65] = ttf.CMap.Lookup('A')
+	encoding[66] = ttf.CMap.Lookup('C')
 
 	toUnicode := map[charcode.CharCode][]rune{
 		65: {'A'},
@@ -43,16 +45,12 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	info1 := &EmbedInfoSimple{
-		Font:       otf.AsCFF(),
-		SubsetTag:  "UVWXYZ",
+		Font:       ttf,
+		SubsetTag:  "ABCXYZ",
 		Encoding:   encoding,
 		ToUnicode:  toUnicode,
-		UnitsPerEm: otf.UnitsPerEm,
-		Ascent:     otf.Ascent,
-		Descent:    otf.Descent,
-		CapHeight:  otf.CapHeight,
-		IsSerif:    true, // Just for testing
-		IsAllCap:   true, // Just for testing
+		IsSmallCap: true, // just for testing
+		ForceBold:  true, // just for testing
 	}
 
 	rw := pdf.NewData(pdf.V1_7)
@@ -81,11 +79,35 @@ func TestRoundTrip(t *testing.T) {
 		}
 	}
 
-	for _, info := range []*EmbedInfoSimple{info1, info2} {
-		info.Encoding = nil // already compared above
+	q := 1000 / float64(info1.Font.UnitsPerEm)
+	// Compare capHeight in PDF units, since this comes from the PDF font
+	// descriptor:
+	if math.Round(info1.Font.CapHeight.AsFloat(q)) != math.Round(info2.Font.CapHeight.AsFloat(q)) {
+		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
+	}
 
-		// TODO(voss): reenable this once https://github.com/google/go-cmp/issues/335 is resolved
-		info.Font.Outlines = nil
+	for _, info := range []*EmbedInfoSimple{info1, info2} {
+		info.Encoding = nil       // already compared above
+		info.Font.CMapTable = nil // already tested when comparing the encodings
+		info.Font.CMap = nil      // all but encoding information is optional
+
+		info.Font.CapHeight = 0 // already compared above
+
+		info.Font.FamilyName = ""        // "name" table is optional
+		info.Font.Width = 0              // "OS/2" table is optional
+		info.Font.Weight = 0             // "OS/2" table is optional
+		info.Font.IsRegular = false      // "OS/2" table is optional
+		info.Font.CodePageRange = 0      // "OS/2" table is optional
+		info.Font.Description = ""       // "name" table is optional
+		info.Font.Copyright = ""         // "name" table is optional
+		info.Font.Trademark = ""         // "name" table is optional
+		info.Font.License = ""           // "name" table is optional
+		info.Font.LicenseURL = ""        // "name" table is optional
+		info.Font.XHeight = 0            // "OS/2" table is optional
+		info.Font.UnderlinePosition = 0  // "post" table is optional
+		info.Font.UnderlineThickness = 0 // "post" table is optional
+
+		info.Font.Outlines.(*glyf.Outlines).Names = nil // "post" table is optional
 	}
 
 	if d := cmp.Diff(info1, info2); d != "" {

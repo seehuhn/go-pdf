@@ -168,10 +168,11 @@ func (info *EmbedInfoCIDGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) err
 		return err
 	}
 
-	otf := info.Font
+	otf := info.Font.Clone()
 	if !otf.IsGlyf() {
 		return fmt.Errorf("not a glyf-based OpenType font")
 	}
+	otf.CMapTable = nil // TODO(voss): is this correct?
 	outlines := otf.Outlines.(*glyf.Outlines)
 
 	// CidFontName shall be the value of the CIDFontName entry in the CIDFont program.
@@ -181,7 +182,7 @@ func (info *EmbedInfoCIDGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) err
 		cidFontName = info.SubsetTag + "+" + cidFontName
 	}
 
-	// make a CMap
+	// make a PDF CMap
 	cmapInfo := cmap.New(info.ROS, info.CS, info.CMap)
 	var encoding pdf.Object
 	if cmap.IsPredefined(cmapInfo) {
@@ -296,7 +297,7 @@ func (info *EmbedInfoCIDGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) err
 	if err != nil {
 		return err
 	}
-	_, err = otf.WriteTrueTypePDF(fontFileStream, nil)
+	_, err = otf.WriteTrueTypePDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding glyf-based OpenType CIDFont %q: %w", cidFontName, err)
 	}

@@ -295,6 +295,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Embedded, start int) error {
 			if r, ok := f.rev[gid]; ok {
 				g.Text = []rune{r}
 
+				// TODO(voss): fix this
 				// Try to establish a mapping from glyph ID to rune in the embedded
 				// font (called for side effects only).
 				_ = theFont.Layout(string([]rune{r}), glyphSize)

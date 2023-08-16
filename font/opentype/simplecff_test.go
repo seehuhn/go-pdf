@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package opentype
 
 import (
@@ -14,7 +30,7 @@ import (
 )
 
 func TestRoundTripSimpleCFF(t *testing.T) {
-	otf, err := gofont.OpenType(gofont.GoRegular)
+	otf, err := gofont.OpenType(gofont.GoItalic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +91,8 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 	}
 
 	for _, info := range []*EmbedInfoSimpleCFF{info1, info2} {
-		info.Encoding = nil     // already compared above
+		info.Encoding = nil // already compared above
+
 		info.Font.Ascent = 0    // already compared above
 		info.Font.Descent = 0   // already compared above
 		info.Font.CapHeight = 0 // already compared above
@@ -93,7 +110,11 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 		info.Font.LineGap = 0                    // "OS/2" and "hmtx" tables are optional
 		info.Font.XHeight = 0                    // "OS/2" table is optional
 
-		info.Font.Outlines = nil // TODO(voss): reenable this (but cmp.Diff hangs)
+		// TODO(voss): make this match, and ignore font.CMap instead
+		info.Font.CMapTable = nil
+
+		// TODO(voss): reenable this once https://github.com/google/go-cmp/issues/335 is resolved
+		info.Font.Outlines = nil
 	}
 
 	if d := cmp.Diff(info1, info2); d != "" {

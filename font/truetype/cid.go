@@ -168,10 +168,11 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		return err
 	}
 
-	ttf := info.Font
+	ttf := info.Font.Clone()
 	if !ttf.IsGlyf() {
 		return fmt.Errorf("not a TrueType font")
 	}
+	ttf.CMapTable = nil // TODO(voss): is this correct?
 	outlines := ttf.Outlines.(*glyf.Outlines)
 
 	fontName := ttf.PostscriptName()
@@ -296,7 +297,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	if err != nil {
 		return err
 	}
-	n, err := ttf.WriteTrueTypePDF(fontFileStream, nil)
+	n, err := ttf.WriteTrueTypePDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("composite TrueType Font %q: %w", fontName, err)
 	}

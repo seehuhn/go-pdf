@@ -19,21 +19,26 @@ package truetype
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
+	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	pdfcmap "seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
@@ -150,7 +155,7 @@ func (f *embeddedSimple) Close() error {
 		toUnicode[charcode.CharCode(code)] = f.text[gid]
 	}
 
-	info := EmbedInfo{
+	info := EmbedInfoSimple{
 		Font:      ttfSubset,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
@@ -160,7 +165,7 @@ func (f *embeddedSimple) Close() error {
 }
 
 // TODO(voss): should this be merged with opentype.PDFInfoGlyf?
-type EmbedInfo struct {
+type EmbedInfoSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -183,13 +188,13 @@ type EmbedInfo struct {
 	ForceBold  bool
 }
 
-func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
 		return err
 	}
 
-	ttf := info.Font
+	ttf := info.Font.Clone()
 	if !ttf.IsGlyf() {
 		return fmt.Errorf("not a TrueType font")
 	}
@@ -207,9 +212,6 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 	widthsInfo := font.CompressWidths(ww, unitsPerEm)
 
-	var encoding pdf.Object
-	var cmapTable cmap.Table
-
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
 	// character codes to glyphs.
 	isSymbolic := true
@@ -220,10 +222,9 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		}
 		subtable[uint16(i)] = gid
 	}
-	cmapTable = cmap.Table{
+	ttf.CMapTable = cmap.Table{
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
-	cmapData := cmapTable.Encode()
 
 	q := 1000 / float64(unitsPerEm)
 	bbox := ttf.BBox()
@@ -247,9 +248,6 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		"LastChar":       widthsInfo.LastChar,
 		"Widths":         widthsRef,
 		"FontDescriptor": fontDescriptorRef,
-	}
-	if encoding != nil {
-		fontDict["Encoding"] = encoding
 	}
 	var toUnicodeRef pdf.Reference
 	if info.ToUnicode != nil {
@@ -291,7 +289,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if err != nil {
 		return err
 	}
-	n, err := ttf.WriteTrueTypePDF(fontFileStream, cmapData)
+	n, err := ttf.WriteTrueTypePDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding TrueType font %q: %w", fontName, err)
 	}
@@ -312,4 +310,141 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	return nil
+}
+
+func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
+	if dicts.Type != font.SimpleTrueType {
+		return nil, fmt.Errorf("expected %q, got %q", font.SimpleTrueType, dicts.Type)
+	}
+
+	res := &EmbedInfoSimple{}
+
+	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	if err != nil {
+		return nil, err
+	}
+	ttf, err := sfnt.Read(stm)
+	if err != nil {
+		return nil, err
+	}
+	_, ok := ttf.Outlines.(*glyf.Outlines)
+	if !ok {
+		return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
+	}
+	if ttf.FamilyName == "" {
+		familyName, _ := pdf.GetName(r, dicts.FontDescriptor["FontFamily"])
+		ttf.FamilyName = string(familyName)
+	}
+	if ttf.Width == 0 {
+		width, _ := pdf.GetName(r, dicts.FontDescriptor["FontStretch"])
+		switch width {
+		case "UltraCondensed":
+			ttf.Width = os2.WidthUltraCondensed
+		case "ExtraCondensed":
+			ttf.Width = os2.WidthExtraCondensed
+		case "Condensed":
+			ttf.Width = os2.WidthCondensed
+		case "SemiCondensed":
+			ttf.Width = os2.WidthSemiCondensed
+		case "Normal":
+			ttf.Width = os2.WidthNormal
+		case "SemiExpanded":
+			ttf.Width = os2.WidthSemiExpanded
+		case "Expanded":
+			ttf.Width = os2.WidthExpanded
+		case "ExtraExpanded":
+			ttf.Width = os2.WidthExtraExpanded
+		case "UltraExpanded":
+			ttf.Width = os2.WidthUltraExpanded
+		}
+	}
+	if ttf.Weight == 0 {
+		weight, _ := pdf.GetNumber(r, dicts.FontDescriptor["FontWeight"])
+		if weight > 0 {
+			ttf.Weight = os2.Weight(math.Round(float64(weight))).Rounded()
+		}
+	}
+	q := 1000 / float64(ttf.UnitsPerEm)
+	if ttf.CapHeight == 0 {
+		capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+		ttf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+	}
+	if ttf.XHeight == 0 {
+		xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"])
+		ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
+	}
+	res.Font = ttf
+
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
+	}
+
+	// See section 9.6.5.4 of ISO 32000-2:2020.
+	// TODO(voss): revisit this, once
+	// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
+	var encoding []glyph.ID
+	if encodingEntry, _ := pdf.Resolve(r, dicts.FontDict["Encoding"]); encodingEntry != nil {
+		encodingNames, _ := font.UndescribeEncodingType1(r, encodingEntry, pdfenc.StandardEncoding[:])
+		for i, name := range encodingNames {
+			if name == ".notdef" {
+				encodingNames[i] = pdfenc.StandardEncoding[i]
+			}
+		}
+
+		cmap, _ := ttf.CMapTable.GetNoLang(3, 1)
+		if cmap != nil {
+			encoding = make([]glyph.ID, 256)
+			for code, name := range encodingNames {
+				rr := names.ToUnicode(name, false)
+				if len(rr) == 1 {
+					encoding[code] = cmap.Lookup(rr[0])
+				}
+			}
+		}
+		// TODO(voss): also try to use a (1,0) subtable together with encodingNames
+	}
+	if encoding == nil {
+		cmap, _ := ttf.CMapTable.GetNoLang(3, 0)
+		if cmap != nil {
+			encoding = make([]glyph.ID, 256)
+			for code := rune(0); code < 256; code++ {
+				for _, pfx := range []rune{0xF000, 0xF100, 0xF200, 0x0000} {
+					if cmap.Lookup(pfx+code) != 0 {
+						encoding[code] = cmap.Lookup(pfx | code)
+						break
+					}
+				}
+			}
+		}
+	}
+	if encoding == nil {
+		cmap, _ := ttf.CMapTable.GetNoLang(1, 0)
+		if cmap != nil {
+			encoding = make([]glyph.ID, 256)
+			for code := rune(0); code < 256; code++ {
+				encoding[code] = cmap.Lookup(code)
+			}
+		}
+	}
+	if encoding == nil {
+		encoding = make([]glyph.ID, 256)
+		for i := range encoding {
+			encoding[i] = glyph.ID(i)
+		}
+	}
+	res.Encoding = encoding
+
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
+	}
+
+	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
+	flags := font.Flags(flagsInt)
+	res.IsAllCap = flags&font.FlagAllCap != 0
+	res.IsSmallCap = flags&font.FlagSmallCap != 0
+	res.ForceBold = flags&font.FlagForceBold != 0
+
+	return res, nil
 }

@@ -19,7 +19,6 @@ package opentype
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"golang.org/x/text/language"
 
@@ -178,6 +177,9 @@ type EmbedInfoGlyf struct {
 	// Character codes must be in the range 0, ..., 255.
 	// TODO(voss): or else?
 	ToUnicode map[charcode.CharCode][]rune
+
+	IsAllCap   bool
+	IsSmallCap bool
 }
 
 func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
@@ -186,26 +188,22 @@ func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 		return err
 	}
 
-	trueTypeFont := info.Font
+	ttf := info.Font.Clone()
 
-	var fontName pdf.Name
-	postScriptName := trueTypeFont.PostscriptName()
-	if info.SubsetTag == "" {
-		fontName = pdf.Name(postScriptName)
-	} else {
-		fontName = pdf.Name(info.SubsetTag + "+" + postScriptName)
+	fontName := ttf.PostscriptName()
+	if info.SubsetTag != "" {
+		fontName = info.SubsetTag + "+" + fontName
 	}
 
-	unitsPerEm := trueTypeFont.UnitsPerEm
+	unitsPerEm := ttf.UnitsPerEm
 
 	ww := make([]funit.Int16, 256)
 	for i := range ww {
-		ww[i] = trueTypeFont.GlyphWidth(info.Encoding[i])
+		ww[i] = ttf.GlyphWidth(info.Encoding[i])
 	}
 	widthsInfo := font.CompressWidths(ww, unitsPerEm)
 
 	var encoding pdf.Object
-	var cmapTable cmap.Table
 	toUnicode := info.ToUnicode
 
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
@@ -218,13 +216,12 @@ func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 		}
 		subtable[uint16(i)] = gid
 	}
-	cmapTable = cmap.Table{
+	ttf.CMapTable = cmap.Table{
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
-	cmapData := cmapTable.Encode()
 
 	q := 1000 / float64(unitsPerEm)
-	bbox := trueTypeFont.BBox()
+	bbox := ttf.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -240,7 +237,7 @@ func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 	fontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("TrueType"),
-		"BaseFont":       fontName,
+		"BaseFont":       pdf.Name(fontName),
 		"FirstChar":      widthsInfo.FirstChar,
 		"LastChar":       widthsInfo.LastChar,
 		"Widths":         widthsRef,
@@ -256,23 +253,25 @@ func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 	}
 
 	// See section 9.8.1 of PDF 32000-1:2008.
-	fontDescriptor := pdf.Dict{
-		"Type":        pdf.Name("FontDescriptor"),
-		"FontName":    fontName,
-		"Flags":       pdf.Integer(font.MakeFlags(trueTypeFont, isSymbolic)),
-		"FontBBox":    fontBBox,
-		"ItalicAngle": pdf.Number(trueTypeFont.ItalicAngle),
-		"Ascent":      pdf.Integer(math.Round(trueTypeFont.Ascent.AsFloat(q))),
-		"Descent":     pdf.Integer(math.Round(trueTypeFont.Descent.AsFloat(q))),
-		"StemV":       pdf.Integer(0), // TODO(voss): can we do better?
-		"FontFile3":   fontFileRef,
+	fd := &font.Descriptor{
+		FontName:     fontName,
+		IsFixedPitch: ttf.IsFixedPitch(),
+		IsSerif:      ttf.IsSerif,
+		IsScript:     ttf.IsScript,
+		IsItalic:     ttf.IsItalic,
+		IsAllCap:     info.IsAllCap,
+		IsSmallCap:   info.IsSmallCap,
+		ForceBold:    false,
+		FontBBox:     fontBBox,
+		ItalicAngle:  ttf.ItalicAngle,
+		Ascent:       ttf.Ascent.AsFloat(q),
+		Descent:      ttf.Descent.AsFloat(q),
+		CapHeight:    ttf.CapHeight.AsFloat(q),
+		StemV:        0, // unknown
+		MissingWidth: widthsInfo.MissingWidth,
 	}
-	if trueTypeFont.CapHeight != 0 {
-		fontDescriptor["CapHeight"] = pdf.Integer(math.Round(trueTypeFont.CapHeight.AsFloat(q)))
-	}
-	if widthsInfo.MissingWidth != 0 {
-		fontDescriptor["MissingWidth"] = widthsInfo.MissingWidth
-	}
+	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor["FontFile3"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
 	compressedObjects := []pdf.Object{fontDict, fontDescriptor, widthsInfo.Widths}
@@ -291,7 +290,7 @@ func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 	if err != nil {
 		return err
 	}
-	n, err := trueTypeFont.WriteTrueTypePDF(fontFileStream, cmapData)
+	n, err := ttf.WriteTrueTypePDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding TrueType font %q: %w", fontName, err)
 	}

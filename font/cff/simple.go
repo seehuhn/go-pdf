@@ -252,6 +252,8 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
 
+	isSymbolic := true // TODO(voss): check this
+
 	fd := &font.Descriptor{
 		FontName:     fontName,
 		IsFixedPitch: cff.IsFixedPitch,
@@ -269,7 +271,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		StemV:        cff.Private[0].StdVW * q,
 		MissingWidth: widthsInfo.MissingWidth,
 	}
-	fontDescriptor := fd.AsDict(true)
+	fontDescriptor := fd.AsDict(isSymbolic)
 	fontDescriptor["FontFile3"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
