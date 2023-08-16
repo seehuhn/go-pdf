@@ -171,11 +171,6 @@ func UndescribeEncodingType1(r pdf.Getter, desc pdf.Object, builtin []string) ([
 	case pdf.Name:
 		return namedEncoding(desc)
 	case pdf.Dict:
-		err = pdf.CheckDictType(r, desc, "Encoding")
-		if err != nil {
-			return nil, err
-		}
-
 		base, err := pdf.GetName(r, desc["BaseEncoding"])
 		if err != nil {
 			return nil, err

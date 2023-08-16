@@ -134,18 +134,18 @@ func (f *embeddedSimpleCFF) Close() error {
 		return fmt.Errorf("font subset: %w", err)
 	}
 
-	m := make(map[charcode.CharCode][]rune)
+	toUnicode := make(map[charcode.CharCode][]rune)
 	for code, gid := range encoding {
 		if gid == 0 || len(f.text[gid]) == 0 {
 			continue
 		}
-		m[charcode.CharCode(code)] = f.text[gid]
+		toUnicode[charcode.CharCode(code)] = f.text[gid]
 	}
 	info := EmbedInfoSimpleCFF{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
-		ToUnicode: m,
+		ToUnicode: toUnicode,
 	}
 	return info.Embed(f.w, f.Ref)
 }
@@ -173,7 +173,7 @@ type EmbedInfoSimpleCFF struct {
 }
 
 func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "embedding of OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		len(cff.Private) != 1 ||
 		len(cff.Glyphs) == 0 ||
 		len(cff.Glyphs[0].Name) == 0 {
-		return errors.New("not a CFF-based simple OpenType font")
+		return errors.New("not a simple OpenType/CFF font")
 	}
 
 	fontName := otf.PostscriptName()
@@ -197,19 +197,21 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 
 	ww := make([]funit.Int16, 256)
 	for i := range ww {
-		ww[i] = otf.GlyphWidth(info.Encoding[i])
+		ww[i] = cff.Glyphs[info.Encoding[i]].Width
 	}
 	widthsInfo := font.CompressWidths(ww, unitsPerEm)
 
 	encoding := make([]string, 256)
 	builtin := make([]string, 256)
 	for i := 0; i < 256; i++ {
-		encoding[i] = otf.GlyphName(info.Encoding[i])
-		builtin[i] = otf.GlyphName(cff.Encoding[i])
+		encoding[i] = cff.Glyphs[info.Encoding[i]].Name
+		builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
 	}
+	info.Font.CMap = nil
+	// TODO(voss): for all other font types, check for unnecessary "cmap" tables.
 
 	q := 1000 / float64(unitsPerEm)
-	bbox := otf.BBox()
+	bbox := cff.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -242,7 +244,6 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 
 	isSymbolic := true // TODO(voss): check this
 
-	// See section 9.8.1 of PDF 32000-1:2008.
 	fd := &font.Descriptor{
 		FontName:     fontName,
 		IsFixedPitch: otf.IsFixedPitch(),
@@ -280,7 +281,7 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 	err = otf.WriteCFFOpenTypePDF(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding OpenType font %q: %w", fontName, err)
+		return fmt.Errorf("embedding OpenType/CFF font %q: %w", fontName, err)
 	}
 	err = fontFileStream.Close()
 	if err != nil {
@@ -297,74 +298,80 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
-func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, error) {
+func ExtractSimpleCFF(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, error) {
 	if dicts.Type != font.SimpleOpenTypeCFF {
 		return nil, fmt.Errorf("expected %q, got %q", font.SimpleOpenTypeCFF, dicts.Type)
 	}
-
 	res := &EmbedInfoSimpleCFF{}
-
-	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
-	if err != nil {
-		return nil, err
-	}
-	otf, err := sfnt.Read(stm)
-	if err != nil {
-		return nil, err
-	}
-	cff, ok := otf.Outlines.(*cff.Outlines)
-	if !ok {
-		return nil, fmt.Errorf("expected CFF outlines, got %T", otf.Outlines)
-	}
-	res.Font = otf
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
 	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
 		res.SubsetTag = m[1]
 	}
 
-	builtin := make([]string, 256)
-	for i := 0; i < 256; i++ {
-		builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
-	}
-	nameEncoding, err := font.UndescribeEncodingType1(
-		r, dicts.FontDict["Encoding"], builtin)
-	if err != nil {
-		return nil, pdf.Wrap(err, "font encoding")
-	}
-	rev := make(map[string]glyph.ID)
-	for i, g := range cff.Glyphs {
-		rev[g.Name] = glyph.ID(i)
-	}
-	encoding := make([]glyph.ID, 256)
-	for i, name := range nameEncoding {
-		encoding[i] = rev[name]
-	}
-	res.Encoding = encoding
-
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+		if err != nil {
+			return nil, pdf.Wrap(err, "uncompressing OpenType font stream")
+		}
+		otf, err := sfnt.Read(stm)
+		if err != nil {
+			return nil, pdf.Wrap(err, "decoding OpenType font")
+		}
+		res.Font = otf
 	}
 
-	q := 1000 / float64(otf.UnitsPerEm)
-	ascent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
-	otf.Ascent = funit.Int16(math.Round(float64(ascent) / q))
-	descent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
-	otf.Descent = funit.Int16(math.Round(float64(descent) / q))
-	capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
-	otf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
-	xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"]) // optional
-	otf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
-	leading, _ := pdf.GetNumber(r, dicts.FontDescriptor["Leading"])
-	if ascent-descent < leading {
-		otf.LineGap = funit.Int16(math.Round(float64(leading-ascent+descent) / q))
+	if res.Font != nil {
+		cff, ok := res.Font.Outlines.(*cff.Outlines)
+		if !ok {
+			return nil, fmt.Errorf("expected CFF outlines, got %T", res.Font.Outlines)
+		}
+
+		builtin := make([]string, 256)
+		for i := 0; i < 256; i++ {
+			builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
+		}
+		nameEncoding, err := font.UndescribeEncodingType1(
+			r, dicts.FontDict["Encoding"], builtin)
+		if err != nil {
+			return nil, pdf.Wrap(err, "font encoding")
+		}
+
+		rev := make(map[string]glyph.ID)
+		for i, g := range cff.Glyphs {
+			rev[g.Name] = glyph.ID(i)
+		}
+
+		encoding := make([]glyph.ID, 256)
+		for i, name := range nameEncoding {
+			encoding[i] = rev[name]
+		}
+		res.Encoding = encoding
+
+		q := 1000 / float64(res.Font.UnitsPerEm)
+		ascent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
+		res.Font.Ascent = funit.Int16(math.Round(float64(ascent) / q))
+		descent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
+		res.Font.Descent = funit.Int16(math.Round(float64(descent) / q))
+		capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+		res.Font.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+		xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"]) // optional
+		res.Font.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
+		leading, _ := pdf.GetNumber(r, dicts.FontDescriptor["Leading"])
+		if ascent-descent < leading {
+			res.Font.LineGap = funit.Int16(math.Round(float64(leading-ascent+descent) / q))
+		}
 	}
 
 	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
 	flags := font.Flags(flagsInt)
 	res.IsAllCap = flags&font.FlagAllCap != 0
 	res.IsSmallCap = flags&font.FlagSmallCap != 0
+
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
+	}
 
 	return res, nil
 }

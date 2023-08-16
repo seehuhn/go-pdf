@@ -110,6 +110,21 @@ var (
 	GetString  = resolveAndCast[String]
 )
 
+func GetDictTyped(r Getter, obj Object, tp Name) (Dict, error) {
+	dict, err := GetDict(r, obj)
+	if dict == nil || err != nil {
+		return nil, err
+	}
+	val, err := GetName(r, dict["Type"])
+	if err != nil {
+		return nil, err
+	}
+	if val != tp && val != "" {
+		return nil, fmt.Errorf("expected dict type %q, got %q", tp, val)
+	}
+	return dict, nil
+}
+
 // DecodeStream returns a reader for the decoded stream data.
 // If numFilters is non-zero, only the first numFilters filters are decoded.
 func DecodeStream(r Getter, x *Stream, numFilters int) (io.Reader, error) {
@@ -192,17 +207,6 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 		return nil, errors.New("invalid /Filter field")
 	}
 	return res, nil
-}
-
-func CheckDictType(r Getter, dict Dict, tp Name) error {
-	val, err := GetName(r, dict["Type"])
-	if err != nil {
-		return err
-	}
-	if val != tp && val != "" {
-		return fmt.Errorf("expected dict type %q, got %q", tp, val)
-	}
-	return nil
 }
 
 // TODO(voss): find a better name for this

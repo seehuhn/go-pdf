@@ -94,7 +94,7 @@ func (e *embedded) Close() error {
 		psSubset = psFont
 	}
 
-	// TODO(voss): implement ToUnicode
+	// TODO(voss): generated a ToUnicode map, if needed.
 
 	t1 := &EmbedInfo{
 		PSFont:    psSubset,
@@ -105,8 +105,8 @@ func (e *embedded) Close() error {
 	return t1.Embed(e.w, e.Ref)
 }
 
-// EmbedInfo is all the information about a Type 1 font which is stored when
-// the font is embedded in a PDF file.
+// EmbedInfo holds all the information needed to embed a Type 1 font
+// into a PDF file.
 type EmbedInfo struct {
 	// PSFont is the (subsetted as needed) font to embed.
 	PSFont *type1.Font

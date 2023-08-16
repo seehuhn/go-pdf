@@ -70,7 +70,7 @@ func TestRoundTripCID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info2, err := ExtractCIDInfo(rw, ref)
+	info2, err := ExtractComposite(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

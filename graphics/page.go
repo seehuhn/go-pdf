@@ -34,7 +34,7 @@ type Page struct {
 	Err       error
 
 	currentObject objectType
-	stack         []*graphicsState
+	stack         []*graphicsStateOld
 
 	fillColor   color.Color
 	strokeColor color.Color

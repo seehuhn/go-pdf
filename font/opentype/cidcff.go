@@ -303,12 +303,9 @@ func (info *EmbedInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	return nil
 }
 
+// TODO(voss): use [font.ExtractDicts]
 func ExtractEmbedInfoCFF(r pdf.Getter, ref pdf.Reference) (*EmbedInfoCIDCFF, error) {
-	fontDict, err := pdf.GetDict(r, ref)
-	if err != nil {
-		return nil, err
-	}
-	err = pdf.CheckDictType(r, fontDict, "Font")
+	fontDict, err := pdf.GetDictTyped(r, ref, "Font")
 	if err != nil {
 		return nil, err
 	}
@@ -335,11 +332,7 @@ func ExtractEmbedInfoCFF(r pdf.Getter, ref pdf.Reference) (*EmbedInfoCIDCFF, err
 		toUnicode = info.GetMapping()
 	}
 
-	cidFontDict, err := pdf.GetDict(r, descendantFonts[0])
-	if err != nil {
-		return nil, err
-	}
-	err = pdf.CheckDictType(r, cidFontDict, "Font")
+	cidFontDict, err := pdf.GetDictTyped(r, descendantFonts[0], "Font")
 	if err != nil {
 		return nil, err
 	}
@@ -364,11 +357,7 @@ func ExtractEmbedInfoCFF(r pdf.Getter, ref pdf.Reference) (*EmbedInfoCIDCFF, err
 		ROS = cmap.ROS
 	}
 
-	fontDescriptor, err := pdf.GetDict(r, cidFontDict["FontDescriptor"])
-	if err != nil {
-		return nil, err
-	}
-	err = pdf.CheckDictType(r, fontDescriptor, "FontDescriptor")
+	fontDescriptor, err := pdf.GetDictTyped(r, cidFontDict["FontDescriptor"], "FontDescriptor")
 	if err != nil {
 		return nil, err
 	}

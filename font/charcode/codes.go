@@ -26,7 +26,13 @@ type CharCode int
 
 type CodeSpaceRange interface {
 	Append(pdf.String, CharCode) pdf.String
+
+	// Decode decodes the first character code from the given PDF string.
+	// It returns the character code and the number of bytes consumed.
+	// If the character code cannot be decoded, a code of -1 is returned,
+	// and the length is either 0 (if the string is empty) or 1.
 	Decode(pdf.String) (CharCode, int)
+
 	Ranges() []Range
 }
 

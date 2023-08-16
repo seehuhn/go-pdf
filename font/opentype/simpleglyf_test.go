@@ -19,18 +19,18 @@ package opentype
 import (
 	"math"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func TestRoundTripSimpleCFF(t *testing.T) {
-	otf, err := gofont.OpenType(gofont.GoItalic)
+func TestRoundTripSimple(t *testing.T) {
+	otf, err := gofont.TrueType(gofont.GoItalic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,11 +44,12 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 		66: {'C'},
 	}
 
-	info1 := &EmbedInfoSimpleCFF{
+	info1 := &EmbedInfoSimpleGlyf{
 		Font:      otf,
-		SubsetTag: "UVWXYZ",
+		SubsetTag: "ABCXYZ",
 		Encoding:  encoding,
 		ToUnicode: toUnicode,
+		IsAllCap:  true, // just for testing
 	}
 
 	rw := pdf.NewData(pdf.V1_7)
@@ -62,7 +63,7 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractSimpleCFF(rw, dicts)
+	info2, err := ExtractSimpleGlyf(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,43 +79,34 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 	}
 
 	q := 1000 / float64(info1.Font.UnitsPerEm)
-	// Compare ascent, descent, capHeight in PDF units, since they come from
-	// the PDF font descriptor:
-	if math.Round(info1.Font.Ascent.AsFloat(q)) != math.Round(info2.Font.Ascent.AsFloat(q)) {
-		t.Errorf("info1.Font.Ascent != info2.Font.Ascent: %f != %f", info1.Font.Ascent.AsFloat(q), info2.Font.Ascent.AsFloat(q))
-	}
-	if math.Round(info1.Font.Descent.AsFloat(q)) != math.Round(info2.Font.Descent.AsFloat(q)) {
-		t.Errorf("info1.Font.Descent != info2.Font.Descent: %f != %f", info1.Font.Descent.AsFloat(q), info2.Font.Descent.AsFloat(q))
-	}
+	// Compare capHeight in PDF units, since this comes from the PDF font
+	// descriptor:
 	if math.Round(info1.Font.CapHeight.AsFloat(q)) != math.Round(info2.Font.CapHeight.AsFloat(q)) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*EmbedInfoSimpleCFF{info1, info2} {
-		info.Encoding = nil // already compared above
+	for _, info := range []*EmbedInfoSimpleGlyf{info1, info2} {
+		info.Encoding = nil       // already compared above
+		info.Font.CMapTable = nil // already tested when comparing the encodings
+		info.Font.CMap = nil      // all but encoding information is optional
 
-		info.Font.Ascent = 0    // already compared above
-		info.Font.Descent = 0   // already compared above
 		info.Font.CapHeight = 0 // already compared above
 
-		info.Font.Width = 0                      // "OS/2" table is optional
-		info.Font.IsRegular = false              // "OS/2" table is optional
-		info.Font.CodePageRange = 0              // "OS/2" table is optional
-		info.Font.CreationTime = time.Time{}     // "head" table is optional
-		info.Font.ModificationTime = time.Time{} // "head" table is optional
-		info.Font.Description = ""               // "name" table is optional
-		info.Font.Trademark = ""                 // "name" table is optional
-		info.Font.License = ""                   // "name" table is optional
-		info.Font.LicenseURL = ""                // "name" table is optional
-		info.Font.PermUse = 0                    // "OS/2" table is optional
-		info.Font.LineGap = 0                    // "OS/2" and "hmtx" tables are optional
-		info.Font.XHeight = 0                    // "OS/2" table is optional
+		info.Font.FamilyName = ""        // "name" table is optional
+		info.Font.Width = 0              // "OS/2" table is optional
+		info.Font.Weight = 0             // "OS/2" table is optional
+		info.Font.IsRegular = false      // "OS/2" table is optional
+		info.Font.CodePageRange = 0      // "OS/2" table is optional
+		info.Font.Description = ""       // "name" table is optional
+		info.Font.Copyright = ""         // "name" table is optional
+		info.Font.Trademark = ""         // "name" table is optional
+		info.Font.License = ""           // "name" table is optional
+		info.Font.LicenseURL = ""        // "name" table is optional
+		info.Font.XHeight = 0            // "OS/2" table is optional
+		info.Font.UnderlinePosition = 0  // "post" table is optional
+		info.Font.UnderlineThickness = 0 // "post" table is optional
 
-		// TODO(voss): make this match, and ignore font.CMap instead
-		info.Font.CMapTable = nil
-
-		// TODO(voss): reenable this once https://github.com/google/go-cmp/issues/335 is resolved
-		info.Font.Outlines = nil
+		info.Font.Outlines.(*glyf.Outlines).Names = nil // "post" table is optional
 	}
 
 	if d := cmp.Diff(info1, info2); d != "" {

@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// TODO(voss): return font.Font instead of type1.Font?
 func Type1(font FontID) (*type1.Font, error) {
 	info, err := TrueType(font)
 	if err != nil {

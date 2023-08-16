@@ -24,18 +24,20 @@ import (
 	"math"
 
 	"golang.org/x/text/language"
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 )
 
 type SimpleFont struct {
@@ -289,7 +291,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	if err != nil {
 		return err
 	}
-	err = cff.Encode(fontFileStream)
+	err = cff.Write(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding CFF font %q: %w", fontName, err)
 	}
@@ -308,11 +310,16 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	return nil
 }
 
-func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
+func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	if dicts.Type != font.SimpleCFF {
 		return nil, fmt.Errorf("expected %q, got %q", font.SimpleCFF, dicts.Type)
 	}
 	res := &EmbedInfoSimple{}
+
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
+	}
 
 	if dicts.FontProgram != nil {
 		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
@@ -331,15 +338,11 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		res.Font = cff
 	}
 
-	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
-	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
-		res.SubsetTag = m[1]
-	}
-
-	var unitsPerEm uint16 = 1000
+	var unitsPerEm uint16 = 1000 // updated below, in case we have font data
+	var builtin []string
 	if res.Font != nil {
 		cff := res.Font
-		builtin := make([]string, 256)
+		builtin = make([]string, 256)
 		for i := 0; i < 256; i++ {
 			builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
 		}
@@ -364,27 +367,18 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 			unitsPerEm = uint16(math.Round(1 / cff.FontMatrix[0]))
 		}
 	}
-
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
-	}
+	// If the font is non-symbolic and not embedded, we could still get
+	// the glyphnames for the encoding, but not the GIDs.
 
 	res.UnitsPerEm = unitsPerEm
 
 	q := 1000 / float64(unitsPerEm)
-	ascent, err := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
-	if err == nil {
-		res.Ascent = funit.Int16(math.Round(float64(ascent) / q))
-	}
-	descent, err := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
-	if err == nil {
-		res.Descent = funit.Int16(math.Round(float64(descent) / q))
-	}
-	capHeight, err := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
-	if err == nil {
-		res.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
-	}
+	ascent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
+	res.Ascent = funit.Int16(math.Round(float64(ascent) / q))
+	descent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
+	res.Descent = funit.Int16(math.Round(float64(descent) / q))
+	capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+	res.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
 
 	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
 	flags := font.Flags(flagsInt)
@@ -392,6 +386,11 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	res.IsScript = flags&font.FlagScript != 0
 	res.IsAllCap = flags&font.FlagAllCap != 0
 	res.IsSmallCap = flags&font.FlagSmallCap != 0
+
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
+	}
 
 	return res, nil
 }

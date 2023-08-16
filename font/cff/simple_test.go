@@ -66,7 +66,7 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := Extract(rw, dicts)
+	info2, err := ExtractSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}

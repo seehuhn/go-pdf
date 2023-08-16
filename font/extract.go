@@ -94,11 +94,7 @@ type Dicts struct {
 func ExtractDicts(r pdf.Getter, ref pdf.Reference) (*Dicts, error) {
 	res := &Dicts{}
 
-	fontDict, err := pdf.GetDict(r, ref)
-	if err != nil {
-		return nil, err
-	}
-	err = pdf.CheckDictType(r, fontDict, "Font")
+	fontDict, err := pdf.GetDictTyped(r, ref, "Font")
 	if err != nil {
 		return nil, err
 	}
@@ -118,11 +114,7 @@ func ExtractDicts(r pdf.Getter, ref pdf.Reference) (*Dicts, error) {
 			return nil, fmt.Errorf("invalid descendant fonts: %v", descendantFonts)
 		}
 
-		cidFontDict, err := pdf.GetDict(r, descendantFonts[0])
-		if err != nil {
-			return nil, err
-		}
-		err = pdf.CheckDictType(r, cidFontDict, "Font")
+		cidFontDict, err := pdf.GetDictTyped(r, descendantFonts[0], "Font")
 		if err != nil {
 			return nil, err
 		}

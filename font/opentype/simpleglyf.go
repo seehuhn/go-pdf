@@ -19,6 +19,7 @@ package opentype
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/text/language"
 
@@ -29,6 +30,7 @@ import (
 	"seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
+	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -36,6 +38,7 @@ import (
 	pdfcmap "seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
+	"seehuhn.de/go/pdf/font/truetype"
 )
 
 type SimpleFontGlyf struct {
@@ -150,7 +153,7 @@ func (f *embeddedSimpleGlyf) Close() error {
 		m[charcode.CharCode(code)] = f.text[gid]
 	}
 
-	info := EmbedInfoGlyf{
+	info := EmbedInfoSimpleGlyf{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
@@ -159,8 +162,7 @@ func (f *embeddedSimpleGlyf) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-// TODO(voss): should this be merged with truetype.PDFInfo?
-type EmbedInfoGlyf struct {
+type EmbedInfoSimpleGlyf struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -182,7 +184,7 @@ type EmbedInfoGlyf struct {
 	IsSmallCap bool
 }
 
-func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoSimpleGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err
@@ -208,10 +210,14 @@ func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
 	// character codes to glyphs.
+	//
+	// TODO(voss): also try the two allowed encodings for "non-symbolic" fonts.
+	//
+	// TODO(voss): merge with the code for TrueType fonts.
 	isSymbolic := true
 	subtable := cmap.Format4{}
 	for i, gid := range info.Encoding {
-		if gid == 0 || i >= 256 {
+		if gid == 0 {
 			continue
 		}
 		subtable[uint16(i)] = gid
@@ -311,4 +317,87 @@ func (info *EmbedInfoGlyf) Embed(w pdf.Putter, fontDictRef pdf.Reference) error 
 	}
 
 	return nil
+}
+
+func ExtractSimpleGlyf(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleGlyf, error) {
+	if dicts.Type != font.SimpleOpenTypeGlyf {
+		return nil, fmt.Errorf("expected %q, got %q", font.SimpleOpenTypeGlyf, dicts.Type)
+	}
+	res := &EmbedInfoSimpleGlyf{}
+
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
+	}
+
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+		if err != nil {
+			return nil, pdf.Wrap(err, "uncompressing TrueType font stream")
+		}
+		otf, err := sfnt.Read(stm)
+		if err != nil {
+			return nil, pdf.Wrap(err, "decoding TrueType font")
+		}
+		if otf.FamilyName == "" {
+			familyName, _ := pdf.GetName(r, dicts.FontDescriptor["FontFamily"])
+			otf.FamilyName = string(familyName)
+		}
+		if otf.Width == 0 {
+			width, _ := pdf.GetName(r, dicts.FontDescriptor["FontStretch"])
+			switch width {
+			case "UltraCondensed":
+				otf.Width = os2.WidthUltraCondensed
+			case "ExtraCondensed":
+				otf.Width = os2.WidthExtraCondensed
+			case "Condensed":
+				otf.Width = os2.WidthCondensed
+			case "SemiCondensed":
+				otf.Width = os2.WidthSemiCondensed
+			case "Normal":
+				otf.Width = os2.WidthNormal
+			case "SemiExpanded":
+				otf.Width = os2.WidthSemiExpanded
+			case "Expanded":
+				otf.Width = os2.WidthExpanded
+			case "ExtraExpanded":
+				otf.Width = os2.WidthExtraExpanded
+			case "UltraExpanded":
+				otf.Width = os2.WidthUltraExpanded
+			}
+		}
+		if otf.Weight == 0 {
+			weight, _ := pdf.GetNumber(r, dicts.FontDescriptor["FontWeight"])
+			if weight > 0 {
+				otf.Weight = os2.Weight(math.Round(float64(weight))).Rounded()
+			}
+		}
+		q := 1000 / float64(otf.UnitsPerEm)
+		if otf.CapHeight == 0 {
+			capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+			otf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+		}
+		if otf.XHeight == 0 {
+			xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"])
+			otf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
+		}
+
+		res.Font = otf
+	}
+
+	if res.Font != nil {
+		res.Encoding = truetype.ExtractEncoding(r, dicts.FontDict["Encoding"], res.Font)
+	}
+
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
+	}
+
+	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
+	flags := font.Flags(flagsInt)
+	res.IsAllCap = flags&font.FlagAllCap != 0
+	res.IsSmallCap = flags&font.FlagSmallCap != 0
+
+	return res, nil
 }

@@ -304,7 +304,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	if err != nil {
 		return err
 	}
-	err = cffFont.Encode(fontFileStream)
+	err = cffFont.Write(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding CFF CIDFont %q: %w", cidFontName, err)
 	}
@@ -330,12 +330,8 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
-func ExtractCIDInfo(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, error) {
-	fontDict, err := pdf.GetDict(r, ref)
-	if err != nil {
-		return nil, err
-	}
-	err = pdf.CheckDictType(r, fontDict, "Font")
+func ExtractComposite(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, error) {
+	fontDict, err := pdf.GetDictTyped(r, ref, "Font")
 	if err != nil {
 		return nil, err
 	}
@@ -362,11 +358,7 @@ func ExtractCIDInfo(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, error
 		toUnicode = info.GetMapping()
 	}
 
-	cidFontDict, err := pdf.GetDict(r, descendantFonts[0])
-	if err != nil {
-		return nil, err
-	}
-	err = pdf.CheckDictType(r, cidFontDict, "Font")
+	cidFontDict, err := pdf.GetDictTyped(r, descendantFonts[0], "Font")
 	if err != nil {
 		return nil, err
 	}
@@ -391,11 +383,7 @@ func ExtractCIDInfo(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, error
 		ROS = cmap.ROS
 	}
 
-	fontDescriptor, err := pdf.GetDict(r, cidFontDict["FontDescriptor"])
-	if err != nil {
-		return nil, err
-	}
-	err = pdf.CheckDictType(r, fontDescriptor, "FontDescriptor")
+	fontDescriptor, err := pdf.GetDictTyped(r, cidFontDict["FontDescriptor"], "FontDescriptor")
 	if err != nil {
 		return nil, err
 	}

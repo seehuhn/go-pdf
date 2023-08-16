@@ -40,11 +40,6 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
 		defer r.Close()
 		return Read(r, nil)
 	case *pdf.Stream:
-		err := pdf.CheckDictType(r, obj.Dict, "CMap")
-		if err != nil {
-			return nil, err
-		}
-
 		if _, ok := obj.Dict["UseCMap"].(pdf.Name); ok {
 			panic("not implemented: UseCMap") // TODO(voss): implement this
 		}
