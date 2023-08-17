@@ -18,6 +18,7 @@ package charcode
 
 import (
 	"bytes"
+	"reflect"
 
 	"seehuhn.de/go/pdf"
 )
@@ -31,6 +32,8 @@ func NewCodeSpace(ranges []Range) CodeSpaceRange {
 		if bytes.Equal(r.Low, []byte{0x00, 0x00}) && bytes.Equal(r.High, []byte{0xFF, 0xFF}) {
 			return UCS2
 		}
+	} else if len(ranges) == 4 && reflect.DeepEqual(ranges, UTF8.Ranges()) {
+		return UTF8
 	}
 
 	res := make(customCS, len(ranges))

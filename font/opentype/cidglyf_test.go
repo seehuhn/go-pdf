@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package opentype
 
 import (
-	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,32 +24,44 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func TestRoundTripSimple(t *testing.T) {
-	ttf, err := gofont.TrueType(gofont.GoItalic)
+func TestRoundTripGlyfComposite(t *testing.T) {
+	ttf, err := gofont.TrueType(gofont.GoSmallcapsItalic)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	encoding := make([]glyph.ID, 256)
-	encoding[65] = ttf.CMap.Lookup('A')
-	encoding[66] = ttf.CMap.Lookup('C')
-
-	toUnicode := map[charcode.CharCode][]rune{
-		65: {'A'},
-		66: {'C'},
+	cs := charcode.UTF8
+	ros := &type1.CIDSystemInfo{
+		Registry:   "Test",
+		Ordering:   "Merkwürdig",
+		Supplement: 7,
 	}
-
-	info1 := &EmbedInfoSimple{
+	cmap := make(map[charcode.CharCode]type1.CID, 8)
+	cmap[charcode.CharCode('A')] = type1.CID(ttf.CMap.Lookup('A'))
+	cmap[charcode.CharCode('B')] = type1.CID(ttf.CMap.Lookup('B'))
+	cmap[charcode.CharCode('C')] = type1.CID(ttf.CMap.Lookup('C'))
+	maxCID := type1.CID(ttf.CMap.Lookup('C'))
+	CID2GID := make([]glyph.ID, maxCID+1)
+	for cid := type1.CID(0); cid <= maxCID; cid++ {
+		CID2GID[cid] = glyph.ID(cid)
+	}
+	toUnicode := make(map[charcode.CharCode][]rune, 8)
+	toUnicode[charcode.CharCode('A')] = []rune{'A'}
+	toUnicode[charcode.CharCode('B')] = []rune{'B'}
+	toUnicode[charcode.CharCode('C')] = []rune{'C'}
+	info1 := &EmbedInfoGlyfComposite{
 		Font:       ttf,
-		SubsetTag:  "ABCXYZ",
-		Encoding:   encoding,
+		SubsetTag:  "ZZZZZZ",
+		CS:         cs,
+		ROS:        ros,
+		CMap:       cmap,
+		CID2GID:    CID2GID,
 		ToUnicode:  toUnicode,
-		IsSmallCap: true, // just for testing
-		ForceBold:  true, // just for testing
+		IsSmallCap: true,
 	}
 
 	rw := pdf.NewData(pdf.V1_7)
@@ -64,34 +75,14 @@ func TestRoundTripSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractSimple(rw, dicts)
+	info2, err := ExtractGlyfComposite(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Compare encodings:
-	if len(info1.Encoding) != len(info2.Encoding) {
-		t.Fatalf("len(info1.Encoding) != len(info2.Encoding): %d != %d", len(info1.Encoding), len(info2.Encoding))
-	}
-	for i, gid := range info1.Encoding {
-		if gid != 0 && gid != info2.Encoding[i] {
-			t.Errorf("info1.Encoding[%d] != info2.Encoding[%d]: %d != %d", i, i, gid, info2.Encoding[i])
-		}
-	}
-
-	q := 1000 / float64(info1.Font.UnitsPerEm)
-	// Compare capHeight in PDF units, since this comes from the PDF font
-	// descriptor:
-	if math.Round(info1.Font.CapHeight.AsFloat(q)) != math.Round(info2.Font.CapHeight.AsFloat(q)) {
-		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
-	}
-
-	for _, info := range []*EmbedInfoSimple{info1, info2} {
-		info.Encoding = nil       // already compared above
-		info.Font.CMapTable = nil // already tested when comparing the encodings
-		info.Font.CMap = nil      // all but encoding information is optional
-
-		info.Font.CapHeight = 0 // already compared above
+	for _, info := range []*EmbedInfoGlyfComposite{info1, info2} {
+		info.Font.CMapTable = nil // "cmap" table is optional
+		info.Font.CMap = nil      // "cmap" table is optional
 
 		info.Font.FamilyName = ""        // "name" table is optional
 		info.Font.Width = 0              // "OS/2" table is optional

@@ -190,16 +190,15 @@ func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 		dict["V"] = Integer(5)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
-		dict["Length"] = Integer(256)
 		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(256), "CFM": Name("AESV3")},
+			"StdCF": Dict{"Length": Integer(32), "CFM": Name("AESV3")},
 		}
 	} else if cipher == cipherAES && length == 128 && version >= V1_6 {
 		dict["V"] = Integer(4)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
 		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(128), "CFM": Name("AESV2")},
+			"StdCF": Dict{"Length": Integer(16), "CFM": Name("AESV2")},
 		}
 	} else if cipher == cipherRC4 && length == 40 && version >= V1_1 {
 		dict["V"] = Integer(1)

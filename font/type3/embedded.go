@@ -43,7 +43,7 @@ func (e *embedded) Close() error {
 	subset := make(map[string]*Glyph)
 	for i, gid := range encoding {
 		// Gid 0 maps to the empty glyph name, which is not in the charProcs map.
-		if glyph := e.charProcs[e.glyphNames[gid]]; glyph != nil {
+		if glyph := e.Glyphs[e.glyphNames[gid]]; glyph != nil {
 			name := e.glyphNames[gid]
 			encodingNames[i] = name
 			subset[name] = glyph
@@ -61,9 +61,10 @@ func (e *embedded) Close() error {
 			IsSmallCap:   e.IsSmallCap,
 			ForceBold:    e.ForceBold,
 			ItalicAngle:  e.ItalicAngle,
+			StemV:        -1,
 		}
 		if pdf.GetVersion(e.w) == pdf.V1_0 {
-			// required by PDF 2.0 specification errata:
+			// required by PDF 2.0 specification errata, if the font dictionary has a Name entry
 			// https://pdf-issues.pdfa.org/32000-2-2020/clause09.html#H9.8.1
 			descriptor.FontName = string(e.Name)
 		}
@@ -73,10 +74,9 @@ func (e *embedded) Close() error {
 	// TODO(voss): construct a toUnicode map, when needed
 
 	info := &EmbedInfo{
-		FontMatrix: e.fontMatrix,
+		FontMatrix: e.FontMatrix,
 		Glyphs:     subset,
-		Resources:  e.resources,
-		Descriptor: descriptor,
+		Resources:  e.Resources,
 		Encoding:   encodingNames,
 		ToUnicode:  toUnicode,
 		ResName:    e.Name,

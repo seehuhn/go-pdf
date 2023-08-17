@@ -19,9 +19,12 @@ package truetype
 import (
 	"errors"
 	"fmt"
+	"io"
+	"math"
 
 	"golang.org/x/text/language"
 
+	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
@@ -266,8 +269,9 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		FontName:     fontName,
 		IsFixedPitch: ttf.IsFixedPitch(),
 		IsSerif:      ttf.IsSerif,
+		IsSymbolic:   isSymbolic,
 		IsScript:     ttf.IsScript,
-		IsItalic:     ttf.ItalicAngle != 0,
+		IsItalic:     ttf.IsItalic,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    info.ForceBold,
@@ -277,7 +281,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		Descent:      ttf.Descent.AsFloat(q),
 		CapHeight:    ttf.CapHeight.AsFloat(q),
 	}
-	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile2"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fontDescriptorRef}
@@ -318,7 +322,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = tounicode.Embed(w, toUnicodeRef, info.CS, info.ToUnicode)
 		if err != nil {
 			return err
 		}
@@ -349,4 +353,115 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	return nil
+}
+
+func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, error) {
+	if err := dicts.Type.MustBe(font.TrueTypeComposite); err != nil {
+		return nil, err
+	}
+	res := &EmbedInfoComposite{}
+
+	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	if err != nil {
+		return nil, err
+	}
+	ttf, err := sfnt.Read(stm)
+	if err != nil {
+		return nil, err
+	}
+	_, ok := ttf.Outlines.(*glyf.Outlines)
+	if !ok {
+		return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
+	}
+	if ttf.FamilyName == "" {
+		ttf.FamilyName = dicts.FontDescriptor.FontFamily
+	}
+	if ttf.Width == 0 {
+		ttf.Width = dicts.FontDescriptor.FontStretch
+	}
+	if ttf.Weight == 0 {
+		ttf.Weight = dicts.FontDescriptor.FontWeight
+	}
+	ttf.IsItalic = dicts.FontDescriptor.IsItalic
+	ttf.IsSerif = dicts.FontDescriptor.IsSerif
+	ttf.IsScript = dicts.FontDescriptor.IsScript
+	q := 1000 / float64(ttf.UnitsPerEm)
+	if ttf.CapHeight == 0 {
+		capHeight := dicts.FontDescriptor.CapHeight
+		ttf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+	}
+	if ttf.XHeight == 0 {
+		xHeight := dicts.FontDescriptor.XHeight
+		ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
+	}
+	res.Font = ttf
+
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
+	}
+
+	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
+	if err != nil {
+		return nil, err
+	}
+	var ROS *type1.CIDSystemInfo
+	if rosDict, _ := pdf.GetDict(r, dicts.CIDFontDict["CIDSystemInfo"]); rosDict != nil {
+		registry, _ := pdf.GetString(r, rosDict["Registry"])
+		ordering, _ := pdf.GetString(r, rosDict["Ordering"])
+		supplement, _ := pdf.GetInteger(r, rosDict["Supplement"])
+		ROS = &type1.CIDSystemInfo{
+			Registry:   string(registry),
+			Ordering:   string(ordering),
+			Supplement: int32(supplement),
+		}
+	}
+	if ROS == nil {
+		ROS = cmap.ROS
+	}
+	res.CS = cmap.CS
+	res.ROS = ROS
+	res.CMap = cmap.GetMapping()
+
+	CID2GIDObj, err := pdf.Resolve(r, dicts.CIDFontDict["CIDToGIDMap"])
+	if err != nil {
+		return nil, err
+	}
+	switch CID2GID := CID2GIDObj.(type) {
+	case pdf.Name:
+		if CID2GID != "Identity" {
+			return nil, fmt.Errorf("unsupported CIDToGIDMap: %q", CID2GID)
+		}
+		res.CID2GID = make([]glyph.ID, ttf.NumGlyphs())
+		for i := range res.CID2GID {
+			res.CID2GID[i] = glyph.ID(i)
+		}
+	case *pdf.Stream:
+		in, err := pdf.DecodeStream(r, CID2GID, 0)
+		if err != nil {
+			return nil, err
+		}
+		cid2gidData, err := io.ReadAll(in)
+		if err == nil && len(cid2gidData)%2 != 0 {
+			err = fmt.Errorf("odd length CIDToGIDMap")
+		}
+		if err != nil {
+			return nil, err
+		}
+		res.CID2GID = make([]glyph.ID, len(cid2gidData)/2)
+		for i := range res.CID2GID {
+			res.CID2GID[i] = glyph.ID(cid2gidData[2*i])<<8 | glyph.ID(cid2gidData[2*i+1])
+		}
+	}
+
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
+	}
+
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+	res.ForceBold = dicts.FontDescriptor.ForceBold
+
+	return res, nil
 }

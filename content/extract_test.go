@@ -24,7 +24,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/extract"
 	"seehuhn.de/go/pdf/internal/debug"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -57,6 +56,8 @@ func TestExtract(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			// os.WriteFile("debug.pdf", buf.Bytes(), 0644)
+
 			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 			if err != nil {
 				t.Fatal(err)
@@ -71,7 +72,7 @@ func TestExtract(t *testing.T) {
 				if f, ok := decoders[ref]; ok {
 					return f, nil
 				}
-				f, err := extract.MakeTextDecoder(r, ref)
+				f, err := MakeTextDecoder(r, ref)
 				if err != nil {
 					return nil, err
 				}

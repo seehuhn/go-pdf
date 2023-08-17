@@ -17,6 +17,8 @@
 package font
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/sfnt/os2"
 )
@@ -25,17 +27,20 @@ import (
 //
 // See section 9.8.1 of PDF 32000-1:2008.
 type Descriptor struct {
-	FontName     string         // required
-	FontFamily   string         // optional
-	FontStretch  os2.Width      // optional
-	FontWeight   os2.Weight     // optional
-	IsFixedPitch bool           // required
-	IsSerif      bool           // required
-	IsScript     bool           // required
-	IsItalic     bool           // required
-	IsAllCap     bool           // required
-	IsSmallCap   bool           // required
-	ForceBold    bool           // required
+	FontName    string     // required
+	FontFamily  string     // optional
+	FontStretch os2.Width  // optional
+	FontWeight  os2.Weight // optional
+
+	IsFixedPitch bool // flag
+	IsSerif      bool // flag
+	IsSymbolic   bool // flag
+	IsScript     bool // flag
+	IsItalic     bool // flag
+	IsAllCap     bool // flag
+	IsSmallCap   bool // flag
+	ForceBold    bool // flag
+
 	FontBBox     *pdf.Rectangle // required, except for Type 3 fonts
 	ItalicAngle  float64        // required
 	Ascent       float64        // required, except for Type 3 fonts
@@ -50,33 +55,178 @@ type Descriptor struct {
 	MissingWidth pdf.Number     // optional (default: 0)
 }
 
-func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
+func DecodeDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
+	fontDescriptor, err := pdf.GetDictTyped(r, obj, "FontDescriptor")
+	if err != nil {
+		return nil, err
+	}
+
+	res := &Descriptor{}
+
+	fontName, err := pdf.GetName(r, fontDescriptor["FontName"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "FontName")
+	}
+	res.FontName = string(fontName)
+
+	fontFamily, err := pdf.GetString(r, fontDescriptor["FontFamily"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "FontFamily")
+	}
+	res.FontFamily = string(fontFamily)
+
+	fontStretch, err := pdf.GetName(r, fontDescriptor["FontStretch"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "FontStretch")
+	}
+	switch fontStretch {
+	case "UltraCondensed":
+		res.FontStretch = os2.WidthUltraCondensed
+	case "ExtraCondensed":
+		res.FontStretch = os2.WidthExtraCondensed
+	case "Condensed":
+		res.FontStretch = os2.WidthCondensed
+	case "SemiCondensed":
+		res.FontStretch = os2.WidthSemiCondensed
+	case "Normal":
+		res.FontStretch = os2.WidthNormal
+	case "SemiExpanded":
+		res.FontStretch = os2.WidthSemiExpanded
+	case "Expanded":
+		res.FontStretch = os2.WidthExpanded
+	case "ExtraExpanded":
+		res.FontStretch = os2.WidthExtraExpanded
+	case "UltraExpanded":
+		res.FontStretch = os2.WidthUltraExpanded
+	}
+
+	fontWeight, err := pdf.GetNumber(r, fontDescriptor["FontWeight"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "FontWeight")
+	}
+	if fontWeight > 0 && fontWeight < 1000 {
+		res.FontWeight = os2.Weight(math.Round(float64(fontWeight))).Rounded()
+	}
+
+	flags, err := pdf.GetInteger(r, fontDescriptor["Flags"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "Flags")
+	}
+	res.IsFixedPitch = flags&flagFixedPitch != 0
+	res.IsSerif = flags&flagSerif != 0
+	res.IsSymbolic = flags&flagSymbolic != 0
+	res.IsScript = flags&flagScript != 0
+	res.IsItalic = flags&flagItalic != 0
+	res.IsAllCap = flags&flagAllCap != 0
+	res.IsSmallCap = flags&flagSmallCap != 0
+	res.ForceBold = flags&flagForceBold != 0
+
+	fontBBox, err := pdf.GetRectangle(r, fontDescriptor["FontBBox"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "FontBBox")
+	}
+	res.FontBBox = fontBBox
+
+	italicAngle, err := pdf.GetNumber(r, fontDescriptor["ItalicAngle"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "ItalicAngle")
+	}
+	res.ItalicAngle = float64(italicAngle)
+
+	ascent, err := pdf.GetNumber(r, fontDescriptor["Ascent"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "Ascent")
+	}
+	res.Ascent = float64(ascent)
+
+	descent, err := pdf.GetNumber(r, fontDescriptor["Descent"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "Descent")
+	}
+	res.Descent = float64(descent)
+
+	leading, err := pdf.GetNumber(r, fontDescriptor["Leading"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "Leading")
+	}
+	res.Leading = float64(leading)
+
+	capHeight, err := pdf.GetNumber(r, fontDescriptor["CapHeight"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "CapHeight")
+	}
+	res.CapHeight = float64(capHeight)
+
+	xHeight, err := pdf.GetNumber(r, fontDescriptor["XHeight"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "XHeight")
+	}
+	res.XHeight = float64(xHeight)
+
+	if stemVObj, ok := fontDescriptor["StemV"]; ok {
+		stemV, err := pdf.GetNumber(r, stemVObj)
+		if err != nil {
+			return nil, pdf.Wrap(err, "StemV")
+		}
+		res.StemV = float64(stemV)
+	} else {
+		res.StemV = -1
+	}
+
+	stemH, err := pdf.GetNumber(r, fontDescriptor["StemH"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "StemH")
+	}
+	res.StemH = float64(stemH)
+
+	maxWidth, err := pdf.GetNumber(r, fontDescriptor["MaxWidth"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "MaxWidth")
+	}
+	res.MaxWidth = float64(maxWidth)
+
+	avgWidth, err := pdf.GetNumber(r, fontDescriptor["AvgWidth"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "AvgWidth")
+	}
+	res.AvgWidth = float64(avgWidth)
+
+	missingWidth, err := pdf.GetNumber(r, fontDescriptor["MissingWidth"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "MissingWidth")
+	}
+	res.MissingWidth = missingWidth
+
+	return res, nil
+}
+
+func (d *Descriptor) AsDict() pdf.Dict {
 	var flags pdf.Integer
 	if d.IsFixedPitch {
-		flags |= 1 << (1 - 1)
+		flags |= flagFixedPitch
 	}
 	if d.IsSerif {
-		flags |= 1 << (2 - 1)
+		flags |= flagSerif
 	}
-	if isSymbolic {
-		flags |= 1 << (3 - 1)
+	if d.IsSymbolic {
+		flags |= flagSymbolic
 	} else {
-		flags |= 1 << (6 - 1)
+		flags |= flagNonsymbolic
 	}
 	if d.IsScript {
-		flags |= 1 << (4 - 1)
+		flags |= flagScript
 	}
 	if d.IsItalic {
-		flags |= 1 << (7 - 1)
+		flags |= flagItalic
 	}
 	if d.IsAllCap {
-		flags |= 1 << (17 - 1)
+		flags |= flagAllCap
 	}
 	if d.IsSmallCap {
-		flags |= 1 << (18 - 1)
+		flags |= flagSmallCap
 	}
 	if d.ForceBold {
-		flags |= 1 << (19 - 1)
+		flags |= flagForceBold
 	}
 
 	dict := pdf.Dict{
@@ -89,7 +239,7 @@ func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
 		dict["FontName"] = pdf.Name(d.FontName)
 	}
 	if d.FontFamily != "" {
-		dict["FontFamily"] = pdf.Name(d.FontFamily)
+		dict["FontFamily"] = pdf.String(d.FontFamily)
 	}
 	switch d.FontStretch {
 	case os2.WidthUltraCondensed:
@@ -150,3 +300,16 @@ func (d *Descriptor) AsDict(isSymbolic bool) pdf.Dict {
 
 	return dict
 }
+
+// Possible values for PDF Font Descriptor Flags.
+const (
+	flagFixedPitch  pdf.Integer = 1 << 0  // All glyphs have the same width (as opposed to proportional or variable-pitch fonts, which have different widths).
+	flagSerif       pdf.Integer = 1 << 1  // Glyphs have serifs, which are short strokes drawn at an angle on the top and bottom of glyph stems. (Sans serif fonts do not have serifs.)
+	flagSymbolic    pdf.Integer = 1 << 2  // Font contains glyphs outside the Adobe standard Latin character set. This flag and the Nonsymbolic flag shall not both be set or both be clear.
+	flagScript      pdf.Integer = 1 << 3  // Glyphs resemble cursive handwriting.
+	flagNonsymbolic pdf.Integer = 1 << 5  // Font uses the Adobe standard Latin character set or a subset of it.
+	flagItalic      pdf.Integer = 1 << 6  // Glyphs have dominant vertical strokes that are slanted.
+	flagAllCap      pdf.Integer = 1 << 16 // Font contains no lowercase letters; typically used for display purposes, such as for titles or headlines.
+	flagSmallCap    pdf.Integer = 1 << 17 // Font contains both uppercase and lowercase letters.  The uppercase letters are similar to those in the regular version of the same typeface family. The glyphs for the lowercase letters have the same shapes as the corresponding uppercase letters, but they are sized and their proportions adjusted so that they have the same size and stroke weight as lowercase glyphs in the same typeface family.
+	flagForceBold   pdf.Integer = 1 << 18 // ...
+)

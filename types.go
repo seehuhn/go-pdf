@@ -191,6 +191,8 @@ func (x String) PDF(w io.Writer) error {
 func (x String) AsTextString() string {
 	if isUTF16(string(x)) {
 		return utf16Decode(x[2:])
+	} else if isUTF8(string(x)) {
+		return string(x[3:])
 	}
 	return pdfDocDecode(x)
 }
@@ -202,6 +204,7 @@ func TextString(s string) String {
 	if ok {
 		return buf
 	}
+	// TODO(voss): for PDF >=2.0 we should use UTF-8 encoding here
 	return utf16Encode(s)
 }
 

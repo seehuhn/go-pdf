@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/postscript/type1"
@@ -70,7 +71,11 @@ func TestRoundTripCID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info2, err := ExtractComposite(rw, ref)
+	dicts, err := font.ExtractDicts(rw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info2, err := ExtractComposite(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}

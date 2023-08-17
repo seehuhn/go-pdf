@@ -105,21 +105,24 @@ fieldLoop:
 }
 
 // DecodeDict initialises a struct using the data from a PDF dictionary.
-// The argument s must be a pointer to a struct, or the function will panic.
+// The argument dst must be a pointer to a struct, or the function will panic.
 //
 // Go struct tags can be used to control the decoding process.  The following
 // tags are supported:
+//
 //   - "optional": the field is optional and may be omitted from the PDF
-//     dictionary.  Omitted fields correspond to the Go zero value for the
+//     dictionary.  Omitted fields default to the Go zero value for the
 //     field type.
 //   - "text string": the field is a string which should be encoded as a PDF
 //     text string.
 //   - "allowstring": the field is a Name, but the PDF dictionary may contain
-//     a String instead.  The String will be converted to a Name.
-//   - "extra": the field is a map[string]string which should contain all
+//     a String instead.  If a String is found, it will be converted to a Name.
+//   - "extra": the field is a map[string]string which contains all
 //     entries in the PDF dictionary which are not otherwise decoded.
-func DecodeDict(r Getter, s interface{}, d Dict) error {
-	v := reflect.Indirect(reflect.ValueOf(s))
+//
+// This function is the converse of [AsDict].
+func DecodeDict(r Getter, dst interface{}, src Dict) error {
+	v := reflect.Indirect(reflect.ValueOf(dst))
 	vt := v.Type()
 
 	// To allow parsing malformed PDF files, we don't abort on error.  Instead,
@@ -158,7 +161,7 @@ fieldLoop:
 		}
 
 		// get and fix up the value from the Dict
-		dictVal := d[Name(fInfo.Name)]
+		dictVal := src[Name(fInfo.Name)]
 		if fInfo.Type != objectType && fInfo.Type != refType {
 			// follow references to indirect objects where needed
 			obj, err := Resolve(r, dictVal)
@@ -255,7 +258,7 @@ fieldLoop:
 
 	if extra >= 0 {
 		extraDict := make(map[string]string)
-		for keyName, valObj := range d {
+		for keyName, valObj := range src {
 			key := string(keyName)
 			if seen[key] {
 				continue

@@ -260,6 +260,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		FontName:     fontName,
 		IsFixedPitch: cff.IsFixedPitch,
 		IsSerif:      info.IsSerif,
+		IsSymbolic:   isSymbolic,
 		IsScript:     info.IsScript,
 		IsItalic:     info.Font.ItalicAngle != 0,
 		IsAllCap:     info.IsAllCap,
@@ -273,7 +274,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		StemV:        cff.Private[0].StdVW * q,
 		MissingWidth: widthsInfo.MissingWidth,
 	}
-	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile3"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
@@ -311,8 +312,8 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 }
 
 func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
-	if dicts.Type != font.SimpleCFF {
-		return nil, fmt.Errorf("expected %q, got %q", font.SimpleCFF, dicts.Type)
+	if err := dicts.Type.MustBe(font.CFFSimple); err != nil {
+		return nil, err
 	}
 	res := &EmbedInfoSimple{}
 
@@ -373,19 +374,17 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	res.UnitsPerEm = unitsPerEm
 
 	q := 1000 / float64(unitsPerEm)
-	ascent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
+	ascent := dicts.FontDescriptor.Ascent
 	res.Ascent = funit.Int16(math.Round(float64(ascent) / q))
-	descent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
+	descent := dicts.FontDescriptor.Descent
 	res.Descent = funit.Int16(math.Round(float64(descent) / q))
-	capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+	capHeight := dicts.FontDescriptor.CapHeight
 	res.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
 
-	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
-	flags := font.Flags(flagsInt)
-	res.IsSerif = flags&font.FlagSerif != 0
-	res.IsScript = flags&font.FlagScript != 0
-	res.IsAllCap = flags&font.FlagAllCap != 0
-	res.IsSmallCap = flags&font.FlagSmallCap != 0
+	res.IsSerif = dicts.FontDescriptor.IsSerif
+	res.IsScript = dicts.FontDescriptor.IsScript
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.

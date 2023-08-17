@@ -141,7 +141,7 @@ func (f *embeddedSimpleCFF) Close() error {
 		}
 		toUnicode[charcode.CharCode(code)] = f.text[gid]
 	}
-	info := EmbedInfoSimpleCFF{
+	info := EmbedInfoCFFSimple{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
@@ -150,7 +150,7 @@ func (f *embeddedSimpleCFF) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-type EmbedInfoSimpleCFF struct {
+type EmbedInfoCFFSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -172,7 +172,7 @@ type EmbedInfoSimpleCFF struct {
 	IsSmallCap bool
 }
 
-func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return err
@@ -248,6 +248,7 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		FontName:     fontName,
 		IsFixedPitch: otf.IsFixedPitch(),
 		IsSerif:      otf.IsSerif,
+		IsSymbolic:   isSymbolic,
 		IsScript:     otf.IsScript,
 		IsItalic:     otf.IsItalic,
 		IsAllCap:     info.IsAllCap,
@@ -261,7 +262,7 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		StemV:        cff.Private[0].StdVW * q,
 		MissingWidth: widthsInfo.MissingWidth,
 	}
-	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile3"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
@@ -298,11 +299,11 @@ func (info *EmbedInfoSimpleCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
-func ExtractSimpleCFF(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, error) {
-	if dicts.Type != font.SimpleOpenTypeCFF {
-		return nil, fmt.Errorf("expected %q, got %q", font.SimpleOpenTypeCFF, dicts.Type)
+func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error) {
+	if err := dicts.Type.MustBe(font.OpenTypeCFFSimple); err != nil {
+		return nil, err
 	}
-	res := &EmbedInfoSimpleCFF{}
+	res := &EmbedInfoCFFSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
 	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
@@ -349,24 +350,22 @@ func ExtractSimpleCFF(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimpleCFF, err
 		res.Encoding = encoding
 
 		q := 1000 / float64(res.Font.UnitsPerEm)
-		ascent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
+		ascent := dicts.FontDescriptor.Ascent
 		res.Font.Ascent = funit.Int16(math.Round(float64(ascent) / q))
-		descent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
+		descent := dicts.FontDescriptor.Descent
 		res.Font.Descent = funit.Int16(math.Round(float64(descent) / q))
-		capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+		capHeight := dicts.FontDescriptor.CapHeight
 		res.Font.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
-		xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"]) // optional
+		xHeight := dicts.FontDescriptor.XHeight // optional
 		res.Font.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
-		leading, _ := pdf.GetNumber(r, dicts.FontDescriptor["Leading"])
+		leading := dicts.FontDescriptor.Leading
 		if ascent-descent < leading {
 			res.Font.LineGap = funit.Int16(math.Round(float64(leading-ascent+descent) / q))
 		}
 	}
 
-	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
-	flags := font.Flags(flagsInt)
-	res.IsAllCap = flags&font.FlagAllCap != 0
-	res.IsSmallCap = flags&font.FlagSmallCap != 0
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.

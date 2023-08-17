@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package extract
+package content
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/type3"
 )
 
 func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, error) {
@@ -39,6 +40,7 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 
 	var CS charcode.CodeSpaceRange
 	var toUnicode map[charcode.CharCode][]rune
+	// TODO(voss): make this less repetitive
 	switch dicts.Type {
 	case font.Type1, font.Builtin:
 		CS = charcode.Simple
@@ -56,7 +58,7 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			name := info.Encoding[i]
 			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-	case font.SimpleCFF:
+	case font.CFFSimple:
 		CS = charcode.Simple
 		info, err := cff.ExtractSimple(r, dicts)
 		if err != nil {
@@ -73,9 +75,9 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			name := info.Font.Glyphs[gid].Name
 			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-	case font.SimpleOpenTypeCFF:
+	case font.OpenTypeCFFSimple:
 		CS = charcode.Simple
-		info, err := opentype.ExtractSimpleCFF(r, dicts)
+		info, err := opentype.ExtractCFFSimple(r, dicts)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +92,7 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			name := info.Font.GlyphName(gid)
 			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-	case font.SimpleTrueType:
+	case font.TrueTypeSimple:
 		CS = charcode.Simple
 		info, err := truetype.ExtractSimple(r, dicts)
 		if err != nil {
@@ -100,9 +102,9 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			toUnicode = info.ToUnicode
 			break
 		}
-	case font.SimpleOpenTypeGlyf:
+	case font.OpenTypeGlyfSimple:
 		CS = charcode.Simple
-		info, err := opentype.ExtractSimpleGlyf(r, dicts)
+		info, err := opentype.ExtractGlyfSimple(r, dicts)
 		if err != nil {
 			return nil, err
 		}
@@ -112,10 +114,73 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 		}
 	case font.Type3:
 		CS = charcode.Simple
-	case font.CompositeCFF:
-	case font.CompositeOpenTypeCFF:
-	case font.CompositeTrueType:
-	case font.CompositeOpenTypeGlyf:
+		info, err := type3.Extract(r, dicts)
+		if err != nil {
+			return nil, err
+		}
+		if info.ToUnicode != nil {
+			toUnicode = info.ToUnicode
+			break
+		}
+
+		toUnicode = make(map[charcode.CharCode][]rune)
+		for i := 0; i < 256; i++ {
+			name := info.Encoding[i]
+			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
+		}
+
+	case font.CFFComposite:
+		info, err := cff.ExtractComposite(r, dicts)
+		if err != nil {
+			return nil, err
+		}
+		CS = info.CS
+
+		if info.ToUnicode != nil {
+			toUnicode = info.ToUnicode
+			break
+		}
+		// TODO(voss): other methods ...
+
+	case font.OpenTypeCFFComposite:
+		info, err := opentype.ExtractCFFComposite(r, dicts)
+		if err != nil {
+			return nil, err
+		}
+		CS = info.CS
+
+		if info.ToUnicode != nil {
+			toUnicode = info.ToUnicode
+			break
+		}
+		// TODO(voss): other methods ...
+
+	case font.TrueTypeComposite:
+		info, err := truetype.ExtractComposite(r, dicts)
+		if err != nil {
+			return nil, err
+		}
+		CS = info.CS
+
+		if info.ToUnicode != nil {
+			toUnicode = info.ToUnicode
+			break
+		}
+		// TODO(voss): other methods ...
+
+	case font.OpenTypeGlyfComposite:
+		info, err := opentype.ExtractGlyfComposite(r, dicts)
+		if err != nil {
+			return nil, err
+		}
+		CS = info.CS
+
+		if info.ToUnicode != nil {
+			toUnicode = info.ToUnicode
+			break
+		}
+		// TODO(voss): other methods ...
+
 	}
 
 	if toUnicode == nil {

@@ -44,7 +44,7 @@ func TestRoundTripSimple(t *testing.T) {
 		66: {'C'},
 	}
 
-	info1 := &EmbedInfoSimpleGlyf{
+	info1 := &EmbedInfoGlyfSimple{
 		Font:      otf,
 		SubsetTag: "ABCXYZ",
 		Encoding:  encoding,
@@ -63,7 +63,7 @@ func TestRoundTripSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractSimpleGlyf(rw, dicts)
+	info2, err := ExtractGlyfSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestRoundTripSimple(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*EmbedInfoSimpleGlyf{info1, info2} {
+	for _, info := range []*EmbedInfoGlyfSimple{info1, info2} {
 		info.Encoding = nil       // already compared above
 		info.Font.CMapTable = nil // already tested when comparing the encodings
 		info.Font.CMap = nil      // all but encoding information is optional

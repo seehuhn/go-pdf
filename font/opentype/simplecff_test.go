@@ -44,7 +44,7 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 		66: {'C'},
 	}
 
-	info1 := &EmbedInfoSimpleCFF{
+	info1 := &EmbedInfoCFFSimple{
 		Font:      otf,
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -62,7 +62,7 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractSimpleCFF(rw, dicts)
+	info2, err := ExtractCFFSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestRoundTripSimpleCFF(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*EmbedInfoSimpleCFF{info1, info2} {
+	for _, info := range []*EmbedInfoCFFSimple{info1, info2} {
 		info.Encoding = nil // already compared above
 
 		info.Font.Ascent = 0    // already compared above

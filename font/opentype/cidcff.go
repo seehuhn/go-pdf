@@ -22,17 +22,20 @@ import (
 	"math"
 
 	"golang.org/x/text/language"
+
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 )
 
 type CIDFontCFF struct {
@@ -127,7 +130,7 @@ func (f *embeddedCIDCFF) Close() error {
 		toUnicode[charcode.CharCode(e.CID)] = e.Text
 	}
 
-	info := EmbedInfoCIDCFF{
+	info := EmbedInfoCFFComposite{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		CS:        charcode.UCS2,
@@ -138,7 +141,7 @@ func (f *embeddedCIDCFF) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-type EmbedInfoCIDCFF struct {
+type EmbedInfoCFFComposite struct {
 	Font      *sfnt.Font
 	SubsetTag string
 
@@ -152,7 +155,7 @@ type EmbedInfoCIDCFF struct {
 	IsSmallCap bool
 }
 
-func (info *EmbedInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return err
@@ -248,8 +251,9 @@ func (info *EmbedInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		FontName:     cidFontName,
 		IsFixedPitch: cff.IsFixedPitch,
 		IsSerif:      otf.IsSerif,
+		IsSymbolic:   isSymbolic,
 		IsScript:     otf.IsScript,
-		IsItalic:     otf.ItalicAngle != 0,
+		IsItalic:     otf.IsItalic,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    cff.Private[0].ForceBold,
@@ -259,7 +263,7 @@ func (info *EmbedInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		Descent:      otf.Descent.AsFloat(q),
 		CapHeight:    otf.CapHeight.AsFloat(q),
 	}
-	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile3"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fontDescriptorRef}
@@ -294,7 +298,7 @@ func (info *EmbedInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = tounicode.Embed(w, toUnicodeRef, info.CS, info.ToUnicode)
 		if err != nil {
 			return err
 		}
@@ -303,47 +307,41 @@ func (info *EmbedInfoCIDCFF) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	return nil
 }
 
-// TODO(voss): use [font.ExtractDicts]
-func ExtractEmbedInfoCFF(r pdf.Getter, ref pdf.Reference) (*EmbedInfoCIDCFF, error) {
-	fontDict, err := pdf.GetDictTyped(r, ref, "Font")
+func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposite, error) {
+	if err := dicts.Type.MustBe(font.OpenTypeCFFComposite); err != nil {
+		return nil, err
+	}
+	res := &EmbedInfoCFFComposite{}
+
+	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 	if err != nil {
 		return nil, err
 	}
-	subType, err := pdf.GetName(r, fontDict["Subtype"])
-	if err != nil || (subType != "Type0" && subType != "") {
-		return nil, fmt.Errorf("invalid font subtype: %v", fontDict["Subtype"])
-	}
-
-	cmap, err := cmap.Extract(r, fontDict["Encoding"])
+	otf, err := sfnt.Read(stm)
 	if err != nil {
 		return nil, err
 	}
+	// Most OpenType tables will be missing, so we fill in information from
+	// the font descriptor instead.
+	otf.IsSerif = dicts.FontDescriptor.IsSerif
+	otf.IsScript = dicts.FontDescriptor.IsScript
+	q := 1000 / float64(otf.UnitsPerEm)
+	otf.Ascent = funit.Int16(math.Round(float64(dicts.FontDescriptor.Ascent) / q))
+	otf.Descent = funit.Int16(math.Round(float64(dicts.FontDescriptor.Descent) / q))
+	otf.CapHeight = funit.Int16(math.Round(float64(dicts.FontDescriptor.CapHeight) / q))
+	res.Font = otf
 
-	descendantFonts, err := pdf.GetArray(r, fontDict["DescendantFonts"])
-	if err != nil {
-		return nil, err
-	} else if len(descendantFonts) != 1 {
-		return nil, fmt.Errorf("invalid descendant fonts: %v", descendantFonts)
-	}
-
-	var toUnicode map[charcode.CharCode][]rune
-	if info, _ := tounicode.Extract(r, fontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		toUnicode = info.GetMapping()
-	}
-
-	cidFontDict, err := pdf.GetDictTyped(r, descendantFonts[0], "Font")
-	if err != nil {
-		return nil, err
-	}
-
-	postScriptName, _ := pdf.GetName(r, cidFontDict["BaseFont"])
-	var subsetTag string
+	postScriptName, _ := pdf.GetName(r, dicts.CIDFontDict["BaseFont"])
 	if m := subset.TagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
-		subsetTag = m[1]
+		res.SubsetTag = m[1]
+	}
+
+	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
+	if err != nil {
+		return nil, err
 	}
 	var ROS *type1.CIDSystemInfo
-	if rosDict, _ := pdf.GetDict(r, cidFontDict["CIDSystemInfo"]); rosDict != nil {
+	if rosDict, _ := pdf.GetDict(r, dicts.CIDFontDict["CIDSystemInfo"]); rosDict != nil {
 		registry, _ := pdf.GetString(r, rosDict["Registry"])
 		ordering, _ := pdf.GetString(r, rosDict["Ordering"])
 		supplement, _ := pdf.GetInteger(r, rosDict["Supplement"])
@@ -356,55 +354,17 @@ func ExtractEmbedInfoCFF(r pdf.Getter, ref pdf.Reference) (*EmbedInfoCIDCFF, err
 	if ROS == nil {
 		ROS = cmap.ROS
 	}
+	res.CS = cmap.CS
+	res.ROS = ROS
+	res.CMap = cmap.GetMapping()
 
-	fontDescriptor, err := pdf.GetDictTyped(r, cidFontDict["FontDescriptor"], "FontDescriptor")
-	if err != nil {
-		return nil, err
-	}
-	ascent, _ := pdf.GetNumber(r, fontDescriptor["Ascent"])
-	descent, _ := pdf.GetNumber(r, fontDescriptor["Descent"])
-	capHeight, _ := pdf.GetNumber(r, fontDescriptor["CapHeight"])
-	flagsInt, _ := pdf.GetInteger(r, fontDescriptor["Flags"])
-	flags := font.Flags(flagsInt)
-
-	fontProgramStm, err := pdf.GetStream(r, fontDescriptor["FontFile3"])
-	if err != nil {
-		return nil, err
-	}
-	subType, err = pdf.GetName(r, fontProgramStm.Dict["Subtype"])
-	if err != nil {
-		return nil, err
-	} else if subType != "OpenType" {
-		return nil, fmt.Errorf("invalid font program subtype: %v", subType)
-	}
-	stm, err := pdf.DecodeStream(r, fontProgramStm, 0)
-	if err != nil {
-		return nil, err
-	}
-	otf, err := sfnt.Read(stm)
-	if err != nil {
-		return nil, err
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
 	}
 
-	// Most OpenType tables will be missing, so we fill in information from
-	// the font descriptor instead.
-	otf.IsSerif = flags&font.FlagSerif != 0
-	otf.IsScript = flags&font.FlagScript != 0
-	q := 1000 / float64(otf.UnitsPerEm)
-	otf.Ascent = funit.Int16(math.Round(float64(ascent) / q))
-	otf.Descent = funit.Int16(math.Round(float64(descent) / q))
-	otf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
-	res := &EmbedInfoCIDCFF{
-		Font:      otf,
-		SubsetTag: subsetTag,
-		CS:        cmap.CS,
-		ROS:       ROS,
-		CMap:      cmap.GetMapping(),
-		ToUnicode: toUnicode,
-
-		IsAllCap:   flags&font.FlagAllCap != 0,
-		IsSmallCap: flags&font.FlagSmallCap != 0,
-	}
 	return res, nil
 }

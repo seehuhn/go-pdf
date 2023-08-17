@@ -48,9 +48,10 @@ type Font struct {
 	IsSmallCap         bool
 	ForceBold          bool
 
-	fontMatrix [6]float64
-	charProcs  map[string]*Glyph
-	resources  *pdf.Resources
+	Glyphs     map[string]*Glyph
+	FontMatrix [6]float64
+	Resources  *pdf.Resources
+
 	glyphNames []string
 	cmap       map[rune]glyph.ID
 	numOpen    int
@@ -63,9 +64,9 @@ func New(unitsPerEm uint16) *Font {
 		0, 0,
 	}
 	f := &Font{
-		fontMatrix: m,
-		charProcs:  map[string]*Glyph{},
-		resources:  &pdf.Resources{},
+		FontMatrix: m,
+		Glyphs:     map[string]*Glyph{},
+		Resources:  &pdf.Resources{},
 		glyphNames: []string{""},
 		cmap:       map[rune]glyph.ID{},
 	}
@@ -98,12 +99,12 @@ func (f *Font) GetGeometry() *font.Geometry {
 		if i == 0 {
 			continue
 		}
-		glyphExtents[i] = f.charProcs[name].BBox
-		widths[i] = f.charProcs[name].WidthX
+		glyphExtents[i] = f.Glyphs[name].BBox
+		widths[i] = f.Glyphs[name].WidthX
 	}
 
 	res := &font.Geometry{
-		UnitsPerEm:         uint16(math.Round(1 / f.fontMatrix[0])),
+		UnitsPerEm:         uint16(math.Round(1 / f.FontMatrix[0])),
 		Ascent:             f.Ascent,
 		Descent:            f.Descent,
 		BaseLineSkip:       f.BaseLineSkip,
@@ -125,7 +126,7 @@ func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 		gg = append(gg, glyph.Info{
 			Gid:     gid,
 			Text:    []rune{r},
-			Advance: f.charProcs[f.glyphNames[gid]].WidthX,
+			Advance: f.Glyphs[f.glyphNames[gid]].WidthX,
 		})
 	}
 	return gg
@@ -139,12 +140,12 @@ func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 // operator is added at the start of the glyph description.  In this case, the
 // glyph description may specify both the shape and the color of the glyph.
 func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shapeOnly bool) (*GlyphBuilder, error) {
-	if _, exists := f.charProcs[name]; exists {
+	if _, exists := f.Glyphs[name]; exists {
 		return nil, fmt.Errorf("glyph %q already present", name)
 	} else if name == "" {
 		return nil, errors.New("empty glyph name")
 	}
-	f.charProcs[name] = nil // reserve the name
+	f.Glyphs[name] = nil // reserve the name
 	if rr := names.ToUnicode(string(name), false); len(rr) == 1 {
 		f.cmap[rr[0]] = glyph.ID(len(f.glyphNames))
 	}
@@ -154,7 +155,7 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 	buf := &bytes.Buffer{}
 	page := graphics.NewPage(buf)
 	page.ForgetGraphicsState()
-	page.Resources = f.resources
+	page.Resources = f.Resources
 
 	if shapeOnly {
 		fmt.Fprintf(page.Content,
@@ -181,7 +182,6 @@ type GlyphBuilder struct {
 	*graphics.Page
 	name   string
 	widthX funit.Int16
-	widthY funit.Int16
 	bbox   funit.Rect16
 	f      *Font
 }
@@ -190,12 +190,11 @@ type GlyphBuilder struct {
 func (g *GlyphBuilder) Close() error {
 	buf := g.Content.(*bytes.Buffer)
 	data := &Glyph{
-		WidthX:  g.widthX,
-		WidthY:  g.widthY,
-		BBox:    g.bbox,
-		Content: buf.Bytes(),
+		WidthX: g.widthX,
+		BBox:   g.bbox,
+		Data:   buf.Bytes(),
 	}
-	g.f.charProcs[g.name] = data
+	g.f.Glyphs[g.name] = data
 	g.f.numOpen--
 
 	return nil

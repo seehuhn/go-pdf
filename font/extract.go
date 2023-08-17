@@ -29,18 +29,18 @@ type EmbeddingType int
 const (
 	Unknown EmbeddingType = iota
 
-	Type1                 // Type 1 fonts
 	Builtin               // built-in fonts
-	SimpleCFF             // CFF font data without wrapper (simple font)
-	SimpleOpenTypeCFF     // CFF font data in an OpenType wrapper (simple font)
+	CFFComposite          // CFF font data without wrapper (composite font)
+	CFFSimple             // CFF font data without wrapper (simple font)
 	MMType1               // Multiple Master type 1 fonts
-	SimpleTrueType        // TrueType fonts (simple font)
-	SimpleOpenTypeGlyf    // OpenType fonts with glyf outline (simple font)
+	OpenTypeCFFComposite  // CFF fonts in an OpenType wrapper (composite font)
+	OpenTypeCFFSimple     // CFF font data in an OpenType wrapper (simple font)
+	OpenTypeGlyfComposite // OpenType fonts with glyf outline (composite font)
+	OpenTypeGlyfSimple    // OpenType fonts with glyf outline (simple font)
+	TrueTypeComposite     // TrueType fonts (composite font)
+	TrueTypeSimple        // TrueType fonts (simple font)
+	Type1                 // Type 1 fonts
 	Type3                 // Type 3 fonts
-	CompositeCFF          // CFF font data without wrapper (composite font)
-	CompositeOpenTypeCFF  // CFF fonts in an OpenType wrapper (composite font)
-	CompositeTrueType     // TrueType fonts (composite font)
-	CompositeOpenTypeGlyf // OpenType fonts with glyf outline (composite font)
 )
 
 func (t EmbeddingType) String() string {
@@ -49,25 +49,25 @@ func (t EmbeddingType) String() string {
 		return "Type 1"
 	case Builtin:
 		return "Type 1 (built-in)"
-	case SimpleCFF:
+	case CFFSimple:
 		return "Simple CFF"
-	case SimpleOpenTypeCFF:
+	case OpenTypeCFFSimple:
 		return "Simple OpenType/CFF"
 	case MMType1:
 		return "MMType1"
-	case SimpleTrueType:
+	case TrueTypeSimple:
 		return "Simple TrueType"
-	case SimpleOpenTypeGlyf:
+	case OpenTypeGlyfSimple:
 		return "Simple OpenType/glyf"
 	case Type3:
 		return "Type 3"
-	case CompositeCFF:
+	case CFFComposite:
 		return "Composite CFF"
-	case CompositeOpenTypeCFF:
+	case OpenTypeCFFComposite:
 		return "Composite OpenType/CFF"
-	case CompositeTrueType:
+	case TrueTypeComposite:
 		return "Composite TrueType"
-	case CompositeOpenTypeGlyf:
+	case OpenTypeGlyfComposite:
 		return "Composite OpenType/glyf"
 	default:
 		return fmt.Sprintf("EmbeddingType(%d)", int(t))
@@ -76,17 +76,24 @@ func (t EmbeddingType) String() string {
 
 func (t EmbeddingType) IsComposite() bool {
 	switch t {
-	case CompositeCFF, CompositeOpenTypeCFF, CompositeTrueType, CompositeOpenTypeGlyf:
+	case CFFComposite, OpenTypeCFFComposite, TrueTypeComposite, OpenTypeGlyfComposite:
 		return true
 	default:
 		return false
 	}
 }
 
+func (t EmbeddingType) MustBe(expected EmbeddingType) error {
+	if t != expected {
+		return fmt.Errorf("expected %q, got %q", expected, t)
+	}
+	return nil
+}
+
 type Dicts struct {
 	FontDict       pdf.Dict
 	CIDFontDict    pdf.Dict
-	FontDescriptor pdf.Dict
+	FontDescriptor *Descriptor
 	FontProgram    *pdf.Stream
 	Type           EmbeddingType
 }
@@ -128,13 +135,16 @@ func ExtractDicts(r pdf.Getter, ref pdf.Reference) (*Dicts, error) {
 		fontDict = cidFontDict
 	}
 
-	fontDescriptor, err := pdf.GetDict(r, fontDict["FontDescriptor"])
+	fontDescriptor, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
 	if err != nil {
 		return nil, err
 	}
 	var fontKey pdf.Name
 	if fontDescriptor != nil {
-		res.FontDescriptor = fontDescriptor
+		res.FontDescriptor, err = DecodeDescriptor(r, fontDescriptor)
+		if err != nil {
+			return nil, err
+		}
 		for _, key := range []pdf.Name{"FontFile", "FontFile2", "FontFile3"} {
 			if ref, _ := fontDescriptor[key].(pdf.Reference); ref != 0 {
 				stm, err := pdf.GetStream(r, ref)
@@ -165,25 +175,25 @@ func ExtractDicts(r pdf.Getter, ref pdf.Reference) (*Dicts, error) {
 			res.Type = Type1
 		}
 	case fontType == "Type1" && fontKey == "FontFile3" && subType == "Type1C":
-		res.Type = SimpleCFF
+		res.Type = CFFSimple
 	case fontType == "Type1" && fontKey == "FontFile3" && subType == "OpenType":
-		res.Type = SimpleOpenTypeCFF
+		res.Type = OpenTypeCFFSimple
 	case fontType == "MMType1":
 		res.Type = MMType1
 	case fontType == "TrueType" && fontKey == "FontFile2":
-		res.Type = SimpleTrueType
+		res.Type = TrueTypeSimple
 	case fontType == "TrueType" && fontKey == "FontFile3" && subType == "OpenType":
-		res.Type = SimpleOpenTypeGlyf
+		res.Type = OpenTypeGlyfSimple
 	case fontType == "Type3":
 		res.Type = Type3
 	case fontType == "Type0" && cidFontType == "CIDFontType0" && fontKey == "FontFile3" && subType == "CIDFontType0C":
-		res.Type = CompositeCFF
+		res.Type = CFFComposite
 	case fontType == "Type0" && cidFontType == "CIDFontType0" && fontKey == "FontFile3" && subType == "OpenType":
-		res.Type = CompositeOpenTypeCFF
+		res.Type = OpenTypeCFFComposite
 	case fontType == "Type0" && cidFontType == "CIDFontType2" && fontKey == "FontFile2":
-		res.Type = CompositeTrueType
+		res.Type = TrueTypeComposite
 	case fontType == "Type0" && cidFontType == "CIDFontType2" && fontKey == "FontFile3" && subType == "OpenType":
-		res.Type = CompositeOpenTypeGlyf
+		res.Type = OpenTypeGlyfComposite
 	default:
 		return nil, fmt.Errorf("unknown font type: %s/%s/%s/%s",
 			fontType, cidFontType, fontKey, subType)

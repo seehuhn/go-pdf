@@ -32,7 +32,6 @@ import (
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
-	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -260,8 +259,9 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		FontName:     fontName,
 		IsFixedPitch: ttf.IsFixedPitch(),
 		IsSerif:      ttf.IsSerif,
+		IsSymbolic:   isSymbolic,
 		IsScript:     ttf.IsScript,
-		IsItalic:     ttf.ItalicAngle != 0,
+		IsItalic:     ttf.IsItalic,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    info.ForceBold,
@@ -272,7 +272,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		CapHeight:    ttf.CapHeight.AsFloat(q),
 		MissingWidth: widthsInfo.MissingWidth,
 	}
-	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile2"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, fontDescriptorRef, widthsRef}
@@ -315,8 +315,8 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 }
 
 func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
-	if dicts.Type != font.SimpleTrueType {
-		return nil, fmt.Errorf("expected %q, got %q", font.SimpleTrueType, dicts.Type)
+	if err := dicts.Type.MustBe(font.TrueTypeSimple); err != nil {
+		return nil, err
 	}
 
 	res := &EmbedInfoSimple{}
@@ -334,45 +334,21 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
 	}
 	if ttf.FamilyName == "" {
-		familyName, _ := pdf.GetName(r, dicts.FontDescriptor["FontFamily"])
-		ttf.FamilyName = string(familyName)
+		ttf.FamilyName = dicts.FontDescriptor.FontFamily
 	}
 	if ttf.Width == 0 {
-		width, _ := pdf.GetName(r, dicts.FontDescriptor["FontStretch"])
-		switch width {
-		case "UltraCondensed":
-			ttf.Width = os2.WidthUltraCondensed
-		case "ExtraCondensed":
-			ttf.Width = os2.WidthExtraCondensed
-		case "Condensed":
-			ttf.Width = os2.WidthCondensed
-		case "SemiCondensed":
-			ttf.Width = os2.WidthSemiCondensed
-		case "Normal":
-			ttf.Width = os2.WidthNormal
-		case "SemiExpanded":
-			ttf.Width = os2.WidthSemiExpanded
-		case "Expanded":
-			ttf.Width = os2.WidthExpanded
-		case "ExtraExpanded":
-			ttf.Width = os2.WidthExtraExpanded
-		case "UltraExpanded":
-			ttf.Width = os2.WidthUltraExpanded
-		}
+		ttf.Width = dicts.FontDescriptor.FontStretch
 	}
 	if ttf.Weight == 0 {
-		weight, _ := pdf.GetNumber(r, dicts.FontDescriptor["FontWeight"])
-		if weight > 0 {
-			ttf.Weight = os2.Weight(math.Round(float64(weight))).Rounded()
-		}
+		ttf.Weight = dicts.FontDescriptor.FontWeight
 	}
 	q := 1000 / float64(ttf.UnitsPerEm)
 	if ttf.CapHeight == 0 {
-		capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+		capHeight := dicts.FontDescriptor.CapHeight
 		ttf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
 	}
 	if ttf.XHeight == 0 {
-		xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"])
+		xHeight := dicts.FontDescriptor.XHeight
 		ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
 	}
 	res.Font = ttf
@@ -389,11 +365,9 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		res.ToUnicode = info.GetMapping()
 	}
 
-	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
-	flags := font.Flags(flagsInt)
-	res.IsAllCap = flags&font.FlagAllCap != 0
-	res.IsSmallCap = flags&font.FlagSmallCap != 0
-	res.ForceBold = flags&font.FlagForceBold != 0
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+	res.ForceBold = dicts.FontDescriptor.ForceBold
 
 	return res, nil
 }

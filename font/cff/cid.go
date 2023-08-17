@@ -122,13 +122,14 @@ func (f *embeddedCIDCFF) Close() error {
 	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
 
 	cmap := make(map[charcode.CharCode]type1.CID)
-	for _, s := range ss {
-		cmap[charcode.CharCode(s.CID)] = s.CID
-	}
 
 	toUnicode := make(map[charcode.CharCode][]rune)
 	for _, e := range encoding {
 		toUnicode[charcode.CharCode(e.CID)] = e.Text
+	}
+
+	for _, e := range encoding {
+		cmap[charcode.CharCode(e.CID)] = e.CID
 	}
 
 	info := EmbedInfoComposite{
@@ -275,6 +276,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		FontName:     cidFontName,
 		IsFixedPitch: cffFont.IsFixedPitch,
 		IsSerif:      info.IsSerif,
+		IsSymbolic:   isSymbolic,
 		IsScript:     info.IsScript,
 		IsItalic:     cffFont.ItalicAngle != 0,
 		IsAllCap:     info.IsAllCap,
@@ -286,7 +288,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		Descent:      info.Descent.AsFloat(q),
 		CapHeight:    info.CapHeight.AsFloat(q),
 	}
-	fontDescriptor := fd.AsDict(isSymbolic)
+	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile3"] = fontFileRef
 
 	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fontDescriptorRef}
@@ -321,7 +323,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = tounicode.Embed(w, toUnicodeRef, info.CS, info.ToUnicode)
 		if err != nil {
 			return err
 		}
@@ -330,22 +332,17 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
-func ExtractComposite(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, error) {
-	fontDict, err := pdf.GetDictTyped(r, ref, "Font")
-	if err != nil {
+func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, error) {
+	if err := dicts.Type.MustBe(font.CFFComposite); err != nil {
 		return nil, err
 	}
-	subType, err := pdf.GetName(r, fontDict["Subtype"])
-	if err != nil || (subType != "Type0" && subType != "") {
-		return nil, fmt.Errorf("invalid font subtype: %v", fontDict["Subtype"])
-	}
 
-	cmap, err := cmap.Extract(r, fontDict["Encoding"])
+	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
 
-	descendantFonts, err := pdf.GetArray(r, fontDict["DescendantFonts"])
+	descendantFonts, err := pdf.GetArray(r, dicts.FontDict["DescendantFonts"])
 	if err != nil {
 		return nil, err
 	} else if len(descendantFonts) != 1 {
@@ -353,23 +350,19 @@ func ExtractComposite(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, err
 	}
 
 	var toUnicode map[charcode.CharCode][]rune
-	if info, _ := tounicode.Extract(r, fontDict["ToUnicode"]); info != nil {
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
 		toUnicode = info.GetMapping()
 	}
 
-	cidFontDict, err := pdf.GetDictTyped(r, descendantFonts[0], "Font")
-	if err != nil {
-		return nil, err
-	}
-
-	postScriptName, _ := pdf.GetName(r, cidFontDict["BaseFont"])
+	postScriptName, _ := pdf.GetName(r, dicts.CIDFontDict["BaseFont"])
 	var subsetTag string
 	if m := subsetTagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
 		subsetTag = m[1]
 	}
+
 	var ROS *type1.CIDSystemInfo
-	if rosDict, _ := pdf.GetDict(r, cidFontDict["CIDSystemInfo"]); rosDict != nil {
+	if rosDict, _ := pdf.GetDict(r, dicts.CIDFontDict["CIDSystemInfo"]); rosDict != nil {
 		registry, _ := pdf.GetString(r, rosDict["Registry"])
 		ordering, _ := pdf.GetString(r, rosDict["Ordering"])
 		supplement, _ := pdf.GetInteger(r, rosDict["Supplement"])
@@ -383,27 +376,7 @@ func ExtractComposite(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, err
 		ROS = cmap.ROS
 	}
 
-	fontDescriptor, err := pdf.GetDictTyped(r, cidFontDict["FontDescriptor"], "FontDescriptor")
-	if err != nil {
-		return nil, err
-	}
-	ascent, _ := pdf.GetNumber(r, fontDescriptor["Ascent"])
-	descent, _ := pdf.GetNumber(r, fontDescriptor["Descent"])
-	capHeight, _ := pdf.GetNumber(r, fontDescriptor["CapHeight"])
-	flagsInt, _ := pdf.GetInteger(r, fontDescriptor["Flags"])
-	flags := font.Flags(flagsInt)
-
-	fontProgramStm, err := pdf.GetStream(r, fontDescriptor["FontFile3"])
-	if err != nil {
-		return nil, err
-	}
-	subType, err = pdf.GetName(r, fontProgramStm.Dict["Subtype"])
-	if err != nil {
-		return nil, err
-	} else if subType != "CIDFontType0C" {
-		return nil, fmt.Errorf("invalid font program subtype: %v", subType)
-	}
-	stm, err := pdf.DecodeStream(r, fontProgramStm, 0)
+	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -429,13 +402,13 @@ func ExtractComposite(r pdf.Getter, ref pdf.Reference) (*EmbedInfoComposite, err
 		ToUnicode: toUnicode,
 
 		UnitsPerEm: unitsPerEm,
-		Ascent:     funit.Int16(math.Round(float64(ascent) / q)),
-		Descent:    funit.Int16(math.Round(float64(descent) / q)),
-		CapHeight:  funit.Int16(math.Round(float64(capHeight) / q)),
-		IsSerif:    flags&font.FlagSerif != 0,
-		IsScript:   flags&font.FlagScript != 0,
-		IsAllCap:   flags&font.FlagAllCap != 0,
-		IsSmallCap: flags&font.FlagSmallCap != 0,
+		Ascent:     funit.Int16(math.Round(dicts.FontDescriptor.Ascent / q)),
+		Descent:    funit.Int16(math.Round(dicts.FontDescriptor.Descent / q)),
+		CapHeight:  funit.Int16(math.Round(dicts.FontDescriptor.CapHeight / q)),
+		IsSerif:    dicts.FontDescriptor.IsSerif,
+		IsScript:   dicts.FontDescriptor.IsScript,
+		IsAllCap:   dicts.FontDescriptor.IsAllCap,
+		IsSmallCap: dicts.FontDescriptor.IsSmallCap,
 	}
 	return res, nil
 }

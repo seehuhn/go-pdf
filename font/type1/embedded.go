@@ -201,6 +201,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			FontName:     fontName,
 			IsFixedPitch: psFont.FontInfo.IsFixedPitch,
 			IsSerif:      info.IsSerif,
+			IsSymbolic:   isSymbolic,
 			IsScript:     info.IsScript,
 			IsItalic:     psFont.FontInfo.ItalicAngle != 0,
 			IsAllCap:     info.IsAllCap,
@@ -215,7 +216,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			StemV:        psFont.Private.StdVW * q,
 			MissingWidth: widthsInfo.MissingWidth,
 		}
-		fontDescriptor := fd.AsDict(isSymbolic)
+		fontDescriptor := fd.AsDict()
 		if psFont.Outlines != nil {
 			fontFileRef = w.Alloc()
 			fontDescriptor["FontFile"] = fontFileRef
@@ -287,13 +288,13 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 
 		q := 1000 * t1.FontInfo.FontMatrix[0]
 
-		ascent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Ascent"])
+		ascent := dicts.FontDescriptor.Ascent
 		t1.Ascent = funit.Int16(math.Round(float64(ascent) / q))
-		descent, _ := pdf.GetNumber(r, dicts.FontDescriptor["Descent"])
+		descent := dicts.FontDescriptor.Descent
 		t1.Descent = funit.Int16(math.Round(float64(descent) / q))
-		capHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["CapHeight"])
+		capHeight := dicts.FontDescriptor.CapHeight
 		t1.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
-		xHeight, _ := pdf.GetNumber(r, dicts.FontDescriptor["XHeight"]) // optional
+		xHeight := dicts.FontDescriptor.XHeight // optional
 		t1.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
 
 		res.PSFont = t1
@@ -326,12 +327,12 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 
 	res.ResName, _ = pdf.GetName(r, dicts.FontDict["Name"])
 
-	flagsInt, _ := pdf.GetInteger(r, dicts.FontDescriptor["Flags"])
-	flags := font.Flags(flagsInt)
-	res.IsSerif = flags&font.FlagSerif != 0
-	res.IsScript = flags&font.FlagScript != 0
-	res.IsAllCap = flags&font.FlagAllCap != 0
-	res.IsSmallCap = flags&font.FlagSmallCap != 0
+	if dicts.FontDescriptor != nil {
+		res.IsSerif = dicts.FontDescriptor.IsSerif
+		res.IsScript = dicts.FontDescriptor.IsScript
+		res.IsAllCap = dicts.FontDescriptor.IsAllCap
+		res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+	}
 
 	return res, nil
 }

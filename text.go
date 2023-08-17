@@ -21,6 +21,10 @@ import (
 	"unicode/utf16"
 )
 
+func isUTF8(s string) bool {
+	return len(s) >= 3 && s[0] == 239 && s[1] == 187 && s[2] == 191
+}
+
 func isUTF16(s string) bool {
 	return len(s) >= 2 && s[0] == 0xFE && s[1] == 0xFF
 }

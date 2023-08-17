@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/postscript/type1"
@@ -29,7 +30,7 @@ import (
 	"seehuhn.de/go/sfnt/cff"
 )
 
-func TestRoundTripCID(t *testing.T) {
+func TestRoundTripCFFComposite(t *testing.T) {
 	otf, err := gofont.OpenType(gofont.GoRegular)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +52,7 @@ func TestRoundTripCID(t *testing.T) {
 	for code := charcode.CharCode(0); code < 8; code++ {
 		toUnicode[code] = []rune{'X', '0' + rune(code)}
 	}
-	info := &EmbedInfoCIDCFF{
+	info1 := &EmbedInfoCFFComposite{
 		Font:      otf,
 		SubsetTag: "ABCDEF",
 		CS:        cs,
@@ -62,18 +63,22 @@ func TestRoundTripCID(t *testing.T) {
 
 	rw := pdf.NewData(pdf.V1_7)
 	ref := rw.Alloc()
-	err = info.Embed(rw, ref)
+	err = info1.Embed(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info2, err := ExtractEmbedInfoCFF(rw, ref)
+	dicts, err := font.ExtractDicts(rw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info2, err := ExtractCFFComposite(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// normalize the fonts before comparing them
-	for _, font := range []*sfnt.Font{info.Font, info2.Font} {
+	for _, font := range []*sfnt.Font{info1.Font, info2.Font} {
 		// LineGap is stored in the "hmtx" and "OS/2" tables.
 		font.LineGap = 0
 
@@ -106,7 +111,7 @@ func TestRoundTripCID(t *testing.T) {
 		outlines.FDSelect = nil
 	}
 
-	if d := cmp.Diff(info, info2); d != "" {
+	if d := cmp.Diff(info1, info2); d != "" {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }

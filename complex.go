@@ -57,6 +57,8 @@ func GetNumber(r Getter, obj Object) (Number, error) {
 		return Number(x), nil
 	case Number:
 		return x, nil
+	case nil:
+		return 0, nil
 	default:
 		return 0, &MalformedFileError{
 			Err: fmt.Errorf("expected number but got %T", obj),
@@ -73,6 +75,10 @@ type Rectangle struct {
 // resulting object is a PDF rectangle object.
 // If the object is null, nil is returned.
 func GetRectangle(r Getter, obj Object) (*Rectangle, error) {
+	if rect, ok := obj.(*Rectangle); ok {
+		return rect, nil
+	}
+
 	a, err := GetArray(r, obj)
 	if err != nil {
 		return nil, err
