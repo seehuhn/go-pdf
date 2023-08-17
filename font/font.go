@@ -108,9 +108,6 @@ func NumGlyphs(font interface{ GetGeometry() *Geometry }) int {
 
 // GetGID returns the glyph ID and advance width for a given rune.
 // A glyph ID of 0 indicates that the rune is not supported by the font.
-//
-// TODO(voss): check tha missing glyphs in Type 1 and Type 3 fonts
-// work correctly
 func GetGID(font Layouter, r rune) (glyph.ID, funit.Int16) {
 	gg := font.Layout(string(r), 10)
 	if len(gg) != 1 {

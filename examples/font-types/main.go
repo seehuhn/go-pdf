@@ -133,7 +133,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewSimpleCFF(otf, language.English)
+			X, err = opentype.NewCFFSimple(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -182,7 +182,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewCompositeCFF(otf, language.English)
+			X, err = opentype.NewCFFComposite(otf, language.English)
 			if err != nil {
 				return err
 			}

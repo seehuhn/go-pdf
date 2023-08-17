@@ -66,7 +66,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.CFFSimple})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewSimpleCFF(otf, language.English)
+	F, err = opentype.NewCFFSimple(otf, language.English)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.CFFComposite})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewCompositeCFF(otf, language.English)
+	F, err = opentype.NewCFFComposite(otf, language.English)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.CFFComposite})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewCompositeCFF(otf, language.English)
+	F, err = opentype.NewCFFComposite(otf, language.English)
 	if err != nil {
 		return nil, err
 	}

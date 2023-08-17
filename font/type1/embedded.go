@@ -136,10 +136,6 @@ type EmbedInfo struct {
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	useBuiltin := w.GetMeta().Version < pdf.V2_0 && IsBuiltin(info.PSFont)
 
-	if len(info.Encoding) != 256 || len(info.PSFont.Encoding) != 256 {
-		panic("unreachable") // TODO(voss): remove
-	}
-
 	fontName := info.PSFont.FontInfo.FontName
 	if info.SubsetTag != "" {
 		fontName = info.SubsetTag + "+" + fontName

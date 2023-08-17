@@ -74,7 +74,7 @@ func NewCompositeGlyf(info *sfnt.Font, loc language.Tag) (*CIDFontGlyf, error) {
 }
 
 func (f *CIDFontGlyf) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	err := pdf.CheckVersion(w, "composite glyf-based OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ type EmbedInfoGlyfComposite struct {
 }
 
 func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "composite glyf-based OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	}
 	_, err = otf.WriteTrueTypePDF(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding glyf-based OpenType CIDFont %q: %w", cidFontName, err)
+		return fmt.Errorf("embedding OpenType/glyf CIDFont %q: %w", cidFontName, err)
 	}
 	err = fontFileStream.Close()
 	if err != nil {
@@ -365,10 +365,11 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 	if err != nil {
 		return nil, err
 	}
-	_, ok := otf.Outlines.(*glyf.Outlines)
-	if !ok {
+	if _, ok := otf.Outlines.(*glyf.Outlines); !ok {
 		return nil, fmt.Errorf("expected glyf outlines, got %T", otf.Outlines)
 	}
+	// Most OpenType tables will be missing, so we fill in information from
+	// the font descriptor instead.
 	if otf.FamilyName == "" {
 		otf.FamilyName = dicts.FontDescriptor.FontFamily
 	}

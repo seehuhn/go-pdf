@@ -63,10 +63,6 @@ type EmbedInfo struct {
 }
 
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	if len(info.Encoding) != 256 {
-		panic("unreachable") // TODO(voss): remove
-	}
-
 	if len(info.FontMatrix) != 6 {
 		return errors.New("invalid font matrix")
 	}

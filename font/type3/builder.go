@@ -52,8 +52,9 @@ type Font struct {
 	FontMatrix [6]float64
 	Resources  *pdf.Resources
 
+	CMap map[rune]glyph.ID
+
 	glyphNames []string
-	cmap       map[rune]glyph.ID
 	numOpen    int
 }
 
@@ -68,7 +69,7 @@ func New(unitsPerEm uint16) *Font {
 		Glyphs:     map[string]*Glyph{},
 		Resources:  &pdf.Resources{},
 		glyphNames: []string{""},
-		cmap:       map[rune]glyph.ID{},
+		CMap:       map[rune]glyph.ID{},
 	}
 	return f
 }
@@ -119,9 +120,9 @@ func (f *Font) GetGeometry() *font.Geometry {
 func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 	gg := make(glyph.Seq, 0, len(s))
 	for _, r := range s {
-		gid, ok := f.cmap[r]
+		gid, ok := f.CMap[r]
 		if !ok {
-			gid = glyph.ID(0)
+			continue
 		}
 		gg = append(gg, glyph.Info{
 			Gid:     gid,
@@ -147,7 +148,7 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 	}
 	f.Glyphs[name] = nil // reserve the name
 	if rr := names.ToUnicode(string(name), false); len(rr) == 1 {
-		f.cmap[rr[0]] = glyph.ID(len(f.glyphNames))
+		f.CMap[rr[0]] = glyph.ID(len(f.glyphNames))
 	}
 	f.glyphNames = append(f.glyphNames, name) // this must come after the cmap update
 	f.numOpen++

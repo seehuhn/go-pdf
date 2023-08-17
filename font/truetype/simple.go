@@ -163,7 +163,6 @@ func (f *embeddedSimple) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-// TODO(voss): should this be merged with opentype.PDFInfoGlyf?
 type EmbedInfoSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"regexp"
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
@@ -122,23 +121,23 @@ func (f *embeddedCIDCFF) Close() error {
 	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
 
 	cmap := make(map[charcode.CharCode]type1.CID)
+	for _, e := range encoding {
+		cmap[charcode.CharCode(e.CID)] = e.CID
+	}
 
 	toUnicode := make(map[charcode.CharCode][]rune)
 	for _, e := range encoding {
 		toUnicode[charcode.CharCode(e.CID)] = e.Text
 	}
 
-	for _, e := range encoding {
-		cmap[charcode.CharCode(e.CID)] = e.CID
-	}
-
 	info := EmbedInfoComposite{
-		Font:       subsetInfo.AsCFF(),
-		SubsetTag:  subsetTag,
-		CS:         charcode.UCS2,
-		ROS:        CIDSystemInfo,
-		CMap:       cmap,
-		ToUnicode:  toUnicode,
+		Font:      subsetInfo.AsCFF(),
+		SubsetTag: subsetTag,
+		CS:        charcode.UCS2,
+		ROS:       CIDSystemInfo,
+		CMap:      cmap,
+		ToUnicode: toUnicode,
+
 		UnitsPerEm: f.info.UnitsPerEm,
 		Ascent:     f.info.Ascent,
 		Descent:    f.info.Descent,
@@ -163,24 +162,11 @@ type EmbedInfoComposite struct {
 	Ascent     funit.Int16
 	Descent    funit.Int16
 	CapHeight  funit.Int16
-
 	IsSerif    bool
 	IsScript   bool
 	IsAllCap   bool
 	IsSmallCap bool
 }
-
-// Section 9.7.4.2 of ISO-32000-2 ("Glyph selection in CIDFonts"):
-//
-// If the "CFF" font program has a Top DICT that does not use CIDFont
-// operators: The CIDs shall be used directly as GID values, and the glyph
-// procedure shall be retrieved using the CharStrings INDEX.
-//
-// If the "CFF" font program has a Top DICT that uses CIDFont operators:
-// The CIDs shall be used to determine the GID value for the glyph
-// procedure using the charset table in the CFF program. The GID value
-// shall then be used to look up the glyph procedure using the CharStrings
-// INDEX table.
 
 func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "CFF CIDFonts", pdf.V1_3)
@@ -188,15 +174,13 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		return err
 	}
 
-	cffFont := info.Font
+	cff := info.Font
 
 	// CidFontName shall be the value of the CIDFontName entry in the CIDFont program.
 	// The name may have a subset prefix if appropriate.
-	var cidFontName string
-	if info.SubsetTag == "" {
-		cidFontName = cffFont.FontInfo.FontName
-	} else {
-		cidFontName = info.SubsetTag + "+" + cffFont.FontInfo.FontName
+	cidFontName := cff.FontInfo.FontName
+	if info.SubsetTag != "" {
+		cidFontName = info.SubsetTag + "+" + cidFontName
 	}
 
 	// make a CMap
@@ -211,10 +195,10 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	unitsPerEm := info.UnitsPerEm
 
 	var ww []font.CIDWidth
-	widths := cffFont.Widths()
-	if cffFont.Gid2Cid != nil { // CID-keyed CFF font
+	widths := cff.Widths()
+	if cff.Gid2Cid != nil { // CID-keyed CFF font
 		for gid, w := range widths {
-			ww = append(ww, font.CIDWidth{CID: cffFont.Gid2Cid[gid], GlyphWidth: w})
+			ww = append(ww, font.CIDWidth{CID: cff.Gid2Cid[gid], GlyphWidth: w})
 		}
 	} else { // simple CFF font
 		for gid, w := range widths {
@@ -224,7 +208,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	DW, W := font.EncodeCIDWidths(ww, info.UnitsPerEm)
 
 	q := 1000 / float64(unitsPerEm)
-	bbox := cffFont.BBox()
+	bbox := cff.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -274,16 +258,16 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 
 	fd := &font.Descriptor{
 		FontName:     cidFontName,
-		IsFixedPitch: cffFont.IsFixedPitch,
+		IsFixedPitch: cff.IsFixedPitch,
 		IsSerif:      info.IsSerif,
 		IsSymbolic:   isSymbolic,
 		IsScript:     info.IsScript,
-		IsItalic:     cffFont.ItalicAngle != 0,
+		IsItalic:     cff.ItalicAngle != 0,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
-		ForceBold:    cffFont.Private[0].ForceBold,
+		ForceBold:    cff.Private[0].ForceBold,
 		FontBBox:     fontBBox,
-		ItalicAngle:  cffFont.ItalicAngle,
+		ItalicAngle:  cff.ItalicAngle,
 		Ascent:       info.Ascent.AsFloat(q),
 		Descent:      info.Descent.AsFloat(q),
 		CapHeight:    info.CapHeight.AsFloat(q),
@@ -306,7 +290,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	if err != nil {
 		return err
 	}
-	err = cffFont.Write(fontFileStream)
+	err = cff.Write(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding CFF CIDFont %q: %w", cidFontName, err)
 	}
@@ -336,31 +320,31 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 	if err := dicts.Type.MustBe(font.CFFComposite); err != nil {
 		return nil, err
 	}
+	res := &EmbedInfoComposite{}
+
+	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(stm)
+	if err != nil {
+		return nil, err
+	}
+	cff, err := cff.Read(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	res.Font = cff
+
+	postScriptName, _ := pdf.GetName(r, dicts.CIDFontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
+		res.SubsetTag = m[1]
+	}
 
 	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
-
-	descendantFonts, err := pdf.GetArray(r, dicts.FontDict["DescendantFonts"])
-	if err != nil {
-		return nil, err
-	} else if len(descendantFonts) != 1 {
-		return nil, fmt.Errorf("invalid descendant fonts: %v", descendantFonts)
-	}
-
-	var toUnicode map[charcode.CharCode][]rune
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		toUnicode = info.GetMapping()
-	}
-
-	postScriptName, _ := pdf.GetName(r, dicts.CIDFontDict["BaseFont"])
-	var subsetTag string
-	if m := subsetTagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
-		subsetTag = m[1]
-	}
-
 	var ROS *type1.CIDSystemInfo
 	if rosDict, _ := pdf.GetDict(r, dicts.CIDFontDict["CIDSystemInfo"]); rosDict != nil {
 		registry, _ := pdf.GetString(r, rosDict["Registry"])
@@ -375,42 +359,27 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 	if ROS == nil {
 		ROS = cmap.ROS
 	}
+	res.CS = cmap.CS
+	res.ROS = ROS
+	res.CMap = cmap.GetMapping()
 
-	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
-	if err != nil {
-		return nil, err
-	}
-	data, err := io.ReadAll(stm)
-	if err != nil {
-		return nil, err
-	}
-	cffFont, err := cff.Read(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
+		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+		res.ToUnicode = info.GetMapping()
 	}
 
 	// TODO(voss): be more robust here
-	unitsPerEm := uint16(math.Round(1 / float64(cffFont.FontMatrix[0])))
+	unitsPerEm := uint16(math.Round(1 / float64(cff.FontMatrix[0])))
 	q := 1000 / float64(unitsPerEm)
 
-	res := &EmbedInfoComposite{
-		Font:      cffFont,
-		SubsetTag: subsetTag,
-		CS:        cmap.CS,
-		ROS:       ROS,
-		CMap:      cmap.GetMapping(),
-		ToUnicode: toUnicode,
+	res.UnitsPerEm = unitsPerEm
+	res.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent / q))
+	res.Descent = funit.Int16(math.Round(dicts.FontDescriptor.Descent / q))
+	res.CapHeight = funit.Int16(math.Round(dicts.FontDescriptor.CapHeight / q))
+	res.IsSerif = dicts.FontDescriptor.IsSerif
+	res.IsScript = dicts.FontDescriptor.IsScript
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
-		UnitsPerEm: unitsPerEm,
-		Ascent:     funit.Int16(math.Round(dicts.FontDescriptor.Ascent / q)),
-		Descent:    funit.Int16(math.Round(dicts.FontDescriptor.Descent / q)),
-		CapHeight:  funit.Int16(math.Round(dicts.FontDescriptor.CapHeight / q)),
-		IsSerif:    dicts.FontDescriptor.IsSerif,
-		IsScript:   dicts.FontDescriptor.IsScript,
-		IsAllCap:   dicts.FontDescriptor.IsAllCap,
-		IsSmallCap: dicts.FontDescriptor.IsSmallCap,
-	}
 	return res, nil
 }
-
-var subsetTagRegexp = regexp.MustCompile(`^([A-Z]{6})\+(.*)$`)

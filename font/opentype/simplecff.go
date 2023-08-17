@@ -39,13 +39,13 @@ import (
 )
 
 type SimpleFontCFF struct {
-	info        *sfnt.Font
+	otf         *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
-func NewSimpleCFF(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
+func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -63,7 +63,7 @@ func NewSimpleCFF(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
 	}
 
 	res := &SimpleFontCFF{
-		info:        info,
+		otf:         info,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
@@ -72,11 +72,11 @@ func NewSimpleCFF(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
 }
 
 func (f *SimpleFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
-	res := &embeddedSimpleCFF{
+	res := &embeddedCFFSimple{
 		SimpleFontCFF: f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
@@ -89,10 +89,10 @@ func (f *SimpleFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 
 func (f *SimpleFontCFF) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
-	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.otf.Layout(rr, f.gsubLookups, f.gposLookups)
 }
 
-type embeddedSimpleCFF struct {
+type embeddedCFFSimple struct {
 	*SimpleFontCFF
 	w pdf.Putter
 	pdf.Resource
@@ -102,12 +102,12 @@ type embeddedSimpleCFF struct {
 	closed bool
 }
 
-func (f *embeddedSimpleCFF) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+func (f *embeddedCFFSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	f.text[gid] = rr
 	return f.SimpleEncoder.AppendEncoded(s, gid, rr)
 }
 
-func (f *embeddedSimpleCFF) Close() error {
+func (f *embeddedCFFSimple) Close() error {
 	if f.closed {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (f *embeddedSimpleCFF) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.Name, f.info.PostscriptName())
+			f.Name, f.otf.PostscriptName())
 	}
 	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
 
@@ -128,8 +128,8 @@ func (f *embeddedSimpleCFF) Close() error {
 			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
 		}
 	}
-	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
-	subsetInfo, err := subset.Simple(f.info, ss)
+	subsetTag := subset.Tag(ss, f.otf.NumGlyphs())
+	subsetInfo, err := subset.Simple(f.otf, ss)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
@@ -364,13 +364,13 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 		}
 	}
 
-	res.IsAllCap = dicts.FontDescriptor.IsAllCap
-	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
-
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
 		res.ToUnicode = info.GetMapping()
 	}
+
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
 	return res, nil
 }

@@ -33,7 +33,7 @@ type Font struct {
 	outlines *type1.Font
 	*font.Geometry
 
-	cmap map[rune]glyph.ID
+	CMap map[rune]glyph.ID
 	lig  map[glyph.Pair]glyph.ID
 	kern map[glyph.Pair]funit.Int16
 }
@@ -98,7 +98,7 @@ func New(psFont *type1.Font) (*Font, error) {
 		names:    glyphNames,
 		outlines: psFont,
 		Geometry: geometry,
-		cmap:     cMap,
+		CMap:     cMap,
 		lig:      lig,
 		kern:     kern,
 	}
@@ -125,7 +125,7 @@ func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 	gg := make(glyph.Seq, 0, len(rr))
 	var prev glyph.ID
 	for i, r := range rr {
-		gid := f.cmap[r]
+		gid := f.CMap[r]
 		if i > 0 {
 			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
 				gg[len(gg)-1].Gid = repl
