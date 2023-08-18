@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-func TestRoundTripCID(t *testing.T) {
+func TestRoundTripComposite(t *testing.T) {
 	otf, err := gofont.OpenType(gofont.GoRegular)
 	if err != nil {
 		t.Fatal(err)

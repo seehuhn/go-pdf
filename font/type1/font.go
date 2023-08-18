@@ -21,15 +21,144 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/type1/names"
+
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/sfnt/glyph"
 )
+
+type Font struct {
+	names    []string
+	outlines *type1.Font
+	*font.Geometry
+
+	CMap map[rune]glyph.ID
+	lig  map[glyph.Pair]glyph.ID
+	kern map[glyph.Pair]funit.Int16
+}
+
+func New(psFont *type1.Font) (*Font, error) {
+	glyphNames := psFont.GlyphList()
+	nameGid := make(map[string]glyph.ID, len(glyphNames))
+	for i, name := range glyphNames {
+		nameGid[name] = glyph.ID(i)
+	}
+
+	widths := make([]funit.Int16, len(glyphNames))
+	extents := make([]funit.Rect16, len(glyphNames))
+	for i, name := range glyphNames {
+		gi := psFont.GlyphInfo[name]
+		widths[i] = gi.WidthX
+		extents[i] = gi.BBox
+	}
+
+	geometry := &font.Geometry{
+		UnitsPerEm:   psFont.UnitsPerEm,
+		Widths:       widths,
+		GlyphExtents: extents,
+
+		Ascent:             psFont.Ascent,
+		Descent:            psFont.Descent,
+		BaseLineSkip:       (psFont.Ascent - psFont.Descent) * 6 / 5, // TODO(voss)
+		UnderlinePosition:  psFont.FontInfo.UnderlinePosition,
+		UnderlineThickness: psFont.FontInfo.UnderlineThickness,
+	}
+
+	cMap := make(map[rune]glyph.ID)
+	isDingbats := psFont.FontInfo.FontName == "ZapfDingbats"
+	for gid, name := range glyphNames {
+		rr := names.ToUnicode(name, isDingbats)
+		if len(rr) != 1 {
+			continue
+		}
+		r := rr[0]
+
+		if _, exists := cMap[r]; exists {
+			continue
+		}
+		cMap[r] = glyph.ID(gid)
+	}
+
+	lig := make(map[glyph.Pair]glyph.ID)
+	for left, name := range glyphNames {
+		gi := psFont.GlyphInfo[name]
+		for right, repl := range gi.Ligatures {
+			lig[glyph.Pair{Left: glyph.ID(left), Right: nameGid[right]}] = nameGid[repl]
+		}
+	}
+
+	kern := make(map[glyph.Pair]funit.Int16)
+	for _, k := range psFont.Kern {
+		left, right := nameGid[k.Left], nameGid[k.Right]
+		kern[glyph.Pair{Left: left, Right: right}] = k.Adjust
+	}
+
+	res := &Font{
+		names:    glyphNames,
+		outlines: psFont,
+		Geometry: geometry,
+		CMap:     cMap,
+		lig:      lig,
+		kern:     kern,
+	}
+	return res, nil
+}
+
+func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	e := &embedded{
+		Font: f,
+		w:    w,
+		Resource: pdf.Resource{
+			Ref:  w.Alloc(),
+			Name: resName,
+		},
+		SimpleEncoder: cmap.NewSimpleEncoder(),
+	}
+	w.AutoClose(e)
+	return e, nil
+}
+
+func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
+	rr := []rune(s)
+
+	gg := make(glyph.Seq, 0, len(rr))
+	var prev glyph.ID
+	for i, r := range rr {
+		gid := f.CMap[r]
+		if i > 0 {
+			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
+				gg[len(gg)-1].Gid = repl
+				gg[len(gg)-1].Text = append(gg[len(gg)-1].Text, r)
+				prev = repl
+				continue
+			}
+		}
+		gg = append(gg, glyph.Info{
+			Gid:  gid,
+			Text: []rune{r},
+		})
+		prev = gid
+	}
+
+	for i, g := range gg {
+		if i > 0 {
+			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.Gid}]; ok {
+				gg[i-1].Advance += adj
+			}
+		}
+		gg[i].Advance = f.Widths[g.Gid]
+		prev = g.Gid
+	}
+
+	return gg
+}
 
 type embedded struct {
 	*Font
@@ -97,7 +226,7 @@ func (e *embedded) Close() error {
 	// TODO(voss): generated a ToUnicode map, if needed.
 
 	t1 := &EmbedInfo{
-		PSFont:    psSubset,
+		Font:      psSubset,
 		SubsetTag: subsetTag,
 		Encoding:  encoding,
 		ResName:   e.Name,
@@ -108,8 +237,8 @@ func (e *embedded) Close() error {
 // EmbedInfo holds all the information needed to embed a Type 1 font
 // into a PDF file.
 type EmbedInfo struct {
-	// PSFont is the (subsetted as needed) font to embed.
-	PSFont *type1.Font
+	// Font is the (subsetted as needed) font to embed.
+	Font *type1.Font
 
 	// SubsetTag should be a unique tag for the font subset,
 	// or the empty string if this is the full font.
@@ -119,10 +248,6 @@ type EmbedInfo struct {
 	// This is used to determine the `Encoding` entry of the PDF font dictionary.
 	Encoding []string
 
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	// Character codes must be in the range 0, ..., 255.
-	ToUnicode map[charcode.CharCode][]rune
-
 	// ResName is the resource name for the font.
 	// This is only used for PDF version 1.0.
 	ResName pdf.Name
@@ -131,12 +256,15 @@ type EmbedInfo struct {
 	IsScript   bool
 	IsAllCap   bool
 	IsSmallCap bool
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	useBuiltin := w.GetMeta().Version < pdf.V2_0 && IsBuiltin(info.PSFont)
+	useBuiltin := w.GetMeta().Version < pdf.V2_0 && IsBuiltin(info.Font)
 
-	fontName := info.PSFont.FontInfo.FontName
+	fontName := info.Font.FontInfo.FontName
 	if info.SubsetTag != "" {
 		fontName = info.SubsetTag + "+" + fontName
 	}
@@ -153,7 +281,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if w.GetMeta().Version == pdf.V1_0 {
 		fontDict["Name"] = info.ResName
 	}
-	if enc := font.DescribeEncodingType1(info.Encoding, info.PSFont.Encoding); enc != nil {
+	if enc := font.DescribeEncodingType1(info.Encoding, info.Font.Encoding); enc != nil {
 		fontDict["Encoding"] = enc
 	}
 	if info.ToUnicode != nil {
@@ -164,7 +292,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	compressedObjects := []pdf.Object{fontDict}
 
 	if !useBuiltin {
-		psFont := info.PSFont
+		psFont := info.Font
 
 		widthsRef := w.Alloc()
 		ww := make([]funit.Int16, 256)
@@ -239,7 +367,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		if err != nil {
 			return err
 		}
-		l1, l2, err := info.PSFont.WritePDF(fontFileStream)
+		l1, l2, err := info.Font.WritePDF(fontFileStream)
 		if err != nil {
 			return err
 		}
@@ -293,7 +421,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		xHeight := dicts.FontDescriptor.XHeight // optional
 		t1.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
 
-		res.PSFont = t1
+		res.Font = t1
 	}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
@@ -301,14 +429,14 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		res.SubsetTag = m[1]
 	}
 
-	if res.PSFont != nil {
+	if res.Font != nil {
 		encoding, err := font.UndescribeEncodingType1(
-			r, dicts.FontDict["Encoding"], res.PSFont.Encoding)
+			r, dicts.FontDict["Encoding"], res.Font.Encoding)
 		if err == nil {
 			res.Encoding = encoding
 		}
 	} else if t1, err := Builtin(baseFont).PSFont(); err == nil {
-		res.PSFont = t1
+		res.Font = t1
 		encoding, err := font.UndescribeEncodingType1(
 			r, dicts.FontDict["Encoding"], t1.Encoding)
 		if err == nil {

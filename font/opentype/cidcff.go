@@ -53,7 +53,7 @@ func NewCFFComposite(info *sfnt.Font, loc language.Tag) (*CIDFontCFF, error) {
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
+		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
 		Ascent:             info.Ascent,
@@ -88,8 +88,7 @@ func (f *CIDFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 }
 
 func (f *CIDFontCFF) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.otf.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.otf.Layout(s, f.gsubLookups, f.gposLookups)
 }
 
 type embeddedCFFComposite struct {
@@ -154,13 +153,11 @@ type EmbedInfoCFFComposite struct {
 	ROS  *type1.CIDSystemInfo
 	CMap map[charcode.CharCode]type1.CID
 
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	// Character codes must be in the range 0, ..., 255.
-	// TODO(voss): or else?
-	ToUnicode map[charcode.CharCode][]rune
-
 	IsAllCap   bool
 	IsSmallCap bool
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
@@ -289,7 +286,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	if err != nil {
 		return err
 	}
-	err = otf.WriteCFFOpenTypePDF(fontFileStream)
+	err = otf.WriteOpenTypeCFFPDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("embedding OpenType/CFF CIDFont %q: %w", cidFontName, err)
 	}

@@ -227,7 +227,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	var seq []glyph.Info
 	total := 0.
 	for gid := 0; gid < info.NumGlyphs() && len(seq) < 256; gid++ {
-		if info.GlyphExtent(glyph.ID(gid)).IsZero() {
+		if info.GlyphBBox(glyph.ID(gid)).IsZero() {
 			continue
 		}
 		w := info.GlyphWidth(glyph.ID(gid))

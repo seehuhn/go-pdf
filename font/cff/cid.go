@@ -52,7 +52,7 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*CIDFontCFF, error) {
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
+		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
 		Ascent:             info.Ascent,
@@ -87,8 +87,7 @@ func (f *CIDFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 }
 
 func (f *CIDFontCFF) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.info.Layout(s, f.gsubLookups, f.gposLookups)
 }
 
 type embeddedCIDCFF struct {
@@ -149,14 +148,16 @@ func (f *embeddedCIDCFF) Close() error {
 }
 
 type EmbedInfoComposite struct {
-	Font      *cff.Font
+	// Font is the font to embed (already subsetted, if needed).
+	Font *cff.Font
+
+	// SubsetTag should be a unique tag for the font subset,
+	// or the empty string if this is the full font.
 	SubsetTag string
 
 	CS   charcode.CodeSpaceRange
 	ROS  *type1.CIDSystemInfo
 	CMap map[charcode.CharCode]type1.CID
-
-	ToUnicode map[charcode.CharCode][]rune
 
 	UnitsPerEm uint16 // TODO(voss): get this from the font matrix instead?
 	Ascent     funit.Int16
@@ -166,10 +167,13 @@ type EmbedInfoComposite struct {
 	IsScript   bool
 	IsAllCap   bool
 	IsSmallCap bool
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "CFF CIDFonts", pdf.V1_3)
+	err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 	if err != nil {
 		return err
 	}

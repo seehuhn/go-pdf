@@ -36,6 +36,7 @@ import (
 
 func main() {
 	passwdArg := flag.String("p", "", "PDF password")
+	extractStream := flag.Bool("S", false, "extract stream contents")
 	flag.Parse()
 
 	tryPasswd := func(_ []byte, try int) string {
@@ -76,6 +77,20 @@ func main() {
 	}
 	obj, err := e.locate(flag.Args()[1:]...)
 	check(err)
+
+	if *extractStream {
+		stm, ok := obj.(*pdf.Stream)
+		if !ok {
+			err := fmt.Errorf("expected a PDF stream but got %T", obj)
+			check(err)
+		}
+		stmData, err := pdf.DecodeStream(r, stm, 0)
+		check(err)
+		_, err = io.Copy(os.Stdout, stmData)
+		check(err)
+		return
+	}
+
 	err = e.show(obj)
 	check(err)
 }

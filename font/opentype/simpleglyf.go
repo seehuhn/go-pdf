@@ -54,7 +54,7 @@ func NewSimpleGlyf(info *sfnt.Font, loc language.Tag) (*SimpleFontGlyf, error) {
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
+		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
 		Ascent:             info.Ascent,
@@ -90,8 +90,7 @@ func (f *SimpleFontGlyf) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, e
 }
 
 func (f *SimpleFontGlyf) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.info.Layout(s, f.gsubLookups, f.gposLookups)
 }
 
 type embeddedSimpleGlyf struct {
@@ -174,17 +173,15 @@ type EmbedInfoGlyfSimple struct {
 	// the `Encoding` entry of the PDF font dictionary.
 	Encoding []glyph.ID
 
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	// Character codes must be in the range 0, ..., 255.
-	// TODO(voss): or else?
-	ToUnicode map[charcode.CharCode][]rune
-
 	IsAllCap   bool
 	IsSmallCap bool
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "simple OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "simple OpenType/gylf fonts", pdf.V1_6)
 	if err != nil {
 		return err
 	}

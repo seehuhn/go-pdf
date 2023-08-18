@@ -142,7 +142,7 @@ func Type1(font FontID) (*type1.Font, error) {
 	for c := 'A'; c <= 'Z'; c++ {
 		gid := info.CMap.Lookup(c)
 
-		ext := info.GlyphExtent(gid)
+		ext := info.GlyphBBox(gid)
 		top := ext.URy
 		if c == 'A' || top < topMin {
 			topMin = top

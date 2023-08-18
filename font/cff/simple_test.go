@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func TestRoundTrip(t *testing.T) {
+func TestRoundTripSimple(t *testing.T) {
 	otf, err := gofont.OpenType(gofont.GoRegular)
 	if err != nil {
 		t.Fatal(err)

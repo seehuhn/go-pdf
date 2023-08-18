@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -37,6 +36,8 @@ type Glyph struct {
 }
 
 // Simple constructs a subset of the font, for use in a simple PDF font.
+//
+// TODO(voss): merge with [CID]
 func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
 	if len(subset) == 0 || subset[0].OrigGID != 0 {
 		return nil, errors.New("subset does not start with .notdef")
@@ -124,18 +125,11 @@ func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
 		}
 		res.Outlines = o2
 
-		// Use a format 4 TrueType cmap to specify the mapping from
-		// character codes to glyph indices.
-		//
-		// TODO(voss): Is this correct/needed?
-		encoding := cmap.Format4{}
-		for subsetGid, g := range subset {
-			if subsetGid == 0 {
-				continue
-			}
-			encoding[uint16(g.CID)] = glyph.ID(subsetGid)
-		}
-		res.CMap = encoding
+		// TODO(voss): construct CMap tables for the subset?
+		res.CMap = nil
+		res.CMapTable = nil
+
+		// TODO(voss): can anything be done to make the "fpgm" table smaller?
 
 	default:
 		panic("unexpected font type")
@@ -145,6 +139,8 @@ func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
 }
 
 // CID constructs a subset of the font for use as a CID-keyed PDF font.
+//
+// TODO(voss): merge with [Simple]
 func CID(info *sfnt.Font, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Font, error) {
 	if len(subset) == 0 || subset[0].OrigGID != 0 {
 		return nil, errors.New("subset does not start with .notdef")
@@ -236,9 +232,11 @@ func CID(info *sfnt.Font, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Font,
 		}
 		res.Outlines = o2
 
-		// The mapping from CIDs to GIDs is specified in the CIDToGIDMap entry
-		// in the CIDFont dictionary.
+		// TODO(voss): construct CMap tables for the subset?
 		res.CMap = nil
+		res.CMapTable = nil
+
+		// TODO(voss): can anything be done to make the "fpgm" table smaller?
 
 	default:
 		panic("unexpected font type")

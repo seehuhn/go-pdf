@@ -21,21 +21,176 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"regexp"
-	"strconv"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
-type Glyph struct {
-	WidthX funit.Int16
-	BBox   funit.Rect16
-	Data   []byte
+type Font struct {
+	Ascent             funit.Int16
+	Descent            funit.Int16
+	BaseLineSkip       funit.Int16
+	UnderlinePosition  funit.Float64
+	UnderlineThickness funit.Float64
+	ItalicAngle        float64
+	IsFixedPitch       bool
+	IsSerif            bool
+	IsScript           bool
+	IsItalic           bool
+	IsAllCap           bool
+	IsSmallCap         bool
+	ForceBold          bool
+
+	Glyphs     map[string]*Glyph
+	FontMatrix [6]float64
+	Resources  *pdf.Resources
+
+	CMap map[rune]glyph.ID
+
+	glyphNames []string
+	numOpen    int
+}
+
+func New(unitsPerEm uint16) *Font {
+	m := [6]float64{
+		1 / float64(unitsPerEm), 0,
+		0, 1 / float64(unitsPerEm),
+		0, 0,
+	}
+	f := &Font{
+		FontMatrix: m,
+		Glyphs:     map[string]*Glyph{},
+		Resources:  &pdf.Resources{},
+		glyphNames: []string{""},
+		CMap:       map[rune]glyph.ID{},
+	}
+	return f
+}
+
+func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	if f.numOpen != 0 {
+		return nil, fmt.Errorf("font: %d glyphs not closed", f.numOpen)
+	}
+	res := &embedded{
+		w:    w,
+		Font: f,
+		Resource: pdf.Resource{
+			Name: resName,
+			Ref:  w.Alloc(),
+		},
+		SimpleEncoder: cmap.NewSimpleEncoderSequential(),
+	}
+	w.AutoClose(res)
+	return res, nil
+}
+
+func (f *Font) GetGeometry() *font.Geometry {
+	glyphNames := f.glyphNames
+
+	glyphExtents := make([]funit.Rect16, len(glyphNames))
+	widths := make([]funit.Int16, len(glyphNames))
+	for i, name := range glyphNames {
+		if i == 0 {
+			continue
+		}
+		glyphExtents[i] = f.Glyphs[name].BBox
+		widths[i] = f.Glyphs[name].WidthX
+	}
+
+	res := &font.Geometry{
+		UnitsPerEm:         uint16(math.Round(1 / f.FontMatrix[0])),
+		Ascent:             f.Ascent,
+		Descent:            f.Descent,
+		BaseLineSkip:       f.BaseLineSkip,
+		UnderlinePosition:  f.UnderlinePosition,
+		UnderlineThickness: f.UnderlineThickness,
+		GlyphExtents:       glyphExtents,
+		Widths:             widths,
+	}
+	return res
+}
+
+func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
+	gg := make(glyph.Seq, 0, len(s))
+	for _, r := range s {
+		gid, ok := f.CMap[r]
+		if !ok {
+			continue
+		}
+		gg = append(gg, glyph.Info{
+			Gid:     gid,
+			Text:    []rune{r},
+			Advance: f.Glyphs[f.glyphNames[gid]].WidthX,
+		})
+	}
+	return gg
+}
+
+type embedded struct {
+	w pdf.Putter
+	*Font
+	pdf.Resource
+	cmap.SimpleEncoder
+	closed bool
+}
+
+func (e *embedded) Close() error {
+	if e.closed {
+		return nil
+	}
+	e.closed = true
+
+	encoding := e.Encoding()
+	encodingNames := make([]string, 256)
+
+	subset := make(map[string]*Glyph)
+	for i, gid := range encoding {
+		// Gid 0 maps to the empty glyph name, which is not in the charProcs map.
+		if glyph := e.Glyphs[e.glyphNames[gid]]; glyph != nil {
+			name := e.glyphNames[gid]
+			encodingNames[i] = name
+			subset[name] = glyph
+		}
+	}
+
+	var descriptor *font.Descriptor
+	if pdf.IsTagged(e.w) {
+		descriptor = &font.Descriptor{
+			IsFixedPitch: e.IsFixedPitch,
+			IsSerif:      e.IsSerif,
+			IsScript:     e.IsScript,
+			IsItalic:     e.IsItalic,
+			IsAllCap:     e.IsAllCap,
+			IsSmallCap:   e.IsSmallCap,
+			ForceBold:    e.ForceBold,
+			ItalicAngle:  e.ItalicAngle,
+			StemV:        -1,
+		}
+		if pdf.GetVersion(e.w) == pdf.V1_0 {
+			// required by PDF 2.0 specification errata, if the font dictionary has a Name entry
+			// https://pdf-issues.pdfa.org/32000-2-2020/clause09.html#H9.8.1
+			descriptor.FontName = string(e.Name)
+		}
+	}
+
+	var toUnicode map[charcode.CharCode][]rune
+	// TODO(voss): construct a toUnicode map, when needed
+
+	info := &EmbedInfo{
+		FontMatrix: e.FontMatrix,
+		Glyphs:     subset,
+		Resources:  e.Resources,
+		Encoding:   encodingNames,
+		ToUnicode:  toUnicode,
+		ResName:    e.Name,
+	}
+	return info.Embed(e.w, e.Ref)
 }
 
 type EmbedInfo struct {
@@ -47,10 +202,6 @@ type EmbedInfo struct {
 	// This is used to determine the `Encoding` entry of the PDF font dictionary.
 	Encoding []string
 
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	// Character codes must be in the range 0, ..., 255.
-	ToUnicode map[charcode.CharCode][]rune
-
 	// ResName is the resource name for the font.
 	// This is only used for PDF version 1.0.
 	ResName pdf.Name
@@ -60,6 +211,9 @@ type EmbedInfo struct {
 
 	// Descriptor *font.Descriptor
 	Descriptor *font.Descriptor
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
@@ -301,36 +455,3 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 
 	return res, nil
 }
-
-func setGlyphGeometry(g *Glyph, data []byte) {
-	m := type3StartRegexp.FindSubmatch(data)
-	if len(m) != 9 {
-		return
-	}
-	if m[1] != nil {
-		x, _ := strconv.ParseFloat(string(m[1]), 64)
-		g.WidthX = funit.Int16(math.Round(x))
-	} else if m[3] != nil {
-		var xx [6]funit.Int16
-		for i := range xx {
-			x, _ := strconv.ParseFloat(string(m[3+i]), 64)
-			xx[i] = funit.Int16(math.Round(x))
-		}
-		g.WidthX = xx[0]
-		g.BBox = funit.Rect16{
-			LLx: xx[2],
-			LLy: xx[3],
-			URx: xx[4],
-			URy: xx[5],
-		}
-	}
-}
-
-var (
-	spc = `[\t\n\f\r ]+`
-	num = `([+-]?[0-9.]+)` + spc
-	d0  = num + num + "d0"
-	d1  = num + num + num + num + num + num + "d1"
-
-	type3StartRegexp = regexp.MustCompile(`^[\t\n\f\r ]*(?:` + d0 + "|" + d1 + ")" + spc)
-)

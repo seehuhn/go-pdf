@@ -52,7 +52,7 @@ func doit() error {
 	}
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
+		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
 		Ascent:             info.Ascent,
@@ -127,8 +127,7 @@ func (f *funkel) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 }
 
 func (f *funkel) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.info.Layout(s, f.gsubLookups, f.gposLookups)
 }
 
 func (f *funkel) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {

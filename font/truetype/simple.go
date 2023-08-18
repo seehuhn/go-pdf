@@ -56,7 +56,7 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
+		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
 		Ascent:             info.Ascent,
@@ -92,8 +92,7 @@ func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 }
 
 func (f *SimpleFont) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.ttf.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.ttf.Layout(s, f.gsubLookups, f.gposLookups)
 }
 
 type embeddedSimple struct {
@@ -176,14 +175,12 @@ type EmbedInfoSimple struct {
 	// the `Encoding` entry of the PDF font dictionary.
 	Encoding []glyph.ID
 
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	// Character codes must be in the range 0, ..., 255.
-	// TODO(voss): or else?
-	ToUnicode map[charcode.CharCode][]rune
-
 	IsAllCap   bool
 	IsSmallCap bool
 	ForceBold  bool
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {

@@ -40,21 +40,21 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-type SimpleFont struct {
+type FontSimple struct {
 	info        *sfnt.Font
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
-func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
+func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
+		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
 		Ascent:             info.Ascent,
@@ -64,7 +64,7 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &SimpleFont{
+	res := &FontSimple{
 		info:        info,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
@@ -73,13 +73,13 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
 	return res, nil
 }
 
-func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedSimple{
-		SimpleFont:    f,
+		FontSimple:    f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		SimpleEncoder: cmap.NewSimpleEncoder(),
@@ -89,13 +89,12 @@ func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	return res, nil
 }
 
-func (f *SimpleFont) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.info.Layout(rr, f.gsubLookups, f.gposLookups)
+func (f *FontSimple) Layout(s string, ptSize float64) glyph.Seq {
+	return f.info.Layout(s, f.gsubLookups, f.gposLookups)
 }
 
 type embeddedSimple struct {
-	*SimpleFont
+	*FontSimple
 	w pdf.Putter
 	pdf.Resource
 
@@ -171,11 +170,6 @@ type EmbedInfoSimple struct {
 	// the `Encoding` entry of the PDF font dictionary.
 	Encoding []glyph.ID
 
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	// Character codes must be in the range 0, ..., 255.
-	// TODO(voss): or else?
-	ToUnicode map[charcode.CharCode][]rune
-
 	UnitsPerEm uint16 // TODO(voss): get this from the font matrix instead
 
 	Ascent    funit.Int16
@@ -186,6 +180,9 @@ type EmbedInfoSimple struct {
 	IsScript   bool
 	IsAllCap   bool
 	IsSmallCap bool
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {

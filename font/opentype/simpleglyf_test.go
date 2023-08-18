@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func TestRoundTripSimple(t *testing.T) {
+func TestRoundTripGlyfSimple(t *testing.T) {
 	otf, err := gofont.TrueType(gofont.GoItalic)
 	if err != nil {
 		t.Fatal(err)

@@ -46,7 +46,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	info1 := &EmbedInfo{
-		PSFont:    t1,
+		Font:      t1,
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
 		ToUnicode: toUnicode,
@@ -79,9 +79,9 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	for _, info := range []*EmbedInfo{info1, info2} {
-		info.Encoding = nil         // already compared above
-		info.PSFont.XHeight = 0     // optional entry in FontDescriptor
-		info.PSFont.GlyphInfo = nil // the bounding boxes sometimes differ
+		info.Encoding = nil       // already compared above
+		info.Font.XHeight = 0     // optional entry in FontDescriptor
+		info.Font.GlyphInfo = nil // the bounding boxes sometimes differ
 	}
 
 	cmpFloat := cmp.Comparer(func(x, y float64) bool {
@@ -111,7 +111,7 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	}
 
 	info1 := &EmbedInfo{
-		PSFont:    t1,
+		Font:      t1,
 		Encoding:  encoding,
 		ToUnicode: toUnicode,
 	}
@@ -143,9 +143,9 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	}
 
 	for _, info := range []*EmbedInfo{info1, info2} {
-		info.Encoding = nil         // already compared above
-		info.PSFont.XHeight = 0     // optional entry in FontDescriptor
-		info.PSFont.GlyphInfo = nil // the bounding boxes sometimes differ
+		info.Encoding = nil       // already compared above
+		info.Font.XHeight = 0     // optional entry in FontDescriptor
+		info.Font.GlyphInfo = nil // the bounding boxes sometimes differ
 	}
 
 	cmpFloat := cmp.Comparer(func(x, y float64) bool {

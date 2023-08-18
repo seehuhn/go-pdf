@@ -22,116 +22,54 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
+	"strconv"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/graphics"
 )
 
-type Font struct {
-	Ascent             funit.Int16
-	Descent            funit.Int16
-	BaseLineSkip       funit.Int16
-	UnderlinePosition  funit.Float64
-	UnderlineThickness funit.Float64
-	ItalicAngle        float64
-	IsFixedPitch       bool
-	IsSerif            bool
-	IsScript           bool
-	IsItalic           bool
-	IsAllCap           bool
-	IsSmallCap         bool
-	ForceBold          bool
-
-	Glyphs     map[string]*Glyph
-	FontMatrix [6]float64
-	Resources  *pdf.Resources
-
-	CMap map[rune]glyph.ID
-
-	glyphNames []string
-	numOpen    int
+type Glyph struct {
+	WidthX funit.Int16
+	BBox   funit.Rect16
+	Data   []byte
 }
 
-func New(unitsPerEm uint16) *Font {
-	m := [6]float64{
-		1 / float64(unitsPerEm), 0,
-		0, 1 / float64(unitsPerEm),
-		0, 0,
+func setGlyphGeometry(g *Glyph, data []byte) {
+	m := type3StartRegexp.FindSubmatch(data)
+	if len(m) != 9 {
+		return
 	}
-	f := &Font{
-		FontMatrix: m,
-		Glyphs:     map[string]*Glyph{},
-		Resources:  &pdf.Resources{},
-		glyphNames: []string{""},
-		CMap:       map[rune]glyph.ID{},
-	}
-	return f
-}
-
-func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	if f.numOpen != 0 {
-		return nil, fmt.Errorf("font: %d glyphs not closed", f.numOpen)
-	}
-	res := &embedded{
-		w:    w,
-		Font: f,
-		Resource: pdf.Resource{
-			Name: resName,
-			Ref:  w.Alloc(),
-		},
-		SimpleEncoder: cmap.NewSimpleEncoderSequential(),
-	}
-	w.AutoClose(res)
-	return res, nil
-}
-
-func (f *Font) GetGeometry() *font.Geometry {
-	glyphNames := f.glyphNames
-
-	glyphExtents := make([]funit.Rect16, len(glyphNames))
-	widths := make([]funit.Int16, len(glyphNames))
-	for i, name := range glyphNames {
-		if i == 0 {
-			continue
+	if m[1] != nil {
+		x, _ := strconv.ParseFloat(string(m[1]), 64)
+		g.WidthX = funit.Int16(math.Round(x))
+	} else if m[3] != nil {
+		var xx [6]funit.Int16
+		for i := range xx {
+			x, _ := strconv.ParseFloat(string(m[3+i]), 64)
+			xx[i] = funit.Int16(math.Round(x))
 		}
-		glyphExtents[i] = f.Glyphs[name].BBox
-		widths[i] = f.Glyphs[name].WidthX
-	}
-
-	res := &font.Geometry{
-		UnitsPerEm:         uint16(math.Round(1 / f.FontMatrix[0])),
-		Ascent:             f.Ascent,
-		Descent:            f.Descent,
-		BaseLineSkip:       f.BaseLineSkip,
-		UnderlinePosition:  f.UnderlinePosition,
-		UnderlineThickness: f.UnderlineThickness,
-		GlyphExtents:       glyphExtents,
-		Widths:             widths,
-	}
-	return res
-}
-
-func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
-	gg := make(glyph.Seq, 0, len(s))
-	for _, r := range s {
-		gid, ok := f.CMap[r]
-		if !ok {
-			continue
+		g.WidthX = xx[0]
+		g.BBox = funit.Rect16{
+			LLx: xx[2],
+			LLy: xx[3],
+			URx: xx[4],
+			URy: xx[5],
 		}
-		gg = append(gg, glyph.Info{
-			Gid:     gid,
-			Text:    []rune{r},
-			Advance: f.Glyphs[f.glyphNames[gid]].WidthX,
-		})
 	}
-	return gg
 }
+
+var (
+	spc = `[\t\n\f\r ]+`
+	num = `([+-]?[0-9.]+)` + spc
+	d0  = num + num + "d0"
+	d1  = num + num + num + num + num + num + "d1"
+
+	type3StartRegexp = regexp.MustCompile(`^[\t\n\f\r ]*(?:` + d0 + "|" + d1 + ")" + spc)
+)
 
 // AddGlyph adds a new glyph to the type 3 font.
 //

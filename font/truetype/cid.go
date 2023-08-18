@@ -54,7 +54,7 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*CompositeFont, error) {
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.Extents(),
+		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
 		Ascent:             info.Ascent,
@@ -89,8 +89,7 @@ func (f *CompositeFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 }
 
 func (f *CompositeFont) Layout(s string, ptSize float64) glyph.Seq {
-	rr := []rune(s)
-	return f.ttf.Layout(rr, f.gsubLookups, f.gposLookups)
+	return f.ttf.Layout(s, f.gsubLookups, f.gposLookups)
 }
 
 type embeddedCID struct {
@@ -150,19 +149,25 @@ func (f *embeddedCID) Close() error {
 }
 
 type EmbedInfoComposite struct {
-	Font      *sfnt.Font
+	// Font is the font to embed (already subsetted, if needed).
+	Font *sfnt.Font
+
+	// SubsetTag should be a unique tag for the font subset,
+	// or the empty string if this is the full font.
 	SubsetTag string
 
 	CS   charcode.CodeSpaceRange
 	ROS  *type1.CIDSystemInfo
 	CMap map[charcode.CharCode]type1.CID
 
-	CID2GID   []glyph.ID
-	ToUnicode map[charcode.CharCode][]rune
+	CID2GID []glyph.ID
 
 	IsAllCap   bool
 	IsSmallCap bool
 	ForceBold  bool
+
+	// ToUnicode (optional) is a map from character codes to unicode strings.
+	ToUnicode map[charcode.CharCode][]rune
 }
 
 func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
