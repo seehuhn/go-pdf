@@ -22,11 +22,13 @@ import (
 	"math"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
@@ -38,14 +40,17 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-type SimpleFontCFF struct {
+// FontCFFSimple is a OpenType/CFF font for embedding in a PDF file as a simple font.
+type FontCFFSimple struct {
 	otf         *sfnt.Font
+	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
-func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
+// NewCFFSimple creates a new OpenType/CFF font for embedding in a PDF file as a simple font.
+func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*FontCFFSimple, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -62,8 +67,14 @@ func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &SimpleFontCFF{
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		return nil, err
+	}
+
+	res := &FontCFFSimple{
 		otf:         info,
+		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
@@ -71,13 +82,14 @@ func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*SimpleFontCFF, error) {
 	return res, nil
 }
 
-func (f *SimpleFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+// Embed implements the [font.Font] interface.
+func (f *FontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedCFFSimple{
-		SimpleFontCFF: f,
+		FontCFFSimple: f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		SimpleEncoder: cmap.NewSimpleEncoder(),
@@ -87,12 +99,13 @@ func (f *SimpleFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	return res, nil
 }
 
-func (f *SimpleFontCFF) Layout(s string, ptSize float64) glyph.Seq {
-	return f.otf.Layout(s, f.gsubLookups, f.gposLookups)
+// Layout implements the [font.Font] interface.
+func (f *FontCFFSimple) Layout(s string, ptSize float64) glyph.Seq {
+	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedCFFSimple struct {
-	*SimpleFontCFF
+	*FontCFFSimple
 	w pdf.Putter
 	pdf.Resource
 
@@ -149,6 +162,7 @@ func (f *embeddedCFFSimple) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
+// EmbedInfoCFFSimple contains all information needed to embed a simple OpenType/CFF font.
 type EmbedInfoCFFSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
@@ -169,6 +183,7 @@ type EmbedInfoCFFSimple struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
+// Embed writes the PDF objects needed to embed the font.
 func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
@@ -204,7 +219,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		encoding[i] = cff.Glyphs[info.Encoding[i]].Name
 		builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
 	}
-	info.Font.CMap = nil
+	info.Font.CMapTable = nil
 	// TODO(voss): for all other font types, check for unnecessary "cmap" tables.
 
 	q := 1000 / float64(unitsPerEm)
@@ -296,6 +311,8 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
+// ExtractCFFSimple extracts all information about a simple OpenType/CFF font.
+// This is the inverse of [EmbedInfoCFFSimple.Embed].
 func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeCFFSimple); err != nil {
 		return nil, err

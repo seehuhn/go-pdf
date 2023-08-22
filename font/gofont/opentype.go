@@ -27,8 +27,14 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// OpenType returns `font` as an OpenType font.
 func OpenType(font FontID) (*sfnt.Font, error) {
 	info, err := TrueType(font)
+	if err != nil {
+		return nil, err
+	}
+
+	cmap, err := info.CMapTable.GetBest()
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +42,7 @@ func OpenType(font FontID) (*sfnt.Font, error) {
 	var topMin, topMax funit.Int16
 	var bottomMin, bottomMax funit.Int16
 	for c := 'A'; c <= 'Z'; c++ {
-		gid := info.CMap.Lookup(c)
+		gid := cmap.Lookup(c)
 
 		ext := info.GlyphBBox(gid)
 		top := ext.URy

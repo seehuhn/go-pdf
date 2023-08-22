@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// Type3 returns `font` as a Type3 font.
 func Type3(font FontID) (*type3.Font, error) {
 	info, err := TrueType(font)
 	if err != nil {

@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cmap"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
@@ -36,20 +36,21 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
-	pdfcmap "seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-type SimpleFont struct {
+type FontSimple struct {
 	ttf         *sfnt.Font
+	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
-func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
+func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -66,8 +67,14 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &SimpleFont{
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		return nil, err
+	}
+
+	res := &FontSimple{
 		ttf:         info,
+		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
@@ -75,32 +82,32 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*SimpleFont, error) {
 	return res, nil
 }
 
-func (f *SimpleFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedSimple{
-		SimpleFont:    f,
+		FontSimple:    f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
-		SimpleEncoder: pdfcmap.NewSimpleEncoder(),
+		SimpleEncoder: cmap.NewSimpleEncoder(),
 		text:          map[glyph.ID][]rune{},
 	}
 	w.AutoClose(res)
 	return res, nil
 }
 
-func (f *SimpleFont) Layout(s string, ptSize float64) glyph.Seq {
-	return f.ttf.Layout(s, f.gsubLookups, f.gposLookups)
+func (f *FontSimple) Layout(s string, ptSize float64) glyph.Seq {
+	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
-	*SimpleFont
+	*FontSimple
 	w pdf.Putter
 	pdf.Resource
 
-	pdfcmap.SimpleEncoder
+	cmap.SimpleEncoder
 	text   map[glyph.ID][]rune
 	closed bool
 }
@@ -120,7 +127,7 @@ func (f *embeddedSimple) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			f.Name, f.ttf.PostscriptName())
 	}
-	f.SimpleEncoder = pdfcmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
+	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
 
 	// subset the font
 	var ss []subset.Glyph
@@ -212,14 +219,14 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	//
 	// TODO(voss): also try the two allowed encodings for "non-symbolic" fonts.
 	isSymbolic := true
-	subtable := cmap.Format4{}
+	subtable := sfntcmap.Format4{}
 	for i, gid := range info.Encoding {
 		if gid == 0 {
 			continue
 		}
 		subtable[uint16(i)] = gid
 	}
-	ttf.CMapTable = cmap.Table{
+	ttf.CMapTable = sfntcmap.Table{
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 

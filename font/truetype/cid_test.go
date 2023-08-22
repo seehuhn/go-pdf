@@ -81,7 +81,6 @@ func TestRoundTripComposite(t *testing.T) {
 
 	for _, info := range []*EmbedInfoComposite{info1, info2} {
 		info.Font.CMapTable = nil // "cmap" table is optional
-		info.Font.CMap = nil      // "cmap" table is optional
 
 		info.Font.FamilyName = ""        // "name" table is optional
 		info.Font.Width = 0              // "OS/2" table is optional

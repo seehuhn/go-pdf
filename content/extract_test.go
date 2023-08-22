@@ -38,7 +38,7 @@ func TestExtract(t *testing.T) {
 	for i, font := range fonts {
 		t.Run(fmt.Sprintf("%d:%s", i, font.Type), func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			page, err := document.WriteSinglePage(buf, document.A4, nil)
+			page, err := document.WriteSinglePage(buf, document.A5r, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

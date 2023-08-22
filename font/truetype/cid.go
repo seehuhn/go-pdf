@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
@@ -40,14 +41,15 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-type CompositeFont struct {
+type FontComposite struct {
 	ttf         *sfnt.Font
+	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
-func NewComposite(info *sfnt.Font, loc language.Tag) (*CompositeFont, error) {
+func NewComposite(info *sfnt.Font, loc language.Tag) (*FontComposite, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -64,8 +66,14 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*CompositeFont, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &CompositeFont{
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		return nil, err
+	}
+
+	res := &FontComposite{
 		ttf:         info,
+		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
@@ -73,13 +81,13 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*CompositeFont, error) {
 	return res, nil
 }
 
-func (f *CompositeFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedCID{
-		CompositeFont: f,
+		FontComposite: f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		CIDEncoder:    cmap.NewCIDEncoder(),
@@ -88,12 +96,12 @@ func (f *CompositeFont) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	return res, nil
 }
 
-func (f *CompositeFont) Layout(s string, ptSize float64) glyph.Seq {
-	return f.ttf.Layout(s, f.gsubLookups, f.gposLookups)
+func (f *FontComposite) Layout(s string, ptSize float64) glyph.Seq {
+	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedCID struct {
-	*CompositeFont
+	*FontComposite
 	w pdf.Putter
 	pdf.Resource
 

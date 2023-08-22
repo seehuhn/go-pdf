@@ -40,11 +40,17 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		Ordering:   "Merkwürdig",
 		Supplement: 7,
 	}
-	cmap := make(map[charcode.CharCode]type1.CID, 8)
-	cmap[charcode.CharCode('A')] = type1.CID(ttf.CMap.Lookup('A'))
-	cmap[charcode.CharCode('B')] = type1.CID(ttf.CMap.Lookup('B'))
-	cmap[charcode.CharCode('C')] = type1.CID(ttf.CMap.Lookup('C'))
-	maxCID := type1.CID(ttf.CMap.Lookup('C'))
+
+	fontCMap, err := ttf.CMapTable.GetBest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmap := make(map[charcode.CharCode]type1.CID)
+	cmap[charcode.CharCode('A')] = type1.CID(fontCMap.Lookup('A'))
+	cmap[charcode.CharCode('B')] = type1.CID(fontCMap.Lookup('B'))
+	cmap[charcode.CharCode('C')] = type1.CID(fontCMap.Lookup('C'))
+	maxCID := type1.CID(fontCMap.Lookup('C'))
 	CID2GID := make([]glyph.ID, maxCID+1)
 	for cid := type1.CID(0); cid <= maxCID; cid++ {
 		CID2GID[cid] = glyph.ID(cid)
@@ -82,7 +88,6 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 
 	for _, info := range []*EmbedInfoGlyfComposite{info1, info2} {
 		info.Font.CMapTable = nil // "cmap" table is optional
-		info.Font.CMap = nil      // "cmap" table is optional
 
 		info.Font.FamilyName = ""        // "name" table is optional
 		info.Font.Width = 0              // "OS/2" table is optional

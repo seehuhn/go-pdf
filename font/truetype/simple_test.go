@@ -35,9 +35,14 @@ func TestRoundTripSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	cmap, err := ttf.CMapTable.GetBest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	encoding := make([]glyph.ID, 256)
-	encoding[65] = ttf.CMap.Lookup('A')
-	encoding[66] = ttf.CMap.Lookup('C')
+	encoding[65] = cmap.Lookup('A')
+	encoding[66] = cmap.Lookup('C')
 
 	toUnicode := map[charcode.CharCode][]rune{
 		65: {'A'},
@@ -89,7 +94,6 @@ func TestRoundTripSimple(t *testing.T) {
 	for _, info := range []*EmbedInfoSimple{info1, info2} {
 		info.Encoding = nil       // already compared above
 		info.Font.CMapTable = nil // already tested when comparing the encodings
-		info.Font.CMap = nil      // all but encoding information is optional
 
 		info.Font.CapHeight = 0 // already compared above
 

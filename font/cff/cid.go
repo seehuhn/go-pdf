@@ -24,30 +24,56 @@ import (
 	"math"
 
 	"golang.org/x/text/language"
+
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/cff"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 )
 
-type CIDFontCFF struct {
+// FontComposite is a CFF font for embedding into a PDF file as a composite font.
+type FontComposite struct {
 	info        *sfnt.Font
+	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
+
+	cs  charcode.CodeSpaceRange
+	ros *type1.CIDSystemInfo
 }
 
-func NewComposite(info *sfnt.Font, loc language.Tag) (*CIDFontCFF, error) {
+// FontOptions allows to customize details of the font embedding.
+type FontOptions struct {
+	Language language.Tag
+	CS       charcode.CodeSpaceRange
+	ROS      *type1.CIDSystemInfo
+}
+
+var defaultFontOptions = FontOptions{
+	Language: language.Und,
+	CS:       charcode.UCS2,
+}
+
+// NewComposite allocates a new CFF font for embedding into a PDF file as a composite font.
+func NewComposite(info *sfnt.Font, opt *FontOptions) (*FontComposite, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
+	}
+
+	if opt == nil {
+		opt = &defaultFontOptions
 	}
 
 	geometry := &font.Geometry{
@@ -62,36 +88,63 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*CIDFontCFF, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &CIDFontCFF{
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		return nil, err
+	}
+
+	loc := opt.Language
+	CS := opt.CS
+	if CS == nil {
+		CS = charcode.UCS2
+	}
+	ROS := opt.ROS
+	if ROS == nil {
+		ROS = info.Outlines.(*cff.Outlines).ROS
+	}
+	if ROS == nil {
+		ROS = &type1.CIDSystemInfo{ // TODO(voss): is this ok?
+			Registry:   "Adobe",
+			Ordering:   "Identity",
+			Supplement: 0,
+		}
+	}
+
+	res := &FontComposite{
 		info:        info,
+		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
+		cs:          CS,
+		ros:         ROS,
 	}
 	return res, nil
 }
 
-func (f *CIDFontCFF) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+// Embed implements the [font.Font] interface.
+func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
-	res := &embeddedCIDCFF{
-		CIDFontCFF: f,
-		w:          w,
-		Resource:   pdf.Resource{Ref: w.Alloc(), Name: resName},
-		CIDEncoder: cmap.NewCIDEncoder(),
+	res := &embeddedComposite{
+		FontComposite: f,
+		w:             w,
+		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
+		CIDEncoder:    cmap.NewCustomCIDEncoder(f.cs, f.ros),
 	}
 	w.AutoClose(res)
 	return res, nil
 }
 
-func (f *CIDFontCFF) Layout(s string, ptSize float64) glyph.Seq {
-	return f.info.Layout(s, f.gsubLookups, f.gposLookups)
+// Layout implements the [font.Font] interface.
+func (f *FontComposite) Layout(s string, ptSize float64) glyph.Seq {
+	return f.info.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
-type embeddedCIDCFF struct {
-	*CIDFontCFF
+type embeddedComposite struct {
+	*FontComposite
 	w pdf.Putter
 	pdf.Resource
 
@@ -99,7 +152,7 @@ type embeddedCIDCFF struct {
 	closed bool
 }
 
-func (f *embeddedCIDCFF) Close() error {
+func (f *embeddedComposite) Close() error {
 	if f.closed {
 		return nil
 	}
@@ -107,13 +160,12 @@ func (f *embeddedCIDCFF) Close() error {
 
 	// subset the font
 	encoding := f.CIDEncoder.Encoding()
-	CIDSystemInfo := f.CIDEncoder.CIDSystemInfo()
 	var ss []subset.Glyph
 	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
 	for _, p := range encoding {
 		ss = append(ss, subset.Glyph{OrigGID: p.GID, CID: p.CID})
 	}
-	subsetInfo, err := subset.CID(f.info, ss, CIDSystemInfo)
+	subsetInfo, err := subset.CID(f.info, ss, f.ros)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
@@ -121,19 +173,19 @@ func (f *embeddedCIDCFF) Close() error {
 
 	cmap := make(map[charcode.CharCode]type1.CID)
 	for _, e := range encoding {
-		cmap[charcode.CharCode(e.CID)] = e.CID
+		cmap[e.Code] = e.CID
 	}
 
 	toUnicode := make(map[charcode.CharCode][]rune)
 	for _, e := range encoding {
-		toUnicode[charcode.CharCode(e.CID)] = e.Text
+		toUnicode[e.Code] = e.Text
 	}
 
 	info := EmbedInfoComposite{
 		Font:      subsetInfo.AsCFF(),
 		SubsetTag: subsetTag,
-		CS:        charcode.UCS2,
-		ROS:       CIDSystemInfo,
+		CS:        f.cs,
+		ROS:       f.ros,
 		CMap:      cmap,
 		ToUnicode: toUnicode,
 
@@ -147,6 +199,7 @@ func (f *embeddedCIDCFF) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
+// EmbedInfoComposite contains the information needed to embed a CFF font as a composite font into a PDF file.
 type EmbedInfoComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *cff.Font
@@ -172,6 +225,7 @@ type EmbedInfoComposite struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
+// Embed writes the PDF objects needed to embed the font into the PDF file.
 func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 	if err != nil {
@@ -320,6 +374,8 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
+// ExtractComposite extracts all information about a composite CFF font from a PDF file.
+// This is the reverse of [EmbedInfoComposite.Embed].
 func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, error) {
 	if err := dicts.Type.MustBe(font.CFFComposite); err != nil {
 		return nil, err

@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
@@ -40,14 +41,15 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-type CIDFontGlyf struct {
+type FontGlyfComposite struct {
 	otf         *sfnt.Font
+	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
-func NewCompositeGlyf(info *sfnt.Font, loc language.Tag) (*CIDFontGlyf, error) {
+func NewGlyfComposite(info *sfnt.Font, loc language.Tag) (*FontGlyfComposite, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -64,8 +66,14 @@ func NewCompositeGlyf(info *sfnt.Font, loc language.Tag) (*CIDFontGlyf, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
-	res := &CIDFontGlyf{
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		return nil, err
+	}
+
+	res := &FontGlyfComposite{
 		otf:         info,
+		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
@@ -73,27 +81,27 @@ func NewCompositeGlyf(info *sfnt.Font, loc language.Tag) (*CIDFontGlyf, error) {
 	return res, nil
 }
 
-func (f *CIDFontGlyf) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *FontGlyfComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
-	res := &embeddedCIDGlyf{
-		CIDFontGlyf: f,
-		w:           w,
-		Resource:    pdf.Resource{Ref: w.Alloc(), Name: resName},
-		CIDEncoder:  cmap.NewCIDEncoder(),
+	res := &embeddedGlyfComposite{
+		FontGlyfComposite: f,
+		w:                 w,
+		Resource:          pdf.Resource{Ref: w.Alloc(), Name: resName},
+		CIDEncoder:        cmap.NewCIDEncoder(),
 	}
 	w.AutoClose(res)
 	return res, nil
 }
 
-func (f *CIDFontGlyf) Layout(s string, ptSize float64) glyph.Seq {
-	return f.otf.Layout(s, f.gsubLookups, f.gposLookups)
+func (f *FontGlyfComposite) Layout(s string, ptSize float64) glyph.Seq {
+	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
-type embeddedCIDGlyf struct {
-	*CIDFontGlyf
+type embeddedGlyfComposite struct {
+	*FontGlyfComposite
 	w pdf.Putter
 	pdf.Resource
 
@@ -101,7 +109,7 @@ type embeddedCIDGlyf struct {
 	closed bool
 }
 
-func (f *embeddedCIDGlyf) Close() error {
+func (f *embeddedGlyfComposite) Close() error {
 	if f.closed {
 		return nil
 	}

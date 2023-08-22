@@ -35,9 +35,14 @@ func TestRoundTripCFFSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	cmap, err := otf.CMapTable.GetBest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	encoding := make([]glyph.ID, 256)
-	encoding[65] = otf.CMap.Lookup('A')
-	encoding[66] = otf.CMap.Lookup('C')
+	encoding[65] = cmap.Lookup('A')
+	encoding[66] = cmap.Lookup('C')
 
 	toUnicode := map[charcode.CharCode][]rune{
 		65: {'A'},

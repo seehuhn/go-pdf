@@ -24,11 +24,13 @@ import (
 	"math"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
@@ -40,13 +42,16 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
+// FontSimple is a CFF font for embedding in a PDF file as a simple font.
 type FontSimple struct {
 	info        *sfnt.Font
+	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
 }
 
+// NewSimple allocated a new CFF font for embedding in a PDF file as a simple font.
 func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
@@ -64,8 +69,14 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 		UnderlineThickness: info.UnderlineThickness,
 	}
 
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		return nil, err
+	}
+
 	res := &FontSimple{
 		info:        info,
+		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
 		Geometry:    geometry,
@@ -73,6 +84,7 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	return res, nil
 }
 
+// Embed implements the [font.Font] interface.
 func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
 	if err != nil {
@@ -89,8 +101,9 @@ func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	return res, nil
 }
 
+// Layout implements the [font.Font] interface.
 func (f *FontSimple) Layout(s string, ptSize float64) glyph.Seq {
-	return f.info.Layout(s, f.gsubLookups, f.gposLookups)
+	return f.info.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
@@ -157,6 +170,7 @@ func (f *embeddedSimple) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
+// EmbedInfoSimple contains the information needed to embed a CFF font as a simple font into a PDF file.
 type EmbedInfoSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *cff.Font
@@ -185,6 +199,7 @@ type EmbedInfoSimple struct {
 	ToUnicode map[charcode.CharCode][]rune
 }
 
+// Embed writes the PDF objects needed to embed the font into the PDF file.
 func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
@@ -308,6 +323,8 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	return nil
 }
 
+// ExtractSimple extracts all information about a simple CFF font from a PDF file.
+// This is the inverse of [EmbedInfoSimple.Embed].
 func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	if err := dicts.Type.MustBe(font.CFFSimple); err != nil {
 		return nil, err

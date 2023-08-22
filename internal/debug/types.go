@@ -84,7 +84,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.TrueTypeSimple})
 
 	// ... or using an OpenType wrapper
-	F, err = opentype.NewSimpleGlyf(ttf, language.English)
+	F, err = opentype.NewGlyfSimple(ttf, language.English)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,10 @@ func MakeFonts() ([]FontSample, error) {
 	if len(outlines.Encoding) != 256 || outlines.ROS != nil || len(outlines.Gid2Cid) != 0 {
 		panic("CFF font unexpectedly has CIDFont operators")
 	}
-	F, err = cff.NewComposite(otf, language.English)
+	opt := &cff.FontOptions{
+		Language: language.English,
+	}
+	F, err = cff.NewComposite(otf, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +138,10 @@ func MakeFonts() ([]FontSample, error) {
 	for i := range outlines.Gid2Cid {
 		outlines.Gid2Cid[i] = pstype1.CID(i)
 	}
-	F, err = cff.NewComposite(otf, language.English)
+	opt = &cff.FontOptions{
+		Language: language.English,
+	}
+	F, err = cff.NewComposite(otf, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +166,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.TrueTypeComposite})
 
 	// ... or using an OpenType wrapper
-	F, err = opentype.NewCompositeGlyf(ttf, language.English)
+	F, err = opentype.NewGlyfComposite(ttf, language.English)
 	if err != nil {
 		return nil, err
 	}

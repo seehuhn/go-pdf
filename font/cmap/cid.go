@@ -17,10 +17,10 @@
 package cmap
 
 import (
-	"bytes"
 	"sort"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/glyph"
@@ -34,7 +34,7 @@ type CIDEncoder interface {
 }
 
 type Record struct {
-	Code []byte
+	Code charcode.CharCode
 	CID  type1.CID
 	GID  glyph.ID
 	Text []rune
@@ -62,12 +62,11 @@ func (enc *defaultCIDEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []run
 func (enc *defaultCIDEncoder) Encoding() []Record {
 	var encs []Record
 	for gid := range enc.used {
-		code := []byte{byte(gid >> 8), byte(gid)}
 		cid := type1.CID(gid)
-		encs = append(encs, Record{code, cid, gid, enc.text[cid]})
+		encs = append(encs, Record{charcode.CharCode(gid), cid, gid, enc.text[cid]})
 	}
 	sort.Slice(encs, func(i, j int) bool {
-		return bytes.Compare(encs[i].Code, encs[j].Code) < 0
+		return encs[i].Code < encs[j].Code
 	})
 	return encs
 }

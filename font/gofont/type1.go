@@ -25,6 +25,8 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// Type1 returns `font` as a Type1 font.
+//
 // TODO(voss): return font.Font instead of type1.Font?
 func Type1(font FontID) (*type1.Font, error) {
 	info, err := TrueType(font)
@@ -137,10 +139,15 @@ func Type1(font FontID) (*type1.Font, error) {
 		}
 	}
 
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		panic("unreachable")
+	}
+
 	var topMin, topMax funit.Int16
 	var bottomMin, bottomMax funit.Int16
 	for c := 'A'; c <= 'Z'; c++ {
-		gid := info.CMap.Lookup(c)
+		gid := cmap.Lookup(c)
 
 		ext := info.GlyphBBox(gid)
 		top := ext.URy

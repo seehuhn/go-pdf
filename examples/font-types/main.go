@@ -155,7 +155,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewSimpleGlyf(otf, language.English)
+			X, err = opentype.NewGlyfSimple(otf, language.English)
 			if err != nil {
 				return err
 			}
@@ -172,7 +172,10 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = cff.NewComposite(otf, language.English)
+			opt := &cff.FontOptions{
+				Language: language.English,
+			}
+			X, err = cff.NewComposite(otf, opt)
 			if err != nil {
 				return err
 			}
@@ -202,7 +205,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewCompositeGlyf(otf, language.English)
+			X, err = opentype.NewGlyfComposite(otf, language.English)
 			if err != nil {
 				return err
 			}

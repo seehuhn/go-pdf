@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
+// TrueType returns `font` as a TrueType font.
 func TrueType(font FontID) (*sfnt.Font, error) {
 	raw, ok := ttf[font]
 	if !ok {

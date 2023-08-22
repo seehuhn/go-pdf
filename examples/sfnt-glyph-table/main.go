@@ -43,16 +43,20 @@ func main() {
 		log.Fatal(err)
 	}
 
+	cmap, _ := tt.CMapTable.GetBest()
+
 	rev := make(map[glyph.ID]rune)
-	min, max := tt.CMap.CodeRange()
-	for r := min; r <= max; r++ {
-		gid := tt.CMap.Lookup(r)
-		if gid == 0 {
-			continue
-		}
-		r2 := rev[gid]
-		if r2 == 0 || r < r2 {
-			rev[gid] = r
+	if cmap != nil {
+		min, max := cmap.CodeRange()
+		for r := min; r <= max; r++ {
+			gid := cmap.Lookup(r)
+			if gid == 0 {
+				continue
+			}
+			r2 := rev[gid]
+			if r2 == 0 || r < r2 {
+				rev[gid] = r
+			}
 		}
 	}
 

@@ -91,7 +91,10 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 // on the number of distinct glyphs which can be accessed.
 func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
 	if info.IsCFF() {
-		return cff.NewComposite(info, loc)
+		opt := &cff.FontOptions{
+			Language: loc,
+		}
+		return cff.NewComposite(info, opt)
 	}
 	return truetype.NewComposite(info, loc)
 }

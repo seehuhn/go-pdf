@@ -126,7 +126,6 @@ func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
 		res.Outlines = o2
 
 		// TODO(voss): construct CMap tables for the subset?
-		res.CMap = nil
 		res.CMapTable = nil
 
 		// TODO(voss): can anything be done to make the "fpgm" table smaller?
@@ -233,7 +232,6 @@ func CID(info *sfnt.Font, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Font,
 		res.Outlines = o2
 
 		// TODO(voss): construct CMap tables for the subset?
-		res.CMap = nil
 		res.CMapTable = nil
 
 		// TODO(voss): can anything be done to make the "fpgm" table smaller?

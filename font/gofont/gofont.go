@@ -35,8 +35,10 @@ import (
 
 // TODO(voss): attach all required methods to FontID, to make it implement Font?
 
+// FontID identifies individual fonts in the Go font family.
 type FontID int
 
+// Constants for the available fonts in the Go font family.
 const (
 	_                 FontID = iota
 	GoBold                   // gobold
@@ -53,6 +55,7 @@ const (
 	GoMonoItalic             // gomonoitalic
 )
 
+// All is a slice containing all available fonts in the Go font family.
 var All = []FontID{
 	GoBold,
 	GoBoldItalic,
@@ -83,4 +86,5 @@ var ttf = map[FontID][]byte{
 	GoMonoItalic:      gomonoitalic.TTF,
 }
 
+// ErrInvalidFontID indicates that a FontID is invalid.
 var ErrInvalidFontID = errors.New("invalid font ID")
