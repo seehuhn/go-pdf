@@ -39,7 +39,7 @@ type MetaInfo struct {
 	Info *Info
 
 	// Trailer is the trailer dictionary for the file.
-	// This excludes entries related to the cross-reference table.
+	// All entries related to the cross-reference table have been removed.
 	Trailer Dict
 }
 

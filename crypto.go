@@ -452,7 +452,7 @@ type stdSecHandler struct {
 func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, int) string) (*stdSecHandler, error) {
 	R, ok := enc["R"].(Integer)
 	if !ok || R < 2 || R == 5 || R > 6 {
-		return nil, errors.New("invalid Encrypt.R")
+		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.R")}
 	}
 	ouLength := 32
 	if R == 6 {
@@ -464,18 +464,20 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 	V := enc["V"].(Integer)
 
 	O, ok := enc["O"].(String)
+	O = tryCrop(O, ouLength)
 	if !ok || len(O) != ouLength {
-		return nil, errors.New("invalid Encrypt.O")
+		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.O")}
 	}
 
 	U, ok := enc["U"].(String)
+	U = tryCrop(U, ouLength)
 	if !ok || len(U) != ouLength {
-		return nil, errors.New("invalid Encrypt.U")
+		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.U")}
 	}
 
 	P, ok := enc["P"].(Integer)
 	if !ok {
-		return nil, errors.New("invalid Encrypt.P")
+		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.P")}
 	}
 
 	emd := true
@@ -499,24 +501,38 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 	if R == 6 {
 		OE, ok := enc["OE"].(String)
 		if !ok || len(OE) != 32 {
-			return nil, errors.New("invalid Encrypt.OE")
+			return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.OE")}
 		}
 		sec.OE = []byte(OE)
 
 		UE, ok := enc["UE"].(String)
 		if !ok || len(UE) != 32 {
-			return nil, errors.New("invalid Encrypt.UE")
+			return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.UE")}
 		}
 		sec.UE = []byte(UE)
 
 		Perms, ok := enc["Perms"].(String)
 		if !ok || len(Perms) != 16 {
-			return nil, errors.New("invalid Encrypt.Perms")
+			return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.Perms")}
 		}
 		sec.Perms = []byte(Perms)
 	}
 
 	return sec, nil
+}
+
+// Some PDF files have too long O and U strings, but the excess data
+// only consists of zeros.  In these cases, we simply remove the zeros.
+func tryCrop(s String, l int) String {
+	if len(s) <= l {
+		return s
+	}
+	for i := l; i < len(s); i++ {
+		if s[i] != 0 {
+			return s
+		}
+	}
+	return s[:l]
 }
 
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security

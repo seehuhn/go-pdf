@@ -135,6 +135,8 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		return opt.ErrorHandling != ErrorHandlingRecover
 	}
 
+	var damaged bool
+
 	IDObj := trailer["ID"]
 	r.meta.ID = getIDDirect(IDObj)
 	if encObj, ok := trailer["Encrypt"]; ok {
@@ -147,7 +149,11 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		}
 		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
 		if err != nil {
-			return nil, Wrap(err, "encryption dictionary")
+			err = Wrap(err, "encryption dictionary")
+			if shouldExit(err) {
+				return nil, err
+			}
+			damaged = true
 		}
 	} else if r.meta.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
@@ -161,51 +167,52 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 			err := &MalformedFileError{Err: errInvalidID}
 			if shouldExit(err) {
 				return nil, err
-			} else {
-				r.meta.ID = nil
-				break
+			}
+			r.meta.ID = nil
+			break
+		}
+	}
+
+	if !damaged {
+		catalogDict, err := GetDict(r, trailer["Root"])
+		if err != nil {
+			err = Wrap(err, "document catalog")
+			if shouldExit(err) {
+				return nil, err
 			}
 		}
-	}
+		r.meta.Catalog = &Catalog{}
+		err = DecodeDict(r, r.meta.Catalog, catalogDict)
+		if shouldExit(err) {
+			return nil, err
+		} else if r.meta.Catalog.Pages == 0 {
+			err := &MalformedFileError{
+				Err: errors.New("no pages in PDF document catalog"),
+			}
+			if opt.ErrorHandling == ErrorHandlingReport {
+				r.Errors = append(r.Errors, err)
+			} else {
+				return nil, err
+			}
+		}
+		if r.meta.Catalog.Version > r.meta.Version {
+			r.meta.Version = r.meta.Catalog.Version
+		}
 
-	catalogDict, err := GetDict(r, trailer["Root"])
-	if err != nil {
-		err = Wrap(err, "document catalog")
+		if r.meta.Version == V1_0 {
+			r.meta.ID = nil
+		}
+
+		infoDict, err := GetDict(r, trailer["Info"])
 		if shouldExit(err) {
 			return nil, err
 		}
-	}
-	r.meta.Catalog = &Catalog{}
-	err = DecodeDict(r, r.meta.Catalog, catalogDict)
-	if shouldExit(err) {
-		return nil, err
-	} else if r.meta.Catalog.Pages == 0 {
-		err := &MalformedFileError{
-			Err: errors.New("no pages in PDF document catalog"),
-		}
-		if opt.ErrorHandling == ErrorHandlingReport {
-			r.Errors = append(r.Errors, err)
-		} else {
-			return nil, err
-		}
-	}
-	if r.meta.Catalog.Version > r.meta.Version {
-		r.meta.Version = r.meta.Catalog.Version
-	}
-
-	if r.meta.Version == V1_0 {
-		r.meta.ID = nil
-	}
-
-	infoDict, err := GetDict(r, trailer["Info"])
-	if shouldExit(err) {
-		return nil, err
-	}
-	if infoDict != nil {
-		r.meta.Info = &Info{}
-		err = DecodeDict(r, r.meta.Info, infoDict)
-		if shouldExit(err) {
-			return nil, err
+		if infoDict != nil {
+			r.meta.Info = &Info{}
+			err = DecodeDict(r, r.meta.Info, infoDict)
+			if shouldExit(err) {
+				return nil, err
+			}
 		}
 	}
 
@@ -246,7 +253,7 @@ func (r *Reader) AuthenticateOwner() error {
 	return err
 }
 
-// AuthenticateOwner tries to authenticate the actions given in perm.  If a
+// Authenticate tries to authenticate the actions given in perm.  If a
 // password is required, this calls the ReadPassword function specified in the
 // [ReaderOptions] struct.  The return value is nil if the owner was
 // authenticated (or if no authentication is required), and an object of type
@@ -267,7 +274,7 @@ func (r *Reader) GetMeta() *MetaInfo {
 	return &r.meta
 }
 
-// GetObject reads an indirect object from the PDF file.  If the object is not
+// Get reads an indirect object from the PDF file.  If the object is not
 // present, nil is returned without an error.
 //
 // The argument canObjStm specifies whether the object may be read from an

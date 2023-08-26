@@ -18,11 +18,11 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,30 +32,40 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/term"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/pagetree"
+)
+
+var (
+	debug         = flag.Bool("d", false, "debug mode")
+	passwdArg     = flag.String("p", "", "PDF password")
+	extractStream = flag.Bool("S", false, "extract stream contents")
 )
 
 func main() {
-	passwdArg := flag.String("p", "", "PDF password")
-	extractStream := flag.Bool("S", false, "extract stream contents")
 	flag.Parse()
+	args := flag.Args()
 
+	err := run(args...)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func run(args ...string) error {
 	tryPasswd := func(_ []byte, try int) string {
 		if *passwdArg != "" && try == 0 {
 			return *passwdArg
 		}
 		fmt.Print("password: ")
-		passwd, err := term.ReadPassword(syscall.Stdin)
+		passwd, _ := term.ReadPassword(syscall.Stdin)
 		fmt.Println("***")
-		check(err)
 		return string(passwd)
 	}
 
-	args := flag.Args()
-
 	fd, err := os.Open(args[0])
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	opt := &pdf.ReaderOptions{
 		ReadPassword:  tryPasswd,
@@ -63,8 +73,7 @@ func main() {
 	}
 	r, err := pdf.NewReader(fd, opt)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	for _, err := range r.Errors {
 		fmt.Println(err)
@@ -75,117 +84,162 @@ func main() {
 		r:   r,
 		buf: &bytes.Buffer{},
 	}
-	obj, err := e.locate(flag.Args()[1:]...)
-	check(err)
-
-	if *extractStream {
-		stm, ok := obj.(*pdf.Stream)
-		if !ok {
-			err := fmt.Errorf("expected a PDF stream but got %T", obj)
-			check(err)
-		}
-		stmData, err := pdf.DecodeStream(r, stm, 0)
-		check(err)
-		_, err = io.Copy(os.Stdout, stmData)
-		check(err)
-		return
+	err = e.abs("catalog")
+	if err != nil {
+		return err
 	}
 
-	err = e.show(obj)
-	check(err)
+	path := flag.Args()[1:]
+	for i, key := range path {
+		if strings.HasPrefix(key, "@") {
+			err = e.abs(key[1:])
+		} else if strings.HasPrefix(key, ".") {
+			err = e.rel(key[1:])
+		} else {
+			err = e.rel(key)
+			if i == 0 && err != nil {
+				err = e.abs(key)
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if *extractStream {
+		stm, ok := e.obj.(*pdf.Stream)
+		if !ok {
+			return fmt.Errorf("expected a PDF stream but got %T", e.obj)
+		}
+		stmData, err := pdf.DecodeStream(r, stm, 0)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(os.Stdout, stmData)
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Println(strings.Join(e.loc, ".") + ":")
+	err = e.show(e.obj)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type explainer struct {
 	r   *pdf.Reader
 	buf *bytes.Buffer
+
+	obj pdf.Object
+	loc []string
 }
 
-func (e *explainer) locate(desc ...string) (pdf.Object, error) {
-	var obj pdf.Object = pdf.AsDict(e.r.GetMeta().Catalog)
+func (e *explainer) abs(key string) error {
+	var obj pdf.Object
+	switch {
+	case key == "" || key == "catalog":
+		obj = pdf.AsDict(e.r.GetMeta().Catalog)
+		key = "catalog"
+	case key == "info":
+		obj = pdf.AsDict(e.r.GetMeta().Info)
+	case key == "trailer":
+		obj = e.r.GetMeta().Trailer
+	case objNumberRegexp.MatchString(key):
+		m := objNumberRegexp.FindStringSubmatch(key)
+		number, err := strconv.ParseUint(m[1], 10, 32)
+		if err != nil {
+			return err
+		}
+		var generation uint16
+		if m[2] != "" {
+			tmp, err := strconv.ParseUint(m[2], 10, 16)
+			if err != nil {
+				return err
+			}
+			generation = uint16(tmp)
+		}
+		ref := pdf.NewReference(uint32(number), generation)
+		obj, err = pdf.Resolve(e.r, ref)
+		if err != nil {
+			return err
+		}
+	}
+	e.obj = obj
+	e.loc = []string{key}
 
-	debug := false
-
-	if debug {
+	if *debug {
 		msg, err := e.explainSingleLine(obj)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		fmt.Println(".", msg)
+		fmt.Printf("%s: %s\n", strings.Join(e.loc, "."), msg)
 	}
 
-	for _, key := range desc {
-		keyInt, err := strconv.ParseInt(key, 10, 64)
-		isInt := err == nil
+	return nil
+}
 
-		switch {
-		case key == "":
-			return nil, errors.New("empty selector")
-		case key == "@info":
-			obj = pdf.AsDict(e.r.GetMeta().Info)
-		case key[0] == '@':
-			ff := strings.Split(key[1:], ".")
-			if len(ff) > 2 {
-				return nil, errors.New("invalid selector " + key)
-			}
-			var number uint64
-			number, err := strconv.ParseUint(ff[0], 10, 32)
+func (e *explainer) rel(key string) error {
+	var err error
+	obj := e.obj
+	loc := strings.Join(e.loc, ".")
+
+	switch x := obj.(type) {
+	case pdf.Dict:
+		forceKey := false
+		if strings.HasPrefix(key, "/") {
+			key = key[1:]
+			forceKey = true
+		}
+
+		if loc == "catalog.Pages" && intRegexp.MatchString(key) && !forceKey {
+			pageNo, err := strconv.ParseUint(key, 10, 32)
 			if err != nil {
-				return nil, err
+				return err
 			}
-
-			var generation uint16
-			if len(ff) > 1 {
-				tmp, err := strconv.ParseUint(ff[1], 10, 16)
-				if err != nil {
-					return nil, err
-				}
-				generation = uint16(tmp)
-			}
-
-			ref := pdf.NewReference(uint32(number), generation)
-			obj, err = pdf.Resolve(e.r, ref)
+			obj, err = pagetree.GetPage(e.r, int(pageNo)-1)
 			if err != nil {
-				return nil, err
+				return err
 			}
-		default:
-			switch x := obj.(type) {
-			case pdf.Dict:
-				val, ok := x[pdf.Name(key)]
-				if !ok {
-					return nil, fmt.Errorf("key %q not present in dict", key)
-				}
-				obj, err = pdf.Resolve(e.r, val)
-				if err != nil {
-					return nil, err
-				}
-			case pdf.Array:
-				if !isInt {
-					return nil, fmt.Errorf("key %q not valid for type Array", key)
-				}
-				idx := keyInt
-				if idx < 0 {
-					idx += int64(len(x))
-				}
-				if idx < 0 || idx >= int64(len(x)) {
-					return nil, fmt.Errorf("index %d out of range 0...%d", keyInt, len(x)-1)
-				}
-				obj, err = pdf.Resolve(e.r, x[idx])
-				if err != nil {
-					return nil, err
-				}
-			default:
-				return nil, fmt.Errorf("key %q not valid for type %T", key, obj)
+		} else {
+			var ok bool
+			obj, ok = x[pdf.Name(key)]
+			if !ok {
+				return fmt.Errorf("%s: key %q not found", loc, key)
 			}
 		}
-		if debug {
-			msg, err := e.explainSingleLine(obj)
-			if err != nil {
-				return nil, err
-			}
-			fmt.Println(key, msg)
+	case pdf.Array:
+		idx, err := strconv.ParseInt(key, 10, 64)
+		if err != nil {
+			return err
 		}
+		if idx < 0 && idx+int64(len(x)) >= 0 {
+			idx += int64(len(x))
+		} else if idx < 0 || idx >= int64(len(x)) {
+			return fmt.Errorf("%s: index %d out of range 0...%d", loc, idx, len(x)-1)
+		}
+		obj = x[idx]
 	}
-	return obj, nil
+
+	obj, err = pdf.Resolve(e.r, obj)
+	if err != nil {
+		return err
+	}
+	e.obj = obj
+	e.loc = append(e.loc, key)
+
+	if *debug {
+		msg, err := e.explainSingleLine(obj)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s: %s\n", strings.Join(e.loc, "."), msg)
+	}
+
+	return nil
 }
 
 func (e *explainer) explainShort(obj pdf.Object) (string, error) {
@@ -334,6 +388,7 @@ func (e *explainer) show(obj pdf.Object) error {
 		}
 		fmt.Println("decoded stream contents:")
 		fmt.Print(string(buf[:n]))
+		// TODO(voss): fix line endings
 		_, err = io.Copy(os.Stdout, stmData)
 		if err != nil {
 			return err
@@ -391,13 +446,6 @@ func dictKeys(obj pdf.Dict) []pdf.Name {
 	return keys
 }
 
-func check(err error) {
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
 // MostlyBinary returns true if the contents of buf should not be
 // printed to the screen without quoting.
 func mostlyBinary(buf []byte) bool {
@@ -413,3 +461,8 @@ func mostlyBinary(buf []byte) bool {
 	}
 	return bad > 16+n/10
 }
+
+var (
+	intRegexp       = regexp.MustCompile(`^(\d+)$`)
+	objNumberRegexp = regexp.MustCompile(`^(\d+)(?:\.(\d+))?$`)
+)
