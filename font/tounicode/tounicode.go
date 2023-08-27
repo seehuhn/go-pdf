@@ -54,6 +54,9 @@ func (info *Info) Decode(s pdf.String) ([]rune, int) {
 		if len(r.Values) > int(code-r.First) {
 			return r.Values[code-r.First], k
 		}
+		if len(r.Values[0]) == 0 {
+			return []rune{}, k
+		}
 		rr := make([]rune, len(r.Values[0]))
 		copy(rr, r.Values[0])
 		rr[len(rr)-1] += rune(code - r.First)

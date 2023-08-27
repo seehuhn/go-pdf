@@ -476,8 +476,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 		}
 	}
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], cmap.CS); info != nil {
 		res.ToUnicode = info
 	}
 

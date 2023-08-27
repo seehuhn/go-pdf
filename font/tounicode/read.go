@@ -29,7 +29,9 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
+// Extract extracts a ToUnicode CMap from a PDF file.
+// If cs is not nil, it overrides the code space range given inside the CMap.
+func Extract(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) (*Info, error) {
 	stm, err := pdf.GetStream(r, obj)
 	if err != nil {
 		return nil, err
@@ -40,10 +42,12 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Read(data)
+	return Read(data, cs)
 }
 
-func Read(r io.Reader) (*Info, error) {
+// Read reads a ToUnicode CMap.
+// If cs is not nil, it overrides the code space range given inside the CMap.
+func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 	cmap, err := cmap.ReadRaw(r)
 	if err != nil {
 		return nil, err
@@ -74,7 +78,9 @@ func Read(r io.Reader) (*Info, error) {
 	for i, r := range codeMap.CodeSpaceRanges {
 		csRanges[i] = charcode.Range(r)
 	}
-	cs := charcode.NewCodeSpace(csRanges)
+	if cs == nil {
+		cs = charcode.NewCodeSpace(csRanges)
+	}
 
 	res := &Info{
 		Name: pdf.Name(cmapName),

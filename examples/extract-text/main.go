@@ -55,7 +55,6 @@ func extractText(fname string) error {
 	}
 
 	for pageNo := 0; pageNo < numPages; pageNo++ {
-		fmt.Println()
 		fmt.Println("Page", pageNo)
 		fmt.Println()
 		pageDict, err := pagetree.GetPage(r, pageNo)
@@ -66,6 +65,7 @@ func extractText(fname string) error {
 			fmt.Print(s)
 			return nil
 		})
+		fmt.Println()
 	}
 	return nil
 }

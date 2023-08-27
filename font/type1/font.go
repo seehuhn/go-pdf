@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
@@ -451,8 +452,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		}
 	}
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

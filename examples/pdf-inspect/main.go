@@ -38,11 +38,8 @@ import (
 )
 
 var (
-	debug           = flag.Bool("d", false, "debug mode")
-	explainFont     = flag.Bool("F", false, "explain font")
-	extractContents = flag.Int("C", -1, "output the content stream for page `n` (0-based)")
-	extractStream   = flag.Bool("S", false, "extract raw stream contents")
-	passwdArg       = flag.String("p", "", "PDF password")
+	debug     = flag.Bool("d", false, "debug mode")
+	passwdArg = flag.String("p", "", "PDF password")
 )
 
 func main() {
@@ -100,8 +97,57 @@ func printObject(args ...string) error {
 	}
 	defer r.Close()
 
-	if *extractContents >= 0 {
-		pageDict, err := pagetree.GetPage(r, *extractContents)
+	e := &explainer{
+		r:   r,
+		buf: &bytes.Buffer{},
+	}
+
+	action := "@show"
+
+	path := flag.Args()[1:]
+	err = e.abs("catalog")
+	if err != nil {
+		return err
+	}
+	for i, key := range path {
+		if i == len(path)-1 && strings.HasPrefix(key, "@") {
+			action = key
+			break
+		}
+		if i == 0 {
+			err = e.abs(key)
+			if err == nil {
+				continue
+			}
+		}
+		err = e.rel(key)
+		if err != nil {
+			return err
+		}
+	}
+
+	switch action {
+	case "@show":
+		fmt.Println(strings.Join(e.loc, ".") + ":")
+		err = e.show(e.obj)
+		if err != nil {
+			return err
+		}
+
+	case "@raw":
+		stm, ok := e.obj.(*pdf.Stream)
+		if !ok {
+			return fmt.Errorf("expected a PDF stream but got %T", e.obj)
+		}
+		stmData, err := pdf.DecodeStream(r, stm, 0)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(os.Stdout, stmData)
+		return err
+
+	case "@contents":
+		pageDict, err := pdf.GetDictTyped(e.r, e.obj, "Page")
 		if err != nil {
 			return err
 		}
@@ -139,60 +185,22 @@ func printObject(args ...string) error {
 			return fmt.Errorf("unexpected type %T for page contents", contents)
 		}
 		return nil
-	}
 
-	e := &explainer{
-		r:   r,
-		buf: &bytes.Buffer{},
-	}
-	err = e.abs("catalog")
-	if err != nil {
-		return err
-	}
-
-	path := flag.Args()[1:]
-	for i, key := range path {
-		if strings.HasPrefix(key, "@") {
-			err = e.abs(key[1:])
-		} else if strings.HasPrefix(key, ".") {
-			err = e.rel(key[1:])
-		} else {
-			err = e.rel(key)
-			if i == 0 && err != nil {
-				err = e.abs(key)
-			}
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	if *extractStream {
-		stm, ok := e.obj.(*pdf.Stream)
-		if !ok {
-			return fmt.Errorf("expected a PDF stream but got %T", e.obj)
-		}
-		stmData, err := pdf.DecodeStream(r, stm, 0)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(os.Stdout, stmData)
-		return err
-	} else if *explainFont {
+	case "@font":
 		dicts, err := font.ExtractDicts(r, e.obj)
 		if err != nil {
 			return err
 		}
 		fmt.Println(dicts.Type.String() + " font")
 		fmt.Println()
-		fmt.Println("Font dict:")
+		fmt.Print("Font dict: ")
 		err = e.show(dicts.FontDict)
 		if err != nil {
 			return err
 		}
 		if dicts.CIDFontDict != nil {
 			fmt.Println()
-			fmt.Println("CID font dict:")
+			fmt.Print("CID font dict: ")
 			err = e.show(dicts.CIDFontDict)
 			if err != nil {
 				return err
@@ -200,7 +208,7 @@ func printObject(args ...string) error {
 		}
 		if dicts.FontDescriptor != nil {
 			fmt.Println()
-			fmt.Println("Font descriptor:")
+			fmt.Print("Font descriptor: ")
 			fontDescriptor := dicts.FontDescriptor.AsDict()
 			err = e.show(fontDescriptor)
 			if err != nil {
@@ -209,19 +217,13 @@ func printObject(args ...string) error {
 		}
 		if dicts.FontProgram != nil {
 			fmt.Println()
-			fmt.Println("Font program:")
+			fmt.Print("Font program: ")
 			err = e.show(dicts.FontProgram)
 			if err != nil {
 				return err
 			}
 		}
 		return nil
-	}
-
-	fmt.Println(strings.Join(e.loc, ".") + ":")
-	err = e.show(e.obj)
-	if err != nil {
-		return err
 	}
 
 	return nil
@@ -264,6 +266,8 @@ func (e *explainer) abs(key string) error {
 		if err != nil {
 			return err
 		}
+	default:
+		return fmt.Errorf("unknown key %q", key)
 	}
 	e.obj = obj
 	e.loc = []string{key}

@@ -48,7 +48,7 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end`
-	info, err := Read(strings.NewReader(cmap))
+	info, err := Read(strings.NewReader(cmap), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestRoundtrip(t *testing.T) {
 
 	// fmt.Println(buf.String())
 
-	info2, err := Read(buf)
+	info2, err := Read(buf, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ CMapName currentdict /CMap defineresource pop
 end
 end`)
 	f.Fuzz(func(t *testing.T, s string) {
-		info1, err := Read(strings.NewReader(s))
+		info1, err := Read(strings.NewReader(s), nil)
 		if err != nil {
 			return
 		}
@@ -167,7 +167,7 @@ end`)
 		if err != nil {
 			t.Fatal(err)
 		}
-		info2, err := Read(buf)
+		info2, err := Read(buf, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

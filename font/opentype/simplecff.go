@@ -379,8 +379,7 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 		}
 	}
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

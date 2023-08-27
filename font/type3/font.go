@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/tounicode"
@@ -97,7 +98,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 			Ref:  w.Alloc(),
 			Name: resName,
 		},
-		SimpleEncoder: cmap.NewSimpleEncoderSequential(),
+		SimpleEncoder: cmap.NewSimpleEncoder(),
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -204,7 +205,7 @@ func (e *embedded) Close() error {
 		}
 	}
 
-	var toUnicode *tounicode.Info
+	// var toUnicode *tounicode.Info
 	// TODO(voss): construct a toUnicode map, when needed
 
 	info := &EmbedInfo{
@@ -212,8 +213,8 @@ func (e *embedded) Close() error {
 		Glyphs:     subset,
 		Resources:  e.Resources,
 		Encoding:   encoding,
-		ToUnicode:  toUnicode,
-		ResName:    e.Name,
+		// ToUnicode:  toUnicode,
+		ResName: e.Name,
 
 		ItalicAngle: e.ItalicAngle,
 
@@ -482,8 +483,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		}
 	}
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
+	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

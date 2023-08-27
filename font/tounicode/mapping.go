@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
+// GetMapping returns the mapping information from info.
 func (info *Info) GetMapping() map[charcode.CharCode][]rune {
 	res := make(map[charcode.CharCode][]rune)
 	for _, s := range info.Singles {

@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
@@ -106,7 +107,27 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			toUnicode = info.ToUnicode
 			break
 		}
-		// TODO(voss): other methods???
+
+		// construct a ToUnicode map from the Encoding
+		// TODO(voss): revisit this, once
+		// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
+		if encodingEntry, _ := pdf.Resolve(r, dicts.FontDict["Encoding"]); encodingEntry != nil {
+			encodingNames, _ := font.UndescribeEncodingType1(r, encodingEntry, pdfenc.StandardEncoding[:])
+			for i, name := range encodingNames {
+				if name == ".notdef" {
+					encodingNames[i] = pdfenc.StandardEncoding[i]
+				}
+			}
+
+			m := make(map[charcode.CharCode][]rune)
+			for i, name := range encodingNames {
+				m[charcode.CharCode(i)] = names.ToUnicode(name, false)
+			}
+			toUnicode = tounicode.FromMapping(charcode.Simple, m)
+			break
+		}
+
+		// TODO(voss): use info.Encoding together with the TrueType "cmap" table
 
 	case font.OpenTypeGlyfSimple:
 		info, err := opentype.ExtractGlyfSimple(r, dicts)
@@ -135,6 +156,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Encoding[i]
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
+		toUnicode = tounicode.FromMapping(charcode.Simple, m)
 
 	case font.CFFComposite:
 		info, err := cff.ExtractComposite(r, dicts)

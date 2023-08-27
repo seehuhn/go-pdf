@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/postscript"
 )
 
+// Embed adds the ToUnicode cmap to a PDF file.
 func (info *Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 	touniStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 	if err != nil {
