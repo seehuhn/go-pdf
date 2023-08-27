@@ -24,7 +24,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/tounicode"
@@ -32,57 +31,71 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// Font is a PDF type 3 font.
 type Font struct {
+	glyphNames []string
+	Glyphs     map[string]*Glyph
+
 	Ascent             funit.Int16
 	Descent            funit.Int16
 	BaseLineSkip       funit.Int16
 	UnderlinePosition  funit.Float64
 	UnderlineThickness funit.Float64
-	ItalicAngle        float64
-	IsFixedPitch       bool
-	IsSerif            bool
-	IsScript           bool
-	IsItalic           bool
-	IsAllCap           bool
-	IsSmallCap         bool
-	ForceBold          bool
 
-	Glyphs     map[string]*Glyph
+	ItalicAngle  float64
+	IsFixedPitch bool
+	IsSerif      bool
+	IsScript     bool
+	IsItalic     bool
+	IsAllCap     bool
+	IsSmallCap   bool
+	ForceBold    bool
+
 	FontMatrix [6]float64
 	Resources  *pdf.Resources
 
 	CMap map[rune]glyph.ID
 
-	glyphNames []string
-	numOpen    int
+	numOpen int
 }
 
+// Glyph is a glyph in a type 3 font.
+type Glyph struct {
+	WidthX funit.Int16
+	BBox   funit.Rect16
+	Data   []byte
+}
+
+// New creates a new type 3 font.
+// Initally the font does not contain any glyphs.
+// Use [Font.AddGlyph] to add glyphs to the font.
 func New(unitsPerEm uint16) *Font {
 	m := [6]float64{
 		1 / float64(unitsPerEm), 0,
 		0, 1 / float64(unitsPerEm),
 		0, 0,
 	}
-	f := &Font{
+	res := &Font{
 		FontMatrix: m,
 		Glyphs:     map[string]*Glyph{},
 		Resources:  &pdf.Resources{},
 		glyphNames: []string{""},
 		CMap:       map[rune]glyph.ID{},
 	}
-	return f
+	return res
 }
 
+// Embed implements the [font.Font] interface.
 func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	if f.numOpen != 0 {
 		return nil, fmt.Errorf("font: %d glyphs not closed", f.numOpen)
 	}
 	res := &embedded{
-		w:    w,
 		Font: f,
+		w:    w,
 		Resource: pdf.Resource{
-			Name: resName,
 			Ref:  w.Alloc(),
+			Name: resName,
 		},
 		SimpleEncoder: cmap.NewSimpleEncoderSequential(),
 	}
@@ -90,6 +103,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	return res, nil
 }
 
+// GetGeometry implements the [font.Font] interface.
 func (f *Font) GetGeometry() *font.Geometry {
 	glyphNames := f.glyphNames
 
@@ -116,9 +130,12 @@ func (f *Font) GetGeometry() *font.Geometry {
 	return res
 }
 
+// Layout implements the [font.Font] interface.
 func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
-	gg := make(glyph.Seq, 0, len(s))
-	for _, r := range s {
+	rr := []rune(s)
+
+	gg := make(glyph.Seq, 0, len(rr))
+	for _, r := range rr {
 		gid, ok := f.CMap[r]
 		if !ok {
 			continue
@@ -133,9 +150,11 @@ func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 }
 
 type embedded struct {
-	w pdf.Putter
 	*Font
+
+	w pdf.Putter
 	pdf.Resource
+
 	cmap.SimpleEncoder
 	closed bool
 }
@@ -146,15 +165,21 @@ func (e *embedded) Close() error {
 	}
 	e.closed = true
 
-	encoding := e.Encoding()
-	encodingNames := make([]string, 256)
+	if e.SimpleEncoder.Overflow() {
+		return fmt.Errorf("too many distinct glyphs used in Type 3 font %q",
+			e.Name)
+	}
+	e.SimpleEncoder = cmap.NewFrozenSimpleEncoder(e.SimpleEncoder)
+
+	encodingGid := e.Encoding()
+	encoding := make([]string, 256)
 
 	subset := make(map[string]*Glyph)
-	for i, gid := range encoding {
+	for i, gid := range encodingGid {
 		// Gid 0 maps to the empty glyph name, which is not in the charProcs map.
 		if glyph := e.Glyphs[e.glyphNames[gid]]; glyph != nil {
 			name := e.glyphNames[gid]
-			encodingNames[i] = name
+			encoding[i] = name
 			subset[name] = glyph
 		}
 	}
@@ -179,20 +204,31 @@ func (e *embedded) Close() error {
 		}
 	}
 
-	var toUnicode map[charcode.CharCode][]rune
+	var toUnicode *tounicode.Info
 	// TODO(voss): construct a toUnicode map, when needed
 
 	info := &EmbedInfo{
 		FontMatrix: e.FontMatrix,
 		Glyphs:     subset,
 		Resources:  e.Resources,
-		Encoding:   encodingNames,
+		Encoding:   encoding,
 		ToUnicode:  toUnicode,
 		ResName:    e.Name,
+
+		ItalicAngle: e.ItalicAngle,
+
+		IsFixedPitch: e.IsFixedPitch,
+		IsSerif:      e.IsSerif,
+		IsScript:     e.IsScript,
+		ForceBold:    e.ForceBold,
+
+		IsAllCap:   e.IsAllCap,
+		IsSmallCap: e.IsSmallCap,
 	}
 	return info.Embed(e.w, e.Ref)
 }
 
+// EmbedInfo contains the information needed to embed a type 3 font into a PDF document.
 type EmbedInfo struct {
 	Glyphs map[string]*Glyph
 
@@ -209,13 +245,21 @@ type EmbedInfo struct {
 	// Resources is the resource dictionary for the font.
 	Resources *pdf.Resources
 
-	// Descriptor *font.Descriptor
-	Descriptor *font.Descriptor
+	ItalicAngle float64
+
+	IsFixedPitch bool
+	IsSerif      bool
+	IsScript     bool
+	ForceBold    bool
+
+	IsAllCap   bool
+	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
+// Embed implements the [font.Font] interface.
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if len(info.FontMatrix) != 6 {
 		return errors.New("invalid font matrix")
@@ -301,23 +345,35 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	compressedRefs := []pdf.Reference{fontDictRef}
 	compressedObjects := []pdf.Object{fontDict}
 
-	if info.Descriptor != nil {
+	if pdf.IsTagged(w) {
 		isSymbolic := true
 		for name := range charProcs {
-			// TODO(voss): should this only check encoded glyphs?
 			if !pdfenc.IsStandardLatin[string(name)] {
 				isSymbolic = false
 				break
 			}
 		}
 
+		fd := &font.Descriptor{
+			IsFixedPitch: info.IsFixedPitch,
+			IsSerif:      info.IsSerif,
+			IsSymbolic:   isSymbolic,
+			IsScript:     info.IsScript,
+			IsItalic:     info.ItalicAngle != 0,
+			IsAllCap:     info.IsAllCap,
+			IsSmallCap:   info.IsSmallCap,
+			ForceBold:    info.ForceBold,
+			ItalicAngle:  info.ItalicAngle,
+			StemV:        -1,
+		}
+		if name, ok := fontDict["Name"].(pdf.Name); ok {
+			fd.FontName = string(name)
+		}
+
 		fdRef := w.Alloc()
 		fontDict["FontDescriptor"] = fdRef
 
-		d := *info.Descriptor
-		d.IsSymbolic = isSymbolic
-
-		fontDescriptor := d.AsDict()
+		fontDescriptor := fd.AsDict()
 		compressedObjects = append(compressedObjects, fontDescriptor)
 		compressedRefs = append(compressedRefs, fdRef)
 	}
@@ -344,7 +400,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -353,6 +409,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	return nil
 }
 
+// Extract extracts information about a type 3 font from a PDF file.
 func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	if err := dicts.Type.MustBe(font.Type3); err != nil {
 		return nil, err
@@ -425,16 +482,12 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		}
 	}
 
-	name, err := pdf.GetName(r, dicts.FontDict["Name"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "Name")
-	}
-	res.ResName = name
-
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
+
+	res.ResName, _ = pdf.GetName(r, dicts.FontDict["Name"])
 
 	resources, err := pdf.GetDict(r, dicts.FontDict["Resources"])
 	if err != nil {
@@ -446,12 +499,15 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		return nil, pdf.Wrap(err, "decoding Resources")
 	}
 
-	fontDescriptor, err := font.DecodeDescriptor(r, dicts.FontDict["FontDescriptor"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "FontDescriptor")
+	if dicts.FontDescriptor != nil {
+		res.ItalicAngle = dicts.FontDescriptor.ItalicAngle
+		res.IsFixedPitch = dicts.FontDescriptor.IsFixedPitch
+		res.IsSerif = dicts.FontDescriptor.IsSerif
+		res.IsScript = dicts.FontDescriptor.IsScript
+		res.IsAllCap = dicts.FontDescriptor.IsAllCap
+		res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+		res.ForceBold = dicts.FontDescriptor.ForceBold
 	}
-	fontDescriptor.IsSymbolic = false // TODO(voss)
-	res.Descriptor = fontDescriptor
 
 	return res, nil
 }

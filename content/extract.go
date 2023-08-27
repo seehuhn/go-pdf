@@ -26,13 +26,16 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
+// Context holds information about the current state of the PDF content stream.
 type Context struct {
 	*pdf.Resources
 	*graphics.State
 }
 
-func ForAllText(r pdf.Getter, ref pdf.Object, yield func(*Context, pdf.String) error) error {
-	page, err := pdf.GetDictTyped(r, ref, "Page")
+// ForAllText loads the given page of a PDF file and calls the given
+// function for each text string on the page.
+func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) error) error {
+	page, err := pdf.GetDictTyped(r, pageDict, "Page")
 	if err != nil {
 		return err
 	}
@@ -49,6 +52,21 @@ func ForAllText(r pdf.Getter, ref pdf.Object, yield func(*Context, pdf.String) e
 
 	var graphicsStack []*graphics.State
 	g := graphics.NewState()
+
+	decoders := make(map[pdf.Name]func(pdf.String) string)
+	yield := func(ctx *Context, s pdf.String) error {
+		fontName := g.Font
+		decoder, ok := decoders[fontName]
+		if !ok {
+			fontRef := resources.Font[fontName]
+			decoder, err = makeTextDecoder(r, fontRef)
+			if err != nil {
+				return err
+			}
+			decoders[fontName] = decoder
+		}
+		return cb(ctx, decoder(s))
+	}
 
 	seq := &operatorSeq{}
 

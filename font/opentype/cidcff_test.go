@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -48,10 +49,11 @@ func TestRoundTripCFFComposite(t *testing.T) {
 	for code := charcode.CharCode(0); code < 8; code++ {
 		cmap[code] = type1.CID(2*code + 1)
 	}
-	toUnicode := make(map[charcode.CharCode][]rune, 8)
+	m := make(map[charcode.CharCode][]rune, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
-		toUnicode[code] = []rune{'X', '0' + rune(code)}
+		m[code] = []rune{'X', '0' + rune(code)}
 	}
+	toUnicode := tounicode.FromMapping(cs, m)
 	info1 := &EmbedInfoCFFComposite{
 		Font:      otf,
 		SubsetTag: "ABCDEF",

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -32,27 +33,46 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/term"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
 var (
-	debug         = flag.Bool("d", false, "debug mode")
-	passwdArg     = flag.String("p", "", "PDF password")
-	extractStream = flag.Bool("S", false, "extract stream contents")
+	debug           = flag.Bool("d", false, "debug mode")
+	explainFont     = flag.Bool("F", false, "explain font")
+	extractContents = flag.Int("C", -1, "output the content stream for page `n` (0-based)")
+	extractStream   = flag.Bool("S", false, "extract raw stream contents")
+	passwdArg       = flag.String("p", "", "PDF password")
 )
 
 func main() {
 	flag.Parse()
+	flag.CommandLine.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"Usage: %s [options] <file.pdf> <path>...\n",
+			filepath.Base(os.Args[0]))
+		fmt.Fprintln(flag.CommandLine.Output())
+		fmt.Fprintln(flag.CommandLine.Output(), "The given path describes an object in the PDF file,")
+		fmt.Fprintln(flag.CommandLine.Output(), "starting from the document catalog.")
+		fmt.Fprintln(flag.CommandLine.Output())
+		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
+		flag.PrintDefaults()
+	}
 	args := flag.Args()
 
-	err := run(args...)
+	if len(args) == 0 {
+		flag.CommandLine.Usage()
+		os.Exit(1)
+	}
+
+	err := printObject(args...)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func run(args ...string) error {
+func printObject(args ...string) error {
 	tryPasswd := func(_ []byte, try int) string {
 		if *passwdArg != "" && try == 0 {
 			return *passwdArg
@@ -79,6 +99,47 @@ func run(args ...string) error {
 		fmt.Println(err)
 	}
 	defer r.Close()
+
+	if *extractContents >= 0 {
+		pageDict, err := pagetree.GetPage(r, *extractContents)
+		if err != nil {
+			return err
+		}
+		contents, err := pdf.Resolve(r, pageDict["Contents"])
+		if err != nil {
+			return err
+		}
+		switch contents := contents.(type) {
+		case *pdf.Stream:
+			stmData, err := pdf.DecodeStream(r, contents, 0)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(os.Stdout, stmData)
+			if err != nil {
+				return err
+			}
+		case pdf.Array:
+			for _, elem := range contents {
+				stm, err := pdf.GetStream(r, elem)
+				if err != nil {
+					return err
+				}
+				stmData, err := pdf.DecodeStream(r, stm, 0)
+				if err != nil {
+					return err
+				}
+				_, err = io.Copy(os.Stdout, stmData)
+				if err != nil {
+					return err
+				}
+				fmt.Println()
+			}
+		default:
+			return fmt.Errorf("unexpected type %T for page contents", contents)
+		}
+		return nil
+	}
 
 	e := &explainer{
 		r:   r,
@@ -116,9 +177,45 @@ func run(args ...string) error {
 			return err
 		}
 		_, err = io.Copy(os.Stdout, stmData)
+		return err
+	} else if *explainFont {
+		dicts, err := font.ExtractDicts(r, e.obj)
 		if err != nil {
 			return err
 		}
+		fmt.Println(dicts.Type.String() + " font")
+		fmt.Println()
+		fmt.Println("Font dict:")
+		err = e.show(dicts.FontDict)
+		if err != nil {
+			return err
+		}
+		if dicts.CIDFontDict != nil {
+			fmt.Println()
+			fmt.Println("CID font dict:")
+			err = e.show(dicts.CIDFontDict)
+			if err != nil {
+				return err
+			}
+		}
+		if dicts.FontDescriptor != nil {
+			fmt.Println()
+			fmt.Println("Font descriptor:")
+			fontDescriptor := dicts.FontDescriptor.AsDict()
+			err = e.show(fontDescriptor)
+			if err != nil {
+				return err
+			}
+		}
+		if dicts.FontProgram != nil {
+			fmt.Println()
+			fmt.Println("Font program:")
+			err = e.show(dicts.FontProgram)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	fmt.Println(strings.Join(e.loc, ".") + ":")
@@ -200,7 +297,7 @@ func (e *explainer) rel(key string) error {
 			if err != nil {
 				return err
 			}
-			obj, err = pagetree.GetPage(e.r, int(pageNo)-1)
+			obj, err = pagetree.GetPage(e.r, int(pageNo))
 			if err != nil {
 				return err
 			}

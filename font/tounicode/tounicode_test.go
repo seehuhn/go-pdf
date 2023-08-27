@@ -18,6 +18,7 @@ package tounicode
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 	"testing"
 
@@ -25,6 +26,43 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/type1"
 )
+
+func TestMapping(t *testing.T) {
+	cmap := `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo 3 dict dup begin
+  /Registry (Test) def
+  /Ordering (Test) def
+  /Supplement 0 def
+end def
+/CMapName /Test def
+/CMapType 2 def
+1 begincodespacerange
+<20> <ff>
+endcodespacerange
+1 beginbfrange
+<20> <7e> <0020>
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end`
+	info, err := Read(strings.NewReader(cmap))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := info.GetMapping()
+
+	in := []byte{0x20}
+	code, k := info.CS.Decode(in)
+	if k != 1 {
+		t.Fatalf("unexpected k=%d", k)
+	}
+	if !slices.Equal(m[code], []rune{0x20}) {
+		t.Fatalf("unexpected mapping: %02x -> %q", in, m[code])
+	}
+}
 
 func TestRoundtrip(t *testing.T) {
 	info := &Info{

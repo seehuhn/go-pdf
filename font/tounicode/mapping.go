@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/postscript/type1"
 )
 
 func (info *Info) GetMapping() map[charcode.CharCode][]rune {
@@ -55,7 +56,22 @@ func c(rr []rune) []rune {
 	return res
 }
 
-// SetMapping overwrites the mapping information in info with the given mapping.
+// FromMapping constructs a ToUnicode cmap from the given mapping.
+func FromMapping(CS charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *Info {
+	info := &Info{
+		ROS: &type1.CIDSystemInfo{
+			Registry:   "Adobe",
+			Ordering:   "UCS",
+			Supplement: 0,
+		},
+		CS: CS,
+	}
+	info.SetMapping(m)
+	info.makeName()
+	return info
+}
+
+// SetMapping replaces the mapping information in info with the given mapping.
 //
 // To make efficient use of range entries, the generated mapping may be a
 // superset of the original mapping, i.e. it may contain entries for charcodes

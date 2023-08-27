@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/pdf/font/type3"
 )
 
@@ -37,33 +38,32 @@ func TestRoundTrip(t *testing.T) {
 	encoding[65] = "A"
 	encoding[66] = "C"
 
-	toUnicode := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCode][]rune{
 		65: {'A'},
 		66: {'C'},
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
-	descriptor := &font.Descriptor{
+	info1 := &type3.EmbedInfo{
+		Glyphs:       t3.Glyphs,
+		FontMatrix:   t3.FontMatrix,
+		Resources:    t3.Resources,
+		Encoding:     encoding,
 		IsFixedPitch: t3.IsFixedPitch,
 		IsSerif:      t3.IsSerif,
 		IsScript:     t3.IsScript,
-		IsItalic:     t3.IsItalic,
 		IsAllCap:     t3.IsAllCap,
 		IsSmallCap:   t3.IsSmallCap,
 		ForceBold:    t3.ForceBold,
 		ItalicAngle:  t3.ItalicAngle,
-		StemV:        -1,
-	}
-
-	info1 := &type3.EmbedInfo{
-		Glyphs:     t3.Glyphs,
-		FontMatrix: t3.FontMatrix,
-		Resources:  t3.Resources,
-		Encoding:   encoding,
-		ToUnicode:  toUnicode,
-		Descriptor: descriptor,
+		ToUnicode:    toUnicode,
 	}
 
 	rw := pdf.NewData(pdf.V1_7)
+
+	// mark as tagged PDF, to force writing of the font descriptor
+	rw.GetMeta().Catalog.MarkInfo = pdf.Dict{"Marked": pdf.Boolean(true)}
+
 	ref := rw.Alloc()
 	err = info1.Embed(rw, ref)
 	if err != nil {

@@ -28,6 +28,18 @@ import (
 	"seehuhn.de/go/postscript"
 )
 
+func (info *Info) Embed(w pdf.Putter, ref pdf.Reference) error {
+	touniStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
+	if err != nil {
+		return err
+	}
+	err = info.Write(touniStream)
+	if err != nil {
+		return fmt.Errorf("embedding ToUnicode cmap: %w", err)
+	}
+	return touniStream.Close()
+}
+
 func (info *Info) Write(w io.Writer) error {
 	return toUnicodeTmpl.Execute(w, info)
 }

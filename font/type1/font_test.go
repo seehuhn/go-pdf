@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/tounicode"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -40,10 +41,11 @@ func TestRoundTrip(t *testing.T) {
 	encoding[65] = "A"
 	encoding[66] = "B"
 
-	toUnicode := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCode][]rune{
 		65: {'A'},
 		66: {'B'},
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
 	info1 := &EmbedInfo{
 		Font:      t1,
@@ -105,10 +107,11 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	encoding[65] = "A"
 	encoding[66] = "C"
 
-	toUnicode := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCode][]rune{
 		65: {'A'},
 		66: {'C'},
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
 	info1 := &EmbedInfo{
 		Font:      t1,

@@ -41,6 +41,7 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
+// FontComposite is a composite TrueType font.
 type FontComposite struct {
 	ttf         *sfnt.Font
 	cmap        sfntcmap.Subtable
@@ -49,6 +50,7 @@ type FontComposite struct {
 	*font.Geometry
 }
 
+// NewComposite creates a new composite TrueType font.
 func NewComposite(info *sfnt.Font, loc language.Tag) (*FontComposite, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
@@ -81,6 +83,7 @@ func NewComposite(info *sfnt.Font, loc language.Tag) (*FontComposite, error) {
 	return res, nil
 }
 
+// Embed implements the [font.Font] interface.
 func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
@@ -96,6 +99,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	return res, nil
 }
 
+// Layout implements the [font.Font] interface.
 func (f *FontComposite) Layout(s string, ptSize float64) glyph.Seq {
 	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
@@ -139,10 +143,11 @@ func (f *embeddedCID) Close() error {
 		CID2GID[s.CID] = glyph.ID(subsetGID)
 	}
 
-	toUnicode := make(map[charcode.CharCode][]rune)
+	m := make(map[charcode.CharCode][]rune)
 	for _, e := range encoding {
-		toUnicode[charcode.CharCode(e.CID)] = e.Text
+		m[charcode.CharCode(e.CID)] = e.Text
 	}
+	toUnicode := tounicode.FromMapping(charcode.UCS2, m)
 
 	info := EmbedInfoComposite{
 		Font:      ttfSubset,
@@ -156,6 +161,7 @@ func (f *embeddedCID) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
+// EmbedInfoComposite is the information needed to embed a composite TrueType font.
 type EmbedInfoComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
@@ -170,14 +176,16 @@ type EmbedInfoComposite struct {
 
 	CID2GID []glyph.ID
 
+	ForceBold bool
+
 	IsAllCap   bool
 	IsSmallCap bool
-	ForceBold  bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
+// Embed adds a composite TrueType font to a PDF file.
 func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
@@ -335,7 +343,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, info.CS, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -368,6 +376,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
+// ExtractComposite extracts information about a composite TrueType font.
 func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, error) {
 	if err := dicts.Type.MustBe(font.TrueTypeComposite); err != nil {
 		return nil, err
@@ -469,7 +478,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap

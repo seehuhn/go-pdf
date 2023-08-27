@@ -146,13 +146,14 @@ func (f *embeddedCFFSimple) Close() error {
 		return fmt.Errorf("font subset: %w", err)
 	}
 
-	toUnicode := make(map[charcode.CharCode][]rune)
+	m := make(map[charcode.CharCode][]rune)
 	for code, gid := range encoding {
 		if gid == 0 || len(f.text[gid]) == 0 {
 			continue
 		}
-		toUnicode[charcode.CharCode(code)] = f.text[gid]
+		m[charcode.CharCode(code)] = f.text[gid]
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 	info := EmbedInfoCFFSimple{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
@@ -180,7 +181,7 @@ type EmbedInfoCFFSimple struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
 // Embed writes the PDF objects needed to embed the font.
@@ -302,7 +303,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -380,7 +381,7 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap

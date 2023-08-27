@@ -51,7 +51,7 @@ type FontSimple struct {
 	*font.Geometry
 }
 
-// NewSimple allocated a new CFF font for embedding in a PDF file as a simple font.
+// NewSimple allocates a new CFF font for embedding in a PDF file as a simple font.
 func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
@@ -148,13 +148,14 @@ func (f *embeddedSimple) Close() error {
 		return fmt.Errorf("font subset: %w", err)
 	}
 
-	toUnicode := make(map[charcode.CharCode][]rune)
+	m := make(map[charcode.CharCode][]rune)
 	for code, gid := range encoding {
 		if gid == 0 || len(f.text[gid]) == 0 {
 			continue
 		}
-		toUnicode[charcode.CharCode(code)] = f.text[gid]
+		m[charcode.CharCode(code)] = f.text[gid]
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 	info := EmbedInfoSimple{
 		Font:       subsetInfo.AsCFF(),
 		SubsetTag:  subsetTag,
@@ -190,13 +191,14 @@ type EmbedInfoSimple struct {
 	Descent   funit.Int16
 	CapHeight funit.Int16
 
-	IsSerif    bool
-	IsScript   bool
+	IsSerif  bool
+	IsScript bool
+
 	IsAllCap   bool
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
 // Embed writes the PDF objects needed to embed the font into the PDF file.
@@ -314,7 +316,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -402,7 +404,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	return res, nil

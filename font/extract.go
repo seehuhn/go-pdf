@@ -98,7 +98,7 @@ type Dicts struct {
 	Type           EmbeddingType
 }
 
-func ExtractDicts(r pdf.Getter, ref pdf.Reference) (*Dicts, error) {
+func ExtractDicts(r pdf.Getter, ref pdf.Object) (*Dicts, error) {
 	res := &Dicts{}
 
 	fontDict, err := pdf.GetDictTyped(r, ref, "Font")

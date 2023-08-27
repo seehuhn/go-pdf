@@ -42,6 +42,7 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
+// FontSimple is a simple TrueType font.
 type FontSimple struct {
 	ttf         *sfnt.Font
 	cmap        sfntcmap.Subtable
@@ -50,6 +51,7 @@ type FontSimple struct {
 	*font.Geometry
 }
 
+// NewSimple creates a new simple TrueType font.
 func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
@@ -82,6 +84,7 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	return res, nil
 }
 
+// Embed implements the [font.Font] interface.
 func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
@@ -98,6 +101,7 @@ func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	return res, nil
 }
 
+// Layout implements the [font.Font] interface.
 func (f *FontSimple) Layout(s string, ptSize float64) glyph.Seq {
 	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
@@ -152,13 +156,14 @@ func (f *embeddedSimple) Close() error {
 		subsetEncoding[g.CID] = glyph.ID(subsetGid)
 	}
 
-	toUnicode := make(map[charcode.CharCode][]rune)
+	m := make(map[charcode.CharCode][]rune)
 	for code, gid := range encoding {
 		if gid == 0 || len(f.text[gid]) == 0 {
 			continue
 		}
-		toUnicode[charcode.CharCode(code)] = f.text[gid]
+		m[charcode.CharCode(code)] = f.text[gid]
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
 	info := EmbedInfoSimple{
 		Font:      ttfSubset,
@@ -169,6 +174,7 @@ func (f *embeddedSimple) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
+// EmbedInfoSimple is the information needed to embed a simple TrueType font.
 type EmbedInfoSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
@@ -182,14 +188,16 @@ type EmbedInfoSimple struct {
 	// the `Encoding` entry of the PDF font dictionary.
 	Encoding []glyph.ID
 
+	ForceBold bool
+
 	IsAllCap   bool
 	IsSmallCap bool
-	ForceBold  bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
+// Embed adds the font to a PDF file.
 func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
@@ -308,7 +316,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -317,6 +325,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	return nil
 }
 
+// ExtractSimple extracts information about a simple TrueType font.
 func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	if err := dicts.Type.MustBe(font.TrueTypeSimple); err != nil {
 		return nil, err
@@ -365,7 +374,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap

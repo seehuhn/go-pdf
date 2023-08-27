@@ -27,7 +27,7 @@ import (
 //
 // See section 9.8.1 of PDF 32000-1:2008.
 type Descriptor struct {
-	FontName    string     // required
+	FontName    string     // required, except (usually) for Type 3 fonts
 	FontFamily  string     // optional
 	FontStretch os2.Width  // optional
 	FontWeight  os2.Weight // optional

@@ -18,7 +18,6 @@ package content
 
 import (
 	"fmt"
-	"unicode"
 
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -27,23 +26,22 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
 )
 
-func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, error) {
+func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, error) {
 	dicts, err := font.ExtractDicts(r, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	var CS charcode.CodeSpaceRange
-	var toUnicode map[charcode.CharCode][]rune
+	var toUnicode *tounicode.Info
 	// TODO(voss): make this less repetitive
 	switch dicts.Type {
 	case font.Type1, font.Builtin:
-		CS = charcode.Simple
 		info, err := type1.Extract(r, dicts)
 		if err != nil {
 			return nil, err
@@ -53,13 +51,15 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			break
 		}
 
-		toUnicode = make(map[charcode.CharCode][]rune)
+		// construct a ToUnicode map from the Encoding
+		m := make(map[charcode.CharCode][]rune)
 		for i := 0; i < 256; i++ {
 			name := info.Encoding[i]
-			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
+			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
+		toUnicode = tounicode.FromMapping(charcode.Simple, m)
+
 	case font.CFFSimple:
-		CS = charcode.Simple
 		info, err := cff.ExtractSimple(r, dicts)
 		if err != nil {
 			return nil, err
@@ -69,14 +69,16 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			break
 		}
 
-		toUnicode = make(map[charcode.CharCode][]rune)
+		// construct a ToUnicode map from the Encoding
+		m := make(map[charcode.CharCode][]rune)
 		for i := 0; i < 256; i++ {
 			gid := info.Encoding[i]
 			name := info.Font.Glyphs[gid].Name
-			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
+			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
+		toUnicode = tounicode.FromMapping(charcode.Simple, m)
+
 	case font.OpenTypeCFFSimple:
-		CS = charcode.Simple
 		info, err := opentype.ExtractCFFSimple(r, dicts)
 		if err != nil {
 			return nil, err
@@ -86,14 +88,16 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			break
 		}
 
-		toUnicode = make(map[charcode.CharCode][]rune)
+		// construct a ToUnicode map from the Encoding
+		m := make(map[charcode.CharCode][]rune)
 		for i := 0; i < 256; i++ {
 			gid := info.Encoding[i]
 			name := info.Font.GlyphName(gid)
-			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
+			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
+		toUnicode = tounicode.FromMapping(charcode.Simple, m)
+
 	case font.TrueTypeSimple:
-		CS = charcode.Simple
 		info, err := truetype.ExtractSimple(r, dicts)
 		if err != nil {
 			return nil, err
@@ -102,8 +106,9 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			toUnicode = info.ToUnicode
 			break
 		}
+		// TODO(voss): other methods???
+
 	case font.OpenTypeGlyfSimple:
-		CS = charcode.Simple
 		info, err := opentype.ExtractGlyfSimple(r, dicts)
 		if err != nil {
 			return nil, err
@@ -112,8 +117,9 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			toUnicode = info.ToUnicode
 			break
 		}
+		// TODO(voss): other methods???
+
 	case font.Type3:
-		CS = charcode.Simple
 		info, err := type3.Extract(r, dicts)
 		if err != nil {
 			return nil, err
@@ -123,10 +129,11 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 			break
 		}
 
-		toUnicode = make(map[charcode.CharCode][]rune)
+		// construct a ToUnicode map from the Encoding
+		m := make(map[charcode.CharCode][]rune)
 		for i := 0; i < 256; i++ {
 			name := info.Encoding[i]
-			toUnicode[charcode.CharCode(i)] = names.ToUnicode(name, false)
+			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
 
 	case font.CFFComposite:
@@ -134,7 +141,6 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 		if err != nil {
 			return nil, err
 		}
-		CS = info.CS
 
 		if info.ToUnicode != nil {
 			toUnicode = info.ToUnicode
@@ -147,7 +153,6 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 		if err != nil {
 			return nil, err
 		}
-		CS = info.CS
 
 		if info.ToUnicode != nil {
 			toUnicode = info.ToUnicode
@@ -160,7 +165,6 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 		if err != nil {
 			return nil, err
 		}
-		CS = info.CS
 
 		if info.ToUnicode != nil {
 			toUnicode = info.ToUnicode
@@ -173,14 +177,12 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 		if err != nil {
 			return nil, err
 		}
-		CS = info.CS
 
 		if info.ToUnicode != nil {
 			toUnicode = info.ToUnicode
 			break
 		}
 		// TODO(voss): other methods ...
-
 	}
 
 	if toUnicode == nil {
@@ -190,14 +192,9 @@ func MakeTextDecoder(r pdf.Getter, ref pdf.Reference) (func(pdf.String) string, 
 	fn := func(s pdf.String) string {
 		var res []rune
 		for len(s) > 0 {
-			code, k := CS.Decode(s)
+			rr, k := toUnicode.Decode(s)
 			s = s[k:]
-
-			if code < 0 {
-				res = append(res, unicode.ReplacementChar)
-			} else {
-				res = append(res, toUnicode[charcode.CharCode(code)]...)
-			}
+			res = append(res, rr...)
 		}
 		return string(res)
 	}

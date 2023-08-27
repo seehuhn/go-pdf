@@ -63,35 +63,13 @@ func TestExtract(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			decoders := map[pdf.Reference]func(pdf.String) string{}
-			getDecoder := func(obj pdf.Object) (func(pdf.String) string, error) {
-				ref, ok := obj.(pdf.Reference)
-				if !ok {
-					return nil, fmt.Errorf("expected reference, got %T", obj)
-				}
-				if f, ok := decoders[ref]; ok {
-					return f, nil
-				}
-				f, err := MakeTextDecoder(r, ref)
-				if err != nil {
-					return nil, err
-				}
-				decoders[ref] = f
-				return f, nil
-			}
-
 			pageDict, err := pagetree.GetPage(r, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 			var fragments []string
-			err = ForAllText(r, pageDict, func(ctx *Context, s pdf.String) error {
-				ref := ctx.Resources.Font[ctx.State.Font]
-				f, err := getDecoder(ref)
-				if err != nil {
-					return err
-				}
-				fragments = append(fragments, f(s))
+			err = ForAllText(r, pageDict, func(ctx *Context, s string) error {
+				fragments = append(fragments, s)
 				return nil
 			})
 			if err != nil {

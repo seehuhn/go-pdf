@@ -44,6 +44,7 @@ func NumPages(r pdf.Getter) (int, error) {
 }
 
 // GetPage returns the page tree node for a given page number.
+// Page numbers start at 0.
 // Inheritable attributes are copied from the parent nodes.
 // The /Parent attribute is removed from the returned dictionary.
 func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {

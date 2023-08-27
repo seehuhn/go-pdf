@@ -14,19 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package content
-
-import (
-	"io"
-
-	"seehuhn.de/go/pdf"
-)
-
-// Operator is a PDF operator found in a content stream.
-type Operator pdf.Name
-
-// PDF implements the [pdf.Object] interface.
-func (x Operator) PDF(w io.Writer) error {
-	_, err := w.Write([]byte(x))
-	return err
-}
+// Package cff allows to embed CFF fonts into a PDF file.
+package cff

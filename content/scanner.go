@@ -42,6 +42,7 @@ type Scanner struct {
 	err error
 }
 
+// NewScanner returns a new Scanner that reads from r.
 func NewScanner(r io.Reader) *Scanner {
 	return &Scanner{
 		src: r,
@@ -49,6 +50,7 @@ func NewScanner(r io.Reader) *Scanner {
 	}
 }
 
+// Next returns the next token from the input.
 func (s *Scanner) Next() (pdf.Object, error) {
 	type stackEntry struct {
 		isDict bool

@@ -176,10 +176,11 @@ func (f *embeddedComposite) Close() error {
 		cmap[e.Code] = e.CID
 	}
 
-	toUnicode := make(map[charcode.CharCode][]rune)
+	m := make(map[charcode.CharCode][]rune)
 	for _, e := range encoding {
-		toUnicode[e.Code] = e.Text
+		m[e.Code] = e.Text
 	}
+	toUnicode := tounicode.FromMapping(f.cs, m)
 
 	info := EmbedInfoComposite{
 		Font:      subsetInfo.AsCFF(),
@@ -213,19 +214,22 @@ type EmbedInfoComposite struct {
 	CMap map[charcode.CharCode]type1.CID
 
 	UnitsPerEm uint16 // TODO(voss): get this from the font matrix instead?
-	Ascent     funit.Int16
-	Descent    funit.Int16
-	CapHeight  funit.Int16
-	IsSerif    bool
-	IsScript   bool
+
+	Ascent    funit.Int16
+	Descent   funit.Int16
+	CapHeight funit.Int16
+	IsSerif   bool
+	IsScript  bool
+
 	IsAllCap   bool
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
 // Embed writes the PDF objects needed to embed the font into the PDF file.
+// This is the reverse of [ExtractComposite]
 func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 	if err != nil {
@@ -365,7 +369,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, info.CS, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -374,7 +378,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
-// ExtractComposite extracts all information about a composite CFF font from a PDF file.
+// ExtractComposite extracts information about a composite CFF font from a PDF file.
 // This is the reverse of [EmbedInfoComposite.Embed].
 func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, error) {
 	if err := dicts.Type.MustBe(font.CFFComposite); err != nil {
@@ -425,7 +429,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	// TODO(voss): be more robust here

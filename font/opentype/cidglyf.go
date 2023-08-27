@@ -41,6 +41,7 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
+// FontGlyfComposite is a composite OpenType/glyf font.
 type FontGlyfComposite struct {
 	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
@@ -49,6 +50,7 @@ type FontGlyfComposite struct {
 	*font.Geometry
 }
 
+// NewGlyfComposite creates a new composite OpenType/glyf font.
 func NewGlyfComposite(info *sfnt.Font, loc language.Tag) (*FontGlyfComposite, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
@@ -81,6 +83,7 @@ func NewGlyfComposite(info *sfnt.Font, loc language.Tag) (*FontGlyfComposite, er
 	return res, nil
 }
 
+// Embed implements the [font.Font] interface.
 func (f *FontGlyfComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
@@ -96,6 +99,7 @@ func (f *FontGlyfComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded
 	return res, nil
 }
 
+// Layout implements the [font.Font] interface.
 func (f *FontGlyfComposite) Layout(s string, ptSize float64) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
@@ -139,10 +143,11 @@ func (f *embeddedGlyfComposite) Close() error {
 		CID2GID[s.CID] = glyph.ID(subsetGID)
 	}
 
-	toUnicode := make(map[charcode.CharCode][]rune)
+	m := make(map[charcode.CharCode][]rune)
 	for _, e := range encoding {
-		toUnicode[charcode.CharCode(e.CID)] = e.Text
+		m[charcode.CharCode(e.CID)] = e.Text
 	}
+	toUnicode := tounicode.FromMapping(charcode.UCS2, m)
 
 	info := EmbedInfoGlyfComposite{
 		Font:      otfSubset,
@@ -156,6 +161,7 @@ func (f *embeddedGlyfComposite) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
+// EmbedInfoGlyfComposite is the information needed to embed a composite OpenType/glyf font.
 type EmbedInfoGlyfComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
@@ -170,14 +176,16 @@ type EmbedInfoGlyfComposite struct {
 
 	CID2GID []glyph.ID
 
+	ForceBold bool
+
 	IsAllCap   bool
 	IsSmallCap bool
-	ForceBold  bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
+// Embed adds the font to the PDF file.
 func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
@@ -331,7 +339,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, info.CS, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -364,6 +372,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	return nil
 }
 
+// ExtractGlyfComposite extracts information for a composite OpenType/glyf font.
 func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfComposite, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeGlyfComposite); err != nil {
 		return nil, err
@@ -470,7 +479,7 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap

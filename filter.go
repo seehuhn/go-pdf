@@ -72,7 +72,7 @@ import (
 
 // Filter represents a PDF stream filter.
 //
-// Currently, the following filter types are represented by this library:
+// Currently, the following filter types are implemented by this library:
 // [FilterASCII85], [FilterFlate], [FilterLZW].  In addition, [FilterCompress]
 // can be used to select the best available compression filter when writing PDF
 // streams.  This is FilterFlate for PDF versions 1.2 and above, and FilterLZW

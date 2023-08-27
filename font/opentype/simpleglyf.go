@@ -40,6 +40,7 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
+// FontGlyfSimple is a simple OpenType/glyf font.
 type FontGlyfSimple struct {
 	info        *sfnt.Font
 	cmap        sfntcmap.Subtable
@@ -48,6 +49,7 @@ type FontGlyfSimple struct {
 	*font.Geometry
 }
 
+// NewGlyfSimple creates a new simple OpenType/glyf font.
 func NewGlyfSimple(info *sfnt.Font, loc language.Tag) (*FontGlyfSimple, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
@@ -80,6 +82,7 @@ func NewGlyfSimple(info *sfnt.Font, loc language.Tag) (*FontGlyfSimple, error) {
 	return res, nil
 }
 
+// Embed implements the [font.Font] interface.
 func (f *FontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple OpenType fonts", pdf.V1_6)
 	if err != nil {
@@ -96,6 +99,7 @@ func (f *FontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, e
 	return res, nil
 }
 
+// Layout implements the [font.Font] interface.
 func (f *FontGlyfSimple) Layout(s string, ptSize float64) glyph.Seq {
 	return f.info.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
@@ -157,16 +161,18 @@ func (f *embeddedSimpleGlyf) Close() error {
 		}
 		m[charcode.CharCode(code)] = f.text[gid]
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
 	info := EmbedInfoGlyfSimple{
 		Font:      subsetInfo,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
-		ToUnicode: m,
+		ToUnicode: toUnicode,
 	}
 	return info.Embed(f.w, f.Ref)
 }
 
+// EmbedInfoGlyfSimple is the information needed to embed a simple OpenType/glyf font.
 type EmbedInfoGlyfSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
@@ -184,9 +190,10 @@ type EmbedInfoGlyfSimple struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
+// Embed adds the font to a PDF file.
 func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/gylf fonts", pdf.V1_6)
 	if err != nil {
@@ -314,7 +321,7 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, toUnicode)
+		err = toUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -323,6 +330,7 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 	return nil
 }
 
+// ExtractGlyfSimple extracts information about a simple OpenType font.
 func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeGlyfSimple); err != nil {
 		return nil, err
@@ -371,7 +379,7 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, e
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap

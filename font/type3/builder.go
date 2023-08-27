@@ -32,45 +32,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
-type Glyph struct {
-	WidthX funit.Int16
-	BBox   funit.Rect16
-	Data   []byte
-}
-
-func setGlyphGeometry(g *Glyph, data []byte) {
-	m := type3StartRegexp.FindSubmatch(data)
-	if len(m) != 9 {
-		return
-	}
-	if m[1] != nil {
-		x, _ := strconv.ParseFloat(string(m[1]), 64)
-		g.WidthX = funit.Int16(math.Round(x))
-	} else if m[3] != nil {
-		var xx [6]funit.Int16
-		for i := range xx {
-			x, _ := strconv.ParseFloat(string(m[3+i]), 64)
-			xx[i] = funit.Int16(math.Round(x))
-		}
-		g.WidthX = xx[0]
-		g.BBox = funit.Rect16{
-			LLx: xx[2],
-			LLy: xx[3],
-			URx: xx[4],
-			URy: xx[5],
-		}
-	}
-}
-
-var (
-	spc = `[\t\n\f\r ]+`
-	num = `([+-]?[0-9.]+)` + spc
-	d0  = num + num + "d0"
-	d1  = num + num + num + num + num + num + "d1"
-
-	type3StartRegexp = regexp.MustCompile(`^[\t\n\f\r ]*(?:` + d0 + "|" + d1 + ")" + spc)
-)
-
 // AddGlyph adds a new glyph to the type 3 font.
 //
 // If shapeOnly is true, a call to the "d1" operator is added at the start of
@@ -138,3 +99,36 @@ func (g *GlyphBuilder) Close() error {
 
 	return nil
 }
+
+func setGlyphGeometry(g *Glyph, data []byte) {
+	m := type3StartRegexp.FindSubmatch(data)
+	if len(m) != 9 {
+		return
+	}
+	if m[1] != nil {
+		x, _ := strconv.ParseFloat(string(m[1]), 64)
+		g.WidthX = funit.Int16(math.Round(x))
+	} else if m[3] != nil {
+		var xx [6]funit.Int16
+		for i := range xx {
+			x, _ := strconv.ParseFloat(string(m[3+i]), 64)
+			xx[i] = funit.Int16(math.Round(x))
+		}
+		g.WidthX = xx[0]
+		g.BBox = funit.Rect16{
+			LLx: xx[2],
+			LLy: xx[3],
+			URx: xx[4],
+			URy: xx[5],
+		}
+	}
+}
+
+var (
+	spc = `[\t\n\f\r ]+`
+	num = `([+-]?[0-9.]+)` + spc
+	d0  = num + num + "d0"
+	d1  = num + num + num + num + num + num + "d1"
+
+	type3StartRegexp = regexp.MustCompile(`^[\t\n\f\r ]*(?:` + d0 + "|" + d1 + ")" + spc)
+)

@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
@@ -55,10 +56,11 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 	for cid := type1.CID(0); cid <= maxCID; cid++ {
 		CID2GID[cid] = glyph.ID(cid)
 	}
-	toUnicode := make(map[charcode.CharCode][]rune, 8)
-	toUnicode[charcode.CharCode('A')] = []rune{'A'}
-	toUnicode[charcode.CharCode('B')] = []rune{'B'}
-	toUnicode[charcode.CharCode('C')] = []rune{'C'}
+	m := make(map[charcode.CharCode][]rune, 8)
+	m[charcode.CharCode('A')] = []rune{'A'}
+	m[charcode.CharCode('B')] = []rune{'B'}
+	m[charcode.CharCode('C')] = []rune{'C'}
+	toUnicode := tounicode.FromMapping(cs, m)
 	info1 := &EmbedInfoGlyfComposite{
 		Font:       ttf,
 		SubsetTag:  "ZZZZZZ",

@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
+// Builtin is one of the 14 built-in PDF fonts.
 type Builtin string
 
 // The 14 built-in PDF fonts.
@@ -137,6 +138,7 @@ func (f Builtin) PSFont() (*type1.Font, error) {
 	return res, nil
 }
 
+// IsBuiltin returns true if the given font is one of the 14 built-in PDF fonts.
 func IsBuiltin(f *type1.Font) bool {
 	b, err := Builtin(f.FontInfo.FontName).PSFont()
 	if err != nil || b.UnitsPerEm != f.UnitsPerEm {

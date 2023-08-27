@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -44,10 +45,11 @@ func TestRoundTripSimple(t *testing.T) {
 	encoding[65] = cmap.Lookup('A')
 	encoding[66] = cmap.Lookup('C')
 
-	toUnicode := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCode][]rune{
 		65: {'A'},
 		66: {'C'},
 	}
+	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
 	info1 := &EmbedInfoSimple{
 		Font:       ttf,

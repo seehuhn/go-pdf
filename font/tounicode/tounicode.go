@@ -20,14 +20,14 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"slices"
+	"unicode"
 
-	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/type1"
 )
 
+// Info holds the information from a ToUnicode cmap.
 type Info struct {
 	Name    pdf.Name
 	ROS     *type1.CIDSystemInfo
@@ -36,10 +36,45 @@ type Info struct {
 	Ranges  []Range
 }
 
+// Decode decodes the first character code from the given string.
+// It returns the corresponding unicode rune and the number of bytes consumed.
+// If the character code cannot be decoded, [unicode.ReplacementChar] is returned,
+// and the length is either 0 (if the string is empty) or 1.
+// If a valid character code is found but the code is not mapped by the
+// ToUnicode cmap, then the unicode replacement character is returned.
+func (info *Info) Decode(s pdf.String) ([]rune, int) {
+	code, k := info.CS.Decode(s)
+	if code < 0 {
+		return []rune{unicode.ReplacementChar}, k
+	}
+	for _, r := range info.Ranges {
+		if code < r.First || code > r.Last {
+			continue
+		}
+		if len(r.Values) > int(code-r.First) {
+			return r.Values[code-r.First], k
+		}
+		rr := make([]rune, len(r.Values[0]))
+		copy(rr, r.Values[0])
+		rr[len(rr)-1] += rune(code - r.First)
+		return rr, k
+	}
+	for _, s := range info.Singles {
+		if s.Code == code {
+			return s.Value, k
+		}
+	}
+	return []rune{unicode.ReplacementChar}, k
+}
+
 // Single specifies that character code Code represents the given unicode string.
 type Single struct {
 	Code  charcode.CharCode
 	Value []rune
+}
+
+func (s Single) String() string {
+	return fmt.Sprintf("%d: %q", s.Code, string(s.Value))
 }
 
 // Range describes a range of character codes.
@@ -54,37 +89,63 @@ type Range struct {
 	Values [][]rune
 }
 
-func Embed(w pdf.Putter, ref pdf.Reference, cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) error {
-	touni := &Info{
-		Name: makeName(m),
-		ROS: &type1.CIDSystemInfo{
-			Registry:   "Adobe",
-			Ordering:   "UCS",
-			Supplement: 0,
-		},
-		CS: cs,
+func (r Range) String() string {
+	ss := make([]string, len(r.Values))
+	for i, v := range r.Values {
+		ss[i] = string(v)
 	}
-	touni.SetMapping(m)
-	touniStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	err = touni.Write(touniStream)
-	if err != nil {
-		return fmt.Errorf("embedding ToUnicode cmap: %w", err)
-	}
-	return touniStream.Close()
+	return fmt.Sprintf("%d-%d: %q", r.First, r.Last, ss)
 }
 
-func makeName(m map[charcode.CharCode][]rune) pdf.Name {
-	codes := maps.Keys(m)
-	slices.Sort(codes)
+// MakeName sets a unique name for the ToUnicode cmap.
+func (info *Info) makeName() {
+	var buf [binary.MaxVarintLen64]byte
+
 	h := sha256.New()
-	for _, k := range codes {
-		binary.Write(h, binary.BigEndian, uint32(k))
-		h.Write([]byte{byte(len(m[k]))})
-		binary.Write(h, binary.BigEndian, m[k])
+	k := binary.PutVarint(buf[:], int64(len(info.ROS.Registry)))
+	h.Write(buf[:k])
+	h.Write([]byte(info.ROS.Registry))
+	k = binary.PutVarint(buf[:], int64(len(info.ROS.Ordering)))
+	h.Write(buf[:k])
+	h.Write([]byte(info.ROS.Ordering))
+	k = binary.PutVarint(buf[:], int64(info.ROS.Supplement))
+	h.Write(buf[:k])
+
+	rr := info.CS.Ranges()
+	k = binary.PutVarint(buf[:], int64(len(rr)))
+	h.Write(buf[:k])
+	for _, r := range rr {
+		k = binary.PutVarint(buf[:], int64(len(r.Low)))
+		h.Write(buf[:k])
+		h.Write(r.Low)
+		k = binary.PutVarint(buf[:], int64(len(r.High)))
+		h.Write(buf[:k])
+		h.Write(r.High)
 	}
+
+	k = binary.PutVarint(buf[:], int64(len(info.Singles)))
+	h.Write(buf[:k])
+	for _, s := range info.Singles {
+		binary.Write(h, binary.LittleEndian, s.Code)
+		k = binary.PutVarint(buf[:], int64(len(s.Value)))
+		h.Write(buf[:k])
+		binary.Write(h, binary.LittleEndian, s.Value)
+	}
+
+	k = binary.PutVarint(buf[:], int64(len(info.Ranges)))
+	h.Write(buf[:k])
+	for _, r := range info.Ranges {
+		binary.Write(h, binary.LittleEndian, r.First)
+		binary.Write(h, binary.LittleEndian, r.Last)
+		k = binary.PutVarint(buf[:], int64(len(r.Values)))
+		h.Write(buf[:k])
+		for _, v := range r.Values {
+			k = binary.PutVarint(buf[:], int64(len(v)))
+			h.Write(buf[:k])
+			binary.Write(h, binary.LittleEndian, v)
+		}
+	}
+
 	sum := h.Sum(nil)
-	return pdf.Name(fmt.Sprintf("Seehuhn-%x", sum[:8]))
+	info.Name = pdf.Name(fmt.Sprintf("Seehuhn-%x", sum[:8]))
 }

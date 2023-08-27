@@ -137,10 +137,11 @@ func (f *embeddedCFFComposite) Close() error {
 		cmap[charcode.CharCode(s.CID)] = s.CID
 	}
 
-	toUnicode := make(map[charcode.CharCode][]rune)
+	m := make(map[charcode.CharCode][]rune)
 	for _, e := range encoding {
-		toUnicode[charcode.CharCode(e.CID)] = e.Text
+		m[charcode.CharCode(e.CID)] = e.Text
 	}
+	toUnicode := tounicode.FromMapping(charcode.UCS2, m)
 
 	info := EmbedInfoCFFComposite{
 		Font:      otfSubset,
@@ -170,7 +171,7 @@ type EmbedInfoCFFComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
 // Embed writes the PDF objects needed to embed the font.
@@ -317,7 +318,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, info.CS, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -384,7 +385,7 @@ func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposit
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap

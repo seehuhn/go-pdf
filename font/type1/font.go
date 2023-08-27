@@ -28,15 +28,15 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
+// Font is a Type 1 font.
 type Font struct {
-	names    []string
-	outlines *type1.Font
+	glyphNames []string
+	outlines   *type1.Font
 	*font.Geometry
 
 	CMap map[rune]glyph.ID
@@ -44,6 +44,7 @@ type Font struct {
 	kern map[glyph.Pair]funit.Int16
 }
 
+// New creates a new Type 1 PDF font from a PostScript font.
 func New(psFont *type1.Font) (*Font, error) {
 	glyphNames := psFont.GlyphList()
 	nameGid := make(map[string]glyph.ID, len(glyphNames))
@@ -101,18 +102,19 @@ func New(psFont *type1.Font) (*Font, error) {
 	}
 
 	res := &Font{
-		names:    glyphNames,
-		outlines: psFont,
-		Geometry: geometry,
-		CMap:     cMap,
-		lig:      lig,
-		kern:     kern,
+		glyphNames: glyphNames,
+		outlines:   psFont,
+		Geometry:   geometry,
+		CMap:       cMap,
+		lig:        lig,
+		kern:       kern,
 	}
 	return res, nil
 }
 
+// Embed implements the [font.Font] interface.
 func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	e := &embedded{
+	res := &embedded{
 		Font: f,
 		w:    w,
 		Resource: pdf.Resource{
@@ -121,10 +123,11 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 		},
 		SimpleEncoder: cmap.NewSimpleEncoder(),
 	}
-	w.AutoClose(e)
-	return e, nil
+	w.AutoClose(res)
+	return res, nil
 }
 
+// Layout implements the [font.Font] interface.
 func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 	rr := []rune(s)
 
@@ -182,10 +185,10 @@ func (e *embedded) Close() error {
 	}
 	e.SimpleEncoder = cmap.NewFrozenSimpleEncoder(e.SimpleEncoder)
 
-	encodingGid := e.SimpleEncoder.Encoding()
+	encodingGid := e.Encoding()
 	encoding := make([]string, 256)
 	for i, gid := range encodingGid {
-		encoding[i] = e.names[gid]
+		encoding[i] = e.glyphNames[gid]
 	}
 
 	psFont := e.outlines
@@ -210,7 +213,7 @@ func (e *embedded) Close() error {
 		psSubset.Encoding = encoding
 
 		var ss []subset.Glyph
-		for origGid, name := range e.names {
+		for origGid, name := range e.glyphNames {
 			if _, ok := psSubset.Outlines[name]; ok {
 				ss = append(ss, subset.Glyph{
 					OrigGID: glyph.ID(origGid),
@@ -225,13 +228,13 @@ func (e *embedded) Close() error {
 
 	// TODO(voss): generated a ToUnicode map, if needed.
 
-	t1 := &EmbedInfo{
+	info := &EmbedInfo{
 		Font:      psSubset,
 		SubsetTag: subsetTag,
 		Encoding:  encoding,
 		ResName:   e.Name,
 	}
-	return t1.Embed(e.w, e.Ref)
+	return info.Embed(e.w, e.Ref)
 }
 
 // EmbedInfo holds all the information needed to embed a Type 1 font
@@ -252,15 +255,17 @@ type EmbedInfo struct {
 	// This is only used for PDF version 1.0.
 	ResName pdf.Name
 
-	IsSerif    bool
-	IsScript   bool
+	IsSerif  bool
+	IsScript bool
+
 	IsAllCap   bool
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode map[charcode.CharCode][]rune
+	ToUnicode *tounicode.Info
 }
 
+// Embed implements the [font.Font] interface.
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	useBuiltin := w.GetMeta().Version < pdf.V2_0 && IsBuiltin(info.Font)
 
@@ -269,7 +274,6 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		fontName = info.SubsetTag + "+" + fontName
 	}
 
-	var toUnicodeRef pdf.Reference
 	var fontFileRef pdf.Reference
 
 	// See section 9.6.2.1 of PDF 32000-1:2008.
@@ -284,10 +288,12 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if enc := font.DescribeEncodingType1(info.Encoding, info.Font.Encoding); enc != nil {
 		fontDict["Encoding"] = enc
 	}
+	var toUnicodeRef pdf.Reference
 	if info.ToUnicode != nil {
 		toUnicodeRef = w.Alloc()
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
+
 	compressedRefs := []pdf.Reference{fontDictRef}
 	compressedObjects := []pdf.Object{fontDict}
 
@@ -306,8 +312,8 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		compressedRefs = append(compressedRefs, widthsRef)
 		compressedObjects = append(compressedObjects, widthsInfo.Widths)
 
-		FontDescriptorRef := w.Alloc()
-		fontDict["FontDescriptor"] = FontDescriptorRef
+		fdRef := w.Alloc()
+		fontDict["FontDescriptor"] = fdRef
 
 		q := 1000 / float64(psFont.UnitsPerEm)
 		bbox := psFont.BBox()
@@ -345,8 +351,8 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			fontFileRef = w.Alloc()
 			fontDescriptor["FontFile"] = fontFileRef
 		}
-		compressedRefs = append(compressedRefs, FontDescriptorRef)
 		compressedObjects = append(compressedObjects, fontDescriptor)
+		compressedRefs = append(compressedRefs, fdRef)
 	}
 
 	err := w.WriteCompressed(compressedRefs, compressedObjects...)
@@ -380,7 +386,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	if toUnicodeRef != 0 {
-		err = tounicode.Embed(w, toUnicodeRef, charcode.Simple, info.ToUnicode)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -389,6 +395,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	return nil
 }
 
+// Extract extracts information about a Type 1 font from a PDF file.
 func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	if dicts.Type != font.Type1 && dicts.Type != font.Builtin {
 		return nil, fmt.Errorf("expected %q or %q, got %q",
@@ -446,7 +453,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"]); info != nil {
 		// TODO(voss): check that the codespace ranges are compatible with the cmap.
-		res.ToUnicode = info.GetMapping()
+		res.ToUnicode = info
 	}
 
 	res.ResName, _ = pdf.GetName(r, dicts.FontDict["Name"])
