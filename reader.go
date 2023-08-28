@@ -41,11 +41,18 @@ type ReaderErrorHandling int
 const (
 	// ErrorHandlingRecover means that the reader will try to recover from
 	// errors and continue parsing the file.  This is the default.
+	//
+	// This guarantees that the reader will return a valid Catalog object,
+	// with a non-null Pages field.
 	ErrorHandlingRecover = iota
 
 	// ErrorHandlingReport means that the reader will try to recover from
 	// errors and continue parsing the file, but will report errors to the
 	// caller.
+	//
+	// This mode tolerates more errors than ErrorHandlingRecover does.
+	// In particular, it is not guaranteed that there are any pages in the
+	// document.
 	ErrorHandlingReport
 
 	// ErrorHandlingStop means that the reader will stop parsing the file as
@@ -135,8 +142,6 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		return opt.ErrorHandling != ErrorHandlingRecover
 	}
 
-	var damaged bool
-
 	IDObj := trailer["ID"]
 	r.meta.ID = getIDDirect(IDObj)
 	if encObj, ok := trailer["Encrypt"]; ok {
@@ -153,7 +158,6 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 			if shouldExit(err) {
 				return nil, err
 			}
-			damaged = true
 		}
 	} else if r.meta.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
@@ -173,46 +177,44 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		}
 	}
 
-	if !damaged {
-		catalogDict, err := GetDict(r, trailer["Root"])
-		if err != nil {
-			err = Wrap(err, "document catalog")
-			if shouldExit(err) {
-				return nil, err
-			}
-		}
-		r.meta.Catalog = &Catalog{}
-		err = DecodeDict(r, r.meta.Catalog, catalogDict)
-		if shouldExit(err) {
-			return nil, err
-		} else if r.meta.Catalog.Pages == 0 {
-			err := &MalformedFileError{
-				Err: errors.New("no pages in PDF document catalog"),
-			}
-			if opt.ErrorHandling == ErrorHandlingReport {
-				r.Errors = append(r.Errors, err)
-			} else {
-				return nil, err
-			}
-		}
-		if r.meta.Catalog.Version > r.meta.Version {
-			r.meta.Version = r.meta.Catalog.Version
-		}
-
-		if r.meta.Version == V1_0 {
-			r.meta.ID = nil
-		}
-
-		infoDict, err := GetDict(r, trailer["Info"])
+	catalogDict, err := GetDict(r, trailer["Root"])
+	if err != nil {
+		err = Wrap(err, "document catalog")
 		if shouldExit(err) {
 			return nil, err
 		}
-		if infoDict != nil {
-			r.meta.Info = &Info{}
-			err = DecodeDict(r, r.meta.Info, infoDict)
-			if shouldExit(err) {
-				return nil, err
-			}
+	}
+	r.meta.Catalog = &Catalog{}
+	err = DecodeDict(r, r.meta.Catalog, catalogDict)
+	if shouldExit(err) {
+		return nil, err
+	} else if r.meta.Catalog.Pages == 0 {
+		err := &MalformedFileError{
+			Err: errors.New("no pages in PDF document catalog"),
+		}
+		if opt.ErrorHandling == ErrorHandlingReport {
+			r.Errors = append(r.Errors, err)
+		} else {
+			return nil, err
+		}
+	}
+	if r.meta.Catalog.Version > r.meta.Version {
+		r.meta.Version = r.meta.Catalog.Version
+	}
+
+	if r.meta.Version == V1_0 {
+		r.meta.ID = nil
+	}
+
+	infoDict, err := GetDict(r, trailer["Info"])
+	if shouldExit(err) {
+		return nil, err
+	}
+	if infoDict != nil {
+		r.meta.Info = &Info{}
+		err = DecodeDict(r, r.meta.Info, infoDict)
+		if shouldExit(err) {
+			return nil, err
 		}
 	}
 

@@ -384,7 +384,6 @@ func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposit
 	res.CMap = cmap.GetMapping()
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], cmap.CS); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
 		res.ToUnicode = info
 	}
 

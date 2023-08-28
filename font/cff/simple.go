@@ -403,7 +403,6 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
-		// TODO(voss): check that the codespace ranges are compatible with the cmap.
 		res.ToUnicode = info
 	}
 

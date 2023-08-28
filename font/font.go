@@ -28,7 +28,8 @@ import (
 )
 
 type Geometry struct {
-	UnitsPerEm         uint16
+	UnitsPerEm uint16
+
 	Ascent             funit.Int16
 	Descent            funit.Int16 // negative
 	BaseLineSkip       funit.Int16

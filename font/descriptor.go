@@ -55,6 +55,7 @@ type Descriptor struct {
 	MissingWidth pdf.Number     // optional (default: 0)
 }
 
+// DecodeDescriptor reads the font descriptor from a PDF file.
 func DecodeDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
 	fontDescriptor, err := pdf.GetDictTyped(r, obj, "FontDescriptor")
 	if err != nil {
@@ -200,6 +201,8 @@ func DecodeDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
 	return res, nil
 }
 
+// AsDict converts the font descriptor to a PDF dictionary,
+// ready for storing in a PDF file.
 func (d *Descriptor) AsDict() pdf.Dict {
 	var flags pdf.Integer
 	if d.IsFixedPitch {
@@ -303,13 +306,13 @@ func (d *Descriptor) AsDict() pdf.Dict {
 
 // Possible values for PDF Font Descriptor Flags.
 const (
-	flagFixedPitch  pdf.Integer = 1 << 0  // All glyphs have the same width (as opposed to proportional or variable-pitch fonts, which have different widths).
-	flagSerif       pdf.Integer = 1 << 1  // Glyphs have serifs, which are short strokes drawn at an angle on the top and bottom of glyph stems. (Sans serif fonts do not have serifs.)
-	flagSymbolic    pdf.Integer = 1 << 2  // Font contains glyphs outside the Adobe standard Latin character set. This flag and the Nonsymbolic flag shall not both be set or both be clear.
-	flagScript      pdf.Integer = 1 << 3  // Glyphs resemble cursive handwriting.
-	flagNonsymbolic pdf.Integer = 1 << 5  // Font uses the Adobe standard Latin character set or a subset of it.
-	flagItalic      pdf.Integer = 1 << 6  // Glyphs have dominant vertical strokes that are slanted.
-	flagAllCap      pdf.Integer = 1 << 16 // Font contains no lowercase letters; typically used for display purposes, such as for titles or headlines.
-	flagSmallCap    pdf.Integer = 1 << 17 // Font contains both uppercase and lowercase letters.  The uppercase letters are similar to those in the regular version of the same typeface family. The glyphs for the lowercase letters have the same shapes as the corresponding uppercase letters, but they are sized and their proportions adjusted so that they have the same size and stroke weight as lowercase glyphs in the same typeface family.
-	flagForceBold   pdf.Integer = 1 << 18 // ...
+	flagFixedPitch  pdf.Integer = 1 << 0  // all glyphs have the same width
+	flagSerif       pdf.Integer = 1 << 1  // glyphs have serifs
+	flagSymbolic    pdf.Integer = 1 << 2  // some glyphs are outside the Adobe standard Latin character set
+	flagScript      pdf.Integer = 1 << 3  // glyphs resemble cursive handwriting
+	flagNonsymbolic pdf.Integer = 1 << 5  // all glyphs are from the Adobe standard Latin character set
+	flagItalic      pdf.Integer = 1 << 6  // dominant vertical strokes are slanted
+	flagAllCap      pdf.Integer = 1 << 16 // no lowercase letters
+	flagSmallCap    pdf.Integer = 1 << 17 // lowercase glyphs are smaller versions of the corresponding uppercase glyphs
+	flagForceBold   pdf.Integer = 1 << 18 // enhance boldness at small pixel sizes
 )

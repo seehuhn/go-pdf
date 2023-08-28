@@ -80,7 +80,7 @@ func New(unitsPerEm uint16) *Font {
 		FontMatrix: m,
 		Glyphs:     map[string]*Glyph{},
 		Resources:  &pdf.Resources{},
-		glyphNames: []string{""},
+		glyphNames: []string{""}, // TODO(voss): is this right?
 		CMap:       map[rune]glyph.ID{},
 	}
 	return res

@@ -22,10 +22,11 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// EmbeddingType represents the different ways font data
+// can be embedded in a PDF file.
 type EmbeddingType int
 
-// EmbeddingType values representing all the different ways font data
-// can be embedded in a PDF file.
+// List of all embedding types supported by PDF.
 const (
 	Unknown EmbeddingType = iota
 

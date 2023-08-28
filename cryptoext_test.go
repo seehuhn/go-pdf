@@ -94,6 +94,8 @@ func FuzzEncrypted(f *testing.F) {
 		r = bytes.NewReader(pdfContents1)
 		pdf2, err := pdf.Read(r, nil)
 		if err != nil {
+			os.WriteFile("a.pdf", raw, 0644)
+			os.WriteFile("b.pdf", pdfContents1, 0644)
 			t.Fatal(err)
 		}
 		buf = &bytes.Buffer{}
@@ -104,8 +106,8 @@ func FuzzEncrypted(f *testing.F) {
 		pdfContents2 := buf.Bytes()
 
 		if !bytes.Equal(pdfContents1, pdfContents2) {
-			os.WriteFile("a.pdf", pdfContents1, 0644)
-			os.WriteFile("b.pdf", pdfContents2, 0644)
+			os.WriteFile("b.pdf", pdfContents1, 0644)
+			os.WriteFile("c.pdf", pdfContents2, 0644)
 			t.Fatalf("pdf contents differ")
 		}
 	})

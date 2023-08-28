@@ -154,4 +154,4 @@ describes the mapping from character codes to CIDs.  The `CIDToGIDMap`
 entry in the CIDFont dictionary specifies the mapping from CIDs to glyphs.
 
 There seems little reason to use this font type, since the font data
-could equally be embedded as a TrueType font.
+could equally be embedded as a composite TrueType font.

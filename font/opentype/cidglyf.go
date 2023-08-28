@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
@@ -192,11 +193,11 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 		return err
 	}
 
-	otf := info.Font.Clone()
-	if !otf.IsGlyf() {
+	if !info.Font.IsGlyf() {
 		return fmt.Errorf("not a glyf-based OpenType font")
 	}
-	otf.CMapTable = nil // TODO(voss): is this correct?
+	otf := info.Font.Clone()
+	otf.CMapTable = nil
 	outlines := otf.Outlines.(*glyf.Outlines)
 
 	// CidFontName shall be the value of the CIDFontName entry in the CIDFont program.
@@ -247,7 +248,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := true // TODO
+	isSymbolic := !isStandardLatin(otf)
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
@@ -486,4 +487,16 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 	res.ForceBold = dicts.FontDescriptor.ForceBold
 
 	return res, nil
+}
+
+// isStandardLatin returns true if all glyphs are in the Adobe Standard Latin
+// character set.
+func isStandardLatin(f *sfnt.Font) bool {
+	glyphNames := f.MakeGlyphNames()
+	for _, name := range glyphNames {
+		if !pdfenc.IsStandardLatin[name] {
+			return false
+		}
+	}
+	return true
 }
