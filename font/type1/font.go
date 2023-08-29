@@ -222,7 +222,7 @@ func (e *embedded) Close() error {
 				})
 			}
 		}
-		subsetTag = subset.Tag(ss, psFont.NumGlyphs())
+		subsetTag = subset.TagOld(ss, psFont.NumGlyphs())
 	} else {
 		psSubset = psFont
 	}

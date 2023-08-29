@@ -140,7 +140,7 @@ func (f *embeddedSimpleGlyf) Close() error {
 			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
 		}
 	}
-	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
+	subsetTag := subset.TagOld(ss, f.info.NumGlyphs())
 	subsetInfo, err := subset.Simple(f.info, ss)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)

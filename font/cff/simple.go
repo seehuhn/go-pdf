@@ -23,10 +23,11 @@ import (
 	"io"
 	"math"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -44,7 +45,7 @@ import (
 
 // FontSimple is a CFF font for embedding in a PDF file as a simple font.
 type FontSimple struct {
-	info        *sfnt.Font
+	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -75,7 +76,7 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	}
 
 	res := &FontSimple{
-		info:        info,
+		otf:         info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
@@ -103,7 +104,7 @@ func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 
 // Layout implements the [font.Font] interface.
 func (f *FontSimple) Layout(s string, ptSize float64) glyph.Seq {
-	return f.info.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
@@ -129,23 +130,37 @@ func (f *embeddedSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.Name, f.info.PostscriptName())
+			f.Name, f.otf.PostscriptName())
 	}
 	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
 
-	// subset the font
-	var ss []subset.Glyph
-	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
+	// make our encoding the built-in encoding of the font
+	otf := f.otf.Clone()
 	encoding := f.SimpleEncoder.Encoding()
-	for cid, gid := range encoding {
-		if gid != 0 {
-			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
-		}
+	outlines := otf.Outlines.(*cff.Outlines)
+	outlines.Encoding = encoding
+	outlines.ROS = nil
+	outlines.Gid2Cid = nil
+
+	// subset the font
+	gidUsed := make(map[glyph.ID]bool)
+	gidUsed[0] = true
+	for _, gid := range encoding {
+		gidUsed[gid] = true
 	}
-	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
-	subsetInfo, err := subset.Simple(f.info, ss)
+	origGid := maps.Keys(gidUsed)
+	slices.Sort(origGid)
+	subsetOtf, err := otf.Subset(origGid)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
+	}
+	subsetTag := subset.Tag(origGid, f.otf.NumGlyphs())
+
+	// convert the font to a simple font, if needed
+	subsetOtf.EnsureGlyphNames()
+	subsetCFF := subsetOtf.AsCFF()
+	if len(subsetCFF.Private) != 1 {
+		return fmt.Errorf("need exactly one private dict for a simple font")
 	}
 
 	m := make(map[charcode.CharCode][]rune)
@@ -157,16 +172,16 @@ func (f *embeddedSimple) Close() error {
 	}
 	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 	info := EmbedInfoSimple{
-		Font:       subsetInfo.AsCFF(),
+		Font:       subsetCFF,
 		SubsetTag:  subsetTag,
-		Encoding:   subsetInfo.Outlines.(*cff.Outlines).Encoding,
+		Encoding:   subsetCFF.Encoding, // we use the built-in encoding
 		ToUnicode:  toUnicode,
-		UnitsPerEm: f.info.UnitsPerEm,
-		Ascent:     f.info.Ascent,
-		Descent:    f.info.Descent,
-		CapHeight:  f.info.CapHeight,
-		IsSerif:    f.info.IsScript,
-		IsScript:   f.info.IsScript,
+		UnitsPerEm: f.otf.UnitsPerEm,
+		Ascent:     f.otf.Ascent,
+		Descent:    f.otf.Descent,
+		CapHeight:  f.otf.CapHeight,
+		IsSerif:    f.otf.IsScript,
+		IsScript:   f.otf.IsScript,
 	}
 	return info.Embed(f.w, f.Ref)
 }

@@ -169,7 +169,7 @@ func (f *embeddedComposite) Close() error {
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
-	subsetTag := subset.Tag(ss, f.info.NumGlyphs())
+	subsetTag := subset.TagOld(ss, f.info.NumGlyphs())
 
 	cmap := make(map[charcode.CharCode]type1.CID)
 	for _, e := range encoding {

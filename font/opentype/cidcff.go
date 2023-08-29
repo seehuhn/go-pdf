@@ -130,7 +130,7 @@ func (f *embeddedCFFComposite) Close() error {
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
-	subsetTag := subset.Tag(ss, f.otf.NumGlyphs())
+	subsetTag := subset.TagOld(ss, f.otf.NumGlyphs())
 
 	cmap := make(map[charcode.CharCode]type1.CID)
 	for _, s := range ss {

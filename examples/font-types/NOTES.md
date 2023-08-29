@@ -34,9 +34,10 @@ Font data is embedded via the `FontFile3` entry in the font descriptor,
 and the `Subtype` entry in the font file stream dictionary is `Type1C`.
 
 The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font must not
-contain a `ROS` operator.  Usually, `Encoding` is omitted from the font
-dictionary, and the mapping from character codes to glyphs is described by the
-"builtin encoding" of the CFF font.
+contain a `ROS` operator.  If the encoding used in PDF content streams is
+different from the font's builtin encoding, the `Encoding` entry in the font
+dictionary describes the mapping from character codes to glyph names,
+
 
 ## Simple CFF-based OpenType Fonts (PDF 1.6)
 

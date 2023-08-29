@@ -18,7 +18,6 @@ package subset
 
 import (
 	"errors"
-	"regexp"
 
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
@@ -36,8 +35,6 @@ type Glyph struct {
 }
 
 // Simple constructs a subset of the font, for use in a simple PDF font.
-//
-// TODO(voss): merge with [CID]
 func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
 	if len(subset) == 0 || subset[0].OrigGID != 0 {
 		return nil, errors.New("subset does not start with .notdef")
@@ -250,5 +247,3 @@ func pop(todo map[glyph.ID]bool) glyph.ID {
 	}
 	panic("empty map")
 }
-
-var TagRegexp = regexp.MustCompile(`^([A-Z]{6})\+(.*)$`)

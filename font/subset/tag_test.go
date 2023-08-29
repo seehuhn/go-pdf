@@ -21,7 +21,7 @@ import (
 )
 
 func TestGetSubsetTag(t *testing.T) {
-	tag := Tag(nil, 0)
+	tag := TagOld(nil, 0)
 	if tag != "AAAAAA" {
 		t.Error("wrong tag " + tag)
 	}

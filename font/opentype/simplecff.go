@@ -140,7 +140,7 @@ func (f *embeddedCFFSimple) Close() error {
 			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
 		}
 	}
-	subsetTag := subset.Tag(ss, f.otf.NumGlyphs())
+	subsetTag := subset.TagOld(ss, f.otf.NumGlyphs())
 	subsetInfo, err := subset.Simple(f.otf, ss)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
