@@ -20,11 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -49,7 +50,11 @@ type FontCFFSimple struct {
 	*font.Geometry
 }
 
-// NewCFFSimple creates a new OpenType/CFF font for embedding in a PDF file as a simple font.
+// NewCFFSimple allocates a new OpenType/CFF font for embedding in a PDF file as a simple font.
+// Info must be an OpenType font with CFF outlines.
+// If info is CID-keyed, the function will attempt to convert it to a simple font.
+// If the conversion fails (because more than one private dictionary is used
+// after subsetting), an error is returned.
 func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*FontCFFSimple, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
@@ -130,20 +135,39 @@ func (f *embeddedCFFSimple) Close() error {
 			f.Name, f.otf.PostscriptName())
 	}
 	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
+	encoding := f.SimpleEncoder.Encoding()
+
+	// Make our encoding the built-in encoding of the font.
+	otf := f.otf.Clone()
+	outlines := otf.Outlines.(*cff.Outlines)
+	outlines.Encoding = encoding
+	outlines.ROS = nil
+	outlines.Gid2Cid = nil
+
+	otf.CMapTable = nil
+	otf.Gdef = nil
+	otf.Gpos = nil
+	otf.Gsub = nil
 
 	// subset the font
-	var ss []subset.Glyph
-	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	encoding := f.SimpleEncoder.Encoding()
-	for cid, gid := range encoding {
-		if gid != 0 {
-			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
-		}
+	gidUsed := make(map[glyph.ID]bool)
+	gidUsed[0] = true
+	for _, gid := range encoding {
+		gidUsed[gid] = true
 	}
-	subsetTag := subset.TagOld(ss, f.otf.NumGlyphs())
-	subsetInfo, err := subset.Simple(f.otf, ss)
+	origGid := maps.Keys(gidUsed)
+	slices.Sort(origGid)
+	subsetOtf, err := otf.Subset(origGid)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
+	}
+	subsetTag := subset.Tag(origGid, otf.NumGlyphs())
+
+	// convert the font to a simple font, if needed
+	subsetOtf.EnsureGlyphNames()
+	subsetCFF := subsetOtf.AsCFF()
+	if len(subsetCFF.Private) != 1 {
+		return fmt.Errorf("need exactly one private dict for a simple font")
 	}
 
 	m := make(map[charcode.CharCode][]rune)
@@ -155,15 +179,15 @@ func (f *embeddedCFFSimple) Close() error {
 	}
 	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 	info := EmbedInfoCFFSimple{
-		Font:      subsetInfo,
+		Font:      subsetOtf,
 		SubsetTag: subsetTag,
-		Encoding:  subsetInfo.Outlines.(*cff.Outlines).Encoding,
+		Encoding:  subsetCFF.Encoding,
 		ToUnicode: toUnicode,
 	}
 	return info.Embed(f.w, f.Ref)
 }
 
-// EmbedInfoCFFSimple contains all information needed to embed a simple OpenType/CFF font.
+// EmbedInfoCFFSimple is the information needed to embed a simple OpenType/CFF font.
 type EmbedInfoCFFSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
@@ -220,8 +244,6 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		encoding[i] = cff.Glyphs[info.Encoding[i]].Name
 		builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
 	}
-	info.Font.CMapTable = nil
-	// TODO(voss): for all other font types, check for unnecessary "cmap" tables.
 
 	q := 1000 / float64(unitsPerEm)
 	bbox := cff.BBox()
@@ -318,6 +340,7 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 	if err := dicts.Type.MustBe(font.OpenTypeCFFSimple); err != nil {
 		return nil, err
 	}
+
 	res := &EmbedInfoCFFSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
@@ -328,11 +351,11 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 	if dicts.FontProgram != nil {
 		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 		if err != nil {
-			return nil, pdf.Wrap(err, "uncompressing OpenType font stream")
+			return nil, pdf.Wrap(err, "uncompressing OpenType/CFF font stream")
 		}
 		otf, err := sfnt.Read(stm)
 		if err != nil {
-			return nil, pdf.Wrap(err, "decoding OpenType font")
+			return nil, pdf.Wrap(err, "decoding OpenType/CFF font")
 		}
 		res.Font = otf
 	}

@@ -20,14 +20,16 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	sfntcmap "seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
@@ -42,7 +44,7 @@ import (
 
 // FontGlyfSimple is a simple OpenType/glyf font.
 type FontGlyfSimple struct {
-	info        *sfnt.Font
+	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -50,6 +52,7 @@ type FontGlyfSimple struct {
 }
 
 // NewGlyfSimple creates a new simple OpenType/glyf font.
+// Info must either be a TrueType font or an OpenType font with TrueType outlines.
 func NewGlyfSimple(info *sfnt.Font, loc language.Tag) (*FontGlyfSimple, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
@@ -73,7 +76,7 @@ func NewGlyfSimple(info *sfnt.Font, loc language.Tag) (*FontGlyfSimple, error) {
 	}
 
 	res := &FontGlyfSimple{
-		info:        info,
+		otf:         info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
 		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
@@ -84,7 +87,7 @@ func NewGlyfSimple(info *sfnt.Font, loc language.Tag) (*FontGlyfSimple, error) {
 
 // Embed implements the [font.Font] interface.
 func (f *FontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	err := pdf.CheckVersion(w, "simple OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "simple OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +104,7 @@ func (f *FontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, e
 
 // Layout implements the [font.Font] interface.
 func (f *FontGlyfSimple) Layout(s string, ptSize float64) glyph.Seq {
-	return f.info.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimpleGlyf struct {
@@ -127,31 +130,38 @@ func (f *embeddedSimpleGlyf) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.Name, f.info.PostscriptName())
+			f.Name, f.otf.PostscriptName())
 	}
 	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
+	encoding := f.SimpleEncoder.Encoding()
+
+	ttf := f.otf.Clone()
+	ttf.CMapTable = nil
+	ttf.Gdef = nil
+	ttf.Gsub = nil
+	ttf.Gpos = nil
 
 	// subset the font
-	var ss []subset.Glyph
-	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	encoding := f.SimpleEncoder.Encoding()
-	for cid, gid := range encoding {
-		if gid != 0 {
-			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
-		}
+	gidUsed := make(map[glyph.ID]bool)
+	gidUsed[0] = true
+	for _, gid := range encoding {
+		gidUsed[gid] = true
 	}
-	subsetTag := subset.TagOld(ss, f.info.NumGlyphs())
-	subsetInfo, err := subset.Simple(f.info, ss)
+	origGid := maps.Keys(gidUsed)
+	slices.Sort(origGid)
+	subsetOtf, err := ttf.Subset(origGid)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
+	subsetTag := subset.Tag(origGid, ttf.NumGlyphs())
 
+	subsetGid := make(map[glyph.ID]glyph.ID)
+	for gNew, gOld := range origGid {
+		subsetGid[gOld] = glyph.ID(gNew)
+	}
 	subsetEncoding := make([]glyph.ID, 256)
-	for subsetGid, g := range ss {
-		if subsetGid == 0 {
-			continue
-		}
-		subsetEncoding[g.CID] = glyph.ID(subsetGid)
+	for i, gid := range encoding {
+		subsetEncoding[i] = subsetGid[gid]
 	}
 
 	m := make(map[charcode.CharCode][]rune)
@@ -164,7 +174,7 @@ func (f *embeddedSimpleGlyf) Close() error {
 	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
 	info := EmbedInfoGlyfSimple{
-		Font:      subsetInfo,
+		Font:      subsetOtf,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
@@ -186,6 +196,8 @@ type EmbedInfoGlyfSimple struct {
 	// the `Encoding` entry of the PDF font dictionary.
 	Encoding []glyph.ID
 
+	ForceBold bool
+
 	IsAllCap   bool
 	IsSmallCap bool
 
@@ -195,12 +207,15 @@ type EmbedInfoGlyfSimple struct {
 
 // Embed adds the font to a PDF file.
 func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
-	err := pdf.CheckVersion(w, "simple OpenType/gylf fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "simple OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return err
 	}
 
 	ttf := info.Font.Clone()
+	if !ttf.IsGlyf() {
+		return fmt.Errorf("not an OpenType/glyf font")
+	}
 
 	fontName := ttf.PostscriptName()
 	if info.SubsetTag != "" {
@@ -215,13 +230,13 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 	}
 	widthsInfo := font.CompressWidths(ww, unitsPerEm)
 
-	var encoding pdf.Object
-	toUnicode := info.ToUnicode
-
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
 	// character codes to glyphs.
 	//
 	// TODO(voss): also try the two allowed encodings for "non-symbolic" fonts.
+	//
+	// TODO(voss): revisit this, once
+	// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
 	//
 	// TODO(voss): merge with the code for TrueType fonts.
 	isSymbolic := true
@@ -259,16 +274,11 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 		"Widths":         widthsRef,
 		"FontDescriptor": fontDescriptorRef,
 	}
-	if encoding != nil {
-		fontDict["Encoding"] = encoding
-	}
 	var toUnicodeRef pdf.Reference
-	if toUnicode != nil {
+	if info.ToUnicode != nil {
 		toUnicodeRef = w.Alloc()
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
-
-	// See section 9.8.1 of PDF 32000-1:2008.
 	fd := &font.Descriptor{
 		FontName:     fontName,
 		IsFixedPitch: ttf.IsFixedPitch(),
@@ -278,13 +288,12 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 		IsItalic:     ttf.IsItalic,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
-		ForceBold:    false,
+		ForceBold:    info.ForceBold,
 		FontBBox:     fontBBox,
 		ItalicAngle:  ttf.ItalicAngle,
 		Ascent:       ttf.Ascent.AsFloat(q),
 		Descent:      ttf.Descent.AsFloat(q),
 		CapHeight:    ttf.CapHeight.AsFloat(q),
-		StemV:        0, // unknown
 		MissingWidth: widthsInfo.MissingWidth,
 	}
 	fontDescriptor := fd.AsDict()
@@ -321,7 +330,7 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 	}
 
 	if toUnicodeRef != 0 {
-		err = toUnicode.Embed(w, toUnicodeRef)
+		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}
@@ -335,6 +344,7 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, e
 	if err := dicts.Type.MustBe(font.OpenTypeGlyfSimple); err != nil {
 		return nil, err
 	}
+
 	res := &EmbedInfoGlyfSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
@@ -345,14 +355,18 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, e
 	if dicts.FontProgram != nil {
 		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 		if err != nil {
-			return nil, pdf.Wrap(err, "uncompressing TrueType font stream")
+			return nil, pdf.Wrap(err, "uncompressing OpenType/glyf font stream")
 		}
 		otf, err := sfnt.Read(stm)
 		if err != nil {
-			return nil, pdf.Wrap(err, "decoding TrueType font")
+			return nil, pdf.Wrap(err, "decoding OpenType/glyf font")
+		}
+		_, ok := otf.Outlines.(*glyf.Outlines)
+		if !ok {
+			return nil, fmt.Errorf("expected glyf outlines, got %T", otf.Outlines)
 		}
 		if otf.FamilyName == "" {
-			otf.FamilyName = string(dicts.FontDescriptor.FontFamily)
+			otf.FamilyName = dicts.FontDescriptor.FontFamily
 		}
 		if otf.Width == 0 {
 			otf.Width = dicts.FontDescriptor.FontStretch
@@ -369,7 +383,6 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, e
 			xHeight := dicts.FontDescriptor.XHeight
 			otf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
 		}
-
 		res.Font = otf
 	}
 
@@ -383,6 +396,7 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, e
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+	res.ForceBold = dicts.FontDescriptor.ForceBold
 
 	return res, nil
 }

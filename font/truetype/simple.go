@@ -350,39 +350,43 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		res.SubsetTag = m[1]
 	}
 
-	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
-	if err != nil {
-		return nil, err
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+		if err != nil {
+			return nil, pdf.Wrap(err, "uncompressing TrueType font stream")
+		}
+		ttf, err := sfnt.Read(stm)
+		if err != nil {
+			return nil, pdf.Wrap(err, "decoding TrueType font")
+		}
+		_, ok := ttf.Outlines.(*glyf.Outlines)
+		if !ok {
+			return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
+		}
+		if ttf.FamilyName == "" {
+			ttf.FamilyName = dicts.FontDescriptor.FontFamily
+		}
+		if ttf.Width == 0 {
+			ttf.Width = dicts.FontDescriptor.FontStretch
+		}
+		if ttf.Weight == 0 {
+			ttf.Weight = dicts.FontDescriptor.FontWeight
+		}
+		q := 1000 / float64(ttf.UnitsPerEm)
+		if ttf.CapHeight == 0 {
+			capHeight := dicts.FontDescriptor.CapHeight
+			ttf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+		}
+		if ttf.XHeight == 0 {
+			xHeight := dicts.FontDescriptor.XHeight
+			ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
+		}
+		res.Font = ttf
 	}
-	ttf, err := sfnt.Read(stm)
-	if err != nil {
-		return nil, err
-	}
-	_, ok := ttf.Outlines.(*glyf.Outlines)
-	if !ok {
-		return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
-	}
-	if ttf.FamilyName == "" {
-		ttf.FamilyName = dicts.FontDescriptor.FontFamily
-	}
-	if ttf.Width == 0 {
-		ttf.Width = dicts.FontDescriptor.FontStretch
-	}
-	if ttf.Weight == 0 {
-		ttf.Weight = dicts.FontDescriptor.FontWeight
-	}
-	q := 1000 / float64(ttf.UnitsPerEm)
-	if ttf.CapHeight == 0 {
-		capHeight := dicts.FontDescriptor.CapHeight
-		ttf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
-	}
-	if ttf.XHeight == 0 {
-		xHeight := dicts.FontDescriptor.XHeight
-		ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
-	}
-	res.Font = ttf
 
-	res.Encoding = ExtractEncoding(r, dicts.FontDict["Encoding"], ttf)
+	if res.Font != nil {
+		res.Encoding = ExtractEncoding(r, dicts.FontDict["Encoding"], res.Font)
+	}
 
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info

@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// TODO(voss): remove
 type Glyph struct {
 	// OrigGID is the glyph ID before subsetting.
 	OrigGID glyph.ID
@@ -34,109 +35,8 @@ type Glyph struct {
 	CID type1.CID
 }
 
-// Simple constructs a subset of the font, for use in a simple PDF font.
-func Simple(info *sfnt.Font, subset []Glyph) (*sfnt.Font, error) {
-	if len(subset) == 0 || subset[0].OrigGID != 0 {
-		return nil, errors.New("subset does not start with .notdef")
-	}
-	for _, g := range subset[1:] {
-		if g.CID >= 256 {
-			return nil, errors.New("CID out of range for simple font")
-		}
-	}
-
-	res := &sfnt.Font{}
-	*res = *info
-
-	switch outlines := info.Outlines.(type) {
-	case *cff.Outlines:
-		o2 := &cff.Outlines{}
-		pIdxMap := make(map[int]int)
-		for _, g := range subset {
-			o2.Glyphs = append(o2.Glyphs, outlines.Glyphs[g.OrigGID])
-			oldPIdx := outlines.FDSelect(g.OrigGID)
-			if _, ok := pIdxMap[oldPIdx]; !ok {
-				newPIdx := len(o2.Private)
-				o2.Private = append(o2.Private, outlines.Private[oldPIdx])
-				pIdxMap[oldPIdx] = newPIdx
-			}
-		}
-		if len(o2.Private) != 1 {
-			return nil, errors.New("need exactly one private dict for a simple font")
-		}
-		o2.FDSelect = func(gid glyph.ID) int { return 0 }
-
-		if o2.Glyphs[0].Name == "" {
-			// TODO(voss): if this ever becomes a problem, we could try
-			// to generate names from info.CMap.
-			return nil, errors.New("need glyph names for a simple font")
-		}
-		o2.Encoding = make([]glyph.ID, 256)
-		for subsetGid, g := range subset {
-			if subsetGid == 0 {
-				continue
-			}
-			o2.Encoding[g.CID] = glyph.ID(subsetGid)
-		}
-
-		res.Outlines = o2
-
-	case *glyf.Outlines:
-		newGid := make(map[glyph.ID]glyph.ID)
-		todo := make(map[glyph.ID]bool)
-		nextGid := glyph.ID(0)
-		for _, g := range subset {
-			gid := g.OrigGID
-			newGid[gid] = nextGid
-			nextGid++
-
-			for _, gid2 := range outlines.Glyphs[gid].Components() {
-				if _, ok := newGid[gid2]; !ok {
-					todo[gid2] = true
-				}
-			}
-		}
-		for len(todo) > 0 {
-			gid := pop(todo)
-			subset = append(subset, Glyph{OrigGID: gid})
-			newGid[gid] = nextGid
-			nextGid++
-
-			for _, gid2 := range outlines.Glyphs[gid].Components() {
-				if _, ok := newGid[gid2]; !ok {
-					todo[gid2] = true
-				}
-			}
-		}
-
-		o2 := &glyf.Outlines{
-			Tables: outlines.Tables,
-			Maxp:   outlines.Maxp,
-		}
-		for _, g := range subset {
-			gid := g.OrigGID
-			newGlyph := outlines.Glyphs[gid]
-			o2.Glyphs = append(o2.Glyphs, newGlyph.FixComponents(newGid))
-			o2.Widths = append(o2.Widths, outlines.Widths[gid])
-			// o2.Names = append(o2.Names, outlines.Names[gid])
-		}
-		res.Outlines = o2
-
-		// TODO(voss): construct CMap tables for the subset?
-		res.CMapTable = nil
-
-		// TODO(voss): can anything be done to make the "fpgm" table smaller?
-
-	default:
-		panic("unexpected font type")
-	}
-
-	return res, nil
-}
-
 // CID constructs a subset of the font for use as a CID-keyed PDF font.
-//
-// TODO(voss): merge with [Simple]
+// TODO(voss): remove
 func CID(info *sfnt.Font, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Font, error) {
 	if len(subset) == 0 || subset[0].OrigGID != 0 {
 		return nil, errors.New("subset does not start with .notdef")

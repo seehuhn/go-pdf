@@ -146,6 +146,11 @@ func (f *embeddedSimple) Close() error {
 	outlines.ROS = nil
 	outlines.Gid2Cid = nil
 
+	otf.CMapTable = nil
+	otf.Gdef = nil
+	otf.Gpos = nil
+	otf.Gsub = nil
+
 	// subset the font
 	gidUsed := make(map[glyph.ID]bool)
 	gidUsed[0] = true
@@ -180,12 +185,12 @@ func (f *embeddedSimple) Close() error {
 		SubsetTag:  subsetTag,
 		Encoding:   subsetCFF.Encoding, // we use the built-in encoding
 		ToUnicode:  toUnicode,
-		UnitsPerEm: f.otf.UnitsPerEm,
-		Ascent:     f.otf.Ascent,
-		Descent:    f.otf.Descent,
-		CapHeight:  f.otf.CapHeight,
-		IsSerif:    f.otf.IsScript,
-		IsScript:   f.otf.IsScript,
+		UnitsPerEm: subsetOtf.UnitsPerEm,
+		Ascent:     subsetOtf.Ascent,
+		Descent:    subsetOtf.Descent,
+		CapHeight:  subsetOtf.CapHeight,
+		IsSerif:    subsetOtf.IsScript,
+		IsScript:   subsetOtf.IsScript,
 	}
 	return info.Embed(f.w, f.Ref)
 }
