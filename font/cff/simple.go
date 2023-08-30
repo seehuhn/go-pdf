@@ -53,6 +53,10 @@ type FontSimple struct {
 }
 
 // NewSimple allocates a new CFF font for embedding in a PDF file as a simple font.
+// Info must be an OpenType font with CFF outlines.
+// If info is CID-keyed, the function will attempt to convert it to a simple font.
+// If the conversion fails (because more than one private dictionary is used
+// after subsetting), an error is returned.
 func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
@@ -87,7 +91,7 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 
 // Embed implements the [font.Font] interface.
 func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	err := pdf.CheckVersion(w, "use of OpenType fonts", pdf.V1_6)
+	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
 		return nil, err
 	}
@@ -133,10 +137,10 @@ func (f *embeddedSimple) Close() error {
 			f.Name, f.otf.PostscriptName())
 	}
 	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
-
-	// make our encoding the built-in encoding of the font
-	otf := f.otf.Clone()
 	encoding := f.SimpleEncoder.Encoding()
+
+	// Make our encoding the built-in encoding of the font.
+	otf := f.otf.Clone()
 	outlines := otf.Outlines.(*cff.Outlines)
 	outlines.Encoding = encoding
 	outlines.ROS = nil
@@ -154,7 +158,7 @@ func (f *embeddedSimple) Close() error {
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
-	subsetTag := subset.Tag(origGid, f.otf.NumGlyphs())
+	subsetTag := subset.Tag(origGid, otf.NumGlyphs())
 
 	// convert the font to a simple font, if needed
 	subsetOtf.EnsureGlyphNames()
@@ -186,7 +190,7 @@ func (f *embeddedSimple) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-// EmbedInfoSimple contains the information needed to embed a CFF font as a simple font into a PDF file.
+// EmbedInfoSimple is the information needed to embed a simple CFF font.
 type EmbedInfoSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *cff.Font
@@ -216,7 +220,7 @@ type EmbedInfoSimple struct {
 	ToUnicode *tounicode.Info
 }
 
-// Embed writes the PDF objects needed to embed the font into the PDF file.
+// Embed adds the font to a PDF file.
 func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
@@ -227,8 +231,8 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	if len(cff.Encoding) != 256 ||
 		len(cff.Private) != 1 ||
 		len(cff.Glyphs) == 0 ||
-		len(cff.Glyphs[0].Name) == 0 {
-		return errors.New("font is not a simple CFF font")
+		cff.Glyphs[0].Name == "" {
+		return errors.New("not a simple CFF font")
 	}
 
 	fontName := cff.FontInfo.FontName
@@ -346,6 +350,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	if err := dicts.Type.MustBe(font.CFFSimple); err != nil {
 		return nil, err
 	}
+
 	res := &EmbedInfoSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])

@@ -20,11 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
@@ -52,6 +53,7 @@ type FontSimple struct {
 }
 
 // NewSimple creates a new simple TrueType font.
+// Info must either be a TrueType font or an OpenType font with TrueType outlines.
 func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
@@ -132,28 +134,35 @@ func (f *embeddedSimple) Close() error {
 			f.Name, f.ttf.PostscriptName())
 	}
 	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
+	encoding := f.SimpleEncoder.Encoding()
+
+	ttf := f.ttf.Clone()
+	ttf.CMapTable = nil
+	ttf.Gdef = nil
+	ttf.Gsub = nil
+	ttf.Gpos = nil
 
 	// subset the font
-	var ss []subset.Glyph
-	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	encoding := f.SimpleEncoder.Encoding()
-	for cid, gid := range encoding {
-		if gid != 0 {
-			ss = append(ss, subset.Glyph{OrigGID: gid, CID: type1.CID(cid)})
-		}
+	gidUsed := make(map[glyph.ID]bool)
+	gidUsed[0] = true
+	for _, gid := range encoding {
+		gidUsed[gid] = true
 	}
-	subsetTag := subset.TagOld(ss, f.ttf.NumGlyphs())
-	ttfSubset, err := subset.Simple(f.ttf, ss)
+	origGid := maps.Keys(gidUsed)
+	slices.Sort(origGid)
+	subsetTtf, err := ttf.Subset(origGid)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
+	subsetTag := subset.Tag(origGid, ttf.NumGlyphs())
 
+	subsetGid := make(map[glyph.ID]glyph.ID)
+	for gNew, gOld := range origGid {
+		subsetGid[gOld] = glyph.ID(gNew)
+	}
 	subsetEncoding := make([]glyph.ID, 256)
-	for subsetGid, g := range ss {
-		if subsetGid == 0 {
-			continue
-		}
-		subsetEncoding[g.CID] = glyph.ID(subsetGid)
+	for i, gid := range encoding {
+		subsetEncoding[i] = subsetGid[gid]
 	}
 
 	m := make(map[charcode.CharCode][]rune)
@@ -166,7 +175,7 @@ func (f *embeddedSimple) Close() error {
 	toUnicode := tounicode.FromMapping(charcode.Simple, m)
 
 	info := EmbedInfoSimple{
-		Font:      ttfSubset,
+		Font:      subsetTtf,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
@@ -226,6 +235,9 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	// character codes to glyphs.
 	//
 	// TODO(voss): also try the two allowed encodings for "non-symbolic" fonts.
+	//
+	// TODO(voss): revisit this, once
+	// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
 	isSymbolic := true
 	subtable := sfntcmap.Format4{}
 	for i, gid := range info.Encoding {
@@ -333,6 +345,11 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 
 	res := &EmbedInfoSimple{}
 
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
+	}
+
 	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 	if err != nil {
 		return nil, err
@@ -364,11 +381,6 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
 	}
 	res.Font = ttf
-
-	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
-	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
-		res.SubsetTag = m[1]
-	}
 
 	res.Encoding = ExtractEncoding(r, dicts.FontDict["Encoding"], ttf)
 
