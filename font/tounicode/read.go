@@ -22,11 +22,12 @@ import (
 	"io"
 	"unicode/utf16"
 
+	"seehuhn.de/go/postscript"
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/postscript"
-	"seehuhn.de/go/postscript/type1"
 )
 
 // Extract extracts a ToUnicode CMap from a PDF file.
@@ -74,12 +75,12 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 		}
 	}
 
-	csRanges := make([]charcode.Range, len(codeMap.CodeSpaceRanges))
+	csRanges := make(charcode.CodeSpaceRange, len(codeMap.CodeSpaceRanges))
 	for i, r := range codeMap.CodeSpaceRanges {
 		csRanges[i] = charcode.Range(r)
 	}
-	if cs == nil {
-		cs = charcode.NewCodeSpace(csRanges)
+	if cs == nil { // TODO(voss): check this
+		cs = csRanges
 	}
 
 	res := &Info{

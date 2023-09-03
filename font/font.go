@@ -32,7 +32,7 @@ type Geometry struct {
 
 	Ascent             funit.Int16
 	Descent            funit.Int16 // negative
-	BaseLineSkip       funit.Int16
+	BaseLineSkip       funit.Int16 // TODO(voss): rename to "Leading"?
 	UnderlinePosition  funit.Float64
 	UnderlineThickness funit.Float64
 

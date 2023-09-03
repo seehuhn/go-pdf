@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func NewCustomCIDEncoder(CS charcode.CodeSpaceRange, ROS *type1.CIDSystemInfo) CIDEncoder {
+func NewCustomCIDEncoder(CS charcode.CodeSpaceRange, ROS *type1.CIDSystemInfo) CIDEncoderOld {
 	enc := &customCIDEncoder{
 		CS:       CS,
 		ROS:      ROS,

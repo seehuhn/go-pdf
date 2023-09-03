@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"seehuhn.de/go/pdf/font/charcode"
 )
 
 func TestPredefined(t *testing.T) {
@@ -57,7 +58,7 @@ func TestPredefined(t *testing.T) {
 		}
 
 		rr1 := builtinCS[name]
-		rr2 := cmap.CS.Ranges()
+		rr2 := []charcode.Range(cmap.CS)
 		if d := cmp.Diff(rr1, rr2); d != "" {
 			fmt.Printf("\t%q: {\n", name)
 			for _, r := range rr2 {

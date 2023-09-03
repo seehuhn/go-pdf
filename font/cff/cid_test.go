@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/type1"
@@ -33,19 +34,20 @@ func TestRoundTripComposite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs := charcode.NewCodeSpace([]charcode.Range{
+	cs := charcode.CodeSpaceRange{
 		{Low: []byte{0x04}, High: []byte{0x07}},
 		{Low: []byte{0x10, 0x12}, High: []byte{0x11, 0x13}},
-	})
+	}
 	ros := &type1.CIDSystemInfo{
 		Registry:   "Test",
 		Ordering:   "Sonderbar",
 		Supplement: 13,
 	}
-	cmap := make(map[charcode.CharCode]type1.CID, 8)
+	cmapData := make(map[charcode.CharCode]type1.CID, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
-		cmap[code] = type1.CID(2*code + 1)
+		cmapData[code] = type1.CID(2*code + 1)
 	}
+	cmapInfo := cmap.New(ros, cs, cmapData)
 	m := make(map[charcode.CharCode][]rune, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
 		m[code] = []rune{'X', '0' + rune(code)}
@@ -54,9 +56,7 @@ func TestRoundTripComposite(t *testing.T) {
 	info := &EmbedInfoComposite{
 		Font:       otf.AsCFF(),
 		SubsetTag:  "ABCDEF",
-		CS:         cs,
-		ROS:        ros,
-		CMap:       cmap,
+		CMap:       cmapInfo,
 		ToUnicode:  toUnicode,
 		UnitsPerEm: otf.UnitsPerEm,
 		Ascent:     otf.Ascent,

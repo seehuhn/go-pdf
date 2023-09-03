@@ -17,29 +17,90 @@
 package charcode
 
 import (
-	"unicode/utf8"
-
 	"seehuhn.de/go/pdf"
 )
 
+// CharCode represents a character code within a [CodeSpaceRange] as a non-negative integer.
 type CharCode int
 
-type CodeSpaceRange interface {
-	Append(pdf.String, CharCode) pdf.String
+// CodeSpaceRange describes the ranges of byte sequences which are valid
+// character codes for a given encoding.
+type CodeSpaceRange []Range
 
-	// Decode decodes the first character code from the given PDF string.
-	// It returns the character code and the number of bytes consumed.
-	// If the character code cannot be decoded, a code of -1 is returned,
-	// and the length is either 0 (if the string is empty) or 1.
-	Decode(pdf.String) (CharCode, int)
+// Append appends the given character code to the given PDF string.
+func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
+	for _, r := range c {
+		if numCodes := r.numCodes(); code >= numCodes {
+			code -= numCodes
+			continue
+		}
 
-	Ranges() []Range
+		n := len(s)
+		for range r.Low {
+			s = append(s, 0)
+		}
+		for i := len(r.Low) - 1; i >= 0; i-- {
+			k := CharCode(r.High[i]) - CharCode(r.Low[i]) + 1
+			s[n+i] = r.Low[i] + byte(code%k)
+			code /= k
+		}
+		break
+	}
+	return s
 }
 
+// Decode decodes the first character code from the given PDF string.
+// It returns the character code and the number of bytes consumed.
+// If the character code cannot be decoded, a code of -1 is returned,
+// and the length is either 0 (if the string is empty) or 1.
+func (c CodeSpaceRange) Decode(s pdf.String) (CharCode, int) {
+	var base CharCode
+tryNextRange:
+	for _, r := range c {
+		numCodes := r.numCodes()
+		if len(s) < len(r.Low) {
+			base += numCodes
+			continue tryNextRange
+		}
+
+		var code CharCode
+		for i := 0; i < len(r.Low); i++ {
+			b := s[i]
+			if b < r.Low[i] || b > r.High[i] {
+				base += numCodes
+				continue tryNextRange
+			}
+
+			k := CharCode(r.High[i]) - CharCode(r.Low[i]) + 1
+			code = code*k + CharCode(b-r.Low[i])
+		}
+		return code + base, len(r.Low)
+	}
+
+	if len(s) == 0 {
+		return -1, 0
+	}
+	return -1, 1
+}
+
+// Range represents a range of character codes.
+// The range is inclusive, i.e. the character codes Low and High are
+// part of the range.
+// Low and High must have the same length and only differ in the last byte.
 type Range struct {
 	Low, High []byte
 }
 
+func (r Range) numCodes() CharCode {
+	var numCodes CharCode = 1
+	for i, low := range r.Low {
+		numCodes *= CharCode(r.High[i]-low) + 1
+	}
+	return numCodes
+}
+
+// Matches returns true, if the PDF string starts with a character code
+// in the given range.
 func (r Range) Matches(s pdf.String) bool {
 	if len(s) < len(r.Low) {
 		return false
@@ -58,72 +119,8 @@ func (r Range) Matches(s pdf.String) bool {
 // Simple represents the code space range for a simple font.
 // Character codes are one byte long, and are directly mapped to
 // the bytes of the PDF string.
-var Simple CodeSpaceRange = &simpleCS{}
-
-type simpleCS struct{}
-
-func (c *simpleCS) Append(s pdf.String, code CharCode) pdf.String {
-	return append(s, byte(code))
-}
-
-func (c *simpleCS) Decode(s pdf.String) (CharCode, int) {
-	if len(s) == 0 {
-		return -1, 0
-	}
-	return CharCode(s[0]), 1
-}
-
-func (c *simpleCS) Ranges() []Range {
-	return []Range{{[]byte{0x00}, []byte{0xFF}}}
-}
+var Simple = CodeSpaceRange{{[]byte{0x00}, []byte{0xFF}}}
 
 // UCS2 represents a two-byte encoding.
 // Character codes are two bytes long, and are stored in big-endian order.
-var UCS2 CodeSpaceRange = &ucs2CS{}
-
-type ucs2CS struct{}
-
-func (c *ucs2CS) Append(s pdf.String, code CharCode) pdf.String {
-	return append(s, byte(code>>8), byte(code))
-}
-
-func (c *ucs2CS) Decode(s pdf.String) (CharCode, int) {
-	switch len(s) {
-	case 0:
-		return -1, 0
-	case 1:
-		return -1, 1
-	}
-	return CharCode(s[0])<<8 | CharCode(s[1]), 2
-}
-
-func (c *ucs2CS) Ranges() []Range {
-	return []Range{{[]byte{0x00, 0x00}, []byte{0xFF, 0xFF}}}
-}
-
-// UTF8 represents UTF-8-encoded character codes.
-var UTF8 CodeSpaceRange = &utf8CS{}
-
-type utf8CS struct{}
-
-func (c *utf8CS) Append(s pdf.String, code CharCode) pdf.String {
-	buf := utf8.AppendRune([]byte(s), rune(code))
-	return pdf.String(buf)
-}
-
-func (c *utf8CS) Decode(s pdf.String) (CharCode, int) {
-	r, size := utf8.DecodeRune([]byte(s))
-	if r == utf8.RuneError {
-		r = -1
-	}
-	return CharCode(r), size
-}
-
-func (c *utf8CS) Ranges() []Range {
-	return []Range{
-		{[]byte{0x00}, []byte{0x7F}},
-		{[]byte{0xC2, 0x80}, []byte{0xDF, 0xBF}},
-		{[]byte{0xE0, 0x80, 0x80}, []byte{0xEF, 0xBF, 0xBF}},
-		{[]byte{0xF0, 0x80, 0x80, 0x80}, []byte{0xF7, 0xBF, 0xBF, 0xBF}},
-	}
-}
+var UCS2 = CodeSpaceRange{{[]byte{0x00, 0x00}, []byte{0xFF, 0xFF}}}

@@ -142,7 +142,7 @@ func (f *embeddedCFFSimple) Close() error {
 	outlines := otf.Outlines.(*cff.Outlines)
 	outlines.Encoding = encoding
 	outlines.ROS = nil
-	outlines.Gid2Cid = nil
+	outlines.GIDToCID = nil
 
 	otf.CMapTable = nil
 	otf.Gdef = nil

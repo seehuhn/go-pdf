@@ -19,12 +19,11 @@ package main
 import (
 	"golang.org/x/text/language"
 
-	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 func main() {
@@ -46,13 +45,9 @@ func doit() error {
 	}
 
 	opt := &cff.FontOptions{
-		Language: language.German,
-		CS:       charcode.UTF8,
-		ROS: &type1.CIDSystemInfo{
-			Registry:   "Seehuhn",
-			Ordering:   "Sonderbar",
-			Supplement: 0,
-		},
+		Language:     language.German,
+		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
+		MakeEncoder:  cmap.NewUTF8Encoder,
 	}
 	FF, err := cff.NewComposite(info, opt)
 	if err != nil {
@@ -66,7 +61,7 @@ func doit() error {
 	page.TextSetFont(F, 36)
 	page.TextStart()
 	page.TextFirstLine(100, 700)
-	page.TextShow("Größenwahn")
+	page.TextShow("“Größenwahn”")
 	page.TextEnd()
 
 	return page.Close()

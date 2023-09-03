@@ -47,7 +47,10 @@ func TestFontTypes(t *testing.T) {
 			page.TextFirstLine(72, 72)
 			page.TextShow(`“Hello World!”`)
 			page.TextEnd()
-			page.Close()
+			err = page.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 			if err != nil {

@@ -23,33 +23,41 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/text/unicode/runenames"
 
 	"seehuhn.de/go/postscript/funit"
+	pst1 "seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/header"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
+	pdft1 "seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
 const (
-	q      = 0.4
-	margin = 24
+	q            = 0.3
+	topMargin    = 24 + 3*12
+	rightMargin  = 24
+	bottomMargin = 24
+	leftMargin   = 24
 )
 
 func main() {
 	fileNames := os.Args[1:]
 	if len(fileNames) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: %s font.ttf font.otf ...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "usage: %s font.ttf font.otf ...\n",
+			filepath.Base(os.Args[0]))
+		os.Exit(1)
 	}
 
 	out, err := pdf.Create("out.pdf", nil)
@@ -57,7 +65,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := type1.Courier.Embed(out, "F")
+	labelFont, err := pdft1.Courier.Embed(out, "F")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,10 +85,10 @@ func main() {
 
 		fontBBox := getFontBBox(cffFont)
 		pageSize := &pdf.Rectangle{
-			LLx: fontBBox.LLx.AsFloat(q) - margin,
-			LLy: fontBBox.LLy.AsFloat(q) - margin,
-			URx: fontBBox.URx.AsFloat(q) + margin,
-			URy: fontBBox.URy.AsFloat(q) + margin,
+			LLx: fontBBox.LLx.AsFloat(q) - leftMargin,
+			LLy: fontBBox.LLy.AsFloat(q) - bottomMargin,
+			URx: fontBBox.URx.AsFloat(q) + rightMargin,
+			URy: fontBBox.URy.AsFloat(q) + topMargin,
 		}
 
 		subTree, err := tree.NewRange()
@@ -150,6 +158,22 @@ type illustrator struct {
 }
 
 func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
+	codes := make(map[glyph.ID][]int)
+	if fnt.Encoding != nil {
+		for code, gid := range fnt.Encoding {
+			if gid == 0 {
+				continue
+			}
+			codes[gid] = append(codes[gid], code)
+		}
+	}
+	CIDs := make(map[glyph.ID]pst1.CID)
+	if fnt.GIDToCID != nil {
+		for gid, cid := range fnt.GIDToCID {
+			CIDs[glyph.ID(gid)] = cid
+		}
+	}
+
 	for i, g := range fnt.Glyphs {
 		contentRef := ctx.pageTree.Out.Alloc()
 		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
@@ -171,16 +195,26 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		page.PopGraphicsState()
 
 		// show the glyph ID and name
-		var label string
+		var label []string
+		label = append(label, fmt.Sprintf("glyph %d", i))
 		if g.Name != "" {
-			label = fmt.Sprintf("glyph %d %q", i, g.Name)
-		} else {
-			label = fmt.Sprintf("glyph %d", i)
+			label = append(label, fmt.Sprintf("%q", g.Name))
 		}
+		if cc := codes[glyph.ID(i)]; len(cc) > 0 {
+			var ccString []string
+			for _, c := range cc {
+				ccString = append(ccString, fmt.Sprintf("%d", c))
+			}
+			label = append(label, fmt.Sprintf("code=%s", strings.Join(ccString, ",")))
+		}
+		if cid, ok := CIDs[glyph.ID(i)]; ok {
+			label = append(label, fmt.Sprintf("CID=%d", cid))
+		}
+
 		page.TextStart()
 		page.TextSetFont(ctx.labelFont, 12)
 		page.TextFirstLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
-		page.TextShow(label)
+		page.TextShow(strings.Join(label, ", "))
 		if g.Name != "" {
 			rr := names.ToUnicode(g.Name, false)
 			if len(rr) == 1 {

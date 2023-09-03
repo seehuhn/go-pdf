@@ -93,7 +93,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 		FontComposite: f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
-		CIDEncoder:    cmap.NewCIDEncoder(),
+		CIDEncoderOld: cmap.NewCIDEncoderOld(),
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -109,7 +109,7 @@ type embeddedCID struct {
 	w pdf.Putter
 	pdf.Resource
 
-	cmap.CIDEncoder
+	cmap.CIDEncoderOld
 	closed bool
 }
 
@@ -120,8 +120,8 @@ func (f *embeddedCID) Close() error {
 	f.closed = true
 
 	// subset the font
-	encoding := f.CIDEncoder.Encoding()
-	CIDSystemInfo := f.CIDEncoder.CIDSystemInfo()
+	encoding := f.CIDEncoderOld.Encoding()
+	CIDSystemInfo := f.CIDEncoderOld.CIDSystemInfo()
 	var ss []subset.Glyph
 	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
 	for _, p := range encoding {

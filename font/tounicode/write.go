@@ -130,7 +130,7 @@ begincmap
 >> def
 {{end -}}
 
-{{with .CS.Ranges -}}
+{{with .CS -}}
 {{len .}} begincodespacerange
 {{range . -}}
 {{B .Low}} {{B .High}}

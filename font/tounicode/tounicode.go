@@ -22,9 +22,10 @@ import (
 	"fmt"
 	"unicode"
 
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
 )
 
 // Info holds the information from a ToUnicode cmap.
@@ -114,7 +115,7 @@ func (info *Info) makeName() {
 	k = binary.PutVarint(buf[:], int64(info.ROS.Supplement))
 	h.Write(buf[:k])
 
-	rr := info.CS.Ranges()
+	rr := info.CS
 	k = binary.PutVarint(buf[:], int64(len(rr)))
 	h.Write(buf[:k])
 	for _, r := range rr {

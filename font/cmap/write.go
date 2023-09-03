@@ -111,7 +111,7 @@ end def
 /CMapName {{PN .Name}} def
 /CMapType 1 def
 /WMode {{.WMode}} def
-{{with .CSFile.Ranges -}}
+{{with .CSFile -}}
 {{len .}} begincodespacerange
 {{range . -}}
 {{B .Low}} {{B .High}}

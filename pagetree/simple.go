@@ -18,6 +18,7 @@ package pagetree
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"golang.org/x/exp/maps"
@@ -132,6 +133,10 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 		}
 	}
 
+	numPages, err := NumPages(r)
+	if err == nil {
+		return nil, fmt.Errorf("page not found (valid page numbers are 0 to %d)", numPages-1)
+	}
 	return nil, errors.New("page not found")
 }
 

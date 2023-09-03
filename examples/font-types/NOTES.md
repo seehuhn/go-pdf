@@ -7,6 +7,7 @@ Simple fonts always use a single byte per character in the PDF content stream.
 Thus, only 256 distinct glyphs can be used, even if the font contains more
 glyphs.
 
+
 ## Type 1 Fonts
 
 These fonts use `Type1` as the `Subtype` in the font dictionary.
@@ -37,7 +38,6 @@ The CFF data is not allowed to be CID-keyed, *i.e.* the CFF font must not
 contain a `ROS` operator.  If the encoding used in PDF content streams is
 different from the font's builtin encoding, the `Encoding` entry in the font
 dictionary describes the mapping from character codes to glyph names,
-
 
 ## Simple CFF-based OpenType Fonts (PDF 1.6)
 
@@ -81,8 +81,10 @@ the `Encoding` entry in the font dictionary, the `cmap` table in the TrueType,
 and the symbolic/nonsymbolic flags in the font descriptor.
 
 There seems little reason to use this font type, since the font data
-could equally be embedded as a TrueType font.  Glyf-based OpenType fonts
-seem not to be supported by the MacOS Preview application.
+could equally be embedded as a TrueType font.
+
+Glyf-based OpenType fonts seem not to be supported by the MacOS Preview
+application.
 
 ## Type 3 Fonts
 
@@ -97,9 +99,13 @@ dictionary).
 
 # Composite PDF Fonts
 
-CIDFonts can use multiple bytes to encode a character, the exact encoding is
-configurable.  The most common encoding is `Identity-H` which uses two bytes
-for every character.
+Composite PDF fonts can use multiple bytes to encode a character, the exact
+encoding is configurable.  For example, a commonly used encoding is
+`Identity-H` which uses two bytes for every character.
+
+Character codes longer than two bytes seem to be not supported by the MacOS
+Preview application.
+
 
 ## Composite CFF Fonts (PDF 1.3)
 

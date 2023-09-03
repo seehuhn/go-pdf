@@ -19,29 +19,86 @@ package charcode
 import (
 	"bytes"
 	"testing"
-
-	"seehuhn.de/go/pdf"
 )
 
-func TestUTF8(t *testing.T) {
-	// verify that the encoding equals standard UTF-8 encoding
+func TestCustom(t *testing.T) {
+	cs := CodeSpaceRange{
+		{Low: []byte{0x0, 0x0}, High: []byte{0xff, 0xf0}},
+	}
 
-	var buf pdf.String
-	for r := rune(0); r <= 0x10_FFFF; r++ {
-		if r >= 0xD800 && r <= 0xDFFF || r == 0xFFFD {
-			continue
+	if len(cs) != 1 {
+		t.Errorf("expected 1 custom range, got %d", len(cs))
+	}
+	if cs[0].numCodes() != (0xf0-0x00+1)*(0xff-0x00+1) {
+		t.Errorf("expected %d codes, got %d", (0xf0-0x00+1)*(0xff-0x00+1), cs[0].numCodes())
+	}
+}
+
+func TestCustom2(t *testing.T) {
+	cs := CodeSpaceRange{
+		{Low: []byte{0x10, 0x80}, High: []byte{0x30, 0xA0}},
+	}
+
+	seen := make(map[CharCode]bool)
+	var buf []byte
+	for c1 := byte(0x10); c1 <= 0x30; c1++ {
+		for c2 := byte(0x80); c2 <= 0xA0; c2++ {
+			buf = append(buf[:0], c1, c2)
+			code, k := cs.Decode(buf)
+			if k != 2 {
+				t.Errorf("expected 2 bytes, got %d", k)
+			}
+			if seen[code] {
+				t.Errorf("code %d seen twice", code)
+			}
+			seen[code] = true
+
+			buf = cs.Append(buf[:0], code)
+			if !bytes.Equal(buf, []byte{c1, c2}) {
+				t.Fatalf("expected %v, got %v", []byte{c1, c2}, buf)
+			}
 		}
+	}
+}
 
-		code := CharCode(r)
-		buf = UTF8.Append(buf[:0], code)
-		buf2 := []byte(string(r))
-		if !bytes.Equal(buf, buf2) {
-			t.Fatalf("UTF8.Append(%#x) = %v, want %v", code, buf, buf2)
+func TestCustom3(t *testing.T) {
+	cs := CodeSpaceRange{ // from the EUC-H cmap
+		{Low: []byte{0x00}, High: []byte{0x80}},
+		{Low: []byte{0x8E, 0xA0}, High: []byte{0x8E, 0xDF}},
+		{Low: []byte{0xA1, 0xA1}, High: []byte{0xFE, 0xFE}},
+	}
+
+	testCases := [][]byte{
+		{0x00},
+		{0x41},
+		{0x80},
+		{0x8E, 0xA0},
+		{0x8E, 0xDF},
+		{0xA1, 0xA1},
+		{0xC1, 0xD2},
+		{0xFE, 0xFE},
+	}
+	for _, in := range testCases {
+		code, k := cs.Decode(in)
+		if k != len(in) {
+			t.Errorf("expected %d bytes, got %d", len(in), k)
+		} else if code < 0 {
+			t.Errorf("expected positive code, got %d", code)
 		}
+		out := cs.Append(nil, code)
+		if !bytes.Equal(in, out) {
+			t.Fatalf("%d: expected <%x>, got <%x>", code, in, out)
+		}
+	}
 
-		code2, size := UTF8.Decode(buf2)
-		if code2 != code || size != len(buf2) {
-			t.Fatalf("UTF8.Decode(%v) = %#x:%d, want %#x:%d", buf2, code2, size, code, len(buf2))
+	for code := CharCode(0); code < 1000; code++ {
+		buf := cs.Append(nil, code)
+		code2, k := cs.Decode(buf)
+		if k != len(buf) {
+			t.Errorf("expected %d bytes, got %d", len(buf), k)
+		}
+		if code2 != code {
+			t.Errorf("expected code %d, got %d", code, code2)
 		}
 	}
 }

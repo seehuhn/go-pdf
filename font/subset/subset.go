@@ -36,6 +36,7 @@ type Glyph struct {
 }
 
 // CID constructs a subset of the font for use as a CID-keyed PDF font.
+//
 // TODO(voss): remove
 func CID(info *sfnt.Font, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Font, error) {
 	if len(subset) == 0 || subset[0].OrigGID != 0 {
@@ -76,12 +77,12 @@ func CID(info *sfnt.Font, subset []Glyph, ROS *type1.CIDSystemInfo) (*sfnt.Font,
 		if !cidEqualsGid || len(pIdxMap) > 1 || o2.Glyphs[0].Name == "" {
 			// use a CID-keyed font only when necessary
 			o2.ROS = ROS
-			o2.Gid2Cid = make([]type1.CID, len(subset))
+			o2.GIDToCID = make([]type1.CID, len(subset))
 			for subsetGid, g := range subset {
 				if subsetGid == 0 {
 					continue
 				}
-				o2.Gid2Cid[subsetGid] = g.CID
+				o2.GIDToCID[subsetGid] = g.CID
 			}
 		}
 

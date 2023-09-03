@@ -43,7 +43,7 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-// FontSimple is a CFF font for embedding in a PDF file as a simple font.
+// FontSimple is a CFF font for embedding into a PDF file as a simple font.
 type FontSimple struct {
 	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
@@ -144,7 +144,7 @@ func (f *embeddedSimple) Close() error {
 	outlines := otf.Outlines.(*cff.Outlines)
 	outlines.Encoding = encoding
 	outlines.ROS = nil
-	outlines.Gid2Cid = nil
+	outlines.GIDToCID = nil
 
 	otf.CMapTable = nil
 	otf.Gdef = nil
@@ -415,12 +415,9 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	res.UnitsPerEm = unitsPerEm
 
 	q := 1000 / float64(unitsPerEm)
-	ascent := dicts.FontDescriptor.Ascent
-	res.Ascent = funit.Int16(math.Round(float64(ascent) / q))
-	descent := dicts.FontDescriptor.Descent
-	res.Descent = funit.Int16(math.Round(float64(descent) / q))
-	capHeight := dicts.FontDescriptor.CapHeight
-	res.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+	res.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent / q))
+	res.Descent = funit.Int16(math.Round(dicts.FontDescriptor.Descent / q))
+	res.CapHeight = funit.Int16(math.Round(dicts.FontDescriptor.CapHeight / q))
 
 	res.IsSerif = dicts.FontDescriptor.IsSerif
 	res.IsScript = dicts.FontDescriptor.IsScript

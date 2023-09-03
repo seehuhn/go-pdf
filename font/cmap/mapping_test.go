@@ -24,11 +24,11 @@ import (
 )
 
 func TestMapping(t *testing.T) {
-	cs := charcode.NewCodeSpace([]charcode.Range{
+	cs := charcode.CodeSpaceRange{
 		{Low: []byte{0x00}, High: []byte{0x0F}},
 		{Low: []byte{0x10, 0x12}, High: []byte{0x10, 0x7F}},
 		{Low: []byte{0x11, 0x80, 0x80}, High: []byte{0x11, 0xFF, 0xFF}},
-	})
+	}
 	info := &Info{
 		Name:   "Test",
 		CS:     cs,

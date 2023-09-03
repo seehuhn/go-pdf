@@ -35,7 +35,7 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs := charcode.UTF8
+	cs := charcode.UCS2
 	ros := &type1.CIDSystemInfo{
 		Registry:   "Test",
 		Ordering:   "Merkwürdig",

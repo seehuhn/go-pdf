@@ -60,16 +60,37 @@ type Range struct {
 }
 
 func New(ROS *type1.CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]type1.CID) *Info {
-	// TODO(voss): check whether one of the predefined CMaps can be used.
-	name := makeName(m)
 	res := &Info{
-		Name:   name,
 		ROS:    ROS,
 		CS:     cs,
 		CSFile: cs,
 	}
 	res.SetMapping(m)
+
+	// TODO(voss): check whether any of the predefined CMaps can be used.
+
+	if res.IsIdentity() {
+		res.Name = "Identity-H"
+	} else {
+		res.Name = makeName(m)
+	}
+
 	return res
+}
+
+// IsIdentity returns true if all codes are equal to the corresponding CID.
+func (info *Info) IsIdentity() bool {
+	for _, s := range info.Singles {
+		if int(s.Code) != int(s.Value) {
+			return false
+		}
+	}
+	for _, r := range info.Ranges {
+		if int(r.First) != int(r.Value) {
+			return false
+		}
+	}
+	return true
 }
 
 func (info *Info) Embed(w pdf.Putter, ref pdf.Reference, other map[string]pdf.Reference) error {

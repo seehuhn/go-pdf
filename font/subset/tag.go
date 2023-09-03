@@ -27,6 +27,8 @@ const subsetModulus = 26 * 26 * 26 * 26 * 26 * 26
 // TagOld constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe
 // a subset of glyphs of a font.  This is used for the /BaseFont entry in PDF
 // Font dictionaries and the /FontName entry in FontDescriptor dictionaries.
+//
+// TODO(voss): remove
 func TagOld(gg []Glyph, origNumGlyphs int) string {
 	// mix all the information into a single uint32
 	X := uint32(origNumGlyphs)

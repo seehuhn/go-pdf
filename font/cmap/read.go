@@ -114,7 +114,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 			other = make(map[string]*Info)
 		}
 		if other, ok := other[codeMap.UseCMap]; ok {
-			rr = append(rr, other.CS.Ranges()...)
+			rr = append(rr, other.CS...)
 		} else if other, ok := builtinCS[codeMap.UseCMap]; ok {
 			rr = append(rr, other...)
 		} else {
@@ -125,8 +125,9 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	for _, r := range codeMap.CodeSpaceRanges {
 		rrFile = append(rrFile, charcode.Range{Low: r.Low, High: r.High})
 	}
-	res.CS = charcode.NewCodeSpace(append(rr, rrFile...))
-	res.CSFile = charcode.NewCodeSpace(rrFile)
+	// TODO(voss): do we need to sort the ranges?
+	res.CS = charcode.CodeSpaceRange(append(rr, rrFile...))
+	res.CSFile = charcode.CodeSpaceRange(rrFile)
 
 	for _, m := range codeMap.Chars {
 		code, k := res.CS.Decode(m.Src)
@@ -166,6 +167,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	return res, nil
 }
 
+// ExtractRaw extract the raw PostScript data of a CMap from a PDF file.
 func ExtractRaw(r pdf.Getter, ref pdf.Object) (postscript.Dict, error) {
 	stream, err := pdf.GetStream(r, ref)
 	if err != nil {
@@ -178,6 +180,7 @@ func ExtractRaw(r pdf.Getter, ref pdf.Object) (postscript.Dict, error) {
 	return ReadRaw(cmapBody)
 }
 
+// ReadRaw reads the raw PostScript data of a CMap from an [io.Reader].
 func ReadRaw(r io.Reader) (postscript.Dict, error) {
 	intp := postscript.NewInterpreter()
 	intp.MaxOps = 1_000_000 // TODO(voss): measure what is required

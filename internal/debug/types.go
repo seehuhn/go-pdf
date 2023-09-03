@@ -103,7 +103,7 @@ func MakeFonts() ([]FontSample, error) {
 		return nil, err
 	}
 	outlines := otf.Outlines.(*scff.Outlines)
-	if len(outlines.Encoding) != 256 || outlines.ROS != nil || len(outlines.Gid2Cid) != 0 {
+	if len(outlines.Encoding) != 256 || outlines.ROS != nil || len(outlines.GIDToCID) != 0 {
 		panic("CFF font unexpectedly has CIDFont operators")
 	}
 	opt := &cff.FontOptions{
@@ -134,9 +134,9 @@ func MakeFonts() ([]FontSample, error) {
 		Ordering:   "Sonderbar",
 		Supplement: 0,
 	}
-	outlines.Gid2Cid = make([]pstype1.CID, len(outlines.Glyphs))
-	for i := range outlines.Gid2Cid {
-		outlines.Gid2Cid[i] = pstype1.CID(i)
+	outlines.GIDToCID = make([]pstype1.CID, len(outlines.Glyphs))
+	for i := range outlines.GIDToCID {
+		outlines.GIDToCID[i] = pstype1.CID(i)
 	}
 	opt = &cff.FontOptions{
 		Language: language.English,
