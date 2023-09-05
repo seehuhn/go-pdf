@@ -67,13 +67,13 @@ func New(ROS *type1.CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.Ch
 	}
 	res.SetMapping(m)
 
-	// TODO(voss): check whether any of the predefined CMaps can be used.
-
 	if res.IsIdentity() {
 		res.Name = "Identity-H"
 	} else {
 		res.Name = makeName(m)
 	}
+
+	// TODO(voss): check whether any of the other predefined CMaps can be used.
 
 	return res
 }
@@ -91,6 +91,22 @@ func (info *Info) IsIdentity() bool {
 		}
 	}
 	return true
+}
+
+func (info *Info) MaxCID() type1.CID {
+	var maxCID type1.CID
+	for _, s := range info.Singles {
+		if s.Value > maxCID {
+			maxCID = s.Value
+		}
+	}
+	for _, r := range info.Ranges {
+		rangeMax := r.Value + type1.CID(r.Last-r.First)
+		if rangeMax > maxCID {
+			maxCID = rangeMax
+		}
+	}
+	return maxCID
 }
 
 func (info *Info) Embed(w pdf.Putter, ref pdf.Reference, other map[string]pdf.Reference) error {

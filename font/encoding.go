@@ -22,6 +22,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/pdf"
 )
@@ -164,4 +165,16 @@ func getNamedEncoding(name pdf.Name) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unknown encoding %q", name)
 	}
+}
+
+// IsStandardLatin returns true if all glyphs are in the Adobe Standard Latin
+// character set.
+func IsStandardLatin(f *sfnt.Font) bool {
+	glyphNames := f.MakeGlyphNames()
+	for _, name := range glyphNames {
+		if !pdfenc.IsStandardLatin[name] {
+			return false
+		}
+	}
+	return true
 }

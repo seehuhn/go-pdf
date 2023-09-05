@@ -117,9 +117,6 @@ func TestRoundTripCFFSimple(t *testing.T) {
 		info.Font.LineGap = 0                    // "OS/2" and "hmtx" tables are optional
 		info.Font.XHeight = 0                    // "OS/2" table is optional
 
-		// TODO(voss): make this match, and ignore font.CMap instead
-		info.Font.CMapTable = nil
-
 		// TODO(voss): reenable this once https://github.com/google/go-cmp/issues/335 is resolved
 		info.Font.Outlines = nil
 	}

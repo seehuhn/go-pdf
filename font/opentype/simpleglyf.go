@@ -237,8 +237,6 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 	//
 	// TODO(voss): revisit this, once
 	// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
-	//
-	// TODO(voss): merge with the code for TrueType fonts.
 	isSymbolic := true
 	subtable := sfntcmap.Format4{}
 	for i, gid := range info.Encoding {

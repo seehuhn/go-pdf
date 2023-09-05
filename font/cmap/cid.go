@@ -17,8 +17,10 @@
 package cmap
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
 	"slices"
-	"sort"
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
@@ -103,6 +105,8 @@ func (e *identityEncoder) UsedGIDs() []glyph.ID {
 	return subset
 }
 
+// NewUTF8Encoder returns an encoder where character codes equal the UTF-8
+// encoding of the text content, where possible.
 func NewUTF8Encoder(g2c GIDToCID) Encoder {
 	return &utf8Encoder{
 		g2c:   g2c,
@@ -206,6 +210,8 @@ var utf8cs = charcode.CodeSpaceRange{
 	{Low: []byte{0xF0, 0x80, 0x80, 0x80}, High: []byte{0xF7, 0xBF, 0xBF, 0xBF}},
 }
 
+// GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
+// Identifier (CID) values.
 type GIDToCID interface {
 	CID(glyph.ID) type1.CID
 
@@ -214,6 +220,8 @@ type GIDToCID interface {
 	GIDToCID(numGlyph int) []type1.CID
 }
 
+// NewSequentialGIDToCID returns a GIDToCID which assigns CID values
+// sequentially, starting with 1.
 func NewSequentialGIDToCID() GIDToCID {
 	return &gidToCIDSequential{
 		data: make(map[glyph.ID]type1.CID),
@@ -224,6 +232,7 @@ type gidToCIDSequential struct {
 	data map[glyph.ID]type1.CID
 }
 
+// GID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) CID(gid glyph.ID) type1.CID {
 	cid, ok := g.data[gid]
 	if !ok {
@@ -233,14 +242,27 @@ func (g *gidToCIDSequential) CID(gid glyph.ID) type1.CID {
 	return cid
 }
 
+// ROS implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) ROS() *type1.CIDSystemInfo {
+	h := sha256.New()
+	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential"))
+	binary.Write(h, binary.BigEndian, len(g.data))
+	gg := maps.Keys(g.data)
+	slices.Sort(gg)
+	for _, gid := range gg {
+		binary.Write(h, binary.BigEndian, gid)
+		binary.Write(h, binary.BigEndian, g.data[gid])
+	}
+	sum := h.Sum(nil)
+
 	return &type1.CIDSystemInfo{
 		Registry:   "Seehuhn",
-		Ordering:   "Sonderbar", // TODO(voss)
+		Ordering:   fmt.Sprintf("%x", sum[:8]),
 		Supplement: 0,
 	}
 }
 
+// GIDToCID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) GIDToCID(numGlyph int) []type1.CID {
 	res := make([]type1.CID, numGlyph)
 	for gid, cid := range g.data {
@@ -255,10 +277,12 @@ func NewIdentityGIDToCID() GIDToCID {
 
 type gidToCIDIdentity struct{}
 
+// GID implements the [GIDToCID] interface.
 func (g *gidToCIDIdentity) CID(gid glyph.ID) type1.CID {
 	return type1.CID(gid)
 }
 
+// ROS implements the [GIDToCID] interface.
 func (g *gidToCIDIdentity) ROS() *type1.CIDSystemInfo {
 	return &type1.CIDSystemInfo{
 		Registry:   "Adobe",
@@ -267,70 +291,11 @@ func (g *gidToCIDIdentity) ROS() *type1.CIDSystemInfo {
 	}
 }
 
+// GIDToCID implements the [GIDToCID] interface.
 func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []type1.CID {
 	res := make([]type1.CID, numGlyph)
 	for i := range res {
 		res[i] = type1.CID(i)
 	}
 	return res
-}
-
-// Old versions ==============================================================
-
-// TODO(voss): remove
-type CIDEncoderOld interface {
-	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-
-	Encoding() []Record
-	CIDSystemInfo() *type1.CIDSystemInfo
-}
-
-// TODO(voss): remove
-type Record struct {
-	Code charcode.CharCode
-	CID  type1.CID
-	GID  glyph.ID
-	Text []rune
-}
-
-// TODO(voss): remove
-func NewCIDEncoderOld() CIDEncoderOld {
-	enc := &defaultCIDEncoderOld{
-		used: make(map[glyph.ID]bool),
-		text: make(map[type1.CID][]rune),
-	}
-	return enc
-}
-
-// TODO(voss): remove
-type defaultCIDEncoderOld struct {
-	used map[glyph.ID]bool
-	text map[type1.CID][]rune
-}
-
-func (enc *defaultCIDEncoderOld) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	enc.used[gid] = true
-	enc.text[type1.CID(gid)] = rr
-	return append(s, byte(gid>>8), byte(gid))
-}
-
-func (enc *defaultCIDEncoderOld) Encoding() []Record {
-	var encs []Record
-	for gid := range enc.used {
-		cid := type1.CID(gid)
-		encs = append(encs, Record{charcode.CharCode(gid), cid, gid, enc.text[cid]})
-	}
-	sort.Slice(encs, func(i, j int) bool {
-		return encs[i].Code < encs[j].Code
-	})
-	return encs
-}
-
-func (enc *defaultCIDEncoderOld) CIDSystemInfo() *type1.CIDSystemInfo {
-	// TODO(voss): is this right?
-	return &type1.CIDSystemInfo{
-		Registry:   "Adobe",
-		Ordering:   "Identity",
-		Supplement: 0,
-	}
 }

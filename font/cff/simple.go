@@ -292,7 +292,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
 
-	isSymbolic := true // TODO(voss): check this
+	isSymbolic := true // TODO(voss): try to set this correctly?
 
 	fd := &font.Descriptor{
 		FontName:     fontName,

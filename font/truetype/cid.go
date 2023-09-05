@@ -114,6 +114,11 @@ func NewComposite(info *sfnt.Font, opt *FontOptions) (*FontComposite, error) {
 	return res, nil
 }
 
+// Layout implements the [font.Font] interface.
+func (f *FontComposite) Layout(s string, ptSize float64) glyph.Seq {
+	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+}
+
 // Embed implements the [font.Font] interface.
 func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
@@ -130,11 +135,6 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	}
 	w.AutoClose(res)
 	return res, nil
-}
-
-// Layout implements the [font.Font] interface.
-func (f *FontComposite) Layout(s string, ptSize float64) glyph.Seq {
-	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedCID struct {
@@ -286,7 +286,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := true // TODO(voss): set this correctly
+	isSymbolic := !font.IsStandardLatin(ttf)
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
@@ -436,6 +436,8 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 	if !ok {
 		return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
 	}
+	// Most TrueType tables will be missing, so we fill in information from
+	// the font descriptor instead.
 	if ttf.FamilyName == "" {
 		ttf.FamilyName = dicts.FontDescriptor.FontFamily
 	}

@@ -31,11 +31,13 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 )
 
+// FontSample is an example of a font of the given [EmbeddingType].
 type FontSample struct {
 	Font font.Font
 	Type font.EmbeddingType
 }
 
+// MakeFonts generates a list of different fonts for testing.
 func MakeFonts() ([]FontSample, error) {
 	var res []FontSample
 	var F font.Font
@@ -116,7 +118,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.CFFComposite})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewCFFComposite(otf, language.English)
+	F, err = opentype.NewCFFComposite(otf, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +150,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.CFFComposite})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewCFFComposite(otf, language.English)
+	F, err = opentype.NewCFFComposite(otf, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +168,7 @@ func MakeFonts() ([]FontSample, error) {
 	res = append(res, FontSample{F, font.TrueTypeComposite})
 
 	// ... or using an OpenType wrapper
-	F, err = opentype.NewGlyfComposite(ttf, language.English)
+	F, err = opentype.NewGlyfComposite(ttf, nil)
 	if err != nil {
 		return nil, err
 	}

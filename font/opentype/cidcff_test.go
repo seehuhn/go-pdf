@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/type1"
@@ -45,10 +46,11 @@ func TestRoundTripCFFComposite(t *testing.T) {
 		Ordering:   "Sonderbar",
 		Supplement: 13,
 	}
-	cmap := make(map[charcode.CharCode]type1.CID, 8)
+	cmapData := make(map[charcode.CharCode]type1.CID, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
-		cmap[code] = type1.CID(2*code + 1)
+		cmapData[code] = type1.CID(2*code + 1)
 	}
+	cmapInfo := cmap.New(ros, cs, cmapData)
 	m := make(map[charcode.CharCode][]rune, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
 		m[code] = []rune{'X', '0' + rune(code)}
@@ -57,9 +59,7 @@ func TestRoundTripCFFComposite(t *testing.T) {
 	info1 := &EmbedInfoCFFComposite{
 		Font:      otf,
 		SubsetTag: "ABCDEF",
-		CS:        cs,
-		ROS:       ros,
-		CMap:      cmap,
+		CMap:      cmapInfo,
 		ToUnicode: toUnicode,
 	}
 
@@ -100,9 +100,6 @@ func TestRoundTripCFFComposite(t *testing.T) {
 		// Description and License are stored in the "name" table.
 		font.Description = ""
 		font.License = ""
-
-		// TODO(voss): make this match, and ignore font.CMap instead
-		font.CMapTable = nil
 
 		// The floating point numbers in the glyphs may be represented differently.
 		// Let's hope the Glyphs are ok.

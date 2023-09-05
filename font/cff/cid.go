@@ -166,10 +166,9 @@ func (f *embeddedComposite) Close() error {
 	subsetGID := f.Encoder.UsedGIDs()
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
-		return fmt.Errorf("OpenType font subset: %w", err)
+		return fmt.Errorf("OpenType/CFF font subset: %w", err)
 	}
 	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
-	subsetCFF := subsetOTF.AsCFF().Clone()
 
 	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
 	gidToCID := make([]type1.CID, subsetOTF.NumGlyphs())
@@ -194,6 +193,7 @@ func (f *embeddedComposite) Close() error {
 			break
 		}
 	}
+	subsetCFF := subsetOTF.AsCFF().Clone()
 	mustUseCID := len(subsetCFF.Private) > 1
 	if isIdentity && !mustUseCID { // Make the font non-CID-keyed.
 		subsetCFF.Encoding = cff.StandardEncoding(subsetCFF.Glyphs)
@@ -295,7 +295,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := true // TODO(voss): set this correctly
+	isSymbolic := true // TODO(voss): try to set this correctly
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference

@@ -277,7 +277,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
 
-	isSymbolic := true // TODO(voss): check this
+	isSymbolic := !font.IsStandardLatin(otf)
 
 	fd := &font.Descriptor{
 		FontName:     fontName,

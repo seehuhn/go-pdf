@@ -24,29 +24,6 @@ import (
 
 const subsetModulus = 26 * 26 * 26 * 26 * 26 * 26
 
-// TagOld constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe
-// a subset of glyphs of a font.  This is used for the /BaseFont entry in PDF
-// Font dictionaries and the /FontName entry in FontDescriptor dictionaries.
-//
-// TODO(voss): remove
-func TagOld(gg []Glyph, origNumGlyphs int) string {
-	// mix all the information into a single uint32
-	X := uint32(origNumGlyphs)
-	for _, g := range gg {
-		// 11 is the largest integer smaller than `1<<32 / subsetModulus` which
-		// is relatively prime to 26.
-		X = (X*11 + uint32(g.OrigGID)) % subsetModulus
-	}
-
-	// convert to a string of six capital letters
-	var buf [6]byte
-	for i := range buf {
-		buf[i] = 'A' + byte(X%26)
-		X /= 26
-	}
-	return string(buf[:])
-}
-
 // Tag constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe
 // a subset of glyphs of a font.  This is used for the /BaseFont entry in PDF
 // Font dictionaries and the /FontName entry in FontDescriptor dictionaries.

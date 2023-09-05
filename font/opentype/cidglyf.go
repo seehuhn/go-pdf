@@ -35,9 +35,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
@@ -49,12 +47,35 @@ type FontGlyfComposite struct {
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
+
+	makeGIDToCID func() cmap.GIDToCID
+	makeEncoder  func(cmap.GIDToCID) cmap.Encoder
+}
+
+var defaultFontOptionsGlyf = FontOptions{
+	Language:     language.Und,
+	MakeGIDToCID: cmap.NewSequentialGIDToCID,
+	MakeEncoder:  cmap.NewIdentityEncoder,
 }
 
 // NewGlyfComposite creates a new composite OpenType/glyf font.
-func NewGlyfComposite(info *sfnt.Font, loc language.Tag) (*FontGlyfComposite, error) {
+func NewGlyfComposite(info *sfnt.Font, opt *FontOptions) (*FontGlyfComposite, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
+	}
+
+	if opt == nil {
+		opt = &defaultFontOptionsGlyf
+	}
+	loc := opt.Language
+
+	makeGIDToCID := opt.MakeGIDToCID
+	if makeGIDToCID == nil {
+		makeGIDToCID = defaultFontOptionsGlyf.MakeGIDToCID
+	}
+	makeEncoder := opt.MakeEncoder
+	if makeEncoder == nil {
+		makeEncoder = defaultFontOptionsGlyf.MakeEncoder
 	}
 
 	geometry := &font.Geometry{
@@ -75,28 +96,14 @@ func NewGlyfComposite(info *sfnt.Font, loc language.Tag) (*FontGlyfComposite, er
 	}
 
 	res := &FontGlyfComposite{
-		otf:         info,
-		cmap:        cmap,
-		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
-		Geometry:    geometry,
+		otf:          info,
+		cmap:         cmap,
+		gsubLookups:  info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
+		gposLookups:  info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		Geometry:     geometry,
+		makeGIDToCID: makeGIDToCID,
+		makeEncoder:  makeEncoder,
 	}
-	return res, nil
-}
-
-// Embed implements the [font.Font] interface.
-func (f *FontGlyfComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
-	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
-	if err != nil {
-		return nil, err
-	}
-	res := &embeddedGlyfComposite{
-		FontGlyfComposite: f,
-		w:                 w,
-		Resource:          pdf.Resource{Ref: w.Alloc(), Name: resName},
-		CIDEncoderOld:     cmap.NewCIDEncoderOld(),
-	}
-	w.AutoClose(res)
 	return res, nil
 }
 
@@ -105,12 +112,32 @@ func (f *FontGlyfComposite) Layout(s string, ptSize float64) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
+// Embed implements the [font.Font] interface.
+func (f *FontGlyfComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
+	if err != nil {
+		return nil, err
+	}
+	gidToCID := f.makeGIDToCID()
+	res := &embeddedGlyfComposite{
+		FontGlyfComposite: f,
+		w:                 w,
+		Resource:          pdf.Resource{Ref: w.Alloc(), Name: resName},
+		GIDToCID:          gidToCID,
+		Encoder:           f.makeEncoder(gidToCID),
+	}
+	w.AutoClose(res)
+	return res, nil
+}
+
 type embeddedGlyfComposite struct {
 	*FontGlyfComposite
 	w pdf.Putter
 	pdf.Resource
 
-	cmap.CIDEncoderOld
+	cmap.GIDToCID
+	cmap.Encoder
+
 	closed bool
 }
 
@@ -120,43 +147,51 @@ func (f *embeddedGlyfComposite) Close() error {
 	}
 	f.closed = true
 
+	origOTF := f.otf.Clone()
+	origOTF.CMapTable = nil
+	origOTF.Gdef = nil
+	origOTF.Gsub = nil
+	origOTF.Gpos = nil
+
 	// subset the font
-	encoding := f.CIDEncoderOld.Encoding()
-	CIDSystemInfo := f.CIDEncoderOld.CIDSystemInfo()
-	var ss []subset.Glyph
-	ss = append(ss, subset.Glyph{OrigGID: 0, CID: 0})
-	for _, p := range encoding {
-		ss = append(ss, subset.Glyph{OrigGID: p.GID, CID: p.CID})
-	}
-	otfSubset, err := subset.CID(f.otf, ss, CIDSystemInfo)
+	subsetGID := f.Encoder.UsedGIDs()
+	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
-		return fmt.Errorf("font subset: %w", err)
+		return fmt.Errorf("TrueType font subset: %w", err)
 	}
-	subsetTag := subset.TagOld(ss, f.otf.NumGlyphs())
+	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 
-	cmap := make(map[charcode.CharCode]type1.CID)
-	for _, s := range ss {
-		cmap[charcode.CharCode(s.CID)] = s.CID
-	}
+	ros := f.ROS()
+	cs := f.CodeSpaceRange()
+	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
 
-	CID2GID := make([]glyph.ID, f.otf.NumGlyphs())
-	for subsetGID, s := range ss {
-		CID2GID[s.CID] = glyph.ID(subsetGID)
-	}
+	cmapData := f.CMap()
+	cmapInfo := cmap.New(ros, cs, cmapData)
 
-	m := make(map[charcode.CharCode][]rune)
-	for _, e := range encoding {
-		m[charcode.CharCode(e.CID)] = e.Text
+	//  The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
+	//  from CIDs to glyphs.
+	m := make(map[glyph.ID]type1.CID)
+	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
+	for origGID, cid := range origGIDToCID {
+		m[glyph.ID(origGID)] = cid
 	}
-	toUnicode := tounicode.FromMapping(charcode.UCS2, m)
+	var maxCID type1.CID
+	for _, origGID := range subsetGID {
+		cid := m[origGID]
+		if cid > maxCID {
+			maxCID = cid
+		}
+	}
+	cidToGID := make([]glyph.ID, maxCID+1)
+	for subsetGID, origGID := range subsetGID {
+		cidToGID[m[origGID]] = glyph.ID(subsetGID)
+	}
 
 	info := EmbedInfoGlyfComposite{
-		Font:      otfSubset,
+		Font:      subsetOTF,
 		SubsetTag: subsetTag,
-		CS:        charcode.UCS2,
-		ROS:       CIDSystemInfo,
-		CMap:      cmap,
-		CID2GID:   CID2GID,
+		CMap:      cmapInfo,
+		CIDToGID:  cidToGID,
 		ToUnicode: toUnicode,
 	}
 	return info.Embed(f.w, f.Ref)
@@ -171,11 +206,9 @@ type EmbedInfoGlyfComposite struct {
 	// or the empty string if this is the full font.
 	SubsetTag string
 
-	CS   charcode.CodeSpaceRange
-	ROS  *type1.CIDSystemInfo
-	CMap map[charcode.CharCode]type1.CID
+	CMap *cmap.Info
 
-	CID2GID []glyph.ID
+	CIDToGID []glyph.ID
 
 	ForceBold bool
 
@@ -208,7 +241,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	}
 
 	// make a PDF CMap
-	cmapInfo := cmap.New(info.ROS, info.CS, info.CMap)
+	cmapInfo := info.CMap
 	var encoding pdf.Object
 	if cmap.IsPredefined(cmapInfo) {
 		encoding = pdf.Name(cmapInfo.Name)
@@ -220,15 +253,15 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 
 	var ww []font.CIDWidth
 	widths := outlines.Widths
-	for cid, gid := range info.CID2GID {
+	for cid, gid := range info.CIDToGID {
 		ww = append(ww, font.CIDWidth{CID: type1.CID(cid), GlyphWidth: widths[gid]})
 	}
-	DW, W := font.EncodeCIDWidths(ww, otf.UnitsPerEm)
+	DW, W := font.EncodeCIDWidths(ww, unitsPerEm)
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true
-	for cid, gid := range info.CID2GID {
-		if cid != int(gid) {
+	for cid, gid := range info.CIDToGID {
+		if int(gid) != cid && gid != 0 {
 			isIdentity = false
 			break
 		}
@@ -248,7 +281,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := !isStandardLatin(otf)
+	isSymbolic := !font.IsStandardLatin(otf)
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
@@ -268,9 +301,9 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	}
 
 	ROS := pdf.Dict{
-		"Registry":   pdf.String(info.ROS.Registry),
-		"Ordering":   pdf.String(info.ROS.Ordering),
-		"Supplement": pdf.Integer(info.ROS.Supplement),
+		"Registry":   pdf.String(info.CMap.ROS.Registry),
+		"Ordering":   pdf.String(info.CMap.ROS.Ordering),
+		"Supplement": pdf.Integer(info.CMap.ROS.Supplement),
 	}
 
 	cidFontDict := pdf.Dict{
@@ -285,7 +318,6 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 		cidFontDict["DW"] = DW
 	}
 	if W != nil {
-		// TODO(voss): use an indirect object?
 		cidFontDict["W"] = W
 	}
 
@@ -355,8 +387,8 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 		if err != nil {
 			return err
 		}
-		cid2gid := make([]byte, 2*len(info.CID2GID))
-		for cid, gid := range info.CID2GID {
+		cid2gid := make([]byte, 2*len(info.CIDToGID))
+		for cid, gid := range info.CIDToGID {
 			cid2gid[2*cid] = byte(gid >> 8)
 			cid2gid[2*cid+1] = byte(gid)
 		}
@@ -425,23 +457,7 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 	if err != nil {
 		return nil, err
 	}
-	var ROS *type1.CIDSystemInfo
-	if rosDict, _ := pdf.GetDict(r, dicts.CIDFontDict["CIDSystemInfo"]); rosDict != nil {
-		registry, _ := pdf.GetString(r, rosDict["Registry"])
-		ordering, _ := pdf.GetString(r, rosDict["Ordering"])
-		supplement, _ := pdf.GetInteger(r, rosDict["Supplement"])
-		ROS = &type1.CIDSystemInfo{
-			Registry:   string(registry),
-			Ordering:   string(ordering),
-			Supplement: int32(supplement),
-		}
-	}
-	if ROS == nil {
-		ROS = cmap.ROS
-	}
-	res.CS = cmap.CS
-	res.ROS = ROS
-	res.CMap = cmap.GetMapping()
+	res.CMap = cmap
 
 	CID2GIDObj, err := pdf.Resolve(r, dicts.CIDFontDict["CIDToGIDMap"])
 	if err != nil {
@@ -452,29 +468,25 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 		if CID2GID != "Identity" {
 			return nil, fmt.Errorf("unsupported CIDToGIDMap: %q", CID2GID)
 		}
-		var maxCID type1.CID
-		for _, cid := range res.CMap {
-			maxCID = max(maxCID, cid)
-		}
-		res.CID2GID = make([]glyph.ID, maxCID+1)
-		for i := range res.CID2GID {
-			res.CID2GID[i] = glyph.ID(i)
+		res.CIDToGID = make([]glyph.ID, cmap.MaxCID()+1)
+		for i := range res.CIDToGID {
+			res.CIDToGID[i] = glyph.ID(i)
 		}
 	case *pdf.Stream:
 		in, err := pdf.DecodeStream(r, CID2GID, 0)
 		if err != nil {
 			return nil, err
 		}
-		cid2gidData, err := io.ReadAll(in)
-		if err == nil && len(cid2gidData)%2 != 0 {
+		cidToGIDData, err := io.ReadAll(in)
+		if err == nil && len(cidToGIDData)%2 != 0 {
 			err = fmt.Errorf("odd length CIDToGIDMap")
 		}
 		if err != nil {
 			return nil, err
 		}
-		res.CID2GID = make([]glyph.ID, len(cid2gidData)/2)
-		for i := range res.CID2GID {
-			res.CID2GID[i] = glyph.ID(cid2gidData[2*i])<<8 | glyph.ID(cid2gidData[2*i+1])
+		res.CIDToGID = make([]glyph.ID, len(cidToGIDData)/2)
+		for i := range res.CIDToGID {
+			res.CIDToGID[i] = glyph.ID(cidToGIDData[2*i])<<8 | glyph.ID(cidToGIDData[2*i+1])
 		}
 	}
 
@@ -487,16 +499,4 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 	res.ForceBold = dicts.FontDescriptor.ForceBold
 
 	return res, nil
-}
-
-// isStandardLatin returns true if all glyphs are in the Adobe Standard Latin
-// character set.
-func isStandardLatin(f *sfnt.Font) bool {
-	glyphNames := f.MakeGlyphNames()
-	for _, name := range glyphNames {
-		if !pdfenc.IsStandardLatin[name] {
-			return false
-		}
-	}
-	return true
 }
