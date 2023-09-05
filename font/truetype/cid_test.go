@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/type1"
@@ -45,10 +46,11 @@ func TestRoundTripComposite(t *testing.T) {
 		Ordering:   "Sonderbar",
 		Supplement: 13,
 	}
-	cmap := make(map[charcode.CharCode]type1.CID, 8)
+	cmapData := make(map[charcode.CharCode]type1.CID, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
-		cmap[code] = type1.CID(2*code + 1)
+		cmapData[code] = type1.CID(2*code + 1)
 	}
+	cmapInfo := cmap.New(ros, cs, cmapData)
 	m := make(map[charcode.CharCode][]rune, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
 		m[code] = []rune{'X', '0' + rune(code)}
@@ -58,9 +60,7 @@ func TestRoundTripComposite(t *testing.T) {
 	info1 := &EmbedInfoComposite{
 		Font:      ttf,
 		SubsetTag: "AAAAAA",
-		CS:        cs,
-		ROS:       ros,
-		CMap:      cmap,
+		CMap:      cmapInfo,
 		CID2GID:   []glyph.ID{0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8},
 		ToUnicode: toUnicode,
 		IsAllCap:  true, // just for testing

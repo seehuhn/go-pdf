@@ -62,7 +62,7 @@ type FontOptions struct {
 
 var defaultFontOptions = FontOptions{
 	Language:     language.Und,
-	MakeGIDToCID: cmap.NewGIDToCIDIdentity,
+	MakeGIDToCID: cmap.NewIdentityGIDToCID,
 	MakeEncoder:  cmap.NewIdentityEncoder,
 }
 
@@ -166,10 +166,11 @@ func (f *embeddedComposite) Close() error {
 	subsetGID := f.Encoder.UsedGIDs()
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
-		return fmt.Errorf("font subset: %w", err)
+		return fmt.Errorf("OpenType font subset: %w", err)
 	}
 	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
-	cffFont := subsetOTF.AsCFF().Clone()
+	subsetCFF := subsetOTF.AsCFF().Clone()
+
 	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
 	gidToCID := make([]type1.CID, subsetOTF.NumGlyphs())
 	for i, gid := range subsetGID {
@@ -179,6 +180,9 @@ func (f *embeddedComposite) Close() error {
 	ros := f.ROS()
 	cs := f.CodeSpaceRange()
 	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
+
+	cmapData := f.CMap()
+	cmapInfo := cmap.New(ros, cs, cmapData)
 
 	// If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 	// then the `charset` table in the CFF font describes the mapping from CIDs
@@ -190,22 +194,19 @@ func (f *embeddedComposite) Close() error {
 			break
 		}
 	}
-	mustUseCID := len(cffFont.Private) > 1
+	mustUseCID := len(subsetCFF.Private) > 1
 	if isIdentity && !mustUseCID { // Make the font non-CID-keyed.
-		cffFont.Encoding = cff.StandardEncoding(cffFont.Glyphs)
-		cffFont.ROS = nil
-		cffFont.GIDToCID = nil
+		subsetCFF.Encoding = cff.StandardEncoding(subsetCFF.Glyphs)
+		subsetCFF.ROS = nil
+		subsetCFF.GIDToCID = nil
 	} else { // Make the font CID-keyed.
-		cffFont.Encoding = nil
-		cffFont.ROS = ros
-		cffFont.GIDToCID = gidToCID
+		subsetCFF.Encoding = nil
+		subsetCFF.ROS = ros
+		subsetCFF.GIDToCID = gidToCID
 	}
 
-	cmapData := f.CMap()
-	cmapInfo := cmap.New(ros, cs, cmapData)
-
 	info := EmbedInfoComposite{
-		Font:      cffFont,
+		Font:      subsetCFF,
 		SubsetTag: subsetTag,
 		CMap:      cmapInfo,
 		ToUnicode: toUnicode,
@@ -220,7 +221,7 @@ func (f *embeddedComposite) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-// EmbedInfoComposite contains the information needed to embed a CFF font as a composite PDF font.
+// EmbedInfoComposite is the information needed to embed a CFF font as a composite PDF font.
 type EmbedInfoComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *cff.Font
@@ -246,7 +247,7 @@ type EmbedInfoComposite struct {
 	ToUnicode *tounicode.Info
 }
 
-// Embed writes the PDF objects needed to embed the font into the PDF file.
+// Embed adds a composite CFF font to a PDF file.
 // This is the reverse of [ExtractComposite]
 func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
@@ -256,8 +257,6 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 
 	cff := info.Font
 
-	// CidFontName shall be the value of the CIDFontName entry in the CIDFont program.
-	// The name may have a subset prefix if appropriate.
 	cidFontName := cff.FontInfo.FontName
 	if info.SubsetTag != "" {
 		cidFontName = info.SubsetTag + "+" + cidFontName
@@ -285,7 +284,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 			ww = append(ww, font.CIDWidth{CID: type1.CID(gid), GlyphWidth: w})
 		}
 	}
-	DW, W := font.EncodeCIDWidths(ww, info.UnitsPerEm)
+	DW, W := font.EncodeCIDWidths(ww, unitsPerEm)
 
 	q := 1000 / float64(unitsPerEm)
 	bbox := cff.BBox()
@@ -371,7 +370,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 	err = cff.Write(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding CFF CIDFont %q: %w", cidFontName, err)
+		return fmt.Errorf("composite CFF font %q: %w", cidFontName, err)
 	}
 	err = fontFileStream.Close()
 	if err != nil {

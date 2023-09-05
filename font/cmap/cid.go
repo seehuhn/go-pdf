@@ -52,22 +52,26 @@ type Encoder interface {
 	UsedGIDs() []glyph.ID
 }
 
-// NewIdentityEncoder returns an encoder where CID values equal the
-// corresponding glyph ID.
+// NewIdentityEncoder returns an encoder where two-byte codes
+// are used directly as CID values.
 func NewIdentityEncoder(g2c GIDToCID) Encoder {
 	return &identityEncoder{
+		g2c:       g2c,
 		toUnicode: make(map[charcode.CharCode][]rune),
 		used:      make(map[glyph.ID]struct{}),
 	}
 }
 
 type identityEncoder struct {
+	g2c GIDToCID
+
 	toUnicode map[charcode.CharCode][]rune
 	used      map[glyph.ID]struct{}
 }
 
 func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	code := charcode.CharCode(gid)
+	cid := e.g2c.CID(gid)
+	code := charcode.CharCode(cid)
 	e.toUnicode[code] = rr
 	e.used[gid] = struct{}{}
 	return charcode.UCS2.Append(s, code)
@@ -210,7 +214,7 @@ type GIDToCID interface {
 	GIDToCID(numGlyph int) []type1.CID
 }
 
-func NewGIDToCIDSequential() GIDToCID {
+func NewSequentialGIDToCID() GIDToCID {
 	return &gidToCIDSequential{
 		data: make(map[glyph.ID]type1.CID),
 	}
@@ -245,7 +249,7 @@ func (g *gidToCIDSequential) GIDToCID(numGlyph int) []type1.CID {
 	return res
 }
 
-func NewGIDToCIDIdentity() GIDToCID {
+func NewIdentityGIDToCID() GIDToCID {
 	return &gidToCIDIdentity{}
 }
 

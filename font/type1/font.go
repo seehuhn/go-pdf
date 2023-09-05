@@ -213,16 +213,13 @@ func (e *embedded) Close() error {
 		}
 		psSubset.Encoding = encoding
 
-		var ss []subset.Glyph
+		var ss []glyph.ID
 		for origGid, name := range e.glyphNames {
 			if _, ok := psSubset.Outlines[name]; ok {
-				ss = append(ss, subset.Glyph{
-					OrigGID: glyph.ID(origGid),
-					CID:     type1.CID(len(ss)),
-				})
+				ss = append(ss, glyph.ID(origGid))
 			}
 		}
-		subsetTag = subset.TagOld(ss, psFont.NumGlyphs())
+		subsetTag = subset.Tag(ss, psFont.NumGlyphs())
 	} else {
 		psSubset = psFont
 	}

@@ -96,5 +96,8 @@ func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
 		}
 		return cff.NewComposite(info, opt)
 	}
-	return truetype.NewComposite(info, loc)
+	opt := &truetype.FontOptions{
+		Language: loc,
+	}
+	return truetype.NewComposite(info, opt)
 }

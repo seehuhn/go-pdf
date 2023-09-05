@@ -159,7 +159,7 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	F, err = truetype.NewComposite(ttf, language.English)
+	F, err = truetype.NewComposite(ttf, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -195,7 +195,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = truetype.NewComposite(ttf, language.English)
+			X, err = truetype.NewComposite(ttf, nil)
 			if err != nil {
 				return err
 			}

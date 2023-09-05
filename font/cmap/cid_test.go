@@ -28,7 +28,7 @@ import (
 
 func TestAppendEncoded(t *testing.T) {
 	// Create a new utf8Encoder instance
-	g2c := NewGIDToCIDIdentity()
+	g2c := NewIdentityGIDToCID()
 	e := NewUTF8Encoder(g2c).(*utf8Encoder)
 
 	// Append some encoded characters
@@ -76,7 +76,7 @@ func TestAppendEncoded(t *testing.T) {
 func TestUTF8(t *testing.T) {
 	// verify that the encoding equals standard UTF-8 encoding
 
-	enc := NewUTF8Encoder(NewGIDToCIDIdentity())
+	enc := NewUTF8Encoder(NewIdentityGIDToCID())
 
 	var buf pdf.String
 	for r := rune(0); r <= 0x10_FFFF; r++ {

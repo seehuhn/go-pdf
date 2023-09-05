@@ -46,7 +46,7 @@ func doit() error {
 
 	opt := &cff.FontOptions{
 		Language:     language.German,
-		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
+		MakeGIDToCID: cmap.NewIdentityGIDToCID,
 		MakeEncoder:  cmap.NewUTF8Encoder,
 	}
 	FF, err := cff.NewComposite(info, opt)
