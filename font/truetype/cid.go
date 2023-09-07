@@ -49,14 +49,14 @@ type FontComposite struct {
 	*font.Geometry
 
 	makeGIDToCID func() cmap.GIDToCID
-	makeEncoder  func(cmap.GIDToCID) cmap.Encoder
+	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
 // FontOptions allows to customize details of the font embedding.
 type FontOptions struct {
 	Language     language.Tag
 	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cmap.GIDToCID) cmap.Encoder
+	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
 var defaultFontOptions = FontOptions{
@@ -92,7 +92,7 @@ func NewComposite(info *sfnt.Font, opt *FontOptions) (*FontComposite, error) {
 
 		Ascent:             info.Ascent,
 		Descent:            info.Descent,
-		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		BaseLineDistance:   info.Ascent - info.Descent + info.LineGap,
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 	}
@@ -131,7 +131,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		GIDToCID:      gidToCID,
-		Encoder:       f.makeEncoder(gidToCID),
+		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -143,7 +143,7 @@ type embeddedCID struct {
 	pdf.Resource
 
 	cmap.GIDToCID
-	cmap.Encoder
+	cmap.CIDEncoder
 
 	closed bool
 }
@@ -161,7 +161,7 @@ func (f *embeddedCID) Close() error {
 	origTTF.Gpos = nil
 
 	// subset the font
-	subsetGID := f.Encoder.UsedGIDs()
+	subsetGID := f.CIDEncoder.UsedGIDs()
 	subsetTTF, err := origTTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("TrueType font subset: %w", err)
@@ -261,7 +261,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	for cid, gid := range info.CID2GID {
 		ww = append(ww, font.CIDWidth{CID: type1.CID(cid), GlyphWidth: widths[gid]})
 	}
-	DW, W := font.EncodeCIDWidths(ww, unitsPerEm)
+	DW, W := font.EncodeWidthsComposite(ww, unitsPerEm)
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true

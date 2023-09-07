@@ -48,14 +48,14 @@ type FontCFFComposite struct {
 	*font.Geometry
 
 	makeGIDToCID func() cmap.GIDToCID
-	makeEncoder  func(cmap.GIDToCID) cmap.Encoder
+	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
 // FontOptions allows to customize details of the font embedding.
 type FontOptions struct {
 	Language     language.Tag
 	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cmap.GIDToCID) cmap.Encoder
+	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
 var defaultFontOptionsCFF = FontOptions{
@@ -92,7 +92,7 @@ func NewCFFComposite(info *sfnt.Font, opt *FontOptions) (*FontCFFComposite, erro
 
 		Ascent:             info.Ascent,
 		Descent:            info.Descent,
-		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		BaseLineDistance:   info.Ascent - info.Descent + info.LineGap,
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 	}
@@ -126,7 +126,7 @@ func (f *FontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded,
 		w:                w,
 		Resource:         pdf.Resource{Ref: w.Alloc(), Name: resName},
 		GIDToCID:         gidToCID,
-		Encoder:          f.makeEncoder(gidToCID),
+		CIDEncoder:       f.makeEncoder(gidToCID),
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -143,7 +143,7 @@ type embeddedCFFComposite struct {
 	pdf.Resource
 
 	cmap.GIDToCID
-	cmap.Encoder
+	cmap.CIDEncoder
 
 	closed bool
 }
@@ -161,7 +161,7 @@ func (f *embeddedCFFComposite) Close() error {
 	origOTF.Gpos = nil
 
 	// subset the font
-	subsetGID := f.Encoder.UsedGIDs()
+	subsetGID := f.CIDEncoder.UsedGIDs()
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("OpenType/CFF font subset: %w", err)
@@ -169,7 +169,7 @@ func (f *embeddedCFFComposite) Close() error {
 	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 
 	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
-	gidToCID := make([]type1.CID, subsetOTF.NumGlyphs())
+	gidToCID := make([]type1.CID, len(subsetGID))
 	for i, gid := range subsetGID {
 		gidToCID[i] = origGIDToCID[gid]
 	}
@@ -191,16 +191,16 @@ func (f *embeddedCFFComposite) Close() error {
 			break
 		}
 	}
-	subsetCFF := subsetOTF.AsCFF().Clone()
-	mustUseCID := len(subsetCFF.Private) > 1
+	outlines := subsetOTF.Outlines.(*cff.Outlines)
+	mustUseCID := len(outlines.Private) > 1
 	if isIdentity && !mustUseCID { // Make the font non-CID-keyed.
-		subsetCFF.Encoding = cff.StandardEncoding(subsetCFF.Glyphs)
-		subsetCFF.ROS = nil
-		subsetCFF.GIDToCID = nil
+		outlines.Encoding = cff.StandardEncoding(outlines.Glyphs)
+		outlines.ROS = nil
+		outlines.GIDToCID = nil
 	} else { // Make the font CID-keyed.
-		subsetCFF.Encoding = nil
-		subsetCFF.ROS = ros
-		subsetCFF.GIDToCID = gidToCID
+		outlines.Encoding = nil
+		outlines.ROS = ros
+		outlines.GIDToCID = gidToCID
 	}
 
 	info := EmbedInfoCFFComposite{
@@ -230,7 +230,7 @@ type EmbedInfoCFFComposite struct {
 	ToUnicode *tounicode.Info
 }
 
-// Embed writes the PDF objects needed to embed the font.
+// Embed adds a composite OpenType/CFF font to a PDF file.
 // This is the reverse of [ExtractCFFComposite]
 func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
@@ -271,7 +271,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 			ww = append(ww, font.CIDWidth{CID: type1.CID(gid), GlyphWidth: w})
 		}
 	}
-	DW, W := font.EncodeCIDWidths(ww, otf.UnitsPerEm)
+	DW, W := font.EncodeWidthsComposite(ww, otf.UnitsPerEm)
 
 	q := 1000 / float64(unitsPerEm)
 	bbox := otf.BBox()
@@ -357,7 +357,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	}
 	err = otf.WriteOpenTypeCFFPDF(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding OpenType/CFF CIDFont %q: %w", cidFontName, err)
+		return fmt.Errorf("OpenType/CFF font program %q: %w", cidFontName, err)
 	}
 	err = fontFileStream.Close()
 	if err != nil {

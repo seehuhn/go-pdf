@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/postscript/psenc"
+	"seehuhn.de/go/postscript/type1/names"
 )
 
 // TestStandardEncoding tests that the PDF standard encoding is
@@ -28,6 +29,20 @@ func TestStandardEncoding(t *testing.T) {
 	for code, name := range StandardEncoding {
 		if string(name) != psenc.StandardEncoding[code] {
 			t.Errorf("StandardEncoding[%d] = %q != %q", code, name, psenc.StandardEncoding[code])
+		}
+	}
+}
+
+// TestStandardEncoding2 tests that all encoded entries in StandardEncoding
+// correspond to a single unicode rune.
+func TestStandardEncoding2(t *testing.T) {
+	for _, name := range StandardEncoding {
+		if name == ".notdef" {
+			continue
+		}
+		rr := names.ToUnicode(name, false)
+		if len(rr) != 1 {
+			t.Errorf("StandardEncoding[%q] = %q, which is not a single unicode rune", name, rr)
 		}
 	}
 }

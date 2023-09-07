@@ -176,9 +176,9 @@ func (f *fontTables) WriteHeader(title, fileName string) error {
 	gBody := f.bodyFont.GetGeometry()
 	gMono := f.monoFont.GetGeometry()
 	v1 := gBody.ToPDF16(12, gBody.Ascent)
-	v2 := gBody.ToPDF16(12, gBody.BaseLineSkip-gBody.Ascent) +
+	v2 := gBody.ToPDF16(12, gBody.BaseLineDistance-gBody.Ascent) +
 		gMono.ToPDF16(10, gMono.Ascent)
-	v3 := gMono.ToPDF16(10, gMono.BaseLineSkip-gMono.Ascent) +
+	v3 := gMono.ToPDF16(10, gMono.BaseLineDistance-gMono.Ascent) +
 		12
 	total := v1 + v2 + v3
 

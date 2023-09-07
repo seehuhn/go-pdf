@@ -604,7 +604,7 @@ func (l *layout) addFont(key string, F font.Embedded, ptSize float64) {
 	geom := F.GetGeometry()
 	ascent := geom.ToPDF16(ptSize, geom.Ascent)
 	descent := geom.ToPDF16(ptSize, geom.Descent)
-	baseLineSkip := geom.ToPDF16(ptSize, geom.BaseLineSkip)
+	baseLineSkip := geom.ToPDF16(ptSize, geom.BaseLineDistance)
 
 	l.F[key] = &pdfFont{F, ptSize, geom, ascent, descent, baseLineSkip}
 }

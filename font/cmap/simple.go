@@ -17,145 +17,113 @@
 package cmap
 
 import (
+	"math/bits"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-type SimpleEncoder interface {
-	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	Overflow() bool
-	Encoding() []glyph.ID
+// SimpleEncoder constructs and stores mappings from one-byte character codes
+// to GID values and from one-byte character codes to unicode strings.
+type SimpleEncoder struct {
+	cache map[key]byte
+	used  map[byte]struct{}
 }
 
-// TODO(voss): try different encoders
-
-func NewSimpleEncoder() SimpleEncoder {
-	enc := &keepAscii{
-		codeLookup: make(map[glyph.ID]byte),
-		codeIsUsed: make(map[byte]bool),
-	}
-	return enc
-}
-
-type keepAscii struct {
-	codeLookup map[glyph.ID]byte
-	codeIsUsed map[byte]bool
-}
-
-func (enc *keepAscii) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	c, alreadyAllocated := enc.codeLookup[gid]
-	if !alreadyAllocated {
-		c = enc.selectNewCharCode(gid, rr)
-		enc.codeLookup[gid] = c
-		enc.codeIsUsed[c] = true
-	}
-	return append(s, c)
-}
-
-func (enc *keepAscii) selectNewCharCode(gid glyph.ID, rr []rune) byte {
-	// Try to keep the PDF somewhat human-readable.
-	if len(rr) == 1 {
-		r := rr[0]
-		if r > 0 && r < 128 && !enc.codeIsUsed[byte(r)] {
-			return byte(r)
-		}
-	}
-
-	// If we need to allocate a new code, first try codes which don't clash
-	// with the ASCII range.
-	for c := 128; c < 256; c++ {
-		if !enc.codeIsUsed[byte(c)] {
-			return byte(c)
-		}
-	}
-
-	// If this isn't enough, use all codes available.
-	for c := 127; c > 0; c-- {
-		if !enc.codeIsUsed[byte(c)] {
-			return byte(c)
-		}
-	}
-
-	// In case we run out of codes, we map everything to zero here and
-	// return an error in [fontDict.Write].
-	return 0
-}
-
-func (enc *keepAscii) Overflow() bool {
-	return len(enc.codeLookup) > 256
-}
-
-func (enc *keepAscii) Encoding() []glyph.ID {
-	res := make([]glyph.ID, 256)
-	for gid, c := range enc.codeLookup {
-		res[c] = gid
+// NewSimpleEncoder allocates a new SimpleEncoder.
+func NewSimpleEncoder() *SimpleEncoder {
+	res := &SimpleEncoder{
+		cache: make(map[key]byte),
+		used:  make(map[byte]struct{}),
 	}
 	return res
 }
 
-func NewSimpleEncoderSequential() SimpleEncoder {
-	enc := &sequential{
-		codeLookup: make(map[glyph.ID]byte),
+// AppendEncoded appends the character code for the given glyph ID
+// to the given PDF string (allocating new codes as needed).
+// It also records the fact that the character code corresponds to the
+// given unicode string.
+func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	k := key{gid, string(rr)}
+
+	// Rules for choosing the code:
+	// 1. If the combination of `gid` and `rr` has previously been used,
+	//    then use the same code as before.
+	code, valid := e.cache[k]
+	if valid {
+		return append(s, code)
 	}
-	return enc
-}
 
-type sequential struct {
-	codeLookup map[glyph.ID]byte
-	numUsed    int
-}
-
-func (enc *sequential) AppendEncoded(s pdf.String, gid glyph.ID, _ []rune) pdf.String {
-	c, alreadyAllocated := enc.codeLookup[gid]
-	if !alreadyAllocated {
-		c = byte(enc.numUsed)
-		enc.numUsed++
-		enc.codeLookup[gid] = c
+	// 2. Allocate a new code base on the last rune in rr.
+	var r rune
+	if len(rr) > 0 {
+		r = rr[len(rr)-1]
 	}
-	return append(s, c)
+	code = e.allocateCode(r)
+	e.cache[k] = code
+	return append(s, code)
 }
 
-func (enc *sequential) Overflow() bool {
-	return enc.numUsed > 256
-}
-
-func (enc *sequential) Encoding() []glyph.ID {
-	res := make([]glyph.ID, 256)
-	for gid, c := range enc.codeLookup {
-		res[c] = gid
+func (e *SimpleEncoder) allocateCode(r rune) byte {
+	if len(e.cache) >= 256 {
+		// Once all codes are used, simply return 0 for everything.
+		return 0
 	}
-	return res
-}
-
-type frozenSimpleEncoder struct {
-	toCode   map[glyph.ID]byte
-	fromCode []glyph.ID
-}
-
-func NewFrozenSimpleEncoder(enc SimpleEncoder) frozenSimpleEncoder {
-	fromCode := enc.Encoding()
-	toCode := make(map[glyph.ID]byte)
-	for c, gid := range fromCode {
-		if gid == 0 {
+	bestScore := 1
+	bestCode := byte(0)
+	for codeInt := 0; codeInt < 256; codeInt++ {
+		code := byte(codeInt)
+		if _, alreadyUsed := e.used[code]; alreadyUsed {
 			continue
 		}
-		toCode[gid] = byte(c)
+		var score int
+		q := rune(code)
+		stdName := pdfenc.StandardEncoding[code]
+		if stdName == ".notdef" {
+			// fill up the unused slots first
+			score += 100
+		} else {
+			q = names.ToUnicode(stdName, false)[0]
+			if q == r {
+				// If r is in the standard encoding, and the corresponding
+				// code is still free, then use it.
+				bestCode = code
+				break
+			}
+		}
+		score += bits.TrailingZeros16(uint16(r) ^ uint16(q))
+		if score > bestScore {
+			bestScore = score
+			bestCode = code
+		}
 	}
-	return frozenSimpleEncoder{toCode: toCode, fromCode: fromCode}
+	e.used[bestCode] = struct{}{}
+	return bestCode
 }
 
-func (enc frozenSimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, _ []rune) pdf.String {
-	c, ok := enc.toCode[gid]
-	if !ok {
-		panic("glyphs cannot be added after a font has been closed")
+// Overflow returns true if the encoder has run out of codes.
+func (e *SimpleEncoder) Overflow() bool {
+	return len(e.cache) > 256
+}
+
+// Encoding returns the glyph ID corresponding to each character code.
+func (e *SimpleEncoder) Encoding() []glyph.ID {
+	res := make([]glyph.ID, 256)
+	for key, code := range e.cache {
+		res[code] = key.gid
 	}
-	return append(s, c)
+	return res
 }
 
-func (enc frozenSimpleEncoder) Overflow() bool {
-	return false
-}
-
-func (enc frozenSimpleEncoder) Encoding() []glyph.ID {
-	return enc.fromCode
+// ToUnicode returns the mapping from character codes to unicode strings.
+// This can be used to construct a PDF ToUnicode CMap.
+func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
+	toUnicode := make(map[charcode.CharCode][]rune)
+	for k, v := range e.cache {
+		toUnicode[charcode.CharCode(v)] = []rune(k.rr)
+	}
+	return toUnicode
 }

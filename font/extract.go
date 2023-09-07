@@ -75,6 +75,8 @@ func (t EmbeddingType) String() string {
 	}
 }
 
+// IsComposite returns true if the embedded font is a composite PDF font.
+// If the function returns false, the font is a simple PDF font.
 func (t EmbeddingType) IsComposite() bool {
 	switch t {
 	case CFFComposite, OpenTypeCFFComposite, TrueTypeComposite, OpenTypeGlyfComposite:
@@ -84,6 +86,7 @@ func (t EmbeddingType) IsComposite() bool {
 	}
 }
 
+// MustBe returns an error if the embedding type is not as expected.
 func (t EmbeddingType) MustBe(expected EmbeddingType) error {
 	if t != expected {
 		return fmt.Errorf("expected %q, got %q", expected, t)
@@ -91,6 +94,7 @@ func (t EmbeddingType) MustBe(expected EmbeddingType) error {
 	return nil
 }
 
+// Dicts collects all information about a font embedded in a PDF file.
 type Dicts struct {
 	FontDict       pdf.Dict
 	CIDFontDict    pdf.Dict
@@ -99,10 +103,11 @@ type Dicts struct {
 	Type           EmbeddingType
 }
 
-func ExtractDicts(r pdf.Getter, ref pdf.Object) (*Dicts, error) {
+// ExtractDicts reads all information about a font from a PDF file.
+func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 	res := &Dicts{}
 
-	fontDict, err := pdf.GetDictTyped(r, ref, "Font")
+	fontDict, err := pdf.GetDictTyped(r, fontDictRef, "Font")
 	if err != nil {
 		return nil, err
 	}

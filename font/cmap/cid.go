@@ -30,33 +30,35 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// Encoder constructs and stores the mappings from character codes
+// CIDEncoder constructs and stores mappings from character codes
 // to CID values and from character codes to unicode strings.
-type Encoder interface {
+type CIDEncoder interface {
 	// AppendEncoded appends the character code for the given glyph ID
 	// to the given PDF string (allocating new codes as needed).
-	// It also records that the character code
-	// used corresponds to the given unicode string.
+	// It also records the fact that the character code corresponds to the
+	// given unicode string.
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
-	// CMap returns the information needed to construct a PDF CMap.
+	// CMap returns the mapping from character codes to CID values.
+	// This can be used to construct a PDF CMap.
 	CMap() map[charcode.CharCode]type1.CID
 
 	// ToUnicode returns the mapping from character codes to unicode strings.
+	// This can be used to construct a PDF ToUnicode CMap.
 	ToUnicode() map[charcode.CharCode][]rune
 
-	// CodeSpaceRange returns the range of character codes which are
+	// CodeSpaceRange returns the range of character codes
 	// used by this encoder.
 	CodeSpaceRange() charcode.CodeSpaceRange
 
-	// Return the set of all GIDs which have been used with AppendEncoded.
-	// The returned slice is sorted and always includes GID 0.
+	// UsedGIDs is the set of all GIDs which have been used with AppendEncoded.
+	// The returned slice is sorted and always starts with GID 0.
 	UsedGIDs() []glyph.ID
 }
 
 // NewIdentityEncoder returns an encoder where two-byte codes
 // are used directly as CID values.
-func NewIdentityEncoder(g2c GIDToCID) Encoder {
+func NewIdentityEncoder(g2c GIDToCID) CIDEncoder {
 	return &identityEncoder{
 		g2c:       g2c,
 		toUnicode: make(map[charcode.CharCode][]rune),
@@ -107,7 +109,7 @@ func (e *identityEncoder) UsedGIDs() []glyph.ID {
 
 // NewUTF8Encoder returns an encoder where character codes equal the UTF-8
 // encoding of the text content, where possible.
-func NewUTF8Encoder(g2c GIDToCID) Encoder {
+func NewUTF8Encoder(g2c GIDToCID) CIDEncoder {
 	return &utf8Encoder{
 		g2c:   g2c,
 		cache: make(map[key]charcode.CharCode),

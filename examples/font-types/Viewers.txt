@@ -1,0 +1,19 @@
+ 1 = Type 1 Fonts
+ 2 = Builtin Fonts
+ 3 = Simple CFF Fonts
+ 4 = Simple CFF-based OpenType Fonts (PDF 1.6)
+ 5 = Simple TrueType Fonts (PDF 1.1)
+ 6 = Glyf-based OpenType Fonts (PDF 1.6)
+ 7 = Type 3 Fonts
+ 8 = Composite CFF Fonts (PDF 1.3)
+ 9 = Composite CFF-based OpenType Fonts (PDF 1.6)
+10 = Composite TrueType Fonts (PDF 1.3)
+11 = Composite Glyf-based OpenType Fonts (PDF 1.6)
+
+                       1  2  3  4  5  6  7  8  9 10 11
+---------------------+--+--+--+--+--+--+--+--+--+--+--
+Mac Preview          |  |  |  |  |  | X|  |  |  |  |
+Google Chrome        |  |  |  | X|  |  |  |  | X|  |
+Adobe Acrobat Reader |  |  |  |  |  |  |  |  |  |  |
+xpdf                 |  |  |  |  |  |  |  |  |  |  |
+gs                   |  |  |  |  |  |  |  |  |  |  |

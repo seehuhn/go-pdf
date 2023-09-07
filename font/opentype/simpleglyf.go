@@ -65,7 +65,7 @@ func NewGlyfSimple(info *sfnt.Font, loc language.Tag) (*FontGlyfSimple, error) {
 
 		Ascent:             info.Ascent,
 		Descent:            info.Descent,
-		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		BaseLineDistance:   info.Ascent - info.Descent + info.LineGap,
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 	}
@@ -96,7 +96,6 @@ func (f *FontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, e
 		w:              w,
 		Resource:       pdf.Resource{Ref: w.Alloc(), Name: resName},
 		SimpleEncoder:  cmap.NewSimpleEncoder(),
-		text:           map[glyph.ID][]rune{},
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -112,14 +111,8 @@ type embeddedSimpleGlyf struct {
 	w pdf.Putter
 	pdf.Resource
 
-	cmap.SimpleEncoder
-	text   map[glyph.ID][]rune
+	*cmap.SimpleEncoder
 	closed bool
-}
-
-func (f *embeddedSimpleGlyf) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	f.text[gid] = rr
-	return f.SimpleEncoder.AppendEncoded(s, gid, rr)
 }
 
 func (f *embeddedSimpleGlyf) Close() error {
@@ -132,7 +125,6 @@ func (f *embeddedSimpleGlyf) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			f.Name, f.otf.PostscriptName())
 	}
-	f.SimpleEncoder = cmap.NewFrozenSimpleEncoder(f.SimpleEncoder)
 	encoding := f.SimpleEncoder.Encoding()
 
 	ttf := f.otf.Clone()
@@ -164,14 +156,9 @@ func (f *embeddedSimpleGlyf) Close() error {
 		subsetEncoding[i] = subsetGid[gid]
 	}
 
-	m := make(map[charcode.CharCode][]rune)
-	for code, gid := range encoding {
-		if gid == 0 || len(f.text[gid]) == 0 {
-			continue
-		}
-		m[charcode.CharCode(code)] = f.text[gid]
-	}
+	m := f.SimpleEncoder.ToUnicode()
 	toUnicode := tounicode.FromMapping(charcode.Simple, m)
+	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
 	info := EmbedInfoGlyfSimple{
 		Font:      subsetOtf,
@@ -228,7 +215,7 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 	for i := range ww {
 		ww[i] = ttf.GlyphWidth(info.Encoding[i])
 	}
-	widthsInfo := font.CompressWidths(ww, unitsPerEm)
+	widthsInfo := font.EncodeWidthsSimple(ww, unitsPerEm)
 
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
 	// character codes to glyphs.

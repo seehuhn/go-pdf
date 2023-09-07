@@ -61,7 +61,7 @@ func main() {
 			page.TextSetFont(F, 12)
 			page.TextFirstLine(50, 250)
 			page.TextShow("PDF version " + V.String())
-			page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineSkip))
+			page.TextSecondLine(0, -geom.ToPDF16(12, geom.BaseLineDistance))
 			if enc == "enc" {
 				page.TextShow("encrypted text")
 			} else {

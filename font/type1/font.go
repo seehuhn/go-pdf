@@ -68,7 +68,7 @@ func New(psFont *type1.Font) (*Font, error) {
 
 		Ascent:             psFont.Ascent,
 		Descent:            psFont.Descent,
-		BaseLineSkip:       (psFont.Ascent - psFont.Descent) * 6 / 5, // TODO(voss)
+		BaseLineDistance:   (psFont.Ascent - psFont.Descent) * 6 / 5, // TODO(voss)
 		UnderlinePosition:  psFont.FontInfo.UnderlinePosition,
 		UnderlineThickness: psFont.FontInfo.UnderlineThickness,
 	}
@@ -170,7 +170,7 @@ type embedded struct {
 	w pdf.Putter
 	pdf.Resource
 
-	cmap.SimpleEncoder
+	*cmap.SimpleEncoder
 	closed bool
 }
 
@@ -184,7 +184,6 @@ func (e *embedded) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			e.Name, e.outlines.FontInfo.FontName)
 	}
-	e.SimpleEncoder = cmap.NewFrozenSimpleEncoder(e.SimpleEncoder)
 
 	encodingGid := e.Encoding()
 	encoding := make([]string, 256)
@@ -303,7 +302,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		for i := range ww {
 			ww[i] = psFont.GlyphInfo[info.Encoding[i]].WidthX
 		}
-		widthsInfo := font.CompressWidths(ww, psFont.UnitsPerEm)
+		widthsInfo := font.EncodeWidthsSimple(ww, psFont.UnitsPerEm)
 		fontDict["FirstChar"] = widthsInfo.FirstChar
 		fontDict["LastChar"] = widthsInfo.LastChar
 		fontDict["Widths"] = widthsRef

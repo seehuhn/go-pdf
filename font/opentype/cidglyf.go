@@ -49,7 +49,7 @@ type FontGlyfComposite struct {
 	*font.Geometry
 
 	makeGIDToCID func() cmap.GIDToCID
-	makeEncoder  func(cmap.GIDToCID) cmap.Encoder
+	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
 var defaultFontOptionsGlyf = FontOptions{
@@ -85,7 +85,7 @@ func NewGlyfComposite(info *sfnt.Font, opt *FontOptions) (*FontGlyfComposite, er
 
 		Ascent:             info.Ascent,
 		Descent:            info.Descent,
-		BaseLineSkip:       info.Ascent - info.Descent + info.LineGap,
+		BaseLineDistance:   info.Ascent - info.Descent + info.LineGap,
 		UnderlinePosition:  info.UnderlinePosition,
 		UnderlineThickness: info.UnderlineThickness,
 	}
@@ -124,7 +124,7 @@ func (f *FontGlyfComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded
 		w:                 w,
 		Resource:          pdf.Resource{Ref: w.Alloc(), Name: resName},
 		GIDToCID:          gidToCID,
-		Encoder:           f.makeEncoder(gidToCID),
+		CIDEncoder:        f.makeEncoder(gidToCID),
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -136,7 +136,7 @@ type embeddedGlyfComposite struct {
 	pdf.Resource
 
 	cmap.GIDToCID
-	cmap.Encoder
+	cmap.CIDEncoder
 
 	closed bool
 }
@@ -154,7 +154,7 @@ func (f *embeddedGlyfComposite) Close() error {
 	origOTF.Gpos = nil
 
 	// subset the font
-	subsetGID := f.Encoder.UsedGIDs()
+	subsetGID := f.CIDEncoder.UsedGIDs()
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("TrueType font subset: %w", err)
@@ -165,8 +165,7 @@ func (f *embeddedGlyfComposite) Close() error {
 	cs := f.CodeSpaceRange()
 	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
 
-	cmapData := f.CMap()
-	cmapInfo := cmap.New(ros, cs, cmapData)
+	cmapInfo := cmap.New(ros, cs, f.CMap())
 
 	//  The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
 	//  from CIDs to glyphs.
@@ -256,7 +255,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	for cid, gid := range info.CIDToGID {
 		ww = append(ww, font.CIDWidth{CID: type1.CID(cid), GlyphWidth: widths[gid]})
 	}
-	DW, W := font.EncodeCIDWidths(ww, unitsPerEm)
+	DW, W := font.EncodeWidthsComposite(ww, unitsPerEm)
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true

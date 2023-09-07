@@ -27,12 +27,14 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Geometry collects the various dimensions connected to a font and to
+// the individual glyphs.
 type Geometry struct {
 	UnitsPerEm uint16
 
 	Ascent             funit.Int16
 	Descent            funit.Int16 // negative
-	BaseLineSkip       funit.Int16 // TODO(voss): rename to "Leading"?
+	BaseLineDistance   funit.Int16
 	UnderlinePosition  funit.Float64
 	UnderlineThickness funit.Float64
 
@@ -40,22 +42,29 @@ type Geometry struct {
 	Widths       []funit.Int16
 }
 
+// GetGeometry returns the geometry of a font.
 func (g *Geometry) GetGeometry() *Geometry {
 	return g
 }
 
+// ToPDF converts an integer from font design units to PDF units.
 func (g *Geometry) ToPDF(fontSize float64, a funit.Int) float64 {
 	return float64(a) * fontSize / float64(g.UnitsPerEm)
 }
 
+// ToPDF16 converts an int16 from font design units to PDF units.
 func (g *Geometry) ToPDF16(fontSize float64, a funit.Int16) float64 {
 	return float64(a) * fontSize / float64(g.UnitsPerEm)
 }
 
+// FromPDF16 converts from PDF units (given as a float64) to an int16 in
+// font design units.
 func (g *Geometry) FromPDF16(fontSize float64, x float64) funit.Int16 {
 	return funit.Int16(math.Round(x / fontSize * float64(g.UnitsPerEm)))
 }
 
+// BoundingBox returns the bounding box of a glyph sequence,
+// in PDF units.
 func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 	var bbox funit.Rect
 	var xPos funit.Int
@@ -80,6 +89,7 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 	return res
 }
 
+// A Layouter can turn a string into a sequence of glyphs.
 type Layouter interface {
 	Layout(s string, ptSize float64) glyph.Seq
 }
@@ -88,7 +98,6 @@ type Layouter interface {
 type Font interface {
 	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error)
 	GetGeometry() *Geometry
-	Layouter // TODO(voss): remove?
 }
 
 // Embedded represents a font embedded in a PDF file.

@@ -28,14 +28,18 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-type widthInfo struct {
+// WidthInfo contains the FirstChar, LastChar and Widths entries of
+// a PDF font dictionary, as well as the MissingWidth entry of the
+// FontDescriptor dictionary.
+type WidthInfo struct {
 	FirstChar    pdf.Integer
 	LastChar     pdf.Integer
 	Widths       pdf.Array
 	MissingWidth pdf.Number
 }
 
-func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
+// EncodeWidthsSimple encodes the glyph width information for a simple PDF font.
+func EncodeWidthsSimple(ww []funit.Int16, unitsPerEm uint16) *WidthInfo {
 	q := 1000 / float64(unitsPerEm)
 
 	// find FirstChar and LastChar
@@ -73,7 +77,7 @@ func CompressWidths(ww []funit.Int16, unitsPerEm uint16) *widthInfo {
 		Widths[i] = pdf.Number(w.AsFloat(q))
 	}
 
-	return &widthInfo{
+	return &WidthInfo{
 		FirstChar:    pdf.Integer(FirstChar),
 		LastChar:     pdf.Integer(LastChar),
 		Widths:       Widths,
@@ -87,9 +91,9 @@ type CIDWidth struct {
 	GlyphWidth funit.Int16
 }
 
-// EncodeCIDWidths constructs the W and DW entries for a CIDFont dictionary.
+// EncodeWidthsComposite constructs the W and DW entries for a CIDFont dictionary.
 // This function modifies ww, sorting it by increasing CID.
-func EncodeCIDWidths(ww []CIDWidth, unitsPerEm uint16) (pdf.Integer, pdf.Array) {
+func EncodeWidthsComposite(ww []CIDWidth, unitsPerEm uint16) (pdf.Integer, pdf.Array) {
 	sort.Slice(ww, func(i, j int) bool {
 		return ww[i].CID < ww[j].CID
 	})

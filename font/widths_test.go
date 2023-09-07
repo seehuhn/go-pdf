@@ -97,7 +97,7 @@ func TestCompressWidths(t *testing.T) {
 					ww[i] = 600 + 2*funit.Int16(i)
 				}
 			}
-			info := CompressWidths(ww, u)
+			info := EncodeWidthsSimple(ww, u)
 
 			for i := 0; i < 256; i++ {
 				var w pdf.Object = info.MissingWidth
@@ -164,7 +164,7 @@ func TestEncodeWidths(t *testing.T) {
 				pos++
 			}
 
-			dw, w := EncodeCIDWidths(ww, 1000)
+			dw, w := EncodeWidthsComposite(ww, 1000)
 			if dw != 0 {
 				t.Errorf("dw=%v, want 0", dw)
 			}

@@ -80,9 +80,14 @@ func New(unitsPerEm uint16) *Font {
 		FontMatrix: m,
 		Glyphs:     map[string]*Glyph{},
 		Resources:  &pdf.Resources{},
-		glyphNames: []string{""}, // TODO(voss): is this right?
 		CMap:       map[rune]glyph.ID{},
 	}
+
+	// Gid 0 maps to the empty glyph name, because code outside this package
+	// uses gid 0 to indicate a missing glyph.  This is not a problem, because
+	// we don't accept empty glyph names in [Font.AddGlyph].
+	res.glyphNames = append(res.glyphNames, "")
+
 	return res
 }
 
@@ -122,7 +127,7 @@ func (f *Font) GetGeometry() *font.Geometry {
 		UnitsPerEm:         uint16(math.Round(1 / f.FontMatrix[0])),
 		Ascent:             f.Ascent,
 		Descent:            f.Descent,
-		BaseLineSkip:       f.BaseLineSkip,
+		BaseLineDistance:   f.BaseLineSkip,
 		UnderlinePosition:  f.UnderlinePosition,
 		UnderlineThickness: f.UnderlineThickness,
 		GlyphExtents:       glyphExtents,
@@ -156,7 +161,7 @@ type embedded struct {
 	w pdf.Putter
 	pdf.Resource
 
-	cmap.SimpleEncoder
+	*cmap.SimpleEncoder
 	closed bool
 }
 
@@ -170,7 +175,6 @@ func (e *embedded) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in Type 3 font %q",
 			e.Name)
 	}
-	e.SimpleEncoder = cmap.NewFrozenSimpleEncoder(e.SimpleEncoder)
 
 	encodingGid := e.Encoding()
 	encoding := make([]string, 256)
@@ -236,7 +240,7 @@ type EmbedInfo struct {
 	FontMatrix [6]float64
 
 	// Encoding (a slice of length 256) is the encoding vector used by the client.
-	// This is used to determine the `Encoding` entry of the PDF font dictionary.
+	// This is used to construct the `Encoding` entry of the PDF font dictionary.
 	Encoding []string
 
 	// ResName is the resource name for the font.
@@ -244,7 +248,7 @@ type EmbedInfo struct {
 	ResName pdf.Name
 
 	// Resources is the resource dictionary for the font.
-	Resources *pdf.Resources
+	Resources *pdf.Resources // TODO(voss): include the individual fields instead
 
 	ItalicAngle float64
 
