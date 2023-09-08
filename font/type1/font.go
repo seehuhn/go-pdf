@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
 )
@@ -321,8 +322,13 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			URy: bbox.URy.AsFloat(q),
 		}
 
-		// TODO(voss): correctly set the isSymbolic flag?
-		isSymbolic := true
+		isSymbolic := false
+		for name := range info.Font.GlyphInfo {
+			if name != ".notdef" && !pdfenc.IsStandardLatin[name] {
+				isSymbolic = true
+				break
+			}
+		}
 
 		fd := &font.Descriptor{
 			FontName:     fontName,

@@ -33,10 +33,6 @@ import (
 //
 // See section 9.6.1 and 9.6.5 of ISO 32000-2:2020.
 func DescribeEncodingType1(encoding, builtin []string) pdf.Object {
-	if len(encoding) != 256 || len(builtin) != 256 {
-		panic("unreachable") // TODO: remove
-	}
-
 	type cand struct {
 		name pdf.Object
 		enc  []string
@@ -82,10 +78,7 @@ func DescribeEncodingType1(encoding, builtin []string) pdf.Object {
 		newDesc["Differences"] = a
 
 		b := &bytes.Buffer{}
-		err := newDesc.PDF(b)
-		if err != nil {
-			panic(err)
-		}
+		newDesc.PDF(b)
 		if b.Len() < descLen {
 			desc = newDesc
 			descLen = b.Len()
