@@ -31,8 +31,8 @@ func (info *Info) Write(w io.Writer) error {
 
 const chunkSize = 100
 
-func singleChunks(x []Single) [][]Single {
-	var res [][]Single
+func singleChunks(x []SingleEntry) [][]SingleEntry {
+	var res [][]SingleEntry
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -43,8 +43,8 @@ func singleChunks(x []Single) [][]Single {
 	return res
 }
 
-func rangeChunks(x []Range) [][]Range {
-	var res [][]Range
+func rangeChunks(x []RangeEntry) [][]RangeEntry {
+	var res [][]RangeEntry
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -68,13 +68,13 @@ var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 		return fmt.Sprintf("<%02x>", x)
 	},
 	"SingleChunks": singleChunks,
-	"Single": func(cs charcode.CodeSpaceRange, s Single) string {
+	"Single": func(cs charcode.CodeSpaceRange, s SingleEntry) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
 		return fmt.Sprintf("<%x> %d", buf, s.Value)
 	},
 	"RangeChunks": rangeChunks,
-	"Range": func(cs charcode.CodeSpaceRange, s Range) string {
+	"Range": func(cs charcode.CodeSpaceRange, s RangeEntry) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)
 		last = cs.Append(last, s.Last)

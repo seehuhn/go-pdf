@@ -61,7 +61,7 @@ type FontOptions struct {
 var defaultFontOptionsCFF = FontOptions{
 	Language:     language.Und,
 	MakeGIDToCID: cmap.NewIdentityGIDToCID,
-	MakeEncoder:  cmap.NewIdentityEncoder,
+	MakeEncoder:  cmap.NewCIDEncoderIdentity,
 }
 
 // NewCFFComposite creates a new OpenType/CFF font for embedding in a PDF file as a composite font.
@@ -178,8 +178,7 @@ func (f *embeddedCFFComposite) Close() error {
 	cs := f.CodeSpaceRange()
 	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
 
-	cmapData := f.CMap()
-	cmapInfo := cmap.New(ros, cs, cmapData)
+	cmapInfo := f.CMap()
 
 	// If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
 	// then the `charset` table in the CFF font describes the mapping from CIDs
@@ -252,7 +251,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	// make a PDF CMap
 	cmapInfo := info.CMap
 	var encoding pdf.Object
-	if cmap.IsPredefined(cmapInfo) {
+	if cmapInfo.IsPredefined() {
 		encoding = pdf.Name(cmapInfo.Name)
 	} else {
 		encoding = w.Alloc()

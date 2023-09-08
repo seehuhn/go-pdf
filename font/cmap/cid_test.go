@@ -29,7 +29,7 @@ import (
 func TestAppendEncoded(t *testing.T) {
 	// Create a new utf8Encoder instance
 	g2c := NewIdentityGIDToCID()
-	e := NewUTF8Encoder(g2c).(*utf8Encoder)
+	e := NewCIDEncoderUTF8(g2c).(*utf8Encoder)
 
 	// Append some encoded characters
 	s := pdf.String{}
@@ -49,7 +49,7 @@ func TestAppendEncoded(t *testing.T) {
 	}
 
 	// Check that the cmap and tounicode maps are correct
-	expectedCMap := map[charcode.CharCode]type1.CID{
+	expectedMapping := map[charcode.CharCode]type1.CID{
 		runeToCode('A'):      1,
 		runeToCode('B'):      2,
 		runeToCode('C'):      3,
@@ -57,6 +57,7 @@ func TestAppendEncoded(t *testing.T) {
 		runeToCode('\uE000'): 4,
 		runeToCode('\uE001'): 5,
 	}
+	expectedCMap := New(g2c.ROS(), utf8cs, expectedMapping)
 	if !reflect.DeepEqual(e.CMap(), expectedCMap) {
 		t.Errorf("CMap returned %v, expected %v", e.CMap(), expectedCMap)
 	}
@@ -76,7 +77,7 @@ func TestAppendEncoded(t *testing.T) {
 func TestUTF8(t *testing.T) {
 	// verify that the encoding equals standard UTF-8 encoding
 
-	enc := NewUTF8Encoder(NewIdentityGIDToCID())
+	enc := NewCIDEncoderUTF8(NewIdentityGIDToCID())
 
 	var buf pdf.String
 	for r := rune(0); r <= 0x10_FFFF; r++ {

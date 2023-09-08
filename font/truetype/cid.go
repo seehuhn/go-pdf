@@ -62,7 +62,7 @@ type FontOptions struct {
 var defaultFontOptions = FontOptions{
 	Language:     language.Und,
 	MakeGIDToCID: cmap.NewSequentialGIDToCID,
-	MakeEncoder:  cmap.NewIdentityEncoder,
+	MakeEncoder:  cmap.NewCIDEncoderIdentity,
 }
 
 // NewComposite creates a new composite TrueType font.
@@ -168,12 +168,10 @@ func (f *embeddedCID) Close() error {
 	}
 	subsetTag := subset.Tag(subsetGID, origTTF.NumGlyphs())
 
-	ros := f.ROS()
 	cs := f.CodeSpaceRange()
 	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
 
-	cmapData := f.CMap()
-	cmapInfo := cmap.New(ros, cs, cmapData)
+	cmapInfo := f.CMap()
 
 	//  The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
 	//  from CIDs to glyphs.
@@ -248,7 +246,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	// make a CMap
 	cmapInfo := info.CMap
 	var encoding pdf.Object
-	if cmap.IsPredefined(cmapInfo) {
+	if cmapInfo.IsPredefined() {
 		encoding = pdf.Name(cmapInfo.Name)
 	} else {
 		encoding = w.Alloc()

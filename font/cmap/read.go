@@ -33,7 +33,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
 	}
 	switch obj := obj.(type) {
 	case pdf.Name:
-		r, err := OpenPredefined(string(obj))
+		r, err := openPredefined(string(obj))
 		if err != nil {
 			return nil, err
 		}
@@ -137,7 +137,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		if cid, ok := m.Dst.(postscript.Integer); !ok {
 			return nil, fmt.Errorf("invalid CID %v", m.Dst)
 		} else {
-			res.Singles = append(res.Singles, Single{
+			res.Singles = append(res.Singles, SingleEntry{
 				Code:  code,
 				Value: type1.CID(cid),
 			})
@@ -156,7 +156,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		if cid, ok := m.Dst.(postscript.Integer); !ok {
 			return nil, fmt.Errorf("invalid CID %v", m.Dst)
 		} else {
-			res.Ranges = append(res.Ranges, Range{
+			res.Ranges = append(res.Ranges, RangeEntry{
 				First: low,
 				Last:  high,
 				Value: type1.CID(cid),
@@ -165,19 +165,6 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	}
 
 	return res, nil
-}
-
-// ExtractRaw extract the raw PostScript data of a CMap from a PDF file.
-func ExtractRaw(r pdf.Getter, ref pdf.Object) (postscript.Dict, error) {
-	stream, err := pdf.GetStream(r, ref)
-	if err != nil {
-		return nil, err
-	}
-	cmapBody, err := pdf.DecodeStream(r, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-	return ReadRaw(cmapBody)
 }
 
 // ReadRaw reads the raw PostScript data of a CMap from an [io.Reader].

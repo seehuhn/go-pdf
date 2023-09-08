@@ -66,10 +66,10 @@ func TestMapping(t *testing.T) {
 }
 
 func TestMappingPredefined(t *testing.T) {
-	for _, name := range AllPredefined {
+	for _, name := range allPredefined {
 		name := name
 		t.Run(name, func(t *testing.T) {
-			r, err := OpenPredefined(name)
+			r, err := openPredefined(name)
 			if err != nil {
 				t.Fatal(err)
 			}

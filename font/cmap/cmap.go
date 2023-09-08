@@ -31,6 +31,7 @@ import (
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 
+// Info describes CMap file for embedding in a PDF file.
 type Info struct {
 	Name     string
 	Version  float64
@@ -39,21 +40,21 @@ type Info struct {
 	CSFile   charcode.CodeSpaceRange
 	WMode    int
 	UseCMap  string
-	Singles  []Single
-	Ranges   []Range
+	Singles  []SingleEntry
+	Ranges   []RangeEntry
 	Comments bool
 }
 
-// Single specifies that character code Code represents the given CID.
-type Single struct {
+// SingleEntry specifies that character code Code represents the given CID.
+type SingleEntry struct {
 	Code  charcode.CharCode
 	Value type1.CID
 }
 
-// Range describes a range of character codes with consecutive CIDs.
+// RangeEntry describes a range of character codes with consecutive CIDs.
 // First and Last are the first and last code points in the range.
 // Value is the CID of the first code point in the range.
-type Range struct {
+type RangeEntry struct {
 	First charcode.CharCode
 	Last  charcode.CharCode
 	Value type1.CID

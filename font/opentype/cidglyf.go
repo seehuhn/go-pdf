@@ -55,7 +55,7 @@ type FontGlyfComposite struct {
 var defaultFontOptionsGlyf = FontOptions{
 	Language:     language.Und,
 	MakeGIDToCID: cmap.NewSequentialGIDToCID,
-	MakeEncoder:  cmap.NewIdentityEncoder,
+	MakeEncoder:  cmap.NewCIDEncoderIdentity,
 }
 
 // NewGlyfComposite creates a new composite OpenType/glyf font.
@@ -161,11 +161,10 @@ func (f *embeddedGlyfComposite) Close() error {
 	}
 	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 
-	ros := f.ROS()
 	cs := f.CodeSpaceRange()
 	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
 
-	cmapInfo := cmap.New(ros, cs, f.CMap())
+	cmapInfo := f.CMap()
 
 	//  The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
 	//  from CIDs to glyphs.
@@ -242,7 +241,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	// make a PDF CMap
 	cmapInfo := info.CMap
 	var encoding pdf.Object
-	if cmap.IsPredefined(cmapInfo) {
+	if cmapInfo.IsPredefined() {
 		encoding = pdf.Name(cmapInfo.Name)
 	} else {
 		encoding = w.Alloc()

@@ -26,9 +26,9 @@ import (
 )
 
 func TestRoundTrip(t *testing.T) {
-	for _, name := range AllPredefined {
+	for _, name := range allPredefined {
 		t.Run(name, func(t *testing.T) {
-			r, err := OpenPredefined(name)
+			r, err := openPredefined(name)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -60,7 +60,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func FuzzCMap(f *testing.F) {
-	for _, name := range AllPredefined {
+	for _, name := range allPredefined {
 		raw, err := predefined.Open("predefined/" + name + ".gz")
 		if err != nil {
 			f.Fatal(err)

@@ -30,7 +30,7 @@ import (
 //go:embed predefined/*.gz
 var predefined embed.FS
 
-func OpenPredefined(name string) (io.ReadCloser, error) {
+func openPredefined(name string) (io.ReadCloser, error) {
 	fd, err := predefined.Open("predefined/" + name + ".gz")
 	if err != nil {
 		return nil, err
@@ -38,12 +38,12 @@ func OpenPredefined(name string) (io.ReadCloser, error) {
 	return gzip.NewReader(fd)
 }
 
-func IsPredefined(cmap *Info) bool {
-	_, ok := builtinCS[cmap.Name]
+func (info *Info) IsPredefined() bool {
+	_, ok := builtinCS[info.Name]
 	return ok
 }
 
-var AllPredefined = []string{
+var allPredefined = []string{
 	"78-EUC-H",
 	"78-EUC-V",
 	"78-H",

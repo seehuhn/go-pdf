@@ -40,8 +40,7 @@ type CIDEncoder interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
 	// CMap returns the mapping from character codes to CID values.
-	// This can be used to construct a PDF CMap.
-	CMap() map[charcode.CharCode]type1.CID
+	CMap() *Info
 
 	// ToUnicode returns the mapping from character codes to unicode strings.
 	// This can be used to construct a PDF ToUnicode CMap.
@@ -56,9 +55,9 @@ type CIDEncoder interface {
 	UsedGIDs() []glyph.ID
 }
 
-// NewIdentityEncoder returns an encoder where two-byte codes
+// NewCIDEncoderIdentity returns an encoder where two-byte codes
 // are used directly as CID values.
-func NewIdentityEncoder(g2c GIDToCID) CIDEncoder {
+func NewCIDEncoderIdentity(g2c GIDToCID) CIDEncoder {
 	return &identityEncoder{
 		g2c:       g2c,
 		toUnicode: make(map[charcode.CharCode][]rune),
@@ -81,12 +80,12 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 	return charcode.UCS2.Append(s, code)
 }
 
-func (e *identityEncoder) CMap() map[charcode.CharCode]type1.CID {
-	cmap := make(map[charcode.CharCode]type1.CID)
+func (e *identityEncoder) CMap() *Info {
+	m := make(map[charcode.CharCode]type1.CID)
 	for code := range e.toUnicode {
-		cmap[code] = type1.CID(code)
+		m[code] = type1.CID(code)
 	}
-	return cmap
+	return New(e.g2c.ROS(), e.CodeSpaceRange(), m)
 }
 
 func (e *identityEncoder) ToUnicode() map[charcode.CharCode][]rune {
@@ -107,9 +106,9 @@ func (e *identityEncoder) UsedGIDs() []glyph.ID {
 	return subset
 }
 
-// NewUTF8Encoder returns an encoder where character codes equal the UTF-8
+// NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
 // encoding of the text content, where possible.
-func NewUTF8Encoder(g2c GIDToCID) CIDEncoder {
+func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 	return &utf8Encoder{
 		g2c:   g2c,
 		cache: make(map[key]charcode.CharCode),
@@ -177,8 +176,8 @@ func runeToCode(r rune) charcode.CharCode {
 	return code
 }
 
-func (e *utf8Encoder) CMap() map[charcode.CharCode]type1.CID {
-	return e.cmap
+func (e *utf8Encoder) CMap() *Info {
+	return New(e.g2c.ROS(), e.CodeSpaceRange(), e.cmap)
 }
 
 func (e *utf8Encoder) ToUnicode() map[charcode.CharCode][]rune {

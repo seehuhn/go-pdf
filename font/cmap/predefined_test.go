@@ -42,12 +42,12 @@ func TestPredefined(t *testing.T) {
 	}
 	slices.Sort(allNames)
 
-	if d := cmp.Diff(allNames, AllPredefined); d != "" {
+	if d := cmp.Diff(allNames, allPredefined); d != "" {
 		t.Errorf("wrong names:\n%s", d)
 	}
 
 	for _, name := range allNames {
-		r, err := OpenPredefined(name)
+		r, err := openPredefined(name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,7 +78,7 @@ func TestPredefined(t *testing.T) {
 func TestConsistency(t *testing.T) {
 	names := maps.Keys(builtinCS)
 	slices.Sort(names)
-	if d := cmp.Diff(names, AllPredefined); d != "" {
+	if d := cmp.Diff(names, allPredefined); d != "" {
 		t.Errorf("wrong names:\n%s", d)
 	}
 }

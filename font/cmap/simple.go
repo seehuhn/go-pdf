@@ -69,7 +69,7 @@ func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf
 
 func (e *SimpleEncoder) allocateCode(r rune) byte {
 	if len(e.cache) >= 256 {
-		// Once all codes are used, simply return 0 for everything.
+		// Once all codes are used up, simply return 0 for everything.
 		return 0
 	}
 	bestScore := 1

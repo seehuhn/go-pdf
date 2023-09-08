@@ -70,12 +70,12 @@ func (info *Info) SetMapping(m map[charcode.CharCode]type1.CID) {
 	v := 0
 	for _, e := range ee {
 		if e == 0 {
-			info.Singles = append(info.Singles, Single{
+			info.Singles = append(info.Singles, SingleEntry{
 				Code:  entries[v].code,
 				Value: entries[v].value,
 			})
 		} else {
-			info.Ranges = append(info.Ranges, Range{
+			info.Ranges = append(info.Ranges, RangeEntry{
 				First: entries[v].code,
 				Last:  entries[v+int(e)-1].code,
 				Value: entries[v].value,
