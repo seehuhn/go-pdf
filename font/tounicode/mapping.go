@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
 )
 
 // GetMapping returns the mapping information from info.
@@ -57,21 +56,6 @@ func c(rr []rune) []rune {
 	return res
 }
 
-// FromMapping constructs a ToUnicode cmap from the given mapping.
-func FromMapping(CS charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *Info {
-	info := &Info{
-		ROS: &type1.CIDSystemInfo{
-			Registry:   "Adobe",
-			Ordering:   "UCS",
-			Supplement: 0,
-		},
-		CS: CS,
-	}
-	info.SetMapping(m)
-	info.makeName()
-	return info
-}
-
 // SetMapping replaces the mapping information in info with the given mapping.
 //
 // To make efficient use of range entries, the generated mapping may be a
@@ -100,12 +84,12 @@ func (info *Info) SetMapping(m map[charcode.CharCode][]rune) {
 	v := 0
 	for _, e := range ee {
 		if e == 0 {
-			info.Singles = append(info.Singles, Single{
+			info.Singles = append(info.Singles, SingleEntry{
 				Code:  entries[v].code,
 				Value: entries[v].value,
 			})
 		} else if e < 0 {
-			info.Ranges = append(info.Ranges, Range{
+			info.Ranges = append(info.Ranges, RangeEntry{
 				First:  entries[v].code,
 				Last:   entries[v-int(e)-1].code,
 				Values: [][]rune{entries[v].value},
@@ -115,7 +99,7 @@ func (info *Info) SetMapping(m map[charcode.CharCode][]rune) {
 			for i := v; i < v+int(e); i++ {
 				values = append(values, entries[i].value)
 			}
-			info.Ranges = append(info.Ranges, Range{
+			info.Ranges = append(info.Ranges, RangeEntry{
 				First:  entries[v].code,
 				Last:   entries[v+int(e)-1].code,
 				Values: values,

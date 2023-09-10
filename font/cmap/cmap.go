@@ -31,18 +31,16 @@ import (
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 
-// Info describes CMap file for embedding in a PDF file.
+// Info holds the information for a PDF CMap.
 type Info struct {
-	Name     string
-	Version  float64
-	ROS      *type1.CIDSystemInfo
-	CS       charcode.CodeSpaceRange
-	CSFile   charcode.CodeSpaceRange
-	WMode    int
-	UseCMap  string
-	Singles  []SingleEntry
-	Ranges   []RangeEntry
-	Comments bool
+	Name    string
+	ROS     *type1.CIDSystemInfo
+	CS      charcode.CodeSpaceRange
+	CSFile  charcode.CodeSpaceRange // TODO(voss): clean this up
+	WMode   int
+	UseCMap string
+	Singles []SingleEntry
+	Ranges  []RangeEntry
 }
 
 // SingleEntry specifies that character code Code represents the given CID.
@@ -60,23 +58,24 @@ type RangeEntry struct {
 	Value type1.CID
 }
 
+// New allocates a new CMap object.
 func New(ROS *type1.CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]type1.CID) *Info {
-	res := &Info{
+	info := &Info{
 		ROS:    ROS,
 		CS:     cs,
 		CSFile: cs,
 	}
-	res.SetMapping(m)
+	info.SetMapping(m)
 
-	if res.IsIdentity() {
-		res.Name = "Identity-H"
+	if info.IsIdentity() {
+		info.Name = "Identity-H"
 	} else {
-		res.Name = makeName(m)
+		info.Name = makeName(m)
 	}
 
 	// TODO(voss): check whether any of the other predefined CMaps can be used.
 
-	return res
+	return info
 }
 
 // IsIdentity returns true if all codes are equal to the corresponding CID.
@@ -157,6 +156,7 @@ func makeName(m map[charcode.CharCode]type1.CID) string {
 	codes := maps.Keys(m)
 	slices.Sort(codes)
 	h := sha256.New()
+	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.makeName\n"))
 	for _, k := range codes {
 		binary.Write(h, binary.BigEndian, uint32(k))
 		binary.Write(h, binary.BigEndian, uint32(m[k]))

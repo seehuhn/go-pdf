@@ -42,7 +42,7 @@ func TestRoundTrip(t *testing.T) {
 		65: {'A'},
 		66: {'C'},
 	}
-	toUnicode := tounicode.FromMapping(charcode.Simple, m)
+	toUnicode := tounicode.New(charcode.Simple, m)
 
 	info1 := &type3.EmbedInfo{
 		Glyphs:       t3.Glyphs,

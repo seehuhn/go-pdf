@@ -37,7 +37,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
@@ -96,7 +96,7 @@ func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 		FontSimple:    f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
-		SimpleEncoder: cmap.NewSimpleEncoder(),
+		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -112,7 +112,7 @@ type embeddedSimple struct {
 	w pdf.Putter
 	pdf.Resource
 
-	*cmap.SimpleEncoder
+	*encoding.SimpleEncoder
 	closed bool
 }
 
@@ -158,7 +158,7 @@ func (f *embeddedSimple) Close() error {
 	}
 
 	m := f.SimpleEncoder.ToUnicode()
-	toUnicode := tounicode.FromMapping(charcode.Simple, m)
+	toUnicode := tounicode.New(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
 	info := EmbedInfoSimple{

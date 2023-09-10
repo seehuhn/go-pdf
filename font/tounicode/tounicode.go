@@ -22,19 +22,56 @@ import (
 	"fmt"
 	"unicode"
 
-	"seehuhn.de/go/postscript/type1"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// Info holds the information from a ToUnicode cmap.
+// Info holds the information for a PDF ToUnicode cmap.
 type Info struct {
-	Name    pdf.Name
-	ROS     *type1.CIDSystemInfo
+	Name    string
 	CS      charcode.CodeSpaceRange
-	Singles []Single
-	Ranges  []Range
+	Singles []SingleEntry
+	Ranges  []RangeEntry
+}
+
+// SingleEntry specifies that character code Code represents the given unicode string.
+type SingleEntry struct {
+	Code  charcode.CharCode
+	Value []rune
+}
+
+func (s SingleEntry) String() string {
+	return fmt.Sprintf("%d: %q", s.Code, string(s.Value))
+}
+
+// RangeEntry describes a range of character codes.
+// First and Last are the first and last code points in the range.
+// Values is a list of unicode strings.  If the list has length one, then the
+// replacement character is incremented by one for each code point in the
+// range.  Otherwise, the list must have the length Last-First+1, and specify
+// the value for each code point in the range.
+type RangeEntry struct {
+	First  charcode.CharCode
+	Last   charcode.CharCode
+	Values [][]rune
+}
+
+func (r RangeEntry) String() string {
+	ss := make([]string, len(r.Values))
+	for i, v := range r.Values {
+		ss[i] = string(v)
+	}
+	return fmt.Sprintf("%d-%d: %q", r.First, r.Last, ss)
+}
+
+// New constructs a ToUnicode cmap from the given mapping.
+func New(cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *Info {
+	info := &Info{
+		CS: cs,
+	}
+	info.SetMapping(m)
+	info.makeName()
+	return info
 }
 
 // Decode decodes the first character code from the given string.
@@ -48,6 +85,7 @@ func (info *Info) Decode(s pdf.String) ([]rune, int) {
 	if code < 0 {
 		return []rune{unicode.ReplacementChar}, k
 	}
+
 	for _, r := range info.Ranges {
 		if code < r.First || code > r.Last {
 			continue
@@ -63,42 +101,14 @@ func (info *Info) Decode(s pdf.String) ([]rune, int) {
 		rr[len(rr)-1] += rune(code - r.First)
 		return rr, k
 	}
+
 	for _, s := range info.Singles {
 		if s.Code == code {
 			return s.Value, k
 		}
 	}
+
 	return []rune{unicode.ReplacementChar}, k
-}
-
-// Single specifies that character code Code represents the given unicode string.
-type Single struct {
-	Code  charcode.CharCode
-	Value []rune
-}
-
-func (s Single) String() string {
-	return fmt.Sprintf("%d: %q", s.Code, string(s.Value))
-}
-
-// Range describes a range of character codes.
-// First and Last are the first and last code points in the range.
-// Values is a list of unicode strings.  If the list has length one, then the
-// replacement character is incremented by one for each code point in the
-// range.  Otherwise, the list must have the length Last-First+1, and specify
-// the value for each code point in the range.
-type Range struct {
-	First  charcode.CharCode
-	Last   charcode.CharCode
-	Values [][]rune
-}
-
-func (r Range) String() string {
-	ss := make([]string, len(r.Values))
-	for i, v := range r.Values {
-		ss[i] = string(v)
-	}
-	return fmt.Sprintf("%d-%d: %q", r.First, r.Last, ss)
 }
 
 // MakeName sets a unique name for the ToUnicode cmap.
@@ -106,17 +116,10 @@ func (info *Info) makeName() {
 	var buf [binary.MaxVarintLen64]byte
 
 	h := sha256.New()
-	k := binary.PutVarint(buf[:], int64(len(info.ROS.Registry)))
-	h.Write(buf[:k])
-	h.Write([]byte(info.ROS.Registry))
-	k = binary.PutVarint(buf[:], int64(len(info.ROS.Ordering)))
-	h.Write(buf[:k])
-	h.Write([]byte(info.ROS.Ordering))
-	k = binary.PutVarint(buf[:], int64(info.ROS.Supplement))
-	h.Write(buf[:k])
+	h.Write([]byte("seehuhn.de/go/pdf/font/tounicode.makeName\n"))
 
 	rr := info.CS
-	k = binary.PutVarint(buf[:], int64(len(rr)))
+	k := binary.PutVarint(buf[:], int64(len(rr)))
 	h.Write(buf[:k])
 	for _, r := range rr {
 		k = binary.PutVarint(buf[:], int64(len(r.Low)))
@@ -151,5 +154,5 @@ func (info *Info) makeName() {
 	}
 
 	sum := h.Sum(nil)
-	info.Name = pdf.Name(fmt.Sprintf("Seehuhn-%x", sum[:8]))
+	info.Name = fmt.Sprintf("Seehuhn-%x", sum[:8])
 }

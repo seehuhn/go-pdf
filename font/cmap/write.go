@@ -80,21 +80,7 @@ var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 		last = cs.Append(last, s.Last)
 		return fmt.Sprintf("<%x> <%x> %d", first, last, s.Value)
 	},
-}).Parse(`{{if .Comments -}}
-%!PS-Adobe-3.0 Resource-CMap
-%%DocumentNeededResources: ProcSet (CIDInit)
-%%IncludeResource: ProcSet (CIDInit)
-%%BeginResource: CMap {{PS .Name}}
-%%Title: {{printf "%s %s %s %d" .Name .ROS.Registry .ROS.Ordering .ROS.Supplement | PS}}
-%%Version: {{printf "%.3f" .Version}}
-{{if .UseCMap -}}
-%%DocumentNeededResources: CMap {{PN .UseCMap}}
-%%IncludeResource: CMap {{PN .UseCMap}}
-{{end -}}
-%%EndComments
-{{end -}}
-
-/CIDInit /ProcSet findresource begin
+}).Parse(`/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
 {{if .UseCMap -}}

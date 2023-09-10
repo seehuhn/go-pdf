@@ -73,7 +73,7 @@ func TestFromMapping2(t *testing.T) {
 		t.Fatalf("expected 1 range, got %d", len(info.Ranges))
 	}
 	r := info.Ranges[0]
-	rExpected := Range{
+	rExpected := RangeEntry{
 		First:  'A',
 		Last:   'E',
 		Values: [][]rune{[]rune("A")},

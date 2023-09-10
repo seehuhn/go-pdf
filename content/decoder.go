@@ -58,7 +58,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Encoding[i]
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.FromMapping(charcode.Simple, m)
+		toUnicode = tounicode.New(charcode.Simple, m)
 
 	case font.CFFSimple:
 		info, err := cff.ExtractSimple(r, dicts)
@@ -77,7 +77,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Font.Glyphs[gid].Name
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.FromMapping(charcode.Simple, m)
+		toUnicode = tounicode.New(charcode.Simple, m)
 
 	case font.OpenTypeCFFSimple:
 		info, err := opentype.ExtractCFFSimple(r, dicts)
@@ -96,7 +96,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Font.GlyphName(gid)
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.FromMapping(charcode.Simple, m)
+		toUnicode = tounicode.New(charcode.Simple, m)
 
 	case font.TrueTypeSimple:
 		info, err := truetype.ExtractSimple(r, dicts)
@@ -123,7 +123,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			for i, name := range encodingNames {
 				m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 			}
-			toUnicode = tounicode.FromMapping(charcode.Simple, m)
+			toUnicode = tounicode.New(charcode.Simple, m)
 			break
 		}
 
@@ -156,7 +156,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Encoding[i]
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.FromMapping(charcode.Simple, m)
+		toUnicode = tounicode.New(charcode.Simple, m)
 
 	case font.CFFComposite:
 		info, err := cff.ExtractComposite(r, dicts)

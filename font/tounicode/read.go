@@ -23,7 +23,6 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/postscript"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -61,19 +60,6 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 	codeMap := cmap["CodeMap"].(*postscript.CMapInfo)
 
 	cmapName, _ := cmap["CMapName"].(postscript.Name)
-	var ROS *type1.CIDSystemInfo
-	if cidSystemInfo, _ := cmap["CIDSystemInfo"].(postscript.Dict); cidSystemInfo != nil {
-		Registry, ok1 := cidSystemInfo["Registry"].(postscript.String)
-		Ordering, ok2 := cidSystemInfo["Ordering"].(postscript.String)
-		Supplement, ok3 := cidSystemInfo["Supplement"].(postscript.Integer)
-		if ok1 && ok2 && ok3 {
-			ROS = &type1.CIDSystemInfo{
-				Registry:   string(Registry),
-				Ordering:   string(Ordering),
-				Supplement: int32(Supplement),
-			}
-		}
-	}
 
 	csRanges := make(charcode.CodeSpaceRange, len(codeMap.CodeSpaceRanges))
 	for i, r := range codeMap.CodeSpaceRanges {
@@ -84,8 +70,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 	}
 
 	res := &Info{
-		Name: pdf.Name(cmapName),
-		ROS:  ROS,
+		Name: string(cmapName),
 		CS:   cs,
 	}
 
@@ -98,7 +83,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		res.Singles = append(res.Singles, Single{
+		res.Singles = append(res.Singles, SingleEntry{
 			Code:  code,
 			Value: rr,
 		})
@@ -119,7 +104,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 			if err != nil {
 				return nil, err
 			}
-			res.Ranges = append(res.Ranges, Range{
+			res.Ranges = append(res.Ranges, RangeEntry{
 				First:  low,
 				Last:   high,
 				Values: [][]rune{rr},
@@ -136,7 +121,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 				}
 				values = append(values, rr)
 			}
-			res.Ranges = append(res.Ranges, Range{
+			res.Ranges = append(res.Ranges, RangeEntry{
 				First:  low,
 				Last:   high,
 				Values: values,

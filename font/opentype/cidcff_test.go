@@ -55,7 +55,7 @@ func TestRoundTripCFFComposite(t *testing.T) {
 	for code := charcode.CharCode(0); code < 8; code++ {
 		m[code] = []rune{'X', '0' + rune(code)}
 	}
-	toUnicode := tounicode.FromMapping(cs, m)
+	toUnicode := tounicode.New(cs, m)
 	info1 := &EmbedInfoCFFComposite{
 		Font:      otf,
 		SubsetTag: "ABCDEF",

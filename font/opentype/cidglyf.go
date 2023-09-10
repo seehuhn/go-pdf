@@ -154,7 +154,7 @@ func (f *embeddedGlyfComposite) Close() error {
 	origOTF.Gpos = nil
 
 	// subset the font
-	subsetGID := f.CIDEncoder.UsedGIDs()
+	subsetGID := f.CIDEncoder.Subset()
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("TrueType font subset: %w", err)
@@ -162,7 +162,7 @@ func (f *embeddedGlyfComposite) Close() error {
 	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 
 	cs := f.CodeSpaceRange()
-	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
+	toUnicode := tounicode.New(cs, f.ToUnicode())
 
 	cmapInfo := f.CMap()
 

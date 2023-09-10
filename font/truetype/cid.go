@@ -161,7 +161,7 @@ func (f *embeddedCID) Close() error {
 	origTTF.Gpos = nil
 
 	// subset the font
-	subsetGID := f.CIDEncoder.UsedGIDs()
+	subsetGID := f.CIDEncoder.Subset()
 	subsetTTF, err := origTTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("TrueType font subset: %w", err)
@@ -169,7 +169,7 @@ func (f *embeddedCID) Close() error {
 	subsetTag := subset.Tag(subsetGID, origTTF.NumGlyphs())
 
 	cs := f.CodeSpaceRange()
-	toUnicode := tounicode.FromMapping(cs, f.ToUnicode())
+	toUnicode := tounicode.New(cs, f.ToUnicode())
 
 	cmapInfo := f.CMap()
 

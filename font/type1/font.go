@@ -29,7 +29,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/tounicode"
@@ -123,7 +123,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 			Ref:  w.Alloc(),
 			Name: resName,
 		},
-		SimpleEncoder: cmap.NewSimpleEncoder(),
+		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res)
 	return res, nil
@@ -171,7 +171,7 @@ type embedded struct {
 	w pdf.Putter
 	pdf.Resource
 
-	*cmap.SimpleEncoder
+	*encoding.SimpleEncoder
 	closed bool
 }
 

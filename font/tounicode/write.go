@@ -47,8 +47,8 @@ func (info *Info) Write(w io.Writer) error {
 
 const chunkSize = 100
 
-func singleChunks(x []Single) [][]Single {
-	var res [][]Single
+func singleChunks(x []SingleEntry) [][]SingleEntry {
+	var res [][]SingleEntry
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -59,8 +59,8 @@ func singleChunks(x []Single) [][]Single {
 	return res
 }
 
-func rangeChunks(x []Range) [][]Range {
-	var res [][]Range
+func rangeChunks(x []RangeEntry) [][]RangeEntry {
+	var res [][]RangeEntry
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -89,7 +89,7 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 		x := postscript.String(s)
 		return x.PS()
 	},
-	"PN": func(s pdf.Name) string {
+	"PN": func(s string) string {
 		x := postscript.Name(s)
 		return x.PS()
 	},
@@ -97,14 +97,14 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 		return fmt.Sprintf("<%02x>", x)
 	},
 	"SingleChunks": singleChunks,
-	"Single": func(cs charcode.CodeSpaceRange, s Single) string {
+	"Single": func(cs charcode.CodeSpaceRange, s SingleEntry) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
 		val := hexRunes(s.Value)
 		return fmt.Sprintf("<%x> %s", buf, val)
 	},
 	"RangeChunks": rangeChunks,
-	"Range": func(cs charcode.CodeSpaceRange, s Range) string {
+	"Range": func(cs charcode.CodeSpaceRange, s RangeEntry) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)
 		last = cs.Append(last, s.Last)
@@ -122,13 +122,11 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 begincmap
 /CMapName {{PN .Name}} def
 /CMapType 2 def
-{{if .ROS -}}
 /CIDSystemInfo <<
-/Registry {{PS .ROS.Registry}}
-/Ordering {{PS .ROS.Ordering}}
-/Supplement {{.ROS.Supplement}}
+/Registry (Adobe)
+/Ordering (UCS)
+/Supplement 0
 >> def
-{{end -}}
 
 {{with .CS -}}
 {{len .}} begincodespacerange

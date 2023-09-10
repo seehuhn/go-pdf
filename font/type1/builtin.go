@@ -27,7 +27,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding"
 )
 
 // Builtin is one of the 14 built-in PDF fonts.
@@ -83,7 +83,7 @@ func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 			Ref:  w.Alloc(),
 			Name: resName,
 		},
-		SimpleEncoder: cmap.NewSimpleEncoder(),
+		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res)
 	return res, nil

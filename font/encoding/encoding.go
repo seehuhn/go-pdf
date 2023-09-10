@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cmap
+package encoding
 
 import (
 	"math/bits"
@@ -31,6 +31,11 @@ import (
 type SimpleEncoder struct {
 	cache map[key]byte
 	used  map[byte]struct{}
+}
+
+type key struct {
+	gid glyph.ID
+	rr  string
 }
 
 // NewSimpleEncoder allocates a new SimpleEncoder.

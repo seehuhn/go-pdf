@@ -45,7 +45,7 @@ func TestRoundTrip(t *testing.T) {
 		65: {'A'},
 		66: {'B'},
 	}
-	toUnicode := tounicode.FromMapping(charcode.Simple, m)
+	toUnicode := tounicode.New(charcode.Simple, m)
 
 	info1 := &EmbedInfo{
 		Font:      t1,
@@ -111,7 +111,7 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 		65: {'A'},
 		66: {'C'},
 	}
-	toUnicode := tounicode.FromMapping(charcode.Simple, m)
+	toUnicode := tounicode.New(charcode.Simple, m)
 
 	info1 := &EmbedInfo{
 		Font:      t1,

@@ -58,7 +58,7 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 	m[charcode.CharCode('A')] = []rune{'A'}
 	m[charcode.CharCode('B')] = []rune{'B'}
 	m[charcode.CharCode('C')] = []rune{'C'}
-	toUnicode := tounicode.FromMapping(cs, m)
+	toUnicode := tounicode.New(cs, m)
 
 	maxCID := type1.CID(fontCMap.Lookup('C'))
 	CID2GID := make([]glyph.ID, maxCID+1)

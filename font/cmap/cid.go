@@ -50,9 +50,9 @@ type CIDEncoder interface {
 	// used by this encoder.
 	CodeSpaceRange() charcode.CodeSpaceRange
 
-	// UsedGIDs is the set of all GIDs which have been used with AppendEncoded.
+	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
-	UsedGIDs() []glyph.ID
+	Subset() []glyph.ID
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -96,7 +96,7 @@ func (e *identityEncoder) CodeSpaceRange() charcode.CodeSpaceRange {
 	return charcode.UCS2
 }
 
-func (e *identityEncoder) UsedGIDs() []glyph.ID {
+func (e *identityEncoder) Subset() []glyph.ID {
 	_, hasNotDef := e.toUnicode[0]
 	subset := maps.Keys(e.used)
 	if !hasNotDef {
@@ -192,7 +192,7 @@ func (e *utf8Encoder) CodeSpaceRange() charcode.CodeSpaceRange {
 	return utf8cs
 }
 
-func (e *utf8Encoder) UsedGIDs() []glyph.ID {
+func (e *utf8Encoder) Subset() []glyph.ID {
 	used := make(map[glyph.ID]bool, len(e.cache)+1)
 	used[0] = true
 	for k := range e.cache {
@@ -246,7 +246,7 @@ func (g *gidToCIDSequential) CID(gid glyph.ID) type1.CID {
 // ROS implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) ROS() *type1.CIDSystemInfo {
 	h := sha256.New()
-	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential"))
+	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, len(g.data))
 	gg := maps.Keys(g.data)
 	slices.Sort(gg)
@@ -272,6 +272,8 @@ func (g *gidToCIDSequential) GIDToCID(numGlyph int) []type1.CID {
 	return res
 }
 
+// NewIdentityGIDToCID returns a GIDToCID which uses the GID values
+// directly as CID values.
 func NewIdentityGIDToCID() GIDToCID {
 	return &gidToCIDIdentity{}
 }

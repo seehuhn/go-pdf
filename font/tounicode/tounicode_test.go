@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
 )
 
 func TestMapping(t *testing.T) {
@@ -67,13 +66,8 @@ end`
 func TestRoundtrip(t *testing.T) {
 	info := &Info{
 		Name: "Test-Map",
-		ROS: &type1.CIDSystemInfo{
-			Registry:   "Adobe",
-			Ordering:   "Identity",
-			Supplement: 0,
-		},
-		CS: charcode.Simple,
-		Singles: []Single{
+		CS:   charcode.Simple,
+		Singles: []SingleEntry{
 			{
 				Code:  65,
 				Value: []rune{'A'},
@@ -83,7 +77,7 @@ func TestRoundtrip(t *testing.T) {
 				Value: []rune("ffl"),
 			},
 		},
-		Ranges: []Range{
+		Ranges: []RangeEntry{
 			{
 				First:  96,
 				Last:   112,
