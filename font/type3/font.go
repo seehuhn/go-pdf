@@ -248,7 +248,7 @@ type EmbedInfo struct {
 	ResName pdf.Name
 
 	// Resources is the resource dictionary for the font.
-	Resources *pdf.Resources // TODO(voss): include the individual fields instead
+	Resources *pdf.Resources
 
 	ItalicAngle float64
 

@@ -241,11 +241,11 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	}
 	widthsInfo := font.EncodeWidthsSimple(ww, unitsPerEm)
 
-	encoding := make([]string, 256)
-	builtin := make([]string, 256)
+	clientEnc := make([]string, 256)
+	builtinEnc := make([]string, 256)
 	for i := 0; i < 256; i++ {
-		encoding[i] = cff.Glyphs[info.Encoding[i]].Name
-		builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
+		clientEnc[i] = cff.Glyphs[info.Encoding[i]].Name
+		builtinEnc[i] = cff.Glyphs[cff.Encoding[i]].Name
 	}
 
 	q := 1000 / float64(unitsPerEm)
@@ -271,7 +271,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		"Widths":         widthsRef,
 		"FontDescriptor": fontDescriptorRef,
 	}
-	if enc := font.DescribeEncodingType1(encoding, builtin); enc != nil {
+	if enc := encoding.DescribeEncodingType1(clientEnc, builtinEnc); enc != nil {
 		fontDict["Encoding"] = enc
 	}
 	var toUnicodeRef pdf.Reference
@@ -376,7 +376,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		for i := 0; i < 256; i++ {
 			builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
 		}
-		nameEncoding, err := font.UndescribeEncodingType1(
+		nameEncoding, err := encoding.UndescribeEncodingType1(
 			r, dicts.FontDict["Encoding"], builtin)
 		if err != nil {
 			return nil, pdf.Wrap(err, "font encoding")

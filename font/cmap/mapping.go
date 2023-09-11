@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
+// GetMapping returns the mapping information from info.
 func (info *Info) GetMapping() map[charcode.CharCode]type1.CID {
 	res := make(map[charcode.CharCode]type1.CID)
 	for _, s := range info.Singles {
@@ -41,8 +42,7 @@ func (info *Info) GetMapping() map[charcode.CharCode]type1.CID {
 	return res
 }
 
-// SetMapping overwrites the mapping information in info with the given
-// mapping.
+// SetMapping replaces the mapping information in info with the given mapping.
 //
 // To make efficient use of range entries, the generated mapping may be a
 // superset of the original mapping, i.e. it may contain entries for charcodes

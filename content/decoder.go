@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/tounicode"
@@ -112,7 +113,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 		// TODO(voss): revisit this, once
 		// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
 		if encodingEntry, _ := pdf.Resolve(r, dicts.FontDict["Encoding"]); encodingEntry != nil {
-			encodingNames, _ := font.UndescribeEncodingType1(r, encodingEntry, pdfenc.StandardEncoding[:])
+			encodingNames, _ := encoding.UndescribeEncodingType1(r, encodingEntry, pdfenc.StandardEncoding[:])
 			for i, name := range encodingNames {
 				if name == ".notdef" {
 					encodingNames[i] = pdfenc.StandardEncoding[i]

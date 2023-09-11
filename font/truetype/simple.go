@@ -393,7 +393,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 // https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
 func ExtractEncoding(r pdf.Getter, encodingDict pdf.Object, ttf *sfnt.Font) []glyph.ID {
 	if encodingEntry, _ := pdf.Resolve(r, encodingDict); encodingEntry != nil {
-		encodingNames, _ := font.UndescribeEncodingType1(r, encodingEntry, pdfenc.StandardEncoding[:])
+		encodingNames, _ := encoding.UndescribeEncodingType1(r, encodingEntry, pdfenc.StandardEncoding[:])
 		for i, name := range encodingNames {
 			if name == ".notdef" {
 				encodingNames[i] = pdfenc.StandardEncoding[i]

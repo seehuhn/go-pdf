@@ -283,7 +283,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if w.GetMeta().Version == pdf.V1_0 {
 		fontDict["Name"] = info.ResName
 	}
-	if enc := font.DescribeEncodingType1(info.Encoding, info.Font.Encoding); enc != nil {
+	if enc := encoding.DescribeEncodingType1(info.Encoding, info.Font.Encoding); enc != nil {
 		fontDict["Encoding"] = enc
 	}
 	var toUnicodeRef pdf.Reference
@@ -440,14 +440,14 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	}
 
 	if res.Font != nil {
-		encoding, err := font.UndescribeEncodingType1(
+		encoding, err := encoding.UndescribeEncodingType1(
 			r, dicts.FontDict["Encoding"], res.Font.Encoding)
 		if err == nil {
 			res.Encoding = encoding
 		}
 	} else if t1, err := Builtin(baseFont).PSFont(); err == nil {
 		res.Font = t1
-		encoding, err := font.UndescribeEncodingType1(
+		encoding, err := encoding.UndescribeEncodingType1(
 			r, dicts.FontDict["Encoding"], t1.Encoding)
 		if err == nil {
 			res.Encoding = encoding
