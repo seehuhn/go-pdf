@@ -17,8 +17,6 @@
 package tounicode
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
 	"fmt"
 	"unicode"
 
@@ -28,7 +26,6 @@ import (
 
 // Info holds the information for a PDF ToUnicode cmap.
 type Info struct {
-	Name    string
 	CS      charcode.CodeSpaceRange
 	Singles []SingleEntry
 	Ranges  []RangeEntry
@@ -70,7 +67,6 @@ func New(cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *Info {
 		CS: cs,
 	}
 	info.SetMapping(m)
-	info.makeName()
 	return info
 }
 
@@ -109,50 +105,4 @@ func (info *Info) Decode(s pdf.String) ([]rune, int) {
 	}
 
 	return []rune{unicode.ReplacementChar}, k
-}
-
-// MakeName sets a unique name for the ToUnicode cmap.
-func (info *Info) makeName() {
-	var buf [binary.MaxVarintLen64]byte
-
-	h := sha256.New()
-	h.Write([]byte("seehuhn.de/go/pdf/font/tounicode.makeName\n"))
-
-	rr := info.CS
-	k := binary.PutVarint(buf[:], int64(len(rr)))
-	h.Write(buf[:k])
-	for _, r := range rr {
-		k = binary.PutVarint(buf[:], int64(len(r.Low)))
-		h.Write(buf[:k])
-		h.Write(r.Low)
-		k = binary.PutVarint(buf[:], int64(len(r.High)))
-		h.Write(buf[:k])
-		h.Write(r.High)
-	}
-
-	k = binary.PutVarint(buf[:], int64(len(info.Singles)))
-	h.Write(buf[:k])
-	for _, s := range info.Singles {
-		binary.Write(h, binary.LittleEndian, s.Code)
-		k = binary.PutVarint(buf[:], int64(len(s.Value)))
-		h.Write(buf[:k])
-		binary.Write(h, binary.LittleEndian, s.Value)
-	}
-
-	k = binary.PutVarint(buf[:], int64(len(info.Ranges)))
-	h.Write(buf[:k])
-	for _, r := range info.Ranges {
-		binary.Write(h, binary.LittleEndian, r.First)
-		binary.Write(h, binary.LittleEndian, r.Last)
-		k = binary.PutVarint(buf[:], int64(len(r.Values)))
-		h.Write(buf[:k])
-		for _, v := range r.Values {
-			k = binary.PutVarint(buf[:], int64(len(v)))
-			h.Write(buf[:k])
-			binary.Write(h, binary.LittleEndian, v)
-		}
-	}
-
-	sum := h.Sum(nil)
-	info.Name = fmt.Sprintf("Seehuhn-%x", sum[:8])
 }

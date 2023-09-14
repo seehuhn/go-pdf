@@ -53,13 +53,13 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 		return nil, err
 	}
 
-	tp := cmap["CMapType"]
-	if tp != postscript.Integer(2) {
-		return nil, fmt.Errorf("tounicode: invalid CMap type %v", tp)
+	if tp, ok := cmap["CMapType"].(postscript.Integer); !ok || tp != 2 {
+		return nil, fmt.Errorf("invalid CMapType: %v", tp)
 	}
-	codeMap := cmap["CodeMap"].(*postscript.CMapInfo)
-
-	cmapName, _ := cmap["CMapName"].(postscript.Name)
+	codeMap, ok := cmap["CodeMap"].(*postscript.CMapInfo)
+	if !ok {
+		return nil, fmt.Errorf("unsupported CMap format")
+	}
 
 	csRanges := make(charcode.CodeSpaceRange, len(codeMap.CodeSpaceRanges))
 	for i, r := range codeMap.CodeSpaceRanges {
@@ -70,8 +70,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 	}
 
 	res := &Info{
-		Name: string(cmapName),
-		CS:   cs,
+		CS: cs,
 	}
 
 	for _, c := range codeMap.Chars {

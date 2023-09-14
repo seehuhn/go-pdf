@@ -65,8 +65,7 @@ end`
 
 func TestRoundtrip(t *testing.T) {
 	info := &Info{
-		Name: "Test-Map",
-		CS:   charcode.Simple,
+		CS: charcode.Simple,
 		Singles: []SingleEntry{
 			{
 				Code:  65,

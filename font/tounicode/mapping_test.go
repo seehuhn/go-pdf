@@ -34,8 +34,7 @@ func TestFromMapping(t *testing.T) {
 		'G': []rune("G"),
 	}
 	info := &Info{
-		Name: "Test",
-		CS:   charcode.Simple,
+		CS: charcode.Simple,
 	}
 	info.SetMapping(m)
 	if len(info.Singles) != 2 {
@@ -62,8 +61,7 @@ func TestFromMapping2(t *testing.T) {
 		'E': []rune("E"),
 	}
 	info := &Info{
-		Name: "Test",
-		CS:   charcode.Simple,
+		CS: charcode.Simple,
 	}
 	info.SetMapping(m)
 	if len(info.Singles) != 0 {

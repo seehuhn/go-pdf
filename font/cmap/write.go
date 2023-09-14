@@ -21,9 +21,53 @@ import (
 	"io"
 	"text/template"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript"
 )
+
+func (info *Info) Embed(w pdf.Putter, ref pdf.Reference, other map[string]pdf.Reference) error {
+	dict := pdf.Dict{
+		"Type":     pdf.Name("CMap"),
+		"CMapName": pdf.Name(info.Name),
+		"CIDSystemInfo": pdf.Dict{
+			"Registry":   pdf.String(info.ROS.Registry),
+			"Ordering":   pdf.String(info.ROS.Ordering),
+			"Supplement": pdf.Integer(info.ROS.Supplement),
+		},
+	}
+	if info.WMode != 0 {
+		dict["WMode"] = pdf.Integer(info.WMode)
+	}
+	if info.UseCMap != "" {
+		var useCMap pdf.Object
+		isInOther := false
+		if other != nil {
+			_, isInOther = other[info.UseCMap]
+		}
+		if _, ok := builtinCS[info.UseCMap]; ok {
+			useCMap = pdf.Name(info.UseCMap)
+		} else if isInOther {
+			useCMap = other[info.UseCMap]
+		} else {
+			return fmt.Errorf("unknown CMap %q", info.UseCMap)
+		}
+		dict["UseCMap"] = useCMap
+	}
+	stm, err := w.OpenStream(ref, dict, pdf.FilterCompress{})
+	if err != nil {
+		return err
+	}
+	err = info.Write(stm)
+	if err != nil {
+		return fmt.Errorf("embedding cmap: %w", err)
+	}
+	err = stm.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func (info *Info) Write(w io.Writer) error {
 	return cmapTmpl.Execute(w, info)

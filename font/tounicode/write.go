@@ -25,20 +25,23 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript"
 )
 
 // Embed adds the ToUnicode cmap to a PDF file.
 func (info *Info) Embed(w pdf.Putter, ref pdf.Reference) error {
-	touniStream, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
+	stm, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err
 	}
-	err = info.Write(touniStream)
+	err = info.Write(stm)
 	if err != nil {
 		return fmt.Errorf("embedding ToUnicode cmap: %w", err)
 	}
-	return touniStream.Close()
+	err = stm.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (info *Info) Write(w io.Writer) error {
@@ -84,15 +87,9 @@ func hexRunes(rr []rune) string {
 	return "<" + strings.Join(valStrings, "") + ">"
 }
 
+// TODO(voss): once https://github.com/pdf-association/pdf-issues/issues/344
+// is resoved, reconsider CIDSystemInfo and CMapName.
 var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncMap{
-	"PS": func(s string) string {
-		x := postscript.String(s)
-		return x.PS()
-	},
-	"PN": func(s string) string {
-		x := postscript.Name(s)
-		return x.PS()
-	},
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
@@ -120,7 +117,7 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 }).Parse(`/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
-/CMapName {{PN .Name}} def
+/CMapName /Adobe-Identity-UCS def
 /CMapType 2 def
 /CIDSystemInfo <<
 /Registry (Adobe)
