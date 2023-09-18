@@ -217,8 +217,8 @@ func printObject(args ...string) error {
 		}
 		if dicts.FontProgram != nil {
 			fmt.Println()
-			fmt.Print("Font program: ")
-			err = e.show(dicts.FontProgram)
+			fmt.Print("Font program dict: ")
+			err = e.show(dicts.FontProgram.Dict)
 			if err != nil {
 				return err
 			}

@@ -201,6 +201,7 @@ func (e *embedded) Close() error {
 		psSubset.Outlines = make(map[string]*type1.Glyph)
 		psSubset.GlyphInfo = make(map[string]*type1.GlyphInfo)
 
+		// TODO(voss): only include .notdef if there are ununsed codes?
 		if _, ok := psFont.Outlines[".notdef"]; ok {
 			psSubset.Outlines[".notdef"] = psFont.Outlines[".notdef"]
 			psSubset.GlyphInfo[".notdef"] = psFont.GlyphInfo[".notdef"]

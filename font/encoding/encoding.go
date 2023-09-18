@@ -57,12 +57,12 @@ func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf
 	// Rules for choosing the code:
 	// 1. If the combination of `gid` and `rr` has previously been used,
 	//    then use the same code as before.
-	code, valid := e.cache[k]
-	if valid {
+	code, seen := e.cache[k]
+	if seen {
 		return append(s, code)
 	}
 
-	// 2. Allocate a new code base on the last rune in rr.
+	// 2. Allocate a new code based on the last rune in rr.
 	var r rune
 	if len(rr) > 0 {
 		r = rr[len(rr)-1]
@@ -77,7 +77,7 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 		// Once all codes are used up, simply return 0 for everything.
 		return 0
 	}
-	bestScore := 1
+	bestScore := -1
 	bestCode := byte(0)
 	for codeInt := 0; codeInt < 256; codeInt++ {
 		code := byte(codeInt)
@@ -97,6 +97,10 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 				// code is still free, then use it.
 				bestCode = code
 				break
+			} else if !(code == 32 && r != ' ') {
+				// Try to keep code 32 for the space character,
+				// in order to not break the PDF word spacing parameter.
+				score += 10
 			}
 		}
 		score += bits.TrailingZeros16(uint16(r) ^ uint16(q))

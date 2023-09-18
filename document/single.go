@@ -46,15 +46,19 @@ func singlePage(w pdf.Putter, pageSize *pdf.Rectangle) (*Page, error) {
 
 	page := graphics.NewPage(&bytes.Buffer{})
 
+	pageDict := pdf.Dict{
+		"Type": pdf.Name("Page"),
+	}
+	if pageSize != nil {
+		pageDict["MediaBox"] = pageSize
+	}
+
 	p := &Page{
-		Page: page,
-		PageDict: pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"MediaBox": pageSize,
-		},
-		Out:     w,
-		tree:    tree,
-		closeFn: closePage,
+		Page:     page,
+		PageDict: pageDict,
+		Out:      w,
+		tree:     tree,
+		closeFn:  closePage,
 	}
 	return p, nil
 }

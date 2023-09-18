@@ -126,7 +126,7 @@ func (p *Page) TextShowAligned(s string, w, q float64) {
 		p.Err = errors.New("no font set")
 		return
 	}
-	p.showGlyphsAligned(p.font.Layout(s, p.fontSize), w, q)
+	p.showGlyphsAligned(p.TextLayout(s), w, q)
 }
 
 // TextShowGlyphs draws a sequence of glyphs.
@@ -143,8 +143,6 @@ func (p *Page) TextShowGlyphs(gg glyph.Seq) float64 {
 }
 
 // TextShowGlyphsAligned draws a sequence of glyphs and aligns it.
-// The beginning of the string is shifted right by a*w+b, where w
-// is the width of the string.
 func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 	if !p.valid("TextShowGlyphsAligned", objText) {
 		return

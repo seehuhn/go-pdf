@@ -18,6 +18,7 @@ package document
 
 import (
 	"bytes"
+	"errors"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -46,6 +47,9 @@ func (p *Page) GetPageSize() *pdf.Rectangle {
 func (p *Page) Close() error {
 	if p.Page.Err != nil {
 		return p.Page.Err
+	}
+	if p.PageDict["MediaBox"] == nil || p.PageDict["MediaBox"] == (*pdf.Rectangle)(nil) {
+		return errors.New("page size not set")
 	}
 
 	contentRef := p.Out.Alloc()
