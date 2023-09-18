@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -155,9 +156,8 @@ func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 }
 
 func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
-	advanceWidth := gg.AdvanceWidth()
-	unitsPerEm := p.font.GetGeometry().UnitsPerEm
-	total := float64(advanceWidth) * p.fontSize / float64(unitsPerEm)
+	geom := p.font.GetGeometry()
+	total := geom.ToPDF(p.fontSize, gg.AdvanceWidth())
 	delta := w - total
 
 	// we interpolate between the following:
@@ -214,23 +214,20 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 	unitsPerEm := geom.UnitsPerEm
 	q := 1000 / float64(unitsPerEm)
 
-	var advanceWidth float64
-
-	// xOffset is the difference between the wanted x position and the
-	// actual x position, in PDF font units.
-	xOffset := left
+	// We track the actual and wanted x-position in PDF units,
+	// relative to the initial x-position.
+	xWanted := left
+	xActual := 0.0
 	for _, glyph := range gg {
-		xOffset += float64(glyph.XOffset) * q
-		xOffsetInt := pdf.Integer(math.Round(xOffset))
+		xWanted += float64(glyph.XOffset) * q
+		xOffsetInt := pdf.Integer(math.Round(xWanted - xActual))
 		if xOffsetInt != 0 {
 			if len(run) > 0 {
 				out = append(out, run)
 				run = nil
 			}
-			// advance the actual x position by xOffsetInt
 			out = append(out, -xOffsetInt)
-			xOffset -= float64(xOffsetInt)
-			advanceWidth += float64(xOffsetInt)
+			xActual += float64(xOffsetInt)
 		}
 
 		if newYPos := pdf.Integer(math.Round(float64(glyph.YOffset) * q)); newYPos != p.textRise {
@@ -246,29 +243,27 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 			_, p.Err = fmt.Fprintln(p.Content, " Ts")
 		}
 
-		gid := glyph.Gid
-		if int(gid) > len(widths) {
-			gid = 0
-		}
 		run = font.AppendEncoded(run, glyph.Gid, glyph.Text)
 
-		// Advance the wanted x position by the glyph advance width, minus the xOffset.
-		// Advance the actual x position by the PDF glyph width.
-		xOffset += float64(glyph.Advance-glyph.XOffset-widths[gid]) * q
-		advanceWidth += float64(widths[gid]) * q
+		var w funit.Int16
+		if gid := glyph.Gid; int(gid) < len(widths) {
+			w = widths[gid]
+		}
+		xActual += float64(w) * q
+		xWanted += float64(-glyph.XOffset+glyph.Advance) * q
 	}
 
-	xOffset += right
-	xOffsetInt := pdf.Integer(math.Round(xOffset))
+	xWanted += right
+	xOffsetInt := pdf.Integer(math.Round(xWanted - xActual))
 	if xOffsetInt != 0 {
 		if len(run) > 0 {
 			out = append(out, run)
 			run = nil
 		}
 		out = append(out, -xOffsetInt)
-		advanceWidth += float64(xOffsetInt)
+		xActual += float64(xOffsetInt)
 	}
 
 	flush()
-	return advanceWidth * p.fontSize / 1000
+	return xActual * p.fontSize / 1000
 }
