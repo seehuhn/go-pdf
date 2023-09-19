@@ -53,39 +53,22 @@ type FontComposite struct {
 	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
-// FontOptions allows to customize details of the font embedding.
-type FontOptions struct {
-	Language     language.Tag
-	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
-}
-
-var defaultFontOptions = FontOptions{
+var defaultFontOptions = &font.Options{
 	Language:     language.Und,
 	MakeGIDToCID: cmap.NewIdentityGIDToCID,
 	MakeEncoder:  cmap.NewCIDEncoderIdentity,
+	GsubFeatures: gtab.GsubDefaultFeatures,
+	GposFeatures: gtab.GposDefaultFeatures,
 }
 
 // NewComposite allocates a new CFF font for embedding into a PDF file as a composite font.
 // The font `info` is allowed but not required to be CID-keyed.
-func NewComposite(info *sfnt.Font, opt *FontOptions) (*FontComposite, error) {
+func NewComposite(info *sfnt.Font, opt *font.Options) (*FontComposite, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
 
-	if opt == nil {
-		opt = &defaultFontOptions
-	}
-	loc := opt.Language
-
-	makeGIDToCID := opt.MakeGIDToCID
-	if makeGIDToCID == nil {
-		makeGIDToCID = defaultFontOptions.MakeGIDToCID
-	}
-	makeEncoder := opt.MakeEncoder
-	if makeEncoder == nil {
-		makeEncoder = defaultFontOptions.MakeEncoder
-	}
+	opt = font.MergeOptions(opt, defaultFontOptions)
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
@@ -107,11 +90,11 @@ func NewComposite(info *sfnt.Font, opt *FontOptions) (*FontComposite, error) {
 	res := &FontComposite{
 		otf:          info,
 		cmap:         cmap,
-		gsubLookups:  info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups:  info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
+		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		Geometry:     geometry,
-		makeGIDToCID: makeGIDToCID,
-		makeEncoder:  makeEncoder,
+		makeGIDToCID: opt.MakeGIDToCID,
+		makeEncoder:  opt.MakeEncoder,
 	}
 	return res, nil
 }

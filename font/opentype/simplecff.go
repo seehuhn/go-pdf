@@ -23,7 +23,6 @@ import (
 	"slices"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
 
@@ -41,8 +40,8 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-// FontCFFSimple is a OpenType/CFF font for embedding in a PDF file as a simple font.
-type FontCFFSimple struct {
+// fontCFFSimple is a OpenType/CFF font
+type fontCFFSimple struct {
 	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
@@ -55,10 +54,13 @@ type FontCFFSimple struct {
 // If info is CID-keyed, the function will attempt to convert it to a simple font.
 // If the conversion fails (because more than one private dictionary is used
 // after subsetting), an error is returned.
-func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*FontCFFSimple, error) {
+// Consider using [cff.NewSimple] instead of this function.
+func NewCFFSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
+
+	opt = font.MergeOptions(opt, defaultOptionsCFF)
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
@@ -77,24 +79,24 @@ func NewCFFSimple(info *sfnt.Font, loc language.Tag) (*FontCFFSimple, error) {
 		return nil, err
 	}
 
-	res := &FontCFFSimple{
+	res := &fontCFFSimple{
 		otf:         info,
 		cmap:        cmap,
-		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
+		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
 		Geometry:    geometry,
 	}
 	return res, nil
 }
 
 // Embed implements the [font.Font] interface.
-func (f *FontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedCFFSimple{
-		FontCFFSimple: f,
+		fontCFFSimple: f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
@@ -104,12 +106,12 @@ func (f *FontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 }
 
 // Layout implements the [font.Font] interface.
-func (f *FontCFFSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontCFFSimple) Layout(s string, ptSize float64) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedCFFSimple struct {
-	*FontCFFSimple
+	*fontCFFSimple
 	w pdf.Putter
 	pdf.Resource
 
@@ -130,16 +132,16 @@ func (f *embeddedCFFSimple) Close() error {
 	encoding := f.SimpleEncoder.Encoding()
 
 	// Make our encoding the built-in encoding of the font.
-	otf := f.otf.Clone()
-	outlines := otf.Outlines.(*cff.Outlines)
+	origOTF := f.otf.Clone()
+	outlines := origOTF.Outlines.(*cff.Outlines)
 	outlines.Encoding = encoding
 	outlines.ROS = nil
 	outlines.GIDToCID = nil
 
-	otf.CMapTable = nil
-	otf.Gdef = nil
-	otf.Gpos = nil
-	otf.Gsub = nil
+	origOTF.CMapTable = nil
+	origOTF.Gdef = nil
+	origOTF.Gsub = nil
+	origOTF.Gpos = nil
 
 	// subset the font
 	gidUsed := make(map[glyph.ID]bool)
@@ -149,15 +151,15 @@ func (f *embeddedCFFSimple) Close() error {
 	}
 	origGid := maps.Keys(gidUsed)
 	slices.Sort(origGid)
-	subsetOtf, err := otf.Subset(origGid)
+	subsetOTF, err := origOTF.Subset(origGid)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
-	subsetTag := subset.Tag(origGid, otf.NumGlyphs())
+	subsetTag := subset.Tag(origGid, origOTF.NumGlyphs())
 
 	// convert the font to a simple font, if needed
-	subsetOtf.EnsureGlyphNames()
-	subsetCFF := subsetOtf.AsCFF()
+	subsetOTF.EnsureGlyphNames()
+	subsetCFF := subsetOTF.AsCFF()
 	if len(subsetCFF.Private) != 1 {
 		return fmt.Errorf("need exactly one private dict for a simple font")
 	}
@@ -167,7 +169,7 @@ func (f *embeddedCFFSimple) Close() error {
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
 	info := EmbedInfoCFFSimple{
-		Font:      subsetOtf,
+		Font:      subsetOTF,
 		SubsetTag: subsetTag,
 		Encoding:  subsetCFF.Encoding,
 		ToUnicode: toUnicode,
@@ -196,7 +198,8 @@ type EmbedInfoCFFSimple struct {
 	ToUnicode *tounicode.Info
 }
 
-// Embed writes the PDF objects needed to embed the font.
+// Embed adds a simple OpenType/CFF font to a PDF file.
+// This is the reverse of [ExtractCFFSimple]
 func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
@@ -204,6 +207,9 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	otf := info.Font
+	if !otf.IsCFF() {
+		return fmt.Errorf("not an OpenType/CFF font")
+	}
 	cff, ok := otf.Outlines.(*cff.Outlines)
 	if !ok ||
 		len(cff.Encoding) != 256 ||
@@ -305,7 +311,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 	err = otf.WriteOpenTypeCFFPDF(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding OpenType/CFF font %q: %w", fontName, err)
+		return fmt.Errorf("OpenType/CFF font program %q: %w", fontName, err)
 	}
 	err = fontFileStream.Close()
 	if err != nil {
@@ -322,7 +328,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	return nil
 }
 
-// ExtractCFFSimple extracts all information about a simple OpenType/CFF font.
+// ExtractCFFSimple extracts information about a simple OpenType/CFF font.
 // This is the inverse of [EmbedInfoCFFSimple.Embed].
 func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeCFFSimple); err != nil {
@@ -390,12 +396,12 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 		}
 	}
 
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+
 	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
-
-	res.IsAllCap = dicts.FontDescriptor.IsAllCap
-	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
 	return res, nil
 }

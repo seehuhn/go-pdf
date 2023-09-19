@@ -39,8 +39,8 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-// FontCFFComposite is an OpenType/CFF font for embedding in a PDF file as a composite font.
-type FontCFFComposite struct {
+// fontCFFComposite is an OpenType/CFF font for embedding in a PDF file as a composite font.
+type fontCFFComposite struct {
 	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
@@ -51,39 +51,24 @@ type FontCFFComposite struct {
 	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
-// FontOptions allows to customize details of the font embedding.
-type FontOptions struct {
-	Language     language.Tag
-	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
-}
-
-var defaultFontOptionsCFF = FontOptions{
+var defaultOptionsCFF = &font.Options{
 	Language:     language.Und,
 	MakeGIDToCID: cmap.NewIdentityGIDToCID,
 	MakeEncoder:  cmap.NewCIDEncoderIdentity,
+	GsubFeatures: gtab.GsubDefaultFeatures,
+	GposFeatures: gtab.GposDefaultFeatures,
 }
 
 // NewCFFComposite creates a new OpenType/CFF font for embedding in a PDF file as a composite font.
-// The font `info` is allowed but not required to be CID-keyed.
-func NewCFFComposite(info *sfnt.Font, opt *FontOptions) (*FontCFFComposite, error) {
+// Info must be an OpenType font with CFF outlines.
+// The font info is allowed but not required to be CID-keyed.
+// Consider using [cff.NewComposite] instead of this function.
+func NewCFFComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
 
-	if opt == nil {
-		opt = &defaultFontOptionsCFF
-	}
-	loc := opt.Language
-
-	makeGIDToCID := opt.MakeGIDToCID
-	if makeGIDToCID == nil {
-		makeGIDToCID = defaultFontOptionsCFF.MakeGIDToCID
-	}
-	makeEncoder := opt.MakeEncoder
-	if makeEncoder == nil {
-		makeEncoder = defaultFontOptionsCFF.MakeEncoder
-	}
+	opt = font.MergeOptions(opt, defaultOptionsCFF)
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
@@ -102,27 +87,27 @@ func NewCFFComposite(info *sfnt.Font, opt *FontOptions) (*FontCFFComposite, erro
 		return nil, err
 	}
 
-	res := &FontCFFComposite{
+	res := &fontCFFComposite{
 		otf:          info,
 		cmap:         cmap,
-		gsubLookups:  info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups:  info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
+		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
 		Geometry:     geometry,
-		makeGIDToCID: makeGIDToCID,
-		makeEncoder:  makeEncoder,
+		makeGIDToCID: opt.MakeGIDToCID,
+		makeEncoder:  opt.MakeEncoder,
 	}
 	return res, nil
 }
 
 // Embed implements the [font.Font] interface.
-func (f *FontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 	gidToCID := f.makeGIDToCID()
 	res := &embeddedCFFComposite{
-		FontCFFComposite: f,
+		fontCFFComposite: f,
 		w:                w,
 		Resource:         pdf.Resource{Ref: w.Alloc(), Name: resName},
 		GIDToCID:         gidToCID,
@@ -133,12 +118,12 @@ func (f *FontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded,
 }
 
 // Layout implements the [font.Font] interface.
-func (f *FontCFFComposite) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontCFFComposite) Layout(s string, ptSize float64) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedCFFComposite struct {
-	*FontCFFComposite
+	*fontCFFComposite
 	w pdf.Putter
 	pdf.Resource
 
@@ -386,6 +371,7 @@ func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposit
 	if err := dicts.Type.MustBe(font.OpenTypeCFFComposite); err != nil {
 		return nil, err
 	}
+
 	res := &EmbedInfoCFFComposite{}
 
 	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)

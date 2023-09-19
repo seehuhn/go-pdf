@@ -23,7 +23,6 @@ import (
 	"slices"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
@@ -43,8 +42,8 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-// FontSimple is a simple TrueType font.
-type FontSimple struct {
+// fontSimple is a simple TrueType font.
+type fontSimple struct {
 	ttf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
@@ -54,7 +53,7 @@ type FontSimple struct {
 
 // NewSimple creates a new simple TrueType font.
 // Info must either be a TrueType font or an OpenType font with TrueType outlines.
-func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
+func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -76,24 +75,24 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 		return nil, err
 	}
 
-	res := &FontSimple{
+	res := &fontSimple{
 		ttf:         info,
 		cmap:        cmap,
-		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
+		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
 		Geometry:    geometry,
 	}
 	return res, nil
 }
 
 // Embed implements the [font.Font] interface.
-func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedSimple{
-		FontSimple:    f,
+		fontSimple:    f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
@@ -103,12 +102,12 @@ func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 }
 
 // Layout implements the [font.Font] interface.
-func (f *FontSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontSimple) Layout(s string, ptSize float64) glyph.Seq {
 	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
-	*FontSimple
+	*fontSimple
 	w pdf.Putter
 	pdf.Resource
 

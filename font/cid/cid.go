@@ -30,22 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
-// Inside the PDF documents on my laptop, the following encoding CMaps are used
-// for CIDFonts.  The numbers are the number of occurences of the encoding:
-//
-//   3110 /Identity-H
-//      6 /UniCNS-UTF16-H
-//      5 /Identity-V
-//      5 /UniGB-UCS2-H
-//      4 /UniKS-UCS2-H
-//      3 /UniJIS-UCS2-H
-//      2 /90msp-RKSJ-H
-//      2 /KSCms-UHC-H
-//      2 /UniGB-UTF16-H
-//      2 (indirect reference to embedded CMap)
-//      1 /ETenms-B5-H
-//      1 /GBK-EUC-H
-
 // EmbedFile loads a font from a file and embeds it into a PDF file.
 // At the moment, only TrueType and OpenType fonts are supported.
 func EmbedFile(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
@@ -90,14 +74,11 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 // CIDFonts lead to larger PDF files than simple fonts, but there is no limit
 // on the number of distinct glyphs which can be accessed.
 func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
-	if info.IsCFF() {
-		opt := &cff.FontOptions{
-			Language: loc,
-		}
-		return cff.NewComposite(info, opt)
-	}
-	opt := &truetype.FontOptions{
+	opt := &font.Options{
 		Language: loc,
+	}
+	if info.IsCFF() {
+		return cff.NewComposite(info, opt)
 	}
 	return truetype.NewComposite(info, opt)
 }

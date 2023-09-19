@@ -73,8 +73,11 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 // to larger PDF files but there is no limit on the number of distinct glyphs
 // which can be accessed.
 func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
-	if info.IsCFF() {
-		return cff.NewSimple(info, loc)
+	opt := &font.Options{
+		Language: loc,
 	}
-	return truetype.NewSimple(info, loc)
+	if info.IsCFF() {
+		return cff.NewSimple(info, opt)
+	}
+	return truetype.NewSimple(info, opt)
 }

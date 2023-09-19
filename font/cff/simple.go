@@ -25,7 +25,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"golang.org/x/text/language"
 
 	"seehuhn.de/go/postscript/funit"
 
@@ -57,7 +56,7 @@ type FontSimple struct {
 // If info is CID-keyed, the function will attempt to convert it to a simple font.
 // If the conversion fails (because more than one private dictionary is used
 // after subsetting), an error is returned.
-func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
+func NewSimple(info *sfnt.Font, opt *font.Options) (*FontSimple, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -82,8 +81,8 @@ func NewSimple(info *sfnt.Font, loc language.Tag) (*FontSimple, error) {
 	res := &FontSimple{
 		otf:         info,
 		cmap:        cmap,
-		gsubLookups: info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups: info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
+		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
 		Geometry:    geometry,
 	}
 	return res, nil

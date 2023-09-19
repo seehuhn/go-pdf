@@ -95,6 +95,10 @@ func doit() error {
 	l.addFont("chapter", SB, 24)
 	l.addFont("section", SB, 18)
 
+	opt := &font.Options{
+		Language: language.English,
+	}
+
 	pageNo := 1
 	fontNo := 1
 	for _, s := range sections {
@@ -123,7 +127,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = cff.NewSimple(otf, language.English)
+			X, err = cff.NewSimple(otf, opt)
 			if err != nil {
 				return err
 			}
@@ -133,7 +137,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewCFFSimple(otf, language.English)
+			X, err = opentype.NewCFFSimple(otf, opt)
 			if err != nil {
 				return err
 			}
@@ -145,7 +149,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = truetype.NewSimple(ttf, language.English)
+			X, err = truetype.NewSimple(ttf, opt)
 			if err != nil {
 				return err
 			}
@@ -155,7 +159,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewGlyfSimple(otf, language.English)
+			X, err = opentype.NewGlyfSimple(otf, opt)
 			if err != nil {
 				return err
 			}
@@ -172,9 +176,6 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			opt := &cff.FontOptions{
-				Language: language.English,
-			}
 			X, err = cff.NewComposite(otf, opt)
 			if err != nil {
 				return err
@@ -185,7 +186,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewCFFComposite(otf, nil)
+			X, err = opentype.NewCFFComposite(otf, opt)
 			if err != nil {
 				return err
 			}
@@ -195,7 +196,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = truetype.NewComposite(ttf, nil)
+			X, err = truetype.NewComposite(ttf, opt)
 			if err != nil {
 				return err
 			}
@@ -205,7 +206,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewGlyfComposite(otf, nil)
+			X, err = opentype.NewGlyfComposite(otf, opt)
 			if err != nil {
 				return err
 			}

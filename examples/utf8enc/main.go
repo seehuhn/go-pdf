@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/cmap"
 )
@@ -44,7 +45,7 @@ func doit() error {
 		return err
 	}
 
-	opt := &cff.FontOptions{
+	opt := &font.Options{
 		Language:     language.German,
 		MakeGIDToCID: cmap.NewIdentityGIDToCID,
 		MakeEncoder:  cmap.NewCIDEncoderUTF8,

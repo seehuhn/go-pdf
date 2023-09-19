@@ -40,8 +40,8 @@ import (
 	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-// FontComposite is a composite TrueType font.
-type FontComposite struct {
+// fontComposite is a composite TrueType font.
+type fontComposite struct {
 	ttf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
@@ -52,38 +52,21 @@ type FontComposite struct {
 	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
 }
 
-// FontOptions allows to customize details of the font embedding.
-type FontOptions struct {
-	Language     language.Tag
-	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
-}
-
-var defaultFontOptions = FontOptions{
+var defaultFontOptions = &font.Options{
 	Language:     language.Und,
 	MakeGIDToCID: cmap.NewSequentialGIDToCID,
 	MakeEncoder:  cmap.NewCIDEncoderIdentity,
+	GsubFeatures: gtab.GsubDefaultFeatures,
+	GposFeatures: gtab.GposDefaultFeatures,
 }
 
 // NewComposite creates a new composite TrueType font.
-func NewComposite(info *sfnt.Font, opt *FontOptions) (*FontComposite, error) {
+func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
 
-	if opt == nil {
-		opt = &defaultFontOptions
-	}
-	loc := opt.Language
-
-	makeGIDToCID := opt.MakeGIDToCID
-	if makeGIDToCID == nil {
-		makeGIDToCID = defaultFontOptions.MakeGIDToCID
-	}
-	makeEncoder := opt.MakeEncoder
-	if makeEncoder == nil {
-		makeEncoder = defaultFontOptions.MakeEncoder
-	}
+	opt = font.MergeOptions(opt, defaultFontOptions)
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
@@ -102,32 +85,32 @@ func NewComposite(info *sfnt.Font, opt *FontOptions) (*FontComposite, error) {
 		return nil, err
 	}
 
-	res := &FontComposite{
+	res := &fontComposite{
 		ttf:          info,
 		cmap:         cmap,
-		gsubLookups:  info.Gsub.FindLookups(loc, gtab.GsubDefaultFeatures),
-		gposLookups:  info.Gpos.FindLookups(loc, gtab.GposDefaultFeatures),
+		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
+		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
 		Geometry:     geometry,
-		makeGIDToCID: makeGIDToCID,
-		makeEncoder:  makeEncoder,
+		makeGIDToCID: opt.MakeGIDToCID,
+		makeEncoder:  opt.MakeEncoder,
 	}
 	return res, nil
 }
 
 // Layout implements the [font.Font] interface.
-func (f *FontComposite) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontComposite) Layout(s string, ptSize float64) glyph.Seq {
 	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 // Embed implements the [font.Font] interface.
-func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
 		return nil, err
 	}
 	gidToCID := f.makeGIDToCID()
 	res := &embeddedCID{
-		FontComposite: f,
+		fontComposite: f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		GIDToCID:      gidToCID,
@@ -138,7 +121,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 }
 
 type embeddedCID struct {
-	*FontComposite
+	*fontComposite
 	w pdf.Putter
 	pdf.Resource
 
