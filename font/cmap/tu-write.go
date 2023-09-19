@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tounicode
+package cmap
 
 import (
 	"fmt"
@@ -28,7 +28,7 @@ import (
 )
 
 // Embed adds the ToUnicode cmap to a PDF file.
-func (info *Info) Embed(w pdf.Putter, ref pdf.Reference) error {
+func (info *ToUnicode) Embed(w pdf.Putter, ref pdf.Reference) error {
 	stm, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err
@@ -44,14 +44,12 @@ func (info *Info) Embed(w pdf.Putter, ref pdf.Reference) error {
 	return nil
 }
 
-func (info *Info) Write(w io.Writer) error {
+func (info *ToUnicode) Write(w io.Writer) error {
 	return toUnicodeTmpl.Execute(w, info)
 }
 
-const chunkSize = 100
-
-func singleChunks(x []SingleEntry) [][]SingleEntry {
-	var res [][]SingleEntry
+func tuSingleChunks(x []SingleTUEntry) [][]SingleTUEntry {
+	var res [][]SingleTUEntry
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -62,8 +60,8 @@ func singleChunks(x []SingleEntry) [][]SingleEntry {
 	return res
 }
 
-func rangeChunks(x []RangeEntry) [][]RangeEntry {
-	var res [][]RangeEntry
+func tuRangeChunks(x []RangeTUEntry) [][]RangeTUEntry {
+	var res [][]RangeTUEntry
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -93,15 +91,15 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": singleChunks,
-	"Single": func(cs charcode.CodeSpaceRange, s SingleEntry) string {
+	"SingleChunks": tuSingleChunks,
+	"Single": func(cs charcode.CodeSpaceRange, s SingleTUEntry) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
 		val := hexRunes(s.Value)
 		return fmt.Sprintf("<%x> %s", buf, val)
 	},
-	"RangeChunks": rangeChunks,
-	"Range": func(cs charcode.CodeSpaceRange, s RangeEntry) string {
+	"RangeChunks": tuRangeChunks,
+	"Range": func(cs charcode.CodeSpaceRange, s RangeTUEntry) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)
 		last = cs.Append(last, s.Last)

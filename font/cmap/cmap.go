@@ -92,6 +92,7 @@ func (info *Info) IsIdentity() bool {
 	return true
 }
 
+// MaxCID returns the largest CID used by this CMap.
 func (info *Info) MaxCID() type1.CID {
 	var maxCID type1.CID
 	for _, s := range info.Singles {

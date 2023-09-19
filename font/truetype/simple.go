@@ -20,9 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
@@ -36,10 +33,10 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
 )
 
 // fontSimple is a simple TrueType font.
@@ -127,28 +124,22 @@ func (f *embeddedSimple) Close() error {
 	}
 	encoding := f.SimpleEncoder.Encoding()
 
-	ttf := f.ttf.Clone()
-	ttf.CMapTable = nil
-	ttf.Gdef = nil
-	ttf.Gsub = nil
-	ttf.Gpos = nil
+	origTTF := f.ttf.Clone()
+	origTTF.CMapTable = nil
+	origTTF.Gdef = nil
+	origTTF.Gsub = nil
+	origTTF.Gpos = nil
 
 	// subset the font
-	gidUsed := make(map[glyph.ID]bool)
-	gidUsed[0] = true
-	for _, gid := range encoding {
-		gidUsed[gid] = true
-	}
-	origGid := maps.Keys(gidUsed)
-	slices.Sort(origGid)
-	subsetTtf, err := ttf.Subset(origGid)
+	subsetGID := f.SimpleEncoder.Subset()
+	subsetTag := subset.Tag(subsetGID, origTTF.NumGlyphs())
+	subsetTTF, err := origTTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
-	subsetTag := subset.Tag(origGid, ttf.NumGlyphs())
 
 	subsetGid := make(map[glyph.ID]glyph.ID)
-	for gNew, gOld := range origGid {
+	for gNew, gOld := range subsetGID {
 		subsetGid[gOld] = glyph.ID(gNew)
 	}
 	subsetEncoding := make([]glyph.ID, 256)
@@ -157,11 +148,11 @@ func (f *embeddedSimple) Close() error {
 	}
 
 	m := f.SimpleEncoder.ToUnicode()
-	toUnicode := tounicode.New(charcode.Simple, m)
+	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
 	info := EmbedInfoSimple{
-		Font:      subsetTtf,
+		Font:      subsetTTF,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
@@ -189,7 +180,7 @@ type EmbedInfoSimple struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *tounicode.Info
+	ToUnicode *cmap.ToUnicode
 }
 
 // Embed adds the font to a PDF file.
@@ -374,7 +365,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		res.Encoding = ExtractEncoding(r, dicts.FontDict["Encoding"], res.Font)
 	}
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

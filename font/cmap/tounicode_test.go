@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tounicode
+package cmap
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-func TestMapping(t *testing.T) {
+func TestToUnicodeMapping(t *testing.T) {
 	cmap := `/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
@@ -47,7 +47,7 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end`
-	info, err := Read(strings.NewReader(cmap), nil)
+	info, err := ReadToUnicode(strings.NewReader(cmap), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,9 +64,9 @@ end`
 }
 
 func TestRoundtrip(t *testing.T) {
-	info := &Info{
+	info := &ToUnicode{
 		CS: charcode.Simple,
-		Singles: []SingleEntry{
+		Singles: []SingleTUEntry{
 			{
 				Code:  65,
 				Value: []rune{'A'},
@@ -76,7 +76,7 @@ func TestRoundtrip(t *testing.T) {
 				Value: []rune("ffl"),
 			},
 		},
-		Ranges: []RangeEntry{
+		Ranges: []RangeTUEntry{
 			{
 				First:  96,
 				Last:   112,
@@ -98,7 +98,7 @@ func TestRoundtrip(t *testing.T) {
 
 	// fmt.Println(buf.String())
 
-	info2, err := Read(buf, nil)
+	info2, err := ReadToUnicode(buf, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ CMapName currentdict /CMap defineresource pop
 end
 end`)
 	f.Fuzz(func(t *testing.T, s string) {
-		info1, err := Read(strings.NewReader(s), nil)
+		info1, err := ReadToUnicode(strings.NewReader(s), nil)
 		if err != nil {
 			return
 		}
@@ -160,7 +160,7 @@ end`)
 		if err != nil {
 			t.Fatal(err)
 		}
-		info2, err := Read(buf, nil)
+		info2, err := ReadToUnicode(buf, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

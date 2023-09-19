@@ -44,10 +44,12 @@ type CIDEncoder interface {
 
 	// ToUnicode returns the mapping from character codes to unicode strings.
 	// This can be used to construct a PDF ToUnicode CMap.
-	ToUnicode() map[charcode.CharCode][]rune
+	ToUnicode() *ToUnicode
 
 	// CodeSpaceRange returns the range of character codes
 	// used by this encoder.
+	//
+	// TODO(voss): is this still needed?
 	CodeSpaceRange() charcode.CodeSpaceRange
 
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
@@ -88,8 +90,8 @@ func (e *identityEncoder) CMap() *Info {
 	return New(e.g2c.ROS(), e.CodeSpaceRange(), m)
 }
 
-func (e *identityEncoder) ToUnicode() map[charcode.CharCode][]rune {
-	return e.toUnicode
+func (e *identityEncoder) ToUnicode() *ToUnicode {
+	return NewToUnicode(charcode.UCS2, e.toUnicode)
 }
 
 func (e *identityEncoder) CodeSpaceRange() charcode.CodeSpaceRange {
@@ -180,12 +182,12 @@ func (e *utf8Encoder) CMap() *Info {
 	return New(e.g2c.ROS(), e.CodeSpaceRange(), e.cmap)
 }
 
-func (e *utf8Encoder) ToUnicode() map[charcode.CharCode][]rune {
+func (e *utf8Encoder) ToUnicode() *ToUnicode {
 	toUnicode := make(map[charcode.CharCode][]rune)
 	for k, v := range e.cache {
 		toUnicode[v] = []rune(k.rr)
 	}
-	return toUnicode
+	return NewToUnicode(utf8cs, toUnicode)
 }
 
 func (e *utf8Encoder) CodeSpaceRange() charcode.CodeSpaceRange {

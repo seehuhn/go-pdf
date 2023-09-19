@@ -25,10 +25,10 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
@@ -40,7 +40,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 		return nil, err
 	}
 
-	var toUnicode *tounicode.Info
+	var toUnicode *cmap.ToUnicode
 	// TODO(voss): make this less repetitive
 	switch dicts.Type {
 	case font.Type1, font.Builtin:
@@ -59,7 +59,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Encoding[i]
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.New(charcode.Simple, m)
+		toUnicode = cmap.NewToUnicode(charcode.Simple, m)
 
 	case font.CFFSimple:
 		info, err := cff.ExtractSimple(r, dicts)
@@ -78,7 +78,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Font.Glyphs[gid].Name
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.New(charcode.Simple, m)
+		toUnicode = cmap.NewToUnicode(charcode.Simple, m)
 
 	case font.OpenTypeCFFSimple:
 		info, err := opentype.ExtractCFFSimple(r, dicts)
@@ -97,7 +97,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Font.GlyphName(gid)
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.New(charcode.Simple, m)
+		toUnicode = cmap.NewToUnicode(charcode.Simple, m)
 
 	case font.TrueTypeSimple:
 		info, err := truetype.ExtractSimple(r, dicts)
@@ -124,7 +124,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			for i, name := range encodingNames {
 				m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 			}
-			toUnicode = tounicode.New(charcode.Simple, m)
+			toUnicode = cmap.NewToUnicode(charcode.Simple, m)
 			break
 		}
 
@@ -157,7 +157,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 			name := info.Encoding[i]
 			m[charcode.CharCode(i)] = names.ToUnicode(name, false)
 		}
-		toUnicode = tounicode.New(charcode.Simple, m)
+		toUnicode = cmap.NewToUnicode(charcode.Simple, m)
 
 	case font.CFFComposite:
 		info, err := cff.ExtractComposite(r, dicts)

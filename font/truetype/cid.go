@@ -37,7 +37,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
 )
 
 // fontComposite is a composite TrueType font.
@@ -145,14 +144,13 @@ func (f *embeddedCID) Close() error {
 
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
+	subsetTag := subset.Tag(subsetGID, origTTF.NumGlyphs())
 	subsetTTF, err := origTTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("TrueType font subset: %w", err)
 	}
-	subsetTag := subset.Tag(subsetGID, origTTF.NumGlyphs())
 
-	cs := f.CodeSpaceRange()
-	toUnicode := tounicode.New(cs, f.ToUnicode())
+	toUnicode := f.ToUnicode()
 
 	cmapInfo := f.CMap()
 
@@ -204,7 +202,7 @@ type EmbedInfoComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *tounicode.Info
+	ToUnicode *cmap.ToUnicode
 }
 
 // Embed adds a composite TrueType font to a PDF file.
@@ -447,11 +445,11 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 		res.SubsetTag = m[1]
 	}
 
-	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
+	cmapInfo, err := cmap.Extract(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
-	res.CMap = cmap
+	res.CMap = cmapInfo
 
 	CID2GIDObj, err := pdf.Resolve(r, dicts.CIDFontDict["CIDToGIDMap"])
 	if err != nil {
@@ -484,7 +482,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 		}
 	}
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], cmap.CS); info != nil {
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CS); info != nil {
 		res.ToUnicode = info
 	}
 

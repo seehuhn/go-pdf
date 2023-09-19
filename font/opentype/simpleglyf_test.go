@@ -24,8 +24,8 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -36,20 +36,20 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmap, err := otf.CMapTable.GetBest()
+	cmapInfo, err := otf.CMapTable.GetBest()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	encoding := make([]glyph.ID, 256)
-	encoding[65] = cmap.Lookup('A')
-	encoding[66] = cmap.Lookup('C')
+	encoding[65] = cmapInfo.Lookup('A')
+	encoding[66] = cmapInfo.Lookup('C')
 
 	m := map[charcode.CharCode][]rune{
 		65: {'A'},
 		66: {'C'},
 	}
-	toUnicode := tounicode.New(charcode.Simple, m)
+	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
 	info1 := &EmbedInfoGlyfSimple{
 		Font:      otf,

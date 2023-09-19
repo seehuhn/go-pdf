@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tounicode
+package cmap
 
 import (
 	"fmt"
@@ -24,36 +24,36 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// Info holds the information for a PDF ToUnicode cmap.
-type Info struct {
+// ToUnicode holds the information for a PDF ToUnicode cmap.
+type ToUnicode struct {
 	CS      charcode.CodeSpaceRange
-	Singles []SingleEntry
-	Ranges  []RangeEntry
+	Singles []SingleTUEntry
+	Ranges  []RangeTUEntry
 }
 
-// SingleEntry specifies that character code Code represents the given unicode string.
-type SingleEntry struct {
+// SingleTUEntry specifies that character code Code represents the given unicode string.
+type SingleTUEntry struct {
 	Code  charcode.CharCode
 	Value []rune
 }
 
-func (s SingleEntry) String() string {
+func (s SingleTUEntry) String() string {
 	return fmt.Sprintf("%d: %q", s.Code, string(s.Value))
 }
 
-// RangeEntry describes a range of character codes.
+// RangeTUEntry describes a range of character codes.
 // First and Last are the first and last code points in the range.
 // Values is a list of unicode strings.  If the list has length one, then the
 // replacement character is incremented by one for each code point in the
 // range.  Otherwise, the list must have the length Last-First+1, and specify
 // the value for each code point in the range.
-type RangeEntry struct {
+type RangeTUEntry struct {
 	First  charcode.CharCode
 	Last   charcode.CharCode
 	Values [][]rune
 }
 
-func (r RangeEntry) String() string {
+func (r RangeTUEntry) String() string {
 	ss := make([]string, len(r.Values))
 	for i, v := range r.Values {
 		ss[i] = string(v)
@@ -61,9 +61,9 @@ func (r RangeEntry) String() string {
 	return fmt.Sprintf("%d-%d: %q", r.First, r.Last, ss)
 }
 
-// New constructs a ToUnicode cmap from the given mapping.
-func New(cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *Info {
-	info := &Info{
+// NewToUnicode constructs a ToUnicode cmap from the given mapping.
+func NewToUnicode(cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *ToUnicode {
+	info := &ToUnicode{
 		CS: cs,
 	}
 	info.SetMapping(m)
@@ -76,7 +76,7 @@ func New(cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *Info {
 // and the length is either 0 (if the string is empty) or 1.
 // If a valid character code is found but the code is not mapped by the
 // ToUnicode cmap, then the unicode replacement character is returned.
-func (info *Info) Decode(s pdf.String) ([]rune, int) {
+func (info *ToUnicode) Decode(s pdf.String) ([]rune, int) {
 	code, k := info.CS.Decode(s)
 	if code < 0 {
 		return []rune{unicode.ReplacementChar}, k

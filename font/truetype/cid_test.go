@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
@@ -55,7 +54,7 @@ func TestRoundTripComposite(t *testing.T) {
 	for code := charcode.CharCode(0); code < 8; code++ {
 		m[code] = []rune{'X', '0' + rune(code)}
 	}
-	toUnicode := tounicode.New(cs, m)
+	toUnicode := cmap.NewToUnicode(cs, m)
 
 	info1 := &EmbedInfoComposite{
 		Font:      ttf,

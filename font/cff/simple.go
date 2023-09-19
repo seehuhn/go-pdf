@@ -23,9 +23,6 @@ import (
 	"io"
 	"math"
 
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
@@ -37,13 +34,13 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
 )
 
-// FontSimple is a CFF font for embedding into a PDF file as a simple font.
-type FontSimple struct {
+// fontSimple is a CFF font for embedding into a PDF file as a simple font.
+type fontSimple struct {
 	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
@@ -56,7 +53,7 @@ type FontSimple struct {
 // If info is CID-keyed, the function will attempt to convert it to a simple font.
 // If the conversion fails (because more than one private dictionary is used
 // after subsetting), an error is returned.
-func NewSimple(info *sfnt.Font, opt *font.Options) (*FontSimple, error) {
+func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -78,7 +75,7 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (*FontSimple, error) {
 		return nil, err
 	}
 
-	res := &FontSimple{
+	res := &fontSimple{
 		otf:         info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
@@ -89,13 +86,13 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (*FontSimple, error) {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedSimple{
-		FontSimple:    f,
+		fontSimple:    f,
 		w:             w,
 		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
@@ -105,12 +102,12 @@ func (f *FontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 }
 
 // Layout implements the [font.Font] interface.
-func (f *FontSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontSimple) Layout(s string, ptSize float64) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
-	*FontSimple
+	*fontSimple
 	w pdf.Putter
 	pdf.Resource
 
@@ -143,18 +140,12 @@ func (f *embeddedSimple) Close() error {
 	otf.Gsub = nil
 
 	// subset the font
-	gidUsed := make(map[glyph.ID]bool)
-	gidUsed[0] = true
-	for _, gid := range encoding {
-		gidUsed[gid] = true
-	}
-	origGid := maps.Keys(gidUsed)
-	slices.Sort(origGid)
-	subsetOtf, err := otf.Subset(origGid)
+	subsetGID := f.SimpleEncoder.Subset()
+	subsetTag := subset.Tag(subsetGID, otf.NumGlyphs())
+	subsetOtf, err := otf.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
-	subsetTag := subset.Tag(origGid, otf.NumGlyphs())
 
 	// convert the font to a simple font, if needed
 	subsetOtf.EnsureGlyphNames()
@@ -164,7 +155,7 @@ func (f *embeddedSimple) Close() error {
 	}
 
 	m := f.SimpleEncoder.ToUnicode()
-	toUnicode := tounicode.New(charcode.Simple, m)
+	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
 	info := EmbedInfoSimple{
@@ -209,7 +200,7 @@ type EmbedInfoSimple struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *tounicode.Info
+	ToUnicode *cmap.ToUnicode
 }
 
 // Embed adds the font to a PDF file.
@@ -411,7 +402,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

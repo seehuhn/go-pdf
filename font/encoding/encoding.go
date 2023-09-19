@@ -19,6 +19,8 @@ package encoding
 import (
 	"math/bits"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/pdfenc"
@@ -116,6 +118,19 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 // Overflow returns true if the encoder has run out of codes.
 func (e *SimpleEncoder) Overflow() bool {
 	return len(e.cache) > 256
+}
+
+// Subset returns the subset of glyph IDs which are used by this encoder.
+// The result is sorted and always include the glyph ID 0.
+func (e *SimpleEncoder) Subset() []glyph.ID {
+	gidUsed := make(map[glyph.ID]bool, len(e.cache)+1)
+	gidUsed[0] = true
+	for key := range e.cache {
+		gidUsed[key.gid] = true
+	}
+	subset := maps.Keys(gidUsed)
+	slices.Sort(subset)
+	return subset
 }
 
 // Encoding returns the glyph ID corresponding to each character code.

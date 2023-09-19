@@ -37,7 +37,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
 )
 
 // fontGlyfComposite is a composite OpenType/glyf font.
@@ -147,14 +146,13 @@ func (f *embeddedGlyfComposite) Close() error {
 
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
+	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
-		return fmt.Errorf("TrueType font subset: %w", err)
+		return fmt.Errorf("OpenType/glyf font subset: %w", err)
 	}
-	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 
-	cs := f.CodeSpaceRange()
-	toUnicode := tounicode.New(cs, f.ToUnicode())
+	toUnicode := f.ToUnicode()
 
 	cmapInfo := f.CMap()
 
@@ -206,7 +204,7 @@ type EmbedInfoGlyfComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *tounicode.Info
+	ToUnicode *cmap.ToUnicode
 }
 
 // Embed adds the font to the PDF file.
@@ -443,11 +441,11 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 		res.SubsetTag = m[1]
 	}
 
-	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
+	cmapInfo, err := cmap.Extract(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
-	res.CMap = cmap
+	res.CMap = cmapInfo
 
 	CID2GIDObj, err := pdf.Resolve(r, dicts.CIDFontDict["CIDToGIDMap"])
 	if err != nil {
@@ -458,7 +456,7 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 		if CID2GID != "Identity" {
 			return nil, fmt.Errorf("unsupported CIDToGIDMap: %q", CID2GID)
 		}
-		res.CIDToGID = make([]glyph.ID, cmap.MaxCID()+1)
+		res.CIDToGID = make([]glyph.ID, cmapInfo.MaxCID()+1)
 		for i := range res.CIDToGID {
 			res.CIDToGID[i] = glyph.ID(i)
 		}
@@ -480,7 +478,7 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 		}
 	}
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], cmap.CS); info != nil {
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CS); info != nil {
 		res.ToUnicode = info
 	}
 

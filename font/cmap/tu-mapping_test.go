@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tounicode
+package cmap
 
 import (
 	"testing"
@@ -33,7 +33,7 @@ func TestFromMapping(t *testing.T) {
 		'F': []rune("F"),
 		'G': []rune("G"),
 	}
-	info := &Info{
+	info := &ToUnicode{
 		CS: charcode.Simple,
 	}
 	info.SetMapping(m)
@@ -60,7 +60,7 @@ func TestFromMapping2(t *testing.T) {
 		'C': []rune("C"),
 		'E': []rune("E"),
 	}
-	info := &Info{
+	info := &ToUnicode{
 		CS: charcode.Simple,
 	}
 	info.SetMapping(m)
@@ -71,7 +71,7 @@ func TestFromMapping2(t *testing.T) {
 		t.Fatalf("expected 1 range, got %d", len(info.Ranges))
 	}
 	r := info.Ranges[0]
-	rExpected := RangeEntry{
+	rExpected := RangeTUEntry{
 		First:  'A',
 		Last:   'E',
 		Values: [][]rune{[]rune("A")},

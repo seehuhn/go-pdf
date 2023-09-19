@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tounicode
+package cmap
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ import (
 )
 
 // GetMapping returns the mapping information from info.
-func (info *Info) GetMapping() map[charcode.CharCode][]rune {
+func (info *ToUnicode) GetMapping() map[charcode.CharCode][]rune {
 	res := make(map[charcode.CharCode][]rune)
 	for _, s := range info.Singles {
 		res[s.Code] = s.Value
@@ -61,16 +61,16 @@ func c(rr []rune) []rune {
 // To make efficient use of range entries, the generated mapping may be a
 // superset of the original mapping, i.e. it may contain entries for charcodes
 // which were not mapped in the original mapping.
-func (info *Info) SetMapping(m map[charcode.CharCode][]rune) {
-	entries := make([]entry, 0, len(m))
+func (info *ToUnicode) SetMapping(m map[charcode.CharCode][]rune) {
+	entries := make([]tuEntry, 0, len(m))
 	for code, val := range m {
-		entries = append(entries, entry{code, val})
+		entries = append(entries, tuEntry{code, val})
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].code < entries[j].code
 	})
 
-	g := &encoder{
+	g := &tuEncoder{
 		cs: info.CS,
 		mm: entries,
 	}
@@ -84,12 +84,12 @@ func (info *Info) SetMapping(m map[charcode.CharCode][]rune) {
 	v := 0
 	for _, e := range ee {
 		if e == 0 {
-			info.Singles = append(info.Singles, SingleEntry{
+			info.Singles = append(info.Singles, SingleTUEntry{
 				Code:  entries[v].code,
 				Value: entries[v].value,
 			})
 		} else if e < 0 {
-			info.Ranges = append(info.Ranges, RangeEntry{
+			info.Ranges = append(info.Ranges, RangeTUEntry{
 				First:  entries[v].code,
 				Last:   entries[v-int(e)-1].code,
 				Values: [][]rune{entries[v].value},
@@ -99,7 +99,7 @@ func (info *Info) SetMapping(m map[charcode.CharCode][]rune) {
 			for i := v; i < v+int(e); i++ {
 				values = append(values, entries[i].value)
 			}
-			info.Ranges = append(info.Ranges, RangeEntry{
+			info.Ranges = append(info.Ranges, RangeTUEntry{
 				First:  entries[v].code,
 				Last:   entries[v+int(e)-1].code,
 				Values: values,
@@ -109,20 +109,20 @@ func (info *Info) SetMapping(m map[charcode.CharCode][]rune) {
 	}
 }
 
-type entry struct {
+type tuEntry struct {
 	code  charcode.CharCode
 	value []rune
 }
 
-type encoder struct {
+type tuEncoder struct {
 	cs   charcode.CodeSpaceRange
-	mm   []entry
+	mm   []tuEntry
 	bufR []rune
 	buf0 pdf.String
 	buf1 pdf.String
 }
 
-func (g *encoder) AppendEdges(ee []int16, v int) []int16 {
+func (g *tuEncoder) AppendEdges(ee []int16, v int) []int16 {
 	if v < 0 || v >= len(g.mm) {
 		return ee
 	}
@@ -188,7 +188,7 @@ vertexLoop:
 	return ee
 }
 
-func (g *encoder) Length(v int, e int16) uint32 {
+func (g *tuEncoder) Length(v int, e int16) uint32 {
 	// For simplicity we ignore the cost of the "begin...end" operators.
 	// For simplicity we assume all runes are in the BMP.
 
@@ -214,7 +214,7 @@ func (g *encoder) Length(v int, e int16) uint32 {
 	return cost
 }
 
-func (g *encoder) To(v int, e int16) int {
+func (g *tuEncoder) To(v int, e int16) int {
 	if e == 0 {
 		return v + 1
 	} else if e < 0 {

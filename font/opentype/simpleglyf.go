@@ -20,9 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/postscript/funit"
 
@@ -35,9 +32,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
@@ -136,21 +133,15 @@ func (f *embeddedSimpleGlyf) Close() error {
 	origOTF.Gpos = nil
 
 	// subset the font
-	gidUsed := make(map[glyph.ID]bool)
-	gidUsed[0] = true
-	for _, gid := range encoding {
-		gidUsed[gid] = true
-	}
-	origGid := maps.Keys(gidUsed)
-	slices.Sort(origGid)
-	subsetOTF, err := origOTF.Subset(origGid)
+	subsetGID := f.SimpleEncoder.Subset()
+	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
+	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("font subset: %w", err)
 	}
-	subsetTag := subset.Tag(origGid, origOTF.NumGlyphs())
 
 	subsetGid := make(map[glyph.ID]glyph.ID)
-	for gNew, gOld := range origGid {
+	for gNew, gOld := range subsetGID {
 		subsetGid[gOld] = glyph.ID(gNew)
 	}
 	subsetEncoding := make([]glyph.ID, 256)
@@ -159,7 +150,7 @@ func (f *embeddedSimpleGlyf) Close() error {
 	}
 
 	m := f.SimpleEncoder.ToUnicode()
-	toUnicode := tounicode.New(charcode.Simple, m)
+	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
 	info := EmbedInfoGlyfSimple{
@@ -191,7 +182,7 @@ type EmbedInfoGlyfSimple struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *tounicode.Info
+	ToUnicode *cmap.ToUnicode
 }
 
 // Embed adds the font to a PDF file.
@@ -381,7 +372,7 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, e
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 	res.ForceBold = dicts.FontDescriptor.ForceBold
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

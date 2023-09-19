@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/font/tounicode"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
@@ -58,7 +57,7 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 	m[charcode.CharCode('A')] = []rune{'A'}
 	m[charcode.CharCode('B')] = []rune{'B'}
 	m[charcode.CharCode('C')] = []rune{'C'}
-	toUnicode := tounicode.New(cs, m)
+	toUnicode := cmap.NewToUnicode(cs, m)
 
 	maxCID := type1.CID(fontCMap.Lookup('C'))
 	CID2GID := make([]glyph.ID, maxCID+1)

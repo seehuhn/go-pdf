@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript"
+	"seehuhn.de/go/postscript/cmap"
 	"seehuhn.de/go/postscript/type1"
 )
 
@@ -55,7 +56,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
 }
 
 func Read(r io.Reader, other map[string]*Info) (*Info, error) {
-	cmap, err := ReadRaw(r)
+	cmap, err := cmap.Read(r)
 	if err != nil {
 		return nil, err
 	}
@@ -165,31 +166,4 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	}
 
 	return res, nil
-}
-
-// ReadRaw reads the raw PostScript data of a CMap from an [io.Reader].
-func ReadRaw(r io.Reader) (postscript.Dict, error) {
-	intp := postscript.NewInterpreter()
-	intp.MaxOps = 1_000_000 // TODO(voss): measure what is required
-	err := intp.Execute(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var cmap postscript.Dict
-	for name, val := range intp.CMapDirectory {
-		var ok bool
-		cmap, ok = val.(postscript.Dict)
-		if !ok {
-			continue
-		}
-		if _, ok := cmap["CMapName"].(postscript.Name); !ok {
-			cmap["CMapName"] = postscript.Name(name)
-		}
-	}
-	if cmap == nil {
-		return nil, fmt.Errorf("no valid CMap found")
-	}
-
-	return cmap, nil
 }

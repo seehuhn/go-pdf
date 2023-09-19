@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tounicode
+package cmap
 
 import (
 	"errors"
@@ -23,15 +23,15 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/postscript"
+	pscmap "seehuhn.de/go/postscript/cmap"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
 )
 
-// Extract extracts a ToUnicode CMap from a PDF file.
+// ExtractToUnicode extracts a ToUnicode CMap from a PDF file.
 // If cs is not nil, it overrides the code space range given inside the CMap.
-func Extract(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) (*Info, error) {
+func ExtractToUnicode(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) (*ToUnicode, error) {
 	stm, err := pdf.GetStream(r, obj)
 	if err != nil {
 		return nil, err
@@ -42,13 +42,13 @@ func Extract(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) (*Info, e
 	if err != nil {
 		return nil, err
 	}
-	return Read(data, cs)
+	return ReadToUnicode(data, cs)
 }
 
-// Read reads a ToUnicode CMap.
+// ReadToUnicode reads a ToUnicode CMap.
 // If cs is not nil, it overrides the code space range given inside the CMap.
-func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
-	cmap, err := cmap.ReadRaw(r)
+func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) {
+	cmap, err := pscmap.Read(r)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 		cs = csRanges
 	}
 
-	res := &Info{
+	res := &ToUnicode{
 		CS: cs,
 	}
 
@@ -82,7 +82,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		res.Singles = append(res.Singles, SingleEntry{
+		res.Singles = append(res.Singles, SingleTUEntry{
 			Code:  code,
 			Value: rr,
 		})
@@ -103,7 +103,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 			if err != nil {
 				return nil, err
 			}
-			res.Ranges = append(res.Ranges, RangeEntry{
+			res.Ranges = append(res.Ranges, RangeTUEntry{
 				First:  low,
 				Last:   high,
 				Values: [][]rune{rr},
@@ -120,7 +120,7 @@ func Read(r io.Reader, cs charcode.CodeSpaceRange) (*Info, error) {
 				}
 				values = append(values, rr)
 			}
-			res.Ranges = append(res.Ranges, RangeEntry{
+			res.Ranges = append(res.Ranges, RangeTUEntry{
 				First:  low,
 				Last:   high,
 				Values: values,

@@ -8,8 +8,8 @@ require (
 	golang.org/x/term v0.5.0
 	golang.org/x/text v0.13.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
-	seehuhn.de/go/postscript v0.3.5
-	seehuhn.de/go/sfnt v0.3.5
+	seehuhn.de/go/postscript v0.3.6
+	seehuhn.de/go/sfnt v0.3.6
 )
 
 require golang.org/x/image v0.12.0

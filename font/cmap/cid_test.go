@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/type1"
@@ -61,16 +62,16 @@ func TestAppendEncoded(t *testing.T) {
 	if !reflect.DeepEqual(e.CMap(), expectedCMap) {
 		t.Errorf("CMap returned %v, expected %v", e.CMap(), expectedCMap)
 	}
-	expectedToUnicode := map[charcode.CharCode][]rune{
+	expectedToUnicode := NewToUnicode(utf8cs, map[charcode.CharCode][]rune{
 		runeToCode('A'):      {'A'},
 		runeToCode('B'):      {'B'},
 		runeToCode('C'):      {'C'},
 		runeToCode('a'):      {'a'},
 		runeToCode('\uE000'): {'A'},
 		runeToCode('\uE001'): {'H', 'e', 'l', 'l', 'o'},
-	}
-	if !reflect.DeepEqual(e.ToUnicode(), expectedToUnicode) {
-		t.Errorf("ToUnicode returned %v, expected %v", e.ToUnicode(), expectedToUnicode)
+	})
+	if d := cmp.Diff(e.ToUnicode(), expectedToUnicode); d != "" {
+		t.Errorf("ToUnicode returned diff %v", d)
 	}
 }
 

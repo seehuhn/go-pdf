@@ -36,7 +36,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
 )
 
 // fontCFFComposite is an OpenType/CFF font for embedding in a PDF file as a composite font.
@@ -147,11 +146,11 @@ func (f *embeddedCFFComposite) Close() error {
 
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
+	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("OpenType/CFF font subset: %w", err)
 	}
-	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 
 	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
 	gidToCID := make([]type1.CID, len(subsetGID))
@@ -160,8 +159,7 @@ func (f *embeddedCFFComposite) Close() error {
 	}
 
 	ros := f.ROS()
-	cs := f.CodeSpaceRange()
-	toUnicode := tounicode.New(cs, f.ToUnicode())
+	toUnicode := f.ToUnicode()
 
 	cmapInfo := f.CMap()
 
@@ -211,7 +209,7 @@ type EmbedInfoCFFComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *tounicode.Info
+	ToUnicode *cmap.ToUnicode
 }
 
 // Embed adds a composite OpenType/CFF font to a PDF file.
@@ -400,16 +398,16 @@ func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposit
 		res.SubsetTag = m[1]
 	}
 
-	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
+	cmapInfo, err := cmap.Extract(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
-	res.CMap = cmap
+	res.CMap = cmapInfo
 
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], cmap.CS); info != nil {
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CS); info != nil {
 		res.ToUnicode = info
 	}
 

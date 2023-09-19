@@ -38,7 +38,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/tounicode"
 )
 
 // FontComposite is a CFF font for embedding into a PDF file as a composite font.
@@ -63,7 +62,7 @@ var defaultFontOptions = &font.Options{
 
 // NewComposite allocates a new CFF font for embedding into a PDF file as a composite font.
 // The font `info` is allowed but not required to be CID-keyed.
-func NewComposite(info *sfnt.Font, opt *font.Options) (*FontComposite, error) {
+func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -147,11 +146,11 @@ func (f *embeddedComposite) Close() error {
 
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
+	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("OpenType/CFF font subset: %w", err)
 	}
-	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
 
 	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
 	gidToCID := make([]type1.CID, subsetOTF.NumGlyphs())
@@ -160,8 +159,7 @@ func (f *embeddedComposite) Close() error {
 	}
 
 	ros := f.ROS()
-	cs := f.CodeSpaceRange()
-	toUnicode := tounicode.New(cs, f.ToUnicode())
+	toUnicode := f.ToUnicode()
 
 	cmapInfo := f.CMap()
 
@@ -226,7 +224,7 @@ type EmbedInfoComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *tounicode.Info
+	ToUnicode *cmap.ToUnicode
 }
 
 // Embed adds a composite CFF font to a PDF file.
@@ -403,11 +401,11 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 		res.SubsetTag = m[1]
 	}
 
-	cmap, err := cmap.Extract(r, dicts.FontDict["Encoding"])
+	cmapInfo, err := cmap.Extract(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
-	res.CMap = cmap
+	res.CMap = cmapInfo
 
 	// TODO(voss): be more robust here
 	unitsPerEm := uint16(math.Round(1 / float64(cff.FontMatrix[0])))
@@ -422,7 +420,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
-	if info, _ := tounicode.Extract(r, dicts.FontDict["ToUnicode"], cmap.CS); info != nil {
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CS); info != nil {
 		res.ToUnicode = info
 	}
 
