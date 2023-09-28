@@ -67,16 +67,27 @@ type State struct {
 	AlphaSourceFlag        bool
 	BlackPointCompensation pdf.Name
 
-	// device-dependent parameters:
+	// The following parameters are device-dependent:
+
 	OverprintStroke bool
 	OverprintFill   bool
 	OverprintMode   int
+
 	// TODO(voss): black generation
 	// TODO(voss): undercolor removal
 	// TODO(voss): transfer function
 	// TODO(voss): halftone
-	// TODO(voss): flatness
-	// TODO(voss): smoothness
+
+	// Flatness is a positive number specifying the precision with which
+	// curves are be rendered on the output device.  Smaller numbers give
+	// smoother curves, but also increase the amount of computation needed
+	// (default: 1).
+	Flatness float64
+
+	// Smoothness is a number in the range 0 to 1 specifying the precision of
+	// smooth shading (default: device-dependent).  As a special case, the
+	// value -1 represents the device-dependent default value.
+	Smoothness float64
 }
 
 func NewState() *State {
@@ -111,6 +122,9 @@ func NewState() *State {
 	res.OverprintStroke = false
 	res.OverprintFill = false
 	res.OverprintMode = 0
+
+	res.Flatness = 1
+	res.Smoothness = -1
 
 	return res
 }

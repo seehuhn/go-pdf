@@ -172,6 +172,22 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 						}
 						// fmt.Println("\tOPM:", opm)
 						g.OverprintMode = int(opm)
+
+					case "FL": // flatness tolerance
+						fl, err := pdf.GetNumber(r, val)
+						if err != nil {
+							return err
+						}
+						// fmt.Println("\tFL:", fl)
+						g.Flatness = float64(fl)
+					case "SM": // smoothness tolerance
+						sm, err := pdf.GetNumber(r, val)
+						if err != nil {
+							return err
+						}
+						// fmt.Println("\tSM:", sm)
+						g.Smoothness = float64(sm)
+
 					case "SA": // stroke adjustment
 						sa, err := pdf.GetBoolean(r, val)
 						if err != nil {
@@ -219,8 +235,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 						}
 						g.AlphaSourceFlag = bool(val)
 					default:
-						// fmt.Printf("* unknown graphics state key: %s\n", key)
-						panic("fish")
+						// TODO(voss): what to do for unknown keys?
 					}
 				}
 
