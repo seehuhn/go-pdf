@@ -23,6 +23,8 @@ import (
 
 // IsStandardLatin returns true if all glyphs are in the Adobe Standard Latin
 // character set.
+//
+// TODO(voss): move this somewhere else.
 func IsStandardLatin(f *sfnt.Font) bool {
 	glyphNames := f.MakeGlyphNames()
 	for _, name := range glyphNames {

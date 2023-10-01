@@ -456,7 +456,11 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 		if CID2GID != "Identity" {
 			return nil, fmt.Errorf("unsupported CIDToGIDMap: %q", CID2GID)
 		}
-		res.CIDToGID = make([]glyph.ID, cmapInfo.MaxCID()+1)
+		numCIDs := int(cmapInfo.MaxCID()) + 1
+		if numCIDs > otf.NumGlyphs() {
+			numCIDs = otf.NumGlyphs()
+		}
+		res.CIDToGID = make([]glyph.ID, numCIDs)
 		for i := range res.CIDToGID {
 			res.CIDToGID[i] = glyph.ID(i)
 		}

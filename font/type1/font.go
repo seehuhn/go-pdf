@@ -17,6 +17,7 @@
 package type1
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -453,6 +454,8 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		if err == nil {
 			res.Encoding = encoding
 		}
+	} else {
+		return nil, errors.New("no font data found")
 	}
 
 	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
