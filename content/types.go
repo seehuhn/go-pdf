@@ -22,11 +22,11 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Operator is a PDF operator found in a content stream.
-type Operator pdf.Name
+// operator is a PDF operator found in a content stream.
+type operator pdf.Name
 
 // PDF implements the [pdf.Object] interface.
-func (x Operator) PDF(w io.Writer) error {
+func (x operator) PDF(w io.Writer) error {
 	_, err := w.Write([]byte(x))
 	return err
 }

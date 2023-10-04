@@ -52,9 +52,11 @@ func FuzzExtract(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		w.Resources.Font = pdf.Dict{
-			"X": F.Reference(),
-		}
+		w.TextStart()
+		w.TextSetFont(F, 12)
+		w.TextFirstLine(100, 100)
+		w.TextShow("X")
+		w.TextEnd()
 		err = w.Close()
 		if err != nil {
 			f.Fatal(err)

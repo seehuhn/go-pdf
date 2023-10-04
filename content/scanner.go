@@ -25,8 +25,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// A Scanner breaks up a content stream into tokens.
-type Scanner struct {
+// A scanner breaks up a content stream into tokens.
+type scanner struct {
 	line int // 0-based
 	col  int // 0-based
 
@@ -42,16 +42,16 @@ type Scanner struct {
 	err error
 }
 
-// NewScanner returns a new Scanner that reads from r.
-func NewScanner(r io.Reader) *Scanner {
-	return &Scanner{
+// newScanner returns a new Scanner that reads from r.
+func newScanner(r io.Reader) *scanner {
+	return &scanner{
 		src: r,
 		buf: make([]byte, 512),
 	}
 }
 
 // Next returns the next token from the input.
-func (s *Scanner) Next() (pdf.Object, error) {
+func (s *scanner) Next() (pdf.Object, error) {
 	type stackEntry struct {
 		isDict bool
 		data   []pdf.Object
@@ -65,9 +65,9 @@ func (s *Scanner) Next() (pdf.Object, error) {
 
 	retry:
 		switch obj {
-		case Operator("<<"):
+		case operator("<<"):
 			stack = append(stack, &stackEntry{isDict: true})
-		case Operator(">>"):
+		case operator(">>"):
 			if len(stack) == 0 || !stack[len(stack)-1].isDict {
 				return nil, &scannerError{"unexpected '>>'"}
 			}
@@ -90,9 +90,9 @@ func (s *Scanner) Next() (pdf.Object, error) {
 			}
 			obj = dict
 			goto retry
-		case Operator("["):
+		case operator("["):
 			stack = append(stack, &stackEntry{})
-		case Operator("]"):
+		case operator("]"):
 			if len(stack) == 0 || stack[len(stack)-1].isDict {
 				return nil, &scannerError{"unexpected ']'"}
 			}
@@ -109,7 +109,7 @@ func (s *Scanner) Next() (pdf.Object, error) {
 	}
 }
 
-func (s *Scanner) next() (pdf.Object, error) {
+func (s *scanner) next() (pdf.Object, error) {
 	err := s.skipWhiteSpace()
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (s *Scanner) next() (pdf.Object, error) {
 		case "<<": // dict
 			s.skipRequiredByte('<')
 			s.skipRequiredByte('<')
-			return Operator("<<"), nil
+			return operator("<<"), nil
 		default: // hex string
 			return s.readHexString()
 		}
@@ -137,7 +137,7 @@ func (s *Scanner) next() (pdf.Object, error) {
 		case ">>": // end dict
 			s.skipRequiredByte('>')
 			s.skipRequiredByte('>')
-			return Operator(">>"), nil
+			return operator(">>"), nil
 		default:
 			err := s.err
 			if err == nil {
@@ -181,11 +181,11 @@ func (s *Scanner) next() (pdf.Object, error) {
 			return nil, nil
 		}
 
-		return Operator(opBytes), nil
+		return operator(opBytes), nil
 	}
 }
 
-func (s *Scanner) readString() (pdf.String, error) {
+func (s *scanner) readString() (pdf.String, error) {
 	err := s.skipRequiredByte('(')
 	if err != nil {
 		return nil, err
@@ -264,7 +264,7 @@ func (s *Scanner) readString() (pdf.String, error) {
 	}
 }
 
-func (s *Scanner) readHexString() (pdf.String, error) {
+func (s *scanner) readHexString() (pdf.String, error) {
 	err := s.skipRequiredByte('<')
 	if err != nil {
 		return nil, err
@@ -310,7 +310,7 @@ readLoop:
 }
 
 // readName reads a PDF name object (without the leading slash).
-func (s *Scanner) readName() (pdf.Name, error) {
+func (s *scanner) readName() (pdf.Name, error) {
 	var name []byte
 	hex := 0
 	var high byte
@@ -361,7 +361,7 @@ func (s *Scanner) readName() (pdf.Name, error) {
 
 // skipWhiteSpace skips all input (including comments) until a non-whitespace
 // character is found.
-func (s *Scanner) skipWhiteSpace() error {
+func (s *scanner) skipWhiteSpace() error {
 	for {
 		b, err := s.peek()
 		if err != nil {
@@ -378,7 +378,7 @@ func (s *Scanner) skipWhiteSpace() error {
 }
 
 // skipComment skips everything from a % to the end of the line (both inclusive).
-func (s *Scanner) skipComment() {
+func (s *scanner) skipComment() {
 	err := s.skipRequiredByte('%')
 	if err != nil {
 		return
@@ -393,7 +393,7 @@ func (s *Scanner) skipComment() {
 	}
 }
 
-func (s *Scanner) skipRequiredByte(expected byte) error {
+func (s *scanner) skipRequiredByte(expected byte) error {
 	seen, err := s.nextByte()
 	if err != nil {
 		return err
@@ -404,7 +404,7 @@ func (s *Scanner) skipRequiredByte(expected byte) error {
 	return nil
 }
 
-func (s *Scanner) peek() (byte, error) {
+func (s *scanner) peek() (byte, error) {
 	if len(s.ahead) == 0 {
 		b, err := s.readByte()
 		if err != nil {
@@ -415,7 +415,7 @@ func (s *Scanner) peek() (byte, error) {
 	return s.ahead[0], nil
 }
 
-func (s *Scanner) peekN(n int) []byte {
+func (s *scanner) peekN(n int) []byte {
 	for len(s.ahead) < n {
 		b, err := s.readByte()
 		if err != nil {
@@ -426,7 +426,7 @@ func (s *Scanner) peekN(n int) []byte {
 	return s.ahead[:n]
 }
 
-func (s *Scanner) nextByte() (byte, error) {
+func (s *scanner) nextByte() (byte, error) {
 	var b byte
 
 	if len(s.ahead) > 0 {
@@ -454,7 +454,7 @@ func (s *Scanner) nextByte() (byte, error) {
 	return b, nil
 }
 
-func (s *Scanner) readByte() (byte, error) {
+func (s *scanner) readByte() (byte, error) {
 	for s.pos >= s.used {
 		err := s.refill()
 		if err != nil {
@@ -468,7 +468,7 @@ func (s *Scanner) readByte() (byte, error) {
 	return b, nil
 }
 
-func (s *Scanner) refill() error {
+func (s *scanner) refill() error {
 	if s.err != nil {
 		return s.err
 	}

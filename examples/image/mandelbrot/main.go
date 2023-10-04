@@ -20,6 +20,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"math"
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type1"
@@ -68,11 +69,14 @@ func run(fname string) error {
 		return err
 	}
 	page.TextStart()
-	page.TextFirstLine(72, bottom-15)
+	page.TextFirstLine(72, bottom-20)
 	page.TextSetFont(bold, 10)
-	page.TextShow("Figure 1. ")
+	page.TextShow("Figure 1.")
 	page.TextSetFont(roman, 10)
-	page.TextShow("A graphical depiction of the Mandelbrot set.")
+	gg := page.TextLayout(" A graphical depiction of the Mandelbrot set.")
+	// make the leading space wider than normal
+	gg[0].Advance = gg[0].Advance * 3
+	page.TextShowGlyphs(gg)
 	page.TextEnd()
 
 	return page.Close()
@@ -86,6 +90,7 @@ func mandelbrot() image.Image {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
 	for i := 0; i < width; i++ {
+	yLoop:
 		for j := 0; j < height; j++ {
 			x := xmin + (xmax-xmin)*float64(i)/width
 			y := ymin + (ymax-ymin)*float64(j)/height
@@ -97,9 +102,10 @@ func mandelbrot() image.Image {
 				v = v*v + z
 				if (real(v)*real(v) + imag(v)*imag(v)) > 4 {
 					img.Set(i, j, palette(n, maxDepth))
-					break
+					continue yLoop
 				}
 			}
+			img.Set(i, j, color.RGBA{0, 0, 0, 255})
 		}
 	}
 
@@ -109,14 +115,14 @@ func mandelbrot() image.Image {
 // A nice curve through RGB color space.
 // pos < max, large value of pos means darker color
 func palette(pos, max int) color.Color {
-	q := float64(pos) / float64(max-1)
-	r := uint8(245 * (1 - q))
-	g := uint8(245 * (1 - q) * (1 - q))
-	b := uint8(245 * (0.9 - 0.8*q*q*q))
+	q := 1 - float64(pos)/float64(max-1)
+	r := uint8(220 * math.Pow(q, 1.3))
+	g := uint8(230 * math.Pow(q, 3.2))
+	b := uint8(220 * math.Pow(q, 0.9))
 	if pos%2 == 0 {
-		r += 10
-		g += 10
-		b += 10
+		r += 20
+		g += 20
+		b += 20
 	}
 	return color.RGBA{r, g, b, 255}
 }

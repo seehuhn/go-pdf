@@ -76,7 +76,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 			return err
 		}
 
-		err = seq.forAllCommands(stm, func(cmd Operator, args []pdf.Object) error {
+		err = seq.forAllCommands(stm, func(cmd operator, args []pdf.Object) error {
 			switch cmd {
 
 			// == General graphics state =========================================
@@ -612,9 +612,9 @@ type operatorSeq struct {
 	args []pdf.Object
 }
 
-func (o *operatorSeq) forAllCommands(stm io.Reader, yield func(name Operator, args []pdf.Object) error) error {
+func (o *operatorSeq) forAllCommands(stm io.Reader, yield func(name operator, args []pdf.Object) error) error {
 	// TODO(voss): use one scanner for all parts, add white space between parts
-	s := NewScanner(stm)
+	s := newScanner(stm)
 	for {
 		obj, err := s.Next()
 		if err == io.EOF {
@@ -623,7 +623,7 @@ func (o *operatorSeq) forAllCommands(stm io.Reader, yield func(name Operator, ar
 			return err
 		}
 
-		cmd, ok := obj.(Operator)
+		cmd, ok := obj.(operator)
 		if !ok {
 			o.args = append(o.args, obj)
 			continue

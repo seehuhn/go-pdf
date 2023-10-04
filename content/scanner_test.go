@@ -39,7 +39,7 @@ func TestComment(t *testing.T) {
 		{"%", nil, io.EOF},
 	}
 	for i, c := range cases {
-		s := NewScanner(bytes.NewReader([]byte(c.in)))
+		s := newScanner(bytes.NewReader([]byte(c.in)))
 		obj, err := s.Next()
 		if err != c.err {
 			t.Errorf("%d: Expected error %v, got %v", i, c.err, err)
@@ -76,7 +76,7 @@ func TestString(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		s := NewScanner(bytes.NewReader([]byte(c.in)))
+		s := newScanner(bytes.NewReader([]byte(c.in)))
 		obj, err := s.Next()
 		if err != nil {
 			t.Error(err)
@@ -114,7 +114,7 @@ func TestName(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		s := NewScanner(bytes.NewReader([]byte(c.in)))
+		s := newScanner(bytes.NewReader([]byte(c.in)))
 		obj, err := s.Next()
 		if err != nil {
 			t.Error(err)
@@ -133,7 +133,7 @@ func TestName(t *testing.T) {
 
 func TestScanner(t *testing.T) {
 	for _, c := range testCases {
-		s := NewScanner(bytes.NewReader([]byte(c.in)))
+		s := newScanner(bytes.NewReader([]byte(c.in)))
 		obj, err := s.Next()
 		if err != nil && c.ok {
 			t.Errorf("%q: Unexpected error: %s", c.in, err)
@@ -157,7 +157,7 @@ func FuzzScanner(f *testing.F) {
 	f.Fuzz(func(t *testing.T, in string) {
 		r1 := strings.NewReader(in)
 
-		s := NewScanner(r1)
+		s := newScanner(r1)
 		obj1, err := s.Next()
 		if err != nil {
 			return
@@ -171,7 +171,7 @@ func FuzzScanner(f *testing.F) {
 		out1 := buf.String()
 
 		r2 := strings.NewReader(out1)
-		s = NewScanner(r2)
+		s = newScanner(r2)
 		obj2, err := s.Next()
 		if err != nil {
 			fmt.Printf("%q -> %v -> %q\n", in, obj1, out1)
@@ -286,11 +286,11 @@ var testCases = []struct {
 		"key3": pdf.Integer(3),
 	}, true},
 
-	{"q", Operator("q"), true},
-	{"T*", Operator("T*"), true},
-	{"NULL", Operator("NULL"), true},
-	{"TRUE", Operator("TRUE"), true},
-	{"FALSE", Operator("FALSE"), true},
-	{"A;Name_With-Various***Characters?", Operator("A;Name_With-Various***Characters?"), true},
-	{"ß", Operator("ß"), true},
+	{"q", operator("q"), true},
+	{"T*", operator("T*"), true},
+	{"NULL", operator("NULL"), true},
+	{"TRUE", operator("TRUE"), true},
+	{"FALSE", operator("FALSE"), true},
+	{"A;Name_With-Various***Characters?", operator("A;Name_With-Various***Characters?"), true},
+	{"ß", operator("ß"), true},
 }
