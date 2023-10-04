@@ -429,6 +429,9 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	glyphs := make(map[string]*Glyph, len(charProcs))
 	for name, ref := range charProcs {
 		stm, err := pdf.GetStream(r, ref)
+		if stm == nil {
+			err = errors.New("stream not found")
+		}
 		if err != nil {
 			return nil, pdf.Wrap(err, fmt.Sprintf("CharProcs[%s]", name))
 		}
@@ -480,8 +483,9 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		case pdf.Integer:
 			code = int(obj)
 		case pdf.Name:
-			if code < 256 {
-				res.Encoding[code] = string(obj)
+			name := string(obj)
+			if _, exists := glyphs[name]; exists && code < 256 {
+				res.Encoding[code] = name
 			}
 			code++
 		}

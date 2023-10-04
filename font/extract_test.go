@@ -79,6 +79,21 @@ func FuzzExtract(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		// fmt.Println("writing out.pdf")
+		// fd, err := os.Create("out.pdf")
+		// if err != nil {
+		// 	t.Fatal(err)
+		// }
+		// err = data.Write(fd)
+		// if err != nil {
+		// 	t.Fatal(err)
+		// }
+		// err = fd.Close()
+		// if err != nil {
+		// 	t.Fatal(err)
+		// }
+
 		info2, err := extractFont(data, ref)
 		if err != nil {
 			t.Fatal(err)
