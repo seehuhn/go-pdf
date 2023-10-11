@@ -152,6 +152,9 @@ func (w *Writer) Close() (pdf.Reference, error) {
 }
 
 // AppendPage adds a new page to the page tree.
+//
+// This function takes ownership of the pageDict object, and
+// adds the /Parent entry before writing the object to the PDF file.
 func (w *Writer) AppendPage(pageDict pdf.Dict) error {
 	return w.AppendPageRef(w.Out.Alloc(), pageDict)
 }
