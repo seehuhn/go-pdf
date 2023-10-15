@@ -150,7 +150,7 @@ func (p *Page) Fill() {
 	_, p.Err = fmt.Fprintln(p.Content, "f")
 }
 
-// Fill fills the current path, using the even-odd rule.  Any
+// FillEvenOdd fills the current path, using the even-odd rule.  Any
 // subpaths that are open are implicitly closed before being filled.
 func (p *Page) FillEvenOdd() {
 	if !p.valid("FillEvenOdd", objPath, objClippingPath) {
@@ -180,6 +180,8 @@ func (p *Page) EndPath() {
 	_, p.Err = fmt.Fprintln(p.Content, "n")
 }
 
+// ClipNonZero sets the current clipping path using the nonzero winding number
+// rule.
 func (p *Page) ClipNonZero() {
 	if !p.valid("ClipNonZero", objPath) {
 		return
@@ -188,6 +190,7 @@ func (p *Page) ClipNonZero() {
 	_, p.Err = fmt.Fprintln(p.Content, "W")
 }
 
+// ClipEvenOdd sets the current clipping path using the even-odd rule.
 func (p *Page) ClipEvenOdd() {
 	if !p.valid("ClipEvenOdd", objPath) {
 		return

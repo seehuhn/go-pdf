@@ -51,17 +51,17 @@ func (p *Page) TextSetFont(font font.Embedded, size float64) {
 		return
 	}
 
-	if p.font == font && p.fontSize == size {
-		return
-	}
-
 	if p.Resources.Font == nil {
 		p.Resources.Font = pdf.Dict{}
 	}
 	name := p.resourceName(font, p.Resources.Font, "F%d")
 
+	if p.isSet&StateFont != 0 && p.isSet&StateFontSize != 0 && p.state.Font == name && p.state.FontSize == size {
+		return
+	}
+	p.state.Font = name
+	p.state.FontSize = size
 	p.font = font
-	p.fontSize = size
 
 	err := name.PDF(p.Content)
 	if err != nil {
@@ -99,7 +99,7 @@ func (p *Page) TextNextLine() {
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.
 func (p *Page) TextLayout(s string) glyph.Seq {
-	return p.font.Layout(s, p.fontSize)
+	return p.font.Layout(s, p.state.FontSize)
 }
 
 // TextShow draws a string.
@@ -157,7 +157,7 @@ func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 
 func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
 	geom := p.font.GetGeometry()
-	total := geom.ToPDF(p.fontSize, gg.AdvanceWidth())
+	total := geom.ToPDF(p.state.FontSize, gg.AdvanceWidth())
 	delta := w - total
 
 	// we interpolate between the following:
@@ -166,7 +166,7 @@ func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
 	left := q * delta
 	right := (1 - q) * delta
 
-	p.showGlyphsWithMargins(gg, left*1000/p.fontSize, right*1000/p.fontSize)
+	p.showGlyphsWithMargins(gg, left*1000/p.state.FontSize, right*1000/p.state.FontSize)
 }
 
 func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 {
@@ -230,13 +230,13 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 			xActual += float64(xOffsetInt)
 		}
 
-		if newYPos := pdf.Integer(math.Round(float64(glyph.YOffset) * q)); newYPos != p.textRise {
+		if newYPos := float64(glyph.YOffset) * q; p.isSet&StateTextRise == 0 || newYPos != p.state.TextRise {
 			flush()
-			p.textRise = newYPos
+			p.state.TextRise = newYPos
 			if p.Err != nil {
 				return 0
 			}
-			p.Err = p.textRise.PDF(p.Content)
+			p.Err = pdf.Number(p.state.TextRise).PDF(p.Content) // TODO(voss): rounding?
 			if p.Err != nil {
 				return 0
 			}
@@ -265,5 +265,5 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 	}
 
 	flush()
-	return xActual * p.fontSize / 1000
+	return xActual * p.state.FontSize / 1000
 }

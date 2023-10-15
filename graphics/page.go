@@ -21,47 +21,54 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/float"
 )
 
 // TODO(voss): fill in the ProcSet resource.
 
+// Page represents a PDF content stream.
 type Page struct {
 	Content   io.Writer
 	Resources *pdf.Resources
 	Err       error
 
 	currentObject objectType
-	stack         []*graphicsStateOld
+	stack         []*stackEntry
 
-	fillColor   color.Color
-	strokeColor color.Color
-
-	font     font.Embedded
-	fontSize float64
-	textRise pdf.Integer
+	state *State
+	isSet StateBits
+	font  font.Embedded
 
 	resNames map[pdf.Reference]pdf.Name
 }
 
+type stackEntry struct {
+	state         *State
+	isSet         StateBits
+	currentObject objectType // TODO: is this needed?
+}
+
+// NewPage allocates a new Page object.
 func NewPage(w io.Writer) *Page {
+	state, isSet := NewState()
+
 	return &Page{
 		Content:       w,
 		Resources:     &pdf.Resources{},
 		currentObject: objPage,
 
-		fillColor:   color.Gray(0),
-		strokeColor: color.Gray(0),
+		state: state,
+		isSet: isSet,
 
 		resNames: make(map[pdf.Reference]pdf.Name),
 	}
 }
 
+// ForgetGraphicsState removes all information about previous graphics state
+// settings.
 func (p *Page) ForgetGraphicsState() {
-	p.fillColor = nil
-	p.strokeColor = nil
+	p.isSet = 0
 }
 
 func (p *Page) coord(x float64) string {

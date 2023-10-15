@@ -39,12 +39,10 @@ type graphicsStateOld struct {
 func (p *Page) PushGraphicsState() {
 	// TODO(voss): does this require certain states?
 
-	state := &graphicsStateOld{
-		object:      p.currentObject,
-		fillColor:   p.fillColor,
-		strokeColor: p.strokeColor,
-		font:        p.font,
-		fontSize:    p.fontSize,
+	state := &stackEntry{
+		state:         p.state.Clone(),
+		isSet:         p.isSet,
+		currentObject: p.currentObject,
 	}
 	p.stack = append(p.stack, state)
 
@@ -59,14 +57,12 @@ func (p *Page) PopGraphicsState() {
 	// TODO(voss): does this require certain states?
 
 	n := len(p.stack) - 1
-	state := p.stack[n]
+	entry := p.stack[n]
 	p.stack = p.stack[:n]
 
-	p.currentObject = state.object
-	p.fillColor = state.fillColor
-	p.strokeColor = state.strokeColor
-	p.font = state.font
-	p.fontSize = state.fontSize
+	p.currentObject = entry.currentObject
+	p.state = entry.state
+	p.isSet = entry.isSet
 
 	_, err := fmt.Fprintln(p.Content, "Q")
 	if p.Err == nil {
@@ -90,6 +86,7 @@ func (p *Page) SetExtGState(dictName pdf.Name) {
 	_, p.Err = fmt.Fprintln(p.Content, " gs")
 }
 
+// AddExtGState adds a new graphics state dictionary.
 func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
 	if p.Resources.ExtGState == nil {
 		p.Resources.ExtGState = pdf.Dict{}
@@ -149,17 +146,6 @@ func (p *Page) SetLineCap(cap LineCapStyle) {
 	_, p.Err = fmt.Fprintln(p.Content, int(cap), "J")
 }
 
-// LineCapStyle is the style of the end of a line.
-type LineCapStyle uint8
-
-// Possible values for LineCapStyle.
-// See section 8.4.3.3 of PDF 32000-1:2008.
-const (
-	LineCapButt   LineCapStyle = 0
-	LineCapRound  LineCapStyle = 1
-	LineCapSquare LineCapStyle = 2
-)
-
 // SetLineJoin sets the line join style.
 func (p *Page) SetLineJoin(join LineJoinStyle) {
 	if !p.valid("SetLineJoin", objPage, objText) {
@@ -168,16 +154,7 @@ func (p *Page) SetLineJoin(join LineJoinStyle) {
 	_, p.Err = fmt.Fprintln(p.Content, int(join), "j")
 }
 
-// LineJoinStyle is the style of the corner of a line.
-type LineJoinStyle uint8
-
-// Possible values for LineJoinStyle.
-const (
-	LineJoinMiter LineJoinStyle = 0
-	LineJoinRound LineJoinStyle = 1
-	LineJoinBevel LineJoinStyle = 2
-)
-
+// SetDashPattern sets the line dash pattern.
 func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
 	if !p.valid("SetDashPattern", objPage, objText) {
 		return
@@ -207,12 +184,10 @@ func (p *Page) SetFillColor(col color.Color) {
 	if !p.valid("SetFillColor", objPage, objText) {
 		return
 	}
-	if col == nil || col == p.fillColor {
+	if p.isSet&StateFillColor != 0 && col == p.state.FillColor {
 		return
 	}
-
-	p.fillColor = col
-
+	p.state.FillColor = col
 	p.Err = col.SetFill(p.Content)
 }
 
@@ -222,11 +197,9 @@ func (p *Page) SetStrokeColor(col color.Color) {
 	if !p.valid("SetStrokeColor", objPage, objText) {
 		return
 	}
-	if col == nil || col == p.strokeColor {
+	if p.isSet&StateStrokeColor != 0 && col == p.state.StrokeColor {
 		return
 	}
-
-	p.strokeColor = col
-
+	p.state.StrokeColor = col
 	p.Err = col.SetStroke(p.Content)
 }

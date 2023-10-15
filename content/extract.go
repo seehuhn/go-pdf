@@ -51,7 +51,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 	}
 
 	var graphicsStack []*graphics.State
-	g := graphics.NewState()
+	g, _ := graphics.NewState()
 
 	decoders := make(map[pdf.Name]func(pdf.String) string)
 	yield := func(ctx *Context, s pdf.String) error {

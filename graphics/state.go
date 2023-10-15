@@ -44,7 +44,7 @@ type State struct {
 	Font         pdf.Name
 	FontSize     float64
 	Tmode        int
-	TextTrise    float64
+	TextRise     float64
 	TextKnockout bool
 
 	LineWidth   float64 // thickness of paths to be stroked
@@ -85,13 +85,57 @@ type State struct {
 	Flatness float64
 
 	// Smoothness is a number in the range 0 to 1 specifying the precision of
-	// smooth shading (default: device-dependent).  As a special case, the
-	// value -1 represents the device-dependent default value.
+	// smooth shading (default: device-dependent).
 	Smoothness float64
 }
 
-func NewState() *State {
+// StateBits is a bit mask for the fields of the State struct.
+type StateBits uint64
+
+// Possible values for StateBits.
+const (
+	StateCTM StateBits = 1 << iota
+	StateStrokeColor
+	StateFillColor
+	StateTm
+	StateTlm
+	StateTc
+	StateTw
+	StateTh
+	StateTl
+	StateFont
+	StateFontSize
+	StateTmode
+	StateTextRise
+	StateTextKnockout
+	StateLineWidth
+	StateLineCap
+	StateLineJoin
+	StateMiterLimit
+	StateDashPattern
+	StateRenderingIntent
+	StateStrokeAdjustment
+	StateBlendMode
+	StateSoftMask
+	StateStrokeAlpha
+	StateFillAlpha
+	StateAlphaSourceFlag
+	StateBlackPointCompensation
+	StateOverprintStroke
+	StateOverprintFill
+	StateOverprintMode
+	StateFlatness
+	StateSmoothness
+
+	stateFirstUnused
+	AllStateBits = stateFirstUnused - 1
+)
+
+// NewState returns a new graphics state with default values,
+// and a bit mask indicating which fields are set to their default values.
+func NewState() (*State, StateBits) {
 	res := &State{}
+
 	res.CTM = IdentityMatrix
 	res.FillColor = color.Gray(0)
 	res.StrokeColor = color.Gray(0)
@@ -103,7 +147,7 @@ func NewState() *State {
 	// no default for Font
 	// no default for FontSize
 	res.Tmode = 0
-	res.TextTrise = 0
+	res.TextRise = 0
 	res.TextKnockout = true
 
 	res.LineWidth = 1
@@ -124,9 +168,11 @@ func NewState() *State {
 	res.OverprintMode = 0
 
 	res.Flatness = 1
-	res.Smoothness = -1
+	// res.Smoothness has a device-dependent default
 
-	return res
+	isSet := AllStateBits & ^(StateFont | StateFontSize | StateSmoothness)
+
+	return res, isSet
 }
 
 // Clone returns a shallow copy of the GraphicsState.
@@ -150,10 +196,12 @@ func (g *State) Clone() *State {
 //	(x y 1) * M = (a*x+c*y+e, b*x+d*y+f, 1)
 type Matrix [6]float64
 
+// Apply applies the transformation matrix to the given vector.
 func (A Matrix) Apply(x, y float64) (float64, float64) {
 	return A[0]*x + A[2]*y + A[4], A[1]*x + A[3]*y + A[5]
 }
 
+// Mul multiplies two transformation matrices and returns the result.
 func (A Matrix) Mul(B Matrix) Matrix {
 	// / A0 A1 0 \  / B0 B1 0 \   / A0*B0+A1*B2    A0*B1+A1*B3    0 \
 	// | A2 A3 0 |  | B2 B3 0 | = | A2*B0+A3*B2    A2*B1+A3*B3    0 |
@@ -168,4 +216,26 @@ func (A Matrix) Mul(B Matrix) Matrix {
 	}
 }
 
+// IdentityMatrix is the identity transformation.
 var IdentityMatrix = Matrix{1, 0, 0, 1, 0, 0}
+
+// LineCapStyle is the style of the end of a line.
+type LineCapStyle uint8
+
+// Possible values for LineCapStyle.
+// See section 8.4.3.3 of PDF 32000-1:2008.
+const (
+	LineCapButt   LineCapStyle = 0
+	LineCapRound  LineCapStyle = 1
+	LineCapSquare LineCapStyle = 2
+)
+
+// LineJoinStyle is the style of the corner of a line.
+type LineJoinStyle uint8
+
+// Possible values for LineJoinStyle.
+const (
+	LineJoinMiter LineJoinStyle = 0
+	LineJoinRound LineJoinStyle = 1
+	LineJoinBevel LineJoinStyle = 2
+)
