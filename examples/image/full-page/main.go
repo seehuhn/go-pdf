@@ -26,6 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/graphics"
 	pdfimage "seehuhn.de/go/pdf/image"
 )
 
@@ -75,7 +76,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	doc.Scale(width, height)
+	doc.Transform(graphics.Scale(width, height))
 	doc.DrawImage(embedded)
 
 	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{

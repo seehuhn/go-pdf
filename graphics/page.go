@@ -37,7 +37,7 @@ type Page struct {
 	stack         []*stackEntry
 
 	state *State
-	isSet StateBits
+	set   StateBits
 	font  font.Embedded
 
 	resNames map[pdf.Reference]pdf.Name
@@ -59,7 +59,7 @@ func NewPage(w io.Writer) *Page {
 		currentObject: objPage,
 
 		state: state,
-		isSet: isSet,
+		set:   isSet,
 
 		resNames: make(map[pdf.Reference]pdf.Name),
 	}
@@ -68,7 +68,47 @@ func NewPage(w io.Writer) *Page {
 // ForgetGraphicsState removes all information about previous graphics state
 // settings.
 func (p *Page) ForgetGraphicsState() {
-	p.isSet = 0
+	p.set = 0
+}
+
+// PushGraphicsState saves the current graphics state.
+func (p *Page) PushGraphicsState() {
+	// TODO(voss): does this require certain states?
+
+	state := &stackEntry{
+		state:         p.state.Clone(),
+		isSet:         p.set,
+		currentObject: p.currentObject,
+	}
+	p.stack = append(p.stack, state)
+
+	_, err := fmt.Fprintln(p.Content, "q")
+	if p.Err == nil {
+		p.Err = err
+	}
+}
+
+// PopGraphicsState restores the previous graphics state.
+func (p *Page) PopGraphicsState() {
+	// TODO(voss): does this require certain states?
+
+	n := len(p.stack) - 1
+	entry := p.stack[n]
+	p.stack = p.stack[:n]
+
+	p.currentObject = entry.currentObject
+	p.state = entry.state
+	p.set = entry.isSet
+
+	_, err := fmt.Fprintln(p.Content, "Q")
+	if p.Err == nil {
+		p.Err = err
+	}
+}
+
+// isSet returns true, if all of the given fields in the graphics state are set.
+func (p *Page) isSet(bits StateBits) bool {
+	return p.set&bits == bits
 }
 
 func (p *Page) coord(x float64) string {

@@ -225,7 +225,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		}
 		page.TextEnd()
 
-		page.Scale(q, q)
+		page.Transform(graphics.Scale(q, q))
 
 		// illustrate the advance width by drawing an arrow
 		page.PushGraphicsState()

@@ -37,11 +37,11 @@ type State struct {
 	// Text State parameters:
 	Tm           Matrix
 	Tlm          Matrix
-	Tc           float64 // character spacing
-	Tw           float64 // word spacing
-	Th           float64 // horizonal scaling
-	Tl           float64 // leading
-	Font         pdf.Name
+	Tc           float64  // character spacing
+	Tw           float64  // word spacing
+	Th           float64  // horizonal scaling
+	Tl           float64  // leading
+	Font         pdf.Name // TODO(voss): should this be font.Embedded?
 	FontSize     float64
 	Tmode        int
 	TextRise     float64
@@ -52,6 +52,7 @@ type State struct {
 	LineJoin    LineJoinStyle
 	MiterLimit  float64
 	DashPattern []float64
+	DashPhase   float64
 
 	RenderingIntent pdf.Name
 
@@ -103,8 +104,7 @@ const (
 	StateTw
 	StateTh
 	StateTl
-	StateFont
-	StateFontSize
+	StateFont // includes size
 	StateTmode
 	StateTextRise
 	StateTextKnockout
@@ -112,7 +112,7 @@ const (
 	StateLineCap
 	StateLineJoin
 	StateMiterLimit
-	StateDashPattern
+	StateDash // pattern and phase
 	StateRenderingIntent
 	StateStrokeAdjustment
 	StateBlendMode
@@ -170,7 +170,7 @@ func NewState() (*State, StateBits) {
 	res.Flatness = 1
 	// res.Smoothness has a device-dependent default
 
-	isSet := AllStateBits & ^(StateFont | StateFontSize | StateSmoothness)
+	isSet := AllStateBits & ^(StateFont | StateSmoothness)
 
 	return res, isSet
 }
@@ -195,6 +195,36 @@ func (g *State) Clone() *State {
 //
 //	(x y 1) * M = (a*x+c*y+e, b*x+d*y+f, 1)
 type Matrix [6]float64
+
+// Translate moves the origin of the coordinate system.
+//
+// Drawing the unit square [0, 1] x [0, 1] after applying this transformation
+// is equivalent to drawing the rectangle [dx, dx+1] x [dy, dy+1] in the
+// original coordinate system.
+func Translate(dx, dy float64) Matrix {
+	return Matrix{1, 0, 0, 1, dx, dy}
+}
+
+// Scale scales the coordinate system.
+//
+// Drawing the unit square [0, 1] x [0, 1] after applying this transformation
+// is equivalent to drawing the rectangle [0, xScale] x [0, yScale] in the
+// original coordinate system.
+func Scale(xScale, yScale float64) Matrix {
+	return Matrix{xScale, 0, 0, yScale, 0, 0}
+}
+
+// TranslateAndScale moves and scales the coordinate system.
+//
+// Drawing the unit square [0, 1] x [0, 1] after applying this transformation
+// is equivalent to drawing the rectangle [dx, dx+xScale] x [dy, dy+yScale] in
+// the original coordinate system.
+//
+// This is equivalent to first applying Translate(dx, dy) and then
+// Scale(xScale, yScale).
+func TranslateAndScale(dx, dy, xScale, yScale float64) Matrix {
+	return Matrix{xScale, 0, 0, yScale, dx, dy}
+}
 
 // Apply applies the transformation matrix to the given vector.
 func (A Matrix) Apply(x, y float64) (float64, float64) {

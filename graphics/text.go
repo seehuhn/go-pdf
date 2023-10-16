@@ -46,6 +46,9 @@ func (p *Page) TextEnd() {
 }
 
 // TextSetFont sets the font and font size.
+//
+// TODO(voss): Instead of font.Embedded, use only information which can
+// be extracted from a PDF file?
 func (p *Page) TextSetFont(font font.Embedded, size float64) {
 	if !p.valid("TextSetFont", objText, objPage) {
 		return
@@ -56,12 +59,13 @@ func (p *Page) TextSetFont(font font.Embedded, size float64) {
 	}
 	name := p.resourceName(font, p.Resources.Font, "F%d")
 
-	if p.isSet&StateFont != 0 && p.isSet&StateFontSize != 0 && p.state.Font == name && p.state.FontSize == size {
+	if p.isSet(StateFont) && p.state.Font == name && p.state.FontSize == size {
 		return
 	}
 	p.state.Font = name
 	p.state.FontSize = size
 	p.font = font
+	p.set |= StateFont
 
 	err := name.PDF(p.Content)
 	if err != nil {
@@ -230,7 +234,7 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 			xActual += float64(xOffsetInt)
 		}
 
-		if newYPos := float64(glyph.YOffset) * q; p.isSet&StateTextRise == 0 || newYPos != p.state.TextRise {
+		if newYPos := float64(glyph.YOffset) * q; p.set&StateTextRise == 0 || newYPos != p.state.TextRise {
 			flush()
 			p.state.TextRise = newYPos
 			if p.Err != nil {

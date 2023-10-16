@@ -110,6 +110,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 		}
 
 		// construct a ToUnicode map from the Encoding
+		//
 		// TODO(voss): revisit this, once
 		// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
 		if encodingEntry, _ := pdf.Resolve(r, dicts.FontDict["Encoding"]); encodingEntry != nil {

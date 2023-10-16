@@ -90,9 +90,13 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 }
 
 // A Layouter can turn a string into a sequence of glyphs.
+//
+// TODO(voss): can we remove this?
 type Layouter interface {
 	Layout(s string, ptSize float64) glyph.Seq
 }
+
+// TODO(voss): should we have GeometryGetter interface?
 
 // Font represents a font which can be embedded in a PDF file.
 type Font interface {
@@ -100,7 +104,7 @@ type Font interface {
 	GetGeometry() *Geometry
 }
 
-// Embedded represents a font embedded in a PDF file.
+// Embedded represents a font which is already embedded in a PDF file.
 type Embedded interface {
 	GetGeometry() *Geometry
 	Layouter
@@ -118,6 +122,8 @@ func NumGlyphs(font interface{ GetGeometry() *Geometry }) int {
 
 // GetGID returns the glyph ID and advance width for a given rune.
 // A glyph ID of 0 indicates that the rune is not supported by the font.
+//
+// TODO(voss): remove?
 func GetGID(font Layouter, r rune) (glyph.ID, funit.Int16) {
 	gg := font.Layout(string(r), 10)
 	if len(gg) != 1 {
