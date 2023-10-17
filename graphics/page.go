@@ -21,7 +21,6 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/float"
 )
 
@@ -38,7 +37,6 @@ type Page struct {
 
 	state *State
 	set   StateBits
-	font  font.Embedded
 
 	resNames map[pdf.Reference]pdf.Name
 }

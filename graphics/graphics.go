@@ -184,6 +184,83 @@ func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
 	p.Resources.ExtGState[name] = dict
 }
 
+// See table 57 in ISO 32000-2:2020.
+func ExtGStateDict(s *State, set StateBits) pdf.Dict {
+	res := pdf.Dict{}
+	if set&StateLineWidth != 0 {
+		res["LW"] = pdf.Number(s.LineWidth)
+	}
+	if set&StateLineCap != 0 {
+		res["LC"] = pdf.Integer(s.LineCap)
+	}
+	if set&StateLineJoin != 0 {
+		res["LJ"] = pdf.Integer(s.LineJoin)
+	}
+	if set&StateMiterLimit != 0 {
+		res["ML"] = pdf.Number(s.MiterLimit)
+	}
+	if set&StateDash != 0 {
+		pat := make(pdf.Array, len(s.DashPattern))
+		for i, x := range s.DashPattern {
+			pat[i] = pdf.Number(x)
+		}
+		res["D"] = pdf.Array{
+			pat,
+			pdf.Number(s.DashPhase),
+		}
+	}
+	if set&StateRenderingIntent != 0 {
+		res["RI"] = s.RenderingIntent
+	}
+	if set&StateOverprint != 0 {
+		res["OP"] = pdf.Boolean(s.OverprintStroke)
+		if s.OverprintFill != s.OverprintStroke {
+			res["op"] = pdf.Boolean(s.OverprintFill)
+		}
+	}
+	if set&StateOverprintMode != 0 {
+		res["OPM"] = pdf.Integer(s.OverprintMode)
+	}
+	if set&StateFont != 0 {
+		res["Font"] = pdf.Array{
+			s.Font.Reference(),
+			pdf.Number(s.FontSize),
+		}
+	}
+
+	// TODO(voss): black generation
+	// TODO(voss): undercolor removal
+	// TODO(voss): transfer function
+	// TODO(voss): halftone
+
+	if set&StateFlatnessTolerance != 0 {
+		res["FL"] = pdf.Number(s.FlatnessTolerance)
+	}
+	if set&StateSmoothnessTolerance != 0 {
+		res["SM"] = pdf.Number(s.SmoothnessTolerance)
+	}
+	if set&StateStrokeAdjustment != 0 {
+		res["SA"] = pdf.Boolean(s.StrokeAdjustment)
+	}
+	if set&StateBlendMode != 0 {
+		res["BM"] = s.BlendMode
+	}
+	if set&StateSoftMask != 0 {
+		res["SMask"] = s.SoftMask
+	}
+	if set&StateStrokeAlpha != 0 {
+		res["CA"] = pdf.Number(s.StrokeAlpha)
+	}
+	if set&StateFillAlpha != 0 {
+		res["ca"] = pdf.Number(s.FillAlpha)
+	}
+	if set&StateAlphaSourceFlag != 0 {
+		res["AIS"] = pdf.Boolean(s.AlphaSourceFlag)
+	}
+
+	return res
+}
+
 func sliceNearlyEqual(a, b []float64) bool {
 	if len(a) != len(b) {
 		return false

@@ -54,17 +54,17 @@ func (p *Page) TextSetFont(font font.Embedded, size float64) {
 		return
 	}
 
+	if p.isSet(StateFont) && p.state.Font == font && p.state.FontSize == size {
+		return
+	}
+
 	if p.Resources.Font == nil {
 		p.Resources.Font = pdf.Dict{}
 	}
 	name := p.resourceName(font, p.Resources.Font, "F%d")
 
-	if p.isSet(StateFont) && p.state.Font == name && p.state.FontSize == size {
-		return
-	}
-	p.state.Font = name
+	p.state.Font = font
 	p.state.FontSize = size
-	p.font = font
 	p.set |= StateFont
 
 	err := name.PDF(p.Content)
@@ -103,7 +103,8 @@ func (p *Page) TextNextLine() {
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.
 func (p *Page) TextLayout(s string) glyph.Seq {
-	return p.font.Layout(s, p.state.FontSize)
+	st := p.state
+	return st.Font.Layout(s, st.FontSize)
 }
 
 // TextShow draws a string.
@@ -111,7 +112,7 @@ func (p *Page) TextShow(s string) float64 {
 	if !p.valid("TextShow", objText) {
 		return 0
 	}
-	if p.font == nil {
+	if p.state.Font == nil {
 		p.Err = errors.New("no font set")
 		return 0
 	}
@@ -127,7 +128,7 @@ func (p *Page) TextShowAligned(s string, w, q float64) {
 	if !p.valid("TextShowAligned", objText) {
 		return
 	}
-	if p.font == nil {
+	if p.state.Font == nil {
 		p.Err = errors.New("no font set")
 		return
 	}
@@ -139,7 +140,7 @@ func (p *Page) TextShowGlyphs(gg glyph.Seq) float64 {
 	if !p.valid("TextShowGlyphs", objText) {
 		return 0
 	}
-	if p.font == nil {
+	if p.state.Font == nil {
 		p.Err = errors.New("no font set")
 		return 0
 	}
@@ -152,7 +153,7 @@ func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 	if !p.valid("TextShowGlyphsAligned", objText) {
 		return
 	}
-	if p.font == nil {
+	if p.state.Font == nil {
 		p.Err = errors.New("no font set")
 		return
 	}
@@ -160,7 +161,7 @@ func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 }
 
 func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
-	geom := p.font.GetGeometry()
+	geom := p.state.Font.GetGeometry()
 	total := geom.ToPDF(p.state.FontSize, gg.AdvanceWidth())
 	delta := w - total
 
@@ -212,7 +213,7 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 		out = nil
 	}
 
-	font := p.font
+	font := p.state.Font
 	geom := font.GetGeometry()
 	widths := geom.Widths
 	unitsPerEm := geom.UnitsPerEm

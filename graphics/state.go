@@ -19,6 +19,7 @@ package graphics
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/font"
 )
 
 // State collects all graphical parameters of the PDF processor.
@@ -37,11 +38,11 @@ type State struct {
 	// Text State parameters:
 	Tm           Matrix
 	Tlm          Matrix
-	Tc           float64  // character spacing
-	Tw           float64  // word spacing
-	Th           float64  // horizonal scaling
-	Tl           float64  // leading
-	Font         pdf.Name // TODO(voss): should this be font.Embedded?
+	Tc           float64       // character spacing
+	Tw           float64       // word spacing
+	Th           float64       // horizonal scaling
+	Tl           float64       // leading
+	Font         font.Embedded // TODO(voss): is this the right type?
 	FontSize     float64
 	Tmode        int
 	TextRise     float64
@@ -61,8 +62,8 @@ type State struct {
 	// small relative to the pixel resolution of the output device.
 	StrokeAdjustment bool
 
-	BlendMode              pdf.Name
-	SoftMask               pdf.Dict
+	BlendMode              pdf.Name // TODO(voss): can be an array for PDF<2.0
+	SoftMask               pdf.Dict // TODO(voss): can be name
 	StrokeAlpha            float64
 	FillAlpha              float64
 	AlphaSourceFlag        bool
@@ -71,23 +72,23 @@ type State struct {
 	// The following parameters are device-dependent:
 
 	OverprintStroke bool
-	OverprintFill   bool
-	OverprintMode   int
+	OverprintFill   bool // for PDF<1.3 this must equal OverprintStroke
+	OverprintMode   int  // for PDF<1.3 this must be 0
 
 	// TODO(voss): black generation
 	// TODO(voss): undercolor removal
 	// TODO(voss): transfer function
 	// TODO(voss): halftone
 
-	// Flatness is a positive number specifying the precision with which
+	// FlatnessTolerance is a positive number specifying the precision with which
 	// curves are be rendered on the output device.  Smaller numbers give
 	// smoother curves, but also increase the amount of computation needed
 	// (default: 1).
-	Flatness float64
+	FlatnessTolerance float64
 
-	// Smoothness is a number in the range 0 to 1 specifying the precision of
-	// smooth shading (default: device-dependent).
-	Smoothness float64
+	// SmoothnessTolerance is a number in the range 0 to 1 specifying the
+	// precision of smooth shading (default: device-dependent).
+	SmoothnessTolerance float64
 }
 
 // StateBits is a bit mask for the fields of the State struct.
@@ -121,11 +122,10 @@ const (
 	StateFillAlpha
 	StateAlphaSourceFlag
 	StateBlackPointCompensation
-	StateOverprintStroke
-	StateOverprintFill
+	StateOverprint
 	StateOverprintMode
-	StateFlatness
-	StateSmoothness
+	StateFlatnessTolerance
+	StateSmoothnessTolerance
 
 	stateFirstUnused
 	AllStateBits = stateFirstUnused - 1
@@ -167,10 +167,11 @@ func NewState() (*State, StateBits) {
 	res.OverprintFill = false
 	res.OverprintMode = 0
 
-	res.Flatness = 1
-	// res.Smoothness has a device-dependent default
+	res.FlatnessTolerance = 1
+	// res.SmoothnessTolerance has a device-dependent default
 
-	isSet := AllStateBits & ^(StateFont | StateSmoothness)
+	// TODO(voss): should the list of exceptions include the CTM?
+	isSet := AllStateBits & ^(StateFont | StateSmoothnessTolerance)
 
 	return res, isSet
 }

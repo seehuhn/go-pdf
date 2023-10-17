@@ -23,7 +23,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // Context holds information about the current state of the PDF content stream.
@@ -50,20 +52,31 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 		return err
 	}
 
+	fonts := make(map[pdf.Name]font.Embedded)
+	getFont := func(name pdf.Name) font.Embedded {
+		if f, ok := fonts[name]; ok {
+			return f
+		}
+		ref, _ := resources.Font[name].(pdf.Reference)
+		f := &fontFromPDF{ref: ref, name: name}
+		fonts[name] = f
+		return f
+	}
+
 	var graphicsStack []*graphics.State
 	g, _ := graphics.NewState()
 
-	decoders := make(map[pdf.Name]func(pdf.String) string)
+	decoders := make(map[font.Embedded]func(pdf.String) string)
 	yield := func(ctx *Context, s pdf.String) error {
-		fontName := g.Font
-		decoder, ok := decoders[fontName]
+		font := g.Font
+		decoder, ok := decoders[font]
 		if !ok {
-			fontRef := resources.Font[fontName]
+			fontRef := font.Reference()
 			decoder, err = makeTextDecoder(r, fontRef)
 			if err != nil {
 				return err
 			}
-			decoders[fontName] = decoder
+			decoders[font] = decoder
 		}
 		return cb(ctx, decoder(s))
 	}
@@ -179,14 +192,14 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 							return err
 						}
 						// fmt.Println("\tFL:", fl)
-						g.Flatness = float64(fl)
+						g.FlatnessTolerance = float64(fl)
 					case "SM": // smoothness tolerance
 						sm, err := pdf.GetNumber(r, val)
 						if err != nil {
 							return err
 						}
 						// fmt.Println("\tSM:", sm)
-						g.Smoothness = float64(sm)
+						g.SmoothnessTolerance = float64(sm)
 
 					case "SA": // stroke adjustment
 						sa, err := pdf.GetBoolean(r, val)
@@ -361,7 +374,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					return fmt.Errorf("unexpected type for font: %T %T", args[0], args[1])
 				}
 				// fmt.Printf("Tf %s %f\n", name, size)
-				g.Font = name
+				g.Font = getFont(name)
 				g.FontSize = size
 
 			// == Text positioning ===============================================
@@ -670,6 +683,35 @@ func getReal(x pdf.Object) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+type fontFromPDF struct {
+	ref  pdf.Reference
+	name pdf.Name
+}
+
+func (f *fontFromPDF) GetGeometry() *font.Geometry {
+	panic("not implemented")
+}
+
+func (f *fontFromPDF) Layout(s string, ptSize float64) glyph.Seq {
+	panic("not implemented")
+}
+
+func (f *fontFromPDF) AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String {
+	panic("not implemented")
+}
+
+func (f *fontFromPDF) ResourceName() pdf.Name {
+	return f.name
+}
+
+func (f *fontFromPDF) Reference() pdf.Reference {
+	return f.ref
+}
+
+func (f *fontFromPDF) Close() error {
+	return nil
 }
 
 var (
