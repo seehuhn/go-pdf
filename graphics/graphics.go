@@ -162,7 +162,7 @@ func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
 func (p *Page) SetExtGState(dictName pdf.Name) {
 	// TODO(voss): keep track of the graphics state
 
-	if !p.valid("SetGraphicsState", objPage, objText) {
+	if !p.valid("SetExtGState", objPage, objText) {
 		return
 	}
 
@@ -184,6 +184,7 @@ func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
 	p.Resources.ExtGState[name] = dict
 }
 
+// ExtGStateDict returns a graphics state parameter dictionary for the given state.
 // See table 57 in ISO 32000-2:2020.
 func ExtGStateDict(s *State, set StateBits) pdf.Dict {
 	res := pdf.Dict{}
@@ -257,6 +258,13 @@ func ExtGStateDict(s *State, set StateBits) pdf.Dict {
 	if set&StateAlphaSourceFlag != 0 {
 		res["AIS"] = pdf.Boolean(s.AlphaSourceFlag)
 	}
+	if set&StateTextKnockout != 0 {
+		res["TK"] = pdf.Boolean(s.TextKnockout)
+	}
+	if set&StateBlackPointCompensation != 0 {
+		res["UseBlackPtComp"] = s.BlackPointCompensation
+	}
+	// TODO(voss): HTO
 
 	return res
 }

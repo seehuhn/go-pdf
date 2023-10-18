@@ -79,6 +79,7 @@ type State struct {
 	// TODO(voss): undercolor removal
 	// TODO(voss): transfer function
 	// TODO(voss): halftone
+	// TODO(voss): halftone origin https://github.com/pdf-association/pdf-issues/issues/260
 
 	// FlatnessTolerance is a positive number specifying the precision with which
 	// curves are be rendered on the output device.  Smaller numbers give
