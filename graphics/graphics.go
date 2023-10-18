@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/internal/float"
 )
@@ -154,119 +153,6 @@ func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
 	if p.Err != nil {
 		return
 	}
-}
-
-// SetExtGState sets selected graphics state parameters.
-// The argument dictName must be the name of a graphics state dictionary
-// that has been defined using the [Page.AddExtGState] method.
-func (p *Page) SetExtGState(dictName pdf.Name) {
-	// TODO(voss): keep track of the graphics state
-
-	if !p.valid("SetExtGState", objPage, objText) {
-		return
-	}
-
-	err := dictName.PDF(p.Content)
-	if err != nil {
-		p.Err = err
-		return
-	}
-	_, p.Err = fmt.Fprintln(p.Content, " gs")
-}
-
-// AddExtGState adds a new graphics state dictionary.
-func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
-	// TODO(voss): keep track of the graphics state
-
-	if p.Resources.ExtGState == nil {
-		p.Resources.ExtGState = pdf.Dict{}
-	}
-	p.Resources.ExtGState[name] = dict
-}
-
-// ExtGStateDict returns a graphics state parameter dictionary for the given state.
-// See table 57 in ISO 32000-2:2020.
-func ExtGStateDict(s *State, set StateBits) pdf.Dict {
-	res := pdf.Dict{}
-	if set&StateLineWidth != 0 {
-		res["LW"] = pdf.Number(s.LineWidth)
-	}
-	if set&StateLineCap != 0 {
-		res["LC"] = pdf.Integer(s.LineCap)
-	}
-	if set&StateLineJoin != 0 {
-		res["LJ"] = pdf.Integer(s.LineJoin)
-	}
-	if set&StateMiterLimit != 0 {
-		res["ML"] = pdf.Number(s.MiterLimit)
-	}
-	if set&StateDash != 0 {
-		pat := make(pdf.Array, len(s.DashPattern))
-		for i, x := range s.DashPattern {
-			pat[i] = pdf.Number(x)
-		}
-		res["D"] = pdf.Array{
-			pat,
-			pdf.Number(s.DashPhase),
-		}
-	}
-	if set&StateRenderingIntent != 0 {
-		res["RI"] = s.RenderingIntent
-	}
-	if set&StateOverprint != 0 {
-		res["OP"] = pdf.Boolean(s.OverprintStroke)
-		if s.OverprintFill != s.OverprintStroke {
-			res["op"] = pdf.Boolean(s.OverprintFill)
-		}
-	}
-	if set&StateOverprintMode != 0 {
-		res["OPM"] = pdf.Integer(s.OverprintMode)
-	}
-	if set&StateFont != 0 {
-		res["Font"] = pdf.Array{
-			s.Font.Reference(),
-			pdf.Number(s.FontSize),
-		}
-	}
-
-	// TODO(voss): black generation
-	// TODO(voss): undercolor removal
-	// TODO(voss): transfer function
-	// TODO(voss): halftone
-
-	if set&StateFlatnessTolerance != 0 {
-		res["FL"] = pdf.Number(s.FlatnessTolerance)
-	}
-	if set&StateSmoothnessTolerance != 0 {
-		res["SM"] = pdf.Number(s.SmoothnessTolerance)
-	}
-	if set&StateStrokeAdjustment != 0 {
-		res["SA"] = pdf.Boolean(s.StrokeAdjustment)
-	}
-	if set&StateBlendMode != 0 {
-		res["BM"] = s.BlendMode
-	}
-	if set&StateSoftMask != 0 {
-		res["SMask"] = s.SoftMask
-	}
-	if set&StateStrokeAlpha != 0 {
-		res["CA"] = pdf.Number(s.StrokeAlpha)
-	}
-	if set&StateFillAlpha != 0 {
-		res["ca"] = pdf.Number(s.FillAlpha)
-	}
-	if set&StateAlphaSourceFlag != 0 {
-		res["AIS"] = pdf.Boolean(s.AlphaSourceFlag)
-	}
-	if set&StateTextKnockout != 0 {
-		res["TK"] = pdf.Boolean(s.TextKnockout)
-	}
-	if set&StateBlackPointCompensation != 0 {
-		res["UseBlackPtComp"] = s.BlackPointCompensation
-	}
-	// TODO(voss): HTO
-
-	return res
 }
 
 func sliceNearlyEqual(a, b []float64) bool {
