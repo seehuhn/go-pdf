@@ -32,7 +32,7 @@ func (p *Page) DrawImage(img image.Embedded) {
 	if p.Resources.XObject == nil {
 		p.Resources.XObject = make(pdf.Dict)
 	}
-	name := p.resourceName(img, p.Resources.XObject, "I%d")
+	name := p.resourceNameOld(img, p.Resources.XObject, "I%d")
 	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err

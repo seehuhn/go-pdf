@@ -1,0 +1,24 @@
+Design Principles
+=================
+
+- Resources are represented by Go objects.  These objects are used
+  as arguments in calls to Page methods.
+- New entries are added to resource dictionaries automatically
+  when a resource is used.
+
+Types of Resources
+==================
+
+Font - A dictionary that maps resource names to font dictionaries.
+
+ExtGState - A dictionary that maps resource names to graphics state parameter dictionaries.
+
+XObject - A dictionary that maps resource names to external objects.
+
+ColorSpace - A dictionary that maps each resource name to either the name of a device-dependent colour space or an array describing a colour space.
+
+Pattern - A dictionary that maps resource names to pattern objects.
+
+Shading - A dictionary that maps resource names to shading dictionaries.
+
+Properties - A dictionary that maps resource names to property list dictionaries for marked-content.

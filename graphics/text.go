@@ -61,7 +61,7 @@ func (p *Page) TextSetFont(font font.Embedded, size float64) {
 	if p.Resources.Font == nil {
 		p.Resources.Font = pdf.Dict{}
 	}
-	name := p.resourceName(font, p.Resources.Font, "F%d")
+	name := p.resourceNameOld(font, p.Resources.Font, "F%d")
 
 	p.state.Font = font
 	p.state.FontSize = size

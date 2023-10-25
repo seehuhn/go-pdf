@@ -24,7 +24,7 @@ import (
 	"seehuhn.de/go/pdf/internal/float"
 )
 
-// TODO(voss): fill in the ProcSet resource.
+// TODO(voss): for PDF <2.0, fill in the ProcSet resource
 
 // Page represents a PDF content stream.
 type Page struct {
@@ -33,12 +33,14 @@ type Page struct {
 	Err       error
 
 	currentObject objectType
-	stack         []*stackEntry
 
 	state *State
 	set   StateBits
+	stack []*stackEntry
 
-	resNames map[pdf.Reference]pdf.Name
+	extGState map[*ExtGState]pdf.Name
+
+	resNamesOld map[pdf.Reference]pdf.Name
 }
 
 type stackEntry struct {
@@ -59,7 +61,7 @@ func NewPage(w io.Writer) *Page {
 		state: state,
 		set:   isSet,
 
-		resNames: make(map[pdf.Reference]pdf.Name),
+		resNamesOld: make(map[pdf.Reference]pdf.Name),
 	}
 }
 
@@ -122,9 +124,37 @@ type resource interface {
 	ResourceName() pdf.Name
 }
 
-func (p *Page) resourceName(obj resource, d pdf.Dict, nameTmpl string) pdf.Name {
+func resourceName[T comparable](m map[T]pdf.Name, obj T, defName pdf.Name, nameTmpl string) (pdf.Name, bool) {
+	name, ok := m[obj]
+	if ok {
+		return name, false
+	}
+
+	used := make(map[pdf.Name]bool, len(m))
+	for _, name := range m {
+		used[name] = true
+	}
+
+	if defName != "" {
+		if _, exists := used[defName]; !exists {
+			m[obj] = defName
+			return name, true
+		}
+	}
+
+	for k := len(used) + 1; ; k-- {
+		name = pdf.Name(fmt.Sprintf(nameTmpl, k))
+		if _, exists := used[name]; exists {
+			continue
+		}
+		m[obj] = name
+		return name, true
+	}
+}
+
+func (p *Page) resourceNameOld(obj resource, d pdf.Dict, nameTmpl string) pdf.Name {
 	ref := obj.Reference()
-	name, ok := p.resNames[ref]
+	name, ok := p.resNamesOld[ref]
 	if ok {
 		return name
 	}
@@ -132,7 +162,7 @@ func (p *Page) resourceName(obj resource, d pdf.Dict, nameTmpl string) pdf.Name 
 	name = obj.ResourceName()
 	if _, exists := d[name]; name != "" && !exists {
 		d[name] = ref
-		p.resNames[ref] = name
+		p.resNamesOld[ref] = name
 		return name
 	}
 
@@ -143,7 +173,7 @@ func (p *Page) resourceName(obj resource, d pdf.Dict, nameTmpl string) pdf.Name 
 		}
 
 		d[name] = ref
-		p.resNames[ref] = name
+		p.resNamesOld[ref] = name
 		return name
 	}
 }

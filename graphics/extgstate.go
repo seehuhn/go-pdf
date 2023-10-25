@@ -22,32 +22,51 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// SetExtGState sets selected graphics state parameters.
-// The argument dictName must be the name of a graphics state dictionary
-// that has been defined using the [Page.AddExtGState] method.
-func (p *Page) SetExtGState(dictName pdf.Name) {
-	// TODO(voss): keep track of the graphics state
+// ExtGState represents a collection of graphics state parameters.
+// These parameters can be set using the [Page.SetExtGState] method.
+type ExtGState struct {
+	Name  pdf.Name   // leave empty to generate new names automatically
+	Data  pdf.Object // either pdf.Dict or pdf.Reference
+	Value *State
+	Set   StateBits
+}
 
+func MakeExtGState(s *State, set StateBits, defaultName string) *ExtGState {
+	return &ExtGState{
+		Name:  pdf.Name(defaultName),
+		Data:  ExtGStateDict(s, set),
+		Value: s,
+		Set:   set,
+	}
+}
+
+// SetExtGState sets selected graphics state parameters.
+//
+// This implements the "gs" graphics operator.
+func (p *Page) SetExtGState(s *ExtGState) {
 	if !p.valid("SetExtGState", objPage, objText) {
 		return
 	}
 
-	err := dictName.PDF(p.Content)
+	if p.extGState == nil {
+		p.extGState = make(map[*ExtGState]pdf.Name)
+	}
+	name, isNew := resourceName(p.extGState, s, s.Name, "GS%d")
+	if isNew {
+		if p.Resources.ExtGState == nil {
+			p.Resources.ExtGState = pdf.Dict{}
+		}
+		p.Resources.ExtGState[name] = s.Data
+	}
+
+	p.state.Update(s.Value, s.Set)
+
+	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, " gs")
-}
-
-// AddExtGState adds a new graphics state dictionary.
-func (p *Page) AddExtGState(name pdf.Name, dict pdf.Dict) {
-	// TODO(voss): keep track of the graphics state
-
-	if p.Resources.ExtGState == nil {
-		p.Resources.ExtGState = pdf.Dict{}
-	}
-	p.Resources.ExtGState[name] = dict
 }
 
 // ExtGStateDict returns a graphics state parameter dictionary for the given state.

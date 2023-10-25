@@ -177,9 +177,106 @@ func NewState() (*State, StateBits) {
 	return res, isSet
 }
 
+// Update copies selected fields from another State into s.
+func (s *State) Update(other *State, set StateBits) {
+	if set&StateCTM != 0 {
+		s.CTM = other.CTM
+	}
+	if set&StateStrokeColor != 0 {
+		s.StrokeColor = other.StrokeColor
+	}
+	if set&StateFillColor != 0 {
+		s.FillColor = other.FillColor
+	}
+	if set&StateTm != 0 {
+		s.Tm = other.Tm
+	}
+	if set&StateTlm != 0 {
+		s.Tlm = other.Tlm
+	}
+	if set&StateTc != 0 {
+		s.Tc = other.Tc
+	}
+	if set&StateTw != 0 {
+		s.Tw = other.Tw
+	}
+	if set&StateTh != 0 {
+		s.Th = other.Th
+	}
+	if set&StateTl != 0 {
+		s.Tl = other.Tl
+	}
+	if set&StateFont != 0 {
+		s.Font = other.Font
+		s.FontSize = other.FontSize
+	}
+	if set&StateTmode != 0 {
+		s.Tmode = other.Tmode
+	}
+	if set&StateTextRise != 0 {
+		s.TextRise = other.TextRise
+	}
+	if set&StateTextKnockout != 0 {
+		s.TextKnockout = other.TextKnockout
+	}
+	if set&StateLineWidth != 0 {
+		s.LineWidth = other.LineWidth
+	}
+	if set&StateLineCap != 0 {
+		s.LineCap = other.LineCap
+	}
+	if set&StateLineJoin != 0 {
+		s.LineJoin = other.LineJoin
+	}
+	if set&StateMiterLimit != 0 {
+		s.MiterLimit = other.MiterLimit
+	}
+	if set&StateDash != 0 {
+		s.DashPattern = other.DashPattern // TODO(voss): make a copy?
+		s.DashPhase = other.DashPhase
+	}
+	if set&StateRenderingIntent != 0 {
+		s.RenderingIntent = other.RenderingIntent
+	}
+	if set&StateStrokeAdjustment != 0 {
+		s.StrokeAdjustment = other.StrokeAdjustment
+	}
+	if set&StateBlendMode != 0 {
+		s.BlendMode = other.BlendMode
+	}
+	if set&StateSoftMask != 0 {
+		s.SoftMask = other.SoftMask
+	}
+	if set&StateStrokeAlpha != 0 {
+		s.StrokeAlpha = other.StrokeAlpha
+	}
+	if set&StateFillAlpha != 0 {
+		s.FillAlpha = other.FillAlpha
+	}
+	if set&StateAlphaSourceFlag != 0 {
+		s.AlphaSourceFlag = other.AlphaSourceFlag
+	}
+	if set&StateBlackPointCompensation != 0 {
+		s.BlackPointCompensation = other.BlackPointCompensation
+	}
+	if set&StateOverprint != 0 {
+		s.OverprintStroke = other.OverprintStroke
+		s.OverprintFill = other.OverprintFill
+	}
+	if set&StateOverprintMode != 0 {
+		s.OverprintMode = other.OverprintMode
+	}
+	if set&StateFlatnessTolerance != 0 {
+		s.FlatnessTolerance = other.FlatnessTolerance
+	}
+	if set&StateSmoothnessTolerance != 0 {
+		s.SmoothnessTolerance = other.SmoothnessTolerance
+	}
+}
+
 // Clone returns a shallow copy of the GraphicsState.
-func (g *State) Clone() *State {
-	res := *g
+func (s *State) Clone() *State {
+	res := *s
 	return &res
 }
 
