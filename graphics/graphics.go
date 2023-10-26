@@ -134,8 +134,6 @@ func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
 	p.state.DashPattern = pattern
 	p.state.DashPhase = phase
 	p.set |= StateDash
-	// TODO(voss): when we stroke lines, make sure to either update the
-	// phase, or at least to unset the StateDash bit.
 
 	_, p.Err = fmt.Fprint(p.Content, "[")
 	if p.Err != nil {

@@ -36,8 +36,8 @@ type State struct {
 	FillColor   color.Color
 
 	// Text State parameters:
-	Tm           Matrix
-	Tlm          Matrix
+	Tm           Matrix        // reset at the start of each text object
+	Tlm          Matrix        // reset at the start of each text object
 	Tc           float64       // character spacing
 	Tw           float64       // word spacing
 	Th           float64       // horizonal scaling
@@ -48,7 +48,7 @@ type State struct {
 	TextRise     float64
 	TextKnockout bool
 
-	LineWidth   float64 // thickness of paths to be stroked
+	LineWidth   float64
 	LineCap     LineCapStyle
 	LineJoin    LineJoinStyle
 	MiterLimit  float64
