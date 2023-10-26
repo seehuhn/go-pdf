@@ -19,6 +19,7 @@ package graphics
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/float"
@@ -38,8 +39,8 @@ type Page struct {
 	set   StateBits
 	stack []*stackEntry
 
-	extGState map[*ExtGState]pdf.Name
-
+	resName     map[resource]pdf.Name
+	nameUsed    map[pdf.Name]struct{}
 	resNamesOld map[pdf.Reference]pdf.Name
 }
 
@@ -118,41 +119,92 @@ func (p *Page) coord(x float64) string {
 	return float.Format(x, 2)
 }
 
-// TODO(voss): remove?
+// Resource represents the different PDF resource types.
+// Implementations of this must be "comparable".
 type resource interface {
+	DefaultName() pdf.Name // return "" to choose names automatically
+	PDFData() pdf.Object   // value to use in the resource dictionary
+}
+
+// GetResourceName returns the name of a resource.
+// A new name is generated, if necessary, and the resource is added to the
+// resource dictionary for the category.
+// Valid categories are "Font", "ExtGState", "XObject", "ColorSpace",
+// "Pattern", "Shading", and "Properties".
+func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
+	name, ok := p.resName[r]
+	if ok {
+		return name
+	}
+
+	var field *pdf.Dict
+	var tmpl string
+	switch category {
+	case "Font":
+		field = &p.Resources.Font
+		tmpl = "F%d"
+	case "ExtGState":
+		field = &p.Resources.ExtGState
+		tmpl = "E%d"
+	case "XObject":
+		field = &p.Resources.XObject
+		tmpl = "X%d"
+	case "ColorSpace":
+		field = &p.Resources.ColorSpace
+		tmpl = "C%d"
+	case "Pattern":
+		field = &p.Resources.Pattern
+		tmpl = "P%d"
+	case "Shading":
+		field = &p.Resources.Shading
+		tmpl = "S%d"
+	case "Properties":
+		field = &p.Resources.Properties
+		tmpl = "MC%d"
+	default:
+		panic("invalid resource category " + category)
+	}
+
+	isUsed := func(name pdf.Name) bool {
+		_, isUsed := p.nameUsed[category+":"+name]
+		return isUsed
+	}
+
+	if defName := r.DefaultName(); defName != "" && !isUsed(defName) {
+		name = defName
+	} else {
+		var numUsed int
+		for name := range p.nameUsed {
+			if strings.HasPrefix(string(name), string(category)+":") {
+				numUsed++
+			}
+		}
+		for k := numUsed + 1; ; k-- {
+			name = pdf.Name(fmt.Sprintf(tmpl, k))
+			if !isUsed(name) {
+				break
+			}
+		}
+	}
+	p.resName[r] = name
+	p.nameUsed[category+":"+name] = struct{}{}
+
+	if *field == nil {
+		*field = pdf.Dict{}
+	}
+	(*field)[name] = r.PDFData()
+
+	return name
+}
+
+// TODO(voss): remove
+type oldResource interface {
 	Reference() pdf.Reference
 	ResourceName() pdf.Name
 }
 
-func resourceName[T comparable](m map[T]pdf.Name, obj T, defName pdf.Name, nameTmpl string) (pdf.Name, bool) {
-	name, ok := m[obj]
-	if ok {
-		return name, false
-	}
-
-	used := make(map[pdf.Name]bool, len(m))
-	for _, name := range m {
-		used[name] = true
-	}
-
-	if defName != "" {
-		if _, exists := used[defName]; !exists {
-			m[obj] = defName
-			return name, true
-		}
-	}
-
-	for k := len(used) + 1; ; k-- {
-		name = pdf.Name(fmt.Sprintf(nameTmpl, k))
-		if _, exists := used[name]; exists {
-			continue
-		}
-		m[obj] = name
-		return name, true
-	}
-}
-
-func (p *Page) resourceNameOld(obj resource, d pdf.Dict, nameTmpl string) pdf.Name {
+// TODO(voss): remove
+func (p *Page) resourceNameOld(obj oldResource, d pdf.Dict, nameTmpl string) pdf.Name {
 	ref := obj.Reference()
 	name, ok := p.resNamesOld[ref]
 	if ok {

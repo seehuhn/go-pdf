@@ -25,19 +25,33 @@ import (
 // ExtGState represents a collection of graphics state parameters.
 // These parameters can be set using the [Page.SetExtGState] method.
 type ExtGState struct {
-	Name  pdf.Name   // leave empty to generate new names automatically
-	Data  pdf.Object // either pdf.Dict or pdf.Reference
-	Value *State
-	Set   StateBits
+	DefName pdf.Name   // leave empty to generate new names automatically
+	Data    pdf.Object // either pdf.Dict or pdf.Reference
+	Value   *State
+	Set     StateBits
 }
 
+// MakeExtGState creates a new ExtGState object.
 func MakeExtGState(s *State, set StateBits, defaultName string) *ExtGState {
 	return &ExtGState{
-		Name:  pdf.Name(defaultName),
-		Data:  ExtGStateDict(s, set),
-		Value: s,
-		Set:   set,
+		DefName: pdf.Name(defaultName),
+		Data:    ExtGStateDict(s, set),
+		Value:   s,
+		Set:     set,
 	}
+}
+
+// DefaultName returns the default name for this resource.
+// In case of name clashes, or if the returned name is empty,
+// a new name will be generated automatically.
+func (s *ExtGState) DefaultName() pdf.Name {
+	return s.DefName
+}
+
+// PDFData returns the value to use in the PDF Resources dictionary.
+// This can either be [pdf.Reference] or [pdf.Dict].
+func (s *ExtGState) PDFData() pdf.Object {
+	return s.Data
 }
 
 // SetExtGState sets selected graphics state parameters.
@@ -48,19 +62,9 @@ func (p *Page) SetExtGState(s *ExtGState) {
 		return
 	}
 
-	if p.extGState == nil {
-		p.extGState = make(map[*ExtGState]pdf.Name)
-	}
-	name, isNew := resourceName(p.extGState, s, s.Name, "GS%d")
-	if isNew {
-		if p.Resources.ExtGState == nil {
-			p.Resources.ExtGState = pdf.Dict{}
-		}
-		p.Resources.ExtGState[name] = s.Data
-	}
-
 	p.state.Update(s.Value, s.Set)
 
+	name := p.getResourceName("ExtGState", s)
 	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err

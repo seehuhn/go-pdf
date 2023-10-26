@@ -23,6 +23,11 @@ import (
 	"seehuhn.de/go/pdf/image"
 )
 
+type Image struct {
+	DefaultName pdf.Name   // leave empty to generate new names automatically
+	Data        pdf.Object // either pdf.Dict or pdf.Reference
+}
+
 // DrawImage draws an image on the page.
 func (p *Page) DrawImage(img image.Embedded) {
 	if !p.valid("DrawImage", objPage) {
