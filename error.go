@@ -78,6 +78,16 @@ func Wrap(err error, loc string) error {
 	return fmt.Errorf("%s: %w", loc, err)
 }
 
+func IsMalformed(err error) bool {
+	for err != nil {
+		if _, ok := err.(*MalformedFileError); ok {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
+}
+
 // VersionError is returned when trying to use a feature in a PDF file which is
 // not supported by the PDF version used.  Use [CheckVersion] to create
 // VersionError objects.

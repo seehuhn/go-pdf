@@ -22,11 +22,11 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// ExtGState represents a collection of graphics state parameters.
-// These parameters can be set using the [Page.SetExtGState] method.
+// ExtGState represents a combination of graphics state parameters.
+// This combination of parameters can be set using the [Page.SetExtGState] method.
 type ExtGState struct {
 	DefName pdf.Name   // leave empty to generate new names automatically
-	Data    pdf.Object // either pdf.Dict or pdf.Reference
+	Dict    pdf.Object // either pdf.Dict or pdf.Reference
 	Value   *State
 	Set     StateBits
 }
@@ -35,7 +35,7 @@ type ExtGState struct {
 func MakeExtGState(s *State, set StateBits, defaultName string) *ExtGState {
 	return &ExtGState{
 		DefName: pdf.Name(defaultName),
-		Data:    ExtGStateDict(s, set),
+		Dict:    ExtGStateDict(s, set),
 		Value:   s,
 		Set:     set,
 	}
@@ -48,10 +48,10 @@ func (s *ExtGState) DefaultName() pdf.Name {
 	return s.DefName
 }
 
-// PDFData returns the value to use in the PDF Resources dictionary.
+// PDFDict returns the value to use in the PDF Resources dictionary.
 // This can either be [pdf.Reference] or [pdf.Dict].
-func (s *ExtGState) PDFData() pdf.Object {
-	return s.Data
+func (s *ExtGState) PDFDict() pdf.Object {
+	return s.Dict
 }
 
 // SetExtGState sets selected graphics state parameters.
@@ -168,45 +168,40 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 	s := &State{}
 	var set StateBits
 	var overprintFillSet bool
-keyLoop:
 	for key, v := range dict {
 		switch key {
 		case "LW":
 			lw, err := pdf.GetNumber(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			s.LineWidth = float64(lw)
 			set |= StateLineWidth
 		case "LC":
 			lc, err := pdf.GetInteger(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			s.LineCap = LineCapStyle(lc)
 			set |= StateLineCap
 		case "LJ":
 			lj, err := pdf.GetInteger(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			s.LineJoin = LineJoinStyle(lj)
 			set |= StateLineJoin
 		case "ML":
 			ml, err := pdf.GetNumber(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			s.MiterLimit = float64(ml)
@@ -222,30 +217,27 @@ keyLoop:
 			}
 		case "RI":
 			ri, err := pdf.GetName(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			s.RenderingIntent = ri
 			set |= StateRenderingIntent
 		case "OP":
 			op, err := pdf.GetBoolean(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			s.OverprintStroke = bool(op)
 			set |= StateOverprint
 		case "op":
 			op, err := pdf.GetBoolean(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			s.OverprintFill = bool(op)
@@ -253,10 +245,9 @@ keyLoop:
 			overprintFillSet = true
 		case "OPM":
 			opm, err := pdf.GetInteger(r, v)
-			if err != nil {
-				if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-					continue keyLoop
-				}
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
 				return nil, 0, err
 			}
 			if opm != 0 {

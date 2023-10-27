@@ -33,6 +33,8 @@ func (p *Page) TextStart() {
 		return
 	}
 	p.currentObject = objText
+	p.state.Tm = IdentityMatrix
+	p.state.Tlm = IdentityMatrix
 	_, p.Err = fmt.Fprintln(p.Content, "BT")
 }
 

@@ -39,9 +39,9 @@ type Page struct {
 	set   StateBits
 	stack []*stackEntry
 
-	resName     map[resource]pdf.Name
+	resName     map[resource]pdf.Name // TODO(voss): should we use (category, resource) as the key?
 	nameUsed    map[pdf.Name]struct{}
-	resNamesOld map[pdf.Reference]pdf.Name
+	resNamesOld map[pdf.Reference]pdf.Name // TODO(voss): remove
 }
 
 type stackEntry struct {
@@ -123,7 +123,7 @@ func (p *Page) coord(x float64) string {
 // Implementations of this must be "comparable".
 type resource interface {
 	DefaultName() pdf.Name // return "" to choose names automatically
-	PDFData() pdf.Object   // value to use in the resource dictionary
+	PDFDict() pdf.Object   // value to use in the resource dictionary
 }
 
 // GetResourceName returns the name of a resource.
@@ -192,7 +192,7 @@ func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
 	if *field == nil {
 		*field = pdf.Dict{}
 	}
-	(*field)[name] = r.PDFData()
+	(*field)[name] = r.PDFDict()
 
 	return name
 }
