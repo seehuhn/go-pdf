@@ -62,6 +62,8 @@ func NewPage(w io.Writer) *Page {
 		state: state,
 		set:   isSet,
 
+		resName:     make(map[resource]pdf.Name),
+		nameUsed:    make(map[pdf.Name]struct{}),
 		resNamesOld: make(map[pdf.Reference]pdf.Name),
 	}
 }

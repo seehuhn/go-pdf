@@ -81,13 +81,13 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 
 	seq := &operatorSeq{}
 
-	err = forAllContentStreamParts(r, page["Contents"], func(r pdf.Getter, contents *pdf.Stream) error {
+	err = foreachContentStreamPart(r, page["Contents"], func(r pdf.Getter, contents *pdf.Stream) error {
 		stm, err := pdf.DecodeStream(r, contents, 0)
 		if err != nil {
 			return err
 		}
 
-		err = seq.forAllCommands(stm, func(cmd operator, args []pdf.Object) error {
+		err = seq.foreachCommand(stm, func(cmd operator, args []pdf.Object) error {
 			switch cmd {
 
 			// == General graphics state =========================================
@@ -487,7 +487,7 @@ type operatorSeq struct {
 	args []pdf.Object
 }
 
-func (o *operatorSeq) forAllCommands(stm io.Reader, yield func(name operator, args []pdf.Object) error) error {
+func (o *operatorSeq) foreachCommand(stm io.Reader, yield func(name operator, args []pdf.Object) error) error {
 	// TODO(voss): use one scanner for all parts, add white space between parts
 	s := newScanner(stm)
 	for {
@@ -509,7 +509,7 @@ func (o *operatorSeq) forAllCommands(stm io.Reader, yield func(name operator, ar
 	}
 }
 
-func forAllContentStreamParts(r pdf.Getter, ref pdf.Object, yield func(pdf.Getter, *pdf.Stream) error) error {
+func foreachContentStreamPart(r pdf.Getter, ref pdf.Object, yield func(pdf.Getter, *pdf.Stream) error) error {
 	contents, err := pdf.Resolve(r, ref)
 	if err != nil {
 		return err
