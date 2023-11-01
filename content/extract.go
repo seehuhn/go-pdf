@@ -26,6 +26,11 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+type extractor struct {
+	*pdf.Resources
+	*graphics.State
+}
+
 // Context holds information about the current state of the PDF content stream.
 type Context struct {
 	*pdf.Resources
@@ -79,7 +84,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 		return cb(ctx, decoder(s))
 	}
 
-	seq := &operatorSeq{}
+	seq := &parser{}
 
 	err = foreachContentStreamPart(r, page["Contents"], func(r pdf.Getter, contents *pdf.Stream) error {
 		stm, err := pdf.DecodeStream(r, contents, 0)
@@ -483,11 +488,11 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 	return nil
 }
 
-type operatorSeq struct {
+type parser struct {
 	args []pdf.Object
 }
 
-func (o *operatorSeq) foreachCommand(stm io.Reader, yield func(name operator, args []pdf.Object) error) error {
+func (o *parser) foreachCommand(stm io.Reader, yield func(name operator, args []pdf.Object) error) error {
 	// TODO(voss): use one scanner for all parts, add white space between parts
 	s := newScanner(stm)
 	for {

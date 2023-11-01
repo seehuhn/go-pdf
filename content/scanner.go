@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// A scanner breaks up a content stream into tokens.
+// A scanner breaks a content stream into tokens.
 type scanner struct {
 	line int // 0-based
 	col  int // 0-based
@@ -42,7 +42,7 @@ type scanner struct {
 	err error
 }
 
-// newScanner returns a new Scanner that reads from r.
+// newScanner returns a new scanner that reads from r.
 func newScanner(r io.Reader) *scanner {
 	return &scanner{
 		src: r,
@@ -426,6 +426,10 @@ func (s *scanner) peekN(n int) []byte {
 	return s.ahead[:n]
 }
 
+// nextByte returns the next byte from the input stream.
+// The function updates the line and column numbers.
+// This checks the read-ahead buffer first, and only calls .readByte() if
+// necessary.
 func (s *scanner) nextByte() (byte, error) {
 	var b byte
 
@@ -454,6 +458,8 @@ func (s *scanner) nextByte() (byte, error) {
 	return b, nil
 }
 
+// readByte reads the next byte from the underlying reader.
+// It is the callers responsibility to check the read-ahead buffer first.
 func (s *scanner) readByte() (byte, error) {
 	for s.pos >= s.used {
 		err := s.refill()
@@ -468,6 +474,8 @@ func (s *scanner) readByte() (byte, error) {
 	return b, nil
 }
 
+// refill reads more data from the underlying reader into the buffer.
+// This is the only place where the underlying reader is called.
 func (s *scanner) refill() error {
 	if s.err != nil {
 		return s.err
