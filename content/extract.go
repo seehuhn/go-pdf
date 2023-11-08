@@ -138,7 +138,6 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if err != nil {
 					return err
 				}
-				// fmt.Println("M", f)
 				g.MiterLimit = float64(f)
 			case "gs": // Set parameters from graphics state parameter dictionary
 				if len(args) < 1 {
