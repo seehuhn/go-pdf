@@ -42,7 +42,6 @@ type Scanner struct {
 	src       io.Reader
 	buf       []byte
 	pos, used int
-	ahead     []byte
 	crSeen    bool
 }
 
@@ -69,14 +68,12 @@ func (s *Scanner) Scan(r io.Reader) func(yield func(string, []pdf.Object) bool) 
 		s.src = r
 		s.pos = 0
 		s.used = 0
-		s.ahead = s.ahead[:0]
 		s.crSeen = false
 
 	tokenLoop:
 		for {
 			obj, err := s.nextToken()
 			if err != nil {
-				s.err = err
 				break
 			}
 
@@ -135,7 +132,6 @@ func (s *Scanner) Scan(r io.Reader) func(yield func(string, []pdf.Object) bool) 
 		}
 
 		if s.err == io.EOF {
-			s.err = nil
 			if s.col > 0 {
 				s.col = 0
 				s.line++
@@ -149,41 +145,34 @@ func (s *Scanner) Scan(r io.Reader) func(yield func(string, []pdf.Object) bool) 
 }
 
 func (s *Scanner) nextToken() (pdf.Object, error) {
-	err := s.skipWhiteSpace()
-	if err != nil {
-		return nil, err
-	}
-
+	s.skipWhiteSpace()
 	bb := s.peekN(2)
 	if len(bb) == 0 {
 		return nil, s.err
 	}
-	switch bb[0] {
-	case '(':
-		return s.readString()
-	case '<':
-		if string(bb) == "<<" { // dict
-			s.skipRequiredByte('<')
-			s.skipRequiredByte('<')
-			return operator("<<"), nil
-		}
-		return s.readHexString()
-	case '>':
-		if string(bb) == ">>" { // end dict
-			s.skipRequiredByte('>')
-			s.skipRequiredByte('>')
-			return operator(">>"), nil
-		}
-		s.skipRequiredByte('>')
-		return operator(">"), nil
-	case '/':
+
+	switch {
+	case bb[0] == '/':
+		s.skipN(1)
 		return s.readName()
+	case bb[0] == '(':
+		s.skipN(1)
+		return s.readString()
+	case string(bb) == "<<":
+		s.skipN(2)
+		return operator("<<"), nil
+	case bb[0] == '<':
+		s.skipN(1)
+		return s.readHexString()
+	case string(bb) == ">>":
+		s.skipN(2)
+		return operator(">>"), nil
 	default:
 		// TODO(voss): revisit this once
 		// https://github.com/pdf-association/pdf-issues/issues/363
 		// is resolved.
 		opBytes := []byte{bb[0]}
-		s.nextByte() // skip bb[0] (invalidates bb)
+		s.readByte() // skip bb[0] (invalidates bb)
 		if class[bb[0]] == regular {
 			for {
 				b, err := s.peek()
@@ -195,7 +184,7 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 				if class[b] != regular {
 					break
 				}
-				s.nextByte() // skip b
+				s.readByte() // skip b
 				opBytes = append(opBytes, b)
 			}
 		}
@@ -216,16 +205,13 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 	}
 }
 
+// Reads a PDF string, starting after the opening '(').
 func (s *Scanner) readString() (pdf.String, error) {
-	err := s.skipRequiredByte('(')
-	if err != nil {
-		return nil, err
-	}
 	var res []byte
 	bracketLevel := 1
 	ignoreLF := false
 	for {
-		b, err := s.nextByte()
+		b, err := s.readByte()
 		if err != nil {
 			return nil, err
 		}
@@ -244,7 +230,7 @@ func (s *Scanner) readString() (pdf.String, error) {
 			}
 			res = append(res, b)
 		case '\\':
-			b, err = s.nextByte()
+			b, err = s.readByte()
 			if err != nil {
 				return nil, err
 			}
@@ -282,7 +268,7 @@ func (s *Scanner) readString() (pdf.String, error) {
 					if b < '0' || b > '7' {
 						break
 					}
-					s.nextByte()
+					s.readByte()
 					oct = oct*8 + (b - '0')
 				}
 				res = append(res, oct)
@@ -296,17 +282,12 @@ func (s *Scanner) readString() (pdf.String, error) {
 }
 
 func (s *Scanner) readHexString() (pdf.String, error) {
-	err := s.skipRequiredByte('<')
-	if err != nil {
-		return nil, err
-	}
-
 	var res []byte
 	first := true
 	var hi byte
 readLoop:
 	for {
-		b, err := s.nextByte()
+		b, err := s.readByte()
 		if err != nil {
 			return nil, err
 		}
@@ -342,17 +323,12 @@ readLoop:
 
 // readName reads a PDF name object (including the leading slash).
 func (s *Scanner) readName() (pdf.Name, error) {
-	err := s.skipRequiredByte('/')
-	if err != nil {
-		return "", err
-	}
-
 	var name []byte
 	hex := 0
 	var high byte
 	for {
 		if hex > 0 {
-			c, err := s.nextByte()
+			c, err := s.readByte()
 			if err != nil {
 				return "", err
 			}
@@ -390,104 +366,51 @@ func (s *Scanner) readName() (pdf.Name, error) {
 		} else {
 			name = append(name, b)
 		}
-		s.nextByte()
+		s.readByte()
 	}
 	return pdf.Name(name), nil
 }
 
 // skipWhiteSpace skips all input (including comments) until a non-whitespace
 // character is found.
-func (s *Scanner) skipWhiteSpace() error {
+func (s *Scanner) skipWhiteSpace() {
 	for {
 		b, err := s.peek()
 		if err != nil {
-			return err
+			break
 		}
 		if b <= 32 {
-			s.nextByte()
+			s.readByte()
 		} else if b == '%' {
-			s.skipComment()
+			s.skipToEOL()
 		} else {
-			return nil
+			break
 		}
 	}
 }
 
-// skipComment skips everything from a % to the end of the line (both inclusive).
-func (s *Scanner) skipComment() {
-	err := s.skipRequiredByte('%')
-	if err != nil {
-		return
-	}
-
+// skipToEOL skips everything up to (but not including) the end of the line.
+func (s *Scanner) skipToEOL() {
 	for {
 		b, err := s.peek()
 		if b == 10 || b == 13 || err != nil {
 			break
 		}
-		s.nextByte()
+		s.readByte()
 	}
 }
 
-func (s *Scanner) skipRequiredByte(expected byte) error {
-	seen, err := s.nextByte()
-	if err != nil {
-		return err
-	}
-	if seen != expected {
-		return errParse
-	}
-	return nil
-}
-
-func (s *Scanner) peek() (byte, error) {
-	if len(s.ahead) == 0 {
-		b, err := s.readByte()
-		if err != nil {
-			return 0, err
-		}
-		s.ahead = append(s.ahead, b)
-	}
-	return s.ahead[0], nil
-}
-
-// PeekN returns the next n bytes from the input stream without consuming them.
-// In case of a read error, less than n bytes may be returned.
-//
-// The returned slice is owned by the scanner and is only valid until the next
-// read.
-func (s *Scanner) peekN(n int) []byte {
-	for len(s.ahead) < n {
-		b, err := s.readByte()
-		if err != nil {
-			return s.ahead
-		}
-		s.ahead = append(s.ahead, b)
-	}
-	return s.ahead[:n]
-}
-
-// nextByte returns the next byte of the input stream.
+// readByte consumes and returns the next byte of the input stream.
 // The function updates the line and column numbers.
-// This checks the read-ahead buffer first, and only calls .readByte() if
-// necessary.
-func (s *Scanner) nextByte() (byte, error) {
-	var b byte
-
-	if len(s.ahead) > 0 {
-		b = s.ahead[0]
-		copy(s.ahead, s.ahead[1:])
-		s.ahead = s.ahead[:len(s.ahead)-1]
-	} else {
-		var err error
-		b, err = s.readByte()
-		if err != nil {
-			return 0, err
-		}
+func (s *Scanner) readByte() (byte, error) {
+	b, err := s.peek()
+	if err != nil {
+		return 0, err
 	}
+	s.pos++
 
 	if s.crSeen && b == 10 {
-		// ignore LF after CR
+		// LF after CR does not start a new line
 	} else if b == 10 || b == 13 {
 		s.line++
 		s.col = 0
@@ -499,20 +422,54 @@ func (s *Scanner) nextByte() (byte, error) {
 	return b, nil
 }
 
-// readByte reads the next byte from the underlying reader.
-// It is the callers responsibility to check the read-ahead buffer first.
-func (s *Scanner) readByte() (byte, error) {
+// Peek returns the next byte from the input stream without consuming it.
+func (s *Scanner) peek() (byte, error) {
 	for s.pos >= s.used {
 		err := s.refill()
 		if err != nil {
 			return 0, err
 		}
 	}
+	return s.buf[s.pos], nil
+}
 
-	b := s.buf[s.pos]
-	s.pos++
+// PeekN returns the next n bytes from the input stream without consuming them.
+// In case of EOF or of a read error, less than n bytes may be returned.
+//
+// The returned slice is owned by the scanner and is only valid until the next
+// read.
+func (s *Scanner) peekN(n int) []byte {
+	for s.pos+n > s.used {
+		err := s.refill()
+		if err != nil {
+			break
+		}
+	}
 
-	return b, nil
+	a := s.pos
+	b := s.pos + n
+	if b > s.used {
+		b = s.used
+	}
+	return s.buf[a:b]
+}
+
+// skipN consumes n bytes from the input stream.
+func (s *Scanner) skipN(n int) {
+	for n > 0 {
+		if s.pos >= s.used {
+			err := s.refill()
+			if err != nil {
+				break
+			}
+		}
+		if s.pos+n <= s.used {
+			s.pos += n
+			break
+		}
+		n -= s.used - s.pos
+		s.pos = s.used
+	}
 }
 
 // refill reads more data from the underlying reader into the buffer.
