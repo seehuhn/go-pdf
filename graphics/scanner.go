@@ -154,7 +154,7 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 	switch {
 	case bb[0] == '/':
 		s.skipN(1)
-		return s.readName()
+		return s.readName(), nil
 	case bb[0] == '(':
 		s.skipN(1)
 		return s.readString()
@@ -205,7 +205,7 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 	}
 }
 
-// Reads a PDF string, starting after the opening '(').
+// Reads a PDF string (not including the leading parenthesis).
 func (s *Scanner) readString() (pdf.String, error) {
 	var res []byte
 	bracketLevel := 1
@@ -321,46 +321,21 @@ readLoop:
 	return pdf.String(res), nil
 }
 
-// readName reads a PDF name object (including the leading slash).
-func (s *Scanner) readName() (pdf.Name, error) {
+// readName reads a PDF name object (not including the leading slash).
+func (s *Scanner) readName() pdf.Name {
 	var name []byte
-	hex := 0
-	var high byte
 	for {
-		if hex > 0 {
-			c, err := s.readByte()
-			if err != nil {
-				return "", err
-			}
-			var low byte
-			if c >= '0' && c <= '9' {
-				low = c - '0'
-			} else if c >= 'A' && c <= 'F' {
-				low = c - 'A' + 10
-			} else if c >= 'a' && c <= 'f' {
-				low = c - 'a' + 10
-			} else {
-				return "", errParse
-			}
-			switch hex {
-			case 2:
-				high = low << 4
-			case 1:
-				name = append(name, high|low)
-			}
-			hex--
-			continue
-		}
-
 		b, err := s.peek()
-		if err == io.EOF {
+		if err != nil {
 			break
-		} else if err != nil {
-			return "", err
 		}
 
 		if b == '#' {
-			hex = 2
+			if b, ok := s.tryHex(); ok {
+				name = append(name, b)
+				continue
+			}
+			name = append(name, '#')
 		} else if class[b] != regular {
 			break
 		} else {
@@ -368,7 +343,21 @@ func (s *Scanner) readName() (pdf.Name, error) {
 		}
 		s.readByte()
 	}
-	return pdf.Name(name), nil
+	return pdf.Name(name)
+}
+
+func (s *Scanner) tryHex() (byte, bool) {
+	digits := s.peekN(3)
+	if len(digits) != 3 {
+		return 0, false
+	}
+	high := hexDigit(digits[1])
+	low := hexDigit(digits[2])
+	if high == 255 || low == 255 {
+		return 0, false
+	}
+	s.skipN(3)
+	return high<<4 | low, true
 }
 
 // skipWhiteSpace skips all input (including comments) until a non-whitespace
@@ -490,6 +479,18 @@ func (s *Scanner) refill() error {
 		return err
 	}
 	return nil
+}
+
+func hexDigit(c byte) byte {
+	if c >= '0' && c <= '9' {
+		return c - '0'
+	} else if c >= 'A' && c <= 'F' {
+		return c - 'A' + 10
+	} else if c >= 'a' && c <= 'f' {
+		return c - 'a' + 10
+	} else {
+		return 255
+	}
 }
 
 func parseNumber(s []byte) (pdf.Object, error) {
