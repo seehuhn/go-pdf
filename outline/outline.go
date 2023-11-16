@@ -49,7 +49,7 @@ func Read(r *pdf.Reader) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	tree.Open = false
+	tree.Open = false // TODO(voss): is this right?
 	return tree, nil
 }
 
@@ -58,11 +58,11 @@ func readNode(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) (*
 		return nil, nil, fmt.Errorf("outline tree contains a loop")
 	}
 	seen[node] = true
-	if len(seen) > 1000 {
+	if len(seen) > 65536 {
 		return nil, nil, errors.New("outline too large")
 	}
 
-	dict, err := pdf.GetDict(r, node)
+	dict, err := pdf.GetDictTyped(r, node, "Outlines")
 	if err != nil {
 		return nil, nil, err
 	}
