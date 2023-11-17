@@ -189,7 +189,7 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 			}
 		}
 
-		if x, err := parseNumber(opBytes); err == nil {
+		if x := parseNumber(opBytes); x != nil {
 			return x, nil
 		}
 
@@ -493,12 +493,15 @@ func hexDigit(c byte) byte {
 	}
 }
 
-func parseNumber(s []byte) (pdf.Object, error) {
+// parseNumber tries to interpret s as a number.
+// The function returns [pdf.Integer] or [pdf.Real] in case s is a valid
+// number, and nil otherwise.
+func parseNumber(s []byte) pdf.Object {
 	// TODO(voss): don't use strconv
 
 	x, err := strconv.ParseInt(string(s), 10, 64)
 	if err == nil {
-		return pdf.Integer(x), nil
+		return pdf.Integer(x)
 	}
 
 	isSimple := true
@@ -518,11 +521,11 @@ func parseNumber(s []byte) (pdf.Object, error) {
 	if isSimple {
 		y, err := strconv.ParseFloat(string(s), 64)
 		if err == nil && !math.IsInf(y, 0) && !math.IsNaN(y) {
-			return pdf.Real(y), nil
+			return pdf.Real(y)
 		}
 	}
 
-	return nil, errParse
+	return nil
 }
 
 var errParse = errors.New("parse error")
