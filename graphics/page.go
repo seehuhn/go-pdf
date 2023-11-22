@@ -39,8 +39,8 @@ type Page struct {
 	set   StateBits
 	stack []*stackEntry
 
-	resName     map[resource]pdf.Name // TODO(voss): should we use (category, resource) as the key?
-	nameUsed    map[pdf.Name]struct{}
+	resName     map[resource]pdf.Name      // TODO(voss): should we use (category, resource) as the key?
+	nameUsed    map[pdf.Name]struct{}      // keys are `category+":"+name`
 	resNamesOld map[pdf.Reference]pdf.Name // TODO(voss): remove
 }
 

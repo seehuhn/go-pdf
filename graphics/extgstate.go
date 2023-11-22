@@ -26,7 +26,7 @@ import (
 // This combination of parameters can be set using the [Page.SetExtGState] method.
 type ExtGState struct {
 	DefName pdf.Name   // leave empty to generate new names automatically
-	Dict    pdf.Object // either pdf.Dict or pdf.Reference
+	Dict    pdf.Object // either [pdf.Dict] or [pdf.Reference]
 	Value   *State
 	Set     StateBits
 }
