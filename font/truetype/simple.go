@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // fontSimple is a simple TrueType font.
@@ -91,10 +92,10 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	res := &embeddedSimple{
 		fontSimple:    f,
 		w:             w,
-		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
+		Resource:      graphics.Resource{Ref: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res)
+	w.AutoClose(res, res.Ref)
 	return res, nil
 }
 
@@ -106,7 +107,7 @@ func (f *fontSimple) Layout(s string, ptSize float64) glyph.Seq {
 type embeddedSimple struct {
 	*fontSimple
 	w pdf.Putter
-	pdf.Resource
+	graphics.Resource
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -120,7 +121,7 @@ func (f *embeddedSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.Name, f.ttf.PostscriptName())
+			f.DefName, f.ttf.PostscriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding()
 

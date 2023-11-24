@@ -34,6 +34,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // Font is a Type 1 font.
@@ -120,13 +121,13 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	res := &embedded{
 		Font: f,
 		w:    w,
-		Resource: pdf.Resource{
-			Ref:  w.Alloc(),
-			Name: resName,
+		Resource: graphics.Resource{
+			Ref:     w.Alloc(),
+			DefName: resName,
 		},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res)
+	w.AutoClose(res, res.Ref)
 	return res, nil
 }
 
@@ -170,7 +171,7 @@ type embedded struct {
 	*Font
 
 	w pdf.Putter
-	pdf.Resource
+	graphics.Resource
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -184,7 +185,7 @@ func (e *embedded) Close() error {
 
 	if e.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			e.Name, e.outlines.FontInfo.FontName)
+			e.DefName, e.outlines.FontInfo.FontName)
 	}
 
 	encodingGid := e.Encoding()
@@ -232,7 +233,7 @@ func (e *embedded) Close() error {
 		Font:      psSubset,
 		SubsetTag: subsetTag,
 		Encoding:  encoding,
-		ResName:   e.Name,
+		ResName:   e.DefName,
 	}
 	return info.Embed(e.w, e.Ref)
 }

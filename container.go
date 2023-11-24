@@ -220,7 +220,7 @@ type Putter interface {
 	// TODO(voss): allow to set the object ID for the containing stream?
 	WriteCompressed(refs []Reference, objects ...Object) error
 
-	AutoClose(res Closer)
+	AutoClose(obj io.Closer, key Reference)
 }
 
 func IsTagged(pdf Putter) bool {

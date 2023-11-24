@@ -20,11 +20,12 @@ import (
 	"image"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // EmbedPNG writes the image img to the PDF file w, using a lossless representation
 // very similar to the PNG format.
-func EmbedPNG(w pdf.Putter, src image.Image, resName pdf.Name) (Embedded, error) {
+func EmbedPNG(w pdf.Putter, src image.Image, resName pdf.Name) (graphics.EmbeddedImage, error) {
 	im, err := PNG(src)
 	if err != nil {
 		return nil, err
@@ -32,7 +33,7 @@ func EmbedPNG(w pdf.Putter, src image.Image, resName pdf.Name) (Embedded, error)
 	return im.Embed(w, resName)
 }
 
-func PNG(src image.Image) (Image, error) {
+func PNG(src image.Image) (graphics.Image, error) {
 	return &pngImage{src}, nil
 }
 
@@ -41,12 +42,12 @@ type pngImage struct {
 }
 
 // Bounds implements the [Image] interface.
-func (im *pngImage) Bounds() Rectangle {
+func (im *pngImage) Bounds() graphics.Rectangle {
 	b := im.im.Bounds()
-	return Rectangle{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}
+	return graphics.Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
 }
 
-func (im *pngImage) Embed(w pdf.Putter, resName pdf.Name) (Embedded, error) {
+func (im *pngImage) Embed(w pdf.Putter, resName pdf.Name) (graphics.EmbeddedImage, error) {
 	ref := w.Alloc()
 	src := im.im
 
@@ -125,10 +126,10 @@ type pngEmbedded struct {
 	resName pdf.Name
 }
 
-func (im *pngEmbedded) Reference() pdf.Reference {
+func (im *pngEmbedded) PDFObject() pdf.Object {
 	return im.ref
 }
 
-func (im *pngEmbedded) ResourceName() pdf.Name {
+func (im *pngEmbedded) DefaultName() pdf.Name {
 	return im.resName
 }

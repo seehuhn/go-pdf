@@ -20,25 +20,43 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/image"
 )
 
-// Image represents an image embedded in the PDF file.
-type Image struct {
-	DefaultName pdf.Name   // leave empty to generate new names automatically
-	Data        pdf.Object // either pdf.Dict or pdf.Reference
+// Image represents an image which can be embedded in a PDF file.
+type Image interface {
+	Embed(w pdf.Putter, resName pdf.Name) (EmbeddedImage, error)
+	Bounds() Rectangle
+}
+
+// EmbeddedImage represents an image which has been embedded in a PDF file.
+type EmbeddedImage interface {
+	Image
+	DefaultName() pdf.Name
+	PDFObject() pdf.Object
+}
+
+// Rectangle gives the dimensions of an image.
+type Rectangle struct {
+	XMin, YMin, XMax, YMax int
+}
+
+// Dx returns the width of the rectangle.
+func (r Rectangle) Dx() int {
+	return r.XMax - r.XMin
+}
+
+// Dy returns the height of the rectangle.
+func (r Rectangle) Dy() int {
+	return r.YMax - r.YMin
 }
 
 // DrawImage draws an image on the page.
-func (p *Page) DrawImage(img image.Embedded) {
+func (p *Page) DrawImage(img EmbeddedImage) {
 	if !p.valid("DrawImage", objPage) {
 		return
 	}
 
-	if p.Resources.XObject == nil {
-		p.Resources.XObject = make(pdf.Dict)
-	}
-	name := p.resourceNameOld(img, p.Resources.XObject, "I%d")
+	name := p.getResourceName("XObject", img)
 	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err

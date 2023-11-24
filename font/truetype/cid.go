@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // fontComposite is a composite TrueType font.
@@ -111,18 +112,18 @@ func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedCID{
 		fontComposite: f,
 		w:             w,
-		Resource:      pdf.Resource{Ref: w.Alloc(), Name: resName},
+		Resource:      graphics.Resource{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
-	w.AutoClose(res)
+	w.AutoClose(res, res.Ref)
 	return res, nil
 }
 
 type embeddedCID struct {
 	*fontComposite
 	w pdf.Putter
-	pdf.Resource
+	graphics.Resource
 
 	cmap.GIDToCID
 	cmap.CIDEncoder

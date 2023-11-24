@@ -18,26 +18,16 @@ package graphics
 
 import (
 	"fmt"
-
-	"seehuhn.de/go/pdf"
 )
 
 // FormXObject represents a PDF Form XObject.
 //
 // See section 8.10 of ISO 32000-2:2020 for details.
 type FormXObject struct {
-	DefName pdf.Name      // leave empty to generate new names automatically
-	Ref     pdf.Reference // The Form XObject content stream
+	Resource
 }
 
-func (f *FormXObject) DefaultName() pdf.Name {
-	return f.DefName
-}
-
-func (f *FormXObject) PDFDict() pdf.Object {
-	return f.Ref
-}
-
+// PaintFormXObject draws a Form XObject onto the page.
 func (p *Page) PaintFormXObject(x *FormXObject) {
 	if !p.valid("PaintFormXObject", objPage, objText) {
 		return

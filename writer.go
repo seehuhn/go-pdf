@@ -59,33 +59,13 @@ type Writer struct {
 	inStream    bool
 	afterStream []allocatedObject
 
-	autoclose map[Reference]Closer
+	autoclose map[Reference]io.Closer
 }
 
+// TODO(voss): is this more generally useful?
 type allocatedObject struct {
 	ref Reference
 	obj Object
-}
-
-type Closer interface {
-	// Write writes the resource to the PDF file.  No changes can be
-	// made to the resource after it has been written.
-	Close() error
-
-	Reference() Reference
-}
-
-type Resource struct {
-	Ref  Reference
-	Name Name
-}
-
-func (r Resource) Reference() Reference {
-	return r.Ref
-}
-
-func (r Resource) ResourceName() Name {
-	return r.Name
 }
 
 // Create creates a PDF file with the given name and opens it for output. If a
@@ -240,7 +220,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 		nextRef: 1,
 		xref:    xref,
 
-		autoclose: make(map[Reference]Closer),
+		autoclose: make(map[Reference]io.Closer),
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -258,23 +238,21 @@ func (pdf *Writer) Close() error {
 		return errors.New("Close() while stream is open")
 	}
 
-	var rr []Closer
-	for _, r := range pdf.autoclose {
-		rr = append(rr, r)
-	}
-	sort.Slice(rr, func(i, j int) bool {
-		ri := rr[i].Reference()
-		rj := rr[j].Reference()
+	keys := maps.Keys(pdf.autoclose)
+	sort.Slice(keys, func(i, j int) bool {
+		ri := keys[i]
+		rj := keys[j]
 		if ri.Generation() != rj.Generation() {
 			return ri.Generation() < rj.Generation()
 		}
 		return ri.Number() < rj.Number()
 	})
-	for _, r := range rr {
-		err := r.Close()
+	for _, key := range keys {
+		err := pdf.autoclose[key].Close()
 		if err != nil {
 			return err
 		}
+		delete(pdf.autoclose, key)
 	}
 
 	trailer := pdf.meta.Trailer
@@ -332,11 +310,14 @@ func (pdf *Writer) Close() error {
 	return nil
 }
 
-func (pdf *Writer) AutoClose(res Closer) {
-	ref := res.Reference()
-	pdf.autoclose[ref] = res
+// AutoClose registers an object to be automatically closed when the PDF file
+// is closed.  Only one object can be registered for each key,
+// and objects are closed in ascending order of their keys.
+func (pdf *Writer) AutoClose(obj io.Closer, key Reference) {
+	pdf.autoclose[key] = obj
 }
 
+// GetMeta returns the MetaInfo for the PDF file.
 func (pdf *Writer) GetMeta() *MetaInfo {
 	return &pdf.meta
 }

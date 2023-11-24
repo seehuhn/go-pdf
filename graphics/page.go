@@ -39,9 +39,8 @@ type Page struct {
 	set   StateBits
 	stack []*stackEntry
 
-	resName     map[resource]pdf.Name      // TODO(voss): should we use (category, resource) as the key?
-	nameUsed    map[pdf.Name]struct{}      // keys are `category+":"+name`
-	resNamesOld map[pdf.Reference]pdf.Name // TODO(voss): remove
+	resName  map[resource]pdf.Name // TODO(voss): should we use (category, resource) as the key?
+	nameUsed map[pdf.Name]struct{} // keys are `category+":"+name`
 }
 
 type stackEntry struct {
@@ -62,9 +61,8 @@ func NewPage(w io.Writer) *Page {
 		state: state,
 		set:   isSet,
 
-		resName:     make(map[resource]pdf.Name),
-		nameUsed:    make(map[pdf.Name]struct{}),
-		resNamesOld: make(map[pdf.Reference]pdf.Name),
+		resName:  make(map[resource]pdf.Name),
+		nameUsed: make(map[pdf.Name]struct{}),
 	}
 }
 
@@ -121,11 +119,24 @@ func (p *Page) coord(x float64) string {
 	return float.Format(x, 2)
 }
 
+type Resource struct {
+	DefName pdf.Name
+	Ref     pdf.Reference
+}
+
+func (r Resource) DefaultName() pdf.Name {
+	return r.DefName
+}
+
+func (r Resource) PDFObject() pdf.Object {
+	return r.Ref
+}
+
 // Resource represents the different PDF resource types.
 // Implementations of this must be "comparable".
 type resource interface {
 	DefaultName() pdf.Name // return "" to choose names automatically
-	PDFDict() pdf.Object   // value to use in the resource dictionary
+	PDFObject() pdf.Object // value to use in the resource dictionary
 }
 
 // GetResourceName returns the name of a resource.
@@ -194,42 +205,9 @@ func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
 	if *field == nil {
 		*field = pdf.Dict{}
 	}
-	(*field)[name] = r.PDFDict()
+	(*field)[name] = r.PDFObject()
 
 	return name
-}
-
-// TODO(voss): remove
-type oldResource interface {
-	Reference() pdf.Reference
-	ResourceName() pdf.Name
-}
-
-// TODO(voss): remove
-func (p *Page) resourceNameOld(obj oldResource, d pdf.Dict, nameTmpl string) pdf.Name {
-	ref := obj.Reference()
-	name, ok := p.resNamesOld[ref]
-	if ok {
-		return name
-	}
-
-	name = obj.ResourceName()
-	if _, exists := d[name]; name != "" && !exists {
-		d[name] = ref
-		p.resNamesOld[ref] = name
-		return name
-	}
-
-	for k := len(d) + 1; ; k-- {
-		name = pdf.Name(fmt.Sprintf(nameTmpl, k))
-		if _, exists := d[name]; exists {
-			continue
-		}
-
-		d[name] = ref
-		p.resNamesOld[ref] = name
-		return name
-	}
 }
 
 type objectType int
@@ -266,7 +244,7 @@ func (s objectType) String() string {
 	}
 }
 
-// valid returns true, if the current object is one of the given types.
+// valid returns true, if the current graphics object is one of the given types.
 // Otherwise it sets p.Err and returns false.
 func (p *Page) valid(cmd string, ss ...objectType) bool {
 	if p.Err != nil {

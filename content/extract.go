@@ -61,7 +61,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 			return f
 		}
 		ref, _ := resources.Font[name].(pdf.Reference)
-		f := &fontFromPDF{ref: ref, name: name}
+		f := &fontFromPDF{graphics.Resource{DefName: name, Ref: ref}}
 		fonts[name] = f
 		return f
 	}
@@ -74,7 +74,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 		font := g.Font
 		decoder, ok := decoders[font]
 		if !ok {
-			fontRef := font.Reference()
+			fontRef := font.PDFObject()
 			decoder, err = makeTextDecoder(r, fontRef)
 			if err != nil {
 				return err
@@ -550,8 +550,7 @@ func getReal(x pdf.Object) (float64, bool) {
 }
 
 type fontFromPDF struct {
-	ref  pdf.Reference
-	name pdf.Name
+	graphics.Resource
 }
 
 func (f *fontFromPDF) GetGeometry() *font.Geometry {
@@ -564,14 +563,6 @@ func (f *fontFromPDF) Layout(s string, ptSize float64) glyph.Seq {
 
 func (f *fontFromPDF) AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String {
 	panic("not implemented")
-}
-
-func (f *fontFromPDF) ResourceName() pdf.Name {
-	return f.name
-}
-
-func (f *fontFromPDF) Reference() pdf.Reference {
-	return f.ref
 }
 
 func (f *fontFromPDF) Close() error {

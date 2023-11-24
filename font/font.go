@@ -109,8 +109,8 @@ type Embedded interface {
 	GetGeometry() *Geometry
 	Layouter
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	ResourceName() pdf.Name
-	Reference() pdf.Reference
+	DefaultName() pdf.Name
+	PDFObject() pdf.Object
 	Close() error
 }
 

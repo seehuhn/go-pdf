@@ -42,15 +42,13 @@ func MakeExtGState(s *State, set StateBits, defaultName string) *ExtGState {
 }
 
 // DefaultName returns the default name for this resource.
-// In case of name clashes, or if the returned name is empty,
-// a new name will be generated automatically.
 func (s *ExtGState) DefaultName() pdf.Name {
 	return s.DefName
 }
 
-// PDFDict returns the value to use in the PDF Resources dictionary.
+// PDFObject returns the value to use in the PDF Resources dictionary.
 // This can either be [pdf.Reference] or [pdf.Dict].
-func (s *ExtGState) PDFDict() pdf.Object {
+func (s *ExtGState) PDFObject() pdf.Object {
 	return s.Dict
 }
 
@@ -113,7 +111,7 @@ func ExtGStateDict(s *State, set StateBits) pdf.Dict {
 	}
 	if set&StateFont != 0 {
 		res["Font"] = pdf.Array{
-			s.Font.Reference(),
+			s.Font.PDFObject(),
 			pdf.Number(s.FontSize),
 		}
 	}

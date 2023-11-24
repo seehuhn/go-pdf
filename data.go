@@ -29,7 +29,7 @@ type Data struct {
 	meta      MetaInfo
 	objects   map[Reference]Object
 	lastRef   uint32
-	autoclose map[Reference]Closer
+	autoclose map[Reference]io.Closer
 }
 
 func NewData(v Version) *Data {
@@ -40,7 +40,7 @@ func NewData(v Version) *Data {
 		},
 		objects:   map[Reference]Object{},
 		lastRef:   0,
-		autoclose: map[Reference]Closer{},
+		autoclose: map[Reference]io.Closer{},
 	}
 	return res
 }
@@ -56,7 +56,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 		meta:    pdf.meta,
 		objects: map[Reference]Object{},
 
-		autoclose: map[Reference]Closer{},
+		autoclose: map[Reference]io.Closer{},
 	}
 
 	isObjectStream := make(map[Reference]bool)
@@ -138,23 +138,21 @@ func (d *Data) Write(w io.Writer) error {
 }
 
 func (d *Data) Close() error {
-	var rr []Closer
-	for _, r := range d.autoclose {
-		rr = append(rr, r)
-	}
-	sort.Slice(rr, func(i, j int) bool {
-		ri := rr[i].Reference()
-		rj := rr[j].Reference()
+	keys := maps.Keys(d.autoclose)
+	sort.Slice(keys, func(i, j int) bool {
+		ri := keys[i]
+		rj := keys[j]
 		if ri.Generation() != rj.Generation() {
 			return ri.Generation() < rj.Generation()
 		}
 		return ri.Number() < rj.Number()
 	})
-	for _, r := range rr {
-		err := r.Close()
+	for _, key := range keys {
+		err := d.autoclose[key].Close()
 		if err != nil {
 			return err
 		}
+		delete(d.autoclose, key)
 	}
 	return nil
 }
@@ -256,7 +254,6 @@ func (d *Data) WriteCompressed(refs []Reference, objects ...Object) error {
 	return nil
 }
 
-func (d *Data) AutoClose(res Closer) {
-	ref := res.Reference()
-	d.autoclose[ref] = res
+func (d *Data) AutoClose(obj io.Closer, key Reference) {
+	d.autoclose[key] = obj
 }

@@ -305,11 +305,12 @@ func doit() error {
 				return err
 			}
 
-			fontDict, err := pdf.GetDict(data, Y.Reference())
+			fontDict, err := pdf.GetDict(data, Y.PDFObject())
 			if err != nil {
 				return err
 			}
-			yFD := l.ShowDict(page, fontDict, "Font Dictionary", Y.Reference())
+			ref, _ := Y.PDFObject().(pdf.Reference)
+			yFD := l.ShowDict(page, fontDict, "Font Dictionary", ref)
 			fd := fontDict["FontDescriptor"]
 			y0FontDesc := yFD["FontDescriptor"]
 

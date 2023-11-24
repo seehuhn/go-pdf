@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -99,13 +100,13 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	res := &embedded{
 		Font: f,
 		w:    w,
-		Resource: pdf.Resource{
-			Ref:  w.Alloc(),
-			Name: resName,
+		Resource: graphics.Resource{
+			Ref:     w.Alloc(),
+			DefName: resName,
 		},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res)
+	w.AutoClose(res, res.Ref)
 	return res, nil
 }
 
@@ -159,7 +160,7 @@ type embedded struct {
 	*Font
 
 	w pdf.Putter
-	pdf.Resource
+	graphics.Resource
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -173,7 +174,7 @@ func (e *embedded) Close() error {
 
 	if e.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in Type 3 font %q",
-			e.Name)
+			e.DefName)
 	}
 
 	encodingGid := e.Encoding()
@@ -205,7 +206,7 @@ func (e *embedded) Close() error {
 		if pdf.GetVersion(e.w) == pdf.V1_0 {
 			// required by PDF 2.0 specification errata, if the font dictionary has a Name entry
 			// https://pdf-issues.pdfa.org/32000-2-2020/clause09.html#H9.8.1
-			descriptor.FontName = string(e.Name)
+			descriptor.FontName = string(e.DefName)
 		}
 	}
 
@@ -218,7 +219,7 @@ func (e *embedded) Close() error {
 		Resources:  e.Resources,
 		Encoding:   encoding,
 		// ToUnicode:  toUnicode,
-		ResName: e.Name,
+		ResName: e.DefName,
 
 		ItalicAngle: e.ItalicAngle,
 

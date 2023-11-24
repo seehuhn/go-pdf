@@ -56,7 +56,7 @@ func TestFontTypes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			dicts, err := font.ExtractDicts(r, X.Reference())
+			dicts, err := font.ExtractDicts(r, X.PDFObject())
 			if err != nil {
 				t.Fatal(err)
 			}

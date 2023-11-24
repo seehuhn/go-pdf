@@ -22,10 +22,11 @@ import (
 	"image/jpeg"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // EmbedJPEG writes the image src to the PDF file w, using lossy compression.
-func EmbedJPEG(w pdf.Putter, src image.Image, opts *jpeg.Options, resName pdf.Name) (Embedded, error) {
+func EmbedJPEG(w pdf.Putter, src image.Image, opts *jpeg.Options, resName pdf.Name) (graphics.EmbeddedImage, error) {
 	im, err := JPEG(src, opts)
 	if err != nil {
 		return nil, err
@@ -33,7 +34,7 @@ func EmbedJPEG(w pdf.Putter, src image.Image, opts *jpeg.Options, resName pdf.Na
 	return im.Embed(w, resName)
 }
 
-func JPEG(src image.Image, opts *jpeg.Options) (Image, error) {
+func JPEG(src image.Image, opts *jpeg.Options) (graphics.Image, error) {
 	// convert to NRGBA format
 	b := src.Bounds()
 	img := image.NewNRGBA(b)
@@ -52,13 +53,13 @@ type jpegImage struct {
 }
 
 // Bounds implements the [Image] interface.
-func (im *jpegImage) Bounds() Rectangle {
+func (im *jpegImage) Bounds() graphics.Rectangle {
 	b := im.im.Bounds()
-	return Rectangle{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}
+	return graphics.Rectangle{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}
 }
 
 // Embed implements the [Image] interface.
-func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (Embedded, error) {
+func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (graphics.EmbeddedImage, error) {
 	ref := w.Alloc()
 
 	// TODO(voss): write a mask if there is an alpha channel
@@ -89,21 +90,14 @@ func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (Embedded, error) {
 
 	return &jpegEmbedded{
 		jpegImage: im,
-		ref:       ref,
-		resName:   resName,
+		Resource: graphics.Resource{
+			DefName: resName,
+			Ref:     ref,
+		},
 	}, nil
 }
 
 type jpegEmbedded struct {
 	*jpegImage
-	ref     pdf.Reference
-	resName pdf.Name
-}
-
-func (e *jpegEmbedded) Reference() pdf.Reference {
-	return e.ref
-}
-
-func (e *jpegEmbedded) ResourceName() pdf.Name {
-	return e.resName
+	graphics.Resource
 }

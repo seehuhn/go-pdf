@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // fontCFFComposite is an OpenType/CFF font for embedding in a PDF file as a composite font.
@@ -108,11 +109,11 @@ func (f *fontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded,
 	res := &embeddedCFFComposite{
 		fontCFFComposite: f,
 		w:                w,
-		Resource:         pdf.Resource{Ref: w.Alloc(), Name: resName},
+		Resource:         graphics.Resource{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:         gidToCID,
 		CIDEncoder:       f.makeEncoder(gidToCID),
 	}
-	w.AutoClose(res)
+	w.AutoClose(res, res.Ref)
 	return res, nil
 }
 
@@ -124,7 +125,7 @@ func (f *fontCFFComposite) Layout(s string, ptSize float64) glyph.Seq {
 type embeddedCFFComposite struct {
 	*fontCFFComposite
 	w pdf.Putter
-	pdf.Resource
+	graphics.Resource
 
 	cmap.GIDToCID
 	cmap.CIDEncoder
