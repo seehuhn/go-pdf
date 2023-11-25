@@ -68,8 +68,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 	seen := map[pdf.Object]bool{}
 	for len(kids) > 0 {
 		ref := kids[0]
-		copy(kids, kids[1:])
-		kids = kids[:len(kids)-1]
+		kids = kids[1:]
 
 		// load the page tree node
 		if r, ok := ref.(pdf.Reference); ok {
