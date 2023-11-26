@@ -18,6 +18,8 @@ package pagetree
 
 import "seehuhn.de/go/pdf"
 
+// FindPages returns a list of all pages in the document.
+// The returned list contains the references to the page dictionaries.
 func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 	meta := r.GetMeta()
 	catalog := meta.Catalog
@@ -64,4 +66,8 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 	}
 
 	return res, nil
+}
+
+func All(r pdf.Getter) func(yield func(pdf.Reference, pdf.Dict) bool) bool {
+	panic("not implemented")
 }
