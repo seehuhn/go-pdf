@@ -19,6 +19,7 @@ package outline
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -174,10 +175,10 @@ func TestWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// err = os.WriteFile("test_Write.pdf", buf.Bytes(), 0644)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+	err = os.WriteFile("test_Write.pdf", buf.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 	if err != nil {

@@ -16,7 +16,11 @@
 
 package pagetree
 
-import "seehuhn.de/go/pdf"
+import (
+	"maps"
+
+	"seehuhn.de/go/pdf"
+)
 
 // FindPages returns a list of all pages in the document.
 // The returned list contains the references to the page dictionaries.
@@ -68,6 +72,137 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 	return res, nil
 }
 
-func All(r pdf.Getter) func(yield func(pdf.Reference, pdf.Dict) bool) bool {
-	panic("not implemented")
+type Iterator struct {
+	Err error
+	r   pdf.Getter
 }
+
+func NewIterator(r pdf.Getter) *Iterator {
+	return &Iterator{r: r}
+}
+
+func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
+	yield := func(yield func(pdf.Reference, pdf.Dict) bool) bool {
+		if i.Err != nil {
+			return false
+		}
+
+		r := i.r
+		meta := r.GetMeta()
+		root := meta.Catalog.Pages
+		if root == 0 {
+			return true
+		}
+
+		type frame struct {
+			todo      []pdf.Reference
+			inherited pdf.Dict
+		}
+		var stack []*frame
+		todo := []pdf.Reference{root}
+		inherited := pdf.Dict{}
+		inheritable := getInheritable(meta.Version)
+
+		seen := map[pdf.Reference]bool{
+			root: true,
+		}
+		for len(todo) > 0 || len(stack) > 0 {
+			if len(todo) == 0 {
+				k := len(stack) - 1
+				frame := stack[k]
+				stack = stack[:k]
+				todo = frame.todo
+				inherited = frame.inherited
+			}
+
+			k := len(todo) - 1
+			ref := todo[k]
+			todo = todo[:k]
+
+			node, err := pdf.GetDict(r, ref)
+			if err != nil {
+				if pdf.IsMalformed(err) {
+					continue
+				}
+				i.Err = err
+				return false
+			}
+			tp, err := pdf.GetName(r, node["Type"])
+			if err != nil {
+				if pdf.IsMalformed(err) {
+					continue
+				}
+				i.Err = err
+				return false
+			}
+			switch tp {
+			case "Page":
+				for _, name := range inheritable {
+					_, isPresent := node[name]
+					if val, canInherit := inherited[name]; !isPresent && canInherit {
+						node[name] = val
+					}
+				}
+				delete(node, "Parent")
+				cont := yield(ref, node)
+				if !cont {
+					return false
+				}
+
+			case "Pages":
+				kids, err := pdf.GetArray(r, node["Kids"])
+				if err != nil {
+					if pdf.IsMalformed(err) {
+						continue
+					}
+					i.Err = err
+					return false
+				}
+
+				hasInheritables := false
+				for _, name := range inheritable {
+					if _, isPresent := node[name]; isPresent {
+						hasInheritables = true
+						break
+					}
+				}
+				if hasInheritables {
+					if len(todo) > 0 {
+						stack = append(stack, &frame{
+							todo:      todo,
+							inherited: maps.Clone(inherited),
+						})
+						todo = nil
+					}
+					for _, name := range inheritable {
+						if tmp, ok := node[name]; ok {
+							inherited[name] = tmp
+						}
+					}
+				}
+
+				for i := len(kids) - 1; i >= 0; i-- {
+					kid := kids[i]
+					if kidRef, ok := kid.(pdf.Reference); ok && !seen[kidRef] {
+						todo = append(todo, kidRef)
+						seen[kidRef] = true
+					}
+				}
+			}
+		}
+		return true
+	}
+	return yield
+}
+
+func getInheritable(v pdf.Version) []pdf.Name {
+	if v < pdf.V1_3 {
+		return inheritedOld
+	}
+	return inheritableNew
+}
+
+var (
+	inheritableNew = []pdf.Name{"Resources", "MediaBox", "CropBox", "Rotate"}       // Since PDF 1.3
+	inheritedOld   = []pdf.Name{"Resources", "MediaBox", "CropBox", "Rotate", "AA"} // Before PDF 1.3
+)

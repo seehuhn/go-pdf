@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math"
 
-	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 )
 
@@ -55,10 +54,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 
 	meta := r.GetMeta()
 	inherited := pdf.Dict{}
-	inheritable := []pdf.Name{"Resources", "MediaBox", "CropBox", "Rotate"}
-	if meta.Version < pdf.V1_3 {
-		inheritable = append(inheritable, "AA")
-	}
+	inheritable := getInheritable(meta.Version)
 
 	skip := pdf.Integer(pageNo)
 
@@ -94,7 +90,6 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 				break
 			}
 
-			pageTreeNode = maps.Clone(pageTreeNode)
 			for _, name := range inheritable {
 				if _, ok := pageTreeNode[name]; !ok {
 					if val, ok := inherited[name]; ok {

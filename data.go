@@ -19,6 +19,7 @@ package pdf
 import (
 	"bytes"
 	"io"
+	"slices"
 	"sort"
 
 	"golang.org/x/exp/maps"
@@ -174,13 +175,18 @@ func (d *Data) Alloc() Reference {
 
 func (d *Data) Get(ref Reference, _ bool) (Object, error) {
 	obj := d.objects[ref]
-	if s, ok := obj.(*Stream); ok {
-		if ss, ok := s.R.(io.Seeker); ok {
+	switch obj := obj.(type) {
+	case *Stream:
+		if ss, ok := obj.R.(io.Seeker); ok {
 			_, err := ss.Seek(0, io.SeekStart)
 			if err != nil {
 				return nil, err
 			}
 		}
+	case Dict:
+		obj = maps.Clone(obj)
+	case Array:
+		obj = slices.Clone(obj)
 	}
 	return obj, nil
 }
