@@ -28,13 +28,13 @@ import (
 
 type extractor struct {
 	*pdf.Resources
-	*graphics.State
+	*graphics.Parameters
 }
 
 // Context holds information about the current state of the PDF content stream.
 type Context struct {
 	*pdf.Resources
-	*graphics.State
+	graphics.State
 }
 
 // ForAllText loads the given page of a PDF file and calls the given
@@ -61,17 +61,17 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 			return f
 		}
 		ref, _ := resources.Font[name].(pdf.Reference)
-		f := &fontFromPDF{graphics.Resource{DefName: name, Ref: ref}}
+		f := &fontFromPDF{graphics.Res{DefName: name, Ref: ref}}
 		fonts[name] = f
 		return f
 	}
 
-	var graphicsStack []*graphics.State
-	g, _ := graphics.NewState()
+	var graphicsStack []graphics.State
+	g := graphics.NewState()
 
-	decoders := make(map[font.Embedded]func(pdf.String) string)
+	decoders := make(map[graphics.Resource]func(pdf.String) string)
 	yield := func(ctx *Context, s pdf.String) error {
-		font := g.Font
+		font := g.Parameters.Font
 		decoder, ok := decoders[font]
 		if !ok {
 			fontRef := font.PDFObject()
@@ -92,6 +92,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 			return err
 		}
 
+		// TODO(voss): use graphics.Scanner
 		err = seq.foreachCommand(stm, func(cmd operator, args []pdf.Object) error {
 			switch cmd {
 
@@ -148,13 +149,13 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					break
 				}
 
-				newState, set, err := graphics.ReadDict(r, resources.ExtGState[name])
+				newState, err := graphics.ReadDict(r, resources.ExtGState[name])
 				if pdf.IsMalformed(err) {
 					break
 				} else if err != nil {
 					return err
 				}
-				g.Update(newState, set)
+				g.Update(newState)
 
 			// == Special graphics state =========================================
 
@@ -550,7 +551,7 @@ func getReal(x pdf.Object) (float64, bool) {
 }
 
 type fontFromPDF struct {
-	graphics.Resource
+	graphics.Res
 }
 
 func (f *fontFromPDF) GetGeometry() *font.Geometry {

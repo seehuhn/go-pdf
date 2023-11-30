@@ -19,13 +19,10 @@ package graphics
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/float"
 )
-
-// TODO(voss): for PDF <2.0, fill in the ProcSet resource
 
 // Page represents a PDF content stream.
 type Page struct {
@@ -35,53 +32,52 @@ type Page struct {
 
 	currentObject objectType
 
-	state *State
-	set   StateBits
-	stack []*stackEntry
+	state State
+	stack []State
 
-	resName  map[resource]pdf.Name // TODO(voss): should we use (category, resource) as the key?
-	nameUsed map[pdf.Name]struct{} // keys are `category+":"+name`
+	resName  map[catRes]pdf.Name
+	nameUsed map[catName]struct{}
 }
 
-type stackEntry struct {
-	state         *State
-	isSet         StateBits
-	currentObject objectType // TODO: is this needed?
+type catRes struct {
+	cat resourceCategory
+	res Resource
+}
+
+type catName struct {
+	cat  resourceCategory
+	name pdf.Name
 }
 
 // NewPage allocates a new Page object.
 func NewPage(w io.Writer) *Page {
-	state, isSet := NewState()
-
 	return &Page{
 		Content:       w,
 		Resources:     &pdf.Resources{},
 		currentObject: objPage,
 
-		state: state,
-		set:   isSet,
+		state: NewState(),
 
-		resName:  make(map[resource]pdf.Name),
-		nameUsed: make(map[pdf.Name]struct{}),
+		resName:  make(map[catRes]pdf.Name),
+		nameUsed: make(map[catName]struct{}),
 	}
 }
 
 // ForgetGraphicsState removes all information about previous graphics state
 // settings.
+//
+// TODO(voss): remove
 func (p *Page) ForgetGraphicsState() {
-	p.set = 0
+	p.state.Set = 0
 }
 
 // PushGraphicsState saves the current graphics state.
 func (p *Page) PushGraphicsState() {
-	// TODO(voss): does this require certain states?
-
-	state := &stackEntry{
-		state:         p.state.Clone(),
-		isSet:         p.set,
-		currentObject: p.currentObject,
+	if !p.valid("PushGraphicsState", objPage, objText) {
+		return
 	}
-	p.stack = append(p.stack, state)
+
+	p.stack = append(p.stack, p.state.Clone())
 
 	_, err := fmt.Fprintln(p.Content, "q")
 	if p.Err == nil {
@@ -91,15 +87,15 @@ func (p *Page) PushGraphicsState() {
 
 // PopGraphicsState restores the previous graphics state.
 func (p *Page) PopGraphicsState() {
-	// TODO(voss): does this require certain states?
+	if !p.valid("PopGraphicsState", objPage, objText) {
+		return
+	}
 
 	n := len(p.stack) - 1
-	entry := p.stack[n]
+	savedState := p.stack[n]
 	p.stack = p.stack[:n]
 
-	p.currentObject = entry.currentObject
-	p.state = entry.state
-	p.set = entry.isSet
+	p.state = savedState
 
 	_, err := fmt.Fprintln(p.Content, "Q")
 	if p.Err == nil {
@@ -109,7 +105,7 @@ func (p *Page) PopGraphicsState() {
 
 // isSet returns true, if all of the given fields in the graphics state are set.
 func (p *Page) isSet(bits StateBits) bool {
-	return p.set&bits == bits
+	return p.state.Set&bits == bits
 }
 
 func (p *Page) coord(x float64) string {
@@ -119,33 +115,50 @@ func (p *Page) coord(x float64) string {
 	return float.Format(x, 2)
 }
 
-type Resource struct {
+// Res represents a PDF resource.
+type Res struct {
 	DefName pdf.Name
 	Ref     pdf.Reference
 }
 
-func (r Resource) DefaultName() pdf.Name {
+// DefaultName implements the [Resource] interface.
+func (r Res) DefaultName() pdf.Name {
 	return r.DefName
 }
 
-func (r Resource) PDFObject() pdf.Object {
+// PDFObject implements the [Resource] interface.
+func (r Res) PDFObject() pdf.Object {
 	return r.Ref
 }
 
-// Resource represents the different PDF resource types.
+// Resource represents the different PDF Resource types.
 // Implementations of this must be "comparable".
-type resource interface {
+type Resource interface {
 	DefaultName() pdf.Name // return "" to choose names automatically
 	PDFObject() pdf.Object // value to use in the resource dictionary
 }
 
+type resourceCategory pdf.Name
+
+// The valid resource categories.
+// These corresponds to the fields in the Resources dictionary.
+//
+// See section 7.8.3 of ISO 32000-2:2020.
+const (
+	catExtGState  resourceCategory = "ExtGState"
+	catColorSpace resourceCategory = "ColorSpace"
+	catPattern    resourceCategory = "Pattern"
+	catShading    resourceCategory = "Shading"
+	catXObject    resourceCategory = "XObject"
+	catFont       resourceCategory = "Font"
+	catProperties resourceCategory = "Properties"
+)
+
 // GetResourceName returns the name of a resource.
 // A new name is generated, if necessary, and the resource is added to the
 // resource dictionary for the category.
-// Valid categories are "Font", "ExtGState", "XObject", "ColorSpace",
-// "Pattern", "Shading", and "Properties".
-func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
-	name, ok := p.resName[r]
+func (p *Page) getResourceName(category resourceCategory, r Resource) pdf.Name {
+	name, ok := p.resName[catRes{category, r}]
 	if ok {
 		return name
 	}
@@ -153,25 +166,25 @@ func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
 	var field *pdf.Dict
 	var tmpl string
 	switch category {
-	case "Font":
+	case catFont:
 		field = &p.Resources.Font
 		tmpl = "F%d"
-	case "ExtGState":
+	case catExtGState:
 		field = &p.Resources.ExtGState
 		tmpl = "E%d"
-	case "XObject":
+	case catXObject:
 		field = &p.Resources.XObject
 		tmpl = "X%d"
-	case "ColorSpace":
+	case catColorSpace:
 		field = &p.Resources.ColorSpace
 		tmpl = "C%d"
-	case "Pattern":
+	case catPattern:
 		field = &p.Resources.Pattern
 		tmpl = "P%d"
-	case "Shading":
+	case catShading:
 		field = &p.Resources.Shading
 		tmpl = "S%d"
-	case "Properties":
+	case catProperties:
 		field = &p.Resources.Properties
 		tmpl = "MC%d"
 	default:
@@ -179,7 +192,7 @@ func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
 	}
 
 	isUsed := func(name pdf.Name) bool {
-		_, isUsed := p.nameUsed[category+":"+name]
+		_, isUsed := p.nameUsed[catName{category, name}]
 		return isUsed
 	}
 
@@ -187,8 +200,8 @@ func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
 		name = defName
 	} else {
 		var numUsed int
-		for name := range p.nameUsed {
-			if strings.HasPrefix(string(name), string(category)+":") {
+		for item := range p.nameUsed {
+			if item.cat == category {
 				numUsed++
 			}
 		}
@@ -199,8 +212,8 @@ func (p *Page) getResourceName(category pdf.Name, r resource) pdf.Name {
 			}
 		}
 	}
-	p.resName[r] = name
-	p.nameUsed[category+":"+name] = struct{}{}
+	p.resName[catRes{category, r}] = name
+	p.nameUsed[catName{category, name}] = struct{}{}
 
 	if *field == nil {
 		*field = pdf.Dict{}

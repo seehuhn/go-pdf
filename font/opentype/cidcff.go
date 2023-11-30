@@ -109,7 +109,7 @@ func (f *fontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded,
 	res := &embeddedCFFComposite{
 		fontCFFComposite: f,
 		w:                w,
-		Resource:         graphics.Resource{Ref: w.Alloc(), DefName: resName},
+		Res:              graphics.Res{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:         gidToCID,
 		CIDEncoder:       f.makeEncoder(gidToCID),
 	}
@@ -125,7 +125,7 @@ func (f *fontCFFComposite) Layout(s string, ptSize float64) glyph.Seq {
 type embeddedCFFComposite struct {
 	*fontCFFComposite
 	w pdf.Putter
-	graphics.Resource
+	graphics.Res
 
 	cmap.GIDToCID
 	cmap.CIDEncoder

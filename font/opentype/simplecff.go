@@ -96,7 +96,7 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedCFFSimple{
 		fontCFFSimple: f,
 		w:             w,
-		Resource:      graphics.Resource{Ref: w.Alloc(), DefName: resName},
+		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res, res.Ref)
@@ -111,7 +111,7 @@ func (f *fontCFFSimple) Layout(s string, ptSize float64) glyph.Seq {
 type embeddedCFFSimple struct {
 	*fontCFFSimple
 	w pdf.Putter
-	graphics.Resource
+	graphics.Res
 
 	*encoding.SimpleEncoder
 	closed bool

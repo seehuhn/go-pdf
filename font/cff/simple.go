@@ -95,7 +95,7 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	res := &embeddedSimple{
 		fontSimple:    f,
 		w:             w,
-		Resource:      graphics.Resource{Ref: w.Alloc(), DefName: resName},
+		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res, res.Ref)
@@ -110,7 +110,7 @@ func (f *fontSimple) Layout(s string, ptSize float64) glyph.Seq {
 type embeddedSimple struct {
 	*fontSimple
 	w pdf.Putter
-	graphics.Resource
+	graphics.Res
 
 	*encoding.SimpleEncoder
 	closed bool

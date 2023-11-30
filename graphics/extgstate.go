@@ -27,17 +27,15 @@ import (
 type ExtGState struct {
 	DefName pdf.Name   // leave empty to generate new names automatically
 	Dict    pdf.Object // either [pdf.Dict] or [pdf.Reference]
-	Value   *State
-	Set     StateBits
+	Value   State
 }
 
 // MakeExtGState creates a new ExtGState object.
-func MakeExtGState(s *State, set StateBits, defaultName string) *ExtGState {
+func MakeExtGState(s State, defaultName string) *ExtGState {
 	return &ExtGState{
 		DefName: pdf.Name(defaultName),
-		Dict:    ExtGStateDict(s, set),
+		Dict:    ExtGStateDict(s),
 		Value:   s,
-		Set:     set,
 	}
 }
 
@@ -60,9 +58,9 @@ func (p *Page) SetExtGState(s *ExtGState) {
 		return
 	}
 
-	p.state.Update(s.Value, s.Set)
+	p.state.Update(s.Value)
 
-	name := p.getResourceName("ExtGState", s)
+	name := p.getResourceName(catExtGState, s)
 	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err
@@ -73,8 +71,9 @@ func (p *Page) SetExtGState(s *ExtGState) {
 
 // ExtGStateDict returns a graphics state parameter dictionary for the given state.
 // See table 57 in ISO 32000-2:2020.
-func ExtGStateDict(s *State, set StateBits) pdf.Dict {
+func ExtGStateDict(s State) pdf.Dict {
 	res := pdf.Dict{}
+	set := s.Set
 	if set&StateLineWidth != 0 {
 		res["LW"] = pdf.Number(s.LineWidth)
 	}
@@ -157,13 +156,13 @@ func ExtGStateDict(s *State, set StateBits) pdf.Dict {
 }
 
 // ReadDict reads an graphics state parameter dictionary from a PDF file.
-func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
+func ReadDict(r pdf.Getter, ref pdf.Object) (State, error) {
 	dict, err := pdf.GetDictTyped(r, ref, "ExtGState")
 	if err != nil {
-		return nil, 0, err
+		return State{}, err
 	}
 
-	s := &State{}
+	s := &Parameters{}
 	var set StateBits
 	var overprintFillSet bool
 	for key, v := range dict {
@@ -173,7 +172,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			s.LineWidth = float64(lw)
 			set |= StateLineWidth
@@ -182,7 +181,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			s.LineCap = LineCapStyle(lc)
 			set |= StateLineCap
@@ -191,7 +190,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			s.LineJoin = LineJoinStyle(lj)
 			set |= StateLineJoin
@@ -200,14 +199,14 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			s.MiterLimit = float64(ml)
 			set |= StateMiterLimit
 		case "D":
 			dashPattern, phase, err := readDash(r, v)
 			if err != nil {
-				return nil, 0, err
+				return State{}, err
 			} else if dashPattern != nil {
 				s.DashPattern = dashPattern
 				s.DashPhase = phase
@@ -218,7 +217,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			s.RenderingIntent = ri
 			set |= StateRenderingIntent
@@ -227,7 +226,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			s.OverprintStroke = bool(op)
 			set |= StateOverprint
@@ -236,7 +235,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			s.OverprintFill = bool(op)
 			set |= StateOverprint
@@ -246,7 +245,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
-				return nil, 0, err
+				return State{}, err
 			}
 			if opm != 0 {
 				s.OverprintMode = 1
@@ -259,7 +258,7 @@ func ReadDict(r pdf.Getter, ref pdf.Object) (*State, StateBits, error) {
 	if set&StateOverprint != 0 && !overprintFillSet {
 		s.OverprintFill = s.OverprintStroke
 	}
-	return s, set, nil
+	return State{s, set}, nil
 }
 
 func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err error) {

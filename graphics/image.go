@@ -56,7 +56,7 @@ func (p *Page) DrawImage(img EmbeddedImage) {
 		return
 	}
 
-	name := p.getResourceName("XObject", img)
+	name := p.getResourceName(catXObject, img)
 	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err

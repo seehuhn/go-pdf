@@ -60,11 +60,11 @@ func (p *Page) TextSetFont(font font.Embedded, size float64) {
 		return
 	}
 
-	name := p.getResourceName("Font", font)
+	name := p.getResourceName(catFont, font)
 
 	p.state.Font = font
 	p.state.FontSize = size
-	p.set |= StateFont
+	p.state.Set |= StateFont
 
 	err := name.PDF(p.Content)
 	if err != nil {
@@ -103,7 +103,7 @@ func (p *Page) TextNextLine() {
 // The function panics if no font is set.
 func (p *Page) TextLayout(s string) glyph.Seq {
 	st := p.state
-	return st.Font.Layout(s, st.FontSize)
+	return st.Font.(font.Embedded).Layout(s, st.FontSize)
 }
 
 // TextShow draws a string.
@@ -160,7 +160,7 @@ func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 }
 
 func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
-	geom := p.state.Font.GetGeometry()
+	geom := p.state.Font.(font.Embedded).GetGeometry()
 	total := geom.ToPDF(p.state.FontSize, gg.AdvanceWidth())
 	delta := w - total
 
@@ -212,8 +212,8 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 		out = nil
 	}
 
-	font := p.state.Font
-	geom := font.GetGeometry()
+	F := p.state.Font
+	geom := F.(font.Embedded).GetGeometry()
 	widths := geom.Widths
 	unitsPerEm := geom.UnitsPerEm
 	q := 1000 / float64(unitsPerEm)
@@ -234,7 +234,7 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 			xActual += float64(xOffsetInt)
 		}
 
-		if newYPos := float64(glyph.YOffset) * q; p.set&StateTextRise == 0 || newYPos != p.state.TextRise {
+		if newYPos := float64(glyph.YOffset) * q; p.state.Set&StateTextRise == 0 || newYPos != p.state.TextRise {
 			flush()
 			p.state.TextRise = newYPos
 			if p.Err != nil {
@@ -247,7 +247,7 @@ func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 
 			_, p.Err = fmt.Fprintln(p.Content, " Ts")
 		}
 
-		run = font.AppendEncoded(run, glyph.Gid, glyph.Text)
+		run = F.(font.Embedded).AppendEncoded(run, glyph.Gid, glyph.Text)
 
 		var w funit.Int16
 		if gid := glyph.Gid; int(gid) < len(widths) {

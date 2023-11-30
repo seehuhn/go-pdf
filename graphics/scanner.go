@@ -65,6 +65,8 @@ func (s *Scanner) Scan(r io.Reader) func(yield func(string, []pdf.Object) bool) 
 	iterate := func(yield func(string, []pdf.Object) bool) bool {
 		s.err = nil
 
+		// TODO(voss): reset line and col?
+
 		s.src = r
 		s.pos = 0
 		s.used = 0

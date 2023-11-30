@@ -80,7 +80,7 @@ func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	res := &embedded{
 		Font: info,
 		w:    w,
-		Resource: graphics.Resource{
+		Res: graphics.Res{
 			Ref:     w.Alloc(),
 			DefName: resName,
 		},

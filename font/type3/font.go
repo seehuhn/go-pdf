@@ -100,7 +100,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	res := &embedded{
 		Font: f,
 		w:    w,
-		Resource: graphics.Resource{
+		Res: graphics.Res{
 			Ref:     w.Alloc(),
 			DefName: resName,
 		},
@@ -160,7 +160,7 @@ type embedded struct {
 	*Font
 
 	w pdf.Putter
-	graphics.Resource
+	graphics.Res
 
 	*encoding.SimpleEncoder
 	closed bool

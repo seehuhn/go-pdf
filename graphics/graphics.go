@@ -50,7 +50,7 @@ func (p *Page) SetStrokeColor(col color.Color) {
 		return
 	}
 	p.state.StrokeColor = col
-	p.set |= StateStrokeColor
+	p.state.Set |= StateStrokeColor
 	p.Err = col.SetStroke(p.Content)
 }
 
@@ -64,7 +64,7 @@ func (p *Page) SetFillColor(col color.Color) {
 		return
 	}
 	p.state.FillColor = col
-	p.set |= StateFillColor
+	p.state.Set |= StateFillColor
 	p.Err = col.SetFill(p.Content)
 }
 
@@ -77,7 +77,7 @@ func (p *Page) SetLineWidth(width float64) {
 		return
 	}
 	p.state.LineWidth = width
-	p.set |= StateLineWidth
+	p.state.Set |= StateLineWidth
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(width), "w")
 }
 
@@ -90,7 +90,7 @@ func (p *Page) SetLineCap(cap LineCapStyle) {
 		return
 	}
 	p.state.LineCap = cap
-	p.set |= StateLineCap
+	p.state.Set |= StateLineCap
 	_, p.Err = fmt.Fprintln(p.Content, int(cap), "J")
 }
 
@@ -103,7 +103,7 @@ func (p *Page) SetLineJoin(join LineJoinStyle) {
 		return
 	}
 	p.state.LineJoin = join
-	p.set |= StateLineJoin
+	p.state.Set |= StateLineJoin
 	_, p.Err = fmt.Fprintln(p.Content, int(join), "j")
 }
 
@@ -116,7 +116,7 @@ func (p *Page) SetMiterLimit(limit float64) {
 		return
 	}
 	p.state.MiterLimit = limit
-	p.set |= StateMiterLimit
+	p.state.Set |= StateMiterLimit
 	_, p.Err = fmt.Fprintln(p.Content, float.Format(limit, 3), "M")
 }
 
@@ -133,7 +133,7 @@ func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
 	}
 	p.state.DashPattern = pattern
 	p.state.DashPhase = phase
-	p.set |= StateDash
+	p.state.Set |= StateDash
 
 	_, p.Err = fmt.Fprint(p.Content, "[")
 	if p.Err != nil {

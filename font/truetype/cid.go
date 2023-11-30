@@ -112,7 +112,7 @@ func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedCID{
 		fontComposite: f,
 		w:             w,
-		Resource:      graphics.Resource{Ref: w.Alloc(), DefName: resName},
+		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
@@ -123,7 +123,7 @@ func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 type embeddedCID struct {
 	*fontComposite
 	w pdf.Putter
-	graphics.Resource
+	graphics.Res
 
 	cmap.GIDToCID
 	cmap.CIDEncoder

@@ -19,15 +19,27 @@ package graphics
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
-	"seehuhn.de/go/pdf/font"
 )
 
-// State collects all graphical parameters of the PDF processor.
+type State struct {
+	*Parameters
+	Set StateBits
+}
+
+func (s State) Clone() State {
+	return State{
+		Parameters: s.Parameters.Clone(),
+		Set:        s.Set,
+	}
+}
+
+// Parameters collects all graphical parameters of the PDF processor.
 //
 // See section 8.4 of PDF 32000-1:2008.
-type State struct {
+type Parameters struct {
 	// CTM is the "current transformation matrix", which maps positions from
-	// user coordinates to device coordinates
+	// user coordinates to device coordinates.
+	// (default: device-dependent)
 	CTM Matrix
 
 	// TODO(voss): clipping path
@@ -36,13 +48,13 @@ type State struct {
 	FillColor   color.Color
 
 	// Text State parameters:
-	Tm           Matrix        // reset at the start of each text object
-	Tlm          Matrix        // reset at the start of each text object
-	Tc           float64       // character spacing
-	Tw           float64       // word spacing
-	Th           float64       // horizonal scaling
-	Tl           float64       // leading
-	Font         font.Embedded // TODO(voss): is this the right type?
+	Tm           Matrix  // reset at the start of each text object
+	Tlm          Matrix  // reset at the start of each text object
+	Tc           float64 // character spacing
+	Tw           float64 // word spacing
+	Th           float64 // horizonal scaling
+	Tl           float64 // leading
+	Font         Resource
 	FontSize     float64
 	Tmode        int
 	TextRise     float64
@@ -134,148 +146,149 @@ const (
 
 // NewState returns a new graphics state with default values,
 // and a bit mask indicating which fields are set to their default values.
-func NewState() (*State, StateBits) {
-	res := &State{}
+func NewState() State {
+	param := &Parameters{}
 
-	res.CTM = IdentityMatrix
-	res.FillColor = color.Gray(0)
-	res.StrokeColor = color.Gray(0)
+	param.CTM = IdentityMatrix
+	param.FillColor = color.Gray(0)
+	param.StrokeColor = color.Gray(0)
 
-	res.Tc = 0
-	res.Tw = 0
-	res.Th = 1
-	res.Tl = 0
+	param.Tc = 0
+	param.Tw = 0
+	param.Th = 1
+	param.Tl = 0
 	// no default for Font
 	// no default for FontSize
-	res.Tmode = 0
-	res.TextRise = 0
-	res.TextKnockout = true
+	param.Tmode = 0
+	param.TextRise = 0
+	param.TextKnockout = true
 
-	res.LineWidth = 1
-	res.LineCap = LineCapButt
-	res.LineJoin = LineJoinMiter
-	res.MiterLimit = 10
-	res.RenderingIntent = pdf.Name("RelativeColorimetric")
-	res.StrokeAdjustment = false
-	res.BlendMode = pdf.Name("Normal")
-	res.SoftMask = nil
-	res.StrokeAlpha = 1
-	res.FillAlpha = 1
-	res.AlphaSourceFlag = false
-	res.BlackPointCompensation = pdf.Name("Default")
+	param.LineWidth = 1
+	param.LineCap = LineCapButt
+	param.LineJoin = LineJoinMiter
+	param.MiterLimit = 10
+	param.RenderingIntent = pdf.Name("RelativeColorimetric")
+	param.StrokeAdjustment = false
+	param.BlendMode = pdf.Name("Normal")
+	param.SoftMask = nil
+	param.StrokeAlpha = 1
+	param.FillAlpha = 1
+	param.AlphaSourceFlag = false
+	param.BlackPointCompensation = pdf.Name("Default")
 
-	res.OverprintStroke = false
-	res.OverprintFill = false
-	res.OverprintMode = 0
+	param.OverprintStroke = false
+	param.OverprintFill = false
+	param.OverprintMode = 0
 
-	res.FlatnessTolerance = 1
+	param.FlatnessTolerance = 1
 	// res.SmoothnessTolerance has a device-dependent default
 
 	// TODO(voss): should the list of exceptions include the CTM?
 	isSet := AllStateBits & ^(StateFont | StateSmoothnessTolerance)
 
-	return res, isSet
+	return State{param, isSet}
 }
 
 // Update copies selected fields from another State into s.
-func (s *State) Update(other *State, set StateBits) {
-	if set&StateCTM != 0 {
-		s.CTM = other.CTM
+func (s *State) Update(other State) {
+	s.Set |= other.Set & AllStateBits
+	if other.Set&StateCTM != 0 {
+		s.Parameters.CTM = other.Parameters.CTM
 	}
-	if set&StateStrokeColor != 0 {
-		s.StrokeColor = other.StrokeColor
+	if other.Set&StateStrokeColor != 0 {
+		s.Parameters.StrokeColor = other.Parameters.StrokeColor
 	}
-	if set&StateFillColor != 0 {
-		s.FillColor = other.FillColor
+	if other.Set&StateFillColor != 0 {
+		s.Parameters.FillColor = other.Parameters.FillColor
 	}
-	if set&StateTm != 0 {
-		s.Tm = other.Tm
+	if other.Set&StateTm != 0 {
+		s.Parameters.Tm = other.Parameters.Tm
 	}
-	if set&StateTlm != 0 {
-		s.Tlm = other.Tlm
+	if other.Set&StateTlm != 0 {
+		s.Parameters.Tlm = other.Parameters.Tlm
 	}
-	if set&StateTc != 0 {
-		s.Tc = other.Tc
+	if other.Set&StateTc != 0 {
+		s.Parameters.Tc = other.Parameters.Tc
 	}
-	if set&StateTw != 0 {
-		s.Tw = other.Tw
+	if other.Set&StateTw != 0 {
+		s.Parameters.Tw = other.Parameters.Tw
 	}
-	if set&StateTh != 0 {
-		s.Th = other.Th
+	if other.Set&StateTh != 0 {
+		s.Parameters.Th = other.Parameters.Th
 	}
-	if set&StateTl != 0 {
-		s.Tl = other.Tl
+	if other.Set&StateTl != 0 {
+		s.Parameters.Tl = other.Parameters.Tl
 	}
-	if set&StateFont != 0 {
-		s.Font = other.Font
-		s.FontSize = other.FontSize
+	if other.Set&StateFont != 0 {
+		s.Parameters.Font = other.Parameters.Font
+		s.Parameters.FontSize = other.Parameters.FontSize
 	}
-	if set&StateTmode != 0 {
-		s.Tmode = other.Tmode
+	if other.Set&StateTmode != 0 {
+		s.Parameters.Tmode = other.Parameters.Tmode
 	}
-	if set&StateTextRise != 0 {
-		s.TextRise = other.TextRise
+	if other.Set&StateTextRise != 0 {
+		s.Parameters.TextRise = other.Parameters.TextRise
 	}
-	if set&StateTextKnockout != 0 {
-		s.TextKnockout = other.TextKnockout
+	if other.Set&StateTextKnockout != 0 {
+		s.Parameters.TextKnockout = other.Parameters.TextKnockout
 	}
-	if set&StateLineWidth != 0 {
-		s.LineWidth = other.LineWidth
+	if other.Set&StateLineWidth != 0 {
+		s.Parameters.LineWidth = other.Parameters.LineWidth
 	}
-	if set&StateLineCap != 0 {
-		s.LineCap = other.LineCap
+	if other.Set&StateLineCap != 0 {
+		s.Parameters.LineCap = other.Parameters.LineCap
 	}
-	if set&StateLineJoin != 0 {
-		s.LineJoin = other.LineJoin
+	if other.Set&StateLineJoin != 0 {
+		s.Parameters.LineJoin = other.Parameters.LineJoin
 	}
-	if set&StateMiterLimit != 0 {
-		s.MiterLimit = other.MiterLimit
+	if other.Set&StateMiterLimit != 0 {
+		s.Parameters.MiterLimit = other.Parameters.MiterLimit
 	}
-	if set&StateDash != 0 {
-		s.DashPattern = other.DashPattern // TODO(voss): make a copy?
-		s.DashPhase = other.DashPhase
+	if other.Set&StateDash != 0 {
+		s.Parameters.DashPattern = other.Parameters.DashPattern // TODO(voss): make a copy?
+		s.Parameters.DashPhase = other.Parameters.DashPhase
 	}
-	if set&StateRenderingIntent != 0 {
-		s.RenderingIntent = other.RenderingIntent
+	if other.Set&StateRenderingIntent != 0 {
+		s.Parameters.RenderingIntent = other.Parameters.RenderingIntent
 	}
-	if set&StateStrokeAdjustment != 0 {
-		s.StrokeAdjustment = other.StrokeAdjustment
+	if other.Set&StateStrokeAdjustment != 0 {
+		s.Parameters.StrokeAdjustment = other.Parameters.StrokeAdjustment
 	}
-	if set&StateBlendMode != 0 {
-		s.BlendMode = other.BlendMode
+	if other.Set&StateBlendMode != 0 {
+		s.Parameters.BlendMode = other.Parameters.BlendMode
 	}
-	if set&StateSoftMask != 0 {
-		s.SoftMask = other.SoftMask
+	if other.Set&StateSoftMask != 0 {
+		s.Parameters.SoftMask = other.Parameters.SoftMask
 	}
-	if set&StateStrokeAlpha != 0 {
-		s.StrokeAlpha = other.StrokeAlpha
+	if other.Set&StateStrokeAlpha != 0 {
+		s.Parameters.StrokeAlpha = other.Parameters.StrokeAlpha
 	}
-	if set&StateFillAlpha != 0 {
-		s.FillAlpha = other.FillAlpha
+	if other.Set&StateFillAlpha != 0 {
+		s.Parameters.FillAlpha = other.Parameters.FillAlpha
 	}
-	if set&StateAlphaSourceFlag != 0 {
-		s.AlphaSourceFlag = other.AlphaSourceFlag
+	if other.Set&StateAlphaSourceFlag != 0 {
+		s.Parameters.AlphaSourceFlag = other.Parameters.AlphaSourceFlag
 	}
-	if set&StateBlackPointCompensation != 0 {
-		s.BlackPointCompensation = other.BlackPointCompensation
+	if other.Set&StateBlackPointCompensation != 0 {
+		s.Parameters.BlackPointCompensation = other.Parameters.BlackPointCompensation
 	}
-	if set&StateOverprint != 0 {
-		s.OverprintStroke = other.OverprintStroke
-		s.OverprintFill = other.OverprintFill
+	if other.Set&StateOverprint != 0 {
+		s.Parameters.OverprintStroke = other.Parameters.OverprintStroke
+		s.Parameters.OverprintFill = other.Parameters.OverprintFill
 	}
-	if set&StateOverprintMode != 0 {
-		s.OverprintMode = other.OverprintMode
+	if other.Set&StateOverprintMode != 0 {
+		s.Parameters.OverprintMode = other.Parameters.OverprintMode
 	}
-	if set&StateFlatnessTolerance != 0 {
-		s.FlatnessTolerance = other.FlatnessTolerance
+	if other.Set&StateFlatnessTolerance != 0 {
+		s.Parameters.FlatnessTolerance = other.Parameters.FlatnessTolerance
 	}
-	if set&StateSmoothnessTolerance != 0 {
-		s.SmoothnessTolerance = other.SmoothnessTolerance
+	if other.Set&StateSmoothnessTolerance != 0 {
+		s.Parameters.SmoothnessTolerance = other.Parameters.SmoothnessTolerance
 	}
 }
 
 // Clone returns a shallow copy of the GraphicsState.
-func (s *State) Clone() *State {
+func (s *Parameters) Clone() *Parameters {
 	res := *s
 	return &res
 }

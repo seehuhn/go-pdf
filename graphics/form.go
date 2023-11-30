@@ -24,7 +24,7 @@ import (
 //
 // See section 8.10 of ISO 32000-2:2020 for details.
 type FormXObject struct {
-	Resource
+	Res
 }
 
 // PaintFormXObject draws a Form XObject onto the page.
@@ -33,7 +33,7 @@ func (p *Page) PaintFormXObject(x *FormXObject) {
 		return
 	}
 
-	name := p.getResourceName("XObject", x)
+	name := p.getResourceName(catXObject, x)
 	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err
