@@ -26,14 +26,18 @@ import (
 
 // Page represents a PDF content stream.
 type Page struct {
+	Version   pdf.Version
 	Content   io.Writer
 	Resources *pdf.Resources
 	Err       error
 
 	currentObject objectType
 
-	state State
+	State
 	stack []State
+
+	// TODO(voss): https://github.com/pdf-association/pdf-issues/issues/302
+	qtNesting []byte // nesting of q/Q with BT/ET operators, entries are 'q' or 't'
 
 	resName  map[catRes]pdf.Name
 	nameUsed map[catName]struct{}
@@ -50,62 +54,18 @@ type catName struct {
 }
 
 // NewPage allocates a new Page object.
-func NewPage(w io.Writer) *Page {
+func NewPage(w io.Writer, v pdf.Version) *Page {
 	return &Page{
+		Version:       v,
 		Content:       w,
 		Resources:     &pdf.Resources{},
 		currentObject: objPage,
 
-		state: NewState(),
+		State: NewState(),
 
 		resName:  make(map[catRes]pdf.Name),
 		nameUsed: make(map[catName]struct{}),
 	}
-}
-
-// ForgetGraphicsState removes all information about previous graphics state
-// settings.
-//
-// TODO(voss): remove
-func (p *Page) ForgetGraphicsState() {
-	p.state.Set = 0
-}
-
-// PushGraphicsState saves the current graphics state.
-func (p *Page) PushGraphicsState() {
-	if !p.valid("PushGraphicsState", objPage, objText) {
-		return
-	}
-
-	p.stack = append(p.stack, p.state.Clone())
-
-	_, err := fmt.Fprintln(p.Content, "q")
-	if p.Err == nil {
-		p.Err = err
-	}
-}
-
-// PopGraphicsState restores the previous graphics state.
-func (p *Page) PopGraphicsState() {
-	if !p.valid("PopGraphicsState", objPage, objText) {
-		return
-	}
-
-	n := len(p.stack) - 1
-	savedState := p.stack[n]
-	p.stack = p.stack[:n]
-
-	p.state = savedState
-
-	_, err := fmt.Fprintln(p.Content, "Q")
-	if p.Err == nil {
-		p.Err = err
-	}
-}
-
-// isSet returns true, if all of the given fields in the graphics state are set.
-func (p *Page) isSet(bits StateBits) bool {
-	return p.state.Set&bits == bits
 }
 
 func (p *Page) coord(x float64) string {
@@ -272,4 +232,59 @@ func (p *Page) valid(cmd string, ss ...objectType) bool {
 
 	p.Err = fmt.Errorf("unexpected state %q for %q", p.currentObject, cmd)
 	return false
+}
+
+// PushGraphicsState saves the current graphics state.
+func (p *Page) PushGraphicsState() {
+	var allowedStates []objectType
+	if p.Version >= pdf.V2_0 {
+		allowedStates = []objectType{objPage, objText}
+	} else {
+		allowedStates = []objectType{objPage}
+	}
+	if !p.valid("PushGraphicsState", allowedStates...) {
+		return
+	}
+
+	p.stack = append(p.stack, p.State.Clone())
+	p.qtNesting = append(p.qtNesting, 'q')
+
+	_, err := fmt.Fprintln(p.Content, "q")
+	if p.Err == nil {
+		p.Err = err
+	}
+}
+
+// PopGraphicsState restores the previous graphics state.
+func (p *Page) PopGraphicsState() {
+	var allowedStates []objectType
+	if p.Version >= pdf.V2_0 {
+		allowedStates = []objectType{objPage, objText}
+	} else {
+		allowedStates = []objectType{objPage}
+	}
+	if !p.valid("PopGraphicsState", allowedStates...) {
+		return
+	}
+
+	if len(p.qtNesting) == 0 || p.qtNesting[len(p.qtNesting)-1] != 'q' {
+		p.Err = fmt.Errorf("PopGraphicsState: no matching PushGraphicsState")
+		return
+	}
+	p.qtNesting = p.qtNesting[:len(p.qtNesting)-1]
+
+	n := len(p.stack) - 1
+	savedState := p.stack[n]
+	p.stack = p.stack[:n]
+	p.State = savedState
+
+	_, err := fmt.Fprintln(p.Content, "Q")
+	if p.Err == nil {
+		p.Err = err
+	}
+}
+
+// isSet returns true, if all of the given fields in the graphics state are set.
+func (p *Page) isSet(bits StateBits) bool {
+	return p.State.Set&bits == bits
 }

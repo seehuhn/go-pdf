@@ -58,7 +58,7 @@ func (p *Page) SetExtGState(s *ExtGState) {
 		return
 	}
 
-	p.state.Update(s.Value)
+	p.State.Update(s.Value)
 
 	name := p.getResourceName(catExtGState, s)
 	err := name.PDF(p.Content)

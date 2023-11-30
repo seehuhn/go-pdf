@@ -48,8 +48,6 @@ type Parameters struct {
 	FillColor   color.Color
 
 	// Text State parameters:
-	Tm           Matrix  // reset at the start of each text object
-	Tlm          Matrix  // reset at the start of each text object
 	Tc           float64 // character spacing
 	Tw           float64 // word spacing
 	Th           float64 // horizonal scaling
@@ -59,6 +57,11 @@ type Parameters struct {
 	Tmode        int
 	TextRise     float64
 	TextKnockout bool
+
+	// TODO(voss): revisit the following two parameters once
+	// https://github.com/pdf-association/pdf-issues/issues/368 is resolved.
+	Tm  Matrix // reset at the start of each text object
+	Tlm Matrix // reset at the start of each text object
 
 	LineWidth   float64
 	LineCap     LineCapStyle

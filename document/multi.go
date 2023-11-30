@@ -103,7 +103,7 @@ func (doc *MultiPage) Close() error {
 func (doc *MultiPage) AddPage() *Page {
 	doc.numOpen++
 
-	page := graphics.NewPage(&bytes.Buffer{})
+	page := graphics.NewPage(&bytes.Buffer{}, pdf.GetVersion(doc.Out))
 	return &Page{
 		Page: page,
 		PageDict: pdf.Dict{

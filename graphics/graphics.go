@@ -33,7 +33,7 @@ func (p *Page) Transform(m Matrix) {
 	if !p.valid("Transform", objPage, objText) {
 		return
 	}
-	p.state.CTM = p.state.CTM.Mul(m)
+	p.State.CTM = p.State.CTM.Mul(m)
 	_, p.Err = fmt.Fprintln(p.Content,
 		float.Format(m[0], 3), float.Format(m[1], 3),
 		float.Format(m[2], 3), float.Format(m[3], 3),
@@ -46,11 +46,11 @@ func (p *Page) SetStrokeColor(col color.Color) {
 	if !p.valid("SetStrokeColor", objPage, objText) {
 		return
 	}
-	if p.isSet(StateStrokeColor) && col == p.state.StrokeColor {
+	if p.isSet(StateStrokeColor) && col == p.State.StrokeColor {
 		return
 	}
-	p.state.StrokeColor = col
-	p.state.Set |= StateStrokeColor
+	p.State.StrokeColor = col
+	p.State.Set |= StateStrokeColor
 	p.Err = col.SetStroke(p.Content)
 }
 
@@ -60,11 +60,11 @@ func (p *Page) SetFillColor(col color.Color) {
 	if !p.valid("SetFillColor", objPage, objText) {
 		return
 	}
-	if p.isSet(StateFillColor) && col == p.state.FillColor {
+	if p.isSet(StateFillColor) && col == p.State.FillColor {
 		return
 	}
-	p.state.FillColor = col
-	p.state.Set |= StateFillColor
+	p.State.FillColor = col
+	p.State.Set |= StateFillColor
 	p.Err = col.SetFill(p.Content)
 }
 
@@ -73,11 +73,15 @@ func (p *Page) SetLineWidth(width float64) {
 	if !p.valid("SetLineWidth", objPage, objText) {
 		return
 	}
-	if p.isSet(StateLineWidth) && math.Abs(width-p.state.LineWidth) < ε {
+	if width < 0 {
+		p.Err = fmt.Errorf("invalid line width %f", width)
 		return
 	}
-	p.state.LineWidth = width
-	p.state.Set |= StateLineWidth
+	if p.isSet(StateLineWidth) && nearlyEqual(width, p.State.LineWidth) {
+		return
+	}
+	p.State.LineWidth = width
+	p.State.Set |= StateLineWidth
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(width), "w")
 }
 
@@ -86,11 +90,11 @@ func (p *Page) SetLineCap(cap LineCapStyle) {
 	if !p.valid("SetLineCap", objPage, objText) {
 		return
 	}
-	if p.isSet(StateLineCap) && cap == p.state.LineCap {
+	if p.isSet(StateLineCap) && cap == p.State.LineCap {
 		return
 	}
-	p.state.LineCap = cap
-	p.state.Set |= StateLineCap
+	p.State.LineCap = cap
+	p.State.Set |= StateLineCap
 	_, p.Err = fmt.Fprintln(p.Content, int(cap), "J")
 }
 
@@ -99,11 +103,11 @@ func (p *Page) SetLineJoin(join LineJoinStyle) {
 	if !p.valid("SetLineJoin", objPage, objText) {
 		return
 	}
-	if p.isSet(StateLineJoin) && join == p.state.LineJoin {
+	if p.isSet(StateLineJoin) && join == p.State.LineJoin {
 		return
 	}
-	p.state.LineJoin = join
-	p.state.Set |= StateLineJoin
+	p.State.LineJoin = join
+	p.State.Set |= StateLineJoin
 	_, p.Err = fmt.Fprintln(p.Content, int(join), "j")
 }
 
@@ -112,11 +116,11 @@ func (p *Page) SetMiterLimit(limit float64) {
 	if !p.valid("SetMiterLimit", objPage, objText) {
 		return
 	}
-	if p.isSet(StateMiterLimit) && math.Abs(limit-p.state.MiterLimit) < ε {
+	if p.isSet(StateMiterLimit) && nearlyEqual(limit, p.State.MiterLimit) {
 		return
 	}
-	p.state.MiterLimit = limit
-	p.state.Set |= StateMiterLimit
+	p.State.MiterLimit = limit
+	p.State.Set |= StateMiterLimit
 	_, p.Err = fmt.Fprintln(p.Content, float.Format(limit, 3), "M")
 }
 
@@ -127,13 +131,13 @@ func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
 	}
 
 	if p.isSet(StateDash) &&
-		sliceNearlyEqual(pattern, p.state.DashPattern) &&
-		math.Abs(phase-p.state.DashPhase) < ε {
+		sliceNearlyEqual(pattern, p.State.DashPattern) &&
+		nearlyEqual(phase, p.State.DashPhase) {
 		return
 	}
-	p.state.DashPattern = pattern
-	p.state.DashPhase = phase
-	p.state.Set |= StateDash
+	p.State.DashPattern = pattern
+	p.State.DashPhase = phase
+	p.State.Set |= StateDash
 
 	_, p.Err = fmt.Fprint(p.Content, "[")
 	if p.Err != nil {
@@ -153,16 +157,19 @@ func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
 	}
 }
 
+func nearlyEqual(a, b float64) bool {
+	const ε = 1e-6
+	return math.Abs(a-b) < ε
+}
+
 func sliceNearlyEqual(a, b []float64) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for i, x := range a {
-		if math.Abs(x-b[i]) > ε {
+		if nearlyEqual(x, b[i]) {
 			return false
 		}
 	}
 	return true
 }
-
-const ε = 1e-6

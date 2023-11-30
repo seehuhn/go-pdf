@@ -180,7 +180,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		if err != nil {
 			return err
 		}
-		page := graphics.NewPage(stream)
+		page := graphics.NewPage(stream, pdf.GetVersion(ctx.pageTree.Out))
 
 		// show the glyph extent as a shaded rectangle
 		bbox := g.Extent()

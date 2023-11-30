@@ -51,7 +51,7 @@ func doit() error {
 	if err != nil {
 		return err
 	}
-	page := graphics.NewPage(c)
+	page := graphics.NewPage(c, pdf.GetVersion(w))
 	// draw a grid to show page coordinates
 	page.PushGraphicsState()
 	page.SetStrokeColor(color.Gray(0.85))

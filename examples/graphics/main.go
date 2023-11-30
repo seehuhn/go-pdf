@@ -17,11 +17,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math"
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 func main() {
@@ -58,6 +60,33 @@ func main() {
 	w.TextShow("line 2")
 	w.TextNextLine()
 	w.TextShow("line 3")
+	w.TextEnd()
+
+	y -= 80
+	w.PushGraphicsState()
+	w.SetLineWidth(10)
+	w.SetLineJoin(graphics.LineJoinMiter)
+	w.SetMiterLimit(1.414)
+	for i, phi := range []float64{85, 87, 89, 91, 93, 95} {
+		x = 72 + float64(i)*72
+		w.MoveTo(x-30, y)
+		w.LineTo(x, y)
+		phiRad := phi * math.Pi / 180
+		w.LineTo(x+30*math.Cos(phiRad), y+30*math.Sin(phiRad))
+	}
+	w.Stroke()
+	w.PopGraphicsState()
+	w.TextStart()
+	w.TextSetFont(F, 9)
+	for i, phi := range []float64{85, 87, 89, 91, 93, 95} {
+		switch i {
+		case 0:
+			w.TextFirstLine(42, y-17)
+		default:
+			w.TextFirstLine(72, 0)
+		}
+		w.TextShow(fmt.Sprintf("phi = %gº", phi))
+	}
 	w.TextEnd()
 
 	err = w.Close()

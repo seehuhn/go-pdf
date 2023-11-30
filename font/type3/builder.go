@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
@@ -53,8 +54,8 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 	f.numOpen++
 
 	buf := &bytes.Buffer{}
-	page := graphics.NewPage(buf)
-	page.ForgetGraphicsState()
+	page := graphics.NewPage(buf, pdf.V1_7) // TODO(voss): what to use as the PDF version here?
+	page.State.Set = graphics.StateCTM
 	page.Resources = f.Resources
 
 	if shapeOnly {
