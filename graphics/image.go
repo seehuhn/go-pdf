@@ -51,7 +51,7 @@ func (r Rectangle) Dy() int {
 }
 
 // DrawImage draws an image on the page.
-func (p *Page) DrawImage(img EmbeddedImage) {
+func (p *Writer) DrawImage(img EmbeddedImage) {
 	if !p.valid("DrawImage", objPage) {
 		return
 	}

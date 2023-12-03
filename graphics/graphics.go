@@ -29,11 +29,11 @@ import (
 // given matrix from the right.
 //
 // This implementes the "cm" PDF graphics operator.
-func (p *Page) Transform(m Matrix) {
+func (p *Writer) Transform(m Matrix) {
 	if !p.valid("Transform", objPage, objText) {
 		return
 	}
-	p.State.CTM = p.State.CTM.Mul(m)
+	p.CTM = p.CTM.Mul(m)
 	_, p.Err = fmt.Fprintln(p.Content,
 		float.Format(m[0], 3), float.Format(m[1], 3),
 		float.Format(m[2], 3), float.Format(m[3], 3),
@@ -42,102 +42,98 @@ func (p *Page) Transform(m Matrix) {
 
 // SetStrokeColor sets the stroke color in the graphics state.
 // If col is nil, the stroke color is not changed.
-func (p *Page) SetStrokeColor(col color.Color) {
+func (p *Writer) SetStrokeColor(col color.Color) {
 	if !p.valid("SetStrokeColor", objPage, objText) {
 		return
 	}
-	if p.isSet(StateStrokeColor) && col == p.State.StrokeColor {
+	if p.isSet(StateStrokeColor) && col == p.StrokeColor {
 		return
 	}
-	p.State.StrokeColor = col
-	p.State.Set |= StateStrokeColor
+	p.StrokeColor = col
+	p.Set |= StateStrokeColor
 	p.Err = col.SetStroke(p.Content)
 }
 
 // SetFillColor sets the fill color in the graphics state.
 // If col is nil, the fill color is not changed.
-func (p *Page) SetFillColor(col color.Color) {
+func (p *Writer) SetFillColor(col color.Color) {
 	if !p.valid("SetFillColor", objPage, objText) {
 		return
 	}
-	if p.isSet(StateFillColor) && col == p.State.FillColor {
+	if p.isSet(StateFillColor) && col == p.FillColor {
 		return
 	}
-	p.State.FillColor = col
-	p.State.Set |= StateFillColor
+	p.FillColor = col
+	p.Set |= StateFillColor
 	p.Err = col.SetFill(p.Content)
 }
 
 // SetLineWidth sets the line width.
-func (p *Page) SetLineWidth(width float64) {
+func (p *Writer) SetLineWidth(width float64) {
 	if !p.valid("SetLineWidth", objPage, objText) {
 		return
 	}
-	if width < 0 {
-		p.Err = fmt.Errorf("invalid line width %f", width)
+	if p.isSet(StateLineWidth) && nearlyEqual(width, p.LineWidth) {
 		return
 	}
-	if p.isSet(StateLineWidth) && nearlyEqual(width, p.State.LineWidth) {
-		return
-	}
-	p.State.LineWidth = width
-	p.State.Set |= StateLineWidth
+	p.LineWidth = width
+	p.Set |= StateLineWidth
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(width), "w")
 }
 
 // SetLineCap sets the line cap style.
-func (p *Page) SetLineCap(cap LineCapStyle) {
+func (p *Writer) SetLineCap(cap LineCapStyle) {
 	if !p.valid("SetLineCap", objPage, objText) {
 		return
 	}
-	if p.isSet(StateLineCap) && cap == p.State.LineCap {
+	if p.isSet(StateLineCap) && cap == p.LineCap {
 		return
 	}
-	p.State.LineCap = cap
-	p.State.Set |= StateLineCap
+	p.LineCap = cap
+	p.Set |= StateLineCap
 	_, p.Err = fmt.Fprintln(p.Content, int(cap), "J")
 }
 
 // SetLineJoin sets the line join style.
-func (p *Page) SetLineJoin(join LineJoinStyle) {
+func (p *Writer) SetLineJoin(join LineJoinStyle) {
 	if !p.valid("SetLineJoin", objPage, objText) {
 		return
 	}
-	if p.isSet(StateLineJoin) && join == p.State.LineJoin {
+	if p.isSet(StateLineJoin) && join == p.LineJoin {
 		return
 	}
-	p.State.LineJoin = join
-	p.State.Set |= StateLineJoin
+	p.LineJoin = join
+	p.Set |= StateLineJoin
 	_, p.Err = fmt.Fprintln(p.Content, int(join), "j")
 }
 
 // SetMiterLimit sets the miter limit.
-func (p *Page) SetMiterLimit(limit float64) {
+func (p *Writer) SetMiterLimit(limit float64) {
 	if !p.valid("SetMiterLimit", objPage, objText) {
 		return
 	}
-	if p.isSet(StateMiterLimit) && nearlyEqual(limit, p.State.MiterLimit) {
+	if p.isSet(StateMiterLimit) && nearlyEqual(limit, p.MiterLimit) {
 		return
 	}
-	p.State.MiterLimit = limit
-	p.State.Set |= StateMiterLimit
+	p.MiterLimit = limit
+	p.Set |= StateMiterLimit
 	_, p.Err = fmt.Fprintln(p.Content, float.Format(limit, 3), "M")
 }
 
 // SetDashPattern sets the line dash pattern.
-func (p *Page) SetDashPattern(phase float64, pattern ...float64) {
+func (p *Writer) SetDashPattern(phase float64, pattern ...float64) {
 	if !p.valid("SetDashPattern", objPage, objText) {
 		return
 	}
 
 	if p.isSet(StateDash) &&
-		sliceNearlyEqual(pattern, p.State.DashPattern) &&
-		nearlyEqual(phase, p.State.DashPhase) {
+		sliceNearlyEqual(pattern, p.DashPattern) &&
+		nearlyEqual(phase, p.DashPhase) {
 		return
 	}
-	p.State.DashPattern = pattern
-	p.State.DashPhase = phase
-	p.State.Set |= StateDash
+	p.DashPattern = pattern
+	p.DashPhase = phase
+	p.Set |= StateDash
 
 	_, p.Err = fmt.Fprint(p.Content, "[")
 	if p.Err != nil {

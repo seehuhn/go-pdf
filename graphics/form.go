@@ -28,7 +28,7 @@ type FormXObject struct {
 }
 
 // PaintFormXObject draws a Form XObject onto the page.
-func (p *Page) PaintFormXObject(x *FormXObject) {
+func (p *Writer) PaintFormXObject(x *FormXObject) {
 	if !p.valid("PaintFormXObject", objPage, objText) {
 		return
 	}

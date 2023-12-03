@@ -21,16 +21,10 @@ import (
 	"seehuhn.de/go/pdf/color"
 )
 
+// State represents the graphics state of a PDF processor.
 type State struct {
 	*Parameters
 	Set StateBits
-}
-
-func (s State) Clone() State {
-	return State{
-		Parameters: s.Parameters.Clone(),
-		Set:        s.Set,
-	}
 }
 
 // Parameters collects all graphical parameters of the PDF processor.
@@ -42,24 +36,23 @@ type Parameters struct {
 	// (default: device-dependent)
 	CTM Matrix
 
-	// TODO(voss): clipping path
+	ClippingPath interface{} // TODO(voss): implement this
 
 	StrokeColor color.Color
 	FillColor   color.Color
 
 	// Text State parameters:
-	Tc           float64 // character spacing
-	Tw           float64 // word spacing
-	Th           float64 // horizonal scaling
-	Tl           float64 // leading
-	Font         Resource
+	Tc           float64  // character spacing
+	Tw           float64  // word spacing
+	Th           float64  // horizonal scaling
+	Tl           float64  // leading
+	Font         Resource // Font.PDFObject() must return a pdf.Reference
 	FontSize     float64
 	Tmode        int
 	TextRise     float64
 	TextKnockout bool
 
-	// TODO(voss): revisit the following two parameters once
-	// https://github.com/pdf-association/pdf-issues/issues/368 is resolved.
+	// See https://github.com/pdf-association/pdf-issues/issues/368
 	Tm  Matrix // reset at the start of each text object
 	Tlm Matrix // reset at the start of each text object
 
@@ -77,8 +70,8 @@ type Parameters struct {
 	// small relative to the pixel resolution of the output device.
 	StrokeAdjustment bool
 
-	BlendMode              pdf.Name // TODO(voss): can be an array for PDF<2.0
-	SoftMask               pdf.Dict // TODO(voss): can be name
+	BlendMode              pdf.Object
+	SoftMask               pdf.Object
 	StrokeAlpha            float64
 	FillAlpha              float64
 	AlphaSourceFlag        bool
@@ -90,11 +83,12 @@ type Parameters struct {
 	OverprintFill   bool // for PDF<1.3 this must equal OverprintStroke
 	OverprintMode   int  // for PDF<1.3 this must be 0
 
-	// TODO(voss): black generation
-	// TODO(voss): undercolor removal
-	// TODO(voss): transfer function
-	// TODO(voss): halftone
-	// TODO(voss): halftone origin https://github.com/pdf-association/pdf-issues/issues/260
+	BlackGeneration   pdf.Object
+	UndercolorRemoval pdf.Object
+	TransferFunction  pdf.Object
+	Halftone          pdf.Object
+	HalftoneOriginX   float64 //  https://github.com/pdf-association/pdf-issues/issues/260
+	HalftoneOriginY   float64
 
 	// FlatnessTolerance is a positive number specifying the precision with which
 	// curves are be rendered on the output device.  Smaller numbers give
@@ -112,11 +106,12 @@ type StateBits uint64
 
 // Possible values for StateBits.
 const (
-	StateCTM StateBits = 1 << iota
-	StateStrokeColor
+	// CTM is always set, so it is not included in the bit mask.
+	// ClippingPath is always set, so it is not included in the bit mask.
+
+	StateStrokeColor StateBits = 1 << iota
 	StateFillColor
-	StateTm
-	StateTlm
+
 	StateTc
 	StateTw
 	StateTh
@@ -125,11 +120,16 @@ const (
 	StateTmode
 	StateTextRise
 	StateTextKnockout
+
+	StateTm
+	StateTlm
+
 	StateLineWidth
 	StateLineCap
 	StateLineJoin
 	StateMiterLimit
 	StateDash // pattern and phase
+
 	StateRenderingIntent
 	StateStrokeAdjustment
 	StateBlendMode
@@ -138,13 +138,43 @@ const (
 	StateFillAlpha
 	StateAlphaSourceFlag
 	StateBlackPointCompensation
+
 	StateOverprint
 	StateOverprintMode
+	StateBlackGeneration
+	StateUndercolorRemoval
+	StateTransferFunction
+	StateHalftone
+	StateHalftoneOrigin
 	StateFlatnessTolerance
 	StateSmoothnessTolerance
 
 	stateFirstUnused
 	AllStateBits = stateFirstUnused - 1
+)
+
+const (
+	// initializedStateBits lists the parameters which are initialized to
+	// their default values in [NewState].
+	initializedStateBits = StateStrokeColor | StateFillColor | StateTc |
+		StateTw | StateTh | StateTl | StateTmode | StateTextRise |
+		StateTextKnockout | StateLineWidth | StateLineCap | StateLineJoin |
+		StateMiterLimit | StateDash | StateRenderingIntent |
+		StateStrokeAdjustment | StateBlendMode | StateSoftMask |
+		StateStrokeAlpha | StateFillAlpha | StateAlphaSourceFlag |
+		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
+		StateFlatnessTolerance
+
+	// extStateBits lists the parameters which can be encoded in an ExtGState
+	// resource.
+	extStateBits = StateFont | StateTextKnockout | StateLineWidth |
+		StateLineCap | StateLineJoin | StateMiterLimit | StateDash |
+		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
+		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
+		StateAlphaSourceFlag | StateBlackPointCompensation | StateOverprint |
+		StateOverprintMode | StateBlackGeneration | StateUndercolorRemoval |
+		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
+		StateFlatnessTolerance | StateSmoothnessTolerance
 )
 
 // NewState returns a new graphics state with default values,
@@ -153,8 +183,8 @@ func NewState() State {
 	param := &Parameters{}
 
 	param.CTM = IdentityMatrix
-	param.FillColor = color.Gray(0)
 	param.StrokeColor = color.Gray(0)
+	param.FillColor = color.Gray(0)
 
 	param.Tc = 0
 	param.Tw = 0
@@ -166,10 +196,15 @@ func NewState() State {
 	param.TextRise = 0
 	param.TextKnockout = true
 
+	// Tm and Tlm are reset at the start of each text object
+
 	param.LineWidth = 1
 	param.LineCap = LineCapButt
 	param.LineJoin = LineJoinMiter
 	param.MiterLimit = 10
+	param.DashPattern = []float64{}
+	param.DashPhase = 0
+
 	param.RenderingIntent = pdf.Name("RelativeColorimetric")
 	param.StrokeAdjustment = false
 	param.BlendMode = pdf.Name("Normal")
@@ -183,111 +218,19 @@ func NewState() State {
 	param.OverprintFill = false
 	param.OverprintMode = 0
 
-	param.FlatnessTolerance = 1
-	// res.SmoothnessTolerance has a device-dependent default
+	// param.BlackGeneration = nil   // defaul: device dependent
+	// param.UndercolorRemoval = nil // defaul: device dependent
+	// param.TransferFunction = nil  // defaul: device dependent
+	// param.Halftone = nil          // defaul: device dependent
+	// param.HalftoneOriginX = 0     // defaul: device dependent
+	// param.HalftoneOriginY = 0     // defaul: device dependent
 
-	// TODO(voss): should the list of exceptions include the CTM?
-	isSet := AllStateBits & ^(StateFont | StateSmoothnessTolerance)
+	param.FlatnessTolerance = 1
+	// param.SmoothnessTolerance = 0 // defaul: device dependent
+
+	isSet := initializedStateBits
 
 	return State{param, isSet}
-}
-
-// Update copies selected fields from another State into s.
-func (s *State) Update(other State) {
-	s.Set |= other.Set & AllStateBits
-	if other.Set&StateCTM != 0 {
-		s.Parameters.CTM = other.Parameters.CTM
-	}
-	if other.Set&StateStrokeColor != 0 {
-		s.Parameters.StrokeColor = other.Parameters.StrokeColor
-	}
-	if other.Set&StateFillColor != 0 {
-		s.Parameters.FillColor = other.Parameters.FillColor
-	}
-	if other.Set&StateTm != 0 {
-		s.Parameters.Tm = other.Parameters.Tm
-	}
-	if other.Set&StateTlm != 0 {
-		s.Parameters.Tlm = other.Parameters.Tlm
-	}
-	if other.Set&StateTc != 0 {
-		s.Parameters.Tc = other.Parameters.Tc
-	}
-	if other.Set&StateTw != 0 {
-		s.Parameters.Tw = other.Parameters.Tw
-	}
-	if other.Set&StateTh != 0 {
-		s.Parameters.Th = other.Parameters.Th
-	}
-	if other.Set&StateTl != 0 {
-		s.Parameters.Tl = other.Parameters.Tl
-	}
-	if other.Set&StateFont != 0 {
-		s.Parameters.Font = other.Parameters.Font
-		s.Parameters.FontSize = other.Parameters.FontSize
-	}
-	if other.Set&StateTmode != 0 {
-		s.Parameters.Tmode = other.Parameters.Tmode
-	}
-	if other.Set&StateTextRise != 0 {
-		s.Parameters.TextRise = other.Parameters.TextRise
-	}
-	if other.Set&StateTextKnockout != 0 {
-		s.Parameters.TextKnockout = other.Parameters.TextKnockout
-	}
-	if other.Set&StateLineWidth != 0 {
-		s.Parameters.LineWidth = other.Parameters.LineWidth
-	}
-	if other.Set&StateLineCap != 0 {
-		s.Parameters.LineCap = other.Parameters.LineCap
-	}
-	if other.Set&StateLineJoin != 0 {
-		s.Parameters.LineJoin = other.Parameters.LineJoin
-	}
-	if other.Set&StateMiterLimit != 0 {
-		s.Parameters.MiterLimit = other.Parameters.MiterLimit
-	}
-	if other.Set&StateDash != 0 {
-		s.Parameters.DashPattern = other.Parameters.DashPattern // TODO(voss): make a copy?
-		s.Parameters.DashPhase = other.Parameters.DashPhase
-	}
-	if other.Set&StateRenderingIntent != 0 {
-		s.Parameters.RenderingIntent = other.Parameters.RenderingIntent
-	}
-	if other.Set&StateStrokeAdjustment != 0 {
-		s.Parameters.StrokeAdjustment = other.Parameters.StrokeAdjustment
-	}
-	if other.Set&StateBlendMode != 0 {
-		s.Parameters.BlendMode = other.Parameters.BlendMode
-	}
-	if other.Set&StateSoftMask != 0 {
-		s.Parameters.SoftMask = other.Parameters.SoftMask
-	}
-	if other.Set&StateStrokeAlpha != 0 {
-		s.Parameters.StrokeAlpha = other.Parameters.StrokeAlpha
-	}
-	if other.Set&StateFillAlpha != 0 {
-		s.Parameters.FillAlpha = other.Parameters.FillAlpha
-	}
-	if other.Set&StateAlphaSourceFlag != 0 {
-		s.Parameters.AlphaSourceFlag = other.Parameters.AlphaSourceFlag
-	}
-	if other.Set&StateBlackPointCompensation != 0 {
-		s.Parameters.BlackPointCompensation = other.Parameters.BlackPointCompensation
-	}
-	if other.Set&StateOverprint != 0 {
-		s.Parameters.OverprintStroke = other.Parameters.OverprintStroke
-		s.Parameters.OverprintFill = other.Parameters.OverprintFill
-	}
-	if other.Set&StateOverprintMode != 0 {
-		s.Parameters.OverprintMode = other.Parameters.OverprintMode
-	}
-	if other.Set&StateFlatnessTolerance != 0 {
-		s.Parameters.FlatnessTolerance = other.Parameters.FlatnessTolerance
-	}
-	if other.Set&StateSmoothnessTolerance != 0 {
-		s.Parameters.SmoothnessTolerance = other.Parameters.SmoothnessTolerance
-	}
 }
 
 // Clone returns a shallow copy of the GraphicsState.

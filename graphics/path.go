@@ -22,7 +22,7 @@ import (
 )
 
 // MoveTo starts a new path at the given coordinates.
-func (p *Page) MoveTo(x, y float64) {
+func (p *Writer) MoveTo(x, y float64) {
 	if !p.valid("MoveTo", objPage, objPath) {
 		return
 	}
@@ -31,7 +31,7 @@ func (p *Page) MoveTo(x, y float64) {
 }
 
 // LineTo appends a straight line segment to the current path.
-func (p *Page) LineTo(x, y float64) {
+func (p *Writer) LineTo(x, y float64) {
 	if !p.valid("LineTo", objPath, objClippingPath) {
 		return
 	}
@@ -39,7 +39,7 @@ func (p *Page) LineTo(x, y float64) {
 }
 
 // CurveTo appends a cubic Bezier curve to the current path.
-func (p *Page) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
+func (p *Writer) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 	if !p.valid("CurveTo", objPath, objClippingPath) {
 		return
 	}
@@ -48,7 +48,7 @@ func (p *Page) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 }
 
 // Rectangle appends a rectangle to the current path as a closed subpath.
-func (p *Page) Rectangle(x, y, width, height float64) {
+func (p *Writer) Rectangle(x, y, width, height float64) {
 	if !p.valid("Rectangle", objPage, objPath) {
 		return
 	}
@@ -58,7 +58,7 @@ func (p *Page) Rectangle(x, y, width, height float64) {
 
 // MoveToArc appends a circular arc to the current path,
 // starting a new subpath.
-func (p *Page) MoveToArc(x, y, radius, startAngle, endAngle float64) {
+func (p *Writer) MoveToArc(x, y, radius, startAngle, endAngle float64) {
 	if !p.valid("MoveToArc", objPage, objPath) {
 		return
 	}
@@ -67,7 +67,7 @@ func (p *Page) MoveToArc(x, y, radius, startAngle, endAngle float64) {
 
 // LineToArc appends a circular arc to the current subpath,
 // connecting the arc to the previous point with a straight line.
-func (p *Page) LineToArc(x, y, radius, startAngle, endAngle float64) {
+func (p *Writer) LineToArc(x, y, radius, startAngle, endAngle float64) {
 	if !p.valid("LineToArc", objPath) {
 		return
 	}
@@ -75,7 +75,7 @@ func (p *Page) LineToArc(x, y, radius, startAngle, endAngle float64) {
 }
 
 // arc appends a circular path to the current path.
-func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
+func (p *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 	p.currentObject = objPath
 
 	// also see https://www.tinaja.com/glib/bezcirc2.pdf
@@ -109,13 +109,13 @@ func (p *Page) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 }
 
 // Circle appends a circle to the current path, as a closed subpath.
-func (p *Page) Circle(x, y, radius float64) {
+func (p *Writer) Circle(x, y, radius float64) {
 	p.MoveToArc(x, y, radius, 0, 2*math.Pi)
 	p.ClosePath()
 }
 
 // ClosePath closes the current subpath.
-func (p *Page) ClosePath() {
+func (p *Writer) ClosePath() {
 	if !p.valid("ClosePath", objPath) {
 		return
 	}
@@ -123,7 +123,7 @@ func (p *Page) ClosePath() {
 }
 
 // Stroke strokes the current path.
-func (p *Page) Stroke() {
+func (p *Writer) Stroke() {
 	if !p.valid("Stroke", objPath, objClippingPath) {
 		return
 	}
@@ -132,7 +132,7 @@ func (p *Page) Stroke() {
 }
 
 // CloseAndStroke closes and strokes the current path.
-func (p *Page) CloseAndStroke() {
+func (p *Writer) CloseAndStroke() {
 	if !p.valid("CloseAndStroke", objPath, objClippingPath) {
 		return
 	}
@@ -142,7 +142,7 @@ func (p *Page) CloseAndStroke() {
 
 // Fill fills the current path, using the nonzero winding number rule.  Any
 // subpaths that are open are implicitly closed before being filled.
-func (p *Page) Fill() {
+func (p *Writer) Fill() {
 	if !p.valid("Fill", objPath, objClippingPath) {
 		return
 	}
@@ -152,7 +152,7 @@ func (p *Page) Fill() {
 
 // FillEvenOdd fills the current path, using the even-odd rule.  Any
 // subpaths that are open are implicitly closed before being filled.
-func (p *Page) FillEvenOdd() {
+func (p *Writer) FillEvenOdd() {
 	if !p.valid("FillEvenOdd", objPath, objClippingPath) {
 		return
 	}
@@ -162,7 +162,7 @@ func (p *Page) FillEvenOdd() {
 
 // FillAndStroke fills and strokes the current path.  Any subpaths that are
 // open are implicitly closed before being filled.
-func (p *Page) FillAndStroke() {
+func (p *Writer) FillAndStroke() {
 	if !p.valid("FillAndStroke", objPath, objClippingPath) {
 		return
 	}
@@ -172,7 +172,7 @@ func (p *Page) FillAndStroke() {
 
 // EndPath ends the path without filling and stroking it.
 // This is for use after the [Page.ClipNonZero] and [Page.ClipEvenOdd] methods.
-func (p *Page) EndPath() {
+func (p *Writer) EndPath() {
 	if !p.valid("EndPath", objPath, objClippingPath) {
 		return
 	}
@@ -182,7 +182,7 @@ func (p *Page) EndPath() {
 
 // ClipNonZero sets the current clipping path using the nonzero winding number
 // rule.
-func (p *Page) ClipNonZero() {
+func (p *Writer) ClipNonZero() {
 	if !p.valid("ClipNonZero", objPath) {
 		return
 	}
@@ -191,7 +191,7 @@ func (p *Page) ClipNonZero() {
 }
 
 // ClipEvenOdd sets the current clipping path using the even-odd rule.
-func (p *Page) ClipEvenOdd() {
+func (p *Writer) ClipEvenOdd() {
 	if !p.valid("ClipEvenOdd", objPath) {
 		return
 	}

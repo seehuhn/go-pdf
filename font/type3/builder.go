@@ -54,8 +54,7 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 	f.numOpen++
 
 	buf := &bytes.Buffer{}
-	page := graphics.NewPage(buf, pdf.V1_7) // TODO(voss): what to use as the PDF version here?
-	page.State.Set = graphics.StateCTM
+	page := graphics.NewWriter(buf, pdf.V1_7) // TODO(voss): what to use as the PDF version here?
 	page.Resources = f.Resources
 
 	if shapeOnly {
@@ -67,7 +66,7 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 	}
 
 	g := &GlyphBuilder{
-		Page:   page,
+		Writer: page,
 		name:   name,
 		widthX: widthX,
 		bbox:   bbox,
@@ -80,7 +79,7 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 // 9.6.5 of PDF 32000-1:2008.  The .Close() method must be called after
 // the description has been written.
 type GlyphBuilder struct {
-	*graphics.Page
+	*graphics.Writer
 	name   string
 	widthX funit.Int16
 	bbox   funit.Rect16

@@ -44,7 +44,7 @@ func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOption
 func singlePage(w pdf.Putter, pageSize *pdf.Rectangle) (*Page, error) {
 	tree := pagetree.NewWriter(w)
 
-	page := graphics.NewPage(&bytes.Buffer{}, pdf.GetVersion(w))
+	page := graphics.NewWriter(&bytes.Buffer{}, pdf.GetVersion(w))
 
 	pageDict := pdf.Dict{
 		"Type": pdf.Name("Page"),
@@ -54,7 +54,7 @@ func singlePage(w pdf.Putter, pageSize *pdf.Rectangle) (*Page, error) {
 	}
 
 	p := &Page{
-		Page:     page,
+		Writer:   page,
 		PageDict: pageDict,
 		Out:      w,
 		tree:     tree,

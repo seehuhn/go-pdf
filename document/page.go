@@ -30,7 +30,7 @@ import (
 // The contents of the page can be drawn using the [graphics.Page] methods.
 type Page struct {
 	// Page is used to draw the contents of the page.
-	*graphics.Page
+	*graphics.Writer
 
 	// PageDict is the PDF dictionary for this page.
 	// This can be modified by the user.  The values at the time
@@ -63,8 +63,8 @@ func (p *Page) GetPageSize() *pdf.Rectangle {
 // Close writes the page to the PDF file.
 // The page contents can no longer be modified after this call.
 func (p *Page) Close() error {
-	if p.Page.Err != nil {
-		return p.Page.Err
+	if p.Writer.Err != nil {
+		return p.Writer.Err
 	}
 	if p.PageDict["MediaBox"] == nil || p.PageDict["MediaBox"] == (*pdf.Rectangle)(nil) {
 		return errors.New("page size not set")
@@ -75,7 +75,7 @@ func (p *Page) Close() error {
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(stream, p.Page.Content.(*bytes.Buffer))
+	_, err = io.Copy(stream, p.Writer.Content.(*bytes.Buffer))
 	if err != nil {
 		return err
 	}
@@ -84,11 +84,11 @@ func (p *Page) Close() error {
 		return err
 	}
 	p.PageDict["Contents"] = contentRef
-	p.PageDict["Resources"] = pdf.AsDict(p.Page.Resources)
+	p.PageDict["Resources"] = pdf.AsDict(p.Writer.Resources)
 
 	// Disable the page, since it cannot be modified anymore.
-	p.Page.Content = nil
-	p.Page = nil
+	p.Writer.Content = nil
+	p.Writer = nil
 
 	ref := p.Ref
 	if ref == 0 {

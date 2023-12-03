@@ -18,9 +18,29 @@ package graphics
 
 import (
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 )
+
+// SetExtGState sets selected graphics state parameters.
+//
+// This implements the "gs" graphics operator.
+func (p *Writer) SetExtGState(s *ExtGState) {
+	if !p.valid("SetExtGState", objPage, objText) {
+		return
+	}
+
+	s.ApplyTo(&p.State)
+
+	name := p.getResourceName(catExtGState, s)
+	err := name.PDF(p.Content)
+	if err != nil {
+		p.Err = err
+		return
+	}
+	_, p.Err = fmt.Fprintln(p.Content, " gs")
+}
 
 // ExtGState represents a combination of graphics state parameters.
 // This combination of parameters can be set using the [Page.SetExtGState] method.
@@ -30,13 +50,400 @@ type ExtGState struct {
 	Value   State
 }
 
-// MakeExtGState creates a new ExtGState object.
-func MakeExtGState(s State, defaultName string) *ExtGState {
+// NewExtGState creates a new ExtGState object.
+func NewExtGState(s State, defaultName string) *ExtGState {
+	set := s.Set
+
+	dict := pdf.Dict{}
+	// Build a graphics state parameter dictionary for the given state.
+	// See table 57 in ISO 32000-2:2020.
+	if set&StateFont != 0 {
+		// TODO(voss): verify that the font is given as a reference?
+		dict["Font"] = pdf.Array{
+			s.Font.PDFObject(),
+			pdf.Number(s.FontSize),
+		}
+	}
+	if set&StateTextKnockout != 0 {
+		dict["TK"] = pdf.Boolean(s.TextKnockout)
+	}
+	if set&StateLineWidth != 0 {
+		dict["LW"] = pdf.Number(s.LineWidth)
+	}
+	if set&StateLineCap != 0 {
+		dict["LC"] = pdf.Integer(s.LineCap)
+	}
+	if set&StateLineJoin != 0 {
+		dict["LJ"] = pdf.Integer(s.LineJoin)
+	}
+	if set&StateMiterLimit != 0 {
+		dict["ML"] = pdf.Number(s.MiterLimit)
+	}
+	if set&StateDash != 0 {
+		pat := make(pdf.Array, len(s.DashPattern))
+		for i, x := range s.DashPattern {
+			pat[i] = pdf.Number(x)
+		}
+		dict["D"] = pdf.Array{
+			pat,
+			pdf.Number(s.DashPhase),
+		}
+	}
+	if set&StateRenderingIntent != 0 {
+		dict["RI"] = s.RenderingIntent
+	}
+	if set&StateStrokeAdjustment != 0 {
+		dict["SA"] = pdf.Boolean(s.StrokeAdjustment)
+	}
+	if set&StateBlendMode != 0 {
+		dict["BM"] = s.BlendMode
+	}
+	if set&StateSoftMask != 0 {
+		dict["SMask"] = s.SoftMask
+	}
+	if set&StateStrokeAlpha != 0 {
+		dict["CA"] = pdf.Number(s.StrokeAlpha)
+	}
+	if set&StateFillAlpha != 0 {
+		dict["ca"] = pdf.Number(s.FillAlpha)
+	}
+	if set&StateAlphaSourceFlag != 0 {
+		dict["AIS"] = pdf.Boolean(s.AlphaSourceFlag)
+	}
+	if set&StateBlackPointCompensation != 0 {
+		dict["UseBlackPtComp"] = s.BlackPointCompensation
+	}
+
+	if set&StateOverprint != 0 {
+		dict["OP"] = pdf.Boolean(s.OverprintStroke)
+		if s.OverprintFill != s.OverprintStroke {
+			dict["op"] = pdf.Boolean(s.OverprintFill)
+		}
+	}
+	if set&StateOverprintMode != 0 {
+		dict["OPM"] = pdf.Integer(s.OverprintMode)
+	}
+	if set&StateBlackGeneration != 0 {
+		if _, isName := s.BlackGeneration.(pdf.Name); isName {
+			dict["BG2"] = s.BlackGeneration
+		} else {
+			dict["BG"] = s.BlackGeneration
+		}
+	}
+	if set&StateUndercolorRemoval != 0 {
+		if _, isName := s.UndercolorRemoval.(pdf.Name); isName {
+			dict["UCR2"] = s.UndercolorRemoval
+		} else {
+			dict["UCR"] = s.UndercolorRemoval
+		}
+	}
+	if set&StateTransferFunction != 0 {
+		if _, isName := s.TransferFunction.(pdf.Name); isName {
+			dict["TR2"] = s.TransferFunction
+		} else {
+			dict["TR"] = s.TransferFunction
+		}
+	}
+	if set&StateHalftone != 0 {
+		dict["HT"] = s.Halftone
+	}
+	if set&StateHalftoneOrigin != 0 {
+		dict["HTO"] = pdf.Array{
+			pdf.Number(s.HalftoneOriginX),
+			pdf.Number(s.HalftoneOriginY),
+		}
+	}
+	if set&StateFlatnessTolerance != 0 {
+		dict["FL"] = pdf.Number(s.FlatnessTolerance)
+	}
+	if set&StateSmoothnessTolerance != 0 {
+		dict["SM"] = pdf.Number(s.SmoothnessTolerance)
+	}
+
 	return &ExtGState{
 		DefName: pdf.Name(defaultName),
-		Dict:    ExtGStateDict(s),
-		Value:   s,
+		Dict:    dict,
+		Value: State{
+			Parameters: s.Parameters.Clone(),
+			Set:        set & extStateBits,
+		},
 	}
+}
+
+// ReadExtGState reads an graphics state parameter dictionary from a PDF file.
+func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*ExtGState, error) {
+	dict, err := pdf.GetDictTyped(r, ref, "ExtGState")
+	if err != nil {
+		return nil, err
+	}
+
+	param := &Parameters{}
+	var set StateBits
+	var overprintFillSet bool
+	var bg1, bg2 pdf.Object
+	var ucr1, ucr2 pdf.Object
+	var tr1, tr2 pdf.Object
+	for key, v := range dict {
+		switch key {
+		case "Font":
+			a, err := pdf.GetArray(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if len(a) != 2 {
+				break
+			}
+			ref, ok := a[0].(pdf.Reference)
+			if !ok {
+				break
+			}
+			size, err := pdf.GetNumber(r, a[1])
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.Font = Res{Ref: ref}
+			param.FontSize = float64(size)
+		case "TK":
+			val, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.TextKnockout = bool(val)
+			set |= StateTextKnockout
+		case "LW":
+			lw, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.LineWidth = float64(lw)
+			set |= StateLineWidth
+		case "LC":
+			lc, err := pdf.GetInteger(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.LineCap = LineCapStyle(lc)
+			set |= StateLineCap
+		case "LJ":
+			lj, err := pdf.GetInteger(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.LineJoin = LineJoinStyle(lj)
+			set |= StateLineJoin
+		case "ML":
+			ml, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.MiterLimit = float64(ml)
+			set |= StateMiterLimit
+		case "D":
+			dashPattern, phase, err := readDash(r, v)
+			if err != nil {
+				return nil, err
+			} else if dashPattern != nil {
+				param.DashPattern = dashPattern
+				param.DashPhase = phase
+				set |= StateDash
+			}
+		case "RI":
+			ri, err := pdf.GetName(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.RenderingIntent = ri
+			set |= StateRenderingIntent
+		case "SA":
+			val, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.StrokeAdjustment = bool(val)
+			set |= StateStrokeAdjustment
+		case "BM":
+			param.BlendMode = v
+			set |= StateBlendMode
+		case "SMask":
+			param.SoftMask = v
+			set |= StateSoftMask
+		case "CA":
+			ca, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.StrokeAlpha = float64(ca)
+			set |= StateStrokeAlpha
+		case "ca":
+			ca, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.FillAlpha = float64(ca)
+			set |= StateFillAlpha
+		case "AIS":
+			ais, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.AlphaSourceFlag = bool(ais)
+			set |= StateAlphaSourceFlag
+		case "UseBlackPtComp":
+			val, err := pdf.GetName(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.BlackPointCompensation = val
+			set |= StateBlackPointCompensation
+		case "OP":
+			op, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.OverprintStroke = bool(op)
+			set |= StateOverprint
+		case "op":
+			op, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.OverprintFill = bool(op)
+			set |= StateOverprint
+			overprintFillSet = true
+		case "OPM":
+			opm, err := pdf.GetInteger(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if opm != 0 {
+				param.OverprintMode = 1
+			}
+			set |= StateOverprintMode
+		case "BG":
+			bg1 = v
+		case "BG2":
+			bg2 = v
+		case "UCR":
+			ucr1 = v
+		case "UCR2":
+			ucr2 = v
+		case "TR":
+			tr1 = v
+		case "TR2":
+			tr2 = v
+		case "HT":
+			param.Halftone = v
+			set |= StateHalftone
+		case "HTO":
+			a, err := pdf.GetArray(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if len(a) != 2 {
+				break
+			}
+			x, err := pdf.GetNumber(r, a[0])
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			y, err := pdf.GetNumber(r, a[1])
+			if pdf.IsMalformed(err) {
+				break
+			}
+			param.HalftoneOriginX = float64(x)
+			param.HalftoneOriginY = float64(y)
+			set |= StateHalftoneOrigin
+		case "FL":
+			fl, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.FlatnessTolerance = float64(fl)
+			set |= StateFlatnessTolerance
+		case "SM":
+			sm, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.SmoothnessTolerance = float64(sm)
+			set |= StateSmoothnessTolerance
+		}
+	}
+
+	if set&StateOverprint != 0 && !overprintFillSet {
+		param.OverprintFill = param.OverprintStroke
+	}
+	if bg2 != nil {
+		param.BlackGeneration = bg2
+		set |= StateBlackGeneration
+	} else if bg1 != nil {
+		param.BlackGeneration = bg1
+		set |= StateBlackGeneration
+	}
+	if ucr2 != nil {
+		param.UndercolorRemoval = ucr2
+		set |= StateUndercolorRemoval
+	} else if ucr1 != nil {
+		param.UndercolorRemoval = ucr1
+		set |= StateUndercolorRemoval
+	}
+	if tr2 != nil {
+		param.TransferFunction = tr2
+		set |= StateTransferFunction
+	} else if tr1 != nil {
+		param.TransferFunction = tr1
+		set |= StateTransferFunction
+	}
+
+	res := &ExtGState{
+		DefName: defaultName,
+		Dict:    ref,
+		Value: State{
+			Parameters: param,
+			Set:        set,
+		},
+	}
+	return res, nil
 }
 
 // DefaultName returns the default name for this resource.
@@ -50,215 +457,91 @@ func (s *ExtGState) PDFObject() pdf.Object {
 	return s.Dict
 }
 
-// SetExtGState sets selected graphics state parameters.
+// ApplyTo applies the graphics state parameters to the given state.
 //
-// This implements the "gs" graphics operator.
-func (p *Page) SetExtGState(s *ExtGState) {
-	if !p.valid("SetExtGState", objPage, objText) {
-		return
-	}
+// TODO(voss): unexport this method.
+func (s *ExtGState) ApplyTo(other *State) {
+	set := s.Value.Set
+	param := s.Value.Parameters
 
-	p.State.Update(s.Value)
-
-	name := p.getResourceName(catExtGState, s)
-	err := name.PDF(p.Content)
-	if err != nil {
-		p.Err = err
-		return
-	}
-	_, p.Err = fmt.Fprintln(p.Content, " gs")
-}
-
-// ExtGStateDict returns a graphics state parameter dictionary for the given state.
-// See table 57 in ISO 32000-2:2020.
-func ExtGStateDict(s State) pdf.Dict {
-	res := pdf.Dict{}
-	set := s.Set
-	if set&StateLineWidth != 0 {
-		res["LW"] = pdf.Number(s.LineWidth)
-	}
-	if set&StateLineCap != 0 {
-		res["LC"] = pdf.Integer(s.LineCap)
-	}
-	if set&StateLineJoin != 0 {
-		res["LJ"] = pdf.Integer(s.LineJoin)
-	}
-	if set&StateMiterLimit != 0 {
-		res["ML"] = pdf.Number(s.MiterLimit)
-	}
-	if set&StateDash != 0 {
-		pat := make(pdf.Array, len(s.DashPattern))
-		for i, x := range s.DashPattern {
-			pat[i] = pdf.Number(x)
-		}
-		res["D"] = pdf.Array{
-			pat,
-			pdf.Number(s.DashPhase),
-		}
-	}
-	if set&StateRenderingIntent != 0 {
-		res["RI"] = s.RenderingIntent
-	}
-	if set&StateOverprint != 0 {
-		res["OP"] = pdf.Boolean(s.OverprintStroke)
-		if s.OverprintFill != s.OverprintStroke {
-			res["op"] = pdf.Boolean(s.OverprintFill)
-		}
-	}
-	if set&StateOverprintMode != 0 {
-		res["OPM"] = pdf.Integer(s.OverprintMode)
-	}
+	other.Set |= set
+	otherParam := other.Parameters
 	if set&StateFont != 0 {
-		res["Font"] = pdf.Array{
-			s.Font.PDFObject(),
-			pdf.Number(s.FontSize),
-		}
-	}
-
-	// TODO(voss): black generation
-	// TODO(voss): undercolor removal
-	// TODO(voss): transfer function
-	// TODO(voss): halftone
-
-	if set&StateFlatnessTolerance != 0 {
-		res["FL"] = pdf.Number(s.FlatnessTolerance)
-	}
-	if set&StateSmoothnessTolerance != 0 {
-		res["SM"] = pdf.Number(s.SmoothnessTolerance)
-	}
-	if set&StateStrokeAdjustment != 0 {
-		res["SA"] = pdf.Boolean(s.StrokeAdjustment)
-	}
-	if set&StateBlendMode != 0 {
-		res["BM"] = s.BlendMode
-	}
-	if set&StateSoftMask != 0 {
-		res["SMask"] = s.SoftMask
-	}
-	if set&StateStrokeAlpha != 0 {
-		res["CA"] = pdf.Number(s.StrokeAlpha)
-	}
-	if set&StateFillAlpha != 0 {
-		res["ca"] = pdf.Number(s.FillAlpha)
-	}
-	if set&StateAlphaSourceFlag != 0 {
-		res["AIS"] = pdf.Boolean(s.AlphaSourceFlag)
+		otherParam.Font = param.Font
+		otherParam.FontSize = param.FontSize
 	}
 	if set&StateTextKnockout != 0 {
-		res["TK"] = pdf.Boolean(s.TextKnockout)
+		otherParam.TextKnockout = param.TextKnockout
+	}
+	if set&StateLineWidth != 0 {
+		otherParam.LineWidth = param.LineWidth
+	}
+	if set&StateLineCap != 0 {
+		otherParam.LineCap = param.LineCap
+	}
+	if set&StateLineJoin != 0 {
+		otherParam.LineJoin = param.LineJoin
+	}
+	if set&StateMiterLimit != 0 {
+		otherParam.MiterLimit = param.MiterLimit
+	}
+	if set&StateDash != 0 {
+		otherParam.DashPattern = slices.Clone(param.DashPattern)
+		otherParam.DashPhase = param.DashPhase
+	}
+	if set&StateRenderingIntent != 0 {
+		otherParam.RenderingIntent = param.RenderingIntent
+	}
+	if set&StateStrokeAdjustment != 0 {
+		otherParam.StrokeAdjustment = param.StrokeAdjustment
+	}
+	if set&StateBlendMode != 0 {
+		otherParam.BlendMode = param.BlendMode
+	}
+	if set&StateSoftMask != 0 {
+		otherParam.SoftMask = param.SoftMask
+	}
+	if set&StateStrokeAlpha != 0 {
+		otherParam.StrokeAlpha = param.StrokeAlpha
+	}
+	if set&StateFillAlpha != 0 {
+		otherParam.FillAlpha = param.FillAlpha
+	}
+	if set&StateAlphaSourceFlag != 0 {
+		otherParam.AlphaSourceFlag = param.AlphaSourceFlag
 	}
 	if set&StateBlackPointCompensation != 0 {
-		res["UseBlackPtComp"] = s.BlackPointCompensation
+		otherParam.BlackPointCompensation = param.BlackPointCompensation
 	}
-	// TODO(voss): HTO
-
-	return res
-}
-
-// ReadDict reads an graphics state parameter dictionary from a PDF file.
-func ReadDict(r pdf.Getter, ref pdf.Object) (State, error) {
-	dict, err := pdf.GetDictTyped(r, ref, "ExtGState")
-	if err != nil {
-		return State{}, err
+	if set&StateOverprint != 0 {
+		otherParam.OverprintStroke = param.OverprintStroke
+		otherParam.OverprintFill = param.OverprintFill
 	}
-
-	s := &Parameters{}
-	var set StateBits
-	var overprintFillSet bool
-	for key, v := range dict {
-		switch key {
-		case "LW":
-			lw, err := pdf.GetNumber(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			s.LineWidth = float64(lw)
-			set |= StateLineWidth
-		case "LC":
-			lc, err := pdf.GetInteger(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			s.LineCap = LineCapStyle(lc)
-			set |= StateLineCap
-		case "LJ":
-			lj, err := pdf.GetInteger(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			s.LineJoin = LineJoinStyle(lj)
-			set |= StateLineJoin
-		case "ML":
-			ml, err := pdf.GetNumber(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			s.MiterLimit = float64(ml)
-			set |= StateMiterLimit
-		case "D":
-			dashPattern, phase, err := readDash(r, v)
-			if err != nil {
-				return State{}, err
-			} else if dashPattern != nil {
-				s.DashPattern = dashPattern
-				s.DashPhase = phase
-				set |= StateDash
-			}
-		case "RI":
-			ri, err := pdf.GetName(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			s.RenderingIntent = ri
-			set |= StateRenderingIntent
-		case "OP":
-			op, err := pdf.GetBoolean(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			s.OverprintStroke = bool(op)
-			set |= StateOverprint
-		case "op":
-			op, err := pdf.GetBoolean(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			s.OverprintFill = bool(op)
-			set |= StateOverprint
-			overprintFillSet = true
-		case "OPM":
-			opm, err := pdf.GetInteger(r, v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return State{}, err
-			}
-			if opm != 0 {
-				s.OverprintMode = 1
-			}
-			set |= StateOverprintMode
-		case "Font":
-			panic("not implemented")
-		}
+	if set&StateOverprintMode != 0 {
+		otherParam.OverprintMode = param.OverprintMode
 	}
-	if set&StateOverprint != 0 && !overprintFillSet {
-		s.OverprintFill = s.OverprintStroke
+	if set&StateBlackGeneration != 0 {
+		otherParam.BlackGeneration = param.BlackGeneration
 	}
-	return State{s, set}, nil
+	if set&StateUndercolorRemoval != 0 {
+		otherParam.UndercolorRemoval = param.UndercolorRemoval
+	}
+	if set&StateTransferFunction != 0 {
+		otherParam.TransferFunction = param.TransferFunction
+	}
+	if set&StateHalftone != 0 {
+		otherParam.Halftone = param.Halftone
+	}
+	if set&StateHalftoneOrigin != 0 {
+		otherParam.HalftoneOriginX = param.HalftoneOriginX
+		otherParam.HalftoneOriginY = param.HalftoneOriginY
+	}
+	if set&StateFlatnessTolerance != 0 {
+		otherParam.FlatnessTolerance = param.FlatnessTolerance
+	}
+	if set&StateSmoothnessTolerance != 0 {
+		otherParam.SmoothnessTolerance = param.SmoothnessTolerance
+	}
 }
 
 func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err error) {
@@ -272,12 +555,15 @@ func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err erro
 	if len(a) != 2 { // either error or malformed
 		return nil, 0, err
 	}
+	return readDash2(r, a[0], a[1])
+}
 
-	dashPattern, err := pdf.GetArray(r, a[0])
+func readDash2(r pdf.Getter, a0, a1 pdf.Object) (pat []float64, ph float64, err error) {
+	dashPattern, err := pdf.GetArray(r, a0)
 	if err != nil {
 		return nil, 0, err
 	}
-	phase, err := pdf.GetNumber(r, a[1])
+	phase, err := pdf.GetNumber(r, a1)
 	if err != nil {
 		return nil, 0, err
 	}

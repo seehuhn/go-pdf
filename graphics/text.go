@@ -28,11 +28,11 @@ import (
 )
 
 // TextStart starts a new text object.
-func (p *Page) TextStart() {
+func (p *Writer) TextStart() {
 	if !p.valid("TextStart", objPage) {
 		return
 	}
-	p.qtNesting = append(p.qtNesting, 't')
+	p.nesting = append(p.nesting, pairTypeBT)
 
 	p.currentObject = objText
 	p.State.Tm = IdentityMatrix
@@ -41,15 +41,15 @@ func (p *Page) TextStart() {
 }
 
 // TextEnd ends the current text object.
-func (p *Page) TextEnd() {
+func (p *Writer) TextEnd() {
 	if !p.valid("TextEnd", objText) {
 		return
 	}
-	if len(p.qtNesting) == 0 || p.qtNesting[len(p.qtNesting)-1] != 't' {
+	if len(p.nesting) == 0 || p.nesting[len(p.nesting)-1] != pairTypeBT {
 		p.Err = errors.New("TextEnd without TextStart")
 		return
 	}
-	p.qtNesting = p.qtNesting[:len(p.qtNesting)-1]
+	p.nesting = p.nesting[:len(p.nesting)-1]
 
 	p.currentObject = objPage
 	_, p.Err = fmt.Fprintln(p.Content, "ET")
@@ -59,7 +59,7 @@ func (p *Page) TextEnd() {
 //
 // TODO(voss): Instead of font.Embedded, use only information which can
 // be extracted from a PDF file?
-func (p *Page) TextSetFont(font font.Embedded, size float64) {
+func (p *Writer) TextSetFont(font font.Embedded, size float64) {
 	if !p.valid("TextSetFont", objText, objPage) {
 		return
 	}
@@ -83,7 +83,7 @@ func (p *Page) TextSetFont(font font.Embedded, size float64) {
 }
 
 // TextFirstLine moves to the start of the next line of text.
-func (p *Page) TextFirstLine(x, y float64) {
+func (p *Writer) TextFirstLine(x, y float64) {
 	if !p.valid("TextFirstLine", objText) {
 		return
 	}
@@ -92,7 +92,7 @@ func (p *Page) TextFirstLine(x, y float64) {
 
 // TextSecondLine moves to the start of the next line of text and sets
 // the leading.  Usually, dy is negative.
-func (p *Page) TextSecondLine(dx, dy float64) {
+func (p *Writer) TextSecondLine(dx, dy float64) {
 	if !p.valid("TextSecondLine", objText) {
 		return
 	}
@@ -100,7 +100,7 @@ func (p *Page) TextSecondLine(dx, dy float64) {
 }
 
 // TextNextLine moves to the start of the next line of text.
-func (p *Page) TextNextLine() {
+func (p *Writer) TextNextLine() {
 	if !p.valid("TextNewLine", objText) {
 		return
 	}
@@ -109,13 +109,13 @@ func (p *Page) TextNextLine() {
 
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.
-func (p *Page) TextLayout(s string) glyph.Seq {
+func (p *Writer) TextLayout(s string) glyph.Seq {
 	st := p.State
 	return st.Font.(font.Embedded).Layout(s, st.FontSize)
 }
 
 // TextShow draws a string.
-func (p *Page) TextShow(s string) float64 {
+func (p *Writer) TextShow(s string) float64 {
 	if !p.valid("TextShow", objText) {
 		return 0
 	}
@@ -131,7 +131,7 @@ func (p *Page) TextShow(s string) float64 {
 // The beginning is aligned in a space of width w.
 // q=0 means left alignment, q=1 means right alignment
 // and q=0.5 means center alignment.
-func (p *Page) TextShowAligned(s string, w, q float64) {
+func (p *Writer) TextShowAligned(s string, w, q float64) {
 	if !p.valid("TextShowAligned", objText) {
 		return
 	}
@@ -143,7 +143,7 @@ func (p *Page) TextShowAligned(s string, w, q float64) {
 }
 
 // TextShowGlyphs draws a sequence of glyphs.
-func (p *Page) TextShowGlyphs(gg glyph.Seq) float64 {
+func (p *Writer) TextShowGlyphs(gg glyph.Seq) float64 {
 	if !p.valid("TextShowGlyphs", objText) {
 		return 0
 	}
@@ -156,7 +156,7 @@ func (p *Page) TextShowGlyphs(gg glyph.Seq) float64 {
 }
 
 // TextShowGlyphsAligned draws a sequence of glyphs and aligns it.
-func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
+func (p *Writer) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 	if !p.valid("TextShowGlyphsAligned", objText) {
 		return
 	}
@@ -167,7 +167,7 @@ func (p *Page) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 	p.showGlyphsAligned(gg, w, q)
 }
 
-func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
+func (p *Writer) showGlyphsAligned(gg glyph.Seq, w, q float64) {
 	geom := p.State.Font.(font.Embedded).GetGeometry()
 	total := geom.ToPDF(p.State.FontSize, gg.AdvanceWidth())
 	delta := w - total
@@ -181,10 +181,12 @@ func (p *Page) showGlyphsAligned(gg glyph.Seq, w, q float64) {
 	p.showGlyphsWithMargins(gg, left*1000/p.State.FontSize, right*1000/p.State.FontSize)
 }
 
-func (p *Page) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 {
+func (p *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 {
 	if len(gg) == 0 {
 		return 0
 	}
+
+	// TODO(voss): Update p.Tm
 
 	var run pdf.String
 	var out pdf.Array

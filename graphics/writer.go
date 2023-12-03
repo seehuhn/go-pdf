@@ -24,8 +24,8 @@ import (
 	"seehuhn.de/go/pdf/internal/float"
 )
 
-// Page represents a PDF content stream.
-type Page struct {
+// Writer writes a PDF content stream.
+type Writer struct {
 	Version   pdf.Version
 	Content   io.Writer
 	Resources *pdf.Resources
@@ -36,12 +36,20 @@ type Page struct {
 	State
 	stack []State
 
-	// TODO(voss): https://github.com/pdf-association/pdf-issues/issues/302
-	qtNesting []byte // nesting of q/Q with BT/ET operators, entries are 'q' or 't'
+	nesting []pairType
 
 	resName  map[catRes]pdf.Name
 	nameUsed map[catName]struct{}
 }
+
+type pairType byte
+
+const (
+	pairTypeQ   pairType = iota + 1 // q ... Q
+	pairTypeBT                      // BT ... ET
+	pairTypeBMC                     // BMC ... EMC and BDC ... EMC
+	pairTypeBX                      // BX ... EX
+)
 
 type catRes struct {
 	cat resourceCategory
@@ -53,9 +61,9 @@ type catName struct {
 	name pdf.Name
 }
 
-// NewPage allocates a new Page object.
-func NewPage(w io.Writer, v pdf.Version) *Page {
-	return &Page{
+// NewWriter allocates a new Writer object.
+func NewWriter(w io.Writer, v pdf.Version) *Writer {
+	return &Writer{
 		Version:       v,
 		Content:       w,
 		Resources:     &pdf.Resources{},
@@ -68,7 +76,7 @@ func NewPage(w io.Writer, v pdf.Version) *Page {
 	}
 }
 
-func (p *Page) coord(x float64) string {
+func (p *Writer) coord(x float64) string {
 	// TODO(voss): Think about this some more.  Once we track the current
 	// transformation matrix, we can use this to determine the number of digits
 	// to keep.
@@ -117,7 +125,7 @@ const (
 // GetResourceName returns the name of a resource.
 // A new name is generated, if necessary, and the resource is added to the
 // resource dictionary for the category.
-func (p *Page) getResourceName(category resourceCategory, r Resource) pdf.Name {
+func (p *Writer) getResourceName(category resourceCategory, r Resource) pdf.Name {
 	name, ok := p.resName[catRes{category, r}]
 	if ok {
 		return name
@@ -219,7 +227,7 @@ func (s objectType) String() string {
 
 // valid returns true, if the current graphics object is one of the given types.
 // Otherwise it sets p.Err and returns false.
-func (p *Page) valid(cmd string, ss ...objectType) bool {
+func (p *Writer) valid(cmd string, ss ...objectType) bool {
 	if p.Err != nil {
 		return false
 	}
@@ -235,7 +243,7 @@ func (p *Page) valid(cmd string, ss ...objectType) bool {
 }
 
 // PushGraphicsState saves the current graphics state.
-func (p *Page) PushGraphicsState() {
+func (p *Writer) PushGraphicsState() {
 	var allowedStates []objectType
 	if p.Version >= pdf.V2_0 {
 		allowedStates = []objectType{objPage, objText}
@@ -246,8 +254,11 @@ func (p *Page) PushGraphicsState() {
 		return
 	}
 
-	p.stack = append(p.stack, p.State.Clone())
-	p.qtNesting = append(p.qtNesting, 'q')
+	p.stack = append(p.stack, State{
+		Parameters: p.State.Parameters.Clone(),
+		Set:        p.State.Set,
+	})
+	p.nesting = append(p.nesting, pairTypeQ)
 
 	_, err := fmt.Fprintln(p.Content, "q")
 	if p.Err == nil {
@@ -256,7 +267,7 @@ func (p *Page) PushGraphicsState() {
 }
 
 // PopGraphicsState restores the previous graphics state.
-func (p *Page) PopGraphicsState() {
+func (p *Writer) PopGraphicsState() {
 	var allowedStates []objectType
 	if p.Version >= pdf.V2_0 {
 		allowedStates = []objectType{objPage, objText}
@@ -267,11 +278,11 @@ func (p *Page) PopGraphicsState() {
 		return
 	}
 
-	if len(p.qtNesting) == 0 || p.qtNesting[len(p.qtNesting)-1] != 'q' {
+	if len(p.nesting) == 0 || p.nesting[len(p.nesting)-1] != pairTypeQ {
 		p.Err = fmt.Errorf("PopGraphicsState: no matching PushGraphicsState")
 		return
 	}
-	p.qtNesting = p.qtNesting[:len(p.qtNesting)-1]
+	p.nesting = p.nesting[:len(p.nesting)-1]
 
 	n := len(p.stack) - 1
 	savedState := p.stack[n]
@@ -285,6 +296,6 @@ func (p *Page) PopGraphicsState() {
 }
 
 // isSet returns true, if all of the given fields in the graphics state are set.
-func (p *Page) isSet(bits StateBits) bool {
+func (p *Writer) isSet(bits StateBits) bool {
 	return p.State.Set&bits == bits
 }

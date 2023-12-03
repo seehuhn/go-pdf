@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package scanner
 
 import (
 	"errors"
@@ -61,7 +61,7 @@ func NewScanner() *Scanner {
 //
 // The []pdf.Object slice passed to the yield function is owned by the scanner
 // and is only valid until the yield returns.
-func (s *Scanner) Scan(r io.Reader) func(yield func(string, []pdf.Object) bool) bool {
+func (s *Scanner) Scan(r io.Reader) func(yield func(op string, args []pdf.Object) bool) bool {
 	iterate := func(yield func(string, []pdf.Object) bool) bool {
 		s.err = nil
 

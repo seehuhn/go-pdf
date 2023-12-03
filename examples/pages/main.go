@@ -58,7 +58,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewPage(stream, pdf.GetVersion(out))
+		g := graphics.NewWriter(stream, pdf.GetVersion(out))
 
 		g.TextStart()
 		g.TextSetFont(font, 12)
@@ -94,7 +94,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewPage(stream, pdf.GetVersion(out))
+		g := graphics.NewWriter(stream, pdf.GetVersion(out))
 
 		g.TextStart()
 		g.TextSetFont(font, 12)
@@ -126,7 +126,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewPage(stream, pdf.GetVersion(out))
+		g := graphics.NewWriter(stream, pdf.GetVersion(out))
 		if err != nil {
 			log.Fatal(err)
 		}

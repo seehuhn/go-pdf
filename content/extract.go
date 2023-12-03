@@ -67,11 +67,11 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 	}
 
 	var graphicsStack []graphics.State
-	g := graphics.NewState()
+	state := graphics.NewState()
 
 	decoders := make(map[graphics.Resource]func(pdf.String) string)
 	yield := func(ctx *Context, s pdf.String) error {
-		font := g.Parameters.Font
+		font := state.Parameters.Font
 		decoder, ok := decoders[font]
 		if !ok {
 			fontRef := font.PDFObject()
@@ -93,16 +93,19 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 		}
 
 		// TODO(voss): use graphics.Scanner
-		err = seq.foreachCommand(stm, func(cmd operator, args []pdf.Object) error {
-			switch cmd {
+		err = seq.foreachCommand(stm, func(op operator, args []pdf.Object) error {
+			switch op {
 
 			// == General graphics state =========================================
 
 			case "q":
-				graphicsStack = append(graphicsStack, g.Clone())
+				graphicsStack = append(graphicsStack, graphics.State{
+					Parameters: state.Parameters.Clone(),
+					Set:        state.Set,
+				})
 			case "Q":
 				if len(graphicsStack) > 0 {
-					g = graphicsStack[len(graphicsStack)-1]
+					state = graphicsStack[len(graphicsStack)-1]
 					graphicsStack = graphicsStack[:len(graphicsStack)-1]
 				}
 			case "cm": // Concatenate matrix to current transformation matrix
@@ -119,7 +122,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					}
 					m[i] = float64(f)
 				}
-				g.CTM = m.Mul(g.CTM) // TODO(voss): correct order?
+				state.CTM = m.Mul(state.CTM) // TODO(voss): correct order?
 			case "w": // Set line width
 				if len(args) < 1 {
 					break
@@ -130,7 +133,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				} else if err != nil {
 					return err
 				}
-				g.LineWidth = float64(f)
+				state.LineWidth = float64(f)
 			case "M": // Set miter limit
 				if len(args) < 1 {
 					break
@@ -139,7 +142,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if err != nil {
 					return err
 				}
-				g.MiterLimit = float64(f)
+				state.MiterLimit = float64(f)
 			case "gs": // Set parameters from graphics state parameter dictionary
 				if len(args) < 1 {
 					break
@@ -149,13 +152,13 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					break
 				}
 
-				newState, err := graphics.ReadDict(r, resources.ExtGState[name])
+				newState, err := graphics.ReadExtGState(r, resources.ExtGState[name], name)
 				if pdf.IsMalformed(err) {
 					break
 				} else if err != nil {
 					return err
 				}
-				g.Update(newState)
+				newState.ApplyTo(&state)
 
 			// == Special graphics state =========================================
 
@@ -236,8 +239,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 			// == Text objects ===================================================
 
 			case "BT": // Begin text object
-				g.Tm = graphics.IdentityMatrix
-				g.Tlm = graphics.IdentityMatrix
+				state.Tm = graphics.IdentityMatrix
+				state.Tlm = graphics.IdentityMatrix
 
 			case "ET": // End text object
 
@@ -251,7 +254,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if !ok {
 					break
 				}
-				g.Tc = Tc
+				state.Tc = Tc
 
 			case "Tf": // Set text font and size
 				if len(args) < 2 {
@@ -262,8 +265,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if !ok1 || !ok2 {
 					break
 				}
-				g.Font = getFont(name)
-				g.FontSize = size
+				state.Font = getFont(name)
+				state.FontSize = size
 
 			// == Text positioning ===============================================
 
@@ -277,8 +280,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					break
 				}
 
-				g.Tlm = graphics.Matrix{1, 0, 0, 1, tx, ty}.Mul(g.Tlm)
-				g.Tm = g.Tlm
+				state.Tlm = graphics.Matrix{1, 0, 0, 1, tx, ty}.Mul(state.Tlm)
+				state.Tm = state.Tlm
 
 			case "Tm": // Set text matrix and text line matrix
 				if len(args) < 6 {
@@ -292,8 +295,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					}
 					data[i] = x
 				}
-				g.Tm = data
-				g.Tlm = data
+				state.Tm = data
+				state.Tlm = data
 
 			// == Text showing ===================================================
 
@@ -306,7 +309,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					break
 				}
 
-				yield(&Context{resources, g}, s)
+				yield(&Context{resources, state}, s)
 
 				// TODO(voss): update g.Tm
 
@@ -322,7 +325,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				for _, frag := range arr {
 					switch frag := frag.(type) {
 					case pdf.String:
-						yield(&Context{resources, g}, frag)
+						yield(&Context{resources, state}, frag)
 					case pdf.Integer:
 					case pdf.Real:
 					case pdf.Number:
@@ -343,7 +346,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if !ok {
 					break
 				}
-				g.StrokeColor = color.Gray(gray)
+				state.StrokeColor = color.Gray(gray)
 
 			case "g": // nonstroking gray level
 				if len(args) < 1 {
@@ -353,7 +356,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if !ok {
 					break
 				}
-				g.FillColor = color.Gray(gray)
+				state.FillColor = color.Gray(gray)
 
 			case "RG": // nonstroking DeviceRGB color
 				if len(args) < 3 {
@@ -370,7 +373,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if blue, ok = getReal(args[2]); !ok {
 					break
 				}
-				g.StrokeColor = color.RGB(red, green, blue)
+				state.StrokeColor = color.RGB(red, green, blue)
 
 			case "rg": // nonstroking DeviceRGB color
 				if len(args) < 3 {
@@ -387,7 +390,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if blue, ok = getReal(args[2]); !ok {
 					break
 				}
-				g.FillColor = color.RGB(red, green, blue)
+				state.FillColor = color.RGB(red, green, blue)
 
 			case "K": // stroking DeviceCMYK color
 				if len(args) < 4 {
@@ -407,7 +410,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if black, ok = getReal(args[3]); !ok {
 					break
 				}
-				g.StrokeColor = color.CMYK(cyan, magenta, yellow, black)
+				state.StrokeColor = color.CMYK(cyan, magenta, yellow, black)
 
 			case "k": // nonstroking DeviceCMYK color
 				if len(args) < 4 {
@@ -427,7 +430,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if black, ok = getReal(args[3]); !ok {
 					break
 				}
-				g.FillColor = color.CMYK(cyan, magenta, yellow, black)
+				state.FillColor = color.CMYK(cyan, magenta, yellow, black)
 
 			// == Shading patterns ===============================================
 

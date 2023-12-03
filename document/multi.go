@@ -103,9 +103,9 @@ func (doc *MultiPage) Close() error {
 func (doc *MultiPage) AddPage() *Page {
 	doc.numOpen++
 
-	page := graphics.NewPage(&bytes.Buffer{}, pdf.GetVersion(doc.Out))
+	page := graphics.NewWriter(&bytes.Buffer{}, pdf.GetVersion(doc.Out))
 	return &Page{
-		Page: page,
+		Writer: page,
 		PageDict: pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"MediaBox": doc.mediaBox,
