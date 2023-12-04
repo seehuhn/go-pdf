@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/internal/float"
 )
@@ -121,7 +122,7 @@ func (p *Writer) SetMiterLimit(limit float64) {
 }
 
 // SetDashPattern sets the line dash pattern.
-func (p *Writer) SetDashPattern(phase float64, pattern ...float64) {
+func (p *Writer) SetDashPattern(pattern []float64, phase float64) {
 	if !p.valid("SetDashPattern", objPage, objText) {
 		return
 	}
@@ -148,9 +149,37 @@ func (p *Writer) SetDashPattern(phase float64, pattern ...float64) {
 		sep = " "
 	}
 	_, p.Err = fmt.Fprint(p.Content, "] ", float.Format(phase, 3), " d\n")
-	if p.Err != nil {
+}
+
+// SetRenderingIntent sets the rendering intent.
+func (p *Writer) SetRenderingIntent(intent pdf.Name) {
+	if !p.valid("SetRenderingIntent", objPage, objText) {
 		return
 	}
+	if p.isSet(StateRenderingIntent) && intent == p.RenderingIntent {
+		return
+	}
+	p.RenderingIntent = intent
+	p.Set |= StateRenderingIntent
+	err := intent.PDF(p.Content)
+	if err != nil {
+		p.Err = err
+		return
+	}
+	_, p.Err = fmt.Fprintln(p.Content, " ri")
+}
+
+// SetFlatness sets the flatness tolerance.
+func (p *Writer) SetFlatness(flatness float64) {
+	if !p.valid("SetFlatness", objPage, objText) {
+		return
+	}
+	if p.isSet(StateFlatnessTolerance) && nearlyEqual(flatness, p.FlatnessTolerance) {
+		return
+	}
+	p.FlatnessTolerance = flatness
+	p.Set |= StateFlatnessTolerance
+	_, p.Err = fmt.Fprintln(p.Content, float.Format(flatness, 3), "i")
 }
 
 func nearlyEqual(a, b float64) bool {

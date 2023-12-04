@@ -205,7 +205,7 @@ func NewState() State {
 	param.DashPattern = []float64{}
 	param.DashPhase = 0
 
-	param.RenderingIntent = pdf.Name("RelativeColorimetric")
+	param.RenderingIntent = RenderingIntentRelativeColorimetric
 	param.StrokeAdjustment = false
 	param.BlendMode = pdf.Name("Normal")
 	param.SoftMask = nil
@@ -326,4 +326,14 @@ const (
 	LineJoinMiter LineJoinStyle = 0
 	LineJoinRound LineJoinStyle = 1
 	LineJoinBevel LineJoinStyle = 2
+)
+
+// The PDF standard rendering intents.
+//
+// See section 8.6.5.8 of ISO 32000-2:2020.
+const (
+	RenderingIntentAbsoluteColorimetric pdf.Name = "AbsoluteColorimetric"
+	RenderingIntentRelativeColorimetric pdf.Name = "RelativeColorimetric"
+	RenderingIntentSaturation           pdf.Name = "Saturation"
+	RenderingIntentPerceptual           pdf.Name = "Perceptual"
 )

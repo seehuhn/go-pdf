@@ -29,104 +29,93 @@ type Reader struct {
 }
 
 func (r *Reader) UpdateState(op string, args []pdf.Object) error {
-	// Operators are listed in the order of table 50 in
+	// Operators are listed in the order of table 50 ("Operator categories") in
 	// ISO 32000-2:2020.
 
 	switch op {
 
 	// == General graphics state =========================================
 
-	case "w":
+	case "w": // line width
 		if len(args) < 1 {
 			break
 		}
-		x, err := pdf.GetNumber(r.R, args[0])
-		if pdf.IsMalformed(err) {
+		x, ok := getNumber(args[0])
+		if !ok {
 			break
-		} else if err != nil {
-			return err
 		}
 		r.LineWidth = float64(x)
 		r.Set |= StateLineWidth
 
-	case "J":
+	case "J": // line cap style
 		if len(args) < 1 {
 			break
 		}
-		x, err := pdf.GetInteger(r.R, args[0])
-		if pdf.IsMalformed(err) {
+		x, ok := args[0].(pdf.Integer)
+		if !ok {
 			break
-		} else if err != nil {
-			return err
 		}
 		x = min(max(x, 0), 2)
 		r.LineCap = LineCapStyle(x)
 		r.Set |= StateLineCap
 
-	case "j":
+	case "j": // line join style
 		if len(args) < 1 {
 			break
 		}
-		x, err := pdf.GetInteger(r.R, args[0])
-		if pdf.IsMalformed(err) {
+		x, ok := args[0].(pdf.Integer)
+		if !ok {
 			break
-		} else if err != nil {
-			return err
 		}
 		x = min(max(x, 0), 2)
 		r.LineJoin = LineJoinStyle(x)
 		r.Set |= StateLineJoin
 
-	case "M":
+	case "M": // miter limit
 		if len(args) < 1 {
 			break
 		}
-		f, err := pdf.GetNumber(r.R, args[0])
-		if err != nil {
-			return err
+		x, ok := getNumber(args[0])
+		if !ok {
+			break
 		}
-		r.MiterLimit = float64(f)
+		r.MiterLimit = float64(x)
 		r.Set |= StateMiterLimit
 
-	case "d":
+	case "d": // dash pattern and phase
 		if len(args) < 2 {
 			break
 		}
-		arr, phase, err := readDash2(r.R, args[0], args[1])
-		if pdf.IsMalformed(err) {
+		pattern, phase, ok := readDashDirect(args[0], args[1])
+		if !ok {
 			break
-		} else if err != nil {
-			return err
 		}
-		r.DashPattern = arr
+		r.DashPattern = pattern
 		r.DashPhase = phase
 		r.Set |= StateDash
 
-	case "ri":
+	case "ri": // rendering intent
 		if len(args) < 1 {
 			break
 		}
-		name, err := pdf.GetName(r.R, args[0])
-		if pdf.IsMalformed(err) {
+		name, ok := args[0].(pdf.Name)
+		if !ok {
 			break
-		} else if err != nil {
-			return err
 		}
 		r.RenderingIntent = name
 		r.Set |= StateRenderingIntent
 
-	// ----------------
-
-	case "q":
-		r.stack = append(r.stack, State{
-			Parameters: r.Parameters.Clone(),
-			Set:        r.Set,
-		})
-	case "Q":
-		if len(r.stack) > 0 {
-			r.State = r.stack[len(r.stack)-1]
-			r.stack = r.stack[:len(r.stack)-1]
+	case "i": // flatness tolerance
+		if len(args) < 1 {
+			break
 		}
+		x, ok := getNumber(args[0])
+		if !ok {
+			break
+		}
+		r.FlatnessTolerance = float64(x)
+		r.Set |= StateFlatnessTolerance
+
 	case "gs": // Set parameters from graphics state parameter dictionary
 		if len(args) < 1 {
 			break
@@ -144,6 +133,18 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 			return err
 		}
 		newState.ApplyTo(&r.State)
+
+	case "q":
+		r.stack = append(r.stack, State{
+			Parameters: r.Parameters.Clone(),
+			Set:        r.Set,
+		})
+
+	case "Q":
+		if len(r.stack) > 0 {
+			r.State = r.stack[len(r.stack)-1]
+			r.stack = r.stack[:len(r.stack)-1]
+		}
 
 	// == Special graphics state =========================================
 
@@ -169,8 +170,8 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 2 {
 			break
 		}
-		x, ok1 := getReal(args[0])
-		y, ok2 := getReal(args[1])
+		x, ok1 := getNumber(args[0])
+		y, ok2 := getNumber(args[1])
 		if !ok1 || !ok2 {
 			break
 		}
@@ -181,8 +182,8 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 2 {
 			break
 		}
-		x, ok1 := getReal(args[0])
-		y, ok2 := getReal(args[1])
+		x, ok1 := getNumber(args[0])
+		y, ok2 := getNumber(args[1])
 		if !ok1 || !ok2 {
 			break
 		}
@@ -193,12 +194,12 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 6 {
 			break
 		}
-		x1, ok1 := getReal(args[0])
-		y1, ok2 := getReal(args[1])
-		x2, ok3 := getReal(args[2])
-		y2, ok4 := getReal(args[3])
-		x3, ok5 := getReal(args[4])
-		y3, ok6 := getReal(args[5])
+		x1, ok1 := getNumber(args[0])
+		y1, ok2 := getNumber(args[1])
+		x2, ok3 := getNumber(args[2])
+		y2, ok4 := getNumber(args[3])
+		x3, ok5 := getNumber(args[4])
+		y3, ok6 := getNumber(args[5])
 		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 {
 			break
 		}
@@ -210,10 +211,10 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 4 {
 			break
 		}
-		x, ok1 := getReal(args[0])
-		y, ok2 := getReal(args[1])
-		w, ok3 := getReal(args[2])
-		h, ok4 := getReal(args[3])
+		x, ok1 := getNumber(args[0])
+		y, ok2 := getNumber(args[1])
+		w, ok3 := getNumber(args[2])
+		h, ok4 := getNumber(args[3])
 		if !ok1 || !ok2 || !ok3 || !ok4 {
 			break
 		}
@@ -251,7 +252,7 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 1 {
 			break
 		}
-		Tc, ok := getReal(args[0])
+		Tc, ok := getNumber(args[0])
 		if !ok {
 			break
 		}
@@ -262,7 +263,7 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 			break
 		}
 		name, ok1 := args[0].(pdf.Name)
-		size, ok2 := getReal(args[1])
+		size, ok2 := getNumber(args[1])
 		if !ok1 || !ok2 {
 			break
 		}
@@ -278,8 +279,8 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 2 {
 			break
 		}
-		tx, ok1 := getReal(args[0])
-		ty, ok2 := getReal(args[1])
+		tx, ok1 := getNumber(args[0])
+		ty, ok2 := getNumber(args[1])
 		if !ok1 || !ok2 {
 			break
 		}
@@ -293,7 +294,7 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		}
 		var data Matrix
 		for i := 0; i < 6; i++ {
-			x, ok := getReal(args[i])
+			x, ok := getNumber(args[i])
 			if !ok {
 				break
 			}
@@ -318,7 +319,7 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 1 {
 			break
 		}
-		gray, ok := getReal(args[0])
+		gray, ok := getNumber(args[0])
 		if !ok {
 			break
 		}
@@ -328,7 +329,7 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if len(args) < 1 {
 			break
 		}
-		gray, ok := getReal(args[0])
+		gray, ok := getNumber(args[0])
 		if !ok {
 			break
 		}
@@ -340,13 +341,13 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		}
 		var red, green, blue float64
 		var ok bool
-		if red, ok = getReal(args[0]); !ok {
+		if red, ok = getNumber(args[0]); !ok {
 			break
 		}
-		if green, ok = getReal(args[1]); !ok {
+		if green, ok = getNumber(args[1]); !ok {
 			break
 		}
-		if blue, ok = getReal(args[2]); !ok {
+		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
 		r.StrokeColor = color.RGB(red, green, blue)
@@ -357,13 +358,13 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		}
 		var red, green, blue float64
 		var ok bool
-		if red, ok = getReal(args[0]); !ok {
+		if red, ok = getNumber(args[0]); !ok {
 			break
 		}
-		if green, ok = getReal(args[1]); !ok {
+		if green, ok = getNumber(args[1]); !ok {
 			break
 		}
-		if blue, ok = getReal(args[2]); !ok {
+		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
 		r.FillColor = color.RGB(red, green, blue)
@@ -374,16 +375,16 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		}
 		var cyan, magenta, yellow, black float64
 		var ok bool
-		if cyan, ok = getReal(args[0]); !ok {
+		if cyan, ok = getNumber(args[0]); !ok {
 			break
 		}
-		if magenta, ok = getReal(args[1]); !ok {
+		if magenta, ok = getNumber(args[1]); !ok {
 			break
 		}
-		if yellow, ok = getReal(args[2]); !ok {
+		if yellow, ok = getNumber(args[2]); !ok {
 			break
 		}
-		if black, ok = getReal(args[3]); !ok {
+		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
 		r.StrokeColor = color.CMYK(cyan, magenta, yellow, black)
@@ -394,16 +395,16 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		}
 		var cyan, magenta, yellow, black float64
 		var ok bool
-		if cyan, ok = getReal(args[0]); !ok {
+		if cyan, ok = getNumber(args[0]); !ok {
 			break
 		}
-		if magenta, ok = getReal(args[1]); !ok {
+		if magenta, ok = getNumber(args[1]); !ok {
 			break
 		}
-		if yellow, ok = getReal(args[2]); !ok {
+		if yellow, ok = getNumber(args[2]); !ok {
 			break
 		}
-		if black, ok = getReal(args[3]); !ok {
+		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
 		r.FillColor = color.CMYK(cyan, magenta, yellow, black)
@@ -459,7 +460,7 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 	return nil
 }
 
-func getReal(x pdf.Object) (float64, bool) {
+func getNumber(x pdf.Object) (float64, bool) {
 	switch x := x.(type) {
 	case pdf.Real:
 		return float64(x), true
@@ -470,4 +471,24 @@ func getReal(x pdf.Object) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func readDashDirect(patObj, phaseObj pdf.Object) (pat []float64, ph float64, ok bool) {
+	dashPattern, ok := patObj.(pdf.Array)
+	if !ok {
+		return nil, 0, false
+	}
+	phase, ok := getNumber(phaseObj)
+	if !ok {
+		return nil, 0, false
+	}
+	pat = make([]float64, len(dashPattern))
+	for i, obj := range dashPattern {
+		x, ok := getNumber(obj)
+		if !ok {
+			return nil, 0, false
+		}
+		pat[i] = float64(x)
+	}
+	return pat, phase, true
 }

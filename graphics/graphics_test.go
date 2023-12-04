@@ -25,10 +25,16 @@ import (
 	"seehuhn.de/go/pdf/graphics/scanner"
 )
 
-func TestLineWidth(t *testing.T) {
+func TestParameters(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf, pdf.V1_7)
 	w.SetLineWidth(12.3)
+	w.SetLineCap(LineCapRound)
+	w.SetLineJoin(LineJoinBevel)
+	w.SetMiterLimit(4)
+	w.SetDashPattern([]float64{5, 6, 7}, 8)
+	w.SetRenderingIntent(RenderingIntentPerceptual)
+	w.SetFlatness(10)
 
 	r := &Reader{
 		R:         nil,
@@ -48,6 +54,28 @@ func TestLineWidth(t *testing.T) {
 	if r.State.LineWidth != 12.3 {
 		t.Errorf("LineWidth: got %v, want 12.3", r.State.LineWidth)
 	}
+	if r.State.LineCap != LineCapRound {
+		t.Errorf("LineCap: got %v, want %v", r.State.LineCap, LineCapRound)
+	}
+	if r.State.LineJoin != LineJoinBevel {
+		t.Errorf("LineJoin: got %v, want %v", r.State.LineJoin, LineJoinBevel)
+	}
+	if r.State.MiterLimit != 4 {
+		t.Errorf("MiterLimit: got %v, want 4", r.State.MiterLimit)
+	}
+	if d := cmp.Diff(r.State.DashPattern, []float64{5, 6, 7}); d != "" {
+		t.Errorf("DashPattern: %s", d)
+	}
+	if r.State.DashPhase != 8 {
+		t.Errorf("DashPhase: got %v, want 8", r.State.DashPhase)
+	}
+	if r.State.RenderingIntent != RenderingIntentPerceptual {
+		t.Errorf("RenderingIntent: got %v, want %v", r.State.RenderingIntent, RenderingIntentPerceptual)
+	}
+	if r.State.FlatnessTolerance != 10 {
+		t.Errorf("Flatness: got %v, want 10", r.State.FlatnessTolerance)
+	}
+
 	if d := cmp.Diff(w.State, r.State); d != "" {
 		t.Errorf("State: %s", d)
 	}

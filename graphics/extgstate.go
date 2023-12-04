@@ -555,19 +555,15 @@ func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err erro
 	if len(a) != 2 { // either error or malformed
 		return nil, 0, err
 	}
-	return readDash2(r, a[0], a[1])
-}
-
-func readDash2(r pdf.Getter, a0, a1 pdf.Object) (pat []float64, ph float64, err error) {
-	dashPattern, err := pdf.GetArray(r, a0)
+	dashPattern, err := pdf.GetArray(r, a[0])
 	if err != nil {
 		return nil, 0, err
 	}
-	phase, err := pdf.GetNumber(r, a1)
+	phase, err := pdf.GetNumber(r, a[1])
 	if err != nil {
 		return nil, 0, err
 	}
-	pat = make([]float64, len(pat))
+	pat = make([]float64, len(dashPattern))
 	for i, obj := range dashPattern {
 		x, err := pdf.GetNumber(r, obj)
 		if err != nil {
