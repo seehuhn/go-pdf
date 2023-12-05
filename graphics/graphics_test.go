@@ -28,6 +28,10 @@ import (
 func TestParameters(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf, pdf.V1_7)
+	w.Set = 0
+
+	font := &Res{DefName: "F", Data: pdf.NewReference(13, 0)}
+
 	w.SetLineWidth(12.3)
 	w.SetLineCap(LineCapRound)
 	w.SetLineJoin(LineJoinBevel)
@@ -37,13 +41,20 @@ func TestParameters(t *testing.T) {
 	w.SetFlatness(10)
 	m := Matrix{1, 2, 3, 4, 5, 6}
 	w.Transform(m)
-	w.SetCharSpacing(9)
+	w.TextSetCharSpacing(9)
+	w.TextSetWordSpacing(10)
+	w.TextSetHorizontalScaling(11)
+	w.TextSetLeading(12)
+	w.TextSetFont(font, 14)
+	w.TextSetRenderingMode(TextRenderingModeFillStrokeClip)
+	w.TextSetRise(15)
 
 	r := &Reader{
 		R:         nil,
 		Resources: w.Resources,
 		State:     NewState(),
 	}
+	r.Set = 0
 	s := scanner.NewScanner()
 	iter := s.Scan(bytes.NewReader(buf.Bytes()))
 	iter(func(op string, args []pdf.Object) bool {
@@ -81,11 +92,33 @@ func TestParameters(t *testing.T) {
 	if r.State.CTM != m {
 		t.Errorf("CTM: got %v, want %v", r.State.CTM, m)
 	}
-	if r.State.Tc != 9 {
-		t.Errorf("Tc: got %v, want 9", r.State.Tc)
+	if r.State.TextCharacterSpacing != 9 {
+		t.Errorf("Tc: got %v, want 9", r.State.TextCharacterSpacing)
+	}
+	if r.State.TextWordSpacing != 10 {
+		t.Errorf("Tw: got %v, want 10", r.State.TextWordSpacing)
+	}
+	if r.State.TextHorizonalScaling != 11 {
+		t.Errorf("Th: got %v, want 11", r.State.TextHorizonalScaling)
+	}
+	if r.State.TextLeading != 12 {
+		t.Errorf("Tl: got %v, want 12", r.State.TextLeading)
+	}
+	if !resEqual(r.State.TextFont, font) || r.State.TextFontSize != 14 {
+		t.Errorf("Font: got %v, %v, want %v, 14", r.State.TextFont, r.State.TextFontSize, font)
+	}
+	if r.State.TextRenderingMode != TextRenderingModeFillStrokeClip {
+		t.Errorf("TextRenderingMode: got %v, want %v", r.State.TextRenderingMode, TextRenderingModeFillStrokeClip)
+	}
+	if r.State.TextRise != 15 {
+		t.Errorf("Tr: got %v, want 15", r.State.TextRise)
 	}
 
 	if d := cmp.Diff(w.State, r.State); d != "" {
 		t.Errorf("State: %s", d)
 	}
+}
+
+func resEqual(a, b Resource) bool {
+	return a.DefaultName() == b.DefaultName() && a.PDFObject() == b.PDFObject()
 }

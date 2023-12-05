@@ -61,7 +61,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 			return f
 		}
 		ref, _ := resources.Font[name].(pdf.Reference)
-		f := &fontFromPDF{graphics.Res{DefName: name, Ref: ref}}
+		f := &fontFromPDF{graphics.Res{DefName: name, Data: ref}}
 		fonts[name] = f
 		return f
 	}
@@ -71,7 +71,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 
 	decoders := make(map[graphics.Resource]func(pdf.String) string)
 	yield := func(ctx *Context, s pdf.String) error {
-		font := state.Parameters.Font
+		font := state.Parameters.TextFont
 		decoder, ok := decoders[font]
 		if !ok {
 			fontRef := font.PDFObject()
@@ -239,8 +239,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 			// == Text objects ===================================================
 
 			case "BT": // Begin text object
-				state.Tm = graphics.IdentityMatrix
-				state.Tlm = graphics.IdentityMatrix
+				state.TextMatrix = graphics.IdentityMatrix
+				state.TextLineMatrix = graphics.IdentityMatrix
 
 			case "ET": // End text object
 
@@ -254,7 +254,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if !ok {
 					break
 				}
-				state.Tc = Tc
+				state.TextCharacterSpacing = Tc
 
 			case "Tf": // Set text font and size
 				if len(args) < 2 {
@@ -265,8 +265,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if !ok1 || !ok2 {
 					break
 				}
-				state.Font = getFont(name)
-				state.FontSize = size
+				state.TextFont = getFont(name)
+				state.TextFontSize = size
 
 			// == Text positioning ===============================================
 
@@ -280,8 +280,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					break
 				}
 
-				state.Tlm = graphics.Matrix{1, 0, 0, 1, tx, ty}.Mul(state.Tlm)
-				state.Tm = state.Tlm
+				state.TextLineMatrix = graphics.Matrix{1, 0, 0, 1, tx, ty}.Mul(state.TextLineMatrix)
+				state.TextMatrix = state.TextLineMatrix
 
 			case "Tm": // Set text matrix and text line matrix
 				if len(args) < 6 {
@@ -295,8 +295,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					}
 					data[i] = x
 				}
-				state.Tm = data
-				state.Tlm = data
+				state.TextMatrix = data
+				state.TextLineMatrix = data
 
 			// == Text showing ===================================================
 

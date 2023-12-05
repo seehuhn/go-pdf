@@ -92,10 +92,10 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	res := &embeddedSimple{
 		fontSimple:    f,
 		w:             w,
-		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
+		Res:           graphics.Res{Data: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res, res.Ref)
+	w.AutoClose(res)
 	return res, nil
 }
 
@@ -158,7 +158,7 @@ func (f *embeddedSimple) Close() error {
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Data)
 }
 
 // EmbedInfoSimple is the information needed to embed a simple TrueType font.

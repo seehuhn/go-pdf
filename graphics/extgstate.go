@@ -61,11 +61,11 @@ func NewExtGState(s State, defaultName string) (*ExtGState, error) {
 	dict := pdf.Dict{}
 	// Build a graphics state parameter dictionary for the given state.
 	// See table 57 in ISO 32000-2:2020.
-	if set&StateFont != 0 {
+	if set&StateTextFont != 0 {
 		// TODO(voss): verify that the font is given as a reference?
 		dict["Font"] = pdf.Array{
-			s.Font.PDFObject(),
-			pdf.Number(s.FontSize),
+			s.TextFont.PDFObject(),
+			pdf.Number(s.TextFontSize),
 		}
 	}
 	if set&StateTextKnockout != 0 {
@@ -209,9 +209,9 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*ExtGSta
 			} else if err != nil {
 				return nil, err
 			}
-			param.Font = Res{Ref: ref}
-			param.FontSize = float64(size)
-			set |= StateFont
+			param.TextFont = Res{Data: ref}
+			param.TextFontSize = float64(size)
+			set |= StateTextFont
 		case "TK":
 			val, err := pdf.GetBoolean(r, v)
 			if pdf.IsMalformed(err) {
@@ -460,9 +460,9 @@ func (s *ExtGState) ApplyTo(other *State) {
 
 	other.Set |= set
 	otherParam := other.Parameters
-	if set&StateFont != 0 {
-		otherParam.Font = param.Font
-		otherParam.FontSize = param.FontSize
+	if set&StateTextFont != 0 {
+		otherParam.TextFont = param.TextFont
+		otherParam.TextFontSize = param.TextFontSize
 	}
 	if set&StateTextKnockout != 0 {
 		otherParam.TextKnockout = param.TextKnockout

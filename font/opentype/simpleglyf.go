@@ -94,10 +94,10 @@ func (f *fontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, e
 	res := &embeddedSimpleGlyf{
 		fontGlyfSimple: f,
 		w:              w,
-		Res:            graphics.Res{Ref: w.Alloc(), DefName: resName},
+		Res:            graphics.Res{Data: w.Alloc(), DefName: resName},
 		SimpleEncoder:  encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res, res.Ref)
+	w.AutoClose(res)
 	return res, nil
 }
 
@@ -160,7 +160,7 @@ func (f *embeddedSimpleGlyf) Close() error {
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Data)
 }
 
 // EmbedInfoGlyfSimple is the information needed to embed a simple OpenType/glyf font.

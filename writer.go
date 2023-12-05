@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strconv"
 
 	"golang.org/x/exp/maps"
@@ -59,7 +58,7 @@ type Writer struct {
 	inStream    bool
 	afterStream []allocatedObject
 
-	autoclose map[Reference]io.Closer
+	autoclose []io.Closer
 }
 
 // TODO(voss): is this more generally useful?
@@ -219,8 +218,6 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 
 		nextRef: 1,
 		xref:    xref,
-
-		autoclose: make(map[Reference]io.Closer),
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -238,21 +235,11 @@ func (pdf *Writer) Close() error {
 		return errors.New("Close() while stream is open")
 	}
 
-	keys := maps.Keys(pdf.autoclose)
-	sort.Slice(keys, func(i, j int) bool {
-		ri := keys[i]
-		rj := keys[j]
-		if ri.Generation() != rj.Generation() {
-			return ri.Generation() < rj.Generation()
-		}
-		return ri.Number() < rj.Number()
-	})
-	for _, key := range keys {
-		err := pdf.autoclose[key].Close()
+	for _, obj := range pdf.autoclose {
+		err := obj.Close()
 		if err != nil {
 			return err
 		}
-		delete(pdf.autoclose, key)
 	}
 
 	trailer := pdf.meta.Trailer
@@ -313,8 +300,8 @@ func (pdf *Writer) Close() error {
 // AutoClose registers an object to be automatically closed when the PDF file
 // is closed.  Only one object can be registered for each key,
 // and objects are closed in ascending order of their keys.
-func (pdf *Writer) AutoClose(obj io.Closer, key Reference) {
-	pdf.autoclose[key] = obj
+func (pdf *Writer) AutoClose(obj io.Closer) {
+	pdf.autoclose = append(pdf.autoclose, obj)
 }
 
 // GetMeta returns the MetaInfo for the PDF file.

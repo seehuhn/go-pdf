@@ -81,12 +81,12 @@ func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 		Font: info,
 		w:    w,
 		Res: graphics.Res{
-			Ref:     w.Alloc(),
+			Data:    w.Alloc(),
 			DefName: resName,
 		},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res, res.Ref)
+	w.AutoClose(res)
 	return res, nil
 }
 

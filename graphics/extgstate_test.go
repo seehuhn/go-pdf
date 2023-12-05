@@ -28,9 +28,9 @@ func TestExtGState(t *testing.T) {
 	fontRef := data.Alloc()
 
 	s1 := State{Parameters: &Parameters{}}
-	s1.Font = Res{Ref: fontRef}
-	s1.FontSize = 12
-	s1.Set |= StateFont
+	s1.TextFont = Res{Data: fontRef}
+	s1.TextFontSize = 12
+	s1.Set |= StateTextFont
 	s1.TextKnockout = true
 	s1.Set |= StateTextKnockout
 	s1.LineWidth = 13

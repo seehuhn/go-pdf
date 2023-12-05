@@ -21,6 +21,7 @@ import (
 	"seehuhn.de/go/pdf/color"
 )
 
+// A Reader reads a PDF content stream.
 type Reader struct {
 	R         pdf.Getter
 	Resources *pdf.Resources
@@ -28,6 +29,8 @@ type Reader struct {
 	stack []State
 }
 
+// UpdateState updates the graphics state according to the given operator and
+// arguments.
 func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 	// Operators are listed in the order of table 50 ("Operator categories") in
 	// ISO 32000-2:2020.
@@ -241,8 +244,8 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 	// == Text objects ===================================================
 
 	case "BT": // Begin text object
-		r.Tm = IdentityMatrix
-		r.Tlm = IdentityMatrix
+		r.TextMatrix = IdentityMatrix
+		r.TextLineMatrix = IdentityMatrix
 
 	case "ET": // End text object
 
@@ -256,7 +259,41 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if !ok {
 			break
 		}
-		r.Tc = Tc
+		r.TextCharacterSpacing = Tc
+		r.Set |= StateTextCharacterSpacing
+
+	case "Tw": // Set word spacing
+		if len(args) < 1 {
+			break
+		}
+		Tw, ok := getNumber(args[0])
+		if !ok {
+			break
+		}
+		r.TextWordSpacing = Tw
+		r.Set |= StateTextWordSpacing
+
+	case "Tz": // Set the horizontal scaling
+		if len(args) < 1 {
+			break
+		}
+		Th, ok := getNumber(args[0])
+		if !ok {
+			break
+		}
+		r.TextHorizonalScaling = Th
+		r.Set |= StateTextHorizontalSpacing
+
+	case "TL": // Set the leading
+		if len(args) < 1 {
+			break
+		}
+		leading, ok := getNumber(args[0])
+		if !ok {
+			break
+		}
+		r.TextLeading = leading
+		r.Set |= StateTextLeading
 
 	case "Tf": // Set text font and size
 		if len(args) < 2 {
@@ -267,11 +304,39 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		if !ok1 || !ok2 {
 			break
 		}
-		r.Font = &Res{
-			DefName: name,
-			Ref:     0,
+		var obj pdf.Object
+		if r.Resources.Font != nil {
+			obj = r.Resources.Font[name]
 		}
-		r.FontSize = size
+		ref, _ := obj.(pdf.Reference)
+		r.TextFont = &Res{
+			DefName: name,
+			Data:    ref,
+		}
+		r.TextFontSize = size
+		r.Set |= StateTextFont
+
+	case "Tr": // text rendering mode
+		if len(args) < 1 {
+			break
+		}
+		mode, ok := args[0].(pdf.Integer)
+		if !ok {
+			break
+		}
+		r.TextRenderingMode = TextRenderingMode(mode)
+		r.Set |= StateTextRenderingMode
+
+	case "Ts": // Set text rise
+		if len(args) < 1 {
+			break
+		}
+		rise, ok := getNumber(args[0])
+		if !ok {
+			break
+		}
+		r.TextRise = rise
+		r.Set |= StateTextRise
 
 	// == Text positioning ===============================================
 
@@ -285,8 +350,8 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 			break
 		}
 
-		r.Tlm = Matrix{1, 0, 0, 1, tx, ty}.Mul(r.Tlm)
-		r.Tm = r.Tlm
+		r.TextLineMatrix = Matrix{1, 0, 0, 1, tx, ty}.Mul(r.TextLineMatrix)
+		r.TextMatrix = r.TextLineMatrix
 
 	case "Tm": // Set text matrix and text line matrix
 		if len(args) < 6 {
@@ -300,8 +365,8 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 			}
 			data[i] = x
 		}
-		r.Tm = data
-		r.Tlm = data
+		r.TextMatrix = data
+		r.TextLineMatrix = data
 
 	// == Text showing ===================================================
 

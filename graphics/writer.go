@@ -83,10 +83,10 @@ func (p *Writer) coord(x float64) string {
 	return float.Format(x, 2)
 }
 
-// Res represents a PDF resource.
+// Res represents a named PDF resource.
 type Res struct {
 	DefName pdf.Name
-	Ref     pdf.Reference
+	Data    pdf.Reference // TODO(voss): can this be pdf.Object?
 }
 
 // DefaultName implements the [Resource] interface.
@@ -96,7 +96,7 @@ func (r Res) DefaultName() pdf.Name {
 
 // PDFObject implements the [Resource] interface.
 func (r Res) PDFObject() pdf.Object {
-	return r.Ref
+	return r.Data
 }
 
 // Resource represents the different PDF Resource types.

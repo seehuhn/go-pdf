@@ -27,39 +27,83 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// SetCharSpacing sets the character spacing.
+// TextSetCharSpacing sets the character spacing.
 //
 // This implementes the PDF graphics operator "Tc".
-func (p *Writer) SetCharSpacing(spacing float64) {
-	if !p.valid("SetCharSpacing", objText, objPage) {
+func (p *Writer) TextSetCharSpacing(spacing float64) {
+	if !p.valid("TextSetCharSpacing", objText, objPage) {
 		return
 	}
-	if p.isSet(StateTc) && spacing == p.State.Tc {
+	if p.isSet(StateTextCharacterSpacing) && nearlyEqual(spacing, p.State.TextCharacterSpacing) {
 		return
 	}
-	p.State.Tc = spacing
-	p.Set |= StateTc
+	p.State.TextCharacterSpacing = spacing
+	p.Set |= StateTextCharacterSpacing
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(spacing), "Tc")
+}
+
+// TextSetWordSpacing sets the word spacing.
+//
+// This implementes the PDF graphics operator "Tw".
+func (p *Writer) TextSetWordSpacing(spacing float64) {
+	if !p.valid("TextSetWordSpacing", objText, objPage) {
+		return
+	}
+	if p.isSet(StateTextWordSpacing) && nearlyEqual(spacing, p.State.TextWordSpacing) {
+		return
+	}
+	p.State.TextWordSpacing = spacing
+	p.Set |= StateTextWordSpacing
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(spacing), "Tw")
+}
+
+// TextSetHorizontalScaling sets the horizontal scaling.
+//
+// This implementes the PDF graphics operator "Tz".
+func (p *Writer) TextSetHorizontalScaling(scaling float64) {
+	if !p.valid("TextSetHorizontalScaling", objText, objPage) {
+		return
+	}
+	if p.isSet(StateTextHorizontalSpacing) && nearlyEqual(scaling, p.State.TextHorizonalScaling) {
+		return
+	}
+	p.State.TextHorizonalScaling = scaling
+	p.Set |= StateTextHorizontalSpacing
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(scaling), "Tz")
+}
+
+// TextSetLeading sets the leading.
+//
+// This implementes the PDF graphics operator "TL".
+func (p *Writer) TextSetLeading(leading float64) {
+	if !p.valid("TextSetLeading", objText, objPage) {
+		return
+	}
+	if p.isSet(StateTextLeading) && nearlyEqual(leading, p.State.TextLeading) {
+		return
+	}
+	p.State.TextLeading = leading
+	p.Set |= StateTextLeading
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(leading), "TL")
 }
 
 // TextSetFont sets the font and font size.
 //
-// TODO(voss): Instead of font.Embedded, use only information which can
-// be extracted from a PDF file?
-func (p *Writer) TextSetFont(font font.Embedded, size float64) {
+// This implements the PDF graphics operator "Tf".
+func (p *Writer) TextSetFont(font Resource, size float64) {
 	if !p.valid("TextSetFont", objText, objPage) {
 		return
 	}
 
-	if p.isSet(StateFont) && p.State.Font == font && p.State.FontSize == size {
+	if p.isSet(StateTextFont) && p.State.TextFont == font && p.State.TextFontSize == size {
 		return
 	}
 
 	name := p.getResourceName(catFont, font)
 
-	p.State.Font = font
-	p.State.FontSize = size
-	p.State.Set |= StateFont
+	p.State.TextFont = font
+	p.State.TextFontSize = size
+	p.State.Set |= StateTextFont
 
 	err := name.PDF(p.Content)
 	if err != nil {
@@ -67,6 +111,36 @@ func (p *Writer) TextSetFont(font font.Embedded, size float64) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, "", size, "Tf")
+}
+
+// TextSetRenderingMode sets the text rendering mode.
+//
+// This implements the PDF graphics operator "Tr".
+func (p *Writer) TextSetRenderingMode(mode TextRenderingMode) {
+	if !p.valid("TextSetRenderingMode", objText, objPage) {
+		return
+	}
+	if p.isSet(StateTextRenderingMode) && p.State.TextRenderingMode == mode {
+		return
+	}
+	p.State.TextRenderingMode = mode
+	p.Set |= StateTextRenderingMode
+	_, p.Err = fmt.Fprintln(p.Content, mode, "Tr")
+}
+
+// TextSetRise sets the text rise.
+//
+// This implements the PDF graphics operator "Ts".
+func (p *Writer) TextSetRise(rise float64) {
+	if !p.valid("TextSetRise", objText, objPage) {
+		return
+	}
+	if p.isSet(StateTextRise) && nearlyEqual(rise, p.State.TextRise) {
+		return
+	}
+	p.State.TextRise = rise
+	p.Set |= StateTextRise
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(rise), "Ts")
 }
 
 // TextStart starts a new text object.
@@ -77,8 +151,8 @@ func (p *Writer) TextStart() {
 	p.nesting = append(p.nesting, pairTypeBT)
 
 	p.currentObject = objText
-	p.State.Tm = IdentityMatrix
-	p.State.Tlm = IdentityMatrix
+	p.State.TextMatrix = IdentityMatrix
+	p.State.TextLineMatrix = IdentityMatrix
 	_, p.Err = fmt.Fprintln(p.Content, "BT")
 }
 
@@ -126,7 +200,7 @@ func (p *Writer) TextNextLine() {
 // The function panics if no font is set.
 func (p *Writer) TextLayout(s string) glyph.Seq {
 	st := p.State
-	return st.Font.(font.Embedded).Layout(s, st.FontSize)
+	return st.TextFont.(font.Embedded).Layout(s, st.TextFontSize)
 }
 
 // TextShow draws a string.
@@ -134,7 +208,7 @@ func (p *Writer) TextShow(s string) float64 {
 	if !p.valid("TextShow", objText) {
 		return 0
 	}
-	if p.State.Font == nil {
+	if p.State.TextFont == nil {
 		p.Err = errors.New("no font set")
 		return 0
 	}
@@ -150,7 +224,7 @@ func (p *Writer) TextShowAligned(s string, w, q float64) {
 	if !p.valid("TextShowAligned", objText) {
 		return
 	}
-	if p.State.Font == nil {
+	if p.State.TextFont == nil {
 		p.Err = errors.New("no font set")
 		return
 	}
@@ -162,7 +236,7 @@ func (p *Writer) TextShowGlyphs(gg glyph.Seq) float64 {
 	if !p.valid("TextShowGlyphs", objText) {
 		return 0
 	}
-	if p.State.Font == nil {
+	if p.State.TextFont == nil {
 		p.Err = errors.New("no font set")
 		return 0
 	}
@@ -175,7 +249,7 @@ func (p *Writer) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 	if !p.valid("TextShowGlyphsAligned", objText) {
 		return
 	}
-	if p.State.Font == nil {
+	if p.State.TextFont == nil {
 		p.Err = errors.New("no font set")
 		return
 	}
@@ -183,8 +257,8 @@ func (p *Writer) TextShowGlyphsAligned(gg glyph.Seq, w, q float64) {
 }
 
 func (p *Writer) showGlyphsAligned(gg glyph.Seq, w, q float64) {
-	geom := p.State.Font.(font.Embedded).GetGeometry()
-	total := geom.ToPDF(p.State.FontSize, gg.AdvanceWidth())
+	geom := p.State.TextFont.(font.Embedded).GetGeometry()
+	total := geom.ToPDF(p.State.TextFontSize, gg.AdvanceWidth())
 	delta := w - total
 
 	// we interpolate between the following:
@@ -193,7 +267,7 @@ func (p *Writer) showGlyphsAligned(gg glyph.Seq, w, q float64) {
 	left := q * delta
 	right := (1 - q) * delta
 
-	p.showGlyphsWithMargins(gg, left*1000/p.State.FontSize, right*1000/p.State.FontSize)
+	p.showGlyphsWithMargins(gg, left*1000/p.State.TextFontSize, right*1000/p.State.TextFontSize)
 }
 
 func (p *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 {
@@ -237,7 +311,7 @@ func (p *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float6
 		out = nil
 	}
 
-	F := p.State.Font
+	F := p.State.TextFont
 	geom := F.(font.Embedded).GetGeometry()
 	widths := geom.Widths
 	unitsPerEm := geom.UnitsPerEm
@@ -294,5 +368,5 @@ func (p *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float6
 	}
 
 	flush()
-	return xActual * p.State.FontSize / 1000
+	return xActual * p.State.TextFontSize / 1000
 }

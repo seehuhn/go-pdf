@@ -122,12 +122,12 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 		Font: f,
 		w:    w,
 		Res: graphics.Res{
-			Ref:     w.Alloc(),
+			Data:    w.Alloc(),
 			DefName: resName,
 		},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res, res.Ref)
+	w.AutoClose(res)
 	return res, nil
 }
 
@@ -235,7 +235,7 @@ func (e *embedded) Close() error {
 		Encoding:  encoding,
 		ResName:   e.DefName,
 	}
-	return info.Embed(e.w, e.Ref)
+	return info.Embed(e.w, e.Data)
 }
 
 // EmbedInfo holds all the information needed to embed a Type 1 font

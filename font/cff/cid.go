@@ -109,11 +109,11 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedComposite{
 		FontComposite: f,
 		w:             w,
-		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
+		Res:           graphics.Res{Data: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
-	w.AutoClose(res, res.Ref)
+	w.AutoClose(res)
 	return res, nil
 }
 
@@ -199,7 +199,7 @@ func (f *embeddedComposite) Close() error {
 		IsSerif:    subsetOTF.IsSerif,
 		IsScript:   subsetOTF.IsScript,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Data)
 }
 
 // EmbedInfoComposite is the information needed to embed a CFF font as a composite PDF font.

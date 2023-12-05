@@ -96,10 +96,10 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedCFFSimple{
 		fontCFFSimple: f,
 		w:             w,
-		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
+		Res:           graphics.Res{Data: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	w.AutoClose(res, res.Ref)
+	w.AutoClose(res)
 	return res, nil
 }
 
@@ -166,7 +166,7 @@ func (f *embeddedCFFSimple) Close() error {
 		Encoding:  subsetCFF.Encoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Data)
 }
 
 // EmbedInfoCFFSimple is the information needed to embed a simple OpenType/CFF font.

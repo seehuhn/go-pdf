@@ -42,19 +42,19 @@ type Parameters struct {
 	FillColor   color.Color
 
 	// Text State parameters:
-	Tc           float64  // character spacing
-	Tw           float64  // word spacing
-	Th           float64  // horizonal scaling
-	Tl           float64  // leading
-	Font         Resource // Font.PDFObject() must return a pdf.Reference
-	FontSize     float64
-	Tmode        int
-	TextRise     float64
-	TextKnockout bool
+	TextCharacterSpacing float64 // character spacing (T_c)
+	TextWordSpacing      float64 // word spacing (T_w)
+	TextHorizonalScaling float64 // horizonal scaling (T_h, normal sapcing = 100)
+	TextLeading          float64 // leading (T_l)
+	TextFont             Resource
+	TextFontSize         float64
+	TextRenderingMode    TextRenderingMode
+	TextRise             float64
+	TextKnockout         bool
 
 	// See https://github.com/pdf-association/pdf-issues/issues/368
-	Tm  Matrix // reset at the start of each text object
-	Tlm Matrix // reset at the start of each text object
+	TextMatrix     Matrix // reset at the start of each text object
+	TextLineMatrix Matrix // reset at the start of each text object
 
 	LineWidth   float64
 	LineCap     LineCapStyle
@@ -112,12 +112,12 @@ const (
 	StateStrokeColor StateBits = 1 << iota
 	StateFillColor
 
-	StateTc
-	StateTw
-	StateTh
-	StateTl
-	StateFont // includes size
-	StateTmode
+	StateTextCharacterSpacing
+	StateTextWordSpacing
+	StateTextHorizontalSpacing
+	StateTextLeading
+	StateTextFont // includes size
+	StateTextRenderingMode
 	StateTextRise
 	StateTextKnockout
 
@@ -156,8 +156,8 @@ const (
 const (
 	// initializedStateBits lists the parameters which are initialized to
 	// their default values in [NewState].
-	initializedStateBits = StateStrokeColor | StateFillColor | StateTc |
-		StateTw | StateTh | StateTl | StateTmode | StateTextRise |
+	initializedStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
+		StateTextWordSpacing | StateTextHorizontalSpacing | StateTextLeading | StateTextRenderingMode | StateTextRise |
 		StateTextKnockout | StateLineWidth | StateLineCap | StateLineJoin |
 		StateMiterLimit | StateDash | StateRenderingIntent |
 		StateStrokeAdjustment | StateBlendMode | StateSoftMask |
@@ -167,7 +167,7 @@ const (
 
 	// extStateBits lists the parameters which can be encoded in an ExtGState
 	// resource.
-	extStateBits = StateFont | StateTextKnockout | StateLineWidth |
+	extStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
 		StateLineCap | StateLineJoin | StateMiterLimit | StateDash |
 		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
 		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
@@ -186,13 +186,13 @@ func NewState() State {
 	param.StrokeColor = color.Gray(0)
 	param.FillColor = color.Gray(0)
 
-	param.Tc = 0
-	param.Tw = 0
-	param.Th = 1
-	param.Tl = 0
+	param.TextCharacterSpacing = 0
+	param.TextWordSpacing = 0
+	param.TextHorizonalScaling = 1
+	param.TextLeading = 0
 	// no default for Font
 	// no default for FontSize
-	param.Tmode = 0
+	param.TextRenderingMode = 0
 	param.TextRise = 0
 	param.TextKnockout = true
 
@@ -306,6 +306,22 @@ func (A Matrix) Mul(B Matrix) Matrix {
 
 // IdentityMatrix is the identity transformation.
 var IdentityMatrix = Matrix{1, 0, 0, 1, 0, 0}
+
+// TextRenderingMode is the rendering mode for text.
+type TextRenderingMode uint8
+
+// Possible values for TextRenderingMode.
+// See section 9.3.6 of ISO 32000-2:2020.
+const (
+	TextRenderingModeFill TextRenderingMode = iota
+	TextRenderingModeStroke
+	TextRenderingModeFillStroke
+	TextRenderingModeInvisible
+	TextRenderingModeFillClip
+	TextRenderingModeStrokeClip
+	TextRenderingModeFillStrokeClip
+	TextRenderingModeClip
+)
 
 // LineCapStyle is the style of the end of a line.
 type LineCapStyle uint8
