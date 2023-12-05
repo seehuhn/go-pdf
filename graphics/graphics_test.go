@@ -35,6 +35,9 @@ func TestParameters(t *testing.T) {
 	w.SetDashPattern([]float64{5, 6, 7}, 8)
 	w.SetRenderingIntent(RenderingIntentPerceptual)
 	w.SetFlatness(10)
+	m := Matrix{1, 2, 3, 4, 5, 6}
+	w.Transform(m)
+	w.SetCharSpacing(9)
 
 	r := &Reader{
 		R:         nil,
@@ -74,6 +77,12 @@ func TestParameters(t *testing.T) {
 	}
 	if r.State.FlatnessTolerance != 10 {
 		t.Errorf("Flatness: got %v, want 10", r.State.FlatnessTolerance)
+	}
+	if r.State.CTM != m {
+		t.Errorf("CTM: got %v, want %v", r.State.CTM, m)
+	}
+	if r.State.Tc != 9 {
+		t.Errorf("Tc: got %v, want 9", r.State.Tc)
 	}
 
 	if d := cmp.Diff(w.State, r.State); d != "" {

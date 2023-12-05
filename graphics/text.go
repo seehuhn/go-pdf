@@ -27,32 +27,19 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// TextStart starts a new text object.
-func (p *Writer) TextStart() {
-	if !p.valid("TextStart", objPage) {
+// SetCharSpacing sets the character spacing.
+//
+// This implementes the PDF graphics operator "Tc".
+func (p *Writer) SetCharSpacing(spacing float64) {
+	if !p.valid("SetCharSpacing", objText, objPage) {
 		return
 	}
-	p.nesting = append(p.nesting, pairTypeBT)
-
-	p.currentObject = objText
-	p.State.Tm = IdentityMatrix
-	p.State.Tlm = IdentityMatrix
-	_, p.Err = fmt.Fprintln(p.Content, "BT")
-}
-
-// TextEnd ends the current text object.
-func (p *Writer) TextEnd() {
-	if !p.valid("TextEnd", objText) {
+	if p.isSet(StateTc) && spacing == p.State.Tc {
 		return
 	}
-	if len(p.nesting) == 0 || p.nesting[len(p.nesting)-1] != pairTypeBT {
-		p.Err = errors.New("TextEnd without TextStart")
-		return
-	}
-	p.nesting = p.nesting[:len(p.nesting)-1]
-
-	p.currentObject = objPage
-	_, p.Err = fmt.Fprintln(p.Content, "ET")
+	p.State.Tc = spacing
+	p.Set |= StateTc
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(spacing), "Tc")
 }
 
 // TextSetFont sets the font and font size.
@@ -80,6 +67,34 @@ func (p *Writer) TextSetFont(font font.Embedded, size float64) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, "", size, "Tf")
+}
+
+// TextStart starts a new text object.
+func (p *Writer) TextStart() {
+	if !p.valid("TextStart", objPage) {
+		return
+	}
+	p.nesting = append(p.nesting, pairTypeBT)
+
+	p.currentObject = objText
+	p.State.Tm = IdentityMatrix
+	p.State.Tlm = IdentityMatrix
+	_, p.Err = fmt.Fprintln(p.Content, "BT")
+}
+
+// TextEnd ends the current text object.
+func (p *Writer) TextEnd() {
+	if !p.valid("TextEnd", objText) {
+		return
+	}
+	if len(p.nesting) == 0 || p.nesting[len(p.nesting)-1] != pairTypeBT {
+		p.Err = errors.New("TextEnd without TextStart")
+		return
+	}
+	p.nesting = p.nesting[:len(p.nesting)-1]
+
+	p.currentObject = objPage
+	_, p.Err = fmt.Fprintln(p.Content, "ET")
 }
 
 // TextFirstLine moves to the start of the next line of text.

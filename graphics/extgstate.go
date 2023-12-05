@@ -17,6 +17,7 @@
 package graphics
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -51,8 +52,11 @@ type ExtGState struct {
 }
 
 // NewExtGState creates a new ExtGState object.
-func NewExtGState(s State, defaultName string) *ExtGState {
+func NewExtGState(s State, defaultName string) (*ExtGState, error) {
 	set := s.Set
+	if set & ^extStateBits != 0 {
+		return nil, errors.New("invalid states for ExtGState")
+	}
 
 	dict := pdf.Dict{}
 	// Build a graphics state parameter dictionary for the given state.
@@ -165,9 +169,9 @@ func NewExtGState(s State, defaultName string) *ExtGState {
 		Dict:    dict,
 		Value: State{
 			Parameters: s.Parameters.Clone(),
-			Set:        set & extStateBits,
+			Set:        set,
 		},
-	}
+	}, nil
 }
 
 // ReadExtGState reads an graphics state parameter dictionary from a PDF file.
@@ -207,6 +211,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*ExtGSta
 			}
 			param.Font = Res{Ref: ref}
 			param.FontSize = float64(size)
+			set |= StateFont
 		case "TK":
 			val, err := pdf.GetBoolean(r, v)
 			if pdf.IsMalformed(err) {
@@ -446,17 +451,6 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*ExtGSta
 	return res, nil
 }
 
-// DefaultName returns the default name for this resource.
-func (s *ExtGState) DefaultName() pdf.Name {
-	return s.DefName
-}
-
-// PDFObject returns the value to use in the PDF Resources dictionary.
-// This can either be [pdf.Reference] or [pdf.Dict].
-func (s *ExtGState) PDFObject() pdf.Object {
-	return s.Dict
-}
-
 // ApplyTo applies the graphics state parameters to the given state.
 //
 // TODO(voss): unexport this method.
@@ -542,6 +536,39 @@ func (s *ExtGState) ApplyTo(other *State) {
 	if set&StateSmoothnessTolerance != 0 {
 		otherParam.SmoothnessTolerance = param.SmoothnessTolerance
 	}
+}
+
+// Embed writes the graphics state dictionary into the PDF file so that the
+// graphics state can refer to it by reference.
+// This allows for efficient sharing of PDF graphics state dictionaries
+// between content streams.
+func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
+	if _, alreadyDone := s.Dict.(pdf.Reference); alreadyDone {
+		return s, nil
+	}
+	ref := w.Alloc()
+	err := w.Put(ref, s.Dict)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &ExtGState{
+		DefName: s.DefName,
+		Dict:    ref,
+		Value:   s.Value,
+	}
+	return res, nil
+}
+
+// DefaultName returns the default name for this resource.
+func (s *ExtGState) DefaultName() pdf.Name {
+	return s.DefName
+}
+
+// PDFObject returns the value to use in the PDF Resources dictionary.
+// This can either be [pdf.Reference] or [pdf.Dict].
+func (s *ExtGState) PDFObject() pdf.Object {
+	return s.Dict
 }
 
 func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err error) {

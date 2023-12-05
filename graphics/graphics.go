@@ -29,7 +29,7 @@ import (
 // This function modifies the current transformation matrix by multiplying the
 // given matrix from the right.
 //
-// This implementes the "cm" PDF graphics operator.
+// This implementes the PDF graphics operator "cm".
 func (p *Writer) Transform(m Matrix) {
 	if !p.valid("Transform", objPage, objText) {
 		return
@@ -70,6 +70,8 @@ func (p *Writer) SetFillColor(col color.Color) {
 }
 
 // SetLineWidth sets the line width.
+//
+// This implementes the PDF graphics operator "w".
 func (p *Writer) SetLineWidth(width float64) {
 	if !p.valid("SetLineWidth", objPage, objText) {
 		return
@@ -83,6 +85,8 @@ func (p *Writer) SetLineWidth(width float64) {
 }
 
 // SetLineCap sets the line cap style.
+//
+// This implementes the PDF graphics operator "J".
 func (p *Writer) SetLineCap(cap LineCapStyle) {
 	if !p.valid("SetLineCap", objPage, objText) {
 		return
@@ -96,6 +100,8 @@ func (p *Writer) SetLineCap(cap LineCapStyle) {
 }
 
 // SetLineJoin sets the line join style.
+//
+// This implementes the PDF graphics operator "j".
 func (p *Writer) SetLineJoin(join LineJoinStyle) {
 	if !p.valid("SetLineJoin", objPage, objText) {
 		return
