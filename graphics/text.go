@@ -27,10 +27,10 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// TextSetCharSpacing sets the character spacing.
+// TextSetCharacterSpacing sets the character spacing.
 //
 // This implementes the PDF graphics operator "Tc".
-func (p *Writer) TextSetCharSpacing(spacing float64) {
+func (p *Writer) TextSetCharacterSpacing(spacing float64) {
 	if !p.valid("TextSetCharSpacing", objText, objPage) {
 		return
 	}

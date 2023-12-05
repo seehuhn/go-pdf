@@ -38,10 +38,10 @@ func TestParameters(t *testing.T) {
 	w.SetMiterLimit(4)
 	w.SetDashPattern([]float64{5, 6, 7}, 8)
 	w.SetRenderingIntent(RenderingIntentPerceptual)
-	w.SetFlatness(10)
+	w.SetFlatnessTolerance(10)
 	m := Matrix{1, 2, 3, 4, 5, 6}
 	w.Transform(m)
-	w.TextSetCharSpacing(9)
+	w.TextSetCharacterSpacing(9)
 	w.TextSetWordSpacing(10)
 	w.TextSetHorizontalScaling(11)
 	w.TextSetLeading(12)

@@ -175,8 +175,8 @@ func (p *Writer) SetRenderingIntent(intent pdf.Name) {
 	_, p.Err = fmt.Fprintln(p.Content, " ri")
 }
 
-// SetFlatness sets the flatness tolerance.
-func (p *Writer) SetFlatness(flatness float64) {
+// SetFlatnessTolerance sets the flatness tolerance.
+func (p *Writer) SetFlatnessTolerance(flatness float64) {
 	if !p.valid("SetFlatness", objPage, objText) {
 		return
 	}

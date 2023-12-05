@@ -19,6 +19,7 @@ package graphics
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/float"
@@ -164,7 +165,12 @@ func (p *Writer) getResourceName(category resourceCategory, r Resource) pdf.Name
 		return isUsed
 	}
 
-	if defName := r.DefaultName(); defName != "" && !isUsed(defName) {
+	origName := r.DefaultName()
+	defName := origName
+	if strings.HasPrefix(string(defName), "/") {
+		defName = defName[1:]
+	}
+	if origName != "" && !isUsed(defName) {
 		name = defName
 	} else {
 		var numUsed int

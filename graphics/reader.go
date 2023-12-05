@@ -32,110 +32,113 @@ type Reader struct {
 // UpdateState updates the graphics state according to the given operator and
 // arguments.
 func (r *Reader) UpdateState(op string, args []pdf.Object) error {
+	getInteger := func() (pdf.Integer, bool) {
+		if len(args) == 0 {
+			return 0, false
+		}
+		x, ok := args[0].(pdf.Integer)
+		args = args[1:]
+		return x, ok
+	}
+	getNum := func() (float64, bool) {
+		if len(args) == 0 {
+			return 0, false
+		}
+		x, ok := getNumber(args[0])
+		args = args[1:]
+		return x, ok
+	}
+	getName := func() (pdf.Name, bool) {
+		if len(args) == 0 {
+			return "", false
+		}
+		x, ok := args[0].(pdf.Name)
+		args = args[1:]
+		return x, ok
+	}
+	getArray := func() (pdf.Array, bool) {
+		if len(args) == 0 {
+			return nil, false
+		}
+		x, ok := args[0].(pdf.Array)
+		args = args[1:]
+		return x, ok
+	}
+
 	// Operators are listed in the order of table 50 ("Operator categories") in
 	// ISO 32000-2:2020.
 
+doOps:
 	switch op {
 
 	// == General graphics state =========================================
 
 	case "w": // line width
-		if len(args) < 1 {
-			break
+		x, ok := getNum()
+		if ok {
+			r.LineWidth = float64(x)
+			r.Set |= StateLineWidth
 		}
-		x, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.LineWidth = float64(x)
-		r.Set |= StateLineWidth
 
 	case "J": // line cap style
-		if len(args) < 1 {
-			break
+		x, ok := getInteger()
+		if ok {
+			x = min(max(x, 0), 2)
+			r.LineCap = LineCapStyle(x)
+			r.Set |= StateLineCap
 		}
-		x, ok := args[0].(pdf.Integer)
-		if !ok {
-			break
-		}
-		x = min(max(x, 0), 2)
-		r.LineCap = LineCapStyle(x)
-		r.Set |= StateLineCap
 
 	case "j": // line join style
-		if len(args) < 1 {
-			break
+		x, ok := getInteger()
+		if ok {
+			x = min(max(x, 0), 2)
+			r.LineJoin = LineJoinStyle(x)
+			r.Set |= StateLineJoin
 		}
-		x, ok := args[0].(pdf.Integer)
-		if !ok {
-			break
-		}
-		x = min(max(x, 0), 2)
-		r.LineJoin = LineJoinStyle(x)
-		r.Set |= StateLineJoin
 
 	case "M": // miter limit
-		if len(args) < 1 {
-			break
+		x, ok := getNum()
+		if ok {
+			r.MiterLimit = float64(x)
+			r.Set |= StateMiterLimit
 		}
-		x, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.MiterLimit = float64(x)
-		r.Set |= StateMiterLimit
 
 	case "d": // dash pattern and phase
-		if len(args) < 2 {
-			break
+		patObj, ok1 := getArray()
+		pattern, ok2 := convertDashPattern(patObj)
+		phase, ok3 := getNum()
+		if ok1 && ok2 && ok3 {
+			r.DashPattern = pattern
+			r.DashPhase = phase
+			r.Set |= StateDash
 		}
-		pattern, phase, ok := readDashDirect(args[0], args[1])
-		if !ok {
-			break
-		}
-		r.DashPattern = pattern
-		r.DashPhase = phase
-		r.Set |= StateDash
 
 	case "ri": // rendering intent
-		if len(args) < 1 {
-			break
+		name, ok := getName()
+		if ok {
+			r.RenderingIntent = name
+			r.Set |= StateRenderingIntent
 		}
-		name, ok := args[0].(pdf.Name)
-		if !ok {
-			break
-		}
-		r.RenderingIntent = name
-		r.Set |= StateRenderingIntent
 
 	case "i": // flatness tolerance
-		if len(args) < 1 {
-			break
+		x, ok := getNum()
+		if ok {
+			r.FlatnessTolerance = float64(x)
+			r.Set |= StateFlatnessTolerance
 		}
-		x, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.FlatnessTolerance = float64(x)
-		r.Set |= StateFlatnessTolerance
 
 	case "gs": // Set parameters from graphics state parameter dictionary
-		if len(args) < 1 {
-			break
+		name, ok := getName()
+		if ok {
+			// TODO(voss): use caching
+			newState, err := ReadExtGState(r.R, r.Resources.ExtGState[name], name)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return err
+			}
+			newState.ApplyTo(&r.State)
 		}
-		name, ok := args[0].(pdf.Name)
-		if !ok {
-			break
-		}
-
-		// TODO(voss): use caching
-		newState, err := ReadExtGState(r.R, r.Resources.ExtGState[name], name)
-		if pdf.IsMalformed(err) {
-			break
-		} else if err != nil {
-			return err
-		}
-		newState.ApplyTo(&r.State)
 
 	case "q":
 		r.stack = append(r.stack, State{
@@ -152,94 +155,15 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 	// == Special graphics state =========================================
 
 	case "cm":
-		if len(args) < 6 {
-			break
-		}
 		m := Matrix{}
 		for i := 0; i < 6; i++ {
-			f, err := pdf.GetNumber(r.R, args[i])
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return err
+			f, ok := getNum()
+			if !ok {
+				break doOps
 			}
 			m[i] = float64(f)
 		}
 		r.CTM = r.CTM.Mul(m) // TODO(voss): correct order?
-
-	// == Path construction ==============================================
-
-	case "m": // Begin new subpath
-		if len(args) < 2 {
-			break
-		}
-		x, ok1 := getNumber(args[0])
-		y, ok2 := getNumber(args[1])
-		if !ok1 || !ok2 {
-			break
-		}
-		_ = x
-		_ = y
-
-	case "l": // Append straight line segment to path
-		if len(args) < 2 {
-			break
-		}
-		x, ok1 := getNumber(args[0])
-		y, ok2 := getNumber(args[1])
-		if !ok1 || !ok2 {
-			break
-		}
-		_ = x
-		_ = y
-
-	case "c": // Append cubic Bezier curve to path
-		if len(args) < 6 {
-			break
-		}
-		x1, ok1 := getNumber(args[0])
-		y1, ok2 := getNumber(args[1])
-		x2, ok3 := getNumber(args[2])
-		y2, ok4 := getNumber(args[3])
-		x3, ok5 := getNumber(args[4])
-		y3, ok6 := getNumber(args[5])
-		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 {
-			break
-		}
-		_, _, _, _, _, _ = x1, y1, x2, y2, x3, y3
-
-	case "h": // Close subpath
-
-	case "re": // Append rectangle to path
-		if len(args) < 4 {
-			break
-		}
-		x, ok1 := getNumber(args[0])
-		y, ok2 := getNumber(args[1])
-		w, ok3 := getNumber(args[2])
-		h, ok4 := getNumber(args[3])
-		if !ok1 || !ok2 || !ok3 || !ok4 {
-			break
-		}
-		_, _, _, _ = x, y, w, h
-
-	// == Path painting ==================================================
-
-	case "S": // Stroke path
-
-	case "s": // Close and stroke path
-
-	case "f": // Fill path using nonzero winding number rule
-
-	case "f*": // Fill path using even-odd rule
-
-	case "n": // End path without filling or stroking
-
-	// == Clipping paths =================================================
-
-	case "W": // Modify clipping path by intersecting with current path
-
-	case "W*": // Modify clipping path by intersecting with current path, using even-odd rule
 
 	// == Text objects ===================================================
 
@@ -252,15 +176,11 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 	// == Text state =====================================================
 
 	case "Tc": // Set character spacing
-		if len(args) < 1 {
-			break
+		Tc, ok := getNum()
+		if ok {
+			r.TextCharacterSpacing = Tc
+			r.Set |= StateTextCharacterSpacing
 		}
-		Tc, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.TextCharacterSpacing = Tc
-		r.Set |= StateTextCharacterSpacing
 
 	case "Tw": // Set word spacing
 		if len(args) < 1 {
@@ -538,22 +458,17 @@ func getNumber(x pdf.Object) (float64, bool) {
 	}
 }
 
-func readDashDirect(patObj, phaseObj pdf.Object) (pat []float64, ph float64, ok bool) {
-	dashPattern, ok := patObj.(pdf.Array)
-	if !ok {
-		return nil, 0, false
-	}
-	phase, ok := getNumber(phaseObj)
-	if !ok {
-		return nil, 0, false
+func convertDashPattern(dashPattern pdf.Array) (pat []float64, ok bool) {
+	if dashPattern == nil {
+		return nil, true
 	}
 	pat = make([]float64, len(dashPattern))
 	for i, obj := range dashPattern {
 		x, ok := getNumber(obj)
 		if !ok {
-			return nil, 0, false
+			return nil, false
 		}
 		pat[i] = float64(x)
 	}
-	return pat, phase, true
+	return pat, true
 }

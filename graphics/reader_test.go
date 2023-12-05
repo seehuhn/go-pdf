@@ -23,7 +23,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/graphics/scanner"
 )
 
@@ -57,7 +59,20 @@ func FuzzReader(f *testing.F) {
 		s := scanner.NewScanner()
 		iter := s.Scan(strings.NewReader(body))
 		iter(func(op string, args []pdf.Object) bool {
-			getNumber := func() (float64, bool) {
+			err := r.UpdateState(op, args)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			getInteger := func() (pdf.Integer, bool) {
+				if len(args) == 0 {
+					return 0, false
+				}
+				x, ok := args[0].(pdf.Integer)
+				args = args[1:]
+				return x, ok
+			}
+			getNum := func() (float64, bool) {
 				if len(args) == 0 {
 					return 0, false
 				}
@@ -73,24 +88,130 @@ func FuzzReader(f *testing.F) {
 				args = args[1:]
 				return x, ok
 			}
-
-			err := r.UpdateState(op, args)
-			if err != nil {
-				t.Fatal(err)
+			getArray := func() (pdf.Array, bool) {
+				if len(args) == 0 {
+					return nil, false
+				}
+				x, ok := args[0].(pdf.Array)
+				args = args[1:]
+				return x, ok
 			}
 
+		doOps:
 			switch op {
 			case "w":
-				x, ok := getNumber()
+				x, ok := getNum()
 				if ok {
 					w.SetLineWidth(x)
 				}
+			case "J":
+				x, ok := getInteger()
+				if ok {
+					w.SetLineCap(LineCapStyle(x))
+				}
+			case "j":
+				x, ok := getInteger()
+				if ok {
+					w.SetLineJoin(LineJoinStyle(x))
+				}
+			case "M":
+				x, ok := getNum()
+				if ok {
+					w.SetMiterLimit(x)
+				}
+			case "d":
+				patObj, ok1 := getArray()
+				pattern, ok2 := convertDashPattern(patObj)
+				phase, ok3 := getNum()
+				if ok1 && ok2 && ok3 {
+					w.SetDashPattern(pattern, phase)
+				}
+			case "ri":
+				name, ok := getName()
+				if ok {
+					w.SetRenderingIntent(name)
+				}
+			case "i":
+				x, ok := getNum()
+				if ok {
+					w.SetFlatnessTolerance(x)
+				}
+			case "gs":
+				name, ok := getName()
+				if ok {
+					ext, err := ReadExtGState(nil, res.ExtGState[name], name)
+					if err == nil {
+						w.SetExtGState(ext)
+					}
+				}
+			case "q":
+				w.PushGraphicsState()
+			case "Q":
+				if len(w.nesting) > 0 && w.nesting[len(w.nesting)-1] == pairTypeQ {
+					w.PopGraphicsState()
+				}
+
+			case "cm":
+				m := Matrix{}
+				for i := 0; i < 6; i++ {
+					f, ok := getNum()
+					if !ok {
+						break doOps
+					}
+					m[i] = float64(f)
+				}
+				w.Transform(m)
+
+			case "BT":
+				w.TextStart()
+			case "ET":
+				w.TextEnd()
+
+			case "Tc":
+				x, ok := getNum()
+				if ok {
+					w.TextSetCharacterSpacing(x)
+				}
+			case "Tw":
+				x, ok := getNum()
+				if ok {
+					w.TextSetWordSpacing(x)
+				}
+			case "Tz":
+				x, ok := getNum()
+				if ok {
+					w.TextSetHorizontalScaling(x)
+				}
+			case "TL":
+				x, ok := getNum()
+				if ok {
+					w.TextSetLeading(x)
+				}
 			case "Tf":
 				name, ok1 := getName()
-				size, ok2 := getNumber()
+				size, ok2 := getNum()
 				ref, _ := res.Font[name].(pdf.Reference)
 				if ok1 && ok2 {
-					w.TextSetFont(&Res{DefName: name, Data: ref}, size)
+					w.TextSetFont(&Res{DefName: "/" + name, Data: ref}, size)
+				}
+			case "Tr":
+				x, ok := getInteger()
+				if ok {
+					w.TextSetRenderingMode(TextRenderingMode(x))
+				}
+
+			case "G":
+				gray, ok := getNum()
+				if ok {
+					w.SetStrokeColor(color.Gray(gray))
+				}
+			case "k":
+				cyan, ok1 := getNum()
+				magenta, ok2 := getNum()
+				yellow, ok3 := getNum()
+				black, ok4 := getNum()
+				if ok1 && ok2 && ok3 && ok4 {
+					w.SetFillColor(color.CMYK(cyan, magenta, yellow, black))
 				}
 			}
 
@@ -118,8 +239,9 @@ func FuzzReader(f *testing.F) {
 		state2 := r.State
 
 		if d := cmp.Diff(state1, state2); d != "" {
-			fmt.Println(state1.TextFont)
-			fmt.Println(state2.TextFont)
+			fmt.Println("1:")
+			fmt.Println(body)
+			fmt.Println("2:")
 			fmt.Println(buf.String())
 			t.Errorf("state: %s", d)
 		}
