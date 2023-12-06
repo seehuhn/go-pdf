@@ -47,6 +47,15 @@ func FuzzReader(f *testing.F) {
 
 	f.Add("5 w\n")
 	f.Add("/F 12 Tf\n")
+	f.Add(`
+	BT
+	/F 12 Tf
+	100 100 Td
+	(Hello) Tj
+	0 -15 Td
+	(World) Tj
+	ET
+	`)
 	f.Fuzz(func(t *testing.T, body string) {
 		buf := &bytes.Buffer{}
 		w := NewWriter(buf, pdf.V1_7)
@@ -158,7 +167,7 @@ func FuzzReader(f *testing.F) {
 					if !ok {
 						break doOps
 					}
-					m[i] = float64(f)
+					m[i] = f
 				}
 				w.Transform(m)
 
@@ -199,6 +208,38 @@ func FuzzReader(f *testing.F) {
 				if ok {
 					w.TextSetRenderingMode(TextRenderingMode(x))
 				}
+			case "Ts":
+				x, ok := getNum()
+				if ok {
+					w.TextSetRise(x)
+				}
+
+			case "Td": // Move text position
+				tx, ok1 := getNum()
+				ty, ok2 := getNum()
+				if ok1 && ok2 {
+					w.TextFirstLine(tx, ty)
+				}
+
+			case "TD": // Move text position and set leading
+				tx, ok1 := getNum()
+				ty, ok2 := getNum()
+				if ok1 && ok2 {
+					w.TextSecondLine(tx, ty)
+				}
+
+			case "Tm": // Set text matrix and line matrix
+				m := Matrix{}
+				for i := 0; i < 6; i++ {
+					f, ok := getNum()
+					if !ok {
+						break doOps
+					}
+					m[i] = f
+				}
+				w.TextSetMatrix(m)
+
+			// ---
 
 			case "G":
 				gray, ok := getNum()

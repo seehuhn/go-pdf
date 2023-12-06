@@ -242,7 +242,7 @@ func (s *Parameters) Clone() *Parameters {
 // Matrix contains a PDF transformation matrix.
 // The elements are stored in the same order as for the "cm" operator.
 //
-// If M = [a b c d e f] is a matrix, then M corresponds to the following
+// If M = [a b c d e f] is a Matrix, then M corresponds to the following
 // 3x3 matrix:
 //
 //	/ a b 0 \

@@ -176,117 +176,99 @@ doOps:
 	// == Text state =====================================================
 
 	case "Tc": // Set character spacing
-		Tc, ok := getNum()
+		x, ok := getNum()
 		if ok {
-			r.TextCharacterSpacing = Tc
+			r.TextCharacterSpacing = x
 			r.Set |= StateTextCharacterSpacing
 		}
 
 	case "Tw": // Set word spacing
-		if len(args) < 1 {
-			break
+		x, ok := getNum()
+		if ok {
+			r.TextWordSpacing = x
+			r.Set |= StateTextWordSpacing
 		}
-		Tw, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.TextWordSpacing = Tw
-		r.Set |= StateTextWordSpacing
 
 	case "Tz": // Set the horizontal scaling
-		if len(args) < 1 {
-			break
+		x, ok := getNum()
+		if ok {
+			r.TextHorizonalScaling = x
+			r.Set |= StateTextHorizontalSpacing
 		}
-		Th, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.TextHorizonalScaling = Th
-		r.Set |= StateTextHorizontalSpacing
 
 	case "TL": // Set the leading
-		if len(args) < 1 {
-			break
+		x, ok := getNum()
+		if ok {
+			r.TextLeading = x
+			r.Set |= StateTextLeading
 		}
-		leading, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.TextLeading = leading
-		r.Set |= StateTextLeading
 
 	case "Tf": // Set text font and size
-		if len(args) < 2 {
-			break
+		name, ok1 := getName()
+		size, ok2 := getNum()
+		if ok1 && ok2 {
+			var obj pdf.Object
+			if r.Resources.Font != nil {
+				obj = r.Resources.Font[name]
+			}
+			ref, _ := obj.(pdf.Reference) // TODO(voss): think about this
+			r.TextFont = &Res{
+				DefName: name,
+				Data:    ref,
+			}
+			r.TextFontSize = size
+			r.Set |= StateTextFont
 		}
-		name, ok1 := args[0].(pdf.Name)
-		size, ok2 := getNumber(args[1])
-		if !ok1 || !ok2 {
-			break
-		}
-		var obj pdf.Object
-		if r.Resources.Font != nil {
-			obj = r.Resources.Font[name]
-		}
-		ref, _ := obj.(pdf.Reference)
-		r.TextFont = &Res{
-			DefName: name,
-			Data:    ref,
-		}
-		r.TextFontSize = size
-		r.Set |= StateTextFont
 
 	case "Tr": // text rendering mode
-		if len(args) < 1 {
-			break
+		x, ok := getInteger()
+		if ok {
+			r.TextRenderingMode = TextRenderingMode(x)
+			r.Set |= StateTextRenderingMode
 		}
-		mode, ok := args[0].(pdf.Integer)
-		if !ok {
-			break
-		}
-		r.TextRenderingMode = TextRenderingMode(mode)
-		r.Set |= StateTextRenderingMode
 
 	case "Ts": // Set text rise
-		if len(args) < 1 {
-			break
+		x, ok := getNum()
+		if ok {
+			r.TextRise = x
+			r.Set |= StateTextRise
 		}
-		rise, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.TextRise = rise
-		r.Set |= StateTextRise
 
 	// == Text positioning ===============================================
 
 	case "Td": // Move text position
-		if len(args) < 2 {
-			break
-		}
-		tx, ok1 := getNumber(args[0])
-		ty, ok2 := getNumber(args[1])
-		if !ok1 || !ok2 {
-			break
+		tx, ok1 := getNum()
+		ty, ok2 := getNum()
+		if ok1 && ok2 {
+			r.TextLineMatrix = Matrix{1, 0, 0, 1, tx, ty}.Mul(r.TextLineMatrix)
+			r.TextMatrix = r.TextLineMatrix
+			if r.Set&StateTlm != 0 {
+				r.Set |= StateTm
+			}
 		}
 
-		r.TextLineMatrix = Matrix{1, 0, 0, 1, tx, ty}.Mul(r.TextLineMatrix)
-		r.TextMatrix = r.TextLineMatrix
+	case "TD": // Move text position and set leading
+		tx, ok1 := getNum()
+		ty, ok2 := getNum()
+		if ok1 && ok2 {
+			r.TextLeading = -ty
+			r.TextLineMatrix = Matrix{1, 0, 0, 1, tx, ty}.Mul(r.TextLineMatrix)
+			r.TextMatrix = r.TextLineMatrix
+			r.Set |= StateTextLeading
+		}
 
 	case "Tm": // Set text matrix and text line matrix
-		if len(args) < 6 {
-			break
-		}
-		var data Matrix
+		m := Matrix{}
 		for i := 0; i < 6; i++ {
-			x, ok := getNumber(args[i])
+			f, ok := getNum()
 			if !ok {
-				break
+				break doOps
 			}
-			data[i] = x
+			m[i] = float64(f)
 		}
-		r.TextMatrix = data
-		r.TextLineMatrix = data
+		r.TextMatrix = m
+		r.TextLineMatrix = m
+		r.Set |= StateTm | StateTlm
 
 	// == Text showing ===================================================
 

@@ -201,7 +201,7 @@ type objectType int
 
 // See Figure 9 (p. 113) of PDF 32000-1:2008.
 const (
-	objPage objectType = iota
+	objPage objectType = 1 << iota
 	objPath
 	objText
 	objClippingPath

@@ -153,6 +153,7 @@ func (p *Writer) TextStart() {
 	p.currentObject = objText
 	p.State.TextMatrix = IdentityMatrix
 	p.State.TextLineMatrix = IdentityMatrix
+	p.Set |= StateTm | StateTlm
 	_, p.Err = fmt.Fprintln(p.Content, "BT")
 }
 
@@ -172,15 +173,24 @@ func (p *Writer) TextEnd() {
 }
 
 // TextFirstLine moves to the start of the next line of text.
+//
+// This implements the PDF graphics operator "Td".
 func (p *Writer) TextFirstLine(x, y float64) {
 	if !p.valid("TextFirstLine", objText) {
 		return
+	}
+	p.TextLineMatrix = Matrix{1, 0, 0, 1, x, y}.Mul(p.TextLineMatrix)
+	p.TextMatrix = p.TextLineMatrix
+	if p.Set&StateTlm != 0 {
+		p.Set |= StateTm
 	}
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "Td")
 }
 
 // TextSecondLine moves to the start of the next line of text and sets
 // the leading.  Usually, dy is negative.
+//
+// This implements the PDF graphics operator "TD".
 func (p *Writer) TextSecondLine(dx, dy float64) {
 	if !p.valid("TextSecondLine", objText) {
 		return
@@ -189,11 +199,26 @@ func (p *Writer) TextSecondLine(dx, dy float64) {
 }
 
 // TextNextLine moves to the start of the next line of text.
+//
+// This implements the PDF graphics operator "T*".
 func (p *Writer) TextNextLine() {
 	if !p.valid("TextNewLine", objText) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, "T*")
+}
+
+// TextSetMatrix replaces the current text matrix and line matrix with M.
+//
+// This implements the PDF graphics operator "Tm".
+func (p *Writer) TextSetMatrix(M Matrix) {
+	if !p.valid("TextSetMatrix", objText) {
+		return
+	}
+	p.TextMatrix = M
+	p.TextLineMatrix = M
+	p.Set |= StateTm | StateTlm
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(M[0]), p.coord(M[1]), p.coord(M[2]), p.coord(M[3]), p.coord(M[4]), p.coord(M[5]), "Tm")
 }
 
 // TextLayout returns the glyph sequence for a string.
