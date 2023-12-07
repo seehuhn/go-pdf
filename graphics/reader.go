@@ -83,7 +83,9 @@ doOps:
 	case "J": // line cap style
 		x, ok := getInteger()
 		if ok {
-			x = min(max(x, 0), 2)
+			if LineCapStyle(x) > 2 {
+				x = 0
+			}
 			r.LineCap = LineCapStyle(x)
 			r.Set |= StateLineCap
 		}
@@ -91,7 +93,9 @@ doOps:
 	case "j": // line join style
 		x, ok := getInteger()
 		if ok {
-			x = min(max(x, 0), 2)
+			if LineJoinStyle(x) > 2 {
+				x = 0
+			}
 			r.LineJoin = LineJoinStyle(x)
 			r.Set |= StateLineJoin
 		}
@@ -237,24 +241,27 @@ doOps:
 	// == Text positioning ===============================================
 
 	case "Td": // Move text position
-		tx, ok1 := getNum()
-		ty, ok2 := getNum()
+		dx, ok1 := getNum()
+		dy, ok2 := getNum()
 		if ok1 && ok2 {
-			r.TextLineMatrix = Matrix{1, 0, 0, 1, tx, ty}.Mul(r.TextLineMatrix)
+			r.TextLineMatrix = Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
-			if r.Set&StateTlm != 0 {
-				r.Set |= StateTm
+			if r.Set&StateTextLineMatrix != 0 {
+				r.Set |= StateTextMatrix
 			}
 		}
 
 	case "TD": // Move text position and set leading
-		tx, ok1 := getNum()
-		ty, ok2 := getNum()
+		dx, ok1 := getNum()
+		dy, ok2 := getNum()
 		if ok1 && ok2 {
-			r.TextLeading = -ty
-			r.TextLineMatrix = Matrix{1, 0, 0, 1, tx, ty}.Mul(r.TextLineMatrix)
-			r.TextMatrix = r.TextLineMatrix
+			r.TextLeading = -dy
 			r.Set |= StateTextLeading
+			r.TextLineMatrix = Translate(dx, dy).Mul(r.TextLineMatrix)
+			r.TextMatrix = r.TextLineMatrix
+			if r.Set&StateTextLineMatrix != 0 {
+				r.Set |= StateTextMatrix
+			}
 		}
 
 	case "Tm": // Set text matrix and text line matrix
@@ -268,7 +275,14 @@ doOps:
 		}
 		r.TextMatrix = m
 		r.TextLineMatrix = m
-		r.Set |= StateTm | StateTlm
+		r.Set |= StateTextMatrix | StateTextLineMatrix
+
+	case "T*": // Move to start of next text line
+		r.TextLineMatrix = Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+		r.TextMatrix = r.TextLineMatrix
+		if r.Set&StateTextLineMatrix != 0 {
+			r.Set |= StateTextMatrix
+		}
 
 	// == Text showing ===================================================
 
@@ -291,6 +305,7 @@ doOps:
 			break
 		}
 		r.StrokeColor = color.Gray(gray)
+		r.Set |= StateStrokeColor
 
 	case "g": // nonstroking gray level
 		if len(args) < 1 {
@@ -301,6 +316,7 @@ doOps:
 			break
 		}
 		r.FillColor = color.Gray(gray)
+		r.Set |= StateFillColor
 
 	case "RG": // nonstroking DeviceRGB color
 		if len(args) < 3 {

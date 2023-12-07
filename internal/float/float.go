@@ -59,3 +59,12 @@ func Format(x float64, digits int) string {
 	}
 	return signPart + intPart + fracPart
 }
+
+func Round(x float64, digits int) float64 {
+	s := Format(x, digits)
+	y, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		panic(err)
+	}
+	return y
+}

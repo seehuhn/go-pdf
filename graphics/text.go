@@ -31,7 +31,7 @@ import (
 //
 // This implementes the PDF graphics operator "Tc".
 func (p *Writer) TextSetCharacterSpacing(spacing float64) {
-	if !p.valid("TextSetCharSpacing", objText, objPage) {
+	if !p.valid("TextSetCharSpacing", objText|objPage) {
 		return
 	}
 	if p.isSet(StateTextCharacterSpacing) && nearlyEqual(spacing, p.State.TextCharacterSpacing) {
@@ -46,7 +46,7 @@ func (p *Writer) TextSetCharacterSpacing(spacing float64) {
 //
 // This implementes the PDF graphics operator "Tw".
 func (p *Writer) TextSetWordSpacing(spacing float64) {
-	if !p.valid("TextSetWordSpacing", objText, objPage) {
+	if !p.valid("TextSetWordSpacing", objText|objPage) {
 		return
 	}
 	if p.isSet(StateTextWordSpacing) && nearlyEqual(spacing, p.State.TextWordSpacing) {
@@ -61,7 +61,7 @@ func (p *Writer) TextSetWordSpacing(spacing float64) {
 //
 // This implementes the PDF graphics operator "Tz".
 func (p *Writer) TextSetHorizontalScaling(scaling float64) {
-	if !p.valid("TextSetHorizontalScaling", objText, objPage) {
+	if !p.valid("TextSetHorizontalScaling", objText|objPage) {
 		return
 	}
 	if p.isSet(StateTextHorizontalSpacing) && nearlyEqual(scaling, p.State.TextHorizonalScaling) {
@@ -76,7 +76,7 @@ func (p *Writer) TextSetHorizontalScaling(scaling float64) {
 //
 // This implementes the PDF graphics operator "TL".
 func (p *Writer) TextSetLeading(leading float64) {
-	if !p.valid("TextSetLeading", objText, objPage) {
+	if !p.valid("TextSetLeading", objText|objPage) {
 		return
 	}
 	if p.isSet(StateTextLeading) && nearlyEqual(leading, p.State.TextLeading) {
@@ -91,7 +91,7 @@ func (p *Writer) TextSetLeading(leading float64) {
 //
 // This implements the PDF graphics operator "Tf".
 func (p *Writer) TextSetFont(font Resource, size float64) {
-	if !p.valid("TextSetFont", objText, objPage) {
+	if !p.valid("TextSetFont", objText|objPage) {
 		return
 	}
 
@@ -117,7 +117,7 @@ func (p *Writer) TextSetFont(font Resource, size float64) {
 //
 // This implements the PDF graphics operator "Tr".
 func (p *Writer) TextSetRenderingMode(mode TextRenderingMode) {
-	if !p.valid("TextSetRenderingMode", objText, objPage) {
+	if !p.valid("TextSetRenderingMode", objText|objPage) {
 		return
 	}
 	if p.isSet(StateTextRenderingMode) && p.State.TextRenderingMode == mode {
@@ -132,7 +132,7 @@ func (p *Writer) TextSetRenderingMode(mode TextRenderingMode) {
 //
 // This implements the PDF graphics operator "Ts".
 func (p *Writer) TextSetRise(rise float64) {
-	if !p.valid("TextSetRise", objText, objPage) {
+	if !p.valid("TextSetRise", objText|objPage) {
 		return
 	}
 	if p.isSet(StateTextRise) && nearlyEqual(rise, p.State.TextRise) {
@@ -153,7 +153,7 @@ func (p *Writer) TextStart() {
 	p.currentObject = objText
 	p.State.TextMatrix = IdentityMatrix
 	p.State.TextLineMatrix = IdentityMatrix
-	p.Set |= StateTm | StateTlm
+	p.Set |= StateTextMatrix | StateTextLineMatrix
 	_, p.Err = fmt.Fprintln(p.Content, "BT")
 }
 
@@ -175,16 +175,16 @@ func (p *Writer) TextEnd() {
 // TextFirstLine moves to the start of the next line of text.
 //
 // This implements the PDF graphics operator "Td".
-func (p *Writer) TextFirstLine(x, y float64) {
+func (p *Writer) TextFirstLine(dx, dy float64) {
 	if !p.valid("TextFirstLine", objText) {
 		return
 	}
-	p.TextLineMatrix = Matrix{1, 0, 0, 1, x, y}.Mul(p.TextLineMatrix)
+	p.TextLineMatrix = Translate(dx, dy).Mul(p.TextLineMatrix)
 	p.TextMatrix = p.TextLineMatrix
-	if p.Set&StateTlm != 0 {
-		p.Set |= StateTm
+	if p.Set&StateTextLineMatrix != 0 {
+		p.Set |= StateTextMatrix
 	}
-	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "Td")
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(dx), p.coord(dy), "Td")
 }
 
 // TextSecondLine moves to the start of the next line of text and sets
@@ -195,17 +195,14 @@ func (p *Writer) TextSecondLine(dx, dy float64) {
 	if !p.valid("TextSecondLine", objText) {
 		return
 	}
-	_, p.Err = fmt.Fprintln(p.Content, p.coord(dx), p.coord(dy), "TD")
-}
-
-// TextNextLine moves to the start of the next line of text.
-//
-// This implements the PDF graphics operator "T*".
-func (p *Writer) TextNextLine() {
-	if !p.valid("TextNewLine", objText) {
-		return
+	p.TextLeading = -dy
+	p.Set |= StateTextLeading
+	p.TextLineMatrix = Translate(dx, dy).Mul(p.TextLineMatrix)
+	p.TextMatrix = p.TextLineMatrix
+	if p.Set&StateTextLineMatrix != 0 {
+		p.Set |= StateTextMatrix
 	}
-	_, p.Err = fmt.Fprintln(p.Content, "T*")
+	_, p.Err = fmt.Fprintln(p.Content, p.coord(dx), p.coord(dy), "TD")
 }
 
 // TextSetMatrix replaces the current text matrix and line matrix with M.
@@ -217,8 +214,23 @@ func (p *Writer) TextSetMatrix(M Matrix) {
 	}
 	p.TextMatrix = M
 	p.TextLineMatrix = M
-	p.Set |= StateTm | StateTlm
+	p.Set |= StateTextMatrix | StateTextLineMatrix
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(M[0]), p.coord(M[1]), p.coord(M[2]), p.coord(M[3]), p.coord(M[4]), p.coord(M[5]), "Tm")
+}
+
+// TextNextLine moves to the start of the next line of text.
+//
+// This implements the PDF graphics operator "T*".
+func (p *Writer) TextNextLine() {
+	if !p.valid("TextNewLine", objText) {
+		return
+	}
+	p.TextLineMatrix = Translate(0, -p.TextLeading).Mul(p.TextLineMatrix)
+	p.TextMatrix = p.TextLineMatrix
+	if p.Set&StateTextLineMatrix != 0 {
+		p.Set |= StateTextMatrix
+	}
+	_, p.Err = fmt.Fprintln(p.Content, "T*")
 }
 
 // TextLayout returns the glyph sequence for a string.

@@ -121,8 +121,8 @@ const (
 	StateTextRise
 	StateTextKnockout
 
-	StateTm
-	StateTlm
+	StateTextMatrix
+	StateTextLineMatrix
 
 	StateLineWidth
 	StateLineCap

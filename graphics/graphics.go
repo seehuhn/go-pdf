@@ -31,7 +31,7 @@ import (
 //
 // This implementes the PDF graphics operator "cm".
 func (p *Writer) Transform(m Matrix) {
-	if !p.valid("Transform", objPage, objText) {
+	if !p.valid("Transform", objPage|objText) {
 		return
 	}
 	p.CTM = p.CTM.Mul(m)
@@ -44,7 +44,7 @@ func (p *Writer) Transform(m Matrix) {
 // SetStrokeColor sets the stroke color in the graphics state.
 // If col is nil, the stroke color is not changed.
 func (p *Writer) SetStrokeColor(col color.Color) {
-	if !p.valid("SetStrokeColor", objPage, objText) {
+	if !p.valid("SetStrokeColor", objPage|objText) {
 		return
 	}
 	if p.isSet(StateStrokeColor) && col == p.StrokeColor {
@@ -58,7 +58,7 @@ func (p *Writer) SetStrokeColor(col color.Color) {
 // SetFillColor sets the fill color in the graphics state.
 // If col is nil, the fill color is not changed.
 func (p *Writer) SetFillColor(col color.Color) {
-	if !p.valid("SetFillColor", objPage, objText) {
+	if !p.valid("SetFillColor", objPage|objText) {
 		return
 	}
 	if p.isSet(StateFillColor) && col == p.FillColor {
@@ -73,7 +73,7 @@ func (p *Writer) SetFillColor(col color.Color) {
 //
 // This implementes the PDF graphics operator "w".
 func (p *Writer) SetLineWidth(width float64) {
-	if !p.valid("SetLineWidth", objPage, objText) {
+	if !p.valid("SetLineWidth", objPage|objText) {
 		return
 	}
 	if p.isSet(StateLineWidth) && nearlyEqual(width, p.LineWidth) {
@@ -88,8 +88,11 @@ func (p *Writer) SetLineWidth(width float64) {
 //
 // This implementes the PDF graphics operator "J".
 func (p *Writer) SetLineCap(cap LineCapStyle) {
-	if !p.valid("SetLineCap", objPage, objText) {
+	if !p.valid("SetLineCap", objPage|objText) {
 		return
+	}
+	if LineCapStyle(cap) > 2 {
+		cap = 0
 	}
 	if p.isSet(StateLineCap) && cap == p.LineCap {
 		return
@@ -103,8 +106,11 @@ func (p *Writer) SetLineCap(cap LineCapStyle) {
 //
 // This implementes the PDF graphics operator "j".
 func (p *Writer) SetLineJoin(join LineJoinStyle) {
-	if !p.valid("SetLineJoin", objPage, objText) {
+	if !p.valid("SetLineJoin", objPage|objText) {
 		return
+	}
+	if LineJoinStyle(join) > 2 {
+		join = 0
 	}
 	if p.isSet(StateLineJoin) && join == p.LineJoin {
 		return
@@ -116,7 +122,7 @@ func (p *Writer) SetLineJoin(join LineJoinStyle) {
 
 // SetMiterLimit sets the miter limit.
 func (p *Writer) SetMiterLimit(limit float64) {
-	if !p.valid("SetMiterLimit", objPage, objText) {
+	if !p.valid("SetMiterLimit", objPage|objText) {
 		return
 	}
 	if p.isSet(StateMiterLimit) && nearlyEqual(limit, p.MiterLimit) {
@@ -129,7 +135,7 @@ func (p *Writer) SetMiterLimit(limit float64) {
 
 // SetDashPattern sets the line dash pattern.
 func (p *Writer) SetDashPattern(pattern []float64, phase float64) {
-	if !p.valid("SetDashPattern", objPage, objText) {
+	if !p.valid("SetDashPattern", objPage|objText) {
 		return
 	}
 
@@ -159,7 +165,7 @@ func (p *Writer) SetDashPattern(pattern []float64, phase float64) {
 
 // SetRenderingIntent sets the rendering intent.
 func (p *Writer) SetRenderingIntent(intent pdf.Name) {
-	if !p.valid("SetRenderingIntent", objPage, objText) {
+	if !p.valid("SetRenderingIntent", objPage|objText) {
 		return
 	}
 	if p.isSet(StateRenderingIntent) && intent == p.RenderingIntent {
@@ -177,7 +183,7 @@ func (p *Writer) SetRenderingIntent(intent pdf.Name) {
 
 // SetFlatnessTolerance sets the flatness tolerance.
 func (p *Writer) SetFlatnessTolerance(flatness float64) {
-	if !p.valid("SetFlatness", objPage, objText) {
+	if !p.valid("SetFlatness", objPage|objText) {
 		return
 	}
 	if p.isSet(StateFlatnessTolerance) && nearlyEqual(flatness, p.FlatnessTolerance) {

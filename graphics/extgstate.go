@@ -28,7 +28,7 @@ import (
 //
 // This implements the "gs" graphics operator.
 func (p *Writer) SetExtGState(s *ExtGState) {
-	if !p.valid("SetExtGState", objPage, objText) {
+	if !p.valid("SetExtGState", objPage|objText) {
 		return
 	}
 

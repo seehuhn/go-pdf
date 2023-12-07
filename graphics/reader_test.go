@@ -68,10 +68,7 @@ func FuzzReader(f *testing.F) {
 		s := scanner.NewScanner()
 		iter := s.Scan(strings.NewReader(body))
 		iter(func(op string, args []pdf.Object) bool {
-			err := r.UpdateState(op, args)
-			if err != nil {
-				t.Fatal(err)
-			}
+			oargs := args
 
 			getInteger := func() (pdf.Integer, bool) {
 				if len(args) == 0 {
@@ -215,17 +212,17 @@ func FuzzReader(f *testing.F) {
 				}
 
 			case "Td": // Move text position
-				tx, ok1 := getNum()
-				ty, ok2 := getNum()
+				dx, ok1 := getNum()
+				dy, ok2 := getNum()
 				if ok1 && ok2 {
-					w.TextFirstLine(tx, ty)
+					w.TextFirstLine(dx, dy)
 				}
 
 			case "TD": // Move text position and set leading
-				tx, ok1 := getNum()
-				ty, ok2 := getNum()
+				dx, ok1 := getNum()
+				dy, ok2 := getNum()
 				if ok1 && ok2 {
-					w.TextSecondLine(tx, ty)
+					w.TextSecondLine(dx, dy)
 				}
 
 			case "Tm": // Set text matrix and line matrix
@@ -239,6 +236,9 @@ func FuzzReader(f *testing.F) {
 				}
 				w.TextSetMatrix(m)
 
+			case "T*": // Move to start of next text line
+				w.TextNextLine()
+
 			// ---
 
 			case "G":
@@ -246,6 +246,13 @@ func FuzzReader(f *testing.F) {
 				if ok {
 					w.SetStrokeColor(color.Gray(gray))
 				}
+
+			case "g":
+				gray, ok := getNum()
+				if ok {
+					w.SetFillColor(color.Gray(gray))
+				}
+
 			case "k":
 				cyan, ok1 := getNum()
 				magenta, ok2 := getNum()
@@ -256,11 +263,15 @@ func FuzzReader(f *testing.F) {
 				}
 			}
 
+			if w.Err != nil {
+				return false
+			}
+			err := r.UpdateState(op, oargs)
+			if err != nil {
+				t.Fatal(err)
+			}
 			return true
 		})
-		if w.Err != nil {
-			t.Fatal(w.Err)
-		}
 		state1 := r.State
 
 		r = &Reader{

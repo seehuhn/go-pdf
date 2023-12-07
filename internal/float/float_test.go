@@ -60,8 +60,8 @@ func TestFormat(t *testing.T) {
 
 func FuzzFormat(f *testing.F) {
 	f.Fuzz(func(t *testing.T, x float64, digits int) {
-		// The Format function is only used in the PDF writer, which
-		// only uses it with `digits`` in the range {0, ..., 5}.
+		// The Format function is used in the PDF writer, which only uses it
+		// with `digits` in the range {0, ..., 5}.
 		if digits < 0 || digits > 5 {
 			return
 		}
@@ -72,6 +72,22 @@ func FuzzFormat(f *testing.F) {
 		} else if math.Log10(x)+float64(digits) < 15 && math.Abs(x-y) > 0.500001*math.Pow10(-digits) {
 			fmt.Println(math.Abs(x-y), 0.500001*math.Pow10(-digits))
 			t.Errorf("Format(%g, %d) = %q", x, digits, xString)
+		}
+	})
+}
+
+func FuzzRound(f *testing.F) {
+	f.Add(0.0, 5)
+	f.Add(1.0, 5)
+	f.Add(9999.9999, 5)
+	f.Fuzz(func(t *testing.T, a float64, b int) {
+		if b < 1 || b > 5 {
+			return
+		}
+		s1 := Format(a, b)
+		s2 := Format(Round(a, b), b)
+		if s1 != s2 {
+			t.Errorf("Format(%g, %d) = %q, but Round(%g, %d) = %q", a, b, s1, a, b, s2)
 		}
 	})
 }

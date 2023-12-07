@@ -29,7 +29,7 @@ type FormXObject struct {
 
 // PaintFormXObject draws a Form XObject onto the page.
 func (p *Writer) PaintFormXObject(x *FormXObject) {
-	if !p.valid("PaintFormXObject", objPage, objText) {
+	if !p.valid("PaintFormXObject", objPage|objText) {
 		return
 	}
 

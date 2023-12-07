@@ -233,15 +233,13 @@ func (s objectType) String() string {
 
 // valid returns true, if the current graphics object is one of the given types.
 // Otherwise it sets p.Err and returns false.
-func (p *Writer) valid(cmd string, ss ...objectType) bool {
+func (p *Writer) valid(cmd string, ss objectType) bool {
 	if p.Err != nil {
 		return false
 	}
 
-	for _, s := range ss {
-		if p.currentObject == s {
-			return true
-		}
+	if p.currentObject&ss != 0 {
+		return true
 	}
 
 	p.Err = fmt.Errorf("unexpected state %q for %q", p.currentObject, cmd)
@@ -250,13 +248,13 @@ func (p *Writer) valid(cmd string, ss ...objectType) bool {
 
 // PushGraphicsState saves the current graphics state.
 func (p *Writer) PushGraphicsState() {
-	var allowedStates []objectType
+	var allowedStates objectType
 	if p.Version >= pdf.V2_0 {
-		allowedStates = []objectType{objPage, objText}
+		allowedStates = objPage | objText
 	} else {
-		allowedStates = []objectType{objPage}
+		allowedStates = objPage
 	}
-	if !p.valid("PushGraphicsState", allowedStates...) {
+	if !p.valid("PushGraphicsState", allowedStates) {
 		return
 	}
 
@@ -274,13 +272,13 @@ func (p *Writer) PushGraphicsState() {
 
 // PopGraphicsState restores the previous graphics state.
 func (p *Writer) PopGraphicsState() {
-	var allowedStates []objectType
+	var allowedStates objectType
 	if p.Version >= pdf.V2_0 {
-		allowedStates = []objectType{objPage, objText}
+		allowedStates = objPage | objText
 	} else {
-		allowedStates = []objectType{objPage}
+		allowedStates = objPage
 	}
-	if !p.valid("PopGraphicsState", allowedStates...) {
+	if !p.valid("PopGraphicsState", allowedStates) {
 		return
 	}
 
