@@ -55,7 +55,7 @@ type jpegImage struct {
 // Bounds implements the [Image] interface.
 func (im *jpegImage) Bounds() graphics.Rectangle {
 	b := im.im.Bounds()
-	return graphics.Rectangle{b.Min.X, b.Min.Y, b.Max.X, b.Max.Y}
+	return graphics.Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
 }
 
 // Embed implements the [Image] interface.
