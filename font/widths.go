@@ -17,6 +17,7 @@
 package font
 
 import (
+	"errors"
 	"math"
 	"sort"
 
@@ -39,6 +40,7 @@ type WidthInfo struct {
 }
 
 // EncodeWidthsSimple encodes the glyph width information for a simple PDF font.
+// The slice ww must have length 256 and is indexed by character code.
 func EncodeWidthsSimple(ww []funit.Int16, unitsPerEm uint16) *WidthInfo {
 	q := 1000 / float64(unitsPerEm)
 
@@ -93,7 +95,9 @@ type CIDWidth struct {
 
 // EncodeWidthsComposite constructs the W and DW entries for a CIDFont dictionary.
 // This function modifies ww, sorting it by increasing CID.
-func EncodeWidthsComposite(ww []CIDWidth, unitsPerEm uint16) (pdf.Integer, pdf.Array) {
+//
+// TODO(voss): use map[type1.CID]float64 instead of []CIDWidth?
+func EncodeWidthsComposite(ww []CIDWidth, unitsPerEm uint16) (pdf.Number, pdf.Array) {
 	sort.Slice(ww, func(i, j int) bool {
 		return ww[i].CID < ww[j].CID
 	})
@@ -107,7 +111,7 @@ func EncodeWidthsComposite(ww []CIDWidth, unitsPerEm uint16) (pdf.Integer, pdf.A
 	}
 
 	q := 1000 / float64(unitsPerEm)
-	dwScaled := pdf.Integer(math.Round(dw.AsFloat(q)))
+	dwScaled := dw.AsFloat(q)
 
 	var res pdf.Array
 	pos := 0
@@ -131,7 +135,7 @@ func EncodeWidthsComposite(ww []CIDWidth, unitsPerEm uint16) (pdf.Integer, pdf.A
 		pos = g.To(pos, e)
 	}
 
-	return dwScaled, res
+	return pdf.Number(dwScaled), res
 }
 
 type wwGraph struct {
@@ -213,4 +217,81 @@ func mostFrequent(ww []CIDWidth) funit.Int16 {
 		}
 	}
 	return bestVal
+}
+
+// TODO(voss): make DecodeWidthsComposite and EncodeWidthsComposite
+// inverse functions of each other.  Use this for testing/fuzzing.
+
+// DecodeWidthsComposite decodes the W and DW entries of a CIDFont dictionary.
+func DecodeWidthsComposite(r pdf.Getter, ref pdf.Object) (map[type1.CID]float64, float64, error) {
+	dw, err := pdf.GetNumber(r, ref)
+	if err != nil {
+		return nil, 0, err
+	}
+	w, err := pdf.GetArray(r, ref)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	res := make(map[type1.CID]float64)
+	for len(w) > 1 {
+		c0, err := pdf.GetInteger(r, w[0])
+		if err != nil {
+			return nil, 0, err
+		}
+		obj1, err := pdf.Resolve(r, w[1])
+		if err != nil {
+			return nil, 0, err
+		}
+		if c1, ok := obj1.(pdf.Integer); ok {
+			if len(w) < 3 {
+				break
+			}
+			wi, err := pdf.GetNumber(r, w[2])
+			if err != nil {
+				return nil, 0, err
+			}
+			for c := c0; c <= c1; c++ {
+				cid := type1.CID(c)
+				if pdf.Integer(cid) != c {
+					return nil, 0, &pdf.MalformedFileError{
+						Err: errors.New("invalid W entry in CIDFont dictionary"),
+					}
+				}
+				if wi != dw {
+					res[cid] = float64(wi)
+				}
+			}
+			w = w[3:]
+		} else {
+			wi, err := pdf.GetArray(r, w[1])
+			if err != nil {
+				return nil, 0, err
+			}
+			for _, wiObj := range wi {
+				wi, err := pdf.GetNumber(r, wiObj)
+				if err != nil {
+					return nil, 0, err
+				}
+				cid := type1.CID(c0)
+				if pdf.Integer(cid) != c0 {
+					return nil, 0, &pdf.MalformedFileError{
+						Err: errors.New("invalid W entry in CIDFont dictionary"),
+					}
+				}
+				if wi != dw {
+					res[cid] = float64(wi)
+				}
+				c0++
+			}
+			w = w[2:]
+		}
+	}
+	if len(w) != 0 {
+		return nil, 0, &pdf.MalformedFileError{
+			Err: errors.New("invalid W entry in CIDFont dictionary"),
+		}
+	}
+
+	return res, float64(dw), nil
 }

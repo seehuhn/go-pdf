@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -38,13 +39,19 @@ type Geometry struct {
 	UnderlinePosition  funit.Float64
 	UnderlineThickness funit.Float64
 
-	GlyphExtents []funit.Rect16
-	Widths       []funit.Int16
+	// TODO(voss): check that this is indexed by CID, not by GID
+	GlyphExtents []funit.Rect16 // indexed by CID
+	Widths       []funit.Int16  // indexed by CID
 }
 
 // GetGeometry returns the geometry of a font.
 func (g *Geometry) GetGeometry() *Geometry {
 	return g
+}
+
+// GlyphWidth implements the [font.NewFont] interface.
+func (g *Geometry) GlyphWidth(cid type1.CID) float64 {
+	return g.ToPDF16(1000, g.Widths[cid])
 }
 
 // ToPDF converts an integer from font design units to PDF units.
@@ -112,6 +119,9 @@ type Embedded interface {
 	DefaultName() pdf.Name
 	PDFObject() pdf.Object
 	Close() error
+
+	SplitString(pdf.String) []type1.CID
+	GlyphWidth(type1.CID) float64 // 1000 units correspond to 1 unit in text space
 }
 
 // NumGlyphs returns the number of glyphs in a font.

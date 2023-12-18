@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -121,6 +122,7 @@ func (f *Font) GetGeometry() *font.Geometry {
 			continue
 		}
 		glyphExtents[i] = f.Glyphs[name].BBox
+		// TODO(voss): is `withds` ordered correctly?
 		widths[i] = f.Glyphs[name].WidthX
 	}
 
@@ -232,6 +234,11 @@ func (e *embedded) Close() error {
 		IsSmallCap: e.IsSmallCap,
 	}
 	return info.Embed(e.w, e.Data)
+}
+
+func (e *embedded) GlyphWidth(cid type1.CID) float64 {
+	// TODO(voss): is this correct?
+	return float64(e.Glyphs[e.glyphNames[cid]].WidthX)
 }
 
 // EmbedInfo contains the information needed to embed a type 3 font into a PDF document.

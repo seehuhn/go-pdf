@@ -36,7 +36,6 @@ func TestFindPages(t *testing.T) {
 		pageDict := pdf.Dict{
 			"Type": pdf.Name("Page"),
 		}
-		doc.Put(pageRefsIn[i], pageDict)
 		err := tree.AppendPageRef(pageRefsIn[i], pageDict)
 		if err != nil {
 			t.Fatal(err)

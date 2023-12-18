@@ -17,6 +17,7 @@
 package font
 
 import (
+	"errors"
 	"fmt"
 
 	"seehuhn.de/go/pdf"
@@ -109,33 +110,33 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 
 	fontDict, err := pdf.GetDictTyped(r, fontDictRef, "Font")
 	if err != nil {
-		return nil, err
+		return nil, pdf.Wrap(err, "font dict")
 	}
 	res.FontDict = fontDict
 
 	fontType, err := pdf.GetName(r, fontDict["Subtype"])
 	if err != nil {
-		return nil, err
+		return nil, pdf.Wrap(err, "Subtype")
 	}
 
 	var cidFontType pdf.Name
 	if fontType == "Type0" {
 		descendantFonts, err := pdf.GetArray(r, fontDict["DescendantFonts"])
 		if err != nil {
-			return nil, err
+			return nil, pdf.Wrap(err, "DescendantFonts")
 		} else if len(descendantFonts) != 1 {
 			return nil, fmt.Errorf("invalid descendant fonts: %v", descendantFonts)
 		}
 
 		cidFontDict, err := pdf.GetDictTyped(r, descendantFonts[0], "Font")
 		if err != nil {
-			return nil, err
+			return nil, pdf.Wrap(err, "CIDFont dict")
 		}
 		res.CIDFontDict = cidFontDict
 
 		cidFontType, err = pdf.GetName(r, cidFontDict["Subtype"])
 		if err != nil {
-			return nil, err
+			return nil, pdf.Wrap(err, "CIDFont Subtype")
 		}
 
 		fontDict = cidFontDict
@@ -143,7 +144,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 
 	fontDescriptor, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
 	if err != nil {
-		return nil, err
+		return nil, pdf.Wrap(err, "FontDescriptor")
 	}
 	var fontKey pdf.Name
 	if fontDescriptor != nil {
@@ -155,7 +156,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 			if ref, _ := fontDescriptor[key].(pdf.Reference); ref != 0 {
 				stm, err := pdf.GetStream(r, ref)
 				if err != nil {
-					return nil, err
+					return nil, pdf.Wrap(err, string(key))
 				}
 				fontKey = key
 				res.FontProgram = stm
@@ -168,7 +169,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 	if res.FontProgram != nil {
 		subType, err = pdf.GetName(r, res.FontProgram.Dict["Subtype"])
 		if err != nil {
-			return nil, err
+			return nil, pdf.Wrap(err, "Subtype")
 		}
 	}
 
@@ -201,8 +202,10 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 	case fontType == "Type0" && cidFontType == "CIDFontType2" && fontKey == "FontFile3" && subType == "OpenType":
 		res.Type = OpenTypeGlyfComposite
 	default:
-		return nil, fmt.Errorf("unknown font type: %s/%s/%s/%s",
-			fontType, cidFontType, fontKey, subType)
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("unknown font type"),
+			Loc: []string{pdf.Format(fontDictRef)},
+		}
 	}
 
 	return res, nil

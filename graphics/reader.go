@@ -19,6 +19,7 @@ package graphics
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/font"
 )
 
 // A Reader reads a PDF content stream.
@@ -210,19 +211,22 @@ doOps:
 	case "Tf": // Set text font and size
 		name, ok1 := getName()
 		size, ok2 := getNum()
-		if ok1 && ok2 {
-			var obj pdf.Object
-			if r.Resources.Font != nil {
-				obj = r.Resources.Font[name]
-			}
-			ref, _ := obj.(pdf.Reference) // TODO(voss): think about this
-			r.TextFont = &Res{
-				DefName: name,
-				Data:    ref,
-			}
-			r.TextFontSize = size
-			r.Set |= StateTextFont
+		if !ok1 || !ok2 || r.Resources == nil || r.Resources.Font == nil {
+			break
 		}
+		ref := r.Resources.Font[name]
+		if ref == nil {
+			break
+		}
+		F, err := font.Read(r.R, ref)
+		if pdf.IsMalformed(err) {
+			break
+		} else if err != nil {
+			return err
+		}
+		r.TextFont = F
+		r.TextFontSize = size
+		r.Set |= StateTextFont
 
 	case "Tr": // text rendering mode
 		x, ok := getInteger()

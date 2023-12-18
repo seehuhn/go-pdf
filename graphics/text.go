@@ -90,7 +90,7 @@ func (p *Writer) TextSetLeading(leading float64) {
 // TextSetFont sets the font and font size.
 //
 // This implements the PDF graphics operator "Tf".
-func (p *Writer) TextSetFont(font Resource, size float64) {
+func (p *Writer) TextSetFont(font font.NewFont, size float64) {
 	if !p.valid("TextSetFont", objText|objPage) {
 		return
 	}

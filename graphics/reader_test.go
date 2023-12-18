@@ -26,22 +26,27 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/scanner"
+	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
 func FuzzReader(f *testing.F) {
+	data := pdf.NewData(pdf.V1_7)
+	F := dummyfont.Embed(data)
+
 	res := &pdf.Resources{
 		ExtGState: map[pdf.Name]pdf.Object{
-			"G": pdf.NewReference(1, 0),
+			"G": data.Alloc(),
 		},
 		ColorSpace: map[pdf.Name]pdf.Object{},
 		Pattern:    map[pdf.Name]pdf.Object{},
 		Shading:    map[pdf.Name]pdf.Object{},
 		XObject: map[pdf.Name]pdf.Object{
-			"X": pdf.NewReference(2, 0),
+			"X": data.Alloc(),
 		},
 		Font: map[pdf.Name]pdf.Object{
-			"F": pdf.NewReference(3, 0),
+			"F": F.PDFObject(),
 		},
 	}
 
@@ -60,8 +65,10 @@ func FuzzReader(f *testing.F) {
 		buf := &bytes.Buffer{}
 		w := NewWriter(buf, pdf.V1_7)
 
+		data := pdf.NewData(pdf.V1_7)
+
 		r := &Reader{
-			R:         nil,
+			R:         data,
 			Resources: res,
 			State:     NewState(),
 		}
@@ -196,9 +203,14 @@ func FuzzReader(f *testing.F) {
 			case "Tf":
 				name, ok1 := getName()
 				size, ok2 := getNum()
-				ref, _ := res.Font[name].(pdf.Reference)
+				F, err := font.Read(data, res.Font[name])
+				if pdf.IsMalformed(err) {
+					break
+				} else {
+					t.Fatal(err)
+				}
 				if ok1 && ok2 {
-					w.TextSetFont(&Res{DefName: "/" + name, Data: ref}, size)
+					w.TextSetFont(F, size)
 				}
 			case "Tr":
 				x, ok := getInteger()

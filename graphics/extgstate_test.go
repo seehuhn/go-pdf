@@ -21,14 +21,16 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
 func TestExtGState(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
-	fontRef := data.Alloc()
+
+	F := dummyfont.Embed(data)
 
 	s1 := State{Parameters: &Parameters{}}
-	s1.TextFont = Res{Data: fontRef}
+	s1.TextFont = F
 	s1.TextFontSize = 12
 	s1.Set |= StateTextFont
 	s1.TextKnockout = true

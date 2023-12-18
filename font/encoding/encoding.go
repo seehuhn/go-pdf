@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -150,4 +151,12 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 		toUnicode[charcode.CharCode(v)] = []rune(k.rr)
 	}
 	return toUnicode
+}
+
+func (e *SimpleEncoder) SplitString(s pdf.String) []type1.CID {
+	res := make([]type1.CID, len(s))
+	for i, code := range s {
+		res[i] = type1.CID(code)
+	}
+	return res
 }

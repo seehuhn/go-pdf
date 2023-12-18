@@ -46,15 +46,11 @@ type CIDEncoder interface {
 	// This can be used to construct a PDF ToUnicode CMap.
 	ToUnicode() *ToUnicode
 
-	// CodeSpaceRange returns the range of character codes
-	// used by this encoder.
-	//
-	// TODO(voss): is this still needed?
-	CodeSpaceRange() charcode.CodeSpaceRange
-
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
 	Subset() []glyph.ID
+
+	SplitString(s pdf.String) []type1.CID
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -87,15 +83,11 @@ func (e *identityEncoder) CMap() *Info {
 	for code := range e.toUnicode {
 		m[code] = type1.CID(code)
 	}
-	return New(e.g2c.ROS(), e.CodeSpaceRange(), m)
+	return New(e.g2c.ROS(), charcode.UCS2, m)
 }
 
 func (e *identityEncoder) ToUnicode() *ToUnicode {
 	return NewToUnicode(charcode.UCS2, e.toUnicode)
-}
-
-func (e *identityEncoder) CodeSpaceRange() charcode.CodeSpaceRange {
-	return charcode.UCS2
 }
 
 func (e *identityEncoder) Subset() []glyph.ID {
@@ -106,6 +98,19 @@ func (e *identityEncoder) Subset() []glyph.ID {
 	}
 	slices.Sort(subset)
 	return subset
+}
+
+func (e *identityEncoder) SplitString(s pdf.String) []type1.CID {
+	cs := charcode.UCS2
+	var res []type1.CID
+	for len(s) > 0 {
+		code, n := cs.Decode(s)
+		s = s[n:]
+		if code >= 0 {
+			res = append(res, type1.CID(code))
+		}
+	}
+	return res
 }
 
 // NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
@@ -119,17 +124,17 @@ func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 	}
 }
 
-type key struct {
-	gid glyph.ID
-	rr  string
-}
-
 type utf8Encoder struct {
 	g2c GIDToCID
 
 	cache map[key]charcode.CharCode
 	cmap  map[charcode.CharCode]type1.CID
 	next  rune
+}
+
+type key struct {
+	gid glyph.ID
+	rr  string
 }
 
 func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
@@ -179,7 +184,7 @@ func runeToCode(r rune) charcode.CharCode {
 }
 
 func (e *utf8Encoder) CMap() *Info {
-	return New(e.g2c.ROS(), e.CodeSpaceRange(), e.cmap)
+	return New(e.g2c.ROS(), utf8cs, e.cmap)
 }
 
 func (e *utf8Encoder) ToUnicode() *ToUnicode {
@@ -188,10 +193,6 @@ func (e *utf8Encoder) ToUnicode() *ToUnicode {
 		toUnicode[v] = []rune(k.rr)
 	}
 	return NewToUnicode(utf8cs, toUnicode)
-}
-
-func (e *utf8Encoder) CodeSpaceRange() charcode.CodeSpaceRange {
-	return utf8cs
 }
 
 func (e *utf8Encoder) Subset() []glyph.ID {
@@ -203,6 +204,19 @@ func (e *utf8Encoder) Subset() []glyph.ID {
 	subset := maps.Keys(used)
 	slices.Sort(subset)
 	return subset
+}
+
+func (e *utf8Encoder) SplitString(s pdf.String) []type1.CID {
+	cs := utf8cs
+	var res []type1.CID
+	for len(s) > 0 {
+		code, n := cs.Decode(s)
+		s = s[n:]
+		if code >= 0 {
+			res = append(res, e.cmap[code])
+		}
+	}
+	return res
 }
 
 // utf8cs represents UTF-8-encoded character codes.

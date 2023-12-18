@@ -154,7 +154,7 @@ func (d *Data) Alloc() Reference {
 	for {
 		d.lastRef++
 		ref := NewReference(d.lastRef, 0)
-		if _, ok := d.objects[ref]; !ok {
+		if _, isUsed := d.objects[ref]; !isUsed {
 			return ref
 		}
 	}
@@ -181,6 +181,8 @@ func (d *Data) Get(ref Reference, _ bool) (Object, error) {
 func (d *Data) Put(ref Reference, obj Object) error {
 	if obj == nil {
 		delete(d.objects, ref)
+	} else if _, exists := d.objects[ref]; exists {
+		return errDuplicateRef
 	} else {
 		d.objects[ref] = obj
 	}
@@ -242,7 +244,10 @@ func (d *Data) WriteCompressed(refs []Reference, objects ...Object) error {
 
 	// TODO(voss): implement this
 	for i, obj := range objects {
-		d.Put(refs[i], obj)
+		err = d.Put(refs[i], obj)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

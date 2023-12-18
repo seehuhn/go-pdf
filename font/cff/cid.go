@@ -38,7 +38,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 // FontComposite is a CFF font for embedding into a PDF file as a composite font.
@@ -109,7 +108,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedComposite{
 		FontComposite: f,
 		w:             w,
-		Res:           graphics.Res{Data: w.Alloc(), DefName: resName},
+		Res:           Res{Data: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
@@ -125,7 +124,7 @@ func (f *FontComposite) Layout(s string, ptSize float64) glyph.Seq {
 type embeddedComposite struct {
 	*FontComposite
 	w pdf.Putter
-	graphics.Res
+	Res
 
 	cmap.GIDToCID
 	cmap.CIDEncoder
@@ -426,4 +425,22 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 	}
 
 	return res, nil
+}
+
+// Res represents a named PDF resource.
+//
+// TODO(voss): remove
+type Res struct {
+	DefName pdf.Name
+	Data    pdf.Reference // TODO(voss): can this be pdf.Object?
+}
+
+// DefaultName implements the [Resource] interface.
+func (r Res) DefaultName() pdf.Name {
+	return r.DefName
+}
+
+// PDFObject implements the [Resource] interface.
+func (r Res) PDFObject() pdf.Object {
+	return r.Data
 }

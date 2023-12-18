@@ -37,7 +37,6 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 // fontSimple is a CFF font for embedding into a PDF file as a simple font.
@@ -95,7 +94,7 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	res := &embeddedSimple{
 		fontSimple:    f,
 		w:             w,
-		Res:           graphics.Res{Data: w.Alloc(), DefName: resName},
+		Res:           Res{Data: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res)
@@ -110,7 +109,7 @@ func (f *fontSimple) Layout(s string, ptSize float64) glyph.Seq {
 type embeddedSimple struct {
 	*fontSimple
 	w pdf.Putter
-	graphics.Res
+	Res
 
 	*encoding.SimpleEncoder
 	closed bool

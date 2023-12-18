@@ -22,6 +22,7 @@ import (
 	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 )
 
 // SetExtGState sets selected graphics state parameters.
@@ -199,17 +200,21 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*ExtGSta
 			if len(a) != 2 {
 				break
 			}
-			ref, ok := a[0].(pdf.Reference)
-			if !ok {
+
+			F, err := font.Read(r, a[0])
+			if pdf.IsMalformed(err) {
 				break
+			} else if err != nil {
+				return nil, err
 			}
+
 			size, err := pdf.GetNumber(r, a[1])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
 				return nil, err
 			}
-			param.TextFont = Res{Data: ref}
+			param.TextFont = F
 			param.TextFontSize = float64(size)
 			set |= StateTextFont
 		case "TK":

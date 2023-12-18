@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/postscript/type1"
 )
 
 type extractor struct {
@@ -55,8 +55,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 		return err
 	}
 
-	fonts := make(map[pdf.Name]font.Embedded)
-	getFont := func(name pdf.Name) font.Embedded {
+	fonts := make(map[pdf.Name]font.NewFont)
+	getFont := func(name pdf.Name) font.NewFont {
 		if f, ok := fonts[name]; ok {
 			return f
 		}
@@ -557,18 +557,10 @@ type fontFromPDF struct {
 	graphics.Res
 }
 
-func (f *fontFromPDF) GetGeometry() *font.Geometry {
+func (f *fontFromPDF) SplitString(pdf.String) []type1.CID {
 	panic("not implemented")
 }
 
-func (f *fontFromPDF) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontFromPDF) GlyphWidth(type1.CID) float64 {
 	panic("not implemented")
-}
-
-func (f *fontFromPDF) AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String {
-	panic("not implemented")
-}
-
-func (f *fontFromPDF) Close() error {
-	return nil
 }
