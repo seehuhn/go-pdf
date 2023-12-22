@@ -17,6 +17,8 @@
 package graphics
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
@@ -26,6 +28,11 @@ import (
 type State struct {
 	*Parameters
 	Set StateBits
+}
+
+// isSet returns true, if all of the given fields in the graphics state are set.
+func (s State) isSet(bits StateBits) bool {
+	return s.Set&bits == bits
 }
 
 // Parameters collects all graphical parameters of the PDF processor.
@@ -243,7 +250,7 @@ func (s *Parameters) Clone() *Parameters {
 // Matrix contains a PDF transformation matrix.
 // The elements are stored in the same order as for the "cm" operator.
 //
-// If M = [a b c d e f] is a Matrix, then M corresponds to the following
+// If M = [a b c d e f] is a [Matrix], then M corresponds to the following
 // 3x3 matrix:
 //
 //	/ a b 0 \
@@ -273,16 +280,11 @@ func Scale(xScale, yScale float64) Matrix {
 	return Matrix{xScale, 0, 0, yScale, 0, 0}
 }
 
-// TranslateAndScale moves and scales the coordinate system.
-//
-// Drawing the unit square [0, 1] x [0, 1] after applying this transformation
-// is equivalent to drawing the rectangle [dx, dx+xScale] x [dy, dy+yScale] in
-// the original coordinate system.
-//
-// This is equivalent to first applying Translate(dx, dy) and then
-// Scale(xScale, yScale).
-func TranslateAndScale(dx, dy, xScale, yScale float64) Matrix {
-	return Matrix{xScale, 0, 0, yScale, dx, dy}
+// Rotate rotates the coordinate system by the given angle (in radians).
+func Rotate(phi float64) Matrix {
+	c := math.Cos(phi)
+	s := math.Sin(phi)
+	return Matrix{c, s, -s, c, 0, 0}
 }
 
 // Apply applies the transformation matrix to the given vector.

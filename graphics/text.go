@@ -99,6 +99,10 @@ func (p *Writer) TextSetFont(font font.NewFont, size float64) {
 		return
 	}
 
+	if _, ok := font.PDFObject().(pdf.Reference); !ok {
+		panic("font is not an indirect object")
+	}
+
 	name := p.getResourceName(catFont, font)
 
 	p.State.TextFont = font

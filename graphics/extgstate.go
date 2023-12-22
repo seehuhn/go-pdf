@@ -63,9 +63,9 @@ func NewExtGState(s State, defaultName string) (*ExtGState, error) {
 	// Build a graphics state parameter dictionary for the given state.
 	// See table 57 in ISO 32000-2:2020.
 	if set&StateTextFont != 0 {
-		// TODO(voss): verify that the font is given as a reference?
+		ref := s.TextFont.PDFObject().(pdf.Reference)
 		dict["Font"] = pdf.Array{
-			s.TextFont.PDFObject(),
+			ref,
 			pdf.Number(s.TextFontSize),
 		}
 	}
@@ -458,12 +458,12 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*ExtGSta
 
 // ApplyTo applies the graphics state parameters to the given state.
 //
-// TODO(voss): unexport this method.
+// TODO(voss): unexport this method?
 func (s *ExtGState) ApplyTo(other *State) {
 	set := s.Value.Set
-	param := s.Value.Parameters
-
 	other.Set |= set
+
+	param := s.Value.Parameters
 	otherParam := other.Parameters
 	if set&StateTextFont != 0 {
 		otherParam.TextFont = param.TextFont
