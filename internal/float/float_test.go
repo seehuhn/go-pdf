@@ -35,6 +35,7 @@ func TestFormat(t *testing.T) {
 		{-1, 0, "-1"},
 		{0, 1, "0"},
 		{1, 1, "1"},
+		{1, 5, "1"},
 		{-1, 1, "-1"},
 		{0.1, 0, "0"},
 		{0.1, 1, ".1"},
@@ -68,7 +69,7 @@ func FuzzFormat(f *testing.F) {
 		xString := Format(x, digits)
 		y, err := strconv.ParseFloat(xString, 64)
 		if err != nil {
-			t.Errorf("strconv.ParseFloat(%q, 64) failed: %v", xString, err)
+			t.Fatalf("strconv.ParseFloat(%q, 64) failed: %v", xString, err)
 		} else if math.Log10(x)+float64(digits) < 15 && math.Abs(x-y) > 0.500001*math.Pow10(-digits) {
 			fmt.Println(math.Abs(x-y), 0.500001*math.Pow10(-digits))
 			t.Errorf("Format(%g, %d) = %q", x, digits, xString)

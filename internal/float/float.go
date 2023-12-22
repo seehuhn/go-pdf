@@ -17,47 +17,24 @@
 package float
 
 import (
-	"math"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
-func Format(x float64, digits int) string {
-	signPart := ""
-	if x < 0 {
-		signPart = "-"
-		x = -x
-	}
-
-	for i := 0; i < digits; i++ {
-		x *= 10
-	}
-	xInt := int64(math.Round(x))
-	if xInt == 0 {
-		return "0"
-	}
-	s := strconv.FormatInt(xInt, 10)
-	var intPart, fracPart string
-	if len(s) > digits {
-		intPart = s[:len(s)-digits]
-		fracPart = s[len(s)-digits:]
-	} else {
-		intPart = "0"
-		fracPart = s
-		for len(fracPart) < digits {
-			fracPart = "0" + fracPart
+func Format(x float64, precision int) string {
+	out := strconv.FormatFloat(x, 'f', precision, 64)
+	if m := tailRegexp.FindStringSubmatchIndex(out); m != nil {
+		if m[2] > 0 {
+			out = out[:m[2]]
+		} else if m[4] > 0 {
+			out = out[:m[4]]
 		}
 	}
-	for fracPart != "" && fracPart[len(fracPart)-1] == '0' {
-		fracPart = fracPart[:len(fracPart)-1]
+	if strings.HasPrefix(out, "0.") {
+		out = out[1:]
 	}
-	if fracPart != "" {
-		fracPart = "." + fracPart
-	}
-
-	if signPart == "" && intPart == "0" && fracPart != "" {
-		intPart = ""
-	}
-	return signPart + intPart + fracPart
+	return out
 }
 
 func Round(x float64, digits int) float64 {
@@ -68,3 +45,7 @@ func Round(x float64, digits int) float64 {
 	}
 	return y
 }
+
+var (
+	tailRegexp = regexp.MustCompile(`(?:\..*[1-9](0+)|(\.0+))$`)
+)
