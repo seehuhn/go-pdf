@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/postscript/type1"
 )
 
 type extractor struct {
@@ -56,14 +55,17 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 	}
 
 	fonts := make(map[pdf.Name]font.NewFont)
-	getFont := func(name pdf.Name) font.NewFont {
+	getFont := func(name pdf.Name) (font.NewFont, error) {
 		if f, ok := fonts[name]; ok {
-			return f
+			return f, nil
 		}
 		ref, _ := resources.Font[name].(pdf.Reference)
-		f := &fontFromPDF{graphics.Res{DefName: name, Data: ref}}
+		f, err := font.Read(r, ref, name)
+		if err != nil {
+			return nil, err
+		}
 		fonts[name] = f
-		return f
+		return f, nil
 	}
 
 	var graphicsStack []graphics.State
@@ -265,7 +267,13 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 				if !ok1 || !ok2 {
 					break
 				}
-				state.TextFont = getFont(name)
+				F, err := getFont(name)
+				if pdf.IsMalformed(err) {
+					break
+				} else if err != nil {
+					return err
+				}
+				state.TextFont = F
 				state.TextFontSize = size
 
 			// == Text positioning ===============================================
@@ -551,16 +559,4 @@ func getReal(x pdf.Object) (float64, bool) {
 	default:
 		return 0, false
 	}
-}
-
-type fontFromPDF struct {
-	graphics.Res
-}
-
-func (f *fontFromPDF) SplitString(pdf.String) []type1.CID {
-	panic("not implemented")
-}
-
-func (f *fontFromPDF) GlyphWidth(type1.CID) float64 {
-	panic("not implemented")
 }

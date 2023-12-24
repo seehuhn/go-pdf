@@ -129,8 +129,7 @@ const (
 	StateTextRise
 	StateTextKnockout
 
-	StateTextMatrix
-	StateTextLineMatrix
+	StateTextMatrix // text matrix and text line matrix
 
 	StateLineWidth
 	StateLineCap

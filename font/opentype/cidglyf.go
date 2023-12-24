@@ -133,6 +133,10 @@ type embeddedGlyfComposite struct {
 	closed bool
 }
 
+func (f *embeddedGlyfComposite) WritingMode() int {
+	return 0 // TODO(voss): implement vertical writing mode
+}
+
 func (f *embeddedGlyfComposite) Close() error {
 	if f.closed {
 		return nil

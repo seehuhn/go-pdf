@@ -20,6 +20,7 @@ package font
 import (
 	"math"
 
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
@@ -120,6 +121,8 @@ type Embedded interface {
 	PDFObject() pdf.Object
 	Close() error
 
+	WritingMode() int // 0 = horizontal, 1 = vertical
+	Decode(pdf.String) (charcode.CharCode, int)
 	SplitString(pdf.String) []type1.CID
 	GlyphWidth(type1.CID) float64 // 1000 units correspond to 1 unit in text space
 }

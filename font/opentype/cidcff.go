@@ -133,6 +133,10 @@ type embeddedCFFComposite struct {
 	closed bool
 }
 
+func (f *embeddedCFFComposite) WritingMode() int {
+	return 0 // TODO(voss): implement vertical writing mode
+}
+
 func (f *embeddedCFFComposite) Close() error {
 	if f.closed {
 		return nil

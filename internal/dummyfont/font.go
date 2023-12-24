@@ -96,7 +96,7 @@ func Embed(w pdf.Putter) font.NewFont {
 	if err != nil {
 		panic(err)
 	}
-	F, err := font.Read(tmp, ref)
+	F, err := font.Read(tmp, ref, "dummy")
 	if err != nil {
 		panic(err)
 	}

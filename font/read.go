@@ -28,23 +28,27 @@ import (
 type fromFile struct {
 	Name   pdf.Name
 	Object pdf.Object
-	CS     charcode.CodeSpaceRange
-	M      map[charcode.CharCode]type1.CID
-	DW     float64
-	W      map[type1.CID]float64
+	charcode.CodeSpaceRange
+	M     map[charcode.CharCode]type1.CID
+	WMode int // 0 = horizontal, 1 = vertical
+	DW    float64
+	W     map[type1.CID]float64
 }
 
 // Read reads a font from a PDF file.
-func Read(r pdf.Getter, obj pdf.Object) (NewFont, error) {
+func Read(r pdf.Getter, obj pdf.Object, name pdf.Name) (NewFont, error) {
 	fontDicts, err := ExtractDicts(r, obj)
 	if err != nil {
 		return nil, err
 	}
 
-	name, _ := fontDicts.FontDict["Name"].(pdf.Name)
+	if name == "" {
+		name, _ = fontDicts.FontDict["Name"].(pdf.Name)
+	}
 
 	var cs charcode.CodeSpaceRange
 	var m map[charcode.CharCode]type1.CID
+	writingMode := 0
 	var dw float64
 	w := make(map[type1.CID]float64)
 	if fontDicts.Type.IsComposite() {
@@ -57,6 +61,8 @@ func Read(r pdf.Getter, obj pdf.Object) (NewFont, error) {
 		// expanding the cmap into a map?
 		cs = cmapInfo.CS
 		m = cmapInfo.GetMapping()
+
+		writingMode = cmapInfo.WMode
 
 		w, dw, err = DecodeWidthsComposite(r, fontDicts.CIDFontDict["W"])
 		if err != nil {
@@ -79,7 +85,10 @@ func Read(r pdf.Getter, obj pdf.Object) (NewFont, error) {
 		if err != nil {
 			return nil, pdf.Wrap(err, "LastFirst")
 		}
-		dw = float64(fontDicts.FontDescriptor.MissingWidth)
+		var dw float64
+		if fontDicts.FontDescriptor != nil {
+			dw = float64(fontDicts.FontDescriptor.MissingWidth)
+		}
 		ww, err := pdf.GetArray(r, fontDicts.FontDict["Widths"])
 		if err != nil {
 			return nil, pdf.Wrap(err, "Widths")
@@ -100,12 +109,13 @@ func Read(r pdf.Getter, obj pdf.Object) (NewFont, error) {
 	}
 
 	res := &fromFile{
-		Object: obj,
-		Name:   name,
-		CS:     cs,
-		M:      m,
-		DW:     dw,
-		W:      w,
+		Object:         obj,
+		Name:           name,
+		CodeSpaceRange: cs,
+		M:              m,
+		WMode:          writingMode,
+		DW:             dw,
+		W:              w,
 	}
 	return res, nil
 }
@@ -118,10 +128,14 @@ func (f *fromFile) PDFObject() pdf.Object {
 	return f.Object
 }
 
+func (f *fromFile) WritingMode() int {
+	return f.WMode
+}
+
 func (f *fromFile) SplitString(s pdf.String) []type1.CID {
 	var res []type1.CID
 	for len(s) > 0 {
-		c, n := f.CS.Decode(s)
+		c, n := f.CodeSpaceRange.Decode(s)
 		s = s[n:]
 		if c >= 0 {
 			// TODO(voss): what to do if c is not in the cmap?

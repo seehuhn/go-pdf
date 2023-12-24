@@ -50,6 +50,8 @@ type CIDEncoder interface {
 	// The returned slice is sorted and always starts with GID 0.
 	Subset() []glyph.ID
 
+	Decode(pdf.String) (charcode.CharCode, int)
+
 	SplitString(s pdf.String) []type1.CID
 }
 
@@ -100,11 +102,14 @@ func (e *identityEncoder) Subset() []glyph.ID {
 	return subset
 }
 
+func (e *identityEncoder) Decode(s pdf.String) (charcode.CharCode, int) {
+	return charcode.UCS2.Decode(s)
+}
+
 func (e *identityEncoder) SplitString(s pdf.String) []type1.CID {
-	cs := charcode.UCS2
 	var res []type1.CID
 	for len(s) > 0 {
-		code, n := cs.Decode(s)
+		code, n := e.Decode(s)
 		s = s[n:]
 		if code >= 0 {
 			res = append(res, type1.CID(code))
@@ -206,11 +211,14 @@ func (e *utf8Encoder) Subset() []glyph.ID {
 	return subset
 }
 
+func (e *utf8Encoder) Decode(s pdf.String) (charcode.CharCode, int) {
+	return utf8cs.Decode(s)
+}
+
 func (e *utf8Encoder) SplitString(s pdf.String) []type1.CID {
-	cs := utf8cs
 	var res []type1.CID
 	for len(s) > 0 {
-		code, n := cs.Decode(s)
+		code, n := e.Decode(s)
 		s = s[n:]
 		if code >= 0 {
 			res = append(res, e.cmap[code])

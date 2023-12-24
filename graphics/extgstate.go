@@ -29,7 +29,7 @@ import (
 //
 // This implements the "gs" graphics operator.
 func (p *Writer) SetExtGState(s *ExtGState) {
-	if !p.valid("SetExtGState", objPage|objText) {
+	if !p.isValid("SetExtGState", objPage|objText) {
 		return
 	}
 
@@ -201,7 +201,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*ExtGSta
 				break
 			}
 
-			F, err := font.Read(r, a[0])
+			F, err := font.Read(r, a[0], "")
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

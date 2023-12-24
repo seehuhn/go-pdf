@@ -218,7 +218,7 @@ doOps:
 		if ref == nil {
 			break
 		}
-		F, err := font.Read(r.R, ref)
+		F, err := font.Read(r.R, ref, name)
 		if pdf.IsMalformed(err) {
 			break
 		} else if err != nil {
@@ -250,9 +250,6 @@ doOps:
 		if ok1 && ok2 {
 			r.TextLineMatrix = Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
-			if r.Set&StateTextLineMatrix != 0 {
-				r.Set |= StateTextMatrix
-			}
 		}
 
 	case "TD": // Move text position and set leading
@@ -263,9 +260,6 @@ doOps:
 			r.Set |= StateTextLeading
 			r.TextLineMatrix = Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
-			if r.Set&StateTextLineMatrix != 0 {
-				r.Set |= StateTextMatrix
-			}
 		}
 
 	case "Tm": // Set text matrix and text line matrix
@@ -279,14 +273,11 @@ doOps:
 		}
 		r.TextMatrix = m
 		r.TextLineMatrix = m
-		r.Set |= StateTextMatrix | StateTextLineMatrix
+		r.Set |= StateTextMatrix
 
 	case "T*": // Move to start of next text line
 		r.TextLineMatrix = Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 		r.TextMatrix = r.TextLineMatrix
-		if r.Set&StateTextLineMatrix != 0 {
-			r.Set |= StateTextMatrix
-		}
 
 	// == Text showing ===================================================
 

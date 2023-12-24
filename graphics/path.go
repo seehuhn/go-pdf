@@ -23,7 +23,7 @@ import (
 
 // MoveTo starts a new path at the given coordinates.
 func (p *Writer) MoveTo(x, y float64) {
-	if !p.valid("MoveTo", objPage|objPath) {
+	if !p.isValid("MoveTo", objPage|objPath) {
 		return
 	}
 	p.currentObject = objPath
@@ -32,7 +32,7 @@ func (p *Writer) MoveTo(x, y float64) {
 
 // LineTo appends a straight line segment to the current path.
 func (p *Writer) LineTo(x, y float64) {
-	if !p.valid("LineTo", objPath|objClippingPath) {
+	if !p.isValid("LineTo", objPath|objClippingPath) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "l")
@@ -40,7 +40,7 @@ func (p *Writer) LineTo(x, y float64) {
 
 // CurveTo appends a cubic Bezier curve to the current path.
 func (p *Writer) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
-	if !p.valid("CurveTo", objPath|objClippingPath) {
+	if !p.isValid("CurveTo", objPath|objClippingPath) {
 		return
 	}
 	// TODO(voss): generate "v" or "y" when possible
@@ -49,7 +49,7 @@ func (p *Writer) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 
 // Rectangle appends a rectangle to the current path as a closed subpath.
 func (p *Writer) Rectangle(x, y, width, height float64) {
-	if !p.valid("Rectangle", objPage|objPath) {
+	if !p.isValid("Rectangle", objPage|objPath) {
 		return
 	}
 	p.currentObject = objPath
@@ -59,7 +59,7 @@ func (p *Writer) Rectangle(x, y, width, height float64) {
 // MoveToArc appends a circular arc to the current path,
 // starting a new subpath.
 func (p *Writer) MoveToArc(x, y, radius, startAngle, endAngle float64) {
-	if !p.valid("MoveToArc", objPage|objPath) {
+	if !p.isValid("MoveToArc", objPage|objPath) {
 		return
 	}
 	p.arc(x, y, radius, startAngle, endAngle, true)
@@ -68,7 +68,7 @@ func (p *Writer) MoveToArc(x, y, radius, startAngle, endAngle float64) {
 // LineToArc appends a circular arc to the current subpath,
 // connecting the arc to the previous point with a straight line.
 func (p *Writer) LineToArc(x, y, radius, startAngle, endAngle float64) {
-	if !p.valid("LineToArc", objPath) {
+	if !p.isValid("LineToArc", objPath) {
 		return
 	}
 	p.arc(x, y, radius, startAngle, endAngle, false)
@@ -116,7 +116,7 @@ func (p *Writer) Circle(x, y, radius float64) {
 
 // ClosePath closes the current subpath.
 func (p *Writer) ClosePath() {
-	if !p.valid("ClosePath", objPath) {
+	if !p.isValid("ClosePath", objPath) {
 		return
 	}
 	_, p.Err = fmt.Fprintln(p.Content, "h")
@@ -124,7 +124,7 @@ func (p *Writer) ClosePath() {
 
 // Stroke strokes the current path.
 func (p *Writer) Stroke() {
-	if !p.valid("Stroke", objPath|objClippingPath) {
+	if !p.isValid("Stroke", objPath|objClippingPath) {
 		return
 	}
 	p.currentObject = objPage
@@ -133,7 +133,7 @@ func (p *Writer) Stroke() {
 
 // CloseAndStroke closes and strokes the current path.
 func (p *Writer) CloseAndStroke() {
-	if !p.valid("CloseAndStroke", objPath|objClippingPath) {
+	if !p.isValid("CloseAndStroke", objPath|objClippingPath) {
 		return
 	}
 	p.currentObject = objPage
@@ -143,7 +143,7 @@ func (p *Writer) CloseAndStroke() {
 // Fill fills the current path, using the nonzero winding number rule.  Any
 // subpaths that are open are implicitly closed before being filled.
 func (p *Writer) Fill() {
-	if !p.valid("Fill", objPath|objClippingPath) {
+	if !p.isValid("Fill", objPath|objClippingPath) {
 		return
 	}
 	p.currentObject = objPage
@@ -153,7 +153,7 @@ func (p *Writer) Fill() {
 // FillEvenOdd fills the current path, using the even-odd rule.  Any
 // subpaths that are open are implicitly closed before being filled.
 func (p *Writer) FillEvenOdd() {
-	if !p.valid("FillEvenOdd", objPath|objClippingPath) {
+	if !p.isValid("FillEvenOdd", objPath|objClippingPath) {
 		return
 	}
 	p.currentObject = objPage
@@ -163,7 +163,7 @@ func (p *Writer) FillEvenOdd() {
 // FillAndStroke fills and strokes the current path.  Any subpaths that are
 // open are implicitly closed before being filled.
 func (p *Writer) FillAndStroke() {
-	if !p.valid("FillAndStroke", objPath|objClippingPath) {
+	if !p.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
 	p.currentObject = objPage
@@ -173,7 +173,7 @@ func (p *Writer) FillAndStroke() {
 // EndPath ends the path without filling and stroking it.
 // This is for use after the [Page.ClipNonZero] and [Page.ClipEvenOdd] methods.
 func (p *Writer) EndPath() {
-	if !p.valid("EndPath", objPath|objClippingPath) {
+	if !p.isValid("EndPath", objPath|objClippingPath) {
 		return
 	}
 	p.currentObject = objPage
@@ -183,7 +183,7 @@ func (p *Writer) EndPath() {
 // ClipNonZero sets the current clipping path using the nonzero winding number
 // rule.
 func (p *Writer) ClipNonZero() {
-	if !p.valid("ClipNonZero", objPath) {
+	if !p.isValid("ClipNonZero", objPath) {
 		return
 	}
 	p.currentObject = objClippingPath
@@ -192,7 +192,7 @@ func (p *Writer) ClipNonZero() {
 
 // ClipEvenOdd sets the current clipping path using the even-odd rule.
 func (p *Writer) ClipEvenOdd() {
-	if !p.valid("ClipEvenOdd", objPath) {
+	if !p.isValid("ClipEvenOdd", objPath) {
 		return
 	}
 	p.currentObject = objClippingPath

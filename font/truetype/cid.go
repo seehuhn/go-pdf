@@ -131,6 +131,10 @@ type embeddedCID struct {
 	closed bool
 }
 
+func (f *embeddedCID) WritingMode() int {
+	return 0 // TODO(voss): implement vertical writing mode
+}
+
 func (f *embeddedCID) Close() error {
 	if f.closed {
 		return nil

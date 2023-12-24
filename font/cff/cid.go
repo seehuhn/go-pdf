@@ -132,6 +132,10 @@ type embeddedComposite struct {
 	closed bool
 }
 
+func (f *embeddedComposite) WritingMode() int {
+	return 0 // TODO(voss): implement
+}
+
 func (f *embeddedComposite) Close() error {
 	if f.closed {
 		return nil

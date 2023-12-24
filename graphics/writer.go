@@ -98,58 +98,58 @@ func NewWriter(w io.Writer, v pdf.Version) *Writer {
 // PushGraphicsState saves the current graphics state.
 //
 // This implementes the PDF graphics operator "q".
-func (p *Writer) PushGraphicsState() {
+func (w *Writer) PushGraphicsState() {
 	var allowedStates objectType
-	if p.Version >= pdf.V2_0 {
+	if w.Version >= pdf.V2_0 {
 		allowedStates = objPage | objText
 	} else {
 		allowedStates = objPage
 	}
-	if !p.valid("PushGraphicsState", allowedStates) {
+	if !w.isValid("PushGraphicsState", allowedStates) {
 		return
 	}
 
-	p.nesting = append(p.nesting, pairTypeQ)
+	w.nesting = append(w.nesting, pairTypeQ)
 
-	p.stack = append(p.stack, State{
-		Parameters: p.State.Parameters.Clone(),
-		Set:        p.State.Set,
+	w.stack = append(w.stack, State{
+		Parameters: w.State.Parameters.Clone(),
+		Set:        w.State.Set,
 	})
 
-	_, err := fmt.Fprintln(p.Content, "q")
-	if p.Err == nil {
-		p.Err = err
+	_, err := fmt.Fprintln(w.Content, "q")
+	if w.Err == nil {
+		w.Err = err
 	}
 }
 
 // PopGraphicsState restores the previous graphics state.
 //
 // This implementes the PDF graphics operator "Q".
-func (p *Writer) PopGraphicsState() {
+func (w *Writer) PopGraphicsState() {
 	var allowedStates objectType
-	if p.Version >= pdf.V2_0 {
+	if w.Version >= pdf.V2_0 {
 		allowedStates = objPage | objText
 	} else {
 		allowedStates = objPage
 	}
-	if !p.valid("PopGraphicsState", allowedStates) {
+	if !w.isValid("PopGraphicsState", allowedStates) {
 		return
 	}
 
-	if len(p.nesting) == 0 || p.nesting[len(p.nesting)-1] != pairTypeQ {
-		p.Err = fmt.Errorf("PopGraphicsState: no matching PushGraphicsState")
+	if len(w.nesting) == 0 || w.nesting[len(w.nesting)-1] != pairTypeQ {
+		w.Err = fmt.Errorf("PopGraphicsState: no matching PushGraphicsState")
 		return
 	}
-	p.nesting = p.nesting[:len(p.nesting)-1]
+	w.nesting = w.nesting[:len(w.nesting)-1]
 
-	n := len(p.stack) - 1
-	savedState := p.stack[n]
-	p.stack = p.stack[:n]
-	p.State = savedState
+	n := len(w.stack) - 1
+	savedState := w.stack[n]
+	w.stack = w.stack[:n]
+	w.State = savedState
 
-	_, err := fmt.Fprintln(p.Content, "Q")
-	if p.Err == nil {
-		p.Err = err
+	_, err := fmt.Fprintln(w.Content, "Q")
+	if w.Err == nil {
+		w.Err = err
 	}
 }
 
@@ -158,12 +158,12 @@ func (p *Writer) PopGraphicsState() {
 // given matrix from the right.
 //
 // This implementes the PDF graphics operator "cm".
-func (p *Writer) Transform(m Matrix) {
-	if !p.valid("Transform", objPage) { // special graphics state
+func (w *Writer) Transform(m Matrix) {
+	if !w.isValid("Transform", objPage) { // special graphics state
 		return
 	}
-	p.CTM = m.Mul(p.CTM)
-	_, p.Err = fmt.Fprintln(p.Content,
+	w.CTM = m.Mul(w.CTM)
+	_, w.Err = fmt.Fprintln(w.Content,
 		float.Format(m[0], 3), float.Format(m[1], 3),
 		float.Format(m[2], 3), float.Format(m[3], 3),
 		float.Format(m[4], 3), float.Format(m[5], 3), "cm")
@@ -172,154 +172,250 @@ func (p *Writer) Transform(m Matrix) {
 // SetLineWidth sets the line width.
 //
 // This implementes the PDF graphics operator "w".
-func (p *Writer) SetLineWidth(width float64) {
-	if !p.valid("SetLineWidth", objPage|objText) {
+func (w *Writer) SetLineWidth(width float64) {
+	if !w.isValid("SetLineWidth", objPage|objText) {
 		return
 	}
-	if p.isSet(StateLineWidth) && nearlyEqual(width, p.LineWidth) {
+	if w.isSet(StateLineWidth) && nearlyEqual(width, w.LineWidth) {
 		return
 	}
-	p.LineWidth = width
-	p.Set |= StateLineWidth
-	_, p.Err = fmt.Fprintln(p.Content, p.coord(width), "w")
+	w.LineWidth = width
+	w.Set |= StateLineWidth
+	_, w.Err = fmt.Fprintln(w.Content, w.coord(width), "w")
 }
 
 // SetLineCap sets the line cap style.
 //
 // This implementes the PDF graphics operator "J".
-func (p *Writer) SetLineCap(cap LineCapStyle) {
-	if !p.valid("SetLineCap", objPage|objText) {
+func (w *Writer) SetLineCap(cap LineCapStyle) {
+	if !w.isValid("SetLineCap", objPage|objText) {
 		return
 	}
 	if LineCapStyle(cap) > 2 {
 		cap = 0
 	}
-	if p.isSet(StateLineCap) && cap == p.LineCap {
+	if w.isSet(StateLineCap) && cap == w.LineCap {
 		return
 	}
-	p.LineCap = cap
-	p.Set |= StateLineCap
-	_, p.Err = fmt.Fprintln(p.Content, int(cap), "J")
+	w.LineCap = cap
+	w.Set |= StateLineCap
+	_, w.Err = fmt.Fprintln(w.Content, int(cap), "J")
 }
 
 // SetLineJoin sets the line join style.
 //
 // This implementes the PDF graphics operator "j".
-func (p *Writer) SetLineJoin(join LineJoinStyle) {
-	if !p.valid("SetLineJoin", objPage|objText) {
+func (w *Writer) SetLineJoin(join LineJoinStyle) {
+	if !w.isValid("SetLineJoin", objPage|objText) {
 		return
 	}
 	if LineJoinStyle(join) > 2 {
 		join = 0
 	}
-	if p.isSet(StateLineJoin) && join == p.LineJoin {
+	if w.isSet(StateLineJoin) && join == w.LineJoin {
 		return
 	}
-	p.LineJoin = join
-	p.Set |= StateLineJoin
-	_, p.Err = fmt.Fprintln(p.Content, int(join), "j")
+	w.LineJoin = join
+	w.Set |= StateLineJoin
+	_, w.Err = fmt.Fprintln(w.Content, int(join), "j")
 }
 
 // SetMiterLimit sets the miter limit.
-func (p *Writer) SetMiterLimit(limit float64) {
-	if !p.valid("SetMiterLimit", objPage|objText) {
+func (w *Writer) SetMiterLimit(limit float64) {
+	if !w.isValid("SetMiterLimit", objPage|objText) {
 		return
 	}
-	if p.isSet(StateMiterLimit) && nearlyEqual(limit, p.MiterLimit) {
+	if w.isSet(StateMiterLimit) && nearlyEqual(limit, w.MiterLimit) {
 		return
 	}
-	p.MiterLimit = limit
-	p.Set |= StateMiterLimit
-	_, p.Err = fmt.Fprintln(p.Content, float.Format(limit, 3), "M")
+	w.MiterLimit = limit
+	w.Set |= StateMiterLimit
+	_, w.Err = fmt.Fprintln(w.Content, float.Format(limit, 3), "M")
 }
 
 // SetDashPattern sets the line dash pattern.
-func (p *Writer) SetDashPattern(pattern []float64, phase float64) {
-	if !p.valid("SetDashPattern", objPage|objText) {
+func (w *Writer) SetDashPattern(pattern []float64, phase float64) {
+	if !w.isValid("SetDashPattern", objPage|objText) {
 		return
 	}
 
-	if p.isSet(StateDash) &&
-		sliceNearlyEqual(pattern, p.DashPattern) &&
-		nearlyEqual(phase, p.DashPhase) {
+	if w.isSet(StateDash) &&
+		sliceNearlyEqual(pattern, w.DashPattern) &&
+		nearlyEqual(phase, w.DashPhase) {
 		return
 	}
-	p.DashPattern = pattern
-	p.DashPhase = phase
-	p.Set |= StateDash
+	w.DashPattern = pattern
+	w.DashPhase = phase
+	w.Set |= StateDash
 
-	_, p.Err = fmt.Fprint(p.Content, "[")
-	if p.Err != nil {
+	_, w.Err = fmt.Fprint(w.Content, "[")
+	if w.Err != nil {
 		return
 	}
 	sep := ""
 	for _, x := range pattern {
-		_, p.Err = fmt.Fprint(p.Content, sep, float.Format(x, 3))
-		if p.Err != nil {
+		_, w.Err = fmt.Fprint(w.Content, sep, float.Format(x, 3))
+		if w.Err != nil {
 			return
 		}
 		sep = " "
 	}
-	_, p.Err = fmt.Fprint(p.Content, "] ", float.Format(phase, 3), " d\n")
+	_, w.Err = fmt.Fprint(w.Content, "] ", float.Format(phase, 3), " d\n")
 }
 
 // SetRenderingIntent sets the rendering intent.
-func (p *Writer) SetRenderingIntent(intent pdf.Name) {
-	if !p.valid("SetRenderingIntent", objPage|objText) {
+func (w *Writer) SetRenderingIntent(intent pdf.Name) {
+	if !w.isValid("SetRenderingIntent", objPage|objText) {
 		return
 	}
-	if p.isSet(StateRenderingIntent) && intent == p.RenderingIntent {
+	if w.isSet(StateRenderingIntent) && intent == w.RenderingIntent {
 		return
 	}
-	p.RenderingIntent = intent
-	p.Set |= StateRenderingIntent
-	err := intent.PDF(p.Content)
+	w.RenderingIntent = intent
+	w.Set |= StateRenderingIntent
+	err := intent.PDF(w.Content)
 	if err != nil {
-		p.Err = err
+		w.Err = err
 		return
 	}
-	_, p.Err = fmt.Fprintln(p.Content, " ri")
+	_, w.Err = fmt.Fprintln(w.Content, " ri")
 }
 
 // SetFlatnessTolerance sets the flatness tolerance.
-func (p *Writer) SetFlatnessTolerance(flatness float64) {
-	if !p.valid("SetFlatness", objPage|objText) {
+func (w *Writer) SetFlatnessTolerance(flatness float64) {
+	if !w.isValid("SetFlatness", objPage|objText) {
 		return
 	}
-	if p.isSet(StateFlatnessTolerance) && nearlyEqual(flatness, p.FlatnessTolerance) {
+	if w.isSet(StateFlatnessTolerance) && nearlyEqual(flatness, w.FlatnessTolerance) {
 		return
 	}
-	p.FlatnessTolerance = flatness
-	p.Set |= StateFlatnessTolerance
-	_, p.Err = fmt.Fprintln(p.Content, float.Format(flatness, 3), "i")
+	w.FlatnessTolerance = flatness
+	w.Set |= StateFlatnessTolerance
+	_, w.Err = fmt.Fprintln(w.Content, float.Format(flatness, 3), "i")
 }
 
 // SetStrokeColor sets the stroke color in the graphics state.
 // If col is nil, the stroke color is not changed.
-func (p *Writer) SetStrokeColor(col color.Color) {
-	if !p.valid("SetStrokeColor", objPage|objText) {
+func (w *Writer) SetStrokeColor(col color.Color) {
+	if !w.isValid("SetStrokeColor", objPage|objText) {
 		return
 	}
-	if p.isSet(StateStrokeColor) && col == p.StrokeColor {
+	if w.isSet(StateStrokeColor) && col == w.StrokeColor {
 		return
 	}
-	p.StrokeColor = col
-	p.Set |= StateStrokeColor
-	p.Err = col.SetStroke(p.Content)
+	w.StrokeColor = col
+	w.Set |= StateStrokeColor
+	w.Err = col.SetStroke(w.Content)
 }
 
 // SetFillColor sets the fill color in the graphics state.
 // If col is nil, the fill color is not changed.
-func (p *Writer) SetFillColor(col color.Color) {
-	if !p.valid("SetFillColor", objPage|objText) {
+func (w *Writer) SetFillColor(col color.Color) {
+	if !w.isValid("SetFillColor", objPage|objText) {
 		return
 	}
-	if p.isSet(StateFillColor) && col == p.FillColor {
+	if w.isSet(StateFillColor) && col == w.FillColor {
 		return
 	}
-	p.FillColor = col
-	p.Set |= StateFillColor
-	p.Err = col.SetFill(p.Content)
+	w.FillColor = col
+	w.Set |= StateFillColor
+	w.Err = col.SetFill(w.Content)
+}
+
+// GetResourceName returns the name of a resource.
+// A new name is generated, if necessary, and the resource is added to the
+// resource dictionary for the category.
+func (w *Writer) getResourceName(category resourceCategory, r Resource) pdf.Name {
+	name, ok := w.resName[catRes{category, r}]
+	if ok {
+		return name
+	}
+
+	var field *pdf.Dict
+	var tmpl string
+	switch category {
+	case catFont:
+		field = &w.Resources.Font
+		tmpl = "F%d"
+	case catExtGState:
+		field = &w.Resources.ExtGState
+		tmpl = "E%d"
+	case catXObject:
+		field = &w.Resources.XObject
+		tmpl = "X%d"
+	case catColorSpace:
+		field = &w.Resources.ColorSpace
+		tmpl = "C%d"
+	case catPattern:
+		field = &w.Resources.Pattern
+		tmpl = "P%d"
+	case catShading:
+		field = &w.Resources.Shading
+		tmpl = "S%d"
+	case catProperties:
+		field = &w.Resources.Properties
+		tmpl = "MC%d"
+	default:
+		panic("invalid resource category " + category)
+	}
+
+	isUsed := func(name pdf.Name) bool {
+		_, isUsed := w.nameUsed[catName{category, name}]
+		return isUsed
+	}
+
+	origName := r.DefaultName()
+	defName := origName
+	if strings.HasPrefix(string(defName), "/") {
+		defName = defName[1:]
+	}
+	if origName != "" && !isUsed(defName) {
+		name = defName
+	} else {
+		var numUsed int
+		for item := range w.nameUsed {
+			if item.cat == category {
+				numUsed++
+			}
+		}
+		for k := numUsed + 1; ; k-- {
+			name = pdf.Name(fmt.Sprintf(tmpl, k))
+			if !isUsed(name) {
+				break
+			}
+		}
+	}
+	w.resName[catRes{category, r}] = name
+	w.nameUsed[catName{category, name}] = struct{}{}
+
+	if *field == nil {
+		*field = pdf.Dict{}
+	}
+	(*field)[name] = r.PDFObject()
+
+	return name
+}
+
+// isValid returns true, if the current graphics object is one of the given types
+// and if p.Err is nil.  Otherwise it sets p.Err and returns false.
+func (w *Writer) isValid(cmd string, ss objectType) bool {
+	if w.Err != nil {
+		return false
+	}
+
+	if w.currentObject&ss != 0 {
+		return true
+	}
+
+	w.Err = fmt.Errorf("unexpected state %q for %q", w.currentObject, cmd)
+	return false
+}
+
+func (w *Writer) coord(x float64) string {
+	// TODO(voss): Think about this some more.  Once we track the current
+	// transformation matrix, we can use this to determine the number of digits
+	// to keep.
+	return float.Format(x, 2)
 }
 
 func nearlyEqual(a, b float64) bool {
@@ -339,87 +435,6 @@ func sliceNearlyEqual(a, b []float64) bool {
 	return true
 }
 
-func (p *Writer) coord(x float64) string {
-	// TODO(voss): Think about this some more.  Once we track the current
-	// transformation matrix, we can use this to determine the number of digits
-	// to keep.
-	return float.Format(x, 2)
-}
-
-// GetResourceName returns the name of a resource.
-// A new name is generated, if necessary, and the resource is added to the
-// resource dictionary for the category.
-func (p *Writer) getResourceName(category resourceCategory, r Resource) pdf.Name {
-	name, ok := p.resName[catRes{category, r}]
-	if ok {
-		return name
-	}
-
-	var field *pdf.Dict
-	var tmpl string
-	switch category {
-	case catFont:
-		field = &p.Resources.Font
-		tmpl = "F%d"
-	case catExtGState:
-		field = &p.Resources.ExtGState
-		tmpl = "E%d"
-	case catXObject:
-		field = &p.Resources.XObject
-		tmpl = "X%d"
-	case catColorSpace:
-		field = &p.Resources.ColorSpace
-		tmpl = "C%d"
-	case catPattern:
-		field = &p.Resources.Pattern
-		tmpl = "P%d"
-	case catShading:
-		field = &p.Resources.Shading
-		tmpl = "S%d"
-	case catProperties:
-		field = &p.Resources.Properties
-		tmpl = "MC%d"
-	default:
-		panic("invalid resource category " + category)
-	}
-
-	isUsed := func(name pdf.Name) bool {
-		_, isUsed := p.nameUsed[catName{category, name}]
-		return isUsed
-	}
-
-	origName := r.DefaultName()
-	defName := origName
-	if strings.HasPrefix(string(defName), "/") {
-		defName = defName[1:]
-	}
-	if origName != "" && !isUsed(defName) {
-		name = defName
-	} else {
-		var numUsed int
-		for item := range p.nameUsed {
-			if item.cat == category {
-				numUsed++
-			}
-		}
-		for k := numUsed + 1; ; k-- {
-			name = pdf.Name(fmt.Sprintf(tmpl, k))
-			if !isUsed(name) {
-				break
-			}
-		}
-	}
-	p.resName[catRes{category, r}] = name
-	p.nameUsed[catName{category, name}] = struct{}{}
-
-	if *field == nil {
-		*field = pdf.Dict{}
-	}
-	(*field)[name] = r.PDFObject()
-
-	return name
-}
-
 // See Figure 9 (p. 113) of PDF 32000-1:2008.
 type objectType int
 
@@ -428,9 +443,9 @@ const (
 	objPath
 	objText
 	objClippingPath
-	objShading
 	objInlineImage
-	objExternal
+	// objShading
+	// objExternal
 )
 
 func (s objectType) String() string {
@@ -443,30 +458,11 @@ func (s objectType) String() string {
 		return "text"
 	case objClippingPath:
 		return "clipping path"
-	case objShading:
-		return "shading"
 	case objInlineImage:
 		return "inline image"
-	case objExternal:
-		return "external"
 	default:
 		return fmt.Sprintf("objectType(%d)", s)
 	}
-}
-
-// valid returns true, if the current graphics object is one of the given types.
-// Otherwise it sets p.Err and returns false.
-func (p *Writer) valid(cmd string, ss objectType) bool {
-	if p.Err != nil {
-		return false
-	}
-
-	if p.currentObject&ss != 0 {
-		return true
-	}
-
-	p.Err = fmt.Errorf("unexpected state %q for %q", p.currentObject, cmd)
-	return false
 }
 
 // Res represents a named PDF resource.

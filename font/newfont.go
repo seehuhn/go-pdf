@@ -18,6 +18,7 @@ package font
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/type1"
 )
 
@@ -28,6 +29,9 @@ import (
 type NewFont interface {
 	DefaultName() pdf.Name // return "" to choose names automatically
 	PDFObject() pdf.Object // value to use in the resource dictionary
-	SplitString(pdf.String) []type1.CID
-	GlyphWidth(type1.CID) float64 // 1000 units correspond to 1 unit in text space
+
+	WritingMode() int // 0 = horizontal, 1 = vertical
+	Decode(pdf.String) (charcode.CharCode, int)
+	SplitString(pdf.String) []type1.CID // TODO(voss): remove?
+	GlyphWidth(type1.CID) float64       // 1000 units correspond to 1 unit in text space
 }

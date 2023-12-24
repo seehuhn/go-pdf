@@ -153,6 +153,17 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 	return toUnicode
 }
 
+func (e *SimpleEncoder) WritingMode() int {
+	return 0 // simple fonts are always horizontal
+}
+
+func (e *SimpleEncoder) Decode(s pdf.String) (charcode.CharCode, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	return charcode.CharCode(s[0]), 1
+}
+
 func (e *SimpleEncoder) SplitString(s pdf.String) []type1.CID {
 	res := make([]type1.CID, len(s))
 	for i, code := range s {
