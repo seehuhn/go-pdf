@@ -20,7 +20,6 @@ package font
 import (
 	"math"
 
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
@@ -117,14 +116,8 @@ type Embedded interface {
 	GetGeometry() *Geometry
 	Layouter
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	DefaultName() pdf.Name
-	PDFObject() pdf.Object
 	Close() error
-
-	WritingMode() int // 0 = horizontal, 1 = vertical
-	Decode(pdf.String) (charcode.CharCode, int)
-	SplitString(pdf.String) []type1.CID
-	GlyphWidth(type1.CID) float64 // 1000 units correspond to 1 unit in text space
+	NewFont
 }
 
 // NumGlyphs returns the number of glyphs in a font.

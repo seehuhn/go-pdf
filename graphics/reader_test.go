@@ -33,7 +33,7 @@ import (
 
 func FuzzReader(f *testing.F) {
 	data := pdf.NewData(pdf.V1_7)
-	F := dummyfont.Embed(data)
+	F := dummyfont.Embed(data, "dummy")
 
 	res := &pdf.Resources{
 		ExtGState: map[pdf.Name]pdf.Object{

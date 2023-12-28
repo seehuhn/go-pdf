@@ -25,11 +25,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
-type extractor struct {
-	*pdf.Resources
-	*graphics.Parameters
-}
-
 // Context holds information about the current state of the PDF content stream.
 type Context struct {
 	*pdf.Resources

@@ -19,7 +19,45 @@ package charcode
 import (
 	"bytes"
 	"testing"
+
+	"seehuhn.de/go/pdf"
 )
+
+func TestFirstCode(t *testing.T) {
+	cs := CodeSpaceRange{
+		{Low: []byte{1}, High: []byte{8}},
+		{Low: []byte{10, 1, 1, 1, 1}, High: []byte{10, 1, 1, 9, 9}},
+		{Low: []byte{10, 1, 1, 10, 10}, High: []byte{10, 1, 1, 20, 20}},
+	}
+
+	type testCase struct {
+		in  pdf.String
+		out pdf.String
+		k   int
+	}
+	testCases := []testCase{
+		{in: nil, out: nil, k: 0},
+		{in: pdf.String{}, out: nil, k: 0},
+		{in: pdf.String{0}, out: nil, k: 1},
+		{in: pdf.String{1}, out: pdf.String{1}, k: 1},
+		{in: pdf.String{2}, out: pdf.String{2}, k: 1},
+		{in: pdf.String{9}, out: nil, k: 1},
+		{in: pdf.String{10, 1, 1, 1, 1, 255}, out: pdf.String{10, 1, 1, 1, 1}, k: 5},
+		{in: pdf.String{10, 1, 1, 2, 2}, out: pdf.String{10, 1, 1, 2, 2}, k: 5},
+		{in: pdf.String{10, 1, 1, 5}, out: nil, k: 1},
+		{in: pdf.String{10, 1, 1, 1, 10}, out: nil, k: 1},
+		{in: pdf.String{10, 1, 1}, out: nil, k: 1},
+	}
+	for _, tc := range testCases {
+		out, k := cs.FirstCode(tc.in)
+		if k != tc.k {
+			t.Errorf("%v: expected %d bytes, got %d", tc.in, tc.k, k)
+		}
+		if !bytes.Equal(out, tc.out) || (out == nil) != (tc.out == nil) {
+			t.Errorf("%v: expected %v, got %v", tc.in, tc.out, out)
+		}
+	}
+}
 
 func TestCustom(t *testing.T) {
 	cs := CodeSpaceRange{

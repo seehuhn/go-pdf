@@ -162,18 +162,18 @@ func (d *Data) Alloc() Reference {
 
 func (d *Data) Get(ref Reference, _ bool) (Object, error) {
 	obj := d.objects[ref]
-	switch obj := obj.(type) {
+	switch x := obj.(type) {
 	case *Stream:
-		if ss, ok := obj.R.(io.Seeker); ok {
+		if ss, ok := x.R.(io.Seeker); ok {
 			_, err := ss.Seek(0, io.SeekStart)
 			if err != nil {
 				return nil, err
 			}
 		}
 	case Dict:
-		obj = maps.Clone(obj)
+		obj = maps.Clone(x)
 	case Array:
-		obj = slices.Clone(obj)
+		obj = slices.Clone(x)
 	}
 	return obj, nil
 }

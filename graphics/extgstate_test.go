@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 )
@@ -27,7 +28,7 @@ import (
 func TestExtGState(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
 
-	F := dummyfont.Embed(data)
+	F := dummyfont.Embed(data, "")
 
 	s1 := State{Parameters: &Parameters{}}
 	s1.TextFont = F

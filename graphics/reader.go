@@ -218,7 +218,7 @@ doOps:
 		if ref == nil {
 			break
 		}
-		F, err := font.Read(r.R, ref, name)
+		F, err := font.Read(r.R, ref, name) // TODO(voss): use caching
 		if pdf.IsMalformed(err) {
 			break
 		} else if err != nil {
@@ -282,10 +282,10 @@ doOps:
 	// == Text showing ===================================================
 
 	case "Tj": // Show text
-		// TODO(voss): update g.Tm
+		// TODO(voss): update g.TextMatrix
 
 	case "TJ": // Show text with kerning
-		// TODO(voss): update g.Tm
+		// TODO(voss): update g.TextMatrix
 
 	// == Type 3 fonts ===================================================
 

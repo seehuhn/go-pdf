@@ -77,7 +77,7 @@ func TestParameters(t *testing.T) {
 	w.Set = 0
 
 	data := pdf.NewData(pdf.V1_7)
-	font := dummyfont.Embed(data)
+	font := dummyfont.Embed(data, "dummy")
 
 	w.SetLineWidth(12.3)
 	w.SetLineCap(LineCapRound)

@@ -17,15 +17,61 @@
 package charcode
 
 import (
+	"bytes"
+
 	"seehuhn.de/go/pdf"
 )
 
 // CharCode represents a character code within a [CodeSpaceRange] as a non-negative integer.
+//
+// TODO(voss): remove
 type CharCode int
 
 // CodeSpaceRange describes the ranges of byte sequences which are valid
 // character codes for a given encoding.
+//
+// Ranges must be sorted in ascending lexicographic order.
 type CodeSpaceRange []Range
+
+// FirstCode returns the first character code from the given PDF string.
+// It returns the character code and the number of bytes consumed.
+// If the character code is not in the CodeSpaceRange, nil is returned,
+// and the length is either 0 (if the string is empty) or 1.
+func (c CodeSpaceRange) FirstCode(s pdf.String) (pdf.String, int) {
+	// use binary search to find the first matching range
+	i, j := 0, len(c)
+bisectLoop:
+	for i < j {
+		h := int((uint(i) + uint(j)) >> 1) // avoid integer overflow
+		r := c[h]
+
+		// Compare s with the Low and High of the current range
+		switch {
+		case bytes.Compare(s, r.Low) < 0:
+			j = h
+		case bytes.Compare(s, r.High) > 0:
+			i = h + 1
+		default:
+			if len(s) < len(r.Low) {
+				break bisectLoop
+			}
+			for i := 0; i < len(r.Low); i++ {
+				if s[i] < r.Low[i] || s[i] > r.High[i] {
+					break bisectLoop
+				}
+			}
+			return s[:len(r.Low)], len(r.Low)
+		}
+	}
+	// no matching range found
+
+	// TODO(voss): implement the algorithm from section 9.7.6.3 of the
+	// PDF-2.0 spec.
+	if len(s) == 0 {
+		return nil, 0
+	}
+	return nil, 1
+}
 
 // Append appends the given character code to the given PDF string.
 func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
@@ -86,7 +132,7 @@ tryNextRange:
 // Range represents a range of character codes.
 // The range is inclusive, i.e. the character codes Low and High are
 // part of the range.
-// Low and High must have the same length and only differ in the last byte.
+// Low and High must have the same length.
 type Range struct {
 	Low, High []byte
 }
