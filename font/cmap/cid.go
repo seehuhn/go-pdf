@@ -42,8 +42,7 @@ type CIDEncoder interface {
 	// CMap returns the mapping from character codes to CID values.
 	CMap() *Info
 
-	// ToUnicode returns the mapping from character codes to unicode strings.
-	// This can be used to construct a PDF ToUnicode CMap.
+	// ToUnicode returns a PDF ToUnicode CMap.
 	ToUnicode() *ToUnicode
 
 	// Subset is the set of all GIDs which have been used with AppendEncoded.

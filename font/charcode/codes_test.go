@@ -28,33 +28,35 @@ func TestFirstCode(t *testing.T) {
 		{Low: []byte{1}, High: []byte{8}},
 		{Low: []byte{10, 1, 1, 1, 1}, High: []byte{10, 1, 1, 9, 9}},
 		{Low: []byte{10, 1, 1, 10, 10}, High: []byte{10, 1, 1, 20, 20}},
+		{Low: []byte{20, 20}, High: []byte{30, 30}},
 	}
 
 	type testCase struct {
-		in  pdf.String
-		out pdf.String
-		k   int
+		in    pdf.String
+		valid bool
+		k     int
 	}
 	testCases := []testCase{
-		{in: nil, out: nil, k: 0},
-		{in: pdf.String{}, out: nil, k: 0},
-		{in: pdf.String{0}, out: nil, k: 1},
-		{in: pdf.String{1}, out: pdf.String{1}, k: 1},
-		{in: pdf.String{2}, out: pdf.String{2}, k: 1},
-		{in: pdf.String{9}, out: nil, k: 1},
-		{in: pdf.String{10, 1, 1, 1, 1, 255}, out: pdf.String{10, 1, 1, 1, 1}, k: 5},
-		{in: pdf.String{10, 1, 1, 2, 2}, out: pdf.String{10, 1, 1, 2, 2}, k: 5},
-		{in: pdf.String{10, 1, 1, 5}, out: nil, k: 1},
-		{in: pdf.String{10, 1, 1, 1, 10}, out: nil, k: 1},
-		{in: pdf.String{10, 1, 1}, out: nil, k: 1},
+		{in: nil, valid: false, k: 0},
+		{in: pdf.String{}, valid: false, k: 0},
+		{in: pdf.String{0}, valid: false, k: 1},
+		{in: pdf.String{1}, valid: true, k: 1},
+		{in: pdf.String{2}, valid: true, k: 1},
+		{in: pdf.String{9}, valid: false, k: 1},
+		{in: pdf.String{10, 1, 1, 1, 1, 255}, valid: true, k: 5},
+		{in: pdf.String{10, 1, 1, 2, 2}, valid: true, k: 5},
+		{in: pdf.String{10, 1, 1, 5}, valid: false, k: 4},
+		{in: pdf.String{10, 1, 1, 1, 10}, valid: false, k: 5},
+		{in: pdf.String{10, 1, 1}, valid: false, k: 3},
+		{in: pdf.String{25, 15, 15}, valid: false, k: 2},
 	}
 	for _, tc := range testCases {
-		out, k := cs.FirstCode(tc.in)
+		k, valid := cs.firstCode(tc.in)
+		if valid != tc.valid {
+			t.Errorf("%v: expected valid=%t, got %t", tc.in, tc.valid, valid)
+		}
 		if k != tc.k {
 			t.Errorf("%v: expected %d bytes, got %d", tc.in, tc.k, k)
-		}
-		if !bytes.Equal(out, tc.out) || (out == nil) != (tc.out == nil) {
-			t.Errorf("%v: expected %v, got %v", tc.in, tc.out, out)
 		}
 	}
 }

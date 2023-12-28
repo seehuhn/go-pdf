@@ -17,8 +17,6 @@
 package charcode
 
 import (
-	"bytes"
-
 	"seehuhn.de/go/pdf"
 )
 
@@ -29,48 +27,63 @@ type CharCode int
 
 // CodeSpaceRange describes the ranges of byte sequences which are valid
 // character codes for a given encoding.
-//
-// Ranges must be sorted in ascending lexicographic order.
 type CodeSpaceRange []Range
 
-// FirstCode returns the first character code from the given PDF string.
-// It returns the character code and the number of bytes consumed.
-// If the character code is not in the CodeSpaceRange, nil is returned,
-// and the length is either 0 (if the string is empty) or 1.
-func (c CodeSpaceRange) FirstCode(s pdf.String) (pdf.String, int) {
-	// use binary search to find the first matching range
-	i, j := 0, len(c)
-bisectLoop:
-	for i < j {
-		h := int((uint(i) + uint(j)) >> 1) // avoid integer overflow
-		r := c[h]
+// firstCode returns the length of the first character code from the given PDF string,
+// together with a boolean indicating whether the code was valid.
+//
+// See algorithm from section 9.7.6.3 of the PDF-2.0 spec.
+func (c CodeSpaceRange) firstCode(s pdf.String) (int, bool) {
+	candiates := make([]int, len(c))
+	for j := range candiates {
+		candiates[j] = j
+	}
 
-		// Compare s with the Low and High of the current range
-		switch {
-		case bytes.Compare(s, r.Low) < 0:
-			j = h
-		case bytes.Compare(s, r.High) > 0:
-			i = h + 1
-		default:
-			if len(s) < len(r.Low) {
-				break bisectLoop
+	if len(s) == 0 {
+		return 0, false
+	}
+
+	var skipLen int
+	for i := 0; i < len(s); i++ {
+		skipLen = len(s)
+
+		b := s[i]
+		for j := 0; j < len(candiates); {
+			r := c[candiates[j]]
+
+			L := len(r.Low)
+			if L < skipLen {
+				skipLen = L
 			}
-			for i := 0; i < len(r.Low); i++ {
-				if s[i] < r.Low[i] || s[i] > r.High[i] {
-					break bisectLoop
-				}
+
+			if L <= i || b < r.Low[i] || b > r.High[i] {
+				candiates[j] = candiates[len(candiates)-1]
+				candiates = candiates[:len(candiates)-1]
+			} else if L == i+1 {
+				return i + 1, true
+			} else {
+				j++
 			}
-			return s[:len(r.Low)], len(r.Low)
+		}
+		if len(candiates) == 0 {
+			break
 		}
 	}
-	// no matching range found
+	return skipLen, false
+}
 
-	// TODO(voss): implement the algorithm from section 9.7.6.3 of the
-	// PDF-2.0 spec.
-	if len(s) == 0 {
-		return nil, 0
+// AllCodes returns an iterator over all character codes in the given PDF string.
+func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, valid bool) bool) bool {
+	return func(yield func(pdf.String, bool) bool) bool {
+		for len(s) > 0 {
+			k, valid := c.firstCode(s)
+			if !yield(s[:k], valid) {
+				return false
+			}
+			s = s[k:]
+		}
+		return true
 	}
-	return nil, 1
 }
 
 // Append appends the given character code to the given PDF string.
