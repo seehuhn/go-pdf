@@ -18,6 +18,7 @@ package font
 
 import (
 	"errors"
+	"fmt"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -25,19 +26,22 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-type fromFile struct {
-	Name   pdf.Name
-	Object pdf.Object
+// FromFile represents a font read from a PDF file.
+type FromFile struct {
+	Name pdf.Name
+	Ref  pdf.Object
 	charcode.CodeSpaceRange
-	M     map[charcode.CharCode]type1.CID
-	WMode int // 0 = horizontal, 1 = vertical
-	DW    float64
-	W     map[type1.CID]float64
+	M     map[charcode.CharCode]type1.CID // TODO(voss): remove
+	WMode int                             // 0 = horizontal, 1 = vertical
+
+	AllWidther
 }
 
-// Read reads a font from a PDF file.
-func Read(r pdf.Getter, obj pdf.Object, name pdf.Name) (NewFont, error) {
-	fontDicts, err := ExtractDicts(r, obj)
+// Read extracts a font from a PDF file.
+//
+// TODO(voss): return NewFont instead?
+func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (*FromFile, error) {
+	fontDicts, err := ExtractDicts(r, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +53,7 @@ func Read(r pdf.Getter, obj pdf.Object, name pdf.Name) (NewFont, error) {
 	var cs charcode.CodeSpaceRange
 	var m map[charcode.CharCode]type1.CID
 	writingMode := 0
-	var dw float64
-	w := make(map[type1.CID]float64)
+	var widther AllWidther
 	if fontDicts.Type.IsComposite() {
 		cmapInfo, err := cmap.Extract(r, fontDicts.FontDict["Encoding"])
 		if err != nil {
@@ -59,14 +62,14 @@ func Read(r pdf.Getter, obj pdf.Object, name pdf.Name) (NewFont, error) {
 
 		// TODO(voss): read this information from cmapInfo instead of
 		// expanding the cmap into a map?
-		cs = cmapInfo.CS
+		cs = cmapInfo.CodeSpaceRange
 		m = cmapInfo.GetMapping()
 
 		writingMode = cmapInfo.WMode
 
-		w, dw, err = DecodeWidthsComposite(r, fontDicts.CIDFontDict["W"])
+		widther, err = newCIDWidther(r, cmapInfo, fontDicts)
 		if err != nil {
-			return nil, pdf.Wrap(err, "W, DW")
+			return nil, err
 		}
 	} else {
 		cs = charcode.Simple
@@ -75,64 +78,42 @@ func Read(r pdf.Getter, obj pdf.Object, name pdf.Name) (NewFont, error) {
 			m[charcode.CharCode(i)] = type1.CID(i)
 		}
 
-		// TODO(voss): handle width information for the standard fonts
+		// TODO(voss): somehow handle width information for the standard fonts
 
-		firstChar, err := pdf.GetInteger(r, fontDicts.FontDict["FirstChar"])
+		widther, err = newSimpleWidther(r, fontDicts)
 		if err != nil {
-			return nil, pdf.Wrap(err, "FirstChar")
-		}
-		lastChar, err := pdf.GetInteger(r, fontDicts.FontDict["LastChar"])
-		if err != nil {
-			return nil, pdf.Wrap(err, "LastFirst")
-		}
-		var dw float64
-		if fontDicts.FontDescriptor != nil {
-			dw = float64(fontDicts.FontDescriptor.MissingWidth)
-		}
-		ww, err := pdf.GetArray(r, fontDicts.FontDict["Widths"])
-		if err != nil {
-			return nil, pdf.Wrap(err, "Widths")
-		} else if len(ww) != int(lastChar)-int(firstChar)+1 {
-			return nil, &pdf.MalformedFileError{
-				Err: errors.New("malformed Widths"),
-			}
-		}
-		for i, wi := range ww {
-			x, err := pdf.GetNumber(r, wi)
-			if err != nil {
-				return nil, err
-			}
-			if float64(x) != dw {
-				w[type1.CID(i)+type1.CID(firstChar)] = float64(x)
-			}
+			return nil, err
 		}
 	}
 
-	res := &fromFile{
-		Object:         obj,
+	res := &FromFile{
+		Ref:            ref,
 		Name:           name,
 		CodeSpaceRange: cs,
 		M:              m,
 		WMode:          writingMode,
-		DW:             dw,
-		W:              w,
+		AllWidther:     widther,
 	}
 	return res, nil
 }
 
-func (f *fromFile) DefaultName() pdf.Name {
+// DefaultName implements the [NewFont] interface.
+func (f *FromFile) DefaultName() pdf.Name {
 	return f.Name
 }
 
-func (f *fromFile) PDFObject() pdf.Object {
-	return f.Object
+// PDFObject implements the [NewFont] interface.
+func (f *FromFile) PDFObject() pdf.Object {
+	return f.Ref
 }
 
-func (f *fromFile) WritingMode() int {
+// WritingMode implements the [NewFont] interface.
+func (f *FromFile) WritingMode() int {
 	return f.WMode
 }
 
-func (f *fromFile) SplitString(s pdf.String) []type1.CID {
+// SplitString implements the [NewFont] interface.
+func (f *FromFile) SplitString(s pdf.String) []type1.CID {
 	var res []type1.CID
 	for len(s) > 0 {
 		c, n := f.CodeSpaceRange.Decode(s)
@@ -145,10 +126,112 @@ func (f *fromFile) SplitString(s pdf.String) []type1.CID {
 	return res
 }
 
-func (f *fromFile) GlyphWidth(c type1.CID) float64 {
-	w, ok := f.W[c]
-	if !ok {
-		w = f.DW
+type AllWidther interface {
+	AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool
+	GlyphWidth(type1.CID) float64 // TODO(voss): remove
+}
+
+type simpleWidther struct {
+	W []float64
+}
+
+func newSimpleWidther(r pdf.Getter, fontInfo *Dicts) (*simpleWidther, error) {
+	firstChar, err := pdf.GetInteger(r, fontInfo.FontDict["FirstChar"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "FirstChar")
+	} else if firstChar < 0 || firstChar > 255 {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("invalid FirstChar=%d", firstChar),
+		}
 	}
-	return w
+	lastChar, err := pdf.GetInteger(r, fontInfo.FontDict["LastChar"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "LastChar")
+	} else if lastChar < 0 || lastChar > 255 {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("invalid LastChar=%d", lastChar),
+		}
+	}
+	var dw float64
+	if fontInfo.FontDescriptor != nil {
+		dw = float64(fontInfo.FontDescriptor.MissingWidth)
+	}
+	ww, err := pdf.GetArray(r, fontInfo.FontDict["Widths"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "Widths")
+	} else if len(ww) != int(lastChar)-int(firstChar)+1 {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("malformed Widths array"),
+		}
+	}
+
+	w := make([]float64, 256)
+	for i := range w {
+		if i < int(firstChar) || i > int(lastChar) {
+			w[i] = dw
+			continue
+		}
+
+		wi := i - int(firstChar)
+		x, err := pdf.GetNumber(r, ww[wi])
+		if err != nil {
+			return nil, pdf.Wrap(err, fmt.Sprintf("Widths[%d]", wi))
+		}
+		w[i] = float64(x)
+	}
+	return &simpleWidther{W: w}, nil
+}
+
+func (w *simpleWidther) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+	return func(yield func(w float64, isSpace bool) bool) bool {
+		for _, c := range s {
+			if !yield(w.W[c], c == 0x20) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func (w *simpleWidther) GlyphWidth(c type1.CID) float64 {
+	return w.W[c]
+}
+
+type compositeWidther struct {
+	charcode.CodeSpaceRange
+	M  map[charcode.CharCode]type1.CID
+	DW float64
+	W  map[type1.CID]float64
+}
+
+func newCIDWidther(r pdf.Getter, cmap *cmap.Info, fontInfo *Dicts) (*compositeWidther, error) {
+	w, dw, err := DecodeWidthsComposite(r, fontInfo.CIDFontDict["W"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "W, DW")
+	}
+	return &compositeWidther{
+		CodeSpaceRange: cmap.CodeSpaceRange,
+		M:              cmap.GetMapping(),
+		DW:             dw,
+		W:              w,
+	}, nil
+}
+
+func (w *compositeWidther) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+	return func(yield func(w float64, isSpace bool) bool) bool {
+		return w.CodeSpaceRange.AllCodes(s)(func(c pdf.String, valid bool) bool {
+			if !valid {
+				return yield(w.DW, false)
+			}
+			code, k := w.CodeSpaceRange.Decode(c)
+			if k != len(c) {
+				panic("internal error")
+			}
+			return yield(w.W[w.M[code]], len(c) == 1 && c[0] == 0x20)
+		})
+	}
+}
+
+func (w *compositeWidther) GlyphWidth(c type1.CID) float64 {
+	return w.W[c]
 }

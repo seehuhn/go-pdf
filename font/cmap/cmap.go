@@ -32,10 +32,10 @@ import (
 
 // Info holds the information for a PDF CMap.
 type Info struct {
-	Name    string
-	ROS     *type1.CIDSystemInfo
-	CS      charcode.CodeSpaceRange
-	CSFile  charcode.CodeSpaceRange // TODO(voss): clean this up
+	Name string
+	ROS  *type1.CIDSystemInfo
+	charcode.CodeSpaceRange
+	CSFile  charcode.CodeSpaceRange // TODO(voss): remove this
 	WMode   int
 	UseCMap string
 	Singles []SingleEntry
@@ -60,14 +60,18 @@ type RangeEntry struct {
 // New allocates a new CMap object.
 func New(ROS *type1.CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]type1.CID) *Info {
 	info := &Info{
-		ROS:    ROS,
-		CS:     cs,
-		CSFile: cs,
+		ROS:            ROS,
+		CodeSpaceRange: cs,
+		CSFile:         cs,
 	}
 	info.SetMapping(m)
 
 	if info.IsIdentity() {
-		info.Name = "Identity-H"
+		if info.WMode == 0 {
+			info.Name = "Identity-H"
+		} else {
+			info.Name = "Identity-V"
+		}
 	} else {
 		info.Name = makeName(m)
 	}

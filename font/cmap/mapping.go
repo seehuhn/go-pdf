@@ -57,7 +57,7 @@ func (info *Info) SetMapping(m map[charcode.CharCode]type1.CID) {
 	})
 
 	g := &encoder{
-		cs: info.CS,
+		cs: info.CodeSpaceRange,
 		mm: entries,
 	}
 	ee, err := dag.ShortestPath[int16, uint32](g, len(entries))

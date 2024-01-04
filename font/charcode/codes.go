@@ -29,10 +29,24 @@ type CharCode int
 // character codes for a given encoding.
 type CodeSpaceRange []Range
 
+// AllCodes returns an iterator over all character codes in the given PDF string.
+func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, valid bool) bool) bool {
+	return func(yield func(pdf.String, bool) bool) bool {
+		for len(s) > 0 {
+			k, valid := c.firstCode(s)
+			if !yield(s[:k], valid) {
+				return false
+			}
+			s = s[k:]
+		}
+		return true
+	}
+}
+
 // firstCode returns the length of the first character code from the given PDF string,
 // together with a boolean indicating whether the code was valid.
 //
-// See algorithm from section 9.7.6.3 of the PDF-2.0 spec.
+// See the algorithm from section 9.7.6.3 of the PDF-2.0 spec.
 func (c CodeSpaceRange) firstCode(s pdf.String) (int, bool) {
 	candiates := make([]int, len(c))
 	for j := range candiates {
@@ -70,20 +84,6 @@ func (c CodeSpaceRange) firstCode(s pdf.String) (int, bool) {
 		}
 	}
 	return skipLen, false
-}
-
-// AllCodes returns an iterator over all character codes in the given PDF string.
-func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, valid bool) bool) bool {
-	return func(yield func(pdf.String, bool) bool) bool {
-		for len(s) > 0 {
-			k, valid := c.firstCode(s)
-			if !yield(s[:k], valid) {
-				return false
-			}
-			s = s[k:]
-		}
-		return true
-	}
 }
 
 // Append appends the given character code to the given PDF string.

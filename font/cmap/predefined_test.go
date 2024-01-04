@@ -58,7 +58,7 @@ func TestPredefined(t *testing.T) {
 		}
 
 		rr1 := builtinCS[name]
-		rr2 := []charcode.Range(cmap.CS)
+		rr2 := []charcode.Range(cmap.CodeSpaceRange)
 		if d := cmp.Diff(rr1, rr2); d != "" {
 			fmt.Printf("\t%q: {\n", name)
 			for _, r := range rr2 {

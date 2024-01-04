@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
+// Extract reads a CMap from a PDF file.
 func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
@@ -62,9 +63,9 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	}
 
 	res := &Info{
-		ROS:   &type1.CIDSystemInfo{},
-		CS:    nil,
-		WMode: 0,
+		ROS:            &type1.CIDSystemInfo{},
+		CodeSpaceRange: nil,
+		WMode:          0,
 	}
 
 	if tp, ok := cmap["CMapType"].(postscript.Integer); !ok || !(tp == 0 || tp == 1) {
@@ -115,7 +116,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 			other = make(map[string]*Info)
 		}
 		if other, ok := other[codeMap.UseCMap]; ok {
-			rr = append(rr, other.CS...)
+			rr = append(rr, other.CodeSpaceRange...)
 		} else if other, ok := builtinCS[codeMap.UseCMap]; ok {
 			rr = append(rr, other...)
 		} else {
@@ -127,11 +128,11 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		rrFile = append(rrFile, charcode.Range{Low: r.Low, High: r.High})
 	}
 	// TODO(voss): do we need to sort the ranges?
-	res.CS = charcode.CodeSpaceRange(append(rr, rrFile...))
+	res.CodeSpaceRange = charcode.CodeSpaceRange(append(rr, rrFile...))
 	res.CSFile = charcode.CodeSpaceRange(rrFile)
 
 	for _, m := range codeMap.Chars {
-		code, k := res.CS.Decode(m.Src)
+		code, k := res.CodeSpaceRange.Decode(m.Src)
 		if k != len(m.Src) || code < 0 {
 			return nil, fmt.Errorf("invalid code <%02x>", m.Src)
 		}
@@ -146,11 +147,11 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	}
 
 	for _, m := range codeMap.Ranges {
-		low, k := res.CS.Decode(m.Low)
+		low, k := res.CodeSpaceRange.Decode(m.Low)
 		if k != len(m.Low) || low < 0 {
 			return nil, fmt.Errorf("invalid code <%02x>", m.Low)
 		}
-		high, k := res.CS.Decode(m.High)
+		high, k := res.CodeSpaceRange.Decode(m.High)
 		if k != len(m.High) || high < 0 {
 			return nil, fmt.Errorf("invalid code <%02x>", m.High)
 		}

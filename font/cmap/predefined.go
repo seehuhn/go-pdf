@@ -38,6 +38,7 @@ func openPredefined(name string) (io.ReadCloser, error) {
 	return gzip.NewReader(fd)
 }
 
+// IsPredefined returns true if the CMap is one of the CMaps predefined in PDF.
 func (info *Info) IsPredefined() bool {
 	_, ok := builtinCS[info.Name]
 	return ok

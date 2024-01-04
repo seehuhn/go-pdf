@@ -30,9 +30,9 @@ func TestMapping(t *testing.T) {
 		{Low: []byte{0x11, 0x80, 0x80}, High: []byte{0x11, 0xFF, 0xFF}},
 	}
 	info := &Info{
-		Name:   "Test",
-		CS:     cs,
-		CSFile: cs,
+		Name:           "Test",
+		CodeSpaceRange: cs,
+		CSFile:         cs,
 	}
 	m1 := map[charcode.CharCode]type1.CID{
 		0:  0, // single 1
