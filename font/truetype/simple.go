@@ -123,7 +123,7 @@ func (f *embeddedSimple) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			f.DefName, f.ttf.PostscriptName())
 	}
-	encoding := f.SimpleEncoder.Encoding()
+	encoding := f.SimpleEncoder.Encoding
 
 	origTTF := f.ttf.Clone()
 	origTTF.CMapTable = nil

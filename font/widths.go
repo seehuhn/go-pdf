@@ -41,6 +41,8 @@ type WidthInfo struct {
 
 // EncodeWidthsSimple encodes the glyph width information for a simple PDF font.
 // The slice ww must have length 256 and is indexed by character code.
+//
+// TODO(voss): convert ww to use PDF text space units and remove unitsPerEm.
 func EncodeWidthsSimple(ww []funit.Int16, unitsPerEm uint16) *WidthInfo {
 	q := 1000 / float64(unitsPerEm)
 

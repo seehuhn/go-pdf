@@ -127,7 +127,7 @@ func (f *embeddedCFFSimple) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			f.DefName, f.otf.PostscriptName())
 	}
-	encoding := f.SimpleEncoder.Encoding()
+	encoding := f.SimpleEncoder.Encoding
 
 	// Make our encoding the built-in encoding of the font.
 	origOTF := f.otf.Clone()

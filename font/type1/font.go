@@ -188,7 +188,7 @@ func (e *embedded) Close() error {
 			e.DefName, e.outlines.FontInfo.FontName)
 	}
 
-	encodingGid := e.Encoding()
+	encodingGid := e.Encoding
 	encoding := make([]string, 256)
 	for i, gid := range encodingGid {
 		encoding[i] = e.glyphNames[gid]

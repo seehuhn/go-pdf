@@ -154,7 +154,7 @@ func doit() error {
 				return err
 			}
 			ffKey = "FontFile2"
-		case "Glyf-based OpenType Fonts":
+		case "Simple Glyf-based OpenType Fonts":
 			otf, err := gofont.TrueType(gofont.GoRegular)
 			if err != nil {
 				return err

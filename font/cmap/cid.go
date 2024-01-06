@@ -39,6 +39,8 @@ type CIDEncoder interface {
 	// given unicode string.
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
+	CS() charcode.CodeSpaceRange
+
 	// CMap returns the mapping from character codes to CID values.
 	CMap() *Info
 
@@ -49,8 +51,10 @@ type CIDEncoder interface {
 	// The returned slice is sorted and always starts with GID 0.
 	Subset() []glyph.ID
 
+	// TODO(voss): remove
 	Decode(pdf.String) (charcode.CharCode, int)
 
+	// TODO(voss): remove
 	SplitString(s pdf.String) []type1.CID
 }
 
@@ -77,6 +81,10 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 	e.toUnicode[code] = rr
 	e.used[gid] = struct{}{}
 	return charcode.UCS2.Append(s, code)
+}
+
+func (e *identityEncoder) CS() charcode.CodeSpaceRange {
+	return charcode.UCS2
 }
 
 func (e *identityEncoder) CMap() *Info {
@@ -185,6 +193,10 @@ func runeToCode(r rune) charcode.CharCode {
 		code += 0x0080
 	}
 	return code
+}
+
+func (e *utf8Encoder) CS() charcode.CodeSpaceRange {
+	return utf8cs
 }
 
 func (e *utf8Encoder) CMap() *Info {

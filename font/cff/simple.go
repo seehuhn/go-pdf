@@ -115,6 +115,20 @@ type embeddedSimple struct {
 	closed bool
 }
 
+func (f *embeddedSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+	return func(yield func(w float64, isSpace bool) bool) bool {
+		q := 1000 / float64(f.otf.UnitsPerEm)
+		for _, c := range s {
+			gid := f.Encoding[c]
+			w := f.otf.GlyphWidth(gid).AsFloat(q)
+			if !yield(w, c == 0x20) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 func (f *embeddedSimple) Close() error {
 	if f.closed {
 		return nil
@@ -125,7 +139,7 @@ func (f *embeddedSimple) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			f.DefName, f.otf.PostscriptName())
 	}
-	encoding := f.SimpleEncoder.Encoding()
+	encoding := f.SimpleEncoder.Encoding
 
 	// Make our encoding the built-in encoding of the font.
 	otf := f.otf.Clone()

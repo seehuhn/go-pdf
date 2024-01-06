@@ -32,8 +32,9 @@ import (
 // SimpleEncoder constructs and stores mappings from one-byte character codes
 // to GID values and from one-byte character codes to unicode strings.
 type SimpleEncoder struct {
-	cache map[key]byte
-	used  map[byte]struct{}
+	Encoding []glyph.ID
+	cache    map[key]byte
+	used     map[byte]struct{}
 }
 
 type key struct {
@@ -44,8 +45,9 @@ type key struct {
 // NewSimpleEncoder allocates a new SimpleEncoder.
 func NewSimpleEncoder() *SimpleEncoder {
 	res := &SimpleEncoder{
-		cache: make(map[key]byte),
-		used:  make(map[byte]struct{}),
+		Encoding: make([]glyph.ID, 256),
+		cache:    make(map[key]byte),
+		used:     make(map[byte]struct{}),
 	}
 	return res
 }
@@ -71,6 +73,7 @@ func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf
 		r = rr[len(rr)-1]
 	}
 	code = e.allocateCode(r)
+	e.Encoding[code] = gid
 	e.cache[k] = code
 	return append(s, code)
 }
@@ -134,15 +137,6 @@ func (e *SimpleEncoder) Subset() []glyph.ID {
 	return subset
 }
 
-// Encoding returns the glyph ID corresponding to each character code.
-func (e *SimpleEncoder) Encoding() []glyph.ID {
-	res := make([]glyph.ID, 256)
-	for key, code := range e.cache {
-		res[code] = key.gid
-	}
-	return res
-}
-
 // ToUnicode returns the mapping from character codes to unicode strings.
 // This can be used to construct a PDF ToUnicode CMap.
 func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
@@ -153,10 +147,12 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 	return toUnicode
 }
 
+// WritingMode implements the [font.NewFont] interface.
 func (e *SimpleEncoder) WritingMode() int {
 	return 0 // simple fonts are always horizontal
 }
 
+// TODO(voss): remove
 func (e *SimpleEncoder) Decode(s pdf.String) (charcode.CharCode, int) {
 	if len(s) == 0 {
 		return 0, 0
@@ -164,6 +160,7 @@ func (e *SimpleEncoder) Decode(s pdf.String) (charcode.CharCode, int) {
 	return charcode.CharCode(s[0]), 1
 }
 
+// TODO(voss): remove
 func (e *SimpleEncoder) SplitString(s pdf.String) []type1.CID {
 	res := make([]type1.CID, len(s))
 	for i, code := range s {

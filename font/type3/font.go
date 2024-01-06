@@ -179,7 +179,7 @@ func (e *embedded) Close() error {
 			e.DefName)
 	}
 
-	encodingGid := e.Encoding()
+	encodingGid := e.Encoding
 	encoding := make([]string, 256)
 
 	subset := make(map[string]*Glyph)

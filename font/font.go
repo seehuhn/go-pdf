@@ -39,9 +39,8 @@ type Geometry struct {
 	UnderlinePosition  funit.Float64
 	UnderlineThickness funit.Float64
 
-	// TODO(voss): check that this is indexed by CID, not by GID
-	GlyphExtents []funit.Rect16 // indexed by CID
-	Widths       []funit.Int16  // indexed by CID
+	GlyphExtents []funit.Rect16 // indexed by GID
+	Widths       []funit.Int16  // indexed by GID
 }
 
 // GetGeometry returns the geometry of a font.

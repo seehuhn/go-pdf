@@ -34,4 +34,5 @@ type NewFont interface {
 
 	SplitString(pdf.String) []type1.CID // TODO(voss): remove?
 	GlyphWidth(type1.CID) float64       // 1000 units correspond to 1 unit in text space
+	// AllWidther
 }

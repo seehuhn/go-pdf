@@ -148,7 +148,7 @@ end def
 {{end -}}
 {{end -}}
 endcodespacerange
-{{$cs := .CS -}}
+{{$cs := .CodeSpaceRange -}}
 
 {{range SingleChunks .Singles -}}
 {{len .}} begincidchar

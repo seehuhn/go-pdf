@@ -70,7 +70,7 @@ Only a subset of the TrueType tables is required for embedded fonts.
 Usually, `Encoding` is omitted from the font dictionary, and the mapping from
 character codes to glyphs is described by a `cmap` table in the TrueType font.
 
-## Glyf-based OpenType Fonts (PDF 1.6)
+## Simple Glyf-based OpenType Fonts (PDF 1.6)
 
 These fonts use `TrueType` as the `Subtype` in the font dictionary.
 The font data is embedded via the `FontFile3` entry in the font descriptor,
