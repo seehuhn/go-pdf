@@ -145,8 +145,13 @@ func (f *embeddedComposite) AllWidths(s pdf.String) func(yield func(w float64, i
 			if k != len(c) {
 				panic("internal error")
 			}
-			...
-			return yield(width, len(c)==1 && c[0] = 0x20)
+
+			// If code is invalid, CID 0 is used.
+			cid, _ := f.Lookup(code)
+			gid := f.GID(cid)
+			width := f.otf.GlyphWidth(gid).AsFloat(q)
+
+			return yield(width, len(c) == 1 && c[0] == 0x20)
 		})
 	}
 }

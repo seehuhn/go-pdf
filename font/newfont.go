@@ -33,6 +33,10 @@ type NewFont interface {
 	Decode(pdf.String) (charcode.CharCode, int)
 
 	SplitString(pdf.String) []type1.CID // TODO(voss): remove?
-	GlyphWidth(type1.CID) float64       // 1000 units correspond to 1 unit in text space
-	// AllWidther
+	AllWidther
+}
+
+type AllWidther interface {
+	AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool
+	GlyphWidth(type1.CID) float64 // TODO(voss): remove
 }

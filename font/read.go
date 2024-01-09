@@ -126,11 +126,6 @@ func (f *FromFile) SplitString(s pdf.String) []type1.CID {
 	return res
 }
 
-type AllWidther interface {
-	AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool
-	GlyphWidth(type1.CID) float64 // TODO(voss): remove
-}
-
 type simpleWidther struct {
 	W []float64
 }

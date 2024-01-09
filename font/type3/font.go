@@ -111,6 +111,10 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	return res, nil
 }
 
+func (f *Font) UnitsPerEm() uint16 {
+	return uint16(math.Round(1 / f.FontMatrix[0]))
+}
+
 // GetGeometry implements the [font.Font] interface.
 func (f *Font) GetGeometry() *font.Geometry {
 	glyphNames := f.glyphNames
@@ -127,7 +131,7 @@ func (f *Font) GetGeometry() *font.Geometry {
 	}
 
 	res := &font.Geometry{
-		UnitsPerEm:         uint16(math.Round(1 / f.FontMatrix[0])),
+		UnitsPerEm:         f.UnitsPerEm(),
 		Ascent:             f.Ascent,
 		Descent:            f.Descent,
 		BaseLineDistance:   f.BaseLineSkip,
@@ -166,6 +170,20 @@ type embedded struct {
 
 	*encoding.SimpleEncoder
 	closed bool
+}
+
+func (f *embedded) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+	return func(yield func(w float64, isSpace bool) bool) bool {
+		q := 1000 / float64(f.UnitsPerEm())
+		for _, c := range s {
+			gid := f.Encoding[c]
+			w := f.Glyphs[f.glyphNames[gid]].WidthX.AsFloat(q)
+			if !yield(w, c == 0x20) {
+				return false
+			}
+		}
+		return true
+	}
 }
 
 func (e *embedded) Close() error {

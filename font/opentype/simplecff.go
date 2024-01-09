@@ -117,6 +117,20 @@ type embeddedCFFSimple struct {
 	closed bool
 }
 
+func (f *embeddedCFFSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+	return func(yield func(w float64, isSpace bool) bool) bool {
+		q := 1000 / float64(f.otf.UnitsPerEm)
+		for _, c := range s {
+			gid := f.Encoding[c]
+			w := f.otf.GlyphWidth(gid).AsFloat(q)
+			if !yield(w, c == 0x20) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 func (f *embeddedCFFSimple) Close() error {
 	if f.closed {
 		return nil

@@ -177,24 +177,38 @@ type embedded struct {
 	closed bool
 }
 
-func (e *embedded) Close() error {
-	if e.closed {
+func (f *embedded) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+	return func(yield func(w float64, isSpace bool) bool) bool {
+		q := 1000 / float64(f.outlines.UnitsPerEm)
+		for _, c := range s {
+			gid := f.Encoding[c]
+			w := f.outlines.GlyphInfo[f.outlines.Encoding[gid]].WidthX.AsFloat(q)
+			if !yield(w, c == 0x20) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func (f *embedded) Close() error {
+	if f.closed {
 		return nil
 	}
-	e.closed = true
+	f.closed = true
 
-	if e.SimpleEncoder.Overflow() {
+	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			e.DefName, e.outlines.FontInfo.FontName)
+			f.DefName, f.outlines.FontInfo.FontName)
 	}
 
-	encodingGid := e.Encoding
+	encodingGid := f.Encoding
 	encoding := make([]string, 256)
 	for i, gid := range encodingGid {
-		encoding[i] = e.glyphNames[gid]
+		encoding[i] = f.glyphNames[gid]
 	}
 
-	psFont := e.outlines
+	psFont := f.outlines
 	var psSubset *type1.Font
 	var subsetTag string
 	if psFont.Outlines != nil {
@@ -217,7 +231,7 @@ func (e *embedded) Close() error {
 		psSubset.Encoding = encoding
 
 		var ss []glyph.ID
-		for origGid, name := range e.glyphNames {
+		for origGid, name := range f.glyphNames {
 			if _, ok := psSubset.Outlines[name]; ok {
 				ss = append(ss, glyph.ID(origGid))
 			}
@@ -233,9 +247,9 @@ func (e *embedded) Close() error {
 		Font:      psSubset,
 		SubsetTag: subsetTag,
 		Encoding:  encoding,
-		ResName:   e.DefName,
+		ResName:   f.DefName,
 	}
-	return info.Embed(e.w, e.Data)
+	return info.Embed(f.w, f.Data)
 }
 
 // EmbedInfo holds all the information needed to embed a Type 1 font

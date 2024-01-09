@@ -41,6 +41,8 @@ type CIDEncoder interface {
 
 	CS() charcode.CodeSpaceRange
 
+	Lookup(c charcode.CharCode) (type1.CID, bool)
+
 	// CMap returns the mapping from character codes to CID values.
 	CMap() *Info
 
@@ -85,6 +87,13 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 
 func (e *identityEncoder) CS() charcode.CodeSpaceRange {
 	return charcode.UCS2
+}
+
+func (e *identityEncoder) Lookup(code charcode.CharCode) (type1.CID, bool) {
+	if _, ok := e.toUnicode[code]; !ok {
+		return 0, false
+	}
+	return type1.CID(code), true
 }
 
 func (e *identityEncoder) CMap() *Info {
@@ -199,6 +208,11 @@ func (e *utf8Encoder) CS() charcode.CodeSpaceRange {
 	return utf8cs
 }
 
+func (e *utf8Encoder) Lookup(code charcode.CharCode) (type1.CID, bool) {
+	cid, ok := e.cmap[code]
+	return cid, ok
+}
+
 func (e *utf8Encoder) CMap() *Info {
 	return New(e.g2c.ROS(), utf8cs, e.cmap)
 }
@@ -250,6 +264,7 @@ var utf8cs = charcode.CodeSpaceRange{
 // Identifier (CID) values.
 type GIDToCID interface {
 	CID(glyph.ID) type1.CID
+	GID(type1.CID) glyph.ID
 
 	ROS() *type1.CIDSystemInfo
 
@@ -260,34 +275,41 @@ type GIDToCID interface {
 // sequentially, starting with 1.
 func NewSequentialGIDToCID() GIDToCID {
 	return &gidToCIDSequential{
-		data: make(map[glyph.ID]type1.CID),
+		g2c: make(map[glyph.ID]type1.CID),
+		c2g: make(map[type1.CID]glyph.ID),
 	}
 }
 
 type gidToCIDSequential struct {
-	data map[glyph.ID]type1.CID
+	g2c map[glyph.ID]type1.CID
+	c2g map[type1.CID]glyph.ID
 }
 
 // GID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) CID(gid glyph.ID) type1.CID {
-	cid, ok := g.data[gid]
+	cid, ok := g.g2c[gid]
 	if !ok {
-		cid = type1.CID(len(g.data) + 1)
-		g.data[gid] = cid
+		cid = type1.CID(len(g.g2c) + 1)
+		g.g2c[gid] = cid
+		g.c2g[cid] = gid
 	}
 	return cid
+}
+
+func (g *gidToCIDSequential) GID(cid type1.CID) glyph.ID {
+	return g.c2g[cid]
 }
 
 // ROS implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) ROS() *type1.CIDSystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
-	binary.Write(h, binary.BigEndian, len(g.data))
-	gg := maps.Keys(g.data)
+	binary.Write(h, binary.BigEndian, len(g.g2c))
+	gg := maps.Keys(g.g2c)
 	slices.Sort(gg)
 	for _, gid := range gg {
 		binary.Write(h, binary.BigEndian, gid)
-		binary.Write(h, binary.BigEndian, g.data[gid])
+		binary.Write(h, binary.BigEndian, g.g2c[gid])
 	}
 	sum := h.Sum(nil)
 
@@ -301,7 +323,7 @@ func (g *gidToCIDSequential) ROS() *type1.CIDSystemInfo {
 // GIDToCID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) GIDToCID(numGlyph int) []type1.CID {
 	res := make([]type1.CID, numGlyph)
-	for gid, cid := range g.data {
+	for gid, cid := range g.g2c {
 		res[gid] = cid
 	}
 	return res
@@ -318,6 +340,11 @@ type gidToCIDIdentity struct{}
 // GID implements the [GIDToCID] interface.
 func (g *gidToCIDIdentity) CID(gid glyph.ID) type1.CID {
 	return type1.CID(gid)
+}
+
+// CID implements the [GIDToCID] interface.
+func (g *gidToCIDIdentity) GID(cid type1.CID) glyph.ID {
+	return glyph.ID(cid)
 }
 
 // ROS implements the [GIDToCID] interface.
