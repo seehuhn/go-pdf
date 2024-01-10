@@ -38,7 +38,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
-// fontCFFSimple is a OpenType/CFF font
+// fontCFFSimple is a OpenType/CFF font for embedding into a PDF file as a simple font.
 type fontCFFSimple struct {
 	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
@@ -204,6 +204,11 @@ type EmbedInfoCFFSimple struct {
 	ToUnicode *cmap.ToUnicode
 }
 
+// WritingMode implements the [font.NewFont] interface.
+func (info *EmbedInfoCFFSimple) WritingMode() int {
+	return 0
+}
+
 // Embed adds a simple OpenType/CFF font to a PDF file.
 // This is the reverse of [ExtractCFFSimple]
 func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
@@ -239,10 +244,10 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	widthsInfo := font.EncodeWidthsSimple(ww, unitsPerEm)
 
 	clientEnc := make([]string, 256)
-	builtin := make([]string, 256)
+	builtinEnc := make([]string, 256)
 	for i := 0; i < 256; i++ {
 		clientEnc[i] = cff.Glyphs[info.Encoding[i]].Name
-		builtin[i] = cff.Glyphs[cff.Encoding[i]].Name
+		builtinEnc[i] = cff.Glyphs[cff.Encoding[i]].Name
 	}
 
 	q := 1000 / float64(unitsPerEm)
@@ -268,7 +273,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		"Widths":         widthsRef,
 		"FontDescriptor": fontDescriptorRef,
 	}
-	if enc := encoding.DescribeEncodingType1(clientEnc, builtin); enc != nil {
+	if enc := encoding.DescribeEncodingType1(clientEnc, builtinEnc); enc != nil {
 		fontDict["Encoding"] = enc
 	}
 	var toUnicodeRef pdf.Reference
@@ -351,7 +356,7 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 	if dicts.FontProgram != nil {
 		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 		if err != nil {
-			return nil, pdf.Wrap(err, "uncompressing OpenType/CFF font stream")
+			return nil, pdf.Wrap(err, "OpenType/CFF font stream")
 		}
 		otf, err := sfnt.Read(stm)
 		if err != nil {

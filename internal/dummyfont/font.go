@@ -69,7 +69,7 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont {
 	}
 
 	ref := w.Alloc()
-	info := &pdfcff.EmbedInfoSimple{
+	info := &pdfcff.EmbedInfoCFFSimple{
 		Font:       in,
 		Encoding:   encoding,
 		UnitsPerEm: 1000,

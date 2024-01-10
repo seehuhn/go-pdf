@@ -117,7 +117,7 @@ func TestTextPositions(t *testing.T) {
 		F.Glyphs = append(F.Glyphs, g)
 	}
 
-	e := &pdfcff.EmbedInfoSimple{
+	e := &pdfcff.EmbedInfoCFFSimple{
 		Font:       F,
 		Encoding:   F.Encoding,
 		UnitsPerEm: uint16(math.Round(1 / F.FontInfo.FontMatrix[0])),
@@ -196,21 +196,21 @@ func TestTextPositions(t *testing.T) {
 }
 
 type testFont struct {
-	*pdfcff.EmbedInfoSimple
+	*pdfcff.EmbedInfoCFFSimple
 	ref  pdf.Reference
 	name pdf.Name
 }
 
-func embedTestFont(w pdf.Putter, e *pdfcff.EmbedInfoSimple, name pdf.Name) (*testFont, error) {
+func embedTestFont(w pdf.Putter, e *pdfcff.EmbedInfoCFFSimple, name pdf.Name) (*testFont, error) {
 	ref := w.Alloc()
 	err := e.Embed(w, ref)
 	if err != nil {
 		return nil, err
 	}
 	F := &testFont{
-		EmbedInfoSimple: e,
-		ref:             ref,
-		name:            name,
+		EmbedInfoCFFSimple: e,
+		ref:                ref,
+		name:               name,
 	}
 	return F, nil
 }
@@ -221,10 +221,6 @@ func (f *testFont) DefaultName() pdf.Name {
 
 func (f *testFont) PDFObject() pdf.Object {
 	return f.ref
-}
-
-func (f *testFont) WritingMode() int {
-	return 0
 }
 
 func gsRender(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) image.Image {

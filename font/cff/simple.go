@@ -23,6 +23,7 @@ import (
 	"io"
 	"math"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
@@ -39,13 +40,19 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-// fontSimple is a CFF font for embedding into a PDF file as a simple font.
-type fontSimple struct {
+// fontCFFSimple is a CFF font for embedding into a PDF file as a simple font.
+type fontCFFSimple struct {
 	otf         *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
 	*font.Geometry
+}
+
+var defaultOptionsCFF = &font.Options{
+	Language:     language.Und,
+	GsubFeatures: gtab.GsubDefaultFeatures,
+	GposFeatures: gtab.GposDefaultFeatures,
 }
 
 // NewSimple allocates a new CFF font for embedding in a PDF file as a simple font.
@@ -57,6 +64,8 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
+
+	opt = font.MergeOptions(opt, defaultOptionsCFF)
 
 	geometry := &font.Geometry{
 		UnitsPerEm:   info.UnitsPerEm,
@@ -75,7 +84,7 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 		return nil, err
 	}
 
-	res := &fontSimple{
+	res := &fontCFFSimple{
 		otf:         info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
@@ -86,13 +95,13 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
 		return nil, err
 	}
 	res := &embeddedSimple{
-		fontSimple:    f,
+		fontCFFSimple: f,
 		w:             w,
 		Res:           Res{Data: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
@@ -102,12 +111,12 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 }
 
 // Layout implements the [font.Font] interface.
-func (f *fontSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontCFFSimple) Layout(s string, ptSize float64) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
-	*fontSimple
+	*fontCFFSimple
 	w pdf.Putter
 	Res
 
@@ -142,28 +151,28 @@ func (f *embeddedSimple) Close() error {
 	encoding := f.SimpleEncoder.Encoding
 
 	// Make our encoding the built-in encoding of the font.
-	otf := f.otf.Clone()
-	outlines := otf.Outlines.(*cff.Outlines)
+	origOTF := f.otf.Clone()
+	outlines := origOTF.Outlines.(*cff.Outlines)
 	outlines.Encoding = encoding
 	outlines.ROS = nil
 	outlines.GIDToCID = nil
 
-	otf.CMapTable = nil
-	otf.Gdef = nil
-	otf.Gpos = nil
-	otf.Gsub = nil
+	origOTF.CMapTable = nil
+	origOTF.Gdef = nil
+	origOTF.Gsub = nil
+	origOTF.Gpos = nil
 
 	// subset the font
 	subsetGID := f.SimpleEncoder.Subset()
-	subsetTag := subset.Tag(subsetGID, otf.NumGlyphs())
-	subsetOtf, err := otf.Subset(subsetGID)
+	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
+	subsetOTF, err := origOTF.Subset(subsetGID)
 	if err != nil {
-		return fmt.Errorf("font subset: %w", err)
+		return fmt.Errorf("CFF font subset: %w", err)
 	}
 
 	// convert the font to a simple font, if needed
-	subsetOtf.EnsureGlyphNames()
-	subsetCFF := subsetOtf.AsCFF()
+	subsetOTF.EnsureGlyphNames()
+	subsetCFF := subsetOTF.AsCFF()
 	if len(subsetCFF.Private) != 1 {
 		return fmt.Errorf("need exactly one private dict for a simple font")
 	}
@@ -172,23 +181,24 @@ func (f *embeddedSimple) Close() error {
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
-	info := EmbedInfoSimple{
-		Font:       subsetCFF,
-		SubsetTag:  subsetTag,
-		Encoding:   subsetCFF.Encoding, // we use the built-in encoding
-		ToUnicode:  toUnicode,
-		UnitsPerEm: subsetOtf.UnitsPerEm,
-		Ascent:     subsetOtf.Ascent,
-		Descent:    subsetOtf.Descent,
-		CapHeight:  subsetOtf.CapHeight,
-		IsSerif:    subsetOtf.IsScript,
-		IsScript:   subsetOtf.IsScript,
+	info := EmbedInfoCFFSimple{
+		Font:      subsetCFF,
+		SubsetTag: subsetTag,
+		Encoding:  subsetCFF.Encoding, // we use the built-in encoding
+		ToUnicode: toUnicode,
+
+		UnitsPerEm: subsetOTF.UnitsPerEm,
+		Ascent:     subsetOTF.Ascent,
+		Descent:    subsetOTF.Descent,
+		CapHeight:  subsetOTF.CapHeight,
+		IsSerif:    subsetOTF.IsScript,
+		IsScript:   subsetOTF.IsScript,
 	}
 	return info.Embed(f.w, f.Data)
 }
 
-// EmbedInfoSimple is the information needed to embed a simple CFF font.
-type EmbedInfoSimple struct {
+// EmbedInfoCFFSimple is the information needed to embed a simple CFF font.
+type EmbedInfoCFFSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *cff.Font
 
@@ -217,8 +227,13 @@ type EmbedInfoSimple struct {
 	ToUnicode *cmap.ToUnicode
 }
 
+// WritingMode implements the [font.NewFont] interface.
+func (info *EmbedInfoCFFSimple) WritingMode() int {
+	return 0
+}
+
 // AllWidths implements the [font.NewFont] interface.
-func (info *EmbedInfoSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+func (info *EmbedInfoCFFSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
 	return func(yield func(w float64, isSpace bool) bool) bool {
 		q := 1 / float64(info.UnitsPerEm)
 		for _, c := range s {
@@ -233,7 +248,8 @@ func (info *EmbedInfoSimple) AllWidths(s pdf.String) func(yield func(w float64, 
 }
 
 // Embed adds the font to a PDF file.
-func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+// This is the reverse of [ExtractSimple]
+func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
 		return err
@@ -307,12 +323,12 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		IsSerif:      info.IsSerif,
 		IsSymbolic:   isSymbolic,
 		IsScript:     info.IsScript,
-		IsItalic:     info.Font.ItalicAngle != 0,
+		IsItalic:     cff.ItalicAngle != 0,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
-		ForceBold:    info.Font.Private[0].ForceBold,
+		ForceBold:    cff.Private[0].ForceBold,
 		FontBBox:     fontBBox,
-		ItalicAngle:  info.Font.ItalicAngle,
+		ItalicAngle:  cff.ItalicAngle,
 		Ascent:       info.Ascent.AsFloat(q),
 		Descent:      info.Descent.AsFloat(q),
 		CapHeight:    info.CapHeight.AsFloat(q),
@@ -339,7 +355,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	}
 	err = cff.Write(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding CFF font %q: %w", fontName, err)
+		return fmt.Errorf("CFF font program %q: %w", fontName, err)
 	}
 	err = fontFileStream.Close()
 	if err != nil {
@@ -357,13 +373,13 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 }
 
 // ExtractSimple extracts all information about a simple CFF font from a PDF file.
-// This is the inverse of [EmbedInfoSimple.Embed].
-func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
+// This is the inverse of [EmbedInfoCFFSimple.Embed].
+func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error) {
 	if err := dicts.Type.MustBe(font.CFFSimple); err != nil {
 		return nil, err
 	}
 
-	res := &EmbedInfoSimple{}
+	res := &EmbedInfoCFFSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
 	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
@@ -373,7 +389,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	if dicts.FontProgram != nil {
 		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 		if err != nil {
-			return nil, pdf.Wrap(err, "uncompressing CFF font stream")
+			return nil, pdf.Wrap(err, "CFF font stream")
 		}
 		data, err := io.ReadAll(stm)
 		if err != nil {
