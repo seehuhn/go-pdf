@@ -239,20 +239,15 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 	}
 
 	var width float64
-	codes := s
-	for len(codes) > 0 {
-		c, n := w.TextFont.Decode(codes)
-		if c >= 0 {
-			// TODO(voss): add the glyph width
-			// width += w.TextFont.GlyphWidth(c)
-			if n == 1 && codes[0] == 0x20 {
-				width += w.State.TextWordSpacing
-			}
+	w.TextFont.AllWidths(s)(func(glyphWidth float64, isSpace bool) bool {
+		width += glyphWidth * w.State.TextFontSize
+		if isSpace {
+			width += w.State.TextWordSpacing
 		}
 		width += w.State.TextCharacterSpacing
-		codes = codes[n:]
-	}
-
+		return true
+	})
+	width *= w.State.TextHorizonalScaling / 100
 	switch w.TextFont.WritingMode() {
 	case 0: // horizontal
 		w.TextMatrix = Translate(width, 0).Mul(w.TextMatrix)
