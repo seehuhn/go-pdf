@@ -112,20 +112,6 @@ func (f *FromFile) WritingMode() int {
 	return f.WMode
 }
 
-// SplitString implements the [NewFont] interface.
-func (f *FromFile) SplitString(s pdf.String) []type1.CID {
-	var res []type1.CID
-	for len(s) > 0 {
-		c, n := f.CodeSpaceRange.Decode(s)
-		s = s[n:]
-		if c >= 0 {
-			// TODO(voss): what to do if c is not in the cmap?
-			res = append(res, f.M[c])
-		}
-	}
-	return res
-}
-
 type simpleWidther struct {
 	W []float64
 }

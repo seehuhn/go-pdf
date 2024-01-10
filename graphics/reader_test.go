@@ -206,7 +206,7 @@ func FuzzReader(f *testing.F) {
 				F, err := font.Read(data, res.Font[name], name)
 				if pdf.IsMalformed(err) {
 					break
-				} else {
+				} else if err != nil {
 					t.Fatal(err)
 				}
 				if ok1 && ok2 {

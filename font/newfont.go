@@ -18,8 +18,6 @@ package font
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
 )
 
 // NewFont represents a font in a PDF document.
@@ -30,13 +28,14 @@ type NewFont interface {
 	DefaultName() pdf.Name // return "" to choose names automatically
 	PDFObject() pdf.Object // value to use in the resource dictionary
 	WritingMode() int      // 0 = horizontal, 1 = vertical
-	Decode(pdf.String) (charcode.CharCode, int)
 
-	SplitString(pdf.String) []type1.CID // TODO(voss): remove?
 	AllWidther
 }
 
+// AllWidther is an interface for fonts which can return the width of all
+// characters in PDF string.
 type AllWidther interface {
+	// AllWidths returns a function which iterates over all characters in the
+	// given string.  The width values are returned in PDF text space units.
 	AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool
-	GlyphWidth(type1.CID) float64 // TODO(voss): remove
 }

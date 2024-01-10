@@ -217,6 +217,21 @@ type EmbedInfoSimple struct {
 	ToUnicode *cmap.ToUnicode
 }
 
+// AllWidths implements the [font.NewFont] interface.
+func (info *EmbedInfoSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
+	return func(yield func(w float64, isSpace bool) bool) bool {
+		q := 1 / float64(info.UnitsPerEm)
+		for _, c := range s {
+			gid := info.Encoding[c]
+			w := info.Font.Glyphs[gid].Width.AsFloat(q)
+			if !yield(w, c == 0x20) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 // Embed adds the font to a PDF file.
 func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)

@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -150,21 +149,4 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 // WritingMode implements the [font.NewFont] interface.
 func (e *SimpleEncoder) WritingMode() int {
 	return 0 // simple fonts are always horizontal
-}
-
-// TODO(voss): remove
-func (e *SimpleEncoder) Decode(s pdf.String) (charcode.CharCode, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	return charcode.CharCode(s[0]), 1
-}
-
-// TODO(voss): remove
-func (e *SimpleEncoder) SplitString(s pdf.String) []type1.CID {
-	res := make([]type1.CID, len(s))
-	for i, code := range s {
-		res[i] = type1.CID(code)
-	}
-	return res
 }

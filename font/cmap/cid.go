@@ -52,12 +52,6 @@ type CIDEncoder interface {
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
 	Subset() []glyph.ID
-
-	// TODO(voss): remove
-	Decode(pdf.String) (charcode.CharCode, int)
-
-	// TODO(voss): remove
-	SplitString(s pdf.String) []type1.CID
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -116,22 +110,6 @@ func (e *identityEncoder) Subset() []glyph.ID {
 	}
 	slices.Sort(subset)
 	return subset
-}
-
-func (e *identityEncoder) Decode(s pdf.String) (charcode.CharCode, int) {
-	return charcode.UCS2.Decode(s)
-}
-
-func (e *identityEncoder) SplitString(s pdf.String) []type1.CID {
-	var res []type1.CID
-	for len(s) > 0 {
-		code, n := e.Decode(s)
-		s = s[n:]
-		if code >= 0 {
-			res = append(res, type1.CID(code))
-		}
-	}
-	return res
 }
 
 // NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
@@ -234,22 +212,6 @@ func (e *utf8Encoder) Subset() []glyph.ID {
 	subset := maps.Keys(used)
 	slices.Sort(subset)
 	return subset
-}
-
-func (e *utf8Encoder) Decode(s pdf.String) (charcode.CharCode, int) {
-	return utf8cs.Decode(s)
-}
-
-func (e *utf8Encoder) SplitString(s pdf.String) []type1.CID {
-	var res []type1.CID
-	for len(s) > 0 {
-		code, n := e.Decode(s)
-		s = s[n:]
-		if code >= 0 {
-			res = append(res, e.cmap[code])
-		}
-	}
-	return res
 }
 
 // utf8cs represents UTF-8-encoded character codes.

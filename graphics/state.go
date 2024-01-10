@@ -195,7 +195,7 @@ func NewState() State {
 
 	param.TextCharacterSpacing = 0
 	param.TextWordSpacing = 0
-	param.TextHorizonalScaling = 1
+	param.TextHorizonalScaling = 100
 	param.TextLeading = 0
 	// no default for Font
 	// no default for FontSize

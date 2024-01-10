@@ -112,6 +112,9 @@ func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
 // It returns the character code and the number of bytes consumed.
 // If the character code cannot be decoded, a code of -1 is returned,
 // and the length is either 0 (if the string is empty) or 1.
+//
+// TODO(voss): Remove?  Otherwise, fix the the number of bytes consumed
+// for invalid codes as described in the PDF spec.
 func (c CodeSpaceRange) Decode(s pdf.String) (CharCode, int) {
 	var base CharCode
 tryNextRange:
