@@ -72,6 +72,8 @@ type allocatedObject struct {
 //
 // After writing the content to the file, [Writer.Close] must be called to
 // write the PDF trailer and close the underlying file.
+//
+// TODO(voss): make the pdf version an argument instead of an option.
 func Create(name string, opt *WriterOptions) (*Writer, error) {
 	fd, err := os.Create(name)
 	if err != nil {
@@ -89,6 +91,8 @@ func Create(name string, opt *WriterOptions) (*Writer, error) {
 //
 // After writing the content to the file, [Writer.Close] must be called to
 // write the PDF trailer.
+//
+// TODO(voss): make the pdf version an argument instead of an option.
 func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
 		opt = defaultWriterOptions

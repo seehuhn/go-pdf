@@ -140,7 +140,7 @@ func (f *embeddedCFFComposite) WritingMode() int {
 func (f *embeddedCFFComposite) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
 	return func(yield func(w float64, isSpace bool) bool) bool {
 		cs := f.CS()
-		q := 1000 / float64(f.otf.UnitsPerEm)
+		q := 1 / float64(f.otf.UnitsPerEm)
 		return cs.AllCodes(s)(func(c pdf.String, valid bool) bool {
 			if !valid {
 				notdefWidth := f.otf.GlyphWidth(0).AsFloat(q)

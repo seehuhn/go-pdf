@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 
@@ -37,6 +38,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/internal/debug"
 )
 
 // The tests in this file check that ghostscripts idea of PDF coincides with
@@ -48,6 +50,7 @@ func TestLineWidth(t *testing.T) {
 	if !haveGhostScript() {
 		t.Skip("ghostscript not found")
 	}
+
 	img := gsRender(t, 20, 5, pdf.V1_7, func(r *document.Page) error {
 		r.SetLineWidth(6.0)
 		r.MoveTo(10, 0)
@@ -78,6 +81,10 @@ func TestLineWidth(t *testing.T) {
 // TestTextPositions checks that text positions are correcly updated
 // in the graphics state.
 func TestTextPositions(t *testing.T) {
+	if !haveGhostScript() {
+		t.Skip("ghostscript not found")
+	}
+
 	// make a test font
 	F := &cff.Font{
 		FontInfo: &type1.FontInfo{
@@ -188,10 +195,96 @@ func TestTextPositions(t *testing.T) {
 			r1, g1, b1, a1 := img1.At(i, j).RGBA()
 			r2, g2, b2, a2 := img2.At(i, j).RGBA()
 			r3, g3, b3, a3 := img3.At(i, j).RGBA()
-			if r1 != r2 || r1 != r3 || g1 != g2 || g1 != g3 || b1 != b2 || b1 != b3 || a1 != a2 || a1 != a3 {
-				t.Errorf("pixel (%d,%d) differs: %d,%d,%d,%d vs %d,%d,%d,%d vs %d,%d,%d,%d", i, j, r1, g1, b1, a1, r2, g2, b2, a2, r3, g3, b3, a3)
+			if r1 != r2 || r1 != r3 ||
+				g1 != g2 || g1 != g3 ||
+				b1 != b2 || b1 != b3 ||
+				a1 != a2 || a1 != a3 {
+				t.Errorf("pixel (%d,%d) differs: %d vs %d vs %d",
+					i, j,
+					[]uint32{r1, g1, b1, a1},
+					[]uint32{r2, g2, b2, a2},
+					[]uint32{r3, g3, b3, a3})
 			}
 		}
+	}
+}
+
+// TestTextPositions checks that text positions are correcly updated
+// in the graphics state.
+func TestTextPositions2(t *testing.T) {
+	if !haveGhostScript() {
+		t.Skip("ghostscript not found")
+	}
+
+	fonts, err := debug.MakeFonts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testString := ".MiAbc"
+	for _, fontInfo := range fonts {
+		t.Run(fontInfo.Type.String(), func(t *testing.T) {
+			const fontSize = 100
+			var s pdf.String
+
+			// First print glyphs one-by-one and record the x positions.
+			var xx []float64
+			img1 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
+				F, err := fontInfo.Font.Embed(r.Out, "F")
+				if err != nil {
+					return err
+				}
+
+				r.TextSetFont(F, fontSize)
+				r.TextStart()
+				r.TextFirstLine(10, 10)
+				for _, g := range F.Layout(testString, fontSize) {
+					xx = append(xx, r.TextMatrix[4])
+					s = F.AppendEncoded(s[:0], g.Gid, g.Text)
+					r.TextShowRaw(s)
+				}
+				r.TextEnd()
+
+				return nil
+			})
+			// Then print each glyph at the recorded x positions.
+			img2 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
+				F, err := fontInfo.Font.Embed(r.Out, "F")
+				if err != nil {
+					return err
+				}
+
+				r.TextSetFont(F, fontSize)
+				for i, g := range F.Layout(testString, fontSize) {
+					r.TextStart()
+					r.TextFirstLine(xx[i], 10)
+					s = F.AppendEncoded(s[:0], g.Gid, g.Text)
+					r.TextShowRaw(s)
+					r.TextEnd()
+				}
+
+				return nil
+			})
+
+			// check that all three images are the same
+			rect := img1.Bounds()
+			if rect != img2.Bounds() {
+				t.Errorf("image bounds differ: %v, %v", img1.Bounds(), img2.Bounds())
+			}
+			for i := rect.Min.X; i < rect.Max.X; i++ {
+				for j := rect.Min.Y; j < rect.Max.Y; j++ {
+					r1, g1, b1, a1 := img1.At(i, j).RGBA()
+					r2, g2, b2, a2 := img2.At(i, j).RGBA()
+					if r1 != r2 || g1 != g2 || b1 != b2 || a1 != a2 {
+						t.Errorf("pixel (%d,%d) differs: %d vs %d",
+							i, j,
+							[]uint32{r1, g1, b1, a1},
+							[]uint32{r2, g2, b2, a2})
+						goto tooMuch
+					}
+				}
+			}
+		tooMuch:
+		})
 	}
 }
 
@@ -253,7 +346,15 @@ func newGSRenderer(t *testing.T, width, height float64, v pdf.Version) (*gsRende
 
 	dir := t.TempDir()
 
-	pdfName := filepath.Join(dir, fmt.Sprintf("test%03d.pdf", gsIndex))
+	// dir, err := filepath.Abs("./xxx/")
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	idx := <-gsIndex
+	gsIndex <- idx + 1
+
+	pdfName := filepath.Join(dir, fmt.Sprintf("test%03d.pdf", idx))
 	paper := &pdf.Rectangle{
 		URx: width,
 		URy: height,
@@ -279,8 +380,7 @@ func (r *gsRenderer) Close() (image.Image, error) {
 		return nil, err
 	}
 
-	pngName := filepath.Join(r.Dir, fmt.Sprintf("test%03d.png", gsIndex))
-	gsIndex++
+	pngName := strings.TrimSuffix(r.PDFName, ".pdf") + ".png"
 
 	cmd := exec.Command(
 		"gs", "-q",
@@ -322,6 +422,7 @@ func haveGhostScript() bool {
 			return
 		}
 		gsScriptFound = gsScriptPNGRe.Match(out)
+		gsIndex <- 1
 	})
 	return gsScriptFound
 }
@@ -330,7 +431,7 @@ var (
 	gsScriptOnce  sync.Once
 	gsScriptPNGRe = regexp.MustCompile(`\bpng16m\b`)
 	gsScriptFound bool
-	gsIndex       int
+	gsIndex       = make(chan int, 1)
 )
 
 const gsResolution = 4 * 72

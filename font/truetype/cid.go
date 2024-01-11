@@ -138,7 +138,7 @@ func (f *embeddedCID) WritingMode() int {
 func (f *embeddedCID) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
 	return func(yield func(w float64, isSpace bool) bool) bool {
 		cs := f.CS()
-		q := 1000 / float64(f.ttf.UnitsPerEm)
+		q := 1 / float64(f.ttf.UnitsPerEm)
 		return cs.AllCodes(s)(func(c pdf.String, valid bool) bool {
 			if !valid {
 				notdefWidth := f.ttf.GlyphWidth(0).AsFloat(q)

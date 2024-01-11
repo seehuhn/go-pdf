@@ -117,7 +117,7 @@ type embeddedSimpleGlyf struct {
 
 func (f *embeddedSimpleGlyf) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
 	return func(yield func(w float64, isSpace bool) bool) bool {
-		q := 1000 / float64(f.otf.UnitsPerEm)
+		q := 1 / float64(f.otf.UnitsPerEm)
 		for _, c := range s {
 			gid := f.Encoding[c]
 			w := f.otf.GlyphWidth(gid).AsFloat(q)

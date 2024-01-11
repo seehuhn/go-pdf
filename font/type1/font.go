@@ -48,7 +48,7 @@ type Font struct {
 	kern map[glyph.Pair]funit.Int16
 }
 
-// New creates a new Type 1 PDF font from a PostScript font.
+// New creates a new Type 1 PDF font from a Type 1 PostScript font.
 func New(psFont *type1.Font) (*Font, error) {
 	glyphNames := psFont.GlyphList()
 	nameGid := make(map[string]glyph.ID, len(glyphNames))
@@ -179,10 +179,11 @@ type embedded struct {
 
 func (f *embedded) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
 	return func(yield func(w float64, isSpace bool) bool) bool {
-		q := 1000 / float64(f.outlines.UnitsPerEm)
+		q := 1 / float64(f.outlines.UnitsPerEm)
 		for _, c := range s {
 			gid := f.Encoding[c]
-			w := f.outlines.GlyphInfo[f.outlines.Encoding[gid]].WidthX.AsFloat(q)
+			glyphName := f.glyphNames[gid]
+			w := f.outlines.GlyphInfo[glyphName].WidthX.AsFloat(q)
 			if !yield(w, c == 0x20) {
 				return false
 			}
@@ -263,7 +264,8 @@ type EmbedInfo struct {
 	SubsetTag string
 
 	// Encoding (a slice of length 256) is the encoding vector used by the client.
-	// This is used to determine the `Encoding` entry of the PDF font dictionary.
+	// When writing a font, this is used to determine the `Encoding` entry of
+	// the PDF font dictionary.
 	Encoding []string
 
 	// ResName is the resource name for the font.
@@ -397,8 +399,14 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		if err != nil {
 			return err
 		}
-		length1.Set(pdf.Integer(l1))
-		length2.Set(pdf.Integer(l2))
+		err = length1.Set(pdf.Integer(l1))
+		if err != nil {
+			return err
+		}
+		err = length2.Set(pdf.Integer(l2))
+		if err != nil {
+			return err
+		}
 		err = fontFileStream.Close()
 		if err != nil {
 			return err
