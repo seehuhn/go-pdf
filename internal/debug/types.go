@@ -38,6 +38,8 @@ type FontSample struct {
 }
 
 // MakeFonts generates a list of different fonts for testing.
+//
+// TODO(voss): remove the error return value and panic instead.
 func MakeFonts() ([]FontSample, error) {
 	var res []FontSample
 	var F font.Font

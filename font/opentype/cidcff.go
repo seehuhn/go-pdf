@@ -137,6 +137,27 @@ func (f *embeddedCFFComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
+func (f *embeddedCFFComposite) AllCIDs(s pdf.String) func(yield func(cid type1.CID) bool) bool {
+	return func(yield func(cid type1.CID) bool) bool {
+		cs := f.CS()
+		// TODO(voss): clean this up
+		return cs.AllCodes(s)(func(c pdf.String, valid bool) bool {
+			if !valid {
+				// TODO(voss): use notdefrange
+				return yield(0)
+			}
+			code, k := cs.Decode(c)
+			if k != len(c) {
+				panic("internal error")
+			}
+
+			// If code is invalid, CID 0 is used.
+			cid, _ := f.Lookup(code)
+			return yield(cid)
+		})
+	}
+}
+
 func (f *embeddedCFFComposite) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
 	return func(yield func(w float64, isSpace bool) bool) bool {
 		cs := f.CS()
@@ -270,21 +291,21 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	}
 
 	unitsPerEm := otf.UnitsPerEm
+	q := 1000 / float64(unitsPerEm)
 
-	var ww []font.CIDWidth
 	widths := otf.Widths()
+	ww := make(map[type1.CID]float64, len(widths))
 	if cff.GIDToCID != nil {
 		for gid, w := range widths {
-			ww = append(ww, font.CIDWidth{CID: cff.GIDToCID[gid], GlyphWidth: w})
+			ww[cff.GIDToCID[gid]] = w.AsFloat(q)
 		}
 	} else {
 		for gid, w := range widths {
-			ww = append(ww, font.CIDWidth{CID: type1.CID(gid), GlyphWidth: w})
+			ww[type1.CID(gid)] = w.AsFloat(q)
 		}
 	}
-	DW, W := font.EncodeWidthsComposite(ww, otf.UnitsPerEm)
+	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))
 
-	q := 1000 / float64(unitsPerEm)
 	bbox := otf.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
@@ -326,7 +347,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 		"FontDescriptor": fontDescriptorRef,
 	}
 	if DW != 1000 {
-		cidFontDict["DW"] = DW
+		cidFontDict["DW"] = pdf.Number(DW)
 	}
 	if W != nil {
 		cidFontDict["W"] = W

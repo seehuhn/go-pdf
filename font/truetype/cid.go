@@ -263,13 +263,14 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	unitsPerEm := ttf.UnitsPerEm
+	q := 1000 / float64(unitsPerEm)
 
-	var ww []font.CIDWidth
 	widths := outlines.Widths
+	ww := make(map[type1.CID]float64, len(widths))
 	for cid, gid := range info.CID2GID {
-		ww = append(ww, font.CIDWidth{CID: type1.CID(cid), GlyphWidth: widths[gid]})
+		ww[type1.CID(cid)] = widths[gid].AsFloat(q)
 	}
-	DW, W := font.EncodeWidthsComposite(ww, unitsPerEm)
+	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true
@@ -285,7 +286,6 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		CIDToGIDMap = w.Alloc()
 	}
 
-	q := 1000 / float64(unitsPerEm)
 	bbox := ttf.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
@@ -328,7 +328,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		"CIDToGIDMap":    CIDToGIDMap,
 	}
 	if DW != 1000 {
-		cidFontDict["DW"] = DW
+		cidFontDict["DW"] = pdf.Number(DW)
 	}
 	if W != nil {
 		cidFontDict["W"] = W

@@ -40,6 +40,7 @@ type FromFile struct {
 // Read extracts a font from a PDF file.
 //
 // TODO(voss): return NewFont instead?
+// TODO(voss): can we get away without the name argument?
 func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (*FromFile, error) {
 	fontDicts, err := ExtractDicts(r, ref)
 	if err != nil {
@@ -186,14 +187,22 @@ type compositeWidther struct {
 }
 
 func newCIDWidther(r pdf.Getter, cmap *cmap.Info, fontInfo *Dicts) (*compositeWidther, error) {
-	w, dw, err := DecodeWidthsComposite(r, fontInfo.CIDFontDict["W"])
+	dw := 100.0
+	if val, ok := fontInfo.CIDFontDict["DW"]; ok {
+		x, err := pdf.GetNumber(r, val)
+		if err != nil {
+			return nil, pdf.Wrap(err, "CIDFontDict.DW")
+		}
+		dw = float64(x)
+	}
+	w, err := DecodeWidthsComposite(r, fontInfo.CIDFontDict["W"], dw)
 	if err != nil {
-		return nil, pdf.Wrap(err, "W, DW")
+		return nil, pdf.Wrap(err, "CIDFontDict.W")
 	}
 	return &compositeWidther{
 		CodeSpaceRange: cmap.CodeSpaceRange,
 		M:              cmap.GetMapping(),
-		DW:             dw,
+		DW:             float64(dw),
 		W:              w,
 	}, nil
 }

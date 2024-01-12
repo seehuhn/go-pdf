@@ -281,20 +281,21 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 
 	unitsPerEm := info.UnitsPerEm
 
-	var ww []font.CIDWidth
+	q := 1000 / float64(unitsPerEm)
+
+	ww := make(map[type1.CID]float64)
 	widths := cff.Widths()
 	if cff.GIDToCID != nil {
 		for gid, w := range widths {
-			ww = append(ww, font.CIDWidth{CID: cff.GIDToCID[gid], GlyphWidth: w})
+			ww[cff.GIDToCID[gid]] = w.AsFloat(q)
 		}
 	} else {
 		for gid, w := range widths {
-			ww = append(ww, font.CIDWidth{CID: type1.CID(gid), GlyphWidth: w})
+			ww[type1.CID(gid)] = w.AsFloat(q)
 		}
 	}
-	DW, W := font.EncodeWidthsComposite(ww, unitsPerEm)
+	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))
 
-	q := 1000 / float64(unitsPerEm)
 	bbox := cff.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
@@ -336,7 +337,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		"FontDescriptor": fontDescriptorRef,
 	}
 	if DW != 1000 {
-		cidFontDict["DW"] = DW
+		cidFontDict["DW"] = pdf.Number(DW)
 	}
 	if W != nil {
 		cidFontDict["W"] = W

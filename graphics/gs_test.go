@@ -221,6 +221,8 @@ func TestTextPositions2(t *testing.T) {
 		t.Fatal(err)
 	}
 	testString := ".MiAbc"
+	// TODO(voss): also try PDF.V2_0 once
+	// https://bugs.ghostscript.com/show_bug.cgi?id=707475 is resolved.
 	for _, fontInfo := range fonts {
 		t.Run(fontInfo.Type.String(), func(t *testing.T) {
 			const fontSize = 100

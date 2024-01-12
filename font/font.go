@@ -114,7 +114,10 @@ type Font interface {
 type Embedded interface {
 	GetGeometry() *Geometry
 	Layouter
+
+	// TODO(voss): use glyph.Info as an argument here?
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
+
 	Close() error
 	NewFont
 }
