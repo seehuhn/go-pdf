@@ -81,6 +81,12 @@ func NewIterator(r pdf.Getter) *Iterator {
 	return &Iterator{r: r}
 }
 
+// All returns a function which iterates over all pages in the document.
+// The arguments are the reference to the page dictionary and the page
+// dictionary itself.
+//
+// The function must return true if the iteration should continue, or false if it
+// should stop.
 func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 	yield := func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 		if i.Err != nil {
