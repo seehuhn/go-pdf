@@ -57,6 +57,14 @@ func (r *Reader) UpdateState(op string, args []pdf.Object) error {
 		args = args[1:]
 		return x, ok
 	}
+	getString := func() (pdf.String, bool) {
+		if len(args) == 0 {
+			return nil, false
+		}
+		x, ok := args[0].(pdf.String)
+		args = args[1:]
+		return x, ok
+	}
 	getArray := func() (pdf.Array, bool) {
 		if len(args) == 0 {
 			return nil, false
@@ -197,7 +205,7 @@ doOps:
 	case "Tz": // Set the horizontal scaling
 		x, ok := getNum()
 		if ok {
-			r.TextHorizonalScaling = x
+			r.TextHorizonalScaling = x / 100
 			r.Set |= StateTextHorizontalSpacing
 		}
 
@@ -282,10 +290,41 @@ doOps:
 	// == Text showing ===================================================
 
 	case "Tj": // Show text
-		// TODO(voss): update g.TextMatrix
+		s, ok := getString()
+		if ok {
+			// TODO(voss): show text
+			_ = s
+		}
+
+	case "'": // Move to next line and show text
+		s, ok := getString()
+		if ok {
+			r.TextLineMatrix = Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+			r.TextMatrix = r.TextLineMatrix
+
+			// TODO(voss): show text
+			_ = s
+		}
+
+	case "\"": // Set spacing, move to next line, and show text
+		aw, ok1 := getNum()
+		ac, ok2 := getNum()
+		s, ok3 := getString()
+		if ok1 && ok2 && ok3 {
+			r.TextWordSpacing = aw
+			r.TextCharacterSpacing = ac
+			r.Set |= StateTextWordSpacing | StateTextCharacterSpacing
+
+			// TODO(voss): show text
+			_ = s
+		}
 
 	case "TJ": // Show text with kerning
-		// TODO(voss): update g.TextMatrix
+		a, ok := getArray()
+		if ok {
+			// TODO(voss): show text
+			_ = a
+		}
 
 	// == Type 3 fonts ===================================================
 

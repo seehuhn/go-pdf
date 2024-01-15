@@ -55,18 +55,20 @@ func (w *Writer) TextSetWordSpacing(spacing float64) {
 }
 
 // TextSetHorizontalScaling sets the horizontal scaling.
+// The value 100 corresponds to the normal scaling.
 //
 // This implementes the PDF graphics operator "Tz".
 func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 	if !w.isValid("TextSetHorizontalScaling", objText|objPage) {
 		return
 	}
+	scaling /= 100
 	if w.isSet(StateTextHorizontalSpacing) && nearlyEqual(scaling, w.State.TextHorizonalScaling) {
 		return
 	}
 	w.State.TextHorizonalScaling = scaling
 	w.Set |= StateTextHorizontalSpacing
-	_, w.Err = fmt.Fprintln(w.Content, w.coord(scaling), "Tz")
+	_, w.Err = fmt.Fprintln(w.Content, w.coord(scaling*100), "Tz")
 }
 
 // TextSetLeading sets the leading.
@@ -238,22 +240,21 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 		return
 	}
 
-	var width float64
+	writingMode := w.TextFont.WritingMode()
 	w.TextFont.AllWidths(s)(func(glyphWidth float64, isSpace bool) bool {
-		width += glyphWidth * w.State.TextFontSize
+		dw := glyphWidth*w.State.TextFontSize + w.State.TextCharacterSpacing
 		if isSpace {
-			width += w.State.TextWordSpacing
+			dw += w.State.TextWordSpacing
 		}
-		width += w.State.TextCharacterSpacing
+		dw *= w.State.TextHorizonalScaling
+		switch writingMode {
+		case 0: // horizontal
+			w.TextMatrix[4] += dw
+		case 1: // vertical
+			w.TextMatrix[5] += dw
+		}
 		return true
 	})
-	width *= w.State.TextHorizonalScaling / 100
-	switch w.TextFont.WritingMode() {
-	case 0: // horizontal
-		w.TextMatrix = Translate(width, 0).Mul(w.TextMatrix)
-	case 1: // vertical
-		w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
-	}
 
 	_, w.Err = fmt.Fprintln(w.Content, " Tj")
 }

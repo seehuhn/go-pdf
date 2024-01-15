@@ -90,7 +90,7 @@ func TestParameters(t *testing.T) {
 	w.Transform(m)
 	w.TextSetCharacterSpacing(9)
 	w.TextSetWordSpacing(10)
-	w.TextSetHorizontalScaling(11)
+	w.TextSetHorizontalScaling(1100)
 	w.TextSetLeading(12)
 	w.TextSetFont(font, 14)
 	w.TextSetRenderingMode(TextRenderingModeFillStrokeClip)

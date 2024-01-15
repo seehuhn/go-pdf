@@ -52,7 +52,7 @@ type Parameters struct {
 	// Text State parameters:
 	TextCharacterSpacing float64 // character spacing (T_c)
 	TextWordSpacing      float64 // word spacing (T_w)
-	TextHorizonalScaling float64 // horizonal scaling (T_h, normal sapcing = 100)
+	TextHorizonalScaling float64 // horizonal scaling (T_h, normal spacing = 1)
 	TextLeading          float64 // leading (T_l)
 	TextFont             font.NewFont
 	TextFontSize         float64
@@ -195,7 +195,7 @@ func NewState() State {
 
 	param.TextCharacterSpacing = 0
 	param.TextWordSpacing = 0
-	param.TextHorizonalScaling = 100
+	param.TextHorizonalScaling = 1
 	param.TextLeading = 0
 	// no default for Font
 	// no default for FontSize
