@@ -21,7 +21,6 @@ import (
 	"math"
 
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -46,11 +45,6 @@ type Geometry struct {
 // GetGeometry returns the geometry of a font.
 func (g *Geometry) GetGeometry() *Geometry {
 	return g
-}
-
-// GlyphWidth implements the [font.NewFont] interface.
-func (g *Geometry) GlyphWidth(cid type1.CID) float64 {
-	return g.ToPDF16(1000, g.Widths[cid])
 }
 
 // ToPDF converts an integer from font design units to PDF units.
