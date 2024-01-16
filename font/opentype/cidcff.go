@@ -422,11 +422,15 @@ func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposit
 
 	res := &EmbedInfoCFFComposite{}
 
-	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
 	if err != nil {
 		return nil, err
 	}
-	otf, err := sfnt.Read(stm)
+	stmData, err := pdf.DecodeStream(r, stmObj, 0)
+	if err != nil {
+		return nil, err
+	}
+	otf, err := sfnt.Read(stmData)
 	if err != nil {
 		return nil, err
 	}

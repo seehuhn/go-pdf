@@ -37,6 +37,8 @@ type Getter interface {
 //
 // If a reference loop is encountered, the function returns an error of type
 // [MalformedFileError].
+//
+// TODO(voss): rename to "Get"?
 func Resolve(r Getter, obj Object) (Object, error) {
 	return resolve(r, obj, true)
 }

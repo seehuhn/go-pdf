@@ -52,6 +52,8 @@ type CIDEncoder interface {
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
 	Subset() []glyph.ID
+
+	AsText(pdf.String) []rune
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -110,6 +112,17 @@ func (e *identityEncoder) Subset() []glyph.ID {
 	}
 	slices.Sort(subset)
 	return subset
+}
+
+func (e *identityEncoder) AsText(s pdf.String) []rune {
+	var res []rune
+	cs := charcode.UCS2
+	cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
+		c, _ := cs.Decode(code)
+		res = append(res, e.toUnicode[c]...)
+		return true
+	})
+	return res
 }
 
 // NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
@@ -212,6 +225,10 @@ func (e *utf8Encoder) Subset() []glyph.ID {
 	subset := maps.Keys(used)
 	slices.Sort(subset)
 	return subset
+}
+
+func (e *utf8Encoder) AsText(s pdf.String) []rune {
+	return []rune(string(s))
 }
 
 // utf8cs represents UTF-8-encoded character codes.

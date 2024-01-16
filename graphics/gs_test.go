@@ -318,6 +318,10 @@ func (f *testFont) PDFObject() pdf.Object {
 	return f.ref
 }
 
+func (f *testFont) AsText(pdf.String) []rune {
+	return nil
+}
+
 func gsRender(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) image.Image {
 	t.Helper()
 

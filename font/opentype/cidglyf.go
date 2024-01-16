@@ -429,11 +429,12 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 	}
 	res := &EmbedInfoGlyfComposite{}
 
-	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
+	stmData, err := pdf.DecodeStream(r, stmObj, 0)
 	if err != nil {
 		return nil, err
 	}
-	otf, err := sfnt.Read(stm)
+	otf, err := sfnt.Read(stmData)
 	if err != nil {
 		return nil, err
 	}

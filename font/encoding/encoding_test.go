@@ -44,8 +44,8 @@ func TestSimpleEncoder(t *testing.T) {
 	if e.Overflow() {
 		t.Errorf("unexpected overflow")
 	}
-	if len(e.cache) != 256 {
-		t.Errorf("unexpected cache length %d", len(e.cache))
+	if len(e.code) != 256 {
+		t.Errorf("unexpected cache length %d", len(e.code))
 	}
 
 	for i := 0; i < 256; i++ {

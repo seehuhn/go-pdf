@@ -33,7 +33,7 @@ import (
 // The font is embedded as a simple CFF font.
 //
 // If a write error on w occurs, the function panics.
-func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont {
+func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont2 {
 	encoding := make([]glyph.ID, 256)
 	encoding[' '] = 1
 	encoding['A'] = 2

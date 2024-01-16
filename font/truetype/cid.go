@@ -432,7 +432,11 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 	}
 	res := &EmbedInfoComposite{}
 
-	stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
+	if err != nil {
+		return nil, err
+	}
+	stm, err := pdf.DecodeStream(r, stmObj, 0)
 	if err != nil {
 		return nil, err
 	}

@@ -113,7 +113,7 @@ type Embedded interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
 	Close() error
-	NewFont
+	NewFont2
 }
 
 // NumGlyphs returns the number of glyphs in a font.

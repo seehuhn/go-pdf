@@ -32,8 +32,8 @@ import (
 // to GID values and from one-byte character codes to unicode strings.
 type SimpleEncoder struct {
 	Encoding []glyph.ID
-	cache    map[key]byte
-	used     map[byte]struct{}
+	code     map[key]byte
+	key      map[byte]key
 }
 
 type key struct {
@@ -45,8 +45,8 @@ type key struct {
 func NewSimpleEncoder() *SimpleEncoder {
 	res := &SimpleEncoder{
 		Encoding: make([]glyph.ID, 256),
-		cache:    make(map[key]byte),
-		used:     make(map[byte]struct{}),
+		code:     make(map[key]byte),
+		key:      make(map[byte]key),
 	}
 	return res
 }
@@ -61,7 +61,7 @@ func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf
 	// Rules for choosing the code:
 	// 1. If the combination of `gid` and `rr` has previously been used,
 	//    then use the same code as before.
-	code, seen := e.cache[k]
+	code, seen := e.code[k]
 	if seen {
 		return append(s, code)
 	}
@@ -73,12 +73,13 @@ func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf
 	}
 	code = e.allocateCode(r)
 	e.Encoding[code] = gid
-	e.cache[k] = code
+	e.code[k] = code
+	e.key[code] = k
 	return append(s, code)
 }
 
 func (e *SimpleEncoder) allocateCode(r rune) byte {
-	if len(e.cache) >= 256 {
+	if len(e.code) >= 256 {
 		// Once all codes are used up, simply return 0 for everything.
 		return 0
 	}
@@ -86,7 +87,7 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 	bestCode := byte(0)
 	for codeInt := 0; codeInt < 256; codeInt++ {
 		code := byte(codeInt)
-		if _, alreadyUsed := e.used[code]; alreadyUsed {
+		if _, alreadyUsed := e.key[code]; alreadyUsed {
 			continue
 		}
 		var score int
@@ -114,21 +115,20 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 			bestCode = code
 		}
 	}
-	e.used[bestCode] = struct{}{}
 	return bestCode
 }
 
 // Overflow returns true if the encoder has run out of codes.
 func (e *SimpleEncoder) Overflow() bool {
-	return len(e.cache) > 256
+	return len(e.code) > 256
 }
 
 // Subset returns the subset of glyph IDs which are used by this encoder.
 // The result is sorted and always include the glyph ID 0.
 func (e *SimpleEncoder) Subset() []glyph.ID {
-	gidUsed := make(map[glyph.ID]bool, len(e.cache)+1)
+	gidUsed := make(map[glyph.ID]bool, len(e.code)+1)
 	gidUsed[0] = true
-	for key := range e.cache {
+	for key := range e.code {
 		gidUsed[key.gid] = true
 	}
 	subset := maps.Keys(gidUsed)
@@ -140,7 +140,7 @@ func (e *SimpleEncoder) Subset() []glyph.ID {
 // This can be used to construct a PDF ToUnicode CMap.
 func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 	toUnicode := make(map[charcode.CharCode][]rune)
-	for k, v := range e.cache {
+	for k, v := range e.code {
 		toUnicode[charcode.CharCode(v)] = []rune(k.rr)
 	}
 	return toUnicode
@@ -149,4 +149,15 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 // WritingMode implements the [font.NewFont] interface.
 func (e *SimpleEncoder) WritingMode() int {
 	return 0 // simple fonts are always horizontal
+}
+
+func (e *SimpleEncoder) AsText(s pdf.String) []rune {
+	var res []rune
+	for _, c := range s {
+		k, ok := e.key[c]
+		if ok {
+			res = append(res, []rune(k.rr)...)
+		}
+	}
+	return res
 }
