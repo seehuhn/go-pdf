@@ -394,9 +394,39 @@ doOps:
 
 	case "TJ": // Show text with kerning
 		a, ok := getArray()
-		if ok {
-			// TODO(voss): show text
-			_ = a
+		if !ok {
+			break
+		}
+		for _, ai := range a {
+			switch ai := ai.(type) {
+			case pdf.String:
+				gg := decodeString(ai, &r.State)
+				for _, g := range gg {
+					if r.DrawGlyph != nil {
+						err := r.DrawGlyph(g)
+						if err != nil {
+							return err
+						}
+					}
+					switch r.TextFont.WritingMode() {
+					case 0:
+						r.TextMatrix[4] += g.Advance
+					case 1:
+						r.TextMatrix[5] += g.Advance
+					}
+				}
+			case pdf.Number:
+				x, ok := getNum()
+				if !ok {
+					break doOps
+				}
+				switch r.TextFont.WritingMode() {
+				case 0:
+					r.TextMatrix[4] -= float64(x)
+				case 1:
+					r.TextMatrix[5] -= float64(x)
+				}
+			}
 		}
 
 	// == Type 3 fonts ===================================================
