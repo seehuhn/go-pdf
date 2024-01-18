@@ -23,18 +23,32 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-type NewFont interface {
+// Resource is a PDF resource.
+type Resource interface {
 	DefaultName() pdf.Name // return "" to choose names automatically
 	PDFObject() pdf.Object // value to use in the resource dictionary
-	WritingMode() int      // 0 = horizontal, 1 = vertical
-	AsText(pdf.String) []rune
-	// Outlines() interface{}
 }
 
-type NewFontLayouter interface {
-	NewFont
-	Layout(s string) glyph.Seq
-	FontMatrix() []float64
+type ResourceData struct {
+	DefName pdf.Name
+	Ref     pdf.Object
+}
+
+// DefaultName implements the [Resource] interface.
+func (r ResourceData) DefaultName() pdf.Name {
+	return r.DefName
+}
+
+// PDFObject implements the [Resource] interface.
+func (r ResourceData) PDFObject() pdf.Object {
+	return r.Ref
+}
+
+type NewFont interface {
+	Resource
+	WritingMode() int // 0 = horizontal, 1 = vertical
+	AsText(pdf.String) []rune
+	// Glyphs() interface{}
 }
 
 type NewFontSimple interface {
@@ -53,4 +67,10 @@ type NewFontComposite interface {
 	GID(type1.CID) glyph.ID
 	CID(glyph.ID, []rune) type1.CID
 	CIDToWidth(type1.CID) float64
+}
+
+type NewFontLayouter interface {
+	NewFont
+	Layout(s string) glyph.Seq
+	FontMatrix() []float64
 }

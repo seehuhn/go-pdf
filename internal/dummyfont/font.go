@@ -70,13 +70,12 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont {
 
 	ref := w.Alloc()
 	info := &pdfcff.EmbedInfoCFFSimple{
-		Font:       in,
-		Encoding:   encoding,
-		UnitsPerEm: 1000,
-		Ascent:     850,
-		Descent:    0,
-		CapHeight:  850,
-		ToUnicode:  cmap.NewToUnicode(charcode.Simple, toUni),
+		Font:      in,
+		Encoding:  encoding,
+		Ascent:    850,
+		Descent:   0,
+		CapHeight: 850,
+		ToUnicode: cmap.NewToUnicode(charcode.Simple, toUni),
 	}
 	err := info.Embed(w, ref)
 	if err != nil {

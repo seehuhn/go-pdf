@@ -228,11 +228,12 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 
 	unitsPerEm := otf.UnitsPerEm
 
-	ww := make([]funit.Int16, 256)
+	ww := make([]float64, 256)
+	q := 1000 / float64(unitsPerEm)
 	for i := range ww {
-		ww[i] = cff.Glyphs[info.Encoding[i]].Width
+		ww[i] = float64(cff.Glyphs[info.Encoding[i]].Width) * q
 	}
-	widthsInfo := font.EncodeWidthsSimple(ww, unitsPerEm)
+	widthsInfo := font.EncodeWidthsSimple(ww)
 
 	clientEnc := make([]string, 256)
 	builtinEnc := make([]string, 256)
@@ -241,7 +242,6 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		builtinEnc[i] = cff.Glyphs[cff.Encoding[i]].Name
 	}
 
-	q := 1000 / float64(unitsPerEm)
 	bbox := cff.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),

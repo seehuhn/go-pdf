@@ -47,6 +47,7 @@ func (g *Geometry) GetGeometry() *Geometry {
 	return g
 }
 
+// FontMatrix returns the font matrix for a font.
 func (g *Geometry) FontMatrix() []float64 {
 	return []float64{1 / float64(g.UnitsPerEm), 0, 0, 1 / float64(g.UnitsPerEm), 0, 0}
 }

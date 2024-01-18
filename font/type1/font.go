@@ -308,11 +308,12 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		psFont := info.Font
 
 		widthsRef := w.Alloc()
-		ww := make([]funit.Int16, 256)
+		ww := make([]float64, 256)
+		q := 1000 * psFont.FontInfo.FontMatrix[0]
 		for i := range ww {
-			ww[i] = psFont.GlyphInfo[info.Encoding[i]].WidthX
+			ww[i] = float64(psFont.GlyphInfo[info.Encoding[i]].WidthX) * q
 		}
-		widthsInfo := font.EncodeWidthsSimple(ww, psFont.UnitsPerEm)
+		widthsInfo := font.EncodeWidthsSimple(ww)
 		fontDict["FirstChar"] = widthsInfo.FirstChar
 		fontDict["LastChar"] = widthsInfo.LastChar
 		fontDict["Widths"] = widthsRef
@@ -322,7 +323,6 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		fdRef := w.Alloc()
 		fontDict["FontDescriptor"] = fdRef
 
-		q := 1000 / float64(psFont.UnitsPerEm)
 		bbox := psFont.BBox()
 		fontBBox := &pdf.Rectangle{
 			LLx: bbox.LLx.AsFloat(q),

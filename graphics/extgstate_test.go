@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/dummyfont"
+	"seehuhn.de/go/sfnt/cff"
 )
 
 func TestExtGState(t *testing.T) {
@@ -111,13 +112,17 @@ func TestExtGState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if d := cmp.Diff(ext1, ext2); d != "" {
+	cmpFDSelectFn := cmp.Comparer(func(fn1, fn2 cff.FDSelectFn) bool {
+		return true
+	})
+
+	if d := cmp.Diff(ext1, ext2, cmpFDSelectFn); d != "" {
 		t.Error(d)
 	}
 
 	s3 := State{Parameters: &Parameters{}}
 	ext2.ApplyTo(&s3)
-	if d := cmp.Diff(s1, s3); d != "" {
+	if d := cmp.Diff(s1, s3, cmpFDSelectFn); d != "" {
 		t.Error(d)
 	}
 }

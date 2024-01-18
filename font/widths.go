@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/dag"
 
-	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
@@ -40,13 +39,10 @@ type WidthInfo struct {
 
 // EncodeWidthsSimple encodes the glyph width information for a simple PDF font.
 // The slice ww must have length 256 and is indexed by character code.
-//
-// TODO(voss): convert ww to use PDF text space units and remove unitsPerEm.
-func EncodeWidthsSimple(ww []funit.Int16, unitsPerEm uint16) *WidthInfo {
-	q := 1000 / float64(unitsPerEm)
-
+// Widths values are given in PDF glyph space units.
+func EncodeWidthsSimple(ww []float64) *WidthInfo {
 	// find FirstChar and LastChar
-	cand := make(map[funit.Int16]bool)
+	cand := make(map[float64]bool)
 	cand[ww[0]] = true
 	cand[ww[255]] = true
 	bestGain := 0
@@ -70,14 +66,14 @@ func EncodeWidthsSimple(ww []funit.Int16, unitsPerEm uint16) *WidthInfo {
 			bestGain = gain
 			FirstChar = a
 			LastChar = b
-			MissingWidth = pdf.Number(w.AsFloat(q))
+			MissingWidth = pdf.Number(w)
 		}
 	}
 
 	Widths := make(pdf.Array, LastChar-FirstChar+1)
 	for i := range Widths {
 		w := ww[FirstChar+i]
-		Widths[i] = pdf.Number(w.AsFloat(q))
+		Widths[i] = pdf.Number(w)
 	}
 
 	return &WidthInfo{

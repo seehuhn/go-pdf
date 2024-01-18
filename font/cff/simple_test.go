@@ -20,12 +20,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripSimple(t *testing.T) {
@@ -50,16 +52,15 @@ func TestRoundTripSimple(t *testing.T) {
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
 	info1 := &EmbedInfoCFFSimple{
-		Font:       otf.AsCFF(),
-		SubsetTag:  "UVWXYZ",
-		Encoding:   encoding,
-		ToUnicode:  toUnicode,
-		UnitsPerEm: otf.UnitsPerEm,
-		Ascent:     otf.Ascent,
-		Descent:    otf.Descent,
-		CapHeight:  otf.CapHeight,
-		IsSerif:    true, // Just for testing
-		IsAllCap:   true, // Just for testing
+		Font:      otf.AsCFF(),
+		SubsetTag: "UVWXYZ",
+		Encoding:  encoding,
+		ToUnicode: toUnicode,
+		Ascent:    otf.Ascent,
+		Descent:   otf.Descent,
+		CapHeight: otf.CapHeight,
+		IsSerif:   true, // Just for testing
+		IsAllCap:  true, // Just for testing
 	}
 
 	rw := pdf.NewData(pdf.V1_7)
@@ -101,3 +102,4 @@ func TestRoundTripSimple(t *testing.T) {
 }
 
 var _ font.NewFontSimple = (*embeddedSimple)(nil)
+var _ font.NewFontSimple = (*fromFileSimple)(nil)

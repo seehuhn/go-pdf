@@ -208,11 +208,12 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 
 	unitsPerEm := ttf.UnitsPerEm
 
-	ww := make([]funit.Int16, 256)
+	ww := make([]float64, 256)
+	q := 1000 / float64(unitsPerEm)
 	for i := range ww {
-		ww[i] = ttf.GlyphWidth(info.Encoding[i])
+		ww[i] = float64(ttf.GlyphWidth(info.Encoding[i])) * q
 	}
-	widthsInfo := font.EncodeWidthsSimple(ww, unitsPerEm)
+	widthsInfo := font.EncodeWidthsSimple(ww)
 
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
 	// character codes to glyphs.
@@ -233,7 +234,6 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 
-	q := 1000 / float64(unitsPerEm)
 	bbox := ttf.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),

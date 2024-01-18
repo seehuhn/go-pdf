@@ -108,7 +108,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedComposite{
 		FontComposite: f,
 		w:             w,
-		Res:           Res{Data: w.Alloc(), DefName: resName},
+		Res:           Res{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
@@ -208,7 +208,7 @@ func (f *embeddedComposite) Close() error {
 		IsSerif:    subsetOTF.IsSerif,
 		IsScript:   subsetOTF.IsScript,
 	}
-	return info.Embed(f.w, f.Data)
+	return info.Embed(f.w, f.Ref)
 }
 
 // EmbedInfoComposite is the information needed to embed a CFF font as a composite PDF font.
@@ -447,7 +447,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 // TODO(voss): remove
 type Res struct {
 	DefName pdf.Name
-	Data    pdf.Reference // TODO(voss): can this be pdf.Object?
+	Ref     pdf.Reference // TODO(voss): should this be pdf.Object?
 }
 
 // DefaultName implements the [Resource] interface.
@@ -457,5 +457,5 @@ func (r Res) DefaultName() pdf.Name {
 
 // PDFObject implements the [Resource] interface.
 func (r Res) PDFObject() pdf.Object {
-	return r.Data
+	return r.Ref
 }

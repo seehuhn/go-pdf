@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/scanner"
 	"seehuhn.de/go/pdf/internal/dummyfont"
+	"seehuhn.de/go/sfnt/cff"
 )
 
 func TestPushPop(t *testing.T) {
@@ -164,7 +165,11 @@ func TestParameters(t *testing.T) {
 		t.Errorf("Tr: got %v, want 15", r.State.TextRise)
 	}
 
-	if d := cmp.Diff(w.State, r.State); d != "" {
+	cmpFDSelectFn := cmp.Comparer(func(fn1, fn2 cff.FDSelectFn) bool {
+		return true
+	})
+
+	if d := cmp.Diff(w.State, r.State, cmpFDSelectFn); d != "" {
 		t.Errorf("State: %s", d)
 	}
 }

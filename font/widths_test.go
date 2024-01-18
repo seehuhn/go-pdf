@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
@@ -32,7 +31,7 @@ import (
 func TestCompressWidths(t *testing.T) {
 	type testCase struct {
 		nLeft, nRight int
-		wLeft, wRight funit.Int16
+		wLeft, wRight float64
 		expFirstChar  int
 		expLastChar   int
 		expMissing    pdf.Integer
@@ -84,31 +83,29 @@ func TestCompressWidths(t *testing.T) {
 			expMissing:   0,
 		},
 	}
-	ww := make([]funit.Int16, 256)
+	ww := make([]float64, 256)
 	for k, c := range cases {
-		for _, u := range []uint16{500, 1000, 2000} {
-			for i := 0; i < 256; i++ {
-				switch {
-				case i < c.nLeft:
-					ww[i] = c.wLeft
-				case i >= 256-c.nRight:
-					ww[i] = c.wRight
-				default:
-					ww[i] = 600 + 2*funit.Int16(i)
-				}
+		for i := 0; i < 256; i++ {
+			switch {
+			case i < c.nLeft:
+				ww[i] = c.wLeft
+			case i >= 256-c.nRight:
+				ww[i] = c.wRight
+			default:
+				ww[i] = 600 + 2*float64(i)
 			}
-			info := EncodeWidthsSimple(ww, u)
+		}
+		info := EncodeWidthsSimple(ww)
 
-			for i := 0; i < 256; i++ {
-				var w pdf.Object = info.MissingWidth
-				if i >= int(info.FirstChar) && i <= int(info.LastChar) {
-					w = info.Widths[i-int(info.FirstChar)]
-				}
-				if math.Abs(float64(w.(pdf.Number)-pdf.Number(ww[i])*1000/pdf.Number(u))) > 1e-6 {
-					t.Errorf("case %d, u=%d: got w[%d] = %d, want %d (L=%d, R=%d, D=%f)",
-						k, u, i, w, int(ww[i])*1000/int(u),
-						info.FirstChar, info.LastChar, info.MissingWidth)
-				}
+		for i := 0; i < 256; i++ {
+			var w pdf.Object = info.MissingWidth
+			if i >= int(info.FirstChar) && i <= int(info.LastChar) {
+				w = info.Widths[i-int(info.FirstChar)]
+			}
+			if math.Abs(float64(w.(pdf.Number)-pdf.Number(ww[i]))) > 1e-6 {
+				t.Errorf("case %d: got w[%d] = %d, want %d (L=%d, R=%d, D=%f)",
+					k, i, w, int(ww[i]),
+					info.FirstChar, info.LastChar, info.MissingWidth)
 			}
 		}
 	}
