@@ -104,7 +104,7 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 }
 
 // Layout implements the [font.Font] interface.
-func (f *fontCFFSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontCFFSimple) Layout(s string) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
@@ -117,18 +117,9 @@ type embeddedCFFSimple struct {
 	closed bool
 }
 
-func (f *embeddedCFFSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
-	return func(yield func(w float64, isSpace bool) bool) bool {
-		q := 1 / float64(f.otf.UnitsPerEm)
-		for _, c := range s {
-			gid := f.Encoding[c]
-			w := f.otf.GlyphWidth(gid).AsFloat(q)
-			if !yield(w, c == 0x20) {
-				return false
-			}
-		}
-		return true
-	}
+func (f *embeddedCFFSimple) CodeToWidth(c byte) float64 {
+	gid := f.Encoding[c]
+	return float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
 }
 
 func (f *embeddedCFFSimple) Close() error {

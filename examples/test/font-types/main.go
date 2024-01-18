@@ -98,7 +98,7 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Embedded, d
 		w := geom.Widths[gid]
 		gg := []glyph.Info{
 			{
-				Gid:     gid,
+				GID:     gid,
 				Advance: w,
 			},
 		}

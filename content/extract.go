@@ -49,8 +49,8 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 		return err
 	}
 
-	fonts := make(map[pdf.Name]font.NewFont2)
-	getFont := func(name pdf.Name) (font.NewFont2, error) {
+	fonts := make(map[pdf.Name]font.NewFont)
+	getFont := func(name pdf.Name) (font.NewFont, error) {
 		if f, ok := fonts[name]; ok {
 			return f, nil
 		}

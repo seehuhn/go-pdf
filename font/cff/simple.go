@@ -111,7 +111,7 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 }
 
 // Layout implements the [font.Font] interface.
-func (f *fontCFFSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontCFFSimple) Layout(s string) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
@@ -124,18 +124,9 @@ type embeddedSimple struct {
 	closed bool
 }
 
-func (f *embeddedSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
-	return func(yield func(w float64, isSpace bool) bool) bool {
-		q := 1 / float64(f.otf.UnitsPerEm)
-		for _, c := range s {
-			gid := f.Encoding[c]
-			w := f.otf.GlyphWidth(gid).AsFloat(q)
-			if !yield(w, c == 0x20) {
-				return false
-			}
-		}
-		return true
-	}
+func (f *embeddedSimple) CodeToWidth(c byte) float64 {
+	gid := f.Encoding[c]
+	return float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
 }
 
 func (f *embeddedSimple) Close() error {
@@ -232,19 +223,23 @@ func (info *EmbedInfoCFFSimple) WritingMode() int {
 	return 0
 }
 
-// AllWidths implements the [font.NewFont] interface.
-func (info *EmbedInfoCFFSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
-	return func(yield func(w float64, isSpace bool) bool) bool {
-		q := 1 / float64(info.UnitsPerEm)
-		for _, c := range s {
-			gid := info.Encoding[c]
-			w := info.Font.Glyphs[gid].Width.AsFloat(q)
-			if !yield(w, c == 0x20) {
-				return false
-			}
+func (info *EmbedInfoCFFSimple) CodeToGID(c byte) glyph.ID {
+	return info.Encoding[c]
+}
+
+func (info *EmbedInfoCFFSimple) CodeToWidth(c byte) float64 {
+	gid := info.Encoding[c]
+	return float64(info.Font.Glyphs[gid].Width) / float64(info.UnitsPerEm)
+}
+
+// TODO(voss): does this need to be fast?
+func (info *EmbedInfoCFFSimple) GIDToCode(gid glyph.ID, _ []rune) byte {
+	for code, gid := range info.Encoding {
+		if gid == gid {
+			return byte(code)
 		}
-		return true
 	}
+	return 0
 }
 
 // Embed adds the font to a PDF file.

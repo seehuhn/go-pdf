@@ -219,7 +219,7 @@ func doit() error {
 
 		page.TextStart()
 		if s.level == 1 {
-			gg := SB.Layout(title, l.F["chapter"].ptSize)
+			gg := SB.Layout(title)
 			w := l.F["chapter"].geom.ToPDF(l.F["chapter"].ptSize, gg.AdvanceWidth())
 			l.yPos = paper.URy - l.topMargin - 72 - l.F["chapter"].ascent
 			xPos := (paper.URx-l.rightMargin-l.leftMargin-w)/2 + l.leftMargin
@@ -491,7 +491,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	keyGlyphs := make([]glyph.Seq, len(keys))
 	var maxWidth funit.Int
 	for i, key := range keys {
-		gg := l.F["dict"].F.Layout(pdf.Format(key)+" ", 9)
+		gg := l.F["dict"].F.Layout(pdf.Format(key) + " ")
 		keyGlyphs[i] = gg
 		w := gg.AdvanceWidth()
 		if w > maxWidth {
@@ -547,7 +547,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 		if key == "CharProcs" && len(desc) > 20 {
 			desc = "<< ... >>"
 		}
-		gg = append(gg, l.F["dict"].F.Layout(desc, l.F["dict"].ptSize)...)
+		gg = append(gg, l.F["dict"].F.Layout(desc)...)
 
 		page.TextSetFont(l.F["dict"].F, l.F["dict"].ptSize)
 		page.TextShowGlyphs(gg)

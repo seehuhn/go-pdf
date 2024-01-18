@@ -47,6 +47,10 @@ func (g *Geometry) GetGeometry() *Geometry {
 	return g
 }
 
+func (g *Geometry) FontMatrix() []float64 {
+	return []float64{1 / float64(g.UnitsPerEm), 0, 0, 1 / float64(g.UnitsPerEm), 0, 0}
+}
+
 // ToPDF converts an integer from font design units to PDF units.
 func (g *Geometry) ToPDF(fontSize float64, a funit.Int) float64 {
 	return float64(a) * fontSize / float64(g.UnitsPerEm)
@@ -69,7 +73,7 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 	var bbox funit.Rect
 	var xPos funit.Int
 	for _, glyph := range gg {
-		b16 := g.GlyphExtents[glyph.Gid]
+		b16 := g.GlyphExtents[glyph.GID]
 		b := funit.Rect{
 			LLx: funit.Int(b16.LLx+glyph.XOffset) + xPos,
 			LLy: funit.Int(b16.LLy + glyph.YOffset),
@@ -93,7 +97,7 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 //
 // TODO(voss): can we remove this?
 type Layouter interface {
-	Layout(s string, ptSize float64) glyph.Seq
+	Layout(s string) glyph.Seq
 }
 
 // TODO(voss): should we have GeometryGetter interface?
@@ -113,7 +117,7 @@ type Embedded interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
 	Close() error
-	NewFont2
+	NewFont
 }
 
 // NumGlyphs returns the number of glyphs in a font.
@@ -127,9 +131,9 @@ func NumGlyphs(font interface{ GetGeometry() *Geometry }) int {
 //
 // TODO(voss): remove?
 func GetGID(font Layouter, r rune) (glyph.ID, funit.Int16) {
-	gg := font.Layout(string(r), 10)
+	gg := font.Layout(string(r))
 	if len(gg) != 1 {
 		return 0, 0
 	}
-	return gg[0].Gid, gg[0].Advance
+	return gg[0].GID, gg[0].Advance
 }

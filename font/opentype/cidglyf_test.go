@@ -115,3 +115,5 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
+
+var _ font.NewFontComposite = (*embeddedGlyfComposite)(nil)

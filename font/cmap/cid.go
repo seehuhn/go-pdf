@@ -54,6 +54,10 @@ type CIDEncoder interface {
 	Subset() []glyph.ID
 
 	AsText(pdf.String) []rune
+
+	AppendCode(pdf.String, type1.CID) pdf.String
+
+	CodeToCID(pdf.String) type1.CID
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -74,7 +78,7 @@ type identityEncoder struct {
 }
 
 func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	cid := e.g2c.CID(gid)
+	cid := e.g2c.CID(gid, rr)
 	code := charcode.CharCode(cid)
 	e.toUnicode[code] = rr
 	e.used[gid] = struct{}{}
@@ -119,10 +123,26 @@ func (e *identityEncoder) AsText(s pdf.String) []rune {
 	cs := charcode.UCS2
 	cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 		c, _ := cs.Decode(code)
-		res = append(res, e.toUnicode[c]...)
+		if c >= 0 {
+			res = append(res, e.toUnicode[c]...)
+		}
 		return true
 	})
 	return res
+}
+
+func (e *identityEncoder) AppendCode(s pdf.String, cid type1.CID) pdf.String {
+	// TODO(voss): opencode this
+	return charcode.UCS2.Append(s, charcode.CharCode(cid))
+}
+
+func (e *identityEncoder) CodeToCID(s pdf.String) type1.CID {
+	c, _ := charcode.UCS2.Decode(s)
+	if c < 0 {
+		// TODO(voss): implement notdef ranges, etc.
+		return 0
+	}
+	return type1.CID(c)
 }
 
 // NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
@@ -132,6 +152,7 @@ func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 		g2c:   g2c,
 		cache: make(map[key]charcode.CharCode),
 		cmap:  make(map[charcode.CharCode]type1.CID),
+		rev:   make(map[type1.CID]charcode.CharCode),
 		next:  0xE000,
 	}
 }
@@ -141,6 +162,7 @@ type utf8Encoder struct {
 
 	cache map[key]charcode.CharCode
 	cmap  map[charcode.CharCode]type1.CID
+	rev   map[type1.CID]charcode.CharCode
 	next  rune
 }
 
@@ -164,7 +186,7 @@ func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.S
 	//    different gid, then use rr[0] as the code.
 	if len(rr) == 1 {
 		code = runeToCode(rr[0])
-		if cid, ok := e.cmap[code]; !ok || e.g2c.CID(gid) == cid {
+		if cid, ok := e.cmap[code]; !ok || e.g2c.CID(gid, rr) == cid {
 			valid = true
 		}
 	}
@@ -178,8 +200,10 @@ func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.S
 		}
 	}
 
+	cid := e.g2c.CID(gid, rr)
 	e.cache[k] = code
-	e.cmap[code] = e.g2c.CID(gid)
+	e.cmap[code] = cid
+	e.rev[cid] = code
 	return utf8cs.Append(s, code)
 }
 
@@ -231,6 +255,15 @@ func (e *utf8Encoder) AsText(s pdf.String) []rune {
 	return []rune(string(s))
 }
 
+func (e *utf8Encoder) AppendCode(s pdf.String, cid type1.CID) pdf.String {
+	return utf8cs.Append(s, e.rev[cid])
+}
+
+func (e *utf8Encoder) CodeToCID(s pdf.String) type1.CID {
+	code, _ := utf8cs.Decode(s)
+	return e.cmap[code]
+}
+
 // utf8cs represents UTF-8-encoded character codes.
 var utf8cs = charcode.CodeSpaceRange{
 	{Low: []byte{0x00}, High: []byte{0x7F}},
@@ -242,7 +275,7 @@ var utf8cs = charcode.CodeSpaceRange{
 // GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
 // Identifier (CID) values.
 type GIDToCID interface {
-	CID(glyph.ID) type1.CID
+	CID(glyph.ID, []rune) type1.CID
 	GID(type1.CID) glyph.ID
 
 	ROS() *type1.CIDSystemInfo
@@ -265,7 +298,7 @@ type gidToCIDSequential struct {
 }
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) CID(gid glyph.ID) type1.CID {
+func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) type1.CID {
 	cid, ok := g.g2c[gid]
 	if !ok {
 		cid = type1.CID(len(g.g2c) + 1)
@@ -317,7 +350,7 @@ func NewIdentityGIDToCID() GIDToCID {
 type gidToCIDIdentity struct{}
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) CID(gid glyph.ID) type1.CID {
+func (g *gidToCIDIdentity) CID(gid glyph.ID, _ []rune) type1.CID {
 	return type1.CID(gid)
 }
 

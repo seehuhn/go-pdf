@@ -161,3 +161,12 @@ func (e *SimpleEncoder) AsText(s pdf.String) []rune {
 	}
 	return res
 }
+
+func (e *SimpleEncoder) CodeToGID(c byte) glyph.ID {
+	return e.Encoding[c]
+}
+
+func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
+	k := key{gid, string(rr)}
+	return e.code[k]
+}

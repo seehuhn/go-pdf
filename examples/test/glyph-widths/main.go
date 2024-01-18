@@ -78,7 +78,7 @@ func run(filename string) error {
 		}
 
 		geom := F.GetGeometry()
-		gg := F.Layout("Nimm!", testFontSize)
+		gg := F.Layout("Nimm!")
 
 		// Draw the glyphs.
 		page.SetFillColor(color.Gray(0))
@@ -109,7 +109,7 @@ func run(filename string) error {
 		page.SetLineWidth(1)
 		xPos = xBase
 		for i, g := range gg {
-			w := geom.ToPDF16(testFontSize, geom.Widths[g.Gid])
+			w := geom.ToPDF16(testFontSize, geom.Widths[g.GID])
 			y := yBase + 10
 			if i%2 == 0 {
 				y += 2
@@ -127,7 +127,7 @@ func run(filename string) error {
 		for _, g := range gg {
 			x := xPos + geom.ToPDF16(testFontSize, g.XOffset)
 			y := yBase + 16 + geom.ToPDF16(testFontSize, g.YOffset)
-			bbox := geom.GlyphExtents[g.Gid]
+			bbox := geom.GlyphExtents[g.GID]
 			page.Rectangle(x+geom.ToPDF16(testFontSize, bbox.LLx),
 				y+geom.ToPDF16(testFontSize, bbox.LLy),
 				geom.ToPDF16(testFontSize, bbox.URx-bbox.LLx),

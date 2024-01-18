@@ -236,7 +236,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 			break
 		}
 		seq = append(seq, glyph.Info{
-			Gid:     glyph.ID(gid),
+			GID:     glyph.ID(gid),
 			Advance: w,
 		})
 		total += wf

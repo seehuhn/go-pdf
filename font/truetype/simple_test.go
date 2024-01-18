@@ -121,3 +121,5 @@ func TestRoundTripSimple(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
+
+var _ font.NewFontSimple = (*embeddedSimple)(nil)

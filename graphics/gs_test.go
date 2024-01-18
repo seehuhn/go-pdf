@@ -37,7 +37,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug"
 )
 
@@ -90,7 +92,7 @@ func TestTextPositions(t *testing.T) {
 		FontInfo: &type1.FontInfo{
 			FontName:   "Test",
 			Version:    "1.000",
-			FontMatrix: []float64{0.0005, 0, 0, 0.0005, 0, 0},
+			FontMatrix: [6]float64{0.0005, 0, 0, 0.0005, 0, 0},
 		},
 		Outlines: &cff.Outlines{
 			Private: []*type1.PrivateDict{
@@ -133,6 +135,13 @@ func TestTextPositions(t *testing.T) {
 	}
 
 	testString := pdf.String("CADABX")
+	testGlyphs := make([]graphics.PDFGlyph, len(testString))
+	for i := 0; i < len(testString); i++ {
+		testGlyphs[i] = graphics.PDFGlyph{
+			GID: glyph.ID(testString[i]),
+		}
+	}
+
 	// first print all glyphs in one string
 	img1 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
 		F, err := embedTestFont(r.Out, e, "F")
@@ -143,7 +152,7 @@ func TestTextPositions(t *testing.T) {
 		r.TextSetFont(F, 100)
 		r.TextStart()
 		r.TextFirstLine(10, 10)
-		r.TextShowRaw(testString)
+		r.TextShowGlyphsNew(testGlyphs)
 		r.TextEnd()
 
 		return nil
@@ -161,7 +170,7 @@ func TestTextPositions(t *testing.T) {
 		r.TextFirstLine(10, 10)
 		for _, c := range testString {
 			xx = append(xx, r.TextMatrix[4])
-			r.TextShowRaw(pdf.String{c})
+			r.TextShowGlyphsNew([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
 		}
 		r.TextEnd()
 
@@ -178,7 +187,7 @@ func TestTextPositions(t *testing.T) {
 		for i, c := range testString {
 			r.TextStart()
 			r.TextFirstLine(xx[i], 10)
-			r.TextShowRaw(pdf.String{c})
+			r.TextShowGlyphsNew([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
 			r.TextEnd()
 		}
 
@@ -221,7 +230,7 @@ func TestTextPositions2(t *testing.T) {
 		t.Fatal(err)
 	}
 	testString := ".MiAbc"
-	// TODO(voss): also try PDF.V2_0 once
+	// TODO(voss): also try PDF.V2_0, once
 	// https://bugs.ghostscript.com/show_bug.cgi?id=707475 is resolved.
 	for _, fontInfo := range fonts {
 		t.Run(fontInfo.Type.String(), func(t *testing.T) {
@@ -239,9 +248,10 @@ func TestTextPositions2(t *testing.T) {
 				r.TextSetFont(F, fontSize)
 				r.TextStart()
 				r.TextFirstLine(10, 10)
-				for _, g := range F.Layout(testString, fontSize) {
+				for _, g := range F.Layout(testString) {
 					xx = append(xx, r.TextMatrix[4])
-					s = F.AppendEncoded(s[:0], g.Gid, g.Text)
+					s = F.AppendEncoded(s[:0], g.GID, g.Text)
+
 					r.TextShowRaw(s)
 				}
 				r.TextEnd()
@@ -256,10 +266,10 @@ func TestTextPositions2(t *testing.T) {
 				}
 
 				r.TextSetFont(F, fontSize)
-				for i, g := range F.Layout(testString, fontSize) {
+				for i, g := range F.Layout(testString) {
 					r.TextStart()
 					r.TextFirstLine(xx[i], 10)
-					s = F.AppendEncoded(s[:0], g.Gid, g.Text)
+					s = F.AppendEncoded(s[:0], g.GID, g.Text)
 					r.TextShowRaw(s)
 					r.TextEnd()
 				}
@@ -321,6 +331,8 @@ func (f *testFont) PDFObject() pdf.Object {
 func (f *testFont) AsText(pdf.String) []rune {
 	return nil
 }
+
+var _ font.NewFontSimple = (*testFont)(nil)
 
 func gsRender(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) image.Image {
 	t.Helper()

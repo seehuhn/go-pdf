@@ -125,3 +125,5 @@ func TestRoundTripCFFSimple(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
+
+var _ font.NewFontSimple = (*embeddedCFFSimple)(nil)

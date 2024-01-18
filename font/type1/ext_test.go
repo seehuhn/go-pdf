@@ -45,10 +45,10 @@ func TestEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gg := E.Layout(".MiAbc", 100)
+	gg := E.Layout(".MiAbc")
 	var s pdf.String
 	for _, g := range gg {
-		s = E.AppendEncoded(s[:0], g.Gid, g.Text)
+		s = E.AppendEncoded(s[:0], g.GID, g.Text)
 	}
 	err = E.Close()
 	if err != nil {

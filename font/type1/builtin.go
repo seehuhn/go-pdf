@@ -97,9 +97,9 @@ func (f Builtin) GetGeometry() *font.Geometry {
 }
 
 // Layout implements the [font.Font] interface.
-func (f Builtin) Layout(s string, ptSize float64) glyph.Seq {
+func (f Builtin) Layout(s string) glyph.Seq {
 	info, _ := getBuiltin(f)
-	return info.Layout(s, ptSize)
+	return info.Layout(s)
 }
 
 func getBuiltin(f Builtin) (*Font, error) {

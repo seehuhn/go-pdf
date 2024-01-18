@@ -65,14 +65,14 @@ func doit() error {
 	page.SetFillColor(color.Gray(1))
 	for _, x := range []float64{82, 532} {
 		for i := 0; i <= 600; i += 50 {
-			gg := F.Layout(fmt.Sprintf("%d", i), 9)
+			gg := F.Layout(fmt.Sprintf("%d", i))
 			b := geom.BoundingBox(9, gg)
 			page.Rectangle(x-b.URx-1, float64(i)-3+b.LLy, b.URx-b.LLx+2, b.URy-b.LLy)
 		}
 	}
 	for _, y := range []float64{72, 522} {
 		for i := 0; i <= 600; i += 50 {
-			gg := F.Layout(fmt.Sprintf("%d", i), 9)
+			gg := F.Layout(fmt.Sprintf("%d", i))
 			b := geom.BoundingBox(9, gg)
 			w := b.URx - b.LLx
 			page.Rectangle(float64(i)-0.5*w, y+b.LLy-1, w, b.URy-b.LLy+2)

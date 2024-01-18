@@ -132,7 +132,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 }
 
 // Layout implements the [font.Font] interface.
-func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
+func (f *Font) Layout(s string) glyph.Seq {
 	rr := []rune(s)
 
 	gg := make(glyph.Seq, 0, len(rr))
@@ -141,14 +141,14 @@ func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 		gid := f.CMap[r]
 		if i > 0 {
 			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
-				gg[len(gg)-1].Gid = repl
+				gg[len(gg)-1].GID = repl
 				gg[len(gg)-1].Text = append(gg[len(gg)-1].Text, r)
 				prev = repl
 				continue
 			}
 		}
 		gg = append(gg, glyph.Info{
-			Gid:  gid,
+			GID:  gid,
 			Text: []rune{r},
 		})
 		prev = gid
@@ -156,12 +156,12 @@ func (f *Font) Layout(s string, ptSize float64) glyph.Seq {
 
 	for i, g := range gg {
 		if i > 0 {
-			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.Gid}]; ok {
+			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.GID}]; ok {
 				gg[i-1].Advance += adj
 			}
 		}
-		gg[i].Advance = f.Widths[g.Gid]
-		prev = g.Gid
+		gg[i].Advance = f.Widths[g.GID]
+		prev = g.GID
 	}
 
 	return gg
@@ -177,19 +177,9 @@ type embedded struct {
 	closed bool
 }
 
-func (f *embedded) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
-	return func(yield func(w float64, isSpace bool) bool) bool {
-		q := 1 / float64(f.outlines.UnitsPerEm)
-		for _, c := range s {
-			gid := f.Encoding[c]
-			glyphName := f.glyphNames[gid]
-			w := f.outlines.GlyphInfo[glyphName].WidthX.AsFloat(q)
-			if !yield(w, c == 0x20) {
-				return false
-			}
-		}
-		return true
-	}
+func (f *embedded) CodeToWidth(c byte) float64 {
+	gid := f.Encoding[c]
+	return float64(f.Geometry.Widths[gid]) * f.outlines.FontInfo.FontMatrix[0]
 }
 
 func (f *embedded) Close() error {

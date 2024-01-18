@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 )
 
 func TestWidthsFull(t *testing.T) {
@@ -48,10 +47,10 @@ func TestWidthsFull(t *testing.T) {
 
 	// Layout and encode a string to make sure the corresponding glyphs are
 	// included in the embedded font.
-	gg := E.Layout(sampleText, 100)
+	gg := E.Layout(sampleText)
 	var s pdf.String
 	for _, g := range gg {
-		s = E.AppendEncoded(s, g.Gid, g.Text)
+		s = E.AppendEncoded(s, g.GID, g.Text)
 	}
 	err = E.Close()
 	if err != nil {
@@ -71,17 +70,16 @@ func TestWidthsFull(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1 := E.(interface {
-		AllCIDs(s pdf.String) func(yield func(cid type1.CID) bool) bool
-	})
+	F1 := E.(font.NewFontComposite)
 	i := 0
-	F1.AllCIDs(s)(func(cid type1.CID) bool {
+	F1.CS().AllCodes(s)(func(code pdf.String, valid bool) bool {
+		cid := F1.CodeToCID(code)
 		w, ok := W[cid]
 		if !ok {
 			w = float64(DW)
 		}
 		wFromPDF := funit.Int16(math.Round(w * float64(goRegular.UnitsPerEm) / 1000))
-		wFromFont := goRegular.GlyphWidth(gg[i].Gid)
+		wFromFont := goRegular.GlyphWidth(gg[i].GID)
 
 		if wFromPDF != wFromFont {
 			t.Errorf("widths differ for CID %d: %d vs %d", cid, wFromPDF, wFromFont)

@@ -118,7 +118,7 @@ func (f *fontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded,
 }
 
 // Layout implements the [font.Font] interface.
-func (f *fontCFFComposite) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontCFFComposite) Layout(s string) glyph.Seq {
 	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
@@ -137,49 +137,10 @@ func (f *embeddedCFFComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
-func (f *embeddedCFFComposite) AllCIDs(s pdf.String) func(yield func(cid type1.CID) bool) bool {
-	return func(yield func(cid type1.CID) bool) bool {
-		cs := f.CS()
-		// TODO(voss): clean this up
-		return cs.AllCodes(s)(func(c pdf.String, valid bool) bool {
-			if !valid {
-				// TODO(voss): use notdefrange
-				return yield(0)
-			}
-			code, k := cs.Decode(c)
-			if k != len(c) {
-				panic("internal error")
-			}
-
-			// If code is invalid, CID 0 is used.
-			cid, _ := f.Lookup(code)
-			return yield(cid)
-		})
-	}
-}
-
-func (f *embeddedCFFComposite) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
-	return func(yield func(w float64, isSpace bool) bool) bool {
-		cs := f.CS()
-		q := 1 / float64(f.otf.UnitsPerEm)
-		return cs.AllCodes(s)(func(c pdf.String, valid bool) bool {
-			if !valid {
-				notdefWidth := f.otf.GlyphWidth(0).AsFloat(q)
-				return yield(notdefWidth, false)
-			}
-			code, k := cs.Decode(c)
-			if k != len(c) {
-				panic("internal error")
-			}
-
-			// If code is invalid, CID 0 is used.
-			cid, _ := f.Lookup(code)
-			gid := f.GID(cid)
-			width := f.otf.GlyphWidth(gid).AsFloat(q)
-
-			return yield(width, len(c) == 1 && c[0] == 0x20)
-		})
-	}
+func (f *embeddedCFFComposite) CIDToWidth(cid type1.CID) float64 {
+	gid := f.GID(cid)
+	// TODO(voss): deal with different Font Matrices for different private dicts.
+	return float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
 }
 
 func (f *embeddedCFFComposite) Close() error {

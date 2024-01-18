@@ -98,7 +98,7 @@ func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 }
 
 // Layout implements the [font.Font] interface.
-func (f *fontComposite) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontComposite) Layout(s string) glyph.Seq {
 	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
@@ -135,28 +135,9 @@ func (f *embeddedCID) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
-func (f *embeddedCID) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
-	return func(yield func(w float64, isSpace bool) bool) bool {
-		cs := f.CS()
-		q := 1 / float64(f.ttf.UnitsPerEm)
-		return cs.AllCodes(s)(func(c pdf.String, valid bool) bool {
-			if !valid {
-				notdefWidth := f.ttf.GlyphWidth(0).AsFloat(q)
-				return yield(notdefWidth, false)
-			}
-			code, k := cs.Decode(c)
-			if k != len(c) {
-				panic("internal error")
-			}
-
-			// If code is invalid, CID 0 is used.
-			cid, _ := f.Lookup(code)
-			gid := f.GID(cid)
-			width := f.ttf.GlyphWidth(gid).AsFloat(q)
-
-			return yield(width, len(c) == 1 && c[0] == 0x20)
-		})
-	}
+func (f *embeddedCID) CIDToWidth(cid type1.CID) float64 {
+	gid := f.GID(cid)
+	return float64(f.ttf.GlyphWidth(gid)) / float64(f.ttf.UnitsPerEm)
 }
 
 func (f *embeddedCID) Close() error {

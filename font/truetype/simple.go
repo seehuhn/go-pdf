@@ -100,7 +100,7 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 }
 
 // Layout implements the [font.Font] interface.
-func (f *fontSimple) Layout(s string, ptSize float64) glyph.Seq {
+func (f *fontSimple) Layout(s string) glyph.Seq {
 	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
@@ -113,18 +113,9 @@ type embeddedSimple struct {
 	closed bool
 }
 
-func (f *embeddedSimple) AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool {
-	return func(yield func(w float64, isSpace bool) bool) bool {
-		q := 1 / float64(f.ttf.UnitsPerEm)
-		for _, c := range s {
-			gid := f.Encoding[c]
-			w := f.ttf.GlyphWidth(gid).AsFloat(q)
-			if !yield(w, c == 0x20) {
-				return false
-			}
-		}
-		return true
-	}
+func (f *embeddedSimple) CodeToWidth(c byte) float64 {
+	gid := f.Encoding[c]
+	return float64(f.ttf.GlyphWidth(gid)) / float64(f.ttf.UnitsPerEm)
 }
 
 func (f *embeddedSimple) Close() error {

@@ -31,7 +31,7 @@ import (
 // The function panics if no font is set.
 func (w *Writer) TextLayout(s string) glyph.Seq {
 	st := w.State
-	return st.TextFont.(font.Embedded).Layout(s, st.TextFontSize)
+	return st.TextFont.(font.Embedded).Layout(s)
 }
 
 // TextShow draws a string.
@@ -177,10 +177,10 @@ func (w *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float6
 			_, w.Err = fmt.Fprintln(w.Content, " Ts")
 		}
 
-		run = F.(font.Embedded).AppendEncoded(run, glyph.Gid, glyph.Text)
+		run = F.(font.Embedded).AppendEncoded(run, glyph.GID, glyph.Text)
 
 		var w funit.Int16
-		if gid := glyph.Gid; int(gid) < len(widths) {
+		if gid := glyph.GID; int(gid) < len(widths) {
 			w = widths[gid]
 		}
 		xActual += float64(w) * q

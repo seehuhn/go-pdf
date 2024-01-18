@@ -23,7 +23,7 @@ import (
 )
 
 // Read extracts a font from a PDF file.
-func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont2, error) {
+func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont, error) {
 	fontDicts, err := ExtractDicts(r, ref)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,13 @@ func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont2, error) {
 		// 	if err != nil {
 		// 		return nil, err
 		// 	}
-		panic("not implemented")
+		res := &fromFile{
+			Name:  name,
+			Ref:   ref,
+			WMode: 0, // TODO(voss)
+			ToUni: toUnicode.GetMapping(),
+		}
+		return res, nil
 	} else {
 		// cs = charcode.Simple
 		// m = make(map[charcode.CharCode]type1.CID, 256)
@@ -67,33 +73,32 @@ func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont2, error) {
 		// 	return nil, err
 		// }
 		res := &fromFile{
-			defaultName: name,
-			ref:         ref,
-			writingMode: 0,
-			toUnicode:   toUnicode.GetMapping(),
+			Name:  name,
+			Ref:   ref,
+			WMode: 0,
+			ToUni: toUnicode.GetMapping(),
 		}
-		panic("not implemented")
 		return res, nil
 	}
 }
 
 type fromFile struct {
-	defaultName pdf.Name
-	ref         pdf.Object
-	writingMode int
-	toUnicode   map[charcode.CharCode][]rune
+	Name  pdf.Name
+	Ref   pdf.Object
+	WMode int
+	ToUni map[charcode.CharCode][]rune
 }
 
 func (f *fromFile) DefaultName() pdf.Name {
-	return f.defaultName
+	return f.Name
 }
 
 func (f *fromFile) PDFObject() pdf.Object {
-	return f.ref
+	return f.Ref
 }
 
 func (f *fromFile) WritingMode() int {
-	return f.writingMode
+	return f.WMode
 }
 
 func (f *fromFile) AsText(pdf.String) []rune {

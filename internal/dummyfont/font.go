@@ -33,7 +33,7 @@ import (
 // The font is embedded as a simple CFF font.
 //
 // If a write error on w occurs, the function panics.
-func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont2 {
+func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont {
 	encoding := make([]glyph.ID, 256)
 	encoding[' '] = 1
 	encoding['A'] = 2
@@ -41,7 +41,7 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont2 {
 	in := &cff.Font{
 		FontInfo: &type1.FontInfo{
 			FontName:   "Dummy",
-			FontMatrix: []float64{0.001, 0, 0, 0.001, 0, 0},
+			FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
 		},
 		Outlines: &cff.Outlines{
 			Private:  []*type1.PrivateDict{{}},

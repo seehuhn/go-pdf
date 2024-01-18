@@ -272,7 +272,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 				page.TextSetFont(F, fontSize)
 				g := glyph.Seq{
 					{
-						Gid:     glyph.ID(curGlyph),
+						GID:     glyph.ID(curGlyph),
 						Advance: geom.Widths[curGlyph],
 					},
 				}

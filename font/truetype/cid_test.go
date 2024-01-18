@@ -106,3 +106,5 @@ func TestRoundTripComposite(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
+
+var _ font.NewFontComposite = (*embeddedCID)(nil)

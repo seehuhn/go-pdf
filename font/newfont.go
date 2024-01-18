@@ -23,24 +23,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// NewFont represents a font in a PDF document.
 type NewFont interface {
-	DefaultName() pdf.Name // return "" to choose names automatically
-	PDFObject() pdf.Object // value to use in the resource dictionary
-	WritingMode() int      // 0 = horizontal, 1 = vertical
-
-	AllWidther
-}
-
-// AllWidther is an interface for fonts which can return the width of all
-// characters in PDF string.
-type AllWidther interface {
-	// AllWidths returns a function which iterates over all characters in the
-	// given string.  The width values are returned in PDF text space units.
-	AllWidths(s pdf.String) func(yield func(w float64, isSpace bool) bool) bool
-}
-
-type NewFont2 interface {
 	DefaultName() pdf.Name // return "" to choose names automatically
 	PDFObject() pdf.Object // value to use in the resource dictionary
 	WritingMode() int      // 0 = horizontal, 1 = vertical
@@ -48,19 +31,25 @@ type NewFont2 interface {
 	// Outlines() interface{}
 }
 
+type NewFontLayouter interface {
+	NewFont
+	Layout(s string) glyph.Seq
+	FontMatrix() []float64
+}
+
 type NewFontSimple interface {
-	NewFont2
+	NewFont
 	CodeToGID(byte) glyph.ID
 	GIDToCode(glyph.ID, []rune) byte
-	CodeToWidth(byte) float64
+	CodeToWidth(byte) float64 // scaled PDF text space units
 }
 
 type NewFontComposite interface {
-	NewFont2
+	NewFont
 	CS() charcode.CodeSpaceRange
 	CodeToCID(pdf.String) type1.CID
 	AppendCode(pdf.String, type1.CID) pdf.String
-	CIDToGID(type1.CID) glyph.ID
-	GIDToCID(glyph.ID, []rune) type1.CID
+	GID(type1.CID) glyph.ID
+	CID(glyph.ID, []rune) type1.CID
 	CIDToWidth(type1.CID) float64
 }
