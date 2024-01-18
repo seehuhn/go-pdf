@@ -17,9 +17,12 @@
 package graphics
 
 import (
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/scanner"
 )
 
 // A Reader reads a PDF content stream.
@@ -27,12 +30,68 @@ type Reader struct {
 	R         pdf.Getter
 	Resources *pdf.Resources
 	State
-	stack []State
+
+	DrawGlyph func(g PDFGlyph) error
+	UnknownOp func(op string, args []pdf.Object) error
+
+	stack   []State
+	scanner *scanner.Scanner
 }
 
-// UpdateState updates the graphics state according to the given operator and
-// arguments.
-func (r *Reader) UpdateState(op string, args []pdf.Object) error {
+// NewReader creates a new Reader.
+func NewReader(r pdf.Getter, res *pdf.Resources) *Reader {
+	return &Reader{
+		R:         r,
+		Resources: res,
+		State:     NewState(),
+		scanner:   scanner.NewScanner(),
+	}
+}
+
+// ScanContentStream scans a content stream.
+// Obj can be either a stream or an array of streams.
+func (r *Reader) ScanContentStream(obj pdf.Object) error {
+	contents, err := pdf.Resolve(r.R, obj)
+	if err != nil {
+		return err
+	}
+	switch contents := contents.(type) {
+	case *pdf.Stream:
+		err := r.scanPDFStream(contents)
+		if err != nil {
+			return pdf.Wrap(err, "content stream")
+		}
+	case pdf.Array:
+		for _, ref := range contents {
+			stm, err := pdf.GetStream(r.R, ref)
+			if err != nil {
+				return err
+			}
+			err = r.scanPDFStream(stm)
+			if err != nil {
+				return pdf.Wrap(err, "content stream")
+			}
+		}
+	default:
+		return &pdf.MalformedFileError{
+			Err: fmt.Errorf("unexpected type %T for content stream", contents),
+		}
+	}
+	return nil
+}
+
+func (r *Reader) scanPDFStream(stm *pdf.Stream) error {
+	body, err := pdf.DecodeStream(r.R, stm, 0)
+	if err != nil {
+		return err
+	}
+	return r.scanner.Scan(body)(r.do)
+}
+
+// Do processes the given operator and arguments.
+// This updates the graphics state, and calls the appropriate callback
+// functions.
+func (r *Reader) do(op string, args []pdf.Object) error {
 	getInteger := func() (pdf.Integer, bool) {
 		if len(args) == 0 {
 			return 0, false
@@ -291,9 +350,23 @@ doOps:
 
 	case "Tj": // Show text
 		s, ok := getString()
-		if ok {
-			// TODO(voss): show text
-			_ = s
+		if !ok {
+			break
+		}
+		gg := decodeString(s, &r.State)
+		for _, g := range gg {
+			if r.DrawGlyph != nil {
+				err := r.DrawGlyph(g)
+				if err != nil {
+					return err
+				}
+			}
+			switch r.TextFont.WritingMode() {
+			case 0:
+				r.TextMatrix[4] += g.Advance
+			case 1:
+				r.TextMatrix[5] += g.Advance
+			}
 		}
 
 	case "'": // Move to next line and show text
@@ -442,6 +515,7 @@ doOps:
 		if !ok {
 			break
 		}
+		// TODO(voss): do something with this information
 		_ = name
 
 	case "BDC": // Begin marked-content sequence with property list
@@ -466,12 +540,18 @@ doOps:
 			break
 		}
 
+		// TODO(voss): do something with this information
 		_ = name
 		_ = dict
 
 	case "EMC": // End marked-content sequence
 
 		// == Compatibility ===================================================
+
+	default:
+		if r.UnknownOp != nil {
+			r.UnknownOp(op, args)
+		}
 
 	}
 	return nil

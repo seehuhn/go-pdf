@@ -230,7 +230,7 @@ func (w *Writer) SetMiterLimit(limit float64) {
 	}
 	w.MiterLimit = limit
 	w.Set |= StateMiterLimit
-	_, w.Err = fmt.Fprintln(w.Content, float.Format(limit, 3), "M")
+	_, w.Err = fmt.Fprintln(w.Content, float.Format(limit, 4), "M")
 }
 
 // SetDashPattern sets the line dash pattern.

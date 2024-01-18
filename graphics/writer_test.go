@@ -104,13 +104,16 @@ func TestParameters(t *testing.T) {
 	r.Set = 0
 	s := scanner.NewScanner()
 	iter := s.Scan(bytes.NewReader(buf.Bytes()))
-	iter(func(op string, args []pdf.Object) bool {
-		err := r.UpdateState(op, args)
+	err := iter(func(op string, args []pdf.Object) error {
+		err := r.do(op, args)
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
-		return true
+		return nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if r.State.LineWidth != 12.3 {
 		t.Errorf("LineWidth: got %v, want 12.3", r.State.LineWidth)

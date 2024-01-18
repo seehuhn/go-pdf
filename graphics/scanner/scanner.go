@@ -61,8 +61,8 @@ func NewScanner() *Scanner {
 //
 // The []pdf.Object slice passed to the yield function is owned by the scanner
 // and is only valid until the yield returns.
-func (s *Scanner) Scan(r io.Reader) func(yield func(op string, args []pdf.Object) bool) bool {
-	iterate := func(yield func(string, []pdf.Object) bool) bool {
+func (s *Scanner) Scan(r io.Reader) func(yield func(op string, args []pdf.Object) error) error {
+	iterate := func(yield func(string, []pdf.Object) error) error {
 		s.err = nil
 
 		// TODO(voss): reset line and col?
@@ -123,11 +123,11 @@ func (s *Scanner) Scan(r io.Reader) func(yield func(op string, args []pdf.Object
 			if len(s.stack) > 0 { // we are inside a dict or array
 				s.stack[len(s.stack)-1].data = append(s.stack[len(s.stack)-1].data, obj)
 			} else if op, ok := obj.(operator); ok {
-				cont := yield(string(op), s.args)
-				s.args = s.args[:0]
-				if !cont {
-					return false
+				err := yield(string(op), s.args)
+				if err != nil {
+					return err
 				}
+				s.args = s.args[:0]
 			} else {
 				s.args = append(s.args, obj)
 			}
@@ -138,10 +138,10 @@ func (s *Scanner) Scan(r io.Reader) func(yield func(op string, args []pdf.Object
 				s.col = 0
 				s.line++
 			}
-			return true
+			return nil
 		}
 
-		return false
+		return s.err
 	}
 	return iterate
 }

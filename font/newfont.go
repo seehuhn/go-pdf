@@ -39,9 +39,10 @@ type NewFontLayouter interface {
 
 type NewFontSimple interface {
 	NewFont
+	CodeToWidth(byte) float64 // scaled PDF text space units
+
 	CodeToGID(byte) glyph.ID
 	GIDToCode(glyph.ID, []rune) byte
-	CodeToWidth(byte) float64 // scaled PDF text space units
 }
 
 type NewFontComposite interface {

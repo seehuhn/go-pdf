@@ -215,14 +215,10 @@ func printObject(args ...string) error {
 				return err
 			}
 		}
-		if dicts.FontProgram != 0 {
+		if dicts.FontProgram != nil {
 			fmt.Println()
 			fmt.Print("Font program dict: ")
-			stmObj, err := pdf.GetStream(r, dicts.FontProgram)
-			if err != nil {
-				return err
-			}
-			err = e.show(stmObj.Dict)
+			err = e.show(dicts.FontProgram.Dict)
 			if err != nil {
 				return err
 			}

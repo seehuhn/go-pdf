@@ -349,14 +349,15 @@ func decodeString(s pdf.String, param *State) []PDFGlyph {
 		res = make([]PDFGlyph, len(s))
 		for i := 0; i < len(s); i++ {
 			c := s[i]
-			gid := F.CodeToGID(c)
 			width := F.CodeToWidth(c)*param.TextFontSize + param.TextCharacterSpacing
 			if c == ' ' {
 				width += param.TextWordSpacing
 			}
+			gid := F.CodeToGID(c)
 			res[i] = PDFGlyph{
 				GID:     gid,
 				Advance: width * param.TextHorizonalScaling,
+				Rise:    param.TextRise,
 				Text:    F.AsText(pdf.String{c}),
 			}
 		}
@@ -372,12 +373,15 @@ func decodeString(s pdf.String, param *State) []PDFGlyph {
 			g := PDFGlyph{
 				GID:     gid,
 				Advance: width * param.TextHorizonalScaling,
+				Rise:    param.TextRise,
 				Text:    F.AsText(code),
 			}
 			res = append(res, g)
 
 			return true
 		})
+	case nil: // no font
+		return nil
 	default:
 		fmt.Printf("%#v\n", F)
 		panic("unknown font type")

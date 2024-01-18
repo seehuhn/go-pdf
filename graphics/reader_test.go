@@ -33,7 +33,7 @@ import (
 
 func FuzzReader(f *testing.F) {
 	data := pdf.NewData(pdf.V1_7)
-	F := dummyfont.Embed(data, "dummy")
+	F := dummyfont.Embed(data, "F")
 
 	res := &pdf.Resources{
 		ExtGState: map[pdf.Name]pdf.Object{
@@ -74,7 +74,8 @@ func FuzzReader(f *testing.F) {
 		}
 		s := scanner.NewScanner()
 		iter := s.Scan(strings.NewReader(body))
-		iter(func(op string, args []pdf.Object) bool {
+		// TODO(voss): rewrite this
+		err := iter(func(op string, args []pdf.Object) error {
 			oargs := args
 
 			getInteger := func() (pdf.Integer, bool) {
@@ -276,14 +277,17 @@ func FuzzReader(f *testing.F) {
 			}
 
 			if w.Err != nil {
-				return false
+				return w.Err
 			}
-			err := r.UpdateState(op, oargs)
+			err := r.do(op, oargs)
 			if err != nil {
-				t.Fatal(err)
+				return err
 			}
-			return true
+			return nil
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		state1 := r.State
 
 		r = &Reader{
@@ -293,13 +297,16 @@ func FuzzReader(f *testing.F) {
 		}
 		s = scanner.NewScanner()
 		iter = s.Scan(bytes.NewReader(buf.Bytes()))
-		iter(func(op string, args []pdf.Object) bool {
-			err := r.UpdateState(op, args)
+		err = iter(func(op string, args []pdf.Object) error {
+			err := r.do(op, args)
 			if err != nil {
-				t.Fatal(err)
+				return err
 			}
-			return true
+			return nil
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		state2 := r.State
 
 		if d := cmp.Diff(state1, state2); d != "" {

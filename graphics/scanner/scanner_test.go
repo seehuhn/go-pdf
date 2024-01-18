@@ -76,10 +76,13 @@ func TestScanner(t *testing.T) {
 		var actual []testOutput
 
 		s := NewScanner()
-		s.Scan(strings.NewReader(tc.in))(func(op string, args []pdf.Object) bool {
+		err := s.Scan(strings.NewReader(tc.in))(func(op string, args []pdf.Object) error {
 			actual = append(actual, testOutput{op, slices.Clone(args)})
-			return true
+			return nil
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if d := cmp.Diff(tc.expected, actual); d != "" {
 			t.Errorf("%d: unexpected output (-want +got):\n%s", testNo, d)

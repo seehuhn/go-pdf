@@ -100,7 +100,7 @@ type Dicts struct {
 	FontDict       pdf.Dict
 	CIDFontDict    pdf.Dict
 	FontDescriptor *Descriptor
-	FontProgram    pdf.Reference
+	FontProgram    *pdf.Stream
 	Type           EmbeddingType
 }
 
@@ -147,6 +147,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 		return nil, pdf.Wrap(err, "FontDescriptor")
 	}
 	var fontKey pdf.Name
+	var fontRef pdf.Reference
 	if fontDescriptor != nil {
 		res.FontDescriptor, err = DecodeDescriptor(r, fontDescriptor)
 		if err != nil {
@@ -155,18 +156,19 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 		for _, key := range []pdf.Name{"FontFile", "FontFile2", "FontFile3"} {
 			if ref, _ := fontDescriptor[key].(pdf.Reference); ref != 0 {
 				fontKey = key
-				res.FontProgram = ref
+				fontRef = ref
 				break
 			}
 		}
 	}
 
 	var subType pdf.Name
-	if res.FontProgram != 0 {
-		stmObj, err := pdf.GetStream(r, res.FontProgram)
+	if fontRef != 0 {
+		stmObj, err := pdf.GetStream(r, fontRef)
 		if err != nil {
 			return nil, pdf.Wrap(err, string(fontKey))
 		}
+		res.FontProgram = stmObj
 		subType, err = pdf.GetName(r, stmObj.Dict["Subtype"])
 		if err != nil {
 			return nil, pdf.Wrap(err, "Subtype")

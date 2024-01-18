@@ -422,12 +422,8 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 
 	res := &EmbedInfo{}
 
-	if dicts.FontProgram != 0 {
-		stmObj, err := pdf.GetStream(r, dicts.FontProgram)
-		if err != nil {
-			return nil, err
-		}
-		stm, err := pdf.DecodeStream(r, stmObj, 0)
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
 		if err != nil {
 			return nil, err
 		}

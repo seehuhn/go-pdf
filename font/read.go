@@ -20,6 +20,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // Read extracts a font from a PDF file.
@@ -27,6 +28,22 @@ func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont, error) {
 	fontDicts, err := ExtractDicts(r, ref)
 	if err != nil {
 		return nil, err
+	}
+
+	switch fontDicts.Type {
+	case Builtin: // built-in fonts
+	case CFFComposite: // CFF font data without wrapper (composite font)
+	case CFFSimple: // CFF font data without wrapper (simple font)
+		// cff.ExtractSimple(r, fontDicts)
+	case MMType1: // Multiple Master type 1 fonts
+	case OpenTypeCFFComposite: // CFF fonts in an OpenType wrapper (composite font)
+	case OpenTypeCFFSimple: // CFF font data in an OpenType wrapper (simple font)
+	case OpenTypeGlyfComposite: // OpenType fonts with glyf outline (composite font)
+	case OpenTypeGlyfSimple: // OpenType fonts with glyf outline (simple font)
+	case TrueTypeComposite: // TrueType fonts (composite font)
+	case TrueTypeSimple: // TrueType fonts (simple font)
+	case Type1: // Type 1 fonts
+	case Type3: // Type 3 fonts
 	}
 
 	// TODO(voss): always override the code space range?
@@ -60,14 +77,6 @@ func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont, error) {
 		}
 		return res, nil
 	} else {
-		// cs = charcode.Simple
-		// m = make(map[charcode.CharCode]type1.CID, 256)
-		// for i := 0; i < 256; i++ {
-		// 	m[charcode.CharCode(i)] = type1.CID(i)
-		// }
-
-		// // TODO(voss): somehow handle width information for the standard fonts
-
 		// widther, err = newSimpleWidther(r, fontDicts)
 		// if err != nil {
 		// 	return nil, err
@@ -75,11 +84,26 @@ func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont, error) {
 		res := &fromFile{
 			Name:  name,
 			Ref:   ref,
-			WMode: 0,
 			ToUni: toUnicode.GetMapping(),
 		}
 		return res, nil
 	}
+}
+
+type fromFileSimple struct {
+	fromFile
+}
+
+func (f *fromFileSimple) CodeToGID(byte) glyph.ID {
+	panic("not implemented")
+}
+
+func (f *fromFileSimple) GIDToCode(glyph.ID, []rune) byte {
+	panic("not implemented")
+}
+
+func (f *fromFileSimple) CodeToWidth(byte) float64 {
+	panic("not implemented")
 }
 
 type fromFile struct {
@@ -102,9 +126,5 @@ func (f *fromFile) WritingMode() int {
 }
 
 func (f *fromFile) AsText(pdf.String) []rune {
-	panic("not implemented")
-}
-
-func (f *fromFile) Outlines() interface{} {
 	panic("not implemented")
 }
