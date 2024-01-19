@@ -288,11 +288,11 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
 	isSymbolic := true
 	subtable := sfntcmap.Format4{}
-	for i, gid := range info.Encoding {
+	for code, gid := range info.Encoding {
 		if gid == 0 {
 			continue
 		}
-		subtable[uint16(i)] = gid
+		subtable[uint16(code)] = gid
 	}
 	ttf.CMapTable = sfntcmap.Table{
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
