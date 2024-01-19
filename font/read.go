@@ -23,22 +23,26 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+type AsFonter interface {
+	AsFont(ref pdf.Object, name pdf.Name) NewFont
+}
+
 var (
 	loaderMutex sync.Mutex
-	loader      map[EmbeddingType]func(pdf.Getter, pdf.Object, pdf.Name) (NewFont, error)
+	loader      map[EmbeddingType]func(r pdf.Getter, dicts *Dicts) (AsFonter, error)
 )
 
 // RegisterLoader registers a new font loader.
-func RegisterLoader(t EmbeddingType, f func(pdf.Getter, pdf.Object, pdf.Name) (NewFont, error)) {
+func RegisterLoader(t EmbeddingType, f func(r pdf.Getter, dicts *Dicts) (AsFonter, error)) {
 	loaderMutex.Lock()
 	defer loaderMutex.Unlock()
 	if loader == nil {
-		loader = make(map[EmbeddingType]func(pdf.Getter, pdf.Object, pdf.Name) (NewFont, error))
+		loader = make(map[EmbeddingType]func(r pdf.Getter, dicts *Dicts) (AsFonter, error))
 	}
 	loader[t] = f
 }
 
-func getLoader(t EmbeddingType) func(pdf.Getter, pdf.Object, pdf.Name) (NewFont, error) {
+func getLoader(t EmbeddingType) func(r pdf.Getter, dicts *Dicts) (AsFonter, error) {
 	loaderMutex.Lock()
 	defer loaderMutex.Unlock()
 	return loader[t]
@@ -53,7 +57,11 @@ func Read(r pdf.Getter, ref pdf.Object, name pdf.Name) (NewFont, error) {
 
 	load := getLoader(fontDicts.Type)
 	if load == nil {
-		return nil, errors.New("unsupported font type " + fontDicts.Type.String())
+		return nil, errors.New(fontDicts.Type.String() + " not supported")
 	}
-	return load(r, ref, name)
+	info, err := load(r, fontDicts)
+	if err != nil {
+		return nil, err
+	}
+	return info.AsFont(ref, name), nil
 }

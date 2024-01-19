@@ -109,7 +109,7 @@ func (f *fontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded,
 	res := &embeddedCFFComposite{
 		fontCFFComposite: f,
 		w:                w,
-		Res:              graphics.Res{Data: w.Alloc(), DefName: resName},
+		Res:              graphics.Res{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:         gidToCID,
 		CIDEncoder:       f.makeEncoder(gidToCID),
 	}
@@ -202,7 +202,7 @@ func (f *embeddedCFFComposite) Close() error {
 		CMap:      cmapInfo,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data)
+	return info.Embed(f.w, f.Ref)
 }
 
 // EmbedInfoCFFComposite contains the information needed to embed an OpenType/CFF font in a PDF file as a composite font.

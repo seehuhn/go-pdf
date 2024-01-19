@@ -29,18 +29,18 @@ type Resource interface {
 	PDFObject() pdf.Object // value to use in the resource dictionary
 }
 
-type ResourceData struct {
+type Res struct {
 	DefName pdf.Name
 	Ref     pdf.Object
 }
 
 // DefaultName implements the [Resource] interface.
-func (r ResourceData) DefaultName() pdf.Name {
+func (r Res) DefaultName() pdf.Name {
 	return r.DefName
 }
 
 // PDFObject implements the [Resource] interface.
-func (r ResourceData) PDFObject() pdf.Object {
+func (r Res) PDFObject() pdf.Object {
 	return r.Ref
 }
 

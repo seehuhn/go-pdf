@@ -468,7 +468,7 @@ func (s objectType) String() string {
 // Res represents a named PDF resource.
 type Res struct {
 	DefName pdf.Name
-	Data    pdf.Reference // TODO(voss): can this be pdf.Object?
+	Ref     pdf.Reference // TODO(voss): can this be pdf.Object?
 }
 
 // DefaultName implements the [Resource] interface.
@@ -478,7 +478,7 @@ func (r Res) DefaultName() pdf.Name {
 
 // PDFObject implements the [Resource] interface.
 func (r Res) PDFObject() pdf.Object {
-	return r.Data
+	return r.Ref
 }
 
 // Resource represents the different PDF Resource types.

@@ -112,7 +112,7 @@ func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 	res := &embeddedCID{
 		fontComposite: f,
 		w:             w,
-		Res:           graphics.Res{Data: w.Alloc(), DefName: resName},
+		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
@@ -190,7 +190,7 @@ func (f *embeddedCID) Close() error {
 		CID2GID:   cidToGID,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data)
+	return info.Embed(f.w, f.Ref)
 }
 
 // EmbedInfoComposite is the information needed to embed a TrueType font as a composite PDF font.

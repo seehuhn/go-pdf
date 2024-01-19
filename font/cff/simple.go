@@ -43,7 +43,7 @@ import (
 
 // fontCFFSimple is a CFF font for embedding into a PDF file as a simple font.
 type fontCFFSimple struct {
-	otf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -86,7 +86,7 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &fontCFFSimple{
-		otf:         info,
+		sfnt:        info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
@@ -113,7 +113,7 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, er
 
 // Layout implements the [font.Font] interface.
 func (f *fontCFFSimple) Layout(s string) glyph.Seq {
-	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
@@ -127,7 +127,7 @@ type embeddedSimple struct {
 
 func (f *embeddedSimple) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
-	return float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
+	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 }
 
 func (f *embeddedSimple) Close() error {
@@ -138,12 +138,12 @@ func (f *embeddedSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.otf.PostscriptName())
+			f.DefName, f.sfnt.PostscriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding
 
 	// Make our encoding the built-in encoding of the font.
-	origOTF := f.otf.Clone()
+	origOTF := f.sfnt.Clone()
 	outlines := origOTF.Outlines.(*cff.Outlines)
 	outlines.Encoding = encoding
 	outlines.ROS = nil
@@ -247,9 +247,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error)
 		res.Font = cff
 	}
 
-	q := 1.0
-	if res.Font != nil {
-		cff := res.Font
+	if cff := res.Font; cff != nil {
 		nameEncoding, err := encoding.UndescribeEncodingType1(
 			r, dicts.FontDict["Encoding"], cff.BuiltinEncoding())
 		if err != nil {
@@ -266,7 +264,11 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error)
 			encoding[i] = rev[name]
 		}
 		res.Encoding = encoding
+	}
 
+	q := 1.0
+	if res.Font != nil {
+		cff := res.Font
 		if cff.FontMatrix[0] != 0 {
 			q = 1000 * cff.FontMatrix[0]
 		}
@@ -277,7 +279,6 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error)
 	res.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent / q))
 	res.Descent = funit.Int16(math.Round(dicts.FontDescriptor.Descent / q))
 	res.CapHeight = funit.Int16(math.Round(dicts.FontDescriptor.CapHeight / q))
-
 	res.IsSerif = dicts.FontDescriptor.IsSerif
 	res.IsScript = dicts.FontDescriptor.IsScript
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap
@@ -326,6 +327,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	bbox := cff.BBox()
+	// TODO(voss): use the font matrix?
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -429,30 +431,16 @@ func (info *EmbedInfoCFFSimple) AsFont(ref pdf.Object, name pdf.Name) font.NewFo
 	}
 
 	return &fromFileSimple{
-		ResourceData:       font.ResourceData{Ref: ref, DefName: name},
+		Res:                font.Res{Ref: ref, DefName: name},
 		EmbedInfoCFFSimple: info,
 		Text:               asText,
 	}
 }
 
-// ReadSimple reads a simple CFF font from a PDF file.
-// The resulting font implements the [font.NewFontSimple] interface.
-func ReadSimple(r pdf.Getter, ref pdf.Object, name pdf.Name) (font.NewFont, error) {
-	dicts, err := font.ExtractDicts(r, ref)
-	if err != nil {
-		return nil, err
-	}
-	info, err := ExtractSimple(r, dicts)
-	if err != nil {
-		return nil, err
-	}
-	return info.AsFont(ref, name), nil
-}
-
 // fromFileSimple represents a simple CFF font read from a PDF file.
 // This implements the [font.NewFontSimple] interface.
 type fromFileSimple struct {
-	font.ResourceData
+	font.Res
 	*EmbedInfoCFFSimple
 	Text [][]rune
 }
@@ -484,7 +472,7 @@ func (f *fromFileSimple) CodeToGID(c byte) glyph.ID {
 
 // GIDToCode implements the [font.NewFontSimple] interface.
 //
-// TODO(voss): does this need to be fast?
+// TODO(voss): speed this up
 func (f *fromFileSimple) GIDToCode(gid glyph.ID, _ []rune) byte {
 	for code, gid := range f.Encoding {
 		if gid == gid {
@@ -499,5 +487,8 @@ func (f *fromFileSimple) Glyphs() interface{} {
 }
 
 func init() {
-	font.RegisterLoader(font.CFFSimple, ReadSimple)
+	f := func(r pdf.Getter, dicts *font.Dicts) (font.AsFonter, error) {
+		return ExtractSimple(r, dicts)
+	}
+	font.RegisterLoader(font.CFFSimple, f)
 }

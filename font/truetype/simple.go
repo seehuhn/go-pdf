@@ -37,12 +37,11 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 // fontSimple is a simple TrueType font.
 type fontSimple struct {
-	ttf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -74,7 +73,7 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &fontSimple{
-		ttf:         info,
+		sfnt:        info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
@@ -92,7 +91,7 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 	res := &embeddedSimple{
 		fontSimple:    f,
 		w:             w,
-		Res:           graphics.Res{Data: w.Alloc(), DefName: resName},
+		Res:           font.Res{Ref: w.Alloc(), DefName: resName},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res)
@@ -101,13 +100,13 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error
 
 // Layout implements the [font.Font] interface.
 func (f *fontSimple) Layout(s string) glyph.Seq {
-	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedSimple struct {
 	*fontSimple
 	w pdf.Putter
-	graphics.Res
+	font.Res
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -115,7 +114,7 @@ type embeddedSimple struct {
 
 func (f *embeddedSimple) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
-	return float64(f.ttf.GlyphWidth(gid)) / float64(f.ttf.UnitsPerEm)
+	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 }
 
 func (f *embeddedSimple) Close() error {
@@ -126,11 +125,11 @@ func (f *embeddedSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.ttf.PostscriptName())
+			f.DefName, f.sfnt.PostscriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding
 
-	origTTF := f.ttf.Clone()
+	origTTF := f.sfnt.Clone()
 	origTTF.CMapTable = nil
 	origTTF.Gdef = nil
 	origTTF.Gsub = nil
@@ -163,7 +162,7 @@ func (f *embeddedSimple) Close() error {
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfoSimple is the information needed to embed a simple TrueType font.
@@ -189,7 +188,74 @@ type EmbedInfoSimple struct {
 	ToUnicode *cmap.ToUnicode
 }
 
+// ExtractSimple extracts information about a simple TrueType font.
+// This is the inverse of [EmbedInfoSimple.Embed].
+func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
+	if err := dicts.Type.MustBe(font.TrueTypeSimple); err != nil {
+		return nil, err
+	}
+
+	res := &EmbedInfoSimple{}
+
+	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		res.SubsetTag = m[1]
+	}
+
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+		if err != nil {
+			return nil, pdf.Wrap(err, "TrueType font stream")
+		}
+		ttf, err := sfnt.Read(stm)
+		if err != nil {
+			return nil, pdf.Wrap(err, "reading TrueType font stream")
+		}
+		_, ok := ttf.Outlines.(*glyf.Outlines)
+		if !ok {
+			return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
+		}
+
+		res.Font = ttf
+	}
+
+	if res.Font != nil {
+		res.Encoding = ExtractEncoding(r, dicts.FontDict["Encoding"], res.Font)
+	}
+
+	if ttf := res.Font; ttf != nil {
+		if ttf.FamilyName == "" {
+			ttf.FamilyName = dicts.FontDescriptor.FontFamily
+		}
+		if ttf.Width == 0 {
+			ttf.Width = dicts.FontDescriptor.FontStretch
+		}
+		if ttf.Weight == 0 {
+			ttf.Weight = dicts.FontDescriptor.FontWeight
+		}
+		q := 1000 / float64(ttf.UnitsPerEm)
+		if ttf.CapHeight == 0 {
+			capHeight := dicts.FontDescriptor.CapHeight
+			ttf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+		}
+		if ttf.XHeight == 0 {
+			xHeight := dicts.FontDescriptor.XHeight
+			ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
+		}
+	}
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+	res.ForceBold = dicts.FontDescriptor.ForceBold
+
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
+		res.ToUnicode = info
+	}
+
+	return res, nil
+}
+
 // Embed adds the font to a PDF file.
+// This is the reverse of [ExtractSimple]
 func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
@@ -206,10 +272,8 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		fontName = info.SubsetTag + "+" + fontName
 	}
 
-	unitsPerEm := ttf.UnitsPerEm
-
 	ww := make([]float64, 256)
-	q := 1000 / float64(unitsPerEm)
+	q := 1000 / float64(ttf.UnitsPerEm)
 	for i := range ww {
 		ww[i] = float64(ttf.GlyphWidth(info.Encoding[i])) * q
 	}
@@ -320,68 +384,6 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	return nil
 }
 
-// ExtractSimple extracts information about a simple TrueType font.
-func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
-	if err := dicts.Type.MustBe(font.TrueTypeSimple); err != nil {
-		return nil, err
-	}
-
-	res := &EmbedInfoSimple{}
-
-	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
-	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
-		res.SubsetTag = m[1]
-	}
-
-	if dicts.FontProgram != nil {
-		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
-		if err != nil {
-			return nil, pdf.Wrap(err, "uncompressing TrueType font stream")
-		}
-		ttf, err := sfnt.Read(stm)
-		if err != nil {
-			return nil, pdf.Wrap(err, "decoding TrueType font")
-		}
-		_, ok := ttf.Outlines.(*glyf.Outlines)
-		if !ok {
-			return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
-		}
-		if ttf.FamilyName == "" {
-			ttf.FamilyName = dicts.FontDescriptor.FontFamily
-		}
-		if ttf.Width == 0 {
-			ttf.Width = dicts.FontDescriptor.FontStretch
-		}
-		if ttf.Weight == 0 {
-			ttf.Weight = dicts.FontDescriptor.FontWeight
-		}
-		q := 1000 / float64(ttf.UnitsPerEm)
-		if ttf.CapHeight == 0 {
-			capHeight := dicts.FontDescriptor.CapHeight
-			ttf.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
-		}
-		if ttf.XHeight == 0 {
-			xHeight := dicts.FontDescriptor.XHeight
-			ttf.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
-		}
-		res.Font = ttf
-	}
-
-	if res.Font != nil {
-		res.Encoding = ExtractEncoding(r, dicts.FontDict["Encoding"], res.Font)
-	}
-
-	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
-		res.ToUnicode = info
-	}
-
-	res.IsAllCap = dicts.FontDescriptor.IsAllCap
-	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
-	res.ForceBold = dicts.FontDescriptor.ForceBold
-
-	return res, nil
-}
-
 // ExtractEncoding tries to extract an encoding vector from the given encoding
 // dictionary.  See section 9.6.5.4 of ISO 32000-2:2020.
 //
@@ -440,4 +442,77 @@ func ExtractEncoding(r pdf.Getter, encodingDict pdf.Object, ttf *sfnt.Font) []gl
 	// return encoding
 
 	return nil
+}
+
+func (info *EmbedInfoSimple) AsFont(ref pdf.Object, name pdf.Name) font.NewFont {
+	asText := make([][]rune, 256)
+	if toUni := info.ToUnicode; toUni != nil {
+		for c := 0; c < 256; c++ {
+			rr, _ := toUni.Decode(pdf.String{byte(c)})
+			asText[c] = rr
+		}
+	}
+	// TODO(voss): any other methods?
+
+	return &fromFileSimple{
+		Res:             font.Res{Ref: ref, DefName: name},
+		EmbedInfoSimple: info,
+		Text:            asText,
+	}
+}
+
+// fromFileSimple represents a simple CFF font read from a PDF file.
+// This implements the [font.NewFontSimple] interface.
+type fromFileSimple struct {
+	font.Res
+	*EmbedInfoSimple
+	Text [][]rune
+}
+
+// AsText implements the [font.NewFont] interface.
+func (f *fromFileSimple) AsText(s pdf.String) []rune {
+	var res []rune
+	for _, c := range s {
+		res = append(res, f.Text[c]...)
+	}
+	return res
+}
+
+// WritingMode implements the [font.NewFont] interface.
+func (f *fromFileSimple) WritingMode() int {
+	return 0
+}
+
+// CodeToWidth implements the [font.NewFontSimple] interface.
+func (f *fromFileSimple) CodeToWidth(c byte) float64 {
+	gid := f.Encoding[c]
+	return float64(f.Font.GlyphWidth(gid)) / float64(f.Font.UnitsPerEm)
+}
+
+// CodeToGID implements the [font.NewFontSimple] interface.
+func (f *fromFileSimple) CodeToGID(c byte) glyph.ID {
+	return f.Encoding[c]
+}
+
+// GIDToCode implements the [font.NewFontSimple] interface.
+//
+// TODO(voss): speed this up
+func (f *fromFileSimple) GIDToCode(gid glyph.ID, _ []rune) byte {
+	for code, gid := range f.Encoding {
+		if gid == gid {
+			return byte(code)
+		}
+	}
+	return 0
+}
+
+func (f *fromFileSimple) Glyphs() interface{} {
+	return f.Font
+}
+
+func init() {
+	f := func(r pdf.Getter, dicts *font.Dicts) (font.AsFonter, error) {
+		return ExtractSimple(r, dicts)
+	}
+	font.RegisterLoader(font.TrueTypeSimple, f)
 }

@@ -102,7 +102,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
 		Font: f,
 		w:    w,
 		Res: graphics.Res{
-			Data:    w.Alloc(),
+			Ref:     w.Alloc(),
 			DefName: resName,
 		},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
@@ -243,7 +243,7 @@ func (e *embedded) Close() error {
 		IsAllCap:   e.IsAllCap,
 		IsSmallCap: e.IsSmallCap,
 	}
-	return info.Embed(e.w, e.Data)
+	return info.Embed(e.w, e.Ref)
 }
 
 func (e *embedded) GlyphWidth(cid type1.CID) float64 {
