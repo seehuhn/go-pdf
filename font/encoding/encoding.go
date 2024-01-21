@@ -56,25 +56,7 @@ func NewSimpleEncoder() *SimpleEncoder {
 // It also records the fact that the character code corresponds to the
 // given unicode string.
 func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	k := key{gid, string(rr)}
-
-	// Rules for choosing the code:
-	// 1. If the combination of `gid` and `rr` has previously been used,
-	//    then use the same code as before.
-	code, seen := e.code[k]
-	if seen {
-		return append(s, code)
-	}
-
-	// 2. Allocate a new code based on the last rune in rr.
-	var r rune
-	if len(rr) > 0 {
-		r = rr[len(rr)-1]
-	}
-	code = e.allocateCode(r)
-	e.Encoding[code] = gid
-	e.code[k] = code
-	e.key[code] = k
+	code := e.GIDToCode(gid, rr)
 	return append(s, code)
 }
 
@@ -168,5 +150,24 @@ func (e *SimpleEncoder) CodeToGID(c byte) glyph.ID {
 
 func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
 	k := key{gid, string(rr)}
-	return e.code[k]
+
+	// Rules for choosing the code:
+	// 1. If the combination of `gid` and `rr` has previously been used,
+	//    then use the same code as before.
+	code, seen := e.code[k]
+	if seen {
+		return code
+	}
+
+	// 2. Allocate a new code based on the last rune in rr.
+	var r rune
+	if len(rr) > 0 {
+		r = rr[len(rr)-1]
+	}
+	code = e.allocateCode(r)
+	e.Encoding[code] = gid
+	e.code[k] = code
+	e.key[code] = k
+
+	return code
 }

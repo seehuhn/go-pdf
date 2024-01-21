@@ -235,6 +235,11 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 	widthsInfo := font.EncodeWidthsSimple(ww)
 
+	ascent := otf.Ascent.AsFloat(q)
+	descent := otf.Descent.AsFloat(q)
+	linegap := otf.LineGap.AsFloat(q)
+	leading := ascent - descent + linegap
+
 	clientEnc := make([]string, 256)
 	builtinEnc := make([]string, 256)
 	for i := 0; i < 256; i++ {
@@ -287,8 +292,9 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		ForceBold:    cff.Private[0].ForceBold,
 		FontBBox:     fontBBox,
 		ItalicAngle:  otf.ItalicAngle,
-		Ascent:       otf.Ascent.AsFloat(q),
-		Descent:      otf.Descent.AsFloat(q),
+		Ascent:       ascent,
+		Descent:      descent,
+		Leading:      leading,
 		CapHeight:    otf.CapHeight.AsFloat(q),
 		StemV:        cff.Private[0].StdVW * q,
 		MissingWidth: widthsInfo.MissingWidth,
@@ -385,16 +391,16 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 
 		q := 1000 / float64(res.Font.UnitsPerEm)
 		ascent := dicts.FontDescriptor.Ascent
-		res.Font.Ascent = funit.Int16(math.Round(float64(ascent) / q))
+		res.Font.Ascent = funit.Int16(math.Round(ascent / q))
 		descent := dicts.FontDescriptor.Descent
-		res.Font.Descent = funit.Int16(math.Round(float64(descent) / q))
+		res.Font.Descent = funit.Int16(math.Round(descent / q))
 		capHeight := dicts.FontDescriptor.CapHeight
-		res.Font.CapHeight = funit.Int16(math.Round(float64(capHeight) / q))
+		res.Font.CapHeight = funit.Int16(math.Round(capHeight / q))
 		xHeight := dicts.FontDescriptor.XHeight // optional
-		res.Font.XHeight = funit.Int16(math.Round(float64(xHeight) / q))
+		res.Font.XHeight = funit.Int16(math.Round(xHeight / q))
 		leading := dicts.FontDescriptor.Leading
-		if ascent-descent < leading {
-			res.Font.LineGap = funit.Int16(math.Round(float64(leading-ascent+descent) / q))
+		if x := math.Round((leading - ascent + descent) / q); x > 0 {
+			res.Font.LineGap = funit.Int16(x)
 		}
 	}
 

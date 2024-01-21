@@ -85,7 +85,7 @@ func run(filename string) error {
 		page.TextStart()
 		page.TextFirstLine(xBase, yBase+16)
 		page.TextSetFont(F, testFontSize)
-		totalWidth := page.TextShowGlyphs(gg)
+		totalWidth := page.TextShowGlyphsOld(gg)
 		page.TextEnd()
 
 		// Mark the glyph x-positions in blue.

@@ -228,10 +228,13 @@ func (w *Writer) TextNextLine() {
 	_, w.Err = fmt.Fprintln(w.Content, "T*")
 }
 
-// TextShowGlyphsNew shows the PDF string s.
+// TextShowGlyphs shows the PDF string s, using the glyphs'
+// natural widths and ignoring text rise.
+// The function also updates gg, setting the Advance field and zeroing Rise for
+// each glyph.
 //
 // This implements the PDF graphics operator "Tj".
-func (w *Writer) TextShowGlyphsNew(gg []PDFGlyph) {
+func (w *Writer) TextShowGlyphs(gg []PDFGlyph) {
 	if !w.isValid("TextShowRaw", objText) {
 		return
 	}
@@ -259,16 +262,9 @@ func (w *Writer) TextShowGlyphsNew(gg []PDFGlyph) {
 	_, w.Err = fmt.Fprintln(w.Content, " Tj")
 }
 
-func (w *Writer) TextShowString(s string) {
-	F := w.State.TextFont.(font.NewFontLayouter)
-	gg := F.Layout(s)
-	_, pdfGlyphs := convertGlyphs(gg, F.FontMatrix(), w.State.TextFontSize)
-	w.TextShowGlyphsNew(pdfGlyphs)
-}
-
 func (w *Writer) TextShowRaw(s pdf.String) {
 	gg := decodeString(s, &w.State)
-	w.TextShowGlyphsNew(gg)
+	w.TextShowGlyphs(gg)
 }
 
 type PDFGlyph struct {

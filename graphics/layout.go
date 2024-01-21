@@ -27,6 +27,13 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+func (w *Writer) TextShowString(s string) {
+	F := w.State.TextFont.(font.NewFontLayouter)
+	gg := F.Layout(s)
+	_, pdfGlyphs := convertGlyphs(gg, F.FontMatrix(), w.State.TextFontSize)
+	w.TextShowGlyphs(pdfGlyphs)
+}
+
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.
 func (w *Writer) TextLayout(s string) glyph.Seq {
@@ -62,8 +69,8 @@ func (w *Writer) TextShowAligned(s string, width, q float64) {
 	w.showGlyphsAligned(w.TextLayout(s), width, q)
 }
 
-// TextShowGlyphs draws a sequence of glyphs.
-func (w *Writer) TextShowGlyphs(gg glyph.Seq) float64 {
+// TextShowGlyphsOld draws a sequence of glyphs.
+func (w *Writer) TextShowGlyphsOld(gg glyph.Seq) float64 {
 	if !w.isValid("TextShowGlyphs", objText) {
 		return 0
 	}

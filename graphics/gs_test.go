@@ -150,7 +150,7 @@ func TestTextPositions(t *testing.T) {
 		r.TextSetFont(F, 100)
 		r.TextStart()
 		r.TextFirstLine(10, 10)
-		r.TextShowGlyphsNew(testGlyphs)
+		r.TextShowGlyphs(testGlyphs)
 		r.TextEnd()
 
 		return nil
@@ -168,7 +168,7 @@ func TestTextPositions(t *testing.T) {
 		r.TextFirstLine(10, 10)
 		for _, c := range testString {
 			xx = append(xx, r.TextMatrix[4])
-			r.TextShowGlyphsNew([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
+			r.TextShowGlyphs([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
 		}
 		r.TextEnd()
 
@@ -185,7 +185,7 @@ func TestTextPositions(t *testing.T) {
 		for i, c := range testString {
 			r.TextStart()
 			r.TextFirstLine(xx[i], 10)
-			r.TextShowGlyphsNew([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
+			r.TextShowGlyphs([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
 			r.TextEnd()
 		}
 

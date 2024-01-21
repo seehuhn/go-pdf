@@ -327,7 +327,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	bbox := cff.BBox()
-	// TODO(voss): use the font matrix?
+	// TODO(voss): use the full font matrix
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),

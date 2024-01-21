@@ -257,7 +257,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	page.TextShow(fileName)
 	page.TextFirstLine(0, -v3)
 	page.TextSetFont(X, 24)
-	page.TextShowGlyphs(seq)
+	page.TextShowGlyphsOld(seq)
 	page.TextEnd()
 
 	f.used += totalPartHeight

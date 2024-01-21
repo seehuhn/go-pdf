@@ -77,7 +77,7 @@ func run(fname string) error {
 	gg := page.TextLayout(" A graphical depiction of the Mandelbrot set.")
 	// make the leading space wider than normal
 	gg[0].Advance = gg[0].Advance * 3
-	page.TextShowGlyphs(gg)
+	page.TextShowGlyphsOld(gg)
 	page.TextEnd()
 
 	return page.Close()

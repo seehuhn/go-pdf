@@ -550,7 +550,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 		gg = append(gg, l.F["dict"].F.Layout(desc)...)
 
 		page.TextSetFont(l.F["dict"].F, l.F["dict"].ptSize)
-		page.TextShowGlyphs(gg)
+		page.TextShowGlyphsOld(gg)
 
 		w := gg.AdvanceWidth()
 		if w > maxWidth {

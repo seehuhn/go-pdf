@@ -314,7 +314,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Embedded, start int) error {
 		page.TextStart()
 		page.TextSetFont(theFont, glyphSize)
 		page.TextFirstLine(xPos[i], yBase)
-		page.TextShowGlyphs(glyph.Seq{g})
+		page.TextShowGlyphsOld(glyph.Seq{g})
 		page.TextSetFont(f.bodyFont, 8)
 		page.TextFirstLine(left+float64(i)*dx-xPos[i], -v2-7.5)
 		page.TextShowAligned(label, dx, 0.5)
