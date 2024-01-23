@@ -1,0 +1,334 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package parser
+
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics"
+)
+
+// ReadExtGState reads an graphics state parameter dictionary from a PDF file.
+func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphics.ExtGState, error) {
+	dict, err := pdf.GetDictTyped(r, ref, "ExtGState")
+	if err != nil {
+		return nil, err
+	}
+
+	param := &graphics.Parameters{}
+	var set graphics.StateBits
+	var overprintFillSet bool
+	var bg1, bg2 pdf.Object
+	var ucr1, ucr2 pdf.Object
+	var tr1, tr2 pdf.Object
+	for key, v := range dict {
+		switch key {
+		case "Font":
+			a, err := pdf.GetArray(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if len(a) != 2 {
+				break
+			}
+
+			F, err := font.Read(r, a[0], "")
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+
+			size, err := pdf.GetNumber(r, a[1])
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.TextFont = F
+			param.TextFontSize = float64(size)
+			set |= graphics.StateTextFont
+		case "TK":
+			val, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.TextKnockout = bool(val)
+			set |= graphics.StateTextKnockout
+		case "LW":
+			lw, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.LineWidth = float64(lw)
+			set |= graphics.StateLineWidth
+		case "LC":
+			lc, err := pdf.GetInteger(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.LineCap = graphics.LineCapStyle(lc)
+			set |= graphics.StateLineCap
+		case "LJ":
+			lj, err := pdf.GetInteger(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.LineJoin = graphics.LineJoinStyle(lj)
+			set |= graphics.StateLineJoin
+		case "ML":
+			ml, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.MiterLimit = float64(ml)
+			set |= graphics.StateMiterLimit
+		case "D":
+			dashPattern, phase, err := readDash(r, v)
+			if err != nil {
+				return nil, err
+			} else if dashPattern != nil {
+				param.DashPattern = dashPattern
+				param.DashPhase = phase
+				set |= graphics.StateDash
+			}
+		case "RI":
+			ri, err := pdf.GetName(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.RenderingIntent = ri
+			set |= graphics.StateRenderingIntent
+		case "SA":
+			val, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.StrokeAdjustment = bool(val)
+			set |= graphics.StateStrokeAdjustment
+		case "BM":
+			param.BlendMode = v
+			set |= graphics.StateBlendMode
+		case "SMask":
+			param.SoftMask = v
+			set |= graphics.StateSoftMask
+		case "CA":
+			ca, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.StrokeAlpha = float64(ca)
+			set |= graphics.StateStrokeAlpha
+		case "ca":
+			ca, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.FillAlpha = float64(ca)
+			set |= graphics.StateFillAlpha
+		case "AIS":
+			ais, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.AlphaSourceFlag = bool(ais)
+			set |= graphics.StateAlphaSourceFlag
+		case "UseBlackPtComp":
+			val, err := pdf.GetName(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.BlackPointCompensation = val
+			set |= graphics.StateBlackPointCompensation
+		case "OP":
+			op, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.OverprintStroke = bool(op)
+			set |= graphics.StateOverprint
+		case "op":
+			op, err := pdf.GetBoolean(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.OverprintFill = bool(op)
+			set |= graphics.StateOverprint
+			overprintFillSet = true
+		case "OPM":
+			opm, err := pdf.GetInteger(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if opm != 0 {
+				param.OverprintMode = 1
+			}
+			set |= graphics.StateOverprintMode
+		case "BG":
+			bg1 = v
+		case "BG2":
+			bg2 = v
+		case "UCR":
+			ucr1 = v
+		case "UCR2":
+			ucr2 = v
+		case "TR":
+			tr1 = v
+		case "TR2":
+			tr2 = v
+		case "HT":
+			param.Halftone = v
+			set |= graphics.StateHalftone
+		case "HTO":
+			a, err := pdf.GetArray(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if len(a) != 2 {
+				break
+			}
+			x, err := pdf.GetNumber(r, a[0])
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			y, err := pdf.GetNumber(r, a[1])
+			if pdf.IsMalformed(err) {
+				break
+			}
+			param.HalftoneOriginX = float64(x)
+			param.HalftoneOriginY = float64(y)
+			set |= graphics.StateHalftoneOrigin
+		case "FL":
+			fl, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.FlatnessTolerance = float64(fl)
+			set |= graphics.StateFlatnessTolerance
+		case "SM":
+			sm, err := pdf.GetNumber(r, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			param.SmoothnessTolerance = float64(sm)
+			set |= graphics.StateSmoothnessTolerance
+		}
+	}
+
+	if set&graphics.StateOverprint != 0 && !overprintFillSet {
+		param.OverprintFill = param.OverprintStroke
+	}
+	if bg2 != nil {
+		param.BlackGeneration = bg2
+		set |= graphics.StateBlackGeneration
+	} else if bg1 != nil {
+		param.BlackGeneration = bg1
+		set |= graphics.StateBlackGeneration
+	}
+	if ucr2 != nil {
+		param.UndercolorRemoval = ucr2
+		set |= graphics.StateUndercolorRemoval
+	} else if ucr1 != nil {
+		param.UndercolorRemoval = ucr1
+		set |= graphics.StateUndercolorRemoval
+	}
+	if tr2 != nil {
+		param.TransferFunction = tr2
+		set |= graphics.StateTransferFunction
+	} else if tr1 != nil {
+		param.TransferFunction = tr1
+		set |= graphics.StateTransferFunction
+	}
+
+	res := &graphics.ExtGState{
+		DefName: defaultName,
+		Dict:    ref,
+		Value: graphics.State{
+			Parameters: param,
+			Set:        set,
+		},
+	}
+	return res, nil
+}
+
+func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err error) {
+	defer func() {
+		if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
+			err = nil
+		}
+	}()
+
+	a, err := pdf.GetArray(r, obj)
+	if len(a) != 2 { // either error or malformed
+		return nil, 0, err
+	}
+	dashPattern, err := pdf.GetArray(r, a[0])
+	if err != nil {
+		return nil, 0, err
+	}
+	phase, err := pdf.GetNumber(r, a[1])
+	if err != nil {
+		return nil, 0, err
+	}
+	pat = make([]float64, len(dashPattern))
+	for i, obj := range dashPattern {
+		x, err := pdf.GetNumber(r, obj)
+		if err != nil {
+			return nil, 0, err
+		}
+		pat[i] = float64(x)
+	}
+	return pat, float64(phase), nil
+}

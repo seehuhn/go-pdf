@@ -136,6 +136,16 @@ func (f *embeddedComposite) WritingMode() int {
 	return 0 // TODO(voss): implement
 }
 
+func (f *embeddedComposite) ForeachWidth(s pdf.String, yield func(float64, bool)) {
+	f.AllCIDs(s)(func(code []byte, cid type1.CID) bool {
+		gid := f.GID(cid)
+		// TODO(voss): deal with different Font Matrices for different private dicts.
+		width := float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
+		yield(width, len(code) == 1 && code[0] == ' ')
+		return true
+	})
+}
+
 func (f *embeddedComposite) CIDToWidth(cid type1.CID) float64 {
 	gid := f.GID(cid)
 	// TODO(voss): deal with different Font Matrices for different private dicts.

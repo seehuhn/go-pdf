@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package parser
 
 import (
 	"bytes"
@@ -27,8 +27,10 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/graphics/scanner"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/dummyfont"
+	"seehuhn.de/go/pdf/parser/scanner"
+	"seehuhn.de/go/sfnt/cff"
 )
 
 func FuzzReader(f *testing.F) {
@@ -63,14 +65,14 @@ func FuzzReader(f *testing.F) {
 	`)
 	f.Fuzz(func(t *testing.T, body string) {
 		buf := &bytes.Buffer{}
-		w := NewWriter(buf, pdf.V1_7)
+		w := graphics.NewWriter(buf, pdf.V1_7)
 
 		data := pdf.NewData(pdf.V1_7)
 
 		r := &Reader{
 			R:         data,
 			Resources: res,
-			State:     NewState(),
+			State:     graphics.NewState(),
 		}
 		s := scanner.NewScanner()
 		iter := s.Scan(strings.NewReader(body))
@@ -121,12 +123,12 @@ func FuzzReader(f *testing.F) {
 			case "J":
 				x, ok := getInteger()
 				if ok {
-					w.SetLineCap(LineCapStyle(x))
+					w.SetLineCap(graphics.LineCapStyle(x))
 				}
 			case "j":
 				x, ok := getInteger()
 				if ok {
-					w.SetLineJoin(LineJoinStyle(x))
+					w.SetLineJoin(graphics.LineJoinStyle(x))
 				}
 			case "M":
 				x, ok := getNum()
@@ -161,12 +163,10 @@ func FuzzReader(f *testing.F) {
 			case "q":
 				w.PushGraphicsState()
 			case "Q":
-				if len(w.nesting) > 0 && w.nesting[len(w.nesting)-1] == pairTypeQ {
-					w.PopGraphicsState()
-				}
+				w.PopGraphicsState()
 
 			case "cm":
-				m := Matrix{}
+				m := graphics.Matrix{}
 				for i := 0; i < 6; i++ {
 					f, ok := getNum()
 					if !ok {
@@ -216,7 +216,7 @@ func FuzzReader(f *testing.F) {
 			case "Tr":
 				x, ok := getInteger()
 				if ok {
-					w.TextSetRenderingMode(TextRenderingMode(x))
+					w.TextSetRenderingMode(graphics.TextRenderingMode(x))
 				}
 			case "Ts":
 				x, ok := getNum()
@@ -239,7 +239,7 @@ func FuzzReader(f *testing.F) {
 				}
 
 			case "Tm": // Set text matrix and line matrix
-				m := Matrix{}
+				m := graphics.Matrix{}
 				for i := 0; i < 6; i++ {
 					f, ok := getNum()
 					if !ok {
@@ -293,7 +293,7 @@ func FuzzReader(f *testing.F) {
 		r = &Reader{
 			R:         nil,
 			Resources: w.Resources,
-			State:     NewState(),
+			State:     graphics.NewState(),
 		}
 		s = scanner.NewScanner()
 		iter = s.Scan(bytes.NewReader(buf.Bytes()))
@@ -317,4 +317,110 @@ func FuzzReader(f *testing.F) {
 			t.Errorf("state: %s", d)
 		}
 	})
+}
+
+func TestParameters(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w := graphics.NewWriter(buf, pdf.V1_7)
+	w.Set = 0
+
+	data := pdf.NewData(pdf.V1_7)
+	font := dummyfont.Embed(data, "dummy")
+
+	w.SetLineWidth(12.3)
+	w.SetLineCap(graphics.LineCapRound)
+	w.SetLineJoin(graphics.LineJoinBevel)
+	w.SetMiterLimit(4)
+	w.SetDashPattern([]float64{5, 6, 7}, 8)
+	w.SetRenderingIntent(graphics.RenderingIntentPerceptual)
+	w.SetFlatnessTolerance(10)
+	m := graphics.Matrix{1, 2, 3, 4, 5, 6}
+	w.Transform(m)
+	w.TextSetCharacterSpacing(9)
+	w.TextSetWordSpacing(10)
+	w.TextSetHorizontalScaling(1100)
+	w.TextSetLeading(12)
+	w.TextSetFont(font, 14)
+	w.TextSetRenderingMode(graphics.TextRenderingModeFillStrokeClip)
+	w.TextSetRise(15)
+
+	r := &Reader{
+		R:         data,
+		Resources: w.Resources,
+		State:     graphics.NewState(),
+	}
+	r.Set = 0
+	s := scanner.NewScanner()
+	iter := s.Scan(bytes.NewReader(buf.Bytes()))
+	err := iter(func(op string, args []pdf.Object) error {
+		err := r.do(op, args)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if r.State.LineWidth != 12.3 {
+		t.Errorf("LineWidth: got %v, want 12.3", r.State.LineWidth)
+	}
+	if r.State.LineCap != graphics.LineCapRound {
+		t.Errorf("LineCap: got %v, want %v", r.State.LineCap, graphics.LineCapRound)
+	}
+	if r.State.LineJoin != graphics.LineJoinBevel {
+		t.Errorf("LineJoin: got %v, want %v", r.State.LineJoin, graphics.LineJoinBevel)
+	}
+	if r.State.MiterLimit != 4 {
+		t.Errorf("MiterLimit: got %v, want 4", r.State.MiterLimit)
+	}
+	if d := cmp.Diff(r.State.DashPattern, []float64{5, 6, 7}); d != "" {
+		t.Errorf("DashPattern: %s", d)
+	}
+	if r.State.DashPhase != 8 {
+		t.Errorf("DashPhase: got %v, want 8", r.State.DashPhase)
+	}
+	if r.State.RenderingIntent != graphics.RenderingIntentPerceptual {
+		t.Errorf("RenderingIntent: got %v, want %v", r.State.RenderingIntent, graphics.RenderingIntentPerceptual)
+	}
+	if r.State.FlatnessTolerance != 10 {
+		t.Errorf("Flatness: got %v, want 10", r.State.FlatnessTolerance)
+	}
+	if r.State.CTM != m {
+		t.Errorf("CTM: got %v, want %v", r.State.CTM, m)
+	}
+	if r.State.TextCharacterSpacing != 9 {
+		t.Errorf("Tc: got %v, want 9", r.State.TextCharacterSpacing)
+	}
+	if r.State.TextWordSpacing != 10 {
+		t.Errorf("Tw: got %v, want 10", r.State.TextWordSpacing)
+	}
+	if r.State.TextHorizontalScaling != 11 {
+		t.Errorf("Th: got %v, want 11", r.State.TextHorizontalScaling)
+	}
+	if r.State.TextLeading != 12 {
+		t.Errorf("Tl: got %v, want 12", r.State.TextLeading)
+	}
+	if !resEqual(r.State.TextFont, font) || r.State.TextFontSize != 14 { // TODO(voss)
+		t.Errorf("Font: got %v, %v, want %v, 14", r.State.TextFont, r.State.TextFontSize, font)
+	}
+	if r.State.TextRenderingMode != graphics.TextRenderingModeFillStrokeClip {
+		t.Errorf("TextRenderingMode: got %v, want %v", r.State.TextRenderingMode, graphics.TextRenderingModeFillStrokeClip)
+	}
+	if r.State.TextRise != 15 {
+		t.Errorf("Tr: got %v, want 15", r.State.TextRise)
+	}
+
+	cmpFDSelectFn := cmp.Comparer(func(fn1, fn2 cff.FDSelectFn) bool {
+		return true
+	})
+
+	if d := cmp.Diff(w.State, r.State, cmpFDSelectFn); d != "" {
+		t.Errorf("State: %s", d)
+	}
+}
+
+func resEqual(a, b graphics.Resource) bool {
+	return a.DefaultName() == b.DefaultName() && a.PDFObject() == b.PDFObject()
 }

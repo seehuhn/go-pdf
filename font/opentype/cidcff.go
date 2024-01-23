@@ -41,7 +41,7 @@ import (
 
 // fontCFFComposite is an OpenType/CFF font for embedding in a PDF file as a composite font.
 type fontCFFComposite struct {
-	otf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -88,7 +88,7 @@ func NewCFFComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &fontCFFComposite{
-		otf:          info,
+		sfnt:         info,
 		cmap:         cmap,
 		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
@@ -119,7 +119,7 @@ func (f *fontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter,
 
 // Layout implements the [font.Font] interface.
 func (f *fontCFFComposite) Layout(s string) glyph.Seq {
-	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedCFFComposite struct {
@@ -137,10 +137,20 @@ func (f *embeddedCFFComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
+func (f *embeddedCFFComposite) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	f.AllCIDs(s)(func(code []byte, cid type1.CID) bool {
+		gid := f.GID(cid)
+		// TODO(voss): deal with different Font Matrices for different private dicts.
+		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+		yield(width, len(code) == 1 && code[0] == ' ')
+		return true
+	})
+}
+
 func (f *embeddedCFFComposite) CIDToWidth(cid type1.CID) float64 {
 	gid := f.GID(cid)
 	// TODO(voss): deal with different Font Matrices for different private dicts.
-	return float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
+	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 }
 
 func (f *embeddedCFFComposite) Close() error {
@@ -149,7 +159,7 @@ func (f *embeddedCFFComposite) Close() error {
 	}
 	f.closed = true
 
-	origOTF := f.otf.Clone()
+	origOTF := f.sfnt.Clone()
 	origOTF.CMapTable = nil
 	origOTF.Gdef = nil
 	origOTF.Gsub = nil

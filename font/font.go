@@ -30,10 +30,19 @@ import (
 )
 
 type Glyph struct {
-	GID     glyph.ID
-	Advance float64 // measured in PDF text space units
-	Rise    float64 // measured in PDF text space units
-	Text    []rune
+	GID glyph.ID
+
+	// Advance is the advance with for the current glyph the client
+	// wishes to achieve.  It is measured in PDF text space units,
+	// and is already scaled by the font size.
+	Advance float64
+
+	// Rise is by how much the client wishes to lift the glyph above
+	// the baseline.  It is measured in PDF text space units,
+	// and is already scaled by the font size.
+	Rise float64
+
+	Text []rune
 }
 
 // Font represents a font which can be embedded in a PDF file.
@@ -62,9 +71,8 @@ type Embedded interface {
 }
 
 type NewFont interface {
-	Resource
+	Basic
 
-	WritingMode() int // 0 = horizontal, 1 = vertical
 	AsText(pdf.String) []rune
 
 	// Glyphs() interface{}
@@ -86,6 +94,14 @@ type NewFontComposite interface {
 	GID(type1.CID) glyph.ID
 	CID(glyph.ID, []rune) type1.CID
 	CIDToWidth(type1.CID) float64
+}
+
+// Basic represents a font embedded in a PDF file,
+// together with enough information to write and parse content streams.
+type Basic interface {
+	Resource
+	WritingMode() int // 0 = horizontal, 1 = vertical
+	ForeachWidth(s pdf.String, yield func(width float64, is_space bool))
 }
 
 // Geometry collects the various dimensions connected to a font and to
@@ -179,6 +195,7 @@ type Resource interface {
 	PDFObject() pdf.Object // value to use in the resource dictionary
 }
 
+// Res can be embedded in a struct to implement the [Resource] interface.
 type Res struct {
 	DefName pdf.Name
 	Ref     pdf.Object

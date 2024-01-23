@@ -58,6 +58,8 @@ type CIDEncoder interface {
 	AppendCode(pdf.String, type1.CID) pdf.String
 
 	CodeToCID(pdf.String) type1.CID
+
+	AllCIDs(pdf.String) func(yield func([]byte, type1.CID) bool) bool
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -136,13 +138,27 @@ func (e *identityEncoder) AppendCode(s pdf.String, cid type1.CID) pdf.String {
 	return charcode.UCS2.Append(s, charcode.CharCode(cid))
 }
 
-func (e *identityEncoder) CodeToCID(s pdf.String) type1.CID {
-	c, _ := charcode.UCS2.Decode(s)
+func (e *identityEncoder) CodeToCID(code pdf.String) type1.CID {
+	c, _ := charcode.UCS2.Decode(code)
 	if c < 0 {
 		// TODO(voss): implement notdef ranges, etc.
 		return 0
 	}
 	return type1.CID(c)
+}
+
+func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, type1.CID) bool) bool {
+	return func(yield func([]byte, type1.CID) bool) bool {
+		for len(s) >= 2 {
+			var code []byte
+			code, s = s[:2], s[2:]
+			cid := type1.CID(code[0])<<8 | type1.CID(code[1])
+			if !yield(code, cid) {
+				return false
+			}
+		}
+		return true
+	}
 }
 
 // NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
@@ -262,6 +278,15 @@ func (e *utf8Encoder) AppendCode(s pdf.String, cid type1.CID) pdf.String {
 func (e *utf8Encoder) CodeToCID(s pdf.String) type1.CID {
 	code, _ := utf8cs.Decode(s)
 	return e.cmap[code]
+}
+
+func (e *utf8Encoder) AllCIDs(s pdf.String) func(yield func([]byte, type1.CID) bool) bool {
+	return func(yield func([]byte, type1.CID) bool) bool {
+		return utf8cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
+			c, _ := utf8cs.Decode(code)
+			return yield(code, e.cmap[c])
+		})
+	}
 }
 
 // utf8cs represents UTF-8-encoded character codes.

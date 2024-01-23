@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package parser
 
 import (
 	"testing"
@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 	"seehuhn.de/go/sfnt/cff"
 )
@@ -31,57 +32,57 @@ func TestExtGState(t *testing.T) {
 
 	F := dummyfont.Embed(data, "")
 
-	s1 := State{Parameters: &Parameters{}}
+	s1 := graphics.State{Parameters: &graphics.Parameters{}}
 	s1.TextFont = F
 	s1.TextFontSize = 12
-	s1.Set |= StateTextFont
+	s1.Set |= graphics.StateTextFont
 	s1.TextKnockout = true
-	s1.Set |= StateTextKnockout
+	s1.Set |= graphics.StateTextKnockout
 	s1.LineWidth = 13
-	s1.Set |= StateLineWidth
-	s1.LineCap = LineCapSquare
-	s1.Set |= StateLineCap
-	s1.LineJoin = LineJoinRound
-	s1.Set |= StateLineJoin
+	s1.Set |= graphics.StateLineWidth
+	s1.LineCap = graphics.LineCapSquare
+	s1.Set |= graphics.StateLineCap
+	s1.LineJoin = graphics.LineJoinRound
+	s1.Set |= graphics.StateLineJoin
 	s1.MiterLimit = 14
-	s1.Set |= StateMiterLimit
+	s1.Set |= graphics.StateMiterLimit
 	s1.DashPattern = []float64{1, 2, 3}
 	s1.DashPhase = 4
-	s1.Set |= StateDash
+	s1.Set |= graphics.StateDash
 	s1.RenderingIntent = "dangerously ambiguous"
-	s1.Set |= StateRenderingIntent
+	s1.Set |= graphics.StateRenderingIntent
 	s1.StrokeAdjustment = true
-	s1.Set |= StateStrokeAdjustment
+	s1.Set |= graphics.StateStrokeAdjustment
 	s1.BlendMode = pdf.Name("SoftLight")
-	s1.Set |= StateBlendMode
+	s1.Set |= graphics.StateBlendMode
 	s1.SoftMask = pdf.Dict{
 		"Type": pdf.Name("Mask"),
 		"S":    pdf.Name("Alpha"),
 	}
-	s1.Set |= StateSoftMask
+	s1.Set |= graphics.StateSoftMask
 	s1.StrokeAlpha = 0.4
-	s1.Set |= StateStrokeAlpha
+	s1.Set |= graphics.StateStrokeAlpha
 	s1.FillAlpha = 0.6
-	s1.Set |= StateFillAlpha
+	s1.Set |= graphics.StateFillAlpha
 	s1.AlphaSourceFlag = true
-	s1.Set |= StateAlphaSourceFlag
+	s1.Set |= graphics.StateAlphaSourceFlag
 	s1.BlackPointCompensation = pdf.Name("OFF")
-	s1.Set |= StateBlackPointCompensation
+	s1.Set |= graphics.StateBlackPointCompensation
 	s1.OverprintFill = false
 	s1.OverprintStroke = true
-	s1.Set |= StateOverprint
+	s1.Set |= graphics.StateOverprint
 	s1.OverprintMode = 1
-	s1.Set |= StateOverprintMode
+	s1.Set |= graphics.StateOverprintMode
 	s1.BlackGeneration = pdf.Name("Default")
-	s1.Set |= StateBlackGeneration
+	s1.Set |= graphics.StateBlackGeneration
 	s1.UndercolorRemoval = pdf.Dict{
 		"FunctionType": pdf.Integer(0),
 		"Domain":       pdf.Array{pdf.Number(0), pdf.Number(1)},
 		"Range":        pdf.Array{pdf.Number(0), pdf.Number(1)},
 	}
-	s1.Set |= StateUndercolorRemoval
+	s1.Set |= graphics.StateUndercolorRemoval
 	s1.TransferFunction = pdf.Name("Default")
-	s1.Set |= StateTransferFunction
+	s1.Set |= graphics.StateTransferFunction
 	s1.Halftone = pdf.Dict{
 		"Type":         pdf.Name("Halftone"),
 		"HalftoneType": pdf.Integer(1),
@@ -89,16 +90,16 @@ func TestExtGState(t *testing.T) {
 		"Angle":        pdf.Number(30),
 		"SpotFunction": pdf.Name("Round"),
 	}
-	s1.Set |= StateHalftone
+	s1.Set |= graphics.StateHalftone
 	s1.HalftoneOriginX = 12
 	s1.HalftoneOriginY = 34
-	s1.Set |= StateHalftoneOrigin
+	s1.Set |= graphics.StateHalftoneOrigin
 	s1.FlatnessTolerance = 0.5
-	s1.Set |= StateFlatnessTolerance
+	s1.Set |= graphics.StateFlatnessTolerance
 	s1.SmoothnessTolerance = 0.6
-	s1.Set |= StateSmoothnessTolerance
+	s1.Set |= graphics.StateSmoothnessTolerance
 
-	ext1, err := NewExtGState(s1, "X")
+	ext1, err := graphics.NewExtGState(s1, "X")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +121,7 @@ func TestExtGState(t *testing.T) {
 		t.Error(d)
 	}
 
-	s3 := State{Parameters: &Parameters{}}
+	s3 := graphics.State{Parameters: &graphics.Parameters{}}
 	ext2.ApplyTo(&s3)
 	if d := cmp.Diff(s1, s3, cmpFDSelectFn); d != "" {
 		t.Error(d)

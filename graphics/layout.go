@@ -23,13 +23,6 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-func (w *Writer) TextShowString(s string) {
-	F := w.State.TextFont.(font.Layouter)
-	gg := F.Layout(s)
-	_, pdfGlyphs := convertGlyphs(gg, F.FontMatrix(), w.State.TextFontSize)
-	w.TextShowGlyphsRaw(pdfGlyphs)
-}
-
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.
 func (w *Writer) TextLayout(s string) glyph.Seq {
@@ -121,13 +114,15 @@ func convertGlyphs(gg glyph.Seq, fontMatrix []float64, fontSize float64) (float6
 	var xOffset float64
 	res := make([]font.Glyph, len(gg))
 	for i, g := range gg {
+		// TODO(voss): is the following correct?
+
 		fontDx := float64(g.XOffset)
 		fontDy := float64(g.YOffset)
 		pdfDx := (fontMatrix[0]*fontDx + fontMatrix[2]*fontDy + fontMatrix[4]) * fontSize
 		pdfDy := (fontMatrix[1]*fontDx + fontMatrix[3]*fontDy + fontMatrix[5]) * fontSize
 
 		fontAdvanceX := float64(g.Advance)
-		pdfAdvanceX := fontMatrix[0] * fontAdvanceX * fontSize // TODO(voss): is this correct?
+		pdfAdvanceX := fontMatrix[0] * fontAdvanceX * fontSize
 
 		if i > 0 {
 			res[i-1].Advance += pdfDx

@@ -40,7 +40,7 @@ import (
 
 // fontCFFSimple is a OpenType/CFF font for embedding into a PDF file as a simple font.
 type fontCFFSimple struct {
-	otf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -78,7 +78,7 @@ func NewCFFSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &fontCFFSimple{
-		otf:         info,
+		sfnt:        info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
@@ -105,7 +105,7 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 
 // Layout implements the [font.Font] interface.
 func (f *fontCFFSimple) Layout(s string) glyph.Seq {
-	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedCFFSimple struct {
@@ -117,9 +117,17 @@ type embeddedCFFSimple struct {
 	closed bool
 }
 
+func (f *embeddedCFFSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	for _, c := range s {
+		gid := f.Encoding[c]
+		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+		yield(width, c == ' ')
+	}
+}
+
 func (f *embeddedCFFSimple) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
-	return float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
+	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 }
 
 func (f *embeddedCFFSimple) Close() error {
@@ -130,12 +138,12 @@ func (f *embeddedCFFSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.otf.PostscriptName())
+			f.DefName, f.sfnt.PostscriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding
 
 	// Make our encoding the built-in encoding of the font.
-	origOTF := f.otf.Clone()
+	origOTF := f.sfnt.Clone()
 	outlines := origOTF.Outlines.(*cff.Outlines)
 	outlines.Encoding = encoding
 	outlines.ROS = nil

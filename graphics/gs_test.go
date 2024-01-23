@@ -132,12 +132,6 @@ func TestTextPositions(t *testing.T) {
 	}
 
 	testString := pdf.String("CADABX")
-	testGlyphs := make([]font.Glyph, len(testString))
-	for i := 0; i < len(testString); i++ {
-		testGlyphs[i] = font.Glyph{
-			GID: glyph.ID(testString[i]),
-		}
-	}
 
 	// first print all glyphs in one string
 	img1 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
@@ -149,7 +143,7 @@ func TestTextPositions(t *testing.T) {
 		r.TextSetFont(F, 100)
 		r.TextStart()
 		r.TextFirstLine(10, 10)
-		r.TextShowGlyphsRaw(testGlyphs)
+		r.TextShowRaw(testString)
 		r.TextEnd()
 
 		return nil
@@ -165,9 +159,9 @@ func TestTextPositions(t *testing.T) {
 		r.TextSetFont(F, 100)
 		r.TextStart()
 		r.TextFirstLine(10, 10)
-		for _, c := range testString {
+		for i := range testString {
 			xx = append(xx, r.TextMatrix[4])
-			r.TextShowGlyphsRaw([]font.Glyph{{GID: glyph.ID(c)}})
+			r.TextShowRaw(testString[i : i+1])
 		}
 		r.TextEnd()
 
@@ -181,10 +175,10 @@ func TestTextPositions(t *testing.T) {
 		}
 
 		r.TextSetFont(F, 100)
-		for i, c := range testString {
+		for i := range testString {
 			r.TextStart()
 			r.TextFirstLine(xx[i], 10)
-			r.TextShowGlyphsRaw([]font.Glyph{{GID: glyph.ID(c)}})
+			r.TextShowRaw(testString[i : i+1])
 			r.TextEnd()
 		}
 

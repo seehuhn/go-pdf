@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
+	pdfparser "seehuhn.de/go/pdf/parser"
 )
 
 // Context holds information about the current state of the PDF content stream.
@@ -149,7 +150,7 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 					break
 				}
 
-				newState, err := graphics.ReadExtGState(r, resources.ExtGState[name], name)
+				newState, err := pdfparser.ReadExtGState(r, resources.ExtGState[name], name)
 				if pdf.IsMalformed(err) {
 					break
 				} else if err != nil {

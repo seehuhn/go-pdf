@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package parser
 
 import (
 	"fmt"
@@ -22,19 +22,20 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/graphics/scanner"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/parser/scanner"
 )
 
 // A Reader reads a PDF content stream.
 type Reader struct {
 	R         pdf.Getter
 	Resources *pdf.Resources
-	State
+	graphics.State
 
 	DrawGlyph func(g font.Glyph) error
 	UnknownOp func(op string, args []pdf.Object) error
 
-	stack   []State
+	stack   []graphics.State
 	scanner *scanner.Scanner
 }
 
@@ -43,21 +44,21 @@ func NewReader(r pdf.Getter, res *pdf.Resources) *Reader {
 	return &Reader{
 		R:         r,
 		Resources: res,
-		State:     NewState(),
+		State:     graphics.NewState(),
 		scanner:   scanner.NewScanner(),
 	}
 }
 
-// ScanContentStream scans a content stream.
+// ParseContentStream parses a content stream.
 // Obj can be either a stream or an array of streams.
-func (r *Reader) ScanContentStream(obj pdf.Object) error {
+func (r *Reader) ParseContentStream(obj pdf.Object) error {
 	contents, err := pdf.Resolve(r.R, obj)
 	if err != nil {
 		return err
 	}
 	switch contents := contents.(type) {
 	case *pdf.Stream:
-		err := r.scanPDFStream(contents)
+		err := r.parsePDFStream(contents)
 		if err != nil {
 			return pdf.Wrap(err, "content stream")
 		}
@@ -67,7 +68,7 @@ func (r *Reader) ScanContentStream(obj pdf.Object) error {
 			if err != nil {
 				return err
 			}
-			err = r.scanPDFStream(stm)
+			err = r.parsePDFStream(stm)
 			if err != nil {
 				return pdf.Wrap(err, "content stream")
 			}
@@ -80,7 +81,7 @@ func (r *Reader) ScanContentStream(obj pdf.Object) error {
 	return nil
 }
 
-func (r *Reader) scanPDFStream(stm *pdf.Stream) error {
+func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 	body, err := pdf.DecodeStream(r.R, stm, 0)
 	if err != nil {
 		return err
@@ -145,34 +146,34 @@ doOps:
 		x, ok := getNum()
 		if ok {
 			r.LineWidth = float64(x)
-			r.Set |= StateLineWidth
+			r.Set |= graphics.StateLineWidth
 		}
 
 	case "J": // line cap style
 		x, ok := getInteger()
 		if ok {
-			if LineCapStyle(x) > 2 {
+			if graphics.LineCapStyle(x) > 2 {
 				x = 0
 			}
-			r.LineCap = LineCapStyle(x)
-			r.Set |= StateLineCap
+			r.LineCap = graphics.LineCapStyle(x)
+			r.Set |= graphics.StateLineCap
 		}
 
 	case "j": // line join style
 		x, ok := getInteger()
 		if ok {
-			if LineJoinStyle(x) > 2 {
+			if graphics.LineJoinStyle(x) > 2 {
 				x = 0
 			}
-			r.LineJoin = LineJoinStyle(x)
-			r.Set |= StateLineJoin
+			r.LineJoin = graphics.LineJoinStyle(x)
+			r.Set |= graphics.StateLineJoin
 		}
 
 	case "M": // miter limit
 		x, ok := getNum()
 		if ok {
 			r.MiterLimit = float64(x)
-			r.Set |= StateMiterLimit
+			r.Set |= graphics.StateMiterLimit
 		}
 
 	case "d": // dash pattern and phase
@@ -182,21 +183,21 @@ doOps:
 		if ok1 && ok2 && ok3 {
 			r.DashPattern = pattern
 			r.DashPhase = phase
-			r.Set |= StateDash
+			r.Set |= graphics.StateDash
 		}
 
 	case "ri": // rendering intent
 		name, ok := getName()
 		if ok {
 			r.RenderingIntent = name
-			r.Set |= StateRenderingIntent
+			r.Set |= graphics.StateRenderingIntent
 		}
 
 	case "i": // flatness tolerance
 		x, ok := getNum()
 		if ok {
 			r.FlatnessTolerance = float64(x)
-			r.Set |= StateFlatnessTolerance
+			r.Set |= graphics.StateFlatnessTolerance
 		}
 
 	case "gs": // Set parameters from graphics state parameter dictionary
@@ -213,7 +214,7 @@ doOps:
 		}
 
 	case "q":
-		r.stack = append(r.stack, State{
+		r.stack = append(r.stack, graphics.State{
 			Parameters: r.Parameters.Clone(),
 			Set:        r.Set,
 		})
@@ -227,7 +228,7 @@ doOps:
 	// == Special graphics state =========================================
 
 	case "cm":
-		m := Matrix{}
+		m := graphics.Matrix{}
 		for i := 0; i < 6; i++ {
 			f, ok := getNum()
 			if !ok {
@@ -240,8 +241,8 @@ doOps:
 	// == Text objects ===================================================
 
 	case "BT": // Begin text object
-		r.TextMatrix = IdentityMatrix
-		r.TextLineMatrix = IdentityMatrix
+		r.TextMatrix = graphics.IdentityMatrix
+		r.TextLineMatrix = graphics.IdentityMatrix
 
 	case "ET": // End text object
 
@@ -251,28 +252,28 @@ doOps:
 		x, ok := getNum()
 		if ok {
 			r.TextCharacterSpacing = x
-			r.Set |= StateTextCharacterSpacing
+			r.Set |= graphics.StateTextCharacterSpacing
 		}
 
 	case "Tw": // Set word spacing
 		x, ok := getNum()
 		if ok {
 			r.TextWordSpacing = x
-			r.Set |= StateTextWordSpacing
+			r.Set |= graphics.StateTextWordSpacing
 		}
 
 	case "Tz": // Set the horizontal scaling
 		x, ok := getNum()
 		if ok {
-			r.TextHorizonalScaling = x / 100
-			r.Set |= StateTextHorizontalSpacing
+			r.TextHorizontalScaling = x / 100
+			r.Set |= graphics.StateTextHorizontalSpacing
 		}
 
 	case "TL": // Set the leading
 		x, ok := getNum()
 		if ok {
 			r.TextLeading = x
-			r.Set |= StateTextLeading
+			r.Set |= graphics.StateTextLeading
 		}
 
 	case "Tf": // Set text font and size
@@ -293,20 +294,20 @@ doOps:
 		}
 		r.TextFont = F
 		r.TextFontSize = size
-		r.Set |= StateTextFont
+		r.Set |= graphics.StateTextFont
 
 	case "Tr": // text rendering mode
 		x, ok := getInteger()
 		if ok {
-			r.TextRenderingMode = TextRenderingMode(x)
-			r.Set |= StateTextRenderingMode
+			r.TextRenderingMode = graphics.TextRenderingMode(x)
+			r.Set |= graphics.StateTextRenderingMode
 		}
 
 	case "Ts": // Set text rise
 		x, ok := getNum()
 		if ok {
 			r.TextRise = x
-			r.Set |= StateTextRise
+			r.Set |= graphics.StateTextRise
 		}
 
 	// == Text positioning ===============================================
@@ -315,7 +316,7 @@ doOps:
 		dx, ok1 := getNum()
 		dy, ok2 := getNum()
 		if ok1 && ok2 {
-			r.TextLineMatrix = Translate(dx, dy).Mul(r.TextLineMatrix)
+			r.TextLineMatrix = graphics.Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 		}
 
@@ -324,13 +325,13 @@ doOps:
 		dy, ok2 := getNum()
 		if ok1 && ok2 {
 			r.TextLeading = -dy
-			r.Set |= StateTextLeading
-			r.TextLineMatrix = Translate(dx, dy).Mul(r.TextLineMatrix)
+			r.Set |= graphics.StateTextLeading
+			r.TextLineMatrix = graphics.Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 		}
 
 	case "Tm": // Set text matrix and text line matrix
-		m := Matrix{}
+		m := graphics.Matrix{}
 		for i := 0; i < 6; i++ {
 			f, ok := getNum()
 			if !ok {
@@ -340,10 +341,10 @@ doOps:
 		}
 		r.TextMatrix = m
 		r.TextLineMatrix = m
-		r.Set |= StateTextMatrix
+		r.Set |= graphics.StateTextMatrix
 
 	case "T*": // Move to start of next text line
-		r.TextLineMatrix = Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+		r.TextLineMatrix = graphics.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 		r.TextMatrix = r.TextLineMatrix
 
 	// == Text showing ===================================================
@@ -372,7 +373,7 @@ doOps:
 	case "'": // Move to next line and show text
 		s, ok := getString()
 		if ok {
-			r.TextLineMatrix = Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+			r.TextLineMatrix = graphics.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 
 			// TODO(voss): show text
@@ -386,7 +387,7 @@ doOps:
 		if ok1 && ok2 && ok3 {
 			r.TextWordSpacing = aw
 			r.TextCharacterSpacing = ac
-			r.Set |= StateTextWordSpacing | StateTextCharacterSpacing
+			r.Set |= graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
 
 			// TODO(voss): show text
 			_ = s
@@ -442,7 +443,7 @@ doOps:
 			break
 		}
 		r.StrokeColor = color.Gray(gray)
-		r.Set |= StateStrokeColor
+		r.Set |= graphics.StateStrokeColor
 
 	case "g": // nonstroking gray level
 		if len(args) < 1 {
@@ -453,7 +454,7 @@ doOps:
 			break
 		}
 		r.FillColor = color.Gray(gray)
-		r.Set |= StateFillColor
+		r.Set |= graphics.StateFillColor
 
 	case "RG": // nonstroking DeviceRGB color
 		if len(args) < 3 {
@@ -613,4 +614,52 @@ func convertDashPattern(dashPattern pdf.Array) (pat []float64, ok bool) {
 		pat[i] = float64(x)
 	}
 	return pat, true
+}
+
+func decodeGlyphs(s pdf.String, param graphics.State) []font.Glyph {
+	var res []font.Glyph
+	switch F := param.TextFont.(type) {
+	case font.NewFontSimple:
+		res = make([]font.Glyph, len(s))
+		for i := 0; i < len(s); i++ {
+			c := s[i]
+			width := F.CodeToWidth(c)*param.TextFontSize + param.TextCharacterSpacing
+			if c == ' ' {
+				width += param.TextWordSpacing
+			}
+			gid := F.CodeToGID(c)
+			res[i] = font.Glyph{
+				GID:     gid,
+				Advance: width * param.TextHorizontalScaling,
+				Rise:    param.TextRise,
+				Text:    F.AsText(pdf.String{c}),
+			}
+		}
+	case font.NewFontComposite:
+		cs := F.CS()
+		cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
+			cid := F.CodeToCID(code)
+			gid := F.GID(cid)
+			width := F.CIDToWidth(cid)*param.TextFontSize + param.TextCharacterSpacing
+			if len(code) == 1 && code[0] == ' ' {
+				width += param.TextWordSpacing
+			}
+			// TODO(voss): TextHorizontalScaling is only used for horizontal writing mode.
+			g := font.Glyph{
+				GID:     gid,
+				Advance: width * param.TextHorizontalScaling,
+				Rise:    param.TextRise,
+				Text:    F.AsText(code),
+			}
+			res = append(res, g)
+
+			return true
+		})
+	case nil: // no font
+		return nil
+	default:
+		fmt.Printf("%#v\n", F)
+		panic("unknown font type")
+	}
+	return res
 }

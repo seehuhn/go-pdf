@@ -41,7 +41,7 @@ import (
 
 // fontGlyfSimple is a simple OpenType/glyf font
 type fontGlyfSimple struct {
-	otf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -76,7 +76,7 @@ func NewGlyfSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &fontGlyfSimple{
-		otf:         info,
+		sfnt:        info,
 		cmap:        cmap,
 		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
@@ -91,7 +91,7 @@ func (f *fontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, e
 	if err != nil {
 		return nil, err
 	}
-	res := &embeddedSimpleGlyf{
+	res := &embeddedGlyfSimple{
 		fontGlyfSimple: f,
 		w:              w,
 		Res:            graphics.Res{Ref: w.Alloc(), DefName: resName},
@@ -103,10 +103,10 @@ func (f *fontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, e
 
 // Layout implements the [font.Font] interface.
 func (f *fontGlyfSimple) Layout(s string) glyph.Seq {
-	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
-type embeddedSimpleGlyf struct {
+type embeddedGlyfSimple struct {
 	*fontGlyfSimple
 	w pdf.Putter
 	graphics.Res
@@ -115,12 +115,19 @@ type embeddedSimpleGlyf struct {
 	closed bool
 }
 
-func (f *embeddedSimpleGlyf) CodeToWidth(c byte) float64 {
-	gid := f.Encoding[c]
-	return float64(f.otf.GlyphWidth(gid)) / float64(f.otf.UnitsPerEm)
+func (f *embeddedGlyfSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	for _, c := range s {
+		gid := f.Encoding[c]
+		yield(float64(f.sfnt.GlyphWidth(gid))/float64(f.sfnt.UnitsPerEm), c == ' ')
+	}
 }
 
-func (f *embeddedSimpleGlyf) Close() error {
+func (f *embeddedGlyfSimple) CodeToWidth(c byte) float64 {
+	gid := f.Encoding[c]
+	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+}
+
+func (f *embeddedGlyfSimple) Close() error {
 	if f.closed {
 		return nil
 	}
@@ -128,11 +135,11 @@ func (f *embeddedSimpleGlyf) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.otf.PostscriptName())
+			f.DefName, f.sfnt.PostscriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding
 
-	origOTF := f.otf.Clone()
+	origOTF := f.sfnt.Clone()
 	origOTF.CMapTable = nil
 	origOTF.Gdef = nil
 	origOTF.Gsub = nil

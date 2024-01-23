@@ -42,7 +42,7 @@ import (
 
 // fontComposite is a composite TrueType font.
 type fontComposite struct {
-	ttf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -86,7 +86,7 @@ func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &fontComposite{
-		ttf:          info,
+		sfnt:         info,
 		cmap:         cmap,
 		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
@@ -99,7 +99,7 @@ func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 
 // Layout implements the [font.Font] interface.
 func (f *fontComposite) Layout(s string) glyph.Seq {
-	return f.ttf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 // Embed implements the [font.Font] interface.
@@ -109,7 +109,7 @@ func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 		return nil, err
 	}
 	gidToCID := f.makeGIDToCID()
-	res := &embeddedCID{
+	res := &embeddedComposite{
 		fontComposite: f,
 		w:             w,
 		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
@@ -120,7 +120,7 @@ func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 	return res, nil
 }
 
-type embeddedCID struct {
+type embeddedComposite struct {
 	*fontComposite
 	w pdf.Putter
 	graphics.Res
@@ -131,22 +131,31 @@ type embeddedCID struct {
 	closed bool
 }
 
-func (f *embeddedCID) WritingMode() int {
+func (f *embeddedComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
-func (f *embeddedCID) CIDToWidth(cid type1.CID) float64 {
-	gid := f.GID(cid)
-	return float64(f.ttf.GlyphWidth(gid)) / float64(f.ttf.UnitsPerEm)
+func (f *embeddedComposite) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	f.AllCIDs(s)(func(code []byte, cid type1.CID) bool {
+		gid := f.GID(cid)
+		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+		yield(width, len(code) == 1 && code[0] == ' ')
+		return true
+	})
 }
 
-func (f *embeddedCID) Close() error {
+func (f *embeddedComposite) CIDToWidth(cid type1.CID) float64 {
+	gid := f.GID(cid)
+	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+}
+
+func (f *embeddedComposite) Close() error {
 	if f.closed {
 		return nil
 	}
 	f.closed = true
 
-	origTTF := f.ttf.Clone()
+	origTTF := f.sfnt.Clone()
 	origTTF.CMapTable = nil
 	origTTF.Gdef = nil
 	origTTF.Gsub = nil

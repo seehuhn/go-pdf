@@ -177,6 +177,13 @@ type embedded struct {
 	closed bool
 }
 
+func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	for _, c := range s {
+		gid := f.Encoding[c]
+		yield(float64(f.Geometry.Widths[gid])*f.outlines.FontInfo.FontMatrix[0], c == ' ')
+	}
+}
+
 func (f *embedded) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
 	return float64(f.Geometry.Widths[gid]) * f.outlines.FontInfo.FontMatrix[0]

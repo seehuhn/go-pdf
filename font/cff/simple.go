@@ -125,6 +125,14 @@ type embeddedSimple struct {
 	closed bool
 }
 
+func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	for _, c := range s {
+		gid := f.Encoding[c]
+		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+		yield(width, c == ' ')
+	}
+}
+
 func (f *embeddedSimple) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
 	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
@@ -457,6 +465,14 @@ func (f *fromFileSimple) AsText(s pdf.String) []rune {
 // WritingMode implements the [font.NewFont] interface.
 func (f *fromFileSimple) WritingMode() int {
 	return 0
+}
+
+func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	for _, c := range s {
+		gid := f.Encoding[c]
+		width := float64(f.Font.Glyphs[gid].Width) * f.Font.FontMatrix[0]
+		yield(width, c == ' ')
+	}
 }
 
 // CodeToWidth implements the [font.NewFontSimple] interface.

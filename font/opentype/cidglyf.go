@@ -42,7 +42,7 @@ import (
 
 // fontGlyfComposite is a composite OpenType/glyf font.
 type fontGlyfComposite struct {
-	otf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -88,7 +88,7 @@ func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &fontGlyfComposite{
-		otf:          info,
+		sfnt:         info,
 		cmap:         cmap,
 		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
 		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
@@ -101,7 +101,7 @@ func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 
 // Layout implements the [font.Font] interface.
 func (f *fontGlyfComposite) Layout(s string) glyph.Seq {
-	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 // Embed implements the [font.Font] interface.
@@ -137,9 +137,18 @@ func (f *embeddedGlyfComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
+func (f *embeddedGlyfComposite) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	f.AllCIDs(s)(func(code []byte, cid type1.CID) bool {
+		gid := f.GID(cid)
+		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+		yield(width, len(code) == 1 && code[0] == ' ')
+		return true
+	})
+}
+
 func (f *embeddedGlyfComposite) CIDToWidth(cid type1.CID) float64 {
 	gid := f.GID(cid)
-	return float64(f.otf.GlyphWidth(gid)) / float64(f.otf.UnitsPerEm)
+	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 }
 
 func (f *embeddedGlyfComposite) Close() error {
@@ -148,7 +157,7 @@ func (f *embeddedGlyfComposite) Close() error {
 	}
 	f.closed = true
 
-	origOTF := f.otf.Clone()
+	origOTF := f.sfnt.Clone()
 	origOTF.CMapTable = nil
 	origOTF.Gdef = nil
 	origOTF.Gsub = nil
