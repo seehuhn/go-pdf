@@ -18,27 +18,23 @@ package graphics
 
 import (
 	"errors"
-	"fmt"
-	"math"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func (w *Writer) TextShowString(s string) {
-	F := w.State.TextFont.(font.NewFontLayouter)
+	F := w.State.TextFont.(font.Layouter)
 	gg := F.Layout(s)
 	_, pdfGlyphs := convertGlyphs(gg, F.FontMatrix(), w.State.TextFontSize)
-	w.TextShowGlyphs(pdfGlyphs)
+	w.TextShowGlyphsRaw(pdfGlyphs)
 }
 
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.
 func (w *Writer) TextLayout(s string) glyph.Seq {
 	st := w.State
-	return st.TextFont.(font.Embedded).Layout(s)
+	return st.TextFont.(font.Layouter).Layout(s)
 }
 
 // TextShow draws a string.
@@ -95,7 +91,7 @@ func (w *Writer) TextShowGlyphsAligned(gg glyph.Seq, width, q float64) {
 }
 
 func (w *Writer) showGlyphsAligned(gg glyph.Seq, width, q float64) {
-	geom := w.State.TextFont.(font.Embedded).GetGeometry()
+	geom := w.State.TextFont.(font.Layouter).GetGeometry()
 	total := geom.ToPDF(w.State.TextFontSize, gg.AdvanceWidth())
 	delta := width - total
 
@@ -109,102 +105,39 @@ func (w *Writer) showGlyphsAligned(gg glyph.Seq, width, q float64) {
 }
 
 func (w *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 {
-	if len(gg) == 0 {
+	if len(gg) == 0 || w.Err != nil {
 		return 0
 	}
 
-	// TODO(voss): Update p.Tm
+	xBefore := w.State.TextMatrix[4]
+	pdfLeft, pdfGG := convertGlyphs(gg, w.State.TextFont.(font.Layouter).FontMatrix(), w.State.TextFontSize)
 
-	var run pdf.String
-	var out pdf.Array
-	flush := func() {
-		if len(run) > 0 {
-			out = append(out, run)
-			run = nil
-		}
-		if len(out) == 0 {
-			return
-		}
+	w.TextShowGlyphs(pdfLeft+left/1000, pdfGG, right/1000)
 
-		if w.Err != nil {
-			return
-		}
-		if len(out) == 1 {
-			if s, ok := out[0].(pdf.String); ok {
-				w.Err = s.PDF(w.Content)
-				if w.Err != nil {
-					return
-				}
-				_, w.Err = fmt.Fprintln(w.Content, " Tj")
-				out = nil
-				return
-			}
-		}
+	return w.State.TextMatrix[4] - xBefore
+}
 
-		w.Err = out.PDF(w.Content)
-		if w.Err != nil {
-			return
+func convertGlyphs(gg glyph.Seq, fontMatrix []float64, fontSize float64) (float64, []font.Glyph) {
+	var xOffset float64
+	res := make([]font.Glyph, len(gg))
+	for i, g := range gg {
+		fontDx := float64(g.XOffset)
+		fontDy := float64(g.YOffset)
+		pdfDx := (fontMatrix[0]*fontDx + fontMatrix[2]*fontDy + fontMatrix[4]) * fontSize
+		pdfDy := (fontMatrix[1]*fontDx + fontMatrix[3]*fontDy + fontMatrix[5]) * fontSize
+
+		fontAdvanceX := float64(g.Advance)
+		pdfAdvanceX := fontMatrix[0] * fontAdvanceX * fontSize // TODO(voss): is this correct?
+
+		if i > 0 {
+			res[i-1].Advance += pdfDx
+		} else {
+			xOffset = pdfDx
 		}
-		_, w.Err = fmt.Fprintln(w.Content, " TJ")
-		out = nil
+		res[i].GID = g.GID
+		res[i].Advance = pdfAdvanceX
+		res[i].Rise = pdfDy
+		res[i].Text = g.Text
 	}
-
-	F := w.State.TextFont
-	geom := F.(font.Embedded).GetGeometry()
-	widths := geom.Widths
-	unitsPerEm := geom.UnitsPerEm
-	q := 1000 / float64(unitsPerEm)
-
-	// We track the actual and wanted x-position in PDF units,
-	// relative to the initial x-position.
-	xWanted := left
-	xActual := 0.0
-	for _, glyph := range gg {
-		xWanted += float64(glyph.XOffset) * q
-		xOffsetInt := pdf.Integer(math.Round(xWanted - xActual))
-		if xOffsetInt != 0 {
-			if len(run) > 0 {
-				out = append(out, run)
-				run = nil
-			}
-			out = append(out, -xOffsetInt)
-			xActual += float64(xOffsetInt)
-		}
-
-		if newYPos := float64(glyph.YOffset) * q; w.State.Set&StateTextRise == 0 || newYPos != w.State.TextRise {
-			flush()
-			w.State.TextRise = newYPos
-			if w.Err != nil {
-				return 0
-			}
-			w.Err = pdf.Number(w.State.TextRise).PDF(w.Content) // TODO(voss): rounding?
-			if w.Err != nil {
-				return 0
-			}
-			_, w.Err = fmt.Fprintln(w.Content, " Ts")
-		}
-
-		run = F.(font.Embedded).AppendEncoded(run, glyph.GID, glyph.Text)
-
-		var w funit.Int16
-		if gid := glyph.GID; int(gid) < len(widths) {
-			w = widths[gid]
-		}
-		xActual += float64(w) * q
-		xWanted += float64(-glyph.XOffset+glyph.Advance) * q
-	}
-
-	xWanted += right
-	xOffsetInt := pdf.Integer(math.Round(xWanted - xActual))
-	if xOffsetInt != 0 {
-		if len(run) > 0 {
-			out = append(out, run)
-			run = nil
-		}
-		out = append(out, -xOffsetInt)
-		xActual += float64(xOffsetInt)
-	}
-
-	flush()
-	return xActual * w.State.TextFontSize / 1000
+	return xOffset, res
 }

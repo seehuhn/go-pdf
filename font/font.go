@@ -20,12 +20,73 @@ package font
 import (
 	"math"
 
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 )
+
+type Glyph struct {
+	GID     glyph.ID
+	Advance float64 // measured in PDF text space units
+	Rise    float64 // measured in PDF text space units
+	Text    []rune
+}
+
+// Font represents a font which can be embedded in a PDF file.
+type Font interface {
+	Embed(w pdf.Putter, resName pdf.Name) (Layouter, error)
+}
+
+// A Layouter can turn a string into a sequence of glyphs.
+//
+// TODO(voss): can we remove this?
+type Layouter interface {
+	Layout(s string) glyph.Seq
+	GetGeometry() *Geometry
+	FontMatrix() []float64
+	Close() error
+
+	Embedded
+}
+
+// Embedded represents a font which is already embedded in a PDF file.
+type Embedded interface {
+	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
+	// AppendEncoded2(pdf.String, Glyph) (pdf.String, float64)
+
+	NewFont
+}
+
+type NewFont interface {
+	Resource
+
+	WritingMode() int // 0 = horizontal, 1 = vertical
+	AsText(pdf.String) []rune
+
+	// Glyphs() interface{}
+}
+
+type NewFontSimple interface {
+	NewFont
+	CodeToGID(byte) glyph.ID
+	GIDToCode(glyph.ID, []rune) byte
+
+	CodeToWidth(byte) float64 // scaled PDF text space units
+}
+
+type NewFontComposite interface {
+	NewFont
+	CS() charcode.CodeSpaceRange
+	CodeToCID(pdf.String) type1.CID
+	AppendCode(pdf.String, type1.CID) pdf.String
+	GID(type1.CID) glyph.ID
+	CID(glyph.ID, []rune) type1.CID
+	CIDToWidth(type1.CID) float64
+}
 
 // Geometry collects the various dimensions connected to a font and to
 // the individual glyphs.
@@ -94,33 +155,6 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 	return res
 }
 
-// A Layouter can turn a string into a sequence of glyphs.
-//
-// TODO(voss): can we remove this?
-type Layouter interface {
-	Layout(s string) glyph.Seq
-}
-
-// TODO(voss): should we have GeometryGetter interface?
-
-// Font represents a font which can be embedded in a PDF file.
-type Font interface {
-	Embed(w pdf.Putter, resName pdf.Name) (Embedded, error)
-	GetGeometry() *Geometry
-}
-
-// Embedded represents a font which is already embedded in a PDF file.
-type Embedded interface {
-	GetGeometry() *Geometry
-	Layouter
-
-	// TODO(voss): use glyph.Info as an argument here?
-	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-
-	Close() error
-	NewFont
-}
-
 // NumGlyphs returns the number of glyphs in a font.
 func NumGlyphs(font interface{ GetGeometry() *Geometry }) int {
 	g := font.GetGeometry()
@@ -137,4 +171,25 @@ func GetGID(font Layouter, r rune) (glyph.ID, funit.Int16) {
 		return 0, 0
 	}
 	return gg[0].GID, gg[0].Advance
+}
+
+// Resource is a PDF resource.
+type Resource interface {
+	DefaultName() pdf.Name // return "" to choose names automatically
+	PDFObject() pdf.Object // value to use in the resource dictionary
+}
+
+type Res struct {
+	DefName pdf.Name
+	Ref     pdf.Object
+}
+
+// DefaultName implements the [Resource] interface.
+func (r Res) DefaultName() pdf.Name {
+	return r.DefName
+}
+
+// PDFObject implements the [Resource] interface.
+func (r Res) PDFObject() pdf.Object {
+	return r.Ref
 }

@@ -127,8 +127,8 @@ type fontSamples struct {
 
 	used float64 // vertical amount of page space currently used
 
-	bodyFont  font.Embedded
-	titleFont font.Embedded
+	bodyFont  font.Layouter
+	titleFont font.Layouter
 
 	page *document.Page
 

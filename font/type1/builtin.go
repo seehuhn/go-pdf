@@ -71,7 +71,7 @@ var All = []Builtin{
 }
 
 // Embed implements the [font.Font] interface.
-func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	info, err := getBuiltin(f)
 	if err != nil {
 		return nil, err

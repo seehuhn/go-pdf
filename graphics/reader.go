@@ -31,7 +31,7 @@ type Reader struct {
 	Resources *pdf.Resources
 	State
 
-	DrawGlyph func(g PDFGlyph) error
+	DrawGlyph func(g font.Glyph) error
 	UnknownOp func(op string, args []pdf.Object) error
 
 	stack   []State
@@ -353,7 +353,7 @@ doOps:
 		if !ok {
 			break
 		}
-		gg := decodeString(s, &r.State)
+		gg := decodeGlyphs(s, r.State)
 		for _, g := range gg {
 			if r.DrawGlyph != nil {
 				err := r.DrawGlyph(g)
@@ -400,7 +400,7 @@ doOps:
 		for _, ai := range a {
 			switch ai := ai.(type) {
 			case pdf.String:
-				gg := decodeString(ai, &r.State)
+				gg := decodeGlyphs(ai, r.State)
 				for _, g := range gg {
 					if r.DrawGlyph != nil {
 						err := r.DrawGlyph(g)

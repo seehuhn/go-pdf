@@ -27,7 +27,7 @@ import (
 )
 
 // TestEncoding checks that the encoding of a Type 1 font is the standard
-// encoding, if the set of included characters allows for this.
+// encoding, if the set of included characters is in the standard encoding.
 func TestEncoding(t *testing.T) {
 	t1, err := gofont.Type1(gofont.GoRegular)
 	if err != nil {
@@ -46,9 +46,8 @@ func TestEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 	gg := E.Layout(".MiAbc")
-	var s pdf.String
 	for _, g := range gg {
-		s = E.AppendEncoded(s[:0], g.GID, g.Text)
+		E.(font.NewFontSimple).GIDToCode(g.GID, g.Text)
 	}
 	err = E.Close()
 	if err != nil {

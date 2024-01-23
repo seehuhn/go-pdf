@@ -50,7 +50,18 @@ func TestWidthsFull(t *testing.T) {
 	gg := E.Layout(sampleText)
 	var s pdf.String
 	for _, g := range gg {
-		s = E.AppendEncoded(s, g.GID, g.Text)
+		switch E := E.(type) {
+		case font.NewFontSimple:
+			c := E.GIDToCode(g.GID, g.Text)
+			s = append(s, c)
+
+		// TODO(voss): use the new code
+		// case font.NewFontComposite:
+		// 	cid := E.CID(g.GID, g.Text)
+		// 	s = E.AppendCode(s, cid)
+		case font.Embedded:
+			s = E.AppendEncoded(s, g.GID, g.Text)
+		}
 	}
 	err = E.Close()
 	if err != nil {

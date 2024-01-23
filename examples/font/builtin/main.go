@@ -182,7 +182,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4
 
-	var F font.Embedded
+	var F font.Layouter
 	var geom *font.Geometry
 
 	curGlyph := 0

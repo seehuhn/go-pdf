@@ -86,7 +86,7 @@ func NewGlyfSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *fontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontGlyfSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	err := pdf.CheckVersion(w, "simple OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err

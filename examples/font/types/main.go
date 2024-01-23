@@ -599,7 +599,7 @@ func (l *layout) connect(page *document.Page, y0, y1 float64, delta float64) {
 	page.PopGraphicsState()
 }
 
-func (l *layout) addFont(key string, F font.Embedded, ptSize float64) {
+func (l *layout) addFont(key string, F font.Layouter, ptSize float64) {
 	if l.F == nil {
 		l.F = make(map[string]*pdfFont)
 	}
@@ -612,7 +612,7 @@ func (l *layout) addFont(key string, F font.Embedded, ptSize float64) {
 }
 
 type pdfFont struct {
-	F            font.Embedded
+	F            font.Layouter
 	ptSize       float64
 	geom         *font.Geometry
 	ascent       float64

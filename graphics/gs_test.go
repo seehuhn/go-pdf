@@ -38,7 +38,6 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug"
 )
 
@@ -133,9 +132,9 @@ func TestTextPositions(t *testing.T) {
 	}
 
 	testString := pdf.String("CADABX")
-	testGlyphs := make([]graphics.PDFGlyph, len(testString))
+	testGlyphs := make([]font.Glyph, len(testString))
 	for i := 0; i < len(testString); i++ {
-		testGlyphs[i] = graphics.PDFGlyph{
+		testGlyphs[i] = font.Glyph{
 			GID: glyph.ID(testString[i]),
 		}
 	}
@@ -150,7 +149,7 @@ func TestTextPositions(t *testing.T) {
 		r.TextSetFont(F, 100)
 		r.TextStart()
 		r.TextFirstLine(10, 10)
-		r.TextShowGlyphs(testGlyphs)
+		r.TextShowGlyphsRaw(testGlyphs)
 		r.TextEnd()
 
 		return nil
@@ -168,7 +167,7 @@ func TestTextPositions(t *testing.T) {
 		r.TextFirstLine(10, 10)
 		for _, c := range testString {
 			xx = append(xx, r.TextMatrix[4])
-			r.TextShowGlyphs([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
+			r.TextShowGlyphsRaw([]font.Glyph{{GID: glyph.ID(c)}})
 		}
 		r.TextEnd()
 
@@ -185,7 +184,7 @@ func TestTextPositions(t *testing.T) {
 		for i, c := range testString {
 			r.TextStart()
 			r.TextFirstLine(xx[i], 10)
-			r.TextShowGlyphs([]graphics.PDFGlyph{{GID: glyph.ID(c)}})
+			r.TextShowGlyphsRaw([]font.Glyph{{GID: glyph.ID(c)}})
 			r.TextEnd()
 		}
 

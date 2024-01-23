@@ -103,7 +103,7 @@ func (f *fontComposite) Layout(s string) glyph.Seq {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
 		return nil, err

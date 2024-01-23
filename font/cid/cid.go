@@ -42,7 +42,7 @@ func EmbedFile(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (
 
 // Embed creates a PDF CIDFont and embeds it into a PDF file.
 // At the moment, only TrueType and OpenType fonts are supported.
-func Embed(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+func Embed(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Layouter, error) {
 	f, err := Font(info, loc)
 	if err != nil {
 		return nil, err

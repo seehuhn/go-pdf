@@ -29,16 +29,17 @@ func TestSimpleEncoder(t *testing.T) {
 
 	codes := make(map[byte]int)
 	for i := 0; i < 256; i++ {
-		s := e.AppendEncoded(nil, glyph.ID(i+1), []rune{rune(i + 32)})
-		if len(s) != 1 {
-			t.Fatalf("unexpected length %d", len(s))
-		}
-
-		c := s[0]
+		gid := max(glyph.ID(i), 10)
+		c := e.GIDToCode(gid, []rune{rune(i + 32)})
 		if _, seen := codes[c]; seen {
 			t.Errorf("%d: code %d used twice", i, c)
 		}
 		codes[c] = i
+
+		c2 := e.GIDToCode(gid, []rune{rune(i + 32)})
+		if c != c2 {
+			t.Errorf("%d: code %d != %d", i, c, c2)
+		}
 	}
 
 	if e.Overflow() {
@@ -46,21 +47,5 @@ func TestSimpleEncoder(t *testing.T) {
 	}
 	if len(e.code) != 256 {
 		t.Errorf("unexpected cache length %d", len(e.code))
-	}
-
-	for i := 0; i < 256; i++ {
-		s := e.AppendEncoded(nil, glyph.ID(i+1), []rune{rune(i + 32)})
-		if len(s) != 1 {
-			t.Errorf("%d: unexpected length %d", i, len(s))
-			continue
-		}
-
-		c := s[0]
-		prevI, seen := codes[c]
-		if !seen {
-			t.Errorf("code %d not seen before", c)
-		} else if prevI != i {
-			t.Errorf("previous code %d != %d", prevI, i)
-		}
 	}
 }

@@ -96,7 +96,7 @@ func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
 		return nil, err

@@ -117,7 +117,7 @@ func New(psFont *type1.Font) (*Font, error) {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	res := &embedded{
 		Font: f,
 		w:    w,

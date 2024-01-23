@@ -51,13 +51,49 @@ func NewSimpleEncoder() *SimpleEncoder {
 	return res
 }
 
-// AppendEncoded appends the character code for the given glyph ID
-// to the given PDF string (allocating new codes as needed).
-// It also records the fact that the character code corresponds to the
-// given unicode string.
-func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	code := e.GIDToCode(gid, rr)
-	return append(s, code)
+// WritingMode implements the [font.NewFont] interface.
+func (e *SimpleEncoder) WritingMode() int {
+	return 0 // simple fonts are always horizontal
+}
+
+// AsText implements the [font.NewFont] interface.
+func (e *SimpleEncoder) AsText(s pdf.String) []rune {
+	var res []rune
+	for _, c := range s {
+		k, ok := e.key[c]
+		if ok {
+			res = append(res, []rune(k.rr)...)
+		}
+	}
+	return res
+}
+
+func (e *SimpleEncoder) CodeToGID(c byte) glyph.ID {
+	return e.Encoding[c]
+}
+
+func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
+	k := key{gid, string(rr)}
+
+	// Rules for choosing the code:
+	// 1. If the combination of `gid` and `rr` has previously been used,
+	//    then use the same code as before.
+	code, seen := e.code[k]
+	if seen {
+		return code
+	}
+
+	// 2. Allocate a new code based on the last rune in rr.
+	var r rune
+	if len(rr) > 0 {
+		r = rr[len(rr)-1]
+	}
+	code = e.allocateCode(r)
+	e.Encoding[code] = gid
+	e.code[k] = code
+	e.key[code] = k
+
+	return code
 }
 
 func (e *SimpleEncoder) allocateCode(r rune) byte {
@@ -128,46 +164,13 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 	return toUnicode
 }
 
-// WritingMode implements the [font.NewFont] interface.
-func (e *SimpleEncoder) WritingMode() int {
-	return 0 // simple fonts are always horizontal
-}
-
-func (e *SimpleEncoder) AsText(s pdf.String) []rune {
-	var res []rune
-	for _, c := range s {
-		k, ok := e.key[c]
-		if ok {
-			res = append(res, []rune(k.rr)...)
-		}
-	}
-	return res
-}
-
-func (e *SimpleEncoder) CodeToGID(c byte) glyph.ID {
-	return e.Encoding[c]
-}
-
-func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
-	k := key{gid, string(rr)}
-
-	// Rules for choosing the code:
-	// 1. If the combination of `gid` and `rr` has previously been used,
-	//    then use the same code as before.
-	code, seen := e.code[k]
-	if seen {
-		return code
-	}
-
-	// 2. Allocate a new code based on the last rune in rr.
-	var r rune
-	if len(rr) > 0 {
-		r = rr[len(rr)-1]
-	}
-	code = e.allocateCode(r)
-	e.Encoding[code] = gid
-	e.code[k] = code
-	e.key[code] = k
-
-	return code
+// AppendEncoded appends the character code for the given glyph ID
+// to the given PDF string (allocating new codes as needed).
+// It also records the fact that the character code corresponds to the
+// given unicode string.
+//
+// TODO(voss): remove
+func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	code := e.GIDToCode(gid, rr)
+	return append(s, code)
 }

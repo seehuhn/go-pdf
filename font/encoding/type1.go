@@ -49,20 +49,20 @@ func DescribeEncodingType1(encoding, builtin []string) pdf.Object {
 	var diff []D
 	var desc pdf.Dict
 	descLen := math.MaxInt
-	for _, c := range candidates {
+	for _, cand := range candidates {
 		diff = diff[:0]
-		for i, name := range encoding {
-			if name != ".notdef" && name != c.enc[i] {
-				diff = append(diff, D{i, pdf.Name(name)})
+		for code, name := range encoding {
+			if name != ".notdef" && name != cand.enc[code] {
+				diff = append(diff, D{code, pdf.Name(name)})
 			}
 		}
 		if len(diff) == 0 {
-			return c.name
+			return cand.name
 		}
 
 		newDesc := pdf.Dict{}
-		if c.name != nil {
-			newDesc["BaseEncoding"] = c.name
+		if cand.name != nil {
+			newDesc["BaseEncoding"] = cand.name
 		}
 		var a pdf.Array
 		prev := 256

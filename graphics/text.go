@@ -19,10 +19,10 @@ package graphics
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 // TextSetCharacterSpacing sets the character spacing.
@@ -228,18 +228,24 @@ func (w *Writer) TextNextLine() {
 	_, w.Err = fmt.Fprintln(w.Content, "T*")
 }
 
-// TextShowGlyphs shows the PDF string s, using the glyphs'
-// natural widths and ignoring text rise.
-// The function also updates gg, setting the Advance field and zeroing Rise for
-// each glyph.
+func (w *Writer) TextShowRaw(s pdf.String) {
+	gg := decodeGlyphs(s, w.State)
+	w.TextShowGlyphsRaw(gg)
+}
+
+// TextShowGlyphsRaw shows the PDF string s, using the glyphs' natural widths and
+// ignoring text rise.
+//
+// The function also gg, setting the Advance field and zeroing Rise for each
+// glyph.
 //
 // This implements the PDF graphics operator "Tj".
-func (w *Writer) TextShowGlyphs(gg []PDFGlyph) {
-	if !w.isValid("TextShowRaw", objText) {
+func (w *Writer) TextShowGlyphsRaw(gg []font.Glyph) {
+	if !w.isValid("TextShowGlyphsRaw", objText) {
 		return
 	}
 
-	s := encodeStringNatural(gg, w.State)
+	s := encodeGlyphsNatural(gg, w.State)
 
 	err := s.PDF(w.Content)
 	if err != nil {
@@ -262,55 +268,129 @@ func (w *Writer) TextShowGlyphs(gg []PDFGlyph) {
 	_, w.Err = fmt.Fprintln(w.Content, " Tj")
 }
 
-func (w *Writer) TextShowRaw(s pdf.String) {
-	gg := decodeString(s, &w.State)
-	w.TextShowGlyphs(gg)
-}
-
-type PDFGlyph struct {
-	GID     glyph.ID
-	Advance float64 // measured in PDF text space units
-	Rise    float64 // measured in PDF text space units
-	Text    []rune
-}
-
-func convertGlyphs(gg glyph.Seq, fontMatrix []float64, fontSize float64) (float64, []PDFGlyph) {
-	var xOffset float64
-	res := make([]PDFGlyph, len(gg))
-	for i, g := range gg {
-		fontDx := float64(g.XOffset)
-		fontDy := float64(g.YOffset)
-		pdfDx := (fontMatrix[0]*fontDx + fontMatrix[2]*fontDy + fontMatrix[4]) * fontSize
-		pdfDy := (fontMatrix[1]*fontDx + fontMatrix[3]*fontDy + fontMatrix[5]) * fontSize
-
-		fontAdvanceX := float64(g.Advance)
-		pdfAdvanceX := fontMatrix[0] * fontAdvanceX * fontSize // TODO(voss): is this right?
-
-		if i > 0 {
-			res[i-1].Advance += pdfDx
-		} else {
-			xOffset = pdfDx
+// TextShowGlyphs shows the PDF string s, taking kerning and text rise into
+// account.
+//
+// This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
+func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
+	var run pdf.String
+	var out pdf.Array
+	flush := func() {
+		if len(run) > 0 {
+			out = append(out, run)
+			run = nil
 		}
-		res[i].GID = g.GID
-		res[i].Advance = pdfAdvanceX
-		res[i].Rise = pdfDy
-		res[i].Text = g.Text
+		if len(out) == 0 {
+			return
+		}
+		if w.Err != nil {
+			return
+		}
+
+		if len(out) == 1 {
+			if s, ok := out[0].(pdf.String); ok {
+				w.Err = s.PDF(w.Content)
+				if w.Err != nil {
+					return
+				}
+				_, w.Err = fmt.Fprintln(w.Content, " Tj")
+				out = nil
+				return
+			}
+		}
+
+		w.Err = out.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " TJ")
+		out = nil
 	}
-	return xOffset, res
+
+	xActual := 0.0
+	xWanted := left
+	param := w.State
+	if param.TextFont.WritingMode() != 0 {
+		panic("vertical writing mode not implemented")
+	}
+	for _, g := range gg {
+		if w.State.Set&StateTextRise == 0 || math.Abs(g.Rise-w.State.TextRise) > 1e-6 {
+			flush()
+			w.State.TextRise = g.Rise
+			if w.Err != nil {
+				return
+			}
+			w.Err = pdf.Number(w.State.TextRise).PDF(w.Content) // TODO(voss): rounding?
+			if w.Err != nil {
+				return
+			}
+			_, w.Err = fmt.Fprintln(w.Content, " Ts")
+		}
+
+		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000))
+		if xOffsetInt != 0 {
+			if len(run) > 0 {
+				out = append(out, run)
+				run = nil
+			}
+			out = append(out, -xOffsetInt)
+			xActual += float64(xOffsetInt) / 1000
+		}
+
+		var glyphWidth float64
+		switch F := param.TextFont.(type) {
+		case font.NewFontSimple:
+			c := F.GIDToCode(g.GID, g.Text)
+			run = append(run, c)
+
+			glyphWidth = F.CodeToWidth(c)*param.TextFontSize + param.TextCharacterSpacing
+			if c == ' ' {
+				glyphWidth += param.TextWordSpacing
+			}
+		case font.NewFontComposite:
+			cid := F.CID(g.GID, g.Text)
+			run = F.AppendCode(run, cid)
+
+			glyphWidth = F.CIDToWidth(cid)*param.TextFontSize + param.TextCharacterSpacing
+			if len(g.Text) == 1 && g.Text[0] == ' ' {
+				glyphWidth += param.TextWordSpacing
+			}
+		}
+
+		xActual += glyphWidth * param.TextHorizonalScaling
+		xWanted += g.Advance
+	}
+	if math.IsNaN(right) {
+		xWanted = xActual
+	} else {
+		xWanted += right
+	}
+	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000))
+	if xOffsetInt != 0 {
+		if len(run) > 0 {
+			out = append(out, run)
+			run = nil
+		}
+		out = append(out, -xOffsetInt)
+		xActual += float64(xOffsetInt) / 1000
+	}
+	flush()
+	w.TextMatrix[4] += xActual
 }
 
-// encodeStringNatural encodes a string into a PDF string, using the glyphs'
+// EncodeGlyphsNatural encodes a string into a PDF string, using the glyphs'
 // natural widths and ignoring text rise.
-// The function also updates gg, setting the Advance field and zeroing Rise for
-// each glyph.
-func encodeStringNatural(gg []PDFGlyph, param State) pdf.String {
-	var res pdf.String
+//
+// The function updates gg, setting the Advance field and zeroing Rise for each
+// glyph.
+func encodeGlyphsNatural(gg []font.Glyph, param State) pdf.String {
+	var s pdf.String
 	switch F := param.TextFont.(type) {
 	case font.NewFontSimple:
-		res = make(pdf.String, len(gg))
+		s = make(pdf.String, len(gg))
 		for i, g := range gg {
 			c := F.GIDToCode(g.GID, g.Text)
-			res[i] = c
+			s[i] = c
 
 			width := F.CodeToWidth(c)*param.TextFontSize + param.TextCharacterSpacing
 			if c == ' ' {
@@ -322,7 +402,7 @@ func encodeStringNatural(gg []PDFGlyph, param State) pdf.String {
 	case font.NewFontComposite:
 		for i, g := range gg {
 			cid := F.CID(g.GID, g.Text)
-			res = F.AppendCode(res, cid)
+			s = F.AppendCode(s, cid)
 
 			width := F.CIDToWidth(cid)*param.TextFontSize + param.TextCharacterSpacing
 			if len(g.Text) == 1 && g.Text[0] == ' ' {
@@ -335,14 +415,14 @@ func encodeStringNatural(gg []PDFGlyph, param State) pdf.String {
 		fmt.Printf("%#v\n", F)
 		panic("unknown font type")
 	}
-	return res
+	return s
 }
 
-func decodeString(s pdf.String, param *State) []PDFGlyph {
-	var res []PDFGlyph
+func decodeGlyphs(s pdf.String, param State) []font.Glyph {
+	var res []font.Glyph
 	switch F := param.TextFont.(type) {
 	case font.NewFontSimple:
-		res = make([]PDFGlyph, len(s))
+		res = make([]font.Glyph, len(s))
 		for i := 0; i < len(s); i++ {
 			c := s[i]
 			width := F.CodeToWidth(c)*param.TextFontSize + param.TextCharacterSpacing
@@ -350,7 +430,7 @@ func decodeString(s pdf.String, param *State) []PDFGlyph {
 				width += param.TextWordSpacing
 			}
 			gid := F.CodeToGID(c)
-			res[i] = PDFGlyph{
+			res[i] = font.Glyph{
 				GID:     gid,
 				Advance: width * param.TextHorizonalScaling,
 				Rise:    param.TextRise,
@@ -366,7 +446,7 @@ func decodeString(s pdf.String, param *State) []PDFGlyph {
 			if len(code) == 1 && code[0] == ' ' {
 				width += param.TextWordSpacing
 			}
-			g := PDFGlyph{
+			g := font.Glyph{
 				GID:     gid,
 				Advance: width * param.TextHorizonalScaling,
 				Rise:    param.TextRise,

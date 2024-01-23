@@ -126,9 +126,9 @@ type fontTables struct {
 	textHeight float64
 	margin     float64
 
-	bodyFont   font.Embedded
-	italicFont font.Embedded
-	monoFont   font.Embedded
+	bodyFont   font.Layouter
+	italicFont font.Layouter
+	monoFont   font.Layouter
 
 	page   *document.Page
 	pageNo int
@@ -200,7 +200,7 @@ func (f *fontTables) WriteHeader(title, fileName string) error {
 	return nil
 }
 
-func (f *fontTables) WriteGlyphRow(theFont font.Embedded, start int) error {
+func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	const glyphSize = 24
 
 	geom := theFont.GetGeometry()

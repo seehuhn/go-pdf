@@ -53,13 +53,4 @@ func TestUnknownBuiltin(t *testing.T) {
 	}
 }
 
-func TestBuiltinSpace(t *testing.T) {
-	for _, F := range All {
-		gid, width := font.GetGID(F, ' ')
-		if gid == 0 || width == 0 {
-			t.Errorf("%s: space not found", string(F))
-		}
-	}
-}
-
 var _ font.Font = TimesRoman

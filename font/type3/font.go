@@ -94,7 +94,7 @@ func New(unitsPerEm uint16) *Font {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Embedded, error) {
+func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	if f.numOpen != 0 {
 		return nil, fmt.Errorf("font: %d glyphs not closed", f.numOpen)
 	}
@@ -175,7 +175,11 @@ type embedded struct {
 func (f *embedded) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
 	name := f.glyphNames[gid]
-	return float64(f.Glyphs[name].WidthX) * f.FontMatrix[0]
+	return float64(f.Glyphs[name].WidthX) * f.Font.FontMatrix[0]
+}
+
+func (f *embedded) FontMatrix() []float64 {
+	return f.Font.FontMatrix[:]
 }
 
 func (e *embedded) Close() error {
@@ -226,7 +230,7 @@ func (e *embedded) Close() error {
 	// TODO(voss): construct a toUnicode map, when needed
 
 	info := &EmbedInfo{
-		FontMatrix: e.FontMatrix,
+		FontMatrix: e.Font.FontMatrix,
 		Glyphs:     subset,
 		Resources:  e.Resources,
 		Encoding:   encoding,

@@ -37,7 +37,7 @@ import (
 // returned font object.  In comparison, fonts embedded via cid.EmbedFile() lead
 // to larger PDF files but there is no limit on the number of distinct glyphs
 // which can be accessed.
-func EmbedFile(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+func EmbedFile(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Layouter, error) {
 	font, err := LoadFont(fname, loc)
 	if err != nil {
 		return nil, err
