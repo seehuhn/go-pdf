@@ -21,8 +21,7 @@ import (
 	"sort"
 
 	"seehuhn.de/go/dag"
-
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
 )
@@ -85,7 +84,7 @@ func EncodeWidthsSimple(ww []float64) *WidthInfo {
 }
 
 // EncodeWidthsComposite constructs the W and DW entries for a CIDFont dictionary.
-func EncodeWidthsComposite(widths map[type1.CID]float64, v pdf.Version) (float64, pdf.Array) {
+func EncodeWidthsComposite(widths map[cid.CID]float64, v pdf.Version) (float64, pdf.Array) {
 	var ww []cidWidth
 	for cid, w := range widths {
 		ww = append(ww, cidWidth{cid, w})
@@ -136,7 +135,7 @@ func EncodeWidthsComposite(widths map[type1.CID]float64, v pdf.Version) (float64
 }
 
 type cidWidth struct {
-	CID        type1.CID
+	CID        cid.CID
 	GlyphWidth float64
 }
 
@@ -222,13 +221,13 @@ func mostFrequent(ww []cidWidth) float64 {
 }
 
 // DecodeWidthsComposite decodes the W and DW entries of a CIDFont dictionary.
-func DecodeWidthsComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[type1.CID]float64, error) {
+func DecodeWidthsComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]float64, error) {
 	w, err := pdf.GetArray(r, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	res := make(map[type1.CID]float64)
+	res := make(map[cid.CID]float64)
 	for len(w) > 1 {
 		c0, err := pdf.GetInteger(r, w[0])
 		if err != nil {
@@ -247,7 +246,7 @@ func DecodeWidthsComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[type1.
 				return nil, err
 			}
 			for c := c0; c <= c1; c++ {
-				cid := type1.CID(c)
+				cid := cid.CID(c)
 				if pdf.Integer(cid) != c {
 					return nil, &pdf.MalformedFileError{
 						Err: errors.New("invalid W entry in CIDFont dictionary"),
@@ -268,7 +267,7 @@ func DecodeWidthsComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[type1.
 				if err != nil {
 					return nil, err
 				}
-				cid := type1.CID(c0)
+				cid := cid.CID(c0)
 				if pdf.Integer(cid) != c0 {
 					return nil, &pdf.MalformedFileError{
 						Err: errors.New("invalid W entry in CIDFont dictionary"),

@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 )
 
 // https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
@@ -33,7 +33,7 @@ import (
 // Info holds the information for a PDF CMap.
 type Info struct {
 	Name string
-	ROS  *type1.CIDSystemInfo
+	ROS  *cid.SystemInfo
 	charcode.CodeSpaceRange
 	CSFile  charcode.CodeSpaceRange // TODO(voss): remove this
 	WMode   int
@@ -45,7 +45,7 @@ type Info struct {
 // SingleEntry specifies that character code Code represents the given CID.
 type SingleEntry struct {
 	Code  charcode.CharCode
-	Value type1.CID
+	Value cid.CID
 }
 
 // RangeEntry describes a range of character codes with consecutive CIDs.
@@ -54,11 +54,11 @@ type SingleEntry struct {
 type RangeEntry struct {
 	First charcode.CharCode
 	Last  charcode.CharCode
-	Value type1.CID
+	Value cid.CID
 }
 
 // New allocates a new CMap object.
-func New(ROS *type1.CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]type1.CID) *Info {
+func New(ROS *cid.SystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]cid.CID) *Info {
 	info := &Info{
 		ROS:            ROS,
 		CodeSpaceRange: cs,
@@ -97,15 +97,15 @@ func (info *Info) IsIdentity() bool {
 }
 
 // MaxCID returns the largest CID used by this CMap.
-func (info *Info) MaxCID() type1.CID {
-	var maxCID type1.CID
+func (info *Info) MaxCID() cid.CID {
+	var maxCID cid.CID
 	for _, s := range info.Singles {
 		if s.Value > maxCID {
 			maxCID = s.Value
 		}
 	}
 	for _, r := range info.Ranges {
-		rangeMax := r.Value + type1.CID(r.Last-r.First)
+		rangeMax := r.Value + cid.CID(r.Last-r.First)
 		if rangeMax > maxCID {
 			maxCID = rangeMax
 		}
@@ -113,7 +113,7 @@ func (info *Info) MaxCID() type1.CID {
 	return maxCID
 }
 
-func makeName(m map[charcode.CharCode]type1.CID) string {
+func makeName(m map[charcode.CharCode]cid.CID) string {
 	codes := maps.Keys(m)
 	slices.Sort(codes)
 	h := sha256.New()

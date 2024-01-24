@@ -23,9 +23,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"seehuhn.de/go/postscript/type1"
-
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/postscript/cid"
 )
 
 func TestCompressWidths(t *testing.T) {
@@ -146,7 +145,7 @@ func TestEncodeWidths(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(fmt.Sprintf("%s-%d", v, i), func(t *testing.T) {
 			var ww []cidWidth
-			pos := type1.CID(1)
+			pos := cid.CID(1)
 			for _, run := range test.in {
 				for _, w := range run {
 					ww = append(ww, cidWidth{pos, w})
@@ -162,7 +161,7 @@ func TestEncodeWidths(t *testing.T) {
 				pos++
 			}
 
-			widths := make(map[type1.CID]float64)
+			widths := make(map[cid.CID]float64)
 			for _, w := range ww {
 				widths[w.CID] = w.GlyphWidth
 			}
@@ -184,7 +183,7 @@ func TestEncodeWidths(t *testing.T) {
 // The test checks that DecodeWidthsComposite and EncodeWidthsComposite
 // are inverse functions of each other.
 func TestWidthsRoundTrip(t *testing.T) {
-	w1 := map[type1.CID]float64{
+	w1 := map[cid.CID]float64{
 		0:  1000,
 		1:  1000,
 		2:  500,
@@ -198,15 +197,15 @@ func TestWidthsRoundTrip(t *testing.T) {
 		10: 1000,
 		12: 1000,
 	}
-	w2 := map[type1.CID]float64{
+	w2 := map[cid.CID]float64{
 		0: 1000,
 	}
-	w3 := map[type1.CID]float64{
+	w3 := map[cid.CID]float64{
 		0: 1000,
 		1: 1000,
 		2: 1000,
 	}
-	w4 := map[type1.CID]float64{
+	w4 := map[cid.CID]float64{
 		0: 0,
 		1: 800,
 		2: 900,
@@ -215,7 +214,7 @@ func TestWidthsRoundTrip(t *testing.T) {
 	}
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		data := pdf.NewData(v)
-		for _, wIn := range []map[type1.CID]float64{w1, w2, w3, w4} {
+		for _, wIn := range []map[cid.CID]float64{w1, w2, w3, w4} {
 			dw, ww := EncodeWidthsComposite(wIn, pdf.GetVersion(data))
 			wOut, err := DecodeWidthsComposite(data, ww, dw)
 			if err != nil {

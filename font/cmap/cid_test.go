@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 )
 
 func TestAppendEncoded(t *testing.T) {
@@ -50,7 +50,7 @@ func TestAppendEncoded(t *testing.T) {
 	}
 
 	// Check that the cmap and tounicode maps are correct
-	expectedMapping := map[charcode.CharCode]type1.CID{
+	expectedMapping := map[charcode.CharCode]cid.CID{
 		runeToCode('A'):      1,
 		runeToCode('B'):      2,
 		runeToCode('C'):      3,

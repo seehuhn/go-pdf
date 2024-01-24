@@ -28,8 +28,8 @@ import (
 
 	"golang.org/x/text/unicode/runenames"
 
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
-	pst1 "seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/cff"
@@ -167,7 +167,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 			codes[gid] = append(codes[gid], code)
 		}
 	}
-	CIDs := make(map[glyph.ID]pst1.CID)
+	CIDs := make(map[glyph.ID]cid.CID)
 	if fnt.GIDToCID != nil {
 		for gid, cid := range fnt.GIDToCID {
 			CIDs[glyph.ID(gid)] = cid

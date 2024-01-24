@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 )
 
 func TestMapping(t *testing.T) {
@@ -34,7 +34,7 @@ func TestMapping(t *testing.T) {
 		CodeSpaceRange: cs,
 		CSFile:         cs,
 	}
-	m1 := map[charcode.CharCode]type1.CID{
+	m1 := map[charcode.CharCode]cid.CID{
 		0:  0, // single 1
 		2:  1, // range ...
 		3:  2,

@@ -19,9 +19,9 @@ package loader
 import (
 	"bufio"
 	"embed"
-	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 )
@@ -37,16 +37,25 @@ type FontType int
 // Supported font types.
 const (
 	FontTypeType1 FontType = iota + 1
+	FontTypeAFM
 	FontTypeSfnt
 )
 
+// A Loader can load fonts, in case fonts are not embedded in the PDF file.
+// Every Loader contains the 14 standard fonts required by the PDF
+// specification.  Other external fonts can be added using AddFontMap and
+// AddFont.
 type Loader struct {
-	lookup map[string]*font
+	lookup map[key]*val
 }
 
-type font struct {
+type key struct {
+	psname   string
+	fontType FontType
+}
+
+type val struct {
 	fname     string
-	fontType  FontType
 	isBuiltin bool
 }
 
@@ -55,9 +64,10 @@ type font struct {
 // specification.
 func New() *Loader {
 	res := &Loader{
-		lookup: make(map[string]*font),
+		lookup: make(map[key]*val),
 	}
 
+	// There should not be any errors for the builtin fonts.
 	defaultMap, err := builtin.Open("builtin/font.map")
 	if err != nil {
 		panic(err)
@@ -80,32 +90,31 @@ func New() *Loader {
 
 // Open opens the font with the given PostScript name.  The returned
 // io.ReadCloser must be closed by the caller.
-func (l *Loader) Open(postscriptName string) (FontType, io.ReadCloser, error) {
-	font, ok := l.lookup[postscriptName]
+func (l *Loader) Open(postscriptName string, tp FontType) (io.ReadCloser, error) {
+	key := key{postscriptName, tp}
+	font, ok := l.lookup[key]
 	if !ok {
-		return 0, nil, ErrNotFound
+		return nil, fs.ErrNotExist
 	}
 
 	fname := font.fname
 	if font.isBuiltin {
-		r, err := builtin.Open(fname)
-		return font.fontType, r, err
+		return builtin.Open(fname)
 	}
 
-	r, err := os.Open(fname)
-	return font.fontType, r, err
+	return os.Open(fname)
 }
 
-// AddFontMap reads a font map from r and adds it to the loader. The format of
-// the font map is:
+// AddFontMap reads a font map from r and adds it to the loader.  A font map
+// consists of lines of the form
 //
 //	<name> <type> <path>
 //
-// where <name> is the PostScript name of the font, <type> is either "type1" or
-// "sfnt", and <path> is the path to the font file.  The fields must be
-// separated by a single spaces.  Lines starting with '#' or '%' are ignored.
+// where <name> is the PostScript name of the font, <type> is either "type1",
+// "afm" or "sfnt", and <path> is the path to the font file.  The fields must
+// be separated by single spaces.  Lines starting with '#' or '%' are ignored.
 //
-// Any previous mapping for <name> is overwritten.
+// Any previous mapping for (<name>, <type>) is overwritten.
 func (l *Loader) AddFontMap(r io.Reader) error {
 	lines := bufio.NewScanner(r)
 	for lines.Scan() {
@@ -123,22 +132,26 @@ func (l *Loader) AddFontMap(r io.Reader) error {
 		switch parts[1] {
 		case "type1":
 			fontType = FontTypeType1
+		case "afm":
+			fontType = FontTypeAFM
 		case "sfnt":
 			fontType = FontTypeSfnt
 		default:
 			return fmt.Errorf("invalid font type %q", parts[1])
 		}
 
-		l.lookup[parts[0]] = &font{
-			fname:    parts[2],
-			fontType: fontType,
-		}
+		key := key{parts[0], fontType}
+		l.lookup[key] = &val{fname: parts[2]}
 	}
 	return lines.Err()
 }
 
-// ErrNotFound is returned by Open if the font is not known to the loader.
-var ErrNotFound = errors.New("unknown font")
+// AddFont adds a font to the loader.  Any previous mapping for the same
+// PostScript name and font type is overwritten.
+func (l *Loader) AddFont(postscriptName string, tp FontType, fname string) {
+	key := key{postscriptName, tp}
+	l.lookup[key] = &val{fname: fname}
+}
 
 // builtin holds the 14 standard fonts required by the PDF specification.
 //

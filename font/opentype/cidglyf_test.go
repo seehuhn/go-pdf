@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -36,7 +36,7 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		t.Fatal(err)
 	}
 	cs := charcode.UCS2
-	ros := &type1.CIDSystemInfo{
+	ros := &cid.SystemInfo{
 		Registry:   "Test",
 		Ordering:   "Merkwürdig",
 		Supplement: 7,
@@ -47,10 +47,10 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmapData := make(map[charcode.CharCode]type1.CID)
-	cmapData[charcode.CharCode('A')] = type1.CID(fontCMap.Lookup('A'))
-	cmapData[charcode.CharCode('B')] = type1.CID(fontCMap.Lookup('B'))
-	cmapData[charcode.CharCode('C')] = type1.CID(fontCMap.Lookup('C'))
+	cmapData := make(map[charcode.CharCode]cid.CID)
+	cmapData[charcode.CharCode('A')] = cid.CID(fontCMap.Lookup('A'))
+	cmapData[charcode.CharCode('B')] = cid.CID(fontCMap.Lookup('B'))
+	cmapData[charcode.CharCode('C')] = cid.CID(fontCMap.Lookup('C'))
 	cmapInfo := cmap.New(ros, cs, cmapData)
 
 	m := make(map[charcode.CharCode][]rune, 8)
@@ -59,9 +59,9 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 	m[charcode.CharCode('C')] = []rune{'C'}
 	toUnicode := cmap.NewToUnicode(cs, m)
 
-	maxCID := type1.CID(fontCMap.Lookup('C'))
+	maxCID := cid.CID(fontCMap.Lookup('C'))
 	CID2GID := make([]glyph.ID, maxCID+1)
-	for cid := type1.CID(0); cid <= maxCID; cid++ {
+	for cid := cid.CID(0); cid <= maxCID; cid++ {
 		CID2GID[cid] = glyph.ID(cid)
 	}
 

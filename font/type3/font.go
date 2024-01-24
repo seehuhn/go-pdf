@@ -29,8 +29,8 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -266,7 +266,7 @@ func (e *embedded) Close() error {
 	return info.Embed(e.w, e.Ref)
 }
 
-func (e *embedded) GlyphWidth(cid type1.CID) float64 {
+func (e *embedded) GlyphWidth(cid cid.CID) float64 {
 	// TODO(voss): is this correct?
 	return float64(e.Glyphs[e.glyphNames[cid]].WidthX)
 }

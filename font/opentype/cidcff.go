@@ -23,8 +23,8 @@ import (
 
 	"golang.org/x/text/language"
 
+	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -138,7 +138,7 @@ func (f *embeddedCFFComposite) WritingMode() int {
 }
 
 func (f *embeddedCFFComposite) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
-	f.AllCIDs(s)(func(code []byte, cid type1.CID) bool {
+	f.AllCIDs(s)(func(code []byte, cid pscid.CID) bool {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.
 		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
@@ -155,7 +155,7 @@ func (f *embeddedCFFComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []run
 	return s, width, len(s) == k+1 && s[k] == ' '
 }
 
-func (f *embeddedCFFComposite) CIDToWidth(cid type1.CID) float64 {
+func (f *embeddedCFFComposite) CIDToWidth(cid pscid.CID) float64 {
 	gid := f.GID(cid)
 	// TODO(voss): deal with different Font Matrices for different private dicts.
 	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
@@ -182,7 +182,7 @@ func (f *embeddedCFFComposite) Close() error {
 	}
 
 	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
-	gidToCID := make([]type1.CID, len(subsetGID))
+	gidToCID := make([]pscid.CID, len(subsetGID))
 	for i, gid := range subsetGID {
 		gidToCID[i] = origGIDToCID[gid]
 	}
@@ -197,7 +197,7 @@ func (f *embeddedCFFComposite) Close() error {
 	// to glyphs.  Otherwise, the CID is used as the glyph index directly.
 	isIdentity := true
 	for gid, cid := range gidToCID {
-		if cid != 0 && cid != type1.CID(gid) {
+		if cid != 0 && cid != pscid.CID(gid) {
 			isIdentity = false
 			break
 		}
@@ -273,14 +273,14 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	q := 1000 / float64(unitsPerEm)
 
 	widths := otf.Widths()
-	ww := make(map[type1.CID]float64, len(widths))
+	ww := make(map[pscid.CID]float64, len(widths))
 	if cff.GIDToCID != nil {
 		for gid, w := range widths {
 			ww[cff.GIDToCID[gid]] = w.AsFloat(q)
 		}
 	} else {
 		for gid, w := range widths {
-			ww[type1.CID(gid)] = w.AsFloat(q)
+			ww[pscid.CID(gid)] = w.AsFloat(q)
 		}
 	}
 	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))

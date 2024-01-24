@@ -1,4 +1,2 @@
 Unless otherwise stated, the code in this repository is distributed
 under the GNU General Public License v3.0 (see the file COPYING).
-
-

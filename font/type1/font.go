@@ -64,8 +64,9 @@ func New(psFont *type1.Font) (*Font, error) {
 		extents[i] = gi.BBox
 	}
 
+	unitsPerEm := uint16(math.Round(1 / psFont.FontMatrix[0]))
 	geometry := &font.Geometry{
-		UnitsPerEm:   psFont.UnitsPerEm,
+		UnitsPerEm:   unitsPerEm,
 		Widths:       widths,
 		GlyphExtents: extents,
 
@@ -445,9 +446,6 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		unitsPerEm := uint16(math.Round(1 / t1.FontInfo.FontMatrix[0]))
-		t1.UnitsPerEm = unitsPerEm
 
 		q := 1000 * t1.FontInfo.FontMatrix[0]
 

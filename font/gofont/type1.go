@@ -178,7 +178,6 @@ func Type1(font FontID) (*type1.Font, error) {
 
 	res := &type1.Font{
 		CreationDate: info.CreationTime,
-		UnitsPerEm:   info.UnitsPerEm,
 		Encoding:     encoding,
 		Ascent:       info.Ascent,
 		Descent:      info.Descent,

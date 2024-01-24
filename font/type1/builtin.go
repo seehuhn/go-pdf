@@ -17,7 +17,6 @@
 package type1
 
 import (
-	"embed"
 	"sync"
 
 	"seehuhn.de/go/postscript/afm"
@@ -28,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -125,7 +125,9 @@ func getBuiltin(f Builtin) (*Font, error) {
 
 // PSFont returns the font metrics for one of the built-in pdf fonts.
 func (f Builtin) PSFont() (*type1.Font, error) {
-	fd, err := afmData.Open("builtin/" + string(f) + ".afm")
+	L := loader.New()
+
+	fd, err := L.Open(string(f), loader.FontTypeAFM)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +138,18 @@ func (f Builtin) PSFont() (*type1.Font, error) {
 		return nil, err
 	}
 
+	res.FontInfo.FontName = string(f)
+
 	return res, nil
 }
 
 // IsBuiltin returns true if the given font is one of the 14 built-in PDF fonts.
 func IsBuiltin(f *type1.Font) bool {
+	// TODO(voss): a font is one of the 14 standard fonts if the name is one of
+	// the 14 standard names and no glyph data was given.
+
 	b, err := Builtin(f.FontInfo.FontName).PSFont()
-	if err != nil || b.UnitsPerEm != f.UnitsPerEm {
+	if err != nil {
 		return false
 	}
 
@@ -159,9 +166,6 @@ func IsBuiltin(f *type1.Font) bool {
 
 	return true
 }
-
-//go:embed builtin/*.afm
-var afmData embed.FS
 
 var (
 	fontCache     = make(map[Builtin]*Font)

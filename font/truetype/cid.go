@@ -24,8 +24,8 @@ import (
 
 	"golang.org/x/text/language"
 
+	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	sfntcmap "seehuhn.de/go/sfnt/cmap"
@@ -136,7 +136,7 @@ func (f *embeddedComposite) WritingMode() int {
 }
 
 func (f *embeddedComposite) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
-	f.AllCIDs(s)(func(code []byte, cid type1.CID) bool {
+	f.AllCIDs(s)(func(code []byte, cid pscid.CID) bool {
 		gid := f.GID(cid)
 		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 		yield(width, len(code) == 1 && code[0] == ' ')
@@ -151,7 +151,7 @@ func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) 
 	return s, width, len(s) == k+1 && s[k] == ' '
 }
 
-func (f *embeddedComposite) CIDToWidth(cid type1.CID) float64 {
+func (f *embeddedComposite) CIDToWidth(cid pscid.CID) float64 {
 	gid := f.GID(cid)
 	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 }
@@ -182,12 +182,12 @@ func (f *embeddedComposite) Close() error {
 
 	//  The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
 	//  from CIDs to glyphs.
-	m := make(map[glyph.ID]type1.CID)
+	m := make(map[glyph.ID]pscid.CID)
 	origGIDToCID := f.GIDToCID.GIDToCID(origTTF.NumGlyphs())
 	for origGID, cid := range origGIDToCID {
 		m[glyph.ID(origGID)] = cid
 	}
-	var maxCID type1.CID
+	var maxCID pscid.CID
 	for _, origGID := range subsetGID {
 		cid := m[origGID]
 		if cid > maxCID {
@@ -263,9 +263,9 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	q := 1000 / float64(unitsPerEm)
 
 	widths := outlines.Widths
-	ww := make(map[type1.CID]float64, len(widths))
+	ww := make(map[pscid.CID]float64, len(widths))
 	for cid, gid := range info.CID2GID {
-		ww[type1.CID(cid)] = widths[gid].AsFloat(q)
+		ww[pscid.CID(cid)] = widths[gid].AsFloat(q)
 	}
 	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))
 

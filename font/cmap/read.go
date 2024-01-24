@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/postscript"
+	"seehuhn.de/go/postscript/cid"
+	pscid "seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/postscript/cmap"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript"
-	"seehuhn.de/go/postscript/cmap"
-	"seehuhn.de/go/postscript/type1"
 )
 
 // Extract reads a CMap from a PDF file.
@@ -63,7 +65,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	}
 
 	res := &Info{
-		ROS:            &type1.CIDSystemInfo{},
+		ROS:            &cid.SystemInfo{},
 		CodeSpaceRange: nil,
 		WMode:          0,
 	}
@@ -82,7 +84,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	if ROS, ok := cmap["CIDSystemInfo"].(postscript.Dict); !ok {
 		return nil, fmt.Errorf("invalid CIDSystemInfo: %v", cmap["CIDSystemInfo"])
 	} else {
-		ros := &type1.CIDSystemInfo{}
+		ros := &cid.SystemInfo{}
 		if registry, ok := ROS["Registry"].(postscript.String); !ok {
 			return nil, fmt.Errorf("invalid Registry: %v", ROS["Registry"])
 		} else {
@@ -141,7 +143,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		} else {
 			res.Singles = append(res.Singles, SingleEntry{
 				Code:  code,
-				Value: type1.CID(cid),
+				Value: pscid.CID(cid),
 			})
 		}
 	}
@@ -161,7 +163,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 			res.Ranges = append(res.Ranges, RangeEntry{
 				First: low,
 				Last:  high,
-				Value: type1.CID(cid),
+				Value: pscid.CID(cid),
 			})
 		}
 	}

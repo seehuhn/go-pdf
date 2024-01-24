@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 )
@@ -40,14 +40,14 @@ func TestRoundTripCFFComposite(t *testing.T) {
 		{Low: []byte{0x04}, High: []byte{0x07}},
 		{Low: []byte{0x10, 0x12}, High: []byte{0x11, 0x13}},
 	}
-	ros := &type1.CIDSystemInfo{
+	ros := &cid.SystemInfo{
 		Registry:   "Test",
 		Ordering:   "Sonderbar",
 		Supplement: 13,
 	}
-	cmapData := make(map[charcode.CharCode]type1.CID, 8)
+	cmapData := make(map[charcode.CharCode]cid.CID, 8)
 	for code := charcode.CharCode(0); code < 8; code++ {
-		cmapData[code] = type1.CID(2*code + 1)
+		cmapData[code] = cid.CID(2*code + 1)
 	}
 	cmapInfo := cmap.New(ros, cs, cmapData)
 	m := make(map[charcode.CharCode][]rune, 8)

@@ -23,12 +23,12 @@ import (
 	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 )
 
 // GetMapping returns the mapping information from info.
-func (info *Info) GetMapping() map[charcode.CharCode]type1.CID {
-	res := make(map[charcode.CharCode]type1.CID)
+func (info *Info) GetMapping() map[charcode.CharCode]cid.CID {
+	res := make(map[charcode.CharCode]cid.CID)
 	for _, s := range info.Singles {
 		res[s.Code] = s.Value
 	}
@@ -47,7 +47,7 @@ func (info *Info) GetMapping() map[charcode.CharCode]type1.CID {
 // To make efficient use of range entries, the generated mapping may be a
 // superset of the original mapping, i.e. it may contain entries for charcodes
 // which were not mapped in the original mapping.
-func (info *Info) SetMapping(m map[charcode.CharCode]type1.CID) {
+func (info *Info) SetMapping(m map[charcode.CharCode]cid.CID) {
 	entries := make([]entry, 0, len(m))
 	for code, val := range m {
 		entries = append(entries, entry{code, val})
@@ -87,7 +87,7 @@ func (info *Info) SetMapping(m map[charcode.CharCode]type1.CID) {
 
 type entry struct {
 	code  charcode.CharCode
-	value type1.CID
+	value cid.CID
 }
 
 type encoder struct {
@@ -150,7 +150,7 @@ func (g *encoder) Length(v int, e int16) uint32 {
 	return cost
 }
 
-func ndigit(cid type1.CID) uint32 {
+func ndigit(cid cid.CID) uint32 {
 	if cid < 10 {
 		return 1
 	} else if cid < 100 {

@@ -23,28 +23,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-func TestBuiltin(t *testing.T) {
-	known, err := afmData.ReadDir("builtin")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(known) != len(All) {
-		t.Error("wrong number of afm files:", len(known))
-	}
-
-	for _, fontName := range All {
-		afm, err := fontName.PSFont()
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-
-		if afm.FontInfo.FontName != string(fontName) {
-			t.Errorf("wrong font name: %q != %q", afm.FontInfo.FontName, fontName)
-		}
-	}
-}
-
 func TestUnknownBuiltin(t *testing.T) {
 	F := Builtin("unknown font")
 	_, err := F.PSFont()

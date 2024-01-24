@@ -19,7 +19,7 @@ package debug
 import (
 	"golang.org/x/text/language"
 
-	pstype1 "seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/cid"
 
 	scff "seehuhn.de/go/sfnt/cff"
 
@@ -134,14 +134,14 @@ func MakeFonts() ([]FontSample, error) {
 	}
 	outlines = otf.Outlines.(*scff.Outlines) // convert to use CIDFont operators
 	outlines.Encoding = nil
-	outlines.ROS = &pstype1.CIDSystemInfo{
+	outlines.ROS = &cid.SystemInfo{
 		Registry:   "Seehuhn",
 		Ordering:   "Sonderbar",
 		Supplement: 0,
 	}
-	outlines.GIDToCID = make([]pstype1.CID, len(outlines.Glyphs))
+	outlines.GIDToCID = make([]cid.CID, len(outlines.Glyphs))
 	for i := range outlines.GIDToCID {
-		outlines.GIDToCID[i] = pstype1.CID(i)
+		outlines.GIDToCID[i] = cid.CID(i)
 	}
 	F, err = cff.NewComposite(otf, opt)
 	if err != nil {

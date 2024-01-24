@@ -19,9 +19,12 @@ package loader
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
 
+// TestStandardFonts checks that the 14 standard fonts are available.
 func TestStandardFonts(t *testing.T) {
 	loader := New()
 
@@ -41,17 +44,18 @@ func TestStandardFonts(t *testing.T) {
 		"Symbol",
 		"ZapfDingbats",
 	}
+
+	// Type 1 font files
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
-			tp, r, err := loader.Open(name)
+			// Make sure the type file is found ...
+			r, err := loader.Open(name, FontTypeType1)
 			if err != nil {
 				t.Fatalf("error loading font %q: %v", name, err)
 			}
-			if tp != FontTypeType1 {
-				t.Errorf("expected font type %v, got %v", FontTypeType1, tp)
-			}
 
-			_, err = type1.Read(r)
+			// ... and can be read.
+			font, err := type1.Read(r)
 			if err != nil {
 				t.Errorf("error reading font %q: %v", name, err)
 			}
@@ -59,6 +63,28 @@ func TestStandardFonts(t *testing.T) {
 			err = r.Close()
 			if err != nil {
 				t.Errorf("error closing font %q: %v", name, err)
+			}
+
+			// Make sure the ADM file is found ...
+			r, err = loader.Open(name, FontTypeAFM)
+			if err != nil {
+				t.Fatalf("error loading afm file %q: %v", name, err)
+			}
+
+			// ... and can be read.
+			afm, err := afm.Read(r)
+			if err != nil {
+				t.Errorf("error reading afm file %q: %v", name, err)
+			}
+
+			err = r.Close()
+			if err != nil {
+				t.Errorf("error closing afm file %q: %v", name, err)
+			}
+
+			// Check that the font and the afm file match.
+			if d := cmp.Diff(font.Encoding, afm.Encoding); d != "" {
+				t.Errorf("font %q: encoding mismatch:\n%s", name, d)
 			}
 		})
 	}

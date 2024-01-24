@@ -23,11 +23,13 @@ import (
 	"slices"
 
 	"golang.org/x/exp/maps"
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/type1"
+
+	pscid "seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/sfnt/glyph"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
 )
 
 // CIDEncoder constructs and stores mappings from character codes
@@ -39,11 +41,11 @@ type CIDEncoder interface {
 	// given unicode string.
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
-	CodeAndCID(pdf.String, glyph.ID, []rune) (pdf.String, type1.CID)
+	CodeAndCID(pdf.String, glyph.ID, []rune) (pdf.String, pscid.CID)
 
 	CS() charcode.CodeSpaceRange
 
-	Lookup(c charcode.CharCode) (type1.CID, bool)
+	Lookup(c charcode.CharCode) (pscid.CID, bool)
 
 	// CMap returns the mapping from character codes to CID values.
 	CMap() *Info
@@ -57,7 +59,7 @@ type CIDEncoder interface {
 
 	AsText(pdf.String) []rune
 
-	AllCIDs(pdf.String) func(yield func([]byte, type1.CID) bool) bool
+	AllCIDs(pdf.String) func(yield func([]byte, pscid.CID) bool) bool
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -85,7 +87,7 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 	return charcode.UCS2.Append(s, code)
 }
 
-func (e *identityEncoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, type1.CID) {
+func (e *identityEncoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, pscid.CID) {
 	cid := e.g2c.CID(gid, rr)
 	code := charcode.CharCode(cid)
 	e.toUnicode[code] = rr
@@ -97,17 +99,17 @@ func (e *identityEncoder) CS() charcode.CodeSpaceRange {
 	return charcode.UCS2
 }
 
-func (e *identityEncoder) Lookup(code charcode.CharCode) (type1.CID, bool) {
+func (e *identityEncoder) Lookup(code charcode.CharCode) (pscid.CID, bool) {
 	if _, ok := e.toUnicode[code]; !ok {
 		return 0, false
 	}
-	return type1.CID(code), true
+	return pscid.CID(code), true
 }
 
 func (e *identityEncoder) CMap() *Info {
-	m := make(map[charcode.CharCode]type1.CID)
+	m := make(map[charcode.CharCode]pscid.CID)
 	for code := range e.toUnicode {
-		m[code] = type1.CID(code)
+		m[code] = pscid.CID(code)
 	}
 	return New(e.g2c.ROS(), charcode.UCS2, m)
 }
@@ -139,12 +141,12 @@ func (e *identityEncoder) AsText(s pdf.String) []rune {
 	return res
 }
 
-func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, type1.CID) bool) bool {
-	return func(yield func([]byte, type1.CID) bool) bool {
+func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) bool {
+	return func(yield func([]byte, pscid.CID) bool) bool {
 		for len(s) >= 2 {
 			var code []byte
 			code, s = s[:2], s[2:]
-			cid := type1.CID(code[0])<<8 | type1.CID(code[1])
+			cid := pscid.CID(code[0])<<8 | pscid.CID(code[1])
 			if !yield(code, cid) {
 				return false
 			}
@@ -159,8 +161,8 @@ func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 	return &utf8Encoder{
 		g2c:   g2c,
 		cache: make(map[key]charcode.CharCode),
-		cmap:  make(map[charcode.CharCode]type1.CID),
-		rev:   make(map[type1.CID]charcode.CharCode),
+		cmap:  make(map[charcode.CharCode]pscid.CID),
+		rev:   make(map[pscid.CID]charcode.CharCode),
 		next:  0xE000,
 	}
 }
@@ -169,8 +171,8 @@ type utf8Encoder struct {
 	g2c GIDToCID
 
 	cache map[key]charcode.CharCode
-	cmap  map[charcode.CharCode]type1.CID
-	rev   map[type1.CID]charcode.CharCode
+	cmap  map[charcode.CharCode]pscid.CID
+	rev   map[pscid.CID]charcode.CharCode
 	next  rune
 }
 
@@ -184,7 +186,7 @@ func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.S
 	return s
 }
 
-func (e *utf8Encoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, type1.CID) {
+func (e *utf8Encoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, pscid.CID) {
 	cid := e.g2c.CID(gid, rr)
 	k := key{gid, string(rr)}
 
@@ -236,7 +238,7 @@ func (e *utf8Encoder) CS() charcode.CodeSpaceRange {
 	return utf8cs
 }
 
-func (e *utf8Encoder) Lookup(code charcode.CharCode) (type1.CID, bool) {
+func (e *utf8Encoder) Lookup(code charcode.CharCode) (pscid.CID, bool) {
 	cid, ok := e.cmap[code]
 	return cid, ok
 }
@@ -268,8 +270,8 @@ func (e *utf8Encoder) AsText(s pdf.String) []rune {
 	return []rune(string(s))
 }
 
-func (e *utf8Encoder) AllCIDs(s pdf.String) func(yield func([]byte, type1.CID) bool) bool {
-	return func(yield func([]byte, type1.CID) bool) bool {
+func (e *utf8Encoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) bool {
+	return func(yield func([]byte, pscid.CID) bool) bool {
 		return utf8cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 			c, _ := utf8cs.Decode(code)
 			return yield(code, e.cmap[c])
@@ -288,45 +290,45 @@ var utf8cs = charcode.CodeSpaceRange{
 // GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
 // Identifier (CID) values.
 type GIDToCID interface {
-	CID(glyph.ID, []rune) type1.CID
-	GID(type1.CID) glyph.ID
+	CID(glyph.ID, []rune) pscid.CID
+	GID(pscid.CID) glyph.ID
 
-	ROS() *type1.CIDSystemInfo
+	ROS() *pscid.SystemInfo
 
-	GIDToCID(numGlyph int) []type1.CID
+	GIDToCID(numGlyph int) []pscid.CID
 }
 
 // NewSequentialGIDToCID returns a GIDToCID which assigns CID values
 // sequentially, starting with 1.
 func NewSequentialGIDToCID() GIDToCID {
 	return &gidToCIDSequential{
-		g2c: make(map[glyph.ID]type1.CID),
-		c2g: make(map[type1.CID]glyph.ID),
+		g2c: make(map[glyph.ID]pscid.CID),
+		c2g: make(map[pscid.CID]glyph.ID),
 	}
 }
 
 type gidToCIDSequential struct {
-	g2c map[glyph.ID]type1.CID
-	c2g map[type1.CID]glyph.ID
+	g2c map[glyph.ID]pscid.CID
+	c2g map[pscid.CID]glyph.ID
 }
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) type1.CID {
+func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) pscid.CID {
 	cid, ok := g.g2c[gid]
 	if !ok {
-		cid = type1.CID(len(g.g2c) + 1)
+		cid = pscid.CID(len(g.g2c) + 1)
 		g.g2c[gid] = cid
 		g.c2g[cid] = gid
 	}
 	return cid
 }
 
-func (g *gidToCIDSequential) GID(cid type1.CID) glyph.ID {
+func (g *gidToCIDSequential) GID(cid pscid.CID) glyph.ID {
 	return g.c2g[cid]
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) ROS() *type1.CIDSystemInfo {
+func (g *gidToCIDSequential) ROS() *pscid.SystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, len(g.g2c))
@@ -338,7 +340,7 @@ func (g *gidToCIDSequential) ROS() *type1.CIDSystemInfo {
 	}
 	sum := h.Sum(nil)
 
-	return &type1.CIDSystemInfo{
+	return &pscid.SystemInfo{
 		Registry:   "Seehuhn",
 		Ordering:   fmt.Sprintf("%x", sum[:8]),
 		Supplement: 0,
@@ -346,8 +348,8 @@ func (g *gidToCIDSequential) ROS() *type1.CIDSystemInfo {
 }
 
 // GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) GIDToCID(numGlyph int) []type1.CID {
-	res := make([]type1.CID, numGlyph)
+func (g *gidToCIDSequential) GIDToCID(numGlyph int) []pscid.CID {
+	res := make([]pscid.CID, numGlyph)
 	for gid, cid := range g.g2c {
 		res[gid] = cid
 	}
@@ -363,18 +365,18 @@ func NewIdentityGIDToCID() GIDToCID {
 type gidToCIDIdentity struct{}
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) CID(gid glyph.ID, _ []rune) type1.CID {
-	return type1.CID(gid)
+func (g *gidToCIDIdentity) CID(gid glyph.ID, _ []rune) pscid.CID {
+	return pscid.CID(gid)
 }
 
 // CID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GID(cid type1.CID) glyph.ID {
+func (g *gidToCIDIdentity) GID(cid pscid.CID) glyph.ID {
 	return glyph.ID(cid)
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) ROS() *type1.CIDSystemInfo {
-	return &type1.CIDSystemInfo{
+func (g *gidToCIDIdentity) ROS() *pscid.SystemInfo {
+	return &pscid.SystemInfo{
 		Registry:   "Adobe",
 		Ordering:   "Identity",
 		Supplement: 0,
@@ -382,10 +384,10 @@ func (g *gidToCIDIdentity) ROS() *type1.CIDSystemInfo {
 }
 
 // GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []type1.CID {
-	res := make([]type1.CID, numGlyph)
+func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []pscid.CID {
+	res := make([]pscid.CID, numGlyph)
 	for i := range res {
-		res[i] = type1.CID(i)
+		res[i] = pscid.CID(i)
 	}
 	return res
 }
