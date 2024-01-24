@@ -1,0 +1,13 @@
+The folowing files were taken from git://git.ghostscript.com/ghostpdl.git:
+
+- ghostpdl/Resource/Font/D050000L
+
+From ghostpdl/LICENSE:
+
+Additionally, the font files (in Resource/Font) are distributed
+under the AGPL with the following exemption:
+
+As a special exception, permission is granted to include these font
+programs in a Postscript or PDF file that consists of a document that
+contains text to be displayed or printed using this font, regardless
+of the conditions or license applying to the document itself.

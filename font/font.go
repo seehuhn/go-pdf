@@ -33,9 +33,9 @@ type Glyph struct {
 	// and is already scaled by the font size.
 	Advance float64
 
-	// Rise is by how much the client wishes to lift the glyph above
-	// the baseline.  It is measured in PDF text space units,
-	// and is already scaled by the font size.
+	// Rise is by how much the glyph should be lifted above the baseline.  The
+	// rise is measured in PDF text space units, and is already scaled by the
+	// font size.
 	Rise float64
 
 	Text []rune
