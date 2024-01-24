@@ -144,6 +144,13 @@ func (f *embeddedComposite) ForeachWidth(s pdf.String, yield func(width float64,
 	})
 }
 
+func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+	k := len(s)
+	s = f.AppendEncoded(s, gid, rr)
+	return s, width, len(s) == k+1 && s[k] == ' '
+}
+
 func (f *embeddedComposite) CIDToWidth(cid type1.CID) float64 {
 	gid := f.GID(cid)
 	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)

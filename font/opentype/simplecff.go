@@ -125,6 +125,12 @@ func (f *embeddedCFFSimple) ForeachWidth(s pdf.String, yield func(width float64,
 	}
 }
 
+func (f *embeddedCFFSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+	c := f.GIDToCode(gid, rr)
+	return append(s, c), width, c == ' '
+}
+
 func (f *embeddedCFFSimple) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
 	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]

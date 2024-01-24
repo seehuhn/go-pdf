@@ -103,9 +103,9 @@ func (w *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float6
 	}
 
 	xBefore := w.State.TextMatrix[4]
-	pdfLeft, pdfGG := convertGlyphs(gg, w.State.TextFont.(font.Layouter).FontMatrix(), w.State.TextFontSize)
+	pdfLeft, pdfGG := convertGlyphs(gg, w.TextFont.(font.Layouter).FontMatrix(), w.TextFontSize)
 
-	w.TextShowGlyphs(pdfLeft+left/1000, pdfGG, right/1000)
+	w.TextShowGlyphs(pdfLeft+left/1000*w.TextFontSize, pdfGG, right/1000*w.TextFontSize)
 
 	return w.State.TextMatrix[4] - xBefore
 }

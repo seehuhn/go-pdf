@@ -133,6 +133,12 @@ func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is
 	}
 }
 
+func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+	c := f.GIDToCode(gid, rr)
+	return append(s, c), width, c == ' '
+}
+
 func (f *embeddedSimple) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
 	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
@@ -473,6 +479,19 @@ func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is
 		width := float64(f.Font.Glyphs[gid].Width) * f.Font.FontMatrix[0]
 		yield(width, c == ' ')
 	}
+}
+
+// CodeAndWidth implements the [font.NewFontSimple] interface.
+//
+// TODO(voss): speed this up
+func (f *fromFileSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.Font.Glyphs[gid].Width) * f.Font.FontMatrix[0]
+	for code, gid := range f.Encoding {
+		if gid == gid {
+			return append(s, byte(code)), width, code == ' '
+		}
+	}
+	panic("GID not encoded")
 }
 
 // CodeToWidth implements the [font.NewFontSimple] interface.

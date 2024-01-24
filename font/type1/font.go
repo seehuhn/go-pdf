@@ -180,8 +180,15 @@ type embedded struct {
 func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
-		yield(float64(f.Geometry.Widths[gid])*f.outlines.FontInfo.FontMatrix[0], c == ' ')
+		width := float64(f.Geometry.Widths[gid]) * f.outlines.FontInfo.FontMatrix[0]
+		yield(width, c == ' ')
 	}
+}
+
+func (f *embedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.Geometry.Widths[gid]) * f.outlines.FontInfo.FontMatrix[0]
+	c := f.GIDToCode(gid, rr)
+	return append(s, c), width, c == ' '
 }
 
 func (f *embedded) CodeToWidth(c byte) float64 {

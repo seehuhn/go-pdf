@@ -147,6 +147,14 @@ func (f *embeddedCFFComposite) ForeachWidth(s pdf.String, yield func(width float
 	})
 }
 
+func (f *embeddedCFFComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	// TODO(voss): deal with different Font Matrices for different private dicts.
+	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+	k := len(s)
+	s = f.AppendEncoded(s, gid, rr)
+	return s, width, len(s) == k+1 && s[k] == ' '
+}
+
 func (f *embeddedCFFComposite) CIDToWidth(cid type1.CID) float64 {
 	gid := f.GID(cid)
 	// TODO(voss): deal with different Font Matrices for different private dicts.

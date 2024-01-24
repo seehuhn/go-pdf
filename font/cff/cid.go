@@ -42,7 +42,7 @@ import (
 
 // FontComposite is a CFF font for embedding into a PDF file as a composite font.
 type FontComposite struct {
-	otf         *sfnt.Font
+	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -87,7 +87,7 @@ func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	}
 
 	res := &FontComposite{
-		otf:          info,
+		sfnt:         info,
 		cmap:         cmap,
 		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
 		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
@@ -118,7 +118,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 
 // Layout implements the [font.Font] interface.
 func (f *FontComposite) Layout(s string) glyph.Seq {
-	return f.otf.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
 
 type embeddedComposite struct {
@@ -140,16 +140,24 @@ func (f *embeddedComposite) ForeachWidth(s pdf.String, yield func(float64, bool)
 	f.AllCIDs(s)(func(code []byte, cid type1.CID) bool {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.
-		width := float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
+		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 		yield(width, len(code) == 1 && code[0] == ' ')
 		return true
 	})
 }
 
+func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	// TODO(voss): deal with different Font Matrices for different private dicts.
+	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+	k := len(s)
+	s = f.AppendEncoded(s, gid, rr)
+	return s, width, len(s) == k+1 && s[k] == ' '
+}
+
 func (f *embeddedComposite) CIDToWidth(cid type1.CID) float64 {
 	gid := f.GID(cid)
 	// TODO(voss): deal with different Font Matrices for different private dicts.
-	return float64(f.otf.GlyphWidth(gid)) * f.otf.FontMatrix[0]
+	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 }
 
 func (f *embeddedComposite) Close() error {
@@ -158,7 +166,7 @@ func (f *embeddedComposite) Close() error {
 	}
 	f.closed = true
 
-	origOTF := f.otf.Clone()
+	origOTF := f.sfnt.Clone()
 	origOTF.CMapTable = nil
 	origOTF.Gdef = nil
 	origOTF.Gsub = nil

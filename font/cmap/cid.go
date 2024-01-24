@@ -39,6 +39,8 @@ type CIDEncoder interface {
 	// given unicode string.
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
+	CodeAndCID(pdf.String, glyph.ID, []rune) (pdf.String, type1.CID)
+
 	CS() charcode.CodeSpaceRange
 
 	Lookup(c charcode.CharCode) (type1.CID, bool)
@@ -85,6 +87,14 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 	e.toUnicode[code] = rr
 	e.used[gid] = struct{}{}
 	return charcode.UCS2.Append(s, code)
+}
+
+func (e *identityEncoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, type1.CID) {
+	cid := e.g2c.CID(gid, rr)
+	code := charcode.CharCode(cid)
+	e.toUnicode[code] = rr
+	e.used[gid] = struct{}{}
+	return charcode.UCS2.Append(s, code), cid
 }
 
 func (e *identityEncoder) CS() charcode.CodeSpaceRange {
@@ -188,6 +198,12 @@ type key struct {
 }
 
 func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+	s, _ = e.CodeAndCID(s, gid, rr)
+	return s
+}
+
+func (e *utf8Encoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, type1.CID) {
+	cid := e.g2c.CID(gid, rr)
 	k := key{gid, string(rr)}
 
 	// Rules for choosing the code:
@@ -195,14 +211,14 @@ func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.S
 	//    then use the same code as before.
 	code, valid := e.cache[k]
 	if valid {
-		return utf8cs.Append(s, code)
+		return utf8cs.Append(s, code), cid
 	}
 
 	// 2. If rr has length 1, and if rr has not previously been paired with a
 	//    different gid, then use rr[0] as the code.
 	if len(rr) == 1 {
 		code = runeToCode(rr[0])
-		if cid, ok := e.cmap[code]; !ok || e.g2c.CID(gid, rr) == cid {
+		if cidCandidate, ok := e.cmap[code]; !ok || cid == cidCandidate {
 			valid = true
 		}
 	}
@@ -216,11 +232,10 @@ func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.S
 		}
 	}
 
-	cid := e.g2c.CID(gid, rr)
 	e.cache[k] = code
 	e.cmap[code] = cid
 	e.rev[cid] = code
-	return utf8cs.Append(s, code)
+	return utf8cs.Append(s, code), cid
 }
 
 func runeToCode(r rune) charcode.CharCode {

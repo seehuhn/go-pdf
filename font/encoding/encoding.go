@@ -72,6 +72,9 @@ func (e *SimpleEncoder) CodeToGID(c byte) glyph.ID {
 	return e.Encoding[c]
 }
 
+// GIDToCode returns the character code for the given glyph ID (allocating new
+// codes as needed).  It also records the fact that the character code
+// corresponds to the given unicode string.
 func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
 	k := key{gid, string(rr)}
 
@@ -164,11 +167,6 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 	return toUnicode
 }
 
-// AppendEncoded appends the character code for the given glyph ID
-// to the given PDF string (allocating new codes as needed).
-// It also records the fact that the character code corresponds to the
-// given unicode string.
-//
 // TODO(voss): remove
 func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	code := e.GIDToCode(gid, rr)

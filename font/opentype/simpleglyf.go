@@ -118,8 +118,15 @@ type embeddedGlyfSimple struct {
 func (f *embeddedGlyfSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
-		yield(float64(f.sfnt.GlyphWidth(gid))/float64(f.sfnt.UnitsPerEm), c == ' ')
+		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+		yield(width, c == ' ')
 	}
+}
+
+func (f *embeddedGlyfSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+	c := f.GIDToCode(gid, rr)
+	return append(s, c), width, c == ' '
 }
 
 func (f *embeddedGlyfSimple) CodeToWidth(c byte) float64 {

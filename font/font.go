@@ -65,7 +65,6 @@ type Layouter interface {
 // Embedded represents a font which is already embedded in a PDF file.
 type Embedded interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-	// AppendEncoded2(pdf.String, Glyph) (pdf.String, float64)
 
 	NewFont
 }
@@ -75,7 +74,7 @@ type NewFont interface {
 
 	AsText(pdf.String) []rune
 
-	// Glyphs() interface{}
+	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 }
 
 type NewFontSimple interface {

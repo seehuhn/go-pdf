@@ -267,6 +267,8 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 //
 // This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
 func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
+	font := w.TextFont.(font.NewFont) // TODO(voss)
+
 	var run pdf.String
 	var out pdf.Array
 	flush := func() {
@@ -304,7 +306,7 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 	xActual := 0.0
 	xWanted := left
 	param := w.State
-	if param.TextFont.WritingMode() != 0 {
+	if font.WritingMode() != 0 {
 		panic("vertical writing mode not implemented")
 	}
 	for _, g := range gg {
@@ -332,23 +334,11 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 		}
 
 		var glyphWidth float64
-		switch F := param.TextFont.(type) {
-		case font.NewFontSimple:
-			c := F.GIDToCode(g.GID, g.Text)
-			run = append(run, c)
-
-			glyphWidth = F.CodeToWidth(c)*param.TextFontSize + param.TextCharacterSpacing
-			if c == ' ' {
-				glyphWidth += param.TextWordSpacing
-			}
-		case font.NewFontComposite:
-			cid := F.CID(g.GID, g.Text)
-			run = F.AppendCode(run, cid)
-
-			glyphWidth = F.CIDToWidth(cid)*param.TextFontSize + param.TextCharacterSpacing
-			if len(g.Text) == 1 && g.Text[0] == ' ' {
-				glyphWidth += param.TextWordSpacing
-			}
+		var isSpace bool
+		run, glyphWidth, isSpace = font.CodeAndWidth(run, g.GID, g.Text)
+		glyphWidth = glyphWidth*param.TextFontSize + param.TextCharacterSpacing
+		if isSpace {
+			glyphWidth += param.TextWordSpacing
 		}
 
 		xActual += glyphWidth * param.TextHorizontalScaling
@@ -359,14 +349,14 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 	} else {
 		xWanted += right
 	}
-	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000))
+	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize))
 	if xOffsetInt != 0 {
 		if len(run) > 0 {
 			out = append(out, run)
 			run = nil
 		}
 		out = append(out, -xOffsetInt)
-		xActual += float64(xOffsetInt) / 1000
+		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize
 	}
 	flush()
 	w.TextMatrix[4] += xActual

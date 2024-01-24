@@ -115,8 +115,15 @@ type embeddedSimple struct {
 func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
-		yield(float64(f.sfnt.GlyphWidth(gid))/float64(f.sfnt.UnitsPerEm), c == ' ')
+		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+		yield(width, c == ' ')
 	}
+}
+
+func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+	c := f.GIDToCode(gid, rr)
+	return append(s, c), width, c == ' '
 }
 
 func (f *embeddedSimple) CodeToWidth(c byte) float64 {
@@ -495,6 +502,17 @@ func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is
 		gid := f.Encoding[c]
 		yield(float64(f.Font.GlyphWidth(gid))/float64(f.Font.UnitsPerEm), c == ' ')
 	}
+}
+
+// TODO(voss): speed this up
+func (f *fromFileSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	width := float64(f.Font.GlyphWidth(gid)) / float64(f.Font.UnitsPerEm)
+	for code, gid := range f.Encoding {
+		if gid == gid {
+			return append(s, byte(code)), width, code == ' '
+		}
+	}
+	panic("missing code")
 }
 
 // CodeToWidth implements the [font.NewFontSimple] interface.
