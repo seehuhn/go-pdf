@@ -17,24 +17,25 @@
 package font_test
 
 import (
-	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/pdf/reader"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestWidthsFull(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
 
+	// TODO(voss): iterate over all font types
+
 	goRegular, err := gofont.OpenType(gofont.GoRegular)
 	if err != nil {
 		t.Fatal(err)
 	}
-	F, err := opentype.NewCFFComposite(goRegular, nil)
+	F, err := opentype.NewCFFSimple(goRegular, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,54 +50,26 @@ func TestWidthsFull(t *testing.T) {
 	// included in the embedded font.
 	gg := E.Layout(sampleText)
 	var s pdf.String
+	var ww []float64
 	for _, g := range gg {
-		switch E := E.(type) {
-		case font.NewFontSimple:
-			c := E.GIDToCode(g.GID, g.Text)
-			s = append(s, c)
-
-		// TODO(voss): use the new code
-		// case font.NewFontComposite:
-		// 	cid := E.CID(g.GID, g.Text)
-		// 	s = E.AppendCode(s, cid)
-		case font.Embedded:
-			s = E.AppendEncoded(s, g.GID, g.Text)
-		}
+		ww = append(ww, goRegular.GlyphWidthPDF(g.GID))
+		s, _, _ = E.CodeAndWidth(s, g.GID, g.Text)
 	}
 	err = E.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fontDicts, err := font.ExtractDicts(data, E.PDFObject())
+	D, err := reader.ReadFont(data, E.PDFObject(), "F")
 	if err != nil {
 		t.Fatal(err)
 	}
-	DW, err := pdf.GetNumber(data, fontDicts.CIDFontDict["DW"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	W, err := font.DecodeWidthsComposite(data, fontDicts.CIDFontDict["W"], float64(DW))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	F1 := E.(font.NewFontComposite)
 	i := 0
-	F1.CS().AllCodes(s)(func(code pdf.String, valid bool) bool {
-		cid := F1.CodeToCID(code)
-		w, ok := W[cid]
-		if !ok {
-			w = float64(DW)
-		}
-		wFromPDF := funit.Int16(math.Round(w * float64(goRegular.UnitsPerEm) / 1000))
-		wFromFont := goRegular.GlyphWidth(gg[i].GID)
-
+	D.ForeachGlyph(s, func(gid glyph.ID, _ []rune, wFromPDF float64, is_space bool) {
+		wFromFont := ww[i]
 		if wFromPDF != wFromFont {
-			t.Errorf("widths differ for CID %d: %d vs %d", cid, wFromPDF, wFromFont)
+			t.Errorf("widths differ for GID %d: %f vs %f", gid, wFromPDF, wFromFont)
 		}
-
 		i++
-		return true
 	})
 }

@@ -33,7 +33,7 @@ import (
 // The font is embedded as a simple CFF font.
 //
 // If a write error on w occurs, the function panics.
-func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont {
+func Embed(w pdf.Putter, defaultName pdf.Name) font.Embedded {
 	encoding := make([]glyph.ID, 256)
 	encoding[' '] = 1
 	encoding['A'] = 2
@@ -68,8 +68,7 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont {
 		'A': {'A'},
 	}
 
-	ref := w.Alloc()
-	info := &pdfcff.EmbedInfoCFFSimple{
+	info := &pdfcff.EmbedInfoSimple{
 		Font:      in,
 		Encoding:  encoding,
 		Ascent:    850,
@@ -77,27 +76,38 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.NewFont {
 		CapHeight: 850,
 		ToUnicode: cmap.NewToUnicode(charcode.Simple, toUni),
 	}
+	return EmbedCFF(w, info, defaultName)
+}
+
+func EmbedCFF(w pdf.Putter, info *pdfcff.EmbedInfoSimple, defaultName pdf.Name) font.Embedded {
+	ref := w.Alloc()
 	err := info.Embed(w, ref)
 	if err != nil {
 		panic(err)
 	}
 
-	tmp := pdf.NewData(pdf.GetVersion(w))
-
-	// We need to make sure that ref is allocated in tmp, so that
-	// the allocations in info.Embed don't clash with ref.
-	//
-	// TODO(voss): find a better way to do this.
-	for tmp.Alloc() != ref {
-	}
-
-	err = info.Embed(tmp, ref)
-	if err != nil {
-		panic(err)
-	}
-	F, err := font.Read(tmp, ref, defaultName)
-	if err != nil {
-		panic(err)
+	F := &frozenFont{
+		Res: font.Res{
+			DefName: defaultName,
+			Ref:     ref,
+		},
+		EmbedInfoSimple: info,
 	}
 	return F
+}
+
+type frozenFont struct {
+	font.Res
+	*pdfcff.EmbedInfoSimple
+}
+
+func (f *frozenFont) WritingMode() int {
+	return 0
+}
+
+func (f *frozenFont) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+	for _, c := range s {
+		width := float64(f.Font.Glyphs[f.Encoding[c]].Width) * f.Font.FontMatrix[0]
+		yield(width, c == ' ')
+	}
 }

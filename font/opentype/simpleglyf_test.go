@@ -120,4 +120,4 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 	}
 }
 
-var _ font.NewFontSimple = (*embeddedGlyfSimple)(nil)
+var _ font.Embedded = (*embeddedGlyfSimple)(nil)

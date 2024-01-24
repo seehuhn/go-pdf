@@ -39,7 +39,6 @@ func TestEncoding(t *testing.T) {
 	}
 
 	// Embed the font
-	// and make sure codes are allocated for a few characters.
 	data := pdf.NewData(pdf.V1_7)
 	E, err := F.Embed(data, "F")
 	if err != nil {
@@ -47,7 +46,7 @@ func TestEncoding(t *testing.T) {
 	}
 	gg := E.Layout(".MiAbc")
 	for _, g := range gg {
-		E.(font.NewFontSimple).GIDToCode(g.GID, g.Text)
+		E.CodeAndWidth(nil, g.GID, g.Text) // allocate codes
 	}
 	err = E.Close()
 	if err != nil {

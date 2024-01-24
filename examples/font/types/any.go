@@ -27,7 +27,7 @@ import (
 var (
 	_ = &type1.EmbedInfo{}
 	_ = &type3.EmbedInfo{}
-	_ = &cff.EmbedInfoCFFSimple{}
+	_ = &cff.EmbedInfoSimple{}
 	_ = &cff.EmbedInfoComposite{}
 	_ = &truetype.EmbedInfoSimple{}
 	_ = &truetype.EmbedInfoComposite{}

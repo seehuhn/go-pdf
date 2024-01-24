@@ -126,4 +126,4 @@ func TestRoundTripCFFSimple(t *testing.T) {
 	}
 }
 
-var _ font.NewFontSimple = (*embeddedCFFSimple)(nil)
+var _ font.Embedded = (*embeddedCFFSimple)(nil)

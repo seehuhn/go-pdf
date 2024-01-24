@@ -18,4 +18,4 @@ package type3
 
 import "seehuhn.de/go/pdf/font"
 
-var _ font.NewFontSimple = (*embedded)(nil)
+var _ font.Embedded = (*embedded)(nil)

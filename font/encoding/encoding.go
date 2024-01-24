@@ -166,9 +166,3 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 	}
 	return toUnicode
 }
-
-// TODO(voss): remove
-func (e *SimpleEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
-	code := e.GIDToCode(gid, rr)
-	return append(s, code)
-}

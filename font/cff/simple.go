@@ -25,7 +25,6 @@ import (
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -128,20 +127,19 @@ type embeddedSimple struct {
 func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
-		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-		yield(width, c == ' ')
+		yield(f.sfnt.GlyphWidthPDF(gid), c == ' ')
 	}
 }
 
 func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
-	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-	c := f.GIDToCode(gid, rr)
+	width := f.sfnt.GlyphWidthPDF(gid)
+	c := f.SimpleEncoder.GIDToCode(gid, rr)
 	return append(s, c), width, c == ' '
 }
 
 func (f *embeddedSimple) CodeToWidth(c byte) float64 {
 	gid := f.Encoding[c]
-	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
+	return f.sfnt.GlyphWidthPDF(gid)
 }
 
 func (f *embeddedSimple) Close() error {
@@ -187,7 +185,7 @@ func (f *embeddedSimple) Close() error {
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
-	info := EmbedInfoCFFSimple{
+	info := EmbedInfoSimple{
 		Font:      subsetCFF,
 		SubsetTag: subsetTag,
 		Encoding:  subsetCFF.Encoding, // we use the built-in encoding
@@ -202,8 +200,8 @@ func (f *embeddedSimple) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-// EmbedInfoCFFSimple is the information needed to embed a simple CFF font.
-type EmbedInfoCFFSimple struct {
+// EmbedInfoSimple is the information needed to embed a simple CFF font.
+type EmbedInfoSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *cff.Font
 
@@ -231,13 +229,13 @@ type EmbedInfoCFFSimple struct {
 }
 
 // ExtractSimple extracts all information about a simple CFF font from a PDF file.
-// This is the inverse of [EmbedInfoCFFSimple.Embed].
-func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error) {
+// This is the inverse of [EmbedInfoSimple.Embed].
+func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	if err := dicts.Type.MustBe(font.CFFSimple); err != nil {
 		return nil, err
 	}
 
-	res := &EmbedInfoCFFSimple{}
+	res := &EmbedInfoSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
 	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
@@ -307,7 +305,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error)
 
 // Embed adds the font to a PDF file.
 // This is the reverse of [ExtractSimple]
-func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
 		return err
@@ -427,103 +425,4 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 
 	return nil
-}
-
-func (info *EmbedInfoCFFSimple) AsFont(ref pdf.Object, name pdf.Name) font.NewFont {
-	asText := make([][]rune, 256)
-	if toUni := info.ToUnicode; toUni != nil {
-		for c := 0; c < 256; c++ {
-			rr, _ := toUni.Decode(pdf.String{byte(c)})
-			asText[c] = rr
-		}
-	} else {
-		for c := 0; c < 256; c++ {
-			gid := info.Encoding[c]
-			name := info.Font.Glyphs[gid].Name
-			asText[c] = names.ToUnicode(name, false)
-		}
-	}
-
-	return &fromFileSimple{
-		Res:                font.Res{Ref: ref, DefName: name},
-		EmbedInfoCFFSimple: info,
-		Text:               asText,
-	}
-}
-
-// fromFileSimple represents a simple CFF font read from a PDF file.
-// This implements the [font.NewFontSimple] interface.
-type fromFileSimple struct {
-	font.Res
-	*EmbedInfoCFFSimple
-	Text [][]rune
-}
-
-// AsText implements the [font.NewFont] interface.
-func (f *fromFileSimple) AsText(s pdf.String) []rune {
-	var res []rune
-	for _, c := range s {
-		res = append(res, f.Text[c]...)
-	}
-	return res
-}
-
-// WritingMode implements the [font.NewFont] interface.
-func (f *fromFileSimple) WritingMode() int {
-	return 0
-}
-
-func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
-	for _, c := range s {
-		gid := f.Encoding[c]
-		width := float64(f.Font.Glyphs[gid].Width) * f.Font.FontMatrix[0]
-		yield(width, c == ' ')
-	}
-}
-
-// CodeAndWidth implements the [font.NewFontSimple] interface.
-//
-// TODO(voss): speed this up
-func (f *fromFileSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
-	width := float64(f.Font.Glyphs[gid].Width) * f.Font.FontMatrix[0]
-	for code, gid := range f.Encoding {
-		if gid == gid {
-			return append(s, byte(code)), width, code == ' '
-		}
-	}
-	panic("GID not encoded")
-}
-
-// CodeToWidth implements the [font.NewFontSimple] interface.
-func (f *fromFileSimple) CodeToWidth(c byte) float64 {
-	gid := f.Encoding[c]
-	return float64(f.Font.Glyphs[gid].Width) * f.Font.FontMatrix[0]
-}
-
-// CodeToGID implements the [font.NewFontSimple] interface.
-func (f *fromFileSimple) CodeToGID(c byte) glyph.ID {
-	return f.Encoding[c]
-}
-
-// GIDToCode implements the [font.NewFontSimple] interface.
-//
-// TODO(voss): speed this up
-func (f *fromFileSimple) GIDToCode(gid glyph.ID, _ []rune) byte {
-	for code, gid := range f.Encoding {
-		if gid == gid {
-			return byte(code)
-		}
-	}
-	return 0
-}
-
-func (f *fromFileSimple) Glyphs() interface{} {
-	return f.Font
-}
-
-func init() {
-	f := func(r pdf.Getter, dicts *font.Dicts) (font.AsFonter, error) {
-		return ExtractSimple(r, dicts)
-	}
-	font.RegisterLoader(font.CFFSimple, f)
 }

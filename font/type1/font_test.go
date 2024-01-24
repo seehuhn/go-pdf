@@ -159,4 +159,4 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	}
 }
 
-var _ font.NewFontSimple = (*embedded)(nil)
+var _ font.Embedded = (*embedded)(nil)

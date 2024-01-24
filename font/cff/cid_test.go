@@ -95,4 +95,4 @@ func TestRoundTripComposite(t *testing.T) {
 	}
 }
 
-var _ font.NewFontComposite = (*embeddedComposite)(nil)
+var _ font.Embedded = (*embeddedComposite)(nil)

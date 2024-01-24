@@ -18,11 +18,7 @@
 package font
 
 import (
-	"math"
-
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -50,130 +46,23 @@ type Font interface {
 	Embed(w pdf.Putter, resName pdf.Name) (Layouter, error)
 }
 
-// A Layouter can turn a string into a sequence of glyphs.
+// A Layouter is a font embedded in a PDF file which can typeset string data.
 //
 // TODO(voss): can we remove this?
 type Layouter interface {
+	Embedded
+
 	Layout(s string) glyph.Seq
 	GetGeometry() *Geometry
 	FontMatrix() []float64
-	Close() error
 
-	Embedded
-}
-
-// Embedded represents a font which is already embedded in a PDF file.
-type Embedded interface {
-	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-
-	NewFont
-}
-
-type NewFont interface {
-	Basic
-
-	AsText(pdf.String) []rune
-
+	// CodeAndWidth appends the code for a given glyph/text to s and returns
+	// the width of the glyph in PDF text space units (still to be multiplied
+	// by the font size). The final return value is true if PDF word spacing
+	// adjustment applies to the glyph.
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
-}
 
-type NewFontSimple interface {
-	NewFont
-	CodeToGID(byte) glyph.ID
-	GIDToCode(glyph.ID, []rune) byte
-
-	CodeToWidth(byte) float64 // scaled PDF text space units
-}
-
-type NewFontComposite interface {
-	NewFont
-	CS() charcode.CodeSpaceRange
-	CodeToCID(pdf.String) type1.CID
-	AppendCode(pdf.String, type1.CID) pdf.String
-	GID(type1.CID) glyph.ID
-	CID(glyph.ID, []rune) type1.CID
-	CIDToWidth(type1.CID) float64
-}
-
-// Basic represents a font embedded in a PDF file,
-// together with enough information to write and parse content streams.
-type Basic interface {
-	Resource
-	WritingMode() int // 0 = horizontal, 1 = vertical
-	ForeachWidth(s pdf.String, yield func(width float64, is_space bool))
-}
-
-// Geometry collects the various dimensions connected to a font and to
-// the individual glyphs.
-type Geometry struct {
-	UnitsPerEm uint16
-
-	Ascent             funit.Int16
-	Descent            funit.Int16 // negative
-	BaseLineDistance   funit.Int16
-	UnderlinePosition  funit.Float64
-	UnderlineThickness funit.Float64
-
-	GlyphExtents []funit.Rect16 // indexed by GID
-	Widths       []funit.Int16  // indexed by GID
-}
-
-// GetGeometry returns the geometry of a font.
-func (g *Geometry) GetGeometry() *Geometry {
-	return g
-}
-
-// FontMatrix returns the font matrix for a font.
-func (g *Geometry) FontMatrix() []float64 {
-	return []float64{1 / float64(g.UnitsPerEm), 0, 0, 1 / float64(g.UnitsPerEm), 0, 0}
-}
-
-// ToPDF converts an integer from font design units to PDF units.
-func (g *Geometry) ToPDF(fontSize float64, a funit.Int) float64 {
-	return float64(a) * fontSize / float64(g.UnitsPerEm)
-}
-
-// ToPDF16 converts an int16 from font design units to PDF units.
-func (g *Geometry) ToPDF16(fontSize float64, a funit.Int16) float64 {
-	return float64(a) * fontSize / float64(g.UnitsPerEm)
-}
-
-// FromPDF16 converts from PDF units (given as a float64) to an int16 in
-// font design units.
-func (g *Geometry) FromPDF16(fontSize float64, x float64) funit.Int16 {
-	return funit.Int16(math.Round(x / fontSize * float64(g.UnitsPerEm)))
-}
-
-// BoundingBox returns the bounding box of a glyph sequence,
-// in PDF units.
-func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
-	var bbox funit.Rect
-	var xPos funit.Int
-	for _, glyph := range gg {
-		b16 := g.GlyphExtents[glyph.GID]
-		b := funit.Rect{
-			LLx: funit.Int(b16.LLx+glyph.XOffset) + xPos,
-			LLy: funit.Int(b16.LLy + glyph.YOffset),
-			URx: funit.Int(b16.URx+glyph.XOffset) + xPos,
-			URy: funit.Int(b16.URy + glyph.YOffset),
-		}
-		bbox.Extend(b)
-		xPos += funit.Int(glyph.Advance)
-	}
-
-	res := &pdf.Rectangle{
-		LLx: g.ToPDF(fontSize, bbox.LLx),
-		LLy: g.ToPDF(fontSize, bbox.LLy),
-		URx: g.ToPDF(fontSize, bbox.URx),
-		URy: g.ToPDF(fontSize, bbox.URy),
-	}
-	return res
-}
-
-// NumGlyphs returns the number of glyphs in a font.
-func NumGlyphs(font interface{ GetGeometry() *Geometry }) int {
-	g := font.GetGeometry()
-	return len(g.Widths)
+	Close() error
 }
 
 // GetGID returns the glyph ID and advance width for a given rune.
@@ -186,6 +75,13 @@ func GetGID(font Layouter, r rune) (glyph.ID, funit.Int16) {
 		return 0, 0
 	}
 	return gg[0].GID, gg[0].Advance
+}
+
+// Embedded represents a font which is already embedded in a PDF file.
+type Embedded interface {
+	Resource
+	WritingMode() int // 0 = horizontal, 1 = vertical
+	ForeachWidth(s pdf.String, yield func(width float64, is_space bool))
 }
 
 // Resource is a PDF resource.

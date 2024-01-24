@@ -90,7 +90,7 @@ func (w *Writer) TextSetLeading(leading float64) {
 // TextSetFont sets the font and font size.
 //
 // This implements the PDF graphics operator "Tf".
-func (w *Writer) TextSetFont(font font.NewFont, size float64) {
+func (w *Writer) TextSetFont(font font.Embedded, size float64) {
 	if !w.isValid("TextSetFont", objText|objPage) {
 		return
 	}
@@ -235,13 +235,13 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 	if !w.isValid("TextShowRaw", objText) {
 		return
 	}
-	font := w.State.TextFont
-	if font == nil {
+	F := w.State.TextFont
+	if F == nil {
 		w.Err = errors.New("no font set")
 		return
 	}
-	wmode := font.WritingMode()
-	font.ForeachWidth(s, func(width float64, is_space bool) {
+	wmode := F.WritingMode()
+	F.ForeachWidth(s, func(width float64, is_space bool) {
 		width = width*w.TextFontSize + w.TextCharacterSpacing
 		if is_space {
 			width += w.TextWordSpacing
@@ -267,7 +267,7 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 //
 // This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
 func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
-	font := w.TextFont.(font.NewFont) // TODO(voss)
+	font := w.TextFont.(font.Layouter) // TODO(voss)
 
 	var run pdf.String
 	var out pdf.Array

@@ -57,10 +57,6 @@ type CIDEncoder interface {
 
 	AsText(pdf.String) []rune
 
-	AppendCode(pdf.String, type1.CID) pdf.String
-
-	CodeToCID(pdf.String) type1.CID
-
 	AllCIDs(pdf.String) func(yield func([]byte, type1.CID) bool) bool
 }
 
@@ -141,20 +137,6 @@ func (e *identityEncoder) AsText(s pdf.String) []rune {
 		return true
 	})
 	return res
-}
-
-func (e *identityEncoder) AppendCode(s pdf.String, cid type1.CID) pdf.String {
-	// TODO(voss): opencode this
-	return charcode.UCS2.Append(s, charcode.CharCode(cid))
-}
-
-func (e *identityEncoder) CodeToCID(code pdf.String) type1.CID {
-	c, _ := charcode.UCS2.Decode(code)
-	if c < 0 {
-		// TODO(voss): implement notdef ranges, etc.
-		return 0
-	}
-	return type1.CID(c)
 }
 
 func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, type1.CID) bool) bool {
@@ -284,15 +266,6 @@ func (e *utf8Encoder) Subset() []glyph.ID {
 
 func (e *utf8Encoder) AsText(s pdf.String) []rune {
 	return []rune(string(s))
-}
-
-func (e *utf8Encoder) AppendCode(s pdf.String, cid type1.CID) pdf.String {
-	return utf8cs.Append(s, e.rev[cid])
-}
-
-func (e *utf8Encoder) CodeToCID(s pdf.String) type1.CID {
-	code, _ := utf8cs.Decode(s)
-	return e.cmap[code]
 }
 
 func (e *utf8Encoder) AllCIDs(s pdf.String) func(yield func([]byte, type1.CID) bool) bool {

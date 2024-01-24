@@ -36,9 +36,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/internal/debug"
+	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
 // The tests in this file check that ghostscripts idea of PDF coincides with
@@ -124,7 +124,7 @@ func TestTextPositions(t *testing.T) {
 		F.Glyphs = append(F.Glyphs, g)
 	}
 
-	e := &pdfcff.EmbedInfoCFFSimple{
+	e := &pdfcff.EmbedInfoSimple{
 		Font:      F,
 		Encoding:  F.Encoding,
 		Ascent:    1000,
@@ -135,10 +135,7 @@ func TestTextPositions(t *testing.T) {
 
 	// first print all glyphs in one string
 	img1 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-		F, err := embedTestFont(r.Out, e, "F")
-		if err != nil {
-			return err
-		}
+		F := dummyfont.EmbedCFF(r.Out, e, "F")
 
 		r.TextSetFont(F, 100)
 		r.TextStart()
@@ -151,10 +148,7 @@ func TestTextPositions(t *testing.T) {
 	// now print glyphs one-by-one and record the x positions
 	var xx []float64
 	img2 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-		F, err := embedTestFont(r.Out, e, "F")
-		if err != nil {
-			return err
-		}
+		F := dummyfont.EmbedCFF(r.Out, e, "F")
 
 		r.TextSetFont(F, 100)
 		r.TextStart()
@@ -169,10 +163,7 @@ func TestTextPositions(t *testing.T) {
 	})
 	// finally, print each glyph at the recorded x positions
 	img3 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-		F, err := embedTestFont(r.Out, e, "F")
-		if err != nil {
-			return err
-		}
+		F := dummyfont.EmbedCFF(r.Out, e, "F")
 
 		r.TextSetFont(F, 100)
 		for i := range testString {
@@ -241,7 +232,7 @@ func TestTextPositions2(t *testing.T) {
 				r.TextFirstLine(10, 10)
 				for _, g := range F.Layout(testString) {
 					xx = append(xx, r.TextMatrix[4])
-					s = F.AppendEncoded(s[:0], g.GID, g.Text)
+					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)
 
 					r.TextShowRaw(s)
 				}
@@ -260,7 +251,7 @@ func TestTextPositions2(t *testing.T) {
 				for i, g := range F.Layout(testString) {
 					r.TextStart()
 					r.TextFirstLine(xx[i], 10)
-					s = F.AppendEncoded(s[:0], g.GID, g.Text)
+					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)
 					r.TextShowRaw(s)
 					r.TextEnd()
 				}
@@ -289,15 +280,6 @@ func TestTextPositions2(t *testing.T) {
 		tooMuch:
 		})
 	}
-}
-
-func embedTestFont(w pdf.Putter, e *pdfcff.EmbedInfoCFFSimple, name pdf.Name) (font.NewFont, error) {
-	ref := w.Alloc()
-	err := e.Embed(w, ref)
-	if err != nil {
-		return nil, err
-	}
-	return e.AsFont(ref, name), nil
 }
 
 func gsRender(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) image.Image {

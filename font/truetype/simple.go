@@ -115,8 +115,7 @@ type embeddedSimple struct {
 func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
-		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
-		yield(width, c == ' ')
+		yield(f.sfnt.GlyphWidthPDF(gid), c == ' ')
 	}
 }
 
@@ -229,6 +228,8 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		if !ok {
 			return nil, fmt.Errorf("expected glyf outlines, got %T", ttf.Outlines)
 		}
+
+		// TODO(voss): use the glyph widths from the font dictionaries.
 
 		res.Font = ttf
 	}
@@ -456,95 +457,4 @@ func ExtractEncoding(r pdf.Getter, encodingDict pdf.Object, ttf *sfnt.Font) []gl
 	// return encoding
 
 	return nil
-}
-
-func (info *EmbedInfoSimple) AsFont(ref pdf.Object, name pdf.Name) font.NewFont {
-	asText := make([][]rune, 256)
-	if toUni := info.ToUnicode; toUni != nil {
-		for c := 0; c < 256; c++ {
-			rr, _ := toUni.Decode(pdf.String{byte(c)})
-			asText[c] = rr
-		}
-	}
-	// TODO(voss): any other methods?
-
-	return &fromFileSimple{
-		Res:             font.Res{Ref: ref, DefName: name},
-		EmbedInfoSimple: info,
-		Text:            asText,
-	}
-}
-
-// fromFileSimple represents a simple CFF font read from a PDF file.
-// This implements the [font.NewFontSimple] interface.
-type fromFileSimple struct {
-	font.Res
-	*EmbedInfoSimple
-	Text [][]rune
-}
-
-// AsText implements the [font.NewFont] interface.
-func (f *fromFileSimple) AsText(s pdf.String) []rune {
-	var res []rune
-	for _, c := range s {
-		res = append(res, f.Text[c]...)
-	}
-	return res
-}
-
-// WritingMode implements the [font.NewFont] interface.
-func (f *fromFileSimple) WritingMode() int {
-	return 0
-}
-
-func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
-	for _, c := range s {
-		gid := f.Encoding[c]
-		yield(float64(f.Font.GlyphWidth(gid))/float64(f.Font.UnitsPerEm), c == ' ')
-	}
-}
-
-// TODO(voss): speed this up
-func (f *fromFileSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
-	width := float64(f.Font.GlyphWidth(gid)) / float64(f.Font.UnitsPerEm)
-	for code, gid := range f.Encoding {
-		if gid == gid {
-			return append(s, byte(code)), width, code == ' '
-		}
-	}
-	panic("missing code")
-}
-
-// CodeToWidth implements the [font.NewFontSimple] interface.
-func (f *fromFileSimple) CodeToWidth(c byte) float64 {
-	gid := f.Encoding[c]
-	return float64(f.Font.GlyphWidth(gid)) / float64(f.Font.UnitsPerEm)
-}
-
-// CodeToGID implements the [font.NewFontSimple] interface.
-func (f *fromFileSimple) CodeToGID(c byte) glyph.ID {
-	return f.Encoding[c]
-}
-
-// GIDToCode implements the [font.NewFontSimple] interface.
-//
-// TODO(voss): speed this up
-func (f *fromFileSimple) GIDToCode(gid glyph.ID, _ []rune) byte {
-	for code, gid := range f.Encoding {
-		if gid == gid {
-			return byte(code)
-		}
-	}
-	return 0
-}
-
-func (f *fromFileSimple) Glyphs() interface{} {
-	return f.Font
-}
-
-func init() {
-	f := func(r pdf.Getter, dicts *font.Dicts) (font.AsFonter, error) {
-		return ExtractSimple(r, dicts)
-	}
-	font.RegisterLoader(font.TrueTypeSimple, f)
 }

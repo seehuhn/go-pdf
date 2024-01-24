@@ -116,4 +116,4 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 	}
 }
 
-var _ font.NewFontComposite = (*embeddedGlyfComposite)(nil)
+var _ font.Embedded = (*embeddedGlyfComposite)(nil)

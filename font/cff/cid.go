@@ -150,7 +150,7 @@ func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) 
 	// TODO(voss): deal with different Font Matrices for different private dicts.
 	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 	k := len(s)
-	s = f.AppendEncoded(s, gid, rr)
+	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
 	return s, width, len(s) == k+1 && s[k] == ' '
 }
 

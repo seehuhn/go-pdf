@@ -114,4 +114,4 @@ func TestRoundTripCFFComposite(t *testing.T) {
 	}
 }
 
-var _ font.NewFontComposite = (*embeddedCFFComposite)(nil)
+var _ font.Embedded = (*embeddedCFFComposite)(nil)

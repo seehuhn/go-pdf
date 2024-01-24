@@ -23,7 +23,8 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	pdfparser "seehuhn.de/go/pdf/parser"
+	"seehuhn.de/go/pdf/reader"
+	pdfparser "seehuhn.de/go/pdf/reader"
 )
 
 // Context holds information about the current state of the PDF content stream.
@@ -50,13 +51,13 @@ func ForAllText(r pdf.Getter, pageDict pdf.Object, cb func(*Context, string) err
 		return err
 	}
 
-	fonts := make(map[pdf.Name]font.NewFont)
-	getFont := func(name pdf.Name) (font.NewFont, error) {
+	fonts := make(map[pdf.Name]font.Embedded)
+	getFont := func(name pdf.Name) (font.Embedded, error) {
 		if f, ok := fonts[name]; ok {
 			return f, nil
 		}
 		ref, _ := resources.Font[name].(pdf.Reference)
-		f, err := font.Read(r, ref, name)
+		f, err := reader.ReadFont(r, ref, name)
 		if err != nil {
 			return nil, err
 		}
