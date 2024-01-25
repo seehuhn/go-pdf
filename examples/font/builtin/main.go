@@ -158,18 +158,12 @@ func (f *fontTables) AddTitle(title string, fontSize, a, b float64) error {
 func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 	fontSize := 10.0
 
-	afm, err := fnt.PSFont()
+	afm, err := fnt.AFM()
 	if err != nil {
 		return err
 	}
 	glyphNames := afm.GlyphList()
 	nGlyph := afm.NumGlyphs()
-	if nGlyph != len(glyphNames) {
-		fmt.Println(nGlyph, len(glyphNames))
-		_, ok := afm.GlyphInfo[".notdef"]
-		fmt.Println(len(afm.GlyphInfo), ok)
-		panic("something is wrong: " + string(fnt))
-	}
 
 	glyphCode := make(map[string]int)
 	for i, name := range afm.Encoding {
@@ -215,7 +209,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 				}
 				y := yTop - baseLineSkip*float64(i)
 
-				gi := afm.GlyphInfo[glyphNames[tmpGlyph]]
+				gi := afm.Glyphs[glyphNames[tmpGlyph]]
 				ext := gi.BBox
 				if !ext.IsZero() {
 					w := gi.WidthX.AsFloat(fontSize / 1000)

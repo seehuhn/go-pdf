@@ -144,7 +144,7 @@ func (f *embeddedCFFSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.sfnt.PostscriptName())
+			f.DefName, f.sfnt.PostScriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding
 
@@ -235,7 +235,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		return errors.New("not a simple OpenType/CFF font")
 	}
 
-	fontName := otf.PostscriptName()
+	fontName := otf.PostScriptName()
 	if info.SubsetTag != "" {
 		fontName = info.SubsetTag + "+" + fontName
 	}

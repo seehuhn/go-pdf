@@ -31,7 +31,6 @@ type EmbeddingType int
 const (
 	Unknown EmbeddingType = iota
 
-	Builtin               // built-in fonts
 	CFFComposite          // CFF font data without wrapper (composite font)
 	CFFSimple             // CFF font data without wrapper (simple font)
 	MMType1               // Multiple Master type 1 fonts
@@ -49,8 +48,6 @@ func (t EmbeddingType) String() string {
 	switch t {
 	case Type1:
 		return "Type 1"
-	case Builtin:
-		return "Type 1 (built-in)"
 	case CFFSimple:
 		return "Simple CFF"
 	case OpenTypeCFFSimple:
@@ -180,12 +177,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 
 	switch {
 	case fontType == "Type1" && (fontKey == "FontFile" || fontKey == ""):
-		baseFont, _ := pdf.GetName(r, fontDict["BaseFont"])
-		if fontKey == "" && isBuiltinFont[baseFont] {
-			res.Type = Builtin
-		} else {
-			res.Type = Type1
-		}
+		res.Type = Type1
 	case fontType == "Type1" && fontKey == "FontFile3" && subType == "Type1C":
 		res.Type = CFFSimple
 	case fontType == "Type1" && fontKey == "FontFile3" && subType == "OpenType":

@@ -18,6 +18,7 @@ package encoding
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 
@@ -116,6 +117,9 @@ func UndescribeEncodingType1(r pdf.Getter, desc pdf.Object, builtin []string) ([
 			if err != nil {
 				return nil, err
 			}
+		}
+		if baseEnc == nil {
+			return nil, errors.New("encoding: invalid base encoding")
 		}
 		copy(res, baseEnc)
 

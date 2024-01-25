@@ -24,5 +24,9 @@ func TestType1(t *testing.T) {
 		if err != nil {
 			t.Errorf("error for font %v: %v", fontID, err)
 		}
+		_, err = AFM(fontID)
+		if err != nil {
+			t.Errorf("error for afm %v: %v", fontID, err)
+		}
 	}
 }

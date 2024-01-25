@@ -17,6 +17,7 @@
 package gofont
 
 import (
+	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
@@ -34,23 +35,18 @@ func Type1(font FontID) (*type1.Font, error) {
 	info.EnsureGlyphNames()
 
 	newOutlines := make(map[string]*type1.Glyph)
-	newInfo := make(map[string]*type1.GlyphInfo)
 
 	// convert glypf outlines to type1 outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)
 	for i, origGlyph := range origOutlines.Glyphs {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
-		newGlyph := &type1.Glyph{}
-		newGlyphI := &type1.GlyphInfo{ // TODO(voss)
+		newGlyph := &type1.Glyph{
 			WidthX: info.GlyphWidth(gid),
 		}
-
 		if origGlyph == nil {
 			goto done
 		}
-
-		newGlyphI.BBox = origGlyph.Rect16
 
 		switch g := origGlyph.Data.(type) {
 		case glyf.SimpleGlyph:
@@ -124,7 +120,6 @@ func Type1(font FontID) (*type1.Font, error) {
 
 	done:
 		newOutlines[name] = newGlyph
-		newInfo[name] = newGlyphI
 	}
 
 	encoding := make([]string, 256)
@@ -174,19 +169,61 @@ func Type1(font FontID) (*type1.Font, error) {
 		},
 	}
 
-	// TODO(voss): add kerning and ligature information
-
 	res := &type1.Font{
-		CreationDate: info.CreationTime,
-		Encoding:     encoding,
-		Ascent:       info.Ascent,
-		Descent:      info.Descent,
-		CapHeight:    info.CapHeight,
-		XHeight:      info.XHeight,
 		FontInfo:     info.GetFontInfo(),
-		Private:      Private,
 		Glyphs:       newOutlines,
-		GlyphInfo:    newInfo,
+		Private:      Private,
+		Encoding:     encoding,
+		CreationDate: info.CreationTime,
+	}
+
+	return res, nil
+}
+
+// AFM returns the font metrics for `font`.
+func AFM(font FontID) (*afm.Info, error) {
+	info, err := TrueType(font)
+	if err != nil {
+		return nil, err
+	}
+	info.EnsureGlyphNames()
+
+	n := info.NumGlyphs()
+	newInfo := make(map[string]*afm.GlyphInfo, n)
+	for i := 0; i < n; i++ {
+		gid := glyph.ID(i)
+		name := info.GlyphName(gid)
+		newInfo[name] = &afm.GlyphInfo{
+			WidthX: info.GlyphWidth(gid),
+			BBox:   info.GlyphBBox(gid),
+			// TODO(voss): ligatures
+		}
+	}
+
+	encoding := make([]string, 256)
+	for i := 0; i < 256; i++ {
+		name := psenc.StandardEncoding[i]
+		if _, ok := newInfo[name]; ok {
+			encoding[i] = name
+		} else {
+			encoding[i] = ".notdef"
+		}
+	}
+
+	res := &afm.Info{
+		Glyphs:             newInfo,
+		Encoding:           encoding,
+		FontName:           info.PostScriptName(),
+		FullName:           info.FullName(),
+		CapHeight:          info.CapHeight,
+		XHeight:            info.XHeight,
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		ItalicAngle:        info.ItalicAngle,
+		IsFixedPitch:       info.IsFixedPitch(),
+		// TODO(voss): kerning
 	}
 
 	return res, nil

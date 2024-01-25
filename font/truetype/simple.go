@@ -138,7 +138,7 @@ func (f *embeddedSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.sfnt.PostscriptName())
+			f.DefName, f.sfnt.PostScriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding
 
@@ -282,7 +282,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		return fmt.Errorf("not a TrueType font")
 	}
 
-	fontName := ttf.PostscriptName()
+	fontName := ttf.PostScriptName()
 	if info.SubsetTag != "" {
 		fontName = info.SubsetTag + "+" + fontName
 	}

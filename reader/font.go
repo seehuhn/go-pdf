@@ -49,7 +49,7 @@ func ReadFont(r pdf.Getter, ref pdf.Object, name pdf.Name) (FontFromFile, error)
 	}
 
 	switch fontDicts.Type {
-	case font.Builtin, font.Type1: // Type 1 fonts (including the standard 14 fonts)
+	case font.Type1: // Type 1 fonts (including the standard 14 fonts)
 		info, err := type1.Extract(r, fontDicts)
 		if err != nil {
 			return nil, err

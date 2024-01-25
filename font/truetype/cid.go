@@ -245,7 +245,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	}
 	outlines := ttf.Outlines.(*glyf.Outlines)
 
-	fontName := ttf.PostscriptName()
+	fontName := ttf.PostScriptName()
 	if info.SubsetTag != "" {
 		fontName = info.SubsetTag + "+" + fontName
 	}

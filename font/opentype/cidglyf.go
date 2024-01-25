@@ -249,7 +249,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 
 	// CidFontName shall be the value of the CIDFontName entry in the CIDFont program.
 	// The name may have a subset prefix if appropriate.
-	cidFontName := otf.PostscriptName()
+	cidFontName := otf.PostScriptName()
 	if info.SubsetTag != "" {
 		cidFontName = info.SubsetTag + "+" + cidFontName
 	}

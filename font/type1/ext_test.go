@@ -29,11 +29,13 @@ import (
 // TestEncoding checks that the encoding of a Type 1 font is the standard
 // encoding, if the set of included characters is in the standard encoding.
 func TestEncoding(t *testing.T) {
-	t1, err := gofont.Type1(gofont.GoRegular)
+	goRegular := gofont.GoRegular
+	t1, err := gofont.Type1(goRegular)
 	if err != nil {
 		t.Fatal(err)
 	}
-	F, err := type1.New(t1)
+	metrics, err := gofont.AFM(goRegular)
+	F, err := type1.New(t1, metrics)
 	if err != nil {
 		t.Fatal(err)
 	}

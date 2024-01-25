@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Glyph represents a single glyph.
 type Glyph struct {
 	GID glyph.ID
 

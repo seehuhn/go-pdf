@@ -43,7 +43,7 @@ func makeTextDecoder(r pdf.Getter, ref pdf.Object) (func(pdf.String) string, err
 	var toUnicode *cmap.ToUnicode
 	// TODO(voss): make this less repetitive
 	switch dicts.Type {
-	case font.Type1, font.Builtin:
+	case font.Type1:
 		info, err := type1.Extract(r, dicts)
 		if err != nil {
 			return nil, err

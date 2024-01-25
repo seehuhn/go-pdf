@@ -17,22 +17,84 @@
 package type1
 
 import (
-	"sync"
-
 	"seehuhn.de/go/postscript/afm"
-	"seehuhn.de/go/postscript/type1"
-
-	"seehuhn.de/go/sfnt/glyph"
+	pstype1 "seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/loader"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 // Builtin is one of the 14 built-in PDF fonts.
 type Builtin string
+
+// Embed implements the [font.Font] interface.
+func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+	afm, err := f.AFM()
+	if err != nil {
+		return nil, err
+	}
+
+	var glyphs *pstype1.Font
+	if pdf.GetVersion(w) >= pdf.V2_0 {
+		glyphs, err = f.PSFont()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		afm.FontName = string(f)
+	}
+
+	F, err := New(glyphs, afm)
+	if err != nil {
+		return nil, err
+	}
+
+	return F.Embed(w, resName)
+}
+
+// PSFont returns the PostScript font program for this builtin font.
+func (f Builtin) PSFont() (*pstype1.Font, error) {
+	data, err := builtin.Open(string(f), loader.FontTypeType1)
+	if err != nil {
+		return nil, err
+	}
+
+	psFont, err := pstype1.Read(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return psFont, nil
+}
+
+// AFM returns the font metrics for this builtin font.
+func (f Builtin) AFM() (*afm.Info, error) {
+	data, err := builtin.Open(string(f), loader.FontTypeAFM)
+	if err != nil {
+		return nil, err
+	}
+
+	metrics, err := afm.Read(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return metrics, nil
+}
+
+// StandardWidths returns the widths of the encoded glyphs.
+func (f Builtin) StandardWidths(encoding []string) []float64 {
+	ww := make([]float64, len(encoding))
+	metrics, err := f.AFM()
+	if err != nil {
+		panic(err)
+	}
+	for i, name := range encoding {
+		ww[i] = float64(metrics.Glyphs[name].WidthX)
+	}
+	return ww
+}
 
 // The 14 built-in PDF fonts.
 const (
@@ -70,104 +132,21 @@ var All = []Builtin{
 	ZapfDingbats,
 }
 
-// Embed implements the [font.Font] interface.
-func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
-	info, err := getBuiltin(f)
-	if err != nil {
-		return nil, err
-	}
-
-	res := &embedded{
-		Font: info,
-		w:    w,
-		Res: graphics.Res{
-			Ref:     w.Alloc(),
-			DefName: resName,
-		},
-		SimpleEncoder: encoding.NewSimpleEncoder(),
-	}
-	w.AutoClose(res)
-	return res, nil
+var isBuiltinName = map[string]bool{
+	"Courier":               true,
+	"Courier-Bold":          true,
+	"Courier-BoldOblique":   true,
+	"Courier-Oblique":       true,
+	"Helvetica":             true,
+	"Helvetica-Bold":        true,
+	"Helvetica-BoldOblique": true,
+	"Helvetica-Oblique":     true,
+	"Times-Roman":           true,
+	"Times-Bold":            true,
+	"Times-BoldItalic":      true,
+	"Times-Italic":          true,
+	"Symbol":                true,
+	"ZapfDingbats":          true,
 }
 
-// GetGeometry implements the [font.Font] interface.
-func (f Builtin) GetGeometry() *font.Geometry {
-	info, _ := getBuiltin(f)
-	return info.GetGeometry()
-}
-
-// Layout implements the [font.Font] interface.
-func (f Builtin) Layout(s string) glyph.Seq {
-	info, _ := getBuiltin(f)
-	return info.Layout(s)
-}
-
-func getBuiltin(f Builtin) (*Font, error) {
-	fontCacheLock.Lock()
-	defer fontCacheLock.Unlock()
-
-	if res, ok := fontCache[f]; ok {
-		return res, nil
-	}
-
-	psFont, err := f.PSFont()
-	if err != nil {
-		return nil, err
-	}
-	res, err := New(psFont)
-	if err != nil {
-		return nil, err
-	}
-
-	fontCache[f] = res
-	return res, nil
-}
-
-// PSFont returns the font metrics for one of the built-in pdf fonts.
-func (f Builtin) PSFont() (*type1.Font, error) {
-	L := loader.New()
-
-	fd, err := L.Open(string(f), loader.FontTypeAFM)
-	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-
-	res, err := afm.ReadOld(fd)
-	if err != nil {
-		return nil, err
-	}
-
-	res.FontInfo.FontName = string(f)
-
-	return res, nil
-}
-
-// IsBuiltin returns true if the given font is one of the 14 built-in PDF fonts.
-func IsBuiltin(f *type1.Font) bool {
-	// TODO(voss): a font is one of the 14 standard fonts if the name is one of
-	// the 14 standard names and no glyph data was given.
-
-	b, err := Builtin(f.FontInfo.FontName).PSFont()
-	if err != nil {
-		return false
-	}
-
-	// TODO(voss): Is the following test too strict?
-	for name, fi := range f.GlyphInfo {
-		bi, ok := b.GlyphInfo[name]
-		if !ok {
-			return false
-		}
-		if fi.WidthX != bi.WidthX {
-			return false
-		}
-	}
-
-	return true
-}
-
-var (
-	fontCache     = make(map[Builtin]*Font)
-	fontCacheLock sync.Mutex
-)
+var builtin = loader.New()

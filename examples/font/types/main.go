@@ -115,7 +115,8 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = type1.New(t1)
+			// TODO(voss): implement and use gofont.AFM()
+			X, err = type1.New(t1, nil)
 			if err != nil {
 				return err
 			}

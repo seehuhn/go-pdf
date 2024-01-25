@@ -53,14 +53,18 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	F, err = type1.New(t1)
+	metrics, err := gofont.AFM(gofont.GoRegular)
+	if err != nil {
+		return nil, err
+	}
+	F, err = type1.New(t1, metrics)
 	if err != nil {
 		return nil, err
 	}
 	res = append(res, FontSample{F, font.Type1})
 
 	// a built-in font
-	res = append(res, FontSample{type1.Helvetica, font.Builtin})
+	res = append(res, FontSample{type1.Helvetica, font.Type1})
 
 	// a CFF font, embedded directly ...
 	otf, err := gofont.OpenType(gofont.GoRegular)
