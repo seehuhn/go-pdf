@@ -34,7 +34,10 @@ func main() {
 	const margin = 50
 
 	paper := document.A4
-	doc, err := document.CreateMultiPage("builtin.pdf", paper, nil)
+	opt := &pdf.WriterOptions{
+		Version: pdf.V1_7,
+	}
+	doc, err := document.CreateMultiPage("builtin.pdf", paper, opt)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -256,9 +259,9 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 				}
 
 				name := glyphNames[curGlyph]
-				code := "—"
-				if glyphCode[name] >= 0 {
-					code = fmt.Sprintf("%d", glyphCode[name])
+				code := "·"
+				if x, ok := glyphCode[name]; ok {
+					code = fmt.Sprintf("%d", x)
 				}
 				page.TextSetFont(f.bodyFont, fontSize)
 				page.TextShowAligned(code, 16, 1)

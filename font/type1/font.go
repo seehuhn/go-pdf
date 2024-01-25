@@ -241,9 +241,12 @@ func (f *embedded) Close() error {
 		encoding[i] = f.glyphNames[gid]
 	}
 
-	var psSubset *type1.Font
-	var metricsSubset *afm.Info
+	var subsetTag string
+	psSubset := f.ps
+	metricsSubset := f.metrics
 	if psFont := f.ps; psFont != nil {
+		// only subset the font, if it is embedded
+
 		psSubset = clone(psFont)
 		psSubset.Glyphs = make(map[string]*type1.Glyph)
 
@@ -256,24 +259,22 @@ func (f *embedded) Close() error {
 			}
 		}
 		psSubset.Encoding = encoding
-	}
-	if metrics := f.metrics; metrics != nil {
-		metricsSubset = clone(metrics)
-		metricsSubset.Glyphs = make(map[string]*afm.GlyphInfo)
 
-		if _, ok := metrics.Glyphs[".notdef"]; ok {
-			metricsSubset.Glyphs[".notdef"] = metrics.Glyphs[".notdef"]
-		}
-		for _, name := range encoding {
-			if _, ok := metrics.Glyphs[name]; ok {
-				metricsSubset.Glyphs[name] = metrics.Glyphs[name]
+		if metrics := f.metrics; metrics != nil {
+			metricsSubset = clone(metrics)
+			metricsSubset.Glyphs = make(map[string]*afm.GlyphInfo)
+
+			if _, ok := metrics.Glyphs[".notdef"]; ok {
+				metricsSubset.Glyphs[".notdef"] = metrics.Glyphs[".notdef"]
 			}
+			for _, name := range encoding {
+				if _, ok := metrics.Glyphs[name]; ok {
+					metricsSubset.Glyphs[name] = metrics.Glyphs[name]
+				}
+			}
+			metricsSubset.Encoding = encoding
 		}
-		metricsSubset.Encoding = encoding
-	}
 
-	var subsetTag string
-	if psFont := f.ps; psFont != nil {
 		var ss []glyph.ID
 		for origGid, name := range f.glyphNames {
 			if _, ok := psSubset.Glyphs[name]; ok {
@@ -281,14 +282,6 @@ func (f *embedded) Close() error {
 			}
 		}
 		subsetTag = subset.Tag(ss, psFont.NumGlyphs())
-	} else {
-		var ss []glyph.ID
-		for origGid, name := range f.glyphNames {
-			if _, ok := metricsSubset.Glyphs[name]; ok {
-				ss = append(ss, glyph.ID(origGid))
-			}
-		}
-		subsetTag = subset.Tag(ss, f.metrics.NumGlyphs())
 	}
 
 	// TODO(voss): generated a ToUnicode map, if needed.
@@ -363,7 +356,7 @@ func (info *EmbedInfo) BuiltinEncoding() []string {
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	postScriptName := info.PostScriptName()
 	fontName := postScriptName
-	if info.SubsetTag != "" && info.Font != nil {
+	if info.SubsetTag != "" {
 		fontName = info.SubsetTag + "+" + fontName
 	}
 

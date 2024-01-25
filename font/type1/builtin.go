@@ -80,6 +80,24 @@ func (f Builtin) AFM() (*afm.Info, error) {
 		return nil, err
 	}
 
+	// fix some metrics
+	for _, name := range []string{"d", "bracketleft", "bar"} {
+		if glyph, ok := metrics.Glyphs[name]; ok {
+			y := glyph.BBox.URy
+			if y > metrics.Ascent {
+				metrics.Ascent = y
+			}
+		}
+	}
+	for _, name := range []string{"p", "bracketleft", "bar"} {
+		if glyph, ok := metrics.Glyphs[name]; ok {
+			y := glyph.BBox.LLy
+			if y < metrics.Descent {
+				metrics.Descent = y
+			}
+		}
+	}
+
 	return metrics, nil
 }
 
