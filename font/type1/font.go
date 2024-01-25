@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
@@ -192,11 +192,6 @@ func (f *embedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.Stri
 	return append(s, c), width, c == ' '
 }
 
-func (f *embedded) CodeToWidth(c byte) float64 {
-	gid := f.Encoding[c]
-	return float64(f.Geometry.Widths[gid]) * f.outlines.FontInfo.FontMatrix[0]
-}
-
 func (f *embedded) Close() error {
 	if f.closed {
 		return nil
@@ -217,20 +212,20 @@ func (f *embedded) Close() error {
 	psFont := f.outlines
 	var psSubset *type1.Font
 	var subsetTag string
-	if psFont.Outlines != nil {
+	if psFont.Glyphs != nil {
 		psSubset = &type1.Font{}
 		*psSubset = *psFont
-		psSubset.Outlines = make(map[string]*type1.Glyph)
+		psSubset.Glyphs = make(map[string]*type1.Glyph)
 		psSubset.GlyphInfo = make(map[string]*type1.GlyphInfo)
 
 		// TODO(voss): only include .notdef if there are ununsed codes?
-		if _, ok := psFont.Outlines[".notdef"]; ok {
-			psSubset.Outlines[".notdef"] = psFont.Outlines[".notdef"]
+		if _, ok := psFont.Glyphs[".notdef"]; ok {
+			psSubset.Glyphs[".notdef"] = psFont.Glyphs[".notdef"]
 			psSubset.GlyphInfo[".notdef"] = psFont.GlyphInfo[".notdef"]
 		}
 		for _, name := range encoding {
-			if _, ok := psFont.Outlines[name]; ok {
-				psSubset.Outlines[name] = psFont.Outlines[name]
+			if _, ok := psFont.Glyphs[name]; ok {
+				psSubset.Glyphs[name] = psFont.Glyphs[name]
 				psSubset.GlyphInfo[name] = psFont.GlyphInfo[name]
 			}
 		}
@@ -238,7 +233,7 @@ func (f *embedded) Close() error {
 
 		var ss []glyph.ID
 		for origGid, name := range f.glyphNames {
-			if _, ok := psSubset.Outlines[name]; ok {
+			if _, ok := psSubset.Glyphs[name]; ok {
 				ss = append(ss, glyph.ID(origGid))
 			}
 		}
@@ -374,7 +369,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 			MissingWidth: widthsInfo.MissingWidth,
 		}
 		fontDescriptor := fd.AsDict()
-		if psFont.Outlines != nil {
+		if psFont.Glyphs != nil {
 			fontFileRef = w.Alloc()
 			fontDescriptor["FontFile"] = fontFileRef
 		}

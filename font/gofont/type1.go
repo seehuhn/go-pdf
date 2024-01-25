@@ -185,7 +185,7 @@ func Type1(font FontID) (*type1.Font, error) {
 		XHeight:      info.XHeight,
 		FontInfo:     info.GetFontInfo(),
 		Private:      Private,
-		Outlines:     newOutlines,
+		Glyphs:       newOutlines,
 		GlyphInfo:    newInfo,
 	}
 

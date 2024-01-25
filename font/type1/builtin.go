@@ -133,7 +133,7 @@ func (f Builtin) PSFont() (*type1.Font, error) {
 	}
 	defer fd.Close()
 
-	res, err := afm.Read(fd)
+	res, err := afm.ReadOld(fd)
 	if err != nil {
 		return nil, err
 	}
