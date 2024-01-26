@@ -65,22 +65,16 @@ func FuzzReader(f *testing.F) {
 	ET
 	`)
 	f.Fuzz(func(t *testing.T, body string) {
+		// Use a new writer to try to replicate the read state.
 		buf := &bytes.Buffer{}
 		w := graphics.NewWriter(buf, pdf.V1_7)
 
-		data := pdf.NewData(pdf.V1_7)
-
-		r := &Reader{
-			R:         data,
-			Resources: res,
-			State:     graphics.NewState(),
-		}
-		s := scanner.NewScanner()
-		iter := s.Scan(strings.NewReader(body))
-		// TODO(voss): rewrite this
-		err := iter(func(op string, args []pdf.Object) error {
-			oargs := args
-
+		// Read from content stream from 'body'
+		r := New(pdf.NewData(pdf.V1_7))
+		r.State = graphics.NewState()
+		r.stack = r.stack[:0]
+		r.Resources = res
+		r.EveryOp = func(op string, args []pdf.Object) error {
 			getInteger := func() (pdf.Integer, bool) {
 				if len(args) == 0 {
 					return 0, false
@@ -156,7 +150,7 @@ func FuzzReader(f *testing.F) {
 			case "gs":
 				name, ok := getName()
 				if ok {
-					ext, err := ReadExtGState(nil, res.ExtGState[name], name)
+					ext, err := r.ReadExtGState(res.ExtGState[name], name)
 					if err == nil {
 						w.SetExtGState(ext)
 					}
@@ -205,7 +199,7 @@ func FuzzReader(f *testing.F) {
 			case "Tf":
 				name, ok1 := getName()
 				size, ok2 := getNum()
-				F, err := ReadFont(data, res.Font[name], name)
+				F, err := r.ReadFont(res.Font[name], name)
 				if pdf.IsMalformed(err) {
 					break
 				} else if err != nil {
@@ -280,31 +274,22 @@ func FuzzReader(f *testing.F) {
 			if w.Err != nil {
 				return w.Err
 			}
-			err := r.do(op, oargs)
-			if err != nil {
-				return err
-			}
 			return nil
-		})
+		}
+		err := r.parseFile(strings.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
 		}
 		state1 := r.State
 
-		r = &Reader{
-			R:         nil,
-			Resources: w.Resources,
-			State:     graphics.NewState(),
-		}
-		s = scanner.NewScanner()
-		iter = s.Scan(bytes.NewReader(buf.Bytes()))
-		err = iter(func(op string, args []pdf.Object) error {
-			err := r.do(op, args)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
+		r.scanner.Reset()
+		r.State = graphics.NewState()
+		r.stack = r.stack[:0]
+		r.Resources = w.Resources
+
+		r.EveryOp = nil
+		replicate := buf.String()
+		err = r.parseFile(buf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -314,7 +299,7 @@ func FuzzReader(f *testing.F) {
 			fmt.Println("1:")
 			fmt.Println(body)
 			fmt.Println("2:")
-			fmt.Println(buf.String())
+			fmt.Println(replicate)
 			t.Errorf("state: %s", d)
 		}
 	})

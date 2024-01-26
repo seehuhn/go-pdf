@@ -18,10 +18,12 @@ package reader
 
 import (
 	"fmt"
+	"io"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/reader/scanner"
 	"seehuhn.de/go/sfnt/glyph"
@@ -29,32 +31,58 @@ import (
 
 // A Reader reads a PDF content stream.
 type Reader struct {
-	R         pdf.Getter
-	Resources *pdf.Resources
-
+	R       pdf.Getter
 	scanner *scanner.Scanner
+	loader  *loader.FontLoader
+
+	Resources *pdf.Resources
 	graphics.State
 	stack []graphics.State
 
+	// User callbacks
 	DrawGlyph func(g font.Glyph) error
+	Text      func(text string) error
 	UnknownOp func(op string, args []pdf.Object) error
+	EveryOp   func(op string, args []pdf.Object) error
 }
 
-// NewReader creates a new Reader.
-func NewReader(r pdf.Getter, res *pdf.Resources) *Reader {
+// New creates a new Reader.
+func New(r pdf.Getter) *Reader {
 	return &Reader{
-		R:         r,
-		Resources: res,
-		State:     graphics.NewState(),
-		scanner:   scanner.NewScanner(),
+		R:       r,
+		scanner: scanner.NewScanner(),
+		loader:  loader.New(),
 	}
 }
 
-// NewPage resets the reader to its initial state.
-func (r *Reader) NewPage() {
+// ParsePage parses a page, and calls the appropriate callback functions.
+func (r *Reader) ParsePage(page pdf.Object) error {
+	pageDict, err := pdf.GetDictTyped(r.R, page, "Page")
+	if err != nil {
+		return err
+	}
+
+	resources := &pdf.Resources{}
+	resourcesDict, err := pdf.GetDict(r.R, pageDict["Resources"])
+	if err != nil {
+		return err
+	}
+	err = pdf.DecodeDict(r.R, resources, resourcesDict)
+	if err != nil {
+		return err
+	}
+
 	r.scanner.Reset()
 	r.State = graphics.NewState()
 	r.stack = r.stack[:0]
+	r.Resources = resources
+
+	err = r.ParseContentStream(pageDict["Contents"])
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ParseContentStream parses a content stream.
@@ -94,13 +122,19 @@ func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 	if err != nil {
 		return err
 	}
-	return r.scanner.Scan(body)(r.do)
+	return r.parseFile(body)
+}
+
+func (r *Reader) parseFile(in io.Reader) error {
+	return r.scanner.Scan(in)(r.do)
 }
 
 // Do processes the given operator and arguments.
 // This updates the graphics state, and calls the appropriate callback
 // functions.
 func (r *Reader) do(op string, args []pdf.Object) error {
+	origArgs := args
+
 	getInteger := func() (pdf.Integer, bool) {
 		if len(args) == 0 {
 			return 0, false
@@ -212,7 +246,7 @@ doOps:
 		name, ok := getName()
 		if ok {
 			// TODO(voss): use caching
-			newState, err := ReadExtGState(r.R, r.Resources.ExtGState[name], name)
+			newState, err := r.ReadExtGState(r.Resources.ExtGState[name], name)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -294,7 +328,7 @@ doOps:
 		if ref == nil {
 			break
 		}
-		F, err := ReadFont(r.R, ref, name) // TODO(voss): use caching
+		F, err := r.ReadFont(ref, name) // TODO(voss): use caching
 		if pdf.IsMalformed(err) {
 			break
 		} else if err != nil {
@@ -557,15 +591,26 @@ doOps:
 
 	default:
 		if r.UnknownOp != nil {
-			r.UnknownOp(op, args)
+			err := r.UnknownOp(op, args)
+			if err != nil {
+				return err
+			}
 		}
-
+	}
+	if r.EveryOp != nil {
+		err := r.EveryOp(op, origArgs)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (r *Reader) processText(s pdf.String) {
 	switch F := r.TextFont.(type) {
+	case nil:
+		// TODO(voss): what to do here?
+		return
 	case FontFromFile:
 		wmode := F.WritingMode()
 		F.ForeachGlyph(s, func(gid glyph.ID, text []rune, width float64, is_space bool) {
@@ -577,13 +622,18 @@ func (r *Reader) processText(s pdf.String) {
 				width *= r.TextHorizontalScaling
 			}
 
-			g := font.Glyph{
-				GID:     gid,
-				Advance: width,
-				Rise:    r.TextRise,
-				Text:    text,
+			if r.DrawGlyph != nil {
+				g := font.Glyph{
+					GID:     gid,
+					Advance: width,
+					Rise:    r.TextRise,
+					Text:    text,
+				}
+				r.DrawGlyph(g)
 			}
-			r.DrawGlyph(g)
+			if r.Text != nil {
+				r.Text(string(text))
+			}
 
 			switch wmode {
 			case 0: // horizontal
@@ -592,20 +642,8 @@ func (r *Reader) processText(s pdf.String) {
 				r.TextMatrix[5] += width
 			}
 		})
-	case font.Embedded: // TODO(voss): can this happen?  otherwise, remove!
-		wmode := F.WritingMode()
-		F.ForeachWidth(s, func(width float64, is_space bool) {
-			width = width*r.TextFontSize + r.TextCharacterSpacing
-			if is_space {
-				width += r.TextWordSpacing
-			}
-			switch wmode {
-			case 0: // horizontal
-				r.TextMatrix[4] += width * r.TextHorizontalScaling
-			case 1: // vertical
-				r.TextMatrix[5] += width
-			}
-		})
+	default:
+		panic(fmt.Sprintf("unexpected font type %T", F))
 	}
 }
 

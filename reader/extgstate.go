@@ -22,8 +22,8 @@ import (
 )
 
 // ReadExtGState reads an graphics state parameter dictionary from a PDF file.
-func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphics.ExtGState, error) {
-	dict, err := pdf.GetDictTyped(r, ref, "ExtGState")
+func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.ExtGState, error) {
+	dict, err := pdf.GetDictTyped(r.R, ref, "ExtGState")
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 	for key, v := range dict {
 		switch key {
 		case "Font":
-			a, err := pdf.GetArray(r, v)
+			a, err := pdf.GetArray(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -47,14 +47,14 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 				break
 			}
 
-			F, err := ReadFont(r, a[0], "")
+			F, err := r.ReadFont(a[0], "")
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			size, err := pdf.GetNumber(r, a[1])
+			size, err := pdf.GetNumber(r.R, a[1])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -64,7 +64,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.TextFontSize = float64(size)
 			set |= graphics.StateTextFont
 		case "TK":
-			val, err := pdf.GetBoolean(r, v)
+			val, err := pdf.GetBoolean(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -73,7 +73,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.TextKnockout = bool(val)
 			set |= graphics.StateTextKnockout
 		case "LW":
-			lw, err := pdf.GetNumber(r, v)
+			lw, err := pdf.GetNumber(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -82,7 +82,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.LineWidth = float64(lw)
 			set |= graphics.StateLineWidth
 		case "LC":
-			lc, err := pdf.GetInteger(r, v)
+			lc, err := pdf.GetInteger(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -91,7 +91,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.LineCap = graphics.LineCapStyle(lc)
 			set |= graphics.StateLineCap
 		case "LJ":
-			lj, err := pdf.GetInteger(r, v)
+			lj, err := pdf.GetInteger(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -100,7 +100,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.LineJoin = graphics.LineJoinStyle(lj)
 			set |= graphics.StateLineJoin
 		case "ML":
-			ml, err := pdf.GetNumber(r, v)
+			ml, err := pdf.GetNumber(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -109,7 +109,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.MiterLimit = float64(ml)
 			set |= graphics.StateMiterLimit
 		case "D":
-			dashPattern, phase, err := readDash(r, v)
+			dashPattern, phase, err := readDash(r.R, v)
 			if err != nil {
 				return nil, err
 			} else if dashPattern != nil {
@@ -118,7 +118,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 				set |= graphics.StateDash
 			}
 		case "RI":
-			ri, err := pdf.GetName(r, v)
+			ri, err := pdf.GetName(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -127,7 +127,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.RenderingIntent = ri
 			set |= graphics.StateRenderingIntent
 		case "SA":
-			val, err := pdf.GetBoolean(r, v)
+			val, err := pdf.GetBoolean(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -142,7 +142,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.SoftMask = v
 			set |= graphics.StateSoftMask
 		case "CA":
-			ca, err := pdf.GetNumber(r, v)
+			ca, err := pdf.GetNumber(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -151,7 +151,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.StrokeAlpha = float64(ca)
 			set |= graphics.StateStrokeAlpha
 		case "ca":
-			ca, err := pdf.GetNumber(r, v)
+			ca, err := pdf.GetNumber(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -160,7 +160,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.FillAlpha = float64(ca)
 			set |= graphics.StateFillAlpha
 		case "AIS":
-			ais, err := pdf.GetBoolean(r, v)
+			ais, err := pdf.GetBoolean(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -169,7 +169,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.AlphaSourceFlag = bool(ais)
 			set |= graphics.StateAlphaSourceFlag
 		case "UseBlackPtComp":
-			val, err := pdf.GetName(r, v)
+			val, err := pdf.GetName(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -178,7 +178,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.BlackPointCompensation = val
 			set |= graphics.StateBlackPointCompensation
 		case "OP":
-			op, err := pdf.GetBoolean(r, v)
+			op, err := pdf.GetBoolean(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -187,7 +187,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.OverprintStroke = bool(op)
 			set |= graphics.StateOverprint
 		case "op":
-			op, err := pdf.GetBoolean(r, v)
+			op, err := pdf.GetBoolean(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -197,7 +197,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			set |= graphics.StateOverprint
 			overprintFillSet = true
 		case "OPM":
-			opm, err := pdf.GetInteger(r, v)
+			opm, err := pdf.GetInteger(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -223,7 +223,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.Halftone = v
 			set |= graphics.StateHalftone
 		case "HTO":
-			a, err := pdf.GetArray(r, v)
+			a, err := pdf.GetArray(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -232,13 +232,13 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			if len(a) != 2 {
 				break
 			}
-			x, err := pdf.GetNumber(r, a[0])
+			x, err := pdf.GetNumber(r.R, a[0])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
 				return nil, err
 			}
-			y, err := pdf.GetNumber(r, a[1])
+			y, err := pdf.GetNumber(r.R, a[1])
 			if pdf.IsMalformed(err) {
 				break
 			}
@@ -246,7 +246,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.HalftoneOriginY = float64(y)
 			set |= graphics.StateHalftoneOrigin
 		case "FL":
-			fl, err := pdf.GetNumber(r, v)
+			fl, err := pdf.GetNumber(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -255,7 +255,7 @@ func ReadExtGState(r pdf.Getter, ref pdf.Object, defaultName pdf.Name) (*graphic
 			param.FlatnessTolerance = float64(fl)
 			set |= graphics.StateFlatnessTolerance
 		case "SM":
-			sm, err := pdf.GetNumber(r, v)
+			sm, err := pdf.GetNumber(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

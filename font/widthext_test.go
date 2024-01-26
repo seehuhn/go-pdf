@@ -60,7 +60,8 @@ func TestWidthsFull(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	D, err := reader.ReadFont(data, E.PDFObject(), "F")
+	qqq := reader.New(data)
+	D, err := qqq.ReadFont(E.PDFObject(), "F")
 	if err != nil {
 		t.Fatal(err)
 	}

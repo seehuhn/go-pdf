@@ -21,11 +21,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"seehuhn.de/go/sfnt/cff"
+
 	"seehuhn.de/go/pdf"
-	pdffont "seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/dummyfont"
-	"seehuhn.de/go/sfnt/cff"
 )
 
 func TestExtGState(t *testing.T) {
@@ -109,7 +110,9 @@ func TestExtGState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ext2, err := ReadExtGState(data, ext1.Dict, "X")
+
+	qqq := New(data)
+	ext2, err := qqq.ReadExtGState(ext1.Dict, "X")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +120,7 @@ func TestExtGState(t *testing.T) {
 	cmpFDSelectFn := cmp.Comparer(func(fn1, fn2 cff.FDSelectFn) bool {
 		return true
 	})
-	cmpFont := cmp.Comparer(func(f1, f2 pdffont.Embedded) bool {
+	cmpFont := cmp.Comparer(func(f1, f2 font.Embedded) bool {
 		if f1.PDFObject() != f2.PDFObject() {
 			return false
 		}

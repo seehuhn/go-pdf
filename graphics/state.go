@@ -261,6 +261,30 @@ func (s *Parameters) Clone() *Parameters {
 //	(x y 1) * M = (a*x+c*y+e, b*x+d*y+f, 1)
 type Matrix [6]float64
 
+// Apply applies the transformation matrix to the given vector.
+func (A Matrix) Apply(x, y float64) (float64, float64) {
+	return x*A[0] + y*A[2] + A[4], x*A[1] + y*A[3] + A[5]
+}
+
+// Mul multiplies two transformation matrices and returns the result.
+// The result is equivalent to first applying A and then B.
+func (A Matrix) Mul(B Matrix) Matrix {
+	// / A0 A1 0 \  / B0 B1 0 \   / A0*B0+A1*B2    A0*B1+A1*B3    0 \
+	// | A2 A3 0 |  | B2 B3 0 | = | A2*B0+A3*B2    A2*B1+A3*B3    0 |
+	// \ A4 A5 1 /  \ B4 B5 1 /   \ A4*B0+A5*B2+B4 A4*B1+A5*B3+B5 1 /
+	return Matrix{
+		A[0]*B[0] + A[1]*B[2],
+		A[0]*B[1] + A[1]*B[3],
+		A[2]*B[0] + A[3]*B[2],
+		A[2]*B[1] + A[3]*B[3],
+		A[4]*B[0] + A[5]*B[2] + B[4],
+		A[4]*B[1] + A[5]*B[3] + B[5],
+	}
+}
+
+// IdentityMatrix is the identity transformation.
+var IdentityMatrix = Matrix{1, 0, 0, 1, 0, 0}
+
 // Translate moves the origin of the coordinate system.
 //
 // Drawing the unit square [0, 1] x [0, 1] after applying this transformation
@@ -285,29 +309,6 @@ func Rotate(phi float64) Matrix {
 	s := math.Sin(phi)
 	return Matrix{c, s, -s, c, 0, 0}
 }
-
-// Apply applies the transformation matrix to the given vector.
-func (A Matrix) Apply(x, y float64) (float64, float64) {
-	return A[0]*x + A[2]*y + A[4], A[1]*x + A[3]*y + A[5]
-}
-
-// Mul multiplies two transformation matrices and returns the result.
-func (A Matrix) Mul(B Matrix) Matrix {
-	// / A0 A1 0 \  / B0 B1 0 \   / A0*B0+A1*B2    A0*B1+A1*B3    0 \
-	// | A2 A3 0 |  | B2 B3 0 | = | A2*B0+A3*B2    A2*B1+A3*B3    0 |
-	// \ A4 A5 1 /  \ B4 B5 1 /   \ A4*B0+A5*B2+B4 A4*B1+A5*B3+B5 1 /
-	return Matrix{
-		A[0]*B[0] + A[1]*B[2],
-		A[0]*B[1] + A[1]*B[3],
-		A[2]*B[0] + A[3]*B[2],
-		A[2]*B[1] + A[3]*B[3],
-		A[4]*B[0] + A[5]*B[2] + B[4],
-		A[4]*B[1] + A[5]*B[3] + B[5],
-	}
-}
-
-// IdentityMatrix is the identity transformation.
-var IdentityMatrix = Matrix{1, 0, 0, 1, 0, 0}
 
 // TextRenderingMode is the rendering mode for text.
 type TextRenderingMode uint8

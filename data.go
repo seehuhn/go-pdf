@@ -160,7 +160,11 @@ func (d *Data) Alloc() Reference {
 	}
 }
 
+// Get implements the [Getter] interface.
 func (d *Data) Get(ref Reference, _ bool) (Object, error) {
+	if ref.IsInternal() {
+		panic("internal reference") // TODO(voss): return an error instead?
+	}
 	obj := d.objects[ref]
 	switch x := obj.(type) {
 	case *Stream:

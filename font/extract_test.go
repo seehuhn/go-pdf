@@ -37,6 +37,48 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 )
 
+// TestExtract makes sure that information about all PDF font types
+// can be extracted.
+func TestExtract(t *testing.T) {
+	FF, err := debug.MakeFonts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fontInfo := range FF {
+		t.Run(fontInfo.Type.String(), func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w, err := document.WriteSinglePage(buf, document.A4, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			F, err := fontInfo.Font.Embed(w.Out, "F")
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.TextStart()
+			w.TextSetFont(F, 12)
+			w.TextFirstLine(100, 100)
+			w.TextShow("Hello World!")
+			w.TextEnd()
+			err = w.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			fontRef := F.PDFObject()
+
+			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = font.ExtractDicts(r, fontRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func FuzzExtract(f *testing.F) {
 	FF, err := debug.MakeFonts()
 	if err != nil {

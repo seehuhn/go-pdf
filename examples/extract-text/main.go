@@ -23,8 +23,8 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/content"
 	"seehuhn.de/go/pdf/pagetree"
+	"seehuhn.de/go/pdf/reader"
 )
 
 func main() {
@@ -49,23 +49,27 @@ func extractText(fname string) error {
 		return err
 	}
 
-	numPages, err := pagetree.NumPages(r)
-	if err != nil {
-		return err
+	contents := reader.New(r)
+	contents.Text = func(text string) error {
+		fmt.Print(text)
+		return nil
 	}
 
-	for pageNo := 0; pageNo < numPages; pageNo++ {
+	pages := pagetree.NewIterator(r)
+	pageNo := 0
+	pages.All()(func(_ pdf.Reference, pageDict pdf.Dict) bool {
 		fmt.Println("Page", pageNo)
 		fmt.Println()
-		pageDict, err := pagetree.GetPage(r, pageNo)
+
+		err := contents.ParsePage(pageDict)
 		if err != nil {
-			return err
+			log.Fatal(err)
 		}
-		content.ForAllText(r, pageDict, func(ctx *content.Context, s string) error {
-			fmt.Print(s)
-			return nil
-		})
+
 		fmt.Println()
-	}
+
+		pageNo++
+		return true
+	})
 	return nil
 }

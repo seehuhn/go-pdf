@@ -24,6 +24,7 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+	"sync"
 )
 
 // https://learn.microsoft.com/en-us/typography/opentype/spec/name#nid6
@@ -41,11 +42,14 @@ const (
 	FontTypeSfnt
 )
 
-// A Loader can load fonts, in case fonts are not embedded in the PDF file.
-// Every Loader contains the 14 standard fonts required by the PDF
+// A FontLoader can load fonts, in case fonts are not embedded in the PDF file.
+// Every FontLoader contains the 14 standard fonts required by the PDF
 // specification.  Other external fonts can be added using AddFontMap and
 // AddFont.
-type Loader struct {
+//
+// It is safe to use a FontLoader concurrently from multiple goroutines.
+type FontLoader struct {
+	sync.RWMutex
 	lookup map[key]*val
 }
 
@@ -62,8 +66,8 @@ type val struct {
 // New creates a new font loader.
 // The loader is initialized with the 14 standard fonts required by the PDF
 // specification.
-func New() *Loader {
-	res := &Loader{
+func New() *FontLoader {
+	res := &FontLoader{
 		lookup: make(map[key]*val),
 	}
 
@@ -90,9 +94,11 @@ func New() *Loader {
 
 // Open opens the font with the given PostScript name.  The returned
 // io.ReadCloser must be closed by the caller.
-func (l *Loader) Open(postscriptName string, tp FontType) (io.ReadCloser, error) {
+func (l *FontLoader) Open(postscriptName string, tp FontType) (io.ReadCloser, error) {
 	key := key{postscriptName, tp}
+	l.RLock()
 	font, ok := l.lookup[key]
+	l.RUnlock()
 	if !ok {
 		return nil, fs.ErrNotExist
 	}
@@ -115,7 +121,7 @@ func (l *Loader) Open(postscriptName string, tp FontType) (io.ReadCloser, error)
 // be separated by single spaces.  Lines starting with '#' or '%' are ignored.
 //
 // Any previous mapping for (<name>, <type>) is overwritten.
-func (l *Loader) AddFontMap(r io.Reader) error {
+func (l *FontLoader) AddFontMap(r io.Reader) error {
 	lines := bufio.NewScanner(r)
 	for lines.Scan() {
 		line := lines.Text()
@@ -141,16 +147,20 @@ func (l *Loader) AddFontMap(r io.Reader) error {
 		}
 
 		key := key{parts[0], fontType}
+		l.Lock()
 		l.lookup[key] = &val{fname: parts[2]}
+		l.Unlock()
 	}
 	return lines.Err()
 }
 
 // AddFont adds a font to the loader.  Any previous mapping for the same
 // PostScript name and font type is overwritten.
-func (l *Loader) AddFont(postscriptName string, tp FontType, fname string) {
+func (l *FontLoader) AddFont(postscriptName string, tp FontType, fname string) {
 	key := key{postscriptName, tp}
+	l.Lock()
 	l.lookup[key] = &val{fname: fname}
+	l.Unlock()
 }
 
 // builtin holds the 14 standard fonts required by the PDF specification.

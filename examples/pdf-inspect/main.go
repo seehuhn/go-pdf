@@ -175,6 +175,7 @@ func printObject(args ...string) error {
 				if err != nil {
 					return err
 				}
+				// TODO(voss): sanitise line endings
 				_, err = io.Copy(os.Stdout, stmData)
 				if err != nil {
 					return err
@@ -489,7 +490,7 @@ func (e *explainer) show(obj pdf.Object) error {
 		}
 		fmt.Println("decoded stream contents:")
 		fmt.Print(string(buf[:n]))
-		// TODO(voss): fix line endings
+		// TODO(voss): fix line endings (see type1-deobfuscate/main.go)
 		_, err = io.Copy(os.Stdout, stmData)
 		if err != nil {
 			return err

@@ -87,6 +87,8 @@ func NewIterator(r pdf.Getter) *Iterator {
 //
 // The function must return true if the iteration should continue, or false if it
 // should stop.
+//
+// TODO(voss): change this to iterate over (page number, page dictionary) pairs?
 func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 	yield := func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 		if i.Err != nil {

@@ -30,15 +30,21 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// FontFromFile represents a font which has been extracted from a PDF file.
 type FontFromFile interface {
 	font.Embedded
+
+	// TODO(voss): how to handle glyph selection in Type 1 font?
 	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool))
+
 	FontData() interface{}
+
+	Key() pdf.Reference
 }
 
 // ReadFont extracts a font from a PDF file.
-func ReadFont(r pdf.Getter, ref pdf.Object, name pdf.Name) (FontFromFile, error) {
-	fontDicts, err := font.ExtractDicts(r, ref)
+func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (FontFromFile, error) {
+	fontDicts, err := font.ExtractDicts(r.R, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -48,23 +54,24 @@ func ReadFont(r pdf.Getter, ref pdf.Object, name pdf.Name) (FontFromFile, error)
 		Ref:     ref,
 	}
 
+	// TODO(voss): make this less repetitive
 	switch fontDicts.Type {
 	case font.Type1: // Type 1 fonts (including the standard 14 fonts)
-		info, err := type1.Extract(r, fontDicts)
+		info, err := type1.Extract(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
 		_ = info
 		panic("not implemented")
 	case font.CFFComposite: // CFF font data without wrapper (composite font)
-		info, err := cff.ExtractComposite(r, fontDicts)
+		info, err := cff.ExtractComposite(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
 		_ = info
 		panic("not implemented")
 	case font.CFFSimple: // CFF font data without wrapper (simple font)
-		info, err := cff.ExtractSimple(r, fontDicts)
+		info, err := cff.ExtractSimple(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
@@ -72,25 +79,31 @@ func ReadFont(r pdf.Getter, ref pdf.Object, name pdf.Name) (FontFromFile, error)
 		for c := range widths {
 			widths[c] = info.Font.GlyphWidthPDF(info.Encoding[c])
 		}
+		text := make([][]rune, 256)
+		if info.ToUnicode != nil {
+			text = info.ToUnicode.GetSimpleMapping()
+		}
+		// TODO: other methods for extracting the text mapping
 		res := &fromFileSimple{
 			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
-			text:     info.ToUnicode.GetSimpleMapping(),
+			text:     text,
 			fontData: info.Font,
+			key:      fontDicts.FontProgramRef,
 		}
 		return res, nil
 	case font.MMType1: // Multiple Master type 1 fonts
 		return nil, errors.New("Multiple Master type 1 fonts not supported")
 	case font.OpenTypeCFFComposite: // CFF fonts in an OpenType wrapper (composite font)
-		info, err := opentype.ExtractCFFComposite(r, fontDicts)
+		info, err := opentype.ExtractCFFComposite(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
 		_ = info
 		panic("not implemented")
 	case font.OpenTypeCFFSimple: // CFF font data in an OpenType wrapper (simple font)
-		info, err := opentype.ExtractCFFSimple(r, fontDicts)
+		info, err := opentype.ExtractCFFSimple(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
@@ -98,37 +111,42 @@ func ReadFont(r pdf.Getter, ref pdf.Object, name pdf.Name) (FontFromFile, error)
 		for c := range widths {
 			widths[c] = info.Font.GlyphWidthPDF(info.Encoding[c])
 		}
+		text := make([][]rune, 256)
+		if info.ToUnicode != nil {
+			text = info.ToUnicode.GetSimpleMapping()
+		}
+		// TODO(voss): other methods for extracting the text mapping
 		res := &fromFileSimple{
 			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
-			text:     info.ToUnicode.GetSimpleMapping(),
+			text:     text,
 			fontData: info.Font,
 		}
 		return res, nil
 	case font.OpenTypeGlyfComposite: // OpenType fonts with glyf outline (composite font)
-		info, err := opentype.ExtractGlyfComposite(r, fontDicts)
+		info, err := opentype.ExtractGlyfComposite(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
 		_ = info
 		panic("not implemented")
 	case font.OpenTypeGlyfSimple: // OpenType fonts with glyf outline (simple font)
-		info, err := opentype.ExtractGlyfSimple(r, fontDicts)
+		info, err := opentype.ExtractGlyfSimple(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
 		_ = info
 		panic("not implemented")
 	case font.TrueTypeComposite: // TrueType fonts (composite font)
-		info, err := truetype.ExtractComposite(r, fontDicts)
+		info, err := truetype.ExtractComposite(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
 		_ = info
 		panic("not implemented")
 	case font.TrueTypeSimple: // TrueType fonts (simple font)
-		info, err := truetype.ExtractSimple(r, fontDicts)
+		info, err := truetype.ExtractSimple(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
@@ -136,16 +154,21 @@ func ReadFont(r pdf.Getter, ref pdf.Object, name pdf.Name) (FontFromFile, error)
 		for c := range widths {
 			widths[c] = info.Font.GlyphWidthPDF(info.Encoding[c])
 		}
+		text := make([][]rune, 256)
+		if info.ToUnicode != nil {
+			text = info.ToUnicode.GetSimpleMapping()
+		}
+		// TODO: other methods for extracting the text mapping
 		res := &fromFileSimple{
 			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
-			text:     info.ToUnicode.GetSimpleMapping(),
+			text:     text,
 			fontData: info.Font,
 		}
 		return res, nil
 	case font.Type3: // Type 3 fonts
-		info, err := type3.Extract(r, fontDicts)
+		info, err := type3.Extract(r.R, fontDicts)
 		if err != nil {
 			return nil, err
 		}
@@ -162,6 +185,7 @@ type fromFileSimple struct {
 	encoding []glyph.ID
 	text     [][]rune
 	fontData interface{}
+	key      pdf.Reference
 }
 
 func (f *fromFileSimple) WritingMode() int {
@@ -182,6 +206,10 @@ func (f *fromFileSimple) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, tex
 
 func (f *fromFileSimple) FontData() interface{} {
 	return f.fontData
+}
+
+func (f *fromFileSimple) Key() pdf.Reference {
+	return f.key
 }
 
 type fromFileComposite struct {

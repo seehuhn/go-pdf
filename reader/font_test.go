@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package content
+package reader
 
 import (
 	"bytes"
@@ -28,58 +28,66 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 )
 
-func TestExtract(t *testing.T) {
-	// TODO(voss): re-enable once font-handling has stabilised
-	t.Skip("disabled for now")
+func TestExtractText(t *testing.T) {
+	t.Skip("reenable this, once ReadFont() is fully implemented")
 
-	text := `“Hello World!”`
+	line1 := "Hello World!\n"
+	line2 := "— Jochen Voß\n"
+	textEmbedded := line1 + line2
 
-	fonts, err := debug.MakeFonts()
+	FF, err := debug.MakeFonts()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, font := range fonts {
-		t.Run(fmt.Sprintf("%d:%s", i, font.Type), func(t *testing.T) {
+	for i, F := range FF {
+		t.Run(fmt.Sprintf("%d:%s", i, F.Type), func(t *testing.T) {
+			// Create a document with two lines of text.
 			buf := &bytes.Buffer{}
-			page, err := document.WriteSinglePage(buf, document.A5r, nil)
+			doc, err := document.WriteSinglePage(buf, document.A5r, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			F, err := font.Font.Embed(page.Out, "F")
+			E, err := F.Font.Embed(doc.Out, "F")
 			if err != nil {
 				t.Fatal(err)
 			}
-			page.TextStart()
-			page.TextSetFont(F, 12)
-			page.TextFirstLine(72, 72)
-			page.TextShow(text)
-			page.TextEnd()
-			err = page.Close()
+			doc.TextSetFont(E, 12)
+			doc.TextStart()
+			doc.TextFirstLine(72, 100)
+			doc.TextShow(line1)
+			doc.TextSecondLine(0, -18)
+			doc.TextShow(line2)
+			doc.TextEnd()
+			err = doc.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			// os.WriteFile("debug.pdf", buf.Bytes(), 0644)
-
+			// Now try to read back the text.
 			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 			if err != nil {
 				t.Fatal(err)
+			}
+
+			var pieces []string
+			contents := New(r)
+			contents.Text = func(text string) error {
+				pieces = append(pieces, text)
+				return nil
 			}
 
 			pageDict, err := pagetree.GetPage(r, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
-			var fragments []string
-			err = ForAllText(r, pageDict, func(ctx *Context, s string) error {
-				fragments = append(fragments, s)
-				return nil
-			})
+			err = contents.ParsePage(pageDict)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if strings.Join(fragments, "") != text {
-				t.Errorf("got %q, want %q", strings.Join(fragments, ""), text)
+
+			textReceived := strings.Join(pieces, "")
+			if textReceived != textEmbedded {
+				t.Errorf("expected %q, got %q", textEmbedded, textReceived)
 			}
 		})
 	}

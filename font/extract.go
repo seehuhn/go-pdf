@@ -94,19 +94,18 @@ func (t EmbeddingType) MustBe(expected EmbeddingType) error {
 
 // Dicts collects all information about a font embedded in a PDF file.
 type Dicts struct {
-	Ref            pdf.Object
+	PostScriptName pdf.Name
 	FontDict       pdf.Dict
 	CIDFontDict    pdf.Dict
 	FontDescriptor *Descriptor
+	FontProgramRef pdf.Reference
 	FontProgram    *pdf.Stream
 	Type           EmbeddingType
 }
 
 // ExtractDicts reads all information about a font from a PDF file.
 func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
-	res := &Dicts{
-		Ref: fontDictRef,
-	}
+	res := &Dicts{}
 
 	fontDict, err := pdf.GetDictTyped(r, fontDictRef, "Font")
 	if err != nil {
@@ -142,6 +141,11 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 		fontDict = cidFontDict
 	}
 
+	fontName, err := pdf.GetName(r, fontDict["BaseFont"])
+	if err == nil {
+		res.PostScriptName = fontName
+	}
+
 	fontDescriptor, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontDescriptor")
@@ -168,6 +172,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 		if err != nil {
 			return nil, pdf.Wrap(err, string(fontKey))
 		}
+		res.FontProgramRef = fontRef
 		res.FontProgram = stmObj
 		subType, err = pdf.GetName(r, stmObj.Dict["Subtype"])
 		if err != nil {

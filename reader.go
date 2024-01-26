@@ -166,14 +166,16 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 			return nil, err
 		}
 	}
-	for _, id := range r.meta.ID {
-		if len(id) < 16 {
-			err := &MalformedFileError{Err: errInvalidID}
-			if shouldExit(err) {
-				return nil, err
+	if version >= V2_0 {
+		for _, id := range r.meta.ID {
+			if len(id) < 16 {
+				err := &MalformedFileError{Err: errInvalidID}
+				if shouldExit(err) {
+					return nil, err
+				}
+				r.meta.ID = nil
+				break
 			}
-			r.meta.ID = nil
-			break
 		}
 	}
 
@@ -283,6 +285,10 @@ func (r *Reader) GetMeta() *MetaInfo {
 // object stream.  Normally, this should be set to true.  If canObjStm is false
 // and the object is in an object stream, an error is returned.
 func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
+	if ref.IsInternal() {
+		panic("internal reference") // TODO(voss): return an error instead?
+	}
+
 	defer func() {
 		if err != nil {
 			err = Wrap(err, "object "+ref.String())

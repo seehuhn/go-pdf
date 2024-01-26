@@ -486,23 +486,42 @@ func (x *Stream) PDF(w io.Writer) error {
 }
 
 // Reference represents a reference to an indirect object in a PDF file.
-// The lower 32 bits represent the object number, the next 16 bits the
+// The lowest 32 bits represent the object number, the next 16 bits the
 // generation number.
 type Reference uint64
 
+// NewReference creates a new reference object.
 func NewReference(number uint32, generation uint16) Reference {
 	return Reference(uint64(number) | uint64(generation)<<32)
 }
 
+// NewInternalReference creates a new reference object which is guaranteed
+// not to clash with an existing reference in the PDF file.
+func NewInternalReference(number uint32) Reference {
+	return Reference(uint64(number) | internalReferenceFlag)
+}
+
+const internalReferenceFlag = 1 << 48
+
+// Number returns the object number of the reference.
 func (x Reference) Number() uint32 {
 	return uint32(x)
 }
 
+// Generation returns the generation number of the reference.
 func (x Reference) Generation() uint16 {
 	return uint16(x >> 32)
 }
 
+// IsInternal returns true if the reference is an internal reference.
+func (x Reference) IsInternal() bool {
+	return x>>48 != 0
+}
+
 func (x Reference) String() string {
+	if x&internalReferenceFlag != 0 {
+		return fmt.Sprintf("int_%d", x&0x000_0000_ffff_ffff)
+	}
 	res := []string{
 		"obj_",
 		strconv.FormatInt(int64(x.Number()), 10),

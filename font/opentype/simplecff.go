@@ -209,11 +209,6 @@ type EmbedInfoCFFSimple struct {
 	ToUnicode *cmap.ToUnicode
 }
 
-// WritingMode implements the [font.NewFont] interface.
-func (info *EmbedInfoCFFSimple) WritingMode() int {
-	return 0
-}
-
 // Embed adds a simple OpenType/CFF font to a PDF file.
 // This is the reverse of [ExtractCFFSimple]
 func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
