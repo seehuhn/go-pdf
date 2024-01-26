@@ -385,17 +385,11 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 
 	canOmit := pdf.GetVersion(w) < pdf.V2_0 && info.IsBuiltin()
 
-	ww := make([]float64, 256)
-	if psFont := info.Font; psFont != nil {
-		q := 1000 * psFont.FontInfo.FontMatrix[0]
-		for i, name := range info.Encoding {
-			ww[i] = float64(psFont.Glyphs[name].WidthX) * q
-		}
-	} else {
-		for i, name := range info.Encoding {
-			ww[i] = float64(info.Metrics.Glyphs[name].WidthX)
-		}
+	ww := info.GetWidths()
+	for i := range ww {
+		ww[i] *= 1000
 	}
+
 	if canOmit {
 		wwStd := Builtin(postScriptName).StandardWidths(info.Encoding)
 		for i, w := range ww {
@@ -528,6 +522,40 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	return nil
+}
+
+// GetWidths returns the widths of the 256 encoded characters.
+// The returned widths are given in PDF text space units.
+func (info *EmbedInfo) GetWidths() []float64 {
+	ww := make([]float64, 256)
+	if psFont := info.Font; psFont != nil {
+		q := psFont.FontInfo.FontMatrix[0]
+		notdefWidth := float64(psFont.Glyphs[".notdef"].WidthX) * q
+		for i, name := range info.Encoding {
+			if g, ok := psFont.Glyphs[name]; ok {
+				ww[i] = float64(g.WidthX) * q
+			} else {
+				ww[i] = notdefWidth
+			}
+		}
+	} else {
+		notdefWidth := float64(info.Metrics.Glyphs[".notdef"].WidthX) / 1000
+		for i, name := range info.Encoding {
+			if g, ok := info.Metrics.Glyphs[name]; ok {
+				ww[i] = float64(g.WidthX) / 1000
+			} else {
+				ww[i] = notdefWidth
+			}
+		}
+	}
+	return ww
+}
+
+func (info *EmbedInfo) GlyphList() []string {
+	if info.Font != nil {
+		return info.Font.GlyphList()
+	}
+	return info.Metrics.GlyphList()
 }
 
 // Extract extracts information about a Type 1 font from a PDF file.

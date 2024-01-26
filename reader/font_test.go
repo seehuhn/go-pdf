@@ -31,8 +31,10 @@ import (
 func TestExtractText(t *testing.T) {
 	t.Skip("reenable this, once ReadFont() is fully implemented")
 
-	line1 := "Hello World!\n"
-	line2 := "— Jochen Voß\n"
+	// TODO(voss): test both, fonts with and without ToUnicode maps
+
+	line1 := "Hello World!"
+	line2 := "— Jochen Voß"
 	textEmbedded := line1 + line2
 
 	FF, err := debug.MakeFonts()
@@ -62,6 +64,8 @@ func TestExtractText(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			// os.WriteFile("test.pdf", buf.Bytes(), 0644)
 
 			// Now try to read back the text.
 			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)

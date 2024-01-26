@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -61,8 +62,33 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (FontFromFile, error) {
 		if err != nil {
 			return nil, err
 		}
-		_ = info
-		panic("not implemented")
+		widths := info.GetWidths()
+		glyphNames := info.GlyphList()
+		rev := make(map[string]glyph.ID, len(glyphNames))
+		for i, name := range glyphNames {
+			rev[name] = glyph.ID(i)
+		}
+		encoding := make([]glyph.ID, 256)
+		for c, name := range info.Encoding {
+			encoding[c] = rev[name]
+		}
+		text := make([][]rune, 256)
+		if info.ToUnicode != nil {
+			text = info.ToUnicode.GetSimpleMapping()
+		} else {
+			for c, name := range info.Encoding {
+				text[c] = names.ToUnicode(name, fontDicts.PostScriptName == "ZapfDingbats")
+			}
+		}
+		res := &fromFileSimple{
+			Res:      res,
+			widths:   widths,
+			encoding: encoding,
+			text:     text,
+			fontData: info.Font,
+			key:      fontDicts.FontProgramRef,
+		}
+		return res, nil
 	case font.CFFComposite: // CFF font data without wrapper (composite font)
 		info, err := cff.ExtractComposite(r.R, fontDicts)
 		if err != nil {
@@ -82,8 +108,12 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (FontFromFile, error) {
 		text := make([][]rune, 256)
 		if info.ToUnicode != nil {
 			text = info.ToUnicode.GetSimpleMapping()
+		} else {
+			for c, gid := range info.Encoding {
+				name := info.Font.Glyphs[gid].Name
+				text[c] = names.ToUnicode(name, fontDicts.PostScriptName == "ZapfDingbats")
+			}
 		}
-		// TODO: other methods for extracting the text mapping
 		res := &fromFileSimple{
 			Res:      res,
 			widths:   widths,
@@ -172,8 +202,18 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (FontFromFile, error) {
 		if err != nil {
 			return nil, err
 		}
+		widths := make([]float64, 256)
+		for c, name := range info.Encoding {
+			widths[c] = float64(info.Glyphs[name].WidthX) * info.FontMatrix[0]
+		}
+		// rev := make(map[string]glyph.ID, len(info.GlyphNames))
+		// for i, name := range glyphNames {
+		// 	rev[name] = glyph.ID(i)
+		// }
+		// encoding := make([]glyph.ID, 256)
 		_ = info
 		panic("not implemented")
+
 	default:
 		panic("unknown font type")
 	}
