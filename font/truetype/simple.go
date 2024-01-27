@@ -98,7 +98,7 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error
 	return res, nil
 }
 
-// Layout implements the [font.Font] interface.
+// Layout implements the [font.Layouter] interface.
 func (f *fontSimple) Layout(s string) glyph.Seq {
 	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }

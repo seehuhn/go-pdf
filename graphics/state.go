@@ -235,9 +235,7 @@ func NewState() State {
 	param.FlatnessTolerance = 1
 	// param.SmoothnessTolerance = 0 // defaul: device dependent
 
-	isSet := initializedStateBits
-
-	return State{param, isSet}
+	return State{param, initializedStateBits}
 }
 
 // Clone returns a shallow copy of the GraphicsState.

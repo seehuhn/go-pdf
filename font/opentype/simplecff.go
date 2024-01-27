@@ -103,7 +103,7 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 	return res, nil
 }
 
-// Layout implements the [font.Font] interface.
+// Layout implements the [font.Layouter] interface.
 func (f *fontCFFSimple) Layout(s string) glyph.Seq {
 	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }

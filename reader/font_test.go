@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -84,7 +85,7 @@ func TestExtractText(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = contents.ParsePage(pageDict)
+			err = contents.ParsePage(pageDict, graphics.IdentityMatrix)
 			if err != nil {
 				t.Fatal(err)
 			}

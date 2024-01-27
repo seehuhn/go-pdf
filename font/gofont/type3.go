@@ -36,13 +36,10 @@ func Type3(font FontID) (*type3.Font, error) {
 	res.Ascent = info.Ascent
 	res.Descent = info.Descent
 	res.BaseLineSkip = info.Ascent - info.Descent + info.LineGap
-	res.UnderlinePosition = info.UnderlinePosition
-	res.UnderlineThickness = info.UnderlineThickness
 	res.ItalicAngle = info.ItalicAngle
 	res.IsFixedPitch = info.IsFixedPitch()
 	res.IsSerif = info.IsSerif
 	res.IsScript = info.IsScript
-	res.IsItalic = info.IsItalic
 
 	// convert glypf outlines to type 3 outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)

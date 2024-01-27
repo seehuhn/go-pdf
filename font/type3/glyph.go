@@ -27,8 +27,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1/names"
-	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/graphics"
 )
@@ -41,28 +39,33 @@ import (
 // operator is added at the start of the glyph description.  In this case, the
 // glyph description may specify both the shape and the color of the glyph.
 func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shapeOnly bool) (*GlyphBuilder, error) {
+	if f.NumOpen < 0 {
+		return nil, errors.New("font already embedded")
+	}
+	f.NumOpen++
+
 	if _, exists := f.Glyphs[name]; exists {
 		return nil, fmt.Errorf("glyph %q already present", name)
 	} else if name == "" {
 		return nil, errors.New("empty glyph name")
 	}
 	f.Glyphs[name] = nil // reserve the name
-	if rr := names.ToUnicode(string(name), false); len(rr) == 1 {
-		f.CMap[rr[0]] = glyph.ID(len(f.glyphNames))
-	}
-	f.glyphNames = append(f.glyphNames, name) // this must come after the cmap update
-	f.numOpen++
 
 	buf := &bytes.Buffer{}
 	page := graphics.NewWriter(buf, pdf.V1_7) // TODO(voss): what to use as the PDF version here?
+
+	// TODO(voss): consider the discussion at
+	// https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
 	page.Resources = f.Resources
 
 	if shapeOnly {
 		fmt.Fprintf(page.Content,
 			"%d 0 %d %d %d %d d1\n",
 			widthX, bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)
+		page.Set = graphics.StateStrokeColor | graphics.StateFillColor
 	} else {
 		fmt.Fprintf(page.Content, "%d 0 d0\n", widthX)
+		page.Set = 0
 	}
 
 	g := &GlyphBuilder{
@@ -95,8 +98,8 @@ func (g *GlyphBuilder) Close() error {
 		Data:   buf.Bytes(),
 	}
 	g.f.Glyphs[g.name] = data
-	g.f.numOpen--
 
+	g.f.NumOpen--
 	return nil
 }
 

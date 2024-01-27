@@ -99,7 +99,7 @@ func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	return res, nil
 }
 
-// Layout implements the [font.Font] interface.
+// Layout implements the [font.Layouter] interface.
 func (f *fontGlyfComposite) Layout(s string) glyph.Seq {
 	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }

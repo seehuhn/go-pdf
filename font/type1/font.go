@@ -159,7 +159,7 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	return res, nil
 }
 
-// Layout implements the [font.Font] interface.
+// Layout implements the [font.Layouter] interface.
 func (f *Font) Layout(s string) glyph.Seq {
 	rr := []rune(s)
 
@@ -586,7 +586,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	}
 
 	var metrics *afm.Info
-	if isBuiltinName[string(fontName)] {
+	if psFont == nil && isBuiltinName[string(fontName)] {
 		afm, err := Builtin(fontName).AFM()
 		if err != nil {
 			panic(err) // should never happen
@@ -594,7 +594,12 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		afm.FontName = string(fontName)
 		metrics = afm
 	} else {
-		metrics = &afm.Info{}
+		metrics = &afm.Info{
+			Glyphs: map[string]*afm.GlyphInfo{
+				".notdef": {},
+			},
+			FontName: string(dicts.PostScriptName),
+		}
 	}
 	if dicts.FontDescriptor != nil {
 		metrics.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent))

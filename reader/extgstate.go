@@ -47,6 +47,13 @@ func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 				break
 			}
 
+			size, err := pdf.GetNumber(r.R, a[1])
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+
 			F, err := r.ReadFont(a[0], "")
 			if pdf.IsMalformed(err) {
 				break
@@ -54,12 +61,6 @@ func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 				return nil, err
 			}
 
-			size, err := pdf.GetNumber(r.R, a[1])
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return nil, err
-			}
 			param.TextFont = F
 			param.TextFontSize = float64(size)
 			set |= graphics.StateTextFont

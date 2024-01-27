@@ -120,9 +120,11 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 
 	var ID [][]byte
 	if needID {
-		for _, id := range opt.ID {
-			if len(id) < 16 {
-				return nil, errInvalidID
+		if version >= V2_0 {
+			for _, id := range opt.ID {
+				if len(id) < 16 {
+					return nil, errInvalidID
+				}
 			}
 		}
 		switch len(opt.ID) {

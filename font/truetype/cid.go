@@ -97,7 +97,7 @@ func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	return res, nil
 }
 
-// Layout implements the [font.Font] interface.
+// Layout implements the [font.Layouter] interface.
 func (f *fontComposite) Layout(s string) glyph.Seq {
 	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 }
@@ -511,6 +511,8 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 			res.CID2GID[i] = glyph.ID(cid2gidData[2*i])<<8 | glyph.ID(cid2gidData[2*i+1])
 		}
 	}
+
+	// TODO(voss): read the widths from the CIDFont dictionary
 
 	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
 		res.ToUnicode = info

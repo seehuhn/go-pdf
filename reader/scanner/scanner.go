@@ -203,8 +203,10 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 			}
 		}
 
-		if x := parseNumber(opBytes); x != nil {
-			return x, nil
+		if opBytes[0] >= '0' && opBytes[0] <= '9' || opBytes[0] == '-' || opBytes[0] == '+' {
+			if x := parseNumber(opBytes); x != nil {
+				return x, nil
+			}
 		}
 
 		switch string(opBytes) {

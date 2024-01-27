@@ -330,11 +330,9 @@ func TestParameters(t *testing.T) {
 	w.TextSetRenderingMode(graphics.TextRenderingModeFillStrokeClip)
 	w.TextSetRise(15)
 
-	r := &Reader{
-		R:         data,
-		Resources: w.Resources,
-		State:     graphics.NewState(),
-	}
+	r := New(data)
+	r.Resources = w.Resources
+	r.State = graphics.NewState()
 	r.Set = 0
 	s := scanner.NewScanner()
 	iter := s.Scan(bytes.NewReader(buf.Bytes()))

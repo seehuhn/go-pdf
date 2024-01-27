@@ -35,6 +35,8 @@ type Reader struct {
 	scanner *scanner.Scanner
 	loader  *loader.FontLoader
 
+	fontCache map[pdf.Reference]FontFromFile
+
 	Resources *pdf.Resources
 	graphics.State
 	stack []graphics.State
@@ -52,11 +54,13 @@ func New(r pdf.Getter) *Reader {
 		R:       r,
 		scanner: scanner.NewScanner(),
 		loader:  loader.New(),
+
+		fontCache: make(map[pdf.Reference]FontFromFile),
 	}
 }
 
 // ParsePage parses a page, and calls the appropriate callback functions.
-func (r *Reader) ParsePage(page pdf.Object) error {
+func (r *Reader) ParsePage(page pdf.Object, ctm graphics.Matrix) error {
 	pageDict, err := pdf.GetDictTyped(r.R, page, "Page")
 	if err != nil {
 		return err
@@ -74,6 +78,7 @@ func (r *Reader) ParsePage(page pdf.Object) error {
 
 	r.scanner.Reset()
 	r.State = graphics.NewState()
+	r.State.CTM = ctm
 	r.stack = r.stack[:0]
 	r.Resources = resources
 
@@ -328,7 +333,7 @@ doOps:
 		if ref == nil {
 			break
 		}
-		F, err := r.ReadFont(ref, name) // TODO(voss): use caching
+		F, err := r.ReadFont(ref, name)
 		if pdf.IsMalformed(err) {
 			break
 		} else if err != nil {
