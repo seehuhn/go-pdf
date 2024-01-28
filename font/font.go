@@ -89,3 +89,19 @@ func (r Res) DefaultName() pdf.Name {
 func (r Res) PDFObject() pdf.Object {
 	return r.Ref
 }
+
+// ResInd can be embedded in a struct to implement the [Resource] interface.
+type ResInd struct {
+	DefName pdf.Name
+	Ref     pdf.Reference
+}
+
+// DefaultName implements the [Resource] interface.
+func (r ResInd) DefaultName() pdf.Name {
+	return r.DefName
+}
+
+// PDFObject implements the [Resource] interface.
+func (r ResInd) PDFObject() pdf.Object {
+	return r.Ref
+}

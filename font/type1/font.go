@@ -34,16 +34,15 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/graphics"
 )
 
-// Font is a Type 1 font.
-type Font struct {
+// fontSimple is a Type 1 font.
+type fontSimple struct {
 	ps         *type1.Font
 	metrics    *afm.Info
 	glyphNames []string
 
-	CMap map[rune]glyph.ID
+	cmap map[rune]glyph.ID
 	lig  map[glyph.Pair]glyph.ID
 	kern map[glyph.Pair]funit.Int16
 
@@ -51,7 +50,7 @@ type Font struct {
 }
 
 // New creates a new Type 1 PDF font from a Type 1 PostScript font.
-func New(psFont *type1.Font, metrics *afm.Info) (*Font, error) {
+func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
 	if psFont == nil && metrics == nil {
 		return nil, fmt.Errorf("no font data given")
 	}
@@ -102,7 +101,7 @@ func New(psFont *type1.Font, metrics *afm.Info) (*Font, error) {
 		geometry.BaseLineDistance = (metrics.Ascent - metrics.Descent) * 6 / 5 // TODO(voss)
 	}
 
-	cMap := make(map[rune]glyph.ID)
+	cmap := make(map[rune]glyph.ID)
 	isDingbats := fontName == "ZapfDingbats"
 	for gid, name := range glyphNames {
 		rr := names.ToUnicode(name, isDingbats)
@@ -111,10 +110,10 @@ func New(psFont *type1.Font, metrics *afm.Info) (*Font, error) {
 		}
 		r := rr[0]
 
-		if _, exists := cMap[r]; exists {
+		if _, exists := cmap[r]; exists {
 			continue
 		}
-		cMap[r] = glyph.ID(gid)
+		cmap[r] = glyph.ID(gid)
 	}
 
 	lig := make(map[glyph.Pair]glyph.ID)
@@ -132,12 +131,12 @@ func New(psFont *type1.Font, metrics *afm.Info) (*Font, error) {
 		}
 	}
 
-	res := &Font{
+	res := &fontSimple{
 		ps:         psFont,
 		metrics:    metrics,
 		glyphNames: glyphNames,
 		Geometry:   geometry,
-		CMap:       cMap,
+		cmap:       cmap,
 		lig:        lig,
 		kern:       kern,
 	}
@@ -145,11 +144,11 @@ func New(psFont *type1.Font, metrics *afm.Info) (*Font, error) {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
-	res := &embedded{
-		Font: f,
-		w:    w,
-		Res: graphics.Res{
+func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+	res := &embeddedSimple{
+		fontSimple: f,
+		w:          w,
+		ResInd: font.ResInd{
 			Ref:     w.Alloc(),
 			DefName: resName,
 		},
@@ -160,13 +159,13 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *Font) Layout(s string) glyph.Seq {
+func (f *fontSimple) Layout(s string) glyph.Seq {
 	rr := []rune(s)
 
 	gg := make(glyph.Seq, 0, len(rr))
 	var prev glyph.ID
 	for i, r := range rr {
-		gid := f.CMap[r]
+		gid := f.cmap[r]
 		if i > 0 {
 			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
 				gg[len(gg)-1].GID = repl
@@ -195,36 +194,35 @@ func (f *Font) Layout(s string) glyph.Seq {
 	return gg
 }
 
-type embedded struct {
-	*Font
-
+type embeddedSimple struct {
+	*fontSimple
 	w pdf.Putter
-	graphics.Res
+	font.ResInd
 
 	*encoding.SimpleEncoder
 	closed bool
 }
 
-func (f *embedded) GlyphWidth(gid glyph.ID) float64 {
+func (f *embeddedSimple) GlyphWidth(gid glyph.ID) float64 {
 	if f.ps != nil {
 		return float64(f.Geometry.Widths[gid]) * f.ps.FontInfo.FontMatrix[0]
 	}
 	return float64(f.Geometry.Widths[gid]) / float64(f.Geometry.UnitsPerEm)
 }
 
-func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
 		yield(f.GlyphWidth(gid), c == ' ')
 	}
 }
 
-func (f *embedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
 	c := f.GIDToCode(gid, rr)
 	return append(s, c), f.GlyphWidth(gid), c == ' '
 }
 
-func (f *embedded) Close() error {
+func (f *embeddedSimple) Close() error {
 	if f.closed {
 		return nil
 	}
@@ -296,8 +294,7 @@ func (f *embedded) Close() error {
 	return info.Embed(f.w, f.Ref)
 }
 
-// EmbedInfo holds all the information needed to embed a Type 1 font
-// into a PDF file.
+// EmbedInfo is the information needed to embed a Type 1 font.
 type EmbedInfo struct {
 	// Font (optional) is the (subsetted as needed) font to embed.
 	// This is non-nil, if and only if the font program is embedded.
@@ -331,25 +328,85 @@ type EmbedInfo struct {
 	ToUnicode *cmap.ToUnicode
 }
 
-// PostScriptName returns the PostScript name of the font.
-func (info *EmbedInfo) PostScriptName() string {
-	if info.Font != nil {
-		return info.Font.FontInfo.FontName
+// Extract extracts information about a Type 1 font from a PDF file.
+func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
+	if err := dicts.Type.MustBe(font.Type1); err != nil {
+		return nil, err
 	}
-	return info.Metrics.FontName
-}
 
-// IsBuiltin returns true if the font is one of the 14 standard PDF fonts.
-func (info *EmbedInfo) IsBuiltin() bool {
-	return isBuiltinName[info.PostScriptName()] && info.Font == nil
-}
+	res := &EmbedInfo{}
 
-// BuiltinEncoding returns the builtin encoding vector for this font.
-func (info *EmbedInfo) BuiltinEncoding() []string {
-	if info.Font != nil {
-		return info.Font.Encoding
+	var psFont *type1.Font
+	if dicts.FontProgram != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+		if err != nil {
+			return nil, err
+		}
+		psFont, err = type1.Read(stm)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return info.Metrics.Encoding
+	res.Font = psFont
+
+	fontName, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(fontName)); m != nil {
+		res.SubsetTag = m[1]
+		fontName = pdf.Name(m[2])
+	}
+
+	var metrics *afm.Info
+	if psFont == nil && isBuiltinName[string(fontName)] {
+		afm, err := Builtin(fontName).AFM()
+		if err != nil {
+			panic(err) // should never happen
+		}
+		afm.FontName = string(fontName)
+		metrics = afm
+	} else {
+		metrics = &afm.Info{
+			Glyphs: map[string]*afm.GlyphInfo{
+				".notdef": {},
+			},
+			FontName: string(fontName),
+		}
+	}
+	if dicts.FontDescriptor != nil {
+		metrics.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent))
+		metrics.Descent = funit.Int16(math.Round(dicts.FontDescriptor.Descent))
+		metrics.CapHeight = funit.Int16(math.Round(dicts.FontDescriptor.CapHeight))
+		metrics.XHeight = funit.Int16(math.Round(dicts.FontDescriptor.XHeight))
+	}
+	res.Metrics = metrics
+
+	if psFont != nil {
+		encoding, err := encoding.UndescribeEncodingType1(
+			r, dicts.FontDict["Encoding"], psFont.Encoding)
+		if err == nil {
+			res.Encoding = encoding
+		}
+	} else {
+		encoding, err := encoding.UndescribeEncodingType1(
+			r, dicts.FontDict["Encoding"], metrics.Encoding)
+		if err == nil {
+			res.Encoding = encoding
+		}
+	}
+
+	res.ResName, _ = pdf.GetName(r, dicts.FontDict["Name"])
+
+	if dicts.FontDescriptor != nil {
+		res.IsSerif = dicts.FontDescriptor.IsSerif
+		res.IsScript = dicts.FontDescriptor.IsScript
+		res.IsAllCap = dicts.FontDescriptor.IsAllCap
+		res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+	}
+
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
+		res.ToUnicode = info
+	}
+
+	return res, nil
 }
 
 // Embed implements the [font.Font] interface.
@@ -383,7 +440,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	compressedRefs := []pdf.Reference{fontDictRef}
 	compressedObjects := []pdf.Object{fontDict}
 
-	canOmit := pdf.GetVersion(w) < pdf.V2_0 && info.IsBuiltin()
+	canOmit := pdf.GetVersion(w) < pdf.V2_0 && info.IsStandard()
 
 	ww := info.GetWidths()
 	for i := range ww {
@@ -524,6 +581,27 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	return nil
 }
 
+// PostScriptName returns the PostScript name of the font.
+func (info *EmbedInfo) PostScriptName() string {
+	if info.Font != nil {
+		return info.Font.FontInfo.FontName
+	}
+	return info.Metrics.FontName
+}
+
+// IsStandard returns true if the font is one of the 14 standard PDF fonts.
+func (info *EmbedInfo) IsStandard() bool {
+	return isBuiltinName[info.PostScriptName()] && info.Font == nil
+}
+
+// BuiltinEncoding returns the builtin encoding vector for this font.
+func (info *EmbedInfo) BuiltinEncoding() []string {
+	if info.Font != nil {
+		return info.Font.Encoding
+	}
+	return info.Metrics.Encoding
+}
+
 // GetWidths returns the widths of the 256 encoded characters.
 // The returned widths are given in PDF text space units.
 func (info *EmbedInfo) GetWidths() []float64 {
@@ -551,92 +629,13 @@ func (info *EmbedInfo) GetWidths() []float64 {
 	return ww
 }
 
+// GlyphList returns the list of glyph names, in a standardised order.
+// Glyph IDs, where used, are indices into this list.
 func (info *EmbedInfo) GlyphList() []string {
 	if info.Font != nil {
 		return info.Font.GlyphList()
 	}
 	return info.Metrics.GlyphList()
-}
-
-// Extract extracts information about a Type 1 font from a PDF file.
-func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
-	if dicts.Type != font.Type1 {
-		return nil, fmt.Errorf("expected %q, got %q", font.Type1, dicts.Type)
-	}
-
-	res := &EmbedInfo{}
-
-	var psFont *type1.Font
-	if dicts.FontProgram != nil {
-		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
-		if err != nil {
-			return nil, err
-		}
-		psFont, err = type1.Read(stm)
-		if err != nil {
-			return nil, err
-		}
-	}
-	res.Font = psFont
-
-	fontName, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
-	if m := subset.TagRegexp.FindStringSubmatch(string(fontName)); m != nil {
-		res.SubsetTag = m[1]
-		fontName = pdf.Name(m[2])
-	}
-
-	var metrics *afm.Info
-	if psFont == nil && isBuiltinName[string(fontName)] {
-		afm, err := Builtin(fontName).AFM()
-		if err != nil {
-			panic(err) // should never happen
-		}
-		afm.FontName = string(fontName)
-		metrics = afm
-	} else {
-		metrics = &afm.Info{
-			Glyphs: map[string]*afm.GlyphInfo{
-				".notdef": {},
-			},
-			FontName: string(dicts.PostScriptName),
-		}
-	}
-	if dicts.FontDescriptor != nil {
-		metrics.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent))
-		metrics.Descent = funit.Int16(math.Round(dicts.FontDescriptor.Descent))
-		metrics.CapHeight = funit.Int16(math.Round(dicts.FontDescriptor.CapHeight))
-		metrics.XHeight = funit.Int16(math.Round(dicts.FontDescriptor.XHeight))
-	}
-	res.Metrics = metrics
-
-	if psFont != nil {
-		encoding, err := encoding.UndescribeEncodingType1(
-			r, dicts.FontDict["Encoding"], psFont.Encoding)
-		if err == nil {
-			res.Encoding = encoding
-		}
-	} else {
-		encoding, err := encoding.UndescribeEncodingType1(
-			r, dicts.FontDict["Encoding"], metrics.Encoding)
-		if err == nil {
-			res.Encoding = encoding
-		}
-	}
-
-	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
-		res.ToUnicode = info
-	}
-
-	res.ResName, _ = pdf.GetName(r, dicts.FontDict["Name"])
-
-	if dicts.FontDescriptor != nil {
-		res.IsSerif = dicts.FontDescriptor.IsSerif
-		res.IsScript = dicts.FontDescriptor.IsScript
-		res.IsAllCap = dicts.FontDescriptor.IsAllCap
-		res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
-	}
-
-	return res, nil
 }
 
 func clone[T any](x *T) *T {

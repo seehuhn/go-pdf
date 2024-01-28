@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package cid provides support for embedding CID fonts into PDF documents.
-package cid
+// Package composite provides convenience functions for embedding fonts into
+// PDF files.
+package composite
 
 import (
 	"os"
@@ -30,32 +31,46 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 )
 
-// EmbedFile loads a font from a file and embeds it into a PDF file.
-// At the moment, only TrueType and OpenType fonts are supported.
-func EmbedFile(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
-	font, err := LoadFont(fname, loc)
+// EmbedOpenType loads a font from a file and embeds it into a PDF file.
+// Both TrueType and OpenType fonts are supported.
+//
+// ResName, if not empty, is the default PDF resource name to use for the
+// embedded font inside PDF content streams.  Normally, this should be left
+// empty.
+func EmbedOpenType(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
+	font, err := LoadOpenType(fname, loc)
 	if err != nil {
 		return nil, err
 	}
 	return font.Embed(w, resName)
 }
 
-// Embed creates a PDF CIDFont and embeds it into a PDF file.
-// At the moment, only TrueType and OpenType fonts are supported.
-func Embed(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Layouter, error) {
-	f, err := Font(info, loc)
+// EmbedOld creates a PDF CIDFont and embeds it into a PDF file.
+//
+// Deprecated: use EmbedOpenType instead, or open code the functionality.
+//
+// TODO(voss): remove
+func EmbedOld(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Layouter, error) {
+	opt := &font.Options{
+		Language: loc,
+	}
+	var f font.Font
+	var err error
+	if info.IsCFF() {
+		f, err = cff.NewComposite(info, opt)
+	} else {
+		f, err = truetype.NewComposite(info, opt)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return f.Embed(w, resName)
 }
 
-// LoadFont loads a font from a file as a PDF CIDFont.
-// At the moment, only TrueType and OpenType fonts are supported.
-//
-// CIDFonts lead to larger PDF files than simple fonts, but there is no limit
-// on the number of distinct glyphs which can be accessed.
-func LoadFont(fname string, loc language.Tag) (font.Font, error) {
+// LoadOpenType loads a font from a file as a simple PDF font.
+// Both TrueType and OpenType fonts are supported.
+func LoadOpenType(fname string, loc language.Tag) (font.Font, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -66,14 +81,7 @@ func LoadFont(fname string, loc language.Tag) (font.Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Font(info, loc)
-}
 
-// Font creates a PDF CIDFont.
-//
-// CIDFonts lead to larger PDF files than simple fonts, but there is no limit
-// on the number of distinct glyphs which can be accessed.
-func Font(info *sfnt.Font, loc language.Tag) (font.Font, error) {
 	opt := &font.Options{
 		Language: loc,
 	}

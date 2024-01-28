@@ -32,7 +32,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cid"
+	"seehuhn.de/go/pdf/font/composite"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -191,7 +191,7 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
 	f.fontNo++
-	X, err := cid.Embed(f.doc.Out, info, instName, language.AmericanEnglish)
+	X, err := composite.EmbedOld(f.doc.Out, info, instName, language.AmericanEnglish)
 	if err != nil {
 		return err
 	}

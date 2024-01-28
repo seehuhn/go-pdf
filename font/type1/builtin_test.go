@@ -85,7 +85,7 @@ func TestExtractBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !info.IsBuiltin() {
+	if !info.IsStandard() {
 		t.Errorf("built-in font not recognized")
 	}
 }

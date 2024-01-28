@@ -94,7 +94,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestDefaultFontRoundTrip(t *testing.T) {
-	t1, err := TimesItalic.PSFont()
+	t1, err := TimesItalic.psFont()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,4 +157,4 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	}
 }
 
-var _ font.Embedded = (*embedded)(nil)
+var _ font.Embedded = (*embeddedSimple)(nil)

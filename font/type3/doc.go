@@ -14,5 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package type1 implements Type 1 fonts embedded into PDF files.
-package type1
+// Package type3 implements Type 3 fonts embedded into PDF files.
+package type3

@@ -108,7 +108,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 	res := &embeddedComposite{
 		FontComposite: f,
 		w:             w,
-		Res:           Res{Ref: w.Alloc(), DefName: resName},
+		ResInd:        font.ResInd{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
@@ -124,7 +124,7 @@ func (f *FontComposite) Layout(s string) glyph.Seq {
 type embeddedComposite struct {
 	*FontComposite
 	w pdf.Putter
-	Res
+	font.ResInd
 
 	cmap.GIDToCID
 	cmap.CIDEncoder
@@ -458,22 +458,4 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, err
 	}
 
 	return res, nil
-}
-
-// Res represents a named PDF resource.
-//
-// TODO(voss): remove
-type Res struct {
-	DefName pdf.Name
-	Ref     pdf.Reference // TODO(voss): should this be pdf.Object?
-}
-
-// DefaultName implements the [Resource] interface.
-func (r Res) DefaultName() pdf.Name {
-	return r.DefName
-}
-
-// PDFObject implements the [Resource] interface.
-func (r Res) PDFObject() pdf.Object {
-	return r.Ref
 }

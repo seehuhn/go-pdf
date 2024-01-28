@@ -24,6 +24,7 @@ import (
 	"math"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
@@ -103,7 +104,10 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 	res := &embeddedSimple{
 		fontCFFSimple: f,
 		w:             w,
-		Res:           Res{Ref: w.Alloc(), DefName: resName},
+		ResInd: font.ResInd{
+			Ref:     w.Alloc(),
+			DefName: resName,
+		},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
 	w.AutoClose(res)
@@ -118,7 +122,7 @@ func (f *fontCFFSimple) Layout(s string) glyph.Seq {
 type embeddedSimple struct {
 	*fontCFFSimple
 	w pdf.Putter
-	Res
+	font.ResInd
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -135,11 +139,6 @@ func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pd
 	width := f.sfnt.GlyphWidthPDF(gid)
 	c := f.SimpleEncoder.GIDToCode(gid, rr)
 	return append(s, c), width, c == ' '
-}
-
-func (f *embeddedSimple) CodeToWidth(c byte) float64 {
-	gid := f.Encoding[c]
-	return f.sfnt.GlyphWidthPDF(gid)
 }
 
 func (f *embeddedSimple) Close() error {
@@ -228,7 +227,7 @@ type EmbedInfoSimple struct {
 	ToUnicode *cmap.ToUnicode
 }
 
-// ExtractSimple extracts all information about a simple CFF font from a PDF file.
+// ExtractSimple extracts information about a simple CFF font from a PDF file.
 // This is the inverse of [EmbedInfoSimple.Embed].
 func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 	if err := dicts.Type.MustBe(font.CFFSimple); err != nil {

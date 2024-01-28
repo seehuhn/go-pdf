@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package opentype handles fonts embedded into PDF files as OpenType fonts.
+// Package opentype implements OpenType fonts embedded into PDF files.
+//
 // Use of this package should be avoided when creating new documents: If the
 // given font contains CFF glyphs, then it is more efficient to embed the font
-// via [cff.NewSimple] or [cff.NewComposite] instead. If the given font
+// via [cff.NewSimple] or [cff.NewComposite] instead.  If the given font
 // contains TrueType glyphs, [truetype.NewSimple] or [truetype.NewComposite]
 // should be used instead of the function from this package.
 package opentype

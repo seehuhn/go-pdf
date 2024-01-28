@@ -37,7 +37,7 @@ func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 
 	var glyphs *pstype1.Font
 	if pdf.GetVersion(w) >= pdf.V2_0 {
-		glyphs, err = f.PSFont()
+		glyphs, err = f.psFont()
 		if err != nil {
 			return nil, err
 		}
@@ -53,8 +53,8 @@ func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	return F.Embed(w, resName)
 }
 
-// PSFont returns the PostScript font program for this builtin font.
-func (f Builtin) PSFont() (*pstype1.Font, error) {
+// psFont returns the PostScript font program for this builtin font.
+func (f Builtin) psFont() (*pstype1.Font, error) {
 	data, err := builtin.Open(string(f), loader.FontTypeType1)
 	if err != nil {
 		return nil, err
@@ -69,6 +69,8 @@ func (f Builtin) PSFont() (*pstype1.Font, error) {
 }
 
 // AFM returns the font metrics for this builtin font.
+//
+// TODO(voss): unexport
 func (f Builtin) AFM() (*afm.Info, error) {
 	data, err := builtin.Open(string(f), loader.FontTypeAFM)
 	if err != nil {
@@ -115,6 +117,8 @@ func (f Builtin) StandardWidths(encoding []string) []float64 {
 }
 
 // The 14 built-in PDF fonts.
+//
+// All of these implement the [font.Font] interface.
 const (
 	Courier              Builtin = "Courier"
 	CourierBold          Builtin = "Courier-Bold"

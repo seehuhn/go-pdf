@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cid"
+	"seehuhn.de/go/pdf/font/composite"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
@@ -78,7 +78,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err := cid.Embed(doc.Out, tt, "X", language.Und)
+	theFont, err := composite.EmbedOld(doc.Out, tt, "X", language.Und)
 	if err != nil {
 		log.Fatal(err)
 	}
