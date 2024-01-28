@@ -55,7 +55,7 @@ type Layouter interface {
 
 	Layout(s string) glyph.Seq
 	GetGeometry() *Geometry
-	FontMatrix() []float64
+	FontMatrix() []float64 // TODO(voss): remove
 
 	// CodeAndWidth appends the code for a given glyph/text to s and returns
 	// the width of the glyph in PDF text space units (still to be multiplied

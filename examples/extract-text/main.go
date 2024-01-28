@@ -80,7 +80,7 @@ func extractText(fname string) error {
 		return err
 	}
 
-	contents := reader.New(r)
+	contents := reader.New(r, nil)
 	contents.Text = func(text string) error {
 		fmt.Print(text)
 		return nil

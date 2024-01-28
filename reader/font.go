@@ -19,6 +19,7 @@ package reader
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"golang.org/x/exp/maps"
@@ -32,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
@@ -68,6 +70,18 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		return nil, err
 	}
 
+	if L := r.loader; L != nil && fontDicts.FontProgram == nil {
+		tp := loader.FontTypeType1 // TODO(voss): try all supported types
+		if stm, err := L.Open(string(fontDicts.PostScriptName), tp); err == nil {
+			fontDicts.Type = font.Type1
+			fontDicts.FontProgram = &pdf.Stream{R: stm}
+			fontDicts.FontProgramRef = pdf.NewInternalReference(r.nextIntRef)
+			r.nextIntRef++
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
 	res := font.Res{
 		DefName: name,
 		Ref:     ref,
@@ -79,6 +93,10 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		info, err := type1.Extract(r.R, fontDicts)
 		if err != nil {
 			return nil, err
+		}
+		if info.Font == nil {
+			fmt.Println("XXX")
+			fmt.Println(info.PostScriptName())
 		}
 		widths := info.GetWidths()
 		glyphNames := info.GlyphList()
@@ -181,6 +199,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			encoding: info.Encoding,
 			text:     text,
 			fontData: info.Font,
+			key:      fontDicts.FontProgramRef,
 		}
 		return res, nil
 
@@ -212,6 +231,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			encoding: info.Encoding,
 			text:     text,
 			fontData: info.Font,
+			key:      fontDicts.FontProgramRef,
 		}
 		return res, nil
 
@@ -246,7 +266,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			writingMode: info.CMap.WMode,
 			glyph:       glyph,
 			fontData:    F,
-			key:         0,
+			key:         fontDicts.FontProgramRef,
 		}
 		return res, nil
 
@@ -270,6 +290,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			encoding: info.Encoding,
 			text:     text,
 			fontData: info.Font,
+			key:      fontDicts.FontProgramRef,
 		}
 		return res, nil
 
@@ -324,7 +345,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			encoding: encoding,
 			text:     text,
 			fontData: fontData,
-			key:      0,
+			key:      fontDicts.FontProgramRef,
 		}
 		return res, nil
 

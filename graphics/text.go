@@ -248,9 +248,9 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 		}
 		switch wmode {
 		case 0: // horizontal
-			w.TextMatrix[4] += width * w.TextHorizontalScaling
+			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
 		case 1: // vertical
-			w.TextMatrix[5] += width
+			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
 		}
 	})
 
@@ -330,7 +330,7 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 				run = nil
 			}
 			out = append(out, -xOffsetInt)
-			xActual += float64(xOffsetInt) / 1000 * param.TextFontSize
+			xActual += float64(xOffsetInt) / 1000 * param.TextFontSize * param.TextHorizontalScaling
 		}
 
 		var glyphWidth float64
@@ -359,5 +359,5 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize
 	}
 	flush()
-	w.TextMatrix[4] += xActual
+	w.TextMatrix = Translate(xActual, 0).Mul(w.TextMatrix)
 }

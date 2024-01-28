@@ -63,10 +63,10 @@ type val struct {
 	isBuiltin bool
 }
 
-// New creates a new font loader.
+// NewFontLoader creates a new font loader.
 // The loader is initialized with the 14 standard fonts required by the PDF
 // specification.
-func New() *FontLoader {
+func NewFontLoader() *FontLoader {
 	res := &FontLoader{
 		lookup: make(map[key]*val),
 	}

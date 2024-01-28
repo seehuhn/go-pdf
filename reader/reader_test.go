@@ -70,7 +70,7 @@ func FuzzReader(f *testing.F) {
 		w := graphics.NewWriter(buf, pdf.V1_7)
 
 		// Read from content stream from 'body'
-		r := New(pdf.NewData(pdf.V1_7))
+		r := New(pdf.NewData(pdf.V1_7), nil)
 		r.State = graphics.NewState()
 		r.stack = r.stack[:0]
 		r.Resources = res
@@ -330,7 +330,7 @@ func TestParameters(t *testing.T) {
 	w.TextSetRenderingMode(graphics.TextRenderingModeFillStrokeClip)
 	w.TextSetRise(15)
 
-	r := New(data)
+	r := New(data, nil)
 	r.Resources = w.Resources
 	r.State = graphics.NewState()
 	r.Set = 0

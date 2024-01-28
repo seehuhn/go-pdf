@@ -111,7 +111,7 @@ func TestExtGState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	qqq := New(data)
+	qqq := New(data, nil)
 	ext2, err := qqq.ReadExtGState(ext1.Dict, "X")
 	if err != nil {
 		t.Fatal(err)

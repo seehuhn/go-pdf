@@ -31,9 +31,10 @@ import (
 
 // A Reader reads a PDF content stream.
 type Reader struct {
-	R       pdf.Getter
-	scanner *scanner.Scanner
-	loader  *loader.FontLoader
+	R          pdf.Getter
+	scanner    *scanner.Scanner
+	loader     *loader.FontLoader
+	nextIntRef uint32
 
 	fontCache map[pdf.Reference]FontFromFile
 
@@ -49,11 +50,11 @@ type Reader struct {
 }
 
 // New creates a new Reader.
-func New(r pdf.Getter) *Reader {
+func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 	return &Reader{
 		R:       r,
 		scanner: scanner.NewScanner(),
-		loader:  loader.New(),
+		loader:  loader,
 
 		fontCache: make(map[pdf.Reference]FontFromFile),
 	}
@@ -436,6 +437,7 @@ doOps:
 				if !ok {
 					break doOps
 				}
+				// TODO(voss): do we need to use Translate here?
 				switch r.TextFont.WritingMode() {
 				case 0:
 					r.TextMatrix[4] -= float64(x)
@@ -642,9 +644,9 @@ func (r *Reader) processText(s pdf.String) {
 
 			switch wmode {
 			case 0: // horizontal
-				r.TextMatrix[4] += width
+				r.TextMatrix = graphics.Translate(width, 0).Mul(r.TextMatrix)
 			case 1: // vertical
-				r.TextMatrix[5] += width
+				r.TextMatrix = graphics.Translate(0, width).Mul(r.TextMatrix)
 			}
 		})
 	default:

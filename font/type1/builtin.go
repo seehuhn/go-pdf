@@ -167,4 +167,4 @@ var isBuiltinName = map[string]bool{
 	"ZapfDingbats":          true,
 }
 
-var builtin = loader.New()
+var builtin = loader.NewFontLoader()

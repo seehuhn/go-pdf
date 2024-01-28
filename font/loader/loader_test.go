@@ -26,7 +26,7 @@ import (
 
 // TestStandardFonts checks that the 14 standard fonts are available.
 func TestStandardFonts(t *testing.T) {
-	loader := New()
+	loader := NewFontLoader()
 
 	names := []string{
 		"Courier",

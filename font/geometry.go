@@ -26,6 +26,8 @@ import (
 
 // Geometry collects the various dimensions connected to a font and to
 // the individual glyphs.
+//
+// TODO(voss): use PDF coordinates
 type Geometry struct {
 	UnitsPerEm uint16
 

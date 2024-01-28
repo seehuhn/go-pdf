@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 )
@@ -78,9 +79,9 @@ func TestLineWidth(t *testing.T) {
 	}
 }
 
-// TestTextPositions checks that text positions are correcly updated
+// TestTextPositions1 checks that text positions are correcly updated
 // in the graphics state.
-func TestTextPositions(t *testing.T) {
+func TestTextPositions1(t *testing.T) {
 	if !haveGhostScript() {
 		t.Skip("ghostscript not found")
 	}
@@ -133,70 +134,97 @@ func TestTextPositions(t *testing.T) {
 
 	testString := pdf.String("CADABX")
 
-	// first print all glyphs in one string
-	img1 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-		F := dummyfont.EmbedCFF(r.Out, e, "F")
-
-		r.TextSetFont(F, 100)
-		r.TextStart()
-		r.TextFirstLine(10, 10)
-		r.TextShowRaw(testString)
-		r.TextEnd()
-
-		return nil
-	})
-	// now print glyphs one-by-one and record the x positions
-	var xx []float64
-	img2 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-		F := dummyfont.EmbedCFF(r.Out, e, "F")
-
-		r.TextSetFont(F, 100)
-		r.TextStart()
-		r.TextFirstLine(10, 10)
-		for i := range testString {
-			xx = append(xx, r.TextMatrix[4])
-			r.TextShowRaw(testString[i : i+1])
-		}
-		r.TextEnd()
-
-		return nil
-	})
-	// finally, print each glyph at the recorded x positions
-	img3 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-		F := dummyfont.EmbedCFF(r.Out, e, "F")
-
-		r.TextSetFont(F, 100)
-		for i := range testString {
-			r.TextStart()
-			r.TextFirstLine(xx[i], 10)
-			r.TextShowRaw(testString[i : i+1])
-			r.TextEnd()
-		}
-
-		return nil
-	})
-
-	// check that all three images are the same
-	rect := img1.Bounds()
-	if rect != img2.Bounds() || rect != img3.Bounds() {
-		t.Errorf("image bounds differ: %v, %v, %v", img1.Bounds(), img2.Bounds(), img3.Bounds())
+	type testCase struct {
+		fontSize float64
+		M        graphics.Matrix
+		stretch  float64
 	}
-	for i := rect.Min.X; i < rect.Max.X; i++ {
-		for j := rect.Min.Y; j < rect.Max.Y; j++ {
-			r1, g1, b1, a1 := img1.At(i, j).RGBA()
-			r2, g2, b2, a2 := img2.At(i, j).RGBA()
-			r3, g3, b3, a3 := img3.At(i, j).RGBA()
-			if r1 != r2 || r1 != r3 ||
-				g1 != g2 || g1 != g3 ||
-				b1 != b2 || b1 != b3 ||
-				a1 != a2 || a1 != a3 {
-				t.Errorf("pixel (%d,%d) differs: %d vs %d vs %d",
-					i, j,
-					[]uint32{r1, g1, b1, a1},
-					[]uint32{r2, g2, b2, a2},
-					[]uint32{r3, g3, b3, a3})
+	cases := []testCase{
+		{100, graphics.IdentityMatrix, 1},
+		// {50, graphics.Scale(2, 2), 1}, // TODO(voss): make this work
+	}
+
+	for i, c := range cases {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			// first print all glyphs in one string
+			img1 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
+				F := dummyfont.EmbedCFF(r.Out, e, "F")
+
+				r.TextStart()
+				r.TextSetFont(F, c.fontSize)
+				r.TextSetMatrix(c.M)
+				r.TextSetHorizontalScaling(c.stretch * 100)
+				r.TextFirstLine(10, 10)
+				r.TextShowRaw(testString)
+				r.TextEnd()
+
+				return nil
+			})
+			// now print glyphs one-by-one and record the x positions
+			var xx []float64
+			img2 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
+				F := dummyfont.EmbedCFF(r.Out, e, "F")
+
+				r.TextStart()
+				r.TextSetFont(F, c.fontSize)
+				r.TextSetMatrix(c.M)
+				r.TextSetHorizontalScaling(c.stretch * 100)
+				r.TextFirstLine(10, 10)
+				for i := range testString {
+					xx = append(xx, r.TextMatrix[4])
+					r.TextShowRaw(testString[i : i+1])
+				}
+				r.TextEnd()
+
+				return nil
+			})
+			// finally, print each glyph at the recorded x positions
+			img3 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
+				F := dummyfont.EmbedCFF(r.Out, e, "F")
+
+				r.TextSetFont(F, 100)
+				for i := range testString {
+					r.TextStart()
+					r.TextSetFont(F, c.fontSize)
+					r.TextSetMatrix(c.M)
+					r.TextSetHorizontalScaling(c.stretch * 100)
+					r.TextFirstLine(xx[i], 10)
+					r.TextShowRaw(testString[i : i+1])
+					r.TextEnd()
+				}
+
+				return nil
+			})
+
+			// check that all three images are the same
+			rect := img1.Bounds()
+			if rect != img2.Bounds() || rect != img3.Bounds() {
+				t.Errorf("image bounds differ: %v, %v, %v", img1.Bounds(), img2.Bounds(), img3.Bounds())
 			}
-		}
+			count := 0
+		pixLoop:
+			for i := rect.Min.X; i < rect.Max.X; i++ {
+				for j := rect.Min.Y; j < rect.Max.Y; j++ {
+					r1, g1, b1, a1 := img1.At(i, j).RGBA()
+					r2, g2, b2, a2 := img2.At(i, j).RGBA()
+					r3, g3, b3, a3 := img3.At(i, j).RGBA()
+					if r1 != r2 || r1 != r3 ||
+						g1 != g2 || g1 != g3 ||
+						b1 != b2 || b1 != b3 ||
+						a1 != a2 || a1 != a3 {
+						t.Errorf("pixel (%d,%d) differs: %d vs %d vs %d",
+							i, j,
+							[]uint32{r1, g1, b1, a1},
+							[]uint32{r2, g2, b2, a2},
+							[]uint32{r3, g3, b3, a3})
+						count++
+						if count > 10 {
+							break pixLoop
+						}
+					}
+				}
+			}
+		})
 	}
 }
 

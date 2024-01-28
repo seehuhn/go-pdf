@@ -75,7 +75,7 @@ func TestExtractText(t *testing.T) {
 			}
 
 			var pieces []string
-			contents := New(r)
+			contents := New(r, nil)
 			contents.Text = func(text string) error {
 				pieces = append(pieces, text)
 				return nil
