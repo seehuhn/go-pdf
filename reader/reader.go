@@ -338,7 +338,7 @@ doOps:
 		if pdf.IsMalformed(err) {
 			break
 		} else if err != nil {
-			return err
+			return pdf.Wrap(err, fmt.Sprintf("font %s", name))
 		}
 		r.TextFont = F
 		r.TextFontSize = size
