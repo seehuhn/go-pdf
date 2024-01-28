@@ -31,17 +31,17 @@ type EmbeddingType int
 const (
 	Unknown EmbeddingType = iota
 
-	CFFComposite          // CFF font data without wrapper (composite font)
-	CFFSimple             // CFF font data without wrapper (simple font)
-	MMType1               // Multiple Master type 1 fonts
-	OpenTypeCFFComposite  // CFF fonts in an OpenType wrapper (composite font)
-	OpenTypeCFFSimple     // CFF font data in an OpenType wrapper (simple font)
-	OpenTypeGlyfComposite // OpenType fonts with glyf outline (composite font)
-	OpenTypeGlyfSimple    // OpenType fonts with glyf outline (simple font)
-	TrueTypeComposite     // TrueType fonts (composite font)
-	TrueTypeSimple        // TrueType fonts (simple font)
-	Type1                 // Type 1 fonts
-	Type3                 // Type 3 fonts
+	CFFComposite          // CFF font data (composite)
+	CFFSimple             // CFF font data (simple)
+	MMType1               // Multiple Master Type 1
+	OpenTypeCFFComposite  // CFF fonts in an OpenType wrapper (composite)
+	OpenTypeCFFSimple     // OpenType with CFF glyph outlines (simple)
+	OpenTypeGlyfComposite // OpenType with "glyf" glyph outlines (composite)
+	OpenTypeGlyfSimple    // OpenType with "glyf" glyph outlines (simple)
+	TrueTypeComposite     // TrueType (composite)
+	TrueTypeSimple        // TrueType (simple)
+	Type1                 // Type 1 (simple)
+	Type3                 // Type 3 (simple)
 )
 
 func (t EmbeddingType) String() string {

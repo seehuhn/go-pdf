@@ -14,12 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package font implements the PDF font handling.
 package font
 
 import (
-	"seehuhn.de/go/postscript/funit"
-
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -48,8 +45,6 @@ type Font interface {
 }
 
 // A Layouter is a font embedded in a PDF file which can typeset string data.
-//
-// TODO(voss): can we remove this?
 type Layouter interface {
 	Embedded
 
@@ -64,18 +59,6 @@ type Layouter interface {
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 
 	Close() error
-}
-
-// GetGID returns the glyph ID and advance width for a given rune.
-// A glyph ID of 0 indicates that the rune is not supported by the font.
-//
-// TODO(voss): remove?
-func GetGID(font Layouter, r rune) (glyph.ID, funit.Int16) {
-	gg := font.Layout(string(r))
-	if len(gg) != 1 {
-		return 0, 0
-	}
-	return gg[0].GID, gg[0].Advance
 }
 
 // Embedded represents a font which is already embedded in a PDF file.
