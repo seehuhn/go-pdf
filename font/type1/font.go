@@ -310,7 +310,23 @@ func (f *embeddedSimple) Close() error {
 		subsetTag = subset.Tag(ss, psFont.NumGlyphs())
 	}
 
-	// TODO(voss): generated a ToUnicode map, if needed.
+	var fontName string
+	if psSubset != nil {
+		fontName = psSubset.FontInfo.FontName
+	} else {
+		fontName = metricsSubset.FontName
+	}
+
+	var toUnicode *cmap.ToUnicode
+	toUniMap := f.ToUnicodeNew()
+	for c, name := range encoding {
+		got := names.ToUnicode(name, fontName == "ZapfDingbats")
+		want := toUniMap[string(rune(c))]
+		if !slices.Equal(got, want) {
+			toUnicode = cmap.NewToUnicodeNew(charcode.Simple, toUniMap)
+			break
+		}
+	}
 
 	info := &EmbedInfo{
 		Font:      psSubset,
@@ -318,6 +334,7 @@ func (f *embeddedSimple) Close() error {
 		SubsetTag: subsetTag,
 		Encoding:  encoding,
 		ResName:   f.DefName,
+		ToUnicode: toUnicode,
 	}
 	return info.Embed(f.w, f.Ref)
 }

@@ -70,6 +70,24 @@ func NewToUnicode(cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *T
 	return info
 }
 
+// NewToUnicodeNew constructs a ToUnicode cmap from the given mapping.
+func NewToUnicodeNew(cs charcode.CodeSpaceRange, m map[string][]rune) *ToUnicode {
+	m2 := make(map[charcode.CharCode][]rune, len(m))
+	for cStr, v := range m {
+		code, k := cs.Decode(pdf.String(cStr))
+		if code < 0 || k != len(cStr) {
+			panic("invalid code")
+		}
+		m2[code] = v
+	}
+
+	info := &ToUnicode{
+		CS: cs,
+	}
+	info.SetMapping(m2)
+	return info
+}
+
 // Decode decodes the first character code from the given string.
 // It returns the corresponding unicode rune and the number of bytes consumed.
 // If the character code cannot be decoded, [unicode.ReplacementChar] is returned,

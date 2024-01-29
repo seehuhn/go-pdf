@@ -26,7 +26,7 @@ import (
 type Glyph struct {
 	GID glyph.ID
 
-	// Advance is the advance with for the current glyph the client
+	// Advance is the advance width for the current glyph the client
 	// wishes to achieve.  It is measured in PDF text space units,
 	// and is already scaled by the font size.
 	Advance float64

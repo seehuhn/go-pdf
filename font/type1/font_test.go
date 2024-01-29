@@ -18,6 +18,7 @@ package type1
 
 import (
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -27,6 +28,69 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/gofont"
 )
+
+// TestToUnicode verifies that the ToUnicode cmap is only generated if
+// necessary, and that in this case it is works.
+func TestToUnicode(t *testing.T) {
+	F := TimesRoman
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		for _, X := range []string{"A", "B"} {
+			t.Run(v.String()+X, func(t *testing.T) {
+				data := pdf.NewData(v)
+
+				E, err := F.Embed(data, "")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				gg := E.Layout("AB")
+				if len(gg) != 2 {
+					panic("test is broken")
+				}
+
+				var codes pdf.String
+				codes, _, _ = E.CodeAndWidth(codes, gg[0].GID, []rune("A"))
+				codes, _, _ = E.CodeAndWidth(codes, gg[0].GID, []rune(X))
+				codes, _, _ = E.CodeAndWidth(codes, gg[1].GID, []rune("B"))
+				if len(codes) != 3 {
+					panic("test is broken")
+				}
+				err = E.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				fontDicts, err := font.ExtractDicts(data, E.PDFObject())
+				if err != nil {
+					t.Fatal(err)
+				}
+				info, err := Extract(data, fontDicts)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				needToUni := X != "A"
+				if needToUni {
+					if info.ToUnicode == nil {
+						t.Fatal("ToUnicode cmap is missing")
+					}
+					m := info.ToUnicode.GetMappingNew()
+					if !slices.Equal(m[string(codes[0:1])], []rune("A")) {
+						t.Errorf("m[%d] != A: %q", codes[0], m[string(codes[0:1])])
+					}
+					if !slices.Equal(m[string(codes[1:2])], []rune(X)) {
+						t.Errorf("m[%d] != %s: %q", codes[1], X, m[string(codes[1:2])])
+					}
+					if !slices.Equal(m[string(codes[2:3])], []rune("B")) {
+						t.Errorf("m[%d] != B: %q", codes[2], m[string(codes[2:3])])
+					}
+				} else if info.ToUnicode != nil {
+					t.Error("ToUnicode cmap is present")
+				}
+			})
+		}
+	}
+}
 
 // TestNotdefGlyph verifies that the ".notdef" glyph can be generated.
 // This requires to allocate a code which is mapped to a non-existing glyph

@@ -327,7 +327,7 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 			_, w.Err = fmt.Fprintln(w.Content, " Ts")
 		}
 
-		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize))
+		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize / param.TextHorizontalScaling))
 		if xOffsetInt != 0 { // TODO(voss): only do this if the glyph is not blank
 			if len(run) > 0 {
 				out = append(out, run)

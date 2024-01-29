@@ -25,6 +25,18 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
+// GetMappingNew returns the mapping information from info.
+func (info *ToUnicode) GetMappingNew() map[string][]rune {
+	m := info.GetMapping()
+	m2 := make(map[string][]rune, len(m))
+	var s pdf.String
+	for k, v := range m {
+		s = info.CS.Append(s[:0], k)
+		m2[string(s)] = v
+	}
+	return m2
+}
+
 // GetMapping returns the mapping information from info.
 func (info *ToUnicode) GetMapping() map[charcode.CharCode][]rune {
 	res := make(map[charcode.CharCode][]rune)

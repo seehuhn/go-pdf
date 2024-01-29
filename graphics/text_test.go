@@ -42,7 +42,8 @@ func TestGlyphWidths(t *testing.T) {
 	buf := &bytes.Buffer{}
 	out := graphics.NewWriter(buf, pdf.GetVersion(data))
 	out.TextStart()
-	out.TextSetFont(F, 72)
+	out.TextSetHorizontalScaling(200)
+	out.TextSetFont(F, 50)
 	out.TextFirstLine(100, 100)
 	gg := []font.Glyph{
 		{
