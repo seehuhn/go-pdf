@@ -60,6 +60,13 @@ func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 	}
 }
 
+func (r *Reader) NewPage() {
+	r.scanner.Reset()
+	r.State = graphics.NewState()
+	r.stack = r.stack[:0]
+	r.Resources = &pdf.Resources{}
+}
+
 // ParsePage parses a page, and calls the appropriate callback functions.
 func (r *Reader) ParsePage(page pdf.Object, ctm graphics.Matrix) error {
 	pageDict, err := pdf.GetDictTyped(r.R, page, "Page")
@@ -67,33 +74,24 @@ func (r *Reader) ParsePage(page pdf.Object, ctm graphics.Matrix) error {
 		return err
 	}
 
-	resources := &pdf.Resources{}
+	r.NewPage()
+	r.State.CTM = ctm
+
 	resourcesDict, err := pdf.GetDict(r.R, pageDict["Resources"])
 	if err != nil {
 		return err
 	}
-	err = pdf.DecodeDict(r.R, resources, resourcesDict)
+	err = pdf.DecodeDict(r.R, r.Resources, resourcesDict)
 	if err != nil {
 		return err
 	}
 
-	r.scanner.Reset()
-	r.State = graphics.NewState()
-	r.State.CTM = ctm
-	r.stack = r.stack[:0]
-	r.Resources = resources
-
-	err = r.ParseContentStream(pageDict["Contents"])
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.parseContents(pageDict["Contents"])
 }
 
-// ParseContentStream parses a content stream.
+// parseContents parses a content stream.
 // Obj can be either a stream or an array of streams.
-func (r *Reader) ParseContentStream(obj pdf.Object) error {
+func (r *Reader) parseContents(obj pdf.Object) error {
 	contents, err := pdf.Resolve(r.R, obj)
 	if err != nil {
 		return err
@@ -101,7 +99,7 @@ func (r *Reader) ParseContentStream(obj pdf.Object) error {
 	switch contents := contents.(type) {
 	case *pdf.Stream:
 		err := r.parsePDFStream(contents)
-		if err != nil {
+		if err != nil && err != io.ErrUnexpectedEOF {
 			return pdf.Wrap(err, "content stream")
 		}
 	case pdf.Array:
@@ -111,8 +109,12 @@ func (r *Reader) ParseContentStream(obj pdf.Object) error {
 				return err
 			}
 			err = r.parsePDFStream(stm)
-			if err != nil {
-				return pdf.Wrap(err, "content stream")
+			if err != nil && err != io.ErrUnexpectedEOF {
+				key := "content stream"
+				if ref, ok := ref.(pdf.Reference); ok {
+					key = fmt.Sprintf("content stream %s", ref)
+				}
+				return pdf.Wrap(err, key)
 			}
 		}
 	default:
@@ -128,10 +130,11 @@ func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 	if err != nil {
 		return err
 	}
-	return r.parseFile(body)
+	return r.ParseContentStream(body)
 }
 
-func (r *Reader) parseFile(in io.Reader) error {
+// ParseContentStream parses a PDF content stream.
+func (r *Reader) ParseContentStream(in io.Reader) error {
 	return r.scanner.Scan(in)(r.do)
 }
 
@@ -291,6 +294,7 @@ doOps:
 	case "BT": // Begin text object
 		r.TextMatrix = graphics.IdentityMatrix
 		r.TextLineMatrix = graphics.IdentityMatrix
+		r.Set |= graphics.StateTextMatrix
 
 	case "ET": // End text object
 
@@ -314,7 +318,7 @@ doOps:
 		x, ok := getNum()
 		if ok {
 			r.TextHorizontalScaling = x / 100
-			r.Set |= graphics.StateTextHorizontalSpacing
+			r.Set |= graphics.StateTextHorizontalScaling
 		}
 
 	case "TL": // Set the leading
@@ -432,17 +436,24 @@ doOps:
 			switch ai := ai.(type) {
 			case pdf.String:
 				r.processText(ai)
-			case pdf.Number:
-				x, ok := getNum()
-				if !ok {
+			case pdf.Number, pdf.Integer:
+				var d float64
+				switch ai := ai.(type) {
+				case pdf.Integer:
+					d = float64(ai)
+				case pdf.Real:
+					d = float64(ai)
+				case pdf.Number:
+					d = float64(ai)
+				default:
 					break doOps
 				}
-				// TODO(voss): do we need to use Translate here?
+				d = d / 1000 * r.TextFontSize
 				switch r.TextFont.WritingMode() {
 				case 0:
-					r.TextMatrix[4] -= float64(x)
+					r.TextMatrix = graphics.Translate(-d*r.TextHorizontalScaling, 0).Mul(r.TextMatrix)
 				case 1:
-					r.TextMatrix[5] -= float64(x)
+					r.TextMatrix = graphics.Translate(0, -d).Mul(r.TextMatrix)
 				}
 			}
 		}

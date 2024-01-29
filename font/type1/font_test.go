@@ -28,6 +28,68 @@ import (
 	"seehuhn.de/go/pdf/font/gofont"
 )
 
+// TestNotdefGlyph verifies that the ".notdef" glyph can be generated.
+// This requires to allocate a code which is mapped to a non-existing glyph
+// name.
+func TestNotdefGlyph(t *testing.T) {
+	F := TimesRoman
+
+	// Try both the built-in version (PDF-1.7) and the embedded version (PDF-2.0)
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			data := pdf.NewData(v)
+			E, err := F.Embed(data, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Allocate codes for GID 0 and 2:
+			var s pdf.String
+			s, _, _ = E.CodeAndWidth(s, 0, nil)
+			s, _, _ = E.CodeAndWidth(s, 5, []rune("test"))
+			if len(s) != 2 {
+				panic("test is broken")
+			}
+			code0 := s[0]
+			code1 := s[1]
+			err = E.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			fontDicts, err := font.ExtractDicts(data, E.PDFObject())
+			if err != nil {
+				t.Fatal(err)
+			}
+			info, err := Extract(data, fontDicts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			name0 := info.Encoding[code0]
+			name1 := info.Encoding[code1]
+
+			if info.Font != nil {
+				if _, exists := info.Font.Glyphs[name0]; exists {
+					t.Errorf("existing name %q used for code %d",
+						name0, code0)
+				}
+				if _, exists := info.Font.Glyphs[name1]; !exists {
+					t.Errorf("glyph %q (code %d) does not exist",
+						name1, code1)
+				}
+			} else {
+				if _, exists := info.Metrics.Glyphs[name0]; exists {
+					t.Errorf("existing name %q used for code %d",
+						name0, code0)
+				}
+				if _, exists := info.Metrics.Glyphs[name1]; !exists {
+					t.Errorf("glyph %q (code %d) does not exist",
+						name1, code1)
+				}
+			}
+		})
+	}
+}
+
 func TestRoundTrip(t *testing.T) {
 	t1, err := gofont.Type1(gofont.GoRegular)
 	if err != nil {

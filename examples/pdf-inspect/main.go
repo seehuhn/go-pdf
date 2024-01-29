@@ -139,6 +139,14 @@ func printObject(args ...string) error {
 		if !ok {
 			return fmt.Errorf("expected a PDF stream but got %T", e.obj)
 		}
+		_, err = io.Copy(os.Stdout, stm.R)
+		return err
+
+	case "@stream":
+		stm, ok := e.obj.(*pdf.Stream)
+		if !ok {
+			return fmt.Errorf("expected a PDF stream but got %T", e.obj)
+		}
 		stmData, err := pdf.DecodeStream(r, stm, 0)
 		if err != nil {
 			return err

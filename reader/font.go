@@ -94,10 +94,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		if err != nil {
 			return nil, err
 		}
-		if info.Font == nil {
-			fmt.Println("XXX")
-			fmt.Println(info.PostScriptName())
-		}
 		widths := info.GetWidths()
 		glyphNames := info.GlyphList()
 		rev := make(map[string]glyph.ID, len(glyphNames))

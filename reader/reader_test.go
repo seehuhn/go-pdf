@@ -276,7 +276,7 @@ func FuzzReader(f *testing.F) {
 			}
 			return nil
 		}
-		err := r.parseFile(strings.NewReader(body))
+		err := r.ParseContentStream(strings.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -289,7 +289,7 @@ func FuzzReader(f *testing.F) {
 
 		r.EveryOp = nil
 		replicate := buf.String()
-		err = r.parseFile(buf)
+		err = r.ParseContentStream(buf)
 		if err != nil {
 			t.Fatal(err)
 		}

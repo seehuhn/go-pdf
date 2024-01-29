@@ -30,7 +30,7 @@ import (
 )
 
 func main() {
-	const documentTitle = "The 14 Built-in PDF Fonts"
+	const documentTitle = "The Standard 14 Fonts"
 	const margin = 50
 
 	paper := document.A4
@@ -42,11 +42,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := type1.TimesRoman.Embed(doc.Out, "F")
+	labelFont, err := type1.TimesRoman.Embed(doc.Out, "")
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := type1.TimesBold.Embed(doc.Out, "B")
+	titleFont, err := type1.TimesBold.Embed(doc.Out, "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func main() {
 		}
 	}
 
-	err = f.ClosePage()
+	err = f.FlushPage()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,10 +103,9 @@ type fontTables struct {
 	page *document.Page
 
 	pageNo int
-	fontNo int
 }
 
-func (f *fontTables) ClosePage() error {
+func (f *fontTables) FlushPage() error {
 	if f.page == nil {
 		return nil
 	}
@@ -130,7 +129,7 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 	}
 
 	// ... otherwise start a new page.
-	err := f.ClosePage()
+	err := f.FlushPage()
 	if err != nil {
 		return err
 	}
@@ -140,44 +139,45 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 	return nil
 }
 
-func (f *fontTables) AddTitle(title string, fontSize, a, b float64) error {
-	err := f.MakeSpace(a + b + 72)
+// AddTitle adds a title to the current page, together with the given vertical
+// space before and after the title.
+func (f *fontTables) AddTitle(title string, fontSize, before, after float64) error {
+	err := f.MakeSpace(before + after + 72)
 	if err != nil {
 		return err
 	}
 
-	f.used += a
+	f.used += before
+
 	f.page.TextStart()
 	f.page.TextSetFont(f.titleFont, fontSize)
 	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin+f.textHeight-f.used)
 	f.page.TextShowAligned(title, 0, 0.5)
 	f.page.TextEnd()
 
-	f.used += b
+	f.used += after
 
 	return nil
 }
 
 func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 	fontSize := 10.0
+	baseLineSkip := 12.0
+	colWidth := (f.textWidth + 32) / 4
 
 	afm, err := fnt.AFM()
 	if err != nil {
 		return err
 	}
 	glyphNames := afm.GlyphList()
-	nGlyph := afm.NumGlyphs()
+	nGlyph := len(glyphNames)
 
 	glyphCode := make(map[string]int)
 	for i, name := range afm.Encoding {
-		if name == ".notdef" {
-			continue
+		if name != ".notdef" {
+			glyphCode[name] = i
 		}
-		glyphCode[name] = i
 	}
-
-	baseLineSkip := 12.0
-	colWidth := (f.textWidth + 32) / 4
 
 	var F font.Layouter
 	var geom *font.Geometry
@@ -191,16 +191,14 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 		}
 		page := f.page
 
-		rowsAvailable := int((f.textHeight - f.used) / baseLineSkip)
-		rowsNeeded := (nGlyph - curGlyph + 3) / 4
-		nRows := rowsAvailable
-		if nRows > rowsNeeded {
+		nRows := int((f.textHeight - f.used) / baseLineSkip)
+		if rowsNeeded := (nGlyph - curGlyph + 3) / 4; nRows > rowsNeeded {
 			nRows = rowsNeeded
 		}
 
 		yTop := f.margin + f.textHeight - f.used - afm.Ascent.AsFloat(fontSize/1000)
 
-		// draw the rectangles for the glyph extents in the background
+		// First draw the rectangles for the glyph extents onto the background.
 		tmpGlyph := curGlyph
 		page.PushGraphicsState()
 		page.SetFillColor(color.RGB(.4, 1, .4))
@@ -229,7 +227,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 		page.Fill()
 		page.PopGraphicsState()
 
-		// draw the colunmns of text
+		// Then draw the glyphs and their codes/names.
 		for col := 0; col < 4; col++ {
 			page.TextStart()
 			x := f.margin + float64(col)*colWidth
@@ -239,9 +237,10 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 				}
 
 				if curGlyph%256 == 0 {
-					instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
-					f.fontNo++
-					F, err = fnt.Embed(f.doc.Out, instName)
+					// The builtin fonts are simple fonts, so we can only
+					// use up to 256 glyphs for each embedded copy of the
+					// font.
+					F, err = fnt.Embed(f.doc.Out, "")
 					if err != nil {
 						return err
 					}

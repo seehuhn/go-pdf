@@ -19,6 +19,7 @@ package type1
 import (
 	"fmt"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
@@ -49,7 +50,14 @@ type fontSimple struct {
 	*font.Geometry
 }
 
-// New creates a new Type 1 PDF font from a Type 1 PostScript font.
+// New creates a new Type 1 PDF font from a Type 1 PostScript font,
+// and, optionally, from the corresponding AFM metrics.
+//
+// At least one of `psFont` and `metrics` must be non-nil.
+// The font program is embedded, if and only if `psFont` is non-nil.
+// If metrics is non-nil, information about kerning and ligatures is extracted
+// from the metrics, and additional fields in the PDF font descriptor are
+// filled.
 func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
 	if psFont == nil && metrics == nil {
 		return nil, fmt.Errorf("no font data given")
@@ -233,17 +241,37 @@ func (f *embeddedSimple) Close() error {
 			f.DefName, f.ps.FontInfo.FontName)
 	}
 
-	encodingGid := f.Encoding
 	encoding := make([]string, 256)
-	for i, gid := range encodingGid {
-		encoding[i] = f.glyphNames[gid]
+	for c, gid := range f.Encoding {
+		name := f.glyphNames[gid]
+		if name == ".notdef" && f.CodeIsUsed(byte(c)) {
+			name = notdefForce
+		}
+		encoding[c] = name
 	}
 
 	var subsetTag string
 	psSubset := f.ps
 	metricsSubset := f.metrics
 	if psFont := f.ps; psFont != nil {
-		// only subset the font, if it is embedded
+		// only subset the font, if the font is embedded
+
+		subsetEncoding := encoding
+		needFixup := false
+		for _, name := range subsetEncoding {
+			if name == notdefForce {
+				needFixup = true
+				break
+			}
+		}
+		if needFixup {
+			subsetEncoding = slices.Clone(subsetEncoding)
+			for c, name := range subsetEncoding {
+				if name == notdefForce {
+					subsetEncoding[c] = ".notdef"
+				}
+			}
+		}
 
 		psSubset = clone(psFont)
 		psSubset.Glyphs = make(map[string]*type1.Glyph)
@@ -251,12 +279,12 @@ func (f *embeddedSimple) Close() error {
 		if _, ok := psFont.Glyphs[".notdef"]; ok {
 			psSubset.Glyphs[".notdef"] = psFont.Glyphs[".notdef"]
 		}
-		for _, name := range encoding {
+		for _, name := range subsetEncoding {
 			if _, ok := psFont.Glyphs[name]; ok {
 				psSubset.Glyphs[name] = psFont.Glyphs[name]
 			}
 		}
-		psSubset.Encoding = encoding
+		psSubset.Encoding = subsetEncoding
 
 		if metrics := f.metrics; metrics != nil {
 			metricsSubset = clone(metrics)
@@ -265,12 +293,12 @@ func (f *embeddedSimple) Close() error {
 			if _, ok := metrics.Glyphs[".notdef"]; ok {
 				metricsSubset.Glyphs[".notdef"] = metrics.Glyphs[".notdef"]
 			}
-			for _, name := range encoding {
+			for _, name := range subsetEncoding {
 				if _, ok := metrics.Glyphs[name]; ok {
 					metricsSubset.Glyphs[name] = metrics.Glyphs[name]
 				}
 			}
-			metricsSubset.Encoding = encoding
+			metricsSubset.Encoding = subsetEncoding
 		}
 
 		var ss []glyph.ID
@@ -310,12 +338,11 @@ type EmbedInfo struct {
 	SubsetTag string
 
 	// Encoding (a slice of length 256) is the encoding vector used by the client.
-	// When writing a font, this is used to determine the `Encoding` entry of
+	// When embedding a font, this is used to determine the `Encoding` entry in
 	// the PDF font dictionary.
 	Encoding []string
 
-	// ResName is the resource name for the font.
-	// This is only used for PDF version 1.0.
+	// ResName is the resource name for the font (only used for PDF-1.0).
 	ResName pdf.Name
 
 	IsSerif  bool
@@ -642,3 +669,8 @@ func clone[T any](x *T) *T {
 	y := *x
 	return &y
 }
+
+// NotdefForce is a glyph name which is unlikely to be used by any real-world
+// font. We map code points to this glyph name, when the user requests to
+// typeset the .notdef glyph.
+const notdefForce = ".notdef.force"

@@ -69,8 +69,6 @@ func (f Builtin) psFont() (*pstype1.Font, error) {
 }
 
 // AFM returns the font metrics for this builtin font.
-//
-// TODO(voss): unexport
 func (f Builtin) AFM() (*afm.Info, error) {
 	data, err := builtin.Open(string(f), loader.FontTypeAFM)
 	if err != nil {
@@ -82,7 +80,8 @@ func (f Builtin) AFM() (*afm.Info, error) {
 		return nil, err
 	}
 
-	// fix some metrics
+	// Some metrics missing from our .afm files.  Here we infer values for
+	// them from other metrics.
 	for _, name := range []string{"d", "bracketleft", "bar"} {
 		if glyph, ok := metrics.Glyphs[name]; ok {
 			y := glyph.BBox.URy
@@ -111,6 +110,9 @@ func (f Builtin) StandardWidths(encoding []string) []float64 {
 		panic(err)
 	}
 	for i, name := range encoding {
+		if _, ok := metrics.Glyphs[name]; !ok {
+			name = ".notdef"
+		}
 		ww[i] = float64(metrics.Glyphs[name].WidthX)
 	}
 	return ww

@@ -21,7 +21,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/type1/names"
@@ -54,22 +53,6 @@ func NewSimpleEncoder() *SimpleEncoder {
 // WritingMode implements the [font.NewFont] interface.
 func (e *SimpleEncoder) WritingMode() int {
 	return 0 // simple fonts are always horizontal
-}
-
-// AsText implements the [font.NewFont] interface.
-func (e *SimpleEncoder) AsText(s pdf.String) []rune {
-	var res []rune
-	for _, c := range s {
-		k, ok := e.key[c]
-		if ok {
-			res = append(res, []rune(k.rr)...)
-		}
-	}
-	return res
-}
-
-func (e *SimpleEncoder) CodeToGID(c byte) glyph.ID {
-	return e.Encoding[c]
 }
 
 // GIDToCode returns the character code for the given glyph ID (allocating new
@@ -137,6 +120,14 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 		}
 	}
 	return bestCode
+}
+
+// CodeIsUsed returns true if the given code has already been allocated.
+// This can be used to distinguish between codes which have
+// explicitly been mapped to GID 0 and codes which are not used.
+func (e *SimpleEncoder) CodeIsUsed(code byte) bool {
+	_, used := e.key[code]
+	return used
 }
 
 // Overflow returns true if the encoder has run out of codes.

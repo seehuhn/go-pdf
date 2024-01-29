@@ -48,7 +48,7 @@ type Font interface {
 type Layouter interface {
 	Embedded
 
-	Layout(s string) glyph.Seq
+	Layout(s string) glyph.Seq // TODO(voss): use font.Glyph instead?
 	GetGeometry() *Geometry
 	FontMatrix() []float64 // TODO(voss): remove
 

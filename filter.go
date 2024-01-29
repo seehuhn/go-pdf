@@ -281,7 +281,7 @@ func (f FilterFlate) parseParameters(v Version) (*flateFilter, error) {
 	return res, nil
 }
 
-// FilterFlate is the LZWDecode filter.
+// FilterLZW is the LZWDecode filter.
 // This is only useful to read legacy PDF files.  For new files, use
 // [FilterFlate] instead.
 //

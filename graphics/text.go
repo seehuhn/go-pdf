@@ -64,11 +64,11 @@ func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 		return
 	}
 	scaling /= 100
-	if w.isSet(StateTextHorizontalSpacing) && nearlyEqual(scaling, w.State.TextHorizontalScaling) {
+	if w.isSet(StateTextHorizontalScaling) && nearlyEqual(scaling, w.State.TextHorizontalScaling) {
 		return
 	}
 	w.State.TextHorizontalScaling = scaling
-	w.Set |= StateTextHorizontalSpacing
+	w.Set |= StateTextHorizontalScaling
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(scaling*100), "Tz")
 }
 
@@ -236,10 +236,11 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 		return
 	}
 	F := w.State.TextFont
-	if F == nil {
+	if !w.isSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise) {
 		w.Err = errors.New("no font set")
 		return
 	}
+
 	wmode := F.WritingMode()
 	F.ForeachWidth(s, func(width float64, is_space bool) {
 		width = width*w.TextFontSize + w.TextCharacterSpacing
@@ -268,6 +269,9 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 // This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
 func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 	font := w.TextFont.(font.Layouter) // TODO(voss)
+	if !w.isSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise) {
+		panic("GetTextPosition: unset parameters")
+	}
 
 	var run pdf.String
 	var out pdf.Array

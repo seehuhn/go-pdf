@@ -4,6 +4,42 @@ PDF Spec Errata
 - https://pdf-issues.pdfa.org/32000-2-2020/index.html
 - https://github.com/pdf-association/pdf-issues/issues
 
+Bug Reports
+===========
+
+- https://bugs.ghostscript.com/show_bug.cgi?id=707475
+- https://github.com/google/go-cmp/issues/317
+- https://github.com/google/go-cmp/issues/335
+- https://github.com/google/go-cmp/issues/350
+- https://github.com/harfbuzz/harfbuzz/issues/3545
+- https://github.com/harfbuzz/harfbuzz/issues/3556
+- https://github.com/harfbuzz/harfbuzz/issues/3675
+- https://github.com/HinTak/Font-Validator/issues/70
+- https://github.com/MicrosoftDocs/typography-issues/issues/976
+- https://github.com/pdf-association/arlington-pdf-model/issues/98
+- https://github.com/pdf-association/pdf-issues/issues/316
+- https://github.com/pdf-association/pdf-issues/issues/317
+- https://github.com/pdf-association/pdf-issues/issues/324
+- https://github.com/pdf-association/pdf-issues/issues/326
+- https://github.com/pdf-association/pdf-issues/issues/333
+- https://github.com/pdf-association/pdf-issues/issues/334
+- https://github.com/pdf-association/pdf-issues/issues/335
+- https://github.com/pdf-association/pdf-issues/issues/337
+- https://github.com/pdf-association/pdf-issues/issues/342
+- https://github.com/pdf-association/pdf-issues/issues/344
+- https://github.com/pdf-association/pdf-issues/issues/350
+- https://github.com/pdf-association/pdf-issues/issues/360
+- https://github.com/pdf-association/pdf-issues/issues/363
+- https://github.com/pdf-association/pdf-issues/issues/367
+- https://github.com/pdf-association/pdf-issues/issues/368
+- https://github.com/pdf-association/pdf-issues/issues/371
+- https://github.com/pdf-association/pdf-issues/issues/372
+- https://github.com/pdf-association/pdf-issues/issues/373
+- https://github.com/pdf-association/pdf-issues/issues/376
+- https://github.com/pdf-association/pdf-issues/issues/377
+- https://github.com/pdf-association/pdf-issues/issues/378
+
+
 Related Projects
 ================
 

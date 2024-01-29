@@ -122,7 +122,7 @@ const (
 
 	StateTextCharacterSpacing
 	StateTextWordSpacing
-	StateTextHorizontalSpacing
+	StateTextHorizontalScaling
 	StateTextLeading
 	StateTextFont // includes size
 	StateTextRenderingMode
@@ -164,7 +164,7 @@ const (
 	// initializedStateBits lists the parameters which are initialized to
 	// their default values in [NewState].
 	initializedStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
-		StateTextWordSpacing | StateTextHorizontalSpacing | StateTextLeading | StateTextRenderingMode | StateTextRise |
+		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode | StateTextRise |
 		StateTextKnockout | StateLineWidth | StateLineCap | StateLineJoin |
 		StateMiterLimit | StateDash | StateRenderingIntent |
 		StateStrokeAdjustment | StateBlendMode | StateSoftMask |
@@ -242,6 +242,17 @@ func NewState() State {
 func (s *Parameters) Clone() *Parameters {
 	res := *s
 	return &res
+}
+
+// GetTextPositionDevice returns the current text position in device coordinates.
+func (s State) GetTextPositionDevice() (float64, float64) {
+	if !s.isSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise) {
+		panic("GetTextPosition: unset parameters")
+	}
+	M := Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M = M.Mul(s.TextMatrix)
+	M = M.Mul(s.CTM)
+	return M[4], M[5]
 }
 
 // Matrix contains a PDF transformation matrix.

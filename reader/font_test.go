@@ -97,3 +97,5 @@ func TestExtractText(t *testing.T) {
 		})
 	}
 }
+
+var _ FontFromFile = (*fromFileSimple)(nil)
