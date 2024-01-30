@@ -154,7 +154,7 @@ vertexLoop:
 		if !bytes.Equal(g.buf0[:len(g.buf0)-1], g.buf1[:len(g.buf1)-1]) {
 			break
 		}
-		if len(g.bufR) != len(m1.value) {
+		if len(g.bufR) != len(m1.value) || len(g.bufR) == 0 {
 			break
 		}
 		for i := range g.bufR {

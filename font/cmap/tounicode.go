@@ -76,7 +76,7 @@ func NewToUnicodeNew(cs charcode.CodeSpaceRange, m map[string][]rune) *ToUnicode
 	for cStr, v := range m {
 		code, k := cs.Decode(pdf.String(cStr))
 		if code < 0 || k != len(cStr) {
-			panic("invalid code")
+			panic(fmt.Sprintf("invalid code <%x>", []byte(cStr)))
 		}
 		m2[code] = v
 	}

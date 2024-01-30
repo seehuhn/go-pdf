@@ -33,15 +33,17 @@ import (
 
 // FontSample is an example of a font of the given [EmbeddingType].
 type FontSample struct {
-	Font font.Font
-	Type font.EmbeddingType
+	Label       string
+	Description string
+	Type        font.EmbeddingType
+	Font        font.Font
 }
 
-// MakeFonts generates a list of different fonts for testing.
+// MakeFontSamples generates a list of different fonts for testing.
 //
 // TODO(voss): remove the error return value and panic instead.
-func MakeFonts() ([]FontSample, error) {
-	var res []FontSample
+func MakeFontSamples() ([]*FontSample, error) {
+	var res []*FontSample
 	var F font.Font
 
 	opt := &font.Options{
@@ -61,10 +63,20 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.Type1})
+	res = append(res, &FontSample{
+		Label:       "Type1",
+		Description: "an embedded Type 1 font",
+		Type:        font.Type1,
+		Font:        F,
+	})
 
 	// a built-in font
-	res = append(res, FontSample{type1.Helvetica, font.Type1})
+	res = append(res, &FontSample{
+		Label:       "BuiltIn",
+		Description: "a built-in font",
+		Type:        font.Type1,
+		Font:        type1.Helvetica,
+	})
 
 	// a CFF font, embedded directly ...
 	otf, err := gofont.OpenType(gofont.GoRegular)
@@ -75,14 +87,24 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.CFFSimple})
+	res = append(res, &FontSample{
+		Label:       "CFFSimple",
+		Description: "a simple CFF font",
+		Type:        font.CFFSimple,
+		Font:        F,
+	})
 
 	// ... or with the OpenType wrapper
 	F, err = opentype.NewCFFSimple(otf, opt)
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.OpenTypeCFFSimple})
+	res = append(res, &FontSample{
+		Label:       "OpenTypeCFFSimple",
+		Description: "a simple OpenType/CFF font",
+		Type:        font.OpenTypeCFFSimple,
+		Font:        F,
+	})
 
 	// a TrueType font, embedded directly ...
 	ttf, err := gofont.TrueType(gofont.GoRegular)
@@ -93,21 +115,36 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.TrueTypeSimple})
+	res = append(res, &FontSample{
+		Label:       "TrueTypeSimple",
+		Description: "a simple TrueType font",
+		Type:        font.TrueTypeSimple,
+		Font:        F,
+	})
 
 	// ... or using an OpenType wrapper
 	F, err = opentype.NewGlyfSimple(ttf, opt)
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.OpenTypeGlyfSimple})
+	res = append(res, &FontSample{
+		Label:       "OpenTypeGlyfSimple",
+		Description: "a simple OpenType/glyf font",
+		Type:        font.OpenTypeGlyfSimple,
+		Font:        F,
+	})
 
 	// a Type 3 font
 	F, err = gofont.Type3(gofont.GoRegular)
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.Type3})
+	res = append(res, &FontSample{
+		Label:       "Type3",
+		Description: "a Type 3 font",
+		Type:        font.Type3,
+		Font:        F,
+	})
 
 	// a CFF font without CIDFont operators, embedded directly ...
 	otf, err = gofont.OpenType(gofont.GoRegular)
@@ -122,14 +159,24 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.CFFComposite})
+	res = append(res, &FontSample{
+		Label:       "CFFComposite1",
+		Description: "a composite CFF font (no CIDFont operators)",
+		Type:        font.CFFComposite,
+		Font:        F,
+	})
 
 	// ... or with the OpenType wrapper
 	F, err = opentype.NewCFFComposite(otf, nil)
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.OpenTypeCFFComposite})
+	res = append(res, &FontSample{
+		Label:       "OpenTypeCFFComposite1",
+		Description: "a composite OpenType/CFF font (no CIDFont operators)",
+		Type:        font.OpenTypeCFFComposite,
+		Font:        F,
+	})
 
 	// a CFF font with CIDFont operators, embedded directly ...
 	otf, err = gofont.OpenType(gofont.GoRegular) // allocate a new copy
@@ -151,14 +198,24 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.CFFComposite})
+	res = append(res, &FontSample{
+		Label:       "CFFComposite2",
+		Description: "a composite CFF font with CIDFont operators",
+		Type:        font.CFFComposite,
+		Font:        F,
+	})
 
 	// ... or with the OpenType wrapper
 	F, err = opentype.NewCFFComposite(otf, nil)
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.OpenTypeCFFComposite})
+	res = append(res, &FontSample{
+		Label:       "OpenTypeCFFComposite2",
+		Description: "a composite OpenType/CFF font with CIDFont operators",
+		Type:        font.OpenTypeCFFComposite,
+		Font:        F,
+	})
 
 	// a TrueType font, embedded directly ...
 	ttf, err = gofont.TrueType(gofont.GoRegular)
@@ -169,14 +226,24 @@ func MakeFonts() ([]FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.TrueTypeComposite})
+	res = append(res, &FontSample{
+		Label:       "TrueTypeComposite",
+		Description: "an composite TrueType font",
+		Type:        font.TrueTypeComposite,
+		Font:        F,
+	})
 
 	// ... or using an OpenType wrapper
 	F, err = opentype.NewGlyfComposite(ttf, nil)
 	if err != nil {
 		return nil, err
 	}
-	res = append(res, FontSample{F, font.OpenTypeGlyfComposite})
+	res = append(res, &FontSample{
+		Label:       "OpenTypeGlyfComposite",
+		Description: "a composite OpenType/glyf font",
+		Type:        font.OpenTypeGlyfComposite,
+		Font:        F,
+	})
 
 	return res, nil
 }

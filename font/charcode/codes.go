@@ -179,8 +179,8 @@ func (r Range) Matches(s pdf.String) bool {
 }
 
 // Simple represents the code space range for a simple font.
-// Character codes are one byte long, and are directly mapped to
-// the bytes of the PDF string.
+// Character codes are one byte long, and correspond directly to
+// the bytes in the PDF string.
 var Simple = CodeSpaceRange{{[]byte{0x00}, []byte{0xFF}}}
 
 // UCS2 represents a two-byte encoding.

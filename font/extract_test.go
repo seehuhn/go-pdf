@@ -40,18 +40,18 @@ import (
 // TestExtract makes sure that information about all PDF font types
 // can be extracted.
 func TestExtract(t *testing.T) {
-	FF, err := debug.MakeFonts()
+	FF, err := debug.MakeFontSamples()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fontInfo := range FF {
-		t.Run(fontInfo.Type.String(), func(t *testing.T) {
+	for _, sample := range FF {
+		t.Run(sample.Label, func(t *testing.T) {
 			buf := &bytes.Buffer{}
 			w, err := document.WriteSinglePage(buf, document.A4, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			F, err := fontInfo.Font.Embed(w.Out, "F")
+			F, err := sample.Font.Embed(w.Out, "F")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -80,7 +80,7 @@ func TestExtract(t *testing.T) {
 }
 
 func FuzzExtract(f *testing.F) {
-	FF, err := debug.MakeFonts()
+	FF, err := debug.MakeFontSamples()
 	if err != nil {
 		f.Fatal(err)
 	}

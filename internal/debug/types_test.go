@@ -26,18 +26,18 @@ import (
 )
 
 func TestFontTypes(t *testing.T) {
-	ff, err := MakeFonts()
+	ff, err := MakeFontSamples()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range ff {
-		t.Run(f.Type.String(), func(t *testing.T) {
+	for _, sample := range ff {
+		t.Run(sample.Label, func(t *testing.T) {
 			buf := &bytes.Buffer{}
 			page, err := document.WriteSinglePage(buf, document.A4, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			X, err := f.Font.Embed(page.Out, "X")
+			X, err := sample.Font.Embed(page.Out, "X")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -61,8 +61,8 @@ func TestFontTypes(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if dicts.Type != f.Type {
-				t.Errorf("got %q, want %q", dicts.Type, f.Type)
+			if dicts.Type != sample.Type {
+				t.Errorf("got %q, want %q", dicts.Type, sample.Type)
 			}
 		})
 	}

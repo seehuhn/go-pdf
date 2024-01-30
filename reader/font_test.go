@@ -18,7 +18,6 @@ package reader
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -38,19 +37,19 @@ func TestExtractText(t *testing.T) {
 	line2 := "— Jochen Voß"
 	textEmbedded := line1 + line2
 
-	FF, err := debug.MakeFonts()
+	FF, err := debug.MakeFontSamples()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, F := range FF {
-		t.Run(fmt.Sprintf("%d:%s", i, F.Type), func(t *testing.T) {
+	for _, sample := range FF {
+		t.Run(sample.Label, func(t *testing.T) {
 			// Create a document with two lines of text.
 			buf := &bytes.Buffer{}
 			doc, err := document.WriteSinglePage(buf, document.A5r, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			E, err := F.Font.Embed(doc.Out, "F")
+			E, err := sample.Font.Embed(doc.Out, "F")
 			if err != nil {
 				t.Fatal(err)
 			}

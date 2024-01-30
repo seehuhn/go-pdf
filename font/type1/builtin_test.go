@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
@@ -99,4 +100,87 @@ func TestUnknownBuiltin(t *testing.T) {
 	}
 }
 
+// TestGlyphLists tests that the glyph lists of the 14 standard PDF
+// fonts are consistent between the .pfb and the .afm files.
+func TestGlyphLists(t *testing.T) {
+	for _, F := range All {
+		psFont, err := F.psFont()
+		if err != nil {
+			t.Fatal(err)
+		}
+		metrics, err := F.AFM()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		glyphNames1 := psFont.GlyphList()
+		glyphNames2 := metrics.GlyphList()
+		if d := cmp.Diff(glyphNames1, glyphNames2); d != "" {
+			t.Errorf("%-22s differ: %s", F, d)
+		}
+	}
+}
+
+// TestGlyphWidths tests that the glyph widths of the 14 standard PDF
+// fonts are consistent between the .pfb and the .afm files.
+func TestGlyphWidths(t *testing.T) {
+	for _, F := range All {
+		psFont, err := F.psFont()
+		if err != nil {
+			t.Fatal(err)
+		}
+		metrics, err := F.AFM()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for name, g := range psFont.Glyphs {
+			w1 := g.WidthX
+			w2 := metrics.Glyphs[name].WidthX
+			if w1 != w2 {
+				t.Errorf("%-22s %-8s width=%d, claimedWidth=%d",
+					F, name, w1, w2)
+			}
+		}
+	}
+}
+
+// TestBlankGlyphs checks that glyphs are marked as blank in the
+// metrics file if and only if they are blank in the .pfb file.
+func TestBlankGlyphs(t *testing.T) {
+	for _, F := range All {
+		psFont, err := F.psFont()
+		if err != nil {
+			t.Fatal(err)
+		}
+		metrics, err := F.AFM()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, g := range psFont.Glyphs {
+			isBlank := len(g.Cmds) == 0
+			claimedBlank := metrics.Glyphs[name].BBox.IsZero()
+			// TODO(voss): fix this for the .notdef glyphs by
+			// life-patching the type 1 fonts after loading.
+			if isBlank != claimedBlank && name != ".notdef" {
+				t.Errorf("%-22s %-8s isBlank=%v, claimedBlank=%v",
+					F, name, isBlank, claimedBlank)
+			}
+		}
+	}
+}
+
+var _ font.Font = Courier
+var _ font.Font = CourierBold
+var _ font.Font = CourierBoldOblique
+var _ font.Font = CourierOblique
+var _ font.Font = Helvetica
+var _ font.Font = HelveticaBold
+var _ font.Font = HelveticaBoldOblique
+var _ font.Font = HelveticaOblique
 var _ font.Font = TimesRoman
+var _ font.Font = TimesBold
+var _ font.Font = TimesBoldItalic
+var _ font.Font = TimesItalic
+var _ font.Font = Symbol
+var _ font.Font = ZapfDingbats

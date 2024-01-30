@@ -18,6 +18,7 @@ package type1
 
 import (
 	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/postscript/funit"
 	pstype1 "seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
@@ -80,8 +81,20 @@ func (f Builtin) AFM() (*afm.Info, error) {
 		return nil, err
 	}
 
-	// Some metrics missing from our .afm files.  Here we infer values for
-	// them from other metrics.
+	// Some of the fonts wrongly have a non-zero bounding box for some of the
+	// whitespace glyphs.  We fix this here.
+	//
+	// Revisit this, once
+	// https://github.com/ArtifexSoftware/urw-base35-fonts/issues/48
+	// is resolved.
+	for _, name := range []string{"space", "uni00A0", "uni2002"} {
+		if g, ok := metrics.Glyphs[name]; ok {
+			g.BBox = funit.Rect16{}
+		}
+	}
+
+	// Some metrics missing from our .afm files.  We infer values for
+	// these from other metrics.
 	for _, name := range []string{"d", "bracketleft", "bar"} {
 		if glyph, ok := metrics.Glyphs[name]; ok {
 			y := glyph.BBox.URy

@@ -17,7 +17,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"seehuhn.de/go/sfnt/glyph"
@@ -48,22 +47,22 @@ func run() error {
 		return err
 	}
 
-	fonts, err := debug.MakeFonts()
+	fonts, err := debug.MakeFontSamples()
 	if err != nil {
 		return err
 	}
-	for _, s := range fonts {
+	for _, sample := range fonts {
 		page := doc.AddPage()
 
-		F, err := s.Font.Embed(page.Out, "F")
+		F, err := sample.Font.Embed(page.Out, "F")
 		if err != nil {
 			return err
 		}
 
-		if s.Type.IsComposite() {
-			drawPage(H, 32, page, F, fmt.Sprintf("composite font: %s", s.Type.String()))
+		if sample.Type.IsComposite() {
+			drawPage(H, 32, page, F, sample.Description)
 		} else {
-			drawPage(H, 16, page, F, fmt.Sprintf("simple font: %s", s.Type.String()))
+			drawPage(H, 16, page, F, sample.Description)
 		}
 
 		err = F.Close()
@@ -87,7 +86,7 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, d
 	page.PushGraphicsState()
 	page.TextSetFont(F, 16)
 	geom := F.GetGeometry()
-	gid := glyph.ID(1)
+	gid := glyph.ID(0)
 	for i := 0; i < 16*nRow; i++ {
 		row := i / 16
 		col := i % 16

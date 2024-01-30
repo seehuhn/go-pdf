@@ -235,22 +235,22 @@ func TestTextPositions2(t *testing.T) {
 		t.Skip("ghostscript not found")
 	}
 
-	fonts, err := debug.MakeFonts()
+	fonts, err := debug.MakeFontSamples()
 	if err != nil {
 		t.Fatal(err)
 	}
 	testString := ".MiAbc"
 	// TODO(voss): also try PDF.V2_0, once
 	// https://bugs.ghostscript.com/show_bug.cgi?id=707475 is resolved.
-	for _, fontInfo := range fonts {
-		t.Run(fontInfo.Type.String(), func(t *testing.T) {
+	for _, sample := range fonts {
+		t.Run(sample.Label, func(t *testing.T) {
 			const fontSize = 100
 			var s pdf.String
 
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
 			img1 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := fontInfo.Font.Embed(r.Out, "F")
+				F, err := sample.Font.Embed(r.Out, "F")
 				if err != nil {
 					return err
 				}
@@ -270,7 +270,7 @@ func TestTextPositions2(t *testing.T) {
 			})
 			// Then print each glyph at the recorded x positions.
 			img2 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := fontInfo.Font.Embed(r.Out, "F")
+				F, err := sample.Font.Embed(r.Out, "F")
 				if err != nil {
 					return err
 				}

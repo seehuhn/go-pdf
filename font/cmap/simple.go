@@ -41,10 +41,12 @@ func (info *ToUnicode) GetSimpleMapping() [][]rune {
 		last := int(s[0])
 		if len(entry.Values) == 1 {
 			base := entry.Values[0]
-			for i := 0; i <= last-first; i++ {
-				res[first+i] = base
-				base = c(base)
-				base[len(base)-1]++
+			if len(base) > 0 {
+				for i := 0; i <= last-first; i++ {
+					res[first+i] = base
+					base = c(base)
+					base[len(base)-1]++
+				}
 			}
 		} else {
 			for i := 0; i <= last-first && i < len(entry.Values); i++ {

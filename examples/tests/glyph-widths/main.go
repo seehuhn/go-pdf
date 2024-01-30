@@ -35,7 +35,7 @@ func main() {
 }
 
 func run(filename string) error {
-	ff, err := debug.MakeFonts()
+	ff, err := debug.MakeFontSamples()
 	if err != nil {
 		return err
 	}

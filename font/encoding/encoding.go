@@ -163,7 +163,7 @@ func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
 func (e *SimpleEncoder) ToUnicodeNew() map[string][]rune {
 	toUnicode := make(map[string][]rune, len(e.code))
 	for k, c := range e.code {
-		toUnicode[string(c)] = []rune(k.rr)
+		toUnicode[string([]byte{c})] = []rune(k.rr)
 	}
 	return toUnicode
 }

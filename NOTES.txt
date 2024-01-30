@@ -8,6 +8,7 @@ Bug Reports
 ===========
 
 - https://bugs.ghostscript.com/show_bug.cgi?id=707475
+- https://github.com/ArtifexSoftware/urw-base35-fonts/issues/48
 - https://github.com/google/go-cmp/issues/317
 - https://github.com/google/go-cmp/issues/335
 - https://github.com/google/go-cmp/issues/350
