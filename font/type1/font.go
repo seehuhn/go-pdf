@@ -90,8 +90,8 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
 			extents[i] = g.BBox()
 		}
 		geometry.UnitsPerEm = uint16(math.Round(1 / psFont.FontMatrix[0]))
-		geometry.UnderlinePosition = psFont.FontInfo.UnderlinePosition
-		geometry.UnderlineThickness = psFont.FontInfo.UnderlineThickness
+		geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
+		geometry.UnderlineThickness = float64(psFont.FontInfo.UnderlineThickness) * psFont.FontMatrix[3]
 	} else {
 		fontName = metrics.FontName
 		for i, name := range glyphNames {
@@ -100,13 +100,13 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
 			extents[i] = gi.BBox
 		}
 		geometry.UnitsPerEm = 1000
-		geometry.UnderlinePosition = metrics.UnderlinePosition
-		geometry.UnderlineThickness = metrics.UnderlineThickness
+		geometry.UnderlinePosition = float64(metrics.UnderlinePosition) / 1000
+		geometry.UnderlineThickness = float64(metrics.UnderlineThickness) / 1000
 	}
 	if metrics != nil {
-		geometry.Ascent = metrics.Ascent
-		geometry.Descent = metrics.Descent
-		geometry.BaseLineDistance = (metrics.Ascent - metrics.Descent) * 6 / 5 // TODO(voss)
+		geometry.Ascent = float64(metrics.Ascent) / 1000
+		geometry.Descent = float64(metrics.Descent) / 1000
+		geometry.BaseLineDistance = (geometry.Ascent - geometry.Descent) * 6 / 5 // TODO(voss)
 	}
 
 	cmap := make(map[rune]glyph.ID)

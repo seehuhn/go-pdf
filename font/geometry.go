@@ -31,11 +31,11 @@ import (
 type Geometry struct {
 	UnitsPerEm uint16
 
-	Ascent             funit.Int16
-	Descent            funit.Int16 // negative
-	BaseLineDistance   funit.Int16
-	UnderlinePosition  funit.Float64
-	UnderlineThickness funit.Float64
+	Ascent             float64
+	Descent            float64 // negative
+	BaseLineDistance   float64
+	UnderlinePosition  float64
+	UnderlineThickness float64
 
 	GlyphExtents []funit.Rect16 // indexed by GID
 	Widths       []funit.Int16  // indexed by GID

@@ -155,9 +155,9 @@ func (f *embedded) GetGeometry() *font.Geometry {
 
 	res := &font.Geometry{
 		UnitsPerEm:       uint16(math.Round(1 / f.Font.FontMatrix[0])),
-		Ascent:           f.Ascent,
-		Descent:          f.Descent,
-		BaseLineDistance: f.BaseLineSkip,
+		Ascent:           float64(f.Ascent) * f.Font.FontMatrix[3],
+		Descent:          float64(f.Descent) * f.Font.FontMatrix[3],
+		BaseLineDistance: float64(f.BaseLineSkip) * f.Font.FontMatrix[3],
 		GlyphExtents:     glyphExtents,
 		Widths:           widths,
 	}

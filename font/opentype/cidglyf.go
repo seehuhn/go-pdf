@@ -75,11 +75,11 @@ func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
-		Ascent:             info.Ascent,
-		Descent:            info.Descent,
-		BaseLineDistance:   info.Ascent - info.Descent + info.LineGap,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
+		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
+		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
+		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
+		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
+		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
 	}
 
 	cmap, err := info.CMapTable.GetBest()

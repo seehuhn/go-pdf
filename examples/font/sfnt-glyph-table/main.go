@@ -175,11 +175,9 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 func (f *fontTables) WriteHeader(title, fileName string) error {
 	gBody := f.bodyFont.GetGeometry()
 	gMono := f.monoFont.GetGeometry()
-	v1 := gBody.ToPDF16(12, gBody.Ascent)
-	v2 := gBody.ToPDF16(12, gBody.BaseLineDistance-gBody.Ascent) +
-		gMono.ToPDF16(10, gMono.Ascent)
-	v3 := gMono.ToPDF16(10, gMono.BaseLineDistance-gMono.Ascent) +
-		12
+	v1 := 12 * gBody.Ascent
+	v2 := 12*(gBody.BaseLineDistance-gBody.Ascent) + 10*gMono.Ascent
+	v3 := 10*(gMono.BaseLineDistance-gMono.Ascent) + 12
 	total := v1 + v2 + v3
 
 	err := f.MakeSpace(total)
@@ -213,8 +211,8 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 		gid = append(gid, glyph.ID(i))
 	}
 
-	v1 := geom.ToPDF16(glyphSize, geom.Ascent)
-	v2 := geom.ToPDF16(glyphSize, -geom.Descent)
+	v1 := glyphSize * geom.Ascent
+	v2 := -glyphSize * geom.Descent
 	v3 := 12.0
 	total := v1 + v2 + v3
 

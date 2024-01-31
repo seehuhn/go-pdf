@@ -65,11 +65,11 @@ func NewCFFSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 		GlyphExtents: info.GlyphBBoxes(),
 		Widths:       info.Widths(),
 
-		Ascent:             info.Ascent,
-		Descent:            info.Descent,
-		BaseLineDistance:   info.Ascent - info.Descent + info.LineGap,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
+		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
+		Descent:            float64(info.Descent) * info.FontMatrix[3],
+		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
+		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
+		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
 	}
 
 	cmap, err := info.CMapTable.GetBest()

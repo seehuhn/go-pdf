@@ -65,8 +65,8 @@ func run(filename string) error {
 	)
 
 	q := fontSize / float64(geom.UnitsPerEm)
-	ascent := geom.Ascent.AsFloat(q)
-	descent := geom.Descent.AsFloat(q)
+	ascent := geom.Ascent * fontSize
+	descent := geom.Descent * fontSize
 	leading := ascent - descent
 
 	markerFont := type3.New(1000)
