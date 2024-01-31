@@ -237,8 +237,14 @@ func (f *embeddedSimple) Close() error {
 	f.closed = true
 
 	if f.SimpleEncoder.Overflow() {
+		var fontName string
+		if f.ps != nil {
+			fontName = f.ps.FontInfo.FontName
+		} else {
+			fontName = f.metrics.FontName
+		}
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.ps.FontInfo.FontName)
+			f.DefName, fontName)
 	}
 
 	encoding := make([]string, 256)

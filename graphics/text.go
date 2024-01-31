@@ -268,10 +268,14 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 //
 // This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
 func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
-	font := w.TextFont.(font.Layouter) // TODO(voss)
+	if !w.isValid("TextShowGlyphs", objText) {
+		return
+	}
 	if !w.isSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise) {
 		panic("GetTextPosition: unset parameters")
 	}
+
+	font := w.TextFont.(font.Layouter) // TODO(voss)
 
 	var run pdf.String
 	var out pdf.Array

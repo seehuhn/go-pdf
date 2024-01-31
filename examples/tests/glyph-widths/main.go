@@ -17,14 +17,18 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"math"
 
-	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/postscript/funit"
+
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/internal/debug"
+	"seehuhn.de/go/pdf/font/type3"
 )
 
 func main() {
@@ -35,111 +39,129 @@ func main() {
 }
 
 func run(filename string) error {
-	ff, err := debug.MakeFontSamples()
+	paper := document.A4
+	doc, err := document.CreateMultiPage(filename, paper, nil)
 	if err != nil {
 		return err
 	}
+
+	// H, err := type1.Helvetica.Embed(doc.Out, "H")
+	// if err != nil {
+	// 	return err
+	// }
+	F := type1.TimesRoman
+	E, err := F.Embed(doc.Out, "")
+	if err != nil {
+		return err
+	}
+	geom := E.GetGeometry()
 
 	const (
-		margin    = 36.0
-		colWidth  = 2 * 72.0
-		colHeight = 72.0
-
-		testFontSize = 48.0
+		k        = 20
+		left     = 100
+		fontSize = 18
+		gap1     = 50
+		gap2     = 380
 	)
-	paper := &pdf.Rectangle{
-		URx: 2*margin + colWidth,
-		URy: 2*margin + float64(len(ff))*colHeight,
+
+	q := fontSize / float64(geom.UnitsPerEm)
+	ascent := geom.Ascent.AsFloat(q)
+	descent := geom.Descent.AsFloat(q)
+	leading := ascent - descent
+
+	markerFont := type3.New(1000)
+	markerWidth := funit.Int16(math.Round(1.0 / fontSize * 1000))
+	markerAscent := funit.Int16(math.Round(ascent / fontSize * 1000))
+	markerDescent := funit.Int16(math.Round(descent / fontSize * 1000))
+	bbox := funit.Rect16{
+		LLx: 0,
+		LLy: markerDescent,
+		URx: markerWidth,
+		URy: markerAscent,
 	}
-	page, err := document.CreateSinglePage(filename, paper, nil)
+	// TODO(voss): why does "|" instead of "I" not work?
+	g, err := markerFont.AddGlyph("I", markerWidth, bbox, true)
 	if err != nil {
 		return err
 	}
-
-	labelFont, err := type1.Helvetica.Embed(page.Out, "H")
+	g.Rectangle(0, float64(markerDescent),
+		float64(markerWidth), float64(markerAscent)-float64(markerDescent))
+	g.Fill()
+	err = g.Close()
 	if err != nil {
 		return err
 	}
+	M, err := markerFont.Embed(doc.Out, "M")
 
-	for i, font := range ff {
-		xBase := margin
-		yBase := margin + float64(len(ff)-i-1)*colHeight
+	gid := glyph.ID(0)
+	numGlyphs := min(glyph.ID(font.NumGlyphs(E)), 256)
 
-		page.SetFillColor(color.Gray(0.5))
+	for gid < numGlyphs {
+		page := doc.AddPage()
+
+		page.PushGraphicsState()
+		page.SetLineWidth(0.5)
+
+		page.SetStrokeColor(color.Gray(0.85))
+		for w := 0.0; w < 1000.1; w += 10 {
+			x := left + k*fontSize*w/1000 + gap1 + 0.5
+			page.MoveTo(x, paper.LLy)
+			page.LineTo(x, paper.URy)
+		}
+		page.Stroke()
+
+		page.SetStrokeColor(color.Gray(0.7))
+		for w := 0.0; w < 1000.1; w += 100 {
+			x := left + k*fontSize*w/1000 + gap1 + 0.5
+			page.MoveTo(x, paper.LLy)
+			page.LineTo(x, paper.URy)
+		}
+		page.Stroke()
+
+		page.SetLineWidth(1)
+		page.SetStrokeColor(color.RGB(1, 0.5, 0.5))
+		x := left + gap1 + 1 + gap2 + 0.5
+		page.MoveTo(x, paper.LLy)
+		page.LineTo(x, paper.URy)
+		page.Stroke()
+		page.PopGraphicsState()
+
 		page.TextStart()
-		page.TextFirstLine(xBase, yBase+colHeight-10)
-		page.TextSetFont(labelFont, 8)
-		page.TextShow(font.Type.String())
+		yPos := paper.URy - 10 - ascent
+		for i := 0; yPos+descent >= 10 && gid < numGlyphs; i++ {
+			switch i {
+			case 0:
+				page.TextFirstLine(left, yPos)
+			case 1:
+				page.TextSecondLine(0, -leading)
+			default:
+				page.TextNextLine()
+			}
+			page.TextSetFont(E, fontSize)
+			glyphWidth := geom.Widths[gid].AsFloat(q)
+			gg := make([]font.Glyph, k)
+			for j := 0; j < k; j++ {
+				gg[j] = font.Glyph{
+					GID:     gid,
+					Advance: glyphWidth,
+				}
+			}
+			page.TextShowGlyphs(0, gg, gap1)
+			page.TextSetFont(M, fontSize)
+			// TODO(voss): why is the final +1 needed?
+			page.TextShowAligned("I", gap2-k*glyphWidth+1, 0)
+			page.TextShow("I")
+
+			gid++
+			yPos -= leading
+		}
 		page.TextEnd()
 
-		F, err := font.Font.Embed(page.Out, pdf.Name(fmt.Sprintf("F%d", i)))
+		err = page.Close()
 		if err != nil {
 			return err
 		}
-
-		geom := F.GetGeometry()
-		gg := F.Layout("Nimm!")
-
-		// Draw the glyphs.
-		page.SetFillColor(color.Gray(0))
-		page.TextStart()
-		page.TextFirstLine(xBase, yBase+16)
-		page.TextSetFont(F, testFontSize)
-		totalWidth := page.TextShowGlyphsOld(gg)
-		page.TextEnd()
-
-		// Mark the glyph x-positions in blue.
-		page.SetStrokeColor(color.RGB(0, 0, 0.8))
-		page.SetLineWidth(1)
-		xPos := xBase
-		page.MoveTo(xPos, yBase+8)
-		page.LineTo(xPos, yBase+0.5*colHeight)
-		for _, g := range gg {
-			xPos += geom.ToPDF16(testFontSize, g.Advance)
-			page.MoveTo(xPos, yBase+8)
-			page.LineTo(xPos, yBase+16)
-		}
-		xPos = xBase + totalWidth
-		page.MoveTo(xPos, yBase+8)
-		page.LineTo(xPos, yBase+0.5*colHeight)
-		page.Stroke()
-
-		// Mark the glyph widths in red.
-		page.SetStrokeColor(color.RGB(0.8, 0, 0))
-		page.SetLineWidth(1)
-		xPos = xBase
-		for i, g := range gg {
-			w := geom.ToPDF16(testFontSize, geom.Widths[g.GID])
-			y := yBase + 10
-			if i%2 == 0 {
-				y += 2
-			}
-			page.MoveTo(xPos, y)
-			page.LineTo(xPos+w, y)
-			xPos += geom.ToPDF16(testFontSize, g.Advance)
-		}
-		page.Stroke()
-
-		// Mark the glyph bounding boxes in green.
-		page.SetStrokeColor(color.RGB(0, 0.8, 0))
-		page.SetLineWidth(1)
-		xPos = xBase
-		for _, g := range gg {
-			x := xPos + geom.ToPDF16(testFontSize, g.XOffset)
-			y := yBase + 16 + geom.ToPDF16(testFontSize, g.YOffset)
-			bbox := geom.GlyphExtents[g.GID]
-			page.Rectangle(x+geom.ToPDF16(testFontSize, bbox.LLx),
-				y+geom.ToPDF16(testFontSize, bbox.LLy),
-				geom.ToPDF16(testFontSize, bbox.URx-bbox.LLx),
-				geom.ToPDF16(testFontSize, bbox.URy-bbox.LLy))
-			xPos += geom.ToPDF16(testFontSize, g.Advance)
-		}
-		page.Stroke()
 	}
 
-	err = page.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return doc.Close()
 }
