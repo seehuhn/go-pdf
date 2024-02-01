@@ -39,6 +39,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/widths"
 )
 
 // fontCFFSimple is a CFF font for embedding into a PDF file as a simple font.
@@ -61,7 +62,7 @@ var defaultOptionsCFF = &font.Options{
 // If info is CID-keyed, the function will attempt to convert it to a simple font.
 // If the conversion fails (because more than one private dictionary is used
 // after subsetting), an error is returned.
-func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
+func NewSimple(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -103,7 +104,7 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 	res := &embeddedSimple{
 		fontCFFSimple: f,
 		w:             w,
-		ResInd: font.ResInd{
+		ResIndirect: font.ResIndirect{
 			Ref:     w.Alloc(),
 			DefName: resName,
 		},
@@ -139,7 +140,7 @@ func (f *fontCFFSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 type embeddedSimple struct {
 	*fontCFFSimple
 	w pdf.Putter
-	font.ResInd
+	font.ResIndirect
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -345,7 +346,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	for i := range ww {
 		ww[i] = float64(cff.Glyphs[info.Encoding[i]].Width) * q
 	}
-	widthsInfo := font.EncodeWidthsSimple(ww)
+	widthsInfo := widths.EncodeSimple(ww)
 
 	clientEnc := make([]string, 256)
 	builtinEnc := make([]string, 256)

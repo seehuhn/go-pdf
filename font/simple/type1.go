@@ -49,7 +49,7 @@ func EmbedType1(w pdf.Putter, fname string, afmname string, resName pdf.Name) (f
 // If afmname is not empty, the corresponding ".afm" file is loaded as well
 // and is used to provide additional font metrics, ligatures, and kerning
 // information.
-func LoadType1(fname, afmname string) (font.Font, error) {
+func LoadType1(fname, afmname string) (font.Embedder, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err

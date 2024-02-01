@@ -22,6 +22,7 @@ import (
 )
 
 // Options allows to customize fonts for embedding into PDF files.
+// Not all fields apply to all font types.
 type Options struct {
 	Language     language.Tag
 	MakeGIDToCID func() cmap.GIDToCID

@@ -14,16 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font_test
+package widths_test
 
 import (
 	"testing"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/reader"
 	"seehuhn.de/go/sfnt/glyph"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/reader"
 )
 
 func TestWidthsFull(t *testing.T) {
@@ -31,7 +32,7 @@ func TestWidthsFull(t *testing.T) {
 
 	// TODO(voss): iterate over all font types
 
-	goRegular, err := gofont.OpenType(gofont.GoRegular)
+	goRegular, err := many.OpenType(many.GoRegular)
 	if err != nil {
 		t.Fatal(err)
 	}

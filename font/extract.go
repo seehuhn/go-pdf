@@ -25,23 +25,41 @@ import (
 
 // EmbeddingType represents the different ways font data
 // can be embedded in a PDF file.
+//
+// The different ways of embedding fonts in a PDF file are
+// represented by values of type [EmbeddingType]. There are seven different
+// types of embedded simple fonts:
+//   - Type 1: see [seehuhn.de/go/pdf/font/type1.EmbedInfo]
+//   - Multiple Master Type 1 (not supported by this library)
+//   - CFF font data: see [seehuhn.de/go/pdf/font/cff.EmbedInfoSimple]
+//   - TrueType: see [seehuhn.de/go/pdf/font/truetype.EmbedInfoSimple]
+//   - OpenType with CFF glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoCFFSimple]
+//   - OpenType with "glyf" glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoGlyfSimple]
+//   - Type 3: see [seehuhn.de/go/pdf/font/type3.EmbedInfo]
+//
+// There are four different types of embedded composite fonts:
+//   - CFF font data: see [seehuhn.de/go/pdf/font/cff.EmbedInfoComposite]
+//   - TrueType: see [seehuhn.de/go/pdf/font/truetype.EmbedInfoComposite]
+//   - OpenType with CFF glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoCFFComposite]
+//   - OpenType with "glyf" glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoGlyfComposite]
 type EmbeddingType int
 
 // List of all embedding types supported by PDF.
 const (
 	Unknown EmbeddingType = iota
 
+	Type1              // Type 1 (simple)
+	MMType1            // Multiple Master Type 1 (simple)
+	CFFSimple          // CFF font data (simple)
+	TrueTypeSimple     // TrueType (simple)
+	OpenTypeCFFSimple  // OpenType with CFF glyph outlines (simple)
+	OpenTypeGlyfSimple // OpenType with "glyf" glyph outlines (simple)
+	Type3              // Type 3 (simple)
+
 	CFFComposite          // CFF font data (composite)
-	CFFSimple             // CFF font data (simple)
-	MMType1               // Multiple Master Type 1
-	OpenTypeCFFComposite  // CFF fonts in an OpenType wrapper (composite)
-	OpenTypeCFFSimple     // OpenType with CFF glyph outlines (simple)
-	OpenTypeGlyfComposite // OpenType with "glyf" glyph outlines (composite)
-	OpenTypeGlyfSimple    // OpenType with "glyf" glyph outlines (simple)
 	TrueTypeComposite     // TrueType (composite)
-	TrueTypeSimple        // TrueType (simple)
-	Type1                 // Type 1 (simple)
-	Type3                 // Type 3 (simple)
+	OpenTypeCFFComposite  // OpenType with CFF glyph outlines (composite)
+	OpenTypeGlyfComposite // OpenType with "glyf" glyph outlines (composite)
 )
 
 func (t EmbeddingType) String() string {
@@ -75,6 +93,12 @@ func (t EmbeddingType) String() string {
 
 // IsComposite returns true if the embedded font is a composite PDF font.
 // If the function returns false, the font is a simple PDF font.
+//
+// Fonts can be embedded into a PDF file either as "simple fonts" or as
+// "composite fonts".  Simple fonts lead to smaller PDF files, but only allow
+// to use up to 256 glyphs per embedded copy of the font.  Composite fonts
+// allow to use more than 256 glyphs per embedded copy of the font, but lead to
+// larger PDF files.
 func (t EmbeddingType) IsComposite() bool {
 	switch t {
 	case CFFComposite, OpenTypeCFFComposite, TrueTypeComposite, OpenTypeGlyfComposite:

@@ -46,13 +46,13 @@ type Descriptor struct {
 	Ascent       float64        // required, except for Type 3 fonts
 	Descent      float64        // required, except for Type 3 fonts
 	Leading      float64        // optional (default: 0)
-	CapHeight    float64        // required, except if no latin chars and for Type 3 fonts
+	CapHeight    float64        // required, except if no latin chars or for Type 3 fonts
 	XHeight      float64        // optional (default: 0)
 	StemV        float64        // required, except for Type 3 fonts (0 = unknown, set to -1 for Type 3 fonts)
 	StemH        float64        // optional (default: 0)
 	MaxWidth     float64        // optional (default: 0)
 	AvgWidth     float64        // optional (default: 0)
-	MissingWidth pdf.Number     // optional (default: 0)
+	MissingWidth float64        // optional (default: 0)
 }
 
 // DecodeDescriptor reads the font descriptor from a PDF file.
@@ -196,7 +196,7 @@ func DecodeDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
 	if err != nil {
 		return nil, pdf.Wrap(err, "MissingWidth")
 	}
-	res.MissingWidth = missingWidth
+	res.MissingWidth = float64(missingWidth)
 
 	return res, nil
 }

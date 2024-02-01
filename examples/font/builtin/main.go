@@ -66,7 +66,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, fontName := range type1.All {
+	for _, fontName := range type1.Standard {
 		err = f.AddTitle(string(fontName), 10, 36, 12)
 		if err != nil {
 			log.Fatal(err)

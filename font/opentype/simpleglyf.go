@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -51,7 +52,7 @@ type fontGlyfSimple struct {
 // NewGlyfSimple creates a new simple OpenType/glyf font.
 // Info must either be a TrueType font or an OpenType font with TrueType outlines.
 // Consider using [truetype.NewSimple] instead of this function.
-func NewGlyfSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
+func NewGlyfSimple(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -246,7 +247,7 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 	for i := range ww {
 		ww[i] = float64(otf.GlyphWidth(info.Encoding[i])) * q
 	}
-	widthsInfo := font.EncodeWidthsSimple(ww)
+	widthsInfo := widths.EncodeSimple(ww)
 
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
 	// character codes to glyphs.

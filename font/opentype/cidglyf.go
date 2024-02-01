@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -63,7 +64,7 @@ var defaultOptionsGlyf = &font.Options{
 // NewGlyfComposite creates a new composite OpenType/glyf font.
 // Info must either be a TrueType font or an OpenType font with TrueType outlines.
 // Consider using [truetype.NewComposite] instead of this function.
-func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
+func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -283,12 +284,12 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 	unitsPerEm := otf.UnitsPerEm
 	q := 1000 / float64(unitsPerEm)
 
-	widths := outlines.Widths
-	ww := make(map[pscid.CID]float64, len(widths))
+	glyphWidths := outlines.Widths
+	ww := make(map[pscid.CID]float64, len(glyphWidths))
 	for cid, gid := range info.CIDToGID {
-		ww[pscid.CID(cid)] = widths[gid].AsFloat(q)
+		ww[pscid.CID(cid)] = glyphWidths[gid].AsFloat(q)
 	}
-	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))
+	DW, W := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true

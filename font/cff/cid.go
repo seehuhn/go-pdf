@@ -38,6 +38,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
+	fontwidths "seehuhn.de/go/pdf/font/widths"
 )
 
 // FontComposite is a CFF font for embedding into a PDF file as a composite font.
@@ -62,7 +63,7 @@ var defaultFontOptions = &font.Options{
 
 // NewComposite allocates a new CFF font for embedding into a PDF file as a composite font.
 // The font `info` is allowed but not required to be CID-keyed.
-func NewComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
+func NewComposite(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -107,7 +108,7 @@ func (f *FontComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 	res := &embeddedComposite{
 		FontComposite: f,
 		w:             w,
-		ResInd:        font.ResInd{Ref: w.Alloc(), DefName: resName},
+		ResIndirect:   font.ResIndirect{Ref: w.Alloc(), DefName: resName},
 		GIDToCID:      gidToCID,
 		CIDEncoder:    f.makeEncoder(gidToCID),
 	}
@@ -141,7 +142,7 @@ func (f *FontComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 type embeddedComposite struct {
 	*FontComposite
 	w pdf.Putter
-	font.ResInd
+	font.ResIndirect
 
 	cmap.GIDToCID
 	cmap.CIDEncoder
@@ -311,7 +312,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 			ww[pscid.CID(gid)] = w.AsFloat(q)
 		}
 	}
-	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))
+	DW, W := fontwidths.EncodeComposite(ww, pdf.GetVersion(w))
 
 	bbox := cff.BBox()
 	fontBBox := &pdf.Rectangle{

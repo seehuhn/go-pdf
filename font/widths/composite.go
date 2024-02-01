@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,77 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font
+package widths
 
 import (
 	"errors"
 	"sort"
 
 	"seehuhn.de/go/dag"
-	"seehuhn.de/go/postscript/cid"
-
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/postscript/cid"
 )
 
-// WidthInfo contains the FirstChar, LastChar and Widths entries of
-// a PDF font dictionary, as well as the MissingWidth entry of the
-// FontDescriptor dictionary.
-type WidthInfo struct {
-	FirstChar    pdf.Integer
-	LastChar     pdf.Integer
-	Widths       pdf.Array
-	MissingWidth pdf.Number
-}
-
-// EncodeWidthsSimple encodes the glyph width information for a simple PDF font.
-// The slice ww must have length 256 and is indexed by character code.
-// Widths values are given in PDF glyph space units.
-func EncodeWidthsSimple(ww []float64) *WidthInfo {
-	// find FirstChar and LastChar
-	cand := make(map[float64]bool)
-	cand[ww[0]] = true
-	cand[ww[255]] = true
-	bestGain := 0
-	FirstChar := 0
-	LastChar := 255
-	var MissingWidth pdf.Number
-	for w := range cand {
-		b := 255
-		for b > 0 && ww[b] == w {
-			b--
-		}
-		a := 0
-		for a < b && ww[a] == w {
-			a++
-		}
-		gain := (255 - b + a) * 4
-		if w != 0 {
-			gain -= 15
-		}
-		if gain > bestGain {
-			bestGain = gain
-			FirstChar = a
-			LastChar = b
-			MissingWidth = pdf.Number(w)
-		}
-	}
-
-	Widths := make(pdf.Array, LastChar-FirstChar+1)
-	for i := range Widths {
-		w := ww[FirstChar+i]
-		Widths[i] = pdf.Number(w)
-	}
-
-	return &WidthInfo{
-		FirstChar:    pdf.Integer(FirstChar),
-		LastChar:     pdf.Integer(LastChar),
-		Widths:       Widths,
-		MissingWidth: MissingWidth,
-	}
-}
-
-// EncodeWidthsComposite constructs the W and DW entries for a CIDFont dictionary.
-func EncodeWidthsComposite(widths map[cid.CID]float64, v pdf.Version) (float64, pdf.Array) {
+// EncodeComposite constructs the W and DW entries for a CIDFont dictionary.
+func EncodeComposite(widths map[cid.CID]float64, v pdf.Version) (float64, pdf.Array) {
 	var ww []cidWidth
 	for cid, w := range widths {
 		ww = append(ww, cidWidth{cid, w})
@@ -220,8 +162,8 @@ func mostFrequent(ww []cidWidth) float64 {
 	return bestVal
 }
 
-// DecodeWidthsComposite decodes the W and DW entries of a CIDFont dictionary.
-func DecodeWidthsComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]float64, error) {
+// DecodeComposite decodes the W and DW entries of a CIDFont dictionary.
+func DecodeComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]float64, error) {
 	w, err := pdf.GetArray(r, ref)
 	if err != nil {
 		return nil, err

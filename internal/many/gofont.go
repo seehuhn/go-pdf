@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package gofont
+package many
 
 import (
-	"bytes"
 	"errors"
 
 	"golang.org/x/image/font/gofont/gobold"
@@ -32,53 +31,30 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/gofont/gosmallcaps"
 	"golang.org/x/image/font/gofont/gosmallcapsitalic"
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/truetype"
-	"seehuhn.de/go/sfnt"
 )
 
-// Font identifies individual fonts in the Go font family.
-type Font int
-
-func (f Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
-	data, ok := ttf[f]
-	if !ok {
-		return nil, ErrInvalidFontID
-	}
-
-	info, err := sfnt.Read(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-
-	F, err := truetype.NewSimple(info, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return F.Embed(w, resName)
-}
+// FontID identifies individual fonts in the Go font family.
+type FontID int
 
 // Constants for the available fonts in the Go font family.
 const (
-	_                 Font = iota
-	GoBold                 // gobold
-	GoBoldItalic           // gobolditalic
-	GoItalic               // goitalic
-	GoMedium               // gomedium
-	GoMediumItalic         // gomediumitalic
-	GoRegular              // goregular
-	GoSmallcaps            // gosmallcaps
-	GoSmallcapsItalic      // gosmallcapsitalic
-	GoMono                 // gomono
-	GoMonoBold             // gomonobold
-	GoMonoBoldItalic       // gomonobolditalic
-	GoMonoItalic           // gomonoitalic
+	_                 FontID = iota
+	GoBold                   // gobold
+	GoBoldItalic             // gobolditalic
+	GoItalic                 // goitalic
+	GoMedium                 // gomedium
+	GoMediumItalic           // gomediumitalic
+	GoRegular                // goregular
+	GoSmallcaps              // gosmallcaps
+	GoSmallcapsItalic        // gosmallcapsitalic
+	GoMono                   // gomono
+	GoMonoBold               // gomonobold
+	GoMonoBoldItalic         // gomonobolditalic
+	GoMonoItalic             // gomonoitalic
 )
 
 // All is a slice containing all available fonts in the Go font family.
-var All = []Font{
+var All = []FontID{
 	GoBold,
 	GoBoldItalic,
 	GoItalic,
@@ -93,7 +69,7 @@ var All = []Font{
 	GoMonoItalic,
 }
 
-var ttf = map[Font][]byte{
+var ttf = map[FontID][]byte{
 	GoBold:            gobold.TTF,
 	GoBoldItalic:      gobolditalic.TTF,
 	GoItalic:          goitalic.TTF,

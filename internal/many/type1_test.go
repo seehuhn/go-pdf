@@ -14,28 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package gofont
+package many
 
-import (
-	"bytes"
+import "testing"
 
-	"seehuhn.de/go/sfnt"
-)
-
-// TrueType returns `font` as a TrueType font.
-func TrueType(font FontID) (*sfnt.Font, error) {
-	raw, ok := ttf[font]
-	if !ok {
-		return nil, ErrInvalidFontID
+func TestType1(t *testing.T) {
+	for _, fontID := range All {
+		_, err := Type1(fontID)
+		if err != nil {
+			t.Errorf("error for font %v: %v", fontID, err)
+		}
+		_, err = AFM(fontID)
+		if err != nil {
+			t.Errorf("error for afm %v: %v", fontID, err)
+		}
 	}
-	r := bytes.NewReader(raw)
-
-	info, err := sfnt.Read(r)
-	if err != nil {
-		return nil, err
-	}
-	if !info.IsGlyf() {
-		panic("not a TrueType font")
-	}
-	return info, nil
 }

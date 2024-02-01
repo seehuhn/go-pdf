@@ -151,8 +151,9 @@ const (
 	ZapfDingbats         Builtin = "ZapfDingbats"
 )
 
-// All contains the 14 built-in PDF fonts.
-var All = []Builtin{
+// Standard contains the standard 14 PDF fonts.
+// All of these implement the [font.Embedder] interface.
+var Standard = []Builtin{
 	Courier,
 	CourierBold,
 	CourierBoldOblique,

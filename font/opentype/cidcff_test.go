@@ -25,14 +25,14 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/internal/many"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 )
 
 func TestRoundTripCFFComposite(t *testing.T) {
-	otf, err := gofont.OpenType(gofont.GoRegular)
+	otf, err := many.OpenType(many.GoRegular)
 	if err != nil {
 		t.Fatal(err)
 	}

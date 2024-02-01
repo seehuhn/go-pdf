@@ -76,24 +76,34 @@ func (s *GlyphSeq) Align(width float64, q float64) {
 	s.Seq[len(s.Seq)-1].Advance += extra * (1 - q)
 }
 
-// Font represents a font which can be embedded in a PDF file.
-type Font interface {
+// Embedder represents a font which can be embedded in a PDF file.
+type Embedder interface {
 	Embed(w pdf.Putter, resName pdf.Name) (Layouter, error)
 }
 
-// A Layouter is a font embedded in a PDF file which can typeset string data.
+// A Layouter is a font embedded in a PDF file which can typeset text.
 type Layouter interface {
 	Embedded
 
-	Layout(ptSize float64, s string) *GlyphSeq
+	// GetGeometry returns font metrics required for typesetting.
 	GetGeometry() *Geometry
 
-	// CodeAndWidth appends the code for a given glyph/text to s and returns
-	// the width of the glyph in PDF text space units (still to be multiplied
-	// by the font size).  The third return value is true, if PDF word spacing
-	// adjustment applies to this glyph.
+	// Layout turns a string into a sequence of glyphs.
+	Layout(ptSize float64, s string) *GlyphSeq
+
+	// CodeAndWidth converts a glyph ID (corresponding to the given text) into
+	// a PDF character code The character code is appended to s. The function
+	// returns the new string s, the width of the glyph in PDF text space units
+	// (still to be multiplied by the font size), and a value indicating
+	// whether PDF word spacing adjustment applies to this glyph.
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 
+	// Close writes the used subset of the font to the PDF file. After close
+	// has been called, only previously used glyph/text combinations can be
+	// used.
+	//
+	// If this function is not called by the user, the font will be
+	// automatically closed when the PDF file is closed.
 	Close() error
 }
 
@@ -126,18 +136,18 @@ func (r Res) PDFObject() pdf.Object {
 	return r.Ref
 }
 
-// ResInd can be embedded in a struct to implement the [Resource] interface.
-type ResInd struct {
+// ResIndirect can be embedded in a struct to implement the [Resource] interface.
+type ResIndirect struct {
 	DefName pdf.Name
 	Ref     pdf.Reference
 }
 
 // DefaultName implements the [Resource] interface.
-func (r ResInd) DefaultName() pdf.Name {
+func (r ResIndirect) DefaultName() pdf.Name {
 	return r.DefName
 }
 
 // PDFObject implements the [Resource] interface.
-func (r ResInd) PDFObject() pdf.Object {
+func (r ResIndirect) PDFObject() pdf.Object {
 	return r.Ref
 }

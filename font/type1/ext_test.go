@@ -21,20 +21,20 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/internal/many"
 )
 
 // TestEncoding checks that the encoding of a Type 1 font is the standard
 // encoding, if the set of included characters is in the standard encoding.
 func TestEncoding(t *testing.T) {
-	goRegular := gofont.GoRegular
-	t1, err := gofont.Type1(goRegular)
+	goRegular := many.GoRegular
+	t1, err := many.Type1(goRegular)
 	if err != nil {
 		t.Fatal(err)
 	}
-	metrics, err := gofont.AFM(goRegular)
+	metrics, err := many.AFM(goRegular)
 	F, err := type1.New(t1, metrics)
 	if err != nil {
 		t.Fatal(err)

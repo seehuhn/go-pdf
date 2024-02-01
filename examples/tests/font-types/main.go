@@ -30,10 +30,10 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/internal/many"
 )
 
 func main() {
@@ -101,13 +101,13 @@ func doit() error {
 		title := s.title
 		intro := s.lines
 
-		var X font.Font
+		var X font.Embedder
 		var ffKey pdf.Name
 		switch title {
 		case "Simple PDF Fonts":
 			// part 1
 		case "Type 1 Fonts":
-			t1, err := gofont.Type1(gofont.GoRegular)
+			t1, err := many.Type1(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -120,7 +120,7 @@ func doit() error {
 		case "Builtin Fonts":
 			X = type1.Helvetica
 		case "Simple CFF Fonts":
-			otf, err := gofont.OpenType(gofont.GoRegular)
+			otf, err := many.OpenType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -130,7 +130,7 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Simple CFF-based OpenType Fonts":
-			otf, err := gofont.OpenType(gofont.GoRegular)
+			otf, err := many.OpenType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -142,7 +142,7 @@ func doit() error {
 		case "Multiple Master Fonts":
 			// not supported
 		case "Simple TrueType Fonts":
-			ttf, err := gofont.TrueType(gofont.GoRegular)
+			ttf, err := many.TrueType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -152,7 +152,7 @@ func doit() error {
 			}
 			ffKey = "FontFile2"
 		case "Simple Glyf-based OpenType Fonts":
-			otf, err := gofont.TrueType(gofont.GoRegular)
+			otf, err := many.TrueType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -162,14 +162,14 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Type 3 Fonts":
-			X, err = gofont.Type3(gofont.GoRegular)
+			X, err = many.Type3(many.GoRegular)
 			if err != nil {
 				return err
 			}
 		case "Composite PDF Fonts":
 			// part 2
 		case "Composite CFF Fonts":
-			otf, err := gofont.OpenType(gofont.GoRegular)
+			otf, err := many.OpenType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -179,7 +179,7 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Composite CFF-based OpenType Fonts":
-			otf, err := gofont.OpenType(gofont.GoRegular)
+			otf, err := many.OpenType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -189,7 +189,7 @@ func doit() error {
 			}
 			ffKey = "FontFile3"
 		case "Composite TrueType Fonts":
-			ttf, err := gofont.TrueType(gofont.GoRegular)
+			ttf, err := many.TrueType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -199,7 +199,7 @@ func doit() error {
 			}
 			ffKey = "FontFile2"
 		case "Composite Glyf-based OpenType Fonts":
-			otf, err := gofont.TrueType(gofont.GoRegular)
+			otf, err := many.TrueType(many.GoRegular)
 			if err != nil {
 				return err
 			}
@@ -395,7 +395,7 @@ func doit() error {
 	return nil
 }
 
-func writeSinglePage(F font.Font, no int) error {
+func writeSinglePage(F font.Embedder, no int) error {
 	fname := fmt.Sprintf("fonts%02d.pdf", no)
 
 	page, err := document.CreateSinglePage(fname, document.A5r, nil)

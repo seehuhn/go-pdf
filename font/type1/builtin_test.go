@@ -28,7 +28,7 @@ import (
 // TestEmbedBuiltin tests that the 14 standard PDF fonts can be
 // embedded and that (for PDF-1.7) the font program is not included.
 func TestEmbedBuiltin(t *testing.T) {
-	for _, F := range All {
+	for _, F := range Standard {
 		t.Run(string(F), func(t *testing.T) {
 			data := pdf.NewData(pdf.V1_7)
 
@@ -103,7 +103,7 @@ func TestUnknownBuiltin(t *testing.T) {
 // TestGlyphLists tests that the glyph lists of the 14 standard PDF
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphLists(t *testing.T) {
-	for _, F := range All {
+	for _, F := range Standard {
 		psFont, err := F.psFont()
 		if err != nil {
 			t.Fatal(err)
@@ -124,7 +124,7 @@ func TestGlyphLists(t *testing.T) {
 // TestGlyphWidths tests that the glyph widths of the 14 standard PDF
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphWidths(t *testing.T) {
-	for _, F := range All {
+	for _, F := range Standard {
 		psFont, err := F.psFont()
 		if err != nil {
 			t.Fatal(err)
@@ -148,7 +148,7 @@ func TestGlyphWidths(t *testing.T) {
 // TestBlankGlyphs checks that glyphs are marked as blank in the
 // metrics file if and only if they are blank in the .pfb file.
 func TestBlankGlyphs(t *testing.T) {
-	for _, F := range All {
+	for _, F := range Standard {
 		psFont, err := F.psFont()
 		if err != nil {
 			t.Fatal(err)
@@ -170,17 +170,17 @@ func TestBlankGlyphs(t *testing.T) {
 	}
 }
 
-var _ font.Font = Courier
-var _ font.Font = CourierBold
-var _ font.Font = CourierBoldOblique
-var _ font.Font = CourierOblique
-var _ font.Font = Helvetica
-var _ font.Font = HelveticaBold
-var _ font.Font = HelveticaBoldOblique
-var _ font.Font = HelveticaOblique
-var _ font.Font = TimesRoman
-var _ font.Font = TimesBold
-var _ font.Font = TimesBoldItalic
-var _ font.Font = TimesItalic
-var _ font.Font = Symbol
-var _ font.Font = ZapfDingbats
+var _ font.Embedder = Courier
+var _ font.Embedder = CourierBold
+var _ font.Embedder = CourierBoldOblique
+var _ font.Embedder = CourierOblique
+var _ font.Embedder = Helvetica
+var _ font.Embedder = HelveticaBold
+var _ font.Embedder = HelveticaBoldOblique
+var _ font.Embedder = HelveticaOblique
+var _ font.Embedder = TimesRoman
+var _ font.Embedder = TimesBold
+var _ font.Embedder = TimesBoldItalic
+var _ font.Embedder = TimesItalic
+var _ font.Embedder = Symbol
+var _ font.Embedder = ZapfDingbats

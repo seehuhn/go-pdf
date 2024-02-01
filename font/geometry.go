@@ -21,7 +21,8 @@ import (
 )
 
 // Geometry collects the various dimensions connected to a font and to
-// the individual glyphs.
+// the individual glyphs.  All fields are measured in PDF text space units,
+// and need to be scaled by the font size.
 type Geometry struct {
 	Ascent             float64
 	Descent            float64 // negative

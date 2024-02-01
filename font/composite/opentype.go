@@ -54,7 +54,7 @@ func EmbedOld(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag)
 	opt := &font.Options{
 		Language: loc,
 	}
-	var f font.Font
+	var f font.Embedder
 	var err error
 	if info.IsCFF() {
 		f, err = cff.NewComposite(info, opt)
@@ -70,7 +70,7 @@ func EmbedOld(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag)
 
 // LoadOpenType loads a font from a file as a simple PDF font.
 // Both TrueType and OpenType fonts are supported.
-func LoadOpenType(fname string, loc language.Tag) (font.Font, error) {
+func LoadOpenType(fname string, loc language.Tag) (font.Embedder, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err

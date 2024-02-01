@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -63,7 +64,7 @@ var defaultOptionsCFF = &font.Options{
 // Info must be an OpenType font with CFF outlines.
 // The font info is allowed but not required to be CID-keyed.
 // Consider using [cff.NewComposite] instead of this function.
-func NewCFFComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
+func NewCFFComposite(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -289,18 +290,18 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	unitsPerEm := otf.UnitsPerEm
 	q := 1000 / float64(unitsPerEm)
 
-	widths := otf.Widths()
-	ww := make(map[pscid.CID]float64, len(widths))
+	glyphwidths := otf.Widths()
+	ww := make(map[pscid.CID]float64, len(glyphwidths))
 	if cff.GIDToCID != nil {
-		for gid, w := range widths {
+		for gid, w := range glyphwidths {
 			ww[cff.GIDToCID[gid]] = w.AsFloat(q)
 		}
 	} else {
-		for gid, w := range widths {
+		for gid, w := range glyphwidths {
 			ww[pscid.CID(gid)] = w.AsFloat(q)
 		}
 	}
-	DW, W := font.EncodeWidthsComposite(ww, pdf.GetVersion(w))
+	DW, W := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
 	bbox := otf.BBox()
 	fontBBox := &pdf.Rectangle{

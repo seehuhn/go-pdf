@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/widths"
 )
 
 // fontSimple is a Type 1 font.
@@ -58,7 +59,7 @@ type fontSimple struct {
 // If metrics is non-nil, information about kerning and ligatures is extracted
 // from the metrics, and additional fields in the PDF font descriptor are
 // filled.
-func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
+func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
 	if psFont == nil && metrics == nil {
 		return nil, fmt.Errorf("no font data given")
 	}
@@ -182,7 +183,7 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error
 	res := &embeddedSimple{
 		fontSimple: f,
 		w:          w,
-		ResInd: font.ResInd{
+		ResIndirect: font.ResIndirect{
 			Ref:     w.Alloc(),
 			DefName: resName,
 		},
@@ -234,7 +235,7 @@ func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 type embeddedSimple struct {
 	*fontSimple
 	w pdf.Putter
-	font.ResInd
+	font.ResIndirect
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -534,7 +535,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 	if !canOmit {
 		widthsRef := w.Alloc()
-		widthsInfo := font.EncodeWidthsSimple(ww)
+		widthsInfo := widths.EncodeSimple(ww)
 		fontDict["FirstChar"] = widthsInfo.FirstChar
 		fontDict["LastChar"] = widthsInfo.LastChar
 		fontDict["Widths"] = widthsRef

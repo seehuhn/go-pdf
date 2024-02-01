@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -53,7 +54,7 @@ type fontCFFSimple struct {
 // If the conversion fails (because more than one private dictionary is used
 // after subsetting), an error is returned.
 // Consider using [cff.NewSimple] instead of this function.
-func NewCFFSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
+func NewCFFSimple(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("wrong font type")
 	}
@@ -259,7 +260,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 	for i := range ww {
 		ww[i] = float64(cff.Glyphs[info.Encoding[i]].Width) * q
 	}
-	widthsInfo := font.EncodeWidthsSimple(ww)
+	widthsInfo := widths.EncodeSimple(ww)
 
 	ascent := otf.Ascent.AsFloat(q)
 	descent := otf.Descent.AsFloat(q)

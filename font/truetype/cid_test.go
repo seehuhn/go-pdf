@@ -24,14 +24,14 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/internal/many"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripComposite(t *testing.T) {
-	ttf, err := gofont.TrueType(gofont.GoMonoBoldItalic)
+	ttf, err := many.TrueType(many.GoMonoBoldItalic)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,10 +25,10 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/internal/many"
 )
 
 // FontSample is an example of a font of the given [EmbeddingType].
@@ -36,7 +36,7 @@ type FontSample struct {
 	Label       string
 	Description string
 	Type        font.EmbeddingType
-	Font        font.Font
+	Font        font.Embedder
 }
 
 // MakeFontSamples generates a list of different fonts for testing.
@@ -44,18 +44,18 @@ type FontSample struct {
 // TODO(voss): remove the error return value and panic instead.
 func MakeFontSamples() ([]*FontSample, error) {
 	var res []*FontSample
-	var F font.Font
+	var F font.Embedder
 
 	opt := &font.Options{
 		Language: language.English,
 	}
 
 	// a Type 1 font
-	t1, err := gofont.Type1(gofont.GoRegular)
+	t1, err := many.Type1(many.GoRegular)
 	if err != nil {
 		return nil, err
 	}
-	metrics, err := gofont.AFM(gofont.GoRegular)
+	metrics, err := many.AFM(many.GoRegular)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a CFF font, embedded directly ...
-	otf, err := gofont.OpenType(gofont.GoRegular)
+	otf, err := many.OpenType(many.GoRegular)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a TrueType font, embedded directly ...
-	ttf, err := gofont.TrueType(gofont.GoRegular)
+	ttf, err := many.TrueType(many.GoRegular)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a Type 3 font
-	F, err = gofont.Type3(gofont.GoRegular)
+	F, err = many.Type3(many.GoRegular)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a CFF font without CIDFont operators, embedded directly ...
-	otf, err = gofont.OpenType(gofont.GoRegular)
+	otf, err = many.OpenType(many.GoRegular)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a CFF font with CIDFont operators, embedded directly ...
-	otf, err = gofont.OpenType(gofont.GoRegular) // allocate a new copy
+	otf, err = many.OpenType(many.GoRegular) // allocate a new copy
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a TrueType font, embedded directly ...
-	ttf, err = gofont.TrueType(gofont.GoRegular)
+	ttf, err = many.TrueType(many.GoRegular)
 	if err != nil {
 		return nil, err
 	}

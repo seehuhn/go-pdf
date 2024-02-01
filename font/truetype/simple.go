@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/widths"
 )
 
 // fontSimple is a simple TrueType font.
@@ -50,7 +51,7 @@ type fontSimple struct {
 
 // NewSimple creates a new simple TrueType font.
 // Info must either be a TrueType font or an OpenType font with TrueType outlines.
-func NewSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
+func NewSimple(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("wrong font type")
 	}
@@ -309,7 +310,7 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	for i := range ww {
 		ww[i] = float64(ttf.GlyphWidth(info.Encoding[i])) * q
 	}
-	widthsInfo := font.EncodeWidthsSimple(ww)
+	widthsInfo := widths.EncodeSimple(ww)
 
 	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
 	// character codes to glyphs.

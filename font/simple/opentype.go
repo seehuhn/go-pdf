@@ -52,7 +52,7 @@ func EmbedOpenType(w pdf.Putter, fname string, resName pdf.Name, loc language.Ta
 
 // LoadOpenType loads a font from a file as a simple PDF font.
 // Both TrueType and OpenType fonts are supported.
-func LoadOpenType(fname string, loc language.Tag) (font.Font, error) {
+func LoadOpenType(fname string, loc language.Tag) (font.Embedder, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err

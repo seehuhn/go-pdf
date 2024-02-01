@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/internal/many"
 )
 
 // TestToUnicode verifies that the ToUnicode cmap is only generated if
@@ -156,7 +156,7 @@ func TestNotdefGlyph(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	t1, err := gofont.Type1(gofont.GoRegular)
+	t1, err := many.Type1(many.GoRegular)
 	if err != nil {
 		t.Fatal(err)
 	}
