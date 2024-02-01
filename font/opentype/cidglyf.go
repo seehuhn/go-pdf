@@ -71,9 +71,8 @@ func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	opt = font.MergeOptions(opt, defaultOptionsGlyf)
 
 	geometry := &font.Geometry{
-		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.GlyphBBoxes(),
-		Widths:       info.Widths(),
+		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
+		Widths:       info.WidthsPDF(),
 
 		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
 		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),

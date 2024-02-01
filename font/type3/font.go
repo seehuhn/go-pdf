@@ -136,25 +136,19 @@ type embedded struct {
 	closed bool
 }
 
-func (f *embedded) FontMatrix() []float64 {
-	return f.Font.FontMatrix[:]
-}
-
 // GetGeometry implements the [font.Layouter] interface.
 func (f *embedded) GetGeometry() *font.Geometry {
-	glyphExtents := make([]funit.Rect16, len(f.GlyphNames))
-	widths := make([]funit.Int16, len(f.GlyphNames))
+	glyphExtents := make([]pdf.Rectangle, len(f.GlyphNames))
+	widths := make([]float64, len(f.GlyphNames))
 	for i, name := range f.GlyphNames {
 		if i == 0 {
 			continue
 		}
-		glyphExtents[i] = f.Glyphs[name].BBox
-		// TODO(voss): is `widths` ordered correctly?
-		widths[i] = f.Glyphs[name].WidthX
+		glyphExtents[i] = glyphBoxtoPDF(f.Glyphs[name].BBox, f.Font.FontMatrix[:])
+		widths[i] = float64(f.Glyphs[name].WidthX) * f.Font.FontMatrix[0]
 	}
 
 	res := &font.Geometry{
-		UnitsPerEm:       uint16(math.Round(1 / f.Font.FontMatrix[0])),
 		Ascent:           float64(f.Ascent) * f.Font.FontMatrix[3],
 		Descent:          float64(f.Descent) * f.Font.FontMatrix[3],
 		BaseLineDistance: float64(f.BaseLineSkip) * f.Font.FontMatrix[3],
@@ -162,6 +156,31 @@ func (f *embedded) GetGeometry() *font.Geometry {
 		Widths:           widths,
 	}
 	return res
+}
+
+func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
+	bPDF := pdf.Rectangle{
+		LLx: math.Inf(+1),
+		LLy: math.Inf(+1),
+		URx: math.Inf(-1),
+		URy: math.Inf(-1),
+	}
+	corners := []struct{ x, y funit.Int16 }{
+		{b.LLx, b.LLy},
+		{b.LLx, b.URy},
+		{b.URx, b.LLy},
+		{b.URx, b.URy},
+	}
+	for _, c := range corners {
+		xf := float64(c.x)
+		yf := float64(c.y)
+		x, y := M[0]*xf+M[2]*yf+M[4], M[1]*xf+M[3]*yf+M[5]
+		bPDF.LLx = min(bPDF.LLx, x)
+		bPDF.LLy = min(bPDF.LLy, y)
+		bPDF.URx = max(bPDF.URx, x)
+		bPDF.URy = max(bPDF.URy, y)
+	}
+	return bPDF
 }
 
 // Layout implements the [font.Layouter] interface.

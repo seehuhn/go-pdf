@@ -22,8 +22,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 func main() {
@@ -34,24 +34,38 @@ func main() {
 }
 
 func doit() error {
-	w, err := pdf.Create("boxes.pdf", nil)
-	if err != nil {
-		return err
+	page, err := document.CreateSinglePage("boxes.pdf", nil, nil)
+
+	page.PageDict["MediaBox"] = &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 600}
+	page.PageDict["CropBox"] = &pdf.Rectangle{LLx: 50, LLy: 50, URx: 550, URy: 550}
+	page.PageDict["TrimBox"] = &pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 500}
+	page.PageDict["BleedBox"] = &pdf.Rectangle{LLx: 85, LLy: 85, URx: 515, URy: 515}
+	page.PageDict["ArtBox"] = &pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 450}
+	page.PageDict["BoxColorInfo"] = pdf.Dict{
+		"CropBox": pdf.Dict{
+			"C": pdf.Array{pdf.Real(0.4), pdf.Real(0), pdf.Real(0.8)}, // purple
+			"W": pdf.Integer(2),
+		},
+		"TrimBox": pdf.Dict{
+			"C": pdf.Array{pdf.Real(0.8), pdf.Real(0.4), pdf.Real(0)}, // orange
+			"W": pdf.Integer(2),
+		},
+		"BleedBox": pdf.Dict{
+			"C": pdf.Array{pdf.Real(0), pdf.Real(0), pdf.Real(0.8)}, // blue
+			"W": pdf.Integer(2),
+		},
+		"ArtBox": pdf.Dict{
+			"C": pdf.Array{pdf.Real(0), pdf.Real(0.8), pdf.Real(0)}, // green
+			"W": pdf.Integer(2),
+		},
 	}
 
-	F, err := type1.Helvetica.Embed(w, "F")
+	F, err := type1.Helvetica.Embed(page.Out, "F")
 	if err != nil {
 		return err
 	}
 	geom := F.GetGeometry()
 
-	// Draw the contents of the page.
-	contentRef := w.Alloc()
-	c, err := w.OpenStream(contentRef, nil, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	page := graphics.NewWriter(c, pdf.GetVersion(w))
 	// draw a grid to show page coordinates
 	page.PushGraphicsState()
 	page.SetStrokeColor(color.Gray(0.85))
@@ -66,14 +80,14 @@ func doit() error {
 	for _, x := range []float64{82, 532} {
 		for i := 0; i <= 600; i += 50 {
 			gg := F.Layout(9, fmt.Sprintf("%d", i))
-			b := geom.BoundingBoxNew(9, gg)
+			b := geom.BoundingBox(9, gg)
 			page.Rectangle(x-b.URx-1, float64(i)-3+b.LLy, b.URx-b.LLx+2, b.URy-b.LLy)
 		}
 	}
 	for _, y := range []float64{72, 522} {
 		for i := 0; i <= 600; i += 50 {
 			gg := F.Layout(9, fmt.Sprintf("%d", i))
-			b := geom.BoundingBoxNew(9, gg)
+			b := geom.BoundingBox(9, gg)
 			w := b.URx - b.LLx
 			page.Rectangle(float64(i)-0.5*w, y+b.LLy-1, w, b.URy-b.LLy+2)
 		}
@@ -167,59 +181,5 @@ func doit() error {
 	page.TextShow("green.")
 	page.TextEnd()
 
-	err = c.Close()
-	if err != nil {
-		return err
-	}
-
-	// Manually construct a page tree, so that we can test inheritance
-	// of the /MediaBox and /CropBox attributes.
-	rootRef := w.Alloc()
-	midRef := w.Alloc()
-	pageRef := w.Alloc()
-	w.Put(rootRef, pdf.Dict{
-		"Type":    pdf.Name("Pages"),
-		"Kids":    pdf.Array{midRef},
-		"Count":   pdf.Integer(1),
-		"CropBox": &pdf.Rectangle{LLx: 50, LLy: 50, URx: 550, URy: 550},
-	})
-	w.Put(midRef, pdf.Dict{
-		"Type":     pdf.Name("Pages"),
-		"Parent":   rootRef,
-		"Kids":     pdf.Array{pageRef},
-		"Count":    pdf.Integer(1),
-		"MediaBox": &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 600},
-	})
-	w.Put(pageRef, pdf.Dict{
-		"Type":      pdf.Name("Page"),
-		"Parent":    midRef,
-		"Contents":  contentRef,
-		"Resources": pdf.AsDict(page.Resources),
-
-		"TrimBox":  &pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 500},
-		"BleedBox": &pdf.Rectangle{LLx: 85, LLy: 85, URx: 515, URy: 515},
-		"ArtBox":   &pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 450},
-
-		"BoxColorInfo": pdf.Dict{
-			"CropBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(0.4), pdf.Real(0), pdf.Real(0.8)}, // purple
-				"W": pdf.Integer(2),
-			},
-			"TrimBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(0.8), pdf.Real(0.4), pdf.Real(0)}, // orange
-				"W": pdf.Integer(2),
-			},
-			"BleedBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(0), pdf.Real(0), pdf.Real(0.8)}, // blue
-				"W": pdf.Integer(2),
-			},
-			"ArtBox": pdf.Dict{
-				"C": pdf.Array{pdf.Real(0), pdf.Real(0.8), pdf.Real(0)}, // green
-				"W": pdf.Integer(2),
-			},
-		},
-	})
-	w.GetMeta().Catalog.Pages = rootRef
-
-	return w.Close()
+	return page.Close()
 }

@@ -100,7 +100,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	numGlyphs := font.NumGlyphs(theFont)
+	geom := theFont.GetGeometry()
+	numGlyphs := len(geom.Widths)
 	for i := 0; i < numGlyphs; i += 10 {
 		err = f.WriteGlyphRow(theFont, i)
 		if err != nil {
@@ -260,7 +261,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	xPos := make([]float64, len(gid))
 	page.SetStrokeColor(color.RGB(1, 0, 0))
 	for i, gid := range gid {
-		w := geom.ToPDF16(glyphSize, geom.Widths[gid])
+		w := glyphSize * geom.Widths[gid]
 		xPos[i] = left + (float64(i)+0.5)*dx - 0.5*w
 		page.MoveTo(xPos[i], yBase+v1)
 		page.LineTo(xPos[i], yBase-v2)
@@ -276,10 +277,10 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	for i, gid := range gid {
 		ext := geom.GlyphExtents[gid]
 		page.Rectangle(
-			xPos[i]+geom.ToPDF16(glyphSize, ext.LLx),
-			yBase+geom.ToPDF16(glyphSize, ext.LLy),
-			geom.ToPDF16(glyphSize, ext.URx-ext.LLx),
-			geom.ToPDF16(glyphSize, ext.URy-ext.LLy))
+			xPos[i]+glyphSize*ext.LLx,
+			yBase+glyphSize*ext.LLy,
+			glyphSize*(ext.URx-ext.LLx),
+			glyphSize*(ext.URy-ext.LLy))
 	}
 	page.Fill()
 	page.PopGraphicsState()
@@ -288,7 +289,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	for i, gid := range gid {
 		g := font.Glyph{
 			GID:     gid,
-			Advance: geom.ToPDF16(glyphSize, geom.Widths[gid]),
+			Advance: glyphSize * geom.Widths[gid],
 		}
 
 		r := f.rev[gid]

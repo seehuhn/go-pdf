@@ -40,7 +40,7 @@ func doit() error {
 		return err
 	}
 
-	info, err := sfnt.ReadFile("../../../otf/SourceSerif4-Regular.otf")
+	info, err := sfnt.ReadFile("../../../../otf/SourceSerif4-Regular.otf")
 	if err != nil {
 		return err
 	}

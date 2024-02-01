@@ -61,9 +61,8 @@ func NewCFFSimple(info *sfnt.Font, opt *font.Options) (font.Font, error) {
 	opt = font.MergeOptions(opt, defaultOptionsCFF)
 
 	geometry := &font.Geometry{
-		UnitsPerEm:   info.UnitsPerEm,
-		GlyphExtents: info.GlyphBBoxes(),
-		Widths:       info.Widths(),
+		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
+		Widths:       info.WidthsPDF(),
 
 		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
 		Descent:            float64(info.Descent) * info.FontMatrix[3],

@@ -64,7 +64,6 @@ func run(filename string) error {
 		gap2     = 380
 	)
 
-	q := fontSize / float64(geom.UnitsPerEm)
 	ascent := geom.Ascent * fontSize
 	descent := geom.Descent * fontSize
 	leading := ascent - descent
@@ -94,7 +93,7 @@ func run(filename string) error {
 	M, err := markerFont.Embed(doc.Out, "M")
 
 	gid := glyph.ID(0)
-	numGlyphs := min(glyph.ID(font.NumGlyphs(E)), 256)
+	numGlyphs := min(glyph.ID(len(geom.Widths)), 256)
 
 	for gid < numGlyphs {
 		page := doc.AddPage()
@@ -138,7 +137,7 @@ func run(filename string) error {
 				page.TextNextLine()
 			}
 			page.TextSetFont(E, fontSize)
-			glyphWidth := geom.Widths[gid].AsFloat(q)
+			glyphWidth := fontSize * geom.Widths[gid]
 			gg := &font.GlyphSeq{
 				Seq: make([]font.Glyph, k),
 			}

@@ -35,6 +35,10 @@ type Page struct {
 	// PageDict is the PDF dictionary for this page.
 	// This can be modified by the user.  The values at the time
 	// when the page is closed will be written to the PDF file.
+	//
+	// See section 7.7.3.3. of PDF 32000-1:2008 for a list of
+	// possible entries in this dictionary:
+	// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=85
 	PageDict pdf.Dict
 
 	// Out is the PDF file which contains this page.

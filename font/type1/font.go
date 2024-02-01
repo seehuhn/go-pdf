@@ -74,32 +74,31 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
 		nameGid[name] = glyph.ID(i)
 	}
 
-	widths := make([]funit.Int16, len(glyphNames))
-	extents := make([]funit.Rect16, len(glyphNames))
-	geometry := &font.Geometry{
-		Widths:       widths,
-		GlyphExtents: extents,
-	}
-
+	geometry := &font.Geometry{}
+	widths := make([]float64, len(glyphNames))
+	extents := make([]pdf.Rectangle, len(glyphNames))
 	var fontName string
 	if psFont != nil {
 		fontName = psFont.FontInfo.FontName
 		for i, name := range glyphNames {
 			g := psFont.Glyphs[name]
-			widths[i] = g.WidthX
-			extents[i] = g.BBox()
+			widths[i] = float64(g.WidthX) * psFont.FontMatrix[0]
+			extents[i] = glyphBoxtoPDF(g.BBox(), psFont.FontMatrix[:])
 		}
-		geometry.UnitsPerEm = uint16(math.Round(1 / psFont.FontMatrix[0]))
 		geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
 		geometry.UnderlineThickness = float64(psFont.FontInfo.UnderlineThickness) * psFont.FontMatrix[3]
 	} else {
 		fontName = metrics.FontName
 		for i, name := range glyphNames {
 			gi := metrics.Glyphs[name]
-			widths[i] = gi.WidthX
-			extents[i] = gi.BBox
+			widths[i] = float64(gi.WidthX) / 1000
+			extents[i] = pdf.Rectangle{
+				LLx: float64(gi.BBox.LLx) / 1000,
+				LLy: float64(gi.BBox.LLy) / 1000,
+				URx: float64(gi.BBox.URx) / 1000,
+				URy: float64(gi.BBox.URy) / 1000,
+			}
 		}
-		geometry.UnitsPerEm = 1000
 		geometry.UnderlinePosition = float64(metrics.UnderlinePosition) / 1000
 		geometry.UnderlineThickness = float64(metrics.UnderlineThickness) / 1000
 	}
@@ -108,6 +107,8 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
 		geometry.Descent = float64(metrics.Descent) / 1000
 		geometry.BaseLineDistance = (geometry.Ascent - geometry.Descent) * 6 / 5 // TODO(voss)
 	}
+	geometry.Widths = widths
+	geometry.GlyphExtents = extents
 
 	cmap := make(map[rune]glyph.ID)
 	isDingbats := fontName == "ZapfDingbats"
@@ -151,6 +152,31 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Font, error) {
 	return res, nil
 }
 
+func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
+	bPDF := pdf.Rectangle{
+		LLx: math.Inf(+1),
+		LLy: math.Inf(+1),
+		URx: math.Inf(-1),
+		URy: math.Inf(-1),
+	}
+	corners := []struct{ x, y funit.Int16 }{
+		{b.LLx, b.LLy},
+		{b.LLx, b.URy},
+		{b.URx, b.LLy},
+		{b.URx, b.URy},
+	}
+	for _, c := range corners {
+		xf := float64(c.x)
+		yf := float64(c.y)
+		x, y := M[0]*xf+M[2]*yf+M[4], M[1]*xf+M[3]*yf+M[5]
+		bPDF.LLx = min(bPDF.LLx, x)
+		bPDF.LLy = min(bPDF.LLy, y)
+		bPDF.URx = max(bPDF.URx, x)
+		bPDF.URy = max(bPDF.URy, y)
+	}
+	return bPDF
+}
+
 // Embed implements the [font.Font] interface.
 func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 	res := &embeddedSimple{
@@ -170,9 +196,6 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error
 func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	rr := []rune(s)
 
-	fm := f.FontMatrix()
-	q := fm[0] * ptSize
-
 	gg := make([]font.Glyph, 0, len(rr))
 	var prev glyph.ID
 	for i, r := range rr {
@@ -188,7 +211,7 @@ func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 		gg = append(gg, font.Glyph{
 			GID:     gid,
 			Text:    []rune{r},
-			Advance: float64(f.Widths[gid]) * q,
+			Advance: f.Widths[gid] * ptSize,
 		})
 		prev = gid
 	}
@@ -196,7 +219,7 @@ func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	for i, g := range gg {
 		if i > 0 {
 			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.GID}]; ok {
-				gg[i-1].Advance += float64(adj) * q
+				gg[i-1].Advance += float64(adj) * ptSize / 1000
 			}
 		}
 		prev = g.GID
@@ -218,10 +241,7 @@ type embeddedSimple struct {
 }
 
 func (f *embeddedSimple) GlyphWidth(gid glyph.ID) float64 {
-	if f.ps != nil {
-		return float64(f.Geometry.Widths[gid]) * f.ps.FontInfo.FontMatrix[0]
-	}
-	return float64(f.Geometry.Widths[gid]) / float64(f.Geometry.UnitsPerEm)
+	return f.Geometry.Widths[gid]
 }
 
 func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {

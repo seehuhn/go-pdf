@@ -270,7 +270,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 					Seq: []font.Glyph{
 						{
 							GID:     glyph.ID(curGlyph),
-							Advance: geom.ToPDF16(fontSize, geom.Widths[curGlyph]),
+							Advance: fontSize * geom.Widths[curGlyph],
 						},
 					},
 				}

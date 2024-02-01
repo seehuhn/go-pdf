@@ -39,11 +39,13 @@ type Glyph struct {
 	Text []rune
 }
 
+// GlyphSeq represents a sequence of glyphs.
 type GlyphSeq struct {
 	Skip float64
 	Seq  []Glyph
 }
 
+// Append modifies s by appending the glyphs from other.
 func (s *GlyphSeq) Append(other *GlyphSeq) {
 	if len(s.Seq) == 0 {
 		s.Skip += other.Skip
@@ -53,7 +55,8 @@ func (s *GlyphSeq) Append(other *GlyphSeq) {
 	s.Seq = append(s.Seq, other.Seq...)
 }
 
-func (s *GlyphSeq) TotalLength() float64 {
+// TotalWidth returns the total advance width of the glyph sequence.
+func (s *GlyphSeq) TotalWidth() float64 {
 	w := s.Skip
 	for _, g := range s.Seq {
 		w += g.Advance
@@ -65,7 +68,10 @@ func (s *GlyphSeq) TotalLength() float64 {
 // q=0 means left alignment, q=1 means right alignment
 // and q=0.5 means centering.
 func (s *GlyphSeq) Align(width float64, q float64) {
-	extra := width - s.TotalLength()
+	if len(s.Seq) == 0 {
+		return
+	}
+	extra := width - s.TotalWidth()
 	s.Skip += extra * q
 	s.Seq[len(s.Seq)-1].Advance += extra * (1 - q)
 }
@@ -81,7 +87,6 @@ type Layouter interface {
 
 	Layout(ptSize float64, s string) *GlyphSeq
 	GetGeometry() *Geometry
-	FontMatrix() []float64 // TODO(voss): remove
 
 	// CodeAndWidth appends the code for a given glyph/text to s and returns
 	// the width of the glyph in PDF text space units (still to be multiplied
