@@ -38,13 +38,14 @@ func TestSpaceIsBlank(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			gg := E.Layout(" ")
-			if len(gg) != 1 {
-				t.Fatalf("expected 1 glyph, got %d", len(gg))
+			gg := E.Layout(10, " ")
+			if len(gg.Seq) != 1 {
+				t.Fatalf("expected 1 glyph, got %d", len(gg.Seq))
 			}
 			geom := E.GetGeometry()
-			if !geom.GlyphExtents[gg[0].GID].IsZero() {
-				t.Errorf("expected blank glyph, got %v", geom.GlyphExtents[gg[0].GID])
+			if !geom.GlyphExtents[gg.Seq[0].GID].IsZero() {
+				t.Errorf("expected blank glyph, got %v",
+					geom.GlyphExtents[gg.Seq[0].GID])
 			}
 		})
 	}

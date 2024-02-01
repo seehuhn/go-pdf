@@ -95,17 +95,20 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, d
 			gid++
 		}
 		w := geom.Widths[gid]
-		gg := []glyph.Info{
-			{
-				GID:     gid,
-				Advance: w,
+		gg := &font.GlyphSeq{
+			Seq: []font.Glyph{
+				{
+					GID:     gid,
+					Advance: geom.ToPDF16(16, w),
+				},
 			},
 		}
+		gg.Align(0, 0.5)
 		gid++
 
 		page.TextStart()
 		page.TextFirstLine(float64(5+20*col+10), float64(20*nRow-10-20*row))
-		page.TextShowGlyphsAligned(gg, 0, 0.5)
+		page.TextShowGlyphs(gg)
 		page.TextEnd()
 	}
 	page.PopGraphicsState()

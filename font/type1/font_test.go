@@ -43,7 +43,8 @@ func TestToUnicode(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				gg := E.Layout("AB")
+				l := E.Layout(10, "AB")
+				gg := l.Seq
 				if len(gg) != 2 {
 					panic("test is broken")
 				}

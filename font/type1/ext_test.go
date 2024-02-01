@@ -46,8 +46,8 @@ func TestEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gg := E.Layout(".MiAbc")
-	for _, g := range gg {
+	gg := E.Layout(10, ".MiAbc")
+	for _, g := range gg.Seq {
 		E.CodeAndWidth(nil, g.GID, g.Text) // allocate codes
 	}
 	err = E.Close()

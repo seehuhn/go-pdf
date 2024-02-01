@@ -18,6 +18,7 @@ package graphics
 
 import (
 	"math"
+	"math/bits"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
@@ -33,6 +34,21 @@ type State struct {
 // isSet returns true, if all of the given fields in the graphics state are set.
 func (s State) isSet(bits StateBits) bool {
 	return s.Set&bits == bits
+}
+
+func (s *State) mustBeSet(bits StateBits) error {
+	missing := ^s.Set & bits
+	if missing == 0 {
+		return nil
+	}
+	return errMissingState(missing)
+}
+
+type errMissingState StateBits
+
+func (e errMissingState) Error() string {
+	k := bits.TrailingZeros64(uint64(e))
+	return stateNames[k] + " not set"
 }
 
 // Parameters collects all graphical parameters of the PDF processor.
@@ -159,6 +175,42 @@ const (
 	stateFirstUnused
 	AllStateBits = stateFirstUnused - 1
 )
+
+var stateNames = []string{
+	"StrokeColor",
+	"FillColor",
+	"TextCharacterSpacing",
+	"TextWordSpacing",
+	"TextHorizontalScaling",
+	"TextLeading",
+	"TextFont",
+	"TextRenderingMode",
+	"TextRise",
+	"TextKnockout",
+	"TextMatrix",
+	"LineWidth",
+	"LineCap",
+	"LineJoin",
+	"MiterLimit",
+	"Dash",
+	"RenderingIntent",
+	"StrokeAdjustment",
+	"BlendMode",
+	"SoftMask",
+	"StrokeAlpha",
+	"FillAlpha",
+	"AlphaSourceFlag",
+	"BlackPointCompensation",
+	"Overprint",
+	"OverprintMode",
+	"BlackGeneration",
+	"UndercolorRemoval",
+	"TransferFunction",
+	"Halftone",
+	"HalftoneOrigin",
+	"FlatnessTolerance",
+	"SmoothnessTolerance",
+}
 
 const (
 	// initializedStateBits lists the parameters which are initialized to

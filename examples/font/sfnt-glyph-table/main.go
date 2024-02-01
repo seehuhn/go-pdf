@@ -286,9 +286,9 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 
 	// draw the glyphs and labels
 	for i, gid := range gid {
-		g := glyph.Info{
+		g := font.Glyph{
 			GID:     gid,
-			Advance: geom.Widths[gid],
+			Advance: geom.ToPDF16(glyphSize, geom.Widths[gid]),
 		}
 
 		r := f.rev[gid]
@@ -300,7 +300,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 				// TODO(voss): fix this
 				// Try to establish a mapping from glyph ID to rune in the embedded
 				// font (called for side effects only).
-				_ = theFont.Layout(string([]rune{r}))
+				theFont.CodeAndWidth(nil, gid, []rune{r})
 			}
 			if unicode.IsPrint(r) && r < 128 {
 				label = fmt.Sprintf("%q", r)
@@ -309,10 +309,12 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 			}
 		}
 
+		gg := &font.GlyphSeq{Seq: []font.Glyph{g}}
+
 		page.TextStart()
 		page.TextSetFont(theFont, glyphSize)
 		page.TextFirstLine(xPos[i], yBase)
-		page.TextShowGlyphsOld(glyph.Seq{g})
+		page.TextShowGlyphs(gg)
 		page.TextSetFont(f.bodyFont, 8)
 		page.TextFirstLine(left+float64(i)*dx-xPos[i], -v2-7.5)
 		page.TextShowAligned(label, dx, 0.5)

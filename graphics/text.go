@@ -267,13 +267,17 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 // account.
 //
 // This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
-func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
+func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	if !w.isValid("TextShowGlyphs", objText) {
-		return
+		return 0
 	}
-	if !w.isSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise) {
-		panic("GetTextPosition: unset parameters")
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+		w.Err = err
+		return 0
 	}
+
+	left := seq.Skip
+	gg := seq.Seq
 
 	font := w.TextFont.(font.Layouter) // TODO(voss)
 
@@ -322,11 +326,11 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 			flush()
 			w.State.TextRise = g.Rise
 			if w.Err != nil {
-				return
+				return 0
 			}
 			w.Err = pdf.Number(w.State.TextRise).PDF(w.Content) // TODO(voss): rounding?
 			if w.Err != nil {
-				return
+				return 0
 			}
 			_, w.Err = fmt.Fprintln(w.Content, " Ts")
 		}
@@ -352,11 +356,6 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 		xActual += glyphWidth * param.TextHorizontalScaling
 		xWanted += g.Advance
 	}
-	if math.IsNaN(right) {
-		xWanted = xActual
-	} else {
-		xWanted += right
-	}
 	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize))
 	if xOffsetInt != 0 {
 		if len(run) > 0 {
@@ -368,4 +367,6 @@ func (w *Writer) TextShowGlyphs(left float64, gg []font.Glyph, right float64) {
 	}
 	flush()
 	w.TextMatrix = Translate(xActual, 0).Mul(w.TextMatrix)
+
+	return xActual
 }

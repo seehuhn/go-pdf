@@ -266,13 +266,16 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 				page.TextShowAligned(code, 16, 1)
 
 				page.TextSetFont(F, fontSize)
-				g := glyph.Seq{
-					{
-						GID:     glyph.ID(curGlyph),
-						Advance: geom.Widths[curGlyph],
+				g := &font.GlyphSeq{
+					Seq: []font.Glyph{
+						{
+							GID:     glyph.ID(curGlyph),
+							Advance: geom.ToPDF16(fontSize, geom.Widths[curGlyph]),
+						},
 					},
 				}
-				page.TextShowGlyphsAligned(g, 32, 0.5)
+				g.Align(32, 0.5)
+				page.TextShowGlyphs(g)
 
 				page.TextSetFont(f.bodyFont, fontSize)
 				page.TextShow(name)

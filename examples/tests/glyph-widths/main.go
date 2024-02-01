@@ -139,14 +139,17 @@ func run(filename string) error {
 			}
 			page.TextSetFont(E, fontSize)
 			glyphWidth := geom.Widths[gid].AsFloat(q)
-			gg := make([]font.Glyph, k)
+			gg := &font.GlyphSeq{
+				Seq: make([]font.Glyph, k),
+			}
 			for j := 0; j < k; j++ {
-				gg[j] = font.Glyph{
+				gg.Seq[j] = font.Glyph{
 					GID:     gid,
 					Advance: glyphWidth,
 				}
 			}
-			page.TextShowGlyphs(0, gg, gap1)
+			gg.Seq[k-1].Advance += gap1
+			page.TextShowGlyphs(gg)
 			page.TextSetFont(M, fontSize)
 			// TODO(voss): why is the final +1 needed?
 			page.TextShowAligned("I", gap2-k*glyphWidth+1, 0)

@@ -48,10 +48,10 @@ func TestWidthsFull(t *testing.T) {
 
 	// Layout and encode a string to make sure the corresponding glyphs are
 	// included in the embedded font.
-	gg := E.Layout(sampleText)
+	gg := E.Layout(10, sampleText)
 	var s pdf.String
 	var ww []float64
-	for _, g := range gg {
+	for _, g := range gg.Seq {
 		ww = append(ww, goRegular.GlyphWidthPDF(g.GID))
 		s, _, _ = E.CodeAndWidth(s, g.GID, g.Text)
 	}

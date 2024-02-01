@@ -222,9 +222,9 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	}
 	subTitle := strings.Join(parts, ", ")
 
-	var seq []glyph.Info
+	seq := &font.GlyphSeq{}
 	total := 0.
-	for gid := 0; gid < info.NumGlyphs() && len(seq) < 256; gid++ {
+	for gid := 0; gid < info.NumGlyphs() && len(seq.Seq) < 256; gid++ {
 		if info.GlyphBBox(glyph.ID(gid)).IsZero() {
 			continue
 		}
@@ -233,9 +233,9 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 		if total+wf > f.textWidth {
 			break
 		}
-		seq = append(seq, glyph.Info{
+		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     glyph.ID(gid),
-			Advance: w,
+			Advance: wf,
 		})
 		total += wf
 	}
@@ -255,7 +255,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	page.TextShow(fileName)
 	page.TextFirstLine(0, -v3)
 	page.TextSetFont(X, 24)
-	page.TextShowGlyphsOld(seq)
+	page.TextShowGlyphs(seq)
 	page.TextEnd()
 
 	f.used += totalPartHeight

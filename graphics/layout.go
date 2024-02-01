@@ -20,14 +20,20 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.
-func (w *Writer) TextLayout(s string) glyph.Seq {
-	st := w.State
-	return st.TextFont.(font.Layouter).Layout(s)
+func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
+	if err := w.mustBeSet(StateTextFont); err != nil {
+		return nil, err
+	}
+	F, ok := w.State.TextFont.(font.Layouter)
+	if !ok {
+		return nil, errors.New("font does not support layouting")
+	}
+	// TODO(voss): use character spacing, word spacing, horizontal scaling
+	return F.Layout(w.TextFontSize, s), nil
 }
 
 // TextShow draws a string.
@@ -35,104 +41,31 @@ func (w *Writer) TextShow(s string) float64 {
 	if !w.isValid("TextShow", objText) {
 		return 0
 	}
-	if w.State.TextFont == nil {
+	if !w.isSet(StateTextFont) {
 		w.Err = errors.New("no font set")
 		return 0
 	}
-	gg := w.TextLayout(s)
-	return w.showGlyphsWithMargins(gg, 0, 0)
+	gg, err := w.TextLayout(s)
+	if err != nil {
+		w.Err = err
+		return 0
+	}
+	return w.TextShowGlyphs(gg)
 }
 
 // TextShowAligned draws a string and aligns it.
-// The beginning is aligned in a space of the given width.
+// The string is aligned in a space of the given width.
 // q=0 means left alignment, q=1 means right alignment
-// and q=0.5 means center alignment.
+// and q=0.5 means centering.
 func (w *Writer) TextShowAligned(s string, width, q float64) {
 	if !w.isValid("TextShowAligned", objText) {
 		return
 	}
-	if w.State.TextFont == nil {
-		w.Err = errors.New("no font set")
+	gg, err := w.TextLayout(s)
+	if err != nil {
+		w.Err = err
 		return
 	}
-	w.showGlyphsAligned(w.TextLayout(s), width, q)
-}
-
-// TextShowGlyphsOld draws a sequence of glyphs.
-func (w *Writer) TextShowGlyphsOld(gg glyph.Seq) float64 {
-	if !w.isValid("TextShowGlyphs", objText) {
-		return 0
-	}
-	if w.State.TextFont == nil {
-		w.Err = errors.New("no font set")
-		return 0
-	}
-
-	return w.showGlyphsWithMargins(gg, 0, 0)
-}
-
-// TextShowGlyphsAligned draws a sequence of glyphs and aligns it.
-func (w *Writer) TextShowGlyphsAligned(gg glyph.Seq, width, q float64) {
-	if !w.isValid("TextShowGlyphsAligned", objText) {
-		return
-	}
-	if w.State.TextFont == nil {
-		w.Err = errors.New("no font set")
-		return
-	}
-	w.showGlyphsAligned(gg, width, q)
-}
-
-func (w *Writer) showGlyphsAligned(gg glyph.Seq, width, q float64) {
-	geom := w.State.TextFont.(font.Layouter).GetGeometry()
-	total := geom.ToPDF(w.State.TextFontSize, gg.AdvanceWidth())
-	delta := width - total
-
-	// we interpolate between the following:
-	// q = 0: left = 0, right = delta
-	// q = 1: left = delta, right = 0
-	left := q * delta
-	right := (1 - q) * delta
-
-	w.showGlyphsWithMargins(gg, left*1000/w.State.TextFontSize, right*1000/w.State.TextFontSize)
-}
-
-func (w *Writer) showGlyphsWithMargins(gg glyph.Seq, left, right float64) float64 {
-	if len(gg) == 0 || w.Err != nil {
-		return 0
-	}
-
-	xBefore := w.State.TextMatrix[4]
-	pdfLeft, pdfGG := convertGlyphs(gg, w.TextFont.(font.Layouter).FontMatrix(), w.TextFontSize)
-
-	w.TextShowGlyphs(pdfLeft+left/1000*w.TextFontSize, pdfGG, right/1000*w.TextFontSize)
-
-	return w.State.TextMatrix[4] - xBefore
-}
-
-func convertGlyphs(gg glyph.Seq, fontMatrix []float64, fontSize float64) (float64, []font.Glyph) {
-	var xOffset float64
-	res := make([]font.Glyph, len(gg))
-	for i, g := range gg {
-		// TODO(voss): is the following correct?
-
-		fontDx := float64(g.XOffset)
-		fontDy := float64(g.YOffset)
-		pdfDx := (fontMatrix[0]*fontDx + fontMatrix[2]*fontDy + fontMatrix[4]) * fontSize
-		pdfDy := (fontMatrix[1]*fontDx + fontMatrix[3]*fontDy + fontMatrix[5]) * fontSize
-
-		fontAdvanceX := float64(g.Advance)
-		pdfAdvanceX := fontMatrix[0] * fontAdvanceX * fontSize
-
-		if i > 0 {
-			res[i-1].Advance += pdfDx
-		} else {
-			xOffset = pdfDx
-		}
-		res[i].GID = g.GID
-		res[i].Advance = pdfAdvanceX
-		res[i].Rise = pdfDy
-		res[i].Text = g.Text
-	}
-	return xOffset, res
+	gg.Align(width, q)
+	w.TextShowGlyphs(gg)
 }

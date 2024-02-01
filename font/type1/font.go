@@ -167,10 +167,13 @@ func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontSimple) Layout(s string) glyph.Seq {
+func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	rr := []rune(s)
 
-	gg := make(glyph.Seq, 0, len(rr))
+	fm := f.FontMatrix()
+	q := fm[0] * ptSize
+
+	gg := make([]font.Glyph, 0, len(rr))
 	var prev glyph.ID
 	for i, r := range rr {
 		gid := f.cmap[r]
@@ -182,9 +185,10 @@ func (f *fontSimple) Layout(s string) glyph.Seq {
 				continue
 			}
 		}
-		gg = append(gg, glyph.Info{
-			GID:  gid,
-			Text: []rune{r},
+		gg = append(gg, font.Glyph{
+			GID:     gid,
+			Text:    []rune{r},
+			Advance: float64(f.Widths[gid]) * q,
 		})
 		prev = gid
 	}
@@ -192,14 +196,16 @@ func (f *fontSimple) Layout(s string) glyph.Seq {
 	for i, g := range gg {
 		if i > 0 {
 			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.GID}]; ok {
-				gg[i-1].Advance += adj
+				gg[i-1].Advance += float64(adj) * q
 			}
 		}
-		gg[i].Advance = f.Widths[g.GID]
 		prev = g.GID
 	}
 
-	return gg
+	res := &font.GlyphSeq{
+		Seq: gg,
+	}
+	return res
 }
 
 type embeddedSimple struct {

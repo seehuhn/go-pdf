@@ -11,7 +11,7 @@ require (
 	golang.org/x/text v0.14.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
 	seehuhn.de/go/postscript v0.3.7-0.20240125192807-ef0ef529fc55
-	seehuhn.de/go/sfnt v0.3.7-0.20240125193130-b11aa46b374a
+	seehuhn.de/go/sfnt v0.3.7-0.20240201095021-9cf154304652
 )
 
 require (

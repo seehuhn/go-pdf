@@ -42,5 +42,5 @@ seehuhn.de/go/dijkstra v0.9.3 h1:uVbFjlAuhlwV45qM7S4Wz+C7XlfbgAaTfcZX1r8OgIA=
 seehuhn.de/go/dijkstra v0.9.3/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
 seehuhn.de/go/postscript v0.3.7-0.20240125192807-ef0ef529fc55 h1:C0EWp1hPG51FWZDk0PaxI/eRZx076nUfP5RIkdbAJjY=
 seehuhn.de/go/postscript v0.3.7-0.20240125192807-ef0ef529fc55/go.mod h1:G3Bh9SsgQQfn31kN2N9EWc5tPwoTYPqRMcvocejTDLs=
-seehuhn.de/go/sfnt v0.3.7-0.20240125193130-b11aa46b374a h1:DCDiCfW6x7HXsbrVzrOAqVbVVLDkiFNcUB+yiGae25k=
-seehuhn.de/go/sfnt v0.3.7-0.20240125193130-b11aa46b374a/go.mod h1:Uk3BCluafSOJePidC03VmG3DsSPjLisaZ9T8PG64uN0=
+seehuhn.de/go/sfnt v0.3.7-0.20240201095021-9cf154304652 h1:ry1unRaddevJon4fBwkPB/X91GmcR+ijSXXdZG7VfLc=
+seehuhn.de/go/sfnt v0.3.7-0.20240201095021-9cf154304652/go.mod h1:Uk3BCluafSOJePidC03VmG3DsSPjLisaZ9T8PG64uN0=

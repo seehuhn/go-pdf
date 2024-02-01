@@ -25,10 +25,6 @@ import (
 
 	"golang.org/x/text/language"
 
-	"seehuhn.de/go/postscript/funit"
-
-	"seehuhn.de/go/sfnt/glyph"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
@@ -220,8 +216,8 @@ func doit() error {
 
 		page.TextStart()
 		if s.level == 1 {
-			gg := SB.Layout(title)
-			w := l.F["chapter"].geom.ToPDF(l.F["chapter"].ptSize, gg.AdvanceWidth())
+			gg := SB.Layout(l.F["chapter"].ptSize, title)
+			w := gg.TotalLength()
 			l.yPos = paper.URy - l.topMargin - 72 - l.F["chapter"].ascent
 			xPos := (paper.URx-l.rightMargin-l.leftMargin-w)/2 + l.leftMargin
 			page.SetFillColor(color.Gray(0.3))
@@ -489,22 +485,23 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 		return keys[i] < keys[j]
 	})
 
-	keyGlyphs := make([]glyph.Seq, len(keys))
-	var maxWidth funit.Int
+	keyGlyphs := make([]*font.GlyphSeq, len(keys))
+	var maxWidth float64
 	for i, key := range keys {
-		gg := l.F["dict"].F.Layout(pdf.Format(key) + " ")
+		fDict := l.F["dict"]
+		gg := fDict.F.Layout(fDict.ptSize, pdf.Format(key)+" ")
 		keyGlyphs[i] = gg
-		w := gg.AdvanceWidth()
+		w := gg.TotalLength()
 		if w > maxWidth {
 			maxWidth = w
 		}
 	}
-	maxWidth += funit.Int(keyGlyphs[0][len(keyGlyphs[0])-1].Advance)
+	maxWidth += 10
 	for _, gg := range keyGlyphs {
-		w := gg.AdvanceWidth()
+		w := gg.TotalLength()
 		delta := maxWidth - w
 		if delta > 0 {
-			gg[len(gg)-1].Advance += funit.Int16(delta)
+			gg.Seq[len(gg.Seq)-1].Advance += delta
 		}
 	}
 
@@ -548,12 +545,12 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 		if key == "CharProcs" && len(desc) > 20 {
 			desc = "<< ... >>"
 		}
-		gg = append(gg, l.F["dict"].F.Layout(desc)...)
+		gg.Append(l.F["dict"].F.Layout(l.F["dict"].ptSize, desc))
 
 		page.TextSetFont(l.F["dict"].F, l.F["dict"].ptSize)
-		page.TextShowGlyphsOld(gg)
+		page.TextShowGlyphs(gg)
 
-		w := gg.AdvanceWidth()
+		w := gg.TotalLength()
 		if w > maxWidth {
 			maxWidth = w
 		}
@@ -563,7 +560,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	y2 := l.yPos - 2
 	l.yPos -= 4
 
-	wPDF := l.F["dict"].geom.ToPDF(l.F["dict"].ptSize, maxWidth)
+	wPDF := maxWidth
 	if wPDF < titleWitdhPDF {
 		wPDF = titleWitdhPDF
 	}

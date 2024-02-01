@@ -258,7 +258,7 @@ func TestTextPositions2(t *testing.T) {
 				r.TextSetFont(F, fontSize)
 				r.TextStart()
 				r.TextFirstLine(10, 10)
-				for _, g := range F.Layout(testString) {
+				for _, g := range F.Layout(fontSize, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
 					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)
 
@@ -276,7 +276,7 @@ func TestTextPositions2(t *testing.T) {
 				}
 
 				r.TextSetFont(F, fontSize)
-				for i, g := range F.Layout(testString) {
+				for i, g := range F.Layout(10, testString).Seq {
 					r.TextStart()
 					r.TextFirstLine(xx[i], 10)
 					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)

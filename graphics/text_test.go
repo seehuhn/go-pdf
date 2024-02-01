@@ -34,8 +34,8 @@ func TestGlyphWidths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gg0 := F.Layout("AB")
-	if len(gg0) != 2 {
+	gg0 := F.Layout(50, "AB")
+	if len(gg0.Seq) != 2 {
 		t.Fatal("wrong number of glyphs")
 	}
 
@@ -45,18 +45,20 @@ func TestGlyphWidths(t *testing.T) {
 	out.TextSetHorizontalScaling(200)
 	out.TextSetFont(F, 50)
 	out.TextFirstLine(100, 100)
-	gg := []font.Glyph{
-		{
-			GID:     gg0[0].GID,
-			Advance: 100,
-			Text:    []rune("A"),
-		},
-		{
-			GID:  gg0[1].GID,
-			Text: []rune("B"),
+	gg := &font.GlyphSeq{
+		Seq: []font.Glyph{
+			{
+				GID:     gg0.Seq[0].GID,
+				Advance: 100,
+				Text:    []rune("A"),
+			},
+			{
+				GID:  gg0.Seq[1].GID,
+				Text: []rune("B"),
+			},
 		},
 	}
-	out.TextShowGlyphs(0, gg, math.NaN())
+	out.TextShowGlyphs(gg)
 	out.TextEnd()
 
 	err = F.Close()

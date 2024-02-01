@@ -165,22 +165,27 @@ func (f *embedded) GetGeometry() *font.Geometry {
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *embedded) Layout(s string) glyph.Seq {
+func (f *embedded) Layout(ptSize float64, s string) *font.GlyphSeq {
 	rr := []rune(s)
 
-	gg := make(glyph.Seq, 0, len(rr))
+	q := f.Font.FontMatrix[0] * ptSize
+
+	gg := make([]font.Glyph, 0, len(rr))
 	for _, r := range rr {
 		gid, ok := f.CMap[r]
 		if !ok {
 			continue
 		}
-		gg = append(gg, glyph.Info{
+		gg = append(gg, font.Glyph{
 			GID:     gid,
 			Text:    []rune{r},
-			Advance: f.Glyphs[f.GlyphNames[gid]].WidthX,
+			Advance: float64(f.Glyphs[f.GlyphNames[gid]].WidthX) * q,
 		})
 	}
-	return gg
+	res := &font.GlyphSeq{
+		Seq: gg,
+	}
+	return res
 }
 
 func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {

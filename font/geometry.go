@@ -93,6 +93,32 @@ func (g *Geometry) BoundingBox(fontSize float64, gg glyph.Seq) *pdf.Rectangle {
 	return res
 }
 
+// BoundingBoxNew returns the bounding box of a glyph sequence,
+// assuming that it is typeset at point (0, 0) using the given font size.
+func (g *Geometry) BoundingBoxNew(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
+	res := &pdf.Rectangle{}
+
+	q := fontSize / float64(g.UnitsPerEm)
+
+	xPos := gg.Skip
+	for _, glyph := range gg.Seq {
+		b16 := g.GlyphExtents[glyph.GID]
+		if b16.IsZero() {
+			continue
+		}
+
+		b := &pdf.Rectangle{
+			LLx: b16.LLx.AsFloat(q) + xPos,
+			LLy: b16.LLy.AsFloat(q) + glyph.Rise,
+			URx: b16.URx.AsFloat(q) + xPos,
+			URy: b16.URy.AsFloat(q) + glyph.Rise,
+		}
+		res.Extend(b)
+		xPos += glyph.Advance
+	}
+	return res
+}
+
 // NumGlyphs returns the number of glyphs in a font.
 //
 // TODO(voss): remove?

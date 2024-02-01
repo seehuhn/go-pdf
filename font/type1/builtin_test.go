@@ -37,8 +37,8 @@ func TestEmbedBuiltin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			gg := E.Layout("Hello World")
-			for _, g := range gg { // allocate codes
+			gg := E.Layout(10, "Hello World")
+			for _, g := range gg.Seq { // allocate codes
 				E.CodeAndWidth(nil, g.GID, g.Text)
 			}
 

@@ -39,6 +39,37 @@ type Glyph struct {
 	Text []rune
 }
 
+type GlyphSeq struct {
+	Skip float64
+	Seq  []Glyph
+}
+
+func (s *GlyphSeq) Append(other *GlyphSeq) {
+	if len(s.Seq) == 0 {
+		s.Skip += other.Skip
+	} else {
+		s.Seq[len(s.Seq)-1].Advance += other.Skip
+	}
+	s.Seq = append(s.Seq, other.Seq...)
+}
+
+func (s *GlyphSeq) TotalLength() float64 {
+	w := s.Skip
+	for _, g := range s.Seq {
+		w += g.Advance
+	}
+	return w
+}
+
+// Align places the glyphs in a space of the given width.
+// q=0 means left alignment, q=1 means right alignment
+// and q=0.5 means centering.
+func (s *GlyphSeq) Align(width float64, q float64) {
+	extra := width - s.TotalLength()
+	s.Skip += extra * q
+	s.Seq[len(s.Seq)-1].Advance += extra * (1 - q)
+}
+
 // Font represents a font which can be embedded in a PDF file.
 type Font interface {
 	Embed(w pdf.Putter, resName pdf.Name) (Layouter, error)
@@ -48,14 +79,14 @@ type Font interface {
 type Layouter interface {
 	Embedded
 
-	Layout(s string) glyph.Seq // TODO(voss): use font.Glyph instead?
+	Layout(ptSize float64, s string) *GlyphSeq
 	GetGeometry() *Geometry
 	FontMatrix() []float64 // TODO(voss): remove
 
 	// CodeAndWidth appends the code for a given glyph/text to s and returns
 	// the width of the glyph in PDF text space units (still to be multiplied
-	// by the font size). The final return value is true if PDF word spacing
-	// adjustment applies to the glyph.
+	// by the font size).  The third return value is true, if PDF word spacing
+	// adjustment applies to this glyph.
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 
 	Close() error

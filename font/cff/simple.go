@@ -115,8 +115,26 @@ func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, er
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontCFFSimple) Layout(s string) glyph.Seq {
-	return f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+func (f *fontCFFSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
+	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	res := &font.GlyphSeq{
+		Seq: make([]font.Glyph, len(gg)),
+	}
+	for i, g := range gg {
+		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
+		if i == 0 {
+			res.Skip += xOffset
+		} else {
+			res.Seq[i-1].Advance += xOffset
+		}
+		res.Seq[i] = font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * ptSize * f.sfnt.FontMatrix[0],
+			Rise:    float64(g.YOffset) * ptSize * f.sfnt.FontMatrix[3],
+			Text:    g.Text,
+		}
+	}
+	return res
 }
 
 type embeddedSimple struct {
