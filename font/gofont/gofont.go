@@ -41,7 +41,7 @@ import (
 // Font identifies individual fonts in the Go font family.
 type Font int
 
-func (f Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+func (f Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	data, ok := ttf[f]
 	if !ok {
 		return nil, ErrInvalidFontID
@@ -57,7 +57,7 @@ func (f Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 		return nil, err
 	}
 
-	return F.Embed(w, resName)
+	return F.Embed(w, opt)
 }
 
 // Constants for the available fonts in the Go font family.

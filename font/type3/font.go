@@ -95,7 +95,7 @@ func (f *Font) glyphList() []string {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+func (f *Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	if f.NumOpen > 0 {
 		return nil, fmt.Errorf("font: %d glyphs not closed", f.NumOpen)
 	}
@@ -109,13 +109,17 @@ func (f *Font) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 		}
 	}
 
+	var defName pdf.Name
+	if opt != nil {
+		defName = opt.ResName
+	}
 	res := &embedded{
 		Font:       f,
 		GlyphNames: glyphNames,
 		w:          w,
 		Res: graphics.Res{
 			Ref:     w.Alloc(),
-			DefName: resName,
+			DefName: defName,
 		},
 		CMap:          cmap,
 		SimpleEncoder: encoding.NewSimpleEncoder(),

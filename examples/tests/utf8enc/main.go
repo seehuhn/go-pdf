@@ -47,14 +47,16 @@ func doit() error {
 
 	opt := &font.Options{
 		Language:     language.German,
+		Composite:    true,
 		MakeGIDToCID: cmap.NewIdentityGIDToCID,
 		MakeEncoder:  cmap.NewCIDEncoderUTF8,
+		ResName:      "F",
 	}
-	FF, err := cff.NewComposite(info, opt)
+	FF, err := cff.New(info)
 	if err != nil {
 		return err
 	}
-	F, err := FF.Embed(page.Out, "F")
+	F, err := FF.Embed(page.Out, opt)
 	if err != nil {
 		return err
 	}

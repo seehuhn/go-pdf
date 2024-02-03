@@ -50,7 +50,7 @@ func run(filename string) error {
 	// 	return err
 	// }
 	F := type1.TimesRoman
-	E, err := F.Embed(doc.Out, "")
+	E, err := F.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func run(filename string) error {
 	if err != nil {
 		return err
 	}
-	M, err := markerFont.Embed(doc.Out, "M")
+	M, err := markerFont.Embed(doc.Out, &font.Options{ResName: "M"})
 
 	gid := glyph.ID(0)
 	numGlyphs := min(glyph.ID(len(geom.Widths)), 256)

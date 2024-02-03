@@ -43,11 +43,14 @@ import (
 // embedded font inside PDF content streams.  Normally, this should be left
 // empty.
 func EmbedOpenType(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Layouter, error) {
-	font, err := LoadOpenType(fname, loc)
+	sfnt, err := LoadOpenType(fname, loc)
 	if err != nil {
 		return nil, err
 	}
-	return font.Embed(w, resName)
+	opt := &font.Options{
+		ResName: resName,
+	}
+	return sfnt.Embed(w, opt)
 }
 
 // LoadOpenType loads a font from a file as a simple PDF font.
@@ -68,7 +71,7 @@ func LoadOpenType(fname string, loc language.Tag) (font.Embedder, error) {
 		Language: loc,
 	}
 	if info.IsCFF() {
-		return cff.NewSimple(info, opt)
+		return cff.New(info)
 	}
 	return truetype.NewSimple(info, opt)
 }

@@ -36,6 +36,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug"
@@ -250,7 +251,7 @@ func TestTextPositions2(t *testing.T) {
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
 			img1 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := sample.Font.Embed(r.Out, "F")
+				F, err := sample.Font.Embed(r.Out, &font.Options{ResName: "F"})
 				if err != nil {
 					return err
 				}
@@ -270,7 +271,7 @@ func TestTextPositions2(t *testing.T) {
 			})
 			// Then print each glyph at the recorded x positions.
 			img2 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := sample.Font.Embed(r.Out, "F")
+				F, err := sample.Font.Embed(r.Out, &font.Options{ResName: "F"})
 				if err != nil {
 					return err
 				}

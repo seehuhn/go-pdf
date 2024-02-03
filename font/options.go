@@ -18,17 +18,28 @@ package font
 
 import (
 	"golang.org/x/text/language"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
 // Options allows to customize fonts for embedding into PDF files.
 // Not all fields apply to all font types.
 type Options struct {
-	Language     language.Tag
-	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
+	Language language.Tag
+
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
+
+	// Composite specifies whether to embed the font as a composite font.
+	Composite bool
+
+	// TODO(voss): get rid of the generator functions
+	MakeGIDToCID func() cmap.GIDToCID                // only used for composite fonts
+	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder // only used for composite fonts
+
+	// The default resource name to use for the font within content streams.
+	// Leave blank to have names allocated automatically.
+	ResName pdf.Name
 }
 
 // MergeOptions takes an options struct and a default values struct and returns a new

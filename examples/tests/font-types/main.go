@@ -65,41 +65,41 @@ func doit() error {
 		rightMargin: 144.0,
 	}
 
-	F, err := type1.TimesRoman.Embed(doc.Out, "F")
+	F, err := type1.TimesRoman.Embed(doc.Out, &font.Options{ResName: "F"})
 	if err != nil {
 		return err
 	}
 	l.addFont("text", F, 10)
 
-	I, err := type1.TimesItalic.Embed(doc.Out, "I")
+	I, err := type1.TimesItalic.Embed(doc.Out, &font.Options{ResName: "I"})
 	if err != nil {
 		return err
 	}
 	l.addFont("it", I, 10)
 
-	S, err := type1.Helvetica.Embed(doc.Out, "S")
+	S, err := type1.Helvetica.Embed(doc.Out, &font.Options{ResName: "S"})
 	if err != nil {
 		return err
 	}
 	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
-	SB, err := type1.HelveticaBold.Embed(doc.Out, "B")
+	SB, err := type1.HelveticaBold.Embed(doc.Out, &font.Options{ResName: "B"})
 	if err != nil {
 		return err
 	}
 	l.addFont("chapter", SB, 24)
 	l.addFont("section", SB, 18)
 
-	opt := &font.Options{
-		Language: language.English,
-	}
-
 	pageNo := 1
 	fontNo := 1
 	for _, s := range sections {
 		title := s.title
 		intro := s.lines
+
+		opt := &font.Options{
+			Language: language.English,
+		}
 
 		var X font.Embedder
 		var ffKey pdf.Name
@@ -124,7 +124,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = cff.NewSimple(otf, opt)
+			X, err = cff.New(otf)
 			if err != nil {
 				return err
 			}
@@ -173,7 +173,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = cff.NewComposite(otf, opt)
+			X, err = cff.New(otf)
 			if err != nil {
 				return err
 			}
@@ -284,7 +284,7 @@ func doit() error {
 		}
 
 		if X != nil {
-			Y, err := X.Embed(doc.Out, "X")
+			Y, err := X.Embed(doc.Out, &font.Options{ResName: "X"})
 			if err != nil {
 				return err
 			}
@@ -403,7 +403,7 @@ func writeSinglePage(F font.Embedder, no int) error {
 		return err
 	}
 
-	X, err := F.Embed(page.Out, "X")
+	X, err := F.Embed(page.Out, &font.Options{ResName: "X"})
 	if err != nil {
 		return err
 	}
@@ -555,7 +555,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 			maxWidth = w
 		}
 	}
-	l.yPos += 1
+	l.yPos++
 	page.TextEnd()
 	y2 := l.yPos - 2
 	l.yPos -= 4

@@ -23,6 +23,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	pdfimage "seehuhn.de/go/pdf/image"
@@ -61,11 +62,11 @@ func run(fname string) error {
 	page.DrawImage(img)
 	page.PopGraphicsState()
 
-	roman, err := type1.TimesRoman.Embed(page.Out, "R")
+	roman, err := type1.TimesRoman.Embed(page.Out, &font.Options{ResName: "R"})
 	if err != nil {
 		return err
 	}
-	bold, err := type1.TimesBold.Embed(page.Out, "B")
+	bold, err := type1.TimesBold.Embed(page.Out, &font.Options{ResName: "B"})
 	if err != nil {
 		return err
 	}

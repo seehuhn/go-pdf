@@ -20,6 +20,7 @@ import (
 	"log"
 
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -37,7 +38,7 @@ func run() error {
 	}
 	defer doc.Close()
 
-	font, err := type1.HelveticaBold.Embed(doc.Out, "F")
+	font, err := type1.HelveticaBold.Embed(doc.Out, &font.Options{ResName: "F"})
 	if err != nil {
 		return err
 	}

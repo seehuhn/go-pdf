@@ -30,7 +30,7 @@ import (
 
 func TestGlyphWidths(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
-	F, err := type1.TimesRoman.Embed(data, "")
+	F, err := type1.TimesRoman.Embed(data, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -37,11 +37,11 @@ import (
 // embedded font inside PDF content streams.  Normally, this should be left
 // empty.
 func EmbedType1(w pdf.Putter, fname string, afmname string, resName pdf.Name) (font.Layouter, error) {
-	font, err := LoadType1(fname, afmname)
+	sfnt, err := LoadType1(fname, afmname)
 	if err != nil {
 		return nil, err
 	}
-	return font.Embed(w, resName)
+	return sfnt.Embed(w, &font.Options{ResName: resName})
 }
 
 // LoadType1 loads a Type 1 font from a file as a simple PDF font.

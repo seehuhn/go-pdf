@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/debug"
 )
 
@@ -34,7 +35,7 @@ func TestSpaceIsBlank(t *testing.T) {
 		t.Run(sample.Label, func(t *testing.T) {
 			data := pdf.NewData(pdf.V1_7)
 			F := sample.Font
-			E, err := F.Embed(data, "F")
+			E, err := F.Embed(data, &font.Options{ResName: "F"})
 			if err != nil {
 				t.Fatal(err)
 			}

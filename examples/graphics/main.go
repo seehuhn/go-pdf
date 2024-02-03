@@ -22,6 +22,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 )
@@ -34,7 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	F, err := type1.Helvetica.Embed(w.Out, "F")
+	F, err := type1.Helvetica.Embed(w.Out, &font.Options{ResName: "F"})
 	if err != nil {
 		log.Fatal(err)
 	}

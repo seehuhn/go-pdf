@@ -65,7 +65,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := pdft1.Courier.Embed(out, "F")
+	labelFont, err := pdft1.Courier.Embed(out, &font.Options{ResName: "F"})
 	if err != nil {
 		log.Fatal(err)
 	}

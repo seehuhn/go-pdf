@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 )
 
 func TestType3(t *testing.T) {
@@ -58,7 +59,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Dict, err := F1.Embed(doc.Out, "F")
+	F1Dict, err := F1.Embed(doc.Out, &font.Options{ResName: "F"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,8 +23,6 @@ import (
 	"io"
 	"math"
 
-	"golang.org/x/text/language"
-
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
@@ -42,80 +40,23 @@ import (
 	"seehuhn.de/go/pdf/font/widths"
 )
 
-// fontCFFSimple is a CFF font for embedding into a PDF file as a simple font.
-type fontCFFSimple struct {
+type embeddedSimple struct {
+	w pdf.Putter
+	font.ResIndirect
+	*font.Geometry
+
 	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
-	*font.Geometry
-}
 
-var defaultOptionsCFF = &font.Options{
-	Language:     language.Und,
-	GsubFeatures: gtab.GsubDefaultFeatures,
-	GposFeatures: gtab.GposDefaultFeatures,
-}
+	*encoding.SimpleEncoder
 
-// NewSimple allocates a new CFF font for embedding in a PDF file as a simple font.
-// Info must be an OpenType font with CFF outlines.
-// If info is CID-keyed, the function will attempt to convert it to a simple font.
-// If the conversion fails (because more than one private dictionary is used
-// after subsetting), an error is returned.
-func NewSimple(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
-	if !info.IsCFF() {
-		return nil, errors.New("wrong font type")
-	}
-
-	opt = font.MergeOptions(opt, defaultOptionsCFF)
-
-	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
-		Descent:            float64(info.Descent) * info.FontMatrix[3],
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
-		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
-		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
-	}
-
-	cmap, err := info.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-
-	res := &fontCFFSimple{
-		sfnt:        info,
-		cmap:        cmap,
-		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
-		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
-		Geometry:    geometry,
-	}
-	return res, nil
-}
-
-// Embed implements the [font.Font] interface.
-func (f *fontCFFSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
-	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
-	if err != nil {
-		return nil, err
-	}
-	res := &embeddedSimple{
-		fontCFFSimple: f,
-		w:             w,
-		ResIndirect: font.ResIndirect{
-			Ref:     w.Alloc(),
-			DefName: resName,
-		},
-		SimpleEncoder: encoding.NewSimpleEncoder(),
-	}
-	w.AutoClose(res)
-	return res, nil
+	closed bool
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontCFFSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
+func (f *embeddedSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 	res := &font.GlyphSeq{
 		Seq: make([]font.Glyph, len(gg)),
@@ -135,15 +76,6 @@ func (f *fontCFFSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 		}
 	}
 	return res
-}
-
-type embeddedSimple struct {
-	*fontCFFSimple
-	w pdf.Putter
-	font.ResIndirect
-
-	*encoding.SimpleEncoder
-	closed bool
 }
 
 func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
@@ -227,8 +159,7 @@ type EmbedInfoSimple struct {
 	SubsetTag string
 
 	// Encoding is the encoding vector used by the client (a slice of length 256).
-	// Together with the font's built-in encoding, this is used to determine
-	// the `Encoding` entry of the PDF font dictionary.
+	// This may be different from the font's built-in encoding.
 	Encoding []glyph.ID
 
 	Ascent    funit.Int16

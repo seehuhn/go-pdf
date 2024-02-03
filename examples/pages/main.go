@@ -21,6 +21,7 @@ import (
 	"log"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/pagetree"
@@ -32,7 +33,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	font, err := type1.Helvetica.Embed(out, "F")
+	font, err := type1.Helvetica.Embed(out, &font.Options{ResName: "F"})
 	if err != nil {
 		log.Fatal(err)
 	}

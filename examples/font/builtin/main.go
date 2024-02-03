@@ -42,11 +42,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := type1.TimesRoman.Embed(doc.Out, "")
+	labelFont, err := type1.TimesRoman.Embed(doc.Out, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := type1.TimesBold.Embed(doc.Out, "")
+	titleFont, err := type1.TimesBold.Embed(doc.Out, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 					// The builtin fonts are simple fonts, so we can only
 					// use up to 256 glyphs for each embedded copy of the
 					// font.
-					F, err = fnt.Embed(f.doc.Out, "")
+					F, err = fnt.Embed(f.doc.Out, nil)
 					if err != nil {
 						return err
 					}

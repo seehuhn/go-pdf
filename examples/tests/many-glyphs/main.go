@@ -42,7 +42,7 @@ func run() error {
 		return err
 	}
 
-	H, err := type1.Helvetica.Embed(doc.Out, "H")
+	H, err := type1.Helvetica.Embed(doc.Out, &font.Options{ResName: "H"})
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func run() error {
 	for _, sample := range fonts {
 		page := doc.AddPage()
 
-		F, err := sample.Font.Embed(page.Out, "F")
+		F, err := sample.Font.Embed(page.Out, &font.Options{ResName: "F"})
 		if err != nil {
 			return err
 		}

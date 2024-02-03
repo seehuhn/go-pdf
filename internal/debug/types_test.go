@@ -37,7 +37,11 @@ func TestFontTypes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			X, err := sample.Font.Embed(page.Out, "X")
+			opt := &font.Options{
+				ResName:   "X",
+				Composite: sample.Type.IsComposite(),
+			}
+			X, err := sample.Font.Embed(page.Out, opt)
 			if err != nil {
 				t.Fatal(err)
 			}

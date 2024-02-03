@@ -30,7 +30,7 @@ import (
 type Builtin string
 
 // Embed implements the [font.Font] interface.
-func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+func (f Builtin) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	afm, err := f.AFM()
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (f Builtin) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
 		return nil, err
 	}
 
-	return F.Embed(w, resName)
+	return F.Embed(w, opt)
 }
 
 // psFont returns the PostScript font program for this builtin font.

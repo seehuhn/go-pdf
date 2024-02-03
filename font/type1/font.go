@@ -179,7 +179,11 @@ func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *fontSimple) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+func (f *fontSimple) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+	var resName pdf.Name
+	if opt != nil {
+		resName = opt.ResName
+	}
 	res := &embeddedSimple{
 		fontSimple: f,
 		w:          w,

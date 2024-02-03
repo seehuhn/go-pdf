@@ -100,12 +100,16 @@ func NewCFFComposite(info *sfnt.Font, opt *font.Options) (font.Embedder, error) 
 }
 
 // Embed implements the [font.Font] interface.
-func (f *fontCFFComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+func (f *fontCFFComposite) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 	gidToCID := f.makeGIDToCID()
+	var resName pdf.Name
+	if opt != nil {
+		resName = opt.ResName
+	}
 	res := &embeddedCFFComposite{
 		fontCFFComposite: f,
 		w:                w,

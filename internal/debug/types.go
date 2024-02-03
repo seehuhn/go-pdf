@@ -83,7 +83,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	F, err = cff.NewSimple(otf, opt)
+	F, err = cff.New(otf)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	if len(outlines.Encoding) != 256 || outlines.ROS != nil || len(outlines.GIDToCID) != 0 {
 		panic("CFF font unexpectedly has CIDFont operators")
 	}
-	F, err = cff.NewComposite(otf, opt)
+	F, err = cff.New(otf)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	for i := range outlines.GIDToCID {
 		outlines.GIDToCID[i] = cid.CID(i)
 	}
-	F, err = cff.NewComposite(otf, opt)
+	F, err = cff.New(otf)
 	if err != nil {
 		return nil, err
 	}

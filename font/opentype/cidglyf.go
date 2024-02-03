@@ -123,12 +123,16 @@ func (f *fontGlyfComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *fontGlyfComposite) Embed(w pdf.Putter, resName pdf.Name) (font.Layouter, error) {
+func (f *fontGlyfComposite) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 	gidToCID := f.makeGIDToCID()
+	var resName pdf.Name
+	if opt.ResName != "" {
+		resName = opt.ResName
+	}
 	res := &embeddedGlyfComposite{
 		fontGlyfComposite: f,
 		w:                 w,

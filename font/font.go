@@ -78,7 +78,7 @@ func (s *GlyphSeq) Align(width float64, q float64) {
 
 // Embedder represents a font which can be embedded in a PDF file.
 type Embedder interface {
-	Embed(w pdf.Putter, resName pdf.Name) (Layouter, error)
+	Embed(w pdf.Putter, opt *Options) (Layouter, error)
 }
 
 // A Layouter is a font embedded in a PDF file which can typeset text.

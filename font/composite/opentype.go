@@ -38,11 +38,16 @@ import (
 // embedded font inside PDF content streams.  Normally, this should be left
 // empty.
 func EmbedOpenType(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Embedded, error) {
-	font, err := LoadOpenType(fname, loc)
+	opt := &font.Options{
+		Language:  loc,
+		Composite: true,
+		ResName:   resName,
+	}
+	sfnt, err := LoadOpenType(fname, loc)
 	if err != nil {
 		return nil, err
 	}
-	return font.Embed(w, resName)
+	return sfnt.Embed(w, opt)
 }
 
 // EmbedOld creates a PDF CIDFont and embeds it into a PDF file.
@@ -52,12 +57,14 @@ func EmbedOpenType(w pdf.Putter, fname string, resName pdf.Name, loc language.Ta
 // TODO(voss): remove
 func EmbedOld(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag) (font.Layouter, error) {
 	opt := &font.Options{
-		Language: loc,
+		Language:  loc,
+		ResName:   resName,
+		Composite: true,
 	}
 	var f font.Embedder
 	var err error
 	if info.IsCFF() {
-		f, err = cff.NewComposite(info, opt)
+		f, err = cff.New(info)
 	} else {
 		f, err = truetype.NewComposite(info, opt)
 	}
@@ -65,7 +72,7 @@ func EmbedOld(w pdf.Putter, info *sfnt.Font, resName pdf.Name, loc language.Tag)
 		return nil, err
 	}
 
-	return f.Embed(w, resName)
+	return f.Embed(w, opt)
 }
 
 // LoadOpenType loads a font from a file as a simple PDF font.
@@ -82,11 +89,12 @@ func LoadOpenType(fname string, loc language.Tag) (font.Embedder, error) {
 		return nil, err
 	}
 
-	opt := &font.Options{
-		Language: loc,
-	}
 	if info.IsCFF() {
-		return cff.NewComposite(info, opt)
+		return cff.New(info)
+	}
+	opt := &font.Options{
+		Language:  loc,
+		Composite: true,
 	}
 	return truetype.NewComposite(info, opt)
 }

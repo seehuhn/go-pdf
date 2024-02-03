@@ -38,7 +38,7 @@ func TestToUnicode(t *testing.T) {
 			t.Run(v.String()+X, func(t *testing.T) {
 				data := pdf.NewData(v)
 
-				E, err := F.Embed(data, "")
+				E, err := F.Embed(data, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -103,7 +103,7 @@ func TestNotdefGlyph(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
-			E, err := F.Embed(data, "")
+			E, err := F.Embed(data, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -209,7 +209,7 @@ func TestRoundTrip(t *testing.T) {
 
 	for _, info := range []*EmbedInfo{info1, info2} {
 		info.Encoding = nil // already compared above
-		info.Metrics = nil  // TODO(voss): re-enable this once it works
+		info.Metrics = nil  // TODO(voss): enable this once it works
 	}
 
 	cmpFloat := cmp.Comparer(func(x, y float64) bool {

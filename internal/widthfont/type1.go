@@ -148,5 +148,5 @@ func Type1(out pdf.Putter, unitsPerEm funit.Int16) (font.Embedded, error) {
 		return nil, err
 	}
 
-	return F.Embed(out, "")
+	return F.Embed(out, nil)
 }
