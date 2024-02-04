@@ -10,8 +10,8 @@ require (
 	golang.org/x/term v0.16.0
 	golang.org/x/text v0.14.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
-	seehuhn.de/go/postscript v0.3.7-0.20240201125759-e32692a39f00
-	seehuhn.de/go/sfnt v0.3.7-0.20240201130831-3e1e0755c3f6
+	seehuhn.de/go/postscript v0.4.0
+	seehuhn.de/go/sfnt v0.4.0
 )
 
 require (
