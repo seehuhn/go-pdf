@@ -48,7 +48,7 @@ func doit() error {
 	opt := &font.Options{
 		Language:     language.German,
 		Composite:    true,
-		MakeGIDToCID: cmap.NewIdentityGIDToCID,
+		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
 		MakeEncoder:  cmap.NewCIDEncoderUTF8,
 		ResName:      "F",
 	}

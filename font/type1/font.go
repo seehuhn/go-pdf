@@ -178,18 +178,21 @@ func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
 	return bPDF
 }
 
-// Embed implements the [font.Font] interface.
 func (f *fontSimple) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	var resName pdf.Name
-	if opt != nil {
-		resName = opt.ResName
+	if opt == nil {
+		opt = &font.Options{}
 	}
+
+	if opt.Composite {
+		return nil, fmt.Errorf("Type 1 fonts do not support composite embedding")
+	}
+
 	res := &embeddedSimple{
 		fontSimple: f,
 		w:          w,
-		ResIndirect: font.ResIndirect{
+		Res: font.Res{
 			Ref:     w.Alloc(),
-			DefName: resName,
+			DefName: opt.ResName,
 		},
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
@@ -239,7 +242,7 @@ func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 type embeddedSimple struct {
 	*fontSimple
 	w pdf.Putter
-	font.ResIndirect
+	font.Res
 
 	*encoding.SimpleEncoder
 	closed bool
@@ -373,7 +376,7 @@ func (f *embeddedSimple) Close() error {
 		ResName:   f.DefName,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfo is the information needed to embed a Type 1 font.

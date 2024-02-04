@@ -51,7 +51,11 @@ func TestExtract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			F, err := sample.Font.Embed(w.Out, &font.Options{ResName: "F"})
+			opt := &font.Options{
+				Composite: sample.Type.IsComposite(),
+				ResName:   "F",
+			}
+			F, err := sample.Font.Embed(w.Out, opt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -90,7 +94,11 @@ func FuzzExtract(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		F, err := fontInfo.Font.Embed(w.Out, &font.Options{ResName: "X"})
+		opt := &font.Options{
+			Composite: fontInfo.Type.IsComposite(),
+			ResName:   "X",
+		}
+		F, err := fontInfo.Font.Embed(w.Out, opt)
 		if err != nil {
 			f.Fatal(err)
 		}

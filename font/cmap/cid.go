@@ -298,9 +298,9 @@ type GIDToCID interface {
 	GIDToCID(numGlyph int) []pscid.CID
 }
 
-// NewSequentialGIDToCID returns a GIDToCID which assigns CID values
+// NewGIDToCIDSequential returns a GIDToCID which assigns CID values
 // sequentially, starting with 1.
-func NewSequentialGIDToCID() GIDToCID {
+func NewGIDToCIDSequential() GIDToCID {
 	return &gidToCIDSequential{
 		g2c: make(map[glyph.ID]pscid.CID),
 		c2g: make(map[pscid.CID]glyph.ID),
@@ -356,9 +356,9 @@ func (g *gidToCIDSequential) GIDToCID(numGlyph int) []pscid.CID {
 	return res
 }
 
-// NewIdentityGIDToCID returns a GIDToCID which uses the GID values
+// NewGIDToCIDIdentity returns a GIDToCID which uses the GID values
 // directly as CID values.
-func NewIdentityGIDToCID() GIDToCID {
+func NewGIDToCIDIdentity() GIDToCID {
 	return &gidToCIDIdentity{}
 }
 

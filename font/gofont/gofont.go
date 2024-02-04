@@ -52,7 +52,7 @@ func (f Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 		return nil, err
 	}
 
-	F, err := truetype.NewSimple(info, nil)
+	F, err := truetype.New(info)
 	if err != nil {
 		return nil, err
 	}

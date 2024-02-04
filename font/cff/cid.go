@@ -40,7 +40,7 @@ import (
 
 type embeddedComposite struct {
 	w pdf.Putter
-	font.ResIndirect
+	font.Res
 	*font.Geometry
 
 	sfnt        *sfnt.Font
@@ -97,12 +97,6 @@ func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) 
 	k := len(s)
 	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
 	return s, width, len(s) == k+1 && s[k] == ' '
-}
-
-func (f *embeddedComposite) CIDToWidth(cid pscid.CID) float64 {
-	gid := f.GID(cid)
-	// TODO(voss): deal with different Font Matrices for different private dicts.
-	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 }
 
 func (f *embeddedComposite) Close() error {
@@ -171,7 +165,7 @@ func (f *embeddedComposite) Close() error {
 		IsSerif:    subsetOTF.IsSerif,
 		IsScript:   subsetOTF.IsScript,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfoComposite is the information needed to embed a CFF font as a composite PDF font.

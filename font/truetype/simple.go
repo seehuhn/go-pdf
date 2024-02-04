@@ -17,7 +17,6 @@
 package truetype
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -40,70 +39,23 @@ import (
 	"seehuhn.de/go/pdf/font/widths"
 )
 
-// fontSimple is a simple TrueType font.
-type fontSimple struct {
+type embeddedSimple struct {
+	w pdf.Putter
+	font.Res
+	*font.Geometry
+
 	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
-	*font.Geometry
-}
 
-// NewSimple creates a new simple TrueType font.
-// Info must either be a TrueType font or an OpenType font with TrueType outlines.
-func NewSimple(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
-	if !info.IsGlyf() {
-		return nil, errors.New("wrong font type")
-	}
+	*encoding.SimpleEncoder
 
-	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.UnitsPerEm),
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
-		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
-	}
-
-	cmap, err := info.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-
-	res := &fontSimple{
-		sfnt:        info,
-		cmap:        cmap,
-		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
-		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
-		Geometry:    geometry,
-	}
-	return res, nil
-}
-
-// Embed implements the [font.Font] interface.
-func (f *fontSimple) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
-	if err != nil {
-		return nil, err
-	}
-	var resName pdf.Name
-	if opt != nil {
-		resName = opt.ResName
-	}
-	res := &embeddedSimple{
-		fontSimple:    f,
-		w:             w,
-		Res:           font.Res{Ref: w.Alloc(), DefName: resName},
-		SimpleEncoder: encoding.NewSimpleEncoder(),
-	}
-	w.AutoClose(res)
-	return res, nil
+	closed bool
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
+func (f *embeddedSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 	res := &font.GlyphSeq{
 		Seq: make([]font.Glyph, len(gg)),
@@ -125,15 +77,6 @@ func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	return res
 }
 
-type embeddedSimple struct {
-	*fontSimple
-	w pdf.Putter
-	font.Res
-
-	*encoding.SimpleEncoder
-	closed bool
-}
-
 func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
@@ -145,11 +88,6 @@ func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pd
 	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 	c := f.GIDToCode(gid, rr)
 	return append(s, c), width, c == ' '
-}
-
-func (f *embeddedSimple) CodeToWidth(c byte) float64 {
-	gid := f.Encoding[c]
-	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 }
 
 func (f *embeddedSimple) Close() error {
@@ -164,18 +102,18 @@ func (f *embeddedSimple) Close() error {
 	}
 	encoding := f.SimpleEncoder.Encoding
 
-	origTTF := f.sfnt.Clone()
-	origTTF.CMapTable = nil
-	origTTF.Gdef = nil
-	origTTF.Gsub = nil
-	origTTF.Gpos = nil
+	origSfnt := f.sfnt.Clone()
+	origSfnt.CMapTable = nil
+	origSfnt.Gdef = nil
+	origSfnt.Gsub = nil
+	origSfnt.Gpos = nil
 
 	// subset the font
 	subsetGID := f.SimpleEncoder.Subset()
-	subsetTag := subset.Tag(subsetGID, origTTF.NumGlyphs())
-	subsetTTF, err := origTTF.Subset(subsetGID)
+	subsetTag := subset.Tag(subsetGID, origSfnt.NumGlyphs())
+	subsetSfnt, err := origSfnt.Subset(subsetGID)
 	if err != nil {
-		return fmt.Errorf("font subset: %w", err)
+		return fmt.Errorf("TrueType font subset: %w", err)
 	}
 
 	subsetGid := make(map[glyph.ID]glyph.ID)
@@ -192,7 +130,7 @@ func (f *embeddedSimple) Close() error {
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
 	info := EmbedInfoSimple{
-		Font:      subsetTTF,
+		Font:      subsetSfnt,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
@@ -210,8 +148,7 @@ type EmbedInfoSimple struct {
 	SubsetTag string
 
 	// Encoding is the encoding vector used by the client (a slice of length 256).
-	// Together with the font's built-in encoding, this is used to determine
-	// the `Encoding` entry of the PDF font dictionary.
+	// This may be different from the font's built-in encoding.
 	Encoding []glyph.ID
 
 	ForceBold bool
@@ -299,20 +236,20 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		return err
 	}
 
-	ttf := info.Font.Clone()
-	if !ttf.IsGlyf() {
+	sfnt := info.Font.Clone()
+	if !sfnt.IsGlyf() {
 		return fmt.Errorf("not a TrueType font")
 	}
 
-	fontName := ttf.PostScriptName()
+	fontName := sfnt.PostScriptName()
 	if info.SubsetTag != "" {
 		fontName = info.SubsetTag + "+" + fontName
 	}
 
 	ww := make([]float64, 256)
-	q := 1000 / float64(ttf.UnitsPerEm)
+	q := 1000 / float64(sfnt.UnitsPerEm)
 	for i := range ww {
-		ww[i] = float64(ttf.GlyphWidth(info.Encoding[i])) * q
+		ww[i] = float64(sfnt.GlyphWidth(info.Encoding[i])) * q
 	}
 	widthsInfo := widths.EncodeSimple(ww)
 
@@ -331,11 +268,11 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 		}
 		subtable[uint16(code)] = gid
 	}
-	ttf.CMapTable = sfntcmap.Table{
+	sfnt.CMapTable = sfntcmap.Table{
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 
-	bbox := ttf.BBox()
+	bbox := sfnt.BBox()
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -364,19 +301,19 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	}
 	fd := &font.Descriptor{
 		FontName:     fontName,
-		IsFixedPitch: ttf.IsFixedPitch(),
-		IsSerif:      ttf.IsSerif,
+		IsFixedPitch: sfnt.IsFixedPitch(),
+		IsSerif:      sfnt.IsSerif,
 		IsSymbolic:   isSymbolic,
-		IsScript:     ttf.IsScript,
-		IsItalic:     ttf.IsItalic,
+		IsScript:     sfnt.IsScript,
+		IsItalic:     sfnt.IsItalic,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    info.ForceBold,
 		FontBBox:     fontBBox,
-		ItalicAngle:  ttf.ItalicAngle,
-		Ascent:       ttf.Ascent.AsFloat(q),
-		Descent:      ttf.Descent.AsFloat(q),
-		CapHeight:    ttf.CapHeight.AsFloat(q),
+		ItalicAngle:  sfnt.ItalicAngle,
+		Ascent:       sfnt.Ascent.AsFloat(q),
+		Descent:      sfnt.Descent.AsFloat(q),
+		CapHeight:    sfnt.CapHeight.AsFloat(q),
 		MissingWidth: widthsInfo.MissingWidth,
 	}
 	fontDescriptor := fd.AsDict()
@@ -398,9 +335,9 @@ func (info *EmbedInfoSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) erro
 	if err != nil {
 		return err
 	}
-	n, err := ttf.WriteTrueTypePDF(fontFileStream)
+	n, err := sfnt.WriteTrueTypePDF(fontFileStream)
 	if err != nil {
-		return fmt.Errorf("embedding TrueType font %q: %w", fontName, err)
+		return fmt.Errorf("TrueType font program %q: %w", fontName, err)
 	}
 	err = length1.Set(pdf.Integer(n))
 	if err != nil {

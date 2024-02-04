@@ -17,11 +17,8 @@
 package opentype
 
 import (
-	"errors"
 	"fmt"
 	"math"
-
-	"golang.org/x/text/language"
 
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
@@ -37,92 +34,26 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
-	"seehuhn.de/go/pdf/graphics"
 )
 
-// fontCFFComposite is an OpenType/CFF font for embedding in a PDF file as a composite font.
-type fontCFFComposite struct {
+type embeddedCFFComposite struct {
+	w pdf.Putter
+	font.Res
+	*font.Geometry
+
 	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
-	*font.Geometry
 
-	makeGIDToCID func() cmap.GIDToCID
-	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
-}
+	cmap.GIDToCID
+	cmap.CIDEncoder
 
-var defaultOptionsCFF = &font.Options{
-	Language:     language.Und,
-	MakeGIDToCID: cmap.NewIdentityGIDToCID,
-	MakeEncoder:  cmap.NewCIDEncoderIdentity,
-	GsubFeatures: gtab.GsubDefaultFeatures,
-	GposFeatures: gtab.GposDefaultFeatures,
-}
-
-// NewCFFComposite creates a new OpenType/CFF font for embedding in a PDF file as a composite font.
-// Info must be an OpenType font with CFF outlines.
-// The font info is allowed but not required to be CID-keyed.
-// Consider using [cff.NewComposite] instead of this function.
-func NewCFFComposite(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
-	if !info.IsCFF() {
-		return nil, errors.New("wrong font type")
-	}
-
-	opt = font.MergeOptions(opt, defaultOptionsCFF)
-
-	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
-		Descent:            float64(info.Descent) * info.FontMatrix[3],
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
-		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
-		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
-	}
-
-	cmap, err := info.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-
-	res := &fontCFFComposite{
-		sfnt:         info,
-		cmap:         cmap,
-		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
-		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
-		Geometry:     geometry,
-		makeGIDToCID: opt.MakeGIDToCID,
-		makeEncoder:  opt.MakeEncoder,
-	}
-	return res, nil
-}
-
-// Embed implements the [font.Font] interface.
-func (f *fontCFFComposite) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
-	if err != nil {
-		return nil, err
-	}
-	gidToCID := f.makeGIDToCID()
-	var resName pdf.Name
-	if opt != nil {
-		resName = opt.ResName
-	}
-	res := &embeddedCFFComposite{
-		fontCFFComposite: f,
-		w:                w,
-		Res:              graphics.Res{Ref: w.Alloc(), DefName: resName},
-		GIDToCID:         gidToCID,
-		CIDEncoder:       f.makeEncoder(gidToCID),
-	}
-	w.AutoClose(res)
-	return res, nil
+	closed bool
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontCFFComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
+func (f *embeddedCFFComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 	res := &font.GlyphSeq{
 		Seq: make([]font.Glyph, len(gg)),
@@ -142,17 +73,6 @@ func (f *fontCFFComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 		}
 	}
 	return res
-}
-
-type embeddedCFFComposite struct {
-	*fontCFFComposite
-	w pdf.Putter
-	graphics.Res
-
-	cmap.GIDToCID
-	cmap.CIDEncoder
-
-	closed bool
 }
 
 func (f *embeddedCFFComposite) WritingMode() int {
@@ -177,33 +97,27 @@ func (f *embeddedCFFComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []run
 	return s, width, len(s) == k+1 && s[k] == ' '
 }
 
-func (f *embeddedCFFComposite) CIDToWidth(cid pscid.CID) float64 {
-	gid := f.GID(cid)
-	// TODO(voss): deal with different Font Matrices for different private dicts.
-	return float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-}
-
 func (f *embeddedCFFComposite) Close() error {
 	if f.closed {
 		return nil
 	}
 	f.closed = true
 
-	origOTF := f.sfnt.Clone()
-	origOTF.CMapTable = nil
-	origOTF.Gdef = nil
-	origOTF.Gsub = nil
-	origOTF.Gpos = nil
+	origSfnt := f.sfnt.Clone()
+	origSfnt.CMapTable = nil
+	origSfnt.Gdef = nil
+	origSfnt.Gsub = nil
+	origSfnt.Gpos = nil
 
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
-	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
-	subsetOTF, err := origOTF.Subset(subsetGID)
+	subsetTag := subset.Tag(subsetGID, origSfnt.NumGlyphs())
+	subsetOTF, err := origSfnt.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("OpenType/CFF font subset: %w", err)
 	}
 
-	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
+	origGIDToCID := f.GIDToCID.GIDToCID(origSfnt.NumGlyphs())
 	gidToCID := make([]pscid.CID, len(subsetGID))
 	for i, gid := range subsetGID {
 		gidToCID[i] = origGIDToCID[gid]
@@ -242,10 +156,10 @@ func (f *embeddedCFFComposite) Close() error {
 		CMap:      cmapInfo,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
-// EmbedInfoCFFComposite contains the information needed to embed an OpenType/CFF font in a PDF file as a composite font.
+// EmbedInfoCFFComposite is the information needed to embed a composite OpenType/CFF font.
 type EmbedInfoCFFComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
@@ -263,6 +177,62 @@ type EmbedInfoCFFComposite struct {
 	ToUnicode *cmap.ToUnicode
 }
 
+// ExtractCFFComposite extracts information about a composite OpenType/CFF font from a PDF file.
+// This is the inverse of [EmbedInfoCFFComposite.Embed].
+func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposite, error) {
+	if err := dicts.Type.MustBe(font.OpenTypeCFFComposite); err != nil {
+		return nil, err
+	}
+
+	res := &EmbedInfoCFFComposite{}
+
+	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
+	if err != nil {
+		return nil, err
+	}
+	stmData, err := pdf.DecodeStream(r, stmObj, 0)
+	if err != nil {
+		return nil, err
+	}
+	otf, err := sfnt.Read(stmData)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := otf.Outlines.(*cff.Outlines); !ok {
+		return nil, fmt.Errorf("expected CFF outlines, got %T", otf.Outlines)
+	}
+
+	// Most OpenType tables will be missing, so we fill in information from
+	// the font descriptor instead.
+	otf.IsSerif = dicts.FontDescriptor.IsSerif
+	otf.IsScript = dicts.FontDescriptor.IsScript
+	q := 1000 / float64(otf.UnitsPerEm)
+	otf.Ascent = funit.Int16(math.Round(float64(dicts.FontDescriptor.Ascent) / q))
+	otf.Descent = funit.Int16(math.Round(float64(dicts.FontDescriptor.Descent) / q))
+	otf.CapHeight = funit.Int16(math.Round(float64(dicts.FontDescriptor.CapHeight) / q))
+	res.Font = otf
+
+	postScriptName, _ := pdf.GetName(r, dicts.CIDFontDict["BaseFont"])
+	if m := subset.TagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
+		res.SubsetTag = m[1]
+	}
+
+	cmapInfo, err := cmap.Extract(r, dicts.FontDict["Encoding"])
+	if err != nil {
+		return nil, err
+	}
+	res.CMap = cmapInfo
+
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
+
+	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
+		res.ToUnicode = info
+	}
+
+	return res, nil
+}
+
 // Embed adds a composite OpenType/CFF font to a PDF file.
 // This is the reverse of [ExtractCFFComposite]
 func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
@@ -271,11 +241,11 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 		return err
 	}
 
-	otf := info.Font
-	if !otf.IsCFF() {
+	sfnt := info.Font
+	if !sfnt.IsCFF() {
 		return fmt.Errorf("not an OpenType/CFF font")
 	}
-	cff := otf.AsCFF()
+	cff := sfnt.AsCFF()
 
 	cidFontName := cff.FontInfo.FontName
 	if info.SubsetTag != "" {
@@ -291,23 +261,22 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 		encoding = w.Alloc()
 	}
 
-	unitsPerEm := otf.UnitsPerEm
-	q := 1000 / float64(unitsPerEm)
-
-	glyphwidths := otf.Widths()
+	glyphwidths := sfnt.Widths()
 	ww := make(map[pscid.CID]float64, len(glyphwidths))
 	if cff.GIDToCID != nil {
 		for gid, w := range glyphwidths {
-			ww[cff.GIDToCID[gid]] = w.AsFloat(q)
+			ww[cff.GIDToCID[gid]] = float64(w) * sfnt.FontMatrix[0] * 1000
 		}
 	} else {
 		for gid, w := range glyphwidths {
-			ww[pscid.CID(gid)] = w.AsFloat(q)
+			ww[pscid.CID(gid)] = float64(w) * sfnt.FontMatrix[0] * 1000
 		}
 	}
 	DW, W := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
-	bbox := otf.BBox()
+	bbox := sfnt.BBox()
+
+	q := 1000 / float64(sfnt.UnitsPerEm)
 	fontBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
@@ -315,7 +284,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := !font.IsStandardLatin(otf)
+	isSymbolic := !font.IsStandardLatin(sfnt)
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
@@ -357,18 +326,18 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	fd := &font.Descriptor{
 		FontName:     cidFontName,
 		IsFixedPitch: cff.IsFixedPitch,
-		IsSerif:      otf.IsSerif,
+		IsSerif:      sfnt.IsSerif,
 		IsSymbolic:   isSymbolic,
-		IsScript:     otf.IsScript,
-		IsItalic:     otf.IsItalic,
+		IsScript:     sfnt.IsScript,
+		IsItalic:     sfnt.IsItalic,
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    cff.Private[0].ForceBold,
 		FontBBox:     fontBBox,
-		ItalicAngle:  otf.ItalicAngle,
-		Ascent:       otf.Ascent.AsFloat(q),
-		Descent:      otf.Descent.AsFloat(q),
-		CapHeight:    otf.CapHeight.AsFloat(q),
+		ItalicAngle:  sfnt.ItalicAngle,
+		Ascent:       sfnt.Ascent.AsFloat(q),
+		Descent:      sfnt.Descent.AsFloat(q),
+		CapHeight:    sfnt.CapHeight.AsFloat(q),
 	}
 	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile3"] = fontFileRef
@@ -388,7 +357,7 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	if err != nil {
 		return err
 	}
-	err = otf.WriteOpenTypeCFFPDF(fontFileStream)
+	err = sfnt.WriteOpenTypeCFFPDF(fontFileStream)
 	if err != nil {
 		return fmt.Errorf("OpenType/CFF font program %q: %w", cidFontName, err)
 	}
@@ -412,59 +381,4 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 	}
 
 	return nil
-}
-
-// ExtractCFFComposite extracts information about a composite OpenType/CFF font from a PDF file.
-// This is the inverse of [EmbedInfoCFFComposite.Embed].
-func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposite, error) {
-	if err := dicts.Type.MustBe(font.OpenTypeCFFComposite); err != nil {
-		return nil, err
-	}
-
-	res := &EmbedInfoCFFComposite{}
-
-	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
-	if err != nil {
-		return nil, err
-	}
-	stmData, err := pdf.DecodeStream(r, stmObj, 0)
-	if err != nil {
-		return nil, err
-	}
-	otf, err := sfnt.Read(stmData)
-	if err != nil {
-		return nil, err
-	}
-	if _, ok := otf.Outlines.(*cff.Outlines); !ok {
-		return nil, fmt.Errorf("expected CFF outlines, got %T", otf.Outlines)
-	}
-	// Most OpenType tables will be missing, so we fill in information from
-	// the font descriptor instead.
-	otf.IsSerif = dicts.FontDescriptor.IsSerif
-	otf.IsScript = dicts.FontDescriptor.IsScript
-	q := 1000 / float64(otf.UnitsPerEm)
-	otf.Ascent = funit.Int16(math.Round(float64(dicts.FontDescriptor.Ascent) / q))
-	otf.Descent = funit.Int16(math.Round(float64(dicts.FontDescriptor.Descent) / q))
-	otf.CapHeight = funit.Int16(math.Round(float64(dicts.FontDescriptor.CapHeight) / q))
-	res.Font = otf
-
-	postScriptName, _ := pdf.GetName(r, dicts.CIDFontDict["BaseFont"])
-	if m := subset.TagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
-		res.SubsetTag = m[1]
-	}
-
-	cmapInfo, err := cmap.Extract(r, dicts.FontDict["Encoding"])
-	if err != nil {
-		return nil, err
-	}
-	res.CMap = cmapInfo
-
-	res.IsAllCap = dicts.FontDescriptor.IsAllCap
-	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
-
-	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
-		res.ToUnicode = info
-	}
-
-	return res, nil
 }

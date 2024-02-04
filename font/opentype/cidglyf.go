@@ -17,12 +17,9 @@
 package opentype
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"math"
-
-	"golang.org/x/text/language"
 
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
@@ -38,69 +35,26 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
-	"seehuhn.de/go/pdf/graphics"
 )
 
-// fontGlyfComposite is a composite OpenType/glyf font.
-type fontGlyfComposite struct {
+type embeddedGlyfComposite struct {
+	w pdf.Putter
+	font.Res
+	*font.Geometry
+
 	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
-	*font.Geometry
 
-	makeGIDToCID func() cmap.GIDToCID
-	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
-}
+	cmap.GIDToCID
+	cmap.CIDEncoder
 
-var defaultOptionsGlyf = &font.Options{
-	Language:     language.Und,
-	MakeGIDToCID: cmap.NewSequentialGIDToCID,
-	MakeEncoder:  cmap.NewCIDEncoderIdentity,
-	GsubFeatures: gtab.GsubDefaultFeatures,
-	GposFeatures: gtab.GposDefaultFeatures,
-}
-
-// NewGlyfComposite creates a new composite OpenType/glyf font.
-// Info must either be a TrueType font or an OpenType font with TrueType outlines.
-// Consider using [truetype.NewComposite] instead of this function.
-func NewGlyfComposite(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
-	if !info.IsGlyf() {
-		return nil, errors.New("wrong font type")
-	}
-
-	opt = font.MergeOptions(opt, defaultOptionsGlyf)
-
-	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
-		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
-	}
-
-	cmap, err := info.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-
-	res := &fontGlyfComposite{
-		sfnt:         info,
-		cmap:         cmap,
-		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
-		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
-		Geometry:     geometry,
-		makeGIDToCID: opt.MakeGIDToCID,
-		makeEncoder:  opt.MakeEncoder,
-	}
-	return res, nil
+	closed bool
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontGlyfComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
+func (f *embeddedGlyfComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 	res := &font.GlyphSeq{
 		Seq: make([]font.Glyph, len(gg)),
@@ -122,39 +76,6 @@ func (f *fontGlyfComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 	return res
 }
 
-// Embed implements the [font.Font] interface.
-func (f *fontGlyfComposite) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
-	if err != nil {
-		return nil, err
-	}
-	gidToCID := f.makeGIDToCID()
-	var resName pdf.Name
-	if opt.ResName != "" {
-		resName = opt.ResName
-	}
-	res := &embeddedGlyfComposite{
-		fontGlyfComposite: f,
-		w:                 w,
-		Res:               graphics.Res{Ref: w.Alloc(), DefName: resName},
-		GIDToCID:          gidToCID,
-		CIDEncoder:        f.makeEncoder(gidToCID),
-	}
-	w.AutoClose(res)
-	return res, nil
-}
-
-type embeddedGlyfComposite struct {
-	*fontGlyfComposite
-	w pdf.Putter
-	graphics.Res
-
-	cmap.GIDToCID
-	cmap.CIDEncoder
-
-	closed bool
-}
-
 func (f *embeddedGlyfComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
@@ -173,11 +94,6 @@ func (f *embeddedGlyfComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []ru
 	k := len(s)
 	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
 	return s, width, len(s) == k+1 && s[k] == ' '
-}
-
-func (f *embeddedGlyfComposite) CIDToWidth(cid pscid.CID) float64 {
-	gid := f.GID(cid)
-	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 }
 
 func (f *embeddedGlyfComposite) Close() error {
@@ -230,7 +146,7 @@ func (f *embeddedGlyfComposite) Close() error {
 		CIDToGID:  cidToGID,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfoGlyfComposite is the information needed to embed a composite OpenType/glyf font.

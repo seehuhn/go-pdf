@@ -17,7 +17,6 @@
 package truetype
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -38,67 +37,34 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
-	"seehuhn.de/go/pdf/graphics"
 )
-
-// fontComposite is a composite TrueType font.
-type fontComposite struct {
-	sfnt        *sfnt.Font
-	cmap        sfntcmap.Subtable
-	gsubLookups []gtab.LookupIndex
-	gposLookups []gtab.LookupIndex
-	*font.Geometry
-
-	makeGIDToCID func() cmap.GIDToCID
-	makeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder
-}
 
 var defaultFontOptions = &font.Options{
 	Language:     language.Und,
-	MakeGIDToCID: cmap.NewSequentialGIDToCID,
+	MakeGIDToCID: cmap.NewGIDToCIDSequential,
 	MakeEncoder:  cmap.NewCIDEncoderIdentity,
 	GsubFeatures: gtab.GsubDefaultFeatures,
 	GposFeatures: gtab.GposDefaultFeatures,
 }
 
-// NewComposite creates a new composite TrueType font.
-func NewComposite(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
-	if !info.IsGlyf() {
-		return nil, errors.New("wrong font type")
-	}
+type embeddedComposite struct {
+	w pdf.Putter
+	font.Res
+	*font.Geometry
 
-	opt = font.MergeOptions(opt, defaultFontOptions)
+	sfnt        *sfnt.Font
+	cmap        sfntcmap.Subtable
+	gsubLookups []gtab.LookupIndex
+	gposLookups []gtab.LookupIndex
 
-	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.UnitsPerEm),
-		Widths:       info.WidthsPDF(),
+	cmap.GIDToCID
+	cmap.CIDEncoder
 
-		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
-		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
-	}
-
-	cmap, err := info.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-
-	res := &fontComposite{
-		sfnt:         info,
-		cmap:         cmap,
-		gsubLookups:  info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
-		gposLookups:  info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
-		Geometry:     geometry,
-		makeGIDToCID: opt.MakeGIDToCID,
-		makeEncoder:  opt.MakeEncoder,
-	}
-	return res, nil
+	closed bool
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
+func (f *embeddedComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 	res := &font.GlyphSeq{
 		Seq: make([]font.Glyph, len(gg)),
@@ -120,39 +86,6 @@ func (f *fontComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
 	return res
 }
 
-// Embed implements the [font.Font] interface.
-func (f *fontComposite) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
-	if err != nil {
-		return nil, err
-	}
-	gidToCID := f.makeGIDToCID()
-	var resName pdf.Name
-	if opt != nil {
-		resName = opt.ResName
-	}
-	res := &embeddedComposite{
-		fontComposite: f,
-		w:             w,
-		Res:           graphics.Res{Ref: w.Alloc(), DefName: resName},
-		GIDToCID:      gidToCID,
-		CIDEncoder:    f.makeEncoder(gidToCID),
-	}
-	w.AutoClose(res)
-	return res, nil
-}
-
-type embeddedComposite struct {
-	*fontComposite
-	w pdf.Putter
-	graphics.Res
-
-	cmap.GIDToCID
-	cmap.CIDEncoder
-
-	closed bool
-}
-
 func (f *embeddedComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
@@ -171,11 +104,6 @@ func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) 
 	k := len(s)
 	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
 	return s, width, len(s) == k+1 && s[k] == ' '
-}
-
-func (f *embeddedComposite) CIDToWidth(cid pscid.CID) float64 {
-	gid := f.GID(cid)
-	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 }
 
 func (f *embeddedComposite) Close() error {
@@ -228,7 +156,7 @@ func (f *embeddedComposite) Close() error {
 		CID2GID:   cidToGID,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfoComposite is the information needed to embed a TrueType font as a composite PDF font.

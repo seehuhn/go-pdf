@@ -42,7 +42,7 @@ import (
 
 type embeddedSimple struct {
 	w pdf.Putter
-	font.ResIndirect
+	font.Res
 	*font.Geometry
 
 	sfnt        *sfnt.Font
@@ -103,29 +103,29 @@ func (f *embeddedSimple) Close() error {
 	}
 	encoding := f.SimpleEncoder.Encoding
 
-	// Make our encoding the built-in encoding of the font.
-	origOTF := f.sfnt.Clone()
-	outlines := origOTF.Outlines.(*cff.Outlines)
-	outlines.Encoding = encoding
-	outlines.ROS = nil
-	outlines.GIDToCID = nil
-
-	origOTF.CMapTable = nil
-	origOTF.Gdef = nil
-	origOTF.Gsub = nil
-	origOTF.Gpos = nil
+	origSfnt := f.sfnt.Clone()
+	origSfnt.CMapTable = nil
+	origSfnt.Gdef = nil
+	origSfnt.Gsub = nil
+	origSfnt.Gpos = nil
 
 	// subset the font
 	subsetGID := f.SimpleEncoder.Subset()
-	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
-	subsetOTF, err := origOTF.Subset(subsetGID)
+	subsetTag := subset.Tag(subsetGID, origSfnt.NumGlyphs())
+	subsetSfnt, err := origSfnt.Subset(subsetGID)
 	if err != nil {
 		return fmt.Errorf("CFF font subset: %w", err)
 	}
 
+	// Make our encoding the built-in encoding of the font.
+	outlines := origSfnt.Outlines.(*cff.Outlines)
+	outlines.Encoding = encoding
+	outlines.ROS = nil
+	outlines.GIDToCID = nil
+
 	// convert the font to a simple font, if needed
-	subsetOTF.EnsureGlyphNames()
-	subsetCFF := subsetOTF.AsCFF()
+	subsetSfnt.EnsureGlyphNames()
+	subsetCFF := subsetSfnt.AsCFF()
 	if len(subsetCFF.Private) != 1 {
 		return fmt.Errorf("need exactly one private dict for a simple font")
 	}
@@ -140,13 +140,13 @@ func (f *embeddedSimple) Close() error {
 		Encoding:  subsetCFF.Encoding, // we use the built-in encoding
 		ToUnicode: toUnicode,
 
-		Ascent:    subsetOTF.Ascent,
-		Descent:   subsetOTF.Descent,
-		CapHeight: subsetOTF.CapHeight,
-		IsSerif:   subsetOTF.IsScript,
-		IsScript:  subsetOTF.IsScript,
+		Ascent:    subsetSfnt.Ascent,
+		Descent:   subsetSfnt.Descent,
+		CapHeight: subsetSfnt.CapHeight,
+		IsSerif:   subsetSfnt.IsScript,
+		IsScript:  subsetSfnt.IsScript,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfoSimple is the information needed to embed a simple CFF font.
@@ -162,6 +162,7 @@ type EmbedInfoSimple struct {
 	// This may be different from the font's built-in encoding.
 	Encoding []glyph.ID
 
+	// TODO(voss): use PDF text space units
 	Ascent    funit.Int16
 	Descent   funit.Int16
 	CapHeight funit.Int16
@@ -203,6 +204,8 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoSimple, error) {
 		if err != nil {
 			return nil, pdf.Wrap(err, "decoding CFF font")
 		}
+
+		// TODO(voss): use the glyph widths from the font dictionaries.
 
 		res.Font = cff
 	}

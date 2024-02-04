@@ -43,19 +43,20 @@ import (
 // embedded font inside PDF content streams.  Normally, this should be left
 // empty.
 func EmbedOpenType(w pdf.Putter, fname string, resName pdf.Name, loc language.Tag) (font.Layouter, error) {
-	sfnt, err := LoadOpenType(fname, loc)
+	sfnt, err := LoadOpenType(fname)
 	if err != nil {
 		return nil, err
 	}
 	opt := &font.Options{
-		ResName: resName,
+		Language: loc,
+		ResName:  resName,
 	}
 	return sfnt.Embed(w, opt)
 }
 
 // LoadOpenType loads a font from a file as a simple PDF font.
 // Both TrueType and OpenType fonts are supported.
-func LoadOpenType(fname string, loc language.Tag) (font.Embedder, error) {
+func LoadOpenType(fname string) (font.Embedder, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -67,11 +68,8 @@ func LoadOpenType(fname string, loc language.Tag) (font.Embedder, error) {
 		return nil, err
 	}
 
-	opt := &font.Options{
-		Language: loc,
-	}
 	if info.IsCFF() {
 		return cff.New(info)
 	}
-	return truetype.NewSimple(info, opt)
+	return truetype.New(info)
 }

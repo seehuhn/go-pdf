@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cff
+package truetype
 
 import (
 	"errors"
-	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -33,12 +32,12 @@ type embedder struct {
 	sfnt *sfnt.Font
 }
 
-// New makes a PDF CFF font from a sfnt.Font.
-// The font info must be an OpenType font with CFF outlines.
+// New makes a PDF TrueType font from a sfnt.Font.
+// The font info must be an OpenType/TrueType font with glyf outlines.
 // The font can be embedded as a simple font or as a composite font.
 func New(info *sfnt.Font) (font.Embedder, error) {
-	if !info.IsCFF() {
-		return nil, errors.New("no CFF outlines in font")
+	if !info.IsGlyf() {
+		return nil, errors.New("no glyf outlines in font")
 	}
 
 	return embedder{sfnt: info}, nil
@@ -68,39 +67,38 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	}
 	gposLookups := info.Gpos.FindLookups(opt.Language, opt.GposFeatures)
 
+	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
+
 	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
+		GlyphExtents: scaleBboxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
 		Widths:       info.WidthsPDF(),
 
-		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
-		Descent:            float64(info.Descent) * info.FontMatrix[3],
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
-		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
-		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
+		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
+		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
+		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
+		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
+		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
 	}
-
-	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
 
 	var res font.Layouter
 	if !opt.Composite {
-		err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
+		err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 		if err != nil {
 			return nil, err
 		}
+
 		res = &embeddedSimple{
-			w:        w,
-			Res:      resource,
-			Geometry: geometry,
-
-			sfnt:        info,
-			cmap:        fontCmap,
-			gsubLookups: gsubLookups,
-			gposLookups: gposLookups,
-
+			w:             w,
+			Res:           resource,
+			Geometry:      geometry,
+			sfnt:          f.sfnt,
+			cmap:          fontCmap,
+			gsubLookups:   gsubLookups,
+			gposLookups:   gposLookups,
 			SimpleEncoder: encoding.NewSimpleEncoder(),
 		}
 	} else {
-		err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
+		err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +107,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 		if opt.MakeGIDToCID != nil {
 			gidToCID = opt.MakeGIDToCID()
 		} else {
-			gidToCID = cmap.NewGIDToCIDIdentity()
+			gidToCID = cmap.NewGIDToCIDSequential()
 		}
 
 		var cidEncoder cmap.CIDEncoder
@@ -120,49 +118,32 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 		}
 
 		res = &embeddedComposite{
-			w:        w,
-			Res:      resource,
-			Geometry: geometry,
-
-			sfnt:        info,
+			w:           w,
+			Res:         resource,
+			Geometry:    geometry,
+			sfnt:        f.sfnt,
 			cmap:        fontCmap,
 			gsubLookups: gsubLookups,
 			gposLookups: gposLookups,
-
-			GIDToCID:   gidToCID,
-			CIDEncoder: cidEncoder,
+			GIDToCID:    gidToCID,
+			CIDEncoder:  cidEncoder,
 		}
 	}
+
 	w.AutoClose(res)
 
 	return res, nil
 }
 
-func bboxesToPDF(bboxes []funit.Rect16, M []float64) []pdf.Rectangle {
+func scaleBboxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {
 	res := make([]pdf.Rectangle, len(bboxes))
 	for i, b := range bboxes {
-		bPDF := pdf.Rectangle{
-			LLx: math.Inf(+1),
-			LLy: math.Inf(+1),
-			URx: math.Inf(-1),
-			URy: math.Inf(-1),
+		res[i] = pdf.Rectangle{
+			LLx: float64(b.LLx) / float64(unitsPerEm),
+			LLy: float64(b.LLy) / float64(unitsPerEm),
+			URx: float64(b.URx) / float64(unitsPerEm),
+			URy: float64(b.URy) / float64(unitsPerEm),
 		}
-		corners := []struct{ x, y funit.Int16 }{
-			{b.LLx, b.LLy},
-			{b.LLx, b.URy},
-			{b.URx, b.LLy},
-			{b.URx, b.URy},
-		}
-		for _, c := range corners {
-			xf := float64(c.x)
-			yf := float64(c.y)
-			x, y := M[0]*xf+M[2]*yf+M[4], M[1]*xf+M[3]*yf+M[5]
-			bPDF.LLx = min(bPDF.LLx, x)
-			bPDF.LLy = min(bPDF.LLy, y)
-			bPDF.URx = max(bPDF.URx, x)
-			bPDF.URy = max(bPDF.URy, y)
-		}
-		res[i] = bPDF
 	}
 	return res
 }

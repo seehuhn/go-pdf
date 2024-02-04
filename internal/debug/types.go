@@ -17,8 +17,6 @@
 package debug
 
 import (
-	"golang.org/x/text/language"
-
 	"seehuhn.de/go/postscript/cid"
 
 	scff "seehuhn.de/go/sfnt/cff"
@@ -45,10 +43,6 @@ type FontSample struct {
 func MakeFontSamples() ([]*FontSample, error) {
 	var res []*FontSample
 	var F font.Embedder
-
-	opt := &font.Options{
-		Language: language.English,
-	}
 
 	// a Type 1 font
 	t1, err := many.Type1(many.GoRegular)
@@ -95,7 +89,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewCFFSimple(otf, opt)
+	F, err = opentype.New(otf)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +105,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	F, err = truetype.NewSimple(ttf, opt)
+	F, err = truetype.New(ttf)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +117,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// ... or using an OpenType wrapper
-	F, err = opentype.NewGlyfSimple(ttf, opt)
+	F, err = opentype.New(ttf)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +161,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewCFFComposite(otf, nil)
+	F, err = opentype.New(otf)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +200,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// ... or with the OpenType wrapper
-	F, err = opentype.NewCFFComposite(otf, nil)
+	F, err = opentype.New(otf)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +216,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	if err != nil {
 		return nil, err
 	}
-	F, err = truetype.NewComposite(ttf, nil)
+	F, err = truetype.New(ttf)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +228,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// ... or using an OpenType wrapper
-	F, err = opentype.NewGlyfComposite(ttf, nil)
+	F, err = opentype.New(ttf)
 	if err != nil {
 		return nil, err
 	}

@@ -37,7 +37,7 @@ func TestWidthsFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	F, err := opentype.NewCFFSimple(goRegular, nil)
+	F, err := opentype.New(goRegular)
 	if err != nil {
 		t.Fatal(err)
 	}

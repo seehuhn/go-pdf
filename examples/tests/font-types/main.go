@@ -97,12 +97,9 @@ func doit() error {
 		title := s.title
 		intro := s.lines
 
-		opt := &font.Options{
-			Language: language.English,
-		}
-
 		var X font.Embedder
 		var ffKey pdf.Name
+		composite := false
 		switch title {
 		case "Simple PDF Fonts":
 			// part 1
@@ -134,7 +131,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewCFFSimple(otf, opt)
+			X, err = opentype.New(otf)
 			if err != nil {
 				return err
 			}
@@ -146,7 +143,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = truetype.NewSimple(ttf, opt)
+			X, err = truetype.New(ttf)
 			if err != nil {
 				return err
 			}
@@ -156,7 +153,7 @@ func doit() error {
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewGlyfSimple(otf, opt)
+			X, err = opentype.New(otf)
 			if err != nil {
 				return err
 			}
@@ -178,36 +175,40 @@ func doit() error {
 				return err
 			}
 			ffKey = "FontFile3"
+			composite = true
 		case "Composite CFF-based OpenType Fonts":
 			otf, err := many.OpenType(many.GoRegular)
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewCFFComposite(otf, opt)
+			X, err = opentype.New(otf)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile3"
+			composite = true
 		case "Composite TrueType Fonts":
 			ttf, err := many.TrueType(many.GoRegular)
 			if err != nil {
 				return err
 			}
-			X, err = truetype.NewComposite(ttf, opt)
+			X, err = truetype.New(ttf)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile2"
+			composite = true
 		case "Composite Glyf-based OpenType Fonts":
 			otf, err := many.TrueType(many.GoRegular)
 			if err != nil {
 				return err
 			}
-			X, err = opentype.NewGlyfComposite(otf, opt)
+			X, err = opentype.New(otf)
 			if err != nil {
 				return err
 			}
 			ffKey = "FontFile3"
+			composite = true
 		default:
 			panic("unexpected section " + title)
 		}
@@ -284,7 +285,12 @@ func doit() error {
 		}
 
 		if X != nil {
-			Y, err := X.Embed(doc.Out, &font.Options{ResName: "X"})
+			opt := &font.Options{
+				Language:  language.English,
+				Composite: composite,
+				ResName:   "X",
+			}
+			Y, err := X.Embed(doc.Out, opt)
 			if err != nil {
 				return err
 			}

@@ -17,7 +17,6 @@
 package opentype
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -37,76 +36,25 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/widths"
-	"seehuhn.de/go/pdf/graphics"
 )
 
-// fontGlyfSimple is a simple OpenType/glyf font
-type fontGlyfSimple struct {
+type embeddedGlyfSimple struct {
+	w pdf.Putter
+	font.Res
+	*font.Geometry
+
 	sfnt        *sfnt.Font
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
-	*font.Geometry
-}
 
-// NewGlyfSimple creates a new simple OpenType/glyf font.
-// Info must either be a TrueType font or an OpenType font with TrueType outlines.
-// Consider using [truetype.NewSimple] instead of this function.
-func NewGlyfSimple(info *sfnt.Font, opt *font.Options) (font.Embedder, error) {
-	if !info.IsGlyf() {
-		return nil, errors.New("wrong font type")
-	}
+	*encoding.SimpleEncoder
 
-	opt = font.MergeOptions(opt, defaultOptionsGlyf)
-
-	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
-		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
-	}
-
-	cmap, err := info.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-
-	res := &fontGlyfSimple{
-		sfnt:        info,
-		cmap:        cmap,
-		gsubLookups: info.Gsub.FindLookups(opt.Language, opt.GsubFeatures),
-		gposLookups: info.Gpos.FindLookups(opt.Language, opt.GposFeatures),
-		Geometry:    geometry,
-	}
-	return res, nil
-}
-
-// Embed implements the [font.Font] interface.
-func (f *fontGlyfSimple) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	err := pdf.CheckVersion(w, "simple OpenType/glyf fonts", pdf.V1_6)
-	if err != nil {
-		return nil, err
-	}
-	var resName pdf.Name
-	if opt != nil {
-		resName = opt.ResName
-	}
-	res := &embeddedGlyfSimple{
-		fontGlyfSimple: f,
-		w:              w,
-		Res:            graphics.Res{Ref: w.Alloc(), DefName: resName},
-		SimpleEncoder:  encoding.NewSimpleEncoder(),
-	}
-	w.AutoClose(res)
-	return res, nil
+	closed bool
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontGlyfSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
+func (f *embeddedGlyfSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
 	res := &font.GlyphSeq{
 		Seq: make([]font.Glyph, len(gg)),
@@ -128,15 +76,6 @@ func (f *fontGlyfSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	return res
 }
 
-type embeddedGlyfSimple struct {
-	*fontGlyfSimple
-	w pdf.Putter
-	graphics.Res
-
-	*encoding.SimpleEncoder
-	closed bool
-}
-
 func (f *embeddedGlyfSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
@@ -149,11 +88,6 @@ func (f *embeddedGlyfSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune)
 	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 	c := f.GIDToCode(gid, rr)
 	return append(s, c), width, c == ' '
-}
-
-func (f *embeddedGlyfSimple) CodeToWidth(c byte) float64 {
-	gid := f.Encoding[c]
-	return float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 }
 
 func (f *embeddedGlyfSimple) Close() error {
@@ -201,7 +135,7 @@ func (f *embeddedGlyfSimple) Close() error {
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfoGlyfSimple is the information needed to embed a simple OpenType/glyf font.

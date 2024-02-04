@@ -30,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
@@ -101,6 +100,14 @@ func (f *Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	}
 	f.NumOpen = -1
 
+	if opt == nil {
+		opt = &font.Options{}
+	}
+
+	if opt.Composite {
+		return nil, fmt.Errorf("Type 3 fonts do not support composite embedding")
+	}
+
 	glyphNames := f.glyphList()
 	cmap := map[rune]glyph.ID{}
 	for gid, name := range glyphNames {
@@ -109,17 +116,13 @@ func (f *Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 		}
 	}
 
-	var defName pdf.Name
-	if opt != nil {
-		defName = opt.ResName
-	}
 	res := &embedded{
 		Font:       f,
 		GlyphNames: glyphNames,
 		w:          w,
-		Res: graphics.Res{
+		Res: font.Res{
 			Ref:     w.Alloc(),
-			DefName: defName,
+			DefName: opt.ResName,
 		},
 		CMap:          cmap,
 		SimpleEncoder: encoding.NewSimpleEncoder(),
@@ -133,7 +136,7 @@ type embedded struct {
 	GlyphNames []string
 
 	w pdf.Putter
-	graphics.Res
+	font.Res
 
 	CMap map[rune]glyph.ID
 	*encoding.SimpleEncoder
@@ -292,7 +295,7 @@ func (f *embedded) Close() error {
 		IsAllCap:   f.IsAllCap,
 		IsSmallCap: f.IsSmallCap,
 	}
-	return info.Embed(f.w, f.Ref)
+	return info.Embed(f.w, f.Ref.(pdf.Reference))
 }
 
 // EmbedInfo contains the information needed to embed a type 3 font into a PDF document.
