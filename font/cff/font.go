@@ -60,13 +60,13 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	if gsubFeatures == nil {
 		gsubFeatures = gtab.GsubDefaultFeatures
 	}
-	gsubLookups := info.Gsub.FindLookups(opt.Language, opt.GsubFeatures)
+	gsubLookups := info.Gsub.FindLookups(opt.Language, gsubFeatures)
 
 	gposFeatures := opt.GposFeatures
 	if gposFeatures == nil {
 		gposFeatures = gtab.GposDefaultFeatures
 	}
-	gposLookups := info.Gpos.FindLookups(opt.Language, opt.GposFeatures)
+	gposLookups := info.Gpos.FindLookups(opt.Language, gposFeatures)
 
 	geometry := &font.Geometry{
 		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),

@@ -17,3 +17,15 @@
 package pdfenc
 
 //go:generate go run ./generate.go
+
+// IsNonSymbolic returns true if all glyphs are in the Adobe Standard Latin
+// character set.
+func IsNonSymbolic(glyphNames []string) bool {
+	// glyphNames := f.MakeGlyphNames()
+	for _, name := range glyphNames {
+		if !IsStandardLatin[name] {
+			return false
+		}
+	}
+	return true
+}

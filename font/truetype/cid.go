@@ -21,8 +21,6 @@ import (
 	"io"
 	"math"
 
-	"golang.org/x/text/language"
-
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
@@ -35,17 +33,10 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
 )
-
-var defaultFontOptions = &font.Options{
-	Language:     language.Und,
-	MakeGIDToCID: cmap.NewGIDToCIDSequential,
-	MakeEncoder:  cmap.NewCIDEncoderIdentity,
-	GsubFeatures: gtab.GsubDefaultFeatures,
-	GposFeatures: gtab.GposDefaultFeatures,
-}
 
 type embeddedComposite struct {
 	w pdf.Putter
@@ -241,7 +232,7 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := !font.IsStandardLatin(ttf)
+	isSymbolic := !pdfenc.IsNonSymbolic(ttf.MakeGlyphNames())
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference

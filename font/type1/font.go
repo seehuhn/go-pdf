@@ -153,7 +153,7 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
 	return res, nil
 }
 
-func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
+func glyphBoxtoPDF(b funit.Rect16, fMat []float64) pdf.Rectangle {
 	bPDF := pdf.Rectangle{
 		LLx: math.Inf(+1),
 		LLy: math.Inf(+1),
@@ -169,7 +169,7 @@ func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
 	for _, c := range corners {
 		xf := float64(c.x)
 		yf := float64(c.y)
-		x, y := M[0]*xf+M[2]*yf+M[4], M[1]*xf+M[3]*yf+M[5]
+		x, y := fMat[0]*xf+fMat[2]*yf+fMat[4], fMat[1]*xf+fMat[3]*yf+fMat[5]
 		bPDF.LLx = min(bPDF.LLx, x)
 		bPDF.LLy = min(bPDF.LLy, y)
 		bPDF.URx = max(bPDF.URx, x)

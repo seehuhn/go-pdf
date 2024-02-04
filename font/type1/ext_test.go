@@ -35,6 +35,9 @@ func TestEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 	metrics, err := many.AFM(goRegular)
+	if err != nil {
+		t.Fatal(err)
+	}
 	F, err := type1.New(t1, metrics)
 	if err != nil {
 		t.Fatal(err)

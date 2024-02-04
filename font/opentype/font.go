@@ -32,10 +32,15 @@ type embedder struct {
 	sfnt *sfnt.Font
 }
 
-// New makes a PDF font from an OpenType/TrueType font.
-// The font can be embedded as a simple font or as a composite font.
-// Consider using [seehuhn.de/go/pdf/font/cff.New] or
-// [seehuhn.de/go/pdf/font/truetype.New] instead.
+// New makes a PDF font from an OpenType/TrueType font. The font can be
+// embedded as a simple font or as a composite font.
+//
+// If the font has CFF outlines, it is often more efficient to embed the CFF
+// glyph data without the OpenType wrapper. Consider using
+// [seehuhn.de/go/pdf/font/cff.New] instead of this function.  If the font has
+// TrueType outlines, it is often more efficient to embed the font as a
+// TrueType font instead of an OpenType font.  Consider using
+// [seehuhn.de/go/pdf/font/truetype.New] instead of this function.
 func New(info *sfnt.Font) (font.Embedder, error) {
 	return embedder{sfnt: info}, nil
 }
@@ -61,20 +66,20 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	if gsubFeatures == nil {
 		gsubFeatures = gtab.GsubDefaultFeatures
 	}
-	gsubLookups := info.Gsub.FindLookups(opt.Language, opt.GsubFeatures)
+	gsubLookups := info.Gsub.FindLookups(opt.Language, gsubFeatures)
 
 	gposFeatures := opt.GposFeatures
 	if gposFeatures == nil {
 		gposFeatures = gtab.GposDefaultFeatures
 	}
-	gposLookups := info.Gpos.FindLookups(opt.Language, opt.GposFeatures)
+	gposLookups := info.Gpos.FindLookups(opt.Language, gposFeatures)
 
 	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
 
 	var res font.Layouter
 	if f.sfnt.IsCFF() {
 		geometry := &font.Geometry{
-			GlyphExtents: scaleBBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
+			GlyphExtents: scaleBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
 			Widths:       info.WidthsPDF(),
 
 			Ascent:             float64(info.Ascent) * info.FontMatrix[3],
@@ -124,7 +129,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 		}
 	} else { // glyf outlines
 		geometry := &font.Geometry{
-			GlyphExtents: scaleBBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
+			GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
 			Widths:       info.WidthsPDF(),
 
 			Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
@@ -179,7 +184,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	return res, nil
 }
 
-func scaleBBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {
+func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {
 	res := make([]pdf.Rectangle, len(bboxes))
 	for i, b := range bboxes {
 		res[i] = pdf.Rectangle{
@@ -192,7 +197,7 @@ func scaleBBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {
 	return res
 }
 
-func scaleBBoxesCFF(bboxes []funit.Rect16, M []float64) []pdf.Rectangle {
+func scaleBoxesCFF(bboxes []funit.Rect16, M []float64) []pdf.Rectangle {
 	res := make([]pdf.Rectangle, len(bboxes))
 	for i, b := range bboxes {
 		bPDF := pdf.Rectangle{

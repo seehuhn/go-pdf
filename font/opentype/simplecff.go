@@ -34,6 +34,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
 )
@@ -318,7 +319,7 @@ func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 		fontDict["ToUnicode"] = toUnicodeRef
 	}
 
-	isSymbolic := !font.IsStandardLatin(sfnt)
+	isSymbolic := !pdfenc.IsNonSymbolic(sfnt.MakeGlyphNames())
 
 	fd := &font.Descriptor{
 		FontName:     fontName,

@@ -22,11 +22,10 @@ import (
 	"os"
 	"unicode"
 
-	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/composite"
+	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
@@ -78,7 +77,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	theFont, err := composite.EmbedOld(doc.Out, tt, "X", language.Und)
+	opt := &font.Options{
+		Composite: true,
+		ResName:   "X",
+	}
+	theFont, err := embed.OpenTypeFont(doc.Out, tt, opt)
 	if err != nil {
 		log.Fatal(err)
 	}

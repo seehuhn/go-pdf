@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
 )
@@ -233,7 +234,7 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := !font.IsStandardLatin(otf)
+	isSymbolic := !pdfenc.IsNonSymbolic(otf.MakeGlyphNames())
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
@@ -365,6 +366,9 @@ func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfCompos
 	res := &EmbedInfoGlyfComposite{}
 
 	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
+	if err != nil {
+		return nil, err
+	}
 	stmData, err := pdf.DecodeStream(r, stmObj, 0)
 	if err != nil {
 		return nil, err

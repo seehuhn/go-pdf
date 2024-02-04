@@ -33,7 +33,6 @@ type Options struct {
 	// Composite specifies whether to embed the font as a composite font.
 	Composite bool
 
-	// TODO(voss): get rid of the generator functions
 	MakeGIDToCID func() cmap.GIDToCID                // only used for composite fonts
 	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder // only used for composite fonts
 

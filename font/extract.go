@@ -236,20 +236,3 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 
 	return res, nil
 }
-
-var isBuiltinFont = map[pdf.Name]bool{
-	"Courier":               true,
-	"Courier-Bold":          true,
-	"Courier-BoldOblique":   true,
-	"Courier-Oblique":       true,
-	"Helvetica":             true,
-	"Helvetica-Bold":        true,
-	"Helvetica-BoldOblique": true,
-	"Helvetica-Oblique":     true,
-	"Times-Roman":           true,
-	"Times-Bold":            true,
-	"Times-BoldItalic":      true,
-	"Times-Italic":          true,
-	"Symbol":                true,
-	"ZapfDingbats":          true,
-}

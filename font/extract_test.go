@@ -202,7 +202,7 @@ func extractFont(r pdf.Getter, fontDict pdf.Object) (embedder, error) {
 	case font.Type3:
 		return type3.Extract(r, dicts)
 	default:
-		panic("unknown font type (unreachable)")
+		panic("unreachable") // unknown font type
 	}
 }
 

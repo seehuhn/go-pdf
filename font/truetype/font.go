@@ -59,18 +59,18 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	if gsubFeatures == nil {
 		gsubFeatures = gtab.GsubDefaultFeatures
 	}
-	gsubLookups := info.Gsub.FindLookups(opt.Language, opt.GsubFeatures)
+	gsubLookups := info.Gsub.FindLookups(opt.Language, gsubFeatures)
 
 	gposFeatures := opt.GposFeatures
 	if gposFeatures == nil {
 		gposFeatures = gtab.GposDefaultFeatures
 	}
-	gposLookups := info.Gpos.FindLookups(opt.Language, opt.GposFeatures)
+	gposLookups := info.Gpos.FindLookups(opt.Language, gposFeatures)
 
 	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
 
 	geometry := &font.Geometry{
-		GlyphExtents: scaleBboxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
+		GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
 		Widths:       info.WidthsPDF(),
 
 		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
@@ -135,7 +135,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	return res, nil
 }
 
-func scaleBboxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {
+func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {
 	res := make([]pdf.Rectangle, len(bboxes))
 	for i, b := range bboxes {
 		res[i] = pdf.Rectangle{

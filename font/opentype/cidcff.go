@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
 )
@@ -284,7 +285,8 @@ func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference
 		URy: bbox.URy.AsFloat(q),
 	}
 
-	isSymbolic := !font.IsStandardLatin(sfnt)
+	// isSymbolic := !font.IsNonSymbolic(sfnt)
+	isSymbolic := !pdfenc.IsNonSymbolic(sfnt.MakeGlyphNames())
 
 	cidFontRef := w.Alloc()
 	var toUnicodeRef pdf.Reference
