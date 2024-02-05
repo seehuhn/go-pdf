@@ -29,11 +29,8 @@ import (
 	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/internal/testfont"
 )
 
 func main() {
@@ -104,109 +101,42 @@ func doit() error {
 		case "Simple PDF Fonts":
 			// part 1
 		case "Type 1 Fonts":
-			t1, err := many.Type1(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			// TODO(voss): implement and use gofont.AFM()
-			X, err = type1.New(t1, nil)
-			if err != nil {
-				return err
-			}
+			X = testfont.Type1
 			ffKey = "FontFile"
 		case "Builtin Fonts":
 			X = type1.Helvetica
 		case "Simple CFF Fonts":
-			otf, err := many.OpenType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = cff.New(otf)
-			if err != nil {
-				return err
-			}
+			X = testfont.CFF
 			ffKey = "FontFile3"
 		case "Simple CFF-based OpenType Fonts":
-			otf, err := many.OpenType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = opentype.New(otf)
-			if err != nil {
-				return err
-			}
+			X = testfont.OpenTypeCFF
 			ffKey = "FontFile3"
 		case "Multiple Master Fonts":
 			// not supported
 		case "Simple TrueType Fonts":
-			ttf, err := many.TrueType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = truetype.New(ttf)
-			if err != nil {
-				return err
-			}
+			X = testfont.TrueType
 			ffKey = "FontFile2"
 		case "Simple Glyf-based OpenType Fonts":
-			otf, err := many.TrueType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = opentype.New(otf)
-			if err != nil {
-				return err
-			}
+			X = testfont.OpenTypeGlyf
 			ffKey = "FontFile3"
 		case "Type 3 Fonts":
-			X, err = many.Type3(many.GoRegular)
-			if err != nil {
-				return err
-			}
+			X = testfont.Type3
 		case "Composite PDF Fonts":
 			// part 2
 		case "Composite CFF Fonts":
-			otf, err := many.OpenType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = cff.New(otf)
-			if err != nil {
-				return err
-			}
+			X = testfont.CFF
 			ffKey = "FontFile3"
 			composite = true
 		case "Composite CFF-based OpenType Fonts":
-			otf, err := many.OpenType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = opentype.New(otf)
-			if err != nil {
-				return err
-			}
+			X = testfont.OpenTypeCFF
 			ffKey = "FontFile3"
 			composite = true
 		case "Composite TrueType Fonts":
-			ttf, err := many.TrueType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = truetype.New(ttf)
-			if err != nil {
-				return err
-			}
+			X = testfont.TrueType
 			ffKey = "FontFile2"
 			composite = true
 		case "Composite Glyf-based OpenType Fonts":
-			otf, err := many.TrueType(many.GoRegular)
-			if err != nil {
-				return err
-			}
-			X, err = opentype.New(otf)
-			if err != nil {
-				return err
-			}
+			X = testfont.OpenTypeGlyf
 			ffKey = "FontFile3"
 			composite = true
 		default:

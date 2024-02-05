@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cff
+package cff_test
 
 import (
 	"testing"
@@ -22,17 +22,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/internal/testfont"
 	"seehuhn.de/go/postscript/cid"
 )
 
 func TestRoundTripComposite(t *testing.T) {
-	otf, err := many.OpenType(many.GoRegular)
-	if err != nil {
-		t.Fatal(err)
-	}
+	otf := testfont.MakeCFFFont()
 	cs := charcode.CodeSpaceRange{
 		{Low: []byte{0x04}, High: []byte{0x07}},
 		{Low: []byte{0x10, 0x12}, High: []byte{0x11, 0x13}},
@@ -52,7 +50,7 @@ func TestRoundTripComposite(t *testing.T) {
 		m[code] = []rune{'X', '0' + rune(code)}
 	}
 	toUnicode := cmap.NewToUnicode(cs, m)
-	info := &EmbedInfoComposite{
+	info := &cff.EmbedInfoComposite{
 		Font:       otf.AsCFF(),
 		SubsetTag:  "ABCDEF",
 		CMap:       cmapInfo,
@@ -67,7 +65,7 @@ func TestRoundTripComposite(t *testing.T) {
 
 	rw := pdf.NewData(pdf.V1_7)
 	ref := rw.Alloc()
-	err = info.Embed(rw, ref)
+	err := info.Embed(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +74,7 @@ func TestRoundTripComposite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractComposite(rw, dicts)
+	info2, err := cff.ExtractComposite(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,5 +92,3 @@ func TestRoundTripComposite(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
-
-var _ font.Embedded = (*embeddedComposite)(nil)

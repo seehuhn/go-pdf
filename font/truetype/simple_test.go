@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package truetype_test
 
 import (
 	"math"
@@ -25,16 +25,14 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/internal/testfont"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripSimple(t *testing.T) {
-	ttf, err := many.TrueType(many.GoItalic)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ttf := testfont.MakeGlyfFont()
 
 	cmapInfo, err := ttf.CMapTable.GetBest()
 	if err != nil {
@@ -51,7 +49,7 @@ func TestRoundTripSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &EmbedInfoSimple{
+	info1 := &truetype.EmbedInfoSimple{
 		Font:       ttf,
 		SubsetTag:  "ABCXYZ",
 		Encoding:   encoding,
@@ -71,7 +69,7 @@ func TestRoundTripSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractSimple(rw, dicts)
+	info2, err := truetype.ExtractSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +91,7 @@ func TestRoundTripSimple(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*EmbedInfoSimple{info1, info2} {
+	for _, info := range []*truetype.EmbedInfoSimple{info1, info2} {
 		info.Encoding = nil       // already compared above
 		info.Font.CMapTable = nil // already tested when comparing the encodings
 
@@ -121,5 +119,3 @@ func TestRoundTripSimple(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
-
-var _ font.Embedded = (*embeddedSimple)(nil)

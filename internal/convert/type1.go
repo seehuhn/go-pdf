@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,51 +14,35 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package many
+package convert
 
 import (
-	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/psenc"
+	"seehuhn.de/go/postscript/type1"
+
+	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// Type3 returns `font` as a Type3 font.
-func Type3(font FontID) (*type3.Font, error) {
-	info, err := TrueType(font)
-	if err != nil {
-		return nil, err
-	}
+func ToType1(info *sfnt.Font) (*type1.Font, error) {
+	// TODO(voss): base this on ToCFF()
+
+	info = clone(info)
 	info.EnsureGlyphNames()
 
-	res := type3.New(info.UnitsPerEm)
+	newOutlines := make(map[string]*type1.Glyph)
 
-	res.Ascent = info.Ascent
-	res.Descent = info.Descent
-	res.BaseLineSkip = info.Ascent - info.Descent + info.LineGap
-	res.ItalicAngle = info.ItalicAngle
-	res.IsFixedPitch = info.IsFixedPitch()
-	res.IsSerif = info.IsSerif
-	res.IsScript = info.IsScript
-
-	// convert glypf outlines to type 3 outlines
+	// convert glypf outlines to type1 outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)
 	for i, origGlyph := range origOutlines.Glyphs {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
-		if name == ".notdef" {
-			continue
+		newGlyph := &type1.Glyph{
+			WidthX: info.GlyphWidth(gid),
 		}
-
-		var bbox funit.Rect16
-		if origGlyph != nil {
-			bbox = origGlyph.Rect16
-		}
-		newGlyph, err := res.AddGlyph(name, info.GlyphWidth(gid), bbox, true)
-		if err != nil {
-			return nil, err
-		}
-
 		if origGlyph == nil {
 			goto done
 		}
@@ -129,16 +113,112 @@ func Type3(font FontID) (*type3.Font, error) {
 
 				newGlyph.ClosePath()
 			}
-			newGlyph.Fill()
 		case glyf.CompositeGlyph:
 			panic("not implemented")
 		}
 
 	done:
-		err = newGlyph.Close()
-		if err != nil {
-			return nil, err
+		newOutlines[name] = newGlyph
+	}
+
+	encoding := make([]string, 256)
+	for i := 0; i < 256; i++ {
+		name := psenc.StandardEncoding[i]
+		if _, ok := newOutlines[name]; ok {
+			encoding[i] = name
+		} else {
+			encoding[i] = ".notdef"
 		}
+	}
+
+	cmap, err := info.CMapTable.GetBest()
+	if err != nil {
+		panic("unreachable")
+	}
+
+	var topMin, topMax funit.Int16
+	var bottomMin, bottomMax funit.Int16
+	for c := 'A'; c <= 'Z'; c++ {
+		gid := cmap.Lookup(c)
+
+		ext := info.GlyphBBox(gid)
+		top := ext.URy
+		if c == 'A' || top < topMin {
+			topMin = top
+		}
+		if c == 'A' || top > topMax {
+			topMax = top
+		}
+
+		if c == 'Q' {
+			continue
+		}
+		bottom := ext.LLy
+		if c == 'A' || bottom < bottomMin {
+			bottomMin = bottom
+		}
+		if c == 'A' || bottom > bottomMax {
+			bottomMax = bottom
+		}
+	}
+
+	Private := &type1.PrivateDict{
+		BlueValues: []funit.Int16{
+			bottomMin, bottomMax, topMin, topMax,
+		},
+	}
+
+	res := &type1.Font{
+		FontInfo:     info.GetFontInfo(),
+		Glyphs:       newOutlines,
+		Private:      Private,
+		Encoding:     encoding,
+		CreationDate: info.CreationTime,
+	}
+
+	return res, nil
+}
+
+func ToAFM(info *sfnt.Font) (*afm.Info, error) {
+	info = clone(info)
+	info.EnsureGlyphNames()
+
+	n := info.NumGlyphs()
+	newInfo := make(map[string]*afm.GlyphInfo, n)
+	for i := 0; i < n; i++ {
+		gid := glyph.ID(i)
+		name := info.GlyphName(gid)
+		newInfo[name] = &afm.GlyphInfo{
+			WidthX: info.GlyphWidth(gid),
+			BBox:   info.GlyphBBox(gid),
+			// TODO(voss): ligatures
+		}
+	}
+
+	encoding := make([]string, 256)
+	for i := 0; i < 256; i++ {
+		name := psenc.StandardEncoding[i]
+		if _, ok := newInfo[name]; ok {
+			encoding[i] = name
+		} else {
+			encoding[i] = ".notdef"
+		}
+	}
+
+	res := &afm.Info{
+		Glyphs:             newInfo,
+		Encoding:           encoding,
+		FontName:           info.PostScriptName(),
+		FullName:           info.FullName(),
+		CapHeight:          info.CapHeight,
+		XHeight:            info.XHeight,
+		Ascent:             info.Ascent,
+		Descent:            info.Descent,
+		UnderlinePosition:  info.UnderlinePosition,
+		UnderlineThickness: info.UnderlineThickness,
+		ItalicAngle:        info.ItalicAngle,
+		IsFixedPitch:       info.IsFixedPitch(),
+		// TODO(voss): kerning
 	}
 
 	return res, nil

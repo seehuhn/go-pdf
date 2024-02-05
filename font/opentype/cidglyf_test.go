@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package opentype
+package opentype_test
 
 import (
 	"testing"
@@ -24,17 +24,15 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/internal/testfont"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripGlyfComposite(t *testing.T) {
-	ttf, err := many.TrueType(many.GoSmallcapsItalic)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ttf := testfont.MakeGlyfFont()
 	cs := charcode.UCS2
 	ros := &cid.SystemInfo{
 		Registry:   "Test",
@@ -65,7 +63,7 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		CID2GID[cid] = glyph.ID(cid)
 	}
 
-	info1 := &EmbedInfoGlyfComposite{
+	info1 := &opentype.EmbedInfoGlyfComposite{
 		Font:       ttf,
 		SubsetTag:  "ZZZZZZ",
 		CMap:       cmapInfo,
@@ -85,12 +83,12 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractGlyfComposite(rw, dicts)
+	info2, err := opentype.ExtractGlyfComposite(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, info := range []*EmbedInfoGlyfComposite{info1, info2} {
+	for _, info := range []*opentype.EmbedInfoGlyfComposite{info1, info2} {
 		info.Font.CMapTable = nil // "cmap" table is optional
 
 		info.Font.FamilyName = ""        // "name" table is optional
@@ -115,5 +113,3 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
-
-var _ font.Embedded = (*embeddedGlyfComposite)(nil)

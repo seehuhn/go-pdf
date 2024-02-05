@@ -20,22 +20,26 @@ import (
 	"errors"
 	"math"
 
+	"seehuhn.de/go/postscript/funit"
+
+	"seehuhn.de/go/sfnt"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/opentype/gtab"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 )
 
 type embedder struct {
 	sfnt *sfnt.Font
 }
 
-// New makes a PDF CFF font from a sfnt.Font.
+// New turns a sfnt.Font into a PDF CFF font.
 // The font info must be an OpenType font with CFF outlines.
-// The font can be embedded as a simple font or as a composite font.
+// The font can be embedded as a simple font or as a composite font,
+// depending on the options used in the Embed method.
 func New(info *sfnt.Font) (font.Embedder, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("no CFF outlines in font")
@@ -44,12 +48,26 @@ func New(info *sfnt.Font) (font.Embedder, error) {
 	return embedder{sfnt: info}, nil
 }
 
+// Embed implements the [font.Embedder] interface.
 func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	if opt == nil {
 		opt = &font.Options{}
 	}
 
 	info := f.sfnt
+
+	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
+
+	geometry := &font.Geometry{
+		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
+		Descent:            float64(info.Descent) * info.FontMatrix[3],
+		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
+		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
+		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
+
+		GlyphExtents: scaleBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
+		Widths:       info.WidthsPDF(),
+	}
 
 	fontCmap, err := info.CMapTable.GetBest()
 	if err != nil {
@@ -68,38 +86,19 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	}
 	gposLookups := info.Gpos.FindLookups(opt.Language, gposFeatures)
 
-	geometry := &font.Geometry{
-		GlyphExtents: bboxesToPDF(info.GlyphBBoxes(), info.FontMatrix[:]),
-		Widths:       info.WidthsPDF(),
+	e := embedded{
+		w:        w,
+		Res:      resource,
+		Geometry: geometry,
 
-		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
-		Descent:            float64(info.Descent) * info.FontMatrix[3],
-		BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
-		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
-		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
+		sfnt:        info,
+		cmap:        fontCmap,
+		gsubLookups: gsubLookups,
+		gposLookups: gposLookups,
 	}
 
-	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
-
 	var res font.Layouter
-	if !opt.Composite {
-		err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
-		if err != nil {
-			return nil, err
-		}
-		res = &embeddedSimple{
-			w:        w,
-			Res:      resource,
-			Geometry: geometry,
-
-			sfnt:        info,
-			cmap:        fontCmap,
-			gsubLookups: gsubLookups,
-			gposLookups: gposLookups,
-
-			SimpleEncoder: encoding.NewSimpleEncoder(),
-		}
-	} else {
+	if opt.Composite {
 		err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 		if err != nil {
 			return nil, err
@@ -120,17 +119,18 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 		}
 
 		res = &embeddedComposite{
-			w:        w,
-			Res:      resource,
-			Geometry: geometry,
-
-			sfnt:        info,
-			cmap:        fontCmap,
-			gsubLookups: gsubLookups,
-			gposLookups: gposLookups,
-
+			embedded:   e,
 			GIDToCID:   gidToCID,
 			CIDEncoder: cidEncoder,
+		}
+	} else {
+		err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
+		if err != nil {
+			return nil, err
+		}
+		res = &embeddedSimple{
+			embedded:      e,
+			SimpleEncoder: encoding.NewSimpleEncoder(),
 		}
 	}
 	w.AutoClose(res)
@@ -138,7 +138,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	return res, nil
 }
 
-func bboxesToPDF(bboxes []funit.Rect16, M []float64) []pdf.Rectangle {
+func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []pdf.Rectangle {
 	res := make([]pdf.Rectangle, len(bboxes))
 	for i, b := range bboxes {
 		bPDF := pdf.Rectangle{
@@ -156,13 +156,49 @@ func bboxesToPDF(bboxes []funit.Rect16, M []float64) []pdf.Rectangle {
 		for _, c := range corners {
 			xf := float64(c.x)
 			yf := float64(c.y)
-			x, y := M[0]*xf+M[2]*yf+M[4], M[1]*xf+M[3]*yf+M[5]
+			x, y := fMat[0]*xf+fMat[2]*yf+fMat[4], fMat[1]*xf+fMat[3]*yf+fMat[5]
 			bPDF.LLx = min(bPDF.LLx, x)
 			bPDF.LLy = min(bPDF.LLy, y)
 			bPDF.URx = max(bPDF.URx, x)
 			bPDF.URy = max(bPDF.URy, y)
 		}
 		res[i] = bPDF
+	}
+	return res
+}
+
+type embedded struct {
+	w pdf.Putter
+	font.Res
+	*font.Geometry
+
+	sfnt        *sfnt.Font
+	cmap        sfntcmap.Subtable
+	gsubLookups []gtab.LookupIndex
+	gposLookups []gtab.LookupIndex
+
+	closed bool
+}
+
+// Layout implements the [font.Layouter] interface.
+func (f *embedded) Layout(ptSize float64, s string) *font.GlyphSeq {
+	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	res := &font.GlyphSeq{
+		Seq: make([]font.Glyph, len(gg)),
+	}
+	for i, g := range gg {
+		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
+		if i == 0 {
+			res.Skip += xOffset
+		} else {
+			res.Seq[i-1].Advance += xOffset
+		}
+		res.Seq[i] = font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * ptSize * f.sfnt.FontMatrix[0],
+			Rise:    float64(g.YOffset) * ptSize * f.sfnt.FontMatrix[3],
+			Text:    g.Text,
+		}
 	}
 	return res
 }

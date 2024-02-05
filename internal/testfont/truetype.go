@@ -14,28 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package many
+package testfont
 
 import (
-	"bytes"
-
-	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/truetype"
 )
 
-// TrueType returns `font` as a TrueType font.
-func TrueType(font FontID) (*sfnt.Font, error) {
-	raw, ok := ttf[font]
-	if !ok {
-		return nil, ErrInvalidFontID
-	}
-	r := bytes.NewReader(raw)
+type trueTypeEmbedder struct{}
 
-	info, err := sfnt.Read(r)
+// TrueType is a TrueType font.
+var TrueType font.Embedder = trueTypeEmbedder{}
+
+func (trueTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+	info := MakeGlyfFont()
+
+	F, err := truetype.New(info)
 	if err != nil {
 		return nil, err
 	}
-	if !info.IsGlyf() {
-		panic("not a TrueType font")
-	}
-	return info, nil
+	return F.Embed(w, opt)
 }

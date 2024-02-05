@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cff
+package cff_test
 
 import (
 	"testing"
@@ -25,16 +25,14 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/internal/testfont"
 )
 
 func TestRoundTripSimple(t *testing.T) {
-	otf, err := many.OpenType(many.GoRegular)
-	if err != nil {
-		t.Fatal(err)
-	}
+	otf := testfont.MakeCFFFont()
 
 	cmapInfo, err := otf.CMapTable.GetBest()
 	if err != nil {
@@ -51,7 +49,7 @@ func TestRoundTripSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &EmbedInfoSimple{
+	info1 := &cff.EmbedInfoSimple{
 		Font:      otf.AsCFF(),
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -74,7 +72,7 @@ func TestRoundTripSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractSimple(rw, dicts)
+	info2, err := cff.ExtractSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +87,7 @@ func TestRoundTripSimple(t *testing.T) {
 		}
 	}
 
-	for _, info := range []*EmbedInfoSimple{info1, info2} {
+	for _, info := range []*cff.EmbedInfoSimple{info1, info2} {
 		info.Encoding = nil // already compared above
 
 		// TODO(voss): reenable this once https://github.com/google/go-cmp/issues/335 is resolved
@@ -100,5 +98,3 @@ func TestRoundTripSimple(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
-
-var _ font.Embedded = (*embeddedSimple)(nil)

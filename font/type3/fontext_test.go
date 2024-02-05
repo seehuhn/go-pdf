@@ -25,11 +25,11 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/internal/testfont"
 )
 
 func TestRoundTrip(t *testing.T) {
-	t3, err := many.Type3(many.GoItalic)
+	t3, err := testfont.MakeType3()
 	if err != nil {
 		t.Fatal(err)
 	}

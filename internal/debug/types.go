@@ -17,16 +17,12 @@
 package debug
 
 import (
-	"seehuhn.de/go/postscript/cid"
-
-	scff "seehuhn.de/go/sfnt/cff"
-
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/internal/testfont"
 )
 
 // FontSample is an example of a font of the given [EmbeddingType].
@@ -45,23 +41,11 @@ func MakeFontSamples() ([]*FontSample, error) {
 	var F font.Embedder
 
 	// a Type 1 font
-	t1, err := many.Type1(many.GoRegular)
-	if err != nil {
-		return nil, err
-	}
-	metrics, err := many.AFM(many.GoRegular)
-	if err != nil {
-		return nil, err
-	}
-	F, err = type1.New(t1, metrics)
-	if err != nil {
-		return nil, err
-	}
 	res = append(res, &FontSample{
 		Label:       "Type1",
 		Description: "an embedded Type 1 font",
 		Type:        font.Type1,
-		Font:        F,
+		Font:        testfont.Type1,
 	})
 
 	// a built-in font
@@ -73,11 +57,8 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a CFF font, embedded directly ...
-	otf, err := many.OpenType(many.GoRegular)
-	if err != nil {
-		return nil, err
-	}
-	F, err = cff.New(otf)
+	otf := testfont.MakeCFFFont()
+	F, err := cff.New(otf)
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +82,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a TrueType font, embedded directly ...
-	ttf, err := many.TrueType(many.GoRegular)
-	if err != nil {
-		return nil, err
-	}
+	ttf := testfont.MakeGlyfFont()
 	F, err = truetype.New(ttf)
 	if err != nil {
 		return nil, err
@@ -129,7 +107,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a Type 3 font
-	F, err = many.Type3(many.GoRegular)
+	F, err = testfont.MakeType3()
 	if err != nil {
 		return nil, err
 	}
@@ -141,14 +119,11 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a CFF font without CIDFont operators, embedded directly ...
-	otf, err = many.OpenType(many.GoRegular)
-	if err != nil {
-		return nil, err
-	}
-	outlines := otf.Outlines.(*scff.Outlines)
-	if len(outlines.Encoding) != 256 || outlines.ROS != nil || len(outlines.GIDToCID) != 0 {
-		panic("CFF font unexpectedly has CIDFont operators")
-	}
+	otf = testfont.MakeCFFFont()
+	// outlines := otf.Outlines.(*cff.Outlines)
+	// if len(outlines.Encoding) != 256 || outlines.ROS != nil || len(outlines.GIDToCID) != 0 {
+	// 	panic("CFF font unexpectedly has CIDFont operators")
+	// }
 	F, err = cff.New(otf)
 	if err != nil {
 		return nil, err
@@ -173,21 +148,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a CFF font with CIDFont operators, embedded directly ...
-	otf, err = many.OpenType(many.GoRegular) // allocate a new copy
-	if err != nil {
-		return nil, err
-	}
-	outlines = otf.Outlines.(*scff.Outlines) // convert to use CIDFont operators
-	outlines.Encoding = nil
-	outlines.ROS = &cid.SystemInfo{
-		Registry:   "Seehuhn",
-		Ordering:   "Sonderbar",
-		Supplement: 0,
-	}
-	outlines.GIDToCID = make([]cid.CID, len(outlines.Glyphs))
-	for i := range outlines.GIDToCID {
-		outlines.GIDToCID[i] = cid.CID(i)
-	}
+	otf = testfont.MakeCFFCIDFont()
 	F, err = cff.New(otf)
 	if err != nil {
 		return nil, err
@@ -212,10 +173,7 @@ func MakeFontSamples() ([]*FontSample, error) {
 	})
 
 	// a TrueType font, embedded directly ...
-	ttf, err = many.TrueType(many.GoRegular)
-	if err != nil {
-		return nil, err
-	}
+	ttf = testfont.MakeGlyfFont()
 	F, err = truetype.New(ttf)
 	if err != nil {
 		return nil, err

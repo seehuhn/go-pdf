@@ -171,7 +171,7 @@ func (p *Writer) FillAndStroke() {
 }
 
 // EndPath ends the path without filling and stroking it.
-// This is for use after the [Page.ClipNonZero] and [Page.ClipEvenOdd] methods.
+// This is for use after the [Writer.ClipNonZero] and [Writer.ClipEvenOdd] methods.
 func (p *Writer) EndPath() {
 	if !p.isValid("EndPath", objPath|objClippingPath) {
 		return

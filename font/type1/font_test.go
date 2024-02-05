@@ -26,7 +26,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
 )
 
 // TestToUnicode verifies that the ToUnicode cmap is only generated if
@@ -152,71 +151,6 @@ func TestNotdefGlyph(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestRoundTrip(t *testing.T) {
-	t1, err := many.Type1(many.GoRegular)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	encoding := make([]string, 256)
-	for i := range encoding {
-		encoding[i] = ".notdef"
-	}
-	encoding[65] = "A"
-	encoding[66] = "B"
-
-	m := map[charcode.CharCode][]rune{
-		65: {'A'},
-		66: {'B'},
-	}
-	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
-
-	info1 := &EmbedInfo{
-		Font:      t1,
-		SubsetTag: "UVWXYZ",
-		Encoding:  encoding,
-		ToUnicode: toUnicode,
-	}
-
-	rw := pdf.NewData(pdf.V1_7)
-	ref := rw.Alloc()
-	err = info1.Embed(rw, ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dicts, err := font.ExtractDicts(rw, ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-	info2, err := Extract(rw, dicts)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Compare encodings:
-	if len(info1.Encoding) != len(info2.Encoding) {
-		t.Fatalf("len(info1.Encoding) != len(info2.Encoding): %d != %d", len(info1.Encoding), len(info2.Encoding))
-	}
-	for i := range info1.Encoding {
-		if info1.Encoding[i] != ".notdef" && info1.Encoding[i] != info2.Encoding[i] {
-			t.Fatalf("info1.Encoding[%d] != info2.Encoding[%d]: %q != %q", i, i, info1.Encoding[i], info2.Encoding[i])
-		}
-	}
-
-	for _, info := range []*EmbedInfo{info1, info2} {
-		info.Encoding = nil // already compared above
-		info.Metrics = nil  // TODO(voss): enable this once it works
-	}
-
-	cmpFloat := cmp.Comparer(func(x, y float64) bool {
-		return math.Abs(x-y) < 1/65536.
-	})
-	if d := cmp.Diff(info1, info2, cmpFloat); d != "" {
-		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
 

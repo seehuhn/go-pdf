@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package truetype
+package truetype_test
 
 import (
 	"testing"
@@ -24,17 +24,15 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/internal/testfont"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripComposite(t *testing.T) {
-	ttf, err := many.TrueType(many.GoMonoBoldItalic)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ttf := testfont.MakeGlyfFont()
 
 	cs := charcode.CodeSpaceRange{
 		{Low: []byte{0x04}, High: []byte{0x07}},
@@ -56,7 +54,7 @@ func TestRoundTripComposite(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(cs, m)
 
-	info1 := &EmbedInfoComposite{
+	info1 := &truetype.EmbedInfoComposite{
 		Font:      ttf,
 		SubsetTag: "AAAAAA",
 		CMap:      cmapInfo,
@@ -67,7 +65,7 @@ func TestRoundTripComposite(t *testing.T) {
 
 	rw := pdf.NewData(pdf.V1_7)
 	ref := rw.Alloc()
-	err = info1.Embed(rw, ref)
+	err := info1.Embed(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,12 +74,12 @@ func TestRoundTripComposite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractComposite(rw, dicts)
+	info2, err := truetype.ExtractComposite(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, info := range []*EmbedInfoComposite{info1, info2} {
+	for _, info := range []*truetype.EmbedInfoComposite{info1, info2} {
 		info.Font.CMapTable = nil // "cmap" table is optional
 
 		info.Font.FamilyName = ""        // "name" table is optional
@@ -106,5 +104,3 @@ func TestRoundTripComposite(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
-
-var _ font.Embedded = (*embeddedComposite)(nil)

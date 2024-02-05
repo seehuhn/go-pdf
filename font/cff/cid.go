@@ -25,11 +25,8 @@ import (
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
-	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
-	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -39,42 +36,10 @@ import (
 )
 
 type embeddedComposite struct {
-	w pdf.Putter
-	font.Res
-	*font.Geometry
-
-	sfnt        *sfnt.Font
-	cmap        sfntcmap.Subtable
-	gsubLookups []gtab.LookupIndex
-	gposLookups []gtab.LookupIndex
+	embedded
 
 	cmap.GIDToCID
 	cmap.CIDEncoder
-
-	closed bool
-}
-
-// Layout implements the [font.Layouter] interface.
-func (f *embeddedComposite) Layout(ptSize float64, s string) *font.GlyphSeq {
-	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
-	res := &font.GlyphSeq{
-		Seq: make([]font.Glyph, len(gg)),
-	}
-	for i, g := range gg {
-		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
-		if i == 0 {
-			res.Skip += xOffset
-		} else {
-			res.Seq[i-1].Advance += xOffset
-		}
-		res.Seq[i] = font.Glyph{
-			GID:     g.GID,
-			Advance: float64(g.Advance) * ptSize * f.sfnt.FontMatrix[0],
-			Rise:    float64(g.YOffset) * ptSize * f.sfnt.FontMatrix[3],
-			Text:    g.Text,
-		}
-	}
-	return res
 }
 
 func (f *embeddedComposite) WritingMode() int {

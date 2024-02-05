@@ -27,9 +27,9 @@ import (
 )
 
 // Page represents a page in a PDF document.
-// The contents of the page can be drawn using the [graphics.Page] methods.
+// The contents of the page can be drawn using the [graphics.Writer] methods.
 type Page struct {
-	// Page is used to draw the contents of the page.
+	// Writer is used to draw the contents of the page.
 	*graphics.Writer
 
 	// PageDict is the PDF dictionary for this page.

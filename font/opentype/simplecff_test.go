@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package opentype
+package opentype_test
 
 import (
 	"math"
@@ -26,15 +26,13 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/internal/testfont"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripCFFSimple(t *testing.T) {
-	otf, err := many.OpenType(many.GoItalic)
-	if err != nil {
-		t.Fatal(err)
-	}
+	otf := testfont.MakeCFFFont()
 
 	cmapInfo, err := otf.CMapTable.GetBest()
 	if err != nil {
@@ -51,7 +49,7 @@ func TestRoundTripCFFSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &EmbedInfoCFFSimple{
+	info1 := &opentype.EmbedInfoCFFSimple{
 		Font:      otf,
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -69,7 +67,7 @@ func TestRoundTripCFFSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractCFFSimple(rw, dicts)
+	info2, err := opentype.ExtractCFFSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +95,7 @@ func TestRoundTripCFFSimple(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*EmbedInfoCFFSimple{info1, info2} {
+	for _, info := range []*opentype.EmbedInfoCFFSimple{info1, info2} {
 		info.Encoding = nil // already compared above
 
 		info.Font.Ascent = 0    // already compared above
@@ -125,5 +123,3 @@ func TestRoundTripCFFSimple(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
-
-var _ font.Embedded = (*embeddedCFFSimple)(nil)

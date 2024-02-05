@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package opentype
+package opentype_test
 
 import (
 	"math"
@@ -25,16 +25,14 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/many"
+	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/internal/testfont"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripGlyfSimple(t *testing.T) {
-	otf, err := many.TrueType(many.GoItalic)
-	if err != nil {
-		t.Fatal(err)
-	}
+	otf := testfont.MakeGlyfFont()
 
 	cmapInfo, err := otf.CMapTable.GetBest()
 	if err != nil {
@@ -51,7 +49,7 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &EmbedInfoGlyfSimple{
+	info1 := &opentype.EmbedInfoGlyfSimple{
 		Font:      otf,
 		SubsetTag: "ABCXYZ",
 		Encoding:  encoding,
@@ -70,7 +68,7 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := ExtractGlyfSimple(rw, dicts)
+	info2, err := opentype.ExtractGlyfSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +90,7 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*EmbedInfoGlyfSimple{info1, info2} {
+	for _, info := range []*opentype.EmbedInfoGlyfSimple{info1, info2} {
 		info.Encoding = nil       // already compared above
 		info.Font.CMapTable = nil // already tested when comparing the encodings
 
@@ -119,5 +117,3 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }
-
-var _ font.Embedded = (*embeddedGlyfSimple)(nil)

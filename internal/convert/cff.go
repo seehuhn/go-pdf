@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,24 +14,27 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package many
+package convert
 
 import (
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
-
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// OpenType returns `font` as an OpenType font.
-func OpenType(font FontID) (*sfnt.Font, error) {
-	info, err := TrueType(font)
-	if err != nil {
-		return nil, err
+// ToCFF converts "glyf" outlines to "CFF" outlines.
+//
+// The result is inefficient, since we we are using the naive way to
+// convert quadratic bezier curves to cubic bezier curves.  Do not use
+// this function in production code.
+func ToCFF(info *sfnt.Font) (*sfnt.Font, error) {
+	if info.IsCFF() {
+		return info, nil
 	}
 
 	cmap, err := info.CMapTable.GetBest()
@@ -169,4 +172,56 @@ func OpenType(font FontID) (*sfnt.Font, error) {
 	info.Outlines = newOutlines
 
 	return info, nil
+}
+
+// ToCFFCID modifies a font to use CFF CIDFont operators.
+func ToCFFCID(info *sfnt.Font) (*sfnt.Font, error) {
+	info, err := ToCFF(info)
+	if err != nil {
+		return nil, err
+	}
+
+	outlines := clone(info.Outlines.(*cff.Outlines))
+	outlines.Encoding = nil
+	outlines.ROS = &cid.SystemInfo{
+		Registry:   "Seehuhn",
+		Ordering:   "Sonderbar",
+		Supplement: 0,
+	}
+	outlines.GIDToCID = make([]cid.CID, len(outlines.Glyphs))
+	for i := range outlines.GIDToCID {
+		outlines.GIDToCID[i] = cid.CID(i)
+	}
+	info.Outlines = outlines
+
+	return info, nil
+}
+
+// ToCFFCID2 modifies a font to use CFF CIDFont operators
+// with multiple private dictionaries.
+func ToCFFCID2(info *sfnt.Font) (*sfnt.Font, error) {
+	info, err := ToCFFCID(info)
+	if err != nil {
+		return nil, err
+	}
+
+	outlines := info.Outlines.(*cff.Outlines)
+	if len(outlines.Private) != 1 {
+		panic("unexpected number of private dictionaries")
+	}
+	p := outlines.Private[0]
+	outlines.Private = []*type1.PrivateDict{p, p}
+	outlines.FDSelect = func(gid glyph.ID) int {
+		if gid%2 == 0 {
+			return 0
+		}
+		return 1
+	}
+
+	return info, nil
+}
+
+func clone[T any](x *T) *T {
+	y := *x
+	return &y
 }

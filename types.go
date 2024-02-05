@@ -28,7 +28,7 @@ import (
 )
 
 // Object represents an object in a PDF file.  There are nine basic types of
-// PDF objects, which implement this interface: [Array], [Bool], [Dict],
+// PDF objects, which implement this interface: [Array], [Boolean], [Dict],
 // [Integer], [Name], [Real], [Reference], [*Stream], and [String].
 // Custom types can be constructed out of these basic types, by implementing
 // the Object interface.
