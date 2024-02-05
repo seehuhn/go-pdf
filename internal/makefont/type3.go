@@ -14,33 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package testfont
+package makefont
 
 import (
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-var Type3 = &type3embedder{}
-
-type type3embedder struct{}
-
-func (_ *type3embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	F, err := MakeType3()
-	if err != nil {
-		return nil, err
-	}
-
-	return F.Embed(w, opt)
-}
-
-// MakeType3 returns a Type3 font.
-func MakeType3() (*type3.Font, error) {
-	info := MakeGlyfFont()
+// Type3 returns a Type3 font.
+func Type3() (*type3.Font, error) {
+	info := TrueType()
 
 	info = clone(info)
 	info.EnsureGlyphNames()

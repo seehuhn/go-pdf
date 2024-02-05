@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,23 +14,43 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package testfont
+package fonttypes
 
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/sfnt"
 )
 
-type trueTypeEmbedder struct{}
+type cffEmbedder int
 
-// TrueType is a TrueType font.
-var TrueType font.Embedder = trueTypeEmbedder{}
+// CFF fonts
+var (
+	// CFF is a CFF font without CIDFont operators.
+	CFF font.Embedder = cffEmbedder(0)
 
-func (trueTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	info := MakeGlyfFont()
+	// CFFCID is a CFF font with CIDFont operators.
+	CFFCID font.Embedder = cffEmbedder(1)
 
-	F, err := truetype.New(info)
+	// CFFCID2 is a CFF font with CIDFont operators and multiple private
+	// dictionaries.
+	CFFCID2 font.Embedder = cffEmbedder(2)
+)
+
+func (f cffEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+	var info *sfnt.Font
+	switch f {
+	case 0:
+		info = makefont.OpenType()
+	case 1:
+		info = makefont.OpenTypeCID()
+	case 2:
+		info = makefont.OpenTypeCID2()
+	}
+
+	F, err := cff.New(info)
 	if err != nil {
 		return nil, err
 	}

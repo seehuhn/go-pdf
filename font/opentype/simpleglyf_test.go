@@ -26,13 +26,13 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripGlyfSimple(t *testing.T) {
-	otf := testfont.MakeGlyfFont()
+	otf := makefont.TrueType()
 
 	cmapInfo, err := otf.CMapTable.GetBest()
 	if err != nil {

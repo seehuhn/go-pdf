@@ -27,17 +27,17 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/makefont"
 )
 
 // TestEncoding checks that the encoding of a Type 1 font is the standard
 // encoding, if the set of included characters is in the standard encoding.
 func TestEncoding(t *testing.T) {
-	t1, err := testfont.MakeType1()
+	t1, err := makefont.Type1()
 	if err != nil {
 		t.Fatal(err)
 	}
-	metrics, err := testfont.MakeAFM()
+	metrics, err := makefont.AFM()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestEncoding(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	t1, err := testfont.MakeType1()
+	t1, err := makefont.Type1()
 	if err != nil {
 		t.Fatal(err)
 	}

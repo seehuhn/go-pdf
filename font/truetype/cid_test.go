@@ -25,14 +25,14 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/truetype"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripComposite(t *testing.T) {
-	ttf := testfont.MakeGlyfFont()
+	ttf := makefont.TrueType()
 
 	cs := charcode.CodeSpaceRange{
 		{Low: []byte{0x04}, High: []byte{0x07}},

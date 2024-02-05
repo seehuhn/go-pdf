@@ -14,33 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font_test
+package fonttypes
 
 import (
-	"testing"
-
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/fonttypes"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/internal/makefont"
 )
 
-// TestSpaceIsBlank tests that space characters of common fonts are blank.
-func TestSpaceIsBlank(t *testing.T) {
-	for _, sample := range fonttypes.All {
-		t.Run(sample.Label, func(t *testing.T) {
-			data := pdf.NewData(pdf.V1_7)
-			F, err := sample.Embed(data, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			gg := F.Layout(10, " ")
-			if len(gg.Seq) != 1 {
-				t.Fatalf("expected 1 glyph, got %d", len(gg.Seq))
-			}
-			geom := F.GetGeometry()
-			if !geom.GlyphExtents[gg.Seq[0].GID].IsZero() {
-				t.Errorf("expected blank glyph, got %v",
-					geom.GlyphExtents[gg.Seq[0].GID])
-			}
-		})
+var Type3 = &type3embedder{}
+
+type type3embedder struct{}
+
+func (_ *type3embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+	F, err := makefont.Type3()
+	if err != nil {
+		return nil, err
 	}
+
+	return F.Embed(w, opt)
 }

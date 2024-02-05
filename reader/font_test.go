@@ -23,9 +23,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/internal/debug"
+	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -38,11 +37,7 @@ func TestExtractText(t *testing.T) {
 	line2 := "— Jochen Voß"
 	textEmbedded := line1 + line2
 
-	FF, err := debug.MakeFontSamples()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, sample := range FF {
+	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
 			// Create a document with two lines of text.
 			buf := &bytes.Buffer{}
@@ -50,7 +45,7 @@ func TestExtractText(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			E, err := sample.Font.Embed(doc.Out, &font.Options{ResName: "F"})
+			E, err := sample.Embed(doc.Out, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

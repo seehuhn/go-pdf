@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/internal/debug"
+	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
 func main() {
@@ -47,14 +47,10 @@ func run() error {
 		return err
 	}
 
-	fonts, err := debug.MakeFontSamples()
-	if err != nil {
-		return err
-	}
-	for _, sample := range fonts {
+	for _, sample := range fonttypes.All {
 		page := doc.AddPage()
 
-		F, err := sample.Font.Embed(page.Out, &font.Options{ResName: "F"})
+		F, err := sample.Embed(page.Out, nil)
 		if err != nil {
 			return err
 		}

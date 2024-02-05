@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package testfont
+package makefont
 
 import (
 	"bytes"
@@ -26,8 +26,8 @@ import (
 	"seehuhn.de/go/pdf/internal/convert"
 )
 
-// MakeGlyfFont returns a font with glyf outlines.
-func MakeGlyfFont() *sfnt.Font {
+// TrueType returns a font with glyf outlines.
+func TrueType() *sfnt.Font {
 	r := bytes.NewReader(goregular.TTF)
 	info, err := sfnt.Read(r)
 	if err != nil {
@@ -36,9 +36,9 @@ func MakeGlyfFont() *sfnt.Font {
 	return info
 }
 
-// MakeCFFFont returns a font with CFF outlines and not CIDFont operators.
-func MakeCFFFont() *sfnt.Font {
-	info := MakeGlyfFont()
+// OpenType returns a font with CFF outlines and not CIDFont operators.
+func OpenType() *sfnt.Font {
+	info := TrueType()
 	info, err := convert.ToCFF(info)
 	if err != nil {
 		panic(err)
@@ -46,9 +46,9 @@ func MakeCFFFont() *sfnt.Font {
 	return info
 }
 
-// MakeCFFCIDFont returns a font with CFF outlines and CIDFont operators.
-func MakeCFFCIDFont() *sfnt.Font {
-	info := MakeCFFFont()
+// OpenTypeCID returns a font with CFF outlines and CIDFont operators.
+func OpenTypeCID() *sfnt.Font {
+	info := OpenType()
 	info, err := convert.ToCFFCID(info)
 	if err != nil {
 		panic(err)
@@ -56,10 +56,10 @@ func MakeCFFCIDFont() *sfnt.Font {
 	return info
 }
 
-// MakeCFFCIDFont2 returns a font with CFF outlines, CIDFont operators, and
+// OpenTypeCID2 returns a font with CFF outlines, CIDFont operators, and
 // multiple private dictionaries.
-func MakeCFFCIDFont2() *sfnt.Font {
-	info := MakeCFFFont()
+func OpenTypeCID2() *sfnt.Font {
+	info := OpenType()
 	info, err := convert.ToCFFCID2(info)
 	if err != nil {
 		panic(err)

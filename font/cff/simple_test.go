@@ -28,11 +28,11 @@ import (
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/makefont"
 )
 
 func TestRoundTripSimple(t *testing.T) {
-	otf := testfont.MakeCFFFont()
+	otf := makefont.OpenType()
 
 	cmapInfo, err := otf.CMapTable.GetBest()
 	if err != nil {

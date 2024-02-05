@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package debug
+package fonttypes
 
 import (
 	"bytes"
@@ -25,23 +25,15 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-func TestFontTypes(t *testing.T) {
-	ff, err := MakeFontSamples()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, sample := range ff {
+func TestSamples(t *testing.T) {
+	for _, sample := range All {
 		t.Run(sample.Label, func(t *testing.T) {
 			buf := &bytes.Buffer{}
 			page, err := document.WriteSinglePage(buf, document.A4, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			opt := &font.Options{
-				ResName:   "X",
-				Composite: sample.Type.IsComposite(),
-			}
-			X, err := sample.Font.Embed(page.Out, opt)
+			X, err := sample.Embed(page.Out, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

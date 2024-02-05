@@ -80,14 +80,13 @@ func (f *embeddedCFFSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 func (f *embeddedCFFSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
-		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-		yield(width, c == ' ')
+		yield(f.sfnt.GlyphWidthPDF(gid), c == ' ')
 	}
 }
 
 func (f *embeddedCFFSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
-	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-	c := f.GIDToCode(gid, rr)
+	width := f.sfnt.GlyphWidthPDF(gid)
+	c := f.SimpleEncoder.GIDToCode(gid, rr)
 	return append(s, c), width, c == ' '
 }
 
@@ -101,14 +100,18 @@ func (f *embeddedCFFSimple) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			f.DefName, f.sfnt.PostScriptName())
 	}
-	encoding := f.SimpleEncoder.Encoding
 
 	origSfnt := f.sfnt.Clone()
-
 	origSfnt.CMapTable = nil
 	origSfnt.Gdef = nil
 	origSfnt.Gsub = nil
 	origSfnt.Gpos = nil
+
+	// Make our encoding the built-in encoding of the font.
+	outlines := origSfnt.Outlines.(*cff.Outlines)
+	outlines.Encoding = f.SimpleEncoder.Encoding
+	outlines.ROS = nil
+	outlines.GIDToCID = nil
 
 	// subset the font
 	subsetGID := f.SimpleEncoder.Subset()
@@ -117,12 +120,6 @@ func (f *embeddedCFFSimple) Close() error {
 	if err != nil {
 		return fmt.Errorf("OpenType/CFF font subset: %w", err)
 	}
-
-	// Make our encoding the built-in encoding of the font.
-	outlines := origSfnt.Outlines.(*cff.Outlines)
-	outlines.Encoding = encoding
-	outlines.ROS = nil
-	outlines.GIDToCID = nil
 
 	// convert the font to a simple font, if needed
 	subsetSfnt.EnsureGlyphNames()

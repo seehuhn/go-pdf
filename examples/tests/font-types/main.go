@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
 func main() {
@@ -101,42 +101,42 @@ func doit() error {
 		case "Simple PDF Fonts":
 			// part 1
 		case "Type 1 Fonts":
-			X = testfont.Type1
+			X = fonttypes.Type1
 			ffKey = "FontFile"
 		case "Builtin Fonts":
 			X = type1.Helvetica
 		case "Simple CFF Fonts":
-			X = testfont.CFF
+			X = fonttypes.CFF
 			ffKey = "FontFile3"
 		case "Simple CFF-based OpenType Fonts":
-			X = testfont.OpenTypeCFF
+			X = fonttypes.OpenTypeCFF
 			ffKey = "FontFile3"
 		case "Multiple Master Fonts":
 			// not supported
 		case "Simple TrueType Fonts":
-			X = testfont.TrueType
+			X = fonttypes.TrueType
 			ffKey = "FontFile2"
 		case "Simple Glyf-based OpenType Fonts":
-			X = testfont.OpenTypeGlyf
+			X = fonttypes.OpenTypeGlyf
 			ffKey = "FontFile3"
 		case "Type 3 Fonts":
-			X = testfont.Type3
+			X = fonttypes.Type3
 		case "Composite PDF Fonts":
 			// part 2
 		case "Composite CFF Fonts":
-			X = testfont.CFF
+			X = fonttypes.CFF
 			ffKey = "FontFile3"
 			composite = true
 		case "Composite CFF-based OpenType Fonts":
-			X = testfont.OpenTypeCFF
+			X = fonttypes.OpenTypeCFF
 			ffKey = "FontFile3"
 			composite = true
 		case "Composite TrueType Fonts":
-			X = testfont.TrueType
+			X = fonttypes.TrueType
 			ffKey = "FontFile2"
 			composite = true
 		case "Composite Glyf-based OpenType Fonts":
-			X = testfont.OpenTypeGlyf
+			X = fonttypes.OpenTypeGlyf
 			ffKey = "FontFile3"
 			composite = true
 		default:

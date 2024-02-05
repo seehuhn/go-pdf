@@ -24,7 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/pdf/reader"
 )
 
@@ -33,9 +33,9 @@ func TestWidthsFull(t *testing.T) {
 
 	// TODO(voss): iterate over all font types
 
-	sfont := testfont.MakeCFFFont()
+	otf := makefont.OpenType()
 
-	F, err := cff.New(sfont)
+	F, err := cff.New(otf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestWidthsFull(t *testing.T) {
 	var s pdf.String
 	var ww []float64
 	for _, g := range gg.Seq {
-		ww = append(ww, sfont.GlyphWidthPDF(g.GID))
+		ww = append(ww, otf.GlyphWidthPDF(g.GID))
 		s, _, _ = E.CodeAndWidth(s, g.GID, g.Text)
 	}
 	err = E.Close()

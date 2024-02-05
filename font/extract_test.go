@@ -33,29 +33,21 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/internal/debug"
+	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
 // TestExtract makes sure that information about all PDF font types
 // can be extracted.
 func TestExtract(t *testing.T) {
-	FF, err := debug.MakeFontSamples()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, sample := range FF {
+	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
 			buf := &bytes.Buffer{}
 			w, err := document.WriteSinglePage(buf, document.A4, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			opt := &font.Options{
-				Composite: sample.Type.IsComposite(),
-				ResName:   "F",
-			}
-			F, err := sample.Font.Embed(w.Out, opt)
+			F, err := sample.Embed(w.Out, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -84,21 +76,13 @@ func TestExtract(t *testing.T) {
 }
 
 func FuzzExtract(f *testing.F) {
-	FF, err := debug.MakeFontSamples()
-	if err != nil {
-		f.Fatal(err)
-	}
-	for _, fontInfo := range FF {
+	for _, fontInfo := range fonttypes.All {
 		buf := &bytes.Buffer{}
 		w, err := document.WriteSinglePage(buf, document.A4, nil)
 		if err != nil {
 			f.Fatal(err)
 		}
-		opt := &font.Options{
-			Composite: fontInfo.Type.IsComposite(),
-			ResName:   "X",
-		}
-		F, err := fontInfo.Font.Embed(w.Out, opt)
+		F, err := fontInfo.Embed(w.Out, nil)
 		if err != nil {
 			f.Fatal(err)
 		}

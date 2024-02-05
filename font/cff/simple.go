@@ -66,13 +66,18 @@ func (f *embeddedSimple) Close() error {
 		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
 			f.DefName, f.sfnt.PostScriptName())
 	}
-	encoding := f.SimpleEncoder.Encoding
 
 	origSfnt := f.sfnt.Clone()
 	origSfnt.CMapTable = nil
 	origSfnt.Gdef = nil
 	origSfnt.Gsub = nil
 	origSfnt.Gpos = nil
+
+	// Make our encoding the built-in encoding of the font.
+	outlines := origSfnt.Outlines.(*cff.Outlines)
+	outlines.Encoding = f.SimpleEncoder.Encoding
+	outlines.ROS = nil
+	outlines.GIDToCID = nil
 
 	// subset the font
 	subsetGID := f.SimpleEncoder.Subset()
@@ -81,12 +86,6 @@ func (f *embeddedSimple) Close() error {
 	if err != nil {
 		return fmt.Errorf("CFF font subset: %w", err)
 	}
-
-	// Make our encoding the built-in encoding of the font.
-	outlines := origSfnt.Outlines.(*cff.Outlines)
-	outlines.Encoding = encoding
-	outlines.ROS = nil
-	outlines.GIDToCID = nil
 
 	// convert the font to a simple font, if needed
 	subsetSfnt.EnsureGlyphNames()

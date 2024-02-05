@@ -25,14 +25,14 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripGlyfComposite(t *testing.T) {
-	ttf := testfont.MakeGlyfFont()
+	ttf := makefont.TrueType()
 	cs := charcode.UCS2
 	ros := &cid.SystemInfo{
 		Registry:   "Test",

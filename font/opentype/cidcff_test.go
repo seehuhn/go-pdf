@@ -26,14 +26,14 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/internal/testfont"
+	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 )
 
 func TestRoundTripCFFComposite(t *testing.T) {
-	otf := testfont.MakeCFFFont()
+	otf := makefont.OpenType()
 	cs := charcode.CodeSpaceRange{
 		{Low: []byte{0x04}, High: []byte{0x07}},
 		{Low: []byte{0x10, 0x12}, High: []byte{0x11, 0x13}},
