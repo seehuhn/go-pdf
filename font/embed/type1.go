@@ -32,7 +32,7 @@ import (
 // Both `psname` and `afmname` are optional, but at least one of them must be given.
 func Type1File(w pdf.Putter, psname, afmname string, opt *font.Options) (font.Layouter, error) {
 	var psFont *pst1.Font
-	var metrics *afm.Info
+	var metrics *afm.Metrics
 	if psname != "" {
 		fd, err := os.Open(psname)
 		if err != nil {
@@ -68,7 +68,7 @@ func Type1File(w pdf.Putter, psname, afmname string, opt *font.Options) (font.La
 
 // Type1Font embeds a Type 1 font.
 // The `psFont` and `metrics` parameters are optional, but at least one of them must be given.
-func Type1Font(w pdf.Putter, psFont *pst1.Font, metrics *afm.Info, opt *font.Options) (font.Layouter, error) {
+func Type1Font(w pdf.Putter, psFont *pst1.Font, metrics *afm.Metrics, opt *font.Options) (font.Layouter, error) {
 	F, err := type1.New(psFont, metrics)
 	if err != nil {
 		return nil, err

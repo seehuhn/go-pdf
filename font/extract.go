@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/subset"
 )
 
 // EmbeddingType represents the different ways font data
@@ -119,6 +120,8 @@ func (t EmbeddingType) MustBe(expected EmbeddingType) error {
 // Dicts collects all information about a font embedded in a PDF file.
 type Dicts struct {
 	PostScriptName pdf.Name
+	SubsetTag      string
+
 	FontDict       pdf.Dict
 	CIDFontDict    pdf.Dict
 	FontDescriptor *Descriptor
@@ -167,6 +170,10 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 
 	fontName, err := pdf.GetName(r, fontDict["BaseFont"])
 	if err == nil {
+		if m := subset.TagRegexp.FindStringSubmatch(string(fontName)); m != nil {
+			res.SubsetTag = m[1]
+			fontName = pdf.Name(m[2])
+		}
 		res.PostScriptName = fontName
 	}
 

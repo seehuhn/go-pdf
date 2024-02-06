@@ -138,7 +138,7 @@ func TestGlyphWidths(t *testing.T) {
 			w1 := g.WidthX
 			w2 := metrics.Glyphs[name].WidthX
 			if w1 != w2 {
-				t.Errorf("%-22s %-8s width=%d, claimedWidth=%d",
+				t.Errorf("%-22s %-8s width=%g, claimedWidth=%g",
 					F, name, w1, w2)
 			}
 		}

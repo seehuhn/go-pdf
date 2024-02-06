@@ -70,7 +70,7 @@ func (f Builtin) psFont() (*pstype1.Font, error) {
 }
 
 // AFM returns the font metrics for this builtin font.
-func (f Builtin) AFM() (*afm.Info, error) {
+func (f Builtin) AFM() (*afm.Metrics, error) {
 	data, err := builtin.Open(string(f), loader.FontTypeAFM)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (f Builtin) AFM() (*afm.Info, error) {
 	// these from other metrics.
 	for _, name := range []string{"d", "bracketleft", "bar"} {
 		if glyph, ok := metrics.Glyphs[name]; ok {
-			y := glyph.BBox.URy
+			y := float64(glyph.BBox.URy)
 			if y > metrics.Ascent {
 				metrics.Ascent = y
 			}
@@ -105,7 +105,7 @@ func (f Builtin) AFM() (*afm.Info, error) {
 	}
 	for _, name := range []string{"p", "bracketleft", "bar"} {
 		if glyph, ok := metrics.Glyphs[name]; ok {
-			y := glyph.BBox.LLy
+			y := float64(glyph.BBox.LLy)
 			if y < metrics.Descent {
 				metrics.Descent = y
 			}

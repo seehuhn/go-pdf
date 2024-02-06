@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// ToType1 constructs a Type1 font from an sfnt.
 func ToType1(info *sfnt.Font) (*type1.Font, error) {
 	// TODO(voss): base this on ToCFF()
 
@@ -41,7 +42,7 @@ func ToType1(info *sfnt.Font) (*type1.Font, error) {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
 		newGlyph := &type1.Glyph{
-			WidthX: info.GlyphWidth(gid),
+			WidthX: float64(info.GlyphWidth(gid)),
 		}
 		if origGlyph == nil {
 			goto done
@@ -179,17 +180,17 @@ func ToType1(info *sfnt.Font) (*type1.Font, error) {
 	return res, nil
 }
 
-func ToAFM(info *sfnt.Font) (*afm.Info, error) {
+func ToAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	info = clone(info)
 	info.EnsureGlyphNames()
 
 	n := info.NumGlyphs()
-	newInfo := make(map[string]*afm.GlyphInfo, n)
+	newGlyphs := make(map[string]*afm.GlyphInfo, n)
 	for i := 0; i < n; i++ {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
-		newInfo[name] = &afm.GlyphInfo{
-			WidthX: info.GlyphWidth(gid),
+		newGlyphs[name] = &afm.GlyphInfo{
+			WidthX: float64(info.GlyphWidth(gid)),
 			BBox:   info.GlyphBBox(gid),
 			// TODO(voss): ligatures
 		}
@@ -198,24 +199,25 @@ func ToAFM(info *sfnt.Font) (*afm.Info, error) {
 	encoding := make([]string, 256)
 	for i := 0; i < 256; i++ {
 		name := psenc.StandardEncoding[i]
-		if _, ok := newInfo[name]; ok {
+		if _, ok := newGlyphs[name]; ok {
 			encoding[i] = name
 		} else {
 			encoding[i] = ".notdef"
 		}
 	}
 
-	res := &afm.Info{
-		Glyphs:             newInfo,
+	q := 1000.0 / float64(info.UnitsPerEm)
+	res := &afm.Metrics{
+		Glyphs:             newGlyphs,
 		Encoding:           encoding,
 		FontName:           info.PostScriptName(),
 		FullName:           info.FullName(),
-		CapHeight:          info.CapHeight,
-		XHeight:            info.XHeight,
-		Ascent:             info.Ascent,
-		Descent:            info.Descent,
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
+		CapHeight:          info.CapHeight.AsFloat(q),
+		XHeight:            info.XHeight.AsFloat(q),
+		Ascent:             info.Ascent.AsFloat(q),
+		Descent:            info.Descent.AsFloat(q),
+		UnderlinePosition:  float64(info.UnderlinePosition) * q,
+		UnderlineThickness: float64(info.UnderlineThickness) * q,
 		ItalicAngle:        info.ItalicAngle,
 		IsFixedPitch:       info.IsFixedPitch(),
 		// TODO(voss): kerning

@@ -18,19 +18,27 @@ package makefont
 
 import (
 	"seehuhn.de/go/postscript/afm"
-	pst1 "seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf/internal/convert"
 )
 
 // Type1 returns a Type1 font.
-func Type1() (*pst1.Font, error) {
+func Type1() *type1.Font {
 	info := TrueType()
-	return convert.ToType1(info)
+	psFont, err := convert.ToType1(info)
+	if err != nil {
+		panic(err)
+	}
+	return psFont
 }
 
 // AFM returns the font metrics for the font returned by [Type1].
-func AFM() (*afm.Info, error) {
+func AFM() *afm.Metrics {
 	info := TrueType()
-	return convert.ToAFM(info)
+	metrics, err := convert.ToAFM(info)
+	if err != nil {
+		panic(err)
+	}
+	return metrics
 }

@@ -90,6 +90,10 @@ type GlyphBuilder struct {
 
 // Close most be called after the glyph description has been written.
 func (g *GlyphBuilder) Close() error {
+	if g.Writer.Err != nil {
+		return g.Writer.Err
+	}
+
 	buf := g.Content.(*bytes.Buffer)
 	data := &Glyph{
 		WidthX: g.widthX,

@@ -44,7 +44,6 @@ import (
 type FontFromFile interface {
 	font.Embedded
 
-	// TODO(voss): how to handle glyph selection in Type 1 font?
 	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool))
 
 	FontData() interface{}

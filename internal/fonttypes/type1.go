@@ -23,19 +23,14 @@ import (
 	"seehuhn.de/go/pdf/internal/makefont"
 )
 
+// Type1 is a Type 1 PDF font.
 var Type1 = &type1embedder{}
 
 type type1embedder struct{}
 
-func (_ *type1embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	info, err := makefont.Type1()
-	if err != nil {
-		return nil, err
-	}
-	afm, err := makefont.AFM()
-	if err != nil {
-		return nil, err
-	}
+func (*type1embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+	info := makefont.Type1()
+	afm := makefont.AFM()
 
 	F, err := type1.New(info, afm)
 	if err != nil {

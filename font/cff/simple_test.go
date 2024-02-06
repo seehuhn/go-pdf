@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cff_test
+package cff
 
 import (
 	"testing"
@@ -25,7 +25,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/internal/makefont"
@@ -49,7 +48,7 @@ func TestRoundTripSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &cff.EmbedInfoSimple{
+	info1 := &EmbedInfoSimple{
 		Font:      otf.AsCFF(),
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -72,7 +71,7 @@ func TestRoundTripSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := cff.ExtractSimple(rw, dicts)
+	info2, err := ExtractSimple(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +86,7 @@ func TestRoundTripSimple(t *testing.T) {
 		}
 	}
 
-	for _, info := range []*cff.EmbedInfoSimple{info1, info2} {
+	for _, info := range []*EmbedInfoSimple{info1, info2} {
 		info.Encoding = nil // already compared above
 
 		// TODO(voss): reenable this once https://github.com/google/go-cmp/issues/335 is resolved

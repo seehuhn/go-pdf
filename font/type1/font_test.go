@@ -17,16 +17,89 @@
 package type1
 
 import (
+	"fmt"
 	"math"
 	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/postscript/type1"
 )
+
+// TestEmbed checks that the font can be embedded into a PDF file.
+func TestEmbed(t *testing.T) {
+	psFont := makefont.Type1()
+	metrics := makefont.AFM()
+
+	for i := 1; i <= 3; i++ {
+		t.Run(fmt.Sprintf("%02b", i), func(t *testing.T) {
+			var psf *type1.Font
+			var metr *afm.Metrics
+
+			// try all allowed combinations of psfont and metrics
+			if includeFont := i&1 != 0; includeFont {
+				psf = psFont
+			}
+			if useMetrics := i&2 != 0; useMetrics {
+				metr = metrics
+			}
+			F, err := New(psf, metr)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// encode some characters and embed the font
+			data := pdf.NewData(pdf.V1_7)
+			E, err := F.Embed(data, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testString := "Hello, World!"
+			gg := E.Layout(1, testString)
+			var codes pdf.String
+			for _, g := range gg.Seq {
+				codes, _, _ = E.CodeAndWidth(codes, g.GID, g.Text)
+			}
+			err = E.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// read back the font and check the result
+			fontDicts, err := font.ExtractDicts(data, E.PDFObject())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fontDicts.Type != font.Type1 {
+				t.Errorf("wrong font type %s (instead of Type1)", fontDicts.Type)
+			}
+			if fontDicts.PostScriptName != pdf.Name(psFont.FontName) {
+				t.Errorf("wrong font name: %q != %q",
+					fontDicts.PostScriptName, psf.FontName)
+			}
+
+			info, err := Extract(data, fontDicts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (info.Font != nil) != (psf != nil) {
+				t.Errorf("font are included: %t, font should be included: %t",
+					info.Font != nil, psf != nil)
+			}
+			if info.Metrics == nil {
+				t.Error("metrics are missing")
+			}
+		})
+	}
+}
 
 // TestToUnicode verifies that the ToUnicode cmap is only generated if
 // necessary, and that in this case it is works.
@@ -218,4 +291,105 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	}
 }
 
-var _ font.Embedded = (*embeddedSimple)(nil)
+// TestEncoding checks that the encoding of a Type 1 font is the standard
+// encoding, if the set of included characters is in the standard encoding.
+func TestEncoding(t *testing.T) {
+	t1 := makefont.Type1()
+	metrics := makefont.AFM()
+	F, err := New(t1, metrics)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Embed the font
+	data := pdf.NewData(pdf.V1_7)
+	E, err := F.Embed(data, &font.Options{ResName: "F"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gg := E.Layout(10, ".MiAbc")
+	for _, g := range gg.Seq {
+		E.CodeAndWidth(nil, g.GID, g.Text) // allocate codes
+	}
+	err = E.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dicts, err := font.ExtractDicts(data, E.PDFObject())
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := Extract(data, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 256; i++ {
+		if info.Encoding[i] != ".notdef" && info.Encoding[i] != pdfenc.StandardEncoding[i] {
+			t.Error(i, info.Encoding[i])
+		}
+	}
+}
+
+func TestRoundTrip(t *testing.T) {
+	t1 := makefont.Type1()
+
+	encoding := make([]string, 256)
+	for i := range encoding {
+		encoding[i] = ".notdef"
+	}
+	encoding[65] = "A"
+	encoding[66] = "B"
+
+	m := map[charcode.CharCode][]rune{
+		65: {'A'},
+		66: {'B'},
+	}
+	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
+
+	info1 := &EmbedInfo{
+		Font:      t1,
+		SubsetTag: "UVWXYZ",
+		Encoding:  encoding,
+		ToUnicode: toUnicode,
+	}
+
+	rw := pdf.NewData(pdf.V1_7)
+	ref := rw.Alloc()
+	err := info1.Embed(rw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dicts, err := font.ExtractDicts(rw, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info2, err := Extract(rw, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Compare encodings:
+	if len(info1.Encoding) != len(info2.Encoding) {
+		t.Fatalf("len(info1.Encoding) != len(info2.Encoding): %d != %d", len(info1.Encoding), len(info2.Encoding))
+	}
+	for i := range info1.Encoding {
+		if info1.Encoding[i] != ".notdef" && info1.Encoding[i] != info2.Encoding[i] {
+			t.Fatalf("info1.Encoding[%d] != info2.Encoding[%d]: %q != %q", i, i, info1.Encoding[i], info2.Encoding[i])
+		}
+	}
+
+	for _, info := range []*EmbedInfo{info1, info2} {
+		info.Encoding = nil // already compared above
+		info.Metrics = nil  // TODO(voss): enable this once it works
+	}
+
+	cmpFloat := cmp.Comparer(func(x, y float64) bool {
+		return math.Abs(x-y) < 1/65536.
+	})
+	if d := cmp.Diff(info1, info2, cmpFloat); d != "" {
+		t.Errorf("info mismatch (-want +got):\n%s", d)
+	}
+}

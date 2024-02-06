@@ -196,7 +196,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 			nRows = rowsNeeded
 		}
 
-		yTop := f.margin + f.textHeight - f.used - afm.Ascent.AsFloat(fontSize/1000)
+		yTop := f.margin + f.textHeight - f.used - afm.Ascent*fontSize/1000
 
 		// First draw the rectangles for the glyph extents onto the background.
 		tmpGlyph := curGlyph
@@ -213,7 +213,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 				gi := afm.Glyphs[glyphNames[tmpGlyph]]
 				ext := gi.BBox
 				if !ext.IsZero() {
-					w := gi.WidthX.AsFloat(fontSize / 1000)
+					w := gi.WidthX * fontSize / 1000
 					page.Rectangle(
 						x+32-w/2+ext.LLx.AsFloat(fontSize/1000),
 						y+ext.LLy.AsFloat(fontSize/1000),

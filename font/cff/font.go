@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package cff implements CFF font data embedded into PDF files.
+//
+// CFF fonts can be embedded into a PDF file either as "simple fonts" or as
+// "composite fonts".
 package cff
 
 import (

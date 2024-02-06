@@ -96,6 +96,9 @@ type Layouter interface {
 	// returns the new string s, the width of the glyph in PDF text space units
 	// (still to be multiplied by the font size), and a value indicating
 	// whether PDF word spacing adjustment applies to this glyph.
+	//
+	// As a side effect, this function allocates codes for the given
+	// glyph/text combination in the font's encoding.
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 
 	// Close writes the used subset of the font to the PDF file. After close
@@ -133,21 +136,5 @@ func (r Res) DefaultName() pdf.Name {
 
 // PDFObject implements the [Resource] interface.
 func (r Res) PDFObject() pdf.Object {
-	return r.Ref
-}
-
-// ResIndirect can be embedded in a struct to implement the [Resource] interface.
-type ResIndirect struct {
-	DefName pdf.Name
-	Ref     pdf.Reference
-}
-
-// DefaultName implements the [Resource] interface.
-func (r ResIndirect) DefaultName() pdf.Name {
-	return r.DefName
-}
-
-// PDFObject implements the [Resource] interface.
-func (r ResIndirect) PDFObject() pdf.Object {
 	return r.Ref
 }

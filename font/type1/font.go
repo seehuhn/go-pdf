@@ -38,28 +38,13 @@ import (
 	"seehuhn.de/go/pdf/font/widths"
 )
 
-// fontSimple is a Type 1 font.
-type fontSimple struct {
-	ps         *type1.Font
-	metrics    *afm.Info
-	glyphNames []string
-
-	cmap map[rune]glyph.ID
-	lig  map[glyph.Pair]glyph.ID
-	kern map[glyph.Pair]funit.Int16
-
-	*font.Geometry
-}
-
-// New creates a new Type 1 PDF font from a Type 1 PostScript font,
-// and, optionally, from the corresponding AFM metrics.
+// New creates a new Type 1 PDF font from a Type 1 PostScript font.
 //
 // At least one of `psFont` and `metrics` must be non-nil.
 // The font program is embedded, if and only if `psFont` is non-nil.
-// If metrics is non-nil, information about kerning and ligatures is extracted
-// from the metrics, and additional fields in the PDF font descriptor are
-// filled.
-func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
+// If metrics is non-nil, information about kerning and ligatures is extracted,
+// and the corresponding fields in the PDF font descriptor are filled.
+func New(psFont *type1.Font, metrics *afm.Metrics) (font.Embedder, error) {
 	if psFont == nil && metrics == nil {
 		return nil, fmt.Errorf("no font data given")
 	}
@@ -70,10 +55,33 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
 	} else {
 		glyphNames = metrics.GlyphList()
 	}
-	nameGid := make(map[string]glyph.ID, len(glyphNames))
-	for i, name := range glyphNames {
-		nameGid[name] = glyph.ID(i)
+
+	res := &embedder{
+		psFont:     psFont,
+		metrics:    metrics,
+		glyphNames: glyphNames,
 	}
+	return res, nil
+}
+
+type embedder struct {
+	psFont     *type1.Font
+	metrics    *afm.Metrics
+	glyphNames []string
+}
+
+func (f *embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+	if opt == nil {
+		opt = &font.Options{}
+	}
+
+	if opt.Composite {
+		return nil, fmt.Errorf("Type 1 fonts do not support composite embedding")
+	}
+
+	psFont := f.psFont
+	metrics := f.metrics
+	glyphNames := f.glyphNames
 
 	geometry := &font.Geometry{}
 	widths := make([]float64, len(glyphNames))
@@ -92,7 +100,7 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
 		fontName = metrics.FontName
 		for i, name := range glyphNames {
 			gi := metrics.Glyphs[name]
-			widths[i] = float64(gi.WidthX) / 1000
+			widths[i] = gi.WidthX / 1000
 			extents[i] = pdf.Rectangle{
 				LLx: float64(gi.BBox.LLx) / 1000,
 				LLy: float64(gi.BBox.LLy) / 1000,
@@ -100,13 +108,12 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
 				URy: float64(gi.BBox.URy) / 1000,
 			}
 		}
-		geometry.UnderlinePosition = float64(metrics.UnderlinePosition) / 1000
-		geometry.UnderlineThickness = float64(metrics.UnderlineThickness) / 1000
+		geometry.UnderlinePosition = metrics.UnderlinePosition / 1000
+		geometry.UnderlineThickness = metrics.UnderlineThickness / 1000
 	}
 	if metrics != nil {
-		geometry.Ascent = float64(metrics.Ascent) / 1000
-		geometry.Descent = float64(metrics.Descent) / 1000
-		geometry.BaseLineDistance = (geometry.Ascent - geometry.Descent) * 6 / 5 // TODO(voss)
+		geometry.Ascent = metrics.Ascent / 1000
+		geometry.Descent = metrics.Descent / 1000
 	}
 	geometry.Widths = widths
 	geometry.GlyphExtents = extents
@@ -126,6 +133,11 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
 		cmap[r] = glyph.ID(gid)
 	}
 
+	nameGid := make(map[string]glyph.ID, len(glyphNames))
+	for i, name := range glyphNames {
+		nameGid[name] = glyph.ID(i)
+	}
+
 	lig := make(map[glyph.Pair]glyph.ID)
 	kern := make(map[glyph.Pair]funit.Int16)
 	if metrics != nil {
@@ -141,15 +153,25 @@ func New(psFont *type1.Font, metrics *afm.Info) (font.Embedder, error) {
 		}
 	}
 
-	res := &fontSimple{
-		ps:         psFont,
+	res := &embeddedSimple{
+		w: w,
+		Res: font.Res{
+			Ref:     w.Alloc(),
+			DefName: opt.ResName,
+		},
+		Geometry: geometry,
+
+		psFont:     psFont,
 		metrics:    metrics,
 		glyphNames: glyphNames,
-		Geometry:   geometry,
-		cmap:       cmap,
-		lig:        lig,
-		kern:       kern,
+
+		cmap: cmap,
+		lig:  lig,
+		kern: kern,
+
+		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
+	w.AutoClose(res)
 	return res, nil
 }
 
@@ -178,30 +200,25 @@ func glyphBoxtoPDF(b funit.Rect16, fMat []float64) pdf.Rectangle {
 	return bPDF
 }
 
-func (f *fontSimple) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	if opt == nil {
-		opt = &font.Options{}
-	}
+type embeddedSimple struct {
+	w pdf.Putter
+	font.Res
+	*font.Geometry
 
-	if opt.Composite {
-		return nil, fmt.Errorf("Type 1 fonts do not support composite embedding")
-	}
+	psFont     *type1.Font
+	metrics    *afm.Metrics
+	glyphNames []string
+	cmap       map[rune]glyph.ID
+	lig        map[glyph.Pair]glyph.ID
+	kern       map[glyph.Pair]funit.Int16
 
-	res := &embeddedSimple{
-		fontSimple: f,
-		w:          w,
-		Res: font.Res{
-			Ref:     w.Alloc(),
-			DefName: opt.ResName,
-		},
-		SimpleEncoder: encoding.NewSimpleEncoder(),
-	}
-	w.AutoClose(res)
-	return res, nil
+	*encoding.SimpleEncoder
+
+	closed bool
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
+func (f *embeddedSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	rr := []rune(s)
 
 	gg := make([]font.Glyph, 0, len(rr))
@@ -239,15 +256,6 @@ func (f *fontSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 	return res
 }
 
-type embeddedSimple struct {
-	*fontSimple
-	w pdf.Putter
-	font.Res
-
-	*encoding.SimpleEncoder
-	closed bool
-}
-
 func (f *embeddedSimple) GlyphWidth(gid glyph.ID) float64 {
 	return f.Geometry.Widths[gid]
 }
@@ -272,8 +280,8 @@ func (f *embeddedSimple) Close() error {
 
 	if f.SimpleEncoder.Overflow() {
 		var fontName string
-		if f.ps != nil {
-			fontName = f.ps.FontInfo.FontName
+		if f.psFont != nil {
+			fontName = f.psFont.FontInfo.FontName
 		} else {
 			fontName = f.metrics.FontName
 		}
@@ -291,9 +299,9 @@ func (f *embeddedSimple) Close() error {
 	}
 
 	var subsetTag string
-	psSubset := f.ps
+	psSubset := f.psFont
 	metricsSubset := f.metrics
-	if psFont := f.ps; psFont != nil {
+	if psFont := f.psFont; psFont != nil {
 		// only subset the font, if the font is embedded
 
 		subsetEncoding := encoding
@@ -388,7 +396,7 @@ type EmbedInfo struct {
 
 	// Metrics (optional) are the font metrics for the font.
 	// At least one of `Font` and `Metrics` must be non-nil.
-	Metrics *afm.Info
+	Metrics *afm.Metrics
 
 	// SubsetTag should be a unique tag for the font subset,
 	// or the empty string if this is the full font.
@@ -413,6 +421,10 @@ type EmbedInfo struct {
 }
 
 // Extract extracts information about a Type 1 font from a PDF file.
+//
+// The `Font` field in the result is only filled if the font program
+// is included in the file.  `Metrics` is always present, and contains
+// all information available in the PDF file.
 func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	if err := dicts.Type.MustBe(font.Type1); err != nil {
 		return nil, err
@@ -439,7 +451,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		fontName = pdf.Name(m[2])
 	}
 
-	var metrics *afm.Info
+	var metrics *afm.Metrics
 	if psFont == nil && isBuiltinName[string(fontName)] {
 		afm, err := Builtin(fontName).AFM()
 		if err != nil {
@@ -448,7 +460,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		afm.FontName = string(fontName)
 		metrics = afm
 	} else {
-		metrics = &afm.Info{
+		metrics = &afm.Metrics{
 			Glyphs: map[string]*afm.GlyphInfo{
 				".notdef": {},
 			},
@@ -456,10 +468,10 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		}
 	}
 	if dicts.FontDescriptor != nil {
-		metrics.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent))
-		metrics.Descent = funit.Int16(math.Round(dicts.FontDescriptor.Descent))
-		metrics.CapHeight = funit.Int16(math.Round(dicts.FontDescriptor.CapHeight))
-		metrics.XHeight = funit.Int16(math.Round(dicts.FontDescriptor.XHeight))
+		metrics.Ascent = dicts.FontDescriptor.Ascent
+		metrics.Descent = dicts.FontDescriptor.Descent
+		metrics.CapHeight = dicts.FontDescriptor.CapHeight
+		metrics.XHeight = dicts.FontDescriptor.XHeight
 	}
 	res.Metrics = metrics
 

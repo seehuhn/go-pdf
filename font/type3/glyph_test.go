@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,8 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package cff implements CFF font data embedded into PDF files.
-//
-// CFF fonts can be embedded into a PDF file either as "simple fonts" or as
-// "composite fonts".
-package cff
+package type3
+
+import (
+	"testing"
+
+	"seehuhn.de/go/postscript/funit"
+)
+
+// TestGlyphError makes sure that errors during glyph construction are reported.
+func TestGlyphError(t *testing.T) {
+	F := New(1000)
+	g, err := F.AddGlyph("test", 1000, funit.Rect16{0, 0, 1000, 1000}, false)
+	if err != nil {
+		t.Fatalf("AddGlyph failed: %v", err)
+	}
+
+	g.TextEnd() // should cause an error
+
+	err = g.Close()
+	if err == nil {
+		t.Fatalf("Close failed to report the error")
+	}
+}

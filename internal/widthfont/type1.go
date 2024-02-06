@@ -18,6 +18,7 @@ package widthfont
 
 import (
 	"errors"
+	"math"
 
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
@@ -51,18 +52,18 @@ func Type1(out pdf.Putter, unitsPerEm funit.Int16) (font.Embedded, error) {
 		Private:  &pst1.PrivateDict{BlueValues: []funit.Int16{0, 0}},
 		Encoding: encoding,
 	}
-	metrics := &afm.Info{
+	metrics := &afm.Metrics{
 		Glyphs:    map[string]*afm.GlyphInfo{},
 		Encoding:  psfont.Encoding,
 		FontName:  psfont.FontName,
-		CapHeight: unitsPerEm / 2,
-		XHeight:   unitsPerEm / 2,
-		Ascent:    unitsPerEm / 2,
+		CapHeight: float64(unitsPerEm) / 2,
+		XHeight:   float64(unitsPerEm) / 2,
+		Ascent:    float64(unitsPerEm) / 2,
 		Descent:   0,
 	}
 
 	g := &pst1.Glyph{
-		WidthX: unitsPerEm,
+		WidthX: float64(unitsPerEm),
 	}
 	wf := float64(unitsPerEm)
 	hf := float64(unitsPerEm / 2)
@@ -79,7 +80,7 @@ func Type1(out pdf.Putter, unitsPerEm funit.Int16) (font.Embedded, error) {
 	g.ClosePath()
 	psfont.Glyphs[".notdef"] = g
 	metrics.Glyphs[".notdef"] = &afm.GlyphInfo{
-		WidthX: unitsPerEm,
+		WidthX: float64(unitsPerEm),
 		BBox: funit.Rect16{
 			LLx: 0,
 			LLy: 0,
@@ -89,11 +90,11 @@ func Type1(out pdf.Putter, unitsPerEm funit.Int16) (font.Embedded, error) {
 	}
 
 	g = &pst1.Glyph{
-		WidthX: unitsPerEm / 2,
+		WidthX: float64(unitsPerEm) / 2,
 	}
 	psfont.Glyphs["space"] = g
 	metrics.Glyphs["space"] = &afm.GlyphInfo{
-		WidthX: unitsPerEm / 2,
+		WidthX: float64(unitsPerEm) / 2,
 	}
 	encoding[' '] = "space"
 
@@ -119,8 +120,8 @@ func Type1(out pdf.Putter, unitsPerEm funit.Int16) (font.Embedded, error) {
 
 	for c := '1'; c <= '9'; c++ {
 		name := names.FromUnicode(c)
-		h := unitsPerEm / 5
-		w := unitsPerEm / 10 * funit.Int16(c-'0')
+		h := float64(unitsPerEm) / 5
+		w := float64(unitsPerEm) / 10 * float64(c-'0')
 		w0 := max(h/10, w-h/2)
 
 		g = &pst1.Glyph{
@@ -136,8 +137,8 @@ func Type1(out pdf.Putter, unitsPerEm funit.Int16) (font.Embedded, error) {
 		metrics.Glyphs[name] = &afm.GlyphInfo{
 			WidthX: w,
 			BBox: funit.Rect16{
-				URx: w,
-				URy: h,
+				URx: funit.Int16(math.Round(w)),
+				URy: funit.Int16(math.Round(h)),
 			},
 		}
 		encoding[c] = name

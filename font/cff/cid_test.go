@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cff_test
+package cff
 
 import (
 	"testing"
@@ -22,7 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/internal/makefont"
@@ -50,7 +49,7 @@ func TestRoundTripComposite(t *testing.T) {
 		m[code] = []rune{'X', '0' + rune(code)}
 	}
 	toUnicode := cmap.NewToUnicode(cs, m)
-	info := &cff.EmbedInfoComposite{
+	info := &EmbedInfoComposite{
 		Font:       otf.AsCFF(),
 		SubsetTag:  "ABCDEF",
 		CMap:       cmapInfo,
@@ -74,7 +73,7 @@ func TestRoundTripComposite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info2, err := cff.ExtractComposite(rw, dicts)
+	info2, err := ExtractComposite(rw, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
