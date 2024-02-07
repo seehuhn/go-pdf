@@ -60,7 +60,10 @@ type Parameters struct {
 	// (default: device-dependent)
 	CTM Matrix
 
-	ClippingPath interface{} // TODO(voss): implement this
+	startX, startY     float64 // the starting point of the current path
+	currentX, currentY float64 // the "current point"
+	pathSegments       int
+	pathIsClosed       bool
 
 	StrokeColor color.Color
 	FillColor   color.Color
@@ -234,6 +237,9 @@ const (
 		StateOverprintMode | StateBlackGeneration | StateUndercolorRemoval |
 		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
 		StateFlatnessTolerance | StateSmoothnessTolerance
+
+	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin |
+		StateMiterLimit | StateDash | StateStrokeColor
 )
 
 // NewState returns a new graphics state with default values,

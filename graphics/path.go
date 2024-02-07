@@ -21,41 +21,6 @@ import (
 	"math"
 )
 
-// MoveTo starts a new path at the given coordinates.
-func (p *Writer) MoveTo(x, y float64) {
-	if !p.isValid("MoveTo", objPage|objPath) {
-		return
-	}
-	p.currentObject = objPath
-	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "m")
-}
-
-// LineTo appends a straight line segment to the current path.
-func (p *Writer) LineTo(x, y float64) {
-	if !p.isValid("LineTo", objPath|objClippingPath) {
-		return
-	}
-	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), "l")
-}
-
-// CurveTo appends a cubic Bezier curve to the current path.
-func (p *Writer) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
-	if !p.isValid("CurveTo", objPath|objClippingPath) {
-		return
-	}
-	// TODO(voss): generate "v" or "y" when possible
-	_, p.Err = fmt.Fprintln(p.Content, p.coord(x1), p.coord(y1), p.coord(x2), p.coord(y2), p.coord(x3), p.coord(y3), "c")
-}
-
-// Rectangle appends a rectangle to the current path as a closed subpath.
-func (p *Writer) Rectangle(x, y, width, height float64) {
-	if !p.isValid("Rectangle", objPage|objPath) {
-		return
-	}
-	p.currentObject = objPath
-	_, p.Err = fmt.Fprintln(p.Content, p.coord(x), p.coord(y), p.coord(width), p.coord(height), "re")
-}
-
 // MoveToArc appends a circular arc to the current path,
 // starting a new subpath.
 func (p *Writer) MoveToArc(x, y, radius, startAngle, endAngle float64) {
@@ -74,7 +39,7 @@ func (p *Writer) LineToArc(x, y, radius, startAngle, endAngle float64) {
 	p.arc(x, y, radius, startAngle, endAngle, false)
 }
 
-// arc appends a circular path to the current path.
+// arc appends a circular arc to the current path.
 func (p *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 	p.currentObject = objPath
 
@@ -112,32 +77,6 @@ func (p *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 func (p *Writer) Circle(x, y, radius float64) {
 	p.MoveToArc(x, y, radius, 0, 2*math.Pi)
 	p.ClosePath()
-}
-
-// ClosePath closes the current subpath.
-func (p *Writer) ClosePath() {
-	if !p.isValid("ClosePath", objPath) {
-		return
-	}
-	_, p.Err = fmt.Fprintln(p.Content, "h")
-}
-
-// Stroke strokes the current path.
-func (p *Writer) Stroke() {
-	if !p.isValid("Stroke", objPath|objClippingPath) {
-		return
-	}
-	p.currentObject = objPage
-	_, p.Err = fmt.Fprintln(p.Content, "S")
-}
-
-// CloseAndStroke closes and strokes the current path.
-func (p *Writer) CloseAndStroke() {
-	if !p.isValid("CloseAndStroke", objPath|objClippingPath) {
-		return
-	}
-	p.currentObject = objPage
-	_, p.Err = fmt.Fprintln(p.Content, "s")
 }
 
 // Fill fills the current path, using the nonzero winding number rule.  Any

@@ -35,8 +35,10 @@ func (w *Writer) TextSetCharacterSpacing(spacing float64) {
 	if w.isSet(StateTextCharacterSpacing) && nearlyEqual(spacing, w.State.TextCharacterSpacing) {
 		return
 	}
+
 	w.State.TextCharacterSpacing = spacing
 	w.Set |= StateTextCharacterSpacing
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(spacing), "Tc")
 }
 
