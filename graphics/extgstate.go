@@ -18,30 +18,10 @@ package graphics
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 
 	"seehuhn.de/go/pdf"
 )
-
-// SetExtGState sets selected graphics state parameters.
-//
-// This implements the "gs" graphics operator.
-func (p *Writer) SetExtGState(s *ExtGState) {
-	if !p.isValid("SetExtGState", objPage|objText) {
-		return
-	}
-
-	s.ApplyTo(&p.State)
-
-	name := p.getResourceName(catExtGState, s)
-	err := name.PDF(p.Content)
-	if err != nil {
-		p.Err = err
-		return
-	}
-	_, p.Err = fmt.Fprintln(p.Content, " gs")
-}
 
 // ExtGState represents a combination of graphics state parameters.
 // This combination of parameters can be set using the [Writer.SetExtGState] method.
