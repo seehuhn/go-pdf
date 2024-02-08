@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,11 +19,52 @@ package graphics
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
+
+// This file implements all text-related PDF operators.  The operators
+// implemented here are defined in tables 103, 105, 106 107 of ISO
+// 32000-2:2020.
+
+// TextStart starts a new text object.
+//
+// This implements the PDF graphics operator "BT".
+func (w *Writer) TextStart() {
+	if !w.isValid("TextStart", objPage) {
+		return
+	}
+	w.currentObject = objText
+
+	w.nesting = append(w.nesting, pairTypeBT)
+
+	w.State.TextMatrix = IdentityMatrix
+	w.State.TextLineMatrix = IdentityMatrix
+	w.Set |= StateTextMatrix
+
+	_, w.Err = fmt.Fprintln(w.Content, "BT")
+}
+
+// TextEnd ends the current text object.
+//
+// This implements the PDF graphics operator "ET".
+func (w *Writer) TextEnd() {
+	if !w.isValid("TextEnd", objText) {
+		return
+	}
+	w.currentObject = objPage
+
+	if len(w.nesting) == 0 || w.nesting[len(w.nesting)-1] != pairTypeBT {
+		w.Err = errors.New("TextEnd: no matching TextStart")
+		return
+	}
+	w.nesting = w.nesting[:len(w.nesting)-1]
+
+	w.Set &= ^StateTextMatrix
+
+	_, w.Err = fmt.Fprintln(w.Content, "ET")
+}
 
 // TextSetCharacterSpacing sets the character spacing.
 //
@@ -52,8 +93,10 @@ func (w *Writer) TextSetWordSpacing(spacing float64) {
 	if w.isSet(StateTextWordSpacing) && nearlyEqual(spacing, w.State.TextWordSpacing) {
 		return
 	}
+
 	w.State.TextWordSpacing = spacing
 	w.Set |= StateTextWordSpacing
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(spacing), "Tw")
 }
 
@@ -69,8 +112,10 @@ func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 	if w.isSet(StateTextHorizontalScaling) && nearlyEqual(scaling, w.State.TextHorizontalScaling) {
 		return
 	}
+
 	w.State.TextHorizontalScaling = scaling
 	w.Set |= StateTextHorizontalScaling
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(scaling*100), "Tz")
 }
 
@@ -84,8 +129,10 @@ func (w *Writer) TextSetLeading(leading float64) {
 	if w.isSet(StateTextLeading) && nearlyEqual(leading, w.State.TextLeading) {
 		return
 	}
+
 	w.State.TextLeading = leading
 	w.Set |= StateTextLeading
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(leading), "TL")
 }
 
@@ -99,12 +146,16 @@ func (w *Writer) TextSetFont(font font.Embedded, size float64) {
 	if w.isSet(StateTextFont) && w.State.TextFont == font && nearlyEqual(w.State.TextFontSize, size) {
 		return
 	}
+
 	if _, ok := font.PDFObject().(pdf.Reference); !ok {
+		// TODO(voss): can this happen?  do we need this check?
 		panic("font is not an indirect object")
 	}
+
 	w.State.TextFont = font
 	w.State.TextFontSize = size
 	w.State.Set |= StateTextFont
+
 	name := w.getResourceName(catFont, font)
 	err := name.PDF(w.Content)
 	if err != nil {
@@ -124,8 +175,10 @@ func (w *Writer) TextSetRenderingMode(mode TextRenderingMode) {
 	if w.isSet(StateTextRenderingMode) && w.State.TextRenderingMode == mode {
 		return
 	}
+
 	w.State.TextRenderingMode = mode
 	w.Set |= StateTextRenderingMode
+
 	_, w.Err = fmt.Fprintln(w.Content, mode, "Tr")
 }
 
@@ -139,43 +192,11 @@ func (w *Writer) TextSetRise(rise float64) {
 	if w.isSet(StateTextRise) && nearlyEqual(rise, w.State.TextRise) {
 		return
 	}
+
 	w.State.TextRise = rise
 	w.Set |= StateTextRise
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(rise), "Ts")
-}
-
-// TextStart starts a new text object.
-//
-// This implements the PDF graphics operator "BT".
-func (w *Writer) TextStart() {
-	if !w.isValid("TextStart", objPage) {
-		return
-	}
-	w.nesting = append(w.nesting, pairTypeBT)
-
-	w.currentObject = objText
-	w.State.TextMatrix = IdentityMatrix
-	w.State.TextLineMatrix = IdentityMatrix
-	w.Set |= StateTextMatrix
-	_, w.Err = fmt.Fprintln(w.Content, "BT")
-}
-
-// TextEnd ends the current text object.
-//
-// This implements the PDF graphics operator "ET".
-func (w *Writer) TextEnd() {
-	if !w.isValid("TextEnd", objText) {
-		return
-	}
-	if len(w.nesting) == 0 || w.nesting[len(w.nesting)-1] != pairTypeBT {
-		w.Err = errors.New("TextEnd without TextStart")
-		return
-	}
-	w.nesting = w.nesting[:len(w.nesting)-1]
-	w.Set &= ^StateTextMatrix
-
-	w.currentObject = objPage
-	_, w.Err = fmt.Fprintln(w.Content, "ET")
 }
 
 // TextFirstLine moves to the start of the next line of text.
@@ -185,8 +206,10 @@ func (w *Writer) TextFirstLine(dx, dy float64) {
 	if !w.isValid("TextFirstLine", objText) {
 		return
 	}
+
 	w.TextLineMatrix = Translate(dx, dy).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(dx), w.coord(dy), "Td")
 }
 
@@ -198,10 +221,12 @@ func (w *Writer) TextSecondLine(dx, dy float64) {
 	if !w.isValid("TextSecondLine", objText) {
 		return
 	}
+
 	w.TextLineMatrix = Translate(dx, dy).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
 	w.TextLeading = -dy
 	w.Set |= StateTextLeading
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(dx), w.coord(dy), "TD")
 }
 
@@ -212,9 +237,11 @@ func (w *Writer) TextSetMatrix(M Matrix) {
 	if !w.isValid("TextSetMatrix", objText) {
 		return
 	}
+
 	w.TextMatrix = M
 	w.TextLineMatrix = M
 	w.Set |= StateTextMatrix
+
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(M[0]), w.coord(M[1]), w.coord(M[2]), w.coord(M[3]), w.coord(M[4]), w.coord(M[5]), "Tm")
 }
 
@@ -225,8 +252,14 @@ func (w *Writer) TextNextLine() {
 	if !w.isValid("TextNewLine", objText) {
 		return
 	}
+	if err := w.mustBeSet(StateTextMatrix | StateTextLeading); err != nil {
+		w.Err = err
+		return
+	}
+
 	w.TextLineMatrix = Translate(0, -w.TextLeading).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
+
 	_, w.Err = fmt.Fprintln(w.Content, "T*")
 }
 
@@ -237,12 +270,12 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 	if !w.isValid("TextShowRaw", objText) {
 		return
 	}
-	F := w.State.TextFont
-	if !w.isSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise) {
-		w.Err = errors.New("no font set")
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+		w.Err = err
 		return
 	}
 
+	F := w.State.TextFont
 	wmode := F.WritingMode()
 	F.ForeachWidth(s, func(width float64, is_space bool) {
 		width = width*w.TextFontSize + w.TextCharacterSpacing
@@ -262,113 +295,98 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 		return
 	}
 	_, w.Err = fmt.Fprintln(w.Content, " Tj")
-	return
 }
 
-// TextShowGlyphs shows the PDF string s, taking kerning and text rise into
-// account.
+// TextShowNextLineRaw start a new line and then shows an already encoded text
+// in the PDF file.  This has the same effect as [Writer.TextNextLine] followed
+// by [Writer.TextShowRaw].
 //
-// This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
-func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
-	if !w.isValid("TextShowGlyphs", objText) {
-		return 0
+// This implements the PDF graphics operator "'".
+func (w *Writer) TextShowNextLineRaw(s pdf.String) {
+	if !w.isValid("TextShowNextLineRaw", objText) {
+		return
+	}
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextLeading); err != nil {
+		w.Err = err
+		return
+	}
+
+	F := w.State.TextFont
+	wmode := F.WritingMode()
+	F.ForeachWidth(s, func(width float64, is_space bool) {
+		width = width*w.TextFontSize + w.TextCharacterSpacing
+		if is_space {
+			width += w.TextWordSpacing
+		}
+		switch wmode {
+		case 0: // horizontal
+			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
+		case 1: // vertical
+			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
+		}
+	})
+
+	w.Err = s.PDF(w.Content)
+	if w.Err != nil {
+		return
+	}
+	_, w.Err = fmt.Fprintln(w.Content, " '")
+}
+
+// TextShowSpacedRaw adjusts word and character spacing and then shows an
+// already encoded text in the PDF file. This has the same effect as
+// [Writer.TextSetWordSpacing] and [Writer.TextSetCharacterSpacing], followed
+// by [Writer.TextShowRaw].
+//
+// This implements the PDF graphics operator '"'.
+func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.String) {
+	if !w.isValid("TextShowSpacedRaw", objText) {
+		return
 	}
 	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
 		w.Err = err
-		return 0
+		return
 	}
 
-	left := seq.Skip
-	gg := seq.Seq
+	F := w.State.TextFont
+	wmode := F.WritingMode()
+	F.ForeachWidth(s, func(width float64, is_space bool) {
+		width = width*w.TextFontSize + w.TextCharacterSpacing
+		if is_space {
+			width += w.TextWordSpacing
+		}
+		switch wmode {
+		case 0: // horizontal
+			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
+		case 1: // vertical
+			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
+		}
+	})
 
-	font := w.TextFont.(font.Layouter) // TODO(voss)
+	_, w.Err = fmt.Fprint(w.Content, w.coord(wordSpacing), w.coord(charSpacing), " ")
+	if w.Err != nil {
+		return
+	}
+	w.Err = s.PDF(w.Content)
+	if w.Err != nil {
+		return
+	}
+	_, w.Err = fmt.Fprintln(w.Content, " \"")
+}
 
-	var run pdf.String
-	var out pdf.Array
-	flush := func() {
-		if len(run) > 0 {
-			out = append(out, run)
-			run = nil
-		}
-		if len(out) == 0 {
-			return
-		}
-		if w.Err != nil {
-			return
-		}
-
-		if len(out) == 1 {
-			if s, ok := out[0].(pdf.String); ok {
-				w.Err = s.PDF(w.Content)
-				if w.Err != nil {
-					return
-				}
-				_, w.Err = fmt.Fprintln(w.Content, " Tj")
-				out = nil
-				return
-			}
-		}
-
-		w.Err = out.PDF(w.Content)
-		if w.Err != nil {
-			return
-		}
-		_, w.Err = fmt.Fprintln(w.Content, " TJ")
-		out = nil
+// TextShowKernedRaw shows an already encoded text in the PDF file, using
+// kerning information provided to adjust glyph spacing.
+//
+// This implements the PDF graphics operator "TJ".
+func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
+	if !w.isValid("TextShowKernedRaw", objText) {
+		return
+	}
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+		w.Err = err
+		return
 	}
 
-	xActual := 0.0
-	xWanted := left
-	param := w.State
-	if font.WritingMode() != 0 {
-		panic("vertical writing mode not implemented")
-	}
-	for _, g := range gg {
-		if w.State.Set&StateTextRise == 0 || math.Abs(g.Rise-w.State.TextRise) > 1e-6 {
-			flush()
-			w.State.TextRise = g.Rise
-			if w.Err != nil {
-				return 0
-			}
-			w.Err = pdf.Number(w.State.TextRise).PDF(w.Content) // TODO(voss): rounding?
-			if w.Err != nil {
-				return 0
-			}
-			_, w.Err = fmt.Fprintln(w.Content, " Ts")
-		}
-
-		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize / param.TextHorizontalScaling))
-		if xOffsetInt != 0 { // TODO(voss): only do this if the glyph is not blank
-			if len(run) > 0 {
-				out = append(out, run)
-				run = nil
-			}
-			out = append(out, -xOffsetInt)
-			xActual += float64(xOffsetInt) / 1000 * param.TextFontSize * param.TextHorizontalScaling
-		}
-
-		var glyphWidth float64
-		var isSpace bool
-		run, glyphWidth, isSpace = font.CodeAndWidth(run, g.GID, g.Text)
-		glyphWidth = glyphWidth*param.TextFontSize + param.TextCharacterSpacing
-		if isSpace {
-			glyphWidth += param.TextWordSpacing
-		}
-
-		xActual += glyphWidth * param.TextHorizontalScaling
-		xWanted += g.Advance
-	}
-	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize))
-	if xOffsetInt != 0 {
-		if len(run) > 0 {
-			out = append(out, run)
-			run = nil
-		}
-		out = append(out, -xOffsetInt)
-		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize
-	}
-	flush()
-	w.TextMatrix = Translate(xActual, 0).Mul(w.TextMatrix)
-
-	return xActual
+	// TODO(voss): implement this
+	panic("not implemented")
 }

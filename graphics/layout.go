@@ -18,9 +18,120 @@ package graphics
 
 import (
 	"errors"
+	"fmt"
+	"math"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
+
+// TextShowGlyphs shows the PDF string s, taking kerning and text rise into
+// account.
+//
+// This uses the "TJ", "Tj" and "Ts" PDF graphics operators.
+func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
+	if !w.isValid("TextShowGlyphs", objText) {
+		return 0
+	}
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+		w.Err = err
+		return 0
+	}
+
+	left := seq.Skip
+	gg := seq.Seq
+
+	font := w.TextFont.(font.Layouter) // TODO(voss)
+
+	var run pdf.String
+	var out pdf.Array
+	flush := func() {
+		if len(run) > 0 {
+			out = append(out, run)
+			run = nil
+		}
+		if len(out) == 0 {
+			return
+		}
+		if w.Err != nil {
+			return
+		}
+
+		if len(out) == 1 {
+			if s, ok := out[0].(pdf.String); ok {
+				w.Err = s.PDF(w.Content)
+				if w.Err != nil {
+					return
+				}
+				_, w.Err = fmt.Fprintln(w.Content, " Tj")
+				out = nil
+				return
+			}
+		}
+
+		w.Err = out.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " TJ")
+		out = nil
+	}
+
+	xActual := 0.0
+	xWanted := left
+	param := w.State
+	if font.WritingMode() != 0 {
+		panic("vertical writing mode not implemented")
+	}
+	for _, g := range gg {
+		if w.State.Set&StateTextRise == 0 || math.Abs(g.Rise-w.State.TextRise) > 1e-6 {
+			flush()
+			w.State.TextRise = g.Rise
+			if w.Err != nil {
+				return 0
+			}
+			w.Err = pdf.Number(w.State.TextRise).PDF(w.Content) // TODO(voss): rounding?
+			if w.Err != nil {
+				return 0
+			}
+			_, w.Err = fmt.Fprintln(w.Content, " Ts")
+		}
+
+		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize / param.TextHorizontalScaling))
+		if xOffsetInt != 0 { // TODO(voss): only do this if the glyph is not blank
+			if len(run) > 0 {
+				out = append(out, run)
+				run = nil
+			}
+			out = append(out, -xOffsetInt)
+			xActual += float64(xOffsetInt) / 1000 * param.TextFontSize * param.TextHorizontalScaling
+		}
+
+		var glyphWidth float64
+		var isSpace bool
+		run, glyphWidth, isSpace = font.CodeAndWidth(run, g.GID, g.Text)
+		glyphWidth = glyphWidth*param.TextFontSize + param.TextCharacterSpacing
+		if isSpace {
+			glyphWidth += param.TextWordSpacing
+		}
+
+		xActual += glyphWidth * param.TextHorizontalScaling
+		xWanted += g.Advance
+	}
+	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize))
+	if xOffsetInt != 0 {
+		if len(run) > 0 {
+			out = append(out, run)
+			run = nil
+		}
+		out = append(out, -xOffsetInt)
+		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize
+	}
+	flush()
+	w.TextMatrix = Translate(xActual, 0).Mul(w.TextMatrix)
+
+	return xActual
+}
 
 // TextLayout returns the glyph sequence for a string.
 // The function panics if no font is set.

@@ -17,7 +17,6 @@
 package graphics
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -77,63 +76,4 @@ func (p *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 func (p *Writer) Circle(x, y, radius float64) {
 	p.MoveToArc(x, y, radius, 0, 2*math.Pi)
 	p.ClosePath()
-}
-
-// Fill fills the current path, using the nonzero winding number rule.  Any
-// subpaths that are open are implicitly closed before being filled.
-func (p *Writer) Fill() {
-	if !p.isValid("Fill", objPath|objClippingPath) {
-		return
-	}
-	p.currentObject = objPage
-	_, p.Err = fmt.Fprintln(p.Content, "f")
-}
-
-// FillEvenOdd fills the current path, using the even-odd rule.  Any
-// subpaths that are open are implicitly closed before being filled.
-func (p *Writer) FillEvenOdd() {
-	if !p.isValid("FillEvenOdd", objPath|objClippingPath) {
-		return
-	}
-	p.currentObject = objPage
-	_, p.Err = fmt.Fprintln(p.Content, "f*")
-}
-
-// FillAndStroke fills and strokes the current path.  Any subpaths that are
-// open are implicitly closed before being filled.
-func (p *Writer) FillAndStroke() {
-	if !p.isValid("FillAndStroke", objPath|objClippingPath) {
-		return
-	}
-	p.currentObject = objPage
-	_, p.Err = fmt.Fprintln(p.Content, "B")
-}
-
-// EndPath ends the path without filling and stroking it.
-// This is for use after the [Writer.ClipNonZero] and [Writer.ClipEvenOdd] methods.
-func (p *Writer) EndPath() {
-	if !p.isValid("EndPath", objPath|objClippingPath) {
-		return
-	}
-	p.currentObject = objPage
-	_, p.Err = fmt.Fprintln(p.Content, "n")
-}
-
-// ClipNonZero sets the current clipping path using the nonzero winding number
-// rule.
-func (p *Writer) ClipNonZero() {
-	if !p.isValid("ClipNonZero", objPath) {
-		return
-	}
-	p.currentObject = objClippingPath
-	_, p.Err = fmt.Fprintln(p.Content, "W")
-}
-
-// ClipEvenOdd sets the current clipping path using the even-odd rule.
-func (p *Writer) ClipEvenOdd() {
-	if !p.isValid("ClipEvenOdd", objPath) {
-		return
-	}
-	p.currentObject = objClippingPath
-	_, p.Err = fmt.Fprintln(p.Content, "W*")
 }

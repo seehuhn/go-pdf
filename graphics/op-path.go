@@ -19,8 +19,8 @@ package graphics
 import "fmt"
 
 // This file implements the "Path construction operators" and "Path-painting
-// operators". These operators are defined in tables 58 and 59 of ISO
-// 32000-2:2020.
+// operators".  The operators implemented here are defined in tables 58, 59
+// and 60 of ISO 32000-2:2020.
 
 // MoveTo starts a new path at the given coordinates.
 //
@@ -121,11 +121,167 @@ func (w *Writer) Stroke() {
 }
 
 // CloseAndStroke closes and strokes the current path.
+// This has the same effect as [Writer.ClosePath] followed by [Writer.Stroke].
+//
+// This implements the PDF graphics operator "s".
 func (w *Writer) CloseAndStroke() {
 	if !w.isValid("CloseAndStroke", objPath) {
 		return
 	}
 	w.currentObject = objPage
 
+	if err := w.mustBeSet(strokeStateBits); err != nil {
+		w.Err = err
+		return
+	}
+
 	_, w.Err = fmt.Fprintln(w.Content, "s")
+}
+
+// Fill fills the current path, using the nonzero winding number rule.  Any
+// subpaths that are open are implicitly closed before being filled.
+//
+// This implements the PDF graphics operator "f".
+func (w *Writer) Fill() {
+	if !w.isValid("Fill", objPath) {
+		return
+	}
+	w.currentObject = objPage
+
+	if err := w.mustBeSet(fillStateBits); err != nil {
+		w.Err = err
+		return
+	}
+
+	_, w.Err = fmt.Fprintln(w.Content, "f")
+}
+
+// FillEvenOdd fills the current path, using the even-odd rule.  Any
+// subpaths that are open are implicitly closed before being filled.
+//
+// This implements the PDF graphics operator "f*".
+func (w *Writer) FillEvenOdd() {
+	if !w.isValid("FillEvenOdd", objPath) {
+		return
+	}
+	w.currentObject = objPage
+
+	if err := w.mustBeSet(fillStateBits); err != nil {
+		w.Err = err
+		return
+	}
+
+	_, w.Err = fmt.Fprintln(w.Content, "f*")
+}
+
+// FillAndStroke fills and strokes the current path.  Any subpaths that are
+// open are implicitly closed before being filled.
+//
+// This implements the PDF graphics operator "B".
+func (w *Writer) FillAndStroke() {
+	if !w.isValid("FillAndStroke", objPath) {
+		return
+	}
+	w.currentObject = objPage
+
+	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+		w.Err = err
+		return
+	}
+
+	_, w.Err = fmt.Fprintln(w.Content, "B")
+}
+
+// FillAndStrokeEvenOdd fills and strokes the current path, using the even-odd
+// rule for filling.  Any subpaths that are open are implicitly closed before
+// being filled.
+//
+// This implements the PDF graphics operator "B*".
+func (w *Writer) FillAndStrokeEvenOdd() {
+	if !w.isValid("FillAndStroke", objPath) {
+		return
+	}
+	w.currentObject = objPage
+
+	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+		w.Err = err
+		return
+	}
+
+	_, w.Err = fmt.Fprintln(w.Content, "B*")
+}
+
+// CloseFillAndStroke closes, fills and strokes the current path. This has the
+// same effect as [Writer.ClosePath] followed by [Writer.FillAndStroke].
+//
+// This implements the PDF graphics operator "b".
+func (w *Writer) CloseFillAndStroke() {
+	if !w.isValid("FillAndStroke", objPath) {
+		return
+	}
+	w.currentObject = objPage
+
+	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+		w.Err = err
+		return
+	}
+
+	_, w.Err = fmt.Fprintln(w.Content, "b")
+}
+
+// CloseFillAndStrokeEvenOdd closes, fills and strokes the current path, using
+// the even-odd rule for filling.  This has the same effect as
+// [Writer.ClosePath] followed by [Writer.FillAndStrokeEvenOdd].
+//
+// This implements the PDF graphics operator "b*".
+func (w *Writer) CloseFillAndStrokeEvenOdd() {
+	if !w.isValid("FillAndStroke", objPath) {
+		return
+	}
+	w.currentObject = objPage
+
+	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+		w.Err = err
+		return
+	}
+
+	_, w.Err = fmt.Fprintln(w.Content, "b*")
+}
+
+// EndPath ends the path without filling and stroking it.
+// This is for use after the [Writer.ClipNonZero] and [Writer.ClipEvenOdd] methods.
+//
+// This implements the PDF graphics operator "n".
+func (w *Writer) EndPath() {
+	if !w.isValid("EndPath", objPath) {
+		return
+	}
+	w.currentObject = objPage
+
+	_, w.Err = fmt.Fprintln(w.Content, "n")
+}
+
+// ClipNonZero sets the current clipping path using the nonzero winding number
+// rule.
+//
+// This implements the PDF graphics operator "W".
+func (w *Writer) ClipNonZero() {
+	if !w.isValid("ClipNonZero", objPath) {
+		return
+	}
+	w.currentObject = objClippingPath
+
+	_, w.Err = fmt.Fprintln(w.Content, "W")
+}
+
+// ClipEvenOdd sets the current clipping path using the even-odd rule.
+//
+// This implements the PDF graphics operator "W*".
+func (w *Writer) ClipEvenOdd() {
+	if !w.isValid("ClipEvenOdd", objPath) {
+		return
+	}
+	w.currentObject = objClippingPath
+
+	_, w.Err = fmt.Fprintln(w.Content, "W*")
 }

@@ -238,8 +238,11 @@ const (
 		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
 		StateFlatnessTolerance | StateSmoothnessTolerance
 
-	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin |
-		StateMiterLimit | StateDash | StateStrokeColor
+	// TODO(voss): update this one
+	// https://github.com/pdf-association/pdf-issues/issues/380
+	// is resolved
+	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateDash | StateStrokeColor
+	fillStateBits   = StateFillColor
 )
 
 // NewState returns a new graphics state with default values,
