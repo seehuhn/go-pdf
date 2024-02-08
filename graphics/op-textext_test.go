@@ -18,14 +18,6 @@ package graphics_test
 
 import (
 	"fmt"
-	"image"
-	"image/png"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"sync"
 	"testing"
 
 	"seehuhn.de/go/postscript/funit"
@@ -40,52 +32,12 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 	"seehuhn.de/go/pdf/internal/fonttypes"
+	"seehuhn.de/go/pdf/internal/ghostscript"
 )
 
-// The tests in this file check that ghostscripts idea of PDF coincides with
-// our own.
-
-// TestLineWidth checks that a vertical line of width 6 colours the correct
-// pixels.
-func TestLineWidth(t *testing.T) {
-	if !haveGhostScript() {
-		t.Skip("ghostscript not found")
-	}
-
-	img := gsRender(t, 20, 5, pdf.V1_7, func(r *document.Page) error {
-		r.SetLineWidth(6.0)
-		r.MoveTo(10, 0)
-		r.LineTo(10, 5)
-		r.Stroke()
-		return nil
-	})
-
-	rect := img.Bounds()
-	for i := rect.Min.X; i < rect.Max.X; i++ {
-		for j := rect.Min.Y; j < rect.Max.Y; j++ {
-			r, g, b, a := img.At(i, j).RGBA()
-			if i >= 4*7 && i < 4*13 {
-				// should be black
-				if r != 0 || g != 0 || b != 0 || a != 0xffff {
-					t.Errorf("pixel (%d,%d) should be black, but is %d,%d,%d,%d", i, j, r, g, b, a)
-				}
-			} else {
-				// should be white
-				if r != 0xffff || g != 0xffff || b != 0xffff || a != 0xffff {
-					t.Errorf("pixel (%d,%d) should be white, but is %d,%d,%d,%d", i, j, r, g, b, a)
-				}
-			}
-		}
-	}
-}
-
-// TestTextPositions1 checks that text positions are correcly updated
+// TestTextShowRaw checks that text positions are correcly updated
 // in the graphics state.
-func TestTextPositions1(t *testing.T) {
-	if !haveGhostScript() {
-		t.Skip("ghostscript not found")
-	}
-
+func TestTextShowRaw(t *testing.T) {
 	// make a test font
 	F := &cff.Font{
 		FontInfo: &type1.FontInfo{
@@ -147,7 +99,7 @@ func TestTextPositions1(t *testing.T) {
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			// first print all glyphs in one string
-			img1 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
+			img1 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
 				F := dummyfont.EmbedCFF(r.Out, e, "F")
 
 				r.TextStart()
@@ -162,7 +114,7 @@ func TestTextPositions1(t *testing.T) {
 			})
 			// now print glyphs one-by-one and record the x positions
 			var xx []float64
-			img2 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
+			img2 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
 				F := dummyfont.EmbedCFF(r.Out, e, "F")
 
 				r.TextStart()
@@ -179,7 +131,7 @@ func TestTextPositions1(t *testing.T) {
 				return nil
 			})
 			// finally, print each glyph at the recorded x positions
-			img3 := gsRender(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
+			img3 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
 				F := dummyfont.EmbedCFF(r.Out, e, "F")
 
 				r.TextSetFont(F, 100)
@@ -230,11 +182,7 @@ func TestTextPositions1(t *testing.T) {
 
 // TestTextPositions checks that text positions are correcly updated
 // in the graphics state.
-func TestTextPositions2(t *testing.T) {
-	if !haveGhostScript() {
-		t.Skip("ghostscript not found")
-	}
-
+func TestTextShowRaw2(t *testing.T) {
 	testString := ".MiAbc"
 	// TODO(voss): also try PDF.V2_0, once
 	// https://bugs.ghostscript.com/show_bug.cgi?id=707475 is resolved.
@@ -245,7 +193,7 @@ func TestTextPositions2(t *testing.T) {
 
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
-			img1 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
+			img1 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
 				F, err := sample.Embed(r.Out, nil)
 				if err != nil {
 					return err
@@ -265,7 +213,7 @@ func TestTextPositions2(t *testing.T) {
 				return nil
 			})
 			// Then print each glyph at the recorded x positions.
-			img2 := gsRender(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
+			img2 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
 				F, err := sample.Embed(r.Out, nil)
 				if err != nil {
 					return err
@@ -305,123 +253,3 @@ func TestTextPositions2(t *testing.T) {
 		})
 	}
 }
-
-func gsRender(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) image.Image {
-	t.Helper()
-
-	r, err := newGSRenderer(t, pdfWidth, pdfHeight, v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = f(r.Page)
-	if err != nil {
-		t.Fatal(err)
-	}
-	img, err := r.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return img
-}
-
-type gsRenderer struct {
-	Dir     string
-	PDFName string
-
-	*document.Page
-}
-
-func newGSRenderer(t *testing.T, width, height float64, v pdf.Version) (*gsRenderer, error) {
-	t.Helper()
-
-	dir := t.TempDir()
-
-	// dir, err := filepath.Abs("./xxx/")
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	idx := <-gsIndex
-	gsIndex <- idx + 1
-
-	pdfName := filepath.Join(dir, fmt.Sprintf("test%03d.pdf", idx))
-	paper := &pdf.Rectangle{
-		URx: width,
-		URy: height,
-	}
-	opt := &pdf.WriterOptions{Version: v}
-	doc, err := document.CreateSinglePage(pdfName, paper, opt)
-	if err != nil {
-		return nil, err
-	}
-
-	res := &gsRenderer{
-		Dir:     dir,
-		PDFName: pdfName,
-		Page:    doc,
-	}
-
-	return res, nil
-}
-
-func (r *gsRenderer) Close() (image.Image, error) {
-	err := r.Page.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	pngName := strings.TrimSuffix(r.PDFName, ".pdf") + ".png"
-
-	cmd := exec.Command(
-		"gs", "-q",
-		"-sDEVICE=png16m", fmt.Sprintf("-r%d", gsResolution),
-		"-dTextAlphaBits=4", "-dGraphicsAlphaBits=4",
-		"-o", pngName,
-		r.PDFName)
-	cmd.Dir = r.Dir
-	cmd.Stdin = nil
-	cmd.Stderr = nil
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	if len(out) > 0 {
-		fmt.Println("unexpected ghostscript output:")
-		fmt.Println(string(out))
-	}
-
-	fd, err := os.Open(pngName)
-	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-
-	img, err := png.Decode(fd)
-	if err != nil {
-		return nil, err
-	}
-
-	return img, nil
-}
-
-func haveGhostScript() bool {
-	gsScriptOnce.Do(func() {
-		out, err := exec.Command("gs", "-h").Output()
-		if err != nil {
-			gsScriptFound = false
-			return
-		}
-		gsScriptFound = gsScriptPNGRe.Match(out)
-		gsIndex <- 1
-	})
-	return gsScriptFound
-}
-
-var (
-	gsScriptOnce  sync.Once
-	gsScriptPNGRe = regexp.MustCompile(`\bpng16m\b`)
-	gsScriptFound bool
-	gsIndex       = make(chan int, 1)
-)
-
-const gsResolution = 4 * 72

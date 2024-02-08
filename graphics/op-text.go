@@ -69,35 +69,35 @@ func (w *Writer) TextEnd() {
 // TextSetCharacterSpacing sets the character spacing.
 //
 // This implementes the PDF graphics operator "Tc".
-func (w *Writer) TextSetCharacterSpacing(spacing float64) {
+func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
 	if !w.isValid("TextSetCharSpacing", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextCharacterSpacing) && nearlyEqual(spacing, w.State.TextCharacterSpacing) {
+	if w.isSet(StateTextCharacterSpacing) && nearlyEqual(charSpacing, w.State.TextCharacterSpacing) {
 		return
 	}
 
-	w.State.TextCharacterSpacing = spacing
+	w.State.TextCharacterSpacing = charSpacing
 	w.Set |= StateTextCharacterSpacing
 
-	_, w.Err = fmt.Fprintln(w.Content, w.coord(spacing), "Tc")
+	_, w.Err = fmt.Fprintln(w.Content, w.coord(charSpacing), "Tc")
 }
 
 // TextSetWordSpacing sets the word spacing.
 //
 // This implementes the PDF graphics operator "Tw".
-func (w *Writer) TextSetWordSpacing(spacing float64) {
+func (w *Writer) TextSetWordSpacing(wordSpacing float64) {
 	if !w.isValid("TextSetWordSpacing", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextWordSpacing) && nearlyEqual(spacing, w.State.TextWordSpacing) {
+	if w.isSet(StateTextWordSpacing) && nearlyEqual(wordSpacing, w.State.TextWordSpacing) {
 		return
 	}
 
-	w.State.TextWordSpacing = spacing
+	w.State.TextWordSpacing = wordSpacing
 	w.Set |= StateTextWordSpacing
 
-	_, w.Err = fmt.Fprintln(w.Content, w.coord(spacing), "Tw")
+	_, w.Err = fmt.Fprintln(w.Content, w.coord(wordSpacing), "Tw")
 }
 
 // TextSetHorizontalScaling sets the horizontal scaling.
@@ -270,25 +270,12 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 	if !w.isValid("TextShowRaw", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextWordSpacing | StateTextCharacterSpacing); err != nil {
 		w.Err = err
 		return
 	}
 
-	F := w.State.TextFont
-	wmode := F.WritingMode()
-	F.ForeachWidth(s, func(width float64, is_space bool) {
-		width = width*w.TextFontSize + w.TextCharacterSpacing
-		if is_space {
-			width += w.TextWordSpacing
-		}
-		switch wmode {
-		case 0: // horizontal
-			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
-		case 1: // vertical
-			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
-		}
-	})
+	w.updateTextPosition(w.State.TextFont, s)
 
 	w.Err = s.PDF(w.Content)
 	if w.Err != nil {
@@ -306,25 +293,15 @@ func (w *Writer) TextShowNextLineRaw(s pdf.String) {
 	if !w.isValid("TextShowNextLineRaw", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextLeading); err != nil {
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextWordSpacing | StateTextCharacterSpacing | StateTextLeading); err != nil {
 		w.Err = err
 		return
 	}
 
-	F := w.State.TextFont
-	wmode := F.WritingMode()
-	F.ForeachWidth(s, func(width float64, is_space bool) {
-		width = width*w.TextFontSize + w.TextCharacterSpacing
-		if is_space {
-			width += w.TextWordSpacing
-		}
-		switch wmode {
-		case 0: // horizontal
-			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
-		case 1: // vertical
-			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
-		}
-	})
+	w.TextLineMatrix = Translate(0, -w.TextLeading).Mul(w.TextLineMatrix)
+	w.TextMatrix = w.TextLineMatrix
+
+	w.updateTextPosition(w.State.TextFont, s)
 
 	w.Err = s.PDF(w.Content)
 	if w.Err != nil {
@@ -348,20 +325,10 @@ func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Strin
 		return
 	}
 
-	F := w.State.TextFont
-	wmode := F.WritingMode()
-	F.ForeachWidth(s, func(width float64, is_space bool) {
-		width = width*w.TextFontSize + w.TextCharacterSpacing
-		if is_space {
-			width += w.TextWordSpacing
-		}
-		switch wmode {
-		case 0: // horizontal
-			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
-		case 1: // vertical
-			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
-		}
-	})
+	w.State.TextWordSpacing = wordSpacing
+	w.State.TextCharacterSpacing = charSpacing
+	w.Set |= StateTextWordSpacing | StateTextCharacterSpacing
+	w.updateTextPosition(w.State.TextFont, s)
 
 	_, w.Err = fmt.Fprint(w.Content, w.coord(wordSpacing), w.coord(charSpacing), " ")
 	if w.Err != nil {
@@ -382,11 +349,61 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 	if !w.isValid("TextShowKernedRaw", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextWordSpacing | StateTextCharacterSpacing); err != nil {
 		w.Err = err
 		return
 	}
 
-	// TODO(voss): implement this
-	panic("not implemented")
+	var a pdf.Array
+	wMode := w.State.TextFont.WritingMode()
+	for _, arg := range args {
+		var delta float64
+		switch arg := arg.(type) {
+		case pdf.String:
+			w.updateTextPosition(w.State.TextFont, arg)
+			if w.Err != nil {
+				return
+			}
+		case pdf.Real:
+			delta = float64(arg)
+		case pdf.Integer:
+			delta = float64(arg)
+		case pdf.Number:
+			delta = float64(arg)
+		default:
+			w.Err = fmt.Errorf("TextShowKernedRaw: invalid argument type %T", arg)
+			return
+		}
+		if delta != 0 {
+			delta *= -w.State.TextFontSize / 1000
+			if wMode == 0 {
+				w.TextMatrix = Translate(delta*w.State.TextHorizontalScaling, 0).Mul(w.TextMatrix)
+			} else {
+				w.TextMatrix = Translate(0, delta).Mul(w.TextMatrix)
+			}
+		}
+		a = append(a, arg)
+	}
+
+	w.Err = a.PDF(w.Content)
+	if w.Err != nil {
+		return
+	}
+	_, w.Err = fmt.Fprintln(w.Content, " TJ")
+}
+
+func (w *Writer) updateTextPosition(F font.Embedded, s pdf.String) {
+	wmode := F.WritingMode()
+	F.ForeachWidth(s, func(width float64, is_space bool) {
+		width = width*w.TextFontSize + w.TextCharacterSpacing
+		if is_space {
+			width += w.TextWordSpacing
+		}
+		switch wmode {
+		case 0: // horizontal
+			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
+		case 1: // vertical
+			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
+		}
+	})
 }
