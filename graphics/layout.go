@@ -143,8 +143,12 @@ func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
 	if !ok {
 		return nil, errors.New("font does not support layouting")
 	}
-	// TODO(voss): use character spacing, word spacing, horizontal scaling
-	return F.Layout(w.TextFontSize, s), nil
+	gg := F.Layout(w.TextFontSize, s)
+	for i := range gg.Seq {
+		gg.Seq[i].Advance = gg.Seq[i].Advance * w.State.TextHorizontalScaling
+	}
+	// TODO(voss): use character spacing, word spacing
+	return gg, nil
 }
 
 // TextShow draws a string.

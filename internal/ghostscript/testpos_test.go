@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,24 +14,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package ghostscript
 
 import (
+	"math"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/document"
 )
 
-func TestIdentityMatrix(t *testing.T) {
-	A := Matrix{2, 3, 4, 5, 6, 7}
-
-	B := A.Mul(IdentityMatrix)
-	if d := cmp.Diff(A, B); d != "" {
-		t.Error(d)
+func TestTextPos(t *testing.T) {
+	xTest := 100.0
+	yTest := 100.0
+	x, y, err := FindTextPos(pdf.V1_7, document.A5r, func(page *document.Page) error {
+		page.TextFirstLine(xTest, yTest)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	C := IdentityMatrix.Mul(A)
-	if d := cmp.Diff(A, C); d != "" {
-		t.Error(d)
+	// fmt.Printf("got (%g,%g) instead of (%g,%g)\n", x, y, xTest, yTest)
+	if math.Abs(x-xTest) > 0.2 || math.Abs(y-yTest) > 0.2 {
+		t.Fatalf("expected x=%f, y=%f, got x=%f, y=%f", xTest, yTest, x, y)
 	}
 }

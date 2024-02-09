@@ -18,6 +18,8 @@ package graphics_test
 
 import (
 	"fmt"
+	"io"
+	"math"
 	"testing"
 
 	"seehuhn.de/go/postscript/funit"
@@ -30,10 +32,34 @@ import (
 	"seehuhn.de/go/pdf/document"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/testcases"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/internal/ghostscript"
 )
+
+func TestTextPos(t *testing.T) {
+	for i, setup := range testcases.All {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			page, err := document.WriteSinglePage(io.Discard, testcases.Paper, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			page.TextStart()
+			err = setup(page)
+			if err != nil {
+				t.Fatal(err)
+			}
+			x, y := page.GetTextPositionDevice()
+
+			expected := testcases.AllGhostscript[i]
+			if math.Abs(x-expected.X) > 1 || math.Abs(y-expected.Y) > 1 {
+				t.Fatalf("expected x=%f, y=%f, got x=%f, y=%f", expected.X, expected.Y, x, y)
+			}
+		})
+	}
+}
 
 // TestTextShowRaw checks that text positions are correcly updated
 // in the graphics state.

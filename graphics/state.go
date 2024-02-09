@@ -17,7 +17,6 @@
 package graphics
 
 import (
-	"math"
 	"math/bits"
 
 	"seehuhn.de/go/pdf"
@@ -60,10 +59,8 @@ type Parameters struct {
 	// (default: device-dependent)
 	CTM Matrix
 
-	startX, startY     float64 // the starting point of the current path
-	currentX, currentY float64 // the "current point"
-	pathSegments       int
-	pathIsClosed       bool
+	StartX, StartY     float64 // the starting point of the current path
+	CurrentX, CurrentY float64 // the "current point"
 
 	StrokeColor color.Color
 	FillColor   color.Color
@@ -307,77 +304,13 @@ func (s *Parameters) Clone() *Parameters {
 
 // GetTextPositionDevice returns the current text position in device coordinates.
 func (s State) GetTextPositionDevice() (float64, float64) {
-	if !s.isSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise) {
-		panic("GetTextPosition: unset parameters")
+	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+		panic(err)
 	}
 	M := Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
 	M = M.Mul(s.TextMatrix)
 	M = M.Mul(s.CTM)
 	return M[4], M[5]
-}
-
-// Matrix contains a PDF transformation matrix.
-// The elements are stored in the same order as for the "cm" operator.
-//
-// If M = [a b c d e f] is a [Matrix], then M corresponds to the following
-// 3x3 matrix:
-//
-//	/ a b 0 \
-//	| c d 0 |
-//	\ e f 1 /
-//
-// A vector (x, y, 1) is transformed by M into
-//
-//	(x y 1) * M = (a*x+c*y+e, b*x+d*y+f, 1)
-type Matrix [6]float64
-
-// Apply applies the transformation matrix to the given vector.
-func (A Matrix) Apply(x, y float64) (float64, float64) {
-	return x*A[0] + y*A[2] + A[4], x*A[1] + y*A[3] + A[5]
-}
-
-// Mul multiplies two transformation matrices and returns the result.
-// The result is equivalent to first applying A and then B.
-func (A Matrix) Mul(B Matrix) Matrix {
-	// / A0 A1 0 \  / B0 B1 0 \   / A0*B0+A1*B2    A0*B1+A1*B3    0 \
-	// | A2 A3 0 |  | B2 B3 0 | = | A2*B0+A3*B2    A2*B1+A3*B3    0 |
-	// \ A4 A5 1 /  \ B4 B5 1 /   \ A4*B0+A5*B2+B4 A4*B1+A5*B3+B5 1 /
-	return Matrix{
-		A[0]*B[0] + A[1]*B[2],
-		A[0]*B[1] + A[1]*B[3],
-		A[2]*B[0] + A[3]*B[2],
-		A[2]*B[1] + A[3]*B[3],
-		A[4]*B[0] + A[5]*B[2] + B[4],
-		A[4]*B[1] + A[5]*B[3] + B[5],
-	}
-}
-
-// IdentityMatrix is the identity transformation.
-var IdentityMatrix = Matrix{1, 0, 0, 1, 0, 0}
-
-// Translate moves the origin of the coordinate system.
-//
-// Drawing the unit square [0, 1] x [0, 1] after applying this transformation
-// is equivalent to drawing the rectangle [dx, dx+1] x [dy, dy+1] in the
-// original coordinate system.
-func Translate(dx, dy float64) Matrix {
-	return Matrix{1, 0, 0, 1, dx, dy}
-}
-
-// Scale scales the coordinate system.
-//
-// Drawing the unit square [0, 1] x [0, 1] after applying this transformation
-// is equivalent to drawing the rectangle [0, xScale] x [0, yScale] in the
-// original coordinate system.
-func Scale(xScale, yScale float64) Matrix {
-	return Matrix{xScale, 0, 0, yScale, 0, 0}
-}
-
-// Rotate rotates the coordinate system by the given angle (in radians).
-func Rotate(phi float64) Matrix {
-	c := math.Cos(phi)
-	s := math.Sin(phi)
-	return Matrix{c, s, -s, c, 0, 0}
 }
 
 // TextRenderingMode is the rendering mode for text.

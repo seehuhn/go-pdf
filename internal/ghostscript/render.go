@@ -17,6 +17,7 @@
 package ghostscript
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -46,7 +47,11 @@ func Render(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(pag
 		t.Skip("ghostscript not found")
 	}
 
-	r, err := newGSRenderer(t, pdfWidth, pdfHeight, v)
+	paper := &pdf.Rectangle{
+		URx: pdfWidth,
+		URy: pdfHeight,
+	}
+	r, err := newGSRenderer(paper, v)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +73,11 @@ type gsRenderer struct {
 	*document.Page
 }
 
-func newGSRenderer(t *testing.T, width, height float64, v pdf.Version) (*gsRenderer, error) {
-	t.Helper()
-
-	dir := t.TempDir()
+func newGSRenderer(paper *pdf.Rectangle, v pdf.Version) (*gsRenderer, error) {
+	dir, err := os.MkdirTemp("", "pdf*")
+	if err != nil {
+		return nil, err
+	}
 
 	// dir, err := filepath.Abs("./xxx/")
 	// if err != nil {
@@ -82,10 +88,6 @@ func newGSRenderer(t *testing.T, width, height float64, v pdf.Version) (*gsRende
 	gsIndex <- idx + 1
 
 	pdfName := filepath.Join(dir, fmt.Sprintf("test%03d.pdf", idx))
-	paper := &pdf.Rectangle{
-		URx: width,
-		URy: height,
-	}
 	opt := &pdf.WriterOptions{Version: v}
 	doc, err := document.CreateSinglePage(pdfName, paper, opt)
 	if err != nil {
@@ -138,6 +140,11 @@ func (r *gsRenderer) Close() (image.Image, error) {
 		return nil, err
 	}
 
+	err = os.RemoveAll(r.Dir)
+	if err != nil {
+		return nil, err
+	}
+
 	return img, nil
 }
 
@@ -154,6 +161,8 @@ func isAvailable() bool {
 	})
 	return gsScriptFound
 }
+
+var ErrNoGhostscript = errors.New("cannot run ghostscript")
 
 var (
 	gsScriptOnce  sync.Once

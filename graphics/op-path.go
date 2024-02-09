@@ -31,9 +31,8 @@ func (w *Writer) MoveTo(x, y float64) {
 	}
 	w.currentObject = objPath
 
-	w.startX, w.startY = x, y
-	w.currentX, w.currentY = x, y
-	w.pathIsClosed = false
+	w.StartX, w.StartY = x, y
+	w.CurrentX, w.CurrentY = x, y
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "m")
 }
@@ -46,8 +45,7 @@ func (w *Writer) LineTo(x, y float64) {
 		return
 	}
 
-	w.currentX, w.currentY = x, y
-	w.pathIsClosed = false
+	w.CurrentX, w.CurrentY = x, y
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "l")
 }
@@ -60,9 +58,8 @@ func (w *Writer) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 		return
 	}
 
-	x0, y0 := w.currentX, w.currentY
-	w.currentX, w.currentY = x3, y3
-	w.pathIsClosed = false
+	x0, y0 := w.CurrentX, w.CurrentY
+	w.CurrentX, w.CurrentY = x3, y3
 
 	if nearlyEqual(x0, x1) && nearlyEqual(y0, y1) {
 		_, w.Err = fmt.Fprintln(w.Content, w.coord(x2), w.coord(y2), w.coord(x3), w.coord(y3), "v")
@@ -81,8 +78,7 @@ func (w *Writer) ClosePath() {
 		return
 	}
 
-	w.currentX, w.currentY = w.startX, w.startY
-	w.pathIsClosed = true
+	w.CurrentX, w.CurrentY = w.StartX, w.StartY
 
 	_, w.Err = fmt.Fprintln(w.Content, "h")
 }
@@ -96,9 +92,8 @@ func (w *Writer) Rectangle(x, y, width, height float64) {
 	}
 	w.currentObject = objPath
 
-	w.startX, w.startY = x, y
-	w.currentX, w.currentY = x, y
-	w.pathIsClosed = true
+	w.StartX, w.StartY = x, y
+	w.CurrentX, w.CurrentY = x, y
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), w.coord(width), w.coord(height), "re")
 }
