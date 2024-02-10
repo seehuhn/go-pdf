@@ -46,6 +46,8 @@ func run() error {
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "package testcases")
 	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "// AllGhostscript contains the text positions determined using ghostscript.")
+	fmt.Fprintln(out, "// This corresponds to the test cases in All.")
 	fmt.Fprintln(out, "var AllGhostscript = []Answer{")
 	for _, setup := range testcases.All {
 		x, y, err := ghostscript.FindTextPos(pdf.V1_7, testcases.Paper, setup)

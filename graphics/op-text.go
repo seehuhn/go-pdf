@@ -66,7 +66,8 @@ func (w *Writer) TextEnd() {
 	_, w.Err = fmt.Fprintln(w.Content, "ET")
 }
 
-// TextSetCharacterSpacing sets the character spacing.
+// TextSetCharacterSpacing sets additional character spacing.
+// The value does not scale with font size.
 //
 // This implementes the PDF graphics operator "Tc".
 func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
@@ -83,7 +84,8 @@ func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(charSpacing), "Tc")
 }
 
-// TextSetWordSpacing sets the word spacing.
+// TextSetWordSpacing sets additional word spacing.
+// The additional spacing does not scale with font size.
 //
 // This implementes the PDF graphics operator "Tw".
 func (w *Writer) TextSetWordSpacing(wordSpacing float64) {
@@ -101,14 +103,15 @@ func (w *Writer) TextSetWordSpacing(wordSpacing float64) {
 }
 
 // TextSetHorizontalScaling sets the horizontal scaling.
-// The value 100 corresponds to the normal scaling.
+// The effect of this is to strech/compress the text horizontally.
+// The value 1 corresponds to normal scaling.
+// Negative values correspond to horizontally mirrored text.
 //
 // This implementes the PDF graphics operator "Tz".
 func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 	if !w.isValid("TextSetHorizontalScaling", objText|objPage) {
 		return
 	}
-	scaling /= 100
 	if w.isSet(StateTextHorizontalScaling) && nearlyEqual(scaling, w.State.TextHorizontalScaling) {
 		return
 	}
@@ -120,6 +123,8 @@ func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 }
 
 // TextSetLeading sets the leading.
+// The leading is the distance between the baselines of two consecutive lines of text.
+// Positive values indicate that the next line of text is below the current line.
 //
 // This implementes the PDF graphics operator "TL".
 func (w *Writer) TextSetLeading(leading float64) {
@@ -183,6 +188,7 @@ func (w *Writer) TextSetRenderingMode(mode TextRenderingMode) {
 }
 
 // TextSetRise sets the text rise.
+// Positive values move the text up.  The value does not scale with font size.
 //
 // This implements the PDF graphics operator "Ts".
 func (w *Writer) TextSetRise(rise float64) {
@@ -330,7 +336,7 @@ func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Strin
 	w.Set |= StateTextWordSpacing | StateTextCharacterSpacing
 	w.updateTextPosition(w.State.TextFont, s)
 
-	_, w.Err = fmt.Fprint(w.Content, w.coord(wordSpacing), w.coord(charSpacing), " ")
+	_, w.Err = fmt.Fprint(w.Content, w.coord(wordSpacing), " ", w.coord(charSpacing), " ")
 	if w.Err != nil {
 		return
 	}

@@ -33,6 +33,8 @@ import (
 	"seehuhn.de/go/pdf/document"
 )
 
+var keepTempFiles = false
+
 // Render can be used in unit tests to render a PDF page to an image.
 //
 // This calls the ghostscript command-line tool to render the PDF page to a PNG
@@ -74,15 +76,18 @@ type gsRenderer struct {
 }
 
 func newGSRenderer(paper *pdf.Rectangle, v pdf.Version) (*gsRenderer, error) {
-	dir, err := os.MkdirTemp("", "pdf*")
+	var dir string
+	var err error
+	if !keepTempFiles {
+		dir, err = os.MkdirTemp("", "pdf*")
+	} else {
+		const dirName = "./render-files"
+		os.Mkdir(dirName, 0755)
+		dir, err = filepath.Abs(dirName)
+	}
 	if err != nil {
 		return nil, err
 	}
-
-	// dir, err := filepath.Abs("./xxx/")
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
 
 	idx := <-gsIndex
 	gsIndex <- idx + 1
@@ -140,9 +145,11 @@ func (r *gsRenderer) Close() (image.Image, error) {
 		return nil, err
 	}
 
-	err = os.RemoveAll(r.Dir)
-	if err != nil {
-		return nil, err
+	if !keepTempFiles {
+		err = os.RemoveAll(r.Dir)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return img, nil

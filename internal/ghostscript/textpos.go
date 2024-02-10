@@ -89,12 +89,6 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 		return 0, 0, err
 	}
 
-	// {
-	// 	fd, _ := os.Create("test.png")
-	// 	png.Encode(fd, img)
-	// 	fd.Close()
-	// }
-
 	var xSum, ySum float64
 	var weight float64
 	b := img.Bounds()

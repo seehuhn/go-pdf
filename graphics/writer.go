@@ -212,9 +212,8 @@ func (w *Writer) isValid(cmd string, ss objectType) bool {
 }
 
 func (w *Writer) coord(x float64) string {
-	// TODO(voss): Think about this some more.  Once we track the current
-	// transformation matrix, we can use this to determine the number of digits
-	// to keep.
+	// TODO(voss): use the current transformation matrix to determine the
+	// number of digits to keep.
 	return float.Format(x, 2)
 }
 

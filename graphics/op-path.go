@@ -102,7 +102,7 @@ func (w *Writer) Rectangle(x, y, width, height float64) {
 //
 // This implements the PDF graphics operator "S".
 func (w *Writer) Stroke() {
-	if !w.isValid("Stroke", objPath) {
+	if !w.isValid("Stroke", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -120,7 +120,7 @@ func (w *Writer) Stroke() {
 //
 // This implements the PDF graphics operator "s".
 func (w *Writer) CloseAndStroke() {
-	if !w.isValid("CloseAndStroke", objPath) {
+	if !w.isValid("CloseAndStroke", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -138,7 +138,7 @@ func (w *Writer) CloseAndStroke() {
 //
 // This implements the PDF graphics operator "f".
 func (w *Writer) Fill() {
-	if !w.isValid("Fill", objPath) {
+	if !w.isValid("Fill", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -156,7 +156,7 @@ func (w *Writer) Fill() {
 //
 // This implements the PDF graphics operator "f*".
 func (w *Writer) FillEvenOdd() {
-	if !w.isValid("FillEvenOdd", objPath) {
+	if !w.isValid("FillEvenOdd", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -174,7 +174,7 @@ func (w *Writer) FillEvenOdd() {
 //
 // This implements the PDF graphics operator "B".
 func (w *Writer) FillAndStroke() {
-	if !w.isValid("FillAndStroke", objPath) {
+	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -193,7 +193,7 @@ func (w *Writer) FillAndStroke() {
 //
 // This implements the PDF graphics operator "B*".
 func (w *Writer) FillAndStrokeEvenOdd() {
-	if !w.isValid("FillAndStroke", objPath) {
+	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -211,7 +211,7 @@ func (w *Writer) FillAndStrokeEvenOdd() {
 //
 // This implements the PDF graphics operator "b".
 func (w *Writer) CloseFillAndStroke() {
-	if !w.isValid("FillAndStroke", objPath) {
+	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -230,7 +230,7 @@ func (w *Writer) CloseFillAndStroke() {
 //
 // This implements the PDF graphics operator "b*".
 func (w *Writer) CloseFillAndStrokeEvenOdd() {
-	if !w.isValid("FillAndStroke", objPath) {
+	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage
@@ -248,7 +248,7 @@ func (w *Writer) CloseFillAndStrokeEvenOdd() {
 //
 // This implements the PDF graphics operator "n".
 func (w *Writer) EndPath() {
-	if !w.isValid("EndPath", objPath) {
+	if !w.isValid("EndPath", objPath|objClippingPath) {
 		return
 	}
 	w.currentObject = objPage

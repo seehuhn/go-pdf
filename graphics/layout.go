@@ -25,6 +25,51 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
+// TextShow draws a string.
+func (w *Writer) TextShow(s string) float64 {
+	if !w.isValid("TextShow", objText) {
+		return 0
+	}
+	if !w.isSet(StateTextFont) {
+		w.Err = errors.New("no font set")
+		return 0
+	}
+	gg, err := w.TextLayout(s)
+	if err != nil {
+		w.Err = err
+		return 0
+	}
+	return w.TextShowGlyphs(gg)
+}
+
+// TextLayout returns the glyph sequence for a string.
+// The function panics if no font is set.
+func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
+	if err := w.mustBeSet(StateTextFont); err != nil {
+		return nil, err
+	}
+	F, ok := w.State.TextFont.(font.Layouter)
+	if !ok {
+		return nil, errors.New("font does not support layouting")
+	}
+
+	// TODO(voss): disable ligatures if TextCharacterSpacing is non-zero
+	gg := F.Layout(w.TextFontSize, s)
+
+	// Apply PDF layout parameters
+	for i, g := range gg.Seq {
+		advance := g.Advance
+		advance += w.TextCharacterSpacing
+		if string(g.Text) == " " {
+			advance += w.TextWordSpacing
+		}
+		gg.Seq[i].Advance = advance * w.TextHorizontalScaling
+		gg.Seq[i].Rise = w.TextRise
+	}
+
+	return gg, nil
+}
+
 // TextShowGlyphs shows the PDF string s, taking kerning and text rise into
 // account.
 //
@@ -97,7 +142,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 			_, w.Err = fmt.Fprintln(w.Content, " Ts")
 		}
 
-		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize / param.TextHorizontalScaling))
+		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) / param.TextFontSize / param.TextHorizontalScaling * 1000))
 		if xOffsetInt != 0 { // TODO(voss): only do this if the glyph is not blank
 			if len(run) > 0 {
 				out = append(out, run)
@@ -133,45 +178,12 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	return xActual
 }
 
-// TextLayout returns the glyph sequence for a string.
-// The function panics if no font is set.
-func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
-	if err := w.mustBeSet(StateTextFont); err != nil {
-		return nil, err
-	}
-	F, ok := w.State.TextFont.(font.Layouter)
-	if !ok {
-		return nil, errors.New("font does not support layouting")
-	}
-	gg := F.Layout(w.TextFontSize, s)
-	for i := range gg.Seq {
-		gg.Seq[i].Advance = gg.Seq[i].Advance * w.State.TextHorizontalScaling
-	}
-	// TODO(voss): use character spacing, word spacing
-	return gg, nil
-}
-
-// TextShow draws a string.
-func (w *Writer) TextShow(s string) float64 {
-	if !w.isValid("TextShow", objText) {
-		return 0
-	}
-	if !w.isSet(StateTextFont) {
-		w.Err = errors.New("no font set")
-		return 0
-	}
-	gg, err := w.TextLayout(s)
-	if err != nil {
-		w.Err = err
-		return 0
-	}
-	return w.TextShowGlyphs(gg)
-}
-
 // TextShowAligned draws a string and aligns it.
 // The string is aligned in a space of the given width.
 // q=0 means left alignment, q=1 means right alignment
 // and q=0.5 means centering.
+//
+// TODO(voss): remove this function?
 func (w *Writer) TextShowAligned(s string, width, q float64) {
 	if !w.isValid("TextShowAligned", objText) {
 		return

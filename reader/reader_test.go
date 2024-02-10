@@ -189,7 +189,7 @@ func FuzzReader(f *testing.F) {
 			case "Tz":
 				x, ok := getNum()
 				if ok {
-					w.TextSetHorizontalScaling(x)
+					w.TextSetHorizontalScaling(x / 100)
 				}
 			case "TL":
 				x, ok := getNum()
@@ -324,7 +324,7 @@ func TestParameters(t *testing.T) {
 	w.Transform(m)
 	w.TextSetCharacterSpacing(9)
 	w.TextSetWordSpacing(10)
-	w.TextSetHorizontalScaling(1100)
+	w.TextSetHorizontalScaling(11)
 	w.TextSetLeading(12)
 	w.TextSetFont(font, 14)
 	w.TextSetRenderingMode(graphics.TextRenderingModeFillStrokeClip)

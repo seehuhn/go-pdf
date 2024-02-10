@@ -110,6 +110,18 @@ type Layouter interface {
 	Close() error
 }
 
+// EncodeText encodes a string as a PDF string using the given layouter.
+// This allocates character codes as needed.
+// All layout information (including kerning) is ignored.
+func EncodeText(F Layouter, s string) pdf.String {
+	gg := F.Layout(10, s)
+	var res pdf.String
+	for _, g := range gg.Seq {
+		res, _, _ = F.CodeAndWidth(res, g.GID, g.Text)
+	}
+	return res
+}
+
 // Embedded represents a font which is already embedded in a PDF file.
 type Embedded interface {
 	Resource
