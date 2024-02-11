@@ -46,7 +46,7 @@ type Writer struct {
 
 type catRes struct {
 	cat resourceCategory
-	res Resource
+	res resource
 }
 
 type catName struct {
@@ -81,6 +81,14 @@ const (
 
 // NewWriter allocates a new Writer object.
 func NewWriter(w io.Writer, v pdf.Version) *Writer {
+	nameUsed := make(map[catName]struct{})
+
+	// See table 73 of ISO 32000-2:2020
+	nameUsed[catName{catColorSpace, "DeviceGray"}] = struct{}{}
+	nameUsed[catName{catColorSpace, "DeviceRGB"}] = struct{}{}
+	nameUsed[catName{catColorSpace, "DeviceCMYK"}] = struct{}{}
+	nameUsed[catName{catColorSpace, "Pattern"}] = struct{}{}
+
 	return &Writer{
 		Version:       v,
 		Content:       w,
@@ -90,7 +98,7 @@ func NewWriter(w io.Writer, v pdf.Version) *Writer {
 		State: NewState(),
 
 		resName:  make(map[catRes]pdf.Name),
-		nameUsed: make(map[catName]struct{}),
+		nameUsed: nameUsed,
 	}
 }
 
@@ -122,10 +130,15 @@ func (w *Writer) SetFillColor(col color.Color) {
 	w.Err = col.SetFill(w.Content)
 }
 
+type resource interface {
+	DefaultName() pdf.Name
+	PDFObject() pdf.Object
+}
+
 // GetResourceName returns the name of a resource.
 // A new name is generated, if necessary, and the resource is added to the
 // resource dictionary for the category.
-func (w *Writer) getResourceName(category resourceCategory, r Resource) pdf.Name {
+func (w *Writer) getResourceName(category resourceCategory, r resource) pdf.Name {
 	name, ok := w.resName[catRes{category, r}]
 	if ok {
 		return name
@@ -250,7 +263,7 @@ func (s objectType) String() string {
 // Res represents a named PDF resource.
 type Res struct {
 	DefName pdf.Name
-	Ref     pdf.Reference // TODO(voss): can this be pdf.Object?
+	Ref     pdf.Object
 }
 
 // DefaultName implements the [Resource] interface.
@@ -261,11 +274,4 @@ func (r Res) DefaultName() pdf.Name {
 // PDFObject implements the [Resource] interface.
 func (r Res) PDFObject() pdf.Object {
 	return r.Ref
-}
-
-// Resource represents the different PDF Resource types.
-// Implementations of this must be "comparable".
-type Resource interface {
-	DefaultName() pdf.Name // return "" to choose names automatically
-	PDFObject() pdf.Object // value to use in the resource dictionary
 }

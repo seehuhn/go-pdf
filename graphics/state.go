@@ -235,7 +235,7 @@ const (
 		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
 		StateFlatnessTolerance | StateSmoothnessTolerance
 
-	// TODO(voss): update this one
+	// TODO(voss): update this once
 	// https://github.com/pdf-association/pdf-issues/issues/380
 	// is resolved
 	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateDash | StateStrokeColor

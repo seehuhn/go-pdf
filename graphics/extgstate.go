@@ -155,8 +155,6 @@ func NewExtGState(s State, defaultName string) (*ExtGState, error) {
 }
 
 // ApplyTo applies the graphics state parameters to the given state.
-//
-// TODO(voss): unexport this method?
 func (s *ExtGState) ApplyTo(other *State) {
 	set := s.Value.Set
 	other.Set |= set
@@ -243,8 +241,8 @@ func (s *ExtGState) ApplyTo(other *State) {
 
 // Embed writes the graphics state dictionary into the PDF file so that the
 // graphics state can refer to it by reference.
-// This allows for efficient sharing of PDF graphics state dictionaries
-// between content streams.
+// This allows for sharing of PDF graphics state dictionaries between content
+// streams.
 func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
 	if _, alreadyDone := s.Dict.(pdf.Reference); alreadyDone {
 		return s, nil

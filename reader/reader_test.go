@@ -28,6 +28,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/font"
 	pdffont "seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/dummyfont"
@@ -418,6 +419,6 @@ func TestParameters(t *testing.T) {
 	}
 }
 
-func resEqual(a, b graphics.Resource) bool {
+func resEqual(a, b font.Resource) bool {
 	return a.DefaultName() == b.DefaultName() && a.PDFObject() == b.PDFObject()
 }

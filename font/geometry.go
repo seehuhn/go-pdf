@@ -36,6 +36,14 @@ type Geometry struct {
 
 // GetGeometry returns the geometry of a font.
 func (g *Geometry) GetGeometry() *Geometry {
+	if g.BaseLineDistance == 0 {
+		x := 1.0
+		if g.Ascent != 0 || g.Descent != 0 {
+			g.BaseLineDistance = g.Ascent - g.Descent
+		}
+		g.BaseLineDistance = 1.2 * x
+	}
+
 	return g
 }
 

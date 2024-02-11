@@ -20,21 +20,35 @@ import (
 	"math"
 )
 
+// This file contains convenience functions for circular arcs.
+
+// Circle appends a circle to the current path, as a closed subpath.
+func (p *Writer) Circle(x, y, radius float64) {
+	if !p.isValid("Circle", objPage|objPath) {
+		return
+	}
+
+	p.arc(x, y, radius, 0, 2*math.Pi, true)
+	p.ClosePath()
+}
+
 // MoveToArc appends a circular arc to the current path,
 // starting a new subpath.
 func (p *Writer) MoveToArc(x, y, radius, startAngle, endAngle float64) {
 	if !p.isValid("MoveToArc", objPage|objPath) {
 		return
 	}
+
 	p.arc(x, y, radius, startAngle, endAngle, true)
 }
 
 // LineToArc appends a circular arc to the current subpath,
-// connecting the arc to the previous point with a straight line.
+// connecting the previous point to the arc using a straight line.
 func (p *Writer) LineToArc(x, y, radius, startAngle, endAngle float64) {
 	if !p.isValid("LineToArc", objPath) {
 		return
 	}
+
 	p.arc(x, y, radius, startAngle, endAngle, false)
 }
 
@@ -70,10 +84,4 @@ func (p *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 		x0 = x3
 		y0 = y3
 	}
-}
-
-// Circle appends a circle to the current path, as a closed subpath.
-func (p *Writer) Circle(x, y, radius float64) {
-	p.MoveToArc(x, y, radius, 0, 2*math.Pi)
-	p.ClosePath()
 }
