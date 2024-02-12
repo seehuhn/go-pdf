@@ -120,7 +120,7 @@ func (f *Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 		Font:       f,
 		GlyphNames: glyphNames,
 		w:          w,
-		Res: font.Res{
+		Res: pdf.Res{
 			Ref:     w.Alloc(),
 			DefName: opt.ResName,
 		},
@@ -136,7 +136,7 @@ type embedded struct {
 	GlyphNames []string
 
 	w pdf.Putter
-	font.Res
+	pdf.Res
 
 	CMap map[rune]glyph.ID
 	*encoding.SimpleEncoder

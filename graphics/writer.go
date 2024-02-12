@@ -46,7 +46,7 @@ type Writer struct {
 
 type catRes struct {
 	cat resourceCategory
-	res resource
+	res pdf.Resource
 }
 
 type catName struct {
@@ -108,11 +108,11 @@ func (w *Writer) SetStrokeColor(col color.Color) {
 	if !w.isValid("SetStrokeColor", objPage|objText) {
 		return
 	}
-	if w.isSet(StateStrokeColor) && col == w.StrokeColor {
+	if w.isSet(StateColorStroke) && col == w.StrokeColor {
 		return
 	}
 	w.StrokeColor = col
-	w.Set |= StateStrokeColor
+	w.Set |= StateColorStroke
 	w.Err = col.SetStroke(w.Content)
 }
 
@@ -122,23 +122,18 @@ func (w *Writer) SetFillColor(col color.Color) {
 	if !w.isValid("SetFillColor", objPage|objText) {
 		return
 	}
-	if w.isSet(StateFillColor) && col == w.FillColor {
+	if w.isSet(StateColorFill) && col == w.FillColor {
 		return
 	}
 	w.FillColor = col
-	w.Set |= StateFillColor
+	w.Set |= StateColorFill
 	w.Err = col.SetFill(w.Content)
-}
-
-type resource interface {
-	DefaultName() pdf.Name
-	PDFObject() pdf.Object
 }
 
 // GetResourceName returns the name of a resource.
 // A new name is generated, if necessary, and the resource is added to the
 // resource dictionary for the category.
-func (w *Writer) getResourceName(category resourceCategory, r resource) pdf.Name {
+func (w *Writer) getResourceName(category resourceCategory, r pdf.Resource) pdf.Name {
 	name, ok := w.resName[catRes{category, r}]
 	if ok {
 		return name
@@ -258,20 +253,4 @@ func (s objectType) String() string {
 	default:
 		return fmt.Sprintf("objectType(%d)", s)
 	}
-}
-
-// Res represents a named PDF resource.
-type Res struct {
-	DefName pdf.Name
-	Ref     pdf.Object
-}
-
-// DefaultName implements the [Resource] interface.
-func (r Res) DefaultName() pdf.Name {
-	return r.DefName
-}
-
-// PDFObject implements the [Resource] interface.
-func (r Res) PDFObject() pdf.Object {
-	return r.Ref
 }

@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,32 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package pdf
 
-import (
-	"fmt"
-
-	"seehuhn.de/go/pdf"
-)
-
-// FormXObject represents a PDF Form XObject.
-//
-// See section 8.10 of ISO 32000-2:2020 for details.
-type FormXObject struct {
-	pdf.Res
+// Resource is a PDF resource inside a content stream.
+type Resource interface {
+	DefaultName() Name // return "" to choose names automatically
+	PDFObject() Object // value to use in the resource dictionary
 }
 
-// PaintFormXObject draws a Form XObject onto the page.
-func (p *Writer) PaintFormXObject(x *FormXObject) {
-	if !p.isValid("PaintFormXObject", objPage|objText) {
-		return
-	}
+// Res can be embedded in a struct to implement the [Resource] interface.
+type Res struct {
+	DefName Name
+	Ref     Object
+}
 
-	name := p.getResourceName(catXObject, x)
-	err := name.PDF(p.Content)
-	if err != nil {
-		p.Err = err
-		return
-	}
-	_, p.Err = fmt.Fprintln(p.Content, " Do")
+// DefaultName implements the [Resource] interface.
+func (r Res) DefaultName() Name {
+	return r.DefName
+}
+
+// PDFObject implements the [Resource] interface.
+func (r Res) PDFObject() Object {
+	return r.Ref
 }

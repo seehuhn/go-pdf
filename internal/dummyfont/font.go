@@ -87,7 +87,7 @@ func EmbedCFF(w pdf.Putter, info *pdfcff.EmbedInfoSimple, defaultName pdf.Name) 
 	}
 
 	F := &frozenFont{
-		Res: font.Res{
+		Res: pdf.Res{
 			DefName: defaultName,
 			Ref:     ref,
 		},
@@ -97,7 +97,7 @@ func EmbedCFF(w pdf.Putter, info *pdfcff.EmbedInfoSimple, defaultName pdf.Name) 
 }
 
 type frozenFont struct {
-	font.Res
+	pdf.Res
 	*pdfcff.EmbedInfoSimple
 }
 

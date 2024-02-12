@@ -212,11 +212,11 @@ func (w *Writer) SetDashPattern(pattern []float64, phase float64) {
 //
 // This implementes the PDF graphics operator "ri".
 func (w *Writer) SetRenderingIntent(intent pdf.Name) {
-	if w.Version < pdf.V1_1 {
-		w.Err = &pdf.VersionError{Operation: "SetRenderingIntent", Earliest: pdf.V1_1}
-	}
 	if !w.isValid("SetRenderingIntent", objPage|objText) {
 		return
+	}
+	if w.Version < pdf.V1_1 {
+		w.Err = &pdf.VersionError{Operation: "SetRenderingIntent", Earliest: pdf.V1_1}
 	}
 	if w.isSet(StateRenderingIntent) && intent == w.RenderingIntent {
 		return
@@ -257,11 +257,11 @@ func (w *Writer) SetFlatnessTolerance(flatness float64) {
 //
 // This implements the "gs" graphics operator.
 func (w *Writer) SetExtGState(s *ExtGState) {
-	if w.Version < pdf.V1_2 {
-		w.Err = &pdf.VersionError{Operation: "SetExtGState", Earliest: pdf.V1_2}
-	}
 	if !w.isValid("SetExtGState", objPage|objText) {
 		return
+	}
+	if w.Version < pdf.V1_2 {
+		w.Err = &pdf.VersionError{Operation: "SetExtGState", Earliest: pdf.V1_2}
 	}
 
 	s.ApplyTo(&w.State)

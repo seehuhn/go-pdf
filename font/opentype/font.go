@@ -74,7 +74,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	}
 	gposLookups := info.Gpos.FindLookups(opt.Language, gposFeatures)
 
-	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
+	resource := pdf.Res{Ref: w.Alloc(), DefName: opt.ResName}
 
 	var res font.Layouter
 	if f.sfnt.IsCFF() {

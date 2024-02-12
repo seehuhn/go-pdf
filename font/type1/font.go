@@ -155,7 +155,7 @@ func (f *embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error)
 
 	res := &embeddedSimple{
 		w: w,
-		Res: font.Res{
+		Res: pdf.Res{
 			Ref:     w.Alloc(),
 			DefName: opt.ResName,
 		},
@@ -202,7 +202,7 @@ func glyphBoxtoPDF(b funit.Rect16, fMat []float64) pdf.Rectangle {
 
 type embeddedSimple struct {
 	w pdf.Putter
-	font.Res
+	pdf.Res
 	*font.Geometry
 
 	psFont     *type1.Font

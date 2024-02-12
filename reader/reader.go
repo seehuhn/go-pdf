@@ -471,7 +471,7 @@ doOps:
 			break
 		}
 		r.StrokeColor = color.Gray(gray)
-		r.Set |= graphics.StateStrokeColor
+		r.Set |= graphics.StateColorStroke
 
 	case "g": // nonstroking gray level
 		if len(args) < 1 {
@@ -482,7 +482,7 @@ doOps:
 			break
 		}
 		r.FillColor = color.Gray(gray)
-		r.Set |= graphics.StateFillColor
+		r.Set |= graphics.StateColorFill
 
 	case "RG": // nonstroking DeviceRGB color
 		if len(args) < 3 {

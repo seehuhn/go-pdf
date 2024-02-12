@@ -81,7 +81,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 	}
 
-	res := font.Res{
+	res := pdf.Res{
 		DefName: name,
 		Ref:     ref,
 	}
@@ -350,7 +350,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 }
 
 type fromFileSimple struct {
-	font.Res
+	pdf.Res
 	widths   []float64
 	encoding []glyph.ID
 	text     [][]rune
@@ -383,7 +383,7 @@ func (f *fromFileSimple) Key() pdf.Reference {
 }
 
 type fromFileComposite struct {
-	font.Res
+	pdf.Res
 	cs          charcode.CodeSpaceRange
 	writingMode int
 	glyph       map[string]glyphData

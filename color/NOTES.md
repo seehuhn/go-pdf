@@ -10,9 +10,9 @@ Device Color Spaces
 
 The device color spaces are:
 
+- DeviceGray (PDF-1.1)
 - DeviceRGB (PDF-1.1)
 - DeviceCMYK (PDF-1.1)
-- DeviceGray (PDF-1.1)
 
 - CalCMYK is a synonym for DeviceCMYK.
 
@@ -29,8 +29,8 @@ CIE-Based Color Spaces
 
 The CIE-based color spaces are:
 
-- CalRGB (PDF-1.1)
 - CalGray (PDF-1.1)
+- CalRGB (PDF-1.1)
 - Lab (PDF-1.1)
 - ICCBased (PDF-1.3)
 

@@ -60,7 +60,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 
 	info := f.sfnt
 
-	resource := font.Res{Ref: w.Alloc(), DefName: opt.ResName}
+	resource := pdf.Res{Ref: w.Alloc(), DefName: opt.ResName}
 
 	geometry := &font.Geometry{
 		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
@@ -173,7 +173,7 @@ func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []pdf.Rectangle {
 
 type embedded struct {
 	w pdf.Putter
-	font.Res
+	pdf.Res
 	*font.Geometry
 
 	sfnt        *sfnt.Font

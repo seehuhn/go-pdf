@@ -40,7 +40,7 @@ import (
 
 type embeddedGlyfComposite struct {
 	w pdf.Putter
-	font.Res
+	pdf.Res
 	*font.Geometry
 
 	sfnt        *sfnt.Font

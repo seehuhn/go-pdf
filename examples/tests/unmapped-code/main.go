@@ -273,7 +273,7 @@ func embedTestFont(w pdf.Putter) (font.Embedded, error) {
 	w.Put(fontDictRef, fontDict)
 
 	res := &funnyFont{
-		Res: font.Res{
+		Res: pdf.Res{
 			DefName: "X",
 			Ref:     fontDictRef,
 		},
@@ -283,7 +283,7 @@ func embedTestFont(w pdf.Putter) (font.Embedded, error) {
 }
 
 type funnyFont struct {
-	font.Res
+	pdf.Res
 	W []float64
 }
 

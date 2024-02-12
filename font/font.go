@@ -124,29 +124,7 @@ func EncodeText(F Layouter, s string) pdf.String {
 
 // Embedded represents a font which is already embedded in a PDF file.
 type Embedded interface {
-	Resource
+	pdf.Resource
 	WritingMode() int // 0 = horizontal, 1 = vertical
 	ForeachWidth(s pdf.String, yield func(width float64, is_space bool))
-}
-
-// Resource is a PDF resource.
-type Resource interface {
-	DefaultName() pdf.Name // return "" to choose names automatically
-	PDFObject() pdf.Object // value to use in the resource dictionary
-}
-
-// Res can be embedded in a struct to implement the [Resource] interface.
-type Res struct {
-	DefName pdf.Name
-	Ref     pdf.Object
-}
-
-// DefaultName implements the [Resource] interface.
-func (r Res) DefaultName() pdf.Name {
-	return r.DefName
-}
-
-// PDFObject implements the [Resource] interface.
-func (r Res) PDFObject() pdf.Object {
-	return r.Ref
 }

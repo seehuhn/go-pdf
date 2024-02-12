@@ -62,8 +62,12 @@ type Parameters struct {
 	StartX, StartY     float64 // the starting point of the current path
 	CurrentX, CurrentY float64 // the "current point"
 
-	StrokeColor color.Color
-	FillColor   color.Color
+	StrokeColor       color.Color // old
+	FillColor         color.Color // old
+	ColorSpaceStroke  pdf.Name
+	ColorValuesStroke []float64
+	ColorSpaceFill    pdf.Name
+	ColorValuesFill   []float64
 
 	// Text State parameters:
 	TextCharacterSpacing  float64 // character spacing (T_c)
@@ -133,8 +137,8 @@ const (
 	// CTM is always set, so it is not included in the bit mask.
 	// ClippingPath is always set, so it is not included in the bit mask.
 
-	StateStrokeColor StateBits = 1 << iota
-	StateFillColor
+	StateColorStroke StateBits = 1 << iota
+	StateColorFill
 
 	StateTextCharacterSpacing
 	StateTextWordSpacing
@@ -215,7 +219,7 @@ var stateNames = []string{
 const (
 	// initializedStateBits lists the parameters which are initialized to
 	// their default values in [NewState].
-	initializedStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
+	initializedStateBits = StateColorStroke | StateColorFill | StateTextCharacterSpacing |
 		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode | StateTextRise |
 		StateTextKnockout | StateLineWidth | StateLineCap | StateLineJoin |
 		StateMiterLimit | StateDash | StateRenderingIntent |
@@ -238,8 +242,8 @@ const (
 	// TODO(voss): update this once
 	// https://github.com/pdf-association/pdf-issues/issues/380
 	// is resolved
-	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateDash | StateStrokeColor
-	fillStateBits   = StateFillColor
+	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateDash | StateColorStroke
+	fillStateBits   = StateColorFill
 )
 
 // NewState returns a new graphics state with default values,

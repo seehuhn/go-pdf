@@ -90,7 +90,7 @@ func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (graphics.EmbeddedIma
 
 	return &jpegEmbedded{
 		jpegImage: im,
-		Res: graphics.Res{
+		Res: pdf.Res{
 			DefName: resName,
 			Ref:     ref,
 		},
@@ -99,5 +99,5 @@ func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (graphics.EmbeddedIma
 
 type jpegEmbedded struct {
 	*jpegImage
-	graphics.Res
+	pdf.Res
 }
