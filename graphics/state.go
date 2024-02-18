@@ -62,12 +62,13 @@ type Parameters struct {
 	StartX, StartY     float64 // the starting point of the current path
 	CurrentX, CurrentY float64 // the "current point"
 
-	StrokeColor       color.Color // old
-	FillColor         color.Color // old
-	ColorSpaceStroke  pdf.Name
-	ColorValuesStroke []float64
-	ColorSpaceFill    pdf.Name
-	ColorValuesFill   []float64
+	StrokeColorOld color.Color
+	FillColorOld   color.Color
+
+	StrokeColorSpace ColorSpace
+	FillColorSpace   ColorSpace
+	StrokeColor      []float64
+	FillColor        []float64
 
 	// Text State parameters:
 	TextCharacterSpacing  float64 // character spacing (T_c)
@@ -137,8 +138,8 @@ const (
 	// CTM is always set, so it is not included in the bit mask.
 	// ClippingPath is always set, so it is not included in the bit mask.
 
-	StateColorStroke StateBits = 1 << iota
-	StateColorFill
+	StateStrokeColor StateBits = 1 << iota
+	StateFillColor
 
 	StateTextCharacterSpacing
 	StateTextWordSpacing
@@ -219,7 +220,7 @@ var stateNames = []string{
 const (
 	// initializedStateBits lists the parameters which are initialized to
 	// their default values in [NewState].
-	initializedStateBits = StateColorStroke | StateColorFill | StateTextCharacterSpacing |
+	initializedStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
 		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode | StateTextRise |
 		StateTextKnockout | StateLineWidth | StateLineCap | StateLineJoin |
 		StateMiterLimit | StateDash | StateRenderingIntent |
@@ -242,8 +243,8 @@ const (
 	// TODO(voss): update this once
 	// https://github.com/pdf-association/pdf-issues/issues/380
 	// is resolved
-	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateDash | StateColorStroke
-	fillStateBits   = StateColorFill
+	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateDash | StateStrokeColor
+	fillStateBits   = StateFillColor
 )
 
 // NewState returns a new graphics state with default values,
@@ -252,8 +253,14 @@ func NewState() State {
 	param := &Parameters{}
 
 	param.CTM = IdentityMatrix
-	param.StrokeColor = color.Gray(0)
-	param.FillColor = color.Gray(0)
+
+	param.StrokeColorOld = color.Gray(0) // old
+	param.FillColorOld = color.Gray(0)   // old
+
+	param.StrokeColorSpace = DeviceGray
+	param.StrokeColor = DeviceGray.DefaultColor()
+	param.FillColorSpace = DeviceGray
+	param.FillColor = DeviceGray.DefaultColor()
 
 	param.TextCharacterSpacing = 0
 	param.TextWordSpacing = 0

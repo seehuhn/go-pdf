@@ -61,7 +61,7 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 		fmt.Fprintf(page.Content,
 			"%d 0 %d %d %d %d d1\n",
 			widthX, bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)
-		page.Set = graphics.StateColorStroke | graphics.StateColorFill
+		page.Set = graphics.StateStrokeColor | graphics.StateFillColor
 	} else {
 		fmt.Fprintf(page.Content, "%d 0 d0\n", widthX)
 		page.Set = 0

@@ -252,13 +252,13 @@ func FuzzReader(f *testing.F) {
 			case "G":
 				gray, ok := getNum()
 				if ok {
-					w.SetStrokeColor(color.Gray(gray))
+					w.SetStrokeColorOld(color.Gray(gray))
 				}
 
 			case "g":
 				gray, ok := getNum()
 				if ok {
-					w.SetFillColor(color.Gray(gray))
+					w.SetFillColorOld(color.Gray(gray))
 				}
 
 			case "k":
@@ -267,7 +267,7 @@ func FuzzReader(f *testing.F) {
 				yellow, ok3 := getNum()
 				black, ok4 := getNum()
 				if ok1 && ok2 && ok3 && ok4 {
-					w.SetFillColor(color.CMYK(cyan, magenta, yellow, black))
+					w.SetFillColorOld(color.CMYK(cyan, magenta, yellow, black))
 				}
 			}
 

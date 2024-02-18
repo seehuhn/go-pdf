@@ -110,7 +110,7 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, d
 	page.PopGraphicsState()
 
 	page.TextSetFont(H, 8)
-	page.SetFillColor(color.Gray(0.5))
+	page.SetFillColorOld(color.Gray(0.5))
 	page.TextStart()
 	page.TextFirstLine(5, paper.URy-10)
 	page.TextShow(desc)

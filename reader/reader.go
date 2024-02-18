@@ -470,8 +470,8 @@ doOps:
 		if !ok {
 			break
 		}
-		r.StrokeColor = color.Gray(gray)
-		r.Set |= graphics.StateColorStroke
+		r.StrokeColorOld = color.Gray(gray)
+		r.Set |= graphics.StateStrokeColor
 
 	case "g": // nonstroking gray level
 		if len(args) < 1 {
@@ -481,8 +481,8 @@ doOps:
 		if !ok {
 			break
 		}
-		r.FillColor = color.Gray(gray)
-		r.Set |= graphics.StateColorFill
+		r.FillColorOld = color.Gray(gray)
+		r.Set |= graphics.StateFillColor
 
 	case "RG": // nonstroking DeviceRGB color
 		if len(args) < 3 {
@@ -499,7 +499,7 @@ doOps:
 		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
-		r.StrokeColor = color.RGB(red, green, blue)
+		r.StrokeColorOld = color.RGB(red, green, blue)
 
 	case "rg": // nonstroking DeviceRGB color
 		if len(args) < 3 {
@@ -516,7 +516,7 @@ doOps:
 		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
-		r.FillColor = color.RGB(red, green, blue)
+		r.FillColorOld = color.RGB(red, green, blue)
 
 	case "K": // stroking DeviceCMYK color
 		if len(args) < 4 {
@@ -536,7 +536,7 @@ doOps:
 		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
-		r.StrokeColor = color.CMYK(cyan, magenta, yellow, black)
+		r.StrokeColorOld = color.CMYK(cyan, magenta, yellow, black)
 
 	case "k": // nonstroking DeviceCMYK color
 		if len(args) < 4 {
@@ -556,7 +556,7 @@ doOps:
 		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
-		r.FillColor = color.CMYK(cyan, magenta, yellow, black)
+		r.FillColorOld = color.CMYK(cyan, magenta, yellow, black)
 
 	// == Shading patterns ===============================================
 

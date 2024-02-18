@@ -201,7 +201,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 		// First draw the rectangles for the glyph extents onto the background.
 		tmpGlyph := curGlyph
 		page.PushGraphicsState()
-		page.SetFillColor(color.RGB(.4, 1, .4))
+		page.SetFillColorOld(color.RGB(.4, 1, .4))
 		for col := 0; col < 4; col++ {
 			x := f.margin + float64(col)*colWidth
 			for i := 0; i < nRows; i++ {

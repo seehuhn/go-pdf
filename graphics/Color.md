@@ -67,3 +67,15 @@ PDF-1.6
 
 PDF-1.7 and PDF-2.0
     profile version 4.3.0, spec version ICC.1:2010-12 (identical to ISO 15076-1:2010)
+
+
+Resources
+=========
+
+https://github.com/lucasb-eyer/go-colorful
+https://developer.apple.com/library/archive/technotes/tn2313/_index.html
+https://en.wikipedia.org/wiki/CIE_1931_color_space
+
+https://medium.com/hipster-color-science/a-beginners-guide-to-colorimetry-401f1830b65a
+
+https://www.color.org/specification/ICC1v43_2010-12.pdf

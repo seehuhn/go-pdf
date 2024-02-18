@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/internal/float"
 )
 
@@ -100,34 +99,6 @@ func NewWriter(w io.Writer, v pdf.Version) *Writer {
 		resName:  make(map[catRes]pdf.Name),
 		nameUsed: nameUsed,
 	}
-}
-
-// SetStrokeColor sets the stroke color in the graphics state.
-// If col is nil, the stroke color is not changed.
-func (w *Writer) SetStrokeColor(col color.Color) {
-	if !w.isValid("SetStrokeColor", objPage|objText) {
-		return
-	}
-	if w.isSet(StateColorStroke) && col == w.StrokeColor {
-		return
-	}
-	w.StrokeColor = col
-	w.Set |= StateColorStroke
-	w.Err = col.SetStroke(w.Content)
-}
-
-// SetFillColor sets the fill color in the graphics state.
-// If col is nil, the fill color is not changed.
-func (w *Writer) SetFillColor(col color.Color) {
-	if !w.isValid("SetFillColor", objPage|objText) {
-		return
-	}
-	if w.isSet(StateColorFill) && col == w.FillColor {
-		return
-	}
-	w.FillColor = col
-	w.Set |= StateColorFill
-	w.Err = col.SetFill(w.Content)
 }
 
 // GetResourceName returns the name of a resource.

@@ -189,7 +189,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		x1 := bbox.URx.AsFloat(q)
 		y1 := bbox.URy.AsFloat(q)
 		page.PushGraphicsState()
-		page.SetFillColor(color.Gray(0.9))
+		page.SetFillColorOld(color.Gray(0.9))
 		page.Rectangle(x0, y0, x1-x0, y1-y0)
 		page.Fill()
 		page.PopGraphicsState()
@@ -229,7 +229,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 
 		// illustrate the advance width by drawing an arrow
 		page.PushGraphicsState()
-		page.SetStrokeColor(color.RGB(0.1, 0.9, 0.1))
+		page.SetStrokeColorOld(color.RGB(0.1, 0.9, 0.1))
 		page.SetLineWidth(3)
 		page.MoveTo(0, -10)
 		page.LineTo(0, 10)
@@ -281,7 +281,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 
 			// label the points
 			page.PushGraphicsState()
-			page.SetFillColor(color.RGB(0, 0, 0.8))
+			page.SetFillColorOld(color.RGB(0, 0, 0.8))
 			page.TextStart()
 			page.TextSetFont(ctx.labelFont, 8/q)
 			xPrev := 0.0

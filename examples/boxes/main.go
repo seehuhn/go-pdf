@@ -69,7 +69,7 @@ func doit() error {
 
 	// draw a grid to show page coordinates
 	page.PushGraphicsState()
-	page.SetStrokeColor(color.Gray(0.85))
+	page.SetStrokeColorOld(color.Gray(0.85))
 	for z := 0.0; z <= 600+1e-6; z += 50 {
 		page.MoveTo(z, 0)
 		page.LineTo(z, 600)
@@ -77,7 +77,7 @@ func doit() error {
 		page.LineTo(600, z)
 	}
 	page.Stroke()
-	page.SetFillColor(color.Gray(1))
+	page.SetFillColorOld(color.Gray(1))
 	for _, x := range []float64{82, 532} {
 		for i := 0; i <= 600; i += 50 {
 			gg := F.Layout(9, fmt.Sprintf("%d", i))
@@ -94,7 +94,7 @@ func doit() error {
 		}
 	}
 	page.Fill()
-	page.SetFillColor(color.Gray(0.6))
+	page.SetFillColorOld(color.Gray(0.6))
 	page.TextSetFont(F, 9)
 	for _, x := range []float64{82, 532} {
 		page.TextStart()
@@ -154,9 +154,9 @@ func doit() error {
 	page.TextShow("On this page, the TrimBox is [100,500]×[100,500].  If your viewer supports BoxColorInfo,")
 	page.TextNextLine()
 	page.TextShow("the TrimBox may be shown in ")
-	page.SetFillColor(color.RGB(0.8, 0.4, 0))
+	page.SetFillColorOld(color.RGB(0.8, 0.4, 0))
 	page.TextShow("orange.")
-	page.SetFillColor(color.Gray(0))
+	page.SetFillColorOld(color.Gray(0))
 	page.TextEnd()
 
 	page.TextStart()
@@ -166,9 +166,9 @@ func doit() error {
 	page.TextShow("On this page, the BleedBox is [85,515]×[85,515].  If your viewer supports BoxColorInfo,")
 	page.TextNextLine()
 	page.TextShow("the BleedBox may be shown in ")
-	page.SetFillColor(color.RGB(0, 0, 0.8))
+	page.SetFillColorOld(color.RGB(0, 0, 0.8))
 	page.TextShow("blue.")
-	page.SetFillColor(color.Gray(0))
+	page.SetFillColorOld(color.Gray(0))
 	page.TextEnd()
 
 	page.TextStart()
@@ -178,7 +178,7 @@ func doit() error {
 	page.TextShow("On this page, the ArtBox is [150,450]×[150,450].  If your viewer supports BoxColorInfo,")
 	page.TextNextLine()
 	page.TextShow("the ArtBox may be shown in ")
-	page.SetFillColor(color.RGB(0, 0.8, 0))
+	page.SetFillColorOld(color.RGB(0, 0.8, 0))
 	page.TextShow("green.")
 	page.TextEnd()
 

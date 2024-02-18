@@ -71,6 +71,11 @@ type Rectangle struct {
 	LLx, LLy, URx, URy float64
 }
 
+// Dx returns the width of the rectangle.
+func (r *Rectangle) Dx() float64 {
+	return r.URx - r.LLx
+}
+
 // GetRectangle resolves references to indirect objects and makes sure the
 // resulting object is a PDF rectangle object.
 // If the object is null, nil is returned.
