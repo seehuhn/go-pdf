@@ -21,25 +21,17 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
+	"seehuhn.de/go/pdf/internal/float"
 )
 
-// WhitePointD65 represents the D65 whitepoint.
-//
-// https://en.wikipedia.org/wiki/Illuminant_D65
-var WhitePointD65 = []float64{0.95047, 1.0, 1.08883}
+// This file implements functions to set the stroke and fill colors.
+// The operators used here are defined in table 73 of
+// ISO 32000-2:2020.
 
-type Color struct {
-	CS     ColorSpace
-	Values []float64
-	Name   pdf.Name
-}
-
-// ColorSpace represents a PDF color space.
-type ColorSpace interface {
-	pdf.Resource
-	Family() ColorSpaceFamily
-	DefaultColor() []float64
+// Color represents a PDF color.
+type Color interface {
+	setStroke(w *Writer)
+	setFill(w *Writer)
 }
 
 func (w *Writer) SetStrokeColor(c Color) {
@@ -47,33 +39,14 @@ func (w *Writer) SetStrokeColor(c Color) {
 		return
 	}
 
-	switch c.CS.Family() {
-	case ColorSpaceDeviceGray:
-		if len(c.Values) != 1 {
-			w.Err = fmt.Errorf("SetStrokeColor: DeviceGray: expected 1 value, got %d", len(c.Values))
-			return
-		}
-		w.SetStrokeColorDeviceGray(c.Values[0])
-	case ColorSpaceDeviceRGB:
-		if len(c.Values) != 3 {
-			w.Err = fmt.Errorf("SetStrokeColor: DeviceRGB: expected 3 values, got %d", len(c.Values))
-			return
-		}
-		w.SetStrokeColorDeviceRGB(c.Values[0], c.Values[1], c.Values[2])
-	case ColorSpaceDeviceCMYK:
-		if len(c.Values) != 4 {
-			w.Err = fmt.Errorf("SetStrokeColor: DeviceCMYK: expected 4 values, got %d", len(c.Values))
-			return
-		}
-		w.SetStrokeColorDeviceCMYK(c.Values[0], c.Values[1], c.Values[2], c.Values[3])
-	default:
-		w.SetStrokeColorSpace(c.CS)
-		if c.Name == "" {
-			w.SetStrokeColorValues(c.Values)
-		} else {
-			w.SetStrokeColorValuesName(c.Values, c.Name)
-		}
+	minVersion := pdf.V1_0
+	switch c.(type) {
 	}
+	if w.Version < minVersion {
+		w.Err = &pdf.VersionError{Operation: fmt.Sprintf("%T colors", c), Earliest: minVersion}
+		return
+	}
+	c.setStroke(w)
 }
 
 func (w *Writer) SetFillColor(c Color) {
@@ -81,145 +54,154 @@ func (w *Writer) SetFillColor(c Color) {
 		return
 	}
 
-	switch c.CS.Family() {
-	case ColorSpaceDeviceGray:
-		if len(c.Values) != 1 {
-			w.Err = fmt.Errorf("SetFillColor: DeviceGray: expected 1 value, got %d", len(c.Values))
-			return
-		}
-		w.SetFillColorDeviceGray(c.Values[0])
-	case ColorSpaceDeviceRGB:
-		if len(c.Values) != 3 {
-			w.Err = fmt.Errorf("SetFillColor: DeviceRGB: expected 3 values, got %d", len(c.Values))
-			return
-		}
-		w.SetFillColorDeviceRGB(c.Values[0], c.Values[1], c.Values[2])
-	case ColorSpaceDeviceCMYK:
-		if len(c.Values) != 4 {
-			w.Err = fmt.Errorf("SetFillColor: DeviceCMYK: expected 4 values, got %d", len(c.Values))
-			return
-		}
-		w.SetFillColorDeviceCMYK(c.Values[0], c.Values[1], c.Values[2], c.Values[3])
-	default:
-		w.SetFillColorSpace(c.CS)
-		if c.Name == "" {
-			w.SetFillColorValues(c.Values)
-		} else {
-			w.SetFillColorValuesName(c.Values, c.Name)
-		}
+	minVersion := pdf.V1_0
+	switch c.(type) {
 	}
-}
-
-// ColorSpaceFamily is an enumeration of the color space families defined in PDF-2.0.
-type ColorSpaceFamily int
-
-func (cs ColorSpaceFamily) String() string {
-	switch cs {
-	case ColorSpaceDeviceGray:
-		return "DeviceGray"
-	case ColorSpaceDeviceRGB:
-		return "DeviceRGB"
-	case ColorSpaceDeviceCMYK:
-		return "DeviceCMYK"
-	case ColorSpaceCalGray:
-		return "CalGray"
-	case ColorSpaceCalRGB:
-		return "CalRGB"
-	case ColorSpaceLab:
-		return "Lab"
-	case ColorSpaceICCBased:
-		return "ICCBased"
-	case ColorSpaceIndexed:
-		return "Indexed"
-	case ColorSpacePattern:
-		return "Pattern"
-	case ColorSpaceSeparation:
-		return "Separation"
-	case ColorSpaceDeviceN:
-		return "DeviceN"
-	default:
-		return fmt.Sprintf("ColorSpaceFamily(%d)", cs)
+	if w.Version < minVersion {
+		w.Err = &pdf.VersionError{Operation: fmt.Sprintf("%T colors", c), Earliest: minVersion}
+		return
 	}
+	c.setFill(w)
 }
 
-// These are the color space families defined in PDF-2.0.
-const (
-	ColorSpaceDeviceGray ColorSpaceFamily = iota + 1
-	ColorSpaceDeviceRGB
-	ColorSpaceDeviceCMYK
-	ColorSpaceCalGray
-	ColorSpaceCalRGB
-	ColorSpaceLab
-	ColorSpaceICCBased
-	ColorSpaceIndexed
-	ColorSpacePattern
-	ColorSpaceSeparation
-	ColorSpaceDeviceN
-)
+// == DeviceGray =============================================================
 
-var colMinVersion = map[ColorSpaceFamily]pdf.Version{
-	ColorSpaceICCBased:   pdf.V1_3,
-	ColorSpacePattern:    pdf.V1_2,
-	ColorSpaceSeparation: pdf.V1_2,
-	ColorSpaceDeviceN:    pdf.V1_3,
+type colorDeviceGray float64
+
+// DeviceGrayNew returns a new DeviceGray color.
+func DeviceGrayNew(gray float64) Color {
+	return colorDeviceGray(gray)
 }
 
-var colNeedsScn = map[ColorSpaceFamily]bool{
-	ColorSpacePattern:    true,
-	ColorSpaceSeparation: true,
-	ColorSpaceDeviceN:    true,
-	ColorSpaceICCBased:   true,
+// setStroke sets the current stroking color space to DeviceGray
+// and sets the gray level for stroking.
+//
+// This implements the PDF graphics operator "G".
+func (c colorDeviceGray) setStroke(w *Writer) {
+	cur, ok := w.StrokeColor.(colorDeviceGray)
+	if ok && w.isSet(StateStrokeColor) && cur == c {
+		return
+	}
+
+	w.StrokeColor = c
+	w.Set |= StateStrokeColor
+
+	// TODO(voss): rounding
+	_, w.Err = fmt.Fprintf(w.Content, "%f G\n", c)
 }
 
-type simpleColorSpace struct {
-	Name     pdf.Name
-	Fam      ColorSpaceFamily
-	DefColor []float64
+// setFill sets the current fill color space to DeviceGray
+// and sets the gray level for filling.
+//
+// This implements the PDF graphics operator "g".
+func (c colorDeviceGray) setFill(w *Writer) {
+	cur, ok := w.FillColor.(colorDeviceGray)
+	if ok && w.isSet(StateFillColor) && cur == c {
+		return
+	}
+
+	w.FillColor = c
+	w.Set |= StateFillColor
+
+	// TODO(voss): rounding
+	_, w.Err = fmt.Fprintf(w.Content, "%f g\n", c)
 }
 
-// DefaultName implements the [ColorSpace] interface.
-func (c simpleColorSpace) DefaultName() pdf.Name {
-	return ""
+// == DeviceRGB ==============================================================
+
+type colorDeviceRGB [3]float64
+
+// DeviceRGBNew returns a new DeviceRGB color.
+func DeviceRGBNew(r, g, b float64) Color {
+	return colorDeviceRGB{r, g, b}
 }
 
-// PDFObject implements the [ColorSpace] interface.
-func (c simpleColorSpace) PDFObject() pdf.Object {
-	return c.Name
+// setStroke sets the current stroking color space to DeviceRGB
+// and sets the red, green, and blue levels for stroking.
+//
+// This implements the PDF graphics operator "RG".
+func (c colorDeviceRGB) setStroke(w *Writer) {
+	cur, ok := w.StrokeColor.(colorDeviceRGB)
+	if ok && w.isSet(StateStrokeColor) && cur == c {
+		return
+	}
+
+	w.StrokeColor = c
+	w.Set |= StateStrokeColor
+
+	// TODO(voss): rounding
+	_, w.Err = fmt.Fprintf(w.Content, "%f %f %f RG\n", c[0], c[1], c[2])
 }
 
-// Family implements the [ColorSpace] interface.
-func (c simpleColorSpace) Family() ColorSpaceFamily {
-	return c.Fam
+// setFill sets the current fill color space to DeviceRGB
+// and sets the red, green, and blue levels for filling.
+//
+// This implements the PDF graphics operator "rg".
+func (c colorDeviceRGB) setFill(w *Writer) {
+	cur, ok := w.FillColor.(colorDeviceRGB)
+	if ok && w.isSet(StateFillColor) && cur == c {
+		return
+	}
+
+	w.FillColor = c
+	w.Set |= StateFillColor
+
+	// TODO(voss): rounding
+	_, w.Err = fmt.Fprintf(w.Content, "%f %f %f rg\n", c[0], c[1], c[2])
 }
 
-// DefaultColor implements the [ColorSpace] interface.
-func (c simpleColorSpace) DefaultColor() []float64 {
-	return c.DefColor
+// == DeviceCMYK =============================================================
+
+type colorDeviceCYMK [4]float64
+
+// DeviceCYMKNew returns a new DeviceCMYK color.
+func DeviceCYMKNew(cyan, magenta, yellow, black float64) Color {
+	return colorDeviceCYMK{cyan, magenta, yellow, black}
 }
 
-var deviceGray = &simpleColorSpace{
-	Name:     "DeviceGray",
-	Fam:      ColorSpaceDeviceGray,
-	DefColor: []float64{0},
-}
-var deviceRGB = &simpleColorSpace{
-	Name:     "DeviceRGB",
-	Fam:      ColorSpaceDeviceRGB,
-	DefColor: []float64{0, 0, 0},
-}
-var deviceCMYK = &simpleColorSpace{
-	Name:     "DeviceCMYK",
-	Fam:      ColorSpaceDeviceCMYK,
-	DefColor: []float64{0, 0, 0, 1},
+// setStroke sets the current stroking color space to DeviceCMYK
+// and sets the cyan, magenta, yellow, and black levels for stroking.
+//
+// This implements the PDF graphics operator "K".
+func (c colorDeviceCYMK) setStroke(w *Writer) {
+	cur, ok := w.StrokeColor.(colorDeviceCYMK)
+	if ok && w.isSet(StateStrokeColor) && cur == c {
+		return
+	}
+
+	w.StrokeColor = c
+	w.Set |= StateStrokeColor
+
+	// TODO(voss): rounding
+	_, w.Err = fmt.Fprintf(w.Content, "%f %f %f %f K\n", c[0], c[1], c[2], c[3])
 }
 
-// These are the color space families which have no parameters and can
-// be represented by singleton objects.
-var (
-	DeviceGray = deviceGray
-	DeviceRGB  = deviceRGB
-	DeviceCMYK = deviceCMYK
-)
+// setFill sets the current fill color space to DeviceCMYK
+// and sets the cyan, magenta, yellow, and black levels for filling.
+//
+// This implements the PDF graphics operator "k".
+func (c colorDeviceCYMK) setFill(w *Writer) {
+	cur, ok := w.FillColor.(colorDeviceCYMK)
+	if ok && w.isSet(StateFillColor) && cur == c {
+		return
+	}
+
+	w.FillColor = c
+	w.Set |= StateFillColor
+
+	// TODO(voss): rounding
+	_, w.Err = fmt.Fprintf(w.Content, "%f %f %f %f k\n", c[0], c[1], c[2], c[3])
+}
+
+// == CalGray ================================================================
+
+// ColorSpaceCalGray represents a CalGray color space.
+type ColorSpaceCalGray struct {
+	pdf.Res
+	whitePoint []float64
+	blackPoint []float64
+	gamma      float64
+}
 
 // CalGray returns a new CalGray color space.
 //
@@ -230,11 +212,16 @@ var (
 // blackPoint is optional, the default value is [0 0 0].
 //
 // The gamma parameter is a positive number (usually greater than or equal to 1).
-func CalGray(whitePoint, blackPoint []float64, gamma float64) (ColorSpace, error) {
+//
+// DefName is the default resource name to use within content streams.
+// This can be left empty to allocate names automatically.
+func CalGray(whitePoint, blackPoint []float64, gamma float64, defName pdf.Name) (*ColorSpaceCalGray, error) {
 	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
 		return nil, errors.New("CalGray: invalid white point")
 	}
-	if blackPoint != nil && !isPosVec3(blackPoint) {
+	if blackPoint == nil {
+		blackPoint = []float64{0, 0, 0}
+	} else if !isPosVec3(blackPoint) {
 		return nil, errors.New("CalGray: invalid black point")
 	}
 	if gamma <= 0 {
@@ -243,48 +230,132 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64) (ColorSpace, error
 
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(whitePoint)
-	if len(blackPoint) == 3 && !isZero(blackPoint) {
+	if !isZero(blackPoint) {
 		dict["BlackPoint"] = toPDF(blackPoint)
 	}
 	if gamma != 1 {
 		dict["Gamma"] = pdf.Number(gamma)
 	}
-	data := pdf.Array{pdf.Name("CalGray"), dict}
 
-	// TODO(voss): fill in the default values in the struct?
-
-	return &calGray{
-		data:       data,
+	return &ColorSpaceCalGray{
+		Res: pdf.Res{
+			DefName: defName,
+			Ref:     pdf.Array{pdf.Name("CalGray"), dict},
+		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
-		gamma:      gamma,
-	}, nil
+		gamma:      gamma}, nil
 }
 
-type calGray struct {
-	data       pdf.Object
+// Embed embeds the color space in the PDF file.
+// This saves space in case the color space is used in multiple content streams.
+func (c *ColorSpaceCalGray) Embed(out *pdf.Writer) (*ColorSpaceCalGray, error) {
+	if _, ok := c.Res.Ref.(pdf.Reference); ok {
+		return c, nil
+	}
+	ref := out.Alloc()
+	err := out.Put(ref, c.Res.Ref)
+	if err != nil {
+		return nil, err
+	}
+
+	res := clone(c)
+	res.Res.Ref = ref
+	return res, nil
+}
+
+// New returns a new CalGray color.
+func (c *ColorSpaceCalGray) New(gray float64) Color {
+	return colorCalGray{Space: c, Value: gray}
+}
+
+type colorCalGray struct {
+	Space *ColorSpaceCalGray
+	Value float64
+}
+
+func (c colorCalGray) setStroke(w *Writer) {
+	if w.Version < pdf.V1_1 {
+		w.Err = &pdf.VersionError{Operation: "CalGray colors", Earliest: pdf.V1_1}
+		return
+	}
+
+	cur, ok := w.StrokeColor.(colorCalGray)
+	// First set the color space, if needed.
+	if !ok || !w.isSet(StateStrokeColor) || cur.Space != c.Space {
+		name := w.getResourceName(catColorSpace, c.Space)
+		w.Err = name.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " CS")
+		if w.Err != nil {
+			return
+		}
+
+		cur.Value = 0
+	}
+
+	// Then set the color value.
+	if cur.Value != c.Value {
+		// TODO(voss): rounding
+		_, w.Err = fmt.Fprintf(w.Content, "%f SC\n", c.Value)
+		if w.Err != nil {
+			return
+		}
+	}
+
+	w.StrokeColor = c
+	w.State.Set |= StateStrokeColor
+}
+
+func (c colorCalGray) setFill(w *Writer) {
+	if w.Version < pdf.V1_1 {
+		w.Err = &pdf.VersionError{Operation: "CalGray colors", Earliest: pdf.V1_1}
+		return
+	}
+
+	cur, ok := w.FillColor.(colorCalGray)
+	// First set the color space, if needed.
+	if !ok || !w.isSet(StateFillColor) || cur.Space != c.Space {
+		name := w.getResourceName(catColorSpace, c.Space)
+		w.Err = name.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " cs")
+		if w.Err != nil {
+			return
+		}
+
+		cur.Value = 0
+	}
+
+	// Then set the color value.
+	if cur.Value != c.Value {
+		// TODO(voss): rounding
+		_, w.Err = fmt.Fprintf(w.Content, "%f sc\n", c.Value)
+		if w.Err != nil {
+			return
+		}
+	}
+
+	w.FillColor = c
+	w.State.Set |= StateFillColor
+}
+
+// == CalRGB =================================================================
+
+// ColorSpaceCalRGB represents a CalRGB color space.
+type ColorSpaceCalRGB struct {
+	pdf.Res
 	whitePoint []float64
 	blackPoint []float64
-	gamma      float64
+	gamma      []float64
+	matrix     []float64
 }
 
-func (cs *calGray) DefaultName() pdf.Name {
-	return ""
-}
-
-func (cs *calGray) PDFObject() pdf.Object {
-	return cs.data
-}
-
-func (cs *calGray) Family() ColorSpaceFamily {
-	return ColorSpaceCalGray
-}
-
-func (cs *calGray) DefaultColor() []float64 {
-	return []float64{0}
-}
-
-// CalRGB allocates a new CalRGB color space.
+// CalRGB returns a new CalRGB color space.
 //
 // WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates.  This
 // must be a slice of length 3, with positive entries, and Y=1.
@@ -296,37 +367,48 @@ func (cs *calGray) DefaultColor() []float64 {
 // Gamma (optional) gives the gamma values for the red, green and blue
 // components.  If non-nil, this must be a slice of three numbers.  The default
 // is [1 1 1].
-func CalRGB(whitePoint, blackPoint, gamma []float64, matrix []float64) (ColorSpace, error) {
+//
+// Matrix (optional) is a 3x3 matrix.  The default is [1 0 0 0 1 0 0 0 1].
+//
+// DefName is the default resource name to use within content streams.
+// This can be left empty to allocate names automatically.
+func CalRGB(whitePoint, blackPoint, gamma, matrix []float64, defName pdf.Name) (*ColorSpaceCalRGB, error) {
 	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
 		return nil, errors.New("CalRGB: invalid white point")
 	}
-	if blackPoint != nil && !isPosVec3(blackPoint) {
+	if blackPoint == nil {
+		blackPoint = []float64{0, 0, 0}
+	} else if !isPosVec3(blackPoint) {
 		return nil, errors.New("CalRGB: invalid black point")
 	}
-	if gamma != nil && len(gamma) != 3 {
-		return nil, fmt.Errorf("CalRGB: invalid gamma")
+	if gamma == nil {
+		gamma = []float64{1, 1, 1}
+	} else if len(gamma) != 3 {
+		return nil, errors.New("CalRGB: invalid gamma")
 	}
-	if matrix != nil && len(matrix) != 9 {
-		return nil, fmt.Errorf("CalRGB: invalid matrix")
+	if matrix == nil {
+		matrix = []float64{1, 0, 0, 0, 1, 0, 0, 0, 1}
+	} else if len(matrix) != 9 {
+		return nil, errors.New("CalRGB: invalid matrix")
 	}
 
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(whitePoint)
-	if len(blackPoint) == 3 && !isZero(blackPoint) {
+	if !isZero(blackPoint) {
 		dict["BlackPoint"] = toPDF(blackPoint)
 	}
-	if len(gamma) == 3 && !isConst(gamma, 1) {
+	if !isConst(gamma, 1) {
 		dict["Gamma"] = toPDF(gamma)
 	}
-	if len(matrix) == 9 && !isValues(matrix, 1, 0, 0, 0, 1, 0, 0, 0, 1) {
+	if !isValues(matrix, 1, 0, 0, 0, 1, 0, 0, 0, 1) {
 		dict["Matrix"] = toPDF(matrix)
 	}
-	data := pdf.Array{pdf.Name("CalRGB"), dict}
 
-	// TODO(voss): fill in the default values in the struct?
-
-	return &calRGB{
-		data:       data,
+	return &ColorSpaceCalRGB{
+		Res: pdf.Res{
+			DefName: defName,
+			Ref:     pdf.Array{pdf.Name("CalRGB"), dict},
+		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
 		gamma:      gamma,
@@ -334,28 +416,159 @@ func CalRGB(whitePoint, blackPoint, gamma []float64, matrix []float64) (ColorSpa
 	}, nil
 }
 
-type calRGB struct {
-	data       pdf.Object
-	whitePoint []float64
-	blackPoint []float64
-	gamma      []float64
-	matrix     []float64
+// Embed embeds the color space in the PDF file.
+// This saves space in case the color space is used in multiple content streams.
+func (c *ColorSpaceCalRGB) Embed(out *pdf.Writer) (*ColorSpaceCalRGB, error) {
+	if _, ok := c.Res.Ref.(pdf.Reference); ok {
+		return c, nil
+	}
+	ref := out.Alloc()
+	err := out.Put(ref, c.Res.Ref)
+	if err != nil {
+		return nil, err
+	}
+
+	res := clone(c)
+	res.Res.Ref = ref
+	return res, nil
 }
 
-func (cs *calRGB) DefaultName() pdf.Name {
-	return ""
+// New returns a new CalRGB color.
+func (c *ColorSpaceCalRGB) New(r, g, b float64) Color {
+	return colorCalRGB{Space: c, R: r, G: g, B: b}
 }
 
-func (cs *calRGB) PDFObject() pdf.Object {
-	return cs.data
+type colorCalRGB struct {
+	Space   *ColorSpaceCalRGB
+	R, G, B float64
 }
 
-func (cs *calRGB) Family() ColorSpaceFamily {
-	return ColorSpaceCalGray
+func (c colorCalRGB) setStroke(w *Writer) {
+	if w.Version < pdf.V1_1 {
+		w.Err = &pdf.VersionError{Operation: "CalRGB colors", Earliest: pdf.V1_1}
+		return
+	}
+
+	cur, ok := w.StrokeColor.(colorCalRGB)
+	// First set the color space, if needed.
+	if !ok || !w.isSet(StateStrokeColor) || cur.Space != c.Space {
+		name := w.getResourceName(catColorSpace, c.Space)
+		w.Err = name.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " CS")
+		if w.Err != nil {
+			return
+		}
+
+		cur.R = 0
+		cur.G = 0
+		cur.B = 0
+	}
+
+	// Then set the color value.
+	if cur.R != c.R || cur.G != c.G || cur.B != c.B {
+		rString := float.Format(c.R, 3)
+		gString := float.Format(c.G, 3)
+		bString := float.Format(c.B, 3)
+		_, w.Err = fmt.Fprintln(w.Content, rString, gString, bString, "SC")
+		if w.Err != nil {
+			return
+		}
+	}
+
+	w.StrokeColor = c
+	w.State.Set |= StateStrokeColor
 }
 
-func (cs *calRGB) DefaultColor() []float64 {
-	return []float64{0, 0, 0}
+func (c colorCalRGB) setFill(w *Writer) {
+	if w.Version < pdf.V1_1 {
+		w.Err = &pdf.VersionError{Operation: "CalRGB colors", Earliest: pdf.V1_1}
+		return
+	}
+
+	cur, ok := w.FillColor.(colorCalRGB)
+	// First set the color space, if needed.
+	if !ok || !w.isSet(StateFillColor) || cur.Space != c.Space {
+		name := w.getResourceName(catColorSpace, c.Space)
+		w.Err = name.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " cs")
+		if w.Err != nil {
+			return
+		}
+
+		cur.R = 0
+		cur.G = 0
+		cur.B = 0
+	}
+
+	// Then set the color value.
+	if cur.R != c.R || cur.G != c.G || cur.B != c.B {
+		rString := float.Format(c.R, 3)
+		gString := float.Format(c.G, 3)
+		bString := float.Format(c.B, 3)
+		_, w.Err = fmt.Fprintln(w.Content, rString, gString, bString, "sc")
+		if w.Err != nil {
+			return
+		}
+	}
+
+	w.FillColor = c
+	w.State.Set |= StateFillColor
+}
+
+// == ... =================================================================
+
+type colorSpaceLab struct {
+	pdf.Res
+}
+
+func (c *colorSpaceLab) defaultColor() []float64 {
+	panic("not implemented")
+}
+
+type colorSpaceICCBased struct {
+	pdf.Res
+}
+
+func (c *colorSpaceICCBased) defaultColor() []float64 {
+	panic("not implemented")
+}
+
+type colorSpaceIndexed struct {
+	pdf.Res
+}
+
+func (c *colorSpaceIndexed) defaultColor() []float64 {
+	panic("not implemented")
+}
+
+type colorSpacePattern struct {
+	pdf.Res
+}
+
+func (c *colorSpacePattern) defaultColor() []float64 {
+	panic("not implemented")
+}
+
+type colorSpaceSeparation struct {
+	pdf.Res
+}
+
+func (c *colorSpaceSeparation) defaultColor() []float64 {
+	panic("not implemented")
+}
+
+type colorSpaceDeviceN struct {
+	pdf.Res
+}
+
+func (c *colorSpaceDeviceN) defaultColor() []float64 {
+	panic("not implemented")
 }
 
 func toPDF(x []float64) pdf.Array {
@@ -407,30 +620,12 @@ func isValues(x []float64, y ...float64) bool {
 	return isEqual(x, y)
 }
 
-// SetStrokeColorOld sets the stroke color in the graphics state.
-// If col is nil, the stroke color is not changed.
-func (w *Writer) SetStrokeColorOld(col color.Color) {
-	if !w.isValid("SetStrokeColor", objPage|objText) {
-		return
-	}
-	if w.isSet(StateStrokeColor) && col == w.StrokeColorOld {
-		return
-	}
-	w.StrokeColorOld = col
-	w.Set |= StateStrokeColor
-	w.Err = col.SetStroke(w.Content)
+func clone[T any](x *T) *T {
+	y := *x
+	return &y
 }
 
-// SetFillColorOld sets the fill color in the graphics state.
-// If col is nil, the fill color is not changed.
-func (w *Writer) SetFillColorOld(col color.Color) {
-	if !w.isValid("SetFillColor", objPage|objText) {
-		return
-	}
-	if w.isSet(StateFillColor) && col == w.FillColorOld {
-		return
-	}
-	w.FillColorOld = col
-	w.Set |= StateFillColor
-	w.Err = col.SetFill(w.Content)
-}
+// WhitePointD65 represents the D65 whitepoint.
+//
+// https://en.wikipedia.org/wiki/Illuminant_D65
+var WhitePointD65 = []float64{0.95047, 1.0, 1.08883}

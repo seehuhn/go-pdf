@@ -22,10 +22,10 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
@@ -110,7 +110,7 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, d
 	page.PopGraphicsState()
 
 	page.TextSetFont(H, 8)
-	page.SetFillColorOld(color.Gray(0.5))
+	page.SetFillColor(graphics.DeviceGrayNew(0.5))
 	page.TextStart()
 	page.TextFirstLine(5, paper.URy-10)
 	page.TextShow(desc)

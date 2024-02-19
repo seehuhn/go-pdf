@@ -19,8 +19,8 @@ package main
 import (
 	"log"
 
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 	}
 
 	page.SetLineWidth(5)
-	page.SetStrokeColorOld(color.Gray(0.5))
+	page.SetStrokeColor(graphics.DeviceGrayNew(0.5))
 
 	page.MoveTo(100, 100)
 	page.LineTo(120, 200)

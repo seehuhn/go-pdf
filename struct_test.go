@@ -31,7 +31,7 @@ func TestCatalog(t *testing.T) {
 	}
 	d1 := AsDict(cat0)
 	if len(d1) != 2 {
-		t.Errorf("wrong Catalog dict: %s", format(d1))
+		t.Errorf("wrong Catalog dict: %s", Format(d1))
 	}
 	cat1 := &Catalog{}
 	err := DecodeDict(nil, cat1, d1)
@@ -84,7 +84,7 @@ func TestInfo(t *testing.T) {
 	info0.Author = "Jochen Voß"
 	d1 = AsDict(info0)
 	if len(d1) != 1 {
-		t.Errorf("wrong dict for empty Info struct: %s", format(d1))
+		t.Errorf("wrong dict for empty Info struct: %s", Format(d1))
 	}
 	info1 := &Info{}
 	err := DecodeDict(nil, info1, d1)
@@ -105,11 +105,11 @@ func TestInfo(t *testing.T) {
 	}
 	d2 := AsDict(info1)
 	if len(d1) != len(d2) {
-		t.Errorf("wrong d2: %s", format(d2))
+		t.Errorf("wrong d2: %s", Format(d2))
 	}
 	for key, val := range d1 {
 		if d2[key].(String).AsTextString() != val.(String).AsTextString() {
-			t.Errorf("wrong d2[%s]: %s", key, format(d2[key]))
+			t.Errorf("wrong d2[%s]: %s", key, Format(d2[key]))
 		}
 	}
 }

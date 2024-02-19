@@ -24,13 +24,13 @@ import (
 	"seehuhn.de/go/postscript/psenc"
 	pst1 "seehuhn.de/go/postscript/type1"
 
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/font/widths"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 func main() {
@@ -62,7 +62,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	g.SetFillColorOld(color.Gray(0.5))
+	g.SetFillColor(graphics.DeviceGrayNew(0.5))
 	g.Rectangle(0, -500, 50, 2000)
 	g.Fill()
 	err = g.Close()

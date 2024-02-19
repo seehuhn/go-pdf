@@ -40,7 +40,7 @@ func TestFormat(t *testing.T) {
 		{Array{Integer(1), nil, Integer(3)}, "[1 null 3]"},
 	}
 	for _, test := range cases {
-		out := format(test.in)
+		out := Format(test.in)
 		if out != test.out {
 			t.Errorf("string wrongly formatted, expected %q but got %q",
 				test.out, out)
@@ -92,7 +92,7 @@ func FuzzString(f *testing.F) {
 	f.Add([]byte{0xFF, 0x00})
 	f.Fuzz(func(t *testing.T, data []byte) {
 		s1 := String(data)
-		enc := format(s1)
+		enc := Format(s1)
 		s2, err := ParseString([]byte(enc))
 		if err != nil {
 			t.Error(err)
@@ -248,10 +248,4 @@ func TestPlaceholder(t *testing.T) {
 	if lengthOut != testVal {
 		t.Errorf("wrong /Length: %d vs %d", lengthOut, testVal)
 	}
-}
-
-func format(x Object) string {
-	buf := &bytes.Buffer{}
-	writeObject(buf, x)
-	return buf.String()
 }

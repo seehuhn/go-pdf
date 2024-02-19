@@ -24,11 +24,11 @@ import (
 
 	"seehuhn.de/go/sfnt/glyph"
 
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 func main() {
@@ -101,7 +101,7 @@ func run(filename string) error {
 		page.PushGraphicsState()
 		page.SetLineWidth(0.5)
 
-		page.SetStrokeColorOld(color.Gray(0.85))
+		page.SetStrokeColor(graphics.DeviceGrayNew(0.85))
 		for w := 0.0; w < 1000.1; w += 10 {
 			x := left + k*fontSize*w/1000 + gap1 + 0.5
 			page.MoveTo(x, paper.LLy)
@@ -109,7 +109,7 @@ func run(filename string) error {
 		}
 		page.Stroke()
 
-		page.SetStrokeColorOld(color.Gray(0.7))
+		page.SetStrokeColor(graphics.DeviceGrayNew(0.7))
 		for w := 0.0; w < 1000.1; w += 100 {
 			x := left + k*fontSize*w/1000 + gap1 + 0.5
 			page.MoveTo(x, paper.LLy)
@@ -118,7 +118,7 @@ func run(filename string) error {
 		page.Stroke()
 
 		page.SetLineWidth(1)
-		page.SetStrokeColorOld(color.RGB(1, 0.5, 0.5))
+		page.SetStrokeColor(graphics.DeviceRGBNew(1, 0.5, 0.5))
 		x := left + gap1 + 1 + gap2 + 0.5
 		page.MoveTo(x, paper.LLy)
 		page.LineTo(x, paper.URy)

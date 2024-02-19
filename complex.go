@@ -118,14 +118,14 @@ func asRectangle(r Getter, a Array) (*Rectangle, error) {
 	return rect, nil
 }
 
-func (rect *Rectangle) String() string {
-	return fmt.Sprintf("[%.2f %.2f %.2f %.2f]", rect.LLx, rect.LLy, rect.URx, rect.URy)
+func (r *Rectangle) String() string {
+	return fmt.Sprintf("[%.2f %.2f %.2f %.2f]", r.LLx, r.LLy, r.URx, r.URy)
 }
 
 // PDF implements the [Object] interface.
-func (rect *Rectangle) PDF(w io.Writer) error {
+func (r *Rectangle) PDF(w io.Writer) error {
 	res := Array{}
-	for _, x := range []float64{rect.LLx, rect.LLy, rect.URx, rect.URy} {
+	for _, x := range []float64{r.LLx, r.LLy, r.URx, r.URy} {
 		x = math.Round(100*x) / 100
 		res = append(res, Number(x))
 	}
@@ -133,47 +133,47 @@ func (rect *Rectangle) PDF(w io.Writer) error {
 }
 
 // IsZero is true if the rectangle is the zero rectangle object.
-func (rect Rectangle) IsZero() bool {
-	return rect.LLx == 0 && rect.LLy == 0 && rect.URx == 0 && rect.URy == 0
+func (r Rectangle) IsZero() bool {
+	return r.LLx == 0 && r.LLy == 0 && r.URx == 0 && r.URy == 0
 }
 
 // NearlyEqual reports whether the corner coordinates of two rectangles
 // differ by less than `eps`.
-func (rect *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
-	return (math.Abs(rect.LLx-other.LLx) < eps &&
-		math.Abs(rect.LLy-other.LLy) < eps &&
-		math.Abs(rect.URx-other.URx) < eps &&
-		math.Abs(rect.URy-other.URy) < eps)
+func (r *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
+	return (math.Abs(r.LLx-other.LLx) < eps &&
+		math.Abs(r.LLy-other.LLy) < eps &&
+		math.Abs(r.URx-other.URx) < eps &&
+		math.Abs(r.URy-other.URy) < eps)
 }
 
-func (rect *Rectangle) XPos(rel float64) float64 {
-	return rect.LLx + rel*(rect.URx-rect.LLx)
+func (r *Rectangle) XPos(rel float64) float64 {
+	return r.LLx + rel*(r.URx-r.LLx)
 }
 
-func (rect *Rectangle) YPos(rel float64) float64 {
-	return rect.LLy + rel*(rect.URy-rect.LLy)
+func (r *Rectangle) YPos(rel float64) float64 {
+	return r.LLy + rel*(r.URy-r.LLy)
 }
 
 // Extend enlarges the rectangle to also cover `other`.
-func (rect *Rectangle) Extend(other *Rectangle) {
+func (r *Rectangle) Extend(other *Rectangle) {
 	if other.IsZero() {
 		return
 	}
-	if rect.IsZero() {
-		*rect = *other
+	if r.IsZero() {
+		*r = *other
 		return
 	}
-	if other.LLx < rect.LLx {
-		rect.LLx = other.LLx
+	if other.LLx < r.LLx {
+		r.LLx = other.LLx
 	}
-	if other.LLy < rect.LLy {
-		rect.LLy = other.LLy
+	if other.LLy < r.LLy {
+		r.LLy = other.LLy
 	}
-	if other.URx > rect.URx {
-		rect.URx = other.URx
+	if other.URx > r.URx {
+		r.URx = other.URx
 	}
-	if other.URy > rect.URy {
-		rect.URy = other.URy
+	if other.URy > r.URy {
+		r.URy = other.URy
 	}
 }
 
@@ -260,7 +260,7 @@ type Info struct {
 // See section 7.8.3 of PDF 32000-1:2008 for details.
 type Resources struct {
 	ExtGState  Dict  `pdf:"optional"` // maps resource names to graphics state parameter dictionaries
-	ColorSpace Dict  `pdf:"optional"` // maps each resource name to either the name of a device-dependent colour space or an array describing a colour space
+	ColorSpace Dict  `pdf:"optional"` // maps resource names to colour spaces
 	Pattern    Dict  `pdf:"optional"` // maps resource names to pattern objects
 	Shading    Dict  `pdf:"optional"` // maps resource names to shading dictionaries
 	XObject    Dict  `pdf:"optional"` // maps resource names to external objects
@@ -269,6 +269,7 @@ type Resources struct {
 	Properties Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
 }
 
+// IsEmpty returns true if no resources are defined.
 func (r *Resources) IsEmpty() bool {
 	if r == nil {
 		return true

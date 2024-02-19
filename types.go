@@ -660,8 +660,7 @@ func Format(obj Object) string {
 	buf := &bytes.Buffer{}
 	err := obj.PDF(buf)
 	if err != nil {
-		// TODO(voss): what to do here?
-		panic(err)
+		panic(err) // unreachable
 	}
 	return buf.String()
 }

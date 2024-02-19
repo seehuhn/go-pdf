@@ -18,7 +18,6 @@ package ghostscript
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics"
@@ -60,7 +59,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	if err != nil {
 		return 0, 0, err
 	}
-	g.SetFillColorOld(color.RGB(1.0, 0, 0))
+	g.SetFillColor(graphics.DeviceRGBNew(1.0, 0, 0))
 	A := M.Inv()
 	p, q := A.Apply(xc-1, yc-1)
 	g.MoveTo(p*1000, q*1000)

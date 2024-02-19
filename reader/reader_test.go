@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/sfnt/cff"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
 	pdffont "seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/dummyfont"
@@ -252,13 +251,13 @@ func FuzzReader(f *testing.F) {
 			case "G":
 				gray, ok := getNum()
 				if ok {
-					w.SetStrokeColorOld(color.Gray(gray))
+					w.SetStrokeColor(graphics.DeviceGrayNew(gray))
 				}
 
 			case "g":
 				gray, ok := getNum()
 				if ok {
-					w.SetFillColorOld(color.Gray(gray))
+					w.SetFillColor(graphics.DeviceGrayNew(gray))
 				}
 
 			case "k":
@@ -267,7 +266,7 @@ func FuzzReader(f *testing.F) {
 				yellow, ok3 := getNum()
 				black, ok4 := getNum()
 				if ok1 && ok2 && ok3 && ok4 {
-					w.SetFillColorOld(color.CMYK(cyan, magenta, yellow, black))
+					w.SetFillColor(graphics.DeviceCYMKNew(cyan, magenta, yellow, black))
 				}
 			}
 

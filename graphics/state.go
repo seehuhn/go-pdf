@@ -20,7 +20,6 @@ import (
 	"math/bits"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -62,13 +61,8 @@ type Parameters struct {
 	StartX, StartY     float64 // the starting point of the current path
 	CurrentX, CurrentY float64 // the "current point"
 
-	StrokeColorOld color.Color
-	FillColorOld   color.Color
-
-	StrokeColorSpace ColorSpace
-	FillColorSpace   ColorSpace
-	StrokeColor      []float64
-	FillColor        []float64
+	StrokeColor Color
+	FillColor   Color
 
 	// Text State parameters:
 	TextCharacterSpacing  float64 // character spacing (T_c)
@@ -254,13 +248,8 @@ func NewState() State {
 
 	param.CTM = IdentityMatrix
 
-	param.StrokeColorOld = color.Gray(0) // old
-	param.FillColorOld = color.Gray(0)   // old
-
-	param.StrokeColorSpace = DeviceGray
-	param.StrokeColor = DeviceGray.DefaultColor()
-	param.FillColorSpace = DeviceGray
-	param.FillColor = DeviceGray.DefaultColor()
+	param.StrokeColor = DeviceGrayNew(0)
+	param.FillColor = DeviceGrayNew(0)
 
 	param.TextCharacterSpacing = 0
 	param.TextWordSpacing = 0

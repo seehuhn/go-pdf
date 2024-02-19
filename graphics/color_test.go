@@ -31,53 +31,24 @@ func TestCalGray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cs1 := graphics.DeviceGray
-	cs2, err := graphics.CalGray(graphics.WhitePointD65, nil, 1.0)
+	calGray, err := graphics.CalGray(graphics.WhitePointD65, nil, 1.0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if err != nil {
 		t.Fatal(err)
 	}
 	w := (paper.Dx() - 72) / 10
-	for i, cs := range []graphics.ColorSpace{cs1, cs2} {
+	for i := 0; i < 2; i++ {
 		y := paper.URy - 36 - float64(i+1)*w
 		for j := 0; j < 10; j++ {
 			x := 36 + float64(j)*w
-			col := graphics.Color{
-				CS:     cs,
-				Values: []float64{float64(j) / 9},
-			}
-			page.SetFillColor(col)
-			page.Rectangle(x, y, w, w)
-			page.Fill()
-		}
-	}
-
-	err = page.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestCalRGB(t *testing.T) {
-	paper := document.A4
-
-	page, err := document.CreateSinglePage("test.pdf", paper, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cs1 := graphics.DeviceRGB
-	cs2, err := graphics.CalRGB(graphics.WhitePointD65, nil, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := (paper.Dx() - 72) / 10
-	for i, cs := range []graphics.ColorSpace{cs1, cs2} {
-		y := paper.URy - 36 - float64(i+1)*w
-		for j := 0; j < 10; j++ {
-			x := 36 + float64(j)*w
-			col := graphics.Color{
-				CS:     cs,
-				Values: []float64{float64(j) / 19, 0, 0},
+			var col graphics.Color
+			if i == 0 {
+				col = graphics.DeviceGrayNew(float64(j) / 9)
+			} else {
+				col = calGray.New(float64(j) / 9)
 			}
 			page.SetFillColor(col)
 			page.Rectangle(x, y, w, w)

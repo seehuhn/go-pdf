@@ -21,7 +21,6 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/color"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
@@ -470,7 +469,7 @@ doOps:
 		if !ok {
 			break
 		}
-		r.StrokeColorOld = color.Gray(gray)
+		r.StrokeColor = graphics.DeviceGrayNew(gray)
 		r.Set |= graphics.StateStrokeColor
 
 	case "g": // nonstroking gray level
@@ -481,7 +480,7 @@ doOps:
 		if !ok {
 			break
 		}
-		r.FillColorOld = color.Gray(gray)
+		r.FillColor = graphics.DeviceGrayNew(gray)
 		r.Set |= graphics.StateFillColor
 
 	case "RG": // nonstroking DeviceRGB color
@@ -499,7 +498,7 @@ doOps:
 		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
-		r.StrokeColorOld = color.RGB(red, green, blue)
+		r.StrokeColor = graphics.DeviceRGBNew(red, green, blue)
 
 	case "rg": // nonstroking DeviceRGB color
 		if len(args) < 3 {
@@ -516,7 +515,7 @@ doOps:
 		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
-		r.FillColorOld = color.RGB(red, green, blue)
+		r.FillColor = graphics.DeviceRGBNew(red, green, blue)
 
 	case "K": // stroking DeviceCMYK color
 		if len(args) < 4 {
@@ -536,7 +535,7 @@ doOps:
 		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
-		r.StrokeColorOld = color.CMYK(cyan, magenta, yellow, black)
+		r.StrokeColor = graphics.DeviceCYMKNew(cyan, magenta, yellow, black)
 
 	case "k": // nonstroking DeviceCMYK color
 		if len(args) < 4 {
@@ -556,7 +555,7 @@ doOps:
 		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
-		r.FillColorOld = color.CMYK(cyan, magenta, yellow, black)
+		r.FillColor = graphics.DeviceCYMKNew(cyan, magenta, yellow, black)
 
 	// == Shading patterns ===============================================
 

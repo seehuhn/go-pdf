@@ -19,7 +19,7 @@ package graphics
 import (
 	"fmt"
 	"io"
-	"strings"
+	"strconv"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/float"
@@ -37,8 +37,7 @@ type Writer struct {
 	State
 	stack []State
 
-	resName  map[catRes]pdf.Name
-	nameUsed map[catName]struct{}
+	resName map[catRes]pdf.Name
 
 	nesting []pairType
 }
@@ -53,20 +52,20 @@ type catName struct {
 	name pdf.Name
 }
 
-type resourceCategory pdf.Name
+type resourceCategory byte
 
 // The valid resource categories.
 // These corresponds to the fields in the Resources dictionary.
 //
 // See section 7.8.3 of ISO 32000-2:2020.
 const (
-	catExtGState  resourceCategory = "ExtGState"
-	catColorSpace resourceCategory = "ColorSpace"
-	catPattern    resourceCategory = "Pattern"
-	catShading    resourceCategory = "Shading"
-	catXObject    resourceCategory = "XObject"
-	catFont       resourceCategory = "Font"
-	catProperties resourceCategory = "Properties"
+	catExtGState resourceCategory = iota + 1
+	catColorSpace
+	catPattern
+	catShading
+	catXObject
+	catFont
+	catProperties
 )
 
 type pairType byte
@@ -80,14 +79,6 @@ const (
 
 // NewWriter allocates a new Writer object.
 func NewWriter(w io.Writer, v pdf.Version) *Writer {
-	nameUsed := make(map[catName]struct{})
-
-	// See table 73 of ISO 32000-2:2020
-	nameUsed[catName{catColorSpace, "DeviceGray"}] = struct{}{}
-	nameUsed[catName{catColorSpace, "DeviceRGB"}] = struct{}{}
-	nameUsed[catName{catColorSpace, "DeviceCMYK"}] = struct{}{}
-	nameUsed[catName{catColorSpace, "Pattern"}] = struct{}{}
-
 	return &Writer{
 		Version:       v,
 		Content:       w,
@@ -96,14 +87,12 @@ func NewWriter(w io.Writer, v pdf.Version) *Writer {
 
 		State: NewState(),
 
-		resName:  make(map[catRes]pdf.Name),
-		nameUsed: nameUsed,
+		resName: make(map[catRes]pdf.Name),
 	}
 }
 
 // GetResourceName returns the name of a resource.
-// A new name is generated, if necessary, and the resource is added to the
-// resource dictionary for the category.
+// If the resource is not yet in the resource dictionary, a new name is generated.
 func (w *Writer) getResourceName(category resourceCategory, r pdf.Resource) pdf.Name {
 	name, ok := w.resName[catRes{category, r}]
 	if ok {
@@ -111,71 +100,67 @@ func (w *Writer) getResourceName(category resourceCategory, r pdf.Resource) pdf.
 	}
 
 	var field *pdf.Dict
-	var tmpl string
+	var prefix pdf.Name
 	switch category {
 	case catFont:
 		field = &w.Resources.Font
-		tmpl = "F%d"
+		prefix = "F"
 	case catExtGState:
 		field = &w.Resources.ExtGState
-		tmpl = "E%d"
+		prefix = "E"
 	case catXObject:
 		field = &w.Resources.XObject
-		tmpl = "X%d"
+		prefix = "X"
 	case catColorSpace:
 		field = &w.Resources.ColorSpace
-		tmpl = "C%d"
+		prefix = "C"
 	case catPattern:
 		field = &w.Resources.Pattern
-		tmpl = "P%d"
+		prefix = "P"
 	case catShading:
 		field = &w.Resources.Shading
-		tmpl = "S%d"
+		prefix = "S"
 	case catProperties:
 		field = &w.Resources.Properties
-		tmpl = "MC%d"
+		prefix = "M"
 	default:
-		panic("invalid resource category " + category)
+		panic("invalid resource category " + strconv.Itoa(int(category)))
+	}
+	if *field == nil {
+		*field = pdf.Dict{}
 	}
 
 	isUsed := func(name pdf.Name) bool {
-		_, isUsed := w.nameUsed[catName{category, name}]
+		_, isUsed := (*field)[name]
 		return isUsed
 	}
 
-	origName := r.DefaultName()
-	defName := origName
-	if strings.HasPrefix(string(defName), "/") {
-		defName = defName[1:]
-	}
-	if origName != "" && !isUsed(defName) {
-		name = defName
-	} else {
-		var numUsed int
-		for item := range w.nameUsed {
-			if item.cat == category {
-				numUsed++
-			}
+	name = r.DefaultName()
+	// Some names are forbidden for color spaces,
+	// see table 73 of ISO 32000-2:2020
+	if category == catColorSpace {
+		if n, ok := r.PDFObject().(pdf.Name); ok {
+			name = n
+		} else if name == "DeviceGray" || name == "DeviceRGB" || name == "DeviceCMYK" || name == "Pattern" {
+			name = ""
 		}
+	}
+	if name == "" || isUsed(name) {
+		numUsed := len(*field)
 		for k := numUsed + 1; ; k-- {
-			name = pdf.Name(fmt.Sprintf(tmpl, k))
+			name = prefix + pdf.Name(strconv.Itoa(k))
 			if !isUsed(name) {
 				break
 			}
 		}
 	}
-	w.resName[catRes{category, r}] = name
-	w.nameUsed[catName{category, name}] = struct{}{}
-
-	if *field == nil {
-		*field = pdf.Dict{}
-	}
 	(*field)[name] = r.PDFObject()
+	w.resName[catRes{category, r}] = name
 
 	return name
 }
 
-// isValid returns true, if the current graphics object is one of the given types
+// IsValid returns true, if the current graphics object is one of the given types
 // and if p.Err is nil.  Otherwise it sets p.Err and returns false.
 func (w *Writer) isValid(cmd string, ss objectType) bool {
 	if w.Err != nil {
