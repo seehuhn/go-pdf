@@ -30,9 +30,8 @@ type Image interface {
 
 // EmbeddedImage represents an image which has been embedded in a PDF file.
 type EmbeddedImage interface {
+	pdf.Resource
 	Image
-	DefaultName() pdf.Name
-	PDFObject() pdf.Object
 }
 
 // Rectangle gives the dimensions of an image.
@@ -51,7 +50,7 @@ func (r Rectangle) Dy() int {
 }
 
 // DrawImage draws an image on the page.
-func (p *Writer) DrawImage(img EmbeddedImage) {
+func (p *Writer) DrawImage(img pdf.Resource) {
 	if !p.isValid("DrawImage", objPage) {
 		return
 	}

@@ -25,8 +25,7 @@ import (
 )
 
 // This file implements functions to set the stroke and fill colors.
-// The operators used here are defined in table 73 of
-// ISO 32000-2:2020.
+// The operators used here are defined in table 73 of ISO 32000-2:2020.
 
 // Color represents a PDF color.
 type Color interface {
@@ -34,31 +33,17 @@ type Color interface {
 	setFill(w *Writer)
 }
 
+// SetStrokeColor sets the color to use for stroking operations.
 func (w *Writer) SetStrokeColor(c Color) {
 	if !w.isValid("SetStrokeColor", objPage|objText) {
-		return
-	}
-
-	minVersion := pdf.V1_0
-	switch c.(type) {
-	}
-	if w.Version < minVersion {
-		w.Err = &pdf.VersionError{Operation: fmt.Sprintf("%T colors", c), Earliest: minVersion}
 		return
 	}
 	c.setStroke(w)
 }
 
+// SetFillColor sets the color to use for filling operations.
 func (w *Writer) SetFillColor(c Color) {
 	if !w.isValid("SetFillColor", objPage|objText) {
-		return
-	}
-
-	minVersion := pdf.V1_0
-	switch c.(type) {
-	}
-	if w.Version < minVersion {
-		w.Err = &pdf.VersionError{Operation: fmt.Sprintf("%T colors", c), Earliest: minVersion}
 		return
 	}
 	c.setFill(w)
@@ -68,12 +53,12 @@ func (w *Writer) SetFillColor(c Color) {
 
 type colorDeviceGray float64
 
-// DeviceGrayNew returns a new DeviceGray color.
+// DeviceGrayNew returns a color in the DeviceGray color space.
 func DeviceGrayNew(gray float64) Color {
 	return colorDeviceGray(gray)
 }
 
-// setStroke sets the current stroking color space to DeviceGray
+// SetStroke sets the current stroking color space to DeviceGray
 // and sets the gray level for stroking.
 //
 // This implements the PDF graphics operator "G".
@@ -111,12 +96,12 @@ func (c colorDeviceGray) setFill(w *Writer) {
 
 type colorDeviceRGB [3]float64
 
-// DeviceRGBNew returns a new DeviceRGB color.
+// DeviceRGBNew returns a color in the DeviceRGB color space.
 func DeviceRGBNew(r, g, b float64) Color {
 	return colorDeviceRGB{r, g, b}
 }
 
-// setStroke sets the current stroking color space to DeviceRGB
+// SetStroke sets the current stroking color space to DeviceRGB
 // and sets the red, green, and blue levels for stroking.
 //
 // This implements the PDF graphics operator "RG".
@@ -129,8 +114,10 @@ func (c colorDeviceRGB) setStroke(w *Writer) {
 	w.StrokeColor = c
 	w.Set |= StateStrokeColor
 
-	// TODO(voss): rounding
-	_, w.Err = fmt.Fprintf(w.Content, "%f %f %f RG\n", c[0], c[1], c[2])
+	rString := float.Format(c[0], 3)
+	gString := float.Format(c[1], 3)
+	bString := float.Format(c[2], 3)
+	_, w.Err = fmt.Fprintln(w.Content, rString, gString, bString, "RG")
 }
 
 // setFill sets the current fill color space to DeviceRGB
@@ -146,8 +133,10 @@ func (c colorDeviceRGB) setFill(w *Writer) {
 	w.FillColor = c
 	w.Set |= StateFillColor
 
-	// TODO(voss): rounding
-	_, w.Err = fmt.Fprintf(w.Content, "%f %f %f rg\n", c[0], c[1], c[2])
+	rString := float.Format(c[0], 3)
+	gString := float.Format(c[1], 3)
+	bString := float.Format(c[2], 3)
+	_, w.Err = fmt.Fprintln(w.Content, rString, gString, bString, "rg")
 }
 
 // == DeviceCMYK =============================================================
@@ -172,8 +161,11 @@ func (c colorDeviceCYMK) setStroke(w *Writer) {
 	w.StrokeColor = c
 	w.Set |= StateStrokeColor
 
-	// TODO(voss): rounding
-	_, w.Err = fmt.Fprintf(w.Content, "%f %f %f %f K\n", c[0], c[1], c[2], c[3])
+	rString := float.Format(c[0], 3)
+	gString := float.Format(c[1], 3)
+	bString := float.Format(c[2], 3)
+	kString := float.Format(c[3], 3)
+	_, w.Err = fmt.Fprintln(w.Content, rString, gString, bString, kString, "K")
 }
 
 // setFill sets the current fill color space to DeviceCMYK
@@ -205,11 +197,12 @@ type ColorSpaceCalGray struct {
 
 // CalGray returns a new CalGray color space.
 //
-// The whitePoint and blackPoint parameters are arrays of three numbers
-// each, representing the X, Y, and Z components of the points.
-// The Y-value of the white point must equal 1.0.
+// WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates.  This
+// must be a slice of length 3, with positive entries, and Y=1.
 //
-// blackPoint is optional, the default value is [0 0 0].
+// BlackPoint (optional) is the diffuse black point in the CIE 1931 XYZ
+// coordinates.  If non-nil, this must be a slice of three non-negative
+// numbers.  The default is [0 0 0].
 //
 // The gamma parameter is a positive number (usually greater than or equal to 1).
 //
@@ -298,8 +291,8 @@ func (c colorCalGray) setStroke(w *Writer) {
 
 	// Then set the color value.
 	if cur.Value != c.Value {
-		// TODO(voss): rounding
-		_, w.Err = fmt.Fprintf(w.Content, "%f SC\n", c.Value)
+		gString := float.Format(c.Value, 3)
+		_, w.Err = fmt.Fprintln(w.Content, gString, "SC")
 		if w.Err != nil {
 			return
 		}
@@ -333,8 +326,8 @@ func (c colorCalGray) setFill(w *Writer) {
 
 	// Then set the color value.
 	if cur.Value != c.Value {
-		// TODO(voss): rounding
-		_, w.Err = fmt.Fprintf(w.Content, "%f sc\n", c.Value)
+		gString := float.Format(c.Value, 3)
+		_, w.Err = fmt.Fprintln(w.Content, gString, "sc")
 		if w.Err != nil {
 			return
 		}
@@ -428,9 +421,9 @@ func (c *ColorSpaceCalRGB) Embed(out *pdf.Writer) (*ColorSpaceCalRGB, error) {
 		return nil, err
 	}
 
-	res := clone(c)
-	res.Res.Ref = ref
-	return res, nil
+	embedded := clone(c)
+	embedded.Res.Ref = ref
+	return embedded, nil
 }
 
 // New returns a new CalRGB color.
@@ -449,8 +442,8 @@ func (c colorCalRGB) setStroke(w *Writer) {
 		return
 	}
 
-	cur, ok := w.StrokeColor.(colorCalRGB)
 	// First set the color space, if needed.
+	cur, ok := w.StrokeColor.(colorCalRGB)
 	if !ok || !w.isSet(StateStrokeColor) || cur.Space != c.Space {
 		name := w.getResourceName(catColorSpace, c.Space)
 		w.Err = name.PDF(w.Content)
@@ -521,55 +514,238 @@ func (c colorCalRGB) setFill(w *Writer) {
 	w.State.Set |= StateFillColor
 }
 
-// == ... =================================================================
+// == Lab ====================================================================
 
-type colorSpaceLab struct {
+// ColorSpaceLab represents a CIE 1976 L*a*b* color space.
+type ColorSpaceLab struct {
 	pdf.Res
+	whitePoint []float64
+	blackPoint []float64
+	ranges     []float64
 }
 
-func (c *colorSpaceLab) defaultColor() []float64 {
-	panic("not implemented")
+// Lab returns a new CIE 1976 L*a*b* color space.
+//
+// WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates.  This
+// must be a slice of length 3, with positive entries, and Y=1.
+//
+// BlackPoint (optional) is the diffuse black point in the CIE 1931 XYZ
+// coordinates.  If non-nil, this must be a slice of three non-negative
+// numbers.  The default is [0 0 0].
+//
+// Ranges (optional) is a slice of four numbers, [aMin, aMax, bMin, bMax],
+// which define the valid range of the a* and b* components.
+// The default is [-100 100 -100 100].
+//
+// DefName is the default resource name to use within content streams.
+// This can be left empty to allocate names automatically.
+func Lab(whitePoint, blackPoint, ranges []float64, defName pdf.Name) (*ColorSpaceLab, error) {
+	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
+		return nil, errors.New("Lab: invalid white point")
+	}
+	if blackPoint == nil {
+		blackPoint = []float64{0, 0, 0}
+	} else if !isPosVec3(blackPoint) {
+		return nil, errors.New("Lab: invalid black point")
+	}
+	if ranges == nil {
+		ranges = []float64{-100, 100, -100, 100}
+	} else if len(ranges) != 4 || ranges[0] >= ranges[1] || ranges[2] >= ranges[3] {
+		return nil, errors.New("Lab: invalid ranges")
+	}
+
+	dict := pdf.Dict{}
+	dict["WhitePoint"] = toPDF(whitePoint)
+	if !isZero(blackPoint) {
+		dict["BlackPoint"] = toPDF(blackPoint)
+	}
+	if !isValues(ranges, -100, 100, -100, 100) {
+		dict["Range"] = toPDF(ranges)
+	}
+
+	return &ColorSpaceLab{
+		Res: pdf.Res{
+			DefName: defName,
+			Ref:     pdf.Array{pdf.Name("Lab"), dict},
+		},
+		whitePoint: whitePoint,
+		blackPoint: blackPoint,
+		ranges:     ranges,
+	}, nil
 }
+
+func (c *ColorSpaceLab) Embed(out *pdf.Writer) (*ColorSpaceLab, error) {
+	if _, ok := c.Res.Ref.(pdf.Reference); ok {
+		return c, nil
+	}
+	ref := out.Alloc()
+	err := out.Put(ref, c.Res.Ref)
+	if err != nil {
+		return nil, err
+	}
+
+	embedded := clone(c)
+	embedded.Res.Ref = ref
+	return embedded, nil
+}
+
+// New returns a new Lab color.
+func (c *ColorSpaceLab) New(l, a, b float64) (Color, error) {
+	if l < 0 || l > 100 {
+		return nil, fmt.Errorf("Lab: invalid L* value %g∉[0,100]", l)
+	}
+	if a < c.ranges[0] || a > c.ranges[1] {
+		return nil, fmt.Errorf("Lab: invalid a* value %g∉[%g,%g]",
+			a, c.ranges[0], c.ranges[1])
+	}
+	if b < c.ranges[2] || b > c.ranges[3] {
+		return nil, fmt.Errorf("Lab: invalid b* value %g∉[%g,%g]",
+			b, c.ranges[2], c.ranges[3])
+	}
+
+	return colorLab{Space: c, L: l, A: a, B: b}, nil
+}
+
+type colorLab struct {
+	Space   *ColorSpaceLab
+	L, A, B float64
+}
+
+func (c colorLab) setStroke(w *Writer) {
+	if w.Version < pdf.V1_1 {
+		w.Err = &pdf.VersionError{Operation: "Lab colors", Earliest: pdf.V1_1}
+		return
+	}
+
+	// First set the color space, if needed.
+	cur, ok := w.StrokeColor.(colorLab)
+	if !ok || !w.isSet(StateStrokeColor) || cur.Space != c.Space {
+		name := w.getResourceName(catColorSpace, c.Space)
+		w.Err = name.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " CS")
+		if w.Err != nil {
+			return
+		}
+
+		cur.L = 0
+		if c.Space.ranges[0] > 0 {
+			cur.A = c.Space.ranges[0]
+		} else if c.Space.ranges[1] < 0 {
+			cur.A = c.Space.ranges[1]
+		} else {
+			cur.A = 0
+		}
+		if c.Space.ranges[2] > 0 {
+			cur.B = c.Space.ranges[2]
+		}
+		if c.Space.ranges[3] < 0 {
+			cur.B = c.Space.ranges[3]
+		} else {
+			cur.B = 0
+		}
+	}
+
+	// Then set the color value.
+	if cur.L != c.L || cur.A != c.A || cur.B != c.B {
+		lString := float.Format(c.L, 3)
+		aString := float.Format(c.A, 3)
+		bString := float.Format(c.B, 3)
+		_, w.Err = fmt.Fprintln(w.Content, lString, aString, bString, "SC")
+		if w.Err != nil {
+			return
+		}
+	}
+
+	w.StrokeColor = c
+	w.State.Set |= StateStrokeColor
+}
+
+func (c colorLab) setFill(w *Writer) {
+	if w.Version < pdf.V1_1 {
+		w.Err = &pdf.VersionError{Operation: "Lab colors", Earliest: pdf.V1_1}
+		return
+	}
+
+	// First set the color space, if needed.
+	cur, ok := w.FillColor.(colorLab)
+	if !ok || !w.isSet(StateFillColor) || cur.Space != c.Space {
+		name := w.getResourceName(catColorSpace, c.Space)
+		w.Err = name.PDF(w.Content)
+		if w.Err != nil {
+			return
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " cs")
+		if w.Err != nil {
+			return
+		}
+
+		cur.L = 0
+		if c.Space.ranges[0] > 0 {
+			cur.A = c.Space.ranges[0]
+		} else if c.Space.ranges[1] < 0 {
+			cur.A = c.Space.ranges[1]
+		} else {
+			cur.A = 0
+		}
+		if c.Space.ranges[2] > 0 {
+			cur.B = c.Space.ranges[2]
+		}
+		if c.Space.ranges[3] < 0 {
+			cur.B = c.Space.ranges[3]
+		} else {
+			cur.B = 0
+		}
+	}
+
+	// Then set the color value.
+	if cur.L != c.L || cur.A != c.A || cur.B != c.B {
+		lString := float.Format(c.L, 3)
+		aString := float.Format(c.A, 3)
+		bString := float.Format(c.B, 3)
+		_, w.Err = fmt.Fprintln(w.Content, lString, aString, bString, "sc")
+		if w.Err != nil {
+			return
+		}
+	}
+
+	w.FillColor = c
+	w.State.Set |= StateFillColor
+}
+
+// == ICCBased ===============================================================
 
 type colorSpaceICCBased struct {
 	pdf.Res
 }
 
-func (c *colorSpaceICCBased) defaultColor() []float64 {
-	panic("not implemented")
-}
+// == Indexed ================================================================
 
 type colorSpaceIndexed struct {
 	pdf.Res
 }
 
-func (c *colorSpaceIndexed) defaultColor() []float64 {
-	panic("not implemented")
-}
+// == Pattern ================================================================
 
 type colorSpacePattern struct {
 	pdf.Res
 }
 
-func (c *colorSpacePattern) defaultColor() []float64 {
-	panic("not implemented")
-}
+// == Separation =============================================================
 
 type colorSpaceSeparation struct {
 	pdf.Res
 }
 
-func (c *colorSpaceSeparation) defaultColor() []float64 {
-	panic("not implemented")
-}
+// == DeviceN ================================================================
 
 type colorSpaceDeviceN struct {
 	pdf.Res
 }
 
-func (c *colorSpaceDeviceN) defaultColor() []float64 {
-	panic("not implemented")
-}
+// ===========================================================================
 
 func toPDF(x []float64) pdf.Array {
 	res := make(pdf.Array, len(x))
@@ -626,6 +802,13 @@ func clone[T any](x *T) *T {
 }
 
 // WhitePointD65 represents the D65 whitepoint.
+// The given values are CIE 1931 XYZ coordinates.
 //
 // https://en.wikipedia.org/wiki/Illuminant_D65
 var WhitePointD65 = []float64{0.95047, 1.0, 1.08883}
+
+// WhitePointD50 represents the D50 whitepoint.
+// The given values are CIE 1931 XYZ coordinates.
+//
+// https://en.wikipedia.org/wiki/Standard_illuminant#Illuminant_series_D
+var WhitePointD50 = []float64{0.964212, 1.0, 0.8251883}
