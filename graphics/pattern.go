@@ -107,65 +107,52 @@ func (w *WhatsIt) New(c Color) Color {
 	return colorTilingPattern{col: c, pattern: w.pattern}
 }
 
-type whatsItSpace struct {
+// colorSpacePattern is used for uncolored tiling patterns and shading patterns.
+type colorSpacePattern struct{}
+
+// DefaultName implements the [ColorSpace] interface.
+func (s colorSpacePattern) DefaultName() pdf.Name {
+	return ""
+}
+
+// PDFObject implements the [ColorSpace] interface.
+func (s colorSpacePattern) PDFObject() pdf.Object {
+	return pdf.Name("Pattern")
+}
+
+// ColorSpaceFamily implements the [ColorSpace] interface.
+func (s colorSpacePattern) ColorSpaceFamily() string {
+	return "Pattern"
+}
+
+// defaultColor implements the [ColorSpace] interface.
+func (s colorSpacePattern) defaultColor() Color {
+	return blankPattern // TODO(voss): check this
+}
+
+type colorSpacePatternUncolored struct {
 	s ColorSpace
 }
 
-func (s whatsItSpace) DefaultName() pdf.Name {
+func (s colorSpacePatternUncolored) DefaultName() pdf.Name {
 	return pdf.Name("")
 }
 
-func (s whatsItSpace) PDFObject() pdf.Object {
+func (s colorSpacePatternUncolored) PDFObject() pdf.Object {
 	return pdf.Array{
 		pdf.Name("Pattern"),
 		s.s.PDFObject(),
 	}
 }
 
-func (s whatsItSpace) setStrokeSpace(w *Writer) {
-	minVersion := pdf.V1_2
-	if w.Version < minVersion {
-		w.Err = &pdf.VersionError{Operation: "tiling patterns", Earliest: minVersion}
-		return
-	}
-
-	defCol := blankPattern
-	if w.isSet(StateStrokeColor) && w.StrokeColor == defCol {
-		return
-	}
-
-	w.StrokeColor = defCol
-	w.State.Set |= StateStrokeColor
-
-	name := w.getResourceName(catColorSpace, s)
-	w.Err = name.PDF(w.Content)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " CS")
+// ColorSpaceFamily implements the [ColorSpace] interface.
+func (s colorSpacePatternUncolored) ColorSpaceFamily() string {
+	return "Pattern"
 }
 
-func (s whatsItSpace) setFillSpace(w *Writer) {
-	minVersion := pdf.V1_2
-	if w.Version < minVersion {
-		w.Err = &pdf.VersionError{Operation: "tiling patterns", Earliest: minVersion}
-		return
-	}
-
-	defCol := blankPattern
-	if w.isSet(StateFillColor) && w.FillColor == defCol {
-		return
-	}
-
-	w.FillColor = defCol
-	w.State.Set |= StateFillColor
-
-	name := w.getResourceName(catColorSpace, s)
-	w.Err = name.PDF(w.Content)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " cs")
+// defaultColor implements the [ColorSpace] interface.
+func (s colorSpacePatternUncolored) defaultColor() Color {
+	return blankPattern // TODO(voss): check this
 }
 
 var blankPattern = (*colorTilingPattern)(nil)
@@ -177,79 +164,12 @@ type colorTilingPattern struct {
 
 // ColorSpace implements the [Color] interface.
 func (c colorTilingPattern) ColorSpace() ColorSpace {
-	return whatsItSpace{s: c.col.ColorSpace()}
+	return colorSpacePatternUncolored{s: c.col.ColorSpace()}
 }
 
-func (c colorTilingPattern) setStroke(w *Writer) {
-	minVersion := pdf.V1_2
-	if w.Version < minVersion {
-		w.Err = &pdf.VersionError{Operation: "tiling patterns", Earliest: minVersion}
-		return
-	}
-
-	cs := whatsItSpace{s: c.col.ColorSpace()}
-	cs.setStrokeSpace(w)
-	if w.Err != nil {
-		return
-	}
-
-	if w.StrokeColor == c {
-		return
-	}
-
-	w.StrokeColor = c
-	w.State.Set |= StateStrokeColor
-
-	// TODO(voss): use the actual color component values
-	_, w.Err = fmt.Fprint(w.Content, "0.5 0.5 0.5 ")
-	if w.Err != nil {
-		return
-	}
-	name := w.getResourceName(catPattern, c.pattern)
-	w.Err = name.PDF(w.Content)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " SCN")
-	if w.Err != nil {
-		return
-	}
-}
-
-func (c colorTilingPattern) setFill(w *Writer) {
-	minVersion := pdf.V1_2
-	if w.Version < minVersion {
-		w.Err = &pdf.VersionError{Operation: "tiling patterns", Earliest: minVersion}
-		return
-	}
-
-	cs := whatsItSpace{s: c.col.ColorSpace()}
-	cs.setFillSpace(w)
-	if w.Err != nil {
-		return
-	}
-
-	if w.FillColor == c {
-		return
-	}
-
-	w.FillColor = c
-	w.State.Set |= StateFillColor
-
-	// TODO(voss): use the actual color component values
-	_, w.Err = fmt.Fprint(w.Content, "0.5 0.5 0.5 ")
-	if w.Err != nil {
-		return
-	}
-	name := w.getResourceName(catPattern, c.pattern)
-	w.Err = name.PDF(w.Content)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " scn")
-	if w.Err != nil {
-		return
-	}
+// values implements the [Color] interface.
+func (c colorTilingPattern) values() []float64 {
+	return c.col.values()
 }
 
 // func NewShadingPattern(w pdf.Putter, shading pdf.Dict, matrix Matrix, extGState *ExtGState) (*ShadingPattern, error) {
