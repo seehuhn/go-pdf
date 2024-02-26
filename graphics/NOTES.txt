@@ -1,24 +1,34 @@
+Uses of Content Streams
+=======================
+
+- page contents (one or more content streams):
+  Resources come from the page dictionary (inherited through the page tree).
+
+- form XObjects (see 8.10, "Form XObjects")
+  Resources come from the stream dictionary.
+
+- Glyphs in a Type 3 fonts (9.6.4, "Type 3 fonts")
+  The search order for resources is:
+    1. The stream dictionary of the glyph
+    2. The Type 3 font dictionary
+    3. The page dictionary (inherited through the page tree)
+  The content-stream may be shape-only or may also describe colour.
+
+- patterns (8.7, "Patterns")
+  Resources come from the stream dictionary.
+  The content-stream may be shape-only or may also describe colour.
+
+- annotation appearances (12.5.5, "Appearance streams")
+  Resources come from the stream dictionary.
+
+TODO(voss): how to detect resource loops?
+
+
+
 Design Principles
 =================
 
 - Resources are represented by Go objects.  These objects are used
-  as arguments in calls to Page methods.
+  as arguments in calls to Writer methods.
 - New entries are added to resource dictionaries automatically
   when a resource is used.
-
-Types of Resources
-==================
-
-Font - A dictionary that maps resource names to font dictionaries.
-
-ExtGState - A dictionary that maps resource names to graphics state parameter dictionaries.
-
-XObject - A dictionary that maps resource names to external objects.
-
-ColorSpace - A dictionary that maps each resource name to either the name of a device-dependent colour space or an array describing a colour space.
-
-Pattern - A dictionary that maps resource names to pattern objects.
-
-Shading - A dictionary that maps resource names to shading dictionaries.
-
-Properties - A dictionary that maps resource names to property list dictionaries for marked-content.

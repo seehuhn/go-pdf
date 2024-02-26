@@ -391,6 +391,7 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 		a = append(a, arg)
 	}
 
+	// TODO(voss): omit excess spaces in the content stream
 	w.Err = a.PDF(w.Content)
 	if w.Err != nil {
 		return

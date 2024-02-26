@@ -30,7 +30,7 @@ func main() {
 	}
 
 	page.SetLineWidth(5)
-	page.SetStrokeColor(graphics.DeviceGrayNew(0.5))
+	page.SetStrokeColor(graphics.DeviceGray.New(0.5))
 
 	page.MoveTo(100, 100)
 	page.LineTo(120, 200)

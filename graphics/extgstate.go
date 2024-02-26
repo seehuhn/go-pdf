@@ -26,6 +26,7 @@ import (
 // ExtGState represents a combination of graphics state parameters.
 // This combination of parameters can be set using the [Writer.SetExtGState] method.
 type ExtGState struct {
+	// TODO(voss): use pdf.Res here?
 	DefName pdf.Name   // leave empty to generate new names automatically
 	Dict    pdf.Object // [pdf.Dict], can be indirect
 	Value   State

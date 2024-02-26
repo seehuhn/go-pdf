@@ -114,6 +114,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 			}
 		}
 
+		// TODO(voss): omit excess spaces in the content stream
 		w.Err = out.PDF(w.Content)
 		if w.Err != nil {
 			return

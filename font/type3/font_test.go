@@ -16,6 +16,63 @@
 
 package type3
 
-import "seehuhn.de/go/pdf/font"
+import (
+	"testing"
+
+	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/postscript/funit"
+)
+
+func TestType3(t *testing.T) {
+	paper := document.A5
+	doc, err := document.CreateSinglePage("test-type3.pdf", paper, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	F1 := New(1000)
+
+	bbox := funit.Rect16{LLx: 0, LLy: 0, URx: 750, URy: 750}
+	g, err := F1.AddGlyph("A", 1000, bbox, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Rectangle(0, 0, 750, 750)
+	g.Fill()
+	err = g.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g, err = F1.AddGlyph("B", 1000, bbox, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.MoveTo(0, 0)
+	g.LineTo(750, 750)
+	g.LineTo(750, 0)
+	g.Fill()
+	err = g.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	F1Dict, err := F1.Embed(doc.Out, &font.Options{ResName: "F"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc.TextStart()
+	doc.TextSetFont(F1Dict, 12)
+	doc.TextFirstLine(72, 340)
+	doc.TextShow("ABABAB")
+	doc.TextEnd()
+
+	err = doc.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 var _ font.Embedded = (*embedded)(nil)

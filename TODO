@@ -1,8 +1,4 @@
-- font support:
-  * unify ToUnicode support between the different Extract/Embed functions
-  * decide whether or not we set StemV
-  * make the naming consistent
-  * make the PDF version checking consistent
+- decide whether matrices are [6]float64 or []float64
 
 - make sure that unit tests don't leave stray files behind
 - rationalize the error handling

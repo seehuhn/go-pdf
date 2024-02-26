@@ -25,7 +25,7 @@ import (
 // TestGlyphError makes sure that errors during glyph construction are reported.
 func TestGlyphError(t *testing.T) {
 	F := New(1000)
-	g, err := F.AddGlyph("test", 1000, funit.Rect16{0, 0, 1000, 1000}, false)
+	g, err := F.AddGlyph("test", 1000, funit.Rect16{LLx: 0, LLy: 0, URx: 1000, URy: 1000}, false)
 	if err != nil {
 		t.Fatalf("AddGlyph failed: %v", err)
 	}

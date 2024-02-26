@@ -62,7 +62,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	g.SetFillColor(graphics.DeviceGrayNew(0.5))
+	g.SetFillColor(graphics.DeviceGray.New(0.5))
 	g.Rectangle(0, -500, 50, 2000)
 	g.Fill()
 	err = g.Close()

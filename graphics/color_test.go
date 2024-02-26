@@ -46,7 +46,7 @@ func TestCalGray(t *testing.T) {
 			x := 36 + float64(j)*w
 			var col graphics.Color
 			if i == 0 {
-				col = graphics.DeviceGrayNew(float64(j) / 9)
+				col = graphics.DeviceGray.New(float64(j) / 9)
 			} else {
 				col = calGray.New(float64(j) / 9)
 			}
