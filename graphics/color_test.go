@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 func TestCalGray(t *testing.T) {
@@ -31,7 +31,7 @@ func TestCalGray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	calGray, err := graphics.CalGray(graphics.WhitePointD65, nil, 1.0, "")
+	calGray, err := color.CalGray(color.WhitePointD65, nil, 1.0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,9 +44,9 @@ func TestCalGray(t *testing.T) {
 		y := paper.URy - 36 - float64(i+1)*w
 		for j := 0; j < 10; j++ {
 			x := 36 + float64(j)*w
-			var col graphics.Color
+			var col color.Color
 			if i == 0 {
-				col = graphics.DeviceGray.New(float64(j) / 9)
+				col = color.DeviceGray.New(float64(j) / 9)
 			} else {
 				col = calGray.New(float64(j) / 9)
 			}

@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // State represents the graphics state of a PDF processor.
@@ -61,8 +62,8 @@ type Parameters struct {
 	StartX, StartY     float64 // the starting point of the current path
 	CurrentX, CurrentY float64 // the "current point"
 
-	StrokeColor Color
-	FillColor   Color
+	StrokeColor color.Color
+	FillColor   color.Color
 
 	// Text State parameters:
 	TextCharacterSpacing  float64 // character spacing (T_c)
@@ -248,8 +249,8 @@ func NewState() State {
 
 	param.CTM = IdentityMatrix
 
-	param.StrokeColor = DeviceGray.New(0)
-	param.FillColor = DeviceGray.New(0)
+	param.StrokeColor = color.DeviceGray.New(0)
+	param.FillColor = color.DeviceGray.New(0)
 
 	param.TextCharacterSpacing = 0
 	param.TextWordSpacing = 0

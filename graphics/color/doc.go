@@ -14,38 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package main
-
-import (
-	"log"
-
-	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/graphics/color"
-)
-
-func main() {
-	page, err := document.CreateSinglePage("test.pdf", document.A4, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	page.SetLineWidth(5)
-	page.SetStrokeColor(color.DeviceGray.New(0.5))
-
-	page.MoveTo(100, 100)
-	page.LineTo(120, 200)
-	page.LineTo(120, 300)
-	page.LineTo(100, 400)
-	page.ClosePath()
-	page.LineTo(400, 250)
-	page.Stroke()
-
-	page.Rectangle(100, 500, 200, 200)
-	page.LineTo(400, 600)
-	page.Stroke()
-
-	err = page.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-}
+// Package color implements all PDF colors and color spaces.
+package color

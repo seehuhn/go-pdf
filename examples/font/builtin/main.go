@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 func main() {
@@ -201,7 +201,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 		// First draw the rectangles for the glyph extents onto the background.
 		tmpGlyph := curGlyph
 		page.PushGraphicsState()
-		page.SetFillColor(graphics.DeviceRGB.New(.4, 1, .4))
+		page.SetFillColor(color.DeviceRGB.New(.4, 1, .4))
 		for col := 0; col < 4; col++ {
 			x := f.margin + float64(col)*colWidth
 			for i := 0; i < nRows; i++ {

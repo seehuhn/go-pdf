@@ -21,6 +21,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/postscript/funit"
 )
 
@@ -59,7 +60,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	if err != nil {
 		return 0, 0, err
 	}
-	g.SetFillColor(graphics.DeviceRGB.New(1.0, 0, 0))
+	g.SetFillColor(color.DeviceRGB.New(1.0, 0, 0))
 	A := M.Inv()
 	p, q := A.Apply(xc-1, yc-1)
 	g.MoveTo(p*1000, q*1000)

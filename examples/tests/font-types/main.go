@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
@@ -151,20 +151,20 @@ func doit() error {
 			w := gg.TotalWidth()
 			l.yPos = paper.URy - l.topMargin - 72 - l.F["chapter"].ascent
 			xPos := (paper.URx-l.rightMargin-l.leftMargin-w)/2 + l.leftMargin
-			page.SetFillColor(graphics.DeviceGray.New(0.3))
+			page.SetFillColor(color.DeviceGray.New(0.3))
 			page.TextSetFont(l.F["chapter"].F, l.F["chapter"].ptSize)
 			page.TextFirstLine(xPos, l.yPos)
 			l.yPos -= -l.F["chapter"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
 		} else {
 			l.yPos = paper.URy - l.topMargin - l.F["section"].ascent
-			page.SetFillColor(graphics.DeviceGray.New(0.15))
+			page.SetFillColor(color.DeviceGray.New(0.15))
 			page.TextSetFont(l.F["section"].F, l.F["section"].ptSize)
 			page.TextFirstLine(l.leftMargin, l.yPos)
 			l.yPos -= -l.F["section"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
 		}
 		page.TextShow(title)
 		page.TextEnd()
-		page.SetFillColor(graphics.DeviceGray.New(0))
+		page.SetFillColor(color.DeviceGray.New(0))
 
 		page.TextStart()
 		if X != nil {
@@ -516,7 +516,7 @@ func (l *layout) connect(page *document.Page, y0, y1 float64, delta float64) {
 	vLinePos := l.leftMargin - delta
 	xBase := l.leftMargin
 	page.PushGraphicsState()
-	col := graphics.DeviceGray.New(0.5)
+	col := color.DeviceGray.New(0.5)
 	page.SetFillColor(col)
 	page.SetStrokeColor(col)
 	page.MoveTo(xBase+3.5, y0)
