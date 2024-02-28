@@ -421,24 +421,30 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 }
 
 func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
-	shadeDict := pdf.Dict{
-		"ShadingType": pdf.Integer(3),
-		"ColorSpace":  pdf.Name("DeviceRGB"),
-		"Background":  pdf.Array{pdf.Number(1), pdf.Number(1), pdf.Number(0)},
-		"Coords": pdf.Array{
-			pdf.Integer(100), pdf.Integer(350), pdf.Integer(10),
-			pdf.Integer(500), pdf.Integer(750), pdf.Integer(200),
-		},
-		"Function": pdf.Dict{
+	shadingData := color.ShadingType3{
+		ColorSpace: color.DeviceRGB,
+		X1:         100,
+		Y1:         350,
+		R1:         10,
+		X2:         500,
+		Y2:         750,
+		R2:         200,
+		F: pdf.Dict{
 			"FunctionType": pdf.Integer(2),
 			"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
 			"C0":           pdf.Array{pdf.Real(1), pdf.Real(0), pdf.Real(0)},
 			"C1":           pdf.Array{pdf.Real(0), pdf.Real(1), pdf.Real(0)},
 			"N":            pdf.Real(1),
 		},
-		"Extend": pdf.Array{pdf.Boolean(true), pdf.Boolean(true)},
+		ExtendStart: true,
+		ExtendEnd:   true,
 	}
-	col, err := graphics.NewShadingPattern(doc.Out, shadeDict, graphics.IdentityMatrix, nil)
+	shading, err := shadingData.Embed(doc.Out, true, "")
+	if err != nil {
+		return err
+	}
+
+	col, err := graphics.NewShadingPattern(doc.Out, shading, graphics.IdentityMatrix, nil)
 	if err != nil {
 		return err
 	}

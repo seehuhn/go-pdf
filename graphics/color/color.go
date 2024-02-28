@@ -46,6 +46,14 @@ var (
 	// TODO(voss): DeviceN colour spaces
 )
 
+func isPattern(s Space) bool {
+	switch s.(type) {
+	case spacePatternColored, spacePatternUncolored:
+		return true
+	}
+	return false
+}
+
 // Color represents a PDF color.
 type Color interface {
 	ColorSpace() Space
@@ -61,8 +69,8 @@ var (
 	_ Color = colorCalRGB{}
 	_ Color = colorLab{}
 	// TODO(voss): ICCBased
-	_ Color = colorTilingColored{}
-	_ Color = colorTilingUncolored{}
+	_ Color = colorPatternColored{}
+	_ Color = colorPatternUncolored{}
 	_ Color = colorIndexed{}
 	// TODO(voss): Separation colour spaces
 	// TODO(voss): DeviceN colour spaces
@@ -117,9 +125,9 @@ func Operator(c Color) ([]float64, pdf.Resource, string) {
 		return c.values(), nil, "SC"
 	case colorIndexed:
 		return c.values(), nil, "SC"
-	case colorTilingColored:
+	case colorPatternColored:
 		return nil, c.pattern, "SCN"
-	case colorTilingUncolored:
+	case colorPatternUncolored:
 		return c.values(), c.pattern, "SCN"
 	default:
 		panic("unknown color type")

@@ -45,7 +45,7 @@ func (s spacePatternColored) defaultColor() Color {
 	return nil
 }
 
-type colorTilingColored struct {
+type colorPatternColored struct {
 	pattern pdf.Res
 }
 
@@ -57,7 +57,7 @@ type colorTilingColored struct {
 //
 // TODO(voss): make this API more robust
 func NewTilingPatternColored(pattern pdf.Res) Color {
-	return colorTilingColored{
+	return colorPatternColored{
 		pattern: pattern,
 	}
 }
@@ -70,7 +70,7 @@ func NewTilingPatternColored(pattern pdf.Res) Color {
 //
 // TODO(voss): make this API more robust
 func NewShadingPattern(dict pdf.Object, defName pdf.Name) Color {
-	return colorTilingColored{
+	return colorPatternColored{
 		pattern: pdf.Res{
 			DefName: defName,
 			Ref:     dict,
@@ -78,11 +78,11 @@ func NewShadingPattern(dict pdf.Object, defName pdf.Name) Color {
 	}
 }
 
-func (c colorTilingColored) ColorSpace() Space {
+func (c colorPatternColored) ColorSpace() Space {
 	return spacePatternColored{}
 }
 
-func (c colorTilingColored) values() []float64 {
+func (c colorPatternColored) values() []float64 {
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (s spacePatternUncolored) defaultColor() Color {
 	return nil
 }
 
-type colorTilingUncolored struct {
+type colorPatternUncolored struct {
 	col     Color
 	pattern pdf.Res
 }
@@ -130,18 +130,18 @@ type colorTilingUncolored struct {
 //
 // TODO(voss): make this API more robust
 func NewTilingPatternUncolored(pattern pdf.Res, color Color) Color {
-	return colorTilingUncolored{
+	return colorPatternUncolored{
 		col:     color,
 		pattern: pattern,
 	}
 }
 
 // ColorSpace implements the [Color] interface.
-func (c colorTilingUncolored) ColorSpace() Space {
+func (c colorPatternUncolored) ColorSpace() Space {
 	return spacePatternUncolored{s: c.col.ColorSpace()}
 }
 
 // values implements the [Color] interface.
-func (c colorTilingUncolored) values() []float64 {
+func (c colorPatternUncolored) values() []float64 {
 	return c.col.values()
 }

@@ -307,6 +307,8 @@ type SpaceLab struct {
 	ranges     []float64
 }
 
+// Embed embeds the color space in the PDF file.
+// This saves space in case the color space is used in multiple content streams.
 func (s *SpaceLab) Embed(out *pdf.Writer) (*SpaceLab, error) {
 	if _, ok := s.Res.Ref.(pdf.Reference); ok {
 		return s, nil

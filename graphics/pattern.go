@@ -102,14 +102,10 @@ func (p *TilingPatternBuilder) Make() (pdf.Res, error) {
 	}, nil
 }
 
-func NewShadingPattern(w pdf.Putter, shading pdf.Dict, matrix Matrix, extGState *ExtGState) (color.Color, error) {
-	if stp, ok := shading["ShadingType"].(pdf.Integer); !ok || stp < 1 || stp > 7 {
-		return nil, fmt.Errorf("invalid shading type: %d", stp)
-	}
-
+func NewShadingPattern(w pdf.Putter, shading *color.EmbeddedShading, matrix Matrix, extGState *ExtGState) (color.Color, error) {
 	dict := pdf.Dict{
 		"PatternType": pdf.Integer(2),
-		"Shading":     shading,
+		"Shading":     shading.Ref,
 	}
 	if matrix != IdentityMatrix {
 		dict["Matrix"] = toPDF(matrix[:])
