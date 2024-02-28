@@ -67,7 +67,6 @@ func (w *Writer) TextEnd() {
 }
 
 // TextSetCharacterSpacing sets additional character spacing.
-// The value does not scale with font size.
 //
 // This implementes the PDF graphics operator "Tc".
 func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
@@ -85,7 +84,6 @@ func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
 }
 
 // TextSetWordSpacing sets additional word spacing.
-// The additional spacing does not scale with font size.
 //
 // This implementes the PDF graphics operator "Tw".
 func (w *Writer) TextSetWordSpacing(wordSpacing float64) {
@@ -152,11 +150,6 @@ func (w *Writer) TextSetFont(font font.Embedded, size float64) {
 		return
 	}
 
-	if _, ok := font.PDFObject().(pdf.Reference); !ok {
-		// TODO(voss): can this happen?  do we need this check?
-		panic("font is not an indirect object")
-	}
-
 	w.State.TextFont = font
 	w.State.TextFontSize = size
 	w.State.Set |= StateTextFont
@@ -188,7 +181,7 @@ func (w *Writer) TextSetRenderingMode(mode TextRenderingMode) {
 }
 
 // TextSetRise sets the text rise.
-// Positive values move the text up.  The value does not scale with font size.
+// Positive values move the text up.
 //
 // This implements the PDF graphics operator "Ts".
 func (w *Writer) TextSetRise(rise float64) {
@@ -220,7 +213,7 @@ func (w *Writer) TextFirstLine(dx, dy float64) {
 }
 
 // TextSecondLine moves to the start of the next line of text and sets
-// the leading.  Usually, dy is negative.
+// the leading to -dy.  Usually, dy is negative, to get a positive leading.
 //
 // This implements the PDF graphics operator "TD".
 func (w *Writer) TextSecondLine(dx, dy float64) {
@@ -317,7 +310,7 @@ func (w *Writer) TextShowNextLineRaw(s pdf.String) {
 }
 
 // TextShowSpacedRaw adjusts word and character spacing and then shows an
-// already encoded text in the PDF file. This has the same effect as
+// already encoded text in the PDF file.  This has the same effect as
 // [Writer.TextSetWordSpacing] and [Writer.TextSetCharacterSpacing], followed
 // by [Writer.TextShowRaw].
 //
@@ -349,6 +342,9 @@ func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Strin
 
 // TextShowKernedRaw shows an already encoded text in the PDF file, using
 // kerning information provided to adjust glyph spacing.
+//
+// The arguments must be of type [pdf.String], [pdf.Real], [pdf.Integer] or
+// [pdf.Number].
 //
 // This implements the PDF graphics operator "TJ".
 func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {

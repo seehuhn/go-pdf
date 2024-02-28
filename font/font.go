@@ -123,6 +123,9 @@ func EncodeText(F Layouter, s string) pdf.String {
 }
 
 // Embedded represents a font which is already embedded in a PDF file.
+//
+// In addition to satisfying the interface, embedded fonts must also
+// be "comparable" using the == operator.
 type Embedded interface {
 	pdf.Resource
 	WritingMode() int // 0 = horizontal, 1 = vertical
