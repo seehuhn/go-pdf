@@ -16,7 +16,10 @@
 
 package graphics
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // This file implements the "Path construction operators" and "Path-painting
 // operators".  The operators implemented here are defined in tables 58, 59
@@ -279,4 +282,77 @@ func (w *Writer) ClipEvenOdd() {
 	w.currentObject = objClippingPath
 
 	_, w.Err = fmt.Fprintln(w.Content, "W*")
+}
+
+// Circle appends a circle to the current path, as a closed subpath.
+//
+// This is a convenience function, which uses [Writer.MoveTo] and
+// [Writer.CurveTo] to draw the circle.
+func (w *Writer) Circle(x, y, radius float64) {
+	if !w.isValid("Circle", objPage|objPath) {
+		return
+	}
+
+	w.arc(x, y, radius, 0, 2*math.Pi, true)
+	w.ClosePath()
+}
+
+// MoveToArc appends a circular arc to the current path,
+// starting a new subpath.
+//
+// This is a convenience function, which uses [Writer.MoveTo] and
+// [Writer.CurveTo] to draw the arc.
+func (w *Writer) MoveToArc(x, y, radius, startAngle, endAngle float64) {
+	if !w.isValid("MoveToArc", objPage|objPath) {
+		return
+	}
+
+	w.arc(x, y, radius, startAngle, endAngle, true)
+}
+
+// LineToArc appends a circular arc to the current subpath,
+// connecting the previous point to the arc using a straight line.
+//
+// This is a convenience function, which uses [Writer.LineTo] and
+// [Writer.CurveTo] to draw the arc.
+func (w *Writer) LineToArc(x, y, radius, startAngle, endAngle float64) {
+	if !w.isValid("LineToArc", objPath) {
+		return
+	}
+
+	w.arc(x, y, radius, startAngle, endAngle, false)
+}
+
+// arc appends a circular arc to the current path.
+func (w *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
+	w.currentObject = objPath
+
+	// also see https://www.tinaja.com/glib/bezcirc2.pdf
+	// from https://pomax.github.io/bezierinfo/ , section 42
+
+	nSegment := int(math.Ceil(math.Abs(endAngle-startAngle) / (0.5 * math.Pi)))
+	dPhi := (endAngle - startAngle) / float64(nSegment)
+	k := 4.0 / 3.0 * radius * math.Tan(dPhi/4)
+
+	phi := startAngle
+	x0 := x + radius*math.Cos(phi)
+	y0 := y + radius*math.Sin(phi)
+	if move {
+		w.MoveTo(x0, y0)
+	} else {
+		w.LineTo(x0, y0)
+	}
+
+	for i := 0; i < nSegment; i++ {
+		x1 := x0 - k*math.Sin(phi)
+		y1 := y0 + k*math.Cos(phi)
+		phi += dPhi
+		x3 := x + radius*math.Cos(phi)
+		y3 := y + radius*math.Sin(phi)
+		x2 := x3 + k*math.Sin(phi)
+		y2 := y3 - k*math.Cos(phi)
+		w.CurveTo(x1, y1, x2, y2, x3, y3)
+		x0 = x3
+		y0 = y3
+	}
 }

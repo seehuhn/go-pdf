@@ -125,7 +125,7 @@ func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 			} else if err != nil {
 				return nil, err
 			}
-			param.RenderingIntent = ri
+			param.RenderingIntent = graphics.RenderingIntent(ri)
 			set |= graphics.StateRenderingIntent
 		case "SA":
 			val, err := pdf.GetBoolean(r.R, v)

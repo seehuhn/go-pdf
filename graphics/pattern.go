@@ -35,12 +35,14 @@ type TilingProperties struct {
 	DefaultName pdf.Name
 }
 
+// A TilingPatternBuilder is used to construct a tiling pattern.
 type TilingPatternBuilder struct {
 	Out pdf.Putter
 	*Writer
 	TilingProperties
 }
 
+// NewTilingPattern returns a new TilingPatternBuilder.
 func NewTilingPattern(w pdf.Putter, prop TilingProperties) *TilingPatternBuilder {
 	contents := NewWriter(&bytes.Buffer{}, pdf.GetVersion(w))
 	return &TilingPatternBuilder{
@@ -50,6 +52,7 @@ func NewTilingPattern(w pdf.Putter, prop TilingProperties) *TilingPatternBuilder
 	}
 }
 
+// Make creates the new tiling pattern.
 func (p *TilingPatternBuilder) Make() (pdf.Res, error) {
 	if p.Writer.Err != nil {
 		return pdf.Res{}, p.Writer.Err
@@ -102,6 +105,7 @@ func (p *TilingPatternBuilder) Make() (pdf.Res, error) {
 	}, nil
 }
 
+// NewShadingPattern creates a new shading pattern.
 func NewShadingPattern(w pdf.Putter, shading *color.EmbeddedShading, matrix Matrix, extGState *ExtGState) (color.Color, error) {
 	dict := pdf.Dict{
 		"PatternType": pdf.Integer(2),

@@ -211,7 +211,7 @@ func (w *Writer) SetDashPattern(pattern []float64, phase float64) {
 // SetRenderingIntent sets the rendering intent.
 //
 // This implementes the PDF graphics operator "ri".
-func (w *Writer) SetRenderingIntent(intent pdf.Name) {
+func (w *Writer) SetRenderingIntent(intent RenderingIntent) {
 	if !w.isValid("SetRenderingIntent", objPage|objText) {
 		return
 	}
@@ -225,7 +225,7 @@ func (w *Writer) SetRenderingIntent(intent pdf.Name) {
 	w.RenderingIntent = intent
 	w.Set |= StateRenderingIntent
 
-	err := intent.PDF(w.Content)
+	err := pdf.Name(intent).PDF(w.Content)
 	if err != nil {
 		w.Err = err
 		return

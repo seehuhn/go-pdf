@@ -240,7 +240,7 @@ doOps:
 	case "ri": // rendering intent
 		name, ok := getName()
 		if ok {
-			r.RenderingIntent = name
+			r.RenderingIntent = graphics.RenderingIntent(name)
 			r.Set |= graphics.StateRenderingIntent
 		}
 

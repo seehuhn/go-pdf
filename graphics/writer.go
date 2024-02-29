@@ -39,7 +39,8 @@ type Writer struct {
 
 	resName map[catRes]pdf.Name
 
-	nesting []pairType
+	nesting       []pairType
+	markedContent []*MarkedContent
 }
 
 type catRes struct {

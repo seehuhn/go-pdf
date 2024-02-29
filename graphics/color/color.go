@@ -54,6 +54,14 @@ func isPattern(s Space) bool {
 	return false
 }
 
+func isIndexed(s Space) bool {
+	switch s.(type) {
+	case *SpaceIndexed:
+		return true
+	}
+	return false
+}
+
 // Color represents a PDF color.
 type Color interface {
 	ColorSpace() Space

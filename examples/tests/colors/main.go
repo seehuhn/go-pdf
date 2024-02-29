@@ -76,6 +76,11 @@ func run() error {
 		return err
 	}
 
+	err = showShading(doc, F)
+	if err != nil {
+		return err
+	}
+
 	err = doc.Close()
 	if err != nil {
 		return err
@@ -461,6 +466,93 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	page.TextStart()
 	page.TextFirstLine(50, 230)
 	page.TextShow("A square filled with a shading pattern (color space ’Pattern’).")
+	page.TextEnd()
+
+	err = page.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func showShading(doc *document.MultiPage, F font.Layouter) error {
+	vertices := []color.ShadingType4Vertex{
+		{X: 0.95, Y: 0.6, Flag: 0, Color: []float64{0}}, // 0
+		{X: 2.7, Y: 0.8, Flag: 0, Color: []float64{0}},
+		{X: 1.9, Y: 2.0, Flag: 0, Color: []float64{0.1}},
+		{X: 3.5, Y: 1.8, Flag: 1, Color: []float64{0.1}},
+		{X: 4.6, Y: 0.3, Flag: 2, Color: []float64{0}},
+
+		{X: 3.5, Y: 1.8, Flag: 0, Color: []float64{0.1}}, // 5
+		{X: 1.9, Y: 2.0, Flag: 0, Color: []float64{0.1}},
+		{X: 3.2, Y: 2.8, Flag: 0, Color: []float64{0.15}},
+		{X: 2.2, Y: 3.9, Flag: 1, Color: []float64{0.2}},
+		{X: 3.3, Y: 4.9, Flag: 1, Color: []float64{0.15}},
+		{X: 2.0, Y: 6.0, Flag: 1, Color: []float64{0.2}}, // 10
+		{X: 3.3, Y: 6.25, Flag: 1, Color: []float64{0.15}},
+		{X: 1.5, Y: 7.0, Flag: 1, Color: []float64{0.15}},
+		{X: 3.1, Y: 7.2, Flag: 1, Color: []float64{0.1}},
+		{X: 1.2, Y: 7.9, Flag: 1, Color: []float64{0.25}},
+		{X: 3.25, Y: 7.3, Flag: 1, Color: []float64{0.1}}, // 15
+		{X: 3.5, Y: 9.2, Flag: 1, Color: []float64{0.35}},
+		{X: 4.9, Y: 7.8, Flag: 1, Color: []float64{0.35}},
+		{X: 6.0, Y: 9.4, Flag: 1, Color: []float64{0.4}},
+		{X: 6.4, Y: 7.6, Flag: 1, Color: []float64{0.35}},
+		{X: 8.0, Y: 8.0, Flag: 1, Color: []float64{0.35}}, // 20
+		{X: 7.2, Y: 7.0, Flag: 1, Color: []float64{0.25}},
+		{X: 8.3, Y: 6.3, Flag: 1, Color: []float64{0.35}},
+		{X: 7.2, Y: 5.5, Flag: 1, Color: []float64{0.35}},
+		{X: 8.5, Y: 5.3, Flag: 1, Color: []float64{0.35}},
+		{X: 7.8, Y: 4.5, Flag: 1, Color: []float64{0.2}}, // 25
+		{X: 8.9, Y: 4.0, Flag: 1, Color: []float64{0.35}},
+		{X: 8.1, Y: 3.5, Flag: 1, Color: []float64{0.25}},
+		{X: 9.05, Y: 2.7, Flag: 1, Color: []float64{0.35}},
+		{X: 7.8, Y: 2.7, Flag: 1, Color: []float64{0.05}},
+		{X: 8.8, Y: 1.5, Flag: 1, Color: []float64{0.2}}, // 30
+		{X: 7.95, Y: 1.15, Flag: 1, Color: []float64{0.15}},
+		{X: 7.0, Y: 1.7, Flag: 2, Color: []float64{0.1}},
+		{X: 6.6, Y: 2.4, Flag: 2, Color: []float64{0.1}},
+		{X: 7.2, Y: 3.3, Flag: 2, Color: []float64{0.1}},
+		{X: 6.4, Y: 3.2, Flag: 1, Color: []float64{0.05}}, // 35
+		{X: 6.6, Y: 3.95, Flag: 1, Color: []float64{0.1}},
+		{X: 6.3, Y: 3.7, Flag: 1, Color: []float64{0.0}},
+		{X: 6.1, Y: 4.3, Flag: 1, Color: []float64{0.1}},
+		{X: 5.8, Y: 4.1, Flag: 1, Color: []float64{0.0}},
+		{X: 5.0, Y: 4.3, Flag: 1, Color: []float64{0.0}}, // 40
+	}
+	cs, err := color.CalGray(color.WhitePointD65, nil, 1, "")
+	if err != nil {
+		return err
+	}
+	shadingData := color.ShadingType4{
+		ColorSpace:        cs,
+		BitsPerFlag:       2,
+		BitsPerCoordinate: 8,
+		BitsPerComponent:  4,
+		Decode: []float64{
+			0, 10, 0, 10, 0, 1,
+		},
+		Vertices: vertices,
+	}
+	shading, err := shadingData.Embed(doc.Out, true, "")
+	if err != nil {
+		return err
+	}
+
+	page := doc.AddPage()
+
+	page.PushGraphicsState()
+	m := graphics.Scale(50, 50)
+	m = m.Mul(graphics.Translate(50, 300))
+	page.Transform(m)
+	page.DrawShading(shading)
+	page.PopGraphicsState()
+
+	page.TextSetFont(F, 12)
+	page.TextStart()
+	page.TextFirstLine(50, 230)
+	page.TextShow("A Type 4 shading drawn using the sh operator.")
 	page.TextEnd()
 
 	err = page.Close()

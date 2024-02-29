@@ -140,7 +140,7 @@ func FuzzReader(f *testing.F) {
 			case "ri":
 				name, ok := getName()
 				if ok {
-					w.SetRenderingIntent(name)
+					w.SetRenderingIntent(graphics.RenderingIntent(name))
 				}
 			case "i":
 				x, ok := getNum()
@@ -318,7 +318,7 @@ func TestParameters(t *testing.T) {
 	w.SetLineJoin(graphics.LineJoinBevel)
 	w.SetMiterLimit(4)
 	w.SetDashPattern([]float64{5, 6, 7}, 8)
-	w.SetRenderingIntent(graphics.RenderingIntentPerceptual)
+	w.SetRenderingIntent(graphics.Perceptual)
 	w.SetFlatnessTolerance(10)
 	m := graphics.Matrix{1, 2, 3, 4, 5, 6}
 	w.Transform(m)
@@ -365,8 +365,8 @@ func TestParameters(t *testing.T) {
 	if r.State.DashPhase != 8 {
 		t.Errorf("DashPhase: got %v, want 8", r.State.DashPhase)
 	}
-	if r.State.RenderingIntent != graphics.RenderingIntentPerceptual {
-		t.Errorf("RenderingIntent: got %v, want %v", r.State.RenderingIntent, graphics.RenderingIntentPerceptual)
+	if r.State.RenderingIntent != graphics.Perceptual {
+		t.Errorf("RenderingIntent: got %v, want %v", r.State.RenderingIntent, graphics.Perceptual)
 	}
 	if r.State.FlatnessTolerance != 10 {
 		t.Errorf("Flatness: got %v, want 10", r.State.FlatnessTolerance)

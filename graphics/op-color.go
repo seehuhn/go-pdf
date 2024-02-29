@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/float"
 )
@@ -145,4 +146,32 @@ func (w *Writer) SetFillColor(c color.Color) {
 			return
 		}
 	}
+}
+
+// DrawShading paints the given shading, subject to the current clipping path.
+// The current colour in the graphics state is neither used nor altered.
+//
+// All coordinates in the shading dictionary are interpreted relative to the
+// current user space. The "Background" entry in the shading pattern (if any)
+// is ignored.
+//
+// This implements the "sh" graphics operator.
+func (w *Writer) DrawShading(shading *color.EmbeddedShading) {
+	if !w.isValid("DrawShading", objPage) {
+		return
+	}
+	if w.Version < pdf.V1_3 {
+		w.Err = &pdf.VersionError{
+			Operation: "shading objects",
+			Earliest:  pdf.V1_3,
+		}
+		return
+	}
+
+	name := w.getResourceName(catShading, shading)
+	w.Err = name.PDF(w.Content)
+	if w.Err != nil {
+		return
+	}
+	_, w.Err = fmt.Fprintln(w.Content, " sh")
 }

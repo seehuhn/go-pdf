@@ -87,7 +87,7 @@ type Parameters struct {
 	DashPattern []float64
 	DashPhase   float64
 
-	RenderingIntent pdf.Name
+	RenderingIntent RenderingIntent
 
 	// StrokeAdjustment is a flag specifying whether to compensate for possible
 	// rasterization effects when stroking a path with a line width that is
@@ -271,7 +271,7 @@ func NewState() State {
 	param.DashPattern = []float64{}
 	param.DashPhase = 0
 
-	param.RenderingIntent = RenderingIntentRelativeColorimetric
+	param.RenderingIntent = RelativeColorimetric
 	param.StrokeAdjustment = false
 	param.BlendMode = pdf.Name("Normal")
 	param.SoftMask = nil
@@ -351,12 +351,15 @@ const (
 	LineJoinBevel LineJoinStyle = 2
 )
 
-// The PDF standard rendering intents.
+// A RenderingIntent specifies the PDF rendering intent.
 //
 // See section 8.6.5.8 of ISO 32000-2:2020.
+type RenderingIntent pdf.Name
+
+// The PDF standard rendering intents.
 const (
-	RenderingIntentAbsoluteColorimetric pdf.Name = "AbsoluteColorimetric"
-	RenderingIntentRelativeColorimetric pdf.Name = "RelativeColorimetric"
-	RenderingIntentSaturation           pdf.Name = "Saturation"
-	RenderingIntentPerceptual           pdf.Name = "Perceptual"
+	AbsoluteColorimetric RenderingIntent = "AbsoluteColorimetric"
+	RelativeColorimetric RenderingIntent = "RelativeColorimetric"
+	Saturation           RenderingIntent = "Saturation"
+	Perceptual           RenderingIntent = "Perceptual"
 )

@@ -39,7 +39,7 @@ func (M Matrix) Apply(x, y float64) (float64, float64) {
 }
 
 // Mul multiplies two transformation matrices and returns the result.
-// The result is equivalent to first applying A and then B.
+// The result is equivalent to first applying M and then B.
 func (M Matrix) Mul(B Matrix) Matrix {
 	// / A0 A1 0 \  / B0 B1 0 \   / A0*B0+A1*B2    A0*B1+A1*B3    0 \
 	// | A2 A3 0 |  | B2 B3 0 | = | A2*B0+A3*B2    A2*B1+A3*B3    0 |

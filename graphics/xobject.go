@@ -63,3 +63,25 @@ func (p *Writer) DrawImage(img pdf.Resource) {
 	}
 	_, p.Err = fmt.Fprintln(p.Content, "", "Do")
 }
+
+// FormXObject represents a PDF Form XObject.
+//
+// See section 8.10 of ISO 32000-2:2020 for details.
+type FormXObject struct {
+	pdf.Res
+}
+
+// PaintFormXObject draws a Form XObject onto the page.
+func (p *Writer) PaintFormXObject(x *FormXObject) {
+	if !p.isValid("PaintFormXObject", objPage|objText) {
+		return
+	}
+
+	name := p.getResourceName(catXObject, x)
+	err := name.PDF(p.Content)
+	if err != nil {
+		p.Err = err
+		return
+	}
+	_, p.Err = fmt.Fprintln(p.Content, " Do")
+}

@@ -75,7 +75,7 @@ func NewExtGState(s State, defaultName string) (*ExtGState, error) {
 		}
 	}
 	if set&StateRenderingIntent != 0 {
-		dict["RI"] = s.RenderingIntent
+		dict["RI"] = pdf.Name(s.RenderingIntent)
 	}
 	if set&StateStrokeAdjustment != 0 {
 		dict["SA"] = pdf.Boolean(s.StrokeAdjustment)
