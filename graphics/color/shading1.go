@@ -32,14 +32,13 @@ type ShadingType1 struct {
 	// the number of colour components of the ColorSpace.
 	F function.Func
 
-	Background []float64
-	BBox       *pdf.Rectangle
-	AntiAlias  bool
-
 	// Domain (optional)
 	Domain []float64
 
-	Matrix []float64
+	Matrix     []float64
+	Background []float64
+	BBox       *pdf.Rectangle
+	AntiAlias  bool
 }
 
 // Embed implements the [Shading] interface.
