@@ -19,38 +19,12 @@ package graphics
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/image"
 )
 
-// Image represents an image which can be embedded in a PDF file.
-type Image interface {
-	Embed(w pdf.Putter, resName pdf.Name) (EmbeddedImage, error)
-	Bounds() Rectangle
-}
-
-// EmbeddedImage represents an image which has been embedded in a PDF file.
-type EmbeddedImage interface {
-	pdf.Resource
-	Image
-}
-
-// Rectangle gives the dimensions of an image.
-type Rectangle struct {
-	XMin, YMin, XMax, YMax int
-}
-
-// Dx returns the width of the rectangle.
-func (r Rectangle) Dx() int {
-	return r.XMax - r.XMin
-}
-
-// Dy returns the height of the rectangle.
-func (r Rectangle) Dy() int {
-	return r.YMax - r.YMin
-}
-
 // DrawImage draws an image on the page.
-func (p *Writer) DrawImage(img pdf.Resource) {
+func (p *Writer) DrawImage(img *image.Embedded) {
 	if !p.isValid("DrawImage", objPage) {
 		return
 	}
@@ -64,17 +38,10 @@ func (p *Writer) DrawImage(img pdf.Resource) {
 	_, p.Err = fmt.Fprintln(p.Content, "", "Do")
 }
 
-// FormXObject represents a PDF Form XObject.
-//
-// See section 8.10 of ISO 32000-2:2020 for details.
-type FormXObject struct {
-	pdf.Res
-}
-
 // DrawFormXObject draws a Form XObject onto the page.
 //
 // This implements the PDF graphics operator "Do".
-func (p *Writer) DrawFormXObject(x *FormXObject) {
+func (p *Writer) DrawFormXObject(x *form.Embedded) {
 	if !p.isValid("PaintFormXObject", objPage|objText) {
 		return
 	}

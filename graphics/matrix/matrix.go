@@ -72,6 +72,9 @@ func (M Matrix) Inv() Matrix {
 // Identity is the identity transformation.
 var Identity = Matrix{1, 0, 0, 1, 0, 0}
 
+// Zero is an uninitialized transformation.
+var Zero = Matrix{0, 0, 0, 0, 0, 0}
+
 // Translate moves the origin of the coordinate system.
 //
 // Drawing the unit square [0, 1] x [0, 1] after applying this transformation

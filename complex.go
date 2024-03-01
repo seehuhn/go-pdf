@@ -76,6 +76,11 @@ func (r *Rectangle) Dx() float64 {
 	return r.URx - r.LLx
 }
 
+// Dy returns the height of the rectangle.
+func (r *Rectangle) Dy() float64 {
+	return r.URy - r.LLy
+}
+
 // GetRectangle resolves references to indirect objects and makes sure the
 // resulting object is a PDF rectangle object.
 // If the object is null, nil is returned.

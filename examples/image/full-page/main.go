@@ -26,8 +26,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	pdfimage "seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/matrix"
-	pdfimage "seehuhn.de/go/pdf/image"
 )
 
 const dpi = 300

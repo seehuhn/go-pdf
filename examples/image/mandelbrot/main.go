@@ -25,8 +25,8 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
+	pdfimage "seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/matrix"
-	pdfimage "seehuhn.de/go/pdf/image"
 )
 
 func main() {
