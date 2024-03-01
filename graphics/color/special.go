@@ -81,7 +81,7 @@ func Indexed(colors []Color, defName pdf.Name) (*SpaceIndexed, error) {
 	return &SpaceIndexed{
 		Res: pdf.Res{
 			DefName: defName,
-			Ref: pdf.Array{
+			Data: pdf.Array{
 				pdf.Name("Indexed"),
 				space.PDFObject(),
 				pdf.Integer(len(colors) - 1),
@@ -96,17 +96,17 @@ func Indexed(colors []Color, defName pdf.Name) (*SpaceIndexed, error) {
 // Embed embeds the color space in the PDF file.
 // This saves space in case the color space is used in multiple content streams.
 func (s *SpaceIndexed) Embed(out *pdf.Writer) (*SpaceIndexed, error) {
-	if _, ok := s.Res.Ref.(pdf.Reference); ok {
+	if _, ok := s.Res.Data.(pdf.Reference); ok {
 		return s, nil
 	}
 	ref := out.Alloc()
-	err := out.Put(ref, s.Res.Ref)
+	err := out.Put(ref, s.Res.Data)
 	if err != nil {
 		return nil, err
 	}
 
 	embedded := clone(s)
-	embedded.Res.Ref = ref
+	embedded.Res.Data = ref
 	return embedded, nil
 }
 

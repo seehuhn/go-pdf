@@ -295,7 +295,7 @@ func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 	res := &graphics.ExtGState{
 		Res: pdf.Res{
 			DefName: defaultName,
-			Ref:     ref,
+			Data:    ref,
 		},
 		Value: graphics.State{
 			Parameters: param,

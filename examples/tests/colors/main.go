@@ -128,7 +128,7 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	img := &pdf.Res{Ref: ref}
+	img := &pdf.Res{Data: ref}
 
 	page.PushGraphicsState()
 	M := matrix.Scale(500, -500)
@@ -194,7 +194,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	img := &pdf.Res{Ref: ref}
+	img := &pdf.Res{Data: ref}
 
 	page := doc.AddPage()
 
@@ -281,7 +281,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	img := &pdf.Res{Ref: ref}
+	img := &pdf.Res{Data: ref}
 
 	page := doc.AddPage()
 

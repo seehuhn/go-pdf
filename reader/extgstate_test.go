@@ -112,7 +112,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	qqq := New(data, nil)
-	ext2, err := qqq.ReadExtGState(ext1.Res.Ref, "X")
+	ext2, err := qqq.ReadExtGState(ext1.Res.Data, "X")
 	if err != nil {
 		t.Fatal(err)
 	}

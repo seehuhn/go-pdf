@@ -92,7 +92,7 @@ func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (graphics.EmbeddedIma
 		jpegImage: im,
 		Res: pdf.Res{
 			DefName: resName,
-			Ref:     ref,
+			Data:    ref,
 		},
 	}, nil
 }

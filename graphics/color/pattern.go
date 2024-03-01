@@ -73,7 +73,7 @@ func NewShadingPattern(dict pdf.Object, defName pdf.Name) Color {
 	return colorPatternColored{
 		pattern: pdf.Res{
 			DefName: defName,
-			Ref:     dict,
+			Data:    dict,
 		},
 	}
 }

@@ -147,7 +147,7 @@ func (f *embeddedComposite) Close() error {
 		CID2GID:   cidToGID,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref.(pdf.Reference))
+	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
 // EmbedInfoComposite is the information needed to embed a TrueType font as a composite PDF font.

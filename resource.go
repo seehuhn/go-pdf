@@ -25,7 +25,7 @@ type Resource interface {
 // Res can be embedded in a struct to implement the [Resource] interface.
 type Res struct {
 	DefName Name
-	Ref     Object
+	Data    Object
 }
 
 // DefaultName implements the [Resource] interface.
@@ -35,5 +35,5 @@ func (r Res) DefaultName() Name {
 
 // PDFObject implements the [Resource] interface.
 func (r Res) PDFObject() Object {
-	return r.Ref
+	return r.Data
 }

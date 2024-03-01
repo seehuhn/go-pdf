@@ -30,7 +30,7 @@ func TestGetResourceName1(t *testing.T) {
 	ref := pdf.NewReference(1, 2)
 	r := &pdf.Res{
 		DefName: "Q",
-		Ref:     ref,
+		Data:    ref,
 	}
 	var allCats = []resourceCategory{
 		catExtGState,
@@ -89,7 +89,7 @@ func TestGetResourceName2(t *testing.T) {
 	for i := 0; i < 9; i++ {
 		r := &pdf.Res{
 			DefName: defName,
-			Ref:     pdf.Reference(i + 1),
+			Data:    pdf.Reference(i + 1),
 		}
 		names = append(names, w.getResourceName(catFont, r))
 	}
@@ -119,7 +119,7 @@ func TestGetResourceName3(t *testing.T) {
 
 	for _, name := range []pdf.Name{"DeviceGray", "DeviceRGB", "DeviceCMYK", "Pattern"} {
 		r := &pdf.Res{
-			Ref: name,
+			Data: name,
 		}
 		got := w.getResourceName(catColorSpace, r)
 		if got != name {
@@ -136,7 +136,7 @@ func TestGetResourceName4(t *testing.T) {
 	for _, name := range []pdf.Name{"DeviceGray", "DeviceRGB", "DeviceCMYK", "Pattern"} {
 		r := &pdf.Res{
 			DefName: name,
-			Ref:     pdf.NewReference(1, 0),
+			Data:    pdf.NewReference(1, 0),
 		}
 		w.getResourceName(catColorSpace, r)
 	}

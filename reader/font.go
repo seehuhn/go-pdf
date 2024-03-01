@@ -83,7 +83,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 
 	res := pdf.Res{
 		DefName: name,
-		Ref:     ref,
+		Data:    ref,
 	}
 
 	// TODO(voss): make this less repetitive

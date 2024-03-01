@@ -89,7 +89,7 @@ func EmbedCFF(w pdf.Putter, info *pdfcff.EmbedInfoSimple, defaultName pdf.Name) 
 	F := &frozenFont{
 		Res: pdf.Res{
 			DefName: defaultName,
-			Ref:     ref,
+			Data:    ref,
 		},
 		EmbedInfoSimple: info,
 	}

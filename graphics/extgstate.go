@@ -145,7 +145,7 @@ func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 	return &ExtGState{
 		Res: pdf.Res{
 			DefName: pdf.Name(defaultName),
-			Ref:     dict,
+			Data:    dict,
 		},
 		Value: State{
 			Parameters: s.Parameters.Clone(),
@@ -159,17 +159,17 @@ func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 // This allows for sharing of graphics state dictionaries between content
 // streams.
 func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
-	if _, alreadyDone := s.Res.Ref.(pdf.Reference); alreadyDone {
+	if _, alreadyDone := s.Res.Data.(pdf.Reference); alreadyDone {
 		return s, nil
 	}
 	ref := w.Alloc()
-	err := w.Put(ref, s.Res.Ref)
+	err := w.Put(ref, s.Res.Data)
 	if err != nil {
 		return nil, err
 	}
 
 	res := &ExtGState{
-		Res:   pdf.Res{DefName: s.DefName, Ref: ref},
+		Res:   pdf.Res{DefName: s.DefName, Data: ref},
 		Value: s.Value,
 	}
 	return res, nil

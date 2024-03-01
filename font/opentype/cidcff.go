@@ -157,7 +157,7 @@ func (f *embeddedCFFComposite) Close() error {
 		CMap:      cmapInfo,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref.(pdf.Reference))
+	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
 // EmbedInfoCFFComposite is the information needed to embed a composite OpenType/CFF font.

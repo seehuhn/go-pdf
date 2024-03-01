@@ -135,7 +135,7 @@ func (f *embeddedGlyfSimple) Close() error {
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref.(pdf.Reference))
+	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
 // EmbedInfoGlyfSimple is the information needed to embed a simple OpenType/glyf font.

@@ -138,7 +138,7 @@ func (f *embeddedCFFSimple) Close() error {
 		Encoding:  subsetCFF.Encoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref.(pdf.Reference))
+	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
 // EmbedInfoCFFSimple is the information needed to embed a simple OpenType/CFF font.

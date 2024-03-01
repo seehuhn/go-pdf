@@ -110,7 +110,7 @@ func (f *embeddedSimple) Close() error {
 		IsSerif:   subsetSfnt.IsScript,
 		IsScript:  subsetSfnt.IsScript,
 	}
-	return info.Embed(f.w, f.Ref.(pdf.Reference))
+	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
 // EmbedInfoSimple is the information needed to embed a simple CFF font.

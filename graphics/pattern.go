@@ -102,7 +102,7 @@ func (p *TilingPatternBuilder) Make() (pdf.Res, error) {
 
 	return pdf.Res{
 		DefName: p.DefaultName,
-		Ref:     ref,
+		Data:    ref,
 	}, nil
 }
 
@@ -110,7 +110,7 @@ func (p *TilingPatternBuilder) Make() (pdf.Res, error) {
 func NewShadingPattern(w pdf.Putter, shading *color.EmbeddedShading, M matrix.Matrix, extGState *ExtGState) (color.Color, error) {
 	dict := pdf.Dict{
 		"PatternType": pdf.Integer(2),
-		"Shading":     shading.Ref,
+		"Shading":     shading.Data,
 	}
 	if M != matrix.Identity {
 		dict["Matrix"] = toPDF(M[:])

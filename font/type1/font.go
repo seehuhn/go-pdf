@@ -156,7 +156,7 @@ func (f *embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error)
 	res := &embeddedSimple{
 		w: w,
 		Res: pdf.Res{
-			Ref:     w.Alloc(),
+			Data:    w.Alloc(),
 			DefName: opt.ResName,
 		},
 		Geometry: geometry,
@@ -384,7 +384,7 @@ func (f *embeddedSimple) Close() error {
 		ResName:   f.DefName,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Ref.(pdf.Reference))
+	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
 // EmbedInfo is the information needed to embed a Type 1 font.

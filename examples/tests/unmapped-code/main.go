@@ -275,7 +275,7 @@ func embedTestFont(w pdf.Putter) (font.Embedded, error) {
 	res := &funnyFont{
 		Res: pdf.Res{
 			DefName: "X",
-			Ref:     fontDictRef,
+			Data:    fontDictRef,
 		},
 		W: ww,
 	}

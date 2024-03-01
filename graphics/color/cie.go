@@ -71,7 +71,7 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64, defName pdf.Name) 
 	return &SpaceCalGray{
 		Res: pdf.Res{
 			DefName: defName,
-			Ref:     pdf.Array{pdf.Name("CalGray"), dict},
+			Data:    pdf.Array{pdf.Name("CalGray"), dict},
 		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
@@ -81,17 +81,17 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64, defName pdf.Name) 
 // Embed embeds the color space in the PDF file.
 // This saves space in case the color space is used in multiple content streams.
 func (s *SpaceCalGray) Embed(out *pdf.Writer) (*SpaceCalGray, error) {
-	if _, ok := s.Res.Ref.(pdf.Reference); ok {
+	if _, ok := s.Res.Data.(pdf.Reference); ok {
 		return s, nil
 	}
 	ref := out.Alloc()
-	err := out.Put(ref, s.Res.Ref)
+	err := out.Put(ref, s.Res.Data)
 	if err != nil {
 		return nil, err
 	}
 
 	res := clone(s)
-	res.Res.Ref = ref
+	res.Res.Data = ref
 	return res, nil
 }
 
@@ -188,7 +188,7 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64, defName pdf.Name) (
 	return &SpaceCalRGB{
 		Res: pdf.Res{
 			DefName: defName,
-			Ref:     pdf.Array{pdf.Name("CalRGB"), dict},
+			Data:    pdf.Array{pdf.Name("CalRGB"), dict},
 		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
@@ -200,17 +200,17 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64, defName pdf.Name) (
 // Embed embeds the color space in the PDF file.
 // This saves space in case the color space is used in multiple content streams.
 func (s *SpaceCalRGB) Embed(out *pdf.Writer) (*SpaceCalRGB, error) {
-	if _, ok := s.Res.Ref.(pdf.Reference); ok {
+	if _, ok := s.Res.Data.(pdf.Reference); ok {
 		return s, nil
 	}
 	ref := out.Alloc()
-	err := out.Put(ref, s.Res.Ref)
+	err := out.Put(ref, s.Res.Data)
 	if err != nil {
 		return nil, err
 	}
 
 	embedded := clone(s)
-	embedded.Res.Ref = ref
+	embedded.Res.Data = ref
 	return embedded, nil
 }
 
@@ -291,7 +291,7 @@ func Lab(whitePoint, blackPoint, ranges []float64, defName pdf.Name) (*SpaceLab,
 	return &SpaceLab{
 		Res: pdf.Res{
 			DefName: defName,
-			Ref:     pdf.Array{pdf.Name("Lab"), dict},
+			Data:    pdf.Array{pdf.Name("Lab"), dict},
 		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
@@ -310,17 +310,17 @@ type SpaceLab struct {
 // Embed embeds the color space in the PDF file.
 // This saves space in case the color space is used in multiple content streams.
 func (s *SpaceLab) Embed(out *pdf.Writer) (*SpaceLab, error) {
-	if _, ok := s.Res.Ref.(pdf.Reference); ok {
+	if _, ok := s.Res.Data.(pdf.Reference); ok {
 		return s, nil
 	}
 	ref := out.Alloc()
-	err := out.Put(ref, s.Res.Ref)
+	err := out.Put(ref, s.Res.Data)
 	if err != nil {
 		return nil, err
 	}
 
 	embedded := clone(s)
-	embedded.Res.Ref = ref
+	embedded.Res.Data = ref
 	return embedded, nil
 }
 

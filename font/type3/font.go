@@ -121,7 +121,7 @@ func (f *Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 		GlyphNames: glyphNames,
 		w:          w,
 		Res: pdf.Res{
-			Ref:     w.Alloc(),
+			Data:    w.Alloc(),
 			DefName: opt.ResName,
 		},
 		CMap:          cmap,
@@ -295,7 +295,7 @@ func (f *embedded) Close() error {
 		IsAllCap:   f.IsAllCap,
 		IsSmallCap: f.IsSmallCap,
 	}
-	return info.Embed(f.w, f.Ref.(pdf.Reference))
+	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
 // EmbedInfo contains the information needed to embed a type 3 font into a PDF document.

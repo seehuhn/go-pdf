@@ -117,5 +117,5 @@ func (s *ShadingType3) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*E
 		data = ref
 	}
 
-	return &EmbeddedShading{pdf.Res{DefName: defName, Ref: data}}, nil
+	return &EmbeddedShading{pdf.Res{DefName: defName, Data: data}}, nil
 }
