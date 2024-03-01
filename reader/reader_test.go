@@ -136,7 +136,7 @@ func FuzzReader(f *testing.F) {
 				pattern, ok2 := convertDashPattern(patObj)
 				phase, ok3 := getNum()
 				if ok1 && ok2 && ok3 {
-					w.SetDashPattern(pattern, phase)
+					w.SetLineDash(pattern, phase)
 				}
 			case "ri":
 				name, ok := getName()
@@ -318,7 +318,7 @@ func TestParameters(t *testing.T) {
 	w.SetLineCap(graphics.LineCapRound)
 	w.SetLineJoin(graphics.LineJoinBevel)
 	w.SetMiterLimit(4)
-	w.SetDashPattern([]float64{5, 6, 7}, 8)
+	w.SetLineDash([]float64{5, 6, 7}, 8)
 	w.SetRenderingIntent(graphics.Perceptual)
 	w.SetFlatnessTolerance(10)
 	m := matrix.Matrix{1, 2, 3, 4, 5, 6}

@@ -18,38 +18,13 @@ package graphics
 
 import (
 	"math/bits"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/matrix"
 )
-
-// State represents the graphics state of a PDF processor.
-type State struct {
-	*Parameters
-	Set StateBits
-}
-
-// isSet returns true, if all of the given fields in the graphics state are set.
-func (s State) isSet(bits StateBits) bool {
-	return s.Set&bits == bits
-}
-
-func (s *State) mustBeSet(bits StateBits) error {
-	missing := ^s.Set & bits
-	if missing == 0 {
-		return nil
-	}
-	return errMissingState(missing)
-}
-
-type errMissingState StateBits
-
-func (e errMissingState) Error() string {
-	k := bits.TrailingZeros64(uint64(e))
-	return stateNames[k] + " not set"
-}
 
 // Parameters collects all graphical parameters of the PDF processor.
 //
@@ -243,6 +218,12 @@ const (
 	fillStateBits   = StateFillColor
 )
 
+// State represents the graphics state of a PDF processor.
+type State struct {
+	*Parameters
+	Set StateBits
+}
+
 // NewState returns a new graphics state with default values,
 // and a bit mask indicating which fields are set to their default values.
 func NewState() State {
@@ -296,6 +277,111 @@ func NewState() State {
 	// param.SmoothnessTolerance = 0 // defaul: device dependent
 
 	return State{param, initializedStateBits}
+}
+
+// isSet returns true, if all of the given fields in the graphics state are set.
+func (s State) isSet(bits StateBits) bool {
+	return s.Set&bits == bits
+}
+
+func (s *State) mustBeSet(bits StateBits) error {
+	missing := ^s.Set & bits
+	if missing == 0 {
+		return nil
+	}
+	return errMissingState(missing)
+}
+
+// ApplyTo applies the graphics state parameters to the given state.
+func (s State) ApplyTo(other *State) {
+	set := s.Set
+	other.Set |= set
+
+	param := s.Parameters
+	otherParam := other.Parameters
+	if set&StateTextFont != 0 {
+		otherParam.TextFont = param.TextFont
+		otherParam.TextFontSize = param.TextFontSize
+	}
+	if set&StateTextKnockout != 0 {
+		otherParam.TextKnockout = param.TextKnockout
+	}
+	if set&StateLineWidth != 0 {
+		otherParam.LineWidth = param.LineWidth
+	}
+	if set&StateLineCap != 0 {
+		otherParam.LineCap = param.LineCap
+	}
+	if set&StateLineJoin != 0 {
+		otherParam.LineJoin = param.LineJoin
+	}
+	if set&StateMiterLimit != 0 {
+		otherParam.MiterLimit = param.MiterLimit
+	}
+	if set&StateDash != 0 {
+		otherParam.DashPattern = slices.Clone(param.DashPattern)
+		otherParam.DashPhase = param.DashPhase
+	}
+	if set&StateRenderingIntent != 0 {
+		otherParam.RenderingIntent = param.RenderingIntent
+	}
+	if set&StateStrokeAdjustment != 0 {
+		otherParam.StrokeAdjustment = param.StrokeAdjustment
+	}
+	if set&StateBlendMode != 0 {
+		otherParam.BlendMode = param.BlendMode
+	}
+	if set&StateSoftMask != 0 {
+		otherParam.SoftMask = param.SoftMask
+	}
+	if set&StateStrokeAlpha != 0 {
+		otherParam.StrokeAlpha = param.StrokeAlpha
+	}
+	if set&StateFillAlpha != 0 {
+		otherParam.FillAlpha = param.FillAlpha
+	}
+	if set&StateAlphaSourceFlag != 0 {
+		otherParam.AlphaSourceFlag = param.AlphaSourceFlag
+	}
+	if set&StateBlackPointCompensation != 0 {
+		otherParam.BlackPointCompensation = param.BlackPointCompensation
+	}
+	if set&StateOverprint != 0 {
+		otherParam.OverprintStroke = param.OverprintStroke
+		otherParam.OverprintFill = param.OverprintFill
+	}
+	if set&StateOverprintMode != 0 {
+		otherParam.OverprintMode = param.OverprintMode
+	}
+	if set&StateBlackGeneration != 0 {
+		otherParam.BlackGeneration = param.BlackGeneration
+	}
+	if set&StateUndercolorRemoval != 0 {
+		otherParam.UndercolorRemoval = param.UndercolorRemoval
+	}
+	if set&StateTransferFunction != 0 {
+		otherParam.TransferFunction = param.TransferFunction
+	}
+	if set&StateHalftone != 0 {
+		otherParam.Halftone = param.Halftone
+	}
+	if set&StateHalftoneOrigin != 0 {
+		otherParam.HalftoneOriginX = param.HalftoneOriginX
+		otherParam.HalftoneOriginY = param.HalftoneOriginY
+	}
+	if set&StateFlatnessTolerance != 0 {
+		otherParam.FlatnessTolerance = param.FlatnessTolerance
+	}
+	if set&StateSmoothnessTolerance != 0 {
+		otherParam.SmoothnessTolerance = param.SmoothnessTolerance
+	}
+}
+
+type errMissingState StateBits
+
+func (e errMissingState) Error() string {
+	k := bits.TrailingZeros64(uint64(e))
+	return stateNames[k] + " not set"
 }
 
 // Clone returns a shallow copy of the parameter vector.

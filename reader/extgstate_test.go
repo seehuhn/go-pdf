@@ -112,7 +112,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	qqq := New(data, nil)
-	ext2, err := qqq.ReadExtGState(ext1.Dict, "X")
+	ext2, err := qqq.ReadExtGState(ext1.Res.Ref, "X")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	s3 := graphics.State{Parameters: &graphics.Parameters{}}
-	ext2.ApplyTo(&s3)
+	ext2.Value.ApplyTo(&s3)
 	if d := cmp.Diff(s1, s3, cmpFDSelectFn, cmpFont); d != "" {
 		t.Error(d)
 	}

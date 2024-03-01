@@ -18,7 +18,6 @@ package graphics
 
 import (
 	"errors"
-	"slices"
 
 	"seehuhn.de/go/pdf"
 )
@@ -26,14 +25,12 @@ import (
 // ExtGState represents a combination of graphics state parameters.
 // This combination of parameters can be set using the [Writer.SetExtGState] method.
 type ExtGState struct {
-	// TODO(voss): use pdf.Res here?
-	DefName pdf.Name   // leave empty to generate new names automatically
-	Dict    pdf.Object // [pdf.Dict], can be indirect
-	Value   State
+	pdf.Res
+	Value State
 }
 
 // NewExtGState creates a new ExtGState object.
-func NewExtGState(s State, defaultName string) (*ExtGState, error) {
+func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 	set := s.Set
 	if set & ^extStateBits != 0 {
 		return nil, errors.New("invalid states for ExtGState")
@@ -146,8 +143,10 @@ func NewExtGState(s State, defaultName string) (*ExtGState, error) {
 	}
 
 	return &ExtGState{
-		DefName: pdf.Name(defaultName),
-		Dict:    dict,
+		Res: pdf.Res{
+			DefName: pdf.Name(defaultName),
+			Ref:     dict,
+		},
 		Value: State{
 			Parameters: s.Parameters.Clone(),
 			Set:        set,
@@ -155,120 +154,23 @@ func NewExtGState(s State, defaultName string) (*ExtGState, error) {
 	}, nil
 }
 
-// ApplyTo applies the graphics state parameters to the given state.
-func (s *ExtGState) ApplyTo(other *State) {
-	set := s.Value.Set
-	other.Set |= set
-
-	param := s.Value.Parameters
-	otherParam := other.Parameters
-	if set&StateTextFont != 0 {
-		otherParam.TextFont = param.TextFont
-		otherParam.TextFontSize = param.TextFontSize
-	}
-	if set&StateTextKnockout != 0 {
-		otherParam.TextKnockout = param.TextKnockout
-	}
-	if set&StateLineWidth != 0 {
-		otherParam.LineWidth = param.LineWidth
-	}
-	if set&StateLineCap != 0 {
-		otherParam.LineCap = param.LineCap
-	}
-	if set&StateLineJoin != 0 {
-		otherParam.LineJoin = param.LineJoin
-	}
-	if set&StateMiterLimit != 0 {
-		otherParam.MiterLimit = param.MiterLimit
-	}
-	if set&StateDash != 0 {
-		otherParam.DashPattern = slices.Clone(param.DashPattern)
-		otherParam.DashPhase = param.DashPhase
-	}
-	if set&StateRenderingIntent != 0 {
-		otherParam.RenderingIntent = param.RenderingIntent
-	}
-	if set&StateStrokeAdjustment != 0 {
-		otherParam.StrokeAdjustment = param.StrokeAdjustment
-	}
-	if set&StateBlendMode != 0 {
-		otherParam.BlendMode = param.BlendMode
-	}
-	if set&StateSoftMask != 0 {
-		otherParam.SoftMask = param.SoftMask
-	}
-	if set&StateStrokeAlpha != 0 {
-		otherParam.StrokeAlpha = param.StrokeAlpha
-	}
-	if set&StateFillAlpha != 0 {
-		otherParam.FillAlpha = param.FillAlpha
-	}
-	if set&StateAlphaSourceFlag != 0 {
-		otherParam.AlphaSourceFlag = param.AlphaSourceFlag
-	}
-	if set&StateBlackPointCompensation != 0 {
-		otherParam.BlackPointCompensation = param.BlackPointCompensation
-	}
-	if set&StateOverprint != 0 {
-		otherParam.OverprintStroke = param.OverprintStroke
-		otherParam.OverprintFill = param.OverprintFill
-	}
-	if set&StateOverprintMode != 0 {
-		otherParam.OverprintMode = param.OverprintMode
-	}
-	if set&StateBlackGeneration != 0 {
-		otherParam.BlackGeneration = param.BlackGeneration
-	}
-	if set&StateUndercolorRemoval != 0 {
-		otherParam.UndercolorRemoval = param.UndercolorRemoval
-	}
-	if set&StateTransferFunction != 0 {
-		otherParam.TransferFunction = param.TransferFunction
-	}
-	if set&StateHalftone != 0 {
-		otherParam.Halftone = param.Halftone
-	}
-	if set&StateHalftoneOrigin != 0 {
-		otherParam.HalftoneOriginX = param.HalftoneOriginX
-		otherParam.HalftoneOriginY = param.HalftoneOriginY
-	}
-	if set&StateFlatnessTolerance != 0 {
-		otherParam.FlatnessTolerance = param.FlatnessTolerance
-	}
-	if set&StateSmoothnessTolerance != 0 {
-		otherParam.SmoothnessTolerance = param.SmoothnessTolerance
-	}
-}
-
 // Embed writes the graphics state dictionary into the PDF file so that the
 // graphics state can refer to it by reference.
-// This allows for sharing of PDF graphics state dictionaries between content
+// This allows for sharing of graphics state dictionaries between content
 // streams.
 func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
-	if _, alreadyDone := s.Dict.(pdf.Reference); alreadyDone {
+	if _, alreadyDone := s.Res.Ref.(pdf.Reference); alreadyDone {
 		return s, nil
 	}
 	ref := w.Alloc()
-	err := w.Put(ref, s.Dict)
+	err := w.Put(ref, s.Res.Ref)
 	if err != nil {
 		return nil, err
 	}
 
 	res := &ExtGState{
-		DefName: s.DefName,
-		Dict:    ref,
-		Value:   s.Value,
+		Res:   pdf.Res{DefName: s.DefName, Ref: ref},
+		Value: s.Value,
 	}
 	return res, nil
-}
-
-// DefaultName returns the default name for this resource.
-func (s *ExtGState) DefaultName() pdf.Name {
-	return s.DefName
-}
-
-// PDFObject returns the value to use in the PDF Resources dictionary.
-// This can either be [pdf.Reference] or [pdf.Dict].
-func (s *ExtGState) PDFObject() pdf.Object {
-	return s.Dict
 }

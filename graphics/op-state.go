@@ -177,11 +177,11 @@ func (w *Writer) SetMiterLimit(limit float64) {
 	_, w.Err = fmt.Fprintln(w.Content, float.Format(limit, 4), "M")
 }
 
-// SetDashPattern sets the line dash pattern.
+// SetLineDash sets the line dash pattern.
 //
 // This implementes the PDF graphics operator "d".
-func (w *Writer) SetDashPattern(pattern []float64, phase float64) {
-	if !w.isValid("SetDashPattern", objPage|objText) {
+func (w *Writer) SetLineDash(pattern []float64, phase float64) {
+	if !w.isValid("SetLineDash", objPage|objText) {
 		return
 	}
 	if w.isSet(StateDash) &&
@@ -265,7 +265,7 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 		w.Err = &pdf.VersionError{Operation: "SetExtGState", Earliest: pdf.V1_2}
 	}
 
-	s.ApplyTo(&w.State)
+	s.Value.ApplyTo(&w.State)
 
 	name := w.getResourceName(catExtGState, s)
 	err := name.PDF(w.Content)

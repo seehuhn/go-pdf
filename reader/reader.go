@@ -262,7 +262,7 @@ doOps:
 			} else if err != nil {
 				return err
 			}
-			newState.ApplyTo(&r.State)
+			newState.Value.ApplyTo(&r.State)
 		}
 
 	case "q":

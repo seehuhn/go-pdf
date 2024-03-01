@@ -184,8 +184,6 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 // The string is aligned in a space of the given width.
 // q=0 means left alignment, q=1 means right alignment
 // and q=0.5 means centering.
-//
-// TODO(voss): remove this function?
 func (w *Writer) TextShowAligned(s string, width, q float64) {
 	if !w.isValid("TextShowAligned", objText) {
 		return
