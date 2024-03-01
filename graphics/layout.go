@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // TextShow draws a string.
@@ -174,7 +175,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize
 	}
 	flush()
-	w.TextMatrix = Translate(xActual, 0).Mul(w.TextMatrix)
+	w.TextMatrix = matrix.Translate(xActual, 0).Mul(w.TextMatrix)
 
 	return xActual
 }

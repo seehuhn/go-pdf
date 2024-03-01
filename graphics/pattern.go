@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // TilingProperties describes the properties of a tiling pattern.
@@ -31,7 +32,7 @@ type TilingProperties struct {
 	BBox        *pdf.Rectangle
 	XStep       float64
 	YStep       float64
-	Matrix      Matrix
+	Matrix      matrix.Matrix
 	DefaultName pdf.Name
 }
 
@@ -78,7 +79,7 @@ func (p *TilingPatternBuilder) Make() (pdf.Res, error) {
 	} else {
 		dict["PaintType"] = pdf.Integer(2)
 	}
-	if p.Matrix != IdentityMatrix {
+	if p.Matrix != matrix.Identity {
 		dict["Matrix"] = toPDF(p.Matrix[:])
 	}
 
@@ -106,13 +107,13 @@ func (p *TilingPatternBuilder) Make() (pdf.Res, error) {
 }
 
 // NewShadingPattern creates a new shading pattern.
-func NewShadingPattern(w pdf.Putter, shading *color.EmbeddedShading, matrix Matrix, extGState *ExtGState) (color.Color, error) {
+func NewShadingPattern(w pdf.Putter, shading *color.EmbeddedShading, M matrix.Matrix, extGState *ExtGState) (color.Color, error) {
 	dict := pdf.Dict{
 		"PatternType": pdf.Integer(2),
 		"Shading":     shading.Ref,
 	}
-	if matrix != IdentityMatrix {
-		dict["Matrix"] = toPDF(matrix[:])
+	if M != matrix.Identity {
+		dict["Matrix"] = toPDF(M[:])
 	}
 	if extGState != nil {
 		dict["ExtGState"] = extGState.PDFObject()

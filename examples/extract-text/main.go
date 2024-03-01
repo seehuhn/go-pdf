@@ -25,7 +25,7 @@ import (
 	"runtime/pprof"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
 )
@@ -92,7 +92,7 @@ func extractText(fname string) error {
 		fmt.Println("Page", pageNo)
 		fmt.Println()
 
-		err := contents.ParsePage(pageDict, graphics.IdentityMatrix)
+		err := contents.ParsePage(pageDict, matrix.Identity)
 		if err != nil {
 			log.Fatal(err)
 		}

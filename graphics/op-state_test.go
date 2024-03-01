@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 func TestPushPop(t *testing.T) {
@@ -107,9 +108,9 @@ func TestWriterCTM(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf, pdf.V1_7)
 
-	w.Transform(Rotate(math.Pi / 2)) // rotate 90 degrees counter-clockwise
-	w.Transform(Translate(10, 20))
-	w.Transform(Rotate(math.Pi / 7))
+	w.Transform(matrix.Rotate(math.Pi / 2)) // rotate 90 degrees counter-clockwise
+	w.Transform(matrix.Translate(10, 20))
+	w.Transform(matrix.Rotate(math.Pi / 7))
 
 	x, y := w.CTM[4], w.CTM[5]
 	if !nearlyEqual(x, -20) || !nearlyEqual(y, 10) {

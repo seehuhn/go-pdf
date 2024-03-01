@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/reader/scanner"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -68,7 +69,7 @@ func (r *Reader) NewPage() {
 }
 
 // ParsePage parses a page, and calls the appropriate callback functions.
-func (r *Reader) ParsePage(page pdf.Object, ctm graphics.Matrix) error {
+func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 	pageDict, err := pdf.GetDictTyped(r.R, page, "Page")
 	if err != nil {
 		return err
@@ -279,7 +280,7 @@ doOps:
 	// == Special graphics state =========================================
 
 	case "cm":
-		m := graphics.Matrix{}
+		m := matrix.Matrix{}
 		for i := 0; i < 6; i++ {
 			f, ok := getNum()
 			if !ok {
@@ -292,8 +293,8 @@ doOps:
 	// == Text objects ===================================================
 
 	case "BT": // Begin text object
-		r.TextMatrix = graphics.IdentityMatrix
-		r.TextLineMatrix = graphics.IdentityMatrix
+		r.TextMatrix = matrix.Identity
+		r.TextLineMatrix = matrix.Identity
 		r.Set |= graphics.StateTextMatrix
 
 	case "ET": // End text object
@@ -368,7 +369,7 @@ doOps:
 		dx, ok1 := getNum()
 		dy, ok2 := getNum()
 		if ok1 && ok2 {
-			r.TextLineMatrix = graphics.Translate(dx, dy).Mul(r.TextLineMatrix)
+			r.TextLineMatrix = matrix.Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 		}
 
@@ -378,12 +379,12 @@ doOps:
 		if ok1 && ok2 {
 			r.TextLeading = -dy
 			r.Set |= graphics.StateTextLeading
-			r.TextLineMatrix = graphics.Translate(dx, dy).Mul(r.TextLineMatrix)
+			r.TextLineMatrix = matrix.Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 		}
 
 	case "Tm": // Set text matrix and text line matrix
-		m := graphics.Matrix{}
+		m := matrix.Matrix{}
 		for i := 0; i < 6; i++ {
 			f, ok := getNum()
 			if !ok {
@@ -396,7 +397,7 @@ doOps:
 		r.Set |= graphics.StateTextMatrix
 
 	case "T*": // Move to start of next text line
-		r.TextLineMatrix = graphics.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+		r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 		r.TextMatrix = r.TextLineMatrix
 
 	// == Text showing ===================================================
@@ -411,7 +412,7 @@ doOps:
 	case "'": // Move to next line and show text
 		s, ok := getString()
 		if ok {
-			r.TextLineMatrix = graphics.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+			r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 			r.processText(s)
 		}
@@ -451,9 +452,9 @@ doOps:
 				d = d / 1000 * r.TextFontSize
 				switch r.TextFont.WritingMode() {
 				case 0:
-					r.TextMatrix = graphics.Translate(-d*r.TextHorizontalScaling, 0).Mul(r.TextMatrix)
+					r.TextMatrix = matrix.Translate(-d*r.TextHorizontalScaling, 0).Mul(r.TextMatrix)
 				case 1:
-					r.TextMatrix = graphics.Translate(0, -d).Mul(r.TextMatrix)
+					r.TextMatrix = matrix.Translate(0, -d).Mul(r.TextMatrix)
 				}
 			}
 		}
@@ -655,9 +656,9 @@ func (r *Reader) processText(s pdf.String) {
 
 			switch wmode {
 			case 0: // horizontal
-				r.TextMatrix = graphics.Translate(width, 0).Mul(r.TextMatrix)
+				r.TextMatrix = matrix.Translate(width, 0).Mul(r.TextMatrix)
 			case 1: // vertical
-				r.TextMatrix = graphics.Translate(0, width).Mul(r.TextMatrix)
+				r.TextMatrix = matrix.Translate(0, width).Mul(r.TextMatrix)
 			}
 		})
 	default:

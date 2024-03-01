@@ -14,5 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package color implements all PDF colors and color spaces.
+// Package color implements the PDF color spaces and colors.
 package color

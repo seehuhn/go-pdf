@@ -18,6 +18,17 @@ package color
 
 import "seehuhn.de/go/pdf"
 
+var (
+	// DeviceGray is the DeviceGray color space.
+	DeviceGray = SpaceDeviceGray{}
+
+	// DeviceRGB is the DeviceRGB color space.
+	DeviceRGB = SpaceDeviceRGB{}
+
+	// DeviceCMYK is the DeviceCMYK color space.
+	DeviceCMYK = SpaceDeviceCMYK{}
+)
+
 // == DeviceGray =============================================================
 
 // SpaceDeviceGray represents the DeviceGray color space.
@@ -48,9 +59,6 @@ func (s SpaceDeviceGray) defaultColor() Color {
 func (s SpaceDeviceGray) New(gray float64) Color {
 	return colorDeviceGray(gray)
 }
-
-// DeviceGray is the DeviceGray color space.
-var DeviceGray = SpaceDeviceGray{}
 
 type colorDeviceGray float64
 
@@ -95,9 +103,6 @@ func (s SpaceDeviceRGB) New(r, g, b float64) Color {
 	return colorDeviceRGB{r, g, b}
 }
 
-// DeviceRGB is the DeviceRGB color space.
-var DeviceRGB = SpaceDeviceRGB{}
-
 type colorDeviceRGB [3]float64
 
 // ColorSpace implements the [Color] interface.
@@ -140,9 +145,6 @@ func (s SpaceDeviceCMYK) defaultColor() Color {
 func (s SpaceDeviceCMYK) New(c, m, y, k float64) Color {
 	return colorDeviceCMYK{c, m, y, k}
 }
-
-// DeviceCMYK is the DeviceCMYK color space.
-var DeviceCMYK = SpaceDeviceCMYK{}
 
 type colorDeviceCMYK [4]float64
 

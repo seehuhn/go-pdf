@@ -30,6 +30,7 @@ import (
 	pdffont "seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 	"seehuhn.de/go/pdf/reader/scanner"
 )
@@ -161,7 +162,7 @@ func FuzzReader(f *testing.F) {
 				w.PopGraphicsState()
 
 			case "cm":
-				m := graphics.Matrix{}
+				m := matrix.Matrix{}
 				for i := 0; i < 6; i++ {
 					f, ok := getNum()
 					if !ok {
@@ -234,7 +235,7 @@ func FuzzReader(f *testing.F) {
 				}
 
 			case "Tm": // Set text matrix and line matrix
-				m := graphics.Matrix{}
+				m := matrix.Matrix{}
 				for i := 0; i < 6; i++ {
 					f, ok := getNum()
 					if !ok {
@@ -320,7 +321,7 @@ func TestParameters(t *testing.T) {
 	w.SetDashPattern([]float64{5, 6, 7}, 8)
 	w.SetRenderingIntent(graphics.Perceptual)
 	w.SetFlatnessTolerance(10)
-	m := graphics.Matrix{1, 2, 3, 4, 5, 6}
+	m := matrix.Matrix{1, 2, 3, 4, 5, 6}
 	w.Transform(m)
 	w.TextSetCharacterSpacing(9)
 	w.TextSetWordSpacing(10)

@@ -18,9 +18,6 @@ package color
 
 import "seehuhn.de/go/pdf"
 
-// TODO(voss): be consistent about whether the New() functions return
-// errors or not.
-
 // Space represents a PDF color space.
 type Space interface {
 	pdf.Resource
@@ -196,14 +193,16 @@ func clone[T any](x *T) *T {
 	return &y
 }
 
-// WhitePointD65 represents the D65 whitepoint.
-// The given values are CIE 1931 XYZ coordinates.
-//
-// https://en.wikipedia.org/wiki/Illuminant_D65
-var WhitePointD65 = []float64{0.95047, 1.0, 1.08883}
+var (
+	// WhitePointD65 represents the D65 whitepoint.
+	// The given values are CIE 1931 XYZ coordinates.
+	//
+	// https://en.wikipedia.org/wiki/Illuminant_D65
+	WhitePointD65 = []float64{0.95047, 1.0, 1.08883}
 
-// WhitePointD50 represents the D50 whitepoint.
-// The given values are CIE 1931 XYZ coordinates.
-//
-// https://en.wikipedia.org/wiki/Standard_illuminant#Illuminant_series_D
-var WhitePointD50 = []float64{0.964212, 1.0, 0.8251883}
+	// WhitePointD50 represents the D50 whitepoint.
+	// The given values are CIE 1931 XYZ coordinates.
+	//
+	// https://en.wikipedia.org/wiki/Standard_illuminant#Illuminant_series_D
+	WhitePointD50 = []float64{0.964212, 1.0, 0.8251883}
+)

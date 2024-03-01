@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 var Paper = &pdf.Rectangle{
@@ -215,7 +215,7 @@ var All = []TestCase{
 			return err
 		}
 		p.TextSetFont(E, 24)
-		p.TextSetMatrix(graphics.Rotate(math.Pi / 4))
+		p.TextSetMatrix(matrix.Rotate(math.Pi / 4))
 		p.TextShow("Hello, world!")
 		return nil
 	},
@@ -227,7 +227,7 @@ var All = []TestCase{
 			return err
 		}
 		p.TextSetFont(E, 24)
-		p.TextSetMatrix(graphics.Matrix{1, 2, 3, 4, 50, 60})
+		p.TextSetMatrix(matrix.Matrix{1, 2, 3, 4, 50, 60})
 		p.TextShow("ABC")
 		return nil
 	},

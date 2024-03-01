@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 func main() {
@@ -130,8 +131,8 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 	img := &pdf.Res{Ref: ref}
 
 	page.PushGraphicsState()
-	M := graphics.Scale(500, -500)
-	M = M.Mul(graphics.Translate(50, 800))
+	M := matrix.Scale(500, -500)
+	M = M.Mul(matrix.Translate(50, 800))
 	page.Transform(M)
 	page.DrawImage(img)
 	page.PopGraphicsState()
@@ -198,8 +199,8 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	page := doc.AddPage()
 
 	page.PushGraphicsState()
-	M := graphics.Scale(500, -500)
-	M = M.Mul(graphics.Translate(50, 800))
+	M := matrix.Scale(500, -500)
+	M = M.Mul(matrix.Translate(50, 800))
 	page.Transform(M)
 	page.DrawImage(img)
 	page.PopGraphicsState()
@@ -285,8 +286,8 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	page := doc.AddPage()
 
 	page.PushGraphicsState()
-	M := graphics.Scale(500, 100)
-	M = M.Mul(graphics.Translate(50, 300))
+	M := matrix.Scale(500, 100)
+	M = M.Mul(matrix.Translate(50, 300))
 	page.Transform(M)
 	page.DrawImage(img)
 	page.PopGraphicsState()
@@ -329,7 +330,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 		BBox:       &pdf.Rectangle{URx: w, URy: h},
 		XStep:      w,
 		YStep:      h,
-		Matrix:     graphics.IdentityMatrix,
+		Matrix:     matrix.Identity,
 	}
 	builder := graphics.NewTilingPattern(doc.Out, prop)
 
@@ -382,7 +383,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 		BBox:       &pdf.Rectangle{URx: w, URy: h},
 		XStep:      w,
 		YStep:      h,
-		Matrix:     graphics.IdentityMatrix,
+		Matrix:     matrix.Identity,
 	}
 	builder := graphics.NewTilingPattern(doc.Out, prop)
 
@@ -449,7 +450,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	col, err := graphics.NewShadingPattern(doc.Out, shading, graphics.IdentityMatrix, nil)
+	col, err := graphics.NewShadingPattern(doc.Out, shading, matrix.Identity, nil)
 	if err != nil {
 		return err
 	}
@@ -543,8 +544,8 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	page := doc.AddPage()
 
 	page.PushGraphicsState()
-	m := graphics.Scale(50, 50)
-	m = m.Mul(graphics.Translate(50, 300))
+	m := matrix.Scale(50, 50)
+	m = m.Mul(matrix.Translate(50, 300))
 	page.Transform(m)
 	page.DrawShading(shading)
 	page.PopGraphicsState()

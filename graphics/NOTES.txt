@@ -22,13 +22,3 @@ Uses of Content Streams
   Resources come from the stream dictionary.
 
 TODO(voss): how to detect resource loops?
-
-
-
-Design Principles
-=================
-
-- Resources are represented by Go objects.  These objects are used
-  as arguments in calls to Writer methods.
-- New entries are added to resource dictionaries automatically
-  when a resource is used.

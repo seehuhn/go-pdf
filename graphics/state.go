@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // State represents the graphics state of a PDF processor.
@@ -57,7 +58,7 @@ type Parameters struct {
 	// CTM is the "current transformation matrix", which maps positions from
 	// user coordinates to device coordinates.
 	// (default: device-dependent)
-	CTM Matrix
+	CTM matrix.Matrix
 
 	StartX, StartY     float64 // the starting point of the current path
 	CurrentX, CurrentY float64 // the "current point"
@@ -77,8 +78,8 @@ type Parameters struct {
 	TextKnockout          bool
 
 	// See https://github.com/pdf-association/pdf-issues/issues/368
-	TextMatrix     Matrix // reset at the start of each text object
-	TextLineMatrix Matrix // reset at the start of each text object
+	TextMatrix     matrix.Matrix // reset at the start of each text object
+	TextLineMatrix matrix.Matrix // reset at the start of each text object
 
 	LineWidth   float64
 	LineCap     LineCapStyle
@@ -247,7 +248,7 @@ const (
 func NewState() State {
 	param := &Parameters{}
 
-	param.CTM = IdentityMatrix
+	param.CTM = matrix.Identity
 
 	param.StrokeColor = color.DeviceGray.New(0)
 	param.FillColor = color.DeviceGray.New(0)
@@ -297,7 +298,7 @@ func NewState() State {
 	return State{param, initializedStateBits}
 }
 
-// Clone returns a shallow copy of the GraphicsState.
+// Clone returns a shallow copy of the parameter vector.
 func (s *Parameters) Clone() *Parameters {
 	res := *s
 	return &res
@@ -308,7 +309,7 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
 		panic(err)
 	}
-	M := Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
 	M = M.Mul(s.TextMatrix)
 	M = M.Mul(s.CTM)
 	return M[4], M[5]

@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package matrix
 
 import "math"
 
 // Matrix contains a PDF transformation matrix.
 // The elements are stored in the same order as for the "cm" operator.
 //
-// If M = [a b c d e f] is a [Matrix], then M corresponds to the following
+// A matrix object M = [a b c d e f] corresponds to the following
 // 3x3 matrix:
 //
 //	/ a b 0 \
@@ -69,8 +69,8 @@ func (M Matrix) Inv() Matrix {
 	}
 }
 
-// IdentityMatrix is the identity transformation.
-var IdentityMatrix = Matrix{1, 0, 0, 1, 0, 0}
+// Identity is the identity transformation.
+var Identity = Matrix{1, 0, 0, 1, 0, 0}
 
 // Translate moves the origin of the coordinate system.
 //

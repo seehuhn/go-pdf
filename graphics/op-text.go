@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // This file implements all text-related PDF operators.  The operators
@@ -29,6 +30,7 @@ import (
 // 32000-2:2020.
 
 // TextStart starts a new text object.
+// This must be paired with [Writer.TextEnd].
 //
 // This implements the PDF graphics operator "BT".
 func (w *Writer) TextStart() {
@@ -39,14 +41,15 @@ func (w *Writer) TextStart() {
 
 	w.nesting = append(w.nesting, pairTypeBT)
 
-	w.State.TextMatrix = IdentityMatrix
-	w.State.TextLineMatrix = IdentityMatrix
+	w.State.TextMatrix = matrix.Identity
+	w.State.TextLineMatrix = matrix.Identity
 	w.Set |= StateTextMatrix
 
 	_, w.Err = fmt.Fprintln(w.Content, "BT")
 }
 
 // TextEnd ends the current text object.
+// This must be paired with [Writer.TextStart].
 //
 // This implements the PDF graphics operator "ET".
 func (w *Writer) TextEnd() {
@@ -201,15 +204,15 @@ func (w *Writer) TextSetRise(rise float64) {
 // TextFirstLine moves to the start of the next line of text.
 //
 // This implements the PDF graphics operator "Td".
-func (w *Writer) TextFirstLine(dx, dy float64) {
+func (w *Writer) TextFirstLine(x, y float64) {
 	if !w.isValid("TextFirstLine", objText) {
 		return
 	}
 
-	w.TextLineMatrix = Translate(dx, dy).Mul(w.TextLineMatrix)
+	w.TextLineMatrix = matrix.Translate(x, y).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
 
-	_, w.Err = fmt.Fprintln(w.Content, w.coord(dx), w.coord(dy), "Td")
+	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "Td")
 }
 
 // TextSecondLine moves to the start of the next line of text and sets
@@ -221,7 +224,7 @@ func (w *Writer) TextSecondLine(dx, dy float64) {
 		return
 	}
 
-	w.TextLineMatrix = Translate(dx, dy).Mul(w.TextLineMatrix)
+	w.TextLineMatrix = matrix.Translate(dx, dy).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
 	w.TextLeading = -dy
 	w.Set |= StateTextLeading
@@ -232,7 +235,7 @@ func (w *Writer) TextSecondLine(dx, dy float64) {
 // TextSetMatrix replaces the current text matrix and line matrix with M.
 //
 // This implements the PDF graphics operator "Tm".
-func (w *Writer) TextSetMatrix(M Matrix) {
+func (w *Writer) TextSetMatrix(M matrix.Matrix) {
 	if !w.isValid("TextSetMatrix", objText) {
 		return
 	}
@@ -256,7 +259,7 @@ func (w *Writer) TextNextLine() {
 		return
 	}
 
-	w.TextLineMatrix = Translate(0, -w.TextLeading).Mul(w.TextLineMatrix)
+	w.TextLineMatrix = matrix.Translate(0, -w.TextLeading).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
 
 	_, w.Err = fmt.Fprintln(w.Content, "T*")
@@ -297,7 +300,7 @@ func (w *Writer) TextShowNextLineRaw(s pdf.String) {
 		return
 	}
 
-	w.TextLineMatrix = Translate(0, -w.TextLeading).Mul(w.TextLineMatrix)
+	w.TextLineMatrix = matrix.Translate(0, -w.TextLeading).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
 
 	w.updateTextPosition(w.State.TextFont, s)
@@ -379,9 +382,9 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 		if delta != 0 {
 			delta *= -w.State.TextFontSize / 1000
 			if wMode == 0 {
-				w.TextMatrix = Translate(delta*w.State.TextHorizontalScaling, 0).Mul(w.TextMatrix)
+				w.TextMatrix = matrix.Translate(delta*w.State.TextHorizontalScaling, 0).Mul(w.TextMatrix)
 			} else {
-				w.TextMatrix = Translate(0, delta).Mul(w.TextMatrix)
+				w.TextMatrix = matrix.Translate(0, delta).Mul(w.TextMatrix)
 			}
 		}
 		a = append(a, arg)
@@ -404,9 +407,9 @@ func (w *Writer) updateTextPosition(F font.Embedded, s pdf.String) {
 		}
 		switch wmode {
 		case 0: // horizontal
-			w.TextMatrix = Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
+			w.TextMatrix = matrix.Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
 		case 1: // vertical
-			w.TextMatrix = Translate(0, width).Mul(w.TextMatrix)
+			w.TextMatrix = matrix.Translate(0, width).Mul(w.TextMatrix)
 		}
 	})
 }

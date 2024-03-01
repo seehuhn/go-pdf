@@ -71,8 +71,10 @@ type FormXObject struct {
 	pdf.Res
 }
 
-// PaintFormXObject draws a Form XObject onto the page.
-func (p *Writer) PaintFormXObject(x *FormXObject) {
+// DrawFormXObject draws a Form XObject onto the page.
+//
+// This implements the PDF graphics operator "Do".
+func (p *Writer) DrawFormXObject(x *FormXObject) {
 	if !p.isValid("PaintFormXObject", objPage|objText) {
 		return
 	}

@@ -31,7 +31,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/graphics/testcases"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 	"seehuhn.de/go/pdf/internal/fonttypes"
@@ -114,12 +114,12 @@ func TestTextShowRaw(t *testing.T) {
 
 	type testCase struct {
 		fontSize float64
-		M        graphics.Matrix
+		M        matrix.Matrix
 		stretch  float64
 	}
 	cases := []testCase{
-		{100, graphics.IdentityMatrix, 1},
-		// {50, graphics.Scale(2, 2), 1}, // TODO(voss): make this work
+		{100, matrix.Identity, 1},
+		// {50, matrix.Scale(2, 2), 1}, // TODO(voss): make this work
 	}
 
 	for i, c := range cases {

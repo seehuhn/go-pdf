@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	pdfimage "seehuhn.de/go/pdf/image"
 )
 
@@ -57,8 +57,8 @@ func run(fname string) error {
 	bottom := paper.URy - 72 - height
 
 	page.PushGraphicsState()
-	page.Transform(graphics.Translate(left, bottom))
-	page.Transform(graphics.Scale(width, height))
+	page.Transform(matrix.Translate(left, bottom))
+	page.Transform(matrix.Scale(width, height))
 	page.DrawImage(img)
 	page.PopGraphicsState()
 

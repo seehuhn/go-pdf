@@ -20,8 +20,8 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/postscript/funit"
 )
 
@@ -50,7 +50,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	// and font size, so that the marker is always the same size.
 	markerFontSize := 10.0
 	s := r.Page.State
-	M := graphics.Matrix{markerFontSize * s.TextHorizontalScaling, 0, 0, markerFontSize, 0, s.TextRise}
+	M := matrix.Matrix{markerFontSize * s.TextHorizontalScaling, 0, 0, markerFontSize, 0, s.TextRise}
 	M = M.Mul(s.TextMatrix)
 	M = M.Mul(s.CTM)
 	xc, yc := M.Apply(0, 0)

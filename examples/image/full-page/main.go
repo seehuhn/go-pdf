@@ -26,7 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	pdfimage "seehuhn.de/go/pdf/image"
 )
 
@@ -76,7 +76,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	doc.Transform(graphics.Scale(width, height))
+	doc.Transform(matrix.Scale(width, height))
 	doc.DrawImage(embedded)
 
 	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{

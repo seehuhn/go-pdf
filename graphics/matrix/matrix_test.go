@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package matrix
 
 import (
 	"fmt"
@@ -28,11 +28,11 @@ import (
 func TestIdentityMatrix(t *testing.T) {
 	for i, A := range testMatrices {
 		t.Run(fmt.Sprintf("mat%d", i), func(t *testing.T) {
-			B := A.Mul(IdentityMatrix)
+			B := A.Mul(Identity)
 			if d := cmp.Diff(A, B); d != "" {
 				t.Error(d)
 			}
-			C := IdentityMatrix.Mul(A)
+			C := Identity.Mul(A)
 			if d := cmp.Diff(A, C); d != "" {
 				t.Error(d)
 			}
@@ -48,12 +48,12 @@ func TestMatrixInverse1(t *testing.T) {
 			Ainv := A.Inv()
 
 			B := Ainv.Mul(A)
-			if d := cmp.Diff(IdentityMatrix, B, cmpopts.EquateApprox(1e-6, 1e-6)); d != "" {
+			if d := cmp.Diff(Identity, B, cmpopts.EquateApprox(1e-6, 1e-6)); d != "" {
 				t.Error(d)
 			}
 
 			B = A.Mul(Ainv)
-			if d := cmp.Diff(IdentityMatrix, B, cmpopts.EquateApprox(1e-6, 1e-6)); d != "" {
+			if d := cmp.Diff(Identity, B, cmpopts.EquateApprox(1e-6, 1e-6)); d != "" {
 				t.Error(d)
 			}
 		})
@@ -75,7 +75,7 @@ func TestMatrixInverse2(t *testing.T) {
 }
 
 var testMatrices = []Matrix{
-	IdentityMatrix,
+	Identity,
 	{2, 3, 4, 5, 6, 7},
 	Translate(-0.5, 0.5),
 	Translate(0, 1),

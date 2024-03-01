@@ -41,6 +41,7 @@ import (
 	pdft1 "seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -225,7 +226,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		}
 		page.TextEnd()
 
-		page.Transform(graphics.Scale(q, q))
+		page.Transform(matrix.Scale(q, q))
 
 		// illustrate the advance width by drawing an arrow
 		page.PushGraphicsState()

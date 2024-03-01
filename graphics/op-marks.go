@@ -84,7 +84,7 @@ func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
 }
 
 // MarkedContentStart begins a marked-content sequence.  The sequence is
-// terminated by a call to [MarkedContentEnd].
+// terminated by a call to [Writer.MarkedContentEnd].
 //
 // The tag parameter specifies the role or significance of the sequence. The
 // properties parameter is a property list.  Properties can either be nil, or a
@@ -130,7 +130,7 @@ func (w *Writer) MarkedContentStart(mc *MarkedContent) {
 }
 
 // MarkedContentEnd ends a marked-content sequence.
-// This must be matched with a preceding call to [MarkedContentStart].
+// This must be matched with a preceding call to [Writer.MarkedContentStart].
 func (w *Writer) MarkedContentEnd() {
 	if len(w.nesting) == 0 || w.nesting[len(w.nesting)-1] != pairTypeBMC {
 		w.Err = errors.New("MarkedContentEnd: no matching MarkedContentStart")

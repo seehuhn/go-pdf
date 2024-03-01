@@ -22,6 +22,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/internal/float"
 )
 
@@ -81,7 +82,7 @@ func (w *Writer) PopGraphicsState() {
 // first, followed by the existing transformation.
 //
 // This implementes the PDF graphics operator "cm".
-func (w *Writer) Transform(extraTrfm Matrix) {
+func (w *Writer) Transform(extraTrfm matrix.Matrix) {
 	if !w.isValid("Transform", objPage) { // special graphics state
 		return
 	}
