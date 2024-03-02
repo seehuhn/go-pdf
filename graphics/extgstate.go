@@ -24,6 +24,10 @@ import (
 
 // ExtGState represents a combination of graphics state parameters.
 // This combination of parameters can be set using the [Writer.SetExtGState] method.
+//
+// Note that not all graphics parameters can be set using the ExtGState object.
+// In particular, the stroke and fill color and some text parameters cannot be
+// included in the ExtGState object.
 type ExtGState struct {
 	pdf.Res
 	Value State
@@ -61,7 +65,7 @@ func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 	if set&StateMiterLimit != 0 {
 		dict["ML"] = pdf.Number(s.MiterLimit)
 	}
-	if set&StateDash != 0 {
+	if set&StateLineDash != 0 {
 		pat := make(pdf.Array, len(s.DashPattern))
 		for i, x := range s.DashPattern {
 			pat[i] = pdf.Number(x)
@@ -156,8 +160,8 @@ func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 
 // Embed writes the graphics state dictionary into the PDF file so that the
 // graphics state can refer to it by reference.
-// This allows for sharing of graphics state dictionaries between content
-// streams.
+// This can reduce the PDF file size if the same graphics state is used
+// in multiple content streams.
 func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
 	if _, alreadyDone := s.Res.Data.(pdf.Reference); alreadyDone {
 		return s, nil

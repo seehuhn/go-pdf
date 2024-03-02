@@ -145,3 +145,5 @@ func (c colorPatternUncolored) ColorSpace() Space {
 func (c colorPatternUncolored) values() []float64 {
 	return c.col.values()
 }
+
+// ===========================================================================

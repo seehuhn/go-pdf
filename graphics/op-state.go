@@ -184,7 +184,7 @@ func (w *Writer) SetLineDash(pattern []float64, phase float64) {
 	if !w.isValid("SetLineDash", objPage|objText) {
 		return
 	}
-	if w.isSet(StateDash) &&
+	if w.isSet(StateLineDash) &&
 		sliceNearlyEqual(pattern, w.DashPattern) &&
 		nearlyEqual(phase, w.DashPhase) {
 		return
@@ -192,7 +192,7 @@ func (w *Writer) SetLineDash(pattern []float64, phase float64) {
 
 	w.DashPattern = pattern
 	w.DashPhase = phase
-	w.Set |= StateDash
+	w.Set |= StateLineDash
 
 	_, w.Err = fmt.Fprint(w.Content, "[")
 	if w.Err != nil {

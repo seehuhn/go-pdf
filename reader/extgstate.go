@@ -116,7 +116,7 @@ func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 			} else if dashPattern != nil {
 				param.DashPattern = dashPattern
 				param.DashPhase = phase
-				set |= graphics.StateDash
+				set |= graphics.StateLineDash
 			}
 		case "RI":
 			ri, err := pdf.GetName(r.R, v)

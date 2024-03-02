@@ -235,7 +235,7 @@ doOps:
 		if ok1 && ok2 && ok3 {
 			r.DashPattern = pattern
 			r.DashPhase = phase
-			r.Set |= graphics.StateDash
+			r.Set |= graphics.StateLineDash
 		}
 
 	case "ri": // rendering intent

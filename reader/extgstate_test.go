@@ -50,7 +50,7 @@ func TestExtGState(t *testing.T) {
 	s1.Set |= graphics.StateMiterLimit
 	s1.DashPattern = []float64{1, 2, 3}
 	s1.DashPhase = 4
-	s1.Set |= graphics.StateDash
+	s1.Set |= graphics.StateLineDash
 	s1.RenderingIntent = "dangerously ambiguous"
 	s1.Set |= graphics.StateRenderingIntent
 	s1.StrokeAdjustment = true

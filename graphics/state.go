@@ -127,7 +127,7 @@ const (
 	StateLineCap
 	StateLineJoin
 	StateMiterLimit
-	StateDash // pattern and phase
+	StateLineDash // pattern and phase
 
 	StateRenderingIntent
 	StateStrokeAdjustment
@@ -191,10 +191,11 @@ var stateNames = []string{
 const (
 	// initializedStateBits lists the parameters which are initialized to
 	// their default values in [NewState].
-	initializedStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
-		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode | StateTextRise |
-		StateTextKnockout | StateLineWidth | StateLineCap | StateLineJoin |
-		StateMiterLimit | StateDash | StateRenderingIntent |
+	initializedStateBits = StateStrokeColor | StateFillColor |
+		StateTextCharacterSpacing | StateTextWordSpacing |
+		StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode |
+		StateTextRise | StateTextKnockout | StateLineWidth | StateLineCap |
+		StateLineJoin | StateMiterLimit | StateLineDash | StateRenderingIntent |
 		StateStrokeAdjustment | StateBlendMode | StateSoftMask |
 		StateStrokeAlpha | StateFillAlpha | StateAlphaSourceFlag |
 		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
@@ -203,7 +204,7 @@ const (
 	// extStateBits lists the parameters which can be encoded in an ExtGState
 	// resource.
 	extStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
-		StateLineCap | StateLineJoin | StateMiterLimit | StateDash |
+		StateLineCap | StateLineJoin | StateMiterLimit | StateLineDash |
 		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
 		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
 		StateAlphaSourceFlag | StateBlackPointCompensation | StateOverprint |
@@ -214,7 +215,7 @@ const (
 	// TODO(voss): update this once
 	// https://github.com/pdf-association/pdf-issues/issues/380
 	// is resolved
-	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateDash | StateStrokeColor
+	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateLineDash | StateStrokeColor
 	fillStateBits   = StateFillColor
 )
 
@@ -318,7 +319,7 @@ func (s State) ApplyTo(other *State) {
 	if set&StateMiterLimit != 0 {
 		otherParam.MiterLimit = param.MiterLimit
 	}
-	if set&StateDash != 0 {
+	if set&StateLineDash != 0 {
 		otherParam.DashPattern = slices.Clone(param.DashPattern)
 		otherParam.DashPhase = param.DashPhase
 	}

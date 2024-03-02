@@ -536,6 +536,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	compressedRefs := []pdf.Reference{fontDictRef}
 	compressedObjects := []pdf.Object{fontDict}
 
+	// TODO(voss): review this
 	canOmit := pdf.GetVersion(w) < pdf.V2_0 && info.IsStandard()
 
 	ww := info.GetWidths()
