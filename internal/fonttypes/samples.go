@@ -27,10 +27,10 @@ type Sample struct {
 	Label       string
 	Description string
 	Type        font.EmbeddingType
-	Font        font.Embedder
+	Font        font.Font
 }
 
-// Embed implements the [font.Embedder] interface.
+// Embed implements the [font.Font] interface.
 func (f *Sample) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	if opt == nil {
 		opt = &font.Options{

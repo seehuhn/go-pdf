@@ -18,15 +18,48 @@ package graphics_test
 
 import (
 	"bytes"
+	"io"
 	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/reader"
 )
+
+// TestTextLayout1 tests that no text content is lost when a glyph sequence
+// is laid out.
+func TestTextLayout1(t *testing.T) {
+	v := pdf.V2_0
+	data := pdf.NewData(v)
+	F, err := gofont.GoRegular.Embed(data, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := graphics.NewWriter(io.Discard, v)
+	out.TextSetFont(F, 10)
+
+	var testCases = []string{
+		"",
+		" ",
+		"ABC",
+		"Hello World",
+		"flower", // ligature
+		"fish",   // ligature
+	}
+	for _, s := range testCases {
+		gg, err := out.TextLayout(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gg.Text() != s {
+			t.Errorf("wrong text: %s != %s", gg.Text(), s)
+		}
+	}
+}
 
 func TestGlyphWidths(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)

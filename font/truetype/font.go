@@ -35,7 +35,7 @@ type embedder struct {
 // New makes a PDF TrueType font from a sfnt.Font.
 // The font info must be an OpenType/TrueType font with glyf outlines.
 // The font can be embedded as a simple font or as a composite font.
-func New(info *sfnt.Font) (font.Embedder, error) {
+func New(info *sfnt.Font) (font.Font, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("no glyf outlines in font")
 	}

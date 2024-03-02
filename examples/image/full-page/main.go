@@ -77,7 +77,7 @@ func main() {
 	}
 
 	doc.Transform(matrix.Scale(width, height))
-	doc.DrawImage(embedded)
+	doc.DrawXObject(embedded)
 
 	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{
 		"FitWindow":    pdf.Boolean(true),

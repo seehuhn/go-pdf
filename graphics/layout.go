@@ -26,25 +26,11 @@ import (
 	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
-// TextShow draws a string.
-func (w *Writer) TextShow(s string) float64 {
-	if !w.isValid("TextShow", objText) {
-		return 0
-	}
-	if !w.isSet(StateTextFont) {
-		w.Err = errors.New("no font set")
-		return 0
-	}
-	gg, err := w.TextLayout(s)
-	if err != nil {
-		w.Err = err
-		return 0
-	}
-	return w.TextShowGlyphs(gg)
-}
+// This function contains convenience methods for drawing text.
+// These functions first convert Go strings to PDF strings and then call the
+// functions from "op-text.go".
 
 // TextLayout returns the glyph sequence for a string.
-// The function panics if no font is set.
 func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
 	if err := w.mustBeSet(StateTextFont); err != nil {
 		return nil, err
@@ -54,8 +40,17 @@ func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
 		return nil, errors.New("font does not support layouting")
 	}
 
-	// TODO(voss): disable ligatures if TextCharacterSpacing is non-zero
-	gg := F.Layout(w.TextFontSize, s)
+	var gg *font.GlyphSeq
+	if w.TextCharacterSpacing == 0 {
+		gg = F.Layout(w.TextFontSize, s)
+	} else {
+		// disable ligatures
+		gg = &font.GlyphSeq{}
+		for _, r := range s {
+			next := F.Layout(w.TextFontSize, string(r))
+			gg.Append(next)
+		}
+	}
 
 	// Apply PDF layout parameters
 	for i, g := range gg.Seq {
@@ -69,6 +64,24 @@ func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
 	}
 
 	return gg, nil
+}
+
+// TextShow draws a string.
+func (w *Writer) TextShow(s string) float64 {
+	if !w.isValid("TextShow", objText) {
+		return 0
+	}
+	if !w.isSet(StateTextFont) {
+		w.Err = errors.New("no font set")
+		return 0
+	}
+
+	gg, err := w.TextLayout(s)
+	if err != nil {
+		w.Err = err
+		return 0
+	}
+	return w.TextShowGlyphs(gg)
 }
 
 // TextShowGlyphs shows the PDF string s, taking kerning and text rise into

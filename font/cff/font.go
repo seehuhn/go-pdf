@@ -44,7 +44,7 @@ type embedder struct {
 // The font info must be an OpenType font with CFF outlines.
 // The font can be embedded as a simple font or as a composite font,
 // depending on the options used in the Embed method.
-func New(info *sfnt.Font) (font.Embedder, error) {
+func New(info *sfnt.Font) (font.Font, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("no CFF outlines in font")
 	}
@@ -52,7 +52,7 @@ func New(info *sfnt.Font) (font.Embedder, error) {
 	return embedder{sfnt: info}, nil
 }
 
-// Embed implements the [font.Embedder] interface.
+// Embed implements the [font.Font] interface.
 func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	if opt == nil {
 		opt = &font.Options{}

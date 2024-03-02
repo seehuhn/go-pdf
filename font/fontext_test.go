@@ -20,7 +20,27 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/internal/fonttypes"
+)
+
+// The following types implement the [font.Dict] interface.
+var (
+	_ font.Dict = (*type1.FontDict)(nil)
+	_ font.Dict = (*cff.FontDictSimple)(nil)
+	_ font.Dict = (*cff.FontDictComposite)(nil)
+	_ font.Dict = (*truetype.FontDictSimple)(nil)
+	_ font.Dict = (*truetype.FontDictComposite)(nil)
+	_ font.Dict = (*opentype.FontDictCFFSimple)(nil)
+	_ font.Dict = (*opentype.FontDictCFFComposite)(nil)
+	_ font.Dict = (*opentype.FontDictGlyfSimple)(nil)
+	_ font.Dict = (*opentype.FontDictGlyfComposite)(nil)
+	_ font.Dict = (*type3.EmbedInfo)(nil)
 )
 
 // TestSpaceIsBlank tests that space characters of common fonts are blank.

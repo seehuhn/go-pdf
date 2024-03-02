@@ -29,14 +29,14 @@ type cffEmbedder int
 // CFF fonts
 var (
 	// CFF is a CFF font without CIDFont operators.
-	CFF font.Embedder = cffEmbedder(0)
+	CFF font.Font = cffEmbedder(0)
 
 	// CFFCID is a CFF font with CIDFont operators.
-	CFFCID font.Embedder = cffEmbedder(1)
+	CFFCID font.Font = cffEmbedder(1)
 
 	// CFFCID2 is a CFF font with CIDFont operators and multiple private
 	// dictionaries.
-	CFFCID2 font.Embedder = cffEmbedder(2)
+	CFFCID2 font.Font = cffEmbedder(2)
 )
 
 func (f cffEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {

@@ -170,17 +170,17 @@ func TestBlankGlyphs(t *testing.T) {
 	}
 }
 
-var _ font.Embedder = Courier
-var _ font.Embedder = CourierBold
-var _ font.Embedder = CourierBoldOblique
-var _ font.Embedder = CourierOblique
-var _ font.Embedder = Helvetica
-var _ font.Embedder = HelveticaBold
-var _ font.Embedder = HelveticaBoldOblique
-var _ font.Embedder = HelveticaOblique
-var _ font.Embedder = TimesRoman
-var _ font.Embedder = TimesBold
-var _ font.Embedder = TimesBoldItalic
-var _ font.Embedder = TimesItalic
-var _ font.Embedder = Symbol
-var _ font.Embedder = ZapfDingbats
+var _ font.Font = Courier
+var _ font.Font = CourierBold
+var _ font.Font = CourierBoldOblique
+var _ font.Font = CourierOblique
+var _ font.Font = Helvetica
+var _ font.Font = HelveticaBold
+var _ font.Font = HelveticaBoldOblique
+var _ font.Font = HelveticaOblique
+var _ font.Font = TimesRoman
+var _ font.Font = TimesBold
+var _ font.Font = TimesBoldItalic
+var _ font.Font = TimesItalic
+var _ font.Font = Symbol
+var _ font.Font = ZapfDingbats

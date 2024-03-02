@@ -14,18 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package color
-
-import (
-	"seehuhn.de/go/pdf"
-)
-
-// A Shading describes the variation of colors across an area.
-type Shading interface {
-	Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*EmbeddedShading, error)
-}
-
-// An EmbeddedShading is a shading that has been embedded in a PDF file.
-type EmbeddedShading struct {
-	pdf.Res
-}
+// Package form implements PDF form XObjects.
+package form

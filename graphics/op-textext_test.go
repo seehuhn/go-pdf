@@ -103,7 +103,7 @@ func TestTextShowRaw(t *testing.T) {
 		F.Glyphs = append(F.Glyphs, g)
 	}
 
-	e := &pdfcff.EmbedInfoSimple{
+	e := &pdfcff.FontDictSimple{
 		Font:      F,
 		Encoding:  F.Encoding,
 		Ascent:    1000,

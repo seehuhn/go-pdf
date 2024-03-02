@@ -49,7 +49,7 @@ func TestRoundTripSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &truetype.EmbedInfoSimple{
+	info1 := &truetype.FontDictSimple{
 		Font:       ttf,
 		SubsetTag:  "ABCXYZ",
 		Encoding:   encoding,
@@ -91,7 +91,7 @@ func TestRoundTripSimple(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*truetype.EmbedInfoSimple{info1, info2} {
+	for _, info := range []*truetype.FontDictSimple{info1, info2} {
 		info.Encoding = nil       // already compared above
 		info.Font.CMapTable = nil // already tested when comparing the encodings
 

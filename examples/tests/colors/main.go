@@ -26,8 +26,9 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/matrix"
+	"seehuhn.de/go/pdf/graphics/pattern"
+	"seehuhn.de/go/pdf/graphics/shading"
 )
 
 func main() {
@@ -129,13 +130,13 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	img := &image.Embedded{Res: pdf.Res{Data: ref}}
+	img := &graphics.XObject{Res: pdf.Res{Data: ref}}
 
 	page.PushGraphicsState()
 	M := matrix.Scale(500, -500)
 	M = M.Mul(matrix.Translate(50, 800))
 	page.Transform(M)
-	page.DrawImage(img)
+	page.DrawXObject(img)
 	page.PopGraphicsState()
 
 	hTickLabel(page, F, 50, 300, "g=0.0")
@@ -195,7 +196,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	img := &image.Embedded{Res: pdf.Res{Data: ref}}
+	img := &graphics.XObject{Res: pdf.Res{Data: ref}}
 
 	page := doc.AddPage()
 
@@ -203,7 +204,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	M := matrix.Scale(500, -500)
 	M = M.Mul(matrix.Translate(50, 800))
 	page.Transform(M)
-	page.DrawImage(img)
+	page.DrawXObject(img)
 	page.PopGraphicsState()
 
 	hTickLabel(page, F, 50, 300, "a*=-100")
@@ -282,7 +283,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	img := &image.Embedded{Res: pdf.Res{Data: ref}}
+	img := &graphics.XObject{Res: pdf.Res{Data: ref}}
 
 	page := doc.AddPage()
 
@@ -290,7 +291,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	M := matrix.Scale(500, 100)
 	M = M.Mul(matrix.Translate(50, 300))
 	page.Transform(M)
-	page.DrawImage(img)
+	page.DrawXObject(img)
 	page.PopGraphicsState()
 
 	page.TextSetFont(F, 12)
@@ -325,15 +326,14 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	h := w * math.Sqrt(3)
 	r := 0.3 * w
 
-	prop := graphics.TilingProperties{
-		Colored:    false,
+	prop := &pattern.TilingProperties{
 		TilingType: 1,
 		BBox:       &pdf.Rectangle{URx: w, URy: h},
 		XStep:      w,
 		YStep:      h,
 		Matrix:     matrix.Identity,
 	}
-	builder := graphics.NewTilingPattern(doc.Out, prop)
+	builder := pattern.NewTilingUncolored(doc.Out, prop)
 
 	builder.Circle(0, 0, r)
 	builder.Circle(w, 0, r)
@@ -342,12 +342,11 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	builder.Circle(w, h, r)
 	builder.Fill()
 
-	pat, err := builder.Make()
+	pat, err := builder.Finish()
 	if err != nil {
 		return err
 	}
-
-	col := color.NewTilingPatternUncolored(pat, color.DeviceRGB.New(1, 0, 0))
+	col := pat.New(color.DeviceRGB.New(1, 0, 0))
 
 	page := doc.AddPage()
 
@@ -378,15 +377,14 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	h := w * math.Sqrt(3)
 	r := 0.3 * w
 
-	prop := graphics.TilingProperties{
-		Colored:    true,
+	prop := &pattern.TilingProperties{
 		TilingType: 1,
 		BBox:       &pdf.Rectangle{URx: w, URy: h},
 		XStep:      w,
 		YStep:      h,
 		Matrix:     matrix.Identity,
 	}
-	builder := graphics.NewTilingPattern(doc.Out, prop)
+	builder := pattern.NewTilingColored(doc.Out, prop)
 
 	builder.SetFillColor(color.DeviceGray.New(0.5))
 	builder.Circle(0, 0, r)
@@ -398,12 +396,10 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	builder.Circle(w/2, h/2, r)
 	builder.Fill()
 
-	pat, err := builder.Make()
+	col, err := builder.Finish()
 	if err != nil {
 		return err
 	}
-
-	col := color.NewTilingPatternColored(pat)
 
 	page := doc.AddPage()
 
@@ -428,7 +424,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 }
 
 func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
-	shadingData := color.ShadingType3{
+	shadingData := shading.Type3{
 		ColorSpace: color.DeviceRGB,
 		X1:         100,
 		Y1:         350,
@@ -451,7 +447,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	col, err := graphics.NewShadingPattern(doc.Out, shading, matrix.Identity, nil)
+	col, err := pattern.NewShadingPattern(doc.Out, shading, matrix.Identity, nil, true, "")
 	if err != nil {
 		return err
 	}
@@ -479,7 +475,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 }
 
 func showShading(doc *document.MultiPage, F font.Layouter) error {
-	vertices := []color.ShadingType4Vertex{
+	vertices := []shading.Type4Vertex{
 		{X: 0.95, Y: 0.6, Flag: 0, Color: []float64{0}}, // 0
 		{X: 2.7, Y: 0.8, Flag: 0, Color: []float64{0}},
 		{X: 1.9, Y: 2.0, Flag: 0, Color: []float64{0.1}},
@@ -527,7 +523,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	shadingData := color.ShadingType4{
+	shadingData := shading.Type4{
 		ColorSpace:        cs,
 		BitsPerFlag:       2,
 		BitsPerCoordinate: 8,

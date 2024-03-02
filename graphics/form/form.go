@@ -17,20 +17,21 @@
 package form
 
 import (
+	"bytes"
 	"errors"
 	"time"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
-// Form represents a PDF Form XObject.
+// FormProperties has data for a form XObject.
 //
 // See section 8.10 of ISO 32000-2:2020 for details.
-type Form struct {
+type FormProperties struct {
 	BBox         *pdf.Rectangle
 	Matrix       matrix.Matrix
-	Resources    *pdf.Resources
 	MetaData     pdf.Reference
 	PieceInfo    pdf.Object
 	LastModified time.Time
@@ -42,16 +43,13 @@ type Form struct {
 	PtData      pdf.Object
 }
 
-// Embedded represents a Form XObject embedded in a PDF file.
-type Embedded struct {
-	pdf.Res
-	BBox *pdf.Rectangle
+type FormBuilder struct {
+	Out pdf.Putter
+	*graphics.Writer
+	*FormProperties
 }
 
-// Embed creates a new Form XObject and embeds it in the PDF file.
-//
-// TODO(voss): can/should we have a streaming interface for the body?
-func (f *Form) Embed(w pdf.Putter, body []byte) (*Embedded, error) {
+func Raw(w pdf.Putter, f *FormProperties, contents []byte, resources *pdf.Resources) (*graphics.XObject, error) {
 	dict := pdf.Dict{
 		"Subtype":  pdf.Name("Form"),
 		"FormType": pdf.Integer(1),
@@ -60,8 +58,8 @@ func (f *Form) Embed(w pdf.Putter, body []byte) (*Embedded, error) {
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])
 	}
-	if f.Resources != nil {
-		dict["Resources"] = pdf.AsDict(f.Resources)
+	if resources != nil {
+		dict["Resources"] = pdf.AsDict(resources)
 	}
 	if f.MetaData != 0 {
 		dict["Metadata"] = f.MetaData
@@ -96,7 +94,7 @@ func (f *Form) Embed(w pdf.Putter, body []byte) (*Embedded, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = stm.Write(body)
+	_, err = stm.Write(contents)
 	if err != nil {
 		return nil, err
 	}
@@ -105,12 +103,11 @@ func (f *Form) Embed(w pdf.Putter, body []byte) (*Embedded, error) {
 		return nil, err
 	}
 
-	res := &Embedded{
+	res := &graphics.XObject{
 		Res: pdf.Res{
 			DefName: f.DefaultName,
 			Data:    ref,
 		},
-		BBox: f.BBox,
 	}
 	return res, nil
 }
@@ -121,4 +118,23 @@ func toPDF(x []float64) pdf.Array {
 		res[i] = pdf.Number(xi)
 	}
 	return res
+}
+
+func New(w pdf.Putter, prop *FormProperties) *FormBuilder {
+	contents := graphics.NewWriter(&bytes.Buffer{}, pdf.GetVersion(w))
+	return &FormBuilder{
+		Out:            w,
+		Writer:         contents,
+		FormProperties: prop,
+	}
+}
+
+func (f *FormBuilder) Finish() (*graphics.XObject, error) {
+	contents := f.Writer.Content.(*bytes.Buffer).Bytes()
+	resources := f.Writer.Resources
+
+	// disable the writer to prevent further writes
+	f.Writer = nil
+
+	return Raw(f.Out, f.FormProperties, contents, resources)
 }

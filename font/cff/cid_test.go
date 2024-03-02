@@ -49,7 +49,7 @@ func TestRoundTripComposite(t *testing.T) {
 		m[code] = []rune{'X', '0' + rune(code)}
 	}
 	toUnicode := cmap.NewToUnicode(cs, m)
-	info := &EmbedInfoComposite{
+	info := &FontDictComposite{
 		Font:       otf.AsCFF(),
 		SubsetTag:  "ABCDEF",
 		CMap:       cmapInfo,

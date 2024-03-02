@@ -44,7 +44,7 @@ import (
 // The font program is embedded, if and only if `psFont` is non-nil.
 // If metrics is non-nil, information about kerning and ligatures is extracted,
 // and the corresponding fields in the PDF font descriptor are filled.
-func New(psFont *type1.Font, metrics *afm.Metrics) (font.Embedder, error) {
+func New(psFont *type1.Font, metrics *afm.Metrics) (font.Font, error) {
 	if psFont == nil && metrics == nil {
 		return nil, fmt.Errorf("no font data given")
 	}
@@ -376,7 +376,7 @@ func (f *embeddedSimple) Close() error {
 		}
 	}
 
-	info := &EmbedInfo{
+	info := &FontDict{
 		Font:      psSubset,
 		Metrics:   metricsSubset,
 		SubsetTag: subsetTag,
@@ -387,8 +387,8 @@ func (f *embeddedSimple) Close() error {
 	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
-// EmbedInfo is the information needed to embed a Type 1 font.
-type EmbedInfo struct {
+// FontDict is the information needed to embed a Type 1 font.
+type FontDict struct {
 	// Font (optional) is the (subsetted as needed) font to embed.
 	// This is non-nil, if and only if the font program is embedded.
 	// At least one of `Font` and `Metrics` must be non-nil.
@@ -425,12 +425,12 @@ type EmbedInfo struct {
 // The `Font` field in the result is only filled if the font program
 // is included in the file.  `Metrics` is always present, and contains
 // all information available in the PDF file.
-func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
+func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 	if err := dicts.Type.MustBe(font.Type1); err != nil {
 		return nil, err
 	}
 
-	res := &EmbedInfo{}
+	res := &FontDict{}
 
 	var psFont *type1.Font
 	if dicts.FontProgram != nil {
@@ -505,8 +505,8 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	return res, nil
 }
 
-// Embed implements the [font.Font] interface.
-func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+// Embed implements the [font.Dict] interface.
+func (info *FontDict) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	postScriptName := info.PostScriptName()
 	fontName := postScriptName
 	if info.SubsetTag != "" {
@@ -679,7 +679,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 }
 
 // PostScriptName returns the PostScript name of the font.
-func (info *EmbedInfo) PostScriptName() string {
+func (info *FontDict) PostScriptName() string {
 	if info.Font != nil {
 		return info.Font.FontInfo.FontName
 	}
@@ -687,12 +687,12 @@ func (info *EmbedInfo) PostScriptName() string {
 }
 
 // IsStandard returns true if the font is one of the 14 standard PDF fonts.
-func (info *EmbedInfo) IsStandard() bool {
+func (info *FontDict) IsStandard() bool {
 	return isBuiltinName[info.PostScriptName()] && info.Font == nil
 }
 
 // BuiltinEncoding returns the builtin encoding vector for this font.
-func (info *EmbedInfo) BuiltinEncoding() []string {
+func (info *FontDict) BuiltinEncoding() []string {
 	if info.Font != nil {
 		return info.Font.Encoding
 	}
@@ -701,7 +701,7 @@ func (info *EmbedInfo) BuiltinEncoding() []string {
 
 // GetWidths returns the widths of the 256 encoded characters.
 // The returned widths are given in PDF text space units.
-func (info *EmbedInfo) GetWidths() []float64 {
+func (info *FontDict) GetWidths() []float64 {
 	ww := make([]float64, 256)
 	if psFont := info.Font; psFont != nil {
 		q := psFont.FontInfo.FontMatrix[0]
@@ -728,7 +728,7 @@ func (info *EmbedInfo) GetWidths() []float64 {
 
 // GlyphList returns the list of glyph names, in a standardised order.
 // Glyph IDs, where used, are indices into this list.
-func (info *EmbedInfo) GlyphList() []string {
+func (info *FontDict) GlyphList() []string {
 	if info.Font != nil {
 		return info.Font.GlyphList()
 	}

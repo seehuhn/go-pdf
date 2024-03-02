@@ -49,7 +49,7 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &opentype.EmbedInfoGlyfSimple{
+	info1 := &opentype.FontDictGlyfSimple{
 		Font:      otf,
 		SubsetTag: "ABCXYZ",
 		Encoding:  encoding,
@@ -90,7 +90,7 @@ func TestRoundTripGlyfSimple(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*opentype.EmbedInfoGlyfSimple{info1, info2} {
+	for _, info := range []*opentype.FontDictGlyfSimple{info1, info2} {
 		info.Encoding = nil       // already compared above
 		info.Font.CMapTable = nil // already tested when comparing the encodings
 

@@ -29,19 +29,19 @@ type openTypeEmbedder int
 // OpenType fonts
 var (
 	// OpenTypeGlyf is an OpenType font with glyph outlines.
-	OpenTypeGlyf font.Embedder = openTypeEmbedder(0)
+	OpenTypeGlyf font.Font = openTypeEmbedder(0)
 
 	// OpenTypeCFF is an OpenType font with CFF outlines and no CIDFont
 	// operators.
-	OpenTypeCFF font.Embedder = openTypeEmbedder(1)
+	OpenTypeCFF font.Font = openTypeEmbedder(1)
 
 	// OpenTypeCFFCID is an OpenType font with CFF outlines and CIDFont
 	// operators.
-	OpenTypeCFFCID font.Embedder = openTypeEmbedder(2)
+	OpenTypeCFFCID font.Font = openTypeEmbedder(2)
 
 	// OpenTypeCFFCID2 is an OpenType font with CFF outlines, CIDFont
 	// operators, and multiple private dictionaries.
-	OpenTypeCFFCID2 font.Embedder = openTypeEmbedder(3)
+	OpenTypeCFFCID2 font.Font = openTypeEmbedder(3)
 )
 
 func (f openTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {

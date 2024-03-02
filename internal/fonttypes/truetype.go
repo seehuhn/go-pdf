@@ -26,7 +26,7 @@ import (
 type trueTypeEmbedder struct{}
 
 // TrueType is a TrueType font.
-var TrueType font.Embedder = trueTypeEmbedder{}
+var TrueType font.Font = trueTypeEmbedder{}
 
 func (trueTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	info := makefont.TrueType()

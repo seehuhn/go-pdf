@@ -68,7 +68,7 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.Embedded {
 		'A': {'A'},
 	}
 
-	info := &pdfcff.EmbedInfoSimple{
+	info := &pdfcff.FontDictSimple{
 		Font:      in,
 		Encoding:  encoding,
 		Ascent:    850,
@@ -79,7 +79,7 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.Embedded {
 	return EmbedCFF(w, info, defaultName)
 }
 
-func EmbedCFF(w pdf.Putter, info *pdfcff.EmbedInfoSimple, defaultName pdf.Name) font.Embedded {
+func EmbedCFF(w pdf.Putter, info *pdfcff.FontDictSimple, defaultName pdf.Name) font.Embedded {
 	ref := w.Alloc()
 	err := info.Embed(w, ref)
 	if err != nil {
@@ -91,14 +91,14 @@ func EmbedCFF(w pdf.Putter, info *pdfcff.EmbedInfoSimple, defaultName pdf.Name) 
 			DefName: defaultName,
 			Data:    ref,
 		},
-		EmbedInfoSimple: info,
+		FontDictSimple: info,
 	}
 	return F
 }
 
 type frozenFont struct {
 	pdf.Res
-	*pdfcff.EmbedInfoSimple
+	*pdfcff.FontDictSimple
 }
 
 func (f *frozenFont) WritingMode() int {

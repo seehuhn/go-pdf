@@ -54,7 +54,7 @@ func TestRoundTripComposite(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(cs, m)
 
-	info1 := &truetype.EmbedInfoComposite{
+	info1 := &truetype.FontDictComposite{
 		Font:      ttf,
 		SubsetTag: "AAAAAA",
 		CMap:      cmapInfo,
@@ -79,7 +79,7 @@ func TestRoundTripComposite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, info := range []*truetype.EmbedInfoComposite{info1, info2} {
+	for _, info := range []*truetype.FontDictComposite{info1, info2} {
 		info.Font.CMapTable = nil // "cmap" table is optional
 
 		info.Font.FamilyName = ""        // "name" table is optional

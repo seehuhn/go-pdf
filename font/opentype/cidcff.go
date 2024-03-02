@@ -151,7 +151,7 @@ func (f *embeddedCFFComposite) Close() error {
 		outlines.GIDToCID = gidToCID
 	}
 
-	info := EmbedInfoCFFComposite{
+	info := FontDictCFFComposite{
 		Font:      subsetOTF,
 		SubsetTag: subsetTag,
 		CMap:      cmapInfo,
@@ -160,8 +160,8 @@ func (f *embeddedCFFComposite) Close() error {
 	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
-// EmbedInfoCFFComposite is the information needed to embed a composite OpenType/CFF font.
-type EmbedInfoCFFComposite struct {
+// FontDictCFFComposite is the information needed to embed a composite OpenType/CFF font.
+type FontDictCFFComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -179,13 +179,13 @@ type EmbedInfoCFFComposite struct {
 }
 
 // ExtractCFFComposite extracts information about a composite OpenType/CFF font from a PDF file.
-// This is the inverse of [EmbedInfoCFFComposite.Embed].
-func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposite, error) {
+// This is the inverse of [FontDictCFFComposite.Embed].
+func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictCFFComposite, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeCFFComposite); err != nil {
 		return nil, err
 	}
 
-	res := &EmbedInfoCFFComposite{}
+	res := &FontDictCFFComposite{}
 
 	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
 	if err != nil {
@@ -235,8 +235,9 @@ func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFComposit
 }
 
 // Embed adds a composite OpenType/CFF font to a PDF file.
+// This implements the [font.Dict] interface.
 // This is the reverse of [ExtractCFFComposite]
-func (info *EmbedInfoCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return err

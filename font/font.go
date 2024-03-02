@@ -45,6 +45,30 @@ type GlyphSeq struct {
 	Seq  []Glyph
 }
 
+// TotalWidth returns the total advance width of the glyph sequence.
+func (s *GlyphSeq) TotalWidth() float64 {
+	w := s.Skip
+	for _, g := range s.Seq {
+		w += g.Advance
+	}
+	return w
+}
+
+// Text returns the text represented by the glyph sequence.
+func (s *GlyphSeq) Text() string {
+	n := 0
+	for _, g := range s.Seq {
+		n += len(g.Text)
+	}
+	res := make([]rune, 0, n)
+
+	for _, g := range s.Seq {
+		res = append(res, g.Text...)
+	}
+
+	return string(res)
+}
+
 // Append modifies s by appending the glyphs from other.
 func (s *GlyphSeq) Append(other *GlyphSeq) {
 	if len(s.Seq) == 0 {
@@ -53,15 +77,6 @@ func (s *GlyphSeq) Append(other *GlyphSeq) {
 		s.Seq[len(s.Seq)-1].Advance += other.Skip
 	}
 	s.Seq = append(s.Seq, other.Seq...)
-}
-
-// TotalWidth returns the total advance width of the glyph sequence.
-func (s *GlyphSeq) TotalWidth() float64 {
-	w := s.Skip
-	for _, g := range s.Seq {
-		w += g.Advance
-	}
-	return w
 }
 
 // Align places the glyphs in a space of the given width.
@@ -76,8 +91,13 @@ func (s *GlyphSeq) Align(width float64, q float64) {
 	s.Seq[len(s.Seq)-1].Advance += extra * (1 - q)
 }
 
-// Embedder represents a font which can be embedded in a PDF file.
-type Embedder interface {
+// Dict is the low-level interface to represent a font in a PDF file.
+type Dict interface {
+	Embed(w pdf.Putter, fontDictRef pdf.Reference) error
+}
+
+// Font represents a font which can be embedded in a PDF file.
+type Font interface {
 	Embed(w pdf.Putter, opt *Options) (Layouter, error)
 }
 

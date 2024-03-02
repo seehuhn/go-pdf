@@ -34,15 +34,18 @@ type ExtGState struct {
 }
 
 // NewExtGState creates a new ExtGState object.
+//
+// If s contains values for parameters that cannot be included in an ExtGState
+// object, an error is returned.
 func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 	set := s.Set
 	if set & ^extStateBits != 0 {
 		return nil, errors.New("invalid states for ExtGState")
 	}
 
-	dict := pdf.Dict{}
 	// Build a graphics state parameter dictionary for the given state.
 	// See table 57 in ISO 32000-2:2020.
+	dict := pdf.Dict{}
 	if set&StateTextFont != 0 {
 		ref := s.TextFont.PDFObject().(pdf.Reference)
 		dict["Font"] = pdf.Array{
@@ -160,12 +163,13 @@ func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 
 // Embed writes the graphics state dictionary into the PDF file so that the
 // graphics state can refer to it by reference.
-// This can reduce the PDF file size if the same graphics state is used
-// in multiple content streams.
+// This can reduce the PDF file size if the graphics state is shared between
+// multiple content streams.
 func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
 	if _, alreadyDone := s.Res.Data.(pdf.Reference); alreadyDone {
 		return s, nil
 	}
+
 	ref := w.Alloc()
 	err := w.Put(ref, s.Res.Data)
 	if err != nil {

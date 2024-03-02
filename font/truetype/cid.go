@@ -140,7 +140,7 @@ func (f *embeddedComposite) Close() error {
 		cidToGID[m[origGID]] = glyph.ID(subsetGID)
 	}
 
-	info := EmbedInfoComposite{
+	info := FontDictComposite{
 		Font:      subsetTTF,
 		SubsetTag: subsetTag,
 		CMap:      cmapInfo,
@@ -150,8 +150,8 @@ func (f *embeddedComposite) Close() error {
 	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
-// EmbedInfoComposite is the information needed to embed a TrueType font as a composite PDF font.
-type EmbedInfoComposite struct {
+// FontDictComposite is the information needed to embed a TrueType font as a composite PDF font.
+type FontDictComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -173,8 +173,9 @@ type EmbedInfoComposite struct {
 }
 
 // Embed adds a composite TrueType font to a PDF file.
+// This implements the [font.Dict] interface.
 // This is the reverse of [ExtractComposite]
-func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 	if err != nil {
 		return err
@@ -363,12 +364,12 @@ func (info *EmbedInfoComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) e
 }
 
 // ExtractComposite extracts information about a composite TrueType font.
-// This is the reverse of [EmbedInfoComposite.Embed].
-func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoComposite, error) {
+// This is the reverse of [FontDictComposite.Embed].
+func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, error) {
 	if err := dicts.Type.MustBe(font.TrueTypeComposite); err != nil {
 		return nil, err
 	}
-	res := &EmbedInfoComposite{}
+	res := &FontDictComposite{}
 
 	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
 	if err != nil {

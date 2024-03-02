@@ -47,7 +47,7 @@ func OpenTypeFile(w pdf.Putter, fname string, opt *font.Options) (font.Layouter,
 
 // OpenTypeFile embeds an OpenType/TrueType font.
 func OpenTypeFont(w pdf.Putter, info *sfnt.Font, opt *font.Options) (font.Layouter, error) {
-	var F font.Embedder
+	var F font.Font
 	var err error
 	if info.IsCFF() {
 		F, err = cff.New(info)

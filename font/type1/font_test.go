@@ -246,7 +246,7 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &EmbedInfo{
+	info1 := &FontDict{
 		Font:      t1,
 		Encoding:  encoding,
 		ToUnicode: toUnicode,
@@ -278,7 +278,7 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 		}
 	}
 
-	for _, info := range []*EmbedInfo{info1, info2} {
+	for _, info := range []*FontDict{info1, info2} {
 		info.Encoding = nil // already compared above
 		info.Metrics = nil  // TODO(voss): re-enable this once it works
 	}
@@ -348,7 +348,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &EmbedInfo{
+	info1 := &FontDict{
 		Font:      t1,
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -381,7 +381,7 @@ func TestRoundTrip(t *testing.T) {
 		}
 	}
 
-	for _, info := range []*EmbedInfo{info1, info2} {
+	for _, info := range []*FontDict{info1, info2} {
 		info.Encoding = nil // already compared above
 		info.Metrics = nil  // TODO(voss): enable this once it works
 	}

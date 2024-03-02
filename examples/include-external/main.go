@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/pagetree"
@@ -52,18 +53,18 @@ func run() error {
 		return err
 	}
 
-	figure, err := LoadFigure("fig.pdf", page.Out)
+	figure, bbox, err := LoadFigure("fig.pdf", page.Out)
 	if err != nil {
 		return err
 	}
 
-	width := figure.BBox.Dx()
-	height := figure.BBox.Dy()
+	width := bbox.Dx()
+	height := bbox.Dy()
 	base := paper.URy - 72 - height
 	left := paper.LLx + 0.5*(paper.Dx()-width)
 	page.PushGraphicsState()
-	page.Transform(matrix.Translate(left-figure.BBox.LLx, base-figure.BBox.LLy))
-	page.DrawFormXObject(figure)
+	page.Transform(matrix.Translate(left-bbox.LLx, base-bbox.LLy))
+	page.DrawXObject(figure)
 	page.PopGraphicsState()
 
 	base -= 12
@@ -84,14 +85,14 @@ func run() error {
 	return nil
 }
 
-func LoadFigure(fname string, w pdf.Putter) (*form.Embedded, error) {
+func LoadFigure(fname string, w pdf.Putter) (*graphics.XObject, *pdf.Rectangle, error) {
 	r, err := pdf.Open(fname, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	dict, err := pagetree.GetPage(r, 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	cropBox := dict["CropBox"]
@@ -100,21 +101,21 @@ func LoadFigure(fname string, w pdf.Putter) (*form.Embedded, error) {
 	}
 	bbox, err := pdf.GetRectangle(r, cropBox)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	copier := NewCopier(w, r)
 
 	origResources, err := pdf.GetDict(r, dict["Resources"])
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	resourceObj, err := copier.Copy(origResources)
 	resourceDict := resourceObj.(pdf.Dict)
 	resources := &pdf.Resources{}
 	err = pdf.DecodeDict(nil, resources, resourceDict)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	body := &bytes.Buffer{}
@@ -123,40 +124,43 @@ func LoadFigure(fname string, w pdf.Putter) (*form.Embedded, error) {
 	case *pdf.Stream:
 		stm, err := pdf.DecodeStream(r, x, 0)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		_, err = io.Copy(body, stm)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	case pdf.Array:
 		for _, ref := range x {
 			obj, err := pdf.GetStream(r, ref)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			stm, err := pdf.DecodeStream(r, obj, 0)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			_, err = io.Copy(body, stm)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	}
 
 	err = r.Close()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	figure := form.Form{
-		BBox:      bbox,
-		Resources: resources,
+	figure := &form.FormProperties{
+		BBox: bbox,
 	}
 
-	return figure.Embed(w, body.Bytes())
+	obj, err := form.Raw(w, figure, body.Bytes(), resources)
+	if err != nil {
+		return nil, nil, err
+	}
+	return obj, bbox, nil
 }
 
 type copier struct {

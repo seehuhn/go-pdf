@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package color
+package shading
 
 import (
 	"errors"
@@ -22,11 +22,13 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// ShadingType3 represents a type 3 (radial) shading.
-type ShadingType3 struct {
-	ColorSpace Space
+// Type3 represents a type 3 (radial) shading.
+type Type3 struct {
+	ColorSpace color.Space
 	X1, Y1, R1 float64
 	X2, Y2, R2 float64
 
@@ -43,14 +45,14 @@ type ShadingType3 struct {
 }
 
 // Embed implements the [Shading] interface.
-func (s *ShadingType3) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*EmbeddedShading, error) {
+func (s *Type3) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*graphics.Shading, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
-	} else if isPattern(s.ColorSpace) {
+	} else if color.IsPattern(s.ColorSpace) {
 		return nil, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
-		want := len(s.ColorSpace.defaultColor().values())
+		want := color.NumValues(s.ColorSpace)
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
@@ -71,7 +73,7 @@ func (s *ShadingType3) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*E
 	case nil:
 		return nil, errors.New("missing Function")
 	case pdf.Array:
-		if len(F) != len(s.ColorSpace.defaultColor().values()) {
+		if len(F) != color.NumValues(s.ColorSpace) {
 			return nil, errors.New("invalid Function")
 		}
 	case pdf.Dict, pdf.Reference:
@@ -117,5 +119,5 @@ func (s *ShadingType3) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*E
 		data = ref
 	}
 
-	return &EmbeddedShading{pdf.Res{DefName: defName, Data: data}}, nil
+	return &graphics.Shading{Res: pdf.Res{DefName: defName, Data: data}}, nil
 }

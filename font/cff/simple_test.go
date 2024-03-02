@@ -48,7 +48,7 @@ func TestRoundTripSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &EmbedInfoSimple{
+	info1 := &FontDictSimple{
 		Font:      otf.AsCFF(),
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -86,7 +86,7 @@ func TestRoundTripSimple(t *testing.T) {
 		}
 	}
 
-	for _, info := range []*EmbedInfoSimple{info1, info2} {
+	for _, info := range []*FontDictSimple{info1, info2} {
 		info.Encoding = nil // already compared above
 
 		// TODO(voss): reenable this once https://github.com/google/go-cmp/issues/335 is resolved

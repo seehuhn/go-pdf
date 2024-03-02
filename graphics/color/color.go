@@ -16,7 +16,11 @@
 
 package color
 
-import "seehuhn.de/go/pdf"
+import (
+	"fmt"
+
+	"seehuhn.de/go/pdf"
+)
 
 // Space represents a PDF color space.
 type Space interface {
@@ -43,7 +47,13 @@ var (
 	// TODO(voss): DeviceN colour spaces
 )
 
-func isPattern(s Space) bool {
+// NumValues returns the number of color values for the given color space.
+func NumValues(s Space) int {
+	return len(s.defaultColor().values())
+}
+
+// IsPattern returns whether the given color space is a pattern color space.
+func IsPattern(s Space) bool {
 	switch s.(type) {
 	case spacePatternColored, spacePatternUncolored:
 		return true
@@ -51,7 +61,8 @@ func isPattern(s Space) bool {
 	return false
 }
 
-func isIndexed(s Space) bool {
+// IsIndexed returns whether the given color space is an indexed color space.
+func IsIndexed(s Space) bool {
 	switch s.(type) {
 	case *SpaceIndexed:
 		return true
@@ -74,7 +85,7 @@ var (
 	_ Color = colorCalRGB{}
 	_ Color = colorLab{}
 	// TODO(voss): ICCBased
-	_ Color = colorPatternColored{}
+	_ Color = PatternColored{}
 	_ Color = colorPatternUncolored{}
 	_ Color = colorIndexed{}
 	// TODO(voss): Separation colour spaces
@@ -130,12 +141,12 @@ func Operator(c Color) ([]float64, pdf.Resource, string) {
 		return c.values(), nil, "SC"
 	case colorIndexed:
 		return c.values(), nil, "SC"
-	case colorPatternColored:
-		return nil, c.pattern, "SCN"
-	case colorPatternUncolored:
-		return c.values(), c.pattern, "SCN"
+	case *PatternColored:
+		return nil, c.Res, "SCN"
+	case *colorPatternUncolored:
+		return c.values(), c.Res, "SCN"
 	default:
-		panic("unknown color type")
+		panic(fmt.Sprintf("unknown color type %T", c))
 	}
 }
 

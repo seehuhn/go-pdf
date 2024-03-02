@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,33 +14,38 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package shading
 
 import (
-	"fmt"
-
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 )
 
-// XObject represents a PDF XObject.
-type XObject struct {
-	pdf.Res
+// A Shading describes the variation of colors across an area.
+type Shading interface {
+	Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*graphics.Shading, error)
 }
 
-// DrawXObject draws a PDF XObject on the page.
-// This can be used to draw images, forms, or other XObjects.
-//
-// This implements the PDF graphics operator "Do".
-func (p *Writer) DrawXObject(obj *XObject) {
-	if !p.isValid("DrawImage", objPage) {
-		return
+func toPDF(x []float64) pdf.Array {
+	res := make(pdf.Array, len(x))
+	for i, xi := range x {
+		res[i] = pdf.Number(xi)
 	}
+	return res
+}
 
-	name := p.getResourceName(catXObject, obj)
-	err := name.PDF(p.Content)
-	if err != nil {
-		p.Err = err
-		return
+func isEqual(x, y []float64) bool {
+	if len(x) != len(y) {
+		return false
 	}
-	_, p.Err = fmt.Fprintln(p.Content, "", "Do")
+	for i := range x {
+		if x[i] != y[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func isValues(x []float64, y ...float64) bool {
+	return isEqual(x, y)
 }

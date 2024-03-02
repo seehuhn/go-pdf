@@ -141,11 +141,7 @@ func FuzzExtract(f *testing.F) {
 	})
 }
 
-type embedder interface {
-	Embed(w pdf.Putter, fontDictRef pdf.Reference) error
-}
-
-func extractX(r pdf.Getter) (embedder, error) {
+func extractX(r pdf.Getter) (font.Dict, error) {
 	page, err := pagetree.GetPage(r, 0)
 	if err != nil {
 		return nil, err
@@ -157,7 +153,7 @@ func extractX(r pdf.Getter) (embedder, error) {
 	return extractFont(r, fontDict)
 }
 
-func extractFont(r pdf.Getter, fontDict pdf.Object) (embedder, error) {
+func extractFont(r pdf.Getter, fontDict pdf.Object) (font.Dict, error) {
 	dicts, err := font.ExtractDicts(r, fontDict)
 	if err != nil {
 		return nil, err

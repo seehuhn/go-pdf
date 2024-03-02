@@ -20,6 +20,23 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// TilingPatternUncolored represents an uncolored PDF tiling pattern.
+//
+// Res.Data must be a PDF stream defining a pattern with PatternType 1 and
+// PaintType 2.
+type TilingPatternUncolored struct {
+	pdf.Res
+}
+
+// New returns a Color which paints the given tiling pattern in the given
+// color.
+func (p *TilingPatternUncolored) New(col Color) Color {
+	return &colorPatternUncolored{
+		Res: p.Res,
+		col: col,
+	}
+}
+
 // == colored patterns and shadings ==========================================
 
 // spacePatternColored is used for uncolored tiling patterns and shading patterns.
@@ -45,44 +62,22 @@ func (s spacePatternColored) defaultColor() Color {
 	return nil
 }
 
-type colorPatternColored struct {
-	pattern pdf.Res
+// PatternColored represents a colored tiling pattern or a shading
+// pattern.
+//
+// In case of a colored tiling pattern, `Res.Data“ must be a PDF stream
+// defining a pattern with PatternType 1 and PaintType 1.  In case of a shading
+// pattern, `Res.Data“ must be a PDF pattern dictionary with PatternType 2.
+type PatternColored struct {
+	pdf.Res
 }
 
-// NewTilingPatternColored returns a new colored tiling pattern. Ref must be a
-// stream defining a pattern with PatternType 1 and PaintType 1.
-//
-// DefName should normally be empty but can be set to specify a default name
-// for refering to the pattern from within content streams.
-//
-// TODO(voss): make this API more robust
-func NewTilingPatternColored(pattern pdf.Res) Color {
-	return colorPatternColored{
-		pattern: pattern,
-	}
-}
-
-// NewShadingPattern returns a new shading pattern.  Dict must be a shading
-// dictionary with PatternType 2.
-//
-// DefName should normally be empty but can be set to specify a default name
-// for refering to the pattern from within content streams.
-//
-// TODO(voss): make this API more robust
-func NewShadingPattern(dict pdf.Object, defName pdf.Name) Color {
-	return colorPatternColored{
-		pattern: pdf.Res{
-			DefName: defName,
-			Data:    dict,
-		},
-	}
-}
-
-func (c colorPatternColored) ColorSpace() Space {
+// ColorSpace implements the [Color] interface.
+func (c PatternColored) ColorSpace() Space {
 	return spacePatternColored{}
 }
 
-func (c colorPatternColored) values() []float64 {
+func (c PatternColored) values() []float64 {
 	return nil
 }
 
@@ -114,26 +109,8 @@ func (s spacePatternUncolored) defaultColor() Color {
 }
 
 type colorPatternUncolored struct {
-	col     Color
-	pattern pdf.Res
-}
-
-// NewTilingPatternUncolored returns a new uncolored tiling pattern.
-//
-// pattern.Ref must be a stream defining a pattern with PatternType 1 and
-// PaintType 2.
-//
-// pattern.DefName should normally be empty but can be set to specify a default
-// name for refering to the pattern from within content streams.
-//
-// Color is the color to paint the pattern with.
-//
-// TODO(voss): make this API more robust
-func NewTilingPatternUncolored(pattern pdf.Res, color Color) Color {
-	return colorPatternUncolored{
-		col:     color,
-		pattern: pattern,
-	}
+	pdf.Res
+	col Color
 }
 
 // ColorSpace implements the [Color] interface.
@@ -145,5 +122,3 @@ func (c colorPatternUncolored) ColorSpace() Space {
 func (c colorPatternUncolored) values() []float64 {
 	return c.col.values()
 }
-
-// ===========================================================================

@@ -41,7 +41,7 @@ type embedder struct {
 // TrueType outlines, it is often more efficient to embed the font as a
 // TrueType font instead of an OpenType font.  Consider using
 // [seehuhn.de/go/pdf/font/truetype.New] instead of this function.
-func New(info *sfnt.Font) (font.Embedder, error) {
+func New(info *sfnt.Font) (font.Font, error) {
 	return embedder{sfnt: info}, nil
 }
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package color
+package shading
 
 import (
 	"errors"
@@ -22,11 +22,13 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// ShadingType1 represents a type 1 (function-based) shading.
-type ShadingType1 struct {
-	ColorSpace Space
+// Type1 represents a type 1 (function-based) shading.
+type Type1 struct {
+	ColorSpace color.Space
 
 	// F is either 2->n function or an array of n 2->1 functions, where n is
 	// the number of colour components of the ColorSpace.
@@ -42,14 +44,14 @@ type ShadingType1 struct {
 }
 
 // Embed implements the [Shading] interface.
-func (s *ShadingType1) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*EmbeddedShading, error) {
+func (s *Type1) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*graphics.Shading, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
-	} else if isPattern(s.ColorSpace) {
+	} else if color.IsPattern(s.ColorSpace) {
 		return nil, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
-		want := len(s.ColorSpace.defaultColor().values())
+		want := color.NumValues(s.ColorSpace)
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
@@ -60,7 +62,7 @@ func (s *ShadingType1) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*E
 	case nil:
 		return nil, errors.New("missing Function")
 	case pdf.Array:
-		if len(F) != len(s.ColorSpace.defaultColor().values()) {
+		if len(F) != color.NumValues(s.ColorSpace) {
 			return nil, errors.New("invalid Function")
 		}
 	case pdf.Dict, pdf.Reference:
@@ -109,5 +111,5 @@ func (s *ShadingType1) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*E
 		data = ref
 	}
 
-	return &EmbeddedShading{pdf.Res{DefName: defName, Data: data}}, nil
+	return &graphics.Shading{Res: pdf.Res{DefName: defName, Data: data}}, nil
 }

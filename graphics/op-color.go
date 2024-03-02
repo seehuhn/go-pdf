@@ -148,6 +148,10 @@ func (w *Writer) SetFillColor(c color.Color) {
 	}
 }
 
+type Shading struct {
+	pdf.Res
+}
+
 // DrawShading paints the given shading, subject to the current clipping path.
 // The current colour in the graphics state is neither used nor altered.
 //
@@ -156,7 +160,7 @@ func (w *Writer) SetFillColor(c color.Color) {
 // is ignored.
 //
 // This implements the "sh" graphics operator.
-func (w *Writer) DrawShading(shading *color.EmbeddedShading) {
+func (w *Writer) DrawShading(shading *Shading) {
 	if !w.isValid("DrawShading", objPage) {
 		return
 	}

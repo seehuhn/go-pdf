@@ -132,7 +132,7 @@ func (f *embeddedCFFSimple) Close() error {
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
-	info := EmbedInfoCFFSimple{
+	info := FontDictCFFSimple{
 		Font:      subsetSfnt,
 		SubsetTag: subsetTag,
 		Encoding:  subsetCFF.Encoding,
@@ -141,8 +141,8 @@ func (f *embeddedCFFSimple) Close() error {
 	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
-// EmbedInfoCFFSimple is the information needed to embed a simple OpenType/CFF font.
-type EmbedInfoCFFSimple struct {
+// FontDictCFFSimple is the information needed to embed a simple OpenType/CFF font.
+type FontDictCFFSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -162,13 +162,13 @@ type EmbedInfoCFFSimple struct {
 }
 
 // ExtractCFFSimple extracts information about a simple OpenType/CFF font.
-// This is the inverse of [EmbedInfoCFFSimple.Embed].
-func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, error) {
+// This is the inverse of [FontDictCFFSimple.Embed].
+func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictCFFSimple, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeCFFSimple); err != nil {
 		return nil, err
 	}
 
-	res := &EmbedInfoCFFSimple{}
+	res := &FontDictCFFSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
 	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
@@ -240,8 +240,9 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoCFFSimple, err
 }
 
 // Embed adds the font to a PDF file.
+// This implements the [font.Dict] interface.
 // This is the reverse of [ExtractCFFSimple]
-func (info *EmbedInfoCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return err

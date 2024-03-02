@@ -16,17 +16,15 @@
 
 package image
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
+)
 
 // Image represents a raster image which can be embedded in a PDF file.
 type Image interface {
-	Embed(w pdf.Putter, defaultName pdf.Name) (*Embedded, error)
+	Embed(w pdf.Putter, defaultName pdf.Name) (*graphics.XObject, error)
 	Bounds() Rectangle
-}
-
-// Embedded represents a raster image which has been embedded in a PDF file.
-type Embedded struct {
-	pdf.Res
 }
 
 // Rectangle gives the dimensions of an image.

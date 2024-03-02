@@ -49,7 +49,7 @@ func TestRoundTripCFFSimple(t *testing.T) {
 	}
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 
-	info1 := &opentype.EmbedInfoCFFSimple{
+	info1 := &opentype.FontDictCFFSimple{
 		Font:      otf,
 		SubsetTag: "UVWXYZ",
 		Encoding:  encoding,
@@ -95,7 +95,7 @@ func TestRoundTripCFFSimple(t *testing.T) {
 		t.Errorf("info1.Font.CapHeight != info2.Font.CapHeight: %f != %f", info1.Font.CapHeight.AsFloat(q), info2.Font.CapHeight.AsFloat(q))
 	}
 
-	for _, info := range []*opentype.EmbedInfoCFFSimple{info1, info2} {
+	for _, info := range []*opentype.FontDictCFFSimple{info1, info2} {
 		info.Encoding = nil // already compared above
 
 		info.Font.Ascent = 0    // already compared above

@@ -94,7 +94,7 @@ func doit() error {
 		title := s.title
 		intro := s.lines
 
-		var X font.Embedder
+		var X font.Font
 		var ffKey pdf.Name
 		composite := false
 		switch title {
@@ -331,7 +331,7 @@ func doit() error {
 	return nil
 }
 
-func writeSinglePage(F font.Embedder, no int) error {
+func writeSinglePage(F font.Font, no int) error {
 	fname := fmt.Sprintf("fonts%02d.pdf", no)
 
 	page, err := document.CreateSinglePage(fname, document.A5r, nil)

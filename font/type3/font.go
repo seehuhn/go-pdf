@@ -329,7 +329,7 @@ type EmbedInfo struct {
 	ToUnicode *cmap.ToUnicode
 }
 
-// Embed implements the [font.Font] interface.
+// Embed implements the [font.Dict] interface.
 func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	if len(info.FontMatrix) != 6 {
 		return errors.New("invalid font matrix")

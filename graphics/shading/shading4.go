@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package color
+package shading
 
 import (
 	"errors"
@@ -23,16 +23,18 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// ShadingType4 represents a type 4 (free-form Gouraud-shaded triangle mesh) shading.
-type ShadingType4 struct {
-	ColorSpace        Space
+// Type4 represents a type 4 (free-form Gouraud-shaded triangle mesh) shading.
+type Type4 struct {
+	ColorSpace        color.Space
 	BitsPerCoordinate int
 	BitsPerComponent  int
 	BitsPerFlag       int
 	Decode            []float64
-	Vertices          []ShadingType4Vertex
+	Vertices          []Type4Vertex
 
 	F          function.Func
 	Background []float64
@@ -40,21 +42,21 @@ type ShadingType4 struct {
 	AntiAlias  bool
 }
 
-// ShadingType4Vertex represents a single vertex in a type 4 shading.
-type ShadingType4Vertex struct {
+// Type4Vertex represents a single vertex in a type 4 shading.
+type Type4Vertex struct {
 	X, Y  float64
 	Flag  uint8
 	Color []float64
 }
 
 // Embed implements the [Shading] interface.
-func (s *ShadingType4) Embed(w pdf.Putter, _ bool, defName pdf.Name) (*EmbeddedShading, error) {
+func (s *Type4) Embed(w pdf.Putter, _ bool, defName pdf.Name) (*graphics.Shading, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
-	} else if isPattern(s.ColorSpace) {
+	} else if color.IsPattern(s.ColorSpace) {
 		return nil, errors.New("invalid ColorSpace")
 	}
-	numComponents := len(s.ColorSpace.defaultColor().values())
+	numComponents := color.NumValues(s.ColorSpace)
 	if have := len(s.Background); have > 0 {
 		if have != numComponents {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
@@ -103,7 +105,7 @@ func (s *ShadingType4) Embed(w pdf.Putter, _ bool, defName pdf.Name) (*EmbeddedS
 				i, numValues, have)
 		}
 	}
-	if s.F != nil && isIndexed(s.ColorSpace) {
+	if s.F != nil && color.IsIndexed(s.ColorSpace) {
 		return nil, errors.New("Function not allowed for indexed color space")
 	}
 
@@ -191,5 +193,5 @@ func (s *ShadingType4) Embed(w pdf.Putter, _ bool, defName pdf.Name) (*EmbeddedS
 		return nil, err
 	}
 
-	return &EmbeddedShading{pdf.Res{DefName: defName, Data: ref}}, nil
+	return &graphics.Shading{Res: pdf.Res{DefName: defName, Data: ref}}, nil
 }

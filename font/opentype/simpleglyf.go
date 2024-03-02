@@ -129,7 +129,7 @@ func (f *embeddedGlyfSimple) Close() error {
 	toUnicode := cmap.NewToUnicode(charcode.Simple, m)
 	// TODO(voss): check whether a ToUnicode CMap is actually needed
 
-	info := EmbedInfoGlyfSimple{
+	info := FontDictGlyfSimple{
 		Font:      subsetOTF,
 		SubsetTag: subsetTag,
 		Encoding:  subsetEncoding,
@@ -138,8 +138,8 @@ func (f *embeddedGlyfSimple) Close() error {
 	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
-// EmbedInfoGlyfSimple is the information needed to embed a simple OpenType/glyf font.
-type EmbedInfoGlyfSimple struct {
+// FontDictGlyfSimple is the information needed to embed a simple OpenType/glyf font.
+type FontDictGlyfSimple struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -162,7 +162,9 @@ type EmbedInfoGlyfSimple struct {
 }
 
 // Embed adds the font to a PDF file.
-func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+//
+// This implements the [font.Dict] interface.
+func (info *FontDictGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return err
@@ -294,12 +296,12 @@ func (info *EmbedInfoGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) 
 }
 
 // ExtractGlyfSimple extracts information about a simple OpenType font.
-func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfSimple, error) {
+func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictGlyfSimple, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeGlyfSimple); err != nil {
 		return nil, err
 	}
 
-	res := &EmbedInfoGlyfSimple{}
+	res := &FontDictGlyfSimple{}
 
 	baseFont, _ := pdf.GetName(r, dicts.FontDict["BaseFont"])
 	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {

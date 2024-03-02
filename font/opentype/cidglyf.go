@@ -140,7 +140,7 @@ func (f *embeddedGlyfComposite) Close() error {
 		cidToGID[m[origGID]] = glyph.ID(subsetGID)
 	}
 
-	info := EmbedInfoGlyfComposite{
+	info := FontDictGlyfComposite{
 		Font:      subsetOTF,
 		SubsetTag: subsetTag,
 		CMap:      cmapInfo,
@@ -150,8 +150,8 @@ func (f *embeddedGlyfComposite) Close() error {
 	return info.Embed(f.w, f.Data.(pdf.Reference))
 }
 
-// EmbedInfoGlyfComposite is the information needed to embed a composite OpenType/glyf font.
-type EmbedInfoGlyfComposite struct {
+// FontDictGlyfComposite is the information needed to embed a composite OpenType/glyf font.
+type FontDictGlyfComposite struct {
 	// Font is the font to embed (already subsetted, if needed).
 	Font *sfnt.Font
 
@@ -173,7 +173,9 @@ type EmbedInfoGlyfComposite struct {
 }
 
 // Embed adds the font to the PDF file.
-func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+//
+// This implements the [font.Dict] interface.
+func (info *FontDictGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return err
@@ -359,11 +361,11 @@ func (info *EmbedInfoGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Referenc
 }
 
 // ExtractGlyfComposite extracts information for a composite OpenType/glyf font.
-func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*EmbedInfoGlyfComposite, error) {
+func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictGlyfComposite, error) {
 	if err := dicts.Type.MustBe(font.OpenTypeGlyfComposite); err != nil {
 		return nil, err
 	}
-	res := &EmbedInfoGlyfComposite{}
+	res := &FontDictGlyfComposite{}
 
 	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
 	if err != nil {

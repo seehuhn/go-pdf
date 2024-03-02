@@ -374,7 +374,7 @@ func (f FilterLZW) Decode(v Version, r io.Reader) (io.Reader, error) {
 	return ff.Decode(r)
 }
 
-func (f FilterLZW) parseParameters(v Version) (*flateFilter, error) {
+func (f FilterLZW) parseParameters(_ Version) (*flateFilter, error) {
 	res := &flateFilter{ // set defaults
 		Predictor:        1,
 		Colors:           1,

@@ -59,7 +59,7 @@ func run(fname string) error {
 	page.PushGraphicsState()
 	page.Transform(matrix.Translate(left, bottom))
 	page.Transform(matrix.Scale(width, height))
-	page.DrawImage(img)
+	page.DrawXObject(img)
 	page.PopGraphicsState()
 
 	roman, err := type1.TimesRoman.Embed(page.Out, &font.Options{ResName: "R"})

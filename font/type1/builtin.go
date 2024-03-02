@@ -26,6 +26,11 @@ import (
 	"seehuhn.de/go/pdf/font/loader"
 )
 
+// TODO(voss): Find a way to optionally embed the PostScript font program for
+// the 14 built-in PDF fonts for PDF versions before PDF-2.0.
+
+// TODO(voss): if font.Options lists the relevant features, enable ligatures.
+
 // Builtin is one of the 14 built-in PDF fonts.
 type Builtin string
 
@@ -133,7 +138,7 @@ func (f Builtin) StandardWidths(encoding []string) []float64 {
 
 // The 14 built-in PDF fonts.
 //
-// All of these implement the [font.Font] interface.
+// All of these fonts implement the [font.Font] interface.
 const (
 	Courier              Builtin = "Courier"
 	CourierBold          Builtin = "Courier-Bold"
@@ -152,7 +157,8 @@ const (
 )
 
 // Standard contains the standard 14 PDF fonts.
-// All of these implement the [font.Embedder] interface.
+//
+// All of these fonts implement the [font.Font] interface.
 var Standard = []Builtin{
 	Courier,
 	CourierBold,

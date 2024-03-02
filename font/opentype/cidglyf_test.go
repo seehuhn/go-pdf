@@ -63,7 +63,7 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		CID2GID[cid] = glyph.ID(cid)
 	}
 
-	info1 := &opentype.EmbedInfoGlyfComposite{
+	info1 := &opentype.FontDictGlyfComposite{
 		Font:       ttf,
 		SubsetTag:  "ZZZZZZ",
 		CMap:       cmapInfo,
@@ -88,7 +88,7 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, info := range []*opentype.EmbedInfoGlyfComposite{info1, info2} {
+	for _, info := range []*opentype.FontDictGlyfComposite{info1, info2} {
 		info.Font.CMapTable = nil // "cmap" table is optional
 
 		info.Font.FamilyName = ""        // "name" table is optional

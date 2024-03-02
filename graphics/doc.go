@@ -19,7 +19,7 @@
 // The main functionality of this package is provided by the [Writer] type.
 // New Writer objects are created using the [NewWriter] function.
 // The methods of the Writer type allow to write PDF content streams.
-// Errors are reported using the [Writer.Err] field.  Once an error has
+// Errors are reported using the `Writer.Err` field.  Once an error has
 // been reported, all writer methods will return immediately without
 // doing anything.
 //

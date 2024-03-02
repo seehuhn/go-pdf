@@ -26,7 +26,7 @@
 //   - Type 1 fonts (.pfa or .pfb files, optionally with the corresponding .afm files)
 //   - Type 3 fonts (glyphs drawn using PDF commands)
 //
-// Normally, fonts are embedded using the convenience functions in the
+// Normally, fonts are embedded using the convenience functions in
 // [seehuhn.de/go/pdf/font/embed].
 // If more control is needed, the following functions can be used for the
 // different ways of embedding fonts into PDF files as simple fonts:
@@ -43,7 +43,7 @@
 //
 // # Data Types for Representing Fonts
 //
-//   - An [Embedder] represents a font before it is embedded into a PDF file.
+//   - An [Font] represents a font before it is embedded into a PDF file.
 //   - A [Layouter] is a font which is embedded and ready to typeset text.
 //   - The type [Embedded] represents the minimum information about a font
 //     required so that a PDF file can be parsed (but no text can be typeset).
