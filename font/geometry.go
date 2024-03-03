@@ -70,3 +70,25 @@ func (g *Geometry) BoundingBox(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
 	}
 	return res
 }
+
+// IsFixedPitch returns true if all glyphs in the font have the same width.
+func (g *Geometry) IsFixedPitch() bool {
+	ww := g.Widths
+	if len(ww) == 0 {
+		return false
+	}
+
+	var width float64
+	for _, w := range ww {
+		if w == 0 {
+			continue
+		}
+		if width == 0 {
+			width = w
+		} else if width != w {
+			return false
+		}
+	}
+
+	return true
+}

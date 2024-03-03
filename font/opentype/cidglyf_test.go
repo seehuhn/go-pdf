@@ -90,6 +90,9 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 
 	for _, info := range []*opentype.FontDictGlyfComposite{info1, info2} {
 		info.Font.CMapTable = nil // "cmap" table is optional
+		info.Font.Gdef = nil      // not included in PDF
+		info.Font.Gsub = nil      // not included in PDF
+		info.Font.Gpos = nil      // not included in PDF
 
 		info.Font.FamilyName = ""        // "name" table is optional
 		info.Font.Width = 0              // "OS/2" table is optional

@@ -47,8 +47,10 @@ func TestTextLayout1(t *testing.T) {
 		" ",
 		"ABC",
 		"Hello World",
-		"flower", // ligature
-		"fish",   // ligature
+		"flower", // typeset as ligature
+		"fish",   // typeset as ligature
+		"ﬂower",  // ligature in source text
+		"ﬁsh",    // ligature in source text
 	}
 	for _, s := range testCases {
 		gg, err := out.TextLayout(s)

@@ -94,6 +94,9 @@ func TestRoundTripSimple(t *testing.T) {
 	for _, info := range []*truetype.FontDictSimple{info1, info2} {
 		info.Encoding = nil       // already compared above
 		info.Font.CMapTable = nil // already tested when comparing the encodings
+		info.Font.Gdef = nil      // not included in PDF
+		info.Font.Gsub = nil      // not included in PDF
+		info.Font.Gpos = nil      // not included in PDF
 
 		info.Font.CapHeight = 0 // already compared above
 
