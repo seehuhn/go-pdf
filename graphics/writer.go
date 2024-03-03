@@ -48,11 +48,6 @@ type catRes struct {
 	res pdf.Resource
 }
 
-type catName struct {
-	cat  resourceCategory
-	name pdf.Name
-}
-
 type resourceCategory byte
 
 // The valid resource categories.

@@ -33,33 +33,72 @@ import (
 // TestTextLayout1 tests that no text content is lost when a glyph sequence
 // is laid out.
 func TestTextLayout1(t *testing.T) {
-	v := pdf.V2_0
-	data := pdf.NewData(v)
-	F, err := gofont.GoRegular.Embed(data, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := graphics.NewWriter(io.Discard, v)
-	out.TextSetFont(F, 10)
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			data := pdf.NewData(v)
+			F, err := gofont.GoRegular.Embed(data, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := graphics.NewWriter(io.Discard, v)
+			out.TextSetFont(F, 10)
 
-	var testCases = []string{
-		"",
-		" ",
-		"ABC",
-		"Hello World",
-		"flower", // typeset as ligature
-		"fish",   // typeset as ligature
-		"ﬂower",  // ligature in source text
-		"ﬁsh",    // ligature in source text
+			var testCases = []string{
+				"",
+				" ",
+				"ABC",
+				"Hello World",
+				"flower", // typeset as ligature
+				"fish",   // typeset as ligature
+				"ﬂower",  // ligature in source text
+				"ﬁsh",    // ligature in source text
+			}
+			for _, s := range testCases {
+				gg, err := out.TextLayout(s)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if gg.Text() != s {
+					t.Errorf("wrong text: %s != %s", gg.Text(), s)
+				}
+			}
+		})
 	}
-	for _, s := range testCases {
-		gg, err := out.TextLayout(s)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if gg.Text() != s {
-			t.Errorf("wrong text: %s != %s", gg.Text(), s)
-		}
+}
+
+// TestTextLayout2 tests that ligatures are disabled when character spacing is
+// non-zero.
+func TestTextLayout2(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			data := pdf.NewData(v)
+			F, err := gofont.GoRegular.Embed(data, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := graphics.NewWriter(io.Discard, v)
+			out.TextSetFont(F, 10)
+
+			// First make sure the font uses ligatures:
+			gg, err := out.TextLayout("fi")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(gg.Seq) != 1 {
+				t.Fatal("test is broken")
+			}
+
+			// Then make sure that ligatures are disabled when character
+			// spacing is non-zero:
+			out.TextSetCharacterSpacing(1)
+			gg, err = out.TextLayout("fi")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(gg.Seq) != 2 {
+				t.Error("ligatures not disabled")
+			}
+		})
 	}
 }
 
