@@ -31,17 +31,34 @@ import (
 // functions from "op-text.go".
 
 // TextLayout returns the glyph sequence for a string.
-func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
-	if err := w.mustBeSet(StateTextFont); err != nil {
-		return nil, err
+//
+// If no font is set, or if the current font does not support layouting,
+// this function returns nil.
+func (w *Writer) TextLayout(s string) *font.GlyphSeq {
+	if !w.isSet(StateTextFont) {
+		return nil
 	}
 	F, ok := w.State.TextFont.(font.Layouter)
 	if !ok {
-		return nil, errors.New("font does not support layouting")
+		return nil
+	}
+
+	var characterSpacing, wordSpacing, horizontalScaling, textRise float64
+	if w.isSet(StateTextCharacterSpacing) {
+		characterSpacing = w.TextCharacterSpacing
+	}
+	if w.isSet(StateTextWordSpacing) {
+		wordSpacing = w.TextWordSpacing
+	}
+	if w.isSet(StateTextHorizontalScaling) {
+		horizontalScaling = w.TextHorizontalScaling
+	}
+	if w.isSet(StateTextRise) {
+		textRise = w.TextRise
 	}
 
 	var gg *font.GlyphSeq
-	if w.TextCharacterSpacing == 0 {
+	if characterSpacing == 0 {
 		gg = F.Layout(w.TextFontSize, s)
 	} else {
 		// disable ligatures
@@ -55,15 +72,15 @@ func (w *Writer) TextLayout(s string) (*font.GlyphSeq, error) {
 	// Apply PDF layout parameters
 	for i, g := range gg.Seq {
 		advance := g.Advance
-		advance += w.TextCharacterSpacing
+		advance += characterSpacing
 		if string(g.Text) == " " {
-			advance += w.TextWordSpacing
+			advance += wordSpacing
 		}
-		gg.Seq[i].Advance = advance * w.TextHorizontalScaling
-		gg.Seq[i].Rise = w.TextRise
+		gg.Seq[i].Advance = advance * horizontalScaling
+		gg.Seq[i].Rise = textRise
 	}
 
-	return gg, nil
+	return gg
 }
 
 // TextShow draws a string.
@@ -76,9 +93,9 @@ func (w *Writer) TextShow(s string) float64 {
 		return 0
 	}
 
-	gg, err := w.TextLayout(s)
-	if err != nil {
-		w.Err = err
+	gg := w.TextLayout(s)
+	if gg == nil {
+		w.Err = errors.New("font does not support layouting")
 		return 0
 	}
 	return w.TextShowGlyphs(gg)
@@ -201,9 +218,9 @@ func (w *Writer) TextShowAligned(s string, width, q float64) {
 	if !w.isValid("TextShowAligned", objText) {
 		return
 	}
-	gg, err := w.TextLayout(s)
-	if err != nil {
-		w.Err = err
+	gg := w.TextLayout(s)
+	if gg == nil {
+		w.Err = errors.New("font does not support layouting")
 		return
 	}
 	gg.Align(width, q)

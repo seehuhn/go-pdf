@@ -76,10 +76,7 @@ func run() error {
 	page.TextStart()
 	page.TextSetFont(F, 10)
 	page.TextFirstLine(72, yPos)
-	gg, err := page.TextLayout("code used in WinAnsi encoding:")
-	if err != nil {
-		return err
-	}
+	gg := page.TextLayout("code used in WinAnsi encoding:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
 	page.TextSetFont(D, 10)
@@ -91,10 +88,7 @@ func run() error {
 
 	page.TextSecondLine(0, -20)
 	page.TextSetFont(F, 10)
-	gg, err = page.TextLayout("remapped code:")
-	if err != nil {
-		return err
-	}
+	gg = page.TextLayout("remapped code:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
 	page.TextSetFont(D, 10)
@@ -106,10 +100,7 @@ func run() error {
 
 	page.TextNextLine()
 	page.TextSetFont(F, 10)
-	gg, err = page.TextLayout("space character:")
-	if err != nil {
-		return err
-	}
+	gg = page.TextLayout("space character:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
 	page.TextSetFont(D, 10)
@@ -121,10 +112,7 @@ func run() error {
 
 	page.TextNextLine()
 	page.TextSetFont(F, 10)
-	gg, err = page.TextLayout("code mapped to non-existent character:")
-	if err != nil {
-		return err
-	}
+	gg = page.TextLayout("code mapped to non-existent character:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
 	page.TextSetFont(D, 10)
@@ -136,10 +124,7 @@ func run() error {
 
 	page.TextNextLine()
 	page.TextSetFont(F, 10)
-	gg, err = page.TextLayout("unmapped code:")
-	if err != nil {
-		return err
-	}
+	gg = page.TextLayout("unmapped code:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
 	page.TextSetFont(D, 10)

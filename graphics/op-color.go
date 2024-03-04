@@ -148,6 +148,10 @@ func (w *Writer) SetFillColor(c color.Color) {
 	}
 }
 
+// Shading represents a PDF shading dictionary.
+//
+// Shadings can either be drawn to the page using the [DrawShading] method,
+// or can be used as the basis of a shading pattern.
 type Shading struct {
 	pdf.Res
 }

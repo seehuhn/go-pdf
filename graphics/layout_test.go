@@ -54,9 +54,9 @@ func TestTextLayout1(t *testing.T) {
 				"ﬁsh",    // ligature in source text
 			}
 			for _, s := range testCases {
-				gg, err := out.TextLayout(s)
-				if err != nil {
-					t.Fatal(err)
+				gg := out.TextLayout(s)
+				if gg == nil {
+					t.Fatal("typesetting failed")
 				}
 				if gg.Text() != s {
 					t.Errorf("wrong text: %s != %s", gg.Text(), s)
@@ -80,9 +80,9 @@ func TestTextLayout2(t *testing.T) {
 			out.TextSetFont(F, 10)
 
 			// First make sure the font uses ligatures:
-			gg, err := out.TextLayout("fi")
-			if err != nil {
-				t.Fatal(err)
+			gg := out.TextLayout("fi")
+			if gg == nil {
+				t.Fatal("typesetting failed")
 			}
 			if len(gg.Seq) != 1 {
 				t.Fatal("test is broken")
@@ -91,9 +91,9 @@ func TestTextLayout2(t *testing.T) {
 			// Then make sure that ligatures are disabled when character
 			// spacing is non-zero:
 			out.TextSetCharacterSpacing(1)
-			gg, err = out.TextLayout("fi")
-			if err != nil {
-				t.Fatal(err)
+			gg = out.TextLayout("fi")
+			if gg == nil {
+				t.Fatal("layout failed")
 			}
 			if len(gg.Seq) != 2 {
 				t.Error("ligatures not disabled")

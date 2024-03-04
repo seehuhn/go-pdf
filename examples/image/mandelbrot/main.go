@@ -75,10 +75,7 @@ func run(fname string) error {
 	page.TextSetFont(bold, 10)
 	page.TextShow("Figure 1.")
 	page.TextSetFont(roman, 10)
-	gg, err := page.TextLayout(" A graphical depiction of the Mandelbrot set.")
-	if err != nil {
-		return err
-	}
+	gg := page.TextLayout(" A graphical depiction of the Mandelbrot set.")
 	// make the leading space wider than normal
 	gg.Seq[0].Advance = gg.Seq[0].Advance * 3
 	page.TextShowGlyphs(gg)
