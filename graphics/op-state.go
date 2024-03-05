@@ -265,7 +265,7 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 		w.Err = &pdf.VersionError{Operation: "SetExtGState", Earliest: pdf.V1_2}
 	}
 
-	s.Value.ApplyTo(&w.State)
+	s.Value.CopyTo(&w.State)
 
 	name := w.getResourceName(catExtGState, s)
 	err := name.PDF(w.Content)

@@ -17,6 +17,7 @@
 package graphics
 
 import (
+	"fmt"
 	"math/bits"
 	"slices"
 
@@ -168,7 +169,7 @@ var stateNames = []string{
 	"LineCap",
 	"LineJoin",
 	"MiterLimit",
-	"Dash",
+	"LineDash",
 	"RenderingIntent",
 	"StrokeAdjustment",
 	"BlendMode",
@@ -201,9 +202,17 @@ const (
 		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
 		StateFlatnessTolerance
 
-	// extStateBits lists the parameters which can be encoded in an ExtGState
-	// resource.
-	extStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
+	// OpStateBits list the graphical parameters which can be set using
+	// graphics operators.
+	OpStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
+		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading |
+		StateTextFont | StateTextRenderingMode | StateTextRise |
+		StateLineWidth | StateLineCap | StateLineJoin | StateMiterLimit |
+		StateLineDash | StateRenderingIntent | StateFlatnessTolerance
+
+	// ExtGStateBits lists the graphical parameters which can be encoded in an
+	// ExtGState resource.
+	ExtGStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
 		StateLineCap | StateLineJoin | StateMiterLimit | StateLineDash |
 		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
 		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
@@ -293,8 +302,8 @@ func (s *State) mustBeSet(bits StateBits) error {
 	return errMissingState(missing)
 }
 
-// ApplyTo applies the graphics state parameters to the given state.
-func (s State) ApplyTo(other *State) {
+// CopyTo applies the graphics state parameters to the given state.
+func (s State) CopyTo(other *State) {
 	set := s.Set
 	other.Set |= set
 
@@ -376,6 +385,120 @@ func (s State) ApplyTo(other *State) {
 	if set&StateSmoothnessTolerance != 0 {
 		otherParam.SmoothnessTolerance = param.SmoothnessTolerance
 	}
+}
+
+// ApplyTo calls methods of the Writer to set the graphics state to the state
+// described by s.
+func (s State) ApplyTo(w *Writer) {
+	if w.Err != nil {
+		return
+	}
+	if excess := s.Set & ^OpStateBits; excess != 0 {
+		k := bits.TrailingZeros64(uint64(excess))
+		w.Err = fmt.Errorf("ApplyTo: " + stateNames[k] + " not allowed")
+	}
+	if s.isSet(StateStrokeColor) {
+		w.SetStrokeColor(s.StrokeColor)
+	}
+	if s.isSet(StateFillColor) {
+		w.SetFillColor(s.FillColor)
+	}
+	if s.isSet(StateTextCharacterSpacing) {
+		w.TextSetCharacterSpacing(s.TextCharacterSpacing)
+	}
+	if s.isSet(StateTextWordSpacing) {
+		w.TextSetWordSpacing(s.TextWordSpacing)
+	}
+	if s.isSet(StateTextHorizontalScaling) {
+		w.TextSetHorizontalScaling(s.TextHorizontalScaling)
+	}
+	if s.isSet(StateTextLeading) {
+		w.TextSetLeading(s.TextLeading)
+	}
+	if s.isSet(StateTextFont) {
+		w.TextSetFont(s.TextFont, s.TextFontSize)
+	}
+	if s.isSet(StateTextRenderingMode) {
+		w.TextSetRenderingMode(s.TextRenderingMode)
+	}
+	if s.isSet(StateTextRise) {
+		w.TextSetRise(s.TextRise)
+	}
+	if s.isSet(StateLineWidth) {
+		w.SetLineWidth(s.LineWidth)
+	}
+	if s.isSet(StateLineCap) {
+		w.SetLineCap(s.LineCap)
+	}
+	if s.isSet(StateLineJoin) {
+		w.SetLineJoin(s.LineJoin)
+	}
+	if s.isSet(StateMiterLimit) {
+		w.SetMiterLimit(s.MiterLimit)
+	}
+	if s.isSet(StateLineDash) {
+		w.SetLineDash(s.DashPattern, s.DashPhase)
+	}
+	if s.isSet(StateRenderingIntent) {
+		w.SetRenderingIntent(s.RenderingIntent)
+	}
+	if s.isSet(StateFlatnessTolerance) {
+		w.SetFlatnessTolerance(s.FlatnessTolerance)
+	}
+}
+
+// TextLayout returns the glyph sequence for a string, using the text
+// parameters from the given graphics state.
+//
+// If no font is set, or if the current font does not support layouting,
+// this function returns nil.
+func (s State) TextLayout(text string) *font.GlyphSeq {
+	if !s.isSet(StateTextFont) {
+		return nil
+	}
+	F, ok := s.TextFont.(font.Layouter)
+	if !ok {
+		return nil
+	}
+
+	var characterSpacing, wordSpacing, horizontalScaling, textRise float64
+	if s.isSet(StateTextCharacterSpacing) {
+		characterSpacing = s.TextCharacterSpacing
+	}
+	if s.isSet(StateTextWordSpacing) {
+		wordSpacing = s.TextWordSpacing
+	}
+	if s.isSet(StateTextHorizontalScaling) {
+		horizontalScaling = s.TextHorizontalScaling
+	}
+	if s.isSet(StateTextRise) {
+		textRise = s.TextRise
+	}
+
+	var gg *font.GlyphSeq
+	if characterSpacing == 0 {
+		gg = F.Layout(s.TextFontSize, text)
+	} else {
+		// disable ligatures
+		gg = &font.GlyphSeq{}
+		for _, r := range text {
+			next := F.Layout(s.TextFontSize, string(r))
+			gg.Append(next)
+		}
+	}
+
+	// Apply PDF layout parameters
+	for i, g := range gg.Seq {
+		advance := g.Advance
+		advance += characterSpacing
+		if string(g.Text) == " " {
+			advance += wordSpacing
+		}
+		gg.Seq[i].Advance = advance * horizontalScaling
+		gg.Seq[i].Rise = textRise
+	}
+
+	return gg
 }
 
 type errMissingState StateBits

@@ -30,59 +30,6 @@ import (
 // These functions first convert Go strings to PDF strings and then call the
 // functions from "op-text.go".
 
-// TextLayout returns the glyph sequence for a string.
-//
-// If no font is set, or if the current font does not support layouting,
-// this function returns nil.
-func (w *Writer) TextLayout(s string) *font.GlyphSeq {
-	if !w.isSet(StateTextFont) {
-		return nil
-	}
-	F, ok := w.State.TextFont.(font.Layouter)
-	if !ok {
-		return nil
-	}
-
-	var characterSpacing, wordSpacing, horizontalScaling, textRise float64
-	if w.isSet(StateTextCharacterSpacing) {
-		characterSpacing = w.TextCharacterSpacing
-	}
-	if w.isSet(StateTextWordSpacing) {
-		wordSpacing = w.TextWordSpacing
-	}
-	if w.isSet(StateTextHorizontalScaling) {
-		horizontalScaling = w.TextHorizontalScaling
-	}
-	if w.isSet(StateTextRise) {
-		textRise = w.TextRise
-	}
-
-	var gg *font.GlyphSeq
-	if characterSpacing == 0 {
-		gg = F.Layout(w.TextFontSize, s)
-	} else {
-		// disable ligatures
-		gg = &font.GlyphSeq{}
-		for _, r := range s {
-			next := F.Layout(w.TextFontSize, string(r))
-			gg.Append(next)
-		}
-	}
-
-	// Apply PDF layout parameters
-	for i, g := range gg.Seq {
-		advance := g.Advance
-		advance += characterSpacing
-		if string(g.Text) == " " {
-			advance += wordSpacing
-		}
-		gg.Seq[i].Advance = advance * horizontalScaling
-		gg.Seq[i].Rise = textRise
-	}
-
-	return gg
-}
-
 // TextShow draws a string.
 func (w *Writer) TextShow(s string) float64 {
 	if !w.isValid("TextShow", objText) {

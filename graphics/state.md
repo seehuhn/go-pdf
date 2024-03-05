@@ -27,10 +27,10 @@ List of all parameters
 | StateFillColor              | ...                | -              | various operators                 |
 | StateTextCharacterSpacing   | Tc                 | -              |                                   |
 | StateTextWordSpacing        | Tw                 | -              |                                   |
-| StateTorizontalScaling      | Th                 | -              |                                   |
+| StateTextHorizontalScaling  | Th                 | -              |                                   |
 | StateTextLeading            | TL, TD, T*         | -              |                                   |
-| StateFont                   | Tf                 | Font           |                                   |
-| StateTmode                  | Tr                 | -              |                                   |
+| StateTextFont               | Tf                 | Font           |                                   |
+| StateTextRenderingMode      | Tr                 | -              |                                   |
 | StateTextRise               | Ts                 | -              |                                   |
 | StateTextKnockout           | -                  | TK             |                                   |
 | StateTextMatrix             | Td, TD, Tm, T*, ...| -              | text matrix (text showing ops)    |

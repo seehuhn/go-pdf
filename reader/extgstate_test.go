@@ -139,7 +139,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	s3 := graphics.State{Parameters: &graphics.Parameters{}}
-	ext2.Value.ApplyTo(&s3)
+	ext2.Value.CopyTo(&s3)
 	if d := cmp.Diff(s1, s3, cmpFDSelectFn, cmpFont); d != "" {
 		t.Error(d)
 	}

@@ -39,7 +39,7 @@ type ExtGState struct {
 // object, an error is returned.
 func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 	set := s.Set
-	if set & ^extStateBits != 0 {
+	if set & ^ExtGStateBits != 0 {
 		return nil, errors.New("invalid states for ExtGState")
 	}
 
