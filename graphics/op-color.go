@@ -150,8 +150,8 @@ func (w *Writer) SetFillColor(c color.Color) {
 
 // Shading represents a PDF shading dictionary.
 //
-// Shadings can either be drawn to the page using the [DrawShading] method,
-// or can be used as the basis of a shading pattern.
+// Shadings can either be drawn to the page using the [Writer.DrawShading]
+// method, or can be used as the basis of a shading pattern.
 type Shading struct {
 	pdf.Res
 }
@@ -163,7 +163,7 @@ type Shading struct {
 // current user space. The "Background" entry in the shading pattern (if any)
 // is ignored.
 //
-// This implements the "sh" graphics operator.
+// This implements the PDF graphics operator "sh".
 func (w *Writer) DrawShading(shading *Shading) {
 	if !w.isValid("DrawShading", objPage) {
 		return

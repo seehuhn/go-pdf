@@ -470,6 +470,8 @@ func (s State) TextLayout(text string) *font.GlyphSeq {
 	}
 	if s.isSet(StateTextHorizontalScaling) {
 		horizontalScaling = s.TextHorizontalScaling
+	} else {
+		horizontalScaling = 1
 	}
 	if s.isSet(StateTextRise) {
 		textRise = s.TextRise

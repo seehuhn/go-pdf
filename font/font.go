@@ -91,6 +91,19 @@ func (s *GlyphSeq) Align(width float64, q float64) {
 	s.Seq[len(s.Seq)-1].Advance += extra * (1 - q)
 }
 
+// PadTo modifies s by adding space to the right so that the total width is
+// at least width.
+func (s *GlyphSeq) PadTo(width float64) {
+	if len(s.Seq) == 0 {
+		s.Skip = width
+		return
+	}
+	extra := width - s.TotalWidth()
+	if extra > 0 {
+		s.Seq[len(s.Seq)-1].Advance += extra
+	}
+}
+
 // Dict is the low-level interface to represent a font in a PDF file.
 type Dict interface {
 	Embed(w pdf.Putter, fontDictRef pdf.Reference) error

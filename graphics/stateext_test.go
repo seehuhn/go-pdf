@@ -18,6 +18,7 @@ package graphics_test
 
 import (
 	"io"
+	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -94,5 +95,53 @@ func TestTextLayout2(t *testing.T) {
 				t.Error("ligatures not disabled")
 			}
 		})
+	}
+}
+
+// TestTextLayout3 tests that the width of a glyph sequence scales
+// with the font size.
+func TestTextLayout3(t *testing.T) {
+	data := pdf.NewData(pdf.V2_0)
+	F, err := gofont.GoRegular.Embed(data, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := graphics.NewWriter(io.Discard, pdf.GetVersion(data))
+
+	out.TextSetFont(F, 10)
+	L1 := out.TextLayout("hello world!").TotalWidth()
+	out.TextSetFont(F, 20)
+	L2 := out.TextLayout("hello world!").TotalWidth()
+
+	if L1 <= 0 {
+		t.Fatalf("invalid width: %f", L1)
+	}
+	if math.Abs(L2/L1-2) > 0.05 {
+		t.Errorf("unexpected width ratio: %f/%f=%f", L2, L1, L2/L1)
+	}
+}
+
+// TestTextLayout4 tests that horizontal scaling has the correct default,
+// if the value is not set in the graphics state.
+func TestTextLayout4(t *testing.T) {
+	data := pdf.NewData(pdf.V2_0)
+	F, err := gofont.GoRegular.Embed(data, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := graphics.NewWriter(io.Discard, pdf.GetVersion(data))
+	out.TextSetFont(F, 10)
+
+	state := &graphics.State{Parameters: &graphics.Parameters{}}
+	state.TextFont = F
+	state.TextFontSize = 10
+	state.Set |= graphics.StateTextFont
+
+	L1 := out.TextLayout("hello world!").TotalWidth()
+	L2 := state.TextLayout("hello world!").TotalWidth()
+
+	if math.Abs(L2-L1) > 1e-6 {
+		t.Errorf("unexpected width: %f != %f", L2, L1)
 	}
 }
