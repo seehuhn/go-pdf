@@ -102,131 +102,11 @@ type Parameters struct {
 	SmoothnessTolerance float64
 }
 
-// StateBits is a bit mask for the fields of the State struct.
-type StateBits uint64
-
-// Possible values for StateBits.
-const (
-	// CTM is always set, so it is not included in the bit mask.
-	// ClippingPath is always set, so it is not included in the bit mask.
-
-	StateStrokeColor StateBits = 1 << iota
-	StateFillColor
-
-	StateTextCharacterSpacing
-	StateTextWordSpacing
-	StateTextHorizontalScaling
-	StateTextLeading
-	StateTextFont // includes size
-	StateTextRenderingMode
-	StateTextRise
-	StateTextKnockout
-
-	StateTextMatrix // text matrix and text line matrix
-
-	StateLineWidth
-	StateLineCap
-	StateLineJoin
-	StateMiterLimit
-	StateLineDash // pattern and phase
-
-	StateRenderingIntent
-	StateStrokeAdjustment
-	StateBlendMode
-	StateSoftMask
-	StateStrokeAlpha
-	StateFillAlpha
-	StateAlphaSourceFlag
-	StateBlackPointCompensation
-
-	StateOverprint
-	StateOverprintMode
-	StateBlackGeneration
-	StateUndercolorRemoval
-	StateTransferFunction
-	StateHalftone
-	StateHalftoneOrigin
-	StateFlatnessTolerance
-	StateSmoothnessTolerance
-
-	stateFirstUnused
-	AllStateBits = stateFirstUnused - 1
-)
-
-var stateNames = []string{
-	"StrokeColor",
-	"FillColor",
-	"TextCharacterSpacing",
-	"TextWordSpacing",
-	"TextHorizontalScaling",
-	"TextLeading",
-	"TextFont",
-	"TextRenderingMode",
-	"TextRise",
-	"TextKnockout",
-	"TextMatrix",
-	"LineWidth",
-	"LineCap",
-	"LineJoin",
-	"MiterLimit",
-	"LineDash",
-	"RenderingIntent",
-	"StrokeAdjustment",
-	"BlendMode",
-	"SoftMask",
-	"StrokeAlpha",
-	"FillAlpha",
-	"AlphaSourceFlag",
-	"BlackPointCompensation",
-	"Overprint",
-	"OverprintMode",
-	"BlackGeneration",
-	"UndercolorRemoval",
-	"TransferFunction",
-	"Halftone",
-	"HalftoneOrigin",
-	"FlatnessTolerance",
-	"SmoothnessTolerance",
+// Clone returns a shallow copy of the parameter vector.
+func (p *Parameters) Clone() *Parameters {
+	res := *p
+	return &res
 }
-
-const (
-	// initializedStateBits lists the parameters which are initialized to
-	// their default values in [NewState].
-	initializedStateBits = StateStrokeColor | StateFillColor |
-		StateTextCharacterSpacing | StateTextWordSpacing |
-		StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode |
-		StateTextRise | StateTextKnockout | StateLineWidth | StateLineCap |
-		StateLineJoin | StateMiterLimit | StateLineDash | StateRenderingIntent |
-		StateStrokeAdjustment | StateBlendMode | StateSoftMask |
-		StateStrokeAlpha | StateFillAlpha | StateAlphaSourceFlag |
-		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
-		StateFlatnessTolerance
-
-	// OpStateBits list the graphical parameters which can be set using
-	// graphics operators.
-	OpStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
-		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading |
-		StateTextFont | StateTextRenderingMode | StateTextRise |
-		StateLineWidth | StateLineCap | StateLineJoin | StateMiterLimit |
-		StateLineDash | StateRenderingIntent | StateFlatnessTolerance
-
-	// ExtGStateBits lists the graphical parameters which can be encoded in an
-	// ExtGState resource.
-	ExtGStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
-		StateLineCap | StateLineJoin | StateMiterLimit | StateLineDash |
-		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
-		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
-		StateAlphaSourceFlag | StateBlackPointCompensation | StateOverprint |
-		StateOverprintMode | StateBlackGeneration | StateUndercolorRemoval |
-		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
-		StateFlatnessTolerance | StateSmoothnessTolerance
-
-	// TODO(voss): update this once
-	// https://github.com/pdf-association/pdf-issues/issues/380
-	// is resolved
-	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateLineDash | StateStrokeColor
-	fillStateBits   = StateFillColor
-)
 
 // State represents the graphics state of a PDF processor.
 type State struct {
@@ -447,6 +327,17 @@ func (s State) ApplyTo(w *Writer) {
 	}
 }
 
+// GetTextPositionDevice returns the current text position in device coordinates.
+func (s State) GetTextPositionDevice() (float64, float64) {
+	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+		panic(err)
+	}
+	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M = M.Mul(s.TextMatrix)
+	M = M.Mul(s.CTM)
+	return M[4], M[5]
+}
+
 // TextLayout returns the glyph sequence for a string, using the text
 // parameters from the given graphics state.
 //
@@ -503,28 +394,137 @@ func (s State) TextLayout(text string) *font.GlyphSeq {
 	return gg
 }
 
+// StateBits is a bit mask for the fields of the State struct.
+type StateBits uint64
+
+// Possible values for StateBits.
+const (
+	// CTM is always set, so it is not included in the bit mask.
+	// ClippingPath is always set, so it is not included in the bit mask.
+
+	StateStrokeColor StateBits = 1 << iota
+	StateFillColor
+
+	StateTextCharacterSpacing
+	StateTextWordSpacing
+	StateTextHorizontalScaling
+	StateTextLeading
+	StateTextFont // includes size
+	StateTextRenderingMode
+	StateTextRise
+	StateTextKnockout
+
+	StateTextMatrix // text matrix and text line matrix
+
+	StateLineWidth
+	StateLineCap
+	StateLineJoin
+	StateMiterLimit
+	StateLineDash // pattern and phase
+
+	StateRenderingIntent
+	StateStrokeAdjustment
+	StateBlendMode
+	StateSoftMask
+	StateStrokeAlpha
+	StateFillAlpha
+	StateAlphaSourceFlag
+	StateBlackPointCompensation
+
+	StateOverprint
+	StateOverprintMode
+	StateBlackGeneration
+	StateUndercolorRemoval
+	StateTransferFunction
+	StateHalftone
+	StateHalftoneOrigin
+	StateFlatnessTolerance
+	StateSmoothnessTolerance
+
+	stateFirstUnused
+	AllStateBits = stateFirstUnused - 1
+)
+
+var stateNames = []string{
+	"StrokeColor",
+	"FillColor",
+	"TextCharacterSpacing",
+	"TextWordSpacing",
+	"TextHorizontalScaling",
+	"TextLeading",
+	"TextFont",
+	"TextRenderingMode",
+	"TextRise",
+	"TextKnockout",
+	"TextMatrix",
+	"LineWidth",
+	"LineCap",
+	"LineJoin",
+	"MiterLimit",
+	"LineDash",
+	"RenderingIntent",
+	"StrokeAdjustment",
+	"BlendMode",
+	"SoftMask",
+	"StrokeAlpha",
+	"FillAlpha",
+	"AlphaSourceFlag",
+	"BlackPointCompensation",
+	"Overprint",
+	"OverprintMode",
+	"BlackGeneration",
+	"UndercolorRemoval",
+	"TransferFunction",
+	"Halftone",
+	"HalftoneOrigin",
+	"FlatnessTolerance",
+	"SmoothnessTolerance",
+}
+
+const (
+	// initializedStateBits lists the parameters which are initialized to
+	// their default values in [NewState].
+	initializedStateBits = StateStrokeColor | StateFillColor |
+		StateTextCharacterSpacing | StateTextWordSpacing |
+		StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode |
+		StateTextRise | StateTextKnockout | StateLineWidth | StateLineCap |
+		StateLineJoin | StateMiterLimit | StateLineDash | StateRenderingIntent |
+		StateStrokeAdjustment | StateBlendMode | StateSoftMask |
+		StateStrokeAlpha | StateFillAlpha | StateAlphaSourceFlag |
+		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
+		StateFlatnessTolerance
+
+	// OpStateBits list the graphical parameters which can be set using
+	// graphics operators.
+	OpStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
+		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading |
+		StateTextFont | StateTextRenderingMode | StateTextRise |
+		StateLineWidth | StateLineCap | StateLineJoin | StateMiterLimit |
+		StateLineDash | StateRenderingIntent | StateFlatnessTolerance
+
+	// ExtGStateBits lists the graphical parameters which can be encoded in an
+	// ExtGState resource.
+	ExtGStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
+		StateLineCap | StateLineJoin | StateMiterLimit | StateLineDash |
+		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
+		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
+		StateAlphaSourceFlag | StateBlackPointCompensation | StateOverprint |
+		StateOverprintMode | StateBlackGeneration | StateUndercolorRemoval |
+		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
+		StateFlatnessTolerance | StateSmoothnessTolerance
+
+	// TODO(voss): update this once
+	// https://github.com/pdf-association/pdf-issues/issues/380
+	// is resolved
+	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateLineDash | StateStrokeColor
+	fillStateBits   = StateFillColor
+)
+
 type errMissingState StateBits
 
 func (e errMissingState) Error() string {
 	k := bits.TrailingZeros64(uint64(e))
 	return stateNames[k] + " not set"
-}
-
-// Clone returns a shallow copy of the parameter vector.
-func (s *Parameters) Clone() *Parameters {
-	res := *s
-	return &res
-}
-
-// GetTextPositionDevice returns the current text position in device coordinates.
-func (s State) GetTextPositionDevice() (float64, float64) {
-	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
-		panic(err)
-	}
-	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
-	M = M.Mul(s.TextMatrix)
-	M = M.Mul(s.CTM)
-	return M[4], M[5]
 }
 
 // TextRenderingMode is the rendering mode for text.

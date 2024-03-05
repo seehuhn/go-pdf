@@ -19,10 +19,12 @@ package graphics_test
 import (
 	"bytes"
 	"math"
+	"strings"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/reader"
@@ -90,5 +92,39 @@ func TestGlyphWidths(t *testing.T) {
 	}
 	if math.Abs(xxOut[1]-200) > 0.01 {
 		t.Errorf("wrong glyph position: %f != 200", xxOut[1])
+	}
+}
+
+// TestSpaceAdvance checks that kerning is not applied before a space.
+func TestSpaceAdvance(t *testing.T) {
+	data := pdf.NewData(pdf.V2_0)
+	F, err := gofont.GoRegular.Embed(data, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf := &bytes.Buffer{}
+	out := graphics.NewWriter(buf, pdf.GetVersion(data))
+	out.TextSetFont(F, 10)
+
+	gg := F.Layout(10, "A B")
+	if len(gg.Seq) != 3 || string(gg.Seq[1].Text) != " " {
+		t.Fatal("unexpected glyph sequence")
+	}
+	// Shift the invisible space to the right, leaving the other glyphs in
+	// place:
+	gg.Seq[0].Advance += 100
+	gg.Seq[1].Advance -= 100
+
+	out.TextStart()
+	out.TextShowGlyphs(gg)
+	out.TextEnd()
+
+	// There should be no kerning required, i.e. "Tj" should be used instead of
+	// the "TJ" operator.
+	if strings.Contains(buf.String(), "TJ") {
+		t.Error("unexpected TJ operator")
+	} else if !strings.Contains(buf.String(), "(A B) Tj") {
+		t.Error("missing Tj operator")
 	}
 }

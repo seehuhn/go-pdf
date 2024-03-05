@@ -61,10 +61,15 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		return 0
 	}
 
+	font, ok := w.TextFont.(font.Layouter)
+	if !ok {
+		w.Err = errors.New("font does not support layouting")
+		return 0
+	}
+	geom := font.GetGeometry()
+
 	left := seq.Skip
 	gg := seq.Seq
-
-	font := w.TextFont.(font.Layouter) // TODO(voss)
 
 	var run pdf.String
 	var out pdf.Array
@@ -122,7 +127,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		}
 
 		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) / param.TextFontSize / param.TextHorizontalScaling * 1000))
-		if xOffsetInt != 0 { // TODO(voss): only do this if the glyph is not blank
+		if xOffsetInt != 0 && !geom.GlyphExtents[g.GID].IsZero() {
 			if len(run) > 0 {
 				out = append(out, run)
 				run = nil
