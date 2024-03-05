@@ -173,7 +173,7 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 			return nil, Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 
-		if start < 0 || length <= 0 || start > math.MaxUint32 || start+length > math.MaxUint32 {
+		if start < 0 || length < 0 || start > math.MaxUint32 || start+length > math.MaxUint32 {
 			return nil, &MalformedFileError{
 				Err: errInvalidXref,
 				Loc: []string{fmt.Sprintf("byte %d", s.currentPos())},
