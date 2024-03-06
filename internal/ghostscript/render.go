@@ -93,8 +93,7 @@ func newGSRenderer(paper *pdf.Rectangle, v pdf.Version) (*gsRenderer, error) {
 	gsIndex <- idx + 1
 
 	pdfName := filepath.Join(dir, fmt.Sprintf("test%03d.pdf", idx))
-	opt := &pdf.WriterOptions{Version: v}
-	doc, err := document.CreateSinglePage(pdfName, paper, opt)
+	doc, err := document.CreateSinglePage(pdfName, paper, v, nil)
 	if err != nil {
 		return nil, err
 	}

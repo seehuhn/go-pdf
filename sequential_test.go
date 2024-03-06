@@ -94,7 +94,7 @@ trailer
 	})
 
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

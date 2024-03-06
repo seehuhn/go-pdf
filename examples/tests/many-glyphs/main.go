@@ -37,7 +37,7 @@ func main() {
 }
 
 func run() error {
-	doc, err := document.CreateMultiPage("test.pdf", nil, nil)
+	doc, err := document.CreateMultiPage("test.pdf", nil, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}

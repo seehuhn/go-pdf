@@ -19,6 +19,7 @@ package main
 import (
 	"log"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
@@ -32,7 +33,7 @@ func main() {
 }
 
 func run() error {
-	doc, err := document.CreateSinglePage("hello.pdf", document.A4r, nil)
+	doc, err := document.CreateSinglePage("hello.pdf", document.A4r, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}

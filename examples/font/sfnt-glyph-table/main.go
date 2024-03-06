@@ -22,6 +22,7 @@ import (
 	"os"
 	"unicode"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/embed"
@@ -60,7 +61,7 @@ func main() {
 	}
 
 	paper := document.A4
-	doc, err := document.CreateMultiPage("test.pdf", paper, nil)
+	doc, err := document.CreateMultiPage("test.pdf", paper, pdf.V1_7, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -22,6 +22,7 @@ import (
 	"log"
 	"math"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
@@ -38,7 +39,7 @@ func main() {
 
 func run(fname string) error {
 	paper := document.A4
-	page, err := document.CreateSinglePage(fname, paper, nil)
+	page, err := document.CreateSinglePage(fname, paper, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}

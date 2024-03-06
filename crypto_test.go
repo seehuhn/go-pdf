@@ -67,13 +67,12 @@ func (sec *stdSecHandler) deauthenticate() {
 
 func TestCryptV1(t *testing.T) {
 	opt := &WriterOptions{
-		Version:       V1_1,
 		UserPassword:  "AA",
 		OwnerPassword: "BB",
 		// UserPermissions: PermAll,
 	}
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, opt)
+	w, err := NewWriter(buf, V1_1, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,17 +121,16 @@ func TestCryptV1(t *testing.T) {
 
 func TestAuthentication(t *testing.T) {
 	msg := "super secret"
-	for i, ver := range []Version{V1_6, V1_4, V1_3, V1_1} {
+	for i, v := range []Version{V1_6, V1_4, V1_3, V1_1} {
 		for _, userFirst := range []bool{true, false} {
 			buf := &bytes.Buffer{}
 
 			opt := &WriterOptions{
-				Version:         ver,
 				UserPassword:    "user",
 				OwnerPassword:   "owner",
 				UserPermissions: PermCopy,
 			}
-			w, err := NewWriter(buf, opt)
+			w, err := NewWriter(buf, v, opt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -201,7 +199,7 @@ func TestAuthentication(t *testing.T) {
 			}
 			err = r.AuthenticateOwner()
 			if err != nil {
-				t.Error(err, "PDF-"+ver.String(), i, userFirst)
+				t.Error(err, "PDF-"+v.String(), i, userFirst)
 				continue
 			}
 			if !r.enc.sec.ownerAuthenticated {

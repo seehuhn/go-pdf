@@ -35,7 +35,7 @@ func TestSubtree(t *testing.T) {
 		// stage 1: write the tree to a file and check invariants in the process.
 
 		buf := &bytes.Buffer{}
-		w, err := pdf.NewWriter(buf, nil)
+		w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,7 +127,7 @@ func TestMerge(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	w, err := pdf.NewWriter(buf, nil)
+	w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

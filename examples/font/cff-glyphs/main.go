@@ -61,7 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	out, err := pdf.Create("out.pdf", nil)
+	out, err := pdf.Create("out.pdf", pdf.V1_7, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

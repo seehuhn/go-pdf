@@ -42,7 +42,7 @@ func main() {
 
 func run() error {
 	paper := document.A5r
-	page, err := document.CreateSinglePage("test.pdf", paper, nil)
+	page, err := document.CreateSinglePage("test.pdf", paper, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}

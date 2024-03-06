@@ -19,12 +19,13 @@ package main
 import (
 	"log"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
 func main() {
-	page, err := document.CreateSinglePage("test.pdf", document.A4, nil)
+	page, err := document.CreateSinglePage("test.pdf", document.A4, pdf.V1_7, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

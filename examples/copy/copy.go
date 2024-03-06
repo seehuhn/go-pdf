@@ -120,9 +120,7 @@ func main() {
 	}
 	defer out.Close()
 
-	w, err := pdf.NewWriter(out, &pdf.WriterOptions{
-		Version: r.GetMeta().Version,
-	})
+	w, err := pdf.NewWriter(out, r.GetMeta().Version, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

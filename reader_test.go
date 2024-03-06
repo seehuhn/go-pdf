@@ -28,7 +28,7 @@ import (
 
 func TestObjectStream(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestObjectStream(t *testing.T) {
 
 func TestReferenceChain(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestReferenceChain(t *testing.T) {
 
 func TestReferenceLoop(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestReferenceLoop(t *testing.T) {
 
 func TestIndirectStreamLength(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestIndirectStreamLength(t *testing.T) {
 
 func TestStreamLengthInStream(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestStreamLengthInStream(t *testing.T) {
 
 func TestStreamLengthCycle(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +344,7 @@ func TestStreamLengthCycle(t *testing.T) {
 
 func TestStreamLengthCycle2(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, nil)
+	w, err := NewWriter(buf, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -444,17 +444,13 @@ func TestReaderGoFuzz(t *testing.T) {
 
 // FuzzReader tests that NewReader does not panic on random inputs.
 func FuzzReader(f *testing.F) {
-	vv := []Version{V1_0, V1_1, V1_2, V1_3, V1_4,
-		V1_5, V1_6, V1_7, V2_0}
+	vv := []Version{V1_0, V1_1, V1_2, V1_3, V1_4, V1_5, V1_6, V1_7, V2_0}
 	buf := &bytes.Buffer{}
 	for i := 0; i < 5; i++ {
-		for _, V := range vv {
+		for _, v := range vv {
 			buf.Reset()
 
-			opt := &WriterOptions{
-				Version: V,
-			}
-			w, err := NewWriter(buf, opt)
+			w, err := NewWriter(buf, v, nil)
 			if err != nil {
 				f.Fatal(err)
 			}

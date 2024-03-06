@@ -41,7 +41,7 @@ func main() {
 	flag.Parse()
 
 	paper := document.A4
-	doc, err := document.CreateMultiPage("out.pdf", paper, nil)
+	doc, err := document.CreateMultiPage("out.pdf", paper, pdf.V1_7, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -37,12 +37,12 @@ type MultiPage struct {
 	base    io.Closer
 }
 
-func CreateMultiPage(fileName string, pageSize *pdf.Rectangle, opt *pdf.WriterOptions) (*MultiPage, error) {
+func CreateMultiPage(fileName string, pageSize *pdf.Rectangle, v pdf.Version, opt *pdf.WriterOptions) (*MultiPage, error) {
 	fd, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
 	}
-	doc, err := WriteMultiPage(fd, pageSize, opt)
+	doc, err := WriteMultiPage(fd, pageSize, v, opt)
 	if err != nil {
 		fd.Close()
 		return nil, err
@@ -51,8 +51,8 @@ func CreateMultiPage(fileName string, pageSize *pdf.Rectangle, opt *pdf.WriterOp
 	return doc, nil
 }
 
-func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOptions) (*MultiPage, error) {
-	out, err := pdf.NewWriter(w, opt)
+func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pdf.WriterOptions) (*MultiPage, error) {
+	out, err := pdf.NewWriter(w, v, opt)
 	if err != nil {
 		return nil, err
 	}

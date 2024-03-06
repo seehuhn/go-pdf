@@ -107,7 +107,7 @@ func FuzzFontDescriptor(f *testing.F) {
 
 func embedFD(fd *Descriptor) ([]byte, error) {
 	buf := &bytes.Buffer{}
-	w, err := pdf.NewWriter(buf, nil)
+	w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
 	if err != nil {
 		return nil, err
 	}

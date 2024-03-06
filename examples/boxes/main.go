@@ -35,7 +35,7 @@ func main() {
 }
 
 func doit() error {
-	page, err := document.CreateSinglePage("boxes.pdf", nil, nil)
+	page, err := document.CreateSinglePage("boxes.pdf", nil, pdf.V1_7, nil)
 
 	page.PageDict["MediaBox"] = &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 600}
 	page.PageDict["CropBox"] = &pdf.Rectangle{LLx: 50, LLy: 50, URx: 550, URy: 550}

@@ -47,7 +47,7 @@ func TestReadLoop(t *testing.T) {
 
 	for _, good := range []bool{true, false} {
 		buf.Reset()
-		doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, nil)
+		doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, pdf.V1_7, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +133,7 @@ func TestReadLoop(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	buf := &bytes.Buffer{}
-	doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, nil)
+	doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, pdf.V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

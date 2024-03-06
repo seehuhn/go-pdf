@@ -29,7 +29,7 @@ func TestSamples(t *testing.T) {
 	for _, sample := range All {
 		t.Run(sample.Label, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			page, err := document.WriteSinglePage(buf, document.A4, nil)
+			page, err := document.WriteSinglePage(buf, document.A4, pdf.V1_7, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

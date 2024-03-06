@@ -20,6 +20,7 @@ import (
 	"log"
 	"math"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt/glyph"
@@ -40,7 +41,7 @@ func main() {
 
 func run(filename string) error {
 	paper := document.A4
-	doc, err := document.CreateMultiPage(filename, paper, nil)
+	doc, err := document.CreateMultiPage(filename, paper, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}

@@ -334,7 +334,7 @@ func doit() error {
 func writeSinglePage(F font.Font, no int) error {
 	fname := fmt.Sprintf("fonts%02d.pdf", no)
 
-	page, err := document.CreateSinglePage(fname, document.A5r, nil)
+	page, err := document.CreateSinglePage(fname, document.A5r, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}

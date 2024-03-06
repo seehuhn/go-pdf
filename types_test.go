@@ -199,7 +199,7 @@ func TestPlaceholder(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "test.pdf")
 
-	w, err := Create(tmpFile, nil)
+	w, err := Create(tmpFile, V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

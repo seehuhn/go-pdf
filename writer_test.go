@@ -31,7 +31,7 @@ func TestWriter(t *testing.T) {
 		OwnerPassword:   "test",
 		UserPermissions: PermCopy,
 	}
-	w, err := NewWriter(out, opt)
+	w, err := NewWriter(out, V1_7, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func (w *testCloseWriter) Close() error {
 func TestClose(t *testing.T) {
 	for _, doClose := range []bool{true, false} {
 		w := &testCloseWriter{}
-		out, err := NewWriter(w, nil)
+		out, err := NewWriter(w, V1_7, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

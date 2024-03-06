@@ -43,7 +43,7 @@ func TestExtract(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			w, err := document.WriteSinglePage(buf, document.A4, nil)
+			w, err := document.WriteSinglePage(buf, document.A4, pdf.V1_7, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -78,7 +78,7 @@ func TestExtract(t *testing.T) {
 func FuzzExtract(f *testing.F) {
 	for _, fontInfo := range fonttypes.All {
 		buf := &bytes.Buffer{}
-		w, err := document.WriteSinglePage(buf, document.A4, nil)
+		w, err := document.WriteSinglePage(buf, document.A4, pdf.V1_7, nil)
 		if err != nil {
 			f.Fatal(err)
 		}

@@ -31,7 +31,7 @@ func FuzzReadWrite(f *testing.F) {
 	buf := &bytes.Buffer{}
 
 	// minimal PDF file
-	w, err := pdf.NewWriter(buf, nil)
+	w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
 	if err != nil {
 		f.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func FuzzReadWrite(f *testing.F) {
 
 	// minimal working PDF file
 	buf = &bytes.Buffer{}
-	page, err := document.WriteSinglePage(buf, document.A4, nil)
+	page, err := document.WriteSinglePage(buf, document.A4, pdf.V1_7, nil)
 	if err != nil {
 		f.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func FuzzReadWrite(f *testing.F) {
 
 	// PDF file which contains all object types
 	buf = &bytes.Buffer{}
-	w, err = pdf.NewWriter(buf, nil)
+	w, err = pdf.NewWriter(buf, pdf.V1_7, nil)
 	if err != nil {
 		f.Fatal(err)
 	}

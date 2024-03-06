@@ -19,6 +19,7 @@ package main
 import (
 	"golang.org/x/text/language"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/pdf/document"
@@ -35,7 +36,7 @@ func main() {
 }
 
 func doit() error {
-	page, err := document.CreateSinglePage("test.pdf", document.A4, nil)
+	page, err := document.CreateSinglePage("test.pdf", document.A4, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}

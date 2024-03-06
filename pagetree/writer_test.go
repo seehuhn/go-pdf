@@ -29,7 +29,7 @@ import (
 func TestBalance(t *testing.T) {
 	// write a test file
 	buf := &bytes.Buffer{}
-	out, err := pdf.NewWriter(buf, nil)
+	out, err := pdf.NewWriter(buf, pdf.V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

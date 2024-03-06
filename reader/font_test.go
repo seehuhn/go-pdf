@@ -41,7 +41,7 @@ func TestExtractText(t *testing.T) {
 		t.Run(sample.Label, func(t *testing.T) {
 			// Create a document with two lines of text.
 			buf := &bytes.Buffer{}
-			doc, err := document.WriteSinglePage(buf, document.A5r, nil)
+			doc, err := document.WriteSinglePage(buf, document.A5r, pdf.V1_7, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

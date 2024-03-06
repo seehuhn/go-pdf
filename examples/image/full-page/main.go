@@ -66,7 +66,7 @@ func main() {
 		URx: width,
 		URy: height,
 	}
-	doc, err := document.CreateSinglePage("test.pdf", paper, nil)
+	doc, err := document.CreateSinglePage("test.pdf", paper, pdf.V1_7, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

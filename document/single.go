@@ -25,16 +25,16 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 )
 
-func CreateSinglePage(fileName string, pageSize *pdf.Rectangle, opt *pdf.WriterOptions) (*Page, error) {
-	out, err := pdf.Create(fileName, opt)
+func CreateSinglePage(fileName string, pageSize *pdf.Rectangle, v pdf.Version, opt *pdf.WriterOptions) (*Page, error) {
+	out, err := pdf.Create(fileName, v, opt)
 	if err != nil {
 		return nil, err
 	}
 	return singlePage(out, pageSize)
 }
 
-func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, opt *pdf.WriterOptions) (*Page, error) {
-	out, err := pdf.NewWriter(w, opt)
+func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pdf.WriterOptions) (*Page, error) {
+	out, err := pdf.NewWriter(w, v, opt)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ package type3
 import (
 	"testing"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/postscript/funit"
@@ -26,7 +27,7 @@ import (
 
 func TestType3(t *testing.T) {
 	paper := document.A5
-	doc, err := document.CreateSinglePage("test-type3.pdf", paper, nil)
+	doc, err := document.CreateSinglePage("test-type3.pdf", paper, pdf.V1_7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

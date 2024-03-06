@@ -41,7 +41,7 @@ import (
 func TestTextPos(t *testing.T) {
 	for i, setup := range testcases.All {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			page, err := document.WriteSinglePage(io.Discard, testcases.Paper, nil)
+			page, err := document.WriteSinglePage(io.Discard, testcases.Paper, pdf.V1_7, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

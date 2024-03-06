@@ -31,17 +31,14 @@ import (
 
 // WriterOptions allows to influence the way a PDF file is generated.
 type WriterOptions struct {
-	Version Version
-	ID      [][]byte
+	ID [][]byte
 
 	UserPassword    string
 	OwnerPassword   string
 	UserPermissions Perm
 }
 
-var defaultWriterOptions = &WriterOptions{
-	Version: V1_7,
-}
+var defaultWriterOptions = &WriterOptions{}
 
 // Writer represents a PDF file open for writing.
 // Use [Create] or [NewWriter] to create a new Writer.
@@ -72,14 +69,12 @@ type allocatedObject struct {
 //
 // After writing the content to the file, [Writer.Close] must be called to
 // write the PDF trailer and close the underlying file.
-//
-// TODO(voss): make the pdf version an argument instead of an option.
-func Create(name string, opt *WriterOptions) (*Writer, error) {
+func Create(name string, v Version, opt *WriterOptions) (*Writer, error) {
 	fd, err := os.Create(name)
 	if err != nil {
 		return nil, err
 	}
-	pdf, err := NewWriter(fd, opt)
+	pdf, err := NewWriter(fd, v, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -91,28 +86,22 @@ func Create(name string, opt *WriterOptions) (*Writer, error) {
 //
 // After writing the content to the file, [Writer.Close] must be called to
 // write the PDF trailer.
-//
-// TODO(voss): make the pdf version an argument instead of an option.
-func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
+func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
 		opt = defaultWriterOptions
 	}
 
-	version := opt.Version
-	if version == 0 {
-		version = defaultWriterOptions.Version
-	}
-	versionString, err := version.ToString() // check for valid version
+	versionString, err := v.ToString() // check for valid version
 	if err != nil {
 		return nil, err
 	}
 
 	useEncryption := opt.UserPassword != "" || opt.OwnerPassword != ""
-	if useEncryption && version == V1_0 {
+	if useEncryption && v == V1_0 {
 		return nil, &VersionError{Operation: "PDF encryption", Earliest: V1_1}
 	}
-	needID := opt.ID != nil || useEncryption || version >= V2_0
-	if needID && version == V1_0 {
+	needID := opt.ID != nil || useEncryption || v >= V2_0
+	if needID && v == V1_0 {
 		return nil, &VersionError{Operation: "PDF file identifiers", Earliest: V1_1}
 	}
 
@@ -120,7 +109,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 
 	var ID [][]byte
 	if needID {
-		if version >= V2_0 {
+		if v >= V2_0 {
 			for _, id := range opt.ID {
 				if len(id) < 16 {
 					return nil, errInvalidID
@@ -152,19 +141,19 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 	if useEncryption {
 		var cf *cryptFilter
 		var V int
-		if version >= V2_0 {
+		if v >= V2_0 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 256,
 			}
 			V = 5
-		} else if version >= V1_6 {
+		} else if v >= V1_6 {
 			cf = &cryptFilter{
 				Cipher: cipherAES,
 				Length: 128,
 			}
 			V = 4
-		} else if version >= V1_4 {
+		} else if v >= V1_4 {
 			cf = &cryptFilter{
 				Cipher: cipherRC4,
 				Length: 128,
@@ -189,7 +178,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 			efF:  cf,
 		}
 
-		encryptDict, err := enc.AsDict(version)
+		encryptDict, err := enc.AsDict(v)
 		if err != nil {
 			return nil, err
 		}
@@ -209,7 +198,7 @@ func NewWriter(w io.Writer, opt *WriterOptions) (*Writer, error) {
 
 	pdf := &Writer{
 		meta: MetaInfo{
-			Version: version,
+			Version: v,
 			Catalog: &Catalog{},
 			Info:    &Info{},
 			ID:      ID,

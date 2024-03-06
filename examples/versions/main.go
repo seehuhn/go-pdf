@@ -29,17 +29,15 @@ func main() {
 	vv := []pdf.Version{pdf.V1_0, pdf.V1_1, pdf.V1_2, pdf.V1_3, pdf.V1_4,
 		pdf.V1_5, pdf.V1_6, pdf.V1_7, pdf.V2_0}
 
-	for _, V := range vv {
+	for _, v := range vv {
 		for _, enc := range []string{"plain", "prot", "enc"} {
-			if V == pdf.V1_0 && enc != "plain" {
+			if v == pdf.V1_0 && enc != "plain" {
 				continue
 			}
 
-			fname := "out-" + V.String() + "-" + enc + ".pdf"
+			fname := "out-" + v.String() + "-" + enc + ".pdf"
 
-			opt := &pdf.WriterOptions{
-				Version: V,
-			}
+			opt := &pdf.WriterOptions{}
 			if enc != "plain" {
 				opt.OwnerPassword = "B"
 				opt.UserPermissions = pdf.PermCopy
@@ -47,7 +45,7 @@ func main() {
 			if enc == "enc" {
 				opt.UserPassword = "A"
 			}
-			page, err := document.CreateSinglePage(fname, &pdf.Rectangle{URx: 300, URy: 300}, opt)
+			page, err := document.CreateSinglePage(fname, &pdf.Rectangle{URx: 300, URy: 300}, v, nil)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -61,7 +59,7 @@ func main() {
 			page.TextStart()
 			page.TextSetFont(F, 12)
 			page.TextFirstLine(50, 250)
-			page.TextShow("PDF version " + V.String())
+			page.TextShow("PDF version " + v.String())
 			page.TextSecondLine(0, -12*geom.BaseLineDistance)
 			if enc == "enc" {
 				page.TextShow("encrypted text")
