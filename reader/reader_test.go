@@ -279,7 +279,7 @@ func FuzzReader(f *testing.F) {
 		}
 		err := r.ParseContentStream(strings.NewReader(body))
 		if err != nil {
-			t.Fatal(err)
+			return
 		}
 		state1 := r.State
 

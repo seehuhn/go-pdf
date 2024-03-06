@@ -44,6 +44,9 @@ func TestScanner(t *testing.T) {
 			[]testOutput{
 				{"m", []pdf.Object{pdf.Integer(1), pdf.Integer(2)}},
 				{"l", []pdf.Object{pdf.Integer(3), pdf.Integer(4)}}}},
+		{".1 x", []testOutput{{"x", []pdf.Object{pdf.Real(0.1)}}}},
+		{"+.1 x", []testOutput{{"x", []pdf.Object{pdf.Real(0.1)}}}},
+		{"-.1 x", []testOutput{{"x", []pdf.Object{pdf.Real(-0.1)}}}},
 		{"<< /a 1 /b 2 >> test",
 			[]testOutput{
 				{"test", []pdf.Object{pdf.Dict{"a": pdf.Integer(1), "b": pdf.Integer(2)}}}},

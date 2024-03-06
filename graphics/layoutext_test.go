@@ -19,14 +19,17 @@ package graphics_test
 import (
 	"bytes"
 	"math"
+	"math/rand"
 	"strings"
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/reader"
 )
 
@@ -96,6 +99,8 @@ func TestGlyphWidths(t *testing.T) {
 }
 
 // TestSpaceAdvance checks that kerning is not applied before a space.
+//
+// TODO(voss): turn this into a benchmark
 func TestSpaceAdvance(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
 	F, err := gofont.GoRegular.Embed(data, nil)
@@ -128,3 +133,110 @@ func TestSpaceAdvance(t *testing.T) {
 		t.Error("missing Tj operator")
 	}
 }
+
+func TestTextLayout(t *testing.T) {
+	words1 := strings.Fields(sampleText1)
+	words2 := strings.Fields(sampleText2)
+
+	paper := document.A4
+	doc, err := document.CreateMultiPage("test.pdf", paper, pdf.V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	F, err := type1.TimesRoman.Embed(doc.Out, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	textStyle := graphics.NewState()
+	textStyle.TextFont = F
+	textStyle.TextFontSize = 10
+	textStyle.TextLeading = 12
+	textStyle.FillColor = color.DeviceGray.New(0)
+	textStyle.Set = graphics.StateTextFont | graphics.StateTextLeading | graphics.StateFillColor
+
+	spaceWidth := textStyle.TextLayout(" ").TotalWidth()
+
+	page := doc.AddPage()
+	textStyle.ApplyTo(page.Writer)
+	page.TextStart()
+	yPos := paper.URy - 72
+	page.TextFirstLine(72, yPos)
+	width := paper.Dx() - 2*72
+
+	showLine := func(line string) {
+		if yPos < 72 {
+			page.TextEnd()
+			err = page.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			page = doc.AddPage()
+			textStyle.ApplyTo(page.Writer)
+			page.TextStart()
+			yPos = paper.URy - 72
+			page.TextFirstLine(72, yPos)
+		}
+		page.TextShow(line)
+		page.TextNextLine()
+		yPos -= textStyle.TextLeading
+	}
+
+	rng := rand.New(rand.NewSource(0))
+
+	var par []string
+	for i := 0; i < 100; i++ {
+		n := rng.Intn(9) + 1
+		par = par[:0]
+		for j := 0; j < n; j++ {
+			if rng.Intn(2) == 0 {
+				par = append(par, words1...)
+			} else {
+				par = append(par, words2...)
+			}
+		}
+
+		var line []string
+		var lineWidth float64
+		for len(par) > 0 {
+			var word string
+			word, par = par[0], par[1:]
+			w := textStyle.TextLayout(word).TotalWidth()
+			if len(line) == 0 {
+				line = append(line, word)
+				lineWidth = w
+			} else if lineWidth+w+spaceWidth <= width {
+				line = append(line, word)
+				lineWidth += w + spaceWidth
+			} else {
+				showLine(strings.Join(line, " "))
+				line = line[:0]
+				line = append(line, word)
+				lineWidth = w
+			}
+		}
+		showLine(strings.Join(line, " "))
+		if yPos >= 72 {
+			showLine("")
+		}
+	}
+
+	page.TextEnd()
+	err = page.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = doc.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Thanks Google Bard, for making up this sentence for me.
+// https://g.co/gemini/share/784105073f35
+const sampleText1 = "I was weary of sight, weary of acquaintance, weary of familiarity, weary of myself, and weary of all the world; and henceforth all places were alike to me."
+
+// This one is from the actual Moby Dick novel.
+const sampleText2 = "With a philosophical flourish Cato throws himself upon his sword; I quietly take to the ship."
