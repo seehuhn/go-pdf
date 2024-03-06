@@ -1,0 +1,2 @@
+go test fuzz v1
+string("\n\tBT\n\tAF 12 Tf\n\t1\t0.100 Td 000000000000000000000000000000000000000")

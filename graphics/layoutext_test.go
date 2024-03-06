@@ -18,6 +18,7 @@ package graphics_test
 
 import (
 	"bytes"
+	"io"
 	"math"
 	"math/rand"
 	"strings"
@@ -99,8 +100,6 @@ func TestGlyphWidths(t *testing.T) {
 }
 
 // TestSpaceAdvance checks that kerning is not applied before a space.
-//
-// TODO(voss): turn this into a benchmark
 func TestSpaceAdvance(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
 	F, err := gofont.GoRegular.Embed(data, nil)
@@ -134,19 +133,25 @@ func TestSpaceAdvance(t *testing.T) {
 	}
 }
 
-func TestTextLayout(t *testing.T) {
+func BenchmarkTextLayout(b *testing.B) {
+	for range b.N {
+		writeDummyDocument(io.Discard)
+	}
+}
+
+func writeDummyDocument(w io.Writer) error {
 	words1 := strings.Fields(sampleText1)
 	words2 := strings.Fields(sampleText2)
 
 	paper := document.A4
-	doc, err := document.CreateMultiPage("test.pdf", paper, pdf.V1_7, nil)
+	doc, err := document.WriteMultiPage(w, paper, pdf.V1_7, nil)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	F, err := type1.TimesRoman.Embed(doc.Out, nil)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	textStyle := graphics.NewState()
@@ -165,12 +170,12 @@ func TestTextLayout(t *testing.T) {
 	page.TextFirstLine(72, yPos)
 	width := paper.Dx() - 2*72
 
-	showLine := func(line string) {
+	showLine := func(line string) error {
 		if yPos < 72 {
 			page.TextEnd()
 			err = page.Close()
 			if err != nil {
-				t.Fatal(err)
+				return err
 			}
 			page = doc.AddPage()
 			textStyle.ApplyTo(page.Writer)
@@ -181,6 +186,7 @@ func TestTextLayout(t *testing.T) {
 		page.TextShow(line)
 		page.TextNextLine()
 		yPos -= textStyle.TextLeading
+		return nil
 	}
 
 	rng := rand.New(rand.NewSource(0))
@@ -210,13 +216,19 @@ func TestTextLayout(t *testing.T) {
 				line = append(line, word)
 				lineWidth += w + spaceWidth
 			} else {
-				showLine(strings.Join(line, " "))
+				err = showLine(strings.Join(line, " "))
+				if err != nil {
+					return err
+				}
 				line = line[:0]
 				line = append(line, word)
 				lineWidth = w
 			}
 		}
-		showLine(strings.Join(line, " "))
+		err = showLine(strings.Join(line, " "))
+		if err != nil {
+			return err
+		}
 		if yPos >= 72 {
 			showLine("")
 		}
@@ -225,13 +237,15 @@ func TestTextLayout(t *testing.T) {
 	page.TextEnd()
 	err = page.Close()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	err = doc.Close()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
+
+	return nil
 }
 
 // Thanks Google Bard, for making up this sentence for me.

@@ -92,7 +92,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 					return
 				}
 				_, w.Err = fmt.Fprintln(w.Content, " Tj")
-				out = nil
+				out = out[:0]
 				return
 			}
 		}
@@ -103,7 +103,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 			return
 		}
 		_, w.Err = fmt.Fprintln(w.Content, " TJ")
-		out = nil
+		out = out[:0]
 	}
 
 	xActual := 0.0

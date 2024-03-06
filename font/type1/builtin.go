@@ -117,6 +117,32 @@ func (f Builtin) AFM() (*afm.Metrics, error) {
 		}
 	}
 
+	// Our .afm files don't have ligatures.  We add the standard ligatures
+	// here.
+	if !metrics.IsFixedPitch {
+		type lig struct {
+			left, right, result string
+		}
+		var all = []lig{
+			{"f", "f", "ff"},
+			{"f", "i", "fi"},
+			{"f", "l", "fl"},
+			{"ff", "i", "ffi"},
+			{"ff", "l", "ffl"},
+		}
+		for _, l := range all {
+			_, leftOk := metrics.Glyphs[l.left]
+			_, rightOk := metrics.Glyphs[l.right]
+			_, resOk := metrics.Glyphs[l.result]
+			if leftOk && rightOk && resOk {
+				if len(metrics.Glyphs[l.left].Ligatures) == 0 {
+					metrics.Glyphs[l.left].Ligatures = make(map[string]string)
+				}
+				metrics.Glyphs[l.left].Ligatures[l.right] = l.result
+			}
+		}
+	}
+
 	return metrics, nil
 }
 

@@ -229,6 +229,7 @@ func (f *embeddedSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
 				gg[len(gg)-1].GID = repl
 				gg[len(gg)-1].Text = append(gg[len(gg)-1].Text, r)
+				gg[len(gg)-1].Advance = f.Widths[repl] * ptSize
 				prev = repl
 				continue
 			}
