@@ -52,9 +52,9 @@ func TestExtractText(t *testing.T) {
 			doc.TextSetFont(E, 12)
 			doc.TextStart()
 			doc.TextFirstLine(72, 100)
-			doc.TextShow(nil, line1)
+			doc.TextShow(line1)
 			doc.TextSecondLine(0, -18)
-			doc.TextShow(nil, line2)
+			doc.TextShow(line2)
 			doc.TextEnd()
 			err = doc.Close()
 			if err != nil {

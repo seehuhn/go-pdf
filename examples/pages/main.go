@@ -65,9 +65,9 @@ func main() {
 		g.TextSetFont(font, 12)
 		g.TextFirstLine(30, 30)
 		if i < 3 {
-			g.TextShow(nil, fmt.Sprintf("page %d", i))
+			g.TextShow(fmt.Sprintf("page %d", i))
 		} else {
-			g.TextShow(nil, fmt.Sprintf("page %d", i+1))
+			g.TextShow(fmt.Sprintf("page %d", i+1))
 		}
 		g.TextEnd()
 
@@ -100,7 +100,7 @@ func main() {
 		g.TextStart()
 		g.TextSetFont(font, 12)
 		g.TextFirstLine(30, 30)
-		g.TextShow(nil, "Title")
+		g.TextShow("Title")
 		g.TextEnd()
 
 		err = stream.Close()
@@ -135,7 +135,7 @@ func main() {
 		g.TextStart()
 		g.TextSetFont(font, 12)
 		g.TextFirstLine(30, 30)
-		g.TextShow(nil, "three")
+		g.TextShow("three")
 		g.TextEnd()
 
 		err = stream.Close()

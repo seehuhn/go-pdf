@@ -150,6 +150,7 @@ func writeDummyDocument(w io.Writer) error {
 	}
 
 	F, err := type1.TimesRoman.Embed(doc.Out, nil)
+	// F, err := gofont.GoRegular.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}
@@ -185,7 +186,7 @@ func writeDummyDocument(w io.Writer) error {
 			yPos = paper.URy - 72
 			page.TextFirstLine(72, yPos)
 		}
-		page.TextShow(gg, line)
+		page.TextShow(line)
 		page.TextNextLine()
 		yPos -= textStyle.TextLeading
 		return nil

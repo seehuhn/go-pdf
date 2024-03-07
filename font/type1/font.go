@@ -225,7 +225,7 @@ func (f *embeddedSimple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *f
 
 	base := len(seq.Seq)
 	var prev glyph.ID
-	for i, r := range []rune(s) {
+	for i, r := range s {
 		gid := f.cmap[r]
 		if i > 0 {
 			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {

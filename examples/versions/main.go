@@ -59,20 +59,20 @@ func main() {
 			page.TextStart()
 			page.TextSetFont(F, 12)
 			page.TextFirstLine(50, 250)
-			page.TextShow(nil, "PDF version "+v.String())
+			page.TextShow("PDF version " + v.String())
 			page.TextSecondLine(0, -12*geom.BaseLineDistance)
 			if enc == "enc" {
-				page.TextShow(nil, "encrypted text")
+				page.TextShow("encrypted text")
 			} else {
-				page.TextShow(nil, "unencrypted text")
+				page.TextShow("unencrypted text")
 			}
 			page.TextNextLine()
-			page.TextShow(nil, "user can copy")
+			page.TextShow("user can copy")
 			page.TextNextLine()
 			if enc == "plain" {
-				page.TextShow(nil, "user can print")
+				page.TextShow("user can print")
 			} else {
-				page.TextShow(nil, "only owner can print")
+				page.TextShow("only owner can print")
 			}
 			page.TextEnd()
 

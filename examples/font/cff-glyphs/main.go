@@ -215,13 +215,13 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		page.TextStart()
 		page.TextSetFont(ctx.labelFont, 12)
 		page.TextFirstLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
-		page.TextShow(nil, strings.Join(label, ", "))
+		page.TextShow(strings.Join(label, ", "))
 		if g.Name != "" {
 			rr := names.ToUnicode(g.Name, false)
 			if len(rr) == 1 {
 				runeName := runenames.Name(rr[0])
 				page.TextSecondLine(0, -15)
-				page.TextShow(nil, runeName)
+				page.TextShow(runeName)
 			}
 		}
 		page.TextEnd()

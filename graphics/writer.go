@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/float"
 )
 
@@ -41,6 +42,8 @@ type Writer struct {
 
 	nesting       []pairType
 	markedContent []*MarkedContent
+
+	glyphBuf *font.GlyphSeq
 }
 
 type catRes struct {
@@ -84,6 +87,8 @@ func NewWriter(w io.Writer, v pdf.Version) *Writer {
 		State: NewState(),
 
 		resName: make(map[catRes]pdf.Name),
+
+		glyphBuf: &font.GlyphSeq{},
 	}
 }
 

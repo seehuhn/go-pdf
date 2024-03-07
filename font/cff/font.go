@@ -23,11 +23,13 @@ package cff
 import (
 	"errors"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
 	sfntcmap "seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/opentype/gtab"
 
 	"seehuhn.de/go/pdf"
@@ -177,6 +179,7 @@ type embedded struct {
 	*font.Geometry
 
 	sfnt        *sfnt.Font
+	buf         []glyph.Info
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -190,8 +193,9 @@ func (f *embedded) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		seq = &font.GlyphSeq{}
 	}
 
-	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
-	for _, g := range gg {
+	f.buf = f.sfnt.Layout(f.buf, f.cmap, f.gsubLookups, f.gposLookups, s)
+	seq.Seq = slices.Grow(seq.Seq, len(f.buf))
+	for _, g := range f.buf {
 		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset

@@ -130,8 +130,12 @@ type Layouter interface {
 	// GetGeometry returns font metrics required for typesetting.
 	GetGeometry() *Geometry
 
-	// Layout appends a string to a glyph sequence. The string is typeset at
+	// Layout appends a string to a glyph sequence.  The string is typeset at
 	// the given point size.
+	//
+	// If seq is non-nil, a new glyph sequence is allocated.  The resulting
+	// GlyphSeq is returned.  If seq is not nil, the return value is guaranteed
+	// to be equal to seq.
 	Layout(seq *GlyphSeq, ptSize float64, s string) *GlyphSeq
 
 	// CodeAndWidth converts a glyph ID (corresponding to the given text) into

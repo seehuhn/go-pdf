@@ -113,6 +113,6 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, d
 	page.SetFillColor(color.DeviceGray.New(0.5))
 	page.TextStart()
 	page.TextFirstLine(5, paper.URy-10)
-	page.TextShow(nil, desc)
+	page.TextShow(desc)
 	page.TextEnd()
 }

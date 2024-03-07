@@ -19,6 +19,7 @@ package truetype
 import (
 	"fmt"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
@@ -45,6 +46,7 @@ type embeddedSimple struct {
 	*font.Geometry
 
 	sfnt        *sfnt.Font
+	buf         []glyph.Info
 	cmap        sfntcmap.Subtable
 	gsubLookups []gtab.LookupIndex
 	gposLookups []gtab.LookupIndex
@@ -60,8 +62,9 @@ func (f *embeddedSimple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *f
 		seq = &font.GlyphSeq{}
 	}
 
-	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
-	for _, g := range gg {
+	f.buf = f.sfnt.Layout(f.buf, f.cmap, f.gsubLookups, f.gposLookups, s)
+	seq.Seq = slices.Grow(seq.Seq, len(f.buf))
+	for _, g := range f.buf {
 		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset

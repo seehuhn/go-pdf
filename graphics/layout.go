@@ -31,7 +31,7 @@ import (
 // functions from "op-text.go".
 
 // TextShow draws a string.
-func (w *Writer) TextShow(buf *font.GlyphSeq, s string) float64 {
+func (w *Writer) TextShow(s string) float64 {
 	if !w.isValid("TextShow", objText) {
 		return 0
 	}
@@ -40,8 +40,8 @@ func (w *Writer) TextShow(buf *font.GlyphSeq, s string) float64 {
 		return 0
 	}
 
-	buf.Reset()
-	gg := w.TextLayout(buf, s)
+	w.glyphBuf.Reset()
+	gg := w.TextLayout(w.glyphBuf, s)
 	if gg == nil {
 		w.Err = errors.New("font does not support layouting")
 		return 0

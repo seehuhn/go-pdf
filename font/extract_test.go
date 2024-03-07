@@ -54,7 +54,7 @@ func TestExtract(t *testing.T) {
 			w.TextStart()
 			w.TextSetFont(F, 12)
 			w.TextFirstLine(100, 100)
-			w.TextShow(nil, "Hello World!")
+			w.TextShow("Hello World!")
 			w.TextEnd()
 			err = w.Close()
 			if err != nil {
@@ -89,7 +89,7 @@ func FuzzExtract(f *testing.F) {
 		w.TextStart()
 		w.TextSetFont(F, 12)
 		w.TextFirstLine(100, 100)
-		w.TextShow(nil, "X")
+		w.TextShow("X")
 		w.TextEnd()
 		err = w.Close()
 		if err != nil {

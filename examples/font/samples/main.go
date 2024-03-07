@@ -180,7 +180,7 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 	f.page.TextStart()
 	f.page.TextSetFont(f.titleFont, fontSize)
 	f.page.TextFirstLine(f.margin, f.margin+f.textHeight-f.used)
-	f.page.TextShow(nil, title)
+	f.page.TextShow(title)
 	f.page.TextEnd()
 
 	f.used += b
@@ -253,10 +253,10 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	page.TextStart()
 	page.TextFirstLine(f.margin, f.margin+f.textHeight-f.used-v1)
 	page.TextSetFont(bodyFont, 10)
-	page.TextShow(nil, subTitle)
+	page.TextShow(subTitle)
 	page.TextFirstLine(0, -v2)
 	page.TextSetFont(bodyFont, 7)
-	page.TextShow(nil, fileName)
+	page.TextShow(fileName)
 	page.TextFirstLine(0, -v3)
 	page.TextSetFont(X, 24)
 	page.TextShowGlyphs(seq)

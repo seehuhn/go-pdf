@@ -338,12 +338,14 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 	return M[4], M[5]
 }
 
-// TextLayout returns the glyph sequence for a string, using the text
-// parameters from the given graphics state.
+// TextLayout appends a string to a GlyphSeq, using the text parameters from
+// the given graphics state.  If seq is nil, a new GlyphSeq is allocated.  The
+// resulting GlyphSeq is returned.  If seq is not nil, the return value is
+// guaranteed to be equal to seq.
 //
-// If no font is set, or if the current font does not support layouting,
-// this function returns nil.
-func (s State) TextLayout(gg *font.GlyphSeq, text string) *font.GlyphSeq {
+// If no font is set, or if the current font does not support layouting, the
+// function returns nil.
+func (s State) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 	if !s.isSet(StateTextFont) {
 		return nil
 	}
@@ -368,32 +370,32 @@ func (s State) TextLayout(gg *font.GlyphSeq, text string) *font.GlyphSeq {
 		textRise = s.TextRise
 	}
 
-	if gg == nil {
-		gg = &font.GlyphSeq{}
+	if seq == nil {
+		seq = &font.GlyphSeq{}
 	}
-	base := len(gg.Seq)
+	base := len(seq.Seq)
 
 	if characterSpacing == 0 {
-		F.Layout(gg, s.TextFontSize, text)
+		F.Layout(seq, s.TextFontSize, text)
 	} else {
 		// disable ligatures
 		for _, r := range text {
-			F.Layout(gg, s.TextFontSize, string(r))
+			F.Layout(seq, s.TextFontSize, string(r))
 		}
 	}
 
 	// Apply PDF layout parameters
-	for i := base; i < len(gg.Seq); i++ {
-		advance := gg.Seq[i].Advance
+	for i := base; i < len(seq.Seq); i++ {
+		advance := seq.Seq[i].Advance
 		advance += characterSpacing
-		if string(gg.Seq[i].Text) == " " {
+		if string(seq.Seq[i].Text) == " " {
 			advance += wordSpacing
 		}
-		gg.Seq[i].Advance = advance * horizontalScaling
-		gg.Seq[i].Rise = textRise
+		seq.Seq[i].Advance = advance * horizontalScaling
+		seq.Seq[i].Rise = textRise
 	}
 
-	return gg
+	return seq
 }
 
 // StateBits is a bit mask for the fields of the State struct.
