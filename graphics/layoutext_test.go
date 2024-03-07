@@ -151,6 +151,7 @@ func writeDummyDocument(w io.Writer) error {
 
 	F, err := type1.TimesRoman.Embed(doc.Out, nil)
 	// F, err := gofont.GoRegular.Embed(doc.Out, nil)
+	// F, err := embed.OpenTypeFile(doc.Out, "../../otf/SourceSerif4-Regular.otf", nil)
 	if err != nil {
 		return err
 	}
