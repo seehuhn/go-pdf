@@ -57,11 +57,11 @@ func main() {
 	w.TextStart()
 	w.TextSetFont(F, 12)
 	w.TextFirstLine(x, y)
-	w.TextShow("AWAY again")
+	w.TextShow(nil, "AWAY again")
 	w.TextSecondLine(0, -15)
-	w.TextShow("line 2")
+	w.TextShow(nil, "line 2")
 	w.TextNextLine()
-	w.TextShow("line 3")
+	w.TextShow(nil, "line 3")
 	w.TextEnd()
 
 	y -= 80
@@ -87,7 +87,7 @@ func main() {
 		default:
 			w.TextFirstLine(72, 0)
 		}
-		w.TextShow(fmt.Sprintf("phi = %gº", phi))
+		w.TextShow(nil, fmt.Sprintf("phi = %gº", phi))
 	}
 	w.TextEnd()
 

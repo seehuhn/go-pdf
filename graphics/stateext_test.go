@@ -50,7 +50,7 @@ func TestTextLayout1(t *testing.T) {
 				"ﬁsh",    // ligature in source text
 			}
 			for _, s := range testCases {
-				gg := out.TextLayout(s)
+				gg := out.TextLayout(nil, s)
 				if gg == nil {
 					t.Fatal("typesetting failed")
 				}
@@ -76,7 +76,7 @@ func TestTextLayout2(t *testing.T) {
 			out.TextSetFont(F, 10)
 
 			// First make sure the font uses ligatures:
-			gg := out.TextLayout("fi")
+			gg := out.TextLayout(nil, "fi")
 			if gg == nil {
 				t.Fatal("typesetting failed")
 			}
@@ -87,7 +87,7 @@ func TestTextLayout2(t *testing.T) {
 			// Then make sure that ligatures are disabled when character
 			// spacing is non-zero:
 			out.TextSetCharacterSpacing(1)
-			gg = out.TextLayout("fi")
+			gg = out.TextLayout(nil, "fi")
 			if gg == nil {
 				t.Fatal("layout failed")
 			}
@@ -109,9 +109,9 @@ func TestTextLayout3(t *testing.T) {
 	out := graphics.NewWriter(io.Discard, pdf.GetVersion(data))
 
 	out.TextSetFont(F, 10)
-	L1 := out.TextLayout("hello world!").TotalWidth()
+	L1 := out.TextLayout(nil, "hello world!").TotalWidth()
 	out.TextSetFont(F, 20)
-	L2 := out.TextLayout("hello world!").TotalWidth()
+	L2 := out.TextLayout(nil, "hello world!").TotalWidth()
 
 	if L1 <= 0 {
 		t.Fatalf("invalid width: %f", L1)
@@ -138,8 +138,8 @@ func TestTextLayout4(t *testing.T) {
 	state.TextFontSize = 10
 	state.Set |= graphics.StateTextFont
 
-	L1 := out.TextLayout("hello world!").TotalWidth()
-	L2 := state.TextLayout("hello world!").TotalWidth()
+	L1 := out.TextLayout(nil, "hello world!").TotalWidth()
+	L2 := state.TextLayout(nil, "hello world!").TotalWidth()
 
 	if math.Abs(L2-L1) > 1e-6 {
 		t.Errorf("unexpected width: %f != %f", L2, L1)

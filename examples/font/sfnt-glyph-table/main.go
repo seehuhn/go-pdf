@@ -193,10 +193,10 @@ func (f *fontTables) WriteHeader(title, fileName string) error {
 	f.page.TextStart()
 	f.page.TextSetFont(f.bodyFont, 12)
 	f.page.TextFirstLine(f.margin, f.margin+f.textHeight-f.used-v1)
-	f.page.TextShow(title)
+	f.page.TextShow(nil, title)
 	f.page.TextSetFont(f.monoFont, 10)
 	f.page.TextSecondLine(0, -v2)
-	f.page.TextShow(fileName)
+	f.page.TextShow(nil, fileName)
 	f.page.TextEnd()
 
 	f.used += total
@@ -243,7 +243,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	}
 	page.TextShowAligned(label, 0, 1)
 	page.TextSetFont(f.italicFont, 10)
-	page.TextShow("x")
+	page.TextShow(nil, "x")
 	page.TextEnd()
 
 	// grid of boxes

@@ -55,26 +55,27 @@ type embeddedCFFSimple struct {
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *embeddedCFFSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
-	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
-	res := &font.GlyphSeq{
-		Seq: make([]font.Glyph, len(gg)),
+func (f *embeddedCFFSimple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
 	}
-	for i, g := range gg {
+
+	gg := f.sfnt.Layout(f.cmap, f.gsubLookups, f.gposLookups, s)
+	for _, g := range gg {
 		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
-		if i == 0 {
-			res.Skip += xOffset
+		if len(seq.Seq) == 0 {
+			seq.Skip += xOffset
 		} else {
-			res.Seq[i-1].Advance += xOffset
+			seq.Seq[len(seq.Seq)-1].Advance += xOffset
 		}
-		res.Seq[i] = font.Glyph{
+		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     g.GID,
 			Advance: float64(g.Advance) * ptSize * f.sfnt.FontMatrix[0],
 			Rise:    float64(g.YOffset) * ptSize * f.sfnt.FontMatrix[3],
 			Text:    g.Text,
-		}
+		})
 	}
-	return res
+	return seq
 }
 
 func (f *embeddedCFFSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {

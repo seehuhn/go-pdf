@@ -52,7 +52,7 @@ func TestSpaceIsBlank(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			gg := F.Layout(10, " ")
+			gg := F.Layout(nil, 10, " ")
 			if len(gg.Seq) != 1 {
 				t.Fatalf("expected 1 glyph, got %d", len(gg.Seq))
 			}

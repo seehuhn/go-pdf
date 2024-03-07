@@ -153,7 +153,7 @@ func run(filename string) error {
 			page.TextSetFont(M, fontSize)
 			// TODO(voss): why is the final +1 needed?
 			page.TextShowAligned("I", gap2-k*glyphWidth+1, 0)
-			page.TextShow("I")
+			page.TextShow(nil, "I")
 
 			gid++
 			yPos -= leading

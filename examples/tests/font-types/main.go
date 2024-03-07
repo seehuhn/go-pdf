@@ -147,7 +147,7 @@ func doit() error {
 
 		page.TextStart()
 		if s.level == 1 {
-			gg := SB.Layout(l.F["chapter"].ptSize, title)
+			gg := SB.Layout(nil, l.F["chapter"].ptSize, title)
 			w := gg.TotalWidth()
 			l.yPos = paper.URy - l.topMargin - 72 - l.F["chapter"].ascent
 			xPos := (paper.URx-l.rightMargin-l.leftMargin-w)/2 + l.leftMargin
@@ -162,7 +162,7 @@ func doit() error {
 			page.TextFirstLine(l.leftMargin, l.yPos)
 			l.yPos -= -l.F["section"].descent + 2*l.F["text"].baseLineSkip + l.F["text"].ascent
 		}
-		page.TextShow(title)
+		page.TextShow(nil, title)
 		page.TextEnd()
 		page.SetFillColor(color.DeviceGray.New(0))
 
@@ -185,7 +185,7 @@ func doit() error {
 				start := 0
 				for _, mm := range mmm {
 					if start < mm[0] {
-						page.TextShow(line[start:mm[0]])
+						page.TextShow(nil, line[start:mm[0]])
 					}
 					switch line[mm[0]] {
 					case '`':
@@ -193,12 +193,12 @@ func doit() error {
 					case '*':
 						page.TextSetFont(l.F["it"].F, l.F["it"].ptSize)
 					}
-					page.TextShow(line[mm[0]+1 : mm[1]-1])
+					page.TextShow(nil, line[mm[0]+1:mm[1]-1])
 					page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
 					start = mm[1]
 				}
 				if start < len(line) {
-					page.TextShow(line[start:])
+					page.TextShow(nil, line[start:])
 				}
 			}
 			l.yPos -= l.F["text"].baseLineSkip
@@ -229,7 +229,7 @@ func doit() error {
 			page.TextStart()
 			page.TextFirstLine(l.leftMargin, l.yPos)
 			page.TextSetFont(Y, 24)
-			page.TextShow(exampleText)
+			page.TextShow(nil, exampleText)
 			page.TextEnd()
 			l.yPos -= 30
 
@@ -347,7 +347,7 @@ func writeSinglePage(F font.Font, no int) error {
 	page.TextStart()
 	page.TextFirstLine(72, 72)
 	page.TextSetFont(X, 24)
-	page.TextShow(exampleText)
+	page.TextShow(nil, exampleText)
 	page.TextEnd()
 
 	err = X.Close()
@@ -425,7 +425,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	var maxWidth float64
 	for i, key := range keys {
 		fDict := l.F["dict"]
-		gg := fDict.F.Layout(fDict.ptSize, pdf.Format(key)+" ")
+		gg := fDict.F.Layout(nil, fDict.ptSize, pdf.Format(key)+" ")
 		keyGlyphs[i] = gg
 		w := gg.TotalWidth()
 		if w > maxWidth {
@@ -447,13 +447,13 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	page.TextStart()
 	page.TextFirstLine(xBase, l.yPos-l.F["text"].ascent)
 	page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
-	titleWitdhPDF := page.TextShow(title)
+	titleWitdhPDF := page.TextShow(nil, title)
 	if ref != 0 {
-		titleWitdhPDF += page.TextShow(" (")
+		titleWitdhPDF += page.TextShow(nil, " (")
 		page.TextSetFont(l.F["code"].F, l.F["code"].ptSize)
-		titleWitdhPDF += page.TextShow(fmt.Sprintf("%d %d obj", ref.Number(), ref.Generation()))
+		titleWitdhPDF += page.TextShow(nil, fmt.Sprintf("%d %d obj", ref.Number(), ref.Generation()))
 		page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
-		titleWitdhPDF += page.TextShow(")")
+		titleWitdhPDF += page.TextShow(nil, ")")
 	}
 	page.TextEnd()
 	l.yPos -= l.F["text"].baseLineSkip
@@ -481,7 +481,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 		if key == "CharProcs" && len(desc) > 20 {
 			desc = "<< ... >>"
 		}
-		gg.Append(l.F["dict"].F.Layout(l.F["dict"].ptSize, desc))
+		gg.Append(l.F["dict"].F.Layout(nil, l.F["dict"].ptSize, desc))
 
 		page.TextSetFont(l.F["dict"].F, l.F["dict"].ptSize)
 		page.TextShowGlyphs(gg)

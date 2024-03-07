@@ -37,7 +37,7 @@ func TestEmbedBuiltin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			gg := E.Layout(10, "Hello World")
+			gg := E.Layout(nil, 10, "Hello World")
 			for _, g := range gg.Seq { // allocate codes
 				E.CodeAndWidth(nil, g.GID, g.Text)
 			}
@@ -184,7 +184,7 @@ func TestLigatures(t *testing.T) {
 			geom := E.GetGeometry()
 
 			for _, lig := range ligatures {
-				gg := E.Layout(10, lig)
+				gg := E.Layout(nil, 10, lig)
 
 				rr := []rune(lig)
 				if gg.Seq[0].GID == 0 {

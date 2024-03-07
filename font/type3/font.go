@@ -191,27 +191,25 @@ func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *embedded) Layout(ptSize float64, s string) *font.GlyphSeq {
-	rr := []rune(s)
+func (f *embedded) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
 
 	q := f.Font.FontMatrix[0] * ptSize
 
-	gg := make([]font.Glyph, 0, len(rr))
-	for _, r := range rr {
+	for _, r := range []rune(s) {
 		gid, ok := f.CMap[r]
 		if !ok {
 			continue
 		}
-		gg = append(gg, font.Glyph{
+		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     gid,
 			Text:    []rune{r},
 			Advance: float64(f.Glyphs[f.GlyphNames[gid]].WidthX) * q,
 		})
 	}
-	res := &font.GlyphSeq{
-		Seq: gg,
-	}
-	return res
+	return seq
 }
 
 func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {

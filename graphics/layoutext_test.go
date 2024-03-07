@@ -40,7 +40,7 @@ func TestGlyphWidths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gg0 := F.Layout(50, "AB")
+	gg0 := F.Layout(nil, 50, "AB")
 	if len(gg0.Seq) != 2 {
 		t.Fatal("wrong number of glyphs")
 	}
@@ -111,7 +111,7 @@ func TestSpaceAdvance(t *testing.T) {
 	out := graphics.NewWriter(buf, pdf.GetVersion(data))
 	out.TextSetFont(F, 10)
 
-	gg := F.Layout(10, "A B")
+	gg := F.Layout(nil, 10, "A B")
 	if len(gg.Seq) != 3 || string(gg.Seq[1].Text) != " " {
 		t.Fatal("unexpected glyph sequence")
 	}
@@ -161,7 +161,7 @@ func writeDummyDocument(w io.Writer) error {
 	textStyle.FillColor = color.DeviceGray.New(0)
 	textStyle.Set = graphics.StateTextFont | graphics.StateTextLeading | graphics.StateFillColor
 
-	spaceWidth := textStyle.TextLayout(" ").TotalWidth()
+	spaceWidth := textStyle.TextLayout(nil, " ").TotalWidth()
 
 	page := doc.AddPage()
 	textStyle.ApplyTo(page.Writer)
@@ -169,6 +169,8 @@ func writeDummyDocument(w io.Writer) error {
 	yPos := paper.URy - 72
 	page.TextFirstLine(72, yPos)
 	width := paper.Dx() - 2*72
+
+	gg := &font.GlyphSeq{}
 
 	showLine := func(line string) error {
 		if yPos < 72 {
@@ -183,7 +185,7 @@ func writeDummyDocument(w io.Writer) error {
 			yPos = paper.URy - 72
 			page.TextFirstLine(72, yPos)
 		}
-		page.TextShow(line)
+		page.TextShow(gg, line)
 		page.TextNextLine()
 		yPos -= textStyle.TextLeading
 		return nil
@@ -208,7 +210,8 @@ func writeDummyDocument(w io.Writer) error {
 		for len(par) > 0 {
 			var word string
 			word, par = par[0], par[1:]
-			w := textStyle.TextLayout(word).TotalWidth()
+			gg.Reset()
+			w := textStyle.TextLayout(gg, word).TotalWidth()
 			if len(line) == 0 {
 				line = append(line, word)
 				lineWidth = w

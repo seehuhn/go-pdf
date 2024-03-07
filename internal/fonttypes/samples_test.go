@@ -41,7 +41,7 @@ func TestSamples(t *testing.T) {
 			page.TextSetFont(X, 12)
 			page.TextStart()
 			page.TextFirstLine(72, 72)
-			page.TextShow(`“Hello World!”`)
+			page.TextShow(nil, `“Hello World!”`)
 			page.TextEnd()
 			err = page.Close()
 			if err != nil {

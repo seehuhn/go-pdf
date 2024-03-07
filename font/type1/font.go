@@ -218,23 +218,25 @@ type embeddedSimple struct {
 }
 
 // Layout implements the [font.Layouter] interface.
-func (f *embeddedSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
-	rr := []rune(s)
+func (f *embeddedSimple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
 
-	gg := make([]font.Glyph, 0, len(rr))
+	base := len(seq.Seq)
 	var prev glyph.ID
-	for i, r := range rr {
+	for i, r := range []rune(s) {
 		gid := f.cmap[r]
 		if i > 0 {
 			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
-				gg[len(gg)-1].GID = repl
-				gg[len(gg)-1].Text = append(gg[len(gg)-1].Text, r)
-				gg[len(gg)-1].Advance = f.Widths[repl] * ptSize
+				seq.Seq[len(seq.Seq)-1].GID = repl
+				seq.Seq[len(seq.Seq)-1].Text = append(seq.Seq[len(seq.Seq)-1].Text, r)
+				seq.Seq[len(seq.Seq)-1].Advance = f.Widths[repl] * ptSize
 				prev = repl
 				continue
 			}
 		}
-		gg = append(gg, font.Glyph{
+		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     gid,
 			Text:    []rune{r},
 			Advance: f.Widths[gid] * ptSize,
@@ -242,19 +244,17 @@ func (f *embeddedSimple) Layout(ptSize float64, s string) *font.GlyphSeq {
 		prev = gid
 	}
 
-	for i, g := range gg {
-		if i > 0 {
+	for i := base; i < len(seq.Seq); i++ {
+		g := seq.Seq[i]
+		if i > base {
 			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.GID}]; ok {
-				gg[i-1].Advance += float64(adj) * ptSize / 1000
+				seq.Seq[len(seq.Seq)-1].Advance += float64(adj) * ptSize / 1000
 			}
 		}
 		prev = g.GID
 	}
 
-	res := &font.GlyphSeq{
-		Seq: gg,
-	}
-	return res
+	return seq
 }
 
 func (f *embeddedSimple) GlyphWidth(gid glyph.ID) float64 {

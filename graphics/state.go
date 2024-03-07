@@ -343,7 +343,7 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 //
 // If no font is set, or if the current font does not support layouting,
 // this function returns nil.
-func (s State) TextLayout(text string) *font.GlyphSeq {
+func (s State) TextLayout(gg *font.GlyphSeq, text string) *font.GlyphSeq {
 	if !s.isSet(StateTextFont) {
 		return nil
 	}
@@ -368,23 +368,25 @@ func (s State) TextLayout(text string) *font.GlyphSeq {
 		textRise = s.TextRise
 	}
 
-	var gg *font.GlyphSeq
+	if gg == nil {
+		gg = &font.GlyphSeq{}
+	}
+	base := len(gg.Seq)
+
 	if characterSpacing == 0 {
-		gg = F.Layout(s.TextFontSize, text)
+		F.Layout(gg, s.TextFontSize, text)
 	} else {
 		// disable ligatures
-		gg = &font.GlyphSeq{}
 		for _, r := range text {
-			next := F.Layout(s.TextFontSize, string(r))
-			gg.Append(next)
+			F.Layout(gg, s.TextFontSize, string(r))
 		}
 	}
 
 	// Apply PDF layout parameters
-	for i, g := range gg.Seq {
-		advance := g.Advance
+	for i := base; i < len(gg.Seq); i++ {
+		advance := gg.Seq[i].Advance
 		advance += characterSpacing
-		if string(g.Text) == " " {
+		if string(gg.Seq[i].Text) == " " {
 			advance += wordSpacing
 		}
 		gg.Seq[i].Advance = advance * horizontalScaling

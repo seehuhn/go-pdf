@@ -63,7 +63,7 @@ func TestEmbed(t *testing.T) {
 				t.Fatal(err)
 			}
 			testString := "Hello, World!"
-			gg := E.Layout(1, testString)
+			gg := E.Layout(nil, 1, testString)
 			var codes pdf.String
 			for _, g := range gg.Seq {
 				codes, _, _ = E.CodeAndWidth(codes, g.GID, g.Text)
@@ -115,7 +115,7 @@ func TestToUnicode(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				l := E.Layout(10, "AB")
+				l := E.Layout(nil, 10, "AB")
 				gg := l.Seq
 				if len(gg) != 2 {
 					panic("test is broken")
@@ -307,7 +307,7 @@ func TestEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gg := E.Layout(10, ".MiAbc")
+	gg := E.Layout(nil, 10, ".MiAbc")
 	for _, g := range gg.Seq {
 		E.CodeAndWidth(nil, g.GID, g.Text) // allocate codes
 	}

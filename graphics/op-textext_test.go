@@ -228,7 +228,7 @@ func TestTextShowRaw2(t *testing.T) {
 				r.TextSetFont(F, fontSize)
 				r.TextStart()
 				r.TextFirstLine(10, 10)
-				for _, g := range F.Layout(fontSize, testString).Seq {
+				for _, g := range F.Layout(nil, fontSize, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
 					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)
 
@@ -246,7 +246,7 @@ func TestTextShowRaw2(t *testing.T) {
 				}
 
 				r.TextSetFont(F, fontSize)
-				for i, g := range F.Layout(10, testString).Seq {
+				for i, g := range F.Layout(nil, 10, testString).Seq {
 					r.TextStart()
 					r.TextFirstLine(xx[i], 10)
 					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)

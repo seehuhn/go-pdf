@@ -45,6 +45,15 @@ type GlyphSeq struct {
 	Seq  []Glyph
 }
 
+// Reset resets the glyph sequence to an empty sequence.
+func (s *GlyphSeq) Reset() {
+	if s == nil {
+		return
+	}
+	s.Skip = 0
+	s.Seq = s.Seq[:0]
+}
+
 // TotalWidth returns the total advance width of the glyph sequence.
 func (s *GlyphSeq) TotalWidth() float64 {
 	w := s.Skip
@@ -121,8 +130,9 @@ type Layouter interface {
 	// GetGeometry returns font metrics required for typesetting.
 	GetGeometry() *Geometry
 
-	// Layout turns a string into a sequence of glyphs.
-	Layout(ptSize float64, s string) *GlyphSeq
+	// Layout appends a string to a glyph sequence. The string is typeset at
+	// the given point size.
+	Layout(seq *GlyphSeq, ptSize float64, s string) *GlyphSeq
 
 	// CodeAndWidth converts a glyph ID (corresponding to the given text) into
 	// a PDF character code The character code is appended to s. The function
@@ -147,7 +157,7 @@ type Layouter interface {
 // This allocates character codes as needed.
 // All layout information (including kerning) is ignored.
 func EncodeText(F Layouter, s string) pdf.String {
-	gg := F.Layout(10, s)
+	gg := F.Layout(nil, 10, s)
 	var res pdf.String
 	for _, g := range gg.Seq {
 		res, _, _ = F.CodeAndWidth(res, g.GID, g.Text)

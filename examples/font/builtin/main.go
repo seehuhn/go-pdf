@@ -275,7 +275,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 				page.TextShowGlyphs(g)
 
 				page.TextSetFont(f.bodyFont, fontSize)
-				page.TextShow(name)
+				page.TextShow(nil, name)
 
 				curGlyph++
 			}

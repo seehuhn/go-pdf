@@ -65,7 +65,7 @@ func doit() error {
 	page.TextSetFont(F, 36)
 	page.TextStart()
 	page.TextFirstLine(100, 700)
-	page.TextShow("“Größenwahn”")
+	page.TextShow(nil, "“Größenwahn”")
 	page.TextEnd()
 
 	return page.Close()

@@ -149,7 +149,7 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 	page.TextSetFont(F, 12)
 	page.TextStart()
 	page.TextFirstLine(50, 230)
-	page.TextShow("Colors in a CIE-based RGB color space, for r=0.5 (color space CalRGB).")
+	page.TextShow(nil, "Colors in a CIE-based RGB color space, for r=0.5 (color space CalRGB).")
 	page.TextEnd()
 
 	err = page.Close()
@@ -217,7 +217,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	page.TextSetFont(F, 12)
 	page.TextStart()
 	page.TextFirstLine(50, 230)
-	page.TextShow("Colors in the CIE L*a*b* color space, for L*=50 (color space ‘Lab’).")
+	page.TextShow(nil, "Colors in the CIE L*a*b* color space, for L*=50 (color space ‘Lab’).")
 	page.TextEnd()
 
 	err = page.Close()
@@ -297,7 +297,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	page.TextSetFont(F, 12)
 	page.TextStart()
 	page.TextFirstLine(50, 230)
-	page.TextShow("Colors in an indexed color space (color space ‘Indexed’).")
+	page.TextShow(nil, "Colors in an indexed color space (color space ‘Indexed’).")
 	page.TextEnd()
 
 	err = page.Close()
@@ -359,7 +359,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	page.TextSetFont(F, 12)
 	page.TextStart()
 	page.TextFirstLine(50, 230)
-	page.TextShow("A square filled with an uncolored tiling pattern (color space ’Pattern’).")
+	page.TextShow(nil, "A square filled with an uncolored tiling pattern (color space ’Pattern’).")
 	page.TextEnd()
 
 	err = page.Close()
@@ -412,7 +412,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	page.TextSetFont(F, 12)
 	page.TextStart()
 	page.TextFirstLine(50, 230)
-	page.TextShow("A square filled with a colored tiling pattern (color space ’Pattern’).")
+	page.TextShow(nil, "A square filled with a colored tiling pattern (color space ’Pattern’).")
 	page.TextEnd()
 
 	err = page.Close()
@@ -463,7 +463,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	page.TextSetFont(F, 12)
 	page.TextStart()
 	page.TextFirstLine(50, 230)
-	page.TextShow("A square filled with a shading pattern (color space ’Pattern’).")
+	page.TextShow(nil, "A square filled with a shading pattern (color space ’Pattern’).")
 	page.TextEnd()
 
 	err = page.Close()
@@ -550,7 +550,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	page.TextSetFont(F, 12)
 	page.TextStart()
 	page.TextFirstLine(50, 230)
-	page.TextShow("A Type 4 shading drawn using the sh operator.")
+	page.TextShow(nil, "A Type 4 shading drawn using the sh operator.")
 	page.TextEnd()
 
 	err = page.Close()
@@ -574,7 +574,7 @@ func hTickLabel(page *document.Page, F font.Layouter, x, y float64, label string
 
 	page.SetFillColor(black)
 	page.TextSetFont(F, 10)
-	gg := F.Layout(10, label)
+	gg := F.Layout(nil, 10, label)
 	w := gg.TotalWidth()
 	page.TextStart()
 	page.TextFirstLine(x-w/2, y-5-10*geom.Ascent)
@@ -594,7 +594,7 @@ func vTickLabel(page *document.Page, F font.Layouter, x, y float64, label string
 
 	page.SetFillColor(black)
 	page.TextSetFont(F, 10)
-	gg := F.Layout(10, label)
+	gg := F.Layout(nil, 10, label)
 	w := gg.TotalWidth()
 	page.TextStart()
 	page.TextFirstLine(x-5-w, y-10*mid)

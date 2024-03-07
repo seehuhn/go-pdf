@@ -81,7 +81,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	}
 
 	r.Page.TextSetFont(X, 10)
-	r.Page.TextShow("x")
+	r.Page.TextShow(nil, "x")
 	r.Page.TextEnd()
 
 	img, err := r.Close()

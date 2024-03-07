@@ -56,7 +56,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextFirstLine(10, 10)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -68,9 +68,9 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextFirstLine(10, 50)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		p.TextSecondLine(0, -25)
-		p.TextShow("Hello again, world!")
+		p.TextShow(nil, "Hello again, world!")
 		return nil
 	},
 
@@ -82,11 +82,11 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextFirstLine(10, 75)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		p.TextSecondLine(0, -25)
-		p.TextShow("Hello again, world!")
+		p.TextShow(nil, "Hello again, world!")
 		p.TextNextLine()
-		p.TextShow("And again.")
+		p.TextShow(nil, "And again.")
 		return nil
 	},
 
@@ -98,7 +98,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextSetCharacterSpacing(10)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -110,7 +110,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextSetCharacterSpacing(-5)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -122,7 +122,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextSetWordSpacing(20)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -134,7 +134,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextSetWordSpacing(-20)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -147,7 +147,7 @@ var All = []TestCase{
 		p.TextSetFont(E, 48)
 		p.TextFirstLine(-20, 10)
 		p.TextSetHorizontalScaling(1.5)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -159,7 +159,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 48)
 		p.TextSetHorizontalScaling(0.5)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -172,7 +172,7 @@ var All = []TestCase{
 		p.TextSetFont(E, 48)
 		p.TextSetHorizontalScaling(-1)
 		p.TextFirstLine(300, 20)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -184,14 +184,14 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextFirstLine(10, 200)
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		p.TextSetLeading(28)
 		p.TextNextLine()
-		p.TextShow("line 2")
+		p.TextShow(nil, "line 2")
 		p.TextNextLine()
-		p.TextShow("line 3")
+		p.TextShow(nil, "line 3")
 		p.TextNextLine()
-		p.TextShow("line 4")
+		p.TextShow(nil, "line 4")
 		return nil
 	},
 
@@ -202,9 +202,9 @@ var All = []TestCase{
 			return err
 		}
 		p.TextSetFont(E, 24)
-		p.TextShow("Hello, ")
+		p.TextShow(nil, "Hello, ")
 		p.TextSetRise(10)
-		p.TextShow("world!")
+		p.TextShow(nil, "world!")
 		return nil
 	},
 
@@ -216,7 +216,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextSetMatrix(matrix.Rotate(math.Pi / 4))
-		p.TextShow("Hello, world!")
+		p.TextShow(nil, "Hello, world!")
 		return nil
 	},
 
@@ -228,7 +228,7 @@ var All = []TestCase{
 		}
 		p.TextSetFont(E, 24)
 		p.TextSetMatrix(matrix.Matrix{1, 2, 3, 4, 50, 60})
-		p.TextShow("ABC")
+		p.TextShow(nil, "ABC")
 		return nil
 	},
 

@@ -39,7 +39,7 @@ func TestLigatures(t *testing.T) {
 		geom := E.GetGeometry()
 
 		for _, lig := range ligatures {
-			gg := E.Layout(10, lig)
+			gg := E.Layout(nil, 10, lig)
 
 			rr := []rune(lig)
 			if gg.Seq[0].GID == 0 {
