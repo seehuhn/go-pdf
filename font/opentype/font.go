@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 )
 
 type embedder struct {
@@ -56,23 +55,10 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	}
 
 	info := f.sfnt
-
-	fontCmap, err := info.CMapTable.GetBest()
+	layouter, err := f.sfnt.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
 		return nil, err
 	}
-
-	gsubFeatures := opt.GsubFeatures
-	if gsubFeatures == nil {
-		gsubFeatures = gtab.GsubDefaultFeatures
-	}
-	gsubLookups := info.Gsub.FindLookups(opt.Language, gsubFeatures)
-
-	gposFeatures := opt.GposFeatures
-	if gposFeatures == nil {
-		gposFeatures = gtab.GposDefaultFeatures
-	}
-	gposLookups := info.Gpos.FindLookups(opt.Language, gposFeatures)
 
 	resource := pdf.Res{Data: w.Alloc(), DefName: opt.ResName}
 
@@ -95,9 +81,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 				Res:           resource,
 				Geometry:      geometry,
 				sfnt:          f.sfnt,
-				cmap:          fontCmap,
-				gsubLookups:   gsubLookups,
-				gposLookups:   gposLookups,
+				layouter:      layouter,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 			}
 		} else {
@@ -116,15 +100,13 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 			}
 
 			res = &embeddedCFFComposite{
-				w:           w,
-				Res:         resource,
-				Geometry:    geometry,
-				sfnt:        f.sfnt,
-				cmap:        fontCmap,
-				gsubLookups: gsubLookups,
-				gposLookups: gposLookups,
-				GIDToCID:    gidToCID,
-				CIDEncoder:  cidEncoder,
+				w:          w,
+				Res:        resource,
+				Geometry:   geometry,
+				sfnt:       f.sfnt,
+				layouter:   layouter,
+				GIDToCID:   gidToCID,
+				CIDEncoder: cidEncoder,
 			}
 		}
 	} else { // glyf outlines
@@ -145,9 +127,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 				Res:           resource,
 				Geometry:      geometry,
 				sfnt:          f.sfnt,
-				cmap:          fontCmap,
-				gsubLookups:   gsubLookups,
-				gposLookups:   gposLookups,
+				layouter:      layouter,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 				closed:        false,
 			}
@@ -167,15 +147,13 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 			}
 
 			res = &embeddedGlyfComposite{
-				w:           w,
-				Res:         resource,
-				Geometry:    geometry,
-				sfnt:        f.sfnt,
-				cmap:        fontCmap,
-				gsubLookups: gsubLookups,
-				gposLookups: gposLookups,
-				GIDToCID:    gidToCID,
-				CIDEncoder:  cidEncoder,
+				w:          w,
+				Res:        resource,
+				Geometry:   geometry,
+				sfnt:       f.sfnt,
+				layouter:   layouter,
+				GIDToCID:   gidToCID,
+				CIDEncoder: cidEncoder,
 			}
 		}
 	}

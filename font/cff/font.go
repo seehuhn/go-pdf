@@ -28,9 +28,6 @@ import (
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
-	sfntcmap "seehuhn.de/go/sfnt/cmap"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/opentype/gtab"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -75,32 +72,18 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 		Widths:       info.WidthsPDF(),
 	}
 
-	fontCmap, err := info.CMapTable.GetBest()
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
 		return nil, err
 	}
-
-	gsubFeatures := opt.GsubFeatures
-	if gsubFeatures == nil {
-		gsubFeatures = gtab.GsubDefaultFeatures
-	}
-	gsubLookups := info.Gsub.FindLookups(opt.Language, gsubFeatures)
-
-	gposFeatures := opt.GposFeatures
-	if gposFeatures == nil {
-		gposFeatures = gtab.GposDefaultFeatures
-	}
-	gposLookups := info.Gpos.FindLookups(opt.Language, gposFeatures)
 
 	e := embedded{
 		w:        w,
 		Res:      resource,
 		Geometry: geometry,
 
-		sfnt:        info,
-		cmap:        fontCmap,
-		gsubLookups: gsubLookups,
-		gposLookups: gposLookups,
+		sfnt:     info,
+		layouter: layouter,
 	}
 
 	var res font.Layouter
@@ -178,11 +161,8 @@ type embedded struct {
 	pdf.Res
 	*font.Geometry
 
-	sfnt        *sfnt.Font
-	buf         []glyph.Info
-	cmap        sfntcmap.Subtable
-	gsubLookups []gtab.LookupIndex
-	gposLookups []gtab.LookupIndex
+	sfnt     *sfnt.Font
+	layouter *sfnt.Layouter
 
 	closed bool
 }
@@ -193,9 +173,9 @@ func (f *embedded) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		seq = &font.GlyphSeq{}
 	}
 
-	f.buf = f.sfnt.Layout(f.buf, f.cmap, f.gsubLookups, f.gposLookups, s)
-	seq.Seq = slices.Grow(seq.Seq, len(f.buf))
-	for _, g := range f.buf {
+	buf := f.layouter.Layout(s)
+	seq.Seq = slices.Grow(seq.Seq, len(buf))
+	for _, g := range buf {
 		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset

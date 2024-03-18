@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
@@ -149,9 +150,9 @@ func writeDummyDocument(w io.Writer) error {
 		return err
 	}
 
-	F, err := type1.TimesRoman.Embed(doc.Out, nil)
+	// F, err := type1.TimesRoman.Embed(doc.Out, nil)
 	// F, err := gofont.GoRegular.Embed(doc.Out, nil)
-	// F, err := embed.OpenTypeFile(doc.Out, "../../otf/SourceSerif4-Regular.otf", nil)
+	F, err := embed.OpenTypeFile(doc.Out, "../../otf/SourceSerif4-Regular.otf", nil)
 	if err != nil {
 		return err
 	}
