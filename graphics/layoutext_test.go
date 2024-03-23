@@ -147,6 +147,7 @@ func BenchmarkTextLayout(b *testing.B) {
 	// 	b.Fatal(err)
 	// }
 
+	b.ResetTimer()
 	for range b.N {
 		writeDummyDocument(io.Discard, F)
 	}

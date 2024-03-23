@@ -36,7 +36,6 @@ func TestFormat(t *testing.T) {
 		{String("a (test version)"), "(a (test version))"},
 		{String("a (test version"), "(a \\(test version)"},
 		{String(""), "()"},
-		{String("\000"), "<00>"},
 		{Array{Integer(1), nil, Integer(3)}, "[1 null 3]"},
 	}
 	for _, test := range cases {
@@ -48,7 +47,7 @@ func TestFormat(t *testing.T) {
 	}
 }
 
-func TestParseString(t *testing.T) {
+func TestStringParse(t *testing.T) {
 	type testCase struct {
 		in  string
 		out String
@@ -85,9 +84,43 @@ func TestParseString(t *testing.T) {
 	}
 }
 
+func TestStringFormat(t *testing.T) {
+	type testCase struct {
+		in  String
+		out string
+	}
+	cases := []testCase{
+		{String(nil), "()"},
+		{String("test string"), "(test string)"},
+		{String("hello"), "(hello)"},
+		{String("he(ll)o"), "(he(ll)o)"},
+		{String("he((ll)o"), "(he(\\(ll)o)"},
+		{String("he)ll(o"), "(he\\)ll\\(o)"},
+		{String("hello\n"), "(hello\n)"},
+		{String("hello\r"), "(hello\\r)"},
+		{String("hello\r\n"), "(hello\\r\\n)"},
+		{String("hello\n\r"), "(hello\\n\\r)"},
+	}
+	buf := &bytes.Buffer{}
+	for i, test := range cases {
+		buf.Reset()
+		err := test.in.PDF(buf)
+		if err != nil {
+			t.Errorf("%d: %q: %s", i, test.in, err)
+		} else if buf.String() != test.out {
+			t.Errorf("%d: wrong string: %q != %q", i, buf.String(), test.out)
+		}
+	}
+}
+
 func FuzzString(f *testing.F) {
 	f.Add([]byte(""))
 	f.Add([]byte("ABC"))
+	f.Add([]byte("()"))
+	f.Add([]byte(")("))
+	f.Add([]byte("(((()))"))
+	f.Add([]byte("\\\\\\(\\)"))
+	f.Add([]byte(""))
 	f.Add([]byte{0, 1, 2})
 	f.Add([]byte{0xFF, 0x00})
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -97,7 +130,7 @@ func FuzzString(f *testing.F) {
 		if err != nil {
 			t.Error(err)
 		} else if !bytes.Equal(s1, s2) {
-			t.Errorf("wrong string: %q != %q", s1, s2)
+			t.Errorf("wrong string: %q -> %q -> %q", s1, enc, s2)
 		}
 	})
 }

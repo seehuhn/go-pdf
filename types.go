@@ -121,69 +121,94 @@ func (x String) PDF(w io.Writer) error {
 		l = enc
 	}
 
-	level := 0
+	const bufLen = 8
+	var buf [bufLen]byte
+	var used int
+
+	var finalErr error
+	need := func(need int) {
+		if finalErr != nil {
+			used = 0
+		} else if used+need > bufLen {
+			_, err := w.Write(buf[:used])
+			if err != nil {
+				finalErr = err
+			}
+			used = 0
+		}
+	}
+
+	numClosingParentheses := 0
 	for _, c := range l {
-		if c == '(' {
-			level++
-		} else if c == ')' {
-			level--
-			if level < 0 {
-				break
-			}
+		if c == ')' {
+			numClosingParentheses++
 		}
 	}
-	balanced := level == 0
 
-	var funny []int
+	parenthesisLevel := 0
+	need(1)
+	buf[used] = '('
+	used++
 	for i, c := range l {
-		if c < 32 || c == '\\' ||
-			!balanced && (c == '(' || c == ')') {
-			funny = append(funny, i)
+		switch c {
+		case '\r':
+			need(2)
+			buf[used] = '\\'
+			buf[used+1] = 'r'
+			used += 2
+		case '\n':
+			if i > 0 && l[i-1] == '\r' || i < len(l)-1 && l[i+1] == '\r' {
+				need(2)
+				buf[used] = '\\'
+				buf[used+1] = 'n'
+				used += 2
+			} else {
+				need(1)
+				buf[used] = c
+				used++
+			}
+		case '(':
+			if parenthesisLevel < numClosingParentheses {
+				parenthesisLevel++
+				need(1)
+				buf[used] = c
+				used++
+			} else {
+				need(2)
+				buf[used] = '\\'
+				buf[used+1] = '('
+				used += 2
+			}
+		case ')':
+			numClosingParentheses--
+			if parenthesisLevel > 0 {
+				parenthesisLevel--
+				need(1)
+				buf[used] = c
+				used++
+			} else {
+				need(2)
+				buf[used] = '\\'
+				buf[used+1] = ')'
+				used += 2
+			}
+		case '\\':
+			need(2)
+			buf[used] = '\\'
+			buf[used+1] = '\\'
+			used += 2
+		default:
+			need(1)
+			buf[used] = c
+			used++
 		}
 	}
-	n := len(l)
+	need(1)
+	buf[used] = ')'
+	used++
 
-	buf := &bytes.Buffer{}
-	if 3*len(funny) <= n {
-		buf.WriteString("(")
-		pos := 0
-		for _, i := range funny {
-			if pos < i {
-				buf.Write(l[pos:i])
-			}
-			c := l[i]
-			switch c {
-			case '\r':
-				buf.WriteString(`\r`)
-			case '\n':
-				buf.WriteString(`\n`)
-			case '\t':
-				buf.WriteString(`\t`)
-			case '\b':
-				buf.WriteString(`\b`)
-			case '\f':
-				buf.WriteString(`\f`)
-			case '(':
-				buf.WriteString(`\(`)
-			case ')':
-				buf.WriteString(`\)`)
-			case '\\':
-				buf.WriteString(`\\`)
-			default:
-				fmt.Fprintf(buf, `\%03o`, c)
-			}
-			pos = i + 1
-		}
-		if pos < n {
-			buf.Write(l[pos:n])
-		}
-		buf.WriteString(")")
-	} else {
-		fmt.Fprintf(buf, "<%x>", l)
-	}
-
-	_, err := w.Write(buf.Bytes())
-	return err
+	need(bufLen)
+	return finalErr
 }
 
 // AsTextString interprets x as a PDF "text string" and returns
