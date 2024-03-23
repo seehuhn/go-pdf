@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
@@ -135,12 +134,25 @@ func TestSpaceAdvance(t *testing.T) {
 }
 
 func BenchmarkTextLayout(b *testing.B) {
+	// F := type1.TimesRoman
+
+	F := gofont.GoRegular
+
+	// info, err := sfnt.ReadFile("../../otf/SourceSerif4-Regular.otf")
+	// if err != nil {
+	// 	b.Fatal(err)
+	// }
+	// F, err := cff.New(info)
+	// if err != nil {
+	// 	b.Fatal(err)
+	// }
+
 	for range b.N {
-		writeDummyDocument(io.Discard)
+		writeDummyDocument(io.Discard, F)
 	}
 }
 
-func writeDummyDocument(w io.Writer) error {
+func writeDummyDocument(w io.Writer, F font.Font) error {
 	words1 := strings.Fields(sampleText1)
 	words2 := strings.Fields(sampleText2)
 
@@ -150,15 +162,13 @@ func writeDummyDocument(w io.Writer) error {
 		return err
 	}
 
-	// F, err := type1.TimesRoman.Embed(doc.Out, nil)
-	// F, err := gofont.GoRegular.Embed(doc.Out, nil)
-	F, err := embed.OpenTypeFile(doc.Out, "../../otf/SourceSerif4-Regular.otf", nil)
+	E, err := F.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}
 
 	textStyle := graphics.NewState()
-	textStyle.TextFont = F
+	textStyle.TextFont = E
 	textStyle.TextFontSize = 10
 	textStyle.TextLeading = 12
 	textStyle.FillColor = color.DeviceGray.New(0)
