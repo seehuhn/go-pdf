@@ -340,11 +340,11 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 
 // TextLayout appends a string to a GlyphSeq, using the text parameters from
 // the given graphics state.  If seq is nil, a new GlyphSeq is allocated.  The
-// resulting GlyphSeq is returned.  If seq is not nil (and there is no error),
-// the return value is guaranteed to be equal to seq.
+// resulting GlyphSeq is returned.
 //
 // If no font is set, or if the current font does not implement
-// [font.Layouter], the function returns nil.
+// [font.Layouter], the function returns nil.  If seq is not nil (and there is
+// no error), the return value is guaranteed to be equal to seq.
 func (s State) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 	if !s.isSet(StateTextFont) {
 		return nil
