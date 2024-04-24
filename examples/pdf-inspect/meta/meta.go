@@ -95,6 +95,9 @@ func showInfo(obj pdf.Object, info *pdf.Info) {
 	if info.Trapped != "" {
 		fmt.Println("Trapped:", info.Trapped)
 	}
+	for name, value := range info.Custom {
+		fmt.Printf("%s: %v\n", name, value)
+	}
 	fmt.Println()
 }
 
@@ -126,6 +129,10 @@ func showXMP(r *pdf.Reader, ref pdf.Reference) error {
 	basic := &xmp.XMP{}
 	packet.Get(basic)
 	showXMPStruct(basic)
+
+	pdf := &PDF{}
+	packet.Get(pdf)
+	showXMPStruct(pdf)
 
 	fmt.Println()
 
@@ -207,15 +214,6 @@ func showXMPValue(label string, value xmp.Value) {
 		for _, q := range ll {
 			fmt.Println("  " + q)
 		}
-	case xmp.OrderedArray[xmp.ProperName]:
-		fmt.Println(label)
-		for i, elem := range value.V {
-			showXMPValue(fmt.Sprintf("  [%d]", i+1), elem)
-		}
-		ll := getXMPQualifiers(value.Q)
-		for _, q := range ll {
-			fmt.Println("  " + q)
-		}
 	default:
 		raw := value.GetXMP()
 		lines := getXMPRaw(label, raw)
@@ -275,23 +273,22 @@ func getXMPRaw(label string, value xmp.Raw) []string {
 			lines = append(lines, "  "+q)
 		}
 	case xmp.RawArray:
-		var start, end string
-		switch value.Kind {
-		case xmp.Ordered:
-			start, end = "[", "]"
-		case xmp.Unordered:
-			start, end = "{", "}"
-		case xmp.Alternative:
-			start, end = "(", ")"
-		}
-		lines = append(lines, label+" "+start)
-		for _, elem := range value.Value {
-			ll := getXMPRaw("  -", elem)
+		lines = append(lines, label)
+		for i, elem := range value.Value {
+			var label string
+			switch value.Kind {
+			case xmp.Ordered:
+				label = fmt.Sprintf("%d.", i+1)
+			case xmp.Unordered:
+				label = "-"
+			case xmp.Alternative:
+				label = "*"
+			}
+			ll := getXMPRaw(label, elem)
 			for _, l := range ll {
 				lines = append(lines, "  "+l)
 			}
 		}
-		lines = append(lines, "  "+end)
 		qq := getXMPQualifiers(value.Q)
 		for _, q := range qq {
 			lines = append(lines, "  "+q)
@@ -303,9 +300,23 @@ func getXMPRaw(label string, value xmp.Raw) []string {
 func getXMPQualifiers(Q []xmp.Qualifier) []string {
 	var res []string
 	for _, q := range Q {
-		key := fmt.Sprintf("%s %s:", q.Name.Space, q.Name.Local)
+		var key string
+		if q.Name.Space == "http://www.w3.org/XML/1998/namespace" {
+			key = fmt.Sprintf("xml:%s", q.Name.Local)
+		} else {
+			key = fmt.Sprintf("%s %s:", q.Name.Space, q.Name.Local)
+		}
 		ll := getXMPRaw(key, q.Value)
 		res = append(res, ll...)
 	}
 	return res
+}
+
+type PDF struct {
+	_          xmp.Namespace `xmp:"http://ns.adobe.com/pdf/1.3/"`
+	_          xmp.Prefix    `xmp:"pdf"`
+	Keywords   xmp.Text
+	PDFVersion xmp.Text
+	Producer   xmp.AgentName
+	Trapped    xmp.Text
 }
