@@ -45,15 +45,15 @@ func TestCatalog(t *testing.T) {
 func TestCatalogReadMissingPages(t *testing.T) {
 	ref := NewReference(123, 0)
 	catalogDict := Dict{
-		"MetaData": ref,
+		"Metadata": ref,
 	}
 	catalog := &Catalog{}
 	err := DecodeDict(nil, catalog, catalogDict)
 	if err == nil {
 		t.Errorf("missing Pages not detected")
 	}
-	if catalog.MetaData != ref {
-		t.Errorf("wrong MetaData: %v", catalog.MetaData)
+	if catalog.Metadata != ref {
+		t.Errorf("wrong Metadata: %v", catalog.Metadata)
 	}
 }
 

@@ -32,7 +32,7 @@ import (
 type FormProperties struct {
 	BBox         *pdf.Rectangle
 	Matrix       matrix.Matrix
-	MetaData     pdf.Reference
+	Metadata     pdf.Reference
 	PieceInfo    pdf.Object
 	LastModified time.Time
 	// TODO(voss): StructParent, StructParents
@@ -61,8 +61,8 @@ func Raw(w pdf.Putter, f *FormProperties, contents []byte, resources *pdf.Resour
 	if resources != nil {
 		dict["Resources"] = pdf.AsDict(resources)
 	}
-	if f.MetaData != 0 {
-		dict["Metadata"] = f.MetaData
+	if f.Metadata != 0 {
+		dict["Metadata"] = f.Metadata
 	}
 	if f.PieceInfo != nil {
 		dict["PieceInfo"] = f.PieceInfo

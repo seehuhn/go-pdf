@@ -33,13 +33,15 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/term"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/examples/pdf-inspect/meta"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
 var (
-	debug     = flag.Bool("d", false, "debug mode")
-	passwdArg = flag.String("p", "", "PDF password")
+	debug        = flag.Bool("d", false, "debug mode")
+	passwdArg    = flag.String("p", "", "PDF password")
+	showMetadata = flag.Bool("show-metadata", false, "show PDF metadata")
 )
 
 func main() {
@@ -96,6 +98,11 @@ func printObject(args ...string) error {
 		fmt.Println(err)
 	}
 	defer r.Close()
+
+	if *showMetadata {
+		err = meta.ShowMetadata(r)
+		return err
+	}
 
 	e := &explainer{
 		r:   r,
@@ -332,6 +339,20 @@ func (e *explainer) rel(key string) error {
 			return fmt.Errorf("%s: index %d out of range 0...%d", loc, idx, len(x)-1)
 		}
 		obj = x[idx]
+	case *pdf.Stream:
+		if key == "dict" {
+			obj = x.Dict
+		} else {
+			if strings.HasPrefix(key, "/") {
+				key = key[1:]
+			}
+
+			var ok bool
+			obj, ok = x.Dict[pdf.Name(key)]
+			if !ok {
+				return fmt.Errorf("%s: key %q not found", loc, key)
+			}
+		}
 	}
 
 	obj, err = pdf.Resolve(e.r, obj)

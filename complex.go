@@ -204,7 +204,7 @@ type Catalog struct {
 	AA                Object       `pdf:"optional"`
 	URI               Object       `pdf:"optional"`
 	AcroForm          Object       `pdf:"optional"`
-	MetaData          Reference    `pdf:"optional"`
+	Metadata          Reference    `pdf:"optional"`
 	StructTreeRoot    Object       `pdf:"optional"`
 	MarkInfo          Object       `pdf:"optional"`
 	Lang              language.Tag `pdf:"optional"`

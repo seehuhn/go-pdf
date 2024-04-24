@@ -214,7 +214,7 @@ func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 	dict["O"] = String(sec.O)
 	dict["U"] = String(sec.U)
 	dict["P"] = Integer(int32(sec.P))
-	if sec.unencryptedMetaData {
+	if sec.unencryptedMetadata {
 		dict["EncryptMetadata"] = Boolean(false)
 	}
 	if sec.R == 6 {
@@ -436,13 +436,13 @@ type stdSecHandler struct {
 	readPwd func([]byte, int) string
 	key     []byte
 
-	// unencryptedMetaData specifies whether document-level XMP metadata
+	// unencryptedMetadata specifies whether document-level XMP metadata
 	// streams are encrypted.
 	//
 	// We use the negation of /EncryptMetadata from the PDF spec, so that
-	// the Go default value (unencryptedMetaData==false) corresponds to the
+	// the Go default value (unencryptedMetadata==false) corresponds to the
 	// PDF default value (/EncryptMetadata true).
-	unencryptedMetaData bool
+	unencryptedMetadata bool
 
 	ownerAuthenticated bool
 }
@@ -481,7 +481,7 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 	}
 
 	emd := true
-	if obj, ok := enc["EncryptMetaData"].(Boolean); ok && V >= 4 {
+	if obj, ok := enc["EncryptMetadata"].(Boolean); ok && V >= 4 {
 		emd = bool(obj)
 	}
 
@@ -495,7 +495,7 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 		U: []byte(U),
 		P: uint32(P),
 
-		unencryptedMetaData: !emd,
+		unencryptedMetadata: !emd,
 	}
 
 	if R == 6 {
@@ -710,7 +710,7 @@ func (sec *stdSecHandler) computeFileEncyptionKey(paddedUserPwd []byte) []byte {
 	h.Write([]byte{
 		byte(sec.P), byte(sec.P >> 8), byte(sec.P >> 16), byte(sec.P >> 24)})
 	h.Write(sec.ID)
-	if sec.unencryptedMetaData && sec.R >= 4 {
+	if sec.unencryptedMetadata && sec.R >= 4 {
 		h.Write([]byte{255, 255, 255, 255})
 	}
 	key := h.Sum(nil)
@@ -986,7 +986,7 @@ func (sec *stdSecHandler) computePerms(fileEncryptionKey []byte) []byte {
 	buf[5] = 0xFF
 	buf[6] = 0xFF
 	buf[7] = 0xFF
-	if sec.unencryptedMetaData {
+	if sec.unencryptedMetadata {
 		buf[8] = 'F'
 	} else {
 		buf[8] = 'T'
@@ -1059,7 +1059,7 @@ func (sec *stdSecHandler) checkPerms(fileEncryptionKey []byte) error {
 	}
 
 	var emdCode byte
-	if sec.unencryptedMetaData {
+	if sec.unencryptedMetadata {
 		emdCode = 'F'
 	} else {
 		emdCode = 'T'
