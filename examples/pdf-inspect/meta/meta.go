@@ -155,7 +155,16 @@ func showXMPStruct(v any) {
 	}
 	st := s.Type()
 
+	prefixTagType := reflect.TypeFor[xmp.Prefix]()
 	typeType := reflect.TypeFor[xmp.Value]()
+
+	var pfx string
+	for i := 0; i < st.NumField(); i++ {
+		if s.Field(i).Type() == prefixTagType {
+			pfx = st.Field(i).Tag.Get("xmp") + ":"
+			break
+		}
+	}
 
 	for i := 0; i < st.NumField(); i++ {
 		fVal := s.Field(i)
@@ -163,8 +172,12 @@ func showXMPStruct(v any) {
 
 		if fVal.CanInterface() && fVal.Type().Implements(typeType) {
 			val := fVal.Interface().(xmp.Value)
+			propertyName := fInfo.Tag.Get("xmp")
+			if propertyName == "" {
+				propertyName = fInfo.Name
+			}
 			if !val.IsZero() {
-				showXMPValue(fInfo.Name+":", val)
+				showXMPValue(pfx+propertyName, val)
 			}
 		}
 	}
