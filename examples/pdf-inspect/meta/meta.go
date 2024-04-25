@@ -134,23 +134,31 @@ func showXMP(r *pdf.Reader, ref pdf.Reference) error {
 	packet.Get(pdf)
 	showXMPStruct(pdf)
 
+	xmpMM := &xmp.MediaManagement{}
+	packet.Get(xmpMM)
+	showXMPStruct(xmpMM)
+
+	xmpRights := &xmp.RightsManagement{}
+	packet.Get(xmpRights)
+	showXMPStruct(xmpRights)
+
 	fmt.Println()
 
-	names := maps.Keys(packet.Properties)
-	sort.Slice(names, func(i, j int) bool {
-		if names[i].Space != names[j].Space {
-			return names[i].Space < names[j].Space
-		}
-		return names[i].Local < names[j].Local
-	})
-	for _, name := range names {
-		label := fmt.Sprintf("%s %s:", name.Space, name.Local)
-		raw := packet.Properties[name]
-		lines := getXMPRaw(label, raw)
-		for _, line := range lines {
-			fmt.Println(line)
-		}
-	}
+	// names := maps.Keys(packet.Properties)
+	// sort.Slice(names, func(i, j int) bool {
+	// 	if names[i].Space != names[j].Space {
+	// 		return names[i].Space < names[j].Space
+	// 	}
+	// 	return names[i].Local < names[j].Local
+	// })
+	// for _, name := range names {
+	// 	label := fmt.Sprintf("%s %s:", name.Space, name.Local)
+	// 	raw := packet.Properties[name]
+	// 	lines := getXMPRaw(label, raw)
+	// 	for _, line := range lines {
+	// 		fmt.Println(line)
+	// 	}
+	// }
 
 	return nil
 }
@@ -226,8 +234,8 @@ func showXMPValue(label string, value xmp.Value) {
 func getXMPRaw(label string, value xmp.Raw) []string {
 	var lines []string
 	switch value := value.(type) {
-	case xmp.RawText:
-		line := label + " " + value.Value
+	case xmp.Text:
+		line := label + " " + value.V
 		qq := getXMPQualifiers(value.Q)
 		if len(qq) == 1 {
 			lines = append(lines, line+" ["+qq[0]+"]")
@@ -237,8 +245,8 @@ func getXMPRaw(label string, value xmp.Raw) []string {
 				lines = append(lines, "  "+q)
 			}
 		}
-	case xmp.RawURI:
-		line := label + " " + value.Value.String()
+	case xmp.URL:
+		line := label + " " + value.V.String()
 		qq := getXMPQualifiers(value.Q)
 		if len(qq) == 1 {
 			lines = append(lines, line+" ["+qq[0]+"]")
@@ -312,6 +320,8 @@ func getXMPQualifiers(Q []xmp.Qualifier) []string {
 	return res
 }
 
+// PDF is the XMP namespace for PDF metadata.
+// See https://developer.adobe.com/xmp/docs/XMPNamespaces/pdf/
 type PDF struct {
 	_          xmp.Namespace `xmp:"http://ns.adobe.com/pdf/1.3/"`
 	_          xmp.Prefix    `xmp:"pdf"`
