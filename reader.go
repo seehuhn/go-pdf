@@ -266,7 +266,7 @@ func (r *Reader) Authenticate(perm Perm) error {
 	if r.enc == nil || r.enc.sec.key != nil {
 		return nil
 	}
-	perm = perm & PermAll
+	perm &= PermAll
 	if perm&r.enc.UserPermissions == perm {
 		return nil
 	}

@@ -198,7 +198,7 @@ func (f *embedded) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 
 	q := f.Font.FontMatrix[0] * ptSize
 
-	for _, r := range []rune(s) {
+	for _, r := range s {
 		gid, ok := f.CMap[r]
 		if !ok {
 			continue

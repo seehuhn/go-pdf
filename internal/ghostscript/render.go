@@ -79,14 +79,20 @@ func newGSRenderer(paper *pdf.Rectangle, v pdf.Version) (*gsRenderer, error) {
 	var dir string
 	var err error
 	if !keepTempFiles {
-		dir, err = os.MkdirTemp("", "pdf*")
+		dir, err = os.MkdirTemp("", "pdf")
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		const dirName = "./render-files"
-		os.Mkdir(dirName, 0755)
+		err = os.Mkdir(dirName, 0755)
+		if err != nil && !os.IsExist(err) {
+			return nil, err
+		}
 		dir, err = filepath.Abs(dirName)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	idx := <-gsIndex

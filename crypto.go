@@ -578,10 +578,7 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length,
 		if err != nil {
 			return nil, err
 		}
-		sec.O, err = sec.computeO(paddedUserPwd, paddedOwnerPwd)
-		if err != nil {
-			return nil, err
-		}
+		sec.O = sec.computeO(paddedUserPwd, paddedOwnerPwd)
 		fileEncryptionKey := sec.computeFileEncyptionKey(paddedUserPwd)
 		sec.U = sec.computeU(fileEncryptionKey)
 		sec.key = fileEncryptionKey
@@ -806,7 +803,7 @@ func slowHash(passwd, salt, U []byte) []byte {
 
 // algorithm 3: compute O.
 // The algorithm is documented in section 7.6.3.4 of ISO 32000-1:2008.
-func (sec *stdSecHandler) computeO(paddedUserPwd, paddedOwnerPwd []byte) ([]byte, error) {
+func (sec *stdSecHandler) computeO(paddedUserPwd, paddedOwnerPwd []byte) []byte {
 	h := md5.New()
 	h.Write(paddedOwnerPwd)
 	sum := h.Sum(nil)
@@ -834,7 +831,7 @@ func (sec *stdSecHandler) computeO(paddedUserPwd, paddedOwnerPwd []byte) ([]byte
 			c.XORKeyStream(O, O)
 		}
 	}
-	return O, nil
+	return O
 }
 
 // Algorithm 4/5: compute U.

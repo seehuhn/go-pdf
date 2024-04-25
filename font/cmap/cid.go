@@ -331,7 +331,7 @@ func (g *gidToCIDSequential) GID(cid pscid.CID) glyph.ID {
 func (g *gidToCIDSequential) ROS() *pscid.SystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
-	binary.Write(h, binary.BigEndian, len(g.g2c))
+	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
 	gg := maps.Keys(g.g2c)
 	slices.Sort(gg)
 	for _, gid := range gg {

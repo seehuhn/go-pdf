@@ -38,10 +38,7 @@ func TestComputeOU(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	O, err := sec.computeO(padded, padded)
-	if err != nil {
-		t.Fatal(err)
-	}
+	O := sec.computeO(padded, padded)
 	goodO := "badad1e86442699427116d3e5d5271bc80a27814fc5e80f815efeef839354c5f"
 	if fmt.Sprintf("%x", O) != goodO {
 		t.Fatal("wrong O value")

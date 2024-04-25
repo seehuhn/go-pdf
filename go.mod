@@ -14,7 +14,7 @@ require (
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
 	seehuhn.de/go/postscript v0.4.5
 	seehuhn.de/go/sfnt v0.4.5
-	seehuhn.de/go/xmp v0.0.0-20240424162827-8f9923d1209e
+	seehuhn.de/go/xmp v0.1.0
 )
 
 require (
