@@ -162,11 +162,13 @@ fieldLoop:
 
 		// get and fix up the value from the Dict
 		dictVal := src[Name(fInfo.Name)]
-		if fInfo.Type != objectType && fInfo.Type != refType {
+		if fInfo.Type != objectType && fInfo.Type != referenceType {
 			// follow references to indirect objects where needed
 			obj, err := Resolve(r, dictVal)
 			if err != nil {
-				firstErr = err
+				if firstErr == nil {
+					firstErr = err
+				}
 				continue
 			}
 			dictVal = obj
@@ -279,11 +281,10 @@ fieldLoop:
 }
 
 var (
-	objectType    = reflect.TypeOf((*Object)(nil)).Elem()
-	refType       = reflect.TypeOf(Reference(0))
-	nameType      = reflect.TypeOf(Name(""))
-	versionType   = reflect.TypeOf(V1_7)
-	timeType      = reflect.TypeOf(time.Time{})
-	languageType  = reflect.TypeOf(language.Tag{})
-	referenceType = reflect.TypeOf(Reference(0))
+	languageType  = reflect.TypeFor[language.Tag]()
+	nameType      = reflect.TypeFor[Name]()
+	objectType    = reflect.TypeFor[Object]()
+	referenceType = reflect.TypeFor[Reference]()
+	timeType      = reflect.TypeFor[time.Time]()
+	versionType   = reflect.TypeFor[Version]()
 )
