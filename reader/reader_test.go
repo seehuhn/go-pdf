@@ -262,6 +262,15 @@ func FuzzReader(f *testing.F) {
 					w.SetFillColor(color.DeviceGray.New(gray))
 				}
 
+			case "K":
+				cyan, ok1 := getNum()
+				magenta, ok2 := getNum()
+				yellow, ok3 := getNum()
+				black, ok4 := getNum()
+				if ok1 && ok2 && ok3 && ok4 {
+					w.SetStrokeColor(color.DeviceCMYK.New(cyan, magenta, yellow, black))
+				}
+
 			case "k":
 				cyan, ok1 := getNum()
 				magenta, ok2 := getNum()

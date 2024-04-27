@@ -37,7 +37,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer doc.Close()
 
 	font, err := type1.HelveticaBold.Embed(doc.Out, &font.Options{ResName: "F"})
 	if err != nil {
@@ -50,5 +49,5 @@ func run() error {
 	doc.TextShow("Hello, World!")
 	doc.TextEnd()
 
-	return nil
+	return doc.Close()
 }

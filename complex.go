@@ -151,10 +151,16 @@ func (r *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {
 		math.Abs(r.URy-other.URy) < eps)
 }
 
+// XPos returns the x-coordinate of a point in the rectangle, given a relative
+// position between 0 and 1.  The relative position 0 corresponds to the left
+// edge of the rectangle, and 1 to the right edge.
 func (r *Rectangle) XPos(rel float64) float64 {
 	return r.LLx + rel*(r.URx-r.LLx)
 }
 
+// YPos returns the y-coordinate of a point in the rectangle, given a relative
+// position between 0 and 1.  The relative position 0 corresponds to the bottom
+// edge of the rectangle, and 1 to the top edge.
 func (r *Rectangle) YPos(rel float64) float64 {
 	return r.LLy + rel*(r.URy-r.LLy)
 }

@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/matrix"
-	"seehuhn.de/go/pdf/internal/float"
 )
 
 // This file implements the operators in the "General Graphics State" and

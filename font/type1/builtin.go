@@ -162,7 +162,7 @@ func (f Builtin) StandardWidths(encoding []string) []float64 {
 	return ww
 }
 
-// The 14 built-in PDF fonts.
+// The 14 standard PDF fonts.
 //
 // All of these fonts implement the [font.Font] interface.
 const (

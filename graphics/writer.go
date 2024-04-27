@@ -21,9 +21,9 @@ import (
 	"io"
 	"strconv"
 
+	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/internal/float"
 )
 
 // Writer writes a PDF content stream.
@@ -178,7 +178,7 @@ func (w *Writer) isValid(cmd string, ss objectType) bool {
 
 func (w *Writer) coord(x float64) string {
 	// TODO(voss): use the current transformation matrix to determine the
-	// number of digits to keep.
+	// number of digits to keep?
 	return float.Format(x, 2)
 }
 

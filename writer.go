@@ -36,9 +36,12 @@ type WriterOptions struct {
 	UserPassword    string
 	OwnerPassword   string
 	UserPermissions Perm
-}
 
-var defaultWriterOptions = &WriterOptions{}
+	// If this flag is true, the writer tries to generate a PDF file which is
+	// more human-readable.  A side effect of this is that the size of the
+	// generated file is significantly increased.
+	HumanReadable bool
+}
 
 // Writer represents a PDF file open for writing.
 // Use [Create] or [NewWriter] to create a new Writer.
@@ -56,6 +59,8 @@ type Writer struct {
 	afterStream []allocatedObject
 
 	autoclose []io.Closer
+
+	humanReadable bool
 }
 
 // TODO(voss): is this more generally useful?
@@ -88,7 +93,7 @@ func Create(name string, v Version, opt *WriterOptions) (*Writer, error) {
 // write the PDF trailer.
 func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	if opt == nil {
-		opt = defaultWriterOptions
+		opt = &WriterOptions{}
 	}
 
 	versionString, err := v.ToString() // check for valid version
@@ -213,6 +218,8 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 		nextRef: 1,
 		xref:    xref,
+
+		humanReadable: opt.HumanReadable,
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -262,7 +269,7 @@ func (pdf *Writer) Close() error {
 	// write the cross reference table and trailer
 	xRefPos := pdf.w.pos
 	trailer["Size"] = Integer(pdf.nextRef)
-	if pdf.meta.Version < V1_5 {
+	if pdf.meta.Version < V1_5 || pdf.humanReadable {
 		err = pdf.writeXRefTable(trailer)
 	} else {
 		err = pdf.writeXRefStream(trailer)
@@ -355,7 +362,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if pdf.meta.Version < V1_5 {
+	if pdf.meta.Version < V1_5 || pdf.humanReadable {
 		// Object streams are only availble in PDF version 1.5 and higher.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)

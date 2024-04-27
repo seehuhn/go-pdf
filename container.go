@@ -223,6 +223,7 @@ type Putter interface {
 	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
 
 	// TODO(voss): allow to set the object ID for the containing stream?
+	// TODO(voss): rename to PutCompressed?
 	WriteCompressed(refs []Reference, objects ...Object) error
 
 	AutoClose(obj io.Closer)

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
@@ -369,6 +370,8 @@ doOps:
 		dx, ok1 := getNum()
 		dy, ok2 := getNum()
 		if ok1 && ok2 {
+			dx = float.Round(dx, 2)
+			dy = float.Round(dy, 2)
 			r.TextLineMatrix = matrix.Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 		}
@@ -501,6 +504,7 @@ doOps:
 			break
 		}
 		r.StrokeColor = color.DeviceRGB.New(red, green, blue)
+		r.Set |= graphics.StateStrokeColor
 
 	case "rg": // nonstroking DeviceRGB color
 		if len(args) < 3 {
@@ -518,6 +522,7 @@ doOps:
 			break
 		}
 		r.FillColor = color.DeviceRGB.New(red, green, blue)
+		r.Set |= graphics.StateFillColor
 
 	case "K": // stroking DeviceCMYK color
 		if len(args) < 4 {
@@ -538,6 +543,7 @@ doOps:
 			break
 		}
 		r.StrokeColor = color.DeviceCMYK.New(cyan, magenta, yellow, black)
+		r.Set |= graphics.StateStrokeColor
 
 	case "k": // nonstroking DeviceCMYK color
 		if len(args) < 4 {
@@ -558,6 +564,7 @@ doOps:
 			break
 		}
 		r.FillColor = color.DeviceCMYK.New(cyan, magenta, yellow, black)
+		r.Set |= graphics.StateFillColor
 
 	// == Shading patterns ===============================================
 

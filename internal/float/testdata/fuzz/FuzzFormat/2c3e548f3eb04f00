@@ -1,3 +1,0 @@
-go test fuzz v1
-float64(-1.9277999999971667e+12)
-int(5)

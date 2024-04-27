@@ -102,6 +102,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 }
 
 // Write writes the PDF document to w.
+// TODO(voss): take a *WriterOptions argument?
 func (d *Data) Write(w io.Writer) error {
 	opt := &WriterOptions{
 		ID: d.meta.ID,

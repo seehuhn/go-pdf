@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strings"
 
+	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/internal/float"
 )
 
 // This file implements functions to set the stroke and fill colors.

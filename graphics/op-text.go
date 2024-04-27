@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/matrix"
@@ -208,6 +209,9 @@ func (w *Writer) TextFirstLine(x, y float64) {
 	if !w.isValid("TextFirstLine", objText) {
 		return
 	}
+
+	x = float.Round(x, 2)
+	y = float.Round(y, 2)
 
 	w.TextLineMatrix = matrix.Translate(x, y).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
