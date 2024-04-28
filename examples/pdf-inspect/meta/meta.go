@@ -124,23 +124,23 @@ func showXMP(r *pdf.Reader, ref pdf.Reference) error {
 
 	dc := &xmp.DublinCore{}
 	packet.Get(dc)
-	showXMPStruct(dc)
+	showXMPStruct(packet, dc)
 
 	basic := &xmp.XMP{}
 	packet.Get(basic)
-	showXMPStruct(basic)
+	showXMPStruct(packet, basic)
 
 	pdf := &PDF{}
 	packet.Get(pdf)
-	showXMPStruct(pdf)
+	showXMPStruct(packet, pdf)
 
 	xmpMM := &xmp.MediaManagement{}
 	packet.Get(xmpMM)
-	showXMPStruct(xmpMM)
+	showXMPStruct(packet, xmpMM)
 
 	xmpRights := &xmp.RightsManagement{}
 	packet.Get(xmpRights)
-	showXMPStruct(xmpRights)
+	showXMPStruct(packet, xmpRights)
 
 	fmt.Println()
 
@@ -163,7 +163,7 @@ func showXMP(r *pdf.Reader, ref pdf.Reference) error {
 	return nil
 }
 
-func showXMPStruct(v any) {
+func showXMPStruct(p *xmp.Packet, v any) {
 	s := reflect.Indirect(reflect.ValueOf(v))
 	if s.Kind() != reflect.Struct {
 		panic("not a struct")
@@ -192,13 +192,13 @@ func showXMPStruct(v any) {
 				propertyName = fInfo.Name
 			}
 			if !val.IsZero() {
-				showXMPValue(pfx+propertyName, val)
+				showXMPValue(p, pfx+propertyName, val)
 			}
 		}
 	}
 }
 
-func showXMPValue(label string, value xmp.Value) {
+func showXMPValue(p *xmp.Packet, label string, value xmp.Value) {
 	switch value := value.(type) {
 	case xmp.Date:
 		line := label + " " + value.V.String()
@@ -213,17 +213,17 @@ func showXMPValue(label string, value xmp.Value) {
 		}
 	case xmp.Localized:
 		fmt.Println(label)
-		showXMPValue("  [x-default]", value.Default)
+		showXMPValue(p, "  [x-default]", value.Default)
 		for key, elem := range value.V {
 			lab := fmt.Sprintf("  [%s]", key)
-			showXMPValue(lab, elem)
+			showXMPValue(p, lab, elem)
 		}
 		ll := getXMPQualifiers(value.Q)
 		for _, q := range ll {
 			fmt.Println("  " + q)
 		}
 	default:
-		raw := value.GetXMP()
+		raw := value.GetXMP(p)
 		lines := getXMPRaw(label, raw)
 		for _, line := range lines {
 			fmt.Println(line)

@@ -211,8 +211,9 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		},
 
 		w: &posWriter{
-			w:   bufferedW,
-			enc: enc,
+			w:      bufferedW,
+			enc:    enc,
+			pretty: opt.HumanReadable,
 		},
 		origW: w,
 
@@ -620,8 +621,9 @@ type posWriter struct {
 	w   writeFlusher
 	pos int64
 
-	ref Reference
-	enc *encryptInfo
+	ref    Reference
+	enc    *encryptInfo
+	pretty bool
 }
 
 func (w *posWriter) Write(p []byte) (int, error) {

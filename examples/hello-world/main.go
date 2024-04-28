@@ -33,7 +33,10 @@ func main() {
 }
 
 func run() error {
-	doc, err := document.CreateSinglePage("hello.pdf", document.A4r, pdf.V1_7, nil)
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	doc, err := document.CreateSinglePage("hello.pdf", document.A4r, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}

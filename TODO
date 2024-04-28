@@ -7,5 +7,4 @@
 
 - implement CCITTFaxDecode filters
 - implement public key encryption?
-- implement crypt filters?
 - add a way to repair broken xref tables?

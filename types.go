@@ -113,12 +113,34 @@ var errInvalidString = errors.New("malformed PDF string")
 func (x String) PDF(w io.Writer) error {
 	l := []byte(x)
 
-	if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
-		enc, err := wenc.enc.EncryptBytes(wenc.ref, l)
-		if err != nil {
+	var pretty bool
+	if wenc, ok := w.(*posWriter); ok {
+		if wenc.enc != nil {
+			enc, err := wenc.enc.EncryptBytes(wenc.ref, l)
+			if err != nil {
+				return err
+			}
+			l = enc
+		} else {
+			pretty = wenc.pretty
+		}
+	}
+
+	if pretty {
+		good := 0
+		bad := 0
+		for _, c := range l {
+			isPrint := c >= 0x20 && c <= 0x7e || c == '\n' || c == '\r' || c == '\t'
+			if isPrint {
+				good++
+			} else {
+				bad++
+			}
+		}
+		if good < 9*bad { // use hex encoding
+			_, err := fmt.Fprintf(w, "<%x>", l)
 			return err
 		}
-		l = enc
 	}
 
 	const bufLen = 8
@@ -207,7 +229,8 @@ func (x String) PDF(w io.Writer) error {
 	buf[used] = ')'
 	used++
 
-	need(bufLen)
+	need(bufLen) // flush the buffer
+
 	return finalErr
 }
 
