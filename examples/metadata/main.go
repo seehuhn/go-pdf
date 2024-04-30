@@ -64,7 +64,7 @@ func run() error {
 	dc.Description.Set(language.MustParse("x-default"), "This is a test document.")
 	dc.Description.Set(language.English, "This is a test document.")
 	dc.Description.Set(language.German, "Dies ist eine Testdatei.")
-	xmpInfo := &xmp.XMP{}
+	xmpInfo := &xmp.Basic{}
 	xmpInfo.CreateDate = xmp.NewDate(now)
 	xmpInfo.ModifyDate = xmp.NewDate(now)
 	pdfInfo := &PDF{}

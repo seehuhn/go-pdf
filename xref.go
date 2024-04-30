@@ -312,21 +312,21 @@ func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, R
 
 func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	size, ok := dict["Size"].(Integer)
-	if !ok {
+	if !ok || size < 0 || size > math.MaxUint32 {
 		return nil, nil, &MalformedFileError{
 			Err: errInvalidXref,
 		}
 	}
 	W, ok := dict["W"].(Array)
-	if !ok || len(W) < 3 {
+	if !ok || len(W) != 3 {
 		return nil, nil, &MalformedFileError{
 			Err: errInvalidXref,
 		}
 	}
 	var w []int
-	for i, Wi := range W {
+	for _, Wi := range W {
 		wi, ok := Wi.(Integer)
-		if !ok || wi < 0 || i < 3 && wi > 8 {
+		if !ok || wi < 0 || wi > 8 {
 			return nil, nil, &MalformedFileError{
 				Err: errInvalidXref,
 			}

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
 	"strconv"
 )
@@ -84,7 +85,11 @@ func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 		return nil, 0, err
 	}
 
-	// TODO(voss): check for overflow
+	if number < 0 || number > math.MaxUint32 || generation < 0 || generation > math.MaxUint16 {
+		return nil, 0, &MalformedFileError{
+			Err: fmt.Errorf("invalid reference %d %d", number, generation),
+		}
+	}
 	ref := NewReference(uint32(number), uint16(generation))
 	if s.unencrypted[ref] {
 		// some objects are not encrypted, e.g. xref dictionaries
@@ -127,7 +132,11 @@ func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 				return nil, 0, err
 			}
 
-			// TODO(voss): check for overflow
+			if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint16 {
+				return nil, 0, &MalformedFileError{
+					Err: fmt.Errorf("invalid reference %d %d", a, b),
+				}
+			}
 			obj = NewReference(uint32(a), uint16(b))
 		}
 	}
@@ -463,10 +472,13 @@ func (s *scanner) ReadArray() (Array, error) {
 		if integersSeen >= 2 && buf[0] == 'R' {
 			s.bufPos++
 			k := len(array)
-			// TODO(voss): check for overflow
 			a := uint32(array[k-2].(Integer))
 			b := uint16(array[k-1].(Integer))
-			array = append(array[:k-2], NewReference(a, b))
+			if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint16 {
+				array = append(array[:k-2], nil)
+			} else {
+				array = append(array[:k-2], NewReference(a, b))
+			}
 			integersSeen = 0
 			continue
 		}
@@ -572,8 +584,11 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 					return nil, err
 				}
 
-				// TODO(voss): check for overflow
-				val = NewReference(uint32(a), uint16(b))
+				if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint16 {
+					val = nil
+				} else {
+					val = NewReference(uint32(a), uint16(b))
+				}
 			}
 		}
 

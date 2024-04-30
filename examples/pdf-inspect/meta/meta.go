@@ -126,7 +126,7 @@ func showXMP(r *pdf.Reader, ref pdf.Reference) error {
 	packet.Get(dc)
 	showXMPStruct(packet, dc)
 
-	basic := &xmp.XMP{}
+	basic := &xmp.Basic{}
 	packet.Get(basic)
 	showXMPStruct(packet, basic)
 
@@ -223,7 +223,7 @@ func showXMPValue(p *xmp.Packet, label string, value xmp.Value) {
 			fmt.Println("  " + q)
 		}
 	default:
-		raw := value.GetXMP(p)
+		raw := value.EncodeXMP(p)
 		lines := getXMPRaw(label, raw)
 		for _, line := range lines {
 			fmt.Println(line)

@@ -13,7 +13,7 @@ require (
 	seehuhn.de/go/float v0.0.0-20240426200002-d66a1cadabf5
 	seehuhn.de/go/postscript v0.4.5
 	seehuhn.de/go/sfnt v0.4.5
-	seehuhn.de/go/xmp v0.2.1
+	seehuhn.de/go/xmp v0.3.0
 )
 
 require (

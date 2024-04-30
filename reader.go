@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 )
 
@@ -473,7 +474,9 @@ func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 		if err != nil {
 			return nil, err
 		}
-		// TODO(voss): check for overflow
+		if no < 0 || no > math.MaxUint32 || offs < 0 || offs > math.MaxInt {
+			return nil, &MalformedFileError{Err: errors.New("invalid object number or offset")}
+		}
 		idx[i].number = uint32(no)
 		idx[i].offs = int(offs)
 	}
@@ -484,6 +487,7 @@ func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 		return nil, &MalformedFileError{Err: errors.New("no valid /First")}
 	}
 	for i := range idx {
+		// TODO(voss): check for overflow
 		idx[i].offs += int(first)
 	}
 
