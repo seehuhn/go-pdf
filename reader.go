@@ -483,11 +483,12 @@ func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 
 	pos := s.currentPos()
 	first, ok := stream.Dict["First"].(Integer)
-	if !ok || first < Integer(pos) {
+	firstInt := int(first)
+	if !ok || first < Integer(pos) || first != Integer(firstInt) {
 		return nil, &MalformedFileError{Err: errors.New("no valid /First")}
 	}
 	for i := range idx {
-		x := idx[i].offs + int(first)
+		x := idx[i].offs + firstInt
 		if x < idx[i].offs { // check for integer overflow
 			return nil, &MalformedFileError{Err: errors.New("invalid object offset")}
 		}
