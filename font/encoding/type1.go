@@ -131,6 +131,9 @@ func UndescribeEncodingType1(r pdf.Getter, desc pdf.Object, builtin []string) ([
 		for _, x := range a {
 			switch x := x.(type) {
 			case pdf.Integer:
+				if x < 0 || x >= 256 {
+					return nil, fmt.Errorf("encoding: invalid code %d", x)
+				}
 				code = int(x)
 			case pdf.Name:
 				if code < 0 || code >= 256 {

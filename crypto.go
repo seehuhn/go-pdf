@@ -88,12 +88,12 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 			Length: 40, // default
 		}
 		if obj, ok := enc["Length"].(Integer); ok && (V == 2 || V == 3) {
-			cf.Length = int(obj)
-			if cf.Length < 40 || cf.Length > 128 || cf.Length%8 != 0 {
+			if obj < 40 || obj > 128 || obj%8 != 0 {
 				return nil, &MalformedFileError{
-					Err: fmt.Errorf("invalid Length=%d", cf.Length),
+					Err: fmt.Errorf("invalid Length=%d", obj),
 				}
 			}
+			cf.Length = int(obj)
 		}
 		res.stmF = cf
 		res.strF = cf

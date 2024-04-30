@@ -313,7 +313,7 @@ func (e *explainer) rel(key string) error {
 		}
 
 		if loc == "catalog.Pages" && intRegexp.MatchString(key) && !forceKey {
-			pageNo, err := strconv.ParseUint(key, 10, 32)
+			pageNo, err := strconv.ParseInt(key, 10, 0)
 			if err != nil {
 				return err
 			}
