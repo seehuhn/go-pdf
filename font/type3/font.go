@@ -544,6 +544,9 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		}
 		switch obj := obj.(type) {
 		case pdf.Integer:
+			if obj >= 256 {
+				return nil, errors.New("invalid code in Encoding.Differences")
+			}
 			code = int(obj)
 		case pdf.Name:
 			name := string(obj)

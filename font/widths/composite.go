@@ -18,6 +18,7 @@ package widths
 
 import (
 	"errors"
+	"math"
 	"sort"
 
 	"seehuhn.de/go/dag"
@@ -180,8 +181,10 @@ func DecodeComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]floa
 			return nil, err
 		}
 		if c1, ok := obj1.(pdf.Integer); ok {
-			if len(w) < 3 {
-				break
+			if len(w) < 3 || c0 < 0 || c1 < c0 || c1-c0 > 65536 {
+				return nil, &pdf.MalformedFileError{
+					Err: errors.New("invalid W entry in CIDFont dictionary"),
+				}
 			}
 			wi, err := pdf.GetNumber(r, w[2])
 			if err != nil {
@@ -194,7 +197,7 @@ func DecodeComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]floa
 						Err: errors.New("invalid W entry in CIDFont dictionary"),
 					}
 				}
-				if float64(wi) != dw {
+				if math.Abs(float64(wi)-dw) > 1e-6 {
 					res[cid] = float64(wi)
 				}
 			}

@@ -84,7 +84,7 @@ func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 			set |= graphics.StateLineWidth
 		case "LC":
 			lc, err := pdf.GetInteger(r.R, v)
-			if pdf.IsMalformed(err) {
+			if pdf.IsMalformed(err) || lc < 0 || lc > 2 {
 				break
 			} else if err != nil {
 				return nil, err
@@ -93,7 +93,7 @@ func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 			set |= graphics.StateLineCap
 		case "LJ":
 			lj, err := pdf.GetInteger(r.R, v)
-			if pdf.IsMalformed(err) {
+			if pdf.IsMalformed(err) || lj < 0 || lj > 2 {
 				break
 			} else if err != nil {
 				return nil, err

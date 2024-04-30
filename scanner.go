@@ -472,12 +472,12 @@ func (s *scanner) ReadArray() (Array, error) {
 		if integersSeen >= 2 && buf[0] == 'R' {
 			s.bufPos++
 			k := len(array)
-			a := uint32(array[k-2].(Integer))
-			b := uint16(array[k-1].(Integer))
+			a := array[k-2].(Integer)
+			b := array[k-1].(Integer)
 			if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint16 {
 				array = append(array[:k-2], nil)
 			} else {
-				array = append(array[:k-2], NewReference(a, b))
+				array = append(array[:k-2], NewReference(uint32(a), uint16(b)))
 			}
 			integersSeen = 0
 			continue

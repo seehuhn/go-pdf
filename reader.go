@@ -487,8 +487,11 @@ func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 		return nil, &MalformedFileError{Err: errors.New("no valid /First")}
 	}
 	for i := range idx {
-		// TODO(voss): check for overflow
-		idx[i].offs += int(first)
+		x := idx[i].offs + int(first)
+		if x < idx[i].offs { // check for integer overflow
+			return nil, &MalformedFileError{Err: errors.New("invalid object offset")}
+		}
+		idx[i].offs = x
 	}
 
 	return &objStm{s: s, idx: idx}, nil
