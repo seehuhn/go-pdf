@@ -174,6 +174,8 @@ func isAvailable() bool {
 	return gsScriptFound
 }
 
+// ErrNoGhostscript is returned if the ghostscript command-line tool is not
+// available.
 var ErrNoGhostscript = errors.New("cannot run ghostscript")
 
 var (

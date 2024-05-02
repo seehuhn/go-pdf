@@ -31,7 +31,9 @@ func TestTextPos(t *testing.T) {
 		page.TextFirstLine(xTest, yTest)
 		return nil
 	})
-	if err != nil {
+	if err == ErrNoGhostscript {
+		t.Skip("ghostscript not found")
+	} else if err != nil {
 		t.Fatal(err)
 	}
 
