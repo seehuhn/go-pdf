@@ -29,7 +29,7 @@ file, starting from the root. The meaning of each selector depends on the type
 of the current object:
 
 - For dictionaries, the selector is interpreted as a dictionary key.
-  The selector can optionally be prefixed with a slash `/`.
+  The key name can optionally be prefixed with a slash `/`.
   The new current object is the corresponding value in the dictionary.
 
 - As a special case, if the current object is the root of the page tree,
@@ -40,8 +40,9 @@ of the current object:
   (0-based).  The new current object is the array element at the index.
 
 - If the current object is a stream, the selector is interpreted as a key in
-  the stream dictionary. The new current object is the value of the key. The
-  special selector `data` can be used to access the stream data as a whole.
+  the stream dictionary. The key name can optionally be prefixed with a slash
+  `/`. The new current object is the value of the key.  The special selector
+  `dict` can be used to access the stream dict as a whole.
 
 The optional action decides what to do with the current object:
 

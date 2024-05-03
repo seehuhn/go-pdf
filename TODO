@@ -1,7 +1,8 @@
+- add a slightly higher-level API for typesetting text,
+  to avoid PDF output like "[-722 (1) -722] TJ" for centered text
 - decide whether matrices are [6]float64 or []float64
 
 - make sure that unit tests don't leave stray files behind
-- rationalize the error handling
 - make sure that supporting incremental updates to PDF files will not require
   major changes to the API
 
