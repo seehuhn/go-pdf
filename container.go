@@ -158,8 +158,6 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.Reader, error) {
 
 // Filters extracts the information contained in the /Filter and /DecodeParms
 // entries of the stream dictionary.
-//
-// TODO(voss): remove?
 func getFilters(r Getter, x *Stream) ([]Filter, error) {
 	decodeParams, err := resolve(r, x.Dict["DecodeParms"], false)
 	if err != nil {
