@@ -35,10 +35,6 @@ func (w *Writer) TextShow(s string) float64 {
 	if !w.isValid("TextShow", objText) {
 		return 0
 	}
-	if !w.isSet(StateTextFont) {
-		w.Err = errors.New("no font set")
-		return 0
-	}
 
 	w.glyphBuf.Reset()
 	gg := w.TextLayout(w.glyphBuf, s)
@@ -46,7 +42,25 @@ func (w *Writer) TextShow(s string) float64 {
 		w.Err = errors.New("font does not support layouting")
 		return 0
 	}
+
 	return w.TextShowGlyphs(gg)
+}
+
+// TextShowAligned draws a string and aligns it.
+// The string is aligned in a space of the given width.
+// q=0 means left alignment, q=1 means right alignment
+// and q=0.5 means centering.
+func (w *Writer) TextShowAligned(s string, width, q float64) {
+	if !w.isValid("TextShowAligned", objText) {
+		return
+	}
+	gg := w.TextLayout(nil, s)
+	if gg == nil {
+		w.Err = errors.New("font does not support layouting")
+		return
+	}
+	gg.Align(width, q)
+	w.TextShowGlyphs(gg)
 }
 
 // TextShowGlyphs shows the PDF string s, taking kerning and text rise into
@@ -161,21 +175,4 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	w.TextMatrix = matrix.Translate(xActual, 0).Mul(w.TextMatrix)
 
 	return xActual
-}
-
-// TextShowAligned draws a string and aligns it.
-// The string is aligned in a space of the given width.
-// q=0 means left alignment, q=1 means right alignment
-// and q=0.5 means centering.
-func (w *Writer) TextShowAligned(s string, width, q float64) {
-	if !w.isValid("TextShowAligned", objText) {
-		return
-	}
-	gg := w.TextLayout(nil, s)
-	if gg == nil {
-		w.Err = errors.New("font does not support layouting")
-		return
-	}
-	gg.Align(width, q)
-	w.TextShowGlyphs(gg)
 }
