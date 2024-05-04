@@ -145,7 +145,7 @@ func doit() error {
 
 		page := doc.AddPage()
 
-		page.TextStart()
+		page.TextBegin()
 		if s.level == 1 {
 			gg := SB.Layout(nil, l.F["chapter"].ptSize, title)
 			w := gg.TotalWidth()
@@ -166,7 +166,7 @@ func doit() error {
 		page.TextEnd()
 		page.SetFillColor(color.DeviceGray.New(0))
 
-		page.TextStart()
+		page.TextBegin()
 		if X != nil {
 			intro = append(intro, "", fmt.Sprintf("Example (see `fonts%02d.pdf`):", fontNo))
 		}
@@ -226,7 +226,7 @@ func doit() error {
 			}
 
 			l.yPos -= 20
-			page.TextStart()
+			page.TextBegin()
 			page.TextFirstLine(l.leftMargin, l.yPos)
 			page.TextSetFont(Y, 24)
 			page.TextShow(exampleText)
@@ -300,7 +300,7 @@ func doit() error {
 
 		// add the page number
 		page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
-		page.TextStart()
+		page.TextBegin()
 		xMid := (l.leftMargin + (paper.URx - l.rightMargin)) / 2
 		page.TextFirstLine(xMid, 36)
 		page.TextShowAligned(fmt.Sprintf("%d", pageNo), 0, 0.5)
@@ -344,7 +344,7 @@ func writeSinglePage(F font.Font, no int) error {
 		return err
 	}
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(72, 72)
 	page.TextSetFont(X, 24)
 	page.TextShow(exampleText)
@@ -444,7 +444,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	xBase := l.leftMargin + 5
 
 	y0 := l.yPos + 2
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(xBase, l.yPos-l.F["text"].ascent)
 	page.TextSetFont(l.F["text"].F, l.F["text"].ptSize)
 	titleWitdhPDF := page.TextShow(title)
@@ -461,7 +461,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	y1 := l.yPos + 5
 	yy[""] = y1
 
-	page.TextStart()
+	page.TextBegin()
 	lineNo := 0
 	for i, key := range keys {
 		switch lineNo {

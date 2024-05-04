@@ -108,7 +108,7 @@ func (f *fontTables) FlushPage() error {
 	}
 
 	f.pageNo++
-	f.page.TextStart()
+	f.page.TextBegin()
 	f.page.TextSetFont(f.bodyFont, 10)
 	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin-20)
 	f.page.TextShowAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
@@ -146,7 +146,7 @@ func (f *fontTables) AddTitle(title string, fontSize, before, after float64) err
 
 	f.used += before
 
-	f.page.TextStart()
+	f.page.TextBegin()
 	f.page.TextSetFont(f.titleFont, fontSize)
 	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin+f.textHeight-f.used)
 	f.page.TextShowAligned(title, 0, 0.5)
@@ -226,7 +226,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 
 		// Then draw the glyphs and their codes/names.
 		for col := 0; col < 4; col++ {
-			page.TextStart()
+			page.TextBegin()
 			x := f.margin + float64(col)*colWidth
 			for i := 0; i < nRows; i++ {
 				if curGlyph >= nGlyph {

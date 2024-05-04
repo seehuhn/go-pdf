@@ -47,7 +47,7 @@ func TestGlyphWidths(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	out := graphics.NewWriter(buf, pdf.GetVersion(data))
-	out.TextStart()
+	out.TextBegin()
 	out.TextSetHorizontalScaling(2)
 	out.TextSetFont(F, 50)
 	out.TextFirstLine(100, 100)
@@ -120,7 +120,7 @@ func TestSpaceAdvance(t *testing.T) {
 	gg.Seq[0].Advance += 100
 	gg.Seq[1].Advance -= 100
 
-	out.TextStart()
+	out.TextBegin()
 	out.TextShowGlyphs(gg)
 	out.TextEnd()
 
@@ -179,7 +179,7 @@ func writeDummyDocument(w io.Writer, F font.Font) error {
 
 	page := doc.AddPage()
 	textStyle.ApplyTo(page.Writer)
-	page.TextStart()
+	page.TextBegin()
 	yPos := paper.URy - 72
 	page.TextFirstLine(72, yPos)
 	width := paper.Dx() - 2*72
@@ -195,7 +195,7 @@ func writeDummyDocument(w io.Writer, F font.Font) error {
 			}
 			page = doc.AddPage()
 			textStyle.ApplyTo(page.Writer)
-			page.TextStart()
+			page.TextBegin()
 			yPos = paper.URy - 72
 			page.TextFirstLine(72, yPos)
 		}

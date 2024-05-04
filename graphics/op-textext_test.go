@@ -46,7 +46,7 @@ func TestTextPos(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			page.TextStart()
+			page.TextBegin()
 			err = setup(page)
 			if err != nil {
 				t.Fatal(err)
@@ -128,7 +128,7 @@ func TestTextShowRaw(t *testing.T) {
 			img1 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
 				F := dummyfont.EmbedCFF(r.Out, e, "F")
 
-				r.TextStart()
+				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
 				r.TextSetMatrix(c.M)
 				r.TextSetHorizontalScaling(c.stretch)
@@ -143,7 +143,7 @@ func TestTextShowRaw(t *testing.T) {
 			img2 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
 				F := dummyfont.EmbedCFF(r.Out, e, "F")
 
-				r.TextStart()
+				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
 				r.TextSetMatrix(c.M)
 				r.TextSetHorizontalScaling(c.stretch)
@@ -162,7 +162,7 @@ func TestTextShowRaw(t *testing.T) {
 
 				r.TextSetFont(F, 100)
 				for i := range testString {
-					r.TextStart()
+					r.TextBegin()
 					r.TextSetFont(F, c.fontSize)
 					r.TextSetMatrix(c.M)
 					r.TextSetHorizontalScaling(c.stretch)
@@ -226,7 +226,7 @@ func TestTextShowRaw2(t *testing.T) {
 				}
 
 				r.TextSetFont(F, fontSize)
-				r.TextStart()
+				r.TextBegin()
 				r.TextFirstLine(10, 10)
 				for _, g := range F.Layout(nil, fontSize, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
@@ -247,7 +247,7 @@ func TestTextShowRaw2(t *testing.T) {
 
 				r.TextSetFont(F, fontSize)
 				for i, g := range F.Layout(nil, 10, testString).Seq {
-					r.TextStart()
+					r.TextBegin()
 					r.TextFirstLine(xx[i], 10)
 					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)
 					r.TextShowRaw(s)

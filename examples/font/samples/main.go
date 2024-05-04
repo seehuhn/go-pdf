@@ -142,7 +142,7 @@ func (f *fontSamples) ClosePage() error {
 	}
 
 	f.pageNo++
-	f.page.TextStart()
+	f.page.TextBegin()
 	f.page.TextSetFont(f.bodyFont, 10)
 	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin-20)
 	f.page.TextShowAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
@@ -177,7 +177,7 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 	}
 
 	f.used += a
-	f.page.TextStart()
+	f.page.TextBegin()
 	f.page.TextSetFont(f.titleFont, fontSize)
 	f.page.TextFirstLine(f.margin, f.margin+f.textHeight-f.used)
 	f.page.TextShow(title)
@@ -250,7 +250,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	}
 
 	page := f.page
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(f.margin, f.margin+f.textHeight-f.used-v1)
 	page.TextSetFont(bodyFont, 10)
 	page.TextShow(subTitle)

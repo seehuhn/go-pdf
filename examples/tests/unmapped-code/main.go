@@ -73,7 +73,7 @@ func run() error {
 
 	yPos := paper.URy - 72 - 15
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextSetFont(F, 10)
 	page.TextFirstLine(72, yPos)
 	gg := page.TextLayout(nil, "code used in WinAnsi encoding:")

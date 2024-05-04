@@ -212,7 +212,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 			label = append(label, fmt.Sprintf("CID=%d", cid))
 		}
 
-		page.TextStart()
+		page.TextBegin()
 		page.TextSetFont(ctx.labelFont, 12)
 		page.TextFirstLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
 		page.TextShow(strings.Join(label, ", "))
@@ -283,7 +283,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 			// label the points
 			page.PushGraphicsState()
 			page.SetFillColor(color.DeviceRGB.New(0, 0, 0.8))
-			page.TextStart()
+			page.TextBegin()
 			page.TextSetFont(ctx.labelFont, 8/q)
 			xPrev := 0.0
 			yPrev := 0.0

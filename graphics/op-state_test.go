@@ -70,7 +70,7 @@ func TestPushPopErr2(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf, pdf.V2_0)
 
-	w.TextStart()
+	w.TextBegin()
 	w.PushGraphicsState()
 	w.TextEnd()
 	w.PopGraphicsState()
@@ -86,7 +86,7 @@ func TestPushPopInText(t *testing.T) {
 			buf := &bytes.Buffer{}
 			w := NewWriter(buf, v)
 
-			w.TextStart()
+			w.TextBegin()
 			w.PushGraphicsState()
 			w.PopGraphicsState()
 			w.TextEnd()

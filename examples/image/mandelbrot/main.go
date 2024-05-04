@@ -71,7 +71,7 @@ func run(fname string) error {
 	if err != nil {
 		return err
 	}
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(72, bottom-20)
 	page.TextSetFont(bold, 10)
 	page.TextShow("Figure 1.")

@@ -30,12 +30,12 @@ import (
 // implemented here are defined in tables 103, 105, 106 107 of ISO
 // 32000-2:2020.
 
-// TextStart starts a new text object.
+// TextBegin starts a new text object.
 // This must be paired with [Writer.TextEnd].
 //
 // This implements the PDF graphics operator "BT".
-func (w *Writer) TextStart() {
-	if !w.isValid("TextStart", objPage) {
+func (w *Writer) TextBegin() {
+	if !w.isValid("TextBegin", objPage) {
 		return
 	}
 	w.currentObject = objText
@@ -50,7 +50,7 @@ func (w *Writer) TextStart() {
 }
 
 // TextEnd ends the current text object.
-// This must be paired with [Writer.TextStart].
+// This must be paired with [Writer.TextBegin].
 //
 // This implements the PDF graphics operator "ET".
 func (w *Writer) TextEnd() {
@@ -60,7 +60,7 @@ func (w *Writer) TextEnd() {
 	w.currentObject = objPage
 
 	if len(w.nesting) == 0 || w.nesting[len(w.nesting)-1] != pairTypeBT {
-		w.Err = errors.New("TextEnd: no matching TextStart")
+		w.Err = errors.New("TextEnd: no matching TextBegin")
 		return
 	}
 	w.nesting = w.nesting[:len(w.nesting)-1]

@@ -126,7 +126,7 @@ func run(filename string) error {
 		page.Stroke()
 		page.PopGraphicsState()
 
-		page.TextStart()
+		page.TextBegin()
 		yPos := paper.URy - 10 - ascent
 		for i := 0; yPos+descent >= 10 && gid < numGlyphs; i++ {
 			switch i {

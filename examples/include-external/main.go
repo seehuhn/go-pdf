@@ -68,7 +68,7 @@ func run() error {
 	page.PopGraphicsState()
 
 	base -= 12
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(72, base)
 	page.TextSetFont(B, 10)
 	page.TextShow("Figure 1.  ")

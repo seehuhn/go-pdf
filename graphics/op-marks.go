@@ -25,10 +25,16 @@ import (
 
 // MarkedContent represents a marked-content point or sequence.
 type MarkedContent struct {
+	// Properties is a property list.  The value can either be nil, or a
+	// [pdf.Dict], or a [pdf.Resource] representing a [pdf.Dict].
 	Properties pdf.Dict
-	Tag        pdf.Name
-	Inline     bool
-	DefName    pdf.Name
+
+	// Tag specifies the role or significance of the sequence. The
+	Tag pdf.Name
+
+	Inline bool
+
+	DefName pdf.Name
 }
 
 // PDFObject implements the [pdf.Resource] interface.
@@ -85,10 +91,6 @@ func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
 
 // MarkedContentStart begins a marked-content sequence.  The sequence is
 // terminated by a call to [Writer.MarkedContentEnd].
-//
-// The tag parameter specifies the role or significance of the sequence. The
-// properties parameter is a property list.  Properties can either be nil, or a
-// [pdf.Dict], or a [pdf.Resource] representing a [pdf.Dict].
 //
 // This implements the PDF graphics operators "BMC" and "BDC".
 func (w *Writer) MarkedContentStart(mc *MarkedContent) {

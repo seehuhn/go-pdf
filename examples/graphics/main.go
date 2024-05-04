@@ -54,7 +54,7 @@ func main() {
 
 	x = 72
 	y -= 72
-	w.TextStart()
+	w.TextBegin()
 	w.TextSetFont(F, 12)
 	w.TextFirstLine(x, y)
 	w.TextShow("AWAY again")
@@ -78,7 +78,7 @@ func main() {
 	}
 	w.Stroke()
 	w.PopGraphicsState()
-	w.TextStart()
+	w.TextBegin()
 	w.TextSetFont(F, 9)
 	for i, phi := range []float64{85, 87, 89, 91, 93, 95} {
 		switch i {

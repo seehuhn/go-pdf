@@ -64,7 +64,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	doc.TextStart()
+	doc.TextBegin()
 	doc.TextSetFont(F1Dict, 12)
 	doc.TextFirstLine(72, 340)
 	doc.TextShow("ABABAB")

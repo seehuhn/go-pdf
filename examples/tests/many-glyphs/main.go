@@ -102,7 +102,7 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, d
 		gg.Align(0, 0.5)
 		gid++
 
-		page.TextStart()
+		page.TextBegin()
 		page.TextFirstLine(float64(5+20*col+10), float64(20*nRow-10-20*row))
 		page.TextShowGlyphs(gg)
 		page.TextEnd()
@@ -111,7 +111,7 @@ func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, d
 
 	page.TextSetFont(H, 8)
 	page.SetFillColor(color.DeviceGray.New(0.5))
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(5, paper.URy-10)
 	page.TextShow(desc)
 	page.TextEnd()

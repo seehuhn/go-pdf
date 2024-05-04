@@ -47,7 +47,7 @@ func run() error {
 	}
 
 	doc.TextSetFont(font, 50)
-	doc.TextStart()
+	doc.TextBegin()
 	doc.TextFirstLine(50, 420)
 	doc.TextShow("Hello, World!")
 	doc.TextEnd()

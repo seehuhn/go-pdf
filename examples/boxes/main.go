@@ -97,7 +97,7 @@ func doit() error {
 	page.SetFillColor(color.DeviceGray.New(0.6))
 	page.TextSetFont(F, 9)
 	for _, x := range []float64{82, 532} {
-		page.TextStart()
+		page.TextBegin()
 		for i := 0; i <= 600; i += 50 {
 			switch i {
 			case 0:
@@ -112,7 +112,7 @@ func doit() error {
 		page.TextEnd()
 	}
 	for _, y := range []float64{72, 522} {
-		page.TextStart()
+		page.TextBegin()
 		for i := 0; i <= 600; i += 50 {
 			switch i {
 			case 0:
@@ -128,26 +128,26 @@ func doit() error {
 
 	page.TextSetFont(F, 12)
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(10, 574)
 	page.TextShow("This text is outside the CropBox.  It will not be visible on most PDF viewers.")
 	page.TextEnd()
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(60, 480)
 	page.TextShow("Every PDF page has a MediaBox.  The MediaBox contains all other page boxes.")
 	page.TextSecondLine(0, -12*geom.BaseLineDistance)
 	page.TextShow("On this page, the MediaBox is the rectangle [0,600]×[0,600].")
 	page.TextEnd()
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(60, 430)
 	page.TextShow("PDF viewers restrict display of a page to the CropBox.")
 	page.TextSecondLine(0, -12*geom.BaseLineDistance)
 	page.TextShow("On this page, the CropBox is the rectangle [50,550]×[50,550].")
 	page.TextEnd()
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(60, 336)
 	page.TextShow("In professional production, the TrimBox gives the outline of the finished page after trimming.")
 	page.TextSecondLine(0, -12*geom.BaseLineDistance)
@@ -159,7 +159,7 @@ func doit() error {
 	page.SetFillColor(color.DeviceGray.New(0))
 	page.TextEnd()
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(60, 286)
 	page.TextShow("In professional production, the BleedBox gives the print area before trimming.")
 	page.TextSecondLine(0, -12*geom.BaseLineDistance)
@@ -171,7 +171,7 @@ func doit() error {
 	page.SetFillColor(color.DeviceGray.New(0))
 	page.TextEnd()
 
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(60, 186)
 	page.TextShow("The final page box is the ArtBox.")
 	page.TextSecondLine(0, -12*geom.BaseLineDistance)

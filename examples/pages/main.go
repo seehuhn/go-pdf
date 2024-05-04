@@ -61,7 +61,7 @@ func main() {
 		}
 		g := graphics.NewWriter(stream, pdf.GetVersion(out))
 
-		g.TextStart()
+		g.TextBegin()
 		g.TextSetFont(font, 12)
 		g.TextFirstLine(30, 30)
 		if i < 3 {
@@ -97,7 +97,7 @@ func main() {
 		}
 		g := graphics.NewWriter(stream, pdf.GetVersion(out))
 
-		g.TextStart()
+		g.TextBegin()
 		g.TextSetFont(font, 12)
 		g.TextFirstLine(30, 30)
 		g.TextShow("Title")
@@ -132,7 +132,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		g.TextStart()
+		g.TextBegin()
 		g.TextSetFont(font, 12)
 		g.TextFirstLine(30, 30)
 		g.TextShow("three")

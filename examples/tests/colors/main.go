@@ -147,7 +147,7 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 	vTickLabel(page, F, 50, 800, "b=1.0")
 
 	page.TextSetFont(F, 12)
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(50, 230)
 	page.TextShow("Colors in a CIE-based RGB color space, for r=0.5 (color space CalRGB).")
 	page.TextEnd()
@@ -215,7 +215,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	vTickLabel(page, F, 50, 800, "b*=100")
 
 	page.TextSetFont(F, 12)
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(50, 230)
 	page.TextShow("Colors in the CIE L*a*b* color space, for L*=50 (color space ‘Lab’).")
 	page.TextEnd()
@@ -295,7 +295,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	page.PopGraphicsState()
 
 	page.TextSetFont(F, 12)
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(50, 230)
 	page.TextShow("Colors in an indexed color space (color space ‘Indexed’).")
 	page.TextEnd()
@@ -357,7 +357,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	page.PopGraphicsState()
 
 	page.TextSetFont(F, 12)
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(50, 230)
 	page.TextShow("A square filled with an uncolored tiling pattern (color space ’Pattern’).")
 	page.TextEnd()
@@ -410,7 +410,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	page.PopGraphicsState()
 
 	page.TextSetFont(F, 12)
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(50, 230)
 	page.TextShow("A square filled with a colored tiling pattern (color space ’Pattern’).")
 	page.TextEnd()
@@ -461,7 +461,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	page.PopGraphicsState()
 
 	page.TextSetFont(F, 12)
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(50, 230)
 	page.TextShow("A square filled with a shading pattern (color space ’Pattern’).")
 	page.TextEnd()
@@ -548,7 +548,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	page.PopGraphicsState()
 
 	page.TextSetFont(F, 12)
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(50, 230)
 	page.TextShow("A Type 4 shading drawn using the sh operator.")
 	page.TextEnd()
@@ -576,7 +576,7 @@ func hTickLabel(page *document.Page, F font.Layouter, x, y float64, label string
 	page.TextSetFont(F, 10)
 	gg := F.Layout(nil, 10, label)
 	w := gg.TotalWidth()
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(x-w/2, y-5-10*geom.Ascent)
 	page.TextShowGlyphs(gg)
 	page.TextEnd()
@@ -596,7 +596,7 @@ func vTickLabel(page *document.Page, F font.Layouter, x, y float64, label string
 	page.TextSetFont(F, 10)
 	gg := F.Layout(nil, 10, label)
 	w := gg.TotalWidth()
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(x-5-w, y-10*mid)
 	page.TextShowGlyphs(gg)
 	page.TextEnd()

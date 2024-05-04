@@ -173,7 +173,7 @@ func FuzzReader(f *testing.F) {
 				w.Transform(m)
 
 			case "BT":
-				w.TextStart()
+				w.TextBegin()
 			case "ET":
 				w.TextEnd()
 

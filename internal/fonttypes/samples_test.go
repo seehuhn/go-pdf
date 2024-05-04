@@ -39,7 +39,7 @@ func TestSamples(t *testing.T) {
 			}
 
 			page.TextSetFont(X, 12)
-			page.TextStart()
+			page.TextBegin()
 			page.TextFirstLine(72, 72)
 			page.TextShow(`“Hello World!”`)
 			page.TextEnd()

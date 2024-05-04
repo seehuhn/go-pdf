@@ -39,7 +39,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 		return 0, 0, err
 	}
 
-	r.Page.TextStart()
+	r.Page.TextBegin()
 	err = setup(r.Page)
 	if err != nil {
 		return 0, 0, err

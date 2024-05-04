@@ -56,7 +56,7 @@ func main() {
 			}
 			geom := F.GetGeometry()
 
-			page.TextStart()
+			page.TextBegin()
 			page.TextSetFont(F, 12)
 			page.TextFirstLine(50, 250)
 			page.TextShow("PDF version " + v.String())

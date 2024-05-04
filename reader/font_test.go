@@ -50,7 +50,7 @@ func TestExtractText(t *testing.T) {
 				t.Fatal(err)
 			}
 			doc.TextSetFont(E, 12)
-			doc.TextStart()
+			doc.TextBegin()
 			doc.TextFirstLine(72, 100)
 			doc.TextShow(line1)
 			doc.TextSecondLine(0, -18)

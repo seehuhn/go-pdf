@@ -149,7 +149,7 @@ func (f *fontTables) ClosePage() error {
 	}
 
 	f.pageNo++
-	f.page.TextStart()
+	f.page.TextBegin()
 	f.page.TextSetFont(f.bodyFont, 10)
 	f.page.TextFirstLine(f.margin+0.5*f.textWidth, f.margin-20)
 	f.page.TextShowAligned(fmt.Sprintf("- %d -", f.pageNo), 0, 0.5)
@@ -190,7 +190,7 @@ func (f *fontTables) WriteHeader(title, fileName string) error {
 		return err
 	}
 
-	f.page.TextStart()
+	f.page.TextBegin()
 	f.page.TextSetFont(f.bodyFont, 12)
 	f.page.TextFirstLine(f.margin, f.margin+f.textHeight-f.used-v1)
 	f.page.TextShow(title)
@@ -234,7 +234,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	dx := (right - left) / 10
 
 	// row label on the left
-	page.TextStart()
+	page.TextBegin()
 	page.TextFirstLine(left-24, yBase)
 	page.TextSetFont(f.bodyFont, 10)
 	var label string
@@ -316,7 +316,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 
 		gg := &font.GlyphSeq{Seq: []font.Glyph{g}}
 
-		page.TextStart()
+		page.TextBegin()
 		page.TextSetFont(theFont, glyphSize)
 		page.TextFirstLine(xPos[i], yBase)
 		page.TextShowGlyphs(gg)
