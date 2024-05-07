@@ -61,7 +61,7 @@ func (l *lruCache) Put(key Reference, obj Object) {
 	}
 }
 
-// Get returns an object from the cache and markes it as recently used.
+// Get returns an object from the cache and marks it as recently used.
 func (l *lruCache) Get(key Reference) (Object, bool) {
 	ent, ok := l.entries[key]
 	if !ok {

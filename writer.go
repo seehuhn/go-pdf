@@ -364,7 +364,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	}
 
 	if pdf.meta.Version < V1_5 || pdf.humanReadable {
-		// Object streams are only availble in PDF version 1.5 and higher.
+		// Object streams are only available in PDF version 1.5 and higher.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)
 			if err != nil {

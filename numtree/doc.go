@@ -17,7 +17,7 @@
 // Package numtree implements PDF number trees.
 //
 // Number trees map integers to PDF objects.  In PDF files these trees are used
-// in two differnt contexts:
+// in two different contexts:
 //   - The `PageLabels` entry in the document catalog is a number tree
 //     defining page labels for the pages in the document.
 //   - The `ParentTree` entry in the structure tree root dictionary

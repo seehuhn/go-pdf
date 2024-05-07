@@ -32,7 +32,7 @@ import (
 
 // PushGraphicsState saves the current graphics state.
 //
-// This implementes the PDF graphics operator "q".
+// This implements the PDF graphics operator "q".
 func (w *Writer) PushGraphicsState() {
 	// This operator was classed as "Special graphics state" until PDF 1.7,
 	// and as "General Graphics State" in PDF 2.0.
@@ -53,7 +53,7 @@ func (w *Writer) PushGraphicsState() {
 
 // PopGraphicsState restores the previous graphics state.
 //
-// This implementes the PDF graphics operator "Q".
+// This implements the PDF graphics operator "Q".
 func (w *Writer) PopGraphicsState() {
 	// This operator was classed as "Special graphics state" until PDF 1.7,
 	// and as "General Graphics State" in PDF 2.0.
@@ -81,7 +81,7 @@ func (w *Writer) PopGraphicsState() {
 // the new, additional transformation is applied to the user coordinates
 // first, followed by the existing transformation.
 //
-// This implementes the PDF graphics operator "cm".
+// This implements the PDF graphics operator "cm".
 func (w *Writer) Transform(extraTrfm matrix.Matrix) {
 	if !w.isValid("Transform", objPage) { // special graphics state
 		return
@@ -97,7 +97,7 @@ func (w *Writer) Transform(extraTrfm matrix.Matrix) {
 
 // SetLineWidth sets the line width.
 //
-// This implementes the PDF graphics operator "w".
+// This implements the PDF graphics operator "w".
 func (w *Writer) SetLineWidth(width float64) {
 	if !w.isValid("SetLineWidth", objPage|objText) {
 		return
@@ -118,7 +118,7 @@ func (w *Writer) SetLineWidth(width float64) {
 
 // SetLineCap sets the line cap style.
 //
-// This implementes the PDF graphics operator "J".
+// This implements the PDF graphics operator "J".
 func (w *Writer) SetLineCap(cap LineCapStyle) {
 	if !w.isValid("SetLineCap", objPage|objText) {
 		return
@@ -138,7 +138,7 @@ func (w *Writer) SetLineCap(cap LineCapStyle) {
 
 // SetLineJoin sets the line join style.
 //
-// This implementes the PDF graphics operator "j".
+// This implements the PDF graphics operator "j".
 func (w *Writer) SetLineJoin(join LineJoinStyle) {
 	if !w.isValid("SetLineJoin", objPage|objText) {
 		return
@@ -158,7 +158,7 @@ func (w *Writer) SetLineJoin(join LineJoinStyle) {
 
 // SetMiterLimit sets the miter limit.
 //
-// This implementes the PDF graphics operator "M".
+// This implements the PDF graphics operator "M".
 func (w *Writer) SetMiterLimit(limit float64) {
 	if !w.isValid("SetMiterLimit", objPage|objText) {
 		return
@@ -179,7 +179,7 @@ func (w *Writer) SetMiterLimit(limit float64) {
 
 // SetLineDash sets the line dash pattern.
 //
-// This implementes the PDF graphics operator "d".
+// This implements the PDF graphics operator "d".
 func (w *Writer) SetLineDash(pattern []float64, phase float64) {
 	if !w.isValid("SetLineDash", objPage|objText) {
 		return
@@ -211,7 +211,7 @@ func (w *Writer) SetLineDash(pattern []float64, phase float64) {
 
 // SetRenderingIntent sets the rendering intent.
 //
-// This implementes the PDF graphics operator "ri".
+// This implements the PDF graphics operator "ri".
 func (w *Writer) SetRenderingIntent(intent RenderingIntent) {
 	if !w.isValid("SetRenderingIntent", objPage|objText) {
 		return
@@ -236,7 +236,7 @@ func (w *Writer) SetRenderingIntent(intent RenderingIntent) {
 
 // SetFlatnessTolerance sets the flatness tolerance.
 //
-// This implementes the PDF graphics operator "i".
+// This implements the PDF graphics operator "i".
 func (w *Writer) SetFlatnessTolerance(flatness float64) {
 	if !w.isValid("SetFlatness", objPage|objText) {
 		return

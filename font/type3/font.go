@@ -65,7 +65,7 @@ type Glyph struct {
 }
 
 // New creates a new type 3 font.
-// Initally the font does not contain any glyphs.
+// Initially the font does not contain any glyphs.
 // Use [Font.AddGlyph] to add glyphs to the font.
 // Once the font is embedded the first time, no more glyphs can be added.
 func New(unitsPerEm uint16) *Font {

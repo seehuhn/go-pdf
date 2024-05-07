@@ -72,7 +72,7 @@ func (w *Writer) TextEnd() {
 
 // TextSetCharacterSpacing sets additional character spacing.
 //
-// This implementes the PDF graphics operator "Tc".
+// This implements the PDF graphics operator "Tc".
 func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
 	if !w.isValid("TextSetCharSpacing", objText|objPage) {
 		return
@@ -89,7 +89,7 @@ func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
 
 // TextSetWordSpacing sets additional word spacing.
 //
-// This implementes the PDF graphics operator "Tw".
+// This implements the PDF graphics operator "Tw".
 func (w *Writer) TextSetWordSpacing(wordSpacing float64) {
 	if !w.isValid("TextSetWordSpacing", objText|objPage) {
 		return
@@ -109,7 +109,7 @@ func (w *Writer) TextSetWordSpacing(wordSpacing float64) {
 // The value 1 corresponds to normal scaling.
 // Negative values correspond to horizontally mirrored text.
 //
-// This implementes the PDF graphics operator "Tz".
+// This implements the PDF graphics operator "Tz".
 func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 	if !w.isValid("TextSetHorizontalScaling", objText|objPage) {
 		return
@@ -128,7 +128,7 @@ func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 // The leading is the distance between the baselines of two consecutive lines of text.
 // Positive values indicate that the next line of text is below the current line.
 //
-// This implementes the PDF graphics operator "TL".
+// This implements the PDF graphics operator "TL".
 func (w *Writer) TextSetLeading(leading float64) {
 	if !w.isValid("TextSetLeading", objText|objPage) {
 		return

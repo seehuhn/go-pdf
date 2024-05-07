@@ -207,7 +207,7 @@ func (s *scanner) ReadObject() (Object, error) {
 	}
 }
 
-// ReadInteger reads an integer, optionally preceeded by white space.
+// ReadInteger reads an integer, optionally preceded by white space.
 func (s *scanner) ReadInteger() (Integer, error) {
 	err := s.SkipWhiteSpace()
 	if err != nil {
