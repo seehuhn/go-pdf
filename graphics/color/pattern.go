@@ -42,22 +42,22 @@ func (p *TilingPatternUncolored) New(col Color) Color {
 // spacePatternColored is used for uncolored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
-// DefaultName implements the [ColorSpace] interface.
+// DefaultName implements the [Space] interface.
 func (s spacePatternColored) DefaultName() pdf.Name {
 	return ""
 }
 
-// PDFObject implements the [ColorSpace] interface.
+// PDFObject implements the [Space] interface.
 func (s spacePatternColored) PDFObject() pdf.Object {
 	return pdf.Name("Pattern")
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s spacePatternColored) ColorSpaceFamily() string {
 	return "Pattern"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s spacePatternColored) defaultColor() Color {
 	return nil
 }
@@ -98,12 +98,12 @@ func (s spacePatternUncolored) PDFObject() pdf.Object {
 	}
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s spacePatternUncolored) ColorSpaceFamily() string {
 	return "Pattern"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s spacePatternUncolored) defaultColor() Color {
 	return nil
 }

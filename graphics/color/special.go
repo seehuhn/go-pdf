@@ -110,7 +110,7 @@ func (s *SpaceIndexed) Embed(out *pdf.Writer) (*SpaceIndexed, error) {
 	return embedded, nil
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s *SpaceIndexed) ColorSpaceFamily() string {
 	return "Indexed"
 }

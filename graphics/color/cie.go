@@ -95,12 +95,12 @@ func (s *SpaceCalGray) Embed(out *pdf.Writer) (*SpaceCalGray, error) {
 	return res, nil
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s *SpaceCalGray) ColorSpaceFamily() string {
 	return "CalGray"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s *SpaceCalGray) defaultColor() Color {
 	return colorCalGray{Space: s, Value: 0}
 }
@@ -214,12 +214,12 @@ func (s *SpaceCalRGB) Embed(out *pdf.Writer) (*SpaceCalRGB, error) {
 	return embedded, nil
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s *SpaceCalRGB) ColorSpaceFamily() string {
 	return "CalRGB"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s *SpaceCalRGB) defaultColor() Color {
 	return colorCalRGB{Space: s, R: 0, G: 0, B: 0}
 }
@@ -324,12 +324,12 @@ func (s *SpaceLab) Embed(out *pdf.Writer) (*SpaceLab, error) {
 	return embedded, nil
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s *SpaceLab) ColorSpaceFamily() string {
 	return "Lab"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s *SpaceLab) defaultColor() Color {
 	a := 0.0
 	if a < s.ranges[0] {

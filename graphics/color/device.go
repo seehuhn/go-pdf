@@ -35,22 +35,22 @@ var (
 // Use [DeviceGray] to access this color space.
 type SpaceDeviceGray struct{}
 
-// DefaultName implements the [ColorSpace] interface.
+// DefaultName implements the [Space] interface.
 func (s SpaceDeviceGray) DefaultName() pdf.Name {
 	return ""
 }
 
-// PDFObject implements the [ColorSpace] interface.
+// PDFObject implements the [Space] interface.
 func (s SpaceDeviceGray) PDFObject() pdf.Object {
 	return pdf.Name("DeviceGray")
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s SpaceDeviceGray) ColorSpaceFamily() string {
 	return "DeviceGray"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s SpaceDeviceGray) defaultColor() Color {
 	return colorDeviceGray(0)
 }
@@ -78,22 +78,22 @@ func (c colorDeviceGray) values() []float64 {
 // Use [DeviceRGB] to access this color space.
 type SpaceDeviceRGB struct{}
 
-// DefaultName implements the [ColorSpace] interface.
+// DefaultName implements the [Space] interface.
 func (s SpaceDeviceRGB) DefaultName() pdf.Name {
 	return ""
 }
 
-// PDFObject implements the [ColorSpace] interface.
+// PDFObject implements the [Space] interface.
 func (s SpaceDeviceRGB) PDFObject() pdf.Object {
 	return pdf.Name("DeviceRGB")
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s SpaceDeviceRGB) ColorSpaceFamily() string {
 	return "DeviceRGB"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s SpaceDeviceRGB) defaultColor() Color {
 	return colorDeviceRGB{0, 0, 0}
 }
@@ -121,22 +121,22 @@ func (c colorDeviceRGB) values() []float64 {
 // Use [DeviceCMYK] to access this color space.
 type SpaceDeviceCMYK struct{}
 
-// DefaultName implements the [ColorSpace] interface.
+// DefaultName implements the [Space] interface.
 func (s SpaceDeviceCMYK) DefaultName() pdf.Name {
 	return ""
 }
 
-// PDFObject implements the [ColorSpace] interface.
+// PDFObject implements the [Space] interface.
 func (s SpaceDeviceCMYK) PDFObject() pdf.Object {
 	return pdf.Name("DeviceCMYK")
 }
 
-// ColorSpaceFamily implements the [ColorSpace] interface.
+// ColorSpaceFamily implements the [Space] interface.
 func (s SpaceDeviceCMYK) ColorSpaceFamily() string {
 	return "DeviceCMYK"
 }
 
-// defaultColor implements the [ColorSpace] interface.
+// defaultColor implements the [Space] interface.
 func (s SpaceDeviceCMYK) defaultColor() Color {
 	return colorDeviceCMYK{0, 0, 0, 1}
 }
