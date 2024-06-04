@@ -261,7 +261,7 @@ func (f *embeddedSimple) GlyphWidth(gid glyph.ID) float64 {
 	return f.Geometry.Widths[gid]
 }
 
-func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
 		yield(f.GlyphWidth(gid), c == ' ')

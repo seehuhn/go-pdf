@@ -44,7 +44,7 @@ import (
 type FontFromFile interface {
 	font.Embedded
 
-	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool))
+	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool))
 
 	FontData() interface{}
 
@@ -127,7 +127,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			return nil, err
 		}
 		_ = info
-		panic("not implemented")
+		panic("not implemented") // TODO(voss): implement
 
 	case font.CFFSimple: // CFF font data without wrapper (simple font)
 		info, err := cff.ExtractSimple(r.R, fontDicts)
@@ -166,7 +166,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			return nil, err
 		}
 		_ = info
-		panic("not implemented")
+		panic("not implemented") // TODO(voss): implement
 
 	case font.OpenTypeCFFSimple: // CFF font data in an OpenType wrapper (simple font)
 		info, err := opentype.ExtractCFFSimple(r.R, fontDicts)
@@ -204,7 +204,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			return nil, err
 		}
 		_ = info
-		panic("not implemented")
+		panic("not implemented") // TODO(voss): implement
 
 	case font.OpenTypeGlyfSimple: // OpenType fonts with glyf outline (simple font)
 		info, err := opentype.ExtractGlyfSimple(r.R, fontDicts)
@@ -345,6 +345,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		return res, nil
 
 	default:
+		// TODO(voss): implement proper error handling
 		panic("unknown font type")
 	}
 }
@@ -362,13 +363,13 @@ func (f *fromFileSimple) WritingMode() int {
 	return 0
 }
 
-func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	for _, c := range s {
 		yield(f.widths[c], c == ' ')
 	}
 }
 
-func (f *fromFileSimple) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
+func (f *fromFileSimple) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool)) {
 	for _, c := range s {
 		yield(f.encoding[c], f.text[c], f.widths[c], c == ' ')
 	}
@@ -401,7 +402,7 @@ func (f *fromFileComposite) WritingMode() int {
 	return f.writingMode
 }
 
-func (f *fromFileComposite) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *fromFileComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	f.cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 		// TODO(voss): notdef glyph(s)???
 		if g, ok := f.glyph[string(code)]; ok {
@@ -411,7 +412,7 @@ func (f *fromFileComposite) ForeachWidth(s pdf.String, yield func(width float64,
 	})
 }
 
-func (f *fromFileComposite) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
+func (f *fromFileComposite) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool)) {
 	f.cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 		// TODO(voss): notdef glyph(s)???
 		if g, ok := f.glyph[string(code)]; ok {

@@ -76,7 +76,7 @@ func (f *embeddedGlyfSimple) Layout(seq *font.GlyphSeq, ptSize float64, s string
 	return seq
 }
 
-func (f *embeddedGlyfSimple) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *embeddedGlyfSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
 		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)

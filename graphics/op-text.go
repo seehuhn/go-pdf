@@ -404,9 +404,9 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 
 func (w *Writer) updateTextPosition(F font.Embedded, s pdf.String) {
 	wmode := F.WritingMode()
-	F.ForeachWidth(s, func(width float64, is_space bool) {
+	F.ForeachWidth(s, func(width float64, isSpace bool) {
 		width = width*w.TextFontSize + w.TextCharacterSpacing
-		if is_space {
+		if isSpace {
 			width += w.TextWordSpacing
 		}
 		switch wmode {

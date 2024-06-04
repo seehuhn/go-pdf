@@ -79,7 +79,7 @@ func (f *embeddedCFFComposite) WritingMode() int {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
-func (f *embeddedCFFComposite) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *embeddedCFFComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	f.AllCIDs(s)(func(code []byte, cid pscid.CID) bool {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.

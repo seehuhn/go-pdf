@@ -66,7 +66,7 @@ func TestWidthsFull(t *testing.T) {
 		t.Fatal(err)
 	}
 	i := 0
-	D.ForeachGlyph(s, func(gid glyph.ID, _ []rune, wFromPDF float64, is_space bool) {
+	D.ForeachGlyph(s, func(gid glyph.ID, _ []rune, wFromPDF float64, isSpace bool) {
 		wFromFont := ww[i]
 		if wFromPDF != wFromFont {
 			t.Errorf("widths differ for GID %d: %f vs %f", gid, wFromPDF, wFromFont)

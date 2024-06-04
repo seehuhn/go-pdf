@@ -176,5 +176,5 @@ func EncodeText(F Layouter, s string) pdf.String {
 type Embedded interface {
 	pdf.Resource
 	WritingMode() int // 0 = horizontal, 1 = vertical
-	ForeachWidth(s pdf.String, yield func(width float64, is_space bool))
+	ForeachWidth(s pdf.String, yield func(width float64, isSpace bool))
 }

@@ -105,7 +105,7 @@ func (f *frozenFont) WritingMode() int {
 	return 0
 }
 
-func (f *frozenFont) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *frozenFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	for _, c := range s {
 		width := float64(f.Font.Glyphs[f.Encoding[c]].Width) * f.Font.FontMatrix[0]
 		yield(width, c == ' ')

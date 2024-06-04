@@ -107,6 +107,6 @@ func (f dummyFont) WritingMode() int {
 	return 0
 }
 
-func (f dummyFont) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f dummyFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	// pass
 }

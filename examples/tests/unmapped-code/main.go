@@ -276,7 +276,7 @@ func (f *funnyFont) WritingMode() int {
 	return 0
 }
 
-func (f *funnyFont) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *funnyFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	for _, c := range s {
 		yield(f.W[c], c == 32)
 	}

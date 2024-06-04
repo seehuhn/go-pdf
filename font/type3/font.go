@@ -212,7 +212,7 @@ func (f *embedded) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 	return seq
 }
 
-func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, is_space bool)) {
+func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	for _, c := range s {
 		gid := f.Encoding[c]
 		name := f.GlyphNames[gid]

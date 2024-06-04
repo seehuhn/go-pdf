@@ -639,9 +639,9 @@ func (r *Reader) processText(s pdf.String) {
 		return
 	case FontFromFile:
 		wmode := F.WritingMode()
-		F.ForeachGlyph(s, func(gid glyph.ID, text []rune, width float64, is_space bool) {
+		F.ForeachGlyph(s, func(gid glyph.ID, text []rune, width float64, isSpace bool) {
 			width = width*r.TextFontSize + r.TextCharacterSpacing
-			if is_space {
+			if isSpace {
 				width += r.TextWordSpacing
 			}
 			if wmode == 0 {
