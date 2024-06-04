@@ -137,7 +137,15 @@ func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 
 // ParseContentStream parses a PDF content stream.
 func (r *Reader) ParseContentStream(in io.Reader) error {
-	return r.scanner.Scan(in)(r.do)
+	r.scanner.SetInput(in)
+	for r.scanner.Scan() {
+		op, args := r.scanner.Operator()
+		err := r.do(op, args)
+		if err != nil {
+			return err
+		}
+	}
+	return r.scanner.Error()
 }
 
 // Do processes the given operator and arguments.

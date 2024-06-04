@@ -25,24 +25,27 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// A Scanner breaks a content stream into tokens.
-//
-// Parse errors are ignored as much as possible.
+// A Scanner breaks a content stream into PDF operators together with
+// their operands.
 type Scanner struct {
 	line  int // 0-based
 	col   int // 0-based
 	stack []*scanStackFrame
 	args  []pdf.Object
 
-	// Err is the first error returned by src.Read().
+	// srcErr is the first error returned by src.Read().
 	// Once an error has been returned, all subsequent calls to .refill() will
-	// return err.
-	err error
+	// return srcErr.
+	srcErr error
 
 	src       io.Reader
 	buf       []byte
 	pos, used int
 	crSeen    bool
+
+	done    bool
+	nextOp  string
+	nextErr error
 }
 
 type scanStackFrame struct {
@@ -50,119 +53,140 @@ type scanStackFrame struct {
 	isDict bool
 }
 
-// NewScanner returns a new scanner that reads from r.
+// NewScanner returns a new scanner.  Before the scanner can be used, the input
+// source must be set using [Scanner.SetInput].
 func NewScanner() *Scanner {
 	return &Scanner{
-		buf: make([]byte, 512),
+		buf:  make([]byte, 512),
+		done: true,
 	}
 }
 
+// Reset resets the scanner to its initial state.
+// This is equivalent to creating a new scanner with [NewScanner] and
+// [Scanner.SetInput] must be called again before using the scanner.
 func (s *Scanner) Reset() {
 	s.line = 0
 	s.col = 0
 	s.stack = s.stack[:0]
 	s.args = s.args[:0]
-	s.err = nil
+	s.srcErr = nil
 	s.src = nil
 	s.pos = 0
 	s.used = 0
 	s.crSeen = false
 }
 
-// Scan return an iterator over all PDF objects in the content stream.
-//
-// The []pdf.Object slice passed to the yield function is owned by the scanner
-// and is only valid until the yield returns.
-func (s *Scanner) Scan(r io.Reader) func(yield func(op string, args []pdf.Object) error) error {
-	iterate := func(yield func(string, []pdf.Object) error) error {
-		s.err = nil
+// SetInput sets the input source for the scanner. This must be called before
+// calling [Scanner.Scan]. If a content stream is split over multiple input
+// sources, SetInput can be called multiple times to switch between the input
+// sources.
+func (s *Scanner) SetInput(r io.Reader) {
+	s.srcErr = nil
 
-		// TODO(voss): reset line and col?
+	s.src = r
+	s.pos = 0
+	s.used = 0
+	s.crSeen = false
 
-		s.src = r
-		s.pos = 0
-		s.used = 0
-		s.crSeen = false
+	s.done = false
+}
 
-	tokenLoop:
-		for {
-			obj, err := s.nextToken()
-			if err != nil {
-				break
-			}
+// Operator returns the most recently scanned operator and its arguments.
+// The argument slice returned is owned by the scanner and is only valid
+// until the next call to [Scanner.Scan].
+func (s *Scanner) Operator() (string, []pdf.Object) {
+	return s.nextOp, s.args
+}
 
-			switch obj {
-			case operator("<<"):
-				s.stack = append(s.stack, &scanStackFrame{isDict: true})
-				continue tokenLoop
-			case operator(">>"):
-				if len(s.stack) == 0 || !s.stack[len(s.stack)-1].isDict {
-					// unexpected '>>'
-					continue tokenLoop
-				}
-				entry := s.stack[len(s.stack)-1]
-				s.stack = s.stack[:len(s.stack)-1]
-				if len(entry.data)%2 != 0 {
-					// unexpected '>>'
-					continue tokenLoop
-				}
-				dict := pdf.Dict{}
-				for i := 0; i < len(entry.data); i += 2 {
-					key, ok := entry.data[i].(pdf.Name)
-					if !ok {
-						// invalid key
-						continue
-					}
-					val := entry.data[i+1]
-					if val == nil {
-						continue
-					}
-					dict[key] = val
-				}
-				obj = dict
-			case operator("["):
-				s.stack = append(s.stack, &scanStackFrame{})
-				continue tokenLoop
-			case operator("]"):
-				if len(s.stack) == 0 || s.stack[len(s.stack)-1].isDict {
-					// unexpected "]"
-					continue tokenLoop
-				}
-				obj = pdf.Array(s.stack[len(s.stack)-1].data)
-				s.stack = s.stack[:len(s.stack)-1]
-			}
+// Error returns the first fatal error encountered by the scanner, or nil if no
+// fatal error has occurred.
+func (s *Scanner) Error() error {
+	return s.nextErr
+}
 
-			if len(s.stack) > 0 { // we are inside a dict or array
-				s.stack[len(s.stack)-1].data = append(s.stack[len(s.stack)-1].data, obj)
-			} else if op, ok := obj.(operator); ok {
-				err := yield(string(op), s.args)
-				if err != nil {
-					return err
-				}
-				s.args = s.args[:0]
-			} else {
-				s.args = append(s.args, obj)
-			}
-		}
-
-		if s.err == io.EOF {
-			if s.col > 0 {
-				s.col = 0
-				s.line++
-			}
-			return nil
-		}
-
-		return s.err
+// Scan advances the scanner to the next PDF operator, which can then be
+// retrieved by the Operator method.  Scan returns false if no more operators
+// are available, either at the end of the input or due to an error. After Scan
+// returns false, the [Scanner.Error] method can be used to check for errors.
+func (s *Scanner) Scan() bool {
+	if s.done {
+		return false
 	}
-	return iterate
+
+	s.args = s.args[:0]
+
+tokenLoop:
+	for {
+		obj, err := s.nextToken()
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			s.nextOp = ""
+			s.args = s.args[:0]
+			s.nextErr = err
+			s.done = true
+			return false
+		}
+
+		switch obj {
+		case operator("<<"):
+			s.stack = append(s.stack, &scanStackFrame{isDict: true})
+			continue tokenLoop
+		case operator(">>"):
+			if len(s.stack) == 0 || !s.stack[len(s.stack)-1].isDict {
+				// unexpected '>>'
+				continue tokenLoop
+			}
+			entry := s.stack[len(s.stack)-1]
+			s.stack = s.stack[:len(s.stack)-1]
+			if len(entry.data)%2 != 0 {
+				// unexpected '>>'
+				continue tokenLoop
+			}
+			dict := pdf.Dict{}
+			for i := 0; i < len(entry.data); i += 2 {
+				key, ok := entry.data[i].(pdf.Name)
+				if !ok {
+					// invalid key
+					continue
+				}
+				val := entry.data[i+1]
+				if val == nil {
+					continue
+				}
+				dict[key] = val
+			}
+			obj = dict
+		case operator("["):
+			s.stack = append(s.stack, &scanStackFrame{})
+			continue tokenLoop
+		case operator("]"):
+			if len(s.stack) == 0 || s.stack[len(s.stack)-1].isDict {
+				// unexpected "]"
+				continue tokenLoop
+			}
+			obj = pdf.Array(s.stack[len(s.stack)-1].data)
+			s.stack = s.stack[:len(s.stack)-1]
+		}
+
+		if len(s.stack) > 0 { // we are inside a dict or array
+			s.stack[len(s.stack)-1].data = append(s.stack[len(s.stack)-1].data, obj)
+		} else if op, ok := obj.(operator); ok {
+			s.nextOp = string(op)
+			return true
+		} else {
+			s.args = append(s.args, obj)
+		}
+	}
 }
 
 func (s *Scanner) nextToken() (pdf.Object, error) {
 	s.skipWhiteSpace()
 	bb := s.peekN(2)
 	if len(bb) == 0 {
-		return nil, s.err
+		return nil, s.srcErr
 	}
 
 	switch {
@@ -480,8 +504,8 @@ func (s *Scanner) skipN(n int) {
 // refill reads more data from the underlying reader into the buffer.
 // This is the only place where the underlying reader is called.
 func (s *Scanner) refill() error {
-	if s.err != nil {
-		return s.err
+	if s.srcErr != nil {
+		return s.srcErr
 	}
 
 	s.used = copy(s.buf, s.buf[s.pos:s.used])
@@ -489,7 +513,7 @@ func (s *Scanner) refill() error {
 
 	n, err := s.src.Read(s.buf[s.used:])
 	s.used += n
-	s.err = err
+	s.srcErr = err
 
 	if n == 0 {
 		return err
