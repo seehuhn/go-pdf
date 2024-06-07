@@ -21,8 +21,8 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
-// ReadExtGState reads an graphics state parameter dictionary from a PDF file.
-func (r *Reader) ReadExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.ExtGState, error) {
+// readExtGState reads an graphics state parameter dictionary from a PDF file.
+func (r *Reader) readExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.ExtGState, error) {
 	dict, err := pdf.GetDictTyped(r.R, ref, "ExtGState")
 	if err != nil {
 		return nil, err

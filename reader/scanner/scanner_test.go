@@ -86,8 +86,8 @@ func TestScanner(t *testing.T) {
 		s := NewScanner()
 		s.SetInput(strings.NewReader(tc.in))
 		for s.Scan() {
-			op, args := s.Operator()
-			actual = append(actual, testOutput{op, slices.Clone(args)})
+			op := s.Operator()
+			actual = append(actual, testOutput{op.Name, slices.Clone(op.Args)})
 		}
 		if err := s.Error(); err != nil {
 			t.Fatal(err)
@@ -113,8 +113,8 @@ func FuzzScanner(f *testing.F) {
 		s := NewScanner()
 		s.SetInput(strings.NewReader(in))
 		for s.Scan() {
-			op, args := s.Operator()
-			for i, arg := range args {
+			op := s.Operator()
+			for i, arg := range op.Args {
 				if i > 0 {
 					buf.WriteString(" ")
 				}
@@ -127,10 +127,10 @@ func FuzzScanner(f *testing.F) {
 					}
 				}
 			}
-			if len(args) > 0 {
+			if len(op.Args) > 0 {
 				buf.WriteString(" ")
 			}
-			buf.WriteString(op)
+			buf.WriteString(op.Name)
 			buf.WriteString("\n")
 		}
 		if err := s.Error(); err != nil {
@@ -143,8 +143,8 @@ func FuzzScanner(f *testing.F) {
 		s.Reset()
 		s.SetInput(strings.NewReader(out1))
 		for s.Scan() {
-			op, args := s.Operator()
-			for i, arg := range args {
+			op := s.Operator()
+			for i, arg := range op.Args {
 				if i > 0 {
 					buf.WriteString(" ")
 				}
@@ -157,10 +157,10 @@ func FuzzScanner(f *testing.F) {
 					}
 				}
 			}
-			if len(args) > 0 {
+			if len(op.Args) > 0 {
 				buf.WriteString(" ")
 			}
-			buf.WriteString(op)
+			buf.WriteString(op.Name)
 			buf.WriteString("\n")
 		}
 		if err := s.Error(); err != nil {

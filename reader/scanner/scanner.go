@@ -95,8 +95,8 @@ func (s *Scanner) SetInput(r io.Reader) {
 // Operator returns the most recently scanned operator and its arguments.
 // The argument slice returned is owned by the scanner and is only valid
 // until the next call to [Scanner.Scan].
-func (s *Scanner) Operator() (string, []pdf.Object) {
-	return s.nextOp, s.args
+func (s *Scanner) Operator() Operator {
+	return Operator{Name: s.nextOp, Args: s.args}
 }
 
 // Error returns the first fatal error encountered by the scanner, or nil if no
@@ -206,9 +206,6 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 		s.skipN(2)
 		return operator(">>"), nil
 	default:
-		// TODO(voss): revisit this once
-		// https://github.com/pdf-association/pdf-issues/issues/363
-		// is resolved.
 		opBytes := []byte{bb[0]}
 		s.readByte() // skip bb[0] (invalidates bb)
 		if class[bb[0]] == regular {
@@ -227,7 +224,7 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 			}
 		}
 
-		if opBytes[0] >= '0' && opBytes[0] <= '9' || opBytes[0] == '-' || opBytes[0] == '+' || opBytes[0] == '.' {
+		if opBytes[0] >= '0' && opBytes[0] <= '9' || opBytes[0] == '.' || opBytes[0] == '-' || opBytes[0] == '+' {
 			if x := parseNumber(opBytes); x != nil {
 				return x, nil
 			}

@@ -64,8 +64,8 @@ func TestParameters(t *testing.T) {
 	s := scanner.NewScanner()
 	s.SetInput(bytes.NewReader(buf.Bytes()))
 	for s.Scan() {
-		op, args := s.Operator()
-		err := r.do(op, args)
+		op := s.Operator()
+		err := r.do(op)
 		if err != nil {
 			t.Fatal(err)
 		}

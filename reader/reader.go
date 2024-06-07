@@ -33,9 +33,10 @@ import (
 
 // A Reader reads a PDF content stream.
 type Reader struct {
-	R          pdf.Getter
+	R      pdf.Getter
+	loader *loader.FontLoader
+
 	scanner    *scanner.Scanner
-	loader     *loader.FontLoader
 	nextIntRef uint32
 
 	fontCache map[pdf.Reference]FontFromFile
@@ -54,19 +55,22 @@ type Reader struct {
 // New creates a new Reader.
 func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 	return &Reader{
-		R:       r,
+		R:      r,
+		loader: loader,
+
 		scanner: scanner.NewScanner(),
-		loader:  loader,
 
 		fontCache: make(map[pdf.Reference]FontFromFile),
 	}
 }
 
-func (r *Reader) NewPage() {
+// Reset resets the reader to its initial state.
+// This should be used before parsing a new page.
+func (r *Reader) Reset() {
 	r.scanner.Reset()
+	r.Resources = &pdf.Resources{}
 	r.State = graphics.NewState()
 	r.stack = r.stack[:0]
-	r.Resources = &pdf.Resources{}
 }
 
 // ParsePage parses a page, and calls the appropriate callback functions.
@@ -76,7 +80,7 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 		return err
 	}
 
-	r.NewPage()
+	r.Reset()
 	r.State.CTM = ctm
 
 	resourcesDict, err := pdf.GetDict(r.R, pageDict["Resources"])
@@ -135,12 +139,136 @@ func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 	return r.ParseContentStream(body)
 }
 
+func (r *Reader) do2() error {
+	for r.scanner.Scan() {
+		op := r.scanner.Operator()
+
+		switch op.Name {
+
+		// Table 56 – Graphics state operators
+
+		case "q":
+			if op.OK() || len(r.stack) < maxGraphicsStackDepth {
+				r.stack = append(r.stack, graphics.State{
+					Parameters: r.Parameters.Clone(),
+					Set:        r.Set,
+				})
+			}
+
+		case "Q":
+			if op.OK() && len(r.stack) > 0 {
+				r.State = r.stack[len(r.stack)-1]
+				r.stack = r.stack[:len(r.stack)-1]
+			}
+
+		case "cm":
+			m := matrix.Matrix{}
+			for i := 0; i < 6; i++ {
+				m[i] = op.GetNumber()
+			}
+			if op.OK() {
+				r.CTM = r.CTM.Mul(m) // TODO(voss): correct order?
+			}
+
+		case "w": // line width
+			lineWidth := op.GetNumber()
+			if op.OK() {
+				r.LineWidth = lineWidth
+				r.Set |= graphics.StateLineWidth
+			}
+
+		case "J": // line cap style
+			lineCap := op.GetInteger()
+			if op.OK() && lineCap >= 0 && lineCap <= 2 {
+				r.LineCap = graphics.LineCapStyle(lineCap)
+				r.Set |= graphics.StateLineCap
+			}
+
+		case "j": // line join style
+			lineJoin := op.GetInteger()
+			if op.OK() && lineJoin >= 0 && lineJoin <= 2 {
+				r.LineJoin = graphics.LineJoinStyle(lineJoin)
+				r.Set |= graphics.StateLineJoin
+			}
+
+		case "M": // miter limit
+			miterLimit := op.GetNumber()
+			if op.OK() {
+				if miterLimit < 1 {
+					miterLimit = 1
+				}
+				r.MiterLimit = miterLimit
+				r.Set |= graphics.StateMiterLimit
+			}
+
+		case "d": // dash pattern and phase
+			pat := op.GetArray()
+			phase := op.GetNumber()
+			if op.OK() {
+				pat, ok := convertDashPattern(pat)
+				if ok {
+					r.DashPattern = pat
+					r.DashPhase = phase
+					r.Set |= graphics.StateLineDash
+				}
+			}
+
+		case "ri": // rendering intent
+			intent := op.GetName()
+			if op.OK() {
+				r.RenderingIntent = graphics.RenderingIntent(intent)
+				r.Set |= graphics.StateRenderingIntent
+			}
+
+		case "i": // flatness tolerance
+			flatness := op.GetNumber()
+			if op.OK() {
+				if flatness < 0 {
+					flatness = 0
+				} else if flatness > 100 {
+					flatness = 100
+				}
+				r.FlatnessTolerance = flatness
+				r.Set |= graphics.StateFlatnessTolerance
+			}
+
+		case "gs": // extGState
+			dictName := op.GetName()
+			if op.OK() {
+				// TODO(voss): use caching
+				newState, err := r.readExtGState(r.Resources.ExtGState[dictName], dictName)
+				if err == nil {
+					newState.Value.CopyTo(&r.State)
+				} else if !pdf.IsMalformed(err) {
+					return err
+				}
+			}
+
+		// Table 105 - Text object operators
+
+		case "BT":
+			if op.OK() {
+				r.TextMatrix = matrix.Identity
+				r.TextLineMatrix = matrix.Identity
+				r.Set |= graphics.StateTextMatrix
+			}
+
+		case "ET":
+			if op.OK() {
+				r.Set &= ^graphics.StateTextMatrix
+			}
+
+		}
+	}
+	return r.scanner.Error()
+}
+
 // ParseContentStream parses a PDF content stream.
 func (r *Reader) ParseContentStream(in io.Reader) error {
 	r.scanner.SetInput(in)
 	for r.scanner.Scan() {
-		op, args := r.scanner.Operator()
-		err := r.do(op, args)
+		op := r.scanner.Operator()
+		err := r.do(op)
 		if err != nil {
 			return err
 		}
@@ -151,8 +279,9 @@ func (r *Reader) ParseContentStream(in io.Reader) error {
 // Do processes the given operator and arguments.
 // This updates the graphics state, and calls the appropriate callback
 // functions.
-func (r *Reader) do(op string, args []pdf.Object) error {
-	origArgs := args
+func (r *Reader) do(op scanner.Operator) error {
+	origArgs := op.Args
+	args := op.Args
 
 	getInteger := func() (pdf.Integer, bool) {
 		if len(args) == 0 {
@@ -199,7 +328,7 @@ func (r *Reader) do(op string, args []pdf.Object) error {
 	// ISO 32000-2:2020.
 
 doOps:
-	switch op {
+	switch op.Name {
 
 	// == General graphics state =========================================
 
@@ -265,7 +394,7 @@ doOps:
 		name, ok := getName()
 		if ok {
 			// TODO(voss): use caching
-			newState, err := r.ReadExtGState(r.Resources.ExtGState[name], name)
+			newState, err := r.readExtGState(r.Resources.ExtGState[name], name)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -625,14 +754,14 @@ doOps:
 
 	default:
 		if r.UnknownOp != nil {
-			err := r.UnknownOp(op, args)
+			err := r.UnknownOp(op.Name, op.Args)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	if r.EveryOp != nil {
-		err := r.EveryOp(op, origArgs)
+		err := r.EveryOp(op.Name, origArgs)
 		if err != nil {
 			return err
 		}
@@ -708,3 +837,7 @@ func convertDashPattern(dashPattern pdf.Array) (pat []float64, ok bool) {
 	}
 	return pat, true
 }
+
+const (
+	maxGraphicsStackDepth = 64
+)
