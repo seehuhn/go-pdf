@@ -59,7 +59,7 @@ type CIDEncoder interface {
 
 	AsText(pdf.String) []rune
 
-	AllCIDs(pdf.String) func(yield func([]byte, pscid.CID) bool) bool
+	AllCIDs(pdf.String) func(yield func([]byte, pscid.CID) bool)
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -141,17 +141,17 @@ func (e *identityEncoder) AsText(s pdf.String) []rune {
 	return res
 }
 
-func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) bool {
-	return func(yield func([]byte, pscid.CID) bool) bool {
+func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) {
+	return func(yield func([]byte, pscid.CID) bool) {
 		for len(s) >= 2 {
 			var code []byte
 			code, s = s[:2], s[2:]
 			cid := pscid.CID(code[0])<<8 | pscid.CID(code[1])
 			if !yield(code, cid) {
-				return false
+				return
 			}
 		}
-		return true
+		return
 	}
 }
 
@@ -270,9 +270,9 @@ func (e *utf8Encoder) AsText(s pdf.String) []rune {
 	return []rune(string(s))
 }
 
-func (e *utf8Encoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) bool {
-	return func(yield func([]byte, pscid.CID) bool) bool {
-		return utf8cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
+func (e *utf8Encoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) {
+	return func(yield func([]byte, pscid.CID) bool) {
+		utf8cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 			c, _ := utf8cs.Decode(code)
 			return yield(code, e.cmap[c])
 		})

@@ -30,16 +30,16 @@ type CharCode int
 type CodeSpaceRange []Range
 
 // AllCodes returns an iterator over all character codes in the given PDF string.
-func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, valid bool) bool) bool {
-	return func(yield func(pdf.String, bool) bool) bool {
+func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, valid bool) bool) {
+	return func(yield func(pdf.String, bool) bool) {
 		for len(s) > 0 {
 			k, valid := c.firstCode(s)
 			if !yield(s[:k], valid) {
-				return false
+				return
 			}
 			s = s[k:]
 		}
-		return true
+		return
 	}
 }
 

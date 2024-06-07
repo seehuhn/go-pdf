@@ -89,17 +89,17 @@ func NewIterator(r pdf.Getter) *Iterator {
 // should stop.
 //
 // TODO(voss): change this to iterate over (page number, page dictionary) pairs?
-func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
-	yield := func(yield func(pdf.Reference, pdf.Dict) bool) bool {
+func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) {
+	yield := func(yield func(pdf.Reference, pdf.Dict) bool) {
 		if i.Err != nil {
-			return false
+			return
 		}
 
 		r := i.r
 		meta := r.GetMeta()
 		root := meta.Catalog.Pages
 		if root == 0 {
-			return true
+			return
 		}
 
 		type frame struct {
@@ -133,7 +133,7 @@ func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 					continue
 				}
 				i.Err = err
-				return false
+				return
 			}
 			tp, err := pdf.GetName(r, node["Type"])
 			if err != nil {
@@ -141,7 +141,7 @@ func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 					continue
 				}
 				i.Err = err
-				return false
+				return
 			}
 			switch tp {
 			case "Page":
@@ -154,7 +154,7 @@ func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 				delete(node, "Parent")
 				cont := yield(ref, node)
 				if !cont {
-					return false
+					return
 				}
 
 			case "Pages":
@@ -164,7 +164,7 @@ func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 						continue
 					}
 					i.Err = err
-					return false
+					return
 				}
 
 				hasInheritables := false
@@ -198,7 +198,7 @@ func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) bool {
 				}
 			}
 		}
-		return true
+		return
 	}
 	return yield
 }
