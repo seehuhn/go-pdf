@@ -83,31 +83,44 @@ func (r *Reader) readExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 			param.LineWidth = float64(lw)
 			set |= graphics.StateLineWidth
 		case "LC":
-			lc, err := pdf.GetInteger(r.R, v)
-			if pdf.IsMalformed(err) || lc < 0 || lc > 2 {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-			param.LineCap = graphics.LineCapStyle(lc)
-			set |= graphics.StateLineCap
-		case "LJ":
-			lj, err := pdf.GetInteger(r.R, v)
-			if pdf.IsMalformed(err) || lj < 0 || lj > 2 {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-			param.LineJoin = graphics.LineJoinStyle(lj)
-			set |= graphics.StateLineJoin
-		case "ML":
-			ml, err := pdf.GetNumber(r.R, v)
+			lineCap, err := pdf.GetInteger(r.R, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
 				return nil, err
 			}
-			param.MiterLimit = float64(ml)
+			if lineCap < 0 {
+				lineCap = 0
+			} else if lineCap > 2 {
+				lineCap = 2
+			}
+			param.LineCap = graphics.LineCapStyle(lineCap)
+			set |= graphics.StateLineCap
+		case "LJ":
+			lineJoin, err := pdf.GetInteger(r.R, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if lineJoin < 0 {
+				lineJoin = 0
+			} else if lineJoin > 2 {
+				lineJoin = 2
+			}
+			param.LineJoin = graphics.LineJoinStyle(lineJoin)
+			set |= graphics.StateLineJoin
+		case "ML":
+			miterLimit, err := pdf.GetNumber(r.R, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if miterLimit < 1 {
+				miterLimit = 1
+			}
+			param.MiterLimit = float64(miterLimit)
 			set |= graphics.StateMiterLimit
 		case "D":
 			dashPattern, phase, err := readDash(r.R, v)

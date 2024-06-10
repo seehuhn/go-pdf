@@ -148,7 +148,7 @@ func (r *Reader) do2() error {
 		// Table 56 – Graphics state operators
 
 		case "q":
-			if op.OK() || len(r.stack) < maxGraphicsStackDepth {
+			if op.OK() && len(r.stack) < maxGraphicsStackDepth {
 				r.stack = append(r.stack, graphics.State{
 					Parameters: r.Parameters.Clone(),
 					Set:        r.Set,
@@ -179,14 +179,24 @@ func (r *Reader) do2() error {
 
 		case "J": // line cap style
 			lineCap := op.GetInteger()
-			if op.OK() && lineCap >= 0 && lineCap <= 2 {
+			if op.OK() {
+				if lineCap < 0 {
+					lineCap = 0
+				} else if lineCap > 2 {
+					lineCap = 2
+				}
 				r.LineCap = graphics.LineCapStyle(lineCap)
 				r.Set |= graphics.StateLineCap
 			}
 
 		case "j": // line join style
 			lineJoin := op.GetInteger()
-			if op.OK() && lineJoin >= 0 && lineJoin <= 2 {
+			if op.OK() {
+				if lineJoin < 0 {
+					lineJoin = 0
+				} else if lineJoin > 2 {
+					lineJoin = 2
+				}
 				r.LineJoin = graphics.LineJoinStyle(lineJoin)
 				r.Set |= graphics.StateLineJoin
 			}
@@ -258,6 +268,191 @@ func (r *Reader) do2() error {
 				r.Set &= ^graphics.StateTextMatrix
 			}
 
+		// Table 103 - Text state operators
+
+		case "Tc":
+			charSpace := op.GetNumber()
+			if op.OK() {
+				r.TextCharacterSpacing = charSpace
+				r.Set |= graphics.StateTextCharacterSpacing
+			}
+
+		case "Tw":
+			wordSpace := op.GetNumber()
+			if op.OK() {
+				r.TextWordSpacing = wordSpace
+				r.Set |= graphics.StateTextWordSpacing
+			}
+
+		case "Tz":
+			scale := op.GetNumber()
+			if op.OK() {
+				r.TextHorizontalScaling = scale / 100
+				r.Set |= graphics.StateTextHorizontalScaling
+			}
+
+		case "TL":
+			leading := op.GetNumber()
+			if op.OK() {
+				r.TextLeading = leading
+				r.Set |= graphics.StateTextLeading
+			}
+
+		case "Tf":
+			font := op.GetName()
+			size := op.GetNumber()
+			if op.OK() && r.Resources != nil && r.Resources.Font != nil {
+				ref := r.Resources.Font[font]
+				if ref != nil {
+					F, err := r.ReadFont(ref, font)
+					if pdf.IsMalformed(err) {
+						break
+					} else if err != nil {
+						return pdf.Wrap(err, fmt.Sprintf("font %s", font))
+					}
+					r.TextFont = F
+					r.TextFontSize = size
+					r.Set |= graphics.StateTextFont
+				}
+			}
+
+		case "Tr":
+			render := op.GetInteger()
+			if op.OK() {
+				if render < 0 {
+					render = 0
+				} else if render > 7 {
+					render = 7
+				}
+				r.TextRenderingMode = graphics.TextRenderingMode(render)
+				r.Set |= graphics.StateTextRenderingMode
+			}
+
+		case "Ts":
+			rise := op.GetNumber()
+			if op.OK() {
+				r.TextRise = rise
+				r.Set |= graphics.StateTextRise
+			}
+
+		// Table 106 - Text-positioning operators
+
+		case "Td":
+			tx := op.GetNumber()
+			ty := op.GetNumber()
+			if op.OK() {
+				r.TextLineMatrix = matrix.Translate(tx, ty).Mul(r.TextLineMatrix)
+				r.TextMatrix = r.TextLineMatrix
+			}
+
+		case "TD":
+			tx := op.GetNumber()
+			ty := op.GetNumber()
+			if op.OK() {
+				r.TextLeading = -ty
+				r.Set |= graphics.StateTextLeading
+				r.TextLineMatrix = matrix.Translate(tx, ty).Mul(r.TextLineMatrix)
+				r.TextMatrix = r.TextLineMatrix
+			}
+
+		case "Tm":
+			m := matrix.Matrix{}
+			for i := 0; i < 6; i++ {
+				m[i] = op.GetNumber()
+			}
+			if op.OK() {
+				r.TextMatrix = m
+				r.TextLineMatrix = m
+				r.Set |= graphics.StateTextMatrix
+			}
+
+		case "T*":
+			if op.OK() {
+				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+				r.TextMatrix = r.TextLineMatrix
+			}
+
+		// Table 107 - Text-showing operators
+
+		case "Tj":
+			s := op.GetString()
+			if op.OK() {
+				r.processText(s)
+			}
+
+		case "'":
+			s := op.GetString()
+			if op.OK() {
+				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+				r.TextMatrix = r.TextLineMatrix
+				r.processText(s)
+			}
+
+		case "\"":
+			aw := op.GetNumber()
+			ac := op.GetNumber()
+			s := op.GetString()
+			if op.OK() {
+				r.TextWordSpacing = aw
+				r.TextCharacterSpacing = ac
+				r.Set |= graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
+				r.processText(s)
+			}
+
+		case "TJ":
+			a := op.GetArray()
+			if op.OK() {
+				for _, ai := range a {
+					var d float64
+					switch ai := ai.(type) {
+					case pdf.String:
+						r.processText(ai)
+					case pdf.Integer:
+						d = float64(ai)
+					case pdf.Real:
+						d = float64(ai)
+					case pdf.Number:
+						d = float64(ai)
+					}
+					if d != 0 {
+						d = d / 1000 * r.TextFontSize
+						switch r.TextFont.WritingMode() {
+						case 0:
+							r.TextMatrix = matrix.Translate(-d*r.TextHorizontalScaling, 0).Mul(r.TextMatrix)
+						case 1:
+							r.TextMatrix = matrix.Translate(0, -d).Mul(r.TextMatrix)
+						}
+					}
+				}
+			}
+
+		// Table 111 - Type 3 font operators
+
+		case "d0":
+			wx := op.GetNumber()
+			wy := op.GetNumber()
+			if op.OK() {
+				// TODO(voss): implement this
+				_, _ = wx, wy
+			}
+
+		case "d1":
+			wx := op.GetNumber()
+			wy := op.GetNumber()
+			llx := op.GetNumber()
+			lly := op.GetNumber()
+			urx := op.GetNumber()
+			ury := op.GetNumber()
+			if op.OK() {
+				// TODO(voss): implement this
+				_, _, _, _, _, _ = wx, wy, llx, lly, urx, ury
+			}
+
+		// Table 73 — Colour operators
+
+		case "CS":
+			name := op.GetName()
+			_ = name // TODO(voss)
 		}
 	}
 	return r.scanner.Error()
