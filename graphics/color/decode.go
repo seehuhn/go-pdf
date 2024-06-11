@@ -2,107 +2,263 @@ package color
 
 import (
 	"fmt"
+	"io"
 
 	"seehuhn.de/go/pdf"
 )
 
 func DecodeSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
-	desc, err := pdf.Resolve(r, desc)
-	if err != nil {
-		return nil, err
-	}
+	d := newDecoder(r, desc)
 
-	switch desc := desc.(type) {
-	case pdf.Name:
-		switch desc {
-		case FamilyDeviceGray:
-			return DeviceGray, nil
-		case FamilyDeviceRGB:
-			return DeviceRGB, nil
-		case FamilyDeviceCMYK:
-			return DeviceCMYK, nil
-		case FamilyPattern:
-			return spacePatternColored{}, nil
-		}
-	case pdf.Array:
-		if len(desc) == 0 {
-			break
-		}
-		name, err := pdf.GetName(r, desc[0])
-		if pdf.IsMalformed(err) {
-			break
-		} else if err != nil {
-			return nil, err
-		}
+	var res Space
+	var err error
+	switch d.name {
+	case FamilyDeviceGray:
+		res = DeviceGray
 
-		switch name {
-		case FamilyCalGray:
-			if len(desc) != 2 {
-				break
-			}
-			dict, err := pdf.GetDict(r, desc[1])
+	case FamilyDeviceRGB:
+		res = DeviceRGB
+
+	case FamilyDeviceCMYK:
+		res = DeviceCMYK
+
+	case FamilyPattern:
+		if len(d.args) == 0 {
+			res = spacePatternColored{}
+		} else {
+			base, err := DecodeSpace(r, d.args[0])
 			if err != nil {
-				break
+				d.SetError(pdf.Wrap(err, "base color space"))
+			} else {
+				// TODO(voss): do we need to look this up in the resource dictionary?
+				res = spacePatternUncolored{
+					base: base,
+				}
 			}
-
-			whitePoint, err := getArrayN(r, dict["WhitePoint"], 3)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-
-			blackPoint, err := getArrayN(r, dict["BlackPoint"], 3)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-			if blackPoint == nil {
-				blackPoint = []float64{0, 0, 0}
-			}
-
-			gamma, err := pdf.GetNumber(r, dict["Gamma"])
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return nil, err
-			}
-
-			res := &SpaceCalGray{
-				whitePoint: whitePoint,
-				blackPoint: blackPoint,
-				gamma:      float64(gamma),
-			}
-			return res, nil
-		case "CalCMYK": // deprecated
-			return DeviceCMYK, nil
 		}
+
+	case FamilyCalGray:
+		whitePoint := d.getArrayN("WhitePoint", 3)
+		blackPoint := d.getArrayN("BlackPoint", 3) // optional
+		gamma := d.getOptionalNumber("Gamma", 1.0)
+
+		res, err = CalGray(whitePoint, blackPoint, gamma, "")
+		if err != nil {
+			d.SetError(err)
+		}
+
+	case FamilyCalRGB:
+		whitePoint := d.getArrayN("WhitePoint", 3)
+		blackPoint := d.getArrayN("BlackPoint", 3)
+		if blackPoint == nil {
+			blackPoint = []float64{0, 0, 0}
+		}
+		gamma := d.getArrayN("Gamma", 3)
+		if gamma == nil {
+			gamma = []float64{1, 1, 1}
+		}
+		matrix := d.getArrayN("Matrix", 9)
+		if matrix == nil {
+			matrix = []float64{1, 0, 0, 0, 1, 0, 0, 0, 1}
+		}
+
+		res, err = CalRGB(whitePoint, blackPoint, gamma, matrix, "")
+		if err != nil {
+			d.SetError(err)
+		}
+
+	case FamilyLab:
+		whitePoint := d.getArrayN("WhitePoint", 3)
+		blackPoint := d.getArrayN("BlackPoint", 3)
+		Range := d.getArrayN("Range", 4)
+
+		res, err = Lab(whitePoint, blackPoint, Range, "")
+		if err != nil {
+			d.SetError(err)
+		}
+
+	case "CalCMYK": // deprecated
+		res = DeviceCMYK
+
+	default:
+		d.MarkAsInvalid()
 	}
-	return nil, &pdf.MalformedFileError{
-		Err: fmt.Errorf("invalid color space: %s", pdf.Format(desc)),
+
+	if d.err != nil {
+		return nil, d.err
+	}
+	return res, nil
+}
+
+type decoder struct {
+	r   pdf.Getter
+	obj pdf.Object
+
+	name pdf.Name
+	args []pdf.Object
+	dict pdf.Dict
+	data []byte
+	err  error
+}
+
+func newDecoder(r pdf.Getter, obj pdf.Object) *decoder {
+	d := &decoder{
+		r:    r,
+		obj:  obj,
+		dict: pdf.Dict{},
+	}
+
+	x, err := pdf.Resolve(r, obj)
+	if err != nil {
+		d.err = err
+		return d
+	}
+	d.obj = x
+
+	switch x := x.(type) {
+	case pdf.Name:
+		d.name = x
+	case pdf.String:
+		d.name = pdf.Name(x)
+	case pdf.Array:
+		if len(x) == 0 {
+			d.MarkAsInvalid()
+			break
+		}
+		name, err := pdf.GetName(r, x[0])
+		if err != nil {
+			d.SetError(err)
+			break
+		}
+		d.name = name
+		x = x[1:]
+
+		if len(x) == 0 {
+			break
+		}
+
+		y, err := pdf.Resolve(r, x[0])
+		if err != nil {
+			d.SetError(err)
+			break
+		}
+		switch y := y.(type) {
+		case pdf.Dict:
+			d.dict = y
+
+		case *pdf.Stream:
+			d.dict = y.Dict
+			r, err := pdf.DecodeStream(r, y, 0)
+			if err != nil {
+				d.SetError(err)
+				break
+			}
+			body, err := io.ReadAll(r)
+			if err != nil {
+				d.SetError(err)
+				break
+			}
+			d.data = body
+
+		default:
+			d.args = x
+		}
+
+	default:
+		d.MarkAsInvalid()
+	}
+
+	return d
+}
+
+func (d *decoder) SetError(err error) {
+	if err == nil {
+		panic("invalid error")
+	}
+
+	switch {
+	case d.err == nil:
+		if pdf.IsMalformed(err) {
+			d.MarkAsInvalid()
+		} else {
+			d.err = err
+		}
+	case pdf.IsMalformed(d.err):
+		if !pdf.IsMalformed(err) {
+			// overwrite format errors with read errors
+			d.err = err
+		}
+	default:
+		// keep the original read error
 	}
 }
 
-func getArrayN(r pdf.Getter, obj pdf.Object, n int) ([]float64, error) {
-	arr, err := pdf.GetArray(r, obj)
+func (d *decoder) MarkAsInvalid() {
+	var desc string
+	switch d.obj.(type) {
+	case *pdf.Stream:
+		desc = "stream"
+	default:
+		desc = pdf.Format(d.obj)
+	}
+	if len(desc) > 40 {
+		desc = desc[:32] + "..." + desc[len(desc)-5:]
+	}
+
+	d.err = &pdf.MalformedFileError{
+		Err: fmt.Errorf("invalid color space: %s", desc),
+	}
+}
+
+func (d *decoder) getOptionalNumber(entry pdf.Name, defValue float64) float64 {
+	if d.err != nil {
+		return defValue
+	}
+
+	obj, ok := d.dict[entry]
+	if !ok {
+		return defValue
+	}
+
+	x, err := pdf.GetNumber(d.r, obj)
 	if err != nil {
-		return nil, err
+		d.SetError(err)
+		return defValue
+	}
+	return float64(x)
+}
+
+func (d *decoder) getArrayN(entry pdf.Name, n int) []float64 {
+	if d.err != nil {
+		return nil
+	}
+
+	obj, ok := d.dict[entry]
+	if !ok {
+		return nil
+	}
+
+	arr, err := pdf.GetArray(d.r, obj)
+	if err != nil {
+		d.SetError(err)
+		return nil
 	}
 
 	if len(arr) != n {
-		return nil, &pdf.MalformedFileError{
+		d.SetError(&pdf.MalformedFileError{
 			Err: fmt.Errorf("expected array of length %d, got %d", n, len(arr)),
-		}
+		})
+		return nil
 	}
 
 	res := make([]float64, n)
 	for i, elem := range arr {
-		x, err := pdf.GetNumber(r, elem)
+		x, err := pdf.GetNumber(d.r, elem)
 		if err != nil {
-			return nil, err
+			d.SetError(err)
+			return nil
 		}
 		res[i] = float64(x)
 	}
-	return res, nil
+	return res
 }

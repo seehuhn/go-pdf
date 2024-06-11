@@ -48,6 +48,9 @@ func (err *AuthenticationError) Error() string {
 }
 
 // MalformedFileError indicates that a PDF file could not be parsed.
+//
+// TODO(voss): introduce a distinction between an invalid PDF container,
+// and invalid PDF content within a valid container.
 type MalformedFileError struct {
 	Err error
 	Loc []string

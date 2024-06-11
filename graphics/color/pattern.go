@@ -84,7 +84,7 @@ func (c PatternColored) values() []float64 {
 // == uncolored patterns =====================================================
 
 type spacePatternUncolored struct {
-	s Space
+	base Space
 }
 
 func (s spacePatternUncolored) DefaultName() pdf.Name {
@@ -94,7 +94,7 @@ func (s spacePatternUncolored) DefaultName() pdf.Name {
 func (s spacePatternUncolored) PDFObject() pdf.Object {
 	return pdf.Array{
 		pdf.Name("Pattern"),
-		s.s.PDFObject(),
+		s.base.PDFObject(),
 	}
 }
 
@@ -115,7 +115,7 @@ type colorPatternUncolored struct {
 
 // ColorSpace implements the [Color] interface.
 func (c colorPatternUncolored) ColorSpace() Space {
-	return spacePatternUncolored{s: c.col.ColorSpace()}
+	return spacePatternUncolored{base: c.col.ColorSpace()}
 }
 
 // values implements the [Color] interface.
