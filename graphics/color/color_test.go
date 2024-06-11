@@ -24,7 +24,7 @@ var (
 	_ Space = (*SpaceCalGray)(nil)
 	_ Space = (*SpaceCalRGB)(nil)
 	_ Space = (*SpaceLab)(nil)
-	// TODO(voss): ICCBased
+	_ Space = (*SpaceICCBased)(nil)
 	_ Space = spacePatternColored{}
 	_ Space = spacePatternUncolored{}
 	_ Space = (*SpaceIndexed)(nil)

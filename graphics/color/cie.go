@@ -80,6 +80,9 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64, defName pdf.Name) 
 
 // Embed embeds the color space in the PDF file.
 // This saves space in case the color space is used in multiple content streams.
+//
+// TODO(voss): decide whether color spaces are specific to a PDF file or
+// whether they can be shared between multiple PDF files.
 func (s *SpaceCalGray) Embed(out *pdf.Writer) (*SpaceCalGray, error) {
 	if _, ok := s.Res.Data.(pdf.Reference); ok {
 		return s, nil
@@ -380,4 +383,62 @@ func (c colorLab) values() []float64 {
 
 // == ICCBased ===============================================================
 
-// TODO(voss): implement this
+type SpaceICCBased struct {
+	n        int
+	ranges   []float64
+	metadata *pdf.Stream
+	profile  []byte
+	defName  pdf.Name
+}
+
+func ICCBased(n int, profile []byte, ranges []float64, metadata *pdf.Stream, defName pdf.Name) (*SpaceICCBased, error) {
+	if n != 1 && n != 3 && n != 4 {
+		return nil, fmt.Errorf("ICCBased: invalid number of components %d", n)
+	}
+	if len(profile) == 0 {
+		return nil, errors.New("ICCBased: missing profile")
+	}
+	if ranges == nil {
+		ranges = make([]float64, 2*n)
+		for i := range ranges {
+			ranges[i] = float64(i % 2)
+		}
+	} else {
+		if len(ranges) != 2*n {
+			return nil, fmt.Errorf("ICCBased: invalid ranges")
+		}
+		for i := 0; i < 2*n; i += 2 {
+			if ranges[i] > ranges[i+1] {
+				return nil, fmt.Errorf("ICCBased: invalid ranges")
+			}
+		}
+	}
+
+	res := &SpaceICCBased{
+		n:        n,
+		ranges:   ranges,
+		metadata: metadata,
+		profile:  profile,
+		defName:  defName,
+	}
+	return res, nil
+}
+
+// DefaultName implements the [Space] interface.
+func (s *SpaceICCBased) DefaultName() pdf.Name {
+	return s.defName
+}
+
+// PDFObject implements the [Space] interface.
+func (s *SpaceICCBased) PDFObject() pdf.Object {
+	panic("not implemented") // TODO: Implement
+}
+
+// ColorSpaceFamily implements the [Space] interface.
+func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
+	return "ICCBased"
+}
+
+func (s *SpaceICCBased) defaultColor() Color {
+	panic("not implemented") // TODO: Implement
+}
