@@ -96,7 +96,7 @@ func (s *SpaceCalGray) Embed(out *pdf.Writer) (*SpaceCalGray, error) {
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s *SpaceCalGray) ColorSpaceFamily() string {
+func (s *SpaceCalGray) ColorSpaceFamily() pdf.Name {
 	return "CalGray"
 }
 
@@ -215,7 +215,7 @@ func (s *SpaceCalRGB) Embed(out *pdf.Writer) (*SpaceCalRGB, error) {
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s *SpaceCalRGB) ColorSpaceFamily() string {
+func (s *SpaceCalRGB) ColorSpaceFamily() pdf.Name {
 	return "CalRGB"
 }
 
@@ -325,7 +325,7 @@ func (s *SpaceLab) Embed(out *pdf.Writer) (*SpaceLab, error) {
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s *SpaceLab) ColorSpaceFamily() string {
+func (s *SpaceLab) ColorSpaceFamily() pdf.Name {
 	return "Lab"
 }
 

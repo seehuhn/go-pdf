@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // EmbedPNG writes the image `src` to the PDF file w, using a lossless
@@ -65,7 +66,7 @@ func (im *pngImage) Embed(w pdf.Putter, defaultName pdf.Name) (*graphics.XObject
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(width),
 		"Height":           pdf.Integer(height),
-		"ColorSpace":       pdf.Name("DeviceRGB"),
+		"ColorSpace":       pdf.Name(color.FamilyDeviceRGB),
 		"BitsPerComponent": pdf.Integer(8),
 		"SMask":            maskRef,
 	}, filter)
@@ -98,7 +99,7 @@ func (im *pngImage) Embed(w pdf.Putter, defaultName pdf.Name) (*graphics.XObject
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(width),
 		"Height":           pdf.Integer(height),
-		"ColorSpace":       pdf.Name("DeviceGray"),
+		"ColorSpace":       pdf.Name(color.FamilyDeviceGray),
 		"BitsPerComponent": pdf.Integer(8),
 	}, filter)
 	if err != nil {

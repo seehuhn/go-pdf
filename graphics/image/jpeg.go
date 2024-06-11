@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // EmbedJPEG writes the image src to the PDF file w, using lossy compression.
@@ -70,7 +71,7 @@ func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (*graphics.XObject, e
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(img.Bounds().Dx()),
 		"Height":           pdf.Integer(img.Bounds().Dy()),
-		"ColorSpace":       pdf.Name("DeviceRGB"),
+		"ColorSpace":       pdf.Name(color.FamilyDeviceRGB),
 		"BitsPerComponent": pdf.Integer(8),
 		"Filter":           pdf.Name("DCTDecode"),
 	})

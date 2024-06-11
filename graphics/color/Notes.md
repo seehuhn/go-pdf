@@ -11,10 +11,16 @@ Device Color Spaces
 The device color spaces are:
 
 - DeviceGray (PDF-1.1)
-- DeviceRGB (PDF-1.1)
-- DeviceCMYK (PDF-1.1)
+  Color space description: \DeviceGray
 
-- CalCMYK is a synonym for DeviceCMYK.
+- DeviceRGB (PDF-1.1)
+  Color space description: \DeviceRGB
+
+- DeviceCMYK (PDF-1.1)
+  Color space description: \DeviceCMYK
+
+- CalCMYK is a deprecated synonym for DeviceCMYK.
+  Color space description: [\CalCMYK dict]
 
 The device color spaces can have two different uses:
 
@@ -30,10 +36,28 @@ CIE-Based Color Spaces
 The CIE-based color spaces are:
 
 - CalGray (PDF-1.1)
-- CalRGB (PDF-1.1)
-- Lab (PDF-1.1)
-- ICCBased (PDF-1.3)
+  Color space description: [\CalGray dict]
+  The dictionary entries are \WhitePoint (required), \BlackPoint (optional)
+  and \Gamma (optional).
+  See table 62 in ISO 32000-2:2020.
 
+- CalRGB (PDF-1.1)
+  Color space description: [\CalRGB dict]
+  The dictionary entries are \WhitePoint (required), \BlackPoint (optional),
+  \Gamma (optional) and \Matrix (optional).
+  See table 63 in ISO 32000-2:2020.
+
+- Lab (PDF-1.1)
+  Color space description: [\Lab dict]
+  The dictionary entries are \WhitePoint (required), \BlackPoint (optional)
+  and \Range (optional).
+  See table 64 in ISO 32000-2:2020.
+
+- ICCBased (PDF-1.3)
+  Color space description: [\ICCBased stream]
+  The stream dictionary has the following (additional) entries: \N (required),
+  \Alternate (deprecated), \Range (optional), and \Metadata (optional).
+  See table 65 in ISO 32000-2:2020.
 
 Special Color Spaces
 --------------------
@@ -41,10 +65,21 @@ Special Color Spaces
 The special color spaces are:
 
 - Indexed (PDF-1.1)
-- Pattern (PDF-1.2)
-- Separation (PDF-1.2)
-- DeviceN (PDF-1.3)
+  Color space description: [\Indexed baseColor highVal lookup]
+  See section 8.6.6.3 in ISO 32000-2:2020.
 
+- Pattern (PDF-1.2)
+  Colored patterns: /Pattern
+  Uncolored tiling patterns: [/Pattern baseColorSpace]
+
+- Separation (PDF-1.2)
+  Color space description: [\Separation name alternateSpace tintTransform]
+  See section 8.6.6.4 in ISO 32000-2:2020.
+
+- DeviceN (PDF-1.3)
+  Color space description: [\DeviceN names alternateSpace tintTransform]
+      or [/DeviceN names alternateSpace tintTransform attributes]
+  See section 8.6.6.5 in ISO 32000-2:2020.
 
 
 ICC Profiles

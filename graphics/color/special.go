@@ -111,7 +111,7 @@ func (s *SpaceIndexed) Embed(out *pdf.Writer) (*SpaceIndexed, error) {
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s *SpaceIndexed) ColorSpaceFamily() string {
+func (s *SpaceIndexed) ColorSpaceFamily() pdf.Name {
 	return "Indexed"
 }
 

@@ -42,12 +42,12 @@ func (s SpaceDeviceGray) DefaultName() pdf.Name {
 
 // PDFObject implements the [Space] interface.
 func (s SpaceDeviceGray) PDFObject() pdf.Object {
-	return pdf.Name("DeviceGray")
+	return pdf.Name(FamilyDeviceGray)
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s SpaceDeviceGray) ColorSpaceFamily() string {
-	return "DeviceGray"
+func (s SpaceDeviceGray) ColorSpaceFamily() pdf.Name {
+	return FamilyDeviceGray
 }
 
 // defaultColor implements the [Space] interface.
@@ -85,12 +85,12 @@ func (s SpaceDeviceRGB) DefaultName() pdf.Name {
 
 // PDFObject implements the [Space] interface.
 func (s SpaceDeviceRGB) PDFObject() pdf.Object {
-	return pdf.Name("DeviceRGB")
+	return pdf.Name(FamilyDeviceRGB)
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s SpaceDeviceRGB) ColorSpaceFamily() string {
-	return "DeviceRGB"
+func (s SpaceDeviceRGB) ColorSpaceFamily() pdf.Name {
+	return FamilyDeviceRGB
 }
 
 // defaultColor implements the [Space] interface.
@@ -132,7 +132,7 @@ func (s SpaceDeviceCMYK) PDFObject() pdf.Object {
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s SpaceDeviceCMYK) ColorSpaceFamily() string {
+func (s SpaceDeviceCMYK) ColorSpaceFamily() pdf.Name {
 	return "DeviceCMYK"
 }
 

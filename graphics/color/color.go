@@ -22,30 +22,29 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Color space families supported by PDF.
+const (
+	FamilyDeviceGray pdf.Name = "DeviceGray"
+	FamilyDeviceRGB  pdf.Name = "DeviceRGB"
+	FamilyDeviceCMYK pdf.Name = "DeviceCMYK"
+	FamilyCalGray    pdf.Name = "CalGray"
+	FamilyCalRGB     pdf.Name = "CalRGB"
+	FamilyLab        pdf.Name = "Lab"
+	FamilyICCBased   pdf.Name = "ICCBased"
+	FamilyPattern    pdf.Name = "Pattern"
+	FamilyIndexed    pdf.Name = "Indexed"
+	FamilySeparation pdf.Name = "Separation"
+	FamilyDeviceN    pdf.Name = "DeviceN"
+)
+
 // Space represents a PDF color space.
 type Space interface {
 	pdf.Resource
 
-	ColorSpaceFamily() string
+	ColorSpaceFamily() pdf.Name
 
 	defaultColor() Color
 }
-
-// The following types implement the ColorSpace interface:
-var (
-	_ Space = SpaceDeviceGray{}
-	_ Space = SpaceDeviceRGB{}
-	_ Space = SpaceDeviceCMYK{}
-	_ Space = (*SpaceCalGray)(nil)
-	_ Space = (*SpaceCalRGB)(nil)
-	_ Space = (*SpaceLab)(nil)
-	// TODO(voss): ICCBased
-	_ Space = spacePatternColored{}
-	_ Space = spacePatternUncolored{}
-	_ Space = (*SpaceIndexed)(nil)
-	// TODO(voss): Separation colour spaces
-	// TODO(voss): DeviceN colour spaces
-)
 
 // NumValues returns the number of color values for the given color space.
 func NumValues(s Space) int {
@@ -76,35 +75,29 @@ type Color interface {
 	values() []float64
 }
 
-// The following types implement the Color interface.
-var (
-	_ Color = colorDeviceGray(0)
-	_ Color = colorDeviceRGB{0, 0, 0}
-	_ Color = colorDeviceCMYK{0, 0, 0, 1}
-	_ Color = colorCalGray{}
-	_ Color = colorCalRGB{}
-	_ Color = colorLab{}
-	// TODO(voss): ICCBased
-	_ Color = PatternColored{}
-	_ Color = colorPatternUncolored{}
-	_ Color = colorIndexed{}
-	// TODO(voss): Separation colour spaces
-	// TODO(voss): DeviceN colour spaces
-)
-
 // CheckVersion checks whether the given color space can be used in the given
 // PDF version.
+//
+// See table 61 in ISO 32000-2:2020.
 func CheckVersion(cs Space, v pdf.Version) error {
+	fam := cs.ColorSpaceFamily()
 	minVersion := pdf.V1_0
-	switch cs.(type) {
-	case *SpaceCalGray, *SpaceCalRGB, *SpaceLab:
+	switch fam {
+	case FamilyDeviceGray, FamilyDeviceRGB, FamilyDeviceCMYK:
+		// The concept of color spaces was only introduced in PDF 1.1.
+		// We use pdf.V1_0 here to allow for use of the "G", "RG", and "K"
+		// operators in PDF 1.0.
+		minVersion = pdf.V1_0
+	case FamilyCalGray, FamilyCalRGB, FamilyLab, FamilyIndexed:
 		minVersion = pdf.V1_1
-	case spacePatternColored, spacePatternUncolored:
+	case FamilyPattern, FamilySeparation:
 		minVersion = pdf.V1_2
+	case FamilyICCBased, FamilyDeviceN:
+		minVersion = pdf.V1_3
 	}
 	if v < minVersion {
 		return &pdf.VersionError{
-			Operation: cs.ColorSpaceFamily() + " colors",
+			Operation: string(fam) + " colors",
 			Earliest:  minVersion,
 		}
 	}
