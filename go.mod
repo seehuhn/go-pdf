@@ -10,7 +10,6 @@ require (
 	golang.org/x/term v0.16.0
 	golang.org/x/text v0.14.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
-	seehuhn.de/go/float v0.5.0
 	seehuhn.de/go/postscript v0.5.0
 	seehuhn.de/go/sfnt v0.5.0
 	seehuhn.de/go/xmp v0.3.0

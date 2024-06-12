@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math"
 
-	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/matrix"
 )
@@ -89,10 +88,11 @@ func (w *Writer) Transform(extraTrfm matrix.Matrix) {
 
 	w.CTM = extraTrfm.Mul(w.CTM)
 
-	_, w.Err = fmt.Fprintln(w.Content,
-		float.Format(extraTrfm[0], 3), float.Format(extraTrfm[1], 3),
-		float.Format(extraTrfm[2], 3), float.Format(extraTrfm[3], 3),
-		float.Format(extraTrfm[4], 3), float.Format(extraTrfm[5], 3), "cm")
+	_, w.Err = fmt.Fprintf(w.Content,
+		"%s %s %s %s %s %s cm\n",
+		format(extraTrfm[0]), format(extraTrfm[1]),
+		format(extraTrfm[2]), format(extraTrfm[3]),
+		format(extraTrfm[4]), format(extraTrfm[5]))
 }
 
 // SetLineWidth sets the line width.
@@ -174,7 +174,7 @@ func (w *Writer) SetMiterLimit(limit float64) {
 	w.MiterLimit = limit
 	w.Set |= StateMiterLimit
 
-	_, w.Err = fmt.Fprintln(w.Content, float.Format(limit, 4), "M")
+	_, w.Err = fmt.Fprintln(w.Content, format(limit), "M")
 }
 
 // SetLineDash sets the line dash pattern.
@@ -200,13 +200,13 @@ func (w *Writer) SetLineDash(pattern []float64, phase float64) {
 	}
 	sep := ""
 	for _, x := range pattern {
-		_, w.Err = fmt.Fprint(w.Content, sep, float.Format(x, 3))
+		_, w.Err = fmt.Fprint(w.Content, sep, format(x))
 		if w.Err != nil {
 			return
 		}
 		sep = " "
 	}
-	_, w.Err = fmt.Fprint(w.Content, "] ", float.Format(phase, 3), " d\n")
+	_, w.Err = fmt.Fprint(w.Content, "] ", format(phase), " d\n")
 }
 
 // SetRenderingIntent sets the rendering intent.
@@ -251,7 +251,7 @@ func (w *Writer) SetFlatnessTolerance(flatness float64) {
 	w.FlatnessTolerance = flatness
 	w.Set |= StateFlatnessTolerance
 
-	_, w.Err = fmt.Fprintln(w.Content, float.Format(flatness, 3), "i")
+	_, w.Err = fmt.Fprintln(w.Content, format(flatness), "i")
 }
 
 // SetExtGState sets selected graphics state parameters.

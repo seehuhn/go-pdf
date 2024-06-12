@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -64,7 +63,7 @@ func (w *Writer) SetStrokeColor(c color.Color) {
 	if needsColor {
 		values, pattern, op := color.Operator(c)
 		for _, val := range values {
-			valString := float.Format(val, 3)
+			valString := format(val)
 			_, w.Err = fmt.Fprint(w.Content, valString, " ")
 			if w.Err != nil {
 				return
@@ -124,7 +123,7 @@ func (w *Writer) SetFillColor(c color.Color) {
 	if needsColor {
 		values, pattern, op := color.Operator(c)
 		for _, val := range values {
-			valString := float.Format(val, 3)
+			valString := format(val)
 			_, w.Err = fmt.Fprint(w.Content, valString, " ")
 			if w.Err != nil {
 				return

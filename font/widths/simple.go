@@ -17,7 +17,6 @@
 package widths
 
 import (
-	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 )
 
@@ -67,7 +66,7 @@ func EncodeSimple(ww []float64) *Info {
 	Widths := make(pdf.Array, LastChar-FirstChar+1)
 	for i := range Widths {
 		w := ww[FirstChar+i]
-		Widths[i] = pdf.Number(float.Round(w, 2))
+		Widths[i] = pdf.Number(w)
 	}
 
 	return &Info{

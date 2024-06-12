@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 
-	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
@@ -702,8 +701,6 @@ doOps:
 		dx, ok1 := getNum()
 		dy, ok2 := getNum()
 		if ok1 && ok2 {
-			dx = float.Round(dx, 2)
-			dy = float.Round(dy, 2)
 			r.TextLineMatrix = matrix.Translate(dx, dy).Mul(r.TextLineMatrix)
 			r.TextMatrix = r.TextLineMatrix
 		}

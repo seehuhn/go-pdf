@@ -21,7 +21,6 @@ import (
 	"io"
 	"strconv"
 
-	"seehuhn.de/go/float"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
@@ -179,7 +178,7 @@ func (w *Writer) isValid(cmd string, ss objectType) bool {
 func (w *Writer) coord(x float64) string {
 	// TODO(voss): use the current transformation matrix to determine the
 	// number of digits to keep?
-	return float.Format(x, 2)
+	return format(x)
 }
 
 // See Figure 9 (p. 113) of PDF 32000-1:2008.
@@ -210,4 +209,8 @@ func (s objectType) String() string {
 	default:
 		return fmt.Sprintf("objectType(%d)", s)
 	}
+}
+
+func format(x float64) string {
+	return strconv.FormatFloat(x, 'f', -1, 64)
 }
