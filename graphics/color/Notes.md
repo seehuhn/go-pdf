@@ -92,7 +92,7 @@ PDF-1.3
     profile version 2.1.0, spec version ICC 3.3 (Nov 1996)
 
 PDF-1.4
-    profile version 2.3.0, spec version ICC.1A:1999-04
+    profile version 2.3.0, spec version ICC.1A:1999-04 + ICC.1:1998-09
 
 PDF-1.5
     profile version 4.0.0, spec version ICC.1:2001-12
