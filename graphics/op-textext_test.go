@@ -126,7 +126,7 @@ func TestTextShowRaw(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			// first print all glyphs in one string
 			img1 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.EmbedCFF(r.Out, e, "F")
+				F := dummyfont.EmbedCFF(r.Out, e)
 
 				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
@@ -141,7 +141,7 @@ func TestTextShowRaw(t *testing.T) {
 			// now print glyphs one-by-one and record the x positions
 			var xx []float64
 			img2 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.EmbedCFF(r.Out, e, "F")
+				F := dummyfont.EmbedCFF(r.Out, e)
 
 				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
@@ -158,7 +158,7 @@ func TestTextShowRaw(t *testing.T) {
 			})
 			// finally, print each glyph at the recorded x positions
 			img3 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.EmbedCFF(r.Out, e, "F")
+				F := dummyfont.EmbedCFF(r.Out, e)
 
 				r.TextSetFont(F, 100)
 				for i := range testString {

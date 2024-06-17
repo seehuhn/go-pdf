@@ -42,11 +42,6 @@ func (mc *MarkedContent) PDFObject() pdf.Object {
 	return mc.Properties
 }
 
-// DefaultName implements the [pdf.Resource] interface.
-func (mc *MarkedContent) DefaultName() pdf.Name {
-	return mc.DefName
-}
-
 // MarkedContentPoint adds a marked-content point to the content stream.
 //
 // The tag parameter specifies the role or significance of the point.

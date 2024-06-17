@@ -245,7 +245,7 @@ func (r *Reader) do2() error {
 			dictName := op.GetName()
 			if op.OK() {
 				// TODO(voss): use caching
-				newState, err := r.readExtGState(r.Resources.ExtGState[dictName], dictName)
+				newState, err := r.readExtGState(r.Resources.ExtGState[dictName])
 				if err == nil {
 					newState.Value.CopyTo(&r.State)
 				} else if !pdf.IsMalformed(err) {
@@ -588,7 +588,7 @@ doOps:
 		name, ok := getName()
 		if ok {
 			// TODO(voss): use caching
-			newState, err := r.readExtGState(r.Resources.ExtGState[name], name)
+			newState, err := r.readExtGState(r.Resources.ExtGState[name])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

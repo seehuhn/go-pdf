@@ -303,7 +303,7 @@ func TestEncoding(t *testing.T) {
 
 	// Embed the font
 	data := pdf.NewData(pdf.V1_7)
-	E, err := F.Embed(data, &font.Options{ResName: "F"})
+	E, err := F.Embed(data, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

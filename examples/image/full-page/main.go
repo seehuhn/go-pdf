@@ -71,7 +71,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	embedded, err := pdfimage.EmbedJPEG(doc.Out, img, nil, "I")
+	embedded, err := pdfimage.EmbedJPEG(doc.Out, img, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

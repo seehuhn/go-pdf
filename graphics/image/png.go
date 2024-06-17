@@ -26,12 +26,12 @@ import (
 
 // EmbedPNG writes the image `src` to the PDF file w, using a lossless
 // representation very similar to the PNG format.
-func EmbedPNG(w pdf.Putter, src image.Image, resName pdf.Name) (*graphics.XObject, error) {
+func EmbedPNG(w pdf.Putter, src image.Image) (*graphics.XObject, error) {
 	im, err := PNG(src)
 	if err != nil {
 		return nil, err
 	}
-	return im.Embed(w, resName)
+	return im.Embed(w)
 }
 
 func PNG(src image.Image) (Image, error) {
@@ -48,7 +48,7 @@ func (im *pngImage) Bounds() Rectangle {
 	return Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
 }
 
-func (im *pngImage) Embed(w pdf.Putter, defaultName pdf.Name) (*graphics.XObject, error) {
+func (im *pngImage) Embed(w pdf.Putter) (*graphics.XObject, error) {
 	ref := w.Alloc()
 	src := im.im
 
@@ -116,8 +116,7 @@ func (im *pngImage) Embed(w pdf.Putter, defaultName pdf.Name) (*graphics.XObject
 
 	return &graphics.XObject{
 		Res: pdf.Res{
-			DefName: defaultName,
-			Data:    ref,
+			Data: ref,
 		},
 	}, nil
 }

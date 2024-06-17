@@ -105,8 +105,7 @@ func Raw(w pdf.Putter, f *FormProperties, contents []byte, resources *pdf.Resour
 
 	res := &graphics.XObject{
 		Res: pdf.Res{
-			DefName: f.DefaultName,
-			Data:    ref,
+			Data: ref,
 		},
 	}
 	return res, nil

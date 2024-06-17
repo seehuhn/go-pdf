@@ -50,7 +50,7 @@ type Type4Vertex struct {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type4) Embed(w pdf.Putter, _ bool, defName pdf.Name) (*graphics.Shading, error) {
+func (s *Type4) Embed(w pdf.Putter, _ bool) (*graphics.Shading, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
 	} else if color.IsPattern(s.ColorSpace) {
@@ -193,5 +193,5 @@ func (s *Type4) Embed(w pdf.Putter, _ bool, defName pdf.Name) (*graphics.Shading
 		return nil, err
 	}
 
-	return &graphics.Shading{Res: pdf.Res{DefName: defName, Data: ref}}, nil
+	return &graphics.Shading{Res: pdf.Res{Data: ref}}, nil
 }

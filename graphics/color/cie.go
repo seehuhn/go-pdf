@@ -46,7 +46,7 @@ type SpaceCalGray struct {
 //
 // DefName is the default resource name to use within content streams.
 // This can be left empty to allocate names automatically.
-func CalGray(whitePoint, blackPoint []float64, gamma float64, defName pdf.Name) (*SpaceCalGray, error) {
+func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, error) {
 	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
 		return nil, errors.New("CalGray: invalid white point")
 	}
@@ -70,8 +70,7 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64, defName pdf.Name) 
 
 	return &SpaceCalGray{
 		Res: pdf.Res{
-			DefName: defName,
-			Data:    pdf.Array{pdf.Name("CalGray"), dict},
+			Data: pdf.Array{pdf.Name("CalGray"), dict},
 		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
@@ -156,7 +155,7 @@ type SpaceCalRGB struct {
 //
 // DefName is the default resource name to use within content streams.
 // This can be left empty to allocate names automatically.
-func CalRGB(whitePoint, blackPoint, gamma, matrix []float64, defName pdf.Name) (*SpaceCalRGB, error) {
+func CalRGB(whitePoint, blackPoint, gamma, matrix []float64) (*SpaceCalRGB, error) {
 	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
 		return nil, errors.New("CalRGB: invalid white point")
 	}
@@ -190,8 +189,7 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64, defName pdf.Name) (
 
 	return &SpaceCalRGB{
 		Res: pdf.Res{
-			DefName: defName,
-			Data:    pdf.Array{pdf.Name("CalRGB"), dict},
+			Data: pdf.Array{pdf.Name("CalRGB"), dict},
 		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
@@ -267,7 +265,7 @@ func (c colorCalRGB) values() []float64 {
 //
 // DefName is the default resource name to use within content streams.
 // This can be left empty to allocate names automatically.
-func Lab(whitePoint, blackPoint, ranges []float64, defName pdf.Name) (*SpaceLab, error) {
+func Lab(whitePoint, blackPoint, ranges []float64) (*SpaceLab, error) {
 	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
 		return nil, errors.New("Lab: invalid white point")
 	}
@@ -293,8 +291,7 @@ func Lab(whitePoint, blackPoint, ranges []float64, defName pdf.Name) (*SpaceLab,
 
 	return &SpaceLab{
 		Res: pdf.Res{
-			DefName: defName,
-			Data:    pdf.Array{pdf.Name("Lab"), dict},
+			Data: pdf.Array{pdf.Name("Lab"), dict},
 		},
 		whitePoint: whitePoint,
 		blackPoint: blackPoint,
@@ -388,10 +385,9 @@ type SpaceICCBased struct {
 	ranges   []float64
 	metadata *pdf.Stream
 	profile  []byte
-	defName  pdf.Name
 }
 
-func ICCBased(n int, profile []byte, ranges []float64, metadata *pdf.Stream, defName pdf.Name) (*SpaceICCBased, error) {
+func ICCBased(n int, profile []byte, ranges []float64, metadata *pdf.Stream) (*SpaceICCBased, error) {
 	if n != 1 && n != 3 && n != 4 {
 		return nil, fmt.Errorf("ICCBased: invalid number of components %d", n)
 	}
@@ -419,14 +415,8 @@ func ICCBased(n int, profile []byte, ranges []float64, metadata *pdf.Stream, def
 		ranges:   ranges,
 		metadata: metadata,
 		profile:  profile,
-		defName:  defName,
 	}
 	return res, nil
-}
-
-// DefaultName implements the [Space] interface.
-func (s *SpaceICCBased) DefaultName() pdf.Name {
-	return s.defName
 }
 
 // PDFObject implements the [Space] interface.

@@ -54,7 +54,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 		return nil, err
 	}
 
-	resource := pdf.Res{Data: w.Alloc(), DefName: opt.ResName}
+	resource := pdf.Res{Data: w.Alloc()}
 
 	geometry := &font.Geometry{
 		GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),

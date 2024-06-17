@@ -22,7 +22,6 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/pdf/reader"
@@ -39,7 +38,7 @@ func TestWidthsFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	E, err := F.Embed(data, &font.Options{ResName: "F"})
+	E, err := F.Embed(data, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -58,7 +58,7 @@ func DecodeSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		blackPoint := d.getArrayN("BlackPoint", 3) // optional
 		gamma := d.getOptionalNumber("Gamma", 1.0)
 
-		res, err = CalGray(whitePoint, blackPoint, gamma, "")
+		res, err = CalGray(whitePoint, blackPoint, gamma)
 		if err != nil {
 			d.SetError(err)
 		}
@@ -78,7 +78,7 @@ func DecodeSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			matrix = []float64{1, 0, 0, 0, 1, 0, 0, 0, 1}
 		}
 
-		res, err = CalRGB(whitePoint, blackPoint, gamma, matrix, "")
+		res, err = CalRGB(whitePoint, blackPoint, gamma, matrix)
 		if err != nil {
 			d.SetError(err)
 		}
@@ -88,7 +88,7 @@ func DecodeSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		blackPoint := d.getArrayN("BlackPoint", 3)
 		Range := d.getArrayN("Range", 4)
 
-		res, err = Lab(whitePoint, blackPoint, Range, "")
+		res, err = Lab(whitePoint, blackPoint, Range)
 		if err != nil {
 			d.SetError(err)
 		}

@@ -32,7 +32,7 @@ func TestEmbedBuiltin(t *testing.T) {
 		t.Run(string(F), func(t *testing.T) {
 			data := pdf.NewData(pdf.V1_7)
 
-			E, err := F.Embed(data, &font.Options{ResName: "F"})
+			E, err := F.Embed(data, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -94,7 +94,7 @@ func TestExtractBuiltin(t *testing.T) {
 func TestUnknownBuiltin(t *testing.T) {
 	F := Builtin("unknown font")
 	w := pdf.NewData(pdf.V1_7)
-	_, err := F.Embed(w, &font.Options{ResName: "F"})
+	_, err := F.Embed(w, nil)
 	if !os.IsNotExist(err) {
 		t.Errorf("wrong error: %s", err)
 	}

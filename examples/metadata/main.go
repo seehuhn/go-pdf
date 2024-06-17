@@ -23,7 +23,6 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/xmp"
 )
@@ -41,7 +40,7 @@ func run() error {
 		return err
 	}
 
-	font, err := type1.HelveticaBold.Embed(doc.Out, &font.Options{ResName: "F"})
+	font, err := type1.HelveticaBold.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}

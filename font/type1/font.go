@@ -156,8 +156,7 @@ func (f *embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error)
 	res := &embeddedSimple{
 		w: w,
 		Res: pdf.Res{
-			Data:    w.Alloc(),
-			DefName: opt.ResName,
+			Data: w.Alloc(),
 		},
 		Geometry: geometry,
 
@@ -286,8 +285,8 @@ func (f *embeddedSimple) Close() error {
 		} else {
 			fontName = f.metrics.FontName
 		}
-		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, fontName)
+		return fmt.Errorf("too many distinct glyphs used in font %q",
+			fontName)
 	}
 
 	encoding := make([]string, 256)
@@ -382,7 +381,6 @@ func (f *embeddedSimple) Close() error {
 		Metrics:   metricsSubset,
 		SubsetTag: subsetTag,
 		Encoding:  encoding,
-		ResName:   f.DefName,
 		ToUnicode: toUnicode,
 	}
 	return info.Embed(f.w, f.Data.(pdf.Reference))

@@ -24,7 +24,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	pdfimage "seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/matrix"
@@ -45,7 +44,7 @@ func run(fname string) error {
 	}
 
 	raw := mandelbrot()
-	img, err := pdfimage.EmbedPNG(page.Out, raw, "I")
+	img, err := pdfimage.EmbedPNG(page.Out, raw)
 	if err != nil {
 		return err
 	}
@@ -63,11 +62,11 @@ func run(fname string) error {
 	page.DrawXObject(img)
 	page.PopGraphicsState()
 
-	roman, err := type1.TimesRoman.Embed(page.Out, &font.Options{ResName: "R"})
+	roman, err := type1.TimesRoman.Embed(page.Out, nil)
 	if err != nil {
 		return err
 	}
-	bold, err := type1.TimesBold.Embed(page.Out, &font.Options{ResName: "B"})
+	bold, err := type1.TimesBold.Embed(page.Out, nil)
 	if err != nil {
 		return err
 	}

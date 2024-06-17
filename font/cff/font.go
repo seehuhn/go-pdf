@@ -59,7 +59,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 
 	info := f.sfnt
 
-	resource := pdf.Res{Data: w.Alloc(), DefName: opt.ResName}
+	resource := pdf.Res{Data: w.Alloc()}
 
 	geometry := &font.Geometry{
 		Ascent:             float64(info.Ascent) * info.FontMatrix[3],

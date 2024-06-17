@@ -24,7 +24,7 @@ import (
 )
 
 // NewShadingPattern creates a new shading pattern.
-func NewShadingPattern(w pdf.Putter, shading *graphics.Shading, M matrix.Matrix, extGState *graphics.ExtGState, singleUse bool, defaultName pdf.Name) (color.Color, error) {
+func NewShadingPattern(w pdf.Putter, shading *graphics.Shading, M matrix.Matrix, extGState *graphics.ExtGState, singleUse bool) (color.Color, error) {
 	dict := pdf.Dict{
 		"PatternType": pdf.Integer(2),
 		"Shading":     shading.PDFObject(),
@@ -48,8 +48,7 @@ func NewShadingPattern(w pdf.Putter, shading *graphics.Shading, M matrix.Matrix,
 
 	pat := &color.PatternColored{
 		Res: pdf.Res{
-			DefName: defaultName,
-			Data:    data,
+			Data: data,
 		},
 	}
 	return pat, nil

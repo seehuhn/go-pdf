@@ -95,7 +95,7 @@ func run() error {
 func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 	page := doc.AddPage()
 
-	CalRGB, err := color.CalRGB(color.WhitePointD65, nil, nil, nil, "")
+	CalRGB, err := color.CalRGB(color.WhitePointD65, nil, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 }
 
 func showLabColors(doc *document.MultiPage, F font.Layouter) error {
-	Lab, err := color.Lab(color.WhitePointD65, nil, nil, "")
+	Lab, err := color.Lab(color.WhitePointD65, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	var cc []color.Color
 
-	lab, err := color.Lab(color.WhitePointD65, nil, nil, "")
+	lab, err := color.Lab(color.WhitePointD65, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 		}
 		cc = append(cc, col)
 	}
-	cs, err := color.Indexed(cc, "")
+	cs, err := color.Indexed(cc)
 	if err != nil {
 		return err
 	}
@@ -442,12 +442,12 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 		ExtendStart: true,
 		ExtendEnd:   true,
 	}
-	shading, err := shadingData.Embed(doc.Out, true, "")
+	shading, err := shadingData.Embed(doc.Out, true)
 	if err != nil {
 		return err
 	}
 
-	col, err := pattern.NewShadingPattern(doc.Out, shading, matrix.Identity, nil, true, "")
+	col, err := pattern.NewShadingPattern(doc.Out, shading, matrix.Identity, nil, true)
 	if err != nil {
 		return err
 	}
@@ -519,7 +519,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 		{X: 5.8, Y: 4.1, Flag: 1, Color: []float64{0.0}},
 		{X: 5.0, Y: 4.3, Flag: 1, Color: []float64{0.0}}, // 40
 	}
-	cs, err := color.CalGray(color.WhitePointD65, nil, 1, "")
+	cs, err := color.CalGray(color.WhitePointD65, nil, 1)
 	if err != nil {
 		return err
 	}
@@ -533,7 +533,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 		},
 		Vertices: vertices,
 	}
-	shading, err := shadingData.Embed(doc.Out, true, "")
+	shading, err := shadingData.Embed(doc.Out, true)
 	if err != nil {
 		return err
 	}

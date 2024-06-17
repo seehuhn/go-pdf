@@ -51,7 +51,6 @@ func doit() error {
 		Composite:    true,
 		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
 		MakeEncoder:  cmap.NewCIDEncoderUTF8,
-		ResName:      "F",
 	}
 	FF, err := cff.New(info)
 	if err != nil {

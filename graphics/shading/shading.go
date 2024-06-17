@@ -23,7 +23,7 @@ import (
 
 // A Shading describes the variation of colors across an area.
 type Shading interface {
-	Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*graphics.Shading, error)
+	Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error)
 }
 
 func toPDF(x []float64) pdf.Array {

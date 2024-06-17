@@ -45,7 +45,7 @@ type Type3 struct {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type3) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*graphics.Shading, error) {
+func (s *Type3) Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
 	} else if color.IsPattern(s.ColorSpace) {
@@ -119,5 +119,5 @@ func (s *Type3) Embed(w pdf.Putter, singleUse bool, defName pdf.Name) (*graphics
 		data = ref
 	}
 
-	return &graphics.Shading{Res: pdf.Res{DefName: defName, Data: data}}, nil
+	return &graphics.Shading{Res: pdf.Res{Data: data}}, nil
 }

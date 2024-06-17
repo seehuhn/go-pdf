@@ -46,11 +46,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := type1.Helvetica.Embed(doc.Out, &font.Options{ResName: "L"})
+	labelFont, err := type1.Helvetica.Embed(doc.Out, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := type1.HelveticaBold.Embed(doc.Out, &font.Options{ResName: "T"})
+	titleFont, err := type1.HelveticaBold.Embed(doc.Out, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -189,12 +189,10 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 }
 
 func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
-	instName := pdf.Name(fmt.Sprintf("X%d", f.fontNo))
 	f.fontNo++
 	opt := &font.Options{
 		Composite: true,
 		Language:  language.AmericanEnglish,
-		ResName:   instName,
 	}
 	X, err := embed.OpenTypeFont(f.doc.Out, info, opt)
 	if err != nil {

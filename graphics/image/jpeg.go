@@ -27,12 +27,12 @@ import (
 )
 
 // EmbedJPEG writes the image src to the PDF file w, using lossy compression.
-func EmbedJPEG(w pdf.Putter, src image.Image, opts *jpeg.Options, resName pdf.Name) (*graphics.XObject, error) {
+func EmbedJPEG(w pdf.Putter, src image.Image, opts *jpeg.Options) (*graphics.XObject, error) {
 	im, err := JPEG(src, opts)
 	if err != nil {
 		return nil, err
 	}
-	return im.Embed(w, resName)
+	return im.Embed(w)
 }
 
 func JPEG(src image.Image, opts *jpeg.Options) (Image, error) {
@@ -60,7 +60,7 @@ func (im *jpegImage) Bounds() Rectangle {
 }
 
 // Embed implements the [Image] interface.
-func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (*graphics.XObject, error) {
+func (im *jpegImage) Embed(w pdf.Putter) (*graphics.XObject, error) {
 	ref := w.Alloc()
 
 	// TODO(voss): write a mask if there is an alpha channel
@@ -91,8 +91,7 @@ func (im *jpegImage) Embed(w pdf.Putter, resName pdf.Name) (*graphics.XObject, e
 
 	return &graphics.XObject{
 		Res: pdf.Res{
-			DefName: resName,
-			Data:    ref,
+			Data: ref,
 		},
 	}, nil
 }

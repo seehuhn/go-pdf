@@ -22,7 +22,7 @@ import (
 )
 
 // readExtGState reads an graphics state parameter dictionary from a PDF file.
-func (r *Reader) readExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.ExtGState, error) {
+func (r *Reader) readExtGState(ref pdf.Object) (*graphics.ExtGState, error) {
 	dict, err := pdf.GetDictTyped(r.R, ref, "ExtGState")
 	if err != nil {
 		return nil, err
@@ -307,8 +307,7 @@ func (r *Reader) readExtGState(ref pdf.Object, defaultName pdf.Name) (*graphics.
 
 	res := &graphics.ExtGState{
 		Res: pdf.Res{
-			DefName: defaultName,
-			Data:    ref,
+			Data: ref,
 		},
 		Value: graphics.State{
 			Parameters: param,

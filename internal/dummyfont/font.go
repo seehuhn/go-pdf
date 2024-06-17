@@ -33,7 +33,7 @@ import (
 // The font is embedded as a simple CFF font.
 //
 // If a write error on w occurs, the function panics.
-func Embed(w pdf.Putter, defaultName pdf.Name) font.Embedded {
+func Embed(w pdf.Putter) font.Embedded {
 	encoding := make([]glyph.ID, 256)
 	encoding[' '] = 1
 	encoding['A'] = 2
@@ -76,10 +76,10 @@ func Embed(w pdf.Putter, defaultName pdf.Name) font.Embedded {
 		CapHeight: 850,
 		ToUnicode: cmap.NewToUnicode(charcode.Simple, toUni),
 	}
-	return EmbedCFF(w, info, defaultName)
+	return EmbedCFF(w, info)
 }
 
-func EmbedCFF(w pdf.Putter, info *pdfcff.FontDictSimple, defaultName pdf.Name) font.Embedded {
+func EmbedCFF(w pdf.Putter, info *pdfcff.FontDictSimple) font.Embedded {
 	ref := w.Alloc()
 	err := info.Embed(w, ref)
 	if err != nil {
@@ -88,8 +88,7 @@ func EmbedCFF(w pdf.Putter, info *pdfcff.FontDictSimple, defaultName pdf.Name) f
 
 	F := &frozenFont{
 		Res: pdf.Res{
-			DefName: defaultName,
-			Data:    ref,
+			Data: ref,
 		},
 		FontDictSimple: info,
 	}

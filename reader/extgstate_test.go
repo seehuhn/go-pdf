@@ -32,7 +32,7 @@ import (
 func TestExtGState(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
 
-	F := dummyfont.Embed(data, "")
+	F := dummyfont.Embed(data)
 
 	s1 := graphics.State{Parameters: &graphics.Parameters{}}
 	s1.TextFont = F
@@ -101,7 +101,7 @@ func TestExtGState(t *testing.T) {
 	s1.SmoothnessTolerance = 0.6
 	s1.Set |= graphics.StateSmoothnessTolerance
 
-	ext1, err := graphics.NewExtGState(s1, "X")
+	ext1, err := graphics.NewExtGState(s1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	qqq := New(data, nil)
-	ext2, err := qqq.readExtGState(ext1.Res.Data, "X")
+	ext2, err := qqq.readExtGState(ext1.Res.Data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,9 +122,6 @@ func TestExtGState(t *testing.T) {
 	})
 	cmpFont := cmp.Comparer(func(f1, f2 font.Embedded) bool {
 		if f1.PDFObject() != f2.PDFObject() {
-			return false
-		}
-		if f1.DefaultName() != f2.DefaultName() {
 			return false
 		}
 		if f1.WritingMode() != f2.WritingMode() {

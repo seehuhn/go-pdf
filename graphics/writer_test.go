@@ -29,8 +29,7 @@ func TestGetResourceName1(t *testing.T) {
 	w := NewWriter(io.Discard, pdf.V1_7)
 	ref := pdf.NewReference(1, 2)
 	r := &pdf.Res{
-		DefName: "Q",
-		Data:    ref,
+		Data: ref,
 	}
 	var allCats = []resourceCategory{
 		catExtGState,
@@ -41,74 +40,40 @@ func TestGetResourceName1(t *testing.T) {
 		catFont,
 		catProperties,
 	}
+	var allNames []pdf.Name
 	for _, cat := range allCats {
 		// test name generation
-		name := w.getResourceName(cat, r)
-		if name != "Q" {
-			t.Errorf("expected Q, got %s", name)
-		}
+		name1 := w.getResourceName(cat, r)
 
 		// test caching
-		name = w.getResourceName(cat, r)
-		if name != "Q" {
-			t.Errorf("expected Q, got %s", name)
+		name2 := w.getResourceName(cat, r)
+		if name1 != name2 {
+			t.Errorf("expected %s, got %s", name1, name2)
 		}
+
+		allNames = append(allNames, name1)
 	}
 
-	if w.Resources.ExtGState["Q"] != ref {
-		t.Errorf("expected Q, got %s", w.Resources.ExtGState["Q"])
+	if obj := w.Resources.ExtGState[allNames[0]]; obj != ref {
+		t.Errorf("expected %s, got %s", ref, obj)
 	}
-	if w.Resources.ColorSpace["Q"] != ref {
-		t.Errorf("expected Q, got %s", w.Resources.ColorSpace["Q"])
+	if obj := w.Resources.ColorSpace[allNames[1]]; obj != ref {
+		t.Errorf("expected %s, got %s", ref, obj)
 	}
-	if w.Resources.Pattern["Q"] != ref {
-		t.Errorf("expected Q, got %s", w.Resources.Pattern["Q"])
+	if obj := w.Resources.Pattern[allNames[2]]; obj != ref {
+		t.Errorf("expected %s, got %s", ref, obj)
 	}
-	if w.Resources.Shading["Q"] != ref {
-		t.Errorf("expected Q, got %s", w.Resources.Shading["Q"])
+	if obj := w.Resources.Shading[allNames[3]]; obj != ref {
+		t.Errorf("expected %s, got %s", ref, obj)
 	}
-	if w.Resources.XObject["Q"] != ref {
-		t.Errorf("expected Q, got %s", w.Resources.XObject["Q"])
+	if obj := w.Resources.XObject[allNames[4]]; obj != ref {
+		t.Errorf("expected %s, got %s", ref, obj)
 	}
-	if w.Resources.Font["Q"] != ref {
-		t.Errorf("expected Q, got %s", w.Resources.Font["Q"])
+	if obj := w.Resources.Font[allNames[5]]; obj != ref {
+		t.Errorf("expected %s, got %s", ref, obj)
 	}
-	if w.Resources.Properties["Q"] != ref {
-		t.Errorf("expected Q, got %s", w.Resources.Properties["Q"])
-	}
-}
-
-// TestGetResourceName2 tests that names are generated correctly when
-// there is more than one resource of the same category.
-func TestGetResourceName2(t *testing.T) {
-	defName := pdf.Name("F3")
-	w := NewWriter(io.Discard, pdf.V1_7)
-
-	// allocate 9 resources
-	var names []pdf.Name
-	for i := 0; i < 9; i++ {
-		r := &pdf.Res{
-			DefName: defName,
-			Data:    pdf.Reference(i + 1),
-		}
-		names = append(names, w.getResourceName(catFont, r))
-	}
-
-	if names[0] != defName {
-		t.Errorf("expected %s, got %s", defName, names[0])
-	}
-	for i, name := range names {
-		if len(name) > 2 {
-			t.Errorf("name too long: %q", name)
-		}
-		ref, ok := w.Resources.Font[name]
-		if !ok {
-			t.Errorf("expected %s, got %s", defName, name)
-			continue
-		}
-		if ref != pdf.Reference(i+1) {
-			t.Errorf("expected %d, got %d", i+1, ref)
-		}
+	if obj := w.Resources.Properties[allNames[6]]; obj != ref {
+		t.Errorf("expected %s, got %s", ref, obj)
 	}
 }
 
@@ -124,26 +89,6 @@ func TestGetResourceName3(t *testing.T) {
 		got := w.getResourceName(catColorSpace, r)
 		if got != name {
 			t.Errorf("expected %s, got %s", name, got)
-		}
-	}
-}
-
-// TestGetResourceName4 tests that the reserved color space names
-// are never added to the resource dictionary.
-func TestGetResourceName4(t *testing.T) {
-	w := NewWriter(io.Discard, pdf.V1_7)
-
-	for _, name := range []pdf.Name{"DeviceGray", "DeviceRGB", "DeviceCMYK", "Pattern"} {
-		r := &pdf.Res{
-			DefName: name,
-			Data:    pdf.NewReference(1, 0),
-		}
-		w.getResourceName(catColorSpace, r)
-	}
-
-	for name := range w.Resources.ColorSpace {
-		if name == "DeviceGray" || name == "DeviceRGB" || name == "DeviceCMYK" || name == "Pattern" {
-			t.Errorf("unexpected name: %s", name)
 		}
 	}
 }

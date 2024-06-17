@@ -35,11 +35,6 @@ var (
 // Use [DeviceGray] to access this color space.
 type SpaceDeviceGray struct{}
 
-// DefaultName implements the [Space] interface.
-func (s SpaceDeviceGray) DefaultName() pdf.Name {
-	return ""
-}
-
 // PDFObject implements the [Space] interface.
 func (s SpaceDeviceGray) PDFObject() pdf.Object {
 	return pdf.Name(FamilyDeviceGray)
@@ -78,11 +73,6 @@ func (c colorDeviceGray) values() []float64 {
 // Use [DeviceRGB] to access this color space.
 type SpaceDeviceRGB struct{}
 
-// DefaultName implements the [Space] interface.
-func (s SpaceDeviceRGB) DefaultName() pdf.Name {
-	return ""
-}
-
 // PDFObject implements the [Space] interface.
 func (s SpaceDeviceRGB) PDFObject() pdf.Object {
 	return pdf.Name(FamilyDeviceRGB)
@@ -120,11 +110,6 @@ func (c colorDeviceRGB) values() []float64 {
 // SpaceDeviceCMYK represents the DeviceCMYK color space.
 // Use [DeviceCMYK] to access this color space.
 type SpaceDeviceCMYK struct{}
-
-// DefaultName implements the [Space] interface.
-func (s SpaceDeviceCMYK) DefaultName() pdf.Name {
-	return ""
-}
 
 // PDFObject implements the [Space] interface.
 func (s SpaceDeviceCMYK) PDFObject() pdf.Object {

@@ -18,19 +18,12 @@ package pdf
 
 // Resource is a PDF resource inside a content stream.
 type Resource interface {
-	DefaultName() Name // return "" to choose names automatically
 	PDFObject() Object // value to use in the resource dictionary
 }
 
 // Res can be embedded in a struct to implement the [Resource] interface.
 type Res struct {
-	DefName Name
-	Data    Object
-}
-
-// DefaultName implements the [Resource] interface.
-func (r Res) DefaultName() Name {
-	return r.DefName
+	Data Object
 }
 
 // PDFObject implements the [Resource] interface.

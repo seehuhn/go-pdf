@@ -97,8 +97,8 @@ func (f *embeddedGlyfSimple) Close() error {
 	f.closed = true
 
 	if f.SimpleEncoder.Overflow() {
-		return fmt.Errorf("too many distinct glyphs used in font %q (%s)",
-			f.DefName, f.sfnt.PostScriptName())
+		return fmt.Errorf("too many distinct glyphs used in font %q",
+			f.sfnt.PostScriptName())
 	}
 	encoding := f.SimpleEncoder.Encoding
 

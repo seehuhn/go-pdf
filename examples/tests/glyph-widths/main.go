@@ -91,7 +91,7 @@ func run(filename string) error {
 	if err != nil {
 		return err
 	}
-	M, err := markerFont.Embed(doc.Out, &font.Options{ResName: "M"})
+	M, err := markerFont.Embed(doc.Out, nil)
 
 	gid := glyph.ID(0)
 	numGlyphs := min(glyph.ID(len(geom.Widths)), 256)

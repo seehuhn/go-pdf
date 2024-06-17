@@ -37,7 +37,7 @@ type SpaceIndexed struct {
 //
 // The colors must all use the same color space, and the number of colors must
 // be in the range from 1 to 256 (both inclusive).
-func Indexed(colors []Color, defName pdf.Name) (*SpaceIndexed, error) {
+func Indexed(colors []Color) (*SpaceIndexed, error) {
 	if len(colors) == 0 || len(colors) > 256 {
 		return nil, fmt.Errorf("Indexed: invalid number of colors: %d", len(colors))
 	}
@@ -80,7 +80,6 @@ func Indexed(colors []Color, defName pdf.Name) (*SpaceIndexed, error) {
 
 	return &SpaceIndexed{
 		Res: pdf.Res{
-			DefName: defName,
 			Data: pdf.Array{
 				pdf.Name("Indexed"),
 				space.PDFObject(),

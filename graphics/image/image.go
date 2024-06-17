@@ -23,7 +23,7 @@ import (
 
 // Image represents a raster image which can be embedded in a PDF file.
 type Image interface {
-	Embed(w pdf.Putter, defaultName pdf.Name) (*graphics.XObject, error)
+	Embed(w pdf.Putter) (*graphics.XObject, error)
 	Bounds() Rectangle
 }
 

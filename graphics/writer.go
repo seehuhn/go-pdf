@@ -135,7 +135,6 @@ func (w *Writer) getResourceName(category resourceCategory, r pdf.Resource) pdf.
 		return isUsed
 	}
 
-	name = r.DefaultName()
 	// Some names are forbidden for color spaces,
 	// see table 73 of ISO 32000-2:2020
 	if category == catColorSpace {

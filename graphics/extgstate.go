@@ -37,7 +37,7 @@ type ExtGState struct {
 //
 // If s contains values for parameters that cannot be included in an ExtGState
 // object, an error is returned.
-func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
+func NewExtGState(s State) (*ExtGState, error) {
 	set := s.Set
 	if set & ^ExtGStateBits != 0 {
 		return nil, errors.New("invalid states for ExtGState")
@@ -151,8 +151,7 @@ func NewExtGState(s State, defaultName pdf.Name) (*ExtGState, error) {
 
 	return &ExtGState{
 		Res: pdf.Res{
-			DefName: pdf.Name(defaultName),
-			Data:    dict,
+			Data: dict,
 		},
 		Value: State{
 			Parameters: s.Parameters.Clone(),
@@ -177,7 +176,7 @@ func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
 	}
 
 	res := &ExtGState{
-		Res:   pdf.Res{DefName: s.DefName, Data: ref},
+		Res:   pdf.Res{Data: ref},
 		Value: s.Value,
 	}
 	return res, nil

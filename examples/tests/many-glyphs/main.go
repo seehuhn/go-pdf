@@ -42,7 +42,7 @@ func run() error {
 		return err
 	}
 
-	H, err := type1.Helvetica.Embed(doc.Out, &font.Options{ResName: "H"})
+	H, err := type1.Helvetica.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}

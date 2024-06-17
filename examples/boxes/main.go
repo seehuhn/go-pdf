@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -61,7 +60,7 @@ func doit() error {
 		},
 	}
 
-	F, err := type1.Helvetica.Embed(page.Out, &font.Options{ResName: "F"})
+	F, err := type1.Helvetica.Embed(page.Out, nil)
 	if err != nil {
 		return err
 	}

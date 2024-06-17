@@ -121,8 +121,7 @@ func (f *Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 		GlyphNames: glyphNames,
 		w:          w,
 		Res: pdf.Res{
-			Data:    w.Alloc(),
-			DefName: opt.ResName,
+			Data: w.Alloc(),
 		},
 		CMap:          cmap,
 		SimpleEncoder: encoding.NewSimpleEncoder(),
@@ -235,8 +234,7 @@ func (f *embedded) Close() error {
 	f.closed = true
 
 	if f.SimpleEncoder.Overflow() {
-		return fmt.Errorf("too many distinct glyphs used in Type 3 font %q",
-			f.DefName)
+		return errors.New("too many distinct glyphs used in Type 3 font")
 	}
 
 	encodingGid := f.Encoding
@@ -252,26 +250,6 @@ func (f *embedded) Close() error {
 		}
 	}
 
-	var descriptor *font.Descriptor
-	if pdf.IsTagged(f.w) {
-		descriptor = &font.Descriptor{
-			IsFixedPitch: f.IsFixedPitch,
-			IsSerif:      f.IsSerif,
-			IsScript:     f.IsScript,
-			IsItalic:     f.ItalicAngle != 0,
-			IsAllCap:     f.IsAllCap,
-			IsSmallCap:   f.IsSmallCap,
-			ForceBold:    f.ForceBold,
-			ItalicAngle:  f.ItalicAngle,
-			StemV:        -1,
-		}
-		if pdf.GetVersion(f.w) == pdf.V1_0 {
-			// required by PDF 2.0 specification errata, if the font dictionary has a Name entry
-			// https://pdf-issues.pdfa.org/32000-2-2020/clause09.html#H9.8.1
-			descriptor.FontName = string(f.DefName)
-		}
-	}
-
 	// var toUnicode *tounicode.Info
 	// TODO(voss): construct a toUnicode map, when needed
 
@@ -281,7 +259,6 @@ func (f *embedded) Close() error {
 		Resources:  f.Resources,
 		Encoding:   encoding,
 		// ToUnicode:  toUnicode,
-		ResName: f.DefName,
 
 		ItalicAngle: f.ItalicAngle,
 
@@ -307,7 +284,7 @@ type EmbedInfo struct {
 	Encoding []string
 
 	// ResName is the resource name for the font.
-	// This is only used for PDF version 1.0.
+	// (Required for PDF-1.0, optional for PDF-1.1 to PDF-1.7, deprecated for PDF-2.0.)
 	ResName pdf.Name
 
 	// Resources is the resource dictionary for the font.
@@ -397,7 +374,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		"LastChar":   lastChar,
 		"Widths":     widths,
 	}
-	if w.GetMeta().Version == pdf.V1_0 {
+	if info.ResName != "" {
 		fontDict["Name"] = info.ResName
 	}
 	if !info.Resources.IsEmpty() {

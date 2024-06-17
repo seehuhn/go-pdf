@@ -32,11 +32,10 @@ type TilingProperties struct {
 	// relative to the device pixel grid.
 	TilingType int
 
-	BBox        *pdf.Rectangle
-	XStep       float64
-	YStep       float64
-	Matrix      matrix.Matrix
-	DefaultName pdf.Name
+	BBox   *pdf.Rectangle
+	XStep  float64
+	YStep  float64
+	Matrix matrix.Matrix
 }
 
 // A TilingColoredBuilder is used to construct a tiling pattern.
@@ -76,8 +75,7 @@ func (p *TilingColoredBuilder) Finish() (color.Color, error) {
 
 	res := &color.PatternColored{
 		Res: pdf.Res{
-			Data:    ref,
-			DefName: p.DefaultName,
+			Data: ref,
 		},
 	}
 	return res, nil
@@ -120,8 +118,7 @@ func (p *TilingUncoloredBuilder) Finish() (*color.TilingPatternUncolored, error)
 
 	res := &color.TilingPatternUncolored{
 		Res: pdf.Res{
-			Data:    ref,
-			DefName: p.DefaultName,
+			Data: ref,
 		},
 	}
 	return res, nil

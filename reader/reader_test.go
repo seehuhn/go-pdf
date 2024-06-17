@@ -38,7 +38,7 @@ func TestParameters(t *testing.T) {
 	w.Set = 0
 
 	data := pdf.NewData(pdf.V1_7)
-	font := dummyfont.Embed(data, "dummy")
+	font := dummyfont.Embed(data)
 
 	w.SetLineWidth(12.3)
 	w.SetLineCap(graphics.LineCapRound)
@@ -130,9 +130,6 @@ func TestParameters(t *testing.T) {
 		if f1.PDFObject() != f2.PDFObject() {
 			return false
 		}
-		if f1.DefaultName() != f2.DefaultName() {
-			return false
-		}
 		if f1.WritingMode() != f2.WritingMode() {
 			return false
 		}
@@ -146,5 +143,5 @@ func TestParameters(t *testing.T) {
 }
 
 func resEqual(a, b pdf.Resource) bool {
-	return a.DefaultName() == b.DefaultName() && a.PDFObject() == b.PDFObject()
+	return a.PDFObject() == b.PDFObject()
 }

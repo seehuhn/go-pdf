@@ -95,10 +95,6 @@ func TestStateApplyToError(t *testing.T) {
 
 type dummyFont struct{}
 
-func (f dummyFont) DefaultName() pdf.Name {
-	return ""
-}
-
 func (f dummyFont) PDFObject() pdf.Object {
 	return nil
 }

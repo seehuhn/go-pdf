@@ -18,7 +18,6 @@ package font
 
 import (
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
@@ -35,10 +34,6 @@ type Options struct {
 
 	MakeGIDToCID func() cmap.GIDToCID                // only used for composite fonts
 	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder // only used for composite fonts
-
-	// The default resource name to use for the font within content streams.
-	// Leave blank to have names allocated automatically.
-	ResName pdf.Name
 }
 
 // MergeOptions takes an options struct and a default values struct and returns a new

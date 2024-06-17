@@ -66,21 +66,20 @@ func main() {
 		log.Fatal(err)
 	}
 
-	helvetica, err := type1.Helvetica.Embed(doc.Out, &font.Options{ResName: "R"})
+	helvetica, err := type1.Helvetica.Embed(doc.Out, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	italic, err := type1.TimesItalic.Embed(doc.Out, &font.Options{ResName: "I"})
+	italic, err := type1.TimesItalic.Embed(doc.Out, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	courier, err := type1.Courier.Embed(doc.Out, &font.Options{ResName: "T"})
+	courier, err := type1.Courier.Embed(doc.Out, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	opt := &font.Options{
 		Composite: true,
-		ResName:   "X",
 	}
 	theFont, err := embed.OpenTypeFont(doc.Out, tt, opt)
 	if err != nil {

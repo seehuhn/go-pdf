@@ -62,26 +62,26 @@ func doit() error {
 		rightMargin: 144.0,
 	}
 
-	F, err := type1.TimesRoman.Embed(doc.Out, &font.Options{ResName: "F"})
+	F, err := type1.TimesRoman.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}
 	l.addFont("text", F, 10)
 
-	I, err := type1.TimesItalic.Embed(doc.Out, &font.Options{ResName: "I"})
+	I, err := type1.TimesItalic.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}
 	l.addFont("it", I, 10)
 
-	S, err := type1.Helvetica.Embed(doc.Out, &font.Options{ResName: "S"})
+	S, err := type1.Helvetica.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}
 	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
-	SB, err := type1.HelveticaBold.Embed(doc.Out, &font.Options{ResName: "B"})
+	SB, err := type1.HelveticaBold.Embed(doc.Out, nil)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,6 @@ func doit() error {
 			opt := &font.Options{
 				Language:  language.English,
 				Composite: composite,
-				ResName:   "X",
 			}
 			Y, err := X.Embed(doc.Out, opt)
 			if err != nil {
@@ -339,7 +338,7 @@ func writeSinglePage(F font.Font, no int) error {
 		return err
 	}
 
-	X, err := F.Embed(page.Out, &font.Options{ResName: "X"})
+	X, err := F.Embed(page.Out, nil)
 	if err != nil {
 		return err
 	}

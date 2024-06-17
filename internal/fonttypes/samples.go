@@ -34,7 +34,6 @@ type Sample struct {
 func (f *Sample) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	if opt == nil {
 		opt = &font.Options{
-			ResName:   pdf.Name(f.Label),
 			Composite: f.Type.IsComposite(),
 		}
 	}
