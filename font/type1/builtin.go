@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
+	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
 // TODO(voss): Find a way to optionally embed the PostScript font program for
@@ -71,6 +72,9 @@ func (f Builtin) psFont() (*pstype1.Font, error) {
 		return nil, err
 	}
 
+	// TODO(voss): introduce a way to access the full URW fonts.
+	restrictGlyphList(f, psFont.Glyphs)
+
 	return psFont, nil
 }
 
@@ -85,6 +89,9 @@ func (f Builtin) AFM() (*afm.Metrics, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO(voss): introduce a way to access the full URW fonts.
+	restrictGlyphList(f, metrics.Glyphs)
 
 	// Some of the fonts wrongly have a non-zero bounding box for some of the
 	// whitespace glyphs.  We fix this here.
@@ -146,8 +153,30 @@ func (f Builtin) AFM() (*afm.Metrics, error) {
 	return metrics, nil
 }
 
-// StandardWidths returns the widths of the encoded glyphs.
-func (f Builtin) StandardWidths(encoding []string) []float64 {
+// Restrict the font to the character set guaranteed by the spec.
+func restrictGlyphList[T any](f Builtin, glyphs map[string]T) {
+	var charset map[string]bool
+	switch f {
+	case Courier, CourierBold, CourierBoldOblique, CourierOblique:
+		charset = pdfenc.IsStandardLatin
+	case Helvetica, HelveticaBold, HelveticaBoldOblique, HelveticaOblique:
+		charset = pdfenc.IsStandardLatin
+	case TimesRoman, TimesBold, TimesBoldItalic, TimesItalic:
+		charset = pdfenc.IsStandardLatin
+	case Symbol:
+		charset = pdfenc.IsSymbol
+	case ZapfDingbats:
+		charset = pdfenc.IsZapfDingbats
+	}
+	for key := range glyphs {
+		if !charset[key] && key != ".notdef" {
+			delete(glyphs, key)
+		}
+	}
+}
+
+// standardWidths returns the widths of the encoded glyphs.
+func (f Builtin) standardWidths(encoding []string) []float64 {
 	ww := make([]float64, len(encoding))
 	metrics, err := f.AFM()
 	if err != nil {

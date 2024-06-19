@@ -544,7 +544,7 @@ func (info *FontDict) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 	}
 
 	if canOmit {
-		wwStd := Builtin(postScriptName).StandardWidths(info.Encoding)
+		wwStd := Builtin(postScriptName).standardWidths(info.Encoding)
 		for i, w := range ww {
 			if math.Abs(w-wwStd[i]) >= 0.1 {
 				canOmit = false
