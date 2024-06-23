@@ -229,17 +229,19 @@ func TestLigatures(t *testing.T) {
 	}
 }
 
-var _ font.Font = Courier
-var _ font.Font = CourierBold
-var _ font.Font = CourierBoldOblique
-var _ font.Font = CourierOblique
-var _ font.Font = Helvetica
-var _ font.Font = HelveticaBold
-var _ font.Font = HelveticaBoldOblique
-var _ font.Font = HelveticaOblique
-var _ font.Font = TimesRoman
-var _ font.Font = TimesBold
-var _ font.Font = TimesBoldItalic
-var _ font.Font = TimesItalic
-var _ font.Font = Symbol
-var _ font.Font = ZapfDingbats
+var (
+	_ font.Font = Courier
+	_ font.Font = CourierBold
+	_ font.Font = CourierBoldOblique
+	_ font.Font = CourierOblique
+	_ font.Font = Helvetica
+	_ font.Font = HelveticaBold
+	_ font.Font = HelveticaBoldOblique
+	_ font.Font = HelveticaOblique
+	_ font.Font = TimesRoman
+	_ font.Font = TimesBold
+	_ font.Font = TimesBoldItalic
+	_ font.Font = TimesItalic
+	_ font.Font = Symbol
+	_ font.Font = ZapfDingbats
+)

@@ -73,7 +73,7 @@ func (f Builtin) psFont() (*pstype1.Font, error) {
 	}
 
 	// TODO(voss): introduce a way to access the full URW fonts.
-	restrictGlyphList(f, psFont.Glyphs)
+	psFont.Encoding = restrictGlyphList(f, psFont.Glyphs)
 
 	return psFont, nil
 }
@@ -91,7 +91,7 @@ func (f Builtin) AFM() (*afm.Metrics, error) {
 	}
 
 	// TODO(voss): introduce a way to access the full URW fonts.
-	restrictGlyphList(f, metrics.Glyphs)
+	metrics.Encoding = restrictGlyphList(f, metrics.Glyphs)
 
 	// Some of the fonts wrongly have a non-zero bounding box for some of the
 	// whitespace glyphs.  We fix this here.
@@ -124,8 +124,7 @@ func (f Builtin) AFM() (*afm.Metrics, error) {
 		}
 	}
 
-	// Our .afm files don't have ligatures.  We add the standard ligatures
-	// here.
+	// We add the standard ligatures here, just in case.
 	if !metrics.IsFixedPitch {
 		type lig struct {
 			left, right, result string
@@ -153,26 +152,28 @@ func (f Builtin) AFM() (*afm.Metrics, error) {
 	return metrics, nil
 }
 
-// Restrict the font to the character set guaranteed by the spec.
-func restrictGlyphList[T any](f Builtin, glyphs map[string]T) {
+// Restrict the font to the character set guaranteed by the spec,
+// and return the corresponding encoding.
+func restrictGlyphList[T any](f Builtin, glyphs map[string]T) []string {
 	var charset map[string]bool
+	var encoding []string
 	switch f {
-	case Courier, CourierBold, CourierBoldOblique, CourierOblique:
-		charset = pdfenc.IsStandardLatin
-	case Helvetica, HelveticaBold, HelveticaBoldOblique, HelveticaOblique:
-		charset = pdfenc.IsStandardLatin
-	case TimesRoman, TimesBold, TimesBoldItalic, TimesItalic:
-		charset = pdfenc.IsStandardLatin
 	case Symbol:
 		charset = pdfenc.IsSymbol
+		encoding = pdfenc.SymbolEncoding[:]
 	case ZapfDingbats:
 		charset = pdfenc.IsZapfDingbats
+		encoding = pdfenc.ZapfDingbatsEncoding[:]
+	default:
+		charset = pdfenc.IsStandardLatin
+		encoding = pdfenc.StandardEncoding[:]
 	}
 	for key := range glyphs {
 		if !charset[key] && key != ".notdef" {
 			delete(glyphs, key)
 		}
 	}
+	return encoding
 }
 
 // standardWidths returns the widths of the encoded glyphs.
