@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -32,6 +33,9 @@ import (
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+var xRange = flag.String("x", "", "Only include text at x coordinates `A-B`")
+
+var xRangeMin, xRangeMax float64
 
 func main() {
 	flag.Parse()
@@ -41,11 +45,20 @@ func main() {
 		if err != nil {
 			log.Fatal("could not create CPU profile: ", err)
 		}
-		defer f.Close() // error handling omitted for example
+		defer f.Close()
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
 		defer pprof.StopCPUProfile()
+	}
+
+	xRangeMin = math.Inf(-1)
+	xRangeMax = math.Inf(1)
+	if *xRange != "" {
+		_, err := fmt.Sscanf(*xRange, "%f-%f", &xRangeMin, &xRangeMax)
+		if err != nil || xRangeMin >= xRangeMax {
+			log.Fatalf("invalid x-range %q", *xRange)
+		}
 	}
 
 	for _, fname := range flag.Args() {
@@ -82,7 +95,10 @@ func extractText(fname string) error {
 
 	contents := reader.New(r, nil)
 	contents.Text = func(text string) error {
-		fmt.Print(text)
+		x, _ := contents.GetTextPositionDevice()
+		if x >= xRangeMin && x < xRangeMax {
+			fmt.Print(text)
+		}
 		return nil
 	}
 
