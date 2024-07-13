@@ -64,6 +64,7 @@ func FuzzEncrypted(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
+
 		f.Add(buf.Bytes())
 	}
 

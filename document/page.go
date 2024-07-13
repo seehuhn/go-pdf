@@ -90,10 +90,6 @@ func (p *Page) Close() error {
 	p.PageDict["Contents"] = contentRef
 	p.PageDict["Resources"] = pdf.AsDict(p.Writer.Resources)
 
-	// Disable the page, since it cannot be modified anymore.
-	p.Writer.Content = nil
-	p.Writer = nil
-
 	ref := p.Ref
 	if ref == 0 {
 		ref = p.Out.Alloc()
@@ -103,5 +99,13 @@ func (p *Page) Close() error {
 		return err
 	}
 
-	return p.closeFn(p)
+	err = p.closeFn(p)
+	if err != nil {
+		return err
+	}
+
+	// Disable the page, since it cannot be modified anymore.
+	p.Writer.Content = nil
+	p.Writer = nil
+	return nil
 }

@@ -77,8 +77,8 @@ const (
 )
 
 // NewWriter allocates a new Writer object.
-func NewWriter(w io.Writer, m *ResourceManager) *Writer {
-	v := pdf.GetVersion(m.w)
+func NewWriter(w io.Writer, rm *ResourceManager) *Writer {
+	v := pdf.GetVersion(rm.w)
 	return &Writer{
 		Version:       v,
 		Content:       w,
@@ -87,7 +87,7 @@ func NewWriter(w io.Writer, m *ResourceManager) *Writer {
 
 		State: NewState(),
 
-		ResourceManager: m,
+		ResourceManager: rm,
 		resName:         make(map[catRes]pdf.Name),
 
 		glyphBuf: &font.GlyphSeq{},
