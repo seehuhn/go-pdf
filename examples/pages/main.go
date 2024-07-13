@@ -32,6 +32,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	rm := graphics.NewResourceManager(out)
+
 	font, err := type1.Helvetica.Embed(out, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -58,7 +60,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewWriter(stream, pdf.GetVersion(out))
+		g := graphics.NewWriter(stream, rm)
 
 		g.TextBegin()
 		g.TextSetFont(font, 12)
@@ -94,7 +96,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewWriter(stream, pdf.GetVersion(out))
+		g := graphics.NewWriter(stream, rm)
 
 		g.TextBegin()
 		g.TextSetFont(font, 12)
@@ -126,7 +128,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewWriter(stream, pdf.GetVersion(out))
+		g := graphics.NewWriter(stream, rm)
 		if err != nil {
 			log.Fatal(err)
 		}

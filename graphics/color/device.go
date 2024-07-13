@@ -35,19 +35,24 @@ var (
 // Use [DeviceGray] to access this color space.
 type SpaceDeviceGray struct{}
 
-// PDFObject implements the [Space] interface.
+// Embed implements the [Space] interface.
+func (s SpaceDeviceGray) Embed(w pdf.Putter) (pdf.Resource, error) {
+	return s, nil
+}
+
+// PDFObject implements the [SpaceEmbedded] interface.
 func (s SpaceDeviceGray) PDFObject() pdf.Object {
 	return pdf.Name(FamilyDeviceGray)
 }
 
-// ColorSpaceFamily implements the [Space] interface.
+// ColorSpaceFamily implements the [SpaceEmbedded] interface.
 func (s SpaceDeviceGray) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceGray
 }
 
-// defaultColor implements the [Space] interface.
-func (s SpaceDeviceGray) defaultColor() Color {
-	return colorDeviceGray(0)
+// defaultValues implements the [SpaceEmbedded] interface.
+func (s SpaceDeviceGray) defaultValues() []float64 {
+	return []float64{0}
 }
 
 // New returns a color in the DeviceGray color space.
@@ -73,19 +78,24 @@ func (c colorDeviceGray) values() []float64 {
 // Use [DeviceRGB] to access this color space.
 type SpaceDeviceRGB struct{}
 
-// PDFObject implements the [Space] interface.
+// Embed implements the [Space] interface.
+func (s SpaceDeviceRGB) Embed(w pdf.Putter) (pdf.Resource, error) {
+	return s, nil
+}
+
+// PDFObject implements the [SpaceEmbedded] interface.
 func (s SpaceDeviceRGB) PDFObject() pdf.Object {
 	return pdf.Name(FamilyDeviceRGB)
 }
 
-// ColorSpaceFamily implements the [Space] interface.
+// ColorSpaceFamily implements the [SpaceEmbedded] interface.
 func (s SpaceDeviceRGB) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceRGB
 }
 
-// defaultColor implements the [Space] interface.
-func (s SpaceDeviceRGB) defaultColor() Color {
-	return colorDeviceRGB{0, 0, 0}
+// defaultValues implements the [SpaceEmbedded] interface.
+func (s SpaceDeviceRGB) defaultValues() []float64 {
+	return []float64{0, 0, 0}
 }
 
 // New returns a color in the DeviceRGB color space.
@@ -111,6 +121,10 @@ func (c colorDeviceRGB) values() []float64 {
 // Use [DeviceCMYK] to access this color space.
 type SpaceDeviceCMYK struct{}
 
+func (s SpaceDeviceCMYK) Embed(w pdf.Putter) (pdf.Resource, error) {
+	return s, nil
+}
+
 // PDFObject implements the [Space] interface.
 func (s SpaceDeviceCMYK) PDFObject() pdf.Object {
 	return pdf.Name("DeviceCMYK")
@@ -121,9 +135,9 @@ func (s SpaceDeviceCMYK) ColorSpaceFamily() pdf.Name {
 	return "DeviceCMYK"
 }
 
-// defaultColor implements the [Space] interface.
-func (s SpaceDeviceCMYK) defaultColor() Color {
-	return colorDeviceCMYK{0, 0, 0, 1}
+// defaultValues implements the [Space] interface.
+func (s SpaceDeviceCMYK) defaultValues() []float64 {
+	return []float64{0, 0, 0, 1}
 }
 
 // New returns a color in the DeviceCMYK color space.

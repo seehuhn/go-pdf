@@ -34,22 +34,23 @@ func (w *Writer) SetStrokeColor(c color.Color) {
 	}
 
 	cs := c.ColorSpace()
-	if err := color.CheckVersion(cs, w.Version); err != nil {
-		w.Err = err
-		return
-	}
 
 	var cur color.Color
 	if w.isSet(StateStrokeColor) {
 		cur = w.StrokeColor
 	}
-	needsColorSpace, needsColor := color.CheckCurrent(cur, c)
-
 	w.StrokeColor = c
 	w.Set |= StateStrokeColor
 
+	needsColorSpace, needsColor := color.CheckCurrent(cur, c)
+
 	if needsColorSpace {
-		name := w.getResourceName(catColorSpace, cs)
+		name, err := writerGetResourceName(w, cs, catColorSpace)
+		if err != nil {
+			w.Err = err
+			return
+		}
+
 		w.Err = name.PDF(w.Content)
 		if w.Err != nil {
 			return
@@ -70,7 +71,7 @@ func (w *Writer) SetStrokeColor(c color.Color) {
 			}
 		}
 		if pattern != nil {
-			name := w.getResourceName(catPattern, pattern)
+			name := w.getResourceNameOld(catPattern, pattern)
 			w.Err = name.PDF(w.Content)
 			if w.Err != nil {
 				return
@@ -93,23 +94,23 @@ func (w *Writer) SetFillColor(c color.Color) {
 		return
 	}
 
-	cs := c.ColorSpace()
-	if err := color.CheckVersion(cs, w.Version); err != nil {
-		w.Err = err
-		return
-	}
-
 	var cur color.Color
 	if w.isSet(StateFillColor) {
 		cur = w.FillColor
 	}
-	needsColorSpace, needsColor := color.CheckCurrent(cur, c)
-
 	w.FillColor = c
 	w.Set |= StateFillColor
 
+	needsColorSpace, needsColor := color.CheckCurrent(cur, c)
+
 	if needsColorSpace {
-		name := w.getResourceName(catColorSpace, cs)
+		cs := c.ColorSpace()
+		name, err := writerGetResourceName(w, cs, catColorSpace)
+		if err != nil {
+			w.Err = err
+			return
+		}
+
 		w.Err = name.PDF(w.Content)
 		if w.Err != nil {
 			return
@@ -130,7 +131,7 @@ func (w *Writer) SetFillColor(c color.Color) {
 			}
 		}
 		if pattern != nil {
-			name := w.getResourceName(catPattern, pattern)
+			name := w.getResourceNameOld(catPattern, pattern)
 			w.Err = name.PDF(w.Content)
 			if w.Err != nil {
 				return
@@ -175,7 +176,7 @@ func (w *Writer) DrawShading(shading *Shading) {
 		return
 	}
 
-	name := w.getResourceName(catShading, shading)
+	name := w.getResourceNameOld(catShading, shading)
 	w.Err = name.PDF(w.Content)
 	if w.Err != nil {
 		return

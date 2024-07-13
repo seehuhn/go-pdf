@@ -42,11 +42,14 @@ func TestStateApplyToError(t *testing.T) {
 		OpStateBits,
 	}
 
+	data := pdf.NewData(pdf.V2_0)
+	rm := NewResourceManager(data)
+
 	buf := &bytes.Buffer{}
 	for _, bad := range forbidden {
 		for _, good := range allowed {
 			buf.Reset()
-			w := NewWriter(buf, pdf.V2_0)
+			w := NewWriter(buf, rm)
 
 			state := NewState()
 			state.TextFont = dummyFont{}

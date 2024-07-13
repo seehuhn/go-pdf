@@ -26,7 +26,10 @@ import (
 // TestGetResourceName1 tests that resources of all categories can be
 // added to the resource dictionary.
 func TestGetResourceName1(t *testing.T) {
-	w := NewWriter(io.Discard, pdf.V1_7)
+	data := pdf.NewData(pdf.V1_7)
+	rm := NewResourceManager(data)
+
+	w := NewWriter(io.Discard, rm)
 	ref := pdf.NewReference(1, 2)
 	r := &pdf.Res{
 		Data: ref,
@@ -43,10 +46,10 @@ func TestGetResourceName1(t *testing.T) {
 	var allNames []pdf.Name
 	for _, cat := range allCats {
 		// test name generation
-		name1 := w.getResourceName(cat, r)
+		name1 := w.getResourceNameOld(cat, r)
 
 		// test caching
-		name2 := w.getResourceName(cat, r)
+		name2 := w.getResourceNameOld(cat, r)
 		if name1 != name2 {
 			t.Errorf("expected %s, got %s", name1, name2)
 		}
@@ -74,21 +77,5 @@ func TestGetResourceName1(t *testing.T) {
 	}
 	if obj := w.Resources.Properties[allNames[6]]; obj != ref {
 		t.Errorf("expected %s, got %s", ref, obj)
-	}
-}
-
-// TestGetResourceName3 tests that the reserved color space names
-// are always returned when the resource is the corresponding color space.
-func TestGetResourceName3(t *testing.T) {
-	w := NewWriter(io.Discard, pdf.V1_7)
-
-	for _, name := range []pdf.Name{"DeviceGray", "DeviceRGB", "DeviceCMYK", "Pattern"} {
-		r := &pdf.Res{
-			Data: name,
-		}
-		got := w.getResourceName(catColorSpace, r)
-		if got != name {
-			t.Errorf("expected %s, got %s", name, got)
-		}
 	}
 }

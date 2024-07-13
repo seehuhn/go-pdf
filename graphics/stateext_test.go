@@ -32,11 +32,12 @@ func TestTextLayout1(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
+			rm := graphics.NewResourceManager(data)
 			F, err := gofont.GoRegular.Embed(data, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			out := graphics.NewWriter(io.Discard, v)
+			out := graphics.NewWriter(io.Discard, rm)
 			out.TextSetFont(F, 10)
 
 			var testCases = []string{
@@ -68,11 +69,13 @@ func TestTextLayout2(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
+			rm := graphics.NewResourceManager(data)
+
 			F, err := gofont.GoRegular.Embed(data, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			out := graphics.NewWriter(io.Discard, v)
+			out := graphics.NewWriter(io.Discard, rm)
 			out.TextSetFont(F, 10)
 
 			// First make sure the font uses ligatures:
@@ -102,11 +105,13 @@ func TestTextLayout2(t *testing.T) {
 // with the font size.
 func TestTextLayout3(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
+	rm := graphics.NewResourceManager(data)
+
 	F, err := gofont.GoRegular.Embed(data, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := graphics.NewWriter(io.Discard, pdf.GetVersion(data))
+	out := graphics.NewWriter(io.Discard, rm)
 
 	out.TextSetFont(F, 10)
 	L1 := out.TextLayout(nil, "hello world!").TotalWidth()
@@ -125,12 +130,14 @@ func TestTextLayout3(t *testing.T) {
 // if the value is not set in the graphics state.
 func TestTextLayout4(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
+	rm := graphics.NewResourceManager(data)
+
 	F, err := gofont.GoRegular.Embed(data, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out := graphics.NewWriter(io.Discard, pdf.GetVersion(data))
+	out := graphics.NewWriter(io.Discard, rm)
 	out.TextSetFont(F, 10)
 
 	state := &graphics.State{Parameters: &graphics.Parameters{}}

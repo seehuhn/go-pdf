@@ -72,6 +72,7 @@ func main() {
 	}
 
 	tree := pagetree.NewWriter(out)
+	rm := graphics.NewResourceManager(out)
 
 	for _, fname := range fileNames {
 		cffData, err := loadCFFData(fname)
@@ -101,6 +102,7 @@ func main() {
 			labelFont: labelFont,
 			pageTree:  subTree,
 			pageSize:  pageSize,
+			rm:        rm,
 		}
 
 		err = ctx.Show(cffFont, pageSize)
@@ -156,6 +158,7 @@ type illustrator struct {
 	labelFont font.Embedded
 	pageTree  *pagetree.Writer
 	pageSize  *pdf.Rectangle
+	rm        *graphics.ResourceManager
 }
 
 func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
@@ -181,7 +184,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		if err != nil {
 			return err
 		}
-		page := graphics.NewWriter(stream, pdf.GetVersion(ctx.pageTree.Out))
+		page := graphics.NewWriter(stream, ctx.rm)
 
 		// show the glyph extent as a shaded rectangle
 		bbox := g.Extent()

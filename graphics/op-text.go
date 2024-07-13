@@ -157,7 +157,7 @@ func (w *Writer) TextSetFont(font font.Embedded, size float64) {
 	w.State.TextFontSize = size
 	w.State.Set |= StateTextFont
 
-	name := w.getResourceName(catFont, font)
+	name := w.getResourceNameOld(catFont, font)
 	err := name.PDF(w.Content)
 	if err != nil {
 		w.Err = err

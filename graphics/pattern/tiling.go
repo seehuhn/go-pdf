@@ -46,8 +46,8 @@ type TilingColoredBuilder struct {
 }
 
 // NewTilingColored returns a new TilingPatternBuilder.
-func NewTilingColored(w pdf.Putter, prop *TilingProperties) *TilingColoredBuilder {
-	contents := graphics.NewWriter(&bytes.Buffer{}, pdf.GetVersion(w))
+func NewTilingColored(w pdf.Putter, rm *graphics.ResourceManager, prop *TilingProperties) *TilingColoredBuilder {
+	contents := graphics.NewWriter(&bytes.Buffer{}, rm)
 	return &TilingColoredBuilder{
 		Out:              w,
 		Writer:           contents,
@@ -89,8 +89,8 @@ type TilingUncoloredBuilder struct {
 }
 
 // NewTilingUncolored returns a new TilingPatternBuilder.
-func NewTilingUncolored(w pdf.Putter, prop *TilingProperties) *TilingUncoloredBuilder {
-	contents := graphics.NewWriter(&bytes.Buffer{}, pdf.GetVersion(w))
+func NewTilingUncolored(w pdf.Putter, rm *graphics.ResourceManager, prop *TilingProperties) *TilingUncoloredBuilder {
+	contents := graphics.NewWriter(&bytes.Buffer{}, rm)
 	return &TilingUncoloredBuilder{
 		Out:              w,
 		Writer:           contents,

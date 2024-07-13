@@ -36,7 +36,7 @@ func (p *Writer) DrawXObject(obj *XObject) {
 		return
 	}
 
-	name := p.getResourceName(catXObject, obj)
+	name := p.getResourceNameOld(catXObject, obj)
 	err := name.PDF(p.Content)
 	if err != nil {
 		p.Err = err

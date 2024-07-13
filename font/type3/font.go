@@ -30,12 +30,16 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
 // Font is a PDF Type 3 font.
+//
+// TODO(voss): This must be completely reworked, to clarify the distinction
+// between free and embedded fonts.
 type Font struct {
 	Glyphs     map[string]*Glyph
 	FontMatrix [6]float64
@@ -53,6 +57,7 @@ type Font struct {
 	ForceBold    bool
 
 	Resources *pdf.Resources
+	RM        *graphics.ResourceManager
 
 	NumOpen int // -1 if the font is embedded, otherwise the number of glyphs not yet closed
 }
@@ -74,10 +79,16 @@ func New(unitsPerEm uint16) *Font {
 		0, 1 / float64(unitsPerEm),
 		0, 0,
 	}
+
+	// TODO(voss): We need to use the caller's ResourceManager here.
+	data := pdf.NewData(pdf.V1_7)
+	rm := graphics.NewResourceManager(data)
+
 	res := &Font{
 		FontMatrix: m,
 		Glyphs:     map[string]*Glyph{},
 		Resources:  &pdf.Resources{},
+		RM:         rm,
 	}
 
 	return res

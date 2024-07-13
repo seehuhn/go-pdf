@@ -18,6 +18,7 @@ package color
 
 import (
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 )
@@ -37,36 +38,30 @@ const (
 	FamilyDeviceN    pdf.Name = "DeviceN"
 )
 
-// Space represents a PDF color space.
+// Space represents a PDF color space which can be embedded in a PDF file.
 type Space interface {
-	pdf.Resource
-
+	Embed(pdf.Putter) (pdf.Resource, error)
 	ColorSpaceFamily() pdf.Name
-
-	defaultColor() Color
+	defaultValues() []float64
 }
 
 // NumValues returns the number of color values for the given color space.
 func NumValues(s Space) int {
-	return len(s.defaultColor().values())
+	return len(s.defaultValues())
 }
 
 // IsPattern returns whether the given color space is a pattern color space.
+//
+// TODO(voss): remove
 func IsPattern(s Space) bool {
-	switch s.(type) {
-	case spacePatternColored, spacePatternUncolored:
-		return true
-	}
-	return false
+	return s.ColorSpaceFamily() == FamilyPattern
 }
 
 // IsIndexed returns whether the given color space is an indexed color space.
+//
+// TODO(voss): remove
 func IsIndexed(s Space) bool {
-	switch s.(type) {
-	case *SpaceIndexed:
-		return true
-	}
-	return false
+	return s.ColorSpaceFamily() == FamilyIndexed
 }
 
 // Color represents a PDF color.
@@ -79,9 +74,12 @@ type Color interface {
 // PDF version.
 //
 // See table 61 in ISO 32000-2:2020.
+//
+// TODO(voss): move into the Space.Embed() methods.
 func CheckVersion(cs Space, v pdf.Version) error {
 	fam := cs.ColorSpaceFamily()
-	minVersion := pdf.V1_0
+
+	var minVersion pdf.Version
 	switch fam {
 	case FamilyDeviceGray, FamilyDeviceRGB, FamilyDeviceCMYK:
 		// The concept of color spaces was only introduced in PDF 1.1.
@@ -94,6 +92,8 @@ func CheckVersion(cs Space, v pdf.Version) error {
 		minVersion = pdf.V1_2
 	case FamilyICCBased, FamilyDeviceN:
 		minVersion = pdf.V1_3
+	default:
+		return fmt.Errorf("unknown color space family %q", fam)
 	}
 	if v < minVersion {
 		return &pdf.VersionError{
@@ -107,15 +107,32 @@ func CheckVersion(cs Space, v pdf.Version) error {
 // CheckCurrent checks whether the changing from the current color to the new
 // color requires a color space change and/or a color change.
 func CheckCurrent(cur, new Color) (needsColorSpace bool, needsColor bool) {
-	needsColorSpace = false
-	if cs := new.ColorSpace(); cs != DeviceGray && cs != DeviceRGB && cs != DeviceCMYK {
-		if cur == nil || cur.ColorSpace() != cs {
-			needsColorSpace = true
-			cur = cs.defaultColor()
-		}
+	var curCS Space
+	if cur != nil {
+		curCS = cur.ColorSpace()
+	}
+	newCS := new.ColorSpace()
+
+	var currentValues []float64
+	if curCS != newCS {
+		needsColorSpace = true
+		currentValues = newCS.defaultValues()
+	} else {
+		currentValues = cur.values()
 	}
 
-	return needsColorSpace, cur != new
+	switch newCS.(type) {
+	case SpaceDeviceGray, SpaceDeviceRGB, SpaceDeviceCMYK:
+		// We use the "k", "g", and "rg" operators without setting the
+		// color space separately.
+		return false, !slices.Equal(currentValues, new.values())
+	case spacePatternColored, spacePatternUncolored:
+		// TODO(voss): do we need to worry about the default pattern (which
+		// draws nothing) here?
+		return needsColorSpace, cur != new
+	default:
+		return needsColorSpace, !slices.Equal(currentValues, new.values())
+	}
 }
 
 // Operator returns the color values, the pattern resource, and the operator

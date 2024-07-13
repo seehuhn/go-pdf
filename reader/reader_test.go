@@ -33,11 +33,13 @@ import (
 )
 
 func TestParameters(t *testing.T) {
+	data := pdf.NewData(pdf.V1_7)
+	rm := graphics.NewResourceManager(data)
+
 	buf := &bytes.Buffer{}
-	w := graphics.NewWriter(buf, pdf.V1_7)
+	w := graphics.NewWriter(buf, rm)
 	w.Set = 0
 
-	data := pdf.NewData(pdf.V1_7)
 	font := dummyfont.Embed(data)
 
 	w.SetLineWidth(12.3)

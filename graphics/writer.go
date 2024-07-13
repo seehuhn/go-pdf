@@ -37,7 +37,8 @@ type Writer struct {
 	State
 	stack []State
 
-	resName map[catRes]pdf.Name
+	ResourceManager *ResourceManager
+	resName         map[catRes]pdf.Name
 
 	nesting       []pairType
 	markedContent []*MarkedContent
@@ -71,12 +72,13 @@ type pairType byte
 const (
 	pairTypeQ   pairType = iota + 1 // q ... Q
 	pairTypeBT                      // BT ... ET
-	pairTypeBMC                     // BMC ... EMC and BDC ... EMC
+	pairTypeBMC                     // BMC/BDC ... EMC
 	pairTypeBX                      // BX ... EX
 )
 
 // NewWriter allocates a new Writer object.
-func NewWriter(w io.Writer, v pdf.Version) *Writer {
+func NewWriter(w io.Writer, m *ResourceManager) *Writer {
+	v := pdf.GetVersion(m.w)
 	return &Writer{
 		Version:       v,
 		Content:       w,
@@ -85,67 +87,86 @@ func NewWriter(w io.Writer, v pdf.Version) *Writer {
 
 		State: NewState(),
 
-		resName: make(map[catRes]pdf.Name),
+		ResourceManager: m,
+		resName:         make(map[catRes]pdf.Name),
 
 		glyphBuf: &font.GlyphSeq{},
 	}
 }
 
-// GetResourceName returns the name of a resource.
-// If the resource is not yet in the resource dictionary, a new name is generated.
-func (w *Writer) getResourceName(category resourceCategory, r pdf.Resource) pdf.Name {
-	name, ok := w.resName[catRes{category, r}]
-	if ok {
-		return name
+// GetResourceName returns a name which can be used to refer to a resource from
+// within the content stream.  If needed, the resource is embedded in the PDF
+// file and/or added to the resource dictionary.
+//
+// Once Go supports methods with type parameters, this function will be turned
+// into a method on Writer.
+func writerGetResourceName[T pdf.Resource](w *Writer, resource Embedder[T], category resourceCategory) (pdf.Name, error) {
+	embedded, err := ResourceManagerEmbed(w.ResourceManager, resource)
+	if err != nil {
+		return "", err
 	}
 
+	key := catRes{category, embedded}
+	name, ok := w.resName[key]
+	if ok {
+		return name, nil
+	}
+
+	dict := w.getCategoryDict(category)
+	name = w.generateName(category, dict, "")
+	(*dict)[name] = embedded.PDFObject()
+
+	return name, nil
+}
+
+func (w *Writer) getCategoryDict(category resourceCategory) *pdf.Dict {
 	var field *pdf.Dict
-	var prefix pdf.Name
 	switch category {
 	case catFont:
 		field = &w.Resources.Font
-		prefix = "F"
 	case catExtGState:
 		field = &w.Resources.ExtGState
-		prefix = "E"
 	case catXObject:
 		field = &w.Resources.XObject
-		prefix = "X"
 	case catColorSpace:
 		field = &w.Resources.ColorSpace
-		prefix = "C"
 	case catPattern:
 		field = &w.Resources.Pattern
-		prefix = "P"
 	case catShading:
 		field = &w.Resources.Shading
-		prefix = "S"
 	case catProperties:
 		field = &w.Resources.Properties
-		prefix = "M"
 	default:
-		panic("invalid resource category " + strconv.Itoa(int(category)))
+		panic("invalid resource category")
 	}
+
 	if *field == nil {
 		*field = pdf.Dict{}
 	}
 
+	return field
+}
+
+func (w *Writer) generateName(category resourceCategory, dict *pdf.Dict, defName pdf.Name) pdf.Name {
 	isUsed := func(name pdf.Name) bool {
-		_, isUsed := (*field)[name]
+		// Some names for color spaces are reserved,
+		// see table 73 of ISO 32000-2:2020
+		if category == catColorSpace &&
+			(name == "DeviceGray" ||
+				name == "DeviceRGB" ||
+				name == "DeviceCMYK" ||
+				name == "Pattern") {
+			return true
+		}
+
+		_, isUsed := (*dict)[name]
 		return isUsed
 	}
 
-	// Some names are forbidden for color spaces,
-	// see table 73 of ISO 32000-2:2020
-	if category == catColorSpace {
-		if n, ok := r.PDFObject().(pdf.Name); ok {
-			name = n
-		} else if name == "DeviceGray" || name == "DeviceRGB" || name == "DeviceCMYK" || name == "Pattern" {
-			name = ""
-		}
-	}
+	name := defName
 	if name == "" || isUsed(name) {
-		numUsed := len(*field)
+		prefix := getCategoryPrefix(category)
+		numUsed := len(*dict)
 		for k := numUsed + 1; ; k-- {
 			name = prefix + pdf.Name(strconv.Itoa(k))
 			if !isUsed(name) {
@@ -153,6 +174,41 @@ func (w *Writer) getResourceName(category resourceCategory, r pdf.Resource) pdf.
 			}
 		}
 	}
+
+	return name
+}
+
+func getCategoryPrefix(category resourceCategory) pdf.Name {
+	switch category {
+	case catFont:
+		return "F"
+	case catExtGState:
+		return "E"
+	case catXObject:
+		return "X"
+	case catColorSpace:
+		return "C"
+	case catPattern:
+		return "P"
+	case catShading:
+		return "S"
+	case catProperties:
+		return "M"
+	default:
+		panic("invalid resource category")
+	}
+}
+
+// GetResourceName returns the name of a resource.
+// If the resource is not yet in the resource dictionary, a new name is generated.
+func (w *Writer) getResourceNameOld(category resourceCategory, r pdf.Resource) pdf.Name {
+	name, ok := w.resName[catRes{category, r}]
+	if ok {
+		return name
+	}
+
+	field := w.getCategoryDict(category)
+	name = w.generateName(category, field, "")
 	(*field)[name] = r.PDFObject()
 	w.resName[catRes{category, r}] = name
 

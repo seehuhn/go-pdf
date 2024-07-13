@@ -183,6 +183,8 @@ func (s *State) mustBeSet(bits StateBits) error {
 }
 
 // CopyTo applies the graphics state parameters to the given state.
+//
+// TODO(voss): rename to MergeInto?
 func (s State) CopyTo(other *State) {
 	set := s.Set
 	other.Set |= set

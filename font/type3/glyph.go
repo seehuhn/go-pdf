@@ -24,7 +24,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/pdf/graphics"
@@ -51,7 +50,7 @@ func (f *Font) AddGlyph(name string, widthX funit.Int16, bbox funit.Rect16, shap
 	f.Glyphs[name] = nil // reserve the name
 
 	buf := &bytes.Buffer{}
-	page := graphics.NewWriter(buf, pdf.V1_7) // TODO(voss): what to use as the PDF version here?
+	page := graphics.NewWriter(buf, f.RM)
 
 	// TODO(voss): consider the discussion at
 	// https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3

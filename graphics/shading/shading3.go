@@ -82,9 +82,14 @@ func (s *Type3) Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error) {
 		return nil, fmt.Errorf("invalid Function: %T", s.F)
 	}
 
+	csE, err := s.ColorSpace.Embed(w)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"ShadingType": pdf.Integer(3),
-		"ColorSpace":  s.ColorSpace.PDFObject(),
+		"ColorSpace":  csE.PDFObject(),
 		"Coords": pdf.Array{
 			pdf.Number(s.X1), pdf.Number(s.Y1), pdf.Number(s.R1),
 			pdf.Number(s.X2), pdf.Number(s.Y2), pdf.Number(s.R2),

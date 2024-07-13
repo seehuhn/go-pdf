@@ -109,9 +109,14 @@ func (s *Type4) Embed(w pdf.Putter, _ bool) (*graphics.Shading, error) {
 		return nil, errors.New("Function not allowed for indexed color space")
 	}
 
+	csE, err := s.ColorSpace.Embed(w)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"ShadingType":       pdf.Integer(4),
-		"ColorSpace":        s.ColorSpace.PDFObject(),
+		"ColorSpace":        csE.PDFObject(),
 		"BitsPerCoordinate": pdf.Integer(s.BitsPerCoordinate),
 		"BitsPerComponent":  pdf.Integer(s.BitsPerComponent),
 		"BitsPerFlag":       pdf.Integer(s.BitsPerFlag),

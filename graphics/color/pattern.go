@@ -42,6 +42,10 @@ func (p *TilingPatternUncolored) New(col Color) Color {
 // spacePatternColored is used for colored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
+func (s spacePatternColored) Embed(w pdf.Putter) (pdf.Resource, error) {
+	return s, nil
+}
+
 // PDFObject implements the [Space] interface.
 func (s spacePatternColored) PDFObject() pdf.Object {
 	return pdf.Name("Pattern")
@@ -52,8 +56,8 @@ func (s spacePatternColored) ColorSpaceFamily() pdf.Name {
 	return "Pattern"
 }
 
-// defaultColor implements the [Space] interface.
-func (s spacePatternColored) defaultColor() Color {
+// defaultValues implements the [Space] interface.
+func (s spacePatternColored) defaultValues() []float64 {
 	return nil
 }
 
@@ -64,6 +68,7 @@ func (s spacePatternColored) defaultColor() Color {
 // defining a pattern with PatternType 1 and PaintType 1.  In case of a shading
 // pattern, `Res.Data“ must be a PDF pattern dictionary with PatternType 2.
 type PatternColored struct {
+	// TODO(voss): do we need to distinguish between free and embedded patterns?
 	pdf.Res
 }
 
@@ -82,21 +87,34 @@ type spacePatternUncolored struct {
 	base Space
 }
 
-func (s spacePatternUncolored) PDFObject() pdf.Object {
-	return pdf.Array{
-		pdf.Name("Pattern"),
-		s.base.PDFObject(),
-	}
-}
-
 // ColorSpaceFamily implements the [Space] interface.
 func (s spacePatternUncolored) ColorSpaceFamily() pdf.Name {
 	return "Pattern"
 }
 
-// defaultColor implements the [Space] interface.
-func (s spacePatternUncolored) defaultColor() Color {
+// defaultValues implements the [Space] interface.
+func (s spacePatternUncolored) defaultValues() []float64 {
 	return nil
+}
+
+func (s spacePatternUncolored) Embed(w pdf.Putter) (pdf.Resource, error) {
+	// TODO(voss): somehow route this through the graphics.ResourceManager???
+	e, err := s.base.Embed(w)
+	if err != nil {
+		return nil, err
+	}
+	return spacePatternUncoloredEmbedded{base: e}, nil
+}
+
+type spacePatternUncoloredEmbedded struct {
+	base pdf.Resource
+}
+
+func (s spacePatternUncoloredEmbedded) PDFObject() pdf.Object {
+	return pdf.Array{
+		pdf.Name("Pattern"),
+		s.base.PDFObject(),
+	}
 }
 
 type colorPatternUncolored struct {

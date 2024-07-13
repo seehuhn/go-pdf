@@ -28,9 +28,9 @@ import (
 
 // SpaceIndexed represents an indexed color space.
 type SpaceIndexed struct {
-	pdf.Res
-	Space  Space
-	NumCol int
+	base   Space
+	numCol int
+	lookup pdf.String
 }
 
 // Indexed returns a new indexed color space.
@@ -79,34 +79,18 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	}
 
 	return &SpaceIndexed{
-		Res: pdf.Res{
-			Data: pdf.Array{
-				pdf.Name("Indexed"),
-				space.PDFObject(),
-				pdf.Integer(len(colors) - 1),
-				lookup,
-			},
-		},
-		Space:  space,
-		NumCol: len(colors),
+		base:   space,
+		numCol: len(colors),
+		lookup: lookup,
 	}, nil
 }
 
-// Embed embeds the color space in the PDF file.
-// This saves space in case the color space is used in multiple content streams.
-func (s *SpaceIndexed) Embed(out *pdf.Writer) (*SpaceIndexed, error) {
-	if _, ok := s.Res.Data.(pdf.Reference); ok {
-		return s, nil
+// New returns a new indexed color.
+func (s *SpaceIndexed) New(idx int) Color {
+	if idx < 0 || idx >= s.numCol {
+		return nil
 	}
-	ref := out.Alloc()
-	err := out.Put(ref, s.Res.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	embedded := clone(s)
-	embedded.Res.Data = ref
-	return embedded, nil
+	return colorIndexed{Space: s, Index: idx}
 }
 
 // ColorSpaceFamily implements the [Space] interface.
@@ -114,16 +98,26 @@ func (s *SpaceIndexed) ColorSpaceFamily() pdf.Name {
 	return "Indexed"
 }
 
-func (s *SpaceIndexed) defaultColor() Color {
-	return colorIndexed{Space: s, Index: 0}
+func (s *SpaceIndexed) defaultValues() []float64 {
+	return []float64{0}
 }
 
-// New returns a new indexed color.
-func (s *SpaceIndexed) New(idx int) Color {
-	if idx < 0 || idx >= s.NumCol {
-		return nil
+// Embed implements the [Space] interface.
+func (s *SpaceIndexed) Embed(w pdf.Putter) (pdf.Resource, error) {
+	// TODO(voss): somehow route this through the graphics.ResourceManager???
+	base, err := s.base.Embed(w)
+	if err != nil {
+		return nil, err
 	}
-	return colorIndexed{Space: s, Index: idx}
+
+	return pdf.Res{
+		Data: pdf.Array{
+			pdf.Name("Indexed"),
+			base.PDFObject(),
+			pdf.Integer(s.numCol - 1),
+			s.lookup,
+		},
+	}, nil
 }
 
 type colorIndexed struct {

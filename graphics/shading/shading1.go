@@ -78,9 +78,14 @@ func (s *Type1) Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error) {
 		return nil, errors.New("invalid Matrix")
 	}
 
+	csE, err := s.ColorSpace.Embed(w)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"ShadingType": pdf.Integer(1),
-		"ColorSpace":  s.ColorSpace.PDFObject(),
+		"ColorSpace":  csE.PDFObject(),
 		"Function":    s.F,
 	}
 	if len(s.Background) > 0 {

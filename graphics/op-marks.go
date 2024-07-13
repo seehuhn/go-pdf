@@ -76,7 +76,7 @@ func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
 			return
 		}
 	} else {
-		prop = w.getResourceName(catProperties, mc)
+		prop = w.getResourceNameOld(catProperties, mc)
 	}
 	w.Err = prop.PDF(w.Content)
 	if w.Err == nil {
@@ -118,7 +118,7 @@ func (w *Writer) MarkedContentStart(mc *MarkedContent) {
 			return
 		}
 	} else {
-		prop = w.getResourceName(catProperties, mc)
+		prop = w.getResourceNameOld(catProperties, mc)
 	}
 	w.Err = prop.PDF(w.Content)
 	if w.Err == nil {

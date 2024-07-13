@@ -30,8 +30,11 @@ import (
 func TestPushPop(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
+			data := pdf.NewData(v)
+			rm := NewResourceManager(data)
+
 			buf := &bytes.Buffer{}
-			w := NewWriter(buf, v)
+			w := NewWriter(buf, rm)
 
 			w.SetLineWidth(2)
 			w.PushGraphicsState()
@@ -54,8 +57,11 @@ func TestPushPop(t *testing.T) {
 }
 
 func TestPushPopErr1(t *testing.T) {
+	data := pdf.NewData(pdf.V1_7)
+	rm := NewResourceManager(data)
+
 	buf := &bytes.Buffer{}
-	w := NewWriter(buf, pdf.V1_7)
+	w := NewWriter(buf, rm)
 
 	w.PushGraphicsState()
 	w.PopGraphicsState()
@@ -67,8 +73,11 @@ func TestPushPopErr1(t *testing.T) {
 }
 
 func TestPushPopErr2(t *testing.T) {
+	data := pdf.NewData(pdf.V2_0)
+	rm := NewResourceManager(data)
+
 	buf := &bytes.Buffer{}
-	w := NewWriter(buf, pdf.V2_0)
+	w := NewWriter(buf, rm)
 
 	w.TextBegin()
 	w.PushGraphicsState()
@@ -83,8 +92,11 @@ func TestPushPopErr2(t *testing.T) {
 func TestPushPopInText(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
+			data := pdf.NewData(v)
+			rm := NewResourceManager(data)
+
 			buf := &bytes.Buffer{}
-			w := NewWriter(buf, v)
+			w := NewWriter(buf, rm)
 
 			w.TextBegin()
 			w.PushGraphicsState()
@@ -105,8 +117,11 @@ func TestPushPopInText(t *testing.T) {
 }
 
 func TestWriterCTM(t *testing.T) {
+	data := pdf.NewData(pdf.V1_7)
+	rm := NewResourceManager(data)
+
 	buf := &bytes.Buffer{}
-	w := NewWriter(buf, pdf.V1_7)
+	w := NewWriter(buf, rm)
 
 	w.Transform(matrix.Rotate(math.Pi / 2)) // rotate 90 degrees counter-clockwise
 	w.Transform(matrix.Translate(10, 20))

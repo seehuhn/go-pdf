@@ -22,3 +22,26 @@ Uses of Content Streams
   Resources come from the stream dictionary.
 
 TODO(voss): how to detect resource loops?
+
+
+PDF Resources
+=============
+
+There are seven different PDF resource types:
+  - ExtGState
+  - ColorSpace
+  - Pattern
+  - Shading
+  - XObject
+  - Font
+  - Properties (marked content)
+
+There are three different contexts for resources:
+  - free (not yet tied to a PDF file)
+  - tied to a file (can use pdf.Reference, may be indirect)
+  - tied to a page (normally in page dict, refered to by a name)
+The idea is for the user to get a free resource object which is passed to the
+functions using resources (e.g. to set a font). These functions will then embed
+the resource into the file, if needed, and add it to the resource dict.
+
+

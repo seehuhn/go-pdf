@@ -48,11 +48,16 @@ func TestDecodeSpace(t *testing.T) {
 		must(Lab(WhitePointD65, []float64{0.1, 0, 0}, []float64{-90, 90, -110, 110})),
 	}
 
-	r := pdf.NewData(pdf.V2_0)
-
 	for i, space := range in {
 		t.Run(fmt.Sprintf("%d-%s", i, space.ColorSpaceFamily()), func(t *testing.T) {
-			obj := space.PDFObject()
+			r := pdf.NewData(pdf.V2_0)
+
+			embeddedSpace, err := space.Embed(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			obj := embeddedSpace.PDFObject()
 			space2, err := DecodeSpace(r, obj)
 			if err != nil {
 				t.Fatal(err)

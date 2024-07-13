@@ -267,7 +267,7 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 
 	s.Value.CopyTo(&w.State)
 
-	name := w.getResourceName(catExtGState, s)
+	name := w.getResourceNameOld(catExtGState, s)
 	err := name.PDF(w.Content)
 	if err != nil {
 		w.Err = err

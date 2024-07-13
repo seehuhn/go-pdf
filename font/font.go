@@ -114,6 +114,8 @@ func (s *GlyphSeq) PadTo(width float64) {
 }
 
 // Dict is the low-level interface to represent a font in a PDF file.
+//
+// TODO(voss): remove?  move somewhere else?  make better use of this?
 type Dict interface {
 	Embed(w pdf.Putter, fontDictRef pdf.Reference) error
 }

@@ -100,13 +100,18 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
+	cs, err := CalRGB.Embed(doc.Out)
+	if err != nil {
+		return err
+	}
+
 	ref := page.Out.Alloc()
 	dict := pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(256),
 		"Height":           pdf.Integer(256),
-		"ColorSpace":       CalRGB.PDFObject(),
+		"ColorSpace":       cs.PDFObject(),
 		"BitsPerComponent": pdf.Integer(8),
 	}
 	compress := pdf.FilterFlate{
@@ -166,13 +171,18 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
+	LabE, err := Lab.Embed(doc.Out)
+	if err != nil {
+		return err
+	}
+
 	ref := doc.Out.Alloc()
 	dict := pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(256),
 		"Height":           pdf.Integer(256),
-		"ColorSpace":       Lab.PDFObject(),
+		"ColorSpace":       LabE.PDFObject(),
 		"BitsPerComponent": pdf.Integer(8),
 	}
 	compress := pdf.FilterFlate{
@@ -255,13 +265,18 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
+	csE, err := cs.Embed(doc.Out)
+	if err != nil {
+		return err
+	}
+
 	ref := doc.Out.Alloc()
 	dict := pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(numColors),
 		"Height":           pdf.Integer(1),
-		"ColorSpace":       cs.PDFObject(),
+		"ColorSpace":       csE.PDFObject(),
 		"BitsPerComponent": pdf.Integer(8),
 	}
 	compress := pdf.FilterFlate{
@@ -333,7 +348,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 		YStep:      h,
 		Matrix:     matrix.Identity,
 	}
-	builder := pattern.NewTilingUncolored(doc.Out, prop)
+	builder := pattern.NewTilingUncolored(doc.Out, doc.RM, prop)
 
 	builder.Circle(0, 0, r)
 	builder.Circle(w, 0, r)
@@ -384,7 +399,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 		YStep:      h,
 		Matrix:     matrix.Identity,
 	}
-	builder := pattern.NewTilingColored(doc.Out, prop)
+	builder := pattern.NewTilingColored(doc.Out, doc.RM, prop)
 
 	builder.SetFillColor(color.DeviceGray.New(0.5))
 	builder.Circle(0, 0, r)
