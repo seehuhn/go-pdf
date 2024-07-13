@@ -439,7 +439,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 }
 
 func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
-	shadingData := shading.Type3{
+	shadingData := &shading.Type3{
 		ColorSpace: color.DeviceRGB,
 		X1:         100,
 		Y1:         350,
@@ -456,13 +456,11 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 		},
 		ExtendStart: true,
 		ExtendEnd:   true,
-	}
-	shading, err := shadingData.Embed(doc.Out, true)
-	if err != nil {
-		return err
+
+		SingleUse: true,
 	}
 
-	col, err := pattern.NewShadingPattern(doc.Out, shading, matrix.Identity, nil, true)
+	col, err := pattern.NewShadingPattern(doc.Out, shadingData, matrix.Identity, nil, true)
 	if err != nil {
 		return err
 	}
@@ -538,7 +536,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	shadingData := shading.Type4{
+	shadingData := &shading.Type4{
 		ColorSpace:        cs,
 		BitsPerFlag:       2,
 		BitsPerCoordinate: 8,
@@ -548,10 +546,6 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 		},
 		Vertices: vertices,
 	}
-	shading, err := shadingData.Embed(doc.Out, true)
-	if err != nil {
-		return err
-	}
 
 	page := doc.AddPage()
 
@@ -559,7 +553,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	m := matrix.Scale(50, 50)
 	m = m.Mul(matrix.Translate(50, 300))
 	page.Transform(m)
-	page.DrawShading(shading)
+	page.DrawShading(shadingData)
 	page.PopGraphicsState()
 
 	page.TextSetFont(F, 12)

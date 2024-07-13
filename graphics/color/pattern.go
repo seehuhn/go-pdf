@@ -22,8 +22,10 @@ import (
 
 // TilingPatternUncolored represents an uncolored PDF tiling pattern.
 //
-// Res.Data must be a PDF stream defining a pattern with PatternType 1 and
-// PaintType 2.
+// Res.Data must be a PDF stream defining a pattern with PatternType 1 (tiling
+// pattern) and PaintType 2 (uncolored).  The function
+// [seehuhn.de/go/pdf/graphics/pattern.NewTilingUncolored] can be used to
+// create a new tiling pattern.
 type TilingPatternUncolored struct {
 	pdf.Res
 }
@@ -61,12 +63,17 @@ func (s spacePatternColored) defaultValues() []float64 {
 	return nil
 }
 
-// PatternColored represents a colored tiling pattern or a shading
-// pattern.
+// PatternColored represents a colored tiling pattern or a shading pattern.
 //
 // In case of a colored tiling pattern, `Res.Data“ must be a PDF stream
-// defining a pattern with PatternType 1 and PaintType 1.  In case of a shading
-// pattern, `Res.Data“ must be a PDF pattern dictionary with PatternType 2.
+// defining a pattern with PatternType 1 (tiling pattern) and PaintType 1
+// (colored).  Use [seehuhn.de/go/pdf/graphics/pattern.NewTilingColored] to
+// create this type of pattern.
+//
+// In case of a shading pattern, `Res.Data“ must be a PDF pattern dictionary
+// with PatternType 2 (shading pattern). Use
+// [seehuhn.de/go/pdf/graphics/pattern.NewShadingPattern] to create this type
+// of pattern.
 type PatternColored struct {
 	// TODO(voss): do we need to distinguish between free and embedded patterns?
 	pdf.Res

@@ -25,6 +25,9 @@ import (
 // A Func represents a PDF function.
 //
 // TODO(voss): This is a placeholder for now.
+//
+// TODO(voss): make a distinction between free functions and functions
+// already embedded in the PDF file.
 type Func pdf.Object
 
 type Interpolate struct {

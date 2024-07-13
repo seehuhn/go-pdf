@@ -21,13 +21,18 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/matrix"
+	"seehuhn.de/go/pdf/graphics/shading"
 )
 
 // NewShadingPattern creates a new shading pattern.
-func NewShadingPattern(w pdf.Putter, shading *graphics.Shading, M matrix.Matrix, extGState *graphics.ExtGState, singleUse bool) (color.Color, error) {
+func NewShadingPattern(w pdf.Putter, shading shading.Shading, M matrix.Matrix, extGState *graphics.ExtGState, singleUse bool) (color.Color, error) {
+	sh, err := shading.Embed(w)
+	if err != nil {
+		return nil, err
+	}
 	dict := pdf.Dict{
 		"PatternType": pdf.Integer(2),
-		"Shading":     shading.PDFObject(),
+		"Shading":     sh.PDFObject(),
 	}
 	if M != matrix.Identity && M != matrix.Zero {
 		dict["Matrix"] = toPDF(M[:])

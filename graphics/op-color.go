@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/shading"
 )
 
 // This file implements functions to set the stroke and fill colors.
@@ -148,14 +149,6 @@ func (w *Writer) SetFillColor(c color.Color) {
 	}
 }
 
-// Shading represents a PDF shading dictionary.
-//
-// Shadings can either be drawn to the page using the [Writer.DrawShading]
-// method, or can be used as the basis of a shading pattern.
-type Shading struct {
-	pdf.Res
-}
-
 // DrawShading paints the given shading, subject to the current clipping path.
 // The current colour in the graphics state is neither used nor altered.
 //
@@ -164,7 +157,7 @@ type Shading struct {
 // is ignored.
 //
 // This implements the PDF graphics operator "sh".
-func (w *Writer) DrawShading(shading *Shading) {
+func (w *Writer) DrawShading(shading shading.Shading) {
 	if !w.isValid("DrawShading", objPage) {
 		return
 	}
@@ -176,7 +169,12 @@ func (w *Writer) DrawShading(shading *Shading) {
 		return
 	}
 
-	name := w.getResourceNameOld(catShading, shading)
+	name, err := writerGetResourceName(w, shading, catShading)
+	if err != nil {
+		w.Err = err
+		return
+	}
+
 	w.Err = name.PDF(w.Content)
 	if w.Err != nil {
 		return

@@ -18,12 +18,16 @@ package shading
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 )
 
-// A Shading describes the variation of colors across an area.
+// Shading represents a PDF shading dictionary.
+//
+// Shadings can either be drawn to the page using the
+// [seehuhn.de/go/pdf/graphics.Writer.DrawShading] method, or can be used as
+// the basis of a shading pattern.
 type Shading interface {
-	Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error)
+	Embed(w pdf.Putter) (pdf.Resource, error)
+	ShadingType() int
 }
 
 func toPDF(x []float64) pdf.Array {

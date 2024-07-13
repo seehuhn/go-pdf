@@ -23,7 +23,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -49,8 +48,13 @@ type Type4Vertex struct {
 	Color []float64
 }
 
+// ShadingType implements the [Shading] interface.
+func (s *Type4) ShadingType() int {
+	return 4
+}
+
 // Embed implements the [Shading] interface.
-func (s *Type4) Embed(w pdf.Putter, _ bool) (*graphics.Shading, error) {
+func (s *Type4) Embed(w pdf.Putter) (pdf.Resource, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
 	} else if color.IsPattern(s.ColorSpace) {
@@ -198,5 +202,5 @@ func (s *Type4) Embed(w pdf.Putter, _ bool) (*graphics.Shading, error) {
 		return nil, err
 	}
 
-	return &graphics.Shading{Res: pdf.Res{Data: ref}}, nil
+	return pdf.Res{Data: ref}, nil
 }

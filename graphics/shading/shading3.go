@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -42,10 +41,17 @@ type Type3 struct {
 	Background  []float64
 	BBox        *pdf.Rectangle
 	AntiAlias   bool
+
+	SingleUse bool
+}
+
+// ShadingType implements the [Shading] interface.
+func (s *Type3) ShadingType() int {
+	return 3
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type3) Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error) {
+func (s *Type3) Embed(w pdf.Putter) (pdf.Resource, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
 	} else if color.IsPattern(s.ColorSpace) {
@@ -113,7 +119,7 @@ func (s *Type3) Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error) {
 	}
 
 	var data pdf.Object
-	if singleUse {
+	if s.SingleUse {
 		data = dict
 	} else {
 		ref := w.Alloc()
@@ -124,5 +130,5 @@ func (s *Type3) Embed(w pdf.Putter, singleUse bool) (*graphics.Shading, error) {
 		data = ref
 	}
 
-	return &graphics.Shading{Res: pdf.Res{Data: data}}, nil
+	return pdf.Res{Data: data}, nil
 }
