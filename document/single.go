@@ -71,5 +71,10 @@ func closePage(p *Page) error {
 	}
 	p.Out.GetMeta().Catalog.Pages = ref
 
+	err = p.Writer.ResourceManager.Close()
+	if err != nil {
+		return err
+	}
+
 	return p.Out.Close()
 }

@@ -117,6 +117,11 @@ func main() {
 	}
 	out.GetMeta().Catalog.Pages = ref
 
+	err = rm.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = out.Close()
 	if err != nil {
 		log.Fatal(err)

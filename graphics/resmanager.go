@@ -32,6 +32,8 @@ type Embedder[T pdf.Resource] interface {
 
 // ResourceManager keeps track of which resources have been embedded in the PDF
 // file.
+//
+// Use the [ResourceManagerEmbed] function to embed resources.
 type ResourceManager struct {
 	w          pdf.Putter
 	embedded   map[any]pdf.Resource
@@ -52,14 +54,11 @@ func NewResourceManager(w pdf.Putter) *ResourceManager {
 // If the embedded type, T, is an io.Closer, the Close() method will be
 // called when the ResourceManager is closed.
 //
-// If/when Go supports methods with type parameters, this function will
+// Once Go supports methods with type parameters, this function will
 // be turned into a method on ResourceManager.
 func ResourceManagerEmbed[T pdf.Resource](rm *ResourceManager, r Embedder[T]) (T, error) {
 	var zero T
 
-	if rm == nil {
-		return zero, fmt.Errorf("no resource manager provided")
-	}
 	if er, ok := rm.embedded[r]; ok {
 		return er.(T), nil
 	}

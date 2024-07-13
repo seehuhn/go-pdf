@@ -33,6 +33,7 @@ func TestTextLayout1(t *testing.T) {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
 			rm := graphics.NewResourceManager(data)
+
 			F, err := gofont.GoRegular.Embed(data, nil)
 			if err != nil {
 				t.Fatal(err)
