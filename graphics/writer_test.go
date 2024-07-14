@@ -27,7 +27,7 @@ import (
 // added to the resource dictionary.
 func TestGetResourceName1(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
-	rm := NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	w := NewWriter(io.Discard, rm)
 	ref := pdf.NewReference(1, 2)

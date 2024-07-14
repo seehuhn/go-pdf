@@ -36,7 +36,7 @@ var (
 type SpaceDeviceGray struct{}
 
 // Embed implements the [Space] interface.
-func (s SpaceDeviceGray) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s SpaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	return s, nil
 }
 
@@ -79,7 +79,7 @@ func (c colorDeviceGray) values() []float64 {
 type SpaceDeviceRGB struct{}
 
 // Embed implements the [Space] interface.
-func (s SpaceDeviceRGB) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s SpaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	return s, nil
 }
 
@@ -121,7 +121,8 @@ func (c colorDeviceRGB) values() []float64 {
 // Use [DeviceCMYK] to access this color space.
 type SpaceDeviceCMYK struct{}
 
-func (s SpaceDeviceCMYK) Embed(w pdf.Putter) (pdf.Resource, error) {
+// Embed implement the [pdf.Embedder] interface.
+func (s SpaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	return s, nil
 }
 

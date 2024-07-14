@@ -103,20 +103,21 @@ func (s *SpaceIndexed) defaultValues() []float64 {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceIndexed) Embed(w pdf.Putter) (pdf.Resource, error) {
-	// TODO(voss): somehow route this through the graphics.ResourceManager???
-	base, err := s.base.Embed(w)
+func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	base, err := s.base.Embed(rm)
 	if err != nil {
 		return nil, err
 	}
 
+	data := pdf.Array{
+		pdf.Name("Indexed"),
+		base.PDFObject(),
+		pdf.Integer(s.numCol - 1),
+		s.lookup,
+	}
+
 	return pdf.Res{
-		Data: pdf.Array{
-			pdf.Name("Indexed"),
-			base.PDFObject(),
-			pdf.Integer(s.numCol - 1),
-			s.lookup,
-		},
+		Data: data,
 	}, nil
 }
 

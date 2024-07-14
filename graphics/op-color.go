@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/shading"
 )
 
 // This file implements functions to set the stroke and fill colors.
@@ -33,60 +32,7 @@ func (w *Writer) SetStrokeColor(c color.Color) {
 	if !w.isValid("SetStrokeColor", objPage|objText) {
 		return
 	}
-
-	cs := c.ColorSpace()
-
-	var cur color.Color
-	if w.isSet(StateStrokeColor) {
-		cur = w.StrokeColor
-	}
-	w.StrokeColor = c
-	w.Set |= StateStrokeColor
-
-	needsColorSpace, needsColor := color.CheckCurrent(cur, c)
-
-	if needsColorSpace {
-		name, err := writerGetResourceName(w, cs, catColorSpace)
-		if err != nil {
-			w.Err = err
-			return
-		}
-
-		w.Err = name.PDF(w.Content)
-		if w.Err != nil {
-			return
-		}
-		_, w.Err = fmt.Fprintln(w.Content, " CS")
-		if w.Err != nil {
-			return
-		}
-	}
-
-	if needsColor {
-		values, pattern, op := color.Operator(c)
-		for _, val := range values {
-			valString := format(val)
-			_, w.Err = fmt.Fprint(w.Content, valString, " ")
-			if w.Err != nil {
-				return
-			}
-		}
-		if pattern != nil {
-			name := w.getResourceNameOld(catPattern, pattern)
-			w.Err = name.PDF(w.Content)
-			if w.Err != nil {
-				return
-			}
-			_, w.Err = fmt.Fprint(w.Content, " ")
-			if w.Err != nil {
-				return
-			}
-		}
-		_, w.Err = fmt.Fprintln(w.Content, op)
-		if w.Err != nil {
-			return
-		}
-	}
+	w.setColor(c, false)
 }
 
 // SetFillColor sets the color to use for non-stroking operations.
@@ -94,13 +40,24 @@ func (w *Writer) SetFillColor(c color.Color) {
 	if !w.isValid("SetFillColor", objPage|objText) {
 		return
 	}
+	w.setColor(c, true)
+}
 
+func (w *Writer) setColor(c color.Color, fill bool) {
 	var cur color.Color
-	if w.isSet(StateFillColor) {
-		cur = w.FillColor
+	if fill {
+		if w.isSet(StateFillColor) {
+			cur = w.FillColor
+		}
+		w.FillColor = c
+		w.Set |= StateFillColor
+	} else {
+		if w.isSet(StateStrokeColor) {
+			cur = w.StrokeColor
+		}
+		w.StrokeColor = c
+		w.Set |= StateStrokeColor
 	}
-	w.FillColor = c
-	w.Set |= StateFillColor
 
 	needsColorSpace, needsColor := color.CheckCurrent(cur, c)
 
@@ -132,7 +89,11 @@ func (w *Writer) SetFillColor(c color.Color) {
 			}
 		}
 		if pattern != nil {
-			name := w.getResourceNameOld(catPattern, pattern)
+			name, err := writerGetResourceName(w, pattern, catPattern)
+			if err != nil {
+				w.Err = err
+				return
+			}
 			w.Err = name.PDF(w.Content)
 			if w.Err != nil {
 				return
@@ -142,7 +103,10 @@ func (w *Writer) SetFillColor(c color.Color) {
 				return
 			}
 		}
-		_, w.Err = fmt.Fprintln(w.Content, strings.ToLower(op))
+		if fill {
+			op = strings.ToLower(op)
+		}
+		_, w.Err = fmt.Fprintln(w.Content, op)
 		if w.Err != nil {
 			return
 		}
@@ -157,7 +121,7 @@ func (w *Writer) SetFillColor(c color.Color) {
 // is ignored.
 //
 // This implements the PDF graphics operator "sh".
-func (w *Writer) DrawShading(shading shading.Shading) {
+func (w *Writer) DrawShading(shading Shading) {
 	if !w.isValid("DrawShading", objPage) {
 		return
 	}

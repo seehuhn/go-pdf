@@ -14,21 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package shading
+package color
 
-import (
-	"seehuhn.de/go/pdf"
-)
-
-// Shading represents a PDF shading dictionary.
-//
-// Shadings can either be drawn to the page using the
-// [seehuhn.de/go/pdf/graphics.Writer.DrawShading] method, or can be used as
-// the basis of a shading pattern.
-type Shading interface {
-	Embed(w pdf.Putter) (pdf.Resource, error)
-	ShadingType() int
-}
+import "seehuhn.de/go/pdf"
 
 func toPDF(x []float64) pdf.Array {
 	res := make(pdf.Array, len(x))
@@ -36,6 +24,31 @@ func toPDF(x []float64) pdf.Array {
 		res[i] = pdf.Number(xi)
 	}
 	return res
+}
+
+func isConst(x []float64, value float64) bool {
+	for _, xi := range x {
+		if xi != value {
+			return false
+		}
+	}
+	return true
+}
+
+func isZero(x []float64) bool {
+	return isConst(x, 0)
+}
+
+func isPosVec3(x []float64) bool {
+	if len(x) != 3 {
+		return false
+	}
+	for _, v := range x {
+		if v < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func isEqual(x, y []float64) bool {
@@ -52,4 +65,9 @@ func isEqual(x, y []float64) bool {
 
 func isValues(x []float64, y ...float64) bool {
 	return isEqual(x, y)
+}
+
+func clone[T any](x *T) *T {
+	y := *x
+	return &y
 }

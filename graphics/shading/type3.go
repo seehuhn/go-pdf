@@ -26,6 +26,8 @@ import (
 )
 
 // Type3 represents a type 3 (radial) shading.
+//
+// This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type3 struct {
 	ColorSpace color.Space
 	X1, Y1, R1 float64
@@ -51,7 +53,7 @@ func (s *Type3) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type3) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
 	} else if color.IsPattern(s.ColorSpace) {
@@ -88,7 +90,7 @@ func (s *Type3) Embed(w pdf.Putter) (pdf.Resource, error) {
 		return nil, fmt.Errorf("invalid Function: %T", s.F)
 	}
 
-	csE, err := s.ColorSpace.Embed(w)
+	csE, err := s.ColorSpace.Embed(rm)
 	if err != nil {
 		return nil, err
 	}
@@ -122,8 +124,8 @@ func (s *Type3) Embed(w pdf.Putter) (pdf.Resource, error) {
 	if s.SingleUse {
 		data = dict
 	} else {
-		ref := w.Alloc()
-		err := w.Put(ref, dict)
+		ref := rm.Out.Alloc()
+		err := rm.Out.Put(ref, dict)
 		if err != nil {
 			return nil, err
 		}

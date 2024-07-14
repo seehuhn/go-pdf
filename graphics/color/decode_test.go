@@ -51,8 +51,9 @@ func TestDecodeSpace(t *testing.T) {
 	for i, space := range in {
 		t.Run(fmt.Sprintf("%d-%s", i, space.ColorSpaceFamily()), func(t *testing.T) {
 			r := pdf.NewData(pdf.V2_0)
+			rm := pdf.NewResourceManager(r)
 
-			embeddedSpace, err := space.Embed(r)
+			embeddedSpace, err := space.Embed(rm)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -40,7 +40,7 @@ const (
 
 // Space represents a PDF color space which can be embedded in a PDF file.
 type Space interface {
-	Embed(pdf.Putter) (pdf.Resource, error)
+	Embed(*pdf.ResourceManager) (pdf.Resource, error)
 	ColorSpaceFamily() pdf.Name
 	defaultValues() []float64
 }
@@ -68,6 +68,16 @@ func IsIndexed(s Space) bool {
 type Color interface {
 	ColorSpace() Space
 	values() []float64
+}
+
+// Pattern represents a PDF pattern dictionary.
+type Pattern interface {
+	// IsColored returns true if the pattern is colored.
+	// This is the case for colored tiling patterns and shading patterns.
+	IsColored() bool
+
+	// Embed embeds the pattern in the PDF file.
+	Embed(*pdf.ResourceManager) (pdf.Res, error)
 }
 
 // CheckVersion checks whether the given color space can be used in the given
@@ -113,23 +123,32 @@ func CheckCurrent(cur, new Color) (needsColorSpace bool, needsColor bool) {
 	}
 	newCS := new.ColorSpace()
 
+	var currentPattern Pattern
+	switch cur := cur.(type) {
+	case colorColoredPattern:
+		currentPattern = cur.Pat
+	case *colorUncoloredPattern:
+		currentPattern = cur.Pat
+	}
+
 	var currentValues []float64
 	if curCS != newCS {
 		needsColorSpace = true
+		currentPattern = nil
 		currentValues = newCS.defaultValues()
 	} else {
 		currentValues = cur.values()
 	}
 
-	switch newCS.(type) {
-	case SpaceDeviceGray, SpaceDeviceRGB, SpaceDeviceCMYK:
-		// We use the "k", "g", and "rg" operators without setting the
+	switch new := new.(type) {
+	case colorDeviceGray, colorDeviceRGB, colorDeviceCMYK:
+		// We use the "g", "rg" and "k" operators without setting the
 		// color space separately.
 		return false, !slices.Equal(currentValues, new.values())
-	case spacePatternColored, spacePatternUncolored:
-		// TODO(voss): do we need to worry about the default pattern (which
-		// draws nothing) here?
-		return needsColorSpace, cur != new
+	case colorColoredPattern:
+		return needsColorSpace, currentPattern != new.Pat
+	case *colorUncoloredPattern:
+		return needsColorSpace, currentPattern != new.Pat || !slices.Equal(currentValues, new.values())
 	default:
 		return needsColorSpace, !slices.Equal(currentValues, new.values())
 	}
@@ -139,7 +158,7 @@ func CheckCurrent(cur, new Color) (needsColorSpace bool, needsColor bool) {
 // name for the given color.  The operator name is for stroking operations. The
 // corresponding operator for filling operations is the operator name converted
 // to lower case.
-func Operator(c Color) ([]float64, pdf.Resource, string) {
+func Operator(c Color) ([]float64, Pattern, string) {
 	switch c := c.(type) {
 	case colorDeviceGray:
 		return c.values(), nil, "G"
@@ -151,67 +170,13 @@ func Operator(c Color) ([]float64, pdf.Resource, string) {
 		return c.values(), nil, "SC"
 	case colorIndexed:
 		return c.values(), nil, "SC"
-	case *PatternColored:
-		return nil, c.Res, "SCN"
-	case *colorPatternUncolored:
-		return c.values(), c.Res, "SCN"
+	case colorColoredPattern:
+		return nil, c.Pat, "SCN"
+	case *colorUncoloredPattern:
+		return c.values(), c.Pat, "SCN"
 	default:
 		panic(fmt.Sprintf("unknown color type %T", c))
 	}
-}
-
-func toPDF(x []float64) pdf.Array {
-	res := make(pdf.Array, len(x))
-	for i, xi := range x {
-		res[i] = pdf.Number(xi)
-	}
-	return res
-}
-
-func isConst(x []float64, value float64) bool {
-	for _, xi := range x {
-		if xi != value {
-			return false
-		}
-	}
-	return true
-}
-
-func isZero(x []float64) bool {
-	return isConst(x, 0)
-}
-
-func isPosVec3(x []float64) bool {
-	if len(x) != 3 {
-		return false
-	}
-	for _, v := range x {
-		if v < 0 {
-			return false
-		}
-	}
-	return true
-}
-
-func isEqual(x, y []float64) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	for i := range x {
-		if x[i] != y[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func isValues(x []float64, y ...float64) bool {
-	return isEqual(x, y)
-}
-
-func clone[T any](x *T) *T {
-	y := *x
-	return &y
 }
 
 var (

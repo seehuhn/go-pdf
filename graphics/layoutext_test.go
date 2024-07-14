@@ -45,7 +45,7 @@ func TestGlyphWidths(t *testing.T) {
 		t.Fatal("wrong number of glyphs")
 	}
 
-	rm := graphics.NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
 	out := graphics.NewWriter(buf, rm)
@@ -104,7 +104,7 @@ func TestGlyphWidths(t *testing.T) {
 // TestSpaceAdvance checks that kerning is not applied before a space.
 func TestSpaceAdvance(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
-	rm := graphics.NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	F, err := gofont.GoRegular.Embed(data, nil)
 	if err != nil {

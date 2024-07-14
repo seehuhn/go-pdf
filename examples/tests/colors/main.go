@@ -100,7 +100,7 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	cs, err := CalRGB.Embed(doc.Out)
+	cs, err := CalRGB.Embed(doc.RM)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	LabE, err := Lab.Embed(doc.Out)
+	LabE, err := Lab.Embed(doc.RM)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	csE, err := cs.Embed(doc.Out)
+	csE, err := cs.Embed(doc.RM)
 	if err != nil {
 		return err
 	}
@@ -348,7 +348,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 		YStep:      h,
 		Matrix:     matrix.Identity,
 	}
-	builder := pattern.NewTilingUncolored(doc.Out, doc.RM, prop)
+	builder := pattern.NewUncoloredBuilder(doc.RM, prop)
 
 	builder.Circle(0, 0, r)
 	builder.Circle(w, 0, r)
@@ -361,7 +361,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	if err != nil {
 		return err
 	}
-	col := pat.New(color.DeviceRGB.New(1, 0, 0))
+	col := color.NewUncoloredPattern(pat, color.DeviceRGB.New(1, 0, 0))
 
 	page := doc.AddPage()
 
@@ -399,7 +399,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 		YStep:      h,
 		Matrix:     matrix.Identity,
 	}
-	builder := pattern.NewTilingColored(doc.Out, doc.RM, prop)
+	builder := pattern.NewColoredBuilder(doc.RM, prop)
 
 	builder.SetFillColor(color.DeviceGray.New(0.5))
 	builder.Circle(0, 0, r)
@@ -411,10 +411,11 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	builder.Circle(w/2, h/2, r)
 	builder.Fill()
 
-	col, err := builder.Finish()
+	pat, err := builder.Finish()
 	if err != nil {
 		return err
 	}
+	col := color.NewColoredPattern(pat)
 
 	page := doc.AddPage()
 
@@ -460,10 +461,11 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 		SingleUse: true,
 	}
 
-	col, err := pattern.NewShadingPattern(doc.Out, shadingData, matrix.Identity, nil, true)
-	if err != nil {
-		return err
+	dict := &pattern.Type2{
+		Shading:   shadingData,
+		SingleUse: true,
 	}
+	col := color.NewColoredPattern(dict)
 
 	page := doc.AddPage()
 
@@ -479,7 +481,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	page.TextShow("A square filled with a shading pattern (color space ’Pattern’).")
 	page.TextEnd()
 
-	err = page.Close()
+	err := page.Close()
 	if err != nil {
 		return err
 	}

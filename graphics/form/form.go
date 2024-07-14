@@ -119,7 +119,7 @@ func toPDF(x []float64) pdf.Array {
 	return res
 }
 
-func New(w pdf.Putter, rm *graphics.ResourceManager, prop *FormProperties) *FormBuilder {
+func New(w pdf.Putter, rm *pdf.ResourceManager, prop *FormProperties) *FormBuilder {
 	contents := graphics.NewWriter(&bytes.Buffer{}, rm)
 	return &FormBuilder{
 		Out:            w,

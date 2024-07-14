@@ -44,7 +44,7 @@ func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *p
 func singlePage(w pdf.Putter, pageSize *pdf.Rectangle) (*Page, error) {
 	tree := pagetree.NewWriter(w)
 
-	rm := graphics.NewResourceManager(w)
+	rm := pdf.NewResourceManager(w)
 	page := graphics.NewWriter(&bytes.Buffer{}, rm)
 
 	pageDict := pdf.Dict{
@@ -71,7 +71,7 @@ func closePage(p *Page) error {
 	}
 	p.Out.GetMeta().Catalog.Pages = ref
 
-	err = p.Writer.ResourceManager.Close()
+	err = p.Writer.RM.Close()
 	if err != nil {
 		return err
 	}

@@ -37,8 +37,8 @@ type Writer struct {
 	State
 	stack []State
 
-	ResourceManager *ResourceManager
-	resName         map[catRes]pdf.Name
+	RM      *pdf.ResourceManager
+	resName map[catRes]pdf.Name
 
 	nesting       []pairType
 	markedContent []*MarkedContent
@@ -77,8 +77,8 @@ const (
 )
 
 // NewWriter allocates a new Writer object.
-func NewWriter(w io.Writer, rm *ResourceManager) *Writer {
-	v := pdf.GetVersion(rm.w)
+func NewWriter(w io.Writer, rm *pdf.ResourceManager) *Writer {
+	v := pdf.GetVersion(rm.Out)
 	return &Writer{
 		Version:       v,
 		Content:       w,
@@ -87,8 +87,8 @@ func NewWriter(w io.Writer, rm *ResourceManager) *Writer {
 
 		State: NewState(),
 
-		ResourceManager: rm,
-		resName:         make(map[catRes]pdf.Name),
+		RM:      rm,
+		resName: make(map[catRes]pdf.Name),
 
 		glyphBuf: &font.GlyphSeq{},
 	}
@@ -98,10 +98,10 @@ func NewWriter(w io.Writer, rm *ResourceManager) *Writer {
 // within the content stream.  If needed, the resource is embedded in the PDF
 // file and/or added to the resource dictionary.
 //
-// Once Go supports methods with type parameters, this function will be turned
-// into a method on Writer.
-func writerGetResourceName[T pdf.Resource](w *Writer, resource Embedder[T], category resourceCategory) (pdf.Name, error) {
-	embedded, err := ResourceManagerEmbed(w.ResourceManager, resource)
+// Once Go supports methods with type parameters, this function can be turned
+// into a method on [Writer].
+func writerGetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], category resourceCategory) (pdf.Name, error) {
+	embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
 	if err != nil {
 		return "", err
 	}

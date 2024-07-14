@@ -14,12 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package shading
+package pattern
 
-import "seehuhn.de/go/pdf/graphics"
+import "seehuhn.de/go/pdf"
 
-var (
-	_ graphics.Shading = (*Type1)(nil)
-	_ graphics.Shading = (*Type3)(nil)
-	_ graphics.Shading = (*Type4)(nil)
-)
+func toPDF(x []float64) pdf.Array {
+	res := make(pdf.Array, len(x))
+	for i, xi := range x {
+		res[i] = pdf.Number(xi)
+	}
+	return res
+}

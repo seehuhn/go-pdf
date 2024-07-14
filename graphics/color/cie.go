@@ -81,7 +81,7 @@ func (s *SpaceCalGray) defaultValues() []float64 {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceCalGray) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s *SpaceCalGray) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(s.whitePoint)
 	if !isZero(s.blackPoint) {
@@ -176,7 +176,7 @@ func (s *SpaceCalRGB) New(r, g, b float64) Color {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceCalRGB) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s *SpaceCalRGB) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(s.whitePoint)
 	if !isZero(s.blackPoint) {
@@ -285,7 +285,7 @@ func (s *SpaceLab) ColorSpaceFamily() pdf.Name {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceLab) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s *SpaceLab) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(s.whitePoint)
 	if !isZero(s.blackPoint) {
@@ -334,6 +334,7 @@ func (c colorLab) values() []float64 {
 
 // == ICCBased ===============================================================
 
+// SpaceICCBased represents an ICC-based color space.
 type SpaceICCBased struct {
 	n        int
 	ranges   []float64
@@ -341,6 +342,7 @@ type SpaceICCBased struct {
 	profile  []byte
 }
 
+// ICCBased returns a new ICC-based color space.
 func ICCBased(n int, profile []byte, ranges []float64, metadata *pdf.Stream) (*SpaceICCBased, error) {
 	if n != 1 && n != 3 && n != 4 {
 		return nil, fmt.Errorf("ICCBased: invalid number of components %d", n)
@@ -379,7 +381,7 @@ func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceICCBased) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s *SpaceICCBased) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
 	panic("not implemented") // TODO: Implement
 }
 

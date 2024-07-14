@@ -20,31 +20,12 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// TilingPatternUncolored represents an uncolored PDF tiling pattern.
-//
-// Res.Data must be a PDF stream defining a pattern with PatternType 1 (tiling
-// pattern) and PaintType 2 (uncolored).  The function
-// [seehuhn.de/go/pdf/graphics/pattern.NewTilingUncolored] can be used to
-// create a new tiling pattern.
-type TilingPatternUncolored struct {
-	pdf.Res
-}
-
-// New returns a Color which paints the given tiling pattern in the given
-// color.
-func (p *TilingPatternUncolored) New(col Color) Color {
-	return &colorPatternUncolored{
-		Res: p.Res,
-		col: col,
-	}
-}
-
 // == colored patterns and shadings ==========================================
 
 // spacePatternColored is used for colored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
-func (s spacePatternColored) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s spacePatternColored) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
 	return s, nil
 }
 
@@ -55,7 +36,7 @@ func (s spacePatternColored) PDFObject() pdf.Object {
 
 // ColorSpaceFamily implements the [Space] interface.
 func (s spacePatternColored) ColorSpaceFamily() pdf.Name {
-	return "Pattern"
+	return FamilyPattern
 }
 
 // defaultValues implements the [Space] interface.
@@ -63,28 +44,24 @@ func (s spacePatternColored) defaultValues() []float64 {
 	return nil
 }
 
-// PatternColored represents a colored tiling pattern or a shading pattern.
-//
-// In case of a colored tiling pattern, `Res.Data“ must be a PDF stream
-// defining a pattern with PatternType 1 (tiling pattern) and PaintType 1
-// (colored).  Use [seehuhn.de/go/pdf/graphics/pattern.NewTilingColored] to
-// create this type of pattern.
-//
-// In case of a shading pattern, `Res.Data“ must be a PDF pattern dictionary
-// with PatternType 2 (shading pattern). Use
-// [seehuhn.de/go/pdf/graphics/pattern.NewShadingPattern] to create this type
-// of pattern.
-type PatternColored struct {
-	// TODO(voss): do we need to distinguish between free and embedded patterns?
-	pdf.Res
+// NewColoredPattern returns a new colored pattern as a PDF color.
+// This can be used with colored tiling patterns and with shading patterns.
+func NewColoredPattern(p Pattern) Color {
+	if !p.IsColored() {
+		panic("pattern is not colored")
+	}
+	return colorColoredPattern{Pat: p}
 }
 
-// ColorSpace implements the [Color] interface.
-func (c PatternColored) ColorSpace() Space {
+type colorColoredPattern struct {
+	Pat Pattern
+}
+
+func (colorColoredPattern) ColorSpace() Space {
 	return spacePatternColored{}
 }
 
-func (c PatternColored) values() []float64 {
+func (c colorColoredPattern) values() []float64 {
 	return nil
 }
 
@@ -96,27 +73,27 @@ type spacePatternUncolored struct {
 
 // ColorSpaceFamily implements the [Space] interface.
 func (s spacePatternUncolored) ColorSpaceFamily() pdf.Name {
-	return "Pattern"
+	return FamilyPattern
 }
 
 // defaultValues implements the [Space] interface.
 func (s spacePatternUncolored) defaultValues() []float64 {
-	return nil
+	return s.base.defaultValues()
 }
 
-func (s spacePatternUncolored) Embed(w pdf.Putter) (pdf.Resource, error) {
-	// TODO(voss): somehow route this through the graphics.ResourceManager???
-	e, err := s.base.Embed(w)
+func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	base, err := pdf.ResourceManagerEmbed(rm, s.base)
 	if err != nil {
 		return nil, err
 	}
-	return spacePatternUncoloredEmbedded{base: e}, nil
+	return spacePatternUncoloredEmbedded{base: base}, nil
 }
 
 type spacePatternUncoloredEmbedded struct {
 	base pdf.Resource
 }
 
+// PDFObject implements the [Resource] interface.
 func (s spacePatternUncoloredEmbedded) PDFObject() pdf.Object {
 	return pdf.Array{
 		pdf.Name("Pattern"),
@@ -124,17 +101,23 @@ func (s spacePatternUncoloredEmbedded) PDFObject() pdf.Object {
 	}
 }
 
-type colorPatternUncolored struct {
-	pdf.Res
-	col Color
+// NewUncoloredPattern returns a new uncolored pattern as a PDF color.
+func NewUncoloredPattern(p Pattern, col Color) Color {
+	if p.IsColored() {
+		panic("pattern is colored")
+	}
+	return &colorUncoloredPattern{Pat: p, Col: col}
 }
 
-// ColorSpace implements the [Color] interface.
-func (c colorPatternUncolored) ColorSpace() Space {
-	return spacePatternUncolored{base: c.col.ColorSpace()}
+type colorUncoloredPattern struct {
+	Pat Pattern
+	Col Color
 }
 
-// values implements the [Color] interface.
-func (c colorPatternUncolored) values() []float64 {
-	return c.col.values()
+func (c *colorUncoloredPattern) ColorSpace() Space {
+	return spacePatternUncolored{base: c.Col.ColorSpace()}
+}
+
+func (c *colorUncoloredPattern) values() []float64 {
+	return c.Col.values()
 }

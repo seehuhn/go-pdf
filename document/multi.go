@@ -29,7 +29,7 @@ import (
 
 type MultiPage struct {
 	Out  pdf.Putter
-	RM   *graphics.ResourceManager
+	RM   *pdf.ResourceManager
 	Tree *pagetree.Writer
 
 	mediaBox *pdf.Rectangle
@@ -58,7 +58,7 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pd
 		return nil, err
 	}
 
-	rm := graphics.NewResourceManager(out)
+	rm := pdf.NewResourceManager(out)
 
 	tree := pagetree.NewWriter(out)
 

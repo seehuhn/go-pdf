@@ -14,50 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pattern
+package shading
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/matrix"
-	"seehuhn.de/go/pdf/graphics/shading"
 )
-
-// NewShadingPattern creates a new shading pattern.
-func NewShadingPattern(w pdf.Putter, shading shading.Shading, M matrix.Matrix, extGState *graphics.ExtGState, singleUse bool) (color.Color, error) {
-	sh, err := shading.Embed(w)
-	if err != nil {
-		return nil, err
-	}
-	dict := pdf.Dict{
-		"PatternType": pdf.Integer(2),
-		"Shading":     sh.PDFObject(),
-	}
-	if M != matrix.Identity && M != matrix.Zero {
-		dict["Matrix"] = toPDF(M[:])
-	}
-	if extGState != nil {
-		dict["ExtGState"] = extGState.PDFObject()
-	}
-
-	var data pdf.Object = dict
-	if singleUse {
-		ref := w.Alloc()
-		err := w.Put(ref, dict)
-		if err != nil {
-			return nil, err
-		}
-		data = ref
-	}
-
-	pat := &color.PatternColored{
-		Res: pdf.Res{
-			Data: data,
-		},
-	}
-	return pat, nil
-}
 
 func toPDF(x []float64) pdf.Array {
 	res := make(pdf.Array, len(x))
@@ -65,4 +26,20 @@ func toPDF(x []float64) pdf.Array {
 		res[i] = pdf.Number(xi)
 	}
 	return res
+}
+
+func isEqual(x, y []float64) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	for i := range x {
+		if x[i] != y[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func isValues(x []float64, y ...float64) bool {
+	return isEqual(x, y)
 }

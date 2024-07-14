@@ -26,6 +26,8 @@ import (
 )
 
 // Type1 represents a type 1 (function-based) shading.
+//
+// This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type1 struct {
 	ColorSpace color.Space
 
@@ -50,7 +52,7 @@ func (s *Type1) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type1) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
 	} else if color.IsPattern(s.ColorSpace) {
@@ -84,7 +86,7 @@ func (s *Type1) Embed(w pdf.Putter) (pdf.Resource, error) {
 		return nil, errors.New("invalid Matrix")
 	}
 
-	csE, err := s.ColorSpace.Embed(w)
+	csE, err := s.ColorSpace.Embed(rm)
 	if err != nil {
 		return nil, err
 	}
@@ -114,8 +116,8 @@ func (s *Type1) Embed(w pdf.Putter) (pdf.Resource, error) {
 	if s.SingleUse {
 		data = dict
 	} else {
-		ref := w.Alloc()
-		err := w.Put(ref, dict)
+		ref := rm.Out.Alloc()
+		err := rm.Out.Put(ref, dict)
 		if err != nil {
 			return nil, err
 		}

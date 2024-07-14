@@ -22,6 +22,16 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Shading represents a PDF shading dictionary.
+//
+// Shadings can either be drawn to the page using the
+// [seehuhn.de/go/pdf/graphics.Writer.DrawShading] method, or can be used as
+// the basis of a shading pattern.
+type Shading interface {
+	Embed(*pdf.ResourceManager) (pdf.Resource, error)
+	ShadingType() int
+}
+
 // XObject represents a PDF XObject.
 type XObject struct {
 	pdf.Res

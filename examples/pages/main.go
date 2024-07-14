@@ -32,7 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rm := graphics.NewResourceManager(out)
+	rm := pdf.NewResourceManager(out)
 
 	font, err := type1.Helvetica.Embed(out, nil)
 	if err != nil {

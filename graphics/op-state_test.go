@@ -31,7 +31,7 @@ func TestPushPop(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
-			rm := NewResourceManager(data)
+			rm := pdf.NewResourceManager(data)
 
 			buf := &bytes.Buffer{}
 			w := NewWriter(buf, rm)
@@ -58,7 +58,7 @@ func TestPushPop(t *testing.T) {
 
 func TestPushPopErr1(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
-	rm := NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf, rm)
@@ -74,7 +74,7 @@ func TestPushPopErr1(t *testing.T) {
 
 func TestPushPopErr2(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
-	rm := NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf, rm)
@@ -93,7 +93,7 @@ func TestPushPopInText(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
-			rm := NewResourceManager(data)
+			rm := pdf.NewResourceManager(data)
 
 			buf := &bytes.Buffer{}
 			w := NewWriter(buf, rm)
@@ -118,7 +118,7 @@ func TestPushPopInText(t *testing.T) {
 
 func TestWriterCTM(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
-	rm := NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf, rm)

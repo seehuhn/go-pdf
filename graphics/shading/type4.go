@@ -27,13 +27,21 @@ import (
 )
 
 // Type4 represents a type 4 (free-form Gouraud-shaded triangle mesh) shading.
+//
+// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=189
+//
+// This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type4 struct {
 	ColorSpace        color.Space
 	BitsPerCoordinate int
 	BitsPerComponent  int
 	BitsPerFlag       int
-	Decode            []float64
-	Vertices          []Type4Vertex
+
+	// An array of numbers specifying how to map vertex coordinates and color
+	// components into the appropriate ranges of values.
+	Decode []float64
+
+	Vertices []Type4Vertex
 
 	F          function.Func
 	Background []float64
@@ -54,7 +62,7 @@ func (s *Type4) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type4) Embed(w pdf.Putter) (pdf.Resource, error) {
+func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
 	} else if color.IsPattern(s.ColorSpace) {
@@ -113,7 +121,7 @@ func (s *Type4) Embed(w pdf.Putter) (pdf.Resource, error) {
 		return nil, errors.New("Function not allowed for indexed color space")
 	}
 
-	csE, err := s.ColorSpace.Embed(w)
+	csE, err := s.ColorSpace.Embed(rm)
 	if err != nil {
 		return nil, err
 	}
@@ -142,8 +150,8 @@ func (s *Type4) Embed(w pdf.Putter) (pdf.Resource, error) {
 	vertexBits := s.BitsPerFlag + 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
 	vertexBytes := (vertexBits + 7) / 8
 
-	ref := w.Alloc()
-	stm, err := w.OpenStream(ref, dict)
+	ref := rm.Out.Alloc()
+	stm, err := rm.Out.OpenStream(ref, dict)
 	if err != nil {
 		return nil, err
 	}

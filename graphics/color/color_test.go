@@ -41,8 +41,8 @@ var (
 	_ Color = colorCalRGB{}
 	_ Color = colorLab{}
 	// TODO(voss): ICCBased
-	_ Color = PatternColored{}
-	_ Color = colorPatternUncolored{}
+	_ Color = colorColoredPattern{}
+	_ Color = (*colorUncoloredPattern)(nil)
 	_ Color = colorIndexed{}
 	// TODO(voss): Separation colour spaces
 	// TODO(voss): DeviceN colour spaces

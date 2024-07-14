@@ -14,21 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package shading provides functionality for creating and manipulating PDF shading objects.
+// Package shading provides functionality for creating PDF shading objects.
 // Shading objects define smooth color transitions and gradients in PDF documents.
-// From the shading, PDF viewers can compute the color of each output
+// For a given shading, PDF viewers can compute the color of each output
 // pixel at device resolution.
 //
 // This package supports multiple types of PDF shadings:
 //   - Type1: Function-based shadings
 //   - Type3: Radial shadings
 //   - Type4: Free-form Gouraud-shaded triangle meshes
-//
-// Each shading type is represented by a corresponding struct (Type1, Type3, Type4)
-// that implements the Shading interface. This interface provides an Embed method
-// for incorporating the shading into a PDF document.
-//
-// Shadings can be used to create complex color effects, gradients, and smooth
-// transitions in PDF graphics. They are typically used in conjunction with the
-// graphics package to create shading patterns or to directly paint areas.
 package shading

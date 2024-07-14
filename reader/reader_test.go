@@ -34,7 +34,7 @@ import (
 
 func TestParameters(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
-	rm := graphics.NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
 	w := graphics.NewWriter(buf, rm)

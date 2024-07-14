@@ -30,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
@@ -57,7 +56,7 @@ type Font struct {
 	ForceBold    bool
 
 	Resources *pdf.Resources
-	RM        *graphics.ResourceManager
+	RM        *pdf.ResourceManager
 
 	NumOpen int // -1 if the font is embedded, otherwise the number of glyphs not yet closed
 }
@@ -82,7 +81,7 @@ func New(unitsPerEm uint16) *Font {
 
 	// TODO(voss): We need to use the caller's ResourceManager here.
 	data := pdf.NewData(pdf.V1_7)
-	rm := graphics.NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	res := &Font{
 		FontMatrix: m,

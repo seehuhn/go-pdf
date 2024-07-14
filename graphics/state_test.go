@@ -43,7 +43,7 @@ func TestStateApplyToError(t *testing.T) {
 	}
 
 	data := pdf.NewData(pdf.V2_0)
-	rm := NewResourceManager(data)
+	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
 	for _, bad := range forbidden {

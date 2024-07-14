@@ -72,7 +72,7 @@ func main() {
 	}
 
 	tree := pagetree.NewWriter(out)
-	rm := graphics.NewResourceManager(out)
+	rm := pdf.NewResourceManager(out)
 
 	for _, fname := range fileNames {
 		cffData, err := loadCFFData(fname)
@@ -163,7 +163,7 @@ type illustrator struct {
 	labelFont font.Embedded
 	pageTree  *pagetree.Writer
 	pageSize  *pdf.Rectangle
-	rm        *graphics.ResourceManager
+	rm        *pdf.ResourceManager
 }
 
 func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
