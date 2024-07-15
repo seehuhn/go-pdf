@@ -611,7 +611,7 @@ func IsDirect(obj Object) bool {
 	case Boolean, Integer, Real, Number, Name, String, nil:
 		return true
 	case Reference:
-		return x != 0
+		return x == 0
 	case Array:
 		for _, elem := range x {
 			if !IsDirect(elem) {

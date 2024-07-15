@@ -27,7 +27,7 @@ import (
 
 // Writer writes a PDF content stream.
 type Writer struct {
-	Version   pdf.Version
+	Version   pdf.Version // TODO(voss): remove
 	Content   io.Writer
 	Resources *pdf.Resources
 	Err       error

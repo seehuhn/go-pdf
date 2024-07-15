@@ -25,21 +25,29 @@ import (
 
 // MarkedContent represents a marked-content point or sequence.
 type MarkedContent struct {
-	// Properties is a property list.  The value can either be nil, or a
-	// [pdf.Dict], or a [pdf.Resource] representing a [pdf.Dict].
-	Properties pdf.Dict
-
 	// Tag specifies the role or significance of the sequence.
 	Tag pdf.Name
 
-	Inline bool
+	// Properties is a property list.
+	Properties pdf.Dict
 
-	DefName pdf.Name
+	Inline    bool
+	SingleUse bool
 }
 
-// PDFObject implements the [pdf.Resource] interface.
-func (mc *MarkedContent) PDFObject() pdf.Object {
-	return mc.Properties
+// Embed adds the MarkedContent properties dict to a PDF file.
+// This implements the [pdf.Embedder] interface.
+func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if mc.SingleUse {
+		return pdf.Res{Data: mc.Properties}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err := rm.Out.Put(ref, mc.Properties)
+	if err != nil {
+		return nil, err
+	}
+	return ref, nil
 }
 
 // MarkedContentPoint adds a marked-content point to the content stream.
@@ -53,35 +61,23 @@ func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
 	if !w.isValid("MarkedContentPoint", objPage|objText) {
 		return
 	}
-	if w.Version < pdf.V1_2 {
-		w.Err = &pdf.VersionError{
-			Operation: "marked content",
-			Earliest:  pdf.V1_2,
-		}
+	if err := pdf.CheckVersion(w.RM.Out, "marked content", pdf.V1_2); err != nil {
+		w.Err = err
+		return
+	}
+
+	err := mc.Tag.PDF(w.Content)
+	if err != nil {
+		w.Err = err
 		return
 	}
 
 	if mc.Properties == nil {
-		w.Err = mc.Tag.PDF(w.Content)
-		if w.Err == nil {
-			_, w.Err = fmt.Fprintln(w.Content, "MP")
-		}
+		_, w.Err = fmt.Fprintln(w.Content, " MP")
 		return
 	}
 
-	var prop pdf.Object = mc.Properties
-	if mc.Inline {
-		w.Err = checkNoReferences(prop)
-		if w.Err != nil {
-			return
-		}
-	} else {
-		prop = w.getResourceNameOld(catProperties, mc)
-	}
-	w.Err = prop.PDF(w.Content)
-	if w.Err == nil {
-		_, w.Err = fmt.Fprintln(w.Content, " DP")
-	}
+	w.writeProperties(mc, "DP")
 }
 
 // MarkedContentStart begins a marked-content sequence.  The sequence is
@@ -92,38 +88,57 @@ func (w *Writer) MarkedContentStart(mc *MarkedContent) {
 	if !w.isValid("MarkedContentStart", objPage|objText) {
 		return
 	}
-	if w.Version < pdf.V1_2 {
-		w.Err = &pdf.VersionError{
-			Operation: "marked content",
-			Earliest:  pdf.V1_2,
-		}
+	if err := pdf.CheckVersion(w.RM.Out, "marked content", pdf.V1_2); err != nil {
+		w.Err = err
 		return
 	}
 
 	w.nesting = append(w.nesting, pairTypeBMC)
 	w.markedContent = append(w.markedContent, mc)
 
-	if mc.Properties == nil {
-		w.Err = mc.Tag.PDF(w.Content)
-		if w.Err == nil {
-			_, w.Err = fmt.Fprintln(w.Content, "BMC")
-		}
+	err := mc.Tag.PDF(w.Content)
+	if err != nil {
+		w.Err = err
 		return
 	}
 
-	var prop pdf.Object = mc.Properties
+	if mc.Properties == nil {
+		_, w.Err = fmt.Fprintln(w.Content, " BMC")
+		return
+	}
+
+	w.writeProperties(mc, "BDC")
+}
+
+func (w *Writer) writeProperties(mc *MarkedContent, op string) {
+	var prop pdf.Object
+
 	if mc.Inline {
-		w.Err = checkNoReferences(prop)
-		if w.Err != nil {
+		if !pdf.IsDirect(mc.Properties) {
+			w.Err = ErrNotDirect
 			return
 		}
+		prop = mc.Properties
 	} else {
-		prop = w.getResourceNameOld(catProperties, mc)
+		propList, err := pdf.ResourceManagerEmbed(w.RM, mc)
+		if err != nil {
+			w.Err = err
+			return
+		}
+		prop = propList.PDFObject()
 	}
-	w.Err = prop.PDF(w.Content)
-	if w.Err == nil {
-		_, w.Err = fmt.Fprintln(w.Content, " BDC")
+
+	_, err := w.Content.Write([]byte(" "))
+	if err != nil {
+		w.Err = err
+		return
 	}
+	err = prop.PDF(w.Content)
+	if err != nil {
+		w.Err = err
+		return
+	}
+	_, w.Err = fmt.Fprintln(w.Content, " "+op)
 }
 
 // MarkedContentEnd ends a marked-content sequence.
@@ -133,27 +148,11 @@ func (w *Writer) MarkedContentEnd() {
 		w.Err = errors.New("MarkedContentEnd: no matching MarkedContentStart")
 		return
 	}
+
 	w.nesting = w.nesting[:len(w.nesting)-1]
 	w.markedContent = w.markedContent[:len(w.markedContent)-1]
 
+	_, w.Err = fmt.Fprintln(w.Content, "EMC")
 }
 
-func checkNoReferences(obj pdf.Object) error {
-	switch obj := obj.(type) {
-	case pdf.Reference:
-		return errors.New("properties cannot be inlined")
-	case pdf.Dict:
-		for _, v := range obj {
-			if err := checkNoReferences(v); err != nil {
-				return err
-			}
-		}
-	case pdf.Array:
-		for _, v := range obj {
-			if err := checkNoReferences(v); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
+var ErrNotDirect = errors.New("MarkedContent: indirect object in inline property list")
