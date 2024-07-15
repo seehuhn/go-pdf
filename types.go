@@ -30,6 +30,7 @@ import (
 // Object represents an object in a PDF file.  There are nine basic types of
 // PDF objects, which implement this interface: [Array], [Boolean], [Dict],
 // [Integer], [Name], [Real], [Reference], [*Stream], and [String].
+// The PDF "null" object is represented by the Go value `nil`.
 // Custom types can be constructed out of these basic types, by implementing
 // the Object interface.
 type Object interface {
@@ -545,6 +546,8 @@ func NewReference(number uint32, generation uint16) Reference {
 
 // NewInternalReference creates a new reference object which is guaranteed
 // not to clash with an existing reference in the PDF file.
+//
+// TODO(voss): can we get rid of this?
 func NewInternalReference(number uint32) Reference {
 	return Reference(uint64(number) | internalReferenceFlag)
 }
@@ -564,6 +567,12 @@ func (x Reference) Generation() uint16 {
 // IsInternal returns true if the reference is an internal reference.
 func (x Reference) IsInternal() bool {
 	return x>>48 != 0
+}
+
+// PDFObject returns the reference as a generic PDF object.
+// This implements the [Resource] interface.
+func (x Reference) PDFObject() Object {
+	return x
 }
 
 func (x Reference) String() string {
@@ -589,6 +598,41 @@ func (x Reference) PDF(w io.Writer) error {
 
 	_, err := fmt.Fprintf(w, "%d %d R", x.Number(), x.Generation())
 	return err
+}
+
+// IsDirect returns true if the object foes not contain any references to
+// indirect objects.
+//
+// If the object contains custom implementations of the [Object] interface, the
+// `IsDirect` method of these objects is called recursively.  If no `IsDirect`
+// method is present, the function panics.
+func IsDirect(obj Object) bool {
+	switch x := obj.(type) {
+	case Boolean, Integer, Real, Number, Name, String, nil:
+		return true
+	case Reference:
+		return x != 0
+	case Array:
+		for _, elem := range x {
+			if !IsDirect(elem) {
+				return false
+			}
+		}
+		return true
+	case Dict:
+		for _, elem := range x {
+			if !IsDirect(elem) {
+				return false
+			}
+		}
+		return true
+	case *Stream:
+		return false
+	case interface{ IsDirect() bool }:
+		return x.IsDirect()
+	default:
+		panic(fmt.Sprintf("IsDirect: unknown type %T", obj))
+	}
 }
 
 // A Placeholder is a space reserved in a PDF file that can later be filled

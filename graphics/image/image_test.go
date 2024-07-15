@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,18 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package image
 
-import (
-	"seehuhn.de/go/pdf"
+import "seehuhn.de/go/pdf/graphics"
+
+var (
+	_ graphics.XObject = Image(nil)
 )
-
-// Shading represents a PDF shading dictionary.
-//
-// Shadings can either be drawn to the page using the
-// [seehuhn.de/go/pdf/graphics.Writer.DrawShading] method, or can be used as
-// the basis of a shading pattern.
-type Shading interface {
-	Embed(*pdf.ResourceManager) (pdf.Resource, error)
-	ShadingType() int
-}

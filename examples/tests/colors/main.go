@@ -17,6 +17,7 @@
 package main
 
 import (
+	goimage "image"
 	"log"
 	"math"
 
@@ -24,8 +25,8 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/graphics/pattern"
 	"seehuhn.de/go/pdf/graphics/shading"
@@ -100,42 +101,20 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	cs, err := CalRGB.Embed(doc.RM)
-	if err != nil {
-		return err
-	}
-
-	ref := page.Out.Alloc()
-	dict := pdf.Dict{
-		"Type":             pdf.Name("XObject"),
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(256),
-		"Height":           pdf.Integer(256),
-		"ColorSpace":       cs.PDFObject(),
-		"BitsPerComponent": pdf.Integer(8),
-	}
-	compress := pdf.FilterFlate{
-		"Predictor": pdf.Integer(12),
-		"Colors":    pdf.Integer(3),
-		"Columns":   pdf.Integer(256),
-	}
-	stm, err := page.Out.OpenStream(ref, dict, compress)
-	if err != nil {
-		return err
-	}
+	imgData := goimage.NewNRGBA(goimage.Rect(0, 0, 256, 256))
 	for i := 0; i < 256; i++ {
 		for j := 0; j < 256; j++ {
-			_, err := stm.Write([]byte{128, byte(j), byte(i)})
-			if err != nil {
-				return err
-			}
+			idx := i*imgData.Stride + j*4
+			imgData.Pix[idx+0] = 128
+			imgData.Pix[idx+1] = uint8(j)
+			imgData.Pix[idx+2] = uint8(i)
+			imgData.Pix[idx+3] = 255
 		}
 	}
-	err = stm.Close()
-	if err != nil {
-		return err
+	img := &image.PNG{
+		Data:       imgData,
+		ColorSpace: CalRGB,
 	}
-	img := &graphics.XObject{Res: pdf.Res{Data: ref}}
 
 	page.PushGraphicsState()
 	M := matrix.Scale(500, -500)
@@ -171,42 +150,20 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	LabE, err := Lab.Embed(doc.RM)
-	if err != nil {
-		return err
-	}
-
-	ref := doc.Out.Alloc()
-	dict := pdf.Dict{
-		"Type":             pdf.Name("XObject"),
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(256),
-		"Height":           pdf.Integer(256),
-		"ColorSpace":       LabE.PDFObject(),
-		"BitsPerComponent": pdf.Integer(8),
-	}
-	compress := pdf.FilterFlate{
-		"Predictor": pdf.Integer(12),
-		"Colors":    pdf.Integer(3),
-		"Columns":   pdf.Integer(256),
-	}
-	stm, err := doc.Out.OpenStream(ref, dict, compress)
-	if err != nil {
-		return err
-	}
+	imgData := goimage.NewNRGBA(goimage.Rect(0, 0, 256, 256))
 	for i := 0; i < 256; i++ {
 		for j := 0; j < 256; j++ {
-			_, err := stm.Write([]byte{128, byte(j), byte(i)})
-			if err != nil {
-				return err
-			}
+			idx := i*imgData.Stride + j*4
+			imgData.Pix[idx+0] = 128
+			imgData.Pix[idx+1] = uint8(j)
+			imgData.Pix[idx+2] = uint8(i)
+			imgData.Pix[idx+3] = 255
 		}
 	}
-	err = stm.Close()
-	if err != nil {
-		return err
+	img := &image.PNG{
+		Data:       imgData,
+		ColorSpace: Lab,
 	}
-	img := &graphics.XObject{Res: pdf.Res{Data: ref}}
 
 	page := doc.AddPage()
 
@@ -265,40 +222,10 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 
-	csE, err := cs.Embed(doc.RM)
-	if err != nil {
-		return err
-	}
-
-	ref := doc.Out.Alloc()
-	dict := pdf.Dict{
-		"Type":             pdf.Name("XObject"),
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(numColors),
-		"Height":           pdf.Integer(1),
-		"ColorSpace":       csE.PDFObject(),
-		"BitsPerComponent": pdf.Integer(8),
-	}
-	compress := pdf.FilterFlate{
-		"Predictor": pdf.Integer(12),
-		"Colors":    pdf.Integer(1),
-		"Columns":   pdf.Integer(numColors),
-	}
-	stm, err := doc.Out.OpenStream(ref, dict, compress)
-	if err != nil {
-		return err
-	}
+	img := image.NewIndexed(numColors, 1, cs)
 	for i := 0; i < numColors; i++ {
-		_, err := stm.Write([]byte{byte(i)})
-		if err != nil {
-			return err
-		}
+		img.Pix[i] = uint8(i)
 	}
-	err = stm.Close()
-	if err != nil {
-		return err
-	}
-	img := &graphics.XObject{Res: pdf.Res{Data: ref}}
 
 	page := doc.AddPage()
 
@@ -374,7 +301,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	page.TextSetFont(F, 12)
 	page.TextBegin()
 	page.TextFirstLine(50, 230)
-	page.TextShow("A square filled with an uncolored tiling pattern (color space ’Pattern’).")
+	page.TextShow("A square filled with an uncolored tiling pattern (color space ‘Pattern’).")
 	page.TextEnd()
 
 	err = page.Close()

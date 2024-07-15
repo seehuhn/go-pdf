@@ -57,13 +57,6 @@ func IsPattern(s Space) bool {
 	return s.ColorSpaceFamily() == FamilyPattern
 }
 
-// IsIndexed returns whether the given color space is an indexed color space.
-//
-// TODO(voss): remove
-func IsIndexed(s Space) bool {
-	return s.ColorSpaceFamily() == FamilyIndexed
-}
-
 // Color represents a PDF color.
 type Color interface {
 	ColorSpace() Space

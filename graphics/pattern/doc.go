@@ -27,5 +27,5 @@
 //   - Shading patterns (PatternType 2)
 //     These patterns are non-repeating,
 //     the color is specified by a shading object.
-//     Use [Type2] structures for pattern objects of this type.
+//     Use [Type2] structs for pattern objects of this type.
 package pattern

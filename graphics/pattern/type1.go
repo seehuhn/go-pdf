@@ -56,7 +56,7 @@ func NewUncoloredBuilder(rm *pdf.ResourceManager, prop *TilingProperties) *Type1
 
 // A Type1Builder is used to construct a tiling pattern.
 //
-// Use methods of the embedded graphics.Writer to draw the pattern cell.
+// Use methods of the embedded [graphics.Writer] to draw the pattern cell.
 type Type1Builder struct {
 	*graphics.Writer
 	*TilingProperties

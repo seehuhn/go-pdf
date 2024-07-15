@@ -29,7 +29,7 @@ type MarkedContent struct {
 	// [pdf.Dict], or a [pdf.Resource] representing a [pdf.Dict].
 	Properties pdf.Dict
 
-	// Tag specifies the role or significance of the sequence. The
+	// Tag specifies the role or significance of the sequence.
 	Tag pdf.Name
 
 	Inline bool

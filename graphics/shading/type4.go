@@ -117,7 +117,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 				i, numValues, have)
 		}
 	}
-	if s.F != nil && color.IsIndexed(s.ColorSpace) {
+	if s.F != nil && s.ColorSpace.ColorSpaceFamily() == color.FamilyIndexed {
 		return nil, errors.New("Function not allowed for indexed color space")
 	}
 

@@ -43,13 +43,10 @@ func run(fname string) error {
 		return err
 	}
 
-	raw := mandelbrot()
-	img, err := pdfimage.EmbedPNG(page.Out, raw)
-	if err != nil {
-		return err
-	}
+	imageData := mandelbrot()
+	img := &pdfimage.PNG{Data: imageData}
 
-	b := raw.Bounds()
+	b := imageData.Bounds()
 	q := float64(b.Dx()) / float64(b.Dy())
 	width := 0.75 * (paper.URx - paper.LLx)
 	height := width / q
