@@ -93,7 +93,7 @@ func ResourceManagerEmbed[T Resource](rm *ResourceManager, r Embedder[T]) (T, er
 	return er, nil
 }
 
-// Close closes all embedded resources which are also io.Closers.
+// Close closes all embedded resources which implement [io.Closer].
 //
 // After Close has been called, no more resources can be embedded.
 func (rm *ResourceManager) Close() error {

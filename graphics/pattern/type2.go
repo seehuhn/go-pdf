@@ -35,7 +35,7 @@ type Type2 struct {
 }
 
 // IsColored returns true.
-// This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
+// This implements the [graphics.Pattern] interface.
 func (p *Type2) IsColored() bool {
 	return true
 }

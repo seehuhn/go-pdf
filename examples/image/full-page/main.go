@@ -54,12 +54,12 @@ func readImage(fname string) (*image.NRGBA, error) {
 func main() {
 	name := os.Args[1]
 
-	img, err := readImage(name)
+	imageData, err := readImage(name)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	b := img.Bounds()
+	b := imageData.Bounds()
 	width := float64(b.Dx()) / dpi * 72
 	height := float64(b.Dy()) / dpi * 72
 	paper := &pdf.Rectangle{
@@ -71,13 +71,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	embedded, err := pdfimage.EmbedJPEG(doc.Out, img, nil)
+	image, err := pdfimage.JPEG(imageData, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	doc.Transform(matrix.Scale(width, height))
-	doc.DrawXObject(embedded)
+	doc.DrawXObject(image)
 
 	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{
 		"FitWindow":    pdf.Boolean(true),

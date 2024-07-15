@@ -53,7 +53,7 @@ func run() error {
 		return err
 	}
 
-	figure, bbox, err := LoadFigure("fig.pdf", page.Out)
+	figure, bbox, err := LoadFigure("fig.pdf", page.RM)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,8 @@ func run() error {
 	return nil
 }
 
-func LoadFigure(fname string, w pdf.Putter) (*graphics.XObject, *pdf.Rectangle, error) {
+// LoadFigure loads the first page of a PDF file as a form XObject.
+func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.Rectangle, error) {
 	r, err := pdf.Open(fname, nil)
 	if err != nil {
 		return nil, nil, err
@@ -104,7 +105,7 @@ func LoadFigure(fname string, w pdf.Putter) (*graphics.XObject, *pdf.Rectangle, 
 		return nil, nil, err
 	}
 
-	copier := NewCopier(w, r)
+	copier := NewCopier(rm.Out, r)
 
 	origResources, err := pdf.GetDict(r, dict["Resources"])
 	if err != nil {
@@ -152,14 +153,15 @@ func LoadFigure(fname string, w pdf.Putter) (*graphics.XObject, *pdf.Rectangle, 
 		return nil, nil, err
 	}
 
-	figure := &form.FormProperties{
-		BBox: bbox,
+	obj := &form.Form{
+		Properties: &form.Properties{
+			BBox: bbox,
+		},
+		Resources: resources,
+		Contents:  body.Bytes(),
+		RM:        rm,
 	}
 
-	obj, err := form.Raw(w, figure, body.Bytes(), resources)
-	if err != nil {
-		return nil, nil, err
-	}
 	return obj, bbox, nil
 }
 

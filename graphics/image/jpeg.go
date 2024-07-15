@@ -22,18 +22,8 @@ import (
 	"image/jpeg"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
-
-// EmbedJPEG writes the image src to the PDF file w, using lossy compression.
-func EmbedJPEG(w pdf.Putter, src image.Image, opts *jpeg.Options) (*graphics.XObject, error) {
-	im, err := JPEG(src, opts)
-	if err != nil {
-		return nil, err
-	}
-	return im.Embed(w)
-}
 
 func JPEG(src image.Image, opts *jpeg.Options) (Image, error) {
 	// convert to NRGBA format
@@ -53,20 +43,27 @@ type jpegImage struct {
 	opts *jpeg.Options
 }
 
+// Subtype returns /Image.
+// This implements the [graphics.XObject] interface.
+func (im *jpegImage) Subtype() pdf.Name {
+	return pdf.Name("Image")
+}
+
 // Bounds implements the [Image] interface.
 func (im *jpegImage) Bounds() Rectangle {
 	b := im.im.Bounds()
 	return Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
 }
 
-// Embed implements the [Image] interface.
-func (im *jpegImage) Embed(w pdf.Putter) (*graphics.XObject, error) {
-	ref := w.Alloc()
+// Embed ensures that the image is embedded in the PDF file.
+// This implements the [Image] interface.
+func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
+	ref := rm.Out.Alloc()
 
 	// TODO(voss): write a mask if there is an alpha channel
 
 	img := im.im
-	stream, err := w.OpenStream(ref, pdf.Dict{
+	stream, err := rm.Out.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(img.Bounds().Dx()),
@@ -76,22 +73,18 @@ func (im *jpegImage) Embed(w pdf.Putter) (*graphics.XObject, error) {
 		"Filter":           pdf.Name("DCTDecode"),
 	})
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	err = jpeg.Encode(stream, img, im.opts)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	err = stream.Close()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	return &graphics.XObject{
-		Res: pdf.Res{
-			Data: ref,
-		},
-	}, nil
+	return ref, nil
 }

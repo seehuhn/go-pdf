@@ -14,30 +14,42 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package image
+package graphics
 
 import (
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 )
 
-// Image represents a raster image which can be embedded in a PDF file.
-type Image interface {
+// This file implements the "XObject operator".
+// The operator is defined in table 86 of ISO 32000-2:2020.
+
+// XObject represents a PDF XObject.
+type XObject interface {
 	Embed(*pdf.ResourceManager) (pdf.Reference, error)
-	Bounds() Rectangle
 	Subtype() pdf.Name
 }
 
-// Rectangle gives the dimensions of an image.
-type Rectangle struct {
-	XMin, YMin, XMax, YMax int
-}
+// DrawXObject draws a PDF XObject on the page.
+// This can be used to draw images, forms, or other XObjects.
+//
+// This implements the PDF graphics operator "Do".
+func (p *Writer) DrawXObject(obj XObject) {
+	if !p.isValid("DrawImage", objPage) {
+		return
+	}
 
-// Dx returns the width of the rectangle.
-func (r Rectangle) Dx() int {
-	return r.XMax - r.XMin
-}
+	name, err := writerGetResourceName(p, obj, catXObject)
+	if err != nil {
+		p.Err = err
+		return
+	}
 
-// Dy returns the height of the rectangle.
-func (r Rectangle) Dy() int {
-	return r.YMax - r.YMin
+	err = name.PDF(p.Content)
+	if err != nil {
+		p.Err = err
+		return
+	}
+	_, p.Err = fmt.Fprintln(p.Content, "", "Do")
 }

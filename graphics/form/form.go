@@ -17,40 +17,32 @@
 package form
 
 import (
-	"bytes"
 	"errors"
-	"time"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
-// FormProperties has data for a form XObject.
-//
-// See section 8.10 of ISO 32000-2:2020 for details.
-type FormProperties struct {
-	BBox         *pdf.Rectangle
-	Matrix       matrix.Matrix
-	Metadata     pdf.Reference
-	PieceInfo    pdf.Object
-	LastModified time.Time
-	// TODO(voss): StructParent, StructParents
-	OC          pdf.Object
-	DefaultName pdf.Name
-	AF          pdf.Object
-	Measure     pdf.Object
-	PtData      pdf.Object
+type Form struct {
+	*Properties
+	Resources *pdf.Resources
+	Contents  []byte
+	RM        *pdf.ResourceManager
 }
 
-type FormBuilder struct {
-	Out pdf.Putter
-	*graphics.Writer
-	*FormProperties
+// IsDirect returns true if the Form object does not contain any
+// references to indirect PDF objects.
+func (f *Form) IsDirect() bool {
+	return f.Resources.IsDirect() && f.Properties.IsDirect()
 }
 
-func Raw(w pdf.Putter, f *FormProperties, contents []byte, resources *pdf.Resources) (*graphics.XObject, error) {
+func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
+	if !f.IsDirect() && f.RM != rm {
+		return 0, errors.New("Form: resource manager mismatch")
+	}
+
 	dict := pdf.Dict{
+		// "Type":     pdf.Name("XObject"),
 		"Subtype":  pdf.Name("Form"),
 		"FormType": pdf.Integer(1),
 		"BBox":     f.BBox,
@@ -58,8 +50,8 @@ func Raw(w pdf.Putter, f *FormProperties, contents []byte, resources *pdf.Resour
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])
 	}
-	if resources != nil {
-		dict["Resources"] = pdf.AsDict(resources)
+	if f.Resources != nil {
+		dict["Resources"] = pdf.AsDict(f.Resources)
 	}
 	if f.Metadata != 0 {
 		dict["Metadata"] = f.Metadata
@@ -73,9 +65,9 @@ func Raw(w pdf.Putter, f *FormProperties, contents []byte, resources *pdf.Resour
 	if f.OC != nil {
 		dict["OC"] = f.OC
 	}
-	if pdf.GetVersion(w) == pdf.V1_0 {
+	if pdf.GetVersion(rm.Out) == pdf.V1_0 {
 		if f.DefaultName == "" {
-			return nil, errors.New("Form.DefaultName must be set in PDF 1.0")
+			return 0, errors.New("Form.DefaultName must be set in PDF 1.0")
 		}
 		dict["Name"] = f.DefaultName
 	}
@@ -89,51 +81,25 @@ func Raw(w pdf.Putter, f *FormProperties, contents []byte, resources *pdf.Resour
 		dict["PtData"] = f.PtData
 	}
 
-	ref := w.Alloc()
-	stm, err := w.OpenStream(ref, dict, &pdf.FilterCompress{})
+	ref := rm.Out.Alloc()
+	stm, err := rm.Out.OpenStream(ref, dict, &pdf.FilterCompress{})
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	_, err = stm.Write(contents)
+	_, err = stm.Write(f.Contents)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	res := &graphics.XObject{
-		Res: pdf.Res{
-			Data: ref,
-		},
-	}
-	return res, nil
+	return ref, nil
 }
 
-func toPDF(x []float64) pdf.Array {
-	res := make(pdf.Array, len(x))
-	for i, xi := range x {
-		res[i] = pdf.Number(xi)
-	}
-	return res
-}
-
-func New(w pdf.Putter, rm *pdf.ResourceManager, prop *FormProperties) *FormBuilder {
-	contents := graphics.NewWriter(&bytes.Buffer{}, rm)
-	return &FormBuilder{
-		Out:            w,
-		Writer:         contents,
-		FormProperties: prop,
-	}
-}
-
-func (f *FormBuilder) Finish() (*graphics.XObject, error) {
-	contents := f.Writer.Content.(*bytes.Buffer).Bytes()
-	resources := f.Writer.Resources
-
-	// disable the writer to prevent further writes
-	f.Writer = nil
-
-	return Raw(f.Out, f.FormProperties, contents, resources)
+// Subtype returns /Form.
+// This implements the [graphics.XObject] interface.
+func (f *Form) Subtype() pdf.Name {
+	return "Form"
 }

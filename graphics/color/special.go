@@ -28,8 +28,9 @@ import (
 
 // SpaceIndexed represents an indexed color space.
 type SpaceIndexed struct {
+	NumCol int
+
 	base   Space
-	numCol int
 	lookup pdf.String
 }
 
@@ -80,14 +81,14 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 
 	return &SpaceIndexed{
 		base:   space,
-		numCol: len(colors),
+		NumCol: len(colors),
 		lookup: lookup,
 	}, nil
 }
 
 // New returns a new indexed color.
 func (s *SpaceIndexed) New(idx int) Color {
-	if idx < 0 || idx >= s.numCol {
+	if idx < 0 || idx >= s.NumCol {
 		return nil
 	}
 	return colorIndexed{Space: s, Index: idx}
@@ -116,7 +117,7 @@ func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	data := pdf.Array{
 		pdf.Name("Indexed"),
 		base.PDFObject(),
-		pdf.Integer(s.numCol - 1),
+		pdf.Integer(s.NumCol - 1),
 		s.lookup,
 	}
 

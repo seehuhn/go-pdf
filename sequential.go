@@ -50,7 +50,7 @@ type FileObject struct {
 	ObjEnd   int64
 	Broken   bool
 	Type     string
-	SubType  Name
+	Subtype  Name
 }
 
 // SequentialScan reads a PDF file sequentially, extracting information
@@ -332,7 +332,7 @@ func (fi *FileInfo) checkObjects() error {
 			case Dict:
 				objInfo.Type = "Dict"
 				if t, ok := o["Type"].(Name); ok {
-					objInfo.SubType = t
+					objInfo.Subtype = t
 
 					if t == "Catalog" {
 						_, hasPages := o["Pages"]
@@ -352,7 +352,7 @@ func (fi *FileInfo) checkObjects() error {
 			case *Stream:
 				objInfo.Type = "Stream"
 				if t, ok := o.Dict["Type"].(Name); ok {
-					objInfo.SubType = t
+					objInfo.Subtype = t
 
 					if t == "ObjStm" {
 						// TODO(voss): what to do if the generation number is not 0?
@@ -449,7 +449,7 @@ func (fi *FileInfo) getTrailer() (Dict, error) {
 		// use the last one.
 		var xrefStream *FileObject
 		for _, obj := range sect.Objects {
-			if obj.Type == "Stream" && obj.SubType == "XRef" {
+			if obj.Type == "Stream" && obj.Subtype == "XRef" {
 				xrefStream = obj
 			}
 		}

@@ -81,6 +81,12 @@ func (r *Rectangle) Dy() float64 {
 	return r.URy - r.LLy
 }
 
+// IsDirect returns true.  This makes the [IsDirect] function work for
+// Rectangle objects.
+func (r *Rectangle) IsDirect() bool {
+	return true
+}
+
 // GetRectangle resolves references to indirect objects and makes sure the
 // resulting object is a PDF rectangle object.
 // If the object is null, nil is returned.
@@ -310,4 +316,20 @@ func (r *Resources) IsEmpty() bool {
 		return false
 	}
 	return true
+}
+
+// IsDirect returns true if the resources directory does not contain any
+// references to indirect objects.
+func (r *Resources) IsDirect() bool {
+	if r == nil {
+		return true
+	}
+	return IsDirect(r.ExtGState) &&
+		IsDirect(r.ColorSpace) &&
+		IsDirect(r.Pattern) &&
+		IsDirect(r.Shading) &&
+		IsDirect(r.XObject) &&
+		IsDirect(r.Font) &&
+		IsDirect(r.ProcSet) &&
+		IsDirect(r.Properties)
 }
