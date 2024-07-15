@@ -50,20 +50,6 @@ func NumValues(s Space) int {
 	return len(s.defaultValues())
 }
 
-// IsPattern returns whether the given color space is a pattern color space.
-//
-// TODO(voss): remove
-func IsPattern(s Space) bool {
-	return s.ColorSpaceFamily() == FamilyPattern
-}
-
-// IsIndexed returns whether the given color space is an indexed color space.
-//
-// TODO(voss): remove
-func IsIndexed(s Space) bool {
-	return s.ColorSpaceFamily() == FamilyIndexed
-}
-
 // Color represents a PDF color.
 type Color interface {
 	ColorSpace() Space
@@ -78,40 +64,6 @@ type Pattern interface {
 
 	// Embed embeds the pattern in the PDF file.
 	Embed(*pdf.ResourceManager) (pdf.Res, error)
-}
-
-// CheckVersion checks whether the given color space can be used in the given
-// PDF version.
-//
-// See table 61 in ISO 32000-2:2020.
-//
-// TODO(voss): move into the Space.Embed() methods.
-func CheckVersion(cs Space, v pdf.Version) error {
-	fam := cs.ColorSpaceFamily()
-
-	var minVersion pdf.Version
-	switch fam {
-	case FamilyDeviceGray, FamilyDeviceRGB, FamilyDeviceCMYK:
-		// The concept of color spaces was only introduced in PDF 1.1.
-		// We use pdf.V1_0 here to allow for use of the "G", "RG", and "K"
-		// operators in PDF 1.0.
-		minVersion = pdf.V1_0
-	case FamilyCalGray, FamilyCalRGB, FamilyLab, FamilyIndexed:
-		minVersion = pdf.V1_1
-	case FamilyPattern, FamilySeparation:
-		minVersion = pdf.V1_2
-	case FamilyICCBased, FamilyDeviceN:
-		minVersion = pdf.V1_3
-	default:
-		return fmt.Errorf("unknown color space family %q", fam)
-	}
-	if v < minVersion {
-		return &pdf.VersionError{
-			Operation: string(fam) + " colors",
-			Earliest:  minVersion,
-		}
-	}
-	return nil
 }
 
 // CheckCurrent checks whether the changing from the current color to the new

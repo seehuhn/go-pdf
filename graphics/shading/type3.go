@@ -56,7 +56,7 @@ func (s *Type3) ShadingType() int {
 func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
-	} else if color.IsPattern(s.ColorSpace) {
+	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
 		return nil, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {

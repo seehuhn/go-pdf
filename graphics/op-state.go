@@ -19,7 +19,6 @@ package graphics
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/matrix"
@@ -261,41 +260,18 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 	if !w.isValid("SetExtGState", objPage|objText) {
 		return
 	}
-	if w.Version < pdf.V1_2 {
-		w.Err = &pdf.VersionError{Operation: "SetExtGState", Earliest: pdf.V1_2}
-	}
 
 	s.Value.CopyTo(&w.State)
 
-	name := w.getResourceNameOld(catExtGState, s)
-	err := name.PDF(w.Content)
+	name, err := writerGetResourceName(w, s, catExtGState)
+	if err != nil {
+		w.Err = err
+		return
+	}
+	err = name.PDF(w.Content)
 	if err != nil {
 		w.Err = err
 		return
 	}
 	_, w.Err = fmt.Fprintln(w.Content, " gs")
-}
-
-func ifelse[T any](c bool, a, b T) T {
-	if c {
-		return a
-	}
-	return b
-}
-
-func nearlyEqual(a, b float64) bool {
-	const ε = 1e-6
-	return math.Abs(a-b) < ε
-}
-
-func sliceNearlyEqual(a, b []float64) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, x := range a {
-		if nearlyEqual(x, b[i]) {
-			return false
-		}
-	}
-	return true
 }

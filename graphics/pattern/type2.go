@@ -35,13 +35,13 @@ type Type2 struct {
 }
 
 // IsColored returns true.
-// This implements the [Pattern] interface.
+// This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
 func (p *Type2) IsColored() bool {
 	return true
 }
 
 // Embed returns the pattern dictionary for the shading pattern.
-// This implements the [Pattern] interface.
+// This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
 func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Res, error) {
 	var zero pdf.Res
 
@@ -59,7 +59,11 @@ func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Res, error) {
 		dict["Matrix"] = toPDF(p.Matrix[:])
 	}
 	if p.ExtGState != nil {
-		dict["ExtGState"] = p.ExtGState.PDFObject()
+		gs, err := pdf.ResourceManagerEmbed(rm, p.ExtGState)
+		if err != nil {
+			return zero, err
+		}
+		dict["ExtGState"] = gs.PDFObject()
 	}
 
 	var data pdf.Object = dict

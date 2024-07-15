@@ -29,8 +29,9 @@ import (
 // In particular, the stroke and fill color and some text parameters cannot be
 // included in the ExtGState object.
 type ExtGState struct {
-	pdf.Res
-	Value State
+	Value     State
+	Dict      pdf.Dict
+	SingleUse bool
 }
 
 // NewExtGState creates a new ExtGState object.
@@ -150,34 +151,44 @@ func NewExtGState(s State) (*ExtGState, error) {
 	}
 
 	return &ExtGState{
-		Res: pdf.Res{
-			Data: dict,
-		},
 		Value: State{
 			Parameters: s.Parameters.Clone(),
 			Set:        set,
 		},
+		Dict: dict,
 	}, nil
 }
 
-// Embed writes the graphics state dictionary into the PDF file so that the
-// graphics state can refer to it by reference.
-// This can reduce the PDF file size if the graphics state is shared between
-// multiple content streams.
-func (s *ExtGState) Embed(w pdf.Putter) (*ExtGState, error) {
-	if _, alreadyDone := s.Res.Data.(pdf.Reference); alreadyDone {
-		return s, nil
-	}
+type embeddedExtGState struct {
+	*ExtGState
+	Ref pdf.Reference
+}
 
-	ref := w.Alloc()
-	err := w.Put(ref, s.Res.Data)
-	if err != nil {
+func (s *embeddedExtGState) PDFObject() pdf.Object {
+	if s.Ref != 0 {
+		return s.Ref
+	}
+	return s.ExtGState.Dict
+}
+
+// Embed adds the graphics state dictionary to a PDF file.
+//
+// This implements the [pdf.Embedder] interface.
+func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "ExtGState", pdf.V1_2); err != nil {
 		return nil, err
 	}
 
-	res := &ExtGState{
-		Res:   pdf.Res{Data: ref},
-		Value: s.Value,
+	res := &embeddedExtGState{ExtGState: s}
+
+	if s.SingleUse {
+		ref := rm.Out.Alloc()
+		err := rm.Out.Put(ref, s.Dict)
+		if err != nil {
+			return nil, err
+		}
+		res.Ref = ref
 	}
+
 	return res, nil
 }

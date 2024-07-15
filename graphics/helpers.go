@@ -14,55 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package color
+package graphics
 
-import "seehuhn.de/go/pdf"
+import "math"
 
-func toPDF(x []float64) pdf.Array {
-	res := make(pdf.Array, len(x))
-	for i, xi := range x {
-		res[i] = pdf.Number(xi)
+func ifelse[T any](c bool, a, b T) T {
+	if c {
+		return a
 	}
-	return res
+	return b
 }
 
-func isConst(x []float64, value float64) bool {
-	for _, xi := range x {
-		if xi != value {
-			return false
-		}
-	}
-	return true
+func nearlyEqual(a, b float64) bool {
+	const ε = 1e-6
+	return math.Abs(a-b) < ε
 }
 
-func isZero(x []float64) bool {
-	return isConst(x, 0)
-}
-
-func isPosVec3(x []float64) bool {
-	if len(x) != 3 {
+func sliceNearlyEqual(a, b []float64) bool {
+	if len(a) != len(b) {
 		return false
 	}
-	for _, v := range x {
-		if v < 0 {
+	for i, x := range a {
+		if nearlyEqual(x, b[i]) {
 			return false
 		}
 	}
 	return true
-}
-
-func isEqual(x, y []float64) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	for i := range x {
-		if x[i] != y[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func isValues(x []float64, y ...float64) bool {
-	return isEqual(x, y)
 }

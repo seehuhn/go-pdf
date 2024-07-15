@@ -81,7 +81,11 @@ func (s *SpaceCalGray) defaultValues() []float64 {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceCalGray) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "CalGray color space", pdf.V1_1); err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(s.whitePoint)
 	if !isZero(s.blackPoint) {
@@ -176,7 +180,11 @@ func (s *SpaceCalRGB) New(r, g, b float64) Color {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceCalRGB) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "CalRGB color space", pdf.V1_1); err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(s.whitePoint)
 	if !isZero(s.blackPoint) {
@@ -285,7 +293,11 @@ func (s *SpaceLab) ColorSpaceFamily() pdf.Name {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceLab) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "Lab color space", pdf.V1_1); err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{}
 	dict["WhitePoint"] = toPDF(s.whitePoint)
 	if !isZero(s.blackPoint) {
@@ -381,7 +393,11 @@ func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceICCBased) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceICCBased) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "ICCBased color space", pdf.V1_3); err != nil {
+		return nil, err
+	}
+
 	panic("not implemented") // TODO: Implement
 }
 

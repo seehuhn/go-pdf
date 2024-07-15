@@ -31,6 +31,7 @@ import (
 
 func TestExtGState(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
+	rm := pdf.NewResourceManager(data)
 
 	F := dummyfont.Embed(data)
 
@@ -106,13 +107,13 @@ func TestExtGState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ext1, err = ext1.Embed(data)
+	ext1embedded, err := pdf.ResourceManagerEmbed(rm, ext1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	qqq := New(data, nil)
-	ext2, err := qqq.readExtGState(ext1.Res.Data)
+	ext2, err := qqq.readExtGState(ext1embedded.PDFObject())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -65,7 +65,7 @@ func (s *Type4) ShadingType() int {
 func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	if s.ColorSpace == nil {
 		return nil, errors.New("missing ColorSpace")
-	} else if color.IsPattern(s.ColorSpace) {
+	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
 		return nil, errors.New("invalid ColorSpace")
 	}
 	numComponents := color.NumValues(s.ColorSpace)
@@ -117,7 +117,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 				i, numValues, have)
 		}
 	}
-	if s.F != nil && color.IsIndexed(s.ColorSpace) {
+	if s.F != nil && s.ColorSpace.ColorSpaceFamily() == color.FamilyIndexed {
 		return nil, errors.New("Function not allowed for indexed color space")
 	}
 

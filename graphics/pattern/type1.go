@@ -126,14 +126,14 @@ type type1 struct {
 }
 
 // IsColored returns true if the tiling pattern is colored.
-// This implements the [Pattern] interface.
+// This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
 func (p *type1) IsColored() bool {
 	return p.PaintType == 1
 }
 
 // Embed returns a reference to the pattern's content stream.
 // The resource manager must be the same as the one used to create the pattern.
-// This implements the [Pattern] interface.
+// This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
 func (p *type1) Embed(rm *pdf.ResourceManager) (pdf.Res, error) {
 	var zero pdf.Res
 

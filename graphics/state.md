@@ -58,3 +58,4 @@ List of all parameters
 | StateHalftoneOrigin         | -                  | HTO            |                                   |
 | StateFlatnessTolerance      | i                  | FL             |                                   |
 | StateSmoothnessTolerance    | -                  | SM             |                                   |
+|-----------------------------|--------------------|----------------|-----------------------------------|

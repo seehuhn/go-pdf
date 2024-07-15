@@ -37,6 +37,9 @@ type SpaceDeviceGray struct{}
 
 // Embed implements the [Space] interface.
 func (s SpaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "DeviceGray color space", pdf.V1_1); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -80,6 +83,10 @@ type SpaceDeviceRGB struct{}
 
 // Embed implements the [Space] interface.
 func (s SpaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "DeviceRGB color space", pdf.V1_1); err != nil {
+		return nil, err
+	}
+
 	return s, nil
 }
 
@@ -123,6 +130,10 @@ type SpaceDeviceCMYK struct{}
 
 // Embed implement the [pdf.Embedder] interface.
 func (s SpaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "DeviceCMYK color space", pdf.V1_1); err != nil {
+		return nil, err
+	}
+
 	return s, nil
 }
 

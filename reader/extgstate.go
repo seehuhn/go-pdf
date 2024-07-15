@@ -306,13 +306,11 @@ func (r *Reader) readExtGState(ref pdf.Object) (*graphics.ExtGState, error) {
 	}
 
 	res := &graphics.ExtGState{
-		Res: pdf.Res{
-			Data: ref,
-		},
 		Value: graphics.State{
 			Parameters: param,
 			Set:        set,
 		},
+		Dict: dict,
 	}
 	return res, nil
 }

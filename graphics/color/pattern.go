@@ -25,7 +25,11 @@ import (
 // spacePatternColored is used for colored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
-func (s spacePatternColored) Embed(*pdf.ResourceManager) (pdf.Resource, error) {
+func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
+		return nil, err
+	}
+
 	return s, nil
 }
 
@@ -82,6 +86,10 @@ func (s spacePatternUncolored) defaultValues() []float64 {
 }
 
 func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
+		return nil, err
+	}
+
 	base, err := pdf.ResourceManagerEmbed(rm, s.base)
 	if err != nil {
 		return nil, err

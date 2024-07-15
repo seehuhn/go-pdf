@@ -104,6 +104,10 @@ func (s *SpaceIndexed) defaultValues() []float64 {
 
 // Embed implements the [Space] interface.
 func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	if err := pdf.CheckVersion(rm.Out, "Indexed color space", pdf.V1_1); err != nil {
+		return nil, err
+	}
+
 	base, err := s.base.Embed(rm)
 	if err != nil {
 		return nil, err
