@@ -168,7 +168,7 @@ func needsAlphaChannel(img image.Image) bool {
 		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 			for x := bounds.Min.X; x < bounds.Max.X; x++ {
 				_, _, _, a := img.At(x, y).RGBA()
-				if a != 0xffff { // fully opaque
+				if a != 0xffff { // not fully opaque
 					return true
 				}
 			}

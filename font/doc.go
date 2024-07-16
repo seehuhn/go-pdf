@@ -39,6 +39,7 @@
 // # Fonts included in the library
 //
 //   - The 14 standard PDF fonts are available as [seehuhn.de/go/pdf/font/type1.Standard].
+//   - The URW fonts are the standard fonts with many additional glyphs.
 //   - The fonts from the Go Font family are available as [seehuhn.de/go/pdf/font/gofont].
 //
 // # Data Types for Representing Fonts

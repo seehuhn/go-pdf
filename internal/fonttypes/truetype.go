@@ -31,9 +31,9 @@ var TrueType font.Font = trueTypeEmbedder{}
 func (trueTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 	info := makefont.TrueType()
 
-	F, err := truetype.New(info)
+	F, err := truetype.New(info, opt)
 	if err != nil {
 		return nil, err
 	}
-	return F.Embed(w, opt)
+	return F.Embed(w, nil)
 }

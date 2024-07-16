@@ -41,10 +41,10 @@ func OpenTypeFont(w pdf.Putter, info *sfnt.Font, opt *font.Options) (font.Layout
 	if info.IsCFF() {
 		F, err = cff.New(info)
 	} else {
-		F, err = truetype.New(info)
+		F, err = truetype.New(info, opt)
 	}
 	if err != nil {
 		return nil, err
 	}
-	return F.Embed(w, opt)
+	return F.Embed(w, nil)
 }

@@ -155,4 +155,6 @@ func (w *Writer) MarkedContentEnd() {
 	_, w.Err = fmt.Fprintln(w.Content, "EMC")
 }
 
+// ErrNotDirect is returned by [Writer.MarkedContentStart] if the properties
+// object is not a direct object, and the Inline property is set.
 var ErrNotDirect = errors.New("MarkedContent: indirect object in inline property list")

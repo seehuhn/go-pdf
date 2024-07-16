@@ -106,7 +106,8 @@ func TestSpaceAdvance(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
 	rm := pdf.NewResourceManager(data)
 
-	F, err := gofont.GoRegular.Embed(data, nil)
+	Fx := gofont.Regular.New(nil)
+	F, err := Fx.Embed(data, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +141,7 @@ func TestSpaceAdvance(t *testing.T) {
 func BenchmarkTextLayout(b *testing.B) {
 	// F := type1.TimesRoman
 
-	F := gofont.GoRegular
+	F := gofont.Regular.New(nil)
 
 	// info, err := sfnt.ReadFile("../../otf/SourceSerif4-Regular.otf")
 	// if err != nil {

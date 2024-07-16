@@ -19,6 +19,7 @@ package gofont
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/gobolditalic"
@@ -33,7 +34,6 @@ import (
 	"golang.org/x/image/font/gofont/gosmallcaps"
 	"golang.org/x/image/font/gofont/gosmallcapsitalic"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/sfnt"
@@ -42,71 +42,72 @@ import (
 // Font identifies individual fonts in the Go font family.
 type Font int
 
-func (f Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+// Constants for the available fonts in the Go font family.
+const (
+	_               Font = iota
+	Bold                 // Go Semi Bold
+	BoldItalic           // Go Semi Bold Italic
+	Italic               // Go Italic
+	Medium               // Go Medium Regular
+	MediumItalic         // Go Medium Italic
+	Regular              // Go Regular
+	Smallcaps            // Go Smallcaps Regular
+	SmallcapsItalic      // Go Smallcaps Italic
+	Mono                 // Go Mono Regular
+	MonoBold             // Go Mono Semi Bold
+	MonoBoldItalic       // Go Mono Semi Bold Italic
+	MonoItalic           // Go Mono Italic
+)
+
+// New returns a new font instance for the given Go font.
+func (f Font) New(opt *font.Options) *truetype.Instance {
 	data, ok := ttf[f]
 	if !ok {
-		return nil, ErrInvalidFontID
+		panic("invalid Go font ID")
 	}
 
 	info, err := sfnt.Read(bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("built-in fonts corrupted??? %s", err))
 	}
 
-	F, err := truetype.New(info)
+	F, err := truetype.New(info, opt)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("built-in fonts corrupted??? %s", err))
 	}
 
-	return F.Embed(w, opt)
+	return F
 }
 
-// Constants for the available fonts in the Go font family.
-const (
-	_                 Font = iota
-	GoBold                 // gobold
-	GoBoldItalic           // gobolditalic
-	GoItalic               // goitalic
-	GoMedium               // gomedium
-	GoMediumItalic         // gomediumitalic
-	GoRegular              // goregular
-	GoSmallcaps            // gosmallcaps
-	GoSmallcapsItalic      // gosmallcapsitalic
-	GoMono                 // gomono
-	GoMonoBold             // gomonobold
-	GoMonoBoldItalic       // gomonobolditalic
-	GoMonoItalic           // gomonoitalic
-)
-
-// All is a slice containing all available fonts in the Go font family.
+// All contains all available fonts in the Go font family.
 var All = []Font{
-	GoBold,
-	GoBoldItalic,
-	GoItalic,
-	GoMedium,
-	GoMediumItalic,
-	GoRegular,
-	GoSmallcaps,
-	GoSmallcapsItalic,
-	GoMono,
-	GoMonoBold,
-	GoMonoBoldItalic,
-	GoMonoItalic,
+	Bold,
+	BoldItalic,
+	Italic,
+	Medium,
+	MediumItalic,
+	Regular,
+	Smallcaps,
+	SmallcapsItalic,
+	Mono,
+	MonoBold,
+	MonoBoldItalic,
+	MonoItalic,
 }
 
 var ttf = map[Font][]byte{
-	GoBold:            gobold.TTF,
-	GoBoldItalic:      gobolditalic.TTF,
-	GoItalic:          goitalic.TTF,
-	GoMedium:          gomedium.TTF,
-	GoMediumItalic:    gomediumitalic.TTF,
-	GoRegular:         goregular.TTF,
-	GoSmallcaps:       gosmallcaps.TTF,
-	GoSmallcapsItalic: gosmallcapsitalic.TTF,
-	GoMono:            gomono.TTF,
-	GoMonoBold:        gomonobold.TTF,
-	GoMonoBoldItalic:  gomonobolditalic.TTF,
-	GoMonoItalic:      gomonoitalic.TTF,
+	Bold:            gobold.TTF,
+	BoldItalic:      gobolditalic.TTF,
+	Italic:          goitalic.TTF,
+	Medium:          gomedium.TTF,
+	MediumItalic:    gomediumitalic.TTF,
+	Regular:         goregular.TTF,
+	Smallcaps:       gosmallcaps.TTF,
+	SmallcapsItalic: gosmallcapsitalic.TTF,
+	Mono:            gomono.TTF,
+	MonoBold:        gomonobold.TTF,
+	MonoBoldItalic:  gomonobolditalic.TTF,
+	MonoItalic:      gomonoitalic.TTF,
 }
 
 // ErrInvalidFontID indicates that a FontID is invalid.

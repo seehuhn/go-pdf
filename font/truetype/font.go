@@ -27,27 +27,36 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
-type embedder struct {
-	sfnt *sfnt.Font
+// Instance represents a TrueType font together with the font options.
+// This implements the [font.Font] interface.
+type Instance struct {
+	*sfnt.Font
+	opt *font.Options
 }
 
 // New makes a PDF TrueType font from a sfnt.Font.
 // The font info must be an OpenType/TrueType font with glyf outlines.
 // The font can be embedded as a simple font or as a composite font.
-func New(info *sfnt.Font) (font.Font, error) {
+func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("no glyf outlines in font")
 	}
 
-	return embedder{sfnt: info}, nil
+	return &Instance{Font: info, opt: opt}, nil
 }
 
-func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+// Embed adds the font to a PDF file.
+// This implements the [font.Font] interface.
+func (f *Instance) Embed(w pdf.Putter, optOld *font.Options) (font.Layouter, error) {
+	opt := f.opt
+	if opt == nil {
+		opt = optOld
+	}
 	if opt == nil {
 		opt = &font.Options{}
 	}
 
-	info := f.sfnt
+	info := f.Font
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
@@ -78,7 +87,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 			w:             w,
 			Res:           resource,
 			Geometry:      geometry,
-			sfnt:          f.sfnt,
+			sfnt:          f.Font,
 			layouter:      layouter,
 			SimpleEncoder: encoding.NewSimpleEncoder(),
 		}
@@ -106,7 +115,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 			w:          w,
 			Res:        resource,
 			Geometry:   geometry,
-			sfnt:       f.sfnt,
+			sfnt:       f.Font,
 			layouter:   layouter,
 			GIDToCID:   gidToCID,
 			CIDEncoder: cidEncoder,

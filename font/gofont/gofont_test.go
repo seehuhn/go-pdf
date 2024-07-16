@@ -20,15 +20,16 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 )
 
 // TestLigatures checks that letters are correctly combined into ligatures.
 func TestLigatures(t *testing.T) {
 	ligatures := []string{"ﬀ=ff", "ﬁ=fi", "ﬂ=fl", "ﬃ=ffi", "ﬄ=ffl"}
-	for i, F := range []font.Font{GoBold, GoBoldItalic, GoItalic,
-		GoMedium, GoMediumItalic, GoRegular, GoSmallcaps, GoSmallcapsItalic,
-		GoMono, GoMonoBold, GoMonoBoldItalic, GoMonoItalic} {
+	for i, Fx := range []Font{Bold, BoldItalic, Italic,
+		Medium, MediumItalic, Regular, Smallcaps, SmallcapsItalic,
+		Mono, MonoBold, MonoBoldItalic, MonoItalic} {
+
+		F := Fx.New(nil)
 
 		data := pdf.NewData(pdf.V2_0)
 		E, err := F.Embed(data, nil)
