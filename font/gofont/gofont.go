@@ -108,3 +108,6 @@ var All = []Font{
 	MonoBoldItalic,
 	MonoItalic,
 }
+
+// Gopher is the Unicode code point for the gopher symbol in the Go fonts.
+const Gopher = '\uF800'
