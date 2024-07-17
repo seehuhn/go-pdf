@@ -32,7 +32,7 @@ func (*type1embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, err
 	info := makefont.Type1()
 	afm := makefont.AFM()
 
-	F, err := type1.New(info, afm)
+	F, err := type1.NewFont(info, afm)
 	if err != nil {
 		return nil, err
 	}

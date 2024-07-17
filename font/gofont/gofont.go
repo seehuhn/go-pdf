@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package gofont provides access to the Go font family.
 package gofont
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"golang.org/x/image/font/gofont/gobold"
@@ -44,22 +44,21 @@ type Font int
 
 // Constants for the available fonts in the Go font family.
 const (
-	_               Font = iota
-	Bold                 // Go Semi Bold
-	BoldItalic           // Go Semi Bold Italic
-	Italic               // Go Italic
-	Medium               // Go Medium Regular
-	MediumItalic         // Go Medium Italic
-	Regular              // Go Regular
-	Smallcaps            // Go Smallcaps Regular
-	SmallcapsItalic      // Go Smallcaps Italic
-	Mono                 // Go Mono Regular
-	MonoBold             // Go Mono Semi Bold
-	MonoBoldItalic       // Go Mono Semi Bold Italic
-	MonoItalic           // Go Mono Italic
+	Regular         Font = iota // Go Regular
+	Bold                        // Go Semi Bold
+	BoldItalic                  // Go Semi Bold Italic
+	Italic                      // Go Italic
+	Medium                      // Go Medium Regular
+	MediumItalic                // Go Medium Italic
+	Smallcaps                   // Go Smallcaps Regular
+	SmallcapsItalic             // Go Smallcaps Italic
+	Mono                        // Go Mono Regular
+	MonoBold                    // Go Mono Semi Bold
+	MonoBoldItalic              // Go Mono Semi Bold Italic
+	MonoItalic                  // Go Mono Italic
 )
 
-// New returns a new font instance for the given Go font.
+// New returns a new font instance for the given Go font and options.
 func (f Font) New(opt *font.Options) *truetype.Instance {
 	data, ok := ttf[f]
 	if !ok {
@@ -68,7 +67,7 @@ func (f Font) New(opt *font.Options) *truetype.Instance {
 
 	info, err := sfnt.Read(bytes.NewReader(data))
 	if err != nil {
-		panic(fmt.Sprintf("built-in fonts corrupted??? %s", err))
+		panic(fmt.Sprintf("built-in Go font corrupted??? %s", err))
 	}
 
 	F, err := truetype.New(info, opt)
@@ -77,22 +76,6 @@ func (f Font) New(opt *font.Options) *truetype.Instance {
 	}
 
 	return F
-}
-
-// All contains all available fonts in the Go font family.
-var All = []Font{
-	Bold,
-	BoldItalic,
-	Italic,
-	Medium,
-	MediumItalic,
-	Regular,
-	Smallcaps,
-	SmallcapsItalic,
-	Mono,
-	MonoBold,
-	MonoBoldItalic,
-	MonoItalic,
 }
 
 var ttf = map[Font][]byte{
@@ -110,5 +93,18 @@ var ttf = map[Font][]byte{
 	MonoItalic:      gomonoitalic.TTF,
 }
 
-// ErrInvalidFontID indicates that a FontID is invalid.
-var ErrInvalidFontID = errors.New("invalid font ID")
+// All contains all available fonts in the Go font family.
+var All = []Font{
+	Bold,
+	BoldItalic,
+	Italic,
+	Medium,
+	MediumItalic,
+	Regular,
+	Smallcaps,
+	SmallcapsItalic,
+	Mono,
+	MonoBold,
+	MonoBoldItalic,
+	MonoItalic,
+}

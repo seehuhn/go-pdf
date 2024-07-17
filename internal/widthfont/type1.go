@@ -144,7 +144,7 @@ func Type1(out pdf.Putter, unitsPerEm funit.Int16) (font.Embedded, error) {
 		encoding[c] = name
 	}
 
-	F, err := type1.New(psfont, metrics)
+	F, err := type1.NewFont(psfont, metrics)
 	if err != nil {
 		return nil, err
 	}

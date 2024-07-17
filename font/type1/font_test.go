@@ -51,7 +51,7 @@ func TestEmbed(t *testing.T) {
 			if useMetrics := i&2 != 0; useMetrics {
 				metr = metrics
 			}
-			F, err := New(psf, metr)
+			F, err := NewFont(psf, metr)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -296,7 +296,7 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 func TestEncoding(t *testing.T) {
 	t1 := makefont.Type1()
 	metrics := makefont.AFM()
-	F, err := New(t1, metrics)
+	F, err := NewFont(t1, metrics)
 	if err != nil {
 		t.Fatal(err)
 	}

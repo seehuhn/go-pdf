@@ -52,7 +52,7 @@ func (f Builtin) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
 		afm.FontName = string(f)
 	}
 
-	F, err := New(glyphs, afm)
+	F, err := NewFont(glyphs, afm)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ var Standard = []Builtin{
 	ZapfDingbats,
 }
 
-var isBuiltinName = map[string]bool{
+var isStandardFont = map[string]bool{
 	"Courier":               true,
 	"Courier-Bold":          true,
 	"Courier-BoldOblique":   true,

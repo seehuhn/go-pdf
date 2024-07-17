@@ -17,12 +17,40 @@
 package loader
 
 import (
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
+
+// TestBuiltin verifies that the builtin fonts are available.
+// This test can catch typos in the builtin font map file.
+func TestBuiltin(t *testing.T) {
+	loader := NewFontLoader()
+
+	for key, val := range loader.lookup {
+		if !val.isBuiltin {
+			t.Errorf("%s/%d: non-builtin font in builtin map", key.psname, key.fontType)
+		}
+
+		// Make sure the font can be loaded.
+		r, err := loader.Open(key.psname, key.fontType)
+		if err != nil {
+			t.Errorf("%s/%d: error loading builtin font: %v", key.psname, key.fontType, err)
+			continue
+		}
+		_, err = io.Copy(io.Discard, r)
+		if err != nil {
+			t.Errorf("%s/%d: error reading builtin font: %v", key.psname, key.fontType, err)
+		}
+		err = r.Close()
+		if err != nil {
+			t.Errorf("%s/%d: error closing builtin font: %v", key.psname, key.fontType, err)
+		}
+	}
+}
 
 // TestStandardFonts checks that the 14 standard fonts are available.
 func TestStandardFonts(t *testing.T) {

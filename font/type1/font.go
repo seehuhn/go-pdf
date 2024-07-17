@@ -38,13 +38,28 @@ import (
 	"seehuhn.de/go/pdf/font/widths"
 )
 
-// New creates a new Type 1 PDF font from a Type 1 PostScript font.
+// Instance is a Type 1 font instance.
+type Instance struct {
+	*type1.Font
+	*afm.Metrics
+	Opt *font.Options
+}
+
+func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) *Instance {
+	return &Instance{
+		Font:    psFont,
+		Metrics: metrics,
+		Opt:     opt,
+	}
+}
+
+// NewFont creates a new Type 1 PDF font from a Type 1 PostScript font.
 //
 // At least one of `psFont` and `metrics` must be non-nil.
 // The font program is embedded, if and only if `psFont` is non-nil.
 // If metrics is non-nil, information about kerning and ligatures is extracted,
 // and the corresponding fields in the PDF font descriptor are filled.
-func New(psFont *type1.Font, metrics *afm.Metrics) (font.Font, error) {
+func NewFont(psFont *type1.Font, metrics *afm.Metrics) (font.Font, error) {
 	if psFont == nil && metrics == nil {
 		return nil, fmt.Errorf("no font data given")
 	}
@@ -451,7 +466,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 	}
 
 	var metrics *afm.Metrics
-	if psFont == nil && isBuiltinName[string(fontName)] {
+	if psFont == nil && isStandardFont[string(fontName)] {
 		afm, err := Builtin(fontName).AFM()
 		if err != nil {
 			panic(err) // should never happen
@@ -687,7 +702,7 @@ func (info *FontDict) PostScriptName() string {
 
 // IsStandard returns true if the font is one of the 14 standard PDF fonts.
 func (info *FontDict) IsStandard() bool {
-	return isBuiltinName[info.PostScriptName()] && info.Font == nil
+	return isStandardFont[info.PostScriptName()] && info.Font == nil
 }
 
 // BuiltinEncoding returns the builtin encoding vector for this font.

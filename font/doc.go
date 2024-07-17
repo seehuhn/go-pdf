@@ -19,8 +19,7 @@
 //
 // # Embedding fonts into PDF files
 //
-// A font must be "embedded" into a PDF file before it can be used.
-// This library allows to embed the following font types:
+// This library supports the following font types:
 //   - OpenType fonts (.otf files)
 //   - TrueType fonts (.ttf files)
 //   - Type 1 fonts (.pfa or .pfb files, optionally with the corresponding .afm files)
@@ -38,13 +37,13 @@
 //
 // # Fonts included in the library
 //
-//   - The 14 standard PDF fonts are available as [seehuhn.de/go/pdf/font/type1.Standard].
-//   - The URW fonts are the standard fonts with many additional glyphs.
-//   - The fonts from the Go Font family are available as [seehuhn.de/go/pdf/font/gofont].
+//   - The 14 standard PDF fonts: [seehuhn.de/go/pdf/font/standard]
+//   - Extended versions of the 14 standard PDF fonts: [seehuhn.de/go/pdf/font/extended]
+//   - The Go Font family: [seehuhn.de/go/pdf/font/gofont]
 //
 // # Data Types for Representing Fonts
 //
-//   - An [Font] represents a font before it is embedded into a PDF file.
+//   - A [Font] represents a font before it is embedded into a PDF file.
 //   - A [Layouter] is a font which is embedded and ready to typeset text.
 //   - The type [Embedded] represents the minimum information about a font
 //     required so that a PDF file can be parsed (but no text can be typeset).
