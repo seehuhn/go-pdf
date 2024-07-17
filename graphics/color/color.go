@@ -96,7 +96,7 @@ func CheckCurrent(cur, new Color) (needsColorSpace bool, needsColor bool) {
 	case colorDeviceGray, colorDeviceRGB, colorDeviceCMYK:
 		// We use the "g", "rg" and "k" operators without setting the
 		// color space separately.
-		return false, !slices.Equal(currentValues, new.values())
+		return false, needsColorSpace || !slices.Equal(currentValues, new.values())
 	case colorColoredPattern:
 		return needsColorSpace, currentPattern != new.Pat
 	case *colorUncoloredPattern:

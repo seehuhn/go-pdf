@@ -37,8 +37,9 @@ type Writer struct {
 	State
 	stack []State
 
-	RM      *pdf.ResourceManager
-	resName map[catRes]pdf.Name
+	RM         *pdf.ResourceManager
+	resName    map[catRes]pdf.Name
+	resNameOld map[catRes]pdf.Name
 
 	nesting       []pairType
 	markedContent []*MarkedContent
@@ -48,7 +49,7 @@ type Writer struct {
 
 type catRes struct {
 	cat resourceCategory
-	res pdf.Resource
+	res any
 }
 
 type resourceCategory byte
@@ -87,8 +88,9 @@ func NewWriter(w io.Writer, rm *pdf.ResourceManager) *Writer {
 
 		State: NewState(),
 
-		RM:      rm,
-		resName: make(map[catRes]pdf.Name),
+		RM:         rm,
+		resName:    make(map[catRes]pdf.Name),
+		resNameOld: make(map[catRes]pdf.Name),
 
 		glyphBuf: &font.GlyphSeq{},
 	}
@@ -101,22 +103,46 @@ func NewWriter(w io.Writer, rm *pdf.ResourceManager) *Writer {
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [Writer].
 func writerGetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], category resourceCategory) (pdf.Name, error) {
-	embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
-	if err != nil {
-		return "", err
-	}
-
-	key := catRes{category, embedded}
+	key := catRes{category, resource}
 	name, ok := w.resName[key]
 	if ok {
 		return name, nil
+	}
+
+	embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
+	if err != nil {
+		return "", err
 	}
 
 	dict := w.getCategoryDict(category)
 	name = w.generateName(category, dict, "")
 	(*dict)[name] = embedded.PDFObject()
 
+	w.resName[key] = name
 	return name, nil
+}
+
+// GetResourceName returns a name which can be used to refer to a resource from
+// within the content stream.  If needed, the resource is embedded in the PDF
+// file and/or added to the resource dictionary.
+//
+// Once Go supports methods with type parameters, this function can be turned
+// into a method on [Writer].
+func writerSetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], category resourceCategory, name pdf.Name) error {
+	for k, v := range w.resName {
+		if k.cat == category && v == name {
+			return fmt.Errorf("name %q is already used for category %d", name, category)
+		}
+	}
+
+	_, err := pdf.ResourceManagerEmbed(w.RM, resource)
+	if err != nil {
+		return err
+	}
+
+	key := catRes{category, resource}
+	w.resName[key] = name
+	return nil
 }
 
 func (w *Writer) getCategoryDict(category resourceCategory) *pdf.Dict {
@@ -202,7 +228,7 @@ func getCategoryPrefix(category resourceCategory) pdf.Name {
 // GetResourceName returns the name of a resource.
 // If the resource is not yet in the resource dictionary, a new name is generated.
 func (w *Writer) getResourceNameOld(category resourceCategory, r pdf.Resource) pdf.Name {
-	name, ok := w.resName[catRes{category, r}]
+	name, ok := w.resNameOld[catRes{category, r}]
 	if ok {
 		return name
 	}
@@ -210,7 +236,7 @@ func (w *Writer) getResourceNameOld(category resourceCategory, r pdf.Resource) p
 	field := w.getCategoryDict(category)
 	name = w.generateName(category, field, "")
 	(*field)[name] = r.PDFObject()
-	w.resName[catRes{category, r}] = name
+	w.resNameOld[catRes{category, r}] = name
 
 	return name
 }

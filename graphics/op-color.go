@@ -73,7 +73,11 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 		if w.Err != nil {
 			return
 		}
-		_, w.Err = fmt.Fprintln(w.Content, " cs")
+		op := "CS"
+		if fill {
+			op = "cs"
+		}
+		_, w.Err = fmt.Fprintln(w.Content, " "+op)
 		if w.Err != nil {
 			return
 		}

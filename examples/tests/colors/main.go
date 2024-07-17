@@ -512,7 +512,7 @@ func hTickLabel(page *document.Page, F font.Layouter, x, y float64, label string
 
 	page.SetFillColor(black)
 	page.TextSetFont(F, 10)
-	gg := F.Layout(nil, 10, label)
+	gg := page.TextLayout(nil, label)
 	w := gg.TotalWidth()
 	page.TextBegin()
 	page.TextFirstLine(x-w/2, y-5-10*geom.Ascent)
@@ -532,7 +532,7 @@ func vTickLabel(page *document.Page, F font.Layouter, x, y float64, label string
 
 	page.SetFillColor(black)
 	page.TextSetFont(F, 10)
-	gg := F.Layout(nil, 10, label)
+	gg := page.TextLayout(nil, label)
 	w := gg.TotalWidth()
 	page.TextBegin()
 	page.TextFirstLine(x-5-w, y-10*mid)

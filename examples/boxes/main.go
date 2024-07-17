@@ -77,16 +77,17 @@ func doit() error {
 	}
 	page.Stroke()
 	page.SetFillColor(color.DeviceGray.New(1))
+	page.TextSetFont(F, 9)
 	for _, x := range []float64{82, 532} {
 		for i := 0; i <= 600; i += 50 {
-			gg := F.Layout(nil, 9, fmt.Sprintf("%d", i))
+			gg := page.TextLayout(nil, fmt.Sprintf("%d", i))
 			b := geom.BoundingBox(9, gg)
 			page.Rectangle(x-b.URx-1, float64(i)-3+b.LLy, b.URx-b.LLx+2, b.URy-b.LLy)
 		}
 	}
 	for _, y := range []float64{72, 522} {
 		for i := 0; i <= 600; i += 50 {
-			gg := F.Layout(nil, 9, fmt.Sprintf("%d", i))
+			gg := page.TextLayout(nil, fmt.Sprintf("%d", i))
 			b := geom.BoundingBox(9, gg)
 			w := b.URx - b.LLx
 			page.Rectangle(float64(i)-0.5*w, y+b.LLy-1, w, b.URy-b.LLy+2)
@@ -94,7 +95,6 @@ func doit() error {
 	}
 	page.Fill()
 	page.SetFillColor(color.DeviceGray.New(0.6))
-	page.TextSetFont(F, 9)
 	for _, x := range []float64{82, 532} {
 		page.TextBegin()
 		for i := 0; i <= 600; i += 50 {

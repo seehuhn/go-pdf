@@ -39,6 +39,9 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
+// TODO(voss): Make it easier to use the alterative zeros provided in the
+// last two glyphs of the Go fonts.
+
 // Font identifies individual fonts in the Go font family.
 type Font int
 
@@ -93,8 +96,10 @@ var ttf = map[Font][]byte{
 	MonoItalic:      gomonoitalic.TTF,
 }
 
-// All contains all available fonts in the Go font family.
-var All = []Font{
+// All contains all the Go font family fonts available in this package.
+var All = allGoFonts
+
+var allGoFonts = []Font{
 	Bold,
 	BoldItalic,
 	Italic,
