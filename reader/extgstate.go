@@ -310,7 +310,6 @@ func (r *Reader) readExtGState(ref pdf.Object) (*graphics.ExtGState, error) {
 			Parameters: param,
 			Set:        set,
 		},
-		Dict: dict,
 	}
 	return res, nil
 }

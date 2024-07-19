@@ -277,7 +277,7 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 		return
 	}
 
-	w.updateTextPosition(w.State.TextFont, s)
+	w.updateTextPosition(s)
 
 	w.Err = s.PDF(w.Content)
 	if w.Err != nil {
@@ -303,7 +303,7 @@ func (w *Writer) TextShowNextLineRaw(s pdf.String) {
 	w.TextLineMatrix = matrix.Translate(0, -w.TextLeading).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
 
-	w.updateTextPosition(w.State.TextFont, s)
+	w.updateTextPosition(s)
 
 	w.Err = s.PDF(w.Content)
 	if w.Err != nil {
@@ -330,7 +330,7 @@ func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Strin
 	w.State.TextWordSpacing = wordSpacing
 	w.State.TextCharacterSpacing = charSpacing
 	w.Set |= StateTextWordSpacing | StateTextCharacterSpacing
-	w.updateTextPosition(w.State.TextFont, s)
+	w.updateTextPosition(s)
 
 	_, w.Err = fmt.Fprint(w.Content, w.coord(wordSpacing), " ", w.coord(charSpacing), " ")
 	if w.Err != nil {
@@ -365,7 +365,7 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 		var delta float64
 		switch arg := arg.(type) {
 		case pdf.String:
-			w.updateTextPosition(w.State.TextFont, arg)
+			w.updateTextPosition(arg)
 			if w.Err != nil {
 				return
 			}
@@ -398,7 +398,8 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 	_, w.Err = fmt.Fprintln(w.Content, " TJ")
 }
 
-func (w *Writer) updateTextPosition(F font.Embedded, s pdf.String) {
+func (w *Writer) updateTextPosition(s pdf.String) {
+	F := w.TextFont
 	wmode := F.WritingMode()
 	F.ForeachWidth(s, func(width float64, isSpace bool) {
 		width = width*w.TextFontSize + w.TextCharacterSpacing

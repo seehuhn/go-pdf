@@ -30,7 +30,6 @@ import (
 // included in the ExtGState object.
 type ExtGState struct {
 	Value     State
-	Dict      pdf.Dict
 	SingleUse bool
 }
 
@@ -44,131 +43,12 @@ func NewExtGState(s State) (*ExtGState, error) {
 		return nil, errors.New("invalid states for ExtGState")
 	}
 
-	// Build a graphics state parameter dictionary for the given state.
-	// See table 57 in ISO 32000-2:2020.
-	dict := pdf.Dict{}
-	if set&StateTextFont != 0 {
-		ref := s.TextFont.PDFObject().(pdf.Reference)
-		dict["Font"] = pdf.Array{
-			ref,
-			pdf.Number(s.TextFontSize),
-		}
-	}
-	if set&StateTextKnockout != 0 {
-		dict["TK"] = pdf.Boolean(s.TextKnockout)
-	}
-	if set&StateLineWidth != 0 {
-		dict["LW"] = pdf.Number(s.LineWidth)
-	}
-	if set&StateLineCap != 0 {
-		dict["LC"] = pdf.Integer(s.LineCap)
-	}
-	if set&StateLineJoin != 0 {
-		dict["LJ"] = pdf.Integer(s.LineJoin)
-	}
-	if set&StateMiterLimit != 0 {
-		dict["ML"] = pdf.Number(s.MiterLimit)
-	}
-	if set&StateLineDash != 0 {
-		pat := make(pdf.Array, len(s.DashPattern))
-		for i, x := range s.DashPattern {
-			pat[i] = pdf.Number(x)
-		}
-		dict["D"] = pdf.Array{
-			pat,
-			pdf.Number(s.DashPhase),
-		}
-	}
-	if set&StateRenderingIntent != 0 {
-		dict["RI"] = pdf.Name(s.RenderingIntent)
-	}
-	if set&StateStrokeAdjustment != 0 {
-		dict["SA"] = pdf.Boolean(s.StrokeAdjustment)
-	}
-	if set&StateBlendMode != 0 {
-		dict["BM"] = s.BlendMode
-	}
-	if set&StateSoftMask != 0 {
-		dict["SMask"] = s.SoftMask
-	}
-	if set&StateStrokeAlpha != 0 {
-		dict["CA"] = pdf.Number(s.StrokeAlpha)
-	}
-	if set&StateFillAlpha != 0 {
-		dict["ca"] = pdf.Number(s.FillAlpha)
-	}
-	if set&StateAlphaSourceFlag != 0 {
-		dict["AIS"] = pdf.Boolean(s.AlphaSourceFlag)
-	}
-	if set&StateBlackPointCompensation != 0 {
-		dict["UseBlackPtComp"] = s.BlackPointCompensation
-	}
-
-	if set&StateOverprint != 0 {
-		dict["OP"] = pdf.Boolean(s.OverprintStroke)
-		if s.OverprintFill != s.OverprintStroke {
-			dict["op"] = pdf.Boolean(s.OverprintFill)
-		}
-	}
-	if set&StateOverprintMode != 0 {
-		dict["OPM"] = pdf.Integer(s.OverprintMode)
-	}
-	if set&StateBlackGeneration != 0 {
-		if _, isName := s.BlackGeneration.(pdf.Name); isName {
-			dict["BG2"] = s.BlackGeneration
-		} else {
-			dict["BG"] = s.BlackGeneration
-		}
-	}
-	if set&StateUndercolorRemoval != 0 {
-		if _, isName := s.UndercolorRemoval.(pdf.Name); isName {
-			dict["UCR2"] = s.UndercolorRemoval
-		} else {
-			dict["UCR"] = s.UndercolorRemoval
-		}
-	}
-	if set&StateTransferFunction != 0 {
-		if _, isName := s.TransferFunction.(pdf.Name); isName {
-			dict["TR2"] = s.TransferFunction
-		} else {
-			dict["TR"] = s.TransferFunction
-		}
-	}
-	if set&StateHalftone != 0 {
-		dict["HT"] = s.Halftone
-	}
-	if set&StateHalftoneOrigin != 0 {
-		dict["HTO"] = pdf.Array{
-			pdf.Number(s.HalftoneOriginX),
-			pdf.Number(s.HalftoneOriginY),
-		}
-	}
-	if set&StateFlatnessTolerance != 0 {
-		dict["FL"] = pdf.Number(s.FlatnessTolerance)
-	}
-	if set&StateSmoothnessTolerance != 0 {
-		dict["SM"] = pdf.Number(s.SmoothnessTolerance)
-	}
-
 	return &ExtGState{
 		Value: State{
 			Parameters: s.Parameters.Clone(),
 			Set:        set,
 		},
-		Dict: dict,
 	}, nil
-}
-
-type embeddedExtGState struct {
-	*ExtGState
-	Ref pdf.Reference
-}
-
-func (s *embeddedExtGState) PDFObject() pdf.Object {
-	if s.Ref != 0 {
-		return s.Ref
-	}
-	return s.ExtGState.Dict
 }
 
 // Embed adds the graphics state dictionary to a PDF file.
@@ -179,16 +59,125 @@ func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		return nil, err
 	}
 
-	res := &embeddedExtGState{ExtGState: s}
+	set := s.Value.Set
+	param := s.Value.Parameters
 
+	// Build a graphics state parameter dictionary for the given state.
+	// See table 57 in ISO 32000-2:2020.
+	dict := pdf.Dict{}
+	if set&StateTextFont != 0 {
+		// TODO(voss): embed the font
+		ref := param.TextFont.PDFObject().(pdf.Reference)
+		dict["Font"] = pdf.Array{
+			ref,
+			pdf.Number(param.TextFontSize),
+		}
+	}
+	if set&StateTextKnockout != 0 {
+		dict["TK"] = pdf.Boolean(param.TextKnockout)
+	}
+	if set&StateLineWidth != 0 {
+		dict["LW"] = pdf.Number(param.LineWidth)
+	}
+	if set&StateLineCap != 0 {
+		dict["LC"] = pdf.Integer(param.LineCap)
+	}
+	if set&StateLineJoin != 0 {
+		dict["LJ"] = pdf.Integer(param.LineJoin)
+	}
+	if set&StateMiterLimit != 0 {
+		dict["ML"] = pdf.Number(param.MiterLimit)
+	}
+	if set&StateLineDash != 0 {
+		pat := make(pdf.Array, len(param.DashPattern))
+		for i, x := range param.DashPattern {
+			pat[i] = pdf.Number(x)
+		}
+		dict["D"] = pdf.Array{
+			pat,
+			pdf.Number(param.DashPhase),
+		}
+	}
+	if set&StateRenderingIntent != 0 {
+		dict["RI"] = pdf.Name(param.RenderingIntent)
+	}
+	if set&StateStrokeAdjustment != 0 {
+		dict["SA"] = pdf.Boolean(param.StrokeAdjustment)
+	}
+	if set&StateBlendMode != 0 {
+		dict["BM"] = param.BlendMode
+	}
+	if set&StateSoftMask != 0 {
+		dict["SMask"] = param.SoftMask
+	}
+	if set&StateStrokeAlpha != 0 {
+		dict["CA"] = pdf.Number(param.StrokeAlpha)
+	}
+	if set&StateFillAlpha != 0 {
+		dict["ca"] = pdf.Number(param.FillAlpha)
+	}
+	if set&StateAlphaSourceFlag != 0 {
+		dict["AIS"] = pdf.Boolean(param.AlphaSourceFlag)
+	}
+	if set&StateBlackPointCompensation != 0 {
+		dict["UseBlackPtComp"] = param.BlackPointCompensation
+	}
+
+	if set&StateOverprint != 0 {
+		dict["OP"] = pdf.Boolean(param.OverprintStroke)
+		if param.OverprintFill != param.OverprintStroke {
+			dict["op"] = pdf.Boolean(param.OverprintFill)
+		}
+	}
+	if set&StateOverprintMode != 0 {
+		dict["OPM"] = pdf.Integer(param.OverprintMode)
+	}
+	if set&StateBlackGeneration != 0 {
+		if _, isName := param.BlackGeneration.(pdf.Name); isName {
+			dict["BG2"] = param.BlackGeneration
+		} else {
+			dict["BG"] = param.BlackGeneration
+		}
+	}
+	if set&StateUndercolorRemoval != 0 {
+		if _, isName := param.UndercolorRemoval.(pdf.Name); isName {
+			dict["UCR2"] = param.UndercolorRemoval
+		} else {
+			dict["UCR"] = param.UndercolorRemoval
+		}
+	}
+	if set&StateTransferFunction != 0 {
+		if _, isName := param.TransferFunction.(pdf.Name); isName {
+			dict["TR2"] = param.TransferFunction
+		} else {
+			dict["TR"] = param.TransferFunction
+		}
+	}
+	if set&StateHalftone != 0 {
+		dict["HT"] = param.Halftone
+	}
+	if set&StateHalftoneOrigin != 0 {
+		dict["HTO"] = pdf.Array{
+			pdf.Number(param.HalftoneOriginX),
+			pdf.Number(param.HalftoneOriginY),
+		}
+	}
+	if set&StateFlatnessTolerance != 0 {
+		dict["FL"] = pdf.Number(param.FlatnessTolerance)
+	}
+	if set&StateSmoothnessTolerance != 0 {
+		dict["SM"] = pdf.Number(param.SmoothnessTolerance)
+	}
+
+	var obj pdf.Object = dict
 	if s.SingleUse {
 		ref := rm.Out.Alloc()
-		err := rm.Out.Put(ref, s.Dict)
+		err := rm.Out.Put(ref, dict)
 		if err != nil {
 			return nil, err
 		}
-		res.Ref = ref
+		obj = ref
 	}
 
-	return res, nil
+	return pdf.Res{Data: obj}, nil
 }
