@@ -119,8 +119,14 @@ func (t EmbeddingType) MustBe(expected EmbeddingType) error {
 
 // Dicts collects all information about a font embedded in a PDF file.
 type Dicts struct {
+	// PostScriptName is the BaseFont entry of the font dictionary
+	// or CIDFont dictionary.  It does not include the subset tag.
 	PostScriptName pdf.Name
-	SubsetTag      string
+
+	// SubsetTag is the tag used to identify a font subset.
+	// This is the part of the BaseFont entry of the font dictionary
+	// before the "+" character, if any.
+	SubsetTag string
 
 	FontDict       pdf.Dict
 	CIDFontDict    pdf.Dict

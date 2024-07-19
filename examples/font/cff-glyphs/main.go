@@ -38,7 +38,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	pdft1 "seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/matrix"
@@ -66,7 +66,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := pdft1.Courier.Embed(out, nil)
+	labelFontX, err := standard.Courier.New(nil)
+	labelFont, err := labelFontX.Embed(out)
 	if err != nil {
 		log.Fatal(err)
 	}

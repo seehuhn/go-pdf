@@ -19,10 +19,11 @@ package fonttypes
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Sample is an example of a font of the given [EmbeddingType].
+//
+// This type implements the [font.Font] interface.
 type Sample struct {
 	Label       string
 	Description string
@@ -31,13 +32,8 @@ type Sample struct {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Sample) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
-	if opt == nil {
-		opt = &font.Options{
-			Composite: f.Type.IsComposite(),
-		}
-	}
-	return f.Font.Embed(w, opt)
+func (f *Sample) Embed(w pdf.Putter) (font.Layouter, error) {
+	return f.Font.Embed(w)
 }
 
 // All is a list of example fonts, covering all supported font and
@@ -47,43 +43,43 @@ var All = []*Sample{
 		Label:       "CFFSimple1",
 		Description: "a simple CFF font",
 		Type:        font.CFFSimple,
-		Font:        CFF,
+		Font:        CFFSimple,
 	},
 	{
 		Label:       "CFFSimple2",
 		Description: "a simple CFF font (with CIDFont operators)",
 		Type:        font.CFFSimple,
-		Font:        CFFCID,
+		Font:        CFFCIDSimple,
 	},
 	{
 		Label:       "OpenTypeCFFSimple1",
 		Description: "a simple OpenType/CFF font",
 		Type:        font.OpenTypeCFFSimple,
-		Font:        OpenTypeCFF,
+		Font:        OpenTypeCFFSimple,
 	},
 	{
 		Label:       "OpenTypeCFFSimple2",
 		Description: "a simple OpenType/CFF font (with CIDFont operators)",
 		Type:        font.OpenTypeCFFSimple,
-		Font:        OpenTypeCFFCID,
+		Font:        OpenTypeCFFCIDSimple,
 	},
 	{
 		Label:       "TrueTypeSimple",
 		Description: "a simple TrueType font",
 		Type:        font.TrueTypeSimple,
-		Font:        TrueType,
+		Font:        TrueTypeSimple,
 	},
 	{
 		Label:       "OpenTypeGlyfSimple",
 		Description: "a simple OpenType/Glyf font",
 		Type:        font.OpenTypeGlyfSimple,
-		Font:        OpenTypeGlyf,
+		Font:        OpenTypeGlyfSimple,
 	},
 	{
 		Label:       "BuiltIn",
 		Description: "a built-in Type 1 font",
 		Type:        font.Type1,
-		Font:        type1.Helvetica,
+		Font:        Standard,
 	},
 	{
 		Label:       "Type1",
@@ -102,48 +98,48 @@ var All = []*Sample{
 		Label:       "CFFComposite1",
 		Description: "a composite CFF font",
 		Type:        font.CFFComposite,
-		Font:        CFF,
+		Font:        CFFComposite,
 	},
 	{
 		Label:       "CFFComposite2",
 		Description: "a composite CFF font (with CIDFont operators)",
 		Type:        font.CFFComposite,
-		Font:        CFFCID,
+		Font:        CFFCIDComposite,
 	},
 	{
 		Label:       "CFFComposite3",
 		Description: "a composite CFF font (CIDFont operators and 2 private dicts)",
 		Type:        font.CFFComposite,
-		Font:        CFFCID2,
+		Font:        CFFCID2Composite,
 	},
 	{
 		Label:       "OpenTypeCFFComposite1",
 		Description: "a composite OpenType/CFF font",
 		Type:        font.OpenTypeCFFComposite,
-		Font:        OpenTypeCFF,
+		Font:        OpenTypeCFFComposite,
 	},
 	{
 		Label:       "OpenTypeCFFComposite2",
 		Description: "a composite OpenType/CFF font (with CIDFont operators)",
 		Type:        font.OpenTypeCFFComposite,
-		Font:        OpenTypeCFFCID,
+		Font:        OpenTypeCFFCIDComposite,
 	},
 	{
 		Label:       "OpenTypeCFFComposite3",
 		Description: "a composite OpenType/CFF font (CIDFont operators and 2 private dicts)",
 		Type:        font.OpenTypeCFFComposite,
-		Font:        OpenTypeCFFCID2,
+		Font:        OpenTypeCFFCID2Composite,
 	},
 	{
 		Label:       "TrueTypeComposite",
 		Description: "a composite TrueType font",
 		Type:        font.TrueTypeComposite,
-		Font:        TrueType,
+		Font:        TrueTypeComposite,
 	},
 	{
 		Label:       "OpenTypeGlyfComposite",
 		Description: "a composite OpenType/Glyf font",
 		Type:        font.OpenTypeGlyfComposite,
-		Font:        OpenTypeGlyf,
+		Font:        OpenTypeGlyfComposite,
 	},
 }

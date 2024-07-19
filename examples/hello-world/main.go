@@ -21,7 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 )
 
 func main() {
@@ -37,7 +37,11 @@ func run() error {
 		return err
 	}
 
-	font, err := type1.HelveticaBold.Embed(doc.Out, nil)
+	fontX, err := standard.Helvetica.New(nil)
+	if err != nil {
+		return err
+	}
+	font, err := fontX.Embed(doc.Out)
 	if err != nil {
 		return err
 	}

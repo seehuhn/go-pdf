@@ -24,7 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	pdfimage "seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/matrix"
 )
@@ -59,11 +59,19 @@ func run(fname string) error {
 	page.DrawXObject(img)
 	page.PopGraphicsState()
 
-	roman, err := type1.TimesRoman.Embed(page.Out, nil)
+	romanX, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		return err
 	}
-	bold, err := type1.TimesBold.Embed(page.Out, nil)
+	roman, err := romanX.Embed(page.Out)
+	if err != nil {
+		return err
+	}
+	boldX, err := standard.TimesBold.New(nil)
+	if err != nil {
+		return err
+	}
+	bold, err := boldX.Embed(page.Out)
 	if err != nil {
 		return err
 	}

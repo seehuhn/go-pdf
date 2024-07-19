@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/embed"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 )
 
 func main() {
@@ -46,11 +46,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := type1.Helvetica.Embed(doc.Out, nil)
+	labelFontX, err := standard.Helvetica.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := type1.HelveticaBold.Embed(doc.Out, nil)
+	labelFont, err := labelFontX.Embed(doc.Out)
+	if err != nil {
+		log.Fatal(err)
+	}
+	titleFontX, err := standard.HelveticaBold.New(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	titleFont, err := titleFontX.Embed(doc.Out)
 	if err != nil {
 		log.Fatal(err)
 	}

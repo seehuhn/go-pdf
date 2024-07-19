@@ -34,11 +34,11 @@ func TestWidthsFull(t *testing.T) {
 
 	otf := makefont.OpenType()
 
-	F, err := cff.New(otf)
+	F, err := cff.New(otf, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	E, err := F.Embed(data, nil)
+	E, err := F.Embed(data)
 	if err != nil {
 		t.Fatal(err)
 	}

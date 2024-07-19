@@ -48,7 +48,7 @@ const (
 )
 
 // New returns a new font instance for the given font and options.
-func (f Font) New(opt *font.Options) *type1.Instance {
+func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 	name := fontName[f]
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)

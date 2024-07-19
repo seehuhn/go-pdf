@@ -31,7 +31,7 @@ type Geometry struct {
 	UnderlineThickness float64
 
 	GlyphExtents []pdf.Rectangle // indexed by GID
-	Widths       []float64       // indexed by GID
+	Widths       []float64       // indexed by GID, PDF text space units
 }
 
 // GetGeometry returns the geometry of a font.

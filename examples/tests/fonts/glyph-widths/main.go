@@ -27,7 +27,7 @@ import (
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -46,12 +46,11 @@ func run(filename string) error {
 		return err
 	}
 
-	// H, err := type1.Helvetica.Embed(doc.Out, "H")
-	// if err != nil {
-	// 	return err
-	// }
-	F := type1.TimesRoman
-	E, err := F.Embed(doc.Out, nil)
+	F, err := standard.TimesRoman.New(nil)
+	if err != nil {
+		return err
+	}
+	E, err := F.Embed(doc.Out)
 	if err != nil {
 		return err
 	}
@@ -91,7 +90,7 @@ func run(filename string) error {
 	if err != nil {
 		return err
 	}
-	M, err := markerFont.Embed(doc.Out, nil)
+	M, err := markerFont.Embed(doc.Out)
 
 	gid := glyph.ID(0)
 	numGlyphs := min(glyph.ID(len(geom.Widths)), 256)

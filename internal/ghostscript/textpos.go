@@ -75,7 +75,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	if err != nil {
 		return 0, 0, err
 	}
-	X, err := XFont.Embed(r.Page.Out, nil)
+	X, err := XFont.Embed(r.Page.Out)
 	if err != nil {
 		return 0, 0, err
 	}

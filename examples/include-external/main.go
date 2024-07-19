@@ -23,7 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/matrix"
@@ -44,11 +44,19 @@ func run() error {
 		return err
 	}
 
-	B, err := type1.TimesBold.Embed(page.Out, nil)
+	BX, err := standard.TimesBold.New(nil)
 	if err != nil {
 		return err
 	}
-	F, err := type1.TimesRoman.Embed(page.Out, nil)
+	B, err := BX.Embed(page.Out)
+	if err != nil {
+		return err
+	}
+	FX, err := standard.TimesRoman.New(nil)
+	if err != nil {
+		return err
+	}
+	F, err := FX.Embed(page.Out)
 	if err != nil {
 		return err
 	}

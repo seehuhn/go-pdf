@@ -23,17 +23,29 @@ import (
 	"seehuhn.de/go/pdf/internal/makefont"
 )
 
-type trueTypeEmbedder struct{}
+type trueTypeEmbedder struct {
+	composite bool
+}
 
 // TrueType is a TrueType font.
-var TrueType font.Font = trueTypeEmbedder{}
+var (
+	TrueTypeSimple    font.Font = trueTypeEmbedder{composite: false}
+	TrueTypeComposite font.Font = trueTypeEmbedder{composite: true}
+)
 
-func (trueTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+func (t trueTypeEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
 	info := makefont.TrueType()
+
+	var opt *font.Options
+	if t.composite {
+		opt = &font.Options{
+			Composite: true,
+		}
+	}
 
 	F, err := truetype.New(info, opt)
 	if err != nil {
 		return nil, err
 	}
-	return F.Embed(w, nil)
+	return F.Embed(w)
 }

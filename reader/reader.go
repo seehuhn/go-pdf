@@ -35,8 +35,8 @@ type Reader struct {
 	R      pdf.Getter
 	loader *loader.FontLoader
 
-	scanner    *scanner.Scanner
-	nextIntRef uint32
+	scanner         *scanner.Scanner
+	nextInternalRef uint32
 
 	fontCache map[pdf.Reference]FontFromFile
 

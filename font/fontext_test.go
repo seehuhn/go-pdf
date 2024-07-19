@@ -48,7 +48,7 @@ func TestSpaceIsBlank(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
 			data := pdf.NewData(pdf.V1_7)
-			F, err := sample.Embed(data, nil)
+			F, err := sample.Embed(data)
 			if err != nil {
 				t.Fatal(err)
 			}

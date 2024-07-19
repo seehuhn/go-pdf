@@ -41,7 +41,7 @@ var All = []TestCase{
 		// We still need to set a font so that there is a font size available
 		// for the text position calculation.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test the normal case: we use TextSetFont and print simple string.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test a two-line text, using TextSecondLine.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test a three-line text, using TextSecondLine and TextNextLine.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test TextSetCharacterSpacing.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test TextSetCharacterSpacing with negative spacing.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test positive word spacing.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test negative word spacing.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test horizontally stretched text.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -163,7 +163,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test horizontally compressed text.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -176,7 +176,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test horizontally mirrored text.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -190,7 +190,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test TextSetLeading.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -210,7 +210,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test the text rise.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -224,7 +224,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test text rotated by 45 degrees.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -237,7 +237,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test an arbitrary text matrix.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -250,7 +250,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test TextShowRaw.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test TextShowNextLineRaw.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}
@@ -279,7 +279,7 @@ var All = []TestCase{
 	func(p *document.Page) error {
 		// Test TextShowSpacedRaw.
 		Ex := gofont.Regular.New(nil)
-		E, err := Ex.Embed(p.Out, nil)
+		E, err := Ex.Embed(p.Out)
 		if err != nil {
 			return err
 		}

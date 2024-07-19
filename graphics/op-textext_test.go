@@ -220,7 +220,7 @@ func TestTextShowRaw2(t *testing.T) {
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
 			img1 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := sample.Embed(r.Out, nil)
+				F, err := sample.Embed(r.Out)
 				if err != nil {
 					return err
 				}
@@ -240,7 +240,7 @@ func TestTextShowRaw2(t *testing.T) {
 			})
 			// Then print each glyph at the recorded x positions.
 			img2 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := sample.Embed(r.Out, nil)
+				F, err := sample.Embed(r.Out)
 				if err != nil {
 					return err
 				}

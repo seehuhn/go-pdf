@@ -24,13 +24,10 @@ import (
 
 // Font represents a font instance which can be embedded in a PDF file.
 type Font interface {
-	Embed(w pdf.Putter, opt *Options) (Layouter, error)
+	Embed(w pdf.Putter) (Layouter, error)
 }
 
 // Embedded represents a font which is already embedded in a PDF file.
-//
-// In addition to satisfying the interface, embedded fonts must also
-// be "comparable" using the == operator.
 type Embedded interface {
 	pdf.Resource
 	WritingMode() int // 0 = horizontal, 1 = vertical

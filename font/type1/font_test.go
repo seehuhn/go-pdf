@@ -17,7 +17,6 @@
 package type1
 
 import (
-	"fmt"
 	"math"
 	"slices"
 	"testing"
@@ -28,89 +27,23 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
 
-// TestEmbed checks that the font can be embedded into a PDF file.
-func TestEmbed(t *testing.T) {
-	psFont := makefont.Type1()
-	metrics := makefont.AFM()
-
-	for i := 1; i <= 3; i++ {
-		t.Run(fmt.Sprintf("%02b", i), func(t *testing.T) {
-			var psf *type1.Font
-			var metr *afm.Metrics
-
-			// try all allowed combinations of psfont and metrics
-			if includeFont := i&1 != 0; includeFont {
-				psf = psFont
-			}
-			if useMetrics := i&2 != 0; useMetrics {
-				metr = metrics
-			}
-			F, err := NewFont(psf, metr)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// encode some characters and embed the font
-			data := pdf.NewData(pdf.V1_7)
-			E, err := F.Embed(data, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			testString := "Hello, World!"
-			gg := E.Layout(nil, 1, testString)
-			var codes pdf.String
-			for _, g := range gg.Seq {
-				codes, _, _ = E.CodeAndWidth(codes, g.GID, g.Text)
-			}
-			err = E.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// read back the font and check the result
-			fontDicts, err := font.ExtractDicts(data, E.PDFObject())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if fontDicts.Type != font.Type1 {
-				t.Errorf("wrong font type %s (instead of Type1)", fontDicts.Type)
-			}
-			if fontDicts.PostScriptName != pdf.Name(psFont.FontName) {
-				t.Errorf("wrong font name: %q != %q",
-					fontDicts.PostScriptName, psf.FontName)
-			}
-
-			info, err := Extract(data, fontDicts)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if (info.Font != nil) != (psf != nil) {
-				t.Errorf("font are included: %t, font should be included: %t",
-					info.Font != nil, psf != nil)
-			}
-			if info.Metrics == nil {
-				t.Error("metrics are missing")
-			}
-		})
-	}
-}
-
 // TestToUnicode verifies that the ToUnicode cmap is only generated if
 // necessary, and that in this case it is works.
 func TestToUnicode(t *testing.T) {
-	F := TimesRoman
+	F := testFont
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for _, X := range []string{"A", "B"} {
 			t.Run(v.String()+X, func(t *testing.T) {
 				data := pdf.NewData(v)
 
-				E, err := F.Embed(data, nil)
+				E, err := F.Embed(data)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -169,13 +102,13 @@ func TestToUnicode(t *testing.T) {
 // This requires to allocate a code which is mapped to a non-existing glyph
 // name.
 func TestNotdefGlyph(t *testing.T) {
-	F := TimesRoman
+	F := testFont
 
 	// Try both the built-in version (PDF-1.7) and the embedded version (PDF-2.0)
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
-			E, err := F.Embed(data, nil)
+			E, err := F.Embed(data)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -227,11 +160,49 @@ func TestNotdefGlyph(t *testing.T) {
 	}
 }
 
-func TestDefaultFontRoundTrip(t *testing.T) {
-	t1, err := TimesItalic.psFont()
+// TestEncoding checks that the encoding of a Type 1 font is the standard
+// encoding, if the set of included characters is in the standard encoding.
+func TestEncoding(t *testing.T) {
+	t1 := makefont.Type1()
+	metrics := makefont.AFM()
+	F, err := New(t1, metrics, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Embed the font
+	data := pdf.NewData(pdf.V1_7)
+	E, err := F.Embed(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gg := E.Layout(nil, 10, ".MiAbc")
+	for _, g := range gg.Seq {
+		E.CodeAndWidth(nil, g.GID, g.Text) // allocate codes
+	}
+	err = E.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dicts, err := font.ExtractDicts(data, E.PDFObject())
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := Extract(data, dicts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 256; i++ {
+		if info.Encoding[i] != ".notdef" && info.Encoding[i] != pdfenc.StandardEncoding[i] {
+			t.Error(i, info.Encoding[i])
+		}
+	}
+}
+
+func TestDefaultFontRoundTrip(t *testing.T) {
+	t1 := testFont.Font
 
 	encoding := make([]string, 256)
 	for i := range encoding {
@@ -254,7 +225,7 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 
 	rw := pdf.NewData(pdf.V1_7)
 	ref := rw.Alloc()
-	err = info1.Embed(rw, ref)
+	err := info1.Embed(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,47 +259,6 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 	})
 	if d := cmp.Diff(info1, info2, cmpFloat); d != "" {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
-	}
-}
-
-// TestEncoding checks that the encoding of a Type 1 font is the standard
-// encoding, if the set of included characters is in the standard encoding.
-func TestEncoding(t *testing.T) {
-	t1 := makefont.Type1()
-	metrics := makefont.AFM()
-	F, err := NewFont(t1, metrics)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Embed the font
-	data := pdf.NewData(pdf.V1_7)
-	E, err := F.Embed(data, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gg := E.Layout(nil, 10, ".MiAbc")
-	for _, g := range gg.Seq {
-		E.CodeAndWidth(nil, g.GID, g.Text) // allocate codes
-	}
-	err = E.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dicts, err := font.ExtractDicts(data, E.PDFObject())
-	if err != nil {
-		t.Fatal(err)
-	}
-	info, err := Extract(data, dicts)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < 256; i++ {
-		if info.Encoding[i] != ".notdef" && info.Encoding[i] != pdfenc.StandardEncoding[i] {
-			t.Error(i, info.Encoding[i])
-		}
 	}
 }
 
@@ -391,5 +321,38 @@ func TestRoundTrip(t *testing.T) {
 	})
 	if d := cmp.Diff(info1, info2, cmpFloat); d != "" {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
+	}
+}
+
+var testFont *Instance
+
+func init() {
+	builtin := loader.NewFontLoader()
+
+	name := "Times-Roman"
+
+	fontData, err := builtin.Open(name, loader.FontTypeType1)
+	if err != nil {
+		panic(err)
+	}
+	psFont, err := type1.Read(fontData)
+	if err != nil {
+		panic(err)
+	}
+	fontData.Close()
+
+	afmData, err := builtin.Open(name, loader.FontTypeAFM)
+	if err != nil {
+		panic(err)
+	}
+	metrics, err := afm.Read(afmData)
+	if err != nil {
+		panic(err)
+	}
+	afmData.Close()
+
+	testFont, err = New(psFont, metrics, nil)
+	if err != nil {
+		panic(err)
 	}
 }

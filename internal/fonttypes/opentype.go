@@ -24,29 +24,43 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
-type openTypeEmbedder int
+type openTypeEmbedder struct {
+	tp        int
+	composite bool
+}
 
 // OpenType fonts
 var (
 	// OpenTypeGlyf is an OpenType font with glyph outlines.
-	OpenTypeGlyf font.Font = openTypeEmbedder(0)
+	OpenTypeGlyfSimple font.Font = openTypeEmbedder{tp: 0, composite: false}
 
 	// OpenTypeCFF is an OpenType font with CFF outlines and no CIDFont
 	// operators.
-	OpenTypeCFF font.Font = openTypeEmbedder(1)
+	OpenTypeCFFSimple font.Font = openTypeEmbedder{tp: 1, composite: false}
 
 	// OpenTypeCFFCID is an OpenType font with CFF outlines and CIDFont
 	// operators.
-	OpenTypeCFFCID font.Font = openTypeEmbedder(2)
+	OpenTypeCFFCIDSimple font.Font = openTypeEmbedder{tp: 2, composite: false}
+
+	// OpenTypeGlyf is an OpenType font with glyph outlines.
+	OpenTypeGlyfComposite font.Font = openTypeEmbedder{tp: 0, composite: true}
+
+	// OpenTypeCFF is an OpenType font with CFF outlines and no CIDFont
+	// operators.
+	OpenTypeCFFComposite font.Font = openTypeEmbedder{tp: 1, composite: true}
+
+	// OpenTypeCFFCID is an OpenType font with CFF outlines and CIDFont
+	// operators.
+	OpenTypeCFFCIDComposite font.Font = openTypeEmbedder{tp: 2, composite: true}
 
 	// OpenTypeCFFCID2 is an OpenType font with CFF outlines, CIDFont
 	// operators, and multiple private dictionaries.
-	OpenTypeCFFCID2 font.Font = openTypeEmbedder(3)
+	OpenTypeCFFCID2Composite font.Font = openTypeEmbedder{tp: 3, composite: true}
 )
 
-func (f openTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+func (f openTypeEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
 	var info *sfnt.Font
-	switch f {
+	switch f.tp {
 	case 0:
 		info = makefont.TrueType()
 	case 1:
@@ -57,9 +71,14 @@ func (f openTypeEmbedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter,
 		info = makefont.OpenTypeCID2()
 	}
 
-	F, err := opentype.New(info)
+	var opt *font.Options
+	if f.composite {
+		opt = &font.Options{Composite: true}
+	}
+
+	F, err := opentype.New(info, opt)
 	if err != nil {
 		return nil, err
 	}
-	return F.Embed(w, opt)
+	return F.Embed(w)
 }

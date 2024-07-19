@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -47,7 +47,11 @@ func run() error {
 		return err
 	}
 
-	F, err := type1.Helvetica.Embed(page.Out, nil)
+	FX, err := standard.Helvetica.New(nil)
+	if err != nil {
+		return err
+	}
+	F, err := FX.Embed(page.Out)
 	if err != nil {
 		return err
 	}
@@ -69,7 +73,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	D, err := Delim.Embed(page.Out, nil)
+	D, err := Delim.Embed(page.Out)
 
 	yPos := paper.URy - 72 - 15
 

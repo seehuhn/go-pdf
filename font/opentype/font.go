@@ -27,12 +27,16 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
-type embedder struct {
-	sfnt *sfnt.Font
+// Instance is an OpenType font instance.
+type Instance struct {
+	*sfnt.Font
+	Opt *font.Options
 }
 
-// New makes a PDF font from an OpenType/TrueType font. The font can be
-// embedded as a simple font or as a composite font.
+// New makes a PDF font from an OpenType/TrueType font.
+//
+// The font options control whether the font will be embedded as a simple font
+// or as a composite font.
 //
 // If the font has CFF outlines, it is often more efficient to embed the CFF
 // glyph data without the OpenType wrapper. Consider using
@@ -40,22 +44,26 @@ type embedder struct {
 // TrueType outlines, it is often more efficient to embed the font as a
 // TrueType font instead of an OpenType font.  Consider using
 // [seehuhn.de/go/pdf/font/truetype.New] instead of this function.
-func New(info *sfnt.Font) (font.Font, error) {
-	return embedder{sfnt: info}, nil
+func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
+	return &Instance{Font: info, Opt: opt}, nil
 }
 
-func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+// Embed adds the font to a PDF file.
+//
+// This implements the [font.Font] interface.
+func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 	err := pdf.CheckVersion(w, "OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
 	}
 
+	opt := f.Opt
 	if opt == nil {
 		opt = &font.Options{}
 	}
 
-	info := f.sfnt
-	layouter, err := f.sfnt.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	info := f.Font
+	layouter, err := f.Font.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +71,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 	resource := pdf.Res{Data: w.Alloc()}
 
 	var res font.Layouter
-	if f.sfnt.IsCFF() {
+	if f.Font.IsCFF() {
 		geometry := &font.Geometry{
 			GlyphExtents: scaleBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
 			Widths:       info.WidthsPDF(),
@@ -80,7 +88,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 				w:             w,
 				Res:           resource,
 				Geometry:      geometry,
-				sfnt:          f.sfnt,
+				sfnt:          f.Font,
 				layouter:      layouter,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 			}
@@ -103,7 +111,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 				w:          w,
 				Res:        resource,
 				Geometry:   geometry,
-				sfnt:       f.sfnt,
+				sfnt:       f.Font,
 				layouter:   layouter,
 				GIDToCID:   gidToCID,
 				CIDEncoder: cidEncoder,
@@ -126,7 +134,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 				w:             w,
 				Res:           resource,
 				Geometry:      geometry,
-				sfnt:          f.sfnt,
+				sfnt:          f.Font,
 				layouter:      layouter,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 				closed:        false,
@@ -150,7 +158,7 @@ func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) 
 				w:          w,
 				Res:        resource,
 				Geometry:   geometry,
-				sfnt:       f.sfnt,
+				sfnt:       f.Font,
 				layouter:   layouter,
 				GIDToCID:   gidToCID,
 				CIDEncoder: cidEncoder,

@@ -59,6 +59,8 @@ type Font struct {
 	RM        *pdf.ResourceManager
 
 	NumOpen int // -1 if the font is embedded, otherwise the number of glyphs not yet closed
+
+	Opt *font.Options // TODO(voss): set/check this
 }
 
 // Glyph is a glyph in a type 3 font.
@@ -104,12 +106,13 @@ func (f *Font) glyphList() []string {
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Font) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+func (f *Font) Embed(w pdf.Putter) (font.Layouter, error) {
 	if f.NumOpen > 0 {
 		return nil, fmt.Errorf("font: %d glyphs not closed", f.NumOpen)
 	}
 	f.NumOpen = -1
 
+	opt := f.Opt
 	if opt == nil {
 		opt = &font.Options{}
 	}

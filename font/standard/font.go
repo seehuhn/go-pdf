@@ -49,26 +49,26 @@ const (
 )
 
 // New returns a new font instance for the given standard font and options.
-func (f Font) New(opt *font.Options) *type1.Instance {
+func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 	name := fontName[f]
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)
 	if err != nil {
-		panic("invalid standard font ID")
+		return nil, err // should not happen
 	}
 	psFont, err := pstype1.Read(fontData)
 	if err != nil {
-		panic("built-in standard font corrupted???")
+		return nil, err // should not happen
 	}
 	fontData.Close()
 
 	afmData, err := builtin.Open(name, loader.FontTypeAFM)
 	if err != nil {
-		panic("built-in standard font metrics missing???")
+		return nil, err // should not happen
 	}
 	metrics, err := afm.Read(afmData)
 	if err != nil {
-		panic("built-in standard font metrics corrupted???")
+		return nil, err // should not happen
 	}
 	afmData.Close()
 

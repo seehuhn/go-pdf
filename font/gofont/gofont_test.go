@@ -32,7 +32,7 @@ func TestLigatures(t *testing.T) {
 		F := Fx.New(nil)
 
 		data := pdf.NewData(pdf.V2_0)
-		E, err := F.Embed(data, nil)
+		E, err := F.Embed(data)
 		if err != nil {
 			t.Fatal(err)
 		}

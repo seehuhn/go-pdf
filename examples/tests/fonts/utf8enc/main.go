@@ -52,11 +52,11 @@ func doit() error {
 		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
 		MakeEncoder:  cmap.NewCIDEncoderUTF8,
 	}
-	FF, err := cff.New(info)
+	FF, err := cff.New(info, opt)
 	if err != nil {
 		return err
 	}
-	F, err := FF.Embed(page.Out, opt)
+	F, err := FF.Embed(page.Out)
 	if err != nil {
 		return err
 	}

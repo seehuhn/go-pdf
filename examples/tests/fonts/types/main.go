@@ -23,12 +23,10 @@ import (
 	"regexp"
 	"sort"
 
-	"golang.org/x/text/language"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
@@ -62,26 +60,42 @@ func doit() error {
 		rightMargin: 144.0,
 	}
 
-	F, err := type1.TimesRoman.Embed(doc.Out, nil)
+	FX, err := standard.TimesRoman.New(nil)
+	if err != nil {
+		return err
+	}
+	F, err := FX.Embed(doc.Out)
 	if err != nil {
 		return err
 	}
 	l.addFont("text", F, 10)
 
-	I, err := type1.TimesItalic.Embed(doc.Out, nil)
+	IX, err := standard.TimesItalic.New(nil)
+	if err != nil {
+		return err
+	}
+	I, err := IX.Embed(doc.Out)
 	if err != nil {
 		return err
 	}
 	l.addFont("it", I, 10)
 
-	S, err := type1.Helvetica.Embed(doc.Out, nil)
+	SX, err := standard.Helvetica.New(nil)
+	if err != nil {
+		return err
+	}
+	S, err := SX.Embed(doc.Out)
 	if err != nil {
 		return err
 	}
 	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
-	SB, err := type1.HelveticaBold.Embed(doc.Out, nil)
+	SBX, err := standard.HelveticaBold.New(nil)
+	if err != nil {
+		return err
+	}
+	SB, err := SBX.Embed(doc.Out)
 	if err != nil {
 		return err
 	}
@@ -96,7 +110,6 @@ func doit() error {
 
 		var X font.Font
 		var ffKey pdf.Name
-		composite := false
 		switch title {
 		case "Simple PDF Fonts":
 			// part 1
@@ -104,41 +117,40 @@ func doit() error {
 			X = fonttypes.Type1
 			ffKey = "FontFile"
 		case "Builtin Fonts":
-			X = type1.Helvetica
+			X, err = standard.Helvetica.New(nil)
+			if err != nil {
+				return err
+			}
 		case "Simple CFF Fonts":
-			X = fonttypes.CFF
+			X = fonttypes.CFFSimple
 			ffKey = "FontFile3"
 		case "Simple CFF-based OpenType Fonts":
-			X = fonttypes.OpenTypeCFF
+			X = fonttypes.OpenTypeCFFSimple
 			ffKey = "FontFile3"
 		case "Multiple Master Fonts":
 			// not supported
 		case "Simple TrueType Fonts":
-			X = fonttypes.TrueType
+			X = fonttypes.TrueTypeSimple
 			ffKey = "FontFile2"
 		case "Simple Glyf-based OpenType Fonts":
-			X = fonttypes.OpenTypeGlyf
+			X = fonttypes.OpenTypeGlyfSimple
 			ffKey = "FontFile3"
 		case "Type 3 Fonts":
 			X = fonttypes.Type3
 		case "Composite PDF Fonts":
 			// part 2
 		case "Composite CFF Fonts":
-			X = fonttypes.CFF
+			X = fonttypes.CFFComposite
 			ffKey = "FontFile3"
-			composite = true
 		case "Composite CFF-based OpenType Fonts":
-			X = fonttypes.OpenTypeCFF
+			X = fonttypes.OpenTypeCFFComposite
 			ffKey = "FontFile3"
-			composite = true
 		case "Composite TrueType Fonts":
-			X = fonttypes.TrueType
+			X = fonttypes.TrueTypeComposite
 			ffKey = "FontFile2"
-			composite = true
 		case "Composite Glyf-based OpenType Fonts":
-			X = fonttypes.OpenTypeGlyf
+			X = fonttypes.OpenTypeGlyfComposite
 			ffKey = "FontFile3"
-			composite = true
 		default:
 			panic("unexpected section " + title)
 		}
@@ -215,11 +227,7 @@ func doit() error {
 		}
 
 		if X != nil {
-			opt := &font.Options{
-				Language:  language.English,
-				Composite: composite,
-			}
-			Y, err := X.Embed(doc.Out, opt)
+			Y, err := X.Embed(doc.Out)
 			if err != nil {
 				return err
 			}
@@ -338,7 +346,7 @@ func writeSinglePage(F font.Font, no int) error {
 		return err
 	}
 
-	X, err := F.Embed(page.Out, nil)
+	X, err := F.Embed(page.Out)
 	if err != nil {
 		return err
 	}

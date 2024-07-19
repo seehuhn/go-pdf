@@ -26,11 +26,11 @@ var Type3 = &type3embedder{}
 
 type type3embedder struct{}
 
-func (_ *type3embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+func (_ *type3embedder) Embed(w pdf.Putter) (font.Layouter, error) {
 	F, err := makefont.Type3()
 	if err != nil {
 		return nil, err
 	}
 
-	return F.Embed(w, opt)
+	return F.Embed(w)
 }

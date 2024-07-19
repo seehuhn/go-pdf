@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/reader"
@@ -36,10 +36,16 @@ import (
 
 func TestGlyphWidths(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
-	F, err := type1.TimesRoman.Embed(data, nil)
+
+	FX, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	F, err := FX.Embed(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	gg0 := F.Layout(nil, 50, "AB")
 	if len(gg0.Seq) != 2 {
 		t.Fatal("wrong number of glyphs")
@@ -107,7 +113,7 @@ func TestSpaceAdvance(t *testing.T) {
 	rm := pdf.NewResourceManager(data)
 
 	Fx := gofont.Regular.New(nil)
-	F, err := Fx.Embed(data, nil)
+	F, err := Fx.Embed(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +145,7 @@ func TestSpaceAdvance(t *testing.T) {
 }
 
 func BenchmarkTextLayout(b *testing.B) {
-	// F := type1.TimesRoman
+	// F := standard.TimesRoman
 
 	F := gofont.Regular.New(nil)
 
@@ -168,7 +174,7 @@ func writeDummyDocument(w io.Writer, F font.Font) error {
 		return err
 	}
 
-	E, err := F.Embed(doc.Out, nil)
+	E, err := F.Embed(doc.Out)
 	if err != nil {
 		return err
 	}

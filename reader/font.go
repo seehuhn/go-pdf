@@ -74,8 +74,8 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		if stm, err := L.Open(string(fontDicts.PostScriptName), tp); err == nil {
 			fontDicts.Type = font.Type1
 			fontDicts.FontProgram = &pdf.Stream{R: stm}
-			fontDicts.FontProgramRef = pdf.NewInternalReference(r.nextIntRef)
-			r.nextIntRef++
+			fontDicts.FontProgramRef = pdf.NewInternalReference(r.nextInternalRef)
+			r.nextInternalRef++
 		} else if !os.IsNotExist(err) {
 			return nil, err
 		}

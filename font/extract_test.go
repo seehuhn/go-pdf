@@ -47,7 +47,7 @@ func TestExtract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			F, err := sample.Embed(w.Out, nil)
+			F, err := sample.Embed(w.Out)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -82,10 +82,13 @@ func FuzzExtract(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		F, err := fontInfo.Embed(w.Out, nil)
+		F, err := fontInfo.Embed(w.Out)
 		if err != nil {
 			f.Fatal(err)
 		}
+
+		w.SetFontNameInternal(F, "X")
+
 		w.TextBegin()
 		w.TextSetFont(F, 12)
 		w.TextFirstLine(100, 100)

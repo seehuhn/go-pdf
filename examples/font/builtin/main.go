@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -39,11 +40,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := type1.TimesRoman.Embed(doc.Out, nil)
+	labelFontX, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := type1.TimesBold.Embed(doc.Out, nil)
+	labelFont, err := labelFontX.Embed(doc.Out)
+	if err != nil {
+		log.Fatal(err)
+	}
+	titleFontX, err := standard.TimesBold.New(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	titleFont, err := titleFontX.Embed(doc.Out)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,12 +72,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, fontName := range type1.Standard {
-		err = f.AddTitle(string(fontName), 10, 36, 12)
+	for _, G := range standard.All {
+		F, err := G.New(nil)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = f.MakeColumns(fontName)
+		err = f.AddTitle(F.PostScriptName(), 10, 36, 12)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = f.MakeColumns(F)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -157,15 +170,12 @@ func (f *fontTables) AddTitle(title string, fontSize, before, after float64) err
 	return nil
 }
 
-func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
+func (f *fontTables) MakeColumns(fnt *type1.Instance) error {
 	fontSize := 10.0
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4
 
-	afm, err := fnt.AFM()
-	if err != nil {
-		return err
-	}
+	afm := fnt.Metrics
 	glyphNames := afm.GlyphList()
 	nGlyph := len(glyphNames)
 
@@ -182,7 +192,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 	curGlyph := 0
 	for curGlyph < nGlyph {
 		// we need space for at least one line
-		err = f.MakeSpace(baseLineSkip)
+		err := f.MakeSpace(baseLineSkip)
 		if err != nil {
 			return nil
 		}
@@ -237,7 +247,7 @@ func (f *fontTables) MakeColumns(fnt type1.Builtin) error {
 					// The builtin fonts are simple fonts, so we can only
 					// use up to 256 glyphs for each embedded copy of the
 					// font.
-					F, err = fnt.Embed(f.doc.Out, nil)
+					F, err = fnt.Embed(f.doc.Out)
 					if err != nil {
 						return err
 					}

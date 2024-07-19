@@ -59,7 +59,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Dict, err := F1.Embed(doc.Out, nil)
+	F1Dict, err := F1.Embed(doc.Out)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -241,6 +241,25 @@ func (w *Writer) getResourceNameOld(category resourceCategory, r pdf.Resource) p
 	return name
 }
 
+// SetFontNameInternal controls how the font is refered to in the content
+// stream.  Normally, a name is allocated automatically, so use of this
+// function is not normally required.
+func (w *Writer) SetFontNameInternal(f font.Embedded, name pdf.Name) error {
+	// TODO(voss): convert to use writerSetResourceName
+
+	for k, v := range w.resNameOld {
+		if k.cat == catFont && v == name {
+			return fmt.Errorf("name %q is already used", name)
+		}
+	}
+
+	field := w.getCategoryDict(catFont)
+	(*field)[name] = f.PDFObject()
+	w.resNameOld[catRes{catFont, f}] = name
+
+	return nil
+}
+
 // IsValid returns true, if the current graphics object is one of the given types
 // and if p.Err is nil.  Otherwise it sets p.Err and returns false.
 func (w *Writer) isValid(cmd string, ss objectType) bool {

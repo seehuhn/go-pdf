@@ -35,7 +35,7 @@ func TestTextLayout1(t *testing.T) {
 			rm := pdf.NewResourceManager(data)
 
 			Fx := gofont.Regular.New(nil)
-			F, err := Fx.Embed(data, nil)
+			F, err := Fx.Embed(data)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -74,7 +74,7 @@ func TestTextLayout2(t *testing.T) {
 			rm := pdf.NewResourceManager(data)
 
 			Fx := gofont.Regular.New(nil)
-			F, err := Fx.Embed(data, nil)
+			F, err := Fx.Embed(data)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -111,7 +111,7 @@ func TestTextLayout3(t *testing.T) {
 	rm := pdf.NewResourceManager(data)
 
 	Fx := gofont.Regular.New(nil)
-	F, err := Fx.Embed(data, nil)
+	F, err := Fx.Embed(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestTextLayout4(t *testing.T) {
 	rm := pdf.NewResourceManager(data)
 
 	Fx := gofont.Regular.New(nil)
-	F, err := Fx.Embed(data, nil)
+	F, err := Fx.Embed(data)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/embed"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
@@ -66,15 +66,27 @@ func main() {
 		log.Fatal(err)
 	}
 
-	helvetica, err := type1.Helvetica.Embed(doc.Out, nil)
+	helveticaX, err := standard.Helvetica.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	italic, err := type1.TimesItalic.Embed(doc.Out, nil)
+	helvetica, err := helveticaX.Embed(doc.Out)
 	if err != nil {
 		log.Fatal(err)
 	}
-	courier, err := type1.Courier.Embed(doc.Out, nil)
+	italicX, err := standard.TimesItalic.New(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	italic, err := italicX.Embed(doc.Out)
+	if err != nil {
+		log.Fatal(err)
+	}
+	courierX, err := standard.Courier.New(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	courier, err := courierX.Embed(doc.Out)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -33,7 +33,7 @@ func TestSamples(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			X, err := sample.Embed(page.Out, nil)
+			X, err := sample.Embed(page.Out)
 			if err != nil {
 				t.Fatal(err)
 			}

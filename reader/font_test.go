@@ -45,7 +45,7 @@ func TestExtractText(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			E, err := sample.Embed(doc.Out, nil)
+			E, err := sample.Embed(doc.Out)
 			if err != nil {
 				t.Fatal(err)
 			}

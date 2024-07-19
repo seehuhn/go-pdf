@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2021  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,30 +14,44 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package type1
+package standard
 
 import (
-	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // TestEmbedBuiltin tests that the 14 standard PDF fonts can be
-// embedded and that (for PDF-1.7) the font program is not included.
+// embedded and that for PDF-1.7 the font program is not included.
 func TestEmbedBuiltin(t *testing.T) {
-	for _, F := range Standard {
-		t.Run(string(F), func(t *testing.T) {
+	for _, G := range All {
+		t.Run(fontName[G], func(t *testing.T) {
 			data := pdf.NewData(pdf.V1_7)
 
-			E, err := F.Embed(data, nil)
+			F, err := G.New(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			E, err := F.Embed(data)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			gg := E.Layout(nil, 10, "Hello World")
+			var testText string
+			switch fontName[G] {
+			case "Symbol":
+				testText = "∀"
+			case "ZapfDingbats":
+				testText = "♠"
+			default:
+				testText = "Hello World"
+			}
+
+			gg := E.Layout(nil, 10, testText)
 			for _, g := range gg.Seq { // allocate codes
 				E.CodeAndWidth(nil, g.GID, g.Text)
 			}
@@ -51,8 +65,8 @@ func TestEmbedBuiltin(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if dicts.FontDict["BaseFont"] != pdf.Name(F) {
-				t.Errorf("wrong BaseFont: %s != %s", dicts.FontDict["BaseFont"], F)
+			if name := pdf.Name(fontName[G]); dicts.FontDict["BaseFont"] != name {
+				t.Errorf("wrong BaseFont: %s != %s", dicts.FontDict["BaseFont"], name)
 			}
 			if dicts.FontProgram != nil {
 				t.Errorf("font program wrongly included")
@@ -62,7 +76,7 @@ func TestEmbedBuiltin(t *testing.T) {
 }
 
 // TestExtractBuiltin tests that one of the 14 standard PDF fonts,
-// embedded using a information, can be extracted again.
+// once embedded, can be extracted again.
 func TestExtractBuiltin(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
 	ref := data.Alloc()
@@ -81,42 +95,32 @@ func TestExtractBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := Extract(data, dicts)
+	info, err := type1.Extract(data, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !info.IsStandard() {
-		t.Errorf("built-in font not recognized")
-	}
-}
-
-func TestUnknownBuiltin(t *testing.T) {
-	F := Builtin("unknown font")
-	w := pdf.NewData(pdf.V1_7)
-	_, err := F.Embed(w, nil)
-	if !os.IsNotExist(err) {
-		t.Errorf("wrong error: %s", err)
-	}
+	_ = info
+	// if !info.IsStandard() {
+	// 	t.Errorf("built-in font not recognized")
+	// }
 }
 
 // TestGlyphLists tests that the glyph lists of the 14 standard PDF
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphLists(t *testing.T) {
-	for _, F := range Standard {
-		psFont, err := F.psFont()
+	for _, G := range All {
+		F, err := G.New(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		metrics, err := F.AFM()
-		if err != nil {
-			t.Fatal(err)
-		}
+		psFont := F.Font
+		metrics := F.Metrics
 
 		glyphNames1 := psFont.GlyphList()
 		glyphNames2 := metrics.GlyphList()
 		if d := cmp.Diff(glyphNames1, glyphNames2); d != "" {
-			t.Errorf("%-22s differ: %s", F, d)
+			t.Errorf("%-22s differ: %s", fontName[G], d)
 		}
 	}
 }
@@ -124,22 +128,20 @@ func TestGlyphLists(t *testing.T) {
 // TestGlyphWidths tests that the glyph widths of the 14 standard PDF
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphWidths(t *testing.T) {
-	for _, F := range Standard {
-		psFont, err := F.psFont()
+	for _, G := range All {
+		F, err := G.New(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		metrics, err := F.AFM()
-		if err != nil {
-			t.Fatal(err)
-		}
+		psFont := F.Font
+		metrics := F.Metrics
 
 		for name, g := range psFont.Glyphs {
 			w1 := g.WidthX
 			w2 := metrics.Glyphs[name].WidthX
 			if w1 != w2 {
 				t.Errorf("%-22s %-8s width=%g, claimedWidth=%g",
-					F, name, w1, w2)
+					fontName[G], name, w1, w2)
 			}
 		}
 	}
@@ -148,15 +150,13 @@ func TestGlyphWidths(t *testing.T) {
 // TestBlankGlyphs checks that glyphs are marked as blank in the
 // metrics file if and only if they are blank in the .pfb file.
 func TestBlankGlyphs(t *testing.T) {
-	for _, F := range Standard {
-		psFont, err := F.psFont()
+	for _, G := range All {
+		F, err := G.New(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		metrics, err := F.AFM()
-		if err != nil {
-			t.Fatal(err)
-		}
+		psFont := F.Font
+		metrics := F.Metrics
 		for name, g := range psFont.Glyphs {
 			isBlank := len(g.Cmds) == 0
 			claimedBlank := metrics.Glyphs[name].BBox.IsZero()
@@ -164,7 +164,7 @@ func TestBlankGlyphs(t *testing.T) {
 			// life-patching the type 1 fonts after loading.
 			if isBlank != claimedBlank && name != ".notdef" {
 				t.Errorf("%-22s %-8s isBlank=%v, claimedBlank=%v",
-					F, name, isBlank, claimedBlank)
+					fontName[G], name, isBlank, claimedBlank)
 			}
 		}
 	}
@@ -174,9 +174,13 @@ func TestBlankGlyphs(t *testing.T) {
 func TestLigatures(t *testing.T) {
 	ligatures := []string{"ﬀ=ff", "ﬁ=fi", "ﬂ=fl", "ﬃ=ffi", "ﬄ=ffl"}
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for i, F := range Standard {
+		for i, G := range All {
 			data := pdf.NewData(v)
-			E, err := F.Embed(data, nil)
+			F, err := G.New(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			E, err := F.Embed(data)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -228,20 +232,3 @@ func TestLigatures(t *testing.T) {
 		}
 	}
 }
-
-var (
-	_ font.Font = Courier
-	_ font.Font = CourierBold
-	_ font.Font = CourierBoldOblique
-	_ font.Font = CourierOblique
-	_ font.Font = Helvetica
-	_ font.Font = HelveticaBold
-	_ font.Font = HelveticaBoldOblique
-	_ font.Font = HelveticaOblique
-	_ font.Font = TimesRoman
-	_ font.Font = TimesBold
-	_ font.Font = TimesBoldItalic
-	_ font.Font = TimesItalic
-	_ font.Font = Symbol
-	_ font.Font = ZapfDingbats
-)

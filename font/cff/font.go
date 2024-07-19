@@ -35,29 +35,31 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 )
 
-type embedder struct {
-	sfnt *sfnt.Font
+type Instance struct {
+	*sfnt.Font
+	Opt *font.Options
 }
 
 // New turns a sfnt.Font into a PDF CFF font.
 // The font info must be an OpenType font with CFF outlines.
 // The font can be embedded as a simple font or as a composite font,
 // depending on the options used in the Embed method.
-func New(info *sfnt.Font) (font.Font, error) {
+func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
-	return embedder{sfnt: info}, nil
+	return &Instance{Font: info, Opt: opt}, nil
 }
 
 // Embed implements the [font.Font] interface.
-func (f embedder) Embed(w pdf.Putter, opt *font.Options) (font.Layouter, error) {
+func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
+	opt := f.Opt
 	if opt == nil {
 		opt = &font.Options{}
 	}
 
-	info := f.sfnt
+	info := f.Font
 
 	resource := pdf.Res{Data: w.Alloc()}
 

@@ -47,11 +47,8 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 
 // Embed adds the font to a PDF file.
 // This implements the [font.Font] interface.
-func (f *Instance) Embed(w pdf.Putter, optOld *font.Options) (font.Layouter, error) {
+func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 	opt := f.opt
-	if opt == nil {
-		opt = optOld
-	}
 	if opt == nil {
 		opt = &font.Options{}
 	}
