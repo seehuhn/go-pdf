@@ -19,7 +19,6 @@ package embed
 import (
 	"os"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/postscript/afm"
@@ -30,7 +29,7 @@ import (
 // The file `psname` can be either an .pfb or .pfa file.
 // The file `afmname` is the corresponding .afm file.
 // Both `psname` and `afmname` are optional, but at least one of them must be given.
-func Type1File(w pdf.Putter, psname, afmname string, opt *font.Options) (font.Layouter, error) {
+func Type1File(psname, afmname string, opt *font.Options) (font.Layouter, error) {
 	var psFont *pst1.Font
 	var metrics *afm.Metrics
 	if psname != "" {
@@ -63,15 +62,11 @@ func Type1File(w pdf.Putter, psname, afmname string, opt *font.Options) (font.La
 			return nil, err
 		}
 	}
-	return Type1Font(w, psFont, metrics, opt)
+	return Type1Font(psFont, metrics, opt)
 }
 
 // Type1Font embeds a Type 1 font.
 // The `psFont` and `metrics` parameters are optional, but at least one of them must be given.
-func Type1Font(w pdf.Putter, psFont *pst1.Font, metrics *afm.Metrics, opt *font.Options) (font.Layouter, error) {
-	F, err := type1.New(psFont, metrics, opt)
-	if err != nil {
-		return nil, err
-	}
-	return F.Embed(w)
+func Type1Font(psFont *pst1.Font, metrics *afm.Metrics, opt *font.Options) (font.Layouter, error) {
+	return type1.New(psFont, metrics, opt)
 }

@@ -42,11 +42,7 @@ func run() error {
 		return err
 	}
 
-	HX, err := standard.Helvetica.New(nil)
-	if err != nil {
-		return err
-	}
-	H, err := HX.Embed(doc.Out)
+	H, err := standard.Helvetica.New(nil)
 	if err != nil {
 		return err
 	}
@@ -54,20 +50,12 @@ func run() error {
 	for _, sample := range fonttypes.All {
 		page := doc.AddPage()
 
-		F, err := sample.Embed(page.Out)
-		if err != nil {
-			return err
-		}
+		F := sample.MakeFont(page.RM)
 
 		if sample.Type.IsComposite() {
 			drawPage(H, 32, page, F, sample.Description)
 		} else {
 			drawPage(H, 16, page, F, sample.Description)
-		}
-
-		err = F.Close()
-		if err != nil {
-			return err
 		}
 
 		err = page.Close()
@@ -79,7 +67,7 @@ func run() error {
 	return doc.Close()
 }
 
-func drawPage(H font.Embedded, nRow int, page *document.Page, F font.Layouter, desc string) {
+func drawPage(H font.Font, nRow int, page *document.Page, F font.Layouter, desc string) {
 	paper := &pdf.Rectangle{URx: 10 + 16*20, URy: 5 + float64(nRow)*20 + 15}
 	page.SetPageSize(paper)
 

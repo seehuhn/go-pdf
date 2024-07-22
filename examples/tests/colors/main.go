@@ -45,11 +45,7 @@ func run() error {
 		return err
 	}
 
-	FX, err := standard.Helvetica.New(nil)
-	if err != nil {
-		return err
-	}
-	F, err := FX.Embed(doc.Out)
+	F, err := standard.Helvetica.New(nil)
 	if err != nil {
 		return err
 	}

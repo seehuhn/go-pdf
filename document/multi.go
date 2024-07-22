@@ -59,7 +59,6 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pd
 	}
 
 	rm := pdf.NewResourceManager(out)
-
 	tree := pagetree.NewWriter(out)
 
 	return &MultiPage{
@@ -71,10 +70,12 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pd
 }
 
 func AddMultiPage(out pdf.Putter, pageSize *pdf.Rectangle) (*MultiPage, error) {
+	rm := pdf.NewResourceManager(out)
 	tree := pagetree.NewWriter(out)
 
 	return &MultiPage{
 		Out:      out,
+		RM:       rm,
 		Tree:     tree,
 		mediaBox: pageSize,
 	}, nil

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
 // TestStateApplyToError tests that the error message returned by ApplyTo
@@ -45,6 +46,8 @@ func TestStateApplyToError(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
 	rm := pdf.NewResourceManager(data)
 
+	F := dummyfont.Must()
+
 	buf := &bytes.Buffer{}
 	for _, bad := range forbidden {
 		for _, good := range allowed {
@@ -52,7 +55,7 @@ func TestStateApplyToError(t *testing.T) {
 			w := NewWriter(buf, rm)
 
 			state := NewState()
-			state.TextFont = dummyFont{}
+			state.TextFont = F
 			state.Set = good | bad
 			state.ApplyTo(w)
 
@@ -94,18 +97,4 @@ func TestStateApplyToError(t *testing.T) {
 			}
 		}
 	}
-}
-
-type dummyFont struct{}
-
-func (f dummyFont) PDFObject() pdf.Object {
-	return nil
-}
-
-func (f dummyFont) WritingMode() int {
-	return 0
-}
-
-func (f dummyFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	// pass
 }

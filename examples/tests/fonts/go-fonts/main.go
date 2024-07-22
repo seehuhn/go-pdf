@@ -24,7 +24,10 @@ import (
 
 func main() {
 	for _, Fx := range gofont.All {
-		F := Fx.New(nil)
+		F, err := Fx.New(nil)
+		if err != nil {
+			panic(err)
+		}
 		fmt.Println(F.FullName())
 	}
 }

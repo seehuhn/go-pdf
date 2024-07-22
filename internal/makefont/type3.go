@@ -17,6 +17,7 @@
 package makefont
 
 import (
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt/glyf"
@@ -24,21 +25,22 @@ import (
 )
 
 // Type3 returns a Type3 font.
-func Type3() (*type3.Font, error) {
-	info := TrueType()
-
-	info = clone(info)
+func Type3(rm *pdf.ResourceManager) (*type3.Font, error) {
+	info := clone(TrueType())
 	info.EnsureGlyphNames()
 
-	res := type3.New(info.UnitsPerEm)
+	builder := type3.NewBuilder(rm)
 
-	res.Ascent = info.Ascent
-	res.Descent = info.Descent
-	res.BaseLineSkip = info.Ascent - info.Descent + info.LineGap
-	res.ItalicAngle = info.ItalicAngle
-	res.IsFixedPitch = info.IsFixedPitch()
-	res.IsSerif = info.IsSerif
-	res.IsScript = info.IsScript
+	prop := &type3.Properties{
+		FontMatrix:   info.FontMatrix,
+		Ascent:       info.Ascent,
+		Descent:      info.Descent,
+		BaseLineSkip: info.Ascent - info.Descent + info.LineGap,
+		ItalicAngle:  info.ItalicAngle,
+		IsFixedPitch: info.IsFixedPitch(),
+		IsSerif:      info.IsSerif,
+		IsScript:     info.IsScript,
+	}
 
 	// convert glypf outlines to type 3 outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)
@@ -53,7 +55,7 @@ func Type3() (*type3.Font, error) {
 		if origGlyph != nil {
 			bbox = origGlyph.Rect16
 		}
-		newGlyph, err := res.AddGlyph(name, info.GlyphWidth(gid), bbox, true)
+		newGlyph, err := builder.AddGlyph(name, float64(info.GlyphWidth(gid)), bbox, true)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +142,7 @@ func Type3() (*type3.Font, error) {
 		}
 	}
 
-	return res, nil
+	return builder.Finish(prop)
 }
 
 func clone[T any](x *T) *T {

@@ -50,11 +50,7 @@ func run(filename string) error {
 	if err != nil {
 		return err
 	}
-	E, err := F.Embed(doc.Out)
-	if err != nil {
-		return err
-	}
-	geom := E.GetGeometry()
+	geom := F.GetGeometry()
 
 	const (
 		k        = 20
@@ -68,18 +64,18 @@ func run(filename string) error {
 	descent := geom.Descent * fontSize
 	leading := ascent - descent
 
-	markerFont := type3.New(1000)
-	markerWidth := funit.Int16(math.Round(1.0 / fontSize * 1000))
+	builder := type3.NewBuilder(doc.RM)
+	markerWidth := 1.0 / fontSize * 1000
 	markerAscent := funit.Int16(math.Round(ascent / fontSize * 1000))
 	markerDescent := funit.Int16(math.Round(descent / fontSize * 1000))
 	bbox := funit.Rect16{
 		LLx: 0,
 		LLy: markerDescent,
-		URx: markerWidth,
+		URx: funit.Int16(math.Round(markerWidth)),
 		URy: markerAscent,
 	}
 	// TODO(voss): why does "|" instead of "I" not work?
-	g, err := markerFont.AddGlyph("I", markerWidth, bbox, true)
+	g, err := builder.AddGlyph("I", markerWidth, bbox, true)
 	if err != nil {
 		return err
 	}
@@ -90,7 +86,11 @@ func run(filename string) error {
 	if err != nil {
 		return err
 	}
-	M, err := markerFont.Embed(doc.Out)
+
+	prop := &type3.Properties{
+		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+	}
+	M, err := builder.Finish(prop)
 
 	gid := glyph.ID(0)
 	numGlyphs := min(glyph.ID(len(geom.Widths)), 256)
@@ -136,7 +136,7 @@ func run(filename string) error {
 			default:
 				page.TextNextLine()
 			}
-			page.TextSetFont(E, fontSize)
+			page.TextSetFont(M, fontSize)
 			glyphWidth := fontSize * geom.Widths[gid]
 			gg := &font.GlyphSeq{
 				Seq: make([]font.Glyph, k),

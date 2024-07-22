@@ -138,7 +138,9 @@ func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 	return r.ParseContentStream(body)
 }
 
-func (r *Reader) do2() error {
+// TODO(voss): This is work in progress, once it is finished it will replace
+// the old doOld method.
+func (r *Reader) doNew() error {
 	for r.scanner.Scan() {
 		op := r.scanner.Operator()
 
@@ -462,7 +464,7 @@ func (r *Reader) ParseContentStream(in io.Reader) error {
 	r.scanner.SetInput(in)
 	for r.scanner.Scan() {
 		op := r.scanner.Operator()
-		err := r.do(op)
+		err := r.doOld(op)
 		if err != nil {
 			return err
 		}
@@ -473,7 +475,7 @@ func (r *Reader) ParseContentStream(in io.Reader) error {
 // Do processes the given operator and arguments.
 // This updates the graphics state, and calls the appropriate callback
 // functions.
-func (r *Reader) do(op scanner.Operator) error {
+func (r *Reader) doOld(op scanner.Operator) error {
 	origArgs := op.Args
 	args := op.Args
 

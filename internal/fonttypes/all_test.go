@@ -33,16 +33,21 @@ func TestSamples(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			X, err := sample.Embed(page.Out)
-			if err != nil {
-				t.Fatal(err)
-			}
 
-			page.TextSetFont(X, 12)
+			F := sample.MakeFont(page.RM)
+
+			page.TextSetFont(F, 12)
 			page.TextBegin()
 			page.TextFirstLine(72, 72)
 			page.TextShow(`“Hello World!”`)
 			page.TextEnd()
+
+			E, err := pdf.ResourceManagerEmbed(page.RM, F)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fontRef := E.PDFObject()
+
 			err = page.Close()
 			if err != nil {
 				t.Fatal(err)
@@ -52,7 +57,7 @@ func TestSamples(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			dicts, err := font.ExtractDicts(r, X.PDFObject())
+			dicts, err := font.ExtractDicts(r, fontRef)
 			if err != nil {
 				t.Fatal(err)
 			}

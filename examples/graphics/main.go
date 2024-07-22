@@ -35,11 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	FX, err := standard.Helvetica.New(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	F, err := FX.Embed(w.Out)
+	F, err := standard.Helvetica.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -29,6 +29,7 @@ import (
 
 func TestWidthsFull(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
+	rm := pdf.NewResourceManager(data)
 
 	// TODO(voss): iterate over all font types
 
@@ -38,7 +39,7 @@ func TestWidthsFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	E, err := F.Embed(data)
+	E, err := pdf.ResourceManagerEmbed(rm, F)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,14 +48,14 @@ func TestWidthsFull(t *testing.T) {
 
 	// Layout and encode a string to make sure the corresponding glyphs are
 	// included in the embedded font.
-	gg := E.Layout(nil, 10, sampleText)
+	gg := F.Layout(nil, 10, sampleText)
 	var s pdf.String
 	var ww []float64
 	for _, g := range gg.Seq {
 		ww = append(ww, otf.GlyphWidthPDF(g.GID))
 		s, _, _ = E.CodeAndWidth(s, g.GID, g.Text)
 	}
-	err = E.Close()
+	err = rm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

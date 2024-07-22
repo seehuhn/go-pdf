@@ -22,15 +22,11 @@ import (
 	"seehuhn.de/go/pdf/internal/makefont"
 )
 
-var Type3 = &type3embedder{}
-
-type type3embedder struct{}
-
-func (_ *type3embedder) Embed(w pdf.Putter) (font.Layouter, error) {
-	F, err := makefont.Type3()
+// Type3 is a Type 3 font.
+var Type3 = func(rm *pdf.ResourceManager) font.Layouter {
+	F, err := makefont.Type3(rm)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-
-	return F.Embed(w)
+	return F
 }

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/bits"
 	"slices"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -47,7 +48,7 @@ type Parameters struct {
 	TextWordSpacing       float64 // word spacing (T_w)
 	TextHorizontalScaling float64 // horizonal scaling (T_h, normal spacing = 1)
 	TextLeading           float64 // leading (T_l)
-	TextFont              font.Embedded
+	TextFont              font.Font
 	TextFontSize          float64
 	TextRenderingMode     TextRenderingMode
 	TextRise              float64
@@ -402,6 +403,22 @@ func (s State) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 
 // StateBits is a bit mask for the fields of the State struct.
 type StateBits uint64
+
+func (b StateBits) Names() string {
+	var parts []string
+
+	for i := 0; i < len(stateNames); i++ {
+		if b&(1<<i) != 0 {
+			parts = append(parts, stateNames[i])
+		}
+	}
+	b = b & ^AllStateBits
+	if b != 0 {
+		parts = append(parts, fmt.Sprintf("0x%x", b))
+	}
+
+	return strings.Join(parts, "|")
+}
 
 // Possible values for StateBits.
 const (

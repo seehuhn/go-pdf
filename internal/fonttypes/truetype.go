@@ -27,13 +27,13 @@ type trueTypeEmbedder struct {
 	composite bool
 }
 
-// TrueType is a TrueType font.
+// TrueType makes a TrueType font.
 var (
-	TrueTypeSimple    font.Font = trueTypeEmbedder{composite: false}
-	TrueTypeComposite font.Font = trueTypeEmbedder{composite: true}
+	TrueTypeSimple    = trueTypeEmbedder{composite: false}.font
+	TrueTypeComposite = trueTypeEmbedder{composite: true}.font
 )
 
-func (t trueTypeEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
+func (t trueTypeEmbedder) font(rm *pdf.ResourceManager) font.Layouter {
 	info := makefont.TrueType()
 
 	var opt *font.Options
@@ -45,7 +45,7 @@ func (t trueTypeEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
 
 	F, err := truetype.New(info, opt)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return F.Embed(w)
+	return F
 }

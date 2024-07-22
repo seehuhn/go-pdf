@@ -18,7 +18,6 @@ package reader
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"sort"
 
@@ -42,7 +41,7 @@ import (
 
 // FontFromFile represents a font which has been extracted from a PDF file.
 type FontFromFile interface {
-	font.Embedded
+	font.Font
 
 	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool))
 
@@ -293,14 +292,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		if err != nil {
 			return nil, err
 		}
-		widths := make([]float64, 256)
-		for c, name := range info.Encoding {
-			if g, ok := info.Glyphs[name]; ok {
-				widths[c] = float64(g.WidthX) * info.FontMatrix[0]
-			} else {
-				fmt.Println("unknown glyph", name)
-			}
-		}
 
 		glyphNames := maps.Keys(info.Glyphs)
 		glyphNames = append(glyphNames, "")
@@ -316,29 +307,12 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			text[c] = names.ToUnicode(name, false)
 		}
 
-		fontData := &type3.Font{
-			Glyphs:     info.Glyphs,
-			FontMatrix: info.FontMatrix,
-			// Ascent:             0,
-			// Descent:            0,
-			// BaseLineSkip:       0,
-			ItalicAngle:  info.ItalicAngle,
-			IsFixedPitch: info.IsFixedPitch,
-			IsSerif:      info.IsSerif,
-			IsScript:     info.IsScript,
-			IsAllCap:     info.IsAllCap,
-			IsSmallCap:   info.IsSmallCap,
-			ForceBold:    info.ForceBold,
-			Resources:    info.Resources,
-			NumOpen:      0,
-		}
-
 		res := &fromFileSimple{
 			Res:      res,
-			widths:   widths,
+			widths:   info.Widths,
 			encoding: encoding,
 			text:     text,
-			fontData: fontData,
+			fontData: nil,
 			key:      fontDicts.FontProgramRef,
 		}
 		return res, nil
@@ -368,7 +342,7 @@ func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is
 	}
 }
 
-func (f *fromFileSimple) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool)) {
+func (f *fromFileSimple) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
 	for _, c := range s {
 		yield(f.encoding[c], f.text[c], f.widths[c], c == ' ')
 	}
@@ -380,6 +354,10 @@ func (f *fromFileSimple) FontData() interface{} {
 
 func (f *fromFileSimple) Key() pdf.Reference {
 	return f.key
+}
+
+func (f *fromFileSimple) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+	panic("unreachable")
 }
 
 type fromFileComposite struct {
@@ -411,7 +389,7 @@ func (f *fromFileComposite) ForeachWidth(s pdf.String, yield func(width float64,
 	})
 }
 
-func (f *fromFileComposite) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool)) {
+func (f *fromFileComposite) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
 	f.cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 		// TODO(voss): notdef glyph(s)???
 		if g, ok := f.glyph[string(code)]; ok {
@@ -427,4 +405,8 @@ func (f *fromFileComposite) FontData() interface{} {
 
 func (f *fromFileComposite) Key() pdf.Reference {
 	return f.key
+}
+
+func (f *fromFileComposite) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+	panic("unreachable")
 }

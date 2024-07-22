@@ -22,15 +22,11 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 )
 
-// Standard is one of the 14 standard PDF fonts.
-var Standard = standardEmbedder{}
-
-type standardEmbedder struct{}
-
-func (f standardEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
+// Standard makes one of the 14 standard PDF fonts.
+var Standard = func(rm *pdf.ResourceManager) font.Layouter {
 	F, err := standard.Helvetica.New(nil)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return F.Embed(w)
+	return F
 }

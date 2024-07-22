@@ -17,96 +17,71 @@
 package dummyfont
 
 import (
-	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/postscript/type1"
 
-	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/sfnt"
+	sfntcff "seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/os2"
+
 	"seehuhn.de/go/pdf/font"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/postscript/type1"
 )
 
-// Embed installs a dummy font into the given PDF file.
+func Must() font.Font {
+	F, err := New()
+	if err != nil {
+		panic(err)
+	}
+	return F
+}
+
+// New creates a simple font for testing purposes.
 // The only glyphs available are the space and the capital letter A.
 // The font is embedded as a simple CFF font.
-//
-// If a write error on w occurs, the function panics.
-func Embed(w pdf.Putter) font.Embedded {
+func New() (font.Font, error) {
 	encoding := make([]glyph.ID, 256)
 	encoding[' '] = 1
 	encoding['A'] = 2
 
-	in := &cff.Font{
-		FontInfo: &type1.FontInfo{
-			FontName:   "Dummy",
-			FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
-		},
-		Outlines: &cff.Outlines{
-			Private:  []*type1.PrivateDict{{}},
-			FDSelect: func(gi glyph.ID) int { return 0 },
-			Encoding: encoding,
-		},
+	in := &sfntcff.Outlines{
+		Private:  []*type1.PrivateDict{{}},
+		FDSelect: func(gi glyph.ID) int { return 0 },
+		Encoding: encoding,
 	}
 
-	g := cff.NewGlyph(".notdef", 500)
+	g := sfntcff.NewGlyph(".notdef", 500)
 	in.Glyphs = append(in.Glyphs, g)
 
-	g = cff.NewGlyph("space", 1000)
+	g = sfntcff.NewGlyph("space", 1000)
 	in.Glyphs = append(in.Glyphs, g)
 
-	g = cff.NewGlyph("A", 900)
+	g = sfntcff.NewGlyph("A", 900)
 	g.MoveTo(50, 50)
 	g.LineTo(850, 50)
 	g.LineTo(850, 850)
 	g.LineTo(50, 850)
 	in.Glyphs = append(in.Glyphs, g)
 
-	toUni := map[charcode.CharCode][]rune{
-		' ': {' '},
-		'A': {'A'},
+	fontData := &sfnt.Font{
+		FamilyName: "Dummy",
+		Width:      os2.WidthNormal,
+		Weight:     os2.WeightNormal,
+		IsRegular:  true,
+		UnitsPerEm: 1000,
+		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+		Ascent:     850,
+		Descent:    0,
+		LineGap:    1000,
+		CapHeight:  850,
+		Outlines:   in,
 	}
 
-	info := &pdfcff.FontDictSimple{
-		Font:      in,
-		Encoding:  encoding,
-		Ascent:    850,
-		Descent:   0,
-		CapHeight: 850,
-		ToUnicode: cmap.NewToUnicode(charcode.Simple, toUni),
-	}
-	return EmbedCFF(w, info)
-}
+	subtable := cmap.Format4{}
+	subtable[' '] = 1
+	subtable['A'] = 2
+	fontData.InstallCMap(subtable)
 
-func EmbedCFF(w pdf.Putter, info *pdfcff.FontDictSimple) font.Embedded {
-	ref := w.Alloc()
-	err := info.Embed(w, ref)
-	if err != nil {
-		panic(err)
-	}
-
-	F := &frozenFont{
-		Res: pdf.Res{
-			Data: ref,
-		},
-		FontDictSimple: info,
-	}
-	return F
-}
-
-type frozenFont struct {
-	pdf.Res
-	*pdfcff.FontDictSimple
-}
-
-func (f *frozenFont) WritingMode() int {
-	return 0
-}
-
-func (f *frozenFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	for _, c := range s {
-		width := float64(f.Font.Glyphs[f.Encoding[c]].Width) * f.Font.FontMatrix[0]
-		yield(width, c == ' ')
-	}
+	return pdfcff.New(fontData, nil)
 }

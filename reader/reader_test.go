@@ -22,25 +22,26 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"seehuhn.de/go/sfnt/cff"
-
 	"seehuhn.de/go/pdf"
-	pdffont "seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/internal/dummyfont"
-	"seehuhn.de/go/pdf/reader/scanner"
 )
 
+// TestParameters verifies that the graphics state is correctly updated by the
+// reader.
 func TestParameters(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
 	rm := pdf.NewResourceManager(data)
 
+	// We start by creating a content stream where we set various graphics
+	// parameters.
 	buf := &bytes.Buffer{}
 	w := graphics.NewWriter(buf, rm)
 	w.Set = 0
 
-	font := dummyfont.Embed(data)
+	testFont := dummyfont.Must()
 
 	w.SetLineWidth(12.3)
 	w.SetLineCap(graphics.LineCapRound)
@@ -55,27 +56,36 @@ func TestParameters(t *testing.T) {
 	w.TextSetWordSpacing(10)
 	w.TextSetHorizontalScaling(11)
 	w.TextSetLeading(12)
-	w.TextSetFont(font, 14)
+	w.TextSetFont(testFont, 14)
 	w.TextSetRenderingMode(graphics.TextRenderingModeFillStrokeClip)
 	w.TextSetRise(15)
 
-	r := New(data, nil)
-	r.Resources = w.Resources
-	r.State = graphics.NewState()
-	r.Set = 0
-	s := scanner.NewScanner()
-	s.SetInput(bytes.NewReader(buf.Bytes()))
-	for s.Scan() {
-		op := s.Operator()
-		err := r.do(op)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := s.Error(); err != nil {
+	err := rm.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Now we read back the content stream and check that the final graphics
+	// state matches the expected values.
+	r := New(data, nil)
+	r.Reset()
+	r.Resources = w.Resources
+	r.State.Set = 0 // TODO(voss): why do we need this?
+	err = r.ParseContentStream(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fontsEqual := func(a, b font.Font) bool {
+		if a == nil || b == nil {
+			return a == b
+		}
+		// TODO(voss): update this once we have a way of comparing a loaded
+		// font to an original font.  Maybe we can use the font name?
+		return true
+	}
+
+	// First check: the individual parameters are as we set them.
 	if r.State.LineWidth != 12.3 {
 		t.Errorf("LineWidth: got %v, want 12.3", r.State.LineWidth)
 	}
@@ -115,8 +125,8 @@ func TestParameters(t *testing.T) {
 	if r.State.TextLeading != 12 {
 		t.Errorf("Tl: got %v, want 12", r.State.TextLeading)
 	}
-	if !resEqual(r.State.TextFont, font) || r.State.TextFontSize != 14 { // TODO(voss)
-		t.Errorf("Font: got %v, %v, want %v, 14", r.State.TextFont, r.State.TextFontSize, font)
+	if !fontsEqual(r.State.TextFont, testFont) || r.State.TextFontSize != 14 {
+		t.Errorf("Font: got %v, %v, want %v, 14", r.State.TextFont, r.State.TextFontSize, testFont)
 	}
 	if r.State.TextRenderingMode != graphics.TextRenderingModeFillStrokeClip {
 		t.Errorf("TextRenderingMode: got %v, want %v", r.State.TextRenderingMode, graphics.TextRenderingModeFillStrokeClip)
@@ -125,21 +135,21 @@ func TestParameters(t *testing.T) {
 		t.Errorf("Tr: got %v, want 15", r.State.TextRise)
 	}
 
-	cmpFDSelectFn := cmp.Comparer(func(fn1, fn2 cff.FDSelectFn) bool {
-		return true
-	})
-	cmpFont := cmp.Comparer(func(f1, f2 pdffont.Embedded) bool {
-		if f1.PDFObject() != f2.PDFObject() {
-			return false
+	for b := graphics.StateBits(1); b != 0; b <<= 1 {
+		if w.State.Set&b != r.State.Set&b {
+			if w.State.Set&b != 0 {
+				t.Errorf("State bit %s only set in writer", b.Names())
+			} else {
+				t.Errorf("State bit %s only set in reader", b.Names())
+			}
 		}
-		if f1.WritingMode() != f2.WritingMode() {
-			return false
-		}
-		// TODO(voss): add more checks?
-		return true
-	})
+	}
 
-	if d := cmp.Diff(w.State, r.State, cmpFDSelectFn, cmpFont); d != "" {
+	// Second check: the final graphics states are the same.
+	// This checks that no parameters different from the ones we explicitly used
+	// were changed.
+	cmpFont := cmp.Comparer(fontsEqual)
+	if d := cmp.Diff(w.State, r.State, cmpFont); d != "" {
 		t.Errorf("State: %s", d)
 	}
 }

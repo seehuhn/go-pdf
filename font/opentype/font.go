@@ -18,6 +18,7 @@ package opentype
 
 import (
 	"math"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -30,7 +31,9 @@ import (
 // Instance is an OpenType font instance.
 type Instance struct {
 	*sfnt.Font
-	Opt *font.Options
+	*font.Geometry
+	layouter *sfnt.Layouter
+	Opt      *font.Options
 }
 
 // New makes a PDF font from an OpenType/TrueType font.
@@ -45,13 +48,87 @@ type Instance struct {
 // TrueType font instead of an OpenType font.  Consider using
 // [seehuhn.de/go/pdf/font/truetype.New] instead of this function.
 func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
-	return &Instance{Font: info, Opt: opt}, nil
+	if opt == nil {
+		opt = &font.Options{}
+	}
+
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	if err != nil {
+		return nil, err
+	}
+
+	var geometry *font.Geometry
+	if info.IsCFF() {
+		geometry = &font.Geometry{
+			GlyphExtents: scaleBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
+			Widths:       info.WidthsPDF(),
+
+			Ascent:             float64(info.Ascent) * info.FontMatrix[3],
+			Descent:            float64(info.Descent) * info.FontMatrix[3],
+			BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
+			UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
+			UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
+		}
+	} else { // glyf outlines
+		geometry = &font.Geometry{
+			GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
+			Widths:       info.WidthsPDF(),
+
+			Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
+			Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
+			BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
+			UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
+			UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
+		}
+	}
+
+	F := &Instance{
+		Font:     info,
+		Geometry: geometry,
+		layouter: layouter,
+		Opt:      opt,
+	}
+
+	return F, nil
+}
+
+// WritingMode implements the [font.Font] interface.
+func (f *Instance) WritingMode() int {
+	// TODO(voss): implement this
+	return 0
+}
+
+// Layout implements the [font.Layouter] interface.
+func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+
+	buf := f.layouter.Layout(s)
+	seq.Seq = slices.Grow(seq.Seq, len(buf))
+	for _, g := range buf {
+		xOffset := float64(g.XOffset) * ptSize * f.Font.FontMatrix[0]
+		if len(seq.Seq) == 0 {
+			seq.Skip += xOffset
+		} else {
+			seq.Seq[len(seq.Seq)-1].Advance += xOffset
+		}
+		seq.Seq = append(seq.Seq, font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * ptSize * f.Font.FontMatrix[0],
+			Rise:    float64(g.YOffset) * ptSize * f.Font.FontMatrix[3],
+			Text:    g.Text,
+		})
+	}
+	return seq
 }
 
 // Embed adds the font to a PDF file.
 //
 // This implements the [font.Font] interface.
-func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
+func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+	w := rm.Out
+
 	err := pdf.CheckVersion(w, "OpenType fonts", pdf.V1_6)
 	if err != nil {
 		return nil, err
@@ -62,34 +139,15 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 		opt = &font.Options{}
 	}
 
-	info := f.Font
-	layouter, err := f.Font.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
-	if err != nil {
-		return nil, err
-	}
-
 	resource := pdf.Res{Data: w.Alloc()}
 
-	var res font.Layouter
+	var res font.Embedded
 	if f.Font.IsCFF() {
-		geometry := &font.Geometry{
-			GlyphExtents: scaleBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
-			Widths:       info.WidthsPDF(),
-
-			Ascent:             float64(info.Ascent) * info.FontMatrix[3],
-			Descent:            float64(info.Descent) * info.FontMatrix[3],
-			BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
-			UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
-			UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
-		}
-
 		if !opt.Composite {
 			res = &embeddedCFFSimple{
 				w:             w,
 				Res:           resource,
-				Geometry:      geometry,
 				sfnt:          f.Font,
-				layouter:      layouter,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 			}
 		} else {
@@ -110,32 +168,17 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 			res = &embeddedCFFComposite{
 				w:          w,
 				Res:        resource,
-				Geometry:   geometry,
 				sfnt:       f.Font,
-				layouter:   layouter,
 				GIDToCID:   gidToCID,
 				CIDEncoder: cidEncoder,
 			}
 		}
 	} else { // glyf outlines
-		geometry := &font.Geometry{
-			GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
-			Widths:       info.WidthsPDF(),
-
-			Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
-			Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-			BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-			UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-			UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
-		}
-
 		if !opt.Composite {
 			res = &embeddedGlyfSimple{
 				w:             w,
 				Res:           resource,
-				Geometry:      geometry,
 				sfnt:          f.Font,
-				layouter:      layouter,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 				closed:        false,
 			}
@@ -157,15 +200,12 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 			res = &embeddedGlyfComposite{
 				w:          w,
 				Res:        resource,
-				Geometry:   geometry,
 				sfnt:       f.Font,
-				layouter:   layouter,
 				GIDToCID:   gidToCID,
 				CIDEncoder: cidEncoder,
 			}
 		}
 	}
-	w.AutoClose(res)
 
 	return res, nil
 }

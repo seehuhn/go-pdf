@@ -43,25 +43,30 @@ func TestExtract(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			w, err := document.WriteSinglePage(buf, document.A4, pdf.V1_7, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			F, err := sample.Embed(w.Out)
-			if err != nil {
-				t.Fatal(err)
-			}
-			w.TextBegin()
-			w.TextSetFont(F, 12)
-			w.TextFirstLine(100, 100)
-			w.TextShow("Hello World!")
-			w.TextEnd()
-			err = w.Close()
+			page, err := document.WriteSinglePage(buf, document.A4, pdf.V1_7, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			fontRef := F.PDFObject()
+			F := sample.MakeFont(page.RM)
+
+			page.TextBegin()
+			page.TextSetFont(F, 12)
+			page.TextFirstLine(100, 100)
+			page.TextShow("Hello World!")
+			page.TextEnd()
+
+			E, err := pdf.ResourceManagerEmbed(page.RM, F)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = page.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			fontRef := E.PDFObject()
 
 			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 			if err != nil {
@@ -82,10 +87,8 @@ func FuzzExtract(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		F, err := fontInfo.Embed(w.Out)
-		if err != nil {
-			f.Fatal(err)
-		}
+
+		F := fontInfo.MakeFont(w.RM)
 
 		w.SetFontNameInternal(F, "X")
 

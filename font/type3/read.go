@@ -17,23 +17,40 @@
 package type3
 
 import (
-	"testing"
+	"math"
+	"regexp"
+	"strconv"
 
 	"seehuhn.de/go/postscript/funit"
 )
 
-// TestGlyphError makes sure that errors during glyph construction are reported.
-func TestGlyphError(t *testing.T) {
-	F := NewBuilder(nil)
-	g, err := F.AddGlyph("test", 1000, funit.Rect16{LLx: 0, LLy: 0, URx: 1000, URy: 1000}, false)
-	if err != nil {
-		t.Fatalf("AddGlyph failed: %v", err)
+func setGlyphGeometry(g *Glyph, data []byte) {
+	m := type3StartRegexp.FindSubmatch(data)
+	if len(m) != 9 {
+		return
 	}
-
-	g.TextEnd() // should cause an error
-
-	err = g.Close()
-	if err == nil {
-		t.Fatalf("Close failed to report the error")
+	if m[1] != nil {
+		g.WidthX, _ = strconv.ParseFloat(string(m[1]), 64)
+	} else if m[3] != nil {
+		var xx [6]float64
+		for i := range xx {
+			xx[i], _ = strconv.ParseFloat(string(m[3+i]), 64)
+		}
+		g.WidthX = xx[0]
+		g.BBox = funit.Rect16{
+			LLx: funit.Int16(math.Round(xx[2])),
+			LLy: funit.Int16(math.Round(xx[3])),
+			URx: funit.Int16(math.Round(xx[4])),
+			URy: funit.Int16(math.Round(xx[5])),
+		}
 	}
 }
+
+var (
+	spc = `[\t\n\f\r ]+`
+	num = `([+-]?[0-9.]+)` + spc
+	d0  = num + num + "d0"
+	d1  = num + num + num + num + num + num + "d1"
+
+	type3StartRegexp = regexp.MustCompile(`^[\t\n\f\r ]*(?:` + d0 + "|" + d1 + ")" + spc)
+)

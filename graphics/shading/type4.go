@@ -121,7 +121,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		return nil, errors.New("Function not allowed for indexed color space")
 	}
 
-	csE, err := s.ColorSpace.Embed(rm)
+	csE, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
 	if err != nil {
 		return nil, err
 	}

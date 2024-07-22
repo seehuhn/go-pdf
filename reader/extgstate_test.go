@@ -21,22 +21,19 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"seehuhn.de/go/sfnt/cff"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
+// TestExtGState verifies that external graphics states are correctly read.
 func TestExtGState(t *testing.T) {
-	data := pdf.NewData(pdf.V1_7)
-	rm := pdf.NewResourceManager(data)
+	testFont := dummyfont.Must()
 
-	F := dummyfont.Embed(data)
-
+	// We start by creating a graphics state with all possible parameters set.
 	s1 := graphics.State{Parameters: &graphics.Parameters{}}
-	s1.TextFont = F
+	s1.TextFont = testFont
 	s1.TextFontSize = 12
 	s1.Set |= graphics.StateTextFont
 	s1.TextKnockout = true
@@ -102,43 +99,54 @@ func TestExtGState(t *testing.T) {
 	s1.SmoothnessTolerance = 0.6
 	s1.Set |= graphics.StateSmoothnessTolerance
 
+	// check that we have set all possible parameters
+	if s1.Set != graphics.ExtGStateBits {
+		t.Error("test is broken: some parameters are not set")
+	}
+
+	// step 1: embed this graphics state into a PDF file
+	data := pdf.NewData(pdf.V1_7)
+	rm := pdf.NewResourceManager(data)
+
 	ext1, err := graphics.NewExtGState(s1)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	ext1embedded, err := pdf.ResourceManagerEmbed(rm, ext1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	qqq := New(data, nil)
-	ext2, err := qqq.readExtGState(ext1embedded.PDFObject())
+	err = rm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cmpFDSelectFn := cmp.Comparer(func(fn1, fn2 cff.FDSelectFn) bool {
-		return true
-	})
-	cmpFont := cmp.Comparer(func(f1, f2 font.Embedded) bool {
-		if f1.PDFObject() != f2.PDFObject() {
-			return false
-		}
-		if f1.WritingMode() != f2.WritingMode() {
-			return false
-		}
-		// TODO(voss): add more checks?
-		return true
-	})
+	// step 2: read back the embedded graphics state
+	reader := New(data, nil)
+	ext2, err := reader.readExtGState(ext1embedded.PDFObject())
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if d := cmp.Diff(ext1, ext2, cmpFDSelectFn, cmpFont); d != "" {
+	// step 3: check that the embedded and read back graphics states are equal
+	fontsEqual := func(a, b font.Font) bool {
+		if a == nil || b == nil {
+			return a == b
+		}
+		// TODO(voss): update this once we have a way of comparing a loaded
+		// font to an original font.  Maybe we can use the font name?
+		return true
+	}
+	cmpFont := cmp.Comparer(fontsEqual)
+
+	if d := cmp.Diff(ext1, ext2, cmpFont); d != "" {
 		t.Error(d)
 	}
 
 	s3 := graphics.State{Parameters: &graphics.Parameters{}}
 	ext2.Value.CopyTo(&s3)
-	if d := cmp.Diff(s1, s3, cmpFDSelectFn, cmpFont); d != "" {
+	if d := cmp.Diff(s1, s3, cmpFont); d != "" {
 		t.Error(d)
 	}
 }

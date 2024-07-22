@@ -19,7 +19,6 @@ package opentype
 import (
 	"fmt"
 	"math"
-	"slices"
 
 	"seehuhn.de/go/postscript/funit"
 
@@ -41,39 +40,12 @@ import (
 type embeddedGlyfSimple struct {
 	w pdf.Putter
 	pdf.Res
-	*font.Geometry
 
-	sfnt     *sfnt.Font
-	layouter *sfnt.Layouter
+	sfnt *sfnt.Font
 
 	*encoding.SimpleEncoder
 
 	closed bool
-}
-
-// Layout implements the [font.Layouter] interface.
-func (f *embeddedGlyfSimple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
-	if seq == nil {
-		seq = &font.GlyphSeq{}
-	}
-
-	buf := f.layouter.Layout(s)
-	seq.Seq = slices.Grow(seq.Seq, len(buf))
-	for _, g := range buf {
-		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
-		if len(seq.Seq) == 0 {
-			seq.Skip += xOffset
-		} else {
-			seq.Seq[len(seq.Seq)-1].Advance += xOffset
-		}
-		seq.Seq = append(seq.Seq, font.Glyph{
-			GID:     g.GID,
-			Advance: float64(g.Advance) * ptSize * f.sfnt.FontMatrix[0],
-			Rise:    float64(g.YOffset) * ptSize * f.sfnt.FontMatrix[3],
-			Text:    g.Text,
-		})
-	}
-	return seq
 }
 
 func (f *embeddedGlyfSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {

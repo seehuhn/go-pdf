@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/psenc"
 	pst1 "seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -42,38 +43,25 @@ func main() {
 
 func run() error {
 	paper := document.A5r
-	page, err := document.CreateSinglePage("test.pdf", paper, pdf.V1_7, nil)
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	page, err := document.CreateSinglePage("test.pdf", paper, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}
 
-	FX, err := standard.Helvetica.New(nil)
-	if err != nil {
-		return err
-	}
-	F, err := FX.Embed(page.Out)
+	F, err := standard.Helvetica.New(nil)
 	if err != nil {
 		return err
 	}
 
-	X, err := embedTestFont(page.Out)
-	if err != nil {
-		return err
-	}
+	X := &testFont{}
 
-	Delim := type3.New(1000)
-	g, err := Delim.AddGlyph("I", 50, funit.Rect16{LLy: -500, URx: 50, URy: 1500}, false)
+	M, err := makeMarkerFont(page.RM)
 	if err != nil {
 		return err
 	}
-	g.SetFillColor(color.DeviceGray.New(0.5))
-	g.Rectangle(0, -500, 50, 2000)
-	g.Fill()
-	err = g.Close()
-	if err != nil {
-		return err
-	}
-	D, err := Delim.Embed(page.Out)
 
 	yPos := paper.URy - 72 - 15
 
@@ -83,11 +71,11 @@ func run() error {
 	gg := page.TextLayout(nil, "code used in WinAnsi encoding:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 	page.TextSetFont(X, 10)
 	page.TextShowRaw(pdf.String{0o335})
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 
 	page.TextSecondLine(0, -20)
@@ -95,11 +83,11 @@ func run() error {
 	gg = page.TextLayout(nil, "remapped code:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 	page.TextSetFont(X, 10)
 	page.TextShowRaw(pdf.String{'A'})
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 
 	page.TextNextLine()
@@ -107,11 +95,11 @@ func run() error {
 	gg = page.TextLayout(nil, "space character:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 	page.TextSetFont(X, 10)
 	page.TextShowRaw(pdf.String{' '})
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 
 	page.TextNextLine()
@@ -119,11 +107,11 @@ func run() error {
 	gg = page.TextLayout(nil, "code mapped to non-existent character:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 	page.TextSetFont(X, 10)
 	page.TextShowRaw(pdf.String{'B'})
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 
 	page.TextNextLine()
@@ -131,11 +119,11 @@ func run() error {
 	gg = page.TextLayout(nil, "unmapped code:")
 	gg.Align(190, 0)
 	page.TextShowGlyphs(gg)
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 	page.TextSetFont(X, 10)
 	page.TextShowRaw(pdf.String{0o010})
-	page.TextSetFont(D, 10)
+	page.TextSetFont(M, 10)
 	page.TextShow("I")
 
 	page.TextEnd()
@@ -143,24 +131,64 @@ func run() error {
 	return page.Close()
 }
 
-func embedTestFont(w pdf.Putter) (font.Embedded, error) {
+// MakeMarkerFont creates a simple type3 font where "I" shows a gray, vertical
+// line.
+func makeMarkerFont(rm *pdf.ResourceManager) (font.Font, error) {
+	builder := type3.NewBuilder(rm)
+
+	g, err := builder.AddGlyph("I", 50, funit.Rect16{LLy: -500, URx: 50, URy: 1500}, false)
+	if err != nil {
+		return nil, err
+	}
+	g.SetFillColor(color.DeviceGray.New(0.5))
+	g.Rectangle(0, -500, 50, 2000)
+	g.Fill()
+	err = g.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	prop := &type3.Properties{
+		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+	}
+	return builder.Finish(prop)
+}
+
+// This is a modified version of the Times-Roman font,
+// which only contains the following glyphs: .notdef, space, Yacute, AEacute.
+type testFont struct{}
+
+func (f *testFont) WritingMode() int {
+	return 0
+}
+
+// GetGeometry returns font metrics required for typesetting.
+func (f *testFont) GetGeometry() *font.Geometry {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *testFont) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+	w := rm.Out
+
+	// load the original font
 	ll := loader.NewFontLoader()
 	fd, err := ll.Open("Times-Roman", loader.FontTypeType1)
 	if err != nil {
 		return nil, err
 	}
-
 	F, err := pst1.Read(fd)
 	if err != nil {
 		return nil, err
 	}
 
+	// copy the glyphs we want to keep
 	oldGlyphs := F.Glyphs
 	F.Glyphs = make(map[string]*pst1.Glyph)
 	F.Glyphs["space"] = oldGlyphs["space"]
 	F.Glyphs["Yacute"] = oldGlyphs["Yacute"]
 	F.Glyphs["AEacute"] = oldGlyphs["AEacute"]
 
+	// Since the original font has a blank .notdef glyph, we draw one manually.
 	notdef := &pst1.Glyph{
 		WidthX: 500,
 	}
@@ -175,6 +203,8 @@ func embedTestFont(w pdf.Putter) (font.Embedded, error) {
 	notdef.LineTo(400, 100)
 	notdef.ClosePath()
 	F.Glyphs[".notdef"] = notdef
+
+	// we manually write the font to the PDF file
 	F.Encoding = psenc.StandardEncoding[:]
 
 	fontFileRef := w.Alloc()
@@ -261,7 +291,7 @@ func embedTestFont(w pdf.Putter) (font.Embedded, error) {
 	}
 	w.Put(fontDictRef, fontDict)
 
-	res := &funnyFont{
+	res := &testFontEmbedded{
 		Res: pdf.Res{
 			Data: fontDictRef,
 		},
@@ -270,16 +300,16 @@ func embedTestFont(w pdf.Putter) (font.Embedded, error) {
 	return res, nil
 }
 
-type funnyFont struct {
+type testFontEmbedded struct {
 	pdf.Res
 	W []float64
 }
 
-func (f *funnyFont) WritingMode() int {
-	return 0
+func (f *testFontEmbedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	panic("not implemented")
 }
 
-func (f *funnyFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
+func (f *testFontEmbedded) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
 	for _, c := range s {
 		yield(f.W[c], c == 32)
 	}

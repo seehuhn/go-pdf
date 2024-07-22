@@ -42,16 +42,17 @@ func TestToUnicode(t *testing.T) {
 		for _, X := range []string{"A", "B"} {
 			t.Run(v.String()+X, func(t *testing.T) {
 				data := pdf.NewData(v)
+				rm := pdf.NewResourceManager(data)
 
-				E, err := F.Embed(data)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				l := E.Layout(nil, 10, "AB")
+				l := F.Layout(nil, 10, "AB")
 				gg := l.Seq
 				if len(gg) != 2 {
 					panic("test is broken")
+				}
+
+				E, err := pdf.ResourceManagerEmbed(rm, F)
+				if err != nil {
+					t.Fatal(err)
 				}
 
 				var codes pdf.String
@@ -61,7 +62,7 @@ func TestToUnicode(t *testing.T) {
 				if len(codes) != 3 {
 					panic("test is broken")
 				}
-				err = E.Close()
+				err = rm.Close()
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -108,11 +109,14 @@ func TestNotdefGlyph(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			data := pdf.NewData(v)
-			E, err := F.Embed(data)
+			rm := pdf.NewResourceManager(data)
+
+			E, err := pdf.ResourceManagerEmbed(rm, F)
 			if err != nil {
 				t.Fatal(err)
 			}
-			// Allocate codes for GID 0 and 2:
+
+			// Allocate codes for GID 0 and 5:
 			var s pdf.String
 			s, _, _ = E.CodeAndWidth(s, 0, nil)
 			s, _, _ = E.CodeAndWidth(s, 5, []rune("test"))
@@ -121,7 +125,8 @@ func TestNotdefGlyph(t *testing.T) {
 			}
 			code0 := s[0]
 			code1 := s[1]
-			err = E.Close()
+
+			err = rm.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -137,24 +142,15 @@ func TestNotdefGlyph(t *testing.T) {
 			name0 := info.Encoding[code0]
 			name1 := info.Encoding[code1]
 
-			if info.Font != nil {
-				if _, exists := info.Font.Glyphs[name0]; exists {
-					t.Errorf("existing name %q used for code %d",
-						name0, code0)
-				}
-				if _, exists := info.Font.Glyphs[name1]; !exists {
-					t.Errorf("glyph %q (code %d) does not exist",
-						name1, code1)
-				}
-			} else {
-				if _, exists := info.Metrics.Glyphs[name0]; exists {
-					t.Errorf("existing name %q used for code %d",
-						name0, code0)
-				}
-				if _, exists := info.Metrics.Glyphs[name1]; !exists {
-					t.Errorf("glyph %q (code %d) does not exist",
-						name1, code1)
-				}
+			if _, exists := info.Font.Glyphs[name0]; exists {
+				// According to the spec, the only way show a .notdef glyph is
+				// to use a non-existing glyph name.
+				t.Errorf("existing name %q used for code %d",
+					name0, code0)
+			}
+			if _, exists := info.Font.Glyphs[name1]; !exists {
+				t.Errorf("glyph %q (code %d) does not exist",
+					name1, code1)
 			}
 		})
 	}
@@ -172,15 +168,17 @@ func TestEncoding(t *testing.T) {
 
 	// Embed the font
 	data := pdf.NewData(pdf.V1_7)
-	E, err := F.Embed(data)
+	rm := pdf.NewResourceManager(data)
+
+	E, err := pdf.ResourceManagerEmbed(rm, F)
 	if err != nil {
 		t.Fatal(err)
 	}
-	gg := E.Layout(nil, 10, ".MiAbc")
+	gg := F.Layout(nil, 10, ".MiAbc")
 	for _, g := range gg.Seq {
 		E.CodeAndWidth(nil, g.GID, g.Text) // allocate codes
 	}
-	err = E.Close()
+	err = rm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -109,7 +109,7 @@ func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		return nil, err
 	}
 
-	base, err := s.base.Embed(rm)
+	base, err := pdf.ResourceManagerEmbed(rm, s.base)
 	if err != nil {
 		return nil, err
 	}

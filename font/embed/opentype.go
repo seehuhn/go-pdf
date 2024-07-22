@@ -17,7 +17,6 @@
 package embed
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/truetype"
@@ -25,18 +24,18 @@ import (
 )
 
 // OpenTypeFile loads and embeds an OpenType/TrueType font.
-func OpenTypeFile(w pdf.Putter, fname string, opt *font.Options) (font.Layouter, error) {
+func OpenTypeFile(fname string, opt *font.Options) (font.Layouter, error) {
 	info, err := sfnt.ReadFile(fname)
 	if err != nil {
 		return nil, err
 	}
 
-	return OpenTypeFont(w, info, opt)
+	return OpenTypeFont(info, opt)
 }
 
 // OpenTypeFont embeds an OpenType/TrueType font.
-func OpenTypeFont(w pdf.Putter, info *sfnt.Font, opt *font.Options) (font.Layouter, error) {
-	var F font.Font
+func OpenTypeFont(info *sfnt.Font, opt *font.Options) (font.Layouter, error) {
+	var F font.Layouter
 	var err error
 	if info.IsCFF() {
 		F, err = cff.New(info, opt)
@@ -46,5 +45,5 @@ func OpenTypeFont(w pdf.Putter, info *sfnt.Font, opt *font.Options) (font.Layout
 	if err != nil {
 		return nil, err
 	}
-	return F.Embed(w)
+	return F, nil
 }

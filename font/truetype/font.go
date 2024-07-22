@@ -18,6 +18,7 @@ package truetype
 
 import (
 	"errors"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -31,7 +32,11 @@ import (
 // This implements the [font.Font] interface.
 type Instance struct {
 	*sfnt.Font
-	opt *font.Options
+	*font.Geometry
+
+	layouter *sfnt.Layouter
+
+	Opt *font.Options
 }
 
 // New makes a PDF TrueType font from a sfnt.Font.
@@ -42,25 +47,9 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 		return nil, errors.New("no glyf outlines in font")
 	}
 
-	return &Instance{Font: info, opt: opt}, nil
-}
-
-// Embed adds the font to a PDF file.
-// This implements the [font.Font] interface.
-func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
-	opt := f.opt
 	if opt == nil {
 		opt = &font.Options{}
 	}
-
-	info := f.Font
-
-	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
-	if err != nil {
-		return nil, err
-	}
-
-	resource := pdf.Res{Data: w.Alloc()}
 
 	geometry := &font.Geometry{
 		GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
@@ -73,7 +62,62 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
 	}
 
-	var res font.Layouter
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	if err != nil {
+		return nil, err
+	}
+
+	f := &Instance{
+		Font:     info,
+		Geometry: geometry,
+		layouter: layouter,
+		Opt:      opt,
+	}
+	return f, nil
+}
+
+// WritingMode implements the [font.Layouter] interface.
+func (f *Instance) WritingMode() int {
+	return 0 // TODO(voss): implement
+}
+
+// Layout implements the [font.Layouter] interface.
+func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+
+	buf := f.layouter.Layout(s)
+	seq.Seq = slices.Grow(seq.Seq, len(buf))
+	for _, g := range buf {
+		xOffset := float64(g.XOffset) * ptSize * f.Font.FontMatrix[0]
+		if len(seq.Seq) == 0 {
+			seq.Skip += xOffset
+		} else {
+			seq.Seq[len(seq.Seq)-1].Advance += xOffset
+		}
+		seq.Seq = append(seq.Seq, font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * ptSize * f.Font.FontMatrix[0],
+			Rise:    float64(g.YOffset) * ptSize * f.Font.FontMatrix[3],
+			Text:    g.Text,
+		})
+	}
+	return seq
+}
+
+// Embed adds the font to a PDF file.
+// This implements the [font.Font] interface.
+func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+	opt := f.Opt
+	if opt == nil {
+		opt = &font.Options{}
+	}
+
+	w := rm.Out
+	resource := pdf.Res{Data: w.Alloc()}
+
+	var res font.Embedded
 	if !opt.Composite {
 		err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 		if err != nil {
@@ -83,9 +127,7 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 		res = &embeddedSimple{
 			w:             w,
 			Res:           resource,
-			Geometry:      geometry,
 			sfnt:          f.Font,
-			layouter:      layouter,
 			SimpleEncoder: encoding.NewSimpleEncoder(),
 		}
 	} else {
@@ -111,15 +153,11 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 		res = &embeddedComposite{
 			w:          w,
 			Res:        resource,
-			Geometry:   geometry,
 			sfnt:       f.Font,
-			layouter:   layouter,
 			GIDToCID:   gidToCID,
 			CIDEncoder: cidEncoder,
 		}
 	}
-
-	w.AutoClose(res)
 
 	return res, nil
 }

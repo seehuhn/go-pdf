@@ -41,7 +41,7 @@ func doit() error {
 		return err
 	}
 
-	info, err := sfnt.ReadFile("../../../../otf/SourceSerif4-Regular.otf")
+	info, err := sfnt.ReadFile("../../../../../otf/SourceSerif4-Regular.otf")
 	if err != nil {
 		return err
 	}
@@ -52,11 +52,7 @@ func doit() error {
 		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
 		MakeEncoder:  cmap.NewCIDEncoderUTF8,
 	}
-	FF, err := cff.New(info, opt)
-	if err != nil {
-		return err
-	}
-	F, err := FF.Embed(page.Out)
+	F, err := cff.New(info, opt)
 	if err != nil {
 		return err
 	}
@@ -64,7 +60,7 @@ func doit() error {
 	page.TextSetFont(F, 36)
 	page.TextBegin()
 	page.TextFirstLine(100, 700)
-	page.TextShow("“Größenwahn”")
+	page.TextShow("„Größenwahn“")
 	page.TextEnd()
 
 	return page.Close()

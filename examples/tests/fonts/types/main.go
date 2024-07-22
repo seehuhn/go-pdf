@@ -19,6 +19,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"sort"
@@ -60,42 +61,26 @@ func doit() error {
 		rightMargin: 144.0,
 	}
 
-	FX, err := standard.TimesRoman.New(nil)
-	if err != nil {
-		return err
-	}
-	F, err := FX.Embed(doc.Out)
+	F, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		return err
 	}
 	l.addFont("text", F, 10)
 
-	IX, err := standard.TimesItalic.New(nil)
-	if err != nil {
-		return err
-	}
-	I, err := IX.Embed(doc.Out)
+	I, err := standard.TimesItalic.New(nil)
 	if err != nil {
 		return err
 	}
 	l.addFont("it", I, 10)
 
-	SX, err := standard.Helvetica.New(nil)
-	if err != nil {
-		return err
-	}
-	S, err := SX.Embed(doc.Out)
+	S, err := standard.Helvetica.New(nil)
 	if err != nil {
 		return err
 	}
 	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
-	SBX, err := standard.HelveticaBold.New(nil)
-	if err != nil {
-		return err
-	}
-	SB, err := SBX.Embed(doc.Out)
+	SB, err := standard.HelveticaBold.New(nil)
 	if err != nil {
 		return err
 	}
@@ -108,51 +93,52 @@ func doit() error {
 		title := s.title
 		intro := s.lines
 
-		var X font.Font
+		var gen func(rm *pdf.ResourceManager) font.Layouter
 		var ffKey pdf.Name
 		switch title {
 		case "Simple PDF Fonts":
 			// part 1
 		case "Type 1 Fonts":
-			X = fonttypes.Type1
+			gen = fonttypes.Type1WithMetrics
 			ffKey = "FontFile"
 		case "Builtin Fonts":
-			X, err = standard.Helvetica.New(nil)
-			if err != nil {
-				return err
-			}
+			gen = fonttypes.Standard
 		case "Simple CFF Fonts":
-			X = fonttypes.CFFSimple
+			gen = fonttypes.CFFSimple
 			ffKey = "FontFile3"
 		case "Simple CFF-based OpenType Fonts":
-			X = fonttypes.OpenTypeCFFSimple
+			gen = fonttypes.OpenTypeCFFSimple
 			ffKey = "FontFile3"
 		case "Multiple Master Fonts":
 			// not supported
 		case "Simple TrueType Fonts":
-			X = fonttypes.TrueTypeSimple
+			gen = fonttypes.TrueTypeSimple
 			ffKey = "FontFile2"
 		case "Simple Glyf-based OpenType Fonts":
-			X = fonttypes.OpenTypeGlyfSimple
+			gen = fonttypes.OpenTypeGlyfSimple
 			ffKey = "FontFile3"
 		case "Type 3 Fonts":
-			X = fonttypes.Type3
+			gen = fonttypes.Type3
 		case "Composite PDF Fonts":
 			// part 2
 		case "Composite CFF Fonts":
-			X = fonttypes.CFFComposite
+			gen = fonttypes.CFFComposite
 			ffKey = "FontFile3"
 		case "Composite CFF-based OpenType Fonts":
-			X = fonttypes.OpenTypeCFFComposite
+			gen = fonttypes.OpenTypeCFFComposite
 			ffKey = "FontFile3"
 		case "Composite TrueType Fonts":
-			X = fonttypes.TrueTypeComposite
+			gen = fonttypes.TrueTypeComposite
 			ffKey = "FontFile2"
 		case "Composite Glyf-based OpenType Fonts":
-			X = fonttypes.OpenTypeGlyfComposite
+			gen = fonttypes.OpenTypeGlyfComposite
 			ffKey = "FontFile3"
 		default:
 			panic("unexpected section " + title)
+		}
+		var X font.Font
+		if gen != nil {
+			X = gen(doc.RM)
 		}
 
 		page := doc.AddPage()
@@ -179,7 +165,7 @@ func doit() error {
 		page.SetFillColor(color.DeviceGray.New(0))
 
 		page.TextBegin()
-		if X != nil {
+		if gen != nil {
 			intro = append(intro, "", fmt.Sprintf("Example (see `fonts%02d.pdf`):", fontNo))
 		}
 		for i, line := range intro {
@@ -218,16 +204,16 @@ func doit() error {
 		page.TextEnd()
 		l.yPos -= -l.F["text"].descent
 
-		if X != nil {
-			err = writeSinglePage(X, fontNo)
+		if gen != nil {
+			err = writeSinglePage(gen, fontNo)
 			if err != nil {
 				return err
 			}
 			fontNo++
 		}
 
-		if X != nil {
-			Y, err := X.Embed(doc.Out)
+		if gen != nil {
+			Y, err := pdf.ResourceManagerEmbed(page.RM, X)
 			if err != nil {
 				return err
 			}
@@ -235,12 +221,12 @@ func doit() error {
 			l.yPos -= 20
 			page.TextBegin()
 			page.TextFirstLine(l.leftMargin, l.yPos)
-			page.TextSetFont(Y, 24)
+			page.TextSetFont(X, 24)
 			page.TextShow(exampleText)
 			page.TextEnd()
 			l.yPos -= 30
 
-			err = Y.Close()
+			err = Y.(io.Closer).Close()
 			if err != nil {
 				return err
 			}
@@ -338,7 +324,7 @@ func doit() error {
 	return nil
 }
 
-func writeSinglePage(F font.Font, no int) error {
+func writeSinglePage(gen func(*pdf.ResourceManager) font.Layouter, no int) error {
 	fname := fmt.Sprintf("fonts%02d.pdf", no)
 
 	page, err := document.CreateSinglePage(fname, document.A5r, pdf.V1_7, nil)
@@ -346,21 +332,13 @@ func writeSinglePage(F font.Font, no int) error {
 		return err
 	}
 
-	X, err := F.Embed(page.Out)
-	if err != nil {
-		return err
-	}
+	F := gen(page.RM)
 
 	page.TextBegin()
 	page.TextFirstLine(72, 72)
-	page.TextSetFont(X, 24)
+	page.TextSetFont(F, 24)
 	page.TextShow(exampleText)
 	page.TextEnd()
-
-	err = X.Close()
-	if err != nil {
-		return err
-	}
 
 	return page.Close()
 }

@@ -145,7 +145,7 @@ func (w *Writer) TextSetLeading(leading float64) {
 // TextSetFont sets the font and font size.
 //
 // This implements the PDF graphics operator "Tf".
-func (w *Writer) TextSetFont(font font.Embedded, size float64) {
+func (w *Writer) TextSetFont(font font.Font, size float64) {
 	if !w.isValid("TextSetFont", objText|objPage) {
 		return
 	}
@@ -157,8 +157,12 @@ func (w *Writer) TextSetFont(font font.Embedded, size float64) {
 	w.State.TextFontSize = size
 	w.State.Set |= StateTextFont
 
-	name := w.getResourceNameOld(catFont, font)
-	err := name.PDF(w.Content)
+	name, err := writerGetResourceName(w, font, catFont)
+	if err != nil {
+		w.Err = err
+		return
+	}
+	err = name.PDF(w.Content)
 	if err != nil {
 		w.Err = err
 		return
@@ -399,9 +403,9 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 }
 
 func (w *Writer) updateTextPosition(s pdf.String) {
-	F := w.TextFont
-	wmode := F.WritingMode()
-	F.ForeachWidth(s, func(width float64, isSpace bool) {
+	wmode := w.TextFont.WritingMode()
+	E := w.textFontEmbedded()
+	E.ForeachWidth(s, func(width float64, isSpace bool) {
 		width = width*w.TextFontSize + w.TextCharacterSpacing
 		if isSpace {
 			width += w.TextWordSpacing

@@ -30,7 +30,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	pdfcff "seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/graphics/testcases"
 	"seehuhn.de/go/pdf/internal/dummyfont"
@@ -103,13 +102,6 @@ func TestTextShowRaw(t *testing.T) {
 		F.Glyphs = append(F.Glyphs, g)
 	}
 
-	e := &pdfcff.FontDictSimple{
-		Font:      F,
-		Encoding:  F.Encoding,
-		Ascent:    1000,
-		CapHeight: 1000,
-	}
-
 	testString := pdf.String("CADABX")
 
 	type testCase struct {
@@ -126,7 +118,7 @@ func TestTextShowRaw(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			// first print all glyphs in one string
 			img1 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.EmbedCFF(r.Out, e)
+				F := dummyfont.Must()
 
 				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
@@ -141,7 +133,7 @@ func TestTextShowRaw(t *testing.T) {
 			// now print glyphs one-by-one and record the x positions
 			var xx []float64
 			img2 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.EmbedCFF(r.Out, e)
+				F := dummyfont.Must()
 
 				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
@@ -158,7 +150,7 @@ func TestTextShowRaw(t *testing.T) {
 			})
 			// finally, print each glyph at the recorded x positions
 			img3 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.EmbedCFF(r.Out, e)
+				F := dummyfont.Must()
 
 				r.TextSetFont(F, 100)
 				for i := range testString {
@@ -220,17 +212,20 @@ func TestTextShowRaw2(t *testing.T) {
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
 			img1 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := sample.Embed(r.Out)
-				if err != nil {
-					return err
-				}
+				F := sample.MakeFont(r.RM)
 
 				r.TextSetFont(F, fontSize)
 				r.TextBegin()
 				r.TextFirstLine(10, 10)
-				for _, g := range F.Layout(nil, fontSize, testString).Seq {
+
+				E, err := pdf.ResourceManagerEmbed(r.RM, F)
+				if err != nil {
+					return err
+				}
+
+				for _, g := range r.TextLayout(nil, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
-					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)
+					s, _, _ = E.CodeAndWidth(s[:0], g.GID, g.Text)
 
 					r.TextShowRaw(s)
 				}
@@ -240,16 +235,18 @@ func TestTextShowRaw2(t *testing.T) {
 			})
 			// Then print each glyph at the recorded x positions.
 			img2 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F, err := sample.Embed(r.Out)
+				F := sample.MakeFont(r.RM)
+				r.TextSetFont(F, fontSize)
+
+				E, err := pdf.ResourceManagerEmbed(r.RM, F)
 				if err != nil {
 					return err
 				}
 
-				r.TextSetFont(F, fontSize)
-				for i, g := range F.Layout(nil, 10, testString).Seq {
+				for i, g := range r.TextLayout(nil, testString).Seq {
 					r.TextBegin()
 					r.TextFirstLine(xx[i], 10)
-					s, _, _ = F.CodeAndWidth(s[:0], g.GID, g.Text)
+					s, _, _ = E.CodeAndWidth(s[:0], g.GID, g.Text)
 					r.TextShowRaw(s)
 					r.TextEnd()
 				}

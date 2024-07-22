@@ -27,7 +27,6 @@ import (
 
 // Writer writes a PDF content stream.
 type Writer struct {
-	Version   pdf.Version // TODO(voss): remove
 	Content   io.Writer
 	Resources *pdf.Resources
 	Err       error
@@ -37,9 +36,8 @@ type Writer struct {
 	State
 	stack []State
 
-	RM         *pdf.ResourceManager
-	resName    map[catRes]pdf.Name
-	resNameOld map[catRes]pdf.Name
+	RM      *pdf.ResourceManager
+	resName map[catRes]objName
 
 	nesting       []pairType
 	markedContent []*MarkedContent
@@ -50,6 +48,11 @@ type Writer struct {
 type catRes struct {
 	cat resourceCategory
 	res any
+}
+
+type objName struct {
+	obj  any
+	name pdf.Name
 }
 
 type resourceCategory byte
@@ -78,22 +81,51 @@ const (
 )
 
 // NewWriter allocates a new Writer object.
-func NewWriter(w io.Writer, rm *pdf.ResourceManager) *Writer {
-	v := pdf.GetVersion(rm.Out)
+func NewWriter(out io.Writer, rm *pdf.ResourceManager) *Writer {
 	return &Writer{
-		Version:       v,
-		Content:       w,
+		Content:       out,
 		Resources:     &pdf.Resources{},
 		currentObject: objPage,
 
 		State: NewState(),
 
-		RM:         rm,
-		resName:    make(map[catRes]pdf.Name),
-		resNameOld: make(map[catRes]pdf.Name),
+		RM:      rm,
+		resName: make(map[catRes]objName),
 
 		glyphBuf: &font.GlyphSeq{},
 	}
+}
+
+// NewStream resets the writer for a new content stream.
+// The new content stream shares the resource dictionary with the previous
+// content stream.
+func (w *Writer) NewStream(out io.Writer) {
+	w.Content = out
+	w.currentObject = objPage
+	w.State = NewState()
+	w.stack = w.stack[:0]
+	w.Err = nil
+}
+
+// IsValid returns true, if the current graphics object is one of the given types
+// and if p.Err is nil.  Otherwise it sets p.Err and returns false.
+func (w *Writer) isValid(cmd string, ss objectType) bool {
+	if w.Err != nil {
+		return false
+	}
+
+	if w.currentObject&ss != 0 {
+		return true
+	}
+
+	w.Err = fmt.Errorf("unexpected state %q for %q", w.currentObject, cmd)
+	return false
+}
+
+func (w *Writer) coord(x float64) string {
+	// TODO(voss): use the current transformation matrix to determine the
+	// number of digits to keep?
+	return format(x)
 }
 
 // GetResourceName returns a name which can be used to refer to a resource from
@@ -102,11 +134,13 @@ func NewWriter(w io.Writer, rm *pdf.ResourceManager) *Writer {
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [Writer].
+//
+// TODO(voss): swap the resource and category arguments?
 func writerGetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], category resourceCategory) (pdf.Name, error) {
 	key := catRes{category, resource}
-	name, ok := w.resName[key]
+	v, ok := w.resName[key]
 	if ok {
-		return name, nil
+		return v.name, nil
 	}
 
 	embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
@@ -115,10 +149,10 @@ func writerGetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], 
 	}
 
 	dict := w.getCategoryDict(category)
-	name = w.generateName(category, dict, "")
+	name := w.generateName(category, dict, "")
 	(*dict)[name] = embedded.PDFObject()
 
-	w.resName[key] = name
+	w.resName[key] = objName{embedded, name}
 	return name, nil
 }
 
@@ -130,19 +164,41 @@ func writerGetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], 
 // into a method on [Writer].
 func writerSetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], category resourceCategory, name pdf.Name) error {
 	for k, v := range w.resName {
-		if k.cat == category && v == name {
+		if k.cat == category && v.name == name {
 			return fmt.Errorf("name %q is already used for category %d", name, category)
 		}
 	}
 
-	_, err := pdf.ResourceManagerEmbed(w.RM, resource)
+	embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
 	if err != nil {
 		return err
 	}
 
+	dict := w.getCategoryDict(category)
+	(*dict)[name] = embedded.PDFObject()
+
 	key := catRes{category, resource}
-	w.resName[key] = name
+	w.resName[key] = objName{embedded, name}
 	return nil
+}
+
+// SetFontNameInternal controls how the font is refered to in the content
+// stream.  Normally, a name is allocated automatically, so use of this
+// function is not normally required.
+func (w *Writer) SetFontNameInternal(f font.Font, name pdf.Name) error {
+	return writerSetResourceName(w, f, catFont, name)
+}
+
+func (w *Writer) textFontEmbedded() font.Embedded {
+	if !w.isSet(StateTextFont) {
+		return nil
+	}
+	F := w.State.TextFont
+	E, ok := w.resName[catRes{catFont, F}]
+	if !ok {
+		return nil
+	}
+	return E.obj.(font.Embedded)
 }
 
 func (w *Writer) getCategoryDict(category resourceCategory) *pdf.Dict {
@@ -223,62 +279,6 @@ func getCategoryPrefix(category resourceCategory) pdf.Name {
 	default:
 		panic("invalid resource category")
 	}
-}
-
-// GetResourceName returns the name of a resource.
-// If the resource is not yet in the resource dictionary, a new name is generated.
-func (w *Writer) getResourceNameOld(category resourceCategory, r pdf.Resource) pdf.Name {
-	name, ok := w.resNameOld[catRes{category, r}]
-	if ok {
-		return name
-	}
-
-	field := w.getCategoryDict(category)
-	name = w.generateName(category, field, "")
-	(*field)[name] = r.PDFObject()
-	w.resNameOld[catRes{category, r}] = name
-
-	return name
-}
-
-// SetFontNameInternal controls how the font is refered to in the content
-// stream.  Normally, a name is allocated automatically, so use of this
-// function is not normally required.
-func (w *Writer) SetFontNameInternal(f font.Embedded, name pdf.Name) error {
-	// TODO(voss): convert to use writerSetResourceName
-
-	for k, v := range w.resNameOld {
-		if k.cat == catFont && v == name {
-			return fmt.Errorf("name %q is already used", name)
-		}
-	}
-
-	field := w.getCategoryDict(catFont)
-	(*field)[name] = f.PDFObject()
-	w.resNameOld[catRes{catFont, f}] = name
-
-	return nil
-}
-
-// IsValid returns true, if the current graphics object is one of the given types
-// and if p.Err is nil.  Otherwise it sets p.Err and returns false.
-func (w *Writer) isValid(cmd string, ss objectType) bool {
-	if w.Err != nil {
-		return false
-	}
-
-	if w.currentObject&ss != 0 {
-		return true
-	}
-
-	w.Err = fmt.Errorf("unexpected state %q for %q", w.currentObject, cmd)
-	return false
-}
-
-func (w *Writer) coord(x float64) string {
-	// TODO(voss): use the current transformation matrix to determine the
-	// number of digits to keep?
-	return format(x)
 }
 
 // See Figure 9 (p. 113) of PDF 32000-1:2008.

@@ -40,8 +40,8 @@ var keepTempFiles = false
 // This calls the ghostscript command-line tool to render the PDF page to a PNG
 // image.  The image is returned as a Go image.Image object.
 //
-// We use this function to verify that Ghostscript's idea of PDF matches our
-// own.
+// This function can be used to verify that Ghostscript's idea of PDF matches
+// our own.
 func Render(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) image.Image {
 	t.Helper()
 

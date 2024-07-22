@@ -55,8 +55,8 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	M = M.Mul(s.CTM)
 	xc, yc := M.Apply(0, 0)
 
-	XFont := type3.New(1000)
-	g, err := XFont.AddGlyph("x", 0, funit.Rect16{LLx: -100, LLy: 1000, URx: 100, URy: 100}, false)
+	builder := type3.NewBuilder(r.Page.RM)
+	g, err := builder.AddGlyph("x", 0, funit.Rect16{LLx: -100, LLy: 1000, URx: 100, URy: 100}, false)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -75,7 +75,11 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	if err != nil {
 		return 0, 0, err
 	}
-	X, err := XFont.Embed(r.Page.Out)
+
+	prop := &type3.Properties{
+		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+	}
+	X, err := builder.Finish(prop)
 	if err != nil {
 		return 0, 0, err
 	}

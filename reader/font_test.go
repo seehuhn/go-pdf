@@ -45,11 +45,10 @@ func TestExtractText(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			E, err := sample.Embed(doc.Out)
-			if err != nil {
-				t.Fatal(err)
-			}
-			doc.TextSetFont(E, 12)
+
+			F := sample.MakeFont(doc.RM)
+
+			doc.TextSetFont(F, 12)
 			doc.TextBegin()
 			doc.TextFirstLine(72, 100)
 			doc.TextShow(line1)
@@ -92,5 +91,3 @@ func TestExtractText(t *testing.T) {
 		})
 	}
 }
-
-var _ FontFromFile = (*fromFileSimple)(nil)

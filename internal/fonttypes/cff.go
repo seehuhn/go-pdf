@@ -31,24 +31,24 @@ type cffEmbedder struct {
 
 // CFF fonts
 var (
-	// CFF is a simple CFF font without CIDFont operators.
-	CFFSimple font.Font = cffEmbedder{0, false}
+	// CFF makes a simple CFF font without CIDFont operators.
+	CFFSimple = cffEmbedder{0, false}.font
 
-	// CFFCID is a simple CFF font with CIDFont operators.
-	CFFCIDSimple font.Font = cffEmbedder{1, false}
+	// CFFCID makes a simple CFF font with CIDFont operators.
+	CFFCIDSimple = cffEmbedder{1, false}.font
 
-	// CFF is a composite CFF font without CIDFont operators.
-	CFFComposite font.Font = cffEmbedder{0, true}
+	// CFF makes a composite CFF font without CIDFont operators.
+	CFFComposite = cffEmbedder{0, true}.font
 
-	// CFFCID is a composite CFF font with CIDFont operators.
-	CFFCIDComposite font.Font = cffEmbedder{1, true}
+	// CFFCID makes a composite CFF font with CIDFont operators.
+	CFFCIDComposite = cffEmbedder{1, true}.font
 
-	// CFFCID2 is a composite CFF font with CIDFont operators and multiple private
+	// CFFCID2 makes a composite CFF font with CIDFont operators and multiple private
 	// dictionaries.
-	CFFCID2Composite font.Font = cffEmbedder{2, true}
+	CFFCID2Composite = cffEmbedder{2, true}.font
 )
 
-func (f cffEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
+func (f cffEmbedder) font(*pdf.ResourceManager) font.Layouter {
 	var info *sfnt.Font
 	switch f.tp {
 	case 0:
@@ -66,7 +66,7 @@ func (f cffEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
 
 	F, err := cff.New(info, opt)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return F.Embed(w)
+	return F
 }

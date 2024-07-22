@@ -62,23 +62,23 @@ const (
 )
 
 // New returns a new font instance for the given Go font and options.
-func (f Font) New(opt *font.Options) *truetype.Instance {
+func (f Font) New(opt *font.Options) (*truetype.Instance, error) {
 	data, ok := ttf[f]
 	if !ok {
-		panic("invalid Go font ID")
+		return nil, fmt.Errorf("gofont: unknown font %d", f)
 	}
 
 	info, err := sfnt.Read(bytes.NewReader(data))
 	if err != nil {
-		panic(fmt.Sprintf("built-in Go font corrupted??? %s", err))
+		return nil, fmt.Errorf("gofont: %w", err)
 	}
 
 	F, err := truetype.New(info, opt)
 	if err != nil {
-		panic(fmt.Sprintf("built-in fonts corrupted??? %s", err))
+		return nil, fmt.Errorf("gofont: %w", err)
 	}
 
-	return F
+	return F, nil
 }
 
 var ttf = map[Font][]byte{

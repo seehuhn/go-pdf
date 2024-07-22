@@ -86,7 +86,7 @@ func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		return nil, errors.New("invalid Matrix")
 	}
 
-	csE, err := s.ColorSpace.Embed(rm)
+	csE, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
 	if err != nil {
 		return nil, err
 	}

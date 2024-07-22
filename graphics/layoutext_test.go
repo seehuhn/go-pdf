@@ -36,12 +36,9 @@ import (
 
 func TestGlyphWidths(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
+	rm := pdf.NewResourceManager(data)
 
-	FX, err := standard.TimesRoman.New(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	F, err := FX.Embed(data)
+	F, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,8 +47,6 @@ func TestGlyphWidths(t *testing.T) {
 	if len(gg0.Seq) != 2 {
 		t.Fatal("wrong number of glyphs")
 	}
-
-	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
 	out := graphics.NewWriter(buf, rm)
@@ -75,7 +70,7 @@ func TestGlyphWidths(t *testing.T) {
 	out.TextShowGlyphs(gg)
 	out.TextEnd()
 
-	err = F.Close()
+	err = rm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,8 +107,7 @@ func TestSpaceAdvance(t *testing.T) {
 	data := pdf.NewData(pdf.V2_0)
 	rm := pdf.NewResourceManager(data)
 
-	Fx := gofont.Regular.New(nil)
-	F, err := Fx.Embed(data)
+	F, err := gofont.Regular.New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +141,10 @@ func TestSpaceAdvance(t *testing.T) {
 func BenchmarkTextLayout(b *testing.B) {
 	// F := standard.TimesRoman
 
-	F := gofont.Regular.New(nil)
+	F, err := gofont.Regular.New(nil)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	// info, err := sfnt.ReadFile("../../otf/SourceSerif4-Regular.otf")
 	// if err != nil {
@@ -174,13 +171,8 @@ func writeDummyDocument(w io.Writer, F font.Font) error {
 		return err
 	}
 
-	E, err := F.Embed(doc.Out)
-	if err != nil {
-		return err
-	}
-
 	textStyle := graphics.NewState()
-	textStyle.TextFont = E
+	textStyle.TextFont = F
 	textStyle.TextFontSize = 10
 	textStyle.TextLeading = 12
 	textStyle.FillColor = color.DeviceGray.New(0)

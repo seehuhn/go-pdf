@@ -76,12 +76,14 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		return 0
 	}
 
-	font, ok := w.TextFont.(font.Layouter)
+	F, ok := w.TextFont.(font.Layouter)
 	if !ok {
 		w.Err = errors.New("font does not support layouting")
 		return 0
 	}
-	geom := font.GetGeometry()
+	geom := F.GetGeometry()
+
+	E := w.textFontEmbedded()
 
 	left := seq.Skip
 	gg := seq.Seq
@@ -124,7 +126,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	xActual := 0.0
 	xWanted := left
 	param := w.State
-	if font.WritingMode() != 0 {
+	if F.WritingMode() != 0 {
 		panic("vertical writing mode not implemented")
 	}
 	for _, g := range gg {
@@ -153,7 +155,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 
 		var glyphWidth float64
 		var isSpace bool
-		run, glyphWidth, isSpace = font.CodeAndWidth(run, g.GID, g.Text)
+		run, glyphWidth, isSpace = E.CodeAndWidth(run, g.GID, g.Text)
 		glyphWidth = glyphWidth*param.TextFontSize + param.TextCharacterSpacing
 		if isSpace {
 			glyphWidth += param.TextWordSpacing

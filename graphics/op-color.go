@@ -129,7 +129,7 @@ func (w *Writer) DrawShading(shading Shading) {
 	if !w.isValid("DrawShading", objPage) {
 		return
 	}
-	if w.Version < pdf.V1_3 {
+	if pdf.GetVersion(w.RM.Out) < pdf.V1_3 {
 		w.Err = &pdf.VersionError{
 			Operation: "shading objects",
 			Earliest:  pdf.V1_3,

@@ -28,29 +28,29 @@ import (
 )
 
 // Font identifies the individualfonts.
-type Font int
+type Font string
 
 // Constants for the 14 standard PDF fonts.
 const (
-	Courier              Font = iota // "Courier"
-	CourierBold                      // "Courier-Bold"
-	CourierBoldOblique               // "Courier-BoldOblique"
-	CourierOblique                   // "Courier-Oblique"
-	Helvetica                        // "Helvetica"
-	HelveticaBold                    // "Helvetica-Bold"
-	HelveticaBoldOblique             // "Helvetica-BoldOblique"
-	HelveticaOblique                 // "Helvetica-Oblique"
-	TimesRoman                       // "Times-Roman"
-	TimesBold                        // "Times-Bold"
-	TimesBoldItalic                  // "Times-BoldItalic"
-	TimesItalic                      // "Times-Italic"
-	Symbol                           // "Symbol"
-	ZapfDingbats                     // "ZapfDingbats"
+	Courier              Font = "Courier"
+	CourierBold          Font = "Courier-Bold"
+	CourierBoldOblique   Font = "Courier-BoldOblique"
+	CourierOblique       Font = "Courier-Oblique"
+	Helvetica            Font = "Helvetica"
+	HelveticaBold        Font = "Helvetica-Bold"
+	HelveticaBoldOblique Font = "Helvetica-BoldOblique"
+	HelveticaOblique     Font = "Helvetica-Oblique"
+	TimesRoman           Font = "Times-Roman"
+	TimesBold            Font = "Times-Bold"
+	TimesBoldItalic      Font = "Times-BoldItalic"
+	TimesItalic          Font = "Times-Italic"
+	Symbol               Font = "Symbol"
+	ZapfDingbats         Font = "ZapfDingbats"
 )
 
 // New returns a new font instance for the given standard font and options.
 func (f Font) New(opt *font.Options) (*type1.Instance, error) {
-	name := fontName[f]
+	name := string(f)
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)
 	if err != nil {
@@ -138,6 +138,16 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 	return type1.New(psFont, metrics, opt)
 }
 
+// Must returns a new font instance for the given standard font and options.
+// It panics if the there is an error.
+func (f Font) Must(opt *font.Options) *type1.Instance {
+	inst, err := f.New(opt)
+	if err != nil {
+		panic(err)
+	}
+	return inst
+}
+
 // Restrict the font to the character set guaranteed by the spec,
 // and return the corresponding encoding.
 func restrictGlyphList[T any](f Font, glyphs map[string]T) []string {
@@ -160,23 +170,6 @@ func restrictGlyphList[T any](f Font, glyphs map[string]T) []string {
 		}
 	}
 	return encoding
-}
-
-var fontName = map[Font]string{
-	Courier:              "Courier",
-	CourierBold:          "Courier-Bold",
-	CourierBoldOblique:   "Courier-BoldOblique",
-	CourierOblique:       "Courier-Oblique",
-	Helvetica:            "Helvetica",
-	HelveticaBold:        "Helvetica-Bold",
-	HelveticaBoldOblique: "Helvetica-BoldOblique",
-	HelveticaOblique:     "Helvetica-Oblique",
-	TimesRoman:           "Times-Roman",
-	TimesBold:            "Times-Bold",
-	TimesBoldItalic:      "Times-BoldItalic",
-	TimesItalic:          "Times-Italic",
-	Symbol:               "Symbol",
-	ZapfDingbats:         "ZapfDingbats",
 }
 
 // All lists the 14 standard PDF fonts defined in this package.

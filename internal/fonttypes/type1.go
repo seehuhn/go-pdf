@@ -21,20 +21,28 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/postscript/afm"
 )
 
-// Type1 is a Type 1 PDF font.
-var Type1 = &type1embedder{}
+// Type1WithMetrics makes a Type 1 PDF font with metrics.
+var Type1WithMetrics = type1embedder{true}.font
 
-type type1embedder struct{}
+// Type1WithoutMetrics makes a Type 1 PDF font without the optional metrics.
+var Type1WithoutMetrics = type1embedder{false}.font
 
-func (*type1embedder) Embed(w pdf.Putter) (font.Layouter, error) {
+type type1embedder struct{ metrics bool }
+
+func (t type1embedder) font(rm *pdf.ResourceManager) font.Layouter {
 	info := makefont.Type1()
-	afm := makefont.AFM()
+
+	var afm *afm.Metrics
+	if t.metrics {
+		afm = makefont.AFM()
+	}
 
 	F, err := type1.New(info, afm, nil)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return F.Embed(w)
+	return F
 }

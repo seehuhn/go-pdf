@@ -34,11 +34,7 @@ func main() {
 
 	rm := pdf.NewResourceManager(out)
 
-	fontX, err := standard.Helvetica.New(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	font, err := fontX.Embed(out)
+	font, err := standard.Helvetica.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}

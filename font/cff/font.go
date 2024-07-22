@@ -37,31 +37,34 @@ import (
 
 type Instance struct {
 	*sfnt.Font
+	*font.Geometry
+
+	layouter *sfnt.Layouter
+
 	Opt *font.Options
 }
 
+var _ font.Font = (*Instance)(nil) // TODO(voss): remove
+
 // New turns a sfnt.Font into a PDF CFF font.
-// The font info must be an OpenType font with CFF outlines.
+//
 // The font can be embedded as a simple font or as a composite font,
-// depending on the options used in the Embed method.
+// depending on the options used.
+//
+// The sfnt.Font info must be an OpenType font with CFF outlines.
 func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 	if !info.IsCFF() {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
-	return &Instance{Font: info, Opt: opt}, nil
-}
-
-// Embed implements the [font.Font] interface.
-func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
-	opt := f.Opt
 	if opt == nil {
 		opt = &font.Options{}
 	}
 
-	info := f.Font
-
-	resource := pdf.Res{Data: w.Alloc()}
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	if err != nil {
+		return nil, err
+	}
 
 	geometry := &font.Geometry{
 		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
@@ -74,21 +77,64 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 		Widths:       info.WidthsPDF(),
 	}
 
-	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
-	if err != nil {
-		return nil, err
+	F := &Instance{
+		Font:     info,
+		Geometry: geometry,
+		layouter: layouter,
+		Opt:      opt,
 	}
+
+	return F, nil
+}
+
+// WritingMode implements the [font.Font] interface.
+func (f *Instance) WritingMode() int {
+	// TODO(voss): implement this
+	return 0
+}
+
+// Layout implements the [font.Layouter] interface.
+func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+
+	buf := f.layouter.Layout(s)
+	seq.Seq = slices.Grow(seq.Seq, len(buf))
+	for _, g := range buf {
+		xOffset := float64(g.XOffset) * ptSize * f.Font.FontMatrix[0]
+		if len(seq.Seq) == 0 {
+			seq.Skip += xOffset
+		} else {
+			seq.Seq[len(seq.Seq)-1].Advance += xOffset
+		}
+		seq.Seq = append(seq.Seq, font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * ptSize * f.Font.FontMatrix[0],
+			Rise:    float64(g.YOffset) * ptSize * f.Font.FontMatrix[3],
+			Text:    g.Text,
+		})
+	}
+	return seq
+}
+
+// Embed implements the [font.Font] interface.
+func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+	opt := f.Opt
+
+	info := f.Font
+
+	w := rm.Out
+	resource := pdf.Res{Data: w.Alloc()}
 
 	e := embedded{
-		w:        w,
-		Res:      resource,
-		Geometry: geometry,
+		w:   w,
+		Res: resource,
 
-		sfnt:     info,
-		layouter: layouter,
+		sfnt: info,
 	}
 
-	var res font.Layouter
+	var res font.Embedded
 	if opt.Composite {
 		err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 		if err != nil {
@@ -124,7 +170,6 @@ func (f *Instance) Embed(w pdf.Putter) (font.Layouter, error) {
 			SimpleEncoder: encoding.NewSimpleEncoder(),
 		}
 	}
-	w.AutoClose(res)
 
 	return res, nil
 }
@@ -161,35 +206,8 @@ func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []pdf.Rectangle {
 type embedded struct {
 	w pdf.Putter
 	pdf.Res
-	*font.Geometry
 
-	sfnt     *sfnt.Font
-	layouter *sfnt.Layouter
+	sfnt *sfnt.Font
 
 	closed bool
-}
-
-// Layout implements the [font.Layouter] interface.
-func (f *embedded) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
-	if seq == nil {
-		seq = &font.GlyphSeq{}
-	}
-
-	buf := f.layouter.Layout(s)
-	seq.Seq = slices.Grow(seq.Seq, len(buf))
-	for _, g := range buf {
-		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
-		if len(seq.Seq) == 0 {
-			seq.Skip += xOffset
-		} else {
-			seq.Seq[len(seq.Seq)-1].Advance += xOffset
-		}
-		seq.Seq = append(seq.Seq, font.Glyph{
-			GID:     g.GID,
-			Advance: float64(g.Advance) * ptSize * f.sfnt.FontMatrix[0],
-			Rise:    float64(g.YOffset) * ptSize * f.sfnt.FontMatrix[3],
-			Text:    g.Text,
-		})
-	}
-	return seq
 }

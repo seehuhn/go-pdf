@@ -66,8 +66,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFontX, err := standard.Courier.New(nil)
-	labelFont, err := labelFontX.Embed(out)
+	labelFont, err := standard.Courier.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -161,7 +160,7 @@ func getFontBBox(fnt *cff.Font) *funit.Rect16 {
 }
 
 type illustrator struct {
-	labelFont font.Embedded
+	labelFont font.Layouter
 	pageTree  *pagetree.Writer
 	pageSize  *pdf.Rectangle
 	rm        *pdf.ResourceManager

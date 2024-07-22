@@ -18,8 +18,6 @@ package gofont
 
 import (
 	"testing"
-
-	"seehuhn.de/go/pdf"
 )
 
 // TestLigatures checks that letters are correctly combined into ligatures.
@@ -29,18 +27,15 @@ func TestLigatures(t *testing.T) {
 		Medium, MediumItalic, Regular, Smallcaps, SmallcapsItalic,
 		Mono, MonoBold, MonoBoldItalic, MonoItalic} {
 
-		F := Fx.New(nil)
-
-		data := pdf.NewData(pdf.V2_0)
-		E, err := F.Embed(data)
+		F, err := Fx.New(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		geom := E.GetGeometry()
+		geom := F.GetGeometry()
 
 		for _, lig := range ligatures {
-			gg := E.Layout(nil, 10, lig)
+			gg := F.Layout(nil, 10, lig)
 
 			rr := []rune(lig)
 			if gg.Seq[0].GID == 0 {

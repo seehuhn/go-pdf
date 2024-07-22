@@ -66,10 +66,12 @@ func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	// See table 57 in ISO 32000-2:2020.
 	dict := pdf.Dict{}
 	if set&StateTextFont != 0 {
-		// TODO(voss): embed the font
-		ref := param.TextFont.PDFObject().(pdf.Reference)
+		E, err := pdf.ResourceManagerEmbed(rm, param.TextFont)
+		if err != nil {
+			return nil, err
+		}
 		dict["Font"] = pdf.Array{
-			ref,
+			E.PDFObject(),
 			pdf.Number(param.TextFontSize),
 		}
 	}

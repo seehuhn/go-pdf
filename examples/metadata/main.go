@@ -40,11 +40,7 @@ func run() error {
 		return err
 	}
 
-	fontX, err := standard.HelveticaBold.New(nil)
-	if err != nil {
-		return err
-	}
-	font, err := fontX.Embed(doc.Out)
+	font, err := standard.HelveticaBold.New(nil)
 	if err != nil {
 		return err
 	}

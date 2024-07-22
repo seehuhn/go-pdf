@@ -60,11 +60,7 @@ func doit() error {
 		},
 	}
 
-	FX, err := standard.Helvetica.New(nil)
-	if err != nil {
-		return err
-	}
-	F, err := FX.Embed(page.Out)
+	F, err := standard.Helvetica.New(nil)
 	if err != nil {
 		return err
 	}

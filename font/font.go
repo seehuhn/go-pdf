@@ -24,19 +24,31 @@ import (
 
 // Font represents a font instance which can be embedded in a PDF file.
 type Font interface {
-	Embed(w pdf.Putter) (Layouter, error)
+	Embed(rm *pdf.ResourceManager) (Embedded, error)
+
+	WritingMode() int // 0 = horizontal, 1 = vertical
 }
 
 // Embedded represents a font which is already embedded in a PDF file.
 type Embedded interface {
 	pdf.Resource
-	WritingMode() int // 0 = horizontal, 1 = vertical
+
 	ForeachWidth(s pdf.String, yield func(width float64, isSpace bool))
+
+	// CodeAndWidth converts a glyph ID (corresponding to the given text) into
+	// a PDF character code The character code is appended to s. The function
+	// returns the new string s, the width of the glyph in PDF text space units
+	// (still to be multiplied by the font size), and a value indicating
+	// whether PDF word spacing adjustment applies to this glyph.
+	//
+	// As a side effect, this function allocates codes for the given
+	// glyph/text combination in the font's encoding.
+	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 }
 
 // A Layouter is a font embedded in a PDF file which can typeset text.
 type Layouter interface {
-	Embedded
+	Font
 
 	// GetGeometry returns font metrics required for typesetting.
 	GetGeometry() *Geometry
@@ -48,21 +60,6 @@ type Layouter interface {
 	// GlyphSeq is returned.  If seq is not nil, the return value is guaranteed
 	// to be equal to seq.
 	Layout(seq *GlyphSeq, ptSize float64, s string) *GlyphSeq
-
-	// CodeAndWidth converts a glyph ID (corresponding to the given text) into
-	// a PDF character code The character code is appended to s. The function
-	// returns the new string s, the width of the glyph in PDF text space units
-	// (still to be multiplied by the font size), and a value indicating
-	// whether PDF word spacing adjustment applies to this glyph.
-	//
-	// As a side effect, this function allocates codes for the given
-	// glyph/text combination in the font's encoding.
-	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
-
-	// Close writes the used subset of the font to the PDF file. After close
-	// has been called, only previously used glyph/text combinations can be
-	// used.
-	Close() error
 }
 
 // Dict is the low-level interface to represent a font in a PDF file.
@@ -162,16 +159,4 @@ func (s *GlyphSeq) PadTo(width float64) {
 	if extra > 0 {
 		s.Seq[len(s.Seq)-1].Advance += extra
 	}
-}
-
-// EncodeText encodes a string as a PDF string using the given layouter.
-// This allocates character codes as needed.
-// All layout information (including kerning) is ignored.
-func EncodeText(F Layouter, s string) pdf.String {
-	gg := F.Layout(nil, 10, s)
-	var res pdf.String
-	for _, g := range gg.Seq {
-		res, _, _ = F.CodeAndWidth(res, g.GID, g.Text)
-	}
-	return res
 }

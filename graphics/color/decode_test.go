@@ -53,7 +53,7 @@ func TestDecodeSpace(t *testing.T) {
 			r := pdf.NewData(pdf.V2_0)
 			rm := pdf.NewResourceManager(r)
 
-			embeddedSpace, err := space.Embed(rm)
+			embeddedSpace, err := pdf.ResourceManagerEmbed(rm, space)
 			if err != nil {
 				t.Fatal(err)
 			}

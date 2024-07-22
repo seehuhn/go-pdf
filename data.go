@@ -27,10 +27,9 @@ import (
 
 // Data is an in-memory representation of a PDF document.
 type Data struct {
-	meta      MetaInfo
-	objects   map[Reference]Object
-	lastRef   uint32
-	autoclose []io.Closer
+	meta    MetaInfo
+	objects map[Reference]Object
+	lastRef uint32
 }
 
 func NewData(v Version) *Data {
@@ -136,12 +135,6 @@ func (d *Data) Write(w io.Writer) error {
 }
 
 func (d *Data) Close() error {
-	for _, obj := range d.autoclose {
-		err := obj.Close()
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -254,8 +247,4 @@ func (d *Data) WriteCompressed(refs []Reference, objects ...Object) error {
 		}
 	}
 	return nil
-}
-
-func (d *Data) AutoClose(obj io.Closer) {
-	d.autoclose = append(d.autoclose, obj)
 }

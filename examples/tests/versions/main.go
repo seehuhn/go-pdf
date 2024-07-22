@@ -49,11 +49,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			FX, err := standard.TimesRoman.New(nil)
-			if err != nil {
-				log.Fatal(err)
-			}
-			F, err := FX.Embed(page.Out)
+			F, err := standard.TimesRoman.New(nil)
 			if err != nil {
 				log.Fatal(err)
 			}

@@ -58,8 +58,6 @@ type Writer struct {
 	inStream    bool
 	afterStream []allocatedObject
 
-	autoclose []io.Closer
-
 	humanReadable bool
 }
 
@@ -238,13 +236,6 @@ func (pdf *Writer) Close() error {
 		return errors.New("Close() while stream is open")
 	}
 
-	for _, obj := range pdf.autoclose {
-		err := obj.Close()
-		if err != nil {
-			return err
-		}
-	}
-
 	trailer := pdf.meta.Trailer
 
 	catRef := pdf.Alloc()
@@ -298,13 +289,6 @@ func (pdf *Writer) Close() error {
 	pdf.w = nil
 
 	return nil
-}
-
-// AutoClose registers an object to be automatically closed when the PDF file
-// is closed.  Only one object can be registered for each key,
-// and objects are closed in ascending order of their keys.
-func (pdf *Writer) AutoClose(obj io.Closer) {
-	pdf.autoclose = append(pdf.autoclose, obj)
 }
 
 // GetMeta returns the MetaInfo for the PDF file.

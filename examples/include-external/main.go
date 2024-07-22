@@ -44,19 +44,11 @@ func run() error {
 		return err
 	}
 
-	BX, err := standard.TimesBold.New(nil)
+	B, err := standard.TimesBold.New(nil)
 	if err != nil {
 		return err
 	}
-	B, err := BX.Embed(page.Out)
-	if err != nil {
-		return err
-	}
-	FX, err := standard.TimesRoman.New(nil)
-	if err != nil {
-		return err
-	}
-	F, err := FX.Embed(page.Out)
+	F, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		return err
 	}

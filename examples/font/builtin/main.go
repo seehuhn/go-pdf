@@ -26,7 +26,6 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -35,24 +34,16 @@ func main() {
 	const margin = 50
 
 	paper := document.A4
-	doc, err := document.CreateMultiPage("builtin.pdf", paper, pdf.V1_7, nil)
+	doc, err := document.CreateMultiPage("builtin.pdf", paper, pdf.V1_0, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	labelFontX, err := standard.TimesRoman.New(nil)
+	titleFont, err := standard.TimesBold.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	labelFont, err := labelFontX.Embed(doc.Out)
-	if err != nil {
-		log.Fatal(err)
-	}
-	titleFontX, err := standard.TimesBold.New(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	titleFont, err := titleFontX.Embed(doc.Out)
+	bodyFont, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,24 +55,21 @@ func main() {
 		textHeight: paper.URy - 2*margin,
 		margin:     margin,
 
-		bodyFont:  labelFont,
 		titleFont: titleFont,
+		bodyFont:  bodyFont,
 	}
 
 	err = f.AddTitle(documentTitle, 24, 36, 36)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	for _, G := range standard.All {
-		F, err := G.New(nil)
+		err = f.AddTitle(string(G), 10, 36, 12)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = f.AddTitle(F.PostScriptName(), 10, 36, 12)
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = f.MakeColumns(F)
+		err = f.MakeColumns(G)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -107,8 +95,8 @@ type fontTables struct {
 
 	used float64 // vertical amount of page space currently used
 
-	bodyFont  font.Embedded
-	titleFont font.Embedded
+	titleFont font.Font
+	bodyFont  font.Font
 
 	page *document.Page
 
@@ -145,6 +133,8 @@ func (f *fontTables) MakeSpace(vSpace float64) error {
 	}
 
 	f.page = f.doc.AddPage()
+	f.page.SetFontNameInternal(f.bodyFont, "R")
+	f.page.SetFontNameInternal(f.titleFont, "B")
 	f.used = 0
 	return nil
 }
@@ -170,10 +160,15 @@ func (f *fontTables) AddTitle(title string, fontSize, before, after float64) err
 	return nil
 }
 
-func (f *fontTables) MakeColumns(fnt *type1.Instance) error {
+func (f *fontTables) MakeColumns(G standard.Font) error {
 	fontSize := 10.0
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4
+
+	fnt, err := G.New(nil)
+	if err != nil {
+		return err
+	}
 
 	afm := fnt.Metrics
 	glyphNames := afm.GlyphList()
@@ -247,7 +242,7 @@ func (f *fontTables) MakeColumns(fnt *type1.Instance) error {
 					// The builtin fonts are simple fonts, so we can only
 					// use up to 256 glyphs for each embedded copy of the
 					// font.
-					F, err = fnt.Embed(f.doc.Out)
+					F, err = G.New(nil)
 					if err != nil {
 						return err
 					}

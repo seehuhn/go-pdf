@@ -23,17 +23,22 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+type dummyResource pdf.Reference
+
+func (r dummyResource) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+	return pdf.Reference(r), nil
+}
+
 // TestGetResourceName1 tests that resources of all categories can be
 // added to the resource dictionary.
 func TestGetResourceName1(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
 	rm := pdf.NewResourceManager(data)
 
+	ref := data.Alloc()
+	r := dummyResource(ref)
+
 	w := NewWriter(io.Discard, rm)
-	ref := pdf.NewReference(1, 2)
-	r := &pdf.Res{
-		Data: ref,
-	}
 	var allCats = []resourceCategory{
 		catExtGState,
 		catColorSpace,
@@ -46,11 +51,16 @@ func TestGetResourceName1(t *testing.T) {
 	var allNames []pdf.Name
 	for _, cat := range allCats {
 		// test name generation
-		name1 := w.getResourceNameOld(cat, r)
+		name1, err := writerGetResourceName(w, r, cat)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 
 		// test caching
-		name2 := w.getResourceNameOld(cat, r)
-		if name1 != name2 {
+		name2, err := writerGetResourceName(w, r, cat)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		} else if name1 != name2 {
 			t.Errorf("expected %s, got %s", name1, name2)
 		}
 

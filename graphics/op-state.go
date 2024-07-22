@@ -34,7 +34,7 @@ import (
 func (w *Writer) PushGraphicsState() {
 	// This operator was classed as "Special graphics state" until PDF 1.7,
 	// and as "General Graphics State" in PDF 2.0.
-	allowedStates := ifelse(w.Version >= pdf.V2_0, objPage|objText, objPage)
+	allowedStates := ifelse(pdf.GetVersion(w.RM.Out) >= pdf.V2_0, objPage|objText, objPage)
 	if !w.isValid("PushGraphicsState", allowedStates) {
 		return
 	}
@@ -55,7 +55,7 @@ func (w *Writer) PushGraphicsState() {
 func (w *Writer) PopGraphicsState() {
 	// This operator was classed as "Special graphics state" until PDF 1.7,
 	// and as "General Graphics State" in PDF 2.0.
-	allowedStates := ifelse(w.Version >= pdf.V2_0, objPage|objText, objPage)
+	allowedStates := ifelse(pdf.GetVersion(w.RM.Out) >= pdf.V2_0, objPage|objText, objPage)
 	if !w.isValid("PopGraphicsState", allowedStates) {
 		return
 	}
@@ -215,7 +215,7 @@ func (w *Writer) SetRenderingIntent(intent RenderingIntent) {
 	if !w.isValid("SetRenderingIntent", objPage|objText) {
 		return
 	}
-	if w.Version < pdf.V1_1 {
+	if pdf.GetVersion(w.RM.Out) < pdf.V1_1 {
 		w.Err = &pdf.VersionError{Operation: "SetRenderingIntent", Earliest: pdf.V1_1}
 	}
 	if w.isSet(StateRenderingIntent) && intent == w.RenderingIntent {

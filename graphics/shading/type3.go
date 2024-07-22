@@ -90,7 +90,7 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		return nil, fmt.Errorf("invalid Function: %T", s.F)
 	}
 
-	csE, err := s.ColorSpace.Embed(rm)
+	csE, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
 	if err != nil {
 		return nil, err
 	}

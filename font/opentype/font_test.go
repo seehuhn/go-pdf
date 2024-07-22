@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,39 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package main
+package opentype
 
-import (
-	"log"
+import "seehuhn.de/go/pdf/font"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/standard"
-)
-
-func main() {
-	err := run()
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func run() error {
-	doc, err := document.CreateSinglePage("hello.pdf", document.A4r, pdf.V1_7, nil)
-	if err != nil {
-		return err
-	}
-
-	font, err := standard.Helvetica.New(nil)
-	if err != nil {
-		return err
-	}
-
-	doc.TextSetFont(font, 50)
-	doc.TextBegin()
-	doc.TextFirstLine(50, 420)
-	doc.TextShow("Hello, World!")
-	doc.TextEnd()
-
-	return doc.Close()
-}
+var _ font.Layouter = (*Instance)(nil)

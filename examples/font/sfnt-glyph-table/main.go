@@ -66,34 +66,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	helveticaX, err := standard.Helvetica.New(nil)
+	helvetica, err := standard.Helvetica.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	helvetica, err := helveticaX.Embed(doc.Out)
+	italic, err := standard.TimesItalic.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	italicX, err := standard.TimesItalic.New(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	italic, err := italicX.Embed(doc.Out)
-	if err != nil {
-		log.Fatal(err)
-	}
-	courierX, err := standard.Courier.New(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	courier, err := courierX.Embed(doc.Out)
+	courier, err := standard.Courier.New(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	opt := &font.Options{
 		Composite: true,
 	}
-	theFont, err := embed.OpenTypeFont(doc.Out, tt, opt)
+	theFont, err := embed.OpenTypeFont(tt, opt)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -300,6 +288,11 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	page.Fill()
 	page.PopGraphicsState()
 
+	E, err := pdf.ResourceManagerEmbed(page.RM, theFont)
+	if err != nil {
+		return err
+	}
+
 	// draw the glyphs and labels
 	for i, gid := range gid {
 		g := font.Glyph{
@@ -316,7 +309,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 				// TODO(voss): fix this
 				// Try to establish a mapping from glyph ID to rune in the embedded
 				// font (called for side effects only).
-				theFont.CodeAndWidth(nil, gid, []rune{r})
+				E.CodeAndWidth(nil, gid, []rune{r})
 			}
 			if unicode.IsPrint(r) && r < 128 {
 				label = fmt.Sprintf("%q", r)

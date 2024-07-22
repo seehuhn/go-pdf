@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"slices"
 
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
@@ -40,40 +39,13 @@ import (
 type embeddedComposite struct {
 	w pdf.Putter
 	pdf.Res
-	*font.Geometry
 
-	sfnt     *sfnt.Font
-	layouter *sfnt.Layouter
+	sfnt *sfnt.Font
 
 	cmap.GIDToCID
 	cmap.CIDEncoder
 
 	closed bool
-}
-
-// Layout implements the [font.Layouter] interface.
-func (f *embeddedComposite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
-	if seq == nil {
-		seq = &font.GlyphSeq{}
-	}
-
-	buf := f.layouter.Layout(s)
-	seq.Seq = slices.Grow(seq.Seq, len(buf))
-	for _, g := range buf {
-		xOffset := float64(g.XOffset) * ptSize * f.sfnt.FontMatrix[0]
-		if len(seq.Seq) == 0 {
-			seq.Skip += xOffset
-		} else {
-			seq.Seq[len(seq.Seq)-1].Advance += xOffset
-		}
-		seq.Seq = append(seq.Seq, font.Glyph{
-			GID:     g.GID,
-			Advance: float64(g.Advance) * ptSize * f.sfnt.FontMatrix[0],
-			Rise:    float64(g.YOffset) * ptSize * f.sfnt.FontMatrix[3],
-			Text:    g.Text,
-		})
-	}
-	return seq
 }
 
 func (f *embeddedComposite) WritingMode() int {

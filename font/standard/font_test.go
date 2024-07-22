@@ -29,34 +29,36 @@ import (
 // embedded and that for PDF-1.7 the font program is not included.
 func TestEmbedBuiltin(t *testing.T) {
 	for _, G := range All {
-		t.Run(fontName[G], func(t *testing.T) {
+		t.Run(string(G), func(t *testing.T) {
 			data := pdf.NewData(pdf.V1_7)
+			rm := pdf.NewResourceManager(data)
 
 			F, err := G.New(nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			E, err := F.Embed(data)
+
+			E, err := pdf.ResourceManagerEmbed(rm, F)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			var testText string
-			switch fontName[G] {
-			case "Symbol":
+			switch G {
+			case Symbol:
 				testText = "∀"
-			case "ZapfDingbats":
+			case ZapfDingbats:
 				testText = "♠"
 			default:
 				testText = "Hello World"
 			}
 
-			gg := E.Layout(nil, 10, testText)
+			gg := F.Layout(nil, 10, testText)
 			for _, g := range gg.Seq { // allocate codes
 				E.CodeAndWidth(nil, g.GID, g.Text)
 			}
 
-			err = E.Close()
+			err = rm.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -65,7 +67,7 @@ func TestEmbedBuiltin(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if name := pdf.Name(fontName[G]); dicts.FontDict["BaseFont"] != name {
+			if name := pdf.Name(G); dicts.FontDict["BaseFont"] != name {
 				t.Errorf("wrong BaseFont: %s != %s", dicts.FontDict["BaseFont"], name)
 			}
 			if dicts.FontProgram != nil {
@@ -120,7 +122,7 @@ func TestGlyphLists(t *testing.T) {
 		glyphNames1 := psFont.GlyphList()
 		glyphNames2 := metrics.GlyphList()
 		if d := cmp.Diff(glyphNames1, glyphNames2); d != "" {
-			t.Errorf("%-22s differ: %s", fontName[G], d)
+			t.Errorf("%-22s differ: %s", G, d)
 		}
 	}
 }
@@ -141,7 +143,7 @@ func TestGlyphWidths(t *testing.T) {
 			w2 := metrics.Glyphs[name].WidthX
 			if w1 != w2 {
 				t.Errorf("%-22s %-8s width=%g, claimedWidth=%g",
-					fontName[G], name, w1, w2)
+					G, name, w1, w2)
 			}
 		}
 	}
@@ -164,7 +166,7 @@ func TestBlankGlyphs(t *testing.T) {
 			// life-patching the type 1 fonts after loading.
 			if isBlank != claimedBlank && name != ".notdef" {
 				t.Errorf("%-22s %-8s isBlank=%v, claimedBlank=%v",
-					fontName[G], name, isBlank, claimedBlank)
+					G, name, isBlank, claimedBlank)
 			}
 		}
 	}
@@ -173,61 +175,54 @@ func TestBlankGlyphs(t *testing.T) {
 // TestLigatures checks that letters are correctly combined into ligatures.
 func TestLigatures(t *testing.T) {
 	ligatures := []string{"ﬀ=ff", "ﬁ=fi", "ﬂ=fl", "ﬃ=ffi", "ﬄ=ffl"}
-	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for i, G := range All {
-			data := pdf.NewData(v)
-			F, err := G.New(nil)
-			if err != nil {
-				t.Fatal(err)
+	for i, G := range All {
+		F, err := G.New(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		geom := F.GetGeometry()
+
+		for _, lig := range ligatures {
+			gg := F.Layout(nil, 10, lig)
+
+			rr := []rune(lig)
+			if gg.Seq[0].GID == 0 {
+				// The ligature is not present in the font.
+				continue
 			}
-			E, err := F.Embed(data)
-			if err != nil {
-				t.Fatal(err)
+
+			var ligIsUsed bool
+			if len(gg.Seq) == 3 {
+				// Glyphs have been combined.
+				ligIsUsed = true
+				if gg.Seq[0].GID != gg.Seq[2].GID {
+					t.Errorf("font %d: ligature %q: unexpected GIDs: %d %d %d",
+						i, lig, gg.Seq[0].GID, gg.Seq[1].GID, gg.Seq[2].GID)
+				}
+				if string(gg.Seq[0].Text) != string(rr[0]) {
+					t.Errorf("font %d: ligature %q: unexpected glyph for %q[0]: %q",
+						i, lig, lig, gg.Seq[0].Text)
+				}
+
+				if string(gg.Seq[1].Text) != "=" {
+					// test is broken
+					t.Fatalf("font %d: ligature %q: unexpected glyph for %q[1]: %q",
+						i, lig, lig, gg.Seq[1].Text)
+				}
+
+				if string(gg.Seq[2].Text) != string(rr[2:]) {
+					t.Errorf("font %d: ligature %q: unexpected glyph for %q[2]: %q",
+						i, lig, lig, gg.Seq[2].Text)
+				}
+			} else {
+				// Glyphs have not been combined.
+				ligIsUsed = false
 			}
 
-			geom := E.GetGeometry()
-
-			for _, lig := range ligatures {
-				gg := E.Layout(nil, 10, lig)
-
-				rr := []rune(lig)
-				if gg.Seq[0].GID == 0 {
-					// The ligature is not present in the font.
-					continue
-				}
-
-				var ligIsUsed bool
-				if len(gg.Seq) == 3 {
-					// Glyphs have been combined.
-					ligIsUsed = true
-					if gg.Seq[0].GID != gg.Seq[2].GID {
-						t.Errorf("font %d: ligature %q: unexpected GIDs: %d %d %d",
-							i, lig, gg.Seq[0].GID, gg.Seq[1].GID, gg.Seq[2].GID)
-					}
-					if string(gg.Seq[0].Text) != string(rr[0]) {
-						t.Errorf("font %d: ligature %q: unexpected glyph for %q[0]: %q",
-							i, lig, lig, gg.Seq[0].Text)
-					}
-
-					if string(gg.Seq[1].Text) != "=" {
-						// test is broken
-						t.Fatalf("font %d: ligature %q: unexpected glyph for %q[1]: %q",
-							i, lig, lig, gg.Seq[1].Text)
-					}
-
-					if string(gg.Seq[2].Text) != string(rr[2:]) {
-						t.Errorf("font %d: ligature %q: unexpected glyph for %q[2]: %q",
-							i, lig, lig, gg.Seq[2].Text)
-					}
-				} else {
-					// Glyphs have not been combined.
-					ligIsUsed = false
-				}
-
-				if ligIsUsed != !geom.IsFixedPitch() {
-					t.Errorf("font %d: ligature %q: isFixedPitch=%t but ligIsUsed=%t",
-						i, lig, geom.IsFixedPitch(), ligIsUsed)
-				}
+			if ligIsUsed != !geom.IsFixedPitch() {
+				t.Errorf("font %d: ligature %q: isFixedPitch=%t but ligIsUsed=%t",
+					i, lig, geom.IsFixedPitch(), ligIsUsed)
 			}
 		}
 	}

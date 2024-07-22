@@ -31,34 +31,34 @@ type openTypeEmbedder struct {
 
 // OpenType fonts
 var (
-	// OpenTypeGlyf is an OpenType font with glyph outlines.
-	OpenTypeGlyfSimple font.Font = openTypeEmbedder{tp: 0, composite: false}
+	// OpenTypeGlyf makes an OpenType font with glyph outlines.
+	OpenTypeGlyfSimple = openTypeEmbedder{tp: 0, composite: false}.font
 
-	// OpenTypeCFF is an OpenType font with CFF outlines and no CIDFont
+	// OpenTypeCFF makes an OpenType font with CFF outlines and no CIDFont
 	// operators.
-	OpenTypeCFFSimple font.Font = openTypeEmbedder{tp: 1, composite: false}
+	OpenTypeCFFSimple = openTypeEmbedder{tp: 1, composite: false}.font
 
-	// OpenTypeCFFCID is an OpenType font with CFF outlines and CIDFont
+	// OpenTypeCFFCID makes an OpenType font with CFF outlines and CIDFont
 	// operators.
-	OpenTypeCFFCIDSimple font.Font = openTypeEmbedder{tp: 2, composite: false}
+	OpenTypeCFFCIDSimple = openTypeEmbedder{tp: 2, composite: false}.font
 
-	// OpenTypeGlyf is an OpenType font with glyph outlines.
-	OpenTypeGlyfComposite font.Font = openTypeEmbedder{tp: 0, composite: true}
+	// OpenTypeGlyf makes an OpenType font with glyph outlines.
+	OpenTypeGlyfComposite = openTypeEmbedder{tp: 0, composite: true}.font
 
-	// OpenTypeCFF is an OpenType font with CFF outlines and no CIDFont
+	// OpenTypeCFF makes an OpenType font with CFF outlines and no CIDFont
 	// operators.
-	OpenTypeCFFComposite font.Font = openTypeEmbedder{tp: 1, composite: true}
+	OpenTypeCFFComposite = openTypeEmbedder{tp: 1, composite: true}.font
 
-	// OpenTypeCFFCID is an OpenType font with CFF outlines and CIDFont
+	// OpenTypeCFFCID makes an OpenType font with CFF outlines and CIDFont
 	// operators.
-	OpenTypeCFFCIDComposite font.Font = openTypeEmbedder{tp: 2, composite: true}
+	OpenTypeCFFCIDComposite = openTypeEmbedder{tp: 2, composite: true}.font
 
-	// OpenTypeCFFCID2 is an OpenType font with CFF outlines, CIDFont
+	// OpenTypeCFFCID2 makes an OpenType font with CFF outlines, CIDFont
 	// operators, and multiple private dictionaries.
-	OpenTypeCFFCID2Composite font.Font = openTypeEmbedder{tp: 3, composite: true}
+	OpenTypeCFFCID2Composite = openTypeEmbedder{tp: 3, composite: true}.font
 )
 
-func (f openTypeEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
+func (f openTypeEmbedder) font(rm *pdf.ResourceManager) font.Layouter {
 	var info *sfnt.Font
 	switch f.tp {
 	case 0:
@@ -78,7 +78,7 @@ func (f openTypeEmbedder) Embed(w pdf.Putter) (font.Layouter, error) {
 
 	F, err := opentype.New(info, opt)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return F.Embed(w)
+	return F
 }

@@ -25,6 +25,8 @@ import (
 	"seehuhn.de/go/postscript/funit"
 )
 
+var _ font.Layouter = (*Font)(nil)
+
 func TestType3(t *testing.T) {
 	paper := document.A5
 	doc, err := document.CreateSinglePage("test-type3.pdf", paper, pdf.V1_7, nil)
@@ -32,10 +34,10 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1 := New(1000)
+	builder := NewBuilder(doc.RM)
 
 	bbox := funit.Rect16{LLx: 0, LLy: 0, URx: 750, URy: 750}
-	g, err := F1.AddGlyph("A", 1000, bbox, true)
+	g, err := builder.AddGlyph("A", 1000, bbox, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +48,7 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g, err = F1.AddGlyph("B", 1000, bbox, true)
+	g, err = builder.AddGlyph("B", 1000, bbox, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,13 +61,16 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F1Dict, err := F1.Embed(doc.Out)
+	prop := &Properties{
+		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+	}
+	F, err := builder.Finish(prop)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	doc.TextBegin()
-	doc.TextSetFont(F1Dict, 12)
+	doc.TextSetFont(F, 12)
 	doc.TextFirstLine(72, 340)
 	doc.TextShow("ABABAB")
 	doc.TextEnd()
@@ -75,5 +80,3 @@ func TestType3(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-var _ font.Embedded = (*embedded)(nil)

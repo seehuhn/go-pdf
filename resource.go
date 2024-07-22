@@ -47,6 +47,9 @@ type Embedder[T Resource] interface {
 // file.
 //
 // Use the [ResourceManagerEmbed] function to embed resources.
+//
+// The ResourceManager must be closed with the [Close] method before the PDF
+// file is closed.
 type ResourceManager struct {
 	Out        Putter
 	embedded   map[any]Resource
