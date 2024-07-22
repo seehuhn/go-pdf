@@ -23,6 +23,7 @@ import (
 	"slices"
 
 	"golang.org/x/exp/maps"
+
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/cid"
 )

@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// Properties contains global information about a Type 3 font.
 type Properties struct {
 	FontMatrix [6]float64
 
@@ -66,8 +67,14 @@ type Glyph struct {
 	Ref    pdf.Reference
 }
 
+// PostScriptName returns the empty string (since Type 3 fonts don't have a PostScript name).
+// This implements the [font.Font] interface.
+func (f *Font) PostScriptName() string {
+	return ""
+}
+
 // WritingMode implements the [font.Font] interface.
-func (f *Font) WritingMode() int {
+func (f *Font) WritingMode() font.WritingMode {
 	return 0
 }
 

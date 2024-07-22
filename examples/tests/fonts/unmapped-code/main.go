@@ -158,7 +158,11 @@ func makeMarkerFont(rm *pdf.ResourceManager) (font.Font, error) {
 // which only contains the following glyphs: .notdef, space, Yacute, AEacute.
 type testFont struct{}
 
-func (f *testFont) WritingMode() int {
+func (f *testFont) PostScriptName() string {
+	return "Test"
+}
+
+func (f *testFont) WritingMode() font.WritingMode {
 	return 0
 }
 

@@ -21,6 +21,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/type1/names"
@@ -51,7 +52,7 @@ func NewSimpleEncoder() *SimpleEncoder {
 }
 
 // WritingMode implements the [font.NewFont] interface.
-func (e *SimpleEncoder) WritingMode() int {
+func (e *SimpleEncoder) WritingMode() font.WritingMode {
 	return 0 // simple fonts are always horizontal
 }
 

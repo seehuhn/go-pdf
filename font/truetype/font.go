@@ -77,7 +77,7 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 }
 
 // WritingMode implements the [font.Layouter] interface.
-func (f *Instance) WritingMode() int {
+func (f *Instance) WritingMode() font.WritingMode {
 	return 0 // TODO(voss): implement
 }
 

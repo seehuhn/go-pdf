@@ -43,8 +43,9 @@ type Embedder[T Resource] interface {
 	Embed(rm *ResourceManager) (T, error)
 }
 
-// ResourceManager keeps track of which resources have been embedded in the PDF
-// file.
+// ResourceManager helps to avoid duplicate resources in a PDF file.
+// It is used to embed object implementing the [Embedder] interface.
+// Each such object is embedded only once.
 //
 // Use the [ResourceManagerEmbed] function to embed resources.
 //
@@ -66,6 +67,9 @@ func NewResourceManager(w Putter) *ResourceManager {
 }
 
 // ResourceManagerEmbed embeds a resource in the PDF file.
+//
+// If the resource is already present in the file, the existing resource is
+// returned.
 //
 // If the embedded type, T, is an io.Closer, the Close() method will be called
 // when the ResourceManager is closed.

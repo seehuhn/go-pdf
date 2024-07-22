@@ -158,7 +158,7 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 }
 
 // WritingMode implements the [font.Font] interface.
-func (f *Instance) WritingMode() int {
+func (f *Instance) WritingMode() font.WritingMode {
 	return 0 // Simple fonts are always horizontal
 }
 

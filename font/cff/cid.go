@@ -42,7 +42,7 @@ type embeddedComposite struct {
 	cmap.CIDEncoder
 }
 
-func (f *embeddedComposite) WritingMode() int {
+func (f *embeddedComposite) WritingMode() font.WritingMode {
 	return 0 // TODO(voss): implement
 }
 

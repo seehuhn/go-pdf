@@ -68,3 +68,32 @@ func TestSamples(t *testing.T) {
 		})
 	}
 }
+
+// TestPostScriptName ensures that the .PostScriptName method of all fonts
+// works correctly.
+func TestPostScriptName(t *testing.T) {
+	data := pdf.NewData(pdf.V1_7)
+	rm := pdf.NewResourceManager(data)
+
+	for _, sample := range All {
+		F := sample.MakeFont(rm)
+
+		name := F.PostScriptName()
+
+		var expected string
+		switch sample.Label {
+		case "BuiltIn":
+			// There is no built-in Go-Regular font.
+			expected = "Helvetica"
+		case "Type3":
+			// Type 3 fonts don't have a PostScript name.
+			expected = ""
+		default:
+			expected = "Go-Regular"
+		}
+
+		if name != expected {
+			t.Errorf("%s: got %q, want %q", sample.Label, name, expected)
+		}
+	}
+}

@@ -27,7 +27,12 @@ import (
 //
 // See section 9.8.1 of PDF 32000-1:2008.
 type Descriptor struct {
-	FontName    string     // required, except (usually) for Type 3 fonts
+	// FontName (required, except for Type 3 fonts) is the PostScript name of the font.
+	// This field is used primarily for the purpose of determining if a font has been subset.
+	//
+	// See https://github.com/pdf-association/pdf-issues/issues/11 .
+	FontName string
+
 	FontFamily  string     // optional
 	FontStretch os2.Width  // optional
 	FontWeight  os2.Weight // optional

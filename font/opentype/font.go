@@ -93,7 +93,7 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 }
 
 // WritingMode implements the [font.Font] interface.
-func (f *Instance) WritingMode() int {
+func (f *Instance) WritingMode() font.WritingMode {
 	// TODO(voss): implement this
 	return 0
 }

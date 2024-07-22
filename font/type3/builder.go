@@ -44,10 +44,14 @@ type Builder struct {
 }
 
 // NewBuilder creates a new Builder.
+//
+// Rm is the resource manager to use.  The resulting font cannot be used with
+// any other resource manager.
 func NewBuilder(rm *pdf.ResourceManager) *Builder {
 	// TODO(voss):
 	// - consider the discussion at https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
 	// - check where different PDF versions put the Resources dictionary
+	// - make it configurable whether to use per-glyph resource dictionaries?
 	page := graphics.NewWriter(nil, rm)
 
 	return &Builder{

@@ -110,6 +110,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			}
 		}
 		res := &fromFileSimple{
+			name:     string(fontDicts.PostScriptName),
 			Res:      res,
 			widths:   widths,
 			encoding: encoding,
@@ -146,6 +147,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 			}
 		}
 		res := &fromFileSimple{
+			name:     string(fontDicts.PostScriptName),
 			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
@@ -187,6 +189,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 		// TODO(voss): other methods for extracting the text mapping
 		res := &fromFileSimple{
+			name:     string(fontDicts.PostScriptName),
 			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
@@ -219,6 +222,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 		// TODO: other methods for extracting the text mapping???
 		res := &fromFileSimple{
+			name:     string(fontDicts.PostScriptName),
 			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
@@ -254,9 +258,10 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 
 		res := &fromFileComposite{
+			name:        string(fontDicts.PostScriptName),
 			Res:         res,
 			cs:          info.CMap.CodeSpaceRange,
-			writingMode: info.CMap.WMode,
+			writingMode: font.WritingMode(info.CMap.WMode),
 			glyph:       glyph,
 			fontData:    F,
 			key:         fontDicts.FontProgramRef,
@@ -324,6 +329,9 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 }
 
 type fromFileSimple struct {
+	// name is the PostScript name of the font
+	name string
+
 	pdf.Res
 	widths   []float64
 	encoding []glyph.ID
@@ -332,7 +340,11 @@ type fromFileSimple struct {
 	key      pdf.Reference
 }
 
-func (f *fromFileSimple) WritingMode() int {
+func (f *fromFileSimple) PostScriptName() string {
+	return f.name
+}
+
+func (f *fromFileSimple) WritingMode() font.WritingMode {
 	return 0
 }
 
@@ -361,9 +373,12 @@ func (f *fromFileSimple) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 }
 
 type fromFileComposite struct {
+	// name is the PostScript name of the font
+	name string
+
 	pdf.Res
 	cs          charcode.CodeSpaceRange
-	writingMode int
+	writingMode font.WritingMode
 	glyph       map[string]glyphData
 	fontData    interface{}
 	key         pdf.Reference
@@ -375,7 +390,11 @@ type glyphData struct {
 	width float64
 }
 
-func (f *fromFileComposite) WritingMode() int {
+func (f *fromFileComposite) PostScriptName() string {
+	return f.name
+}
+
+func (f *fromFileComposite) WritingMode() font.WritingMode {
 	return f.writingMode
 }
 

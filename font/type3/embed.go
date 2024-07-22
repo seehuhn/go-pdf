@@ -180,11 +180,10 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		}
 	}
 
-	needFontDescriptor := (info.IsFixedPitch || info.IsSerif || info.IsScript || info.IsAllCap || info.IsSmallCap || info.ForceBold ||
+	needFontDescriptor := (pdf.IsTagged(w) ||
+		info.IsFixedPitch || info.IsSerif || info.IsScript || info.IsAllCap || info.IsSmallCap || info.ForceBold ||
 		isSymbolic ||
-		info.ItalicAngle != 0 ||
-		pdf.IsTagged(w))
-
+		info.ItalicAngle != 0)
 	if needFontDescriptor {
 		fd := &font.Descriptor{
 			IsFixedPitch: info.IsFixedPitch,

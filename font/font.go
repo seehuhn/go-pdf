@@ -22,11 +22,24 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
+type WritingMode int
+
+const (
+	// Horizontal means that text is written left-to-right.
+	Horizontal WritingMode = iota
+
+	// Vertical means that text is written top-to-bottom.
+	Vertical
+)
+
 // Font represents a font instance which can be embedded in a PDF file.
 type Font interface {
-	Embed(rm *pdf.ResourceManager) (Embedded, error)
+	PostScriptName() string
 
-	WritingMode() int // 0 = horizontal, 1 = vertical
+	WritingMode() WritingMode
+
+	Embed(rm *pdf.ResourceManager) (Embedded, error)
 }
 
 // Embedded represents a font which is already embedded in a PDF file.
