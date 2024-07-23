@@ -70,6 +70,9 @@ func (err *MalformedFileError) Unwrap() error {
 	return err.Err
 }
 
+// Wrap wraps an error with a location.
+// If the error is a [MalformedFileError], the location is appended to the list
+// of locations.  Otherwise, the error is wrapped using [fmt.Errorf].
 func Wrap(err error, loc string) error {
 	if err == nil {
 		return nil
@@ -81,7 +84,10 @@ func Wrap(err error, loc string) error {
 	return fmt.Errorf("%s: %w", loc, err)
 }
 
+// IsMalformed returns true if the error or any of its wrapped errors is a
+// [MalformedFileError].
 func IsMalformed(err error) bool {
+	// TODO(voss): should this be using errors.Is?
 	for err != nil {
 		if _, ok := err.(*MalformedFileError); ok {
 			return true

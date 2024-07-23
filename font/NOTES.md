@@ -17,10 +17,10 @@ Character Codes
 ---------------
 
 Inside content streams, the glyphs are addressed by a (single or multi-byte)
-character code.  In fonts used for typesetting new text, the code automatically
-allocates codes to glyphs, and subsets fonts to the used glyphs.  In fonts
-extracted from existing PDF files, the mapping between character codes and
-glyphs is fixed (extracted from the PDF file).
+character code.  When typesetting new text, the library automatically allocates
+codes to glyphs, and subsets fonts to the glyphs used.  In fonts extracted from
+existing PDF files, the mapping between character codes and glyphs is fixed
+in the font dictionary.
 
 The map of character codes to glyphs can differ between PDF files, but is the
 same for all content streams within a PDF file.
@@ -85,3 +85,19 @@ The Go API needs to cater for the following use cases:
     a Go string to a sequence of glyphs, taking kerning and ligature
     tables into account.  Fonts extracted from a PDF file do not
     expose this functionality.
+
+The following table lists different operations on different types of fonts: A =
+created font (users of the library), B = created font (PDF writer),
+tied to a PDF file, C = extracted font (PDF reader).
+
+| A | B | C | Operation
+|---|---|---|-----------
+| x |   |   | implement pdf.Embedder[T]
+|   | x |   | implement pdf.Resource
+| x | x | . | GID -> width
+|   | . | x | character code -> width
+| x | x | x | writing mode
+| x | x | x | split PDF string into character codes
+|   | x | x | GID <-> character code
+| x | x |   | typesetting (ligatures, kerning, ...)
+| x | x |   | glyphIsBlank()

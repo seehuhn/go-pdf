@@ -32,6 +32,7 @@ type Data struct {
 	lastRef uint32
 }
 
+// NewData returns a new in-memory PDF document.
 func NewData(v Version) *Data {
 	res := &Data{
 		meta: MetaInfo{
@@ -134,10 +135,16 @@ func (d *Data) Write(w io.Writer) error {
 	return nil
 }
 
+// Close does nothing.
+//
+// This implements the [Putter] interface.
 func (d *Data) Close() error {
 	return nil
 }
 
+// GetMeta returns meta information about the file.
+//
+// This implements the [Putter] interface.
 func (d *Data) GetMeta() *MetaInfo {
 	return &d.meta
 }
@@ -175,6 +182,9 @@ func (d *Data) Get(ref Reference, _ bool) (Object, error) {
 	return obj, nil
 }
 
+// Put adds a new PDF object to the document.
+//
+// This implements the [Putter] interface.
 func (d *Data) Put(ref Reference, obj Object) error {
 	if obj == nil {
 		delete(d.objects, ref)
@@ -186,6 +196,9 @@ func (d *Data) Put(ref Reference, obj Object) error {
 	return nil
 }
 
+// OpenStream opens a new PDF stream for writing.
+//
+// This implements the [Putter] interface.
 func (d *Data) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
 	// Copy dict, dict["Filter"], and dict["DecodeParms"], so that we don't
 	// change the caller's dict.
@@ -233,13 +246,17 @@ func (w *dataStreamWriter) Close() error {
 	return nil
 }
 
+// WriteCompressed writes a PDF object stream.
+//
+// TODO(voss): implement this
+//
+// This implements the [Putter] interface.
 func (d *Data) WriteCompressed(refs []Reference, objects ...Object) error {
 	err := checkCompressed(refs, objects)
 	if err != nil {
 		return err
 	}
 
-	// TODO(voss): implement this
 	for i, obj := range objects {
 		err = d.Put(refs[i], obj)
 		if err != nil {

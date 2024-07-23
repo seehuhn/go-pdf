@@ -37,6 +37,7 @@ type ReaderOptions struct {
 	ErrorHandling ReaderErrorHandling
 }
 
+// ReaderErrorHandling specifies how the reader should handle errors.
 type ReaderErrorHandling int
 
 const (
@@ -275,6 +276,8 @@ func (r *Reader) Authenticate(perm Perm) error {
 	return err
 }
 
+// GetMeta returns meta information about the file.
+// This implements the [Getter] interface.
 func (r *Reader) GetMeta() *MetaInfo {
 	return &r.meta
 }
@@ -309,23 +312,23 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
 			}
 		}
 		return r.getFromObjectStream(ref.Number(), entry.InStream)
-	} else {
-		s, err := r.scannerFrom(entry.Pos, canObjStm)
-		if err != nil {
-			return nil, err
-		}
-		obj, fileRef, err := s.ReadIndirectObject()
-		if err != nil {
-			return nil, err
-		}
-		if ref != fileRef {
-			return nil, &MalformedFileError{
-				Err: errors.New("xref corrupted"),
-				Loc: []string{"object " + ref.String() + "*"},
-			}
-		}
-		return obj, nil
 	}
+
+	s, err := r.scannerFrom(entry.Pos, canObjStm)
+	if err != nil {
+		return nil, err
+	}
+	obj, fileRef, err := s.ReadIndirectObject()
+	if err != nil {
+		return nil, err
+	}
+	if ref != fileRef {
+		return nil, &MalformedFileError{
+			Err: errors.New("xref corrupted"),
+			Loc: []string{"object " + ref.String() + "*"},
+		}
+	}
+	return obj, nil
 }
 
 func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, error) {

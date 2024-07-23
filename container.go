@@ -22,6 +22,7 @@ import (
 	"io"
 )
 
+// Getter represents a PDF file opened for reading.
 // TODO(voss): find a better name for this
 type Getter interface {
 	GetMeta() *MetaInfo
@@ -212,6 +213,7 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 	return res, nil
 }
 
+// Putter represents a PDF file opened for writing.
 // TODO(voss): find a better name for this
 type Putter interface {
 	Close() error
@@ -225,6 +227,7 @@ type Putter interface {
 	WriteCompressed(refs []Reference, objects ...Object) error
 }
 
+// IsTagged returns true, if the PDF file is "tagged".
 func IsTagged(pdf Putter) bool {
 	// TODO(voss): what can we do if catalog.MarkInfo is an indirect object?
 	catalog := pdf.GetMeta().Catalog
@@ -236,6 +239,7 @@ func IsTagged(pdf Putter) bool {
 	return bool(marked)
 }
 
+// GetVersion returns the PDF version used in a PDF file.
 func GetVersion(pdf Putter) Version {
 	return pdf.GetMeta().Version
 }

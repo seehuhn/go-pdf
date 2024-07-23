@@ -91,10 +91,10 @@ func ParseString(buf []byte) (String, error) {
 	var s String
 	var err error
 	if b[0] == '(' {
-		scanner.bufPos += 1
+		scanner.bufPos++
 		s, err = scanner.ReadQuotedString()
 	} else if b[0] == '<' {
-		scanner.bufPos += 1
+		scanner.bufPos++
 		s, err = scanner.ReadHexString()
 	} else {
 		err = errInvalidString

@@ -24,6 +24,7 @@ import (
 	"strconv"
 )
 
+// FileInfo contains global information about a PDF file.
 type FileInfo struct {
 	R             io.ReadSeeker
 	FileSize      int64
@@ -33,6 +34,9 @@ type FileInfo struct {
 	Sections      []*FileSection
 }
 
+// FileSection contains information about the part of the PDF file
+// described by a single xref table.
+//
 // TODO(voss): add start and end offsets
 type FileSection struct {
 	XRefPos       int64
@@ -44,6 +48,7 @@ type FileSection struct {
 	ObjectStreams []*FileObject
 }
 
+// FileObject contains information about an indirect object in a PDF file.
 type FileObject struct {
 	Reference
 	ObjStart int64
@@ -114,6 +119,7 @@ func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn) (Object, int64,
 	return x, s.currentPos(), nil
 }
 
+// MakeReader creates a new reader for the PDF file described by fi.
 func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	// TODO(voss): unify as much code as possible with NewReader
 
