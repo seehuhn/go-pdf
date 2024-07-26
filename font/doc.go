@@ -17,7 +17,7 @@
 // Package font implements the foundations of PDF font handling.  Support for
 // specific font types is provided by sub-packages.
 //
-// # Embedding fonts into PDF files
+// # Loading/Creating Fonts
 //
 // This library supports the following font types:
 //   - OpenType fonts (.otf files)
@@ -44,7 +44,6 @@
 // # Data Types for Representing Fonts
 //
 //   - A [Font] represents a font before it is embedded into a PDF file.
-//   - A [Layouter] is a font which is embedded and ready to typeset text.
-//   - The type [Embedded] represents the minimum information about a font
-//     required so that a PDF file can be parsed (but no text can be typeset).
+//   - A [Layouter] is a font which includes enough information to typeset text.
+//   - The type [Embedded] represents a font within a PDF file.
 package font

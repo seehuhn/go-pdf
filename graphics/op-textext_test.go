@@ -22,12 +22,6 @@ import (
 	"math"
 	"testing"
 
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
-
-	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/graphics/matrix"
@@ -63,45 +57,6 @@ func TestTextPos(t *testing.T) {
 // TestTextShowRaw checks that text positions are correcly updated
 // in the graphics state.
 func TestTextShowRaw(t *testing.T) {
-	// make a test font
-	F := &cff.Font{
-		FontInfo: &type1.FontInfo{
-			FontName:   "Test",
-			Version:    "1.000",
-			FontMatrix: [6]float64{0.0005, 0, 0, 0.0005, 0, 0},
-		},
-		Outlines: &cff.Outlines{
-			Private: []*type1.PrivateDict{
-				{BlueValues: []funit.Int16{0, 0}},
-			},
-			FDSelect: func(glyph.ID) int { return 0 },
-			Encoding: make([]glyph.ID, 256),
-		},
-	}
-
-	g := &cff.Glyph{
-		Name:  ".notdef",
-		Width: 2000,
-	}
-	g.MoveTo(0, 0)
-	g.LineTo(2000, 0)
-	g.LineTo(2000, 2000)
-	g.LineTo(0, 2000)
-	F.Glyphs = append(F.Glyphs, g)
-	for i, w := range []funit.Int16{100, 200, 400, 800} { // 5px, 10px, 20px, 40px
-		nameByte := 'A' + byte(i)
-		g = &cff.Glyph{
-			Name:  string([]byte{nameByte}),
-			Width: w,
-		}
-		g.MoveTo(0, 0)
-		g.LineTo(40, 0)
-		g.LineTo(40, 2000)
-		g.LineTo(0, 2000)
-		F.Encoding[nameByte] = glyph.ID(len(F.Glyphs))
-		F.Glyphs = append(F.Glyphs, g)
-	}
-
 	testString := pdf.String("CADABX")
 
 	type testCase struct {

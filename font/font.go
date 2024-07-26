@@ -22,25 +22,47 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
-type WritingMode int
+// A Layouter is a font which can typeset new text.
+//
+// Fonts which implement this interface need to contain the following
+// information:
+//   - How to convert characters to Glyph IDs
+//   - Kerning and Ligature information, if applicable
+//   - Global font metrics, e.g. ascent, descent, line height
+//   - Glyph metrics: advance width, bounding box
+type Layouter interface {
+	Font
 
-const (
-	// Horizontal means that text is written left-to-right.
-	Horizontal WritingMode = iota
+	// GetGeometry returns font metrics required for typesetting.
+	GetGeometry() *Geometry
 
-	// Vertical means that text is written top-to-bottom.
-	Vertical
-)
+	// Layout appends a string to a glyph sequence.  The string is typeset at
+	// the given point size and the resulting GlyphSeq is returned.
+	//
+	// If seq is non-nil, a new glyph sequence is allocated.  If seq is not
+	// nil, the return value is guaranteed to be equal to seq.
+	Layout(seq *GlyphSeq, ptSize float64, s string) *GlyphSeq
+}
 
 // Font represents a font instance which can be embedded in a PDF file.
+//
+// This interface implements [pdf.Embedder] and font objects are normally
+// embedded using [pdf.ResourceManagerEmbed].  As a consequence, each font
+// instance is embedded into a PDF file only once.  If more than one embedded
+// copy is required, separate Font instances must be used.
 type Font interface {
+	// PostScriptName returns the PostScript name of the font.
 	PostScriptName() string
 
+	// Embed adds the font to a PDF file.
 	Embed(rm *pdf.ResourceManager) (pdf.Object, Embedded, error)
 }
 
 // Embedded represents a font which is already embedded in a PDF file.
+//
+// The functions of this interface provide the information required to
+// convert Glyph IDs into PDF character codes, and to keep track of the
+// current text position in a PDF content stream.
 type Embedded interface {
 	WritingMode() WritingMode
 
@@ -52,26 +74,21 @@ type Embedded interface {
 	// (still to be multiplied by the font size), and a value indicating
 	// whether PDF word spacing adjustment applies to this glyph.
 	//
-	// As a side effect, this function allocates codes for the given
+	// As a side effect, this function may allocate codes for the given
 	// glyph/text combination in the font's encoding.
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 }
 
-// A Layouter is a font embedded in a PDF file which can typeset text.
-type Layouter interface {
-	Font
+// WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
+type WritingMode int
 
-	// GetGeometry returns font metrics required for typesetting.
-	GetGeometry() *Geometry
+const (
+	// Horizontal indicates horizontal writing mode.
+	Horizontal WritingMode = iota
 
-	// Layout appends a string to a glyph sequence.  The string is typeset at
-	// the given point size.
-	//
-	// If seq is non-nil, a new glyph sequence is allocated.  The resulting
-	// GlyphSeq is returned.  If seq is not nil, the return value is guaranteed
-	// to be equal to seq.
-	Layout(seq *GlyphSeq, ptSize float64, s string) *GlyphSeq
-}
+	// Vertical indicates vertical writing mode.
+	Vertical
+)
 
 // Dict is the low-level interface to represent a font in a PDF file.
 //

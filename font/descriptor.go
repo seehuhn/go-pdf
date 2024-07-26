@@ -25,7 +25,7 @@ import (
 
 // Descriptor represents a PDF font descriptor.
 //
-// See section 9.8.1 of PDF 32000-1:2008.
+// See section 9.8.1 of PDF 32000-2:2020.
 type Descriptor struct {
 	// FontName (required, except for Type 3 fonts) is the PostScript name of the font.
 	// This field is used primarily for the purpose of determining if a font has been subset.
@@ -49,7 +49,7 @@ type Descriptor struct {
 	FontBBox     *pdf.Rectangle // required, except for Type 3 fonts
 	ItalicAngle  float64        // required
 	Ascent       float64        // required, except for Type 3 fonts
-	Descent      float64        // required, except for Type 3 fonts
+	Descent      float64        // negative, required, except for Type 3 fonts
 	Leading      float64        // optional (default: 0)
 	CapHeight    float64        // required, except if no latin chars or for Type 3 fonts
 	XHeight      float64        // optional (default: 0)
@@ -60,8 +60,8 @@ type Descriptor struct {
 	MissingWidth float64        // optional (default: 0)
 }
 
-// DecodeDescriptor reads the font descriptor from a PDF file.
-func DecodeDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
+// ExtractDescriptor reads the font descriptor from a PDF file.
+func ExtractDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
 	fontDescriptor, err := pdf.GetDictTyped(r, obj, "FontDescriptor")
 	if err != nil {
 		return nil, err

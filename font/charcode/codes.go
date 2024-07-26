@@ -21,8 +21,6 @@ import (
 )
 
 // CharCode represents a character code within a [CodeSpaceRange] as a non-negative integer.
-//
-// TODO(voss): remove
 type CharCode int
 
 // CodeSpaceRange describes the ranges of byte sequences which are valid

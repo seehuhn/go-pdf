@@ -25,6 +25,52 @@ import (
 	"seehuhn.de/go/sfnt/os2"
 )
 
+func TestRoundTrip(t *testing.T) {
+	fd1 := &Descriptor{
+		FontName:     "Test Name",
+		FontFamily:   "Test Family",
+		FontStretch:  os2.WidthCondensed,
+		FontWeight:   os2.WeightBold,
+		IsFixedPitch: true,
+		IsSerif:      true,
+		IsSymbolic:   true,
+		IsScript:     true,
+		IsItalic:     true,
+		IsAllCap:     true,
+		IsSmallCap:   true,
+		ForceBold:    true,
+		FontBBox:     &pdf.Rectangle{10, 20, 30, 40},
+		ItalicAngle:  50,
+		Ascent:       60,
+		Descent:      -70,
+		Leading:      80,
+		CapHeight:    90,
+		XHeight:      100,
+		StemV:        110,
+		StemH:        120,
+		MaxWidth:     130,
+		AvgWidth:     140,
+		MissingWidth: 150,
+	}
+
+	data := pdf.NewData(pdf.V2_0)
+	fdDict := fd1.AsDict()
+	fdRef := data.Alloc()
+	err := data.Put(fdRef, fdDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fd2, err := ExtractDescriptor(data, fdRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d := cmp.Diff(fd1, fd2); d != "" {
+		t.Errorf("diff: %s", d)
+	}
+}
+
 func FuzzFontDescriptor(f *testing.F) {
 	fd := &Descriptor{}
 	data, err := embedFD(fd)
@@ -77,24 +123,19 @@ func FuzzFontDescriptor(f *testing.F) {
 		if err != nil {
 			t.Skip()
 		}
-		fd1, err := DecodeDescriptor(r, fdDict)
+		fd1, err := ExtractDescriptor(r, fdDict)
 		if err != nil {
 			t.Skip()
 		}
 
-		data2, err := embedFD(fd1)
+		data := pdf.NewData(pdf.V2_0)
+		fdDict = fd1.AsDict()
+		fdRef := data.Alloc()
+		err = data.Put(fdRef, fdDict)
 		if err != nil {
 			t.Fatal(err)
 		}
-		r, err = pdf.NewReader(bytes.NewReader(data2), opt)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fdDict, err = pdf.GetDictTyped(r, pdf.NewReference(1, 0), "FontDescriptor")
-		if err != nil {
-			t.Fatal(err)
-		}
-		fd2, err := DecodeDescriptor(r, fdDict)
+		fd2, err := ExtractDescriptor(data, fdRef)
 		if err != nil {
 			t.Fatal(err)
 		}

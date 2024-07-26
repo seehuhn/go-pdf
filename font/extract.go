@@ -30,7 +30,7 @@ import (
 // The different ways of embedding fonts in a PDF file are
 // represented by values of type [EmbeddingType]. There are seven different
 // types of embedded simple fonts:
-//   - Type 1: see [seehuhn.de/go/pdf/font/type1.EmbedInfo]
+//   - Type 1: see [seehuhn.de/go/pdf/font/type1.FontDict]
 //   - Multiple Master Type 1 (not supported by this library)
 //   - CFF font data: see [seehuhn.de/go/pdf/font/cff.EmbedInfoSimple]
 //   - TrueType: see [seehuhn.de/go/pdf/font/truetype.EmbedInfoSimple]
@@ -190,7 +190,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 	var fontKey pdf.Name
 	var fontRef pdf.Reference
 	if fontDescriptor != nil {
-		res.FontDescriptor, err = DecodeDescriptor(r, fontDescriptor)
+		res.FontDescriptor, err = ExtractDescriptor(r, fontDescriptor)
 		if err != nil {
 			return nil, err
 		}
