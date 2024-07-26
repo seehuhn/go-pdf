@@ -49,7 +49,8 @@ func (im *PNG) Bounds() Rectangle {
 
 // Embed ensures that the image is embedded in the PDF file.
 // This implements the [Image] interface.
-func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
+func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	ref := rm.Out.Alloc()
 	src := im.Data
 
@@ -66,11 +67,11 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 		cs = color.DeviceRGB
 	}
 	if color.NumValues(cs) != 3 {
-		return 0, fmt.Errorf("unsupported color space: %v", cs.ColorSpaceFamily())
+		return nil, zero, fmt.Errorf("unsupported color space: %v", cs.ColorSpaceFamily())
 	}
-	csEmbedded, err := pdf.ResourceManagerEmbed(rm, cs)
+	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, cs)
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
 	// see Table 87 of ISO 32000-2:2020
@@ -79,7 +80,7 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(width),
 		"Height":           pdf.Integer(height),
-		"ColorSpace":       csEmbedded.PDFObject(),
+		"ColorSpace":       csEmbedded,
 		"BitsPerComponent": pdf.Integer(8),
 	}
 	var alpha []byte
@@ -97,14 +98,14 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 	}
 	stream, err := rm.Out.OpenStream(ref, imDict, filter)
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 			r, g, b, a := src.At(x, y).RGBA()
 			_, err = stream.Write([]byte{byte(r >> 8), byte(g >> 8), byte(b >> 8)})
 			if err != nil {
-				return 0, err
+				return nil, zero, err
 			}
 			if alpha != nil {
 				alpha = append(alpha, byte(a>>8))
@@ -113,14 +114,14 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 	}
 	err = stream.Close()
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
 	if maskRef != 0 {
 		maskCS := color.DeviceGray
-		maskCSEmbedded, err := pdf.ResourceManagerEmbed(rm, maskCS)
+		maskCSEmbedded, _, err := pdf.ResourceManagerEmbed(rm, maskCS)
 		if err != nil {
-			return 0, err
+			return nil, zero, err
 		}
 
 		maskDict := pdf.Dict{
@@ -128,7 +129,7 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 			"Subtype":          pdf.Name("Image"),
 			"Width":            pdf.Integer(width),
 			"Height":           pdf.Integer(height),
-			"ColorSpace":       maskCSEmbedded.PDFObject(),
+			"ColorSpace":       maskCSEmbedded,
 			"BitsPerComponent": pdf.Integer(8),
 		}
 
@@ -139,19 +140,19 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 		}
 		stream, err = rm.Out.OpenStream(maskRef, maskDict, filter)
 		if err != nil {
-			return 0, err
+			return nil, zero, err
 		}
 		_, err = stream.Write(alpha)
 		if err != nil {
-			return 0, err
+			return nil, zero, err
 		}
 		err = stream.Close()
 		if err != nil {
-			return 0, err
+			return nil, zero, err
 		}
 	}
 
-	return ref, nil
+	return ref, zero, nil
 }
 
 func needsAlphaChannel(img image.Image) bool {

@@ -63,7 +63,7 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 
 	if needsColorSpace {
 		cs := c.ColorSpace()
-		name, err := writerGetResourceName(w, cs, catColorSpace)
+		name, _, err := writerGetResourceName(w, cs, catColorSpace)
 		if err != nil {
 			w.Err = err
 			return
@@ -93,7 +93,7 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 			}
 		}
 		if pattern != nil {
-			name, err := writerGetResourceName(w, pattern, catPattern)
+			name, _, err := writerGetResourceName(w, pattern, catPattern)
 			if err != nil {
 				w.Err = err
 				return
@@ -137,7 +137,7 @@ func (w *Writer) DrawShading(shading Shading) {
 		return
 	}
 
-	name, err := writerGetResourceName(w, shading, catShading)
+	name, _, err := writerGetResourceName(w, shading, catShading)
 	if err != nil {
 		w.Err = err
 		return

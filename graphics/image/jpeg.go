@@ -57,7 +57,8 @@ func (im *jpegImage) Bounds() Rectangle {
 
 // Embed ensures that the image is embedded in the PDF file.
 // This implements the [Image] interface.
-func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
+func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	ref := rm.Out.Alloc()
 
 	// TODO(voss): write a mask if there is an alpha channel
@@ -73,18 +74,18 @@ func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 		"Filter":           pdf.Name("DCTDecode"),
 	})
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
 	err = jpeg.Encode(stream, img, im.opts)
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
 	err = stream.Close()
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
-	return ref, nil
+	return ref, zero, nil
 }

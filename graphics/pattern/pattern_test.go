@@ -14,30 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package image
+package pattern
 
-import (
-	"seehuhn.de/go/pdf"
-)
+import "seehuhn.de/go/pdf/graphics/color"
 
-// Image represents a raster image which can be embedded in a PDF file.
-type Image interface {
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
-	Bounds() Rectangle
-	Subtype() pdf.Name
-}
-
-// Rectangle gives the dimensions of an image.
-type Rectangle struct {
-	XMin, YMin, XMax, YMax int
-}
-
-// Dx returns the width of the rectangle.
-func (r Rectangle) Dx() int {
-	return r.XMax - r.XMin
-}
-
-// Dy returns the height of the rectangle.
-func (r Rectangle) Dy() int {
-	return r.YMax - r.YMin
-}
+var _ color.Pattern = (*type1)(nil)
+var _ color.Pattern = (*Type2)(nil)

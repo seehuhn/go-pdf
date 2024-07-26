@@ -73,11 +73,6 @@ func (f *Font) PostScriptName() string {
 	return ""
 }
 
-// WritingMode implements the [font.Font] interface.
-func (f *Font) WritingMode() font.WritingMode {
-	return 0
-}
-
 // Layout implements the [font.Layouter] interface.
 func (f *Font) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
 	if seq == nil {
@@ -101,35 +96,39 @@ func (f *Font) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphS
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Font) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+func (f *Font) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
 	if f.RM != nil && f.RM != rm {
-		return nil, errors.New("font from different resource manager")
+		return nil, nil, errors.New("font from different resource manager")
 	}
 
 	glyphNames := f.glyphNames
 
 	w := rm.Out
+	ref := w.Alloc()
 	res := &embedded{
-		Font:       f,
-		GlyphNames: glyphNames,
-		w:          w,
-		Res: pdf.Res{
-			Data: w.Alloc(),
-		},
+		Font:          f,
+		GlyphNames:    glyphNames,
+		w:             w,
+		ref:           ref,
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	return res, nil
+	return ref, res, nil
 }
 
 type embedded struct {
 	*Font
 	GlyphNames []string
 
-	w pdf.Putter
-	pdf.Res
+	w   pdf.Putter
+	ref pdf.Reference
 
 	*encoding.SimpleEncoder
 	closed bool
+}
+
+// WritingMode implements the [font.Embedded] interface.
+func (f *embedded) WritingMode() font.WritingMode {
+	return 0
 }
 
 func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
@@ -199,5 +198,5 @@ func (f *embedded) Close() error {
 
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data.(pdf.Reference))
+	return info.Embed(f.w, f.ref)
 }

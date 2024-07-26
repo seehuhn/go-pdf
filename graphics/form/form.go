@@ -36,9 +36,10 @@ func (f *Form) IsDirect() bool {
 	return f.Resources.IsDirect() && f.Properties.IsDirect()
 }
 
-func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
+func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if !f.IsDirect() && f.RM != rm {
-		return 0, errors.New("Form: resource manager mismatch")
+		return nil, zero, errors.New("Form: resource manager mismatch")
 	}
 
 	dict := pdf.Dict{
@@ -67,7 +68,7 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 	}
 	if pdf.GetVersion(rm.Out) == pdf.V1_0 {
 		if f.DefaultName == "" {
-			return 0, errors.New("Form.DefaultName must be set in PDF 1.0")
+			return nil, zero, errors.New("Form.DefaultName must be set in PDF 1.0")
 		}
 		dict["Name"] = f.DefaultName
 	}
@@ -84,18 +85,18 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 	ref := rm.Out.Alloc()
 	stm, err := rm.Out.OpenStream(ref, dict, &pdf.FilterCompress{})
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 	_, err = stm.Write(f.Contents)
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
-	return ref, nil
+	return ref, zero, nil
 }
 
 // Subtype returns /Form.

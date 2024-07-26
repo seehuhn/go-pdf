@@ -40,7 +40,7 @@ const (
 
 // Space represents a PDF color space which can be embedded in a PDF file.
 type Space interface {
-	Embed(*pdf.ResourceManager) (pdf.Resource, error)
+	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	ColorSpaceFamily() pdf.Name
 	defaultValues() []float64
 }
@@ -63,7 +63,7 @@ type Pattern interface {
 	IsColored() bool
 
 	// Embed embeds the pattern in the PDF file.
-	Embed(*pdf.ResourceManager) (pdf.Res, error)
+	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 }
 
 // CheckCurrent checks whether the changing from the current color to the new

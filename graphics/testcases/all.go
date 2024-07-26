@@ -278,7 +278,7 @@ type Answer struct {
 }
 
 func encodeText(rm *pdf.ResourceManager, F font.Layouter, s string) pdf.String {
-	E, err := pdf.ResourceManagerEmbed(rm, F)
+	_, E, err := pdf.ResourceManagerEmbed(rm, F)
 	if err != nil {
 		panic(err)
 	}

@@ -48,7 +48,7 @@ type Parameters struct {
 	TextWordSpacing       float64 // word spacing (T_w)
 	TextHorizontalScaling float64 // horizonal scaling (T_h, normal spacing = 1)
 	TextLeading           float64 // leading (T_l)
-	TextFont              font.Font
+	TextFont              font.Embedded
 	TextFontSize          float64
 	TextRenderingMode     TextRenderingMode
 	TextRise              float64
@@ -270,66 +270,6 @@ func (s State) CopyTo(other *State) {
 	}
 }
 
-// ApplyTo calls methods of the Writer to set the graphics state to the state
-// described by s.
-func (s State) ApplyTo(w *Writer) {
-	if w.Err != nil {
-		return
-	}
-	if excess := s.Set & ^OpStateBits; excess != 0 {
-		k := bits.TrailingZeros64(uint64(excess))
-		w.Err = fmt.Errorf("ApplyTo: " + stateNames[k] + " not allowed")
-	}
-	if s.isSet(StateStrokeColor) {
-		w.SetStrokeColor(s.StrokeColor)
-	}
-	if s.isSet(StateFillColor) {
-		w.SetFillColor(s.FillColor)
-	}
-	if s.isSet(StateTextCharacterSpacing) {
-		w.TextSetCharacterSpacing(s.TextCharacterSpacing)
-	}
-	if s.isSet(StateTextWordSpacing) {
-		w.TextSetWordSpacing(s.TextWordSpacing)
-	}
-	if s.isSet(StateTextHorizontalScaling) {
-		w.TextSetHorizontalScaling(s.TextHorizontalScaling)
-	}
-	if s.isSet(StateTextLeading) {
-		w.TextSetLeading(s.TextLeading)
-	}
-	if s.isSet(StateTextFont) {
-		w.TextSetFont(s.TextFont, s.TextFontSize)
-	}
-	if s.isSet(StateTextRenderingMode) {
-		w.TextSetRenderingMode(s.TextRenderingMode)
-	}
-	if s.isSet(StateTextRise) {
-		w.TextSetRise(s.TextRise)
-	}
-	if s.isSet(StateLineWidth) {
-		w.SetLineWidth(s.LineWidth)
-	}
-	if s.isSet(StateLineCap) {
-		w.SetLineCap(s.LineCap)
-	}
-	if s.isSet(StateLineJoin) {
-		w.SetLineJoin(s.LineJoin)
-	}
-	if s.isSet(StateMiterLimit) {
-		w.SetMiterLimit(s.MiterLimit)
-	}
-	if s.isSet(StateLineDash) {
-		w.SetLineDash(s.DashPattern, s.DashPhase)
-	}
-	if s.isSet(StateRenderingIntent) {
-		w.SetRenderingIntent(s.RenderingIntent)
-	}
-	if s.isSet(StateFlatnessTolerance) {
-		w.SetFlatnessTolerance(s.FlatnessTolerance)
-	}
-}
-
 // GetTextPositionDevice returns the current text position in device coordinates.
 func (s State) GetTextPositionDevice() (float64, float64) {
 	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
@@ -341,69 +281,10 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 	return M[4], M[5]
 }
 
-// TextLayout appends a string to a GlyphSeq, using the text parameters from
-// the given graphics state.  If seq is nil, a new GlyphSeq is allocated.  The
-// resulting GlyphSeq is returned.
-//
-// If no font is set, or if the current font does not implement
-// [font.Layouter], the function returns nil.  If seq is not nil (and there is
-// no error), the return value is guaranteed to be equal to seq.
-func (s State) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
-	if !s.isSet(StateTextFont) {
-		return nil
-	}
-	F, ok := s.TextFont.(font.Layouter)
-	if !ok {
-		return nil
-	}
-
-	var characterSpacing, wordSpacing, horizontalScaling, textRise float64
-	if s.isSet(StateTextCharacterSpacing) {
-		characterSpacing = s.TextCharacterSpacing
-	}
-	if s.isSet(StateTextWordSpacing) {
-		wordSpacing = s.TextWordSpacing
-	}
-	if s.isSet(StateTextHorizontalScaling) {
-		horizontalScaling = s.TextHorizontalScaling
-	} else {
-		horizontalScaling = 1
-	}
-	if s.isSet(StateTextRise) {
-		textRise = s.TextRise
-	}
-
-	if seq == nil {
-		seq = &font.GlyphSeq{}
-	}
-	base := len(seq.Seq)
-
-	if characterSpacing == 0 {
-		F.Layout(seq, s.TextFontSize, text)
-	} else {
-		// disable ligatures
-		for _, r := range text {
-			F.Layout(seq, s.TextFontSize, string(r))
-		}
-	}
-
-	// Apply PDF layout parameters
-	for i := base; i < len(seq.Seq); i++ {
-		advance := seq.Seq[i].Advance
-		advance += characterSpacing
-		if string(seq.Seq[i].Text) == " " {
-			advance += wordSpacing
-		}
-		seq.Seq[i].Advance = advance * horizontalScaling
-		seq.Seq[i].Rise = textRise
-	}
-
-	return seq
-}
-
 // StateBits is a bit mask for the fields of the State struct.
 type StateBits uint64
 
+// Names returns a string representation of the set bits.
 func (b StateBits) Names() string {
 	var parts []string
 

@@ -39,7 +39,7 @@ func TestWidthsFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	E, err := pdf.ResourceManagerEmbed(rm, F)
+	ref, E, err := pdf.ResourceManagerEmbed(rm, F)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestWidthsFull(t *testing.T) {
 	}
 
 	qqq := reader.New(data, nil)
-	D, err := qqq.ReadFont(E.PDFObject(), "F")
+	D, err := qqq.ReadFont(ref, "F")
 	if err != nil {
 		t.Fatal(err)
 	}

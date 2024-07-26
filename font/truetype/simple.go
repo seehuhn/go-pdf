@@ -39,14 +39,19 @@ import (
 )
 
 type embeddedSimple struct {
-	w pdf.Putter
-	pdf.Res
+	w   pdf.Putter
+	ref pdf.Reference
 
 	sfnt *sfnt.Font
 
 	*encoding.SimpleEncoder
 
 	closed bool
+}
+
+// WritingMode implements the [font.Embedded] interface.
+func (f *embeddedSimple) WritingMode() font.WritingMode {
+	return 0
 }
 
 func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
@@ -107,7 +112,7 @@ func (f *embeddedSimple) Close() error {
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data.(pdf.Reference))
+	return info.Embed(f.w, f.ref)
 }
 
 // FontDictSimple is the information needed to embed a simple TrueType font.

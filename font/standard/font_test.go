@@ -38,7 +38,7 @@ func TestEmbedBuiltin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			E, err := pdf.ResourceManagerEmbed(rm, F)
+			ref, E, err := pdf.ResourceManagerEmbed(rm, F)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,7 +63,7 @@ func TestEmbedBuiltin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dicts, err := font.ExtractDicts(data, E.PDFObject())
+			dicts, err := font.ExtractDicts(data, ref)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -53,51 +53,52 @@ func (s *Type3) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if s.ColorSpace == nil {
-		return nil, errors.New("missing ColorSpace")
+		return nil, zero, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
-		return nil, errors.New("invalid ColorSpace")
+		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
 		want := color.NumValues(s.ColorSpace)
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
-			return nil, err
+			return nil, zero, err
 		}
 	}
 
 	if s.R1 < 0 {
-		return nil, fmt.Errorf("invalid radius: %f", s.R1)
+		return nil, zero, fmt.Errorf("invalid radius: %f", s.R1)
 	}
 	if s.R2 < 0 {
-		return nil, fmt.Errorf("invalid radius: %f", s.R2)
+		return nil, zero, fmt.Errorf("invalid radius: %f", s.R2)
 	}
 	if s.F == nil {
-		return nil, errors.New("missing function")
+		return nil, zero, errors.New("missing function")
 	}
 	switch F := s.F.(type) {
 	case nil:
-		return nil, errors.New("missing Function")
+		return nil, zero, errors.New("missing Function")
 	case pdf.Array:
 		if len(F) != color.NumValues(s.ColorSpace) {
-			return nil, errors.New("invalid Function")
+			return nil, zero, errors.New("invalid Function")
 		}
 	case pdf.Dict, pdf.Reference:
 		// pass
 	default:
-		return nil, fmt.Errorf("invalid Function: %T", s.F)
+		return nil, zero, fmt.Errorf("invalid Function: %T", s.F)
 	}
 
-	csE, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
+	csE, _, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	dict := pdf.Dict{
 		"ShadingType": pdf.Integer(3),
-		"ColorSpace":  csE.PDFObject(),
+		"ColorSpace":  csE,
 		"Coords": pdf.Array{
 			pdf.Number(s.X1), pdf.Number(s.Y1), pdf.Number(s.R1),
 			pdf.Number(s.X2), pdf.Number(s.Y2), pdf.Number(s.R2),
@@ -127,10 +128,10 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, dict)
 		if err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 		data = ref
 	}
 
-	return pdf.Res{Data: data}, nil
+	return data, zero, nil
 }

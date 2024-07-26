@@ -37,14 +37,12 @@ const (
 type Font interface {
 	PostScriptName() string
 
-	WritingMode() WritingMode
-
-	Embed(rm *pdf.ResourceManager) (Embedded, error)
+	Embed(rm *pdf.ResourceManager) (pdf.Object, Embedded, error)
 }
 
 // Embedded represents a font which is already embedded in a PDF file.
 type Embedded interface {
-	pdf.Resource
+	WritingMode() WritingMode
 
 	ForeachWidth(s pdf.String, yield func(width float64, isSpace bool))
 

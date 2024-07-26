@@ -126,30 +126,3 @@ func TestTextLayout3(t *testing.T) {
 		t.Errorf("unexpected width ratio: %f/%f=%f", L2, L1, L2/L1)
 	}
 }
-
-// TestTextLayout4 tests that horizontal scaling has the correct default,
-// if the value is not set in the graphics state.
-func TestTextLayout4(t *testing.T) {
-	data := pdf.NewData(pdf.V2_0)
-	rm := pdf.NewResourceManager(data)
-
-	F, err := gofont.Regular.New(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out := graphics.NewWriter(io.Discard, rm)
-	out.TextSetFont(F, 10)
-
-	state := &graphics.State{Parameters: &graphics.Parameters{}}
-	state.TextFont = F
-	state.TextFontSize = 10
-	state.Set |= graphics.StateTextFont
-
-	L1 := out.TextLayout(nil, "hello world!").TotalWidth()
-	L2 := state.TextLayout(nil, "hello world!").TotalWidth()
-
-	if math.Abs(L2-L1) > 1e-6 {
-		t.Errorf("unexpected width: %f != %f", L2, L1)
-	}
-}

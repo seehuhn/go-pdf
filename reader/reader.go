@@ -249,7 +249,7 @@ func (r *Reader) doNew() error {
 				// TODO(voss): use caching
 				newState, err := r.readExtGState(r.Resources.ExtGState[dictName])
 				if err == nil {
-					newState.Value.CopyTo(&r.State)
+					newState.CopyTo(&r.State)
 				} else if !pdf.IsMalformed(err) {
 					return err
 				}
@@ -596,7 +596,7 @@ doOps:
 			} else if err != nil {
 				return err
 			}
-			newState.Value.CopyTo(&r.State)
+			newState.CopyTo(&r.State)
 		}
 
 	case "q":

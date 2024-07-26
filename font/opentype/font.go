@@ -92,12 +92,6 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 	return F, nil
 }
 
-// WritingMode implements the [font.Font] interface.
-func (f *Instance) WritingMode() font.WritingMode {
-	// TODO(voss): implement this
-	return 0
-}
-
 // Layout implements the [font.Layouter] interface.
 func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
 	if seq == nil {
@@ -126,12 +120,13 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 // Embed adds the font to a PDF file.
 //
 // This implements the [font.Font] interface.
-func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
 	w := rm.Out
+	ref := w.Alloc()
 
 	err := pdf.CheckVersion(w, "OpenType fonts", pdf.V1_6)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	opt := f.Opt
@@ -139,14 +134,12 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 		opt = &font.Options{}
 	}
 
-	resource := pdf.Res{Data: w.Alloc()}
-
-	var res font.Embedded
+	var embedded font.Embedded
 	if f.Font.IsCFF() {
 		if !opt.Composite {
-			res = &embeddedCFFSimple{
+			embedded = &embeddedCFFSimple{
 				w:             w,
-				Res:           resource,
+				ref:           ref,
 				sfnt:          f.Font,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 			}
@@ -165,9 +158,9 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 				cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
 			}
 
-			res = &embeddedCFFComposite{
+			embedded = &embeddedCFFComposite{
 				w:          w,
-				Res:        resource,
+				ref:        ref,
 				sfnt:       f.Font,
 				GIDToCID:   gidToCID,
 				CIDEncoder: cidEncoder,
@@ -175,9 +168,9 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 		}
 	} else { // glyf outlines
 		if !opt.Composite {
-			res = &embeddedGlyfSimple{
+			embedded = &embeddedGlyfSimple{
 				w:             w,
-				Res:           resource,
+				ref:           ref,
 				sfnt:          f.Font,
 				SimpleEncoder: encoding.NewSimpleEncoder(),
 				closed:        false,
@@ -197,9 +190,9 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 				cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
 			}
 
-			res = &embeddedGlyfComposite{
+			embedded = &embeddedGlyfComposite{
 				w:          w,
-				Res:        resource,
+				ref:        ref,
 				sfnt:       f.Font,
 				GIDToCID:   gidToCID,
 				CIDEncoder: cidEncoder,
@@ -207,7 +200,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 		}
 	}
 
-	return res, nil
+	return ref, embedded, nil
 }
 
 func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {

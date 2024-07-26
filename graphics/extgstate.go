@@ -17,169 +17,225 @@
 package graphics
 
 import (
-	"errors"
+	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 )
 
-// ExtGState represents a combination of graphics state parameters.
-// This combination of parameters can be set using the [Writer.SetExtGState] method.
+// ExtGState represents a combination of graphics state parameters. This
+// combination of parameters can then be set in a single command, using the
+// [Writer.SetExtGState] method.
 //
-// Note that not all graphics parameters can be set using the ExtGState object.
-// In particular, the stroke and fill color and some text parameters cannot be
-// included in the ExtGState object.
+// The parameters in an extended graphics state are a subset of the parameters
+// in the [Parameters] struct.  The missing parameters, for example colors,
+// cannot be controlled using an extended graphics state.
 type ExtGState struct {
-	Value     State
+	Set StateBits
+
+	// This is a subset of the graphics parameters from the graphics.Parameters
+	// struct.
+	TextFont               font.Font
+	TextFontSize           float64
+	TextKnockout           bool
+	LineWidth              float64
+	LineCap                LineCapStyle
+	LineJoin               LineJoinStyle
+	MiterLimit             float64
+	DashPattern            []float64
+	DashPhase              float64
+	RenderingIntent        RenderingIntent
+	StrokeAdjustment       bool
+	BlendMode              pdf.Object
+	SoftMask               pdf.Object
+	StrokeAlpha            float64
+	FillAlpha              float64
+	AlphaSourceFlag        bool
+	BlackPointCompensation pdf.Name
+	OverprintStroke        bool
+	OverprintFill          bool // for PDF<1.3 this must equal OverprintStroke
+	OverprintMode          int  // for PDF<1.3 this must be 0
+	BlackGeneration        pdf.Object
+	UndercolorRemoval      pdf.Object
+	TransferFunction       pdf.Object
+	Halftone               pdf.Object
+	HalftoneOriginX        float64 //  https://github.com/pdf-association/pdf-issues/issues/260
+	HalftoneOriginY        float64
+	FlatnessTolerance      float64
+	SmoothnessTolerance    float64
+
+	// SingleUse can be set if the extended graphics state is used only in a
+	// single content stream, in order to slightly reduce output file size.  In
+	// this case, the graphics state is embedded in the corresponding resource
+	// dictionary, instead of being stored as an indirect object.
 	SingleUse bool
-}
-
-// NewExtGState creates a new ExtGState object.
-//
-// If s contains values for parameters that cannot be included in an ExtGState
-// object, an error is returned.
-func NewExtGState(s State) (*ExtGState, error) {
-	set := s.Set
-	if set & ^ExtGStateBits != 0 {
-		return nil, errors.New("invalid states for ExtGState")
-	}
-
-	return &ExtGState{
-		Value: State{
-			Parameters: s.Parameters.Clone(),
-			Set:        set,
-		},
-	}, nil
 }
 
 // Embed adds the graphics state dictionary to a PDF file.
 //
 // This implements the [pdf.Embedder] interface.
-func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
-	if err := pdf.CheckVersion(rm.Out, "ExtGState", pdf.V1_2); err != nil {
-		return nil, err
+func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Object, State, error) {
+	res := State{
+		Parameters: &Parameters{},
 	}
 
-	set := s.Value.Set
-	param := s.Value.Parameters
+	if err := pdf.CheckVersion(rm.Out, "ExtGState", pdf.V1_2); err != nil {
+		return nil, res, err
+	}
+
+	set := s.Set
 
 	// Build a graphics state parameter dictionary for the given state.
 	// See table 57 in ISO 32000-2:2020.
 	dict := pdf.Dict{}
 	if set&StateTextFont != 0 {
-		E, err := pdf.ResourceManagerEmbed(rm, param.TextFont)
+		E, embedded, err := pdf.ResourceManagerEmbed(rm, s.TextFont)
 		if err != nil {
-			return nil, err
+			return nil, res, err
 		}
-		dict["Font"] = pdf.Array{
-			E.PDFObject(),
-			pdf.Number(param.TextFontSize),
+		if _, ok := E.(pdf.Reference); !ok {
+			err := fmt.Errorf("font %q cannot be used in ExtGState",
+				s.TextFont.PostScriptName())
+			return nil, res, err
 		}
+		dict["Font"] = pdf.Array{E, pdf.Number(s.TextFontSize)}
+		res.TextFont = embedded
+		res.TextFontSize = s.TextFontSize
 	}
 	if set&StateTextKnockout != 0 {
-		dict["TK"] = pdf.Boolean(param.TextKnockout)
+		dict["TK"] = pdf.Boolean(s.TextKnockout)
+		res.TextKnockout = s.TextKnockout
 	}
 	if set&StateLineWidth != 0 {
-		dict["LW"] = pdf.Number(param.LineWidth)
+		dict["LW"] = pdf.Number(s.LineWidth)
+		res.LineWidth = s.LineWidth
 	}
 	if set&StateLineCap != 0 {
-		dict["LC"] = pdf.Integer(param.LineCap)
+		dict["LC"] = pdf.Integer(s.LineCap)
+		res.LineCap = s.LineCap
 	}
 	if set&StateLineJoin != 0 {
-		dict["LJ"] = pdf.Integer(param.LineJoin)
+		dict["LJ"] = pdf.Integer(s.LineJoin)
+		res.LineJoin = s.LineJoin
 	}
 	if set&StateMiterLimit != 0 {
-		dict["ML"] = pdf.Number(param.MiterLimit)
+		dict["ML"] = pdf.Number(s.MiterLimit)
+		res.MiterLimit = s.MiterLimit
 	}
 	if set&StateLineDash != 0 {
-		pat := make(pdf.Array, len(param.DashPattern))
-		for i, x := range param.DashPattern {
+		pat := make(pdf.Array, len(s.DashPattern))
+		for i, x := range s.DashPattern {
 			pat[i] = pdf.Number(x)
 		}
 		dict["D"] = pdf.Array{
 			pat,
-			pdf.Number(param.DashPhase),
+			pdf.Number(s.DashPhase),
 		}
+		res.DashPattern = s.DashPattern
+		res.DashPhase = s.DashPhase
 	}
 	if set&StateRenderingIntent != 0 {
-		dict["RI"] = pdf.Name(param.RenderingIntent)
+		dict["RI"] = pdf.Name(s.RenderingIntent)
+		res.RenderingIntent = s.RenderingIntent
 	}
 	if set&StateStrokeAdjustment != 0 {
-		dict["SA"] = pdf.Boolean(param.StrokeAdjustment)
+		dict["SA"] = pdf.Boolean(s.StrokeAdjustment)
+		res.StrokeAdjustment = s.StrokeAdjustment
 	}
 	if set&StateBlendMode != 0 {
-		dict["BM"] = param.BlendMode
+		dict["BM"] = s.BlendMode
+		res.BlendMode = s.BlendMode
 	}
 	if set&StateSoftMask != 0 {
-		dict["SMask"] = param.SoftMask
+		dict["SMask"] = s.SoftMask
+		res.SoftMask = s.SoftMask
 	}
 	if set&StateStrokeAlpha != 0 {
-		dict["CA"] = pdf.Number(param.StrokeAlpha)
+		dict["CA"] = pdf.Number(s.StrokeAlpha)
+		res.StrokeAlpha = s.StrokeAlpha
 	}
 	if set&StateFillAlpha != 0 {
-		dict["ca"] = pdf.Number(param.FillAlpha)
+		dict["ca"] = pdf.Number(s.FillAlpha)
+		res.FillAlpha = s.FillAlpha
 	}
 	if set&StateAlphaSourceFlag != 0 {
-		dict["AIS"] = pdf.Boolean(param.AlphaSourceFlag)
+		dict["AIS"] = pdf.Boolean(s.AlphaSourceFlag)
+		res.AlphaSourceFlag = s.AlphaSourceFlag
 	}
 	if set&StateBlackPointCompensation != 0 {
-		dict["UseBlackPtComp"] = param.BlackPointCompensation
+		dict["UseBlackPtComp"] = s.BlackPointCompensation
+		res.BlackPointCompensation = s.BlackPointCompensation
 	}
 
 	if set&StateOverprint != 0 {
-		dict["OP"] = pdf.Boolean(param.OverprintStroke)
-		if param.OverprintFill != param.OverprintStroke {
-			dict["op"] = pdf.Boolean(param.OverprintFill)
+		dict["OP"] = pdf.Boolean(s.OverprintStroke)
+		if s.OverprintFill != s.OverprintStroke {
+			dict["op"] = pdf.Boolean(s.OverprintFill)
 		}
+		res.OverprintStroke = s.OverprintStroke
+		res.OverprintFill = s.OverprintFill
 	}
 	if set&StateOverprintMode != 0 {
-		dict["OPM"] = pdf.Integer(param.OverprintMode)
+		dict["OPM"] = pdf.Integer(s.OverprintMode)
+		res.OverprintMode = s.OverprintMode
 	}
 	if set&StateBlackGeneration != 0 {
-		if _, isName := param.BlackGeneration.(pdf.Name); isName {
-			dict["BG2"] = param.BlackGeneration
+		if _, isName := s.BlackGeneration.(pdf.Name); isName {
+			dict["BG2"] = s.BlackGeneration
 		} else {
-			dict["BG"] = param.BlackGeneration
+			dict["BG"] = s.BlackGeneration
 		}
+		res.BlackGeneration = s.BlackGeneration
 	}
 	if set&StateUndercolorRemoval != 0 {
-		if _, isName := param.UndercolorRemoval.(pdf.Name); isName {
-			dict["UCR2"] = param.UndercolorRemoval
+		if _, isName := s.UndercolorRemoval.(pdf.Name); isName {
+			dict["UCR2"] = s.UndercolorRemoval
 		} else {
-			dict["UCR"] = param.UndercolorRemoval
+			dict["UCR"] = s.UndercolorRemoval
 		}
+		res.UndercolorRemoval = s.UndercolorRemoval
 	}
 	if set&StateTransferFunction != 0 {
-		if _, isName := param.TransferFunction.(pdf.Name); isName {
-			dict["TR2"] = param.TransferFunction
+		if _, isName := s.TransferFunction.(pdf.Name); isName {
+			dict["TR2"] = s.TransferFunction
 		} else {
-			dict["TR"] = param.TransferFunction
+			dict["TR"] = s.TransferFunction
 		}
+		res.TransferFunction = s.TransferFunction
 	}
 	if set&StateHalftone != 0 {
-		dict["HT"] = param.Halftone
+		// TODO(voss): at least in the case of a stream, this needs to be
+		// embedded.
+		dict["HT"] = s.Halftone
+		res.Halftone = s.Halftone
 	}
 	if set&StateHalftoneOrigin != 0 {
 		dict["HTO"] = pdf.Array{
-			pdf.Number(param.HalftoneOriginX),
-			pdf.Number(param.HalftoneOriginY),
+			pdf.Number(s.HalftoneOriginX),
+			pdf.Number(s.HalftoneOriginY),
 		}
+		res.HalftoneOriginX = s.HalftoneOriginX
+		res.HalftoneOriginY = s.HalftoneOriginY
 	}
 	if set&StateFlatnessTolerance != 0 {
-		dict["FL"] = pdf.Number(param.FlatnessTolerance)
+		dict["FL"] = pdf.Number(s.FlatnessTolerance)
+		res.FlatnessTolerance = s.FlatnessTolerance
 	}
 	if set&StateSmoothnessTolerance != 0 {
-		dict["SM"] = pdf.Number(param.SmoothnessTolerance)
+		dict["SM"] = pdf.Number(s.SmoothnessTolerance)
+		res.SmoothnessTolerance = s.SmoothnessTolerance
 	}
 
-	var obj pdf.Object = dict
+	res.Set = set & ExtGStateBits
+
 	if s.SingleUse {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, dict)
 		if err != nil {
-			return nil, err
+			return nil, res, err
 		}
-		obj = ref
+		return ref, res, nil
 	}
 
-	return pdf.Res{Data: obj}, nil
+	return dict, res, nil
 }

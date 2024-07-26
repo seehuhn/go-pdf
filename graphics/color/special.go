@@ -104,26 +104,25 @@ func (s *SpaceIndexed) defaultValues() []float64 {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "Indexed color space", pdf.V1_1); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
-	base, err := pdf.ResourceManagerEmbed(rm, s.base)
+	base, _, err := pdf.ResourceManagerEmbed(rm, s.base)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	data := pdf.Array{
 		pdf.Name("Indexed"),
-		base.PDFObject(),
+		base,
 		pdf.Integer(s.NumCol - 1),
 		s.lookup,
 	}
 
-	return pdf.Res{
-		Data: data,
-	}, nil
+	return data, zero, nil
 }
 
 type colorIndexed struct {

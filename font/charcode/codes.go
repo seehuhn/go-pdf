@@ -39,7 +39,6 @@ func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, 
 			}
 			s = s[k:]
 		}
-		return
 	}
 }
 

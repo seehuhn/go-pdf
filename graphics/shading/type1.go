@@ -52,48 +52,49 @@ func (s *Type1) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if s.ColorSpace == nil {
-		return nil, errors.New("missing ColorSpace")
+		return nil, zero, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
-		return nil, errors.New("invalid ColorSpace")
+		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
 		want := color.NumValues(s.ColorSpace)
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
-			return nil, err
+			return nil, zero, err
 		}
 	}
 	switch F := s.F.(type) {
 	case nil:
-		return nil, errors.New("missing Function")
+		return nil, zero, errors.New("missing Function")
 	case pdf.Array:
 		if len(F) != color.NumValues(s.ColorSpace) {
-			return nil, errors.New("invalid Function")
+			return nil, zero, errors.New("invalid Function")
 		}
 	case pdf.Dict, pdf.Reference:
 		// pass
 	default:
-		return nil, fmt.Errorf("invalid Function: %T", s.F)
+		return nil, zero, fmt.Errorf("invalid Function: %T", s.F)
 	}
 
 	if len(s.Domain) > 0 && (len(s.Domain) != 4 || s.Domain[0] > s.Domain[1] || s.Domain[2] > s.Domain[3]) {
-		return nil, fmt.Errorf("invalid Domain: %v", s.Domain)
+		return nil, zero, fmt.Errorf("invalid Domain: %v", s.Domain)
 	}
 	if len(s.Matrix) > 0 && len(s.Matrix) != 6 {
-		return nil, errors.New("invalid Matrix")
+		return nil, zero, errors.New("invalid Matrix")
 	}
 
-	csE, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
+	csE, _, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	dict := pdf.Dict{
 		"ShadingType": pdf.Integer(1),
-		"ColorSpace":  csE.PDFObject(),
+		"ColorSpace":  csE,
 		"Function":    s.F,
 	}
 	if len(s.Background) > 0 {
@@ -119,10 +120,10 @@ func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, dict)
 		if err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 		data = ref
 	}
 
-	return pdf.Res{Data: data}, nil
+	return data, zero, nil
 }

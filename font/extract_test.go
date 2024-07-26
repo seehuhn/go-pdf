@@ -56,7 +56,7 @@ func TestExtract(t *testing.T) {
 			page.TextShow("Hello World!")
 			page.TextEnd()
 
-			E, err := pdf.ResourceManagerEmbed(page.RM, F)
+			fontRef, _, err := pdf.ResourceManagerEmbed(page.RM, F)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -65,8 +65,6 @@ func TestExtract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
-			fontRef := E.PDFObject()
 
 			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
 			if err != nil {

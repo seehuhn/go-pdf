@@ -41,7 +41,7 @@ import (
 
 // FontFromFile represents a font which has been extracted from a PDF file.
 type FontFromFile interface {
-	font.Font
+	font.Embedded
 
 	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool))
 
@@ -80,10 +80,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 	}
 
-	res := pdf.Res{
-		Data: ref,
-	}
-
 	// TODO(voss): make this less repetitive
 	switch fontDicts.Type {
 	case font.Type1: // Type 1 fonts (including the standard 14 fonts)
@@ -111,7 +107,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 		res := &fromFileSimple{
 			name:     string(fontDicts.PostScriptName),
-			Res:      res,
 			widths:   widths,
 			encoding: encoding,
 			text:     text,
@@ -148,7 +143,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 		res := &fromFileSimple{
 			name:     string(fontDicts.PostScriptName),
-			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
 			text:     text,
@@ -190,7 +184,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		// TODO(voss): other methods for extracting the text mapping
 		res := &fromFileSimple{
 			name:     string(fontDicts.PostScriptName),
-			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
 			text:     text,
@@ -223,7 +216,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		// TODO: other methods for extracting the text mapping???
 		res := &fromFileSimple{
 			name:     string(fontDicts.PostScriptName),
-			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
 			text:     text,
@@ -259,7 +251,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 
 		res := &fromFileComposite{
 			name:        string(fontDicts.PostScriptName),
-			Res:         res,
 			cs:          info.CMap.CodeSpaceRange,
 			writingMode: font.WritingMode(info.CMap.WMode),
 			glyph:       glyph,
@@ -283,7 +274,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 		// TODO: other methods for extracting the text mapping???
 		res := &fromFileSimple{
-			Res:      res,
 			widths:   widths,
 			encoding: info.Encoding,
 			text:     text,
@@ -313,7 +303,6 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}
 
 		res := &fromFileSimple{
-			Res:      res,
 			widths:   info.Widths,
 			encoding: encoding,
 			text:     text,
@@ -330,9 +319,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 
 type fromFileSimple struct {
 	// name is the PostScript name of the font
-	name string
-
-	pdf.Res
+	name     string
 	widths   []float64
 	encoding []glyph.ID
 	text     [][]rune
@@ -354,6 +341,10 @@ func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, is
 	}
 }
 
+func (f *fromFileSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	panic("not implemented")
+}
+
 func (f *fromFileSimple) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
 	for _, c := range s {
 		yield(f.encoding[c], f.text[c], f.widths[c], c == ' ')
@@ -368,15 +359,9 @@ func (f *fromFileSimple) Key() pdf.Reference {
 	return f.key
 }
 
-func (f *fromFileSimple) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
-	panic("unreachable")
-}
-
 type fromFileComposite struct {
 	// name is the PostScript name of the font
-	name string
-
-	pdf.Res
+	name        string
 	cs          charcode.CodeSpaceRange
 	writingMode font.WritingMode
 	glyph       map[string]glyphData
@@ -408,6 +393,10 @@ func (f *fromFileComposite) ForeachWidth(s pdf.String, yield func(width float64,
 	})
 }
 
+func (f *fromFileComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	panic("not implemented")
+}
+
 func (f *fromFileComposite) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
 	f.cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 		// TODO(voss): notdef glyph(s)???
@@ -424,8 +413,4 @@ func (f *fromFileComposite) FontData() interface{} {
 
 func (f *fromFileComposite) Key() pdf.Reference {
 	return f.key
-}
-
-func (f *fromFileComposite) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
-	panic("unreachable")
 }

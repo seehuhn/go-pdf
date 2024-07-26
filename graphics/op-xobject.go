@@ -27,7 +27,7 @@ import (
 
 // XObject represents a PDF XObject.
 type XObject interface {
-	Embed(*pdf.ResourceManager) (pdf.Reference, error)
+	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	Subtype() pdf.Name
 }
 
@@ -40,7 +40,7 @@ func (p *Writer) DrawXObject(obj XObject) {
 		return
 	}
 
-	name, err := writerGetResourceName(p, obj, catXObject)
+	name, _, err := writerGetResourceName(p, obj, catXObject)
 	if err != nil {
 		p.Err = err
 		return

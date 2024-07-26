@@ -37,24 +37,27 @@ type MarkedContent struct {
 
 // Embed adds the MarkedContent properties dict to a PDF file.
 // This implements the [pdf.Embedder] interface.
-func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
 	if mc.SingleUse {
-		return pdf.Res{Data: mc.Properties}, nil
+		// TODO(voss): should this be embedded?
+		return mc.Properties, zero, nil
 	}
 
 	ref := rm.Out.Alloc()
 	err := rm.Out.Put(ref, mc.Properties)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
-	return ref, nil
+	return ref, zero, nil
 }
 
 // MarkedContentPoint adds a marked-content point to the content stream.
 //
 // The tag parameter specifies the role or significance of the point.
 // The properties parameter is a property list.  Properties can either be
-// nil, or a [pdf.Dict], or a [pdf.Resource] representing a [pdf.Dict].
+// nil, or a [pdf.Dict], or a [pdf.Reference] representing a [pdf.Dict].
 //
 // This implements the PDF graphics operators "MP" and "DP".
 func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
@@ -120,12 +123,12 @@ func (w *Writer) writeProperties(mc *MarkedContent, op string) {
 		}
 		prop = mc.Properties
 	} else {
-		propList, err := pdf.ResourceManagerEmbed(w.RM, mc)
+		propList, _, err := pdf.ResourceManagerEmbed(w.RM, mc)
 		if err != nil {
 			w.Err = err
 			return
 		}
-		prop = propList.PDFObject()
+		prop = propList
 	}
 
 	_, err := w.Content.Write([]byte(" "))

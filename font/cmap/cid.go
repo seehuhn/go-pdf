@@ -151,7 +151,6 @@ func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CI
 				return
 			}
 		}
-		return
 	}
 }
 

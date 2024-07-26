@@ -282,8 +282,3 @@ func TestPlaceholder(t *testing.T) {
 		t.Errorf("wrong /Length: %d vs %d", lengthOut, testVal)
 	}
 }
-
-var (
-	// compile time test: Reference implements the Resource interface
-	_ Resource = Reference(0)
-)

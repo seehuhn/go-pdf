@@ -198,7 +198,6 @@ func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) {
 				}
 			}
 		}
-		return
 	}
 	return yield
 }

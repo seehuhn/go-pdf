@@ -87,12 +87,6 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 	return F, nil
 }
 
-// WritingMode implements the [font.Font] interface.
-func (f *Instance) WritingMode() font.WritingMode {
-	// TODO(voss): implement this
-	return 0
-}
-
 // Layout implements the [font.Layouter] interface.
 func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
 	if seq == nil {
@@ -119,17 +113,17 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
 	opt := f.Opt
 
 	info := f.Font
 
 	w := rm.Out
-	resource := pdf.Res{Data: w.Alloc()}
+	ref := w.Alloc()
 
 	e := embedded{
 		w:   w,
-		Res: resource,
+		ref: ref,
 
 		sfnt: info,
 	}
@@ -138,7 +132,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 	if opt.Composite {
 		err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		var gidToCID cmap.GIDToCID
@@ -163,7 +157,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 	} else {
 		err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		res = &embeddedSimple{
 			embedded:      e,
@@ -171,7 +165,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 		}
 	}
 
-	return res, nil
+	return ref, res, nil
 }
 
 func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []pdf.Rectangle {
@@ -204,8 +198,8 @@ func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []pdf.Rectangle {
 }
 
 type embedded struct {
-	w pdf.Putter
-	pdf.Res
+	w   pdf.Putter
+	ref pdf.Reference
 
 	sfnt *sfnt.Font
 

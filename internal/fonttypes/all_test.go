@@ -42,11 +42,10 @@ func TestSamples(t *testing.T) {
 			page.TextShow(`“Hello World!”`)
 			page.TextEnd()
 
-			E, err := pdf.ResourceManagerEmbed(page.RM, F)
+			fontRef, _, err := pdf.ResourceManagerEmbed(page.RM, F)
 			if err != nil {
 				t.Fatal(err)
 			}
-			fontRef := E.PDFObject()
 
 			err = page.Close()
 			if err != nil {

@@ -22,8 +22,6 @@ import (
 )
 
 // Sample is an example of a font of the given [EmbeddingType].
-//
-// This type implements the [font.Font] interface.
 type Sample struct {
 	Label       string
 	Description string

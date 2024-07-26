@@ -157,11 +157,6 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 	return true
 }
 
-// WritingMode implements the [font.Font] interface.
-func (f *Instance) WritingMode() font.WritingMode {
-	return 0 // Simple fonts are always horizontal
-}
-
 // PostScriptName returns the PostScript name of the font.
 func (f *Instance) PostScriptName() string {
 	return f.Font.FontInfo.FontName
@@ -210,18 +205,17 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 // Embed adds the font to a PDF file.
 //
 // This implements the [font.Font] interface.
-func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
 	psFont := f.Font
 	metrics := f.Metrics
 
 	glyphNames := psFont.GlyphList()
 
 	w := rm.Out
+	ref := w.Alloc()
 	res := &embeddedSimple{
-		w: w,
-		Res: pdf.Res{
-			Data: w.Alloc(),
-		},
+		ref: ref,
+		w:   w,
 
 		psFont:     psFont,
 		metrics:    metrics,
@@ -230,7 +224,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 
 		SimpleEncoder: encoding.NewSimpleEncoder(),
 	}
-	return res, nil
+	return ref, res, nil
 }
 
 func glyphBoxtoPDF(b funit.Rect16, fMat []float64) pdf.Rectangle {
@@ -259,8 +253,8 @@ func glyphBoxtoPDF(b funit.Rect16, fMat []float64) pdf.Rectangle {
 }
 
 type embeddedSimple struct {
-	w pdf.Putter
-	pdf.Res
+	w   pdf.Putter
+	ref pdf.Reference
 
 	psFont     *type1.Font
 	metrics    *afm.Metrics
@@ -381,7 +375,7 @@ func (f *embeddedSimple) Close() error {
 		Encoding:  encoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data.(pdf.Reference))
+	return info.Embed(f.w, f.ref)
 }
 
 // IsStandard returns true if the font is one of the standard 14 PDF fonts.

@@ -42,28 +42,28 @@ func (p *Type2) IsColored() bool {
 
 // Embed returns the pattern dictionary for the shading pattern.
 // This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
-func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Res, error) {
-	var zero pdf.Res
+func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 
-	sh, err := pdf.ResourceManagerEmbed(rm, p.Shading)
+	sh, _, err := pdf.ResourceManagerEmbed(rm, p.Shading)
 	if err != nil {
-		return zero, err
+		return nil, zero, err
 	}
 
 	dict := pdf.Dict{
 		// "Type":        pdf.Name("Pattern"),
 		"PatternType": pdf.Integer(2),
-		"Shading":     sh.PDFObject(),
+		"Shading":     sh,
 	}
 	if p.Matrix != matrix.Identity && p.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(p.Matrix[:])
 	}
 	if p.ExtGState != nil {
-		gs, err := pdf.ResourceManagerEmbed(rm, p.ExtGState)
+		gs, _, err := pdf.ResourceManagerEmbed(rm, p.ExtGState)
 		if err != nil {
-			return zero, err
+			return nil, zero, err
 		}
-		dict["ExtGState"] = gs.PDFObject()
+		dict["ExtGState"] = gs
 	}
 
 	var data pdf.Object = dict
@@ -71,12 +71,10 @@ func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Res, error) {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, dict)
 		if err != nil {
-			return zero, err
+			return nil, zero, err
 		}
 		data = ref
 	}
 
-	return pdf.Res{
-		Data: data,
-	}, nil
+	return data, zero, nil
 }

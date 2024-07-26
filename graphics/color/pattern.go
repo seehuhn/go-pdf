@@ -25,17 +25,12 @@ import (
 // spacePatternColored is used for colored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
-func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
-
-	return s, nil
-}
-
-// PDFObject implements the [Space] interface.
-func (s spacePatternColored) PDFObject() pdf.Object {
-	return pdf.Name("Pattern")
+	return pdf.Name("Pattern"), zero, nil
 }
 
 // ColorSpaceFamily implements the [Space] interface.
@@ -85,28 +80,18 @@ func (s spacePatternUncolored) defaultValues() []float64 {
 	return s.base.defaultValues()
 }
 
-func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
 	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
-
-	base, err := pdf.ResourceManagerEmbed(rm, s.base)
+	base, _, err := pdf.ResourceManagerEmbed(rm, s.base)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
-	return spacePatternUncoloredEmbedded{base: base}, nil
-}
 
-type spacePatternUncoloredEmbedded struct {
-	base pdf.Resource
-}
-
-// PDFObject implements the [Resource] interface.
-func (s spacePatternUncoloredEmbedded) PDFObject() pdf.Object {
-	return pdf.Array{
-		pdf.Name("Pattern"),
-		s.base.PDFObject(),
-	}
+	return pdf.Array{pdf.Name("Pattern"), base}, zero, nil
 }
 
 // NewUncoloredPattern returns a new uncolored pattern as a PDF color.

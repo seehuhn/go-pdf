@@ -318,7 +318,10 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	resources, _ := pdf.GetDict(r, dicts.FontDict["Resources"])
 	if resources != nil {
 		res.Resources = &pdf.Resources{}
-		pdf.DecodeDict(r, res.Resources, resources)
+		err := pdf.DecodeDict(r, res.Resources, resources)
+		if err != nil {
+			return nil, pdf.Wrap(err, "Resources")
+		}
 	}
 
 	if dicts.FontDescriptor != nil {

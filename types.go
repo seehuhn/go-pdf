@@ -569,12 +569,6 @@ func (x Reference) IsInternal() bool {
 	return x>>48 != 0
 }
 
-// PDFObject returns the reference as a generic PDF object.
-// This implements the [Resource] interface.
-func (x Reference) PDFObject() Object {
-	return x
-}
-
 func (x Reference) String() string {
 	if x&internalReferenceFlag != 0 {
 		return fmt.Sprintf("int_%d", x&0x000_0000_ffff_ffff)

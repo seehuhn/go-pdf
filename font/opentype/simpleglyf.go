@@ -38,8 +38,8 @@ import (
 )
 
 type embeddedGlyfSimple struct {
-	w pdf.Putter
-	pdf.Res
+	w   pdf.Putter
+	ref pdf.Reference
 
 	sfnt *sfnt.Font
 
@@ -107,7 +107,7 @@ func (f *embeddedGlyfSimple) Close() error {
 		Encoding:  subsetEncoding,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data.(pdf.Reference))
+	return info.Embed(f.w, f.ref)
 }
 
 // FontDictGlyfSimple is the information needed to embed a simple OpenType/glyf font.

@@ -62,37 +62,38 @@ func (s *Type4) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if s.ColorSpace == nil {
-		return nil, errors.New("missing ColorSpace")
+		return nil, zero, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
-		return nil, errors.New("invalid ColorSpace")
+		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	numComponents := color.NumValues(s.ColorSpace)
 	if have := len(s.Background); have > 0 {
 		if have != numComponents {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				numComponents, have)
-			return nil, err
+			return nil, zero, err
 		}
 	}
 	switch s.BitsPerCoordinate {
 	case 1, 2, 4, 8, 12, 16, 24, 32:
 		// pass
 	default:
-		return nil, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
+		return nil, zero, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
 	}
 	switch s.BitsPerComponent {
 	case 1, 2, 4, 8, 12, 16:
 		// pass
 	default:
-		return nil, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
+		return nil, zero, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
 	}
 	switch s.BitsPerFlag {
 	case 2, 4, 8:
 		// pass
 	default:
-		return nil, fmt.Errorf("invalid BitsPerFlag: %d", s.BitsPerFlag)
+		return nil, zero, fmt.Errorf("invalid BitsPerFlag: %d", s.BitsPerFlag)
 	}
 	numValues := numComponents
 	if s.F != nil {
@@ -100,35 +101,35 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	}
 	decodeLen := 4 + 2*numValues
 	if have := len(s.Decode); have != decodeLen {
-		return nil, fmt.Errorf("wrong number of decode values: expected %d, got %d",
+		return nil, zero, fmt.Errorf("wrong number of decode values: expected %d, got %d",
 			decodeLen, have)
 	}
 	for i := 0; i < decodeLen; i += 2 {
 		if s.Decode[i] > s.Decode[i+1] {
-			return nil, fmt.Errorf("invalid decode values: %v", s.Decode)
+			return nil, zero, fmt.Errorf("invalid decode values: %v", s.Decode)
 		}
 	}
 	for i, v := range s.Vertices {
 		if v.Flag > 2 {
-			return nil, fmt.Errorf("vertex %d: invalid flag: %d", i, v.Flag)
+			return nil, zero, fmt.Errorf("vertex %d: invalid flag: %d", i, v.Flag)
 		}
 		if have := len(v.Color); have != numValues {
-			return nil, fmt.Errorf("vertex %d: wrong number of color values: expected %d, got %d",
+			return nil, zero, fmt.Errorf("vertex %d: wrong number of color values: expected %d, got %d",
 				i, numValues, have)
 		}
 	}
 	if s.F != nil && s.ColorSpace.ColorSpaceFamily() == color.FamilyIndexed {
-		return nil, errors.New("Function not allowed for indexed color space")
+		return nil, zero, errors.New("Function not allowed for indexed color space")
 	}
 
-	csE, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
+	csE, _, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	dict := pdf.Dict{
 		"ShadingType":       pdf.Integer(4),
-		"ColorSpace":        csE.PDFObject(),
+		"ColorSpace":        csE,
 		"BitsPerCoordinate": pdf.Integer(s.BitsPerCoordinate),
 		"BitsPerComponent":  pdf.Integer(s.BitsPerComponent),
 		"BitsPerFlag":       pdf.Integer(s.BitsPerFlag),
@@ -153,7 +154,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 	ref := rm.Out.Alloc()
 	stm, err := rm.Out.OpenStream(ref, dict)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	// Write packed bit data for each vertex:
@@ -202,13 +203,13 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		}
 		_, err := stm.Write(buf)
 		if err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
-	return pdf.Res{Data: ref}, nil
+	return ref, zero, nil
 }

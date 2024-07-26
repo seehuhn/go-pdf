@@ -130,7 +130,7 @@ func (f *embeddedComposite) Close() error {
 		IsSerif:    subsetOTF.IsSerif,
 		IsScript:   subsetOTF.IsScript,
 	}
-	return info.Embed(f.w, f.Data.(pdf.Reference))
+	return info.Embed(f.w, f.ref)
 }
 
 // FontDictComposite is the information needed to embed a CFF font as a composite PDF font.

@@ -162,27 +162,24 @@ func (f *testFont) PostScriptName() string {
 	return "Test"
 }
 
-func (f *testFont) WritingMode() font.WritingMode {
-	return 0
-}
-
 // GetGeometry returns font metrics required for typesetting.
 func (f *testFont) GetGeometry() *font.Geometry {
 	panic("not implemented") // TODO: Implement
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
 	w := rm.Out
+	fontDictRef := w.Alloc()
 
 	// load the original font
 	ll := loader.NewFontLoader()
 	fd, err := ll.Open("Times-Roman", loader.FontTypeType1)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	F, err := pst1.Read(fd)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// copy the glyphs we want to keep
@@ -221,23 +218,23 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 	}
 	fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	l1, l2, err := F.WritePDF(fontFileStream)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = length1.Set(pdf.Integer(l1))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = length2.Set(pdf.Integer(l2))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	err = fontFileStream.Close()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var fontBBox *pdf.Rectangle
@@ -282,7 +279,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 	ww[0o335] = F.Glyphs["Yacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
 	widthsInfo := widths.EncodeSimple(ww)
 
-	fontDictRef := w.Alloc()
 	fontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("Type1"),
@@ -296,17 +292,19 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 	w.Put(fontDictRef, fontDict)
 
 	res := &testFontEmbedded{
-		Res: pdf.Res{
-			Data: fontDictRef,
-		},
-		W: ww,
+		Ref: fontDictRef,
+		W:   ww,
 	}
-	return res, nil
+	return fontDictRef, res, nil
 }
 
 type testFontEmbedded struct {
-	pdf.Res
-	W []float64
+	Ref pdf.Reference
+	W   []float64
+}
+
+func (f *testFontEmbedded) WritingMode() font.WritingMode {
+	return 0
 }
 
 func (f *testFontEmbedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

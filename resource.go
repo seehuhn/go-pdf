@@ -21,27 +21,16 @@ import (
 	"io"
 )
 
-// Resource is a PDF resource inside a content stream.
-type Resource interface {
-	PDFObject() Object // value to use in the resource dictionary
-}
-
-// Res can be embedded in a struct to implement the [Resource] interface.
-type Res struct {
-	Data Object
-}
-
-// PDFObject implements the [Resource] interface.
-func (r Res) PDFObject() Object {
-	return r.Data
-}
-
 // Embedder represents a PDF resource which has not yet been associated
 // with a PDF file.
-type Embedder[T Resource] interface {
+type Embedder[T any] interface {
 	// Embed embeds the resource into the PDF file
-	Embed(rm *ResourceManager) (T, error)
+	Embed(rm *ResourceManager) (Object, T, error)
 }
+
+// Unused is a placeholder type for the second return value of the
+// Embedder.Embed method, in cases where the argument is not used.
+type Unused struct{}
 
 // ResourceManager helps to avoid duplicate resources in a PDF file.
 // It is used to embed object implementing the [Embedder] interface.
@@ -53,7 +42,7 @@ type Embedder[T Resource] interface {
 // file is closed.
 type ResourceManager struct {
 	Out        Putter
-	embedded   map[any]Resource
+	embedded   map[any]embRes
 	needsClose []io.Closer
 	isClosed   bool
 }
@@ -62,8 +51,13 @@ type ResourceManager struct {
 func NewResourceManager(w Putter) *ResourceManager {
 	return &ResourceManager{
 		Out:      w,
-		embedded: make(map[any]Resource),
+		embedded: make(map[any]embRes),
 	}
+}
+
+type embRes struct {
+	Val Object
+	Emb any
 }
 
 // ResourceManagerEmbed embeds a resource in the PDF file.
@@ -76,28 +70,28 @@ func NewResourceManager(w Putter) *ResourceManager {
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on ResourceManager.
-func ResourceManagerEmbed[T Resource](rm *ResourceManager, r Embedder[T]) (T, error) {
+func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T, error) {
 	var zero T
 
 	if er, ok := rm.embedded[r]; ok {
-		return er.(T), nil
+		return er.Val, er.Emb.(T), nil
 	}
 	if rm.isClosed {
-		return zero, fmt.Errorf("resource manager is already closed")
+		return nil, zero, fmt.Errorf("resource manager is already closed")
 	}
 
-	er, err := r.Embed(rm)
+	val, emb, err := r.Embed(rm)
 	if err != nil {
-		return zero, fmt.Errorf("failed to embed resource: %w", err)
+		return nil, zero, fmt.Errorf("failed to embed resource: %w", err)
 	}
 
-	rm.embedded[r] = er
+	rm.embedded[r] = embRes{Val: val, Emb: emb}
 
-	if closer, ok := any(er).(io.Closer); ok {
+	if closer, ok := any(emb).(io.Closer); ok {
 		rm.needsClose = append(rm.needsClose, closer)
 	}
 
-	return er, nil
+	return val, emb, nil
 }
 
 // Close closes all embedded resources which implement [io.Closer].

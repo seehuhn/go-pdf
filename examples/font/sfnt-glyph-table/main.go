@@ -288,7 +288,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	page.Fill()
 	page.PopGraphicsState()
 
-	E, err := pdf.ResourceManagerEmbed(page.RM, theFont)
+	_, E, err := pdf.ResourceManagerEmbed(page.RM, theFont)
 	if err != nil {
 		return err
 	}

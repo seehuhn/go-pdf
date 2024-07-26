@@ -37,8 +37,8 @@ import (
 )
 
 type embeddedGlyfComposite struct {
-	w pdf.Putter
-	pdf.Res
+	w   pdf.Putter
+	ref pdf.Reference
 	*font.Geometry
 
 	sfnt *sfnt.Font
@@ -47,6 +47,12 @@ type embeddedGlyfComposite struct {
 	cmap.CIDEncoder
 
 	closed bool
+}
+
+// WritingMode implements the [font.Embedded] interface.
+func (f *embeddedGlyfComposite) WritingMode() font.WritingMode {
+	// TODO(voss): implement this
+	return 0
 }
 
 func (f *embeddedGlyfComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
@@ -115,7 +121,7 @@ func (f *embeddedGlyfComposite) Close() error {
 		CIDToGID:  cidToGID,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data.(pdf.Reference))
+	return info.Embed(f.w, f.ref)
 }
 
 // FontDictGlyfComposite is the information needed to embed a composite OpenType/glyf font.

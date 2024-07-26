@@ -72,7 +72,7 @@ func (s *SpaceCalGray) New(gray float64) Color {
 
 // ColorSpaceFamily implements the [SpaceEmbedded] interface.
 func (s *SpaceCalGray) ColorSpaceFamily() pdf.Name {
-	return "CalGray"
+	return FamilyCalGray
 }
 
 // defaultValues implements the [Space] interface.
@@ -81,9 +81,10 @@ func (s *SpaceCalGray) defaultValues() []float64 {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "CalGray color space", pdf.V1_1); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	dict := pdf.Dict{}
@@ -95,9 +96,7 @@ func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		dict["Gamma"] = pdf.Number(s.gamma)
 	}
 
-	return pdf.Res{
-		Data: pdf.Array{pdf.Name("CalGray"), dict},
-	}, nil
+	return pdf.Array{pdf.Name("CalGray"), dict}, zero, nil
 }
 
 type colorCalGray struct {
@@ -180,9 +179,10 @@ func (s *SpaceCalRGB) New(r, g, b float64) Color {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "CalRGB color space", pdf.V1_1); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	dict := pdf.Dict{}
@@ -197,9 +197,7 @@ func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		dict["Matrix"] = toPDF(s.matrix)
 	}
 
-	return pdf.Res{
-		Data: pdf.Array{pdf.Name("CalRGB"), dict},
-	}, nil
+	return pdf.Array{pdf.Name("CalRGB"), dict}, zero, nil
 }
 
 // defaultValues implements the [Space] interface.
@@ -293,9 +291,10 @@ func (s *SpaceLab) ColorSpaceFamily() pdf.Name {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "Lab color space", pdf.V1_1); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	dict := pdf.Dict{}
@@ -307,9 +306,7 @@ func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
 		dict["Range"] = toPDF(s.ranges)
 	}
 
-	return pdf.Res{
-		Data: pdf.Array{pdf.Name("Lab"), dict},
-	}, nil
+	return pdf.Array{pdf.Name("Lab"), dict}, zero, nil
 }
 
 // defaultValues implements the [Space] interface.
@@ -393,9 +390,10 @@ func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
 }
 
 // Embed implements the [Space] interface.
-func (s *SpaceICCBased) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s *SpaceICCBased) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "ICCBased color space", pdf.V1_3); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	panic("not implemented") // TODO: Implement

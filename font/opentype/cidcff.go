@@ -36,8 +36,8 @@ import (
 )
 
 type embeddedCFFComposite struct {
-	w pdf.Putter
-	pdf.Res
+	w   pdf.Putter
+	ref pdf.Reference
 
 	sfnt *sfnt.Font
 
@@ -128,7 +128,7 @@ func (f *embeddedCFFComposite) Close() error {
 		CMap:      cmapInfo,
 		ToUnicode: toUnicode,
 	}
-	return info.Embed(f.w, f.Data.(pdf.Reference))
+	return info.Embed(f.w, f.ref)
 }
 
 // FontDictCFFComposite is the information needed to embed a composite OpenType/CFF font.

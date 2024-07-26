@@ -213,7 +213,7 @@ func doit() error {
 		}
 
 		if gen != nil {
-			Y, err := pdf.ResourceManagerEmbed(page.RM, X)
+			refY, Y, err := pdf.ResourceManagerEmbed(page.RM, X)
 			if err != nil {
 				return err
 			}
@@ -231,11 +231,11 @@ func doit() error {
 				return err
 			}
 
-			fontDict, err := pdf.GetDict(data, Y.PDFObject())
+			fontDict, err := pdf.GetDict(data, refY)
 			if err != nil {
 				return err
 			}
-			ref, _ := Y.PDFObject().(pdf.Reference)
+			ref, _ := refY.(pdf.Reference)
 			yFD := l.ShowDict(page, fontDict, "Font Dictionary", ref)
 			fd := fontDict["FontDescriptor"]
 			y0FontDesc := yFD["FontDescriptor"]

@@ -16,6 +16,13 @@
 
 package color
 
+import "seehuhn.de/go/pdf"
+
+// color.Space implements pdf.Embedder
+var (
+	_ pdf.Embedder[pdf.Unused] = Space(nil)
+)
+
 // The following types implement the ColorSpace interface:
 var (
 	_ Space = SpaceDeviceGray{}

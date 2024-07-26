@@ -76,11 +76,6 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 	return f, nil
 }
 
-// WritingMode implements the [font.Layouter] interface.
-func (f *Instance) WritingMode() font.WritingMode {
-	return 0 // TODO(voss): implement
-}
-
 // Layout implements the [font.Layouter] interface.
 func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
 	if seq == nil {
@@ -108,32 +103,20 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 
 // Embed adds the font to a PDF file.
 // This implements the [font.Font] interface.
-func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
+func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
 	opt := f.Opt
 	if opt == nil {
 		opt = &font.Options{}
 	}
 
 	w := rm.Out
-	resource := pdf.Res{Data: w.Alloc()}
+	ref := w.Alloc()
 
 	var res font.Embedded
-	if !opt.Composite {
-		err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
-		if err != nil {
-			return nil, err
-		}
-
-		res = &embeddedSimple{
-			w:             w,
-			Res:           resource,
-			sfnt:          f.Font,
-			SimpleEncoder: encoding.NewSimpleEncoder(),
-		}
-	} else {
+	if opt.Composite {
 		err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		var gidToCID cmap.GIDToCID
@@ -152,14 +135,26 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (font.Embedded, error) {
 
 		res = &embeddedComposite{
 			w:          w,
-			Res:        resource,
+			ref:        ref,
 			sfnt:       f.Font,
 			GIDToCID:   gidToCID,
 			CIDEncoder: cidEncoder,
 		}
+	} else {
+		err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		res = &embeddedSimple{
+			w:             w,
+			ref:           ref,
+			sfnt:          f.Font,
+			SimpleEncoder: encoding.NewSimpleEncoder(),
+		}
 	}
 
-	return res, nil
+	return ref, res, nil
 }
 
 func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {

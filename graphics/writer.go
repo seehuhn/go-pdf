@@ -33,6 +33,8 @@ type Writer struct {
 
 	currentObject objectType
 
+	CurrentFont font.Layouter
+
 	State
 	stack []State
 
@@ -136,24 +138,25 @@ func (w *Writer) coord(x float64) string {
 // into a method on [Writer].
 //
 // TODO(voss): swap the resource and category arguments?
-func writerGetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], category resourceCategory) (pdf.Name, error) {
+func writerGetResourceName[T any](w *Writer, resource pdf.Embedder[T], category resourceCategory) (pdf.Name, T, error) {
 	key := catRes{category, resource}
 	v, ok := w.resName[key]
 	if ok {
-		return v.name, nil
+		return v.name, v.obj.(T), nil
 	}
 
-	embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
+	obj, embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
 	if err != nil {
-		return "", err
+		var zero T
+		return "", zero, err
 	}
 
 	dict := w.getCategoryDict(category)
-	name := w.generateName(category, dict, "")
-	(*dict)[name] = embedded.PDFObject()
+	name := w.generateName(category, dict)
+	(*dict)[name] = obj
 
 	w.resName[key] = objName{embedded, name}
-	return name, nil
+	return name, embedded, nil
 }
 
 // GetResourceName returns a name which can be used to refer to a resource from
@@ -162,20 +165,30 @@ func writerGetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], 
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [Writer].
-func writerSetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], category resourceCategory, name pdf.Name) error {
+func writerSetResourceName[T any](w *Writer, resource pdf.Embedder[T], category resourceCategory, name pdf.Name) error {
 	for k, v := range w.resName {
 		if k.cat == category && v.name == name {
 			return fmt.Errorf("name %q is already used for category %d", name, category)
 		}
 	}
 
-	embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
+	// Some names for color spaces are reserved,
+	// see table 73 of ISO 32000-2:2020
+	if category == catColorSpace &&
+		(name == "DeviceGray" ||
+			name == "DeviceRGB" ||
+			name == "DeviceCMYK" ||
+			name == "Pattern") {
+		return fmt.Errorf("name %q is reserved for color spaces", name)
+	}
+
+	dictData, embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
 	if err != nil {
 		return err
 	}
 
 	dict := w.getCategoryDict(category)
-	(*dict)[name] = embedded.PDFObject()
+	(*dict)[name] = dictData
 
 	key := catRes{category, resource}
 	w.resName[key] = objName{embedded, name}
@@ -187,18 +200,6 @@ func writerSetResourceName[T pdf.Resource](w *Writer, resource pdf.Embedder[T], 
 // function is not normally required.
 func (w *Writer) SetFontNameInternal(f font.Font, name pdf.Name) error {
 	return writerSetResourceName(w, f, catFont, name)
-}
-
-func (w *Writer) textFontEmbedded() font.Embedded {
-	if !w.isSet(StateTextFont) {
-		return nil
-	}
-	F := w.State.TextFont
-	E, ok := w.resName[catRes{catFont, F}]
-	if !ok {
-		return nil
-	}
-	return E.obj.(font.Embedded)
 }
 
 func (w *Writer) getCategoryDict(category resourceCategory) *pdf.Dict {
@@ -229,31 +230,15 @@ func (w *Writer) getCategoryDict(category resourceCategory) *pdf.Dict {
 	return field
 }
 
-func (w *Writer) generateName(category resourceCategory, dict *pdf.Dict, defName pdf.Name) pdf.Name {
-	isUsed := func(name pdf.Name) bool {
-		// Some names for color spaces are reserved,
-		// see table 73 of ISO 32000-2:2020
-		if category == catColorSpace &&
-			(name == "DeviceGray" ||
-				name == "DeviceRGB" ||
-				name == "DeviceCMYK" ||
-				name == "Pattern") {
-			return true
-		}
+func (w *Writer) generateName(category resourceCategory, dict *pdf.Dict) pdf.Name {
+	var name pdf.Name
 
-		_, isUsed := (*dict)[name]
-		return isUsed
-	}
-
-	name := defName
-	if name == "" || isUsed(name) {
-		prefix := getCategoryPrefix(category)
-		numUsed := len(*dict)
-		for k := numUsed + 1; ; k-- {
-			name = prefix + pdf.Name(strconv.Itoa(k))
-			if !isUsed(name) {
-				break
-			}
+	prefix := getCategoryPrefix(category)
+	numUsed := len(*dict)
+	for k := numUsed + 1; ; k-- {
+		name = prefix + pdf.Name(strconv.Itoa(k))
+		if _, isUsed := (*dict)[name]; !isUsed {
+			break
 		}
 	}
 

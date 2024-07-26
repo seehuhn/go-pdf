@@ -50,7 +50,7 @@ func TestToUnicode(t *testing.T) {
 					panic("test is broken")
 				}
 
-				E, err := pdf.ResourceManagerEmbed(rm, F)
+				ref, E, err := pdf.ResourceManagerEmbed(rm, F)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -67,7 +67,7 @@ func TestToUnicode(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				fontDicts, err := font.ExtractDicts(data, E.PDFObject())
+				fontDicts, err := font.ExtractDicts(data, ref)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -111,7 +111,7 @@ func TestNotdefGlyph(t *testing.T) {
 			data := pdf.NewData(v)
 			rm := pdf.NewResourceManager(data)
 
-			E, err := pdf.ResourceManagerEmbed(rm, F)
+			ref, E, err := pdf.ResourceManagerEmbed(rm, F)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -131,7 +131,7 @@ func TestNotdefGlyph(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			fontDicts, err := font.ExtractDicts(data, E.PDFObject())
+			fontDicts, err := font.ExtractDicts(data, ref)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -170,7 +170,7 @@ func TestEncoding(t *testing.T) {
 	data := pdf.NewData(pdf.V1_7)
 	rm := pdf.NewResourceManager(data)
 
-	E, err := pdf.ResourceManagerEmbed(rm, F)
+	ref, E, err := pdf.ResourceManagerEmbed(rm, F)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dicts, err := font.ExtractDicts(data, E.PDFObject())
+	dicts, err := font.ExtractDicts(data, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -218,7 +218,7 @@ func TestTextShowRaw2(t *testing.T) {
 				r.TextBegin()
 				r.TextFirstLine(10, 10)
 
-				E, err := pdf.ResourceManagerEmbed(r.RM, F)
+				_, E, err := pdf.ResourceManagerEmbed(r.RM, F)
 				if err != nil {
 					return err
 				}
@@ -238,7 +238,7 @@ func TestTextShowRaw2(t *testing.T) {
 				F := sample.MakeFont(r.RM)
 				r.TextSetFont(F, fontSize)
 
-				E, err := pdf.ResourceManagerEmbed(r.RM, F)
+				_, E, err := pdf.ResourceManagerEmbed(r.RM, F)
 				if err != nil {
 					return err
 				}

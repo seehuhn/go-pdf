@@ -76,14 +76,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		return 0
 	}
 
-	F, ok := w.TextFont.(font.Layouter)
-	if !ok {
-		w.Err = errors.New("font does not support layouting")
-		return 0
-	}
-	geom := F.GetGeometry()
-
-	E := w.textFontEmbedded()
+	E := w.TextFont
 
 	left := seq.Skip
 	gg := seq.Seq
@@ -126,7 +119,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	xActual := 0.0
 	xWanted := left
 	param := w.State
-	if F.WritingMode() != 0 {
+	if E.WritingMode() != 0 {
 		panic("vertical writing mode not implemented")
 	}
 	for _, g := range gg {
@@ -144,7 +137,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		}
 
 		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) / param.TextFontSize / param.TextHorizontalScaling * 1000))
-		if xOffsetInt != 0 && !geom.GlyphExtents[g.GID].IsZero() {
+		if xOffsetInt != 0 { // TODO(voss): only do this if the glyph is not blank
 			if len(run) > 0 {
 				out = append(out, run)
 				run = nil
@@ -177,4 +170,61 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	w.TextMatrix = matrix.Translate(xActual, 0).Mul(w.TextMatrix)
 
 	return xActual
+}
+
+// TextLayout appends a string to a GlyphSeq, using the text parameters from
+// the given graphics state.  If seq is nil, a new GlyphSeq is allocated.  The
+// resulting GlyphSeq is returned.
+//
+// If no font is set, or if the current font does not implement
+// [font.Layouter], the function returns nil.  If seq is not nil (and there is
+// no error), the return value is guaranteed to be equal to seq.
+func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
+	F := w.CurrentFont
+	if F == nil {
+		return nil
+	}
+
+	var characterSpacing, wordSpacing, horizontalScaling, textRise float64
+	if w.isSet(StateTextCharacterSpacing) {
+		characterSpacing = w.TextCharacterSpacing
+	}
+	if w.isSet(StateTextWordSpacing) {
+		wordSpacing = w.TextWordSpacing
+	}
+	if w.isSet(StateTextHorizontalScaling) {
+		horizontalScaling = w.TextHorizontalScaling
+	} else {
+		horizontalScaling = 1
+	}
+	if w.isSet(StateTextRise) {
+		textRise = w.TextRise
+	}
+
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+	base := len(seq.Seq)
+
+	if characterSpacing == 0 {
+		F.Layout(seq, w.TextFontSize, text)
+	} else {
+		// disable ligatures
+		for _, r := range text {
+			F.Layout(seq, w.TextFontSize, string(r))
+		}
+	}
+
+	// Apply PDF layout parameters
+	for i := base; i < len(seq.Seq); i++ {
+		advance := seq.Seq[i].Advance
+		advance += characterSpacing
+		if string(seq.Seq[i].Text) == " " {
+			advance += wordSpacing
+		}
+		seq.Seq[i].Advance = advance * horizontalScaling
+		seq.Seq[i].Rise = textRise
+	}
+
+	return seq
 }

@@ -36,16 +36,12 @@ var (
 type SpaceDeviceGray struct{}
 
 // Embed implements the [Space] interface.
-func (s SpaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s SpaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceGray color space", pdf.V1_1); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
-	return s, nil
-}
-
-// PDFObject implements the [SpaceEmbedded] interface.
-func (s SpaceDeviceGray) PDFObject() pdf.Object {
-	return pdf.Name(FamilyDeviceGray)
+	return FamilyDeviceGray, zero, nil
 }
 
 // ColorSpaceFamily implements the [SpaceEmbedded] interface.
@@ -82,17 +78,12 @@ func (c colorDeviceGray) values() []float64 {
 type SpaceDeviceRGB struct{}
 
 // Embed implements the [Space] interface.
-func (s SpaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s SpaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceRGB color space", pdf.V1_1); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
-
-	return s, nil
-}
-
-// PDFObject implements the [SpaceEmbedded] interface.
-func (s SpaceDeviceRGB) PDFObject() pdf.Object {
-	return pdf.Name(FamilyDeviceRGB)
+	return FamilyDeviceRGB, zero, nil
 }
 
 // ColorSpaceFamily implements the [SpaceEmbedded] interface.
@@ -129,17 +120,13 @@ func (c colorDeviceRGB) values() []float64 {
 type SpaceDeviceCMYK struct{}
 
 // Embed implement the [pdf.Embedder] interface.
-func (s SpaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Resource, error) {
+func (s SpaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceCMYK color space", pdf.V1_1); err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
-	return s, nil
-}
-
-// PDFObject implements the [Space] interface.
-func (s SpaceDeviceCMYK) PDFObject() pdf.Object {
-	return pdf.Name("DeviceCMYK")
+	return FamilyDeviceCMYK, zero, nil
 }
 
 // ColorSpaceFamily implements the [Space] interface.

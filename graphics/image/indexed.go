@@ -55,22 +55,23 @@ func (im *Indexed) Subtype() pdf.Name {
 
 // Embed adds the image to the PDF file.
 // This implements the [Image] interface.
-func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
+func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
 	cs, ok := im.ColorSpace.(*color.SpaceIndexed)
 	if !ok {
-		return 0, fmt.Errorf("Indexed: invalid color space %q", im.ColorSpace.ColorSpaceFamily())
+		return nil, zero, fmt.Errorf("Indexed: invalid color space %q", im.ColorSpace.ColorSpaceFamily())
 	}
 
 	maxCol := uint8(cs.NumCol - 1)
 	for _, pix := range im.Pix {
 		if pix > maxCol {
-			return 0, fmt.Errorf("Indexed: invalid color index %d", pix)
+			return nil, zero, fmt.Errorf("Indexed: invalid color index %d", pix)
 		}
 	}
 
-	csEmbedded, err := pdf.ResourceManagerEmbed(rm, im.ColorSpace)
+	csRef, _, err := pdf.ResourceManagerEmbed(rm, im.ColorSpace)
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
 	imDict := pdf.Dict{
@@ -78,7 +79,7 @@ func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(im.Width),
 		"Height":           pdf.Integer(im.Height),
-		"ColorSpace":       csEmbedded.PDFObject(),
+		"ColorSpace":       csRef,
 		"BitsPerComponent": pdf.Integer(8),
 	}
 	filter := pdf.FilterCompress{
@@ -88,16 +89,16 @@ func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Reference, error) {
 	ref := rm.Out.Alloc()
 	stream, err := rm.Out.OpenStream(ref, imDict, filter)
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 	_, err = stream.Write(im.Pix)
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 	err = stream.Close()
 	if err != nil {
-		return 0, err
+		return nil, zero, err
 	}
 
-	return ref, nil
+	return ref, zero, nil
 }
