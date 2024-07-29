@@ -116,6 +116,8 @@ type Glyph struct {
 }
 
 // GlyphSeq represents a sequence of glyphs.
+//
+// TODO(voss): include the font and size in the struct?
 type GlyphSeq struct {
 	Skip float64
 	Seq  []Glyph
