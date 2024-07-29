@@ -172,70 +172,6 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	return xActual
 }
 
-type Layouter struct {
-	Font     font.Layouter
-	Geometry *font.Geometry
-	FontSize float64
-
-	CharacterSpacing  float64
-	WordSpacing       float64
-	HorizontalScaling float64
-	TextRise          float64
-}
-
-func (w *Writer) NewLayouter() *Layouter {
-	l := &Layouter{
-		HorizontalScaling: 1,
-	}
-
-	if w.CurrentFont != nil {
-		l.SetFont(w.CurrentFont, w.TextFontSize)
-	}
-	if w.isSet(StateTextCharacterSpacing) {
-		l.CharacterSpacing = w.TextCharacterSpacing
-	}
-	if w.isSet(StateTextWordSpacing) {
-		l.WordSpacing = w.TextWordSpacing
-	}
-	if w.isSet(StateTextHorizontalScaling) {
-		l.HorizontalScaling = w.TextHorizontalScaling
-	}
-	if w.isSet(StateTextRise) {
-		l.TextRise = w.TextRise
-	}
-
-	return l
-}
-
-func (l *Layouter) SetFont(F font.Layouter, size float64) {
-	l.Font = F
-	l.Geometry = F.GetGeometry()
-	l.FontSize = size
-}
-
-func (l *Layouter) Layout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
-	if l.CharacterSpacing == 0 {
-		l.Font.Layout(seq, l.FontSize, text)
-	} else { // disable ligatures
-		for _, r := range text {
-			l.Font.Layout(seq, l.FontSize, string(r))
-		}
-	}
-
-	// Apply PDF layout parameters
-	for i := len(seq.Seq) - len(text); i < len(seq.Seq); i++ {
-		advance := seq.Seq[i].Advance
-		advance += l.CharacterSpacing
-		if string(seq.Seq[i].Text) == " " {
-			advance += l.WordSpacing
-		}
-		seq.Seq[i].Advance = advance * l.HorizontalScaling
-		seq.Seq[i].Rise = l.TextRise
-	}
-
-	return seq
-}
-
 // TextLayout appends a string to a GlyphSeq, using the text parameters from
 // the writer's graphics state.  If seq is nil, a new GlyphSeq is allocated.  The
 // resulting GlyphSeq is returned.
@@ -249,46 +185,11 @@ func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 		return nil
 	}
 
-	var characterSpacing, wordSpacing, horizontalScaling, textRise float64
-	if w.isSet(StateTextCharacterSpacing) {
-		characterSpacing = w.TextCharacterSpacing
-	}
-	if w.isSet(StateTextWordSpacing) {
-		wordSpacing = w.TextWordSpacing
-	}
-	if w.isSet(StateTextHorizontalScaling) {
-		horizontalScaling = w.TextHorizontalScaling
-	} else {
-		horizontalScaling = 1
-	}
-	if w.isSet(StateTextRise) {
-		textRise = w.TextRise
-	}
+	T := font.NewTypesetter(w.CurrentFont, w.TextFontSize)
+	T.SetCharacterSpacing(w.TextCharacterSpacing)
+	T.SetWordSpacing(w.TextWordSpacing)
+	T.SetHorizontalScaling(w.TextHorizontalScaling)
+	T.SetTextRise(w.TextRise)
 
-	if seq == nil {
-		seq = &font.GlyphSeq{}
-	}
-	base := len(seq.Seq)
-
-	if characterSpacing == 0 {
-		F.Layout(seq, w.TextFontSize, text)
-	} else {
-		// disable ligatures
-		for _, r := range text {
-			F.Layout(seq, w.TextFontSize, string(r))
-		}
-	}
-
-	// Apply PDF layout parameters
-	for i := base; i < len(seq.Seq); i++ {
-		advance := seq.Seq[i].Advance
-		advance += characterSpacing
-		if string(seq.Seq[i].Text) == " " {
-			advance += wordSpacing
-		}
-		seq.Seq[i].Advance = advance * horizontalScaling
-		seq.Seq[i].Rise = textRise
-	}
-
-	return seq
+	return T.Layout(seq, text)
 }

@@ -39,7 +39,7 @@ func TestRoundTrip(t *testing.T) {
 		IsAllCap:     true,
 		IsSmallCap:   true,
 		ForceBold:    true,
-		FontBBox:     &pdf.Rectangle{10, 20, 30, 40},
+		FontBBox:     &pdf.Rectangle{LLx: 10, LLy: 20, URx: 30, URy: 40},
 		ItalicAngle:  50,
 		Ascent:       60,
 		Descent:      -70,
