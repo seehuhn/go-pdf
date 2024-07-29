@@ -23,75 +23,10 @@ import (
 	"runtime/pprof"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-
-type walker struct {
-	trans map[pdf.Reference]pdf.Reference
-	r     *pdf.Reader
-	w     *pdf.Writer
-}
-
-func (w *walker) Transfer(obj pdf.Object) (pdf.Object, error) {
-	switch x := obj.(type) {
-	case pdf.Dict:
-		res := pdf.Dict{}
-		for key, val := range x {
-			repl, err := w.Transfer(val)
-			if err != nil {
-				return nil, err
-			}
-			res[key] = repl
-		}
-		return res, nil
-	case pdf.Array:
-		var res pdf.Array
-		for _, val := range x {
-			repl, err := w.Transfer(val)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, repl)
-		}
-		return res, nil
-	case *pdf.Stream:
-		res := &pdf.Stream{
-			Dict: make(pdf.Dict),
-			R:    x.R,
-		}
-		for key, val := range x.Dict {
-			repl, err := w.Transfer(val)
-			if err != nil {
-				return nil, err
-			}
-			res.Dict[key] = repl
-		}
-		return res, nil
-	case pdf.Reference:
-		other, ok := w.trans[x]
-		if ok {
-			return other, nil
-		}
-		other = w.w.Alloc()
-		w.trans[x] = other
-
-		val, err := pdf.Resolve(w.r, x)
-		if err != nil {
-			return nil, err
-		}
-		trans, err := w.Transfer(val)
-		if err != nil {
-			return nil, err
-		}
-		err = w.w.Put(other, trans)
-		if err != nil {
-			return nil, err
-		}
-		return other, nil
-	}
-	return obj, nil
-}
 
 func main() {
 	flag.Parse()
@@ -125,29 +60,25 @@ func main() {
 		log.Fatal(err)
 	}
 
+	trans := pdfcopy.NewCopier(w, r)
+
 	catalog := r.GetMeta().Catalog
 
-	trans := &walker{
-		trans: map[pdf.Reference]pdf.Reference{},
-		r:     r,
-		w:     w,
-	}
 	catDict := pdf.AsDict(catalog)
-	newCatDict := pdf.Dict{}
-	for key, val := range catDict {
-		obj, err := trans.Transfer(val)
-		if err != nil {
-			log.Fatal(err)
-		}
-		newCatDict[key] = obj
+	if err != nil {
+		log.Fatal(err)
+	}
+	newCatDict, err := trans.CopyDict(catDict)
+	if err != nil {
+		log.Fatal(err)
 	}
 	err = pdf.DecodeDict(r, catalog, newCatDict)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	trans.w.GetMeta().Info = r.GetMeta().Info
-	trans.w.GetMeta().Catalog = catalog
+	w.GetMeta().Info = r.GetMeta().Info
+	w.GetMeta().Catalog = catalog
 
 	err = w.Close()
 	if err != nil {

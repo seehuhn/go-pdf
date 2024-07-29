@@ -86,12 +86,12 @@ type Reader struct {
 func Open(fname string, opt *ReaderOptions) (*Reader, error) {
 	fd, err := os.Open(fname)
 	if err != nil {
-		return nil, err
+		return nil, Wrap(err, fname)
 	}
 	r, err := NewReader(fd, opt)
 	if err != nil {
 		fd.Close()
-		return nil, err
+		return nil, Wrap(err, fname)
 	}
 	r.closeR = true
 	return r, nil

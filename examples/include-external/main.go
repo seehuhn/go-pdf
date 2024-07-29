@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/pagetree"
+	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 func main() {
@@ -105,7 +106,7 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 		return nil, nil, err
 	}
 
-	copier := NewCopier(rm.Out, r)
+	copier := pdfcopy.NewCopier(rm.Out, r)
 
 	origResources, err := pdf.GetDict(r, dict["Resources"])
 	if err != nil {
@@ -163,79 +164,4 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 	}
 
 	return obj, bbox, nil
-}
-
-type copier struct {
-	trans map[pdf.Reference]pdf.Reference
-	w     pdf.Putter
-	r     pdf.Getter
-}
-
-func NewCopier(w pdf.Putter, r pdf.Getter) *copier {
-	res := &copier{
-		trans: make(map[pdf.Reference]pdf.Reference),
-		w:     w,
-		r:     r,
-	}
-	return res
-}
-
-func (w *copier) Copy(obj pdf.Object) (pdf.Object, error) {
-	switch x := obj.(type) {
-	case pdf.Dict:
-		res := pdf.Dict{}
-		for key, val := range x {
-			repl, err := w.Copy(val)
-			if err != nil {
-				return nil, err
-			}
-			res[key] = repl
-		}
-		return res, nil
-	case pdf.Array:
-		var res pdf.Array
-		for _, val := range x {
-			repl, err := w.Copy(val)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, repl)
-		}
-		return res, nil
-	case *pdf.Stream:
-		res := &pdf.Stream{
-			Dict: make(pdf.Dict),
-			R:    x.R,
-		}
-		for key, val := range x.Dict {
-			repl, err := w.Copy(val)
-			if err != nil {
-				return nil, err
-			}
-			res.Dict[key] = repl
-		}
-		return res, nil
-	case pdf.Reference:
-		other, ok := w.trans[x]
-		if ok {
-			return other, nil
-		}
-		other = w.w.Alloc()
-		w.trans[x] = other
-
-		val, err := pdf.Resolve(w.r, x)
-		if err != nil {
-			return nil, err
-		}
-		trans, err := w.Copy(val)
-		if err != nil {
-			return nil, err
-		}
-		err = w.w.Put(other, trans)
-		if err != nil {
-			return nil, err
-		}
-		return other, nil
-	}
-	return obj, nil
 }
