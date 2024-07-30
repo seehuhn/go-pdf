@@ -21,7 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/font/gofont"
 )
 
 func main() {
@@ -32,12 +32,12 @@ func main() {
 }
 
 func run() error {
-	doc, err := document.CreateSinglePage("hello.pdf", document.A4r, pdf.V1_7, nil)
+	doc, err := document.CreateSinglePage("hello.pdf", document.A4r, pdf.V2_0, nil)
 	if err != nil {
 		return err
 	}
 
-	font, err := standard.Helvetica.New(nil)
+	font, err := gofont.Regular.New(nil)
 	if err != nil {
 		return err
 	}
@@ -46,6 +46,8 @@ func run() error {
 	doc.TextBegin()
 	doc.TextFirstLine(50, 420)
 	doc.TextShow("Hello, World!")
+	doc.TextSecondLine(0, -60)
+	doc.TextShow(string(gofont.Gopher))
 	doc.TextEnd()
 
 	return doc.Close()
