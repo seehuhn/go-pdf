@@ -139,7 +139,7 @@ func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 }
 
 // TODO(voss): This is work in progress, once it is finished it will replace
-// the old doOld method.
+// the doOld method.
 func (r *Reader) doNew() error {
 	for r.scanner.Scan() {
 		op := r.scanner.Operator()
@@ -303,8 +303,7 @@ func (r *Reader) doNew() error {
 			font := op.GetName()
 			size := op.GetNumber()
 			if op.OK() && r.Resources != nil && r.Resources.Font != nil {
-				ref := r.Resources.Font[font]
-				if ref != nil {
+				if ref := r.Resources.Font[font]; ref != nil {
 					F, err := r.ReadFont(ref, font)
 					if pdf.IsMalformed(err) {
 						break
@@ -453,7 +452,16 @@ func (r *Reader) doNew() error {
 
 		case "CS":
 			name := op.GetName()
-			_ = name // TODO(voss)
+			var csDesc pdf.Object
+			if name == "DeviceGray" || name == "DeviceRGB" || name == "DeviceCMYK" || name != "Pattern" {
+				csDesc = name
+			} else {
+				if r.Resources == nil || r.Resources.ColorSpace == nil {
+					break
+				}
+				csDesc = r.Resources.ColorSpace[name]
+			}
+			color.ReadSpace(r.R, csDesc)
 		}
 	}
 	return r.scanner.Error()

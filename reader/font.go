@@ -43,6 +43,8 @@ import (
 type FontFromFile interface {
 	font.Embedded
 
+	// TODO(voss): change font.Embedded until it provides the necessary methods.
+	// Then remove this method here.
 	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool))
 
 	FontData() interface{}

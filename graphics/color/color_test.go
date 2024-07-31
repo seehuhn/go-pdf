@@ -16,29 +16,6 @@
 
 package color
 
-import "seehuhn.de/go/pdf"
-
-// color.Space implements pdf.Embedder
-var (
-	_ pdf.Embedder[pdf.Unused] = Space(nil)
-)
-
-// The following types implement the ColorSpace interface:
-var (
-	_ Space = SpaceDeviceGray{}
-	_ Space = SpaceDeviceRGB{}
-	_ Space = SpaceDeviceCMYK{}
-	_ Space = (*SpaceCalGray)(nil)
-	_ Space = (*SpaceCalRGB)(nil)
-	_ Space = (*SpaceLab)(nil)
-	_ Space = (*SpaceICCBased)(nil)
-	_ Space = spacePatternColored{}
-	_ Space = spacePatternUncolored{}
-	_ Space = (*SpaceIndexed)(nil)
-	// TODO(voss): Separation colour spaces
-	// TODO(voss): DeviceN colour spaces
-)
-
 // The following types implement the Color interface.
 var (
 	_ Color = colorDeviceGray(0)

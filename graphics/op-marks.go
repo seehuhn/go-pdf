@@ -41,7 +41,6 @@ func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused,
 	var zero pdf.Unused
 
 	if mc.SingleUse {
-		// TODO(voss): should this be embedded?
 		return mc.Properties, zero, nil
 	}
 
@@ -115,7 +114,6 @@ func (w *Writer) MarkedContentStart(mc *MarkedContent) {
 
 func (w *Writer) writeProperties(mc *MarkedContent, op string) {
 	var prop pdf.Object
-
 	if mc.Inline {
 		if !pdf.IsDirect(mc.Properties) {
 			w.Err = ErrNotDirect
@@ -123,12 +121,12 @@ func (w *Writer) writeProperties(mc *MarkedContent, op string) {
 		}
 		prop = mc.Properties
 	} else {
-		propList, _, err := pdf.ResourceManagerEmbed(w.RM, mc)
+		name, _, err := writerGetResourceName(w, catProperties, mc)
 		if err != nil {
 			w.Err = err
 			return
 		}
-		prop = propList
+		prop = name
 	}
 
 	_, err := w.Content.Write([]byte(" "))

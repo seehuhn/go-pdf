@@ -229,13 +229,12 @@ func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Object, State, error) {
 	res.Set = set & ExtGStateBits
 
 	if s.SingleUse {
-		ref := rm.Out.Alloc()
-		err := rm.Out.Put(ref, dict)
-		if err != nil {
-			return nil, res, err
-		}
-		return ref, res, nil
+		return dict, res, nil
 	}
-
-	return dict, res, nil
+	ref := rm.Out.Alloc()
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return nil, res, err
+	}
+	return ref, res, nil
 }

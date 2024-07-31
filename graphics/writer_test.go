@@ -52,13 +52,13 @@ func TestGetResourceName1(t *testing.T) {
 	var allNames []pdf.Name
 	for _, cat := range allCats {
 		// test name generation
-		name1, _, err := writerGetResourceName(w, r, cat)
+		name1, _, err := writerGetResourceName(w, cat, r)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 
 		// test caching
-		name2, _, err := writerGetResourceName(w, r, cat)
+		name2, _, err := writerGetResourceName(w, cat, r)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if name1 != name2 {

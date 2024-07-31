@@ -176,6 +176,7 @@ func printObject(args ...string) error {
 			if err != nil {
 				return err
 			}
+			// TODO(voss): sanitise line endings
 			_, err = io.Copy(os.Stdout, stmData)
 			if err != nil {
 				return err

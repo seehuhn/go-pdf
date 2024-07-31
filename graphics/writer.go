@@ -136,10 +136,8 @@ func (w *Writer) coord(x float64) string {
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [Writer].
-//
-// TODO(voss): swap the resource and category arguments?
-func writerGetResourceName[T any](w *Writer, resource pdf.Embedder[T], category resourceCategory) (pdf.Name, T, error) {
-	key := catRes{category, resource}
+func writerGetResourceName[T any](w *Writer, cat resourceCategory, resource pdf.Embedder[T]) (pdf.Name, T, error) {
+	key := catRes{cat, resource}
 	v, ok := w.resName[key]
 	if ok {
 		return v.name, v.obj.(T), nil
@@ -151,8 +149,8 @@ func writerGetResourceName[T any](w *Writer, resource pdf.Embedder[T], category 
 		return "", zero, err
 	}
 
-	dict := w.getCategoryDict(category)
-	name := w.generateName(category, dict)
+	dict := w.getCategoryDict(cat)
+	name := w.generateName(cat, dict)
 	(*dict)[name] = obj
 
 	w.resName[key] = objName{embedded, name}

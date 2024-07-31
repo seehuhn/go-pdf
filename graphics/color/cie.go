@@ -19,6 +19,7 @@ package color
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/pdf"
 )
@@ -46,7 +47,7 @@ type SpaceCalGray struct {
 // DefName is the default resource name to use within content streams.
 // This can be left empty to allocate names automatically.
 func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, error) {
-	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
+	if !isPosVec3(whitePoint) || math.Abs(whitePoint[1]-1) > 1e-6 {
 		return nil, errors.New("CalGray: invalid white point")
 	}
 	if blackPoint == nil {
@@ -97,6 +98,58 @@ func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, e
 	}
 
 	return pdf.Array{pdf.Name("CalGray"), dict}, zero, nil
+}
+
+func readSpaceCalGray(r pdf.Getter, a pdf.Array) (*SpaceCalGray, error) {
+	if len(a) != 2 {
+		return nil, errors.New("invalid CalGray color space")
+	}
+	param, err := pdf.GetDict(r, a[1])
+	if err != nil {
+		return nil, err
+	}
+
+	res := &SpaceCalGray{}
+
+	res.whitePoint, err = getNumbers(r, param["WhitePoint"], 3)
+	if err != nil {
+		return nil, pdf.Wrap(err, "WhitePoint")
+	}
+	if res.whitePoint[0] <= 0 || math.Abs(res.whitePoint[1]-1) > 1e-6 || res.whitePoint[2] <= 0 {
+		return nil, errors.New("invalid WhitePoint")
+	}
+
+	res.blackPoint, _ = getNumbers(r, param["BlackPoint"], 3)
+	if len(res.blackPoint) != 3 {
+		res.blackPoint = []float64{0, 0, 0}
+	}
+
+	gamma, _ := pdf.GetNumber(r, param["Gamma"])
+	if err != nil || gamma <= 0 {
+		gamma = 1
+	}
+	res.gamma = float64(gamma)
+
+	return res, nil
+}
+
+func getNumbers(r pdf.Getter, obj pdf.Object, n int) ([]float64, error) {
+	a, err := pdf.GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+	if len(a) != n {
+		return nil, errors.New("invalid array length")
+	}
+	res := make([]float64, n)
+	for i, v := range a {
+		x, err := pdf.GetNumber(r, v)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = float64(x)
+	}
+	return res, nil
 }
 
 type colorCalGray struct {

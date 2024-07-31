@@ -150,7 +150,7 @@ func (w *Writer) TextSetFont(F font.Font, size float64) {
 		return
 	}
 
-	name, embedded, err := writerGetResourceName(w, F, catFont)
+	name, embedded, err := writerGetResourceName(w, catFont, F)
 	if err != nil {
 		w.Err = err
 		return

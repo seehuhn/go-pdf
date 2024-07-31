@@ -40,7 +40,7 @@ func (p *Writer) DrawXObject(obj XObject) {
 		return
 	}
 
-	name, _, err := writerGetResourceName(p, obj, catXObject)
+	name, _, err := writerGetResourceName(p, catXObject, obj)
 	if err != nil {
 		p.Err = err
 		return

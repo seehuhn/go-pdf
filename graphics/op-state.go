@@ -261,7 +261,7 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 		return
 	}
 
-	name, newState, err := writerGetResourceName(w, s, catExtGState)
+	name, newState, err := writerGetResourceName(w, catExtGState, s)
 	if err != nil {
 		w.Err = err
 		return

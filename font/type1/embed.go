@@ -38,7 +38,7 @@ type FontDict struct {
 	// Metrics (optional) are the font metrics for the font.
 	// At least one of `Font` and `Metrics` must be non-nil.
 	//
-	// TODO(voss): remove this field, and and widths etc as separate fields
+	// TODO(voss): remove this field, and add widths etc as separate fields
 	Metrics *afm.Metrics
 
 	// SubsetTag should be a unique tag for the font subset,

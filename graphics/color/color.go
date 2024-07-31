@@ -23,33 +23,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Color space families supported by PDF.
-const (
-	FamilyDeviceGray pdf.Name = "DeviceGray"
-	FamilyDeviceRGB  pdf.Name = "DeviceRGB"
-	FamilyDeviceCMYK pdf.Name = "DeviceCMYK"
-	FamilyCalGray    pdf.Name = "CalGray"
-	FamilyCalRGB     pdf.Name = "CalRGB"
-	FamilyLab        pdf.Name = "Lab"
-	FamilyICCBased   pdf.Name = "ICCBased"
-	FamilyPattern    pdf.Name = "Pattern"
-	FamilyIndexed    pdf.Name = "Indexed"
-	FamilySeparation pdf.Name = "Separation"
-	FamilyDeviceN    pdf.Name = "DeviceN"
-)
-
-// Space represents a PDF color space which can be embedded in a PDF file.
-type Space interface {
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
-	ColorSpaceFamily() pdf.Name
-	defaultValues() []float64
-}
-
-// NumValues returns the number of color values for the given color space.
-func NumValues(s Space) int {
-	return len(s.defaultValues())
-}
-
 // Color represents a PDF color.
 type Color interface {
 	ColorSpace() Space
