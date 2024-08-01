@@ -38,6 +38,12 @@ func (s spacePatternColored) ColorSpaceFamily() pdf.Name {
 	return FamilyPattern
 }
 
+// Default returns a pattern which causes nothing to be drawn.
+// This implements the [Space] interface.
+func (s spacePatternColored) Default() Color {
+	return colorColoredPattern{Pat: nil}
+}
+
 // defaultValues implements the [Space] interface.
 func (s spacePatternColored) defaultValues() []float64 {
 	return nil
@@ -75,11 +81,6 @@ func (s spacePatternUncolored) ColorSpaceFamily() pdf.Name {
 	return FamilyPattern
 }
 
-// defaultValues implements the [Space] interface.
-func (s spacePatternUncolored) defaultValues() []float64 {
-	return s.base.defaultValues()
-}
-
 func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -92,6 +93,16 @@ func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.U
 	}
 
 	return pdf.Array{pdf.Name("Pattern"), base}, zero, nil
+}
+
+// Default returns a pattern which causes nothing to be drawn.
+func (s spacePatternUncolored) Default() Color {
+	return &colorUncoloredPattern{Pat: nil, Col: s.base.Default()}
+}
+
+// defaultValues implements the [Space] interface.
+func (s spacePatternUncolored) defaultValues() []float64 {
+	return s.base.defaultValues()
 }
 
 // NewUncoloredPattern returns a new uncolored pattern as a PDF color.

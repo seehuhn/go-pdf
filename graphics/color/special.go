@@ -86,6 +86,11 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	}, nil
 }
 
+// ColorSpaceFamily implements the [Space] interface.
+func (s *SpaceIndexed) ColorSpaceFamily() pdf.Name {
+	return "Indexed"
+}
+
 // New returns a new indexed color.
 func (s *SpaceIndexed) New(idx int) Color {
 	if idx < 0 || idx >= s.NumCol {
@@ -94,9 +99,10 @@ func (s *SpaceIndexed) New(idx int) Color {
 	return colorIndexed{Space: s, Index: idx}
 }
 
-// ColorSpaceFamily implements the [Space] interface.
-func (s *SpaceIndexed) ColorSpaceFamily() pdf.Name {
-	return "Indexed"
+// Default returns color 0 in the indexed color space.
+// This implements the [Space] interface.
+func (s *SpaceIndexed) Default() Color {
+	return colorIndexed{Space: s, Index: 0}
 }
 
 func (s *SpaceIndexed) defaultValues() []float64 {

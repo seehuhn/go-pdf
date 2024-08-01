@@ -1,6 +1,8 @@
 module seehuhn.de/go/pdf
 
-go 1.22.2
+go 1.22.4
+
+toolchain go1.22.5
 
 require (
 	github.com/google/go-cmp v0.6.0
@@ -10,6 +12,7 @@ require (
 	golang.org/x/term v0.16.0
 	golang.org/x/text v0.16.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
+	seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a
 	seehuhn.de/go/postscript v0.5.0
 	seehuhn.de/go/sfnt v0.5.0
 	seehuhn.de/go/xmp v0.3.0

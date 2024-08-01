@@ -31,13 +31,14 @@ var (
 
 // The following types implement the ColorSpace interface:
 var (
-	_ Space = SpaceDeviceGray{}
-	_ Space = SpaceDeviceRGB{}
-	_ Space = SpaceDeviceCMYK{}
+	_ Space = DeviceGray
+	_ Space = DeviceRGB
+	_ Space = DeviceCMYK
 	_ Space = (*SpaceCalGray)(nil)
 	_ Space = (*SpaceCalRGB)(nil)
 	_ Space = (*SpaceLab)(nil)
 	_ Space = (*SpaceICCBased)(nil)
+	_ Space = SRGB
 	_ Space = spacePatternColored{}
 	_ Space = spacePatternUncolored{}
 	_ Space = (*SpaceIndexed)(nil)
@@ -49,9 +50,6 @@ var testSpaces = []Space{
 	DeviceGray,
 	DeviceRGB,
 	DeviceCMYK,
-	spacePatternColored{},
-	spacePatternUncolored{base: DeviceGray},
-	spacePatternUncolored{base: must(CalGray(WhitePointD65, nil, 1.2))},
 	must(CalGray(WhitePointD65, nil, 1)),
 	must(CalGray(WhitePointD65, []float64{0.1, 0.1, 0.1}, 1.2)),
 	must(CalRGB(WhitePointD50, nil, nil, nil)),
@@ -59,6 +57,14 @@ var testSpaces = []Space{
 		[]float64{0.9, 0.1, 0, 0, 1, 0, 0, 0, 1})),
 	must(Lab(WhitePointD65, nil, nil)),
 	must(Lab(WhitePointD65, []float64{0.1, 0, 0}, []float64{-90, 90, -110, 110})),
+	must(ICCBased(sRGBv2, nil)),
+	must(ICCBased(sRGBv4, nil)),
+	spacePatternColored{},
+	spacePatternUncolored{base: DeviceGray},
+	spacePatternUncolored{base: must(CalGray(WhitePointD65, nil, 1.2))},
+	// TODO(voss): Indexed
+	// TODO(voss): Separation colour spaces
+	// TODO(voss): DeviceN colour spaces
 }
 
 func must(space Space, err error) Space {

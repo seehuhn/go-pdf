@@ -66,14 +66,21 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, er
 	}, nil
 }
 
+// ColorSpaceFamily implements the [SpaceEmbedded] interface.
+func (s *SpaceCalGray) ColorSpaceFamily() pdf.Name {
+	return FamilyCalGray
+}
+
 // New returns a new CalGray color.
+// The parameter gray must be in the range from 0 (black) to 1 (white).
 func (s *SpaceCalGray) New(gray float64) Color {
 	return colorCalGray{Space: s, Value: gray}
 }
 
-// ColorSpaceFamily implements the [SpaceEmbedded] interface.
-func (s *SpaceCalGray) ColorSpaceFamily() pdf.Name {
-	return FamilyCalGray
+// Default returns the black in the CalGray color space.
+// This implements the [Space] interface.
+func (s *SpaceCalGray) Default() Color {
+	return colorCalGray{Space: s, Value: 0}
 }
 
 // defaultValues implements the [Space] interface.
@@ -208,15 +215,6 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64) (*SpaceCalRGB, erro
 	}, nil
 }
 
-// New returns a new CalRGB color.
-func (s *SpaceCalRGB) New(r, g, b float64) Color {
-	if r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1 {
-		// TODO(voss): clamp the values instead?
-		return nil
-	}
-	return colorCalRGB{Space: s, R: r, G: g, B: b}
-}
-
 // Embed implements the [Space] interface.
 func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
@@ -237,6 +235,18 @@ func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, er
 	}
 
 	return pdf.Array{pdf.Name("CalRGB"), dict}, zero, nil
+}
+
+// New returns a new CalRGB color.
+// The parameters r, g, and b must be in the range [0, 1].
+func (s *SpaceCalRGB) New(r, g, b float64) Color {
+	return colorCalRGB{Space: s, R: r, G: g, B: b}
+}
+
+// Default returns the black in the CalRGB color space.
+// This implements the [Space] interface.
+func (s *SpaceCalRGB) Default() Color {
+	return colorCalRGB{Space: s, R: 0, G: 0, B: 0}
 }
 
 // defaultValues implements the [Space] interface.
@@ -307,23 +317,6 @@ func Lab(whitePoint, blackPoint, ranges []float64) (*SpaceLab, error) {
 	}, nil
 }
 
-// New returns a new Lab color.
-func (s *SpaceLab) New(l, a, b float64) (Color, error) {
-	if l < 0 || l > 100 {
-		return nil, fmt.Errorf("Lab: invalid L* value %g∉[0,100]", l)
-	}
-	if a < s.ranges[0] || a > s.ranges[1] {
-		return nil, fmt.Errorf("Lab: invalid a* value %g∉[%g,%g]",
-			a, s.ranges[0], s.ranges[1])
-	}
-	if b < s.ranges[2] || b > s.ranges[3] {
-		return nil, fmt.Errorf("Lab: invalid b* value %g∉[%g,%g]",
-			b, s.ranges[2], s.ranges[3])
-	}
-
-	return colorLab{Space: s, L: l, A: a, B: b}, nil
-}
-
 // ColorSpaceFamily implements the [Space] interface.
 func (s *SpaceLab) ColorSpaceFamily() pdf.Name {
 	return "Lab"
@@ -346,6 +339,45 @@ func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error
 	}
 
 	return pdf.Array{FamilyLab, dict}, zero, nil
+}
+
+// New returns a new Lab color.
+// The parameter l must be in the range [0, 100].
+// The parameters a and b must be in the range [aMin, aMax] and [bMin, bMax],
+func (s *SpaceLab) New(l, a, b float64) (Color, error) {
+	if l < 0 || l > 100 {
+		return nil, fmt.Errorf("Lab: invalid L* value %g∉[0,100]", l)
+	}
+	if a < s.ranges[0] || a > s.ranges[1] {
+		return nil, fmt.Errorf("Lab: invalid a* value %g∉[%g,%g]",
+			a, s.ranges[0], s.ranges[1])
+	}
+	if b < s.ranges[2] || b > s.ranges[3] {
+		return nil, fmt.Errorf("Lab: invalid b* value %g∉[%g,%g]",
+			b, s.ranges[2], s.ranges[3])
+	}
+
+	return colorLab{Space: s, L: l, A: a, B: b}, nil
+}
+
+// Default returns the black (or the closest representable color) in an Lab
+// color space.
+// This implements the [Space] interface.
+func (s *SpaceLab) Default() Color {
+	a := 0.0
+	if a < s.ranges[0] {
+		a = s.ranges[0]
+	} else if a > s.ranges[1] {
+		a = s.ranges[1]
+	}
+	b := 0.0
+	if b < s.ranges[2] {
+		b = s.ranges[2]
+	} else if b > s.ranges[3] {
+		b = s.ranges[3]
+	}
+
+	return colorLab{Space: s, L: 0, A: a, B: b}
 }
 
 // defaultValues implements the [Space] interface.

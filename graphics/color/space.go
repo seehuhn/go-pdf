@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/metadata"
 )
 
 // Color space families supported by PDF.
@@ -42,10 +43,12 @@ const (
 type Space interface {
 	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	ColorSpaceFamily() pdf.Name
+	Default() Color
+
 	defaultValues() []float64
 }
 
-// NumValues returns the number of color values for the given color space.
+// NumValues returns the number of color component values for the given color space.
 func NumValues(s Space) int {
 	return len(s.defaultValues())
 }
@@ -109,6 +112,19 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		res, err = Lab(whitePoint, blackPoint, Range)
 		if err != nil {
 			d.SetError(&pdf.MalformedFileError{Err: err})
+		}
+
+	case FamilyICCBased:
+		var meta *metadata.Stream
+		if ref, ok := d.dict["Metadata"]; ok {
+			meta, err = metadata.ExtractStream(r, ref)
+			if err != nil {
+				d.SetError(err)
+			}
+		}
+		res, err = ICCBased(d.data, meta)
+		if err != nil {
+			d.SetError(err)
 		}
 
 	case "CalCMYK": // deprecated

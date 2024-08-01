@@ -450,10 +450,10 @@ func (r *Reader) doNew() error {
 
 		// Table 73 — Colour operators
 
-		case "CS":
+		case "CS", "cs":
 			name := op.GetName()
 			var csDesc pdf.Object
-			if name == "DeviceGray" || name == "DeviceRGB" || name == "DeviceCMYK" || name != "Pattern" {
+			if name == "DeviceGray" || name == "DeviceRGB" || name == "DeviceCMYK" || name == "Pattern" {
 				csDesc = name
 			} else {
 				if r.Resources == nil || r.Resources.ColorSpace == nil {
@@ -461,7 +461,20 @@ func (r *Reader) doNew() error {
 				}
 				csDesc = r.Resources.ColorSpace[name]
 			}
-			color.ReadSpace(r.R, csDesc)
+			cs, err := color.ReadSpace(r.R, csDesc)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return err
+			}
+
+			if op.Name == "CS" {
+				r.StrokeColor = cs.Default()
+				r.Set |= graphics.StateStrokeColor
+			} else {
+				r.FillColor = cs.Default()
+				r.Set |= graphics.StateFillColor
+			}
 		}
 	}
 	return r.scanner.Error()

@@ -29,6 +29,24 @@ type Stream struct {
 	Data *xmp.Packet
 }
 
+func ExtractStream(r pdf.Getter, ref pdf.Object) (*Stream, error) {
+	stm, err := pdf.GetStream(r, ref)
+	if err != nil {
+		return nil, err
+	}
+	body, err := pdf.DecodeStream(r, stm, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	packet, err := xmp.Read(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Stream{Data: packet}, nil
+}
+
 // Embed adds the XMP metadata stream to the PDF file.
 // This implements the pdf.Embedder interface.
 func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {

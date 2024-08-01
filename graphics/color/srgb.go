@@ -27,13 +27,8 @@ var SRGB = SRGBSpace{}
 
 // SRGBSpace represents the sRGB color space.
 // This is a special case of the ICCBased color space.
+// Use [SRGB] to access this color space.
 type SRGBSpace struct{}
-
-// New returns a color in the sRGB color space.
-// The values r, g, and b should be in the range [0, 1].
-func (s SRGBSpace) New(r, g, b float64) Color {
-	return colorSRGB{r, g, b}
-}
 
 // Embed adds the sRGB color space to a PDF file.
 // This implements the [Space] interface.
@@ -78,6 +73,18 @@ func (s SRGBSpace) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error
 // This implements the [Space] interface.
 func (s SRGBSpace) ColorSpaceFamily() pdf.Name {
 	return "ICCBased"
+}
+
+// New returns a color in the sRGB color space.
+// The values r, g, and b should be in the range [0, 1].
+func (s SRGBSpace) New(r, g, b float64) Color {
+	return colorSRGB{r, g, b}
+}
+
+// Default returns black in the sRGB color space.
+// This implements the [Space] interface.
+func (s SRGBSpace) Default() Color {
+	return colorSRGB{0, 0, 0}
 }
 
 func (s SRGBSpace) defaultValues() []float64 {

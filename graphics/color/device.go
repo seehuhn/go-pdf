@@ -55,8 +55,15 @@ func (s SpaceDeviceGray) defaultValues() []float64 {
 }
 
 // New returns a color in the DeviceGray color space.
+// The parameter gray must be in the range from 0 (black) to 1 (white).
 func (s SpaceDeviceGray) New(gray float64) Color {
 	return colorDeviceGray(gray)
+}
+
+// Default returns the black in the DeviceGray color space.
+// This implements the [Space] interface.
+func (s SpaceDeviceGray) Default() Color {
+	return colorDeviceGray(0)
 }
 
 type colorDeviceGray float64
@@ -97,8 +104,15 @@ func (s SpaceDeviceRGB) defaultValues() []float64 {
 }
 
 // New returns a color in the DeviceRGB color space.
+// The parameters r, g, and b must be in the range from 0 to 1.
 func (s SpaceDeviceRGB) New(r, g, b float64) Color {
 	return colorDeviceRGB{r, g, b}
+}
+
+// Default returns the black in the DeviceRGB color space.
+// This implements the [Space] interface.
+func (s SpaceDeviceRGB) Default() Color {
+	return colorDeviceRGB{0, 0, 0}
 }
 
 type colorDeviceRGB [3]float64
@@ -140,8 +154,16 @@ func (s SpaceDeviceCMYK) defaultValues() []float64 {
 }
 
 // New returns a color in the DeviceCMYK color space.
+// The parameters c, m, y, and k must be in the range from 0 to 1
+// and control the amount of cyan, magenta, yellow, and black in the color.
 func (s SpaceDeviceCMYK) New(c, m, y, k float64) Color {
 	return colorDeviceCMYK{c, m, y, k}
+}
+
+// Default returns the black in the DeviceCMYK color space.
+// This implements the [Space] interface.
+func (s SpaceDeviceCMYK) Default() Color {
+	return colorDeviceCMYK{0, 0, 0, 1}
 }
 
 type colorDeviceCMYK [4]float64
