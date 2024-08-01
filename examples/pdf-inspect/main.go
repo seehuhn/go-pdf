@@ -318,7 +318,7 @@ func (e *explainer) rel(key string) error {
 			if err != nil {
 				return err
 			}
-			obj, err = pagetree.GetPage(e.r, int(pageNo))
+			obj, err = pagetree.GetPage(e.r, int(pageNo)-1)
 			if err != nil {
 				return err
 			}
