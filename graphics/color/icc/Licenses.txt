@@ -1,37 +1,6 @@
-The sRGB ICC profiles were downloaded from
-https://www.color.org/srgbprofiles.xalter
+The files sRGB-v2-micro.icc and sRGB-v4.icc were downloaded from
+https://github.com/saucecontrol/Compact-ICC-Profiles .
 
-
-sRGB_v4_ICC_preference.icc
---------------------------
-
-To anyone who acknowledges that the file "sRGB_v4_ICC_preference.icc" is
-provided "AS IS" WITH NO EXPRESS OR IMPLIED WARRANTY, permission to use, copy
-and distribute this file for any purpose is hereby granted without fee,
-provided that the file is not changed including the ICC copyright notice tag,
-and that the name of ICC shall not be used in advertising or publicity
-pertaining to distribution of the software without specific, written prior
-permission. ICC makes no representations about the suitability of this software
-for any purpose.
-
-
-sRGB2014.icc
-------------
-
-https://www.color.org/profiles2.xalter#license
-
-Licensing
-
-The copyright owner and terms of use of an ICC profile are normally identified
-in the Creator field in the profile header and in the Copyright tag. Where ICC
-is the copyright owner, the following license terms apply:
-
-"This profile is made available by the International Color Consortium, and may
-be copied, distributed, embedded, made, used, and sold without restriction.
-Altered versions of this profile shall have the original identification and
-copyright information removed and shall not be misrepresented as the original
-profile."
-
-ICC recommends that other profile creators and copyright owners adopt a similar
-wording for profiles that are intended to be freely distributed. See the
-Profile Registration page for more details.
+The author put these files in the public domain, using the Creative Commons
+CC0 1.0 Universal (CC0 1.0) Public Domain Dedication:
+http://creativecommons.org/publicdomain/zero/1.0/

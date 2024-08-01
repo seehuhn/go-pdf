@@ -24,7 +24,7 @@ var (
 	_ Color = colorCalGray{}
 	_ Color = colorCalRGB{}
 	_ Color = colorLab{}
-	// TODO(voss): ICCBased
+	_ Color = colorICCBased{}
 	_ Color = colorColoredPattern{}
 	_ Color = (*colorUncoloredPattern)(nil)
 	_ Color = colorIndexed{}

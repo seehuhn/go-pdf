@@ -18,9 +18,9 @@ package color
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 )
 
@@ -45,46 +45,46 @@ var (
 	// TODO(voss): DeviceN colour spaces
 )
 
-func TestSpaceRoundTrip(t *testing.T) {
-	testCases := []Space{
-		SpaceDeviceGray{},
-		SpaceDeviceRGB{},
-		spacePatternColored{},
-	}
-	s, err := CalGray(WhitePointD65, nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testCases = append(testCases, s)
-	s, err = CalGray(WhitePointD65, []float64{0.1, 0.2, 0.05}, 1.2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testCases = append(testCases, s)
+var testSpaces = []Space{
+	DeviceGray,
+	DeviceRGB,
+	DeviceCMYK,
+	spacePatternColored{},
+	spacePatternUncolored{base: DeviceGray},
+	spacePatternUncolored{base: must(CalGray(WhitePointD65, nil, 1.2))},
+	must(CalGray(WhitePointD65, nil, 1)),
+	must(CalGray(WhitePointD65, []float64{0.1, 0.1, 0.1}, 1.2)),
+	must(CalRGB(WhitePointD50, nil, nil, nil)),
+	must(CalRGB(WhitePointD50, []float64{0.1, 0.1, 0.1}, []float64{1.2, 1.1, 1.0},
+		[]float64{0.9, 0.1, 0, 0, 1, 0, 0, 0, 1})),
+	must(Lab(WhitePointD65, nil, nil)),
+	must(Lab(WhitePointD65, []float64{0.1, 0, 0}, []float64{-90, 90, -110, 110})),
+}
 
-	for i, space := range testCases {
-		t.Run(fmt.Sprintf("%02d-%s", i+1, space.ColorSpaceFamily()), func(t *testing.T) {
-			data := pdf.NewData(pdf.V2_0)
-			rm := pdf.NewResourceManager(data)
-			obj, _, err := space.Embed(rm)
+func must(space Space, err error) Space {
+	if err != nil {
+		panic(err)
+	}
+	return space
+}
+
+func TestDecodeSpace(t *testing.T) {
+	for i, space := range testSpaces {
+		t.Run(fmt.Sprintf("%02d-%s", i, space.ColorSpaceFamily()), func(t *testing.T) {
+			r := pdf.NewData(pdf.V2_0)
+			rm := pdf.NewResourceManager(r)
+
+			obj, _, err := pdf.ResourceManagerEmbed(rm, space)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			space2, err := ReadSpace(data, obj)
+			space2, err := ReadSpace(r, obj)
 			if err != nil {
 				t.Fatal(err)
 			}
-
-			if space.ColorSpaceFamily() != space2.ColorSpaceFamily() {
-				t.Errorf("expected %s, got %s", space.ColorSpaceFamily(), space2.ColorSpaceFamily())
-			}
-
-			opts := []cmp.Option{
-				cmp.AllowUnexported(SpaceCalGray{}),
-			}
-			if d := cmp.Diff(space, space2, opts...); d != "" {
-				t.Errorf("unexpected diff: %s", d)
+			if !reflect.DeepEqual(space, space2) {
+				t.Errorf("got %#v, want %#v", space2, space)
 			}
 		})
 	}

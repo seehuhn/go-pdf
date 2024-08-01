@@ -176,7 +176,7 @@ func (f FilterCompress) Decode(v Version, r io.Reader) (io.Reader, error) {
 // parameters are supported:
 //
 //   - "Predictor": A code that selects the predictor algorithm, if any.
-//     If the value is greater than 1, the data were differenced before being
+//     If the value is greater than 1, the data are differenced before being
 //     encoded. (Default: 1)
 //
 //   - "Colors": The number of interleaved color components per sample.

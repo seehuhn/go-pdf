@@ -16,7 +16,12 @@
 
 package color
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+	"math"
+
+	"seehuhn.de/go/pdf"
+)
 
 func toPDF(x []float64) pdf.Array {
 	res := make(pdf.Array, len(x))
@@ -28,7 +33,7 @@ func toPDF(x []float64) pdf.Array {
 
 func isConst(x []float64, value float64) bool {
 	for _, xi := range x {
-		if xi != value {
+		if math.Abs(xi-value) >= ε {
 			return false
 		}
 	}
@@ -39,30 +44,46 @@ func isZero(x []float64) bool {
 	return isConst(x, 0)
 }
 
-func isPosVec3(x []float64) bool {
-	if len(x) != 3 {
-		return false
-	}
-	for _, v := range x {
-		if v < 0 {
-			return false
-		}
-	}
-	return true
-}
-
-func isEqual(x, y []float64) bool {
+func isValues(x []float64, y ...float64) bool {
 	if len(x) != len(y) {
 		return false
 	}
 	for i := range x {
-		if x[i] != y[i] {
+		if math.Abs(x[i]-y[i]) >= ε {
 			return false
 		}
 	}
 	return true
 }
 
-func isValues(x []float64, y ...float64) bool {
-	return isEqual(x, y)
+func getNumbers(r pdf.Getter, obj pdf.Object, n int) ([]float64, error) {
+	a, err := pdf.GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+	if len(a) != n {
+		return nil, errors.New("invalid array length")
+	}
+	res := make([]float64, n)
+	for i, v := range a {
+		x, err := pdf.GetNumber(r, v)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = float64(x)
+	}
+	return res, nil
 }
+
+func isValidWhitePoint(x []float64) bool {
+	return len(x) == 3 &&
+		x[0] > 0 &&
+		math.Abs(x[1]-1) <= ε &&
+		x[2] > 0
+}
+
+func isValidBlackPoint(x []float64) bool {
+	return len(x) == 3 && x[0] >= 0 && x[1] >= 0 && x[2] >= 0
+}
+
+const ε = 1e-6

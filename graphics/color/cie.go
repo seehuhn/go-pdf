@@ -47,12 +47,12 @@ type SpaceCalGray struct {
 // DefName is the default resource name to use within content streams.
 // This can be left empty to allocate names automatically.
 func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, error) {
-	if !isPosVec3(whitePoint) || math.Abs(whitePoint[1]-1) > 1e-6 {
+	if !isValidWhitePoint(whitePoint) {
 		return nil, errors.New("CalGray: invalid white point")
 	}
 	if blackPoint == nil {
 		blackPoint = []float64{0, 0, 0}
-	} else if !isPosVec3(blackPoint) {
+	} else if !isValidBlackPoint(blackPoint) {
 		return nil, errors.New("CalGray: invalid black point")
 	}
 	if gamma <= 0 {
@@ -93,63 +93,49 @@ func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, e
 	if !isZero(s.blackPoint) {
 		dict["BlackPoint"] = toPDF(s.blackPoint)
 	}
-	if s.gamma != 1 {
+	if math.Abs(s.gamma-1) >= ε {
 		dict["Gamma"] = pdf.Number(s.gamma)
 	}
 
 	return pdf.Array{pdf.Name("CalGray"), dict}, zero, nil
 }
 
-func readSpaceCalGray(r pdf.Getter, a pdf.Array) (*SpaceCalGray, error) {
+func readSpaceCalGray(r pdf.Getter, a pdf.Array) (s *SpaceCalGray, err error) {
+	defer func() {
+		if err != nil {
+			err = pdf.Wrap(err, "CalGray color space")
+		}
+	}()
+
 	if len(a) != 2 {
-		return nil, errors.New("invalid CalGray color space")
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("invalid array length"),
+		}
 	}
 	param, err := pdf.GetDict(r, a[1])
 	if err != nil {
 		return nil, err
 	}
 
-	res := &SpaceCalGray{}
+	s = &SpaceCalGray{}
 
-	res.whitePoint, err = getNumbers(r, param["WhitePoint"], 3)
-	if err != nil {
-		return nil, pdf.Wrap(err, "WhitePoint")
-	}
-	if res.whitePoint[0] <= 0 || math.Abs(res.whitePoint[1]-1) > 1e-6 || res.whitePoint[2] <= 0 {
-		return nil, errors.New("invalid WhitePoint")
+	s.whitePoint, _ = getNumbers(r, param["WhitePoint"], 3)
+	if !isValidWhitePoint(s.whitePoint) {
+		s.whitePoint = WhitePointD65
 	}
 
-	res.blackPoint, _ = getNumbers(r, param["BlackPoint"], 3)
-	if len(res.blackPoint) != 3 {
-		res.blackPoint = []float64{0, 0, 0}
+	s.blackPoint, _ = getNumbers(r, param["BlackPoint"], 3)
+	if len(s.blackPoint) != 3 {
+		s.blackPoint = []float64{0, 0, 0}
 	}
 
 	gamma, _ := pdf.GetNumber(r, param["Gamma"])
 	if err != nil || gamma <= 0 {
 		gamma = 1
 	}
-	res.gamma = float64(gamma)
+	s.gamma = float64(gamma)
 
-	return res, nil
-}
-
-func getNumbers(r pdf.Getter, obj pdf.Object, n int) ([]float64, error) {
-	a, err := pdf.GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	if len(a) != n {
-		return nil, errors.New("invalid array length")
-	}
-	res := make([]float64, n)
-	for i, v := range a {
-		x, err := pdf.GetNumber(r, v)
-		if err != nil {
-			return nil, err
-		}
-		res[i] = float64(x)
-	}
-	return res, nil
+	return s, nil
 }
 
 type colorCalGray struct {
@@ -195,12 +181,12 @@ type SpaceCalRGB struct {
 // DefName is the default resource name to use within content streams.
 // This can be left empty to allocate names automatically.
 func CalRGB(whitePoint, blackPoint, gamma, matrix []float64) (*SpaceCalRGB, error) {
-	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
+	if !isValidWhitePoint(whitePoint) {
 		return nil, errors.New("CalRGB: invalid white point")
 	}
 	if blackPoint == nil {
 		blackPoint = []float64{0, 0, 0}
-	} else if !isPosVec3(blackPoint) {
+	} else if !isValidBlackPoint(blackPoint) {
 		return nil, errors.New("CalRGB: invalid black point")
 	}
 	if gamma == nil {
@@ -300,12 +286,12 @@ type SpaceLab struct {
 // which define the valid range of the a* and b* components.
 // The default is [-100 100 -100 100].
 func Lab(whitePoint, blackPoint, ranges []float64) (*SpaceLab, error) {
-	if !isPosVec3(whitePoint) || whitePoint[1] != 1 {
+	if !isValidWhitePoint(whitePoint) {
 		return nil, errors.New("Lab: invalid white point")
 	}
 	if blackPoint == nil {
 		blackPoint = []float64{0, 0, 0}
-	} else if !isPosVec3(blackPoint) {
+	} else if !isValidBlackPoint(blackPoint) {
 		return nil, errors.New("Lab: invalid black point")
 	}
 	if ranges == nil {
@@ -359,7 +345,7 @@ func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error
 		dict["Range"] = toPDF(s.ranges)
 	}
 
-	return pdf.Array{pdf.Name("Lab"), dict}, zero, nil
+	return pdf.Array{FamilyLab, dict}, zero, nil
 }
 
 // defaultValues implements the [Space] interface.
@@ -392,66 +378,4 @@ func (c colorLab) ColorSpace() Space {
 // values implements the [Color] interface.
 func (c colorLab) values() []float64 {
 	return []float64{c.L, c.A, c.B}
-}
-
-// == ICCBased ===============================================================
-
-// SpaceICCBased represents an ICC-based color space.
-type SpaceICCBased struct {
-	n        int
-	ranges   []float64
-	metadata *pdf.Stream
-	profile  []byte
-}
-
-// ICCBased returns a new ICC-based color space.
-func ICCBased(n int, profile []byte, ranges []float64, metadata *pdf.Stream) (*SpaceICCBased, error) {
-	if n != 1 && n != 3 && n != 4 {
-		return nil, fmt.Errorf("ICCBased: invalid number of components %d", n)
-	}
-	if len(profile) == 0 {
-		return nil, errors.New("ICCBased: missing profile")
-	}
-	if ranges == nil {
-		ranges = make([]float64, 2*n)
-		for i := range ranges {
-			ranges[i] = float64(i % 2)
-		}
-	} else {
-		if len(ranges) != 2*n {
-			return nil, fmt.Errorf("ICCBased: invalid ranges")
-		}
-		for i := 0; i < 2*n; i += 2 {
-			if ranges[i] > ranges[i+1] {
-				return nil, fmt.Errorf("ICCBased: invalid ranges")
-			}
-		}
-	}
-
-	res := &SpaceICCBased{
-		n:        n,
-		ranges:   ranges,
-		metadata: metadata,
-		profile:  profile,
-	}
-	return res, nil
-}
-
-// ColorSpaceFamily implements the [Space] interface.
-func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
-	return "ICCBased"
-}
-
-// Embed implements the [Space] interface.
-func (s *SpaceICCBased) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
-	var zero pdf.Unused
-	if err := pdf.CheckVersion(rm.Out, "ICCBased color space", pdf.V1_3); err != nil {
-		return nil, zero, err
-	}
-
-	panic("not implemented") // TODO: Implement
-}
-
-func (s *SpaceICCBased) defaultValues() []float64 {
-	panic("not implemented") // TODO: Implement
 }
