@@ -176,7 +176,7 @@ func writeDummyDocument(w io.Writer, F font.Font) error {
 	setStyle := func(page *document.Page) {
 		page.TextSetFont(F, 10)
 		page.TextSetLeading(12)
-		page.SetFillColor(color.DeviceGray.New(0))
+		page.SetFillColor(color.DeviceGray(0))
 	}
 
 	page := doc.AddPage()

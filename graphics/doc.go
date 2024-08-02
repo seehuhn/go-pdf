@@ -30,7 +30,7 @@
 //	w := graphics.NewWriter(out, pdf.V2_0)
 //
 //	w.SetLineWidth(2)
-//	w.SetFillColor(color.DeviceRGB.New(1, 0, 0))
+//	w.SetFillColor(color.DeviceRGB(1, 0, 0))
 //	w.Rectangle(100, 100, 200, 200)
 //	w.FillAndStroke()
 //

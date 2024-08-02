@@ -68,7 +68,7 @@ func doit() error {
 
 	// draw a grid to show page coordinates
 	page.PushGraphicsState()
-	page.SetStrokeColor(color.DeviceGray.New(0.85))
+	page.SetStrokeColor(color.DeviceGray(0.85))
 	for z := 0.0; z <= 600+1e-6; z += 50 {
 		page.MoveTo(z, 0)
 		page.LineTo(z, 600)
@@ -76,7 +76,7 @@ func doit() error {
 		page.LineTo(600, z)
 	}
 	page.Stroke()
-	page.SetFillColor(color.DeviceGray.New(1))
+	page.SetFillColor(color.DeviceGray(1))
 	page.TextSetFont(F, 9)
 	for _, x := range []float64{82, 532} {
 		for i := 0; i <= 600; i += 50 {
@@ -94,7 +94,7 @@ func doit() error {
 		}
 	}
 	page.Fill()
-	page.SetFillColor(color.DeviceGray.New(0.6))
+	page.SetFillColor(color.DeviceGray(0.6))
 	for _, x := range []float64{82, 532} {
 		page.TextBegin()
 		for i := 0; i <= 600; i += 50 {
@@ -153,9 +153,9 @@ func doit() error {
 	page.TextShow("On this page, the TrimBox is [100,500]×[100,500].  If your viewer supports BoxColorInfo,")
 	page.TextNextLine()
 	page.TextShow("the TrimBox may be shown in ")
-	page.SetFillColor(color.DeviceRGB.New(0.8, 0.4, 0))
+	page.SetFillColor(color.DeviceRGB(0.8, 0.4, 0))
 	page.TextShow("orange.")
-	page.SetFillColor(color.DeviceGray.New(0))
+	page.SetFillColor(color.DeviceGray(0))
 	page.TextEnd()
 
 	page.TextBegin()
@@ -165,9 +165,9 @@ func doit() error {
 	page.TextShow("On this page, the BleedBox is [85,515]×[85,515].  If your viewer supports BoxColorInfo,")
 	page.TextNextLine()
 	page.TextShow("the BleedBox may be shown in ")
-	page.SetFillColor(color.DeviceRGB.New(0, 0, 0.8))
+	page.SetFillColor(color.DeviceRGB(0, 0, 0.8))
 	page.TextShow("blue.")
-	page.SetFillColor(color.DeviceGray.New(0))
+	page.SetFillColor(color.DeviceGray(0))
 	page.TextEnd()
 
 	page.TextBegin()
@@ -177,7 +177,7 @@ func doit() error {
 	page.TextShow("On this page, the ArtBox is [150,450]×[150,450].  If your viewer supports BoxColorInfo,")
 	page.TextNextLine()
 	page.TextShow("the ArtBox may be shown in ")
-	page.SetFillColor(color.DeviceRGB.New(0, 0.8, 0))
+	page.SetFillColor(color.DeviceRGB(0, 0.8, 0))
 	page.TextShow("green.")
 	page.TextEnd()
 

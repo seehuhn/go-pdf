@@ -288,7 +288,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	if err != nil {
 		return err
 	}
-	col := color.NewUncoloredPattern(pat, color.DeviceRGB.New(1, 0, 0))
+	col := color.PatternUncolored(pat, color.DeviceRGB(1, 0, 0))
 
 	page := doc.AddPage()
 
@@ -328,13 +328,13 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	}
 	builder := pattern.NewColoredBuilder(doc.RM, prop)
 
-	builder.SetFillColor(color.DeviceGray.New(0.5))
+	builder.SetFillColor(color.DeviceGray(0.5))
 	builder.Circle(0, 0, r)
 	builder.Circle(w, 0, r)
 	builder.Circle(0, h, r)
 	builder.Circle(w, h, r)
 	builder.Fill()
-	builder.SetFillColor(color.DeviceRGB.New(1, 0, 0))
+	builder.SetFillColor(color.DeviceRGB(1, 0, 0))
 	builder.Circle(w/2, h/2, r)
 	builder.Fill()
 
@@ -342,7 +342,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	if err != nil {
 		return err
 	}
-	col := color.NewColoredPattern(pat)
+	col := color.PatternColored(pat)
 
 	page := doc.AddPage()
 
@@ -368,7 +368,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 
 func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	shadingData := &shading.Type3{
-		ColorSpace: color.DeviceRGB,
+		ColorSpace: color.DeviceRGB(0, 0, 0).ColorSpace(),
 		X1:         100,
 		Y1:         350,
 		R1:         10,
@@ -392,7 +392,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 		Shading:   shadingData,
 		SingleUse: true,
 	}
-	col := color.NewColoredPattern(dict)
+	col := color.PatternColored(dict)
 
 	page := doc.AddPage()
 
@@ -499,7 +499,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	return nil
 }
 
-var black = color.DeviceGray.New(0.0)
+var black = color.DeviceGray(0.0)
 
 func hTickLabel(page *document.Page, F font.Layouter, x, y float64, label string) {
 	page.SetStrokeColor(black)

@@ -452,6 +452,10 @@ func (r *Reader) doNew() error {
 
 		case "CS", "cs":
 			name := op.GetName()
+			if !op.OK() {
+				break
+			}
+
 			var csDesc pdf.Object
 			if name == "DeviceGray" || name == "DeviceRGB" || name == "DeviceCMYK" || name == "Pattern" {
 				csDesc = name
@@ -475,6 +479,9 @@ func (r *Reader) doNew() error {
 				r.FillColor = cs.Default()
 				r.Set |= graphics.StateFillColor
 			}
+
+		case "SC", "SCN", "sc", "scn":
+
 		}
 	}
 	return r.scanner.Error()
@@ -826,7 +833,7 @@ doOps:
 		if !ok {
 			break
 		}
-		r.StrokeColor = color.DeviceGray.New(gray)
+		r.StrokeColor = color.DeviceGray(gray)
 		r.Set |= graphics.StateStrokeColor
 
 	case "g": // nonstroking gray level
@@ -837,7 +844,7 @@ doOps:
 		if !ok {
 			break
 		}
-		r.FillColor = color.DeviceGray.New(gray)
+		r.FillColor = color.DeviceGray(gray)
 		r.Set |= graphics.StateFillColor
 
 	case "RG": // nonstroking DeviceRGB color
@@ -855,7 +862,7 @@ doOps:
 		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
-		r.StrokeColor = color.DeviceRGB.New(red, green, blue)
+		r.StrokeColor = color.DeviceRGB(red, green, blue)
 		r.Set |= graphics.StateStrokeColor
 
 	case "rg": // nonstroking DeviceRGB color
@@ -873,7 +880,7 @@ doOps:
 		if blue, ok = getNumber(args[2]); !ok {
 			break
 		}
-		r.FillColor = color.DeviceRGB.New(red, green, blue)
+		r.FillColor = color.DeviceRGB(red, green, blue)
 		r.Set |= graphics.StateFillColor
 
 	case "K": // stroking DeviceCMYK color
@@ -894,7 +901,7 @@ doOps:
 		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
-		r.StrokeColor = color.DeviceCMYK.New(cyan, magenta, yellow, black)
+		r.StrokeColor = color.DeviceCMYK(cyan, magenta, yellow, black)
 		r.Set |= graphics.StateStrokeColor
 
 	case "k": // nonstroking DeviceCMYK color
@@ -915,7 +922,7 @@ doOps:
 		if black, ok = getNumber(args[3]); !ok {
 			break
 		}
-		r.FillColor = color.DeviceCMYK.New(cyan, magenta, yellow, black)
+		r.FillColor = color.DeviceCMYK(cyan, magenta, yellow, black)
 		r.Set |= graphics.StateFillColor
 
 	// == Shading patterns ===============================================

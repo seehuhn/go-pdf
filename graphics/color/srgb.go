@@ -22,17 +22,13 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// SRGB is the sRGB color space.
-var SRGB = SRGBSpace{}
-
-// SRGBSpace represents the sRGB color space.
+// spaceSRGB represents the sRGB color space.
 // This is a special case of the ICCBased color space.
-// Use [SRGB] to access this color space.
-type SRGBSpace struct{}
+type spaceSRGB struct{}
 
 // Embed adds the sRGB color space to a PDF file.
 // This implements the [Space] interface.
-func (s SRGBSpace) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spaceSRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	w := rm.Out
@@ -71,30 +67,30 @@ func (s SRGBSpace) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error
 
 // ColorSpaceFamily returns /ICCBased.
 // This implements the [Space] interface.
-func (s SRGBSpace) ColorSpaceFamily() pdf.Name {
+func (s spaceSRGB) ColorSpaceFamily() pdf.Name {
 	return "ICCBased"
-}
-
-// New returns a color in the sRGB color space.
-// The values r, g, and b should be in the range [0, 1].
-func (s SRGBSpace) New(r, g, b float64) Color {
-	return colorSRGB{r, g, b}
 }
 
 // Default returns black in the sRGB color space.
 // This implements the [Space] interface.
-func (s SRGBSpace) Default() Color {
+func (s spaceSRGB) Default() Color {
 	return colorSRGB{0, 0, 0}
 }
 
-func (s SRGBSpace) defaultValues() []float64 {
+func (s spaceSRGB) defaultValues() []float64 {
 	return []float64{0, 0, 0}
 }
 
 type colorSRGB [3]float64
 
+// SRGB returns a color in the sRGB color space.
+// The values r, g, and b should be in the range [0, 1].
+func SRGB(r, g, b float64) Color {
+	return colorSRGB{r, g, b}
+}
+
 func (c colorSRGB) ColorSpace() Space {
-	return SRGB
+	return spaceSRGB{}
 }
 
 func (c colorSRGB) values() []float64 {

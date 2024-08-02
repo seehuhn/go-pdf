@@ -46,13 +46,13 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	space := colors[0].ColorSpace()
 	var min, max []float64
 	switch space := space.(type) {
-	case SpaceDeviceGray, *SpaceCalGray:
+	case spaceDeviceGray, *SpaceCalGray:
 		min = []float64{0}
 		max = []float64{1}
-	case SpaceDeviceRGB, *SpaceCalRGB:
+	case spaceDeviceRGB, *SpaceCalRGB:
 		min = []float64{0, 0, 0}
 		max = []float64{1, 1, 1}
-	case SpaceDeviceCMYK:
+	case spaceDeviceCMYK:
 		min = []float64{0, 0, 0, 0}
 		max = []float64{1, 1, 1, 1}
 	case *SpaceLab:

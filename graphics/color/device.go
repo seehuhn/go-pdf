@@ -18,25 +18,13 @@ package color
 
 import "seehuhn.de/go/pdf"
 
-var (
-	// DeviceGray is the DeviceGray color space.
-	DeviceGray = SpaceDeviceGray{}
-
-	// DeviceRGB is the DeviceRGB color space.
-	DeviceRGB = SpaceDeviceRGB{}
-
-	// DeviceCMYK is the DeviceCMYK color space.
-	DeviceCMYK = SpaceDeviceCMYK{}
-)
-
 // == DeviceGray =============================================================
 
-// SpaceDeviceGray represents the DeviceGray color space.
-// Use [DeviceGray] to access this color space.
-type SpaceDeviceGray struct{}
+// spaceDeviceGray represents the DeviceGray color space.
+type spaceDeviceGray struct{}
 
 // Embed implements the [Space] interface.
-func (s SpaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceGray color space", pdf.V1_1); err != nil {
 		return nil, zero, err
@@ -45,32 +33,32 @@ func (s SpaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused,
 }
 
 // ColorSpaceFamily implements the [SpaceEmbedded] interface.
-func (s SpaceDeviceGray) ColorSpaceFamily() pdf.Name {
+func (s spaceDeviceGray) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceGray
 }
 
 // defaultValues implements the [SpaceEmbedded] interface.
-func (s SpaceDeviceGray) defaultValues() []float64 {
+func (s spaceDeviceGray) defaultValues() []float64 {
 	return []float64{0}
-}
-
-// New returns a color in the DeviceGray color space.
-// The parameter gray must be in the range from 0 (black) to 1 (white).
-func (s SpaceDeviceGray) New(gray float64) Color {
-	return colorDeviceGray(gray)
 }
 
 // Default returns the black in the DeviceGray color space.
 // This implements the [Space] interface.
-func (s SpaceDeviceGray) Default() Color {
+func (s spaceDeviceGray) Default() Color {
 	return colorDeviceGray(0)
 }
 
 type colorDeviceGray float64
 
+// DeviceGray returns a color in the DeviceGray color space.
+// The parameter gray must be in the range from 0 (black) to 1 (white).
+func DeviceGray(gray float64) Color {
+	return colorDeviceGray(gray)
+}
+
 // ColorSpace implements the [Color] interface.
 func (c colorDeviceGray) ColorSpace() Space {
-	return DeviceGray
+	return spaceDeviceGray{}
 }
 
 // values implements the [Color] interface.
@@ -80,12 +68,11 @@ func (c colorDeviceGray) values() []float64 {
 
 // == DeviceRGB ==============================================================
 
-// SpaceDeviceRGB represents the DeviceRGB color space.
-// Use [DeviceRGB] to access this color space.
-type SpaceDeviceRGB struct{}
+// spaceDeviceRGB represents the DeviceRGB color space.
+type spaceDeviceRGB struct{}
 
 // Embed implements the [Space] interface.
-func (s SpaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceRGB color space", pdf.V1_1); err != nil {
 		return nil, zero, err
@@ -94,32 +81,32 @@ func (s SpaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, 
 }
 
 // ColorSpaceFamily implements the [SpaceEmbedded] interface.
-func (s SpaceDeviceRGB) ColorSpaceFamily() pdf.Name {
+func (s spaceDeviceRGB) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceRGB
 }
 
 // defaultValues implements the [SpaceEmbedded] interface.
-func (s SpaceDeviceRGB) defaultValues() []float64 {
+func (s spaceDeviceRGB) defaultValues() []float64 {
 	return []float64{0, 0, 0}
-}
-
-// New returns a color in the DeviceRGB color space.
-// The parameters r, g, and b must be in the range from 0 to 1.
-func (s SpaceDeviceRGB) New(r, g, b float64) Color {
-	return colorDeviceRGB{r, g, b}
 }
 
 // Default returns the black in the DeviceRGB color space.
 // This implements the [Space] interface.
-func (s SpaceDeviceRGB) Default() Color {
+func (s spaceDeviceRGB) Default() Color {
 	return colorDeviceRGB{0, 0, 0}
 }
 
 type colorDeviceRGB [3]float64
 
+// DeviceRGB returns a color in the DeviceRGB color space.
+// The parameters r, g, and b must be in the range from 0 to 1.
+func DeviceRGB(r, g, b float64) Color {
+	return colorDeviceRGB{r, g, b}
+}
+
 // ColorSpace implements the [Color] interface.
 func (c colorDeviceRGB) ColorSpace() Space {
-	return DeviceRGB
+	return spaceDeviceRGB{}
 }
 
 // values implements the [Color] interface.
@@ -129,12 +116,11 @@ func (c colorDeviceRGB) values() []float64 {
 
 // == DeviceCMYK =============================================================
 
-// SpaceDeviceCMYK represents the DeviceCMYK color space.
-// Use [DeviceCMYK] to access this color space.
-type SpaceDeviceCMYK struct{}
+// spaceDeviceCMYK represents the DeviceCMYK color space.
+type spaceDeviceCMYK struct{}
 
 // Embed implement the [pdf.Embedder] interface.
-func (s SpaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceCMYK color space", pdf.V1_1); err != nil {
 		return nil, zero, err
@@ -144,33 +130,33 @@ func (s SpaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused,
 }
 
 // ColorSpaceFamily implements the [Space] interface.
-func (s SpaceDeviceCMYK) ColorSpaceFamily() pdf.Name {
+func (s spaceDeviceCMYK) ColorSpaceFamily() pdf.Name {
 	return "DeviceCMYK"
 }
 
 // defaultValues implements the [Space] interface.
-func (s SpaceDeviceCMYK) defaultValues() []float64 {
+func (s spaceDeviceCMYK) defaultValues() []float64 {
 	return []float64{0, 0, 0, 1}
-}
-
-// New returns a color in the DeviceCMYK color space.
-// The parameters c, m, y, and k must be in the range from 0 to 1
-// and control the amount of cyan, magenta, yellow, and black in the color.
-func (s SpaceDeviceCMYK) New(c, m, y, k float64) Color {
-	return colorDeviceCMYK{c, m, y, k}
 }
 
 // Default returns the black in the DeviceCMYK color space.
 // This implements the [Space] interface.
-func (s SpaceDeviceCMYK) Default() Color {
+func (s spaceDeviceCMYK) Default() Color {
 	return colorDeviceCMYK{0, 0, 0, 1}
 }
 
 type colorDeviceCMYK [4]float64
 
+// DeviceCMYK returns a color in the DeviceCMYK color space.
+// The parameters c, m, y, and k must be in the range from 0 to 1
+// and control the amount of cyan, magenta, yellow, and black in the color.
+func DeviceCMYK(c, m, y, k float64) Color {
+	return colorDeviceCMYK{c, m, y, k}
+}
+
 // ColorSpace implements the [Color] interface.
 func (c colorDeviceCMYK) ColorSpace() Space {
-	return DeviceCMYK
+	return spaceDeviceCMYK{}
 }
 
 // values implements the [Color] interface.

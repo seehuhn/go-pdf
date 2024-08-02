@@ -64,7 +64,7 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 
 	cs := im.ColorSpace
 	if cs == nil {
-		cs = color.DeviceRGB
+		cs = color.DeviceRGB(0, 0, 0).ColorSpace()
 	}
 	if color.NumValues(cs) != 3 {
 		return nil, zero, fmt.Errorf("unsupported color space: %v", cs.ColorSpaceFamily())
@@ -118,7 +118,7 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	}
 
 	if maskRef != 0 {
-		maskCS := color.DeviceGray
+		maskCS := color.DeviceGray(0).ColorSpace()
 		maskCSEmbedded, _, err := pdf.ResourceManagerEmbed(rm, maskCS)
 		if err != nil {
 			return nil, zero, err

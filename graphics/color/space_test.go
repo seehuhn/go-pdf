@@ -31,14 +31,14 @@ var (
 
 // The following types implement the ColorSpace interface:
 var (
-	_ Space = DeviceGray
-	_ Space = DeviceRGB
-	_ Space = DeviceCMYK
+	_ Space = spaceDeviceGray{}
+	_ Space = spaceDeviceRGB{}
+	_ Space = spaceDeviceCMYK{}
 	_ Space = (*SpaceCalGray)(nil)
 	_ Space = (*SpaceCalRGB)(nil)
 	_ Space = (*SpaceLab)(nil)
 	_ Space = (*SpaceICCBased)(nil)
-	_ Space = SRGB
+	_ Space = spaceSRGB{}
 	_ Space = spacePatternColored{}
 	_ Space = spacePatternUncolored{}
 	_ Space = (*SpaceIndexed)(nil)
@@ -47,9 +47,9 @@ var (
 )
 
 var testSpaces = []Space{
-	DeviceGray,
-	DeviceRGB,
-	DeviceCMYK,
+	spaceDeviceGray{},
+	spaceDeviceRGB{},
+	spaceDeviceCMYK{},
 	must(CalGray(WhitePointD65, nil, 1)),
 	must(CalGray(WhitePointD65, []float64{0.1, 0.1, 0.1}, 1.2)),
 	must(CalRGB(WhitePointD50, nil, nil, nil)),
@@ -60,7 +60,7 @@ var testSpaces = []Space{
 	must(ICCBased(sRGBv2, nil)),
 	must(ICCBased(sRGBv4, nil)),
 	spacePatternColored{},
-	spacePatternUncolored{base: DeviceGray},
+	spacePatternUncolored{base: spaceDeviceGray{}},
 	spacePatternUncolored{base: must(CalGray(WhitePointD65, nil, 1.2))},
 	// TODO(voss): Indexed
 	// TODO(voss): Separation colour spaces

@@ -140,7 +140,7 @@ func makeMarkerFont(rm *pdf.ResourceManager) (font.Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	g.SetFillColor(color.DeviceGray.New(0.5))
+	g.SetFillColor(color.DeviceGray(0.5))
 	g.Rectangle(0, -500, 50, 2000)
 	g.Fill()
 	err = g.Close()

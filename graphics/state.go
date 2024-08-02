@@ -122,8 +122,8 @@ func NewState() State {
 
 	param.CTM = matrix.Identity
 
-	param.StrokeColor = color.DeviceGray.New(0)
-	param.FillColor = color.DeviceGray.New(0)
+	param.StrokeColor = color.DeviceGray(0)
+	param.FillColor = color.DeviceGray(0)
 
 	param.TextCharacterSpacing = 0
 	param.TextWordSpacing = 0

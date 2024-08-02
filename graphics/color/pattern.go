@@ -25,6 +25,7 @@ import (
 // spacePatternColored is used for colored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
+// Embed implements the [Space] interface.
 func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
@@ -49,17 +50,17 @@ func (s spacePatternColored) defaultValues() []float64 {
 	return nil
 }
 
-// NewColoredPattern returns a new colored pattern as a PDF color.
+type colorColoredPattern struct {
+	Pat Pattern
+}
+
+// PatternColored returns a new colored pattern as a PDF color.
 // This can be used with colored tiling patterns and with shading patterns.
-func NewColoredPattern(p Pattern) Color {
+func PatternColored(p Pattern) Color {
 	if !p.IsColored() {
 		panic("pattern is not colored")
 	}
 	return colorColoredPattern{Pat: p}
-}
-
-type colorColoredPattern struct {
-	Pat Pattern
 }
 
 func (colorColoredPattern) ColorSpace() Space {
@@ -72,15 +73,20 @@ func (c colorColoredPattern) values() []float64 {
 
 // == uncolored patterns =====================================================
 
+// spacePatternUncolored represents the color space for uncolored patterns
+// (where the color is specified separately).
 type spacePatternUncolored struct {
 	base Space
 }
 
-// ColorSpaceFamily implements the [Space] interface.
+// ColorSpaceFamily returns /Pattern.
+// This implements the [Space] interface.
 func (s spacePatternUncolored) ColorSpaceFamily() pdf.Name {
 	return FamilyPattern
 }
 
+// Embed adds the pattern color space to the PDF file.
+// This implements the [Space] interface.
 func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -105,17 +111,17 @@ func (s spacePatternUncolored) defaultValues() []float64 {
 	return s.base.defaultValues()
 }
 
-// NewUncoloredPattern returns a new uncolored pattern as a PDF color.
-func NewUncoloredPattern(p Pattern, col Color) Color {
+type colorUncoloredPattern struct {
+	Pat Pattern
+	Col Color
+}
+
+// PatternUncolored returns a new uncolored pattern as a PDF color.
+func PatternUncolored(p Pattern, col Color) Color {
 	if p.IsColored() {
 		panic("pattern is colored")
 	}
 	return &colorUncoloredPattern{Pat: p, Col: col}
-}
-
-type colorUncoloredPattern struct {
-	Pat Pattern
-	Col Color
 }
 
 func (c *colorUncoloredPattern) ColorSpace() Space {

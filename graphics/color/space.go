@@ -41,8 +41,14 @@ const (
 
 // Space represents a PDF color space which can be embedded in a PDF file.
 type Space interface {
+	// Embed adds the color space to a PDF file.
+	// This implements the pdf.Embedder interface.
 	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
+
+	// ColorSpaceFamily returns the family of the color space.
 	ColorSpaceFamily() pdf.Name
+
+	// Default returns the default color of the color space.
 	Default() Color
 
 	defaultValues() []float64
@@ -54,6 +60,9 @@ func NumValues(s Space) int {
 }
 
 // ReadSpace reads a color space from a PDF file.
+//
+// The argument desc is typically an value in the ColorSpace sub-dictionary of
+// a Resources dictionary.
 func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 	d := newDecoder(r, desc)
 
@@ -61,13 +70,13 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 	var err error
 	switch d.name {
 	case FamilyDeviceGray:
-		res = DeviceGray
+		res = spaceDeviceGray{}
 
 	case FamilyDeviceRGB:
-		res = DeviceRGB
+		res = spaceDeviceRGB{}
 
 	case FamilyDeviceCMYK:
-		res = DeviceCMYK
+		res = spaceDeviceCMYK{}
 
 	case FamilyPattern:
 		if len(d.args) == 0 {
@@ -128,7 +137,7 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		}
 
 	case "CalCMYK": // deprecated
-		res = DeviceCMYK
+		res = spaceDeviceCMYK{}
 
 	default:
 		d.MarkAsInvalid()
