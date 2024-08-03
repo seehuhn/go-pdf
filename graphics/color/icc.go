@@ -40,12 +40,20 @@ type SpaceICCBased struct {
 //
 // TODO(voss): extract n and ranges from the profile data.
 func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error) {
+	if len(profile) == 0 {
+		return nil, errors.New("ICCBased: missing profile")
+	}
+
 	p, err := icc.Decode(profile)
 	if err != nil {
 		return nil, err
 	}
 
 	n := p.ColorSpace.NumComponents()
+	if n != 1 && n != 3 && n != 4 {
+		return nil, fmt.Errorf("ICCBased: invalid number of components %d", n)
+	}
+
 	var ranges []float64
 	// TODO(voss): revisit this once
 	// https://github.com/pdf-association/pdf-issues/issues/31 is resolved.
@@ -62,38 +70,7 @@ func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error)
 		return nil, fmt.Errorf("ICCBased: unsupported color space %v", p.ColorSpace)
 	}
 
-	if n != 1 && n != 3 && n != 4 {
-		return nil, fmt.Errorf("ICCBased: invalid number of components %d", n)
-	}
-	if len(profile) == 0 {
-		return nil, errors.New("ICCBased: missing profile")
-	}
-	if ranges == nil {
-		ranges = make([]float64, 0, 2*n)
-		for range n {
-			ranges = append(ranges, 0, 1)
-		}
-	} else {
-		if len(ranges) != 2*n {
-			return nil, fmt.Errorf("ICCBased: invalid ranges")
-		}
-		for i := range n {
-			if ranges[2*i] > ranges[2*i+1] {
-				return nil, fmt.Errorf("ICCBased: invalid ranges")
-			}
-		}
-	}
-
 	def := make([]float64, n)
-	for i := range n {
-		x := 0.0
-		if x < ranges[2*i] {
-			x = ranges[2*i]
-		} else if x > ranges[2*i+1] {
-			x = ranges[2*i+1]
-		}
-		def[i] = x
-	}
 
 	res := &SpaceICCBased{
 		N:        n,
@@ -105,12 +82,27 @@ func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error)
 	return res, nil
 }
 
-// ColorSpaceFamily implements the [Space] interface.
+// ColorSpaceFamily returns /ICCBased.
+// This implements the [Space] interface.
 func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
-	return "ICCBased"
+	return FamilyICCBased
 }
 
-// Embed implements the [Space] interface.
+// NumChannels returns the number of color channels.
+// This implements the [Space] interface.
+func (s *SpaceICCBased) NumChannels() int {
+	return s.N
+}
+
+// Default returns the default color in an ICC-based color space.
+func (s *SpaceICCBased) Default() Color {
+	c := colorICCBased{Space: s}
+	copy(c.val[:], s.def)
+	return c
+}
+
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s *SpaceICCBased) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -169,21 +161,15 @@ func (s *SpaceICCBased) New(values []float64) (Color, error) {
 			return nil, fmt.Errorf("ICCBased: value out of range")
 		}
 	}
-	return colorICCBased{s, values}, nil
-}
 
-// Default returns the default color in an ICC-based color space.
-func (s *SpaceICCBased) Default() Color {
-	return colorICCBased{s, s.def}
-}
-
-func (s *SpaceICCBased) defaultValues() []float64 {
-	return s.def
+	c := colorICCBased{Space: s}
+	copy(c.val[:], values)
+	return c, nil
 }
 
 type colorICCBased struct {
 	Space *SpaceICCBased
-	val   []float64
+	val   [4]float64
 }
 
 func (c colorICCBased) ColorSpace() Space {
@@ -191,5 +177,5 @@ func (c colorICCBased) ColorSpace() Space {
 }
 
 func (c colorICCBased) values() []float64 {
-	return c.val
+	return c.val[:c.Space.N]
 }

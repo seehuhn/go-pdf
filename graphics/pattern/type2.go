@@ -34,10 +34,16 @@ type Type2 struct {
 	SingleUse bool
 }
 
-// IsColored returns true.
-// This implements the [graphics.Pattern] interface.
-func (p *Type2) IsColored() bool {
-	return true
+// PatternType returns 2 for shading patterns.
+// This implements the [color.Pattern] interface.
+func (p *Type2) PatternType() int {
+	return 2
+}
+
+// PaintType returns 1 to indicate that shading patterns are colored.
+// This implements the [color.Pattern] interface.
+func (p *Type2) PaintType() int {
+	return 1
 }
 
 // Embed returns the pattern dictionary for the shading pattern.

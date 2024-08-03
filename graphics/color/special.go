@@ -17,11 +17,13 @@
 package color
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/function"
 )
 
 // == Indexed ================================================================
@@ -86,30 +88,20 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	}, nil
 }
 
-// ColorSpaceFamily implements the [Space] interface.
-func (s *SpaceIndexed) ColorSpaceFamily() pdf.Name {
-	return "Indexed"
-}
-
-// New returns a new indexed color.
-func (s *SpaceIndexed) New(idx int) Color {
-	if idx < 0 || idx >= s.NumCol {
-		return nil
-	}
-	return colorIndexed{Space: s, Index: idx}
-}
-
-// Default returns color 0 in the indexed color space.
+// ColorSpaceFamily returns /Indexed.
 // This implements the [Space] interface.
-func (s *SpaceIndexed) Default() Color {
-	return colorIndexed{Space: s, Index: 0}
+func (s *SpaceIndexed) ColorSpaceFamily() pdf.Name {
+	return FamilyIndexed
 }
 
-func (s *SpaceIndexed) defaultValues() []float64 {
-	return []float64{0}
+// NumChannels returns 1
+// This implements the [Space] interface.
+func (s *SpaceIndexed) NumChannels() int {
+	return 1
 }
 
-// Embed implements the [Space] interface.
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "Indexed color space", pdf.V1_1); err != nil {
@@ -131,6 +123,20 @@ func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, e
 	return data, zero, nil
 }
 
+// Default returns color 0 in the indexed color space.
+// This implements the [Space] interface.
+func (s *SpaceIndexed) Default() Color {
+	return colorIndexed{Space: s, Index: 0}
+}
+
+// New returns a new indexed color.
+func (s *SpaceIndexed) New(idx int) Color {
+	if idx < 0 || idx >= s.NumCol {
+		return nil
+	}
+	return colorIndexed{Space: s, Index: idx}
+}
+
 type colorIndexed struct {
 	Space *SpaceIndexed
 	Index int
@@ -146,8 +152,237 @@ func (c colorIndexed) values() []float64 {
 
 // == Separation =============================================================
 
-// TODO(voss): implement this
+// SpaceSeparation represents a separation color space.
+type SpaceSeparation struct {
+	colorant  pdf.Name
+	alternate Space
+	trfm      function.Func
+}
+
+// Separation returns a new separation color space.
+func Separation(colorant pdf.Name, alternate Space, trfm function.Func) (*SpaceSeparation, error) {
+	if IsSpecial(alternate) {
+		return nil, errors.New("Separation: invalid alternate color space")
+	}
+
+	nIn, nOut := trfm.Shape()
+	if nIn != 1 || nOut != alternate.NumChannels() {
+		return nil, errors.New("Separation: invalid transformation function")
+	}
+
+	return &SpaceSeparation{
+		colorant:  colorant,
+		alternate: alternate,
+		trfm:      trfm,
+	}, nil
+}
+
+// ColorSpaceFamily returns /Separation.
+// This implements the [Space] interface.
+func (s *SpaceSeparation) ColorSpaceFamily() pdf.Name {
+	return FamilySeparation
+}
+
+// NumChannels returns 1.
+// This implements the [Space] interface.
+func (s *SpaceSeparation) NumChannels() int {
+	return 1
+}
+
+// Embed adds the color space to a PDF file.
+// This implements the pdf.Embedder interface.
+func (s *SpaceSeparation) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	alt, _, err := pdf.ResourceManagerEmbed(rm, s.alternate)
+	if err != nil {
+		return nil, zero, err
+	}
+	trfm, _, err := pdf.ResourceManagerEmbed(rm, s.trfm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	return pdf.Array{FamilySeparation, s.colorant, alt, trfm}, zero, nil
+}
+
+// New returns a new color in the separation color space.
+// Tint must be between 0 (no ink, lightest) and 1 (full ink, darkest).
+func (s *SpaceSeparation) New(tint float64) Color {
+	return colorSeparation{Space: s, tint: tint}
+}
+
+// Default returns the default color of the color space.
+func (s *SpaceSeparation) Default() Color {
+	return s.New(1)
+}
+
+type colorSeparation struct {
+	Space *SpaceSeparation
+	tint  float64
+}
+
+// ColorSpace returns the color space of the color.
+// This implements the [Color] interface.
+func (c colorSeparation) ColorSpace() Space {
+	return c.Space
+}
+
+func (c colorSeparation) values() []float64 {
+	return []float64{c.tint}
+}
 
 // == DeviceN ================================================================
 
-// TODO(voss): implement this
+// SpaceDeviceN represents a DeviceN color space.
+//
+// See section 8.6.6.5 (DeviceN Color Spaces) of PDF 32000-1:2008 for details:
+// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=167
+type SpaceDeviceN struct {
+	names     pdf.Array
+	alternate Space
+	trfm      function.Func
+	attr      pdf.Dict
+}
+
+// DeviceN returns a new DeviceN color space.
+func DeviceN(names []pdf.Name, alternate Space, trfm function.Func, attr pdf.Dict) (*SpaceDeviceN, error) {
+	namesArray := make(pdf.Array, len(names))
+	seen := make(map[pdf.Name]bool)
+	for i, name := range names {
+		if name == "None" {
+			continue
+		}
+		if name == "All" {
+			return nil, errors.New("DeviceN: invalid colorant name")
+		}
+		if seen[name] {
+			return nil, errors.New("DeviceN: duplicate colorant name")
+		}
+		seen[name] = true
+		namesArray[i] = name
+	}
+
+	if alternate == nil || IsSpecial(alternate) {
+		return nil, errors.New("DeviceN: invalid alternate color space")
+	}
+
+	nIn, nOut := trfm.Shape()
+	if nIn != len(names) || nOut != alternate.NumChannels() {
+		return nil, errors.New("DeviceN: invalid transformation function")
+	}
+
+	if attr != nil {
+		for key := range attr {
+			switch key {
+			case "Subtype", "Colorants", "Process", "MixingHints", "Order":
+				// pass
+			default:
+				return nil, fmt.Errorf("DeviceN: invalid attribute key %s", key)
+			}
+		}
+		subtype := attr["Subtype"]
+		if subtype != nil && subtype != pdf.Name("NChannel") && subtype != pdf.Name("DeviceN") {
+			return nil, fmt.Errorf("DeviceN: invalid subtype %q", subtype)
+		}
+	}
+
+	return &SpaceDeviceN{
+		names:     namesArray,
+		alternate: alternate,
+		trfm:      trfm,
+		attr:      attr,
+	}, nil
+}
+
+// ColorSpaceFamily returns /DeviceN.
+// This implements the [Space] interface.
+func (s *SpaceDeviceN) ColorSpaceFamily() pdf.Name {
+	return FamilyDeviceN
+}
+
+// NumChannels returns the dimensionality of the color space.
+func (s *SpaceDeviceN) NumChannels() int {
+	return len(s.names)
+}
+
+// Embed adds the color space to a PDF file.
+// This implements the pdf.Embedder interface.
+func (s *SpaceDeviceN) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	alt, _, err := pdf.ResourceManagerEmbed(rm, s.alternate)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	trfm, _, err := pdf.ResourceManagerEmbed(rm, s.trfm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	var res pdf.Array
+	if s.attr == nil {
+		res = pdf.Array{
+			FamilyDeviceN,
+			s.names,
+			alt,
+			trfm,
+		}
+	} else {
+		res = pdf.Array{
+			FamilyDeviceN,
+			s.names,
+			alt,
+			trfm,
+			s.attr,
+		}
+	}
+	return res, zero, nil
+}
+
+// Default returns the default color of the color space.
+func (s *SpaceDeviceN) Default() Color {
+	return s.New(make([]float64, s.NumChannels()))
+}
+
+// New returns a new color in the color space.
+func (s *SpaceDeviceN) New(x []float64) Color {
+	n := s.NumChannels()
+
+	if len(x) != s.NumChannels() {
+		panic("invalid number of color components")
+	}
+
+	buf := make([]byte, 0, 8*n)
+	for _, v := range x {
+		bits := math.Float64bits(v)
+		buf = binary.LittleEndian.AppendUint64(buf, bits)
+	}
+
+	return colorDeviceN{Space: s, data: string(buf)}
+}
+
+type colorDeviceN struct {
+	Space *SpaceDeviceN
+
+	// data encoded the color components as a string, so that comparisons
+	// using the "==" operator are possible.
+	data string
+}
+
+// ColorSpace returns the color space of the color.
+// This implements the [Color] interface.
+func (c colorDeviceN) ColorSpace() Space {
+	return c.Space
+}
+
+func (c colorDeviceN) values() []float64 {
+	n := c.Space.NumChannels()
+	x := make([]float64, n)
+	for i := 0; i < n; i++ {
+		bits := binary.LittleEndian.Uint64([]byte(c.data[i*8 : (i+1)*8]))
+		x[i] = math.Float64frombits(bits)
+	}
+	return x
+}

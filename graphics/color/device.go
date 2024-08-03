@@ -23,7 +23,8 @@ import "seehuhn.de/go/pdf"
 // spaceDeviceGray represents the DeviceGray color space.
 type spaceDeviceGray struct{}
 
-// Embed implements the [Space] interface.
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s spaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceGray color space", pdf.V1_1); err != nil {
@@ -32,14 +33,16 @@ func (s spaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused,
 	return FamilyDeviceGray, zero, nil
 }
 
-// ColorSpaceFamily implements the [SpaceEmbedded] interface.
+// ColorSpaceFamily returns /DeviceGray.
+// This implements the [Space] interface.
 func (s spaceDeviceGray) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceGray
 }
 
-// defaultValues implements the [SpaceEmbedded] interface.
-func (s spaceDeviceGray) defaultValues() []float64 {
-	return []float64{0}
+// NumChannels returns 1.
+// This implements the [Space] interface.
+func (s spaceDeviceGray) NumChannels() int {
+	return 1
 }
 
 // Default returns the black in the DeviceGray color space.
@@ -71,7 +74,8 @@ func (c colorDeviceGray) values() []float64 {
 // spaceDeviceRGB represents the DeviceRGB color space.
 type spaceDeviceRGB struct{}
 
-// Embed implements the [Space] interface.
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s spaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceRGB color space", pdf.V1_1); err != nil {
@@ -80,14 +84,16 @@ func (s spaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, 
 	return FamilyDeviceRGB, zero, nil
 }
 
-// ColorSpaceFamily implements the [SpaceEmbedded] interface.
+// ColorSpaceFamily returns /DeviceRGB.
+// This implements the [Space] interface.
 func (s spaceDeviceRGB) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceRGB
 }
 
-// defaultValues implements the [SpaceEmbedded] interface.
-func (s spaceDeviceRGB) defaultValues() []float64 {
-	return []float64{0, 0, 0}
+// NumChannels returns 3.
+// This implements the [Space] interface.
+func (s spaceDeviceRGB) NumChannels() int {
+	return 3
 }
 
 // Default returns the black in the DeviceRGB color space.
@@ -119,7 +125,8 @@ func (c colorDeviceRGB) values() []float64 {
 // spaceDeviceCMYK represents the DeviceCMYK color space.
 type spaceDeviceCMYK struct{}
 
-// Embed implement the [pdf.Embedder] interface.
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s spaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceCMYK color space", pdf.V1_1); err != nil {
@@ -129,14 +136,16 @@ func (s spaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused,
 	return FamilyDeviceCMYK, zero, nil
 }
 
-// ColorSpaceFamily implements the [Space] interface.
+// ColorSpaceFamily returns /DeviceCMYK.
+// This implements the [Space] interface.
 func (s spaceDeviceCMYK) ColorSpaceFamily() pdf.Name {
-	return "DeviceCMYK"
+	return FamilyDeviceCMYK
 }
 
-// defaultValues implements the [Space] interface.
-func (s spaceDeviceCMYK) defaultValues() []float64 {
-	return []float64{0, 0, 0, 1}
+// NumChannels returns 4.
+// This implements the [Space] interface.
+func (s spaceDeviceCMYK) NumChannels() int {
+	return 4
 }
 
 // Default returns the black in the DeviceCMYK color space.

@@ -109,7 +109,7 @@ func (p *Type1Builder) Finish() (color.Pattern, error) {
 
 	return &type1{
 		RM:        p.Writer.RM,
-		PaintType: p.paintType,
+		paintType: p.paintType,
 		Ref:       ref,
 	}, nil
 }
@@ -118,17 +118,23 @@ type type1 struct {
 	// RM is the resource manager for the pattern.
 	RM *pdf.ResourceManager
 
-	// PaintType is the paint type specified in the pattern dictionary.
-	PaintType int
+	// paintType is the paint type specified in the pattern dictionary.
+	paintType int
 
 	// Ref is the reference to the pattern's content stream.
 	Ref pdf.Reference
 }
 
-// IsColored returns true if the tiling pattern is colored.
-// This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
-func (p *type1) IsColored() bool {
-	return p.PaintType == 1
+// PatternType returns 1 for tiling patterns.
+// This implements the [color.Pattern] interface.
+func (p *type1) PatternType() int {
+	return 1
+}
+
+// PaintType returns 1 for colored patterns and 2 for uncolored patterns.
+// This implements the [color.Pattern] interface.
+func (p *type1) PaintType() int {
+	return p.paintType
 }
 
 // Embed returns a reference to the pattern's content stream.

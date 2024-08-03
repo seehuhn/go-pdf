@@ -26,7 +26,19 @@ import (
 // This is a special case of the ICCBased color space.
 type spaceSRGB struct{}
 
-// Embed adds the sRGB color space to a PDF file.
+// ColorSpaceFamily returns /ICCBased.
+// This implements the [Space] interface.
+func (s spaceSRGB) ColorSpaceFamily() pdf.Name {
+	return "ICCBased"
+}
+
+// NumChannels returns 3.
+// This implements the [Space] interface.
+func (s spaceSRGB) NumChannels() int {
+	return 3
+}
+
+// Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s spaceSRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
@@ -65,26 +77,18 @@ func (s spaceSRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error
 	return pdf.Array{FamilyICCBased, sRef}, zero, nil
 }
 
-// ColorSpaceFamily returns /ICCBased.
-// This implements the [Space] interface.
-func (s spaceSRGB) ColorSpaceFamily() pdf.Name {
-	return "ICCBased"
-}
-
 // Default returns black in the sRGB color space.
 // This implements the [Space] interface.
 func (s spaceSRGB) Default() Color {
 	return colorSRGB{0, 0, 0}
 }
 
-func (s spaceSRGB) defaultValues() []float64 {
-	return []float64{0, 0, 0}
-}
-
 type colorSRGB [3]float64
 
 // SRGB returns a color in the sRGB color space.
 // The values r, g, and b should be in the range [0, 1].
+//
+// This is a special case of an ICCBased color space.
 func SRGB(r, g, b float64) Color {
 	return colorSRGB{r, g, b}
 }

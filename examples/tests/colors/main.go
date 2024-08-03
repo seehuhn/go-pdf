@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/matrix"
@@ -367,21 +368,21 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 }
 
 func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
+	fn := &function.Type2{
+		Y0:    []float64{1, 0, 0},
+		Y1:    []float64{0, 1, 0},
+		Gamma: 1,
+	}
+
 	shadingData := &shading.Type3{
-		ColorSpace: color.DeviceRGB(0, 0, 0).ColorSpace(),
-		X1:         100,
-		Y1:         350,
-		R1:         10,
-		X2:         500,
-		Y2:         750,
-		R2:         200,
-		F: pdf.Dict{
-			"FunctionType": pdf.Integer(2),
-			"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
-			"C0":           pdf.Array{pdf.Real(1), pdf.Real(0), pdf.Real(0)},
-			"C1":           pdf.Array{pdf.Real(0), pdf.Real(1), pdf.Real(0)},
-			"N":            pdf.Real(1),
-		},
+		ColorSpace:  color.DeviceRGBSpace,
+		X1:          100,
+		Y1:          350,
+		R1:          10,
+		X2:          500,
+		Y2:          750,
+		R2:          200,
+		F:           fn,
 		ExtendStart: true,
 		ExtendEnd:   true,
 

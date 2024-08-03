@@ -22,13 +22,61 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// A Func represents a PDF function.
-//
-// TODO(voss): This is a placeholder for now.
-//
-// TODO(voss): make a distinction between free functions and functions
-// already embedded in the PDF file.
-type Func pdf.Object
+// Func is a PDF function.
+type Func interface {
+	// Shape returns the number of input and output values of the function.
+	Shape() (int, int)
+
+	// Embed embeds the function in a PDF file.
+	// This method is used by [pdf.ResourceManager].
+	Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
+}
+
+// Type2 is an exponential interpolation function.
+type Type2 struct {
+	Y0    []float64
+	Y1    []float64
+	Gamma float64
+
+	SingleUse bool
+}
+
+// Shape returns the number of input and output values of the function.
+func (f *Type2) Shape() (int, int) {
+	return 1, len(f.Y0)
+}
+
+// Embed embeds the function in a PDF file.
+// This method is used by [pdf.ResourceManager].
+func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	if err := pdf.CheckVersion(rm.Out, "Type 2 functions", pdf.V1_3); err != nil {
+		return nil, zero, err
+	}
+
+	d := pdf.Dict{
+		"FunctionType": pdf.Integer(2),
+		"Domain":       pdf.Array{pdf.Number(0), pdf.Number(1)},
+		"C0":           toPDF(f.Y0),
+		"C1":           toPDF(f.Y1),
+		"N":            pdf.Number(f.Gamma),
+	}
+
+	var obj pdf.Object
+	if f.SingleUse {
+		obj = d
+	} else {
+		ref := rm.Out.Alloc()
+		err := rm.Out.Put(ref, d)
+		if err != nil {
+			return nil, zero, err
+		}
+		obj = ref
+	}
+
+	return obj, zero, nil
+}
 
 type Interpolate struct {
 	XMin, XMax float64

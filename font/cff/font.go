@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 )
 
+// Instance represents a CFF font.
 type Instance struct {
 	*sfnt.Font
 	*font.Geometry

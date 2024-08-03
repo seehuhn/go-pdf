@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 
 	"seehuhn.de/go/postscript/funit"
@@ -156,11 +155,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictSimple, error) {
 	}
 
 	if dicts.FontProgram != nil {
-		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
-		if err != nil {
-			return nil, pdf.Wrap(err, "CFF font stream")
-		}
-		data, err := io.ReadAll(stm)
+		data, err := pdf.ReadAll(r, dicts.FontProgram)
 		if err != nil {
 			return nil, pdf.Wrap(err, "reading CFF font stream")
 		}

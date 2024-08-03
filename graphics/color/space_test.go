@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/function"
 )
 
 // color.Space implements pdf.Embedder
@@ -38,44 +39,52 @@ var (
 	_ Space = (*SpaceCalRGB)(nil)
 	_ Space = (*SpaceLab)(nil)
 	_ Space = (*SpaceICCBased)(nil)
-	_ Space = spaceSRGB{}
+	_ Space = spaceSRGB{} // a special case of ICCBased (built-in profiles)
 	_ Space = spacePatternColored{}
 	_ Space = spacePatternUncolored{}
 	_ Space = (*SpaceIndexed)(nil)
-	// TODO(voss): Separation colour spaces
-	// TODO(voss): DeviceN colour spaces
+	_ Space = (*SpaceSeparation)(nil)
+	_ Space = (*SpaceDeviceN)(nil)
 )
 
-var testSpaces = []Space{
+var testColorSpaces = []Space{
 	spaceDeviceGray{},
+
 	spaceDeviceRGB{},
+
 	spaceDeviceCMYK{},
+
 	must(CalGray(WhitePointD65, nil, 1)),
 	must(CalGray(WhitePointD65, []float64{0.1, 0.1, 0.1}, 1.2)),
+
 	must(CalRGB(WhitePointD50, nil, nil, nil)),
 	must(CalRGB(WhitePointD50, []float64{0.1, 0.1, 0.1}, []float64{1.2, 1.1, 1.0},
 		[]float64{0.9, 0.1, 0, 0, 1, 0, 0, 0, 1})),
+
 	must(Lab(WhitePointD65, nil, nil)),
 	must(Lab(WhitePointD65, []float64{0.1, 0, 0}, []float64{-90, 90, -110, 110})),
+
 	must(ICCBased(sRGBv2, nil)),
 	must(ICCBased(sRGBv4, nil)),
+
 	spacePatternColored{},
+
 	spacePatternUncolored{base: spaceDeviceGray{}},
 	spacePatternUncolored{base: must(CalGray(WhitePointD65, nil, 1.2))},
-	// TODO(voss): Indexed
-	// TODO(voss): Separation colour spaces
+
+	must(Indexed([]Color{DeviceRGB(0, 0, 0), DeviceRGB(1, 1, 1)})),
+
+	must(Separation("foo", DeviceRGBSpace, &function.Type2{
+		Y0:    []float64{1, 0, 0},
+		Y1:    []float64{0, 1, 0},
+		Gamma: 1,
+	})),
+
 	// TODO(voss): DeviceN colour spaces
 }
 
-func must(space Space, err error) Space {
-	if err != nil {
-		panic(err)
-	}
-	return space
-}
-
 func TestDecodeSpace(t *testing.T) {
-	for i, space := range testSpaces {
+	for i, space := range testColorSpaces {
 		t.Run(fmt.Sprintf("%02d-%s", i, space.ColorSpaceFamily()), func(t *testing.T) {
 			r := pdf.NewData(pdf.V2_0)
 			rm := pdf.NewResourceManager(r)
@@ -94,4 +103,11 @@ func TestDecodeSpace(t *testing.T) {
 			}
 		})
 	}
+}
+
+func must(space Space, err error) Space {
+	if err != nil {
+		panic(err)
+	}
+	return space
 }

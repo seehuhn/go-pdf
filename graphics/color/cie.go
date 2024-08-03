@@ -66,15 +66,16 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, er
 	}, nil
 }
 
-// ColorSpaceFamily implements the [SpaceEmbedded] interface.
+// ColorSpaceFamily returns /CalGray.
+// This implements the [Space] interface.
 func (s *SpaceCalGray) ColorSpaceFamily() pdf.Name {
 	return FamilyCalGray
 }
 
-// New returns a new CalGray color.
-// The parameter gray must be in the range from 0 (black) to 1 (white).
-func (s *SpaceCalGray) New(gray float64) Color {
-	return colorCalGray{Space: s, Value: gray}
+// NumChannels returns 1.
+// This implements the [Space] interface.
+func (s *SpaceCalGray) NumChannels() int {
+	return 1
 }
 
 // Default returns the black in the CalGray color space.
@@ -83,12 +84,14 @@ func (s *SpaceCalGray) Default() Color {
 	return colorCalGray{Space: s, Value: 0}
 }
 
-// defaultValues implements the [Space] interface.
-func (s *SpaceCalGray) defaultValues() []float64 {
-	return []float64{0}
+// New returns a new CalGray color.
+// The parameter gray must be in the range from 0 (black) to 1 (white).
+func (s *SpaceCalGray) New(gray float64) Color {
+	return colorCalGray{Space: s, Value: gray}
 }
 
-// Embed implements the [Space] interface.
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "CalGray color space", pdf.V1_1); err != nil {
@@ -105,44 +108,6 @@ func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, e
 	}
 
 	return pdf.Array{pdf.Name("CalGray"), dict}, zero, nil
-}
-
-func readSpaceCalGray(r pdf.Getter, a pdf.Array) (s *SpaceCalGray, err error) {
-	defer func() {
-		if err != nil {
-			err = pdf.Wrap(err, "CalGray color space")
-		}
-	}()
-
-	if len(a) != 2 {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("invalid array length"),
-		}
-	}
-	param, err := pdf.GetDict(r, a[1])
-	if err != nil {
-		return nil, err
-	}
-
-	s = &SpaceCalGray{}
-
-	s.whitePoint, _ = getNumbers(r, param["WhitePoint"], 3)
-	if !isValidWhitePoint(s.whitePoint) {
-		s.whitePoint = WhitePointD65
-	}
-
-	s.blackPoint, _ = getNumbers(r, param["BlackPoint"], 3)
-	if len(s.blackPoint) != 3 {
-		s.blackPoint = []float64{0, 0, 0}
-	}
-
-	gamma, _ := pdf.GetNumber(r, param["Gamma"])
-	if err != nil || gamma <= 0 {
-		gamma = 1
-	}
-	s.gamma = float64(gamma)
-
-	return s, nil
 }
 
 type colorCalGray struct {
@@ -215,7 +180,8 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64) (*SpaceCalRGB, erro
 	}, nil
 }
 
-// Embed implements the [Space] interface.
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "CalRGB color space", pdf.V1_1); err != nil {
@@ -243,20 +209,22 @@ func (s *SpaceCalRGB) New(r, g, b float64) Color {
 	return colorCalRGB{Space: s, R: r, G: g, B: b}
 }
 
+// NumChannels returns 3.
+// This implements the [Space] interface.
+func (s *SpaceCalRGB) NumChannels() int {
+	return 3
+}
+
 // Default returns the black in the CalRGB color space.
 // This implements the [Space] interface.
 func (s *SpaceCalRGB) Default() Color {
 	return colorCalRGB{Space: s, R: 0, G: 0, B: 0}
 }
 
-// defaultValues implements the [Space] interface.
-func (s *SpaceCalRGB) defaultValues() []float64 {
-	return []float64{0, 0, 0}
-}
-
-// ColorSpaceFamily implements the [Space] interface.
+// ColorSpaceFamily returns /CalRGB.
+// This implements the [Space] interface.
 func (s *SpaceCalRGB) ColorSpaceFamily() pdf.Name {
-	return "CalRGB"
+	return FamilyCalRGB
 }
 
 type colorCalRGB struct {
@@ -317,28 +285,10 @@ func Lab(whitePoint, blackPoint, ranges []float64) (*SpaceLab, error) {
 	}, nil
 }
 
-// ColorSpaceFamily implements the [Space] interface.
+// ColorSpaceFamily returns /Lab.
+// This implements the [Space] interface.
 func (s *SpaceLab) ColorSpaceFamily() pdf.Name {
-	return "Lab"
-}
-
-// Embed implements the [Space] interface.
-func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
-	var zero pdf.Unused
-	if err := pdf.CheckVersion(rm.Out, "Lab color space", pdf.V1_1); err != nil {
-		return nil, zero, err
-	}
-
-	dict := pdf.Dict{}
-	dict["WhitePoint"] = toPDF(s.whitePoint)
-	if !isZero(s.blackPoint) {
-		dict["BlackPoint"] = toPDF(s.blackPoint)
-	}
-	if !isValues(s.ranges, -100, 100, -100, 100) {
-		dict["Range"] = toPDF(s.ranges)
-	}
-
-	return pdf.Array{FamilyLab, dict}, zero, nil
+	return FamilyLab
 }
 
 // New returns a new Lab color.
@@ -358,6 +308,12 @@ func (s *SpaceLab) New(l, a, b float64) (Color, error) {
 	}
 
 	return colorLab{Space: s, L: l, A: a, B: b}, nil
+}
+
+// NumChannels returns 3.
+// This implements the [Space] interface.
+func (s *SpaceLab) NumChannels() int {
+	return 3
 }
 
 // Default returns the black (or the closest representable color) in an Lab
@@ -380,21 +336,24 @@ func (s *SpaceLab) Default() Color {
 	return colorLab{Space: s, L: 0, A: a, B: b}
 }
 
-// defaultValues implements the [Space] interface.
-func (s *SpaceLab) defaultValues() []float64 {
-	a := 0.0
-	if a < s.ranges[0] {
-		a = s.ranges[0]
-	} else if a > s.ranges[1] {
-		a = s.ranges[1]
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
+func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+	if err := pdf.CheckVersion(rm.Out, "Lab color space", pdf.V1_1); err != nil {
+		return nil, zero, err
 	}
-	b := 0.0
-	if b < s.ranges[2] {
-		b = s.ranges[2]
-	} else if b > s.ranges[3] {
-		b = s.ranges[3]
+
+	dict := pdf.Dict{}
+	dict["WhitePoint"] = toPDF(s.whitePoint)
+	if !isZero(s.blackPoint) {
+		dict["BlackPoint"] = toPDF(s.blackPoint)
 	}
-	return []float64{0, a, b}
+	if !isValues(s.ranges, -100, 100, -100, 100) {
+		dict["Range"] = toPDF(s.ranges)
+	}
+
+	return pdf.Array{FamilyLab, dict}, zero, nil
 }
 
 type colorLab struct {

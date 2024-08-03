@@ -16,6 +16,10 @@
 
 package color
 
+import (
+	"testing"
+)
+
 // The following types implement the Color interface.
 var (
 	_ Color = colorDeviceGray(0)
@@ -26,8 +30,22 @@ var (
 	_ Color = colorLab{}
 	_ Color = colorICCBased{}
 	_ Color = colorColoredPattern{}
-	_ Color = (*colorUncoloredPattern)(nil)
+	_ Color = colorUncoloredPattern{}
 	_ Color = colorIndexed{}
-	// TODO(voss): Separation colour spaces
-	// TODO(voss): DeviceN colour spaces
+	_ Color = colorSeparation{}
+	_ Color = colorDeviceN{}
 )
+
+// TestColorsComparable verifies that Colors are comparable, and are not
+// implemented as pointers.  This is important because we use the "=="
+// operator to check for equality of colors.
+func TestColorsComparable(t *testing.T) {
+	for _, s := range testColorSpaces {
+		c1 := s.Default()
+		c2 := s.Default()
+
+		if c1 != c2 {
+			t.Errorf("equal colors are not equal: %T", c1)
+		}
+	}
+}

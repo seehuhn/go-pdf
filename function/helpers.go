@@ -14,13 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package color
+package function
 
-import (
-	"math"
-
-	"seehuhn.de/go/pdf"
-)
+import "seehuhn.de/go/pdf"
 
 func toPDF(x []float64) pdf.Array {
 	res := make(pdf.Array, len(x))
@@ -30,40 +26,19 @@ func toPDF(x []float64) pdf.Array {
 	return res
 }
 
-func isConst(x []float64, value float64) bool {
-	for _, xi := range x {
-		if math.Abs(xi-value) >= ε {
-			return false
+func fromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
+	a, err := pdf.GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]float64, len(a))
+	for i, obj := range a {
+		num, err := pdf.GetNumber(r, obj)
+		if err != nil {
+			return nil, err
 		}
+		res[i] = float64(num)
 	}
-	return true
+	return res, nil
 }
-
-func isZero(x []float64) bool {
-	return isConst(x, 0)
-}
-
-func isValues(x []float64, y ...float64) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	for i := range x {
-		if math.Abs(x[i]-y[i]) >= ε {
-			return false
-		}
-	}
-	return true
-}
-
-func isValidWhitePoint(x []float64) bool {
-	return len(x) == 3 &&
-		x[0] > 0 &&
-		math.Abs(x[1]-1) <= ε &&
-		x[2] > 0
-}
-
-func isValidBlackPoint(x []float64) bool {
-	return len(x) == 3 && x[0] >= 0 && x[1] >= 0 && x[2] >= 0
-}
-
-const ε = 1e-6

@@ -61,7 +61,7 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
-		want := color.NumValues(s.ColorSpace)
+		want := s.ColorSpace.NumChannels()
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
@@ -78,17 +78,9 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	if s.F == nil {
 		return nil, zero, errors.New("missing function")
 	}
-	switch F := s.F.(type) {
-	case nil:
-		return nil, zero, errors.New("missing Function")
-	case pdf.Array:
-		if len(F) != color.NumValues(s.ColorSpace) {
-			return nil, zero, errors.New("invalid Function")
-		}
-	case pdf.Dict, pdf.Reference:
-		// pass
-	default:
-		return nil, zero, fmt.Errorf("invalid Function: %T", s.F)
+	fn, _, err := pdf.ResourceManagerEmbed(rm, s.F)
+	if err != nil {
+		return nil, zero, err
 	}
 
 	csE, _, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
@@ -103,7 +95,7 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 			pdf.Number(s.X1), pdf.Number(s.Y1), pdf.Number(s.R1),
 			pdf.Number(s.X2), pdf.Number(s.Y2), pdf.Number(s.R2),
 		},
-		"Function": s.F,
+		"Function": fn,
 	}
 	if len(s.Background) > 0 {
 		dict["Background"] = toPDF(s.Background)

@@ -25,6 +25,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// JPEG creates a new PDF image from a JPEG image.
+// The file is stored in the DCTDecode format in the PDF file.
 func JPEG(src image.Image, opts *jpeg.Options) (Image, error) {
 	// convert to NRGBA format
 	b := src.Bounds()

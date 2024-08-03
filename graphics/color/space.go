@@ -18,9 +18,9 @@ package color
 
 import (
 	"fmt"
-	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/metadata"
 )
 
@@ -39,29 +39,34 @@ const (
 	FamilyDeviceN    pdf.Name = "DeviceN"
 )
 
+// Singleton objects for the color spaces which do not require any parameters.
+var (
+	DeviceGraySpace     = spaceDeviceGray{}
+	DeviceRGBSpace      = spaceDeviceRGB{}
+	DeviceCMYKSpace     = spaceDeviceCMYK{}
+	PatternColoredSpace = spacePatternColored{}
+	SRGBSpace           = spaceSRGB{}
+)
+
 // Space represents a PDF color space which can be embedded in a PDF file.
 type Space interface {
+	// ColorSpaceFamily returns the family of the color space.
+	ColorSpaceFamily() pdf.Name
+
+	// NumChannels returns the dimensionality of the color space.
+	NumChannels() int
+
 	// Embed adds the color space to a PDF file.
 	// This implements the pdf.Embedder interface.
 	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 
-	// ColorSpaceFamily returns the family of the color space.
-	ColorSpaceFamily() pdf.Name
-
 	// Default returns the default color of the color space.
 	Default() Color
-
-	defaultValues() []float64
-}
-
-// NumValues returns the number of color component values for the given color space.
-func NumValues(s Space) int {
-	return len(s.defaultValues())
 }
 
 // ReadSpace reads a color space from a PDF file.
 //
-// The argument desc is typically an value in the ColorSpace sub-dictionary of
+// The argument desc is typically a value in the ColorSpace sub-dictionary of
 // a Resources dictionary.
 func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 	d := newDecoder(r, desc)
@@ -136,6 +141,81 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			d.SetError(err)
 		}
 
+	case FamilyIndexed:
+		if len(d.args) < 3 {
+			d.MarkAsInvalid()
+			break
+		}
+		base, err := ReadSpace(r, d.args[0])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "base color space"))
+			break
+		}
+		hiVal, err := pdf.GetInteger(r, d.args[1])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "high value"))
+			break
+		} else if hiVal < 1 || hiVal > 255 {
+			d.MarkAsInvalid()
+			break
+		}
+
+		var lookup pdf.String
+		lookupData, err := pdf.Resolve(r, d.args[2])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "lookup table"))
+			break
+		}
+		switch obj := lookupData.(type) {
+		case pdf.String:
+			lookup = obj
+		case *pdf.Stream:
+			data, err := pdf.ReadAll(r, obj)
+			if err != nil {
+				d.SetError(pdf.Wrap(err, "lookup table"))
+				break
+			}
+			lookup = data
+		default:
+			d.MarkAsInvalid()
+			break
+		}
+		res = &SpaceIndexed{
+			NumCol: int(hiVal) + 1,
+			base:   base,
+			lookup: lookup,
+		}
+
+	case FamilySeparation:
+		if len(d.args) < 2 {
+			d.MarkAsInvalid()
+			break
+		}
+
+		name, err := pdf.GetName(r, d.args[0])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "colorant name"))
+			break
+		}
+
+		alternate, err := ReadSpace(r, d.args[1])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "alternate color space"))
+			break
+		}
+
+		trfm, err := function.Read(r, d.args[2])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "tint transform"))
+			break
+		}
+
+		res = &SpaceSeparation{
+			colorant:  name,
+			alternate: alternate,
+			trfm:      trfm,
+		}
+
 	case "CalCMYK": // deprecated
 		res = spaceDeviceCMYK{}
 
@@ -207,12 +287,7 @@ func newDecoder(r pdf.Getter, obj pdf.Object) *decoder {
 
 		case *pdf.Stream:
 			d.dict = y.Dict
-			r, err := pdf.DecodeStream(r, y, 0)
-			if err != nil {
-				d.SetError(err)
-				break
-			}
-			body, err := io.ReadAll(r)
+			body, err := pdf.ReadAll(r, y)
 			if err != nil {
 				d.SetError(err)
 				break
@@ -318,4 +393,15 @@ func (d *decoder) getArrayN(entry pdf.Name, n int) []float64 {
 		res[i] = float64(x)
 	}
 	return res
+}
+
+// IsSpecial reports whether the color space is a special color space.
+// The special color spaces are Pattern, Indexed, Separation, and DeviceN.
+func IsSpecial(s Space) bool {
+	switch s.ColorSpaceFamily() {
+	case FamilyPattern, FamilyIndexed, FamilySeparation, FamilyDeviceN:
+		return true
+	default:
+		return false
+	}
 }

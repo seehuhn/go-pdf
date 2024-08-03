@@ -19,7 +19,6 @@ package cff
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"math"
 
 	pscid "seehuhn.de/go/postscript/cid"
@@ -171,11 +170,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, erro
 	if err != nil {
 		return nil, err
 	}
-	stm, err := pdf.DecodeStream(r, stmObj, 0)
-	if err != nil {
-		return nil, err
-	}
-	data, err := io.ReadAll(stm)
+	data, err := pdf.ReadAll(r, stmObj)
 	if err != nil {
 		return nil, err
 	}

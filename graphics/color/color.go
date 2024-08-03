@@ -19,24 +19,12 @@ package color
 import (
 	"fmt"
 	"slices"
-
-	"seehuhn.de/go/pdf"
 )
 
 // Color represents a PDF color.
 type Color interface {
 	ColorSpace() Space
 	values() []float64
-}
-
-// Pattern represents a PDF pattern dictionary.
-type Pattern interface {
-	// IsColored returns true if the pattern is colored.
-	// This is the case for colored tiling patterns and shading patterns.
-	IsColored() bool
-
-	// Embed embeds the pattern in the PDF file.
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 }
 
 // CheckCurrent checks whether the changing from the current color to the new
@@ -60,7 +48,7 @@ func CheckCurrent(cur, new Color) (needsColorSpace bool, needsColor bool) {
 	if curCS != newCS {
 		needsColorSpace = true
 		currentPattern = nil
-		currentValues = newCS.defaultValues()
+		currentValues = newCS.Default().values()
 	} else {
 		currentValues = cur.values()
 	}
@@ -104,6 +92,9 @@ func Operator(c Color) ([]float64, Pattern, string) {
 	}
 }
 
+// Some commonly used white points.
+// These vectors can be used for the white point argument of the
+// [CalGray], [CalRGB], and [Lab] functions.
 var (
 	// WhitePointD65 represents the D65 whitepoint.
 	// The given values are CIE 1931 XYZ coordinates.

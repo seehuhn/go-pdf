@@ -19,7 +19,6 @@ package pdf
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -213,11 +212,7 @@ func TestStream(t *testing.T) {
 		},
 		R: rIn,
 	}
-	rOut, err := DecodeStream(nil, stream, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dataOut, err := io.ReadAll(rOut)
+	dataOut, err := ReadAll(nil, stream)
 	if err != nil {
 		t.Fatal(err)
 	}

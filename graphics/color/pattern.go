@@ -20,12 +20,41 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Pattern represents a PDF pattern.
+//
+// Use the functions in [seehuhn.de/go/pdf/graphics/pattern] to create pattern
+// objects.
+type Pattern interface {
+	// PatternType returns 1 for tiling patterns and 2 for shading patterns.
+	PatternType() int
+
+	// PaintType returns 1 for colored patterns and 2 for uncolored patterns.
+	PaintType() int
+
+	// Embed embeds the pattern in the PDF file.
+	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
+}
+
 // == colored patterns and shadings ==========================================
 
 // spacePatternColored is used for colored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
-// Embed implements the [Space] interface.
+// ColorSpaceFamily returns /Pattern.
+// This implements the [Space] interface.
+func (s spacePatternColored) ColorSpaceFamily() pdf.Name {
+	return FamilyPattern
+}
+
+// NumChannels returns 0, to indicate that no color values are needed for
+// colored patterns.
+// This implements the [Space] interface.
+func (s spacePatternColored) NumChannels() int {
+	return 0
+}
+
+// Embed adds the color space to a PDF file.
+// This implements the [Space] interface.
 func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
@@ -34,20 +63,10 @@ func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unu
 	return pdf.Name("Pattern"), zero, nil
 }
 
-// ColorSpaceFamily implements the [Space] interface.
-func (s spacePatternColored) ColorSpaceFamily() pdf.Name {
-	return FamilyPattern
-}
-
 // Default returns a pattern which causes nothing to be drawn.
 // This implements the [Space] interface.
 func (s spacePatternColored) Default() Color {
 	return colorColoredPattern{Pat: nil}
-}
-
-// defaultValues implements the [Space] interface.
-func (s spacePatternColored) defaultValues() []float64 {
-	return nil
 }
 
 type colorColoredPattern struct {
@@ -57,7 +76,7 @@ type colorColoredPattern struct {
 // PatternColored returns a new colored pattern as a PDF color.
 // This can be used with colored tiling patterns and with shading patterns.
 func PatternColored(p Pattern) Color {
-	if !p.IsColored() {
+	if p.PaintType() != 1 {
 		panic("pattern is not colored")
 	}
 	return colorColoredPattern{Pat: p}
@@ -85,6 +104,12 @@ func (s spacePatternUncolored) ColorSpaceFamily() pdf.Name {
 	return FamilyPattern
 }
 
+// NumChannels returns the number of color channels in the base color space.
+// This implements the [Space] interface.
+func (s spacePatternUncolored) NumChannels() int {
+	return s.base.NumChannels()
+}
+
 // Embed adds the pattern color space to the PDF file.
 // This implements the [Space] interface.
 func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
@@ -103,12 +128,7 @@ func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.U
 
 // Default returns a pattern which causes nothing to be drawn.
 func (s spacePatternUncolored) Default() Color {
-	return &colorUncoloredPattern{Pat: nil, Col: s.base.Default()}
-}
-
-// defaultValues implements the [Space] interface.
-func (s spacePatternUncolored) defaultValues() []float64 {
-	return s.base.defaultValues()
+	return colorUncoloredPattern{Pat: nil, Col: s.base.Default()}
 }
 
 type colorUncoloredPattern struct {
@@ -118,16 +138,16 @@ type colorUncoloredPattern struct {
 
 // PatternUncolored returns a new uncolored pattern as a PDF color.
 func PatternUncolored(p Pattern, col Color) Color {
-	if p.IsColored() {
+	if p.PaintType() != 2 {
 		panic("pattern is colored")
 	}
-	return &colorUncoloredPattern{Pat: p, Col: col}
+	return colorUncoloredPattern{Pat: p, Col: col}
 }
 
-func (c *colorUncoloredPattern) ColorSpace() Space {
+func (c colorUncoloredPattern) ColorSpace() Space {
 	return spacePatternUncolored{base: c.Col.ColorSpace()}
 }
 
-func (c *colorUncoloredPattern) values() []float64 {
+func (c colorUncoloredPattern) values() []float64 {
 	return c.Col.values()
 }

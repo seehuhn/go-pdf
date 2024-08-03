@@ -534,6 +534,19 @@ func (x *Stream) PDF(w io.Writer) error {
 	return err
 }
 
+// ReadAll reads the content of a stream and returns it as a byte slice.
+func ReadAll(r Getter, s *Stream) ([]byte, error) {
+	in, err := DecodeStream(r, s, 0)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(in)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 // Reference represents a reference to an indirect object in a PDF file.
 // The lowest 32 bits represent the object number, the next 16 bits the
 // generation number.

@@ -69,7 +69,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
 		return nil, zero, errors.New("invalid ColorSpace")
 	}
-	numComponents := color.NumValues(s.ColorSpace)
+	numComponents := s.ColorSpace.NumChannels()
 	if have := len(s.Background); have > 0 {
 		if have != numComponents {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
@@ -145,7 +145,11 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
 	if s.F != nil {
-		dict["Function"] = s.F
+		fn, _, err := pdf.ResourceManagerEmbed(rm, s.F)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["Function"] = fn
 	}
 
 	vertexBits := s.BitsPerFlag + 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
