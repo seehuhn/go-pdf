@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/matrix"
+	"seehuhn.de/go/pdf/graphics/pattern"
 	"seehuhn.de/go/pdf/reader/scanner"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -481,7 +482,29 @@ func (r *Reader) doNew() error {
 			}
 
 		case "SC", "SCN", "sc", "scn":
+			var values []float64
+		argLoop:
+			for len(op.Args) > 0 {
+				a := op.Args[0]
+				op.Args = op.Args[1:]
 
+				switch a := a.(type) {
+				case pdf.Integer:
+					values = append(values, float64(a))
+				case pdf.Real:
+					values = append(values, float64(a))
+				case pdf.Number:
+					values = append(values, float64(a))
+				case pdf.Name:
+					if r.Resources != nil && r.Resources.Pattern != nil {
+						pattern, err := pattern.Read(r.R, r.Resources.Pattern[a])
+						_ = pattern
+						_ = err
+						panic("not implemented")
+					}
+					break argLoop
+				}
+			}
 		}
 	}
 	return r.scanner.Error()

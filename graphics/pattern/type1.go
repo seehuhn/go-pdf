@@ -28,6 +28,27 @@ import (
 	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
+// TilingProperties describes the properties of a tiling pattern.
+type TilingProperties struct {
+	// TilingType is a a code that controls adjustments to the spacing of tiles
+	// relative to the device pixel grid.
+	TilingType int
+
+	// The pattern cell's bounding box.
+	// The pattern cell is clipped to this rectangle before it is painted.
+	BBox *pdf.Rectangle
+
+	// XStep is the horizontal spacing between pattern cells.
+	XStep float64
+
+	// YStep is the vertical spacing between pattern cells.
+	YStep float64
+
+	// Matrix is an array of six numbers specifying the pattern cell's matrix.
+	// Leave this empty to use the identity matrix.
+	Matrix matrix.Matrix
+}
+
 // NewColoredBuilder returns a Type1Builder for a colored tiling pattern.
 //
 // The resulting pattern can only be used with same resource manager as was

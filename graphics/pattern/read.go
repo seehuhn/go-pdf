@@ -18,26 +18,14 @@ package pattern
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/matrix"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// TilingProperties describes the properties of a tiling pattern.
-type TilingProperties struct {
-	// TilingType is a a code that controls adjustments to the spacing of tiles
-	// relative to the device pixel grid.
-	TilingType int
-
-	// The pattern cell's bounding box.
-	// The pattern cell is clipped to this rectangle before it is painted.
-	BBox *pdf.Rectangle
-
-	// XStep is the horizontal spacing between pattern cells.
-	XStep float64
-
-	// YStep is the vertical spacing between pattern cells.
-	YStep float64
-
-	// Matrix is an array of six numbers specifying the pattern cell's matrix.
-	// Leave this empty to use the identity matrix.
-	Matrix matrix.Matrix
+func Read(r pdf.Getter, obj pdf.Object) (color.Pattern, error) {
+	dict, err := pdf.GetDictTyped(r, obj, "Pattern")
+	if err != nil {
+		return nil, err
+	}
+	_ = dict
+	panic("not implemented")
 }
