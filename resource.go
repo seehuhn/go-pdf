@@ -24,12 +24,17 @@ import (
 // Embedder represents a PDF resource which has not yet been associated
 // with a PDF file.
 type Embedder[T any] interface {
-	// Embed embeds the resource into the PDF file
+	// Embed converts the Go representation of the object into a PDF object.
+	// The PDF object is returned as the first return value.
+	// The method may embed the object in the PDF file and return a reference.
+	// The second return value is a Go representation of the embedded object.
+	// In most cases, this value is not used and T can be set to [Unused].
 	Embed(rm *ResourceManager) (Object, T, error)
 }
 
 // Unused is a placeholder type for the second return value of the
-// Embedder.Embed method, in cases where the argument is not used.
+// Embedder.Embed method, in cases where no Go representation of the
+// embedded object is required.
 type Unused struct{}
 
 // ResourceManager helps to avoid duplicate resources in a PDF file.

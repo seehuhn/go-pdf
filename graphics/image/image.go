@@ -22,9 +22,9 @@ import (
 
 // Image represents a raster image which can be embedded in a PDF file.
 type Image interface {
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	Bounds() Rectangle
 	Subtype() pdf.Name
+	pdf.Embedder[pdf.Unused]
 }
 
 // Rectangle gives the dimensions of an image.

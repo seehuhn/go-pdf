@@ -53,15 +53,13 @@ type Space interface {
 	// ColorSpaceFamily returns the family of the color space.
 	ColorSpaceFamily() pdf.Name
 
-	// NumChannels returns the dimensionality of the color space.
-	NumChannels() int
-
-	// Embed adds the color space to a PDF file.
-	// This implements the pdf.Embedder interface.
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
+	// Channels returns the dimensionality of the color space.
+	Channels() int
 
 	// Default returns the default color of the color space.
 	Default() Color
+
+	pdf.Embedder[pdf.Unused]
 }
 
 // ReadSpace reads a color space from a PDF file.
@@ -192,7 +190,7 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		name, err := pdf.GetName(r, d.args[0])
+		colorant, err := pdf.GetName(r, d.args[0])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "colorant name"))
 			break
@@ -211,9 +209,49 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		}
 
 		res = &SpaceSeparation{
-			colorant:  name,
+			colorant:  colorant,
 			alternate: alternate,
 			trfm:      trfm,
+		}
+
+	case FamilyDeviceN:
+		if len(d.args) < 3 {
+			d.MarkAsInvalid()
+			break
+		}
+
+		colorants, err := getNames(r, d.args[0])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "colorant names"))
+			break
+		}
+
+		alternate, err := ReadSpace(r, d.args[1])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "alternate color space"))
+			break
+		}
+
+		trfm, err := function.Read(r, d.args[2])
+		if err != nil {
+			d.SetError(pdf.Wrap(err, "tint transform"))
+			break
+		}
+
+		var attr pdf.Dict
+		if len(d.args) >= 4 {
+			attr, err = pdf.GetDict(r, d.args[3])
+			if err != nil {
+				d.SetError(pdf.Wrap(err, "attributes"))
+				break
+			}
+		}
+
+		res = &SpaceDeviceN{
+			colorants: colorants,
+			alternate: alternate,
+			trfm:      trfm,
+			attr:      attr,
 		}
 
 	case "CalCMYK": // deprecated

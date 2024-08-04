@@ -28,4 +28,6 @@
 //     These patterns are non-repeating,
 //     the color is specified by a shading object.
 //     Use [Type2] structs for pattern objects of this type.
+//
+// All pattern types implement the [color.Pattern] interface.
 package pattern

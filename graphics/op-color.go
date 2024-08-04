@@ -59,10 +59,16 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 		w.Set |= StateStrokeColor
 	}
 
-	needsColorSpace, needsColor := color.CheckCurrent(cur, c)
+	cs := c.ColorSpace()
+	var needsColorSpace bool
+	switch cs.ColorSpaceFamily() {
+	case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
+		needsColorSpace = false
+	default:
+		needsColorSpace = cur == nil || cur.ColorSpace() != cs
+	}
 
 	if needsColorSpace {
-		cs := c.ColorSpace()
 		name, _, err := writerGetResourceName(w, catColorSpace, cs)
 		if err != nil {
 			w.Err = err
@@ -81,9 +87,10 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 		if w.Err != nil {
 			return
 		}
+		cur = cs.Default()
 	}
 
-	if needsColor {
+	if cur != c {
 		values, pattern, op := color.Operator(c)
 		for _, val := range values {
 			valString := format(val)

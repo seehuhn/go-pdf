@@ -72,9 +72,9 @@ func (s *SpaceCalGray) ColorSpaceFamily() pdf.Name {
 	return FamilyCalGray
 }
 
-// NumChannels returns 1.
+// Channels returns 1.
 // This implements the [Space] interface.
-func (s *SpaceCalGray) NumChannels() int {
+func (s *SpaceCalGray) Channels() int {
 	return 1
 }
 
@@ -118,11 +118,6 @@ type colorCalGray struct {
 // ColorSpace implements the [Color] interface.
 func (c colorCalGray) ColorSpace() Space {
 	return c.Space
-}
-
-// values implements the [Color] interface.
-func (c colorCalGray) values() []float64 {
-	return []float64{c.Value}
 }
 
 // == CalRGB =================================================================
@@ -206,19 +201,19 @@ func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, er
 // New returns a new CalRGB color.
 // The parameters r, g, and b must be in the range [0, 1].
 func (s *SpaceCalRGB) New(r, g, b float64) Color {
-	return colorCalRGB{Space: s, R: r, G: g, B: b}
+	return colorCalRGB{Space: s, Values: [3]float64{r, g, b}}
 }
 
-// NumChannels returns 3.
+// Channels returns 3.
 // This implements the [Space] interface.
-func (s *SpaceCalRGB) NumChannels() int {
+func (s *SpaceCalRGB) Channels() int {
 	return 3
 }
 
 // Default returns the black in the CalRGB color space.
 // This implements the [Space] interface.
 func (s *SpaceCalRGB) Default() Color {
-	return colorCalRGB{Space: s, R: 0, G: 0, B: 0}
+	return colorCalRGB{Space: s}
 }
 
 // ColorSpaceFamily returns /CalRGB.
@@ -228,18 +223,13 @@ func (s *SpaceCalRGB) ColorSpaceFamily() pdf.Name {
 }
 
 type colorCalRGB struct {
-	Space   *SpaceCalRGB
-	R, G, B float64
+	Space  *SpaceCalRGB
+	Values [3]float64 // R, G, B
 }
 
 // ColorSpace implements the [Color] interface.
 func (c colorCalRGB) ColorSpace() Space {
 	return c.Space
-}
-
-// values implements the [Color] interface.
-func (c colorCalRGB) values() []float64 {
-	return []float64{c.R, c.G, c.B}
 }
 
 // == Lab ====================================================================
@@ -307,12 +297,12 @@ func (s *SpaceLab) New(l, a, b float64) (Color, error) {
 			b, s.ranges[2], s.ranges[3])
 	}
 
-	return colorLab{Space: s, L: l, A: a, B: b}, nil
+	return colorLab{Space: s, Values: [3]float64{l, a, b}}, nil
 }
 
-// NumChannels returns 3.
+// Channels returns 3.
 // This implements the [Space] interface.
-func (s *SpaceLab) NumChannels() int {
+func (s *SpaceLab) Channels() int {
 	return 3
 }
 
@@ -333,7 +323,7 @@ func (s *SpaceLab) Default() Color {
 		b = s.ranges[3]
 	}
 
-	return colorLab{Space: s, L: 0, A: a, B: b}
+	return colorLab{Space: s, Values: [3]float64{0, a, b}}
 }
 
 // Embed adds the color space to a PDF file.
@@ -357,16 +347,11 @@ func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error
 }
 
 type colorLab struct {
-	Space   *SpaceLab
-	L, A, B float64
+	Space  *SpaceLab
+	Values [3]float64 // L, a, b
 }
 
 // ColorSpace implements the [Color] interface.
 func (c colorLab) ColorSpace() Space {
 	return c.Space
-}
-
-// values implements the [Color] interface.
-func (c colorLab) values() []float64 {
-	return []float64{c.L, c.A, c.B}
 }

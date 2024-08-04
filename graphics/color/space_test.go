@@ -80,6 +80,11 @@ var testColorSpaces = []Space{
 		Gamma: 1,
 	})),
 
+	must(DeviceN([]pdf.Name{"bar"}, DeviceRGBSpace, &function.Type2{
+		Y0:    []float64{1, 0, 0},
+		Y1:    []float64{0, 1, 0},
+		Gamma: 1,
+	}, nil)),
 	// TODO(voss): DeviceN colour spaces
 }
 

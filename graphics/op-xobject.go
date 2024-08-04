@@ -27,8 +27,8 @@ import (
 
 // XObject represents a PDF XObject.
 type XObject interface {
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	Subtype() pdf.Name
+	pdf.Embedder[pdf.Unused]
 }
 
 // DrawXObject draws a PDF XObject on the page.

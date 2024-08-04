@@ -39,9 +39,9 @@ func (s spaceDeviceGray) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceGray
 }
 
-// NumChannels returns 1.
+// Channels returns 1.
 // This implements the [Space] interface.
-func (s spaceDeviceGray) NumChannels() int {
+func (s spaceDeviceGray) Channels() int {
 	return 1
 }
 
@@ -62,11 +62,6 @@ func DeviceGray(gray float64) Color {
 // ColorSpace implements the [Color] interface.
 func (c colorDeviceGray) ColorSpace() Space {
 	return spaceDeviceGray{}
-}
-
-// values implements the [Color] interface.
-func (c colorDeviceGray) values() []float64 {
-	return []float64{float64(c)}
 }
 
 // == DeviceRGB ==============================================================
@@ -90,9 +85,9 @@ func (s spaceDeviceRGB) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceRGB
 }
 
-// NumChannels returns 3.
+// Channels returns 3.
 // This implements the [Space] interface.
-func (s spaceDeviceRGB) NumChannels() int {
+func (s spaceDeviceRGB) Channels() int {
 	return 3
 }
 
@@ -113,11 +108,6 @@ func DeviceRGB(r, g, b float64) Color {
 // ColorSpace implements the [Color] interface.
 func (c colorDeviceRGB) ColorSpace() Space {
 	return spaceDeviceRGB{}
-}
-
-// values implements the [Color] interface.
-func (c colorDeviceRGB) values() []float64 {
-	return c[:]
 }
 
 // == DeviceCMYK =============================================================
@@ -142,9 +132,9 @@ func (s spaceDeviceCMYK) ColorSpaceFamily() pdf.Name {
 	return FamilyDeviceCMYK
 }
 
-// NumChannels returns 4.
+// Channels returns 4.
 // This implements the [Space] interface.
-func (s spaceDeviceCMYK) NumChannels() int {
+func (s spaceDeviceCMYK) Channels() int {
 	return 4
 }
 
@@ -166,9 +156,4 @@ func DeviceCMYK(c, m, y, k float64) Color {
 // ColorSpace implements the [Color] interface.
 func (c colorDeviceCMYK) ColorSpace() Space {
 	return spaceDeviceCMYK{}
-}
-
-// values implements the [Color] interface.
-func (c colorDeviceCMYK) values() []float64 {
-	return c[:]
 }

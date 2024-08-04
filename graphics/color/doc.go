@@ -24,7 +24,7 @@
 //   - [DeviceCMYK] makes a DeviceCMYK color
 //   - [PatternColored] makes a "color" which draws a colored pattern
 //   - [PatternUncolored] makes a "color" which draws an uncolored pattern in a given color
-//   - [SRGB] makes a sRGB color (a special case of an ICC-based color)
+//   - [SRGB] makes an sRGB color (a special case of an ICC-based color)
 //
 // Other color spaces depend on parameters and need to be created using
 // generator functions:

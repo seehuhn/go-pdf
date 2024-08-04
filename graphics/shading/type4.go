@@ -69,7 +69,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
 		return nil, zero, errors.New("invalid ColorSpace")
 	}
-	numComponents := s.ColorSpace.NumChannels()
+	numComponents := s.ColorSpace.Channels()
 	if have := len(s.Background); have > 0 {
 		if have != numComponents {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",

@@ -54,8 +54,7 @@ type Font interface {
 	// PostScriptName returns the PostScript name of the font.
 	PostScriptName() string
 
-	// Embed adds the font to a PDF file.
-	Embed(rm *pdf.ResourceManager) (pdf.Object, Embedded, error)
+	pdf.Embedder[Embedded]
 }
 
 // Embedded represents a font which is already embedded in a PDF file.

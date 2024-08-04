@@ -60,7 +60,7 @@ func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
-		want := s.ColorSpace.NumChannels()
+		want := s.ColorSpace.Channels()
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)

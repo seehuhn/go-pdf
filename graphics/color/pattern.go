@@ -31,8 +31,7 @@ type Pattern interface {
 	// PaintType returns 1 for colored patterns and 2 for uncolored patterns.
 	PaintType() int
 
-	// Embed embeds the pattern in the PDF file.
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
+	pdf.Embedder[pdf.Unused]
 }
 
 // == colored patterns and shadings ==========================================
@@ -46,10 +45,10 @@ func (s spacePatternColored) ColorSpaceFamily() pdf.Name {
 	return FamilyPattern
 }
 
-// NumChannels returns 0, to indicate that no color values are needed for
+// Channels returns 0, to indicate that no color values are needed for
 // colored patterns.
 // This implements the [Space] interface.
-func (s spacePatternColored) NumChannels() int {
+func (s spacePatternColored) Channels() int {
 	return 0
 }
 
@@ -86,10 +85,6 @@ func (colorColoredPattern) ColorSpace() Space {
 	return spacePatternColored{}
 }
 
-func (c colorColoredPattern) values() []float64 {
-	return nil
-}
-
 // == uncolored patterns =====================================================
 
 // spacePatternUncolored represents the color space for uncolored patterns
@@ -104,10 +99,10 @@ func (s spacePatternUncolored) ColorSpaceFamily() pdf.Name {
 	return FamilyPattern
 }
 
-// NumChannels returns the number of color channels in the base color space.
+// Channels returns the number of color channels in the base color space.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) NumChannels() int {
-	return s.base.NumChannels()
+func (s spacePatternUncolored) Channels() int {
+	return s.base.Channels()
 }
 
 // Embed adds the pattern color space to the PDF file.
@@ -136,7 +131,8 @@ type colorUncoloredPattern struct {
 	Col Color
 }
 
-// PatternUncolored returns a new uncolored pattern as a PDF color.
+// PatternUncolored returns a new PDF color which draws the given pattern
+// using the given color.
 func PatternUncolored(p Pattern, col Color) Color {
 	if p.PaintType() != 2 {
 		panic("pattern is colored")
@@ -146,8 +142,4 @@ func PatternUncolored(p Pattern, col Color) Color {
 
 func (c colorUncoloredPattern) ColorSpace() Space {
 	return spacePatternUncolored{base: c.Col.ColorSpace()}
-}
-
-func (c colorUncoloredPattern) values() []float64 {
-	return c.Col.values()
 }

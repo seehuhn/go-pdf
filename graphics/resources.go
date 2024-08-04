@@ -26,6 +26,6 @@ import (
 // [seehuhn.de/go/pdf/graphics.Writer.DrawShading] method, or can be used as
 // the basis of a shading pattern.
 type Shading interface {
-	Embed(*pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	ShadingType() int
+	pdf.Embedder[pdf.Unused]
 }

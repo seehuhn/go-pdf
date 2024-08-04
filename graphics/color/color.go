@@ -18,52 +18,71 @@ package color
 
 import (
 	"fmt"
-	"slices"
+	"math"
 )
 
 // Color represents a PDF color.
 type Color interface {
 	ColorSpace() Space
-	values() []float64
 }
 
-// CheckCurrent checks whether the changing from the current color to the new
-// color requires a color space change and/or a color change.
-func CheckCurrent(cur, new Color) (needsColorSpace bool, needsColor bool) {
-	var curCS Space
-	if cur != nil {
-		curCS = cur.ColorSpace()
-	}
-	newCS := new.ColorSpace()
-
-	var currentPattern Pattern
-	switch cur := cur.(type) {
+// SCN returns a new color in the same color space as c, but with the given
+// component values and pattern (if c is from a pattern color space).
+func SCN(c Color, values []float64, pat Pattern) Color {
+	switch d := c.(type) {
+	case colorDeviceGray:
+		if len(values) >= 1 {
+			return colorDeviceGray(values[0])
+		}
+		return d
+	case colorDeviceRGB:
+		copy(d[:], values)
+		return d
+	case colorDeviceCMYK:
+		copy(d[:], values)
+		return d
+	case colorCalGray:
+		if len(values) >= 1 {
+			d.Value = values[0]
+		}
+		return d
+	case colorCalRGB:
+		copy(d.Values[:], values)
+		return d
+	case colorLab:
+		copy(d.Values[:], values)
+		return d
+	case colorICCBased:
+		copy(d.Values[:], values)
+		return d
+	case colorSRGB:
+		copy(d[:], values)
+		return d
 	case colorColoredPattern:
-		currentPattern = cur.Pat
-	case *colorUncoloredPattern:
-		currentPattern = cur.Pat
-	}
-
-	var currentValues []float64
-	if curCS != newCS {
-		needsColorSpace = true
-		currentPattern = nil
-		currentValues = newCS.Default().values()
-	} else {
-		currentValues = cur.values()
-	}
-
-	switch new := new.(type) {
-	case colorDeviceGray, colorDeviceRGB, colorDeviceCMYK:
-		// We use the "g", "rg" and "k" operators without setting the
-		// color space separately.
-		return false, needsColorSpace || !slices.Equal(currentValues, new.values())
-	case colorColoredPattern:
-		return needsColorSpace, currentPattern != new.Pat
-	case *colorUncoloredPattern:
-		return needsColorSpace, currentPattern != new.Pat || !slices.Equal(currentValues, new.values())
+		d.Pat = pat
+		return d
+	case colorUncoloredPattern:
+		d.Col = SCN(d.Col, values, nil)
+		d.Pat = pat
+		return d
+	case colorIndexed:
+		if len(values) >= 1 {
+			d.Index = int(math.Round(values[0]))
+		}
+		return d
+	case colorSeparation:
+		if len(values) >= 1 {
+			d.Tint = values[0]
+		}
+		return d
+	case colorDeviceN:
+		n := d.Space.Channels()
+		if len(values) >= n {
+			d.set(values[:n])
+		}
+		return d
 	default:
-		return needsColorSpace, !slices.Equal(currentValues, new.values())
+		panic(fmt.Sprintf("unknown color type %T", d))
 	}
 }
 
@@ -72,23 +91,67 @@ func CheckCurrent(cur, new Color) (needsColorSpace bool, needsColor bool) {
 // corresponding operator for filling operations is the operator name converted
 // to lower case.
 func Operator(c Color) ([]float64, Pattern, string) {
+	v := values(c)
 	switch c := c.(type) {
 	case colorDeviceGray:
-		return c.values(), nil, "G"
+		return v, nil, "G"
 	case colorDeviceRGB:
-		return c.values(), nil, "RG"
+		return v, nil, "RG"
 	case colorDeviceCMYK:
-		return c.values(), nil, "K"
-	case colorCalGray, colorCalRGB, colorLab:
-		return c.values(), nil, "SC"
-	case colorIndexed:
-		return c.values(), nil, "SC"
+		return v, nil, "K"
+	case colorCalGray:
+		return v, nil, "SC"
+	case colorCalRGB:
+		return v, nil, "SC"
+	case colorLab:
+		return v, nil, "SC"
+	case colorICCBased:
+		return v, nil, "SCN"
+	case colorSRGB:
+		return v, nil, "SCN"
 	case colorColoredPattern:
-		return nil, c.Pat, "SCN"
+		return v, c.Pat, "SCN"
 	case *colorUncoloredPattern:
-		return c.values(), c.Pat, "SCN"
+		return v, c.Pat, "SCN"
+	case colorIndexed:
+		return v, nil, "SC"
+	case colorSeparation:
+		return v, nil, "SCN"
+	case colorDeviceN:
+		return v, nil, "SCN"
 	default:
 		panic(fmt.Sprintf("unknown color type %T", c))
+	}
+}
+
+func values(c Color) []float64 {
+	switch c := c.(type) {
+	case colorDeviceGray:
+		return []float64{float64(c)}
+	case colorDeviceRGB:
+		return c[:]
+	case colorDeviceCMYK:
+		return c[:]
+	case colorCalGray:
+		return []float64{c.Value}
+	case colorCalRGB:
+		return c.Values[:]
+	case colorLab:
+		return c.Values[:]
+	case colorICCBased:
+		return c.Values[:c.Space.N]
+	case colorSRGB:
+		return c[:]
+	case *colorUncoloredPattern:
+		return values(c)
+	case colorIndexed:
+		return []float64{float64(c.Index)}
+	case colorSeparation:
+		return []float64{c.Tint}
+	case colorDeviceN:
+		return c.get()
+	default:
+		return nil
 	}
 }
 
@@ -96,15 +159,17 @@ func Operator(c Color) ([]float64, Pattern, string) {
 // These vectors can be used for the white point argument of the
 // [CalGray], [CalRGB], and [Lab] functions.
 var (
-	// WhitePointD65 represents the D65 whitepoint.
-	// The given values are CIE 1931 XYZ coordinates.
-	//
-	// https://en.wikipedia.org/wiki/Illuminant_D65
-	WhitePointD65 = []float64{0.95047, 1.0, 1.08883}
-
 	// WhitePointD50 represents the D50 whitepoint.
+	// This is often used in the printing industry.
 	// The given values are CIE 1931 XYZ coordinates.
 	//
 	// https://en.wikipedia.org/wiki/Standard_illuminant#Illuminant_series_D
 	WhitePointD50 = []float64{0.964212, 1.0, 0.8251883}
+
+	// WhitePointD65 represents the D65 whitepoint.
+	// This is often used in the computer industry.
+	// The given values are CIE 1931 XYZ coordinates.
+	//
+	// https://en.wikipedia.org/wiki/Illuminant_D65
+	WhitePointD65 = []float64{0.95047, 1.0, 1.08883}
 )

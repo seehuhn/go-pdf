@@ -88,16 +88,16 @@ func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
 	return FamilyICCBased
 }
 
-// NumChannels returns the number of color channels.
+// Channels returns the number of color channels.
 // This implements the [Space] interface.
-func (s *SpaceICCBased) NumChannels() int {
+func (s *SpaceICCBased) Channels() int {
 	return s.N
 }
 
 // Default returns the default color in an ICC-based color space.
 func (s *SpaceICCBased) Default() Color {
 	c := colorICCBased{Space: s}
-	copy(c.val[:], s.def)
+	copy(c.Values[:], s.def)
 	return c
 }
 
@@ -163,19 +163,15 @@ func (s *SpaceICCBased) New(values []float64) (Color, error) {
 	}
 
 	c := colorICCBased{Space: s}
-	copy(c.val[:], values)
+	copy(c.Values[:], values)
 	return c, nil
 }
 
 type colorICCBased struct {
-	Space *SpaceICCBased
-	val   [4]float64
+	Space  *SpaceICCBased
+	Values [4]float64
 }
 
 func (c colorICCBased) ColorSpace() Space {
 	return c.Space
-}
-
-func (c colorICCBased) values() []float64 {
-	return c.val[:c.Space.N]
 }

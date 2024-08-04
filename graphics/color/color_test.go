@@ -29,6 +29,7 @@ var (
 	_ Color = colorCalRGB{}
 	_ Color = colorLab{}
 	_ Color = colorICCBased{}
+	_ Color = colorSRGB{}
 	_ Color = colorColoredPattern{}
 	_ Color = colorUncoloredPattern{}
 	_ Color = colorIndexed{}

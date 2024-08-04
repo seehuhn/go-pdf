@@ -22,7 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-func Read(r pdf.Getter, obj pdf.Object) (fn Func, err error) {
+// Read extracts a function from a PDF file.
+func Read(r pdf.Getter, obj pdf.Object) (Func, error) {
 	ref, isIndirect := obj.(pdf.Reference)
 	singleUse := !isIndirect
 

@@ -32,9 +32,9 @@ func (s spaceSRGB) ColorSpaceFamily() pdf.Name {
 	return "ICCBased"
 }
 
-// NumChannels returns 3.
+// Channels returns 3.
 // This implements the [Space] interface.
-func (s spaceSRGB) NumChannels() int {
+func (s spaceSRGB) Channels() int {
 	return 3
 }
 
@@ -89,16 +89,14 @@ type colorSRGB [3]float64
 // The values r, g, and b should be in the range [0, 1].
 //
 // This is a special case of an ICCBased color space.
+//
+// See https://en.wikipedia.org/wiki/SRGB for details.
 func SRGB(r, g, b float64) Color {
 	return colorSRGB{r, g, b}
 }
 
 func (c colorSRGB) ColorSpace() Space {
 	return spaceSRGB{}
-}
-
-func (c colorSRGB) values() []float64 {
-	return c[:]
 }
 
 //go:embed icc/sRGB-v2-micro.icc

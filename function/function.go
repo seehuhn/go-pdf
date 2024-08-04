@@ -17,8 +17,6 @@
 package function
 
 import (
-	"fmt"
-
 	"seehuhn.de/go/pdf"
 )
 
@@ -27,9 +25,7 @@ type Func interface {
 	// Shape returns the number of input and output values of the function.
 	Shape() (int, int)
 
-	// Embed embeds the function in a PDF file.
-	// This method is used by [pdf.ResourceManager].
-	Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
+	pdf.Embedder[pdf.Unused]
 }
 
 // Type2 is an exponential interpolation function.
@@ -76,26 +72,4 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	}
 
 	return obj, zero, nil
-}
-
-type Interpolate struct {
-	XMin, XMax float64
-	Y0, Y1     []float64
-	YMin, YMax []float64
-	Gamma      float64
-}
-
-func (f *Interpolate) Check() error {
-	if f.XMin >= f.XMax {
-		return fmt.Errorf("invalid domain: [%f, %f]", f.XMin, f.XMax)
-	}
-	if float64(int(f.Gamma)) != f.Gamma && f.XMin < 0 {
-		return fmt.Errorf("invalid XMin for non-integer gamma: %f", f.XMin)
-	}
-	// TODO(voss): Is 0^0 allowed or not?  What is the value?
-	if f.Gamma < 0 && f.XMin <= 0 && f.XMax >= 0 {
-		return fmt.Errorf("invalid domain for negative gamma: [%f, %f]", f.XMin, f.XMax)
-	}
-
-	return nil
 }
