@@ -21,12 +21,15 @@ import (
 	"io"
 )
 
-// Embedder represents a PDF resource which has not yet been associated
-// with a PDF file.
+// Embedder represents a PDF resource (a font, image, pattern, etc.) which has
+// not yet been associated with a specific PDF file.
 type Embedder[T any] interface {
-	// Embed converts the Go representation of the object into a PDF object.
-	// The PDF object is returned as the first return value.
-	// The method may embed the object in the PDF file and return a reference.
+	// Embed converts the Go representation of the object into a PDF object,
+	// corresponding to the PDF version of the output file.
+	//
+	// The first return value is the PDF representation of the object.
+	// If the object is embedded in the PDF file, this may be a reference.
+	//
 	// The second return value is a Go representation of the embedded object.
 	// In most cases, this value is not used and T can be set to [Unused].
 	Embed(rm *ResourceManager) (Object, T, error)

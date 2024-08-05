@@ -26,7 +26,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/matrix"
-	"seehuhn.de/go/pdf/graphics/pattern"
 	"seehuhn.de/go/pdf/reader/scanner"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -139,12 +138,22 @@ func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
 	return r.ParseContentStream(body)
 }
 
-// TODO(voss): This is work in progress, once it is finished it will replace
-// the doOld method.
-func (r *Reader) doNew() error {
+// ParseContentStream parses a PDF content stream.
+func (r *Reader) ParseContentStream(in io.Reader) error {
+	r.scanner.SetInput(in)
+	err := r.do()
+	if err != nil {
+		return err
+	}
+	return r.scanner.Error()
+}
+
+func (r *Reader) do() error {
 	for r.scanner.Scan() {
 		op := r.scanner.Operator()
+		origArgs := op.Args
 
+	cmdSwitch:
 		switch op.Name {
 
 		// Table 56 – Graphics state operators
@@ -483,6 +492,7 @@ func (r *Reader) doNew() error {
 
 		case "SC", "SCN", "sc", "scn":
 			var values []float64
+			var pat color.Pattern
 		argLoop:
 			for len(op.Args) > 0 {
 				a := op.Args[0]
@@ -497,521 +507,91 @@ func (r *Reader) doNew() error {
 					values = append(values, float64(a))
 				case pdf.Name:
 					if r.Resources != nil && r.Resources.Pattern != nil {
-						pattern, err := pattern.Read(r.R, r.Resources.Pattern[a])
-						_ = pattern
-						_ = err
-						panic("not implemented")
+						pattern, err := readPattern(r.R, r.Resources.Pattern[a])
+						if pdf.IsMalformed(err) {
+							break cmdSwitch
+						} else if err != nil {
+							return err
+						}
+						pat = pattern
 					}
 					break argLoop
 				}
 			}
-		}
-	}
-	return r.scanner.Error()
-}
-
-// ParseContentStream parses a PDF content stream.
-func (r *Reader) ParseContentStream(in io.Reader) error {
-	r.scanner.SetInput(in)
-	for r.scanner.Scan() {
-		op := r.scanner.Operator()
-		err := r.doOld(op)
-		if err != nil {
-			return err
-		}
-	}
-	return r.scanner.Error()
-}
-
-// Do processes the given operator and arguments.
-// This updates the graphics state, and calls the appropriate callback
-// functions.
-func (r *Reader) doOld(op scanner.Operator) error {
-	origArgs := op.Args
-	args := op.Args
-
-	getInteger := func() (pdf.Integer, bool) {
-		if len(args) == 0 {
-			return 0, false
-		}
-		x, ok := args[0].(pdf.Integer)
-		args = args[1:]
-		return x, ok
-	}
-	getNum := func() (float64, bool) {
-		if len(args) == 0 {
-			return 0, false
-		}
-		x, ok := getNumber(args[0])
-		args = args[1:]
-		return x, ok
-	}
-	getName := func() (pdf.Name, bool) {
-		if len(args) == 0 {
-			return "", false
-		}
-		x, ok := args[0].(pdf.Name)
-		args = args[1:]
-		return x, ok
-	}
-	getString := func() (pdf.String, bool) {
-		if len(args) == 0 {
-			return nil, false
-		}
-		x, ok := args[0].(pdf.String)
-		args = args[1:]
-		return x, ok
-	}
-	getArray := func() (pdf.Array, bool) {
-		if len(args) == 0 {
-			return nil, false
-		}
-		x, ok := args[0].(pdf.Array)
-		args = args[1:]
-		return x, ok
-	}
-
-	// Operators are listed in the order of table 50 ("Operator categories") in
-	// ISO 32000-2:2020.
-
-doOps:
-	switch op.Name {
-
-	// == General graphics state =========================================
-
-	case "w": // line width
-		x, ok := getNum()
-		if ok {
-			r.LineWidth = float64(x)
-			r.Set |= graphics.StateLineWidth
-		}
-
-	case "J": // line cap style
-		x, ok := getInteger()
-		if ok {
-			if graphics.LineCapStyle(x) > 2 {
-				x = 0
+			if op.Name == "SC" || op.Name == "SCN" {
+				r.StrokeColor = color.SCN(r.StrokeColor, values, pat)
+			} else {
+				r.FillColor = color.SCN(r.FillColor, values, pat)
 			}
-			r.LineCap = graphics.LineCapStyle(x)
-			r.Set |= graphics.StateLineCap
-		}
 
-	case "j": // line join style
-		x, ok := getInteger()
-		if ok {
-			if graphics.LineJoinStyle(x) > 2 {
-				x = 0
+		case "G":
+			gray := op.GetNumber()
+			if op.OK() {
+				r.StrokeColor = color.DeviceGray(gray)
+				r.Set |= graphics.StateStrokeColor
 			}
-			r.LineJoin = graphics.LineJoinStyle(x)
-			r.Set |= graphics.StateLineJoin
-		}
 
-	case "M": // miter limit
-		x, ok := getNum()
-		if ok {
-			r.MiterLimit = float64(x)
-			r.Set |= graphics.StateMiterLimit
-		}
-
-	case "d": // dash pattern and phase
-		patObj, ok1 := getArray()
-		pattern, ok2 := convertDashPattern(patObj)
-		phase, ok3 := getNum()
-		if ok1 && ok2 && ok3 {
-			r.DashPattern = pattern
-			r.DashPhase = phase
-			r.Set |= graphics.StateLineDash
-		}
-
-	case "ri": // rendering intent
-		name, ok := getName()
-		if ok {
-			r.RenderingIntent = graphics.RenderingIntent(name)
-			r.Set |= graphics.StateRenderingIntent
-		}
-
-	case "i": // flatness tolerance
-		x, ok := getNum()
-		if ok {
-			r.FlatnessTolerance = float64(x)
-			r.Set |= graphics.StateFlatnessTolerance
-		}
-
-	case "gs": // Set parameters from graphics state parameter dictionary
-		name, ok := getName()
-		if ok {
-			// TODO(voss): use caching
-			newState, err := r.readExtGState(r.Resources.ExtGState[name])
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return err
+		case "g":
+			gray := op.GetNumber()
+			if op.OK() {
+				r.FillColor = color.DeviceGray(gray)
+				r.Set |= graphics.StateFillColor
 			}
-			newState.CopyTo(&r.State)
-		}
 
-	case "q":
-		r.stack = append(r.stack, graphics.State{
-			Parameters: r.Parameters.Clone(),
-			Set:        r.Set,
-		})
-
-	case "Q":
-		if len(r.stack) > 0 {
-			r.State = r.stack[len(r.stack)-1]
-			r.stack = r.stack[:len(r.stack)-1]
-		}
-
-	// == Special graphics state =========================================
-
-	case "cm":
-		m := matrix.Matrix{}
-		for i := 0; i < 6; i++ {
-			f, ok := getNum()
-			if !ok {
-				break doOps
+		case "RG":
+			red, green, blue := op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() {
+				r.StrokeColor = color.DeviceRGB(red, green, blue)
+				r.Set |= graphics.StateStrokeColor
 			}
-			m[i] = float64(f)
-		}
-		r.CTM = r.CTM.Mul(m) // TODO(voss): correct order?
 
-	// == Text objects ===================================================
-
-	case "BT": // Begin text object
-		r.TextMatrix = matrix.Identity
-		r.TextLineMatrix = matrix.Identity
-		r.Set |= graphics.StateTextMatrix
-
-	case "ET": // End text object
-
-	// == Text state =====================================================
-
-	case "Tc": // Set character spacing
-		x, ok := getNum()
-		if ok {
-			r.TextCharacterSpacing = x
-			r.Set |= graphics.StateTextCharacterSpacing
-		}
-
-	case "Tw": // Set word spacing
-		x, ok := getNum()
-		if ok {
-			r.TextWordSpacing = x
-			r.Set |= graphics.StateTextWordSpacing
-		}
-
-	case "Tz": // Set the horizontal scaling
-		x, ok := getNum()
-		if ok {
-			r.TextHorizontalScaling = x / 100
-			r.Set |= graphics.StateTextHorizontalScaling
-		}
-
-	case "TL": // Set the leading
-		x, ok := getNum()
-		if ok {
-			r.TextLeading = x
-			r.Set |= graphics.StateTextLeading
-		}
-
-	case "Tf": // Set text font and size
-		name, ok1 := getName()
-		size, ok2 := getNum()
-		if !ok1 || !ok2 || r.Resources == nil || r.Resources.Font == nil {
-			break
-		}
-		ref := r.Resources.Font[name]
-		if ref == nil {
-			break
-		}
-		F, err := r.ReadFont(ref, name)
-		if pdf.IsMalformed(err) {
-			break
-		} else if err != nil {
-			return pdf.Wrap(err, fmt.Sprintf("font %s", name))
-		}
-		r.TextFont = F
-		r.TextFontSize = size
-		r.Set |= graphics.StateTextFont
-
-	case "Tr": // text rendering mode
-		x, ok := getInteger()
-		if ok {
-			r.TextRenderingMode = graphics.TextRenderingMode(x)
-			r.Set |= graphics.StateTextRenderingMode
-		}
-
-	case "Ts": // Set text rise
-		x, ok := getNum()
-		if ok {
-			r.TextRise = x
-			r.Set |= graphics.StateTextRise
-		}
-
-	// == Text positioning ===============================================
-
-	case "Td": // Move text position
-		dx, ok1 := getNum()
-		dy, ok2 := getNum()
-		if ok1 && ok2 {
-			r.TextLineMatrix = matrix.Translate(dx, dy).Mul(r.TextLineMatrix)
-			r.TextMatrix = r.TextLineMatrix
-		}
-
-	case "TD": // Move text position and set leading
-		dx, ok1 := getNum()
-		dy, ok2 := getNum()
-		if ok1 && ok2 {
-			r.TextLeading = -dy
-			r.Set |= graphics.StateTextLeading
-			r.TextLineMatrix = matrix.Translate(dx, dy).Mul(r.TextLineMatrix)
-			r.TextMatrix = r.TextLineMatrix
-		}
-
-	case "Tm": // Set text matrix and text line matrix
-		m := matrix.Matrix{}
-		for i := 0; i < 6; i++ {
-			f, ok := getNum()
-			if !ok {
-				break doOps
+		case "rg":
+			red, green, blue := op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() {
+				r.FillColor = color.DeviceRGB(red, green, blue)
+				r.Set |= graphics.StateFillColor
 			}
-			m[i] = float64(f)
-		}
-		r.TextMatrix = m
-		r.TextLineMatrix = m
-		r.Set |= graphics.StateTextMatrix
 
-	case "T*": // Move to start of next text line
-		r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
-		r.TextMatrix = r.TextLineMatrix
-
-	// == Text showing ===================================================
-
-	case "Tj": // Show text
-		s, ok := getString()
-		if !ok {
-			break
-		}
-		r.processText(s)
-
-	case "'": // Move to next line and show text
-		s, ok := getString()
-		if ok {
-			r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
-			r.TextMatrix = r.TextLineMatrix
-			r.processText(s)
-		}
-
-	case "\"": // Set spacing, move to next line, and show text
-		aw, ok1 := getNum()
-		ac, ok2 := getNum()
-		s, ok3 := getString()
-		if ok1 && ok2 && ok3 {
-			r.TextWordSpacing = aw
-			r.TextCharacterSpacing = ac
-			r.Set |= graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
-			r.processText(s)
-		}
-
-	case "TJ": // Show text with kerning
-		a, ok := getArray()
-		if !ok {
-			break
-		}
-		for _, ai := range a {
-			switch ai := ai.(type) {
-			case pdf.String:
-				r.processText(ai)
-			case pdf.Number, pdf.Integer:
-				var d float64
-				switch ai := ai.(type) {
-				case pdf.Integer:
-					d = float64(ai)
-				case pdf.Real:
-					d = float64(ai)
-				case pdf.Number:
-					d = float64(ai)
-				default:
-					break doOps
-				}
-				d = d / 1000 * r.TextFontSize
-				switch r.TextFont.WritingMode() {
-				case 0:
-					r.TextMatrix = matrix.Translate(-d*r.TextHorizontalScaling, 0).Mul(r.TextMatrix)
-				case 1:
-					r.TextMatrix = matrix.Translate(0, -d).Mul(r.TextMatrix)
-				}
+		case "K":
+			c, m, y, k := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() {
+				r.StrokeColor = color.DeviceCMYK(c, m, y, k)
+				r.Set |= graphics.StateStrokeColor
 			}
-		}
 
-	// == Type 3 fonts ===================================================
-
-	// == Color ==========================================================
-
-	case "G": // stroking gray level
-		if len(args) < 1 {
-			break
-		}
-		gray, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.StrokeColor = color.DeviceGray(gray)
-		r.Set |= graphics.StateStrokeColor
-
-	case "g": // nonstroking gray level
-		if len(args) < 1 {
-			break
-		}
-		gray, ok := getNumber(args[0])
-		if !ok {
-			break
-		}
-		r.FillColor = color.DeviceGray(gray)
-		r.Set |= graphics.StateFillColor
-
-	case "RG": // nonstroking DeviceRGB color
-		if len(args) < 3 {
-			break
-		}
-		var red, green, blue float64
-		var ok bool
-		if red, ok = getNumber(args[0]); !ok {
-			break
-		}
-		if green, ok = getNumber(args[1]); !ok {
-			break
-		}
-		if blue, ok = getNumber(args[2]); !ok {
-			break
-		}
-		r.StrokeColor = color.DeviceRGB(red, green, blue)
-		r.Set |= graphics.StateStrokeColor
-
-	case "rg": // nonstroking DeviceRGB color
-		if len(args) < 3 {
-			break
-		}
-		var red, green, blue float64
-		var ok bool
-		if red, ok = getNumber(args[0]); !ok {
-			break
-		}
-		if green, ok = getNumber(args[1]); !ok {
-			break
-		}
-		if blue, ok = getNumber(args[2]); !ok {
-			break
-		}
-		r.FillColor = color.DeviceRGB(red, green, blue)
-		r.Set |= graphics.StateFillColor
-
-	case "K": // stroking DeviceCMYK color
-		if len(args) < 4 {
-			break
-		}
-		var cyan, magenta, yellow, black float64
-		var ok bool
-		if cyan, ok = getNumber(args[0]); !ok {
-			break
-		}
-		if magenta, ok = getNumber(args[1]); !ok {
-			break
-		}
-		if yellow, ok = getNumber(args[2]); !ok {
-			break
-		}
-		if black, ok = getNumber(args[3]); !ok {
-			break
-		}
-		r.StrokeColor = color.DeviceCMYK(cyan, magenta, yellow, black)
-		r.Set |= graphics.StateStrokeColor
-
-	case "k": // nonstroking DeviceCMYK color
-		if len(args) < 4 {
-			break
-		}
-		var cyan, magenta, yellow, black float64
-		var ok bool
-		if cyan, ok = getNumber(args[0]); !ok {
-			break
-		}
-		if magenta, ok = getNumber(args[1]); !ok {
-			break
-		}
-		if yellow, ok = getNumber(args[2]); !ok {
-			break
-		}
-		if black, ok = getNumber(args[3]); !ok {
-			break
-		}
-		r.FillColor = color.DeviceCMYK(cyan, magenta, yellow, black)
-		r.Set |= graphics.StateFillColor
-
-	// == Shading patterns ===============================================
-
-	// == Inline images ==================================================
-
-	// == XObjects =======================================================
-
-	// == Marked content =================================================
-
-	case "BMC": // Begin marked-content sequence
-		if len(args) < 1 {
-			break
-		}
-		name, ok := args[0].(pdf.Name)
-		if !ok {
-			break
-		}
-		// TODO(voss): do something with this information
-		_ = name
-
-	case "BDC": // Begin marked-content sequence with property list
-		if len(args) < 2 {
-			break
-		}
-		name, ok := args[0].(pdf.Name)
-		if !ok {
-			break
-		}
-		var dict pdf.Dict
-		switch a := args[1].(type) {
-		case pdf.Dict:
-			dict = a
-		case pdf.Name:
-			var err error
-			dict, err = pdf.GetDict(r.R, r.Resources.Properties[a])
-			if err != nil {
-				break
+		case "k":
+			c, m, y, k := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() {
+				r.FillColor = color.DeviceCMYK(c, m, y, k)
+				r.Set |= graphics.StateFillColor
 			}
+
+		// Table 76 - Shading operator
+
+		case "sh":
+			name := op.GetName()
+			if op.OK() {
+				_ = name
+				// TODO(voss): implement this
+			}
+
 		default:
-			break
+			if r.UnknownOp != nil {
+				err := r.UnknownOp(op.Name, op.Args)
+				if err != nil {
+					return err
+				}
+			}
 		}
 
-		// TODO(voss): do something with this information
-		_ = name
-		_ = dict
-
-	case "EMC": // End marked-content sequence
-
-		// == Compatibility ===================================================
-
-	default:
-		if r.UnknownOp != nil {
-			err := r.UnknownOp(op.Name, op.Args)
+		if r.EveryOp != nil {
+			err := r.EveryOp(op.Name, origArgs)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	if r.EveryOp != nil {
-		err := r.EveryOp(op.Name, origArgs)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return r.scanner.Error()
 }
 
 func (r *Reader) processText(s pdf.String) {

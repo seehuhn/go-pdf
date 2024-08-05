@@ -24,6 +24,31 @@ import (
 	"seehuhn.de/go/pdf/metadata"
 )
 
+// Space represents a PDF color space which can be embedded in a PDF file.
+type Space interface {
+	// ColorSpaceFamily returns the family of the color space.
+	ColorSpaceFamily() pdf.Name
+
+	// Channels returns the dimensionality of the color space.
+	Channels() int
+
+	// Default returns the default color of the color space.
+	Default() Color
+
+	pdf.Embedder[pdf.Unused]
+}
+
+// IsSpecial reports whether the color space is a special color space.
+// The special color spaces are Pattern, Indexed, Separation, and DeviceN.
+func IsSpecial(s Space) bool {
+	switch s.ColorSpaceFamily() {
+	case FamilyPattern, FamilyIndexed, FamilySeparation, FamilyDeviceN:
+		return true
+	default:
+		return false
+	}
+}
+
 // Color space families supported by PDF.
 const (
 	FamilyDeviceGray pdf.Name = "DeviceGray"
@@ -47,20 +72,6 @@ var (
 	PatternColoredSpace = spacePatternColored{}
 	SRGBSpace           = spaceSRGB{}
 )
-
-// Space represents a PDF color space which can be embedded in a PDF file.
-type Space interface {
-	// ColorSpaceFamily returns the family of the color space.
-	ColorSpaceFamily() pdf.Name
-
-	// Channels returns the dimensionality of the color space.
-	Channels() int
-
-	// Default returns the default color of the color space.
-	Default() Color
-
-	pdf.Embedder[pdf.Unused]
-}
 
 // ReadSpace reads a color space from a PDF file.
 //
@@ -431,15 +442,4 @@ func (d *decoder) getArrayN(entry pdf.Name, n int) []float64 {
 		res[i] = float64(x)
 	}
 	return res
-}
-
-// IsSpecial reports whether the color space is a special color space.
-// The special color spaces are Pattern, Indexed, Separation, and DeviceN.
-func IsSpecial(s Space) bool {
-	switch s.ColorSpaceFamily() {
-	case FamilyPattern, FamilyIndexed, FamilySeparation, FamilyDeviceN:
-		return true
-	default:
-		return false
-	}
 }
