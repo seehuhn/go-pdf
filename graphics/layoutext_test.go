@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/reader"
 )
 
@@ -141,29 +142,17 @@ func TestSpaceAdvance(t *testing.T) {
 }
 
 func BenchmarkTextLayout(b *testing.B) {
-	// F := standard.TimesRoman
-
-	F, err := gofont.Regular.New(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	// info, err := sfnt.ReadFile("../../otf/SourceSerif4-Regular.otf")
-	// if err != nil {
-	// 	b.Fatal(err)
-	// }
-	// F, err := cff.New(info)
-	// if err != nil {
-	// 	b.Fatal(err)
-	// }
-
-	b.ResetTimer()
-	for range b.N {
-		writeDummyDocument(io.Discard, F)
+	for _, info := range fonttypes.All {
+		b.Run(info.Label, func(b *testing.B) {
+			b.ResetTimer()
+			for range b.N {
+				writeDummyDocument(io.Discard, info.MakeFont)
+			}
+		})
 	}
 }
 
-func writeDummyDocument(w io.Writer, F font.Font) error {
+func writeDummyDocument(w io.Writer, makeFont func(*pdf.ResourceManager) font.Layouter) error {
 	words1 := strings.Fields(sampleText1)
 	words2 := strings.Fields(sampleText2)
 
@@ -172,6 +161,8 @@ func writeDummyDocument(w io.Writer, F font.Font) error {
 	if err != nil {
 		return err
 	}
+
+	F := makeFont(doc.RM)
 
 	setStyle := func(page *document.Page) {
 		page.TextSetFont(F, 10)

@@ -33,8 +33,10 @@ import (
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+var pages = flag.String("p", "", "Only include text on pages `A-B`")
 var xRange = flag.String("x", "", "Only include text at x coordinates `A-B`")
 
+var pageMin, pageMax int
 var xRangeMin, xRangeMax float64
 
 func main() {
@@ -59,6 +61,15 @@ func main() {
 		if err != nil || xRangeMin >= xRangeMax {
 			log.Fatalf("invalid x-range %q", *xRange)
 		}
+	}
+
+	if *pages != "" {
+		_, err := fmt.Sscanf(*pages, "%d-%d", &pageMin, &pageMax)
+		if err != nil || pageMin < 1 || pageMax < pageMin {
+			log.Fatalf("invalid page range %q", *pages)
+		}
+	} else {
+		pageMin, pageMax = 1, math.MaxInt
 	}
 
 	for _, fname := range flag.Args() {
@@ -103,20 +114,22 @@ func extractText(fname string) error {
 	}
 
 	pages := pagetree.NewIterator(r)
-	pageNo := 0
+	pageNo := 1
 	pages.All()(func(_ pdf.Reference, pageDict pdf.Dict) bool {
-		fmt.Println("Page", pageNo)
-		fmt.Println()
+		if pageNo >= pageMin {
+			fmt.Println("Page", pageNo)
+			fmt.Println()
 
-		err := contents.ParsePage(pageDict, matrix.Identity)
-		if err != nil {
-			log.Fatal(err)
+			err := contents.ParsePage(pageDict, matrix.Identity)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fmt.Println()
 		}
 
-		fmt.Println()
-
 		pageNo++
-		return true
+		return pageNo <= pageMax
 	})
 	return nil
 }
