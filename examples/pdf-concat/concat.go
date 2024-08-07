@@ -77,7 +77,7 @@ func (c *Concat) Close() error {
 	}
 	meta.Catalog.Pages = pagesRef
 
-	outline := outline.Tree{}
+	outline := &outline.Tree{}
 	for _, child := range c.children {
 		entry := outline.AddChild(child.Title)
 		entry.Action = pdf.Dict{
@@ -150,11 +150,11 @@ func (c *Concat) Append(fname string) error {
 	}
 
 	if outlineTree != nil {
-		oo, err := c.CopyOutline(copy, outlineTree.Children)
+		outline, err := c.CopyOutline(copy, outlineTree.Children)
 		if err != nil {
 			return err
 		}
-		child.Outline = oo
+		child.Outline = outline
 	}
 
 	c.children = append(c.children, child)

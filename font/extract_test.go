@@ -145,8 +145,8 @@ func FuzzExtract(f *testing.F) {
 	})
 }
 
-func extractX(r pdf.Getter) (font.Dict, error) {
-	page, err := pagetree.GetPage(r, 0)
+func extractX(r pdf.Getter) (Dict, error) {
+	_, page, err := pagetree.GetPage(r, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func extractX(r pdf.Getter) (font.Dict, error) {
 	return extractFont(r, fontDict)
 }
 
-func extractFont(r pdf.Getter, fontDict pdf.Object) (font.Dict, error) {
+func extractFont(r pdf.Getter, fontDict pdf.Object) (Dict, error) {
 	dicts, err := font.ExtractDicts(r, fontDict)
 	if err != nil {
 		return nil, err

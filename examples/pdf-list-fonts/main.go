@@ -50,7 +50,7 @@ func doit(fname string) error {
 	}
 	fontMap := make(map[pdf.Reference]bool)
 	for pageNo := 0; pageNo < numPages; pageNo++ {
-		pageDict, err := pagetree.GetPage(r, pageNo)
+		_, pageDict, err := pagetree.GetPage(r, pageNo)
 		if err != nil {
 			return err
 		}

@@ -75,7 +75,7 @@ func TestExtractText(t *testing.T) {
 				return nil
 			}
 
-			pageDict, err := pagetree.GetPage(r, 0)
+			_, pageDict, err := pagetree.GetPage(r, 0)
 			if err != nil {
 				t.Fatal(err)
 			}

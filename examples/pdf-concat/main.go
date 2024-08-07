@@ -47,14 +47,14 @@ func main() {
 		}
 	}
 
-	err := doit(*out, flag.Args())
+	err := concatFiles(*out, flag.Args())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func doit(out string, in []string) error {
+func concatFiles(out string, in []string) error {
 	v := pdf.V1_0
 	for _, fname := range in {
 		ver, err := getVersion(fname)

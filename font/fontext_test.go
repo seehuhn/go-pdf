@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
@@ -29,18 +28,22 @@ import (
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
-// The following types implement the [font.Dict] interface.
+// TODO(voss): remove
+type Dict interface {
+	Embed(w pdf.Putter, fontDictRef pdf.Reference) error
+}
+
 var (
-	_ font.Dict = (*type1.FontDict)(nil)
-	_ font.Dict = (*cff.FontDictSimple)(nil)
-	_ font.Dict = (*cff.FontDictComposite)(nil)
-	_ font.Dict = (*truetype.FontDictSimple)(nil)
-	_ font.Dict = (*truetype.FontDictComposite)(nil)
-	_ font.Dict = (*opentype.FontDictCFFSimple)(nil)
-	_ font.Dict = (*opentype.FontDictCFFComposite)(nil)
-	_ font.Dict = (*opentype.FontDictGlyfSimple)(nil)
-	_ font.Dict = (*opentype.FontDictGlyfComposite)(nil)
-	_ font.Dict = (*type3.EmbedInfo)(nil)
+	_ Dict = (*type1.FontDict)(nil)
+	_ Dict = (*cff.FontDictSimple)(nil)
+	_ Dict = (*cff.FontDictComposite)(nil)
+	_ Dict = (*truetype.FontDictSimple)(nil)
+	_ Dict = (*truetype.FontDictComposite)(nil)
+	_ Dict = (*opentype.FontDictCFFSimple)(nil)
+	_ Dict = (*opentype.FontDictCFFComposite)(nil)
+	_ Dict = (*opentype.FontDictGlyfSimple)(nil)
+	_ Dict = (*opentype.FontDictGlyfComposite)(nil)
+	_ Dict = (*type3.EmbedInfo)(nil)
 )
 
 // TestSpaceIsBlank tests that space characters of common fonts are blank.

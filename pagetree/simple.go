@@ -47,9 +47,9 @@ func NumPages(r pdf.Getter) (int, error) {
 // Page numbers start at 0.
 // Inheritable attributes are copied from the parent nodes.
 // The /Parent attribute is removed from the returned dictionary.
-func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
+func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 	if pageNo < 0 {
-		return nil, errors.New("invalid page number")
+		return 0, nil, errors.New("invalid page number")
 	}
 
 	meta := r.GetMeta()
@@ -63,25 +63,26 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 
 	seen := map[pdf.Object]bool{}
 	for len(kids) > 0 {
-		ref := kids[0]
+		obj := kids[0]
 		kids = kids[1:]
 
 		// load the page tree node
-		if r, ok := ref.(pdf.Reference); ok {
-			if seen[r] {
-				return nil, errInvalidPageTree
+		ref, ok := obj.(pdf.Reference)
+		if ok {
+			if seen[ref] {
+				return 0, nil, errInvalidPageTree
 			}
-			seen[r] = true
+			seen[ref] = true
 		}
-		pageTreeNode, err := pdf.GetDict(r, ref)
+		pageTreeNode, err := pdf.GetDict(r, obj)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 
 		// traverse the tree
 		tp, err := pdf.GetName(r, pageTreeNode["Type"])
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		switch tp {
 		case "Page":
@@ -98,15 +99,15 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 				}
 			}
 			delete(pageTreeNode, "Parent") // TODO(voss): why are we doing this?
-			return pageTreeNode, nil
+			return ref, pageTreeNode, nil
 
 		case "Pages":
 			count, err := pdf.GetInteger(r, pageTreeNode["Count"])
 			if err != nil {
-				return nil, err
+				return 0, nil, err
 			}
 			if count < 0 {
-				return nil, errInvalidPageTree
+				return 0, nil, errInvalidPageTree
 			} else if skip < count {
 				for _, name := range inheritable {
 					if tmp, ok := pageTreeNode[name]; ok {
@@ -116,7 +117,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 
 				kids, err = pdf.GetArray(r, pageTreeNode["Kids"])
 				if err != nil {
-					return nil, err
+					return 0, nil, err
 				}
 			} else {
 				// skip to next kid
@@ -124,15 +125,15 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Dict, error) {
 			}
 
 		default:
-			return nil, errInvalidPageTree
+			return 0, nil, errInvalidPageTree
 		}
 	}
 
 	numPages, err := NumPages(r)
 	if err == nil {
-		return nil, fmt.Errorf("page not found (valid page numbers are 0 to %d)", numPages-1)
+		return 0, nil, fmt.Errorf("page not found (valid page numbers are 0 to %d)", numPages-1)
 	}
-	return nil, errors.New("page not found")
+	return 0, nil, errors.New("page not found")
 }
 
 var errInvalidPageTree = errors.New("invalid page tree")
