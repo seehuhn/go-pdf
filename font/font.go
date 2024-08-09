@@ -89,10 +89,23 @@ const (
 	Vertical
 )
 
-// Dict is the low-level interface to represent a font in a PDF file.
-//
-// TODO(voss): remove?  move somewhere else?  make better use of this?
-// merge with Font?
-type Dict interface {
-	Embed(w pdf.Putter, fontDictRef pdf.Reference) error
+type EmbeddedNew interface {
+	WritingMode() WritingMode
+
+	// Width returns the width corresponding to a character code,
+	// in PDF text space units.
+	Width(cid CID) (float64, bool)
+
+	// Code converts a Glyph ID (with corresponding text) into a PDF character code.
+	Code(gid glyph.ID, rr []rune) CID
+
+	// Append appends the character code for a CID to a string.
+	Append(s pdf.String, cid CID) pdf.String
+
+	// AllCharacters iterates over all character codes in the font.
+	AllCharacters(s pdf.String) func(yield func(c CID) bool)
 }
+
+// CID represents a character ID in a composite font, or a (single byte)
+// character code in a simple font.
+type CID uint32

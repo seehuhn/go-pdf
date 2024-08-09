@@ -83,7 +83,7 @@ func extractText(fname string) error {
 	}
 
 	for _, pageNo := range []int{675, 676, 677} {
-		pageDict, err := pagetree.GetPage(r, pageNo)
+		_, pageDict, err := pagetree.GetPage(r, pageNo)
 		if err != nil {
 			return err
 		}

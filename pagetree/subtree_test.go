@@ -305,7 +305,7 @@ func FuzzInherit(f *testing.F) {
 		doc.GetMeta().Catalog.Pages = rootRef
 
 		for i, c := range data {
-			dict, err := GetPage(doc, i)
+			_, dict, err := GetPage(doc, i)
 			if err != nil {
 				t.Fatal(err)
 			}

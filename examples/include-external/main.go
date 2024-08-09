@@ -92,7 +92,7 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 	if err != nil {
 		return nil, nil, err
 	}
-	dict, err := pagetree.GetPage(r, 0)
+	_, dict, err := pagetree.GetPage(r, 0)
 	if err != nil {
 		return nil, nil, err
 	}
