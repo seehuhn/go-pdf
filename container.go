@@ -214,17 +214,20 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 }
 
 // Putter represents a PDF file opened for writing.
-// TODO(voss): find a better name for this
 type Putter interface {
-	Close() error
 	GetMeta() *MetaInfo
+
 	Alloc() Reference
+
 	Put(ref Reference, obj Object) error
-	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
 
 	// TODO(voss): allow to set the object ID for the containing stream?
 	// TODO(voss): rename to PutCompressed?
 	WriteCompressed(refs []Reference, objects ...Object) error
+
+	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
+
+	Close() error
 }
 
 // IsTagged returns true, if the PDF file is "tagged".
