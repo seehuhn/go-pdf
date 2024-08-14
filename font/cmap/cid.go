@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"iter"
 	"slices"
 
 	"golang.org/x/exp/maps"
@@ -59,7 +60,7 @@ type CIDEncoder interface {
 
 	AsText(pdf.String) []rune
 
-	AllCIDs(pdf.String) func(yield func([]byte, pscid.CID) bool)
+	AllCIDs(pdf.String) iter.Seq2[[]byte, pscid.CID]
 }
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
@@ -141,7 +142,7 @@ func (e *identityEncoder) AsText(s pdf.String) []rune {
 	return res
 }
 
-func (e *identityEncoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) {
+func (e *identityEncoder) AllCIDs(s pdf.String) iter.Seq2[[]byte, pscid.CID] {
 	return func(yield func([]byte, pscid.CID) bool) {
 		for len(s) >= 2 {
 			var code []byte
@@ -269,7 +270,7 @@ func (e *utf8Encoder) AsText(s pdf.String) []rune {
 	return []rune(string(s))
 }
 
-func (e *utf8Encoder) AllCIDs(s pdf.String) func(yield func([]byte, pscid.CID) bool) {
+func (e *utf8Encoder) AllCIDs(s pdf.String) iter.Seq2[[]byte, pscid.CID] {
 	return func(yield func([]byte, pscid.CID) bool) {
 		utf8cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
 			c, _ := utf8cs.Decode(code)

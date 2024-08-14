@@ -118,8 +118,7 @@ func (c *Concat) Append(fname string) error {
 	}
 
 	var copyError error
-	iter := pagetree.NewIterator(r)
-	iter.All()(func(oldRef pdf.Reference, dict pdf.Dict) bool {
+	for oldRef, dict := range pagetree.NewIterator(r).All() {
 		newRef := c.w.Alloc()
 
 		// Since we rebuild the page tree, we can't use `copy` to copy the page
@@ -130,12 +129,12 @@ func (c *Concat) Append(fname string) error {
 		newDict, err := copy.CopyDict(dict)
 		if err != nil {
 			copyError = err
-			return false
+			break
 		}
 		err = c.pages.AppendPageRef(newRef, newDict)
 		if err != nil {
 			copyError = err
-			return false
+			break
 		}
 
 		if child.FirstPage == 0 {
@@ -143,8 +142,7 @@ func (c *Concat) Append(fname string) error {
 		}
 
 		c.numPages++
-		return true
-	})
+	}
 	if copyError != nil {
 		return copyError
 	}

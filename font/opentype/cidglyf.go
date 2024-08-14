@@ -56,12 +56,11 @@ func (f *embeddedGlyfComposite) WritingMode() font.WritingMode {
 }
 
 func (f *embeddedGlyfComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	f.AllCIDs(s)(func(code []byte, cid pscid.CID) bool {
+	for code, cid := range f.AllCIDs(s) {
 		gid := f.GID(cid)
 		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
 		yield(width, len(code) == 1 && code[0] == ' ')
-		return true
-	})
+	}
 }
 
 func (f *embeddedGlyfComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

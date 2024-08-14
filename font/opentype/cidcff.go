@@ -52,13 +52,12 @@ func (f *embeddedCFFComposite) WritingMode() font.WritingMode {
 }
 
 func (f *embeddedCFFComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	f.AllCIDs(s)(func(code []byte, cid pscid.CID) bool {
+	for code, cid := range f.AllCIDs(s) {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.
 		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 		yield(width, len(code) == 1 && code[0] == ' ')
-		return true
-	})
+	}
 }
 
 func (f *embeddedCFFComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

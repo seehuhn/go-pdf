@@ -85,9 +85,8 @@ func extractText(fname string) error {
 		return nil
 	}
 
-	pages := pagetree.NewIterator(r)
 	pageNo := 1
-	pages.All()(func(_ pdf.Reference, pageDict pdf.Dict) bool {
+	for _, pageDict := range pagetree.NewIterator(r).All() {
 		if pageNo >= pageMin {
 			fmt.Println("Page", pageNo)
 			fmt.Println()
@@ -101,7 +100,9 @@ func extractText(fname string) error {
 		}
 
 		pageNo++
-		return pageNo <= pageMax
-	})
+		if pageNo > pageMax {
+			break
+		}
+	}
 	return nil
 }

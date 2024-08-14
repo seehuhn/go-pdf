@@ -139,13 +139,11 @@ func TestIterator(t *testing.T) {
 	var gotReferences []pdf.Reference
 	var gotResources []pdf.Object
 	var gotRotate []pdf.Object
-	iter := pagetree.NewIterator(data).All()
-	iter(func(ref pdf.Reference, dict pdf.Dict) bool {
+	for ref, dict := range pagetree.NewIterator(data).All() {
 		gotReferences = append(gotReferences, ref)
 		gotResources = append(gotResources, dict["Resources"])
 		gotRotate = append(gotRotate, dict["Rotate"])
-		return true
-	})
+	}
 
 	if d := cmp.Diff(refs, gotReferences); d != "" {
 		t.Fatalf("unexpected references (-want +got):\n%s", d)

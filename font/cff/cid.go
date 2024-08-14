@@ -46,13 +46,12 @@ func (f *embeddedComposite) WritingMode() font.WritingMode {
 }
 
 func (f *embeddedComposite) ForeachWidth(s pdf.String, yield func(float64, bool)) {
-	f.AllCIDs(s)(func(code []byte, cid pscid.CID) bool {
+	for code, cid := range f.AllCIDs(s) {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.
 		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 		yield(width, len(code) == 1 && code[0] == ' ')
-		return true
-	})
+	}
 }
 
 func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

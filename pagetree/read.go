@@ -17,6 +17,7 @@
 package pagetree
 
 import (
+	"iter"
 	"maps"
 
 	"seehuhn.de/go/pdf"
@@ -89,7 +90,7 @@ func NewIterator(r pdf.Getter) *Iterator {
 // should stop.
 //
 // TODO(voss): change this to iterate over (page number, page dictionary) pairs?
-func (i *Iterator) All() func(yield func(pdf.Reference, pdf.Dict) bool) {
+func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 	yield := func(yield func(pdf.Reference, pdf.Dict) bool) {
 		if i.Err != nil {
 			return

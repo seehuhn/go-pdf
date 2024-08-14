@@ -48,13 +48,11 @@ func main() {
 
 	// construct a map of page dictionary objects to page numbers
 	pageNumbers := map[pdf.Reference]int{}
-	iter := pagetree.NewIterator(doc).All()
 	pageNo := 0
-	iter(func(ref pdf.Reference, _ pdf.Dict) bool {
+	for ref := range pagetree.NewIterator(doc).All() {
 		pageNumbers[ref] = pageNo
 		pageNo++
-		return true
-	})
+	}
 
 	// print the tree
 	err = showTree(doc, pageNumbers, tree, "")

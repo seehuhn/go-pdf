@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //go:build ignore
-// +build ignore
 
 // The file "data" was extracted from table D.2 in the PDF spec.
 
