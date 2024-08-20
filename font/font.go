@@ -17,6 +17,8 @@
 package font
 
 import (
+	"iter"
+
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -92,9 +94,10 @@ const (
 type EmbeddedNew interface {
 	WritingMode() WritingMode
 
-	// Width returns the width corresponding to a character code,
-	// in PDF text space units.
-	Width(cid CID) (float64, bool)
+	// Width returns the width corresponding to a CID (for composite fonts) or
+	// a character code (for simple fonts).  The width is given in PDF text
+	// space units.
+	Width(cid CID) float64
 
 	// Code converts a Glyph ID (with corresponding text) into a PDF character code.
 	Code(gid glyph.ID, rr []rune) CID
@@ -103,7 +106,7 @@ type EmbeddedNew interface {
 	Append(s pdf.String, cid CID) pdf.String
 
 	// AllCharacters iterates over all character codes in the font.
-	AllCharacters(s pdf.String) func(yield func(c CID) bool)
+	AllCharacters(s pdf.String) iter.Seq[CID]
 }
 
 // CID represents a character ID in a composite font, or a (single byte)
