@@ -23,6 +23,39 @@ import (
 // CharCode represents a character code within a [CodeSpaceRange] as a non-negative integer.
 type CharCode int
 
+// Range represents a range of character codes.
+// The range is inclusive, i.e. the character codes Low and High are
+// part of the range.
+// Low and High must have the same length.
+type Range struct {
+	Low, High []byte
+}
+
+func (r Range) numCodes() CharCode {
+	var numCodes CharCode = 1
+	for i, low := range r.Low {
+		numCodes *= CharCode(r.High[i]-low) + 1
+	}
+	return numCodes
+}
+
+// Matches returns true, if the PDF string starts with a character code
+// in the given range.
+func (r Range) Matches(s pdf.String) bool {
+	if len(s) < len(r.Low) {
+		return false
+	}
+	for i, low := range r.Low {
+		if s[i] < low {
+			return false
+		}
+		if s[i] > r.High[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // CodeSpaceRange describes the ranges of byte sequences which are valid
 // character codes for a given encoding.
 type CodeSpaceRange []Range
@@ -140,39 +173,6 @@ tryNextRange:
 		return -1, 0
 	}
 	return -1, 1
-}
-
-// Range represents a range of character codes.
-// The range is inclusive, i.e. the character codes Low and High are
-// part of the range.
-// Low and High must have the same length.
-type Range struct {
-	Low, High []byte
-}
-
-func (r Range) numCodes() CharCode {
-	var numCodes CharCode = 1
-	for i, low := range r.Low {
-		numCodes *= CharCode(r.High[i]-low) + 1
-	}
-	return numCodes
-}
-
-// Matches returns true, if the PDF string starts with a character code
-// in the given range.
-func (r Range) Matches(s pdf.String) bool {
-	if len(s) < len(r.Low) {
-		return false
-	}
-	for i, low := range r.Low {
-		if s[i] < low {
-			return false
-		}
-		if s[i] > r.High[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // Simple represents the code space range for a simple font.
