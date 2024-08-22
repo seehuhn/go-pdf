@@ -38,7 +38,7 @@ func TestRoundTripCFFComposite(t *testing.T) {
 		{Low: []byte{0x04}, High: []byte{0x07}},
 		{Low: []byte{0x10, 0x12}, High: []byte{0x11, 0x13}},
 	}
-	ros := &cid.SystemInfo{
+	ros := &cmap.CIDSystemInfo{
 		Registry:   "Test",
 		Ordering:   "Sonderbar",
 		Supplement: 13,

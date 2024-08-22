@@ -31,7 +31,7 @@ import (
 // Info holds the information for a PDF CMap.
 type Info struct {
 	Name string
-	ROS  *cid.SystemInfo
+	ROS  *CIDSystemInfo
 	charcode.CodeSpaceRange
 	CSFile  charcode.CodeSpaceRange // TODO(voss): remove this
 	WMode   int
@@ -56,7 +56,7 @@ type RangeEntry struct {
 }
 
 // New allocates a new CMap object.
-func New(ROS *cid.SystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]cid.CID) *Info {
+func New(ROS *CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]cid.CID) *Info {
 	info := &Info{
 		ROS:            ROS,
 		CodeSpaceRange: cs,

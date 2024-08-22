@@ -21,7 +21,6 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/postscript/cid"
 )
 
 // References:
@@ -34,16 +33,16 @@ type WritingMode int
 
 const (
 	// Horizontal indicates horizontal writing mode.
-	Horizontal WritingMode = iota
+	Horizontal WritingMode = 0
 
 	// Vertical indicates vertical writing mode.
-	Vertical
+	Vertical WritingMode = 1
 )
 
 // InfoNew represents the information for a CMap used with a PDF composite font.
 type InfoNew struct {
 	Name   pdf.Name
-	ROS    *cid.SystemInfo
+	ROS    *CIDSystemInfo
 	WMode  WritingMode
 	Parent *InfoNew // This corresponds to the UseCMap entry in the PDF spec.
 

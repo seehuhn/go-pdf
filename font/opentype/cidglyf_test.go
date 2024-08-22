@@ -34,7 +34,7 @@ import (
 func TestRoundTripGlyfComposite(t *testing.T) {
 	ttf := makefont.TrueType()
 	cs := charcode.UCS2
-	ros := &cid.SystemInfo{
+	ros := &cmap.CIDSystemInfo{
 		Registry:   "Test",
 		Ordering:   "Merkwürdig",
 		Supplement: 7,

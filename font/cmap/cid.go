@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"strconv"
 
 	"golang.org/x/exp/maps"
 
@@ -32,6 +33,20 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )
+
+// CIDSystemInfo describes a character collection covered by a font.
+// A character collection implies an encoding which maps Character IDs to glyphs.
+//
+// See section 5.11.2 of the PLRM and section 9.7.3 of PDF 32000-1:2008.
+type CIDSystemInfo struct {
+	Registry   string
+	Ordering   string
+	Supplement int32
+}
+
+func (ROS *CIDSystemInfo) String() string {
+	return ROS.Registry + "-" + ROS.Ordering + "-" + strconv.Itoa(int(ROS.Supplement))
+}
 
 // CIDEncoder constructs and stores mappings from character codes
 // to CID values and from character codes to unicode strings.
@@ -293,7 +308,7 @@ type GIDToCID interface {
 	CID(glyph.ID, []rune) pscid.CID
 	GID(pscid.CID) glyph.ID
 
-	ROS() *pscid.SystemInfo
+	ROS() *CIDSystemInfo
 
 	GIDToCID(numGlyph int) []pscid.CID
 }
@@ -328,7 +343,7 @@ func (g *gidToCIDSequential) GID(cid pscid.CID) glyph.ID {
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) ROS() *pscid.SystemInfo {
+func (g *gidToCIDSequential) ROS() *CIDSystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
@@ -340,7 +355,7 @@ func (g *gidToCIDSequential) ROS() *pscid.SystemInfo {
 	}
 	sum := h.Sum(nil)
 
-	return &pscid.SystemInfo{
+	return &CIDSystemInfo{
 		Registry:   "Seehuhn",
 		Ordering:   fmt.Sprintf("%x", sum[:8]),
 		Supplement: 0,
@@ -375,8 +390,8 @@ func (g *gidToCIDIdentity) GID(cid pscid.CID) glyph.ID {
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) ROS() *pscid.SystemInfo {
-	return &pscid.SystemInfo{
+func (g *gidToCIDIdentity) ROS() *CIDSystemInfo {
+	return &CIDSystemInfo{
 		Registry:   "Adobe",
 		Ordering:   "Identity",
 		Supplement: 0,
