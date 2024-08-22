@@ -17,265 +17,378 @@
 package charcode
 
 import (
+	"errors"
 	"slices"
 
 	"golang.org/x/exp/maps"
 )
 
-// A Decoder efficiently decodes character codes from a byte stream.
-type Decoder struct {
-	tree []node
+// A Codec efficiently converts between sequences of bytes and uint32 character codes.
+type Codec struct {
+	// nodes is a linearised lookup tree.  The root of the nodes is at index 0.
+	nodes []linearizedNode
 }
 
-// node represents a node in the lookup tree of the Decoder.
-type node struct {
-	// The current input byte is compared to high.  If the input byte is less
-	// than or equal to high, the byte is consumed and child node becomes the
-	// new node.  Otherwise, the next node in Decoder.tree becomes the new node.
-	high byte
+// linearizedNode represents a node in the lookup tree of the [Codec].
+type linearizedNode struct {
+	// The current input byte is compared to bound.  If the input byte is less
+	// than or equal to bound, the input byte is consumed and the node
+	// described by child becomes the new node.  Otherwise, the lookup
+	// continues with the next node in Decoder.tree.
+	bound byte
 
 	// Child determines the next node if the input byte is less than or equal
-	// to high:
-	// - If child equals 0, the lookup stops, because the consumed byte
-	//   is the last byte of a valid character code.
-	// - If child equals MaxUint16-k, for k∈{0,1,2,3}, the lookup stopes
-	//   because an invalid character code was encountered.
-	//   An additional k bytes must be consumed to continue.
-	// - Otherwise, the child node is the index of the next node in Decoder.tree.
+	// to bound:
+	//
+	// - If child equals 0, the consumed byte
+	//   is the last byte of a valid character code and the lookup stops.
+	// - If child equals 0xFFFF - k, for k∈{0,1,2,3}, the input starts
+	//   with an invalid character code.  The lookup stops and
+	//   an additional k bytes must be consumed to continue.
+	// - For all other cases, the child node is the index of the next node in
+	//   Decoder.tree.
 	child uint16
 }
 
-// NewDecoder returns a new Decoder for the given code space range.
-func NewDecoder(csr CodeSpaceRange) *Decoder {
-	for _, r := range csr {
-		if len(r.Low) != len(r.High) && len(r.Low) > 0 && len(r.Low) <= 4 {
-			panic("charcode: invalid code space range")
+// These constants represent special values of the child field in a [node].
+const (
+	validLeaf       uint16 = 0x0000
+	invalidConsume3 uint16 = 0xfffc
+	invalidConsume2 uint16 = 0xfffd
+	invalidConsume1 uint16 = 0xfffe
+	invalidConsume0 uint16 = 0xffff
+)
+
+// NewCodec returns a new Decoder for the given code space range.
+// If the code space range is invalid, an error is returned.
+func NewCodec(ranges CodeSpaceRange) (*Codec, error) {
+	for _, r := range ranges {
+		if len(r.Low) != len(r.High) || len(r.Low) == 0 || len(r.Low) > 4 {
+			return nil, errInvalidCodeSpaceRange
 		}
 	}
 
-	ii := make([]int, 0, len(csr))
-	for i := range csr {
-		ii = append(ii, i)
+	tree, _, err := newTree(ranges, 0)
+	if err != nil {
+		return nil, err
 	}
 
-	tree, _ := newTmpTree(csr, ii, 0)
-	b := newBuilder()
-	b.Build(tree)
-
-	d := &Decoder{
-		tree: b.tree,
+	c := &Codec{
+		nodes: linearize(tree),
 	}
-	return d
+	return c, nil
 }
 
 // Decode decodes the first character code of an input byte sequence.
 // The method returns the character code, the number of bytes consumed,
 // and whether the character code is valid.
 //
-// The return value consumed is always less than or equal to the length of s.
-// If the length of s is non-zero, consumed is greater than zero.
+// The returned code contains the consumed bytes, with the first byte
+// in the least significant position.
 //
 // At the end of input, (0, 0, false) is returned.
-func (d *Decoder) Decode(s []byte) (code uint32, consumed int, valid bool) {
-	cur := uint16(0)
-	for len(s) > 0 {
-		var c byte
-		c, s = s[0], s[1:]
-		code |= uint32(c) << (8 * consumed)
+//
+// The return value consumed is always less than or equal to the length of s.
+// If the length of s is non-zero, consumed is greater than zero.
+func (c *Codec) Decode(s []byte) (code uint32, consumed int, valid bool) {
+	var cur uint16
+	for {
+		if len(s) == 0 {
+			return
+		}
+		var b byte
+		b, s = s[0], s[1:]
+
+		// Since codes are at most 4 bytes long, consumed can only be 0, 1, 2,
+		// or 3 at this point.
+		code |= uint32(b) << (8 * consumed)
 		consumed++
 
+		// Use a linear scan to find the correct child node.  If performance
+		// ever becomes an issue, the code could be restructured to use a
+		// binary tree here.
+		var node linearizedNode
 		for {
-			if c <= d.tree[cur].high {
-				cur = d.tree[cur].child
-				switch cur {
-				case leafValid:
-					valid = true
-					return
-				case invalidConsume3:
-					consumed += 3
-					return 0, consumed, false
-				case invalidConsume2:
-					consumed += 2
-					return 0, consumed, false
-				case invalidConsume1:
-					consumed++
-					return 0, consumed, false
-				case invalidConsume0:
-					return 0, consumed, false
-				}
+			node = c.nodes[cur]
+			if b <= node.bound {
 				break
 			}
 			cur++
 		}
-	}
 
-	return 0, consumed, false
+		next := node.child
+		switch next {
+		case validLeaf:
+			valid = true
+			return
+		case invalidConsume3:
+			if len(s) > 0 {
+				code |= uint32(s[0]) << (8 * consumed)
+				s = s[1:]
+				consumed++
+			}
+			fallthrough
+		case invalidConsume2:
+			if len(s) > 0 {
+				code |= uint32(s[0]) << (8 * consumed)
+				s = s[1:]
+				consumed++
+			}
+			fallthrough
+		case invalidConsume1:
+			if len(s) > 0 {
+				code |= uint32(s[0]) << (8 * consumed)
+				s = s[1:]
+				consumed++
+			}
+			fallthrough
+		case invalidConsume0:
+			return
+		default:
+			cur = next
+		}
+	}
 }
 
-type tmpTree map[byte]*tmpNode
+// AppendCode converts an uint32 code to bytes and appends the bytes to the
+// given slice.
+func (c *Codec) AppendCode(s []byte, code uint32) []byte {
+	// For trees generated by [newTree], cur increases with any iteration
+	// of the following loop.  Thus, the loop will always terminate.
 
-type tmpNode struct {
-	// A string representation of the effect of the sub-tree, used for
-	// deduplication.
-	//
-	// For leaf nodes with valid==false, this is []byte{0x00, consume}.
-	//
-	// For all other nodes this is []byte{0x01, high1, child1, high2, child2, ..., 0x02},
-	//
-	// The value is represented as a string so that it can be used as a key in
-	// a map.
-	desc string
+	cur := uint16(0) // root
+	for {
+		b := byte(code)
+		s = append(s, b)
+		code >>= 8
 
-	children tmpTree
+		var node linearizedNode
+		for {
+			node = c.nodes[cur]
+			if b <= node.bound {
+				break
+			}
+			cur++
+		}
 
-	// For leaf nodes, whether a valid code has been found.
-	valid bool
+		next := node.child
+		switch next {
+		case validLeaf:
+			return s
+		case invalidConsume3:
+			s = append(s, byte(code))
+			code >>= 8
+			fallthrough
+		case invalidConsume2:
+			s = append(s, byte(code))
+			code >>= 8
+			fallthrough
+		case invalidConsume1:
+			s = append(s, byte(code))
+			fallthrough
+		case invalidConsume0:
+			return s
+		default:
+			cur = next
+		}
+	}
+}
+
+// tree is an intermediate representation of the lookup tree.
+// For use in a [Codec] it is linearized into a slice of [linearizedNode].
+//
+// The map keys are the highest input byte values which correspond to a child node.
+type tree map[byte]*treeNode
+
+type treeNode struct {
+	// Desc is a string representation of the effect of the sub-tree rooted at
+	// the node.
+	//
+	// For leaf nodes with valid==false, this is {0x00, consume}.
+	//
+	// For all other nodes this is {0x01, child1, high1, child2, high2, ..., 0x02},
+	desc []byte
+
+	// children contains the child nodes of this node.
+	children tree
 
 	// For leaf nodes with valid==false, this is the number of addional bytes
-	// which must be consumed.
+	// to consume.
 	consume int
 }
 
-func newTmpTree(csr CodeSpaceRange, ii []int, pos int) (tmpTree, string) {
-	t := make(tmpTree)
+const (
+	descInvalid byte = iota
+	descValidBegin
+	descValidEnd
+)
 
-	minLength := minLength(csr, ii)
+// newTree returns a new lookup tree for the given code space range.
+func newTree(ranges CodeSpaceRange, depth int) (tree, []byte, error) {
+	t := make(tree)
 
 	breaks := make(map[int]bool)
 	breaks[0] = true
 	breaks[256] = true
-	for _, i := range ii {
-		r := csr[i]
-		breaks[int(r.Low[pos])] = true
-		breaks[int(r.High[pos])+1] = true
+	for _, r := range ranges {
+		breaks[int(r.Low[depth])] = true
+		breaks[int(r.High[depth])+1] = true
 	}
 	bSlice := maps.Keys(breaks)
 	slices.Sort(bSlice)
 
-	desc := []byte{0x01}
+	var childRanges CodeSpaceRange
 
-	var kk []int
+	desc := []byte{descValidBegin}
 	for j := 0; j < len(bSlice)-1; j++ {
 		low := byte(bSlice[j])
 		high := byte(bSlice[j+1] - 1)
 
 		// find all elements of ii which overlap [low, high]
-		kk = kk[:0]
-		for _, i := range ii {
-			r := csr[i]
-			if r.Low[pos] <= high && r.High[pos] >= low {
-				kk = append(kk, i)
+		childRanges = childRanges[:0]
+		for _, r := range ranges {
+			if r.Low[depth] <= high && r.High[depth] >= low {
+				childRanges = append(childRanges, r)
 			}
 		}
 
-		// At this point we have consumed the input bytes up to pos,
-		// we know that any of the ranges in kk could still apply,
-		// and bytes after pos must be used to decide which range to use.
+		// At this point we have consumed the input bytes up to depth,
+		// and we know that any of the childRanges still apply.
 
-		if len(kk) == 0 {
-			// There are no ranges in ii which overlap [low, high],
-			// so bytes in [low, high] must be invalid.
-			t[high] = &tmpNode{
-				desc:    string([]byte{0x00, byte(minLength - pos - 1)}),
-				valid:   false,
-				consume: minLength - pos - 1,
+		if len(childRanges) == 0 {
+			// There are no ranges which overlap [low, high],
+			// and thus byte values in [low, high] are invalid here.
+
+			// Section 9.7.6.3 (Handling undefined characters) of ISO
+			// 32000-2:2020 specifies the following: In case of an invalid
+			// code, the number of input bytes consumed is the length of the
+			// shortest code which contains the longest possible prefix of the
+			// given code.
+
+			minLength := minLength(ranges)
+			alreadyConsumed := depth + 1
+
+			t[high] = &treeNode{
+				desc:    []byte{descInvalid, byte(minLength - alreadyConsumed)},
+				consume: minLength - alreadyConsumed,
 			}
 			continue
 		}
 
-		isLeaf := true
-		for _, k := range kk {
-			if len(csr[k].Low) > pos+1 {
-				isLeaf = false
-				break
+		numLeaves := 0
+		for _, r := range childRanges {
+			if len(r.Low) == depth+1 {
+				numLeaves++
 			}
 		}
-		if isLeaf {
-			t[high] = &tmpNode{
-				desc:  string([]byte{0x01, 0x02}),
-				valid: true,
+		var node *treeNode
+		switch numLeaves {
+		case len(childRanges):
+			// All ranges end with this byte, so this is a leaf.
+			node = &treeNode{
+				desc: []byte{descValidBegin, descValidEnd},
 			}
-			desc = append(desc, high, 0x01, 0x02)
-			continue
+		case 0:
+			// All ranges have more bytes, so we use a sub-tree to
+			// decide which range to use, based on the following bytes.
+			cc, dd, err := newTree(childRanges, depth+1)
+			if err != nil {
+				return nil, nil, err
+			}
+			node = &treeNode{
+				desc:     dd,
+				children: cc,
+			}
+		default:
+			// Some ranges end with this byte, while other ranges allow for
+			// more bytes.  This is an error, since we cannot decide which
+			// range to use.  (No code may be a prefix of another code.)
+			return nil, nil, errInvalidCodeSpaceRange
 		}
 
-		cc, dd := newTmpTree(csr, kk, pos+1)
-		t[high] = &tmpNode{
-			desc:     dd,
-			children: cc,
-		}
+		t[high] = node
+		desc = append(desc, node.desc...)
 		desc = append(desc, high)
-		desc = append(desc, dd...)
 	}
+	desc = append(desc, descValidEnd)
 
-	desc = append(desc, 0x02)
-	return t, string(desc)
+	return t, desc, nil
 }
 
-func minLength(csr CodeSpaceRange, ii []int) int {
-	if len(ii) == 0 {
+func minLength(csr CodeSpaceRange) int {
+	if len(csr) == 0 {
+		// In order to avoid infinite loops in the decoder, we always consume
+		// at least one byte.
 		return 1
 	}
 
-	min := len(csr[ii[0]].Low)
-	for _, i := range ii[1:] {
-		if l := len(csr[i].Low); l < min {
+	min := len(csr[0].Low)
+	for _, r := range csr[1:] {
+		if l := len(r.Low); l < min {
 			min = l
 		}
 	}
 	return min
 }
 
-type builder struct {
-	tree []node
-
-	done map[string]uint16
+func linearize(t tree) []linearizedNode {
+	l := newLinearizer()
+	l.AppendNodes(t)
+	return l.nodes
 }
 
-func newBuilder() *builder {
-	done := make(map[string]uint16)
-	done[string([]byte{0x01, 0x02})] = leafValid
-	done[string([]byte{0x00, 0x03})] = invalidConsume3
-	done[string([]byte{0x00, 0x02})] = invalidConsume2
-	done[string([]byte{0x00, 0x01})] = invalidConsume1
-	done[string([]byte{0x00, 0x00})] = invalidConsume0
+type linearizer struct {
+	nodes []linearizedNode
+	done  map[string]uint16
+}
 
-	return &builder{
+func newLinearizer() *linearizer {
+	done := make(map[string]uint16)
+
+	// register the predefined values for the child field
+	done[string([]byte{descValidBegin, descValidEnd})] = validLeaf
+	done[string([]byte{descInvalid, 0x03})] = invalidConsume3
+	done[string([]byte{descInvalid, 0x02})] = invalidConsume2
+	done[string([]byte{descInvalid, 0x01})] = invalidConsume1
+	done[string([]byte{descInvalid, 0x00})] = invalidConsume0
+
+	return &linearizer{
 		done: done,
 	}
 }
 
-func (b *builder) Build(t tmpTree) uint16 {
+func (l *linearizer) AppendNodes(t tree) uint16 {
 	bb := maps.Keys(t)
 	slices.Sort(bb)
 
-	// reserve some space
-	base := len(b.tree)
+	// reserve space for the child nodes
+	base := len(l.nodes)
 	for _, high := range bb {
-		b.tree = append(b.tree, node{high: high})
+		l.nodes = append(l.nodes, linearizedNode{bound: high})
 	}
 
 	for i, high := range bb {
 		childNode := t[high]
 
-		idx, ok := b.done[childNode.desc]
+		idx, ok := l.done[string(childNode.desc)]
 		if ok {
-			b.tree[base+i].child = idx
+			l.nodes[base+i].child = idx
 			continue
 		}
 
-		childPos := b.Build(t[high].children)
-		b.tree[base+i].child = childPos
-		b.done[childNode.desc] = childPos
+		childPos := l.AppendNodes(t[high].children)
+		l.nodes[base+i].child = childPos
+		l.done[string(childNode.desc)] = childPos
+
+		// Here we verify the invariant that child links always point to
+		// nodes which are later in the slice.  This ensures that the
+		// loop in [Decoder.AppendCode] always terminates.
+		if int(childPos) <= base+i {
+			panic("unreachable")
+		}
 	}
 
 	return uint16(base)
 }
 
-const (
-	leafValid       uint16 = 0x0000
-	invalidConsume3 uint16 = 0xfffc
-	invalidConsume2 uint16 = 0xfffd
-	invalidConsume1 uint16 = 0xfffe
-	invalidConsume0 uint16 = 0xffff
-)
+var errInvalidCodeSpaceRange = errors.New("invalid code space range")

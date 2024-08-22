@@ -50,7 +50,7 @@ type embeddedGlyfComposite struct {
 }
 
 // WritingMode implements the [font.Embedded] interface.
-func (f *embeddedGlyfComposite) WritingMode() font.WritingMode {
+func (f *embeddedGlyfComposite) WritingMode() cmap.WritingMode {
 	// TODO(voss): implement this
 	return 0
 }

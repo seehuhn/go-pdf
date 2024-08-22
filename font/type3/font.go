@@ -127,7 +127,7 @@ type embedded struct {
 }
 
 // WritingMode implements the [font.Embedded] interface.
-func (f *embedded) WritingMode() font.WritingMode {
+func (f *embedded) WritingMode() cmap.WritingMode {
 	return 0
 }
 

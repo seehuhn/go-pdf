@@ -19,6 +19,7 @@ package font
 import (
 	"iter"
 
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -65,7 +66,7 @@ type Font interface {
 // convert Glyph IDs into PDF character codes, and to keep track of the
 // current text position in a PDF content stream.
 type Embedded interface {
-	WritingMode() WritingMode
+	WritingMode() cmap.WritingMode
 
 	ForeachWidth(s pdf.String, yield func(width float64, isSpace bool))
 
@@ -80,19 +81,8 @@ type Embedded interface {
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 }
 
-// WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
-type WritingMode int
-
-const (
-	// Horizontal indicates horizontal writing mode.
-	Horizontal WritingMode = iota
-
-	// Vertical indicates vertical writing mode.
-	Vertical
-)
-
 type EmbeddedNew interface {
-	WritingMode() WritingMode
+	WritingMode() cmap.WritingMode
 
 	// Width returns the width corresponding to a CID (for composite fonts) or
 	// a character code (for simple fonts).  The width is given in PDF text

@@ -121,14 +121,27 @@ func GetDictTyped(r Getter, obj Object, tp Name) (Dict, error) {
 	if dict == nil || err != nil {
 		return nil, err
 	}
-	val, err := GetName(r, dict["Type"])
+	err = CheckDictType(r, dict, tp)
 	if err != nil {
 		return nil, err
 	}
-	if val != tp && val != "" {
-		return nil, fmt.Errorf("expected dict type %q, got %q", tp, val)
-	}
+
 	return dict, nil
+}
+
+// CheckDictType checks that the "Type" entry of the dictionary, if present, is
+// equal to the given type.
+func CheckDictType(r Getter, obj Dict, wantType Name) error {
+	haveType, err := GetName(r, obj["Type"])
+	if err != nil {
+		return err
+	}
+	if haveType != wantType && haveType != "" {
+		return &MalformedFileError{
+			Err: fmt.Errorf("expected dict type %q, got %q", wantType, haveType),
+		}
+	}
+	return nil
 }
 
 // DecodeStream returns a reader for the decoded stream data.

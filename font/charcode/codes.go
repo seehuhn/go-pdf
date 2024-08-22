@@ -21,6 +21,8 @@ import (
 )
 
 // CharCode represents a character code within a [CodeSpaceRange] as a non-negative integer.
+//
+// TODO(voss): remove in favour of the uint32 values used in [Codec].
 type CharCode int
 
 // Range represents a range of character codes.
@@ -117,6 +119,8 @@ func (c CodeSpaceRange) firstCode(s pdf.String) (int, bool) {
 }
 
 // Append appends the given character code to the given PDF string.
+//
+// TODO(voss): remove in favour of [Codec.AppendCode].
 func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
 	for _, r := range c {
 		if numCodes := r.numCodes(); code >= numCodes {
@@ -143,8 +147,7 @@ func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
 // If the character code cannot be decoded, a code of -1 is returned,
 // and the length is either 0 (if the string is empty) or 1.
 //
-// TODO(voss): Remove?  Otherwise, fix the the number of bytes consumed
-// for invalid codes as described in the PDF spec.
+// TODO(voss): Remove in favour of [Codec.Decode].
 func (c CodeSpaceRange) Decode(s pdf.String) (CharCode, int) {
 	var base CharCode
 tryNextRange:

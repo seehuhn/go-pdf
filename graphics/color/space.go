@@ -73,11 +73,11 @@ var (
 	SRGBSpace           = spaceSRGB{}
 )
 
-// ReadSpace reads a color space from a PDF file.
+// ExtractSpace extracts a color space from a PDF file.
 //
 // The argument desc is typically a value in the ColorSpace sub-dictionary of
 // a Resources dictionary.
-func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
+func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 	d := newDecoder(r, desc)
 
 	var res Space
@@ -96,7 +96,7 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		if len(d.args) == 0 {
 			res = spacePatternColored{}
 		} else {
-			base, err := ReadSpace(r, d.args[0])
+			base, err := ExtractSpace(r, d.args[0])
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "base color space"))
 			} else {
@@ -155,7 +155,7 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			d.MarkAsInvalid()
 			break
 		}
-		base, err := ReadSpace(r, d.args[0])
+		base, err := ExtractSpace(r, d.args[0])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "base color space"))
 			break
@@ -207,7 +207,7 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		alternate, err := ReadSpace(r, d.args[1])
+		alternate, err := ExtractSpace(r, d.args[1])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "alternate color space"))
 			break
@@ -237,7 +237,7 @@ func ReadSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		alternate, err := ReadSpace(r, d.args[1])
+		alternate, err := ExtractSpace(r, d.args[1])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "alternate color space"))
 			break

@@ -1,3 +1,8 @@
+- Make sure that readers cannot get into infinite loops when resources
+  depend on each other in a cycle.
+- By more systematic about the use of pdf.MalformedFileError, and in
+  particular the `Loc` field there.
+
 - test that we don't write numbers like 0.6000000000000001 in content streams
 - test that the widths of the notdef character is correct for the
   standard 14 fonts

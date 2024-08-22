@@ -50,7 +50,7 @@ type embeddedSimple struct {
 }
 
 // WritingMode implements the [font.Embedded] interface.
-func (f *embeddedSimple) WritingMode() font.WritingMode {
+func (f *embeddedSimple) WritingMode() cmap.WritingMode {
 	return 0
 }
 

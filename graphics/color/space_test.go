@@ -99,7 +99,7 @@ func TestDecodeSpace(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			space2, err := ReadSpace(r, obj)
+			space2, err := ExtractSpace(r, obj)
 			if err != nil {
 				t.Fatal(err)
 			}

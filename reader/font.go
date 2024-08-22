@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
@@ -254,7 +255,7 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		res := &fromFileComposite{
 			name:        string(fontDicts.PostScriptName),
 			cs:          info.CMap.CodeSpaceRange,
-			writingMode: font.WritingMode(info.CMap.WMode),
+			writingMode: cmap.WritingMode(info.CMap.WMode),
 			glyph:       glyph,
 			fontData:    F,
 			key:         fontDicts.FontProgramRef,
@@ -333,7 +334,7 @@ func (f *fromFileSimple) PostScriptName() string {
 	return f.name
 }
 
-func (f *fromFileSimple) WritingMode() font.WritingMode {
+func (f *fromFileSimple) WritingMode() cmap.WritingMode {
 	return 0
 }
 
@@ -365,7 +366,7 @@ type fromFileComposite struct {
 	// name is the PostScript name of the font
 	name        string
 	cs          charcode.CodeSpaceRange
-	writingMode font.WritingMode
+	writingMode cmap.WritingMode
 	glyph       map[string]glyphData
 	fontData    interface{}
 	key         pdf.Reference
@@ -381,7 +382,7 @@ func (f *fromFileComposite) PostScriptName() string {
 	return f.name
 }
 
-func (f *fromFileComposite) WritingMode() font.WritingMode {
+func (f *fromFileComposite) WritingMode() cmap.WritingMode {
 	return f.writingMode
 }
 

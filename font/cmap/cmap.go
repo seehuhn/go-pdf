@@ -28,9 +28,6 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
-// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
-// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
-
 // Info holds the information for a PDF CMap.
 type Info struct {
 	Name string

@@ -47,7 +47,7 @@ type embeddedCFFComposite struct {
 	closed bool
 }
 
-func (f *embeddedCFFComposite) WritingMode() font.WritingMode {
+func (f *embeddedCFFComposite) WritingMode() cmap.WritingMode {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 

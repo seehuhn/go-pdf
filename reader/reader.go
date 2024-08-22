@@ -475,7 +475,7 @@ func (r *Reader) do() error {
 				}
 				csDesc = r.Resources.ColorSpace[name]
 			}
-			cs, err := color.ReadSpace(r.R, csDesc)
+			cs, err := color.ExtractSpace(r.R, csDesc)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
