@@ -41,11 +41,62 @@ import (
 type CIDSystemInfo struct {
 	Registry   string
 	Ordering   string
-	Supplement int32
+	Supplement pdf.Integer
+}
+
+// ExtractCIDSystemInfo extracts a CIDSystemInfo object from a PDF file.
+func ExtractCIDSystemInfo(r pdf.Getter, obj pdf.Object) (*CIDSystemInfo, error) {
+	dict, err := pdf.GetDict(r, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	var registry, ordering string
+	s, e1 := pdf.GetString(r, dict["Registry"])
+	registry = string(s)
+	s, e2 := pdf.GetString(r, dict["Ordering"])
+	ordering = string(s)
+
+	supplement, e3 := pdf.GetInteger(r, dict["Supplement"])
+
+	// only report errors if absolutely necessary
+	if registry == "" && ordering == "" && supplement == 0 {
+		if e1 != nil {
+			return nil, e1
+		}
+		if e2 != nil {
+			return nil, e2
+		}
+		if e3 != nil {
+			return nil, e3
+		}
+	}
+
+	return &CIDSystemInfo{
+		Registry:   registry,
+		Ordering:   ordering,
+		Supplement: supplement,
+	}, nil
 }
 
 func (ROS *CIDSystemInfo) String() string {
 	return ROS.Registry + "-" + ROS.Ordering + "-" + strconv.Itoa(int(ROS.Supplement))
+}
+
+// Embed converts the CIDSystemInfo object into a PDF object.
+// This implements the [pdf.Embedder] interface.
+func (ROS *CIDSystemInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	dict := pdf.Dict{
+		"Registry":   pdf.String(ROS.Registry),
+		"Ordering":   pdf.String(ROS.Ordering),
+		"Supplement": ROS.Supplement,
+	}
+
+	// TODO(voss): embed as an indirect object?
+
+	return dict, zero, nil
 }
 
 // CIDEncoder constructs and stores mappings from character codes

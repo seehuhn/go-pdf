@@ -120,7 +120,7 @@ func (f *embeddedCFFComposite) Close() error {
 		outlines.ROS = &cff.CIDSystemInfo{
 			Registry:   ros.Registry,
 			Ordering:   ros.Ordering,
-			Supplement: ros.Supplement,
+			Supplement: int64(ros.Supplement),
 		}
 		outlines.GIDToCID = gidToCID
 	}

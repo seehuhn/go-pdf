@@ -114,7 +114,7 @@ func (f *embeddedComposite) Close() error {
 		subsetCFF.ROS = &cff.CIDSystemInfo{
 			Registry:   ros.Registry,
 			Ordering:   ros.Ordering,
-			Supplement: ros.Supplement,
+			Supplement: int64(ros.Supplement),
 		}
 		subsetCFF.GIDToCID = gidToCID
 	}

@@ -52,7 +52,7 @@ type InfoNew struct {
 	NotdefRanges  []RangeEntry
 }
 
-func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
+func ExtractCMap(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
 			return nil, err
 		}
 		defer r.Close()
-		return readNew(r)
+		return readCMap(r)
 
 	case *pdf.Stream:
 		err := pdf.CheckDictType(r, obj.Dict, "CMap")
@@ -76,7 +76,7 @@ func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
 		if err != nil {
 			return nil, err
 		}
-		res, err := readNew(body)
+		res, err := readCMap(body)
 		if err != nil {
 			return nil, err
 		}
@@ -84,16 +84,23 @@ func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
 		if name, _ := pdf.GetName(r, obj.Dict["CMapName"]); name != "" {
 			res.Name = name
 		}
-
-		// TODO(voss): extract the other fields
-		panic("not implemented")
+		if ros, _ := ExtractCIDSystemInfo(r, obj.Dict["CIDSystemInfo"]); ros != nil {
+			res.ROS = ros
+		}
+		if x, _ := pdf.GetInteger(r, obj.Dict["WMode"]); x == 1 {
+			res.WMode = Vertical
+		}
+		if parent, _ := ExtractCMap(r, obj.Dict["UseCMap"]); parent != nil {
+			res.Parent = parent
+		}
+		return res, nil
 
 	default:
 		return nil, errInvalidCMap
 	}
 }
 
-func readNew(r io.Reader) (*InfoNew, error) {
+func readCMap(r io.Reader) (*InfoNew, error) {
 	panic("not implemented")
 }
 

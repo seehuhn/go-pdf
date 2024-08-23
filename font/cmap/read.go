@@ -97,7 +97,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		if supplement, ok := ROS["Supplement"].(postscript.Integer); !ok {
 			return nil, fmt.Errorf("invalid Supplement: %v", ROS["Supplement"])
 		} else {
-			ros.Supplement = int32(supplement)
+			ros.Supplement = pdf.Integer(supplement)
 		}
 		res.ROS = ros
 	}
