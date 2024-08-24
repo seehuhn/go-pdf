@@ -34,7 +34,8 @@ import (
 
 // A Builder is used to create a new type 3 font.
 //
-// Use the [Builder.Finish] method to create the actual font object.
+// Use [Builder.AddGlyph] to add glyphs to the font, and finally call
+// [Builder.Finish] method to create the font object.
 type Builder struct {
 	Glyphs map[string]*Glyph
 	rm     *pdf.ResourceManager
@@ -71,7 +72,7 @@ func (b *Builder) glyphList() []string {
 	return glyphNames
 }
 
-// Finish creates the actual font object.
+// Finish creates the font object.
 func (b *Builder) Finish(prop *Properties) (*Font, error) {
 	if err := b.checkIdle(); err != nil {
 		return nil, err

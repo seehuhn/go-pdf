@@ -23,7 +23,6 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/postscript"
-	pscmap "seehuhn.de/go/postscript/cmap"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -48,15 +47,15 @@ func ExtractToUnicode(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) 
 // ReadToUnicode reads a ToUnicode CMap.
 // If cs is not nil, it overrides the code space range given inside the CMap.
 func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) {
-	cmap, err := pscmap.Read(r)
+	raw, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, err
 	}
 
-	if tp, ok := cmap["CMapType"].(postscript.Integer); !ok || tp != 2 {
+	if tp, ok := raw["CMapType"].(postscript.Integer); ok && tp != 2 {
 		return nil, fmt.Errorf("invalid CMapType: %v", tp)
 	}
-	codeMap, ok := cmap["CodeMap"].(*postscript.CMapInfo)
+	codeMap, ok := raw["CodeMap"].(*postscript.CMapInfo)
 	if !ok {
 		return nil, fmt.Errorf("unsupported CMap format")
 	}
@@ -73,7 +72,7 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 		CS: cs,
 	}
 
-	for _, c := range codeMap.Chars {
+	for _, c := range codeMap.BfChars {
 		code, k := cs.Decode(c.Src)
 		if code < 0 || len(c.Src) != k {
 			return nil, fmt.Errorf("tounicode: invalid code <%02x>", c.Src)
@@ -87,7 +86,7 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 			Value: rr,
 		})
 	}
-	for _, r := range codeMap.Ranges {
+	for _, r := range codeMap.BfRanges {
 		low, k := cs.Decode(r.Low)
 		if low < 0 || len(r.Low) != k {
 			return nil, fmt.Errorf("tounicode: invalid first code <%02x>", r.Low)

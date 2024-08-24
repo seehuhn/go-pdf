@@ -676,7 +676,7 @@ func (x *Placeholder) PDF(w io.Writer) error {
 	}
 
 	// method 2: If we can seek, write whitespace for now and fill in
-	// the actual value later.
+	// the value later.
 	if pdf, ok := x.pdf.(*Writer); ok {
 		if _, ok := pdf.origW.(io.WriteSeeker); ok {
 			x.pos = append(x.pos, pdf.w.pos)

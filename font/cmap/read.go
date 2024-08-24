@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/postscript"
 	pscid "seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/cmap"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -58,7 +57,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
 }
 
 func Read(r io.Reader, other map[string]*Info) (*Info, error) {
-	cmap, err := cmap.Read(r)
+	raw, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, err
 	}
@@ -69,19 +68,19 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		WMode:          0,
 	}
 
-	if tp, ok := cmap["CMapType"].(postscript.Integer); !ok || !(tp == 0 || tp == 1) {
+	if tp, _ := raw["CMapType"].(postscript.Integer); !(tp == 0 || tp == 1) {
 		return nil, fmt.Errorf("invalid CMapType: %v", tp)
 	}
-	if name, ok := cmap["CMapName"].(postscript.Name); ok {
+	if name, ok := raw["CMapName"].(postscript.Name); ok {
 		res.Name = string(name)
 	} else {
-		return nil, fmt.Errorf("invalid CMapName: %v", cmap["CMapName"])
+		return nil, fmt.Errorf("invalid CMapName: %v", raw["CMapName"])
 	}
-	if wmode, ok := cmap["WMode"].(postscript.Integer); ok {
+	if wmode, ok := raw["WMode"].(postscript.Integer); ok {
 		res.WMode = int(wmode)
 	}
-	if ROS, ok := cmap["CIDSystemInfo"].(postscript.Dict); !ok {
-		return nil, fmt.Errorf("invalid CIDSystemInfo: %v", cmap["CIDSystemInfo"])
+	if ROS, ok := raw["CIDSystemInfo"].(postscript.Dict); !ok {
+		return nil, fmt.Errorf("invalid CIDSystemInfo: %v", raw["CIDSystemInfo"])
 	} else {
 		ros := &CIDSystemInfo{}
 		if registry, ok := ROS["Registry"].(postscript.String); !ok {
@@ -102,7 +101,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		res.ROS = ros
 	}
 
-	codeMap, ok := cmap["CodeMap"].(*postscript.CMapInfo)
+	codeMap, ok := raw["CodeMap"].(*postscript.CMapInfo)
 	if !ok {
 		return nil, fmt.Errorf("unsupported CMap format")
 	}
@@ -116,9 +115,9 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		if other == nil {
 			other = make(map[string]*Info)
 		}
-		if other, ok := other[codeMap.UseCMap]; ok {
+		if other, ok := other[string(codeMap.UseCMap)]; ok {
 			rr = append(rr, other.CodeSpaceRange...)
-		} else if other, ok := builtinCS[codeMap.UseCMap]; ok {
+		} else if other, ok := builtinCS[string(codeMap.UseCMap)]; ok {
 			rr = append(rr, other...)
 		} else {
 			return nil, fmt.Errorf("unknown CMap %q", codeMap.UseCMap)
@@ -132,7 +131,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	res.CodeSpaceRange = charcode.CodeSpaceRange(append(rr, rrFile...))
 	res.CSFile = charcode.CodeSpaceRange(rrFile)
 
-	for _, m := range codeMap.Chars {
+	for _, m := range codeMap.CidChars {
 		code, k := res.CodeSpaceRange.Decode(m.Src)
 		if k != len(m.Src) || code < 0 {
 			return nil, fmt.Errorf("invalid code <%02x>", m.Src)
@@ -147,7 +146,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		}
 	}
 
-	for _, m := range codeMap.Ranges {
+	for _, m := range codeMap.CidRanges {
 		low, k := res.CodeSpaceRange.Decode(m.Low)
 		if k != len(m.Low) || low < 0 {
 			return nil, fmt.Errorf("invalid code <%02x>", m.Low)
