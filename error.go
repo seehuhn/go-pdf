@@ -56,6 +56,14 @@ type MalformedFileError struct {
 	Loc []string
 }
 
+func Error(msg string) error {
+	return &MalformedFileError{Err: errors.New(msg)}
+}
+
+func Errorf(format string, args ...interface{}) error {
+	return &MalformedFileError{Err: fmt.Errorf(format, args...)}
+}
+
 func (err *MalformedFileError) Error() string {
 	parts := make([]string, 0, len(err.Loc)+2)
 	parts = append(parts, "invalid PDF: ")

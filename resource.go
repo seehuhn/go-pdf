@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"errors"
 	"fmt"
 	"io"
 )
@@ -115,4 +116,34 @@ func (rm *ResourceManager) Close() error {
 		}
 	}
 	return nil
+}
+
+// A CycleChecker checks for infinite recursion in PDF objects.
+type CycleChecker struct {
+	seen map[Reference]bool
+}
+
+// NewCycleChecker creates a new CycleChecker.
+func NewCycleChecker() *CycleChecker {
+	return &CycleChecker{seen: make(map[Reference]bool)}
+}
+
+// Check checks whether the given object is part of a recursive structure. If
+// the object is not a reference, nil is returned.  If the object is a reference
+// which has been seen before, ErrRecursiveStructure is returned.  Otherwise,
+// nil is returned and the reference is marked as seen.
+func (s *CycleChecker) Check(obj Object) error {
+	ref, ok := obj.(Reference)
+	if !ok {
+		return nil
+	}
+	if s.seen[ref] {
+		return ErrCycle
+	}
+	s.seen[ref] = true
+	return nil
+}
+
+var ErrCycle = &MalformedFileError{
+	Err: errors.New("cycle in recursive structure"),
 }
