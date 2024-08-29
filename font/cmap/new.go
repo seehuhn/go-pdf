@@ -17,7 +17,10 @@
 package cmap
 
 import (
+	"fmt"
 	"io"
+	"sync"
+	"text/template"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -31,6 +34,17 @@ import (
 
 // WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
 type WritingMode int
+
+func (m WritingMode) String() string {
+	switch m {
+	case Horizontal:
+		return "horizontal"
+	case Vertical:
+		return "vertical"
+	default:
+		return fmt.Sprintf("WritingMode(%d)", m)
+	}
+}
 
 const (
 	// Horizontal indicates horizontal writing mode.
@@ -71,11 +85,15 @@ type RangeEntryNew struct {
 
 type CID uint32
 
-func ExtractCMap(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
+func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
+	predefinedMu.Lock()
+	defer predefinedMu.Unlock()
+
 	cycle := pdf.NewCycleChecker()
 	return safeExtractCMap(r, cycle, obj)
 }
 
+// This must be called with predefinedMu locked.
 func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*InfoNew, error) {
 	if err := cycle.Check(obj); err != nil {
 		return nil, err
@@ -84,6 +102,12 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*In
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
+	}
+
+	if name, ok := obj.(pdf.Name); ok {
+		if res, ok := predefinedCMap[name]; ok {
+			return res, nil
+		}
 	}
 
 	var body io.Reader
@@ -135,6 +159,11 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*In
 
 	if parent != nil {
 		res.Parent, _ = safeExtractCMap(r, cycle, parent)
+	}
+
+	if name, ok := obj.(pdf.Name); ok {
+		predefinedCMap[name] = res
+		predefinedName[res] = name
 	}
 
 	return res, nil
@@ -231,9 +260,167 @@ func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
 		})
 	}
 
-	if len(res.CIDSingles) == 0 && len(res.CIDRanges) == 0 && len(res.NotdefSingles) == 0 && len(res.NotdefRanges) == 0 {
-		return nil, nil, pdf.Error("no CMAP entries found")
-	}
-
 	return res, parent, nil
 }
+
+func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	predefinedMu.Lock()
+	predefinedName, ok := predefinedName[c]
+	predefinedMu.Unlock()
+	if ok {
+		return predefinedName, zero, nil
+	}
+
+	ros, _, err := pdf.ResourceManagerEmbed(rm, c.ROS)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	dict := pdf.Dict{
+		"Type":          pdf.Name("CMap"),
+		"CMapName":      pdf.Name(c.Name),
+		"CIDSystemInfo": ros,
+	}
+	if c.WMode != Horizontal {
+		dict["WMode"] = pdf.Integer(c.WMode)
+	}
+	if c.Parent != nil {
+		parent, _, err := c.Parent.Embed(rm)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["UseCMap"] = parent
+	}
+
+	ref := rm.Out.Alloc()
+	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	if err != nil {
+		return nil, zero, err
+	}
+	err = cmapTmplNew.Execute(stm, c)
+	if err != nil {
+		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
+	}
+	err = stm.Close()
+	if err != nil {
+		return nil, zero, err
+	}
+
+	return ref, zero, nil
+}
+
+func singleChunksNew(x []SingleEntryNew) [][]SingleEntryNew {
+	var res [][]SingleEntryNew
+	for len(x) >= chunkSize {
+		res = append(res, x[:chunkSize])
+		x = x[chunkSize:]
+	}
+	if len(x) > 0 {
+		res = append(res, x)
+	}
+	return res
+}
+
+func rangeChunksNew(x []RangeEntryNew) [][]RangeEntryNew {
+	var res [][]RangeEntryNew
+	for len(x) >= chunkSize {
+		res = append(res, x[:chunkSize])
+		x = x[chunkSize:]
+	}
+	if len(x) > 0 {
+		res = append(res, x)
+	}
+	return res
+}
+
+var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
+	"PS": func(s string) string {
+		x := postscript.String(s)
+		return x.PS()
+	},
+	"PN": func(s pdf.Name) string {
+		x := postscript.Name(string(s))
+		return x.PS()
+	},
+	"B": func(x []byte) string {
+		return fmt.Sprintf("<%02x>", x)
+	},
+	"SingleChunks": singleChunksNew,
+	"Single": func(s SingleEntryNew) string {
+		return fmt.Sprintf("<%x> %d", s.Code, s.Value)
+	},
+	"RangeChunks": rangeChunksNew,
+	"Range": func(r RangeEntryNew) string {
+		return fmt.Sprintf("<%x> <%x> %d", r.First, r.Last, r.Value)
+	},
+}).Parse(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+{{if .Parent -}}
+{{PN .Parent.Name}} usecmap
+{{end -}}
+
+{{if .ROS -}}
+/CIDSystemInfo 3 dict dup begin
+/Registry {{PS .ROS.Registry}} def
+/Ordering {{PS .ROS.Ordering}} def
+/Supplement {{.ROS.Supplement}} def
+end def
+{{end -}}
+
+/CMapName {{PN .Name}} def
+/CMapType 1 def
+/WMode {{printf "%d" .WMode}} def
+{{with .CodeSpaceRange -}}
+{{len .}} begincodespacerange
+{{range . -}}
+{{B .Low}} {{B .High}}
+{{end -}}
+{{end -}}
+endcodespacerange
+
+{{range SingleChunks .CIDSingles -}}
+{{len .}} begincidchar
+{{range . -}}
+{{Single .}}
+{{end -}}
+endcidchar
+{{end -}}
+
+{{range RangeChunks .CIDRanges -}}
+{{len .}} begincidrange
+{{range . -}}
+{{Range .}}
+{{end -}}
+endcidrange
+{{end -}}
+
+{{range SingleChunks .NotdefSingles -}}
+{{len .}} beginnotdefchar
+{{range . -}}
+{{Single .}}
+{{end -}}
+endnotdefchar
+{{end -}}
+
+{{range RangeChunks .NotdefRanges -}}
+{{len .}} beginnotdefrange
+{{range . -}}
+{{Range .}}
+{{end -}}
+endnotdefrange
+{{end -}}
+
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`))
+
+var (
+	predefinedMu   sync.Mutex
+	predefinedCMap = make(map[pdf.Name]*InfoNew)
+	predefinedName = make(map[*InfoNew]pdf.Name)
+)
