@@ -45,8 +45,6 @@ type Instance struct {
 	Opt *font.Options
 }
 
-var _ font.Font = (*Instance)(nil) // TODO(voss): remove
-
 // New turns a sfnt.Font into a PDF CFF font.
 //
 // The font can be embedded as a simple font or as a composite font,
@@ -113,7 +111,8 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 	return seq
 }
 
-// Embed implements the [font.Font] interface.
+// Embed adds the font to a PDF file.
+// This implements the [font.Font] interface.
 func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
 	opt := f.Opt
 

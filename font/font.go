@@ -17,8 +17,6 @@
 package font
 
 import (
-	"iter"
-
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -79,24 +77,6 @@ type Embedded interface {
 	// As a side effect, this function may allocate codes for the given
 	// glyph/text combination in the font's encoding.
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
-}
-
-type EmbeddedNew interface {
-	WritingMode() cmap.WritingMode
-
-	// Width returns the width corresponding to a CID (for composite fonts) or
-	// a character code (for simple fonts).  The width is given in PDF text
-	// space units.
-	Width(cid CID) float64
-
-	// Code converts a Glyph ID (with corresponding text) into a PDF character code.
-	Code(gid glyph.ID, rr []rune) CID
-
-	// Append appends the character code for a CID to a string.
-	Append(s pdf.String, cid CID) pdf.String
-
-	// AllCharacters iterates over all character codes in the font.
-	AllCharacters(s pdf.String) iter.Seq[CID]
 }
 
 // CID represents a character ID in a composite font, or a (single byte)

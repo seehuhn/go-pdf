@@ -56,9 +56,10 @@ definition, without exception, shall always be used:
 endcodespacerange
 ```
 
-I believe the information from Adobe Technical Note #5411 is incorrect,
-both the claim that the codespace range is always 0x0000 to 0xFFFF and
-the claim that a ToUnicode CMap file maps CIDs (instead of character codes) to Unicode code points.
+I believe the information from Adobe Technical Note #5411 is incorrect, both
+the claim that the codespace range is always 0x0000 to 0xFFFF and the claim
+that a ToUnicode CMap file maps CIDs (instead of character codes) to Unicode
+code points.
 
 ### The character mappings
 

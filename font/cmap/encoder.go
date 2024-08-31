@@ -17,12 +17,8 @@
 package cmap
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
-	"fmt"
 	"iter"
 	"slices"
-	"strconv"
 
 	"golang.org/x/exp/maps"
 
@@ -34,71 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// CIDSystemInfo describes a character collection covered by a font.
-// A character collection implies an encoding which maps Character IDs to glyphs.
-//
-// See section 5.11.2 of the PLRM and section 9.7.3 of PDF 32000-1:2008.
-type CIDSystemInfo struct {
-	Registry   string
-	Ordering   string
-	Supplement pdf.Integer
-}
-
-// ExtractCIDSystemInfo extracts a CIDSystemInfo object from a PDF file.
-func ExtractCIDSystemInfo(r pdf.Getter, obj pdf.Object) (*CIDSystemInfo, error) {
-	dict, err := pdf.GetDict(r, obj)
-	if err != nil {
-		return nil, err
-	}
-
-	var registry, ordering string
-	s, e1 := pdf.GetString(r, dict["Registry"])
-	registry = string(s)
-	s, e2 := pdf.GetString(r, dict["Ordering"])
-	ordering = string(s)
-
-	supplement, e3 := pdf.GetInteger(r, dict["Supplement"])
-
-	// only report errors if absolutely necessary
-	if registry == "" && ordering == "" && supplement == 0 {
-		if e1 != nil {
-			return nil, e1
-		}
-		if e2 != nil {
-			return nil, e2
-		}
-		if e3 != nil {
-			return nil, e3
-		}
-	}
-
-	return &CIDSystemInfo{
-		Registry:   registry,
-		Ordering:   ordering,
-		Supplement: supplement,
-	}, nil
-}
-
-func (ROS *CIDSystemInfo) String() string {
-	return ROS.Registry + "-" + ROS.Ordering + "-" + strconv.Itoa(int(ROS.Supplement))
-}
-
-// Embed converts the CIDSystemInfo object into a PDF object.
-// This implements the [pdf.Embedder] interface.
-func (ROS *CIDSystemInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
-	var zero pdf.Unused
-
-	dict := pdf.Dict{
-		"Registry":   pdf.String(ROS.Registry),
-		"Ordering":   pdf.String(ROS.Ordering),
-		"Supplement": ROS.Supplement,
-	}
-
-	// TODO(voss): embed as an indirect object?
-
-	return dict, zero, nil
-}
-
 // CIDEncoder constructs and stores mappings from character codes
 // to CID values and from character codes to unicode strings.
 type CIDEncoder interface {
@@ -107,12 +38,6 @@ type CIDEncoder interface {
 	// It also records the fact that the character code corresponds to the
 	// given unicode string.
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
-
-	CodeAndCID(pdf.String, glyph.ID, []rune) (pdf.String, pscid.CID)
-
-	CS() charcode.CodeSpaceRange
-
-	Lookup(c charcode.CharCode) (pscid.CID, bool)
 
 	// CMap returns the mapping from character codes to CID values.
 	CMap() *Info
@@ -123,8 +48,6 @@ type CIDEncoder interface {
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
 	Subset() []glyph.ID
-
-	AsText(pdf.String) []rune
 
 	AllCIDs(pdf.String) iter.Seq2[[]byte, pscid.CID]
 }
@@ -152,25 +75,6 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 	e.toUnicode[code] = rr
 	e.used[gid] = struct{}{}
 	return charcode.UCS2.Append(s, code)
-}
-
-func (e *identityEncoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, pscid.CID) {
-	cid := e.g2c.CID(gid, rr)
-	code := charcode.CharCode(cid)
-	e.toUnicode[code] = rr
-	e.used[gid] = struct{}{}
-	return charcode.UCS2.Append(s, code), cid
-}
-
-func (e *identityEncoder) CS() charcode.CodeSpaceRange {
-	return charcode.UCS2
-}
-
-func (e *identityEncoder) Lookup(code charcode.CharCode) (pscid.CID, bool) {
-	if _, ok := e.toUnicode[code]; !ok {
-		return 0, false
-	}
-	return pscid.CID(code), true
 }
 
 func (e *identityEncoder) CMap() *Info {
@@ -300,15 +204,6 @@ func runeToCode(r rune) charcode.CharCode {
 	return code
 }
 
-func (e *utf8Encoder) CS() charcode.CodeSpaceRange {
-	return utf8cs
-}
-
-func (e *utf8Encoder) Lookup(code charcode.CharCode) (pscid.CID, bool) {
-	cid, ok := e.cmap[code]
-	return cid, ok
-}
-
 func (e *utf8Encoder) CMap() *Info {
 	return New(e.g2c.ROS(), utf8cs, e.cmap)
 }
@@ -351,109 +246,4 @@ var utf8cs = charcode.CodeSpaceRange{
 	{Low: []byte{0xC0, 0x80}, High: []byte{0xDF, 0xBF}},
 	{Low: []byte{0xE0, 0x80, 0x80}, High: []byte{0xEF, 0xBF, 0xBF}},
 	{Low: []byte{0xF0, 0x80, 0x80, 0x80}, High: []byte{0xF7, 0xBF, 0xBF, 0xBF}},
-}
-
-// GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
-// Identifier (CID) values.
-type GIDToCID interface {
-	CID(glyph.ID, []rune) pscid.CID
-	GID(pscid.CID) glyph.ID
-
-	ROS() *CIDSystemInfo
-
-	GIDToCID(numGlyph int) []pscid.CID
-}
-
-// NewGIDToCIDSequential returns a GIDToCID which assigns CID values
-// sequentially, starting with 1.
-func NewGIDToCIDSequential() GIDToCID {
-	return &gidToCIDSequential{
-		g2c: make(map[glyph.ID]pscid.CID),
-		c2g: make(map[pscid.CID]glyph.ID),
-	}
-}
-
-type gidToCIDSequential struct {
-	g2c map[glyph.ID]pscid.CID
-	c2g map[pscid.CID]glyph.ID
-}
-
-// GID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) pscid.CID {
-	cid, ok := g.g2c[gid]
-	if !ok {
-		cid = pscid.CID(len(g.g2c) + 1)
-		g.g2c[gid] = cid
-		g.c2g[cid] = gid
-	}
-	return cid
-}
-
-func (g *gidToCIDSequential) GID(cid pscid.CID) glyph.ID {
-	return g.c2g[cid]
-}
-
-// ROS implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) ROS() *CIDSystemInfo {
-	h := sha256.New()
-	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
-	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
-	gg := maps.Keys(g.g2c)
-	slices.Sort(gg)
-	for _, gid := range gg {
-		binary.Write(h, binary.BigEndian, gid)
-		binary.Write(h, binary.BigEndian, g.g2c[gid])
-	}
-	sum := h.Sum(nil)
-
-	return &CIDSystemInfo{
-		Registry:   "Seehuhn",
-		Ordering:   fmt.Sprintf("%x", sum[:8]),
-		Supplement: 0,
-	}
-}
-
-// GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) GIDToCID(numGlyph int) []pscid.CID {
-	res := make([]pscid.CID, numGlyph)
-	for gid, cid := range g.g2c {
-		res[gid] = cid
-	}
-	return res
-}
-
-// NewGIDToCIDIdentity returns a GIDToCID which uses the GID values
-// directly as CID values.
-func NewGIDToCIDIdentity() GIDToCID {
-	return &gidToCIDIdentity{}
-}
-
-type gidToCIDIdentity struct{}
-
-// GID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) CID(gid glyph.ID, _ []rune) pscid.CID {
-	return pscid.CID(gid)
-}
-
-// CID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GID(cid pscid.CID) glyph.ID {
-	return glyph.ID(cid)
-}
-
-// ROS implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) ROS() *CIDSystemInfo {
-	return &CIDSystemInfo{
-		Registry:   "Adobe",
-		Ordering:   "Identity",
-		Supplement: 0,
-	}
-}
-
-// GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []pscid.CID {
-	res := make([]pscid.CID, numGlyph)
-	for i := range res {
-		res[i] = pscid.CID(i)
-	}
-	return res
 }

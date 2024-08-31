@@ -44,6 +44,6 @@
 // # Data Types for Representing Fonts
 //
 //   - A [Font] represents a font before it is embedded into a PDF file.
-//   - A [Layouter] is a font which includes enough information to typeset text.
+//   - A [Layouter] is a font which includes enough information to typeset new text.
 //   - The type [Embedded] represents a font within a PDF file.
 package font
