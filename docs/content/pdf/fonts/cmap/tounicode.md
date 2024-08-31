@@ -1,4 +1,10 @@
-# Notes about ToUnicode CMaps
++++
+title = 'ToUnicode CMaps'
+date = 2024-08-31T22:21:57+01:00
+draft = true
++++
+
+# ToUnicode CMaps
 
 ToUnicode CMaps are used in PDF files to map character codes to Unicode
 code points.  They are a special kind of CMap file.
@@ -102,7 +108,7 @@ endcodespacerange
 
 - Adobe Technical Note #5411, "ToUnicode Mapping File Tutorial" (May 2003).
   Some of the information in this document seems to be incorrect.
-  https://www.adobe.com/content/dam/acom/en/devnet/acrobat/pdfs/5411.ToUnicode.pdf
+  https://pdfa.org/norm-refs/5411.ToUnicode.pdf
 
 - "PostScript® LANGUAGE REFERENCE", third edition.
   This describes CMap files in general, but has no information specific to ToUnicode CMaps.

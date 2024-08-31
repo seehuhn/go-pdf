@@ -37,8 +37,8 @@ type linearizedNode struct {
 	// continues with the next node in Decoder.tree.
 	bound byte
 
-	// Child determines the next node if the input byte is less than or equal
-	// to bound:
+	// Child determines the next node, in case the input byte is less than or
+	// equal to bound:
 	//
 	// - If child equals 0, the consumed byte
 	//   is the last byte of a valid character code and the lookup stops.

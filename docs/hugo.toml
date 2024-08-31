@@ -1,0 +1,3 @@
+baseURL = 'https://seehuhn.github.io/go-pdf/'
+languageCode = 'en-GB'
+title = 'Go-PDF Documentation'

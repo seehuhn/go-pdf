@@ -1,0 +1,17 @@
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        {{ $urlArray := split (trim .RelPermalink "/") "/" }}
+        {{ $urlArrayLen := len $urlArray }}
+
+        {{ range $index, $element := $urlArray }}
+        {{ $urlPath := delimit (first (add $index 1) $urlArray) "/" }}
+        <li class="breadcrumb-item{{ if eq (add $index 1) $urlArrayLen }} active{{ end }}" {{ if eq (add $index 1) $urlArrayLen }} aria-current="page" {{ end }}>
+            {{ if eq (add $index 1) $urlArrayLen }}
+            {{ . }}
+            {{ else }}
+            <a href="/{{ $urlPath }}">{{ . }}</a>
+            {{ end }}
+        </li>
+        {{ end }}
+    </ol>
+</nav>

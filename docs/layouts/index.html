@@ -1,0 +1,11 @@
+{{ define "main" }}
+<!-- Display the content of _index.md -->
+{{ .Content }}
+
+<!-- Display the list of pages -->
+<ul>
+    {{ range .Pages }}
+    <li><a href="{{ .Permalink }}">{{ .Summary }}</a></li>
+    {{ end }}
+</ul>
+{{ end }}

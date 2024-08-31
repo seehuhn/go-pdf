@@ -1,3 +1,9 @@
++++
+title = 'Notes about the API design'
+date = 2024-08-31T23:09:46+01:00
+draft = true
++++
+
 Notes about the API design
 ==========================
 
