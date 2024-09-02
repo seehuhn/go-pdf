@@ -303,7 +303,7 @@ func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 		dict["WMode"] = pdf.Integer(c.WMode)
 	}
 	if c.Parent != nil {
-		parent, _, err := c.Parent.Embed(rm)
+		parent, _, err := pdf.ResourceManagerEmbed(rm, c.Parent)
 		if err != nil {
 			return nil, zero, err
 		}

@@ -31,11 +31,10 @@ import (
 
 var _ pdf.Embedder[pdf.Unused] = (*InfoNew)(nil)
 
-// TestExtractCMap tests that a CMap can be extracted from a CMAP file
-// and that the stream dictionary is read correctly.
-func TestExtractCMAP(t *testing.T) {
-	// Write a CMap "by hand".
-	testH := `/CIDInit /ProcSet findresource begin
+var (
+	// testCMapParent is a CMap file which defines a horizontal CMap.
+	// This is used as the parent CMap of testCMapChild.
+	testCMapParent = []byte(`/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
 
@@ -61,8 +60,12 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end
-`
-	testV := `/CIDInit /ProcSet findresource begin
+`)
+
+	// testCMapChild is a CMap file which defines a vertical CMap.
+	// This uses testCMapParent as the parent CMap, to test whether
+	// extracting a chain of CMaps works correctly.
+	testCMapChild = []byte(`/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
 
@@ -82,109 +85,11 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end
-`
+`)
 
-	data := pdf.NewData(pdf.V2_0)
-	rm := pdf.NewResourceManager(data)
-
-	ros := &CIDSystemInfo{
-		Registry:   "Test",
-		Ordering:   "Simple",
-		Supplement: 0,
-	}
-	rosRef, _, err := pdf.ResourceManagerEmbed(rm, ros)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testHRef := data.Alloc()
-	testHDict := pdf.Dict{
-		"Type":          pdf.Name("CMap"),
-		"CMapName":      pdf.Name("TestH"),
-		"CIDSystemInfo": rosRef,
-	}
-	stm, err := data.OpenStream(testHRef, testHDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = stm.Write([]byte(testH))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = stm.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testVRef := data.Alloc()
-	testVDict := pdf.Dict{
-		"Type":          pdf.Name("CMap"),
-		"CMapName":      pdf.Name("TestV"),
-		"CIDSystemInfo": rosRef,
-		"WMode":         pdf.Integer(1),
-		"UseCMap":       testHRef,
-	}
-	stm, err = data.OpenStream(testVRef, testVDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = stm.Write([]byte(testV))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = stm.Close()
-	if err != nil {
-		t.Fatal(err)
-
-	}
-
-	info, err := ExtractNew(data, testVRef)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if info.Name != "TestV" {
-		t.Errorf("expected name %q, got %q", "TestV", info.Name)
-	}
-	if info.WMode != Vertical {
-		t.Errorf("expected writing mode %v, got %v", Vertical, info.WMode)
-	}
-	if !reflect.DeepEqual(info.ROS, ros) {
-		t.Errorf("unexpected ROS: %v", info.ROS)
-	}
-	if info.Parent == nil {
-		t.Errorf("expected parent, got nil")
-		return
-	}
-
-	parent := info.Parent
-	if parent.Name != "TestH" {
-		t.Errorf("expected parent name %q, got %q", "TestH", parent.Name)
-	}
-	if parent.WMode != Horizontal {
-		t.Errorf("expected parent writing mode %v, got %v", Horizontal, parent.WMode)
-	}
-	if !reflect.DeepEqual(parent.ROS, ros) {
-		t.Errorf("unexpected parent ROS: %v", parent.ROS)
-	}
-	if parent.Parent != nil {
-		t.Errorf("expected no parent, got %v", parent.Parent)
-	}
-
-	if !reflect.DeepEqual(parent.CodeSpaceRange,
-		charcode.CodeSpaceRange{{Low: []byte{0x00}, High: []byte{0xFF}}}) {
-		t.Errorf("unexpected code space range: %v", parent.CodeSpaceRange)
-	}
-	if !reflect.DeepEqual(parent.CIDSingles,
-		[]SingleNew{{Code: []byte{0x20}, Value: 1}}) {
-		t.Errorf("unexpected CID singles: %v", parent.CIDSingles)
-	}
-}
-
-// TestReadCMap tests that all fields of a CMap can be read correctly
-// from a CMAP file.
-func TestReadCMap(t *testing.T) {
-	in := `/CIDInit /ProcSet findresource begin
+	// testCMapFull is a CMap file which uses all supported CMap features.
+	// This is used to get complete coverage of the CMap extraction code.
+	testCMapFull = []byte(`/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
 
@@ -224,8 +129,191 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end
-`
-	info, parent, err := readCMap(bytes.NewReader([]byte(in)))
+`)
+
+	// testInfoFull is an InfoNew struct which uses all fields of the struct.
+	// This is used to test the template used to format a CMap file.
+	testInfoFull = &InfoNew{
+		Name: "Test",
+		ROS: &CIDSystemInfo{
+			Registry:   "Test",
+			Ordering:   "Random",
+			Supplement: 3,
+		},
+		WMode: Horizontal,
+		Parent: &InfoNew{
+			Name: "Other",
+		},
+		CodeSpaceRange: []charcode.Range{
+			{Low: []byte{0x00}, High: []byte{0xFE}},
+			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFF}},
+		},
+		CIDSingles: []SingleNew{
+			{Code: []byte{0x20}, Value: 2},
+			{Code: []byte{0x22}, Value: 3},
+		},
+		CIDRanges: []RangeNew{
+			{First: []byte{0xFF, 0x20}, Last: []byte{0xFF, 0xFF}, Value: 5},
+		},
+		NotdefSingles: []SingleNew{
+			{Code: []byte{0x21}, Value: 1},
+		},
+		NotdefRanges: []RangeNew{
+			{First: []byte{0x00}, Last: []byte{0x1F}, Value: 0},
+			{First: []byte{0xFF, 0x00}, Last: []byte{0xFF, 0x1F}, Value: 4},
+		},
+	}
+
+	// The following two InfoNew structs are used to test embedding a chain of
+	// CMaps.
+	testROS = &CIDSystemInfo{
+		Registry: "Seehuhn",
+		Ordering: "Test",
+	}
+	testInfoParent = &InfoNew{
+		Name:  "Test1",
+		ROS:   testROS,
+		WMode: Vertical,
+		CodeSpaceRange: []charcode.Range{
+			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
+		},
+		CIDSingles: []SingleNew{
+			{Code: []byte{0x20}, Value: 1},
+		},
+		CIDRanges: []RangeNew{
+			{First: []byte{0x21}, Last: []byte{0x23}, Value: 2},
+		},
+		NotdefSingles: []SingleNew{
+			{Code: []byte{0x24}, Value: 5},
+		},
+		NotdefRanges: []RangeNew{
+			{First: []byte{0x25}, Last: []byte{0x27}, Value: 6},
+		},
+	}
+	testInfoChild = &InfoNew{
+		Name:   "Test2",
+		ROS:    testROS,
+		WMode:  Vertical,
+		Parent: testInfoParent,
+		CodeSpaceRange: []charcode.Range{
+			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
+		},
+		CIDSingles: []SingleNew{
+			{Code: []byte{0x28}, Value: 9},
+		},
+		CIDRanges: []RangeNew{
+			{First: []byte{0x29}, Last: []byte{0x2B}, Value: 10},
+		},
+		NotdefSingles: []SingleNew{
+			{Code: []byte{0x2C}, Value: 13},
+		},
+		NotdefRanges: []RangeNew{
+			{First: []byte{0x2D}, Last: []byte{0x2F}, Value: 14},
+		},
+	}
+)
+
+// TestExtractCMap tests that a CMap can be extracted from a CMAP file
+// and that the stream dictionary is read correctly.
+func TestExtractCMAP(t *testing.T) {
+	// Write a CMap "by hand".
+
+	data := pdf.NewData(pdf.V2_0)
+	rm := pdf.NewResourceManager(data)
+
+	rosRef, _, err := pdf.ResourceManagerEmbed(rm, testROS)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parentRef := data.Alloc()
+	parentDict := pdf.Dict{
+		"Type":          pdf.Name("CMap"),
+		"CMapName":      pdf.Name("TestH"),
+		"CIDSystemInfo": rosRef,
+	}
+	stm, err := data.OpenStream(parentRef, parentDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = stm.Write(testCMapParent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	childRef := data.Alloc()
+	cihldDict := pdf.Dict{
+		"Type":          pdf.Name("CMap"),
+		"CMapName":      pdf.Name("TestV"),
+		"CIDSystemInfo": rosRef,
+		"WMode":         pdf.Integer(1),
+		"UseCMap":       parentRef,
+	}
+	stm, err = data.OpenStream(childRef, cihldDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = stm.Write(testCMapChild)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stm.Close()
+	if err != nil {
+		t.Fatal(err)
+
+	}
+
+	child, err := ExtractNew(data, childRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if child.Name != "TestV" {
+		t.Errorf("expected name %q, got %q", "TestV", child.Name)
+	}
+	if child.WMode != Vertical {
+		t.Errorf("expected writing mode %v, got %v", Vertical, child.WMode)
+	}
+	if !reflect.DeepEqual(child.ROS, testROS) {
+		t.Errorf("unexpected ROS: %v", child.ROS)
+	}
+	if child.Parent == nil {
+		t.Errorf("expected parent, got nil")
+		return
+	}
+
+	parent := child.Parent
+	if parent.Name != "TestH" {
+		t.Errorf("expected parent name %q, got %q", "TestH", parent.Name)
+	}
+	if parent.WMode != Horizontal {
+		t.Errorf("expected parent writing mode %v, got %v", Horizontal, parent.WMode)
+	}
+	if !reflect.DeepEqual(parent.ROS, testROS) {
+		t.Errorf("unexpected parent ROS: %v", parent.ROS)
+	}
+	if parent.Parent != nil {
+		t.Errorf("expected no parent, got %v", parent.Parent)
+	}
+
+	if !reflect.DeepEqual(parent.CodeSpaceRange,
+		charcode.CodeSpaceRange{{Low: []byte{0x00}, High: []byte{0xFF}}}) {
+		t.Errorf("unexpected code space range: %v", parent.CodeSpaceRange)
+	}
+	if !reflect.DeepEqual(parent.CIDSingles,
+		[]SingleNew{{Code: []byte{0x20}, Value: 1}}) {
+		t.Errorf("unexpected CID singles: %v", parent.CIDSingles)
+	}
+}
+
+// TestReadCMap tests that all fields of a CMap can be read correctly
+// from a CMAP file.
+func TestReadCMap(t *testing.T) {
+	info, parent, err := readCMap(bytes.NewReader(testCMapFull))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,41 +554,10 @@ end`
 }
 
 func TestCMapTemplate(t *testing.T) {
-	info := &InfoNew{
-		Name: "Test",
-		ROS: &CIDSystemInfo{
-			Registry:   "Test",
-			Ordering:   "Random",
-			Supplement: 3,
-		},
-		WMode: Horizontal,
-		Parent: &InfoNew{
-			Name: "Other",
-		},
-		CodeSpaceRange: []charcode.Range{
-			{Low: []byte{0x00}, High: []byte{0xFE}},
-			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFF}},
-		},
-		CIDSingles: []SingleNew{
-			{Code: []byte{0x20}, Value: 2},
-			{Code: []byte{0x22}, Value: 3},
-		},
-		CIDRanges: []RangeNew{
-			{First: []byte{0xFF, 0x20}, Last: []byte{0xFF, 0xFF}, Value: 5},
-		},
-		NotdefSingles: []SingleNew{
-			{Code: []byte{0x21}, Value: 1},
-		},
-		NotdefRanges: []RangeNew{
-			{First: []byte{0x00}, Last: []byte{0x1F}, Value: 0},
-			{First: []byte{0xFF, 0x00}, Last: []byte{0xFF, 0x1F}, Value: 4},
-		},
-	}
-
 	buf := &bytes.Buffer{}
 
 	// check that the template renders without error
-	err := cmapTmplNew.Execute(buf, info)
+	err := cmapTmplNew.Execute(buf, testInfoFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -525,56 +582,9 @@ func TestCMapTemplate(t *testing.T) {
 }
 
 func TestEmbedCMap(t *testing.T) {
-	ros := &CIDSystemInfo{
-		Registry:   "Seehuhn",
-		Ordering:   "Test",
-		Supplement: 123,
-	}
-	parent := &InfoNew{
-		Name:  "Test1",
-		ROS:   ros,
-		WMode: Vertical,
-		CodeSpaceRange: []charcode.Range{
-			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
-		},
-		CIDSingles: []SingleNew{
-			{Code: []byte{0x20}, Value: 1},
-		},
-		CIDRanges: []RangeNew{
-			{First: []byte{0x21}, Last: []byte{0x23}, Value: 2},
-		},
-		NotdefSingles: []SingleNew{
-			{Code: []byte{0x24}, Value: 5},
-		},
-		NotdefRanges: []RangeNew{
-			{First: []byte{0x25}, Last: []byte{0x27}, Value: 6},
-		},
-	}
-	info := &InfoNew{
-		Name:   "Test2",
-		ROS:    ros,
-		WMode:  Vertical,
-		Parent: parent,
-		CodeSpaceRange: []charcode.Range{
-			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
-		},
-		CIDSingles: []SingleNew{
-			{Code: []byte{0x28}, Value: 9},
-		},
-		CIDRanges: []RangeNew{
-			{First: []byte{0x29}, Last: []byte{0x2B}, Value: 10},
-		},
-		NotdefSingles: []SingleNew{
-			{Code: []byte{0x2C}, Value: 13},
-		},
-		NotdefRanges: []RangeNew{
-			{First: []byte{0x2D}, Last: []byte{0x2F}, Value: 14},
-		},
-	}
-
 	data := pdf.NewData(pdf.V2_0)
 	rm := pdf.NewResourceManager(data)
-	ref, _, err := pdf.ResourceManagerEmbed(rm, info)
+	ref, _, err := pdf.ResourceManagerEmbed(rm, testInfoChild)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -584,14 +594,20 @@ func TestEmbedCMap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(info, info2) {
-		t.Errorf("expected %v, got %v", info, info2)
+	if !reflect.DeepEqual(testInfoChild, info2) {
+		t.Errorf("expected %v, got %v", testInfoChild, info2)
 	}
 }
 
 // FuzzReadCMap tests that there is a bijections between textual CMap files,
 // and the Info struct (ignoring the parent CMap name, if any).
 func FuzzReadCMap(f *testing.F) {
+	// Add all test CMaps from above
+	f.Add(testCMapParent)
+	f.Add(testCMapChild)
+	f.Add(testCMapFull)
+
+	// Also add all predefined CMaps
 	for _, name := range allPredefined {
 		fd, err := openPredefined(name)
 		if err != nil {
@@ -608,42 +624,20 @@ func FuzzReadCMap(f *testing.F) {
 		f.Add(body)
 	}
 
-	info := &InfoNew{
-		Name: "Test",
-		ROS: &CIDSystemInfo{
-			Registry:   "Test",
-			Ordering:   "Random",
-			Supplement: 3,
-		},
-		WMode: Horizontal,
-		Parent: &InfoNew{
-			Name: "Other",
-		},
-		CodeSpaceRange: []charcode.Range{
-			{Low: []byte{0x00}, High: []byte{0xFE}},
-			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFF}},
-		},
-		CIDSingles: []SingleNew{
-			{Code: []byte{0x20}, Value: 2},
-			{Code: []byte{0x22}, Value: 3},
-		},
-		CIDRanges: []RangeNew{
-			{First: []byte{0xFF, 0x20}, Last: []byte{0xFF, 0xFF}, Value: 5},
-		},
-		NotdefSingles: []SingleNew{
-			{Code: []byte{0x21}, Value: 1},
-		},
-		NotdefRanges: []RangeNew{
-			{First: []byte{0x00}, Last: []byte{0x1F}, Value: 0},
-			{First: []byte{0xFF, 0x00}, Last: []byte{0xFF, 0x1F}, Value: 4},
-		},
-	}
+	// The ToUnicode CMaps are not valid here, but since they are very similar
+	// in structure we add them to the corpus, too.
+	f.Add(testToUniCMapParent)
+	f.Add(testToUniCMapChild)
+
 	buf := &bytes.Buffer{}
-	err := cmapTmplNew.Execute(buf, info)
-	if err != nil {
-		f.Fatal(err)
+	for _, info := range []*InfoNew{testInfoFull, testInfoParent, testInfoChild} {
+		buf.Reset()
+		err := cmapTmplNew.Execute(buf, info)
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(buf.Bytes())
 	}
-	f.Add(buf.Bytes())
 
 	f.Fuzz(func(t *testing.T, body []byte) {
 		info, _, err := readCMap(bytes.NewReader(body))

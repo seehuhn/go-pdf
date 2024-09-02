@@ -67,43 +67,55 @@ func (r ToUnicodeRange) String() string {
 
 func (info *ToUnicodeInfo) MakeName() pdf.Name {
 	h := md5.New()
+	info.writeBinary(h)
+	return pdf.Name(fmt.Sprintf("GoPDF-%x-UTF16", h.Sum(nil)))
+}
 
-	binary.Write(h, binary.BigEndian, uint32(len(info.CodeSpaceRange)))
+func (info *ToUnicodeInfo) writeBinary(h io.Writer) {
+	// This is only used to write to a hash.Hash, so we don't need to check for
+	// write errors.
+
+	var buf [binary.MaxVarintLen64]byte
+	writeInt := func(x int) {
+		k := binary.PutUvarint(buf[:], uint64(x))
+		h.Write(buf[:k])
+	}
+	writeBytes := func(b []byte) {
+		writeInt(len(b))
+		h.Write(b)
+	}
+	writeRunes := func(rr []rune) {
+		writeInt(len(rr))
+		for _, r := range rr {
+			writeInt(int(r))
+		}
+	}
+
+	writeInt(len(info.CodeSpaceRange))
 	for _, r := range info.CodeSpaceRange {
-		binary.Write(h, binary.BigEndian, uint32(len(r.Low)))
-		h.Write(r.Low)
-		binary.Write(h, binary.BigEndian, uint32(len(r.High)))
-		h.Write(r.High)
+		writeBytes(r.Low)
+		writeBytes(r.High)
 	}
 
-	binary.Write(h, binary.BigEndian, uint32(len(info.Singles)))
+	writeInt(len(info.Singles))
 	for _, s := range info.Singles {
-		binary.Write(h, binary.BigEndian, uint32(len(s.Code)))
-		h.Write(s.Code)
-		runeBytes := []byte(string(s.Value))
-		binary.Write(h, binary.BigEndian, uint32(len(runeBytes)))
-		h.Write(runeBytes)
+		writeBytes(s.Code)
+		writeRunes(s.Value)
 	}
 
-	binary.Write(h, binary.BigEndian, uint32(len(info.Ranges)))
+	writeInt(len(info.Ranges))
 	for _, r := range info.Ranges {
-		binary.Write(h, binary.BigEndian, uint32(len(r.First)))
-		h.Write(r.First)
-		binary.Write(h, binary.BigEndian, uint32(len(r.Last)))
-		h.Write(r.Last)
-		binary.Write(h, binary.BigEndian, uint32(len(r.Values)))
+		writeBytes(r.First)
+		writeBytes(r.Last)
+		writeInt(len(r.Values))
 		for _, values := range r.Values {
-			runeBytes := []byte(string(values))
-			binary.Write(h, binary.BigEndian, uint32(len(runeBytes)))
-			h.Write(runeBytes)
+			writeRunes(values)
 		}
 	}
 
 	if info.Parent != nil {
-		h.Write([]byte(info.Parent.MakeName()))
+		info.Parent.writeBinary(h)
 	}
-
-	return pdf.Name(fmt.Sprintf("GoPDF-%x-UTF16", h.Sum(nil)))
 }
 
 func ExtractToUnicodeNew(r pdf.Getter, obj pdf.Object) (*ToUnicodeInfo, error) {
@@ -235,11 +247,18 @@ func toRunes(obj postscript.Object) ([]rune, error) {
 func (c *ToUnicodeInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 	var zero pdf.Unused
 
+	rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)
+	if err != nil {
+		return nil, zero, err
+	}
+
 	dict := pdf.Dict{
-		"Type": pdf.Name("CMap"),
+		"Type":          pdf.Name("CMap"),
+		"CMapName":      c.MakeName(),
+		"CIDSystemInfo": rosRef,
 	}
 	if c.Parent != nil {
-		parent, _, err := c.Parent.Embed(rm)
+		parent, _, err := pdf.ResourceManagerEmbed(rm, c.Parent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -345,5 +364,10 @@ CMapName currentdict /CMap defineresource pop
 end
 end
 `))
+
+var toUnicodeROS = &CIDSystemInfo{
+	Registry: "Adobe",
+	Ordering: "UCS",
+}
 
 var brokenReplacement = []rune{0xFFFD}
