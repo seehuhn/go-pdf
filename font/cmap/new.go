@@ -208,10 +208,7 @@ func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
 		}
 	}
 
-	codeMap, ok := raw["CodeMap"].(*postscript.CMapInfo)
-	if !ok {
-		return nil, nil, pdf.Error("unsupported CMap format")
-	}
+	codeMap := raw["CodeMap"].(*postscript.CMapInfo)
 	if codeMap.UseCMap != "" {
 		parent = pdf.Name(codeMap.UseCMap)
 	}
@@ -330,20 +327,10 @@ func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	return ref, zero, nil
 }
 
-func singleChunksNew(x []SingleNew) [][]SingleNew {
-	var res [][]SingleNew
-	for len(x) >= chunkSize {
-		res = append(res, x[:chunkSize])
-		x = x[chunkSize:]
-	}
-	if len(x) > 0 {
-		res = append(res, x)
-	}
-	return res
-}
+const chunkSize = 100
 
-func rangeChunksNew(x []RangeNew) [][]RangeNew {
-	var res [][]RangeNew
+func chunks[T any](x []T) [][]T {
+	var res [][]T
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -366,11 +353,11 @@ var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": singleChunksNew,
+	"SingleChunks": chunks[SingleNew],
 	"Single": func(s SingleNew) string {
 		return fmt.Sprintf("<%x> %d", s.Code, s.Value)
 	},
-	"RangeChunks": rangeChunksNew,
+	"RangeChunks": chunks[RangeNew],
 	"Range": func(r RangeNew) string {
 		return fmt.Sprintf("<%x> <%x> %d", r.First, r.Last, r.Value)
 	},

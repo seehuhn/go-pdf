@@ -37,7 +37,7 @@ type Embedder[T any] interface {
 }
 
 // Unused is a placeholder type for the second return value of the
-// Embedder.Embed method, in cases where no Go representation of the
+// Embedder.Embed method, for when no Go representation of the
 // embedded object is required.
 type Unused struct{}
 

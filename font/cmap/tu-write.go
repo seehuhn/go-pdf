@@ -21,7 +21,6 @@ import (
 	"io"
 	"strings"
 	"text/template"
-	"unicode/utf16"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -48,57 +47,18 @@ func (info *ToUnicode) Write(w io.Writer) error {
 	return toUnicodeTmpl.Execute(w, info)
 }
 
-func tuSingleChunks(x []SingleTUEntry) [][]SingleTUEntry {
-	var res [][]SingleTUEntry
-	for len(x) >= chunkSize {
-		res = append(res, x[:chunkSize])
-		x = x[chunkSize:]
-	}
-	if len(x) > 0 {
-		res = append(res, x)
-	}
-	return res
-}
-
-func tuRangeChunks(x []RangeTUEntry) [][]RangeTUEntry {
-	var res [][]RangeTUEntry
-	for len(x) >= chunkSize {
-		res = append(res, x[:chunkSize])
-		x = x[chunkSize:]
-	}
-	if len(x) > 0 {
-		res = append(res, x)
-	}
-	return res
-}
-
-func hexRunes(rr []rune) string {
-	val := utf16.Encode(rr)
-	if len(val) == 1 {
-		return fmt.Sprintf("<%04x>", val[0])
-	}
-
-	valStrings := make([]string, len(val))
-	for i, v := range val {
-		valStrings[i] = fmt.Sprintf("%04x", v)
-	}
-	return "<" + strings.Join(valStrings, "") + ">"
-}
-
-// TODO(voss): once https://github.com/pdf-association/pdf-issues/issues/344
-// is resoved, reconsider CIDSystemInfo and CMapName.
 var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncMap{
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": tuSingleChunks,
+	"SingleChunks": chunks[SingleTUEntry],
 	"Single": func(cs charcode.CodeSpaceRange, s SingleTUEntry) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
 		val := hexRunes(s.Value)
 		return fmt.Sprintf("<%x> %s", buf, val)
 	},
-	"RangeChunks": tuRangeChunks,
+	"RangeChunks": chunks[RangeTUEntry],
 	"Range": func(cs charcode.CodeSpaceRange, s RangeTUEntry) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)

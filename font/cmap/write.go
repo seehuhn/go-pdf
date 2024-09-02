@@ -73,32 +73,6 @@ func (info *Info) Write(w io.Writer) error {
 	return cmapTmpl.Execute(w, info)
 }
 
-const chunkSize = 100
-
-func singleChunks(x []SingleEntry) [][]SingleEntry {
-	var res [][]SingleEntry
-	for len(x) >= chunkSize {
-		res = append(res, x[:chunkSize])
-		x = x[chunkSize:]
-	}
-	if len(x) > 0 {
-		res = append(res, x)
-	}
-	return res
-}
-
-func rangeChunks(x []RangeEntry) [][]RangeEntry {
-	var res [][]RangeEntry
-	for len(x) >= chunkSize {
-		res = append(res, x[:chunkSize])
-		x = x[chunkSize:]
-	}
-	if len(x) > 0 {
-		res = append(res, x)
-	}
-	return res
-}
-
 var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"PS": func(s string) string {
 		x := postscript.String(s)
@@ -111,13 +85,13 @@ var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": singleChunks,
+	"SingleChunks": chunks[SingleEntry],
 	"Single": func(cs charcode.CodeSpaceRange, s SingleEntry) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
 		return fmt.Sprintf("<%x> %d", buf, s.Value)
 	},
-	"RangeChunks": rangeChunks,
+	"RangeChunks": chunks[RangeEntry],
 	"Range": func(cs charcode.CodeSpaceRange, s RangeEntry) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)

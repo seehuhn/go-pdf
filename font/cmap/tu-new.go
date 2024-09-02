@@ -17,8 +17,12 @@
 package cmap
 
 import (
+	"crypto/md5"
+	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
+	"text/template"
 	"unicode/utf16"
 
 	"seehuhn.de/go/postscript"
@@ -59,6 +63,47 @@ func (r ToUnicodeRange) String() string {
 		ss[i] = string(v)
 	}
 	return fmt.Sprintf("% 02x-% 02x: %q", r.First, r.Last, ss)
+}
+
+func (info *ToUnicodeInfo) MakeName() pdf.Name {
+	h := md5.New()
+
+	binary.Write(h, binary.BigEndian, uint32(len(info.CodeSpaceRange)))
+	for _, r := range info.CodeSpaceRange {
+		binary.Write(h, binary.BigEndian, uint32(len(r.Low)))
+		h.Write(r.Low)
+		binary.Write(h, binary.BigEndian, uint32(len(r.High)))
+		h.Write(r.High)
+	}
+
+	binary.Write(h, binary.BigEndian, uint32(len(info.Singles)))
+	for _, s := range info.Singles {
+		binary.Write(h, binary.BigEndian, uint32(len(s.Code)))
+		h.Write(s.Code)
+		runeBytes := []byte(string(s.Value))
+		binary.Write(h, binary.BigEndian, uint32(len(runeBytes)))
+		h.Write(runeBytes)
+	}
+
+	binary.Write(h, binary.BigEndian, uint32(len(info.Ranges)))
+	for _, r := range info.Ranges {
+		binary.Write(h, binary.BigEndian, uint32(len(r.First)))
+		h.Write(r.First)
+		binary.Write(h, binary.BigEndian, uint32(len(r.Last)))
+		h.Write(r.Last)
+		binary.Write(h, binary.BigEndian, uint32(len(r.Values)))
+		for _, values := range r.Values {
+			runeBytes := []byte(string(values))
+			binary.Write(h, binary.BigEndian, uint32(len(runeBytes)))
+			h.Write(runeBytes)
+		}
+	}
+
+	if info.Parent != nil {
+		h.Write([]byte(info.Parent.MakeName()))
+	}
+
+	return pdf.Name(fmt.Sprintf("GoPDF-%x-UTF16", h.Sum(nil)))
 }
 
 func ExtractToUnicodeNew(r pdf.Getter, obj pdf.Object) (*ToUnicodeInfo, error) {
@@ -115,10 +160,7 @@ func readToUnicode(r io.Reader) (*ToUnicodeInfo, error) {
 
 	res := &ToUnicodeInfo{}
 
-	codeMap, ok := raw["CodeMap"].(*postscript.CMapInfo)
-	if !ok {
-		return nil, pdf.Error("unsupported CMap format")
-	}
+	codeMap := raw["CodeMap"].(*postscript.CMapInfo)
 
 	for _, entry := range codeMap.CodeSpaceRanges {
 		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
@@ -189,5 +231,119 @@ func toRunes(obj postscript.Object) ([]rune, error) {
 	}
 	return utf16.Decode(buf), nil
 }
+
+func (c *ToUnicodeInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	dict := pdf.Dict{
+		"Type": pdf.Name("CMap"),
+	}
+	if c.Parent != nil {
+		parent, _, err := c.Parent.Embed(rm)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["UseCMap"] = parent
+	}
+
+	ref := rm.Out.Alloc()
+	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	if err != nil {
+		return nil, zero, err
+	}
+	err = toUnicodeTmplNew.Execute(stm, c)
+	if err != nil {
+		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
+	}
+	err = stm.Close()
+	if err != nil {
+		return nil, zero, err
+	}
+
+	return ref, zero, nil
+}
+
+func hexRunes(rr []rune) string {
+	val := utf16.Encode(rr)
+	if len(val) == 1 {
+		return fmt.Sprintf("<%04x>", val[0])
+	}
+
+	valStrings := make([]string, len(val))
+	for i, v := range val {
+		valStrings[i] = fmt.Sprintf("%04x", v)
+	}
+	return "<" + strings.Join(valStrings, "") + ">"
+}
+
+// TODO(voss): once https://github.com/pdf-association/pdf-issues/issues/344
+// is resoved, reconsider CIDSystemInfo and CMapName.
+var toUnicodeTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
+	"PN": func(s pdf.Name) string {
+		x := postscript.Name(string(s))
+		return x.PS()
+	},
+	"B": func(x []byte) string {
+		return fmt.Sprintf("<%02x>", x)
+	},
+	"SingleChunks": chunks[ToUnicodeSingle],
+	"Single": func(s ToUnicodeSingle) string {
+		val := hexRunes(s.Value)
+		return fmt.Sprintf("<%x> %s", s.Code, val)
+	},
+	"RangeChunks": chunks[ToUnicodeRange],
+	"Range": func(r ToUnicodeRange) string {
+		if len(r.Values) == 1 {
+			return fmt.Sprintf("<%x> <%x> %s", r.First, r.Last, hexRunes(r.Values[0]))
+		}
+		var repl []string
+		for _, v := range r.Values {
+			repl = append(repl, hexRunes(v))
+		}
+		return fmt.Sprintf("<%x> <%x> [%s]", r.First, r.Last, strings.Join(repl, " "))
+	},
+}).Parse(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+{{if .Parent -}}
+{{PN .Parent.MakeName}} usecmap
+{{end -}}
+/CMapName {{PN .MakeName}} def
+/CMapType 2 def
+/CIDSystemInfo <<
+/Registry (Adobe)
+/Ordering (UCS)
+/Supplement 0
+>> def
+
+{{with .CodeSpaceRange -}}
+{{len .}} begincodespacerange
+{{range . -}}
+{{B .Low}} {{B .High}}
+{{end -}}
+{{end -}}
+endcodespacerange
+
+{{range SingleChunks .Singles -}}
+{{len .}} begincidchar
+{{range . -}}
+{{Single .}}
+{{end -}}
+endcidchar
+{{end -}}
+
+{{range RangeChunks .Ranges -}}
+{{len .}} begincidrange
+{{range . -}}
+{{Range .}}
+{{end -}}
+endcidrange
+{{end -}}
+
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`))
 
 var brokenReplacement = []rune{0xFFFD}
