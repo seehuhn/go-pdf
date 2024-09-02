@@ -61,6 +61,9 @@ const (
 	TrueTypeComposite     // TrueType (composite)
 	OpenTypeCFFComposite  // OpenType with CFF glyph outlines (composite)
 	OpenTypeGlyfComposite // OpenType with "glyf" glyph outlines (composite)
+
+	ExternalCFFComposite  // extern font, CFF-based (composite)
+	ExternalGlyfComposite // extern font, glyf-based (composite)
 )
 
 func (t EmbeddingType) String() string {
@@ -87,6 +90,11 @@ func (t EmbeddingType) String() string {
 		return "Composite TrueType"
 	case OpenTypeGlyfComposite:
 		return "Composite OpenType/glyf"
+
+	case ExternalCFFComposite:
+		return "Composite CFF (external)"
+	case ExternalGlyfComposite:
+		return "Composite glyf (external)"
 	default:
 		return fmt.Sprintf("EmbeddingType(%d)", int(t))
 	}
@@ -236,10 +244,14 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 		res.Type = CFFComposite
 	case fontType == "Type0" && cidFontType == "CIDFontType0" && fontKey == "FontFile3" && subType == "OpenType":
 		res.Type = OpenTypeCFFComposite
+	case fontType == "Type0" && cidFontType == "CIDFontType0" && fontKey == "":
+		res.Type = ExternalCFFComposite
 	case fontType == "Type0" && cidFontType == "CIDFontType2" && fontKey == "FontFile2":
 		res.Type = TrueTypeComposite
 	case fontType == "Type0" && cidFontType == "CIDFontType2" && fontKey == "FontFile3" && subType == "OpenType":
 		res.Type = OpenTypeGlyfComposite
+	case fontType == "Type0" && cidFontType == "CIDFontType2" && fontKey == "":
+		res.Type = ExternalGlyfComposite
 	default:
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("unknown font type"),

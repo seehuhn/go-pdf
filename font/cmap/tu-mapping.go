@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"seehuhn.de/go/dag"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )

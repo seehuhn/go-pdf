@@ -56,20 +56,21 @@ const (
 
 // InfoNew represents the information for a CMap used with a PDF composite font.
 type InfoNew struct {
-	Name   pdf.Name
-	ROS    *CIDSystemInfo
-	WMode  WritingMode
-	Parent *InfoNew // This corresponds to the UseCMap entry in the PDF spec.
+	Name  pdf.Name
+	ROS   *CIDSystemInfo
+	WMode WritingMode
 
 	charcode.CodeSpaceRange
-	CIDSingles    []SingleEntryNew
-	CIDRanges     []RangeEntryNew
-	NotdefSingles []SingleEntryNew
-	NotdefRanges  []RangeEntryNew
+	CIDSingles    []SingleNew
+	CIDRanges     []RangeNew
+	NotdefSingles []SingleNew
+	NotdefRanges  []RangeNew
+
+	Parent *InfoNew // This corresponds to the UseCMap entry in the PDF spec.
 }
 
 // SingleEntry specifies that character code Code represents the given CID.
-type SingleEntryNew struct {
+type SingleNew struct {
 	Code  []byte
 	Value CID
 }
@@ -77,7 +78,7 @@ type SingleEntryNew struct {
 // RangeEntry describes a range of character codes with consecutive CIDs.
 // First and Last are the first and last code points in the range.
 // Value is the CID of the first code point in the range.
-type RangeEntryNew struct {
+type RangeNew struct {
 	First []byte
 	Last  []byte
 	Value CID
@@ -85,6 +86,8 @@ type RangeEntryNew struct {
 
 type CID uint32
 
+// ExtractNew extracts a CMap from a PDF object.
+// The argument must be the name of a predefined CMap or a stream containing a CMap.
 func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
 	predefinedMu.Lock()
 	defer predefinedMu.Unlock()
@@ -122,7 +125,9 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*In
 		body = stm
 
 	case *pdf.Stream:
-		err := pdf.CheckDictType(r, obj.Dict, "CMap")
+		dict = obj.Dict
+
+		err := pdf.CheckDictType(r, dict, "CMap")
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +137,6 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*In
 			return nil, err
 		}
 
-		dict = obj.Dict
 		body = io.NopCloser(stm)
 
 	default:
@@ -213,47 +217,62 @@ func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
 	}
 
 	for _, entry := range codeMap.CodeSpaceRanges {
+		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+			continue
+		}
 		res.CodeSpaceRange = append(res.CodeSpaceRange,
 			charcode.Range{Low: entry.Low, High: entry.High})
 	}
 
 	for _, entry := range codeMap.CidChars {
+		if len(entry.Src) == 0 {
+			continue
+		}
 		cid, ok := entry.Dst.(postscript.Integer)
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.CIDSingles = append(res.CIDSingles, SingleEntryNew{
+		res.CIDSingles = append(res.CIDSingles, SingleNew{
 			Code:  entry.Src,
 			Value: CID(cid),
 		})
 	}
 	for _, entry := range codeMap.CidRanges {
+		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+			continue
+		}
 		cid, ok := entry.Dst.(postscript.Integer)
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.CIDRanges = append(res.CIDRanges, RangeEntryNew{
+		res.CIDRanges = append(res.CIDRanges, RangeNew{
 			First: entry.Low,
 			Last:  entry.High,
 			Value: CID(cid),
 		})
 	}
 	for _, entry := range codeMap.NotdefChars {
+		if len(entry.Src) == 0 {
+			continue
+		}
 		cid, ok := entry.Dst.(postscript.Integer)
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.NotdefSingles = append(res.NotdefSingles, SingleEntryNew{
+		res.NotdefSingles = append(res.NotdefSingles, SingleNew{
 			Code:  entry.Src,
 			Value: CID(cid),
 		})
 	}
 	for _, entry := range codeMap.NotdefRanges {
+		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+			continue
+		}
 		cid, ok := entry.Dst.(postscript.Integer)
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.NotdefRanges = append(res.NotdefRanges, RangeEntryNew{
+		res.NotdefRanges = append(res.NotdefRanges, RangeNew{
 			First: entry.Low,
 			Last:  entry.High,
 			Value: CID(cid),
@@ -311,8 +330,8 @@ func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error)
 	return ref, zero, nil
 }
 
-func singleChunksNew(x []SingleEntryNew) [][]SingleEntryNew {
-	var res [][]SingleEntryNew
+func singleChunksNew(x []SingleNew) [][]SingleNew {
+	var res [][]SingleNew
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -323,8 +342,8 @@ func singleChunksNew(x []SingleEntryNew) [][]SingleEntryNew {
 	return res
 }
 
-func rangeChunksNew(x []RangeEntryNew) [][]RangeEntryNew {
-	var res [][]RangeEntryNew
+func rangeChunksNew(x []RangeNew) [][]RangeNew {
+	var res [][]RangeNew
 	for len(x) >= chunkSize {
 		res = append(res, x[:chunkSize])
 		x = x[chunkSize:]
@@ -348,11 +367,11 @@ var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 		return fmt.Sprintf("<%02x>", x)
 	},
 	"SingleChunks": singleChunksNew,
-	"Single": func(s SingleEntryNew) string {
+	"Single": func(s SingleNew) string {
 		return fmt.Sprintf("<%x> %d", s.Code, s.Value)
 	},
 	"RangeChunks": rangeChunksNew,
-	"Range": func(r RangeEntryNew) string {
+	"Range": func(r RangeNew) string {
 		return fmt.Sprintf("<%x> <%x> %d", r.First, r.Last, r.Value)
 	},
 }).Parse(`/CIDInit /ProcSet findresource begin

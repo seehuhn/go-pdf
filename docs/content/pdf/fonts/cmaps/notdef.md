@@ -1,7 +1,6 @@
 +++
 title = 'Notdef'
 date = 2024-08-31T22:31:54+01:00
-draft = true
 +++
 
 # Interpreting Character Codes in PDF Strings

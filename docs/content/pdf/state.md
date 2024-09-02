@@ -1,7 +1,6 @@
 +++
 title = 'PDF Graphics State Parameters'
 date = 2024-08-31T23:06:25+01:00
-draft = true
 +++
 
 PDF Graphics State Parameters

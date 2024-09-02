@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"unicode/utf16"
 
 	"seehuhn.de/go/postscript"
 
@@ -129,16 +128,4 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 	}
 
 	return res, nil
-}
-
-func toRunes(obj postscript.Object) ([]rune, error) {
-	dst, ok := obj.(postscript.String)
-	if !ok || len(dst)%2 != 0 {
-		return nil, fmt.Errorf("invalid ToUnicode CMap")
-	}
-	buf := make([]uint16, 0, len(dst)/2)
-	for i := 0; i < len(dst); i += 2 {
-		buf = append(buf, uint16(dst[i])<<8|uint16(dst[i+1]))
-	}
-	return utf16.Decode(buf), nil
 }

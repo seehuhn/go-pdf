@@ -176,7 +176,7 @@ end
 		t.Errorf("unexpected code space range: %v", parent.CodeSpaceRange)
 	}
 	if !reflect.DeepEqual(parent.CIDSingles,
-		[]SingleEntryNew{{Code: []byte{0x20}, Value: 1}}) {
+		[]SingleNew{{Code: []byte{0x20}, Value: 1}}) {
 		t.Errorf("unexpected CID singles: %v", parent.CIDSingles)
 	}
 }
@@ -258,22 +258,22 @@ end
 	}
 
 	if !reflect.DeepEqual(info.CIDSingles,
-		[]SingleEntryNew{{Code: []byte{0x20}, Value: 1}}) {
+		[]SingleNew{{Code: []byte{0x20}, Value: 1}}) {
 		t.Errorf("unexpected CID singles: %v", info.CIDSingles)
 	}
 
 	if !reflect.DeepEqual(info.CIDRanges,
-		[]RangeEntryNew{{First: []byte{0x22}, Last: []byte{0x24}, Value: 3}}) {
+		[]RangeNew{{First: []byte{0x22}, Last: []byte{0x24}, Value: 3}}) {
 		t.Errorf("unexpected CID ranges: %v", info.CIDRanges)
 	}
 
 	if !reflect.DeepEqual(info.NotdefSingles,
-		[]SingleEntryNew{{Code: []byte{0x21}, Value: 2}}) {
+		[]SingleNew{{Code: []byte{0x21}, Value: 2}}) {
 		t.Errorf("unexpected notdef singles: %v", info.NotdefSingles)
 	}
 
 	if !reflect.DeepEqual(info.NotdefRanges,
-		[]RangeEntryNew{{First: []byte{0x25}, Last: []byte{0x27}, Value: 6}}) {
+		[]RangeNew{{First: []byte{0x25}, Last: []byte{0x27}, Value: 6}}) {
 		t.Errorf("unexpected notdef ranges: %v", info.NotdefRanges)
 	}
 }
@@ -481,17 +481,17 @@ func TestCMapTemplate(t *testing.T) {
 			{Low: []byte{0x00}, High: []byte{0xFE}},
 			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFF}},
 		},
-		CIDSingles: []SingleEntryNew{
+		CIDSingles: []SingleNew{
 			{Code: []byte{0x20}, Value: 2},
 			{Code: []byte{0x22}, Value: 3},
 		},
-		CIDRanges: []RangeEntryNew{
+		CIDRanges: []RangeNew{
 			{First: []byte{0xFF, 0x20}, Last: []byte{0xFF, 0xFF}, Value: 5},
 		},
-		NotdefSingles: []SingleEntryNew{
+		NotdefSingles: []SingleNew{
 			{Code: []byte{0x21}, Value: 1},
 		},
-		NotdefRanges: []RangeEntryNew{
+		NotdefRanges: []RangeNew{
 			{First: []byte{0x00}, Last: []byte{0x1F}, Value: 0},
 			{First: []byte{0xFF, 0x00}, Last: []byte{0xFF, 0x1F}, Value: 4},
 		},
@@ -537,16 +537,16 @@ func TestEmbedCMap(t *testing.T) {
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
 		},
-		CIDSingles: []SingleEntryNew{
+		CIDSingles: []SingleNew{
 			{Code: []byte{0x20}, Value: 1},
 		},
-		CIDRanges: []RangeEntryNew{
+		CIDRanges: []RangeNew{
 			{First: []byte{0x21}, Last: []byte{0x23}, Value: 2},
 		},
-		NotdefSingles: []SingleEntryNew{
+		NotdefSingles: []SingleNew{
 			{Code: []byte{0x24}, Value: 5},
 		},
-		NotdefRanges: []RangeEntryNew{
+		NotdefRanges: []RangeNew{
 			{First: []byte{0x25}, Last: []byte{0x27}, Value: 6},
 		},
 	}
@@ -558,16 +558,16 @@ func TestEmbedCMap(t *testing.T) {
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
 		},
-		CIDSingles: []SingleEntryNew{
+		CIDSingles: []SingleNew{
 			{Code: []byte{0x28}, Value: 9},
 		},
-		CIDRanges: []RangeEntryNew{
+		CIDRanges: []RangeNew{
 			{First: []byte{0x29}, Last: []byte{0x2B}, Value: 10},
 		},
-		NotdefSingles: []SingleEntryNew{
+		NotdefSingles: []SingleNew{
 			{Code: []byte{0x2C}, Value: 13},
 		},
-		NotdefRanges: []RangeEntryNew{
+		NotdefRanges: []RangeNew{
 			{First: []byte{0x2D}, Last: []byte{0x2F}, Value: 14},
 		},
 	}
@@ -623,17 +623,17 @@ func FuzzReadCMap(f *testing.F) {
 			{Low: []byte{0x00}, High: []byte{0xFE}},
 			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFF}},
 		},
-		CIDSingles: []SingleEntryNew{
+		CIDSingles: []SingleNew{
 			{Code: []byte{0x20}, Value: 2},
 			{Code: []byte{0x22}, Value: 3},
 		},
-		CIDRanges: []RangeEntryNew{
+		CIDRanges: []RangeNew{
 			{First: []byte{0xFF, 0x20}, Last: []byte{0xFF, 0xFF}, Value: 5},
 		},
-		NotdefSingles: []SingleEntryNew{
+		NotdefSingles: []SingleNew{
 			{Code: []byte{0x21}, Value: 1},
 		},
-		NotdefRanges: []RangeEntryNew{
+		NotdefRanges: []RangeNew{
 			{First: []byte{0x00}, Last: []byte{0x1F}, Value: 0},
 			{First: []byte{0xFF, 0x00}, Last: []byte{0xFF, 0x1F}, Value: 4},
 		},

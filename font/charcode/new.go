@@ -29,7 +29,7 @@ type Codec struct {
 	nodes []linearizedNode
 }
 
-// linearizedNode represents a node in the lookup tree of the [Codec].
+// linearizedNode represents a node in the lookup tree of a [Codec].
 type linearizedNode struct {
 	// The current input byte is compared to bound.  If the input byte is less
 	// than or equal to bound, the input byte is consumed and the node

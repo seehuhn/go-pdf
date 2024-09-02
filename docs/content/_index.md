@@ -1,7 +1,6 @@
 +++
 title = 'Go-PDF Documentation'
 date = 2024-08-31T18:43:11+01:00
-draft = true
 +++
 
 # Go-PDF Documentation

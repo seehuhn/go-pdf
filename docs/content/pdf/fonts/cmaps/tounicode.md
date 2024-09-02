@@ -1,7 +1,6 @@
 +++
 title = 'ToUnicode CMaps'
 date = 2024-08-31T22:21:57+01:00
-draft = true
 +++
 
 # ToUnicode CMaps
@@ -12,7 +11,7 @@ code points.  They are a special kind of CMap file.
 ## Structure of a ToUnicode CMap File
 
 A ToUnicode CMap file is a text file (technically, a PostScript source file).
-The following information encoded in the file:
+The following information is encoded in the file:
 
 ### The CMap name
 
@@ -29,7 +28,7 @@ and the /Supplement integer (zero-padded to three digits)."
 
 I believe that the information from Adobe Technical Note #5411 is incorrect
 here.  For example, Adobe uses the name `Adobe-Identity-UCS2` for one of
-their cmaps, but the name does not follow the pattern described above.
+their CMaps, but the name does not follow the pattern described above.
 
 ### A CIDSystemInfo dictionary
 
@@ -43,11 +42,7 @@ The example in the PDF spec uses the following CIDSystemInfo dictionary:
 
 ### The code space ranges
 
-PDF spec: "Use the beginbfchar, endbfchar, beginbfrange, and endbfrange
-operators to define the mapping from character codes to Unicode character
-sequences expressed in UTF-16BE encoding."
-
-PDF spec: "The CMap file shall contain begincodespacerange and endcodespacerange
+PDF spec: "The CMap file shall contain `begincodespacerange` and `endcodespacerange`
 operators that are consistent with the encoding that the font uses. In
 particular, for a simple font, the codespace shall be one byte long."
 
@@ -68,6 +63,10 @@ that a ToUnicode CMap file maps CIDs (instead of character codes) to Unicode
 code points.
 
 ### The character mappings
+
+PDF spec: "Use the `beginbfchar`, `endbfchar`, `beginbfrange`, and `endbfrange`
+operators to define the mapping from character codes to Unicode character
+sequences expressed in UTF-16BE encoding."
 
 Adobe Technical Note #5411: "Lastly, if a CID does not map to a Unicode code
 point, the value 0xFFFD (expressed as <FFFD> in the ToUnicode mapping file)

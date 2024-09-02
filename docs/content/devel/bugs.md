@@ -1,7 +1,7 @@
 +++
 title = 'Bug Reports'
 date = 2024-08-31T23:27:14+01:00
-draft = true
+weight = 90
 +++
 
 Bug Reports
@@ -50,7 +50,7 @@ projects.  Here is a list:
 - https://bugs.ghostscript.com/show_bug.cgi?id=707475 [fixed]
 - https://github.com/harfbuzz/harfbuzz/issues/3545 [fixed]
 - https://github.com/harfbuzz/harfbuzz/issues/3556 [rejected]
-- https://github.com/harfbuzz/harfbuzz/issues/3675 [closed]
+- https://github.com/harfbuzz/harfbuzz/issues/3675 [rejected]
 - https://github.com/HinTak/Font-Validator/issues/70 [fixed]
 - https://github.com/MicrosoftDocs/typography-issues/issues/976 [rejected]
 - https://github.com/pdf-association/arlington-pdf-model/issues/98 [fixed]

@@ -1,8 +1,7 @@
 +++
 title = 'TODO List'
 date = 2024-08-31T18:43:34+01:00
-draft = true
-weight = 20
+weight = 100
 +++
 
 # TODO List
@@ -19,6 +18,9 @@ weight = 20
   the font program?
 - avoid PDF output like `[-722 (1) -722] TJ` for centered text
 - decide whether matrices are `[6]float64` or `[]float64`
+- add support for external fonts
+- add support for writing human-readable PDF files
+- when fuzzing PDF files, write the examples without compression
 
 - make sure that unit tests don't leave stray files behind
 - make sure that supporting incremental updates to PDF files will not require
