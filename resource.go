@@ -138,7 +138,7 @@ func (s *CycleChecker) Check(obj Object) error {
 		return nil
 	}
 	if s.seen[ref] {
-		return ErrCycle
+		return &MalformedFileError{Err: ErrCycle}
 	}
 	s.seen[ref] = true
 	return nil

@@ -366,6 +366,69 @@ func TestReadCMap(t *testing.T) {
 	}
 }
 
+// FuzzReadCMap tests that there is a bijections between textual CMap files,
+// and the Info struct (ignoring the parent CMap name, if any).
+func FuzzReadCMap(f *testing.F) {
+	// Add all test CMaps from above
+	f.Add(testCMapParent)
+	f.Add(testCMapChild)
+	f.Add(testCMapFull)
+
+	buf := &bytes.Buffer{}
+	for _, info := range []*InfoNew{testInfoFull, testInfoParent, testInfoChild} {
+		buf.Reset()
+		err := cmapTmplNew.Execute(buf, info)
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(buf.Bytes())
+	}
+
+	// Also add all predefined CMaps
+	for _, name := range allPredefined {
+		fd, err := openPredefined(name)
+		if err != nil {
+			f.Fatal(err)
+		}
+		body, err := io.ReadAll(fd)
+		if err != nil {
+			f.Fatal(err)
+		}
+		err = fd.Close()
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(body)
+	}
+
+	// ToUnicode CMaps are not valid here, but since they are very similar
+	// in structure we add them to the corpus, too.
+	f.Add(testToUniCMapParent)
+	f.Add(testToUniCMapChild)
+	f.Add(testToUniCMapFull)
+
+	f.Fuzz(func(t *testing.T, body []byte) {
+		info, _, err := readCMap(bytes.NewReader(body))
+		if err != nil {
+			t.Skip(err)
+		}
+
+		buf := &bytes.Buffer{}
+		err = cmapTmplNew.Execute(buf, info)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		info2, _, err := readCMap(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(info, info2) {
+			t.Errorf("CMaps not equal: %s", cmp.Diff(info, info2))
+		}
+	})
+}
+
 // TestExtractPredefined tests that the predefined CMaps can be extracted
 // without error and have the correct writing mode.
 func TestExtractPredefined(t *testing.T) {
@@ -465,6 +528,7 @@ func TestExtractPredefined(t *testing.T) {
 // TestExtractLoop makes sure that the reader correctly handles loops in the
 // UseCMap chain.
 func TestExtractLoop(t *testing.T) {
+	// Try different loop lengths:
 	for n := 1; n <= 3; n++ {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
 			data := pdf.NewData(pdf.V2_0)
@@ -481,36 +545,28 @@ func TestExtractLoop(t *testing.T) {
 
 			// construct a loop of n CMaps
 			refs := make([]pdf.Reference, n)
+			cmaps := make([]*InfoNew, n)
 			for i := range refs {
 				refs[i] = data.Alloc()
+
+				cmaps[i] = &InfoNew{
+					Name: pdf.Name(fmt.Sprintf("Test%d", i)),
+					ROS:  ros,
+					CodeSpaceRange: charcode.CodeSpaceRange{
+						{Low: []byte{0x00}, High: []byte{0xFF}},
+					},
+					CIDSingles: []SingleNew{
+						{Code: []byte{0x02 + byte(i)}, Value: CID(1 + i)},
+					},
+				}
+			}
+			for i := range cmaps {
+				cmaps[i].Parent = cmaps[(i+1)%n]
 			}
 			for i := range n {
-				thisName := fmt.Sprintf("Test%d", i)
-				nextName := fmt.Sprintf("Test%d", (i+1)%n)
-				// Write a CMap "by hand".
-				body := `/CIDInit /ProcSet findresource begin
-12 dict begin
-begincmap
-
-/CMapName /` + thisName + ` def
-/CMapType 1 def
-/WMode 0 def
-
-/` + nextName + ` usecmap
-
-/CIDSystemInfo 3 dict dup begin
-  /Registry (Test) def
-  /Ordering (Qwerty) def
-  /Supplement 0 def
-end def
-
-endcmap
-CMapName currentdict /CMap defineresource pop
-end
-end`
 				dict := pdf.Dict{
 					"Type":          pdf.Name("CMap"),
-					"CMapName":      pdf.Name(thisName),
+					"CMapName":      cmaps[i].Name,
 					"CIDSystemInfo": rosRef,
 					"UseCMap":       refs[(i+1)%n],
 				}
@@ -518,7 +574,7 @@ end`
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, err = stm.Write([]byte(body))
+				err = cmapTmplNew.Execute(stm, cmaps[i])
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -533,11 +589,12 @@ end`
 				t.Fatal(err)
 			}
 			for i := 0; i < n; i++ {
-				expected := pdf.Name(fmt.Sprintf("Test%d", i))
-				if info.Name != expected {
-					t.Errorf("expected name %q, got %q", expected, info.Name)
+				// check that we got the correct CMap
+				if info.Name != cmaps[i].Name {
+					t.Errorf("expected name %q, got %q", cmaps[i].Name, info.Name)
 				}
 
+				// Make sure the parent chain is correct
 				if i < n-1 {
 					if info.Parent == nil {
 						t.Fatalf("expected parent, got nil")
@@ -550,6 +607,24 @@ end`
 				}
 			}
 		})
+	}
+}
+
+func TestEmbedCMap(t *testing.T) {
+	data := pdf.NewData(pdf.V2_0)
+	rm := pdf.NewResourceManager(data)
+	ref, _, err := pdf.ResourceManagerEmbed(rm, testToUniInfoChild)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info2, err := ExtractToUnicodeNew(data, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(testToUniInfoChild, info2) {
+		t.Errorf("expected %v, got %v", testToUniInfoChild, info2)
 	}
 }
 
@@ -579,84 +654,4 @@ func TestCMapTemplate(t *testing.T) {
 			t.Errorf("expected line %q not found in output", line)
 		}
 	}
-}
-
-func TestEmbedCMap(t *testing.T) {
-	data := pdf.NewData(pdf.V2_0)
-	rm := pdf.NewResourceManager(data)
-	ref, _, err := pdf.ResourceManagerEmbed(rm, testInfoChild)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	info2, err := ExtractNew(data, ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(testInfoChild, info2) {
-		t.Errorf("expected %v, got %v", testInfoChild, info2)
-	}
-}
-
-// FuzzReadCMap tests that there is a bijections between textual CMap files,
-// and the Info struct (ignoring the parent CMap name, if any).
-func FuzzReadCMap(f *testing.F) {
-	// Add all test CMaps from above
-	f.Add(testCMapParent)
-	f.Add(testCMapChild)
-	f.Add(testCMapFull)
-
-	// Also add all predefined CMaps
-	for _, name := range allPredefined {
-		fd, err := openPredefined(name)
-		if err != nil {
-			f.Fatal(err)
-		}
-		body, err := io.ReadAll(fd)
-		if err != nil {
-			f.Fatal(err)
-		}
-		err = fd.Close()
-		if err != nil {
-			f.Fatal(err)
-		}
-		f.Add(body)
-	}
-
-	// The ToUnicode CMaps are not valid here, but since they are very similar
-	// in structure we add them to the corpus, too.
-	f.Add(testToUniCMapParent)
-	f.Add(testToUniCMapChild)
-
-	buf := &bytes.Buffer{}
-	for _, info := range []*InfoNew{testInfoFull, testInfoParent, testInfoChild} {
-		buf.Reset()
-		err := cmapTmplNew.Execute(buf, info)
-		if err != nil {
-			f.Fatal(err)
-		}
-		f.Add(buf.Bytes())
-	}
-
-	f.Fuzz(func(t *testing.T, body []byte) {
-		info, _, err := readCMap(bytes.NewReader(body))
-		if err != nil {
-			t.Skip(err)
-		}
-
-		buf := &bytes.Buffer{}
-		err = cmapTmplNew.Execute(buf, info)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		info2, _, err := readCMap(buf)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(info, info2) {
-			t.Errorf("CMaps not equal: %s", cmp.Diff(info, info2))
-		}
-	})
 }

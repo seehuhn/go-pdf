@@ -65,15 +65,23 @@ func (r ToUnicodeRange) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %q", r.First, r.Last, ss)
 }
 
+// MakeName returns a unique name for the ToUnicodeInfo object.
+//
+// TODO(voss): reconsider once
+// https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
 func (info *ToUnicodeInfo) MakeName() pdf.Name {
 	h := md5.New()
-	info.writeBinary(h)
+	info.writeBinary(h, 3)
 	return pdf.Name(fmt.Sprintf("GoPDF-%x-UTF16", h.Sum(nil)))
 }
 
-func (info *ToUnicodeInfo) writeBinary(h io.Writer) {
-	// This is only used to write to a hash.Hash, so we don't need to check for
-	// write errors.
+func (info *ToUnicodeInfo) writeBinary(h io.Writer, maxGen int) {
+	// This function is only used to write to a hash.Hash.
+	// Therefore we don't need to check for write errors.
+
+	if maxGen <= 0 {
+		return
+	}
 
 	var buf [binary.MaxVarintLen64]byte
 	writeInt := func(x int) {
@@ -114,7 +122,7 @@ func (info *ToUnicodeInfo) writeBinary(h io.Writer) {
 	}
 
 	if info.Parent != nil {
-		info.Parent.writeBinary(h)
+		info.Parent.writeBinary(h, maxGen-1)
 	}
 }
 
@@ -151,7 +159,7 @@ func safeExtractToUnicode(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object)
 	parent := stmObj.Dict["UseCMap"]
 	if parent != nil {
 		parentInfo, err := safeExtractToUnicode(r, cycle, parent)
-		if err != nil {
+		if err != nil && !pdf.IsMalformed(err) {
 			return nil, err
 		}
 		res.Parent = parentInfo
@@ -296,7 +304,7 @@ func hexRunes(rr []rune) string {
 }
 
 // TODO(voss): once https://github.com/pdf-association/pdf-issues/issues/344
-// is resoved, reconsider CIDSystemInfo and CMapName.
+// is resoved, reconsider CIDSystemInfo.
 var toUnicodeTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"PN": func(s pdf.Name) string {
 		x := postscript.Name(string(s))
@@ -329,11 +337,7 @@ begincmap
 {{end -}}
 /CMapName {{PN .MakeName}} def
 /CMapType 2 def
-/CIDSystemInfo <<
-/Registry (Adobe)
-/Ordering (UCS)
-/Supplement 0
->> def
+/CIDSystemInfo <</Registry (Adobe) /Ordering (UCS) /Supplement 0>> def
 
 {{with .CodeSpaceRange -}}
 {{len .}} begincodespacerange
@@ -344,19 +348,19 @@ begincmap
 endcodespacerange
 
 {{range SingleChunks .Singles -}}
-{{len .}} begincidchar
+{{len .}} beginbfchar
 {{range . -}}
 {{Single .}}
 {{end -}}
-endcidchar
+endbfchar
 {{end -}}
 
 {{range RangeChunks .Ranges -}}
-{{len .}} begincidrange
+{{len .}} beginbfrange
 {{range . -}}
 {{Range .}}
 {{end -}}
-endcidrange
+endbfrange
 {{end -}}
 
 endcmap
@@ -365,6 +369,8 @@ end
 end
 `))
 
+// TODO(voss): reconsider once
+// https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
 var toUnicodeROS = &CIDSystemInfo{
 	Registry: "Adobe",
 	Ordering: "UCS",

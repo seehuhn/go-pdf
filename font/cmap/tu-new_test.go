@@ -18,11 +18,13 @@ package cmap
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )
@@ -61,6 +63,31 @@ endcodespacerange
 1 beginbfchar
 <3A51> <D840DC3E>
 endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`)
+	testToUniCMapFull = []byte(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Full def
+/CMapType 2 def
+/Parent usecmap
+2 begincodespacerange
+<00> <7F>
+<8000> <FFFF>
+endcodespacerange
+2 beginbfchar
+<02> <0041>
+<8001> <0042>
+endbfchar
+3 beginbfrange
+<03> <05> <0043>
+<8002> <8004> [<0045> <0044> <0046>]
+<8005> <8007> <0047>
+endbfrange
 endcmap
 CMapName currentdict /CMap defineresource pop
 end
@@ -235,6 +262,189 @@ func TestExtractToUnicode(t *testing.T) {
 	}
 }
 
+func TestReadToUnicode(t *testing.T) {
+	info, err := readToUnicode(bytes.NewReader(testToUniCMapFull))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(info.CodeSpaceRange,
+		charcode.CodeSpaceRange{{Low: []byte{0x00}, High: []byte{0x7F}},
+			{Low: []byte{0x80, 0x00}, High: []byte{0xFF, 0xFF}}}) {
+		t.Errorf("unexpected code space range: %v", info.CodeSpaceRange)
+	}
+	if !reflect.DeepEqual(info.Singles,
+		[]ToUnicodeSingle{
+			{Code: []byte{0x02}, Value: []rune("A")},
+			{Code: []byte{0x80, 0x01}, Value: []rune("B")},
+		}) {
+		t.Errorf("unexpected singles: %v", info.Singles)
+	}
+	if !reflect.DeepEqual(info.Ranges,
+		[]ToUnicodeRange{
+			{
+				First:  []byte{0x03},
+				Last:   []byte{0x05},
+				Values: [][]rune{[]rune("C")},
+			},
+			{
+				First:  []byte{0x80, 0x02},
+				Last:   []byte{0x80, 0x04},
+				Values: [][]rune{[]rune("E"), []rune("D"), []rune("F")},
+			},
+			{
+				First:  []byte{0x80, 0x05},
+				Last:   []byte{0x80, 0x07},
+				Values: [][]rune{[]rune("G")},
+			},
+		}) {
+		t.Errorf("unexpected ranges: %v", info.Ranges)
+	}
+}
+
+// FuzzReadToUnicode tests that there is a bijection between textual CMap files,
+// and the Info struct.
+func FuzzReadToUnicode(f *testing.F) {
+	// Add all test ToUnicode CMaps from above
+	f.Add(testToUniCMapParent)
+	f.Add(testToUniCMapChild)
+	f.Add(testToUniCMapFull)
+
+	buf := &bytes.Buffer{}
+	for _, info := range []*ToUnicodeInfo{testToUniInfoParent, testToUniInfoChild} {
+		buf.Reset()
+		err := toUnicodeTmplNew.Execute(buf, info)
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(buf.Bytes())
+	}
+
+	// Normal CMaps are not valid here, but since they are very similar
+	// in structure we add them to the corpus, too.
+	f.Add(testCMapParent)
+	f.Add(testCMapChild)
+	f.Add(testCMapFull)
+
+	f.Fuzz(func(t *testing.T, body []byte) {
+		info, err := readToUnicode(bytes.NewReader(body))
+		if err != nil {
+			t.Skip(err)
+		}
+
+		buf := &bytes.Buffer{}
+		err = toUnicodeTmplNew.Execute(buf, info)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		info2, err := readToUnicode(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(info, info2) {
+			t.Errorf("ToUnicode CMaps not equal: %s", cmp.Diff(info, info2))
+		}
+	})
+}
+
+// TestExtractToUnicodeLoop tests that the reader does not enter an infinite loop
+// when extracting a ToUnicode CMap that references itself.
+func TestExtractToUnicodeLoop(t *testing.T) {
+	// Try different loop lengths:
+	for n := 1; n <= 3; n++ {
+		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
+			data := pdf.NewData(pdf.V2_0)
+			rm := pdf.NewResourceManager(data)
+			rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// construct a loop of n CMaps
+			refs := make([]pdf.Reference, n)
+			cmaps := make([]*ToUnicodeInfo, n)
+			for i := range refs {
+				refs[i] = data.Alloc()
+
+				cmaps[i] = &ToUnicodeInfo{
+					CodeSpaceRange: []charcode.Range{
+						{Low: []byte{0x00}, High: []byte{0xFF}},
+					},
+					Singles: []ToUnicodeSingle{
+						{Code: []byte{0x02 + byte(i)}, Value: []rune{'A' + rune(i)}},
+					},
+				}
+			}
+			for i := range cmaps {
+				cmaps[i].Parent = cmaps[(i+1)%n]
+			}
+			for i := range n {
+				dict := pdf.Dict{
+					"Type":          pdf.Name("CMap"),
+					"CMapName":      cmaps[i].MakeName(),
+					"CIDSystemInfo": rosRef,
+					"UseCMap":       refs[(i+1)%n],
+				}
+				stm, err := data.OpenStream(refs[i], dict)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = toUnicodeTmplNew.Execute(stm, cmaps[i])
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = stm.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			info, err := ExtractToUnicodeNew(data, refs[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < n; i++ {
+				// Make sure that we got the correct CMap
+				if !reflect.DeepEqual(info.Singles, cmaps[i].Singles) {
+					t.Fatalf("unexpected info: %v", info)
+				}
+
+				// Make sure the parent chain is correct
+				if i < n-1 {
+					if info.Parent == nil {
+						t.Fatalf("expected parent, got nil")
+					}
+					info = info.Parent
+				} else {
+					if info.Parent != nil {
+						t.Fatalf("expected no parent, got %v", info.Parent)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestEmbedToUnicode(t *testing.T) {
+	data := pdf.NewData(pdf.V2_0)
+	rm := pdf.NewResourceManager(data)
+
+	ref, _, err := pdf.ResourceManagerEmbed(rm, testToUniInfoChild)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := ExtractToUnicodeNew(data, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(info, testToUniInfoChild) {
+		t.Errorf("unexpected info: %v", info)
+	}
+}
+
 func TestToUnicodeTemplate(t *testing.T) {
 	buf := &bytes.Buffer{}
 
@@ -244,14 +454,14 @@ func TestToUnicodeTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// check that some key lines are present in the output
+	// check that that some key lines are present in the output
 	body := buf.String()
 	lines := []string{
 		pdf.Format(testToUniInfoParent.MakeName()) + " usecmap",
 		"/CMapName " + pdf.Format(testToUniInfoChild.MakeName()) + " def",
 		"3 begincodespacerange\n<00> <fe>\n<ff00> <fffe>\n<ffff00> <ffffff>\nendcodespacerange",
-		"3 begincidchar\n<02> <0041>\n<04> <0043>\n<05> <65e5>\nendcidchar",
-		"2 begincidrange\n<07> <09> [<0047> <0048> <0049>]\n<ff10> <ff20> <00580041>\nendcidrange",
+		"3 beginbfchar\n<02> <0041>\n<04> <0043>\n<05> <65e5>\nendbfchar",
+		"2 beginbfrange\n<07> <09> [<0047> <0048> <0049>]\n<ff10> <ff20> <00580041>\nendbfrange",
 	}
 	for _, line := range lines {
 		if !strings.Contains(body, line) {
