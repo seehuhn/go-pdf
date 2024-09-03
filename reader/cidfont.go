@@ -17,12 +17,24 @@
 package reader
 
 import (
+	"bytes"
+	"slices"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
 type CIDFont struct {
+	codec *charcode.Codec
+	dec   map[uint32]*codeInfo
+}
+
+type codeInfo struct {
+	CID    cmap.CID
+	NotDef cmap.CID // CID to use if glyph is missing from the font
+	Text   []rune
 }
 
 func getCIDFont(r pdf.Getter, fontDict *font.Dicts) (*CIDFont, error) {
@@ -31,6 +43,146 @@ func getCIDFont(r pdf.Getter, fontDict *font.Dicts) (*CIDFont, error) {
 		return nil, err
 	}
 
-	_ = encoding
+	toUni, _ := cmap.ExtractToUnicodeNew(r, fontDict.FontDict["ToUnicode"])
+
+	// Fix the code space range.
+	var cs charcode.CodeSpaceRange
+	cs = append(cs, encoding.CodeSpaceRange...)
+	cs = append(cs, toUni.CodeSpaceRange...)
+	codec, err := charcode.NewCodec(cs)
+	if err != nil {
+		// In case the two code spaces are not compatible, try to use only the
+		// code space from the encoding.
+		cs = append(cs[:0], encoding.CodeSpaceRange...)
+		codec, err = charcode.NewCodec(cs)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	dec := make(map[uint32]*codeInfo)
+
+	// First add the CID mappings
+	for _, entry := range encoding.CIDSingles {
+		code, k, ok := codec.Decode(entry.Code)
+		if !ok || k != len(entry.Code) {
+			continue
+		}
+		dec[code] = &codeInfo{
+			CID: entry.Value,
+		}
+	}
+	for _, entry := range encoding.CIDRanges {
+		L := len(entry.First)
+		if L != len(entry.Last) ||
+			L == 0 ||
+			!bytes.Equal(entry.First[:L-1], entry.Last[:L-1]) {
+			continue
+		}
+
+		cid := entry.Value
+		seq := bytes.Clone(entry.First)
+		for b := entry.First[L-1]; b <= entry.Last[L-1]; b++ {
+			// we check for overflow at the end of the loop
+
+			seq[L-1] = b
+			code, k, ok := codec.Decode(seq)
+			if ok && k == len(seq) {
+				dec[code] = &codeInfo{
+					CID: cid,
+				}
+			}
+
+			cid++
+			if b == 255 {
+				break
+			}
+		}
+	}
+
+	// Add the notdef mappings
+	for _, entry := range encoding.NotdefSingles {
+		code, k, ok := codec.Decode(entry.Code)
+		if !ok || k != len(entry.Code) {
+			continue
+		}
+
+		d := dec[code]
+		d.NotDef = entry.Value
+		dec[code] = d
+	}
+	for _, entry := range encoding.NotdefRanges {
+		L := len(entry.First)
+		if L != len(entry.Last) ||
+			L == 0 ||
+			!bytes.Equal(entry.First[:L-1], entry.Last[:L-1]) {
+			continue
+		}
+
+		seq := bytes.Clone(entry.First)
+		for b := entry.First[L-1]; b <= entry.Last[L-1]; b++ {
+			// we check for overflow at the end of the loop
+
+			seq[L-1] = b
+			code, k, ok := codec.Decode(seq)
+			if ok && k == len(seq) {
+				d := dec[code]
+				d.NotDef = entry.Value
+				dec[code] = d
+			}
+
+			if b == 255 {
+				break
+			}
+		}
+	}
+
+	// Add the ToUnicode mappings
+	for _, entry := range toUni.Singles {
+		code, k, ok := codec.Decode(entry.Code)
+		if !ok || k != len(entry.Code) {
+			continue
+		}
+
+		d := dec[code]
+		d.Text = entry.Value
+		dec[code] = d
+	}
+	for _, entry := range toUni.Ranges {
+		L := len(entry.First)
+		if L != len(entry.Last) ||
+			L == 0 ||
+			!bytes.Equal(entry.First[:L-1], entry.Last[:L-1]) ||
+			entry.First[L-1] > entry.Last[L-1] {
+			continue
+		}
+
+		seq := bytes.Clone(entry.First)
+		for i := range int(entry.Last[L-1]-entry.First[L-1]) + 1 {
+			seq[L-1] = entry.First[L-1] + byte(i)
+			code, k, ok := codec.Decode(seq)
+			if !ok || k != len(seq) {
+				continue
+			}
+
+			d := dec[code]
+			if i < len(entry.Values) {
+				d.Text = entry.Values[i]
+			} else {
+				text := slices.Clone(entry.Values[0])
+				text[len(text)-1] += rune(i)
+				d.Text = text
+			}
+			dec[code] = d
+		}
+	}
+
+	res := &CIDFont{
+		codec: codec,
+		dec:   dec,
+	}
+
 	panic("not implemented")
+
+	return res, nil
 }

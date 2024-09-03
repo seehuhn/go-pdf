@@ -379,6 +379,46 @@ var testCases = []testRanges{
 			},
 		},
 	},
+
+	{
+		name: "repeated ranges",
+		ranges: CodeSpaceRange{
+			{Low: []byte{0x00, 0x80}, High: []byte{0x7F, 0xFF}},
+			{Low: []byte{0x00, 0x80}, High: []byte{0x7F, 0xFF}},
+		},
+		cases: []testCase{
+			{
+				name:        "valid input",
+				input:       []byte{0x20, 0xA0},
+				wantCode:    0xA020,
+				wantConsume: 2,
+				wantValid:   true,
+			},
+			{
+				name:        "byte 1 invalid",
+				input:       []byte{0x80, 0x20, 0x30},
+				wantCode:    0x2080,
+				wantConsume: 2,
+			},
+			{
+				name:        "byte 2 invalid",
+				input:       []byte{0x20, 0x20},
+				wantCode:    0x2020,
+				wantConsume: 2,
+			},
+			{
+				name:        "empty input",
+				input:       []byte{},
+				wantConsume: 0,
+			},
+			{
+				name:        "short input",
+				input:       []byte{0x20},
+				wantCode:    0x0020,
+				wantConsume: 1,
+			},
+		},
+	},
 }
 
 func TestCodecDecode(t *testing.T) {

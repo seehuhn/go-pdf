@@ -366,7 +366,7 @@ func TestReadCMap(t *testing.T) {
 	}
 }
 
-// FuzzReadCMap tests that there is a bijections between textual CMap files,
+// FuzzReadCMap tests that there is a bijection between textual CMap files,
 // and the Info struct (ignoring the parent CMap name, if any).
 func FuzzReadCMap(f *testing.F) {
 	// Add all test CMaps from above
