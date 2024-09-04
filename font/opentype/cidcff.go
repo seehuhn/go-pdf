@@ -238,17 +238,17 @@ func (info *FontDictCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference)
 	}
 
 	glyphwidths := sfnt.Widths()
-	ww := make(map[pscid.CID]float64, len(glyphwidths))
+	ww := make(map[cmap.CID]float64, len(glyphwidths))
 	if cff.GIDToCID != nil {
 		for gid, w := range glyphwidths {
-			ww[cff.GIDToCID[gid]] = float64(w) * sfnt.FontMatrix[0] * 1000
+			ww[cmap.CID(cff.GIDToCID[gid])] = float64(w) * sfnt.FontMatrix[0] * 1000
 		}
 	} else {
 		for gid, w := range glyphwidths {
-			ww[pscid.CID(gid)] = float64(w) * sfnt.FontMatrix[0] * 1000
+			ww[cmap.CID(gid)] = float64(w) * sfnt.FontMatrix[0] * 1000
 		}
 	}
-	DW, W := widths.EncodeComposite(ww, pdf.GetVersion(w))
+	W, DW := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
 	bbox := sfnt.BBox()
 

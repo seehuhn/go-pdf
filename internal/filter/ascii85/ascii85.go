@@ -23,16 +23,16 @@ import (
 
 // Encode returns a new WriteCloser which encodes data in ASCII85 format.
 // The returned WriteCloser must be closed to flush all data.
-func Encode(w io.WriteCloser, width int) (io.WriteCloser, error) {
+func Encode(w io.WriteCloser, width int) io.WriteCloser {
 	return &ascii85Writer{
 		w:   w,
 		buf: make([]byte, 0, width+1),
-	}, nil
+	}
 }
 
 // Decode returns a new Reader which decodes data in ASCII85 format.
-func Decode(r io.Reader) (io.Reader, error) {
-	return &ascii85Reader{r: r}, nil
+func Decode(r io.Reader) io.Reader {
+	return &ascii85Reader{r: r}
 }
 
 type ascii85Reader struct {
@@ -162,6 +162,7 @@ func (w *ascii85Writer) Write(p []byte) (n int, err error) {
 		w.k++
 		if w.k == 4 {
 			if cap(w.buf) < len(w.buf)+8 { // space for "xxxxx~>\n"
+				w.buf = append(w.buf, '\n')
 				err = w.flush()
 				if err != nil {
 					return n, err
@@ -215,7 +216,6 @@ func (w *ascii85Writer) Close() error {
 }
 
 func (w *ascii85Writer) flush() error {
-	w.buf = append(w.buf, '\n')
 	_, err := w.w.Write(w.buf)
 	if err != nil {
 		return err

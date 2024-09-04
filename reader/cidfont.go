@@ -24,11 +24,18 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/widths"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 type CIDFont struct {
 	codec *charcode.Codec
 	dec   map[uint32]*codeInfo
+
+	wMode cmap.WritingMode
+
+	widths map[cmap.CID]float64
+	dw     float64
 }
 
 type codeInfo struct {
@@ -37,13 +44,36 @@ type codeInfo struct {
 	Text   []rune
 }
 
-func getCIDFont(r pdf.Getter, fontDict *font.Dicts) (*CIDFont, error) {
-	encoding, err := cmap.ExtractNew(r, fontDict.FontDict["Encoding"])
+func (f *CIDFont) WritingMode() cmap.WritingMode {
+	return f.wMode
+}
+
+func (f *CIDFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
+	panic("not implemented")
+}
+
+// CodeAndWidth converts a glyph ID (corresponding to the given text) into
+// a PDF character code The character code is appended to s. The function
+// returns the new string s, the width of the glyph in PDF text space units
+// (still to be multiplied by the font size), and a value indicating
+// whether PDF word spacing adjustment applies to this glyph.
+//
+// As a side effect, this function may allocate codes for the given
+// glyph/text combination in the font's encoding.
+func (f *CIDFont) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	panic("not implemented") // TODO: Implement
+}
+
+func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
+	fontDict := dicts.FontDict
+	cidFontDict := dicts.CIDFontDict
+
+	encoding, err := cmap.ExtractNew(r, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
 
-	toUni, _ := cmap.ExtractToUnicodeNew(r, fontDict.FontDict["ToUnicode"])
+	toUni, _ := cmap.ExtractToUnicodeNew(r, fontDict["ToUnicode"])
 
 	// Fix the code space range.
 	var cs charcode.CodeSpaceRange
@@ -177,12 +207,17 @@ func getCIDFont(r pdf.Getter, fontDict *font.Dicts) (*CIDFont, error) {
 		}
 	}
 
-	res := &CIDFont{
-		codec: codec,
-		dec:   dec,
+	ww, dw, err := widths.DecodeComposite(r, cidFontDict["W"], cidFontDict["DW"])
+	if err != nil {
+		return nil, err
 	}
 
-	panic("not implemented")
+	res := &CIDFont{
+		codec:  codec,
+		dec:    dec,
+		widths: ww,
+		dw:     dw,
+	}
 
 	return res, nil
 }

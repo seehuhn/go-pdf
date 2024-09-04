@@ -55,8 +55,9 @@ import (
 	"strconv"
 	"sync"
 
-	"seehuhn.de/go/pdf/ascii85"
-	"seehuhn.de/go/pdf/lzw"
+	"seehuhn.de/go/pdf/internal/filter/ascii85"
+	"seehuhn.de/go/pdf/internal/filter/asciihex"
+	"seehuhn.de/go/pdf/internal/filter/lzw"
 )
 
 // Frequencies of filter types used in the PDF files on my system:
@@ -73,10 +74,10 @@ import (
 // Filter represents a PDF stream filter.
 //
 // Currently, the following filter types are implemented by this library:
-// [FilterASCII85], [FilterFlate], [FilterLZW].  In addition, [FilterCompress]
-// can be used to select the best available compression filter when writing PDF
-// streams.  This is FilterFlate for PDF versions 1.2 and above, and FilterLZW
-// for older versions.
+// [FilterASCII85], [FilterASCIIHex], [FilterFlate], [FilterLZW].  In addition,
+// [FilterCompress] can be used to select the best available compression filter
+// when writing PDF streams.  This is FilterFlate for PDF versions 1.2 and
+// above, and FilterLZW for older versions.
 type Filter interface {
 	// Info returns the name and parameters of the filter,
 	// as they should be written to the PDF file.
@@ -94,6 +95,8 @@ func makeFilter(filter Name, param Dict) Filter {
 	switch filter {
 	case "ASCII85Decode":
 		return FilterASCII85{}
+	case "ASCIIHexDecode":
+		return FilterASCIIHex{}
 	case "FlateDecode":
 		return FilterFlate(param)
 	case "LZWDecode":
@@ -131,12 +134,31 @@ func (f FilterASCII85) Info(_ Version) (Name, Dict, error) {
 
 // Encode implements the [Filter] interface.
 func (f FilterASCII85) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
-	return ascii85.Encode(w, 79)
+	return ascii85.Encode(w, 79), nil
 }
 
 // Decode implements the [Filter] interface.
 func (f FilterASCII85) Decode(_ Version, r io.Reader) (io.Reader, error) {
-	return ascii85.Decode(r)
+	return ascii85.Decode(r), nil
+}
+
+// FilterASCIIHex is the ASCIIHexDecode filter.
+// This filter has no parameters.
+type FilterASCIIHex struct{}
+
+// Info implements the [Filter] interface.
+func (f FilterASCIIHex) Info(_ Version) (Name, Dict, error) {
+	return "ASCIIHexDecode", nil, nil
+}
+
+// Encode implements the [Filter] interface.
+func (f FilterASCIIHex) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
+	return asciihex.Encode(w, 79), nil
+}
+
+// Decode implements the [Filter] interface.
+func (f FilterASCIIHex) Decode(_ Version, r io.Reader) (io.Reader, error) {
+	return asciihex.Decode(r), nil
 }
 
 // FilterCompress is a special filter name, which is used to select the

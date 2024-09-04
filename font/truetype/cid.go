@@ -175,11 +175,11 @@ func (info *FontDictComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) er
 	q := 1000 / float64(unitsPerEm)
 
 	glyphWidths := outlines.Widths
-	ww := make(map[pscid.CID]float64, len(glyphWidths))
+	ww := make(map[cmap.CID]float64, len(glyphWidths))
 	for cid, gid := range info.CID2GID {
-		ww[pscid.CID(cid)] = glyphWidths[gid].AsFloat(q)
+		ww[cmap.CID(cid)] = glyphWidths[gid].AsFloat(q)
 	}
-	DW, W := widths.EncodeComposite(ww, pdf.GetVersion(w))
+	W, DW := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true

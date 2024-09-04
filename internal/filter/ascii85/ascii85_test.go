@@ -46,10 +46,7 @@ func FuzzReader(f *testing.F) {
 		copy(data2, data)
 		data2 = append(data2, '~', '>')
 		in = bytes.NewReader(data2)
-		enc2, err := Decode(in)
-		if err != nil {
-			t.Fatal(err)
-		}
+		enc2 := Decode(in)
 		out2, err2 := io.ReadAll(enc2)
 
 		if err2 != nil && err1 == nil {
@@ -68,11 +65,8 @@ func FuzzWriter(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, in []byte) {
 		buf := &bytes.Buffer{}
-		enc, err := Encode(withDummyClose{buf}, 80)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = enc.Write(in)
+		enc := Encode(withDummyClose{buf}, 80)
+		_, err := enc.Write(in)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,10 +75,7 @@ func FuzzWriter(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		dec, err := Decode(bytes.NewReader(buf.Bytes()))
-		if err != nil {
-			t.Fatal(err)
-		}
+		dec := Decode(bytes.NewReader(buf.Bytes()))
 		out, err := io.ReadAll(dec)
 		if err != nil {
 			t.Fatal(err)
@@ -110,10 +101,7 @@ func (r *funnyReader) Read(p []byte) (n int, err error) {
 }
 
 func BenchmarkReader(b *testing.B) {
-	r, err := Decode(&funnyReader{})
-	if err != nil {
-		b.Fatal(err)
-	}
+	r := Decode(&funnyReader{})
 
 	blockSize := 1019
 	buf := make([]byte, blockSize)
@@ -139,10 +127,7 @@ func BenchmarkReaderStdLib(b *testing.B) {
 }
 
 func BenchmarkWriter(b *testing.B) {
-	w, err := Encode(withDummyClose{io.Discard}, 80)
-	if err != nil {
-		b.Fatal(err)
-	}
+	w := Encode(withDummyClose{io.Discard}, 80)
 
 	blockSize := 1019
 	buf := make([]byte, blockSize)

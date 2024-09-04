@@ -243,18 +243,18 @@ func (info *FontDictComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) er
 
 	q := 1000 / float64(unitsPerEm)
 
-	ww := make(map[pscid.CID]float64)
+	ww := make(map[cmap.CID]float64)
 	glyphWidths := cff.Widths()
 	if cff.GIDToCID != nil {
 		for gid, w := range glyphWidths {
-			ww[cff.GIDToCID[gid]] = w.AsFloat(q)
+			ww[cmap.CID(cff.GIDToCID[gid])] = w.AsFloat(q)
 		}
 	} else {
 		for gid, w := range glyphWidths {
-			ww[pscid.CID(gid)] = w.AsFloat(q)
+			ww[cmap.CID(gid)] = w.AsFloat(q)
 		}
 	}
-	DW, W := widths.EncodeComposite(ww, pdf.GetVersion(w))
+	W, DW := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
 	bbox := cff.BBox()
 	fontBBox := &pdf.Rectangle{

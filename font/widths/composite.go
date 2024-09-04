@@ -23,11 +23,11 @@ import (
 
 	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 // EncodeComposite constructs the W and DW entries for a CIDFont dictionary.
-func EncodeComposite(widths map[cid.CID]float64, v pdf.Version) (float64, pdf.Array) {
+func EncodeComposite(widths map[cmap.CID]float64, v pdf.Version) (pdf.Array, pdf.Number) {
 	var ww []cidWidth
 	for cid, w := range widths {
 		ww = append(ww, cidWidth{cid, w})
@@ -74,11 +74,11 @@ func EncodeComposite(widths map[cid.CID]float64, v pdf.Version) (float64, pdf.Ar
 		pos = g.To(pos, e)
 	}
 
-	return dw, res
+	return res, pdf.Number(dw)
 }
 
 type cidWidth struct {
-	CID        cid.CID
+	CID        cmap.CID
 	GlyphWidth float64
 }
 
@@ -164,40 +164,42 @@ func mostFrequent(ww []cidWidth) float64 {
 }
 
 // DecodeComposite decodes the W and DW entries of a CIDFont dictionary.
-func DecodeComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]float64, error) {
+func DecodeComposite(r pdf.Getter, ref pdf.Object, dwObj pdf.Object) (map[cmap.CID]float64, float64, error) {
 	w, err := pdf.GetArray(r, ref)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	res := make(map[cid.CID]float64)
+	dw, _ := pdf.GetNumber(r, dwObj)
+
+	res := make(map[cmap.CID]float64)
 	for len(w) > 1 {
 		c0, err := pdf.GetInteger(r, w[0])
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		obj1, err := pdf.Resolve(r, w[1])
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if c1, ok := obj1.(pdf.Integer); ok {
 			if len(w) < 3 || c0 < 0 || c1 < c0 || c1-c0 > 65536 {
-				return nil, &pdf.MalformedFileError{
+				return nil, 0, &pdf.MalformedFileError{
 					Err: errors.New("invalid W entry in CIDFont dictionary"),
 				}
 			}
 			wi, err := pdf.GetNumber(r, w[2])
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			for c := c0; c <= c1; c++ {
-				cid := cid.CID(c)
+				cid := cmap.CID(c)
 				if pdf.Integer(cid) != c {
-					return nil, &pdf.MalformedFileError{
+					return nil, 0, &pdf.MalformedFileError{
 						Err: errors.New("invalid W entry in CIDFont dictionary"),
 					}
 				}
-				if math.Abs(float64(wi)-dw) > 1e-6 {
+				if math.Abs(float64(wi-dw)) > 1e-6 {
 					res[cid] = float64(wi)
 				}
 			}
@@ -205,20 +207,20 @@ func DecodeComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]floa
 		} else {
 			wi, err := pdf.GetArray(r, w[1])
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			for _, wiObj := range wi {
 				wi, err := pdf.GetNumber(r, wiObj)
 				if err != nil {
-					return nil, err
+					return nil, 0, err
 				}
-				cid := cid.CID(c0)
+				cid := cmap.CID(c0)
 				if pdf.Integer(cid) != c0 {
-					return nil, &pdf.MalformedFileError{
+					return nil, 0, &pdf.MalformedFileError{
 						Err: errors.New("invalid W entry in CIDFont dictionary"),
 					}
 				}
-				if float64(wi) != dw {
+				if math.Abs(float64(wi-dw)) > 1e-6 {
 					res[cid] = float64(wi)
 				}
 				c0++
@@ -227,10 +229,10 @@ func DecodeComposite(r pdf.Getter, ref pdf.Object, dw float64) (map[cid.CID]floa
 		}
 	}
 	if len(w) != 0 {
-		return nil, &pdf.MalformedFileError{
+		return nil, 0, &pdf.MalformedFileError{
 			Err: errors.New("invalid W entry in CIDFont dictionary"),
 		}
 	}
 
-	return res, nil
+	return res, float64(dw), nil
 }
