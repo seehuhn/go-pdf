@@ -82,7 +82,11 @@ func (ROS *CIDSystemInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused
 		"Supplement": ROS.Supplement,
 	}
 
-	// TODO(voss): embed as an indirect object?
+	ref := rm.Out.Alloc()
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return nil, zero, err
+	}
 
-	return dict, zero, nil
+	return ref, zero, nil
 }

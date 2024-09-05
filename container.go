@@ -194,7 +194,7 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 		res = append(res, makeFilter(f, pDict))
 	case Array:
 		pa, ok := decodeParams.(Array)
-		if !ok {
+		if !ok && decodeParams != nil {
 			return nil, errors.New("invalid /DecodeParms field")
 		}
 		for i, fi := range f {

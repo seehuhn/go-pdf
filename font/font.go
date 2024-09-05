@@ -76,9 +76,7 @@ type Embedded interface {
 	//
 	// As a side effect, this function may allocate codes for the given
 	// glyph/text combination in the font's encoding.
+	//
+	// TODO(voss): move this to Layouter?
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 }
-
-// CID represents a character ID in a composite font, or a (single byte)
-// character code in a simple font.
-type CID uint32

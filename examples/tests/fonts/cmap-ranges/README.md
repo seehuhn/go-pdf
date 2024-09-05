@@ -4,16 +4,20 @@ which tests the following special case:
 
 ```
 3 begincodespacerange
-  <00> <01>
-  <0200> <02FF>
-  <03> <FF>
+  <00> <41>
+  <4200> <42FF>
+  <43> <FF>
 endcodespacerange
 
 1 begincidrange
-  <01> <03> <34>
+  <41> <43> 34
 endcidrange
 ```
 
 Where CID 34 is 'A' in the Adobe-Japan1 character collection.
-The question is: does <03> now map to 'B' (because <02> is not a valid code),
-or to 'C' (because <03> is the third code in the range)?
+The question is: does `<03>` now map to 'B' (because `<02>` is not a valid code),
+or to 'C' (because `<03>` is the third code in the range)?
+
+The attached PDF file shows two glyphs.  The first one should be 'A'.
+The second one is the glyph encoded by `<03>`.  Most viewers I tried
+showed a 'C' here.

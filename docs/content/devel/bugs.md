@@ -55,3 +55,8 @@ projects.  Here is a list:
 - https://github.com/HinTak/Font-Validator/issues/70 [fixed]
 - https://github.com/MicrosoftDocs/typography-issues/issues/976 [rejected]
 - https://github.com/pdf-association/arlington-pdf-model/issues/98 [fixed]
+
+StackOverflow Questions
+=======================
+
+- https://stackoverflow.com/questions/78952741/ranges-in-cmap-files

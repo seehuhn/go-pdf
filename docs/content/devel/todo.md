@@ -6,6 +6,12 @@ weight = 100
 
 # TODO List
 
+## API
+
+- remove `pdf.Data` and use `*pdf.Writer` instead of `pdf.Putter` throughout?
+- splits `pdf.Object` into a class for primitive PDF objects (just the native types),
+  and a class for "objects who know how to turn themselves into PDF"?
+
 ## General
 
 - add support for writing human-readable PDF files
@@ -28,8 +34,12 @@ weight = 100
 
 ## Stream Filters
 
-- implement the TIFF predictor functions
+- implement the TIFF predictor functions for LZWDecode
+- implement RunLengthDecode filters
 - implement CCITTFaxDecode filters
+- implement JBIG2Decode filters
+- implement JPXDecode filters
+- implement Crypt filters
 
 ## Features
 

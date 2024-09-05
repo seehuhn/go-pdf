@@ -58,14 +58,12 @@ func generateSampleFile(fname string) error {
 			Supplement: 0,
 		},
 		CodeSpaceRange: []charcode.Range{
-			{Low: []byte{0x00}, High: []byte{0x41}},
-			{Low: []byte{0x42, 0x00}, High: []byte{0x42, 0xFF}},
-			{Low: []byte{0x43}, High: []byte{0xFF}},
+			{Low: []byte{0x30, 0x30}, High: []byte{0x32, 0x32}},
 		},
 		CIDRanges: []cmap.RangeNew{
 			{
-				First: []byte{0x41},
-				Last:  []byte{0x43},
+				First: []byte{0x30, 0x30},
+				Last:  []byte{0x32, 0x32},
 				Value: 34, // 'A'
 			},
 		},
@@ -79,7 +77,11 @@ func generateSampleFile(fname string) error {
 	out.TextSetFont(F, 20)
 	out.TextBegin()
 	out.TextFirstLine(50, 370)
-	out.TextShowRaw(pdf.String{0x41, 0x43})
+	out.TextShowRaw(pdf.String("000102"))
+	out.TextSecondLine(0, -40)
+	out.TextShowRaw(pdf.String("101112"))
+	out.TextNextLine()
+	out.TextShowRaw(pdf.String("202122"))
 	out.TextEnd()
 
 	err = out.Close()
@@ -108,7 +110,7 @@ func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.InfoNew) (*testFont, error)
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range "ABC" {
+	for _, r := range "ABCDEFGHI" {
 		gid := lookup.Lookup(r)
 		glyphs = append(glyphs, gid)
 	}
@@ -185,10 +187,16 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, er
 		return nil, nil, err
 	}
 
-	cidToGID := make([]byte, 37*2)
+	cidToGID := make([]byte, 43*2)
 	cidToGID[2*34+1] = 1 // 'A' has GID 0x0001
 	cidToGID[2*35+1] = 2 // 'B' has GID 0x0002
 	cidToGID[2*36+1] = 3 // 'C' has GID 0x0003
+	cidToGID[2*37+1] = 4 // 'D' has GID 0x0004
+	cidToGID[2*38+1] = 5 // 'E' has GID 0x0005
+	cidToGID[2*39+1] = 6 // 'F' has GID 0x0006
+	cidToGID[2*40+1] = 7 // 'G' has GID 0x0007
+	cidToGID[2*41+1] = 8 // 'H' has GID 0x0008
+	cidToGID[2*42+1] = 9 // 'I' has GID 0x0009
 	cidToGIDStream, err := rm.Out.OpenStream(cidToGIDRef, nil, pdf.FilterASCIIHex{})
 	if err != nil {
 		return nil, nil, err

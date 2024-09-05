@@ -6,7 +6,7 @@ draft = true
 
 Here is a list of PDF renderers that I sometimes try on my Mac:
 
-- Preview: `open test.pdf`
+- MacOS Preview: `open test.pdf`
 - Acrobat Reader: `open -a "Adobe Acrobat Reader" test.pdf`
 - Google Chrome: `open -a "Google Chrome" test.pdf`
 - Firefox: `open -a "Firefox" test.pdf`
