@@ -21,7 +21,6 @@ weight = 100
 - By more systematic about the use of pdf.MalformedFileError, and in
   particular the `Loc` field there.
 - avoid PDF output like `[-722 (1) -722] TJ` for centered text
-- when fuzzing PDF files, write the examples without compression
 - decide whether matrices are `[6]float64` or `[]float64`
 
 ## Fonts
@@ -47,6 +46,8 @@ weight = 100
 - add a way to repair broken xref tables?
 - allow for incremental updates to PDF files?
 
-## Repository
+## Testing
 
 - make sure that unit tests don't leave stray files behind
+- when fuzzing PDF files, write the examples without compression
+- look into the VeraPDF test suite
