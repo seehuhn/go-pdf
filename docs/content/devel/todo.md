@@ -28,7 +28,7 @@ weight = 100
 - add support for external fonts
 - test that the widths of the `.notdef` character is correct for the
   standard 14 fonts
-- optionally write encodings that can be interpreted without reading
+- (optionally) write encodings that can be interpreted without reading
   the font program?
 
 ## Stream Filters
@@ -42,9 +42,9 @@ weight = 100
 
 ## Features
 
-- implement public key encryption?
-- add a way to repair broken xref tables?
 - allow for incremental updates to PDF files?
+- add a way to repair broken xref tables?
+- implement public key encryption?
 
 ## Testing
 

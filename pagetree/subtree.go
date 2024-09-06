@@ -195,7 +195,7 @@ func inheritKey(key pdf.Name, parentDict pdf.Dict, childNodes []*nodeInfo) {
 			// value with the "unset" value.
 			return
 		}
-		r := pdf.Format(val)
+		r := pdf.AsString(val)
 		repr[i] = r
 		count[r]++
 	}
@@ -242,7 +242,7 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 	key := pdf.Name("Rotate")
 
 	defaultValue := pdf.Integer(0)
-	defaultString := pdf.Format(defaultValue)
+	defaultString := pdf.AsString(defaultValue)
 	numDefault := 0
 	for i, node := range childNodes {
 		val, ok := node.dict[key]
@@ -251,7 +251,7 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 			// use the inherited value.
 			continue
 		}
-		r := pdf.Format(val)
+		r := pdf.AsString(val)
 		repr[i] = r
 		count[r]++
 		if r == defaultString {

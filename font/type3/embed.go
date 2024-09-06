@@ -154,7 +154,7 @@ func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
 		resources := pdf.AsDict(info.Resources)
 
 		var resourcesRef pdf.Object
-		if len(pdf.Format(resources)) > 60 { // TODO(voss): tune the threshold
+		if len(pdf.AsString(resources)) > 60 { // TODO(voss): tune the threshold
 			ref := w.Alloc()
 			compressedRefs = append(compressedRefs, ref)
 			compressedObjects = append(compressedObjects, resources)

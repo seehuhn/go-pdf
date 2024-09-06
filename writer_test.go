@@ -42,7 +42,7 @@ func TestWriter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encInfo1 := Format(encryptDict)
+	encInfo1 := AsString(encryptDict)
 
 	author := "Jochen Voß"
 	w.GetMeta().Info = &Info{
@@ -133,7 +133,7 @@ ET
 	if err != nil {
 		t.Fatal(err)
 	}
-	encInfo2 := Format(encryptDict)
+	encInfo2 := AsString(encryptDict)
 
 	if encInfo1 != encInfo2 {
 		fmt.Println()

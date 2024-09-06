@@ -398,7 +398,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	var maxWidth float64
 	for i, key := range keys {
 		fDict := l.F["dict"]
-		gg := fDict.F.Layout(nil, fDict.ptSize, pdf.Format(key)+" ")
+		gg := fDict.F.Layout(nil, fDict.ptSize, pdf.AsString(key)+" ")
 		keyGlyphs[i] = gg
 		w := gg.TotalWidth()
 		if w > maxWidth {
@@ -450,7 +450,7 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 		l.yPos -= l.F["dict"].baseLineSkip
 
 		gg := keyGlyphs[i]
-		desc := pdf.Format(fontDict[key])
+		desc := pdf.AsString(fontDict[key])
 		if key == "CharProcs" && len(desc) > 20 {
 			desc = "<< ... >>"
 		}

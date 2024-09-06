@@ -255,7 +255,7 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 	default:
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("unknown font type"),
-			Loc: []string{pdf.Format(fontDictRef)},
+			Loc: []string{pdf.AsString(fontDictRef)},
 		}
 	}
 

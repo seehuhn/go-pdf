@@ -750,9 +750,9 @@ func (x *Placeholder) Set(val Object) error {
 	return err
 }
 
-// Format formats a PDF object as a string, in the same way as the
+// AsString formats a PDF object as a string, in the same way as the
 // it would be written to a PDF file.
-func Format(obj Object) string {
+func AsString(obj Object) string {
 	if obj == nil {
 		return "null"
 	}

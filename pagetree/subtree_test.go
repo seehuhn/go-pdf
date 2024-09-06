@@ -251,9 +251,9 @@ func TestInheritRotate(t *testing.T) {
 	}
 	parentDict := pdf.Dict{}
 	inheritRotate(parentDict, cc)
-	fmt.Println("parent:", pdf.Format(parentDict))
+	fmt.Println("parent:", pdf.AsString(parentDict))
 	for i := 0; i < n; i++ {
-		fmt.Printf("child %d: %s\n", i, pdf.Format(cc[i].dict))
+		fmt.Printf("child %d: %s\n", i, pdf.AsString(cc[i].dict))
 	}
 }
 

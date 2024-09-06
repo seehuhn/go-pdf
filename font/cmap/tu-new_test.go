@@ -457,8 +457,8 @@ func TestToUnicodeTemplate(t *testing.T) {
 	// check that that some key lines are present in the output
 	body := buf.String()
 	lines := []string{
-		pdf.Format(testToUniInfoParent.MakeName()) + " usecmap",
-		"/CMapName " + pdf.Format(testToUniInfoChild.MakeName()) + " def",
+		pdf.AsString(testToUniInfoParent.MakeName()) + " usecmap",
+		"/CMapName " + pdf.AsString(testToUniInfoChild.MakeName()) + " def",
 		"3 begincodespacerange\n<00> <fe>\n<ff00> <fffe>\n<ffff00> <ffffff>\nendcodespacerange",
 		"3 beginbfchar\n<02> <0041>\n<04> <0043>\n<05> <65e5>\nendbfchar",
 		"2 beginbfrange\n<07> <09> [<0047> <0048> <0049>]\n<ff10> <ff20> <00580041>\nendbfrange",

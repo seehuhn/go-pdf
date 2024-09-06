@@ -380,7 +380,7 @@ func (d *decoder) MarkAsInvalid() {
 	case *pdf.Stream:
 		desc = "stream"
 	default:
-		desc = pdf.Format(d.obj)
+		desc = pdf.AsString(d.obj)
 	}
 	if len(desc) > 40 {
 		desc = desc[:32] + "..." + desc[len(desc)-5:]

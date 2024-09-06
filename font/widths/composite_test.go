@@ -88,8 +88,8 @@ func TestEncodeWidths(t *testing.T) {
 			}
 
 			if d := cmp.Diff(w, test.out); d != "" {
-				fmt.Printf("%v\n", pdf.Format(w))
-				fmt.Println(pdf.Format(test.out))
+				fmt.Printf("%v\n", pdf.AsString(w))
+				fmt.Println(pdf.AsString(test.out))
 				t.Errorf("w mismatch (-want +got):\n%s", d)
 			}
 		})

@@ -95,7 +95,7 @@ func TestReadObject(t *testing.T) {
 				}
 			} else if !reflect.DeepEqual(val, test.val) {
 				t.Errorf("%q: wrong value: expected %q, got %q",
-					body, Format(test.val), Format(val))
+					body, AsString(test.val), AsString(val))
 			}
 
 			switch {

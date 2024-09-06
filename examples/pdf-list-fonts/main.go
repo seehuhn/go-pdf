@@ -69,7 +69,7 @@ func doit(fname string) error {
 		for _, font := range resources.Font {
 			fontRef, ok := font.(pdf.Reference)
 			if !ok {
-				fmt.Printf("funny font on page %d: %s\n", pageNo, pdf.Format(font))
+				fmt.Printf("funny font on page %d: %s\n", pageNo, pdf.AsString(font))
 				continue
 			}
 			fontMap[fontRef] = true
@@ -117,7 +117,7 @@ func doit(fname string) error {
 			if err != nil {
 				return err
 			}
-			encoding = pdf.Format(font["Encoding"])
+			encoding = pdf.AsString(font["Encoding"])
 		} else {
 			fontDesc, err = pdf.GetDict(r, font["FontDescriptor"])
 			if err != nil {

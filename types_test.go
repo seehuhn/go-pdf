@@ -38,7 +38,7 @@ func TestFormat(t *testing.T) {
 		{Array{Integer(1), nil, Integer(3)}, "[1 null 3]"},
 	}
 	for _, test := range cases {
-		out := Format(test.in)
+		out := AsString(test.in)
 		if out != test.out {
 			t.Errorf("string wrongly formatted, expected %q but got %q",
 				test.out, out)
@@ -124,7 +124,7 @@ func FuzzString(f *testing.F) {
 	f.Add([]byte{0xFF, 0x00})
 	f.Fuzz(func(t *testing.T, data []byte) {
 		s1 := String(data)
-		enc := Format(s1)
+		enc := AsString(s1)
 		s2, err := ParseString([]byte(enc))
 		if err != nil {
 			t.Error(err)
