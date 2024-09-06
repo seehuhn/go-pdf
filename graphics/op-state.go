@@ -225,9 +225,8 @@ func (w *Writer) SetRenderingIntent(intent RenderingIntent) {
 	w.RenderingIntent = intent
 	w.Set |= StateRenderingIntent
 
-	err := pdf.Name(intent).PDF(w.Content)
-	if err != nil {
-		w.Err = err
+	w.writeObject(pdf.Name(intent))
+	if w.Err != nil {
 		return
 	}
 	_, w.Err = fmt.Fprintln(w.Content, " ri")
@@ -269,9 +268,8 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 
 	newState.CopyTo(&w.State)
 
-	err = name.PDF(w.Content)
-	if err != nil {
-		w.Err = err
+	w.writeObject(name)
+	if w.Err != nil {
 		return
 	}
 	_, w.Err = fmt.Fprintln(w.Content, " gs")

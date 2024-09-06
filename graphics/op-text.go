@@ -170,9 +170,8 @@ func (w *Writer) TextSetFont(F font.Font, size float64) {
 	w.State.TextFontSize = size
 	w.State.Set |= StateTextFont
 
-	err = name.PDF(w.Content)
-	if err != nil {
-		w.Err = err
+	w.writeObject(name)
+	if w.Err != nil {
 		return
 	}
 	_, w.Err = fmt.Fprintln(w.Content, "", size, "Tf")

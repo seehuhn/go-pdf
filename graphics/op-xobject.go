@@ -35,21 +35,20 @@ type XObject interface {
 // This can be used to draw images, forms, or other XObjects.
 //
 // This implements the PDF graphics operator "Do".
-func (p *Writer) DrawXObject(obj XObject) {
-	if !p.isValid("DrawImage", objPage) {
+func (w *Writer) DrawXObject(obj XObject) {
+	if !w.isValid("DrawImage", objPage) {
 		return
 	}
 
-	name, _, err := writerGetResourceName(p, catXObject, obj)
+	name, _, err := writerGetResourceName(w, catXObject, obj)
 	if err != nil {
-		p.Err = err
+		w.Err = err
 		return
 	}
 
-	err = name.PDF(p.Content)
-	if err != nil {
-		p.Err = err
+	w.writeObject(name)
+	if w.Err != nil {
 		return
 	}
-	_, p.Err = fmt.Fprintln(p.Content, "", "Do")
+	_, w.Err = fmt.Fprintln(w.Content, "", "Do")
 }

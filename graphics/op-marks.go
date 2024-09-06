@@ -68,9 +68,8 @@ func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
 		return
 	}
 
-	err := mc.Tag.PDF(w.Content)
-	if err != nil {
-		w.Err = err
+	w.writeObject(mc.Tag)
+	if w.Err != nil {
 		return
 	}
 
@@ -98,9 +97,8 @@ func (w *Writer) MarkedContentStart(mc *MarkedContent) {
 	w.nesting = append(w.nesting, pairTypeBMC)
 	w.markedContent = append(w.markedContent, mc)
 
-	err := mc.Tag.PDF(w.Content)
-	if err != nil {
-		w.Err = err
+	w.writeObject(mc.Tag)
+	if w.Err != nil {
 		return
 	}
 
@@ -134,9 +132,8 @@ func (w *Writer) writeProperties(mc *MarkedContent, op string) {
 		w.Err = err
 		return
 	}
-	err = prop.PDF(w.Content)
-	if err != nil {
-		w.Err = err
+	w.writeObject(prop)
+	if w.Err != nil {
 		return
 	}
 	_, w.Err = fmt.Fprintln(w.Content, " "+op)
