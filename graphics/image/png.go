@@ -49,7 +49,7 @@ func (im *PNG) Bounds() Rectangle {
 
 // Embed ensures that the image is embedded in the PDF file.
 // This implements the [Image] interface.
-func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	ref := rm.Out.Alloc()
 	src := im.Data

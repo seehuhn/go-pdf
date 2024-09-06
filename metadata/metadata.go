@@ -49,7 +49,7 @@ func ExtractStream(r pdf.Getter, ref pdf.Object) (*Stream, error) {
 
 // Embed adds the XMP metadata stream to the PDF file.
 // This implements the pdf.Embedder interface.
-func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	w := rm.Out

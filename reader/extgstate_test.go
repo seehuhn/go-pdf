@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -134,8 +135,10 @@ func TestExtGState(t *testing.T) {
 		// font to an original font.  Maybe we can use the font name?
 		return true
 	})
-
-	if d := cmp.Diff(ext1embedded, ext2, cmpFont); d != "" {
+	fixObj := cmpopts.AcyclicTransformer("fixObj", func(x pdf.Object) pdf.Native {
+		return x.AsPDF(0)
+	})
+	if d := cmp.Diff(ext1embedded, ext2, cmpFont, fixObj); d != "" {
 		t.Error(d)
 	}
 }

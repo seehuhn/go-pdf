@@ -201,7 +201,7 @@ func FuzzScanner(f *testing.F) {
 		}
 
 		buf := &bytes.Buffer{}
-		err = writeObject(buf, obj1)
+		err = Format(buf, 0, obj1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -216,7 +216,7 @@ func FuzzScanner(f *testing.F) {
 		}
 
 		buf.Reset()
-		err = writeObject(buf, obj2)
+		err = Format(buf, 0, obj2)
 		if err != nil {
 			t.Fatal(err)
 		}

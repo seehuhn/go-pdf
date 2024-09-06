@@ -96,7 +96,7 @@ func (f *Font) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphS
 }
 
 // Embed implements the [font.Font] interface.
-func (f *Font) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
+func (f *Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	if f.RM != nil && f.RM != rm {
 		return nil, nil, errors.New("font from different resource manager")
 	}

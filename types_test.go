@@ -26,16 +26,16 @@ import (
 )
 
 var (
-	_ Object = Array{}
-	_ Object = Boolean(true)
-	_ Object = Dict{}
-	_ Object = Integer(0)
-	_ Object = Name("name")
-	_ Object = Real(0)
-	_ Object = Reference(0)
-	_ Object = (*Stream)(nil)
-	_ Object = String(nil)
-	_ Object = (*Placeholder)(nil)
+	_ Native = Array{}
+	_ Native = Boolean(true)
+	_ Native = Dict{}
+	_ Native = Integer(0)
+	_ Native = Name("name")
+	_ Native = Real(0)
+	_ Native = Reference(0)
+	_ Native = (*Stream)(nil)
+	_ Native = String(nil)
+	_ Native = (*Placeholder)(nil)
 )
 
 func TestFormat(t *testing.T) {
@@ -116,7 +116,7 @@ func TestStringFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	for i, test := range cases {
 		buf.Reset()
-		err := test.in.PDF(buf)
+		err := Format(buf, 0, test.in)
 		if err != nil {
 			t.Errorf("%d: %q: %s", i, test.in, err)
 		} else if buf.String() != test.out {
@@ -207,7 +207,7 @@ func TestDict(t *testing.T) {
 		"bad":  nil,
 	}
 	buf := &bytes.Buffer{}
-	err := d.PDF(buf)
+	err := Format(buf, 0, d)
 	if err != nil {
 		t.Fatal(err)
 	}

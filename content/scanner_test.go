@@ -164,7 +164,7 @@ func FuzzScanner(f *testing.F) {
 		}
 
 		buf := &bytes.Buffer{}
-		err = writeObject(buf, obj1)
+		err = pdf.Format(buf, pdf.OptContentStream, obj1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -179,7 +179,7 @@ func FuzzScanner(f *testing.F) {
 		}
 
 		buf.Reset()
-		err = writeObject(buf, obj2)
+		err = pdf.Format(buf, pdf.OptContentStream, obj2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -191,14 +191,6 @@ func FuzzScanner(f *testing.F) {
 			t.Error("results differ")
 		}
 	})
-}
-
-func writeObject(w io.Writer, obj pdf.Object) error {
-	if obj == nil {
-		_, err := w.Write([]byte("null"))
-		return err
-	}
-	return obj.PDF(w)
 }
 
 var testCases = []struct {
@@ -286,11 +278,11 @@ var testCases = []struct {
 		"key3": pdf.Integer(3),
 	}, true},
 
-	{"q", operator("q"), true},
-	{"T*", operator("T*"), true},
-	{"NULL", operator("NULL"), true},
-	{"TRUE", operator("TRUE"), true},
-	{"FALSE", operator("FALSE"), true},
-	{"A;Name_With-Various***Characters?", operator("A;Name_With-Various***Characters?"), true},
-	{"ß", operator("ß"), true},
+	{"q", pdf.Operator("q"), true},
+	{"T*", pdf.Operator("T*"), true},
+	{"NULL", pdf.Operator("NULL"), true},
+	{"TRUE", pdf.Operator("TRUE"), true},
+	{"FALSE", pdf.Operator("FALSE"), true},
+	{"A;Name_With-Various***Characters?", pdf.Operator("A;Name_With-Various***Characters?"), true},
+	{"ß", pdf.Operator("ß"), true},
 }

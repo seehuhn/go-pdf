@@ -161,7 +161,7 @@ func (p *type1) PaintType() int {
 // Embed returns a reference to the pattern's content stream.
 // The resource manager must be the same as the one used to create the pattern.
 // This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
-func (p *type1) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (p *type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if p.RM != rm {

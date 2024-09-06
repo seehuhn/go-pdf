@@ -387,7 +387,7 @@ func (e *explainer) explainShort(obj pdf.Object) (string, error) {
 		return "[...]", nil
 	default:
 		e.buf.Reset()
-		err := obj.PDF(e.buf)
+		err := pdf.Format(e.buf, 0, obj)
 		if err != nil {
 			return "", err
 		}
@@ -435,7 +435,7 @@ func (e *explainer) explainSingleLine(obj pdf.Object) (string, error) {
 			keys := dictKeys(obj)
 			for _, key := range keys {
 				e.buf.Reset()
-				err := key.PDF(e.buf)
+				err := pdf.Format(e.buf, 0, key)
 				if err != nil {
 					return "", err
 				}
@@ -475,7 +475,7 @@ func (e *explainer) explainSingleLine(obj pdf.Object) (string, error) {
 		return fmt.Sprintf("<array, %d elements>", len(obj)), nil
 	default:
 		e.buf.Reset()
-		err := obj.PDF(e.buf)
+		err := pdf.Format(e.buf, pdf.OptPretty, obj)
 		if err != nil {
 			return "", err
 		}
@@ -529,7 +529,7 @@ func (e *explainer) show(obj pdf.Object) error {
 		keys := dictKeys(obj)
 		fmt.Println("<<")
 		for _, key := range keys {
-			err := key.PDF(os.Stdout)
+			err := pdf.Format(os.Stdout, 0, key)
 			if err != nil {
 				return err
 			}
@@ -555,7 +555,7 @@ func (e *explainer) show(obj pdf.Object) error {
 		}
 		fmt.Println("]")
 	default:
-		err := obj.PDF(os.Stdout)
+		err := pdf.Format(os.Stdout, pdf.OptPretty, obj)
 		if err != nil {
 			return err
 		}

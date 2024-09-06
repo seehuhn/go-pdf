@@ -67,7 +67,7 @@ func TestRectangle2(t *testing.T) {
 	for _, test := range cases {
 		t.Run(test.String(), func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := test.PDF(buf)
+			err := Format(buf, 0, test)
 			if err != nil {
 				t.Fatal(err)
 			}

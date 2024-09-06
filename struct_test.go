@@ -157,7 +157,7 @@ func TestStructVersion(t *testing.T) {
 	if err == nil {
 		t.Errorf("invalid version not detected")
 	}
-	aDict = Dict{"V": Number(1.7)}
+	aDict = Dict{"V": Integer(17)}
 	err = DecodeDict(nil, res, aDict)
 	if err == nil {
 		t.Errorf("invalid type not detected")

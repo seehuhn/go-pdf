@@ -107,7 +107,6 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 			}
 		}
 
-		// TODO(voss): omit excess spaces in the content stream
 		w.writeObject(out)
 		if w.Err != nil {
 			return

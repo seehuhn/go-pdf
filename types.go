@@ -21,100 +21,291 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/maps"
 )
 
-// Object represents an object in a PDF file.  There are nine basic types of
-// PDF objects, which implement this interface: [Array], [Boolean], [Dict],
-// [Integer], [Name], [Real], [Reference], [*Stream], and [String].
-// The PDF "null" object is represented by the Go value `nil`.
-// Custom types can be constructed out of these basic types, by implementing
-// the Object interface.
+// Native represents an object in a PDF file.
+// Thus must be one of the following:
+//   - [Array]
+//   - [Boolean]
+//   - [Dict]
+//   - [Integer]
+//   - [Name]
+//   - [Operator]
+//   - [Real]
+//   - [Reference]
+//   - [*Stream]
+//   - [String]
+//   - [*Placeholder]
+//
+// The [Object] interface is a more general interface which can represent
+// be used by the user to extend the set of supported PDF objects.
+type Native interface {
+	Object
+	isNative()
+}
+
 type Object interface {
-	// PDF writes the PDF file representation of the object to w.
-	PDF(w io.Writer) error
+	AsPDF(OutputOptions) Native
 }
 
-// Boolean represents a boolean value in a PDF file.
-type Boolean bool
+type OutputOptions uint32
 
-// PDF implements the [Object] interface.
-func (x Boolean) PDF(w io.Writer) error {
-	var s string
-	if x {
-		s = "true"
-	} else {
-		s = "false"
-	}
-	_, err := w.Write([]byte(s))
+func (o OutputOptions) Has(opt OutputOptions) bool {
+	return o&opt != 0
+}
+
+const (
+	OptASCII         OutputOptions = 1 << iota // top-level only uses ASCII
+	OptContentStream                           // we are inside a content stream
+	OptObjStm                                  // use object streams
+	OptPretty                                  // make the output more human-readable
+	OptXRefStream                              // use an xref stream
+)
+
+// Format writes a textual representation of the object to the given writer.
+// The exact format depends on the format options.
+// The output does not include any leading or trailing whitespace.
+func Format(w io.Writer, opt OutputOptions, obj Object) error {
+	_, err := doFormat(w, obj, opt, false)
 	return err
 }
 
-// Integer represents an integer constant in a PDF file.
-type Integer int64
+// The argument `needSep` indicates whether the function should write a separator
+// before the object, in case the output starts with an alphanumeric character.
+// The first return value indicates whether a separator is needed after the object,
+// if the following object starts with an alphanumeric character.
+func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, error) {
+	var native Native
+	if obj != nil {
+		native = obj.AsPDF(opt)
+	}
 
-// PDF implements the [Object] interface.
-func (x Integer) PDF(w io.Writer) error {
-	s := strconv.FormatInt(int64(x), 10)
-	_, err := w.Write([]byte(s))
-	return err
+	switch x := native.(type) {
+	case nil:
+		if needSep {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return false, err
+			}
+		}
+		_, err := io.WriteString(w, "null")
+		return true, err
+
+	case Array:
+		_, err := io.WriteString(w, "[")
+		if err != nil {
+			return false, err
+		}
+		if opt.Has(OptPretty) {
+			for i, elem := range x {
+				if i > 0 {
+					_, err = io.WriteString(w, " ")
+					if err != nil {
+						return false, err
+					}
+				}
+				_, err = doFormat(w, elem, opt, false)
+				if err != nil {
+					return false, err
+				}
+			}
+		} else {
+			needSep := false
+			for _, elem := range x {
+				needSep, err = doFormat(w, elem, opt, needSep)
+				if err != nil {
+					return false, err
+				}
+			}
+		}
+		_, err = io.WriteString(w, "]")
+		return false, err
+
+	case Boolean:
+		if needSep {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return false, err
+			}
+		}
+		if x {
+			_, err := io.WriteString(w, "true")
+			return true, err
+		} else {
+			_, err := io.WriteString(w, "false")
+			return true, err
+		}
+
+	case Dict:
+		err := formatDict(w, x, opt)
+		return false, err
+
+	case Integer:
+		if needSep {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return false, err
+			}
+		}
+		s := strconv.FormatInt(int64(x), 10)
+		_, err := io.WriteString(w, s)
+		return true, err
+
+	case Name:
+		return true, formatName(w, x)
+
+	case Operator:
+		if !opt.Has(OptContentStream) {
+			return true, errors.New("operator outside content stream")
+		}
+		if needSep {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return false, err
+			}
+		}
+		_, err := io.WriteString(w, string(x))
+		return true, err
+
+	case Real:
+		if needSep {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return false, err
+			}
+		}
+		s := strconv.FormatFloat(float64(x), 'f', -1, 64)
+		if !strings.Contains(s, ".") {
+			s = s + "."
+		}
+		_, err := io.WriteString(w, s)
+		return true, err
+
+	case Reference:
+		if needSep {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return false, err
+			}
+		}
+		_, err := fmt.Fprintf(w, "%d %d R", x.Number(), x.Generation())
+		return true, err
+
+	case *Stream:
+		err := formatDict(w, x.Dict, opt)
+		if err != nil {
+			return false, err
+		}
+		_, err = io.WriteString(w, "\nstream\n")
+		if err != nil {
+			return false, err
+		}
+
+		if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
+			enc, err := wenc.enc.EncryptStream(wenc.ref, withDummyClose{w})
+			if err != nil {
+				return false, err
+			}
+			w = enc
+		}
+		_, err = io.Copy(w, x.R)
+		if err != nil {
+			return false, err
+		}
+		// TODO(voss): won't this encrypt the "endstream", too?
+		_, err = io.WriteString(w, "\nendstream")
+		return true, err
+
+	case String:
+		err := formatString(w, x, opt)
+		return false, err
+
+	case *Placeholder:
+		if needSep {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return false, err
+			}
+		}
+
+		// method 1: If the value is already known, we can just write it to the
+		// file.
+		if x.value != nil {
+			_, err := w.Write(x.value)
+			return true, err
+		}
+
+		// method 2: If we can seek, write whitespace now and replace this with
+		// the real value later.
+		if pdf, ok := x.pdf.(*Writer); ok {
+			if _, ok := pdf.origW.(io.WriteSeeker); ok {
+				x.pos = append(x.pos, pdf.w.pos)
+				_, err := w.Write(bytes.Repeat([]byte{' '}, x.size))
+				return true, err
+			}
+		}
+
+		// method 3: If all else fails, use an indirect reference.
+		if x.ref == 0 {
+			x.ref = x.pdf.Alloc()
+		}
+		return doFormat(w, x.ref, opt, false)
+
+	default:
+		panic(fmt.Sprintf("Format: invalid PDF object type %T", x))
+	}
 }
 
-// Real represents an real number in a PDF file.
-type Real float64
+func formatName(w io.Writer, name Name) error {
+	l := []byte(name)
 
-// PDF implements the [Object] interface.
-func (x Real) PDF(w io.Writer) error {
-	s := strconv.FormatFloat(float64(x), 'f', -1, 64)
-	if !strings.Contains(s, ".") {
-		s = s + "."
+	var funny []int
+	for i, c := range l {
+		if isSpace[c] || isDelimiter[c] || c < 0x21 || c > 0x7e || c == '#' {
+			funny = append(funny, i)
+		}
 	}
-	_, err := w.Write([]byte(s))
-	return err
-}
+	n := len(l)
 
-// String represents a raw string in a PDF file.  The character set encoding,
-// if any, is determined by the context.
-type String []byte
-
-// ParseString parses a string from the given buffer.  The buffer must include
-// the surrounding parentheses or angle brackets.
-func ParseString(buf []byte) (String, error) {
-	scanner := newScanner(bytes.NewReader(buf), nil, nil)
-	b, _ := scanner.Peek(1)
-	if len(b) < 1 {
-		return nil, errInvalidString
-	}
-	var s String
-	var err error
-	if b[0] == '(' {
-		scanner.bufPos++
-		s, err = scanner.ReadQuotedString()
-	} else if b[0] == '<' {
-		scanner.bufPos++
-		s, err = scanner.ReadHexString()
-	} else {
-		err = errInvalidString
-	}
+	_, err := w.Write([]byte{'/'})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if scanner.currentPos() != int64(len(buf)) {
-		return nil, errInvalidString
+	pos := 0
+	for _, i := range funny {
+		if pos < i {
+			_, err = w.Write(l[pos:i])
+			if err != nil {
+				return err
+			}
+		}
+		c := l[i]
+		_, err = fmt.Fprintf(w, "#%02x", c)
+		if err != nil {
+			return err
+		}
+		pos = i + 1
 	}
-	return s, nil
+	if pos < n {
+		_, err = w.Write(l[pos:n])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-var errInvalidString = errors.New("malformed PDF string")
+func formatString(w io.Writer, s String, opt OutputOptions) error {
+	l := []byte(s)
 
-// PDF implements the [Object] interface.
-func (x String) PDF(w io.Writer) error {
-	l := []byte(x)
-
-	var pretty bool
+	pretty := opt.Has(OptPretty)
 	if wenc, ok := w.(*posWriter); ok {
 		if wenc.enc != nil {
 			enc, err := wenc.enc.EncryptBytes(wenc.ref, l)
@@ -122,8 +313,7 @@ func (x String) PDF(w io.Writer) error {
 				return err
 			}
 			l = enc
-		} else {
-			pretty = wenc.pretty
+			pretty = false
 		}
 	}
 
@@ -235,6 +425,130 @@ func (x String) PDF(w io.Writer) error {
 	return finalErr
 }
 
+func formatDict(w io.Writer, dict Dict, opt OutputOptions) error {
+	_, err := io.WriteString(w, "<<")
+	if err != nil {
+		return err
+	}
+	keys := maps.Keys(dict)
+	slices.Sort(keys)
+
+	if opt.Has(OptPretty) {
+		_, err = io.WriteString(w, "\n")
+		if err != nil {
+			return err
+		}
+		for _, name := range keys {
+			val := dict[name]
+			if val == nil {
+				continue
+			}
+
+			err := formatName(w, name)
+			if err != nil {
+				return err
+			}
+			_, err = io.WriteString(w, " ")
+			if err != nil {
+				return err
+			}
+			_, err = doFormat(w, val, opt, false)
+			if err != nil {
+				return err
+			}
+			_, err = io.WriteString(w, "\n")
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		for _, name := range keys {
+			val := dict[name]
+			if val == nil {
+				continue
+			}
+
+			err := formatName(w, name)
+			if err != nil {
+				return err
+			}
+			_, err = doFormat(w, val, opt, true)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	_, err = io.WriteString(w, ">>")
+	return err
+}
+
+// Boolean represents a boolean value in a PDF file.
+type Boolean bool
+
+func (x Boolean) isNative() {}
+
+func (x Boolean) AsPDF(opt OutputOptions) Native {
+	return x
+}
+
+// Integer represents an integer constant in a PDF file.
+type Integer int64
+
+func (x Integer) isNative() {}
+
+func (x Integer) AsPDF(opt OutputOptions) Native {
+	return x
+}
+
+// Real represents an real number in a PDF file.
+type Real float64
+
+func (x Real) isNative() {}
+
+func (x Real) AsPDF(opt OutputOptions) Native {
+	return x
+}
+
+// String represents a raw string in a PDF file.  The character set encoding,
+// if any, is determined by the context.
+type String []byte
+
+func (x String) isNative() {}
+
+func (x String) AsPDF(opt OutputOptions) Native {
+	return x
+}
+
+// ParseString parses a string from the given buffer.  The buffer must include
+// the surrounding parentheses or angle brackets.
+func ParseString(buf []byte) (String, error) {
+	scanner := newScanner(bytes.NewReader(buf), nil, nil)
+	b, _ := scanner.Peek(1)
+	if len(b) < 1 {
+		return nil, errInvalidString
+	}
+	var s String
+	var err error
+	if b[0] == '(' {
+		scanner.bufPos++
+		s, err = scanner.ReadQuotedString()
+	} else if b[0] == '<' {
+		scanner.bufPos++
+		s, err = scanner.ReadHexString()
+	} else {
+		err = errInvalidString
+	}
+	if err != nil {
+		return nil, err
+	}
+	if scanner.currentPos() != int64(len(buf)) {
+		return nil, errInvalidString
+	}
+	return s, nil
+}
+
+var errInvalidString = errors.New("malformed PDF string")
+
 // AsTextString interprets x as a PDF "text string" and returns
 // the corresponding utf-8 encoded string.
 func (x String) AsTextString() string {
@@ -304,6 +618,12 @@ func Date(t time.Time) String {
 // Name represents a name object in a PDF file.
 type Name string
 
+func (x Name) isNative() {}
+
+func (x Name) AsPDF(opt OutputOptions) Native {
+	return x
+}
+
 // ParseName parses a PDF name from the given buffer.  The buffer must include
 // the leading slash.
 func ParseName(buf []byte) (Name, error) {
@@ -324,49 +644,19 @@ func ParseName(buf []byte) (Name, error) {
 
 var errInvalidName = errors.New("malformed PDF name")
 
-// PDF implements the [Object] interface.
-func (x Name) PDF(w io.Writer) error {
-	l := []byte(x)
+// Operator represents a PDF content stream operator.
+type Operator string
 
-	var funny []int
-	for i, c := range l {
-		if isSpace[c] || isDelimiter[c] || c < 0x21 || c > 0x7e || c == '#' {
-			funny = append(funny, i)
-		}
-	}
-	n := len(l)
+func (x Operator) isNative() {}
 
-	_, err := w.Write([]byte{'/'})
-	if err != nil {
-		return err
-	}
-	pos := 0
-	for _, i := range funny {
-		if pos < i {
-			_, err = w.Write(l[pos:i])
-			if err != nil {
-				return err
-			}
-		}
-		c := l[i]
-		_, err = fmt.Fprintf(w, "#%02x", c)
-		if err != nil {
-			return err
-		}
-		pos = i + 1
-	}
-	if pos < n {
-		_, err = w.Write(l[pos:n])
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+func (x Operator) AsPDF(opt OutputOptions) Native {
+	return x
 }
 
 // Array represent an array of objects in a PDF file.
 type Array []Object
+
+func (x Array) isNative() {}
 
 func (x Array) String() string {
 	res := []string{}
@@ -375,30 +665,20 @@ func (x Array) String() string {
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
-// PDF implements the [Object] interface.
-func (x Array) PDF(w io.Writer) error {
-	_, err := w.Write([]byte("["))
-	if err != nil {
-		return err
-	}
-	for i, val := range x {
-		if i > 0 {
-			_, err := w.Write([]byte(" "))
-			if err != nil {
-				return err
-			}
-		}
-		err = writeObject(w, val)
-		if err != nil {
-			return err
+func (x Array) AsPDF(opt OutputOptions) Native {
+	res := make(Array, len(x))
+	for i, elem := range x {
+		if elem != nil {
+			res[i] = elem.AsPDF(opt)
 		}
 	}
-	_, err = w.Write([]byte("]"))
-	return err
+	return res
 }
 
 // Dict represent a Dictionary object in a PDF file.
 type Dict map[Name]Object
+
+func (x Dict) isNative() {}
 
 func (x Dict) String() string {
 	res := []string{}
@@ -416,51 +696,14 @@ func (x Dict) String() string {
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
-// PDF implements the [Object] interface.
-func (x Dict) PDF(w io.Writer) error {
-	if x == nil {
-		_, err := w.Write([]byte("null"))
-		return err
-	}
-
-	keys := make([]Name, 0, len(x))
+func (x Dict) AsPDF(opt OutputOptions) Native {
+	res := make(Dict, len(x))
 	for key, val := range x {
-		if val == nil {
-			continue
-		}
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i int, j int) bool {
-		return keys[i] < keys[j]
-	})
-
-	_, err := w.Write([]byte("<<"))
-	if err != nil {
-		return err
-	}
-
-	for _, name := range keys {
-		val := x[name]
-
-		_, err = w.Write([]byte("\n"))
-		if err != nil {
-			return err
-		}
-		err = name.PDF(w)
-		if err != nil {
-			return err
-		}
-		_, err = w.Write([]byte(" "))
-		if err != nil {
-			return err
-		}
-		err = val.PDF(w)
-		if err != nil {
-			return err
+		if val != nil {
+			res[key] = val.AsPDF(opt)
 		}
 	}
-	_, err = w.Write([]byte("\n>>"))
-	return err
+	return res
 }
 
 // TODO(voss): remove this function
@@ -482,6 +725,8 @@ type Stream struct {
 
 	isEncrypted bool
 }
+
+func (x *Stream) isNative() {}
 
 func (x *Stream) String() string {
 	res := []string{}
@@ -508,30 +753,12 @@ func (x *Stream) String() string {
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
-// PDF implements the [Object] interface.
-func (x *Stream) PDF(w io.Writer) error {
-	err := x.Dict.PDF(w)
-	if err != nil {
-		return err
+func (x *Stream) AsPDF(opt OutputOptions) Native {
+	return &Stream{
+		Dict:        x.Dict.AsPDF(opt).(Dict),
+		R:           x.R,
+		isEncrypted: x.isEncrypted,
 	}
-	_, err = w.Write([]byte("\nstream\n"))
-	if err != nil {
-		return err
-	}
-
-	if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
-		enc, err := wenc.enc.EncryptStream(wenc.ref, withDummyClose{w})
-		if err != nil {
-			return err
-		}
-		w = enc
-	}
-	_, err = io.Copy(w, x.R)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write([]byte("\nendstream"))
-	return err
 }
 
 // ReadAll reads the content of a stream and returns it as a byte slice.
@@ -551,6 +778,12 @@ func ReadAll(r Getter, s *Stream) ([]byte, error) {
 // The lowest 32 bits represent the object number, the next 16 bits the
 // generation number.
 type Reference uint64
+
+func (x Reference) isNative() {}
+
+func (x Reference) AsPDF(opt OutputOptions) Native {
+	return x
+}
 
 // NewReference creates a new reference object.
 func NewReference(number uint32, generation uint16) Reference {
@@ -597,16 +830,6 @@ func (x Reference) String() string {
 	return strings.Join(res, "")
 }
 
-// PDF implements the [Object] interface.
-func (x Reference) PDF(w io.Writer) error {
-	if x>>48 != 0 {
-		return fmt.Errorf("invalid reference: 0x%016x", x)
-	}
-
-	_, err := fmt.Fprintf(w, "%d %d R", x.Number(), x.Generation())
-	return err
-}
-
 // IsDirect returns true if the object foes not contain any references to
 // indirect objects.
 //
@@ -614,8 +837,10 @@ func (x Reference) PDF(w io.Writer) error {
 // `IsDirect` method of these objects is called recursively.  If no `IsDirect`
 // method is present, the function panics.
 func IsDirect(obj Object) bool {
-	switch x := obj.(type) {
-	case Boolean, Integer, Real, Number, Name, String, nil:
+	native := obj.AsPDF(0)
+
+	switch x := native.(type) {
+	case Boolean, Integer, Real, Name, String, nil:
 		return true
 	case Reference:
 		return x == 0
@@ -655,6 +880,8 @@ type Placeholder struct {
 	ref Reference
 }
 
+func (x *Placeholder) isNative() {}
+
 // NewPlaceholder creates a new placeholder for a value which is not yet known.
 // The argument size must be an upper bound to the length of the replacement
 // text.  Once the value becomes known, it can be filled in using the
@@ -666,42 +893,13 @@ func NewPlaceholder(pdf Putter, size int) *Placeholder {
 	}
 }
 
-// PDF implements the [Object] interface.
-func (x *Placeholder) PDF(w io.Writer) error {
-	// method 1: If the value is already known, we can just write it to the
-	// file.
-	if x.value != nil {
-		_, err := w.Write(x.value)
-		return err
-	}
-
-	// method 2: If we can seek, write whitespace for now and fill in
-	// the value later.
-	if pdf, ok := x.pdf.(*Writer); ok {
-		if _, ok := pdf.origW.(io.WriteSeeker); ok {
-			x.pos = append(x.pos, pdf.w.pos)
-
-			buf := bytes.Repeat([]byte{' '}, x.size)
-			_, err := w.Write(buf)
-			return err
-		}
-	}
-
-	// method 3: If all else fails, use an indirect reference.
-	x.ref = x.pdf.Alloc()
-	buf := &bytes.Buffer{}
-	err := x.ref.PDF(buf)
-	if err != nil {
-		return err
-	}
-	x.value = buf.Bytes()
-	_, err = w.Write(x.value)
-	return err
+func (x *Placeholder) AsPDF(opt OutputOptions) Native {
+	return x
 }
 
 // Set fills in the value of the placeholder object.  This should be called
 // as soon as possible after the value becomes known.
-func (x *Placeholder) Set(val Object) error {
+func (x *Placeholder) Set(val Native) error {
 	if x.ref != 0 {
 		err := x.pdf.Put(x.ref, val)
 		if err != nil {
@@ -710,16 +908,20 @@ func (x *Placeholder) Set(val Object) error {
 		return nil
 	}
 
-	// format the value
-	buf := bytes.NewBuffer(make([]byte, 0, x.size))
-	err := val.PDF(buf)
-	if err != nil {
-		return err
+	if x.value != nil {
+		return errors.New("Placeholder.Set: value already set")
 	}
-	if buf.Len() > x.size {
+
+	// format the value
+	buf := &bytes.Buffer{}
+	_, err := doFormat(buf, val, 0, false)
+	if err != nil {
+		return fmt.Errorf("Placeholder.Set: %w", err)
+	} else if buf.Len() > x.size {
 		return errors.New("Placeholder: replacement text too long")
 	}
-	x.value = buf.Bytes()
+	x.value = make([]byte, buf.Len())
+	copy(x.value, buf.Bytes())
 
 	if len(x.pos) == 0 {
 		return nil
@@ -755,13 +957,10 @@ func (x *Placeholder) Set(val Object) error {
 // AsString formats a PDF object as a string, in the same way as the
 // it would be written to a PDF file.
 func AsString(obj Object) string {
-	if obj == nil {
-		return "null"
-	}
 	buf := &bytes.Buffer{}
-	err := obj.PDF(buf)
+	err := Format(buf, OptASCII|OptPretty, obj)
 	if err != nil {
-		panic(err) // unreachable
+		panic(err) // TODO(voss): unreachable?
 	}
 	return buf.String()
 }

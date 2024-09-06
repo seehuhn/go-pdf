@@ -55,7 +55,7 @@ func (im *Indexed) Subtype() pdf.Name {
 
 // Embed adds the image to the PDF file.
 // This implements the [Image] interface.
-func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	cs, ok := im.ColorSpace.(*color.SpaceIndexed)
 	if !ok {

@@ -65,9 +65,9 @@ func (s *scanner) Next() (pdf.Object, error) {
 
 	retry:
 		switch obj {
-		case operator("<<"):
+		case pdf.Operator("<<"):
 			stack = append(stack, &stackEntry{isDict: true})
-		case operator(">>"):
+		case pdf.Operator(">>"):
 			if len(stack) == 0 || !stack[len(stack)-1].isDict {
 				return nil, &scannerError{"unexpected '>>'"}
 			}
@@ -90,9 +90,9 @@ func (s *scanner) Next() (pdf.Object, error) {
 			}
 			obj = dict
 			goto retry
-		case operator("["):
+		case pdf.Operator("["):
 			stack = append(stack, &stackEntry{})
-		case operator("]"):
+		case pdf.Operator("]"):
 			if len(stack) == 0 || stack[len(stack)-1].isDict {
 				return nil, &scannerError{"unexpected ']'"}
 			}
@@ -127,7 +127,7 @@ func (s *scanner) next() (pdf.Object, error) {
 		case "<<": // dict
 			s.skipRequiredByte('<')
 			s.skipRequiredByte('<')
-			return operator("<<"), nil
+			return pdf.Operator("<<"), nil
 		default: // hex string
 			return s.readHexString()
 		}
@@ -137,7 +137,7 @@ func (s *scanner) next() (pdf.Object, error) {
 		case ">>": // end dict
 			s.skipRequiredByte('>')
 			s.skipRequiredByte('>')
-			return operator(">>"), nil
+			return pdf.Operator(">>"), nil
 		default:
 			err := s.err
 			if err == nil {
@@ -181,7 +181,7 @@ func (s *scanner) next() (pdf.Object, error) {
 			return nil, nil
 		}
 
-		return operator(opBytes), nil
+		return pdf.Operator(opBytes), nil
 	}
 }
 

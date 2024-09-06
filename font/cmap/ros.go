@@ -73,7 +73,7 @@ func (ROS *CIDSystemInfo) String() string {
 
 // Embed converts the CIDSystemInfo object into a PDF object.
 // This implements the [pdf.Embedder] interface.
-func (ROS *CIDSystemInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (ROS *CIDSystemInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	dict := pdf.Dict{

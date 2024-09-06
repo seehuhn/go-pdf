@@ -103,7 +103,7 @@ func (s *SpaceICCBased) Default() Color {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceICCBased) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s *SpaceICCBased) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	w := rm.Out

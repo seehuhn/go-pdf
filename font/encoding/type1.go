@@ -77,7 +77,7 @@ func DescribeEncodingType1(encoding, builtin []string) pdf.Object {
 		newDesc["Differences"] = a
 
 		b := &bytes.Buffer{}
-		newDesc.PDF(b)
+		pdf.Format(b, 0, newDesc)
 		if b.Len() < descLen {
 			desc = newDesc
 			descLen = b.Len()

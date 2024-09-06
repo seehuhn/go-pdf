@@ -198,7 +198,7 @@ func inheritKey(key pdf.Name, parentDict pdf.Dict, childNodes []*nodeInfo) {
 			return
 		}
 		buf.Reset()
-		err := val.PDF(buf)
+		err := pdf.Format(buf, 0, val)
 		if err != nil {
 			// This should not happen, since buf cannot have write errors.
 			// If the impossible happens anyway, just give up on inheritance.

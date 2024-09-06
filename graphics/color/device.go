@@ -25,7 +25,7 @@ type spaceDeviceGray struct{}
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceGray color space", pdf.V1_1); err != nil {
 		return nil, zero, err
@@ -71,7 +71,7 @@ type spaceDeviceRGB struct{}
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceRGB color space", pdf.V1_1); err != nil {
 		return nil, zero, err
@@ -117,7 +117,7 @@ type spaceDeviceCMYK struct{}
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "DeviceCMYK color space", pdf.V1_1); err != nil {
 		return nil, zero, err

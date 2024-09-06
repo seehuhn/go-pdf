@@ -21,7 +21,6 @@ package pdf
 
 import (
 	"fmt"
-	"io"
 	"math"
 	"time"
 
@@ -32,14 +31,14 @@ import (
 type Number float64
 
 // PDF implements the [Object] interface.
-func (x Number) PDF(w io.Writer) error {
-	var obj Object
+func (x Number) AsPDF(opt OutputOptions) Native {
+	var obj Native
 	if i := Integer(x); Number(i) == x {
 		obj = i
 	} else {
 		obj = Real(x)
 	}
-	return obj.PDF(w)
+	return obj
 }
 
 // GetNumber is a helper function for reading numeric values from a PDF file.
@@ -55,8 +54,6 @@ func GetNumber(r Getter, obj Object) (Number, error) {
 		return Number(x), nil
 	case Real:
 		return Number(x), nil
-	case Number:
-		return x, nil
 	case nil:
 		return 0, nil
 	default:
@@ -133,14 +130,13 @@ func (r *Rectangle) String() string {
 	return fmt.Sprintf("[%.2f %.2f %.2f %.2f]", r.LLx, r.LLy, r.URx, r.URy)
 }
 
-// PDF implements the [Object] interface.
-func (r *Rectangle) PDF(w io.Writer) error {
+func (r *Rectangle) AsPDF(opt OutputOptions) Native {
 	res := make(Array, 4)
 	for i, x := range []float64{r.LLx, r.LLy, r.URx, r.URy} {
 		x = math.Round(100*x) / 100
-		res[i] = Number(x)
+		res[i] = Number(x).AsPDF(opt)
 	}
-	return res.PDF(w)
+	return res
 }
 
 // IsZero is true if the rectangle is the zero rectangle object.

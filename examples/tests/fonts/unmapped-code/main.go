@@ -168,7 +168,7 @@ func (f *testFont) GetGeometry() *font.Geometry {
 	panic("not implemented") // TODO: Implement
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
+func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	w := rm.Out
 	fontDictRef := w.Alloc()
 

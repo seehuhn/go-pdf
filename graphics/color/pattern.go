@@ -54,7 +54,7 @@ func (s spacePatternColored) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
 		return nil, zero, err
@@ -107,7 +107,7 @@ func (s spacePatternUncolored) Channels() int {
 
 // Embed adds the pattern color space to the PDF file.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {

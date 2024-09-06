@@ -374,7 +374,7 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 	wMode := w.State.TextFont.WritingMode()
 	for _, arg := range args {
 		var delta float64
-		switch arg := arg.(type) {
+		switch arg := arg.AsPDF(w.opt).(type) {
 		case pdf.String:
 			w.updateTextPosition(arg)
 			if w.Err != nil {
@@ -383,8 +383,6 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 		case pdf.Real:
 			delta = float64(arg)
 		case pdf.Integer:
-			delta = float64(arg)
-		case pdf.Number:
 			delta = float64(arg)
 		default:
 			w.Err = fmt.Errorf("TextShowKernedRaw: invalid argument type %T", arg)
@@ -401,7 +399,6 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 		a = append(a, arg)
 	}
 
-	// TODO(voss): omit excess spaces in the content stream
 	w.writeObject(a)
 	if w.Err != nil {
 		return

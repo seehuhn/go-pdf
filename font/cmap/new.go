@@ -282,7 +282,7 @@ func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
 	return res, parent, nil
 }
 
-func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	predefinedMu.Lock()

@@ -48,7 +48,7 @@ func (p *Type2) PaintType() int {
 
 // Embed returns the pattern dictionary for the shading pattern.
 // This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
-func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	sh, _, err := pdf.ResourceManagerEmbed(rm, p.Shading)
@@ -72,7 +72,7 @@ func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 		dict["ExtGState"] = gs
 	}
 
-	var data pdf.Object = dict
+	var data pdf.Native
 	if p.SingleUse {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, dict)
@@ -80,6 +80,8 @@ func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 			return nil, zero, err
 		}
 		data = ref
+	} else {
+		data = dict.AsPDF(rm.Out.GetOptions())
 	}
 
 	return data, zero, nil
