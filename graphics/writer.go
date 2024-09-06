@@ -109,6 +109,13 @@ func (w *Writer) NewStream(out io.Writer) {
 	w.Err = nil
 }
 
+func (w *Writer) writeObject(obj pdf.Object) {
+	if w.Err != nil {
+		return
+	}
+	w.Err = obj.PDF(w.Content)
+}
+
 // IsValid returns true, if the current graphics object is one of the given types
 // and if p.Err is nil.  Otherwise it sets p.Err and returns false.
 func (w *Writer) isValid(cmd string, ss objectType) bool {

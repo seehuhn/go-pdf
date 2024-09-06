@@ -291,7 +291,7 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 
 	w.updateTextPosition(s)
 
-	w.Err = s.PDF(w.Content)
+	w.writeObject(s)
 	if w.Err != nil {
 		return
 	}
@@ -317,7 +317,7 @@ func (w *Writer) TextShowNextLineRaw(s pdf.String) {
 
 	w.updateTextPosition(s)
 
-	w.Err = s.PDF(w.Content)
+	w.writeObject(s)
 	if w.Err != nil {
 		return
 	}
@@ -348,7 +348,7 @@ func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Strin
 	if w.Err != nil {
 		return
 	}
-	w.Err = s.PDF(w.Content)
+	w.writeObject(s)
 	if w.Err != nil {
 		return
 	}
@@ -403,7 +403,7 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 	}
 
 	// TODO(voss): omit excess spaces in the content stream
-	w.Err = a.PDF(w.Content)
+	w.writeObject(a)
 	if w.Err != nil {
 		return
 	}

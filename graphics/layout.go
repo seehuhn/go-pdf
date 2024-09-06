@@ -97,7 +97,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 
 		if len(out) == 1 {
 			if s, ok := out[0].(pdf.String); ok {
-				w.Err = s.PDF(w.Content)
+				w.writeObject(s)
 				if w.Err != nil {
 					return
 				}
@@ -108,7 +108,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		}
 
 		// TODO(voss): omit excess spaces in the content stream
-		w.Err = out.PDF(w.Content)
+		w.writeObject(out)
 		if w.Err != nil {
 			return
 		}
@@ -129,7 +129,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 			if w.Err != nil {
 				return 0
 			}
-			w.Err = pdf.Number(w.State.TextRise).PDF(w.Content) // TODO(voss): rounding?
+			w.writeObject(pdf.Number(w.State.TextRise)) // TODO(voss): rounding?
 			if w.Err != nil {
 				return 0
 			}

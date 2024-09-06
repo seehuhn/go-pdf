@@ -75,7 +75,7 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 			return
 		}
 
-		w.Err = name.PDF(w.Content)
+		w.writeObject(name)
 		if w.Err != nil {
 			return
 		}
@@ -105,7 +105,7 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 				w.Err = err
 				return
 			}
-			w.Err = name.PDF(w.Content)
+			w.writeObject(name)
 			if w.Err != nil {
 				return
 			}
@@ -150,7 +150,7 @@ func (w *Writer) DrawShading(shading Shading) {
 		return
 	}
 
-	w.Err = name.PDF(w.Content)
+	w.writeObject(name)
 	if w.Err != nil {
 		return
 	}
