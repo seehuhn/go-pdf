@@ -135,10 +135,10 @@ func (r *Rectangle) String() string {
 
 // PDF implements the [Object] interface.
 func (r *Rectangle) PDF(w io.Writer) error {
-	res := Array{}
-	for _, x := range []float64{r.LLx, r.LLy, r.URx, r.URy} {
+	res := make(Array, 4)
+	for i, x := range []float64{r.LLx, r.LLy, r.URx, r.URy} {
 		x = math.Round(100*x) / 100
-		res = append(res, Number(x))
+		res[i] = Number(x)
 	}
 	return res.PDF(w)
 }

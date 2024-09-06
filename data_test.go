@@ -124,7 +124,3 @@ func FuzzReadWrite(f *testing.F) {
 		}
 	})
 }
-
-// compile time tests
-var _ pdf.Getter = &pdf.Data{}
-var _ pdf.Putter = &pdf.Data{}

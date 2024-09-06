@@ -17,6 +17,7 @@
 package pagetree
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 
@@ -187,6 +188,7 @@ func inheritKey(key pdf.Name, parentDict pdf.Dict, childNodes []*nodeInfo) {
 	repr := make([]string, n)
 	count := make(map[string]int)
 
+	buf := &bytes.Buffer{}
 	for i, node := range childNodes {
 		val, ok := node.dict[key]
 		if !ok {
@@ -195,7 +197,14 @@ func inheritKey(key pdf.Name, parentDict pdf.Dict, childNodes []*nodeInfo) {
 			// value with the "unset" value.
 			return
 		}
-		r := pdf.AsString(val)
+		buf.Reset()
+		err := val.PDF(buf)
+		if err != nil {
+			// This should not happen, since buf cannot have write errors.
+			// If the impossible happens anyway, just give up on inheritance.
+			return
+		}
+		r := buf.String()
 		repr[i] = r
 		count[r]++
 	}

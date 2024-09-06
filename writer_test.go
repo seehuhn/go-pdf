@@ -148,6 +148,9 @@ ET
 		t.Fatal(err)
 	}
 
+	if r.meta.Info == nil {
+		t.Fatal("no document information dictionary")
+	}
 	if x := r.meta.Info.Author; x != author {
 		t.Error("wrong author " + x)
 	}

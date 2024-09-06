@@ -43,7 +43,7 @@ type MetaInfo struct {
 	Trailer Dict
 }
 
-// Version represents a version of PDF standard.
+// Version represents a version of the PDF standard.
 type Version int
 
 // PDF versions supported by this library.

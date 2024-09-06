@@ -78,24 +78,26 @@ func resolve(r Getter, obj Object, canObjStm bool) (Object, error) {
 	return obj, nil
 }
 
-func resolveAndCast[T Object](r Getter, obj Object) (x T, err error) {
-	obj, err = Resolve(r, obj)
+func resolveAndCast[T Object](r Getter, obj Object) (T, error) {
+	var x T
+
+	resolved, err := Resolve(r, obj)
 	if err != nil {
 		return x, err
 	}
 
-	if obj == nil {
+	if resolved == nil {
 		return x, nil
 	}
 
 	var isCorrectType bool
-	x, isCorrectType = obj.(T)
+	x, isCorrectType = resolved.(T)
 	if isCorrectType {
 		return x, nil
 	}
 
 	return x, &MalformedFileError{
-		Err: fmt.Errorf("expected %T but got %T", x, obj),
+		Err: fmt.Errorf("expected %T but got %T", x, resolved),
 	}
 }
 

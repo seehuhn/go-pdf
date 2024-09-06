@@ -25,6 +25,19 @@ import (
 	"time"
 )
 
+var (
+	_ Object = Array{}
+	_ Object = Boolean(true)
+	_ Object = Dict{}
+	_ Object = Integer(0)
+	_ Object = Name("name")
+	_ Object = Real(0)
+	_ Object = Reference(0)
+	_ Object = (*Stream)(nil)
+	_ Object = String(nil)
+	_ Object = (*Placeholder)(nil)
+)
+
 func TestFormat(t *testing.T) {
 	cases := []struct {
 		in  Object

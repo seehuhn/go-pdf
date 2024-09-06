@@ -703,14 +703,14 @@ func (x *Placeholder) PDF(w io.Writer) error {
 // as soon as possible after the value becomes known.
 func (x *Placeholder) Set(val Object) error {
 	if x.ref != 0 {
-		pdf := x.pdf
-		err := pdf.Put(x.ref, val)
+		err := x.pdf.Put(x.ref, val)
 		if err != nil {
 			return fmt.Errorf("Placeholder.Set: %w", err)
 		}
 		return nil
 	}
 
+	// format the value
 	buf := bytes.NewBuffer(make([]byte, 0, x.size))
 	err := val.PDF(buf)
 	if err != nil {
@@ -725,16 +725,14 @@ func (x *Placeholder) Set(val Object) error {
 		return nil
 	}
 
+	// Replace all previously written placeholders with the final value.
 	pdf := x.pdf.(*Writer)
-
 	pdf.w.Flush()
-
 	fill := pdf.origW.(io.WriteSeeker)
 	currentPos, err := fill.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
-
 	for _, pos := range x.pos {
 		_, err = fill.Seek(pos, io.SeekStart)
 		if err != nil {
@@ -745,9 +743,13 @@ func (x *Placeholder) Set(val Object) error {
 			return err
 		}
 	}
-
 	_, err = fill.Seek(currentPos, io.SeekStart)
-	return err
+	if err != nil {
+		return err
+	}
+
+	x.pos = nil
+	return nil
 }
 
 // AsString formats a PDF object as a string, in the same way as the

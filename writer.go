@@ -38,8 +38,7 @@ type WriterOptions struct {
 	UserPermissions Perm
 
 	// If this flag is true, the writer tries to generate a PDF file which is
-	// more human-readable.  A side effect of this is that the size of the
-	// generated file is significantly increased.
+	// more human-readable, at the expense of increased file size.
 	HumanReadable bool
 }
 
@@ -449,8 +448,8 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		}
 
 		if i < N-1 {
-			// No need to buffer the last object, since we can stream it
-			// separately at the end.
+			// Here we buffer only the first N-1 object, since we can stream
+			// the last object separately at the end.
 			err = writeObject(body, objects[i])
 			if err != nil {
 				return err
