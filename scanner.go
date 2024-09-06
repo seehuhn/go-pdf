@@ -40,14 +40,16 @@ type scanner struct {
 
 	// GetInt is used to get the length of a stream, when the length is
 	// specified as an indirect object.
-	getInt func(Object) (Integer, error)
+	getInt getIntFn
 
 	enc         *encryptInfo
 	encRef      Reference
 	unencrypted map[Reference]bool // objects with no encryption
 }
 
-func newScanner(r io.Reader, getInt func(Object) (Integer, error),
+type getIntFn func(Object) (Integer, error)
+
+func newScanner(r io.Reader, getInt getIntFn,
 	dec *encryptInfo) *scanner {
 	return &scanner{
 		r:      r,

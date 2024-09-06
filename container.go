@@ -23,10 +23,17 @@ import (
 )
 
 // Getter represents a PDF file opened for reading.
+//
 // TODO(voss): find a better name for this
 type Getter interface {
 	GetMeta() *MetaInfo
-	Get(Reference, bool) (Object, error)
+
+	// Get reads an object from the file.
+	//
+	// The argument canObjStm specifies whether the object may be read from an
+	// object stream.  Normally, this should be set to true.  If canObjStm is
+	// false and the object is in an object stream, an error is returned.
+	Get(ref Reference, canObjStm bool) (Object, error)
 }
 
 // Resolve resolves references to indirect objects.
@@ -112,6 +119,19 @@ var (
 	GetStream  = resolveAndCast[*Stream]
 	GetString  = resolveAndCast[String]
 )
+
+func getIntegerNoObjStm(r Getter, obj Object) (Integer, error) {
+	obj, err := resolve(r, obj, false)
+	if err != nil {
+		return 0, err
+	}
+	if x, isCorrectType := obj.(Integer); isCorrectType {
+		return x, nil
+	}
+	return 0, &MalformedFileError{
+		Err: fmt.Errorf("expected Integer but got %T", obj),
+	}
+}
 
 // GetDictTyped resolves any indirect reference and checks that the resulting
 // object is a dictionary.  The function also checks that the "Type" entry of

@@ -567,15 +567,37 @@ func (e *explainer) show(obj pdf.Object) error {
 func dictKeys(obj pdf.Dict) []pdf.Name {
 	keys := maps.Keys(obj)
 	sort.Slice(keys, func(i, j int) bool {
-		if keys[i] == "Type" && keys[j] != "Type" {
-			return true
-		}
-		if keys[j] == "Type" {
-			return false
+		if order(keys[i]) != order(keys[j]) {
+			return order(keys[i]) < order(keys[j])
 		}
 		return keys[i] < keys[j]
 	})
 	return keys
+}
+
+func order(key pdf.Name) int {
+	switch key {
+	case "Type":
+		return 0
+	case "Subtype":
+		return 1
+	case "DescendantFonts":
+		return 2
+	case "BaseFont":
+		return 3
+	case "Encoding":
+		return 4
+	case "FontDescriptor":
+		return 5
+	case "FirstChar":
+		return 10
+	case "LastChar":
+		return 11
+	case "Widths":
+		return 12
+	default:
+		return 999
+	}
 }
 
 // MostlyBinary returns true if the contents of buf should not be

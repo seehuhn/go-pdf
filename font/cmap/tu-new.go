@@ -260,6 +260,8 @@ func (c *ToUnicodeInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, 
 		return nil, zero, err
 	}
 
+	// TODO(voss): review this once
+	// https://github.com/pdf-association/pdf-issues/issues/462 is resolved.
 	dict := pdf.Dict{
 		"Type":          pdf.Name("CMap"),
 		"CMapName":      c.MakeName(),

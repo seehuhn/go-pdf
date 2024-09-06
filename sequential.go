@@ -77,8 +77,6 @@ func SequentialScan(r io.ReadSeeker) (*FileInfo, error) {
 	return fi, nil
 }
 
-type getIntFn func(Object) (Integer, error)
-
 func (fi *FileInfo) Read(objInfo *FileObject) (Object, error) {
 	var getInt getIntFn
 	if objInfo.Type == "Stream" {

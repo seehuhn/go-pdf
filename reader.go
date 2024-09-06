@@ -311,7 +311,8 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
 				Loc: []string{"object " + ref.String()},
 			}
 		}
-		return r.getFromObjectStream(ref.Number(), entry.InStream)
+		getInt := safeGetInteger(r, r.r, true)
+		return getFromObjStm(r, ref.Number(), entry.InStream, getInt, r.enc)
 	}
 
 	s, err := r.scannerFrom(entry.Pos, canObjStm)
@@ -331,12 +332,12 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
 	return obj, nil
 }
 
-func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, error) {
-	// We need to be careful to avoid infinite loops, when reading an object
-	// from an object stream requires opening other object streams first. This
-	// could be either caused by the stream object being contained in another
-	// object stream, or by the length of the stream object being contained in
-	// another object stream.  (Both cases are forbidden by the PDF spec.)
+func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc *encryptInfo) (Object, error) {
+	// We need to be careful to avoid infinite loops, in case reading from an
+	// object stream requires opening other object streams first.  This could
+	// be either caused by the stream object being contained in another object
+	// stream, or by the length of the stream object being contained in another
+	// object stream.  (Both cases are forbidden by the PDF spec.)
 	container, err := resolve(r, sRef, false)
 	if err != nil {
 		return nil, err
@@ -349,7 +350,7 @@ func (r *Reader) getFromObjectStream(number uint32, sRef Reference) (Object, err
 		}
 	}
 
-	contents, err := r.objStmScanner(objectStream)
+	contents, err := getObjStm(r, objectStream, getInt, enc)
 	if err != nil {
 		return nil, Wrap(err, "object stream "+sRef.String())
 	}
@@ -412,7 +413,7 @@ func (r *Reader) getID(obj Object) ([][]byte, error) {
 // references to indirect objects.  If the object is not a valid ID, or if it
 // contains indirect references, nil is returned.
 //
-// This is only used before the encryption dictionary is parsed.
+// This is only used until the encryption dictionary has been parsed.
 func getIDDirect(obj Object) [][]byte {
 	if obj == nil {
 		return nil
@@ -442,7 +443,7 @@ type stmObj struct {
 	offs   int
 }
 
-func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
+func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *objStm, err error) {
 	defer func() {
 		if err != nil {
 			err = Wrap(err, "decoding ObjStm")
@@ -455,17 +456,16 @@ func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 	}
 	n := int(N)
 
-	dec := r.enc
 	if stream.isEncrypted {
 		// Objects in encrypted streams are not encrypted again.
-		dec = nil
+		enc = nil
 	}
 
 	decoded, err := DecodeStream(r, stream, 0)
 	if err != nil {
 		return nil, err
 	}
-	s := newScanner(decoded, r.safeGetInt, dec)
+	s := newScanner(decoded, getInt, enc)
 
 	idx := make([]stmObj, n)
 	for i := 0; i < n; i++ {
@@ -501,66 +501,40 @@ func (r *Reader) objStmScanner(stream *Stream) (_ *objStm, err error) {
 	return &objStm{s: s, idx: idx}, nil
 }
 
-// safeGetInt is like GetInt, but it restores the file position after reading.
-func (r *Reader) safeGetInt(obj Object) (Integer, error) {
-	if x, ok := obj.(Integer); ok {
-		return x, nil
-	}
+// safeGetInteger returns a function that reads an integer from a getter.
+// Before reading the integer, the current position in the file is saved, and
+// restored on return.
+//
+// If canObjStm is false, the function will return an error if the object is in
+// an object stream.  This is used to avoid infinite recursion when reading
+// object streams.
+func safeGetInteger(r Getter, file io.Seeker, canObjStm bool) getIntFn {
+	return func(obj Object) (x Integer, err error) {
+		if x, ok := obj.(Integer); ok {
+			return x, nil
+		}
 
-	pos, err := r.r.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return 0, err
-	}
+		savedPos, err := file.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, err
+		}
+		defer func() {
+			_, e2 := file.Seek(savedPos, io.SeekStart)
+			if err == nil {
+				err = e2
+			}
+		}()
 
-	i, err := GetInteger(r, obj)
-	if err != nil {
-		r.r.Seek(pos, io.SeekStart)
-		return 0, err
-	}
-
-	_, err = r.r.Seek(pos, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-	return i, nil
-}
-
-// safeGetIntNoObjectStreams is like safeGetInt, but it returns an error if the
-// integer is stored inside an object stream.
-func (r *Reader) safeGetIntNoObjectStreams(obj Object) (Integer, error) {
-	if x, ok := obj.(Integer); ok {
-		return x, nil
-	}
-
-	pos, err := r.r.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return 0, err
-	}
-
-	obj, err = resolve(r, obj, false)
-	if err != nil {
-		return 0, err
-	}
-
-	x, isInt := obj.(Integer)
-	if !isInt {
-		return x, &MalformedFileError{
-			Err: fmt.Errorf("expected Integer but got %T", obj),
+		if canObjStm {
+			return GetInteger(r, obj)
+		} else {
+			return getIntegerNoObjStm(r, obj)
 		}
 	}
-
-	_, err = r.r.Seek(pos, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-	return x, nil
 }
 
 func (r *Reader) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
-	getInt := r.safeGetInt
-	if !canObjStm {
-		getInt = r.safeGetIntNoObjectStreams
-	}
+	getInt := safeGetInteger(r, r.r, canObjStm)
 	s := newScanner(r.r, getInt, r.enc)
 	s.unencrypted = r.unencrypted
 

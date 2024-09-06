@@ -19,6 +19,9 @@ package pdf
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -184,6 +187,89 @@ func TestClose(t *testing.T) {
 		if doClose != w.isClosed {
 			t.Errorf("expected %v, got %v", doClose, w.isClosed)
 		}
+	}
+}
+
+func TestWriterGet(t *testing.T) {
+	for _, name := range []string{"direct", "objStm"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, name+".pdf")
+			w, err := Create(file, V2_0, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			testObjects := []Object{
+				nil,
+				Array{Integer(1), Integer(2), Integer(3), NewReference(999, 1)},
+				Boolean(true),
+				Dict{
+					"foo": Integer(1),
+					"bar": Integer(2),
+					"baz": Name("3"),
+				},
+				Integer(42),
+				Name("test"),
+				Real(3.14),
+				String("test"),
+			}
+			refs := make([]Reference, len(testObjects))
+			for i := range len(testObjects) {
+				refs[i] = w.Alloc()
+			}
+
+			// write test objects
+			if name == "direct" {
+				for i, obj := range testObjects {
+					err := w.Put(refs[i], obj)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			} else {
+				err = w.WriteCompressed(refs, testObjects...)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// Check whether the write position is still correct after reading the
+			// first object. If the write position is not correct, the extra object
+			// will overwrite some or all of the objects.
+			_, err = w.Get(refs[0], true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			extraRef := w.Alloc()
+			extraObj := Name(strings.Repeat("x", 1000))
+			err = w.Put(extraRef, extraObj)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// read back the objects
+			for i, ref := range refs {
+				obj, err := w.Get(ref, true)
+				if err != nil {
+					t.Fatalf("error reading object %d: %v", i, err)
+				}
+				if !reflect.DeepEqual(obj, testObjects[i]) {
+					t.Errorf("expected %v, got %v", testObjects[i], obj)
+				}
+			}
+			obj, err := GetName(w, extraRef)
+			if err != nil {
+				t.Errorf("error reading extra object: %v", err)
+			} else if obj != extraObj {
+				t.Errorf("expected %v, got %v", extraObj, obj)
+			}
+
+			err = w.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

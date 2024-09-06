@@ -81,6 +81,8 @@ func (err *MalformedFileError) Unwrap() error {
 // Wrap wraps an error with a location.
 // If the error is a [MalformedFileError], the location is appended to the list
 // of locations.  Otherwise, the error is wrapped using [fmt.Errorf].
+//
+// This should only be used for read errors, not for write errors.
 func Wrap(err error, loc string) error {
 	if err == nil {
 		return nil

@@ -332,6 +332,76 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 	return nil
 }
 
+func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Object, err error) {
+	r, ok := pdf.origW.(io.ReadSeeker)
+	if !ok {
+		return nil, errors.New("Get() not supported by the underlying io.Writer")
+	}
+
+	entry := pdf.xref[ref.Number()]
+	if entry.IsFree() || entry.Generation != ref.Generation() {
+		return nil, nil
+	}
+
+	if entry.InStream != 0 {
+		if !canObjStm {
+			return nil, &MalformedFileError{
+				Err: errors.New("object in object stream"),
+				Loc: []string{"object " + ref.String()},
+			}
+		}
+		getInt := safeGetInteger(pdf, r, true)
+		return getFromObjStm(pdf, ref.Number(), entry.InStream, getInt, pdf.w.enc)
+	}
+
+	err = pdf.w.w.Flush()
+	if err != nil {
+		return nil, err
+	}
+
+	savedPos, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, e2 := r.Seek(savedPos, io.SeekStart)
+		if err == nil {
+			err = e2
+		}
+	}()
+
+	s, err := pdf.scannerFrom(entry.Pos, canObjStm)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, fileRef, err := s.ReadIndirectObject()
+	if err != nil {
+		return nil, err
+	}
+	if ref != fileRef {
+		return nil, &MalformedFileError{
+			Err: errors.New("xref corrupted"),
+			Loc: []string{"object " + ref.String() + "*"},
+		}
+	}
+	return obj, nil
+}
+
+func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
+	r := w.origW.(io.ReadSeeker)
+	getInt := safeGetInteger(w, r, canObjStm)
+	s := newScanner(r, getInt, w.w.enc)
+
+	_, err := r.Seek(pos, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+	s.filePos = pos
+
+	return s, nil
+}
+
 // WriteCompressed writes a number of objects to the file as a compressed
 // object stream.
 //
@@ -381,7 +451,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		if i < N-1 {
 			// No need to buffer the last object, since we can stream it
 			// separately at the end.
-			err = objects[i].PDF(body)
+			err = writeObject(body, objects[i])
 			if err != nil {
 				return err
 			}
