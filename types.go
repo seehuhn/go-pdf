@@ -29,8 +29,9 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// Native represents an object in a PDF file.
-// Thus must be one of the following:
+// Native represents an object in a PDF file. Thus must be one of the
+// following:
+//
 //   - [Array]
 //   - [Boolean]
 //   - [Dict]
@@ -43,43 +44,88 @@ import (
 //   - [String]
 //   - [*Placeholder]
 //
-// The [Object] interface is a more general interface which can represent
-// be used by the user to extend the set of supported PDF objects.
+// The [Object] interface is a more general interface which can be used to
+// construct more complex types out of the native PDF data types.
 type Native interface {
 	Object
+
+	// isNative does nothing.  This is a marker method to help the compiler
+	// tell apart Native objects from other objects.
 	isNative()
 }
 
+// Object represents an object in a PDF file.
 type Object interface {
+	// AsPDF returns the representation of the using built-in PDF data types.
+	//
+	// Only the returned top-level object is required to use a native type.  In
+	// case this object contains other objects, AsPDF must be called recursively
+	// to convert these objects to native types as well.
+	//
+	// The output options can be used to control how the object is formatted.
 	AsPDF(OutputOptions) Native
 }
 
+// OutputOptions is a bit-mask which controls how [Object]s are formatted.
 type OutputOptions uint32
 
 func (o OutputOptions) Has(opt OutputOptions) bool {
 	return o&opt != 0
 }
 
+// These constants give the supported output options.
+// The values are bit masks which can be combined using bitwise OR.
+// The default output options are 0.
 const (
-	OptASCII         OutputOptions = 1 << iota // top-level only uses ASCII
+	OptASCII         OutputOptions = 1 << iota // no binary data
 	OptContentStream                           // we are inside a content stream
 	OptObjStm                                  // use object streams
 	OptPretty                                  // make the output more human-readable
 	OptXRefStream                              // use an xref stream
 )
 
-// Format writes a textual representation of the object to the given writer.
-// The exact format depends on the format options.
+// Format writes the textual representation of one or more objects to the given writer.
 // The output does not include any leading or trailing whitespace.
-func Format(w io.Writer, opt OutputOptions, obj Object) error {
-	_, err := doFormat(w, obj, opt, false)
-	return err
+//
+// The exact format written depends on the output options.
+func Format(w io.Writer, opt OutputOptions, objects ...Object) error {
+	var err error
+
+	if opt.Has(OptPretty) {
+		// Separate objects by spaces.
+		for i, obj := range objects {
+			if i > 0 {
+				_, err = io.WriteString(w, " ")
+				if err != nil {
+					return err
+				}
+			}
+			_, err = doFormat(w, obj, opt, false)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		// Avoid spaces between objects as much as possible.
+		needSep := false
+		for _, obj := range objects {
+			needSep, err = doFormat(w, obj, opt, needSep)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-// The argument `needSep` indicates whether the function should write a separator
-// before the object, in case the output starts with an alphanumeric character.
-// The first return value indicates whether a separator is needed after the object,
-// if the following object starts with an alphanumeric character.
+// doFormat writes the textual representation of a single object, with optional
+// leading white space.
+//
+// The argument `needSep` indicates whether the function should write a
+// separator before the object, in case the output starts with an alphanumeric
+// character. The first return value indicates whether a separator is needed
+// after the object, if the following object starts with an alphanumeric
+// character.
 func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, error) {
 	var native Native
 	if obj != nil {
@@ -102,27 +148,9 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		if err != nil {
 			return false, err
 		}
-		if opt.Has(OptPretty) {
-			for i, elem := range x {
-				if i > 0 {
-					_, err = io.WriteString(w, " ")
-					if err != nil {
-						return false, err
-					}
-				}
-				_, err = doFormat(w, elem, opt, false)
-				if err != nil {
-					return false, err
-				}
-			}
-		} else {
-			needSep := false
-			for _, elem := range x {
-				needSep, err = doFormat(w, elem, opt, needSep)
-				if err != nil {
-					return false, err
-				}
-			}
+		err = Format(w, opt, x...)
+		if err != nil {
+			return false, err
 		}
 		_, err = io.WriteString(w, "]")
 		return false, err
@@ -162,7 +190,7 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 
 	case Operator:
 		if !opt.Has(OptContentStream) {
-			return true, errors.New("operator outside content stream")
+			return false, errors.New("operator outside content stream")
 		}
 		if needSep {
 			_, err := io.WriteString(w, " ")
@@ -207,18 +235,19 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 			return false, err
 		}
 
+		contents := w
 		if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
 			enc, err := wenc.enc.EncryptStream(wenc.ref, withDummyClose{w})
 			if err != nil {
 				return false, err
 			}
-			w = enc
+			contents = enc
 		}
-		_, err = io.Copy(w, x.R)
+		_, err = io.Copy(contents, x.R)
 		if err != nil {
 			return false, err
 		}
-		// TODO(voss): won't this encrypt the "endstream", too?
+
 		_, err = io.WriteString(w, "\nendstream")
 		return true, err
 
@@ -242,7 +271,7 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		}
 
 		// method 2: If we can seek, write whitespace now and replace this with
-		// the real value later.
+		// the actual value later.
 		if pdf, ok := x.pdf.(*Writer); ok {
 			if _, ok := pdf.origW.(io.WriteSeeker); ok {
 				x.pos = append(x.pos, pdf.w.pos)
@@ -666,13 +695,7 @@ func (x Array) String() string {
 }
 
 func (x Array) AsPDF(opt OutputOptions) Native {
-	res := make(Array, len(x))
-	for i, elem := range x {
-		if elem != nil {
-			res[i] = elem.AsPDF(opt)
-		}
-	}
-	return res
+	return x
 }
 
 // Dict represent a Dictionary object in a PDF file.
@@ -697,13 +720,7 @@ func (x Dict) String() string {
 }
 
 func (x Dict) AsPDF(opt OutputOptions) Native {
-	res := make(Dict, len(x))
-	for key, val := range x {
-		if val != nil {
-			res[key] = val.AsPDF(opt)
-		}
-	}
-	return res
+	return x
 }
 
 // TODO(voss): remove this function
@@ -754,11 +771,7 @@ func (x *Stream) String() string {
 }
 
 func (x *Stream) AsPDF(opt OutputOptions) Native {
-	return &Stream{
-		Dict:        x.Dict.AsPDF(opt).(Dict),
-		R:           x.R,
-		isEncrypted: x.isEncrypted,
-	}
+	return x
 }
 
 // ReadAll reads the content of a stream and returns it as a byte slice.
