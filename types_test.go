@@ -19,7 +19,10 @@ package pdf
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -215,8 +218,60 @@ func TestDict(t *testing.T) {
 		t.Error("nil entry in dict")
 	}
 }
+func TestFormatStreamEncrypted(t *testing.T) {
+	testData := "cleartext data"
 
-func TestStream(t *testing.T) {
+	stream := &Stream{
+		Dict: map[Name]Object{
+			"Length": Integer(len(testData)),
+		},
+		R: strings.NewReader(testData),
+	}
+
+	d := t.TempDir()
+	testFileName := filepath.Join(d, "test.pdf")
+	opt := &WriterOptions{
+		UserPassword:  "secret",
+		OwnerPassword: "super secret",
+	}
+	w, err := Create(testFileName, V2_0, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(NewReference(1, 0), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(testFileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pat := regexp.MustCompile(`1 0 obj
+<<\s*/Length\s*(.*)\s*>>\s*stream
+((?s).*?)
+endstream
+endobj
+`)
+	m := pat.FindSubmatch(body)
+	if len(m) != 3 {
+		t.Fatalf("stream not found in file")
+	}
+
+	n, err := strconv.Atoi(string(m[1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != len(testData) {
+		t.Fatalf("wrong stream length: %d != %d", n, len(testData))
+	}
+}
+
+func TestStreamRead(t *testing.T) {
 	dataIn := "\nbinary stream data\000123\n   "
 	rIn := strings.NewReader(dataIn)
 	stream := &Stream{

@@ -530,6 +530,7 @@ func (x *Stream) PDF(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	// TODO(voss): won't this encrypt the endstream marker, too?
 	_, err = w.Write([]byte("\nendstream"))
 	return err
 }
