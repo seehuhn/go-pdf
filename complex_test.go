@@ -18,9 +18,67 @@ package pdf
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
+
+func TestTextString(t *testing.T) {
+	cases := []TextString{
+		"",
+		"hello",
+		"ein Bär",
+		"o țesătură",
+		"中文",
+		"日本語",
+		"\000\011\n\f\r",
+	}
+	for _, test := range cases {
+		enc := test.AsPDF(0).(String)
+		out := enc.AsTextString()
+		if out != test {
+			t.Errorf("wrong text: %q -> % x -> %q", out, enc, test)
+		}
+	}
+}
+
+func TestDateString(t *testing.T) {
+	PST := time.FixedZone("PST", -8*60*60)
+	cases := []time.Time{
+		time.Date(1998, 12, 23, 19, 52, 0, 0, PST),
+		time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2020, 12, 24, 16, 30, 12, 0, time.FixedZone("", 90*60)),
+	}
+	for _, t1 := range cases {
+		enc := Date(t1).AsPDF(0).(String)
+		out, err := enc.AsDate()
+		if err != nil {
+			t.Error(err)
+		} else if t2 := time.Time(out); !t1.Equal(t2) {
+			fmt.Println(t1, string(enc), out)
+			t.Errorf("wrong time: %s != %s", t2, t1)
+		}
+	}
+}
+
+func TestDecodeDate(t *testing.T) {
+	cases := []string{
+		"D:19981223195200-08'00'",
+		"D:20000101000000Z",
+		"D:20201224163012+01'30'",
+		"D:20010809191510 ", // trailing space, seen in some PDF files
+	}
+	for i, test := range cases {
+		in := String(test)
+		_, err := in.AsDate()
+		if err != nil {
+			t.Errorf("%d %q %s\n", i, test, err)
+		}
+	}
+}
 
 func TestRectangle1(t *testing.T) {
 	type testCase struct {
@@ -87,5 +145,125 @@ func TestRectangle2(t *testing.T) {
 				t.Errorf("Decode(%q) = %v, want %v", test.String(), rect, test)
 			}
 		})
+	}
+}
+
+func TestCatalog(t *testing.T) {
+	pRef := NewReference(1, 2)
+
+	// test a round-trip
+	cat0 := &Catalog{
+		Pages: pRef,
+	}
+	d1 := AsDict(cat0)
+	if len(d1) != 2 {
+		t.Errorf("wrong Catalog dict: %s", AsString(d1))
+	}
+	cat1 := &Catalog{}
+	err := DecodeDict(nil, cat1, d1)
+	if err != nil {
+		t.Error(err)
+	} else if *cat0 != *cat1 {
+		t.Errorf("Catalog wrongly decoded: %v", cat1)
+	}
+}
+
+func TestCatalogReadMissingPages(t *testing.T) {
+	ref := NewReference(123, 0)
+	catalogDict := Dict{
+		"Metadata": ref,
+	}
+	catalog := &Catalog{}
+	err := DecodeDict(nil, catalog, catalogDict)
+	if err == nil {
+		t.Errorf("missing Pages not detected")
+	}
+	if catalog.Metadata != ref {
+		t.Errorf("wrong Metadata: %v", catalog.Metadata)
+	}
+}
+
+func TestCatalogWriteMissingPages(t *testing.T) {
+	catalog := &Catalog{}
+	dict := AsDict(catalog)
+	if _, present := dict["Pages"]; present {
+		t.Errorf("missing Pages not ignored")
+	}
+}
+
+func TestDocumentInfoRegular(t *testing.T) {
+	// test missing struct
+	var info1 *Info
+	d1 := AsDict(info1)
+	if d1 != nil {
+		t.Error("wrong dict for nil Info struct")
+	}
+
+	// test empty struct
+	info1 = &Info{}
+	d1 = AsDict(info1)
+	if d1 == nil || len(d1) != 0 {
+		t.Errorf("wrong dict for empty Info struct: %#v", d1)
+	}
+
+	// test all regular fields
+	now := time.Now()
+	info1 = &Info{
+		Title:        "Test Title",
+		Author:       "Jochen Voß",
+		Subject:      "unit testing",
+		Keywords:     "tests, go, DecodeDict",
+		Creator:      "TestDocumentInfoRegular",
+		Producer:     "seehuhn.de/go/pdf",
+		CreationDate: Date(now.Add(-1 * time.Second)),
+		ModDate:      Date(now),
+		Trapped:      "Unknown",
+	}
+	d1 = AsDict(info1)
+	info2 := &Info{}
+	err := DecodeDict(nil, info2, d1)
+
+	if info1.CreationDate.String() != info2.CreationDate.String() {
+		t.Errorf("wrong CreationDate: %s != %s", info1.CreationDate, info2.CreationDate)
+	}
+	info1.CreationDate = Date{}
+	info2.CreationDate = Date{}
+	if info1.ModDate.String() != info2.ModDate.String() {
+		t.Errorf("wrong ModDate: %s != %s", info1.ModDate, info2.ModDate)
+	}
+	info1.ModDate = Date{}
+	info2.ModDate = Date{}
+
+	if err != nil {
+		t.Error(err)
+	} else if d := cmp.Diff(info1, info2); d != "" {
+		t.Errorf("wrong Info: %s", d)
+	}
+}
+
+func TestDocumentInfoCustom(t *testing.T) {
+	// test custom fields
+	d1 := Dict{
+		"grumpy": TextString("bärbeißig"),
+		"funny":  TextString("\000\001\002 \\<>'\")("),
+	}
+
+	info := &Info{}
+	err := DecodeDict(nil, info, d1)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(info.Custom) != 2 {
+		t.Errorf("wrong Extra: %v", info.Custom)
+	}
+
+	d2 := AsDict(info)
+	if len(d1) != len(d2) {
+		t.Fatalf("wrong d2: %s", AsString(d2))
+	}
+	for key, val := range d1 {
+		if d2[key] != val {
+			t.Errorf("wrong d2[%s]: %s", key, AsString(d2[key]))
+		}
 	}
 }

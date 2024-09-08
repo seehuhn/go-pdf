@@ -24,7 +24,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/maps"
 )
@@ -538,7 +537,7 @@ func (x Real) AsPDF(opt OutputOptions) Native {
 	return x
 }
 
-// String represents a raw string in a PDF file.  The character set encoding,
+// String represents a raw string in a PDF file.  The character set and encoding,
 // if any, is determined by the context.
 type String []byte
 
@@ -577,72 +576,6 @@ func ParseString(buf []byte) (String, error) {
 }
 
 var errInvalidString = errors.New("malformed PDF string")
-
-// AsTextString interprets x as a PDF "text string" and returns
-// the corresponding utf-8 encoded string.
-func (x String) AsTextString() string {
-	if isUTF16(string(x)) {
-		return utf16Decode(x[2:])
-	} else if isUTF8(string(x)) {
-		return string(x[3:])
-	}
-	return pdfDocDecode(x)
-}
-
-// TextString creates a String object using the "text string" encoding,
-// i.e. using either UTF-16BE encoding (with a BOM) or PdfDocEncoding.
-func TextString(s string) String {
-	buf, ok := pdfDocEncode(s)
-	if ok {
-		return buf
-	}
-	// TODO(voss): for PDF >=2.0 we should use UTF-8 encoding here
-	return utf16Encode(s)
-}
-
-// AsDate converts a PDF date string to a time.Time object.
-// If the string does not have the correct format, an error is returned.
-func (x String) AsDate() (time.Time, error) {
-	s := x.AsTextString()
-	if s == "D:" || s == "" {
-		return time.Time{}, nil
-	}
-	s = strings.ReplaceAll(s, "'", "")
-	s = strings.TrimSpace(s)
-	if strings.HasPrefix(s, "19") || strings.HasPrefix(s, "20") {
-		s = "D:" + s
-	}
-
-	formats := []string{
-		"D:20060102150405-0700",
-		"D:20060102150405-07",
-		"D:20060102150405Z0000",
-		"D:20060102150405Z00",
-		"D:20060102150405Z",
-		"D:20060102150405",
-		"D:200601021504",
-		"D:2006010215",
-		"D:20060102",
-		"D:200601",
-		"D:2006",
-		time.ANSIC,
-	}
-	for _, format := range formats {
-		t, err := time.Parse(format, s)
-		if err == nil {
-			return t, nil
-		}
-	}
-	return time.Time{}, errNoDate
-}
-
-// Date creates a PDF String object encoding the given date and time.
-func Date(t time.Time) String {
-	s := t.Format("D:20060102150405-0700")
-	k := len(s) - 2
-	s = s[:k] + "'" + s[k:]
-	return String(s)
-}
 
 // Name represents a name object in a PDF file.
 type Name string

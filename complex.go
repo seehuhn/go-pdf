@@ -22,6 +22,7 @@ package pdf
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"golang.org/x/text/language"
@@ -29,17 +30,6 @@ import (
 
 // A Number is either an Integer or a Real.
 type Number float64
-
-// PDF implements the [Object] interface.
-func (x Number) AsPDF(opt OutputOptions) Native {
-	var obj Native
-	if i := Integer(x); Number(i) == x {
-		obj = i
-	} else {
-		obj = Real(x)
-	}
-	return obj
-}
 
 // GetNumber is a helper function for reading numeric values from a PDF file.
 // This resolves indirect references and makes sure the resulting object is an
@@ -58,9 +48,152 @@ func GetNumber(r Getter, obj Object) (Number, error) {
 		return 0, nil
 	default:
 		return 0, &MalformedFileError{
-			Err: fmt.Errorf("expected number but got %T", obj),
+			Err: fmt.Errorf("expected Number but got %T", obj),
 		}
 	}
+}
+
+// PDF implements the [Object] interface.
+func (x Number) AsPDF(opt OutputOptions) Native {
+	var obj Native
+	if i := Integer(x); Number(i) == x {
+		obj = i
+	} else {
+		obj = Real(x)
+	}
+	return obj
+}
+
+type TextString string
+
+// AsTextString interprets x as a PDF "text string" and returns
+// the corresponding utf-8 encoded string.
+func GetTextString(r Getter, obj Object) (TextString, error) {
+	s, err := GetString(r, obj)
+	if err != nil {
+		return "", err
+	}
+	return s.AsTextString(), nil
+}
+
+func (s TextString) AsPDF(opt OutputOptions) Native {
+	buf, ok := pdfDocEncode(string(s))
+	if ok {
+		return buf
+	}
+	// TODO(voss): for PDF >=2.0 we should use UTF-8 encoding here
+	return utf16Encode(string(s))
+}
+
+func (s TextString) AsTextString() TextString {
+	return s
+}
+
+func (x String) AsTextString() TextString {
+	b := []byte(x)
+
+	var s string
+	if isUTF16(b) {
+		s = utf16Decode(b[2:])
+	} else if isUTF8(string(b)) {
+		s = string(b[3:])
+	} else {
+		s = pdfDocDecode(b)
+	}
+
+	return TextString(s)
+}
+
+func (x Name) AsTextString() TextString {
+	return TextString(x)
+}
+
+type asTextStringer interface {
+	AsTextString() TextString
+}
+
+type Date time.Time
+
+func (d Date) String() string {
+	return time.Time(d).Format(time.RFC3339)
+}
+
+func (d Date) IsZero() bool {
+	return time.Time(d).IsZero()
+}
+
+func (d Date) Equal(other Date) bool {
+	return time.Time(d).Equal(time.Time(other))
+}
+
+func GetDate(r Getter, obj Object) (Date, error) {
+	var zero Date
+
+	s, err := GetString(r, obj)
+	if err != nil {
+		return zero, err
+	}
+	return s.AsDate()
+}
+
+// Date creates a PDF String object encoding the given date and time.
+func (d Date) AsPDF(opt OutputOptions) Native {
+	s := time.Time(d).Format("D:20060102150405-0700")
+	k := len(s) - 2
+	s = s[:k] + "'" + s[k:]
+	return String(s)
+}
+
+func (d Date) AsDate() (Date, error) {
+	return d, nil
+}
+
+// AsDate converts a PDF date string to a Date object.
+// If the string does not have the correct format, an error is returned.
+func (x String) AsDate() (Date, error) {
+	var zero Date
+
+	s := string(x.AsTextString())
+
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "'", "")
+	if s == "D:" || s == "" {
+		return zero, nil
+	}
+	if strings.HasPrefix(s, "19") || strings.HasPrefix(s, "20") {
+		s = "D:" + s
+	}
+
+	formats := []string{
+		"D:20060102150405-0700",
+		"D:20060102150405-07",
+		"D:20060102150405Z0000",
+		"D:20060102150405Z00",
+		"D:20060102150405Z",
+		"D:20060102150405",
+		"D:200601021504-0700",
+		"D:200601021504-07",
+		"D:200601021504Z0000",
+		"D:200601021504Z00",
+		"D:200601021504Z",
+		"D:200601021504",
+		"D:2006010215",
+		"D:20060102",
+		"D:200601",
+		"D:2006",
+		time.ANSIC,
+	}
+	for _, format := range formats {
+		t, err := time.Parse(format, s)
+		if err == nil {
+			return Date(t), nil
+		}
+	}
+	return zero, errNoDate
+}
+
+type asDater interface {
+	AsDate() (Date, error)
 }
 
 // Rectangle represents a PDF rectangle.
@@ -233,24 +366,24 @@ type Catalog struct {
 // The Document Information Dictionary is documented in section
 // 14.3.3 of PDF 32000-1:2008.
 type Info struct {
-	Title    string `pdf:"text string,optional"`
-	Author   string `pdf:"text string,optional"`
-	Subject  string `pdf:"text string,optional"`
-	Keywords string `pdf:"text string,optional"`
+	Title    TextString `pdf:"optional"`
+	Author   TextString `pdf:"optional"`
+	Subject  TextString `pdf:"optional"`
+	Keywords TextString `pdf:"optional"`
 
 	// Creator gives the name of the application that created the original
 	// document, if the document was converted to PDF from another format.
-	Creator string `pdf:"text string,optional"`
+	Creator TextString `pdf:"optional"`
 
 	// Producer gives the name of the application that converted the document,
 	// if the document was converted to PDF from another format.
-	Producer string `pdf:"text string,optional"`
+	Producer TextString `pdf:"optional"`
 
 	// CreationDate gives the date and time the document was created.
-	CreationDate time.Time `pdf:"optional"`
+	CreationDate Date `pdf:"optional"`
 
 	// ModDate gives the date and time the document was most recently modified.
-	ModDate time.Time `pdf:"optional"`
+	ModDate Date `pdf:"optional"`
 
 	// Trapped indicates whether the document has been modified to include
 	// trapping information.  (A trap is an overlap between adjacent areas of

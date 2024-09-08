@@ -18,99 +18,155 @@ package pdf
 
 import (
 	"testing"
+	"time"
 
 	"golang.org/x/text/language"
 )
 
-func TestCatalog(t *testing.T) {
-	pRef := NewReference(1, 2)
-
-	// test a round-trip
-	cat0 := &Catalog{
-		Pages: pRef,
-	}
-	d1 := AsDict(cat0)
-	if len(d1) != 2 {
-		t.Errorf("wrong Catalog dict: %s", AsString(d1))
-	}
-	cat1 := &Catalog{}
-	err := DecodeDict(nil, cat1, d1)
-	if err != nil {
-		t.Error(err)
-	} else if *cat0 != *cat1 {
-		t.Errorf("Catalog wrongly decoded: %v", cat1)
-	}
-}
-
-func TestCatalogReadMissingPages(t *testing.T) {
-	ref := NewReference(123, 0)
-	catalogDict := Dict{
-		"Metadata": ref,
-	}
-	catalog := &Catalog{}
-	err := DecodeDict(nil, catalog, catalogDict)
-	if err == nil {
-		t.Errorf("missing Pages not detected")
-	}
-	if catalog.Metadata != ref {
-		t.Errorf("wrong Metadata: %v", catalog.Metadata)
-	}
-}
-
-func TestCatalogWriteMissingPages(t *testing.T) {
-	catalog := &Catalog{}
-	dict := AsDict(catalog)
-	if _, present := dict["Pages"]; present {
-		t.Errorf("missing Pages not ignored")
-	}
-}
-
-func TestInfo(t *testing.T) {
-	// test missing struct
-	var info0 *Info
-	d1 := AsDict(info0)
-	if d1 != nil {
-		t.Error("wrong dict for nil Info struct")
-	}
-
-	// test empty struct
-	info0 = &Info{}
-	d1 = AsDict(info0)
-	if d1 == nil || len(d1) != 0 {
-		t.Errorf("wrong dict for empty Info struct: %#v", d1)
-	}
-
-	// test regular fields
-	info0.Author = "Jochen Voß"
-	d1 = AsDict(info0)
-	if len(d1) != 1 {
-		t.Errorf("wrong dict for empty Info struct: %s", AsString(d1))
-	}
-	info1 := &Info{}
-	err := DecodeDict(nil, info1, d1)
-	if err != nil {
-		t.Error(err)
-	} else if info0.Author != info1.Author || info0.CreationDate != info1.CreationDate {
-		t.Errorf("Catalog wrongly decoded: %v", info1)
-	}
-
-	// test custom fields
-	d1 = Dict{
-		"grumpy": TextString("bärbeißig"),
-		"funny":  TextString("\000\001\002 \\<>'\")("),
-	}
-	err = DecodeDict(nil, info1, d1)
-	if err != nil {
-		t.Error(err)
-	}
-	d2 := AsDict(info1)
-	if len(d1) != len(d2) {
-		t.Errorf("wrong d2: %s", AsString(d2))
-	}
-	for key, val := range d1 {
-		if d2[key].(String).AsTextString() != val.(String).AsTextString() {
-			t.Errorf("wrong d2[%s]: %s", key, AsString(d2[key]))
+func TestStructEncodeTextString(t *testing.T) {
+	for _, testText := range []TextString{"", "hello", "Grüß Gott", "こんにちは"} {
+		type testStructType struct {
+			S TextString
 		}
+		testStructVal := &testStructType{S: testText}
+		testDict := AsDict(testStructVal)
+
+		if testDict["S"] != testText {
+			t.Errorf("wrong string: %q != %q", testDict["S"], testText)
+		}
+	}
+}
+
+func TestStructDecodeTextString(t *testing.T) {
+	type testCase struct {
+		name string
+		in   Object
+		out  TextString
+	}
+	cases := []testCase{
+		{"ASCII TextString", TextString("hello"), TextString("hello")},
+		{"latin1 TextString", TextString("Grüß Gott"), TextString("Grüß Gott")},
+		{"empty TextString", TextString(""), TextString("")},
+		{"ASCII String", pdfDocEncodeMust("hello"), TextString("hello")},
+		{"latin1 String", pdfDocEncodeMust("Grüß Gott"), TextString("Grüß Gott")},
+		{"empty String", String(""), TextString("")},
+		{"nil", nil, TextString("")},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			testDict := Dict{"S": c.in}
+
+			type testStructType struct {
+				S TextString `pdf:"optional"`
+			}
+			var testStructVal testStructType
+			err := DecodeDict(nil, &testStructVal, testDict)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if testStructVal.S != c.out {
+				t.Errorf("wrong text string: %s", testStructVal.S)
+			}
+		})
+	}
+}
+
+func TestStructEncodeDate(t *testing.T) {
+	for _, timeVal := range []time.Time{
+		time.Now().Local(),
+		time.Now().UTC(),
+		time.Date(2021, 1, 2, 3, 4, 5, 0, time.FixedZone("CET", 3600)),
+		time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+	} {
+		testDate := Date(timeVal)
+		type testStructType struct {
+			T Date
+		}
+		testStructVal := &testStructType{T: testDate}
+		testDict := AsDict(testStructVal)
+
+		if testDict["T"] != testDate {
+			t.Errorf("wrong date: %q != %q", testDict["S"], testDate)
+		}
+	}
+}
+
+func TestStructDecodeDate(t *testing.T) {
+	type testCase struct {
+		name string
+		in   Object
+		out  time.Time
+	}
+	now := time.Now().Round(time.Second)
+	nowDate := Date(now)
+	cases := []testCase{
+		{"Date", nowDate, now},
+		{"String", String("D:199812231952-08'00"), time.Date(1998, 12, 23, 19, 52, 0, 0, time.FixedZone("UTC-8", -8*60*60))},
+		{"TextString", TextString("D:199812231952-08'00"), time.Date(1998, 12, 23, 19, 52, 0, 0, time.FixedZone("UTC-8", -8*60*60))},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			testDict := Dict{"T": c.in}
+
+			type testStructType struct {
+				T Date `pdf:"optional"`
+			}
+			var testStructVal testStructType
+			err := DecodeDict(nil, &testStructVal, testDict)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := time.Time(testStructVal.T)
+			if !got.Equal(c.out) {
+				t.Errorf("wrong date: %s -> %s -> %s",
+					Date(c.out), AsString(c.in), testStructVal.T)
+			}
+		})
+	}
+}
+
+func TestStructEncodeLanguageTag(t *testing.T) {
+	type testStruct struct {
+		Lang language.Tag
+	}
+
+	s2 := &testStruct{
+		Lang: language.BrazilianPortuguese,
+	}
+	d2 := AsDict(s2)
+	if s, ok := d2["Lang"].(asTextStringer); !ok || s.AsTextString() != "pt-BR" {
+		t.Errorf("wrong language: %s != %s", s.AsTextString(), "pt-BR")
+	}
+}
+
+func TestStructDecodeLanguageTag(t *testing.T) {
+	type testStruct struct {
+		Lang language.Tag
+	}
+
+	d1 := Dict{"Lang": TextString("en-GB")}
+	s1 := &testStruct{}
+	err := DecodeDict(nil, s1, d1)
+	if err != nil {
+		t.Error(err)
+	}
+	if s1.Lang != language.BritishEnglish {
+		t.Errorf("wrong language: %s", s1.Lang)
+	}
+}
+
+func TestStructEmptyLanguageTag(t *testing.T) {
+	type testStruct struct {
+		Lang language.Tag
+	}
+
+	s3 := &testStruct{}
+	d3 := AsDict(s3)
+	if _, present := d3["Lang"]; present {
+		t.Errorf("empty language tag not ignored, got %q", d3["Lang"])
 	}
 }
 
@@ -165,6 +221,9 @@ func TestStructVersion(t *testing.T) {
 }
 
 func TestDecodeVersion(t *testing.T) {
+	// We support various ways to specify the version number.
+	// The first one (Name) is correct as per the PDF spec, the others are
+	// invalid cases which can be found in the wild.
 	for _, version := range []Object{Name("1.5"), Real(1.5), String("1.5")} {
 		res := &Catalog{}
 		dict := Dict{"Version": version, "Pages": Reference(0)}
@@ -179,44 +238,10 @@ func TestDecodeVersion(t *testing.T) {
 	}
 }
 
-func TestDecodeLanguageTag(t *testing.T) {
-	type testStruct struct {
-		Lang language.Tag
+func pdfDocEncodeMust(s string) String {
+	res, ok := pdfDocEncode(s)
+	if !ok {
+		panic("encoding failed")
 	}
-
-	d1 := Dict{"Lang": TextString("en-GB")}
-	s1 := &testStruct{}
-	err := DecodeDict(nil, s1, d1)
-	if err != nil {
-		t.Error(err)
-	}
-	if s1.Lang != language.BritishEnglish {
-		t.Errorf("wrong language: %s", s1.Lang)
-	}
-}
-
-func TestEncodeLanguageTag(t *testing.T) {
-	type testStruct struct {
-		Lang language.Tag
-	}
-
-	s2 := &testStruct{
-		Lang: language.BrazilianPortuguese,
-	}
-	d2 := AsDict(s2)
-	if s, ok := d2["Lang"].(String); !ok || s.AsTextString() != "pt-BR" {
-		t.Errorf("wrong language: %s", d2["Lang"])
-	}
-}
-
-func TestEmptyLanguageTag(t *testing.T) {
-	type testStruct struct {
-		Lang language.Tag
-	}
-
-	s3 := &testStruct{}
-	d3 := AsDict(s3)
-	if _, present := d3["Lang"]; present {
-		t.Errorf("empty language tag not ignored, got %q", d3["Lang"])
-	}
+	return res
 }

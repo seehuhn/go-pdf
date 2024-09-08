@@ -44,13 +44,13 @@ func TestWriter(t *testing.T) {
 	}
 	encInfo1 := AsString(encryptDict)
 
-	author := "Jochen Voß"
+	author := TextString("Jochen Voß")
 	w.GetMeta().Info = &Info{
 		Title:        "PDF Test Document",
 		Author:       author,
 		Subject:      "Testing",
 		Keywords:     "PDF, testing, Go",
-		CreationDate: time.Now(),
+		CreationDate: Date(time.Now()),
 	}
 
 	refs := []Reference{w.Alloc()}

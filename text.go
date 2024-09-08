@@ -25,7 +25,7 @@ func isUTF8(s string) bool {
 	return len(s) >= 3 && s[0] == 239 && s[1] == 187 && s[2] == 191
 }
 
-func isUTF16(s string) bool {
+func isUTF16(s []byte) bool {
 	return len(s) >= 2 && s[0] == 0xFE && s[1] == 0xFF
 }
 
@@ -41,7 +41,7 @@ func utf16Encode(s string) String {
 	return String(buf)
 }
 
-func utf16Decode(s String) string {
+func utf16Decode(s []byte) string {
 	var u []uint16
 	for i := 0; i < len(s)-1; i += 2 {
 		u = append(u, uint16(s[i])<<8|uint16(s[i+1]))
@@ -68,7 +68,7 @@ func pdfDocEncode(s string) (String, bool) {
 	return String(res), true
 }
 
-func pdfDocDecode(s String) string {
+func pdfDocDecode(s []byte) string {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 0x80 || fromPDFDoc[s[i]] != rune(s[i]) {
 			goto Decode

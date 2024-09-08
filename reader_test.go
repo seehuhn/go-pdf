@@ -464,7 +464,7 @@ func FuzzReader(f *testing.F) {
 			case 1:
 				w.meta.Info.Title = "test"
 			case 2:
-				w.meta.Info.ModDate = time.Now()
+				w.meta.Info.ModDate = Date(time.Now())
 			case 3:
 				w.meta.Catalog.AA = Dict{
 					"O": Integer(1),

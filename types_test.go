@@ -18,14 +18,12 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 var (
@@ -148,60 +146,6 @@ func FuzzString(f *testing.F) {
 			t.Errorf("wrong string: %q -> %q -> %q", s1, enc, s2)
 		}
 	})
-}
-
-func TestTextString(t *testing.T) {
-	cases := []string{
-		"",
-		"hello",
-		"\000\011\n\f\r",
-		"ein Bär",
-		"o țesătură",
-		"中文",
-		"日本語",
-	}
-	for _, test := range cases {
-		enc := TextString(test)
-		out := enc.AsTextString()
-		if out != test {
-			t.Errorf("wrong text: %q != %q", out, test)
-		}
-	}
-}
-
-func TestDateString(t *testing.T) {
-	PST := time.FixedZone("PST", -8*60*60)
-	cases := []time.Time{
-		time.Date(1998, 12, 23, 19, 52, 0, 0, PST),
-		time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
-		time.Date(2020, 12, 24, 16, 30, 12, 0, time.FixedZone("", 90*60)),
-	}
-	for _, test := range cases {
-		enc := Date(test)
-		out, err := enc.AsDate()
-		if err != nil {
-			t.Error(err)
-		} else if !test.Equal(out) {
-			fmt.Println(test, string(enc), out)
-			t.Errorf("wrong time: %s != %s", out, test)
-		}
-	}
-}
-
-func TestDecodeDate(t *testing.T) {
-	cases := []string{
-		"D:19981223195200-08'00'",
-		"D:20000101000000Z",
-		"D:20201224163012+01'30'",
-		"D:20010809191510 ", // trailing space, seen in some PDF files
-	}
-	for i, test := range cases {
-		enc := TextString(test)
-		_, err := enc.AsDate()
-		if err != nil {
-			t.Errorf("%d %q %s\n", i, test, err)
-		}
-	}
 }
 
 func TestDict(t *testing.T) {

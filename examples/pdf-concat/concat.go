@@ -72,8 +72,8 @@ func (c *Concat) Close() error {
 	now := time.Now()
 	meta.Info = &pdf.Info{
 		Producer:     "seehuhn.de/go/pdf/examples/concat",
-		CreationDate: now,
-		ModDate:      now,
+		CreationDate: pdf.Date(now),
+		ModDate:      pdf.Date(now),
 	}
 	meta.Catalog.Pages = pagesRef
 
@@ -87,6 +87,9 @@ func (c *Concat) Close() error {
 		entry.Children = child.Outline
 	}
 	err = outline.Write(c.w)
+	if err != nil {
+		return err
+	}
 
 	return c.w.Close()
 }
@@ -106,7 +109,7 @@ func (c *Concat) Append(fname string) error {
 
 	var title string
 	if meta.Info != nil && meta.Info.Title != "" {
-		title = meta.Info.Title
+		title = string(meta.Info.Title)
 	} else if outlineTree != nil && outlineTree.Title != "" {
 		title = outlineTree.Title
 	} else {

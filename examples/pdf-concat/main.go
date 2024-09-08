@@ -73,6 +73,9 @@ func concatFiles(out string, in []string) error {
 
 	for _, fname := range in {
 		err = c.Append(fname)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = c.Close()
