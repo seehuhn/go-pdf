@@ -35,11 +35,7 @@ type Data struct {
 
 // NewData returns a new in-memory PDF document.
 func NewData(v Version) *Data {
-	var opt OutputOptions
-	if v >= V1_5 {
-		opt |= OptObjStm
-		opt |= OptXRefStream
-	}
+	opt := defaultOutputOptions(v)
 
 	res := &Data{
 		meta: MetaInfo{

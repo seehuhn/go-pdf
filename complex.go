@@ -20,10 +20,12 @@ package pdf
 // of the elementary types from "objects.go".
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"golang.org/x/text/language"
 )
@@ -76,32 +78,57 @@ func GetTextString(r Getter, obj Object) (TextString, error) {
 	return s.AsTextString(), nil
 }
 
+var utf16Marker = []byte{254, 255}
+var utf8Marker = []byte{239, 187, 191}
+
 func (s TextString) AsPDF(opt OutputOptions) Native {
-	buf, ok := pdfDocEncode(string(s))
-	if ok {
+	// use PDFDocEncoding where possible, because it is smallest
+	if buf, ok := pdfDocEncode(string(s)); ok && !bytes.HasPrefix(buf, utf16Marker) && !bytes.HasPrefix(buf, utf8Marker) {
 		return buf
 	}
-	// TODO(voss): for PDF >=2.0 we should use UTF-8 encoding here
-	return utf16Encode(string(s))
-}
 
-func (s TextString) AsTextString() TextString {
-	return s
+	// Otherwise, use UTF-8 if supported.
+	if opt.Has(OptTextStringUtf8) {
+		obj := make(String, 0, 3+len(s))
+		obj = append(obj, 239, 187, 191)
+		obj = append(obj, []byte(s)...)
+		return obj
+	}
+
+	// Otherwise, use UTF-16.
+	var buf = []uint16{0xFEFF}
+	for _, r := range s {
+		buf = utf16.AppendRune(buf, r)
+	}
+	out := make(String, 0, 2*len(buf)+2)
+	for _, x := range buf {
+		out = append(out, byte(x>>8), byte(x))
+	}
+	return out
 }
 
 func (x String) AsTextString() TextString {
 	b := []byte(x)
 
 	var s string
-	if isUTF16(b) {
-		s = utf16Decode(b[2:])
-	} else if isUTF8(string(b)) {
+	if bytes.HasPrefix(b, utf16Marker) {
+		buf := make([]uint16, 0, (len(b)-2)/2)
+		for i := 2; i < len(b); i += 2 {
+			buf = append(buf, uint16(b[i])<<8|uint16(b[i+1]))
+		}
+		rr := utf16.Decode(buf)
+		s = string(rr)
+	} else if bytes.HasPrefix(b, utf8Marker) {
 		s = string(b[3:])
 	} else {
 		s = pdfDocDecode(b)
 	}
 
 	return TextString(s)
+}
+
+func (s TextString) AsTextString() TextString {
+	return s
 }
 
 func (x Name) AsTextString() TextString {

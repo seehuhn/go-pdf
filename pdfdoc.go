@@ -18,36 +18,7 @@ package pdf
 
 import (
 	"unicode"
-	"unicode/utf16"
 )
-
-func isUTF8(s string) bool {
-	return len(s) >= 3 && s[0] == 239 && s[1] == 187 && s[2] == 191
-}
-
-func isUTF16(s []byte) bool {
-	return len(s) >= 2 && s[0] == 0xFE && s[1] == 0xFF
-}
-
-func utf16Encode(s string) String {
-	enc := utf16.Encode([]rune(s))
-	buf := make([]byte, 2*len(enc)+2)
-	buf[0] = 0xFE
-	buf[1] = 0xFF
-	for i, c := range enc {
-		buf[2*i+2] = byte(c >> 8)
-		buf[2*i+3] = byte(c)
-	}
-	return String(buf)
-}
-
-func utf16Decode(s []byte) string {
-	var u []uint16
-	for i := 0; i < len(s)-1; i += 2 {
-		u = append(u, uint16(s[i])<<8|uint16(s[i+1]))
-	}
-	return string(utf16.Decode(u))
-}
 
 // PDFDocEncoding is an encoding used for metadata in PDF files.
 // It is not normally used to show text from fonts in PDF content streams.

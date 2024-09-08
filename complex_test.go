@@ -19,6 +19,7 @@ package pdf
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -26,22 +27,192 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestTextString(t *testing.T) {
-	cases := []TextString{
-		"",
-		"hello",
-		"ein Bär",
-		"o țesătură",
-		"中文",
-		"日本語",
-		"\000\011\n\f\r",
+func TestTextString_Get(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   Object
+		want    TextString
+		wantErr bool
+	}{
+		{
+			name:  "PDFDocEncoded string",
+			input: String("Hello, World!"),
+			want:  "Hello, World!",
+		},
+		{
+			name:  "UTF-16BE string",
+			input: String("\xFE\xFF\x00H\x00e\x00l\x00l\x00o"),
+			want:  "Hello",
+		},
+		{
+			name:  "UTF-8 string",
+			input: String("\xEF\xBB\xBFHello"),
+			want:  "Hello",
+		},
+		{
+			name:  "Empty string",
+			input: String(""),
+			want:  "",
+		},
+		{
+			name:  "String with special characters",
+			input: String("Line 1\nLine 2\tTabbed"),
+			want:  "Line 1\nLine 2\tTabbed",
+		},
+		{
+			name:    "Invalid object type",
+			input:   Integer(42),
+			wantErr: true,
+		},
+		{
+			name:  "Nil object",
+			input: nil,
+			want:  "",
+		},
 	}
-	for _, test := range cases {
-		enc := test.AsPDF(0).(String)
-		out := enc.AsTextString()
-		if out != test {
-			t.Errorf("wrong text: %q -> % x -> %q", out, enc, test)
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetTextString(nil, tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("GetTextString() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("GetTextString() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTextString_AsPDF(t *testing.T) {
+	tests := []struct {
+		name string
+		in   TextString
+		opt  OutputOptions
+		want Native
+	}{
+		{
+			name: "ASCII string",
+			in:   "hello",
+			opt:  0,
+			want: String("hello"),
+		},
+		{
+			name: "Non-PDFDocEncoding char",
+			in:   "Ā",
+			opt:  0,
+			want: String("\xfe\xff\x01\x00"),
+		},
+		{
+			name: "Chinese characters",
+			in:   "中文",
+			opt:  0,
+			want: String("\xfe\xff\x4e\x2d\x65\x87"),
+		},
+		{
+			name: "ASCII with UTF-8", // still encoded as PDFDocEncoding, though
+			in:   "hello",
+			opt:  OptTextStringUtf8,
+			want: String("hello"),
+		},
+		{
+			name: "Non-PDFDocEncoding with UTF-8",
+			in:   "Ā",
+			opt:  OptTextStringUtf8,
+			want: String("\xef\xbb\xbfĀ"),
+		},
+		{
+			name: "Chinese with UTF-8",
+			in:   "中文",
+			opt:  OptTextStringUtf8,
+			want: String("\xef\xbb\xbf中文"),
+		},
+		{
+			name: "Empty string",
+			in:   "",
+			opt:  0,
+			want: String(""),
+		},
+		{
+			name: "String with control characters",
+			in:   "\x00\x01\x02",
+			opt:  0,
+			want: String("\xfe\xff\x00\x00\x00\x01\x00\x02"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.in.AsPDF(tt.opt)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("AsPDF(%q, %v) = %v, want %v", tt.in, tt.opt, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTextString_Roundtrip(t *testing.T) {
+	tests := []struct {
+		name string
+		text TextString
+	}{
+		{
+			name: "Empty string",
+			text: "",
+		},
+		{
+			name: "ASCII string",
+			text: "hello",
+		},
+		{
+			name: "String with umlauts",
+			text: "ein Bär",
+		},
+		{
+			name: "Romanian string",
+			text: "o țesătură",
+		},
+		{
+			name: "Chinese string",
+			text: "中文",
+		},
+		{
+			name: "Japanese string",
+			text: "日本語",
+		},
+		{
+			name: "Control characters",
+			text: "\x00\x09\n\x0c\r",
+		},
+		{
+			name: "Mixed ASCII and non-ASCII",
+			text: "Hello, 世界!",
+		},
+		{
+			name: "Emoji",
+			text: "😀🌍🚀",
+		},
+		{
+			name: "utf8 marker",
+			text: TextString(pdfDocDecode(utf8Marker)),
+		},
+		{
+			name: "utf16 marker",
+			text: TextString(pdfDocDecode(utf16Marker)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, opt := range []OutputOptions{0, OptTextStringUtf8} {
+				enc := tt.text.AsPDF(opt).(String)
+				out := enc.AsTextString()
+				if out != tt.text {
+					t.Errorf("Roundtrip failed for %q with option %v:\nencoded: % x\ndecoded: %q",
+						tt.text, opt, enc, out)
+				}
+			}
+		})
 	}
 }
 

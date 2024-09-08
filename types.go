@@ -76,12 +76,25 @@ func (o OutputOptions) Has(opt OutputOptions) bool {
 // The values are bit masks which can be combined using bitwise OR.
 // The default output options are 0.
 const (
-	OptASCII         OutputOptions = 1 << iota // no binary data
-	OptContentStream                           // we are inside a content stream
-	OptObjStm                                  // use object streams
-	OptPretty                                  // make the output more human-readable
-	OptXRefStream                              // use an xref stream
+	OptASCII          OutputOptions = 1 << iota // no binary data
+	OptContentStream                            // we are inside a content stream
+	OptObjStm                                   // use object streams
+	OptPretty                                   // make the output more human-readable
+	OptTextStringUtf8                           // allow UTF-8 encoding for text strings
+	OptXRefStream                               // use an xref stream
 )
+
+func defaultOutputOptions(v Version) OutputOptions {
+	var opt OutputOptions
+	if v >= V1_5 {
+		opt |= OptObjStm
+		opt |= OptXRefStream
+	}
+	if v >= V2_0 {
+		opt |= OptTextStringUtf8
+	}
+	return opt
+}
 
 // Format writes the textual representation of one or more objects to the given writer.
 // The output does not include any leading or trailing whitespace.

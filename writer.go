@@ -203,11 +203,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		Generation: 65535,
 	}
 
-	var outOpt OutputOptions
-	if v >= V1_5 {
-		outOpt |= OptObjStm
-		outOpt |= OptXRefStream
-	}
+	outOpt := defaultOutputOptions(v)
 	if opt.ASCIIOnly {
 		outOpt &= ^(OptObjStm | OptXRefStream)
 		outOpt |= OptASCII
