@@ -131,10 +131,10 @@ tokenLoop:
 		}
 
 		switch obj {
-		case operator("<<"):
+		case pdf.Operator("<<"):
 			s.stack = append(s.stack, &scanStackFrame{isDict: true})
 			continue tokenLoop
-		case operator(">>"):
+		case pdf.Operator(">>"):
 			if len(s.stack) == 0 || !s.stack[len(s.stack)-1].isDict {
 				// unexpected '>>'
 				continue tokenLoop
@@ -159,10 +159,10 @@ tokenLoop:
 				dict[key] = val
 			}
 			obj = dict
-		case operator("["):
+		case pdf.Operator("["):
 			s.stack = append(s.stack, &scanStackFrame{})
 			continue tokenLoop
-		case operator("]"):
+		case pdf.Operator("]"):
 			if len(s.stack) == 0 || s.stack[len(s.stack)-1].isDict {
 				// unexpected "]"
 				continue tokenLoop
@@ -173,7 +173,7 @@ tokenLoop:
 
 		if len(s.stack) > 0 { // we are inside a dict or array
 			s.stack[len(s.stack)-1].data = append(s.stack[len(s.stack)-1].data, obj)
-		} else if op, ok := obj.(operator); ok {
+		} else if op, ok := obj.(pdf.Operator); ok {
 			s.nextOp = string(op)
 			return true
 		} else {
@@ -198,13 +198,13 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 		return s.readString()
 	case string(bb) == "<<":
 		s.skipN(2)
-		return operator("<<"), nil
+		return pdf.Operator("<<"), nil
 	case bb[0] == '<':
 		s.skipN(1)
 		return s.readHexString()
 	case string(bb) == ">>":
 		s.skipN(2)
-		return operator(">>"), nil
+		return pdf.Operator(">>"), nil
 	default:
 		opBytes := []byte{bb[0]}
 		s.readByte() // skip bb[0] (invalidates bb)
@@ -238,7 +238,7 @@ func (s *Scanner) nextToken() (pdf.Object, error) {
 		case "null":
 			return nil, nil
 		}
-		return operator(opBytes), nil
+		return pdf.Operator(opBytes), nil
 	}
 }
 
@@ -566,15 +566,6 @@ func parseNumber(s []byte) pdf.Object {
 }
 
 var errParse = errors.New("parse error")
-
-// operator is a PDF operator found in a content stream.
-type operator pdf.Name
-
-// PDF implements the [pdf.Object] interface.
-func (x operator) PDF(w io.Writer) error {
-	_, err := w.Write([]byte(x))
-	return err
-}
 
 type characterClass byte
 

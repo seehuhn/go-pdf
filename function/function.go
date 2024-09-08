@@ -44,7 +44,7 @@ func (f *Type2) Shape() (int, int) {
 
 // Embed embeds the function in a PDF file.
 // This method is used by [pdf.ResourceManager].
-func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "Type 2 functions", pdf.V1_3); err != nil {
@@ -59,9 +59,9 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 		"N":            pdf.Number(f.Gamma),
 	}
 
-	var obj pdf.Object
+	var obj pdf.Native
 	if f.SingleUse {
-		obj = d
+		obj = d.AsPDF(rm.Out.GetOptions())
 	} else {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, d)

@@ -37,7 +37,7 @@ type MarkedContent struct {
 
 // Embed adds the MarkedContent properties dict to a PDF file.
 // This implements the [pdf.Embedder] interface.
-func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if mc.SingleUse {

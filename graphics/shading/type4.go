@@ -62,7 +62,7 @@ func (s *Type4) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if s.ColorSpace == nil {
 		return nil, zero, errors.New("missing ColorSpace")

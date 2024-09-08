@@ -34,7 +34,7 @@ func TestMarkedContentInline(t *testing.T) {
 	}
 	var testCases = []TestCase{
 		{nil, "/test MP\n", nil},
-		{pdf.Dict{"X": pdf.Integer(1)}, "/test <<\n/X 1\n>> DP\n", nil},
+		{pdf.Dict{"X": pdf.Integer(1)}, "/test <</X 1>> DP\n", nil},
 		{pdf.Dict{"X": pdf.NewReference(1, 0)}, "", graphics.ErrNotDirect},
 	}
 	data := pdf.NewData(pdf.V1_7)

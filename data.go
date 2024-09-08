@@ -28,19 +28,23 @@ import (
 // Data is an in-memory representation of a PDF document.
 type Data struct {
 	meta    MetaInfo
-	objects map[Reference]Object
+	objects map[Reference]Native
 	lastRef uint32
+	opt     OutputOptions
 }
 
 // NewData returns a new in-memory PDF document.
 func NewData(v Version) *Data {
+	opt := defaultOutputOptions(v)
+
 	res := &Data{
 		meta: MetaInfo{
 			Version: v,
 			Catalog: &Catalog{},
 		},
-		objects: map[Reference]Object{},
+		objects: map[Reference]Native{},
 		lastRef: 0,
+		opt:     opt,
 	}
 	return res
 }
@@ -54,7 +58,7 @@ func Read(r io.ReadSeeker, opt *ReaderOptions) (*Data, error) {
 
 	res := &Data{
 		meta:    pdf.meta,
-		objects: map[Reference]Object{},
+		objects: map[Reference]Native{},
 	}
 
 	isObjectStream := make(map[Reference]bool)
@@ -149,6 +153,10 @@ func (d *Data) GetMeta() *MetaInfo {
 	return &d.meta
 }
 
+func (d *Data) GetOptions() OutputOptions {
+	return d.opt
+}
+
 // Alloc allocates a new object number for an indirect object.
 func (d *Data) Alloc() Reference {
 	for {
@@ -161,7 +169,7 @@ func (d *Data) Alloc() Reference {
 }
 
 // Get implements the [Getter] interface.
-func (d *Data) Get(ref Reference, _ bool) (Object, error) {
+func (d *Data) Get(ref Reference, _ bool) (Native, error) {
 	if ref.IsInternal() {
 		panic("internal reference") // TODO(voss): return an error instead?
 	}
@@ -191,7 +199,7 @@ func (d *Data) Put(ref Reference, obj Object) error {
 	} else if _, exists := d.objects[ref]; exists {
 		return errDuplicateRef
 	} else {
-		d.objects[ref] = obj
+		d.objects[ref] = obj.AsPDF(d.opt)
 	}
 	return nil
 }

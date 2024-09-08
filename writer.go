@@ -40,6 +40,11 @@ type WriterOptions struct {
 	// If this flag is true, the writer tries to generate a PDF file which is
 	// more human-readable, at the expense of increased file size.
 	HumanReadable bool
+
+	// If this flag is true, the writer tries to generate a PDF file which
+	// contains only ASCII characters, at the expense of greatly increased file
+	// size.
+	ASCIIOnly bool
 }
 
 // Writer represents a PDF file open for writing.
@@ -57,7 +62,7 @@ type Writer struct {
 	inStream    bool
 	afterStream []allocatedObject
 
-	humanReadable bool
+	Opt OutputOptions
 }
 
 // TODO(voss): is this more generally useful?
@@ -198,6 +203,16 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		Generation: 65535,
 	}
 
+	outOpt := defaultOutputOptions(v)
+	if opt.ASCIIOnly {
+		outOpt &= ^(OptObjStm | OptXRefStream)
+		outOpt |= OptASCII
+	}
+	if opt.HumanReadable {
+		outOpt &= ^OptObjStm
+		outOpt |= OptPretty
+	}
+
 	pdf := &Writer{
 		meta: MetaInfo{
 			Version: v,
@@ -208,16 +223,15 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		},
 
 		w: &posWriter{
-			w:      bufferedW,
-			enc:    enc,
-			pretty: opt.HumanReadable,
+			w:   bufferedW,
+			enc: enc,
 		},
 		origW: w,
 
 		nextRef: 1,
 		xref:    xref,
 
-		humanReadable: opt.HumanReadable,
+		Opt: outOpt,
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -260,10 +274,10 @@ func (pdf *Writer) Close() error {
 	// write the cross reference table and trailer
 	xRefPos := pdf.w.pos
 	trailer["Size"] = Integer(pdf.nextRef)
-	if pdf.meta.Version < V1_5 || pdf.humanReadable {
-		err = pdf.writeXRefTable(trailer)
-	} else {
+	if pdf.Opt.Has(OptXRefStream) {
 		err = pdf.writeXRefStream(trailer)
+	} else {
+		err = pdf.writeXRefTable(trailer)
 	}
 	if err != nil {
 		return err
@@ -295,6 +309,10 @@ func (pdf *Writer) GetMeta() *MetaInfo {
 	return &pdf.meta
 }
 
+func (pdf *Writer) GetOptions() OutputOptions {
+	return pdf.Opt
+}
+
 // Alloc allocates an object number for an indirect object.
 func (pdf *Writer) Alloc() Reference {
 	res := NewReference(pdf.nextRef, 0)
@@ -319,7 +337,7 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 	if err != nil {
 		return err
 	}
-	err = writeObject(pdf.w, obj)
+	err = Format(pdf.w, pdf.Opt, obj)
 	if err != nil {
 		return err
 	}
@@ -331,7 +349,7 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 	return nil
 }
 
-func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Object, err error) {
+func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 	r, ok := pdf.origW.(io.ReadSeeker)
 	if !ok {
 		return nil, errors.New("Get() not supported by the underlying io.Writer")
@@ -416,12 +434,12 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if pdf.meta.Version < V1_5 || pdf.humanReadable {
-		// Object streams are only available in PDF version 1.5 and higher.
+	if !pdf.Opt.Has(OptObjStm) {
+		// If object streams are disabled, write the objects directly.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)
 			if err != nil {
-				return fmt.Errorf("Writer.WriteCompressed (V<1.5): %w", err)
+				return fmt.Errorf("Writer.WriteCompressed (no object streams): %w", err)
 			}
 		}
 		return nil
@@ -450,7 +468,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		if i < N-1 {
 			// Here we buffer only the first N-1 object, since we can stream
 			// the last object separately at the end.
-			err = writeObject(body, objects[i])
+			err = Format(body, pdf.Opt, objects[i])
 			if err != nil {
 				return err
 			}
@@ -482,7 +500,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	}
 
 	// write the last object separately
-	err = objects[N-1].PDF(w)
+	err = Format(w, pdf.Opt, objects[N-1])
 	if err != nil {
 		return err
 	}
@@ -605,7 +623,7 @@ func (w *streamWriter) startWriting() error {
 	if err != nil {
 		return err
 	}
-	err = w.streamDict.PDF(w.parent.w)
+	err = Format(w.parent.w, w.parent.Opt, w.streamDict)
 	if err != nil {
 		return err
 	}
@@ -674,9 +692,8 @@ type posWriter struct {
 	w   writeFlusher
 	pos int64
 
-	ref    Reference
-	enc    *encryptInfo
-	pretty bool
+	ref Reference
+	enc *encryptInfo
 }
 
 func (w *posWriter) Write(p []byte) (int, error) {
@@ -687,12 +704,4 @@ func (w *posWriter) Write(p []byte) (int, error) {
 
 func (w *posWriter) Flush() error {
 	return w.w.Flush()
-}
-
-func writeObject(w io.Writer, obj Object) error {
-	if obj == nil {
-		_, err := w.Write([]byte("null"))
-		return err
-	}
-	return obj.PDF(w)
 }

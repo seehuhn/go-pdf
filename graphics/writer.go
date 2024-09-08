@@ -45,6 +45,8 @@ type Writer struct {
 	markedContent []*MarkedContent
 
 	glyphBuf *font.GlyphSeq
+
+	opt pdf.OutputOptions
 }
 
 type catRes struct {
@@ -84,6 +86,10 @@ const (
 
 // NewWriter allocates a new Writer object.
 func NewWriter(out io.Writer, rm *pdf.ResourceManager) *Writer {
+	var opt pdf.OutputOptions
+	if rm != nil && rm.Out != nil {
+		opt = rm.Out.GetOptions()
+	}
 	return &Writer{
 		Content:       out,
 		Resources:     &pdf.Resources{},
@@ -95,6 +101,8 @@ func NewWriter(out io.Writer, rm *pdf.ResourceManager) *Writer {
 		resName: make(map[catRes]objName),
 
 		glyphBuf: &font.GlyphSeq{},
+
+		opt: opt,
 	}
 }
 
@@ -113,7 +121,7 @@ func (w *Writer) writeObject(obj pdf.Object) {
 	if w.Err != nil {
 		return
 	}
-	w.Err = obj.PDF(w.Content)
+	w.Err = pdf.Format(w.Content, w.opt, obj)
 }
 
 // IsValid returns true, if the current graphics object is one of the given types

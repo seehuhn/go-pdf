@@ -53,7 +53,7 @@ func (s *Type3) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if s.ColorSpace == nil {
 		return nil, zero, errors.New("missing ColorSpace")
@@ -113,9 +113,9 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
 		dict["Extend"] = pdf.Array{pdf.Boolean(s.ExtendStart), pdf.Boolean(s.ExtendEnd)}
 	}
 
-	var data pdf.Object
+	var data pdf.Native
 	if s.SingleUse {
-		data = dict
+		data = dict.AsPDF(rm.Out.GetOptions())
 	} else {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, dict)

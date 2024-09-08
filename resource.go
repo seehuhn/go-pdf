@@ -33,7 +33,7 @@ type Embedder[T any] interface {
 	//
 	// The second return value is a Go representation of the embedded object.
 	// In most cases, this value is not used and T can be set to [Unused].
-	Embed(rm *ResourceManager) (Object, T, error)
+	Embed(rm *ResourceManager) (Native, T, error)
 }
 
 // Unused is a placeholder type for the second return value of the

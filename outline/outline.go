@@ -69,15 +69,11 @@ func readNode(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) (*
 
 	tree := &Tree{}
 
-	titleObj, err := pdf.Resolve(r, dict["Title"])
+	title, err := pdf.GetTextString(r, dict["Title"])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, pdf.Wrap(err, "/Title in outline")
 	}
-	if title, ok := titleObj.(pdf.String); ok {
-		tree.Title = title.AsTextString()
-	} else if title != nil {
-		return nil, nil, fmt.Errorf("invalid /Title in outline (type %T)", titleObj)
-	}
+	tree.Title = string(title)
 
 	count, _ := dict["Count"].(pdf.Integer)
 	tree.Open = count > 0

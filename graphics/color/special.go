@@ -102,7 +102,7 @@ func (s *SpaceIndexed) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "Indexed color space", pdf.V1_1); err != nil {
@@ -188,7 +188,7 @@ func (s *SpaceSeparation) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the pdf.Embedder interface.
-func (s *SpaceSeparation) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s *SpaceSeparation) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "Separation color space", pdf.V1_2); err != nil {
@@ -305,7 +305,7 @@ func (s *SpaceDeviceN) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the pdf.Embedder interface.
-func (s *SpaceDeviceN) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (s *SpaceDeviceN) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "DeviceN color space", pdf.V1_3); err != nil {

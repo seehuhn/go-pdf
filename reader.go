@@ -288,7 +288,7 @@ func (r *Reader) GetMeta() *MetaInfo {
 // The argument canObjStm specifies whether the object may be read from an
 // object stream.  Normally, this should be set to true.  If canObjStm is false
 // and the object is in an object stream, an error is returned.
-func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
+func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
 	if ref.IsInternal() {
 		panic("internal reference") // TODO(voss): return an error instead?
 	}
@@ -332,7 +332,7 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Object, err error) {
 	return obj, nil
 }
 
-func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc *encryptInfo) (Object, error) {
+func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc *encryptInfo) (Native, error) {
 	// We need to be careful to avoid infinite loops, in case reading from an
 	// object stream requires opening other object streams first.  This could
 	// be either caused by the stream object being contained in another object

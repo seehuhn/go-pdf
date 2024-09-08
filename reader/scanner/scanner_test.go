@@ -118,13 +118,9 @@ func FuzzScanner(f *testing.F) {
 				if i > 0 {
 					buf.WriteString(" ")
 				}
-				if arg == nil {
-					buf.WriteString("null")
-				} else {
-					err := arg.PDF(buf)
-					if err != nil {
-						t.Fatal(err)
-					}
+				err := pdf.Format(buf, 0, arg)
+				if err != nil {
+					t.Fatal(err)
 				}
 			}
 			if len(op.Args) > 0 {
@@ -148,13 +144,9 @@ func FuzzScanner(f *testing.F) {
 				if i > 0 {
 					buf.WriteString(" ")
 				}
-				if arg == nil {
-					buf.WriteString("null")
-				} else {
-					err := arg.PDF(buf)
-					if err != nil {
-						t.Fatal(err)
-					}
+				err := pdf.Format(buf, 0, arg)
+				if err != nil {
+					t.Fatal(err)
 				}
 			}
 			if len(op.Args) > 0 {

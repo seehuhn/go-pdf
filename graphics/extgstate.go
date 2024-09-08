@@ -74,7 +74,7 @@ type ExtGState struct {
 // Embed adds the graphics state dictionary to a PDF file.
 //
 // This implements the [pdf.Embedder] interface.
-func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Object, State, error) {
+func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 	res := State{
 		Parameters: &Parameters{},
 	}

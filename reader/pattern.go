@@ -26,12 +26,12 @@ import (
 type patternFromFile struct {
 	patternType int
 	paintType   int
-	obj         pdf.Object
+	obj         pdf.Native
 	r           pdf.Getter
 }
 
-func readPattern(r pdf.Getter, obj pdf.Object) (*patternFromFile, error) {
-	obj, err := pdf.Resolve(r, obj)
+func readPattern(r pdf.Getter, ref pdf.Object) (*patternFromFile, error) {
+	obj, err := pdf.Resolve(r, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (p *patternFromFile) PaintType() int {
 	return p.paintType
 }
 
-func (p *patternFromFile) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (p *patternFromFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	copier := pdfcopy.NewCopier(rm.Out, p.r)
 	obj, err := copier.Copy(p.obj)
 	if err != nil {

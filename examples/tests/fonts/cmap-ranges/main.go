@@ -134,7 +134,7 @@ func (f *testFont) PostScriptName() string {
 	return "Test"
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Object, font.Embedded, error) {
+func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 	cidFontDictRef := rm.Out.Alloc()
 	fontDescriptorRef := rm.Out.Alloc()

@@ -14,7 +14,7 @@ weight = 100
 
 ## General
 
-- add support for writing human-readable PDF files
+- complete the support for writing human-readable PDF files
 - Make sure that readers cannot get into infinite loops when resources
   depend on each other in a cycle.
 - test that we don't write numbers like `0.6000000000000001` in content streams

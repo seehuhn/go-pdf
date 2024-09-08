@@ -117,7 +117,7 @@ func TestCryptV1(t *testing.T) {
 }
 
 func TestAuthentication(t *testing.T) {
-	msg := "super secret"
+	msg := TextString("super secret")
 	for i, v := range []Version{V1_6, V1_4, V1_3, V1_1} {
 		for _, userFirst := range []bool{true, false} {
 			buf := &bytes.Buffer{}
@@ -145,7 +145,7 @@ func TestAuthentication(t *testing.T) {
 			addPage(w, Name("Contents"), contentsRef)
 
 			ref := w.Alloc()
-			err = w.Put(ref, TextString(msg))
+			err = w.Put(ref, msg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -179,12 +179,11 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err, i)
 			}
 			if userFirst {
-				dec, err := GetString(r, ref)
+				dec, err := GetTextString(r, ref)
 				if err != nil {
 					t.Error(err, i, userFirst)
-					continue
 				}
-				if dec.AsTextString() != msg {
+				if dec != msg {
 					t.Error("got wrong message", i)
 				}
 				if len(pwdList) != 2 {

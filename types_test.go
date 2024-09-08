@@ -18,27 +18,25 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 var (
-	_ Object = Array{}
-	_ Object = Boolean(true)
-	_ Object = Dict{}
-	_ Object = Integer(0)
-	_ Object = Name("name")
-	_ Object = Real(0)
-	_ Object = Reference(0)
-	_ Object = (*Stream)(nil)
-	_ Object = String(nil)
-	_ Object = (*Placeholder)(nil)
+	_ Native = Array{}
+	_ Native = Boolean(true)
+	_ Native = Dict{}
+	_ Native = Integer(0)
+	_ Native = Name("name")
+	_ Native = Real(0)
+	_ Native = Reference(0)
+	_ Native = (*Stream)(nil)
+	_ Native = String(nil)
+	_ Native = (*Placeholder)(nil)
 )
 
 func TestFormat(t *testing.T) {
@@ -119,7 +117,7 @@ func TestStringFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	for i, test := range cases {
 		buf.Reset()
-		err := test.in.PDF(buf)
+		err := Format(buf, 0, test.in)
 		if err != nil {
 			t.Errorf("%d: %q: %s", i, test.in, err)
 		} else if buf.String() != test.out {
@@ -150,67 +148,13 @@ func FuzzString(f *testing.F) {
 	})
 }
 
-func TestTextString(t *testing.T) {
-	cases := []string{
-		"",
-		"hello",
-		"\000\011\n\f\r",
-		"ein Bär",
-		"o țesătură",
-		"中文",
-		"日本語",
-	}
-	for _, test := range cases {
-		enc := TextString(test)
-		out := enc.AsTextString()
-		if out != test {
-			t.Errorf("wrong text: %q != %q", out, test)
-		}
-	}
-}
-
-func TestDateString(t *testing.T) {
-	PST := time.FixedZone("PST", -8*60*60)
-	cases := []time.Time{
-		time.Date(1998, 12, 23, 19, 52, 0, 0, PST),
-		time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
-		time.Date(2020, 12, 24, 16, 30, 12, 0, time.FixedZone("", 90*60)),
-	}
-	for _, test := range cases {
-		enc := Date(test)
-		out, err := enc.AsDate()
-		if err != nil {
-			t.Error(err)
-		} else if !test.Equal(out) {
-			fmt.Println(test, string(enc), out)
-			t.Errorf("wrong time: %s != %s", out, test)
-		}
-	}
-}
-
-func TestDecodeDate(t *testing.T) {
-	cases := []string{
-		"D:19981223195200-08'00'",
-		"D:20000101000000Z",
-		"D:20201224163012+01'30'",
-		"D:20010809191510 ", // trailing space, seen in some PDF files
-	}
-	for i, test := range cases {
-		enc := TextString(test)
-		_, err := enc.AsDate()
-		if err != nil {
-			t.Errorf("%d %q %s\n", i, test, err)
-		}
-	}
-}
-
 func TestDict(t *testing.T) {
 	d := Dict{
 		"good": Name("value"),
 		"bad":  nil,
 	}
 	buf := &bytes.Buffer{}
-	err := d.PDF(buf)
+	err := Format(buf, 0, d)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,6 +162,7 @@ func TestDict(t *testing.T) {
 		t.Error("nil entry in dict")
 	}
 }
+
 func TestFormatStreamEncrypted(t *testing.T) {
 	testData := "cleartext data"
 

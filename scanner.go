@@ -64,7 +64,7 @@ func (s *scanner) currentPos() int64 {
 	return s.filePos + int64(s.bufPos)
 }
 
-func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
+func (s *scanner) ReadIndirectObject() (Native, Reference, error) {
 	number, err := s.ReadInteger()
 	if err != nil {
 		return nil, 0, err
@@ -151,7 +151,7 @@ func (s *scanner) ReadIndirectObject() (Object, Reference, error) {
 	return obj, ref, nil
 }
 
-func (s *scanner) ReadObject() (Object, error) {
+func (s *scanner) ReadObject() (Native, error) {
 	buf, err := s.Peek(5) // len("false") == 5
 	if err != nil {
 		return nil, err
@@ -244,7 +244,7 @@ func (s *scanner) ReadInteger() (Integer, error) {
 }
 
 // ReadNumber reads an integer or real number.
-func (s *scanner) ReadNumber() (Object, error) {
+func (s *scanner) ReadNumber() (Native, error) {
 	hasDot := false
 	first := true
 	var res []byte

@@ -33,7 +33,7 @@ type Getter interface {
 	// The argument canObjStm specifies whether the object may be read from an
 	// object stream.  Normally, this should be set to true.  If canObjStm is
 	// false and the object is in an object stream, an error is returned.
-	Get(ref Reference, canObjStm bool) (Object, error)
+	Get(ref Reference, canObjStm bool) (Native, error)
 }
 
 // Resolve resolves references to indirect objects.
@@ -47,40 +47,45 @@ type Getter interface {
 // [MalformedFileError].
 //
 // TODO(voss): rename to "Get"?
-func Resolve(r Getter, obj Object) (Object, error) {
+func Resolve(r Getter, obj Object) (Native, error) {
 	return resolve(r, obj, true)
 }
 
-func resolve(r Getter, obj Object, canObjStm bool) (Object, error) {
-	origObj := obj
+func resolve(r Getter, obj Object, canObjStm bool) (Native, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	ref, isReference := obj.(Reference)
+	if !isReference {
+		// TODO(voss): which options should be used here?
+		return obj.AsPDF(0), nil
+	}
+
+	origRef := ref
 
 	count := 0
 	for {
-		ref, isReference := obj.(Reference)
-		if !isReference {
-			break
-		}
 		count++
 		if count > 16 {
 			return nil, &MalformedFileError{
 				Err: errors.New("too many levels of indirection"),
-				Loc: []string{"object " + origObj.(Reference).String()},
+				Loc: []string{"object " + origRef.String()},
 			}
 		}
 
-		var err error
-		obj, err = r.Get(ref, canObjStm)
+		next, err := r.Get(ref, canObjStm)
 		if err != nil {
 			return nil, err
 		}
+		ref, isReference = next.(Reference)
+		if !isReference {
+			return next, nil
+		}
 	}
-
-	return obj, nil
 }
 
-func resolveAndCast[T Object](r Getter, obj Object) (T, error) {
-	var x T
-
+func resolveAndCast[T Native](r Getter, obj Object) (x T, err error) {
 	resolved, err := Resolve(r, obj)
 	if err != nil {
 		return x, err
@@ -251,6 +256,7 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 // Putter represents a PDF file opened for writing.
 type Putter interface {
 	GetMeta() *MetaInfo
+	GetOptions() OutputOptions
 
 	Alloc() Reference
 
@@ -278,6 +284,6 @@ func IsTagged(pdf Putter) bool {
 }
 
 // GetVersion returns the PDF version used in a PDF file.
-func GetVersion(pdf Putter) Version {
+func GetVersion(pdf interface{ GetMeta() *MetaInfo }) Version {
 	return pdf.GetMeta().Version
 }

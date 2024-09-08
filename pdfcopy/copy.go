@@ -45,7 +45,7 @@ func NewCopier(w pdf.Putter, r pdf.Getter) *Copier {
 // Copy copies an object from the source file to the target file, recursively.
 //
 // The returned object is guaranteed to be the same type as the input object,
-func (c *Copier) Copy(obj pdf.Object) (pdf.Object, error) {
+func (c *Copier) Copy(obj pdf.Native) (pdf.Native, error) {
 	switch x := obj.(type) {
 	case pdf.Dict:
 		return c.CopyDict(x)
@@ -72,7 +72,7 @@ func (c *Copier) Copy(obj pdf.Object) (pdf.Object, error) {
 func (c *Copier) CopyDict(obj pdf.Dict) (pdf.Dict, error) {
 	res := pdf.Dict{}
 	for key, val := range obj {
-		repl, err := c.Copy(val)
+		repl, err := c.Copy(val.AsPDF(c.w.GetOptions()))
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func (c *Copier) CopyDict(obj pdf.Dict) (pdf.Dict, error) {
 func (c *Copier) CopyArray(obj pdf.Array) (pdf.Array, error) {
 	var res pdf.Array
 	for _, val := range obj {
-		repl, err := c.Copy(val)
+		repl, err := c.Copy(val.AsPDF(c.w.GetOptions()))
 		if err != nil {
 			return nil, err
 		}

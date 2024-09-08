@@ -252,7 +252,7 @@ func toRunes(obj postscript.Object) ([]rune, error) {
 	return utf16.Decode(buf), nil
 }
 
-func (c *ToUnicodeInfo) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (c *ToUnicodeInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)

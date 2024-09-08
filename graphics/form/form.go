@@ -36,7 +36,7 @@ func (f *Form) IsDirect() bool {
 	return f.Resources.IsDirect() && f.Properties.IsDirect()
 }
 
-func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Object, pdf.Unused, error) {
+func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if !f.IsDirect() && f.RM != rm {
 		return nil, zero, errors.New("Form: resource manager mismatch")
