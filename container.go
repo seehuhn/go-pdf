@@ -253,26 +253,8 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 	return res, nil
 }
 
-// Putter represents a PDF file opened for writing.
-type Putter interface {
-	GetMeta() *MetaInfo
-	GetOptions() OutputOptions
-
-	Alloc() Reference
-
-	Put(ref Reference, obj Object) error
-
-	// TODO(voss): allow to set the object ID for the containing stream?
-	// TODO(voss): rename to PutCompressed?
-	WriteCompressed(refs []Reference, objects ...Object) error
-
-	OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error)
-
-	Close() error
-}
-
 // IsTagged returns true, if the PDF file is "tagged".
-func IsTagged(pdf Putter) bool {
+func IsTagged(pdf *Writer) bool {
 	// TODO(voss): what can we do if catalog.MarkInfo is an indirect object?
 	catalog := pdf.GetMeta().Catalog
 	markInfo, _ := catalog.MarkInfo.(Dict)

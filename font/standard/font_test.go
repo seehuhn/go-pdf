@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 )
 
 // TestEmbedBuiltin tests that the 14 standard PDF fonts can be
@@ -30,7 +31,7 @@ import (
 func TestEmbedBuiltin(t *testing.T) {
 	for _, G := range All {
 		t.Run(string(G), func(t *testing.T) {
-			data := pdf.NewData(pdf.V1_7)
+			data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(data)
 
 			F, err := G.New(nil)
@@ -80,7 +81,7 @@ func TestEmbedBuiltin(t *testing.T) {
 // TestExtractBuiltin tests that one of the 14 standard PDF fonts,
 // once embedded, can be extracted again.
 func TestExtractBuiltin(t *testing.T) {
-	data := pdf.NewData(pdf.V1_7)
+	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	ref := data.Alloc()
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),

@@ -113,7 +113,7 @@ func readChildren(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference
 }
 
 // Write writes the outline tree to the PDF file and installs it in the catalog.
-func (tree *Tree) Write(w pdf.Putter) error {
+func (tree *Tree) Write(w *pdf.Writer) error {
 	if tree == nil {
 		return nil
 	}
@@ -145,7 +145,7 @@ func (tree *Tree) Write(w pdf.Putter) error {
 }
 
 type writer struct {
-	out     pdf.Putter
+	out     *pdf.Writer
 	root    *Tree
 	refs    []pdf.Reference
 	objs    []pdf.Object

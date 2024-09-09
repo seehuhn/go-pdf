@@ -31,12 +31,13 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/reader"
 )
 
 func TestGlyphWidths(t *testing.T) {
-	data := pdf.NewData(pdf.V1_7)
+	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	F, err := standard.TimesRoman.New(nil)
@@ -107,7 +108,7 @@ func TestGlyphWidths(t *testing.T) {
 func TestSpaceAdvance(t *testing.T) {
 	t.Skip() // TODO(voss): re-enable this test once TextShowGlyphs is fixed.
 
-	data := pdf.NewData(pdf.V2_0)
+	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	F, err := gofont.Regular.New(nil)

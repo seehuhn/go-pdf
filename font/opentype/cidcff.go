@@ -36,7 +36,7 @@ import (
 )
 
 type embeddedCFFComposite struct {
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 
 	sfnt *sfnt.Font
@@ -215,7 +215,7 @@ func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictCFFComposite
 // Embed adds a composite OpenType/CFF font to a PDF file.
 // This implements the [font.Dict] interface.
 // This is the reverse of [ExtractCFFComposite]
-func (info *FontDictCFFComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictCFFComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return err

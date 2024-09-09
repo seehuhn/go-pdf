@@ -29,11 +29,11 @@ import (
 type Copier struct {
 	trans map[pdf.Reference]pdf.Reference
 	r     pdf.Getter
-	w     pdf.Putter
+	w     *pdf.Writer
 }
 
 // NewCopier creates a new Copier.
-func NewCopier(w pdf.Putter, r pdf.Getter) *Copier {
+func NewCopier(w *pdf.Writer, r pdf.Getter) *Copier {
 	c := &Copier{
 		trans: make(map[pdf.Reference]pdf.Reference),
 		w:     w,
@@ -86,9 +86,13 @@ func (c *Copier) CopyDict(obj pdf.Dict) (pdf.Dict, error) {
 func (c *Copier) CopyArray(obj pdf.Array) (pdf.Array, error) {
 	var res pdf.Array
 	for _, val := range obj {
-		repl, err := c.Copy(val.AsPDF(c.w.GetOptions()))
-		if err != nil {
-			return nil, err
+		var repl pdf.Native
+		if val != nil {
+			var err error
+			repl, err = c.Copy(val.AsPDF(c.w.GetOptions()))
+			if err != nil {
+				return nil, err
+			}
 		}
 		res = append(res, repl)
 	}

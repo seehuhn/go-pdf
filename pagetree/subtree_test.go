@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 )
 
 func TestSubtree(t *testing.T) {
@@ -280,7 +281,7 @@ func FuzzInherit(f *testing.F) {
 			}
 		}
 
-		doc := pdf.NewData(pdf.V1_7)
+		doc, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 		pp := NewWriter(doc)
 		for i, c := range data {
 			dict := pdf.Dict{

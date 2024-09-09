@@ -253,7 +253,7 @@ func glyphBoxtoPDF(b funit.Rect16, fMat []float64) pdf.Rectangle {
 }
 
 type embeddedSimple struct {
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 
 	psFont     *type1.Font

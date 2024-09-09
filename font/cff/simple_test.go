@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/makefont"
 )
 
@@ -60,7 +61,7 @@ func TestRoundTripSimple(t *testing.T) {
 		IsAllCap:  true, // Just for testing
 	}
 
-	rw := pdf.NewData(pdf.V1_7)
+	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	ref := rw.Alloc()
 	err = info1.Embed(rw, ref)
 	if err != nil {

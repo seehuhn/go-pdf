@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 )
 
 func TestMarkedContentInline(t *testing.T) {
@@ -37,7 +38,7 @@ func TestMarkedContentInline(t *testing.T) {
 		{pdf.Dict{"X": pdf.Integer(1)}, "/test <</X 1>> DP\n", nil},
 		{pdf.Dict{"X": pdf.NewReference(1, 0)}, "", graphics.ErrNotDirect},
 	}
-	data := pdf.NewData(pdf.V1_7)
+	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("test%02d", i), func(t *testing.T) {

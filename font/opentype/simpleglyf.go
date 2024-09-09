@@ -38,7 +38,7 @@ import (
 )
 
 type embeddedGlyfSimple struct {
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 
 	sfnt *sfnt.Font
@@ -136,7 +136,7 @@ type FontDictGlyfSimple struct {
 // Embed adds the font to a PDF file.
 //
 // This implements the [font.Dict] interface.
-func (info *FontDictGlyfSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictGlyfSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return err

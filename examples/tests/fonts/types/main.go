@@ -229,7 +229,7 @@ func doit() error {
 				return err
 			}
 
-			fontDict, err := pdf.GetDict(doc.Out.(*pdf.Writer), refY)
+			fontDict, err := pdf.GetDict(doc.Out, refY)
 			if err != nil {
 				return err
 			}
@@ -240,11 +240,11 @@ func doit() error {
 
 			df := fontDict["DescendantFonts"]
 			if df != nil {
-				dfArray, err := pdf.GetArray(doc.Out.(*pdf.Writer), df)
+				dfArray, err := pdf.GetArray(doc.Out, df)
 				if err != nil {
 					return err
 				}
-				cidFontDict, err := pdf.GetDict(doc.Out.(*pdf.Writer), dfArray[0])
+				cidFontDict, err := pdf.GetDict(doc.Out, dfArray[0])
 				if err != nil {
 					return err
 				}
@@ -257,7 +257,7 @@ func doit() error {
 			}
 
 			if fd != nil {
-				fdDict, err := pdf.GetDict(doc.Out.(*pdf.Writer), fd)
+				fdDict, err := pdf.GetDict(doc.Out, fd)
 				if err != nil {
 					return err
 				}
@@ -267,7 +267,7 @@ func doit() error {
 
 				ff := fdDict[ffKey]
 				if ff != nil {
-					ffStream, err := pdf.GetStream(doc.Out.(*pdf.Writer), ff)
+					ffStream, err := pdf.GetStream(doc.Out, ff)
 					if err != nil {
 						return err
 					}
@@ -280,7 +280,7 @@ func doit() error {
 			}
 
 			if title == "Type3 Fonts" {
-				cp, err := pdf.GetDict(doc.Out.(*pdf.Writer), fontDict["CharProcs"])
+				cp, err := pdf.GetDict(doc.Out, fontDict["CharProcs"])
 				if err != nil {
 					return err
 				}

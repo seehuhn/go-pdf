@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
@@ -58,7 +59,7 @@ func TestRoundTripSimple(t *testing.T) {
 		ForceBold:  true, // just for testing
 	}
 
-	rw := pdf.NewData(pdf.V1_7)
+	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	ref := rw.Alloc()
 	err = info1.Embed(rw, ref)
 	if err != nil {

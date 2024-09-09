@@ -16,46 +16,24 @@
 
 package pdfcopy
 
-import (
-	"testing"
+import "seehuhn.de/go/pdf"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
-)
-
-func TestCopyReference(t *testing.T) {
-	// build a chain of references: c -> b -> a -> 42
-	orig, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
-	a := orig.Alloc()
-	err := orig.Put(a, pdf.Integer(42))
+// CopyStruct copies a struct from the source file to the target file.
+// For this to work, `data` must be a pointer to a struct, and must be
+// a valid argument to [pdf.AsDict].  Otherwise, the function panics.
+//
+// Once Go supports methods with type parameters, this function can be turned
+// into a method on [Copier].
+func CopyStruct[T any](c *Copier, data *T) (*T, error) {
+	oldDict := pdf.AsDict(data)
+	newDict, err := c.CopyDict(oldDict)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	b := orig.Alloc()
-	err = orig.Put(b, a)
+	newData := new(T)
+	err = pdf.DecodeDict(c.r, newData, newDict)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	c := orig.Alloc()
-	err = orig.Put(c, b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// copy the chain
-	dest, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
-	copier := NewCopier(dest, orig)
-	copiedC, err := copier.CopyReference(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// check that copied reference points to the correct object
-	obj, err := dest.Get(copiedC, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if obj != pdf.Integer(42) {
-		t.Fatalf("expected 42, got %v", obj)
-	}
+	return newData, nil
 }

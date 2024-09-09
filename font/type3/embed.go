@@ -57,7 +57,7 @@ type EmbedInfo struct {
 }
 
 // Embed implements the [font.Dict] interface.
-func (info *EmbedInfo) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *EmbedInfo) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	var compressedRefs []pdf.Reference
 	var compressedObjects []pdf.Object
 

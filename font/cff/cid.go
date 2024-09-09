@@ -221,7 +221,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, erro
 // Embed adds a composite CFF font to a PDF file.
 // This implements the [font.Dict] interface.
 // This is the reverse of [ExtractComposite]
-func (info *FontDictComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 	if err != nil {
 		return err

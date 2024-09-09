@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/sfnt/os2"
 )
 
@@ -53,7 +54,7 @@ func TestRoundTrip(t *testing.T) {
 		MissingWidth: 150,
 	}
 
-	data := pdf.NewData(pdf.V2_0)
+	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
 	fdDict := fd1.AsDict()
 	fdRef := data.Alloc()
 	err := data.Put(fdRef, fdDict)
@@ -128,7 +129,7 @@ func FuzzFontDescriptor(f *testing.F) {
 			t.Skip()
 		}
 
-		data := pdf.NewData(pdf.V2_0)
+		data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
 		fdDict = fd1.AsDict()
 		fdRef := data.Alloc()
 		err = data.Put(fdRef, fdDict)

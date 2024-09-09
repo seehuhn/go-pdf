@@ -50,14 +50,14 @@ type Unused struct{}
 // The ResourceManager must be closed with the [Close] method before the PDF
 // file is closed.
 type ResourceManager struct {
-	Out        Putter
+	Out        *Writer
 	embedded   map[any]embRes
 	needsClose []io.Closer
 	isClosed   bool
 }
 
 // NewResourceManager creates a new ResourceManager.
-func NewResourceManager(w Putter) *ResourceManager {
+func NewResourceManager(w *Writer) *ResourceManager {
 	return &ResourceManager{
 		Out:      w,
 		embedded: make(map[any]embRes),

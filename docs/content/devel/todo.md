@@ -6,11 +6,9 @@ weight = 100
 
 # TODO List
 
-## API
+## API
 
-- remove `pdf.Data` and use `*pdf.Writer` instead of `pdf.Putter` throughout?
-- splits `pdf.Object` into a class for primitive PDF objects (just the native types),
-  and a class for "objects who know how to turn themselves into PDF"?
+- remove `pdf.Data`, and use `*pdf.Writer` instead of `*pdf.Writer` throughout?
 
 ## General
 
@@ -50,4 +48,4 @@ weight = 100
 
 - make sure that unit tests don't leave stray files behind
 - when fuzzing PDF files, write the examples without compression
-- look into the VeraPDF test suite
+- look into the VeraPDF test suite, for comparison

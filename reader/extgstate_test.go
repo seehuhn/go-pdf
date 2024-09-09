@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
@@ -78,8 +79,8 @@ func TestExtGState(t *testing.T) {
 	ext1.Set |= graphics.StateBlackGeneration
 	ext1.UndercolorRemoval = pdf.Dict{
 		"FunctionType": pdf.Integer(0),
-		"Domain":       pdf.Array{pdf.Number(0), pdf.Number(1)},
-		"Range":        pdf.Array{pdf.Number(0), pdf.Number(1)},
+		"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+		"Range":        pdf.Array{pdf.Integer(0), pdf.Integer(1)},
 	}
 	ext1.Set |= graphics.StateUndercolorRemoval
 	ext1.TransferFunction = pdf.Name("Default")
@@ -87,8 +88,8 @@ func TestExtGState(t *testing.T) {
 	ext1.Halftone = pdf.Dict{
 		"Type":         pdf.Name("Halftone"),
 		"HalftoneType": pdf.Integer(1),
-		"Frequency":    pdf.Number(120),
-		"Angle":        pdf.Number(30),
+		"Frequency":    pdf.Integer(120),
+		"Angle":        pdf.Integer(30),
 		"SpotFunction": pdf.Name("Round"),
 	}
 	ext1.Set |= graphics.StateHalftone
@@ -106,7 +107,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	// step 1: embed this graphics state into a PDF file
-	data := pdf.NewData(pdf.V1_7)
+	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	ext1Ref, ext1embedded, err := pdf.ResourceManagerEmbed(rm, ext1)

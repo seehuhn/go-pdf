@@ -27,7 +27,7 @@ import (
 )
 
 // Embed adds the ToUnicode cmap to a PDF file.
-func (info *ToUnicode) Embed(w pdf.Putter, ref pdf.Reference) error {
+func (info *ToUnicode) Embed(w *pdf.Writer, ref pdf.Reference) error {
 	stm, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err

@@ -25,12 +25,13 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
 // TODO(voss): remove
 type Dict interface {
-	Embed(w pdf.Putter, fontDictRef pdf.Reference) error
+	Embed(w *pdf.Writer, fontDictRef pdf.Reference) error
 }
 
 var (
@@ -50,7 +51,7 @@ var (
 func TestSpaceIsBlank(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
-			data := pdf.NewData(pdf.V1_7)
+			data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(data)
 
 			F := sample.MakeFont(rm)

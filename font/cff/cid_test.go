@@ -24,8 +24,10 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestRoundTripComposite(t *testing.T) {
@@ -49,7 +51,7 @@ func TestRoundTripComposite(t *testing.T) {
 		m[code] = []rune{'X', '0' + rune(code)}
 	}
 	toUnicode := cmap.NewToUnicode(cs, m)
-	info := &FontDictComposite{
+	info1 := &FontDictComposite{
 		Font:       otf.AsCFF(),
 		SubsetTag:  "ABCDEF",
 		CMap:       cmapInfo,
@@ -62,9 +64,10 @@ func TestRoundTripComposite(t *testing.T) {
 		IsScript:   otf.IsScript,
 	}
 
-	rw := pdf.NewData(pdf.V1_7)
+	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+
 	ref := rw.Alloc()
-	err := info.Embed(rw, ref)
+	err := info1.Embed(rw, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,14 +83,25 @@ func TestRoundTripComposite(t *testing.T) {
 
 	// The floating point numbers in the glyphs may be represented differently.
 	// Let's hope the Glyphs are ok.
-	info.Font.Glyphs = nil
-	info2.Font.Glyphs = nil
+	for i := range info1.Font.Glyphs {
+		info1.Font.Glyphs[i].Cmds = nil
+	}
+	for i := range info2.Font.Glyphs {
+		info2.Font.Glyphs[i].Cmds = nil
+	}
 
 	// Functions are difficult to compare.
-	info.Font.FDSelect = nil
+	for i := range info1.Font.Glyphs {
+		gid := glyph.ID(i)
+		if info1.Font.FDSelect(gid) != info2.Font.FDSelect(gid) {
+			t.Errorf("FDSelect mismatch for glyph %d: %d != %d",
+				i, info1.Font.FDSelect(gid), info2.Font.FDSelect(gid))
+		}
+	}
+	info1.Font.FDSelect = nil
 	info2.Font.FDSelect = nil
 
-	if d := cmp.Diff(info, info2); d != "" {
+	if d := cmp.Diff(info1, info2); d != "" {
 		t.Errorf("info mismatch (-want +got):\n%s", d)
 	}
 }

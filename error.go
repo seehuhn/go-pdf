@@ -118,7 +118,7 @@ type VersionError struct {
 // CheckVersion checks whether the PDF file being written has version
 // minVersion or later.  If the version is new enough, nil is returned.
 // Otherwise a [VersionError] for the given operation is returned.
-func CheckVersion(pdf Putter, operation string, minVersion Version) error {
+func CheckVersion(pdf *Writer, operation string, minVersion Version) error {
 	if pdf.GetMeta().Version >= minVersion {
 		return nil
 	}

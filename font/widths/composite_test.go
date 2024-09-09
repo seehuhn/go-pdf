@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 
 	"seehuhn.de/go/pdf"
 )
@@ -130,7 +131,7 @@ func TestWidthsRoundTrip(t *testing.T) {
 		4: 1100,
 	}
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		data := pdf.NewData(v)
+		data, _ := tempfile.NewTempWriter(v, nil)
 		for _, wIn := range []map[cmap.CID]float64{w1, w2, w3, w4} {
 			ww, dw0 := EncodeComposite(wIn, pdf.GetVersion(data))
 			wOut, dw, err := DecodeComposite(data, ww, dw0)

@@ -37,7 +37,7 @@ import (
 )
 
 type embeddedGlyfComposite struct {
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 	*font.Geometry
 
@@ -148,7 +148,7 @@ type FontDictGlyfComposite struct {
 // Embed adds the font to the PDF file.
 //
 // This implements the [font.Dict] interface.
-func (info *FontDictGlyfComposite) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictGlyfComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_6)
 	if err != nil {
 		return err

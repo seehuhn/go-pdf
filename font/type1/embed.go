@@ -185,7 +185,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 }
 
 // Embed implements the [font.Dict] interface.
-func (info *FontDict) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	postScriptName := info.PostScriptName()
 	fontName := postScriptName
 	if info.SubsetTag != "" {

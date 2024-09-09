@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 )
 
 func TestRead(t *testing.T) {
@@ -36,7 +37,7 @@ func TestRead(t *testing.T) {
 		tree1.Data = append(tree1.Data, numTreeNode{Key: i, Value: pdf.Integer(i)})
 	}
 
-	w := pdf.NewData(pdf.V1_7)
+	w, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	ref, err := Write(w, tree1)
 	if err != nil {
 		t.Fatal(err)

@@ -26,7 +26,7 @@ import (
 
 // Writer writes a page tree to a PDF file.
 type Writer struct {
-	Out pdf.Putter
+	Out *pdf.Writer
 
 	isClosed bool
 
@@ -64,7 +64,7 @@ type Writer struct {
 }
 
 // NewWriter creates a new page tree which adds pages to the PDF document w.
-func NewWriter(w pdf.Putter) *Writer {
+func NewWriter(w *pdf.Writer) *Writer {
 	t := &Writer{
 		Out:            w,
 		nextPageNumber: &futureInt{},

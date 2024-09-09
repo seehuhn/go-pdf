@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/postscript"
 )
 
-func (info *Info) Embed(w pdf.Putter, ref pdf.Reference, other map[string]pdf.Reference) error {
+func (info *Info) Embed(w *pdf.Writer, ref pdf.Reference, other map[string]pdf.Reference) error {
 	dict := pdf.Dict{
 		"Type":     pdf.Name("CMap"),
 		"CMapName": pdf.Name(info.Name),

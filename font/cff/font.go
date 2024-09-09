@@ -198,7 +198,7 @@ func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []pdf.Rectangle {
 }
 
 type embedded struct {
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 
 	sfnt *sfnt.Font

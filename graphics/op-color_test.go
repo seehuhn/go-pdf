@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 )
 
 func TestSetColor(t *testing.T) {
@@ -51,7 +52,7 @@ func TestSetColor(t *testing.T) {
 	for i, ci := range colors {
 		for j, cj := range colors {
 			t.Run(fmt.Sprintf("S-%d-%d", i, j), func(t *testing.T) {
-				data := pdf.NewData(pdf.V2_0)
+				data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
 				rm := pdf.NewResourceManager(data)
 				buf := &bytes.Buffer{}
 				w := NewWriter(buf, rm)

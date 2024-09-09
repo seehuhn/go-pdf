@@ -24,7 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-func Write(w pdf.Putter, tree Tree) (pdf.Reference, error) {
+func Write(w *pdf.Writer, tree Tree) (pdf.Reference, error) {
 	sw := NewSequentialWriter(w)
 	pos, err := tree.First()
 	if err != nil {
@@ -57,12 +57,12 @@ func Write(w pdf.Putter, tree Tree) (pdf.Reference, error) {
 // TODO(voss): write an actual tree
 
 type SequentialWriter struct {
-	w    pdf.Putter
+	w    *pdf.Writer
 	ref  pdf.Reference
 	data map[pdf.Integer]pdf.Object
 }
 
-func NewSequentialWriter(w pdf.Putter) *SequentialWriter {
+func NewSequentialWriter(w *pdf.Writer) *SequentialWriter {
 	sw := &SequentialWriter{
 		w:    w,
 		ref:  w.Alloc(),

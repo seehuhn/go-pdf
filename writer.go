@@ -268,6 +268,12 @@ func (pdf *Writer) Close() error {
 		trailer["Info"] = infoRef
 	}
 
+	if pdf.meta.ID != nil {
+		trailer["ID"] = Array{String(pdf.meta.ID[0]), String(pdf.meta.ID[1])}
+	} else {
+		delete(trailer, "ID")
+	}
+
 	// don't encrypt the encryption dictionary and the xref dict
 	pdf.w.enc = nil
 

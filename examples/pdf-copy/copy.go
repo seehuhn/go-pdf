@@ -49,36 +49,26 @@ func main() {
 	}
 	defer r.Close()
 
-	out, err := os.Create("out.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer out.Close()
-
-	w, err := pdf.NewWriter(out, r.GetMeta().Version, nil)
+	w, err := pdf.Create("out.pdf", pdf.GetVersion(r), nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	trans := pdfcopy.NewCopier(w, r)
 
-	catalog := r.GetMeta().Catalog
+	newCatalog, err := pdfcopy.CopyStruct(trans, r.GetMeta().Catalog)
+	if err != nil {
+		log.Fatal(err)
+	}
+	w.GetMeta().Catalog = newCatalog
 
-	catDict := pdf.AsDict(catalog)
+	newInfo, err := pdfcopy.CopyStruct(trans, r.GetMeta().Info)
 	if err != nil {
 		log.Fatal(err)
 	}
-	newCatDict, err := trans.CopyDict(catDict)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = pdf.DecodeDict(r, catalog, newCatDict)
-	if err != nil {
-		log.Fatal(err)
-	}
+	w.GetMeta().Info = newInfo
 
-	w.GetMeta().Info = r.GetMeta().Info
-	w.GetMeta().Catalog = catalog
+	w.GetMeta().ID = r.GetMeta().ID
 
 	err = w.Close()
 	if err != nil {

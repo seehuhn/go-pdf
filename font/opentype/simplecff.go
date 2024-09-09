@@ -38,7 +38,7 @@ import (
 )
 
 type embeddedCFFSimple struct {
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 	*font.Geometry
 
@@ -214,7 +214,7 @@ func ExtractCFFSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictCFFSimple, erro
 // Embed adds the font to a PDF file.
 // This implements the [font.Dict] interface.
 // This is the reverse of [ExtractCFFSimple]
-func (info *FontDictCFFSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictCFFSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple OpenType/CFF fonts", pdf.V1_6)
 	if err != nil {
 		return err

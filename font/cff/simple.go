@@ -216,7 +216,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictSimple, error) {
 // Embed adds the font to a PDF file.
 // This implements the [font.Dict] interface.
 // This is the reverse of [ExtractSimple].
-func (info *FontDictSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple CFF fonts", pdf.V1_2)
 	if err != nil {
 		return err

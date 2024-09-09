@@ -39,7 +39,7 @@ import (
 )
 
 type embeddedSimple struct {
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 
 	sfnt *sfnt.Font
@@ -208,7 +208,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictSimple, error) {
 // Embed adds the font to a PDF file.
 // This implements the [font.Dict] interface.
 // This is the reverse of [ExtractSimple]
-func (info *FontDictSimple) Embed(w pdf.Putter, fontDictRef pdf.Reference) error {
+func (info *FontDictSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 	if err != nil {
 		return err

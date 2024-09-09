@@ -119,7 +119,7 @@ type embedded struct {
 	*Font
 	GlyphNames []string
 
-	w   pdf.Putter
+	w   *pdf.Writer
 	ref pdf.Reference
 
 	*encoding.SimpleEncoder

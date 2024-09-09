@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/makefont"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -56,7 +57,7 @@ func TestRoundTripCFFSimple(t *testing.T) {
 		ToUnicode: toUnicode,
 	}
 
-	rw := pdf.NewData(pdf.V1_7)
+	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 	ref := rw.Alloc()
 	err = info1.Embed(rw, ref)
 	if err != nil {

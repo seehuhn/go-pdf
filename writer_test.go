@@ -277,5 +277,24 @@ func TestWriterGet(t *testing.T) {
 	}
 }
 
-// compile time test
-var _ Putter = &Writer{}
+func TestWriter_ID(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V2_0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
+	w.GetMeta().ID = [][]byte{[]byte("0123456789abcdef"), []byte("0123456789ABCDEF")}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(r.meta.ID, w.meta.ID) {
+		t.Errorf("expected %v, got %v", w.meta.ID, r.meta.ID)
+	}
+}

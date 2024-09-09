@@ -25,10 +25,11 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/internal/debug/tempfile"
 )
 
 func TestRoundTrip(t *testing.T) {
-	rw := pdf.NewData(pdf.V1_7)
+	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
 
 	glyphs := make(map[string]pdf.Reference)
 	glyphs["A"] = rw.Alloc()

@@ -43,7 +43,7 @@ type Page struct {
 
 	// Out is the PDF file which contains this page.
 	// This can be used to embed fonts, images, etc.
-	Out pdf.Putter
+	Out *pdf.Writer
 
 	// Ref, if non-nil, is the pdf reference for this page.
 	// This can be set by the user, to use a specific reference.
