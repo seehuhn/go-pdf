@@ -187,7 +187,6 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			lookup = data
 		default:
 			d.MarkAsInvalid()
-			break
 		}
 		res = &SpaceIndexed{
 			NumCol: int(hiVal) + 1,

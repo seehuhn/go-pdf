@@ -154,7 +154,7 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// os.WriteFile(fmt.Sprintf("xxx%d.pdf", i), buf.Bytes(), 0o666)
+			// os.WriteFile(fmt.Sprintf("debug%d.pdf", i), buf.Bytes(), 0o666)
 
 			var pwdList []string
 			if userFirst {
@@ -554,5 +554,49 @@ func TestPerm(t *testing.T) {
 			t.Errorf("perm=%07b P1=%012b P2=%012b diff=%012b",
 				perm, P&mask, P2&mask, P^P2)
 		}
+	}
+}
+
+// TestAuthEmbed tests that encryption information is correctly embedded in the
+// PDF file.
+func TestAuthEmbed(t *testing.T) {
+	ref := NewReference(1, 2)
+
+	opt := &WriterOptions{
+		UserPassword:  "A",
+		OwnerPassword: "B",
+	}
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(ref, TextString("Hello, World!"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	passWordRequired := false
+	rOpt := &ReaderOptions{
+		ReadPassword: func([]byte, int) string {
+			passWordRequired = true
+			return "A"
+		},
+		ErrorHandling: ErrorHandlingReport,
+	}
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), rOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.Get(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !passWordRequired {
+		t.Error("password not required")
 	}
 }

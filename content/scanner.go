@@ -524,15 +524,6 @@ func parseNumber(s []byte) (pdf.Object, error) {
 	return nil, &scannerError{fmt.Sprintf("invalid number %q", s)}
 }
 
-// operator is a PDF operator found in a content stream.
-type operator pdf.Name
-
-// PDF implements the [pdf.Object] interface.
-func (x operator) PDF(w io.Writer) error {
-	_, err := w.Write([]byte(x))
-	return err
-}
-
 type characterClass byte
 
 const (
