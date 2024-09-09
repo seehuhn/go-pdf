@@ -118,8 +118,8 @@ func FuzzExtract(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		// fmt.Println("writing out.pdf")
-		// fd, err := os.Create("out.pdf")
+		// fmt.Println("writing debug.pdf")
+		// fd, err := os.Create("debug.pdf")
 		// if err != nil {
 		// 	t.Fatal(err)
 		// }

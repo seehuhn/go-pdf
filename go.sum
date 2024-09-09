@@ -44,7 +44,7 @@ seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a h1:AonqL6dUBDUJu06ueS8G44KV
 seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a/go.mod h1:wOBOA24OpXamCfQt//QaJnvlLdQFSTAq4525fJRcem8=
 seehuhn.de/go/postscript v0.5.1-0.20240824115221-0d3d1d4bb61d h1:28bEJwqqFTcj71MUrqNMZHkMDDqO19rRNceI4LbKrDo=
 seehuhn.de/go/postscript v0.5.1-0.20240824115221-0d3d1d4bb61d/go.mod h1:oI/cQ3O8x71fcncl2go6nnoCL73XOLel7D70SqkVyZg=
-seehuhn.de/go/sfnt v0.5.1-0.20240824115421-340e2e11e6de h1:EIsrmtN4TOpsnn6xdyrMHm3W+gRg2GLvStK8Fu+FPtc=
-seehuhn.de/go/sfnt v0.5.1-0.20240824115421-340e2e11e6de/go.mod h1:eNVAWX0znX7H0qi5jwHPsOoWRlDVZD7V0dFr0TU0zZ8=
+seehuhn.de/go/sfnt v0.5.1-0.20240909011524-1d1205bec1e0 h1:r3GHC/JIcMwnDYkJWQ/JTqZOhrAnVb7GU0+0vVQ8DtI=
+seehuhn.de/go/sfnt v0.5.1-0.20240909011524-1d1205bec1e0/go.mod h1:eNVAWX0znX7H0qi5jwHPsOoWRlDVZD7V0dFr0TU0zZ8=
 seehuhn.de/go/xmp v0.3.0 h1:663c5gVv5fJfpKFpWKE0d/LlnPaPXJpD6WHRSEnESzo=
 seehuhn.de/go/xmp v0.3.0/go.mod h1:SrC9BllbJBp04/oRT6saWHvy0Eg9rxnRam/1BRIHp8E=

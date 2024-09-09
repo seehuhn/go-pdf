@@ -111,10 +111,14 @@ func (f *embeddedComposite) Close() error {
 		subsetCFF.GIDToCID = nil
 	} else { // Make the font CID-keyed.
 		subsetCFF.Encoding = nil
+		var sup int32
+		if ros.Supplement > 0 && ros.Supplement < 0x1000_0000 {
+			sup = int32(ros.Supplement)
+		}
 		subsetCFF.ROS = &cff.CIDSystemInfo{
 			Registry:   ros.Registry,
 			Ordering:   ros.Ordering,
-			Supplement: int64(ros.Supplement),
+			Supplement: sup,
 		}
 		subsetCFF.GIDToCID = gidToCID
 	}
