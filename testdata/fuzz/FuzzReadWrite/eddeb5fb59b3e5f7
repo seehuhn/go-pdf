@@ -1,2 +1,0 @@
-go test fuzz v1
-[]byte("%PDF-1.7X7120102+0 obj << /Pages 0 00R %0000000000000\n>> endobj00 0obj <</DecodeParms<< /Columns 2 /Predictor 10>> /Filter /FlateDecode/Length 20 /Root 2 0R /Size 4  /W[1 1 0] >>stream\nx\xdab00\x00!F~&0000000000  endstream endobjstartxref64")

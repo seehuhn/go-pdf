@@ -249,7 +249,7 @@ func (pdf *Writer) Close() error {
 		return errors.New("Close() while stream is open")
 	}
 
-	trailer := pdf.meta.Trailer
+	trailer := pdf.meta.Trailer.Clone()
 
 	catRef := pdf.Alloc()
 	err := pdf.Put(catRef, AsDict(pdf.meta.Catalog))
@@ -428,9 +428,9 @@ func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
 // WriteCompressed writes a number of objects to the file as a compressed
 // object stream.
 //
-// Object streams are only available for PDF version 1.5 and newer; in case the
-// file version is too low, the objects are written directly into the PDF file,
-// without compression.
+// Object streams are only available for PDF version 1.5 and newer; in case
+// object streams are not available, the objects are written directly into the
+// PDF file, without compression.
 func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	if pdf.inStream {
 		return errors.New("WriteCompressed() while stream is open")

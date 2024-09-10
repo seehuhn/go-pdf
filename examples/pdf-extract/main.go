@@ -117,7 +117,7 @@ func extractPages(w io.Writer, inputFile string, pages *PageRange) error {
 
 	copy := pdfcopy.NewCopier(out, in)
 
-	for pageNo := pages.Start; pageNo <= pages.End; pageNo++ {
+	for pageNo := startPage; pageNo <= endPage; pageNo++ {
 		refIn, pageIn, err := pagetree.GetPage(in, pageNo-1)
 		if err != nil {
 			return err

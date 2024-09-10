@@ -38,8 +38,9 @@ type MetaInfo struct {
 	// dictionary.
 	Info *Info
 
-	// Trailer is the trailer dictionary for the file.
-	// All entries relating to the cross-reference table are omitted.
+	// Trailer is the trailer dictionary for the file. All entries relating to
+	// the cross-reference table, and the entries corresponding to the `ID`,
+	// `Catalog` and `Info` fields above, are omitted.
 	Trailer Dict
 }
 

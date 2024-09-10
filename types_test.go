@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -148,7 +149,7 @@ func FuzzString(f *testing.F) {
 	})
 }
 
-func TestDict(t *testing.T) {
+func TestDict_NilValue(t *testing.T) {
 	d := Dict{
 		"good": Name("value"),
 		"bad":  nil,
@@ -160,6 +161,91 @@ func TestDict(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "bad") {
 		t.Error("nil entry in dict")
+	}
+}
+
+func TestDict_SortedKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		d    Dict
+		want []Name
+	}{
+		{
+			name: "Empty dictionary",
+			d:    Dict{},
+			want: []Name{},
+		},
+		{
+			name: "Only Type",
+			d: Dict{
+				"Type": Integer(1),
+			},
+			want: []Name{"Type"},
+		},
+		{
+			name: "Only Subtype",
+			d: Dict{
+				"Subtype": Integer(1),
+			},
+			want: []Name{"Subtype"},
+		},
+		{
+			name: "Type and Subtype",
+			d: Dict{
+				"Type":    Integer(1),
+				"Subtype": Integer(2),
+			},
+			want: []Name{"Type", "Subtype"},
+		},
+		{
+			name: "Type, Subtype, and others",
+			d: Dict{
+				"Type":    Integer(1),
+				"Subtype": Integer(2),
+				"Z":       Integer(3),
+				"A":       Integer(4),
+			},
+			want: []Name{"Type", "Subtype", "A", "Z"},
+		},
+		{
+			name: "Only others",
+			d: Dict{
+				"Z": Integer(1),
+				"A": Integer(2),
+				"M": Integer(3),
+			},
+			want: []Name{"A", "M", "Z"},
+		},
+		{
+			name: "Mixed case with missing special keys",
+			d: Dict{
+				"Subtype": Integer(1),
+				"Z":       Integer(2),
+				"A":       Integer(3),
+			},
+			want: []Name{"Subtype", "A", "Z"},
+		},
+		{
+			name: "Case sensitivity test",
+			d: Dict{
+				"type":    Integer(1),
+				"Type":    Integer(2),
+				"subtype": Integer(3),
+				"Subtype": Integer(4),
+				"a":       Integer(5),
+				"A":       Integer(6),
+			},
+			want: []Name{"Type", "Subtype", "A", "a", "subtype", "type"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.d.SortedKeys()
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("Dict.SortedKeys() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

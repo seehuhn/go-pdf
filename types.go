@@ -667,6 +667,42 @@ func (x Dict) AsPDF(opt OutputOptions) Native {
 	return x
 }
 
+// Clone makes a shallow copy of the dictionary.
+func (x Dict) Clone() Dict {
+	if x == nil {
+		return nil
+	}
+
+	rea := make(Dict, len(x))
+	for k, v := range x {
+		rea[k] = v
+	}
+	return rea
+}
+
+// SortedKeys returns the keys of the dictionary in deterministic order.
+func (d Dict) SortedKeys() []Name {
+	keys := make([]Name, 0, len(d))
+
+	// put some special keys first
+	for _, key := range []Name{"Type", "Subtype"} { // this much match the loop below
+		if _, ok := d[key]; ok {
+			keys = append(keys, key)
+		}
+	}
+
+	// collect and sort the remaining keys
+	base := len(keys)
+	for k := range d {
+		if k != Name("Type") && k != Name("Subtype") {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys[base:])
+
+	return keys
+}
+
 // TODO(voss): remove this function
 func toDict(obj Object) (Dict, error) {
 	if obj == nil {

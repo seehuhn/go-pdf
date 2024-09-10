@@ -223,11 +223,15 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	}
 
 	// remove xref-related information from trailer dictionary
-	delete(trailer, "Size")
-	delete(trailer, "Prev")
 	delete(trailer, "Type")
+	delete(trailer, "Size")
 	delete(trailer, "Index")
+	delete(trailer, "Prev")
 	delete(trailer, "W")
+	// remove ID, Catalog, and Info from trailer dictionary
+	delete(trailer, "ID")
+	delete(trailer, "Root")
+	delete(trailer, "Info")
 	r.meta.Trailer = trailer
 
 	return r, nil

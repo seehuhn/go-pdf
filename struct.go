@@ -25,6 +25,9 @@ import (
 )
 
 // AsDict creates a PDF Dict object, encoding the fields of a Go struct.
+//
+// If the argument is nil, the result is nil.
+//
 // This is the converse of [DecodeDict].
 func AsDict(s interface{}) Dict {
 	if s == nil {

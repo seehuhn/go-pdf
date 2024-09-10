@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/internal/debug/tempfile"
-	"seehuhn.de/go/pdf/pdfcopy"
+	"seehuhn.de/go/pdf/walker"
 )
 
 type testFileSamples struct {
@@ -127,18 +127,24 @@ func FuzzEncrypted(f *testing.F) {
 			return
 		}
 		w1, tmpFile1 := tempfile.NewTempWriter(pdf.GetVersion(r1), nil)
-		trans := pdfcopy.NewCopier(w1, r1)
-		newCatalog, err := pdfcopy.CopyStruct(trans, r1.GetMeta().Catalog)
-		if err != nil {
-			return
+		walk := walker.New(r1)
+		for ref, obj := range walk.IndirectObjects() {
+			err = w1.Put(ref, obj)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
-		w1.GetMeta().Catalog = newCatalog
-		newInfo, err := pdfcopy.CopyStruct(trans, r1.GetMeta().Info)
-		if err != nil {
-			return
+		if walk.Err != nil {
+			t.Fatal(walk.Err)
 		}
-		w1.GetMeta().Info = newInfo
+		w1.GetMeta().Catalog = r1.GetMeta().Catalog
+		w1.GetMeta().Info = r1.GetMeta().Info
 		w1.GetMeta().ID = r1.GetMeta().ID
+		for key, val := range r1.GetMeta().Trailer {
+			if key != "Encrypt" {
+				w1.GetMeta().Trailer[key] = val
+			}
+		}
 		err = w1.Close()
 		if err != nil {
 			t.Fatal(err)
@@ -150,24 +156,31 @@ func FuzzEncrypted(f *testing.F) {
 			t.Fatal(err)
 		}
 		w2, tmpFile2 := tempfile.NewTempWriter(pdf.GetVersion(r2), nil)
-		trans = pdfcopy.NewCopier(w2, r2)
-		newCatalog, err = pdfcopy.CopyStruct(trans, r2.GetMeta().Catalog)
-		if err != nil {
-			return
+		walk = walker.New(r2)
+		if walk.Err != nil {
+			t.Fatal(walk.Err)
 		}
-		w2.GetMeta().Catalog = newCatalog
-		newInfo, err = pdfcopy.CopyStruct(trans, r2.GetMeta().Info)
-		if err != nil {
-			t.Fatal(err)
+		for ref, obj := range walk.IndirectObjects() {
+			err = w2.Put(ref, obj)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
-		w2.GetMeta().Info = newInfo
+		w2.GetMeta().Catalog = r2.GetMeta().Catalog
+		w2.GetMeta().Info = r2.GetMeta().Info
 		w2.GetMeta().ID = r2.GetMeta().ID
+		for key, val := range r2.GetMeta().Trailer {
+			if key != "Encrypt" {
+				w2.GetMeta().Trailer[key] = val
+			}
+		}
 		err = w2.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if !bytes.Equal(tmpFile1.Data, tmpFile2.Data) {
+			os.WriteFile("a.pdf", raw, 0644)
 			os.WriteFile("b.pdf", tmpFile1.Data, 0644)
 			os.WriteFile("c.pdf", tmpFile2.Data, 0644)
 			t.Fatalf("pdf contents differ")

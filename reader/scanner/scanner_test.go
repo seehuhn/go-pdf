@@ -118,7 +118,7 @@ func FuzzScanner(f *testing.F) {
 				if i > 0 {
 					buf.WriteString(" ")
 				}
-				err := pdf.Format(buf, 0, arg)
+				err := pdf.Format(buf, pdf.OptContentStream, arg)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -144,7 +144,7 @@ func FuzzScanner(f *testing.F) {
 				if i > 0 {
 					buf.WriteString(" ")
 				}
-				err := pdf.Format(buf, 0, arg)
+				err := pdf.Format(buf, pdf.OptContentStream, arg)
 				if err != nil {
 					t.Fatal(err)
 				}
