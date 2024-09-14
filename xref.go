@@ -503,7 +503,7 @@ func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
 	if err != nil {
 		return err
 	}
-	err = Format(pdf.w, pdf.Opt, xRefDict)
+	err = Format(pdf.w, pdf.outputOptions, xRefDict)
 	if err != nil {
 		return err
 	}

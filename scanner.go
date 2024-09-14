@@ -650,26 +650,23 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		}
 	}
 
-	start := s.currentPos()
-	l := int64(length)
-
-	var streamData io.Reader
-	if origReader, ok := s.r.(io.ReadSeeker); ok {
-		streamData = &streamReader{
-			r:   origReader,
-			pos: start,
-			end: start + l,
-		}
-		err = s.Discard(l)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Does not happen in valid PDF files.
+	origReader, ok := s.r.(io.ReadSeeker)
+	if !ok {
 		// TODO(voss): can this be reached at all?
 		return nil, &MalformedFileError{
 			Err: errors.New("cannot seek"),
 		}
+	}
+	start := s.currentPos()
+	l := int64(length)
+	var streamData io.Reader = &streamReader{
+		r:   origReader,
+		pos: start,
+		end: start + l,
+	}
+	err = s.Discard(l)
+	if err != nil {
+		return nil, err
 	}
 
 	isEncrypted := false

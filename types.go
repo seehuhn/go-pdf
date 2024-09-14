@@ -249,11 +249,11 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 
 		contents := w
 		if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
-			enc, err := wenc.enc.EncryptStream(wenc.ref, withDummyClose{w})
+			// encrypt the stream, if necessary
+			contents, err = wenc.enc.EncryptStream(wenc.ref, withDummyClose{w})
 			if err != nil {
 				return false, err
 			}
-			contents = enc
 		}
 		_, err = io.Copy(contents, x.R)
 		if err != nil {

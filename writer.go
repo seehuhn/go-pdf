@@ -62,7 +62,7 @@ type Writer struct {
 	inStream    bool
 	afterStream []allocatedObject
 
-	Opt OutputOptions
+	outputOptions OutputOptions
 }
 
 // TODO(voss): is this more generally useful?
@@ -231,7 +231,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		nextRef: 1,
 		xref:    xref,
 
-		Opt: outOpt,
+		outputOptions: outOpt,
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -280,7 +280,7 @@ func (pdf *Writer) Close() error {
 	// write the cross reference table and trailer
 	xRefPos := pdf.w.pos
 	trailer["Size"] = Integer(pdf.nextRef)
-	if pdf.Opt.Has(OptXRefStream) {
+	if pdf.outputOptions.Has(OptXRefStream) {
 		err = pdf.writeXRefStream(trailer)
 	} else {
 		err = pdf.writeXRefTable(trailer)
@@ -316,7 +316,7 @@ func (pdf *Writer) GetMeta() *MetaInfo {
 }
 
 func (pdf *Writer) GetOptions() OutputOptions {
-	return pdf.Opt
+	return pdf.outputOptions
 }
 
 // Alloc allocates an object number for an indirect object.
@@ -324,35 +324,6 @@ func (pdf *Writer) Alloc() Reference {
 	res := NewReference(pdf.nextRef, 0)
 	pdf.nextRef++
 	return res
-}
-
-// Put writes an indirect object to the PDF file, using the given reference.
-func (pdf *Writer) Put(ref Reference, obj Object) error {
-	if pdf.inStream {
-		pdf.afterStream = append(pdf.afterStream, allocatedObject{ref, obj})
-		return nil
-	}
-
-	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
-	if err != nil {
-		return fmt.Errorf("Writer.Put: %w", err)
-	}
-	pdf.w.ref = ref
-
-	_, err = fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number(), ref.Generation())
-	if err != nil {
-		return err
-	}
-	err = Format(pdf.w, pdf.Opt, obj)
-	if err != nil {
-		return err
-	}
-	_, err = pdf.w.Write([]byte("\nendobj\n"))
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
@@ -425,6 +396,35 @@ func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
 	return s, nil
 }
 
+// Put writes an indirect object to the PDF file, using the given reference.
+func (pdf *Writer) Put(ref Reference, obj Object) error {
+	if pdf.inStream {
+		pdf.afterStream = append(pdf.afterStream, allocatedObject{ref, obj})
+		return nil
+	}
+
+	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
+	if err != nil {
+		return fmt.Errorf("Writer.Put: %w", err)
+	}
+	pdf.w.ref = ref
+
+	_, err = fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number(), ref.Generation())
+	if err != nil {
+		return err
+	}
+	err = Format(pdf.w, pdf.outputOptions, obj)
+	if err != nil {
+		return err
+	}
+	_, err = pdf.w.Write([]byte("\nendobj\n"))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // WriteCompressed writes a number of objects to the file as a compressed
 // object stream.
 //
@@ -440,7 +440,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if !pdf.Opt.Has(OptObjStm) {
+	if !pdf.outputOptions.Has(OptObjStm) {
 		// If object streams are disabled, write the objects directly.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)
@@ -472,9 +472,10 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		}
 
 		if i < N-1 {
-			// Here we buffer only the first N-1 object, since we can stream
-			// the last object separately at the end.
-			err = Format(body, pdf.Opt, objects[i])
+			// We buffer the first N-1 object to determine the starting offsets
+			// within the stream.  To reduce memory use, the last object is
+			// written separately at the end without buffering.
+			err = Format(body, pdf.outputOptions, objects[i])
 			if err != nil {
 				return err
 			}
@@ -506,7 +507,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	}
 
 	// write the last object separately
-	err = Format(w, pdf.Opt, objects[N-1])
+	err = Format(w, pdf.outputOptions, objects[N-1])
 	if err != nil {
 		return err
 	}
@@ -536,7 +537,7 @@ func checkCompressed(refs []Reference, objects []Object) error {
 }
 
 // OpenStream adds a PDF Stream to the file and returns an io.Writer which can
-// be used to add the stream's data.  No other objects can be added to the file
+// be used to add the stream's data.  No other objects can be written to the file
 // until the stream is closed.
 func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
 	if pdf.inStream {
@@ -555,10 +556,10 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 	if streamDict == nil {
 		streamDict = Dict{}
 	}
-	if filter, ok := streamDict["Filter"].(Array); ok {
+	if filter, _ := streamDict["Filter"].(Array); len(filter) > 0 {
 		streamDict["Filter"] = append(Array{}, filter...)
 	}
-	if decodeParms, ok := streamDict["DecodeParms"].(Array); ok {
+	if decodeParms, _ := streamDict["DecodeParms"].(Array); len(decodeParms) > 0 {
 		streamDict["DecodeParms"] = append(Array{}, decodeParms...)
 	}
 
@@ -629,7 +630,7 @@ func (w *streamWriter) startWriting() error {
 	if err != nil {
 		return err
 	}
-	err = Format(w.parent.w, w.parent.Opt, w.streamDict)
+	err = Format(w.parent.w, w.parent.outputOptions, w.streamDict)
 	if err != nil {
 		return err
 	}
@@ -698,7 +699,10 @@ type posWriter struct {
 	w   writeFlusher
 	pos int64
 
+	// ref is the reference of the top-level object currently being written.
+	// This is needed to derive the key when strings or streams are encrypted.
 	ref Reference
+
 	enc *encryptInfo
 }
 
