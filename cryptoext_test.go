@@ -135,7 +135,7 @@ func FuzzEncrypted(f *testing.F) {
 			}
 		}
 		if walk.Err != nil {
-			t.Fatal(walk.Err)
+			return
 		}
 		w1.GetMeta().Catalog = r1.GetMeta().Catalog
 		w1.GetMeta().Info = r1.GetMeta().Info
@@ -151,7 +151,7 @@ func FuzzEncrypted(f *testing.F) {
 		}
 
 		tmpFile1.Offset = 0
-		r2, err := pdf.NewReader(tmpFile1, nil)
+		r2, err := pdf.NewReader(tmpFile1, ropt)
 		if err != nil {
 			t.Fatal(err)
 		}

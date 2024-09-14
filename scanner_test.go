@@ -199,6 +199,10 @@ func FuzzScanner(f *testing.F) {
 		if err != nil {
 			return
 		}
+		if _, isStream := obj1.(*Stream); isStream {
+			// Skip streams, as they cannot be written using Format, below.
+			return
+		}
 
 		buf := &bytes.Buffer{}
 		err = Format(buf, 0, obj1)

@@ -183,7 +183,7 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		}
 
 	case Dict:
-		err := formatDict(w, x, opt)
+		err := formatDict(w, opt, x)
 		return false, err
 
 	case Integer:
@@ -238,30 +238,7 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		return true, err
 
 	case *Stream:
-		err := formatDict(w, x.Dict, opt)
-		if err != nil {
-			return false, err
-		}
-		_, err = io.WriteString(w, "\nstream\n")
-		if err != nil {
-			return false, err
-		}
-
-		contents := w
-		if wenc, ok := w.(*posWriter); ok && wenc.enc != nil {
-			// encrypt the stream, if necessary
-			contents, err = wenc.enc.EncryptStream(wenc.ref, withDummyClose{w})
-			if err != nil {
-				return false, err
-			}
-		}
-		_, err = io.Copy(contents, x.R)
-		if err != nil {
-			return false, err
-		}
-
-		_, err = io.WriteString(w, "\nendstream")
-		return true, err
+		return true, errors.New("direct stream objects are not allowed")
 
 	case String:
 		err := formatString(w, x, opt)
@@ -464,7 +441,7 @@ func formatString(w io.Writer, s String, opt OutputOptions) error {
 	return finalErr
 }
 
-func formatDict(w io.Writer, dict Dict, opt OutputOptions) error {
+func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 	_, err := io.WriteString(w, "<<")
 	if err != nil {
 		return err
@@ -893,6 +870,10 @@ func (x *Placeholder) AsPDF(opt OutputOptions) Native {
 // Set fills in the value of the placeholder object.  This should be called
 // as soon as possible after the value becomes known.
 func (x *Placeholder) Set(val Native) error {
+	if x == nil {
+		return nil
+	}
+
 	if x.ref != 0 {
 		err := x.pdf.Put(x.ref, val)
 		if err != nil {

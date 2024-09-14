@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 
 	"golang.org/x/exp/maps"
@@ -319,13 +320,17 @@ func (pdf *Writer) GetOptions() OutputOptions {
 	return pdf.outputOptions
 }
 
-// Alloc allocates an object number for an indirect object.
+// Alloc allocates an object number for a new indirect object.
 func (pdf *Writer) Alloc() Reference {
 	res := NewReference(pdf.nextRef, 0)
 	pdf.nextRef++
 	return res
 }
 
+// Get returns the object with the given reference from the PDF file.
+//
+// If the underlying io.Writer does not support seeking, Get will return an
+// error.
 func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 	r, ok := pdf.origW.(io.ReadSeeker)
 	if !ok {
@@ -403,23 +408,38 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 		return nil
 	}
 
-	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
-	if err != nil {
-		return fmt.Errorf("Writer.Put: %w", err)
-	}
-	pdf.w.ref = ref
+	if stm, isStream := obj.(*Stream); isStream {
+		w, err := pdf.OpenStream(ref, stm.Dict)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(w, stm.R)
+		if err != nil {
+			return err
+		}
+		err = w.Close()
+		if err != nil {
+			return err
+		}
+	} else {
+		err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
+		if err != nil {
+			return fmt.Errorf("Writer.Put: %w", err)
+		}
+		pdf.w.ref = ref
 
-	_, err = fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number(), ref.Generation())
-	if err != nil {
-		return err
-	}
-	err = Format(pdf.w, pdf.outputOptions, obj)
-	if err != nil {
-		return err
-	}
-	_, err = pdf.w.Write([]byte("\nendobj\n"))
-	if err != nil {
-		return err
+		_, err = fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number(), ref.Generation())
+		if err != nil {
+			return err
+		}
+		err = Format(pdf.w, pdf.outputOptions, obj)
+		if err != nil {
+			return err
+		}
+		_, err = pdf.w.Write([]byte("\nendobj\n"))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -539,6 +559,10 @@ func checkCompressed(refs []Reference, objects []Object) error {
 // OpenStream adds a PDF Stream to the file and returns an io.Writer which can
 // be used to add the stream's data.  No other objects can be written to the file
 // until the stream is closed.
+//
+// Filters are specified in order from outermost to innermost.
+// When reading, filters are applied in the given order.
+// When writing, filters are applied in reverse order.
 func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
 	if pdf.inStream {
 		return nil, errors.New("OpenStream() while stream is open")
@@ -551,20 +575,21 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 	pdf.w.ref = ref
 
 	// Copy dict, dict["Filter"], and dict["DecodeParms"], so that we don't
-	// change the caller's dict.
+	// modify the caller's dict.
 	streamDict := maps.Clone(dict)
 	if streamDict == nil {
 		streamDict = Dict{}
 	}
 	if filter, _ := streamDict["Filter"].(Array); len(filter) > 0 {
-		streamDict["Filter"] = append(Array{}, filter...)
+		streamDict["Filter"] = slices.Clone(filter)
 	}
 	if decodeParms, _ := streamDict["DecodeParms"].(Array); len(decodeParms) > 0 {
-		streamDict["DecodeParms"] = append(Array{}, decodeParms...)
+		streamDict["DecodeParms"] = slices.Clone(decodeParms)
 	}
 
-	length := NewPlaceholder(pdf, 12)
+	var length *Placeholder
 	if _, exists := streamDict["Length"]; !exists {
+		length = NewPlaceholder(pdf, 12)
 		streamDict["Length"] = length
 	}
 
@@ -574,6 +599,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 		ref:        ref,
 		length:     length,
 	}
+
 	if pdf.w.enc != nil {
 		enc, err := pdf.w.enc.EncryptStream(ref, w)
 		if err != nil {
@@ -581,6 +607,7 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 		}
 		w = enc
 	}
+
 	for _, filter := range filters {
 		w, err = filter.Encode(pdf.meta.Version, w)
 		if err != nil {

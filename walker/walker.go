@@ -110,6 +110,17 @@ func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native
 			w.Err = err
 			return false
 		}
+
+		if stm, isStream := resolved.(*pdf.Stream); isStream {
+			// Because the Length depends on whether or not the stream is
+			// encrypted, it is not safe to use when writing the object to
+			// another PDF file. To allow easy copying for PDF file contents
+			// using the Walker, we remove the Length key from the stream
+			// dictionary here, to trigger automatic recalculation of the
+			// appropriate Length for any output file.
+			delete(stm.Dict, "Length")
+		}
+
 		obj = resolved
 	}
 
