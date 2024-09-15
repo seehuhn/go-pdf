@@ -153,11 +153,11 @@ func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native
 	case pdf.Dict:
 		keys := v.SortedKeys()
 		for _, k := range keys {
-			obj := v[k]
-			if obj == nil {
-				continue
+			var native pdf.Native
+			if obj := v[k]; obj != nil {
+				native = obj.AsPDF(0)
 			}
-			cont := w.walkObject(obj.AsPDF(0), yield, preOrder, visited)
+			cont := w.walkObject(native, yield, preOrder, visited)
 			if !cont {
 				return false
 			}
