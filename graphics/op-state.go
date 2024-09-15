@@ -225,11 +225,7 @@ func (w *Writer) SetRenderingIntent(intent RenderingIntent) {
 	w.RenderingIntent = intent
 	w.Set |= StateRenderingIntent
 
-	w.writeObject(pdf.Name(intent))
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " ri")
+	w.writeObjects(pdf.Name(intent), pdf.Operator("ri"))
 }
 
 // SetFlatnessTolerance sets the flatness tolerance.
@@ -268,9 +264,5 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 
 	newState.CopyTo(&w.State)
 
-	w.writeObject(name)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " gs")
+	w.writeObjects(name, pdf.Operator("gs"))
 }

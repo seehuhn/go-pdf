@@ -19,5 +19,7 @@ The question is: does `<03>` now map to 'B' (because `<02>` is not a valid code)
 or to 'C' (because `<03>` is the third code in the range)?
 
 The attached PDF file shows two glyphs.  The first one should be 'A'.
-The second one is the glyph encoded by `<03>`.  Most viewers I tried
-showed a 'C' here.
+The second one is the glyph encoded by `<03>`.
+
+Result (Sept 2024):
+Most viewers I tried showed 'A C'.

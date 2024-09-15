@@ -90,6 +90,8 @@ func NewWriter(out io.Writer, rm *pdf.ResourceManager) *Writer {
 	if rm != nil && rm.Out != nil {
 		opt = rm.Out.GetOptions()
 	}
+	opt |= pdf.OptContentStream
+
 	return &Writer{
 		Content:       out,
 		Resources:     &pdf.Resources{},
@@ -117,11 +119,15 @@ func (w *Writer) NewStream(out io.Writer) {
 	w.Err = nil
 }
 
-func (w *Writer) writeObject(obj pdf.Object) {
+func (w *Writer) writeObjects(obj ...pdf.Object) {
 	if w.Err != nil {
 		return
 	}
-	w.Err = pdf.Format(w.Content, w.opt, obj)
+	w.Err = pdf.Format(w.Content, w.opt, obj...)
+	if w.Err != nil {
+		return
+	}
+	_, w.Err = w.Content.Write([]byte("\n"))
 }
 
 // IsValid returns true, if the current graphics object is one of the given types
@@ -209,8 +215,8 @@ func writerSetResourceName[T any](w *Writer, resource pdf.Embedder[T], category 
 }
 
 // SetFontNameInternal controls how the font is refered to in the content
-// stream.  Normally, a name is allocated automatically, so use of this
-// function is not normally required.
+// stream.  Normally names are allocated automatically, and use of this
+// function is not required.
 func (w *Writer) SetFontNameInternal(f font.Font, name pdf.Name) error {
 	return writerSetResourceName(w, f, catFont, name)
 }

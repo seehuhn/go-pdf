@@ -378,7 +378,7 @@ func FuzzReadCMap(f *testing.F) {
 	buf := &bytes.Buffer{}
 	for _, info := range []*InfoNew{testInfoFull, testInfoParent, testInfoChild} {
 		buf.Reset()
-		err := cmapTmplNew.Execute(buf, info)
+		err := cmapTmplNew.Execute(buf, templateData{InfoNew: info})
 		if err != nil {
 			f.Fatal(err)
 		}
@@ -415,7 +415,7 @@ func FuzzReadCMap(f *testing.F) {
 		}
 
 		buf := &bytes.Buffer{}
-		err = cmapTmplNew.Execute(buf, info)
+		err = cmapTmplNew.Execute(buf, templateData{InfoNew: info})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -575,7 +575,7 @@ func TestExtractLoop(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				err = cmapTmplNew.Execute(stm, cmaps[i])
+				err = cmapTmplNew.Execute(stm, templateData{InfoNew: cmaps[i]})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -633,7 +633,7 @@ func TestCMapTemplate(t *testing.T) {
 	buf := &bytes.Buffer{}
 
 	// check that the template renders without error
-	err := cmapTmplNew.Execute(buf, testInfoFull)
+	err := cmapTmplNew.Execute(buf, templateData{InfoNew: testInfoFull})
 	if err != nil {
 		t.Fatal(err)
 	}

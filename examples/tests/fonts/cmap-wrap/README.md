@@ -25,7 +25,7 @@ The PDF shows a 3x3 grid of glyps, using the following codes:
 <3230> <3231> <3232>
 ```
 
-Results:
+Results (September 2024):
 - Adobe Reader, Ghostscript: all codes are mapped
 - Firefox, Google Chrome: only the first row is mapped
 - MacOS Preview: no codes are mapped

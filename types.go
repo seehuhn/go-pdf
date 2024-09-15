@@ -24,8 +24,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/maps"
 )
 
 // Native represents an object in a PDF file. Thus must be one of the
@@ -68,7 +66,8 @@ type Object interface {
 // OutputOptions is a bit-mask which controls how [Object]s are formatted.
 type OutputOptions uint32
 
-func (o OutputOptions) Has(opt OutputOptions) bool {
+// HasAny returns true if any of the given output options are set.
+func (o OutputOptions) HasAny(opt OutputOptions) bool {
 	return o&opt != 0
 }
 
@@ -76,8 +75,7 @@ func (o OutputOptions) Has(opt OutputOptions) bool {
 // The values are bit masks which can be combined using bitwise OR.
 // The default output options are 0.
 const (
-	OptASCII          OutputOptions = 1 << iota // no binary data
-	OptContentStream                            // we are inside a content stream
+	OptContentStream  OutputOptions = 1 << iota // we are inside a content stream
 	OptObjStm                                   // use object streams
 	OptPretty                                   // make the output more human-readable
 	OptTextStringUtf8                           // allow UTF-8 encoding for text strings
@@ -103,7 +101,7 @@ func defaultOutputOptions(v Version) OutputOptions {
 func Format(w io.Writer, opt OutputOptions, objects ...Object) error {
 	var err error
 
-	if opt.Has(OptPretty) {
+	if opt.HasAny(OptPretty) {
 		// Separate objects by spaces.
 		for i, obj := range objects {
 			if i > 0 {
@@ -136,8 +134,7 @@ func Format(w io.Writer, opt OutputOptions, objects ...Object) error {
 // The argument `needSep` indicates whether the function should write a
 // separator before the object, in case the output starts with an alphanumeric
 // character. The first return value indicates whether a separator is needed
-// after the object, if the following object starts with an alphanumeric
-// character.
+// after the object, if the following object starts with a regular character.
 func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, error) {
 	var native Native
 	if obj != nil {
@@ -201,7 +198,7 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		return true, formatName(w, x)
 
 	case Operator:
-		if !opt.Has(OptContentStream) {
+		if !opt.HasAny(OptContentStream) {
 			return false, errors.New("operator outside content stream")
 		}
 		if needSep {
@@ -321,7 +318,7 @@ func formatName(w io.Writer, name Name) error {
 func formatString(w io.Writer, s String, opt OutputOptions) error {
 	l := []byte(s)
 
-	pretty := opt.Has(OptPretty)
+	pretty := opt.HasAny(OptPretty)
 	if wenc, ok := w.(*posWriter); ok {
 		if wenc.enc != nil {
 			enc, err := wenc.enc.EncryptBytes(wenc.ref, l)
@@ -446,10 +443,9 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 	if err != nil {
 		return err
 	}
-	keys := maps.Keys(dict)
-	slices.Sort(keys)
+	keys := dict.SortedKeys()
 
-	if opt.Has(OptPretty) {
+	if opt.HasAny(OptPretty) {
 		_, err = io.WriteString(w, "\n")
 		if err != nil {
 			return err
@@ -931,7 +927,7 @@ func (x *Placeholder) Set(val Native) error {
 // it would be written to a PDF file.
 func AsString(obj Object) string {
 	buf := &bytes.Buffer{}
-	err := Format(buf, OptASCII|OptPretty, obj)
+	err := Format(buf, OptPretty, obj)
 	if err != nil {
 		panic(err) // TODO(voss): unreachable?
 	}

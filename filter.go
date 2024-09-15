@@ -173,7 +173,6 @@ func (f FilterCompress) Info(v Version) (Name, Dict, error) {
 		return FilterFlate(f).Info(v)
 	}
 	return FilterLZW(f).Info(v)
-
 }
 
 // Encode implements the [Filter] interface.
@@ -304,11 +303,12 @@ func (f FilterFlate) parseParameters(v Version) (*flateFilter, error) {
 }
 
 // FilterLZW is the LZWDecode filter.
+//
 // This is only useful to read legacy PDF files.  For new files, use
 // [FilterFlate] instead.
 //
-// The filter is represented by a dictionary of tiler parameters. The following
-// parameters are supported:
+// The filter is represented by a dictionary of filter parameters.
+// The following parameters are supported:
 //
 //   - "Predictor": A code that selects the predictor algorithm, if any.
 //     If the value is greater than 1, the data were differenced before being

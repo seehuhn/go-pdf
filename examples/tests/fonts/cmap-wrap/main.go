@@ -57,7 +57,7 @@ func generateSampleFile(fname string) error {
 			Ordering:   "Japan1",
 			Supplement: 0,
 		},
-		CodeSpaceRange: []charcode.Range{
+		CodeSpaceRange: charcode.CodeSpaceRange{
 			{Low: []byte{0x30, 0x30}, High: []byte{0x32, 0x32}},
 		},
 		CIDRanges: []cmap.RangeNew{
@@ -91,11 +91,18 @@ func generateSampleFile(fname string) error {
 	return nil
 }
 
+// testFont is a small subset of the Go Regular font, with a configurable cmap.
+// This is only useful for testing.
+//
+// For simplicity we use this structure both as the `font.Font` before
+// embedding, and as the `font.Embedded` after embedding.
 type testFont struct {
-	cmap *cmap.InfoNew
-	ttf  *sfnt.Font
+	ttf   *sfnt.Font
+	cmap  *cmap.InfoNew
+	codec *charcode.Codec
 }
 
+// NewTestFont creates a new test font with the given cmap.
 func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.InfoNew) (*testFont, error) {
 	// Create a font with just the glyphs for "ABC".
 	ttf, err := sfnt.Read(bytes.NewReader(goregular.TTF))
@@ -126,16 +133,26 @@ func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.InfoNew) (*testFont, error)
 		outlines.Widths[i] = dw
 	}
 
+	codec, err := charcode.NewCodec(cmap.CodeSpaceRange)
+	if err != nil {
+		return nil, err
+	}
+
 	return &testFont{
-		cmap: cmap,
-		ttf:  ttf,
+		ttf:   ttf,
+		cmap:  cmap,
+		codec: codec,
 	}, nil
 }
 
+// PostScriptName returns the PostScript name of the font.
+// This implements the [font.Font] interface.
 func (f *testFont) PostScriptName() string {
 	return "Test"
 }
 
+// Embed adds the font to a PDF file.
+// This implements the [font.Font] interface.
 func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 	cidFontDictRef := rm.Out.Alloc()
@@ -188,15 +205,15 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	}
 
 	cidToGID := make([]byte, 43*2)
-	cidToGID[2*34+1] = 1 // 'A' has GID 0x0001
-	cidToGID[2*35+1] = 2 // 'B' has GID 0x0002
-	cidToGID[2*36+1] = 3 // 'C' has GID 0x0003
-	cidToGID[2*37+1] = 4 // 'D' has GID 0x0004
-	cidToGID[2*38+1] = 5 // 'E' has GID 0x0005
-	cidToGID[2*39+1] = 6 // 'F' has GID 0x0006
-	cidToGID[2*40+1] = 7 // 'G' has GID 0x0007
-	cidToGID[2*41+1] = 8 // 'H' has GID 0x0008
-	cidToGID[2*42+1] = 9 // 'I' has GID 0x0009
+	cidToGID[2*34+1] = 1 // CID 34 = GID 1 (A)
+	cidToGID[2*35+1] = 2 // CID 35 = GID 2 (B)
+	cidToGID[2*36+1] = 3 // CID 36 = GID 3 (C)
+	cidToGID[2*37+1] = 4 // CID 37 = GID 4 (D)
+	cidToGID[2*38+1] = 5 // CID 38 = GID 5 (E)
+	cidToGID[2*39+1] = 6 // CID 39 = GID 6 (F)
+	cidToGID[2*40+1] = 7 // CID 40 = GID 7 (G)
+	cidToGID[2*41+1] = 8 // CID 41 = GID 8 (H)
+	cidToGID[2*42+1] = 9 // CID 42 = GID 9 (I)
 	cidToGIDStream, err := rm.Out.OpenStream(cidToGIDRef, nil, pdf.FilterASCIIHex{})
 	if err != nil {
 		return nil, nil, err
@@ -224,12 +241,19 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
+	var filters []pdf.Filter
+	opt := rm.Out.GetOptions()
+	if opt.HasAny(pdf.OptPretty) {
+		filters = append(filters, pdf.FilterASCII85{})
+	}
+	filters = append(filters, pdf.FilterCompress{})
+
 	length1 := pdf.NewPlaceholder(rm.Out, 10)
 	fontFileDict := pdf.Dict{
 		"Subtype": pdf.Name("TrueType"),
 		"Length1": length1,
 	}
-	fontFileStream, err := rm.Out.OpenStream(fontFileRef, fontFileDict, pdf.FilterASCII85{}, pdf.FilterCompress{})
+	fontFileStream, err := rm.Out.OpenStream(fontFileRef, fontFileDict, filters...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -249,21 +273,27 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return fontDictRef, f, nil
 }
 
+// WritingMode returns [cmap.Horizontal].
+// This implements the [font.Font] interface.
 func (f *testFont) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
+// ForeachWidth calls the given function for each character in the string.
+// This implements the [font.Embedded] interface.
 func (f *testFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	for i := 0; i < len(s); i++ {
-		yield(2000, s[i] == ' ')
-		if s[i] == 2 {
-			i += 2
-		} else {
-			i++
-		}
+	i := 0
+	for i < len(s) {
+		code, k, _ := f.codec.Decode(s[i:])
+		yield(2000, code == 32 && k == 1)
+		i += k
 	}
 }
 
+// CodeAndWidth encodes the given glyph ID as a PDF character code.
+// This implements the [font.Embedded] interface.
 func (f *testFont) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	// We don't need this method here, since we directly write the character
+	// codes.
 	panic("not implemented")
 }

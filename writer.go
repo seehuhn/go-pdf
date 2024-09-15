@@ -41,11 +41,6 @@ type WriterOptions struct {
 	// If this flag is true, the writer tries to generate a PDF file which is
 	// more human-readable, at the expense of increased file size.
 	HumanReadable bool
-
-	// If this flag is true, the writer tries to generate a PDF file which
-	// contains only ASCII characters, at the expense of greatly increased file
-	// size.
-	ASCIIOnly bool
 }
 
 // Writer represents a PDF file open for writing.
@@ -205,12 +200,8 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	}
 
 	outOpt := defaultOutputOptions(v)
-	if opt.ASCIIOnly {
-		outOpt &= ^(OptObjStm | OptXRefStream)
-		outOpt |= OptASCII
-	}
 	if opt.HumanReadable {
-		outOpt &= ^OptObjStm
+		outOpt &= ^(OptObjStm | OptXRefStream)
 		outOpt |= OptPretty
 	}
 
@@ -240,6 +231,13 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		return nil, err
 	}
 
+	if outOpt.HasAny(OptPretty) {
+		_, err := pdf.w.Write([]byte("\n"))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return pdf, nil
 }
 
@@ -267,6 +265,8 @@ func (pdf *Writer) Close() error {
 			return err
 		}
 		trailer["Info"] = infoRef
+	} else {
+		delete(trailer, "Info")
 	}
 
 	if pdf.meta.ID != nil {
@@ -281,7 +281,7 @@ func (pdf *Writer) Close() error {
 	// write the cross reference table and trailer
 	xRefPos := pdf.w.pos
 	trailer["Size"] = Integer(pdf.nextRef)
-	if pdf.outputOptions.Has(OptXRefStream) {
+	if pdf.outputOptions.HasAny(OptXRefStream) {
 		err = pdf.writeXRefStream(trailer)
 	} else {
 		err = pdf.writeXRefTable(trailer)
@@ -440,6 +440,13 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 		if err != nil {
 			return err
 		}
+
+		if pdf.outputOptions.HasAny(OptPretty) {
+			_, err := pdf.w.Write([]byte("\n"))
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -460,7 +467,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if !pdf.outputOptions.Has(OptObjStm) {
+	if !pdf.outputOptions.HasAny(OptObjStm) {
 		// If object streams are disabled, write the objects directly.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)
@@ -703,6 +710,13 @@ func (w *streamWriter) Close() error {
 	_, err := w.Write([]byte("\nendstream\nendobj\n"))
 	if err != nil {
 		return err
+	}
+
+	if w.parent.outputOptions.HasAny(OptPretty) {
+		_, err := w.Write([]byte("\n"))
+		if err != nil {
+			return err
+		}
 	}
 
 	w.parent.inStream = false

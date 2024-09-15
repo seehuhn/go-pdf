@@ -17,7 +17,6 @@
 package graphics
 
 import (
-	"fmt"
 	"strings"
 
 	"seehuhn.de/go/pdf"
@@ -75,15 +74,11 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 			return
 		}
 
-		w.writeObject(name)
-		if w.Err != nil {
-			return
-		}
-		op := "CS"
+		var op pdf.Operator = "CS"
 		if fill {
 			op = "cs"
 		}
-		_, w.Err = fmt.Fprintln(w.Content, " "+op)
+		w.writeObjects(name, op)
 		if w.Err != nil {
 			return
 		}
@@ -91,13 +86,11 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 	}
 
 	if cur != c {
+		var out []pdf.Object
+
 		values, pattern, op := color.Operator(c)
 		for _, val := range values {
-			valString := format(val)
-			_, w.Err = fmt.Fprint(w.Content, valString, " ")
-			if w.Err != nil {
-				return
-			}
+			out = append(out, pdf.Number(val))
 		}
 		if pattern != nil {
 			name, _, err := writerGetResourceName(w, catPattern, pattern)
@@ -105,22 +98,13 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 				w.Err = err
 				return
 			}
-			w.writeObject(name)
-			if w.Err != nil {
-				return
-			}
-			_, w.Err = fmt.Fprint(w.Content, " ")
-			if w.Err != nil {
-				return
-			}
+			out = append(out, name)
 		}
 		if fill {
 			op = strings.ToLower(op)
 		}
-		_, w.Err = fmt.Fprintln(w.Content, op)
-		if w.Err != nil {
-			return
-		}
+		out = append(out, pdf.Operator(op))
+		w.writeObjects(out...)
 	}
 }
 
@@ -150,9 +134,5 @@ func (w *Writer) DrawShading(shading Shading) {
 		return
 	}
 
-	w.writeObject(name)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " sh")
+	w.writeObjects(name, pdf.Operator("sh"))
 }

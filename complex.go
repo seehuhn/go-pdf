@@ -88,7 +88,7 @@ func (s TextString) AsPDF(opt OutputOptions) Native {
 	}
 
 	// Otherwise, use UTF-8 if supported.
-	if opt.Has(OptTextStringUtf8) {
+	if opt.HasAny(OptTextStringUtf8) {
 		obj := make(String, 0, 3+len(s))
 		obj = append(obj, 239, 187, 191)
 		obj = append(obj, []byte(s)...)

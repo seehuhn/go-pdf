@@ -68,17 +68,16 @@ func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
 		return
 	}
 
-	w.writeObject(mc.Tag)
+	if mc.Properties == nil {
+		w.writeObjects(mc.Tag, pdf.Operator("MP"))
+		return
+	}
+
+	prop := w.getProperties(mc)
 	if w.Err != nil {
 		return
 	}
-
-	if mc.Properties == nil {
-		_, w.Err = fmt.Fprintln(w.Content, " MP")
-		return
-	}
-
-	w.writeProperties(mc, "DP")
+	w.writeObjects(mc.Tag, prop, pdf.Operator("DP"))
 }
 
 // MarkedContentStart begins a marked-content sequence.  The sequence is
@@ -97,46 +96,33 @@ func (w *Writer) MarkedContentStart(mc *MarkedContent) {
 	w.nesting = append(w.nesting, pairTypeBMC)
 	w.markedContent = append(w.markedContent, mc)
 
-	w.writeObject(mc.Tag)
+	if mc.Properties == nil {
+		w.writeObjects(mc.Tag, pdf.Operator("BMC"))
+		return
+	}
+
+	prop := w.getProperties(mc)
 	if w.Err != nil {
 		return
 	}
-
-	if mc.Properties == nil {
-		_, w.Err = fmt.Fprintln(w.Content, " BMC")
-		return
-	}
-
-	w.writeProperties(mc, "BDC")
+	w.writeObjects(mc.Tag, prop, pdf.Operator("BDC"))
 }
 
-func (w *Writer) writeProperties(mc *MarkedContent, op string) {
-	var prop pdf.Object
+func (w *Writer) getProperties(mc *MarkedContent) pdf.Object {
 	if mc.Inline {
 		if !pdf.IsDirect(mc.Properties) {
 			w.Err = ErrNotDirect
-			return
+			return nil
 		}
-		prop = mc.Properties
-	} else {
-		name, _, err := writerGetResourceName(w, catProperties, mc)
-		if err != nil {
-			w.Err = err
-			return
-		}
-		prop = name
+		return mc.Properties
 	}
 
-	_, err := w.Content.Write([]byte(" "))
+	name, _, err := writerGetResourceName(w, catProperties, mc)
 	if err != nil {
 		w.Err = err
-		return
+		return nil
 	}
-	w.writeObject(prop)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " "+op)
+	return name
 }
 
 // MarkedContentEnd ends a marked-content sequence.

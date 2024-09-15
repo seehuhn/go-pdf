@@ -78,7 +78,7 @@ type embRes struct {
 // when the ResourceManager is closed.
 //
 // Once Go supports methods with type parameters, this function can be turned
-// into a method on ResourceManager.
+// into a method on [ResourceManager].
 func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T, error) {
 	var zero T
 

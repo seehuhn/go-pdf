@@ -74,8 +74,14 @@ func (p *Page) Close() error {
 		return errors.New("page size not set")
 	}
 
+	var filters []pdf.Filter
+	opt := p.Out.GetOptions()
+	if !opt.HasAny(pdf.OptPretty) {
+		filters = append(filters, pdf.FilterCompress{})
+	}
+
 	contentRef := p.Out.Alloc()
-	stream, err := p.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
+	stream, err := p.Out.OpenStream(contentRef, nil, filters...)
 	if err != nil {
 		return err
 	}

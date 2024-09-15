@@ -170,11 +170,7 @@ func (w *Writer) TextSetFont(F font.Font, size float64) {
 	w.State.TextFontSize = size
 	w.State.Set |= StateTextFont
 
-	w.writeObject(name)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, "", size, "Tf")
+	w.writeObjects(name, pdf.Number(size), pdf.Operator("Tf"))
 }
 
 // TextSetRenderingMode sets the text rendering mode.
@@ -290,11 +286,7 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 
 	w.updateTextPosition(s)
 
-	w.writeObject(s)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " Tj")
+	w.writeObjects(s, pdf.Operator("Tj"))
 }
 
 // TextShowNextLineRaw start a new line and then shows an already encoded text
@@ -316,11 +308,7 @@ func (w *Writer) TextShowNextLineRaw(s pdf.String) {
 
 	w.updateTextPosition(s)
 
-	w.writeObject(s)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " '")
+	w.writeObjects(s, pdf.Operator("'"))
 }
 
 // TextShowSpacedRaw adjusts word and character spacing and then shows an
@@ -343,15 +331,7 @@ func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Strin
 	w.Set |= StateTextWordSpacing | StateTextCharacterSpacing
 	w.updateTextPosition(s)
 
-	_, w.Err = fmt.Fprint(w.Content, w.coord(wordSpacing), " ", w.coord(charSpacing), " ")
-	if w.Err != nil {
-		return
-	}
-	w.writeObject(s)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " \"")
+	w.writeObjects(pdf.Number(wordSpacing), pdf.Number(charSpacing), s, pdf.Operator(`"`))
 }
 
 // TextShowKernedRaw shows an already encoded text in the PDF file, using
@@ -399,11 +379,7 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 		a = append(a, arg)
 	}
 
-	w.writeObject(a)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, " TJ")
+	w.writeObjects(a, pdf.Operator("TJ"))
 }
 
 func (w *Writer) updateTextPosition(s pdf.String) {

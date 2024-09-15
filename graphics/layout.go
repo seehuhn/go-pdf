@@ -18,7 +18,6 @@ package graphics
 
 import (
 	"errors"
-	"fmt"
 	"math"
 
 	"seehuhn.de/go/pdf"
@@ -97,21 +96,13 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 
 		if len(out) == 1 {
 			if s, ok := out[0].(pdf.String); ok {
-				w.writeObject(s)
-				if w.Err != nil {
-					return
-				}
-				_, w.Err = fmt.Fprintln(w.Content, " Tj")
+				w.writeObjects(s, pdf.Operator("Tj"))
 				out = out[:0]
 				return
 			}
 		}
 
-		w.writeObject(out)
-		if w.Err != nil {
-			return
-		}
-		_, w.Err = fmt.Fprintln(w.Content, " TJ")
+		w.writeObjects(out, pdf.Operator("TJ"))
 		out = out[:0]
 	}
 
@@ -128,11 +119,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 			if w.Err != nil {
 				return 0
 			}
-			w.writeObject(pdf.Number(w.State.TextRise)) // TODO(voss): rounding?
-			if w.Err != nil {
-				return 0
-			}
-			_, w.Err = fmt.Fprintln(w.Content, " Ts")
+			w.writeObjects(pdf.Number(w.State.TextRise), pdf.Operator("Ts"))
 		}
 
 		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) / param.TextFontSize / param.TextHorizontalScaling * 1000))

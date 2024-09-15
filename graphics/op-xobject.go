@@ -17,8 +17,6 @@
 package graphics
 
 import (
-	"fmt"
-
 	"seehuhn.de/go/pdf"
 )
 
@@ -46,9 +44,5 @@ func (w *Writer) DrawXObject(obj XObject) {
 		return
 	}
 
-	w.writeObject(name)
-	if w.Err != nil {
-		return
-	}
-	_, w.Err = fmt.Fprintln(w.Content, "", "Do")
+	w.writeObjects(name, pdf.Operator("Do"))
 }

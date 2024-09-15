@@ -23,6 +23,15 @@ import (
 	"testing"
 )
 
+// These are all filter types currently implemented by this library.
+var (
+	_ Filter = &FilterASCII85{}
+	_ Filter = &FilterASCIIHex{}
+	_ Filter = &FilterCompress{}
+	_ Filter = &FilterFlate{}
+	_ Filter = &FilterLZW{}
+)
+
 func TestFilterChaining(t *testing.T) {
 	F1 := &FilterASCII85{}
 	F2 := &FilterASCIIHex{}

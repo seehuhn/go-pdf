@@ -186,6 +186,12 @@ func extractFont(r pdf.Getter, fontDict pdf.Object) (Dict, error) {
 		return type1.Extract(r, dicts)
 	case font.Type3:
 		return type3.Extract(r, dicts)
+
+	case font.ExternalCFFComposite:
+		return nil, errors.New("ExternalCFFComposite not supported")
+	case font.ExternalGlyfComposite:
+		return nil, errors.New("ExternalGlyfComposite not supported")
+
 	default:
 		panic("unreachable") // unknown font type
 	}

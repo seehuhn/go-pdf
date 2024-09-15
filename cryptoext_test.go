@@ -98,6 +98,7 @@ func (s *testFileSamples) All() iter.Seq[[]byte] {
 	}
 }
 
+// TODO(voss): what exactly is this trying to test?
 func FuzzEncrypted(f *testing.F) {
 	passwd := "secret"
 
@@ -131,7 +132,7 @@ func FuzzEncrypted(f *testing.F) {
 		for ref, obj := range walk.IndirectObjects() {
 			err = w1.Put(ref, obj)
 			if err != nil {
-				t.Fatal(err)
+				return
 			}
 		}
 		if walk.Err != nil {
@@ -157,14 +158,14 @@ func FuzzEncrypted(f *testing.F) {
 		}
 		w2, tmpFile2 := tempfile.NewTempWriter(pdf.GetVersion(r2), nil)
 		walk = walker.New(r2)
-		if walk.Err != nil {
-			t.Fatal(walk.Err)
-		}
 		for ref, obj := range walk.IndirectObjects() {
 			err = w2.Put(ref, obj)
 			if err != nil {
 				t.Fatal(err)
 			}
+		}
+		if walk.Err != nil {
+			t.Fatal(walk.Err)
 		}
 		w2.GetMeta().Catalog = r2.GetMeta().Catalog
 		w2.GetMeta().Info = r2.GetMeta().Info

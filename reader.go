@@ -228,10 +228,6 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 	delete(trailer, "Index")
 	delete(trailer, "Prev")
 	delete(trailer, "W")
-	// remove ID, Catalog, and Info from trailer dictionary
-	delete(trailer, "ID")
-	delete(trailer, "Root")
-	delete(trailer, "Info")
 	r.meta.Trailer = trailer
 
 	return r, nil

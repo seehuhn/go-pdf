@@ -32,6 +32,23 @@ import (
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 
+// InfoNew represents the information for a CMap used with a PDF composite
+// font.  This describes a mapping from character codes (one or more bytes) to
+// character identifiers (CIDs).
+type InfoNew struct {
+	Name  pdf.Name
+	ROS   *CIDSystemInfo
+	WMode WritingMode
+
+	charcode.CodeSpaceRange
+	CIDSingles    []SingleNew
+	CIDRanges     []RangeNew
+	NotdefSingles []SingleNew
+	NotdefRanges  []RangeNew
+
+	Parent *InfoNew // This corresponds to the UseCMap entry in the PDF spec.
+}
+
 // WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
 type WritingMode int
 
@@ -53,21 +70,6 @@ const (
 	// Vertical indicates vertical writing mode.
 	Vertical WritingMode = 1
 )
-
-// InfoNew represents the information for a CMap used with a PDF composite font.
-type InfoNew struct {
-	Name  pdf.Name
-	ROS   *CIDSystemInfo
-	WMode WritingMode
-
-	charcode.CodeSpaceRange
-	CIDSingles    []SingleNew
-	CIDRanges     []RangeNew
-	NotdefSingles []SingleNew
-	NotdefRanges  []RangeNew
-
-	Parent *InfoNew // This corresponds to the UseCMap entry in the PDF spec.
-}
 
 // SingleEntry specifies that character code Code represents the given CID.
 type SingleNew struct {
@@ -313,12 +315,23 @@ func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 		dict["UseCMap"] = parent
 	}
 
+	var filters []pdf.Filter
+	opt := rm.Out.GetOptions()
+	if !opt.HasAny(pdf.OptPretty) {
+		filters = append(filters, pdf.FilterCompress{})
+	}
+
+	data := templateData{
+		HeaderComment: opt.HasAny(pdf.OptPretty),
+		InfoNew:       c,
+	}
+
 	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	stm, err := rm.Out.OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}
-	err = cmapTmplNew.Execute(stm, c)
+	err = cmapTmplNew.Execute(stm, data)
 	if err != nil {
 		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
 	}
@@ -344,6 +357,13 @@ func chunks[T any](x []T) [][]T {
 	return res
 }
 
+type templateData struct {
+	HeaderComment bool
+	*InfoNew
+}
+
+// cmapTmplNew is a template for generating a CMap stream.
+// The expected context is a templateData structure.
 var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"PS": func(s string) string {
 		x := postscript.String(s)
@@ -364,7 +384,10 @@ var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"Range": func(r RangeNew) string {
 		return fmt.Sprintf("<%x> <%x> %d", r.First, r.Last, r.Value)
 	},
-}).Parse(`/CIDInit /ProcSet findresource begin
+}).Parse(`{{if .HeaderComment -}}
+%!PS-Adobe-3.0 Resource-CMap
+{{end -}}
+/CIDInit /ProcSet findresource begin
 12 dict begin
 begincmap
 {{if .Parent -}}
@@ -389,6 +412,7 @@ end def
 {{end -}}
 {{end -}}
 endcodespacerange
+{{/* */ -}}
 
 {{range SingleChunks .CIDSingles -}}
 {{len .}} begincidchar
@@ -425,8 +449,7 @@ endnotdefrange
 endcmap
 CMapName currentdict /CMap defineresource pop
 end
-end
-`))
+end`))
 
 var (
 	predefinedMu   sync.Mutex

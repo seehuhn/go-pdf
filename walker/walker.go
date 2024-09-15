@@ -19,6 +19,7 @@
 package walker
 
 import (
+	"fmt"
 	"iter"
 
 	"seehuhn.de/go/pdf"
@@ -81,6 +82,14 @@ func (w *Walker) walk(yield func(pdf.Reference, pdf.Native) bool, preOrder bool)
 	visited := make(map[pdf.Reference]struct{})
 
 	meta := w.GetMeta()
+	if ref, ok := meta.Trailer["Root"].(pdf.Reference); ok {
+		visited[ref] = struct{}{}
+	}
+	if ref, ok := meta.Trailer["Info"].(pdf.Reference); ok {
+		visited[ref] = struct{}{}
+	}
+
+	fmt.Println(pdf.AsString(meta.Trailer))
 	if !w.walkObject(pdf.AsDict(meta.Info), yield, preOrder, visited) {
 		return
 	}
@@ -144,7 +153,11 @@ func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native
 	case pdf.Dict:
 		keys := v.SortedKeys()
 		for _, k := range keys {
-			cont := w.walkObject(v[k].AsPDF(0), yield, preOrder, visited)
+			obj := v[k]
+			if obj == nil {
+				continue
+			}
+			cont := w.walkObject(obj.AsPDF(0), yield, preOrder, visited)
 			if !cont {
 				return false
 			}
@@ -170,7 +183,7 @@ func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native
 func (w *Walker) IndirectObjects() iter.Seq2[pdf.Reference, pdf.Native] {
 	return func(yield func(pdf.Reference, pdf.Native) bool) {
 		for ref, obj := range w.PreOrder() {
-			if ref == 0 {
+			if ref == 0 || obj == nil {
 				continue
 			}
 			if !yield(ref, obj) {
