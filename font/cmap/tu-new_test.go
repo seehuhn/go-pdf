@@ -32,6 +32,67 @@ import (
 
 var _ pdf.Embedder[pdf.Unused] = (*ToUnicodeInfo)(nil)
 
+func TestToUnicodeRangeIter(t *testing.T) {
+	simple, err := charcode.NewCodec(charcode.Simple)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type pair struct {
+		code uint32
+		text []rune
+	}
+	type testCase struct {
+		codec *charcode.Codec
+		r     ToUnicodeRange
+		want  []pair
+	}
+	cases := []testCase{
+		{
+			codec: simple,
+			r: ToUnicodeRange{
+				First: []byte{0xF0},
+				Last:  []byte{0xF2},
+				Values: [][]rune{
+					[]rune("fl"),
+					[]rune("fi"),
+					[]rune("ffl"),
+				},
+			},
+			want: []pair{
+				{code: 0xF0, text: []rune("fl")},
+				{code: 0xF1, text: []rune("fi")},
+				{code: 0xF2, text: []rune("ffl")},
+			},
+		},
+		{
+			codec: simple,
+			r: ToUnicodeRange{
+				First:  []byte{0x41},
+				Last:   []byte{0x44},
+				Values: [][]rune{[]rune("A")},
+			},
+			want: []pair{
+				{code: 0x41, text: []rune("A")},
+				{code: 0x42, text: []rune("B")},
+				{code: 0x43, text: []rune("C")},
+				{code: 0x44, text: []rune("D")},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		var got []pair
+		for code, text := range c.r.All(c.codec) {
+			got = append(got, pair{code, text})
+		}
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("unexpected result: got %v, want %v", got, c.want)
+		}
+	}
+}
+
+// The following variabes contain test CMap data used in the tests below.
 var (
 	testToUniCMapParent = []byte(`/CIDInit /ProcSet findresource begin
 12 dict begin

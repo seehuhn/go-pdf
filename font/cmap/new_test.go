@@ -32,6 +32,77 @@ import (
 
 var _ pdf.Embedder[pdf.Unused] = (*InfoNew)(nil)
 
+func TestRangeIter(t *testing.T) {
+	simple, err := charcode.NewCodec(charcode.Simple)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gap, err := charcode.NewCodec(charcode.CodeSpaceRange{
+		{Low: []byte{0x00}, High: []byte{0x00}},
+		{Low: []byte{0x02}, High: []byte{0xFF}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ucs2, err := charcode.NewCodec(charcode.UCS2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type testCase struct {
+		codec *charcode.Codec
+		r     RangeNew
+		want  []uint32 // pairs of last, first values
+		inc   uint32
+	}
+	cases := []testCase{
+		{
+			codec: simple,
+			r:     RangeNew{First: []byte{0x20}, Last: []byte{0x7F}},
+			want:  []uint32{0x20, 0x7F},
+			inc:   1,
+		},
+		{
+			codec: simple,
+			r:     RangeNew{First: []byte{0x00}, Last: []byte{0xFF}},
+			want:  []uint32{0x00, 0xFF},
+			inc:   1,
+		},
+		{
+			codec: gap,
+			r:     RangeNew{First: []byte{0x00}, Last: []byte{0x03}},
+			want:  []uint32{0x00, 0x00, 0x02, 0x03},
+			inc:   1,
+		},
+		{
+			codec: ucs2,
+			r:     RangeNew{First: []byte{0x41, 0x80}, Last: []byte{0x42, 0xFF}},
+			want:  []uint32{0x8041, 0xFF41, 0x8042, 0xFF42},
+			inc:   0x100,
+		},
+	}
+
+	for _, c := range cases {
+		want := c.want
+		next := want[0]
+		end := want[1]
+		want = want[2:]
+		for code := range c.r.All(c.codec) {
+			if code != next {
+				t.Errorf("expected code %08x, got %08x", next, code)
+			}
+			if next == end && len(want) >= 2 {
+				next = want[0]
+				end = want[1]
+				want = want[2:]
+			} else {
+				next += c.inc
+			}
+		}
+	}
+}
+
+// The following variabes contain test CMap data used in the tests below.
 var (
 	// testCMapParent is a CMap file which defines a horizontal CMap.
 	// This is used as the parent CMap of testCMapChild.

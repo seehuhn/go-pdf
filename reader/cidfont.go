@@ -17,9 +17,6 @@
 package reader
 
 import (
-	"bytes"
-	"slices"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -91,6 +88,7 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 	}
 
 	dec := make(map[uint32]*codeInfo)
+	hasMapping := make(map[uint32]bool)
 
 	// First add the CID mappings
 	for _, entry := range encoding.CIDSingles {
@@ -101,32 +99,14 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 		dec[code] = &codeInfo{
 			CID: entry.Value,
 		}
+		hasMapping[code] = true
 	}
 	for _, entry := range encoding.CIDRanges {
-		L := len(entry.First)
-		if L != len(entry.Last) ||
-			L == 0 ||
-			!bytes.Equal(entry.First[:L-1], entry.Last[:L-1]) {
-			continue
-		}
-
-		cid := entry.Value
-		seq := bytes.Clone(entry.First)
-		for b := entry.First[L-1]; b <= entry.Last[L-1]; b++ {
-			// we check for overflow at the end of the loop
-
-			seq[L-1] = b
-			code, k, ok := codec.Decode(seq)
-			if ok && k == len(seq) {
-				dec[code] = &codeInfo{
-					CID: cid,
-				}
+		for code, cid := range entry.All(codec) {
+			dec[code] = &codeInfo{
+				CID: cid,
 			}
-
-			cid++
-			if b == 255 {
-				break
-			}
+			hasMapping[code] = true
 		}
 	}
 
@@ -138,32 +118,22 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 		}
 
 		d := dec[code]
-		d.NotDef = entry.Value
+		if hasMapping[code] {
+			d.NotDef = entry.Value
+		} else {
+			d.CID = entry.Value
+		}
 		dec[code] = d
 	}
 	for _, entry := range encoding.NotdefRanges {
-		L := len(entry.First)
-		if L != len(entry.Last) ||
-			L == 0 ||
-			!bytes.Equal(entry.First[:L-1], entry.Last[:L-1]) {
-			continue
-		}
-
-		seq := bytes.Clone(entry.First)
-		for b := entry.First[L-1]; b <= entry.Last[L-1]; b++ {
-			// we check for overflow at the end of the loop
-
-			seq[L-1] = b
-			code, k, ok := codec.Decode(seq)
-			if ok && k == len(seq) {
-				d := dec[code]
+		for code := range entry.All(codec) {
+			d := dec[code]
+			if hasMapping[code] {
 				d.NotDef = entry.Value
-				dec[code] = d
+			} else {
+				d.CID = entry.Value
 			}
-
-			if b == 255 {
-				break
-			}
+			dec[code] = d
 		}
 	}
 
@@ -179,30 +149,9 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 		dec[code] = d
 	}
 	for _, entry := range toUni.Ranges {
-		L := len(entry.First)
-		if L != len(entry.Last) ||
-			L == 0 ||
-			!bytes.Equal(entry.First[:L-1], entry.Last[:L-1]) ||
-			entry.First[L-1] > entry.Last[L-1] {
-			continue
-		}
-
-		seq := bytes.Clone(entry.First)
-		for i := range int(entry.Last[L-1]-entry.First[L-1]) + 1 {
-			seq[L-1] = entry.First[L-1] + byte(i)
-			code, k, ok := codec.Decode(seq)
-			if !ok || k != len(seq) {
-				continue
-			}
-
+		for code, text := range entry.All(codec) {
 			d := dec[code]
-			if i < len(entry.Values) {
-				d.Text = entry.Values[i]
-			} else {
-				text := slices.Clone(entry.Values[0])
-				text[len(text)-1] += rune(i)
-				d.Text = text
-			}
+			d.Text = text
 			dec[code] = d
 		}
 	}
@@ -215,6 +164,7 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 	res := &CIDFont{
 		codec:  codec,
 		dec:    dec,
+		wMode:  encoding.WMode,
 		widths: ww,
 		dw:     dw,
 	}

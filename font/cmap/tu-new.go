@@ -17,10 +17,13 @@
 package cmap
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
 	"io"
+	"iter"
+	"slices"
 	"strings"
 	"text/template"
 	"unicode/utf16"
@@ -63,6 +66,49 @@ func (r ToUnicodeRange) String() string {
 		ss[i] = string(v)
 	}
 	return fmt.Sprintf("% 02x-% 02x: %q", r.First, r.Last, ss)
+}
+
+// All returns all assigned texts of valid codes within a range.
+// The argument codec is used to determine which codes are valid.
+func (r ToUnicodeRange) All(codec *charcode.Codec) iter.Seq2[uint32, []rune] {
+	return func(yield func(uint32, []rune) bool) {
+		L := len(r.First)
+		if L != len(r.Last) || L == 0 {
+			return
+		}
+
+		seq := bytes.Clone(r.First)
+		offs := 0
+		for {
+			code, k, ok := codec.Decode(seq)
+			if ok && k == len(seq) {
+				var rr []rune
+				if offs < len(r.Values) {
+					rr = r.Values[offs]
+				} else {
+					rr = slices.Clone(r.Values[0])
+					rr[len(rr)-1] += rune(offs)
+				}
+				if !yield(code, rr) {
+					return
+				}
+			}
+			offs++
+
+			pos := L - 1
+			for pos >= 0 {
+				if seq[pos] < r.Last[pos] {
+					seq[pos]++
+					break
+				}
+				seq[pos] = r.First[pos]
+				pos--
+			}
+			if pos < 0 {
+				break
+			}
+		}
+	}
 }
 
 // MakeName returns a unique name for the ToUnicodeInfo object.

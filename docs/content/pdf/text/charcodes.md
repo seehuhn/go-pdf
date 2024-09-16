@@ -34,14 +34,3 @@ If the font does not contain a glyph for a CID, the following things happen:
 1. If there is a notdef mapping for the corresponding code,
    and there is a glyph for the CID from the notdef mapping, this glyph is shown.
 2. Otherwise, the glyph for CID 0 is shown.
-
-
-# Algorithm for Decoding Character Codes
-
-I want to construct a lookup tree which takes a sequence of bytes as input
-and returns two CID values and the number of bytes consumed.  The returned
-CID values are as follows:
-
-- If the code is valid and has a CID mapping, the resulting CID is added to the list.
-- If the code is valid and has a notdef mapping, the resulting CID is added to the list.
-- If the list is shorter than 2, It is padded with zeros.
