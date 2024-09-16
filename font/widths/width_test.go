@@ -54,7 +54,7 @@ func TestWidthsFull(t *testing.T) {
 	var ww []float64
 	for _, g := range gg.Seq {
 		ww = append(ww, otf.GlyphWidthPDF(g.GID))
-		s, _, _ = E.CodeAndWidth(s, g.GID, g.Text)
+		s, _ = E.AppendEncoded(s, g.GID, g.Text)
 	}
 	err = rm.Close()
 	if err != nil {

@@ -33,12 +33,14 @@ same for all content streams within a PDF file.
 Typesetting
 -----------
 
-PDF fonts generated within the library contain all information required
-for typesetting text.
+PDF fonts generated within the library contain all information required for
+typesetting text. Some of this information (leading, kerning tables, ligature
+maps, glyph bounding boxes) is not always explicitly stored in PDF files, so
+may not available for fonts extracted from PDF files.
 
-Some of this information (leading, kerning tables, ligature maps, glyph
-bounding boxes) is not always explicitly stored in PDF files, so may not
-available for fonts extracted from PDF files.
+The following steps are performed:
+- rune -> glyph ID: this uses information from the font
+-
 
 Text Positioning
 ----------------
@@ -88,12 +90,13 @@ The Go API needs to cater for the following use cases:
 
   - Fonts created within the library must expose a way to convert
     a Go string to a sequence of glyphs, taking kerning and ligature
-    tables into account.  Fonts extracted from a PDF file do not
+    tables into account.  Fonts extracted from a PDF file may not
     expose this functionality.
 
-The following table lists different operations on different types of fonts: A =
-created font (users of the library), B = created font (PDF writer),
-tied to a PDF file, C = extracted font (PDF reader).
+The following table lists different operations on different types of fonts:
+- A = created font (users of the library)
+- B = created font (PDF writer), tied to a PDF file
+- C = extracted font (PDF reader).
 
 | A | B | C | Operation
 |---|---|---|-----------

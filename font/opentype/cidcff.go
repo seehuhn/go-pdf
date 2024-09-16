@@ -61,12 +61,11 @@ func (f *embeddedCFFComposite) DecodeWidth(s pdf.String) (float64, int) {
 	return 0, 0
 }
 
-func (f *embeddedCFFComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *embeddedCFFComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	// TODO(voss): deal with different Font Matrices for different private dicts.
 	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-	k := len(s)
 	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
-	return s, width, len(s) == k+1 && s[k] == ' '
+	return s, width
 }
 
 func (f *embeddedCFFComposite) Close() error {

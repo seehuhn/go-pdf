@@ -146,7 +146,7 @@ func (f *CIDFont) DecodeWidth(s pdf.String) (float64, int) {
 	return ci.W, k
 }
 
-// CodeAndWidth converts a glyph ID (corresponding to the given text) into
+// AppendEncoded converts a glyph ID (corresponding to the given text) into
 // a PDF character code The character code is appended to s. The function
 // returns the new string s, the width of the glyph in PDF text space units
 // (still to be multiplied by the font size), and a value indicating
@@ -154,6 +154,6 @@ func (f *CIDFont) DecodeWidth(s pdf.String) (float64, int) {
 //
 // As a side effect, this function may allocate codes for the given
 // glyph/text combination in the font's encoding.
-func (f *CIDFont) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *CIDFont) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
 	panic("not implemented") // TODO: Implement
 }

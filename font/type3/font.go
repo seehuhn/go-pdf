@@ -142,11 +142,11 @@ func (f *embedded) DecodeWidth(s pdf.String) (float64, int) {
 	return width, 1
 }
 
-func (f *embedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	name := f.GlyphNames[gid]
 	width := float64(f.Glyphs[name].WidthX) * f.Font.FontMatrix[0]
 	c := f.GIDToCode(gid, rr)
-	return append(s, c), width, c == ' '
+	return append(s, c), width
 }
 
 func (f *embedded) Close() error {

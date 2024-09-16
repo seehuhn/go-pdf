@@ -61,11 +61,10 @@ func (f *embeddedComposite) DecodeWidth(s pdf.String) (float64, int) {
 	return 0, 0
 }
 
-func (f *embeddedComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
-	k := len(s)
 	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
-	return s, width, len(s) == k+1 && s[k] == ' '
+	return s, width
 }
 
 func (f *embeddedComposite) Close() error {

@@ -111,7 +111,7 @@ func Operator(c Color) ([]float64, Pattern, string) {
 		return v, nil, "SCN"
 	case colorColoredPattern:
 		return v, c.Pat, "SCN"
-	case *colorUncoloredPattern:
+	case colorUncoloredPattern:
 		return v, c.Pat, "SCN"
 	case colorIndexed:
 		return v, nil, "SC"

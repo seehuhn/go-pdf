@@ -345,7 +345,7 @@ func (f *fromFileSimple) DecodeWidth(s pdf.String) (float64, int) {
 	return f.widths[s[0]], 1
 }
 
-func (f *fromFileSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *fromFileSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	panic("not implemented")
 }
 
@@ -398,7 +398,7 @@ func (f *fromFileComposite) DecodeWidth(s pdf.String) (float64, int) {
 	return 0, 0
 }
 
-func (f *fromFileComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *fromFileComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	panic("not implemented")
 }
 

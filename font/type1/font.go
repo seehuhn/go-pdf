@@ -274,9 +274,9 @@ func (f *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
 	return f.widths[gid], 1
 }
 
-func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	c := f.GIDToCode(gid, rr)
-	return append(s, c), f.widths[gid], c == ' '
+	return append(s, c), f.widths[gid]
 }
 
 func (f *embeddedSimple) Close() error {

@@ -315,6 +315,6 @@ func (f *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 	return f.W[s[0]], 1
 }
 
-func (f *testFontEmbedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *testFontEmbedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	panic("not implemented")
 }
