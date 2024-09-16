@@ -131,13 +131,15 @@ func (f *embedded) WritingMode() cmap.WritingMode {
 	return 0
 }
 
-func (f *embedded) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	for _, c := range s {
-		gid := f.Encoding[c]
-		name := f.GlyphNames[gid]
-		width := float64(f.Glyphs[name].WidthX) * f.Font.FontMatrix[0]
-		yield(width, c == ' ')
+func (f *embedded) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
 	}
+	c := s[0]
+	gid := f.Encoding[c]
+	name := f.GlyphNames[gid]
+	width := float64(f.Glyphs[name].WidthX) * f.Font.FontMatrix[0]
+	return width, 1
 }
 
 func (f *embedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

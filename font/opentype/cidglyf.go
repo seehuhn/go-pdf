@@ -55,12 +55,13 @@ func (f *embeddedGlyfComposite) WritingMode() cmap.WritingMode {
 	return 0
 }
 
-func (f *embeddedGlyfComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
+func (f *embeddedGlyfComposite) DecodeWidth(s pdf.String) (float64, int) {
 	for code, cid := range f.AllCIDs(s) {
 		gid := f.GID(cid)
 		width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
-		yield(width, len(code) == 1 && code[0] == ' ')
+		return width, len(code)
 	}
+	return 0, 0
 }
 
 func (f *embeddedGlyfComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

@@ -138,8 +138,12 @@ func (f *CIDFont) WritingMode() cmap.WritingMode {
 	return f.cmap.WMode
 }
 
-func (f *CIDFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	panic("not implemented")
+func (f *CIDFont) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	ci, k := f.Decode(s)
+	return ci.W, k
 }
 
 // CodeAndWidth converts a glyph ID (corresponding to the given text) into

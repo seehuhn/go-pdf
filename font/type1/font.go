@@ -266,11 +266,12 @@ type embeddedSimple struct {
 	closed bool
 }
 
-func (f *embeddedSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	for _, c := range s {
-		gid := f.Encoding[c]
-		yield(f.widths[gid], c == ' ')
+func (f *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
 	}
+	gid := f.Encoding[s[0]]
+	return f.widths[gid], 1
 }
 
 func (f *embeddedSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

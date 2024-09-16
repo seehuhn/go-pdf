@@ -51,13 +51,14 @@ func (f *embeddedCFFComposite) WritingMode() cmap.WritingMode {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 
-func (f *embeddedCFFComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
+func (f *embeddedCFFComposite) DecodeWidth(s pdf.String) (float64, int) {
 	for code, cid := range f.AllCIDs(s) {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.
 		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-		yield(width, len(code) == 1 && code[0] == ' ')
+		return width, len(code)
 	}
+	return 0, 0
 }
 
 func (f *embeddedCFFComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

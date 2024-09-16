@@ -384,16 +384,22 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 
 func (w *Writer) updateTextPosition(s pdf.String) {
 	wmode := w.TextFont.WritingMode()
-	w.TextFont.ForeachWidth(s, func(width float64, isSpace bool) {
+
+	pos := 0
+	for pos < len(s) {
+		width, k := w.TextFont.DecodeWidth(s[pos:])
 		width = width*w.TextFontSize + w.TextCharacterSpacing
-		if isSpace {
+		if k == 1 && s[pos] == ' ' {
 			width += w.TextWordSpacing
 		}
+
 		switch wmode {
 		case 0: // horizontal
 			w.TextMatrix = matrix.Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
 		case 1: // vertical
 			w.TextMatrix = matrix.Translate(0, width).Mul(w.TextMatrix)
 		}
-	})
+
+		pos += k
+	}
 }

@@ -66,7 +66,11 @@ type Font interface {
 type Embedded interface {
 	WritingMode() cmap.WritingMode
 
-	ForeachWidth(s pdf.String, yield func(width float64, isSpace bool))
+	// DecodeWidth reads one character code from the given string and returns
+	// the width of the corresponding glyph in PDF text space units (still to
+	// be multiplied by the font size) and the number of bytes read from the
+	// string.
+	DecodeWidth(pdf.String) (float64, int)
 
 	// CodeAndWidth converts a glyph ID (corresponding to the given text) into
 	// a PDF character code The character code is appended to s. The function

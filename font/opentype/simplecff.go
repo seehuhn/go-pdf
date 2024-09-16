@@ -49,11 +49,12 @@ type embeddedCFFSimple struct {
 	closed bool
 }
 
-func (f *embeddedCFFSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	for _, c := range s {
-		gid := f.Encoding[c]
-		yield(f.sfnt.GlyphWidthPDF(gid), c == ' ')
+func (f *embeddedCFFSimple) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
 	}
+	gid := f.Encoding[s[0]]
+	return f.sfnt.GlyphWidthPDF(gid), 1
 }
 
 func (f *embeddedCFFSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

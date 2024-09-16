@@ -279,15 +279,12 @@ func (f *testFont) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-// ForeachWidth calls the given function for each character in the string.
+// DecodeWidth reads one character code from the given string and returns
+// the width of the corresponding glyph.
 // This implements the [font.Embedded] interface.
-func (f *testFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	i := 0
-	for i < len(s) {
-		code, k, _ := f.codec.Decode(s[i:])
-		yield(2000, code == 32 && k == 1)
-		i += k
-	}
+func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {
+	_, k, _ := f.codec.Decode(s)
+	return 2000, k
 }
 
 // CodeAndWidth encodes the given glyph ID as a PDF character code.

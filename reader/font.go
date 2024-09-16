@@ -338,10 +338,11 @@ func (f *fromFileSimple) WritingMode() cmap.WritingMode {
 	return 0
 }
 
-func (f *fromFileSimple) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	for _, c := range s {
-		yield(f.widths[c], c == ' ')
+func (f *fromFileSimple) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
 	}
+	return f.widths[s[0]], 1
 }
 
 func (f *fromFileSimple) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
@@ -386,14 +387,15 @@ func (f *fromFileComposite) WritingMode() cmap.WritingMode {
 	return f.writingMode
 }
 
-func (f *fromFileComposite) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	f.cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
-		// TODO(voss): notdef glyph(s)???
+func (f *fromFileComposite) DecodeWidth(s pdf.String) (float64, int) {
+	for code := range f.cs.AllCodes(s) {
+		var width float64
 		if g, ok := f.glyph[string(code)]; ok {
-			yield(g.width, len(code) == 1 && code[0] == ' ')
+			width = g.width
 		}
-		return true
-	})
+		return width, len(code)
+	}
+	return 0, 0
 }
 
 func (f *fromFileComposite) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {

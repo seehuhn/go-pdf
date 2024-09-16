@@ -308,12 +308,13 @@ func (f *testFontEmbedded) WritingMode() cmap.WritingMode {
 	return 0
 }
 
-func (f *testFontEmbedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
-	panic("not implemented")
+// DecodeWidth reads one character code from the given string and returns
+// the width of the corresponding glyph.
+// This implements the [font.Embedded] interface.
+func (f *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
+	return f.W[s[0]], 1
 }
 
-func (f *testFontEmbedded) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	for _, c := range s {
-		yield(f.W[c], c == 32)
-	}
+func (f *testFontEmbedded) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	panic("not implemented")
 }
