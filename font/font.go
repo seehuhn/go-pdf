@@ -80,3 +80,11 @@ type Embedded interface {
 	// TODO(voss): move this to Layouter?
 	CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool)
 }
+
+// CodeInfo contains information associated with a character code.
+type CodeInfo struct {
+	CID    cmap.CID
+	Notdef cmap.CID
+	Text   string
+	W      float64
+}

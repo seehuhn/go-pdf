@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
+	"hash"
 	"io"
 	"iter"
 	"slices"
@@ -121,7 +122,10 @@ func (info *ToUnicodeInfo) MakeName() pdf.Name {
 	return pdf.Name(fmt.Sprintf("GoPDF-%x-UTF16", h.Sum(nil)))
 }
 
-func (info *ToUnicodeInfo) writeBinary(h io.Writer, maxGen int) {
+// writeBinary writes a binary representation of the ToUnicodeInfo object to
+// the [hash.Hash] h.  The maxGen parameter limits the number of parent
+// references, to avoid infinite recursion.
+func (info *ToUnicodeInfo) writeBinary(h hash.Hash, maxGen int) {
 	// This function is only used to write to a hash.Hash.
 	// Therefore we don't need to check for write errors.
 
@@ -170,6 +174,43 @@ func (info *ToUnicodeInfo) writeBinary(h io.Writer, maxGen int) {
 	if info.Parent != nil {
 		info.Parent.writeBinary(h, maxGen-1)
 	}
+}
+
+func (info *ToUnicodeInfo) Lookup(code []byte) []rune {
+	for _, s := range info.Singles {
+		if bytes.Equal(s.Code, code) {
+			return s.Value
+		}
+	}
+
+rangesLoop:
+	for _, r := range info.Ranges {
+		if len(r.First) != len(code) || len(r.Last) != len(code) {
+			continue
+		}
+
+		var index int
+		for i, b := range code {
+			if b < r.First[i] || b > r.Last[i] {
+				continue rangesLoop
+			}
+			index = index*int(r.Last[i]-r.First[i]+1) + int(b-r.First[i])
+		}
+
+		var rr []rune
+		if index < len(r.Values) {
+			rr = r.Values[index]
+		} else {
+			rr = slices.Clone(r.Values[0])
+			rr[len(rr)-1] += rune(index)
+		}
+		return rr
+	}
+
+	if info.Parent != nil {
+		return info.Parent.Lookup(code)
+	}
+	return nil
 }
 
 func ExtractToUnicodeNew(r pdf.Getter, obj pdf.Object) (*ToUnicodeInfo, error) {

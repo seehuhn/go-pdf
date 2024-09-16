@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"iter"
 	"sync"
 	"text/template"
 
@@ -90,43 +89,6 @@ type RangeNew struct {
 
 func (r RangeNew) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %d", r.First, r.Last, r.Value)
-}
-
-// All returns all valid character codes within a range of codes.
-// The argument codec is used to decode the character codes
-// and to determine which codes are valid.
-func (r RangeNew) All(codec *charcode.Codec) iter.Seq2[uint32, CID] {
-	return func(yield func(uint32, CID) bool) {
-		L := len(r.First)
-		if L != len(r.Last) || L == 0 {
-			return
-		}
-
-		seq := bytes.Clone(r.First)
-		offs := 0
-		for {
-			code, k, ok := codec.Decode(seq)
-			if ok && k == len(seq) {
-				if !yield(code, r.Value+CID(offs)) {
-					return
-				}
-			}
-			offs++
-
-			pos := L - 1
-			for pos >= 0 {
-				if seq[pos] < r.Last[pos] {
-					seq[pos]++
-					break
-				}
-				seq[pos] = r.First[pos]
-				pos--
-			}
-			if pos < 0 {
-				break
-			}
-		}
-	}
 }
 
 type CID uint32
@@ -325,6 +287,62 @@ func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
 	}
 
 	return res, parent, nil
+}
+
+func (c *InfoNew) LookupCID(code []byte) CID {
+	for _, s := range c.CIDSingles {
+		if bytes.Equal(s.Code, code) {
+			return s.Value
+		}
+	}
+
+rangesLoop:
+	for _, r := range c.CIDRanges {
+		if len(r.First) != len(code) || len(r.Last) != len(code) {
+			continue
+		}
+		var index int
+		for i, b := range code {
+			if b < r.First[i] || b > r.Last[i] {
+				continue rangesLoop
+			}
+			index = index*int(r.Last[i]-r.First[i]+1) + int(b-r.First[i])
+		}
+
+		return r.Value + CID(index)
+	}
+
+	if c.Parent != nil {
+		return c.Parent.LookupCID(code)
+	}
+	return 0
+}
+
+func (c *InfoNew) LookupNotdefCID(code []byte) CID {
+	for _, s := range c.NotdefSingles {
+		if bytes.Equal(s.Code, code) {
+			return s.Value
+		}
+	}
+
+rangesLoop:
+	for _, r := range c.NotdefRanges {
+		if len(r.First) != len(code) || len(r.Last) != len(code) {
+			continue
+		}
+		for i, b := range code {
+			if b < r.First[i] || b > r.Last[i] {
+				continue rangesLoop
+			}
+		}
+
+		return r.Value
+	}
+
+	if c.Parent != nil {
+		return c.Parent.LookupNotdefCID(code)
+	}
+	return 0
 }
 
 func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {

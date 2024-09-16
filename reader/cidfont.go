@@ -17,6 +17,8 @@
 package reader
 
 import (
+	"unicode"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -27,38 +29,14 @@ import (
 
 type CIDFont struct {
 	codec *charcode.Codec
-	dec   map[uint32]*codeInfo
+	cmap  *cmap.InfoNew
+	toUni *cmap.ToUnicodeInfo
+	dec   map[uint32]*font.CodeInfo
 
-	wMode cmap.WritingMode
+	notdef *font.CodeInfo
 
 	widths map[cmap.CID]float64
 	dw     float64
-}
-
-type codeInfo struct {
-	CID    cmap.CID
-	NotDef cmap.CID // CID to use if glyph is missing from the font
-	Text   []rune
-}
-
-func (f *CIDFont) WritingMode() cmap.WritingMode {
-	return f.wMode
-}
-
-func (f *CIDFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
-	panic("not implemented")
-}
-
-// CodeAndWidth converts a glyph ID (corresponding to the given text) into
-// a PDF character code The character code is appended to s. The function
-// returns the new string s, the width of the glyph in PDF text space units
-// (still to be multiplied by the font size), and a value indicating
-// whether PDF word spacing adjustment applies to this glyph.
-//
-// As a side effect, this function may allocate codes for the given
-// glyph/text combination in the font's encoding.
-func (f *CIDFont) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
-	panic("not implemented") // TODO: Implement
 }
 
 func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
@@ -87,87 +65,91 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 		return nil, err
 	}
 
-	dec := make(map[uint32]*codeInfo)
-	hasMapping := make(map[uint32]bool)
-
-	// First add the CID mappings
-	for _, entry := range encoding.CIDSingles {
-		code, k, ok := codec.Decode(entry.Code)
-		if !ok || k != len(entry.Code) {
-			continue
-		}
-		dec[code] = &codeInfo{
-			CID: entry.Value,
-		}
-		hasMapping[code] = true
-	}
-	for _, entry := range encoding.CIDRanges {
-		for code, cid := range entry.All(codec) {
-			dec[code] = &codeInfo{
-				CID: cid,
-			}
-			hasMapping[code] = true
-		}
-	}
-
-	// Add the notdef mappings
-	for _, entry := range encoding.NotdefSingles {
-		code, k, ok := codec.Decode(entry.Code)
-		if !ok || k != len(entry.Code) {
-			continue
-		}
-
-		d := dec[code]
-		if hasMapping[code] {
-			d.NotDef = entry.Value
-		} else {
-			d.CID = entry.Value
-		}
-		dec[code] = d
-	}
-	for _, entry := range encoding.NotdefRanges {
-		for code := range entry.All(codec) {
-			d := dec[code]
-			if hasMapping[code] {
-				d.NotDef = entry.Value
-			} else {
-				d.CID = entry.Value
-			}
-			dec[code] = d
-		}
-	}
-
-	// Add the ToUnicode mappings
-	for _, entry := range toUni.Singles {
-		code, k, ok := codec.Decode(entry.Code)
-		if !ok || k != len(entry.Code) {
-			continue
-		}
-
-		d := dec[code]
-		d.Text = entry.Value
-		dec[code] = d
-	}
-	for _, entry := range toUni.Ranges {
-		for code, text := range entry.All(codec) {
-			d := dec[code]
-			d.Text = text
-			dec[code] = d
-		}
-	}
-
 	ww, dw, err := widths.DecodeComposite(r, cidFontDict["W"], cidFontDict["DW"])
 	if err != nil {
 		return nil, err
 	}
 
+	cid0Width, ok := ww[0]
+	if !ok {
+		cid0Width = dw
+	}
+	notdef := &font.CodeInfo{
+		Text: string([]rune{unicode.ReplacementChar}),
+		W:    cid0Width,
+	}
+
 	res := &CIDFont{
-		codec:  codec,
-		dec:    dec,
-		wMode:  encoding.WMode,
+		codec: codec,
+		cmap:  encoding,
+		toUni: toUni,
+		dec:   make(map[uint32]*font.CodeInfo),
+
+		notdef: notdef,
+
 		widths: ww,
 		dw:     dw,
 	}
 
 	return res, nil
+}
+
+func (f *CIDFont) Decode(s pdf.String) (*font.CodeInfo, int) {
+	code, k, ok := f.codec.Decode(s)
+	if !ok {
+		return f.notdef, k
+	}
+
+	if ci, ok := f.dec[code]; ok {
+		return ci, k
+	}
+
+	CID1 := f.cmap.LookupCID(s[:k])
+	CID2 := f.cmap.LookupNotdefCID(s[:k])
+	if CID1 == 0 {
+		CID1 = CID2
+		CID2 = 0
+	}
+
+	w, ok := f.widths[CID1]
+	if !ok {
+		w = f.dw
+	}
+
+	var text []rune
+	if f.toUni != nil {
+		text = f.toUni.Lookup(s[:k])
+	} else {
+		// TODO(voss): try the ToUnicode CMaps for the Adobe standard
+		// character collections.
+	}
+
+	res := &font.CodeInfo{
+		CID:    CID1,
+		Notdef: CID2,
+		Text:   string(text),
+		W:      w,
+	}
+	f.dec[code] = res
+	return res, k
+}
+
+func (f *CIDFont) WritingMode() cmap.WritingMode {
+	return f.cmap.WMode
+}
+
+func (f *CIDFont) ForeachWidth(s pdf.String, yield func(width float64, isSpace bool)) {
+	panic("not implemented")
+}
+
+// CodeAndWidth converts a glyph ID (corresponding to the given text) into
+// a PDF character code The character code is appended to s. The function
+// returns the new string s, the width of the glyph in PDF text space units
+// (still to be multiplied by the font size), and a value indicating
+// whether PDF word spacing adjustment applies to this glyph.
+//
+// As a side effect, this function may allocate codes for the given
+// glyph/text combination in the font's encoding.
+func (f *CIDFont) CodeAndWidth(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+	panic("not implemented") // TODO: Implement
 }

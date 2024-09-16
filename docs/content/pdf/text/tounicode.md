@@ -103,6 +103,12 @@ shall be used as its Unicode code point."
 endcodespacerange
 ```
 
+## Adobe Character Collections
+
+ToUnicode CMaps for the standard Adobe Character collections can be found
+on GitHub:
+- https://github.com/adobe-type-tools/mapping-resources-pdf
+
 ## References
 
 - PDF 32000-1:2008 and ISO 32000-2:2020.
