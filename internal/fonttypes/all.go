@@ -69,8 +69,8 @@ var All = []*Sample{
 		MakeFont:    OpenTypeGlyfSimple,
 	},
 	{
-		Label:       "BuiltIn",
-		Description: "a built-in Type 1 font",
+		Label:       "Standard",
+		Description: "a standard Type 1 font",
 		Type:        font.Type1,
 		MakeFont:    Standard,
 	},

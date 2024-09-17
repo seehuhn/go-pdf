@@ -3,11 +3,143 @@ title = 'Some design considerations for the font API'
 date = 2024-08-31T23:13:27+01:00
 +++
 
-Some design considerations for the font API
-===========================================
+# Some design considerations for the font API
 
-Glyph ID Values
----------------
+## Requirements from the PDF specification
+
+There are seven types of simple fonts which can be used in a PDF file:
+- Type 1
+- Multiple Master Type 1
+- CFF font data
+- TrueType
+- OpenType with CFF glyph outlines
+- OpenType with "glyf" glyph outlines
+- Type 3
+
+Except for Type 3 fonts, the glyph data can either be embedded in the PDF file,
+or be loaded from an external file by the viewer.
+
+There are four types of composite fonts which can be used in a PDF file:
+- CFF font data
+- TrueType
+- OpenType with CFF glyph outlines
+- OpenType with "glyf" glyph outlines
+
+I believe that for all these font types, the glyph data can either be embedded
+in the PDF file, or be loaded from an external file by the viewer.
+
+### Font information stored in a PDF file
+
+#### General
+
+- For all fonts, the `ToUnicode` entry in the font dictionary (optional) maps
+  character codes to Unicode code points.
+
+#### All Simple Fonts
+
+- Glyph widths are described by the `Widths` entry in the font dictionary and
+  the `MissingWidth` entry of the font descriptor.  The widths array is indexed
+  by character code.
+
+#### Type 1 (`Type1`)
+
+- The font is identified by the `BaseFont` entry in the font dictionary and the
+  `FontName` entry in the font descriptor.  If the font is embedded in the PDF
+  file, the name may be prefixed by a subset tag (e.g. `ABCDEF+Times-Roman`).
+  This gives the "PostScript name" of the font.
+
+- The `Encoding` entry in the font dictionary, **together with the font's
+  built-in encoding**, maps character codes to glyph names.
+
+#### Multiple Master Type 1 (`MMType1`)
+
+The information stored in the files is the same as for Type 1 fonts,
+with the only exception that the space characters in the font name
+are replaced with underscore characters.
+
+If the glyph data is embedded in the PDF file, the data is embedded as
+an ordinary Type 1 font (a snapshot of the multiple master font).
+In case the font is loaded from an external file, space/underscore-separated
+numbers give the values for the design axes.
+
+#### Type 3 (`Type3`)
+
+- The font name is optional.  If it is present, it is given by the `Name` entry
+  in the Type3 font dictionary and the `FontName` entry in the font descriptor.
+
+- The `Encoding` entry in the font dictionary maps character codes to glyph
+  names.
+
+#### Simple CFF font data
+
+#### Simple TrueType (`TrueType`)
+
+- The font is identified by the `BaseFont` entry in the font dictionary and the
+  `FontName` entry in the font descriptor.  If the font is embedded in the PDF
+  file, the name may be prefixed by a subset tag (e.g. `ABCDEF+Times-Roman`).
+  The given name may either be the "PostScript name" of the font (if present in
+  the TrueType `"name"` table), or it may be "derived from the name by which
+  the font is known in the host operating system".
+- Font programs "should" be embedded.
+
+- There are special rules for constructing a map from codes to glyph names from
+  the `Encoding` entry in the font dictionary (see section 9.6.5.4, Encodings
+  for TrueType fonts).
+
+- There is a variety of mechanisms to map a single-byte code `c` to a glyph in
+  a TrueType font:
+  - Use a (1,0) "cmap" subtable to map `c` to a glyph.
+  - In a (3,0) "cmap" subtable, look up either `c`, `c+0xF000`, `c+0xF100`,
+    or `c+0xF200` to get a glyph.
+  - Use the encoding to map `c` to a name, use Mac OS Roman to map the name to
+    a code, and use a (1,0) "cmap" subtable to map this code to a glyph.
+  - Use the encoding to map `c` to a name, use the Adobe Glyph List to map the
+    name to unicode, and use a (3,1) "cmap" subtable to map this character to a
+    glyph.
+  - Use the encoding to map `c` to a name, and use the "post" table to look
+    up the glyph.
+
+  The order in which these are tried may depend on the "Symbolic flag" in the
+  font descriptor, the PDF version, and whether the encoding is present, and
+  potentially on whether a `Differences` array is present in the encoding dict.
+
+#### Simple OpenType with CFF glyph outlines
+#### Simple OpenType with "glyf" glyph outlines
+
+
+#### composite CFF font data
+#### composite TrueType
+#### composite OpenType with CFF glyph outlines
+#### composite OpenType with "glyf" glyph outlines
+
+
+
+## Extracting Text
+
+## Typesetting New Text
+
+PDF fonts generated within the library contain all information required for
+typesetting text. Some of this information (leading, kerning tables, ligature
+maps, glyph bounding boxes) is not always explicitly stored in PDF files, so
+may not available for fonts extracted from PDF files.
+
+- Composite Fonts
+
+  The following steps are performed:
+  - rune -> GID: this uses information from the font file
+  - GID -> CID: could be (a) from character collection/font file,
+    or (b) be the identity map or (c) be constructed on the fly
+  - CID -> character code: Could be either (a) from a CMap, or (b) 2-byte
+    encoding of CID values, or (c) constructed on the fly
+
+- Simple Fonts
+
+  The following steps are performed:
+  - rune -> GID/name: this uses information from the font file
+  - GID/name -> character code: could be (a) from a pre-defined encoding, or (b)
+    constructed on the fly
+
+## Glyph ID Values
 
 I normally address the glyphs in a font file by a Glyph ID (GID).
 In Go, use the data type `seehuhn.de/go/sfnt/glyph.ID` for this,
@@ -18,8 +150,7 @@ where it does not refer to any glyph at all).
 
 The map of GIDs to glyphs is fixed for any given font instance.
 
-Character Codes
----------------
+## Character Codes
 
 Inside content streams, the glyphs are addressed by a (single or multi-byte)
 character code.  When typesetting new text, the library automatically allocates
@@ -30,20 +161,8 @@ in the font dictionary.
 The map of character codes to glyphs can differ between PDF files, but is the
 same for all content streams within a PDF file.
 
-Typesetting
------------
 
-PDF fonts generated within the library contain all information required for
-typesetting text. Some of this information (leading, kerning tables, ligature
-maps, glyph bounding boxes) is not always explicitly stored in PDF files, so
-may not available for fonts extracted from PDF files.
-
-The following steps are performed:
-- rune -> glyph ID: this uses information from the font
--
-
-Text Positioning
-----------------
+## Text Positioning
 
 Some information is required to keep track of the current text position in
 content streams.  This information is available for all fonts generated within
@@ -68,8 +187,7 @@ The required information is as follows:
   - For text extracted from a PDF file, the ability to split a PDF string
     into a sequence of character codes is also required.
 
-Go API
-------
+## Go API
 
 The Go API needs to cater for the following use cases:
 

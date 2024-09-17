@@ -200,7 +200,7 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 		"Subtype":  pdf.Name("Type1"),
 		"BaseFont": pdf.Name(fontName),
 	}
-	if w.GetMeta().Version == pdf.V1_0 {
+	if w.GetMeta().Version == pdf.V1_0 && info.ResName != "" {
 		fontDict["Name"] = info.ResName
 	}
 	if enc := encoding.DescribeEncodingType1(info.Encoding, info.BuiltinEncoding()); enc != nil {

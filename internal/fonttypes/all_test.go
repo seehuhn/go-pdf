@@ -82,7 +82,7 @@ func TestPostScriptName(t *testing.T) {
 
 		var expected string
 		switch sample.Label {
-		case "BuiltIn":
+		case "Standard":
 			// There is no built-in Go-Regular font.
 			expected = "Helvetica"
 		case "Type3":

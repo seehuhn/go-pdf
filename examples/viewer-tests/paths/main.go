@@ -25,7 +25,10 @@ import (
 )
 
 func main() {
-	page, err := document.CreateSinglePage("test.pdf", document.A4, pdf.V1_7, nil)
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	page, err := document.CreateSinglePage("test.pdf", document.A4, pdf.V1_7, opt)
 	if err != nil {
 		log.Fatal(err)
 	}

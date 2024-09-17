@@ -79,8 +79,11 @@ func drawPage(H font.Font, nRow int, page *document.Page, F font.Layouter, desc 
 		row := i / 16
 		col := i % 16
 
-		for geom.GlyphExtents[gid].IsZero() {
+		for int(gid) < len(geom.GlyphExtents) && geom.GlyphExtents[gid].IsZero() {
 			gid++
+		}
+		if int(gid) >= len(geom.GlyphExtents) {
+			break
 		}
 		w := geom.Widths[gid]
 		gg := &font.GlyphSeq{

@@ -45,6 +45,7 @@ when I found the existing text to be unclear or ambiguous:
 While writing this library, I have also filed several bug reports against other
 projects.  Here is a list:
 
+- https://github.com/golang/go/issues/69507
 - https://github.com/google/go-cmp/issues/350
 - https://github.com/google/go-cmp/issues/335
 - https://github.com/google/go-cmp/issues/317

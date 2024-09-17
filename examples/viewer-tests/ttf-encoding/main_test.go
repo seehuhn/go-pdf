@@ -18,16 +18,20 @@ package main
 
 import (
 	"fmt"
+	"testing"
 
-	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/postscript/type1/names"
 )
 
-func main() {
-	for _, Fx := range gofont.All {
-		F, err := Fx.New(nil)
-		if err != nil {
-			panic(err)
+func TestEncodings(t *testing.T) {
+	for _, code := range markerString {
+		name := pdfenc.WinAnsiEncoding[code]
+		rr := names.ToUnicode(name, false)
+		if len(rr) != 1 {
+			t.Errorf("expected 1 rune for %s, got %d", name, len(rr))
+			continue
 		}
-		fmt.Println(F.FullName())
+		fmt.Printf("%d -> %s -> 0x%04x %d %q\n", code, name, rr[0], rr[0], rr[0])
 	}
 }

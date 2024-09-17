@@ -136,7 +136,7 @@ func run(filename string) error {
 			default:
 				page.TextNextLine()
 			}
-			page.TextSetFont(M, fontSize)
+			page.TextSetFont(F, fontSize)
 			glyphWidth := fontSize * geom.Widths[gid]
 			gg := &font.GlyphSeq{
 				Seq: make([]font.Glyph, k),

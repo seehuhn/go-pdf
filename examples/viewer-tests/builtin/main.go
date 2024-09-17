@@ -34,7 +34,7 @@ func main() {
 	const margin = 50
 
 	paper := document.A4
-	doc, err := document.CreateMultiPage("builtin.pdf", paper, pdf.V1_0, nil)
+	doc, err := document.CreateMultiPage("builtin.pdf", paper, pdf.V1_7, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
