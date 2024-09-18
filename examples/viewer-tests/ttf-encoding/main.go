@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"iter"
 	"log"
 	"slices"
 	"strings"
@@ -37,9 +36,9 @@ func main() {
 }
 
 func run() error {
-	version := pdf.V1_7
-	useSymbolic := false
-	useEncoding := false
+	version := pdf.V1_2
+	useSymbolic := true
+	useEncoding := true
 	base := uint16(0x0000)
 
 	var methods string
@@ -84,28 +83,37 @@ func run() error {
 		tag     string
 		choices []string
 	}
-	all := []node{
-		{"000", permutations(methods)},
+	var candidates []string
+	for _, subset := range subsets(methods) {
+		candidates = append(candidates, permutations(subset)...)
+	}
+	todo := []node{
+		{"000", candidates},
 	}
 
-	next := 1
-	for len(all) > 0 {
-		cur := all[0]
-		k := copy(all, all[1:])
-		all = all[:k]
+	nextNodeID := 1
+	for len(todo) > 0 {
+		cur := todo[0]
+		k := copy(todo, todo[1:])
+		todo = todo[:k]
 
 		if len(cur.choices) == 1 {
+			// no choice to make, this is a leaf node
 			out.Println(
 				black, labelFont, cur.tag,
-				textFont, ": ",
-				blue, "the order is "+cur.choices[0])
+				textFont, ": the order is ", blue, cur.choices[0])
 			continue
 		}
 
+		// Try all possible splits, and choose the best one according to
+		// the following criteria:
+		//   - reduce the size of the largest child node as much as possible
+		//   - then maximize the size of the smallest child node
+		//   - then use the fewest number of selectors
 		var bestM map[byte][]string
 		bestMax := len(cur.choices) + 1
 		bestMin := -1
-		for _, sel := range selections2(methods) {
+		for _, sel := range subsets(methods) {
 			m := make(map[byte][]string)
 			for _, order := range cur.choices {
 				x := findFirstMatch(order, sel)
@@ -114,7 +122,10 @@ func run() error {
 
 			min := len(cur.choices) + 1
 			max := -1
-			for _, v := range m {
+			for c, v := range m {
+				if c == 'X' {
+					continue
+				}
 				if len(v) < min {
 					min = len(v)
 				}
@@ -122,7 +133,8 @@ func run() error {
 					max = len(v)
 				}
 			}
-			if max < bestMax || (max == bestMax && min > bestMin) || (max == bestMax && min == bestMin && len(m) > len(bestM)) {
+
+			if max < bestMax || (max == bestMax && min > bestMin) || (max == bestMax && min == bestMin && len(m) < len(bestM)) {
 				bestM = m
 				bestMin = min
 				bestMax = max
@@ -143,10 +155,11 @@ func run() error {
 		}
 		cc := maps.Keys(bestM)
 		slices.Sort(cc)
+		var xxx []string
 		for _, c := range cc {
 			choices := bestM[c]
-			tag := fmt.Sprintf("%03d", next)
-			next++
+			tag := fmt.Sprintf("%03d", nextNodeID)
+			nextNodeID++
 
 			switch c {
 			case 'A':
@@ -159,19 +172,26 @@ func run() error {
 				enc.cmap_3_1 = tag
 			case 'E':
 				enc.post = tag
+			case 'X':
+				xxx = choices
 			default:
 				panic(fmt.Sprintf("unexpected selector type %q", c))
 			}
-			all = append(all, node{tag, choices})
+			todo = append(todo, node{tag, choices})
 		}
 		X, err := fb.Build(enc)
 		if err != nil {
 			return err
 		}
+		sel := string(cc)
 
 		var tags []string
-		tags = append(tags, "sel="+string(cc))
-		if len(cur.choices) > 6 {
+		tags = append(tags, "sel="+sel)
+		if len(xxx) <= 6 {
+			tags = append(tags, "XXX="+strings.Join(xxx, "|"))
+		}
+
+		if len(cur.choices) > 6-len(xxx) {
 			tags = append(tags, fmt.Sprintf("%d orders", len(cur.choices)))
 		} else {
 			tags = append(tags, strings.Join(cur.choices, "|"))
@@ -207,23 +227,8 @@ func permutations(s string) []string {
 	return result
 }
 
-func selections(s string) iter.Seq[string] {
-	return func(yield func(string) bool) {
-		for bits := 1; bits < 1<<len(s); bits++ {
-			var choice string
-			for j, char := range s {
-				if bits&(1<<j) != 0 {
-					choice += string(char)
-				}
-			}
-			if !yield(choice) {
-				break
-			}
-		}
-	}
-}
-
-func selections2(s string) []string {
+// subsets returns all non-empty subsets of the input string.
+func subsets(s string) []string {
 	var res []string
 	for bits := 1; bits < 1<<len(s); bits++ {
 		var choice string
@@ -243,5 +248,5 @@ func findFirstMatch(order, sel string) byte {
 			return byte(c)
 		}
 	}
-	return 0
+	return 'X' // no selector matched
 }
