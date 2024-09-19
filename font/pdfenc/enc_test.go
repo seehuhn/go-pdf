@@ -20,28 +20,37 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/maps"
 )
 
 func TestEncoding(t *testing.T) {
 	encodings := []Encoding{
+		Standard,
+		WinAnsi,
+		MacRoman,
+		MacRomanAlt,
+		MacExpert,
 		Symbol,
 		ZapfDingbats,
+		PDFDoc,
 	}
-	for _, enc := range encodings {
-		var names1 []string
+	for i, enc := range encodings {
+		seen := make(map[string]bool)
 		for _, name := range enc.Encoding {
-			if name != ".notdef" {
-				names1 = append(names1, name)
+			if name == ".notdef" {
+				continue
 			}
+			seen[name] = true
 		}
+		names1 := maps.Keys(seen)
 		slices.Sort(names1)
 
 		names2 := maps.Keys(enc.Has)
 		slices.Sort(names2)
 
-		if !slices.Equal(names1, names2) {
-			t.Error("inconsistent name lists")
+		if d := cmp.Diff(names1, names2); d != "" {
+			t.Errorf("%d: inconsistent name lists:\n%s", i, d)
 		}
 	}
 }

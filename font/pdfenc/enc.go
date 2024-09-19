@@ -29,6 +29,7 @@ type Encoding struct {
 // See Appendix D.2 of PDF 32000-1:2008.
 var Standard = Encoding{
 	Encoding: standardEncoding,
+	Has:      standardEncodingHas,
 }
 
 // WinAnsi is the PDF version of the standard Microsoft Windows specific
@@ -37,6 +38,7 @@ var Standard = Encoding{
 // See Appendix D.2 of PDF 32000-1:2008.
 var WinAnsi = Encoding{
 	Encoding: winAnsiEncoding,
+	Has:      winAnsiEncodingHas,
 }
 
 // MacRoman is the PDF version of the MacOS standard encoding for Latin
@@ -45,6 +47,7 @@ var WinAnsi = Encoding{
 // See Appendix D.2 of PDF 32000-1:2008.
 var MacRoman = Encoding{
 	Encoding: macRomanEncoding,
+	Has:      macRomanEncodingHas,
 }
 
 // MacRomanAlt is sometimes used when constructing character encodings
@@ -54,6 +57,7 @@ var MacRoman = Encoding{
 // the replacement of the currency glyph with the Euro symbol.
 var MacRomanAlt = Encoding{
 	Encoding: macRomanAlt,
+	Has:      macRomanAltHas,
 }
 
 // MacExpertEncoding is an encoding which contains more obscure characters.
@@ -61,6 +65,7 @@ var MacRomanAlt = Encoding{
 // See Appendix D.4 of PDF 32000-1:2008.
 var MacExpert = Encoding{
 	Encoding: macExpertEncoding,
+	Has:      macExpertEncodingHas,
 }
 
 // Symbol is the built-in encoding for the Symbol font.
@@ -68,7 +73,7 @@ var MacExpert = Encoding{
 // See Appendix D.5 of PDF 32000-1:2008.
 var Symbol = Encoding{
 	Encoding: symbolEncoding,
-	Has:      isSymbol,
+	Has:      symbolEncodingHas,
 }
 
 // ZapfDingbats is the built-in encoding of the ZapfDingbats font.
@@ -76,7 +81,7 @@ var Symbol = Encoding{
 // See Appendix D.6 of PDF 32000-1:2008.
 var ZapfDingbats = Encoding{
 	Encoding: zapfDingbatsEncoding,
-	Has:      isZapfDingbats,
+	Has:      zapfDingbatsEncodingHas,
 }
 
 // PDFDoc is an encoding for text strings in a PDF document outside the
@@ -85,4 +90,5 @@ var ZapfDingbats = Encoding{
 // See Appendix D.2 of PDF 32000-1:2008.
 var PDFDoc = Encoding{
 	Encoding: pdfDocEncoding,
+	Has:      pdfDocEncodingHas,
 }

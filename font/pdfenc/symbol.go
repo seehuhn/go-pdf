@@ -16,7 +16,7 @@
 
 package pdfenc
 
-var isSymbol = map[string]bool{
+var symbolEncodingHas = map[string]bool{
 	"Alpha":          true,
 	"Beta":           true,
 	"Chi":            true,

@@ -23,10 +23,8 @@ type CharacterSet struct {
 
 // See appendix D.2 ("Latin character set and encodings") of ISO 32000-2:2020.
 var StandardLatin = CharacterSet{
-	Has: isStandardLatin,
+	Has: standardLatinHas,
 }
-
-var ToStandardLatin map[rune]string = toStandardLatin
 
 // IsNonSymbolic returns true if all glyphs are in the Adobe Standard Latin
 // character set.

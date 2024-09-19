@@ -16,7 +16,7 @@
 
 package pdfenc
 
-var isZapfDingbats = map[string]bool{
+var zapfDingbatsEncodingHas = map[string]bool{
 	"a1":    true,
 	"a10":   true,
 	"a100":  true,

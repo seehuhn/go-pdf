@@ -22,7 +22,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"go/format"
 	"log"
 	"os"
 	"sort"
@@ -34,7 +36,6 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
 func main() {
@@ -194,7 +195,7 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 		return err
 	}
 
-	_, err = w.WriteString("var isStandardLatin = map[string]bool{\n")
+	_, err = w.WriteString("var standardLatinHas = map[string]bool{\n")
 	if err != nil {
 		return err
 	}
@@ -210,50 +211,13 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 		return err
 	}
 
-	rev := make(map[rune]string)
-	for name := range pdfenc.StandardLatin.Has {
-		rr := names.ToUnicode(name, false)
-		if len(rr) != 1 {
-			return fmt.Errorf("name %s has %d runes", name, len(rr))
-		}
-		r := rr[0]
-
-		if _, exists := rev[r]; exists {
-			return fmt.Errorf("rune %04x has multiple names", r)
-		}
-		rev[r] = name
-	}
-	glyphRunes := maps.Keys(rev)
-	sort.Slice(glyphRunes, func(i, j int) bool {
-		return glyphRunes[i] < glyphRunes[j]
-	})
-
-	_, err = w.WriteString("var toStandardLatin = map[rune]string{\n")
-	if err != nil {
-		return err
-	}
-	for _, r := range glyphRunes {
-		_, err = fmt.Fprintf(w, "\t0x%04x: %q,\n", r, rev[r])
-		if err != nil {
-			return err
-		}
-	}
-	_, err = w.WriteString("}\n")
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func writeTable(data map[pdf.Name]record, fname string, encName string, col int) error {
-	w, err := os.Create(fname)
-	if err != nil {
-		return err
-	}
-	defer w.Close()
+	buf := &bytes.Buffer{}
 
-	_, err = w.WriteString(header)
+	_, err := buf.WriteString(header)
 	if err != nil {
 		return err
 	}
@@ -289,45 +253,50 @@ func writeTable(data map[pdf.Name]record, fname string, encName string, col int)
 		val[0o312] = " "
 	}
 
-	wd := 18
-	if encName == "macExpertEncoding" {
-		wd = 23
-	}
-	fmt.Fprintf(w, "var %s = [256]string{\n", encName)
+	fmt.Fprintf(buf, "var %s = [256]string{\n", encName)
+	var names []string
 	for i := 0; i < 256; i++ {
 		name := encoding[i]
 		if name == "" {
 			name = ".notdef"
 		}
-		nameString := fmt.Sprintf("%q,", name)
 		var valString string
 		if name != ".notdef" {
 			valString = fmt.Sprintf(" %q", val[i])
+			names = append(names, string(name))
 		}
-		fmt.Fprintf(w, "\t%-*s// %-3d 0x%02x \\%03o%s\n",
-			wd, nameString, i, i, i, valString)
+		fmt.Fprintf(buf, "%q, // %-3d 0x%02x \\%03o%s\n",
+			name, i, i, i, valString)
 	}
-	fmt.Fprintln(w, "}")
+	fmt.Fprintln(buf, "}")
+	fmt.Fprintln(buf)
+
+	fmt.Fprintf(buf, "var %sHas = map[string]bool{\n", encName)
+	sort.Strings(names)
+	var prev string
+	for _, name := range names {
+		if name == prev {
+			continue
+		}
+		prev = name
+		fmt.Fprintf(buf, "%q: true,\n", name)
+	}
+	fmt.Fprintln(buf, "}")
+
+	body, err := format.Source(buf.Bytes())
+	if err != nil {
+		fmt.Println(buf.String())
+		return err
+	}
+	err = os.WriteFile(fname, body, 0644)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-var header = `// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-// Code generated - DO NOT EDIT.
+var header = `// Code generated - DO NOT EDIT.
 
 package pdfenc
 
