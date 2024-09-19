@@ -85,14 +85,18 @@ PDF files.  The information is based on the PDF 2.0 specification.
 - The `Encoding` entry in the font dictionary describes how character codes
   are mapped to glyph names:
   - If `Encoding` is not set, the font's built-in encoding is used.
-  - If `Encoding` is one of `MacRomanEncoding`, `MacExpertEncoding`,
-    or `WinAnsiEncoding`, the corresponding encoding is used.
+  - If `Encoding` is one of `MacRomanEncoding`, `MacExpertEncoding`, or
+    `WinAnsiEncoding`, the corresponding encoding from appendix D of the spec
+    is used.
   - If `Encoding` is a PDF dictionary, first construct a "base encoding":
     - If `BaseEncoding` is one of `MacRomanEncoding`, `MacExpertEncoding`,
       or `WinAnsiEncoding`, the corresponding encoding is used.
     - Otherwise, if the font is embedded, the font's built-in encoding is used.
     - Otherwise, if the font is non-symbolic, `StandardEncoding` is used.
     - Otherwise, the font's built-in encoding is used.
+
+    Then, the updates described by the `Differences` array are applied to the
+    base encoding to get the final encoding.
 
 - Glyphs are selected by glyph name, using information stored in the font
   data.

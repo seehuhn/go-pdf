@@ -23,8 +23,6 @@ import (
 	"hash"
 
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/postscript/type1/names"
 )
 
 type NewCID uint32
@@ -79,49 +77,14 @@ func (s *Simple) ROS() *cmap.CIDSystemInfo {
 // If the glyph name is unknown, this returns the empty string.
 // This implements the [System] interface.
 func (s *Simple) GlyphName(cid NewCID) string {
-	code := int(cid & 0xFF)
-	switch cid >> 24 {
-	case simpleIsWinAnsi:
-		return pdfenc.WinAnsi.Encoding[code]
-	case simpleIsMacRoman:
-		return pdfenc.MacRoman.Encoding[code]
-	case simpleIsMacExpert:
-		return pdfenc.MacExpert.Encoding[code]
-	case simpleIsPair:
-		if int(code) < len(s.Glyphs) {
-			return s.Glyphs[code].Name
-		}
-	}
-	return ""
+	panic("not implemented") // TODO: Implement
 }
 
 // GlyphText returns the text represented by the glyph corresponding to the
 // given CID.
 // This implements the [System] interface.
 func (s *Simple) GlyphText(cid NewCID) string {
-	code := int(cid & 0xFF)
-
-	var name string
-	switch cid >> 24 {
-	case simpleIsWinAnsi:
-		name = pdfenc.WinAnsi.Encoding[code]
-	case simpleIsMacRoman:
-		name = pdfenc.MacRoman.Encoding[code]
-	case simpleIsMacExpert:
-		name = pdfenc.MacExpert.Encoding[code]
-	case simpleIsPair:
-		if int(code) < len(s.Glyphs) {
-			return s.Glyphs[code].Text
-		}
-	}
-	if name != "" {
-		// TODO(voss): how to support Dingbats?
-		rr := names.ToUnicode(name, false)
-		if len(rr) > 0 {
-			return string(rr)
-		}
-	}
-	return ""
+	panic("not implemented") // TODO: Implement
 }
 
 // writeBinary writes a binary representation of the Simple object to
@@ -149,11 +112,3 @@ func (s *Simple) writeBinary(h hash.Hash) {
 		writeString(pair.Text)
 	}
 }
-
-const (
-	simpleIsBuiltin NewCID = iota
-	simpleIsWinAnsi
-	simpleIsMacRoman
-	simpleIsMacExpert
-	simpleIsPair
-)

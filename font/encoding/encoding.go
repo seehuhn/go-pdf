@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,154 +17,261 @@
 package encoding
 
 import (
-	"math/bits"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/postscript/type1/names"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
-// SimpleEncoder constructs and stores mappings from one-byte character codes
-// to GID values and from one-byte character codes to unicode strings.
-type SimpleEncoder struct {
-	Encoding []glyph.ID
-	code     map[key]byte
-	key      map[byte]key
+type Encoding struct {
+	data  []cmap.CID
+	names []string
+	find  map[string]uint16
 }
 
-type key struct {
-	gid glyph.ID
-	rr  string
-}
-
-// NewSimpleEncoder allocates a new SimpleEncoder.
-func NewSimpleEncoder() *SimpleEncoder {
-	res := &SimpleEncoder{
-		Encoding: make([]glyph.ID, 256),
-		code:     make(map[key]byte),
-		key:      make(map[byte]key),
+func New() *Encoding {
+	find := make(map[string]uint16)
+	find[".notdef"] = 0
+	return &Encoding{
+		data: make([]cmap.CID, 256),
+		find: find,
 	}
-	return res
 }
 
-// WritingMode implements the [font.NewFont] interface.
-func (e *SimpleEncoder) WritingMode() cmap.WritingMode {
-	return 0 // simple fonts are always horizontal
-}
-
-// GIDToCode returns the character code for the given glyph ID (allocating new
-// codes as needed).  It also records the fact that the character code
-// corresponds to the given unicode string.
-func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
-	k := key{gid, string(rr)}
-
-	// Rules for choosing the code:
-	// 1. If the combination of `gid` and `rr` has previously been used,
-	//    then use the same code as before.
-	code, seen := e.code[k]
-	if seen {
-		return code
+func ExtractType1(r pdf.Getter, obj pdf.Object, isEmbedded, isSymbolic bool) (*Encoding, error) {
+	obj, err := pdf.Resolve(r, obj)
+	if err != nil {
+		return nil, err
 	}
 
-	// 2. Allocate a new code based on the last rune in rr.
-	var r rune
-	if len(rr) > 0 {
-		r = rr[len(rr)-1]
-	}
-	code = e.allocateCode(r)
-	e.Encoding[code] = gid
-	e.code[k] = code
-	e.key[code] = k
+	e := New()
 
-	return code
-}
+	switch obj := obj.(type) {
+	case nil:
+		e.fillBuiltIn()
 
-func (e *SimpleEncoder) allocateCode(r rune) byte {
-	if len(e.code) >= 256 {
-		// Once all codes are used up, simply return 0 for everything.
-		return 0
-	}
-	bestScore := -1
-	bestCode := byte(0)
-	for codeInt := 0; codeInt < 256; codeInt++ {
-		code := byte(codeInt)
-		if _, alreadyUsed := e.key[code]; alreadyUsed {
-			continue
+	case pdf.Name:
+		err := e.fillNamedEncoding(obj)
+		if err != nil {
+			return nil, err
 		}
-		var score int
-		q := rune(code)
-		stdName := pdfenc.Standard.Encoding[code]
-		if stdName == ".notdef" {
-			// fill up the unused slots first
-			score += 100
+
+	case pdf.Dict:
+		// construct the base encoding
+		base, err := pdf.GetName(r, obj["BaseEncoding"])
+		if err != nil {
+			return nil, err
+		}
+		if base != "" {
+			err := e.fillNamedEncoding(base)
+			if err != nil {
+				return nil, err
+			}
+		} else if !isEmbedded && !isSymbolic {
+			e.fillStandardEncoding()
 		} else {
-			q = names.ToUnicode(stdName, false)[0]
-			if q == r {
-				// If r is in the standard encoding, and the corresponding
-				// code is still free, then use it.
-				bestCode = code
-				break
-			} else if !(code == 32 && r != ' ') {
-				// Try to keep code 32 for the space character,
-				// in order to not break the PDF word spacing parameter.
-				score += 10
+			e.fillBuiltIn()
+		}
+
+		// apply the differences
+		a, err := pdf.GetArray(r, obj["Differences"])
+		if err != nil {
+			return nil, err
+		}
+		code := -1
+		for _, x := range a {
+			switch x := x.(type) {
+			case pdf.Integer:
+				if x < 0 || x >= 256 {
+					return nil, pdf.Errorf("encoding: invalid code %d", x)
+				}
+				code = int(x)
+			case pdf.Name:
+				if code < 0 || code >= 256 {
+					return nil, pdf.Errorf("encoding: invalid code %d", code)
+				}
+				e.data[code] = e.get(string(x), byte(code))
+				code++
+			default:
+				return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
 			}
 		}
-		score += bits.TrailingZeros16(uint16(r) ^ uint16(q))
-		if score > bestScore {
-			bestScore = score
-			bestCode = code
+
+	default:
+		return nil, pdf.Errorf("encoding: expected Name or Dict, got %T", obj)
+	}
+
+	return e, nil
+}
+
+func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
+	obj, err := pdf.Resolve(r, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	e := New()
+
+	switch obj := obj.(type) {
+	case nil:
+		for i := range 256 {
+			e.data[i] = makeCID(cidClassRaw, 0, byte(i))
+		}
+
+	case pdf.Name:
+		err := e.fillNamedEncoding(obj)
+		if err != nil {
+			return nil, err
+		}
+
+	case pdf.Dict:
+		// construct the base encoding
+		base, err := pdf.GetName(r, obj["BaseEncoding"])
+		if err != nil {
+			return nil, err
+		}
+		if base != "" {
+			err := e.fillNamedEncoding(base)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// apply the differences
+		a, err := pdf.GetArray(r, obj["Differences"])
+		if err != nil {
+			return nil, err
+		}
+		code := -1
+		for _, x := range a {
+			switch x := x.(type) {
+			case pdf.Integer:
+				if x < 0 || x >= 256 {
+					return nil, pdf.Errorf("encoding: invalid code %d", x)
+				}
+				code = int(x)
+			case pdf.Name:
+				if code < 0 || code >= 256 {
+					return nil, pdf.Errorf("encoding: invalid code %d", code)
+				}
+				e.data[code] = e.get(string(x), byte(code))
+				code++
+			default:
+				return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
+			}
+		}
+
+		// fill any remaining slots using the standard encoding
+		for i := range 256 {
+			if e.data[i] != 0 {
+				continue
+			}
+			if name := pdfenc.Standard.Encoding[i]; name != ".notdef" {
+				e.data[i] = e.get(name, byte(code))
+			}
+		}
+
+	default:
+		return nil, pdf.Errorf("encoding: expected Name or Dict, got %T", obj)
+	}
+
+	return e, nil
+}
+
+func ExtractType3(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
+	dict, err := pdf.GetDictTyped(r, obj, "Encoding")
+	if err != nil {
+		return nil, err
+	}
+
+	e := New()
+
+	// apply the differences
+	a, err := pdf.GetArray(r, dict["Differences"])
+	if err != nil {
+		return nil, err
+	}
+	code := -1
+	for _, x := range a {
+		switch x := x.(type) {
+		case pdf.Integer:
+			if x < 0 || x >= 256 {
+				return nil, pdf.Errorf("encoding: invalid code %d", x)
+			}
+			code = int(x)
+		case pdf.Name:
+			if code < 0 || code >= 256 {
+				return nil, pdf.Errorf("encoding: invalid code %d", code)
+			}
+			e.data[code] = e.get(string(x), byte(code))
+			code++
+		default:
+			return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
 		}
 	}
-	return bestCode
+
+	return e, nil
 }
 
-// CodeIsUsed returns true if the given code has already been allocated.
-// This can be used to distinguish between codes which have
-// explicitly been mapped to GID 0 and codes which are not used.
-func (e *SimpleEncoder) CodeIsUsed(code byte) bool {
-	_, used := e.key[code]
-	return used
-}
-
-// Overflow returns true if the encoder has run out of codes.
-func (e *SimpleEncoder) Overflow() bool {
-	return len(e.code) > 256
-}
-
-// Subset returns the subset of glyph IDs which are used by this encoder.
-// The result is sorted and always include the glyph ID 0.
-func (e *SimpleEncoder) Subset() []glyph.ID {
-	gidUsed := make(map[glyph.ID]bool, len(e.code)+1)
-	gidUsed[0] = true
-	for key := range e.code {
-		gidUsed[key.gid] = true
+func (e *Encoding) get(name string, code byte) cmap.CID {
+	idx, ok := e.find[name]
+	if !ok {
+		idx = uint16(len(e.names))
+		e.names = append(e.names, name)
+		e.find[name] = idx
 	}
-	subset := maps.Keys(gidUsed)
-	slices.Sort(subset)
-	return subset
+	return makeCID(cidClassName, idx, code)
 }
 
-// ToUnicode returns the mapping from character codes to unicode strings.
-// This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
-	toUnicode := make(map[charcode.CharCode][]rune)
-	for k, v := range e.code {
-		toUnicode[charcode.CharCode(v)] = []rune(k.rr)
+func (e *Encoding) fillBuiltIn() {
+	for i := range 256 {
+		e.data[i] = makeCID(cidClassBuiltin, 0, byte(i))
 	}
-	return toUnicode
 }
 
-// ToUnicodeNew returns the mapping from character codes to unicode strings.
-// This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) ToUnicodeNew() map[string][]rune {
-	toUnicode := make(map[string][]rune, len(e.code))
-	for k, c := range e.code {
-		toUnicode[string([]byte{c})] = []rune(k.rr)
+func (e *Encoding) fillNamedEncoding(name pdf.Name) error {
+	var enc []string
+	switch name {
+	case "WinAnsiEncoding":
+		enc = pdfenc.WinAnsi.Encoding[:]
+	case "MacRomanEncoding":
+		enc = pdfenc.MacRoman.Encoding[:]
+	case "MacExpertEncoding":
+		enc = pdfenc.MacExpert.Encoding[:]
+	default:
+		return pdf.Errorf("encoding: unknown named encoding %s", name)
 	}
-	return toUnicode
+
+	for code, name := range enc {
+		e.data[code] = e.get(name, byte(code))
+	}
+
+	return nil
 }
+
+func (e *Encoding) fillStandardEncoding() {
+	for code, name := range pdfenc.Standard.Encoding {
+		e.data[code] = e.get(name, byte(code))
+	}
+}
+
+func (e *Encoding) LookupCID(code []byte) cmap.CID {
+	if len(code) != 1 {
+		return 0
+	}
+	return e.data[code[0]]
+}
+
+func (e *Encoding) LookupNotdefCID(code []byte) cmap.CID {
+	return 0
+}
+
+func makeCID(class byte, data uint16, code byte) cmap.CID {
+	return cmap.CID(class)<<24 | cmap.CID(data)<<8 | cmap.CID(code)
+}
+
+const (
+	cidClassNotDef byte = iota
+	cidClassBuiltin
+	cidClassName
+	cidClassRaw
+)

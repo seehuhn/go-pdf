@@ -37,9 +37,10 @@ Naming
     - [`GetString(r pdf.Getter, obj Object) (x pdf.String, err error)`](https://pkg.go.dev/seehuhn.de/go/pdf#GetString)
     - [`GetNumber(r pdf.Getter, obj Object) (x pdf.Number, err error)`](https://pkg.go.dev/seehuhn.de/go/pdf#GetNumber)
     - [`GetRectangle(r pdf.Getter, obj Object) (x *pdf.Rectangle, err error)`](https://pkg.go.dev/seehuhn.de/go/pdf#GetRectangle)
-  - More complex structures often have names starting with extract.
+  - More complex structures often have names starting with `Extract...`.
     Examples include:
     - [`font.ExtractDescriptor(r pdf.Getter, obj pdf.Object) (*font.Descriptor, error)`](https://pkg.go.dev/seehuhn.de/go/pdf@v0.5.1-0.20240906163623-d591f7fad2df/font#ExtractDescriptor)
-    - [`cff.ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*cff.FontDictSimple, error)`](https://pkg.go.dev/seehuhn.de/go/pdf/font/cff#ExtractSimple)
     - [`color.ExtractSpace(r pdf.Getter, desc pdf.Object) (color.Space, error)`](https://pkg.go.dev/seehuhn.de/go/pdf@v0.5.1-0.20240906163623-d591f7fad2df/graphics/color#ExtractSpace)
+    - [`cff.ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*cff.FontDictSimple, error)`](https://pkg.go.dev/seehuhn.de/go/pdf/font/cff#ExtractSimple)
+
   In all cases, the first argument is a `pdf.Getter`.
