@@ -174,7 +174,7 @@ func (info *EmbedInfo) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 
 	isSymbolic := false
 	for name := range info.Glyphs {
-		if !pdfenc.IsStandardLatin[string(name)] {
+		if !pdfenc.StandardLatin.Has[string(name)] {
 			isSymbolic = true
 			break
 		}
@@ -291,7 +291,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		}
 	}
 	if !encodingIsGood { // Use the standard encoding as a fallback.
-		for i, name := range pdfenc.StandardEncoding {
+		for i, name := range pdfenc.Standard.Encoding {
 			if _, exists := glyphs[name]; exists {
 				res.Encoding[i] = name
 			}

@@ -30,9 +30,11 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
+
+	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/postscript/type1/names"
 )
 
 func main() {
@@ -86,24 +88,24 @@ func run(fname string) error {
 		return err
 	}
 
-	err = writeLatin(data, "latin.go")
+	err = writeLatin(data, "latin-gen.go")
 
-	err = writeTable(data, "standard.go", "StandardEncoding", 0)
+	err = writeTable(data, "standard-gen.go", "standardEncoding", 0)
 	if err != nil {
 		return err
 	}
 
-	err = writeTable(data, "macroman.go", "MacRomanEncoding", 1)
+	err = writeTable(data, "macroman-gen.go", "macRomanEncoding", 1)
 	if err != nil {
 		return err
 	}
 
-	err = writeTable(data, "winansi.go", "WinAnsiEncoding", 2)
+	err = writeTable(data, "winansi-gen.go", "winAnsiEncoding", 2)
 	if err != nil {
 		return err
 	}
 
-	err = writeTable(data, "pdfdoc.go", "PDFDocEncoding", 3)
+	err = writeTable(data, "pdfdoc-gen.go", "pdfDocEncoding", 3)
 	if err != nil {
 		return err
 	}
@@ -146,7 +148,7 @@ func run2(fname string) error {
 	// 	return err
 	// }
 
-	err = writeTable(data, "macexpert.go", "MacExpertEncoding", 0)
+	err = writeTable(data, "macexpert-gen.go", "macExpertEncoding", 0)
 	if err != nil {
 		return err
 	}
@@ -192,7 +194,7 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 		return err
 	}
 
-	_, err = w.WriteString("var IsStandardLatin = map[string]bool{\n")
+	_, err = w.WriteString("var isStandardLatin = map[string]bool{\n")
 	if err != nil {
 		return err
 	}
@@ -209,7 +211,7 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 	}
 
 	rev := make(map[rune]string)
-	for name := range pdfenc.IsStandardLatin {
+	for name := range pdfenc.StandardLatin.Has {
 		rr := names.ToUnicode(name, false)
 		if len(rr) != 1 {
 			return fmt.Errorf("name %s has %d runes", name, len(rr))
@@ -226,7 +228,7 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 		return glyphRunes[i] < glyphRunes[j]
 	})
 
-	_, err = w.WriteString("var ToStandardLatin = map[rune]string{\n")
+	_, err = w.WriteString("var toStandardLatin = map[rune]string{\n")
 	if err != nil {
 		return err
 	}
@@ -271,7 +273,7 @@ func writeTable(data map[pdf.Name]record, fname string, encName string, col int)
 	}
 
 	switch encName {
-	case "WinAnsiEncoding":
+	case "winAnsiEncoding":
 		// Footnote 5 after table D.2: The hyphen (U+002D) character is also
 		// encoded as 255 (octal) in WinAnsiEncoding.
 		encoding[0o255] = "hyphen"
@@ -280,7 +282,7 @@ func writeTable(data map[pdf.Name]record, fname string, encName string, col int)
 		// encoded [...] as 240 (octal) in WinAnsiEncoding.
 		encoding[0o240] = "space"
 		val[0o240] = " "
-	case "MacRomanEncoding":
+	case "macRomanEncoding":
 		// Footnote 6 after table D.2: The space (U+0020) character is also
 		// encoded as 312 (octal) in MacRomanEncoding [...].
 		encoding[0o312] = "space"
@@ -288,21 +290,8 @@ func writeTable(data map[pdf.Name]record, fname string, encName string, col int)
 	}
 
 	wd := 18
-	if encName == "MacExpertEncoding" {
+	if encName == "macExpertEncoding" {
 		wd = 23
-		_, err = w.WriteString(comment1[4])
-		if err != nil {
-			return err
-		}
-	} else {
-		_, err = w.WriteString(comment1[col])
-		if err != nil {
-			return err
-		}
-	}
-	_, err = w.WriteString(comment2)
-	if err != nil {
-		return err
 	}
 	fmt.Fprintf(w, "var %s = [256]string{\n", encName)
 	for i := 0; i < 256; i++ {
@@ -343,20 +332,3 @@ var header = `// seehuhn.de/go/pdf - a library for reading and writing PDF files
 package pdfenc
 
 `
-
-var (
-	comment1 = [5]string{
-		`// StandardEncoding is the Adobe Standard Encoding for Latin text.`,
-		`// MacRomanEncoding is the PDF version of the MacOS standard encoding for Latin
-// text in Western writing systems.`,
-		`// WinAnsiEncoding is the PDF version of the standard Microsoft Windows specific
-// encoding for Latin text in Western writing systems.`,
-		`// PDFDocEncoding is an encoding for text strings in a PDF document outside the
-// document's content streams.`,
-		`// MacExpertEncoding is an encoding which contains more obscure characters.`,
-	}
-	comment2 = `
-//
-// See Appendix D.2 of PDF 32000-1:2008.
-`
-)

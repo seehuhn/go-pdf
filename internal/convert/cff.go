@@ -76,7 +76,7 @@ func ToCFF(info *sfnt.Font) (*sfnt.Font, error) {
 		for gid, name := range origOutlines.Names {
 			rev[name] = glyph.ID(gid)
 		}
-		for i, name := range pdfenc.StandardEncoding {
+		for i, name := range pdfenc.Standard.Encoding {
 			encoding[i] = rev[name]
 		}
 	}

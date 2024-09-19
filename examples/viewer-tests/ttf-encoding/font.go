@@ -186,9 +186,9 @@ func (fb *fontBuilder) Build(enc *encInfo) (font.Font, error) {
 		}
 
 		rr := []rune(enc.cmap_1_0_enc)
-		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsiEncoding[markerString[0]]]] = byte(findGlyph[rr[0]])
-		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsiEncoding[markerString[1]]]] = byte(findGlyph[rr[1]])
-		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsiEncoding[markerString[2]]]] = byte(findGlyph[rr[2]])
+		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsi.Encoding[markerString[0]]]] = byte(findGlyph[rr[0]])
+		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsi.Encoding[markerString[1]]]] = byte(findGlyph[rr[1]])
+		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsi.Encoding[markerString[2]]]] = byte(findGlyph[rr[2]])
 		useCmap_1_0 = true
 	}
 
@@ -203,7 +203,7 @@ func (fb *fontBuilder) Build(enc *encInfo) (font.Font, error) {
 		rr := []rune(enc.cmap_3_1)
 		for i := range 3 {
 			code := markerString[i]
-			name := pdfenc.WinAnsiEncoding[code]
+			name := pdfenc.WinAnsi.Encoding[code]
 			uni := names.ToUnicode(name, false)
 			if len(uni) != 1 {
 				panic(fmt.Sprintf("expected 1 rune for %s, got %d", name, len(uni)))
@@ -230,7 +230,7 @@ func (fb *fontBuilder) Build(enc *encInfo) (font.Font, error) {
 
 		rr := []rune(enc.post)
 		for i, r := range rr {
-			name := pdfenc.WinAnsiEncoding[markerString[i]]
+			name := pdfenc.WinAnsi.Encoding[markerString[i]]
 			if !seen[r] {
 				names[findGlyph[r]] = name
 			} else {
@@ -419,7 +419,7 @@ var (
 
 func init() {
 	macOSRomanInv = make(map[string]int)
-	for c, name := range pdfenc.MacOSRomanEncoding {
+	for c, name := range pdfenc.MacRomanAlt.Encoding {
 		if name == ".notdef" {
 			continue
 		}

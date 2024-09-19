@@ -16,8 +16,7 @@
 
 package pdfenc
 
-// IsZapfDingbats is the character set of the ZapfDingbats font.
-var IsZapfDingbats = map[string]bool{
+var isZapfDingbats = map[string]bool{
 	"a1":    true,
 	"a10":   true,
 	"a100":  true,
@@ -208,10 +207,7 @@ var IsZapfDingbats = map[string]bool{
 	"space": true,
 }
 
-// ZapfDingbatsEncoding is the built-in encoding of the ZapfDingbats font.
-//
-// See Appendix D.6 of PDF 32000-1:2008.
-var ZapfDingbatsEncoding = [256]string{
+var zapfDingbatsEncoding = [256]string{
 	".notdef", // 0o000 = 0
 	".notdef", // 0o001 = 1
 	".notdef", // 0o002 = 2

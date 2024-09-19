@@ -18,10 +18,7 @@
 
 package pdfenc
 
-// MacExpertEncoding is an encoding which contains more obscure characters.
-//
-// See Appendix D.2 of PDF 32000-1:2008.
-var MacExpertEncoding = [256]string{
+var macExpertEncoding = [256]string{
 	".notdef",             // 0   0x00 \000
 	".notdef",             // 1   0x01 \001
 	".notdef",             // 2   0x02 \002

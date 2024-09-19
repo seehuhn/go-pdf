@@ -97,7 +97,7 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 		}
 		var score int
 		q := rune(code)
-		stdName := pdfenc.StandardEncoding[code]
+		stdName := pdfenc.Standard.Encoding[code]
 		if stdName == ".notdef" {
 			// fill up the unused slots first
 			score += 100

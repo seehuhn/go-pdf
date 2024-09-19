@@ -98,11 +98,11 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 	} else {
 		switch dicts.PostScriptName {
 		case "Symbol":
-			builtinEncoding = pdfenc.SymbolEncoding[:]
+			builtinEncoding = pdfenc.Symbol.Encoding[:]
 		case "ZapfDingbats":
-			builtinEncoding = pdfenc.ZapfDingbatsEncoding[:]
+			builtinEncoding = pdfenc.ZapfDingbats.Encoding[:]
 		default:
-			builtinEncoding = pdfenc.StandardEncoding[:]
+			builtinEncoding = pdfenc.Standard.Encoding[:]
 		}
 	}
 	encoding, err := encoding.UndescribeEncodingType1(
@@ -263,7 +263,7 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 		var fontBBox *pdf.Rectangle
 		if psFont := info.Font; psFont != nil {
 			for name := range psFont.Glyphs {
-				if name != ".notdef" && !pdfenc.IsStandardLatin[name] {
+				if name != ".notdef" && !pdfenc.StandardLatin.Has[name] {
 					isSymbolic = true
 					break
 				}
@@ -280,7 +280,7 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 		} else {
 			metrics := info.Metrics
 			for name := range metrics.Glyphs {
-				if name != ".notdef" && !pdfenc.IsStandardLatin[name] {
+				if name != ".notdef" && !pdfenc.StandardLatin.Has[name] {
 					isSymbolic = true
 					break
 				}

@@ -119,19 +119,21 @@ func (r ToUnicodeRange) All(codec *charcode.Codec) iter.Seq2[uint32, []rune] {
 func (info *ToUnicodeInfo) MakeName() pdf.Name {
 	h := md5.New()
 	info.writeBinary(h, 3)
-	return pdf.Name(fmt.Sprintf("GoPDF-%x-UTF16", h.Sum(nil)))
+	return pdf.Name(fmt.Sprintf("seehuhn.de-%x-UTF16", h.Sum(nil)))
 }
 
 // writeBinary writes a binary representation of the ToUnicodeInfo object to
 // the [hash.Hash] h.  The maxGen parameter limits the number of parent
 // references, to avoid infinite recursion.
 func (info *ToUnicodeInfo) writeBinary(h hash.Hash, maxGen int) {
-	// This function is only used to write to a hash.Hash.
-	// Therefore we don't need to check for write errors.
+	// h.Write is guaranteed to never return an error
 
 	if maxGen <= 0 {
 		return
 	}
+
+	const magic uint32 = 0x70e54f7a
+	binary.Write(h, binary.BigEndian, magic)
 
 	var buf [binary.MaxVarintLen64]byte
 	writeInt := func(x int) {
@@ -172,7 +174,10 @@ func (info *ToUnicodeInfo) writeBinary(h hash.Hash, maxGen int) {
 	}
 
 	if info.Parent != nil {
+		writeInt(1)
 		info.Parent.writeBinary(h, maxGen-1)
+	} else {
+		writeInt(0)
 	}
 }
 

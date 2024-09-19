@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,14 +16,23 @@
 
 package pdfenc
 
-//go:generate go run ./generate.go
+// A CharacterSet is a collection of glyph names.
+type CharacterSet struct {
+	Has map[string]bool
+}
+
+// See appendix D.2 ("Latin character set and encodings") of ISO 32000-2:2020.
+var StandardLatin = CharacterSet{
+	Has: isStandardLatin,
+}
+
+var ToStandardLatin map[rune]string = toStandardLatin
 
 // IsNonSymbolic returns true if all glyphs are in the Adobe Standard Latin
 // character set.
 func IsNonSymbolic(glyphNames []string) bool {
-	// glyphNames := f.MakeGlyphNames()
 	for _, name := range glyphNames {
-		if !IsStandardLatin[name] {
+		if !StandardLatin.Has[name] {
 			return false
 		}
 	}

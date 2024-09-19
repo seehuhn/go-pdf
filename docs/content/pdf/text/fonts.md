@@ -9,25 +9,25 @@ draft = true
 
 The table lists all font types allowed in PDF 2.0.
 
-| Font Dict   | CIDFont Dict   | FontDescriptor | Stream Dict     | Description     |
-| ----------- | -------------- | -------------- | --------------- | --------------- |
-| `Type1`     | -              | `FontFile`     |                 | Type 1          |
-| `Type1`     | -              | `FontFile3`    | `Type1C`        | CFF             |
-| `Type1`     | -              | `FontFile3`    | `OpenType`      | OpenType/CFF    |
-| `Type1`     | -              |                | -               | external Type 1 |
-| `MMType1`   | -              | `FontFile`     |                 | Type 1          |
-| `MMType1`   | -              | `FontFile3`    | `Type1C`        | CFF             |
-| `MMType1`   | -              |                | -               | ext. MMType1    |
-| `TrueType`  | -              | `FontFile2`    |                 | TrueType        |
-| `TrueType`  | -              | `FontFile3`    | `OpenType`      | OpenType/glyf   |
-| `TrueType`  | -              |                | -               | ext. TrueType   |
-| `Type3`     | -              | -              | -               | Type 3          |
-| `Type0`     | `CIDFontType0` | `FontFile3`    | `CIDFontType0C` | CFF             |
-| `Type0`     | `CIDFontType0` | `FontFile3`    | `OpenType`      | OpenType/CFF    |
-| `Type0`     | `CIDFontType0` |                | -               | external CFF    |
-| `Type0`     | `CIDFontType2` | `FontFile2`    |                 | TrueType        |
-| `Type0`     | `CIDFontType2` | `FontFile3`    | `OpenType`      | OpenType/glyf   |
-| `Type0`     | `CIDFontType2` |                | -               | ext. TrueType   |
+|   | Font Dict   | CIDFont Dict   | FontDescriptor | Stream Dict     | Description     |
+|---| ----------- | -------------- | -------------- | --------------- | --------------- |
+| 1 | `Type1`     | -              | `FontFile`     |                 | Type 1          |
+|   | `Type1`     | -              | `FontFile3`    | `Type1C`        | CFF             |
+|   | `Type1`     | -              | `FontFile3`    | `OpenType`      | OpenType/CFF    |
+|   | `Type1`     | -              |                | -               | external Type 1 |
+|   | `MMType1`   | -              | `FontFile`     |                 | Type 1          |
+|   | `MMType1`   | -              | `FontFile3`    | `Type1C`        | CFF             |
+|   | `MMType1`   | -              |                | -               | ext. MMType1    |
+| 2 | `TrueType`  | -              | `FontFile2`    |                 | TrueType        |
+|   | `TrueType`  | -              | `FontFile3`    | `OpenType`      | OpenType/glyf   |
+|   | `TrueType`  | -              |                | -               | ext. TrueType   |
+| 3 | `Type3`     | -              | -              | -               | Type 3          |
+| 4 | `Type0`     | `CIDFontType0` | `FontFile3`    | `CIDFontType0C` | CFF             |
+|   | `Type0`     | `CIDFontType0` | `FontFile3`    | `OpenType`      | OpenType/CFF    |
+|   | `Type0`     | `CIDFontType0` |                | -               | external CFF    |
+| 5 | `Type0`     | `CIDFontType2` | `FontFile2`    |                 | TrueType        |
+|   | `Type0`     | `CIDFontType2` | `FontFile3`    | `OpenType`      | OpenType/glyf   |
+|   | `Type0`     | `CIDFontType2` |                | -               | ext. TrueType   |
 
 The columns contain the following information:
 - The `Subtype` entry in the font dictionary.
@@ -69,7 +69,7 @@ PDF files.  The information is based on the PDF 2.0 specification.
 - If no ToUnicode map is present, glyph names can be mapped to Unicode values
   using the Adobe Glyph List.
 
-### Type 1, OpenType with CFF glyph outlines, and Multiple Master Type 1
+### Type 1, CFF, OpenType with CFF glyph outlines, and Multiple Master Type 1
 
 - The `Subtype` value in the font dictionary is `Type1`, or `MMType1` for multiple
   master fonts.
@@ -94,11 +94,11 @@ PDF files.  The information is based on the PDF 2.0 specification.
     - Otherwise, if the font is non-symbolic, `StandardEncoding` is used.
     - Otherwise, the font's built-in encoding is used.
 
-    Note that this procedure sometimes requires to load an external font file
-    to determine the built-in encoding.
+- Glyphs are selected by glyph name, using information stored in the font
+  data.
 
 - Embedding:
-  - If the textual format is used, the font is embedded using the `FontFile`
+  - If original Type 1 format is used, the font is embedded using the `FontFile`
     entry in the font descriptor.  The `length1` entry in the stream dictionary
     gives the length of the clear-text portion of the font data.  The `length2`
     entry gives the length of the "encrypted" portion of the font data (which
@@ -108,8 +108,8 @@ PDF files.  The information is based on the PDF 2.0 specification.
 
   - If the CFF format is used, the font is embedded using the `FontFile3` entry
     in the font descriptor, and the `Subtype` entry in the font dictionary is
-    set to `Type1C`.\
-    Question: Are CIDFont operators allowed in the CFF data?
+    set to `Type1C`.  Only fonts which do not use CIDFont operators in their
+    Top DICT are allowed, because Glyph names are required.
 
   - OpenType fonts are embedded using the `FontFile3` entry in the font
     descriptor, and the `Subtype` entry in the font dictionary is set to
@@ -135,22 +135,22 @@ PDF files.  The information is based on the PDF 2.0 specification.
 - There are some restrictions on the `Encoding` entry in the font
   dictionary:
   - Sometimes between PDF-1.4 and PDF-1.7, use of of `MacExpertEncoding`
-    was disallowed.
+    was disallowed or at least discouraged.
   - Use of the `Differences` array is discouraged.
 
   In addition, after the table is constructed, any undefined entries in the
-  table are filled using `StandardEncoding`.
+  table are filled using the Standard Encoding.
 
 - The spec describes a variety of mechanisms to map a single-byte code `c` to a
   glyph in a TrueType font:
-  1. Use a (1,0) "cmap" subtable to map `c` to a glyph.
+  1. Use a (1,0) "cmap" subtable to map `c` to a GID.
   2. In a (3,0) "cmap" subtable, look up either `c`, `c+0xF000`, `c+0xF100`,
-     or `c+0xF200` to get a glyph.
+     or `c+0xF200` to get a GID.
   3. Use the encoding to map `c` to a name, use Mac OS Roman to map the name to
-     a code, and use a (1,0) "cmap" subtable to map this code to a glyph.
+     a code, and use a (1,0) "cmap" subtable to map this code to a GID.
   4. Use the encoding to map `c` to a name, use the Adobe Glyph List to map the
      name to unicode, and use a (3,1) "cmap" subtable to map this character to a
-     glyph.
+     GID.
   5. Use the encoding to map `c` to a name, and use the "post" table to look
      up the glyph.
 

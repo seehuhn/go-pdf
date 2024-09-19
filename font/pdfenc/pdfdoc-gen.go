@@ -18,11 +18,7 @@
 
 package pdfenc
 
-// PDFDocEncoding is an encoding for text strings in a PDF document outside the
-// document's content streams.
-//
-// See Appendix D.2 of PDF 32000-1:2008.
-var PDFDocEncoding = [256]string{
+var pdfDocEncoding = [256]string{
 	".notdef",        // 0   0x00 \000
 	".notdef",        // 1   0x01 \001
 	".notdef",        // 2   0x02 \002

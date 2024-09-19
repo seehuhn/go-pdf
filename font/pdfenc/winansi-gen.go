@@ -18,10 +18,7 @@
 
 package pdfenc
 
-// StandardEncoding is the Adobe Standard Encoding for Latin text.
-//
-// See Appendix D.2 of PDF 32000-1:2008.
-var StandardEncoding = [256]string{
+var winAnsiEncoding = [256]string{
 	".notdef",        // 0   0x00 \000
 	".notdef",        // 1   0x01 \001
 	".notdef",        // 2   0x02 \002
@@ -61,7 +58,7 @@ var StandardEncoding = [256]string{
 	"dollar",         // 36  0x24 \044 "$"
 	"percent",        // 37  0x25 \045 "%"
 	"ampersand",      // 38  0x26 \046 "&"
-	"quoteright",     // 39  0x27 \047 "’"
+	"quotesingle",    // 39  0x27 \047 "'"
 	"parenleft",      // 40  0x28 \050 "("
 	"parenright",     // 41  0x29 \051 ")"
 	"asterisk",       // 42  0x2a \052 "*"
@@ -118,7 +115,7 @@ var StandardEncoding = [256]string{
 	"bracketright",   // 93  0x5d \135 "]"
 	"asciicircum",    // 94  0x5e \136 "^"
 	"underscore",     // 95  0x5f \137 "_"
-	"quoteleft",      // 96  0x60 \140 "‘"
+	"grave",          // 96  0x60 \140 "`"
 	"a",              // 97  0x61 \141 "a"
 	"b",              // 98  0x62 \142 "b"
 	"c",              // 99  0x63 \143 "c"
@@ -150,132 +147,132 @@ var StandardEncoding = [256]string{
 	"braceright",     // 125 0x7d \175 "}"
 	"asciitilde",     // 126 0x7e \176 "~"
 	".notdef",        // 127 0x7f \177
-	".notdef",        // 128 0x80 \200
+	"Euro",           // 128 0x80 \200 "€"
 	".notdef",        // 129 0x81 \201
-	".notdef",        // 130 0x82 \202
-	".notdef",        // 131 0x83 \203
-	".notdef",        // 132 0x84 \204
-	".notdef",        // 133 0x85 \205
-	".notdef",        // 134 0x86 \206
-	".notdef",        // 135 0x87 \207
-	".notdef",        // 136 0x88 \210
-	".notdef",        // 137 0x89 \211
-	".notdef",        // 138 0x8a \212
-	".notdef",        // 139 0x8b \213
-	".notdef",        // 140 0x8c \214
+	"quotesinglbase", // 130 0x82 \202 "‚"
+	"florin",         // 131 0x83 \203 "ƒ"
+	"quotedblbase",   // 132 0x84 \204 "„"
+	"ellipsis",       // 133 0x85 \205 "…"
+	"dagger",         // 134 0x86 \206 "†"
+	"daggerdbl",      // 135 0x87 \207 "‡"
+	"circumflex",     // 136 0x88 \210 "ˆ"
+	"perthousand",    // 137 0x89 \211 "‰"
+	"Scaron",         // 138 0x8a \212 "Š"
+	"guilsinglleft",  // 139 0x8b \213 "‹"
+	"OE",             // 140 0x8c \214 "Œ"
 	".notdef",        // 141 0x8d \215
-	".notdef",        // 142 0x8e \216
+	"Zcaron",         // 142 0x8e \216 "Ž"
 	".notdef",        // 143 0x8f \217
 	".notdef",        // 144 0x90 \220
-	".notdef",        // 145 0x91 \221
-	".notdef",        // 146 0x92 \222
-	".notdef",        // 147 0x93 \223
-	".notdef",        // 148 0x94 \224
-	".notdef",        // 149 0x95 \225
-	".notdef",        // 150 0x96 \226
-	".notdef",        // 151 0x97 \227
-	".notdef",        // 152 0x98 \230
-	".notdef",        // 153 0x99 \231
-	".notdef",        // 154 0x9a \232
-	".notdef",        // 155 0x9b \233
-	".notdef",        // 156 0x9c \234
+	"quoteleft",      // 145 0x91 \221 "‘"
+	"quoteright",     // 146 0x92 \222 "’"
+	"quotedblleft",   // 147 0x93 \223 "“"
+	"quotedblright",  // 148 0x94 \224 "”"
+	"bullet",         // 149 0x95 \225 "•"
+	"endash",         // 150 0x96 \226 "–"
+	"emdash",         // 151 0x97 \227 "—"
+	"tilde",          // 152 0x98 \230 "˜"
+	"trademark",      // 153 0x99 \231 "™"
+	"scaron",         // 154 0x9a \232 "š"
+	"guilsinglright", // 155 0x9b \233 "›"
+	"oe",             // 156 0x9c \234 "œ"
 	".notdef",        // 157 0x9d \235
-	".notdef",        // 158 0x9e \236
-	".notdef",        // 159 0x9f \237
-	".notdef",        // 160 0xa0 \240
+	"zcaron",         // 158 0x9e \236 "ž"
+	"Ydieresis",      // 159 0x9f \237 "Ÿ"
+	"space",          // 160 0xa0 \240 " "
 	"exclamdown",     // 161 0xa1 \241 "¡"
 	"cent",           // 162 0xa2 \242 "¢"
 	"sterling",       // 163 0xa3 \243 "£"
-	"fraction",       // 164 0xa4 \244 "⁄"
+	"currency",       // 164 0xa4 \244 "¤"
 	"yen",            // 165 0xa5 \245 "¥"
-	"florin",         // 166 0xa6 \246 "ƒ"
+	"brokenbar",      // 166 0xa6 \246 "¦"
 	"section",        // 167 0xa7 \247 "§"
-	"currency",       // 168 0xa8 \250 "¤"
-	"quotesingle",    // 169 0xa9 \251 "'"
-	"quotedblleft",   // 170 0xaa \252 "“"
+	"dieresis",       // 168 0xa8 \250 "¨"
+	"copyright",      // 169 0xa9 \251 "©"
+	"ordfeminine",    // 170 0xaa \252 "ª"
 	"guillemotleft",  // 171 0xab \253 "«"
-	"guilsinglleft",  // 172 0xac \254 "‹"
-	"guilsinglright", // 173 0xad \255 "›"
-	"fi",             // 174 0xae \256 "ﬁ"
-	"fl",             // 175 0xaf \257 "ﬂ"
-	".notdef",        // 176 0xb0 \260
-	"endash",         // 177 0xb1 \261 "–"
-	"dagger",         // 178 0xb2 \262 "†"
-	"daggerdbl",      // 179 0xb3 \263 "‡"
-	"periodcentered", // 180 0xb4 \264 "·"
-	".notdef",        // 181 0xb5 \265
+	"logicalnot",     // 172 0xac \254 "¬"
+	"hyphen",         // 173 0xad \255 "-"
+	"registered",     // 174 0xae \256 "®"
+	"macron",         // 175 0xaf \257 "¯"
+	"degree",         // 176 0xb0 \260 "°"
+	"plusminus",      // 177 0xb1 \261 "±"
+	"twosuperior",    // 178 0xb2 \262 "²"
+	"threesuperior",  // 179 0xb3 \263 "³"
+	"acute",          // 180 0xb4 \264 "´"
+	"mu",             // 181 0xb5 \265 "µ"
 	"paragraph",      // 182 0xb6 \266 "¶"
-	"bullet",         // 183 0xb7 \267 "•"
-	"quotesinglbase", // 184 0xb8 \270 "‚"
-	"quotedblbase",   // 185 0xb9 \271 "„"
-	"quotedblright",  // 186 0xba \272 "”"
+	"periodcentered", // 183 0xb7 \267 "·"
+	"cedilla",        // 184 0xb8 \270 "¸"
+	"onesuperior",    // 185 0xb9 \271 "¹"
+	"ordmasculine",   // 186 0xba \272 "º"
 	"guillemotright", // 187 0xbb \273 "»"
-	"ellipsis",       // 188 0xbc \274 "…"
-	"perthousand",    // 189 0xbd \275 "‰"
-	".notdef",        // 190 0xbe \276
+	"onequarter",     // 188 0xbc \274 "¼"
+	"onehalf",        // 189 0xbd \275 "½"
+	"threequarters",  // 190 0xbe \276 "¾"
 	"questiondown",   // 191 0xbf \277 "¿"
-	".notdef",        // 192 0xc0 \300
-	"grave",          // 193 0xc1 \301 "`"
-	"acute",          // 194 0xc2 \302 "´"
-	"circumflex",     // 195 0xc3 \303 "ˆ"
-	"tilde",          // 196 0xc4 \304 "˜"
-	"macron",         // 197 0xc5 \305 "¯"
-	"breve",          // 198 0xc6 \306 "˘"
-	"dotaccent",      // 199 0xc7 \307 "˙"
-	"dieresis",       // 200 0xc8 \310 "¨"
-	".notdef",        // 201 0xc9 \311
-	"ring",           // 202 0xca \312 "˚"
-	"cedilla",        // 203 0xcb \313 "¸"
-	".notdef",        // 204 0xcc \314
-	"hungarumlaut",   // 205 0xcd \315 "˝"
-	"ogonek",         // 206 0xce \316 "˛"
-	"caron",          // 207 0xcf \317 "ˇ"
-	"emdash",         // 208 0xd0 \320 "—"
-	".notdef",        // 209 0xd1 \321
-	".notdef",        // 210 0xd2 \322
-	".notdef",        // 211 0xd3 \323
-	".notdef",        // 212 0xd4 \324
-	".notdef",        // 213 0xd5 \325
-	".notdef",        // 214 0xd6 \326
-	".notdef",        // 215 0xd7 \327
-	".notdef",        // 216 0xd8 \330
-	".notdef",        // 217 0xd9 \331
-	".notdef",        // 218 0xda \332
-	".notdef",        // 219 0xdb \333
-	".notdef",        // 220 0xdc \334
-	".notdef",        // 221 0xdd \335
-	".notdef",        // 222 0xde \336
-	".notdef",        // 223 0xdf \337
-	".notdef",        // 224 0xe0 \340
-	"AE",             // 225 0xe1 \341 "Æ"
-	".notdef",        // 226 0xe2 \342
-	"ordfeminine",    // 227 0xe3 \343 "ª"
-	".notdef",        // 228 0xe4 \344
-	".notdef",        // 229 0xe5 \345
-	".notdef",        // 230 0xe6 \346
-	".notdef",        // 231 0xe7 \347
-	"Lslash",         // 232 0xe8 \350 "Ł"
-	"Oslash",         // 233 0xe9 \351 "Ø"
-	"OE",             // 234 0xea \352 "Œ"
-	"ordmasculine",   // 235 0xeb \353 "º"
-	".notdef",        // 236 0xec \354
-	".notdef",        // 237 0xed \355
-	".notdef",        // 238 0xee \356
-	".notdef",        // 239 0xef \357
-	".notdef",        // 240 0xf0 \360
-	"ae",             // 241 0xf1 \361 "æ"
-	".notdef",        // 242 0xf2 \362
-	".notdef",        // 243 0xf3 \363
-	".notdef",        // 244 0xf4 \364
-	"dotlessi",       // 245 0xf5 \365 "ı"
-	".notdef",        // 246 0xf6 \366
-	".notdef",        // 247 0xf7 \367
-	"lslash",         // 248 0xf8 \370 "ł"
-	"oslash",         // 249 0xf9 \371 "ø"
-	"oe",             // 250 0xfa \372 "œ"
-	"germandbls",     // 251 0xfb \373 "ß"
-	".notdef",        // 252 0xfc \374
-	".notdef",        // 253 0xfd \375
-	".notdef",        // 254 0xfe \376
-	".notdef",        // 255 0xff \377
+	"Agrave",         // 192 0xc0 \300 "À"
+	"Aacute",         // 193 0xc1 \301 "Á"
+	"Acircumflex",    // 194 0xc2 \302 "Â"
+	"Atilde",         // 195 0xc3 \303 "Ã"
+	"Adieresis",      // 196 0xc4 \304 "Ä"
+	"Aring",          // 197 0xc5 \305 "Å"
+	"AE",             // 198 0xc6 \306 "Æ"
+	"Ccedilla",       // 199 0xc7 \307 "Ç"
+	"Egrave",         // 200 0xc8 \310 "È"
+	"Eacute",         // 201 0xc9 \311 "É"
+	"Ecircumflex",    // 202 0xca \312 "Ê"
+	"Edieresis",      // 203 0xcb \313 "Ë"
+	"Igrave",         // 204 0xcc \314 "Ì"
+	"Iacute",         // 205 0xcd \315 "Í"
+	"Icircumflex",    // 206 0xce \316 "Î"
+	"Idieresis",      // 207 0xcf \317 "Ï"
+	"Eth",            // 208 0xd0 \320 "Ð"
+	"Ntilde",         // 209 0xd1 \321 "Ñ"
+	"Ograve",         // 210 0xd2 \322 "Ò"
+	"Oacute",         // 211 0xd3 \323 "Ó"
+	"Ocircumflex",    // 212 0xd4 \324 "Ô"
+	"Otilde",         // 213 0xd5 \325 "Õ"
+	"Odieresis",      // 214 0xd6 \326 "Ö"
+	"multiply",       // 215 0xd7 \327 "×"
+	"Oslash",         // 216 0xd8 \330 "Ø"
+	"Ugrave",         // 217 0xd9 \331 "Ù"
+	"Uacute",         // 218 0xda \332 "Ú"
+	"Ucircumflex",    // 219 0xdb \333 "Û"
+	"Udieresis",      // 220 0xdc \334 "Ü"
+	"Yacute",         // 221 0xdd \335 "Ý"
+	"Thorn",          // 222 0xde \336 "Þ"
+	"germandbls",     // 223 0xdf \337 "ß"
+	"agrave",         // 224 0xe0 \340 "à"
+	"aacute",         // 225 0xe1 \341 "á"
+	"acircumflex",    // 226 0xe2 \342 "â"
+	"atilde",         // 227 0xe3 \343 "ã"
+	"adieresis",      // 228 0xe4 \344 "ä"
+	"aring",          // 229 0xe5 \345 "å"
+	"ae",             // 230 0xe6 \346 "æ"
+	"ccedilla",       // 231 0xe7 \347 "ç"
+	"egrave",         // 232 0xe8 \350 "è"
+	"eacute",         // 233 0xe9 \351 "é"
+	"ecircumflex",    // 234 0xea \352 "ê"
+	"edieresis",      // 235 0xeb \353 "ë"
+	"igrave",         // 236 0xec \354 "ì"
+	"iacute",         // 237 0xed \355 "í"
+	"icircumflex",    // 238 0xee \356 "î"
+	"idieresis",      // 239 0xef \357 "ï"
+	"eth",            // 240 0xf0 \360 "ð"
+	"ntilde",         // 241 0xf1 \361 "ñ"
+	"ograve",         // 242 0xf2 \362 "ò"
+	"oacute",         // 243 0xf3 \363 "ó"
+	"ocircumflex",    // 244 0xf4 \364 "ô"
+	"otilde",         // 245 0xf5 \365 "õ"
+	"odieresis",      // 246 0xf6 \366 "ö"
+	"divide",         // 247 0xf7 \367 "÷"
+	"oslash",         // 248 0xf8 \370 "ø"
+	"ugrave",         // 249 0xf9 \371 "ù"
+	"uacute",         // 250 0xfa \372 "ú"
+	"ucircumflex",    // 251 0xfb \373 "û"
+	"udieresis",      // 252 0xfc \374 "ü"
+	"yacute",         // 253 0xfd \375 "ý"
+	"thorn",          // 254 0xfe \376 "þ"
+	"ydieresis",      // 255 0xff \377 "ÿ"
 }

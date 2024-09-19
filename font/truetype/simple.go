@@ -344,10 +344,10 @@ func (info *FontDictSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) erro
 // https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
 func ExtractEncoding(r pdf.Getter, encodingDict pdf.Object, ttf *sfnt.Font) []glyph.ID {
 	if encodingEntry, _ := pdf.Resolve(r, encodingDict); encodingEntry != nil {
-		encodingNames, _ := encoding.UndescribeEncodingType1(r, encodingEntry, pdfenc.StandardEncoding[:])
+		encodingNames, _ := encoding.UndescribeEncodingType1(r, encodingEntry, pdfenc.Standard.Encoding[:])
 		for i, name := range encodingNames {
 			if name == ".notdef" {
-				encodingNames[i] = pdfenc.StandardEncoding[i]
+				encodingNames[i] = pdfenc.Standard.Encoding[i]
 			}
 		}
 

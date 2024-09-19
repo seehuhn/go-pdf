@@ -18,7 +18,7 @@
 
 package pdfenc
 
-var IsStandardLatin = map[string]bool{
+var isStandardLatin = map[string]bool{
 	"A":              true,
 	"AE":             true,
 	"Aacute":         true,
@@ -250,7 +250,7 @@ var IsStandardLatin = map[string]bool{
 	"zero":           true,
 }
 
-var ToStandardLatin = map[rune]string{
+var toStandardLatin = map[rune]string{
 	0x0020: "space",
 	0x0021: "exclam",
 	0x0022: "quotedbl",
