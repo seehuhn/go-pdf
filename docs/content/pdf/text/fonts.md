@@ -97,8 +97,8 @@ The following information applies to simple PDF fonts.
     - If `BaseEncoding` is one of `MacRomanEncoding`, `MacExpertEncoding`, or
       `WinAnsiEncoding`, the corresponding encoding is used as the base
       encoding.
-    - Otherwise, if the font is embedded, the font's built-in encoding is used.
-    - Otherwise, if the font is non-symbolic, `StandardEncoding` is used.
+    - Otherwise, if the font is not embedded and non-symbolic,
+      `StandardEncoding` is used.
     - Otherwise, the font's built-in encoding is used.
 
     Then, the updates described by the `Differences` array are applied to the

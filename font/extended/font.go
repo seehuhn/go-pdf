@@ -18,12 +18,13 @@
 package extended
 
 import (
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/loader"
-	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
 	pstype1 "seehuhn.de/go/postscript/type1"
+
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/loader"
+	"seehuhn.de/go/pdf/font/type1"
 )
 
 // Font identifies the individual fonts.

@@ -37,6 +37,33 @@ func New() *Encoding {
 	}
 }
 
+func (e *Encoding) LookupCID(code []byte) cmap.CID {
+	if len(code) != 1 {
+		return 0
+	}
+	return e.data[code[0]]
+}
+
+func (e *Encoding) LookupNotdefCID(code []byte) cmap.CID {
+	return 0
+}
+
+// AsPDFType1 returns the /Encoding entry for the font dictionary of a Type 1 font.
+// If `builtin` is not nil, it will be used as the builtin encoding of the font.
+func (e *Encoding) AsPDFType1(builtin []string) (pdf.Native, error) {
+	// Check whether any codes refer to the built-in encoding
+	// of the font.
+	usesBuiltin := false
+	for _, c := range e.data {
+		if cidClass(c) == cidClassBuiltin {
+			usesBuiltin = true
+			break
+		}
+	}
+	_ = usesBuiltin
+	panic("not implemented")
+}
+
 func ExtractType1(r pdf.Getter, obj pdf.Object, isEmbedded, isSymbolic bool) (*Encoding, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
@@ -254,19 +281,12 @@ func (e *Encoding) fillStandardEncoding() {
 	}
 }
 
-func (e *Encoding) LookupCID(code []byte) cmap.CID {
-	if len(code) != 1 {
-		return 0
-	}
-	return e.data[code[0]]
-}
-
-func (e *Encoding) LookupNotdefCID(code []byte) cmap.CID {
-	return 0
-}
-
 func makeCID(class byte, data uint16, code byte) cmap.CID {
 	return cmap.CID(class)<<24 | cmap.CID(data)<<8 | cmap.CID(code)
+}
+
+func cidClass(c cmap.CID) byte {
+	return byte(c >> 24)
 }
 
 const (
