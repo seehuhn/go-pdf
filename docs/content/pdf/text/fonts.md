@@ -9,25 +9,29 @@ draft = true
 
 The table lists all font types allowed in PDF 2.0.
 
-| Font Dict   | CIDFont Dict   | FontDescriptor | Stream Dict     | Description     |
-| ----------- | -------------- | -------------- | --------------- | --------------- |
-| `Type1`     | -              | `FontFile`     |                 | Type 1          |
-| `Type1`     | -              | `FontFile3`    | `Type1C`        | CFF             |
-| `Type1`     | -              | `FontFile3`    | `OpenType`      | OpenType/CFF    |
-| `Type1`     | -              |                | -               | external Type 1 |
-| `MMType1`   | -              | `FontFile`     |                 | Type 1          |
-| `MMType1`   | -              | `FontFile3`    | `Type1C`        | CFF             |
-| `MMType1`   | -              |                | -               | ext. MMType1    |
-| `TrueType`  | -              | `FontFile2`    |                 | TrueType        |
-| `TrueType`  | -              | `FontFile3`    | `OpenType`      | OpenType/glyf   |
-| `TrueType`  | -              |                | -               | ext. TrueType   |
-| `Type3`     | -              | -              | -               | Type 3          |
-| `Type0`     | `CIDFontType0` | `FontFile3`    | `CIDFontType0C` | CFF             |
-| `Type0`     | `CIDFontType0` | `FontFile3`    | `OpenType`      | OpenType/CFF    |
-| `Type0`     | `CIDFontType0` |                | -               | external CFF    |
-| `Type0`     | `CIDFontType2` | `FontFile2`    |                 | TrueType        |
-| `Type0`     | `CIDFontType2` | `FontFile3`    | `OpenType`      | OpenType/glyf   |
-| `Type0`     | `CIDFontType2` |                | -               | ext. TrueType   |
+| Font Dict   | CIDFont Dict   | FontDescriptor | Stream Dict     | Description    |
+| ----------- | -------------- | -------------- | --------------- | -------------- |
+| `Type1`     | -              | `FontFile`     |                 | Type 1         |
+| `Type1`     | -              | `FontFile3`    | `Type1C`        | CFF            |
+| `Type1`     | -              | `FontFile3`    | `OpenType`      | OpenType/CFF   |
+| `Type1`     | -              |                | -               | ext. Type 1    |
+| `MMType1`   | -              | `FontFile`     |                 | Type 1         |
+| `MMType1`   | -              | `FontFile3`    | `Type1C`        | CFF            |
+| `MMType1`   | -              |                | -               | ext. MMType1   |
+|             |                |                |                 |                |
+| `TrueType`  | -              | `FontFile2`    |                 | TrueType       |
+| `TrueType`  | -              | `FontFile3`    | `OpenType`      | OpenType/glyf  |
+| `TrueType`  | -              |                | -               | ext. TrueType  |
+|             |                |                |                 |                |
+| `Type3`     | -              | -              | -               | Type 3         |
+|             |                |                |                 |                |
+| `Type0`     | `CIDFontType0` | `FontFile3`    | `CIDFontType0C` | CFF            |
+| `Type0`     | `CIDFontType0` | `FontFile3`    | `OpenType`      | OpenType/CFF   |
+| `Type0`     | `CIDFontType0` |                | -               | ext. CFF       |
+|             |                |                |                 |                |
+| `Type0`     | `CIDFontType2` | `FontFile2`    |                 | TrueType       |
+| `Type0`     | `CIDFontType2` | `FontFile3`    | `OpenType`      | OpenType/glyf  |
+| `Type0`     | `CIDFontType2` |                | -               | ext. TrueType  |
 
 The columns contain the following information:
 - The `Subtype` entry in the font dictionary.
@@ -40,6 +44,8 @@ The following sections summarise how font information is structured in
 PDF files.  The information is based on the PDF 2.0 specification.
 
 ## All Font Types
+
+The following information applies to all font PDF fonts.
 
 - Every font is described by a font dictionary.  The `Type` entry of these
   dictionaries is `Font`, the `Subtype` entry is used to distinguish between
@@ -55,10 +61,13 @@ PDF files.  The information is based on the PDF 2.0 specification.
 
 ## Simple Fonts
 
-- Simple fonts use single byte character codes.  Using information from the
-  `Encoding` entry in the font dictionary, character codes are mapped to glyph
-  names, and glyph names are mapped to glyphs in the font file using the
-  rules outlined below.
+Simple fonts use single byte character codes which map to glyph names.
+Glyph names are then mapped to glyphs in the font file.
+The following information applies to simple PDF fonts.
+
+- Using information from the `Encoding` entry in the font dictionary, character
+  codes are mapped to glyph names, and glyph names are mapped to glyphs in the
+  font file using the rules outlined below.
 
 - If a glyph is not present in the font, the `.notdef` glyph is used instead.
 
@@ -88,14 +97,15 @@ PDF files.  The information is based on the PDF 2.0 specification.
   - If `Encoding` is one of `MacRomanEncoding`, `MacExpertEncoding`,
     or `WinAnsiEncoding`, the corresponding encoding is used.
   - If `Encoding` is a PDF dictionary, first construct a "base encoding":
-    - If `BaseEncoding` is one of `MacRomanEncoding`, `MacExpertEncoding`,
-      or `WinAnsiEncoding`, the corresponding encoding is used.
+    - If `BaseEncoding` is one of `MacRomanEncoding`, `MacExpertEncoding`, or
+      `WinAnsiEncoding`, the corresponding encoding is used as the base
+      encoding.
     - Otherwise, if the font is embedded, the font's built-in encoding is used.
     - Otherwise, if the font is non-symbolic, `StandardEncoding` is used.
     - Otherwise, the font's built-in encoding is used.
 
-    Note that this procedure sometimes requires to load an external font file
-    to determine the built-in encoding.
+    Then, the `Differences` array in the encoding dictionary is used to modify
+    the base encoding.
 
 - Embedding:
   - If the textual format is used, the font is embedded using the `FontFile`
@@ -200,46 +210,48 @@ PDF files.  The information is based on the PDF 2.0 specification.
 
 ## Composite Fonts
 
-- The `Subtype` value in the font dictionary is `Type0`.
+Composite fonts use multi-byte character codes, which map to numeric character
+identifiers (CIDs).  CIDs are then mapped to glyphs in the font file.
+The following information applies to composite PDF fonts.
 
-- Composite fonts use multi-byte character codes to describe character
-  identifiers (CIDs). Only information which requires knowledge about the
-  mapping used is stored in the the font dictionary, the remaining
-  information is stored in the CIDFont dictionary.  The CIDFont dictionary can
+- In addition to the font dictionary, composite fonts have a separate CIDFont dictionary.
+  Information which requires knowledge about the
+  encoding is in the the font dictionary, the remaining
+  information is in the CIDFont dictionary.  The CIDFont dictionary can
   be located via the `DescendantFonts` entry in the font dictionary.
-  Different types of composite fonts are distinguished by the `Subtype` entry
-  in the CIDFont dictionary.
 
-- The `Encoding` entry in the font dictionary contains a CMap which
-  maps character codes to CIDs.
+- The `Subtype` value in the font dictionary is `Type0`.  Different types of
+  composite fonts are distinguished by the `Subtype` entry in the CIDFont
+  dictionary.
 
-  Valid codes are defined by the codespace ranges in the CMap.  If a code is
-  invalid, the following things happen:
+- The `Encoding` entry in the font dictionary specifies a CMap which
+  defines which byte sequences form valid character codes, and which
+  CID values these character codes map to.
 
-  1. CID 0 is returned.
-  2. The number of input bytes consumed is the length of the shortest code which
-     contains the longest possible prefix of the given code.  In particular, if
-     no valid code starts with the first byte of the given code, the number of
-     bytes consumed is the length of the shortest code.
+  If the byte sequence does not start with a valid character code, the
+  following things happen:
 
-  If the code is valid, the following things happen:
+  1. The longes prefix of the byte sequence which forms the start of a valid
+     character code is identified. The number of input bytes consumed is the
+     length of the shortest valid code which starts with this prefix.  In
+     particular, if no valid code starts with the first byte of the given code,
+     the number of bytes consumed is the length of the shortest code overall.
+  2. CID 0 is used.
+
+  If a valid code is found, the following things happen:
+
   1. If there is a `cidchar` or `cidrange` mapping for the code,
-     the resulting CID is returned.
+     the resulting CID is used.
   2. Otherwise, if there is a `notdef` mapping for the code,
-     the resulting CID is returned.
-  3. Otherwise, CID 0 is returned.
+     the resulting CID is used.
+  3. Otherwise, CID 0 is used.
 
-- If the font does not contain a glyph for a CID, the following things happen:
+- CIDs are mapped to glyphs as explained below for the different font types.
+  If the font does not contain a glyph for a CID, the following things happen:
 
   1. If the CMap contains a `notdef` mapping for the corresponding code, and
      there is a glyph for the CID from the `notdef` mapping, this glyph is shown.
   2. Otherwise, the glyph for CID 0 is shown.
-
-- There is a selection of pre-defined character collections which imply a map
-  between CID values and characters/glyphs/unicode. This can be used for glyph
-  selection (see below), and for text extraction.  The character collection is
-  specified by the `CIDSystemInfo` entry in the CIDFont dictionary and in the
-  CMap.
 
 - The `WMode` entry of the CMap specifies the writing mode (horizontal or
   vertical).
@@ -255,6 +267,11 @@ PDF files.  The information is based on the PDF 2.0 specification.
     `DW2` array, and half of the horizontal advance width is used for the
     horizontal component of the offset vector.
 
+- The `CIDSystemInfo` entry in the CIDFont dictionary and in the CMap specifies
+  a "character collection". A character collection maps CID values to
+  characters.  If a standard character collection is used, CID values
+  can be mapped to Unicode values.
+
 ### CFF and OpenType with CFF glyph outlines
 
 - The `Subtype` in the CIDFont dictionary is `CIDFontType0`.
@@ -264,10 +281,9 @@ PDF files.  The information is based on the PDF 2.0 specification.
   may be prefixed by a subset tag (e.g. `ABCDEF+Times-Roman`).
 
 - The mapping of CIDs to glyphs depends on the CFF font variant:
-  - If the CFF font uses CIDFont operators, the CFF font already contains a
-    mapping from CIDs to glyphs.  Glyphs are selected using this mapping.
-  - If the CFF font does not use CIDFont operators, the selected Glyph ID (GID)
-    always equals the CID.
+  - Some CFF fonts use "CIDFont operators" to map CIDs to glyphs.
+    If such a mapping is present, it is used.
+  - If the CFF font does not use CIDFont operators, the CID is used as the GID.
 
 - Embedding:
   - CFF font data is embedded using the `FontFile3` entry in the font
@@ -290,10 +306,9 @@ PDF files.  The information is based on the PDF 2.0 specification.
 - Glyph selection depends on whether the font is embedded:
   - If the font is embedded, the `CIDToGIDMap` entry in the CIDFont dictionary
     is used to map CIDs to GIDs.
-  - If the font is not embedded, one of the pre-defined CMaps must be used.
-    Using the character collection from this CMap, CID values are mapped to
-    unicode values, and the font's "cmap" table is used to map unicode values
-    to glyphs.
+  - If the font is not embedded, CID values are mapped to unicode values, and
+    the font's "cmap" table is used to map unicode values to glyphs. The spec
+    requires that one of the pre-defined CMaps must be used in this case.
 
 - Embedding:
   - TrueType fonts are embedded using the `FontFile2` entry in the font

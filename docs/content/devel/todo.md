@@ -28,7 +28,7 @@ weight = 100
 - avoid PDF output like `[-722 (1) -722] TJ` for centered text
 - double-check that I am correctly using the "Adobe Glyph List" and "Adobe
   Glyph List for New Fonts"
-- make a central list of all external resources I include
+- make a central list of all external assets/resources I include
 
 ## Fonts
 
