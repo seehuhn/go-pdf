@@ -38,9 +38,9 @@ func DescribeEncodingType1(encoding, builtin []string) pdf.Object {
 	}
 	candidates := []cand{
 		{nil, builtin},
-		{pdf.Name("WinAnsiEncoding"), pdfenc.WinAnsiEncoding[:]},
-		{pdf.Name("MacRomanEncoding"), pdfenc.MacRomanEncoding[:]},
-		{pdf.Name("MacExpertEncoding"), pdfenc.MacExpertEncoding[:]},
+		{pdf.Name("WinAnsiEncoding"), pdfenc.WinAnsi.Encoding[:]},
+		{pdf.Name("MacRomanEncoding"), pdfenc.MacRoman.Encoding[:]},
+		{pdf.Name("MacExpertEncoding"), pdfenc.MacExpert.Encoding[:]},
 	}
 
 	type D struct {
@@ -155,11 +155,11 @@ func UndescribeEncodingType1(r pdf.Getter, desc pdf.Object, builtin []string) ([
 func getNamedEncoding(name pdf.Name) ([]string, error) {
 	switch name {
 	case "WinAnsiEncoding":
-		return pdfenc.WinAnsiEncoding[:], nil
+		return pdfenc.WinAnsi.Encoding[:], nil
 	case "MacRomanEncoding":
-		return pdfenc.MacRomanEncoding[:], nil
+		return pdfenc.MacRoman.Encoding[:], nil
 	case "MacExpertEncoding":
-		return pdfenc.MacExpertEncoding[:], nil
+		return pdfenc.MacExpert.Encoding[:], nil
 	default:
 		return nil, fmt.Errorf("unknown encoding %q", name)
 	}

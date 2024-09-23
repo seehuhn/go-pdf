@@ -26,7 +26,7 @@ import (
 // TestStandardEncoding tests that the PDF standard encoding is
 // the same as the postscript standard encoding.
 func TestStandardEncoding(t *testing.T) {
-	for code, name := range StandardEncoding {
+	for code, name := range Standard.Encoding {
 		if string(name) != psenc.StandardEncoding[code] {
 			t.Errorf("StandardEncoding[%d] = %q != %q", code, name, psenc.StandardEncoding[code])
 		}
@@ -36,7 +36,7 @@ func TestStandardEncoding(t *testing.T) {
 // TestStandardEncoding2 tests that all encoded entries in StandardEncoding
 // correspond to a single unicode rune.
 func TestStandardEncoding2(t *testing.T) {
-	for _, name := range StandardEncoding {
+	for _, name := range Standard.Encoding {
 		if name == ".notdef" {
 			continue
 		}

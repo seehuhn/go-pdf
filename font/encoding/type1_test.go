@@ -43,11 +43,11 @@ func TestDescribeEncoding(t *testing.T) {
 	funnyEncoding[0o347] = "Aacute" // only in MacRomanEncoding
 
 	encodings := [][]string{
-		pdfenc.StandardEncoding[:],
-		pdfenc.MacRomanEncoding[:],
-		pdfenc.MacExpertEncoding[:],
-		pdfenc.WinAnsiEncoding[:],
-		pdfenc.PDFDocEncoding[:],
+		pdfenc.Standard.Encoding[:],
+		pdfenc.MacRoman.Encoding[:],
+		pdfenc.MacExpert.Encoding[:],
+		pdfenc.WinAnsi.Encoding[:],
+		pdfenc.PDFDoc.Encoding[:],
 		funnyEncoding,
 	}
 

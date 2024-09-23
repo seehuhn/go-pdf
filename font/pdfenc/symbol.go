@@ -16,8 +16,7 @@
 
 package pdfenc
 
-// IsSymbol is the character set of the Symbol font.
-var IsSymbol = map[string]bool{
+var symbolEncodingHas = map[string]bool{
 	"Alpha":          true,
 	"Beta":           true,
 	"Chi":            true,
@@ -209,10 +208,7 @@ var IsSymbol = map[string]bool{
 	"zeta":           true,
 }
 
-// SymbolEncoding is the built-in encoding for the Symbol font.
-//
-// See Appendix D.5 of PDF 32000-1:2008.
-var SymbolEncoding = [256]string{
+var symbolEncoding = [256]string{
 	".notdef",        // 0o000 = 0
 	".notdef",        // 0o001 = 1
 	".notdef",        // 0o002 = 2

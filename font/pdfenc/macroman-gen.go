@@ -1,22 +1,8 @@
-// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Code generated - DO NOT EDIT.
 
 package pdfenc
 
-var macRomanAlt = [256]string{
+var macRomanEncoding = [256]string{
 	".notdef",        // 0   0x00 \000
 	".notdef",        // 1   0x01 \001
 	".notdef",        // 2   0x02 \002
@@ -190,32 +176,32 @@ var macRomanAlt = [256]string{
 	"trademark",      // 170 0xaa \252 "™"
 	"acute",          // 171 0xab \253 "´"
 	"dieresis",       // 172 0xac \254 "¨"
-	"notequal",       // 173 0xad \255 "≠"
+	".notdef",        // 173 0xad \255
 	"AE",             // 174 0xae \256 "Æ"
 	"Oslash",         // 175 0xaf \257 "Ø"
-	"infinity",       // 176 0xb0 \260 "∞"
+	".notdef",        // 176 0xb0 \260
 	"plusminus",      // 177 0xb1 \261 "±"
-	"lessequal",      // 178 0xb2 \262 "≤"
-	"greaterequal",   // 179 0xb3 \263 "≥"
+	".notdef",        // 178 0xb2 \262
+	".notdef",        // 179 0xb3 \263
 	"yen",            // 180 0xb4 \264 "¥"
 	"mu",             // 181 0xb5 \265 "µ"
-	"partialdiff",    // 182 0xb6 \266 "∂"
-	"summation",      // 183 0xb7 \267 "∑"
-	"product",        // 184 0xb8 \270 "∏"
-	"pi",             // 185 0xb9 \271 "π"
-	"integral",       // 186 0xba \272 "∫"
+	".notdef",        // 182 0xb6 \266
+	".notdef",        // 183 0xb7 \267
+	".notdef",        // 184 0xb8 \270
+	".notdef",        // 185 0xb9 \271
+	".notdef",        // 186 0xba \272
 	"ordfeminine",    // 187 0xbb \273 "ª"
 	"ordmasculine",   // 188 0xbc \274 "º"
-	"Omega",          // 189 0xbd \275 "Ω"
+	".notdef",        // 189 0xbd \275
 	"ae",             // 190 0xbe \276 "æ"
 	"oslash",         // 191 0xbf \277 "ø"
 	"questiondown",   // 192 0xc0 \300 "¿"
 	"exclamdown",     // 193 0xc1 \301 "¡"
 	"logicalnot",     // 194 0xc2 \302 "¬"
-	"radical",        // 195 0xc3 \303 "√"
+	".notdef",        // 195 0xc3 \303
 	"florin",         // 196 0xc4 \304 "ƒ"
-	"approxequal",    // 197 0xc5 \305 "≈"
-	"Delta",          // 198 0xc6 \306 "Δ"
+	".notdef",        // 197 0xc5 \305
+	".notdef",        // 198 0xc6 \306
 	"guillemotleft",  // 199 0xc7 \307 "«"
 	"guillemotright", // 200 0xc8 \310 "»"
 	"ellipsis",       // 201 0xc9 \311 "…"
@@ -232,11 +218,11 @@ var macRomanAlt = [256]string{
 	"quoteleft",      // 212 0xd4 \324 "‘"
 	"quoteright",     // 213 0xd5 \325 "’"
 	"divide",         // 214 0xd6 \326 "÷"
-	"lozenge",        // 215 0xd7 \327 "◊"
+	".notdef",        // 215 0xd7 \327
 	"ydieresis",      // 216 0xd8 \330 "ÿ"
 	"Ydieresis",      // 217 0xd9 \331 "Ÿ"
 	"fraction",       // 218 0xda \332 "⁄"
-	"Euro",           // 219 0xdb \333 "€"
+	"currency",       // 219 0xdb \333 "¤"
 	"guilsinglleft",  // 220 0xdc \334 "‹"
 	"guilsinglright", // 221 0xdd \335 "›"
 	"fi",             // 222 0xde \336 "ﬁ"
@@ -257,7 +243,7 @@ var macRomanAlt = [256]string{
 	"Igrave",         // 237 0xed \355 "Ì"
 	"Oacute",         // 238 0xee \356 "Ó"
 	"Ocircumflex",    // 239 0xef \357 "Ô"
-	"apple",          // 240 0xf0 \360 ""
+	".notdef",        // 240 0xf0 \360
 	"Ograve",         // 241 0xf1 \361 "Ò"
 	"Uacute",         // 242 0xf2 \362 "Ú"
 	"Ucircumflex",    // 243 0xf3 \363 "Û"
@@ -275,7 +261,7 @@ var macRomanAlt = [256]string{
 	"caron",          // 255 0xff \377 "ˇ"
 }
 
-var macRomanAltHas = map[string]bool{
+var macRomanEncodingHas = map[string]bool{
 	"A":              true,
 	"AE":             true,
 	"Aacute":         true,
@@ -288,13 +274,11 @@ var macRomanAltHas = map[string]bool{
 	"C":              true,
 	"Ccedilla":       true,
 	"D":              true,
-	"Delta":          true,
 	"E":              true,
 	"Eacute":         true,
 	"Ecircumflex":    true,
 	"Edieresis":      true,
 	"Egrave":         true,
-	"Euro":           true,
 	"F":              true,
 	"G":              true,
 	"H":              true,
@@ -315,7 +299,6 @@ var macRomanAltHas = map[string]bool{
 	"Ocircumflex":    true,
 	"Odieresis":      true,
 	"Ograve":         true,
-	"Omega":          true,
 	"Oslash":         true,
 	"Otilde":         true,
 	"P":              true,
@@ -342,8 +325,6 @@ var macRomanAltHas = map[string]bool{
 	"ae":             true,
 	"agrave":         true,
 	"ampersand":      true,
-	"apple":          true,
-	"approxequal":    true,
 	"aring":          true,
 	"asciicircum":    true,
 	"asciitilde":     true,
@@ -368,6 +349,7 @@ var macRomanAltHas = map[string]bool{
 	"colon":          true,
 	"comma":          true,
 	"copyright":      true,
+	"currency":       true,
 	"d":              true,
 	"dagger":         true,
 	"daggerdbl":      true,
@@ -400,7 +382,6 @@ var macRomanAltHas = map[string]bool{
 	"germandbls":     true,
 	"grave":          true,
 	"greater":        true,
-	"greaterequal":   true,
 	"guillemotleft":  true,
 	"guillemotright": true,
 	"guilsinglleft":  true,
@@ -413,21 +394,16 @@ var macRomanAltHas = map[string]bool{
 	"icircumflex":    true,
 	"idieresis":      true,
 	"igrave":         true,
-	"infinity":       true,
-	"integral":       true,
 	"j":              true,
 	"k":              true,
 	"l":              true,
 	"less":           true,
-	"lessequal":      true,
 	"logicalnot":     true,
-	"lozenge":        true,
 	"m":              true,
 	"macron":         true,
 	"mu":             true,
 	"n":              true,
 	"nine":           true,
-	"notequal":       true,
 	"ntilde":         true,
 	"numbersign":     true,
 	"o":              true,
@@ -446,15 +422,12 @@ var macRomanAltHas = map[string]bool{
 	"paragraph":      true,
 	"parenleft":      true,
 	"parenright":     true,
-	"partialdiff":    true,
 	"percent":        true,
 	"period":         true,
 	"periodcentered": true,
 	"perthousand":    true,
-	"pi":             true,
 	"plus":           true,
 	"plusminus":      true,
-	"product":        true,
 	"q":              true,
 	"question":       true,
 	"questiondown":   true,
@@ -467,7 +440,6 @@ var macRomanAltHas = map[string]bool{
 	"quotesinglbase": true,
 	"quotesingle":    true,
 	"r":              true,
-	"radical":        true,
 	"registered":     true,
 	"ring":           true,
 	"s":              true,
@@ -478,7 +450,6 @@ var macRomanAltHas = map[string]bool{
 	"slash":          true,
 	"space":          true,
 	"sterling":       true,
-	"summation":      true,
 	"t":              true,
 	"three":          true,
 	"tilde":          true,

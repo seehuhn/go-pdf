@@ -155,14 +155,14 @@ func restrictGlyphList[T any](f Font, glyphs map[string]T) []string {
 	var encoding []string
 	switch f {
 	case Symbol:
-		charset = pdfenc.IsSymbol
-		encoding = pdfenc.SymbolEncoding[:]
+		charset = pdfenc.Symbol.Has
+		encoding = pdfenc.Symbol.Encoding[:]
 	case ZapfDingbats:
-		charset = pdfenc.IsZapfDingbats
-		encoding = pdfenc.ZapfDingbatsEncoding[:]
+		charset = pdfenc.ZapfDingbats.Has
+		encoding = pdfenc.ZapfDingbats.Encoding[:]
 	default:
-		charset = pdfenc.IsStandardLatin
-		encoding = pdfenc.StandardEncoding[:]
+		charset = pdfenc.StandardLatin.Has
+		encoding = pdfenc.Standard.Encoding[:]
 	}
 	for key := range glyphs {
 		if !charset[key] && key != ".notdef" {

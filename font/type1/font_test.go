@@ -194,7 +194,7 @@ func TestEncoding(t *testing.T) {
 	}
 
 	for i := 0; i < 256; i++ {
-		if info.Encoding[i] != ".notdef" && info.Encoding[i] != pdfenc.StandardEncoding[i] {
+		if info.Encoding[i] != ".notdef" && info.Encoding[i] != pdfenc.Standard.Encoding[i] {
 			t.Error(i, info.Encoding[i])
 		}
 	}
