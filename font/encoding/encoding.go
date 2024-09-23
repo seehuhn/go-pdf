@@ -22,6 +22,12 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
+// An Encoding describes the meaning of character codes in a simple font.
+// Normally, the character codes are mapped to names.
+// For use with non-embedded fonts, a code can also refer to glyphs
+// from the built-in encoding of a (potentially not yet loaded) font.
+// For use with TrueType fonts, raw codes can alse be used, leaving the
+// interpretation of the code to the font.
 type Encoding struct {
 	data  []cmap.CID
 	names []string
@@ -30,11 +36,31 @@ type Encoding struct {
 
 func New() *Encoding {
 	find := make(map[string]uint16)
-	find[".notdef"] = 0
 	return &Encoding{
 		data: make([]cmap.CID, 256),
 		find: find,
 	}
+}
+
+func (e *Encoding) SetName(code byte, name string) cmap.CID {
+	var cid cmap.CID
+
+	if name != ".notdef" {
+		idx, ok := e.find[name]
+		if !ok {
+			idx = uint16(len(e.names))
+			e.names = append(e.names, name)
+			e.find[name] = idx
+		}
+		cid = makeCID(cidClassName, idx, code)
+	}
+
+	if e.data[code] != 0 && e.data[code] != cid {
+		panic("duplicate encoding")
+	}
+
+	e.data[code] = cid
+	return cid
 }
 
 func (e *Encoding) LookupCID(code []byte) cmap.CID {
@@ -74,7 +100,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, isEmbedded, isSymbolic bool) (*E
 
 	switch obj := obj.(type) {
 	case nil:
-		e.fillBuiltIn()
+		e.fillBuiltInEncoding()
 
 	case pdf.Name:
 		err := e.fillNamedEncoding(obj)
@@ -96,7 +122,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, isEmbedded, isSymbolic bool) (*E
 		} else if !isEmbedded && !isSymbolic {
 			e.fillStandardEncoding()
 		} else {
-			e.fillBuiltIn()
+			e.fillBuiltInEncoding()
 		}
 
 		// apply the differences
@@ -116,7 +142,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, isEmbedded, isSymbolic bool) (*E
 				if code < 0 || code >= 256 {
 					return nil, pdf.Errorf("encoding: invalid code %d", code)
 				}
-				e.data[code] = e.get(string(x), byte(code))
+				e.SetName(byte(code), string(x))
 				code++
 			default:
 				return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
@@ -180,7 +206,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 				if code < 0 || code >= 256 {
 					return nil, pdf.Errorf("encoding: invalid code %d", code)
 				}
-				e.data[code] = e.get(string(x), byte(code))
+				e.SetName(byte(code), string(x))
 				code++
 			default:
 				return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
@@ -188,12 +214,12 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 		}
 
 		// fill any remaining slots using the standard encoding
-		for i := range 256 {
-			if e.data[i] != 0 {
+		for code := range 256 {
+			if e.data[code] != 0 {
 				continue
 			}
-			if name := pdfenc.Standard.Encoding[i]; name != ".notdef" {
-				e.data[i] = e.get(name, byte(code))
+			if name := pdfenc.Standard.Encoding[code]; name != ".notdef" {
+				e.SetName(byte(code), name)
 			}
 		}
 
@@ -229,7 +255,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 			if code < 0 || code >= 256 {
 				return nil, pdf.Errorf("encoding: invalid code %d", code)
 			}
-			e.data[code] = e.get(string(x), byte(code))
+			e.SetName(byte(code), string(x))
 			code++
 		default:
 			return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
@@ -239,17 +265,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 	return e, nil
 }
 
-func (e *Encoding) get(name string, code byte) cmap.CID {
-	idx, ok := e.find[name]
-	if !ok {
-		idx = uint16(len(e.names))
-		e.names = append(e.names, name)
-		e.find[name] = idx
-	}
-	return makeCID(cidClassName, idx, code)
-}
-
-func (e *Encoding) fillBuiltIn() {
+func (e *Encoding) fillBuiltInEncoding() {
 	for i := range 256 {
 		e.data[i] = makeCID(cidClassBuiltin, 0, byte(i))
 	}
@@ -269,7 +285,7 @@ func (e *Encoding) fillNamedEncoding(name pdf.Name) error {
 	}
 
 	for code, name := range enc {
-		e.data[code] = e.get(name, byte(code))
+		e.SetName(byte(code), name)
 	}
 
 	return nil
@@ -277,7 +293,7 @@ func (e *Encoding) fillNamedEncoding(name pdf.Name) error {
 
 func (e *Encoding) fillStandardEncoding() {
 	for code, name := range pdfenc.Standard.Encoding {
-		e.data[code] = e.get(name, byte(code))
+		e.SetName(byte(code), name)
 	}
 }
 
