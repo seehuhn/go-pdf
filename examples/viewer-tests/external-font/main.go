@@ -17,14 +17,20 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
-	"seehuhn.de/go/pdf"
+	"golang.org/x/exp/maps"
+
+	"seehuhn.de/go/postscript/afm"
 	pstype1 "seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/sfnt/glyph"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
@@ -68,9 +74,9 @@ func write_font(filename string) error {
 		"y":     true,
 		"e":     true,
 		"s":     true,
-		"n":     false,
-		"o":     false,
-		"space": false,
+		"n":     true,
+		"o":     true,
+		"space": true,
 	}
 	newGlyphs := make(map[string]*pstype1.Glyph)
 	for key := range psFont.Glyphs {
@@ -79,6 +85,7 @@ func write_font(filename string) error {
 		}
 	}
 	psFont.Glyphs = newGlyphs
+	fmt.Println(maps.Keys(newGlyphs))
 
 	// make the built-in encoding spell "no "
 	psFont.Encoding = make([]string, 256)
@@ -102,6 +109,35 @@ func write_font(filename string) error {
 		return err
 	}
 
+	metrics := &afm.Metrics{
+		Glyphs:       make(map[string]*afm.GlyphInfo),
+		Encoding:     psFont.Encoding,
+		FontName:     psFont.FontName,
+		FullName:     psFont.FullName,
+		Version:      psFont.Version,
+		Notice:       psFont.Notice,
+		IsFixedPitch: true,
+	}
+	for name, glyph := range psFont.Glyphs {
+		metrics.Glyphs[name] = &afm.GlyphInfo{
+			WidthX: glyph.WidthX,
+			BBox:   glyph.BBox(),
+		}
+	}
+	afmName := strings.TrimSuffix(filename, ".pfb") + ".afm"
+	fd, err = os.Create(afmName)
+	if err != nil {
+		return err
+	}
+	err = metrics.Write(fd)
+	if err != nil {
+		return err
+	}
+	err = fd.Close()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -109,7 +145,7 @@ func write_pdf(filename string) error {
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	doc, err := document.CreateSinglePage(filename, document.A5r, pdf.V2_0, opt)
+	doc, err := document.CreateSinglePage(filename, document.A5r, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}
