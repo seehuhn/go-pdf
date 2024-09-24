@@ -27,11 +27,6 @@ import (
 	"sync"
 )
 
-// https://learn.microsoft.com/en-us/typography/opentype/spec/name#nid6
-// the name string must be no longer than 63 characters and restricted to the
-// printable ASCII subset, codes 33 to 126, except for the 10 characters '[',
-// ']', '(', ')', '{', '}', '<', '>', '/', '%'.
-
 // FontType is the type of a font.
 type FontType int
 
