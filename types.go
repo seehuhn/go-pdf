@@ -63,7 +63,7 @@ type Object interface {
 	AsPDF(OutputOptions) Native
 }
 
-// OutputOptions is a bit-mask which controls how [Object]s are formatted.
+// OutputOptions is a bit-mask which controls how [Object] values are formatted.
 type OutputOptions uint32
 
 // HasAny returns true if any of the given output options are set.
@@ -73,20 +73,31 @@ func (o OutputOptions) HasAny(opt OutputOptions) bool {
 
 // These constants give the supported output options.
 // The values are bit masks which can be combined using bitwise OR.
-// The default output options are 0.
 const (
-	OptContentStream  OutputOptions = 1 << iota // we are inside a content stream
-	OptObjStm                                   // use object streams
-	OptPretty                                   // make the output more human-readable
-	OptTextStringUtf8                           // allow UTF-8 encoding for text strings
-	OptXRefStream                               // use an xref stream
+	// OptContentStream is set if we are inside a content stream.
+	OptContentStream OutputOptions = 1 << iota
+
+	// OptDictTypes adds optional dictionary /Type arguments.
+	OptDictTypes
+
+	// optObjStm allows the use of object streams.
+	optObjStm
+
+	// OptPretty makes the output more human-readable.
+	OptPretty
+
+	// OptTextStringUtf8 enables UTF-8 encoding for text strings.
+	OptTextStringUtf8
+
+	// optXRefStream allows to use an xref stream instead of an xref table.
+	optXRefStream
 )
 
 func defaultOutputOptions(v Version) OutputOptions {
 	var opt OutputOptions
 	if v >= V1_5 {
-		opt |= OptObjStm
-		opt |= OptXRefStream
+		opt |= optObjStm
+		opt |= optXRefStream
 	}
 	if v >= V2_0 {
 		opt |= OptTextStringUtf8

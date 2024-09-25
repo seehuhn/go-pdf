@@ -201,7 +201,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 	outOpt := defaultOutputOptions(v)
 	if opt.HumanReadable {
-		outOpt &= ^(OptObjStm | OptXRefStream)
+		outOpt &= ^(optObjStm | optXRefStream)
 		outOpt |= OptPretty
 	}
 
@@ -281,7 +281,7 @@ func (pdf *Writer) Close() error {
 	// write the cross reference table and trailer
 	xRefPos := pdf.w.pos
 	trailer["Size"] = Integer(pdf.nextRef)
-	if pdf.outputOptions.HasAny(OptXRefStream) {
+	if pdf.outputOptions.HasAny(optXRefStream) {
 		err = pdf.writeXRefStream(trailer)
 	} else {
 		err = pdf.writeXRefTable(trailer)
@@ -467,7 +467,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if !pdf.outputOptions.HasAny(OptObjStm) {
+	if !pdf.outputOptions.HasAny(optObjStm) {
 		// If object streams are disabled, write the objects directly.
 		for i, obj := range objects {
 			err := pdf.Put(refs[i], obj)

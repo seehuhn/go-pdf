@@ -97,7 +97,7 @@ The following information applies to simple PDF fonts.
     - If `BaseEncoding` is one of `MacRomanEncoding`, `MacExpertEncoding`, or
       `WinAnsiEncoding`, the corresponding encoding is used as the base
       encoding.
-    - Otherwise, if the font is not embedded and non-symbolic,
+    - Otherwise, if the font is neither embedded nor symbolic,
       `StandardEncoding` is used.
     - Otherwise, the font's built-in encoding is used.
 
@@ -164,9 +164,10 @@ The following information applies to simple PDF fonts.
   5. Use the encoding to map `c` to a name, and use the "post" table to look
      up the glyph.
 
-  Because of ambiguities, the spec recommends to use composite fonts with
-  `Encoding` set to `Identity-H` and `CIDToGIDMap` set to `Identity`, in place
-  of simple fonts with TrueType outlines.
+  It is not completely specified which method should be used under which
+  circumstances.  Because of this ambiguity, the spec recommends to avoid use
+  of simple TrueType fonts and to use composite fonts with the `Encoding` set
+  to `Identity-H` and `CIDToGIDMap` set to `Identity`, instead.
 
   I plan to implement the following behaviour: In each of the four cases, try
   the following methods and use the first one that succeeds:

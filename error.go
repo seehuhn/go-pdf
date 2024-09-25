@@ -56,6 +56,7 @@ type MalformedFileError struct {
 	Loc []string
 }
 
+// Error creates a new [MalformedFileError] with the given message.
 func Error(msg string) error {
 	return &MalformedFileError{Err: errors.New(msg)}
 }
