@@ -56,7 +56,7 @@ func TestEmbedBuiltin(t *testing.T) {
 
 			gg := F.Layout(nil, 10, testText)
 			for _, g := range gg.Seq { // allocate codes
-				E.AppendEncoded(nil, g.GID, g.Text)
+				E.(font.EmbeddedLayouter).AppendEncoded(nil, g.GID, g.Text)
 			}
 
 			err = rm.Close()
@@ -71,7 +71,7 @@ func TestEmbedBuiltin(t *testing.T) {
 			if name := pdf.Name(G); dicts.FontDict["BaseFont"] != name {
 				t.Errorf("wrong BaseFont: %s != %s", dicts.FontDict["BaseFont"], name)
 			}
-			if dicts.FontProgram != nil {
+			if dicts.FontData != nil {
 				t.Errorf("font program wrongly included")
 			}
 		})

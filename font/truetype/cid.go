@@ -341,7 +341,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, erro
 	}
 	res := &FontDictComposite{}
 
-	stmObj, err := pdf.GetStream(r, dicts.FontProgram)
+	stmObj, err := pdf.GetStream(r, dicts.FontData)
 	if err != nil {
 		return nil, err
 	}

@@ -232,10 +232,10 @@ func printObject(args ...string) error {
 				return err
 			}
 		}
-		if dicts.FontProgram != nil {
+		if dicts.FontData != nil {
 			fmt.Println()
 			fmt.Print("Font program dict: ")
-			err = e.show(dicts.FontProgram.Dict)
+			err = e.show(dicts.FontData.Dict)
 			if err != nil {
 				return err
 			}

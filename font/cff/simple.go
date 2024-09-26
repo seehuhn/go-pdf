@@ -155,8 +155,8 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictSimple, error) {
 		res.SubsetTag = m[1]
 	}
 
-	if dicts.FontProgram != nil {
-		data, err := pdf.ReadAll(r, dicts.FontProgram)
+	if dicts.FontData != nil {
+		data, err := pdf.ReadAll(r, dicts.FontData)
 		if err != nil {
 			return nil, pdf.Wrap(err, "reading CFF font stream")
 		}

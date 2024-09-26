@@ -72,7 +72,7 @@ func TestCIDName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if got := e.CIDName(tt.cid); got != tt.want {
+		if got := e.GlyphName(tt.cid); got != tt.want {
 			t.Errorf("CIDName(%d) = %q, want %q", tt.cid, got, tt.want)
 		}
 	}
@@ -475,7 +475,7 @@ func TestAsPDF(t *testing.T) {
 					if cid == 0 {
 						continue
 					}
-					name := enc1.CIDName(cid)
+					name := enc1.GlyphName(cid)
 					if name == "" {
 						canType3 = false
 						name = testBuiltinEncoding[code]
@@ -532,13 +532,13 @@ func TestAsPDF(t *testing.T) {
 					cid2 := enc2.Decode(byte(code))
 					got := ".notdef"
 					if cid2 != 0 {
-						got = enc2.CIDName(cid2)
+						got = enc2.GlyphName(cid2)
 						if got == "" {
 							got = testBuiltinEncoding[code]
 						}
 					}
 					if got != want {
-						t.Errorf("code %d -> CID %d -> %q, want %q", code, cid2, enc2.CIDName(cid2), want)
+						t.Errorf("code %d -> CID %d -> %q, want %q", code, cid2, enc2.GlyphName(cid2), want)
 						hasErrors = true
 					}
 				}

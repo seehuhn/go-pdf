@@ -78,8 +78,8 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 	res := &FontDict{}
 
 	var psFont *type1.Font
-	if dicts.FontProgram != nil {
-		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	if dicts.FontData != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontData, 0)
 		if err != nil {
 			return nil, err
 		}

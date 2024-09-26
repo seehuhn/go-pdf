@@ -76,11 +76,11 @@ func (e *Encoding) AllocateCID(code byte, glyphName string) cmap.CID {
 	return cid
 }
 
-// CIDName returns the glyph name associated with a CID.
+// GlyphName returns the glyph name associated with a CID.
 //
 // For unmapped codes (CID 0) and codes mapped via the built-in encoding, the
 // empty string is returned.
-func (e *Encoding) CIDName(cid cmap.CID) string {
+func (e *Encoding) GlyphName(cid cmap.CID) string {
 	name := e.names[cid]
 	return name
 }

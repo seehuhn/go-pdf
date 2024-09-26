@@ -134,7 +134,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 
 		var glyphWidth float64
 		prevLen := len(run)
-		run, glyphWidth = E.AppendEncoded(run, g.GID, g.Text)
+		run, glyphWidth = E.(font.EmbeddedLayouter).AppendEncoded(run, g.GID, g.Text)
 		isSpace := len(run) == prevLen+1 && run[prevLen] == ' '
 		glyphWidth = glyphWidth*param.TextFontSize + param.TextCharacterSpacing
 		if isSpace {

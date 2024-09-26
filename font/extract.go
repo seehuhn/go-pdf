@@ -24,11 +24,37 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-// EmbeddingType represents the different ways font data
+// DictType represents the different types of font dictionaries in PDF.
+type DictType int
+
+// List of all font dictionary types supported by PDF.
+const (
+	DictTypeUnknown DictType = iota
+	DictTypeSimpleType1
+	DictTypeSimpleTrueType
+	DictTypeType3
+	DictTypeCompositeCFF
+	DictTypeCompositeTrueType
+)
+
+// DataType represents the different types of font data in PDF.
+type DataType int
+
+// List of all font data types supported by PDF.
+const (
+	DataUnknown DataType = iota
+	DataType1
+	DateType3
+	DataCFF
+	DataTrueType
+	DataOpenType
+)
+
+// EmbeddingTypeOld represents the different ways font data
 // can be embedded in a PDF file.
 //
 // The different ways of embedding fonts in a PDF file are
-// represented by values of type [EmbeddingType]. There are seven different
+// represented by values of type [EmbeddingTypeOld]. There are seven different
 // types of embedded simple fonts:
 //   - Type 1: see [seehuhn.de/go/pdf/font/type1.FontDict]
 //   - Multiple Master Type 1 (not supported by this library)
@@ -43,11 +69,13 @@ import (
 //   - TrueType: see [seehuhn.de/go/pdf/font/truetype.EmbedInfoComposite]
 //   - OpenType with CFF glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoCFFComposite]
 //   - OpenType with "glyf" glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoGlyfComposite]
-type EmbeddingType int
+//
+// TODO(voss): Migrate to use [DictType] instead.
+type EmbeddingTypeOld int
 
 // List of all embedding types supported by PDF.
 const (
-	Unknown EmbeddingType = iota
+	Unknown EmbeddingTypeOld = iota
 
 	Type1              // Type 1 (simple)
 	MMType1            // Multiple Master Type 1 (simple)
@@ -66,7 +94,7 @@ const (
 	ExternalGlyfComposite // extern font, glyf-based (composite)
 )
 
-func (t EmbeddingType) String() string {
+func (t EmbeddingTypeOld) String() string {
 	switch t {
 	case Type1:
 		return "Type 1"
@@ -108,7 +136,7 @@ func (t EmbeddingType) String() string {
 // to use up to 256 glyphs per embedded copy of the font.  Composite fonts
 // allow to use more than 256 glyphs per embedded copy of the font, but lead to
 // larger PDF files.
-func (t EmbeddingType) IsComposite() bool {
+func (t EmbeddingTypeOld) IsComposite() bool {
 	switch t {
 	case CFFComposite, OpenTypeCFFComposite, TrueTypeComposite, OpenTypeGlyfComposite:
 		return true
@@ -118,7 +146,7 @@ func (t EmbeddingType) IsComposite() bool {
 }
 
 // MustBe returns an error if the embedding type is not as expected.
-func (t EmbeddingType) MustBe(expected EmbeddingType) error {
+func (t EmbeddingTypeOld) MustBe(expected EmbeddingTypeOld) error {
 	if t != expected {
 		return fmt.Errorf("expected %q, got %q", expected, t)
 	}
@@ -139,9 +167,13 @@ type Dicts struct {
 	FontDict       pdf.Dict
 	CIDFontDict    pdf.Dict
 	FontDescriptor *Descriptor
-	FontProgramRef pdf.Reference
-	FontProgram    *pdf.Stream
-	Type           EmbeddingType
+
+	FontDataKey pdf.Name
+	FontDataRef pdf.Reference
+	FontData    *pdf.Stream
+
+	DictType DictType
+	Type     EmbeddingTypeOld
 }
 
 // ExtractDicts reads all information about a font from a PDF file.
@@ -182,6 +214,26 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 		fontDict = cidFontDict
 	}
 
+	var dictType DictType
+	switch {
+	case fontType == "Type1" || fontType == "MMType1":
+		dictType = DictTypeSimpleType1
+	case fontType == "TrueType":
+		dictType = DictTypeSimpleTrueType
+	case fontType == "Type3":
+		dictType = DictTypeType3
+	case fontType == "Type0" && cidFontType == "CIDFontType0":
+		dictType = DictTypeCompositeCFF
+	case fontType == "Type0" && cidFontType == "CIDFontType2":
+		dictType = DictTypeCompositeTrueType
+	default:
+		if fontType == "Type0" {
+			return nil, pdf.Errorf("unknown font type: %s/%s", fontType, cidFontType)
+		}
+		return nil, pdf.Errorf("unknown font type: %s", fontType)
+	}
+	res.DictType = dictType
+
 	fontName, err := pdf.GetName(r, fontDict["BaseFont"])
 	if err == nil {
 		if m := subset.TagRegexp.FindStringSubmatch(string(fontName)); m != nil {
@@ -217,8 +269,9 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 		if err != nil {
 			return nil, pdf.Wrap(err, string(fontKey))
 		}
-		res.FontProgramRef = fontRef
-		res.FontProgram = stmObj
+		res.FontDataKey = fontKey
+		res.FontDataRef = fontRef
+		res.FontData = stmObj
 		subType, err = pdf.GetName(r, stmObj.Dict["Subtype"])
 		if err != nil {
 			return nil, pdf.Wrap(err, "Subtype")
@@ -260,4 +313,66 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 	}
 
 	return res, nil
+}
+
+func (d *Dicts) IsSimple() bool {
+	return d.DictType == DictTypeSimpleType1 ||
+		d.DictType == DictTypeSimpleTrueType ||
+		d.DictType == DictTypeType3
+}
+
+func (d *Dicts) IsComposite() bool {
+	return d.DictType == DictTypeCompositeCFF ||
+		d.DictType == DictTypeCompositeTrueType
+}
+
+func (d *Dicts) IsSymbolic() bool {
+	if d.FontDescriptor != nil {
+		return d.FontDescriptor.IsSymbolic
+	}
+
+	n := d.PostScriptName
+	return n == "Symbol" || n == "ZapfDingbats"
+}
+
+func (d *Dicts) IsNonSymbolic() bool {
+	if d.FontDescriptor != nil {
+		return !d.FontDescriptor.IsSymbolic
+	}
+
+	n := d.PostScriptName
+	return n == "Courier" ||
+		n == "Courier-Bold" ||
+		n == "Courier-Oblique" ||
+		n == "Courier-BoldOblique" ||
+		n == "Helvetica" ||
+		n == "Helvetica-Bold" ||
+		n == "Helvetica-Oblique" ||
+		n == "Helvetica-BoldOblique" ||
+		n == "Times-Roman" ||
+		n == "Times-Bold" ||
+		n == "Times-Italic" ||
+		n == "Times-BoldItalic"
+}
+
+func (d *Dicts) IsStandardFont() bool {
+	if d.DictType != DictTypeSimpleType1 {
+		return false
+	}
+
+	n := d.PostScriptName
+	return n == "Courier" ||
+		n == "Courier-Bold" ||
+		n == "Courier-Oblique" ||
+		n == "Courier-BoldOblique" ||
+		n == "Helvetica" ||
+		n == "Helvetica-Bold" ||
+		n == "Helvetica-Oblique" ||
+		n == "Helvetica-BoldOblique" ||
+		n == "Times-Roman" ||
+		n == "Times-Bold" ||
+		n == "Times-Italic" ||
+		n == "Times-BoldItalic" ||
+		n == "Symbol" ||
+		n == "ZapfDingbats"
 }

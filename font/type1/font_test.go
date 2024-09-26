@@ -57,9 +57,9 @@ func TestToUnicode(t *testing.T) {
 				}
 
 				var codes pdf.String
-				codes, _ = E.AppendEncoded(codes, gg[0].GID, []rune("A"))
-				codes, _ = E.AppendEncoded(codes, gg[0].GID, []rune(X))
-				codes, _ = E.AppendEncoded(codes, gg[1].GID, []rune("B"))
+				codes, _ = E.(font.EmbeddedLayouter).AppendEncoded(codes, gg[0].GID, []rune("A"))
+				codes, _ = E.(font.EmbeddedLayouter).AppendEncoded(codes, gg[0].GID, []rune(X))
+				codes, _ = E.(font.EmbeddedLayouter).AppendEncoded(codes, gg[1].GID, []rune("B"))
 				if len(codes) != 3 {
 					panic("test is broken")
 				}
@@ -119,8 +119,8 @@ func TestNotdefGlyph(t *testing.T) {
 
 			// Allocate codes for GID 0 and 5:
 			var s pdf.String
-			s, _ = E.AppendEncoded(s, 0, nil)
-			s, _ = E.AppendEncoded(s, 5, []rune("test"))
+			s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s, 0, nil)
+			s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s, 5, []rune("test"))
 			if len(s) != 2 {
 				panic("test is broken")
 			}
@@ -177,7 +177,7 @@ func TestEncoding(t *testing.T) {
 	}
 	gg := F.Layout(nil, 10, ".MiAbc")
 	for _, g := range gg.Seq {
-		E.AppendEncoded(nil, g.GID, g.Text) // allocate codes
+		E.(font.EmbeddedLayouter).AppendEncoded(nil, g.GID, g.Text) // allocate codes
 	}
 	err = rm.Close()
 	if err != nil {

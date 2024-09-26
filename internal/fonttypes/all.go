@@ -25,7 +25,7 @@ import (
 type Sample struct {
 	Label       string
 	Description string
-	Type        font.EmbeddingType
+	Type        font.EmbeddingTypeOld
 	MakeFont    func(*pdf.ResourceManager) font.Layouter
 }
 

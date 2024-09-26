@@ -19,9 +19,8 @@ package widths_test
 import (
 	"testing"
 
-	"seehuhn.de/go/sfnt/glyph"
-
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/pdf/internal/makefont"
@@ -54,7 +53,7 @@ func TestWidthsFull(t *testing.T) {
 	var ww []float64
 	for _, g := range gg.Seq {
 		ww = append(ww, otf.GlyphWidthPDF(g.GID))
-		s, _ = E.AppendEncoded(s, g.GID, g.Text)
+		s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s, g.GID, g.Text)
 	}
 	err = rm.Close()
 	if err != nil {
@@ -62,16 +61,22 @@ func TestWidthsFull(t *testing.T) {
 	}
 
 	qqq := reader.New(data, nil)
-	D, err := qqq.ReadFont(ref, "F")
+	D, err := qqq.ReadFont(ref)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	i := 0
-	D.ForeachGlyph(s, func(gid glyph.ID, _ []rune, wFromPDF float64, isSpace bool) {
+	for len(s) > 0 {
+		info, k := D.Decode(s)
+
 		wFromFont := ww[i]
+		wFromPDF := info.W
 		if wFromPDF != wFromFont {
-			t.Errorf("widths differ for GID %d: %f vs %f", gid, wFromPDF, wFromFont)
+			t.Errorf("widths differ for code 0x% 02x: %f vs %f", s[:k], wFromPDF, wFromFont)
 		}
+
+		s = s[k:]
 		i++
-	})
+	}
 }

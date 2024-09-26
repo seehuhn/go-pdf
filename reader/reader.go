@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/reader/scanner"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 // A Reader reads a PDF content stream.
@@ -314,7 +313,7 @@ func (r *Reader) do() error {
 			size := op.GetNumber()
 			if op.OK() && r.Resources != nil && r.Resources.Font != nil {
 				if ref := r.Resources.Font[font]; ref != nil {
-					F, err := r.ReadFont(ref, font)
+					F, err := r.ReadFont(ref)
 					if pdf.IsMalformed(err) {
 						break
 					} else if err != nil {
@@ -601,9 +600,12 @@ func (r *Reader) processText(s pdf.String) {
 		return
 	case FontFromFile:
 		wmode := F.WritingMode()
-		F.ForeachGlyph(s, func(gid glyph.ID, text []rune, width float64, isSpace bool) {
-			width = width*r.TextFontSize + r.TextCharacterSpacing
-			if isSpace {
+
+		for len(s) > 0 {
+			info, k := F.Decode(s)
+
+			width := info.W*r.TextFontSize + r.TextCharacterSpacing
+			if k == 1 && s[0] == ' ' {
 				width += r.TextWordSpacing
 			}
 			if wmode == 0 {
@@ -612,15 +614,15 @@ func (r *Reader) processText(s pdf.String) {
 
 			if r.DrawGlyph != nil {
 				g := font.Glyph{
-					GID:     gid,
+					// GID:     gid,
 					Advance: width,
 					Rise:    r.TextRise,
-					Text:    text,
+					Text:    []rune(info.Text),
 				}
 				r.DrawGlyph(g)
 			}
 			if r.Text != nil {
-				r.Text(string(text))
+				r.Text(info.Text)
 			}
 
 			switch wmode {
@@ -629,7 +631,9 @@ func (r *Reader) processText(s pdf.String) {
 			case 1: // vertical
 				r.TextMatrix = matrix.Translate(0, width).Mul(r.TextMatrix)
 			}
-		})
+
+			s = s[k:]
+		}
 	default:
 		panic(fmt.Sprintf("unexpected font type %T", F))
 	}

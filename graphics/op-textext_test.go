@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/graphics/testcases"
 	"seehuhn.de/go/pdf/internal/dummyfont"
@@ -180,7 +181,7 @@ func TestTextShowRaw2(t *testing.T) {
 
 				for _, g := range r.TextLayout(nil, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
-					s, _ = E.AppendEncoded(s[:0], g.GID, g.Text)
+					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, g.Text)
 
 					r.TextShowRaw(s)
 				}
@@ -201,7 +202,7 @@ func TestTextShowRaw2(t *testing.T) {
 				for i, g := range r.TextLayout(nil, testString).Seq {
 					r.TextBegin()
 					r.TextFirstLine(xx[i], 10)
-					s, _ = E.AppendEncoded(s[:0], g.GID, g.Text)
+					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, g.Text)
 					r.TextShowRaw(s)
 					r.TextEnd()
 				}

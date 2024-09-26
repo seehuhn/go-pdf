@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/widths"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 type CIDFont struct {
@@ -39,16 +38,14 @@ type CIDFont struct {
 	dw     float64
 }
 
-func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
-	fontDict := dicts.FontDict
-	cidFontDict := dicts.CIDFontDict
+func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeInfo) (F FontFromFile, err error) {
+	fontDict := info.FontDict
+	cidFontDict := info.CIDFontDict
 
-	encoding, err := cmap.ExtractNew(r, fontDict["Encoding"])
+	encoding, err := cmap.ExtractNew(r.R, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
-
-	toUni, _ := cmap.ExtractToUnicodeNew(r, fontDict["ToUnicode"])
 
 	// Fix the code space range.
 	var cs charcode.CodeSpaceRange
@@ -65,7 +62,7 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 		return nil, err
 	}
 
-	ww, dw, err := widths.DecodeComposite(r, cidFontDict["W"], cidFontDict["DW"])
+	ww, dw, err := widths.DecodeComposite(r.R, cidFontDict["W"], cidFontDict["DW"])
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +89,10 @@ func getCIDFont(r pdf.Getter, dicts *font.Dicts) (*CIDFont, error) {
 	}
 
 	return res, nil
+}
+
+func (f *CIDFont) WritingMode() cmap.WritingMode {
+	return f.cmap.WMode
 }
 
 func (f *CIDFont) Decode(s pdf.String) (*font.CodeInfo, int) {
@@ -134,10 +135,6 @@ func (f *CIDFont) Decode(s pdf.String) (*font.CodeInfo, int) {
 	return res, k
 }
 
-func (f *CIDFont) WritingMode() cmap.WritingMode {
-	return f.cmap.WMode
-}
-
 func (f *CIDFont) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
@@ -146,14 +143,10 @@ func (f *CIDFont) DecodeWidth(s pdf.String) (float64, int) {
 	return ci.W, k
 }
 
-// AppendEncoded converts a glyph ID (corresponding to the given text) into
-// a PDF character code The character code is appended to s. The function
-// returns the new string s, the width of the glyph in PDF text space units
-// (still to be multiplied by the font size), and a value indicating
-// whether PDF word spacing adjustment applies to this glyph.
-//
-// As a side effect, this function may allocate codes for the given
-// glyph/text combination in the font's encoding.
-func (f *CIDFont) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64, bool) {
+func (f *CIDFont) FontData() interface{} {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *CIDFont) Key() pdf.Reference {
 	panic("not implemented") // TODO: Implement
 }

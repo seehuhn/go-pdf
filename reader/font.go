@@ -17,36 +17,21 @@
 package reader
 
 import (
-	"errors"
-	"os"
-	"sort"
-
-	"golang.org/x/exp/maps"
-
 	"seehuhn.de/go/postscript/type1/names"
-
-	sfntcff "seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/loader"
-	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/font/type3"
 )
 
 // FontFromFile represents a font which has been extracted from a PDF file.
 type FontFromFile interface {
 	font.Embedded
 
-	// TODO(voss): change font.Embedded until it provides the necessary methods.
-	// Then remove this method here.
-	ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, isSpace bool))
+	Decode(s pdf.String) (*font.CodeInfo, int)
 
 	FontData() interface{}
 
@@ -54,7 +39,9 @@ type FontFromFile interface {
 }
 
 // ReadFont extracts a font from a PDF file.
-func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err error) {
+//
+// TODO(voss): can we get rid of the `name` parameter?
+func (r *Reader) ReadFont(ref pdf.Object) (F FontFromFile, err error) {
 	if ref, ok := ref.(pdf.Reference); ok {
 		if res, ok := r.fontCache[ref]; ok {
 			return res, nil
@@ -66,356 +53,185 @@ func (r *Reader) ReadFont(ref pdf.Object, name pdf.Name) (F FontFromFile, err er
 		}()
 	}
 
-	fontDicts, err := font.ExtractDicts(r.R, ref)
+	info, err := font.ExtractDicts(r.R, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	if L := r.loader; L != nil && fontDicts.FontProgram == nil {
-		tp := loader.FontTypeType1 // TODO(voss): try all supported types
-		if stm, err := L.Open(string(fontDicts.PostScriptName), tp); err == nil {
-			fontDicts.Type = font.Type1
-			fontDicts.FontProgram = &pdf.Stream{R: stm}
-			fontDicts.FontProgramRef = pdf.NewInternalReference(r.nextInternalRef)
-			r.nextInternalRef++
-		} else if !os.IsNotExist(err) {
+	toUni, err := cmap.ExtractToUnicodeNew(r.R, info.FontDict["ToUnicode"])
+	if err != nil {
+		return nil, err
+	}
+
+	if info.IsSimple() {
+		return r.readSimpleFont(info, toUni)
+	} else {
+		return r.readCompositeFont(info, toUni)
+	}
+}
+
+func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeInfo) (F FontFromFile, err error) {
+	var enc *encoding.Encoding
+	switch info.DictType {
+	case font.DictTypeSimpleType1:
+		isNonSymbolic := info.IsNonSymbolic()
+		isExternal := info.FontData == nil
+		enc, err = encoding.ExtractType1(r.R, info.FontDict["Encoding"], isNonSymbolic && isExternal)
+		if err != nil {
+			return nil, err
+		}
+	case font.DictTypeSimpleTrueType:
+		enc, err = encoding.ExtractTrueType(r.R, info.FontDict["Encoding"])
+		if err != nil {
+			return nil, err
+		}
+	case font.DictTypeType3:
+		enc, err = encoding.ExtractType3(r.R, info.FontDict["Encoding"])
+		if err != nil {
 			return nil, err
 		}
 	}
 
-	// TODO(voss): make this less repetitive
-	switch fontDicts.Type {
-	case font.Type1: // Type 1 fonts (including the standard 14 fonts)
-		info, err := type1.Extract(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-		widths := info.GetWidths()
-		glyphNames := info.GlyphList()
-		rev := make(map[string]glyph.ID, len(glyphNames))
-		for i, name := range glyphNames {
-			rev[name] = glyph.ID(i)
-		}
-		encoding := make([]glyph.ID, 256)
-		for c, name := range info.Encoding {
-			encoding[c] = rev[name]
-		}
-		text := make([][]rune, 256)
-		if info.ToUnicode != nil {
-			text = info.ToUnicode.GetSimpleMapping()
-		} else {
-			for c, name := range info.Encoding {
-				text[c] = names.ToUnicode(name, fontDicts.PostScriptName == "ZapfDingbats")
-			}
-		}
-		res := &fromFileSimple{
-			name:     string(fontDicts.PostScriptName),
-			widths:   widths,
-			encoding: encoding,
-			text:     text,
-			fontData: info.Font,
-			key:      fontDicts.FontProgramRef,
-		}
-		return res, nil
-
-	case font.CFFComposite: // CFF font data without wrapper (composite font)
-		info, err := cff.ExtractComposite(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-		_ = info
-		panic("not implemented") // TODO(voss): implement
-
-	case font.CFFSimple: // CFF font data without wrapper (simple font)
-		info, err := cff.ExtractSimple(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-		widths := make([]float64, 256)
-		for c := range widths {
-			widths[c] = info.Font.GlyphWidthPDF(info.Encoding[c])
-		}
-		text := make([][]rune, 256)
-		if info.ToUnicode != nil {
-			text = info.ToUnicode.GetSimpleMapping()
-		} else {
-			for c, gid := range info.Encoding {
-				name := info.Font.Glyphs[gid].Name
-				text[c] = names.ToUnicode(name, fontDicts.PostScriptName == "ZapfDingbats")
-			}
-		}
-		res := &fromFileSimple{
-			name:     string(fontDicts.PostScriptName),
-			widths:   widths,
-			encoding: info.Encoding,
-			text:     text,
-			fontData: info.Font,
-			key:      fontDicts.FontProgramRef,
-		}
-		return res, nil
-
-	case font.MMType1: // Multiple Master type 1 fonts
-		return nil, errors.New("Multiple Master type 1 fonts not supported")
-
-	case font.OpenTypeCFFComposite: // CFF fonts in an OpenType wrapper (composite font)
-		info, err := opentype.ExtractCFFComposite(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-		_ = info
-		panic("not implemented") // TODO(voss): implement
-
-	case font.OpenTypeCFFSimple: // CFF font data in an OpenType wrapper (simple font)
-		info, err := opentype.ExtractCFFSimple(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-		widths := make([]float64, 256)
-		for c := range widths {
-			widths[c] = info.Font.GlyphWidthPDF(info.Encoding[c])
-		}
-		text := make([][]rune, 256)
-		if info.ToUnicode != nil {
-			text = info.ToUnicode.GetSimpleMapping()
-		} else {
-			outlines := info.Font.Outlines.(*sfntcff.Outlines)
-			for c, gid := range info.Encoding {
-				name := outlines.Glyphs[gid].Name
-				text[c] = names.ToUnicode(name, fontDicts.PostScriptName == "ZapfDingbats")
-			}
-		}
-		// TODO(voss): other methods for extracting the text mapping
-		res := &fromFileSimple{
-			name:     string(fontDicts.PostScriptName),
-			widths:   widths,
-			encoding: info.Encoding,
-			text:     text,
-			fontData: info.Font,
-			key:      fontDicts.FontProgramRef,
-		}
-		return res, nil
-
-	case font.OpenTypeGlyfComposite: // OpenType fonts with glyf outline (composite font)
-		info, err := opentype.ExtractGlyfComposite(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-		_ = info
-		panic("not implemented") // TODO(voss): implement
-
-	case font.OpenTypeGlyfSimple: // OpenType fonts with glyf outline (simple font)
-		info, err := opentype.ExtractGlyfSimple(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-		widths := make([]float64, 256)
-		for c := range widths {
-			widths[c] = info.Font.GlyphWidthPDF(info.Encoding[c])
-		}
-		text := make([][]rune, 256)
-		if info.ToUnicode != nil {
-			text = info.ToUnicode.GetSimpleMapping()
-		}
-		// TODO: other methods for extracting the text mapping???
-		res := &fromFileSimple{
-			name:     string(fontDicts.PostScriptName),
-			widths:   widths,
-			encoding: info.Encoding,
-			text:     text,
-			fontData: info.Font,
-			key:      fontDicts.FontProgramRef,
-		}
-		return res, nil
-
-	case font.TrueTypeComposite: // TrueType fonts (composite font)
-		info, err := truetype.ExtractComposite(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-
-		glyph := make(map[string]glyphData)
-		m := info.CMap.GetMapping()
-		if info.ToUnicode == nil {
-			// TODO(voss): do something clever here
-		}
-		tuMap := info.ToUnicode.GetMapping()
-		var s pdf.String
-		for code, cid := range m {
-			s = info.CMap.Append(s[:0], code)
-			if int(cid) < len(info.CID2GID) {
-				gid := info.CID2GID[cid]
-				glyph[string(s)] = glyphData{
-					gid:   gid,
-					text:  tuMap[code],
-					width: info.Font.GlyphWidthPDF(gid),
+	var widths []float64
+	if info.FontDict["Widths"] == nil && info.IsStandardFont() {
+		widths = make([]float64, 256)
+		for code := range 256 {
+			var glyphName string
+			cid := enc.Decode(byte(code))
+			if cid == 0 {
+				glyphName = ".notdef"
+			} else {
+				glyphName = enc.GlyphName(cid)
+				if glyphName == "" {
+					switch info.PostScriptName {
+					case "Symbol":
+						glyphName = pdfenc.Symbol.Encoding[code]
+					case "ZapfDingbats":
+						glyphName = pdfenc.ZapfDingbats.Encoding[code]
+					default:
+						glyphName = pdfenc.Standard.Encoding[code]
+					}
 				}
 			}
+			w, err := type1.GetStandardWidth(string(info.PostScriptName), glyphName)
+			if err != nil {
+				w, _ = type1.GetStandardWidth(string(info.PostScriptName), ".notdef")
+			}
+			widths[code] = w / 1000
 		}
-
-		res := &fromFileComposite{
-			name:        string(fontDicts.PostScriptName),
-			cs:          info.CMap.CodeSpaceRange,
-			writingMode: cmap.WritingMode(info.CMap.WMode),
-			glyph:       glyph,
-			fontData:    F,
-			key:         fontDicts.FontProgramRef,
-		}
-		return res, nil
-
-	case font.TrueTypeSimple: // TrueType fonts (simple font)
-		info, err := truetype.ExtractSimple(r.R, fontDicts)
+	} else {
+		widths, err = r.extractWidths(info)
 		if err != nil {
 			return nil, err
 		}
-		widths := make([]float64, 256)
-		for c := range widths {
-			widths[c] = info.Font.GlyphWidthPDF(info.Encoding[c])
-		}
-		text := make([][]rune, 256)
-		if info.ToUnicode != nil {
-			text = info.ToUnicode.GetSimpleMapping()
-		}
-		// TODO: other methods for extracting the text mapping???
-		res := &fromFileSimple{
-			widths:   widths,
-			encoding: info.Encoding,
-			text:     text,
-			fontData: info.Font,
-			key:      fontDicts.FontProgramRef,
-		}
-		return res, nil
-
-	case font.Type3: // Type 3 fonts
-		info, err := type3.Extract(r.R, fontDicts)
-		if err != nil {
-			return nil, err
-		}
-
-		glyphNames := maps.Keys(info.Glyphs)
-		glyphNames = append(glyphNames, "")
-		sort.Strings(glyphNames)
-		rev := make(map[string]glyph.ID, len(glyphNames))
-		for i, name := range glyphNames {
-			rev[name] = glyph.ID(i)
-		}
-		encoding := make([]glyph.ID, 256)
-		text := make([][]rune, 256)
-		for c, name := range info.Encoding {
-			encoding[c] = rev[name]
-			text[c] = names.ToUnicode(name, false)
-		}
-
-		res := &fromFileSimple{
-			widths:   info.Widths,
-			encoding: encoding,
-			text:     text,
-			fontData: nil,
-			key:      fontDicts.FontProgramRef,
-		}
-		return res, nil
-
-	default:
-		// TODO(voss): implement proper error handling
-		panic("unknown font type")
 	}
+
+	res := &SimpleFont{
+		enc:    enc,
+		info:   make([]*font.CodeInfo, 256),
+		widths: widths,
+		toUni:  toUni,
+	}
+	return res, nil
 }
 
-type fromFileSimple struct {
-	// name is the PostScript name of the font
-	name     string
-	widths   []float64
-	encoding []glyph.ID
-	text     [][]rune
-	fontData interface{}
-	key      pdf.Reference
+func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {
+	firstChar, err := pdf.GetInteger(r.R, info.FontDict["FirstChar"])
+	if err != nil {
+		return nil, err
+	}
+	lastChar, err := pdf.GetInteger(r.R, info.FontDict["LastChar"])
+	if err != nil {
+		return nil, err
+	}
+
+	widths := make([]float64, 256)
+	if info.FontDescriptor != nil {
+		for c := range widths {
+			widths[c] = info.FontDescriptor.MissingWidth / 1000
+		}
+	}
+	w, err := pdf.GetArray(r.R, info.FontDict["Widths"])
+	if err != nil {
+		return nil, err
+	}
+	if 0 <= firstChar && firstChar <= lastChar && lastChar < 256 {
+		for code := firstChar; code <= lastChar; code++ {
+			if int(code-firstChar) >= len(w) {
+				break
+			}
+			w, err := pdf.GetNumber(r.R, w[code-firstChar])
+			if err != nil {
+				return nil, err
+			}
+			widths[code] = float64(w) / 1000
+		}
+	}
+
+	return widths, nil
 }
 
-func (f *fromFileSimple) PostScriptName() string {
-	return f.name
+type SimpleFont struct {
+	enc    *encoding.Encoding
+	info   []*font.CodeInfo
+	widths []float64
+	toUni  *cmap.ToUnicodeInfo
 }
 
-func (f *fromFileSimple) WritingMode() cmap.WritingMode {
-	return 0
+func (f *SimpleFont) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
 }
 
-func (f *fromFileSimple) DecodeWidth(s pdf.String) (float64, int) {
+// DecodeWidth reads one character code from the given string and returns
+// the width of the corresponding glyph in PDF text space units (still to
+// be multiplied by the font size) and the number of bytes read from the
+// string.
+func (f *SimpleFont) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
-	return f.widths[s[0]], 1
+	code := s[0]
+	return f.widths[code], 1
 }
 
-func (f *fromFileSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
-	panic("not implemented")
-}
-
-func (f *fromFileSimple) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
-	for _, c := range s {
-		yield(f.encoding[c], f.text[c], f.widths[c], c == ' ')
+func (f *SimpleFont) Decode(s pdf.String) (*font.CodeInfo, int) {
+	if len(s) == 0 {
+		return nil, 0
 	}
-}
-
-func (f *fromFileSimple) FontData() interface{} {
-	return f.fontData
-}
-
-func (f *fromFileSimple) Key() pdf.Reference {
-	return f.key
-}
-
-type fromFileComposite struct {
-	// name is the PostScript name of the font
-	name        string
-	cs          charcode.CodeSpaceRange
-	writingMode cmap.WritingMode
-	glyph       map[string]glyphData
-	fontData    interface{}
-	key         pdf.Reference
-}
-
-type glyphData struct {
-	gid   glyph.ID
-	text  []rune
-	width float64
-}
-
-func (f *fromFileComposite) PostScriptName() string {
-	return f.name
-}
-
-func (f *fromFileComposite) WritingMode() cmap.WritingMode {
-	return f.writingMode
-}
-
-func (f *fromFileComposite) DecodeWidth(s pdf.String) (float64, int) {
-	for code := range f.cs.AllCodes(s) {
-		var width float64
-		if g, ok := f.glyph[string(code)]; ok {
-			width = g.width
-		}
-		return width, len(code)
+	code := s[0]
+	if info := f.info[code]; info != nil {
+		return info, 1
 	}
-	return 0, 0
-}
 
-func (f *fromFileComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
-	panic("not implemented")
-}
+	cid := f.enc.Decode(code)
 
-func (f *fromFileComposite) ForeachGlyph(s pdf.String, yield func(gid glyph.ID, text []rune, width float64, is_space bool)) {
-	f.cs.AllCodes(s)(func(code pdf.String, valid bool) bool {
-		// TODO(voss): notdef glyph(s)???
-		if g, ok := f.glyph[string(code)]; ok {
-			yield(g.gid, g.text, g.width, len(code) == 1 && code[0] == ' ')
+	var text []rune
+	if f.toUni != nil {
+		text = f.toUni.Lookup(s[:1])
+	}
+	if text == nil {
+		glyphName := f.enc.GlyphName(cid)
+		if glyphName != "" {
+			text = names.ToUnicode(glyphName, false)
 		}
-		return true
-	})
+	}
+	// TODO(voss): any other methods for extracting the text mapping???
+
+	res := &font.CodeInfo{
+		CID:    cid,
+		Notdef: 0,
+		Text:   string(text),
+		W:      f.widths[code],
+	}
+
+	f.info[code] = res
+	return res, 1
 }
 
-func (f *fromFileComposite) FontData() interface{} {
-	return f.fontData
+func (f *SimpleFont) FontData() interface{} {
+	panic("not implemented") // TODO: Implement
 }
 
-func (f *fromFileComposite) Key() pdf.Reference {
-	return f.key
+func (f *SimpleFont) Key() pdf.Reference {
+	panic("not implemented") // TODO: Implement
 }

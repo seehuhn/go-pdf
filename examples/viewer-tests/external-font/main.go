@@ -28,8 +28,6 @@ import (
 	"seehuhn.de/go/postscript/afm"
 	pstype1 "seehuhn.de/go/postscript/type1"
 
-	"seehuhn.de/go/sfnt/glyph"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -230,15 +228,4 @@ func (f *funnyFont) WritingMode() cmap.WritingMode {
 // string.
 func (f *funnyFont) DecodeWidth(pdf.String) (float64, int) {
 	return 1000, 1
-}
-
-// AppendEncoded converts a glyph ID (corresponding to the given text) into
-// a PDF character code.  The character code is appended to s. The function
-// returns the new string s and the width of the glyph in PDF text space units
-// (still to be multiplied by the font size).
-//
-// As a side effect, this function may allocate codes for the given
-// glyph/text combination in the font's encoding.
-func (f *funnyFont) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
-	panic("not used")
 }

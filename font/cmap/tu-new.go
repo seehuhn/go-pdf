@@ -229,7 +229,7 @@ func safeExtractToUnicode(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object)
 	}
 
 	stmObj, err := pdf.GetStream(r, obj)
-	if err != nil {
+	if err != nil || stmObj == nil {
 		return nil, err
 	}
 

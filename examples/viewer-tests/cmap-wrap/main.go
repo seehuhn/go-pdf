@@ -286,11 +286,3 @@ func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {
 	_, k, _ := f.codec.Decode(s)
 	return 2000, k
 }
-
-// AppendEncoded encodes the given glyph ID as a PDF character code.
-// This implements the [font.Embedded] interface.
-func (f *testFont) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
-	// We don't need this method here, since we directly write the character
-	// codes.
-	panic("not implemented")
-}

@@ -61,8 +61,7 @@ type Font interface {
 // Embedded represents a font which is already embedded in a PDF file.
 //
 // The functions of this interface provide the information required to
-// convert Glyph IDs into PDF character codes, and to keep track of the
-// current text position in a PDF content stream.
+// keep track of the current text position in a PDF content stream.
 type Embedded interface {
 	WritingMode() cmap.WritingMode
 
@@ -71,6 +70,11 @@ type Embedded interface {
 	// be multiplied by the font size) and the number of bytes read from the
 	// string.
 	DecodeWidth(pdf.String) (float64, int)
+}
+
+// EmbeddedLayouter is an embedded font which can typeset new text.
+type EmbeddedLayouter interface {
+	Embedded
 
 	// AppendEncoded converts a glyph ID (corresponding to the given text) into
 	// a PDF character code.  The character code is appended to s. The function

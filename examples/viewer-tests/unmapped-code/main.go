@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/psenc"
 	pst1 "seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -313,8 +312,4 @@ func (f *testFontEmbedded) WritingMode() cmap.WritingMode {
 // This implements the [font.Embedded] interface.
 func (f *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 	return f.W[s[0]], 1
-}
-
-func (f *testFontEmbedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
-	panic("not implemented")
 }

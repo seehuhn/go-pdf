@@ -409,10 +409,6 @@ func (f *funnyFont) DecodeWidth(s pdf.String) (float64, int) {
 	return f.width, 1
 }
 
-func (f *funnyFont) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
-	panic("not implemented") // not needed here
-}
-
 var (
 	macOSRomanInv map[string]int
 )

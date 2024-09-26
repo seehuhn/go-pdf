@@ -280,8 +280,8 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictGlyfSimple, er
 		res.SubsetTag = m[1]
 	}
 
-	if dicts.FontProgram != nil {
-		stm, err := pdf.DecodeStream(r, dicts.FontProgram, 0)
+	if dicts.FontData != nil {
+		stm, err := pdf.DecodeStream(r, dicts.FontData, 0)
 		if err != nil {
 			return nil, pdf.Wrap(err, "uncompressing OpenType/glyf font stream")
 		}
