@@ -114,7 +114,7 @@ func (f *embeddedComposite) Close() error {
 		Font:      subsetTTF,
 		SubsetTag: subsetTag,
 		CMap:      cmapInfo,
-		CID2GID:   cidToGID,
+		CIDToGID:  cidToGID,
 		ToUnicode: toUnicode,
 	}
 	return info.Embed(f.w, f.ref)
@@ -131,7 +131,7 @@ type FontDictComposite struct {
 
 	CMap *cmap.Info
 
-	CID2GID []glyph.ID
+	CIDToGID []glyph.ID
 
 	ForceBold bool
 
@@ -176,14 +176,14 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 
 	glyphWidths := outlines.Widths
 	ww := make(map[cmap.CID]float64, len(glyphWidths))
-	for cid, gid := range info.CID2GID {
+	for cid, gid := range info.CIDToGID {
 		ww[cmap.CID(cid)] = glyphWidths[gid].AsFloat(q)
 	}
 	W, DW := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
 	var CIDToGIDMap pdf.Object
 	isIdentity := true
-	for cid, gid := range info.CID2GID {
+	for cid, gid := range info.CIDToGID {
 		if int(gid) != cid && gid != 0 {
 			isIdentity = false
 			break
@@ -315,8 +315,8 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 		if err != nil {
 			return err
 		}
-		cid2gid := make([]byte, 2*len(info.CID2GID))
-		for cid, gid := range info.CID2GID {
+		cid2gid := make([]byte, 2*len(info.CIDToGID))
+		for cid, gid := range info.CIDToGID {
 			cid2gid[2*cid] = byte(gid >> 8)
 			cid2gid[2*cid+1] = byte(gid)
 		}
@@ -402,9 +402,9 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, erro
 		if CID2GID != "Identity" {
 			return nil, fmt.Errorf("unsupported CIDToGIDMap: %q", CID2GID)
 		}
-		res.CID2GID = make([]glyph.ID, ttf.NumGlyphs())
-		for i := range res.CID2GID {
-			res.CID2GID[i] = glyph.ID(i)
+		res.CIDToGID = make([]glyph.ID, ttf.NumGlyphs())
+		for i := range res.CIDToGID {
+			res.CIDToGID[i] = glyph.ID(i)
 		}
 	case *pdf.Stream:
 		in, err := pdf.DecodeStream(r, CID2GID, 0)
@@ -418,9 +418,9 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, erro
 		if err != nil {
 			return nil, err
 		}
-		res.CID2GID = make([]glyph.ID, len(cid2gidData)/2)
-		for i := range res.CID2GID {
-			res.CID2GID[i] = glyph.ID(cid2gidData[2*i])<<8 | glyph.ID(cid2gidData[2*i+1])
+		res.CIDToGID = make([]glyph.ID, len(cid2gidData)/2)
+		for i := range res.CIDToGID {
+			res.CIDToGID[i] = glyph.ID(cid2gidData[2*i])<<8 | glyph.ID(cid2gidData[2*i+1])
 		}
 	}
 

@@ -28,51 +28,42 @@ import (
 // An Encoding describes a mapping between one-byte character codes and CIDs.
 //
 // CID values can represent either glyph names, or entries in the built-in
-// encoding of a font.  Different codes use diffferent CIDs, even if they
-// refers to the same glyph name (e.g. space and non-breaking space).
-//
-// The interpretation of CID values is specific to the encoder instance which
-// was used to allocate them.
+// encoding of a font.  The interpretation of CID values is specific to the
+// encoder instance which was used to allocate them.  CID 0 is reserved for
+// unmapped codes.
 type Encoding struct {
-	cidToCode map[cmap.CID]byte
-	codeToCID map[byte]cmap.CID
-	names     map[cmap.CID]string
+	enc        [256]cmap.CID
+	glyphNames []string
 }
 
 // New allocates a new Encoding object.
 func New() *Encoding {
-	names := make(map[cmap.CID]string)
-	e := &Encoding{
-		cidToCode: make(map[cmap.CID]byte),
-		codeToCID: make(map[byte]cmap.CID),
-		names:     names,
-	}
-	return e
+	return &Encoding{}
 }
 
-// AllocateCID allocates a new CID for the given code.
+// Allocate allocates a new CID for a named glyph.
 //
-// If glyphName is non-empty, the code is mapped to the given glyph name.
-// Otherwise, the code is mapped via the built-in encoding of the font.
-//
-// Any previous mapping for the code is overwritten.
-func (e *Encoding) AllocateCID(code byte, glyphName string) cmap.CID {
-	if cid, exists := e.codeToCID[code]; exists {
-		if glyphName != "" {
-			e.names[cid] = glyphName
-		} else {
-			delete(e.names, cid)
+// If a CID has already been allocated for the glyph name, the same CID is
+// returned.  Otherwise, a new CID is allocated and returned.
+func (e *Encoding) Allocate(glyphName string) cmap.CID {
+	if glyphName == "" {
+		panic("encoding: missing glyph name")
+	}
+
+	for i, prevName := range e.glyphNames {
+		if prevName == glyphName {
+			return cmap.CID(1 + 256 + i)
 		}
-		return cid
 	}
 
-	cid := cmap.CID(len(e.codeToCID) + 1) // CID 0 is reserved for unmapped codes
-	e.codeToCID[code] = cid
-	e.cidToCode[cid] = code
-	if glyphName != "" {
-		e.names[cid] = glyphName
-	}
+	cid := cmap.CID(1 + 256 + len(e.glyphNames))
+	e.glyphNames = append(e.glyphNames, glyphName)
+	return cid
+}
 
+func (e *Encoding) UseBuiltinEncoding(code byte) cmap.CID {
+	cid := 1 + cmap.CID(code)
+	e.enc[code] = cid
 	return cid
 }
 
@@ -81,37 +72,33 @@ func (e *Encoding) AllocateCID(code byte, glyphName string) cmap.CID {
 // For unmapped codes (CID 0) and codes mapped via the built-in encoding, the
 // empty string is returned.
 func (e *Encoding) GlyphName(cid cmap.CID) string {
-	name := e.names[cid]
-	return name
+	base := cmap.CID(1 + 256)
+	if cid < base {
+		return ""
+	}
+	idx := int(cid - base)
+	if idx >= len(e.glyphNames) {
+		return ""
+	}
+
+	return e.glyphNames[idx]
 }
 
 // Decode returns the CID associated with a character code.
 // If the code is not mapped, 0 is returned.
 func (e *Encoding) Decode(code byte) cmap.CID {
-	cid := e.codeToCID[code]
-	return cid
+	return e.enc[code]
 }
 
-// Encode returns the character code associated with a CID.
+// AsPDFType1 returns the /Encoding entry for Type1 font dictionary.
 //
-// If the CID has not been allocated using [MakeNameCID] or [MakeRawCID], an
-// error is returned.
-func (e *Encoding) Encode(cid cmap.CID) (byte, error) {
-	code, exists := e.cidToCode[cid]
-	if !exists {
-		return 0, fmt.Errorf("invalid CID %d", cid)
-	}
-	return code, nil
-}
-
-// AsPDFType1 returns the /Encoding entry for the font dictionary of a Type 1
-// font. If `builtin` is not nil, it will be used as the builtin encoding of
-// the font. If the argument nonSymbolicExt is true, the function assumes that
-// the font has the non-symbolic flag set in the font descriptor and that the
-// font will not be embedded into the PDF file.
+// If `builtin` is not nil, it will be used as the builtin encoding of the
+// font. If the argument nonSymbolicExt is true, the function assumes that the
+// font has the non-symbolic flag set in the font descriptor and that the font
+// will not be embedded into the PDF file.
 //
 // The resulting PDF object describes an encoding which maps all characters
-// mapped by e in the specified way.  It may map additional codes.
+// mapped by e in the specified way, but it may also map additional codes.
 func (e *Encoding) AsPDFType1(builtin []string, nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Native, error) {
 	type candInfo struct {
 		encName     pdf.Native
@@ -132,13 +119,13 @@ func (e *Encoding) AsPDFType1(builtin []string, nonSymbolicExt bool, opt pdf.Out
 candidateLoop:
 	for _, cand := range candidates {
 		for code := range 256 {
-			cid, used := e.codeToCID[byte(code)]
-			if !used {
+			cid := e.enc[code]
+			if cid == 0 {
 				// If we don't use a code, this code can't conflict.
 				continue
 			}
 
-			glyphName := e.names[cid]
+			glyphName := e.GlyphName(cid)
 			if glyphName == "" {
 				if cand.encName == nil {
 					// If we can, just use the built-in encoding.
@@ -146,11 +133,11 @@ candidateLoop:
 				} else if code < len(builtin) {
 					// Otherwise, if we know the glyph name in the built-in
 					// encoding, we can try to find this glyph name in the
-					// named encoding.
+					// named encodings.
 					glyphName = builtin[code]
 				} else {
 					// If we don't know the glyph name, none of the named
-					// encodings can be used
+					// encodings can be used.
 					//
 					// Note: this assumes that the built-in encoding is tried
 					// first.
@@ -168,8 +155,8 @@ candidateLoop:
 		return cand.encName, nil
 	}
 
-	// If we need an encoding dictionary, use the base encoding with the
-	// smallest Differences array.
+	// If we need an encoding dictionary, use the base encoding which leads to
+	// the smallest Differences array.
 	if nonSymbolicExt {
 		// If a font has the non-symbolic flag set in the font descriptor and
 		// the font is not embedded, a missing `BaseEncoding` field represents
@@ -181,13 +168,13 @@ candidateLoop2:
 	for _, cand := range candidates {
 		lastDiff := 999
 		for code := range 256 {
-			cid, used := e.codeToCID[byte(code)]
-			if !used {
+			cid := e.enc[code]
+			if cid == 0 {
 				// If we don't use a code, this code can't conflict.
 				continue
 			}
 
-			glyphName := e.names[cid]
+			glyphName := e.GlyphName(cid)
 			if glyphName == "" {
 				if cand.encName == nil && !nonSymbolicExt {
 					// If we can, just use the built-in encoding.
@@ -242,25 +229,26 @@ candidateLoop2:
 	return bestDict, nil
 }
 
-// AsPDFTrueType returns the /Encoding entry for the font dictionary of a
-// TrueType font. If `builtin` is not nil, it will be used as the builtin
-// encoding of the font. The function assumes that the non-symbolic flag in the
-// font descriptor is set, and on success it always returns either a name or a
-// dictionary.
+// AsPDFTrueType returns the /Encoding entry in a TrueType font dictionary.
+//
+// If `builtin` is not nil, it will be used as the builtin encoding of the
+// font. The function assumes that the non-symbolic flag in the font descriptor
+// is set, and on success it always returns either a name or a dictionary.  The
+// output never refers to to the built-in encoding of the font.
 //
 // The resulting PDF object describes an encoding which maps all characters
-// mapped by e in the specified way.  It may map additional codes.
+// mapped by e in the specified way, but it may also map additional codes.
 //
 // The glyph names for all mapped codes must be known (either via the encoding,
 // or via the builtin encoding).  Otherwise an error is returned.
 func (e *Encoding) AsPDFTrueType(builtin []string, opt pdf.OutputOptions) (pdf.Native, error) {
 	// First check that all glyph names are known.
 	for code := range 256 {
-		cid, used := e.codeToCID[byte(code)]
-		if !used {
+		cid := e.enc[code]
+		if cid == 0 {
 			continue
 		}
-		if e.names[cid] != "" {
+		if e.GlyphName(cid) != "" {
 			continue
 		}
 		if code < len(builtin) && builtin[code] != "" {
@@ -285,12 +273,12 @@ func (e *Encoding) AsPDFTrueType(builtin []string, opt pdf.OutputOptions) (pdf.N
 candidateLoop:
 	for _, cand := range candidates {
 		for code := range 256 {
-			cid, used := e.codeToCID[byte(code)]
-			if !used {
+			cid := e.enc[code]
+			if cid == 0 {
 				continue
 			}
 
-			glyphName := e.names[cid]
+			glyphName := e.GlyphName(cid)
 			if glyphName == "" {
 				glyphName = builtin[code]
 			}
@@ -303,17 +291,17 @@ candidateLoop:
 		return cand.encName, nil
 	}
 
-	// If we need an encoding dictionary, use the base encoding with the
-	// smaller Differences array.
+	// If we need an encoding dictionary, use the base encoding which leads to
+	// the smaller Differences array.
 	for _, cand := range candidates {
 		lastDiff := 999
 		for code := range 256 {
-			cid, used := e.codeToCID[byte(code)]
-			if !used {
+			cid := e.enc[code]
+			if cid == 0 {
 				continue
 			}
 
-			glyphName := e.names[cid]
+			glyphName := e.GlyphName(cid)
 			if glyphName == "" {
 				glyphName = builtin[code]
 			}
@@ -347,6 +335,8 @@ candidateLoop:
 
 // AsPDFType3 returns the /Encoding entry for the font dictionary of a Type 3
 // font.
+//
+// On success, the function returns a [pdf.Dict] object.
 func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Native, error) {
 	dict := pdf.Dict{}
 	if opt.HasAny(pdf.OptDictTypes) {
@@ -356,11 +346,11 @@ func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Native, error) {
 	var differences pdf.Array
 	lastDiff := 999
 	for code := range 256 {
-		cid, used := e.codeToCID[byte(code)]
-		if !used {
+		cid := e.enc[code]
+		if cid == 0 {
 			continue
 		}
-		name := pdf.Name(e.names[cid])
+		name := pdf.Name(e.GlyphName(cid))
 		if name == "" {
 			return nil, fmt.Errorf("encoding: missing glyph name for code %d", code)
 		}
@@ -432,7 +422,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (*Encoding,
 				if code < 0 || code >= 256 {
 					return nil, pdf.Errorf("encoding: invalid code %d", code)
 				}
-				e.AllocateCID(byte(code), string(x))
+				e.enc[code] = e.Allocate(string(x))
 				code++
 			default:
 				return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
@@ -498,7 +488,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 				if code < 0 || code >= 256 {
 					return nil, pdf.Errorf("encoding: invalid code %d", code)
 				}
-				e.AllocateCID(byte(code), string(x))
+				e.enc[code] = e.Allocate(string(x))
 				code++
 			default:
 				return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
@@ -507,11 +497,11 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 
 		// fill any remaining slots using the standard encoding
 		for code := range 256 {
-			if _, exists := e.codeToCID[byte(code)]; exists {
+			if e.enc[code] != 0 {
 				continue
 			}
 			if name := pdfenc.Standard.Encoding[code]; name != ".notdef" {
-				e.AllocateCID(byte(code), name)
+				e.enc[code] = e.Allocate(name)
 			}
 		}
 
@@ -549,7 +539,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 			if code < 0 || code >= 256 {
 				return nil, pdf.Errorf("encoding: invalid code %d", code)
 			}
-			e.AllocateCID(byte(code), string(x))
+			e.enc[code] = e.Allocate(string(x))
 			code++
 		default:
 			return nil, pdf.Errorf("encoding: expected Integer or Name, got %T", x)
@@ -561,7 +551,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 
 func (e *Encoding) initBuiltInEncoding() {
 	for code := range 256 {
-		e.AllocateCID(byte(code), "")
+		e.UseBuiltinEncoding(byte(code))
 	}
 }
 
@@ -582,7 +572,7 @@ func (e *Encoding) initNamedEncoding(name pdf.Name) error {
 		if name == ".notdef" {
 			continue
 		}
-		e.AllocateCID(byte(code), name)
+		e.enc[code] = e.Allocate(name)
 	}
 
 	return nil
@@ -593,6 +583,6 @@ func (e *Encoding) initStandardEncoding() {
 		if name == ".notdef" {
 			continue
 		}
-		e.AllocateCID(byte(code), name)
+		e.enc[code] = e.Allocate(name)
 	}
 }

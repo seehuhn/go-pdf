@@ -21,111 +21,8 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
-
-func TestAllocateCID(t *testing.T) {
-	tests := []struct {
-		code    byte
-		name    string
-		wantCID cmap.CID
-	}{
-		{65, "A", 1},
-		{66, "B", 2},
-		{67, "", 3},
-		{65, "C", 1}, // Duplicate code
-	}
-
-	e := New()
-
-	for _, tt := range tests {
-		gotCID := e.AllocateCID(tt.code, tt.name)
-		if gotCID != tt.wantCID {
-			t.Errorf("MakeNameCID(%d, %q) = %v, want %v", tt.code, tt.name, gotCID, tt.wantCID)
-		}
-		if e.codeToCID[tt.code] != tt.wantCID {
-			t.Errorf("codeToCID[%d] = %v, want %v", tt.code, e.codeToCID[tt.code], tt.wantCID)
-		}
-		if e.cidToCode[tt.wantCID] != tt.code {
-			t.Errorf("cidToCode[%d] = %v, want %v", tt.wantCID, e.cidToCode[tt.wantCID], tt.code)
-		}
-		if e.names[tt.wantCID] != tt.name {
-			t.Errorf("names[%d] = %q, want %q", tt.wantCID, e.names[tt.wantCID], tt.name)
-		}
-	}
-}
-
-func TestCIDName(t *testing.T) {
-	e := New()
-	e.AllocateCID(65, "A")
-	e.AllocateCID(66, "")
-
-	tests := []struct {
-		cid  cmap.CID
-		want string
-	}{
-		{0, ""}, // CID for invalid codes
-		{1, "A"},
-		{2, ""},
-		{3, ""}, // Non-existent CID
-	}
-
-	for _, tt := range tests {
-		if got := e.GlyphName(tt.cid); got != tt.want {
-			t.Errorf("CIDName(%d) = %q, want %q", tt.cid, got, tt.want)
-		}
-	}
-}
-
-func TestDecode(t *testing.T) {
-	e := New()
-	e.AllocateCID(65, "A")
-	e.AllocateCID(66, "")
-
-	tests := []struct {
-		code byte
-		want cmap.CID
-	}{
-		{65, 1},
-		{66, 2},
-		{67, 0}, // Non-existent code
-	}
-
-	for _, tt := range tests {
-		if got := e.Decode(tt.code); got != tt.want {
-			t.Errorf("Decode(%d) = %v, want %v", tt.code, got, tt.want)
-		}
-	}
-}
-
-func TestEncode(t *testing.T) {
-	e := New()
-	e.AllocateCID(65, "A")
-	e.AllocateCID(66, "")
-
-	tests := []struct {
-		cid     cmap.CID
-		want    byte
-		wantErr bool
-	}{
-		{1, 65, false},
-		{2, 66, false},
-		{0, 0, true}, // .notdef
-		{3, 0, true}, // Non-existent CID
-	}
-
-	for _, tt := range tests {
-		got, err := e.Encode(tt.cid)
-		if (err != nil) != tt.wantErr {
-			t.Errorf("Encode(%d) error = %v, wantErr %v", tt.cid, err, tt.wantErr)
-			continue
-		}
-		if got != tt.want {
-			t.Errorf("Encode(%d) = %v, want %v", tt.cid, got, tt.want)
-		}
-	}
-}
 
 var testBuiltinEncoding = []string{
 	".notdef",        // 0
@@ -403,8 +300,12 @@ func (e *sampleEncoding) set(code byte, name string) error {
 		return nil
 	}
 
-	e.enc.AllocateCID(code, name)
-	e.names[code] = name
+	if name != "" {
+		e.enc.enc[code] = e.enc.Allocate(name)
+		e.names[code] = name
+	} else {
+		e.enc.UseBuiltinEncoding(code)
+	}
 	return nil
 }
 
@@ -464,7 +365,7 @@ func makeTestEncodings() []*sampleEncoding {
 
 func TestAsPDF(t *testing.T) {
 	const nonSymbolicExt = false
-	for _, tp := range "ABC" {
+	for _, tp := range "ABC" { // A = Type 1, B = Type 3, C = TrueType
 		for i, sample := range makeTestEncodings() {
 			t.Run(fmt.Sprintf("case%02d%c", i, tp), func(t *testing.T) {
 				enc1 := sample.enc

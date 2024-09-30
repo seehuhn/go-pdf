@@ -59,7 +59,7 @@ func TestRoundTripComposite(t *testing.T) {
 		Font:      ttf,
 		SubsetTag: "AAAAAA",
 		CMap:      cmapInfo,
-		CID2GID:   []glyph.ID{0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8},
+		CIDToGID:  []glyph.ID{0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8},
 		ToUnicode: toUnicode,
 		IsAllCap:  true, // just for testing
 	}

@@ -36,8 +36,20 @@ The columns contain the following information:
 - The `Subtype` entry in the font data stream dictionary, if any.
 - A short description of the font type.
 
+An alternative way to present this information is given in the following table.
+The table shows which types of font data are allowed in which type of font
+dictionary.
+
+|                   | Type 1 | CFF, OpenType/CFF | TrueType, OpenType/glyf | Type 3 |
+|-------------------|:------:|:-----------------:|:-----------------------:|:------:|
+| `Type1`/`MMType1` | X      | X                 |                         |        |
+| `CIDFontType0`    |        | X                 |                         |        |
+| `TrueType`        |        |                   | X                       |        |
+| `CIDFontType2`    |        |                   | X                       |        |
+| `Type3`           |        |                   |                         | X      |
+
 The following sections summarise how font information is structured in
-PDF files.  The information is based on the PDF 2.0 specification.
+PDF files.
 
 ## All Font Types
 
@@ -47,12 +59,8 @@ The following information applies to all font PDF fonts.
   dictionaries is `Font`, the `Subtype` entry is used to distinguish between
   different font types.
 
-- For all fonts, the `ToUnicode` entry in the font dictionary (optional) maps
-  character codes to Unicode code points.
-
-- Except for Type 3 fonts, the glyph data can either be embedded in the PDF
-  file, or be loaded from an external file by the viewer. Unless text rendering
-  mode 3 (invisible) is used, it is recommended to embed the font.
+- For all fonts, the optional `ToUnicode` entry in the font dictionary can be
+  used to map character codes to Unicode code points, for text extraction.
 
 
 ## Simple Fonts
